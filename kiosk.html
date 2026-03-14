@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>우리반 할 일 체크판</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #0d1b2a;
+  --bg2: #162032;
+  --bg3: #1e2d42;
+  --border: rgba(255,255,255,.1);
+  --txt: #e8edf2;
+  --txt2: #8fa3b8;
+  --gold: #FFD700;
+  --emerald: #2ECC71;
+  --red: #E74C3C;
+  --sky: #5DADE2;
+}
+html, body {
+  width:100%; height:100%;
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'Noto Sans KR',sans-serif;
+  overflow:hidden;
+}
+
+/* ── 로딩 ── */
+#loading {
+  position:fixed;inset:0;z-index:9999;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;
+}
+@keyframes ldBar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+
+/* ── 상단 헤더 ── */
+#header {
+  height:60px;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 1.2rem;gap:1rem;flex-shrink:0;
+}
+#header .title { font-size:1.2rem;font-weight:900;color:var(--gold); }
+#header .date  { font-size:.85rem;color:var(--txt2);margin-left:auto; }
+
+/* ── 탭 ── */
+#tabs {
+  display:flex;gap:.4rem;padding:.6rem 1rem;background:var(--bg2);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.qtab {
+  padding:.4rem 1rem;border-radius:20px;border:1.5px solid var(--border);
+  background:transparent;color:var(--txt2);font-size:.85rem;font-weight:700;
+  cursor:pointer;transition:all .2s;font-family:inherit;
+}
+.qtab.on { background:var(--gold);color:#1a1a1a;border-color:var(--gold); }
+
+/* ── 테이블 영역 ── */
+#table-wrap {
+  flex:1;overflow:auto;padding:.8rem;
+}
+#kiosk-table {
+  width:100%;border-collapse:collapse;table-layout:fixed;
+}
+#kiosk-table th {
+  padding:.5rem .3rem;text-align:center;font-size:.78rem;font-weight:700;
+  background:var(--bg3);border:1px solid var(--border);
+  position:sticky;top:0;z-index:10;
+}
+#kiosk-table th.quest-th {
+  text-align:left;padding:.5rem .8rem;width:200px;min-width:200px;
+  font-size:.82rem;
+}
+#kiosk-table td {
+  border:1px solid var(--border);text-align:center;
+  padding:.3rem;vertical-align:middle;
+}
+#kiosk-table td.quest-name {
+  text-align:left;padding:.5rem .8rem;background:var(--bg2);
+  font-size:.85rem;font-weight:600;position:sticky;left:0;z-index:5;
+}
+#kiosk-table td.quest-name .quest-reward {
+  font-size:.7rem;color:var(--gold);font-weight:400;margin-top:.15rem;
+}
+#kiosk-table tr:hover td { background:rgba(255,255,255,.02); }
+
+/* ── 셀 버튼 ── */
+.cell-btn {
+  width:42px;height:42px;border-radius:50%;border:2px solid rgba(255,255,255,.15);
+  background:transparent;cursor:pointer;font-size:.7rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin:0 auto;
+  transition:all .2s;color:var(--txt2);flex-direction:column;gap:1px;
+}
+.cell-btn:hover { border-color:var(--gold);transform:scale(1.1); }
+.cell-btn.pending {
+  background:rgba(255,215,0,.15);border-color:var(--gold);color:var(--gold);
+  animation:pendingPulse 2s ease-in-out infinite;
+}
+.cell-btn.done {
+  background:rgba(46,204,113,.15);border-color:var(--emerald);color:var(--emerald);
+  cursor:default;
+}
+@keyframes pendingPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,.0)}50%{box-shadow:0 0 0 4px rgba(255,215,0,.2)}}
+
+/* ── 빈 화면 ── */
+#empty-msg {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:calc(100vh - 130px);color:var(--txt2);gap:.8rem;
+}
+
+/* ── 토스트 ── */
+#toast {
+  position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);
+  background:#1e2d42;border:1px solid var(--gold);color:var(--gold);
+  padding:.7rem 1.5rem;border-radius:20px;font-size:.9rem;font-weight:700;
+  z-index:9999;display:none;pointer-events:none;
+}
+
+/* ── 취소 확인 팝업 ── */
+#cancel-popup {
+  display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.6);
+  align-items:center;justify-content:center;
+}
+#cancel-popup .popup-box {
+  background:var(--bg2);border:1.5px solid var(--border);border-radius:20px;
+  padding:1.5rem;text-align:center;max-width:320px;width:90%;
+}
+#cancel-popup .popup-title { font-size:1rem;font-weight:700;margin-bottom:.5rem; }
+#cancel-popup .popup-sub   { font-size:.82rem;color:var(--txt2);margin-bottom:1.2rem; }
+#cancel-popup .popup-btns  { display:flex;gap:.6rem; }
+#cancel-popup .popup-btns button {
+  flex:1;padding:.6rem;border-radius:10px;border:none;
+  font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;
+}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- 로딩 -->
+<div id="loading">
+  <div style="font-size:3rem">🏫</div>
+  <div style="font-size:1rem;font-weight:700;color:var(--gold)">우리반 할 일 체크판</div>
+  <div style="font-size:.8rem;color:#8899aa">서버에 연결하는 중...</div>
+  <div style="width:180px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:.5rem;overflow:hidden">
+    <div style="width:40%;height:100%;background:var(--gold);border-radius:2px;animation:ldBar 1.2s ease-in-out infinite"></div>
+  </div>
+  <style>@keyframes ldBar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}</style>
+</div>
+
+<!-- 취소 확인 팝업 -->
+<div id="cancel-popup">
+  <div class="popup-box">
+    <div class="popup-title">신청을 취소할까요?</div>
+    <div class="popup-sub" id="cancel-popup-sub"></div>
+    <div class="popup-btns">
+      <button style="background:rgba(255,255,255,.1);color:var(--txt)" onclick="closeCancelPopup()">아니요</button>
+      <button style="background:var(--red);color:#fff" id="cancel-confirm-btn">취소하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="main-wrap" style="display:none;height:100vh;flex-direction:column;display:none">
+  <div id="header">
+    <div class="title">📋 우리반 할 일 체크판</div>
+    <div id="class-name" style="font-size:.85rem;color:var(--txt2)"></div>
+    <div class="date" id="today-date"></div>
+  </div>
+  <div id="tabs">
+    <button class="qtab on" onclick="switchTab('daily',this)">📋 일일 퀘스트</button>
+    <button class="qtab" onclick="switchTab('weekly',this)">📅 주간 퀘스트</button>
+    <button class="qtab" onclick="switchTab('special',this)">✏️ 과제</button>
+    <button class="qtab" onclick="switchTab('event',this)">⭐ 특별</button>
+  </div>
+  <div id="table-wrap">
+    <div id="kiosk-content"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Firebase ──
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4",
+  authDomain: "class-rpg-6f409.firebaseapp.com",
+  databaseURL: "https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "class-rpg-6f409",
+  storageBucket: "class-rpg-6f409.firebasestorage.app",
+  messagingSenderId: "408824743154",
+  appId: "1:408824743154:web:382fdd431f7e2dbce13c6b"
+};
+
+let DB_DATA = null;
+let CUR_TAB = 'daily';
+let fbRef = null;
+let _cancelCb = null;
+
+function toArr(v) {
+  return v == null ? [] : Array.isArray(v) ? v : Object.values(v);
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+
+// ── 초기화 ──
+window.onload = async () => {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  fbRef = firebase.database().ref('classRPG_v3');
+
+  try {
+    const snap = await fbRef.once('value');
+    DB_DATA = normalizeData(snap.val());
+    if (!DB_DATA) { alert('데이터가 없습니다. 관리자에서 먼저 설정해주세요.'); return; }
+
+    // 실시간 동기화 — 디바운스로 연속 업데이트 묶어서 처리
+    let _renderTimer = null;
+    fbRef.on('value', snap => {
+      DB_DATA = normalizeData(snap.val());
+      if (_renderTimer) clearTimeout(_renderTimer);
+      _renderTimer = setTimeout(() => renderTable(), 400);
+    });
+
+    document.getElementById('loading').style.display = 'none';
+    const mainWrap = document.getElementById('main-wrap');
+    mainWrap.style.display = 'flex';
+    mainWrap.style.flexDirection = 'column';
+
+    // 오늘 날짜
+    const now = new Date();
+    document.getElementById('today-date').textContent =
+      now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 ('+['일','월','화','수','목','금','토'][now.getDay()]+'요일)';
+
+    // 학급명
+    const className = (DB_DATA.settings||{}).className || '우리반';
+    document.getElementById('class-name').textContent = className;
+
+    renderTable();
+
+  } catch(e) {
+    alert('서버 연결 실패: ' + e.message);
+  }
+};
+
+function normalizeData(data) {
+  if (!data) return null;
+  data.students   = toArr(data.students).filter(Boolean).map(s => ({
+    ...s,
+    pendingRewards: toArr(s.pendingRewards),
+  }));
+  // 중복 학생 제거
+  const seenIds = new Map();
+  data.students.forEach(s => seenIds.set(s.id, s));
+  data.students = Array.from(seenIds.values());
+  data.boardQuests = toArr(data.boardQuests);
+  // quests + questLogs 합쳐서 완료 판정에 사용
+  const quests     = toArr(data.quests);
+  const questLogs  = toArr(data.questLogs);
+  // 중복 제거 (id 또는 boardQuestId+studentId+date 기준)
+  const merged = [...quests];
+  questLogs.forEach(log => {
+    const dup = merged.some(q =>
+      q.studentId === log.studentId &&
+      q.boardQuestId === log.boardQuestId &&
+      q.date === log.date
+    );
+    if (!dup) merged.push(log);
+  });
+  data.quests = merged;
+  return data;
+}
+
+// ── 탭 전환 ──
+function switchTab(type, btn) {
+  CUR_TAB = type;
+  document.querySelectorAll('.qtab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderTable();
+}
+
+// ── 테이블 렌더 ──
+function renderTable() {
+  if (!DB_DATA) return;
+  const students   = DB_DATA.students || [];
+  const boardQuests = (DB_DATA.boardQuests||[]).filter(q => q.active!==false && q.type===CUR_TAB);
+  const allQuests   = DB_DATA.quests || [];
+  const el = document.getElementById('kiosk-content');
+
+  if (boardQuests.length === 0) {
+    el.innerHTML = `<div id="empty-msg">
+      <div style="font-size:3rem">📭</div>
+      <div style="font-size:1rem;font-weight:700">등록된 퀘스트가 없어요</div>
+      <div style="font-size:.82rem">선생님이 퀘스트를 올리면 여기에 표시됩니다</div>
+    </div>`;
+    return;
+  }
+
+  // 학생별 상태 계산 (날짜 기반)
+  const today = new Date().toISOString().slice(0,10);
+  const weekStart = (() => {
+    const d=new Date(); const day=d.getDay();
+    const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    return mon.toISOString().slice(0,10);
+  })();
+
+  function getStatus(studentId, questId, questType) {
+    const s = students.find(x=>x.id===studentId);
+    if (!s) return 'none';
+    // 승인 완료 (날짜 기반)
+    const done = allQuests.some(q => {
+      if (q.studentId!==studentId || q.boardQuestId!==questId) return false;
+      if (!q.date) return true;
+      if (questType==='daily')  return q.date===today;
+      if (questType==='weekly') return q.date>=weekStart;
+      return true;
+    });
+    if (done) return 'done';
+    // 신청 대기
+    const pending = (s.pendingRewards||[]).some(r => r.boardQuestId===questId);
+    if (pending) return 'pending';
+    return 'none';
+  }
+
+  let html = `<table id="kiosk-table">
+    <thead><tr>
+      <th class="quest-th">할 일</th>
+      ${students.map(s=>`<th style="font-size:.8rem">
+        <div style="font-size:1.2rem">${s.avatar}</div>
+        <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
+      </th>`).join('')}
+    </tr></thead>
+    <tbody>`;
+
+  boardQuests.forEach((q, qi) => {
+    html += `<tr>
+      <td class="quest-name">
+        <div>${q.icon||'📋'} ${q.name}</div>
+        <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
+        ${(()=>{
+          const info=getDeadlineInfo(q);
+          if(!info) return '';
+          const color = info.urgent==='expired'?'#999':info.urgent==='critical'?'#ff4444':info.urgent==='warning'?'#ffaa00':'var(--txt2)';
+          const prefix = info.urgent==='critical'?'🔴 ':info.urgent==='warning'?'🟡 ':'⏰ ';
+          const suffix = info.urgent==='critical'?' — 곧 마감!':info.urgent==='warning'?' — 임박!':'';
+          return `<div style="font-size:.66rem;color:${color};margin-top:.15rem;font-weight:${info.urgent?'700':'400'}">${prefix}${info.deadline}까지${suffix}</div>`;
+        })()}
+      </td>`;
+
+    students.forEach(s => {
+      const status = getStatus(s.id, q.id, q.type);
+      if (status === 'done') {
+        html += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
+      } else if (status === 'pending') {
+        html += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
+          ⏳<span style="font-size:.55rem">신청중</span>
+        </div></td>`;
+      } else {
+        html += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}')">
+          <span style="font-size:1rem">○</span>
+        </div></td>`;
+      }
+    });
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── 퀘스트 신청 ──
+function requestQuest(studentId, questId) {
+  const data = DB_DATA;
+  const s = data.students.find(x=>x.id===studentId);
+  const q = (data.boardQuests||[]).find(x=>x.id===questId);
+  if (!s || !q) return;
+
+  // 중복 체크
+  const alreadyDone    = (data.quests||[]).some(x=>x.studentId===studentId && x.boardQuestId===questId);
+  const alreadyPending = (s.pendingRewards||[]).some(r=>r.boardQuestId===questId);
+  if (alreadyDone || alreadyPending) return;
+
+  s.pendingRewards = s.pendingRewards || [];
+  s.pendingRewards.push({
+    id: 'pr_'+Date.now()+'_'+studentId,
+    boardQuestId: questId,
+    label: q.name,
+    exp: q.exp, gold: q.gold,
+    stat: q.stat||'', statVal: q.stat?1:0,
+    icon: q.icon||'📋',
+    date: todayStr(),
+  });
+
+  // Firebase 저장
+  const idx = data.students.findIndex(x=>x.id===studentId);
+  fbRef.child('students/'+idx).set(s);
+  showToast(`✅ ${s.name} · ${q.name} 신청 완료!`);
+}
+
+// ── 신청 취소 확인 팝업 ──
+function requestCancel(studentId, questId, studentName, questName) {
+  document.getElementById('cancel-popup-sub').textContent =
+    `${studentName} · ${questName}`;
+  _cancelCb = () => cancelQuest(studentId, questId);
+  document.getElementById('cancel-confirm-btn').onclick = () => {
+    _cancelCb && _cancelCb();
+    closeCancelPopup();
+  };
+  document.getElementById('cancel-popup').style.display = 'flex';
+}
+
+function closeCancelPopup() {
+  document.getElementById('cancel-popup').style.display = 'none';
+  _cancelCb = null;
+}
+
+function cancelQuest(studentId, questId) {
+  const data = DB_DATA;
+  const s = data.students.find(x=>x.id===studentId);
+  if (!s) return;
+  s.pendingRewards = (s.pendingRewards||[]).filter(r=>r.boardQuestId!==questId);
+  const idx = data.students.findIndex(x=>x.id===studentId);
+  fbRef.child('students/'+idx).set(s);
+  showToast('↩️ 신청이 취소됐어요');
+}
+
+
+// ── 마감일 계산 + 임박 여부 ──
+function getDeadlineInfo(quest) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+
+  let deadline = null;
+  let deadlineTime = null;
+
+  if (quest.type === 'daily') {
+    // 오늘 오후 4시 (방과후)
+    deadlineTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 15, 0, 0);
+    deadline = fmt(now) + ' 방과후';
+  } else if (quest.type === 'weekly') {
+    const day = now.getDay();
+    const diff = day <= 5 ? 5 - day : 6;
+    const fri = new Date(now);
+    fri.setDate(now.getDate() + diff);
+    deadlineTime = new Date(fri.getFullYear(), fri.getMonth(), fri.getDate(), 16, 0, 0);
+    deadline = fmt(fri) + ' 방과후';
+  } else if (quest.dueDate) {
+    deadline = quest.dueDate;
+    deadlineTime = new Date(quest.dueDate + 'T16:00:00');
+  }
+
+  if (!deadline) return null;
+
+  const diffMs = deadlineTime ? deadlineTime - now : null;
+  const diffHr = diffMs ? diffMs / 3600000 : null;
+
+  let urgent = null;
+  if (diffHr !== null) {
+    if (diffHr < 0)       urgent = 'expired';   // 마감 지남
+    else if (diffHr < 1)  urgent = 'critical';  // 1시간 미만
+    else if (diffHr < 3)  urgent = 'warning';   // 3시간 미만
+  }
+
+  return { deadline, urgent, diffHr };
+}
+
+// 구버전 호환
+function getDeadline(quest) {
+  const info = getDeadlineInfo(quest);
+  return info ? info.deadline : null;
+}
+// ── 토스트 ──
+let _toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.style.display='none'; }, 2000);
+}
+</script>
+</body>
+</html>

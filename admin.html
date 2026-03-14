@@ -1,0 +1,3479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리반 성장 RPG — 관리자</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script>
+// ====================================================
+//  우리반 성장 RPG — 공유 게임 데이터 v3 (gamedata.js)
+//  ★ 밸런스 v2: 인성→가치, EXP/골드/농장 전면 조정
+// ====================================================
+
+const GAME_DATA = {
+
+  // ─── EXP 레벨 테이블 (밸런스 조정: 초반 빠르게, 후반 완만하게) ───
+  // 하루 퀘스트 2~3개(각 30~50EXP) 기준 → 초반 매일 레벨업, Lv10+ 3~5일에 1번
+  // expTable[i] = Lv(i+1)이 되기 위한 누적 EXP
+  expTable: [
+      0,   50,  120,  220,  350,  510,  700,  920, 1170, 1450,  // Lv 1~10
+   1760, 2110, 2510, 2960, 3460, 4010, 4610, 5260, 5960, 6710,  // Lv11~20
+   7510, 8360, 9260,10210,11210,12260,13360,14510,15710,17000,18500 // Lv21~31
+  ],
+
+  // ─── 초기 학생 데이터 (가치 스탯, 새 EXP 기준) ──────────────
+  defaultStudents: [
+    { id:'s1', name:'강지원', avatar:'⚔️', pw:'1234', charType:1,
+      level:7, exp:800,   // Lv7: 700~919
+      gold:320, title:'독서왕', job:'미래의 과학자',
+      stats:{ read:3, study:2, art:1, value:4, health:4 },
+      combat:{ atk:12, def:10, mag:0, spd:2 },
+      equipment:{ head:'가죽 모자', body:'철 갑옷', weapon:'강철검', glove:'철 장갑', shoe:'가죽 신발' },
+      equipmentIds:{ head:'e_h2', body:'e_b4', weapon:'e_w4', glove:'e_g4', shoe:'e_s2' },
+      inventory:[ {id:'i_potato_seed',qty:3}, {id:'i_carrot_seed',qty:1} ],
+      titles:['독서왕'],
+      books:[{title:'해리포터와 마법사의 돌',date:'2024-03-01'},{title:'어린왕자',date:'2024-03-10'}],
+      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*3},
+             {slot:3,crop:'carrot',planted:Date.now()-3600000*4},
+             {slot:6,crop:'potato',planted:Date.now()-3600000*1} ],
+      monsterLog:['슬라임'], totalQuests:5, bookCount:2,
+      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false,
+      pendingRewards:[{id:'pr_init1',label:'익힘책 15쪽 완료',exp:30,gold:30,stat:'study',statVal:1,icon:'📚',date:'오늘'}]
+    },
+    { id:'s2', name:'박예지', avatar:'🌸', pw:'1234', charType:2,
+      level:5, exp:420,   // Lv5: 350~509
+      gold:210, title:'예술왕', job:'미래의 화가',
+      stats:{ read:1, study:2, art:5, value:3, health:2 },
+      combat:{ atk:0, def:6, mag:14, spd:3 },
+      equipment:{ head:'천 모자', body:'가죽 갑옷', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
+      equipmentIds:{ head:'e_h1', body:'e_b2', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
+      inventory:[ {id:'i_corn_seed',qty:2} ],
+      titles:['예술왕'], books:[],
+      farm:[ {slot:1,crop:'corn',planted:Date.now()-3600000*6} ],
+      monsterLog:[], totalQuests:2, bookCount:7,
+      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    },
+    { id:'s3', name:'양인우', avatar:'🛡️', pw:'1234', charType:1,
+      level:6, exp:600,   // Lv6: 510~699
+      gold:180, title:'건강왕', job:'미래의 운동선수',
+      stats:{ read:2, study:4, art:1, value:1, health:5 },
+      combat:{ atk:7, def:16, mag:0, spd:6 },
+      equipment:{ head:'가죽 모자', body:'가죽 갑옷', weapon:'철검', glove:'천 장갑', shoe:'철 부츠' },
+      equipmentIds:{ head:'e_h2', body:'e_b2', weapon:'e_w2', glove:'e_g1', shoe:'e_s4' },
+      inventory:[], titles:['건강왕'], books:[],
+      farm:[], monsterLog:[], totalQuests:2, bookCount:2,
+      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    },
+    { id:'s4', name:'이시아', avatar:'🌟', pw:'1234', charType:2,
+      level:4, exp:285,   // Lv4: 220~349
+      gold:150, title:'가치왕', job:'미래의 선생님',
+      stats:{ read:3, study:6, art:2, value:2, health:4 },
+      combat:{ atk:4, def:13, mag:0, spd:2 },
+      equipment:{ head:'천 모자', body:'철 갑옷', weapon:'나무검', glove:'천 장갑', shoe:'가죽 신발' },
+      equipmentIds:{ head:'e_h1', body:'e_b4', weapon:'e_w1', glove:'e_g1', shoe:'e_s2' },
+      inventory:[ {id:'i_potato_seed',qty:1} ],
+      titles:['가치왕'], books:[],
+      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*2} ],
+      monsterLog:[], totalQuests:1, bookCount:5,
+      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    },
+    { id:'s5', name:'이유은', avatar:'🔮', pw:'1234', charType:2,
+      level:8, exp:1040,  // Lv8: 920~1169
+      gold:420, title:'독서왕', job:'미래의 작가',
+      stats:{ read:1, study:1, art:3, value:3, health:2 },
+      combat:{ atk:7, def:6, mag:16, spd:5 },
+      equipment:{ head:'견습 마법 모자', body:'견습 로브', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
+      equipmentIds:{ head:'e_h3', body:'e_b3', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
+      inventory:[ {id:'i_strawberry_seed',qty:1} ],
+      titles:['독서왕'], books:[],
+      farm:[ {slot:2,crop:'strawberry',planted:Date.now()-3600000*13} ],
+      monsterLog:['슬라임','아기 멧돼지'], totalQuests:3, bookCount:10,
+      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    },
+    { id:'s6', name:'한은규', avatar:'🏹', pw:'1234', charType:1,
+      level:9, exp:1300,  // Lv9: 1170~1449
+      gold:510, title:'도전왕', job:'미래의 축구선수',
+      stats:{ read:2, study:4, art:5, value:6, health:7 },
+      combat:{ atk:24, def:22, mag:0, spd:6 },
+      equipment:{ head:'기사 투구', body:'기사 갑옷', weapon:'기사검', glove:'기사 장갑', shoe:'기사 부츠' },
+      equipmentIds:{ head:'e_h4', body:'e_b6', weapon:'e_w6', glove:'e_g6', shoe:'e_s6' },
+      inventory:[], titles:['도전왕','건강왕'], books:[],
+      farm:[ {slot:0,crop:'tomato',planted:Date.now()-3600000*10} ],
+      monsterLog:['슬라임','아기 멧돼지','고블린'], totalQuests:8, bookCount:4,
+      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    },
+  ],
+
+  // ─── 장비 (밸런스 v3: spd → 신발+장갑, def → 머리+몸통) ────────────────
+  // 핵심 원칙: 해당 레벨 풀셋 기준으로 몬스터 조건 달성 가능
+  equipment: {
+    head: [
+      {id:'e_h1', name:'천 모자',        lv:3,  stats:{def:3},               cond:{},                           price:80,   icon:'🎩'},
+      {id:'e_h2', name:'가죽 모자',      lv:5,  stats:{def:5, spd:1},        cond:{health:3},                   price:120,  icon:'🪖'},
+      {id:'e_h3', name:'견습 마법 모자', lv:7,  stats:{mag:4, def:3},        cond:{art:4},                      price:160,  icon:'🧙'},
+      {id:'e_h4', name:'기사 투구',      lv:10, stats:{def:10, spd:2},       cond:{health:6},                   price:220,  icon:'⛑️'},
+      {id:'e_h5', name:'학자의 모자',    lv:13, stats:{mag:8, def:4},        cond:{study:7},                    price:320,  icon:'🎓'},
+      {id:'e_h6', name:'수호 투구',      lv:16, stats:{def:15, spd:3},       cond:{health:10,value:5},          price:420,  icon:'🛡️'},
+      {id:'e_h7', name:'대마법 모자',    lv:20, stats:{mag:13, def:5},       cond:{art:12,study:8},             price:600,  icon:'🔮'},
+      {id:'e_h8', name:'황금 투구',      lv:24, stats:{def:21, spd:4},       cond:{health:14,value:8},          price:650,  icon:'👑'},
+      {id:'e_h9', name:'전설 투구',      lv:28, stats:{def:26, spd:5},       cond:{health:18,value:12},         price:850,  icon:'💎'},
+      {id:'e_h10',name:'왕관',           lv:30, stats:{def:30,mag:8,spd:6},  cond:{read:15,study:15,value:15},  price:1100, icon:'👑'},
+    ],
+    body: [
+      {id:'e_b1', name:'천 옷',          lv:3,  stats:{def:5},               cond:{},                           price:80,   icon:'👕'},
+      {id:'e_b2', name:'가죽 갑옷',      lv:5,  stats:{def:9},               cond:{health:3},                   price:120,  icon:'🥋'},
+      {id:'e_b3', name:'견습 로브',      lv:7,  stats:{mag:6, def:4},        cond:{art:4},                      price:160,  icon:'🧥'},
+      {id:'e_b4', name:'철 갑옷',        lv:10, stats:{def:14},              cond:{health:6},                   price:220,  icon:'🛡️'},
+      {id:'e_b5', name:'연구 로브',      lv:13, stats:{mag:11, def:6},       cond:{study:7},                    price:320,  icon:'🔬'},
+      {id:'e_b6', name:'기사 갑옷',      lv:16, stats:{def:20},              cond:{health:10,value:5},          price:420,  icon:'⚔️'},
+      {id:'e_b7', name:'대마법 로브',    lv:20, stats:{mag:18, def:8},       cond:{art:12,study:8},             price:600,  icon:'✨'},
+      {id:'e_b8', name:'황금 갑옷',      lv:24, stats:{def:27},              cond:{health:14,value:8},          price:650,  icon:'💛'},
+      {id:'e_b9', name:'전설 갑옷',      lv:28, stats:{def:34},              cond:{health:18,value:12},         price:850,  icon:'🌟'},
+      {id:'e_b10',name:'왕의 갑옷',      lv:30, stats:{def:40},              cond:{health:20,value:15,study:10},price:1100, icon:'👑'},
+    ],
+    weapon: [
+      {id:'e_w1', name:'나무검',         lv:3,  stats:{atk:5},               cond:{},                           price:80,   icon:'🗡️'},
+      {id:'e_w2', name:'철검',           lv:5,  stats:{atk:8, mag:2},         cond:{health:3},                   price:120,  icon:'⚔️'},
+      {id:'e_w3', name:'마법 지팡이',    lv:7,  stats:{mag:10},              cond:{art:4},                      price:160,  icon:'🪄'},
+      {id:'e_w4', name:'강철검',         lv:10, stats:{atk:15},              cond:{health:6},                   price:220,  icon:'🔱'},
+      {id:'e_w5', name:'학자의 지팡이',  lv:13, stats:{mag:16},              cond:{study:7},                    price:320,  icon:'📿'},
+      {id:'e_w6', name:'기사검',         lv:16, stats:{atk:21},              cond:{health:10,value:5},          price:420,  icon:'🏹'},
+      {id:'e_w7', name:'대마법 지팡이',  lv:20, stats:{mag:23},              cond:{art:12,study:8},             price:600,  icon:'⚡'},
+      {id:'e_w8', name:'황금검',         lv:24, stats:{atk:28},              cond:{health:14,value:8},          price:650,  icon:'✨'},
+      {id:'e_w9', name:'전설검',         lv:28, stats:{atk:34},              cond:{health:18,value:12},         price:850,  icon:'💎'},
+      {id:'e_w10',name:'영웅의 검',      lv:30, stats:{atk:40},              cond:{health:20,value:15,read:10}, price:1100, icon:'🌈'},
+    ],
+    glove: [
+      // ★ 장갑: 공격/마력 + 속도 동시 부여 (속도 분산 핵심)
+      {id:'e_g1', name:'천 장갑',        lv:3,  stats:{atk:2, spd:2},        cond:{},                           price:80,   icon:'🧤'},
+      {id:'e_g2', name:'가죽 장갑',      lv:5,  stats:{atk:3, spd:2, mag:2}, cond:{health:3},                   price:120,  icon:'🥊'},
+      {id:'e_g3', name:'마법 장갑',      lv:7,  stats:{mag:4, spd:3},        cond:{art:4},                      price:160,  icon:'✋'},
+      {id:'e_g4', name:'철 장갑',        lv:10, stats:{atk:5, spd:4},        cond:{health:6},                   price:220,  icon:'⚙️'},
+      {id:'e_g5', name:'연구 장갑',      lv:13, stats:{mag:7, spd:5},        cond:{study:7},                    price:320,  icon:'🔬'},
+      {id:'e_g6', name:'기사 장갑',      lv:16, stats:{atk:8, spd:6},        cond:{health:10,value:5},          price:420,  icon:'🏆'},
+      {id:'e_g7', name:'마도 장갑',      lv:20, stats:{mag:10, spd:8},       cond:{art:12,study:8},             price:600,  icon:'💫'},
+      {id:'e_g8', name:'황금 장갑',      lv:24, stats:{atk:11, spd:9},       cond:{health:14,value:8},          price:650,  icon:'💛'},
+      {id:'e_g9', name:'전설 장갑',      lv:28, stats:{atk:13, spd:11},      cond:{health:18,value:12},         price:850,  icon:'💎'},
+      {id:'e_g10',name:'영웅 장갑',      lv:30, stats:{atk:16,spd:12,mag:4}, cond:{health:20,value:15,study:10},price:1100, icon:'🌟'},
+    ],
+    shoe: [
+      // ★ 신발: 속도 메인 + def/mag 보조
+      {id:'e_s1', name:'천 신발',        lv:3,  stats:{spd:4, def:1},        cond:{},                           price:80,   icon:'👟'},
+      {id:'e_s2', name:'가죽 신발',      lv:5,  stats:{spd:6, def:2},        cond:{health:3},                   price:120,  icon:'👠'},
+      {id:'e_s3', name:'마법 신발',      lv:7,  stats:{spd:6, mag:2},        cond:{art:4},                      price:160,  icon:'✨'},
+      {id:'e_s4', name:'철 부츠',        lv:10, stats:{spd:8, def:3},        cond:{health:6},                   price:220,  icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',      lv:13, stats:{spd:9, mag:3},        cond:{study:7},                    price:320,  icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',      lv:16, stats:{spd:11, def:4},       cond:{health:10,value:5},          price:420,  icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',      lv:20, stats:{spd:13, mag:4},       cond:{art:12,study:8},             price:600,  icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',      lv:24, stats:{spd:15, def:5},       cond:{health:14,value:8},          price:650,  icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',      lv:28, stats:{spd:18, def:6},       cond:{health:18,value:12},         price:850,  icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',      lv:30, stats:{spd:20, def:8},       cond:{health:20,value:15,read:10}, price:1100, icon:'🌈'},
+    ],
+  },
+  // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
+  // 수업 중 2~3번 접속 기준: 감자는 쉬는시간에 심으면 점심에 수확 가능
+  seeds: [
+    // reqLv: 해당 레벨 이상이어야 상점에서 구매 가능
+    // 고급 씨앗일수록 시간당 수익이 더 높음 → 레벨업 동기 강화
+    {id:'i_potato_seed',    name:'감자 씨앗',  icon:'🥔', price:25,  growHours:20, sellPrice:40,  crop:'potato',     cropIcon:'🥔', reqLv:1},
+    {id:'i_carrot_seed',    name:'당근 씨앗',  icon:'🥕', price:40,  growHours:24, sellPrice:75,  crop:'carrot',     cropIcon:'🥕', reqLv:3},
+    {id:'i_corn_seed',      name:'옥수수 씨앗',icon:'🌽', price:60,  growHours:36, sellPrice:125, crop:'corn',       cropIcon:'🌽', reqLv:5},
+    {id:'i_tomato_seed',    name:'토마토 씨앗',icon:'🍅', price:80,  growHours:48, sellPrice:180, crop:'tomato',     cropIcon:'🍅', reqLv:8},
+    {id:'i_strawberry_seed',name:'딸기 씨앗',  icon:'🍓', price:120, growHours:72, sellPrice:290, crop:'strawberry', cropIcon:'🍓', reqLv:12},
+  ],
+
+  // ─── 장식물 ────────────────────────────────────────────
+  decorations: [
+    // ── 마당 (yard) ──
+    // ⚪ 일반 Lv1+
+    {id:'d_y1', name:'장미 꽃밭',    icon:'🌹', price:50,   cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y2', name:'튤립',          icon:'🌷', price:70,   cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y3', name:'선인장',        icon:'🌵', price:80,   cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y4', name:'정원석',        icon:'🪨', price:100,  cat:'yard',   rarity:'common', reqLv:1},
+    // 🔵 희귀 Lv5+
+    {id:'d_y5', name:'정원 벤치',     icon:'🪑', size:{w:2,h:1}, price:200,  cat:'yard',   rarity:'rare',   reqLv:5},
+    {id:'d_y6', name:'가로등',        icon:'🏮', price:250,  cat:'yard',   rarity:'rare',   reqLv:5},
+    {id:'d_y7', name:'해바라기 화단', icon:'🌻', price:300,  cat:'yard',   rarity:'rare',   reqLv:5},
+    {id:'d_y8', name:'허수아비',      icon:'🧹', price:380,  cat:'yard',   rarity:'rare',   reqLv:5},
+    // 🟣 영웅 Lv10+
+    {id:'d_y9', name:'작은 나무',     icon:'🌲', size:{w:2,h:2}, price:600,  cat:'yard',   rarity:'epic',   reqLv:10},
+    {id:'d_y10',name:'분수',          icon:'⛲', size:{w:2,h:2}, price:750,  cat:'yard',   rarity:'epic',   reqLv:10},
+    {id:'d_y11',name:'풍차',          icon:'🌀', size:{w:2,h:2}, price:900,  cat:'yard',   rarity:'epic',   reqLv:10},
+    // 🟡 전설 Lv20+
+    {id:'d_y12',name:'벚나무',        icon:'🌸', size:{w:3,h:3}, price:1200, cat:'yard',   rarity:'legend', reqLv:20},
+    {id:'d_y13',name:'마법 정원석',   icon:'💎', price:1500, cat:'yard',   rarity:'legend', reqLv:20},
+    {id:'d_y14',name:'황금 석등',     icon:'🌟', price:1800, cat:'yard',   rarity:'legend', reqLv:20},
+    // ── 집 안 (indoor) ──
+    // ⚪ 일반 Lv1+
+    {id:'d_i1', name:'화분',          icon:'🪴', price:60,   cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i2', name:'램프',          icon:'💡', price:80,   cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i3', name:'시계',          icon:'🕰️', price:100,  cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i4', name:'그림 액자',     icon:'🖼️', price:120,  cat:'indoor', rarity:'common', reqLv:1},
+    // 🔵 희귀 Lv5+
+    {id:'d_i5', name:'책상',          icon:'🖥️', size:{w:2,h:1}, price:200,  cat:'indoor', rarity:'rare',   reqLv:5},
+    {id:'d_i6', name:'책장',          icon:'📚', size:{w:1,h:2}, price:280,  cat:'indoor', rarity:'rare',   reqLv:5},
+    {id:'d_i7', name:'TV',            icon:'📺', size:{w:2,h:1}, price:320,  cat:'indoor', rarity:'rare',   reqLv:5},
+    {id:'d_i8', name:'소파',          icon:'🛋️', size:{w:3,h:1}, price:380,  cat:'indoor', rarity:'rare',   reqLv:5},
+    // 🟣 영웅 Lv10+
+    {id:'d_i9', name:'피아노',        icon:'🎹', size:{w:2,h:2}, price:600,  cat:'indoor', rarity:'epic',   reqLv:10},
+    {id:'d_i10',name:'침대',          icon:'🛏️', size:{w:2,h:2}, price:750,  cat:'indoor', rarity:'epic',   reqLv:10},
+    {id:'d_i11',name:'수족관',        icon:'🐠', size:{w:3,h:1}, price:900,  cat:'indoor', rarity:'epic',   reqLv:10},
+    // 🟡 전설 Lv20+
+    {id:'d_i12',name:'황금 책장',     icon:'📖', size:{w:2,h:2}, price:1200, cat:'indoor', rarity:'legend', reqLv:20},
+    {id:'d_i13',name:'마법 거울',     icon:'🪞', size:{w:1,h:2}, price:1500, cat:'indoor', rarity:'legend', reqLv:20},
+    {id:'d_i14',name:'왕의 의자',     icon:'👑', size:{w:1,h:2}, price:1800, cat:'indoor', rarity:'legend', reqLv:20},
+    // ── 업적 전용 (상점 미판매, price:0) ──
+    {id:'deco_trophy',    name:'트로피 (업적)',    icon:'🏆', price:0, cat:'yard',   rarity:'legend', reqLv:1},
+    {id:'deco_bookshelf', name:'황금 책장 (업적)', icon:'📚', price:0, cat:'indoor', rarity:'legend', reqLv:1},
+    {id:'deco_garden',    name:'비밀 정원 (업적)', icon:'🌺', price:0, cat:'yard',   rarity:'legend', reqLv:1},
+  ],
+
+  // ─── 몬스터 (밸런스 v4: 1학기 18주 기준 EXP 재조정) ─────────────
+  // 저레벨 몬스터 EXP 대폭 상향 → 초반 레벨업 빠르게, 후반은 완만하게
+  monsters: [
+    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:40},  // Lv1: 장비없어도 가능
+    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:50},
+    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:55},  // mag 상향 (풀셋26)
+    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:55},
+    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:60},
+    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:65},
+    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:70},
+    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:75},  // mag 상향 (풀셋26)
+    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:80},
+    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:88},
+    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:95},
+    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:102}, // def 상향 (풀셋27)
+    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:110}, // mag 대폭 상향 (풀셋45)
+    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:118},
+    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:126},
+    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:134}, // atk 상향 (풀셋29)
+    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:144}, // def 상향 (풀셋39)
+    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:154}, // spd 상향 (풀셋20)
+    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:165}, // mag 대폭 상향 (풀셋68)
+    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:200}, // atk 상향 (풀셋56)
+  ],
+
+  // ─── 칭호·승급 ────────────────────────────────────────
+  titles: ['독서왕','학습왕','예술왕','가치왕','건강왕','도전왕','성실왕','친절왕'],
+  promotionLevels: [5, 10, 15, 20, 25, 30],
+
+  // ─── 이름 매핑 ★ 인성 → 가치 ─────────────────────────
+  statNames:   { read:'독서', study:'학습', art:'예술', value:'가치', health:'건강' },
+  combatNames: { atk:'공격력', def:'방어력', mag:'마력', spd:'속도' },
+
+  // ─── 장비 id → 슬롯 맵 (lazy) ────────────────────────
+  get SLOT_MAP() {
+    if (this._slotMap) return this._slotMap;
+    this._slotMap = {};
+    Object.entries(this.equipment).forEach(([slot, items]) => {
+      items.forEach(item => { this._slotMap[item.id] = slot; });
+    });
+    return this._slotMap;
+  },
+
+  getItemById(id) {
+    for (const items of Object.values(this.equipment)) {
+      const found = items.find(i => i.id === id);
+      if (found) return found;
+    }
+    return null;
+  },
+  getSlotForItem(id) { return this.SLOT_MAP[id] || null; },
+};
+
+// ─── Firebase 설정 ────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4",
+  authDomain: "class-rpg-6f409.firebaseapp.com",
+  databaseURL: "https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "class-rpg-6f409",
+  storageBucket: "class-rpg-6f409.firebasestorage.app",
+  messagingSenderId: "408824743154",
+  appId: "1:408824743154:web:382fdd431f7e2dbce13c6b"
+};
+
+// ─── Firebase DB (실시간 동기화) ──────────────────────
+const DB = {
+  KEY: 'classRPG_v3',
+  ADMIN_KEY: 'classRPG_adminPw',
+  _cache: null,
+  _fbRef: null,
+  _fbAdminRef: null,
+  _onChangeCb: null,
+  _saving: false,
+
+  async init() {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    this._fbRef = firebase.database().ref(this.KEY);
+    this._fbAdminRef = firebase.database().ref(this.ADMIN_KEY);
+
+    // 초기 데이터 로드
+    const snap = await this._fbRef.once('value');
+    let data = snap.val();
+
+    if (!data) {
+      data = this._defaultData();
+      await this._fbRef.set(data);
+    }
+    this._cache = this._migrate(this._normalizeArrays(data));
+
+    // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
+    this._fbRef.on('value', (snap) => {
+      if (this._saving) return; // 내가 저장 중일 때는 무시
+      const d = snap.val();
+      if (d) {
+        this._cache = this._migrate(this._normalizeArrays(d));
+        if (this._onChangeCb) this._onChangeCb();
+      }
+    });
+  },
+
+  onDataChange(fn) { this._onChangeCb = fn; },
+
+  _defaultData() {
+    return {
+      students: JSON.parse(JSON.stringify(GAME_DATA.defaultStudents)),
+      quests: [], promotionRequests: [], boardQuests: [],
+      artworks: [], pwResetRequests: [],
+      settings: {
+        className:'우리반', bossActive:false, bossName:'거대 트롤',
+        bossIcon:'🧌', bossGold:150, monsterWinRate:80,
+        baseExp:80, baseGold:50, monsterDailyLimit:2,
+      }
+    };
+  },
+
+  // Firebase는 배열을 객체로 저장 → 다시 배열로 변환
+  _normalizeArrays(data) {
+    const toArr = v => v == null ? [] : Array.isArray(v) ? v : Object.values(v);
+    data.students          = toArr(data.students).map(s => {
+      if (!s) return null;
+      s.farm             = toArr(s.farm);
+      s.inventory        = toArr(s.inventory);
+      s.books            = toArr(s.books);
+      s.houseDecorations = toArr(s.houseDecorations);
+      s.achievements     = toArr(s.achievements);
+      s.titles           = toArr(s.titles);
+      s.monsterLog       = toArr(s.monsterLog);
+      s.pendingRewards   = toArr(s.pendingRewards);
+      return s;
+    }).filter(Boolean);
+    // 중복 학생 제거 (같은 id가 여러 번 있을 경우 마지막 것 유지)
+    const seen = new Map();
+    data.students.forEach(s => seen.set(s.id, s));
+    data.students = Array.from(seen.values());
+    data.quests             = toArr(data.quests);
+    // questLogs도 quests에 병합 (키오스크/학생화면 완료 판정에 사용)
+    const questLogs = toArr(data.questLogs);
+    questLogs.forEach(log => {
+      const dup = data.quests.some(q =>
+        q.studentId === log.studentId &&
+        q.boardQuestId === log.boardQuestId &&
+        q.date === log.date
+      );
+      if (!dup) data.quests.push(log);
+    });
+    data.promotionRequests  = toArr(data.promotionRequests);
+    data.boardQuests        = toArr(data.boardQuests);
+    data.artworks           = toArr(data.artworks);
+    data.pwResetRequests    = toArr(data.pwResetRequests);
+    return data;
+  },
+
+  _migrate(data) {
+    data.students = data.students.map(s => {
+      if (s.stats && s.stats.moral !== undefined && s.stats.value === undefined) {
+        s.stats.value = s.stats.moral; delete s.stats.moral;
+      }
+      return {
+        books:[], equipmentIds:{}, promotionPending:false,
+        lastMonsterDate:'', monsterDailyCount:0,
+        houseDecorations:[], achievements:[], farmHarvests:0,
+        ...s,
+        houseDecorations: (s.houseDecorations||[]).map(p => {
+          if (p.row !== undefined && p.col !== undefined) return p;
+          const area = p.area || 'yard';
+          const oldCols = area==='yard' ? 5 : 3;
+          const slot = p.slot || 0;
+          return {id:p.id, area, row:Math.floor(slot/oldCols), col:slot%oldCols};
+        }),
+      };
+    });
+    return data;
+  },
+
+  load() { return this._cache; },
+
+  save(data) {
+    this._cache = data;
+    this._saving = true;
+    this._fbRef.set(data).finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
+  },
+
+  // ── 부분 저장 (충돌 방지) ──
+  saveStudent(student) {
+    const db = this.load();
+    const idx = db.students.findIndex(s => s.id === student.id);
+    if (idx >= 0) db.students[idx] = student; else db.students.push(student);
+    this._cache = db;
+    this._saving = true;
+    // student.id로 인덱스 찾아서 해당 위치만 저장 (전체 덮어쓰기 방지)
+    const saveIdx = db.students.findIndex(s => s.id === student.id);
+    this._fbRef.child('students/' + saveIdx).set(student).finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
+  },
+
+  saveQuestLog(log) {
+    const db = this.load();
+    db.quests = db.quests || [];
+    db.quests.push(log);
+    this._cache = db;
+    // 고유 ID 기반으로만 저장 (배열 인덱스 충돌 방지)
+    const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
+    log._id = logId;
+    this._fbRef.child('questLogs/' + logId).set(log);
+  },
+
+  saveArtwork(artwork) {
+    const db = this.load();
+    db.artworks = db.artworks || [];
+    db.artworks.push(artwork);
+    this._cache = db;
+    this._fbRef.child('artworks/' + artwork.id).set(artwork);
+  },
+
+  getStudents()    { return this.load().students; },
+  getStudent(id)   { return this.load().students.find(s => s.id === id); },
+
+  getSettings()    { return this.load().settings; },
+  saveSettings(s)  { const db = this.load(); db.settings = s; this.save(db); },
+
+  getQuests()      { return this.load().quests || []; },
+  addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
+
+  getPromotionRequests()     { return this.load().promotionRequests || []; },
+  addPromotionRequest(r)     { const db = this.load(); db.promotionRequests = [...(db.promotionRequests||[]), r]; this.save(db); },
+  removePromotionRequest(id) { const db = this.load(); db.promotionRequests = (db.promotionRequests||[]).filter(r=>r.id!==id); this.save(db); },
+
+  async getAdminPw() {
+    const snap = await this._fbAdminRef.once('value');
+    return snap.val() || 'teacher1234';
+  },
+  setAdminPw(pw) { this._fbAdminRef.set(pw); },
+
+  getArtworks(studentId) { return (this.load().artworks||[]).filter(a => a.studentId === studentId); },
+  addArtwork(a)          { const db=this.load(); db.artworks=[...(db.artworks||[]),a]; this.save(db); },
+  deleteArtwork(id)      { const db=this.load(); db.artworks=(db.artworks||[]).filter(a=>a.id!==id); this.save(db); },
+
+  getPwResetRequests()    { return this.load().pwResetRequests || []; },
+  addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
+  removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
+};
+
+// ─── 유틸리티 ────────────────────────────────────────
+const Utils = {
+
+  levelFromExp(exp) {
+    const t = GAME_DATA.expTable;
+    for (let i = t.length - 1; i >= 0; i--) { if (exp >= t[i]) return i + 1; }
+    return 1;
+  },
+  expForLevel(lv)    { return GAME_DATA.expTable[Math.min(lv-1, GAME_DATA.expTable.length-1)]; },
+  expForNextLevel(lv){ return GAME_DATA.expTable[Math.min(lv,   GAME_DATA.expTable.length-1)]; },
+
+  expPct(s) {
+    const cur  = s.exp - this.expForLevel(s.level);
+    const need = this.expForNextLevel(s.level) - this.expForLevel(s.level);
+    if (need <= 0) return 100;
+    return Math.max(0, Math.min(100, (cur / need) * 100));
+  },
+
+  // ★ 장비 장착: 이전 스탯 제거 후 새 스탯 적용
+  equipItem(student, item) {
+    const slot = GAME_DATA.getSlotForItem(item.id);
+    if (!slot) return;
+    student.equipmentIds = student.equipmentIds || {};
+    student.combat = student.combat || {};
+    const oldId = student.equipmentIds[slot];
+    if (oldId) {
+      const old = GAME_DATA.getItemById(oldId);
+      if (old) Object.entries(old.stats).forEach(([k,v]) => {
+        student.combat[k] = Math.max(0, (student.combat[k]||0) - v);
+      });
+    }
+    student.equipmentIds[slot] = item.id;
+    student.equipment = student.equipment || {};
+    student.equipment[slot] = item.name;
+    Object.entries(item.stats).forEach(([k,v]) => {
+      student.combat[k] = (student.combat[k]||0) + v;
+    });
+  },
+
+  cropReady(planted, growHours)    { return Date.now() - planted >= growHours * 3600000; },
+  cropProgress(planted, growHours) { return Math.min(100, ((Date.now()-planted)/(growHours*3600000))*100); },
+
+  getSeedById(id)    { return GAME_DATA.seeds.find(s => s.id === id); },
+  getSeedByCrop(crop){ return GAME_DATA.seeds.find(s => s.crop === crop); },
+
+  condMet(student, cond) {
+    return Object.entries(cond).every(([stat,val]) => (student.stats[stat]||0) >= val);
+  },
+  condText(cond) {
+    const n = GAME_DATA.statNames;
+    return Object.entries(cond).map(([s,v]) => `${n[s]||s} ${v}`).join(' + ') || '조건 없음';
+  },
+  statText(stats) {
+    const n = GAME_DATA.combatNames;
+    return Object.entries(stats).map(([s,v]) => `${n[s]||s} +${v}`).join(' · ');
+  },
+
+  charEmoji(type)       { return {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'}[type]||'🧑'; },
+  isPromotionLevel(lv)  { return GAME_DATA.promotionLevels.includes(lv); },
+  todayStr()            { return new Date().toISOString().slice(0,10); },
+  uid()                 { return 'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); },
+
+  // ★ 몬스터 하루 도전 횟수 체크 (2회)
+  canFightMonster(student) {
+    const settings = DB.getSettings();
+    const limit = settings.monsterDailyLimit || 2;
+    if ((student.lastMonsterDate||'') !== this.todayStr()) return true;
+    return (student.monsterDailyCount||0) < limit;
+  },
+  monsterAttemptsLeft(student) {
+    const settings = DB.getSettings();
+    const limit = settings.monsterDailyLimit || 2;
+    if ((student.lastMonsterDate||'') !== this.todayStr()) return limit;
+    return Math.max(0, limit - (student.monsterDailyCount||0));
+  },
+};
+
+// ─── 업적 시스템 ─────────────────────────────────────
+const ACHIEVEMENTS = [
+  // 퀘스트
+  { id:'ach_quest1',  icon:'📋', name:'첫 번째 발걸음',   desc:'첫 퀘스트 완료',          check: s => (s.totalQuests||0) >= 1,   reward:{ title:'모험가', deco:null,  exp:20 } },
+  { id:'ach_quest10', icon:'📜', name:'퀘스트 마스터',    desc:'퀘스트 10회 완료',         check: s => (s.totalQuests||0) >= 10,  reward:{ title:'퀘스트왕', deco:null, exp:50 } },
+  { id:'ach_quest30', icon:'🏅', name:'전설의 모험가',     desc:'퀘스트 30회 완료',         check: s => (s.totalQuests||0) >= 30,  reward:{ title:'전설왕', deco:null,  exp:100 } },
+  // 독서
+  { id:'ach_book1',   icon:'📖', name:'첫 독서',          desc:'책 1권 읽기',              check: s => (s.bookCount||0) >= 1,    reward:{ title:null, deco:'deco_bookshelf', exp:15 } },
+  { id:'ach_book5',   icon:'📚', name:'독서왕 입문',       desc:'책 5권 읽기',              check: s => (s.bookCount||0) >= 5,    reward:{ title:'독서가', deco:null,  exp:40 } },
+  { id:'ach_book15',  icon:'🎓', name:'지식의 탑',         desc:'책 15권 읽기',             check: s => (s.bookCount||0) >= 15,   reward:{ title:'독서왕', deco:null,  exp:80 } },
+  // 몬스터
+  { id:'ach_mon1',    icon:'⚔️', name:'첫 사냥',           desc:'첫 몬스터 처치',           check: s => (s.monsterLog||[]).length >= 1,  reward:{ title:'전사', deco:null, exp:20 } },
+  { id:'ach_mon5',    icon:'🗡️', name:'몬스터 사냥꾼',     desc:'몬스터 5종 처치',          check: s => (s.monsterLog||[]).length >= 5,  reward:{ title:'사냥꾼', deco:null, exp:60 } },
+  { id:'ach_mon_all', icon:'👑', name:'몬스터 도감 완성',  desc:'모든 일반 몬스터 처치',    check: s => (s.monsterLog||[]).length >= GAME_DATA.monsters.length, reward:{ title:'몬스터왕', deco:'deco_trophy', exp:150 } },
+  // 농장
+  { id:'ach_farm5',   icon:'🌱', name:'초보 농부',          desc:'농장 수확 5회',            check: s => (s.farmHarvests||0) >= 5,  reward:{ title:null, deco:null, exp:30 } },
+  { id:'ach_farm20',  icon:'🌾', name:'베테랑 농부',        desc:'농장 수확 20회',           check: s => (s.farmHarvests||0) >= 20, reward:{ title:'농부왕', deco:null, exp:70 } },
+  // 장비
+  { id:'ach_equip',   icon:'🛡️', name:'완전무장',           desc:'5개 슬롯 모두 장착',       check: s => {
+      const ids = s.equipmentIds||{};
+      return ['head','body','weapon','glove','shoe'].every(k => ids[k]);
+    }, reward:{ title:null, deco:null, exp:50 } },
+  // 레벨
+  { id:'ach_lv5',     icon:'⬆️', name:'첫 번째 도약',       desc:'레벨 5 달성',              check: s => s.level >= 5,   reward:{ title:null, deco:null, exp:30 } },
+  { id:'ach_lv10',    icon:'🌟', name:'숙련자',              desc:'레벨 10 달성',             check: s => s.level >= 10,  reward:{ title:'숙련자', deco:'deco_trophy', exp:80 } },
+  { id:'ach_lv20',    icon:'💫', name:'전설의 시작',         desc:'레벨 20 달성',             check: s => s.level >= 20,  reward:{ title:'레전드', deco:null, exp:150 } },
+];
+
+const AchievementUtils = {
+  // 학생의 새 업적 체크 → 새로 달성한 업적 배열 반환
+  checkNew(student) {
+    const earned = new Set(student.achievements || []);
+    const newOnes = [];
+    ACHIEVEMENTS.forEach(a => {
+      if (!earned.has(a.id) && a.check(student)) {
+        earned.add(a.id);
+        newOnes.push(a);
+      }
+    });
+    if (newOnes.length > 0) {
+      student.achievements = [...earned];
+      // 보상 지급
+      newOnes.forEach(a => {
+        student.exp  = (student.exp||0)  + (a.reward.exp||0);
+        student.gold = (student.gold||0) + 20; // 업적 달성 보너스 골드
+        if (a.reward.title && !(student.titles||[]).includes(a.reward.title)) {
+          student.titles = [...(student.titles||[]), a.reward.title];
+          if (!student.title) student.title = a.reward.title;
+        }
+        // 장식 보상 인벤토리 추가
+        if (a.reward.deco) {
+          student.inventory = student.inventory || [];
+          const ex = student.inventory.find(i => i.id === a.reward.deco);
+          if (ex) ex.qty++; else student.inventory.push({ id: a.reward.deco, qty: 1 });
+        }
+      });
+      student.level = Utils.levelFromExp(student.exp);
+    }
+    return newOnes;
+  },
+
+  // 업적 진행도 (0~1)
+  progress(student, ach) {
+    try { return ach.check(student) ? 1 : 0; } catch(e) { return 0; }
+  },
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+</script>
+<style>
+:root {
+  --accent:#4A90E2; --accent2:#2171C7;
+  --emerald:#27AE60; --red:#E74C3C; --gold:#FFD700; --gold2:#FF8C00;
+  --purple:#8E44AD; --orange:#E67E22;
+  --bg:#0E1621; --bg2:#1A2535; --bg3:#243048; --bg4:#1F2D40;
+  --card:#1E2E42; --card2:#243348;
+  --txt:#E2EAF4; --txt2:#8EA8C8; --txt3:#4A6080;
+  --border:rgba(74,144,226,.2); --border2:rgba(255,255,255,.06);
+  --r:12px; --r2:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;}
+
+/* ── LAYOUT ── */
+.app{display:grid;grid-template-columns:220px 1fr;height:100vh;overflow:hidden;}
+@media(max-width:768px){.app{grid-template-columns:1fr;}.sidebar{display:none;}}
+
+/* ── SIDEBAR ── */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.sidebar-logo{padding:1.4rem 1.2rem;border-bottom:1px solid var(--border2);}
+.logo-title{font-size:1rem;font-weight:900;color:var(--accent);}
+.logo-sub{font-size:.7rem;color:var(--txt3);margin-top:.15rem;}
+.nav-section{padding:.7rem .8rem .2rem;font-size:.65rem;color:var(--txt3);letter-spacing:.12em;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:.7rem;padding:.65rem 1.2rem;
+  font-size:.85rem;color:var(--txt2);cursor:pointer;transition:all .18s;border-left:3px solid transparent;}
+.nav-item:hover{background:rgba(74,144,226,.07);color:var(--txt);}
+.nav-item.active{background:rgba(74,144,226,.12);color:var(--accent);border-left-color:var(--accent);}
+.nav-icon{font-size:1rem;width:20px;text-align:center;}
+.sidebar-bottom{margin-top:auto;padding:1rem;border-top:1px solid var(--border2);}
+.sidebar-student-count{font-size:.75rem;color:var(--txt3);}
+
+/* ── MAIN ── */
+.main{overflow-y:auto;background:var(--bg);}
+.main::-webkit-scrollbar{width:5px;}
+.main::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px;}
+
+/* ── TOPBAR ── */
+.topbar{position:sticky;top:0;z-index:50;background:rgba(14,22,33,.96);border-bottom:1px solid var(--border2);
+  backdrop-filter:blur(10px);padding:.8rem 1.5rem;display:flex;align-items:center;justify-content:space-between;}
+.topbar-title{font-size:1.05rem;font-weight:700;color:var(--txt);}
+.topbar-right{display:flex;gap:.6rem;align-items:center;}
+.btn-sm{background:var(--accent);color:#fff;font-family:'Noto Sans KR',sans-serif;
+  font-size:.78rem;font-weight:700;padding:.4rem .9rem;border:none;border-radius:6px;cursor:pointer;transition:all .18s;}
+.btn-sm:hover{background:var(--accent2);}
+.btn-sm.danger{background:var(--red);}
+.btn-sm.success{background:var(--emerald);}
+.btn-sm.outline{background:transparent;border:1px solid var(--border);color:var(--txt2);}
+.btn-sm.outline:hover{background:rgba(255,255,255,.05);}
+.btn-sm.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1a1a;}
+.admin-badge{font-size:.72rem;color:var(--txt3);background:rgba(255,255,255,.04);
+  border:1px solid var(--border2);border-radius:20px;padding:.25rem .7rem;}
+
+/* ── PAGE SECTIONS ── */
+.page{display:none;padding:1.4rem;}
+.page.active{display:block;}
+
+/* ── STAT CARDS ── */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:1.4rem;}
+@media(max-width:900px){.stat-row{grid-template-columns:repeat(2,1fr);}}
+.stat-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  padding:1rem 1.1rem;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.stat-card.blue::before{background:linear-gradient(90deg,var(--accent),#5BA8F5);}
+.stat-card.green::before{background:linear-gradient(90deg,var(--emerald),#2ECC71);}
+.stat-card.gold::before{background:linear-gradient(90deg,var(--gold),var(--gold2));}
+.stat-card.purple::before{background:linear-gradient(90deg,var(--purple),#9B59B6);}
+.sc-label{font-size:.7rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.1em;}
+.sc-value{font-size:1.8rem;font-weight:900;margin:.3rem 0 .15rem;}
+.sc-sub{font-size:.72rem;color:var(--txt2);}
+.sc-value.blue{color:var(--accent);}
+.sc-value.green{color:var(--emerald);}
+.sc-value.gold{color:var(--gold);}
+.sc-value.purple{color:var(--purple);}
+
+/* ── TABLE CARD ── */
+.table-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  overflow:hidden;margin-bottom:1.2rem;}
+.tc-header{padding:.9rem 1.2rem;border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:space-between;}
+.tc-title{font-size:.9rem;font-weight:700;}
+.tc-actions{display:flex;gap:.5rem;}
+table{width:100%;border-collapse:collapse;}
+thead{background:rgba(255,255,255,.03);}
+th{padding:.65rem 1rem;text-align:left;font-size:.72rem;color:var(--txt3);
+  font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--border2);}
+td{padding:.7rem 1rem;font-size:.82rem;border-bottom:1px solid rgba(255,255,255,.04);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+.td-avatar{font-size:1.2rem;width:32px;}
+.td-name{font-weight:600;}
+.td-level{color:var(--accent);font-weight:700;}
+.td-gold{color:var(--gold);font-weight:700;}
+.progress-mini{width:80px;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+.pm-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--emerald),#2ECC71);}
+.tag{display:inline-block;padding:.15rem .5rem;border-radius:20px;font-size:.68rem;font-weight:700;}
+.tag.active{background:rgba(39,174,96,.2);color:var(--emerald);}
+.tag.wait{background:rgba(255,255,255,.06);color:var(--txt3);}
+.tag.approved{background:rgba(39,174,96,.2);color:var(--emerald);}
+.tag.pending{background:rgba(230,126,34,.2);color:var(--orange);}
+.tag.rejected{background:rgba(231,76,60,.15);color:var(--red);}
+.td-actions{display:flex;gap:.4rem;flex-wrap:wrap;}
+
+/* ── FORM GRID ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem;}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr;}}
+.form-group{display:flex;flex-direction:column;gap:.4rem;}
+.form-label{font-size:.75rem;color:var(--txt2);}
+.form-input,.form-select{background:rgba(255,255,255,.04);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:.55rem .8rem;color:var(--txt);font-size:.88rem;
+  font-family:'Noto Sans KR',sans-serif;outline:none;width:100%;transition:border-color .2s;}
+.form-input:focus,.form-select:focus{border-color:var(--accent);}
+.form-select option{background:#1a2535;color:var(--txt);}
+
+/* ── APPROVE CARD ── */
+.approve-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  padding:1.1rem;margin-bottom:.7rem;display:flex;align-items:center;gap:1rem;}
+.ac-left{flex:1;}
+.ac-student{font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:.5rem;}
+.ac-quest{font-size:.78rem;color:var(--txt2);margin-top:.2rem;}
+.ac-rewards{display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap;}
+.ac-tag{background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);
+  border-radius:20px;padding:.12rem .45rem;font-size:.7rem;color:var(--gold);}
+.ac-right{display:flex;gap:.5rem;flex-shrink:0;}
+
+/* ── STUDENT DETAIL MODAL ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;
+  align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(6px);}
+.overlay.open{display:flex;}
+.modal{background:linear-gradient(145deg,#1A2535,#243048);border:1px solid var(--border);
+  border-radius:16px;padding:1.8rem;width:min(580px,100%);max-height:90vh;overflow-y:auto;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);animation:modalIn .25s ease;}
+.modal::-webkit-scrollbar{width:4px;}
+.modal::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:none}}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.4rem;}
+.modal-title{font-size:1.1rem;font-weight:700;color:var(--accent);}
+.modal-close{background:none;border:none;color:var(--txt3);font-size:1.4rem;cursor:pointer;}
+.modal-section{margin-bottom:1.2rem;}
+.ms-label{font-size:.72rem;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;
+  margin-bottom:.6rem;padding-bottom:.4rem;border-bottom:1px solid var(--border2);}
+
+/* ── ABILITY BARS (ADMIN) ── */
+.ab-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+.ab-admin-row{display:flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.03);
+  border-radius:8px;padding:.5rem .7rem;}
+.ab-admin-name{font-size:.75rem;width:35px;color:var(--txt2);}
+.ab-admin-val{font-size:.8rem;font-weight:700;color:var(--accent);width:25px;text-align:right;}
+.ab-admin-bar{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+.ab-admin-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),#5BA8F5);}
+.ab-admin-input{width:50px;background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:6px;padding:.25rem .4rem;color:var(--txt);font-size:.8rem;text-align:center;
+  font-family:'Noto Sans KR',sans-serif;}
+
+/* ── QUEST BUILDER ── */
+.qb-card{background:var(--card2);border:1px solid var(--border2);border-radius:var(--r);
+  padding:1.2rem;margin-bottom:1rem;}
+.qb-title{font-size:.9rem;font-weight:700;margin-bottom:.8rem;color:var(--accent);}
+
+/* ── TOGGLE ── */
+.toggle{position:relative;width:42px;height:22px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:11px;cursor:pointer;transition:.3s;}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:2px;bottom:2px;
+  background:#fff;border-radius:50%;transition:.3s;}
+.toggle input:checked + .toggle-slider{background:var(--emerald);}
+.toggle input:checked + .toggle-slider::before{transform:translateX(20px);}
+
+/* ── MONSTER MANAGER ── */
+.mon-manage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;}
+@media(max-width:700px){.mon-manage-grid{grid-template-columns:repeat(2,1fr);}}
+.mon-manage-card{background:var(--card2);border:1px solid var(--border2);border-radius:var(--r2);
+  padding:.8rem;display:flex;align-items:center;gap:.6rem;}
+.mmc-icon{font-size:1.5rem;}
+.mmc-name{font-size:.8rem;font-weight:700;}
+.mmc-lv{font-size:.68rem;color:var(--txt3);}
+.mmc-right{margin-left:auto;font-size:.75rem;color:var(--gold);font-weight:700;}
+
+/* ── NOTIFICATIONS ── */
+.notif{position:fixed;top:1.2rem;right:1.2rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;}
+.notif-item{background:#1E2E42;border-left:4px solid var(--emerald);border-radius:8px;
+  padding:.7rem 1rem;font-size:.82rem;max-width:300px;
+  animation:notifIn .3s ease,notifOut .3s 2.5s ease forwards;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);}
+.notif-item.error{border-left-color:var(--red);}
+.notif-item.gold{border-left-color:var(--gold);}
+@keyframes notifIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+@keyframes notifOut{to{opacity:0;transform:translateX(20px)}}
+
+/* ── SETTINGS ── */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+@media(max-width:600px){.settings-grid{grid-template-columns:1fr;}}
+.settings-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:1.2rem;}
+.sc-head{font-size:.88rem;font-weight:700;margin-bottom:1rem;color:var(--accent);}
+.setting-row{display:flex;align-items:center;justify-content:space-between;
+  padding:.6rem 0;border-bottom:1px solid var(--border2);}
+.setting-row:last-child{border-bottom:none;}
+.sr-label{font-size:.82rem;}
+.sr-sub{font-size:.7rem;color:var(--txt3);margin-top:.1rem;}
+
+/* BULK APPROVE */
+.bulk-bar{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);
+  border-radius:var(--r);padding:.8rem 1.2rem;margin-bottom:1rem;
+  display:flex;align-items:center;gap:.8rem;}
+.bulk-txt{flex:1;font-size:.82rem;color:var(--gold);}
+
+/* RANK TABLE */
+.rank-medal{font-size:1.1rem;}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+.sh-title{font-size:1rem;font-weight:700;}
+.sh-sub{font-size:.75rem;color:var(--txt2);}
+</style>
+</head>
+<body>
+<div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:#0E1621;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
+  <div style="font-size:3rem">🏫</div>
+  <div style="font-size:1rem;font-weight:700;color:#FFD700">교사 관리자</div>
+  <div style="font-size:.8rem;color:#8899aa;margin-top:.5rem">서버에 연결하는 중...</div>
+  <div style="width:180px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:.5rem;overflow:hidden">
+    <div style="width:40%;height:100%;background:#FFD700;border-radius:2px;animation:ldBar 1.2s ease-in-out infinite"></div>
+  </div>
+  <style>@keyframes ldBar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}</style>
+</div>
+
+<!-- ════ 관리자 로그인 ════ -->
+<div id="admin-login-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
+  display:flex;align-items:center;justify-content:center">
+  <div style="background:#1A2535;border:1px solid rgba(74,144,226,.3);border-radius:16px;
+    padding:2.4rem;width:min(360px,92vw);box-shadow:0 30px 60px rgba(0,0,0,.5)">
+    <div style="text-align:center;margin-bottom:1.8rem">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🏫</div>
+      <div style="font-size:1.1rem;font-weight:900;color:var(--accent)">교사 관리자</div>
+      <div style="font-size:.75rem;color:var(--txt3);margin-top:.25rem">우리반 성장 RPG</div>
+    </div>
+    <div style="margin-bottom:.8rem">
+      <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.35rem">관리자 비밀번호</div>
+      <input type="password" id="admin-pw-input" class="form-input" placeholder="비밀번호 입력"
+        style="margin-bottom:.2rem" onkeydown="if(event.key==='Enter')adminLogin()">
+      <div id="admin-login-err" style="font-size:.72rem;color:var(--red);min-height:1em;margin-top:.25rem"></div>
+    </div>
+    <button style="width:100%;padding:.7rem;font-size:.9rem;cursor:pointer;
+      background:#27ae60;color:#fff;border:none;border-radius:8px;font-weight:700;
+      font-family:inherit" onclick="adminLogin()">
+      🔑 입장하기
+    </button>
+    <div style="font-size:.68rem;color:var(--txt3);text-align:center;margin-top:.8rem">
+      기본 비밀번호: teacher1234
+    </div>
+  </div>
+</div>
+
+<div class="app" id="admin-app" style="display:none">
+  <!-- ════ SIDEBAR ════ -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-title">🏫 우리반 성장 RPG</div>
+      <div class="logo-sub">교사 관리자 페이지</div>
+    </div>
+    <div class="nav-section">대시보드</div>
+    <div class="nav-item active" id="nav-dashboard" onclick="nav('dashboard',this)"><span class="nav-icon">📊</span> 대시보드</div>
+    <div class="nav-section">학생 관리</div>
+    <div class="nav-item" id="nav-students" onclick="nav('students',this)"><span class="nav-icon">👥</span> 학생 목록</div>
+    <div class="nav-item" id="nav-approve" onclick="nav('approve',this)"><span class="nav-icon">✅</span> 활동 승인 <span id="pending-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" id="nav-promo" onclick="nav('promotion',this)"><span class="nav-icon">⬆️</span> 승급 관리 <span id="promo-badge" style="margin-left:auto;background:var(--purple);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon">🏆</span> 랭킹</div>
+    <div class="nav-section">콘텐츠</div>
+    <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon">📋</span> 퀘스트 관리</div>
+    <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
+    <div class="nav-item" onclick="nav('artwork',this)"><span class="nav-icon">🖼️</span> 작품 관리</div>
+    <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon">📚</span> 독서 현황</div>
+    <div class="nav-item" onclick="nav('monsters',this)"><span class="nav-icon">⚔️</span> 몬스터 관리</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item" id="nav-pwreset" onclick="nav('pwreset',this)"><span class="nav-icon">🔑</span> 비번 초기화 <span id="pwreset-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" onclick="nav('settings',this)"><span class="nav-icon">⚙️</span> 게임 설정</div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-student-count" id="sb-count">학생 수: -명</div>
+      <a href="student.html" style="display:block;margin-top:.5rem;font-size:.75rem;color:var(--txt3);">← 학생 화면으로</a>
+    </div>
+  </div>
+
+  <!-- ════ MAIN ════ -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">📊 대시보드</div>
+      <div class="topbar-right">
+        <div class="admin-badge">👨‍🏫 교사 모드</div>
+        <button class="btn-sm" onclick="resetToDefault()" style="background:rgba(255,255,255,.06);color:var(--txt2)">초기화</button>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="p-dashboard">
+
+      <!-- 긴급 처리 배너 -->
+      <div id="dash-urgent-banner" style="display:none;margin-bottom:1rem"></div>
+
+      <!-- 요약 스탯 -->
+      <div class="stat-row" id="stat-row"></div>
+
+      <!-- 오늘 처리할 것 ★ 핵심 -->
+      <div class="table-card" style="border-color:rgba(255,215,0,.2);margin-bottom:1rem">
+        <div class="tc-header" style="background:rgba(255,215,0,.05)">
+          <div class="tc-title">⚡ 오늘 처리할 것</div>
+          <div class="tc-actions">
+            <button class="btn-sm success" onclick="approveAllDash()">전체 승인</button>
+            <button class="btn-sm outline" onclick="nav('approve',document.getElementById('nav-approve'))">전체 보기</button>
+          </div>
+        </div>
+        <div id="dash-pending"></div>
+      </div>
+
+      <!-- 승급 대기 -->
+      <div id="dash-promo-wrap" style="display:none;margin-bottom:1rem">
+        <div class="table-card" style="border-color:rgba(142,68,173,.25)">
+          <div class="tc-header" style="background:rgba(142,68,173,.05)">
+            <div class="tc-title">⬆️ 승급 신청 대기</div>
+            <div class="tc-actions">
+              <button class="btn-sm outline" onclick="nav('promotion',document.getElementById('nav-promo'))">전체 보기</button>
+            </div>
+          </div>
+          <div id="dash-promo-list"></div>
+        </div>
+      </div>
+
+      <!-- 비번 초기화 요청 -->
+      <div id="dash-pwreset-wrap" style="display:none;margin-bottom:1rem">
+        <div class="table-card" style="border-color:rgba(231,76,60,.25)">
+          <div class="tc-header" style="background:rgba(231,76,60,.05)">
+            <div class="tc-title">🔑 비밀번호 초기화 요청</div>
+            <div class="tc-actions">
+              <button class="btn-sm outline" onclick="nav('pwreset',document.getElementById('nav-pwreset'))">전체 보기</button>
+            </div>
+          </div>
+          <div id="dash-pwreset-list"></div>
+        </div>
+      </div>
+
+      <!-- 빠른 보상 지급 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header">
+          <div class="tc-title">🎁 빠른 보상 지급</div>
+          <div class="tc-actions">
+            <button class="btn-sm outline" onclick="nav('reward',document.getElementById('nav-reward'))">전체 보상</button>
+          </div>
+        </div>
+        <div style="padding:.9rem 1.2rem">
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem">
+            <button class="btn-sm outline" onclick="fillPreset('read');nav('approve',document.getElementById('nav-approve'))">📚 독서</button>
+            <button class="btn-sm outline" onclick="fillPreset('hw');nav('approve',document.getElementById('nav-approve'))">📝 숙제</button>
+            <button class="btn-sm outline" onclick="fillPreset('clean');nav('approve',document.getElementById('nav-approve'))">🧹 청소</button>
+            <button class="btn-sm outline" onclick="fillPreset('prep');nav('approve',document.getElementById('nav-approve'))">🎒 준비물</button>
+            <button class="btn-sm outline" onclick="fillPreset('present');nav('approve',document.getElementById('nav-approve'))">🙋 발표</button>
+            <button class="btn-sm outline" onclick="fillPreset('help');nav('approve',document.getElementById('nav-approve'))">🤝 친구도움</button>
+            <button class="btn-sm outline" onclick="fillPreset('daily');nav('approve',document.getElementById('nav-approve'))">📋 일일퀘스트</button>
+            <button class="btn-sm outline" onclick="fillPreset('special');nav('approve',document.getElementById('nav-approve'))">⭐ 특별보상</button>
+          </div>
+          <div style="font-size:.72rem;color:var(--txt3)">클릭하면 승인 페이지에서 프리셋이 바로 채워져요</div>
+        </div>
+      </div>
+
+      <!-- 학생 현황 (보조) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="table-card">
+          <div class="tc-header"><div class="tc-title">📈 학생 레벨 현황</div></div>
+          <div id="dash-level-list" style="padding:.5rem 0"></div>
+        </div>
+        <div class="table-card">
+          <div class="tc-header"><div class="tc-title">⚡ 최근 활동</div></div>
+          <div id="dash-activity" style="padding:.5rem 0;max-height:250px;overflow-y:auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STUDENTS ── -->
+    <div class="page" id="p-students">
+      <div class="table-card">
+        <div class="tc-header">
+          <div class="tc-title">👥 학생 목록</div>
+          <div class="tc-actions">
+            <button class="btn-sm" onclick="openAddStudent()">+ 학생 추가</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>캐릭터</th><th>이름</th><th>레벨</th><th>EXP</th><th>골드</th>
+              <th>칭호</th><th>직업</th><th>관리</th>
+            </tr></thead>
+            <tbody id="student-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── APPROVE ── -->
+    <div class="page" id="p-approve">
+      <div class="section-header">
+        <div><div class="sh-title">✅ 활동 승인</div>
+          <div class="sh-sub">학생의 오프라인 활동을 확인하고 승인하세요</div></div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-sm success" onclick="approveAll()">전체 승인</button>
+        </div>
+      </div>
+      <!-- 활동 프리셋 -->
+      <div class="qb-card" style="margin-bottom:1rem">
+        <div class="qb-title">⚡ 빠른 보상 지급</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.9rem">
+          <button class="btn-sm outline" onclick="fillPreset('read')">📚 독서</button>
+          <button class="btn-sm outline" onclick="fillPreset('hw')">📝 숙제</button>
+          <button class="btn-sm outline" onclick="fillPreset('clean')">🧹 청소</button>
+          <button class="btn-sm outline" onclick="fillPreset('prep')">🎒 준비물</button>
+          <button class="btn-sm outline" onclick="fillPreset('present')">🙋 발표</button>
+          <button class="btn-sm outline" onclick="fillPreset('help')">🤝 친구도움</button>
+          <button class="btn-sm outline" onclick="fillPreset('daily')">📋 일일퀘스트</button>
+          <button class="btn-sm outline" onclick="fillPreset('special')">⭐ 특별보상</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">학생 선택</label>
+            <select class="form-select" id="qa-student">
+              <option value="all">전체 학생</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">활동명</label>
+            <input class="form-input" id="qa-name" placeholder="예: 익힘책 15쪽 완료">
+          </div>
+          <div class="form-group">
+            <label class="form-label">EXP</label>
+            <input class="form-input" type="number" id="qa-exp" value="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">골드</label>
+            <input class="form-input" type="number" id="qa-gold" value="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">능력치</label>
+            <select class="form-select" id="qa-stat">
+              <option value="">없음</option>
+              <option value="read">독서</option>
+              <option value="study">학습</option>
+              <option value="art">예술</option>
+              <option value="value">가치</option>
+              <option value="health">건강</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">아이콘</label>
+            <input class="form-input" id="qa-icon" value="✅" style="font-size:1.1rem;width:70px">
+          </div>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+          <button class="btn-sm success" onclick="quickApprove()">✅ 지급</button>
+          <span style="font-size:.72rem;color:var(--txt3)" id="last-preset-hint"></span>
+        </div>
+      </div>
+      <!-- 필터 -->
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem">
+        <button class="btn-sm outline" id="af-all"    onclick="setApproveFilter('all',this)">전체</button>
+        <button class="btn-sm outline" id="af-today"  onclick="setApproveFilter('today',this)">오늘만</button>
+      </div>
+      <div class="tc-header" style="background:var(--card);border-radius:var(--r) var(--r) 0 0;padding:.9rem 1.2rem;border-bottom:1px solid var(--border2)">
+        <div class="tc-title">⏳ 대기 중인 보상</div>
+      </div>
+      <div id="approve-list"></div>
+    </div>
+
+    <!-- ── RANK ── -->
+    <div class="page" id="p-rank">
+      <div class="section-header">
+        <div><div class="sh-title">🏆 학생 랭킹</div></div>
+        <button class="btn-sm danger" onclick="resetRanking()" style="flex-shrink:0">🔄 랭킹 초기화</button>
+      </div>
+      <div class="table-card">
+        <div class="tc-header"><div class="tc-title">레벨 순위</div></div>
+        <table>
+          <thead><tr><th>순위</th><th>학생</th><th>레벨</th><th>EXP</th><th>골드</th><th>퀘스트</th><th>몬스터</th></tr></thead>
+          <tbody id="rank-table"></tbody>
+        </table>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem">
+        <div class="table-card">
+          <div class="tc-header"><div class="tc-title">📚 독서 랭킹</div></div>
+          <table><thead><tr><th>순위</th><th>학생</th><th>책 수</th></tr></thead>
+          <tbody id="book-rank"></tbody></table>
+        </div>
+        <div class="table-card">
+          <div class="tc-header"><div class="tc-title">⚔️ 몬스터 처치 랭킹</div></div>
+          <table><thead><tr><th>순위</th><th>학생</th><th>처치 수</th></tr></thead>
+          <tbody id="monster-rank"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── QUESTS ── -->
+    <div class="page" id="p-quests">
+      <div class="section-header">
+        <div><div class="sh-title">📋 퀘스트 관리</div>
+        <div class="sh-sub">퀘스트를 게시판에 올리고, 완료한 학생에게 보상을 지급하세요</div></div>
+      </div>
+
+      <!-- 템플릿 탭 -->
+      <div class="qb-card" style="margin-bottom:1rem">
+        <div class="qb-title">📌 퀘스트 게시판 등록</div>
+        <div class="modal-tabs" style="margin-bottom:1rem;flex-wrap:wrap;gap:.3rem">
+          <button class="mtab on" id="qt-daily-btn" onclick="switchQuestTab('daily')">📋 일일</button>
+          <button class="mtab" id="qt-weekly-btn" onclick="switchQuestTab('weekly')">📅 주간</button>
+          <button class="mtab" id="qt-read-btn"   onclick="switchQuestTab('read')">📚 독서</button>
+          <button class="mtab" id="qt-study-btn"  onclick="switchQuestTab('study')">📖 학습</button>
+          <button class="mtab" id="qt-art-btn"    onclick="switchQuestTab('art')">🎨 예술</button>
+          <button class="mtab" id="qt-value-btn"  onclick="switchQuestTab('value')">💛 가치</button>
+          <button class="mtab" id="qt-health-btn" onclick="switchQuestTab('health')">💪 건강</button>
+          <button class="mtab" id="qt-custom-btn" onclick="switchQuestTab('custom')">✏️ 직접입력</button>
+        </div>
+
+        <!-- 일일 템플릿 -->
+        <div id="qt-daily">
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📋 80EXP + 50G</div>
+          <div id="qt-daily-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
+          <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
+            <input class="form-input" id="qt-daily-custom" placeholder="+ 항목 직접 추가" style="flex:1">
+            <button class="btn-sm" onclick="addQuestTemplate('daily')">추가</button>
+          </div>
+          <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('daily')">📌 체크한 항목 게시판에 올리기</button>
+        </div>
+
+        <!-- 주간 템플릿 -->
+        <div id="qt-weekly" style="display:none">
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📅 150EXP + 100G</div>
+          <div id="qt-weekly-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
+          <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
+            <input class="form-input" id="qt-weekly-custom" placeholder="+ 항목 직접 추가" style="flex:1">
+            <button class="btn-sm" onclick="addQuestTemplate('weekly')">추가</button>
+          </div>
+          <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('weekly')">📌 체크한 항목 게시판에 올리기</button>
+        </div>
+
+        <!-- 능력치별 퀘스트 탭 -->
+        <div id="qt-ability" style="display:none">
+          <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center">
+            <span style="font-size:.78rem;color:var(--txt2)">난이도 필터:</span>
+            <button class="btn-sm outline" id="diff-all" onclick="setDiffFilter('all',this)" style="font-size:.72rem;padding:.2rem .6rem">전체</button>
+            <button class="btn-sm outline" id="diff-easy" onclick="setDiffFilter('easy',this)" style="font-size:.72rem;padding:.2rem .6rem">🟢 쉬움</button>
+            <button class="btn-sm outline" id="diff-mid" onclick="setDiffFilter('mid',this)" style="font-size:.72rem;padding:.2rem .6rem">🟡 중간</button>
+            <button class="btn-sm outline" id="diff-hard" onclick="setDiffFilter('hard',this)" style="font-size:.72rem;padding:.2rem .6rem">🔴 어려움</button>
+          </div>
+          <div id="qt-ability-list" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.8rem"></div>
+          <div style="margin-top:.5rem;display:flex;gap:.5rem;align-items:center">
+            <input class="form-input" id="qt-ability-custom" placeholder="+ 항목 직접 추가">
+            <select class="form-select" id="qt-ability-custom-diff" style="width:auto">
+              <option value="easy">🟢 쉬움</option>
+              <option value="mid" selected>🟡 중간</option>
+              <option value="hard">🔴 어려움</option>
+            </select>
+            <button class="btn-sm" onclick="addAbilityTemplate()">추가</button>
+          </div>
+          <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedAbilityQuests()">📌 체크한 항목 게시판에 올리기</button>
+        </div>
+
+                <!-- 직접 입력 -->
+        <div id="qt-custom" style="display:none">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">퀘스트명</label>
+              <input class="form-input" id="nq-name" placeholder="예: 줄넘기 50회">
+            </div>
+            <div class="form-group">
+              <label class="form-label">유형</label>
+              <select class="form-select" id="nq-type" onchange="onQuestTypeChange(this.value)">
+                <option value="daily">일일 퀘스트</option>
+                <option value="weekly">주간 퀘스트</option>
+                <option value="special">과제 퀘스트</option>
+                <option value="event">특별 퀘스트</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">EXP 보상</label>
+              <input class="form-input" type="number" id="nq-exp" value="80">
+            </div>
+            <div class="form-group">
+              <label class="form-label">골드 보상</label>
+              <input class="form-input" type="number" id="nq-gold" value="50">
+            </div>
+            <input type="hidden" id="nq-icon" value="📋">
+            <div class="form-group">
+              <label class="form-label">능력치</label>
+              <select class="form-select" id="nq-stat">
+                <option value="">없음</option>
+                <option value="read">독서</option>
+                <option value="study">학습</option>
+                <option value="art">예술</option>
+                <option value="value">가치</option>
+                <option value="health">건강</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">마감일 (선택)</label>
+              <input class="form-input" type="date" id="nq-due">
+            </div>
+          </div>
+          <button class="btn-sm success" onclick="addBoardQuest()">📌 게시판에 등록</button>
+        </div>
+      </div>
+
+      <!-- 게시판 퀘스트 목록 -->
+      <div class="table-card">
+        <div class="tc-header"><div class="tc-title">📌 현재 게시중인 퀘스트</div></div>
+        <div id="board-quest-list" style="padding:.5rem 0"></div>
+        <div class="tc-header" style="margin-top:.5rem;border-top:1px solid var(--border2)">
+          <div class="tc-title" style="color:var(--txt3)">🗄️ 비활성 퀘스트</div>
+          <button class="btn-sm outline" style="font-size:.72rem" onclick="toggleInactiveQuests()">펼치기</button>
+        </div>
+        <div id="inactive-quest-list" style="display:none;padding:.5rem 0"></div>
+      </div>
+    </div>
+
+    <!-- ── REWARD ── -->
+    <div class="page" id="p-reward">
+      <div class="section-header"><div class="sh-title">🎁 개별 보상 지급</div></div>
+      <div class="qb-card" style="margin-bottom:1rem">
+        <div class="qb-title">학생 능력치 직접 수정</div>
+        <div class="form-group" style="margin-bottom:.8rem">
+          <label class="form-label">학생 선택</label>
+          <select class="form-select" id="rw-student" onchange="loadRewardStudent()"></select>
+        </div>
+        <div class="ab-grid" id="reward-stats" style="margin-bottom:1rem"></div>
+        <div class="form-grid" style="margin-bottom:.8rem">
+          <div class="form-group">
+            <label class="form-label">골드 지급/차감</label>
+            <input class="form-input" type="number" id="rw-gold" value="0" placeholder="양수: 지급, 음수: 차감">
+          </div>
+          <div class="form-group">
+            <label class="form-label">EXP 지급</label>
+            <input class="form-input" type="number" id="rw-exp" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">칭호 부여</label>
+            <select class="form-select" id="rw-title">
+              <option value="">없음</option>
+              ${GAME_DATA.titles.map(t=>`<option>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">비밀번호 변경</label>
+            <input class="form-input" id="rw-pw" placeholder="새 비밀번호">
+          </div>
+        </div>
+        <div style="display:flex;gap:.6rem">
+          <button class="btn-sm success" onclick="applyReward()">✅ 적용</button>
+          <button class="btn-sm gold" onclick="applyReward(true)">🎉 레벨업 이벤트</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MONSTERS ── -->
+    <div class="page" id="p-monsters">
+      <div class="section-header"><div class="sh-title">⚔️ 몬스터 현황</div></div>
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header"><div class="tc-title">학생별 몬스터 처치 현황</div></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>학생</th><th>처치 수</th><th>처치 목록</th></tr></thead>
+            <tbody id="monster-kill-table"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="tc-header"><div class="tc-title">🐉 전체 몬스터 목록</div></div>
+        <div class="mon-manage-grid" style="padding:1rem" id="mon-list"></div>
+      </div>
+    </div>
+
+    <!-- ── ARTWORK ── -->
+    <div class="page" id="p-artwork">
+      <div class="section-header">
+        <div><div class="sh-title">🖼️ 작품 관리</div>
+        <div class="sh-sub">학생이 제출한 작품을 확인하고 승인·반려하세요</div></div>
+      </div>
+
+      <!-- 승인 대기 작품 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header">
+          <div class="tc-title">⏳ 승인 대기 작품</div>
+        </div>
+        <div id="artwork-pending-list" style="padding:.5rem 0"></div>
+      </div>
+
+      <!-- 승인 완료 작품 목록 -->
+      <div class="table-card">
+        <div class="tc-header"><div class="tc-title">✅ 전시중인 작품</div></div>
+        <div id="artwork-admin-list" style="padding:.5rem 0"></div>
+      </div>
+    </div>
+
+    <!-- ── BOOKS ── -->
+    <div class="page" id="p-books">
+      <div class="section-header">
+        <div><div class="sh-title">📚 독서 현황</div>
+        <div class="sh-sub">학생별 독서 기록을 확인하세요</div></div>
+      </div>
+
+      <!-- 학급 전체 요약 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header"><div class="tc-title">📊 학급 독서 요약</div></div>
+        <div id="books-summary" style="padding:.8rem 1.2rem"></div>
+      </div>
+
+      <!-- 월별 독서 막대그래프 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header"><div class="tc-title">📊 월별 독서 현황</div></div>
+        <div style="padding:1rem">
+          <div id="books-monthly-chart" style="display:flex;align-items:flex-end;gap:6px;height:100px"></div>
+          <div id="books-monthly-labels" style="display:flex;gap:6px;margin-top:4px"></div>
+        </div>
+      </div>
+
+      <!-- 학생별 독서 목록 -->
+      <div class="table-card">
+        <div class="tc-header">
+          <div class="tc-title">학생별 독서 기록</div>
+          <select id="books-filter" class="form-select" style="width:auto;font-size:.8rem"
+            onchange="renderBooksPage()">
+            <option value="all">전체 학생</option>
+          </select>
+        </div>
+        <div id="books-list" style="padding:.5rem 0"></div>
+      </div>
+    </div>
+
+    <!-- ── PW RESET ── -->
+    <div class="page" id="p-pwreset">
+      <div class="section-header"><div class="sh-title">🔑 비밀번호 초기화 요청</div></div>
+      <div id="pwreset-list" style="padding:.5rem 0"></div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="page" id="p-settings">
+      <div class="section-header"><div class="sh-title">⚙️ 게임 설정</div></div>
+      <div class="settings-grid">
+        <div class="settings-card">
+          <div class="sc-head">🏫 학급 정보</div>
+          <div class="form-group" style="margin-bottom:.8rem">
+            <label class="form-label">학급 이름</label>
+            <input class="form-input" id="set-classname" value="우리반">
+          </div>
+          <button class="btn-sm success" onclick="saveSettings()">저장</button>
+        </div>
+        <div class="settings-card">
+          <div class="sc-head">🔥 금요일 보스</div>
+          <div class="setting-row">
+            <div><div class="sr-label">보스 활성화</div><div class="sr-sub">금요일에 보스 배너 표시</div></div>
+            <label class="toggle"><input type="checkbox" id="set-boss-active"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-group" style="margin:.8rem 0">
+            <label class="form-label">보스 이름</label>
+            <input class="form-input" id="set-boss-name" value="거대 트롤">
+          </div>
+          <div class="form-grid" style="margin-bottom:.8rem">
+            <div class="form-group">
+              <label class="form-label">보스 아이콘</label>
+              <input class="form-input" id="set-boss-icon" value="🧌" style="font-size:1.2rem">
+            </div>
+            <div class="form-group">
+              <label class="form-label">보상 골드</label>
+              <input class="form-input" type="number" id="set-boss-gold" value="150">
+            </div>
+          </div>
+          <button class="btn-sm success" onclick="saveSettings()">저장</button>
+        </div>
+        <div class="settings-card">
+          <div class="sc-head">🎮 밸런스 조정</div>
+          <div class="setting-row">
+            <div><div class="sr-label">기본 일일 EXP</div></div>
+            <input class="form-input" id="set-base-exp" style="width:70px" value="10" type="number">
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">기본 일일 골드</div></div>
+            <input class="form-input" id="set-base-gold" style="width:70px" value="10" type="number">
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">몬스터 성공률 (%)</div></div>
+            <input class="form-input" id="set-monster-rate" style="width:70px" value="80" type="number">
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">몬스터 하루 도전 횟수</div></div>
+            <input class="form-input" id="set-monster-limit" style="width:70px" value="2" type="number" min="1" max="5">
+          </div>
+          <button class="btn-sm success" style="margin-top:.8rem" onclick="saveSettings()">저장</button>
+        </div>
+        <div class="settings-card">
+          <div class="sc-head">🛠️ 데이터 관리</div>
+          <div class="setting-row">
+            <div><div class="sr-label">🧪 테스트 데이터 주입</div><div class="sr-sub">강지원(1번) 모든 기능 체험용 데이터</div></div>
+            <button class="btn-sm success" onclick="injectTestData()">주입</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">전체 데이터 초기화</div><div class="sr-sub">⚠️ 모든 학생 데이터 초기화</div></div>
+            <button class="btn-sm danger" onclick="confirmReset()">초기화</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">데이터 내보내기</div><div class="sr-sub">JSON 파일로 저장</div></div>
+            <button class="btn-sm outline" onclick="exportData()">내보내기</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">데이터 가져오기</div><div class="sr-sub">JSON 파일 복원</div></div>
+            <button class="btn-sm outline" onclick="document.getElementById('import-file').click()">가져오기</button>
+            <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+          </div>
+          <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border2)">
+            <div style="font-size:.78rem;font-weight:700;margin-bottom:.5rem;color:var(--accent)">🔑 관리자 비밀번호 변경</div>
+            <div style="display:flex;gap:.5rem">
+              <input class="form-input" type="password" id="set-admin-pw" placeholder="새 비밀번호" style="flex:1">
+              <button class="btn-sm success" onclick="changeAdminPw()">변경</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <!-- ── PROMOTION ── -->
+    <div class="page" id="p-promotion">
+      <div class="section-header">
+        <div><div class="sh-title">⬆️ 승급 신청 관리</div>
+        <div class="sh-sub">학생이 신청한 승급을 확인하고 승인하세요</div></div>
+      </div>
+      <div id="promo-list">
+        <div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">
+          대기 중인 승급 신청이 없습니다
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.main -->
+</div><!-- /.app (admin-app) -->
+
+<!-- ════ STUDENT DETAIL MODAL ════ -->
+<div class="overlay" id="m-student"><div class="modal">
+  <div class="modal-hd">
+    <div class="modal-title" id="modal-student-title">학생 상세</div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <div id="modal-student-body"></div>
+</div></div>
+
+<!-- NOTIF -->
+<div class="notif" id="notif-wrap"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  ADMIN LOGIN
+// ══════════════════════════════════════════════════
+async function adminLogin() {
+  const input = document.getElementById('admin-pw-input').value;
+  const pw = await DB.getAdminPw();
+  if (input === pw) {
+    document.getElementById('admin-login-screen').style.display = 'none';
+    document.getElementById('admin-app').style.display = 'grid';
+    renderAll();
+    updatePendingBadge();
+    updatePromoBadge();
+    updatePwResetBadge();
+    populateSelectStudents();
+  } else {
+    document.getElementById('admin-login-err').textContent = '비밀번호가 틀렸습니다!';
+  }
+}
+
+function changeAdminPw() {
+  const newPw = document.getElementById('set-admin-pw').value.trim();
+  if (!newPw || newPw.length < 4) { notify('비밀번호는 4자 이상이어야 합니다', 'error'); return; }
+  DB.setAdminPw(newPw);
+  document.getElementById('set-admin-pw').value = '';
+  notify('🔑 관리자 비밀번호 변경 완료!');
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+window.onload = async () => {
+  const loading = document.getElementById('loading-screen');
+  try {
+    await DB.init();
+    DB.onDataChange(() => {
+      // 관리자 로그인 상태일 때만 재렌더
+      if (document.getElementById('admin-app').style.display !== 'none') {
+        renderAll();
+        updatePendingBadge();
+        updatePromoBadge();
+        updatePwResetBadge();
+      }
+    });
+  } catch(e) {
+    console.error('Firebase 연결 실패:', e);
+    alert('서버 연결에 실패했습니다. 인터넷 연결을 확인해주세요.');
+  }
+  loading.style.display = 'none';
+  loading.remove();
+  document.getElementById('admin-pw-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') adminLogin();
+  });
+};
+
+function renderAll() {
+  renderDashboard();
+  renderStudentTable();
+  renderApproveList();
+  renderRank();
+  renderBoardQuestList();
+  renderMonsters();
+  renderPromotionList();
+  loadSettings();
+  updatePwResetBadge();
+  renderArtworkPending();
+  renderArtworkAdmin();
+  const students = DB.getStudents();
+  document.getElementById('sb-count').textContent = `학생 수: ${students.length}명`;
+}
+
+function updatePwResetBadge() {
+  const reqs = DB.getPwResetRequests();
+  const badge = document.getElementById('pwreset-badge');
+  if (!badge) return;
+  if (reqs.length > 0) { badge.textContent = reqs.length; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════════════════
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset'];
+const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
+  rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
+  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화'};
+
+function nav(page, el) {
+  pages.forEach(p => document.getElementById('p-'+p)?.classList.remove('active'));
+  document.getElementById('p-'+page)?.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el?.classList.add('active');
+  document.getElementById('topbar-title').textContent = titles[page] || page;
+  if (page === 'reward')   populateRewardStudents();
+  if (page === 'artwork')  { renderArtworkPending(); renderArtworkAdmin(); }
+  if (page === 'books')    renderBooksPage();
+  if (page === 'pwreset')  renderPwResetList();
+  if (page === 'quests')   initQuestPage();
+}
+
+// ══════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════
+function renderDashboard() {
+  const students = DB.getStudents();
+  const quests   = DB.getQuests();
+  const promos   = DB.getPromotionRequests();
+  const pwResets = DB.getPwResetRequests();
+  const pendingItems = students.flatMap(s =>
+    (s.pendingRewards||[]).map(r => ({...r, student:s}))
+  );
+  const totalPending = pendingItems.length;
+  const avgLevel = students.length
+    ? (students.reduce((a,s)=>a+s.level,0)/students.length).toFixed(1) : '0';
+
+  // ── 요약 스탯 ──
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card blue" style="cursor:pointer" onclick="nav('students',document.getElementById('nav-students'))">
+      <div class="sc-label">전체 학생</div>
+      <div class="sc-value blue">${students.length}</div><div class="sc-sub">명</div></div>
+    <div class="stat-card ${totalPending>0?'gold':'green'}" style="cursor:pointer" onclick="nav('approve',document.getElementById('nav-approve'))">
+      <div class="sc-label">승인 대기</div>
+      <div class="sc-value ${totalPending>0?'gold':'green'}">${totalPending}</div>
+      <div class="sc-sub">${totalPending>0?'👆 클릭해서 처리':'건 (없음)'}</div></div>
+    <div class="stat-card ${promos.length>0?'purple':'green'}" style="cursor:pointer" onclick="nav('promotion',document.getElementById('nav-promo'))">
+      <div class="sc-label">승급 대기</div>
+      <div class="sc-value ${promos.length>0?'purple':'green'}">${promos.length}</div>
+      <div class="sc-sub">${promos.length>0?'👆 클릭해서 처리':'건 (없음)'}</div></div>
+    <div class="stat-card blue">
+      <div class="sc-label">평균 레벨</div>
+      <div class="sc-value blue">${avgLevel}</div><div class="sc-sub">/ 30</div></div>`;
+
+  // ── 긴급 배너 ──
+  const urgentEl = document.getElementById('dash-urgent-banner');
+  const urgentList = [];
+  if (totalPending > 0) urgentList.push(`<span style="color:var(--gold)">✅ 승인 대기 ${totalPending}건</span>`);
+  if (promos.length > 0) urgentList.push(`<span style="color:#c39bd3">⬆️ 승급 신청 ${promos.length}건</span>`);
+  if (pwResets.length > 0) urgentList.push(`<span style="color:var(--red)">🔑 비번 초기화 ${pwResets.length}건</span>`);
+  if (urgentList.length > 0) {
+    urgentEl.style.display = '';
+    urgentEl.innerHTML = `<div style="background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);
+      border-radius:var(--r);padding:.75rem 1.2rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <span style="font-size:.78rem;font-weight:700;color:var(--txt2)">📌 처리 필요</span>
+      ${urgentList.map(u=>`<span style="font-size:.82rem;font-weight:700">${u}</span>`).join('<span style="color:var(--txt3)">·</span>')}
+    </div>`;
+  } else {
+    urgentEl.style.display = 'none';
+  }
+
+  // ── 오늘 처리할 것 (보상 대기 전체) ──
+  document.getElementById('dash-pending').innerHTML = pendingItems.length > 0
+    ? pendingItems.map(item => `
+      <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.65rem 1.2rem;
+        border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s"
+        onmouseover="this.style.background='rgba(255,255,255,.02)'"
+        onmouseout="this.style.background=''">
+        <div style="font-size:1.15rem;width:32px;text-align:center;padding-top:.1rem">${item.student.avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.84rem;font-weight:700">${item.student.name}
+            <span style="font-weight:400;color:var(--txt2)">· ${item.label}</span>
+            ${item.type==='book'?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);
+              border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">📚 독서</span>`:''}
+          ${item.type==='artwork'?`<span style="font-size:.68rem;background:rgba(155,89,182,.12);color:var(--purple);
+              border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">🎨 작품</span>`:''}
+          </div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">
+            +${item.exp}EXP${item.stat?' · '+GAME_DATA.statNames[item.stat]+' +1':''}
+            ${item.bookDate?' · '+item.bookDate:''}
+          </div>
+          ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;
+            padding:.35rem .55rem;background:rgba(255,255,255,.04);border-radius:8px;
+            border-left:2px solid rgba(93,173,226,.3);line-height:1.5">
+            ${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
+        </div>
+        <div style="display:flex;gap:.4rem;flex-shrink:0;padding-top:.1rem">
+          <button class="btn-sm success" style="font-size:.72rem;padding:.3rem .7rem"
+            onclick="approveSingleDash('${item.student.id}','${item.id}',this)">✅ 승인</button>
+          <button class="btn-sm danger" style="font-size:.72rem;padding:.3rem .6rem"
+            onclick="rejectSingleDash('${item.student.id}','${item.id}',this)">✕</button>
+        </div>
+      </div>`).join('')
+    : `<div style="padding:1.4rem 1.2rem;font-size:.82rem;color:var(--txt3);text-align:center">
+        🎉 처리할 보상이 없어요!</div>`;
+
+  // ── 승급 대기 ──
+  const promoWrap = document.getElementById('dash-promo-wrap');
+  if (promos.length > 0) {
+    promoWrap.style.display = '';
+    document.getElementById('dash-promo-list').innerHTML = promos.map(r => {
+      const s = DB.getStudent(r.studentId);
+      if (!s) return '';
+      return `<div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
+        border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="font-size:1.1rem">${s.avatar}</div>
+        <div style="flex:1">
+          <div style="font-size:.84rem;font-weight:700">${s.name}
+            <span style="background:rgba(142,68,173,.2);color:#c39bd3;font-size:.68rem;
+              padding:.1rem .4rem;border-radius:10px;margin-left:.4rem">
+              Lv.${r.currentLevel} → ${r.targetLevel}
+            </span>
+          </div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${r.date||''}</div>
+        </div>
+        <div style="display:flex;gap:.4rem;flex-shrink:0">
+          <button class="btn-sm success" style="font-size:.72rem;padding:.3rem .7rem"
+            onclick="approvePromoDash('${r.id}',this)">✅ 승급</button>
+          <button class="btn-sm danger" style="font-size:.72rem;padding:.3rem .6rem"
+            onclick="rejectPromoDash('${r.id}',this)">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    promoWrap.style.display = 'none';
+  }
+
+  // ── 비번 초기화 요청 ──
+  const pwWrap = document.getElementById('dash-pwreset-wrap');
+  if (pwResets.length > 0) {
+    pwWrap.style.display = '';
+    document.getElementById('dash-pwreset-list').innerHTML = pwResets.map(r => {
+      const s = DB.getStudent(r.studentId);
+      if (!s) return '';
+      return `<div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
+        border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="font-size:1.1rem">${s.avatar}</div>
+        <div style="flex:1">
+          <div style="font-size:.84rem;font-weight:700">${s.name}</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${r.date||''} 요청</div>
+        </div>
+        <div style="display:flex;gap:.4rem;flex-shrink:0">
+          <button class="btn-sm success" style="font-size:.72rem;padding:.3rem .7rem"
+            onclick="approvePwResetDash('${r.id}','${r.studentId}',this)">✅ 초기화</button>
+          <button class="btn-sm danger" style="font-size:.72rem;padding:.3rem .6rem"
+            onclick="rejectPwResetDash('${r.id}',this)">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    pwWrap.style.display = 'none';
+  }
+
+  // ── 레벨 현황 ──
+  document.getElementById('dash-level-list').innerHTML = students
+    .sort((a,b) => b.level - a.level)
+    .map(s => {
+      const pct = Math.min(100,
+        ((s.exp - Utils.expForLevel(s.level)) /
+         (Utils.expForNextLevel(s.level) - Utils.expForLevel(s.level))) * 100);
+      return `<div style="display:flex;align-items:center;gap:.8rem;padding:.5rem 1rem;">
+        <div style="font-size:1.1rem;width:28px;text-align:center">${s.avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${s.name}</div>
+          <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4A90E2,#5BA8F5);border-radius:2px"></div>
+          </div>
+        </div>
+        <div style="font-size:.78rem;color:var(--accent);font-weight:700;white-space:nowrap">Lv.${s.level}</div>
+      </div>`;
+    }).join('');
+
+  // ── 최근 활동 ──
+  const allQuests = DB.getQuests().slice(-10).reverse();
+  document.getElementById('dash-activity').innerHTML = allQuests.length > 0
+    ? allQuests.map(q => {
+        const s = DB.getStudent(q.studentId);
+        return `<div style="display:flex;align-items:center;gap:.6rem;padding:.45rem 1rem;
+          border-bottom:1px solid rgba(255,255,255,.03)">
+          <span style="font-size:.95rem">${q.icon||'📋'}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              ${s?.name||'?'} · ${q.name}</div>
+            <div style="font-size:.68rem;color:var(--txt3)">${q.date||''}</div>
+          </div>
+          <span class="tag ${q.approved?'approved':'pending'}">${q.approved?'승인':'대기'}</span>
+        </div>`;
+      }).join('')
+    : '<div style="padding:1rem;font-size:.78rem;color:var(--txt3)">활동 기록 없음</div>';
+}
+
+// ══════════════════════════════════════════════════
+//  STUDENT TABLE
+// ══════════════════════════════════════════════════
+function renderStudentTable() {
+  const students = DB.getStudents();
+  document.getElementById('student-table').innerHTML = students.map(s => `
+    <tr>
+      <td><div class="td-avatar">${s.avatar}</div></td>
+      <td><div class="td-name">${s.name}</div></td>
+      <td><div class="td-level">Lv.${s.level}</div></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <div class="progress-mini"><div class="pm-fill" style="width:${Math.min(100,((s.exp-Utils.expForLevel(s.level))/(Utils.expForNextLevel(s.level)-Utils.expForLevel(s.level)))*100)}%"></div></div>
+          <span style="font-size:.7rem;color:var(--txt3)">${s.exp}</span>
+        </div>
+      </td>
+      <td><div class="td-gold">💰 ${s.gold}G</div></td>
+      <td><span style="font-size:.78rem;color:var(--purple)">${s.title||'-'}</span></td>
+      <td><span style="font-size:.75rem;color:var(--txt2)">${s.job||'-'}</span></td>
+      <td><div class="td-actions">
+        <button class="btn-sm" onclick="openStudentDetail('${s.id}')">상세</button>
+        <button class="btn-sm success" style="font-size:.7rem" onclick="quickGiveGold('${s.id}')">+골드</button>
+        <button class="btn-sm danger" style="font-size:.7rem" onclick="confirmDeleteStudent('${s.id}')">삭제</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  STUDENT DETAIL MODAL
+// ══════════════════════════════════════════════════
+function openStudentDetail(id) {
+  const s = DB.getStudent(id);
+  document.getElementById('modal-student-title').textContent = `${s.avatar} ${s.name} 상세`;
+  const statNames = GAME_DATA.statNames;
+
+  document.getElementById('modal-student-body').innerHTML = `
+    <div class="modal-section">
+      <div class="ms-label">기본 정보</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">이름</label>
+          <input class="form-input" id="det-name" value="${s.name}"></div>
+        <div class="form-group"><label class="form-label">직업(장래희망)</label>
+          <input class="form-input" id="det-job" value="${s.job||''}"></div>
+        <div class="form-group"><label class="form-label">칭호</label>
+          <select class="form-select" id="det-title">
+            ${GAME_DATA.titles.map(t=>`<option ${s.title===t?'selected':''}>${t}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="form-label">비밀번호</label>
+          <input class="form-input" id="det-pw" value="${s.pw||'1234'}"></div>
+        <div class="form-group"><label class="form-label">레벨</label>
+          <input class="form-input" type="number" id="det-lv" value="${s.level}"></div>
+        <div class="form-group"><label class="form-label">골드</label>
+          <input class="form-input" type="number" id="det-gold" value="${s.gold}"></div>
+        <div class="form-group"><label class="form-label">EXP</label>
+          <input class="form-input" type="number" id="det-exp" value="${s.exp}"></div>
+        <div class="form-group"><label class="form-label">읽은 책 수</label>
+          <input class="form-input" type="number" id="det-books" value="${s.bookCount||0}"></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="ms-label">활동 능력치</div>
+      <div class="ab-grid">
+        ${Object.entries(s.stats||{}).map(([k,v]) => `
+          <div class="ab-admin-row">
+            <span class="ab-admin-name">${statNames[k]||k}</span>
+            <div class="ab-admin-bar"><div class="ab-admin-fill" style="width:${Math.min(100,v/20*100)}%"></div></div>
+            <input class="ab-admin-input" type="number" id="det-stat-${k}" value="${v}">
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:1rem">
+      <button class="btn-sm success" onclick="saveStudentDetail('${id}')">✅ 저장</button>
+      <button class="btn-sm outline" onclick="closeModal()">취소</button>
+    </div>`;
+
+  document.getElementById('m-student').classList.add('open');
+}
+
+function saveStudentDetail(id) {
+  const s = DB.getStudent(id);
+  s.name = document.getElementById('det-name').value;
+  s.job = document.getElementById('det-job').value;
+  s.title = document.getElementById('det-title').value;
+  s.pw = document.getElementById('det-pw').value;
+  s.level = parseInt(document.getElementById('det-lv').value) || 1;
+  s.gold = parseInt(document.getElementById('det-gold').value) || 0;
+  s.exp = parseInt(document.getElementById('det-exp').value) || 0;
+  s.bookCount = parseInt(document.getElementById('det-books').value) || 0;
+  ['read','study','art','value','health'].forEach(k => {
+    const el = document.getElementById(`det-stat-${k}`);
+    if (el) s.stats[k] = parseInt(el.value) || 0;
+  });
+  DB.saveStudent(s);
+  closeModal();
+  renderAll();
+  notify('✅ 학생 정보가 저장되었습니다!');
+}
+
+function quickGiveGold(id) {
+  const amt = parseInt(prompt('지급할 골드 양을 입력하세요 (음수: 차감)') || '0');
+  if (isNaN(amt)) return;
+  const s = DB.getStudent(id);
+  s.gold = Math.max(0, s.gold + amt);
+  DB.saveStudent(s);
+  renderAll();
+  notify(`💰 ${s.name}에게 ${amt > 0 ? '+' : ''}${amt}G 지급!`);
+}
+
+function confirmDeleteStudent(id) {
+  const s = DB.getStudent(id);
+  if (!confirm(`"${s.name}" 학생을 삭제하시겠습니까?`)) return;
+  const db = DB.load();
+  db.students = db.students.filter(st => st.id !== id);
+  DB.save(db);
+  renderAll();
+  notify('🗑️ 학생이 삭제되었습니다', 'error');
+}
+
+function openAddStudent() {
+  const el = document.createElement('div');
+  el.className = 'overlay open';
+  el.innerHTML = `<div class="modal" style="max-width:420px">
+    <div class="modal-hd">
+      <div class="modal-title">👤 학생 추가</div>
+      <button class="modal-close" onclick="this.closest('.overlay').remove()">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">이름 *</label>
+        <input class="form-input" id="add-name" placeholder="예: 김민준"></div>
+      <div class="form-group"><label class="form-label">비밀번호</label>
+        <input class="form-input" id="add-pw" placeholder="기본값: 1234" value="1234"></div>
+      <div class="form-group"><label class="form-label">장래희망</label>
+        <input class="form-input" id="add-job" placeholder="예: 미래의 과학자"></div>
+      <div class="form-group"><label class="form-label">캐릭터</label>
+        <select class="form-select" id="add-char">
+          <option value="1">🧑‍🦱 남학생 A</option>
+          <option value="2">👧 여학생 A</option>
+          <option value="3">🧑 남학생 B</option>
+          <option value="4">👩 여학생 B</option>
+        </select></div>
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:1.2rem">
+      <button class="btn-sm success" style="flex:1;padding:.65rem" onclick="doAddStudent(this)">✅ 추가</button>
+      <button class="btn-sm outline" onclick="this.closest('.overlay').remove()">취소</button>
+    </div>
+  </div>`;
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+  document.body.appendChild(el);
+  setTimeout(() => document.getElementById('add-name').focus(), 50);
+}
+
+function doAddStudent(btn) {
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { notify('이름을 입력하세요', 'error'); return; }
+  const pw      = document.getElementById('add-pw').value || '1234';
+  const job     = document.getElementById('add-job').value || '미래를 꿈꾸는 학생';
+  const charType= parseInt(document.getElementById('add-char').value);
+  const avatarMap = {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'};
+  const id = 's' + Date.now();
+  const newStudent = {
+    id, name, pw, job, charType,
+    avatar: avatarMap[charType]||'🧑',
+    level:1, exp:0, gold:0,
+    title:'', titles:[],
+    stats:{ read:0, study:0, art:0, value:0, health:0 },
+    combat:{ atk:0, def:0, mag:0, spd:0 },
+    equipment:{}, equipmentIds:{},
+    inventory:[], farm:[], books:[],
+    monsterLog:[], monsterDailyCount:0, lastMonsterDate:'',
+    totalQuests:0, bookCount:0,
+    pendingRewards:[], promotionPending:false,
+  };
+  const db = DB.load();
+  db.students.push(newStudent);
+  DB.save(db);
+  btn.closest('.overlay').remove();
+  renderAll();
+  populateSelectStudents();
+  notify(`✅ ${name} 학생이 추가되었습니다!`);
+}
+
+// approveSelfApply 호환용
+function approveSelfApply(studentId, rewardId) {
+  approveSingle(studentId, rewardId);
+}
+
+// ══ 대시보드 인라인 처리 함수 ══
+function approveAllDash() {
+  if (!confirm('대기 중인 보상을 전체 승인할까요?')) return;
+  approveAll();
+}
+
+function approveSingleDash(studentId, rewardId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  approveSingle(studentId, rewardId);
+}
+
+function rejectSingleDash(studentId, rewardId, btn) {
+  btn.disabled = true;
+  rejectSingle(studentId, rewardId);
+}
+
+function approvePromoDash(reqId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  approvePromotion(reqId);
+}
+
+function rejectPromoDash(reqId, btn) {
+  btn.disabled = true;
+  rejectPromotion(reqId);
+}
+
+function approvePwResetDash(reqId, studentId, btn) {
+  const newPw = prompt('새 비밀번호를 입력하세요:');
+  if (!newPw) return;
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  s.pw = newPw;
+  DB.saveStudent(s);
+  DB.removePwResetRequest(reqId);
+  renderAll();
+  notify(`✅ ${s.name} 비밀번호 → "${newPw}" 초기화 완료!`);
+}
+
+function rejectPwResetDash(reqId, btn) {
+  btn.disabled = true;
+  DB.removePwResetRequest(reqId);
+  renderAll();
+  notify('요청 무시됨');
+}
+
+
+// ══════════════════════════════════════════════════
+//  핵심 승인 함수 (모든 승인은 이 함수만 사용)
+// ══════════════════════════════════════════════════
+function approveReward(student, reward) {
+  // 1. EXP / Gold / Level
+  student.exp   = (student.exp||0)  + (reward.exp||0);
+  student.gold  = (student.gold||0) + (reward.gold||0);
+  student.level = Utils.levelFromExp(student.exp);
+
+  // 2. 스탯 증가
+  if (reward.stat && reward.statVal) {
+    student.stats = student.stats || {};
+    student.stats[reward.stat] = (student.stats[reward.stat]||0) + reward.statVal;
+  }
+
+  // 3. 타입별 처리
+  if (reward.type === 'artwork') {
+    DB.saveArtwork({
+      id: 'aw_' + Date.now() + '_' + student.id,
+      studentId: student.id,
+      title:   reward.artTitle || reward.label,
+      artUrl:  reward.artUrl   || '',
+      comment: reward.artDesc  || '',
+      date:    reward.date     || todayStr(),
+    });
+  } else if (reward.type === 'book') {
+    student.books = student.books || [];
+    student.books.push({
+      title:  reward.bookTitle  || reward.label,
+      review: reward.bookReview || '',
+      date:   reward.bookDate   || reward.date || todayStr(),
+    });
+    student.bookCount = student.books.length;
+  } else {
+    // 일반 퀘스트
+    student.totalQuests = (student.totalQuests||0) + 1;
+  }
+
+  // 4. quests 로그 저장 (boardQuestId + type 포함)
+  DB.saveQuestLog({
+    studentId:    student.id,
+    boardQuestId: reward.boardQuestId || null,
+    type:         reward.type || 'quest',
+    name:         reward.label,
+    exp:          reward.exp  || 0,
+    gold:         reward.gold || 0,
+    icon:         reward.icon || '📋',
+    date:         todayStr(),
+    approved:     true,
+  });
+
+  // 5. pendingRewards 제거
+  student.pendingRewards = (student.pendingRewards||[]).filter(
+    r => r.id !== reward.id && r.label !== reward.id
+  );
+
+  return student;
+}
+
+function approveSingle(studentId, rewardId) {
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
+  if (!reward) return;
+  approveReward(s, reward);
+  DB.saveStudent(s);
+  renderAll();
+  notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
+}
+
+function approveAll() {
+  const students = DB.getStudents();
+  let count = 0;
+  students.forEach(s => {
+    const pending = s.pendingRewards||[];
+    if (pending.length === 0) return;
+    pending.forEach(r => approveReward(s, r));
+    DB.saveStudent(s);
+    count += pending.length;
+  });
+  renderAll();
+  notify(`✅ ${count}개 전체 승인 완료!`);
+}
+
+function rejectSingle(studentId, rewardId) {
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
+  DB.saveStudent(s);
+  renderAll();
+  notify('🗑️ 반려됨', 'error');
+}
+
+function quickApprove() {
+  const studentId = document.getElementById('qa-student').value;
+  const name  = document.getElementById('qa-name').value.trim();
+  const exp   = parseInt(document.getElementById('qa-exp').value)  || 30;
+  const gold  = parseInt(document.getElementById('qa-gold').value) || 30;
+  const stat  = document.getElementById('qa-stat').value;
+  const icon  = document.getElementById('qa-icon')?.value?.trim() || '📋';
+  if (!name) { notify('활동명을 입력하세요', 'error'); return; }
+
+  const reward = {
+    id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    label: name, exp, gold, stat, statVal: stat ? 1 : 0,
+    icon, date: todayStr(),
+  };
+
+  if (studentId === 'all') {
+    DB.getStudents().forEach(s => {
+      s.pendingRewards = [...(s.pendingRewards||[]), {...reward}];
+      DB.saveStudent(s);
+    });
+    notify(`✅ 전체 학생에게 "${name}" 보상 지급!`);
+  } else {
+    const s = DB.getStudent(studentId);
+    if (!s) { notify('학생을 찾을 수 없어요', 'error'); return; }
+    s.pendingRewards = [...(s.pendingRewards||[]), reward];
+    DB.saveStudent(s);
+    notify(`✅ ${s.name}에게 "${name}" 보상 지급!`);
+  }
+  renderAll();
+}
+
+// ── 프리셋 ──
+const PRESETS = {
+  read:    { name:'📚 독서 완료',        exp:30, gold:20, stat:'read',   icon:'📚' },
+  hw:      { name:'📝 숙제 완료',        exp:25, gold:20, stat:'study',  icon:'📝' },
+  clean:   { name:'🧹 청소 당번',        exp:20, gold:15, stat:'health', icon:'🧹' },
+  prep:    { name:'🎒 준비물 챙기기',    exp:15, gold:15, stat:'value',  icon:'🎒' },
+  present: { name:'🙋 발표 참여',        exp:35, gold:25, stat:'study',  icon:'🙋' },
+  help:    { name:'🤝 친구 도움',        exp:30, gold:20, stat:'value',  icon:'🤝' },
+  daily:   { name:'📋 일일 퀘스트',     exp:30, gold:30, stat:'',       icon:'📋' },
+  special: { name:'⭐ 특별 활동 보상',   exp:50, gold:50, stat:'',       icon:'⭐' },
+};
+let _lastPreset = null;
+
+function fillPreset(type) {
+  const p = PRESETS[type];
+  if (!p) return;
+  document.getElementById('qa-name').value  = p.name;
+  document.getElementById('qa-exp').value   = p.exp;
+  document.getElementById('qa-gold').value  = p.gold;
+  document.getElementById('qa-stat').value  = p.stat || '';
+  document.getElementById('qa-icon').value  = p.icon || '✅';
+  _lastPreset = type;
+  // 하이라이트
+  document.querySelectorAll('[onclick^="fillPreset"]').forEach(b => b.classList.remove('success'));
+  event?.target?.classList.add('success');
+  const hint = document.getElementById('last-preset-hint');
+  if (hint) hint.textContent = `"${p.name}" 프리셋 선택됨`;
+}
+
+// ── 필터 ──
+let APPROVE_FILTER = 'all';
+function setApproveFilter(type, el) {
+  APPROVE_FILTER = type;
+  document.querySelectorAll('[id^="af-"]').forEach(b => {
+    b.classList.remove('success');
+    b.classList.add('outline');
+  });
+  el.classList.remove('outline');
+  el.classList.add('success');
+  renderApproveList();
+}
+
+function renderApproveList() {
+  const students  = DB.getStudents();
+  const container = document.getElementById('approve-list');
+  const today     = todayStr();
+  let items = students.flatMap(s =>
+    (s.pendingRewards||[]).map(r => ({...r, student: s}))
+  );
+
+  if (APPROVE_FILTER === 'today') items = items.filter(i => i.date === today);
+
+  if (items.length === 0) {
+    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.85rem;color:var(--txt3)">대기 중인 활동이 없습니다 ✅</div>';
+    updatePendingBadge(); return;
+  }
+
+  // boardQuestId 기준으로 묶음 승인 가능한 그룹 계산
+  const questGroups = {};
+  items.forEach(item => {
+    if (item.boardQuestId) {
+      if (!questGroups[item.boardQuestId]) questGroups[item.boardQuestId] = [];
+      questGroups[item.boardQuestId].push(item);
+    }
+  });
+
+  const html = items.map(item => {
+    const isExpired = item.date && item.date < today;
+    const groupCount = item.boardQuestId ? (questGroups[item.boardQuestId]||[]).length : 0;
+    return `
+    <div class="approve-card" style="${isExpired?'border-left:3px solid rgba(255,100,100,.4)':''}">
+      <div style="font-size:1.5rem">${item.icon||'📋'}</div>
+      <div class="ac-left">
+        <div class="ac-student">${item.student.avatar} ${item.student.name}
+          <span style="font-size:.65rem;color:${isExpired?'var(--red)':'var(--txt3)'};margin-left:.3rem">
+            ${item.date||''}${isExpired?' (기간 만료)':''}
+          </span>
+          ${item.type==='book'?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">📚 독서</span>`:''}
+          ${item.type==='artwork'?`<span style="font-size:.68rem;background:rgba(155,89,182,.12);color:var(--purple);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">🎨 작품</span>`:''}
+        </div>
+        <div class="ac-quest">${item.label}</div>
+        ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
+        <div class="ac-rewards">
+          <span class="ac-tag">+${item.exp}EXP</span>
+          <span class="ac-tag">+${item.gold||0}G</span>
+          ${item.stat ? `<span class="ac-tag">${GAME_DATA.statNames[item.stat]||item.stat} +${item.statVal||1}</span>` : ''}
+        </div>
+      </div>
+      <div class="ac-right" style="display:flex;flex-direction:column;gap:.3rem">
+        <button class="btn-sm success" onclick="approveSingle('${item.student.id}','${item.id}')">✅</button>
+        <button class="btn-sm danger"  onclick="rejectSingle('${item.student.id}','${item.id}')">✕</button>
+        ${groupCount > 1 ? `<button class="btn-sm outline" style="font-size:.64rem;padding:.2rem .4rem;white-space:nowrap"
+          onclick="approveAllByQuest('${item.boardQuestId}')">전체(${groupCount})</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+  updatePendingBadge();
+}
+
+// 같은 퀘스트 전체 승인
+function approveAllByQuest(boardQuestId) {
+  const students = DB.getStudents();
+  let count = 0;
+  students.forEach(s => {
+    const reward = (s.pendingRewards||[]).find(r=>r.boardQuestId===boardQuestId);
+    if (reward) {
+      approveSingle(s.id, reward.id);
+      count++;
+    }
+  });
+  if (count > 0) notify(`✅ ${count}명 전체 승인 완료!`);
+}
+
+// ══════════════════════════════════════════════════
+//  POPULATE SELECTS
+// ══════════════════════════════════════════════════
+
+function populateSelectStudents() {
+  const sel = document.getElementById('qa-student');
+  DB.getStudents().forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = s.name;
+    sel.appendChild(opt);
+  });
+}
+
+function updatePendingBadge() {
+  const total = DB.getStudents().reduce((a,s) => a + (s.pendingRewards||[]).length, 0);
+  const badge = document.getElementById('pending-badge');
+  if (total > 0) { badge.style.display = 'inline'; badge.textContent = total; }
+  else badge.style.display = 'none';
+}
+
+function updatePromoBadge() {
+  const total = DB.getPromotionRequests().length;
+  const badge = document.getElementById('promo-badge');
+  if (!badge) return;
+  if (total > 0) { badge.style.display = 'inline'; badge.textContent = total; }
+  else badge.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════
+//  PROMOTION MANAGEMENT
+// ══════════════════════════════════════════════════
+function renderPromotionList() {
+  const requests = DB.getPromotionRequests();
+  updatePromoBadge();
+  const container = document.getElementById('promo-list');
+  if (!container) return;
+  if (requests.length === 0) {
+    container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">대기 중인 승급 신청이 없습니다</div>';
+    return;
+  }
+  container.innerHTML = requests.map(req => {
+    const s = DB.getStudent(req.studentId);
+    if (!s) return '';
+    return `<div class="approve-card">
+      <div style="font-size:2rem">⬆️</div>
+      <div class="ac-left">
+        <div class="ac-student">${s.avatar} ${s.name}</div>
+        <div class="ac-quest">Lv.${req.level} 승급 신청 · ${req.date||''}</div>
+        <div class="ac-rewards">
+          <span class="ac-tag">현재 Lv.${s.level}</span>
+          <span class="ac-tag">EXP ${s.exp}</span>
+        </div>
+      </div>
+      <div class="ac-right">
+        <button class="btn-sm success" onclick="approvePromotion('${req.id}')">✅ 승급 승인</button>
+        <button class="btn-sm danger"  onclick="rejectPromotion('${req.id}')">✕ 반려</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function approvePromotion(reqId) {
+  const req = DB.getPromotionRequests().find(r => r.id === reqId);
+  if (!req) return;
+  const s = DB.getStudent(req.studentId);
+  // 승급 보상: 골드 100 + 특별 보상 지급
+  s.gold = (s.gold||0) + 100;
+  s.promotionPending = false;
+  // 승급 완료 기록
+  s.pendingRewards = [...(s.pendingRewards||[]), {
+    id: Utils.uid(), label: `Lv.${req.level} 승급 완료! 🎉`, exp: 50, gold: 0,
+    icon: '⬆️', date: todayStr()
+  }];
+  DB.saveStudent(s);
+  DB.removePromotionRequest(reqId);
+  renderAll();
+  notify(`🎉 ${s.name} Lv.${req.level} 승급 승인!`);
+}
+
+function rejectPromotion(reqId) {
+  const req = DB.getPromotionRequests().find(r => r.id === reqId);
+  if (!req) return;
+  const s = DB.getStudent(req.studentId);
+  s.promotionPending = false;
+  DB.saveStudent(s);
+  DB.removePromotionRequest(reqId);
+  renderAll();
+  notify('승급 신청 반려됨', 'error');
+}
+
+// ══════════════════════════════════════════════════
+//  RANK
+// ══════════════════════════════════════════════════
+function renderRank() {
+  const students = DB.getStudents();
+  const medals = ['🥇','🥈','🥉'];
+  const sorted = [...students].sort((a,b) => b.level - a.level || b.exp - a.exp);
+  document.getElementById('rank-table').innerHTML = sorted.map((s,i) => `
+    <tr>
+      <td><span class="rank-medal">${medals[i]||i+1}</span></td>
+      <td>${s.avatar} <strong>${s.name}</strong></td>
+      <td class="td-level">Lv.${s.level}</td>
+      <td style="color:var(--txt2);font-size:.78rem">${s.exp}</td>
+      <td class="td-gold">💰 ${s.gold}G</td>
+      <td style="color:var(--emerald)">${s.totalQuests||0}</td>
+      <td style="color:var(--red)">${(s.monsterLog||[]).length}</td>
+    </tr>`).join('');
+
+  const bookSorted = [...students].sort((a,b) => (b.bookCount||0)-(a.bookCount||0));
+  document.getElementById('book-rank').innerHTML = bookSorted.map((s,i) => `
+    <tr><td>${medals[i]||i+1}</td><td>${s.avatar} ${s.name}</td><td style="color:var(--red);font-weight:700">${s.bookCount||0}권</td></tr>`).join('');
+
+  const monSorted = [...students].sort((a,b) => (b.monsterLog||[]).length-(a.monsterLog||[]).length);
+  document.getElementById('monster-rank').innerHTML = monSorted.map((s,i) => `
+    <tr><td>${medals[i]||i+1}</td><td>${s.avatar} ${s.name}</td><td style="color:var(--red);font-weight:700">${(s.monsterLog||[]).length}마리</td></tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  QUESTS
+// ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  ARTWORK 관리 (학생이 올린 작품 승인/반려)
+// ══════════════════════════════════════════════════
+function populateArtworkStudents() {} // 구버전 호환용
+
+function renderArtworkPending() {
+  const students = DB.getStudents();
+  const pending  = [];
+  students.forEach(s => {
+    (s.pendingRewards||[]).filter(r=>r.type==='artwork').forEach(r => {
+      pending.push({student:s, ...r});
+    });
+  });
+  const el = document.getElementById('artwork-pending-list');
+  if (!el) return;
+  if (pending.length === 0) {
+    el.innerHTML = '<div style="padding:1rem;color:var(--txt3);font-size:.83rem;text-align:center">대기 중인 작품이 없어요</div>';
+    return;
+  }
+  el.innerHTML = pending.map(item => `
+    <div style="padding:.9rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.6rem">
+        <span style="font-size:1.2rem">${item.student.avatar}</span>
+        <span style="font-weight:700">${item.student.name}</span>
+        <span style="font-size:.78rem;color:var(--txt3)">· ${item.artTitle||''}</span>
+        <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">${item.date||''}</span>
+      </div>
+      ${item.artUrl?`<img src="${item.artUrl}" style="width:100%;max-height:250px;object-fit:contain;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="adminOpenLightbox('${item.artUrl}','${item.artTitle||''}')">`:''}
+      ${item.artDesc?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.6rem">${item.artDesc}</div>`:''}
+      <!-- 선생님 코멘트 입력 -->
+      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+        <input class="form-input" id="aw-cmt-${item.id}" placeholder="선생님 한마디 (선택)" style="flex:1;font-size:.8rem">
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn-sm success" style="font-size:.78rem"
+          onclick="approveArtwork('${item.student.id}','${item.id}')">✅ 승인 · 전시</button>
+        <button class="btn-sm danger" style="font-size:.78rem"
+          onclick="rejectSingleDash('${item.student.id}','${item.id}',this)">✕ 반려</button>
+      </div>
+    </div>`).join('');
+}
+
+function approveArtwork(studentId, rewardId) {
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  const reward = (s.pendingRewards||[]).find(r=>r.id===rewardId);
+  if (!reward) return;
+  // 선생님 코멘트를 reward에 반영 후 approveReward로 처리
+  const comment = document.getElementById('aw-cmt-'+rewardId)?.value.trim() || '';
+  if (comment) reward.artDesc = comment;
+  approveReward(s, reward);
+  DB.saveStudent(s);
+  renderAll();
+  notify(`✅ ${s.name} · "${reward.artTitle||reward.label}" 전시 완료!`);
+}
+
+
+// ── 관리자 라이트박스 ──
+function adminOpenLightbox(url, title) {
+  let lb = document.getElementById('admin-lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'admin-lightbox';
+    lb.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);flex-direction:column;align-items:center;justify-content:center;';
+    lb.innerHTML = `
+      <button onclick="document.getElementById('admin-lightbox').style.display='none'"
+        style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);border:none;
+        color:#fff;font-size:1.4rem;width:40px;height:40px;border-radius:50%;cursor:pointer">✕</button>
+      <img id="admin-lb-img" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:10px">
+      <div id="admin-lb-title" style="color:#fff;font-weight:700;margin-top:.8rem;font-size:.95rem"></div>`;
+    lb.addEventListener('click', e => { if(e.target===lb) lb.style.display='none'; });
+    document.body.appendChild(lb);
+  }
+  document.getElementById('admin-lb-img').src = url;
+  document.getElementById('admin-lb-title').textContent = title||'';
+  lb.style.display = 'flex';
+}
+
+function renderArtworkAdmin() {
+  const db = DB.load();
+  const artworks = (db.artworks||[]).slice().reverse();
+  const students = DB.getStudents();
+  const el = document.getElementById('artwork-admin-list');
+  if (!el) return;
+  if (artworks.length === 0) {
+    el.innerHTML = '<div style="padding:1rem;color:var(--txt3);font-size:.83rem;text-align:center">전시중인 작품이 없어요</div>';
+    return;
+  }
+  // 학생별로 그룹핑
+  const byStudent = {};
+  artworks.forEach(a => {
+    if (!byStudent[a.studentId]) byStudent[a.studentId] = [];
+    byStudent[a.studentId].push(a);
+  });
+  el.innerHTML = Object.entries(byStudent).map(([sid, arts]) => {
+    const s = students.find(x=>x.id===sid);
+    const isExpanded = el._expanded === sid;
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="display:flex;align-items:center;gap:.8rem;padding:.75rem 1.2rem;cursor:pointer"
+        onclick="this.parentElement.querySelector('.aw-detail').style.display=
+          this.parentElement.querySelector('.aw-detail').style.display==='none'?'':'none'">
+        <span style="font-size:1.2rem">${s?.avatar||'?'}</span>
+        <span style="font-weight:700;flex:1">${s?.name||'?'}</span>
+        <span style="font-size:.75rem;color:var(--sky)">${arts.length}점</span>
+        <span style="color:var(--txt3);font-size:.9rem">›</span>
+      </div>
+      <div class="aw-detail" style="display:none;padding:0 1.2rem .8rem">
+        ${arts.map(a=>`
+          <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.6rem 0;border-top:1px solid rgba(255,255,255,.04)">
+            ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer" onclick="adminOpenLightbox('${a.artUrl}', '${a.title||''}')">`:''}
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:.85rem">${a.title}</div>
+              <div style="font-size:.7rem;color:var(--txt3)">${a.date||''}</div>
+              ${a.comment?`<div style="font-size:.74rem;color:var(--txt2);margin-top:.15rem">${a.comment}</div>`:''}
+            </div>
+            <button class="btn-sm danger" style="font-size:.66rem;padding:.2rem .45rem;flex-shrink:0"
+              onclick="deleteArtwork('${a.id}')">🗑️</button>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  BOOKS (독서 현황)
+// ══════════════════════════════════════════════════
+function renderBooksPage() {
+  const students = DB.getStudents();
+  const filter   = document.getElementById('books-filter')?.value || 'all';
+
+  // 필터 셀렉트 초기화
+  const sel = document.getElementById('books-filter');
+  if (sel && sel.options.length === 1) {
+    students.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id; opt.textContent = s.avatar + ' ' + s.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  // 학급 요약
+  const totalBooks = students.reduce((sum,s)=>(sum+(s.bookCount||0)),0);
+  const avgBooks   = students.length ? (totalBooks/students.length).toFixed(1) : 0;
+  const topReader  = [...students].sort((a,b)=>(b.bookCount||0)-(a.bookCount||0))[0];
+  document.getElementById('books-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+      <div style="text-align:center">
+        <div style="font-size:1.6rem;font-weight:700;color:var(--gold)">${totalBooks}</div>
+        <div style="font-size:.72rem;color:var(--txt3)">학급 총 독서 권수</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:1.6rem;font-weight:700;color:var(--sky)">${avgBooks}</div>
+        <div style="font-size:.72rem;color:var(--txt3)">1인 평균</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--emerald)">${topReader?.avatar||''} ${topReader?.name||'-'}</div>
+        <div style="font-size:.72rem;color:var(--txt3)">최다 독서 (${topReader?.bookCount||0}권)</div>
+      </div>
+    </div>`;
+
+  // ── 월별 막대그래프 ──
+  const now = new Date();
+  const months = [];
+  for (let i=5; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const mo = d.getMonth()+1;
+    months.push({ key: d.getFullYear()+'-'+mo, label: mo+'월', count: 0 });
+  }
+  // 전체 학생 books 합산
+  students.forEach(s => {
+    (s.books||[]).forEach(b => {
+      if (!b.date) return;
+      const parts = b.date.split('-');
+      if (parts.length < 2) return;
+      const key = parts[0]+'-'+parseInt(parts[1]);
+      const mo = months.find(m=>m.key===key);
+      if (mo) mo.count++;
+    });
+  });
+  const maxCount = Math.max(...months.map(m=>m.count), 1);
+  const chartEl = document.getElementById('books-monthly-chart');
+  const labelEl = document.getElementById('books-monthly-labels');
+  if (chartEl) {
+    chartEl.innerHTML = months.map(m => {
+      const h = Math.max(4, Math.round((m.count/maxCount)*90));
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px">
+        ${m.count>0?`<span style="font-size:.7rem;color:var(--gold);font-weight:700">${m.count}</span>`:''}
+        <div style="width:100%;height:${h}px;border-radius:4px 4px 0 0;
+          background:${m.count>0?'var(--gold)':'rgba(255,255,255,.08)'};opacity:.8"></div>
+      </div>`;
+    }).join('');
+  }
+  if (labelEl) {
+    labelEl.innerHTML = months.map(m =>
+      `<div style="flex:1;text-align:center;font-size:.65rem;color:var(--txt3)">${m.label}</div>`
+    ).join('');
+  }
+
+  // 학생별 독서 목록
+  const target = filter==='all' ? students : students.filter(s=>s.id===filter);
+  const el = document.getElementById('books-list');
+  if (!el) return;
+
+  el.innerHTML = target.map(s => {
+    const books = s.books||[];
+    const pending = (s.pendingRewards||[]).filter(r=>r.type==='book');
+    if (books.length === 0 && pending.length === 0) {
+      return `<div style="padding:.8rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:.7rem">
+        <span style="font-size:1.1rem">${s.avatar}</span>
+        <span style="font-weight:700">${s.name}</span>
+        <span style="font-size:.76rem;color:var(--txt3);margin-left:auto">독서 기록 없음</span>
+      </div>`;
+    }
+    return `
+    <div style="border-bottom:1px solid rgba(255,255,255,.05);padding:.8rem 1.2rem">
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem">
+        <span style="font-size:1.1rem">${s.avatar}</span>
+        <span style="font-weight:700">${s.name}</span>
+        <span style="font-size:.72rem;background:rgba(255,215,0,.12);color:var(--gold);
+          border-radius:20px;padding:.1rem .55rem;font-weight:700">${s.bookCount||0}권</span>
+        ${pending.length>0?`<span style="font-size:.7rem;color:var(--gold)">+ 확인대기 ${pending.length}건</span>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;padding-left:.5rem">
+        ${books.slice().reverse().map((b,i)=>`
+          <div style="display:flex;align-items:flex-start;gap:.6rem;padding:.4rem .6rem;
+            background:rgba(255,255,255,.03);border-radius:8px">
+            <span style="font-size:.7rem;color:var(--txt3);flex-shrink:0;min-width:24px">#${books.length-i}</span>
+            <div style="flex:1">
+              <div style="font-size:.84rem;font-weight:600">${b.title}</div>
+              ${b.review?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem;line-height:1.5">${b.review.length>60?b.review.slice(0,60)+'...':b.review}</div>`:''}
+            </div>
+            <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0">${b.date||''}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteArtwork(id) {
+  if (!confirm('이 작품을 삭제할까요?')) return;
+  DB.deleteArtwork(id);
+  renderArtworkAdmin();
+  notify('작품을 삭제했습니다');
+}
+
+// ══════════════════════════════════════════════════
+//  PW RESET (비밀번호 초기화)
+// ══════════════════════════════════════════════════
+function renderPwResetList() {
+  const reqs = DB.getPwResetRequests();
+  const el   = document.getElementById('pwreset-list');
+  if (!el) return;
+  if (reqs.length === 0) {
+    el.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">비밀번호 초기화 요청이 없습니다 ✅</div>';
+    return;
+  }
+  el.innerHTML = reqs.map(r => `
+    <div style="display:flex;align-items:center;gap:.9rem;padding:.9rem 1rem;
+      background:rgba(255,255,255,.03);border:1px solid rgba(255,215,0,.15);
+      border-radius:12px;margin-bottom:.6rem">
+      <div style="font-size:1.5rem">🔑</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.9rem">${r.name}</div>
+        <div style="font-size:.72rem;color:var(--txt3)">${r.date} 요청</div>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input class="form-input" id="newpw-${r.id}" placeholder="새 비밀번호"
+          style="width:100px;padding:.3rem .5rem;font-size:.78rem">
+        <button class="btn-sm success" style="font-size:.72rem"
+          onclick="resetStudentPw('${r.id}','${r.studentId}')">초기화</button>
+        <button class="btn-sm danger" style="font-size:.72rem"
+          onclick="dismissPwReset('${r.id}')">무시</button>
+      </div>
+    </div>`).join('');
+}
+
+function resetStudentPw(reqId, studentId) {
+  const newPw = document.getElementById('newpw-' + reqId)?.value.trim();
+  if (!newPw) { notify('새 비밀번호를 입력하세요', 'error'); return; }
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  s.pw = newPw;
+  DB.saveStudent(s);
+  DB.removePwResetRequest(reqId);
+  renderPwResetList();
+  updatePwResetBadge();
+  notify(`✅ ${s.name} 비밀번호 초기화 완료! 새 비밀번호: ${newPw}`);
+}
+
+function dismissPwReset(reqId) {
+  DB.removePwResetRequest(reqId);
+  renderPwResetList();
+  updatePwResetBadge();
+  notify('요청을 무시했습니다');
+}
+
+// ══════════════════════════════════════════════════
+//  RANKING RESET (랭킹 초기화)
+// ══════════════════════════════════════════════════
+function resetRanking() {
+  if (!confirm('⚠️ 랭킹 초기화\n\n모든 학생의 EXP·레벨·골드·퀘스트·몬스터 기록을 초기화합니다.\n학생 이름·비밀번호·캐릭터·장비는 유지됩니다.\n\n정말 초기화하시겠습니까?')) return;
+  const students = DB.getStudents();
+  students.forEach(s => {
+    s.exp          = 0;
+    s.level        = 1;
+    s.gold         = 0;
+    s.totalQuests  = 0;
+    s.monsterLog   = [];
+    s.monsterDailyCount = 0;
+    s.lastMonsterDate   = '';
+    s.pendingRewards    = [];
+    s.books             = [];
+    s.bookCount         = 0;
+    s.stats             = { read:0, study:0, art:0, value:0, health:0 };
+    s.combat            = { atk:0, def:0, mag:0, spd:0 };
+    s.equipmentIds      = {};
+    s.inventory         = [];
+    s.houseDecorations  = [];
+    DB.saveStudent(s);
+  });
+  // 퀘스트 기록·작품도 초기화
+  const db = DB.load();
+  db.quests     = [];
+  db.artworks   = [];
+  db.boardQuests= [];
+  DB.save(db);
+  renderAll();
+  notify('🔄 랭킹 전체 초기화 완료!');
+}
+// ══════════════════════════════════════════════════
+// ── 퀘스트 템플릿 시스템 ──
+const QUEST_TEMPLATES = {
+  daily: [
+    {name:'독서록 작성하기', stat:'read'},
+    {name:'오늘의 한 줄 일기', stat:'value'},
+    {name:'줄넘기 50회', stat:'health'},
+    {name:'받아쓰기 연습', stat:'study'},
+    {name:'수학 문제 5개 풀기', stat:'study'},
+    {name:'칭찬 한 마디 전하기', stat:'value'},
+    {name:'오늘의 영단어 5개 외우기', stat:'study'},
+    {name:'바른 자세로 수업 듣기', stat:'health'},
+  ],
+  weekly: [
+    {name:'책 1권 읽기', stat:'read'},
+    {name:'독서 감상문 쓰기', stat:'read'},
+    {name:'익힘책 한 단원 완성', stat:'study'},
+    {name:'수학 단원 평가 준비', stat:'study'},
+    {name:'체육 기록 달성', stat:'health'},
+    {name:'그림일기 쓰기', stat:'art'},
+    {name:'발표 1번 하기', stat:'value'},
+    {name:'친구 도움 주기', stat:'value'},
+  ],
+};
+
+// Firebase에 커스텀 템플릿 저장
+function getCustomTemplates(type) {
+  const db = DB.load();
+  return (db.customQuestTemplates || {})[type] || [];
+}
+function saveCustomTemplate(type, name) {
+  const db = DB.load();
+  db.customQuestTemplates = db.customQuestTemplates || {};
+  db.customQuestTemplates[type] = db.customQuestTemplates[type] || [];
+  if (!db.customQuestTemplates[type].find(t=>t.name===name)) {
+    db.customQuestTemplates[type].push({name, stat:''});
+  }
+  DB._fbRef.child('customQuestTemplates').set(db.customQuestTemplates);
+  DB._cache = db;
+}
+function removeCustomTemplate(type, name) {
+  const db = DB.load();
+  if (!db.customQuestTemplates?.[type]) return;
+  db.customQuestTemplates[type] = db.customQuestTemplates[type].filter(t=>t.name!==name);
+  DB._cache = db;
+  DB._fbRef.child('customQuestTemplates').set(db.customQuestTemplates);
+}
+
+let QUEST_TAB = 'daily';
+let CUR_ABILITY_TAB = 'read';
+let CUR_DIFF_FILTER = 'all';
+
+// ── 능력치별 퀘스트 템플릿 ──
+const ABILITY_QUESTS = {
+  read: [
+    {name:'오늘 책 10분 읽기',       diff:'easy', stat:'read'},
+    {name:'책 제목 말하기',           diff:'easy', stat:'read'},
+    {name:'독서 기록장 쓰기',         diff:'easy', stat:'read'},
+    {name:'책 1권 읽고 줄거리 쓰기',  diff:'mid',  stat:'read'},
+    {name:'독서 감상문 쓰기',         diff:'mid',  stat:'read'},
+    {name:'도서관 책 빌리기',         diff:'mid',  stat:'read'},
+    {name:'책 3권 읽기',              diff:'hard', stat:'read'},
+    {name:'독서 발표하기',            diff:'hard', stat:'read'},
+    {name:'친구에게 책 추천 글 쓰기', diff:'hard', stat:'read'},
+  ],
+  study: [
+    {name:'받아쓰기 연습하기',        diff:'easy', stat:'study'},
+    {name:'수학 문제 5개 풀기',       diff:'easy', stat:'study'},
+    {name:'오늘 배운 내용 정리하기',  diff:'easy', stat:'study'},
+    {name:'익힘책 한 단원 풀기',      diff:'mid',  stat:'study'},
+    {name:'단원 평가 준비하기',       diff:'mid',  stat:'study'},
+    {name:'발표 자료 만들기',         diff:'mid',  stat:'study'},
+    {name:'단원 테스트 100점 맞기',   diff:'hard', stat:'study'},
+    {name:'심화 문제 풀기',           diff:'hard', stat:'study'},
+    {name:'선생님께 질문 3번 하기',   diff:'hard', stat:'study'},
+  ],
+  art: [
+    {name:'그림 그리기',              diff:'easy', stat:'art'},
+    {name:'색칠하기',                 diff:'easy', stat:'art'},
+    {name:'만들기 완성하기',          diff:'easy', stat:'art'},
+    {name:'작품 제출하기',            diff:'mid',  stat:'art'},
+    {name:'미술 감상문 쓰기',         diff:'mid',  stat:'art'},
+    {name:'노래 외워서 부르기',       diff:'mid',  stat:'art'},
+    {name:'전시회 작품 완성하기',     diff:'hard', stat:'art'},
+    {name:'악기 연주하기',            diff:'hard', stat:'art'},
+    {name:'창작 글짓기',              diff:'hard', stat:'art'},
+  ],
+  value: [
+    {name:'친구에게 칭찬하기',        diff:'easy', stat:'value'},
+    {name:'인사 먼저 하기',           diff:'easy', stat:'value'},
+    {name:'감사 일기 쓰기',           diff:'easy', stat:'value'},
+    {name:'친구 도움 주기',           diff:'mid',  stat:'value'},
+    {name:'청소 당번 열심히 하기',    diff:'mid',  stat:'value'},
+    {name:'봉사 활동 참여하기',       diff:'mid',  stat:'value'},
+    {name:'발표 용기 내기',           diff:'hard', stat:'value'},
+    {name:'진심으로 사과하기',        diff:'hard', stat:'value'},
+    {name:'학급 행사 기획 참여',      diff:'hard', stat:'value'},
+  ],
+  health: [
+    {name:'줄넘기 30회',              diff:'easy', stat:'health'},
+    {name:'바른 자세로 수업 듣기',    diff:'easy', stat:'health'},
+    {name:'급식 잔반 없이 먹기',      diff:'easy', stat:'health'},
+    {name:'줄넘기 100회',             diff:'mid',  stat:'health'},
+    {name:'운동장 3바퀴 뛰기',        diff:'mid',  stat:'health'},
+    {name:'체육 기록 달성하기',       diff:'mid',  stat:'health'},
+    {name:'체력 테스트 목표 달성',    diff:'hard', stat:'health'},
+    {name:'한 달 개근하기',           diff:'hard', stat:'health'},
+    {name:'운동 일지 쓰기',           diff:'hard', stat:'health'},
+  ],
+};
+
+const DIFF_INFO = {
+  easy: { label:'🟢 쉬움', exp:80,  gold:50,  icon:'📋', color:'rgba(46,204,113,.15)',  border:'rgba(46,204,113,.3)' },
+  mid:  { label:'🟡 중간', exp:120, gold:80,  icon:'📋', color:'rgba(255,193,7,.1)',    border:'rgba(255,193,7,.35)' },
+  hard: { label:'🔴 어려움',exp:200,gold:150, icon:'⭐', color:'rgba(231,76,60,.1)',    border:'rgba(231,76,60,.3)' },
+};
+
+const ABILITY_ICONS = { read:'📚', study:'📖', art:'🎨', value:'💛', health:'💪' };
+
+function switchQuestTab(tab) {
+  QUEST_TAB = tab;
+  const allTabs = ['daily','weekly','custom','ability'];
+  const abilityTypes = ['read','study','art','value','health'];
+
+  // 탭 패널 표시
+  allTabs.forEach(t => {
+    const el = document.getElementById('qt-'+t);
+    if (el) el.style.display = 'none';
+  });
+  // 버튼 active
+  ['daily','weekly','read','study','art','value','health','custom'].forEach(t => {
+    const btn = document.getElementById('qt-'+t+'-btn');
+    if (btn) btn.classList.remove('on');
+  });
+
+  if (abilityTypes.includes(tab)) {
+    CUR_ABILITY_TAB = tab;
+    document.getElementById('qt-ability').style.display = '';
+    document.getElementById('qt-'+tab+'-btn').classList.add('on');
+    renderAbilityQuests();
+  } else {
+    const el = document.getElementById('qt-'+tab);
+    if (el) el.style.display = '';
+    const btn = document.getElementById('qt-'+tab+'-btn');
+    if (btn) btn.classList.add('on');
+    if (tab !== 'custom') renderQuestTemplates(tab);
+  }
+}
+
+function setDiffFilter(diff, btn) {
+  CUR_DIFF_FILTER = diff;
+  document.querySelectorAll('[id^="diff-"]').forEach(b => b.classList.remove('success'));
+  btn.classList.add('success');
+  renderAbilityQuests();
+}
+
+function renderAbilityQuests() {
+  const type = CUR_ABILITY_TAB;
+  const el = document.getElementById('qt-ability-list');
+  if (!el) return;
+  const db = DB.load();
+  const customs = ((db.customQuestTemplates||{})[type]||[]);
+  let items = [
+    ...ABILITY_QUESTS[type],
+    ...customs.map(t => ({...t, custom:true})),
+  ];
+  if (CUR_DIFF_FILTER !== 'all') items = items.filter(t => t.diff === CUR_DIFF_FILTER);
+
+  el.innerHTML = items.map((t,i) => {
+    const d = DIFF_INFO[t.diff] || DIFF_INFO.easy;
+    return `<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;
+      background:${d.color};border-radius:8px;border:0.5px solid ${d.border}">
+      <input type="checkbox" id="aq-chk-${i}" data-name="${t.name}" data-diff="${t.diff}" data-stat="${t.stat||type}"
+        style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
+      <label for="aq-chk-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
+      <span style="font-size:.68rem;color:var(--txt3)">${d.label}</span>
+      <span style="font-size:.68rem;color:var(--gold)">+${d.exp}EXP</span>
+      ${t.custom ? `<button onclick="removeCustomTemplate('${type}','${t.name}');renderAbilityQuests()"
+        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>` : ''}
+    </div>`;
+  }).join('') || '<div style="padding:1rem;color:var(--txt3);font-size:.82rem;text-align:center">해당 난이도 퀘스트가 없어요</div>';
+}
+
+function addAbilityTemplate() {
+  const name = document.getElementById('qt-ability-custom').value.trim();
+  const diff = document.getElementById('qt-ability-custom-diff').value;
+  if (!name) return;
+  const db = DB.load();
+  db.customQuestTemplates = db.customQuestTemplates || {};
+  db.customQuestTemplates[CUR_ABILITY_TAB] = db.customQuestTemplates[CUR_ABILITY_TAB] || [];
+  db.customQuestTemplates[CUR_ABILITY_TAB].push({name, diff, stat:CUR_ABILITY_TAB, custom:true});
+  DB._cache = db;
+  DB._fbRef.child('customQuestTemplates').set(db.customQuestTemplates);
+  document.getElementById('qt-ability-custom').value = '';
+  renderAbilityQuests();
+}
+
+function postCheckedAbilityQuests() {
+  const checked = [...document.querySelectorAll('[id^="aq-chk-"]:checked')];
+  if (checked.length === 0) { notify('항목을 선택하세요', 'error'); return; }
+  const db = DB.load();
+  db.boardQuests = db.boardQuests || [];
+  let count = 0;
+  checked.forEach(chk => {
+    const name = chk.dataset.name;
+    const diff = chk.dataset.diff;
+    const stat = chk.dataset.stat;
+    const d = DIFF_INFO[diff] || DIFF_INFO.easy;
+    // 이미 게시된 동일 퀘스트 스킵
+    if (db.boardQuests.find(q => q.name===name && q.active!==false)) return;
+    db.boardQuests.push({
+      id: 'bq_'+Date.now()+'_'+count,
+      name, type:'special', diff,
+      exp: d.exp, gold: d.gold,
+      stat, statVal: 1,
+      icon: ABILITY_ICONS[stat]||d.icon,
+      active: true, date: todayStr(),
+    });
+    count++;
+  });
+  if (count === 0) { notify('이미 게시된 퀘스트예요', 'error'); return; }
+  DB._cache = db;
+  DB._fbRef.child('boardQuests').set(db.boardQuests);
+  renderBoardQuestList();
+  notify(`📌 ${count}개 능력치 퀘스트 게시 완료!`);
+}
+
+function renderQuestTemplates(type) {
+  const el = document.getElementById('qt-'+type+'-list');
+  if (!el) return;
+  const defaults = QUEST_TEMPLATES[type] || [];
+  const customs  = getCustomTemplates(type);
+  const all = [
+    ...defaults.map(t => ({...t, custom:false})),
+    ...customs.map(t => ({...t, custom:true})),
+  ];
+  el.innerHTML = all.map((t,i) => `
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;
+      background:rgba(255,255,255,.03);border-radius:8px;border:0.5px solid rgba(255,255,255,.07)">
+      <input type="checkbox" id="qt-chk-${type}-${i}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
+      <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
+      ${t.stat ? `<span style="font-size:.7rem;color:var(--txt3);background:rgba(255,255,255,.06);padding:.1rem .4rem;border-radius:8px">${{read:'독서',study:'학습',art:'예술',value:'가치',health:'건강'}[t.stat]||''}</span>` : ''}
+      ${t.custom ? `<button onclick="removeCustomTemplate('${type}','${t.name}');renderQuestTemplates('${type}')"
+        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>` : ''}
+    </div>`).join('');
+}
+
+function addQuestTemplate(type) {
+  const inp = document.getElementById('qt-'+type+'-custom');
+  const name = inp.value.trim();
+  if (!name) return;
+  saveCustomTemplate(type, name);
+  inp.value = '';
+  renderQuestTemplates(type);
+}
+
+function postCheckedQuests(type) {
+  const defaults = QUEST_TEMPLATES[type] || [];
+  const customs  = getCustomTemplates(type);
+  const all = [...defaults, ...customs];
+  const expMap  = {daily:80, weekly:150};
+  const goldMap = {daily:50, weekly:100};
+  const iconMap = {daily:'📋', weekly:'📅'};
+
+  let count = 0;
+  const db = DB.load();
+  db.boardQuests = db.boardQuests || [];
+
+  all.forEach((t, i) => {
+    const chk = document.getElementById(`qt-chk-${type}-${i}`);
+    if (!chk || !chk.checked) return;
+    // 이미 같은 이름의 활성 퀘스트가 있으면 중복 방지
+    if (db.boardQuests.find(q => q.name===t.name && q.active!==false)) {
+      notify(`"${t.name}" 은 이미 게시중이에요`, 'error');
+      return;
+    }
+    db.boardQuests.push({
+      id: 'bq_' + Date.now() + '_' + i,
+      name: t.name,
+      type,
+      exp:  expMap[type]  || 80,
+      gold: goldMap[type] || 50,
+      icon: iconMap[type] || '📋',
+      stat: t.stat || '',
+      dueDate: '', date: todayStr(),
+      active: true,
+    });
+    count++;
+  });
+
+  if (count === 0) { notify('체크한 항목이 없어요!', 'error'); return; }
+  DB._cache = db;
+  DB._fbRef.child('boardQuests').set(db.boardQuests);
+  renderBoardQuestList();
+  renderQuestTemplates(type);
+  notify(`📌 ${count}개 퀘스트 게시판에 등록!`);
+}
+
+// 퀘스트 페이지 진입 시 초기화
+function initQuestPage() {
+  renderQuestTemplates('daily');
+}
+
+// 퀘스트 유형 변경 시 아이콘·EXP·골드 자동 설정
+function onQuestTypeChange(type) {
+  const iconMap  = { daily:'📋', weekly:'📅', special:'✏️', event:'⭐' };
+  const expMap   = { daily:80, weekly:150, special:120, event:200 };
+  const goldMap  = { daily:50, weekly:100, special:80,  event:150 };
+  document.getElementById('nq-icon').value  = iconMap[type]  || '📋';
+  document.getElementById('nq-exp').value   = expMap[type]   || 80;
+  document.getElementById('nq-gold').value  = goldMap[type]  || 50;
+}
+
+function addBoardQuest() {
+  const name = document.getElementById('nq-name').value.trim();
+  if (!name) { notify('퀘스트 이름을 입력하세요', 'error'); return; }
+  const exp     = parseInt(document.getElementById('nq-exp').value)||80;
+  const gold    = parseInt(document.getElementById('nq-gold').value)||50;
+  const icon    = document.getElementById('nq-icon').value || '📋';
+  const stat    = document.getElementById('nq-stat').value;
+  const type    = document.getElementById('nq-type').value;
+  const dueDate = document.getElementById('nq-due').value || '';
+
+  const quest = {
+    id: 'bq_' + Date.now(),
+    name, type, exp, gold, icon, stat,
+    dueDate, date: todayStr(),
+    active: true,
+  };
+
+  const db = DB.load();
+  db.boardQuests = db.boardQuests || [];
+  db.boardQuests.push(quest);
+  DB._cache = db;
+  DB._fbRef.child('boardQuests').set(db.boardQuests);
+
+  document.getElementById('nq-name').value = '';
+  document.getElementById('nq-due').value  = '';
+  renderBoardQuestList();
+  notify(`📌 "${name}" 게시판에 등록!`);
+}
+
+function renderBoardQuestList() {
+  const db = DB.load();
+  const boardQuests = (db.boardQuests || []).filter(q => q.active !== false);
+  const students    = DB.getStudents();
+  const typeNames   = { daily:'일일', weekly:'주간', special:'과제', event:'특별' };
+  const container   = document.getElementById('board-quest-list');
+  if (!container) return;
+
+  if (boardQuests.length === 0) {
+    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">게시중인 퀘스트가 없습니다</div>';
+    return;
+  }
+
+  container.innerHTML = boardQuests.map(q => {
+    // 학생별 완료 여부 — 날짜/타입 기반 (학생·키오스크와 동일 로직)
+    const allQuestLogs = db.quests||[];
+    const doneSids = new Set(
+      students.filter(s => Utils.isQuestDoneToday(allQuestLogs, s.id, q.id, q.type)).map(s => s.id)
+    );
+
+    const studentRows = students.map(s => {
+      const done = doneSids.has(s.id);
+      return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;
+        border-radius:8px;background:${done?'rgba(46,204,113,.08)':'rgba(255,255,255,.03)'};
+        border:1px solid ${done?'rgba(46,204,113,.2)':'rgba(255,255,255,.06)'};margin-bottom:.3rem">
+        <span style="font-size:1rem">${s.avatar}</span>
+        <span style="font-size:.83rem;font-weight:600;flex:1">${s.name}</span>
+        ${done
+          ? `<span style="font-size:.72rem;color:var(--emerald);font-weight:700">✅ 완료</span>`
+          : `<button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
+              onclick="completeQuestForStudent('${q.id}','${s.id}')">✔ 완료</button>`
+        }
+      </div>`;
+    }).join('');
+
+    return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);
+      border-radius:14px;padding:1rem 1.2rem;margin-bottom:.8rem">
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem">
+        <span style="font-size:1.8rem">${q.icon||'📋'}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.95rem">${q.name}</div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-top:.15rem">
+            <span class="tag active">${typeNames[q.type]||q.type}</span>
+            &nbsp;+${q.exp}EXP · +${q.gold}G
+            ${q.stat?` · ${GAME_DATA.statNames[q.stat]||q.stat} +1`:''}
+            ${q.dueDate?` · 마감 ${q.dueDate}`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:.4rem">
+          <span style="font-size:.75rem;color:var(--txt3)">${doneSids.size}/${students.length}명</span>
+          <button class="btn-sm danger" style="font-size:.68rem;padding:.2rem .5rem"
+            onclick="closeBoardQuest('${q.id}')">🗑️ 닫기</button>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">학생별 완료 처리</div>
+      ${studentRows}
+    </div>`;
+  }).join('');
+}
+
+function completeQuestForStudent(questId, studentId) {
+  const db = DB.load();
+  const bq = (db.boardQuests||[]).find(q => q.id === questId);
+  if (!bq) return;
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+
+  // 이미 완료 처리됐으면 스킵
+  const alreadyDone = Utils.isQuestDoneToday(db.quests||[], studentId, questId, bq.type);
+  if (alreadyDone) { notify('이미 완료 처리된 학생입니다', 'error'); return; }
+
+  // 보상 지급
+  s.exp   = (s.exp||0)  + bq.exp;
+  s.gold  = (s.gold||0) + bq.gold;
+  s.level = Utils.levelFromExp(s.exp);
+  if (bq.stat) {
+    s.stats = s.stats || {};
+    s.stats[bq.stat] = (s.stats[bq.stat]||0) + 1;
+  }
+  s.totalQuests = (s.totalQuests||0) + 1;
+  DB.saveStudent(s);
+
+  // 퀘스트 로그 기록 (saveQuestLog 통일 구조)
+  DB.saveQuestLog({
+    studentId,
+    boardQuestId: questId,
+    type:         bq.type || 'special',
+    name:         bq.name,
+    exp:          bq.exp,
+    gold:         bq.gold,
+    icon:         bq.icon||'📋',
+    date:         todayStr(),
+    approved:     true,
+  });
+
+  renderBoardQuestList();
+  renderDashboard();
+  notify(`✅ ${s.name} · "${bq.name}" 완료 처리!`);
+}
+
+function closeBoardQuest(questId) {
+  if (!confirm('이 퀘스트를 게시판에서 내릴까요?')) return;
+  const db = DB.load();
+  db.boardQuests = (db.boardQuests||[]).map(q => q.id === questId ? {...q, active:false} : q);
+  DB._cache = db;
+  DB._fbRef.child('boardQuests').set(db.boardQuests);
+  renderBoardQuestList();
+  notify('퀘스트를 내렸습니다');
+}
+
+function reactivateBoardQuest(questId) {
+  const db = DB.load();
+  db.boardQuests = (db.boardQuests||[]).map(q => q.id === questId ? {...q, active:true} : q);
+  DB._cache = db;
+  DB._fbRef.child('boardQuests').set(db.boardQuests);
+  renderBoardQuestList();
+  notify('✅ 퀘스트를 다시 게시했습니다');
+}
+
+function deleteBoardQuest(questId) {
+  if (!confirm('이 퀘스트를 완전히 삭제할까요?')) return;
+  const db = DB.load();
+  db.boardQuests = (db.boardQuests||[]).filter(q => q.id !== questId);
+  DB._cache = db;
+  DB._fbRef.child('boardQuests').set(db.boardQuests);
+  renderBoardQuestList();
+  notify('🗑️ 퀘스트가 삭제되었습니다', 'error');
+}
+
+function toggleInactiveQuests() {
+  const el = document.getElementById('inactive-quest-list');
+  const btn = event.target;
+  if (el.style.display === 'none') {
+    el.style.display = '';
+    btn.textContent = '접기';
+    renderInactiveQuests();
+  } else {
+    el.style.display = 'none';
+    btn.textContent = '펼치기';
+  }
+}
+
+function renderInactiveQuests() {
+  const db = DB.load();
+  const inactive = (db.boardQuests||[]).filter(q => q.active === false);
+  const el = document.getElementById('inactive-quest-list');
+  if (!el) return;
+  if (inactive.length === 0) {
+    el.innerHTML = '<div style="padding:.8rem 1.2rem;font-size:.82rem;color:var(--txt3)">비활성 퀘스트가 없습니다</div>';
+    return;
+  }
+  const typeNames = { daily:'일일', weekly:'주간', special:'과제', event:'특별' };
+  el.innerHTML = inactive.map(q => `
+    <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem 1.2rem;
+      border-bottom:1px solid rgba(255,255,255,.04);opacity:.6">
+      <span style="font-size:1.2rem">${q.icon||'📋'}</span>
+      <div style="flex:1">
+        <div style="font-size:.85rem;font-weight:600">${q.name}</div>
+        <div style="font-size:.7rem;color:var(--txt3)">${typeNames[q.type]||q.type} · +${q.exp}EXP · +${q.gold}G</div>
+      </div>
+      <button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
+        onclick="reactivateBoardQuest('${q.id}')">↑ 재게시</button>
+      <button class="btn-sm danger" style="font-size:.7rem;padding:.25rem .5rem"
+        onclick="deleteBoardQuest('${q.id}')">🗑️</button>
+    </div>`).join('');
+}
+
+// renderQuestTable은 renderBoardQuestList 로 대체
+function renderQuestTable() { renderBoardQuestList(); }
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.students || !Array.isArray(data.students)) {
+        notify('올바른 데이터 파일이 아닙니다', 'error'); return;
+      }
+      if (!confirm(`⚠️ 현재 데이터를 덮어쓰시겠습니까?\n학생 ${data.students.length}명 데이터가 복원됩니다.`)) return;
+      DB._fbRef.set(data).then(() => {
+        notify('✅ 데이터 가져오기 완료!');
+        location.reload();
+      });
+    } catch(err) {
+      notify('파일 파싱 오류: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  input.value = ''; // 같은 파일 재선택 허용
+}
+
+// renderQuestTable → renderBoardQuestList 로 대체
+
+// ══════════════════════════════════════════════════
+//  REWARD (individual)
+// ══════════════════════════════════════════════════
+function populateRewardStudents() {
+  const sel = document.getElementById('rw-student');
+  const students = DB.getStudents();
+  // ★ 버그 수정: innerHTML 초기화 후 재구성 (중복 방지)
+  sel.innerHTML = students.map(s => `<option value="${s.id}">${s.avatar} ${s.name}</option>`).join('');
+  loadRewardStudent();
+}
+
+function loadRewardStudent() {
+  const id = document.getElementById('rw-student').value;
+  const s = DB.getStudent(id);
+  if (!s) return;
+  const statNames = GAME_DATA.statNames;
+  document.getElementById('reward-stats').innerHTML = Object.entries(s.stats||{}).map(([k,v]) => `
+    <div class="ab-admin-row">
+      <span class="ab-admin-name">${statNames[k]||k}</span>
+      <div class="ab-admin-bar"><div class="ab-admin-fill" style="width:${Math.min(100,v/20*100)}%"></div></div>
+      <input class="ab-admin-input" type="number" id="rw-stat-${k}" value="${v}">
+    </div>`).join('');
+}
+
+function applyReward(isLevelUp) {
+  const id = document.getElementById('rw-student').value;
+  const s = DB.getStudent(id);
+  if (!s) return;
+  const goldDelta = parseInt(document.getElementById('rw-gold').value)||0;
+  const expDelta = parseInt(document.getElementById('rw-exp').value)||0;
+  const title = document.getElementById('rw-title').value;
+  const newPw = document.getElementById('rw-pw').value;
+
+  s.gold = Math.max(0, s.gold + goldDelta);
+  s.exp += expDelta;
+  s.level = Utils.levelFromExp(s.exp);
+  if (title) { s.title = title; if(!(s.titles||[]).includes(title)) s.titles = [...(s.titles||[]), title]; }
+  if (newPw) s.pw = newPw;
+
+  ['read','study','art','value','health'].forEach(k => {
+    const el = document.getElementById(`rw-stat-${k}`);
+    if (el) s.stats[k] = parseInt(el.value)||0;
+  });
+
+  DB.saveStudent(s);
+  renderAll();
+  notify(`✅ ${s.name} 보상 적용 완료!${isLevelUp ? ' 🎉 레벨업 이벤트!' : ''}`);
+}
+
+// ══════════════════════════════════════════════════
+//  MONSTERS
+// ══════════════════════════════════════════════════
+function renderMonsters() {
+  const students = DB.getStudents();
+  const statNames = { atk:'공격력', def:'방어력', mag:'마력', spd:'이동속도' };
+  document.getElementById('monster-kill-table').innerHTML = students.map(s => `
+    <tr>
+      <td>${s.avatar} <strong>${s.name}</strong></td>
+      <td style="color:var(--red);font-weight:700">${(s.monsterLog||[]).length} / ${GAME_DATA.monsters.length}</td>
+      <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).join(', ')||'-'}</td>
+    </tr>`).join('');
+
+  document.getElementById('mon-list').innerHTML = GAME_DATA.monsters.map(m => `
+    <div class="mon-manage-card">
+      <div class="mmc-icon">${m.icon}</div>
+      <div>
+        <div class="mmc-name">${m.name}</div>
+        <div class="mmc-lv">추천 Lv.${m.recLv} · ${statNames[m.reqStat]||m.reqStat} ${m.reqVal}+</div>
+      </div>
+      <div class="mmc-right">💰${m.gold}G</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════════
+function loadSettings() {
+  const s = DB.getSettings();
+  document.getElementById('set-classname').value    = s.className||'우리반';
+  document.getElementById('set-boss-active').checked = s.bossActive||false;
+  document.getElementById('set-boss-name').value    = s.bossName||'거대 트롤';
+  document.getElementById('set-boss-icon').value    = s.bossIcon||'🧌';
+  document.getElementById('set-boss-gold').value    = s.bossGold||150;
+  document.getElementById('set-base-exp').value     = s.baseExp||30;
+  document.getElementById('set-base-gold').value    = s.baseGold||30;
+  document.getElementById('set-monster-rate').value = s.monsterWinRate||80;
+  const limitEl = document.getElementById('set-monster-limit');
+  if (limitEl) limitEl.value = s.monsterDailyLimit||2;
+}
+
+function saveSettings() {
+  const prev = DB.getSettings();
+  const limitEl = document.getElementById('set-monster-limit');
+  DB.saveSettings({
+    ...prev,
+    className:        document.getElementById('set-classname').value,
+    bossActive:       document.getElementById('set-boss-active').checked,
+    bossName:         document.getElementById('set-boss-name').value,
+    bossIcon:         document.getElementById('set-boss-icon').value,
+    bossGold:         parseInt(document.getElementById('set-boss-gold').value)||150,
+    baseExp:          parseInt(document.getElementById('set-base-exp').value)||30,
+    baseGold:         parseInt(document.getElementById('set-base-gold').value)||30,
+    monsterWinRate:   parseInt(document.getElementById('set-monster-rate').value)||80,
+    monsterDailyLimit: limitEl ? (parseInt(limitEl.value)||2) : 2,
+  });
+  notify('⚙️ 설정 저장 완료!');
+}
+
+function injectTestData() {
+  if (!confirm('강지원(1번) 학생에게 테스트 데이터를 주입할까요?')) return;
+  const db = DB.load();
+  const now = Date.now();
+  const d = (days) => new Date(Date.now() - days*86400000).toISOString().slice(0,10);
+
+  const s = db.students.find(x=>x.id==='s1');
+  if (!s) { notify('강지원 학생을 찾을 수 없습니다', 'error'); return; }
+
+  // 레벨 & 스탯
+  s.level = 15; s.exp = 3460; s.gold = 1850;
+  s.title = '독서왕'; s.titles = ['독서왕','모험가','학습왕','친절왕'];
+  s.stats = { read:18, study:10, art:6, value:8, health:9 };
+  s.combat = { atk:20, def:14, mag:0, spd:9 };
+  s.equipmentIds = { head:'e_h4', body:'e_b4', weapon:'e_w4', glove:'e_g4', shoe:'e_s4' };
+  s.totalQuests = 22;
+
+  // 독서 기록 (승인 완료)
+  s.books = [
+    { title:'해리포터와 마법사의 돌', review:'해리가 처음 호그와트에 가는 장면이 인상적이었어요. 용기가 중요하다는 걸 배웠어요.', date: d(45) },
+    { title:'어린 왕자', review:'어린 왕자가 여우와 친구가 되는 부분이 좋았어요. 진짜 소중한 건 눈에 보이지 않는다는 말이 기억에 남아요.', date: d(38) },
+    { title:'마당을 나온 암탉', review:'잎싹이 알을 품고 초록머리를 키우는 이야기가 감동적이었어요. 엄마의 사랑이 느껴졌어요.', date: d(30) },
+    { title:'샬롯의 거미줄', review:'샬롯이 윌버를 위해 거미줄에 글씨를 써주는 장면에서 눈물이 났어요. 진정한 우정이 뭔지 알았어요.', date: d(22) },
+    { title:'도서관 전쟁', review:'도서관에서 책을 지키기 위해 싸우는 이야기예요. 책이 얼마나 소중한지 다시 생각하게 됐어요.', date: d(14) },
+    { title:'원더', review:'어기가 학교에 처음 가는 날이 너무 떨렸어요. 용기를 내서 친구를 만드는 모습이 멋있었어요.', date: d(7) },
+  ];
+  s.bookCount = s.books.length;
+
+  // 몬스터 처치 기록
+  s.monsterLog = ['슬라임','아기 멧돼지','들쥐','돌거북','고블린','숲 늑대','마법 애벌레','강철 딱정벌레'];
+
+  // 농장
+  s.farm = [
+    {slot:0,crop:'strawberry',planted:now-3600000*10},
+    {slot:1,crop:'tomato',planted:now-3600000*14},
+    {slot:2,crop:'corn',planted:now-3600000*5},
+    {slot:3,crop:'carrot',planted:now-3600000*6},
+    {slot:4,crop:'potato',planted:now-3600000*4},
+  ];
+  s.inventory = [
+    {id:'i_potato_seed',qty:2},{id:'i_corn_seed',qty:3},{id:'i_strawberry_seed',qty:1}
+  ];
+
+  // 집 장식
+  s.houseDecorations = [
+    {id:'d_y1',area:'yard',row:0,col:0},{id:'d_y2',area:'yard',row:0,col:2},
+    {id:'d_y3',area:'yard',row:1,col:1},{id:'d_y5',area:'yard',row:2,col:0},
+    {id:'d_y6',area:'yard',row:0,col:4},{id:'d_y8',area:'yard',row:1,col:3},
+    {id:'d_i1',area:'indoor',row:0,col:0},{id:'d_i2',area:'indoor',row:0,col:2},
+    {id:'d_i3',area:'indoor',row:1,col:1},{id:'d_i5',area:'indoor',row:2,col:0},
+  ];
+
+  // 승인 대기 독서 1건
+  s.pendingRewards = [
+    {
+      id:'test_book_1', type:'book',
+      label:'📖 "80일간의 세계일주" 독서 기록',
+      bookTitle:'80일간의 세계일주',
+      bookReview:'필리어스 포그가 80일 안에 세계를 돌아오는 모험 이야기예요. 각 나라의 문화와 풍경이 생생하게 그려져 있어서 마치 제가 여행하는 것 같았어요. 시간을 잘 지키는 것이 얼마나 중요한지도 배웠어요.',
+      bookDate: d(2),
+      exp:30, gold:0, stat:'read', statVal:3, icon:'📚', date: d(2)
+    }
+  ];
+  s.achievements = ['ach_first_login','ach_quest1','ach_book1','ach_book5','ach_monster1'];
+  s.farmHarvests = 8;
+
+  // 퀘스트 기록도 추가
+  const questNames = [
+    {name:'독서록 작성하기',icon:'📋',exp:80,gold:50,date:d(1)},
+    {name:'줄넘기 50회',icon:'📋',exp:80,gold:50,date:d(2)},
+    {name:'수학 문제 5개 풀기',icon:'📋',exp:80,gold:50,date:d(3)},
+    {name:'책 1권 읽기',icon:'📅',exp:150,gold:100,date:d(5)},
+    {name:'오늘의 한 줄 일기',icon:'📋',exp:80,gold:50,date:d(6)},
+    {name:'받아쓰기 연습',icon:'📋',exp:80,gold:50,date:d(7)},
+    {name:'친구에게 칭찬하기',icon:'📋',exp:80,gold:50,date:d(8)},
+  ];
+  db.quests = db.quests || [];
+  questNames.forEach((q,i) => {
+    db.quests.push({
+      studentId:'s1', name:q.name, exp:q.exp, gold:q.gold,
+      icon:q.icon, date:q.date, approved:true,
+      boardQuestId:'bq_test_'+i
+    });
+  });
+
+  // 작품 (승인 완료) — 실제 이미지 URL 없으므로 샘플
+  db.artworks = db.artworks || [];
+  db.artworks.push({
+    id:'aw_test1', studentId:'s1',
+    title:'내가 그린 우리 가족',
+    artUrl:'',
+    comment:'가족의 모습을 사랑을 담아 그렸어요. 색감이 밝고 따뜻해요 😊',
+    date: d(10)
+  });
+
+  const idx = db.students.findIndex(x=>x.id==='s1');
+  if (idx>=0) db.students[idx] = s;
+  DB.save(db);
+  renderAll();
+  notify('🧪 강지원 테스트 데이터 주입 완료! student.html에서 강지원으로 로그인해보세요');
+}
+
+function confirmReset() {
+  if (!confirm('⚠️ 모든 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다!')) return;
+  DB._fbRef.remove().then(() => location.reload());
+}
+
+function exportData() {
+  const data = DB.load();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `classRPG_${todayStr()}.json`;
+  a.click();
+  notify('📁 데이터 내보내기 완료!');
+}
+
+function resetToDefault() {
+  if (!confirm('학생 데이터를 기본값으로 초기화하시겠습니까?')) return;
+  DB._fbRef.remove().then(() => location.reload());
+}
+
+// ══════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════
+function closeModal() {
+  document.getElementById('m-student').classList.remove('open');
+}
+document.getElementById('m-student').addEventListener('click', e => {
+  if (e.target === document.getElementById('m-student')) closeModal();
+});
+
+function notify(msg, type) {
+  const wrap = document.getElementById('notif-wrap');
+  const item = document.createElement('div');
+  item.className = 'notif-item' + (type === 'error' ? ' error' : type === 'gold' ? ' gold' : '');
+  item.textContent = msg;
+  wrap.appendChild(item);
+  setTimeout(() => item.remove(), 2900);
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+</script>
+</body>
+</html>
