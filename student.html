@@ -315,7 +315,6 @@ const DB = {
   // Firebase는 배열을 객체로 저장 → 다시 배열로 변환
   _normalizeArrays(data) {
     const toArr = v => v == null ? [] : Array.isArray(v) ? v : Object.values(v);
-    // students가 id 키 객체로 저장된 경우도 처리
     data.students          = toArr(data.students).map(s => {
       if (!s) return null;
       s.farm             = toArr(s.farm);
@@ -332,17 +331,9 @@ const DB = {
     const seen = new Map();
     data.students.forEach(s => seen.set(s.id, s));
     data.students = Array.from(seen.values());
-    data.quests             = toArr(data.quests);
-    // questLogs도 quests에 병합 (키오스크/학생화면 완료 판정에 사용)
-    const questLogs = toArr(data.questLogs);
-    questLogs.forEach(log => {
-      const dup = data.quests.some(q =>
-        q.studentId === log.studentId &&
-        q.boardQuestId === log.boardQuestId &&
-        q.date === log.date
-      );
-      if (!dup) data.quests.push(log);
-    });
+    // questLogs가 완료 판정의 단일 소스 (quests 배열 인덱스 충돌 방지)
+    data.quests = Object.values(data.questLogs || {})
+      .filter(q => q != null && typeof q === 'object' && q.studentId);
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
@@ -389,8 +380,7 @@ const DB = {
     if (idx >= 0) db.students[idx] = student; else db.students.push(student);
     this._cache = db;
     this._saving = true;
-    // student.id로 인덱스 찾아서 해당 위치만 저장 (전체 덮어쓰기 방지)
-    // id 키 기반으로 저장 (인덱스 순서 변경으로 인한 덮어쓰기 방지)
+    // id 키 기반 저장 (인덱스 충돌 방지)
     this._fbRef.child('students/' + student.id).set(student).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
@@ -503,21 +493,46 @@ const Utils = {
   charEmoji(type)       { return {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'}[type]||'🧑'; },
   isPromotionLevel(lv)  { return GAME_DATA.promotionLevels.includes(lv); },
 
+  // ★ 공용 퀘스트 상태 계산 (관리자/학생/키오스크 3화면 공통)
+  // 반환값: 'done' | 'pending' | 'none'
+  questStatus(studentId, questId, questType, questLogs, pendingRewards, activeBoardQuestIds) {
+    // 삭제된 boardQuest 참조는 무시
+    if (activeBoardQuestIds && !activeBoardQuestIds.has(questId)) return 'none';
+
+    // 완료 판정
+    const done = this.isQuestDoneToday(questLogs, studentId, questId, questType);
+    if (done) return 'done';
+
+    // 승인된 pending도 done 취급
+    const approved = (pendingRewards||[]).some(r=>
+      r && r.boardQuestId===questId && r.approved===true
+    );
+    if (approved) return 'done';
+
+    // 대기중
+    const pending = (pendingRewards||[]).some(r=>
+      r && r.boardQuestId===questId && !r.approved
+    );
+    if (pending) return 'pending';
+
+    return 'none';
+  },
+
   // 장래희망 + 레벨로 직업명 생성
   getJobTitle(dream, level) {
-    if (!dream) dream = '학생';
-    // 장래희망에서 핵심 단어 추출 (앞에 붙는 수식어 제거)
+    if (!dream) dream = '직장인';
+    // 장래희망에서 핵심 단어 추출
     const core = dream
       .replace(/미래의?\s*/,'').replace(/꿈꾸는\s*/,'').replace(/되고싶은\s*/,'')
-      .replace(/장래희망\s*/,'').trim() || dream;
+      .replace(/장래희망\s*/,'').replace(/최고의\s*/,'').trim() || dream;
 
-    if (level < 5)  return '학생';
-    if (level < 10) return `${core}을 꿈꾸는 학생`;
-    if (level < 15) return `${core} 견습생`;
-    if (level < 20) return `${core} 탐험가`;
-    if (level < 25) return `주니어 ${core}`;
-    if (level < 30) return `${core} 전문가`;
-    return core; // Lv.30: 장래희망 그대로
+    if (level < 5)  return '초등학생';
+    if (level < 10) return '중학생';
+    if (level < 15) return '고등학생';
+    if (level < 20) return '대학생';
+    if (level < 25) return `${core} 지망생`;
+    if (level < 30) return core;
+    return `위대한 ${core}`;
   },
   todayStr() {
     // KST(UTC+9) 기준 날짜
@@ -562,20 +577,20 @@ const Utils = {
 // ─── 업적 시스템 ─────────────────────────────────────
 const ACHIEVEMENTS = [
   // 퀘스트
-  { id:'ach_quest1',  icon:'📋', name:'첫 번째 발걸음',   desc:'첫 퀘스트 완료',          check: s => (s.totalQuests||0) >= 1,   reward:{ title:'모험가', deco:null,  exp:20 } },
-  { id:'ach_quest10', icon:'📜', name:'퀘스트 마스터',    desc:'퀘스트 10회 완료',         check: s => (s.totalQuests||0) >= 10,  reward:{ title:'퀘스트왕', deco:null, exp:50 } },
-  { id:'ach_quest30', icon:'🏅', name:'전설의 모험가',     desc:'퀘스트 30회 완료',         check: s => (s.totalQuests||0) >= 30,  reward:{ title:'전설왕', deco:null,  exp:100 } },
+  { id:'ach_quest1',  icon:'📋', name:'첫 번째 발걸음',   desc:'첫 퀘스트 완료',          check: s => (s.totalQuests||0) >= 1,   reward:{ title:null, deco:null,  exp:20 } },
+  { id:'ach_quest10', icon:'📜', name:'퀘스트 마스터',    desc:'퀘스트 10회 완료',         check: s => (s.totalQuests||0) >= 10,  reward:{ title:null, deco:null, exp:50 } },
+  { id:'ach_quest30', icon:'🏅', name:'전설의 모험가',     desc:'퀘스트 30회 완료',         check: s => (s.totalQuests||0) >= 30,  reward:{ title:null, deco:null,  exp:100 } },
   // 독서
   { id:'ach_book1',   icon:'📖', name:'첫 독서',          desc:'책 1권 읽기',              check: s => (s.bookCount||0) >= 1,    reward:{ title:null, deco:'deco_bookshelf', exp:15 } },
-  { id:'ach_book5',   icon:'📚', name:'독서왕 입문',       desc:'책 5권 읽기',              check: s => (s.bookCount||0) >= 5,    reward:{ title:'독서가', deco:null,  exp:40 } },
-  { id:'ach_book15',  icon:'🎓', name:'지식의 탑',         desc:'책 15권 읽기',             check: s => (s.bookCount||0) >= 15,   reward:{ title:'독서왕', deco:null,  exp:80 } },
+  { id:'ach_book5',   icon:'📚', name:'독서왕 입문',       desc:'책 5권 읽기',              check: s => (s.bookCount||0) >= 5,    reward:{ title:null, deco:null,  exp:40 } },
+  { id:'ach_book15',  icon:'🎓', name:'지식의 탑',         desc:'책 15권 읽기',             check: s => (s.bookCount||0) >= 15,   reward:{ title:null, deco:null,  exp:80 } },
   // 몬스터
-  { id:'ach_mon1',    icon:'⚔️', name:'첫 사냥',           desc:'첫 몬스터 처치',           check: s => (s.monsterLog||[]).length >= 1,  reward:{ title:'전사', deco:null, exp:20 } },
-  { id:'ach_mon5',    icon:'🗡️', name:'몬스터 사냥꾼',     desc:'몬스터 5종 처치',          check: s => (s.monsterLog||[]).length >= 5,  reward:{ title:'사냥꾼', deco:null, exp:60 } },
-  { id:'ach_mon_all', icon:'👑', name:'몬스터 도감 완성',  desc:'모든 일반 몬스터 처치',    check: s => (s.monsterLog||[]).length >= GAME_DATA.monsters.length, reward:{ title:'몬스터왕', deco:'deco_trophy', exp:150 } },
+  { id:'ach_mon1',    icon:'⚔️', name:'첫 사냥',           desc:'첫 몬스터 처치',           check: s => (s.monsterLog||[]).length >= 1,  reward:{ title:null, deco:null, exp:20 } },
+  { id:'ach_mon5',    icon:'🗡️', name:'몬스터 사냥꾼',     desc:'몬스터 5종 처치',          check: s => (s.monsterLog||[]).length >= 5,  reward:{ title:null, deco:null, exp:60 } },
+  { id:'ach_mon_all', icon:'👑', name:'몬스터 도감 완성',  desc:'모든 일반 몬스터 처치',    check: s => (s.monsterLog||[]).length >= GAME_DATA.monsters.length, reward:{ title:null, deco:'deco_trophy', exp:150 } },
   // 농장
   { id:'ach_farm5',   icon:'🌱', name:'초보 농부',          desc:'농장 수확 5회',            check: s => (s.farmHarvests||0) >= 5,  reward:{ title:null, deco:null, exp:30 } },
-  { id:'ach_farm20',  icon:'🌾', name:'베테랑 농부',        desc:'농장 수확 20회',           check: s => (s.farmHarvests||0) >= 20, reward:{ title:'농부왕', deco:null, exp:70 } },
+  { id:'ach_farm20',  icon:'🌾', name:'베테랑 농부',        desc:'농장 수확 20회',           check: s => (s.farmHarvests||0) >= 20, reward:{ title:null, deco:null, exp:70 } },
   // 장비
   { id:'ach_equip',   icon:'🛡️', name:'완전무장',           desc:'5개 슬롯 모두 장착',       check: s => {
       const ids = s.equipmentIds||{};
@@ -583,8 +598,8 @@ const ACHIEVEMENTS = [
     }, reward:{ title:null, deco:null, exp:50 } },
   // 레벨
   { id:'ach_lv5',     icon:'⬆️', name:'첫 번째 도약',       desc:'레벨 5 달성',              check: s => s.level >= 5,   reward:{ title:null, deco:null, exp:30 } },
-  { id:'ach_lv10',    icon:'🌟', name:'숙련자',              desc:'레벨 10 달성',             check: s => s.level >= 10,  reward:{ title:'숙련자', deco:'deco_trophy', exp:80 } },
-  { id:'ach_lv20',    icon:'💫', name:'전설의 시작',         desc:'레벨 20 달성',             check: s => s.level >= 20,  reward:{ title:'레전드', deco:null, exp:150 } },
+  { id:'ach_lv10',    icon:'🌟', name:'숙련자',              desc:'레벨 10 달성',             check: s => s.level >= 10,  reward:{ title:null, deco:'deco_trophy', exp:80 } },
+  { id:'ach_lv20',    icon:'💫', name:'전설의 시작',         desc:'레벨 20 달성',             check: s => s.level >= 20,  reward:{ title:null, deco:null, exp:150 } },
 ];
 
 const AchievementUtils = {
@@ -1526,6 +1541,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </div></div>
 
 <!-- 업적 -->
+<div class="overlay" id="m-rank"><div class="modal">
+  <div class="modal-hd"><div class="modal-title">🏆 우리반 랭킹</div><button class="modal-close" onclick="closeModal('m-rank')">✕</button></div>
+  <div id="rank-modal-body" style="padding:.5rem 0"></div>
+</div></div>
+
 <div class="overlay" id="m-ach"><div class="modal">
   <div class="modal-hd"><div class="modal-title">🏅 업적</div><button class="modal-close" onclick="closeModal('m-ach')">✕</button></div>
   <div id="ach-list"></div>
@@ -1629,8 +1649,30 @@ function selectStudent(id, el) {
   document.getElementById('login-err').textContent = '';
 }
 
+function checkAccessTime() {
+  const settings = DB.getSettings();
+  const startStr = settings.accessStart || '08:30';
+  const endStr   = settings.accessEnd   || '16:00';
+  const now = new Date(Date.now() + 9*3600000); // KST
+  const h = now.getUTCHours(), m = now.getUTCMinutes();
+  const cur  = h * 60 + m;
+  const [sh, sm] = startStr.split(':').map(Number);
+  const [eh, em] = endStr.split(':').map(Number);
+  const start = sh * 60 + sm;
+  const end   = eh * 60 + em;
+  // 허용 시간 외면 차단
+  return cur < start || cur >= end;
+}
+
 function doLogin() {
   if (!SEL_STUDENT) { document.getElementById('login-err').textContent = '이름을 선택해주세요!'; return; }
+
+  // 접속 시간 체크 (8:30~16:00만 허용)
+  if (checkAccessTime()) {
+    document.getElementById('login-err').textContent = '⏰ 접속 가능 시간: 오전 8:30 ~ 오후 4:00';
+    return;
+  }
+
   const student = DB.getStudent(SEL_STUDENT);
   if (document.getElementById('pw-input').value !== student.pw) {
     document.getElementById('login-err').textContent = '비밀번호가 틀렸어요!'; return;
@@ -1661,12 +1703,33 @@ function confirmChar() {
   enterGame();
 }
 
+let _accessTimer = null;
+
+function startAccessTimer() {
+  if (_accessTimer) clearInterval(_accessTimer);
+  _accessTimer = setInterval(() => {
+    if (!CUR) return;
+    if (checkAccessTime()) {
+      clearInterval(_accessTimer);
+      _accessTimer = null;
+      // 데이터 저장 후 로그아웃
+      DB.saveStudent(CUR);
+      CUR = null;
+      document.getElementById('s-game').classList.remove('active');
+      hideScreen('s-game');
+      showScreen('s-login');
+      document.getElementById('login-err').textContent = '⏰ 접속 시간이 종료됐어요. 내일 다시 만나요!';
+    }
+  }, 30000); // 30초마다 체크
+}
+
 function enterGame() {
   autoCloseDailyQuests();
   checkAttendance();
   document.getElementById('s-game').classList.add('active');
   applyLayout(LAYOUT_MODE);
   renderAll();
+  startAccessTimer(); // 자동 로그아웃 타이머 시작
 }
 
 // ══ 자동 출석 ══
@@ -2215,16 +2278,14 @@ function buildMainHTML() {
     // 폴백: 단순 완료 여부만 체크
     return _allQuests.some(q => q.studentId===s.id && q.boardQuestId===qId);
   };
-  const myDoneIds = new Set(boardQuests.filter(q=>isDoneByType(q.id,q.type)).map(q=>q.id));
-  // 승인 대기 중인 퀘스트 id
-  const pendingQuestIds = new Set(
-    (s.pendingRewards||[]).filter(r=>r.boardQuestId).map(r=>r.boardQuestId)
-  );
+  const activeBQIds = new Set(boardQuests.map(q=>q.id));
+  const questLogs   = db.quests || [];
 
   const missionHtml = boardQuests.length > 0
     ? boardQuests.map(q=>{
-        const done    = myDoneIds.has(q.id);
-        const pending = pendingQuestIds.has(q.id);
+        const status  = Utils.questStatus(s.id, q.id, q.type, questLogs, s.pendingRewards, activeBQIds);
+        const done    = status === 'done';
+        const pending = status === 'pending';
         const typeLabel = {daily:'📋 일일',weekly:'📅 주간',special:'✏️ 과제',event:'⭐ 특별'}[q.type]||'📋';
         return `
         <div class="mission-row ${done?'done':pending?'pending':''}"
@@ -2265,7 +2326,7 @@ function buildMainHTML() {
     ${boardQuests.length>0 ? `
     <div class="sec-label">📋 퀘스트
       <span style="font-size:.72rem;color:var(--txt3);font-weight:400;margin-left:.4rem">
-        ${myDoneIds.size}/${boardQuests.length} 완료
+        ${boardQuests.filter(q => Utils.questStatus(s.id, q.id, q.type, questLogs, s.pendingRewards, activeBQIds) === 'done').length}/${boardQuests.length} 완료
       </span>
     </div>
     <div class="mission-list">${missionHtml}</div>` : ''}
@@ -2298,6 +2359,12 @@ function buildMainHTML() {
       <div class="menu-tile mt-inv" onclick="openModal('m-inv');renderInv()">
         <div class="tile-icon">🎒</div><div class="tile-name">인벤토리</div>
         <div class="tile-desc">보유 아이템 관리</div>
+      </div>
+      <div class="menu-tile" style="--hover-c:rgba(255,215,0,.07);border-color:rgba(255,215,0,.15)"
+        onclick="openModal('m-rank');renderRankingModal()"
+        onmouseover="this.style.borderColor='rgba(255,215,0,.35)'" onmouseout="this.style.borderColor='rgba(255,215,0,.15)'">
+        <div class="tile-icon">🏆</div><div class="tile-name">랭킹</div>
+        <div class="tile-desc">우리반 순위 보기</div>
       </div>
       <div class="menu-tile" style="--hover-c:rgba(255,180,0,.07)" onclick="openModal('m-ach');renderAchievements()"
         onmouseover="this.style.borderColor='rgba(255,180,0,.3)'" onmouseout="this.style.borderColor=''">
@@ -4122,21 +4189,10 @@ function questTab(tab, el) {
 // ══ 퀘스트 게시판 ══
 function renderQuestBoard() {
   const db = DB.load();
-  // active 퀘스트만 (삭제되지 않은 것)
-  const activeQuests = (db.boardQuests || []).filter(q => q.active !== false);
-  // 내가 이미 완료 보상 받은 퀘스트 id 목록
-  const _bqMap = {};
-  (db.boardQuests||[]).forEach(q=>{ _bqMap[q.id]=q.type; });
-  const _qList = db.quests||[];
-  const myDoneIds = new Set(
-    (db.boardQuests||[]).filter(q=>q.active!==false)
-      .filter(q => {
-        if (typeof Utils.isQuestDoneToday === 'function')
-          return Utils.isQuestDoneToday(_qList, CUR.id, q.id, q.type);
-        return _qList.some(l => l.studentId===CUR.id && l.boardQuestId===q.id);
-      })
-      .map(q=>q.id)
-  );
+  // ★ 공통 기준: active !== false 인 것만
+  const activeQuests = (db.boardQuests||[]).filter(q => q && q.active !== false);
+  const activeBQIds  = new Set(activeQuests.map(q=>q.id));
+  const questLogs    = db.quests || [];
 
   const container = document.getElementById('quest-board-list');
   if (activeQuests.length === 0) {
@@ -4148,10 +4204,12 @@ function renderQuestBoard() {
   }
 
   container.innerHTML = activeQuests.map(q => {
-    const done = myDoneIds.has(q.id);
-    return `<div style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':'rgba(255,255,255,.08)'};
-      border-radius:12px;padding:.9rem 1rem;margin-bottom:.6rem;
-      ${done?'opacity:.6':''}">
+    // ★ 공통 상태 계산
+    const status  = Utils.questStatus(CUR.id, q.id, q.type, questLogs, CUR.pendingRewards, activeBQIds);
+    const done    = status === 'done';
+    const pending = status === 'pending';
+    return `<div style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':pending?'rgba(255,215,0,.25)':'rgba(255,255,255,.08)'};
+      border-radius:12px;padding:.9rem 1rem;margin-bottom:.6rem;${done?'opacity:.6':''}">
       <div style="display:flex;align-items:flex-start;gap:.7rem">
         <div style="font-size:1.6rem;flex-shrink:0">${q.icon||'📋'}</div>
         <div style="flex:1">
@@ -4169,8 +4227,12 @@ function renderQuestBoard() {
               border-radius:8px;padding:.1rem .45rem;color:var(--sky)">${GAME_DATA.statNames[q.stat]||q.stat} +1</span>`:''}
           </div>
         </div>
-        <div style="flex-shrink:0;font-size:.75rem;color:${done?'var(--emerald)':'var(--txt3)'};font-weight:700">
-          ${done?'✅ 완료':'⭕ 진행중'}
+        <div style="flex-shrink:0;text-align:right">
+          <div style="font-size:.75rem;color:${done?'var(--emerald)':pending?'var(--gold)':'var(--txt3)'};font-weight:700;margin-bottom:.3rem">
+            ${done?'✅ 완료':pending?'⏳ 대기중':'⭕ 진행중'}
+          </div>
+          ${!done&&!pending ? `<button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
+            onclick="submitQuestFromMain('${q.id}');renderQuestBoard()">신청</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -4180,22 +4242,22 @@ function renderQuestBoard() {
 // 메인 화면에서 바로 퀘스트 완료 신청
 function submitQuestFromMain(questId) {
   const db = DB.load();
-  const q  = (db.boardQuests||[]).find(x=>x.id===questId);
-  if (!q) return;
+  const q = (db.boardQuests||[]).find(x=>x.id===questId && x.active!==false);
+  if (!q) return; // 삭제/닫힌 퀘스트면 무시
 
-  // 이미 완료했거나 대기중이면 무시
-  const _q2 = (db.boardQuests||[]).find(x=>x.id===questId);
-  const alreadyDone = typeof Utils.isQuestDoneToday === 'function'
-    ? Utils.isQuestDoneToday(db.questLogs||db.quests||[], CUR.id, questId, _q2?.type||'special')
-    : (db.quests||[]).some(q => q.studentId===CUR.id && q.boardQuestId===questId);
-  const alreadyPending = (CUR.pendingRewards||[]).some(r=>r.boardQuestId===questId);
-  if (alreadyDone || alreadyPending) return;
+  // db.quests = 정규화된 배열 (questLogs 기반)
+  const questLogs = db.quests || [];
+  const status = Utils.questStatus(
+    CUR.id, questId, q.type, questLogs, CUR.pendingRewards,
+    new Set((db.boardQuests||[]).filter(x=>x.active!==false).map(x=>x.id))
+  );
+  if (status === 'done' || status === 'pending') return;
 
-  // pendingRewards에 추가 (선생님 승인 대기)
   CUR.pendingRewards = CUR.pendingRewards || [];
   CUR.pendingRewards.push({
     id: 'pr_'+Date.now(),
     boardQuestId: questId,
+    boardQuestType: q.type||'special',
     label: q.name,
     exp: q.exp, gold: q.gold, stat: q.stat||'', statVal: q.stat?1:0,
     icon: q.icon||'📋',
@@ -4408,44 +4470,61 @@ function visitFriend(id) {
   const db = DB.load();
   const artworks = (db.artworks||[]).filter(a=>a.studentId===f.id);
   const books    = f.books||[];
-  const decos    = f.houseDecorations||[];
 
-  // 인테리어 그리드 렌더 — 실제 DY/DI 크기와 동일하게
-  function renderDecoGrid(area) {
+  // 읽기 전용 Canvas 렌더러 — 기존 꾸미기 렌더러 재사용
+  function renderDecoCanvas(area, containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+
+    // 임시로 전역 상태 교체
+    const prevCUR       = CUR;
+    const prevScene     = DECO_SCENE;
+    const prevCv        = _dCv;
+    const prevCtx       = _dCtx;
+    const prevW         = _dW;
+    const prevH         = _dH;
+    const prevC         = _dC;
+
+    CUR = f;
+    DECO_SCENE = area;
+
+    // 새 canvas 생성
+    el.innerHTML = '';
+    const cv = document.createElement('canvas');
+    cv.style.cssText = 'width:100%;border-radius:12px;display:block';
+    el.appendChild(cv);
+
     const cols = area==='yard' ? DY.cols : DI.cols;
     const rows = area==='yard' ? DY.rows : DI.rows;
-    const grid = Array.from({length:rows}, ()=>Array(cols).fill(null));
-    decos.filter(d=>d.area===area).forEach(d=>{
-      if (d.row<rows && d.col<cols) {
-        const item = GAME_DATA.decorations.find(x=>x.id===d.id);
-        if (item) grid[d.row][d.col] = item;
-      }
-    });
-    const bg     = area='yard' ? 'rgba(39,174,96,.12)' : 'rgba(52,152,219,.1)';
-    const placed = decos.filter(d=>d.area===area).length;
-    // 셀 크기: 너비를 cols로 나눈 값 (최대 30px)
-    const cellPx = Math.min(30, Math.floor(380/cols));
-    const fs     = Math.max(10, cellPx-6);
-    return `<div style="overflow-x:auto">
-      <div style="display:grid;grid-template-columns:repeat(${cols},${cellPx}px);
-        gap:1px;background:${bg};border-radius:10px;padding:4px;
-        width:fit-content;min-width:100%">
-        ${grid.flat().map((item,i)=>{
-          const r=Math.floor(i/cols), c=i%cols;
-          const isHouse = area==='yard' && r<DH.rows && c>=(DY.cols-DH.cols);
-          return `<div style="width:${cellPx}px;height:${cellPx}px;display:flex;align-items:center;
-            justify-content:center;border-radius:3px;font-size:${fs}px;
-            background:${isHouse?'rgba(180,120,60,.25)':(item?'rgba(255,255,255,.08)':'')};
-            ${isHouse?'border:1px solid rgba(180,120,60,.3)':''}">
-            ${isHouse&&!item?'🏠':item?item.icon:''}
-          </div>`;
-        }).join('')}
-      </div>
-      ${placed===0?'<div style="font-size:.72rem;color:var(--txt3);margin-top:.4rem;text-align:center">아직 배치한 장식이 없어요</div>':''}
-    </div>`;
+    const W = el.offsetWidth || 340;
+    const C = Math.floor(W / cols);
+    const H = C * rows;
+
+    _dCv  = cv;
+    _dW   = W;
+    _dH   = H;
+    _dC   = C;
+    cv.width  = W * 2;
+    cv.height = H * 2;
+    cv.style.height = H + 'px';
+    _dCtx = cv.getContext('2d');
+    _dCtx.scale(2, 2);
+
+    // 렌더 (편집 이벤트 없이)
+    _dCtx.clearRect(0, 0, W, H);
+    if (area === 'yard') _drawYard();
+    else _drawIndoor();
+
+    // 전역 상태 복원
+    CUR       = prevCUR;
+    DECO_SCENE = prevScene;
+    _dCv      = prevCv;
+    _dCtx     = prevCtx;
+    _dW       = prevW;
+    _dH       = prevH;
+    _dC       = prevC;
   }
 
-  // 탭 전환 함수 (모달 내부)
   const modalId = 'visit-modal-'+id;
 
   const el = document.createElement('div');
@@ -4478,9 +4557,9 @@ function visitFriend(id) {
     <!-- 인테리어 탭 -->
     <div id="${modalId}-deco">
       <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.35rem">🌿 마당</div>
-      ${renderDecoGrid('yard')}
+      <div id="${modalId}-yard" style="width:100%;min-height:80px"></div>
       <div style="font-size:.72rem;color:var(--txt3);margin:.6rem 0 .35rem">🏠 집 안</div>
-      ${renderDecoGrid('indoor')}
+      <div id="${modalId}-indoor" style="width:100%;min-height:60px"></div>
     </div>
     <!-- 독서 탭 -->
     <div id="${modalId}-books" style="display:none">
@@ -4516,6 +4595,11 @@ function visitFriend(id) {
 
   el.addEventListener('click', e => { if(e.target===el) el.remove(); });
   document.body.appendChild(el);
+  // DOM에 붙은 후 canvas 렌더 (offsetWidth 계산 위해 requestAnimationFrame)
+  requestAnimationFrame(() => {
+    renderDecoCanvas('yard',   `${modalId}-yard`);
+    renderDecoCanvas('indoor', `${modalId}-indoor`);
+  });
 }
 
 function vfTab(modalId, tab, btn) {
@@ -4580,6 +4664,41 @@ function triggerLevelUp(newLv) {
 }
 
 // ══ 업적 ══
+// ══ 랭킹 ══
+function buildRankingHTML(students) {
+  const medals = ['🥇','🥈','🥉'];
+  const categories = [
+    { label:'레벨',   key: s => s.level||0,       fmt: (s,v) => `Lv.${v}` },
+    { label:'퀘스트', key: s => s.totalQuests||0,  fmt: (s,v) => `${v}개` },
+    { label:'골드',   key: s => s.gold||0,         fmt: (s,v) => `${v.toLocaleString()}G` },
+    { label:'독서',   key: s => s.bookCount||0,    fmt: (s,v) => `${v}권` },
+  ];
+  const rows = categories.map(cat => {
+    const top3 = students.slice().sort((a,b) => cat.key(b)-cat.key(a)).slice(0,3);
+    const items = top3.map((s,i) => `
+      <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;
+        background:rgba(255,255,255,.05);border-radius:10px;flex:1;min-width:0">
+        <span style="font-size:1.3rem;flex-shrink:0">${medals[i]}</span>
+        <span style="font-size:1rem;flex-shrink:0">${s.avatar||''}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
+          <div style="font-size:.73rem;color:var(--gold);font-weight:700">${cat.fmt(s,cat.key(s))}</div>
+        </div>
+      </div>`).join('');
+    return `<div style="margin-bottom:.9rem">
+      <div style="font-size:.7rem;color:var(--txt3);font-weight:700;margin-bottom:.35rem;padding-left:.1rem">${cat.label}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem">${items}</div>
+    </div>`;
+  }).join('');
+  return rows;
+}
+
+function renderRankingModal() {
+  const students = DB.getStudents();
+  const el = document.getElementById('rank-modal-body');
+  if (el) el.innerHTML = buildRankingHTML(students);
+}
+
 function renderAchievements() {
   const earned = new Set(CUR.achievements || []);
   const doneList   = ACHIEVEMENTS.filter(a =>  earned.has(a.id));

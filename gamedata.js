@@ -320,17 +320,9 @@ const DB = {
     const seen = new Map();
     data.students.forEach(s => seen.set(s.id, s));
     data.students = Array.from(seen.values());
-    data.quests             = toArr(data.quests);
-    // questLogs도 quests에 병합 (키오스크/학생화면 완료 판정에 사용)
-    const questLogs = toArr(data.questLogs);
-    questLogs.forEach(log => {
-      const dup = data.quests.some(q =>
-        q.studentId === log.studentId &&
-        q.boardQuestId === log.boardQuestId &&
-        q.date === log.date
-      );
-      if (!dup) data.quests.push(log);
-    });
+    // questLogs가 완료 판정의 단일 소스 (quests 배열 인덱스 충돌 방지)
+    data.quests = Object.values(data.questLogs || {})
+      .filter(q => q != null && typeof q === 'object' && q.studentId);
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
@@ -377,9 +369,8 @@ const DB = {
     if (idx >= 0) db.students[idx] = student; else db.students.push(student);
     this._cache = db;
     this._saving = true;
-    // student.id로 인덱스 찾아서 해당 위치만 저장 (전체 덮어쓰기 방지)
-    const saveIdx = db.students.findIndex(s => s.id === student.id);
-    this._fbRef.child('students/' + saveIdx).set(student).finally(() => {
+    // id 키 기반 저장 (인덱스 충돌 방지)
+    this._fbRef.child('students/' + student.id).set(student).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
@@ -491,21 +482,46 @@ const Utils = {
   charEmoji(type)       { return {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'}[type]||'🧑'; },
   isPromotionLevel(lv)  { return GAME_DATA.promotionLevels.includes(lv); },
 
+  // ★ 공용 퀘스트 상태 계산 (관리자/학생/키오스크 3화면 공통)
+  // 반환값: 'done' | 'pending' | 'none'
+  questStatus(studentId, questId, questType, questLogs, pendingRewards, activeBoardQuestIds) {
+    // 삭제된 boardQuest 참조는 무시
+    if (activeBoardQuestIds && !activeBoardQuestIds.has(questId)) return 'none';
+
+    // 완료 판정
+    const done = this.isQuestDoneToday(questLogs, studentId, questId, questType);
+    if (done) return 'done';
+
+    // 승인된 pending도 done 취급
+    const approved = (pendingRewards||[]).some(r=>
+      r && r.boardQuestId===questId && r.approved===true
+    );
+    if (approved) return 'done';
+
+    // 대기중
+    const pending = (pendingRewards||[]).some(r=>
+      r && r.boardQuestId===questId && !r.approved
+    );
+    if (pending) return 'pending';
+
+    return 'none';
+  },
+
   // 장래희망 + 레벨로 직업명 생성
   getJobTitle(dream, level) {
-    if (!dream) dream = '학생';
-    // 장래희망에서 핵심 단어 추출 (앞에 붙는 수식어 제거)
+    if (!dream) dream = '직장인';
+    // 장래희망에서 핵심 단어 추출
     const core = dream
       .replace(/미래의?\s*/,'').replace(/꿈꾸는\s*/,'').replace(/되고싶은\s*/,'')
-      .replace(/장래희망\s*/,'').trim() || dream;
+      .replace(/장래희망\s*/,'').replace(/최고의\s*/,'').trim() || dream;
 
-    if (level < 5)  return '학생';
-    if (level < 10) return `${core}을 꿈꾸는 학생`;
-    if (level < 15) return `${core} 견습생`;
-    if (level < 20) return `${core} 탐험가`;
-    if (level < 25) return `주니어 ${core}`;
-    if (level < 30) return `${core} 전문가`;
-    return core; // Lv.30: 장래희망 그대로
+    if (level < 5)  return '초등학생';
+    if (level < 10) return '중학생';
+    if (level < 15) return '고등학생';
+    if (level < 20) return '대학생';
+    if (level < 25) return `${core} 지망생`;
+    if (level < 30) return core;
+    return `위대한 ${core}`;
   },
   todayStr() {
     // KST(UTC+9) 기준 날짜
@@ -550,20 +566,20 @@ const Utils = {
 // ─── 업적 시스템 ─────────────────────────────────────
 const ACHIEVEMENTS = [
   // 퀘스트
-  { id:'ach_quest1',  icon:'📋', name:'첫 번째 발걸음',   desc:'첫 퀘스트 완료',          check: s => (s.totalQuests||0) >= 1,   reward:{ title:'모험가', deco:null,  exp:20 } },
-  { id:'ach_quest10', icon:'📜', name:'퀘스트 마스터',    desc:'퀘스트 10회 완료',         check: s => (s.totalQuests||0) >= 10,  reward:{ title:'퀘스트왕', deco:null, exp:50 } },
-  { id:'ach_quest30', icon:'🏅', name:'전설의 모험가',     desc:'퀘스트 30회 완료',         check: s => (s.totalQuests||0) >= 30,  reward:{ title:'전설왕', deco:null,  exp:100 } },
+  { id:'ach_quest1',  icon:'📋', name:'첫 번째 발걸음',   desc:'첫 퀘스트 완료',          check: s => (s.totalQuests||0) >= 1,   reward:{ title:null, deco:null,  exp:20 } },
+  { id:'ach_quest10', icon:'📜', name:'퀘스트 마스터',    desc:'퀘스트 10회 완료',         check: s => (s.totalQuests||0) >= 10,  reward:{ title:null, deco:null, exp:50 } },
+  { id:'ach_quest30', icon:'🏅', name:'전설의 모험가',     desc:'퀘스트 30회 완료',         check: s => (s.totalQuests||0) >= 30,  reward:{ title:null, deco:null,  exp:100 } },
   // 독서
   { id:'ach_book1',   icon:'📖', name:'첫 독서',          desc:'책 1권 읽기',              check: s => (s.bookCount||0) >= 1,    reward:{ title:null, deco:'deco_bookshelf', exp:15 } },
-  { id:'ach_book5',   icon:'📚', name:'독서왕 입문',       desc:'책 5권 읽기',              check: s => (s.bookCount||0) >= 5,    reward:{ title:'독서가', deco:null,  exp:40 } },
-  { id:'ach_book15',  icon:'🎓', name:'지식의 탑',         desc:'책 15권 읽기',             check: s => (s.bookCount||0) >= 15,   reward:{ title:'독서왕', deco:null,  exp:80 } },
+  { id:'ach_book5',   icon:'📚', name:'독서왕 입문',       desc:'책 5권 읽기',              check: s => (s.bookCount||0) >= 5,    reward:{ title:null, deco:null,  exp:40 } },
+  { id:'ach_book15',  icon:'🎓', name:'지식의 탑',         desc:'책 15권 읽기',             check: s => (s.bookCount||0) >= 15,   reward:{ title:null, deco:null,  exp:80 } },
   // 몬스터
-  { id:'ach_mon1',    icon:'⚔️', name:'첫 사냥',           desc:'첫 몬스터 처치',           check: s => (s.monsterLog||[]).length >= 1,  reward:{ title:'전사', deco:null, exp:20 } },
-  { id:'ach_mon5',    icon:'🗡️', name:'몬스터 사냥꾼',     desc:'몬스터 5종 처치',          check: s => (s.monsterLog||[]).length >= 5,  reward:{ title:'사냥꾼', deco:null, exp:60 } },
-  { id:'ach_mon_all', icon:'👑', name:'몬스터 도감 완성',  desc:'모든 일반 몬스터 처치',    check: s => (s.monsterLog||[]).length >= GAME_DATA.monsters.length, reward:{ title:'몬스터왕', deco:'deco_trophy', exp:150 } },
+  { id:'ach_mon1',    icon:'⚔️', name:'첫 사냥',           desc:'첫 몬스터 처치',           check: s => (s.monsterLog||[]).length >= 1,  reward:{ title:null, deco:null, exp:20 } },
+  { id:'ach_mon5',    icon:'🗡️', name:'몬스터 사냥꾼',     desc:'몬스터 5종 처치',          check: s => (s.monsterLog||[]).length >= 5,  reward:{ title:null, deco:null, exp:60 } },
+  { id:'ach_mon_all', icon:'👑', name:'몬스터 도감 완성',  desc:'모든 일반 몬스터 처치',    check: s => (s.monsterLog||[]).length >= GAME_DATA.monsters.length, reward:{ title:null, deco:'deco_trophy', exp:150 } },
   // 농장
   { id:'ach_farm5',   icon:'🌱', name:'초보 농부',          desc:'농장 수확 5회',            check: s => (s.farmHarvests||0) >= 5,  reward:{ title:null, deco:null, exp:30 } },
-  { id:'ach_farm20',  icon:'🌾', name:'베테랑 농부',        desc:'농장 수확 20회',           check: s => (s.farmHarvests||0) >= 20, reward:{ title:'농부왕', deco:null, exp:70 } },
+  { id:'ach_farm20',  icon:'🌾', name:'베테랑 농부',        desc:'농장 수확 20회',           check: s => (s.farmHarvests||0) >= 20, reward:{ title:null, deco:null, exp:70 } },
   // 장비
   { id:'ach_equip',   icon:'🛡️', name:'완전무장',           desc:'5개 슬롯 모두 장착',       check: s => {
       const ids = s.equipmentIds||{};
@@ -571,8 +587,8 @@ const ACHIEVEMENTS = [
     }, reward:{ title:null, deco:null, exp:50 } },
   // 레벨
   { id:'ach_lv5',     icon:'⬆️', name:'첫 번째 도약',       desc:'레벨 5 달성',              check: s => s.level >= 5,   reward:{ title:null, deco:null, exp:30 } },
-  { id:'ach_lv10',    icon:'🌟', name:'숙련자',              desc:'레벨 10 달성',             check: s => s.level >= 10,  reward:{ title:'숙련자', deco:'deco_trophy', exp:80 } },
-  { id:'ach_lv20',    icon:'💫', name:'전설의 시작',         desc:'레벨 20 달성',             check: s => s.level >= 20,  reward:{ title:'레전드', deco:null, exp:150 } },
+  { id:'ach_lv10',    icon:'🌟', name:'숙련자',              desc:'레벨 10 달성',             check: s => s.level >= 10,  reward:{ title:null, deco:'deco_trophy', exp:80 } },
+  { id:'ach_lv20',    icon:'💫', name:'전설의 시작',         desc:'레벨 20 달성',             check: s => s.level >= 20,  reward:{ title:null, deco:null, exp:150 } },
 ];
 
 const AchievementUtils = {
