@@ -20,91 +20,56 @@ const GAME_DATA = {
   // 하루 퀘스트 2~3개(각 30~50EXP) 기준 → 초반 매일 레벨업, Lv10+ 3~5일에 1번
   // expTable[i] = Lv(i+1)이 되기 위한 누적 EXP
   expTable: [
-      0,   50,  120,  220,  350,  510,  700,  920, 1170, 1450,  // Lv 1~10
-   1760, 2110, 2510, 2960, 3460, 4010, 4610, 5260, 5960, 6710,  // Lv11~20
-   7510, 8360, 9260,10210,11210,12260,13360,14510,15710,17000,18500 // Lv21~31
+      0,  100,  240,  440,  700, 1020, 1400, 1840, 2340, 2900,  // Lv 1~10
+   3520, 4220, 5020, 5920, 6920, 8020, 9220,10520,11920,13420,  // Lv11~20
+  15020,16720,18520,20420,22420,24520,26720,29020,31420,34000,37000 // Lv21~31
   ],
 
   // ─── 초기 학생 데이터 (가치 스탯, 새 EXP 기준) ──────────────
   defaultStudents: [
-    { id:'s1', name:'강지원', avatar:'⚔️', pw:'1234', charType:1,
-      level:7, exp:800,   // Lv7: 700~919
-      gold:320, title:'독서왕', job:'미래의 과학자',
-      stats:{ read:3, study:2, art:1, value:4, health:4 },
-      combat:{ atk:12, def:10, mag:0, spd:2 },
-      equipment:{ head:'가죽 모자', body:'철 갑옷', weapon:'강철검', glove:'철 장갑', shoe:'가죽 신발' },
-      equipmentIds:{ head:'e_h2', body:'e_b4', weapon:'e_w4', glove:'e_g4', shoe:'e_s2' },
-      inventory:[ {id:'i_potato_seed',qty:3}, {id:'i_carrot_seed',qty:1} ],
-      titles:['독서왕'],
-      books:[{title:'해리포터와 마법사의 돌',date:'2024-03-01'},{title:'어린왕자',date:'2024-03-10'}],
-      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*3},
-             {slot:3,crop:'carrot',planted:Date.now()-3600000*4},
-             {slot:6,crop:'potato',planted:Date.now()-3600000*1} ],
-      monsterLog:['슬라임'], totalQuests:5, bookCount:2,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false,
-      pendingRewards:[{id:'pr_init1',label:'익힘책 15쪽 완료',exp:30,gold:30,stat:'study',statVal:1,icon:'📚',date:'오늘'}]
+    { id:'s1', name:'학생1', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s2', name:'박예지', avatar:'🌸', pw:'1234', charType:2,
-      level:5, exp:420,   // Lv5: 350~509
-      gold:210, title:'예술왕', job:'미래의 화가',
-      stats:{ read:1, study:2, art:5, value:3, health:2 },
-      combat:{ atk:0, def:6, mag:14, spd:3 },
-      equipment:{ head:'천 모자', body:'가죽 갑옷', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
-      equipmentIds:{ head:'e_h1', body:'e_b2', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
-      inventory:[ {id:'i_corn_seed',qty:2} ],
-      titles:['예술왕'], books:[],
-      farm:[ {slot:1,crop:'corn',planted:Date.now()-3600000*6} ],
-      monsterLog:[], totalQuests:2, bookCount:7,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s2', name:'학생2', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s3', name:'양인우', avatar:'🛡️', pw:'1234', charType:1,
-      level:6, exp:600,   // Lv6: 510~699
-      gold:180, title:'건강왕', job:'미래의 운동선수',
-      stats:{ read:2, study:4, art:1, value:1, health:5 },
-      combat:{ atk:7, def:16, mag:0, spd:6 },
-      equipment:{ head:'가죽 모자', body:'가죽 갑옷', weapon:'철검', glove:'천 장갑', shoe:'철 부츠' },
-      equipmentIds:{ head:'e_h2', body:'e_b2', weapon:'e_w2', glove:'e_g1', shoe:'e_s4' },
-      inventory:[], titles:['건강왕'], books:[],
-      farm:[], monsterLog:[], totalQuests:2, bookCount:2,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s3', name:'학생3', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s4', name:'이시아', avatar:'🌟', pw:'1234', charType:2,
-      level:4, exp:285,   // Lv4: 220~349
-      gold:150, title:'가치왕', job:'미래의 선생님',
-      stats:{ read:3, study:6, art:2, value:2, health:4 },
-      combat:{ atk:4, def:13, mag:0, spd:2 },
-      equipment:{ head:'천 모자', body:'철 갑옷', weapon:'나무검', glove:'천 장갑', shoe:'가죽 신발' },
-      equipmentIds:{ head:'e_h1', body:'e_b4', weapon:'e_w1', glove:'e_g1', shoe:'e_s2' },
-      inventory:[ {id:'i_potato_seed',qty:1} ],
-      titles:['가치왕'], books:[],
-      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*2} ],
-      monsterLog:[], totalQuests:1, bookCount:5,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s4', name:'학생4', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s5', name:'이유은', avatar:'🔮', pw:'1234', charType:2,
-      level:8, exp:1040,  // Lv8: 920~1169
-      gold:420, title:'독서왕', job:'미래의 작가',
-      stats:{ read:1, study:1, art:3, value:3, health:2 },
-      combat:{ atk:7, def:6, mag:16, spd:5 },
-      equipment:{ head:'견습 마법 모자', body:'견습 로브', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
-      equipmentIds:{ head:'e_h3', body:'e_b3', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
-      inventory:[ {id:'i_strawberry_seed',qty:1} ],
-      titles:['독서왕'], books:[],
-      farm:[ {slot:2,crop:'strawberry',planted:Date.now()-3600000*13} ],
-      monsterLog:['슬라임','아기 멧돼지'], totalQuests:3, bookCount:10,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s5', name:'학생5', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s6', name:'한은규', avatar:'🏹', pw:'1234', charType:1,
-      level:9, exp:1300,  // Lv9: 1170~1449
-      gold:510, title:'도전왕', job:'미래의 축구선수',
-      stats:{ read:2, study:4, art:5, value:6, health:7 },
-      combat:{ atk:24, def:22, mag:0, spd:6 },
-      equipment:{ head:'기사 투구', body:'기사 갑옷', weapon:'기사검', glove:'기사 장갑', shoe:'기사 부츠' },
-      equipmentIds:{ head:'e_h4', body:'e_b6', weapon:'e_w6', glove:'e_g6', shoe:'e_s6' },
-      inventory:[], titles:['도전왕','건강왕'], books:[],
-      farm:[ {slot:0,crop:'tomato',planted:Date.now()-3600000*10} ],
-      monsterLog:['슬라임','아기 멧돼지','고블린'], totalQuests:8, bookCount:4,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s6', name:'학생6', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:5000, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{},
+      inventory:[{id:'d_y1',qty:3},{id:'d_y2',qty:3},{id:'d_y3',qty:3},{id:'d_y4',qty:3},{id:'d_y5',qty:3},{id:'d_y6',qty:3},{id:'d_y7',qty:3},{id:'d_y8',qty:3},{id:'d_y9',qty:3},{id:'d_y10',qty:3},{id:'d_y11',qty:3},{id:'d_y12',qty:3},{id:'d_y13',qty:3},{id:'d_y14',qty:3},{id:'d_i1',qty:3},{id:'d_i2',qty:3},{id:'d_i3',qty:3},{id:'d_i4',qty:3},{id:'d_i5',qty:3},{id:'d_i6',qty:3},{id:'d_i7',qty:3},{id:'d_i8',qty:3},{id:'d_i9',qty:3},{id:'d_i10',qty:3},{id:'d_i11',qty:3},{id:'d_i12',qty:3},{id:'d_i13',qty:3},{id:'d_i14',qty:3}],
+      farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
   ],
 
@@ -235,26 +200,26 @@ const GAME_DATA = {
   // ─── 몬스터 (밸런스 v4: 1학기 18주 기준 EXP 재조정) ─────────────
   // 저레벨 몬스터 EXP 대폭 상향 → 초반 레벨업 빠르게, 후반은 완만하게
   monsters: [
-    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:40},  // Lv1: 장비없어도 가능
-    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:50},
-    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:55},  // mag 상향 (풀셋26)
-    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:55},
-    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:60},
-    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:65},
-    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:70},
-    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:75},  // mag 상향 (풀셋26)
-    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:80},
-    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:88},
-    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:95},
-    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:102}, // def 상향 (풀셋27)
-    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:110}, // mag 대폭 상향 (풀셋45)
-    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:118},
-    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:126},
-    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:134}, // atk 상향 (풀셋29)
-    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:144}, // def 상향 (풀셋39)
-    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:154}, // spd 상향 (풀셋20)
-    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:165}, // mag 대폭 상향 (풀셋68)
-    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:200}, // atk 상향 (풀셋56)
+    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:25},  // Lv1: 장비없어도 가능
+    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:30},
+    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:33},  // mag 상향 (풀셋26)
+    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:33},
+    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:36},
+    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:39},
+    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:42},
+    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:45},  // mag 상향 (풀셋26)
+    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:48},
+    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:53},
+    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:57},
+    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:61}, // def 상향 (풀셋27)
+    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:66}, // mag 대폭 상향 (풀셋45)
+    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:71},
+    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:76},
+    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:80}, // atk 상향 (풀셋29)
+    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:86}, // def 상향 (풀셋39)
+    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:92}, // spd 상향 (풀셋20)
+    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:99}, // mag 대폭 상향 (풀셋68)
+    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:120}, // atk 상향 (풀셋56)
   ],
 
   // ─── 칭호·승급 ────────────────────────────────────────
@@ -350,6 +315,7 @@ const DB = {
   // Firebase는 배열을 객체로 저장 → 다시 배열로 변환
   _normalizeArrays(data) {
     const toArr = v => v == null ? [] : Array.isArray(v) ? v : Object.values(v);
+    // students가 id 키 객체로 저장된 경우도 처리
     data.students          = toArr(data.students).map(s => {
       if (!s) return null;
       s.farm             = toArr(s.farm);
@@ -423,9 +389,8 @@ const DB = {
     if (idx >= 0) db.students[idx] = student; else db.students.push(student);
     this._cache = db;
     this._saving = true;
-    // student.id로 인덱스 찾아서 해당 위치만 저장 (전체 덮어쓰기 방지)
-    const saveIdx = db.students.findIndex(s => s.id === student.id);
-    this._fbRef.child('students/' + saveIdx).set(student).finally(() => {
+    // id 키 기반으로 저장 (인덱스 순서 변경으로 인한 덮어쓰기 방지)
+    this._fbRef.child('students/' + student.id).set(student).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
@@ -435,7 +400,7 @@ const DB = {
     db.quests = db.quests || [];
     db.quests.push(log);
     this._cache = db;
-    // 고유 ID 기반으로만 저장 (배열 인덱스 충돌 방지)
+    // questLogs에 고유 키로 저장 (완료 판정 기준)
     const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
     log._id = logId;
     this._fbRef.child('questLogs/' + logId).set(log);
@@ -536,7 +501,46 @@ const Utils = {
 
   charEmoji(type)       { return {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'}[type]||'🧑'; },
   isPromotionLevel(lv)  { return GAME_DATA.promotionLevels.includes(lv); },
-  todayStr()            { return new Date().toISOString().slice(0,10); },
+
+  // 장래희망 + 레벨로 직업명 생성
+  getJobTitle(dream, level) {
+    if (!dream) dream = '학생';
+    // 장래희망에서 핵심 단어 추출 (앞에 붙는 수식어 제거)
+    const core = dream
+      .replace(/미래의?\s*/,'').replace(/꿈꾸는\s*/,'').replace(/되고싶은\s*/,'')
+      .replace(/장래희망\s*/,'').trim() || dream;
+
+    if (level < 5)  return '학생';
+    if (level < 10) return `${core}을 꿈꾸는 학생`;
+    if (level < 15) return `${core} 견습생`;
+    if (level < 20) return `${core} 탐험가`;
+    if (level < 25) return `주니어 ${core}`;
+    if (level < 30) return `${core} 전문가`;
+    return core; // Lv.30: 장래희망 그대로
+  },
+  todayStr() {
+    // KST(UTC+9) 기준 날짜
+    return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  },
+  weekStartStr() {
+    // KST 기준 이번 주 일요일 (일요일 자정 리셋)
+    const d = new Date(Date.now()+9*3600000);
+    const day = d.getUTCDay(); // 0=일, 1=월 ...
+    const sun = new Date(d);
+    sun.setUTCDate(d.getUTCDate() - day); // 이번 주 일요일
+    return sun.toISOString().slice(0,10);
+  },
+  isQuestDoneToday(quests, studentId, boardQuestId, questType) {
+    const today = this.todayStr();
+    const weekStart = this.weekStartStr();
+    return (quests||[]).some(q => {
+      if (q.studentId!==studentId || q.boardQuestId!==boardQuestId) return false;
+      if (!q.date) return true;
+      if (questType==='daily')  return q.date===today;
+      if (questType==='weekly') return q.date>=weekStart;
+      return true;
+    });
+  },
   uid()                 { return 'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); },
 
   // ★ 몬스터 하루 도전 횟수 체크 (2회)
@@ -620,18 +624,6 @@ const AchievementUtils = {
     try { return ach.check(student) ? 1 : 0; } catch(e) { return 0; }
   },
 };
-
-
-
-
-
-
-
-
-
-
-
-
 
 </script>
 <style>
@@ -1092,6 +1084,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <span style="font-size:.72rem;color:var(--txt3)" id="last-preset-hint"></span>
         </div>
       </div>
+      <!-- 키오스크 스타일 승인 그리드 -->
+      <div style="margin-bottom:1.2rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <div style="font-size:.85rem;font-weight:700;color:var(--txt1)">⚡ 빠른 승인 (키오스크 뷰)</div>
+          <button class="btn-sm outline" onclick="renderApproveGrid()" style="font-size:.72rem">🔄 새로고침</button>
+        </div>
+        <div id="approve-grid" style="overflow-x:auto;border-radius:var(--r);border:1px solid var(--border2)"></div>
+      </div>
       <!-- 필터 -->
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem">
         <button class="btn-sm outline" id="af-all"    onclick="setApproveFilter('all',this)">전체</button>
@@ -1153,7 +1153,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
         <!-- 일일 템플릿 -->
         <div id="qt-daily">
-          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📋 80EXP + 50G</div>
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📋 35EXP + 25G</div>
           <div id="qt-daily-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
           <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
             <input class="form-input" id="qt-daily-custom" placeholder="+ 항목 직접 추가" style="flex:1">
@@ -1164,7 +1164,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
         <!-- 주간 템플릿 -->
         <div id="qt-weekly" style="display:none">
-          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📅 150EXP + 100G</div>
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📅 80EXP + 70G</div>
           <div id="qt-weekly-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
           <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
             <input class="form-input" id="qt-weekly-custom" placeholder="+ 항목 직접 추가" style="flex:1">
@@ -1213,11 +1213,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
             </div>
             <div class="form-group">
               <label class="form-label">EXP 보상</label>
-              <input class="form-input" type="number" id="nq-exp" value="80">
+              <input class="form-input" type="number" id="nq-exp" value="35">
             </div>
             <div class="form-group">
               <label class="form-label">골드 보상</label>
-              <input class="form-input" type="number" id="nq-gold" value="50">
+              <input class="form-input" type="number" id="nq-gold" value="25">
             </div>
             <input type="hidden" id="nq-icon" value="📋">
             <div class="form-group">
@@ -1325,7 +1325,13 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
       <!-- 승인 완료 작품 목록 -->
       <div class="table-card">
-        <div class="tc-header"><div class="tc-title">✅ 전시중인 작품</div></div>
+        <div class="tc-header" style="display:flex;align-items:center;justify-content:space-between">
+          <div class="tc-title">✅ 전시중인 작품</div>
+          <select id="artwork-filter" class="form-select" style="width:auto;font-size:.8rem"
+            onchange="renderArtworkAdmin()">
+            <option value="all">전체 학생</option>
+          </select>
+        </div>
         <div id="artwork-admin-list" style="padding:.5rem 0"></div>
       </div>
     </div>
@@ -1428,8 +1434,16 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="settings-card">
           <div class="sc-head">🛠️ 데이터 관리</div>
           <div class="setting-row">
-            <div><div class="sr-label">🧪 테스트 데이터 주입</div><div class="sr-sub">강지원(1번) 모든 기능 체험용 데이터</div></div>
+            <div><div class="sr-label">🔄 전체 학생 수치 초기화</div><div class="sr-sub">이름·비번은 유지, 레벨·EXP·골드·아이템 초기화</div></div>
+            <button class="btn-sm danger" onclick="resetAllStudents()">초기화</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">🧪 테스트 데이터 주입</div><div class="sr-sub">학생1 모든 기능 체험용 데이터</div></div>
             <button class="btn-sm success" onclick="injectTestData()">주입</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="sr-label">🔄 학생 수치 초기화</div><div class="sr-sub">모든 학생 Lv1·EXP0·골드0·스탯0으로 리셋 (이름·비번 유지)</div></div>
+            <button class="btn-sm danger" onclick="resetAllStudentStats()">초기화</button>
           </div>
           <div class="setting-row">
             <div><div class="sr-label">전체 데이터 초기화</div><div class="sr-sub">⚠️ 모든 학생 데이터 초기화</div></div>
@@ -1544,6 +1558,7 @@ function renderAll() {
   renderDashboard();
   renderStudentTable();
   renderApproveList();
+  renderApproveGrid();
   renderRank();
   renderBoardQuestList();
   renderMonsters();
@@ -1834,12 +1849,56 @@ function openStudentDetail(id) {
           </div>`).join('')}
       </div>
     </div>
-    <div style="display:flex;gap:.6rem;margin-top:1rem">
+    <div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">
       <button class="btn-sm success" onclick="saveStudentDetail('${id}')">✅ 저장</button>
+      <button class="btn-sm danger" onclick="resetStudentStats('${id}')" style="font-size:.75rem">🔄 수치 초기화</button>
       <button class="btn-sm outline" onclick="closeModal()">취소</button>
     </div>`;
 
   document.getElementById('m-student').classList.add('open');
+}
+
+function resetStudentStats(id) {
+  if (!confirm('이 학생의 모든 수치를 초기화할까요?\n(레벨, EXP, 골드, 스탯, 퀘스트, 몬스터 기록)')) return;
+  const s = DB.getStudent(id);
+  if (!s) return;
+  s.level = 1; s.exp = 0; s.gold = 0;
+  s.stats = {read:0, study:0, art:0, value:0, health:0};
+  s.combat = {atk:0, def:6, mag:0, spd:0};
+  s.totalQuests = 0; s.bookCount = 0;
+  s.books = []; s.monsterLog = [];
+  s.pendingRewards = []; s.titles = [];
+  s.title = ''; s.achievements = [];
+  s.equipmentIds = {}; s.inventory = [];
+  s.houseDecorations = []; s.yardFloor = {};
+  s.lastAttendDate = '';
+  DB.saveStudent(s);
+  closeModal();
+  renderAll();
+  notify(`🔄 ${s.name} 수치 초기화 완료!`);
+}
+
+function resetAllStudents() {
+  if (!confirm('⚠️ 모든 학생의 수치를 초기화할까요?\n이름·비번·아바타는 유지됩니다.')) return;
+  DB.getStudents().forEach(s => {
+    s.level = 1; s.exp = 0; s.gold = 0;
+    s.stats = {read:0, study:0, art:0, value:0, health:0};
+    s.combat = {atk:0, def:6, mag:0, spd:0};
+    s.totalQuests = 0; s.bookCount = 0;
+    s.books = []; s.monsterLog = [];
+    s.pendingRewards = []; s.titles = [];
+    s.title = ''; s.achievements = [];
+    s.equipmentIds = {}; s.inventory = [];
+    s.houseDecorations = []; s.yardFloor = {};
+    s.lastAttendDate = '';
+    DB.saveStudent(s);
+  });
+  // 퀘스트 로그도 초기화
+  const db = DB.load();
+  db.quests = []; db.questLogs = {};
+  DB.save(db);
+  renderAll();
+  notify('🔄 전체 학생 수치 초기화 완료!');
 }
 
 function saveStudentDetail(id) {
@@ -1885,64 +1944,102 @@ function confirmDeleteStudent(id) {
 function openAddStudent() {
   const el = document.createElement('div');
   el.className = 'overlay open';
-  el.innerHTML = `<div class="modal" style="max-width:420px">
+
+  const rows = Array.from({length:6}, (_,i) => `
+    <tr id="add-row-${i}" style="${i>0?'opacity:.45':''}">
+      <td style="padding:.3rem .2rem;font-size:.8rem;color:var(--txt3);text-align:center;width:24px">${i+1}</td>
+      <td style="padding:.2rem .3rem"><input class="form-input" id="add-name-${i}" placeholder="이름" style="padding:.35rem .5rem;font-size:.82rem" oninput="onAddRowInput(${i})"></td>
+      <td style="padding:.2rem .3rem"><input class="form-input" id="add-pw-${i}" value="1234" style="padding:.35rem .5rem;font-size:.82rem;width:64px" oninput="onAddRowInput(${i})"></td>
+      <td style="padding:.2rem .3rem"><input class="form-input" id="add-job-${i}" placeholder="장래희망" style="padding:.35rem .5rem;font-size:.82rem" oninput="onAddRowInput(${i})"></td>
+      <td style="padding:.2rem .3rem">
+        <select class="form-select" id="add-char-${i}" style="padding:.35rem .4rem;font-size:.82rem">
+          <option value="1">👦 남</option>
+          <option value="2">👧 여</option>
+        </select>
+      </td>
+    </tr>`).join('');
+
+  el.innerHTML = `<div class="modal" style="max-width:600px">
     <div class="modal-hd">
-      <div class="modal-title">👤 학생 추가</div>
+      <div class="modal-title">👤 학생 추가 (최대 6명)</div>
       <button class="modal-close" onclick="this.closest('.overlay').remove()">✕</button>
     </div>
-    <div class="form-grid">
-      <div class="form-group"><label class="form-label">이름 *</label>
-        <input class="form-input" id="add-name" placeholder="예: 김민준"></div>
-      <div class="form-group"><label class="form-label">비밀번호</label>
-        <input class="form-input" id="add-pw" placeholder="기본값: 1234" value="1234"></div>
-      <div class="form-group"><label class="form-label">장래희망</label>
-        <input class="form-input" id="add-job" placeholder="예: 미래의 과학자"></div>
-      <div class="form-group"><label class="form-label">캐릭터</label>
-        <select class="form-select" id="add-char">
-          <option value="1">🧑‍🦱 남학생 A</option>
-          <option value="2">👧 여학생 A</option>
-          <option value="3">🧑 남학생 B</option>
-          <option value="4">👩 여학생 B</option>
-        </select></div>
+    <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">이름을 입력하면 해당 줄이 활성화돼요. 비어있는 줄은 건너뜁니다.</div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="font-size:.72rem;color:var(--txt3)">
+        <th style="padding:.2rem;width:24px">#</th>
+        <th style="padding:.2rem;text-align:left">이름 *</th>
+        <th style="padding:.2rem;text-align:left">비번</th>
+        <th style="padding:.2rem;text-align:left">장래희망</th>
+        <th style="padding:.2rem;text-align:left">캐릭터</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
     </div>
-    <div style="display:flex;gap:.6rem;margin-top:1.2rem">
-      <button class="btn-sm success" style="flex:1;padding:.65rem" onclick="doAddStudent(this)">✅ 추가</button>
+    <div style="display:flex;gap:.6rem;margin-top:1rem">
+      <button class="btn-sm success" style="flex:1;padding:.65rem" onclick="doAddStudents(this)">✅ 추가하기</button>
       <button class="btn-sm outline" onclick="this.closest('.overlay').remove()">취소</button>
     </div>
   </div>`;
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
   document.body.appendChild(el);
-  setTimeout(() => document.getElementById('add-name').focus(), 50);
+  setTimeout(() => document.getElementById('add-name-0').focus(), 50);
 }
 
-function doAddStudent(btn) {
-  const name = document.getElementById('add-name').value.trim();
-  if (!name) { notify('이름을 입력하세요', 'error'); return; }
-  const pw      = document.getElementById('add-pw').value || '1234';
-  const job     = document.getElementById('add-job').value || '미래를 꿈꾸는 학생';
-  const charType= parseInt(document.getElementById('add-char').value);
-  const avatarMap = {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'};
-  const id = 's' + Date.now();
-  const newStudent = {
-    id, name, pw, job, charType,
-    avatar: avatarMap[charType]||'🧑',
-    level:1, exp:0, gold:0,
-    title:'', titles:[],
-    stats:{ read:0, study:0, art:0, value:0, health:0 },
-    combat:{ atk:0, def:0, mag:0, spd:0 },
-    equipment:{}, equipmentIds:{},
-    inventory:[], farm:[], books:[],
-    monsterLog:[], monsterDailyCount:0, lastMonsterDate:'',
-    totalQuests:0, bookCount:0,
-    pendingRewards:[], promotionPending:false,
-  };
+function onAddRowInput(i) {
+  // 이름 입력하면 해당 줄 활성화
+  const row = document.getElementById(`add-row-${i}`);
+  const name = document.getElementById(`add-name-${i}`)?.value.trim();
+  if (row) row.style.opacity = name ? '1' : (i === 0 ? '1' : '.45');
+  // 이름 입력되면 다음 줄도 살짝 활성화 힌트
+  if (name && i < 5) {
+    const nextRow = document.getElementById(`add-row-${i+1}`);
+    if (nextRow) nextRow.style.opacity = '.7';
+  }
+}
+
+function doAddStudents(btn) {
+  const avatarMap = {1:'👦',2:'👧'};
   const db = DB.load();
-  db.students.push(newStudent);
+  let count = 0;
+
+  for (let i = 0; i < 6; i++) {
+    const name = document.getElementById(`add-name-${i}`)?.value.trim();
+    if (!name) continue;
+    const pw       = document.getElementById(`add-pw-${i}`)?.value || '1234';
+    const job      = document.getElementById(`add-job-${i}`)?.value.trim() || '미래를 꿈꾸는 학생';
+    const charType = parseInt(document.getElementById(`add-char-${i}`)?.value) || 1;
+    const id = 's' + (Date.now() + i);
+    db.students.push({
+      id, name, pw, charType,
+      dream: job, job: '학생',
+      avatar: avatarMap[charType]||'👦',
+      level:1, exp:0, gold:0,
+      title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0},
+      combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{},
+      inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'',
+      totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false,
+      houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[],
+    });
+    count++;
+  }
+
+  if (count === 0) { notify('이름을 최소 1명 입력해주세요', 'error'); return; }
   DB.save(db);
   btn.closest('.overlay').remove();
   renderAll();
   populateSelectStudents();
-  notify(`✅ ${name} 학생이 추가되었습니다!`);
+  notify(`✅ ${count}명 추가 완료!`);
+}
+
+function doAddStudent(btn) {
+  // 구버전 호환용 (혹시 남아있을 경우)
+  doAddStudents(btn);
 }
 
 // approveSelfApply 호환용
@@ -2034,10 +2131,11 @@ function approveReward(student, reward) {
     student.totalQuests = (student.totalQuests||0) + 1;
   }
 
-  // 4. quests 로그 저장 (boardQuestId + type 포함)
+  // 4. quests 로그 저장 (boardQuestId + boardQuestType + date 포함)
   DB.saveQuestLog({
     studentId:    student.id,
     boardQuestId: reward.boardQuestId || null,
+    boardQuestType: reward.boardQuestType || reward.type || 'special',
     type:         reward.type || 'quest',
     name:         reward.label,
     exp:          reward.exp  || 0,
@@ -2047,9 +2145,9 @@ function approveReward(student, reward) {
     approved:     true,
   });
 
-  // 5. pendingRewards 제거
-  student.pendingRewards = (student.pendingRewards||[]).filter(
-    r => r.id !== reward.id && r.label !== reward.id
+  // 5. pendingReward에 approved:true 표시 (학생이 수령 버튼 누를 때 실제 제거)
+  student.pendingRewards = (student.pendingRewards||[]).map(r =>
+    (r.id === reward.id || r.label === reward.id) ? {...r, approved:true} : r
   );
 
   return student;
@@ -2162,12 +2260,103 @@ function setApproveFilter(type, el) {
   renderApproveList();
 }
 
+function renderApproveGrid() {
+  const el = document.getElementById('approve-grid');
+  if (!el) return;
+  const students    = DB.getStudents();
+  const db          = DB.load();
+  const boardQuests = (db.boardQuests||[]).filter(q => q.active!==false);
+  const today       = todayStr();
+  const weekStart   = weekStartStr();
+
+  if (boardQuests.length === 0) {
+    el.innerHTML = '<div style="padding:1rem;text-align:center;font-size:.82rem;color:var(--txt3)">활성 퀘스트가 없어요</div>';
+    return;
+  }
+
+  // 완료 판정 - questLogs 단일 소스
+  const allQuests = Object.values(db.questLogs || {})
+    .filter(q => q != null && typeof q === 'object' && q.studentId);
+  function isDone(studentId, questId, questType) {
+    return allQuests.some(q => {
+      if (!q || q.studentId!==studentId || q.boardQuestId!==questId) return false;
+      if (!q.date) return true;
+      if (questType==='daily')  return q.date===today;
+      if (questType==='weekly') return q.date>=weekStart;
+      return true;
+    });
+  }
+  function isPending(s, questId) {
+    return (s.pendingRewards||[]).some(r => r && r.boardQuestId===questId);
+  }
+
+  let html = `<table style="width:max-content;min-width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--bg3)">
+      <th style="padding:.5rem .8rem;text-align:left;font-size:.78rem;border:1px solid var(--border2);min-width:160px;position:sticky;left:0;background:var(--bg3);z-index:5">퀘스트</th>
+      ${students.map(s=>`<th style="padding:.4rem .3rem;text-align:center;font-size:.72rem;border:1px solid var(--border2);min-width:64px">
+        <div style="font-size:1rem">${s.avatar}</div>
+        <div>${s.name}</div>
+      </th>`).join('')}
+    </tr></thead><tbody>`;
+
+  boardQuests.forEach(q => {
+    html += `<tr>
+      <td style="padding:.4rem .8rem;font-size:.78rem;font-weight:600;border:1px solid var(--border2);position:sticky;left:0;background:var(--bg2);z-index:4">
+        ${q.icon||'📋'} ${q.name}
+        <div style="font-size:.65rem;color:var(--gold);font-weight:400">+${q.exp}EXP +${q.gold}G</div>
+      </td>`;
+    students.forEach(s => {
+      const done    = isDone(s.id, q.id, q.type);
+      const pending = isPending(s, q.id);
+      const reward  = pending ? (s.pendingRewards||[]).find(r=>r.boardQuestId===q.id) : null;
+      if (done) {
+        html += `<td style="border:1px solid var(--border2);text-align:center;padding:.3rem">
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(46,204,113,.15);border:2px solid #2ECC71;display:flex;align-items:center;justify-content:center;margin:auto;font-size:1.1rem;color:#2ECC71">✓</div>
+        </td>`;
+      } else if (pending && reward) {
+        html += `<td style="border:1px solid var(--border2);text-align:center;padding:.3rem">
+          <div onclick="gridApprove('${s.id}','${reward.id}')" style="width:40px;height:40px;border-radius:50%;background:rgba(255,215,0,.15);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;margin:auto;font-size:1rem;cursor:pointer;color:var(--gold)" title="클릭하여 승인">⏳</div>
+        </td>`;
+      } else {
+        html += `<td style="border:1px solid var(--border2);text-align:center;padding:.3rem">
+          <div style="width:40px;height:40px;border-radius:50%;border:2px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;margin:auto;font-size:.9rem;color:rgba(255,255,255,.2)">○</div>
+        </td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function gridApprove(studentId, rewardId) {
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  const reward = (s.pendingRewards||[]).find(r => r.id === rewardId);
+  if (!reward) return;
+  approveReward(s, reward);
+  DB.saveStudent(s);
+  renderApproveGrid();
+  renderApproveList();
+  renderHUD();
+  notify(`✅ ${s.name} · ${reward.label} 승인!`);
+}
+
+function weekStartStr() {
+  const d = new Date(Date.now()+9*3600000);
+  const day = d.getUTCDay();
+  const sun = new Date(d);
+  sun.setUTCDate(d.getUTCDate()-day);
+  return sun.toISOString().slice(0,10);
+}
+
 function renderApproveList() {
   const students  = DB.getStudents();
   const container = document.getElementById('approve-list');
   const today     = todayStr();
   let items = students.flatMap(s =>
-    (s.pendingRewards||[]).map(r => ({...r, student: s}))
+    (s.pendingRewards||[]).filter(r => !r.approved).map(r => ({...r, student: s}))
   );
 
   if (APPROVE_FILTER === 'today') items = items.filter(i => i.date === today);
@@ -2300,18 +2489,22 @@ function approvePromotion(reqId) {
   const req = DB.getPromotionRequests().find(r => r.id === reqId);
   if (!req) return;
   const s = DB.getStudent(req.studentId);
-  // 승급 보상: 골드 100 + 특별 보상 지급
+  // 직업명 자동 변경 (장래희망 기반)
+  const newJob = Utils.getJobTitle(s.job || s.dream || '', req.level);
+  const oldJob = s.job || '';
+  s.job = newJob;
   s.gold = (s.gold||0) + 100;
   s.promotionPending = false;
-  // 승급 완료 기록
   s.pendingRewards = [...(s.pendingRewards||[]), {
-    id: Utils.uid(), label: `Lv.${req.level} 승급 완료! 🎉`, exp: 50, gold: 0,
+    id: Utils.uid(),
+    label: `⬆️ Lv.${req.level} 승급! ${oldJob ? `${oldJob} → ` : ''}${newJob}`,
+    exp: 50, gold: 0,
     icon: '⬆️', date: todayStr()
   }];
   DB.saveStudent(s);
   DB.removePromotionRequest(reqId);
   renderAll();
-  notify(`🎉 ${s.name} Lv.${req.level} 승급 승인!`);
+  notify(`🎉 ${s.name} Lv.${req.level} 승급! 직업: ${newJob}`);
 }
 
 function rejectPromotion(reqId) {
@@ -2435,10 +2628,23 @@ function adminOpenLightbox(url, title) {
 
 function renderArtworkAdmin() {
   const db = DB.load();
-  const artworks = (db.artworks||[]).slice().reverse();
+  const allArtworks = (db.artworks||[]).slice().reverse();
   const students = DB.getStudents();
   const el = document.getElementById('artwork-admin-list');
   if (!el) return;
+
+  // 필터 셀렉트 초기화
+  const sel = document.getElementById('artwork-filter');
+  if (sel && sel.options.length === 1) {
+    students.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id; opt.textContent = s.avatar + ' ' + s.name;
+      sel.appendChild(opt);
+    });
+  }
+  const filter = sel?.value || 'all';
+  const artworks = filter === 'all' ? allArtworks : allArtworks.filter(a=>a.studentId===filter);
+
   if (artworks.length === 0) {
     el.innerHTML = '<div style="padding:1rem;color:var(--txt3);font-size:.83rem;text-align:center">전시중인 작품이 없어요</div>';
     return;
@@ -2515,16 +2721,15 @@ function renderBooksPage() {
       </div>
     </div>`;
 
-  // ── 월별 막대그래프 ──
+  // ── 월별 막대그래프 (3월~12월 고정) ──
   const now = new Date();
   const months = [];
-  for (let i=5; i>=0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-    const mo = d.getMonth()+1;
-    months.push({ key: d.getFullYear()+'-'+mo, label: mo+'월', count: 0 });
+  for (let mo=3; mo<=12; mo++) {
+    months.push({ key: now.getFullYear()+'-'+mo, label: mo+'월', count: 0 });
   }
-  // 전체 학생 books 합산
-  students.forEach(s => {
+  // 필터에 따라 전체 or 개인 집계
+  const chartTarget = filter==='all' ? students : students.filter(s=>s.id===filter);
+  chartTarget.forEach(s => {
     (s.books||[]).forEach(b => {
       if (!b.date) return;
       const parts = b.date.split('-');
@@ -2537,6 +2742,14 @@ function renderBooksPage() {
   const maxCount = Math.max(...months.map(m=>m.count), 1);
   const chartEl = document.getElementById('books-monthly-chart');
   const labelEl = document.getElementById('books-monthly-labels');
+  // 차트 제목 업데이트
+  const chartTitle = document.querySelector('#p-books .tc-title');
+  if (chartTitle) {
+    const selStudent = filter!=='all' ? students.find(s=>s.id===filter) : null;
+    chartTitle.textContent = selStudent
+      ? `📊 ${selStudent.name} 월별 독서`
+      : '📊 전체 월별 독서 현황';
+  }
   if (chartEl) {
     chartEl.innerHTML = months.map(m => {
       const h = Math.max(4, Math.round((m.count/maxCount)*90));
@@ -2796,9 +3009,9 @@ const ABILITY_QUESTS = {
 };
 
 const DIFF_INFO = {
-  easy: { label:'🟢 쉬움', exp:80,  gold:50,  icon:'📋', color:'rgba(46,204,113,.15)',  border:'rgba(46,204,113,.3)' },
-  mid:  { label:'🟡 중간', exp:120, gold:80,  icon:'📋', color:'rgba(255,193,7,.1)',    border:'rgba(255,193,7,.35)' },
-  hard: { label:'🔴 어려움',exp:200,gold:150, icon:'⭐', color:'rgba(231,76,60,.1)',    border:'rgba(231,76,60,.3)' },
+  easy: { label:'🟢 쉬움', exp:35,  gold:25,  icon:'📋', color:'rgba(46,204,113,.15)',  border:'rgba(46,204,113,.3)' },
+  mid:  { label:'🟡 중간', exp:55,  gold:40,  icon:'📋', color:'rgba(255,193,7,.1)',    border:'rgba(255,193,7,.35)' },
+  hard: { label:'🔴 어려움',exp:80, gold:60,  icon:'⭐', color:'rgba(231,76,60,.1)',    border:'rgba(231,76,60,.3)' },
 };
 
 const ABILITY_ICONS = { read:'📚', study:'📖', art:'🎨', value:'💛', health:'💪' };
@@ -2944,8 +3157,8 @@ function postCheckedQuests(type) {
   const defaults = QUEST_TEMPLATES[type] || [];
   const customs  = getCustomTemplates(type);
   const all = [...defaults, ...customs];
-  const expMap  = {daily:80, weekly:150};
-  const goldMap = {daily:50, weekly:100};
+  const expMap  = {daily:35, weekly:80};
+  const goldMap = {daily:25, weekly:70};
   const iconMap = {daily:'📋', weekly:'📅'};
 
   let count = 0;
@@ -3329,14 +3542,48 @@ function saveSettings() {
   notify('⚙️ 설정 저장 완료!');
 }
 
+function resetAllStudentStats() {
+  if (!confirm('⚠️ 모든 학생의 레벨·EXP·골드·스탯·퀘스트·몬스터 기록을 초기화할까요?\n이름과 비밀번호는 유지됩니다.')) return;
+  const db = DB.load();
+  db.students = (db.students||[]).map(s => ({
+    // 기본 정보 유지
+    id: s.id, name: s.name, avatar: s.avatar,
+    pw: s.pw, charType: s.charType,
+    job: s.job, title: '',
+    // 수치 초기화
+    level: 1, exp: 0, gold: 0,
+    stats: { read:0, study:0, art:0, value:0, health:0 },
+    combat: { atk:0, def:0, mag:0, spd:0 },
+    equipmentIds: {}, equipment: {},
+    inventory: [],
+    titles: [],
+    books: [], bookCount: 0,
+    farm: [],
+    monsterLog: [], monsterDailyCount: 0, lastMonsterDate: '',
+    totalQuests: 0,
+    pendingRewards: [],
+    promotionPending: false,
+    houseDecorations: [],
+    yardFloor: {},
+    achievements: [],
+    lastAttendDate: '',
+  }));
+  // 퀘스트 로그도 초기화
+  db.quests = [];
+  db.questLogs = {};
+  DB.save(db);
+  renderAll();
+  notify('🔄 모든 학생 수치 초기화 완료!');
+}
+
 function injectTestData() {
-  if (!confirm('강지원(1번) 학생에게 테스트 데이터를 주입할까요?')) return;
+  if (!confirm('학생1에게 테스트 데이터를 주입할까요?')) return;
   const db = DB.load();
   const now = Date.now();
   const d = (days) => new Date(Date.now() - days*86400000).toISOString().slice(0,10);
 
   const s = db.students.find(x=>x.id==='s1');
-  if (!s) { notify('강지원 학생을 찾을 수 없습니다', 'error'); return; }
+  if (!s) { notify('학생1을 찾을 수 없습니다', 'error'); return; }
 
   // 레벨 & 스탯
   s.level = 15; s.exp = 3460; s.gold = 1850;
@@ -3397,13 +3644,13 @@ function injectTestData() {
 
   // 퀘스트 기록도 추가
   const questNames = [
-    {name:'독서록 작성하기',icon:'📋',exp:80,gold:50,date:d(1)},
-    {name:'줄넘기 50회',icon:'📋',exp:80,gold:50,date:d(2)},
-    {name:'수학 문제 5개 풀기',icon:'📋',exp:80,gold:50,date:d(3)},
-    {name:'책 1권 읽기',icon:'📅',exp:150,gold:100,date:d(5)},
-    {name:'오늘의 한 줄 일기',icon:'📋',exp:80,gold:50,date:d(6)},
-    {name:'받아쓰기 연습',icon:'📋',exp:80,gold:50,date:d(7)},
-    {name:'친구에게 칭찬하기',icon:'📋',exp:80,gold:50,date:d(8)},
+    {name:'독서록 작성하기',icon:'📋',exp:35,gold:25,date:d(1)},
+    {name:'줄넘기 50회',icon:'📋',exp:35,gold:25,date:d(2)},
+    {name:'수학 문제 5개 풀기',icon:'📋',exp:35,gold:25,date:d(3)},
+    {name:'책 1권 읽기',icon:'📅',exp:80,gold:70,date:d(5)},
+    {name:'오늘의 한 줄 일기',icon:'📋',exp:35,gold:25,date:d(6)},
+    {name:'받아쓰기 연습',icon:'📋',exp:35,gold:25,date:d(7)},
+    {name:'친구에게 칭찬하기',icon:'📋',exp:35,gold:25,date:d(8)},
   ];
   db.quests = db.quests || [];
   questNames.forEach((q,i) => {
@@ -3428,7 +3675,7 @@ function injectTestData() {
   if (idx>=0) db.students[idx] = s;
   DB.save(db);
   renderAll();
-  notify('🧪 강지원 테스트 데이터 주입 완료! student.html에서 강지원으로 로그인해보세요');
+  notify('🧪 학생1 테스트 데이터 주입 완료! student.html에서 학생1으로 로그인해보세요');
 }
 
 function confirmReset() {
@@ -3471,8 +3718,7 @@ function notify(msg, type) {
 }
 
 function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+  return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
 }
 </script>
 </body>

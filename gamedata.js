@@ -9,91 +9,56 @@ const GAME_DATA = {
   // 하루 퀘스트 2~3개(각 30~50EXP) 기준 → 초반 매일 레벨업, Lv10+ 3~5일에 1번
   // expTable[i] = Lv(i+1)이 되기 위한 누적 EXP
   expTable: [
-      0,   50,  120,  220,  350,  510,  700,  920, 1170, 1450,  // Lv 1~10
-   1760, 2110, 2510, 2960, 3460, 4010, 4610, 5260, 5960, 6710,  // Lv11~20
-   7510, 8360, 9260,10210,11210,12260,13360,14510,15710,17000,18500 // Lv21~31
+      0,  100,  240,  440,  700, 1020, 1400, 1840, 2340, 2900,  // Lv 1~10
+   3520, 4220, 5020, 5920, 6920, 8020, 9220,10520,11920,13420,  // Lv11~20
+  15020,16720,18520,20420,22420,24520,26720,29020,31420,34000,37000 // Lv21~31
   ],
 
   // ─── 초기 학생 데이터 (가치 스탯, 새 EXP 기준) ──────────────
   defaultStudents: [
-    { id:'s1', name:'강지원', avatar:'⚔️', pw:'1234', charType:1,
-      level:7, exp:800,   // Lv7: 700~919
-      gold:320, title:'독서왕', job:'미래의 과학자',
-      stats:{ read:3, study:2, art:1, value:4, health:4 },
-      combat:{ atk:12, def:10, mag:0, spd:2 },
-      equipment:{ head:'가죽 모자', body:'철 갑옷', weapon:'강철검', glove:'철 장갑', shoe:'가죽 신발' },
-      equipmentIds:{ head:'e_h2', body:'e_b4', weapon:'e_w4', glove:'e_g4', shoe:'e_s2' },
-      inventory:[ {id:'i_potato_seed',qty:3}, {id:'i_carrot_seed',qty:1} ],
-      titles:['독서왕'],
-      books:[{title:'해리포터와 마법사의 돌',date:'2024-03-01'},{title:'어린왕자',date:'2024-03-10'}],
-      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*3},
-             {slot:3,crop:'carrot',planted:Date.now()-3600000*4},
-             {slot:6,crop:'potato',planted:Date.now()-3600000*1} ],
-      monsterLog:['슬라임'], totalQuests:5, bookCount:2,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false,
-      pendingRewards:[{id:'pr_init1',label:'익힘책 15쪽 완료',exp:30,gold:30,stat:'study',statVal:1,icon:'📚',date:'오늘'}]
+    { id:'s1', name:'학생1', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s2', name:'박예지', avatar:'🌸', pw:'1234', charType:2,
-      level:5, exp:420,   // Lv5: 350~509
-      gold:210, title:'예술왕', job:'미래의 화가',
-      stats:{ read:1, study:2, art:5, value:3, health:2 },
-      combat:{ atk:0, def:6, mag:14, spd:3 },
-      equipment:{ head:'천 모자', body:'가죽 갑옷', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
-      equipmentIds:{ head:'e_h1', body:'e_b2', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
-      inventory:[ {id:'i_corn_seed',qty:2} ],
-      titles:['예술왕'], books:[],
-      farm:[ {slot:1,crop:'corn',planted:Date.now()-3600000*6} ],
-      monsterLog:[], totalQuests:2, bookCount:7,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s2', name:'학생2', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s3', name:'양인우', avatar:'🛡️', pw:'1234', charType:1,
-      level:6, exp:600,   // Lv6: 510~699
-      gold:180, title:'건강왕', job:'미래의 운동선수',
-      stats:{ read:2, study:4, art:1, value:1, health:5 },
-      combat:{ atk:7, def:16, mag:0, spd:6 },
-      equipment:{ head:'가죽 모자', body:'가죽 갑옷', weapon:'철검', glove:'천 장갑', shoe:'철 부츠' },
-      equipmentIds:{ head:'e_h2', body:'e_b2', weapon:'e_w2', glove:'e_g1', shoe:'e_s4' },
-      inventory:[], titles:['건강왕'], books:[],
-      farm:[], monsterLog:[], totalQuests:2, bookCount:2,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s3', name:'학생3', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s4', name:'이시아', avatar:'🌟', pw:'1234', charType:2,
-      level:4, exp:285,   // Lv4: 220~349
-      gold:150, title:'가치왕', job:'미래의 선생님',
-      stats:{ read:3, study:6, art:2, value:2, health:4 },
-      combat:{ atk:4, def:13, mag:0, spd:2 },
-      equipment:{ head:'천 모자', body:'철 갑옷', weapon:'나무검', glove:'천 장갑', shoe:'가죽 신발' },
-      equipmentIds:{ head:'e_h1', body:'e_b4', weapon:'e_w1', glove:'e_g1', shoe:'e_s2' },
-      inventory:[ {id:'i_potato_seed',qty:1} ],
-      titles:['가치왕'], books:[],
-      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*2} ],
-      monsterLog:[], totalQuests:1, bookCount:5,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s4', name:'학생4', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s5', name:'이유은', avatar:'🔮', pw:'1234', charType:2,
-      level:8, exp:1040,  // Lv8: 920~1169
-      gold:420, title:'독서왕', job:'미래의 작가',
-      stats:{ read:1, study:1, art:3, value:3, health:2 },
-      combat:{ atk:7, def:6, mag:16, spd:5 },
-      equipment:{ head:'견습 마법 모자', body:'견습 로브', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
-      equipmentIds:{ head:'e_h3', body:'e_b3', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
-      inventory:[ {id:'i_strawberry_seed',qty:1} ],
-      titles:['독서왕'], books:[],
-      farm:[ {slot:2,crop:'strawberry',planted:Date.now()-3600000*13} ],
-      monsterLog:['슬라임','아기 멧돼지'], totalQuests:3, bookCount:10,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s5', name:'학생5', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s6', name:'한은규', avatar:'🏹', pw:'1234', charType:1,
-      level:9, exp:1300,  // Lv9: 1170~1449
-      gold:510, title:'도전왕', job:'미래의 축구선수',
-      stats:{ read:2, study:4, art:5, value:6, health:7 },
-      combat:{ atk:24, def:22, mag:0, spd:6 },
-      equipment:{ head:'기사 투구', body:'기사 갑옷', weapon:'기사검', glove:'기사 장갑', shoe:'기사 부츠' },
-      equipmentIds:{ head:'e_h4', body:'e_b6', weapon:'e_w6', glove:'e_g6', shoe:'e_s6' },
-      inventory:[], titles:['도전왕','건강왕'], books:[],
-      farm:[ {slot:0,crop:'tomato',planted:Date.now()-3600000*10} ],
-      monsterLog:['슬라임','아기 멧돼지','고블린'], totalQuests:8, bookCount:4,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s6', name:'학생6', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:5000, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{},
+      inventory:[{id:'d_y1',qty:3},{id:'d_y2',qty:3},{id:'d_y3',qty:3},{id:'d_y4',qty:3},{id:'d_y5',qty:3},{id:'d_y6',qty:3},{id:'d_y7',qty:3},{id:'d_y8',qty:3},{id:'d_y9',qty:3},{id:'d_y10',qty:3},{id:'d_y11',qty:3},{id:'d_y12',qty:3},{id:'d_y13',qty:3},{id:'d_y14',qty:3},{id:'d_i1',qty:3},{id:'d_i2',qty:3},{id:'d_i3',qty:3},{id:'d_i4',qty:3},{id:'d_i5',qty:3},{id:'d_i6',qty:3},{id:'d_i7',qty:3},{id:'d_i8',qty:3},{id:'d_i9',qty:3},{id:'d_i10',qty:3},{id:'d_i11',qty:3},{id:'d_i12',qty:3},{id:'d_i13',qty:3},{id:'d_i14',qty:3}],
+      farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
   ],
 
@@ -224,26 +189,26 @@ const GAME_DATA = {
   // ─── 몬스터 (밸런스 v4: 1학기 18주 기준 EXP 재조정) ─────────────
   // 저레벨 몬스터 EXP 대폭 상향 → 초반 레벨업 빠르게, 후반은 완만하게
   monsters: [
-    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:40},  // Lv1: 장비없어도 가능
-    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:50},
-    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:55},  // mag 상향 (풀셋26)
-    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:55},
-    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:60},
-    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:65},
-    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:70},
-    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:75},  // mag 상향 (풀셋26)
-    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:80},
-    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:88},
-    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:95},
-    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:102}, // def 상향 (풀셋27)
-    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:110}, // mag 대폭 상향 (풀셋45)
-    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:118},
-    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:126},
-    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:134}, // atk 상향 (풀셋29)
-    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:144}, // def 상향 (풀셋39)
-    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:154}, // spd 상향 (풀셋20)
-    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:165}, // mag 대폭 상향 (풀셋68)
-    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:200}, // atk 상향 (풀셋56)
+    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:25},  // Lv1: 장비없어도 가능
+    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:30},
+    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:33},  // mag 상향 (풀셋26)
+    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:33},
+    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:36},
+    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:39},
+    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:42},
+    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:45},  // mag 상향 (풀셋26)
+    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:48},
+    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:53},
+    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:57},
+    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:61}, // def 상향 (풀셋27)
+    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:66}, // mag 대폭 상향 (풀셋45)
+    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:71},
+    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:76},
+    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:80}, // atk 상향 (풀셋29)
+    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:86}, // def 상향 (풀셋39)
+    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:92}, // spd 상향 (풀셋20)
+    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:99}, // mag 대폭 상향 (풀셋68)
+    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:120}, // atk 상향 (풀셋56)
   ],
 
   // ─── 칭호·승급 ────────────────────────────────────────
@@ -424,7 +389,7 @@ const DB = {
     db.quests = db.quests || [];
     db.quests.push(log);
     this._cache = db;
-    // 고유 ID 기반으로만 저장 (배열 인덱스 충돌 방지)
+    // questLogs에 고유 키로 저장 (완료 판정 기준)
     const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
     log._id = logId;
     this._fbRef.child('questLogs/' + logId).set(log);
@@ -525,7 +490,46 @@ const Utils = {
 
   charEmoji(type)       { return {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'}[type]||'🧑'; },
   isPromotionLevel(lv)  { return GAME_DATA.promotionLevels.includes(lv); },
-  todayStr()            { return new Date().toISOString().slice(0,10); },
+
+  // 장래희망 + 레벨로 직업명 생성
+  getJobTitle(dream, level) {
+    if (!dream) dream = '학생';
+    // 장래희망에서 핵심 단어 추출 (앞에 붙는 수식어 제거)
+    const core = dream
+      .replace(/미래의?\s*/,'').replace(/꿈꾸는\s*/,'').replace(/되고싶은\s*/,'')
+      .replace(/장래희망\s*/,'').trim() || dream;
+
+    if (level < 5)  return '학생';
+    if (level < 10) return `${core}을 꿈꾸는 학생`;
+    if (level < 15) return `${core} 견습생`;
+    if (level < 20) return `${core} 탐험가`;
+    if (level < 25) return `주니어 ${core}`;
+    if (level < 30) return `${core} 전문가`;
+    return core; // Lv.30: 장래희망 그대로
+  },
+  todayStr() {
+    // KST(UTC+9) 기준 날짜
+    return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  },
+  weekStartStr() {
+    // KST 기준 이번 주 일요일 (일요일 자정 리셋)
+    const d = new Date(Date.now()+9*3600000);
+    const day = d.getUTCDay(); // 0=일, 1=월 ...
+    const sun = new Date(d);
+    sun.setUTCDate(d.getUTCDate() - day); // 이번 주 일요일
+    return sun.toISOString().slice(0,10);
+  },
+  isQuestDoneToday(quests, studentId, boardQuestId, questType) {
+    const today = this.todayStr();
+    const weekStart = this.weekStartStr();
+    return (quests||[]).some(q => {
+      if (q.studentId!==studentId || q.boardQuestId!==boardQuestId) return false;
+      if (!q.date) return true;
+      if (questType==='daily')  return q.date===today;
+      if (questType==='weekly') return q.date>=weekStart;
+      return true;
+    });
+  },
   uid()                 { return 'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); },
 
   // ★ 몬스터 하루 도전 횟수 체크 (2회)

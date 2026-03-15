@@ -58,38 +58,40 @@ html, body {
 /* ── 테이블 영역 ── */
 #table-wrap {
   flex:1;overflow:auto;padding:.8rem;
+  -webkit-overflow-scrolling:touch;
 }
 #kiosk-table {
-  width:100%;border-collapse:collapse;table-layout:fixed;
+  width:max-content;min-width:100%;border-collapse:collapse;
 }
 #kiosk-table th {
-  padding:.5rem .3rem;text-align:center;font-size:.78rem;font-weight:700;
+  padding:.5rem .4rem;text-align:center;font-size:.75rem;font-weight:700;
   background:var(--bg3);border:1px solid var(--border);
-  position:sticky;top:0;z-index:10;
+  position:sticky;top:0;z-index:10;white-space:nowrap;
 }
 #kiosk-table th.quest-th {
-  text-align:left;padding:.5rem .8rem;width:200px;min-width:200px;
-  font-size:.82rem;
+  text-align:left;padding:.5rem .8rem;width:180px;min-width:150px;
+  font-size:.8rem;
 }
 #kiosk-table td {
   border:1px solid var(--border);text-align:center;
-  padding:.3rem;vertical-align:middle;
+  padding:.2rem;vertical-align:middle;min-width:52px;
 }
 #kiosk-table td.quest-name {
   text-align:left;padding:.5rem .8rem;background:var(--bg2);
-  font-size:.85rem;font-weight:600;position:sticky;left:0;z-index:5;
+  font-size:.82rem;font-weight:600;position:sticky;left:0;z-index:5;
 }
 #kiosk-table td.quest-name .quest-reward {
-  font-size:.7rem;color:var(--gold);font-weight:400;margin-top:.15rem;
+  font-size:.68rem;color:var(--gold);font-weight:400;margin-top:.15rem;
 }
 #kiosk-table tr:hover td { background:rgba(255,255,255,.02); }
 
 /* ── 셀 버튼 ── */
 .cell-btn {
-  width:42px;height:42px;border-radius:50%;border:2px solid rgba(255,255,255,.15);
+  width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.15);
   background:transparent;cursor:pointer;font-size:.7rem;font-weight:700;
   display:flex;align-items:center;justify-content:center;margin:0 auto;
   transition:all .2s;color:var(--txt2);flex-direction:column;gap:1px;
+  -webkit-tap-highlight-color:rgba(255,215,0,.2);touch-action:manipulation;
 }
 .cell-btn:hover { border-color:var(--gold);transform:scale(1.1); }
 .cell-btn.pending {
@@ -202,7 +204,7 @@ function toArr(v) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0,10);
+  return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
 }
 
 // ── 초기화 ──
@@ -255,20 +257,9 @@ function normalizeData(data) {
   data.students.forEach(s => seenIds.set(s.id, s));
   data.students = Array.from(seenIds.values());
   data.boardQuests = toArr(data.boardQuests);
-  // quests + questLogs 합쳐서 완료 판정에 사용
-  const quests     = toArr(data.quests);
-  const questLogs  = toArr(data.questLogs);
-  // 중복 제거 (id 또는 boardQuestId+studentId+date 기준)
-  const merged = [...quests];
-  questLogs.forEach(log => {
-    const dup = merged.some(q =>
-      q.studentId === log.studentId &&
-      q.boardQuestId === log.boardQuestId &&
-      q.date === log.date
-    );
-    if (!dup) merged.push(log);
-  });
-  data.quests = merged;
+  // 완료 판정은 questLogs만 사용 (quests 배열 인덱스 충돌 방지)
+  data.questLogs = Object.values(data.questLogs || {})
+    .filter(q => q != null && typeof q === 'object' && q.studentId);
   return data;
 }
 
@@ -283,9 +274,9 @@ function switchTab(type, btn) {
 // ── 테이블 렌더 ──
 function renderTable() {
   if (!DB_DATA) return;
-  const students   = DB_DATA.students || [];
+  const students    = DB_DATA.students || [];
   const boardQuests = (DB_DATA.boardQuests||[]).filter(q => q.active!==false && q.type===CUR_TAB);
-  const allQuests   = DB_DATA.quests || [];
+  const allQuests   = DB_DATA.questLogs || [];
   const el = document.getElementById('kiosk-content');
 
   if (boardQuests.length === 0) {
@@ -298,27 +289,32 @@ function renderTable() {
   }
 
   // 학생별 상태 계산 (날짜 기반)
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
   const weekStart = (() => {
-    const d=new Date(); const day=d.getDay();
-    const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
-    return mon.toISOString().slice(0,10);
+    const d=new Date(Date.now()+9*3600000);
+    const day=d.getUTCDay(); // 0=일
+    const sun=new Date(d);
+    sun.setUTCDate(d.getUTCDate()-day); // 이번 주 일요일
+    return sun.toISOString().slice(0,10);
   })();
 
   function getStatus(studentId, questId, questType) {
     const s = students.find(x=>x.id===studentId);
     if (!s) return 'none';
-    // 승인 완료 (날짜 기반)
-    const done = allQuests.some(q => {
-      if (q.studentId!==studentId || q.boardQuestId!==questId) return false;
+    // 완료 판정: quests 배열(questLogs 포함 병합본) 에서 확인
+    const done = allQuests.filter(Boolean).some(q => {
+      if (!q || q.studentId!==studentId || q.boardQuestId!==questId) return false;
       if (!q.date) return true;
       if (questType==='daily')  return q.date===today;
       if (questType==='weekly') return q.date>=weekStart;
       return true;
     });
     if (done) return 'done';
-    // 신청 대기
-    const pending = (s.pendingRewards||[]).some(r => r.boardQuestId===questId);
+    // 승인됨(approved:true)도 done으로 표시
+    const approvedPending = (s.pendingRewards||[]).some(r => r && r.boardQuestId===questId && r.approved===true);
+    if (approvedPending) return 'done';
+    // 신청 대기: pendingRewards에서 확인
+    const pending = (s.pendingRewards||[]).some(r => r && r.boardQuestId===questId && !r.approved);
     if (pending) return 'pending';
     return 'none';
   }
@@ -371,6 +367,12 @@ function renderTable() {
 }
 
 // ── 퀘스트 신청 ──
+function weekStart2() {
+  const d=new Date(Date.now()+9*3600000); const day=d.getUTCDay();
+  const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+  return mon.toISOString().slice(0,10);
+}
+
 function requestQuest(studentId, questId) {
   const data = DB_DATA;
   const s = data.students.find(x=>x.id===studentId);
@@ -378,14 +380,17 @@ function requestQuest(studentId, questId) {
   if (!s || !q) return;
 
   // 중복 체크
-  const alreadyDone    = (data.quests||[]).some(x=>x.studentId===studentId && x.boardQuestId===questId);
-  const alreadyPending = (s.pendingRewards||[]).some(r=>r.boardQuestId===questId);
+  const today2 = todayStr();
+  const alreadyDone = (DB_DATA.questLogs||[]).some(x => x && x.studentId===studentId && x.boardQuestId===questId &&
+    (q.type==='special' || q.type==='event' || (q.type==='daily'&&x.date===today2) || (q.type==='weekly'&&x.date>=weekStart2())));
+  const alreadyPending = (s.pendingRewards||[]).some(r=>r && r.boardQuestId===questId);
   if (alreadyDone || alreadyPending) return;
 
   s.pendingRewards = s.pendingRewards || [];
   s.pendingRewards.push({
     id: 'pr_'+Date.now()+'_'+studentId,
     boardQuestId: questId,
+    boardQuestType: q.type||'special',
     label: q.name,
     exp: q.exp, gold: q.gold,
     stat: q.stat||'', statVal: q.stat?1:0,
@@ -393,9 +398,9 @@ function requestQuest(studentId, questId) {
     date: todayStr(),
   });
 
-  // Firebase 저장
-  const idx = data.students.findIndex(x=>x.id===studentId);
-  fbRef.child('students/'+idx).set(s);
+  // Firebase 저장 (인덱스 기반 - admin과 동일)
+  const reqIdx = DB_DATA.students.findIndex(x=>x.id===studentId);
+  if (reqIdx >= 0) fbRef.child('students/'+s.id).set(s);
   showToast(`✅ ${s.name} · ${q.name} 신청 완료!`);
 }
 
@@ -421,8 +426,8 @@ function cancelQuest(studentId, questId) {
   const s = data.students.find(x=>x.id===studentId);
   if (!s) return;
   s.pendingRewards = (s.pendingRewards||[]).filter(r=>r.boardQuestId!==questId);
-  const idx = data.students.findIndex(x=>x.id===studentId);
-  fbRef.child('students/'+idx).set(s);
+  const canIdx = DB_DATA.students.findIndex(x=>x.id===studentId);
+  if (canIdx >= 0) fbRef.child('students/'+s.id).set(s);
   showToast('↩️ 신청이 취소됐어요');
 }
 

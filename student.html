@@ -20,91 +20,56 @@ const GAME_DATA = {
   // 하루 퀘스트 2~3개(각 30~50EXP) 기준 → 초반 매일 레벨업, Lv10+ 3~5일에 1번
   // expTable[i] = Lv(i+1)이 되기 위한 누적 EXP
   expTable: [
-      0,   50,  120,  220,  350,  510,  700,  920, 1170, 1450,  // Lv 1~10
-   1760, 2110, 2510, 2960, 3460, 4010, 4610, 5260, 5960, 6710,  // Lv11~20
-   7510, 8360, 9260,10210,11210,12260,13360,14510,15710,17000,18500 // Lv21~31
+      0,  100,  240,  440,  700, 1020, 1400, 1840, 2340, 2900,  // Lv 1~10
+   3520, 4220, 5020, 5920, 6920, 8020, 9220,10520,11920,13420,  // Lv11~20
+  15020,16720,18520,20420,22420,24520,26720,29020,31420,34000,37000 // Lv21~31
   ],
 
   // ─── 초기 학생 데이터 (가치 스탯, 새 EXP 기준) ──────────────
   defaultStudents: [
-    { id:'s1', name:'강지원', avatar:'⚔️', pw:'1234', charType:1,
-      level:7, exp:800,   // Lv7: 700~919
-      gold:320, title:'독서왕', job:'미래의 과학자',
-      stats:{ read:3, study:2, art:1, value:4, health:4 },
-      combat:{ atk:12, def:10, mag:0, spd:2 },
-      equipment:{ head:'가죽 모자', body:'철 갑옷', weapon:'강철검', glove:'철 장갑', shoe:'가죽 신발' },
-      equipmentIds:{ head:'e_h2', body:'e_b4', weapon:'e_w4', glove:'e_g4', shoe:'e_s2' },
-      inventory:[ {id:'i_potato_seed',qty:3}, {id:'i_carrot_seed',qty:1} ],
-      titles:['독서왕'],
-      books:[{title:'해리포터와 마법사의 돌',date:'2024-03-01'},{title:'어린왕자',date:'2024-03-10'}],
-      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*3},
-             {slot:3,crop:'carrot',planted:Date.now()-3600000*4},
-             {slot:6,crop:'potato',planted:Date.now()-3600000*1} ],
-      monsterLog:['슬라임'], totalQuests:5, bookCount:2,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false,
-      pendingRewards:[{id:'pr_init1',label:'익힘책 15쪽 완료',exp:30,gold:30,stat:'study',statVal:1,icon:'📚',date:'오늘'}]
+    { id:'s1', name:'학생1', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s2', name:'박예지', avatar:'🌸', pw:'1234', charType:2,
-      level:5, exp:420,   // Lv5: 350~509
-      gold:210, title:'예술왕', job:'미래의 화가',
-      stats:{ read:1, study:2, art:5, value:3, health:2 },
-      combat:{ atk:0, def:6, mag:14, spd:3 },
-      equipment:{ head:'천 모자', body:'가죽 갑옷', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
-      equipmentIds:{ head:'e_h1', body:'e_b2', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
-      inventory:[ {id:'i_corn_seed',qty:2} ],
-      titles:['예술왕'], books:[],
-      farm:[ {slot:1,crop:'corn',planted:Date.now()-3600000*6} ],
-      monsterLog:[], totalQuests:2, bookCount:7,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s2', name:'학생2', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s3', name:'양인우', avatar:'🛡️', pw:'1234', charType:1,
-      level:6, exp:600,   // Lv6: 510~699
-      gold:180, title:'건강왕', job:'미래의 운동선수',
-      stats:{ read:2, study:4, art:1, value:1, health:5 },
-      combat:{ atk:7, def:16, mag:0, spd:6 },
-      equipment:{ head:'가죽 모자', body:'가죽 갑옷', weapon:'철검', glove:'천 장갑', shoe:'철 부츠' },
-      equipmentIds:{ head:'e_h2', body:'e_b2', weapon:'e_w2', glove:'e_g1', shoe:'e_s4' },
-      inventory:[], titles:['건강왕'], books:[],
-      farm:[], monsterLog:[], totalQuests:2, bookCount:2,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s3', name:'학생3', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s4', name:'이시아', avatar:'🌟', pw:'1234', charType:2,
-      level:4, exp:285,   // Lv4: 220~349
-      gold:150, title:'가치왕', job:'미래의 선생님',
-      stats:{ read:3, study:6, art:2, value:2, health:4 },
-      combat:{ atk:4, def:13, mag:0, spd:2 },
-      equipment:{ head:'천 모자', body:'철 갑옷', weapon:'나무검', glove:'천 장갑', shoe:'가죽 신발' },
-      equipmentIds:{ head:'e_h1', body:'e_b4', weapon:'e_w1', glove:'e_g1', shoe:'e_s2' },
-      inventory:[ {id:'i_potato_seed',qty:1} ],
-      titles:['가치왕'], books:[],
-      farm:[ {slot:0,crop:'potato',planted:Date.now()-3600000*2} ],
-      monsterLog:[], totalQuests:1, bookCount:5,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s4', name:'학생4', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s5', name:'이유은', avatar:'🔮', pw:'1234', charType:2,
-      level:8, exp:1040,  // Lv8: 920~1169
-      gold:420, title:'독서왕', job:'미래의 작가',
-      stats:{ read:1, study:1, art:3, value:3, health:2 },
-      combat:{ atk:7, def:6, mag:16, spd:5 },
-      equipment:{ head:'견습 마법 모자', body:'견습 로브', weapon:'마법 지팡이', glove:'마법 장갑', shoe:'마법 신발' },
-      equipmentIds:{ head:'e_h3', body:'e_b3', weapon:'e_w3', glove:'e_g3', shoe:'e_s3' },
-      inventory:[ {id:'i_strawberry_seed',qty:1} ],
-      titles:['독서왕'], books:[],
-      farm:[ {slot:2,crop:'strawberry',planted:Date.now()-3600000*13} ],
-      monsterLog:['슬라임','아기 멧돼지'], totalQuests:3, bookCount:10,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s5', name:'학생5', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:0, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
-    { id:'s6', name:'한은규', avatar:'🏹', pw:'1234', charType:1,
-      level:9, exp:1300,  // Lv9: 1170~1449
-      gold:510, title:'도전왕', job:'미래의 축구선수',
-      stats:{ read:2, study:4, art:5, value:6, health:7 },
-      combat:{ atk:24, def:22, mag:0, spd:6 },
-      equipment:{ head:'기사 투구', body:'기사 갑옷', weapon:'기사검', glove:'기사 장갑', shoe:'기사 부츠' },
-      equipmentIds:{ head:'e_h4', body:'e_b6', weapon:'e_w6', glove:'e_g6', shoe:'e_s6' },
-      inventory:[], titles:['도전왕','건강왕'], books:[],
-      farm:[ {slot:0,crop:'tomato',planted:Date.now()-3600000*10} ],
-      monsterLog:['슬라임','아기 멧돼지','고블린'], totalQuests:8, bookCount:4,
-      monsterDailyCount:0, lastMonsterDate:'', promotionPending:false, pendingRewards:[]
+    { id:'s6', name:'학생6', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
+      level:1, exp:0, gold:5000, title:'', titles:[],
+      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      equipment:{}, equipmentIds:{},
+      inventory:[{id:'d_y1',qty:3},{id:'d_y2',qty:3},{id:'d_y3',qty:3},{id:'d_y4',qty:3},{id:'d_y5',qty:3},{id:'d_y6',qty:3},{id:'d_y7',qty:3},{id:'d_y8',qty:3},{id:'d_y9',qty:3},{id:'d_y10',qty:3},{id:'d_y11',qty:3},{id:'d_y12',qty:3},{id:'d_y13',qty:3},{id:'d_y14',qty:3},{id:'d_i1',qty:3},{id:'d_i2',qty:3},{id:'d_i3',qty:3},{id:'d_i4',qty:3},{id:'d_i5',qty:3},{id:'d_i6',qty:3},{id:'d_i7',qty:3},{id:'d_i8',qty:3},{id:'d_i9',qty:3},{id:'d_i10',qty:3},{id:'d_i11',qty:3},{id:'d_i12',qty:3},{id:'d_i13',qty:3},{id:'d_i14',qty:3}],
+      farm:[], books:[],
+      monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
+      pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
   ],
 
@@ -235,26 +200,26 @@ const GAME_DATA = {
   // ─── 몬스터 (밸런스 v4: 1학기 18주 기준 EXP 재조정) ─────────────
   // 저레벨 몬스터 EXP 대폭 상향 → 초반 레벨업 빠르게, 후반은 완만하게
   monsters: [
-    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:40},  // Lv1: 장비없어도 가능
-    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:50},
-    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:55},  // mag 상향 (풀셋26)
-    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:55},
-    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:60},
-    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:65},
-    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:70},
-    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:75},  // mag 상향 (풀셋26)
-    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:80},
-    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:88},
-    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:95},
-    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:102}, // def 상향 (풀셋27)
-    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:110}, // mag 대폭 상향 (풀셋45)
-    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:118},
-    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:126},
-    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:134}, // atk 상향 (풀셋29)
-    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:144}, // def 상향 (풀셋39)
-    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:154}, // spd 상향 (풀셋20)
-    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:165}, // mag 대폭 상향 (풀셋68)
-    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:200}, // atk 상향 (풀셋56)
+    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:25},  // Lv1: 장비없어도 가능
+    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:30},
+    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:33},  // mag 상향 (풀셋26)
+    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:33},
+    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:36},
+    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:39},
+    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:42},
+    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:45},  // mag 상향 (풀셋26)
+    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:48},
+    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:53},
+    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:57},
+    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:61}, // def 상향 (풀셋27)
+    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:66}, // mag 대폭 상향 (풀셋45)
+    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:71},
+    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:76},
+    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:80}, // atk 상향 (풀셋29)
+    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:86}, // def 상향 (풀셋39)
+    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:92}, // spd 상향 (풀셋20)
+    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:99}, // mag 대폭 상향 (풀셋68)
+    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:120}, // atk 상향 (풀셋56)
   ],
 
   // ─── 칭호·승급 ────────────────────────────────────────
@@ -350,6 +315,7 @@ const DB = {
   // Firebase는 배열을 객체로 저장 → 다시 배열로 변환
   _normalizeArrays(data) {
     const toArr = v => v == null ? [] : Array.isArray(v) ? v : Object.values(v);
+    // students가 id 키 객체로 저장된 경우도 처리
     data.students          = toArr(data.students).map(s => {
       if (!s) return null;
       s.farm             = toArr(s.farm);
@@ -424,8 +390,8 @@ const DB = {
     this._cache = db;
     this._saving = true;
     // student.id로 인덱스 찾아서 해당 위치만 저장 (전체 덮어쓰기 방지)
-    const saveIdx = db.students.findIndex(s => s.id === student.id);
-    this._fbRef.child('students/' + saveIdx).set(student).finally(() => {
+    // id 키 기반으로 저장 (인덱스 순서 변경으로 인한 덮어쓰기 방지)
+    this._fbRef.child('students/' + student.id).set(student).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
@@ -435,7 +401,7 @@ const DB = {
     db.quests = db.quests || [];
     db.quests.push(log);
     this._cache = db;
-    // 고유 ID 기반으로만 저장 (배열 인덱스 충돌 방지)
+    // questLogs에 고유 키로 저장 (완료 판정 기준)
     const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
     log._id = logId;
     this._fbRef.child('questLogs/' + logId).set(log);
@@ -536,7 +502,46 @@ const Utils = {
 
   charEmoji(type)       { return {1:'🧑‍🦱',2:'👧',3:'🧑',4:'👩'}[type]||'🧑'; },
   isPromotionLevel(lv)  { return GAME_DATA.promotionLevels.includes(lv); },
-  todayStr()            { return new Date().toISOString().slice(0,10); },
+
+  // 장래희망 + 레벨로 직업명 생성
+  getJobTitle(dream, level) {
+    if (!dream) dream = '학생';
+    // 장래희망에서 핵심 단어 추출 (앞에 붙는 수식어 제거)
+    const core = dream
+      .replace(/미래의?\s*/,'').replace(/꿈꾸는\s*/,'').replace(/되고싶은\s*/,'')
+      .replace(/장래희망\s*/,'').trim() || dream;
+
+    if (level < 5)  return '학생';
+    if (level < 10) return `${core}을 꿈꾸는 학생`;
+    if (level < 15) return `${core} 견습생`;
+    if (level < 20) return `${core} 탐험가`;
+    if (level < 25) return `주니어 ${core}`;
+    if (level < 30) return `${core} 전문가`;
+    return core; // Lv.30: 장래희망 그대로
+  },
+  todayStr() {
+    // KST(UTC+9) 기준 날짜
+    return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  },
+  weekStartStr() {
+    // KST 기준 이번 주 일요일 (일요일 자정 리셋)
+    const d = new Date(Date.now()+9*3600000);
+    const day = d.getUTCDay(); // 0=일, 1=월 ...
+    const sun = new Date(d);
+    sun.setUTCDate(d.getUTCDate() - day); // 이번 주 일요일
+    return sun.toISOString().slice(0,10);
+  },
+  isQuestDoneToday(quests, studentId, boardQuestId, questType) {
+    const today = this.todayStr();
+    const weekStart = this.weekStartStr();
+    return (quests||[]).some(q => {
+      if (q.studentId!==studentId || q.boardQuestId!==boardQuestId) return false;
+      if (!q.date) return true;
+      if (questType==='daily')  return q.date===today;
+      if (questType==='weekly') return q.date>=weekStart;
+      return true;
+    });
+  },
   uid()                 { return 'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); },
 
   // ★ 몬스터 하루 도전 횟수 체크 (2회)
@@ -620,18 +625,6 @@ const AchievementUtils = {
     try { return ach.check(student) ? 1 : 0; } catch(e) { return 0; }
   },
 };
-
-
-
-
-
-
-
-
-
-
-
-
 
 </script>
 <style>
@@ -861,7 +854,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8rem;cursor:pointer;transition:color .2s;}
 .friend-row:last-child{border-bottom:none;}.friend-row:hover{color:var(--gold);}
 
-/* ── 오늘 할 일 카드 (중요도 위계) ── */
+/* ── 📢 알림 카드 (중요도 위계) ── */
 @keyframes todoPulse{0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,.0)}50%{box-shadow:0 0 0 5px rgba(231,76,60,.22)}}
 @keyframes todoGlow{0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,.0)}50%{box-shadow:0 0 0 4px rgba(255,215,0,.18)}}
 @keyframes todoShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
@@ -937,7 +930,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .todo-btn.hint{background:rgba(255,255,255,.1);color:var(--txt2);}
 .todo-btn:hover{opacity:.85;transform:scale(1.04);}
 
-/* ── 오늘의 미션 ── */
+/* ── 📋 퀘스트 ── */
 .mission-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1.2rem;}
 .mission-row{display:flex;align-items:center;gap:.7rem;
   background:var(--bg3);border:1px solid rgba(255,255,255,.07);
@@ -1609,9 +1602,14 @@ window.onload = async () => {
 
 function buildLoginGrid() {
   const grid = document.getElementById('student-grid');
-  grid.innerHTML = DB.getStudents().map(s =>
-    `<button class="stu-btn" onclick="selectStudent('${s.id}',this)">${s.avatar} ${s.name}</button>`
-  ).join('');
+  grid.innerHTML = DB.getStudents().map(s => {
+    const av = (s.avatar || '').trim();
+    const nm = (s.name  || '').trim();
+    // 이름 자체에 아이콘이 이미 포함된 경우 avatar 중복 제거
+    const hasAvInName = av && nm.includes(av);
+    const label = hasAvInName ? nm : (av ? `${av} ${nm}` : nm);
+    return `<button class="stu-btn" onclick="selectStudent('${s.id}',this)">${label}</button>`;
+  }).join('');
 }
 
 // ══ 화면 전환 ══
@@ -1675,7 +1673,7 @@ function enterGame() {
 function checkAttendance() {
   const today = new Date().toISOString().slice(0,10);
   if ((CUR.lastAttendDate||'') === today) return; // 오늘 이미 출석
-  const EXP = 20, GOLD = 10;
+  const EXP = 15, GOLD = 10;
   CUR.lastAttendDate = today;
   CUR.exp   = (CUR.exp||0)  + EXP;
   CUR.gold  = (CUR.gold||0) + GOLD;
@@ -2087,6 +2085,8 @@ function buildMainHTML() {
   const settings = DB.getSettings();
   const db       = DB.load();
   const pendingCount  = (s.pendingRewards||[]).length;
+  const approvedCount = (s.pendingRewards||[]).filter(r=>r.approved===true).length;
+  const waitingCount  = pendingCount - approvedCount;
   const canFight      = Utils.canFightMonster(s);
   const attemptsLeft  = Utils.monsterAttemptsLeft(s);
   const farmReady     = hasFarmReady();
@@ -2097,12 +2097,13 @@ function buildMainHTML() {
 
   // ── 긴급 알림 배너 ──
   const alerts = [];
-  if (pendingCount > 0)
-    alerts.push(`<div class="reward-banner" style="cursor:pointer;margin-bottom:.6rem" onclick="openQuestModal()">
-      <div class="rb-icon">🎉</div>
-      <div class="rb-body"><div class="rb-title green">보상 ${pendingCount}개 도착!</div>
-      <div class="rb-desc">${(s.pendingRewards||[]).map(r=>r.label).join(' · ')}</div></div>
-      <button class="btn-gold" style="padding:.4rem .9rem;font-size:.78rem;flex-shrink:0" onclick="event.stopPropagation();claimRewards()">받기!</button>
+
+  if (waitingCount > 0)
+    alerts.push(`<div class="reward-banner" style="margin-bottom:.6rem;opacity:.85">
+      <div class="rb-icon">⏳</div>
+      <div class="rb-body"><div class="rb-title" style="color:var(--sky)">퀘스트 승인 대기중 ${waitingCount}건</div>
+      <div class="rb-desc">${(s.pendingRewards||[]).filter(r=>!r.approved).map(r=>r.label).join(' · ')}</div></div>
+      <div style="font-size:.72rem;color:var(--txt3);flex-shrink:0;padding:.4rem .6rem">선생님 확인 중</div>
     </div>`);
   if (canPromo)
     alerts.push(`<div class="promo-banner" onclick="openModal('m-promo')" style="cursor:pointer;margin-bottom:.6rem">
@@ -2123,11 +2124,16 @@ function buildMainHTML() {
   const todos = [];
 
   // 1순위: 보상 수령 (가장 중요)
-  if (pendingCount > 0)
-    todos.push({type:'urgent', icon:'🎁', badge:pendingCount,
-      title:`보상 ${pendingCount}개 대기 중!`,
-      sub:(s.pendingRewards||[]).slice(0,2).map(r=>r.label).join(' · ') + (pendingCount>2?` 외 ${pendingCount-2}건`:''),
-      action:"openQuestModal()", btnLabel:'받기!'});
+  if (approvedCount > 0)
+    todos.push({type:'urgent', icon:'🎁', badge:approvedCount,
+      title:`보상 ${approvedCount}개 승인 완료!`,
+      sub:(s.pendingRewards||[]).filter(r=>r.approved).slice(0,2).map(r=>r.label).join(' · '),
+      action:"claimRewards()", btnLabel:'받기!'});
+  if (waitingCount > 0)
+    todos.push({type:'info', icon:'⏳', badge:waitingCount,
+      title:`퀘스트 승인 대기중 ${waitingCount}건`,
+      sub:(s.pendingRewards||[]).filter(r=>!r.approved).slice(0,2).map(r=>r.label).join(' · '),
+      action:null, btnLabel:'대기중'});
 
   // 2순위: 시든 작물 경고
   const witheredCount = (s.farm||[]).filter(p=>{
@@ -2257,7 +2263,7 @@ function buildMainHTML() {
     <div class="todo-grid">${todoHtml}</div>
 
     ${boardQuests.length>0 ? `
-    <div class="sec-label">📌 오늘의 미션
+    <div class="sec-label">📋 퀘스트
       <span style="font-size:.72rem;color:var(--txt3);font-weight:400;margin-left:.4rem">
         ${myDoneIds.size}/${boardQuests.length} 완료
       </span>
@@ -2348,9 +2354,14 @@ function buildMainHTML() {
 // ══ 보상 받기 ══
 function claimRewards() {
   const pending = CUR.pendingRewards || [];
-  if (!pending.length) return;
+  // 승인된 보상만 수령 (approved:true)
+  const approved = pending.filter(r => r.approved === true);
+  if (!approved.length) {
+    toast('아직 선생님이 승인한 보상이 없어요!');
+    return;
+  }
   let totalExp = 0, totalGold = 0;
-  pending.forEach(r => {
+  approved.forEach(r => {
     totalExp  += r.exp  || 0;
     totalGold += r.gold || 0;
     if (r.stat && r.statVal) {
@@ -2358,7 +2369,8 @@ function claimRewards() {
       CUR.stats[r.stat] = (CUR.stats[r.stat]||0) + r.statVal;
     }
   });
-  CUR.pendingRewards = [];
+  // 승인된 것만 제거, 대기중인 것은 유지
+  CUR.pendingRewards = pending.filter(r => r.approved !== true);
   const oldLv = CUR.level;
   CUR.gold += totalGold;
   CUR.exp  += totalExp;
@@ -3106,7 +3118,7 @@ let DECO_SCENE = 'yard'; // 'yard' | 'indoor'
 let _dCv = null, _dCtx = null, _dC = 28, _dW = 0, _dH = 0;
 
 // ── 그리드 상수 ──
-const DY = {cols:14, rows:10};   // 마당
+const DY = {cols:20, rows:14};   // 마당 (1.5배 확대)
 const DH = {cols:6,  rows:3};    // 집 건물 차지 영역 (우상단)
 const DI = {cols:12, rows:8};    // 집 안
 function _isHC(r,c){ return r < DH.rows && c >= (DY.cols - DH.cols); }
@@ -3116,20 +3128,20 @@ function _dc(x,y,r){_dCtx.beginPath();_dCtx.arc(x,y,r,0,Math.PI*2);}
 function _drr(x,y,w,h,r){_dCtx.beginPath();_dCtx.roundRect(x,y,w,h,r);}
 
 // ── 마당 장식 드로우 함수 ──
-function _dRose(cx,cy,s){_dCtx.fillStyle='#2d6e1a';_drr(cx-s*.6,cy,s*1.2,s*.38,s*.18);_dCtx.fill();[[-.26,-.4,'#e8314a'],[.1,-.46,'#c8203a'],[.42,-.34,'#e0284a']].forEach(([dx,dy,c])=>{_dCtx.fillStyle=c;_dc(cx+dx*s,cy+dy*s,s*.25);_dCtx.fill();_dCtx.fillStyle='#ff7888';_dc(cx+dx*s,cy+dy*s,s*.11);_dCtx.fill();});}
-function _dTulip(cx,cy,s){_dCtx.strokeStyle='#3a8020';_dCtx.lineWidth=s*.09;_dCtx.beginPath();_dCtx.moveTo(cx,cy+s*.1);_dCtx.lineTo(cx,cy-s*.42);_dCtx.stroke();_dCtx.fillStyle='#e84090';_dCtx.beginPath();_dCtx.ellipse(cx-s*.13,cy-s*.44,s*.17,s*.28,-.2,0,Math.PI*2);_dCtx.fill();_dCtx.fillStyle='#c82070';_dCtx.beginPath();_dCtx.ellipse(cx+s*.13,cy-s*.4,s*.15,s*.24,.2,0,Math.PI*2);_dCtx.fill();}
-function _dTree(cx,cy,s){_dCtx.fillStyle='#6B4A1E';_drr(cx-s*.11,cy+s*.1,s*.22,s*.44,s*.06);_dCtx.fill();_dCtx.fillStyle='#2d7a18';_dc(cx,cy-s*.22,s*.46);_dCtx.fill();_dCtx.fillStyle='#3d9622';_dc(cx,cy-s*.26,s*.35);_dCtx.fill();_dCtx.fillStyle='#4aaa28';_dc(cx-s*.07,cy-s*.4,s*.25);_dCtx.fill();}
-function _dBench(cx,cy,s){_dCtx.fillStyle='#A07830';_drr(cx-s*.54,cy-s*.28,s*1.08,s*.18,s*.05);_dCtx.fill();_dCtx.fillStyle='#8B6520';_drr(cx-s*.54,cy-s*.06,s*1.08,s*.17,s*.05);_dCtx.fill();[-.5,.28].forEach(dx=>{_dCtx.fillStyle='#7a5418';_drr(cx+dx*s,cy+s*.1,s*.19,s*.28,s*.04);_dCtx.fill();});}
-function _dFountain(cx,cy,s){_dCtx.fillStyle='rgba(26,106,154,.75)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.25,s*.52,s*.19,0,0,Math.PI*2);_dCtx.fill();_dCtx.fillStyle='#8B8870';_drr(cx-s*.09,cy-s*.32,s*.17,s*.57,s*.06);_dCtx.fill();_dCtx.strokeStyle='rgba(135,206,235,.88)';_dCtx.lineWidth=s*.07;[[-s*.15,-s*.82],[0,-s*.88],[s*.15,-s*.82]].forEach(([ex,ey])=>{_dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.32);_dCtx.quadraticCurveTo(cx,cy-s*.58,cx+ex,cy+ey);_dCtx.stroke();});}
+function _dRose(cx,cy,s){_dCtx.fillStyle='#2d6e1a';_drr(cx-s*.76,cy+s*.04,s*1.52,s*.48,s*.2);_dCtx.fill();[[-.32,-.5,'#e8314a'],[.12,-.58,'#c8203a'],[.52,-.42,'#e0284a'],[-.08,-.36,'#ff5566']].forEach(([dx,dy,c])=>{_dCtx.fillStyle=c;_dc(cx+dx*s,cy+dy*s,s*.3);_dCtx.fill();_dCtx.fillStyle='#ff8898';_dc(cx+dx*s,cy+dy*s,s*.13);_dCtx.fill();});}
+function _dTulip(cx,cy,s){_dCtx.strokeStyle='#3a8020';_dCtx.lineWidth=s*.12;_dCtx.beginPath();_dCtx.moveTo(cx,cy+s*.18);_dCtx.lineTo(cx,cy-s*.5);_dCtx.stroke();_dCtx.strokeStyle='#2a6010';_dCtx.lineWidth=s*.08;_dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.1);_dCtx.quadraticCurveTo(cx+s*.4,cy-s*.2,cx+s*.52,cy-s*.1);_dCtx.stroke();_dCtx.fillStyle='#e84090';_dCtx.beginPath();_dCtx.ellipse(cx-s*.16,cy-s*.54,s*.22,s*.36,-.2,0,Math.PI*2);_dCtx.fill();_dCtx.fillStyle='#c82070';_dCtx.beginPath();_dCtx.ellipse(cx+s*.16,cy-s*.5,s*.2,s*.32,.2,0,Math.PI*2);_dCtx.fill();_dCtx.fillStyle='#ff60a8';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.62,s*.14,s*.22,0,0,Math.PI*2);_dCtx.fill();}
+function _dTree(cx,cy,s){_dCtx.fillStyle='#6B4A1E';_drr(cx-s*.14,cy+s*.15,s*.28,s*.5,s*.06);_dCtx.fill();_dCtx.fillStyle='#2d7a18';_dc(cx,cy-s*.18,s*.62);_dCtx.fill();_dCtx.fillStyle='#3d9622';_dc(cx,cy-s*.24,s*.48);_dCtx.fill();_dCtx.fillStyle='#4aaa28';_dc(cx-s*.08,cy-s*.42,s*.34);_dCtx.fill();_dCtx.fillStyle='rgba(255,255,255,.08)';_dc(cx-s*.2,cy-s*.5,s*.12);_dCtx.fill();}
+function _dBench(cx,cy,s){_dCtx.fillStyle='#A07830';_drr(cx-s*.7,cy-s*.32,s*1.4,s*.22,s*.06);_dCtx.fill();_dCtx.fillStyle='#8B6520';_drr(cx-s*.7,cy-s*.06,s*1.4,s*.2,s*.06);_dCtx.fill();_dCtx.fillStyle='#c8a050';_drr(cx-s*.68,cy-s*.3,s*1.36,s*.04,0);_dCtx.fill();[-.64,.44].forEach(dx=>{_dCtx.fillStyle='#7a5418';_drr(cx+dx*s,cy+s*.12,s*.24,s*.34,s*.05);_dCtx.fill();});}
+function _dFountain(cx,cy,s){_dCtx.fillStyle='rgba(26,106,154,.8)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.3,s*.72,s*.26,0,0,Math.PI*2);_dCtx.fill();_dCtx.fillStyle='#9B9880';_drr(cx-s*.12,cy-s*.38,s*.24,s*.68,s*.07);_dCtx.fill();_dCtx.fillStyle='rgba(26,106,154,.5)';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.1,s*.42,s*.14,0,0,Math.PI*2);_dCtx.fill();_dCtx.strokeStyle='rgba(135,206,235,.9)';_dCtx.lineWidth=s*.09;[[-s*.2,-s*.9],[0,-s*.96],[s*.2,-s*.9]].forEach(([ex,ey])=>{_dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.38);_dCtx.quadraticCurveTo(cx,cy-s*.62,cx+ex,cy+ey);_dCtx.stroke();});}
 function _dLantern(cx,cy,s){_dCtx.strokeStyle='#5a5a50';_dCtx.lineWidth=s*.07;_dCtx.beginPath();_dCtx.moveTo(cx,cy+s*.44);_dCtx.lineTo(cx,cy-s*.12);_dCtx.stroke();_dCtx.fillStyle='rgba(255,200,50,.75)';_drr(cx-s*.19,cy-s*.54,s*.38,s*.42,s*.06);_dCtx.fill();_dCtx.fillStyle='#8B6520';_dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.78);_dCtx.lineTo(cx-s*.22,cy-s*.54);_dCtx.lineTo(cx+s*.22,cy-s*.54);_dCtx.closePath();_dCtx.fill();}
-function _dCactus(cx,cy,s){_dCtx.fillStyle='#4a8c2a';_drr(cx-s*.12,cy-s*.68,s*.24,s*.88,s*.12);_dCtx.fill();_drr(cx-s*.38,cy-s*.4,s*.24,s*.34,s*.12);_dCtx.fill();_drr(cx+s*.14,cy-s*.5,s*.24,s*.38,s*.12);_dCtx.fill();}
+function _dCactus(cx,cy,s){_dCtx.fillStyle='#4a8c2a';_drr(cx-s*.16,cy-s*.72,s*.32,s*.92,s*.14);_dCtx.fill();_dCtx.fillStyle='#3a7c1a';_drr(cx-s*.48,cy-s*.48,s*.3,s*.38,s*.14);_dCtx.fill();_drr(cx+s*.18,cy-s*.56,s*.3,s*.42,s*.14);_dCtx.fill();_dCtx.fillStyle='#5aac3a';_drr(cx-s*.14,cy-s*.7,s*.06,s*.88,s*.03);_dCtx.fill();}
 function _dStone(cx,cy,s){[[-.16,s*.02,.25,.19,-.2,'#7a7868'],[.18,-.04,.2,.16,.15,'#8a8878'],[0,s*.1,.17,.13,0,'#6a6858']].forEach(([dx,dy,rx,ry,rot,c])=>{_dCtx.fillStyle=c;_dCtx.beginPath();_dCtx.ellipse(cx+dx*s,cy+dy,rx*s,ry*s,rot,0,Math.PI*2);_dCtx.fill();});}
 
 // ── 집 안 가구 드로우 함수 ──
 function _dDesk(cx,cy,s){_dCtx.fillStyle='#A07830';_drr(cx-s*.7,cy-s*.4,s*1.4,s*.8,s*.08);_dCtx.fill();_dCtx.fillStyle='rgba(135,206,235,.72)';_drr(cx-s*.66,cy-s*.36,s*.64,s*.44,s*.05);_dCtx.fill();_dCtx.strokeStyle='#5a3510';_dCtx.lineWidth=s*.04;_dCtx.strokeRect(cx-s*.66,cy-s*.36,s*.64,s*.44);_dCtx.beginPath();_dCtx.moveTo(cx-s*.34,cy-s*.36);_dCtx.lineTo(cx-s*.34,cy+s*.08);_dCtx.stroke();_dCtx.beginPath();_dCtx.moveTo(cx-s*.66,cy-s*.12);_dCtx.lineTo(cx,cy-s*.12);_dCtx.stroke();_dCtx.fillStyle='#c8a870';_drr(cx+s*.04,cy-s*.22,s*.46,s*.1,s*.04);_dCtx.fill();_dCtx.fillStyle='#8B6520';[-.66,.48].forEach(dx=>{_drr(cx+dx*s,cy+s*.38,s*.2,s*.24,s*.05);_dCtx.fill();});}
 function _dSofa(cx,cy,s){_dCtx.fillStyle='#6B4A8E';_drr(cx-s*.78,cy-s*.24,s*1.56,s*.54,s*.11);_dCtx.fill();_dCtx.fillStyle='#7a5aa0';_drr(cx-s*.74,cy-s*.5,s*1.48,s*.28,s*.1);_dCtx.fill();[-.78,.52].forEach(dx=>{_dCtx.fillStyle='#7a5aa0';_drr(cx+dx*s,cy-s*.16,s*.24,s*.44,s*.1);_dCtx.fill();});[-.64,.14].forEach(dx=>{_dCtx.fillStyle='#8060b0';_drr(cx+dx*s,cy-s*.12,s*.5,s*.34,s*.07);_dCtx.fill();});}
 function _dClock(cx,cy,s){_dCtx.fillStyle='#D4A850';_dc(cx,cy,s*.48);_dCtx.fill();_dCtx.fillStyle='#FFF8E8';_dc(cx,cy,s*.4);_dCtx.fill();_dCtx.fillStyle='#5a3010';_dc(cx,cy,s*.06);_dCtx.fill();_dCtx.strokeStyle='#3a2008';_dCtx.lineWidth=s*.07;_dCtx.lineCap='round';_dCtx.beginPath();_dCtx.moveTo(cx,cy);_dCtx.lineTo(cx,cy-s*.27);_dCtx.stroke();_dCtx.lineWidth=s*.05;_dCtx.beginPath();_dCtx.moveTo(cx,cy);_dCtx.lineTo(cx+s*.19,cy+s*.12);_dCtx.stroke();}
-function _dBookshelf(cx,cy,s){_dCtx.fillStyle='#8B6520';_drr(cx-s*.54,cy-s*.7,s*1.08,s*1.26,s*.04);_dCtx.fill();[0,1,2].forEach(i=>{_dCtx.fillStyle='#A07830';_drr(cx-s*.52,cy-s*.66+i*s*.38,s*1.04,s*.26,s*.03);_dCtx.fill();[['#c0392b','#2980b9','#27ae60','#8e44ad'],['#2980b9','#c0392b','#16a085','#d35400'],['#27ae60','#e67e22','#2980b9','#c0392b']][i].forEach((c,ci)=>{_dCtx.fillStyle=c;_drr(cx-s*.5+ci*s*.25,cy-s*.66+i*s*.38,s*.21,s*.26,s*.02);_dCtx.fill();});});}
+function _dBookshelf(cx,cy,s){_dCtx.fillStyle='#8B6520';_drr(cx-s*.68,cy-s*.8,s*1.36,s*1.52,s*.04);_dCtx.fill();[0,1,2].forEach(i=>{_dCtx.fillStyle='#A07830';_drr(cx-s*.52,cy-s*.66+i*s*.38,s*1.04,s*.26,s*.03);_dCtx.fill();[['#c0392b','#2980b9','#27ae60','#8e44ad'],['#2980b9','#c0392b','#16a085','#d35400'],['#27ae60','#e67e22','#2980b9','#c0392b']][i].forEach((c,ci)=>{_dCtx.fillStyle=c;_drr(cx-s*.5+ci*s*.25,cy-s*.66+i*s*.38,s*.21,s*.26,s*.02);_dCtx.fill();});});}
 function _dLamp(cx,cy,s){_dCtx.fillStyle='#8B6520';_drr(cx-s*.07,cy-s*.06,s*.13,s*.58,s*.05);_dCtx.fill();_dCtx.fillStyle='#6B4A1E';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.52,s*.24,s*.09,0,0,Math.PI*2);_dCtx.fill();_dCtx.fillStyle='#F5E0A0';_dCtx.beginPath();_dCtx.moveTo(cx-s*.34,cy-s*.6);_dCtx.quadraticCurveTo(cx,cy-s*.06,cx+s*.34,cy-s*.6);_dCtx.closePath();_dCtx.fill();}
 function _dPiano(cx,cy,s){_dCtx.fillStyle='#1a1a1a';_drr(cx-s*.72,cy-s*.4,s*1.44,s*.8,s*.07);_dCtx.fill();_dCtx.fillStyle='#f0f0f0';_drr(cx-s*.67,cy-s*.17,s*1.34,s*.27,s*.03);_dCtx.fill();_dCtx.fillStyle='#1a1a1a';[-s*.55,-s*.34,-s*.06,s*.15,s*.36].forEach(dx=>{_drr(cx+dx,cy-s*.17,s*.16,s*.18,s*.03);_dCtx.fill();});[-.68,.46].forEach(dx=>{_drr(cx+dx*s,cy+s*.38,s*.21,s*.2,s*.04);_dCtx.fill();});}
 function _dPlant(cx,cy,s){_dCtx.fillStyle='#c8783a';_drr(cx-s*.19,cy+s*.12,s*.38,s*.34,s*.05);_dCtx.fill();_dCtx.fillStyle='#a85a28';_drr(cx-s*.21,cy+s*.1,s*.42,s*.07,s*.03);_dCtx.fill();[[-.17,-.14,.5,.24,.13],[.17,-.18,-.5,.22,.12],[0,-.28,0,.19,.24]].forEach(([dx,dy,rot,rx,ry])=>{_dCtx.fillStyle=dy<-.2?'#4aaa28':'#3a9022';_dCtx.beginPath();_dCtx.ellipse(cx+dx*s,cy+dy*s,rx*s,ry*s,rot,0,Math.PI*2);_dCtx.fill();});}
@@ -3267,36 +3279,43 @@ function _dTV(cx,cy,s){
 }
 
 function _dBed(cx,cy,s){
-  // 침대 프레임
-  _dCtx.fillStyle='#8B6520';_drr(cx-s*.7,cy-s*.4,s*1.4,s*.72,s*.08);_dCtx.fill();
+  // 침대 프레임 (더 크게 - 위아래 꽉)
+  _dCtx.fillStyle='#8B6520';_drr(cx-s*.82,cy-s*.78,s*1.64,s*1.48,s*.08);_dCtx.fill();
   // 매트리스
-  _dCtx.fillStyle='#e8e0d0';_drr(cx-s*.62,cy-s*.36,s*1.24,s*.44,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#e8e0d0';_drr(cx-s*.74,cy-s*.7,s*1.28,s*1.2,s*.06);_dCtx.fill();
   // 이불
-  _dCtx.fillStyle='#6b8cba';_drr(cx-s*.62,cy-s*.28,s*.8,s*.36,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#6b8cba';_drr(cx-s*.74,cy-s*.52,s*1.0,s*.9,s*.06);_dCtx.fill();
+  // 이불 주름
+  _dCtx.strokeStyle='rgba(255,255,255,.15)';_dCtx.lineWidth=s*.04;
+  [-.4,-.1,.2].forEach(dx=>{_dCtx.beginPath();_dCtx.moveTo(cx+dx*s,cy-s*.48);_dCtx.lineTo(cx+dx*s,cy+s*.38);_dCtx.stroke();});
   // 베개
-  _dCtx.fillStyle='#f0e8d8';_drr(cx+s*.22,cy-s*.34,s*.34,s*.24,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#f0e8d8';_drr(cx+s*.3,cy-s*.68,s*.4,s*.3,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#e0d8c8';_drr(cx+s*.32,cy-s*.66,s*.36,s*.26,s*.04);_dCtx.fill();
   // 헤드보드
-  _dCtx.fillStyle='#A07830';_drr(cx+s*.56,cy-s*.46,s*.14,s*.78,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#A07830';_drr(cx+s*.68,cy-s*.82,s*.16,s*1.56,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#c8a050';_drr(cx+s*.7,cy-s*.8,s*.04,s*1.52,s*.02);_dCtx.fill();
 }
 
 function _dAquarium(cx,cy,s){
-  // 수조 본체
-  _dCtx.fillStyle='rgba(20,80,140,.7)';_drr(cx-s*.54,cy-s*.52,s*1.08,s*.86,s*.07);_dCtx.fill();
-  _dCtx.strokeStyle='#4a90c8';_dCtx.lineWidth=s*.06;_dCtx.strokeRect(cx-s*.54,cy-s*.52,s*1.08,s*.86);
+  // 수조 본체 (더 크게)
+  _dCtx.fillStyle='rgba(20,80,140,.75)';_drr(cx-s*.72,cy-s*.68,s*1.44,s*1.1,s*.07);_dCtx.fill();
+  _dCtx.strokeStyle='#4a90c8';_dCtx.lineWidth=s*.07;_dCtx.strokeRect(cx-s*.72,cy-s*.68,s*1.44,s*1.1);
   // 물 표면 반사
-  _dCtx.fillStyle='rgba(100,180,255,.25)';_drr(cx-s*.52,cy-s*.5,s*1.04,s*.18,s*.04);_dCtx.fill();
-  // 물고기들
-  [[-s*.2,-.12,'#ff6b35'],[s*.14,-.28,'#ffd700'],[-.02,-.04,'#ff4488']].forEach(([dx,dy,c])=>{
+  _dCtx.fillStyle='rgba(100,180,255,.3)';_drr(cx-s*.7,cy-s*.66,s*1.4,s*.22,s*.04);_dCtx.fill();
+  // 물고기들 (더 크게)
+  [[-s*.3,-.18,'#ff6b35'],[s*.2,-.38,'#ffd700'],[-.04,-.06,'#ff4488'],[s*.36,-.1,'#44aaff']].forEach(([dx,dy,c])=>{
     _dCtx.fillStyle=c;_dCtx.beginPath();
-    _dCtx.ellipse(cx+dx,cy+dy*s,s*.12,s*.07,0,0,Math.PI*2);_dCtx.fill();
+    _dCtx.ellipse(cx+dx,cy+dy*s,s*.16,s*.09,0,0,Math.PI*2);_dCtx.fill();
+    _dCtx.fillStyle='rgba(255,255,255,.4)';_dCtx.beginPath();
+    _dCtx.ellipse(cx+dx-s*.04,cy+dy*s-s*.02,s*.04,s*.03,0,0,Math.PI*2);_dCtx.fill();
   });
   // 모래/바닥
-  _dCtx.fillStyle='#c8b870';_drr(cx-s*.52,cy+s*.24,s*1.04,s*.1,s*.03);_dCtx.fill();
+  _dCtx.fillStyle='#c8b870';_drr(cx-s*.7,cy+s*.3,s*1.4,s*.12,s*.03);_dCtx.fill();
   // 해초
-  _dCtx.strokeStyle='#28a870';_dCtx.lineWidth=s*.05;
-  [-.3,.1,.38].forEach(dx=>{
-    _dCtx.beginPath();_dCtx.moveTo(cx+dx*s,cy+s*.24);
-    _dCtx.quadraticCurveTo(cx+dx*s+s*.08,cy,cx+dx*s,cy-s*.18);_dCtx.stroke();
+  _dCtx.strokeStyle='#28a870';_dCtx.lineWidth=s*.06;
+  [-.42,-.1,.18,.5].forEach(dx=>{
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx*s,cy+s*.3);
+    _dCtx.quadraticCurveTo(cx+dx*s+s*.1,cy+s*.04,cx+dx*s,cy-s*.24);_dCtx.stroke();
   });
 }
 
@@ -3516,23 +3535,30 @@ function _drawYard() {
 
   // 선택 하이라이트 (장식 모드 vs 바닥 모드)
   if(DECO_MODE==='floor'){
-    // 바닥 모드: 선택된 타일 색으로 호버 표시
-    _dCtx.fillStyle='rgba(255,255,255,.15)';
     for(let r=0;r<DY.rows;r++) for(let c=0;c<DY.cols;c++){
       if(_isHC(r,c)) continue;
-      _dCtx.strokeStyle='rgba(255,255,255,.2)'; _dCtx.lineWidth=.5;
+      _dCtx.strokeStyle='rgba(255,255,255,.18)'; _dCtx.lineWidth=.5;
       _dCtx.strokeRect(c*C+.5,r*C+.5,C-1,C-1);
     }
-  } else if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='yard'){
-    _dCtx.fillStyle='rgba(255,255,255,.09)';
-    for(let r=0;r<DY.rows;r++) for(let c=0;c<DY.cols;c++){
-      if(_isHC(r,c)) continue;
-      if(!(CUR.houseDecorations||[]).find(p=>p.area==='yard'&&p.row===r&&p.col===c))
-        _dCtx.fillRect(c*C+1,r*C+1,C-2,C-2);
+  } else if(SEL_DECO) {
+    const sd = GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
+    if(sd?.cat==='yard') {
+      const ssz = sd.size||{w:1,h:1};
+      // 빈 칸마다 footprint 프리뷰 표시
+      for(let r=0;r<DY.rows;r++) for(let c=0;c<DY.cols;c++){
+        if(_isHC(r,c)) continue;
+        if(canPlaceDeco(r,c,ssz.w,ssz.h,'yard',null)){
+          // 배치 가능한 footprint 영역 강조
+          _dCtx.fillStyle='rgba(255,255,255,.1)';
+          _dCtx.fillRect(c*C+1,r*C+1,ssz.w*C-2,ssz.h*C-2);
+          _dCtx.strokeStyle='rgba(255,255,150,.35)'; _dCtx.lineWidth=1;
+          _dCtx.strokeRect(c*C+1,r*C+1,ssz.w*C-2,ssz.h*C-2);
+        }
+      }
     }
   }
 
-  // 배치된 마당 장식 (멀티셀)
+  // 배치된 마당 장식 - footprint 전체를 채우는 bounding box 렌더
   (CUR.houseDecorations||[]).filter(p=>p.area==='yard').forEach(p=>{
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
@@ -3540,20 +3566,31 @@ function _drawYard() {
     const px=p.col*C, py=p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
     const cx=px+bw/2, cy=py+bh/2;
-    // 멀티셀이면 배경 강조
-    if(fn) fn(cx,cy,Math.min(bw,bh)*.44);
-    else {
+    // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
+    const s = Math.min(bw, bh) * 0.62;
+    if(fn){
+      // 멀티셀이면 bounding box 크기에 맞게 scale 변환
       if(sz.w>1||sz.h>1){
-        _dCtx.fillStyle='rgba(0,0,0,.12)';
-        _drr(px+2,py+2,bw-4,bh-4,6); _dCtx.fill();
+        _dCtx.save();
+        _dCtx.translate(cx, cy);
+        _dCtx.scale(sz.w > sz.h ? sz.w/sz.h : 1, sz.h > sz.w ? sz.h/sz.w : 1);
+        fn(0, 0, s);
+        _dCtx.restore();
+      } else {
+        fn(cx, cy, s);
       }
-      const fs=Math.sqrt(bw*bh)*.72;
-      _dCtx.font=`${fs}px sans-serif`;
-      _dCtx.textAlign='center';
-      _dCtx.textBaseline='middle';
-      _dCtx.fillText(d.icon, cx, cy);
-      _dCtx.textBaseline='alphabetic';
+      return;
     }
+    // 커스텀 함수 없는 경우 - offscreen canvas로 bounding box 채우기
+    const oc=document.createElement('canvas');
+    const base=Math.max(bw,bh)*2;
+    oc.width=oc.height=base;
+    const ox=oc.getContext('2d');
+    ox.font=`${base*0.85}px sans-serif`;
+    ox.textAlign='center'; ox.textBaseline='middle';
+    ox.fillText(d.icon,base/2,base/2);
+    const pad=2;
+    _dCtx.drawImage(oc, px+pad, py+pad, bw-pad*2, bh-pad*2);
   });
 
   _dCv._doorX=dx; _dCv._doorY=dy; _dCv._doorW=C*.7; _dCv._doorH=C*1.02;
@@ -3604,17 +3641,26 @@ function _drawIndoor() {
     const px=offX+p.col*C, py=offY+p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
     const cx=px+bw/2, cy=py+bh/2;
-    if(fn) fn(cx,cy,Math.min(bw,bh)*.44);
-    else {
+    const s = Math.min(bw, bh) * 0.62;
+    if(fn){
       if(sz.w>1||sz.h>1){
-        _dCtx.fillStyle='rgba(0,0,0,.12)';
-        _drr(px+2,py+2,bw-4,bh-4,6); _dCtx.fill();
+        _dCtx.save();
+        _dCtx.translate(cx, cy);
+        _dCtx.scale(sz.w > sz.h ? sz.w/sz.h : 1, sz.h > sz.w ? sz.h/sz.w : 1);
+        fn(0, 0, s);
+        _dCtx.restore();
+      } else {
+        fn(cx, cy, s);
       }
-      _dCtx.font=`${Math.sqrt(bw*bh)*.72}px sans-serif`;
-      _dCtx.textAlign='center';
-      _dCtx.textBaseline='middle';
-      _dCtx.fillText(d.icon, cx, cy);
-      _dCtx.textBaseline='alphabetic';
+    } else {
+      const oc=document.createElement('canvas');
+      const base=Math.max(bw,bh)*2;
+      oc.width=oc.height=base;
+      const ox=oc.getContext('2d');
+      ox.font=`${base*0.85}px sans-serif`;
+      ox.textAlign='center'; ox.textBaseline='middle';
+      ox.fillText(d.icon,base/2,base/2);
+      _dCtx.drawImage(oc, px+2, py+2, bw-4, bh-4);
     }
   });
 
@@ -4140,7 +4186,7 @@ function submitQuestFromMain(questId) {
   // 이미 완료했거나 대기중이면 무시
   const _q2 = (db.boardQuests||[]).find(x=>x.id===questId);
   const alreadyDone = typeof Utils.isQuestDoneToday === 'function'
-    ? Utils.isQuestDoneToday(db.quests||[], CUR.id, questId, _q2?.type||'special')
+    ? Utils.isQuestDoneToday(db.questLogs||db.quests||[], CUR.id, questId, _q2?.type||'special')
     : (db.quests||[]).some(q => q.studentId===CUR.id && q.boardQuestId===questId);
   const alreadyPending = (CUR.pendingRewards||[]).some(r=>r.boardQuestId===questId);
   if (alreadyDone || alreadyPending) return;
@@ -4253,12 +4299,11 @@ function renderBookMonthlyChart(books) {
   const labelEl  = document.getElementById('book-monthly-labels');
   if (!chartEl || !labelEl) return;
 
-  // 최근 6개월 집계
+  // 3월~12월 고정
   const now = new Date();
   const months = [];
-  for (let i=5; i>=0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-    const mo = d.getMonth()+1; months.push({ key: d.getFullYear()+'-'+mo, label: mo+'월', count: 0 });
+  for (let mo=3; mo<=12; mo++) {
+    months.push({ key: now.getFullYear()+'-'+mo, label: mo+'월', count: 0 });
   }
   books.forEach(b => {
     if (!b.date) return;
