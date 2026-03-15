@@ -1738,39 +1738,13 @@ function startAccessTimer() {
 
 function enterGame() {
   autoCloseDailyQuests();
-  checkAttendance();
   document.getElementById('s-game').classList.add('active');
   applyLayout(LAYOUT_MODE);
   renderAll();
-  startAccessTimer(); // 자동 로그아웃 타이머 시작
+  startAccessTimer();
 }
 
 // ══ 자동 출석 ══
-function checkAttendance() {
-  const today = new Date().toISOString().slice(0,10);
-  if ((CUR.lastAttendDate||'') === today) return; // 오늘 이미 출석
-  const EXP = 15, GOLD = 10;
-  CUR.lastAttendDate = today;
-  CUR.exp   = (CUR.exp||0)  + EXP;
-  CUR.gold  = (CUR.gold||0) + GOLD;
-  const oldLv = CUR.level;
-  CUR.level = Utils.levelFromExp(CUR.exp);
-  DB.saveStudent(CUR);
-  // 출석 로그 기록
-  DB.saveQuestLog({
-    studentId: CUR.id,
-    boardQuestId: null,
-    type: 'attendance',
-    name: '오늘 출석!',
-    exp: EXP, gold: GOLD,
-    icon: '🌅',
-    date: today,
-    approved: true,
-  });
-  if (CUR.level > oldLv) setTimeout(() => triggerLevelUp(CUR.level), 500);
-  setTimeout(() => toast(`🌅 출석 완료! +${EXP}EXP +${GOLD}G`), 800);
-}
-
 // ══ 렌더 전체 ══
 function renderAll() { renderHUD(); renderSide(); renderMain(); renderMobile(); }
 
