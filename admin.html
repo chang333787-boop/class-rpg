@@ -1220,6 +1220,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <button class="btn-sm" onclick="addAbilityTemplate()">추가</button>
           </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedAbilityQuests()">📌 체크한 항목 게시판에 올리기</button>
+          <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates(CUR_ABILITY_TAB)">🔄 숨긴 항목 복원</button>
         </div>
 
                 <!-- 직접 입력 -->
@@ -2683,9 +2684,10 @@ function renderActivityPage() {
           <td style="padding:.45rem .8rem;text-align:center;color:var(--emerald);font-weight:700">+${log.exp||0}</td>
           <td style="padding:.45rem .8rem;text-align:center;color:var(--gold);font-weight:700">+${log.gold||0}G</td>
           <td style="padding:.45rem .8rem;text-align:center">
-            ${log.name ? `<button onclick="copyText('${(log.name||'').replace(/'/g,"\\'")}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1200)"
+            ${log.name ? `<button onclick="copyToQuestForm('${(log.name||'').replace(/'/g,"\\'")}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)"
               style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;
-              color:var(--txt3);cursor:pointer;font-size:.75rem;padding:.2rem .45rem">📋</button>` : ''}
+              color:var(--txt3);cursor:pointer;font-size:.75rem;padding:.2rem .45rem"
+              title="복사 + 직접입력에 붙여넣기">📋</button>` : ''}
           </td>
         </tr>`;
       }).join('')}
@@ -2711,6 +2713,23 @@ function copyText(text) {
     t.select(); document.execCommand('copy');
     document.body.removeChild(t);
   });
+}
+function copyToQuestForm(text) {
+  // 클립보드 복사
+  navigator.clipboard?.writeText(text).catch(() => {
+    const t = document.createElement('textarea');
+    t.value = text; document.body.appendChild(t);
+    t.select(); document.execCommand('copy');
+    document.body.removeChild(t);
+  });
+  // 직접입력 탭 열고 퀘스트명 칸에 자동 입력
+  switchQuestTab('custom');
+  nav('quests', document.querySelector('[onclick*="quests"]'));
+  setTimeout(() => {
+    const inp = document.getElementById('nq-name');
+    if (inp) { inp.value = text; inp.focus(); }
+  }, 200);
+  notify(`📋 "${text}" 복사 + 직접입력 탭에 붙여넣기 완료!`);
 }
 
 function renderRank() {
@@ -3246,8 +3265,9 @@ function renderAbilityQuests() {
   if (!el) return;
   const db = DB.load();
   const customs = ((db.customQuestTemplates||{})[type]||[]);
+  const hiddenSet = getHiddenTemplates(type);
   let items = [
-    ...ABILITY_QUESTS[type],
+    ...ABILITY_QUESTS[type].filter(t => !hiddenSet.has(t.name)),
     ...customs.map(t => ({...t, custom:true})),
   ];
   if (CUR_DIFF_FILTER !== 'all') items = items.filter(t => t.diff === CUR_DIFF_FILTER);
@@ -3261,8 +3281,9 @@ function renderAbilityQuests() {
       <label for="aq-chk-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
       <span style="font-size:.68rem;color:var(--txt3)">${d.label}</span>
       <span style="font-size:.68rem;color:var(--gold)">+${d.exp}EXP</span>
-      ${t.custom ? `<button onclick="removeCustomTemplate('${type}','${t.name}');renderAbilityQuests()"
-        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>` : ''}
+      <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderAbilityQuests()` : `hideDefaultTemplate('${type}','${t.name}')`}"
+        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
+        title="${t.custom ? '삭제' : '숨기기'}">✕</button>
     </div>`;
   }).join('') || '<div style="padding:1rem;color:var(--txt3);font-size:.82rem;text-align:center">해당 난이도 퀘스트가 없어요</div>';
 }
