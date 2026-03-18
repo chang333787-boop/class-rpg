@@ -2564,7 +2564,7 @@ function buildRankingHTML(students) {
   const categories = [
     { label:'레벨',   key: s => s.level||0,            fmt: (s,v) => `Lv.${v}` },
     { label:'퀘스트', key: s => s.totalQuests||0,       fmt: (s,v) => `${v}개` },
-    { label:'골드',   key: s => s.gold||0,              fmt: (s,v) => `${v.toLocaleString()}G` },
+    { label:'골드',   key: s => _totalGoldAdmin(s),     fmt: (s,v) => `${v.toLocaleString()}G` },
     { label:'독서',   key: s => s.bookCount||0,         fmt: (s,v) => `${v}권` },
   ];
 
@@ -2732,6 +2732,13 @@ function copyToQuestForm(text) {
     }, 50);
   }, 100);
   notify(`📋 "${text}" → 직접입력 탭에 붙여넣기 완료!`);
+}
+
+function _totalGoldAdmin(s) {
+  const db = DB.load();
+  const logs = db.quests || [];
+  return logs.filter(q => q && q.studentId === s.id)
+    .reduce((sum, q) => sum + (q.gold||0), 0);
 }
 
 function renderRank() {

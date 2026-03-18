@@ -4657,7 +4657,7 @@ function buildRankingHTML(students) {
   const categories = [
     { label:'레벨',   key: s => s.level||0,       fmt: (s,v) => `Lv.${v}` },
     { label:'퀘스트', key: s => s.totalQuests||0,  fmt: (s,v) => `${v}개` },
-    { label:'골드',   key: s => s.gold||0,         fmt: (s,v) => `${v.toLocaleString()}G` },
+    { label:'골드',   key: s => _totalGold(s),     fmt: (s,v) => `${v.toLocaleString()}G` },
     { label:'독서',   key: s => s.bookCount||0,    fmt: (s,v) => `${v}권` },
   ];
   const rows = categories.map(cat => {
@@ -4678,6 +4678,14 @@ function buildRankingHTML(students) {
     </div>`;
   }).join('');
   return rows;
+}
+
+function _totalGold(s) {
+  // 지금까지 번 골드 = questLogs gold 합산 (현재 보유 아님)
+  const db = DB.load();
+  const logs = db.quests || [];
+  return logs.filter(q => q && q.studentId === s.id)
+    .reduce((sum, q) => sum + (q.gold||0), 0);
 }
 
 function renderRankingModal() {
