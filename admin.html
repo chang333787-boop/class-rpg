@@ -1528,11 +1528,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div><div class="sh-title">⬆️ 승급 신청 관리</div>
         <div class="sh-sub">학생이 신청한 승급을 확인하고 승인하세요</div></div>
       </div>
-      <div id="promo-list">
+      <div class="table-card" style="margin-bottom:0"><div id="promo-list">
         <div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">
           대기 중인 승급 신청이 없습니다
         </div>
-      </div>
+      </div></div>
     </div>
 
   </div><!-- /.main -->
@@ -1651,6 +1651,7 @@ function nav(page, el) {
   if (page === 'quests')   initQuestPage();
   if (page === 'activity')  renderActivityPage();
   if (page === 'stats')     renderStatsPage();
+  if (page === 'promotion') renderPromotionList();
 }
 
 // ══════════════════════════════════════════════════
@@ -2638,8 +2639,14 @@ function renderStatsPage() {
   const s = students.find(x => x.id === stuId);
   if (!s) return;
 
-  // questLogs에서 해당 학생 stat 기록 추출
-  const logs = (db.quests || []).filter(q => q && q.studentId === stuId && q.stat);
+  // questLogs + 이미 수령한 pendingRewards에서 stat 기록 추출
+  const questLogs = (db.quests || []).filter(q => q && q.studentId === stuId && q.stat);
+  // pendingRewards 중 approved이고 stat 있는 것 (아직 수령 전 포함)
+  const pendingLogs = (s.pendingRewards||[])
+    .filter(r => r && r.stat)
+    .map(r => ({ name: r.label||r.name||'', stat: r.stat, statVal: r.statVal||1, date: r.date||'', approved: r.approved }));
+  const logs = [...questLogs, ...pendingLogs]
+    .filter((v,i,a) => a.findIndex(x => x.name===v.name && x.date===v.date && x.stat===v.stat) === i); // 중복 제거
 
   const statDefs = [
     { key:'read',   label:'📚 독서',  color:'#e67e22' },
