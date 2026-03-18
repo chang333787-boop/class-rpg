@@ -910,6 +910,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="nav-item" id="nav-promo" onclick="nav('promotion',this)"><span class="nav-icon">⬆️</span> 승급 관리 <span id="promo-badge" style="margin-left:auto;background:var(--purple);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon">🏆</span> 랭킹</div>
     <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon">📅</span> 활동 내역</div>
+    <div class="nav-item" onclick="nav('stats',this)"><span class="nav-icon">📊</span> 능력치 내역</div>
     <div class="nav-section">콘텐츠</div>
     <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon">📋</span> 퀘스트 관리</div>
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
@@ -1121,6 +1122,20 @@ tr:hover td{background:rgba(255,255,255,.02);}
     </div>
 
     <!-- ── RANK ── -->
+    <!-- ── STATS ── -->
+    <div class="page" id="p-stats">
+      <div class="section-header">
+        <div><div class="sh-title">📊 능력치 내역</div>
+        <div class="sh-sub">학생별 활동 능력치 획득 경로</div></div>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <select class="form-select" id="sp-student" style="width:auto" onchange="renderStatsPage()">
+          <option value="">학생 선택</option>
+        </select>
+      </div>
+      <div id="stats-page-body"></div>
+    </div>
+
     <!-- ── ACTIVITY ── -->
     <div class="page" id="p-activity">
       <div class="section-header">
@@ -1618,10 +1633,10 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity','stats'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
   rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
-  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역'};
+  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역'};
 
 function nav(page, el) {
   pages.forEach(p => document.getElementById('p-'+p)?.classList.remove('active'));
@@ -1635,6 +1650,7 @@ function nav(page, el) {
   if (page === 'pwreset')  renderPwResetList();
   if (page === 'quests')   initQuestPage();
   if (page === 'activity')  renderActivityPage();
+  if (page === 'stats')     renderStatsPage();
 }
 
 // ══════════════════════════════════════════════════
@@ -2595,6 +2611,91 @@ function buildRankingHTML(students) {
 }
 
 // ══════════════════════════════════════════════════
+//  STATS (능력치 내역)
+// ══════════════════════════════════════════════════
+function renderStatsPage() {
+  const db       = DB.load();
+  const students = DB.getStudents();
+  const el       = document.getElementById('stats-page-body');
+  if (!el) return;
+
+  // 학생 셀렉트 초기화
+  const sel = document.getElementById('sp-student');
+  if (sel && sel.options.length === 1) {
+    students.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.avatar + ' ' + s.name;
+      sel.appendChild(o);
+    });
+  }
+
+  const stuId = sel?.value || '';
+  if (!stuId) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">학생을 선택해주세요</div>';
+    return;
+  }
+
+  const s = students.find(x => x.id === stuId);
+  if (!s) return;
+
+  // questLogs에서 해당 학생 stat 기록 추출
+  const logs = (db.quests || []).filter(q => q && q.studentId === stuId && q.stat);
+
+  const statDefs = [
+    { key:'read',   label:'📚 독서',  color:'#e67e22' },
+    { key:'study',  label:'✏️ 학습',  color:'var(--sky)' },
+    { key:'art',    label:'🎨 예술',  color:'#9b59b6' },
+    { key:'value',  label:'💎 가치',  color:'var(--gold)' },
+    { key:'health', label:'💪 건강',  color:'var(--emerald)' },
+  ];
+
+  const statCards = statDefs.map(def => {
+    const entries = logs.filter(q => q.stat === def.key)
+      .sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    const total = s.stats?.[def.key] || 0;
+
+    if (entries.length === 0 && total === 0) return '';
+
+    const rows = entries.map(q => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:.4rem .8rem;font-size:.75rem;color:var(--txt3);white-space:nowrap">${q.date||''}</td>
+        <td style="padding:.4rem .8rem;font-size:.82rem;font-weight:600">${q.name||''}</td>
+        <td style="padding:.4rem .8rem;text-align:center;font-size:.75rem;color:${def.color};font-weight:700">+${q.statVal||1}</td>
+      </tr>`).join('');
+
+    return `<div class="table-card" style="margin-bottom:1rem">
+      <div class="tc-header">
+        <div class="tc-title" style="color:${def.color}">${def.label}</div>
+        <div style="font-size:.8rem;color:var(--txt2)">현재 <strong style="color:${def.color}">${total}</strong>점 · ${entries.length}건</div>
+      </div>
+      ${entries.length === 0
+        ? '<div style="padding:.8rem 1.2rem;font-size:.8rem;color:var(--txt3)">기록 없음</div>'
+        : `<table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:var(--bg3)">
+              <th style="padding:.4rem .8rem;text-align:left;font-size:.75rem;color:var(--txt3);width:100px">날짜</th>
+              <th style="padding:.4rem .8rem;text-align:left;font-size:.75rem;color:var(--txt3)">퀘스트명</th>
+              <th style="padding:.4rem .8rem;text-align:center;font-size:.75rem;color:var(--txt3);width:60px">획득</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+           </table>`}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.8rem;padding:.75rem 1rem;
+      background:rgba(255,255,255,.04);border-radius:12px;margin-bottom:1rem">
+      <span style="font-size:2rem">${s.avatar}</span>
+      <div>
+        <div style="font-weight:700">${s.name} <span style="font-size:.76rem;color:var(--txt3)">Lv.${s.level}</span></div>
+        <div style="font-size:.75rem;color:var(--txt2);margin-top:.15rem">
+          📚${s.stats?.read||0} ✏️${s.stats?.study||0} 🎨${s.stats?.art||0} 💎${s.stats?.value||0} 💪${s.stats?.health||0}
+        </div>
+      </div>
+    </div>
+    ${statCards || '<div style="padding:1rem;color:var(--txt3);font-size:.83rem">능력치 획득 기록이 없어요</div>'}`;
+}
+
+// ══════════════════════════════════════════════════
 //  ACTIVITY (활동 내역)
 // ══════════════════════════════════════════════════
 function renderActivityPage() {
@@ -2734,14 +2835,16 @@ function copyToQuestForm(text) {
   notify(`📋 "${text}" → 직접입력 탭에 붙여넣기 완료!`);
 }
 
+let _adminQuestLogs = [];
 function _totalGoldAdmin(s) {
-  const db = DB.load();
-  const logs = db.quests || [];
-  return logs.filter(q => q && q.studentId === s.id)
+  return _adminQuestLogs
+    .filter(q => q && q.studentId === s.id)
     .reduce((sum, q) => sum + (q.gold||0), 0);
 }
 
 function renderRank() {
+  const db = DB.load();
+  _adminQuestLogs = db.quests || [];
   const students = DB.getStudents();
   const el = document.getElementById('admin-ranking-wrap');
   if (el) el.innerHTML = buildRankingHTML(students);
@@ -3139,8 +3242,11 @@ function hideDefaultTemplate(type, name) {
   db.hiddenQuestTemplates[type] = db.hiddenQuestTemplates[type] || [];
   if (!db.hiddenQuestTemplates[type].includes(name))
     db.hiddenQuestTemplates[type].push(name);
+  DB._cache = db; // 캐시 즉시 반영 (화면 바로 갱신)
   DB._fbRef.child('hiddenQuestTemplates').set(db.hiddenQuestTemplates);
-  renderQuestTemplates(type);
+  // 현재 탭에 맞게 렌더
+  if (['read','study','art','value','health'].includes(type)) renderAbilityQuests();
+  else renderQuestTemplates(type);
 }
 function saveCustomTemplate(type, name) {
   const db = DB.load();
@@ -3435,8 +3541,10 @@ function restoreHiddenTemplates(type) {
   const db = DB.load();
   db.hiddenQuestTemplates = db.hiddenQuestTemplates || {};
   db.hiddenQuestTemplates[type] = [];
+  DB._cache = db;
   DB._fbRef.child('hiddenQuestTemplates').set(db.hiddenQuestTemplates);
-  renderQuestTemplates(type);
+  if (['read','study','art','value','health'].includes(type)) renderAbilityQuests();
+  else renderQuestTemplates(type);
   notify('🔄 숨긴 항목을 복원했습니다');
 }
 
@@ -3945,8 +4053,13 @@ function injectTestData() {
 }
 
 function confirmReset() {
-  if (!confirm('⚠️ 모든 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다!')) return;
-  DB._fbRef.remove().then(() => location.reload());
+  if (!confirm('⚠️ 모든 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다!\n\n취소하려면 [아니오], 계속하려면 [예]를 누르세요.')) return;
+  const pw = prompt('교사 비밀번호를 입력하세요:');
+  if (pw === null) return; // 취소
+  DB.getAdminPw().then(adminPw => {
+    if (pw !== adminPw) { notify('❌ 비밀번호가 틀렸습니다', 'error'); return; }
+    DB._fbRef.remove().then(() => { notify('✅ 초기화 완료'); setTimeout(() => location.reload(), 800); });
+  });
 }
 
 function exportData() {
