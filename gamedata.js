@@ -629,3 +629,15 @@ const AchievementUtils = {
     try { return ach.check(student) ? 1 : 0; } catch(e) { return 0; }
   },
 };
+
+// ── 커스텀 몬스터 포함 전체 목록 ──────────────────────────
+function getActiveMonsters(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const customs = d.customMonsters || {};
+  const base = GAME_DATA.monsters.map(m => {
+    const ov = customs[m.id];
+    return ov ? { ...m, ...ov } : m;
+  });
+  const added = Object.values(customs).filter(c => c && c._new);
+  return [...base, ...added].sort((a,b) => (a.recLv||0)-(b.recLv||0));
+}

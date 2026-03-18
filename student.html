@@ -641,6 +641,18 @@ const AchievementUtils = {
   },
 };
 
+// ── 커스텀 몬스터 포함 전체 목록 ──────────────────────────
+function getActiveMonsters(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const customs = d.customMonsters || {};
+  const base = GAME_DATA.monsters.map(m => {
+    const ov = customs[m.id];
+    return ov ? { ...m, ...ov } : m;
+  });
+  const added = Object.values(customs).filter(c => c && c._new);
+  return [...base, ...added].sort((a,b) => (a.recLv||0)-(b.recLv||0));
+}
+
 </script>
 <style>
 :root{
@@ -1158,7 +1170,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @media (min-width:768px) and (max-width:1024px) {
   .modal { max-width:90vw!important; max-height:88vh; }
   /* 집/인테리어, 농장 모달은 태블릿에서 거의 전체화면 */
-  #m-house .modal, #m-farm .modal { width:95vw!important; max-width:95vw!important; max-height:94vh!important; }
+  #m-house .modal, #m-farm .modal { width:98vw!important; max-width:98vw!important; max-height:97vh!important; padding:1rem!important; }
+  #m-house .modal { display:flex; flex-direction:column; }
+  #m-house .modal > *:last-child { flex:1; overflow-y:auto; }
   .btn-sm { padding:.45rem 1rem!important; font-size:.84rem!important; }
   .menu-tile { padding:1.1rem .8rem!important; }
   .tile-icon { font-size:2rem!important; }
@@ -2301,8 +2315,9 @@ function buildMainHTML() {
   const allStudents = DB.getStudents().filter(st=>st.id!==s.id);
   const {cols:_fc, rows:_fr} = getFarmLayout(s.level||1);
   const farmCells   = buildFarmMiniCells(_fc * _fr, _fc);
-  const alive       = GAME_DATA.monsters.filter(m=>!(s.monsterLog||[]).includes(m.name));
-  const recMon      = alive.find(m=>m.recLv<=s.level)||alive[0]||GAME_DATA.monsters[0];
+  const _allMons    = getActiveMonsters();
+  const alive       = _allMons.filter(m=>!(s.monsterLog||[]).includes(m.name));
+  const recMon      = alive.find(m=>m.recLv<=s.level)||alive[0]||_allMons[0];
 
   return `
     ${alerts.join('')}
@@ -2706,7 +2721,7 @@ function renderMonsters() {
   const canFight = Utils.canFightMonster(CUR);
   const attemptsLeft = Utils.monsterAttemptsLeft(CUR);
   const settings = DB.getSettings();
-  document.getElementById('monster-list').innerHTML = GAME_DATA.monsters.map(m => {
+  document.getElementById('monster-list').innerHTML = getActiveMonsters().map(m => {
     const isKilled = killed.includes(m.name);
     const isLocked = m.recLv > CUR.level + 3;
     const canChallenge = canFight && !isKilled && !isLocked;
@@ -2727,7 +2742,7 @@ function renderMonsters() {
 
 // ══ 전투 ══
 function startBattle(monId) {
-  const mon = GAME_DATA.monsters.find(m => m.id === monId);
+  const mon = getActiveMonsters().find(m => m.id === monId);
   if (!mon) return;
   if (!Utils.canFightMonster(CUR)) { toast('오늘 도전 횟수를 모두 사용했어요!'); return; }
   BATTLE_MON = mon; BATTLE_TRIES = 0; BATTLE_DONE = false;
@@ -3059,8 +3074,14 @@ function houseTab(tab, el) {
   document.getElementById('house-tab-deco').style.display    = tab==='deco'    ? '' : 'none';
   document.getElementById('house-tab-artwork').style.display = tab==='artwork' ? '' : 'none';
   if (tab==='book')    renderBookRecords();
-  if (tab==='deco')    renderHouseDeco();
   if (tab==='artwork') renderArtworks();
+  if (tab==='deco') {
+    // Canvas를 실제 컨테이너 크기로 재초기화 (모달 크기 반영)
+    _dCv = null;
+    renderHouseDeco();
+    // 모달이 완전히 열린 후 한 번 더 리사이즈
+    requestAnimationFrame(() => { _dCv = null; renderHouseDeco(); });
+  }
 }
 
 function renderHouse() {
@@ -3085,14 +3106,14 @@ function renderHouse() {
     <div class="house-stat">
       <div class="hs-label">⚔️ 몬스터</div>
       <div class="hs-value" style="color:var(--red)">${(s.monsterLog||[]).length}마리</div>
-      <div class="hs-sub">/ ${GAME_DATA.monsters.length}마리</div>
+      <div class="hs-sub">/ ${getActiveMonsters().length}마리</div>
     </div>`;
 
   const dex = s.monsterLog||[];
   document.getElementById('monster-dex').innerHTML = `
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">⚔️ 처치한 몬스터 도감</div>
     ${dex.length > 0
-      ? dex.map(n => { const m=GAME_DATA.monsters.find(x=>x.name===n); return `<span class="dex-chip">${m?.icon||'❓'} ${n}</span>`; }).join('')
+      ? dex.map(n => { const m=getActiveMonsters().find(x=>x.name===n); return `<span class="dex-chip">${m?.icon||'❓'} ${n}</span>`; }).join('')
       : '<span style="font-size:.75rem;color:var(--txt3)">아직 처치한 몬스터가 없어요</span>'}`;
 
   houseTab('stats', document.querySelector('#m-house .mtab'));
