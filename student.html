@@ -1426,7 +1426,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <!-- 탭2: 독서 -->
   <div id="house-tab-book" style="display:none">
     <div style="font-size:.76rem;color:var(--txt2);margin:.3rem 0 .8rem">
-      책을 읽고 기록하면 선생님 확인 후 독서 스탯 +3이 올라가요 📚
+      책을 읽고 기록하면 선생님 확인 후 EXP +30이 지급돼요 📚
     </div>
 
     <!-- 월별 독서 그래프 -->
@@ -2421,6 +2421,23 @@ function claimRewards() {
     if (r.stat && r.statVal) {
       CUR.stats = CUR.stats || {};
       CUR.stats[r.stat] = (CUR.stats[r.stat]||0) + r.statVal;
+    }
+    // questLog 저장 (능력치 내역 추적용)
+    if (r.boardQuestId || r.stat) {
+      DB.saveQuestLog({
+        studentId:    CUR.id,
+        boardQuestId: r.boardQuestId || null,
+        boardQuestType: r.boardQuestType || r.type || 'special',
+        type:         r.type || 'quest',
+        name:         r.label || r.name || '',
+        exp:          r.exp   || 0,
+        gold:         r.gold  || 0,
+        stat:         r.stat  || '',
+        statVal:      r.statVal || 0,
+        icon:         r.icon  || '📋',
+        date:         Utils.todayStr(),
+        approved:     true,
+      });
     }
   });
   // 승인된 것만 제거, 대기중인 것은 유지
@@ -4280,7 +4297,7 @@ function submitBookRecord() {
     bookReview: review,
     bookDate: date,
     exp: 30, gold: 0,
-    stat: 'read', statVal: 3,  // 책 1권 = 독서 스탯 +3
+    stat: '', statVal: 0,  // 독서 스탯 제거 (주간퀘스트와 중복)
     icon: '📚',
     date: Utils.todayStr(),
   });

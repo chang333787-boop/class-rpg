@@ -2675,6 +2675,7 @@ function renderStatsPage() {
       .sort((a,b) => (b.date||'').localeCompare(a.date||''));
     const total = s.stats?.[def.key] || 0;
 
+    // 기록은 없지만 스탯은 있는 경우 → "기록 확인 불가" 표시
     if (entries.length === 0 && total === 0) return '';
 
     const rows = entries.map(q => `
@@ -2690,7 +2691,9 @@ function renderStatsPage() {
         <div style="font-size:.8rem;color:var(--txt2)">현재 <strong style="color:${def.color}">${total}</strong>점 · ${entries.length}건</div>
       </div>
       ${entries.length === 0
-        ? '<div style="padding:.8rem 1.2rem;font-size:.8rem;color:var(--txt3)">기록 없음</div>'
+        ? `<div style="padding:.8rem 1.2rem;font-size:.8rem;color:var(--txt3)">
+            현재 <strong style="color:${def.color}">${total}점</strong> 보유 · 상세 기록은 오늘 이후 퀘스트부터 기록됩니다
+           </div>`
         : `<table style="width:100%;border-collapse:collapse">
             <thead><tr style="background:var(--bg3)">
               <th style="padding:.4rem .8rem;text-align:left;font-size:.75rem;color:var(--txt3);width:100px">날짜</th>
@@ -4031,7 +4034,7 @@ function injectTestData() {
       bookTitle:'80일간의 세계일주',
       bookReview:'필리어스 포그가 80일 안에 세계를 돌아오는 모험 이야기예요. 각 나라의 문화와 풍경이 생생하게 그려져 있어서 마치 제가 여행하는 것 같았어요. 시간을 잘 지키는 것이 얼마나 중요한지도 배웠어요.',
       bookDate: d(2),
-      exp:30, gold:0, stat:'read', statVal:3, icon:'📚', date: d(2)
+      exp:30, gold:0, stat:'', statVal:0, icon:'📚', date: d(2)
     }
   ];
   s.achievements = ['ach_first_login','ach_quest1','ach_book1','ach_book5','ach_monster1'];
