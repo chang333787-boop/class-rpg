@@ -2722,14 +2722,16 @@ function copyToQuestForm(text) {
     t.select(); document.execCommand('copy');
     document.body.removeChild(t);
   });
-  // 직접입력 탭 열고 퀘스트명 칸에 자동 입력
-  switchQuestTab('custom');
-  nav('quests', document.querySelector('[onclick*="quests"]'));
+  // 퀘스트 페이지로 이동 후 직접입력 탭 열고 이름 채우기
+  nav('quests', document.querySelector('[onclick*="\'quests\'"]'));
   setTimeout(() => {
-    const inp = document.getElementById('nq-name');
-    if (inp) { inp.value = text; inp.focus(); }
-  }, 200);
-  notify(`📋 "${text}" 복사 + 직접입력 탭에 붙여넣기 완료!`);
+    switchQuestTab('custom'); // nav 이후 실행해야 탭 초기화 안 됨
+    setTimeout(() => {
+      const inp = document.getElementById('nq-name');
+      if (inp) { inp.value = text; inp.focus(); }
+    }, 50);
+  }, 100);
+  notify(`📋 "${text}" → 직접입력 탭에 붙여넣기 완료!`);
 }
 
 function renderRank() {
