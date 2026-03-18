@@ -2194,6 +2194,8 @@ function approveReward(student, reward) {
     name:         reward.label,
     exp:          reward.exp  || 0,
     gold:         reward.gold || 0,
+    stat:         reward.stat || '',
+    statVal:      reward.statVal || 0,
     icon:         reward.icon || '📋',
     date:         todayStr(),
     approved:     true,
@@ -2639,14 +2641,26 @@ function renderStatsPage() {
   const s = students.find(x => x.id === stuId);
   if (!s) return;
 
-  // questLogs + 이미 수령한 pendingRewards에서 stat 기록 추출
-  const questLogs = (db.quests || []).filter(q => q && q.studentId === stuId && q.stat);
-  // pendingRewards 중 approved이고 stat 있는 것 (아직 수령 전 포함)
+  // boardQuests 맵 (stat 참조용)
+  const bqStatMap = {};
+  (db.boardQuests||[]).forEach(q => { if (q && q.stat) bqStatMap[q.id] = q.stat; });
+
+  // questLogs - stat 없으면 boardQuest에서 가져오기
+  const questLogs = (db.quests || [])
+    .filter(q => q && q.studentId === stuId)
+    .map(q => ({
+      ...q,
+      stat: q.stat || (q.boardQuestId ? bqStatMap[q.boardQuestId] : '') || ''
+    }))
+    .filter(q => q.stat); // stat 있는 것만
+
+  // pendingRewards 중 stat 있는 것
   const pendingLogs = (s.pendingRewards||[])
     .filter(r => r && r.stat)
-    .map(r => ({ name: r.label||r.name||'', stat: r.stat, statVal: r.statVal||1, date: r.date||'', approved: r.approved }));
+    .map(r => ({ name: r.label||r.name||'', stat: r.stat, statVal: r.statVal||1, date: r.date||'' }));
+
   const logs = [...questLogs, ...pendingLogs]
-    .filter((v,i,a) => a.findIndex(x => x.name===v.name && x.date===v.date && x.stat===v.stat) === i); // 중복 제거
+    .filter((v,i,a) => a.findIndex(x => x.name===v.name && x.date===v.date && x.stat===v.stat) === i);
 
   const statDefs = [
     { key:'read',   label:'📚 독서',  color:'#e67e22' },
