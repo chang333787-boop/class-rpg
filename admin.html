@@ -909,6 +909,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="nav-item" id="nav-approve" onclick="nav('approve',this)"><span class="nav-icon">✅</span> 활동 승인 <span id="pending-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-item" id="nav-promo" onclick="nav('promotion',this)"><span class="nav-icon">⬆️</span> 승급 관리 <span id="promo-badge" style="margin-left:auto;background:var(--purple);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon">🏆</span> 랭킹</div>
+    <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon">📅</span> 활동 내역</div>
     <div class="nav-section">콘텐츠</div>
     <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon">📋</span> 퀘스트 관리</div>
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
@@ -1120,6 +1121,33 @@ tr:hover td{background:rgba(255,255,255,.02);}
     </div>
 
     <!-- ── RANK ── -->
+    <!-- ── ACTIVITY ── -->
+    <div class="page" id="p-activity">
+      <div class="section-header">
+        <div><div class="sh-title">📅 활동 내역</div>
+        <div class="sh-sub">학생별 퀘스트 및 기타 활동 기록</div></div>
+      </div>
+      <!-- 필터 -->
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <select class="form-select" id="act-student" style="width:auto" onchange="renderActivityPage()">
+          <option value="all">전체 학생</option>
+        </select>
+        <select class="form-select" id="act-type" style="width:auto" onchange="renderActivityPage()">
+          <option value="all">전체 유형</option>
+          <option value="quest">📋 퀘스트</option>
+          <option value="other">🎯 퀘스트 외</option>
+        </select>
+        <input type="date" class="form-input" id="act-date-from" style="width:140px" onchange="renderActivityPage()">
+        <span style="font-size:.8rem;color:var(--txt3)">~</span>
+        <input type="date" class="form-input" id="act-date-to" style="width:140px" onchange="renderActivityPage()">
+        <button class="btn-sm outline" onclick="clearActivityFilter()">초기화</button>
+      </div>
+      <!-- 테이블 -->
+      <div class="table-card">
+        <div id="activity-table-wrap" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
     <div class="page" id="p-rank">
       <div class="section-header">
         <div><div class="sh-title">🏆 우리반 랭킹</div></div>
@@ -1157,6 +1185,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <button class="btn-sm" onclick="addQuestTemplate('daily')">추가</button>
           </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('daily')">📌 체크한 항목 게시판에 올리기</button>
+          <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates('daily')">🔄 숨긴 항목 복원</button>
         </div>
 
         <!-- 주간 템플릿 -->
@@ -1168,6 +1197,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <button class="btn-sm" onclick="addQuestTemplate('weekly')">추가</button>
           </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('weekly')">📌 체크한 항목 게시판에 올리기</button>
+          <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates('weekly')">🔄 숨긴 항목 복원</button>
         </div>
 
         <!-- 능력치별 퀘스트 탭 -->
@@ -1587,10 +1617,10 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
   rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
-  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화'};
+  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역'};
 
 function nav(page, el) {
   pages.forEach(p => document.getElementById('p-'+p)?.classList.remove('active'));
@@ -1603,6 +1633,7 @@ function nav(page, el) {
   if (page === 'books')    renderBooksPage();
   if (page === 'pwreset')  renderPwResetList();
   if (page === 'quests')   initQuestPage();
+  if (page === 'activity')  renderActivityPage();
 }
 
 // ══════════════════════════════════════════════════
@@ -2562,6 +2593,126 @@ function buildRankingHTML(students) {
   </div>`;
 }
 
+// ══════════════════════════════════════════════════
+//  ACTIVITY (활동 내역)
+// ══════════════════════════════════════════════════
+function renderActivityPage() {
+  const db       = DB.load();
+  const students = DB.getStudents();
+
+  // 학생 필터 셀렉트 초기화
+  const stuSel = document.getElementById('act-student');
+  if (stuSel && stuSel.options.length === 1) {
+    students.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.avatar + ' ' + s.name;
+      stuSel.appendChild(o);
+    });
+  }
+
+  const stuFilter  = stuSel?.value || 'all';
+  const typeFilter = document.getElementById('act-type')?.value || 'all';
+  const dateFrom   = document.getElementById('act-date-from')?.value || '';
+  const dateTo     = document.getElementById('act-date-to')?.value || '';
+
+  // questLogs 전체 수집
+  const logs = Object.values(db.questLogs || {})
+    .filter(q => q && q.studentId && q.date)
+    .sort((a, b) => (b.date||'').localeCompare(a.date||''));
+
+  // boardQuests 맵 (id → quest)
+  const bqMap = {};
+  (db.boardQuests||[]).forEach(q => { bqMap[q.id] = q; });
+
+  // 필터 적용
+  const filtered = logs.filter(log => {
+    if (stuFilter !== 'all' && log.studentId !== stuFilter) return false;
+    const isQuest = log.boardQuestId != null;
+    if (typeFilter === 'quest'  && !isQuest) return false;
+    if (typeFilter === 'other'  && isQuest)  return false;
+    if (dateFrom && log.date < dateFrom) return false;
+    if (dateTo   && log.date > dateTo)   return false;
+    return true;
+  });
+
+  const el = document.getElementById('activity-table-wrap');
+  if (!el) return;
+
+  if (filtered.length === 0) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">활동 내역이 없어요</div>';
+    return;
+  }
+
+  const typeLabel = { daily:'일일', weekly:'주간', special:'과제', event:'특별', attendance:'출석', quest:'퀘스트', book:'독서', artwork:'작품' };
+  const typeColor = { daily:'var(--emerald)', weekly:'var(--sky)', special:'var(--gold)', event:'var(--purple)', attendance:'var(--txt2)', book:'#e67e22', artwork:'#e91e8c' };
+
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.82rem">
+    <thead>
+      <tr style="background:var(--bg3);position:sticky;top:0">
+        <th style="padding:.55rem .8rem;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap">날짜</th>
+        <th style="padding:.55rem .8rem;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap">학생</th>
+        <th style="padding:.55rem .8rem;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap">유형</th>
+        <th style="padding:.55rem .8rem;text-align:left;border-bottom:1px solid var(--border2)">활동명</th>
+        <th style="padding:.55rem .8rem;text-align:center;border-bottom:1px solid var(--border2);white-space:nowrap">EXP</th>
+        <th style="padding:.55rem .8rem;text-align:center;border-bottom:1px solid var(--border2);white-space:nowrap">골드</th>
+        <th style="padding:.55rem .8rem;text-align:center;border-bottom:1px solid var(--border2);white-space:nowrap">복사</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filtered.map((log, i) => {
+        const s    = students.find(x => x.id === log.studentId);
+        const bq   = log.boardQuestId ? bqMap[log.boardQuestId] : null;
+        const qtype = bq?.type || log.type || 'quest';
+        const isQuest = log.boardQuestId != null;
+        const label = typeLabel[qtype] || qtype;
+        const color = typeColor[qtype] || 'var(--txt2)';
+        const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)';
+        return `<tr style="background:${rowBg};border-bottom:1px solid rgba(255,255,255,.04)">
+          <td style="padding:.45rem .8rem;white-space:nowrap;color:var(--txt2)">${log.date||''}</td>
+          <td style="padding:.45rem .8rem;white-space:nowrap">${s ? s.avatar+' '+s.name : log.studentId}</td>
+          <td style="padding:.45rem .8rem">
+            <span style="font-size:.72rem;padding:.15rem .45rem;border-radius:8px;
+              background:rgba(255,255,255,.06);color:${color};font-weight:700;white-space:nowrap">
+              ${isQuest ? '📋 퀘스트' : '🎯 '+label}
+            </span>
+          </td>
+          <td style="padding:.45rem .8rem;max-width:240px">
+            <div style="font-weight:600">${log.name||''}</div>
+            ${bq ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${label} · 게시일 ${bq.date||''}</div>` : ''}
+          </td>
+          <td style="padding:.45rem .8rem;text-align:center;color:var(--emerald);font-weight:700">+${log.exp||0}</td>
+          <td style="padding:.45rem .8rem;text-align:center;color:var(--gold);font-weight:700">+${log.gold||0}G</td>
+          <td style="padding:.45rem .8rem;text-align:center">
+            ${log.name ? `<button onclick="copyText('${(log.name||'').replace(/'/g,"\\'")}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1200)"
+              style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;
+              color:var(--txt3);cursor:pointer;font-size:.75rem;padding:.2rem .45rem">📋</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+  <div style="padding:.6rem 1rem;font-size:.75rem;color:var(--txt3);border-top:1px solid var(--border2)">
+    총 ${filtered.length}건
+  </div>`;
+}
+
+function clearActivityFilter() {
+  document.getElementById('act-student').value  = 'all';
+  document.getElementById('act-type').value     = 'all';
+  document.getElementById('act-date-from').value = '';
+  document.getElementById('act-date-to').value   = '';
+  renderActivityPage();
+}
+
+function copyText(text) {
+  navigator.clipboard?.writeText(text).catch(() => {
+    const t = document.createElement('textarea');
+    t.value = text; document.body.appendChild(t);
+    t.select(); document.execCommand('copy');
+    document.body.removeChild(t);
+  });
+}
+
 function renderRank() {
   const students = DB.getStudents();
   const el = document.getElementById('admin-ranking-wrap');
@@ -2950,6 +3101,19 @@ function getCustomTemplates(type) {
   const db = DB.load();
   return (db.customQuestTemplates || {})[type] || [];
 }
+function getHiddenTemplates(type) {
+  const db = DB.load();
+  return new Set((db.hiddenQuestTemplates || {})[type] || []);
+}
+function hideDefaultTemplate(type, name) {
+  const db = DB.load();
+  db.hiddenQuestTemplates = db.hiddenQuestTemplates || {};
+  db.hiddenQuestTemplates[type] = db.hiddenQuestTemplates[type] || [];
+  if (!db.hiddenQuestTemplates[type].includes(name))
+    db.hiddenQuestTemplates[type].push(name);
+  DB._fbRef.child('hiddenQuestTemplates').set(db.hiddenQuestTemplates);
+  renderQuestTemplates(type);
+}
 function saveCustomTemplate(type, name) {
   const db = DB.load();
   db.customQuestTemplates = db.customQuestTemplates || {};
@@ -3150,21 +3314,37 @@ function postCheckedAbilityQuests() {
 function renderQuestTemplates(type) {
   const el = document.getElementById('qt-'+type+'-list');
   if (!el) return;
-  const defaults = QUEST_TEMPLATES[type] || [];
+  const hidden   = getHiddenTemplates(type);
+  const defaults = (QUEST_TEMPLATES[type] || []).filter(t => !hidden.has(t.name));
   const customs  = getCustomTemplates(type);
   const all = [
     ...defaults.map(t => ({...t, custom:false})),
     ...customs.map(t => ({...t, custom:true})),
   ];
+  const statOpts = `<option value="">없음</option>
+    <option value="read">📚 독서</option>
+    <option value="study">✏️ 학습</option>
+    <option value="art">🎨 예술</option>
+    <option value="value">💎 가치</option>
+    <option value="health">💪 건강</option>`;
   el.innerHTML = all.map((t,i) => `
     <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;
       background:rgba(255,255,255,.03);border-radius:8px;border:0.5px solid rgba(255,255,255,.07)">
       <input type="checkbox" id="qt-chk-${type}-${i}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
       <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
-      ${t.stat ? `<span style="font-size:.7rem;color:var(--txt3);background:rgba(255,255,255,.06);padding:.1rem .4rem;border-radius:8px">${{read:'독서',study:'학습',art:'예술',value:'가치',health:'건강'}[t.stat]||''}</span>` : ''}
-      ${t.custom ? `<button onclick="removeCustomTemplate('${type}','${t.name}');renderQuestTemplates('${type}')"
-        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>` : ''}
+      <select id="qt-stat-${type}-${i}" style="font-size:.72rem;padding:.15rem .3rem;border-radius:6px;
+        background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt);width:80px">
+        ${statOpts}
+      </select>
+      <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderQuestTemplates('${type}')` : `hideDefaultTemplate('${type}','${t.name}')`}"
+        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
+        title="${t.custom ? '삭제' : '목록에서 숨기기'}">✕</button>
     </div>`).join('');
+  // 기존 stat 값 복원
+  all.forEach((t,i) => {
+    const sel = document.getElementById(`qt-stat-${type}-${i}`);
+    if (sel && t.stat) sel.value = t.stat;
+  });
 }
 
 function addQuestTemplate(type) {
@@ -3191,6 +3371,9 @@ function postCheckedQuests(type) {
   all.forEach((t, i) => {
     const chk = document.getElementById(`qt-chk-${type}-${i}`);
     if (!chk || !chk.checked) return;
+    // 능력치 드롭다운에서 stat 읽기
+    const statEl = document.getElementById(`qt-stat-${type}-${i}`);
+    const stat = statEl ? statEl.value : (t.stat || '');
     // 이미 같은 이름의 활성 퀘스트가 있으면 중복 방지
     if (db.boardQuests.find(q => q.name===t.name && q.active!==false)) {
       notify(`"${t.name}" 은 이미 게시중이에요`, 'error');
@@ -3203,7 +3386,7 @@ function postCheckedQuests(type) {
       exp:  expMap[type]  || 80,
       gold: goldMap[type] || 50,
       icon: iconMap[type] || '📋',
-      stat: t.stat || '',
+      stat: stat,
       dueDate: '', date: todayStr(),
       active: true,
     });
@@ -3216,6 +3399,15 @@ function postCheckedQuests(type) {
   renderBoardQuestList();
   renderQuestTemplates(type);
   notify(`📌 ${count}개 퀘스트 게시판에 등록!`);
+}
+
+function restoreHiddenTemplates(type) {
+  const db = DB.load();
+  db.hiddenQuestTemplates = db.hiddenQuestTemplates || {};
+  db.hiddenQuestTemplates[type] = [];
+  DB._fbRef.child('hiddenQuestTemplates').set(db.hiddenQuestTemplates);
+  renderQuestTemplates(type);
+  notify('🔄 숨긴 항목을 복원했습니다');
 }
 
 // 퀘스트 페이지 진입 시 초기화
