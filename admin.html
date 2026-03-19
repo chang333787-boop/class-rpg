@@ -3066,6 +3066,8 @@ function approveArtwork(studentId, rewardId) {
   const comment = document.getElementById('aw-cmt-'+rewardId)?.value.trim() || '';
   if (comment) reward.artDesc = comment;
   approveReward(s, reward);
+  // 작품은 승인 즉시 pendingRewards에서 제거 (학생 받기 버튼 불필요)
+  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId);
   DB.saveStudent(s);
   renderAll();
   notify(`✅ ${s.name} · "${reward.artTitle||reward.label}" 전시 완료!`);
@@ -3110,15 +3112,14 @@ function renderArtworkAdmin() {
     });
   }
 
-  // 과목 필터 셀렉트 초기화
+  // 과목 필터 셀렉트 매번 갱신
   const subSel = document.getElementById('artwork-subject-filter');
-  if (subSel && subSel.options.length === 1) {
+  if (subSel) {
+    const prevSub = subSel.value;
     const subjects = getActiveSubjects(db);
-    subjects.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s; opt.textContent = s;
-      subSel.appendChild(opt);
-    });
+    subSel.innerHTML = '<option value="all">전체 과목</option>' +
+      subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+    if (prevSub) subSel.value = prevSub;
   }
 
   const filter    = sel?.value    || 'all';

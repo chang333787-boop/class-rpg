@@ -3094,7 +3094,7 @@ function houseTab(tab, el) {
   document.getElementById('house-tab-deco').style.display    = tab==='deco'    ? '' : 'none';
   document.getElementById('house-tab-artwork').style.display = tab==='artwork' ? '' : 'none';
   if (tab==='book')    renderBookRecords();
-  if (tab==='artwork') renderArtworks();
+  if (tab==='artwork') { fillArtworkSubjectSelect(); renderArtworks(); }
   if (tab==='deco') {
     // Canvas를 실제 컨테이너 크기로 재초기화 (모달 크기 반영)
     _dCv = null;

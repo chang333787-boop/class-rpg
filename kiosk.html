@@ -169,12 +169,6 @@ html, body {
     <div id="class-name" style="font-size:.85rem;color:var(--txt2)"></div>
     <div class="date" id="today-date"></div>
   </div>
-  <div id="tabs">
-    <button class="qtab on" onclick="switchTab('daily',this)">📋 일일 퀘스트</button>
-    <button class="qtab" onclick="switchTab('weekly',this)">📅 주간 퀘스트</button>
-    <button class="qtab" onclick="switchTab('special',this)">✏️ 과제</button>
-    <button class="qtab" onclick="switchTab('event',this)">⭐ 특별</button>
-  </div>
   <div id="table-wrap">
     <div id="kiosk-content"></div>
   </div>
@@ -265,48 +259,29 @@ function normalizeData(data) {
 }
 
 // ── 탭 전환 ──
-function switchTab(type, btn) {
-  CUR_TAB = type;
-  document.querySelectorAll('.qtab').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
-  renderTable();
-}
-
 // ── 테이블 렌더 ──
 function renderTable() {
   if (!DB_DATA) return;
-  const students    = DB_DATA.students || [];
-  const boardQuests = (DB_DATA.boardQuests||[]).filter(q => q.active!==false && q.type===CUR_TAB);
-  const allQuests   = DB_DATA.quests || [];
+  const students  = DB_DATA.students || [];
+  const allQuests = DB_DATA.quests || [];
   const el = document.getElementById('kiosk-content');
 
-  if (boardQuests.length === 0) {
-    el.innerHTML = `<div id="empty-msg">
-      <div style="font-size:3rem">📭</div>
-      <div style="font-size:1rem;font-weight:700">등록된 퀘스트가 없어요</div>
-      <div style="font-size:.82rem">선생님이 퀘스트를 올리면 여기에 표시됩니다</div>
-    </div>`;
-    return;
-  }
-
-  // 학생별 상태 계산 (날짜 기반)
   const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
   const weekStart = (() => {
     const d=new Date(Date.now()+9*3600000);
-    const day=d.getUTCDay(); // 0=일
+    const day=d.getUTCDay();
     const sun=new Date(d);
-    sun.setUTCDate(d.getUTCDate()-day); // 이번 주 일요일
+    sun.setUTCDate(d.getUTCDate()-day);
     return sun.toISOString().slice(0,10);
   })();
 
-  const activeBQIds = new Set(boardQuests.map(q=>q.id));
+  const allActive = (DB_DATA.boardQuests||[]).filter(q => q.active!==false);
+  const activeBQIds = new Set(allActive.map(q=>q.id));
 
   function getStatus(studentId, questId, questType) {
     const s = students.find(x=>x.id===studentId);
     if (!s) return 'none';
-    // 삭제/닫힌 퀘스트 무시
     if (!activeBQIds.has(questId)) return 'none';
-    // 완료 판정
     const done = allQuests.filter(Boolean).some(q => {
       if (!q || q.studentId!==studentId || q.boardQuestId!==questId) return false;
       if (!q.date) return true;
@@ -315,58 +290,91 @@ function renderTable() {
       return true;
     });
     if (done) return 'done';
-    // 승인된 pending도 done
     if ((s.pendingRewards||[]).some(r => r && r.boardQuestId===questId && r.approved===true)) return 'done';
-    // 대기중
     if ((s.pendingRewards||[]).some(r => r && r.boardQuestId===questId && !r.approved)) return 'pending';
     return 'none';
   }
 
-  let html = `<table id="kiosk-table">
-    <thead><tr>
-      <th class="quest-th">할 일</th>
-      ${students.map(s=>`<th style="font-size:.8rem">
-        <div style="font-size:1.2rem">${s.avatar}</div>
-        <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
-      </th>`).join('')}
-    </tr></thead>
-    <tbody>`;
+  // 섹션 정의
+  const sections = [
+    { type:'daily',   label:'📋 일일 퀘스트', color:'rgba(74,144,226,.15)',  border:'rgba(74,144,226,.3)' },
+    { type:'weekly',  label:'📅 주간 퀘스트', color:'rgba(46,204,113,.12)',  border:'rgba(46,204,113,.3)' },
+    { type:'special', label:'✏️ 과제',        color:'rgba(255,215,0,.1)',    border:'rgba(255,215,0,.3)'  },
+    { type:'event',   label:'⭐ 특별 퀘스트', color:'rgba(155,89,182,.12)', border:'rgba(155,89,182,.3)' },
+  ];
 
-  boardQuests.forEach((q, qi) => {
-    html += `<tr>
-      <td class="quest-name">
-        <div>${q.icon||'📋'} ${q.name}</div>
-        <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
-        ${(()=>{
-          const info=getDeadlineInfo(q);
-          if(!info) return '';
-          const color = info.urgent==='expired'?'#999':info.urgent==='critical'?'#ff4444':info.urgent==='warning'?'#ffaa00':'var(--txt2)';
-          const prefix = info.urgent==='critical'?'🔴 ':info.urgent==='warning'?'🟡 ':'⏰ ';
-          const suffix = info.urgent==='critical'?' — 곧 마감!':info.urgent==='warning'?' — 임박!':'';
-          return `<div style="font-size:.66rem;color:${color};margin-top:.15rem;font-weight:${info.urgent?'700':'400'}">${prefix}${info.deadline}까지${suffix}</div>`;
-        })()}
-      </td>`;
+  let totalHtml = '';
+  let hasAny = false;
 
-    students.forEach(s => {
-      const status = getStatus(s.id, q.id, q.type);
-      if (status === 'done') {
-        html += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
-      } else if (status === 'pending') {
-        html += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
-          ⏳<span style="font-size:.55rem">신청중</span>
-        </div></td>`;
-      } else {
-        html += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}',this)">
-          <span style="font-size:1rem">○</span>
-        </div></td>`;
-      }
+  sections.forEach(sec => {
+    const quests = allActive.filter(q => q.type === sec.type);
+    if (quests.length === 0) return;
+    hasAny = true;
+
+    // 섹션 헤더
+    totalHtml += `
+      <div style="font-size:.9rem;font-weight:900;color:var(--gold);
+        padding:.5rem .8rem;margin-top:.6rem;background:${sec.color};
+        border-left:3px solid ${sec.border};border-radius:0 8px 8px 0;">
+        ${sec.label}
+      </div>`;
+
+    // 테이블
+    totalHtml += `<table id="kiosk-table" style="margin-bottom:.3rem">
+      <thead><tr>
+        <th class="quest-th">할 일</th>
+        ${students.map(s=>`<th style="font-size:.8rem">
+          <div style="font-size:1.2rem">${s.avatar}</div>
+          <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
+        </th>`).join('')}
+      </tr></thead>
+      <tbody>`;
+
+    quests.forEach(q => {
+      totalHtml += `<tr>
+        <td class="quest-name">
+          <div>${q.icon||'📋'} ${q.name}</div>
+          <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
+          ${(()=>{
+            const info=getDeadlineInfo(q);
+            if(!info) return '';
+            const color = info.urgent==='expired'?'#999':info.urgent==='critical'?'#ff4444':info.urgent==='warning'?'#ffaa00':'var(--txt2)';
+            const prefix = info.urgent==='critical'?'🔴 ':info.urgent==='warning'?'🟡 ':'⏰ ';
+            const suffix = info.urgent==='critical'?' — 곧 마감!':info.urgent==='warning'?' — 임박!':'';
+            return `<div style="font-size:.66rem;color:${color};margin-top:.15rem;font-weight:${info.urgent?'700':'400'}">${prefix}${info.deadline}까지${suffix}</div>`;
+          })()}
+        </td>`;
+
+      students.forEach(s => {
+        const status = getStatus(s.id, q.id, q.type);
+        if (status === 'done') {
+          totalHtml += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
+        } else if (status === 'pending') {
+          totalHtml += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
+            ⏳<span style="font-size:.55rem">신청중</span>
+          </div></td>`;
+        } else {
+          totalHtml += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}',this)">
+            <span style="font-size:1rem">○</span>
+          </div></td>`;
+        }
+      });
+      totalHtml += '</tr>';
     });
 
-    html += '</tr>';
+    totalHtml += '</tbody></table>';
   });
 
-  html += '</tbody></table>';
-  el.innerHTML = html;
+  if (!hasAny) {
+    el.innerHTML = `<div id="empty-msg">
+      <div style="font-size:3rem">📭</div>
+      <div style="font-size:1rem;font-weight:700">등록된 퀘스트가 없어요</div>
+      <div style="font-size:.82rem">선생님이 퀘스트를 올리면 여기에 표시됩니다</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = totalHtml;
 }
 
 // ── 퀘스트 신청 ──
