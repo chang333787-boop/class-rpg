@@ -641,6 +641,16 @@ const AchievementUtils = {
   },
 };
 
+// ── 과목 목록 ────────────────────────────────────────
+const DEFAULT_SUBJECTS = ['국어','수학','사회','과학','음악','미술','체육','영어','창체'];
+
+function getActiveSubjects(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const s = d.activeSubjects;
+  if (!s) return DEFAULT_SUBJECTS; // 설정 없으면 기본 전체
+  return s;
+}
+
 // ── 커스텀 몬스터 포함 전체 목록 ──────────────────────────
 function getActiveMonsters(db) {
   const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
@@ -1521,6 +1531,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.7rem">+ 새 작품 올리기</div>
       <div style="display:flex;flex-direction:column;gap:.55rem">
         <input class="form-input-student" id="aw-title-input" placeholder="작품 제목">
+        <select class="form-input-student" id="aw-subject-input" style="background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.15);color:var(--txt);border-radius:10px;padding:.6rem .8rem;font-size:.9rem">
+          <option value="">과목 선택 (선택사항)</option>
+        </select>
         <input class="form-input-student" id="aw-desc-input" placeholder="작품 설명 (선택)">
         <!-- 이미지 선택 -->
         <div id="aw-preview-wrap" style="display:none;margin:.2rem 0">
@@ -1546,6 +1559,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       </div>
     </div>
 
+    <!-- 내 작품 과목 탭 -->
+    <div id="artwork-subject-tabs" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem"></div>
     <!-- 내 작품 목록 -->
     <div id="artwork-list"></div>
   </div>
@@ -3936,8 +3951,9 @@ function resizeImage(file, maxSize=800) {
 
 // 작품 제출
 async function submitArtwork() {
-  const title = document.getElementById('aw-title-input').value.trim();
-  const desc  = document.getElementById('aw-desc-input').value.trim();
+  const title   = document.getElementById('aw-title-input').value.trim();
+  const desc    = document.getElementById('aw-desc-input').value.trim();
+  const subject = document.getElementById('aw-subject-input').value || '';
   const fileInput = document.getElementById('aw-file-input');
 
   if (!title) { toast('작품 제목을 입력해주세요!'); return; }
@@ -3984,6 +4000,7 @@ async function submitArtwork() {
           artTitle: title,
           artDesc: desc,
           artUrl: url,
+          subject: subject,
           exp: 30, gold: 20,
           icon: '🎨',
           date: Utils.todayStr(),
@@ -4033,11 +4050,58 @@ function _renderLightbox() {
 function lbPrev() { if (_lbIdx > 0) { _lbIdx--; _renderLightbox(); } }
 function lbNext() { if (_lbIdx < _lbImgs.length-1) { _lbIdx++; _renderLightbox(); } }
 
+
+// ══ 작품 과목 ══
+let CUR_ART_SUBJECT = '전체';
+
+function getStudentSubjects() {
+  const db = DB.load();
+  const s = (db.settings || {});
+  const DEFAULT_SUBJECTS = ['국어','수학','사회','과학','음악','미술','체육','영어','창체'];
+  return s.activeSubjects && s.activeSubjects.length > 0 ? s.activeSubjects : DEFAULT_SUBJECTS;
+}
+
+function renderArtworkSubjectTabs() {
+  const subjects = getStudentSubjects();
+  const el = document.getElementById('artwork-subject-tabs');
+  if (!el) return;
+  const tabs = ['전체', ...subjects];
+  el.innerHTML = tabs.map(t => `
+    <button onclick="selectArtSubject('${t}')"
+      style="font-size:.72rem;padding:.2rem .55rem;border-radius:20px;cursor:pointer;border:1px solid;
+        background:${CUR_ART_SUBJECT===t?'var(--gold)':'rgba(255,255,255,.06)'};
+        color:${CUR_ART_SUBJECT===t?'#000':'var(--txt2)'};
+        border-color:${CUR_ART_SUBJECT===t?'var(--gold)':'rgba(255,255,255,.12)'}">
+      ${t}
+    </button>`).join('');
+}
+
+function selectArtSubject(subject) {
+  CUR_ART_SUBJECT = subject;
+  renderArtworkSubjectTabs();
+  renderArtworks();
+}
+
+function fillArtworkSubjectSelect() {
+  const sel = document.getElementById('aw-subject-input');
+  if (!sel) return;
+  const subjects = getStudentSubjects();
+  sel.innerHTML = '<option value="">과목 선택 (선택사항)</option>' +
+    subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
 function renderArtworks() {
   const el = document.getElementById('artwork-list');
   if (!el) return;
-  const approved = DB.getArtworks(CUR.id);
-  const pending  = (CUR.pendingRewards||[]).filter(p=>p.type==='artwork');
+  renderArtworkSubjectTabs();
+  fillArtworkSubjectSelect();
+  let approved = DB.getArtworks(CUR.id);
+  let pending  = (CUR.pendingRewards||[]).filter(p=>p.type==='artwork');
+  // 과목 필터
+  if (CUR_ART_SUBJECT !== '전체') {
+    approved = approved.filter(a => (a.subject||'') === CUR_ART_SUBJECT);
+    pending  = pending.filter(a => (a.subject||'') === CUR_ART_SUBJECT);
+  }
   if (approved.length === 0 && pending.length === 0) {
     el.innerHTML = '<div style="text-align:center;padding:2rem 0;color:var(--txt3);font-size:.83rem">아직 등록된 작품이 없어요 🎨<br><span style="font-size:.72rem">위에서 첫 번째 작품을 올려보세요!</span></div>';
     return;

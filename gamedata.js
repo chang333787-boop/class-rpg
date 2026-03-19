@@ -630,6 +630,16 @@ const AchievementUtils = {
   },
 };
 
+// ── 과목 목록 ────────────────────────────────────────
+const DEFAULT_SUBJECTS = ['국어','수학','사회','과학','음악','미술','체육','영어','창체'];
+
+function getActiveSubjects(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const s = d.activeSubjects;
+  if (!s) return DEFAULT_SUBJECTS; // 설정 없으면 기본 전체
+  return s;
+}
+
 // ── 커스텀 몬스터 포함 전체 목록 ──────────────────────────
 function getActiveMonsters(db) {
   const d = db || (typeof DB !== 'undefined' ? DB.load() : {});

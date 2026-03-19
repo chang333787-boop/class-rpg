@@ -641,6 +641,16 @@ const AchievementUtils = {
   },
 };
 
+// ── 과목 목록 ────────────────────────────────────────
+const DEFAULT_SUBJECTS = ['국어','수학','사회','과학','음악','미술','체육','영어','창체'];
+
+function getActiveSubjects(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const s = d.activeSubjects;
+  if (!s) return DEFAULT_SUBJECTS; // 설정 없으면 기본 전체
+  return s;
+}
+
 // ── 커스텀 몬스터 포함 전체 목록 ──────────────────────────
 function getActiveMonsters(db) {
   const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
@@ -1469,10 +1479,16 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="table-card">
         <div class="tc-header" style="display:flex;align-items:center;justify-content:space-between">
           <div class="tc-title">✅ 전시중인 작품</div>
-          <select id="artwork-filter" class="form-select" style="width:auto;font-size:.8rem"
-            onchange="renderArtworkAdmin()">
-            <option value="all">전체 학생</option>
-          </select>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <select id="artwork-filter" class="form-select" style="width:auto;font-size:.8rem"
+              onchange="renderArtworkAdmin()">
+              <option value="all">전체 학생</option>
+            </select>
+            <select id="artwork-subject-filter" class="form-select" style="width:auto;font-size:.8rem"
+              onchange="renderArtworkAdmin()">
+              <option value="all">전체 과목</option>
+            </select>
+          </div>
         </div>
         <div id="artwork-admin-list" style="padding:.5rem 0"></div>
       </div>
@@ -1594,6 +1610,18 @@ tr:hover td{background:rgba(255,255,255,.02);}
           </div>
           <button class="btn-sm success" style="margin-top:.8rem" onclick="saveSettings()">저장</button>
         </div>
+        <!-- 과목 관리 카드 -->
+        <div class="settings-card">
+          <div class="sc-head">📚 작품 과목 관리</div>
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.7rem">체크 해제하면 학생 화면에서 해당 과목이 숨겨져요</div>
+          <div id="subject-manage-list" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.8rem"></div>
+          <div style="display:flex;gap:.5rem;margin-bottom:.6rem">
+            <input class="form-input" id="subject-custom-input" placeholder="과목 직접 추가" style="flex:1">
+            <button class="btn-sm success" onclick="addCustomSubject()">추가</button>
+          </div>
+          <button class="btn-sm success" style="width:100%" onclick="saveSubjects()">💾 저장</button>
+        </div>
+
         <div class="settings-card">
           <div class="sc-head">🛠️ 데이터 관리</div>
 
@@ -1768,7 +1796,7 @@ function nav(page, el) {
   if (page === 'activity')  renderActivityPage();
   if (page === 'stats')     renderStatsPage();
   if (page === 'promotion') renderPromotionList();
-  if (page === 'settings')  renderBackupList();
+  if (page === 'settings')  { renderBackupList(); renderSubjectManage(); }
 }
 
 // ══════════════════════════════════════════════════
@@ -2284,6 +2312,7 @@ function approveReward(student, reward) {
       title:   reward.artTitle || reward.label,
       artUrl:  reward.artUrl   || '',
       comment: reward.artDesc  || '',
+      subject: reward.subject  || '',
       date:    reward.date     || todayStr(),
     });
   } else if (reward.type === 'book') {
@@ -3071,7 +3100,7 @@ function renderArtworkAdmin() {
   const el = document.getElementById('artwork-admin-list');
   if (!el) return;
 
-  // 필터 셀렉트 초기화
+  // 학생 필터 셀렉트 초기화
   const sel = document.getElementById('artwork-filter');
   if (sel && sel.options.length === 1) {
     students.forEach(s => {
@@ -3080,8 +3109,22 @@ function renderArtworkAdmin() {
       sel.appendChild(opt);
     });
   }
-  const filter = sel?.value || 'all';
-  const artworks = filter === 'all' ? allArtworks : allArtworks.filter(a=>a.studentId===filter);
+
+  // 과목 필터 셀렉트 초기화
+  const subSel = document.getElementById('artwork-subject-filter');
+  if (subSel && subSel.options.length === 1) {
+    const subjects = getActiveSubjects(db);
+    subjects.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      subSel.appendChild(opt);
+    });
+  }
+
+  const filter    = sel?.value    || 'all';
+  const subFilter = subSel?.value || 'all';
+  let artworks = filter === 'all' ? allArtworks : allArtworks.filter(a=>a.studentId===filter);
+  if (subFilter !== 'all') artworks = artworks.filter(a => (a.subject||'') === subFilter);
 
   if (artworks.length === 0) {
     el.innerHTML = '<div style="padding:1rem;color:var(--txt3);font-size:.83rem;text-align:center">전시중인 작품이 없어요</div>';
@@ -4158,6 +4201,81 @@ function resetCustomMonsters() {
 
 function closeMonsterModal() {
   document.getElementById('m-monster-edit').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════
+//  SUBJECT MANAGEMENT (과목 관리)
+// ══════════════════════════════════════════════════
+const DEFAULT_SUBJECTS = ['국어','수학','사회','과학','음악','미술','체육','영어','창체'];
+
+function getActiveSubjects(db) {
+  const d = db || DB.load();
+  const s = d.settings || {};
+  if (s.activeSubjects && s.activeSubjects.length > 0) return s.activeSubjects;
+  return DEFAULT_SUBJECTS; // 설정 없으면 기본 전체
+}
+
+function renderSubjectManage() {
+  const db = DB.load();
+  const settings = db.settings || {};
+  const active = settings.activeSubjects || DEFAULT_SUBJECTS;
+  const customs = settings.customSubjects || [];
+  const el = document.getElementById('subject-manage-list');
+  if (!el) return;
+
+  const allSubjects = [...DEFAULT_SUBJECTS, ...customs];
+  el.innerHTML = allSubjects.map(s => `
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;
+      background:rgba(255,255,255,.03);border-radius:8px">
+      <input type="checkbox" id="subj-chk-${s}" value="${s}"
+        ${active.includes(s) ? 'checked' : ''}
+        style="width:15px;height:15px;accent-color:var(--emerald)">
+      <label for="subj-chk-${s}" style="flex:1;font-size:.85rem;cursor:pointer">${s}</label>
+      ${customs.includes(s) ? `<button onclick="deleteCustomSubject('${s}')"
+        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem">✕</button>` : ''}
+    </div>`).join('');
+}
+
+function addCustomSubject() {
+  const inp = document.getElementById('subject-custom-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.customSubjects = db.settings.customSubjects || [];
+  if (!db.settings.customSubjects.includes(name) && !DEFAULT_SUBJECTS.includes(name)) {
+    db.settings.customSubjects.push(name);
+    DB._cache = db;
+    DB._fbRef.child('settings').set(db.settings);
+    inp.value = '';
+    renderSubjectManage();
+  } else {
+    notify('이미 있는 과목이에요', 'error');
+  }
+}
+
+function deleteCustomSubject(name) {
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.customSubjects = (db.settings.customSubjects||[]).filter(s=>s!==name);
+  db.settings.activeSubjects = (db.settings.activeSubjects||DEFAULT_SUBJECTS).filter(s=>s!==name);
+  DB._cache = db;
+  DB._fbRef.child('settings').set(db.settings);
+  renderSubjectManage();
+}
+
+function saveSubjects() {
+  const db = DB.load();
+  db.settings = db.settings || {};
+  const customs = db.settings.customSubjects || [];
+  const all = [...DEFAULT_SUBJECTS, ...customs];
+  db.settings.activeSubjects = all.filter(s => {
+    const chk = document.getElementById(`subj-chk-${s}`);
+    return chk && chk.checked;
+  });
+  DB._cache = db;
+  DB._fbRef.child('settings').set(db.settings);
+  notify('✅ 과목 설정 저장!');
 }
 
 // ══════════════════════════════════════════════════
