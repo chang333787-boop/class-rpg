@@ -642,12 +642,12 @@ const AchievementUtils = {
 };
 
 // ── 과목 목록 ────────────────────────────────────────
-const DEFAULT_SUBJECTS = ['국어','수학','사회','과학','음악','미술','체육','영어','창체'];
+// DEFAULT_SUBJECTS는 각 HTML 파일에서 선언
 
 function getActiveSubjects(db) {
   const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
   const s = d.activeSubjects;
-  if (!s) return DEFAULT_SUBJECTS; // 설정 없으면 기본 전체
+  if (!s) return (typeof DEFAULT_SUBJECTS !== 'undefined' ? DEFAULT_SUBJECTS : ['국어','수학','사회','과학','음악','미술','체육','영어','창체']);
   return s;
 }
 
