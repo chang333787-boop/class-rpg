@@ -2459,6 +2459,7 @@ function claimRewards() {
   CUR.pendingRewards = pending.filter(r => r.approved !== true);
   const oldLv = CUR.level;
   CUR.gold += totalGold;
+  CUR.totalGold = (CUR.totalGold||0) + totalGold;
   CUR.exp  += totalExp;
   CUR.level = Utils.levelFromExp(CUR.exp);
   DB.saveStudent(CUR);
@@ -2881,6 +2882,7 @@ function doFight() {
         BATTLE_DONE = true;
         if (r.win) {
           CUR.gold += mon.gold; CUR.exp += mon.exp;
+          CUR.totalGold = (CUR.totalGold||0) + mon.gold;
           const oldLv = CUR.level;
           CUR.level = Utils.levelFromExp(CUR.exp);
           if (!(CUR.monsterLog||[]).includes(mon.name)) CUR.monsterLog = [...(CUR.monsterLog||[]), mon.name];
@@ -2893,6 +2895,7 @@ function doFight() {
           setTimeout(() => checkAchievements(), 800);
         } else {
           CUR.gold += 1;
+          CUR.totalGold = (CUR.totalGold||0) + 1;
           if ((CUR.lastMonsterDate||'') !== Utils.todayStr()) CUR.monsterDailyCount = 0;
           CUR.lastMonsterDate = Utils.todayStr();
           CUR.monsterDailyCount = (CUR.monsterDailyCount||0) + 1;
@@ -2952,6 +2955,7 @@ function doBossFight() {
 
 function claimBoss(gold) {
   CUR.gold += gold; CUR.exp += 30;
+  CUR.totalGold = (CUR.totalGold||0) + gold;
   const oldLv = CUR.level;
   CUR.level = Utils.levelFromExp(CUR.exp);
   DB.saveStudent(CUR); renderAll();
@@ -2992,6 +2996,7 @@ function farmCellClick(slot) {
         ? Math.floor(sd.sellPrice * 0.6)
         : sd.sellPrice;
       CUR.gold += earned;
+      CUR.totalGold = (CUR.totalGold||0) + earned;
       CUR.farm = farm.filter(f => f.slot !== slot);
       CUR.farmHarvests = (CUR.farmHarvests||0) + 1;
       DB.saveStudent(CUR);
@@ -4173,6 +4178,7 @@ function sellEquip(itemId) {
   invItem.qty--;
   if (invItem.qty <= 0) CUR.inventory = inv.filter(i=>i.id!==itemId);
   CUR.gold += sellPrice;
+  CUR.totalGold = (CUR.totalGold||0) + sellPrice;
   DB.saveStudent(CUR);
   renderInv(); renderHUD();
   toast(`💰 ${item.name} 판매! +${sellPrice}G`);
@@ -4719,11 +4725,8 @@ function buildRankingHTML(students) {
 }
 
 function _totalGold(s) {
-  // 지금까지 번 골드 = questLogs gold 합산 (현재 보유 아님)
-  const db = DB.load();
-  const logs = db.quests || [];
-  return logs.filter(q => q && q.studentId === s.id)
-    .reduce((sum, q) => sum + (q.gold||0), 0);
+  // totalGold 필드 우선, 없으면 현재 gold (하위 호환)
+  return s.totalGold || s.gold || 0;
 }
 
 function renderRankingModal() {

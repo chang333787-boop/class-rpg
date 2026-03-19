@@ -2273,11 +2273,8 @@ function approveReward(student, reward) {
   student.gold  = (student.gold||0) + (reward.gold||0);
   student.level = Utils.levelFromExp(student.exp);
 
-  // 2. 스탯 증가
-  if (reward.stat && reward.statVal) {
-    student.stats = student.stats || {};
-    student.stats[reward.stat] = (student.stats[reward.stat]||0) + reward.statVal;
-  }
+  // 2. 스탯 증가는 학생이 받기 버튼 누를 때 claimRewards에서 처리
+  // (여기서 중복 적용하지 않음)
 
   // 3. 타입별 처리
   if (reward.type === 'artwork') {
@@ -2976,16 +2973,11 @@ function copyToQuestForm(text) {
   notify(`📋 "${text}" → 직접입력 탭에 붙여넣기 완료!`);
 }
 
-let _adminQuestLogs = [];
 function _totalGoldAdmin(s) {
-  return _adminQuestLogs
-    .filter(q => q && q.studentId === s.id)
-    .reduce((sum, q) => sum + (q.gold||0), 0);
+  return s.totalGold || s.gold || 0;
 }
 
 function renderRank() {
-  const db = DB.load();
-  _adminQuestLogs = db.quests || [];
   const students = DB.getStudents();
   const el = document.getElementById('admin-ranking-wrap');
   if (el) el.innerHTML = buildRankingHTML(students);
@@ -3634,7 +3626,9 @@ function addQuestTemplate(type) {
 }
 
 function postCheckedQuests(type) {
-  const defaults = QUEST_TEMPLATES[type] || [];
+  // ★ renderQuestTemplates와 동일하게 hidden 필터 적용 (인덱스 일치)
+  const hidden   = getHiddenTemplates(type);
+  const defaults = (QUEST_TEMPLATES[type] || []).filter(t => !hidden.has(t.name));
   const customs  = getCustomTemplates(type);
   const all = [...defaults, ...customs];
   const expMap  = {daily:35, weekly:80};
