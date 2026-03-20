@@ -25,7 +25,8 @@ html, body {
   background:var(--bg);
   color:var(--txt);
   font-family:'Noto Sans KR',sans-serif;
-  overflow:hidden; /* main-wrap이 100vh이므로 유지 */
+  overflow-x:hidden;
+  overflow-y:hidden;
 }
 
 /* ── 로딩 ── */
@@ -60,11 +61,12 @@ html, body {
   flex:1;
   overflow-y:scroll;
   overflow-x:auto;
-  padding:.6rem .8rem 4rem; /* 하단 여유 공간 4rem */
+  padding:.6rem .8rem;
+  padding-bottom:max(6rem, env(safe-area-inset-bottom, 0px) + 4rem);
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
   min-height:0;
-  height:0; /* flex 자식 스크롤 강제 */
+  height:0;
 }
 #kiosk-table {
   width:max-content;min-width:100%;border-collapse:collapse;
@@ -169,7 +171,7 @@ html, body {
 </div>
 
 <!-- 메인 -->
-<div id="main-wrap" style="display:none;height:100vh;flex-direction:column;overflow:hidden">
+<div id="main-wrap" style="display:none;height:100vh;height:100dvh;flex-direction:column;overflow:hidden">
   <div id="header">
     <div class="title">📋 우리반 할 일 체크판</div>
     <div id="class-name" style="font-size:.85rem;color:var(--txt2)"></div>
