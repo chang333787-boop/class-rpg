@@ -3145,7 +3145,8 @@ function saveArtworkEdit() {
   if (idx < 0) { notify('작품을 찾을 수 없어요', 'error'); return; }
   db.artworks[idx] = { ...db.artworks[idx], title, subject, comment };
   DB._cache = db;
-  DB._fbRef.child('artworks/'+id).update({ title, subject, comment });
+  // saveArtwork와 동일하게 id 키 기반 저장
+  DB._fbRef.child('artworks/' + id).set(db.artworks[idx]);
   document.getElementById('m-artwork-edit').classList.remove('open');
   renderArtworkAdmin();
   notify('✅ 작품 정보 수정 완료!');
