@@ -400,9 +400,28 @@ const DB = {
   saveArtwork(artwork) {
     const db = this.load();
     db.artworks = db.artworks || [];
-    db.artworks.push(artwork);
+    // 필드명 통일: title/comment/subject 기준으로 저장
+    const normalized = {
+      ...artwork,
+      title:   artwork.title   || artwork.artTitle || '',
+      comment: artwork.comment || artwork.artDesc  || '',
+      subject: artwork.subject || '',
+    };
+    db.artworks.push(normalized);
     this._cache = db;
-    this._fbRef.child('artworks/' + artwork.id).set(artwork);
+    this._fbRef.child('artworks/' + normalized.id).set(normalized);
+  },
+
+  updateArtwork(id, patch) {
+    const db = this.load();
+    const idx = (db.artworks||[]).findIndex(a => a.id === id);
+    if (idx < 0) return false;
+    db.artworks[idx] = { ...db.artworks[idx], ...patch };
+    this._cache = db;
+    this._saving = true;
+    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).finally(() => {
+      setTimeout(() => { this._saving = false; }, 300);
+    });
   },
 
   getStudents()    { return this.load().students; },
@@ -3140,13 +3159,9 @@ function saveArtworkEdit() {
   const title   = document.getElementById('ae-title').value.trim();
   const subject = document.getElementById('ae-subject').value;
   const comment = document.getElementById('ae-comment').value.trim();
-  const db = DB.load();
-  const idx = (db.artworks||[]).findIndex(a=>a.id===id);
-  if (idx < 0) { notify('작품을 찾을 수 없어요', 'error'); return; }
-  db.artworks[idx] = { ...db.artworks[idx], title, subject, comment };
-  DB._cache = db;
-  // saveArtwork와 동일하게 id 키 기반 저장
-  DB._fbRef.child('artworks/' + id).set(db.artworks[idx]);
+  if (!title) { notify('제목을 입력해주세요', 'error'); return; }
+  // 공용 updateArtwork 함수로 title/comment/subject 통일 저장
+  DB.updateArtwork(id, { title, subject, comment });
   document.getElementById('m-artwork-edit').classList.remove('open');
   renderArtworkAdmin();
   notify('✅ 작품 정보 수정 완료!');
