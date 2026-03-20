@@ -1900,7 +1900,11 @@ function nav(page, el) {
   if (page === 'activity')  renderActivityPage();
   if (page === 'stats')     renderStatsPage();
   if (page === 'promotion') renderPromotionList();
-  if (page === 'settings')  { renderBackupList(); renderSubjectManage(); switchShopTab('seed', document.getElementById('shop-tab-seed')); }
+  if (page === 'settings')  {
+    renderBackupList();
+    renderSubjectManage();
+    setTimeout(() => switchShopTab('seed', document.getElementById('shop-tab-seed')), 50);
+  }
 }
 
 // ══════════════════════════════════════════════════
