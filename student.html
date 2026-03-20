@@ -1767,10 +1767,55 @@ function startAccessTimer() {
 
 function enterGame() {
   autoCloseDailyQuests();
+  cleanInactivePending(); // 비활성/삭제된 퀘스트 pending 자동 정리
   document.getElementById('s-game').classList.add('active');
   applyLayout(LAYOUT_MODE);
   renderAll();
   startAccessTimer();
+}
+
+function cleanInactivePending() {
+  const db = DB.load();
+  const activeBQIds = new Set(
+    (db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id)
+  );
+  let changed = false;
+
+  // 비활성 퀘스트 pending 정리
+  const before = (CUR.pendingRewards||[]).length;
+  CUR.pendingRewards = (CUR.pendingRewards||[]).filter(r =>
+    !r.boardQuestId || activeBQIds.has(r.boardQuestId)
+  );
+  if (CUR.pendingRewards.length !== before) changed = true;
+
+  // promotedLevels 자동 복구
+  // 현재 직업이 이미 승급된 직업이면 해당 레벨을 promotedLevels에 추가
+  const jobLevelMap = {
+    '중학생': [5], '고등학생': [5,10], '대학생': [5,10,15],
+  };
+  const promotionLevels = [5,10,15,20,25,30];
+  CUR.promotedLevels = CUR.promotedLevels || [];
+
+  // 현재 레벨 이하의 모든 승급 레벨은 이미 통과한 것
+  promotionLevels.forEach(lv => {
+    if (lv < CUR.level && !CUR.promotedLevels.includes(lv)) {
+      CUR.promotedLevels.push(lv);
+      changed = true;
+    }
+  });
+
+  // 현재 레벨이 승급 레벨이고 직업이 이미 바뀐 경우 (ex: Lv5인데 중학생)
+  const expectedJob = Utils.getJobTitle(CUR.dream || CUR.job || '', CUR.level - 1);
+  const currentJob  = Utils.getJobTitle(CUR.dream || CUR.job || '', CUR.level);
+  if (CUR.job && CUR.job !== expectedJob && CUR.job === currentJob) {
+    // 현재 레벨에서 이미 승급된 상태
+    if (Utils.isPromotionLevel(CUR.level) && !CUR.promotedLevels.includes(CUR.level)) {
+      CUR.promotedLevels.push(CUR.level);
+      changed = true;
+    }
+  }
+
+  if (changed) DB.saveStudent(CUR);
 }
 
 // ══ 자동 출석 ══

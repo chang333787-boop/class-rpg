@@ -2547,10 +2547,24 @@ function renderApproveList() {
   const container = document.getElementById('approve-list');
   const today     = todayStr();
   const activeBQIds = new Set((db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id));
+
+  // 비활성/삭제된 퀘스트 참조 pending 자동 정리
+  let cleaned = false;
+  students.forEach(s => {
+    const before = (s.pendingRewards||[]).length;
+    s.pendingRewards = (s.pendingRewards||[]).filter(r =>
+      !r.boardQuestId || activeBQIds.has(r.boardQuestId)
+    );
+    if (s.pendingRewards.length !== before) {
+      DB._fbRef.child('students/'+s.id).set(s);
+      cleaned = true;
+    }
+  });
+  if (cleaned) DB._cache = db;
+
   let items = students.flatMap(s =>
     (s.pendingRewards||[])
       .filter(r => !r.approved)
-      // 삭제/닫힌 boardQuest 참조 제외
       .filter(r => !r.boardQuestId || activeBQIds.has(r.boardQuestId))
       .map(r => ({...r, student: s}))
   );
@@ -3887,7 +3901,8 @@ function closeBoardQuest(questId) {
 
 // 퀘스트 삭제/닫기 시 학생 pendingRewards 정리
 function cleanQuestPending(db, questId) {
-  (db.students||[]).forEach(s => {
+  const students = DB.getStudents(); // 정규화된 배열 사용
+  students.forEach(s => {
     const before = (s.pendingRewards||[]).length;
     s.pendingRewards = (s.pendingRewards||[]).filter(r => r.boardQuestId !== questId);
     if (s.pendingRewards.length !== before) {
