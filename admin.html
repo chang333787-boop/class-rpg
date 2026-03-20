@@ -3154,17 +3154,20 @@ function openEditArtworkModal(artworkId) {
   document.getElementById('m-artwork-edit').classList.add('open');
 }
 
-function saveArtworkEdit() {
+async function saveArtworkEdit() {
   const id      = document.getElementById('ae-id').value;
   const title   = document.getElementById('ae-title').value.trim();
   const subject = document.getElementById('ae-subject').value;
   const comment = document.getElementById('ae-comment').value.trim();
   if (!title) { notify('제목을 입력해주세요', 'error'); return; }
-  // 공용 updateArtwork 함수로 title/comment/subject 통일 저장
-  DB.updateArtwork(id, { title, subject, comment });
-  document.getElementById('m-artwork-edit').classList.remove('open');
-  renderArtworkAdmin();
-  notify('✅ 작품 정보 수정 완료!');
+  try {
+    await DB.updateArtwork(id, { title, subject, comment });
+    document.getElementById('m-artwork-edit').classList.remove('open');
+    renderArtworkAdmin();
+    notify('✅ 작품 정보 수정 완료!');
+  } catch (e) {
+    notify('작품 수정 저장 실패: ' + e.message, 'error');
+  }
 }
 
 // ── 관리자 라이트박스 ──
