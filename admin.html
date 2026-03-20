@@ -2530,7 +2530,6 @@ function gridApprove(studentId, rewardId) {
   DB.saveStudent(s);
   renderApproveGrid();
   renderApproveList();
-  renderHUD();
   notify(`✅ ${s.name} · ${reward.label} 승인!`);
 }
 

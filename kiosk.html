@@ -25,7 +25,7 @@ html, body {
   background:var(--bg);
   color:var(--txt);
   font-family:'Noto Sans KR',sans-serif;
-  overflow:hidden;
+  overflow:hidden; /* main-wrap이 100vh이므로 유지 */
 }
 
 /* ── 로딩 ── */
@@ -57,8 +57,13 @@ html, body {
 
 /* ── 테이블 영역 ── */
 #table-wrap {
-  flex:1;overflow:auto;padding:.8rem;
+  flex:1;
+  overflow-y:auto;
+  overflow-x:auto;
+  padding:.8rem;
   -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  min-height:0; /* flex 자식 스크롤 핵심 */
 }
 #kiosk-table {
   width:max-content;min-width:100%;border-collapse:collapse;
@@ -163,7 +168,7 @@ html, body {
 </div>
 
 <!-- 메인 -->
-<div id="main-wrap" style="display:none;height:100vh;flex-direction:column;display:none">
+<div id="main-wrap" style="display:none;height:100vh;flex-direction:column;overflow:hidden">
   <div id="header">
     <div class="title">📋 우리반 할 일 체크판</div>
     <div id="class-name" style="font-size:.85rem;color:var(--txt2)"></div>
