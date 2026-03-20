@@ -682,6 +682,47 @@ function getActiveMonsters(db) {
   return [...base, ...added].sort((a,b) => (a.recLv||0)-(b.recLv||0));
 }
 
+// ── 상점 오버라이드 ────────────────────────────────────────
+// DB settings.shopOverrides 값으로 GAME_DATA 실제 값을 패치
+// 관리자/학생/키오스크 모두 동일한 GAME_DATA를 읽으므로 자동 반영
+function applyShopOverrides(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const ov = (d.settings || {}).shopOverrides || {};
+
+  // 씨앗
+  if (ov.seeds) {
+    GAME_DATA.seeds.forEach(s => {
+      const patch = ov.seeds[s.id];
+      if (!patch) return;
+      if (patch.price     !== undefined) s.price     = patch.price;
+      if (patch.sellPrice !== undefined) s.sellPrice = patch.sellPrice;
+      if (patch.growHours !== undefined) s.growHours = patch.growHours;
+    });
+  }
+
+  // 장비 (전 슬롯)
+  if (ov.equipment) {
+    Object.values(GAME_DATA.equipment).forEach(slot => {
+      slot.forEach(item => {
+        const patch = ov.equipment[item.id];
+        if (!patch) return;
+        if (patch.price !== undefined) item.price = patch.price;
+        if (patch.lv    !== undefined) item.lv    = patch.lv;
+        if (patch.stats) Object.assign(item.stats, patch.stats);
+      });
+    });
+  }
+
+  // 장식
+  if (ov.decorations) {
+    GAME_DATA.decorations.forEach(d => {
+      const patch = ov.decorations[d.id];
+      if (!patch) return;
+      if (patch.price !== undefined) d.price = patch.price;
+    });
+  }
+}
+
 </script>
 <style>
 :root {
@@ -1666,6 +1707,23 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <button class="btn-sm success" style="width:100%" onclick="saveSubjects()">💾 저장</button>
         </div>
 
+        <!-- 상점 관리 카드 -->
+        <div class="settings-card">
+          <div class="sc-head">🛒 상점 관리</div>
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.7rem">가격/수치를 바꾸면 학생 화면에도 즉시 반영돼요</div>
+          <!-- 탭 -->
+          <div style="display:flex;gap:.4rem;margin-bottom:.8rem;flex-wrap:wrap">
+            <button class="btn-sm outline" id="shop-tab-seed"   onclick="switchShopTab('seed',this)"   style="font-size:.72rem">🌱 씨앗</button>
+            <button class="btn-sm outline" id="shop-tab-equip"  onclick="switchShopTab('equip',this)"  style="font-size:.72rem">⚔️ 장비</button>
+            <button class="btn-sm outline" id="shop-tab-deco"   onclick="switchShopTab('deco',this)"   style="font-size:.72rem">🌸 장식</button>
+          </div>
+          <div id="shop-manage-body"></div>
+          <div style="display:flex;gap:.5rem;margin-top:.8rem">
+            <button class="btn-sm success" style="flex:1" onclick="saveShopOverrides()">💾 저장</button>
+            <button class="btn-sm outline" onclick="resetShopOverrides()">↩️ 초기화</button>
+          </div>
+        </div>
+
         <div class="settings-card">
           <div class="sc-head">🛠️ 데이터 관리</div>
 
@@ -1771,7 +1829,9 @@ window.onload = async () => {
   const loading = document.getElementById('loading-screen');
   try {
     await DB.init();
+    applyShopOverrides(); // 상점 오버라이드 적용
     DB.onDataChange(() => {
+      applyShopOverrides(); // 설정 변경 시 실시간 반영
       // 관리자 로그인 상태일 때만 재렌더
       if (document.getElementById('admin-app').style.display !== 'none') {
         renderAll();
@@ -1840,7 +1900,7 @@ function nav(page, el) {
   if (page === 'activity')  renderActivityPage();
   if (page === 'stats')     renderStatsPage();
   if (page === 'promotion') renderPromotionList();
-  if (page === 'settings')  { renderBackupList(); renderSubjectManage(); }
+  if (page === 'settings')  { renderBackupList(); renderSubjectManage(); switchShopTab('seed', document.getElementById('shop-tab-seed')); }
 }
 
 // ══════════════════════════════════════════════════
@@ -4342,6 +4402,137 @@ function resetCustomMonsters() {
 
 function closeMonsterModal() {
   document.getElementById('m-monster-edit').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════
+//  SHOP MANAGEMENT
+// ══════════════════════════════════════════════════
+let CUR_SHOP_TAB = 'seed';
+
+function switchShopTab(tab, btn) {
+  CUR_SHOP_TAB = tab;
+  ['seed','equip','deco'].forEach(t => {
+    const b = document.getElementById('shop-tab-'+t);
+    if (b) { b.classList.remove('success'); b.classList.add('outline'); }
+  });
+  if (btn) { btn.classList.remove('outline'); btn.classList.add('success'); }
+  renderShopManage();
+}
+
+function renderShopManage() {
+  const db = DB.load();
+  const ov = (db.settings || {}).shopOverrides || {};
+  const el = document.getElementById('shop-manage-body');
+  if (!el) return;
+
+  if (CUR_SHOP_TAB === 'seed') {
+    const seedOv = ov.seeds || {};
+    el.innerHTML = `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem;display:grid;grid-template-columns:1fr 80px 80px 80px;gap:.3rem;padding:0 .3rem">
+      <span>씨앗</span><span style="text-align:center">구매가(G)</span><span style="text-align:center">수확가(G)</span><span style="text-align:center">성장(h)</span>
+    </div>` +
+    GAME_DATA.seeds.map(s => {
+      const o = seedOv[s.id] || {};
+      return `<div style="display:grid;grid-template-columns:1fr 80px 80px 80px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="font-size:.82rem">${s.icon} ${s.name}</span>
+        <input class="form-input" type="number" id="sov-price-${s.id}" value="${o.price??s.price}" style="padding:.2rem .4rem;font-size:.78rem;text-align:center" placeholder="${s.price}">
+        <input class="form-input" type="number" id="sov-sell-${s.id}" value="${o.sellPrice??s.sellPrice}" style="padding:.2rem .4rem;font-size:.78rem;text-align:center" placeholder="${s.sellPrice}">
+        <input class="form-input" type="number" id="sov-grow-${s.id}" value="${o.growHours??s.growHours}" style="padding:.2rem .4rem;font-size:.78rem;text-align:center" placeholder="${s.growHours}">
+      </div>`;
+    }).join('');
+
+  } else if (CUR_SHOP_TAB === 'equip') {
+    const eqOv = ov.equipment || {};
+    const slotNames = {head:'머리',body:'몸통',weapon:'무기',glove:'장갑',shoe:'신발'};
+    const statKeys = ['atk','def','spd','mag'];
+    el.innerHTML = Object.entries(GAME_DATA.equipment).map(([slot, items]) =>
+      `<div style="font-size:.75rem;font-weight:700;color:var(--gold);margin:.6rem 0 .3rem">${slotNames[slot]||slot}</div>` +
+      items.map(item => {
+        const o = eqOv[item.id] || {};
+        const os = o.stats || {};
+        const statInputs = statKeys.filter(k => item.stats[k] !== undefined).map(k =>
+          `<span style="font-size:.68rem;color:var(--txt3)">${k}</span>
+           <input class="form-input" type="number" id="sov-stat-${item.id}-${k}" value="${os[k]??item.stats[k]}" style="width:48px;padding:.15rem .3rem;font-size:.75rem;text-align:center">`
+        ).join('');
+        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.04);flex-wrap:wrap">
+          <span style="font-size:.82rem;min-width:90px">${item.icon} ${item.name}</span>
+          <span style="font-size:.68rem;color:var(--txt3)">가격</span>
+          <input class="form-input" type="number" id="sov-price-${item.id}" value="${o.price??item.price}" style="width:60px;padding:.15rem .3rem;font-size:.75rem;text-align:center">
+          <span style="font-size:.68rem;color:var(--txt3)">Lv</span>
+          <input class="form-input" type="number" id="sov-lv-${item.id}" value="${o.lv??item.lv}" style="width:40px;padding:.15rem .3rem;font-size:.75rem;text-align:center">
+          ${statInputs}
+        </div>`;
+      }).join('')
+    ).join('');
+
+  } else if (CUR_SHOP_TAB === 'deco') {
+    const decoOv = ov.decorations || {};
+    el.innerHTML = GAME_DATA.decorations.filter(d=>d.price>0).map(d => {
+      const o = decoOv[d.id] || {};
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="font-size:1.1rem">${d.icon}</span>
+        <span style="font-size:.82rem;flex:1">${d.name}</span>
+        <span style="font-size:.68rem;color:var(--txt3)">가격</span>
+        <input class="form-input" type="number" id="sov-price-${d.id}" value="${o.price??d.price}" style="width:70px;padding:.2rem .4rem;font-size:.78rem;text-align:center">
+        <span style="font-size:.68rem;color:var(--txt3)">G</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+function saveShopOverrides() {
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.shopOverrides = db.settings.shopOverrides || {};
+  const ov = db.settings.shopOverrides;
+
+  if (CUR_SHOP_TAB === 'seed') {
+    ov.seeds = ov.seeds || {};
+    GAME_DATA.seeds.forEach(s => {
+      ov.seeds[s.id] = {
+        price:     parseInt(document.getElementById(`sov-price-${s.id}`)?.value) || s.price,
+        sellPrice: parseInt(document.getElementById(`sov-sell-${s.id}`)?.value)  || s.sellPrice,
+        growHours: parseInt(document.getElementById(`sov-grow-${s.id}`)?.value)  || s.growHours,
+      };
+    });
+  } else if (CUR_SHOP_TAB === 'equip') {
+    ov.equipment = ov.equipment || {};
+    Object.values(GAME_DATA.equipment).flat().forEach(item => {
+      const price = parseInt(document.getElementById(`sov-price-${item.id}`)?.value);
+      const lv    = parseInt(document.getElementById(`sov-lv-${item.id}`)?.value);
+      const stats = {};
+      ['atk','def','spd','mag'].forEach(k => {
+        const el = document.getElementById(`sov-stat-${item.id}-${k}`);
+        if (el) stats[k] = parseInt(el.value);
+      });
+      ov.equipment[item.id] = { price, lv, stats };
+    });
+  } else if (CUR_SHOP_TAB === 'deco') {
+    ov.decorations = ov.decorations || {};
+    GAME_DATA.decorations.filter(d=>d.price>0).forEach(d => {
+      const price = parseInt(document.getElementById(`sov-price-${d.id}`)?.value);
+      ov.decorations[d.id] = { price };
+    });
+  }
+
+  DB._cache = db;
+  DB._fbRef.child('settings').set(db.settings);
+  applyShopOverrides(db); // 즉시 반영
+  notify('✅ 상점 설정 저장! 학생 화면에도 즉시 반영됩니다');
+}
+
+function resetShopOverrides() {
+  if (!confirm('이 탭의 상점 설정을 기본값으로 초기화할까요?')) return;
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.shopOverrides = db.settings.shopOverrides || {};
+  if (CUR_SHOP_TAB === 'seed')  delete db.settings.shopOverrides.seeds;
+  if (CUR_SHOP_TAB === 'equip') delete db.settings.shopOverrides.equipment;
+  if (CUR_SHOP_TAB === 'deco')  delete db.settings.shopOverrides.decorations;
+  DB._cache = db;
+  DB._fbRef.child('settings').set(db.settings);
+  // GAME_DATA를 기본값으로 재로드 (페이지 새로고침 필요)
+  notify('↩️ 기본값으로 초기화됐어요. 새로고침 후 반영됩니다');
+  setTimeout(() => location.reload(), 1500);
 }
 
 // ══════════════════════════════════════════════════

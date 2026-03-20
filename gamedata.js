@@ -670,3 +670,44 @@ function getActiveMonsters(db) {
   const added = Object.values(customs).filter(c => c && c._new);
   return [...base, ...added].sort((a,b) => (a.recLv||0)-(b.recLv||0));
 }
+
+// ── 상점 오버라이드 ────────────────────────────────────────
+// DB settings.shopOverrides 값으로 GAME_DATA 실제 값을 패치
+// 관리자/학생/키오스크 모두 동일한 GAME_DATA를 읽으므로 자동 반영
+function applyShopOverrides(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const ov = (d.settings || {}).shopOverrides || {};
+
+  // 씨앗
+  if (ov.seeds) {
+    GAME_DATA.seeds.forEach(s => {
+      const patch = ov.seeds[s.id];
+      if (!patch) return;
+      if (patch.price     !== undefined) s.price     = patch.price;
+      if (patch.sellPrice !== undefined) s.sellPrice = patch.sellPrice;
+      if (patch.growHours !== undefined) s.growHours = patch.growHours;
+    });
+  }
+
+  // 장비 (전 슬롯)
+  if (ov.equipment) {
+    Object.values(GAME_DATA.equipment).forEach(slot => {
+      slot.forEach(item => {
+        const patch = ov.equipment[item.id];
+        if (!patch) return;
+        if (patch.price !== undefined) item.price = patch.price;
+        if (patch.lv    !== undefined) item.lv    = patch.lv;
+        if (patch.stats) Object.assign(item.stats, patch.stats);
+      });
+    });
+  }
+
+  // 장식
+  if (ov.decorations) {
+    GAME_DATA.decorations.forEach(d => {
+      const patch = ov.decorations[d.id];
+      if (!patch) return;
+      if (patch.price !== undefined) d.price = patch.price;
+    });
+  }
+}
