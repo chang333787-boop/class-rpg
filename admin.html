@@ -3145,11 +3145,12 @@ function deleteOrphanArtworks() {
   const students = DB.getStudents();
   const validIds = new Set(students.map(s => s.id));
   const before = (db.artworks||[]).length;
-  const orphans = (db.artworks||[]).filter(a => !validIds.has(a.studentId));
   db.artworks = (db.artworks||[]).filter(a => validIds.has(a.studentId));
   DB._cache = db;
-  // 고아 작품 Firebase에서 삭제
-  orphans.forEach(a => DB._fbRef.child('artworks/' + a.id).remove());
+  // 배열/객체 모두 대응: 전체 artworks를 id 키 기반으로 재저장
+  const artworksObj = {};
+  db.artworks.forEach(a => { artworksObj[a.id] = a; });
+  DB._fbRef.child('artworks').set(artworksObj);
   renderArtworkAdmin();
   notify(`🗑️ 고아 작품 ${before - db.artworks.length}개 정리 완료`);
 }
