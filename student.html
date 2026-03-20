@@ -1789,7 +1789,7 @@ function renderHUD() {
   document.getElementById('hud-exp-txt').textContent = `${s.exp} / ${Utils.expForNextLevel(s.level)} EXP`;
 
   // 승급 배지
-  const canPromo = Utils.isPromotionLevel(s.level) && !s.promotionPending && !DB.getPromotionRequests().find(r => r.studentId === s.id);
+  const canPromo = Utils.isPromotionLevel(s.level) && !s.promotionPending && !(s.promotedLevels||[]).includes(s.level) && !DB.getPromotionRequests().find(r => r.studentId === s.id);
   document.getElementById('promo-badge').style.display = canPromo ? 'inline-flex' : 'none';
 }
 
@@ -2170,7 +2170,7 @@ function buildMainHTML() {
   const attemptsLeft  = Utils.monsterAttemptsLeft(s);
   const farmReady     = hasFarmReady();
   const isFriday      = new Date().getDay() === 5;
-  const canPromo      = Utils.isPromotionLevel(s.level) && !s.promotionPending
+  const canPromo      = Utils.isPromotionLevel(s.level) && !s.promotionPending && !(s.promotedLevels||[]).includes(s.level)
                         && !DB.getPromotionRequests().find(r=>r.studentId===s.id);
   const monsterLimit  = settings.monsterDailyLimit || 2;
 

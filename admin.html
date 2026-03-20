@@ -2691,6 +2691,9 @@ function approvePromotion(reqId) {
   s.job = newJob;
   s.gold = (s.gold||0) + 100;
   s.promotionPending = false;
+  // 승급한 레벨 기록 (중복 승급 방지)
+  s.promotedLevels = s.promotedLevels || [];
+  if (!s.promotedLevels.includes(req.level)) s.promotedLevels.push(req.level);
   s.pendingRewards = [...(s.pendingRewards||[]), {
     id: Utils.uid(),
     label: `⬆️ Lv.${req.level} 승급! ${oldJob ? `${oldJob} → ` : ''}${newJob}`,
