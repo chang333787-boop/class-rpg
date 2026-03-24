@@ -338,6 +338,9 @@ const DB = {
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
     data.pwResetRequests    = toArr(data.pwResetRequests);
+    // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
+    if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
+    data.emotionLogs = data.emotionLogs || {};
     return data;
   },
 
@@ -732,6 +735,177 @@ function applyShopOverrides(db) {
   }
 }
 
+// ══════════════════════════════════════════════════
+//  EMOTION SYSTEM — 오늘의 감정
+// ══════════════════════════════════════════════════
+
+const EMOTION_DATA = [
+  // 긍정 (positive)
+  { key:'happy',      label:'행복하다',   group:'positive', icon:'😄' },
+  { key:'excited',    label:'신나다',     group:'positive', icon:'🤩' },
+  { key:'joyful',     label:'즐겁다',     group:'positive', icon:'😊' },
+  { key:'thrilled',   label:'설레다',     group:'positive', icon:'🥰' },
+  { key:'fun',        label:'재미있다',   group:'positive', icon:'😆' },
+  { key:'calm',       label:'편안하다',   group:'positive', icon:'😌' },
+  { key:'glad',       label:'기쁘다',     group:'positive', icon:'😁' },
+  { key:'proud',      label:'뿌듯하다',   group:'positive', icon:'🥳' },
+  { key:'satisfied',  label:'만족하다',   group:'positive', icon:'😀' },
+  // 보통 (neutral)
+  { key:'lonely',     label:'외롭다',     group:'neutral',  icon:'😶' },
+  { key:'flustered',  label:'당황하다',   group:'neutral',  icon:'😳' },
+  { key:'sorry',      label:'미안하다',   group:'neutral',  icon:'😔' },
+  { key:'shameful',   label:'창피하다',   group:'neutral',  icon:'😳' },
+  { key:'shy',        label:'부끄럽다',   group:'neutral',  icon:'😊' },
+  { key:'surprised',  label:'놀라다',     group:'neutral',  icon:'😲' },
+  { key:'annoyed',    label:'알밉다',     group:'neutral',  icon:'😒' },
+  // 부정 (negative)
+  { key:'scared',     label:'무섭다',     group:'negative', icon:'😨' },
+  { key:'sad',        label:'슬프다',     group:'negative', icon:'😢' },
+  { key:'irritated',  label:'짜증나다',   group:'negative', icon:'😤' },
+  { key:'angry',      label:'화나다',     group:'negative', icon:'😠' },
+  { key:'unfair',     label:'억울하다',   group:'negative', icon:'😤' },
+  { key:'frustrated', label:'답답하다',   group:'negative', icon:'😩' },
+  { key:'worried',    label:'걱정되다',   group:'negative', icon:'😟' },
+  { key:'jealous',    label:'샘나다',     group:'negative', icon:'😒' },
+  { key:'disappointed',label:'실망하다',  group:'negative', icon:'😞' },
+  { key:'tearful',    label:'울고싶다',   group:'negative', icon:'😭' },
+  { key:'upset',      label:'속상하다',   group:'negative', icon:'😣' },
+  { key:'depressed',  label:'우울하다',   group:'negative', icon:'😔' },
+  { key:'hurt',       label:'서운하다',   group:'negative', icon:'🥺' },
+  { key:'anxious',    label:'불안하다',   group:'negative', icon:'😰' },
+  { key:'gloomy',     label:'쓸쓸하다',   group:'negative', icon:'😕' },
+  { key:'nervous',    label:'신경질나다', group:'negative', icon:'😡' },
+  { key:'regretful',  label:'아쉽다',     group:'negative', icon:'😣' },
+  { key:'vexed',      label:'약오르다',   group:'negative', icon:'😤' },
+  { key:'remorseful', label:'후회되다',   group:'negative', icon:'😞' },
+];
+
+const EMOTION_LEVEL = [
+  { value:1, label:'조금' },
+  { value:2, label:'보통' },
+  { value:3, label:'많이' },
+];
+
+const EMOTION_GROUP_VALUE = { positive:1, neutral:0, negative:-1 };
+
+// score = groupValue × level
+function calcEmotionScore(emotionKey, level) {
+  const e = EMOTION_DATA.find(x => x.key === emotionKey);
+  if (!e) return 0;
+  return EMOTION_GROUP_VALUE[e.group] * level;
+}
+
+// ── DB 감정 함수 ──────────────────────────────────
+// key 고정 구조: studentId_date_period → 중복 불가
+const DB_EMOTION = {
+  _ref(db) {
+    return (typeof DB !== 'undefined' ? DB._fbRef : null);
+  },
+
+  // 저장 (있으면 덮어쓰기)
+  save(studentId, date, period, emotionKey, level, reason) {
+    const key = `${studentId}_${date}_${period}`;
+    const e = EMOTION_DATA.find(x => x.key === emotionKey);
+    if (!e) return;
+    const record = {
+      id:           key,
+      studentId,
+      date,
+      period,           // 'am' | 'pm'
+      emotionKey,
+      emotionLabel:  e.label,
+      emotionIcon:   e.icon,
+      group:         e.group,
+      level,            // 1~3
+      levelLabel:    EMOTION_LEVEL.find(x=>x.value===level)?.label || '',
+      score:         calcEmotionScore(emotionKey, level),
+      reason:        reason || '',
+      updatedAt:     Date.now(),
+    };
+    // 캐시 갱신
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    db.emotionLogs = db.emotionLogs || {};
+    db.emotionLogs[key] = record;
+    if (typeof DB !== 'undefined') {
+      DB._cache = db;
+      DB._fbRef.child('emotionLogs/' + key).set(record);
+    }
+    return record;
+  },
+
+  // 단건 조회
+  get(studentId, date, period) {
+    const key = `${studentId}_${date}_${period}`;
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    return (db.emotionLogs || {})[key] || null;
+  },
+
+  // 날짜별 전체 조회
+  getByDate(date) {
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    return Object.values(db.emotionLogs || {}).filter(r => r && r.date === date);
+  },
+
+  // 학생별 전체 조회
+  getByStudent(studentId) {
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    return Object.values(db.emotionLogs || {})
+      .filter(r => r && r.studentId === studentId)
+      .sort((a,b) => a.date.localeCompare(b.date));
+  },
+
+  // 주간 요약 (보상 계산용)
+  getWeeklySummary(studentId, weekStart) {
+    const records = this.getByStudent(studentId)
+      .filter(r => r.date >= weekStart);
+    return {
+      total:      records.length,
+      amCount:    records.filter(r => r.period==='am').length,
+      pmCount:    records.filter(r => r.period==='pm').length,
+      reasonCount:records.filter(r => r.reason && r.reason !== '없음').length,
+      avgScore:   records.length ? (records.reduce((s,r)=>s+r.score,0)/records.length).toFixed(2) : 0,
+    };
+  },
+};
+
+// ── 감정 보상 기준 ──────────────────────────────────
+const EMOTION_REWARDS = [
+  {
+    id:       'emo_participate',
+    label:    '💭 감정 참여 보상',
+    desc:     '이번 주 감정 4회 이상 기록',
+    condition:(summary) => summary.total >= 4,
+    exp:      20,
+    gold:     15,
+  },
+  {
+    id:       'emo_steady',
+    label:    '💪 꾸준한 감정 기록',
+    desc:     '이번 주 감정 8회 이상 기록',
+    condition:(summary) => summary.total >= 8,
+    exp:      50,
+    gold:     40,
+  },
+  {
+    id:       'emo_reflect',
+    label:    '🤔 성찰 보상',
+    desc:     '이번 주 이유 3회 이상 입력',
+    condition:(summary) => summary.reasonCount >= 3,
+    exp:      30,
+    gold:     20,
+  },
+];
+
+// 이번 주에 수령 가능한 감정 보상 목록 반환
+function getClaimableEmotionRewards(student, weekStart) {
+  const summary = DB_EMOTION.getWeeklySummary(student.id, weekStart);
+  const claimed  = (student.emotionRewardsClaimed || {})[weekStart] || [];
+  return EMOTION_REWARDS.filter(r =>
+    r.condition(summary) && !claimed.includes(r.id)
+  ).map(r => ({ ...r, summary }));
+}
+
+
 </script>
 <style>
 :root {
@@ -1001,6 +1175,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="nav-item" id="nav-promo" onclick="nav('promotion',this)"><span class="nav-icon">⬆️</span> 승급 관리 <span id="promo-badge" style="margin-left:auto;background:var(--purple);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon">🏆</span> 랭킹</div>
     <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon">📅</span> 활동 내역</div>
+    <div class="nav-item" onclick="nav('emotion',this)"><span class="nav-icon">💭</span> 감정 현황</div>
     <div class="nav-section">콘텐츠</div>
     <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon">📋</span> 퀘스트 관리</div>
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
@@ -1213,6 +1388,32 @@ tr:hover td{background:rgba(255,255,255,.02);}
     </div>
 
     <!-- ── RANK ── -->
+    <!-- ── EMOTION ── -->
+    <div class="page" id="p-emotion">
+      <div class="section-header">
+        <div><div class="sh-title">💭 감정 현황</div>
+        <div class="sh-sub">학생별 오늘의 감정 기록 조회</div></div>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <input type="date" class="form-input" id="emo-date-filter" style="width:150px" onchange="renderEmotionPage()">
+        <select class="form-select" id="emo-student-filter" style="width:auto" onchange="renderEmotionPage()">
+          <option value="all">전체 학생</option>
+        </select>
+        <select class="form-select" id="emo-period-filter" style="width:auto" onchange="renderEmotionPage()">
+          <option value="all">오전+오후</option>
+          <option value="am">🌅 오전만</option>
+          <option value="pm">🌇 오후만</option>
+        </select>
+        <button class="btn-sm outline" onclick="document.getElementById('emo-date-filter').value=todayStr();renderEmotionPage()">오늘</button>
+      </div>
+      <!-- 요약 -->
+      <div id="emotion-summary" style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem"></div>
+      <!-- 목록 -->
+      <div class="table-card">
+        <div id="emotion-list" style="padding:.5rem 0"></div>
+      </div>
+    </div>
+
     <!-- ── STATS ── -->
     <div class="page" id="p-stats">
       <div class="section-header">
@@ -1892,10 +2093,10 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity','stats'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity','stats','emotion'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
   rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
-  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역'};
+  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역', emotion:'💭 감정 현황'};
 
 function nav(page, el) {
   pages.forEach(p => document.getElementById('p-'+p)?.classList.remove('active'));
@@ -1918,6 +2119,7 @@ function nav(page, el) {
     renderSubjectManage();
     setTimeout(() => switchShopTab('seed', document.getElementById('shop-tab-seed')), 50);
   }
+  if (page === 'emotion')   renderEmotionPage();
 }
 
 // ══════════════════════════════════════════════════
@@ -4711,6 +4913,108 @@ function saveSubjects() {
   DB._cache = db;
   DB._fbRef.child('settings').set(db.settings);
   notify('✅ 과목 설정 저장!');
+}
+
+// ══════════════════════════════════════════════════
+//  EMOTION PAGE
+// ══════════════════════════════════════════════════
+function renderEmotionPage() {
+  const db = DB.load();
+  const students = DB.getStudents();
+
+  // 날짜 필터 초기화
+  const dateSel = document.getElementById('emo-date-filter');
+  if (!dateSel.value) dateSel.value = todayStr();
+  const date = dateSel.value;
+
+  // 학생 필터 셀렉트 초기화
+  const stuSel = document.getElementById('emo-student-filter');
+  if (stuSel && stuSel.options.length === 1) {
+    students.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.avatar + ' ' + s.name;
+      stuSel.appendChild(o);
+    });
+  }
+
+  const stuFilter    = stuSel?.value || 'all';
+  const periodFilter = document.getElementById('emo-period-filter')?.value || 'all';
+
+  // 해당 날짜 감정 기록 가져오기
+  let records = DB_EMOTION.getByDate(date);
+  if (stuFilter !== 'all')    records = records.filter(r => r.studentId === stuFilter);
+  if (periodFilter !== 'all') records = records.filter(r => r.period === periodFilter);
+
+  // 요약
+  const pos = records.filter(r => r.group === 'positive').length;
+  const neu = records.filter(r => r.group === 'neutral').length;
+  const neg = records.filter(r => r.group === 'negative').length;
+  const total = records.length;
+  const summaryEl = document.getElementById('emotion-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      { label:'총 기록', value:total+'건', color:'var(--sky)' },
+      { label:'😊 긍정', value:pos+'건', color:'var(--emerald)' },
+      { label:'😶 보통', value:neu+'건', color:'var(--txt2)' },
+      { label:'😢 부정', value:neg+'건', color:'var(--red)' },
+      { label:'미입력', value:(students.length*2 - total)+'칸', color:'var(--txt3)' },
+    ].map(s => `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+      border-radius:10px;padding:.5rem .9rem;text-align:center">
+      <div style="font-size:.7rem;color:var(--txt3)">${s.label}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:${s.color}">${s.value}</div>
+    </div>`).join('');
+  }
+
+  // 목록
+  const el = document.getElementById('emotion-list');
+  if (!el) return;
+
+  if (records.length === 0) {
+    el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">
+      ${date} 감정 기록이 없어요</div>`;
+    return;
+  }
+
+  // 학생별 그룹핑
+  const byStudent = {};
+  records.forEach(r => {
+    if (!byStudent[r.studentId]) byStudent[r.studentId] = [];
+    byStudent[r.studentId].push(r);
+  });
+
+  const groupColor = { positive:'var(--emerald)', neutral:'var(--txt2)', negative:'var(--red)' };
+  const groupLabel = { positive:'긍정', neutral:'보통', negative:'부정' };
+
+  el.innerHTML = Object.entries(byStudent).map(([sid, recs]) => {
+    const s = students.find(x => x.id === sid);
+    return `<div style="padding:.8rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="font-size:.88rem;font-weight:700;margin-bottom:.5rem">
+        ${s?.avatar||'?'} ${s?.name||'?'}
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        ${recs.sort((a,b)=>a.period.localeCompare(b.period)).map(r => `
+          <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+            border-radius:12px;padding:.6rem .9rem;min-width:140px">
+            <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.3rem">
+              ${r.period==='am'?'🌅 오전':'🌇 오후'}
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span style="font-size:1.6rem">${r.emotionIcon}</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700">${r.emotionLabel}</div>
+                <div style="font-size:.72rem;color:${groupColor[r.group]}">
+                  ${groupLabel[r.group]} · ${r.levelLabel}
+                </div>
+              </div>
+            </div>
+            ${r.reason && r.reason !== '없음'
+              ? `<div style="font-size:.72rem;color:var(--txt2);margin-top:.4rem;
+                  padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:6px">
+                  💬 ${r.reason}</div>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════════

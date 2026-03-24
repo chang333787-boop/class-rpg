@@ -327,6 +327,9 @@ const DB = {
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
     data.pwResetRequests    = toArr(data.pwResetRequests);
+    // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
+    if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
+    data.emotionLogs = data.emotionLogs || {};
     return data;
   },
 
@@ -720,3 +723,174 @@ function applyShopOverrides(db) {
     });
   }
 }
+
+// ══════════════════════════════════════════════════
+//  EMOTION SYSTEM — 오늘의 감정
+// ══════════════════════════════════════════════════
+
+const EMOTION_DATA = [
+  // 긍정 (positive)
+  { key:'happy',      label:'행복하다',   group:'positive', icon:'😄' },
+  { key:'excited',    label:'신나다',     group:'positive', icon:'🤩' },
+  { key:'joyful',     label:'즐겁다',     group:'positive', icon:'😊' },
+  { key:'thrilled',   label:'설레다',     group:'positive', icon:'🥰' },
+  { key:'fun',        label:'재미있다',   group:'positive', icon:'😆' },
+  { key:'calm',       label:'편안하다',   group:'positive', icon:'😌' },
+  { key:'glad',       label:'기쁘다',     group:'positive', icon:'😁' },
+  { key:'proud',      label:'뿌듯하다',   group:'positive', icon:'🥳' },
+  { key:'satisfied',  label:'만족하다',   group:'positive', icon:'😀' },
+  // 보통 (neutral)
+  { key:'lonely',     label:'외롭다',     group:'neutral',  icon:'😶' },
+  { key:'flustered',  label:'당황하다',   group:'neutral',  icon:'😳' },
+  { key:'sorry',      label:'미안하다',   group:'neutral',  icon:'😔' },
+  { key:'shameful',   label:'창피하다',   group:'neutral',  icon:'😳' },
+  { key:'shy',        label:'부끄럽다',   group:'neutral',  icon:'😊' },
+  { key:'surprised',  label:'놀라다',     group:'neutral',  icon:'😲' },
+  { key:'annoyed',    label:'알밉다',     group:'neutral',  icon:'😒' },
+  // 부정 (negative)
+  { key:'scared',     label:'무섭다',     group:'negative', icon:'😨' },
+  { key:'sad',        label:'슬프다',     group:'negative', icon:'😢' },
+  { key:'irritated',  label:'짜증나다',   group:'negative', icon:'😤' },
+  { key:'angry',      label:'화나다',     group:'negative', icon:'😠' },
+  { key:'unfair',     label:'억울하다',   group:'negative', icon:'😤' },
+  { key:'frustrated', label:'답답하다',   group:'negative', icon:'😩' },
+  { key:'worried',    label:'걱정되다',   group:'negative', icon:'😟' },
+  { key:'jealous',    label:'샘나다',     group:'negative', icon:'😒' },
+  { key:'disappointed',label:'실망하다',  group:'negative', icon:'😞' },
+  { key:'tearful',    label:'울고싶다',   group:'negative', icon:'😭' },
+  { key:'upset',      label:'속상하다',   group:'negative', icon:'😣' },
+  { key:'depressed',  label:'우울하다',   group:'negative', icon:'😔' },
+  { key:'hurt',       label:'서운하다',   group:'negative', icon:'🥺' },
+  { key:'anxious',    label:'불안하다',   group:'negative', icon:'😰' },
+  { key:'gloomy',     label:'쓸쓸하다',   group:'negative', icon:'😕' },
+  { key:'nervous',    label:'신경질나다', group:'negative', icon:'😡' },
+  { key:'regretful',  label:'아쉽다',     group:'negative', icon:'😣' },
+  { key:'vexed',      label:'약오르다',   group:'negative', icon:'😤' },
+  { key:'remorseful', label:'후회되다',   group:'negative', icon:'😞' },
+];
+
+const EMOTION_LEVEL = [
+  { value:1, label:'조금' },
+  { value:2, label:'보통' },
+  { value:3, label:'많이' },
+];
+
+const EMOTION_GROUP_VALUE = { positive:1, neutral:0, negative:-1 };
+
+// score = groupValue × level
+function calcEmotionScore(emotionKey, level) {
+  const e = EMOTION_DATA.find(x => x.key === emotionKey);
+  if (!e) return 0;
+  return EMOTION_GROUP_VALUE[e.group] * level;
+}
+
+// ── DB 감정 함수 ──────────────────────────────────
+// key 고정 구조: studentId_date_period → 중복 불가
+const DB_EMOTION = {
+  _ref(db) {
+    return (typeof DB !== 'undefined' ? DB._fbRef : null);
+  },
+
+  // 저장 (있으면 덮어쓰기)
+  save(studentId, date, period, emotionKey, level, reason) {
+    const key = `${studentId}_${date}_${period}`;
+    const e = EMOTION_DATA.find(x => x.key === emotionKey);
+    if (!e) return;
+    const record = {
+      id:           key,
+      studentId,
+      date,
+      period,           // 'am' | 'pm'
+      emotionKey,
+      emotionLabel:  e.label,
+      emotionIcon:   e.icon,
+      group:         e.group,
+      level,            // 1~3
+      levelLabel:    EMOTION_LEVEL.find(x=>x.value===level)?.label || '',
+      score:         calcEmotionScore(emotionKey, level),
+      reason:        reason || '',
+      updatedAt:     Date.now(),
+    };
+    // 캐시 갱신
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    db.emotionLogs = db.emotionLogs || {};
+    db.emotionLogs[key] = record;
+    if (typeof DB !== 'undefined') {
+      DB._cache = db;
+      DB._fbRef.child('emotionLogs/' + key).set(record);
+    }
+    return record;
+  },
+
+  // 단건 조회
+  get(studentId, date, period) {
+    const key = `${studentId}_${date}_${period}`;
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    return (db.emotionLogs || {})[key] || null;
+  },
+
+  // 날짜별 전체 조회
+  getByDate(date) {
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    return Object.values(db.emotionLogs || {}).filter(r => r && r.date === date);
+  },
+
+  // 학생별 전체 조회
+  getByStudent(studentId) {
+    const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    return Object.values(db.emotionLogs || {})
+      .filter(r => r && r.studentId === studentId)
+      .sort((a,b) => a.date.localeCompare(b.date));
+  },
+
+  // 주간 요약 (보상 계산용)
+  getWeeklySummary(studentId, weekStart) {
+    const records = this.getByStudent(studentId)
+      .filter(r => r.date >= weekStart);
+    return {
+      total:      records.length,
+      amCount:    records.filter(r => r.period==='am').length,
+      pmCount:    records.filter(r => r.period==='pm').length,
+      reasonCount:records.filter(r => r.reason && r.reason !== '없음').length,
+      avgScore:   records.length ? (records.reduce((s,r)=>s+r.score,0)/records.length).toFixed(2) : 0,
+    };
+  },
+};
+
+// ── 감정 보상 기준 ──────────────────────────────────
+const EMOTION_REWARDS = [
+  {
+    id:       'emo_participate',
+    label:    '💭 감정 참여 보상',
+    desc:     '이번 주 감정 4회 이상 기록',
+    condition:(summary) => summary.total >= 4,
+    exp:      20,
+    gold:     15,
+  },
+  {
+    id:       'emo_steady',
+    label:    '💪 꾸준한 감정 기록',
+    desc:     '이번 주 감정 8회 이상 기록',
+    condition:(summary) => summary.total >= 8,
+    exp:      50,
+    gold:     40,
+  },
+  {
+    id:       'emo_reflect',
+    label:    '🤔 성찰 보상',
+    desc:     '이번 주 이유 3회 이상 입력',
+    condition:(summary) => summary.reasonCount >= 3,
+    exp:      30,
+    gold:     20,
+  },
+];
+
+// 이번 주에 수령 가능한 감정 보상 목록 반환
+function getClaimableEmotionRewards(student, weekStart) {
+  const summary = DB_EMOTION.getWeeklySummary(student.id, weekStart);
+  const claimed  = (student.emotionRewardsClaimed || {})[weekStart] || [];
+  return EMOTION_REWARDS.filter(r =>
+    r.condition(summary) && !claimed.includes(r.id)
+  ).map(r => ({ ...r, summary }));
+}
+
