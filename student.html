@@ -458,7 +458,17 @@ const DB = {
 
   getArtworks(studentId) { return (this.load().artworks||[]).filter(a => a.studentId === studentId); },
   addArtwork(a)          { const db=this.load(); db.artworks=[...(db.artworks||[]),a]; this.save(db); },
-  deleteArtwork(id)      { const db=this.load(); db.artworks=(db.artworks||[]).filter(a=>a.id!==id); this.save(db); },
+  deleteArtwork(id) {
+    const db = this.load();
+    db.artworks = (db.artworks||[]).filter(a => a.id !== id);
+    this._cache = db;
+    // id 키 기반 삭제
+    this._fbRef.child('artworks/' + id).remove();
+    // 전체 artworks를 id 키 기반으로 재저장 (배열/키 혼재 정리)
+    const artworksObj = {};
+    db.artworks.forEach(a => { artworksObj[a.id] = a; });
+    this._fbRef.child('artworks').set(artworksObj);
+  },
 
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
