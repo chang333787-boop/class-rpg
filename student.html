@@ -434,7 +434,16 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
-  addPromotionRequest(r)     { const db = this.load(); db.promotionRequests = [...(db.promotionRequests||[]), r]; this.save(db); },
+  addPromotionRequest(r) {
+    const db = this.load();
+    db.promotionRequests = db.promotionRequests || [];
+    // 중복 차단: 동일 studentId + level
+    const exists = db.promotionRequests.some(x => x && x.studentId === r.studentId && Number(x.level) === Number(r.level));
+    if (exists) return false;
+    db.promotionRequests.push(r);
+    this.save(db);
+    return true;
+  },
   removePromotionRequest(id) { const db = this.load(); db.promotionRequests = (db.promotionRequests||[]).filter(r=>r.id!==id); this.save(db); },
 
   async getAdminPw() {
@@ -4485,6 +4494,11 @@ function submitBookRecord() {
   if (!title)  { toast('책 제목을 입력해주세요!'); return; }
   if (!review) { toast('줄거리 및 느낀점을 써주세요!'); return; }
 
+  // 중복 차단: 이미 신청 or 승인된 같은 책
+  const dupPending = (CUR.pendingRewards||[]).some(r => r.type==='book' && (r.bookTitle||'').trim() === title.trim());
+  const dupBooks   = (CUR.books||[]).some(b => (b.title||'').trim() === title.trim());
+  if (dupPending || dupBooks) { toast(`📚 "${title}"은 이미 등록된 책이에요!`); return; }
+
   // pendingRewards에 독서 승인 요청 추가
   CUR.pendingRewards = CUR.pendingRewards || [];
   CUR.pendingRewards.push({
@@ -4657,7 +4671,8 @@ function renderPromoModal() {
 
 function requestPromotion() {
   const req = { id: Utils.uid(), studentId: CUR.id, studentName: CUR.name, level: CUR.level, date: Utils.todayStr() };
-  DB.addPromotionRequest(req);
+  const ok = DB.addPromotionRequest(req);
+  if (!ok) { toast('이미 승급 신청이 되어 있어요.'); return; }
   CUR.promotionPending = true;
   DB.saveStudent(CUR);
   renderPromoModal();

@@ -423,7 +423,16 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
-  addPromotionRequest(r)     { const db = this.load(); db.promotionRequests = [...(db.promotionRequests||[]), r]; this.save(db); },
+  addPromotionRequest(r) {
+    const db = this.load();
+    db.promotionRequests = db.promotionRequests || [];
+    // 중복 차단: 동일 studentId + level
+    const exists = db.promotionRequests.some(x => x && x.studentId === r.studentId && Number(x.level) === Number(r.level));
+    if (exists) return false;
+    db.promotionRequests.push(r);
+    this.save(db);
+    return true;
+  },
   removePromotionRequest(id) { const db = this.load(); db.promotionRequests = (db.promotionRequests||[]).filter(r=>r.id!==id); this.save(db); },
 
   async getAdminPw() {

@@ -434,7 +434,16 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
-  addPromotionRequest(r)     { const db = this.load(); db.promotionRequests = [...(db.promotionRequests||[]), r]; this.save(db); },
+  addPromotionRequest(r) {
+    const db = this.load();
+    db.promotionRequests = db.promotionRequests || [];
+    // 중복 차단: 동일 studentId + level
+    const exists = db.promotionRequests.some(x => x && x.studentId === r.studentId && Number(x.level) === Number(r.level));
+    if (exists) return false;
+    db.promotionRequests.push(r);
+    this.save(db);
+    return true;
+  },
   removePromotionRequest(id) { const db = this.load(); db.promotionRequests = (db.promotionRequests||[]).filter(r=>r.id!==id); this.save(db); },
 
   async getAdminPw() {
@@ -1743,6 +1752,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
             </div>
           </div>
 
+          <div class="setting-row">
+            <div><div class="sr-label">🔁 중복 데이터 정리</div><div class="sr-sub">승급/독서 중복 신청 1회 정리</div></div>
+            <button class="btn-sm outline" onclick="dedupeAll()">정리</button>
+          </div>
           <div class="setting-row">
             <div><div class="sr-label">🔄 전체 학생 수치 초기화</div><div class="sr-sub">이름·비번은 유지, 레벨·EXP·골드·아이템 초기화</div></div>
             <button class="btn-sm danger" onclick="resetAllStudents()">초기화</button>
@@ -3485,10 +3498,49 @@ function renderBooksPage() {
               ${b.review?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem;line-height:1.5">${b.review.length>60?b.review.slice(0,60)+'...':b.review}</div>`:''}
             </div>
             <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0">${b.date||''}</span>
+            <button onclick="deleteBook('${s.id}','${b.title}')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.75rem;padding:.1rem .3rem;flex-shrink:0" title="삭제">🗑️</button>
           </div>`).join('')}
       </div>
     </div>`;
   }).join('');
+}
+
+function deleteBook(studentId, bookTitle) {
+  if (!confirm(`"${bookTitle}" 독서 기록을 삭제할까요?`)) return;
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  s.books = (s.books||[]).filter(b => b.title !== bookTitle);
+  s.bookCount = s.books.length;
+  DB.saveStudent(s);
+  renderBooksPage();
+  notify('독서 기록 삭제 완료');
+}
+
+function dedupeAll() {
+  // 승급 중복 제거
+  const db = DB.load();
+  const seen = new Set();
+  db.promotionRequests = (db.promotionRequests||[]).filter(r => {
+    const key = r.studentId + '_' + r.level;
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+  // 독서 중복 제거 (학생별 동일 title)
+  DB.getStudents().forEach(s => {
+    const seenTitles = new Set();
+    const before = (s.books||[]).length;
+    s.books = (s.books||[]).filter(b => {
+      const t = (b.title||'').trim();
+      if (seenTitles.has(t)) return false;
+      seenTitles.add(t); return true;
+    });
+    if (s.books.length !== before) { s.bookCount = s.books.length; DB.saveStudent(s); }
+  });
+  db.promotionRequests = db.promotionRequests;
+  DB._cache = db;
+  DB._fbRef.child('promotionRequests').set(db.promotionRequests);
+  notify('✅ 중복 데이터 정리 완료!');
+  renderAll();
 }
 
 function deleteArtwork(id) {
