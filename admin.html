@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 // ====================================================
 //  우리반 성장 RPG — 공유 게임 데이터 v3 (gamedata.js)
@@ -1408,6 +1409,17 @@ tr:hover td{background:rgba(255,255,255,.02);}
       </div>
       <!-- 요약 -->
       <div id="emotion-summary" style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem"></div>
+      <!-- 그래프 영역 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem">
+        <div class="table-card" style="padding:.8rem">
+          <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.5rem">📈 날짜별 평균 점수</div>
+          <canvas id="admin-emo-score-chart" height="140"></canvas>
+        </div>
+        <div class="table-card" style="padding:.8rem">
+          <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.5rem">😊 감정 분포</div>
+          <canvas id="admin-emo-dist-chart" height="140"></canvas>
+        </div>
+      </div>
       <!-- 목록 -->
       <div class="table-card">
         <div id="emotion-list" style="padding:.5rem 0"></div>
@@ -5015,6 +5027,81 @@ function renderEmotionPage() {
       </div>
     </div>`;
   }).join('');
+
+  // ── 그래프 ──
+  renderEmotionCharts(date);
+}
+
+let _adminScoreChart = null;
+let _adminDistChart  = null;
+
+function renderEmotionCharts(baseDate) {
+  const db = DB.load();
+  const students = DB.getStudents();
+  // 최근 14일 날짜 배열
+  const dates = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(Date.now() + 9*3600000 - i*86400000);
+    dates.push(d.toISOString().slice(0,10));
+  }
+  // 날짜별 평균 score
+  const scoreByDate = dates.map(d => {
+    const recs = DB_EMOTION.getByDate(d);
+    if (!recs.length) return null;
+    return +(recs.reduce((s,r)=>s+r.score,0)/recs.length).toFixed(1);
+  });
+
+  // 점수 꺾은선
+  if (_adminScoreChart) _adminScoreChart.destroy();
+  const scoreCtx = document.getElementById('admin-emo-score-chart');
+  if (scoreCtx) {
+    _adminScoreChart = new Chart(scoreCtx, {
+      type:'line',
+      data:{
+        labels: dates.map(d=>d.slice(5)),
+        datasets:[{
+          label:'반 평균 감정 점수',
+          data: scoreByDate,
+          borderColor:'#FFD700', backgroundColor:'rgba(255,215,0,.1)',
+          pointBackgroundColor: scoreByDate.map(s => s===null?'transparent':s>0?'#2ecc71':s<0?'#e74c3c':'#aaa'),
+          tension:0.3, fill:true, pointRadius:4, spanGaps:true,
+        }]
+      },
+      options:{
+        responsive:true,
+        plugins:{legend:{display:false}},
+        scales:{
+          y:{min:-3,max:3,grid:{color:'rgba(255,255,255,.08)'},ticks:{color:'#aaa',font:{size:10}}},
+          x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#aaa',font:{size:9}}}
+        }
+      }
+    });
+  }
+
+  // 오늘 감정 분포 도넛
+  const todayRecs = DB_EMOTION.getByDate(baseDate);
+  const pos = todayRecs.filter(r=>r.group==='positive').length;
+  const neu = todayRecs.filter(r=>r.group==='neutral').length;
+  const neg = todayRecs.filter(r=>r.group==='negative').length;
+  if (_adminDistChart) _adminDistChart.destroy();
+  const distCtx = document.getElementById('admin-emo-dist-chart');
+  if (distCtx && (pos+neu+neg) > 0) {
+    _adminDistChart = new Chart(distCtx, {
+      type:'doughnut',
+      data:{
+        labels:['긍정','보통','부정'],
+        datasets:[{data:[pos,neu,neg],backgroundColor:['#2ecc71','#95a5a6','#e74c3c'],borderWidth:0}]
+      },
+      options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#ccc',font:{size:11}}}}}
+    });
+  } else if (distCtx) {
+    const ctx2 = distCtx.getContext('2d');
+    ctx2.clearRect(0,0,distCtx.width,distCtx.height);
+    ctx2.fillStyle='rgba(255,255,255,.3)';
+    ctx2.font='13px Noto Sans KR';
+    ctx2.textAlign='center';
+    ctx2.fillText('아직 데이터 없음', distCtx.width/2, 70);
+  }
 }
 
 // ══════════════════════════════════════════════════

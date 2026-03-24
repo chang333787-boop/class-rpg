@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>우리반 성장 RPG</title>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
@@ -1681,6 +1682,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <button class="mtab"    onclick="houseTab('book',this)">📚 독서</button>
     <button class="mtab"    onclick="houseTab('deco',this)">🌸 인테리어</button>
     <button class="mtab"    onclick="houseTab('artwork',this)">🖼️ 작품</button>
+    <button class="mtab"    onclick="houseTab('emotion',this)">💭 감정</button>
   </div>
 
   <!-- 탭1: 기록 -->
@@ -1806,6 +1808,56 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <div id="artwork-subject-tabs" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem"></div>
     <!-- 내 작품 목록 -->
     <div id="artwork-list"></div>
+  </div>
+
+  <!-- 탭5: 감정 -->
+  <div id="house-tab-emotion" style="display:none;padding-bottom:.5rem">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.8rem;flex-wrap:wrap">
+      <select id="emo-month-sel" onchange="renderEmotionHistory()"
+        style="font-size:.78rem;padding:.3rem .6rem;border-radius:8px;
+          background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:var(--txt)">
+      </select>
+      <span style="font-size:.72rem;color:var(--txt3)">월 감정 기록</span>
+    </div>
+    <!-- 월별 통계 요약 -->
+    <div id="emo-month-summary" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem"></div>
+    <!-- 감정 점수 꺾은선 그래프 -->
+    <div style="background:rgba(255,255,255,.03);border-radius:12px;padding:.8rem;margin-bottom:.8rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--gold);margin-bottom:.5rem">📈 감정 점수 추이</div>
+      <canvas id="emo-score-chart" height="120"></canvas>
+    </div>
+    <!-- 감정 비율 -->
+    <div style="display:flex;gap:.6rem;margin-bottom:.8rem">
+      <div style="flex:1;background:rgba(255,255,255,.03);border-radius:12px;padding:.8rem">
+        <div style="font-size:.75rem;font-weight:700;color:var(--gold);margin-bottom:.5rem">😊 감정 분포</div>
+        <canvas id="emo-dist-chart" height="120"></canvas>
+      </div>
+    </div>
+    <!-- 자주 느낀 감정 top5 -->
+    <div style="background:rgba(255,255,255,.03);border-radius:12px;padding:.8rem;margin-bottom:.8rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">🏅 자주 느낀 감정 TOP5</div>
+      <div id="emo-top5"></div>
+    </div>
+    <!-- 달력 -->
+    <div style="background:rgba(255,255,255,.03);border-radius:12px;padding:.8rem;margin-bottom:.8rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">📅 감정 달력</div>
+      <div id="emo-calendar"></div>
+    </div>
+    <!-- 날짜 상세 (클릭 시 표시) -->
+    <div id="emo-detail-wrap" style="display:none;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);
+      border-radius:12px;padding:.8rem;margin-bottom:.8rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+        <div id="emo-detail-date" style="font-size:.8rem;font-weight:700;color:var(--gold)"></div>
+        <button onclick="document.getElementById('emo-detail-wrap').style.display='none'"
+          style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.9rem">✕</button>
+      </div>
+      <div id="emo-detail-content"></div>
+    </div>
+    <!-- 날짜별 기록 타임라인 -->
+    <div style="background:rgba(255,255,255,.03);border-radius:12px;padding:.8rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">📋 감정 일기</div>
+      <div id="emo-daily-list" style="max-height:400px;overflow-y:auto"></div>
+    </div>
   </div>
 </div></div>
 
@@ -3457,13 +3509,13 @@ function houseTab(tab, el) {
   document.getElementById('house-tab-book').style.display    = tab==='book'    ? '' : 'none';
   document.getElementById('house-tab-deco').style.display    = tab==='deco'    ? '' : 'none';
   document.getElementById('house-tab-artwork').style.display = tab==='artwork' ? '' : 'none';
+  document.getElementById('house-tab-emotion').style.display = tab==='emotion' ? '' : 'none';
   if (tab==='book')    renderBookRecords();
   if (tab==='artwork') { fillArtworkSubjectSelect(); renderArtworks(); }
+  if (tab==='emotion') renderEmotionHistory();
   if (tab==='deco') {
-    // Canvas를 실제 컨테이너 크기로 재초기화 (모달 크기 반영)
     _dCv = null;
     renderHouseDeco();
-    // 모달이 완전히 열린 후 한 번 더 리사이즈
     requestAnimationFrame(() => { _dCv = null; renderHouseDeco(); });
   }
 }
@@ -4502,6 +4554,272 @@ function renderArtworks() {
 
 // ══ 오늘의 감정 ══
 
+let _emoScoreChart = null;
+let _emoDistChart  = null;
+
+function renderEmotionHistory() {
+  // 월 셀렉트 초기화
+  const sel = document.getElementById('emo-month-sel');
+  if (!sel) return;
+  const today = Utils.todayStr();
+  const curYear  = parseInt(today.slice(0,4));
+  const curMonth = parseInt(today.slice(5,7));
+  if (sel.options.length === 0) {
+    for (let m = curMonth; m >= Math.max(1, curMonth-5); m--) {
+      const opt = document.createElement('option');
+      const mm = String(m).padStart(2,'0');
+      opt.value = `${curYear}-${mm}`;
+      opt.textContent = `${curYear}년 ${m}월`;
+      sel.appendChild(opt);
+    }
+  }
+  const selectedMonth = sel.value || `${curYear}-${String(curMonth).padStart(2,'0')}`;
+
+  // 해당 월 기록 가져오기
+  const allRecords = DB_EMOTION.getByStudent(CUR.id)
+    .filter(r => r.date.startsWith(selectedMonth));
+
+  // ── 요약 ──
+  const pos = allRecords.filter(r=>r.group==='positive').length;
+  const neu = allRecords.filter(r=>r.group==='neutral').length;
+  const neg = allRecords.filter(r=>r.group==='negative').length;
+  const total = allRecords.length;
+  const summaryEl = document.getElementById('emo-month-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      {label:'총 기록', value:`${total}회`, color:'var(--sky)'},
+      {label:'😊 긍정', value:`${pos}회`, color:'var(--emerald)'},
+      {label:'😶 보통', value:`${neu}회`, color:'var(--txt2)'},
+      {label:'😢 부정', value:`${neg}회`, color:'var(--red)'},
+    ].map(s=>`<div style="flex:1;min-width:60px;background:rgba(255,255,255,.04);border-radius:10px;
+      padding:.45rem .5rem;text-align:center">
+      <div style="font-size:.65rem;color:var(--txt3)">${s.label}</div>
+      <div style="font-size:1rem;font-weight:700;color:${s.color}">${s.value}</div>
+    </div>`).join('');
+  }
+
+  // ── 날짜별 score 꺾은선 ──
+  const byDate = {};
+  allRecords.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push(r.score);
+  });
+  const dateLabels = Object.keys(byDate).sort();
+  const scoreData  = dateLabels.map(d => {
+    const scores = byDate[d];
+    return +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1);
+  });
+
+  if (_emoScoreChart) _emoScoreChart.destroy();
+  const scoreCtx = document.getElementById('emo-score-chart');
+  if (scoreCtx && dateLabels.length > 0) {
+    _emoScoreChart = new Chart(scoreCtx, {
+      type: 'line',
+      data: {
+        labels: dateLabels.map(d => d.slice(5)),
+        datasets: [{
+          data: scoreData,
+          borderColor: '#FFD700',
+          backgroundColor: 'rgba(255,215,0,.1)',
+          pointBackgroundColor: scoreData.map(s => s>0?'#2ecc71':s<0?'#e74c3c':'#aaa'),
+          tension: 0.3, fill: true, pointRadius: 4,
+        }]
+      },
+      options: {
+        responsive:true, plugins:{legend:{display:false}},
+        scales:{
+          y:{min:-3,max:3,grid:{color:'rgba(255,255,255,.08)'},ticks:{color:'#aaa',font:{size:10}}},
+          x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#aaa',font:{size:9}}}
+        }
+      }
+    });
+  } else if (scoreCtx) {
+    const ctx2 = scoreCtx.getContext('2d');
+    ctx2.clearRect(0,0,scoreCtx.width,scoreCtx.height);
+    ctx2.fillStyle='rgba(255,255,255,.3)';
+    ctx2.font='14px Noto Sans KR';
+    ctx2.textAlign='center';
+    ctx2.fillText('아직 기록이 없어요', scoreCtx.width/2, 60);
+  }
+
+  // ── 감정 분포 도넛 ──
+  if (_emoDistChart) _emoDistChart.destroy();
+  const distCtx = document.getElementById('emo-dist-chart');
+  if (distCtx && total > 0) {
+    _emoDistChart = new Chart(distCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['긍정','보통','부정'],
+        datasets:[{data:[pos,neu,neg], backgroundColor:['#2ecc71','#95a5a6','#e74c3c'], borderWidth:0}]
+      },
+      options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#ccc',font:{size:11}}}}}
+    });
+  }
+
+  // ── TOP5 감정 ──
+  const freq = {};
+  allRecords.forEach(r => { freq[r.emotionKey] = (freq[r.emotionKey]||0)+1; });
+  const top5 = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const top5El = document.getElementById('emo-top5');
+  if (top5El) {
+    if (top5.length === 0) {
+      top5El.innerHTML = '<div style="color:var(--txt3);font-size:.8rem">아직 기록이 없어요</div>';
+    } else {
+      const maxCount = top5[0][1];
+      top5El.innerHTML = top5.map(([key, count]) => {
+        const e = EMOTION_DATA.find(x=>x.key===key);
+        const pct = Math.round(count/maxCount*100);
+        return `<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+          <span style="font-size:1.2rem">${e?.icon||'?'}</span>
+          <span style="font-size:.78rem;min-width:60px">${e?.label||key}</span>
+          <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:var(--gold);border-radius:4px"></div>
+          </div>
+          <span style="font-size:.72rem;color:var(--txt3)">${count}회</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── 달력 렌더 ──
+  const calEl = document.getElementById('emo-calendar');
+  if (calEl) {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const firstDay = new Date(year, month-1, 1).getDay(); // 0=일
+    const lastDate  = new Date(year, month, 0).getDate();
+    const days = ['일','월','화','수','목','금','토'];
+    let calHtml = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${days.map(d=>`<div style="text-align:center;font-size:.65rem;color:var(--txt3);padding:2px">${d}</div>`).join('')}
+    </div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">`;
+    for (let i=0;i<firstDay;i++) calHtml += `<div></div>`;
+    for (let d=1;d<=lastDate;d++) {
+      const dateStr = `${selectedMonth}-${String(d).padStart(2,'0')}`;
+      const am = allRecords.find(r=>r.date===dateStr&&r.period==='am');
+      const pm = allRecords.find(r=>r.date===dateStr&&r.period==='pm');
+      const hasRecord = am||pm;
+      const isToday = dateStr === Utils.todayStr();
+      calHtml += `<div onclick="showEmotionDetail('${dateStr}')"
+        style="border-radius:8px;padding:3px 2px;text-align:center;cursor:${hasRecord?'pointer':'default'};
+          background:${isToday?'rgba(255,215,0,.15)':'rgba(255,255,255,.03)'};
+          border:1px solid ${isToday?'rgba(255,215,0,.4)':'rgba(255,255,255,.06)'}">
+        <div style="font-size:.65rem;color:var(--txt3);margin-bottom:1px">${d}</div>
+        <div style="font-size:.75rem;line-height:1">${am?am.emotionIcon:'·'}</div>
+        <div style="font-size:.75rem;line-height:1">${pm?pm.emotionIcon:''}</div>
+      </div>`;
+    }
+    calHtml += '</div>';
+    calEl.innerHTML = calHtml;
+  }
+
+  // ── 감정 일기 타임라인 ──
+  const listEl = document.getElementById('emo-daily-list');
+  if (listEl) {
+    const sorted = [...allRecords].sort((a,b)=>b.date.localeCompare(a.date)||a.period.localeCompare(b.period));
+    if (sorted.length === 0) {
+      listEl.innerHTML = '<div style="color:var(--txt3);font-size:.8rem;padding:.5rem">이번 달 기록이 없어요</div>';
+    } else {
+      const groupColor = {positive:'var(--emerald)',neutral:'var(--txt2)',negative:'var(--red)'};
+      const groupBg    = {positive:'rgba(46,204,113,.08)',neutral:'rgba(255,255,255,.04)',negative:'rgba(231,76,60,.08)'};
+      // 날짜별로 묶기
+      const byDate = {};
+      sorted.forEach(r => { if(!byDate[r.date]) byDate[r.date]=[]; byDate[r.date].push(r); });
+      listEl.innerHTML = Object.entries(byDate).map(([date, recs]) => {
+        const weekDay = ['일','월','화','수','목','금','토'][new Date(date).getDay()];
+        return `<div style="margin-bottom:.8rem">
+          <div style="font-size:.72rem;color:var(--txt3);font-weight:700;margin-bottom:.4rem;
+            padding-bottom:.3rem;border-bottom:1px solid rgba(255,255,255,.08)">
+            ${date.slice(5).replace('-','/')} (${weekDay})
+          </div>
+          ${recs.map(r=>`
+            <div style="display:flex;gap:.7rem;align-items:flex-start;margin-bottom:.4rem;
+              background:${groupBg[r.group]};border-radius:10px;padding:.5rem .7rem">
+              <div style="font-size:.7rem;color:var(--txt3);min-width:32px;padding-top:2px">
+                ${r.period==='am'?'🌅 오전':'🌇 오후'}
+              </div>
+              <div style="font-size:1.4rem;flex-shrink:0">${r.emotionIcon}</div>
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:.4rem">
+                  <span style="font-size:.85rem;font-weight:700">${r.emotionLabel}</span>
+                  <span style="font-size:.68rem;color:${groupColor[r.group]};background:${groupBg[r.group]};
+                    border-radius:8px;padding:.05rem .35rem">${r.levelLabel}</span>
+                </div>
+                ${r.reason&&r.reason!=='없음'
+                  ? `<div style="font-size:.76rem;color:var(--txt2);margin-top:.25rem">💬 ${r.reason}</div>`
+                  : ''}
+              </div>
+              <button onclick="editEmotionRecord('${r.date}','${r.period}')"
+                style="background:none;border:1px solid rgba(255,255,255,.1);color:var(--txt3);
+                  border-radius:6px;font-size:.62rem;padding:.15rem .4rem;cursor:pointer;flex-shrink:0">
+                수정
+              </button>
+            </div>`).join('')}
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+function showEmotionDetail(date) {
+  const records = DB_EMOTION.getByStudent(CUR.id).filter(r=>r.date===date);
+  if (!records.length) return;
+  const wrap = document.getElementById('emo-detail-wrap');
+  const dateEl = document.getElementById('emo-detail-date');
+  const contentEl = document.getElementById('emo-detail-content');
+  if (!wrap||!dateEl||!contentEl) return;
+  const weekDay = ['일','월','화','수','목','금','토'][new Date(date).getDay()];
+  dateEl.textContent = `${date.slice(5).replace('-','/')} (${weekDay}) 감정 기록`;
+  const groupColor = {positive:'var(--emerald)',neutral:'var(--txt2)',negative:'var(--red)'};
+  contentEl.innerHTML = ['am','pm'].map(period => {
+    const r = records.find(x=>x.period===period);
+    if (!r) return `<div style="padding:.4rem 0;color:var(--txt3);font-size:.8rem">
+      ${period==='am'?'🌅 오전':'🌇 오후'} — 기록 없음</div>`;
+    return `<div style="display:flex;gap:.7rem;align-items:flex-start;padding:.5rem 0;
+      border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="font-size:.72rem;color:var(--txt3);min-width:40px">${period==='am'?'🌅 오전':'🌇 오후'}</div>
+      <div style="font-size:1.5rem">${r.emotionIcon}</div>
+      <div style="flex:1">
+        <div style="font-size:.9rem;font-weight:700">${r.emotionLabel} · <span style="color:${groupColor[r.group]};font-size:.78rem">${r.levelLabel}</span></div>
+        ${r.reason&&r.reason!=='없음'?`<div style="font-size:.78rem;color:var(--txt2);margin-top:.2rem">💬 ${r.reason}</div>`:''}
+      </div>
+      <button onclick="editEmotionRecord('${r.date}','${r.period}')"
+        style="background:none;border:1px solid rgba(255,255,255,.12);color:var(--txt3);
+          border-radius:6px;font-size:.68rem;padding:.2rem .5rem;cursor:pointer">수정</button>
+    </div>`;
+  }).join('');
+  wrap.style.display = '';
+  wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function editEmotionRecord(date, period) {
+  // 기존 감정 모달 재활용 (수정 모드)
+  _emoCurrentPeriod = period;
+  _emoSelectedKey   = null;
+  _emoSelectedLevel = null;
+  const existing = DB_EMOTION.get(CUR.id, date, period);
+  const title = `✏️ ${date.slice(5).replace('-','/')} ${period==='am'?'오전':'오후'} 수정`;
+  document.getElementById('emotion-modal-title').textContent = title;
+  document.getElementById('emotion-step1').style.display = '';
+  document.getElementById('emotion-step2').style.display = 'none';
+  document.getElementById('emotion-reason-input').value = existing?.reason || '';
+  // 날짜를 오늘이 아닌 해당 날짜로 임시 저장
+  _emoEditDate = date;
+  const grid = document.getElementById('emotion-grid');
+  grid.innerHTML = EMOTION_DATA.map(e => {
+    const isSelected = existing?.emotionKey === e.key;
+    return `<button onclick="selectEmotion('${e.key}')"
+      style="display:flex;flex-direction:column;align-items:center;gap:2px;
+        padding:.45rem .2rem;border-radius:10px;cursor:pointer;font-family:inherit;
+        border:1.5px solid ${isSelected?'var(--gold)':'rgba(255,255,255,.1)'};
+        background:${isSelected?'rgba(255,215,0,.12)':'rgba(255,255,255,.04)'};transition:all .15s">
+      <span style="font-size:1.3rem">${e.icon}</span>
+      <span style="font-size:.6rem;color:var(--txt2)">${e.label}</span>
+    </button>`;
+  }).join('');
+  openModal('m-emotion');
+}
+
+
+
 function claimEmotionReward(rewardId) {
   const weekStart = Utils.weekStartStr();
   const reward = EMOTION_REWARDS.find(r => r.id === rewardId);
@@ -4607,15 +4925,23 @@ function selectEmotionLevel(level) {
   document.getElementById('emotion-submit-btn').disabled = false;
 }
 
+let _emoEditDate = null; // 수정 모드일 때 날짜
+
 function submitEmotion(reason) {
   if (!_emoSelectedKey || !_emoSelectedLevel) {
     toast('감정과 강도를 선택해주세요!'); return;
   }
-  const today = Utils.todayStr();
-  DB_EMOTION.save(CUR.id, today, _emoCurrentPeriod, _emoSelectedKey, _emoSelectedLevel,
+  const saveDate = _emoEditDate || Utils.todayStr();
+  DB_EMOTION.save(CUR.id, saveDate, _emoCurrentPeriod, _emoSelectedKey, _emoSelectedLevel,
     reason.trim() || '없음');
+  _emoEditDate = null; // 초기화
   closeModal('m-emotion');
-  renderMain(); renderMobile();
+  // 오늘 날짜면 홈 카드 갱신, 아니면 감정 탭 갱신
+  if (saveDate === Utils.todayStr()) {
+    renderMain(); renderMobile();
+  } else {
+    renderEmotionHistory();
+  }
   toast(`💭 감정 기록 완료!`);
 }
 
