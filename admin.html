@@ -2135,17 +2135,24 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <div style="font-size:.7rem;color:var(--txt3);display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;padding:.2rem .3rem;margin-bottom:.3rem">
             <span>보상 종류</span><span style="text-align:center">조건(회)</span><span style="text-align:center">EXP</span><span style="text-align:center">골드</span>
           </div>
-          ${[
-            {id:'participate', label:'💭 참여 보상', condId:'emo-reward-participate', expId:'emo-reward-participate-exp', goldId:'emo-reward-participate-gold', condDef:4, expDef:20, goldDef:15},
-            {id:'steady',      label:'💪 꾸준함 보상', condId:'emo-reward-steady', expId:'emo-reward-steady-exp', goldId:'emo-reward-steady-gold', condDef:8, expDef:50, goldDef:40},
-            {id:'reflect',     label:'🤔 성찰 보상', condId:'emo-reward-reflect', expId:'emo-reward-reflect-exp', goldId:'emo-reward-reflect-gold', condDef:3, expDef:30, goldDef:20},
-          ].map(r=>`
-            <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
-              <span style="font-size:.82rem">${r.label}</span>
-              <input class="form-input" type="number" id="${r.condId}" min="1" max="14" value="${r.condDef}" style="padding:.2rem;font-size:.78rem;text-align:center">
-              <input class="form-input" type="number" id="${r.expId}" min="0" max="200" value="${r.expDef}" style="padding:.2rem;font-size:.78rem;text-align:center">
-              <input class="form-input" type="number" id="${r.goldId}" min="0" max="200" value="${r.goldDef}" style="padding:.2rem;font-size:.78rem;text-align:center">
-            </div>`).join('')}
+          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="font-size:.82rem">💭 참여 보상</span>
+            <input class="form-input" type="number" id="emo-reward-participate" min="1" max="14" value="4" style="padding:.2rem;font-size:.78rem;text-align:center">
+            <input class="form-input" type="number" id="emo-reward-participate-exp" min="0" max="200" value="20" style="padding:.2rem;font-size:.78rem;text-align:center">
+            <input class="form-input" type="number" id="emo-reward-participate-gold" min="0" max="200" value="15" style="padding:.2rem;font-size:.78rem;text-align:center">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="font-size:.82rem">💪 꾸준함 보상</span>
+            <input class="form-input" type="number" id="emo-reward-steady" min="1" max="14" value="8" style="padding:.2rem;font-size:.78rem;text-align:center">
+            <input class="form-input" type="number" id="emo-reward-steady-exp" min="0" max="200" value="50" style="padding:.2rem;font-size:.78rem;text-align:center">
+            <input class="form-input" type="number" id="emo-reward-steady-gold" min="0" max="200" value="40" style="padding:.2rem;font-size:.78rem;text-align:center">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem">
+            <span style="font-size:.82rem">🤔 성찰 보상</span>
+            <input class="form-input" type="number" id="emo-reward-reflect" min="1" max="14" value="3" style="padding:.2rem;font-size:.78rem;text-align:center">
+            <input class="form-input" type="number" id="emo-reward-reflect-exp" min="0" max="200" value="30" style="padding:.2rem;font-size:.78rem;text-align:center">
+            <input class="form-input" type="number" id="emo-reward-reflect-gold" min="0" max="200" value="20" style="padding:.2rem;font-size:.78rem;text-align:center">
+          </div>
           <button class="btn-sm success" style="width:100%;margin-top:.8rem" onclick="saveEmotionRewardSettings()">💾 저장</button>
         </div>
 
