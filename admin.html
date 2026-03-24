@@ -3504,7 +3504,7 @@ function renderBooksPage() {
             <span style="font-size:.7rem;color:var(--gold);flex-shrink:0">대기</span>
             <div style="flex:1">
               <div style="font-size:.84rem;font-weight:600">${p.bookTitle||p.label||''}</div>
-              ${p.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem">${p.bookReview.slice(0,60)}${p.bookReview.length>60?'...':\''}</div>`:\''}
+              ${p.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem">${p.bookReview.length>60?p.bookReview.slice(0,60)+'...':p.bookReview}</div>`:''}
             </div>
             <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0">${p.bookDate||p.date||''}</span>
             <button onclick="deleteBookPending('${s.id}','${p.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem;padding:.1rem .3rem" title="삭제">🗑️</button>
