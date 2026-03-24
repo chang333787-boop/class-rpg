@@ -2318,12 +2318,7 @@ function buildMainHTML() {
   // ── 오늘 할 일 카드 ──
   const todos = [];
 
-  // 1순위: 보상 수령 (가장 중요)
-  if (approvedCount > 0)
-    todos.push({type:'urgent', icon:'🎁', badge:approvedCount,
-      title:`보상 ${approvedCount}개 승인 완료!`,
-      sub:(s.pendingRewards||[]).filter(r=>r.approved).slice(0,2).map(r=>r.label).join(' · '),
-      action:"claimRewards()", btnLabel:'받기!'});
+  // 승인된 보상은 자동 지급됨 (받기 버튼 단계 제거)
   if (waitingCount > 0)
     todos.push({type:'info', icon:'⏳', badge:waitingCount,
       title:`퀘스트 승인 대기중 ${waitingCount}건`,
@@ -4610,10 +4605,7 @@ function renderQuestModal() {
       name:q.name, status:'done', exp:q.exp, gold:q.gold, date:q.date, icon:q.icon||'📋'
     }))
   ];
-  const claimPending = pending.filter(p => !p.selfApplied);
-  const claimBtn = claimPending.length > 0
-    ? `<button class="btn-gold" style="width:100%;padding:.6rem;font-size:.85rem;margin-bottom:1rem"
-        onclick="claimRewards();closeModal('m-quest')">🎁 승인된 보상 ${claimPending.length}개 받기!</button>` : '';
+  const claimBtn = ''; // 보상 자동 지급으로 받기 버튼 제거
   const statusLabel = {
     claim: `<span class="qr-status approved">🎁 받기 가능</span>`,
     self:  `<span class="qr-status waiting">📨 신청중</span>`,

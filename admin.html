@@ -2427,8 +2427,11 @@ function approveReward(student, reward) {
   student.gold  = (student.gold||0) + (reward.gold||0);
   student.level = Utils.levelFromExp(student.exp);
 
-  // 2. 스탯 증가는 학생이 받기 버튼 누를 때 claimRewards에서 처리
-  // (여기서 중복 적용하지 않음)
+  // 2. 스탯 증가 (승인 즉시 지급)
+  if (reward.stat && reward.statVal) {
+    student.stats = student.stats || {};
+    student.stats[reward.stat] = (student.stats[reward.stat]||0) + (reward.statVal||1);
+  }
 
   // 3. 타입별 처리
   if (reward.type === 'artwork') {
@@ -2484,10 +2487,8 @@ function approveSingle(studentId, rewardId) {
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
   if (!reward) return;
   approveReward(s, reward);
-  // 독서/작품은 승인 즉시 제거 (학생 받기 버튼 불필요)
-  if (reward.type === 'book' || reward.type === 'artwork') {
-    s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
-  }
+  // 모든 타입 승인 즉시 제거 (받기 버튼 단계 제거)
+  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
   DB.saveStudent(s);
   renderAll();
   notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
@@ -2500,10 +2501,8 @@ function approveAll() {
     const pending = s.pendingRewards||[];
     if (pending.length === 0) return;
     pending.forEach(r => approveReward(s, r));
-    // 독서/작품은 즉시 제거
-    s.pendingRewards = (s.pendingRewards||[]).filter(r =>
-      r.type !== 'book' && r.type !== 'artwork'
-    );
+    // 모든 타입 승인 즉시 제거
+    s.pendingRewards = [];
     DB.saveStudent(s);
     count += pending.length;
   });
