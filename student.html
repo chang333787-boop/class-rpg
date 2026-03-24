@@ -2568,23 +2568,7 @@ function claimRewards() {
       CUR.stats = CUR.stats || {};
       CUR.stats[r.stat] = (CUR.stats[r.stat]||0) + r.statVal;
     }
-    // questLog 저장 (능력치 내역 추적용)
-    if (r.boardQuestId || r.stat) {
-      DB.saveQuestLog({
-        studentId:    CUR.id,
-        boardQuestId: r.boardQuestId || null,
-        boardQuestType: r.boardQuestType || r.type || 'special',
-        type:         r.type || 'quest',
-        name:         r.label || r.name || '',
-        exp:          r.exp   || 0,
-        gold:         r.gold  || 0,
-        stat:         r.stat  || '',
-        statVal:      r.statVal || 0,
-        icon:         r.icon  || '📋',
-        date:         Utils.todayStr(),
-        approved:     true,
-      });
-    }
+    // questLog는 관리자 approveReward에서 이미 저장됨 → 여기서 중복 저장 제거
   });
   // 승인된 것만 제거, 대기중인 것은 유지
   CUR.pendingRewards = pending.filter(r => r.approved !== true);
