@@ -1933,6 +1933,7 @@ function renderDashboard() {
   const activeBQIds = new Set((db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id));
   const pendingItems = students.flatMap(s =>
     (s.pendingRewards||[])
+      .filter(r => !r.approved) // 승인된 것 제외
       .filter(r => !r.boardQuestId || activeBQIds.has(r.boardQuestId))
       .map(r => ({...r, student:s}))
   );
@@ -2660,9 +2661,12 @@ function gridApprove(studentId, rewardId) {
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId);
   if (!reward) return;
   approveReward(s, reward);
+  // 모든 타입 승인 즉시 제거
+  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId);
   DB.saveStudent(s);
   renderApproveGrid();
   renderApproveList();
+  renderDashboard();
   notify(`✅ ${s.name} · ${reward.label} 승인!`);
 }
 
