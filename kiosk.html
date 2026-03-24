@@ -1326,6 +1326,12 @@ function renderEmotionBoard() {
   if (!el || !DB_DATA) return;
   const students = DB_DATA.students || [];
   const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const emoLogs = DB_DATA.emotionLogs || {};
+
+  // 오늘 특정 학생/시간대 감정 조회
+  function getEmo(studentId, period) {
+    return emoLogs[`${studentId}_${today}_${period}`] || null;
+  }
 
   el.innerHTML = `
     <div style="font-size:.9rem;font-weight:900;color:var(--gold);padding:.4rem .2rem .6rem;
@@ -1340,8 +1346,8 @@ function renderEmotionBoard() {
       </tr></thead>
       <tbody>
         ${students.map(s => {
-          const am = DB_EMOTION.get(s.id, today, 'am');
-          const pm = DB_EMOTION.get(s.id, today, 'pm');
+          const am = getEmo(s.id, 'am');
+          const pm = getEmo(s.id, 'pm');
           return `<tr>
             <td style="padding:.6rem;border:1px solid var(--border);font-size:.88rem;font-weight:700">
               ${s.avatar} ${s.name}
@@ -1387,7 +1393,7 @@ function openKioskEmotion(studentId, period) {
   _kEmoKey = null; _kEmoLevel = null;
 
   const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
-  const existing = DB_EMOTION.get(studentId, today, period);
+  const existing = (DB_DATA?.emotionLogs || {})[`${studentId}_${today}_${period}`] || null;
   const s = (DB_DATA.students||[]).find(x=>x.id===studentId);
   const label = period==='am'?'🌅 오전':'🌇 오후';
 
@@ -1483,7 +1489,16 @@ function kSelectLevel(level) {
 function kSubmitEmotion(reason) {
   if (!_kEmoKey || !_kEmoLevel) { return; }
   const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
-  DB_EMOTION.save(_kEmoStudentId, today, _kEmoPeriod, _kEmoKey, _kEmoLevel, reason.trim()||'없음');
+  const e = EMOTION_DATA.find(x => x.key === _kEmoKey);
+  const key = `${_kEmoStudentId}_${today}_${_kEmoPeriod}`;
+  const record = {
+    id: key, studentId: _kEmoStudentId, date: today, period: _kEmoPeriod,
+    emotionKey: _kEmoKey, emotionLabel: e.label, emotionIcon: e.icon, group: e.group,
+    level: _kEmoLevel, levelLabel: ['조금','보통','많이'][_kEmoLevel-1],
+    score: EMOTION_GROUP_VALUE[e.group] * _kEmoLevel,
+    reason: reason.trim() || '없음', updatedAt: Date.now(),
+  };
+  fbRef.child('emotionLogs/' + key).set(record);
   document.getElementById('kiosk-emo-popup').style.display = 'none';
   renderEmotionBoard();
 }
