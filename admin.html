@@ -3491,6 +3491,17 @@ function renderBooksPage() {
         ${pending.length>0?`<span style="font-size:.7rem;color:var(--gold)">+ 확인대기 ${pending.length}건</span>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:.3rem;padding-left:.5rem">
+        ${pending.map(p=>`
+          <div style="display:flex;align-items:flex-start;gap:.6rem;padding:.4rem .6rem;
+            background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.15);border-radius:8px">
+            <span style="font-size:.7rem;color:var(--gold);flex-shrink:0">대기</span>
+            <div style="flex:1">
+              <div style="font-size:.84rem;font-weight:600">${p.bookTitle||p.label||''}</div>
+              ${p.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem">${p.bookReview.slice(0,60)}${p.bookReview.length>60?'...':\''}</div>`:\''}
+            </div>
+            <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0">${p.bookDate||p.date||''}</span>
+            <button onclick="deleteBookPending('${s.id}','${p.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem;padding:.1rem .3rem" title="삭제">🗑️</button>
+          </div>`).join('')}
         ${books.slice().reverse().map((b,i)=>`
           <div style="display:flex;align-items:flex-start;gap:.6rem;padding:.4rem .6rem;
             background:rgba(255,255,255,.03);border-radius:8px">
@@ -3505,6 +3516,16 @@ function renderBooksPage() {
       </div>
     </div>`;
   }).join('');
+}
+
+function deleteBookPending(studentId, pendingId) {
+  if (!confirm('대기중인 독서 기록을 삭제할까요?')) return;
+  const s = DB.getStudent(studentId);
+  if (!s) return;
+  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== pendingId);
+  DB.saveStudent(s);
+  renderBooksPage();
+  notify('독서 대기 기록 삭제 완료');
 }
 
 function deleteBook(studentId, bookTitle) {
