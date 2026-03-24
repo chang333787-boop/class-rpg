@@ -2484,6 +2484,10 @@ function approveSingle(studentId, rewardId) {
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
   if (!reward) return;
   approveReward(s, reward);
+  // 독서/작품은 승인 즉시 제거 (학생 받기 버튼 불필요)
+  if (reward.type === 'book' || reward.type === 'artwork') {
+    s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
+  }
   DB.saveStudent(s);
   renderAll();
   notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
@@ -2496,6 +2500,10 @@ function approveAll() {
     const pending = s.pendingRewards||[];
     if (pending.length === 0) return;
     pending.forEach(r => approveReward(s, r));
+    // 독서/작품은 즉시 제거
+    s.pendingRewards = (s.pendingRewards||[]).filter(r =>
+      r.type !== 'book' && r.type !== 'artwork'
+    );
     DB.saveStudent(s);
     count += pending.length;
   });
