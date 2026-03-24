@@ -930,6 +930,160 @@ function getClaimableEmotionRewards(student, weekStart) {
 }
 
 
+// ══════════════════════════════════════════════════
+//  EMOTION REFLECTION (감정 돌아보기 팝업)
+// ══════════════════════════════════════════════════
+
+const EMOTION_PAST_TEXT = {
+  "무섭다":"무서웠다고","슬프다":"슬펐다고","외롭다":"외로웠다고",
+  "짜증나다":"짜증났다고","화나다":"화가 났다고","신나다":"신났다고",
+  "행복하다":"행복했다고","당황하다":"당황했다고","미안하다":"미안했다고",
+  "창피하다":"창피했다고","억울하다":"억울했다고","즐겁다":"즐거웠다고",
+  "답답하다":"답답했다고","걱정되다":"걱정됐다고","설레다":"설렜다고",
+  "샘나다":"샘이 났다고","실망하다":"실망했다고","울고싶다":"울고 싶었다고",
+  "부끄럽다":"부끄러웠다고","재미있다":"재미있었다고","편안하다":"편안했다고",
+  "기쁘다":"기뻤다고","알밉다":"밉게 느껴졌다고","속상하다":"속상했다고",
+  "뿌듯하다":"뿌듯했다고","우울하다":"우울했다고","서운하다":"서운했다고",
+  "만족하다":"만족스러웠다고","불안하다":"불안했다고","놀라다":"놀랐다고",
+  "쓸쓸하다":"쓸쓸했다고","신경질나다":"신경질이 났다고","아쉽다":"아쉬웠다고",
+  "약오르다":"약이 올랐다고","후회되다":"후회됐다고",
+};
+
+// 팝업 후보 감정 선택
+function getReflectionCandidate(studentId) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const logs = db.emotionLogs || {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+
+  // 2~7일 사이 기록 (오늘 제외)
+  const candidates = Object.values(logs).filter(r => {
+    if (!r || r.studentId !== studentId) return false;
+    if (r.date === today) return false;
+    const diff = (new Date(today) - new Date(r.date)) / 86400000;
+    return diff >= 1 && diff <= 7;
+  });
+  if (!candidates.length) return null;
+
+  // 이미 사용한 기록 제외
+  const reflections = db.emotionReflections || {};
+  const usedIds = new Set(
+    Object.values(reflections)
+      .filter(r => r && r.studentId === studentId)
+      .map(r => r.promptSourceId)
+  );
+
+  // 부정 감정 우선, 이유 있는 것 우선
+  const available = candidates.filter(r => !usedIds.has(r.id));
+  if (!available.length) return null;
+
+  available.sort((a, b) => {
+    const gScore = {negative:2, neutral:1, positive:0};
+    const gs = (gScore[b.group]||0) - (gScore[a.group]||0);
+    if (gs !== 0) return gs;
+    const hasReasonA = a.reason && a.reason !== '없음' ? 1 : 0;
+    const hasReasonB = b.reason && b.reason !== '없음' ? 1 : 0;
+    return hasReasonB - hasReasonA;
+  });
+
+  return available[0];
+}
+
+// 팝업 노출 가능 여부 체크
+function canShowReflectionPopup(studentId) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+
+  const stats = (db.emotionPromptStats || {})[studentId] || {};
+
+  // 오늘 이미 했으면 금지
+  if (stats.lastShownDate === today) return false;
+  // 이번 주 2회 이상이면 금지
+  if ((stats.weekCount || {})[weekStart] >= 2) return false;
+  // 감정 기록 3개 이상이어야
+  const logCount = Object.values(db.emotionLogs || {})
+    .filter(r => r && r.studentId === studentId).length;
+  if (logCount < 3) return false;
+
+  return true;
+}
+
+// 팝업 통계 업데이트
+function updateReflectionStats(studentId, type) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+
+  db.emotionPromptStats = db.emotionPromptStats || {};
+  db.emotionPromptStats[studentId] = db.emotionPromptStats[studentId] || {};
+  const stats = db.emotionPromptStats[studentId];
+
+  if (type !== 'later') {
+    stats.lastShownDate = today;
+    stats.weekCount = stats.weekCount || {};
+    stats.weekCount[weekStart] = (stats.weekCount[weekStart] || 0) + 1;
+  } else {
+    stats.lastShownDate = today; // later도 오늘은 재노출 금지
+  }
+
+  if (typeof DB !== 'undefined') {
+    DB._cache = db;
+    DB._fbRef.child('emotionPromptStats/' + studentId).set(stats);
+  }
+}
+
+// Reflection 저장
+function saveEmotionReflection(studentId, candidate, responseType, responseText, teacherRequest) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+  const key = `${studentId}_${today}_${Date.now()}`;
+
+  const record = {
+    id: key,
+    studentId,
+    promptSourceId:    candidate.id,
+    promptDate:        candidate.date,
+    promptPeriod:      candidate.period,
+    promptEmotionKey:  candidate.emotionKey,
+    promptEmotionLabel:candidate.emotionLabel,
+    promptEmotionGroup:candidate.group,
+    promptEmotionScore:candidate.score,
+    promptReason:      candidate.reason || '',
+    responseType,
+    responseText:      responseText || '',
+    teacherRequest:    !!teacherRequest,
+    createdAt:         Date.now(),
+    weekKey:           weekStart,
+  };
+
+  if (typeof DB !== 'undefined') {
+    db.emotionReflections = db.emotionReflections || {};
+    db.emotionReflections[key] = record;
+    DB._cache = db;
+    DB._fbRef.child('emotionReflections/' + key).set(record);
+
+    // 관리자 알림
+    if (teacherRequest) {
+      const student = DB.getStudent(studentId);
+      DB._fbRef.child('emotionAlerts/' + key).set({
+        ...record,
+        studentName: student?.name || '',
+        studentAvatar: student?.avatar || '',
+        read: false,
+      });
+    }
+  }
+  return record;
+}
+
 </script>
 <style>
 :root{
@@ -1953,6 +2107,44 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="lup-promo" id="lup-promo"></div>
 </div>
 
+<!-- 감정 돌아보기 팝업 -->
+<div class="overlay" id="m-reflection"><div class="modal" style="max-width:420px">
+  <div class="modal-hd">
+    <div class="modal-title">💭 잠깐, 돌아볼까요?</div>
+    <button class="modal-close" onclick="dismissReflection()">✕</button>
+  </div>
+  <!-- step1: 질문 + 기본 선택지 -->
+  <div id="ref-step1">
+    <div id="ref-question" style="font-size:.88rem;line-height:1.7;color:var(--txt);
+      background:rgba(255,255,255,.04);border-radius:12px;padding:.8rem;margin-bottom:1rem"></div>
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <button onclick="onReflectionResponse('better')" class="btn-sm success" style="text-align:left;padding:.55rem .9rem">😊 좋아졌어요</button>
+      <button onclick="onReflectionResponse('same')"   class="btn-sm outline" style="text-align:left;padding:.55rem .9rem">😐 비슷해요</button>
+      <button onclick="onReflectionResponse('worse')"  class="btn-sm outline" style="text-align:left;padding:.55rem .9rem;color:var(--red);border-color:rgba(231,76,60,.3)">😔 나빠졌어요</button>
+      <button onclick="onReflectionResponse('custom')" class="btn-sm outline" style="text-align:left;padding:.55rem .9rem">✏️ 직접 적을래요</button>
+      <button onclick="onReflectionResponse('later')"  style="background:none;border:none;color:var(--txt3);font-size:.78rem;cursor:pointer;padding:.4rem;font-family:inherit">나중에 할게요</button>
+    </div>
+  </div>
+  <!-- step2: 후속 메시지 -->
+  <div id="ref-step2" style="display:none">
+    <div id="ref-followup-msg" style="font-size:.88rem;line-height:1.7;color:var(--txt);
+      background:rgba(255,255,255,.04);border-radius:12px;padding:.8rem;margin-bottom:1rem"></div>
+    <div id="ref-followup-actions" style="display:flex;flex-direction:column;gap:.5rem"></div>
+  </div>
+  <!-- step2b: 직접 입력 -->
+  <div id="ref-step-custom" style="display:none">
+    <textarea id="ref-custom-text" rows="3" placeholder="지금 마음을 짧게 적어보세요"
+      style="width:100%;padding:.7rem;border-radius:10px;background:rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.15);color:var(--txt);font-size:.85rem;
+        font-family:inherit;resize:none;margin-bottom:.7rem"></textarea>
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <button onclick="submitReflectionCustom(false)" class="btn-sm success">저장</button>
+      <button onclick="submitReflectionCustom(true)"  class="btn-sm outline" style="border-color:rgba(93,173,226,.3);color:var(--sky)">선생님께도 전할래요</button>
+      <button onclick="dismissReflection()" style="background:none;border:none;color:var(--txt3);font-size:.78rem;cursor:pointer;padding:.4rem;font-family:inherit">취소</button>
+    </div>
+  </div>
+</div></div>
+
 <!-- 감정 입력 모달 -->
 <div class="overlay" id="m-emotion"><div class="modal" style="max-width:480px">
   <div class="modal-hd">
@@ -2131,6 +2323,8 @@ function enterGame() {
   applyLayout(LAYOUT_MODE);
   renderAll();
   startAccessTimer();
+  // 감정 돌아보기 팝업 — 30초 후 자연스럽게
+  setTimeout(() => tryShowReflectionPopup(), 30000);
 }
 
 function cleanInactivePending() {
@@ -4574,6 +4768,130 @@ function renderArtworks() {
   el.innerHTML = pendingHtml + approvedHtml;
 }
 
+
+// ══ 감정 돌아보기 팝업 ══
+let _refCandidate = null;
+
+function tryShowReflectionPopup() {
+  if (!CUR) return;
+  if (!canShowReflectionPopup(CUR.id)) return;
+  const candidate = getReflectionCandidate(CUR.id);
+  if (!candidate) return;
+  _refCandidate = candidate;
+
+  // 질문 문장 생성
+  const pastText = EMOTION_PAST_TEXT[candidate.emotionLabel] || `${candidate.emotionLabel}했다고`;
+  const dateStr  = candidate.date.slice(5).replace('-', '/');
+  let question;
+  if (candidate.reason && candidate.reason !== '없음') {
+    question = `${CUR.name}님, ${dateStr}에 "${candidate.reason}"라고 적었고, 그때는 마음이 ${pastText} 했어요. 지금은 어떤가요?`;
+  } else {
+    question = `${CUR.name}님, ${dateStr}에는 마음이 ${pastText} 했어요. 오늘은 어떤가요?`;
+  }
+
+  document.getElementById('ref-question').textContent = question;
+  document.getElementById('ref-step1').style.display         = '';
+  document.getElementById('ref-step2').style.display         = 'none';
+  document.getElementById('ref-step-custom').style.display   = 'none';
+  openModal('m-reflection');
+}
+
+function onReflectionResponse(type) {
+  if (!_refCandidate) return;
+
+  const msgs = {
+    better: ['다행이에요. 마음이 조금 나아졌군요. 😊', '좋아졌다고 알려줘서 고마워요.', '스스로 돌아본 것이 정말 좋아요.'],
+    same:   ['아직 비슷하게 느껴지는군요.', '그 마음이 계속되고 있네요.', '괜찮아요. 천천히 달라질 수도 있어요.'],
+    worse:  ['더 힘들어졌군요.', '그렇게 느낄 수 있어요.', '혼자 참지 않아도 괜찮아요.'],
+    later:  ['괜찮아요. 나중에 다시 생각해봐도 돼요.', '지금 답하지 않아도 괜찮아요.'],
+  };
+
+  if (type === 'later') {
+    updateReflectionStats(CUR.id, 'later');
+    saveEmotionReflection(CUR.id, _refCandidate, 'later', '', false);
+    closeModal('m-reflection');
+    return;
+  }
+
+  if (type === 'custom') {
+    document.getElementById('ref-step1').style.display       = 'none';
+    document.getElementById('ref-step-custom').style.display = '';
+    return;
+  }
+
+  const msg = msgs[type][Math.floor(Math.random() * msgs[type].length)];
+  document.getElementById('ref-followup-msg').textContent = msg;
+  document.getElementById('ref-step1').style.display = 'none';
+  document.getElementById('ref-step2').style.display = '';
+
+  const actionsEl = document.getElementById('ref-followup-actions');
+
+  if (type === 'worse') {
+    // 나빠졌어요 → 2차 선택지
+    actionsEl.innerHTML = `
+      <button onclick="finalizeReflection('worse','',false)"
+        class="btn-sm outline" style="text-align:left;padding:.55rem .9rem">괜찮아요, 기록만 할게요</button>
+      <button onclick="finalizeReflection('worse','',true)"
+        class="btn-sm outline" style="text-align:left;padding:.55rem .9rem;color:var(--sky);border-color:rgba(93,173,226,.3)">
+        선생님께 말하고 싶어요</button>`;
+  } else {
+    // better / same → 부정 반복 체크
+    actionsEl.innerHTML = `<button onclick="finalizeReflection('${type}','',false)"
+      class="btn-sm success" style="padding:.55rem .9rem">확인</button>`;
+
+    // 부정 연속 체크
+    if (shouldShowTeacherOption(CUR.id)) {
+      actionsEl.innerHTML += `
+        <div style="margin-top:.5rem;padding:.6rem;background:rgba(93,173,226,.06);border-radius:10px;
+          border:1px solid rgba(93,173,226,.15)">
+          <div style="font-size:.78rem;color:var(--sky);margin-bottom:.4rem">
+            요즘 마음이 계속 힘든 것 같아요. 선생님께 이야기하고 싶나요?
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <button onclick="finalizeReflection('${type}','',false)"
+              style="flex:1;padding:.4rem;border-radius:8px;background:rgba(255,255,255,.06);
+                border:1px solid rgba(255,255,255,.12);color:var(--txt);font-size:.78rem;cursor:pointer;font-family:inherit">괜찮아요</button>
+            <button onclick="finalizeReflection('${type}','',true)"
+              style="flex:1;padding:.4rem;border-radius:8px;background:rgba(93,173,226,.15);
+                border:1px solid rgba(93,173,226,.3);color:var(--sky);font-size:.78rem;cursor:pointer;font-family:inherit">이야기하고 싶어요</button>
+          </div>
+        </div>`;
+    }
+  }
+}
+
+function submitReflectionCustom(teacherRequest) {
+  const text = document.getElementById('ref-custom-text').value.trim();
+  finalizeReflection('custom', text, teacherRequest);
+}
+
+function finalizeReflection(responseType, responseText, teacherRequest) {
+  if (!_refCandidate) return;
+  updateReflectionStats(CUR.id, responseType);
+  saveEmotionReflection(CUR.id, _refCandidate, responseType, responseText, teacherRequest);
+  closeModal('m-reflection');
+  if (teacherRequest) toast('선생님께 전달됐어요. 고마워요 💙');
+  _refCandidate = null;
+}
+
+function dismissReflection() {
+  updateReflectionStats(CUR.id, 'later');
+  saveEmotionReflection(CUR.id, _refCandidate, 'later', '', false);
+  closeModal('m-reflection');
+  _refCandidate = null;
+}
+
+function shouldShowTeacherOption(studentId) {
+  const db = DB.load();
+  const reflections = Object.values(db.emotionReflections || {})
+    .filter(r => r && r.studentId === studentId)
+    .sort((a,b) => b.createdAt - a.createdAt)
+    .slice(0, 3);
+  const badCount = reflections.filter(r =>
+    r.responseType === 'worse' || r.responseType === 'same'
+  ).length;
+  return badCount >= 2;
+}
 
 // ══ 오늘의 감정 ══
 

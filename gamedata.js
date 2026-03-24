@@ -917,3 +917,157 @@ function getClaimableEmotionRewards(student, weekStart) {
   });
 }
 
+
+// ══════════════════════════════════════════════════
+//  EMOTION REFLECTION (감정 돌아보기 팝업)
+// ══════════════════════════════════════════════════
+
+const EMOTION_PAST_TEXT = {
+  "무섭다":"무서웠다고","슬프다":"슬펐다고","외롭다":"외로웠다고",
+  "짜증나다":"짜증났다고","화나다":"화가 났다고","신나다":"신났다고",
+  "행복하다":"행복했다고","당황하다":"당황했다고","미안하다":"미안했다고",
+  "창피하다":"창피했다고","억울하다":"억울했다고","즐겁다":"즐거웠다고",
+  "답답하다":"답답했다고","걱정되다":"걱정됐다고","설레다":"설렜다고",
+  "샘나다":"샘이 났다고","실망하다":"실망했다고","울고싶다":"울고 싶었다고",
+  "부끄럽다":"부끄러웠다고","재미있다":"재미있었다고","편안하다":"편안했다고",
+  "기쁘다":"기뻤다고","알밉다":"밉게 느껴졌다고","속상하다":"속상했다고",
+  "뿌듯하다":"뿌듯했다고","우울하다":"우울했다고","서운하다":"서운했다고",
+  "만족하다":"만족스러웠다고","불안하다":"불안했다고","놀라다":"놀랐다고",
+  "쓸쓸하다":"쓸쓸했다고","신경질나다":"신경질이 났다고","아쉽다":"아쉬웠다고",
+  "약오르다":"약이 올랐다고","후회되다":"후회됐다고",
+};
+
+// 팝업 후보 감정 선택
+function getReflectionCandidate(studentId) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const logs = db.emotionLogs || {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+
+  // 2~7일 사이 기록 (오늘 제외)
+  const candidates = Object.values(logs).filter(r => {
+    if (!r || r.studentId !== studentId) return false;
+    if (r.date === today) return false;
+    const diff = (new Date(today) - new Date(r.date)) / 86400000;
+    return diff >= 1 && diff <= 7;
+  });
+  if (!candidates.length) return null;
+
+  // 이미 사용한 기록 제외
+  const reflections = db.emotionReflections || {};
+  const usedIds = new Set(
+    Object.values(reflections)
+      .filter(r => r && r.studentId === studentId)
+      .map(r => r.promptSourceId)
+  );
+
+  // 부정 감정 우선, 이유 있는 것 우선
+  const available = candidates.filter(r => !usedIds.has(r.id));
+  if (!available.length) return null;
+
+  available.sort((a, b) => {
+    const gScore = {negative:2, neutral:1, positive:0};
+    const gs = (gScore[b.group]||0) - (gScore[a.group]||0);
+    if (gs !== 0) return gs;
+    const hasReasonA = a.reason && a.reason !== '없음' ? 1 : 0;
+    const hasReasonB = b.reason && b.reason !== '없음' ? 1 : 0;
+    return hasReasonB - hasReasonA;
+  });
+
+  return available[0];
+}
+
+// 팝업 노출 가능 여부 체크
+function canShowReflectionPopup(studentId) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+
+  const stats = (db.emotionPromptStats || {})[studentId] || {};
+
+  // 오늘 이미 했으면 금지
+  if (stats.lastShownDate === today) return false;
+  // 이번 주 2회 이상이면 금지
+  if ((stats.weekCount || {})[weekStart] >= 2) return false;
+  // 감정 기록 3개 이상이어야
+  const logCount = Object.values(db.emotionLogs || {})
+    .filter(r => r && r.studentId === studentId).length;
+  if (logCount < 3) return false;
+
+  return true;
+}
+
+// 팝업 통계 업데이트
+function updateReflectionStats(studentId, type) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+
+  db.emotionPromptStats = db.emotionPromptStats || {};
+  db.emotionPromptStats[studentId] = db.emotionPromptStats[studentId] || {};
+  const stats = db.emotionPromptStats[studentId];
+
+  if (type !== 'later') {
+    stats.lastShownDate = today;
+    stats.weekCount = stats.weekCount || {};
+    stats.weekCount[weekStart] = (stats.weekCount[weekStart] || 0) + 1;
+  } else {
+    stats.lastShownDate = today; // later도 오늘은 재노출 금지
+  }
+
+  if (typeof DB !== 'undefined') {
+    DB._cache = db;
+    DB._fbRef.child('emotionPromptStats/' + studentId).set(stats);
+  }
+}
+
+// Reflection 저장
+function saveEmotionReflection(studentId, candidate, responseType, responseText, teacherRequest) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+  const key = `${studentId}_${today}_${Date.now()}`;
+
+  const record = {
+    id: key,
+    studentId,
+    promptSourceId:    candidate.id,
+    promptDate:        candidate.date,
+    promptPeriod:      candidate.period,
+    promptEmotionKey:  candidate.emotionKey,
+    promptEmotionLabel:candidate.emotionLabel,
+    promptEmotionGroup:candidate.group,
+    promptEmotionScore:candidate.score,
+    promptReason:      candidate.reason || '',
+    responseType,
+    responseText:      responseText || '',
+    teacherRequest:    !!teacherRequest,
+    createdAt:         Date.now(),
+    weekKey:           weekStart,
+  };
+
+  if (typeof DB !== 'undefined') {
+    db.emotionReflections = db.emotionReflections || {};
+    db.emotionReflections[key] = record;
+    DB._cache = db;
+    DB._fbRef.child('emotionReflections/' + key).set(record);
+
+    // 관리자 알림
+    if (teacherRequest) {
+      const student = DB.getStudent(studentId);
+      DB._fbRef.child('emotionAlerts/' + key).set({
+        ...record,
+        studentName: student?.name || '',
+        studentAvatar: student?.avatar || '',
+        read: false,
+      });
+    }
+  }
+  return record;
+}

@@ -930,6 +930,160 @@ function getClaimableEmotionRewards(student, weekStart) {
 }
 
 
+// ══════════════════════════════════════════════════
+//  EMOTION REFLECTION (감정 돌아보기 팝업)
+// ══════════════════════════════════════════════════
+
+const EMOTION_PAST_TEXT = {
+  "무섭다":"무서웠다고","슬프다":"슬펐다고","외롭다":"외로웠다고",
+  "짜증나다":"짜증났다고","화나다":"화가 났다고","신나다":"신났다고",
+  "행복하다":"행복했다고","당황하다":"당황했다고","미안하다":"미안했다고",
+  "창피하다":"창피했다고","억울하다":"억울했다고","즐겁다":"즐거웠다고",
+  "답답하다":"답답했다고","걱정되다":"걱정됐다고","설레다":"설렜다고",
+  "샘나다":"샘이 났다고","실망하다":"실망했다고","울고싶다":"울고 싶었다고",
+  "부끄럽다":"부끄러웠다고","재미있다":"재미있었다고","편안하다":"편안했다고",
+  "기쁘다":"기뻤다고","알밉다":"밉게 느껴졌다고","속상하다":"속상했다고",
+  "뿌듯하다":"뿌듯했다고","우울하다":"우울했다고","서운하다":"서운했다고",
+  "만족하다":"만족스러웠다고","불안하다":"불안했다고","놀라다":"놀랐다고",
+  "쓸쓸하다":"쓸쓸했다고","신경질나다":"신경질이 났다고","아쉽다":"아쉬웠다고",
+  "약오르다":"약이 올랐다고","후회되다":"후회됐다고",
+};
+
+// 팝업 후보 감정 선택
+function getReflectionCandidate(studentId) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const logs = db.emotionLogs || {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+
+  // 2~7일 사이 기록 (오늘 제외)
+  const candidates = Object.values(logs).filter(r => {
+    if (!r || r.studentId !== studentId) return false;
+    if (r.date === today) return false;
+    const diff = (new Date(today) - new Date(r.date)) / 86400000;
+    return diff >= 1 && diff <= 7;
+  });
+  if (!candidates.length) return null;
+
+  // 이미 사용한 기록 제외
+  const reflections = db.emotionReflections || {};
+  const usedIds = new Set(
+    Object.values(reflections)
+      .filter(r => r && r.studentId === studentId)
+      .map(r => r.promptSourceId)
+  );
+
+  // 부정 감정 우선, 이유 있는 것 우선
+  const available = candidates.filter(r => !usedIds.has(r.id));
+  if (!available.length) return null;
+
+  available.sort((a, b) => {
+    const gScore = {negative:2, neutral:1, positive:0};
+    const gs = (gScore[b.group]||0) - (gScore[a.group]||0);
+    if (gs !== 0) return gs;
+    const hasReasonA = a.reason && a.reason !== '없음' ? 1 : 0;
+    const hasReasonB = b.reason && b.reason !== '없음' ? 1 : 0;
+    return hasReasonB - hasReasonA;
+  });
+
+  return available[0];
+}
+
+// 팝업 노출 가능 여부 체크
+function canShowReflectionPopup(studentId) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+
+  const stats = (db.emotionPromptStats || {})[studentId] || {};
+
+  // 오늘 이미 했으면 금지
+  if (stats.lastShownDate === today) return false;
+  // 이번 주 2회 이상이면 금지
+  if ((stats.weekCount || {})[weekStart] >= 2) return false;
+  // 감정 기록 3개 이상이어야
+  const logCount = Object.values(db.emotionLogs || {})
+    .filter(r => r && r.studentId === studentId).length;
+  if (logCount < 3) return false;
+
+  return true;
+}
+
+// 팝업 통계 업데이트
+function updateReflectionStats(studentId, type) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+
+  db.emotionPromptStats = db.emotionPromptStats || {};
+  db.emotionPromptStats[studentId] = db.emotionPromptStats[studentId] || {};
+  const stats = db.emotionPromptStats[studentId];
+
+  if (type !== 'later') {
+    stats.lastShownDate = today;
+    stats.weekCount = stats.weekCount || {};
+    stats.weekCount[weekStart] = (stats.weekCount[weekStart] || 0) + 1;
+  } else {
+    stats.lastShownDate = today; // later도 오늘은 재노출 금지
+  }
+
+  if (typeof DB !== 'undefined') {
+    DB._cache = db;
+    DB._fbRef.child('emotionPromptStats/' + studentId).set(stats);
+  }
+}
+
+// Reflection 저장
+function saveEmotionReflection(studentId, candidate, responseType, responseText, teacherRequest) {
+  const db = (typeof DB !== 'undefined') ? DB.load() : {};
+  const today = (typeof Utils !== 'undefined') ? Utils.todayStr()
+    : new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+  const weekStart = (typeof Utils !== 'undefined') ? Utils.weekStartStr()
+    : today.slice(0,8)+'01';
+  const key = `${studentId}_${today}_${Date.now()}`;
+
+  const record = {
+    id: key,
+    studentId,
+    promptSourceId:    candidate.id,
+    promptDate:        candidate.date,
+    promptPeriod:      candidate.period,
+    promptEmotionKey:  candidate.emotionKey,
+    promptEmotionLabel:candidate.emotionLabel,
+    promptEmotionGroup:candidate.group,
+    promptEmotionScore:candidate.score,
+    promptReason:      candidate.reason || '',
+    responseType,
+    responseText:      responseText || '',
+    teacherRequest:    !!teacherRequest,
+    createdAt:         Date.now(),
+    weekKey:           weekStart,
+  };
+
+  if (typeof DB !== 'undefined') {
+    db.emotionReflections = db.emotionReflections || {};
+    db.emotionReflections[key] = record;
+    DB._cache = db;
+    DB._fbRef.child('emotionReflections/' + key).set(record);
+
+    // 관리자 알림
+    if (teacherRequest) {
+      const student = DB.getStudent(studentId);
+      DB._fbRef.child('emotionAlerts/' + key).set({
+        ...record,
+        studentName: student?.name || '',
+        studentAvatar: student?.avatar || '',
+        read: false,
+      });
+    }
+  }
+  return record;
+}
+
 </script>
 <style>
 :root {
@@ -1200,6 +1354,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon">🏆</span> 랭킹</div>
     <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon">📅</span> 활동 내역</div>
     <div class="nav-item" onclick="nav('emotion',this)"><span class="nav-icon">💭</span> 감정 현황</div>
+    <div class="nav-item" onclick="nav('emotionalerts',this)"><span class="nav-icon">🔔</span> 감정 대화 요청 <span id="emotion-alert-badge" style="margin-left:auto;background:var(--sky);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-section">콘텐츠</div>
     <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon">📋</span> 퀘스트 관리</div>
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
@@ -1446,6 +1601,17 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <!-- 목록 -->
       <div class="table-card">
         <div id="emotion-list" style="padding:.5rem 0"></div>
+      </div>
+    </div>
+
+    <!-- ── EMOTION ALERTS ── -->
+    <div class="page" id="p-emotionalerts">
+      <div class="section-header">
+        <div><div class="sh-title">🔔 감정 대화 요청</div>
+        <div class="sh-sub">학생이 선생님께 말하고 싶다고 한 기록이에요</div></div>
+      </div>
+      <div class="table-card">
+        <div id="emotion-alerts-list" style="padding:.5rem 0"></div>
       </div>
     </div>
 
@@ -2132,6 +2298,7 @@ function renderAll() {
   renderPromotionList();
   loadSettings();
   updatePwResetBadge();
+  updateEmotionAlertBadge();
   renderArtworkPending();
   renderArtworkAdmin();
   const students = DB.getStudents();
@@ -2149,10 +2316,10 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity','stats','emotion'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
   rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
-  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역', emotion:'💭 감정 현황'};
+  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역', emotion:'💭 감정 현황', emotionalerts:'🔔 감정 대화 요청'};
 
 function nav(page, el) {
   pages.forEach(p => document.getElementById('p-'+p)?.classList.remove('active'));
@@ -2176,7 +2343,8 @@ function nav(page, el) {
     loadEmotionRewardSettings();
     setTimeout(() => switchShopTab('seed', document.getElementById('shop-tab-seed')), 50);
   }
-  if (page === 'emotion')   renderEmotionPage();
+  if (page === 'emotion')        renderEmotionPage();
+  if (page === 'emotionalerts')  renderEmotionAlerts();
 }
 
 // ══════════════════════════════════════════════════
@@ -5004,6 +5172,64 @@ function saveSubjects() {
   DB._cache = db;
   DB._fbRef.child('settings').set(db.settings);
   notify('✅ 과목 설정 저장!');
+}
+
+function updateEmotionAlertBadge() {
+  const db = DB.load();
+  const alerts = Object.values(db.emotionAlerts || {}).filter(a => a && !a.read);
+  const badge = document.getElementById('emotion-alert-badge');
+  if (!badge) return;
+  if (alerts.length > 0) { badge.textContent = alerts.length; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+function renderEmotionAlerts() {
+  const db = DB.load();
+  const alerts = Object.values(db.emotionAlerts || {})
+    .filter(a => a)
+    .sort((a,b) => b.createdAt - a.createdAt);
+  const el = document.getElementById('emotion-alerts-list');
+  if (!el) return;
+
+  if (alerts.length === 0) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">감정 대화 요청이 없어요 ✅</div>';
+    return;
+  }
+
+  const typeLabel = {worse:'😔 나빠졌어요', custom:'✏️ 직접 입력', same:'😐 비슷해요'};
+  el.innerHTML = alerts.map(a => `
+    <div style="padding:.8rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05);
+      background:${a.read?'':'rgba(93,173,226,.04)'}">
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.4rem">
+        <span style="font-size:1.1rem">${a.studentAvatar||'?'}</span>
+        <span style="font-weight:700">${a.studentName||'?'}</span>
+        <span style="font-size:.72rem;background:rgba(93,173,226,.12);color:var(--sky);
+          border-radius:8px;padding:.1rem .4rem">${typeLabel[a.responseType]||a.responseType}</span>
+        <span style="font-size:.7rem;color:var(--txt3);margin-left:auto">${a.promptDate||''}</span>
+      </div>
+      <div style="font-size:.8rem;color:var(--txt2);margin-bottom:.3rem">
+        과거 감정: ${a.promptEmotionLabel||''}
+        ${a.promptReason&&a.promptReason!=='없음'?` · "${a.promptReason}"`:''}
+      </div>
+      ${a.responseText?`<div style="font-size:.78rem;color:var(--txt2);padding:.4rem .6rem;
+        background:rgba(255,255,255,.04);border-radius:8px;margin-bottom:.3rem">
+        💬 ${a.responseText}</div>`:''}
+      <button onclick="markEmotionAlertRead('${a.id}')"
+        style="font-size:.7rem;background:none;border:1px solid rgba(255,255,255,.15);
+          color:var(--txt3);border-radius:6px;padding:.2rem .5rem;cursor:pointer">
+        ${a.read?'확인됨':'✅ 확인'}</button>
+    </div>`).join('');
+}
+
+function markEmotionAlertRead(id) {
+  const db = DB.load();
+  if (db.emotionAlerts && db.emotionAlerts[id]) {
+    db.emotionAlerts[id].read = true;
+    DB._cache = db;
+    DB._fbRef.child('emotionAlerts/' + id + '/read').set(true);
+    renderEmotionAlerts();
+    updateEmotionAlertBadge();
+  }
 }
 
 // ══════════════════════════════════════════════════
