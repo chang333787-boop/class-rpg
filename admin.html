@@ -3094,7 +3094,9 @@ function renderActivityPage() {
           <td style="padding:.45rem .8rem;text-align:center;color:var(--emerald);font-weight:700">+${log.exp||0}</td>
           <td style="padding:.45rem .8rem;text-align:center;color:var(--gold);font-weight:700">+${log.gold||0}G</td>
           <td style="padding:.45rem .8rem;text-align:center">
-            ${log.name ? `<button onclick="copyToQuestForm('${(log.name||'').replace(/'/g,"\\'")}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)"
+            ${log.type==='artwork' ? '<span style="font-size:1.1rem" title="작품">🎨</span>'
+            : log.type==='book'    ? '<span style="font-size:1.1rem" title="독서">📚</span>'
+            : log.name ? `<button onclick="copyToQuestForm('${(log.name||'').replace(/'/g,"\\'")}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)"
               style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;
               color:var(--txt3);cursor:pointer;font-size:.75rem;padding:.2rem .45rem"
               title="복사 + 직접입력에 붙여넣기">📋</button>` : ''}
