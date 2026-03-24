@@ -174,16 +174,16 @@ html, body {
 <!-- 메인 -->
 <div id="main-wrap" style="display:none;width:100%">
   <div id="header">
-    <div class="title">📋 우리반 할 일 체크판</div>
-    <div style="display:flex;gap:.4rem;margin-left:.8rem">
+    <div class="title">우리반 할 일</div>
+    <div id="class-name" style="font-size:.78rem;color:var(--txt2)"></div>
+    <div style="display:flex;gap:.4rem;margin-left:auto">
       <button id="kiosk-tab-quest" onclick="switchKioskTab('quest',this)"
-        style="font-size:.78rem;padding:.3rem .8rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
+        style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
           background:var(--gold);color:#1a1a1a;border:none">📋 퀘스트</button>
       <button id="kiosk-tab-emotion" onclick="switchKioskTab('emotion',this)"
-        style="font-size:.78rem;padding:.3rem .8rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
-          background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.15)">💭 감정</button>
+        style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
+          background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">💭 감정</button>
     </div>
-    <div id="class-name" style="font-size:.85rem;color:var(--txt2)"></div>
     <div class="date" id="today-date"></div>
   </div>
   <div id="table-wrap">
