@@ -901,9 +901,28 @@ const EMOTION_REWARDS = [
 function getClaimableEmotionRewards(student, weekStart) {
   const summary = DB_EMOTION.getWeeklySummary(student.id, weekStart);
   const claimed  = (student.emotionRewardsClaimed || {})[weekStart] || [];
-  return EMOTION_REWARDS.filter(r =>
-    r.condition(summary) && !claimed.includes(r.id)
-  ).map(r => ({ ...r, summary }));
+  // 관리자 설정값 읽기 (없으면 기본값)
+  const cfg = ((typeof DB !== 'undefined' ? DB.load() : {}).settings || {}).emotionRewards || {};
+  const thresholds = {
+    emo_participate: cfg.participate || 4,
+    emo_steady:      cfg.steady      || 8,
+    emo_reflect:     cfg.reflect     || 3,
+  };
+  return EMOTION_REWARDS.filter(r => {
+    if (claimed.includes(r.id)) return false;
+    if (r.id === 'emo_participate') return summary.total >= thresholds.emo_participate;
+    if (r.id === 'emo_steady')      return summary.total >= thresholds.emo_steady;
+    if (r.id === 'emo_reflect')     return summary.reasonCount >= thresholds.emo_reflect;
+    return r.condition(summary);
+  }).map(r => {
+    // desc도 실제 기준값으로 업데이트
+    const thresh = thresholds[r.id];
+    let desc = r.desc;
+    if (r.id === 'emo_participate') desc = `이번 주 감정 ${thresh}회 이상 기록`;
+    if (r.id === 'emo_steady')      desc = `이번 주 감정 ${thresh}회 이상 기록`;
+    if (r.id === 'emo_reflect')     desc = `이번 주 이유 ${thresh}회 이상 입력`;
+    return { ...r, desc, summary };
+  });
 }
 
 
@@ -1929,6 +1948,27 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <button class="btn-sm success" style="width:100%" onclick="saveSubjects()">💾 저장</button>
         </div>
 
+        <!-- 감정 보상 기준 카드 -->
+        <div class="settings-card">
+          <div class="sc-head">💭 감정 보상 기준</div>
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">참여 횟수 기준으로 보상이 지급돼요</div>
+          <div style="display:flex;flex-direction:column;gap:.6rem" id="emotion-reward-settings">
+            <div class="setting-row">
+              <div><div class="sr-label">💭 참여 보상 조건 (주간 N회↑)</div></div>
+              <input class="form-input" type="number" id="emo-reward-participate" min="1" max="14" value="4" style="width:60px;text-align:center">
+            </div>
+            <div class="setting-row">
+              <div><div class="sr-label">💪 꾸준함 보상 조건 (주간 N회↑)</div></div>
+              <input class="form-input" type="number" id="emo-reward-steady" min="1" max="14" value="8" style="width:60px;text-align:center">
+            </div>
+            <div class="setting-row">
+              <div><div class="sr-label">🤔 성찰 보상 조건 (이유 N회↑)</div></div>
+              <input class="form-input" type="number" id="emo-reward-reflect" min="1" max="14" value="3" style="width:60px;text-align:center">
+            </div>
+          </div>
+          <button class="btn-sm success" style="width:100%;margin-top:.8rem" onclick="saveEmotionRewardSettings()">💾 저장</button>
+        </div>
+
         <!-- 상점 관리 카드 -->
         <div class="settings-card">
           <div class="sc-head">🛒 상점 관리</div>
@@ -2129,6 +2169,7 @@ function nav(page, el) {
   if (page === 'settings')  {
     renderBackupList();
     renderSubjectManage();
+    loadEmotionRewardSettings();
     setTimeout(() => switchShopTab('seed', document.getElementById('shop-tab-seed')), 50);
   }
   if (page === 'emotion')   renderEmotionPage();
@@ -4794,6 +4835,30 @@ function renderShopManage() {
       </div>`;
     }).join('');
   }
+}
+
+function saveEmotionRewardSettings() {
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.emotionRewards = {
+    participate: parseInt(document.getElementById('emo-reward-participate')?.value) || 4,
+    steady:      parseInt(document.getElementById('emo-reward-steady')?.value)      || 8,
+    reflect:     parseInt(document.getElementById('emo-reward-reflect')?.value)     || 3,
+  };
+  DB._cache = db;
+  DB._fbRef.child('settings').set(db.settings);
+  notify('✅ 감정 보상 기준 저장!');
+}
+
+function loadEmotionRewardSettings() {
+  const db = DB.load();
+  const emo = (db.settings || {}).emotionRewards || {};
+  if (document.getElementById('emo-reward-participate'))
+    document.getElementById('emo-reward-participate').value = emo.participate || 4;
+  if (document.getElementById('emo-reward-steady'))
+    document.getElementById('emo-reward-steady').value = emo.steady || 8;
+  if (document.getElementById('emo-reward-reflect'))
+    document.getElementById('emo-reward-reflect').value = emo.reflect || 3;
 }
 
 function saveShopOverrides() {

@@ -1095,9 +1095,28 @@ const EMOTION_REWARDS = [
 function getClaimableEmotionRewards(student, weekStart) {
   const summary = DB_EMOTION.getWeeklySummary(student.id, weekStart);
   const claimed  = (student.emotionRewardsClaimed || {})[weekStart] || [];
-  return EMOTION_REWARDS.filter(r =>
-    r.condition(summary) && !claimed.includes(r.id)
-  ).map(r => ({ ...r, summary }));
+  // 관리자 설정값 읽기 (없으면 기본값)
+  const cfg = ((typeof DB !== 'undefined' ? DB.load() : {}).settings || {}).emotionRewards || {};
+  const thresholds = {
+    emo_participate: cfg.participate || 4,
+    emo_steady:      cfg.steady      || 8,
+    emo_reflect:     cfg.reflect     || 3,
+  };
+  return EMOTION_REWARDS.filter(r => {
+    if (claimed.includes(r.id)) return false;
+    if (r.id === 'emo_participate') return summary.total >= thresholds.emo_participate;
+    if (r.id === 'emo_steady')      return summary.total >= thresholds.emo_steady;
+    if (r.id === 'emo_reflect')     return summary.reasonCount >= thresholds.emo_reflect;
+    return r.condition(summary);
+  }).map(r => {
+    // desc도 실제 기준값으로 업데이트
+    const thresh = thresholds[r.id];
+    let desc = r.desc;
+    if (r.id === 'emo_participate') desc = `이번 주 감정 ${thresh}회 이상 기록`;
+    if (r.id === 'emo_steady')      desc = `이번 주 감정 ${thresh}회 이상 기록`;
+    if (r.id === 'emo_reflect')     desc = `이번 주 이유 ${thresh}회 이상 입력`;
+    return { ...r, desc, summary };
+  });
 }
 
 
