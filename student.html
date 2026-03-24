@@ -1859,11 +1859,15 @@ function cleanInactivePending() {
   );
   if (CUR.pendingRewards.length !== before) changed = true;
 
+  // 구형 승급 pending 정리 (패치 전 방식으로 남아있는 ⬆️ 승급 항목)
+  // 이제 승급은 즉시 지급되므로 pending에 남아있을 필요 없음
+  const beforePromo = (CUR.pendingRewards||[]).length;
+  CUR.pendingRewards = (CUR.pendingRewards||[]).filter(r =>
+    r.type !== 'promotion' && !(r.icon === '⬆️' && r.exp === 50)
+  );
+  if (CUR.pendingRewards.length !== beforePromo) changed = true;
+
   // promotedLevels 자동 복구
-  // 현재 직업이 이미 승급된 직업이면 해당 레벨을 promotedLevels에 추가
-  const jobLevelMap = {
-    '중학생': [5], '고등학생': [5,10], '대학생': [5,10,15],
-  };
   const promotionLevels = [5,10,15,20,25,30];
   CUR.promotedLevels = CUR.promotedLevels || [];
 
@@ -1879,7 +1883,6 @@ function cleanInactivePending() {
   const expectedJob = Utils.getJobTitle(CUR.dream || CUR.job || '', CUR.level - 1);
   const currentJob  = Utils.getJobTitle(CUR.dream || CUR.job || '', CUR.level);
   if (CUR.job && CUR.job !== expectedJob && CUR.job === currentJob) {
-    // 현재 레벨에서 이미 승급된 상태
     if (Utils.isPromotionLevel(CUR.level) && !CUR.promotedLevels.includes(CUR.level)) {
       CUR.promotedLevels.push(CUR.level);
       changed = true;
@@ -4053,6 +4056,12 @@ async function submitArtwork() {
 
   if (!title) { toast('작품 제목을 입력해주세요!'); return; }
   if (!fileInput.files || !fileInput.files[0]) { toast('사진을 선택해주세요!'); return; }
+
+  // 중복 차단: 같은 제목으로 이미 대기중이거나 전시중인 작품
+  const dupPending = (CUR.pendingRewards||[]).some(r => r.type==='artwork' && (r.artTitle||'').trim() === title.trim());
+  const dupArtwork = DB.getArtworks(CUR.id).some(a => (a.title||a.artTitle||'').trim() === title.trim());
+  if (dupPending) { toast(`🎨 "${title}"은 이미 승인 대기중이에요!`); return; }
+  if (dupArtwork) { toast(`🎨 "${title}"은 이미 전시중인 작품이에요!`); return; }
 
   // 업로드 UI 표시
   document.getElementById('aw-upload-progress').style.display = '';

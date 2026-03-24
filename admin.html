@@ -2836,17 +2836,30 @@ function approvePromotion(reqId) {
   const newJob = Utils.getJobTitle(s.job || s.dream || '', req.level);
   const oldJob = s.job || '';
   s.job = newJob;
+  // 승급 보상 즉시 지급 (받기 버튼 없이)
   s.gold = (s.gold||0) + 100;
+  s.totalGold = (s.totalGold||0) + 100;
+  s.exp  = (s.exp||0) + 50;
+  s.level = Utils.levelFromExp(s.exp);
   s.promotionPending = false;
   // 승급한 레벨 기록 (중복 승급 방지)
   s.promotedLevels = s.promotedLevels || [];
   if (!s.promotedLevels.includes(req.level)) s.promotedLevels.push(req.level);
-  s.pendingRewards = [...(s.pendingRewards||[]), {
-    id: Utils.uid(),
-    label: `⬆️ Lv.${req.level} 승급! ${oldJob ? `${oldJob} → ` : ''}${newJob}`,
-    exp: 50, gold: 0,
-    icon: '⬆️', date: todayStr()
-  }];
+  // 활동 내역 기록
+  DB.saveQuestLog({
+    studentId:     s.id,
+    boardQuestId:  null,
+    boardQuestType:'promotion',
+    type:          'promotion',
+    name:          `⬆️ Lv.${req.level} 승급! ${oldJob ? `${oldJob} → ` : ''}${newJob}`,
+    exp:           50,
+    gold:          100,
+    stat:          '',
+    statVal:       0,
+    icon:          '⬆️',
+    date:          todayStr(),
+    approved:      true,
+  });
   DB.saveStudent(s);
   DB.removePromotionRequest(reqId);
   renderAll();
