@@ -3735,7 +3735,14 @@ async function saveArtworkEdit() {
 }
 
 // ── 관리자 라이트박스 ──
-function adminOpenLightbox(url, title) {
+let _adminLbImages = [];
+let _adminLbIdx    = 0;
+
+function adminOpenLightbox(url, title, images, idx) {
+  // images 배열 전달 시 슬라이드쇼, 아닐 시 단독
+  _adminLbImages = images || [{url, title}];
+  _adminLbIdx    = idx || 0;
+
   let lb = document.getElementById('admin-lightbox');
   if (!lb) {
     lb = document.createElement('div');
@@ -3745,14 +3752,41 @@ function adminOpenLightbox(url, title) {
       <button onclick="document.getElementById('admin-lightbox').style.display='none'"
         style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);border:none;
         color:#fff;font-size:1.4rem;width:40px;height:40px;border-radius:50%;cursor:pointer">✕</button>
-      <img id="admin-lb-img" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:10px">
-      <div id="admin-lb-title" style="color:#fff;font-weight:700;margin-top:.8rem;font-size:.95rem"></div>`;
+      <button id="admin-lb-prev" onclick="adminLbNav(-1)"
+        style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);
+          background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.8rem;
+          width:48px;height:48px;border-radius:50%;cursor:pointer">‹</button>
+      <button id="admin-lb-next" onclick="adminLbNav(1)"
+        style="position:absolute;right:4rem;top:50%;transform:translateY(-50%);
+          background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.8rem;
+          width:48px;height:48px;border-radius:50%;cursor:pointer">›</button>
+      <img id="admin-lb-img" style="max-width:90vw;max-height:78vh;object-fit:contain;border-radius:10px;cursor:pointer" onclick="adminLbNav(1)">
+      <div id="admin-lb-title" style="color:#fff;font-weight:700;margin-top:.8rem;font-size:.95rem"></div>
+      <div id="admin-lb-counter" style="color:rgba(255,255,255,.5);font-size:.78rem;margin-top:.3rem"></div>`;
     lb.addEventListener('click', e => { if(e.target===lb) lb.style.display='none'; });
     document.body.appendChild(lb);
   }
-  document.getElementById('admin-lb-img').src = url;
-  document.getElementById('admin-lb-title').textContent = title||'';
+  adminLbRender();
   lb.style.display = 'flex';
+}
+
+function adminLbRender() {
+  const item = _adminLbImages[_adminLbIdx];
+  if (!item) return;
+  document.getElementById('admin-lb-img').src           = item.url;
+  document.getElementById('admin-lb-title').textContent = item.title || '';
+  document.getElementById('admin-lb-counter').textContent =
+    _adminLbImages.length > 1 ? `${_adminLbIdx+1} / ${_adminLbImages.length}` : '';
+  // 이전/다음 버튼 표시
+  const prevBtn = document.getElementById('admin-lb-prev');
+  const nextBtn = document.getElementById('admin-lb-next');
+  if (prevBtn) prevBtn.style.display = _adminLbImages.length > 1 ? '' : 'none';
+  if (nextBtn) nextBtn.style.display = _adminLbImages.length > 1 ? '' : 'none';
+}
+
+function adminLbNav(dir) {
+  _adminLbIdx = (_adminLbIdx + dir + _adminLbImages.length) % _adminLbImages.length;
+  adminLbRender();
 }
 
 function renderArtworkAdmin() {
@@ -3832,7 +3866,12 @@ function renderArtworkAdmin() {
       <div class="aw-detail" style="display:none;padding:0 1.2rem .8rem">
         ${arts.map(a=>`
           <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.6rem 0;border-top:1px solid rgba(255,255,255,.04)">
-            ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer" onclick="adminOpenLightbox('${a.artUrl}', '${a.title||''}')">`:``}
+            ${a.artUrl?(()=>{
+              const imgs = arts.filter(x=>x.artUrl).map(x=>({url:x.artUrl,title:x.title||''}));
+              const idx  = imgs.findIndex(x=>x.url===a.artUrl);
+              return `<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
+                onclick="adminOpenLightbox('${a.artUrl}','${a.title||''}',${JSON.stringify(imgs)},${idx})">`;
+            })():''}
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:.85rem">${a.title}
                 ${a.subject?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:10px;padding:.1rem .4rem;margin-left:.3rem">${a.subject}</span>`:''}
