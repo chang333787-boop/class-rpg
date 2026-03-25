@@ -3735,6 +3735,16 @@ async function saveArtworkEdit() {
 }
 
 // ── 관리자 라이트박스 ──
+function adminOpenArtLb(e) {
+  const imgEl = e.target;
+  const container = imgEl.closest('.aw-detail');
+  const imgs = container
+    ? Array.from(container.querySelectorAll('img')).map(i => ({url:i.src, title:''}))
+    : [{url: imgEl.src, title:''}];
+  const idx = imgs.findIndex(i => i.url === imgEl.src);
+  adminOpenLightbox(imgEl.src, '', imgs, Math.max(0, idx));
+}
+
 let _adminLbImages = [];
 let _adminLbIdx    = 0;
 
@@ -3866,12 +3876,8 @@ function renderArtworkAdmin() {
       <div class="aw-detail" style="display:none;padding:0 1.2rem .8rem">
         ${arts.map(a=>`
           <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.6rem 0;border-top:1px solid rgba(255,255,255,.04)">
-            ${a.artUrl?(()=>{
-              const imgs = arts.filter(x=>x.artUrl).map(x=>({url:x.artUrl,title:x.title||''}));
-              const idx  = imgs.findIndex(x=>x.url===a.artUrl);
-              return `<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
-                onclick="adminOpenLightbox('${a.artUrl}','${a.title||''}',${JSON.stringify(imgs)},${idx})">`;
-            })():''}
+            ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
+              onclick="adminOpenArtLb(event)">`:``}
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:.85rem">${a.title}
                 ${a.subject?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:10px;padding:.1rem .4rem;margin-left:.3rem">${a.subject}</span>`:''}
