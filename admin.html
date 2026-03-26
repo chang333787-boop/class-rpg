@@ -1706,6 +1706,19 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <input class="form-input" id="qt-daily-custom" placeholder="+ 항목 직접 추가" style="flex:1">
             <button class="btn-sm" onclick="addQuestTemplate('daily')">추가</button>
           </div>
+          <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;background:rgba(255,255,255,.04);border-radius:10px;padding:.5rem .7rem">
+            <span style="font-size:.75rem;color:var(--txt2);flex-shrink:0">능력치:</span>
+            <select class="form-select" id="qt-daily-stat" style="flex:1;font-size:.78rem">
+              <option value="">없음</option>
+              <option value="read">독서</option>
+              <option value="study">학습</option>
+              <option value="art">예술</option>
+              <option value="value">가치</option>
+              <option value="health">건강</option>
+            </select>
+            <input class="form-input" type="number" id="qt-daily-statval" value="1" min="0.1" max="10" step="0.1"
+              style="width:65px;text-align:center;font-size:.78rem" placeholder="수치">
+          </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('daily')">📌 체크한 항목 게시판에 올리기</button>
           <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates('daily')">🔄 숨긴 항목 복원</button>
         </div>
@@ -1717,6 +1730,19 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
             <input class="form-input" id="qt-weekly-custom" placeholder="+ 항목 직접 추가" style="flex:1">
             <button class="btn-sm" onclick="addQuestTemplate('weekly')">추가</button>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;background:rgba(255,255,255,.04);border-radius:10px;padding:.5rem .7rem">
+            <span style="font-size:.75rem;color:var(--txt2);flex-shrink:0">능력치:</span>
+            <select class="form-select" id="qt-weekly-stat" style="flex:1;font-size:.78rem">
+              <option value="">없음</option>
+              <option value="read">독서</option>
+              <option value="study">학습</option>
+              <option value="art">예술</option>
+              <option value="value">가치</option>
+              <option value="health">건강</option>
+            </select>
+            <input class="form-input" type="number" id="qt-weekly-statval" value="1" min="0.1" max="10" step="0.1"
+              style="width:65px;text-align:center;font-size:.78rem" placeholder="수치">
           </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('weekly')">📌 체크한 항목 게시판에 올리기</button>
           <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates('weekly')">🔄 숨긴 항목 복원</button>
@@ -4491,6 +4517,10 @@ function postCheckedQuests(type) {
   const goldMap = {daily:25, weekly:70};
   const iconMap = {daily:'📋', weekly:'📅'};
 
+  // 일일/주간 탭 스탯 설정값 읽기
+  const tabStat    = document.getElementById(`qt-${type}-stat`)?.value || '';
+  const tabStatVal = tabStat ? Math.round((parseFloat(document.getElementById(`qt-${type}-statval`)?.value)||1)*10)/10 : 0;
+
   let count = 0;
   const db = DB.load();
   db.boardQuests = db.boardQuests || [];
@@ -4498,9 +4528,10 @@ function postCheckedQuests(type) {
   all.forEach((t, i) => {
     const chk = document.getElementById(`qt-chk-${type}-${i}`);
     if (!chk || !chk.checked) return;
-    // 능력치 드롭다운에서 stat 읽기
+    // 항목별 stat 드롭다운 (능력치 탭용) 또는 탭 공통 stat
     const statEl = document.getElementById(`qt-stat-${type}-${i}`);
-    const stat = statEl ? statEl.value : (t.stat || '');
+    const stat    = statEl ? statEl.value : (tabStat || t.stat || '');
+    const statVal = statEl ? 1 : tabStatVal;
     // 이미 같은 이름의 활성 퀘스트가 있으면 중복 방지
     if (db.boardQuests.find(q => q.name===t.name && q.active!==false)) {
       notify(`"${t.name}" 은 이미 게시중이에요`, 'error');
@@ -4513,7 +4544,7 @@ function postCheckedQuests(type) {
       exp:  expMap[type]  || 80,
       gold: goldMap[type] || 50,
       icon: iconMap[type] || '📋',
-      stat: stat,
+      stat, statVal,
       dueDate: '', date: todayStr(),
       active: true,
     });
