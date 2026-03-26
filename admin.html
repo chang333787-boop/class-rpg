@@ -30,42 +30,42 @@ const GAME_DATA = {
   defaultStudents: [
     { id:'s1', name:'학생1', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s2', name:'학생2', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s3', name:'학생3', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s4', name:'학생4', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s5', name:'학생5', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s6', name:'학생6', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:5000, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{},
       inventory:[{id:'d_y1',qty:3},{id:'d_y2',qty:3},{id:'d_y3',qty:3},{id:'d_y4',qty:3},{id:'d_y5',qty:3},{id:'d_y6',qty:3},{id:'d_y7',qty:3},{id:'d_y8',qty:3},{id:'d_y9',qty:3},{id:'d_y10',qty:3},{id:'d_y11',qty:3},{id:'d_y12',qty:3},{id:'d_y13',qty:3},{id:'d_y14',qty:3},{id:'d_i1',qty:3},{id:'d_i2',qty:3},{id:'d_i3',qty:3},{id:'d_i4',qty:3},{id:'d_i5',qty:3},{id:'d_i6',qty:3},{id:'d_i7',qty:3},{id:'d_i8',qty:3},{id:'d_i9',qty:3},{id:'d_i10',qty:3},{id:'d_i11',qty:3},{id:'d_i12',qty:3},{id:'d_i13',qty:3},{id:'d_i14',qty:3}],
       farm:[], books:[],
@@ -228,7 +228,7 @@ const GAME_DATA = {
   promotionLevels: [5, 10, 15, 20, 25, 30],
 
   // ─── 이름 매핑 ★ 인성 → 가치 ─────────────────────────
-  statNames:   { read:'독서', study:'학습', art:'예술', value:'가치', health:'건강' },
+  statNames:   { read:'독서', study:'학습', art:'예술', value:'가치', health:'건강', life:'생활' },
   combatNames: { atk:'공격력', def:'방어력', mag:'마력', spd:'속도' },
 
   // ─── 장비 id → 슬롯 맵 (lazy) ────────────────────────
@@ -1546,6 +1546,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
                 <option value="art">예술</option>
                 <option value="value">가치</option>
                 <option value="health">건강</option>
+                <option value="life">생활</option>
               </select>
               <input class="form-input" type="number" id="reward-statval" value="1" min="0.1" max="10" step="0.1"
                 style="width:65px;text-align:center" placeholder="수치">
@@ -1695,6 +1696,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <button class="mtab" id="qt-art-btn"    onclick="switchQuestTab('art')">🎨 예술</button>
           <button class="mtab" id="qt-value-btn"  onclick="switchQuestTab('value')">💛 가치</button>
           <button class="mtab" id="qt-health-btn" onclick="switchQuestTab('health')">💪 건강</button>
+          <button class="mtab" id="qt-life-btn"   onclick="switchQuestTab('life')">🏠 생활</button>
           <button class="mtab" id="qt-custom-btn" onclick="switchQuestTab('custom')">✏️ 직접입력</button>
         </div>
 
@@ -1715,6 +1717,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
               <option value="art">예술</option>
               <option value="value">가치</option>
               <option value="health">건강</option>
+              <option value="life">생활</option>
             </select>
             <input class="form-input" type="number" id="qt-daily-statval" value="1" min="0.1" max="10" step="0.1"
               style="width:65px;text-align:center;font-size:.78rem" placeholder="수치">
@@ -1740,6 +1743,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
               <option value="art">예술</option>
               <option value="value">가치</option>
               <option value="health">건강</option>
+              <option value="life">생활</option>
             </select>
             <input class="form-input" type="number" id="qt-weekly-statval" value="1" min="0.1" max="10" step="0.1"
               style="width:65px;text-align:center;font-size:.78rem" placeholder="수치">
@@ -1806,6 +1810,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
                   <option value="art">예술</option>
                   <option value="value">가치</option>
                   <option value="health">건강</option>
+                  <option value="life">생활</option>
                 </select>
                 <input class="form-input" type="number" id="nq-statval" value="1" min="0.1" max="10" step="0.1"
                   style="width:70px;text-align:center" placeholder="수치">
@@ -2667,7 +2672,7 @@ function resetStudentStats(id) {
   const s = DB.getStudent(id);
   if (!s) return;
   s.level = 1; s.exp = 0; s.gold = 0;
-  s.stats = {read:0, study:0, art:0, value:0, health:0};
+  s.stats = {read:0, study:0, art:0, value:0, health:0, life:0};
   s.combat = {atk:0, def:6, mag:0, spd:0};
   s.totalQuests = 0; s.bookCount = 0;
   s.books = []; s.monsterLog = [];
@@ -2686,7 +2691,7 @@ function resetAllStudents() {
   if (!confirm('⚠️ 모든 학생의 수치를 초기화할까요?\n이름·비번·아바타는 유지됩니다.')) return;
   DB.getStudents().forEach(s => {
     s.level = 1; s.exp = 0; s.gold = 0;
-    s.stats = {read:0, study:0, art:0, value:0, health:0};
+    s.stats = {read:0, study:0, art:0, value:0, health:0, life:0};
     s.combat = {atk:0, def:6, mag:0, spd:0};
     s.totalQuests = 0; s.bookCount = 0;
     s.books = []; s.monsterLog = [];
@@ -2715,7 +2720,7 @@ function saveStudentDetail(id) {
   s.gold = parseInt(document.getElementById('det-gold').value) || 0;
   s.exp = parseInt(document.getElementById('det-exp').value) || 0;
   s.bookCount = parseInt(document.getElementById('det-books').value) || 0;
-  ['read','study','art','value','health'].forEach(k => {
+  ['read','study','art','value','health','life'].forEach(k => {
     const el = document.getElementById(`det-stat-${k}`);
     if (el) s.stats[k] = Math.round((parseFloat(el.value)||0) * 10) / 10;
   });
@@ -2821,7 +2826,7 @@ function doAddStudents(btn) {
       avatar: avatarMap[charType]||'👦',
       level:1, exp:0, gold:0,
       title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0},
       combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{},
       inventory:[], farm:[], books:[],
@@ -3495,7 +3500,7 @@ function renderStatsPage() {
       <div>
         <div style="font-weight:700">${s.name} <span style="font-size:.76rem;color:var(--txt3)">Lv.${s.level}</span></div>
         <div style="font-size:.75rem;color:var(--txt2);margin-top:.15rem">
-          📚${s.stats?.read||0} ✏️${s.stats?.study||0} 🎨${s.stats?.art||0} 💎${s.stats?.value||0} 💪${s.stats?.health||0}
+          📚${s.stats?.read||0} ✏️${s.stats?.study||0} 🎨${s.stats?.art||0} 💎${s.stats?.value||0} 💪${s.stats?.health||0} 🏠${s.stats?.life||0}
         </div>
       </div>
     </div>
@@ -4197,7 +4202,7 @@ function resetRanking() {
     s.pendingRewards    = [];
     s.books             = [];
     s.bookCount         = 0;
-    s.stats             = { read:0, study:0, art:0, value:0, health:0 };
+    s.stats             = { read:0, study:0, art:0, value:0, health:0, life:0 };
     s.combat            = { atk:0, def:0, mag:0, spd:0 };
     s.equipmentIds      = {};
     s.inventory         = [];
@@ -4256,7 +4261,7 @@ function hideDefaultTemplate(type, name) {
   DB._cache = db; // 캐시 즉시 반영 (화면 바로 갱신)
   DB._fbRef.child('hiddenQuestTemplates').set(db.hiddenQuestTemplates);
   // 현재 탭에 맞게 렌더
-  if (['read','study','art','value','health'].includes(type)) renderAbilityQuests();
+  if (['read','study','art','value','health','life'].includes(type)) renderAbilityQuests();
   else renderQuestTemplates(type);
 }
 function saveCustomTemplate(type, name) {
@@ -4338,6 +4343,17 @@ const ABILITY_QUESTS = {
     {name:'한 달 개근하기',           diff:'hard', stat:'health'},
     {name:'운동 일지 쓰기',           diff:'hard', stat:'health'},
   ],
+  life: [
+    {name:'사물함 정리하기',          diff:'easy', stat:'life'},
+    {name:'교실 청소 열심히 하기',    diff:'easy', stat:'life'},
+    {name:'준비물 빠짐없이 챙기기',   diff:'easy', stat:'life'},
+    {name:'복도에서 조용히 걷기',     diff:'easy', stat:'life'},
+    {name:'급식 배식 도우미',         diff:'mid',  stat:'life'},
+    {name:'교실 환경 정리 일주일',    diff:'mid',  stat:'life'},
+    {name:'쉬는시간 바르게 사용하기', diff:'mid',  stat:'life'},
+    {name:'한 달 생활 규칙 지키기',   diff:'hard', stat:'life'},
+    {name:'친구 돕기 3회',            diff:'hard', stat:'life'},
+  ],
 };
 
 const DIFF_INFO = {
@@ -4346,12 +4362,12 @@ const DIFF_INFO = {
   hard: { label:'🔴 어려움',exp:80, gold:60,  icon:'⭐', color:'rgba(231,76,60,.1)',    border:'rgba(231,76,60,.3)' },
 };
 
-const ABILITY_ICONS = { read:'📚', study:'📖', art:'🎨', value:'💛', health:'💪' };
+const ABILITY_ICONS = { read:'📚', study:'📖', art:'🎨', value:'💛', health:'💪', life:'🏠' };
 
 function switchQuestTab(tab) {
   QUEST_TAB = tab;
   const allTabs = ['daily','weekly','custom','ability'];
-  const abilityTypes = ['read','study','art','value','health'];
+  const abilityTypes = ['read','study','art','value','health','life'];
 
   // 탭 패널 표시
   allTabs.forEach(t => {
@@ -4359,7 +4375,7 @@ function switchQuestTab(tab) {
     if (el) el.style.display = 'none';
   });
   // 버튼 active
-  ['daily','weekly','read','study','art','value','health','custom'].forEach(t => {
+  ['daily','weekly','read','study','art','value','health','life','custom'].forEach(t => {
     const btn = document.getElementById('qt-'+t+'-btn');
     if (btn) btn.classList.remove('on');
   });
@@ -4473,7 +4489,8 @@ function renderQuestTemplates(type) {
     <option value="study">✏️ 학습</option>
     <option value="art">🎨 예술</option>
     <option value="value">💎 가치</option>
-    <option value="health">💪 건강</option>`;
+    <option value="health">💪 건강</option>
+    <option value="life">🏠 생활</option>`;
   el.innerHTML = all.map((t,i) => `
     <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;
       background:rgba(255,255,255,.03);border-radius:8px;border:0.5px solid rgba(255,255,255,.07)">
@@ -4561,7 +4578,7 @@ function restoreHiddenTemplates(type) {
   db.hiddenQuestTemplates[type] = [];
   DB._cache = db;
   DB._fbRef.child('hiddenQuestTemplates').set(db.hiddenQuestTemplates);
-  if (['read','study','art','value','health'].includes(type)) renderAbilityQuests();
+  if (['read','study','art','value','health','life'].includes(type)) renderAbilityQuests();
   else renderQuestTemplates(type);
   notify('🔄 숨긴 항목을 복원했습니다');
 }
@@ -4861,7 +4878,7 @@ function applyReward(isLevelUp) {
   if (title) { s.title = title; if(!(s.titles||[]).includes(title)) s.titles = [...(s.titles||[]), title]; }
   if (newPw) s.pw = newPw;
 
-  ['read','study','art','value','health'].forEach(k => {
+  ['read','study','art','value','health','life'].forEach(k => {
     const el = document.getElementById(`rw-stat-${k}`);
     if (el) s.stats[k] = parseInt(el.value)||0;
   });

@@ -30,42 +30,42 @@ const GAME_DATA = {
   defaultStudents: [
     { id:'s1', name:'학생1', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s2', name:'학생2', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s3', name:'학생3', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s4', name:'학생4', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s5', name:'학생5', avatar:'👦', pw:'1234', charType:1, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:0, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{}, inventory:[], farm:[], books:[],
       monsterLog:[], monsterDailyCount:0, lastMonsterDate:'', totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false, houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[]
     },
     { id:'s6', name:'학생6', avatar:'👧', pw:'1234', charType:2, dream:'미래를 꿈꾸는 학생', job:'학생',
       level:1, exp:0, gold:5000, title:'', titles:[],
-      stats:{read:0,study:0,art:0,value:0,health:0}, combat:{atk:0,def:0,mag:0,spd:0},
+      stats:{read:0,study:0,art:0,value:0,health:0,life:0}, combat:{atk:0,def:0,mag:0,spd:0},
       equipment:{}, equipmentIds:{},
       inventory:[{id:'d_y1',qty:3},{id:'d_y2',qty:3},{id:'d_y3',qty:3},{id:'d_y4',qty:3},{id:'d_y5',qty:3},{id:'d_y6',qty:3},{id:'d_y7',qty:3},{id:'d_y8',qty:3},{id:'d_y9',qty:3},{id:'d_y10',qty:3},{id:'d_y11',qty:3},{id:'d_y12',qty:3},{id:'d_y13',qty:3},{id:'d_y14',qty:3},{id:'d_i1',qty:3},{id:'d_i2',qty:3},{id:'d_i3',qty:3},{id:'d_i4',qty:3},{id:'d_i5',qty:3},{id:'d_i6',qty:3},{id:'d_i7',qty:3},{id:'d_i8',qty:3},{id:'d_i9',qty:3},{id:'d_i10',qty:3},{id:'d_i11',qty:3},{id:'d_i12',qty:3},{id:'d_i13',qty:3},{id:'d_i14',qty:3}],
       farm:[], books:[],
@@ -228,7 +228,7 @@ const GAME_DATA = {
   promotionLevels: [5, 10, 15, 20, 25, 30],
 
   // ─── 이름 매핑 ★ 인성 → 가치 ─────────────────────────
-  statNames:   { read:'독서', study:'학습', art:'예술', value:'가치', health:'건강' },
+  statNames:   { read:'독서', study:'학습', art:'예술', value:'가치', health:'건강', life:'생활' },
   combatNames: { atk:'공격력', def:'방어력', mag:'마력', spd:'속도' },
 
   // ─── 장비 id → 슬롯 맵 (lazy) ────────────────────────
@@ -1244,6 +1244,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ab-art .ab-fill{background:linear-gradient(90deg,#9B59B6,#8E44AD);}
 .ab-moral .ab-fill{background:linear-gradient(90deg,#2ECC71,#27AE60);}
 .ab-health .ab-fill{background:linear-gradient(90deg,#F39C12,#E67E22);}
+.ab-life   .ab-fill{background:linear-gradient(90deg,#27AE60,#2ECC71);}
 
 /* ── 메인 영역 ── */
 .main-area{overflow-y:auto;padding:1.2rem;}
@@ -2736,7 +2737,8 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
     </div>`;
   }).join('');
   const abDefs = [{k:'read',l:'독서',c:'ab-read'},{k:'study',l:'학습',c:'ab-study'},
-    {k:'art',l:'예술',c:'ab-art'},{k:'value',l:'가치',c:'ab-moral'},{k:'health',l:'건강',c:'ab-health'}];
+    {k:'art',l:'예술',c:'ab-art'},{k:'value',l:'가치',c:'ab-moral'},{k:'health',l:'건강',c:'ab-health'},
+    {k:'life',l:'생활',c:'ab-life'}];
   const maxV = Math.max(10, ...Object.values(s.stats||{}));
   document.getElementById(abilityId).innerHTML = abDefs.map(ab => {
     const v = s.stats?.[ab.k]||0;
