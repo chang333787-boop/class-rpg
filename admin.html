@@ -909,9 +909,12 @@ const EMOTION_REWARDS = [
 
 // 이번 주에 수령 가능한 감정 보상 목록 반환
 function getClaimableEmotionRewards(student, weekStart) {
+  const db = (typeof DB !== 'undefined' ? DB.load() : {});
+  const cfg = ((db.settings || {}).emotionRewards || {});
+  // 감정 보상 기능 꺼져있으면 빈 배열
+  if (cfg.enabled === false) return [];
   const summary = DB_EMOTION.getWeeklySummary(student.id, weekStart);
   const claimed  = (student.emotionRewardsClaimed || {})[weekStart] || [];
-  const cfg = ((typeof DB !== 'undefined' ? DB.load() : {}).settings || {}).emotionRewards || {};
   const thresholds = {
     emo_participate: cfg.participate || 4,
     emo_steady:      cfg.steady      || 8,
@@ -2170,29 +2173,38 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <!-- 감정 보상 기준 카드 -->
         <div class="settings-card">
           <div class="sc-head">💭 감정 보상 기준</div>
-          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">참여 횟수 기준으로 보상이 지급돼요</div>
-          <div style="font-size:.7rem;color:var(--txt3);display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;padding:.2rem .3rem;margin-bottom:.3rem">
-            <span>보상 종류</span><span style="text-align:center">조건(회)</span><span style="text-align:center">EXP</span><span style="text-align:center">골드</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
+            <div style="font-size:.75rem;color:var(--txt2)">감정 보상 기능 사용</div>
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+              <input type="checkbox" id="emo-reward-enabled" onchange="saveEmotionRewardSettings()"
+                style="width:18px;height:18px;cursor:pointer">
+              <span id="emo-reward-enabled-label" style="font-size:.78rem;color:var(--txt3)">꺼짐</span>
+            </label>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
-            <span style="font-size:.82rem">💭 참여 보상</span>
-            <input class="form-input" type="number" id="emo-reward-participate" min="1" max="14" value="4" style="padding:.2rem;font-size:.78rem;text-align:center">
-            <input class="form-input" type="number" id="emo-reward-participate-exp" min="0" max="200" value="20" style="padding:.2rem;font-size:.78rem;text-align:center">
-            <input class="form-input" type="number" id="emo-reward-participate-gold" min="0" max="200" value="15" style="padding:.2rem;font-size:.78rem;text-align:center">
+          <div id="emo-reward-settings-body">
+            <div style="font-size:.7rem;color:var(--txt3);display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;padding:.2rem .3rem;margin-bottom:.3rem">
+              <span>보상 종류</span><span style="text-align:center">조건(회)</span><span style="text-align:center">EXP</span><span style="text-align:center">골드</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
+              <span style="font-size:.82rem">💭 참여 보상</span>
+              <input class="form-input" type="number" id="emo-reward-participate" min="1" max="14" value="4" style="padding:.2rem;font-size:.78rem;text-align:center">
+              <input class="form-input" type="number" id="emo-reward-participate-exp" min="0" max="200" value="20" style="padding:.2rem;font-size:.78rem;text-align:center">
+              <input class="form-input" type="number" id="emo-reward-participate-gold" min="0" max="200" value="15" style="padding:.2rem;font-size:.78rem;text-align:center">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
+              <span style="font-size:.82rem">💪 꾸준함 보상</span>
+              <input class="form-input" type="number" id="emo-reward-steady" min="1" max="14" value="8" style="padding:.2rem;font-size:.78rem;text-align:center">
+              <input class="form-input" type="number" id="emo-reward-steady-exp" min="0" max="200" value="50" style="padding:.2rem;font-size:.78rem;text-align:center">
+              <input class="form-input" type="number" id="emo-reward-steady-gold" min="0" max="200" value="40" style="padding:.2rem;font-size:.78rem;text-align:center">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem">
+              <span style="font-size:.82rem">🤔 성찰 보상</span>
+              <input class="form-input" type="number" id="emo-reward-reflect" min="1" max="14" value="3" style="padding:.2rem;font-size:.78rem;text-align:center">
+              <input class="form-input" type="number" id="emo-reward-reflect-exp" min="0" max="200" value="30" style="padding:.2rem;font-size:.78rem;text-align:center">
+              <input class="form-input" type="number" id="emo-reward-reflect-gold" min="0" max="200" value="20" style="padding:.2rem;font-size:.78rem;text-align:center">
+            </div>
+            <button class="btn-sm success" style="width:100%;margin-top:.8rem" onclick="saveEmotionRewardSettings()">💾 저장</button>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
-            <span style="font-size:.82rem">💪 꾸준함 보상</span>
-            <input class="form-input" type="number" id="emo-reward-steady" min="1" max="14" value="8" style="padding:.2rem;font-size:.78rem;text-align:center">
-            <input class="form-input" type="number" id="emo-reward-steady-exp" min="0" max="200" value="50" style="padding:.2rem;font-size:.78rem;text-align:center">
-            <input class="form-input" type="number" id="emo-reward-steady-gold" min="0" max="200" value="40" style="padding:.2rem;font-size:.78rem;text-align:center">
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem">
-            <span style="font-size:.82rem">🤔 성찰 보상</span>
-            <input class="form-input" type="number" id="emo-reward-reflect" min="1" max="14" value="3" style="padding:.2rem;font-size:.78rem;text-align:center">
-            <input class="form-input" type="number" id="emo-reward-reflect-exp" min="0" max="200" value="30" style="padding:.2rem;font-size:.78rem;text-align:center">
-            <input class="form-input" type="number" id="emo-reward-reflect-gold" min="0" max="200" value="20" style="padding:.2rem;font-size:.78rem;text-align:center">
-          </div>
-          <button class="btn-sm success" style="width:100%;margin-top:.8rem" onclick="saveEmotionRewardSettings()">💾 저장</button>
         </div>
 
         <!-- 상점 관리 카드 -->
@@ -5140,7 +5152,13 @@ function renderShopManage() {
 function saveEmotionRewardSettings() {
   const db = DB.load();
   db.settings = db.settings || {};
+  const enabled = document.getElementById('emo-reward-enabled')?.checked ?? true;
+  const lbl  = document.getElementById('emo-reward-enabled-label');
+  const body = document.getElementById('emo-reward-settings-body');
+  if (lbl)  lbl.textContent = enabled ? '켜짐' : '꺼짐';
+  if (body) body.style.opacity = enabled ? '1' : '0.4';
   db.settings.emotionRewards = {
+    enabled,
     participate: parseInt(document.getElementById('emo-reward-participate')?.value) || 4,
     participateExp:  parseInt(document.getElementById('emo-reward-participate-exp')?.value) || 20,
     participateGold: parseInt(document.getElementById('emo-reward-participate-gold')?.value) || 15,
@@ -5153,7 +5171,7 @@ function saveEmotionRewardSettings() {
   };
   DB._cache = db;
   DB._fbRef.child('settings').set(db.settings);
-  notify('✅ 감정 보상 기준 저장!');
+  notify(enabled ? '✅ 감정 보상 켜짐!' : '✅ 감정 보상 꺼짐!');
 }
 
 function loadEmotionRewardSettings() {
@@ -5169,6 +5187,14 @@ function loadEmotionRewardSettings() {
   set('emo-reward-reflect',          emo.reflect          || 3);
   set('emo-reward-reflect-exp',      emo.reflectExp       || 30);
   set('emo-reward-reflect-gold',     emo.reflectGold      || 20);
+  // enabled 체크박스
+  const enabled = emo.enabled !== false; // 기본 true
+  const chk = document.getElementById('emo-reward-enabled');
+  const lbl = document.getElementById('emo-reward-enabled-label');
+  const body = document.getElementById('emo-reward-settings-body');
+  if (chk) chk.checked = enabled;
+  if (lbl) lbl.textContent = enabled ? '켜짐' : '꺼짐';
+  if (body) body.style.opacity = enabled ? '1' : '0.4';
 }
 
 function saveShopOverrides() {

@@ -1103,9 +1103,12 @@ const EMOTION_REWARDS = [
 
 // 이번 주에 수령 가능한 감정 보상 목록 반환
 function getClaimableEmotionRewards(student, weekStart) {
+  const db = (typeof DB !== 'undefined' ? DB.load() : {});
+  const cfg = ((db.settings || {}).emotionRewards || {});
+  // 감정 보상 기능 꺼져있으면 빈 배열
+  if (cfg.enabled === false) return [];
   const summary = DB_EMOTION.getWeeklySummary(student.id, weekStart);
   const claimed  = (student.emotionRewardsClaimed || {})[weekStart] || [];
-  const cfg = ((typeof DB !== 'undefined' ? DB.load() : {}).settings || {}).emotionRewards || {};
   const thresholds = {
     emo_participate: cfg.participate || 4,
     emo_steady:      cfg.steady      || 8,
