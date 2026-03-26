@@ -1406,6 +1406,25 @@ function renderTable() {
     return 'none';
   }
 
+  // 스탯 아이콘/색상 정의
+  const STAT_BADGE = {
+    read:   { icon:'📚', label:'독서',  color:'rgba(52,152,219,.25)',  border:'rgba(52,152,219,.5)'  },
+    study:  { icon:'✏️', label:'학습',  color:'rgba(155,89,182,.2)',   border:'rgba(155,89,182,.5)'  },
+    art:    { icon:'🎨', label:'예술',  color:'rgba(230,126,34,.2)',   border:'rgba(230,126,34,.5)'  },
+    value:  { icon:'💎', label:'가치',  color:'rgba(241,196,15,.2)',   border:'rgba(241,196,15,.5)'  },
+    health: { icon:'💪', label:'건강',  color:'rgba(231,76,60,.2)',    border:'rgba(231,76,60,.5)'   },
+    life:   { icon:'🏠', label:'생활',  color:'rgba(46,204,113,.2)',   border:'rgba(46,204,113,.5)'  },
+  };
+
+  function statBadge(stat, statVal) {
+    if (!stat || !STAT_BADGE[stat]) return '';
+    const b = STAT_BADGE[stat];
+    return `<span style="font-size:.62rem;padding:.1rem .4rem;border-radius:6px;
+      background:${b.color};border:1px solid ${b.border};color:#fff;font-weight:700;white-space:nowrap">
+      ${b.icon} ${b.label} +${statVal||1}
+    </span>`;
+  }
+
   // 섹션 정의
   const sections = [
     { type:'daily',   label:'📋 일일 퀘스트', color:'rgba(74,144,226,.15)',  border:'rgba(74,144,226,.3)' },
@@ -1422,7 +1441,91 @@ function renderTable() {
     if (quests.length === 0) return;
     hasAny = true;
 
-    // 섹션 헤더
+    // 일일/주간 퀘스트는 스탯별로 서브섹션 분리
+    if (sec.type === 'daily' || sec.type === 'weekly') {
+      // 스탯별 그룹핑
+      const statGroups = {};
+      const noStat = [];
+      quests.forEach(q => {
+        if (q.stat && STAT_BADGE[q.stat]) {
+          if (!statGroups[q.stat]) statGroups[q.stat] = [];
+          statGroups[q.stat].push(q);
+        } else {
+          noStat.push(q);
+        }
+      });
+
+      // 섹션 헤더
+      totalHtml += `<div style="font-size:.9rem;font-weight:900;color:var(--gold);
+        padding:.5rem .8rem;margin-top:.6rem;background:${sec.color};
+        border-left:3px solid ${sec.border};border-radius:0 8px 8px 0;">
+        ${sec.label}
+      </div>`;
+
+      // 스탯별 서브섹션
+      const renderQuestTable = (questList) => {
+        let html = `<table id="kiosk-table" style="margin-bottom:.3rem">
+          <thead><tr>
+            <th class="quest-th">할 일</th>
+            ${students.map(s=>`<th style="font-size:.8rem">
+              <div style="font-size:1.2rem">${s.avatar}</div>
+              <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
+            </th>`).join('')}
+          </tr></thead><tbody>`;
+        questList.forEach(q => {
+          html += `<tr><td class="quest-name">
+            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+              ${q.icon||'📋'} ${q.name}
+              ${statBadge(q.stat, q.statVal)}
+            </div>
+            <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
+            ${(()=>{
+              const info=getDeadlineInfo(q);
+              if(!info) return '';
+              const color=info.urgent==='expired'?'#999':info.urgent==='critical'?'#ff4444':info.urgent==='warning'?'#ffaa00':'var(--txt2)';
+              const prefix=info.urgent==='critical'?'🔴 ':info.urgent==='warning'?'🟡 ':'⏰ ';
+              const suffix=info.urgent==='critical'?' — 곧 마감!':info.urgent==='warning'?' — 임박!':'';
+              return `<div style="font-size:.66rem;color:${color};margin-top:.15rem;font-weight:${info.urgent?'700':'400'}">${prefix}${info.deadline}까지${suffix}</div>`;
+            })()}
+          </td>`;
+          students.forEach(s => {
+            const status = getStatus(s.id, q.id, q.type);
+            if (status === 'done') {
+              html += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
+            } else if (status === 'pending') {
+              html += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
+                ⏳<span style="font-size:.55rem">신청중</span></div></td>`;
+            } else {
+              html += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}',this)">
+                <span style="font-size:1rem">○</span></div></td>`;
+            }
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+      };
+
+      // 스탯별 서브섹션 렌더
+      Object.entries(statGroups).forEach(([stat, qs]) => {
+        const b = STAT_BADGE[stat];
+        totalHtml += `<div style="font-size:.78rem;font-weight:700;padding:.3rem .8rem;margin-top:.3rem;
+          background:${b.color};border-left:2px solid ${b.border};color:#fff;border-radius:0 6px 6px 0">
+          ${b.icon} ${b.label} 퀘스트
+        </div>`;
+        totalHtml += renderQuestTable(qs);
+      });
+      if (noStat.length > 0) {
+        totalHtml += `<div style="font-size:.78rem;font-weight:700;padding:.3rem .8rem;margin-top:.3rem;
+          background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.2);color:var(--txt2);border-radius:0 6px 6px 0">
+          📋 기타
+        </div>`;
+        totalHtml += renderQuestTable(noStat);
+      }
+      return;
+    }
+
+    // 일반 섹션 (과제/특별) - 기존 방식 유지
     totalHtml += `
       <div style="font-size:.9rem;font-weight:900;color:var(--gold);
         padding:.5rem .8rem;margin-top:.6rem;background:${sec.color};
@@ -1430,7 +1533,6 @@ function renderTable() {
         ${sec.label}
       </div>`;
 
-    // 테이블
     totalHtml += `<table id="kiosk-table" style="margin-bottom:.3rem">
       <thead><tr>
         <th class="quest-th">할 일</th>
@@ -1444,7 +1546,10 @@ function renderTable() {
     quests.forEach(q => {
       totalHtml += `<tr>
         <td class="quest-name">
-          <div>${q.icon||'📋'} ${q.name}</div>
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+            ${q.icon||'📋'} ${q.name}
+            ${statBadge(q.stat, q.statVal)}
+          </div>
           <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
           ${(()=>{
             const info=getDeadlineInfo(q);

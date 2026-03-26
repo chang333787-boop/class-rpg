@@ -4496,6 +4496,7 @@ function renderQuestTemplates(type) {
     ...defaults.map(t => ({...t, custom:false})),
     ...customs.map(t => ({...t, custom:true})),
   ];
+  const isDailyWeekly = (type === 'daily' || type === 'weekly');
   const statOpts = `<option value="">없음</option>
     <option value="read">📚 독서</option>
     <option value="study">✏️ 학습</option>
@@ -4508,19 +4509,21 @@ function renderQuestTemplates(type) {
       background:rgba(255,255,255,.03);border-radius:8px;border:0.5px solid rgba(255,255,255,.07)">
       <input type="checkbox" id="qt-chk-${type}-${i}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
       <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
-      <select id="qt-stat-${type}-${i}" style="font-size:.72rem;padding:.15rem .3rem;border-radius:6px;
+      ${isDailyWeekly ? '' : `<select id="qt-stat-${type}-${i}" style="font-size:.72rem;padding:.15rem .3rem;border-radius:6px;
         background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt);width:80px">
         ${statOpts}
-      </select>
+      </select>`}
       <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderQuestTemplates('${type}')` : `hideDefaultTemplate('${type}','${t.name}')`}"
         style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
         title="${t.custom ? '삭제' : '목록에서 숨기기'}">✕</button>
     </div>`).join('');
-  // 기존 stat 값 복원
-  all.forEach((t,i) => {
-    const sel = document.getElementById(`qt-stat-${type}-${i}`);
-    if (sel && t.stat) sel.value = t.stat;
-  });
+  // 기존 stat 값 복원 (능력치 탭만)
+  if (!isDailyWeekly) {
+    all.forEach((t,i) => {
+      const sel = document.getElementById(`qt-stat-${type}-${i}`);
+      if (sel && t.stat) sel.value = t.stat;
+    });
+  }
 }
 
 function addQuestTemplate(type) {
@@ -4553,10 +4556,19 @@ function postCheckedQuests(type) {
   all.forEach((t, i) => {
     const chk = document.getElementById(`qt-chk-${type}-${i}`);
     if (!chk || !chk.checked) return;
-    // 항목별 stat 드롭다운 (능력치 탭용) 또는 탭 공통 stat
-    const statEl = document.getElementById(`qt-stat-${type}-${i}`);
-    const stat    = statEl ? statEl.value : (tabStat || t.stat || '');
-    const statVal = statEl ? 1 : tabStatVal;
+
+    // 일일/주간: 탭 공통 stat 우선, 개별 드롭다운은 보조
+    let stat, statVal;
+    if (type === 'daily' || type === 'weekly') {
+      // 탭 하단 공통 설정 사용
+      stat    = tabStat || '';
+      statVal = stat ? tabStatVal : 0;
+    } else {
+      // 능력치 탭: 개별 드롭다운 사용
+      const statEl = document.getElementById(`qt-stat-${type}-${i}`);
+      stat    = statEl ? statEl.value : (t.stat || '');
+      statVal = stat ? 1 : 0;
+    }
     // 이미 같은 이름의 활성 퀘스트가 있으면 중복 방지
     if (db.boardQuests.find(q => q.name===t.name && q.active!==false)) {
       notify(`"${t.name}" 은 이미 게시중이에요`, 'error');
