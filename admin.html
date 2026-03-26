@@ -2952,9 +2952,9 @@ function approveReward(student, reward) {
     approved:     true,
   });
 
-  // 5. pendingReward에 approved:true 표시 (학생이 수령 버튼 누를 때 실제 제거)
-  student.pendingRewards = (student.pendingRewards||[]).map(r =>
-    (r.id === reward.id || r.label === reward.id) ? {...r, approved:true} : r
+  // 5. pendingReward 즉시 제거
+  student.pendingRewards = (student.pendingRewards||[]).filter(r =>
+    r.id !== reward.id && r.label !== reward.id
   );
 
   return student;
@@ -2965,9 +2965,7 @@ function approveSingle(studentId, rewardId) {
   if (!s) return;
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
   if (!reward) return;
-  approveReward(s, reward);
-  // 모든 타입 승인 즉시 제거 (받기 버튼 단계 제거)
-  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
+  approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
   DB.saveStudent(s);
   renderAll();
   notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
@@ -3138,9 +3136,7 @@ function gridApprove(studentId, rewardId) {
   if (!s) return;
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId);
   if (!reward) return;
-  approveReward(s, reward);
-  // 모든 타입 승인 즉시 제거
-  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId);
+  approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
   DB.saveStudent(s);
   renderApproveGrid();
   renderApproveList();
