@@ -2740,10 +2740,11 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
   const maxV = Math.max(10, ...Object.values(s.stats||{}));
   document.getElementById(abilityId).innerHTML = abDefs.map(ab => {
     const v = s.stats?.[ab.k]||0;
+    const display = Number.isInteger(v) ? v : v.toFixed(1);
     return `<div class="ab-row ${ab.c}">
       <span class="ab-name">${ab.l}</span>
       <div class="ab-bar"><div class="ab-fill" style="width:${Math.min(100,v/maxV*100)}%"></div></div>
-      <span class="ab-val">${v}</span>
+      <span class="ab-val">${display}</span>
     </div>`;
   }).join('');
 }
@@ -3109,7 +3110,7 @@ function claimRewards() {
     totalGold += r.gold || 0;
     if (r.stat && r.statVal) {
       CUR.stats = CUR.stats || {};
-      CUR.stats[r.stat] = (CUR.stats[r.stat]||0) + r.statVal;
+      CUR.stats[r.stat] = Math.round(((CUR.stats[r.stat]||0) + r.statVal) * 10) / 10;
     }
     // questLog는 관리자 approveReward에서 이미 저장됨 → 여기서 중복 저장 제거
   });
@@ -5485,7 +5486,7 @@ function renderQuestBoard() {
             <span style="font-size:.72rem;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);
               border-radius:8px;padding:.1rem .45rem;color:var(--gold)">+${q.gold}G</span>
             ${q.stat?`<span style="font-size:.72rem;background:rgba(93,173,226,.08);border:1px solid rgba(93,173,226,.2);
-              border-radius:8px;padding:.1rem .45rem;color:var(--sky)">${GAME_DATA.statNames[q.stat]||q.stat} +1</span>`:''}
+              border-radius:8px;padding:.1rem .45rem;color:var(--sky)">${GAME_DATA.statNames[q.stat]||q.stat} +${q.statVal||1}</span>`:''}
           </div>
         </div>
         <div style="flex-shrink:0;text-align:right">

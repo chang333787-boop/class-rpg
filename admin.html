@@ -1538,14 +1538,18 @@ tr:hover td{background:rgba(255,255,255,.02);}
           </div>
           <div class="form-group">
             <label class="form-label">능력치</label>
-            <select class="form-select" id="qa-stat">
-              <option value="">없음</option>
-              <option value="read">독서</option>
-              <option value="study">학습</option>
-              <option value="art">예술</option>
-              <option value="value">가치</option>
-              <option value="health">건강</option>
-            </select>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <select class="form-select" id="qa-stat" style="flex:1">
+                <option value="">없음</option>
+                <option value="read">독서</option>
+                <option value="study">학습</option>
+                <option value="art">예술</option>
+                <option value="value">가치</option>
+                <option value="health">건강</option>
+              </select>
+              <input class="form-input" type="number" id="reward-statval" value="1" min="0.1" max="10" step="0.1"
+                style="width:65px;text-align:center" placeholder="수치">
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">아이콘</label>
@@ -1768,14 +1772,18 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <input type="hidden" id="nq-icon" value="📋">
             <div class="form-group">
               <label class="form-label">능력치</label>
-              <select class="form-select" id="nq-stat">
-                <option value="">없음</option>
-                <option value="read">독서</option>
-                <option value="study">학습</option>
-                <option value="art">예술</option>
-                <option value="value">가치</option>
-                <option value="health">건강</option>
-              </select>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <select class="form-select" id="nq-stat" style="flex:1">
+                  <option value="">없음</option>
+                  <option value="read">독서</option>
+                  <option value="study">학습</option>
+                  <option value="art">예술</option>
+                  <option value="value">가치</option>
+                  <option value="health">건강</option>
+                </select>
+                <input class="form-input" type="number" id="nq-statval" value="1" min="0.1" max="10" step="0.1"
+                  style="width:70px;text-align:center" placeholder="수치">
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">마감일 (선택)</label>
@@ -2436,7 +2444,7 @@ function renderDashboard() {
               border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">🎨 작품</span>`:''}
           </div>
           <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">
-            +${item.exp}EXP${item.stat?' · '+GAME_DATA.statNames[item.stat]+' +1':''}
+            +${item.exp}EXP${item.stat?' · '+GAME_DATA.statNames[item.stat]+' +'+(item.statVal||1):''}
             ${item.bookDate?' · '+item.bookDate:''}
           </div>
           ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;
@@ -2683,7 +2691,7 @@ function saveStudentDetail(id) {
   s.bookCount = parseInt(document.getElementById('det-books').value) || 0;
   ['read','study','art','value','health'].forEach(k => {
     const el = document.getElementById(`det-stat-${k}`);
-    if (el) s.stats[k] = parseInt(el.value) || 0;
+    if (el) s.stats[k] = Math.round((parseFloat(el.value)||0) * 10) / 10;
   });
   DB.saveStudent(s);
   closeModal();
@@ -2875,7 +2883,7 @@ function approveReward(student, reward) {
   // 2. 스탯 증가 (승인 즉시 지급)
   if (reward.stat && reward.statVal) {
     student.stats = student.stats || {};
-    student.stats[reward.stat] = (student.stats[reward.stat]||0) + (reward.statVal||1);
+    student.stats[reward.stat] = Math.round(((student.stats[reward.stat]||0) + (reward.statVal||1)) * 10) / 10;
   }
 
   // 3. 타입별 처리
@@ -2975,7 +2983,7 @@ function quickApprove() {
 
   const reward = {
     id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-    label: name, exp, gold, stat, statVal: stat ? 1 : 0,
+    label: name, exp, gold, stat, statVal: stat ? (Math.round((parseFloat(document.getElementById('reward-statval')?.value)||1)*10)/10) : 0,
     icon, date: todayStr(),
   };
 
@@ -4553,12 +4561,13 @@ function addBoardQuest() {
   const gold    = parseInt(document.getElementById('nq-gold').value)||50;
   const icon    = document.getElementById('nq-icon').value || '📋';
   const stat    = document.getElementById('nq-stat').value;
+  const statVal = stat ? Math.round((parseFloat(document.getElementById('nq-statval')?.value)||1) * 10) / 10 : 0;
   const type    = document.getElementById('nq-type').value;
   const dueDate = document.getElementById('nq-due').value || '';
 
   const quest = {
     id: 'bq_' + Date.now(),
-    name, type, exp, gold, icon, stat,
+    name, type, exp, gold, icon, stat, statVal,
     dueDate, date: todayStr(),
     active: true,
   };
