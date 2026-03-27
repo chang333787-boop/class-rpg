@@ -1712,7 +1712,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <button class="btn-sm" onclick="addQuestTemplate('daily')">추가</button>
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;background:rgba(255,255,255,.04);border-radius:10px;padding:.5rem .7rem">
-            <span style="font-size:.75rem;color:var(--txt2);flex-shrink:0">능력치:</span>
+            <span style="font-size:.75rem;color:var(--txt2);flex-shrink:0">일괄:</span>
             <select class="form-select" id="qt-daily-stat" style="flex:1;font-size:.78rem">
               <option value="">없음</option>
               <option value="read">독서</option>
@@ -1724,6 +1724,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             </select>
             <input class="form-input" type="number" id="qt-daily-statval" value="1" min="0.1" max="10" step="0.1"
               style="width:65px;text-align:center;font-size:.78rem" placeholder="수치">
+            <button class="btn-sm" onclick="applyStatToAll('daily')" style="flex-shrink:0;font-size:.72rem">전체 적용</button>
           </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('daily')">📌 체크한 항목 게시판에 올리기</button>
           <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates('daily')">🔄 숨긴 항목 복원</button>
@@ -1738,7 +1739,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <button class="btn-sm" onclick="addQuestTemplate('weekly')">추가</button>
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;background:rgba(255,255,255,.04);border-radius:10px;padding:.5rem .7rem">
-            <span style="font-size:.75rem;color:var(--txt2);flex-shrink:0">능력치:</span>
+            <span style="font-size:.75rem;color:var(--txt2);flex-shrink:0">일괄:</span>
             <select class="form-select" id="qt-weekly-stat" style="flex:1;font-size:.78rem">
               <option value="">없음</option>
               <option value="read">독서</option>
@@ -1750,6 +1751,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
             </select>
             <input class="form-input" type="number" id="qt-weekly-statval" value="1" min="0.1" max="10" step="0.1"
               style="width:65px;text-align:center;font-size:.78rem" placeholder="수치">
+            <button class="btn-sm" onclick="applyStatToAll('weekly')" style="flex-shrink:0;font-size:.72rem">전체 적용</button>
           </div>
           <button class="btn-sm success" style="margin-top:.9rem;width:100%" onclick="postCheckedQuests('weekly')">📌 체크한 항목 게시판에 올리기</button>
           <button class="btn-sm outline" style="margin-top:.4rem;width:100%;font-size:.72rem" onclick="restoreHiddenTemplates('weekly')">🔄 숨긴 항목 복원</button>
@@ -4504,26 +4506,95 @@ function renderQuestTemplates(type) {
     <option value="value">💎 가치</option>
     <option value="health">💪 건강</option>
     <option value="life">🏠 생활</option>`;
-  el.innerHTML = all.map((t,i) => `
-    <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;
+
+  // 저장된 프리셋 불러오기
+  const presets = (DB.getSettings().questStatPresets || {})[type] || {};
+
+  el.innerHTML = all.map((t,i) => {
+    const saved = presets[t.name] || {};
+    const savedStat = saved.stat || '';
+    const savedVal  = saved.statVal != null ? saved.statVal : 1;
+    const statSelect = `<select id="qt-stat-${type}-${i}"
+        onchange="saveQuestStatPreset('${type}','${encodeURIComponent(t.name)}')"
+        style="font-size:.72rem;padding:.15rem .3rem;border-radius:6px;
+        background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt);width:76px">
+        ${statOpts}
+      </select>
+      <input type="number" id="qt-statval-${type}-${i}" value="${savedVal}" min="0.1" max="10" step="0.1"
+        onchange="saveQuestStatPreset('${type}','${encodeURIComponent(t.name)}')"
+        style="width:48px;font-size:.72rem;padding:.15rem .3rem;border-radius:6px;text-align:center;
+        background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt)">`;
+    return `
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;
       background:rgba(255,255,255,.03);border-radius:8px;border:0.5px solid rgba(255,255,255,.07)">
-      <input type="checkbox" id="qt-chk-${type}-${i}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
-      <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
-      ${isDailyWeekly ? '' : `<select id="qt-stat-${type}-${i}" style="font-size:.72rem;padding:.15rem .3rem;border-radius:6px;
-        background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt);width:80px">
+      <input type="checkbox" id="qt-chk-${type}-${i}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald);flex-shrink:0">
+      <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.84rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.name}</label>
+      ${isDailyWeekly ? statSelect : `<select id="qt-stat-${type}-${i}"
+        style="font-size:.72rem;padding:.15rem .3rem;border-radius:6px;
+        background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt);width:76px">
         ${statOpts}
       </select>`}
       <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderQuestTemplates('${type}')` : `hideDefaultTemplate('${type}','${t.name}')`}"
-        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
+        style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem;flex-shrink:0"
         title="${t.custom ? '삭제' : '목록에서 숨기기'}">✕</button>
-    </div>`).join('');
-  // 기존 stat 값 복원 (능력치 탭만)
-  if (!isDailyWeekly) {
-    all.forEach((t,i) => {
-      const sel = document.getElementById(`qt-stat-${type}-${i}`);
-      if (sel && t.stat) sel.value = t.stat;
-    });
-  }
+    </div>`;
+  }).join('');
+
+  // stat 값 복원
+  all.forEach((t,i) => {
+    const sel = document.getElementById(`qt-stat-${type}-${i}`);
+    if (!sel) return;
+    if (isDailyWeekly) {
+      const saved = presets[t.name] || {};
+      if (saved.stat) sel.value = saved.stat;
+    } else {
+      if (t.stat) sel.value = t.stat;
+    }
+  });
+}
+
+// 항목별 스탯 설정을 Firebase settings.questStatPresets에 저장
+function saveQuestStatPreset(type, encodedName) {
+  const name = decodeURIComponent(encodedName);
+  const hidden   = getHiddenTemplates(type);
+  const defaults = (QUEST_TEMPLATES[type] || []).filter(t => !hidden.has(t.name));
+  const customs  = getCustomTemplates(type);
+  const all = [...defaults, ...customs];
+  const idx = all.findIndex(t => t.name === name);
+  if (idx < 0) return;
+  const stat    = document.getElementById(`qt-stat-${type}-${idx}`)?.value || '';
+  const statVal = Math.round((parseFloat(document.getElementById(`qt-statval-${type}-${idx}`)?.value)||1)*10)/10;
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.questStatPresets = db.settings.questStatPresets || {};
+  db.settings.questStatPresets[type] = db.settings.questStatPresets[type] || {};
+  db.settings.questStatPresets[type][name] = { stat, statVal };
+  DB._cache = db;
+  DB._fbRef.child('settings/questStatPresets/'+type).set(db.settings.questStatPresets[type]);
+}
+
+// 일괄 적용: 탭 하단 공통 설정 → 모든 항목에 적용
+function applyStatToAll(type) {
+  const stat    = document.getElementById(`qt-${type}-stat`)?.value || '';
+  const statVal = Math.round((parseFloat(document.getElementById(`qt-${type}-statval`)?.value)||1)*10)/10;
+  const hidden   = getHiddenTemplates(type);
+  const defaults = (QUEST_TEMPLATES[type] || []).filter(t => !hidden.has(t.name));
+  const customs  = getCustomTemplates(type);
+  const all = [...defaults, ...customs];
+  const db = DB.load();
+  db.settings = db.settings || {};
+  db.settings.questStatPresets = db.settings.questStatPresets || {};
+  db.settings.questStatPresets[type] = db.settings.questStatPresets[type] || {};
+  all.forEach((t, i) => {
+    const sel = document.getElementById(`qt-stat-${type}-${i}`);
+    const inp = document.getElementById(`qt-statval-${type}-${i}`);
+    if (sel) sel.value = stat;
+    if (inp) inp.value = statVal;
+    db.settings.questStatPresets[type][t.name] = { stat, statVal };
+  });
+  DB._cache = db;
+  DB._fbRef.child('settings/questStatPresets/'+type).set(db.settings.questStatPresets[type]);
+  notify(`✅ 전체 ${all.length}개 항목에 적용 완료!`);
 }
 
 function addQuestTemplate(type) {
@@ -4553,16 +4624,26 @@ function postCheckedQuests(type) {
   const db = DB.load();
   db.boardQuests = db.boardQuests || [];
 
+  // 저장된 항목별 프리셋
+  const presets = (DB.getSettings().questStatPresets || {})[type] || {};
+
   all.forEach((t, i) => {
     const chk = document.getElementById(`qt-chk-${type}-${i}`);
     if (!chk || !chk.checked) return;
 
-    // 일일/주간: 탭 공통 stat 우선, 개별 드롭다운은 보조
     let stat, statVal;
     if (type === 'daily' || type === 'weekly') {
-      // 탭 하단 공통 설정 사용
-      stat    = tabStat || '';
-      statVal = stat ? tabStatVal : 0;
+      // 항목별 드롭다운 값 우선, 없으면 저장된 프리셋, 없으면 탭 공통
+      const statEl    = document.getElementById(`qt-stat-${type}-${i}`);
+      const statValEl = document.getElementById(`qt-statval-${type}-${i}`);
+      if (statEl) {
+        stat    = statEl.value || '';
+        statVal = stat ? Math.round((parseFloat(statValEl?.value)||1)*10)/10 : 0;
+      } else {
+        const saved = presets[t.name] || {};
+        stat    = saved.stat || tabStat || '';
+        statVal = stat ? (saved.statVal ?? tabStatVal) : 0;
+      }
     } else {
       // 능력치 탭: 개별 드롭다운 사용
       const statEl = document.getElementById(`qt-stat-${type}-${i}`);
