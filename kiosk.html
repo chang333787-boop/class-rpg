@@ -1462,18 +1462,19 @@ function renderTable() {
         ${sec.label}
       </div>`;
 
-      // 스탯별 서브섹션
-      const renderQuestTable = (questList) => {
-        let html = `<table id="kiosk-table" style="margin-bottom:.3rem">
-          <thead><tr>
-            <th class="quest-th">할 일</th>
-            ${students.map(s=>`<th style="font-size:.8rem">
-              <div style="font-size:1.2rem">${s.avatar}</div>
-              <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
-            </th>`).join('')}
-          </tr></thead><tbody>`;
+      // 하나의 table로 합치기 - 그룹 구분은 tr 헤더 행으로
+      totalHtml += `<table id="kiosk-table" style="margin-bottom:.3rem">
+        <thead><tr>
+          <th class="quest-th">할 일</th>
+          ${students.map(s=>`<th style="font-size:.8rem">
+            <div style="font-size:1.2rem">${s.avatar}</div>
+            <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
+          </th>`).join('')}
+        </tr></thead><tbody>`;
+
+      const addQuestRows = (questList) => {
         questList.forEach(q => {
-          html += `<tr><td class="quest-name">
+          totalHtml += `<tr><td class="quest-name">
             <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
               ${q.icon||'📋'} ${q.name}
               ${statBadge(q.stat, q.statVal)}
@@ -1491,37 +1492,40 @@ function renderTable() {
           students.forEach(s => {
             const status = getStatus(s.id, q.id, q.type);
             if (status === 'done') {
-              html += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
+              totalHtml += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
             } else if (status === 'pending') {
-              html += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
+              totalHtml += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
                 ⏳<span style="font-size:.55rem">신청중</span></div></td>`;
             } else {
-              html += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}',this)">
+              totalHtml += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}',this)">
                 <span style="font-size:1rem">○</span></div></td>`;
             }
           });
-          html += '</tr>';
+          totalHtml += '</tr>';
         });
-        html += '</tbody></table>';
-        return html;
       };
 
-      // 스탯별 서브섹션 렌더
+      // 스탯별 그룹 헤더 행 + 퀘스트 행
       Object.entries(statGroups).forEach(([stat, qs]) => {
         const b = STAT_BADGE[stat];
-        totalHtml += `<div style="font-size:.78rem;font-weight:700;padding:.3rem .8rem;margin-top:.3rem;
-          background:${b.color};border-left:2px solid ${b.border};color:#fff;border-radius:0 6px 6px 0">
+        totalHtml += `<tr><td colspan="${students.length+1}"
+          style="padding:.3rem .7rem;background:${b.color};border-left:2px solid ${b.border};
+            font-size:.72rem;font-weight:700;color:#fff">
           ${b.icon} ${b.label} 퀘스트
-        </div>`;
-        totalHtml += renderQuestTable(qs);
+        </td></tr>`;
+        addQuestRows(qs);
       });
+
       if (noStat.length > 0) {
-        totalHtml += `<div style="font-size:.78rem;font-weight:700;padding:.3rem .8rem;margin-top:.3rem;
-          background:rgba(255,255,255,.06);border-left:2px solid rgba(255,255,255,.2);color:var(--txt2);border-radius:0 6px 6px 0">
+        totalHtml += `<tr><td colspan="${students.length+1}"
+          style="padding:.3rem .7rem;background:rgba(255,255,255,.05);
+            font-size:.72rem;font-weight:700;color:var(--txt2)">
           📋 기타
-        </div>`;
-        totalHtml += renderQuestTable(noStat);
+        </td></tr>`;
+        addQuestRows(noStat);
       }
+
+      totalHtml += '</tbody></table>';
       return;
     }
 

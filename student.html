@@ -1404,10 +1404,24 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .todo-btn:hover{opacity:.85;transform:scale(1.04);}
 
 /* ── 📋 퀘스트 ── */
+@keyframes missionSlideIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes missionSlideOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(18px)}}
 .mission-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1.2rem;}
 .mission-row{display:flex;align-items:center;gap:.7rem;
   background:var(--bg3);border:1px solid rgba(255,255,255,.07);
-  border-radius:10px;padding:.6rem .9rem;cursor:pointer;transition:all .2s;}
+  border-radius:10px;padding:.6rem .9rem;cursor:pointer;transition:border-color .2s, opacity .2s;
+  animation:missionSlideIn .32s ease both;}
+.mission-row:nth-child(1){animation-delay:.02s}
+.mission-row:nth-child(2){animation-delay:.07s}
+.mission-row:nth-child(3){animation-delay:.12s}
+.mission-row:nth-child(4){animation-delay:.17s}
+.mission-row:nth-child(5){animation-delay:.22s}
+.mission-row:nth-child(6){animation-delay:.27s}
+.mission-row:nth-child(7){animation-delay:.32s}
+.mission-row:nth-child(8){animation-delay:.37s}
+.mission-row:nth-child(9){animation-delay:.42s}
+.mission-row:nth-child(10){animation-delay:.47s}
+.mission-row.slide-out{animation:missionSlideOut .22s ease both!important;}
 .mission-row.done{opacity:.55;}
 .mission-row.pending{opacity:.8;border-color:rgba(255,215,0,.2);}
 .mission-row:hover{border-color:rgba(255,215,0,.2);}
@@ -2754,26 +2768,45 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
   }).join('');
 }
 
+// 퀘스트 슬라이드 애니메이션 헬퍼
+function _animateMissionThenRender(containerEl, renderFn) {
+  const rows = containerEl.querySelectorAll('.mission-list .mission-row');
+  if (rows.length > 0) {
+    // 기존 행 슬라이드아웃 (아래로 내려가며 사라짐)
+    rows.forEach((row, i) => {
+      row.style.animation = `missionSlideOut .22s ease ${i * 0.04}s both`;
+    });
+    const delay = Math.min(rows.length * 40 + 230, 500);
+    setTimeout(() => { try { renderFn(); } catch(e) { console.error(e); } }, delay);
+  } else {
+    renderFn();
+  }
+}
+
 function renderMobile() {
   const s = CUR;
   renderCharCard('mob-char-svg-wrap','mob-char-cname','mob-char-job','mob-char-combat','mob-equip-grid','mob-ability-bars', s);
-  document.getElementById('mob-main-tab').innerHTML = buildMainHTML();
+  const mobEl = document.getElementById('mob-main-tab');
+  _animateMissionThenRender(mobEl, () => { mobEl.innerHTML = buildMainHTML(); });
 }
 
 function renderMain() {
-  try {
-    document.getElementById('main-area').innerHTML = buildMainHTML();
-  } catch(e) {
-    console.error('renderMain 오류:', e);
-    document.getElementById('main-area').innerHTML = `
-      <div style="padding:2rem;text-align:center;color:var(--txt2)">
-        <div style="font-size:2rem;margin-bottom:.5rem">⚠️</div>
-        <div style="font-size:.85rem">화면 로딩 중 오류가 발생했어요</div>
-        <div style="font-size:.72rem;color:var(--txt3);margin-top:.3rem">${e.message}</div>
-        <button onclick="renderAll()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;
-          background:var(--gold);color:#1a1a1a;border:none;font-weight:700;cursor:pointer">다시 시도</button>
-      </div>`;
-  }
+  const mainEl = document.getElementById('main-area');
+  _animateMissionThenRender(mainEl, () => {
+    try {
+      mainEl.innerHTML = buildMainHTML();
+    } catch(e) {
+      console.error('renderMain 오류:', e);
+      mainEl.innerHTML = `
+        <div style="padding:2rem;text-align:center;color:var(--txt2)">
+          <div style="font-size:2rem;margin-bottom:.5rem">⚠️</div>
+          <div style="font-size:.85rem">화면 로딩 중 오류가 발생했어요</div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-top:.3rem">${e.message}</div>
+          <button onclick="renderAll()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;
+            background:var(--gold);color:#1a1a1a;border:none;font-weight:700;cursor:pointer">다시 시도</button>
+        </div>`;
+    }
+  });
 }
 
 function buildMainHTML() {
