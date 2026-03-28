@@ -3059,6 +3059,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
         style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
         color:var(--txt2);border-radius:8px;padding:.2rem .5rem;font-size:.7rem;
         cursor:pointer;white-space:nowrap">🖥️ 데스크탑</button>
+      <button id="scale-mode-btn" onclick="toggleScaleMode()"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+        color:var(--txt2);border-radius:8px;padding:.2rem .5rem;font-size:.7rem;
+        cursor:pointer;white-space:nowrap">🔍 비율고정</button>
     </div>
   </div>
 
@@ -3807,6 +3811,10 @@ function enterGame() {
 
   document.getElementById('s-game').classList.add('active');
   applyLayout(LAYOUT_MODE);
+  // 비율고정 버튼 초기 상태 복원
+  const sBtn = document.getElementById('scale-mode-btn');
+  if (sBtn) sBtn.textContent = SCALE_MODE ? '🔍 비율고정 ON' : '🔍 비율고정';
+  applyScale();
   renderAll();
   startAccessTimer();
   setTimeout(() => tryShowReflectionPopup(), 30000);
@@ -9339,6 +9347,25 @@ function vfTab(modalId, tab, btn) {
 
 // ══ 레이아웃 모드 토글 ══
 let LAYOUT_MODE = localStorage.getItem('layoutMode') || 'desktop';
+let SCALE_MODE  = localStorage.getItem('scaleMode') === 'true'; // 비율 스케일링 on/off
+const SCALE_BASE_WIDTH = 2560; // QHD 모니터 기준
+
+function applyScale() {
+  const game = document.getElementById('s-game');
+  if (!game) return;
+  if (SCALE_MODE && LAYOUT_MODE === 'desktop') {
+    const ratio = Math.min(window.innerWidth / SCALE_BASE_WIDTH, 1); // 1440px 이상은 스케일 안함
+    const h = window.innerHeight / ratio;
+    game.style.transformOrigin = 'top left';
+    game.style.transform = `scale(${ratio})`;
+    game.style.width  = SCALE_BASE_WIDTH + 'px';
+    game.style.height = h + 'px';
+  } else {
+    game.style.transform = '';
+    game.style.width  = '';
+    game.style.height = '';
+  }
+}
 
 function applyLayout(mode) {
   LAYOUT_MODE = mode;
@@ -9360,14 +9387,25 @@ function applyLayout(mode) {
       if (homeBtn) homeBtn.classList.add('active');
     }
   } else {
-    // 데스크탑 = 원래 자연 상태 (클래스 없음)
     if (btn) btn.textContent = '🖥️ 데스크탑';
   }
+  applyScale();
 }
 
 function toggleLayout() {
   applyLayout(LAYOUT_MODE === 'desktop' ? 'mobile' : 'desktop');
 }
+
+function toggleScaleMode() {
+  SCALE_MODE = !SCALE_MODE;
+  localStorage.setItem('scaleMode', SCALE_MODE);
+  const btn = document.getElementById('scale-mode-btn');
+  if (btn) btn.textContent = SCALE_MODE ? '🔍 비율고정 ON' : '🔍 비율고정';
+  applyScale();
+}
+
+// 창 크기 바뀔 때 자동 재계산
+window.addEventListener('resize', applyScale);
 
 
 function triggerLevelUp(newLv) {
