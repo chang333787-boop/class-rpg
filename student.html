@@ -3232,6 +3232,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <button class="mtab"    onclick="houseTab('artwork',this)">🖼️ 작품</button>
     <button class="mtab"    onclick="houseTab('memory',this)">📸 추억</button>
     <button class="mtab"    onclick="houseTab('emotion',this)">💭 감정</button>
+    <button class="mtab"    id="house-tab-ach-btn" onclick="houseTab('ach',this)">🏅 업적</button>
   </div>
 
   <!-- 탭1: 기록 -->
@@ -3345,28 +3346,28 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
   <!-- 탭4: 작품 전시 -->
   <div id="house-tab-artwork" style="display:none">
-    <div style="font-size:.76rem;color:var(--txt2);margin:.3rem 0 .8rem">
-      작품을 올리면 선생님 확인 후 전시돼요 🎨
-    </div>
 
-    <!-- 작품 업로드 폼 -->
-    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-      border-radius:12px;padding:.9rem;margin-bottom:.9rem">
-      <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.7rem">+ 새 작품 올리기</div>
-      <div style="display:flex;flex-direction:column;gap:.55rem">
-        <input class="form-input-student" id="aw-title-input" placeholder="작품 제목">
+    <!-- 작품 업로드 영역 — 행동 유도형 -->
+    <div style="background:linear-gradient(135deg,rgba(255,215,0,.07),rgba(255,215,0,.03));
+      border:1.5px solid rgba(255,215,0,.2);border-radius:14px;padding:1rem;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.7rem">
+        <span style="font-size:1rem">🎨</span>
+        <span style="font-size:.82rem;font-weight:800;color:var(--gold)">새 작품 올리기</span>
+        <span style="font-size:.68rem;color:var(--txt3);margin-left:auto">선생님 확인 후 전시돼요</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        <input class="form-input-student" id="aw-title-input" placeholder="작품 제목 *">
         <select class="form-input-student" id="aw-subject-input" style="background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.15);color:var(--txt);border-radius:10px;padding:.6rem .8rem;font-size:.9rem">
           <option value="">과목 선택 (선택사항)</option>
         </select>
         <input class="form-input-student" id="aw-desc-input" placeholder="작품 설명 (선택)">
-        <!-- 이미지 선택 -->
-        <div id="aw-preview-wrap" style="display:none;margin:.2rem 0">
-          <img id="aw-preview-img" style="width:100%;max-height:200px;object-fit:contain;
-            border-radius:8px;border:1px solid rgba(255,255,255,.1)">
+        <div id="aw-preview-wrap" style="display:none;margin:.1rem 0">
+          <img id="aw-preview-img" style="width:100%;max-height:180px;object-fit:contain;
+            border-radius:10px;border:1px solid rgba(255,255,255,.1)">
         </div>
         <label style="display:flex;align-items:center;justify-content:center;gap:.5rem;
-          padding:.6rem;border:1.5px dashed rgba(255,255,255,.2);border-radius:10px;
-          cursor:pointer;font-size:.82rem;color:var(--txt2)" id="aw-file-label">
+          padding:.55rem;border:1.5px dashed rgba(255,215,0,.3);border-radius:10px;
+          cursor:pointer;font-size:.8rem;color:var(--txt3);background:rgba(255,255,255,.02)" id="aw-file-label">
           <span id="aw-file-text">📷 사진 선택하기</span>
           <input type="file" id="aw-file-input" accept="image/*" style="display:none"
             onchange="previewArtwork(this)">
@@ -3375,17 +3376,23 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
           <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden">
             <div id="aw-progress-bar" style="height:100%;background:var(--gold);width:0%;transition:width .3s;border-radius:2px"></div>
           </div>
-          <div id="aw-progress-text" style="font-size:.72rem;color:var(--txt3);margin-top:.3rem;text-align:center">업로드 중...</div>
+          <div id="aw-progress-text" style="font-size:.7rem;color:var(--txt3);margin-top:.3rem;text-align:center">업로드 중...</div>
         </div>
-        <button class="btn-gold" style="padding:.45rem;font-size:.82rem" onclick="submitArtwork()">
-          🎨 작품 제출
+        <button style="padding:.55rem;font-size:.85rem;font-weight:800;border-radius:10px;cursor:pointer;
+          background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1a1a;border:none;
+          font-family:inherit;transition:opacity .2s" onclick="submitArtwork()">
+          🎨 작품 제출하기
         </button>
       </div>
     </div>
 
-    <!-- 내 작품 과목 탭 -->
-    <div id="artwork-subject-tabs" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem"></div>
-    <!-- 내 작품 목록 -->
+    <!-- 내 작품 갤러리 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+      <span style="font-size:.78rem;font-weight:700;color:var(--txt2)">📂 내 작품 갤러리</span>
+    </div>
+    <!-- 과목 필터 탭 -->
+    <div id="artwork-subject-tabs" style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.7rem"></div>
+    <!-- 작품 목록 -->
     <div id="artwork-list"></div>
   </div>
 
@@ -3475,6 +3482,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <div style="font-size:.75rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">📋 감정 일기</div>
       <div id="emo-daily-list" style="max-height:400px;overflow-y:auto"></div>
     </div>
+  </div>
+
+  <!-- 탭7: 업적 -->
+  <div id="house-tab-ach" style="display:none;padding-bottom:.5rem">
+    <div id="house-ach-list"></div>
   </div>
 </div></div>
 
@@ -3628,7 +3640,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 <script>
 // ══ 상태 ══
 let CUR = null, SEL_STUDENT = null, SEL_CHAR = null;
-let SHOP_TAB = 'head', INV_TAB = 'equip', SEL_SEED = null;
+let SHOP_TAB = 'head', INV_TAB = 'equip', SEL_SEED = null, CUR_EQUIP_SLOT = 'all';
 let BATTLE_MON = null, BATTLE_TRIES = 0, BATTLE_DONE = false;
 let BATTLE_STATE = null; // 새 턴제 전투 엔진 상태
 let BATTLE_MENU = 'main'; // 'main' | 'attack' | 'skill'
@@ -4537,45 +4549,64 @@ function buildMainHTML() {
         <div class="tile-icon">🌱</div><div class="tile-name">농장</div>
         <div class="tile-desc">심기 · 수확</div>
       </div>
+      <div class="menu-tile" onclick="openModal('m-inv');renderInv()"
+        style="border-color:rgba(255,255,255,.1)">
+        <div class="tile-icon">🎒</div><div class="tile-name">인벤토리</div>
+        <div class="tile-desc">아이템</div>
+      </div>
+      <div class="menu-tile" onclick="openModal('m-rank');renderRankingModal()"
+        style="border-color:rgba(255,215,0,.2)">
+        <div class="tile-icon">🏆</div><div class="tile-name">랭킹</div>
+        <div class="tile-desc">우리반 순위</div>
+      </div>
     </div>
 
-    <!-- ③ 기타 메뉴 — 한 줄 아이콘형 -->
-    <div id="extra-menu-wrap">
-      <button onclick="toggleExtraMenu()"
-        style="width:100%;padding:.4rem;border-radius:8px;background:rgba(255,255,255,.03);
-          border:1px solid rgba(255,255,255,.07);color:var(--txt3);font-size:.72rem;
-          cursor:pointer;font-family:inherit;margin-bottom:.4rem"
-        id="extra-menu-btn">
-        <span id="extra-menu-arrow">▼</span> 내 집 · 인벤토리 · 랭킹 · 업적
-      </button>
-      <div id="extra-menu-grid" style="display:none;margin-bottom:.5rem">
-        <div style="display:flex;gap:.4rem">
-          <div onclick="openModal('m-house');renderHouse()"
-            style="flex:1;padding:.55rem .3rem;text-align:center;border-radius:10px;cursor:pointer;
-              background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-            <div style="font-size:1.2rem">🏠</div>
-            <div style="font-size:.65rem;color:var(--txt2);margin-top:.15rem">내 집</div>
-          </div>
-          <div onclick="openModal('m-inv');renderInv()"
-            style="flex:1;padding:.55rem .3rem;text-align:center;border-radius:10px;cursor:pointer;
-              background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-            <div style="font-size:1.2rem">🎒</div>
-            <div style="font-size:.65rem;color:var(--txt2);margin-top:.15rem">인벤토리</div>
-          </div>
-          <div onclick="openModal('m-rank');renderRankingModal()"
-            style="flex:1;padding:.55rem .3rem;text-align:center;border-radius:10px;cursor:pointer;
-              background:rgba(255,255,255,.04);border:1px solid rgba(255,215,0,.15)">
-            <div style="font-size:1.2rem">🏆</div>
-            <div style="font-size:.65rem;color:var(--txt2);margin-top:.15rem">랭킹</div>
-          </div>
-          <div onclick="openModal('m-ach');renderAchievements()"
-            style="flex:1;padding:.55rem .3rem;text-align:center;border-radius:10px;cursor:pointer;
-              background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-            <div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
-            <div style="font-size:1.2rem">🏅</div>
-            <div style="font-size:.65rem;color:var(--txt2);margin-top:.15rem">업적</div>
-          </div>
-        </div>
+    <!-- 내집 섹션 -->
+    <div class="sec-label">🏠 내 집</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.5rem">
+      <div onclick="openHouseTab('stats')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">📊</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">기록</div>
+      </div>
+      <div onclick="openHouseTab('book')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">📚</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">독서</div>
+      </div>
+      <div onclick="openHouseTab('deco')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">🌸</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">인테리어</div>
+      </div>
+      <div onclick="openHouseTab('artwork')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">🖼️</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">작품</div>
+      </div>
+      <div onclick="openHouseTab('memory')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">📸</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">추억</div>
+      </div>
+      <div onclick="openHouseTab('emotion')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">💭</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">감정</div>
+      </div>
+      <div onclick="openHouseTab('ach')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          position:relative;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
+        <div style="font-size:1.1rem">🏅</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">업적</div>
       </div>
     </div>
 
@@ -5913,20 +5944,46 @@ function openSkill2SlotPicker(slotIndex) {
 
   const existing = document.getElementById('skill2-slot-picker');
   if (existing) existing.remove();
-  const wrap = document.createElement('div');
-  wrap.id = 'skill2-slot-picker';
-  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
-  wrap.innerHTML = `<div style="background:var(--bg1);border-radius:18px 18px 0 0;padding:1.2rem;width:100%;max-width:420px;max-height:70vh;overflow-y:auto">
-    <div style="font-size:.85rem;font-weight:700;color:var(--txt1);margin-bottom:.3rem">슬롯 ${slotIndex+1} 스킬2 선택</div>
-    <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.8rem">전투당 1회 사용 가능</div>
-    ${optHtml}
-    <button onclick="document.getElementById('skill2-slot-picker').remove()"
-      style="width:100%;padding:.7rem;border-radius:10px;background:rgba(255,255,255,.06);
-        border:1px solid rgba(255,255,255,.1);color:var(--txt2);font-size:.82rem;
-        font-family:inherit;cursor:pointer;margin-top:.2rem">취소</button>
-  </div>`;
-  document.body.appendChild(wrap);
-  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+
+  const card = document.getElementById(`skill2-slot-card-${slotIndex}`);
+  if (!card) return;
+
+  card.style.gridColumn = '1 / -1';
+  card.style.textAlign = 'left';
+  card.style.padding = '.6rem';
+  card.onclick = null;
+  card.onmouseenter = null;
+  card.onmouseleave = null;
+
+  card.innerHTML = `
+    <div style="font-size:.75rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+      슬롯 ${slotIndex+1} 전투 스킬 선택
+    </div>
+    <div onclick="setSkill2Slot(${slotIndex},null)"
+      style="padding:.45rem .7rem;border-radius:8px;cursor:pointer;margin-bottom:.3rem;
+        border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+        font-size:.78rem;color:var(--txt3);text-align:center">비우기</div>
+    ${ALL_SKILL2.map(s => {
+      const current = eq2[slotIndex] === s.id;
+      const taken   = (eq2[0]===s.id||eq2[1]===s.id||eq2[2]===s.id) && !current;
+      return `<div onclick="${taken ? '' : `setSkill2Slot(${slotIndex},'${s.id}')`}"
+        style="padding:.45rem .7rem;border-radius:8px;margin-bottom:.3rem;
+          cursor:${taken ? 'not-allowed' : 'pointer'};
+          opacity:${taken ? '.4' : '1'};
+          border:1.5px solid ${current ? s.color : 'rgba(255,255,255,.1)'};
+          background:${current ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.03)'};
+          display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:.8rem;font-weight:700;color:${s.color}">${s.label}</div>
+          <div style="font-size:.68rem;color:var(--txt3)">${s.desc}</div>
+        </div>
+        <span style="font-size:.68rem;color:var(--txt3)">${current?'✓':taken?'다른 슬롯':''}</span>
+      </div>`;
+    }).join('')}
+    <button onclick="renderInv()"
+      style="width:100%;padding:.4rem;border-radius:8px;background:rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.1);color:var(--txt2);font-size:.75rem;
+        font-family:inherit;cursor:pointer;margin-top:.1rem">취소</button>`;
 }
 
 function setSkill2Slot(slotIndex, skill2Id) {
@@ -5983,20 +6040,46 @@ function openSkillSlotPicker(slotIndex) {
 
   const existing = document.getElementById('skill-slot-picker');
   if (existing) existing.remove();
-  const wrap = document.createElement('div');
-  wrap.id = 'skill-slot-picker';
-  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
-  wrap.innerHTML = `<div style="background:var(--bg1);border-radius:18px 18px 0 0;padding:1.2rem;width:100%;max-width:420px;max-height:60vh;overflow-y:auto">
-    <div style="font-size:.85rem;font-weight:700;color:var(--txt1);margin-bottom:.4rem">슬롯 ${slotIndex+1} 속성 스킬 선택</div>
-    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.8rem">불/물/풀 중 하나를 선택하세요</div>
-    ${optHtml}
-    <button onclick="document.getElementById('skill-slot-picker').remove()"
-      style="width:100%;padding:.7rem;border-radius:10px;background:rgba(255,255,255,.06);
-        border:1px solid rgba(255,255,255,.1);color:var(--txt2);font-size:.82rem;
-        font-family:inherit;cursor:pointer;margin-top:.2rem">취소</button>
-  </div>`;
-  document.body.appendChild(wrap);
-  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+
+  const card = document.getElementById(`skill-slot-card-${slotIndex}`);
+  if (!card) return;
+
+  // 카드 원래 크기 유지하면서 선택 UI로 교체
+  card.style.gridColumn = '1 / -1'; // 3칸 전체 너비 사용
+  card.style.textAlign = 'left';
+  card.style.padding = '.6rem';
+  card.onclick = null;
+  card.onmouseenter = null;
+  card.onmouseleave = null;
+
+  card.innerHTML = `
+    <div style="font-size:.75rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+      슬롯 ${slotIndex+1} 속성 스킬 선택
+    </div>
+    <div onclick="setSkillSlot(${slotIndex},null)"
+      style="padding:.45rem .7rem;border-radius:8px;cursor:pointer;margin-bottom:.3rem;
+        border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+        font-size:.78rem;color:var(--txt3);text-align:center">비우기</div>
+    ${elementTypes.map(t => {
+      const lv      = sl[t.type] ?? 0;
+      const current = eq[slotIndex] === t.type;
+      const taken   = t.type === usedType;
+      if (lv < 1) return '';
+      return `<div onclick="${taken ? '' : `setSkillSlot(${slotIndex},'${t.type}')`}"
+        style="padding:.45rem .7rem;border-radius:8px;margin-bottom:.3rem;
+          cursor:${taken ? 'not-allowed' : 'pointer'};
+          opacity:${taken ? '.35' : '1'};
+          border:1.5px solid ${current ? t.color : 'rgba(255,255,255,.1)'};
+          background:${current ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.03)'};
+          display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.8rem;font-weight:700;color:${t.color}">${t.label}</span>
+        <span style="font-size:.68rem;color:var(--txt3)">Lv.${lv}${current?' ✓':taken?' (다른 슬롯)':''}</span>
+      </div>`;
+    }).join('')}
+    <button onclick="renderInv()"
+      style="width:100%;padding:.4rem;border-radius:8px;background:rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.1);color:var(--txt2);font-size:.75rem;
+        font-family:inherit;cursor:pointer;margin-top:.1rem">취소</button>`;
 }
 
 function setSkillSlot(slotIndex, skillType) {
@@ -6607,15 +6690,28 @@ function houseTab(tab, el) {
   document.getElementById('house-tab-artwork').style.display = tab==='artwork' ? '' : 'none';
   document.getElementById('house-tab-memory').style.display  = tab==='memory'  ? '' : 'none';
   document.getElementById('house-tab-emotion').style.display = tab==='emotion' ? '' : 'none';
+  document.getElementById('house-tab-ach').style.display     = tab==='ach'     ? '' : 'none';
   if (tab==='book')    { renderBookRecords(); initBookForm(); }
   if (tab==='artwork') { fillArtworkSubjectSelect(); renderArtworks(); }
   if (tab==='emotion') renderEmotionHistory();
   if (tab==='memory')  renderMyMemories();
+  if (tab==='ach')     renderHouseAchievements();
   if (tab==='deco') {
     _dCv = null;
     renderHouseDeco();
     requestAnimationFrame(() => { _dCv = null; renderHouseDeco(); });
   }
+}
+
+// 포트폴리오 열고 특정 탭 바로 활성화
+function openHouseTab(tab) {
+  openModal('m-house');
+  renderHouse();
+  // 탭 버튼 찾아서 활성화
+  const btn = [...document.querySelectorAll('#m-house .mtab')].find(b =>
+    b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${tab}'`)
+  );
+  if (btn) houseTab(tab, btn);
 }
 
 function renderHouse() {
@@ -7808,14 +7904,18 @@ function renderArtworkSubjectTabs() {
   const el = document.getElementById('artwork-subject-tabs');
   if (!el) return;
   const tabs = ['전체', ...subjects];
-  el.innerHTML = tabs.map(t => `
-    <button onclick="selectArtSubject('${t}')"
-      style="font-size:.72rem;padding:.2rem .55rem;border-radius:20px;cursor:pointer;border:1px solid;
-        background:${CUR_ART_SUBJECT===t?'var(--gold)':'rgba(255,255,255,.06)'};
-        color:${CUR_ART_SUBJECT===t?'#000':'var(--txt2)'};
-        border-color:${CUR_ART_SUBJECT===t?'var(--gold)':'rgba(255,255,255,.12)'}">
+  el.innerHTML = tabs.map(t => {
+    const active = CUR_ART_SUBJECT === t;
+    return `<button onclick="selectArtSubject('${t}')"
+      style="font-size:.72rem;padding:.22rem .65rem;border-radius:20px;cursor:pointer;
+        border:1.5px solid ${active?'var(--gold)':'rgba(255,255,255,.1)'};
+        background:${active?'var(--gold)':'rgba(255,255,255,.04)'};
+        color:${active?'#1a1a1a':'var(--txt3)'};
+        font-weight:${active?'800':'500'};
+        font-family:inherit;transition:all .15s">
       ${t}
-    </button>`).join('');
+    </button>`;
+  }).join('');
 }
 
 function selectArtSubject(subject) {
@@ -7839,35 +7939,68 @@ function renderArtworks() {
   fillArtworkSubjectSelect();
   let approved = DB.getArtworks(CUR.id);
   let pending  = (CUR.pendingRewards||[]).filter(p=>p.type==='artwork');
-  // 과목 필터
   if (CUR_ART_SUBJECT !== '전체') {
     approved = approved.filter(a => (a.subject||'') === CUR_ART_SUBJECT);
     pending  = pending.filter(a => (a.subject||'') === CUR_ART_SUBJECT);
   }
   if (approved.length === 0 && pending.length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem 0;color:var(--txt3);font-size:.83rem">아직 등록된 작품이 없어요 🎨<br><span style="font-size:.72rem">위에서 첫 번째 작품을 올려보세요!</span></div>';
+    el.innerHTML = `<div style="text-align:center;padding:2.5rem 0;color:var(--txt3);font-size:.82rem;line-height:2">
+      아직 등록된 작품이 없어요 🎨<br>
+      <span style="font-size:.72rem">위에서 첫 번째 작품을 올려보세요!</span></div>`;
     return;
   }
   const lbImgs = approved.filter(a=>a.artUrl||a.link).map(a=>({url:a.artUrl||a.link, title:a.title||a.artTitle||'', desc:a.comment||a.artDesc||''}));
   window._artLbImgs = lbImgs;
-  const pendingHtml = pending.map(a => {
-    return '<div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);border-radius:14px;padding:.9rem;margin-bottom:.7rem">' +
-      (a.artUrl ? '<img src="'+a.artUrl+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:.6rem">' : '') +
-      '<div style="display:flex;align-items:center;gap:.5rem"><span style="font-size:.7rem;background:rgba(255,215,0,.15);color:var(--gold);border-radius:20px;padding:.1rem .55rem;font-weight:700">확인중...</span>' +
-      '<span style="font-weight:700;font-size:.88rem">' + a.artTitle + '</span></div>' +
-      (a.artDesc ? '<div style="font-size:.75rem;color:var(--txt2);margin-top:.3rem">'+a.artDesc+'</div>' : '') +
-      '</div>';
-  }).join('');
+
+  const pendingHtml = pending.map(a => `
+    <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,215,0,.2);
+      border-radius:14px;overflow:hidden;margin-bottom:.8rem">
+      ${a.artUrl?`<img src="${a.artUrl}" style="width:100%;max-height:200px;object-fit:cover;display:block">`:''}
+      <div style="padding:.75rem .9rem">
+        <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap">
+          <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
+            background:rgba(255,215,0,.18);color:var(--gold);border:1px solid rgba(255,215,0,.3)">⏳ 확인중</span>
+          ${a.subject?`<span style="font-size:.65rem;padding:.18rem .5rem;border-radius:20px;
+            background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${a.subject}</span>`:''}
+        </div>
+        <div style="font-size:.92rem;font-weight:800;color:var(--txt1);margin-bottom:.25rem">${a.artTitle||''}</div>
+        ${a.artDesc?`<div style="font-size:.75rem;color:var(--txt2);line-height:1.55;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${a.artDesc}</div>`:''}
+      </div>
+    </div>`).join('');
+
   const approvedHtml = approved.map((a,i) => {
     const url = a.artUrl||a.link||'';
     const lbIdx = lbImgs.findIndex(x=>x.url===url);
-    return '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,215,0,.15);border-radius:14px;padding:.9rem;margin-bottom:.7rem">' +
-      (url ? '<img src="'+url+'" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="openLightbox(window._artLbImgs,'+lbIdx+')" onerror="this.style.display=\'none\'">' : '') +
-      '<div style="display:flex;align-items:center;gap:.5rem"><span style="font-size:.7rem;background:rgba(46,204,113,.15);color:var(--emerald);border-radius:20px;padding:.1rem .55rem;font-weight:700">✓ 전시중</span>' +
-      '<span style="font-weight:700;font-size:.88rem">'+(a.title||a.artTitle||'')+'</span></div>' +
-      ((a.comment||a.artDesc) ? '<div style="font-size:.75rem;color:var(--txt2);margin-top:.3rem">'+(a.comment||a.artDesc)+'</div>' : '') +
-      '<div style="font-size:.65rem;color:var(--txt3);margin-top:.4rem;text-align:right">'+(a.date||'')+'</div></div>';
+    const title = a.title||a.artTitle||'';
+    const desc = a.comment||a.artDesc||'';
+    return `
+    <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(46,204,113,.15);
+      border-radius:14px;overflow:hidden;margin-bottom:.8rem">
+      ${url?`<div style="position:relative;cursor:pointer" onclick="openLightbox(window._artLbImgs,${lbIdx})">
+        <img src="${url}" style="width:100%;max-height:220px;object-fit:cover;display:block"
+          onerror="this.parentElement.style.display='none'">
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .2s"
+          onmouseover="this.style.background='rgba(0,0,0,.15)'" onmouseout="this.style.background='rgba(0,0,0,0)'">
+          <span style="position:absolute;top:.5rem;right:.5rem;background:rgba(0,0,0,.45);
+            border-radius:20px;padding:.15rem .5rem;font-size:.65rem;color:#fff">🔍 크게보기</span>
+        </div>
+      </div>`:''}
+      <div style="padding:.75rem .9rem">
+        <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap">
+          <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
+            background:rgba(46,204,113,.15);color:var(--emerald);border:1px solid rgba(46,204,113,.25)">✓ 전시중</span>
+          ${a.subject?`<span style="font-size:.65rem;padding:.18rem .5rem;border-radius:20px;
+            background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${a.subject}</span>`:''}
+        </div>
+        <div style="font-size:.92rem;font-weight:800;color:var(--txt1);margin-bottom:.25rem">${title}</div>
+        ${desc?`<div style="font-size:.75rem;color:var(--txt2);line-height:1.55;margin-bottom:.3rem;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${desc}</div>`:''}
+        <div style="font-size:.65rem;color:var(--txt3);text-align:right">${a.date||''}</div>
+      </div>
+    </div>`;
   }).join('');
+
   el.innerHTML = pendingHtml + approvedHtml;
 }
 
@@ -8428,7 +8561,7 @@ function renderInv() {
       const tc = skillType ? (typeColors2[skillType]||'var(--gold)') : 'var(--txt3)';
       const lv = skillType ? (sl[skillType] ?? 0) : 0;
       const clickable = !cfg.locked;
-      html += `<div ${clickable ? `onclick="openSkillSlotPicker(${i})"` : ''}
+      html += `<div id="skill-slot-card-${i}" ${clickable ? `onclick="openSkillSlotPicker(${i})"` : ''}
         style="background:${cfg.locked ? 'rgba(255,215,0,.06)' : 'rgba(255,255,255,.04)'};
           border:1.5px solid ${skillType ? tc : (cfg.locked ? 'rgba(255,215,0,.25)' : 'rgba(255,255,255,.1)')};
           border-radius:10px;padding:.6rem .3rem;text-align:center;
@@ -8496,7 +8629,7 @@ function renderInv() {
       const sid  = eq2[i] || null;
       const info = ALL_SKILL2.find(s => s.id === sid);
       const tc   = info ? info.color : 'var(--txt3)';
-      html += `<div onclick="openSkill2SlotPicker(${i})"
+      html += `<div id="skill2-slot-card-${i}" onclick="openSkill2SlotPicker(${i})"
         style="background:rgba(255,255,255,.04);border:1.5px solid ${info ? tc : 'rgba(255,255,255,.1)'};
           border-radius:10px;padding:.6rem .3rem;text-align:center;cursor:pointer;transition:.2s"
         onmouseenter="this.style.background='rgba(255,255,255,.08)'"
@@ -8511,7 +8644,10 @@ function renderInv() {
 
     document.getElementById('inv-slots').innerHTML = html;
     return;
-    // 현재 장착 슬롯 — 2줄로 배치 (5칸이 좁아서 깨지는 문제 해결)
+  }
+
+  if (tab === 'equip') {
+    // 현재 장착 슬롯
     const slots = [
       {k:'head',icon:'🪖',l:'머리'},{k:'body',icon:'🥋',l:'옷'},{k:'weapon',icon:'⚔️',l:'무기'},
       {k:'glove',icon:'🧤',l:'장갑'},{k:'shoe',icon:'👟',l:'신발'}
@@ -8534,24 +8670,56 @@ function renderInv() {
     }).join('');
     html += `</div>`;
 
-    // 보관 장비 목록
-    const equipInv = inv.filter(i => GAME_DATA.getItemById(i.id));
-    html += `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">
-      🎒 보관중인 장비</div>`;
+    // 부위별 탭
+    const slotTabs = [
+      {k:'all',  icon:'📦', l:'전체'},
+      {k:'head', icon:'🪖', l:'머리'},
+      {k:'body', icon:'🥋', l:'옷'},
+      {k:'weapon',icon:'⚔️',l:'무기'},
+      {k:'glove',icon:'🧤', l:'장갑'},
+      {k:'shoe', icon:'👟', l:'신발'},
+    ];
+    html += `<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.6rem">`;
+    slotTabs.forEach(t => {
+      const active = CUR_EQUIP_SLOT === t.k;
+      // 해당 부위 보유 수량
+      const cnt = t.k === 'all'
+        ? inv.filter(i => GAME_DATA.getItemById(i.id)).length
+        : inv.filter(i => { const item = GAME_DATA.getItemById(i.id); return item && (item.slot === t.k || Object.keys(GAME_DATA.equipment).find(s=>s===t.k&&GAME_DATA.equipment[s]?.find(x=>x.id===i.id))); }).length;
+      html += `<button onclick="CUR_EQUIP_SLOT='${t.k}';renderInv()"
+        style="font-size:.7rem;padding:.22rem .55rem;border-radius:20px;cursor:pointer;
+          border:1.5px solid ${active?'var(--gold)':'rgba(255,255,255,.1)'};
+          background:${active?'var(--gold)':'rgba(255,255,255,.04)'};
+          color:${active?'#1a1a1a':'var(--txt2)'};font-weight:${active?'800':'500'};
+          font-family:inherit">${t.icon} ${t.l}${cnt>0?` <span style="font-size:.62rem;opacity:.7">${cnt}</span>`:''}</button>`;
+    });
+    html += `</div>`;
+
+    // 보관 장비 목록 (부위 필터 적용)
+    let equipInv = inv.filter(i => GAME_DATA.getItemById(i.id));
+    if (CUR_EQUIP_SLOT !== 'all') {
+      equipInv = equipInv.filter(i => {
+        const item = GAME_DATA.getItemById(i.id);
+        return item && (item.slot === CUR_EQUIP_SLOT ||
+          Object.keys(GAME_DATA.equipment).find(s => s === CUR_EQUIP_SLOT && GAME_DATA.equipment[s]?.find(x => x.id === i.id)));
+      });
+    }
+
     if (equipInv.length === 0) {
-      html += `<div style="font-size:.8rem;color:var(--txt3);padding:.8rem 0;text-align:center">
-        보관중인 장비가 없어요</div>`;
+      html += `<div style="font-size:.8rem;color:var(--txt3);padding:1.2rem 0;text-align:center">
+        ${CUR_EQUIP_SLOT==='all'?'보관중인 장비가 없어요':'해당 부위 장비가 없어요'}</div>`;
     } else {
       html += `<div style="display:flex;flex-direction:column;gap:.5rem">` + equipInv.map(i => {
         const item = GAME_DATA.getItemById(i.id);
         if (!item) return '';
         const sellPrice = Math.floor(item.price / 2);
         const statStr   = Utils.statText(item.stats);
+        const slotKey   = item.slot || Object.keys(GAME_DATA.equipment).find(s=>GAME_DATA.equipment[s]?.find(x=>x.id===item.id)) || 'body';
         return `<div style="display:flex;align-items:center;gap:.8rem;
           background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
           border-radius:10px;padding:.7rem .9rem">
           <div style="flex-shrink:0;width:48px;height:48px;display:flex;align-items:center;justify-content:center">
-            ${buildEquipIcon(item.slot||Object.keys(GAME_DATA.equipment).find(s=>GAME_DATA.equipment[s].find(x=>x.id===item.id))||'body', item.id)}
+            ${buildEquipIcon(slotKey, item.id)}
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:.88rem">${item.name}</div>
@@ -9298,6 +9466,47 @@ function renderAchievements() {
     </div>
     ${doneList.length > 0 ? `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">✅ 달성한 업적 (${doneList.length})</div>${render(doneList, false)}` : ''}
     <div style="font-size:.72rem;color:var(--txt3);margin:.8rem 0 .5rem">🔒 미달성 업적 (${lockedList.length})</div>
+    ${render(lockedList, true)}`;
+}
+
+// 포트폴리오 내 업적 탭 전용 렌더 (house-ach-list에 출력)
+function renderHouseAchievements() {
+  const earned = new Set(CUR.achievements || []);
+  const doneList   = ACHIEVEMENTS.filter(a =>  earned.has(a.id));
+  const lockedList = ACHIEVEMENTS.filter(a => !earned.has(a.id));
+  const el = document.getElementById('house-ach-list');
+  if (!el) return;
+
+  const rewardText = a => {
+    const parts = [];
+    if (a.reward.exp)   parts.push(`+${a.reward.exp}EXP`);
+    parts.push('+20G');
+    if (a.reward.title) parts.push(`칭호 "${a.reward.title}"`);
+    if (a.reward.deco)  parts.push('특별 장식');
+    return parts.join(' · ');
+  };
+
+  const render = (list, locked) => list.map(a => `
+    <div class="ach-item ${locked?'locked':''}">
+      <div class="ach-icon">${a.icon}</div>
+      <div class="ach-body">
+        <div class="ach-name">${a.name}</div>
+        <div class="ach-desc">${a.desc}</div>
+        <div class="ach-reward">🎁 ${rewardText(a)}</div>
+      </div>
+      <div class="ach-badge ${locked?'locked':'done'}">${locked?'🔒':'✅'}</div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
+      <div style="font-size:.82rem;color:var(--txt2)">달성 <span style="color:var(--gold);font-weight:700">${doneList.length}</span> / ${ACHIEVEMENTS.length}</div>
+      <div style="font-size:.72rem;color:var(--txt3)">EXP·골드·칭호 획득!</div>
+    </div>
+    <div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin-bottom:1rem;overflow:hidden">
+      <div style="height:100%;width:${Math.round(doneList.length/ACHIEVEMENTS.length*100)}%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;transition:width .6s ease"></div>
+    </div>
+    ${doneList.length > 0 ? `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">✅ 달성 (${doneList.length})</div>${render(doneList, false)}` : ''}
+    <div style="font-size:.72rem;color:var(--txt3);margin:.7rem 0 .4rem">🔒 미달성 (${lockedList.length})</div>
     ${render(lockedList, true)}`;
 }
 
