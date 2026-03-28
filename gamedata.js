@@ -62,70 +62,106 @@ const GAME_DATA = {
     },
   ],
 
-  // ─── 장비 (밸런스 v3: spd → 신발+장갑, def → 머리+몸통) ────────────────
-  // 핵심 원칙: 해당 레벨 풀셋 기준으로 몬스터 조건 달성 가능
+  // ─── 장비 (4단계: 가격/조건 정비, body 30개, 기존 ID 완전 유지) ────────────
+  // ★ cond = 구매 조건 (slot 규칙 반영), 기존 보유 장비엔 cond 미적용
+  // 머리=가치+생활, 불몸통=건강+생활, 물몸통=학습+생활, 풀몸통=예술+생활
+  // 검=건강+생활, 지팡이=학습+예술, 장갑=가치+건강, 신발=예술+건강
   equipment: {
     head: [
-      {id:'e_h1', name:'천 모자',        lv:3,  stats:{def:3},               cond:{},                           price:80,   icon:'🎩'},
-      {id:'e_h2', name:'가죽 모자',      lv:5,  stats:{def:5, spd:1},        cond:{health:3},                   price:120,  icon:'🪖'},
-      {id:'e_h3', name:'견습 마법 모자', lv:7,  stats:{mag:4, def:3},        cond:{art:4},                      price:160,  icon:'🧙'},
-      {id:'e_h4', name:'기사 투구',      lv:10, stats:{def:10, spd:2},       cond:{health:6},                   price:220,  icon:'⛑️'},
-      {id:'e_h5', name:'학자의 모자',    lv:13, stats:{mag:8, def:4},        cond:{study:7},                    price:320,  icon:'🎓'},
-      {id:'e_h6', name:'수호 투구',      lv:16, stats:{def:15, spd:3},       cond:{health:10,value:5},          price:420,  icon:'🛡️'},
-      {id:'e_h7', name:'대마법 모자',    lv:20, stats:{mag:13, def:5},       cond:{art:12,study:8},             price:600,  icon:'🔮'},
-      {id:'e_h8', name:'황금 투구',      lv:24, stats:{def:21, spd:4},       cond:{health:14,value:8},          price:650,  icon:'👑'},
-      {id:'e_h9', name:'전설 투구',      lv:28, stats:{def:26, spd:5},       cond:{health:18,value:12},         price:850,  icon:'💎'},
-      {id:'e_h10',name:'왕관',           lv:30, stats:{def:30,mag:8,spd:6},  cond:{read:15,study:15,value:15},  price:1100, icon:'👑'},
+      {id:'e_h1', name:'천 모자',        lv:3,  stats:{def:3},              cond:{},                      price:70,   icon:'🎩'},
+      {id:'e_h2', name:'가죽 모자',      lv:5,  stats:{def:5, spd:1},       cond:{value:2,life:1},        price:100,  icon:'🪖'},
+      {id:'e_h3', name:'견습 마법 모자', lv:7,  stats:{mag:4, def:3},       cond:{value:4,life:2},        price:150,  icon:'🧙'},
+      {id:'e_h4', name:'기사 투구',      lv:10, stats:{def:10, spd:2},      cond:{value:6,life:4},        price:220,  icon:'⛑️'},
+      {id:'e_h5', name:'학자의 모자',    lv:13, stats:{mag:8, def:4},       cond:{value:8,life:6},        price:320,  icon:'🎓'},
+      {id:'e_h6', name:'수호 투구',      lv:16, stats:{def:15, spd:3},      cond:{value:10,life:8},       price:450,  icon:'🛡️'},
+      {id:'e_h7', name:'대마법 모자',    lv:20, stats:{mag:13, def:5},      cond:{value:13,life:10},      price:620,  icon:'🔮'},
+      {id:'e_h8', name:'황금 투구',      lv:24, stats:{def:21, spd:4},      cond:{value:16,life:13},      price:820,  icon:'👑'},
+      {id:'e_h9', name:'전설 투구',      lv:28, stats:{def:26, spd:5},      cond:{value:19,life:15},      price:1050, icon:'💎'},
+      {id:'e_h10',name:'왕관',           lv:30, stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      price:1300, icon:'👑'},
     ],
     body: [
-      {id:'e_b1', name:'천 옷',          lv:3,  stats:{def:5},               cond:{},                           price:80,   icon:'👕'},
-      {id:'e_b2', name:'가죽 갑옷',      lv:5,  stats:{def:9},               cond:{health:3},                   price:120,  icon:'🥋'},
-      {id:'e_b3', name:'견습 로브',      lv:7,  stats:{mag:6, def:4},        cond:{art:4},                      price:160,  icon:'🧥'},
-      {id:'e_b4', name:'철 갑옷',        lv:10, stats:{def:14},              cond:{health:6},                   price:220,  icon:'🛡️'},
-      {id:'e_b5', name:'연구 로브',      lv:13, stats:{mag:11, def:6},       cond:{study:7},                    price:320,  icon:'🔬'},
-      {id:'e_b6', name:'기사 갑옷',      lv:16, stats:{def:20},              cond:{health:10,value:5},          price:420,  icon:'⚔️'},
-      {id:'e_b7', name:'대마법 로브',    lv:20, stats:{mag:18, def:8},       cond:{art:12,study:8},             price:600,  icon:'✨'},
-      {id:'e_b8', name:'황금 갑옷',      lv:24, stats:{def:27},              cond:{health:14,value:8},          price:650,  icon:'💛'},
-      {id:'e_b9', name:'전설 갑옷',      lv:28, stats:{def:34},              cond:{health:18,value:12},         price:850,  icon:'🌟'},
-      {id:'e_b10',name:'왕의 갑옷',      lv:30, stats:{def:40},              cond:{health:20,value:15,study:10},price:1100, icon:'👑'},
+      // ★ e_b1~e_b10 = 불(fire) — 기존 ID 완전 유지, 조건=건강+생활
+      {id:'e_b1', name:'천 옷 (불)',          lv:3,  stats:{def:5},              cond:{},                      price:90,   icon:'👕', element:'fire'},
+      {id:'e_b2', name:'가죽 갑옷 (불)',      lv:5,  stats:{def:9},              cond:{health:2,life:1},       price:130,  icon:'🥋', element:'fire'},
+      {id:'e_b3', name:'견습 로브 (불)',      lv:7,  stats:{mag:6, def:4},       cond:{health:4,life:2},       price:190,  icon:'🧥', element:'fire'},
+      {id:'e_b4', name:'철 갑옷 (불)',        lv:10, stats:{def:14},             cond:{health:6,life:4},       price:280,  icon:'🛡️', element:'fire'},
+      {id:'e_b5', name:'연구 로브 (불)',      lv:13, stats:{mag:11, def:6},      cond:{health:8,life:6},       price:400,  icon:'🔬', element:'fire'},
+      {id:'e_b6', name:'기사 갑옷 (불)',      lv:16, stats:{def:20},             cond:{health:10,life:8},      price:560,  icon:'⚔️', element:'fire'},
+      {id:'e_b7', name:'대마법 로브 (불)',    lv:20, stats:{mag:18, def:8},      cond:{health:13,life:10},     price:760,  icon:'✨', element:'fire'},
+      {id:'e_b8', name:'황금 갑옷 (불)',      lv:24, stats:{def:27},             cond:{health:16,life:13},     price:980,  icon:'💛', element:'fire'},
+      {id:'e_b9', name:'전설 갑옷 (불)',      lv:28, stats:{def:34},             cond:{health:19,life:15},     price:1250, icon:'🌟', element:'fire'},
+      {id:'e_b10',name:'왕의 갑옷 (불)',      lv:30, stats:{def:40},             cond:{health:21,life:17},     price:1550, icon:'👑', element:'fire'},
+      // ★ e_b11~e_b20 = 물(water) — 신규, 조건=학습+생활
+      {id:'e_b11',name:'물의 천 옷',          lv:3,  stats:{def:5},              cond:{},                      price:90,   icon:'🩵', element:'water'},
+      {id:'e_b12',name:'물의 가죽 갑옷',      lv:5,  stats:{def:9},              cond:{study:2,life:1},        price:130,  icon:'💧', element:'water'},
+      {id:'e_b13',name:'물의 견습 로브',      lv:7,  stats:{mag:6, def:4},       cond:{study:4,life:2},        price:190,  icon:'🌊', element:'water'},
+      {id:'e_b14',name:'물의 철 갑옷',        lv:10, stats:{def:14},             cond:{study:6,life:4},        price:280,  icon:'🐚', element:'water'},
+      {id:'e_b15',name:'물의 연구 로브',      lv:13, stats:{mag:11, def:6},      cond:{study:8,life:6},        price:400,  icon:'🔵', element:'water'},
+      {id:'e_b16',name:'물의 기사 갑옷',      lv:16, stats:{def:20},             cond:{study:10,life:8},       price:560,  icon:'🌀', element:'water'},
+      {id:'e_b17',name:'물의 대마법 로브',    lv:20, stats:{mag:18, def:8},      cond:{study:13,life:10},      price:760,  icon:'🫧', element:'water'},
+      {id:'e_b18',name:'물의 황금 갑옷',      lv:24, stats:{def:27},             cond:{study:16,life:13},      price:980,  icon:'🔷', element:'water'},
+      {id:'e_b19',name:'물의 전설 갑옷',      lv:28, stats:{def:34},             cond:{study:19,life:15},      price:1250, icon:'❄️', element:'water'},
+      {id:'e_b20',name:'물의 왕의 갑옷',      lv:30, stats:{def:40},             cond:{study:21,life:17},      price:1550, icon:'🌊', element:'water'},
+      // ★ e_b21~e_b30 = 풀(grass) — 신규, 조건=예술+생활
+      {id:'e_b21',name:'풀의 천 옷',          lv:3,  stats:{def:5},              cond:{},                      price:90,   icon:'🌿', element:'grass'},
+      {id:'e_b22',name:'풀의 가죽 갑옷',      lv:5,  stats:{def:9},              cond:{art:2,life:1},          price:130,  icon:'🍃', element:'grass'},
+      {id:'e_b23',name:'풀의 견습 로브',      lv:7,  stats:{mag:6, def:4},       cond:{art:4,life:2},          price:190,  icon:'🌱', element:'grass'},
+      {id:'e_b24',name:'풀의 철 갑옷',        lv:10, stats:{def:14},             cond:{art:6,life:4},          price:280,  icon:'🍀', element:'grass'},
+      {id:'e_b25',name:'풀의 연구 로브',      lv:13, stats:{mag:11, def:6},      cond:{art:8,life:6},          price:400,  icon:'🌾', element:'grass'},
+      {id:'e_b26',name:'풀의 기사 갑옷',      lv:16, stats:{def:20},             cond:{art:10,life:8},         price:560,  icon:'🌲', element:'grass'},
+      {id:'e_b27',name:'풀의 대마법 로브',    lv:20, stats:{mag:18, def:8},      cond:{art:13,life:10},        price:760,  icon:'🌳', element:'grass'},
+      {id:'e_b28',name:'풀의 황금 갑옷',      lv:24, stats:{def:27},             cond:{art:16,life:13},        price:980,  icon:'🍁', element:'grass'},
+      {id:'e_b29',name:'풀의 전설 갑옷',      lv:28, stats:{def:34},             cond:{art:19,life:15},        price:1250, icon:'🌺', element:'grass'},
+      {id:'e_b30',name:'풀의 왕의 갑옷',      lv:30, stats:{def:40},             cond:{art:21,life:17},        price:1550, icon:'🌸', element:'grass'},
     ],
     weapon: [
-      {id:'e_w1', name:'나무검',         lv:3,  stats:{atk:5},               cond:{},                           price:80,   icon:'🗡️'},
-      {id:'e_w2', name:'철검',           lv:5,  stats:{atk:8, mag:2},         cond:{health:3},                   price:120,  icon:'⚔️'},
-      {id:'e_w3', name:'마법 지팡이',    lv:7,  stats:{mag:10},              cond:{art:4},                      price:160,  icon:'🪄'},
-      {id:'e_w4', name:'강철검',         lv:10, stats:{atk:15},              cond:{health:6},                   price:220,  icon:'🔱'},
-      {id:'e_w5', name:'학자의 지팡이',  lv:13, stats:{mag:16},              cond:{study:7},                    price:320,  icon:'📿'},
-      {id:'e_w6', name:'기사검',         lv:16, stats:{atk:21},              cond:{health:10,value:5},          price:420,  icon:'🏹'},
-      {id:'e_w7', name:'대마법 지팡이',  lv:20, stats:{mag:23},              cond:{art:12,study:8},             price:600,  icon:'⚡'},
-      {id:'e_w8', name:'황금검',         lv:24, stats:{atk:28},              cond:{health:14,value:8},          price:650,  icon:'✨'},
-      {id:'e_w9', name:'전설검',         lv:28, stats:{atk:34},              cond:{health:18,value:12},         price:850,  icon:'💎'},
-      {id:'e_w10',name:'영웅의 검',      lv:30, stats:{atk:40},              cond:{health:20,value:15,read:10}, price:1100, icon:'🌈'},
+      // 검 계열(홀수-짝수 섞임): 건강+생활 / 지팡이 계열: 학습+예술
+      // ── 검 계열 10개 (ATK:MAG ≈ 3:2) ────────────────────
+      {id:'e_w1', name:'나무검',     lv:3,  stats:{atk:8,  mag:5},  cond:{},                 price:90,   icon:'🗡️'},
+      {id:'e_w2', name:'철검',       lv:5,  stats:{atk:12, mag:8},  cond:{health:2,life:1},  price:140,  icon:'⚔️'},
+      {id:'e_w3', name:'마법검',     lv:7,  stats:{atk:16, mag:11}, cond:{health:4,life:2},  price:200,  icon:'🔷'},
+      {id:'e_w4', name:'강철검',     lv:10, stats:{atk:22, mag:15}, cond:{health:6,life:4},  price:300,  icon:'🔱'},
+      {id:'e_w5', name:'기사검',     lv:13, stats:{atk:28, mag:19}, cond:{health:8,life:6},  price:420,  icon:'🏹'},
+      {id:'e_w6', name:'용사검',     lv:16, stats:{atk:35, mag:23}, cond:{health:10,life:8}, price:600,  icon:'⚔️'},
+      {id:'e_w7', name:'용기사검',   lv:20, stats:{atk:43, mag:29}, cond:{health:13,life:10},price:800,  icon:'🌟'},
+      {id:'e_w8', name:'황금검',     lv:24, stats:{atk:52, mag:35}, cond:{health:16,life:13},price:1050, icon:'✨'},
+      {id:'e_w9', name:'전설검',     lv:28, stats:{atk:62, mag:41}, cond:{health:19,life:15},price:1350, icon:'💎'},
+      {id:'e_w10',name:'영웅의 검',  lv:30, stats:{atk:72, mag:48}, cond:{health:21,life:17},price:1700, icon:'🌈'},
+      // ── 스태프 계열 10개 (MAG:ATK ≈ 3:2) — 완전 대칭 ──────
+      {id:'e_ws1', name:'나무 스태프',    lv:3,  stats:{mag:8,  atk:5},  cond:{},                  price:90,   icon:'🪄'},
+      {id:'e_ws2', name:'철 스태프',      lv:5,  stats:{mag:12, atk:8},  cond:{study:2,art:1},     price:140,  icon:'🔮'},
+      {id:'e_ws3', name:'수정 스태프',    lv:7,  stats:{mag:16, atk:11}, cond:{study:4,art:2},     price:200,  icon:'💜'},
+      {id:'e_ws4', name:'강철 스태프',    lv:10, stats:{mag:22, atk:15}, cond:{study:6,art:4},     price:300,  icon:'🌀'},
+      {id:'e_ws5', name:'현자의 스태프',  lv:13, stats:{mag:28, atk:19}, cond:{study:8,art:6},     price:420,  icon:'⭐'},
+      {id:'e_ws6', name:'마법사의 지팡이',lv:16, stats:{mag:35, atk:23}, cond:{study:10,art:8},    price:600,  icon:'🔯'},
+      {id:'e_ws7', name:'고대 스태프',    lv:20, stats:{mag:43, atk:29}, cond:{study:13,art:10},   price:800,  icon:'🌙'},
+      {id:'e_ws8', name:'황금 스태프',    lv:24, stats:{mag:52, atk:35}, cond:{study:16,art:13},   price:1050, icon:'⚡'},
+      {id:'e_ws9', name:'전설 스태프',    lv:28, stats:{mag:62, atk:41}, cond:{study:19,art:15},   price:1350, icon:'🌠'},
+      {id:'e_ws10',name:'영웅의 스태프',  lv:30, stats:{mag:72, atk:48}, cond:{study:21,art:17},   price:1700, icon:'🔯'},
     ],
     glove: [
-      // ★ 장갑: 공격/마력 + 속도 동시 부여 (속도 분산 핵심)
-      {id:'e_g1', name:'천 장갑',        lv:3,  stats:{atk:2, spd:2},        cond:{},                           price:80,   icon:'🧤'},
-      {id:'e_g2', name:'가죽 장갑',      lv:5,  stats:{atk:3, spd:2, mag:2}, cond:{health:3},                   price:120,  icon:'🥊'},
-      {id:'e_g3', name:'마법 장갑',      lv:7,  stats:{mag:4, spd:3},        cond:{art:4},                      price:160,  icon:'✋'},
-      {id:'e_g4', name:'철 장갑',        lv:10, stats:{atk:5, spd:4},        cond:{health:6},                   price:220,  icon:'⚙️'},
-      {id:'e_g5', name:'연구 장갑',      lv:13, stats:{mag:7, spd:5},        cond:{study:7},                    price:320,  icon:'🔬'},
-      {id:'e_g6', name:'기사 장갑',      lv:16, stats:{atk:8, spd:6},        cond:{health:10,value:5},          price:420,  icon:'🏆'},
-      {id:'e_g7', name:'마도 장갑',      lv:20, stats:{mag:10, spd:8},       cond:{art:12,study:8},             price:600,  icon:'💫'},
-      {id:'e_g8', name:'황금 장갑',      lv:24, stats:{atk:11, spd:9},       cond:{health:14,value:8},          price:650,  icon:'💛'},
-      {id:'e_g9', name:'전설 장갑',      lv:28, stats:{atk:13, spd:11},      cond:{health:18,value:12},         price:850,  icon:'💎'},
-      {id:'e_g10',name:'영웅 장갑',      lv:30, stats:{atk:16,spd:12,mag:4}, cond:{health:20,value:15,study:10},price:1100, icon:'🌟'},
+      {id:'e_g1', name:'천 장갑',         lv:3,  stats:{atk:2, spd:2},      cond:{},                      price:50,   icon:'🧤'},
+      {id:'e_g2', name:'가죽 장갑',       lv:5,  stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     price:70,   icon:'🥊'},
+      {id:'e_g3', name:'마법 장갑',       lv:7,  stats:{mag:4, spd:3},      cond:{value:4,health:2},      price:100,  icon:'✋'},
+      {id:'e_g4', name:'철 장갑',         lv:10, stats:{atk:5, spd:4},      cond:{value:6,health:4},      price:140,  icon:'⚙️'},
+      {id:'e_g5', name:'연구 장갑',       lv:13, stats:{mag:7, spd:5},      cond:{value:8,health:6},      price:200,  icon:'🔬'},
+      {id:'e_g6', name:'기사 장갑',       lv:16, stats:{atk:8, spd:6},      cond:{value:10,health:8},     price:280,  icon:'🏆'},
+      {id:'e_g7', name:'마도 장갑',       lv:20, stats:{mag:10, spd:8},     cond:{value:13,health:10},    price:380,  icon:'💫'},
+      {id:'e_g8', name:'황금 장갑',       lv:24, stats:{atk:11, spd:9},     cond:{value:16,health:13},    price:500,  icon:'💛'},
+      {id:'e_g9', name:'전설 장갑',       lv:28, stats:{atk:13, spd:11},    cond:{value:19,health:15},    price:640,  icon:'💎'},
+      {id:'e_g10',name:'영웅 장갑',       lv:30, stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  price:800,  icon:'🌟'},
     ],
     shoe: [
-      // ★ 신발: 속도 메인 + def/mag 보조
-      {id:'e_s1', name:'천 신발',        lv:3,  stats:{spd:4, def:1},        cond:{},                           price:80,   icon:'👟'},
-      {id:'e_s2', name:'가죽 신발',      lv:5,  stats:{spd:6, def:2},        cond:{health:3},                   price:120,  icon:'👠'},
-      {id:'e_s3', name:'마법 신발',      lv:7,  stats:{spd:6, mag:2},        cond:{art:4},                      price:160,  icon:'✨'},
-      {id:'e_s4', name:'철 부츠',        lv:10, stats:{spd:8, def:3},        cond:{health:6},                   price:220,  icon:'🥾'},
-      {id:'e_s5', name:'연구 부츠',      lv:13, stats:{spd:9, mag:3},        cond:{study:7},                    price:320,  icon:'🔬'},
-      {id:'e_s6', name:'기사 부츠',      lv:16, stats:{spd:11, def:4},       cond:{health:10,value:5},          price:420,  icon:'⚔️'},
-      {id:'e_s7', name:'마도 부츠',      lv:20, stats:{spd:13, mag:4},       cond:{art:12,study:8},             price:600,  icon:'💫'},
-      {id:'e_s8', name:'황금 부츠',      lv:24, stats:{spd:15, def:5},       cond:{health:14,value:8},          price:650,  icon:'💛'},
-      {id:'e_s9', name:'전설 부츠',      lv:28, stats:{spd:18, def:6},       cond:{health:18,value:12},         price:850,  icon:'💎'},
-      {id:'e_s10',name:'영웅 부츠',      lv:30, stats:{spd:20, def:8},       cond:{health:20,value:15,read:10}, price:1100, icon:'🌈'},
+      {id:'e_s1', name:'천 신발',         lv:3,  stats:{spd:4, def:1},      cond:{},                      price:60,   icon:'👟'},
+      {id:'e_s2', name:'가죽 신발',       lv:5,  stats:{spd:6, def:2},      cond:{art:2,health:1},        price:85,   icon:'👠'},
+      {id:'e_s3', name:'마법 신발',       lv:7,  stats:{spd:6, mag:2},      cond:{art:4,health:2},        price:120,  icon:'✨'},
+      {id:'e_s4', name:'철 부츠',         lv:10, stats:{spd:8, def:3},      cond:{art:6,health:4},        price:170,  icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',       lv:13, stats:{spd:9, mag:3},      cond:{art:8,health:6},        price:240,  icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',       lv:16, stats:{spd:11, def:4},     cond:{art:10,health:8},       price:340,  icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',       lv:20, stats:{spd:13, mag:4},     cond:{art:13,health:10},      price:470,  icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',       lv:24, stats:{spd:15, def:5},     cond:{art:16,health:13},      price:620,  icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',       lv:28, stats:{spd:18, def:6},     cond:{art:19,health:15},      price:790,  icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',       lv:30, stats:{spd:20, def:8},     cond:{art:21,health:17},      price:980,  icon:'🌈'},
     ],
   },
   // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
@@ -188,27 +224,144 @@ const GAME_DATA = {
 
   // ─── 몬스터 (밸런스 v4: 1학기 18주 기준 EXP 재조정) ─────────────
   // 저레벨 몬스터 EXP 대폭 상향 → 초반 레벨업 빠르게, 후반은 완만하게
+  // ─── 몬스터 100마리 (5단계 최종 확정) ─────────────────────────────
+  // ★ m1~m20: 기존 ID/이름/icon 완전 유지 (monsterLog 호환)
+  // ★ m21~m100: 신규 추가
+  // 유령형 31마리: 초급3 / 중급20 / 고급8
   monsters: [
-    {id:'m1', name:'슬라임',       icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, gold:25,  exp:25},  // Lv1: 장비없어도 가능
-    {id:'m2', name:'아기 멧돼지',  icon:'🐗',recLv:3, reqStat:'atk',reqVal:6, gold:32,  exp:30},
-    {id:'m3', name:'마법 애벌레',  icon:'🐛',recLv:7, reqStat:'mag',reqVal:20,gold:35,  exp:33},  // mag 상향 (풀셋26)
-    {id:'m4', name:'들쥐',         icon:'🐭',recLv:4, reqStat:'spd',reqVal:5, gold:38,  exp:33},
-    {id:'m5', name:'돌거북',       icon:'🐢',recLv:5, reqStat:'def',reqVal:8, gold:42,  exp:36},
-    {id:'m6', name:'고블린',       icon:'👺',recLv:6, reqStat:'atk',reqVal:9, gold:46,  exp:39},
-    {id:'m7', name:'숲 늑대',      icon:'🐺',recLv:7, reqStat:'spd',reqVal:7, gold:50,  exp:42},
-    {id:'m8', name:'마도 고양이',  icon:'🐱',recLv:8, reqStat:'mag',reqVal:22,gold:54,  exp:45},  // mag 상향 (풀셋26)
-    {id:'m9', name:'강철 딱정벌레',icon:'🪲',recLv:9, reqStat:'def',reqVal:6, gold:58,  exp:48},
-    {id:'m10',name:'오크 전사',    icon:'👹',recLv:10,reqStat:'atk',reqVal:14,gold:62,  exp:53},
-    {id:'m11',name:'그림자 늑대',  icon:'🦊',recLv:11,reqStat:'spd',reqVal:12,gold:68,  exp:57},
-    {id:'m12',name:'철 골렘',      icon:'🤖',recLv:12,reqStat:'def',reqVal:20,gold:74,  exp:61}, // def 상향 (풀셋27)
-    {id:'m13',name:'마도 정령',    icon:'💨',recLv:13,reqStat:'mag',reqVal:35,gold:80,  exp:66}, // mag 대폭 상향 (풀셋45)
-    {id:'m14',name:'트롤',         icon:'🧌',recLv:14,reqStat:'spd',reqVal:12,gold:86,  exp:71},
-    {id:'m15',name:'독 거미',      icon:'🕷️',recLv:15,reqStat:'spd',reqVal:13,gold:92,  exp:76},
-    {id:'m16',name:'화염 정령',    icon:'🔥',recLv:16,reqStat:'atk',reqVal:22,gold:98,  exp:80}, // atk 상향 (풀셋29)
-    {id:'m17',name:'바위 거인',    icon:'🗿',recLv:18,reqStat:'def',reqVal:30,gold:108, exp:86}, // def 상향 (풀셋39)
-    {id:'m18',name:'폭풍 늑대',    icon:'⚡',recLv:19,reqStat:'spd',reqVal:18,gold:118, exp:92}, // spd 상향 (풀셋20)
-    {id:'m19',name:'암흑 기사',    icon:'🖤',recLv:20,reqStat:'mag',reqVal:50,gold:128, exp:99}, // mag 대폭 상향 (풀셋68)
-    {id:'m20',name:'고대 드래곤',  icon:'🐉',recLv:30,reqStat:'atk',reqVal:45,gold:220, exp:120}, // atk 상향 (풀셋56)
+    // ══ 초급 beginner Lv1~10 (30마리) ══════════════════════════
+    // Lv1
+    {id:'m1', name:'슬라임',         icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'grass',rarity:'common', role:'normal', trait:null,  hp:34, atk:7,  def:3,  spd:2,  gold:18},
+    {id:'m21',name:'불씨 참새',       icon:'🐦',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'fire', rarity:'common', role:'normal', trait:null,  hp:29, atk:7,  def:3,  spd:3,  gold:18},
+    {id:'m22',name:'물방울 젤리',     icon:'🫧',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'water',rarity:'common', role:'normal', trait:null,  hp:34, atk:7,  def:3,  spd:2,  gold:18},
+    // Lv2
+    {id:'m2', name:'아기 멧돼지',     icon:'🐗',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'fire', rarity:'common', role:'normal', trait:null,  hp:41, atk:8,  def:4,  spd:2,  gold:19},
+    {id:'m23',name:'거품 개구리',     icon:'🐸',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'water',rarity:'common', role:'normal', trait:null,  hp:41, atk:8,  def:4,  spd:2,  gold:19},
+    {id:'m24',name:'새싹 다람쥐',     icon:'🐿️',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'grass',rarity:'common', role:'normal', trait:null,  hp:35, atk:8,  def:3,  spd:3,  gold:19},
+    // Lv3
+    {id:'m25',name:'꼬마 화염벌',     icon:'🐝',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'fire', rarity:'common', role:'fast',   trait:null,  hp:41, atk:10, def:4,  spd:3,  gold:20},
+    {id:'m26',name:'조약돌 게',       icon:'🦀',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'water',rarity:'common', role:'tank',   trait:null,  hp:60, atk:9,  def:6,  spd:2,  gold:20},
+    {id:'m27',name:'덩굴 병아리',     icon:'🐣',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'grass',rarity:'common', role:'normal', trait:null,  hp:48, atk:10, def:5,  spd:2,  gold:20},
+    // Lv4
+    {id:'m28',name:'불꽃 강아지',     icon:'🐕',recLv:4, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'fire', rarity:'common', role:'normal', trait:null,  hp:54, atk:11, def:5,  spd:3,  gold:21},
+    {id:'m4', name:'들쥐',           icon:'🐭',recLv:4, reqStat:'spd',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'water',rarity:'common', role:'fast',   trait:null,  hp:46, atk:11, def:4,  spd:4,  gold:21},
+    {id:'m29',name:'이끼 버섯이',     icon:'🍄',recLv:4, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'grass',rarity:'common', role:'normal', trait:null,  hp:54, atk:11, def:5,  spd:3,  gold:21},
+    // Lv5
+    {id:'m30',name:'재털이 고양이',   icon:'🐈',recLv:5, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'fire', rarity:'common', role:'fast',   trait:null,  hp:51, atk:13, def:5,  spd:5,  gold:22},
+    {id:'m5', name:'돌거북',         icon:'🐢',recLv:5, reqStat:'def',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'water',rarity:'common', role:'tank',   trait:null,  hp:75, atk:12, def:7,  spd:4,  gold:22},
+    {id:'m31',name:'잎새 사슴벌레',   icon:'🦋',recLv:5, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'grass',rarity:'common', role:'normal', trait:null,  hp:60, atk:13, def:6,  spd:4,  gold:22},
+    // Lv6
+    {id:'m6', name:'고블린',         icon:'👺',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'fire', rarity:'common', role:'normal', trait:null,  hp:67, atk:14, def:7,  spd:4,  gold:24},
+    {id:'m32',name:'안개 오리',       icon:'🦆',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'water',rarity:'common', role:'normal', trait:null,  hp:67, atk:14, def:7,  spd:4,  gold:24},
+    {id:'m33',name:'덩굴 두더지',     icon:'🦔',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'grass',rarity:'common', role:'tank',   trait:null,  hp:84, atk:13, def:9,  spd:4,  gold:24},
+    // Lv7
+    {id:'m34',name:'불꽃 박쥐',       icon:'🦇',recLv:7, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'fire', rarity:'rare',   role:'normal', trait:'ghost',hp:63, atk:16, def:7,  spd:6,  gold:34},
+    {id:'m3', name:'마법 애벌레',     icon:'🐛',recLv:7, reqStat:'mag',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'water',rarity:'rare',   role:'dealer', trait:'ghost',hp:74, atk:16, def:8,  spd:5,  gold:34},
+    {id:'m7', name:'숲 늑대',        icon:'🐺',recLv:7, reqStat:'spd',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'grass',rarity:'rare',   role:'fast',   trait:null,  hp:63, atk:16, def:7,  spd:6,  gold:34},
+    // Lv8
+    {id:'m35',name:'유황 두더지',     icon:'🐀',recLv:8, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'fire', rarity:'rare',   role:'tank',   trait:null,  hp:80, atk:17, def:9,  spd:5,  gold:36},
+    {id:'m8', name:'마도 고양이',     icon:'🐱',recLv:8, reqStat:'mag',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'water',rarity:'rare',   role:'normal', trait:null,  hp:80, atk:17, def:9,  spd:5,  gold:36},
+    {id:'m36',name:'껍질 사슴',       icon:'🦌',recLv:8, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:100,atk:15, def:11, spd:5,  gold:36},
+    // Lv9
+    {id:'m37',name:'재의 기사견',     icon:'🐩',recLv:9, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'fire', rarity:'rare',   role:'normal', trait:null,  hp:86, atk:19, def:10, spd:6,  gold:38},
+    {id:'m38',name:'소용돌이 거북',   icon:'🐠',recLv:9, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'water',rarity:'rare',   role:'tank',   trait:null,  hp:108,atk:17, def:12, spd:5,  gold:38},
+    {id:'m9', name:'강철 딱정벌레',   icon:'🪲',recLv:9, reqStat:'def',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:108,atk:17, def:12, spd:5,  gold:38},
+    // Lv10
+    {id:'m10',name:'오크 전사',       icon:'👹',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'fire', rarity:'legend', role:'dealer', trait:null,  hp:84, atk:26, def:10, spd:6,  gold:60},
+    {id:'m39',name:'심연 망령어',     icon:'🐟',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:93, atk:20, def:10, spd:6,  gold:60},
+    {id:'m40',name:'고목 수호자',     icon:'🌳',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:116,atk:18, def:13, spd:5,  gold:28},
+    // ══ 중급 intermediate Lv11~20 (50마리) ══════════════════════
+    // Lv11
+    {id:'m41',name:'화염 멧토끼',     icon:'🐇',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'normal', trait:null,  hp:100,atk:22, def:11, spd:6,  gold:35},
+    {id:'m42',name:'재그늘 사냥개',   icon:'🐕‍🦺',recLv:11,reqStat:'atk',reqVal:0,exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'fast',   trait:null,  hp:100,atk:22, def:11, spd:6,  gold:35},
+    {id:'m43',name:'물결 족제비',     icon:'🦦',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'water',rarity:'common', role:'fast',   trait:null,  hp:100,atk:22, def:11, spd:6,  gold:35},
+    {id:'m11',name:'그림자 늑대',     icon:'🦊',recLv:11,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:11, element:'grass',rarity:'common', role:'normal', trait:'ghost',hp:100,atk:22, def:11, spd:6,  gold:35},
+    {id:'m44',name:'잎날 도마뱀',     icon:'🦎',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'grass',rarity:'common', role:'fast',   trait:null,  hp:85, atk:22, def:9,  spd:9,  gold:35},
+    // Lv12
+    {id:'m45',name:'불사슴',         icon:'🦌',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'fire', rarity:'common', role:'dealer', trait:null,  hp:106,atk:24, def:12, spd:7,  gold:37},
+    {id:'m12',name:'철 골렘',        icon:'🤖',recLv:12,reqStat:'def',reqVal:0, exp:0, zone:'intermediate',level:12, element:'water',rarity:'common', role:'tank',   trait:null,  hp:132,atk:21, def:14, spd:6,  gold:37},
+    {id:'m46',name:'안개 수비병',     icon:'👤',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'water',rarity:'common', role:'normal', trait:'ghost',hp:106,atk:24, def:12, spd:7,  gold:37},
+    {id:'m47',name:'가시 까마귀',     icon:'🐦‍⬛',recLv:12,reqStat:'atk',reqVal:0,exp:0, zone:'intermediate',level:12, element:'grass',rarity:'common', role:'fast',   trait:null,  hp:90, atk:24, def:10, spd:9,  gold:37},
+    {id:'m48',name:'숲그림 버섯병',   icon:'🍄',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'grass',rarity:'common', role:'normal', trait:null,  hp:106,atk:24, def:12, spd:7,  gold:37},
+    // Lv13
+    {id:'m13',name:'마도 정령',       icon:'💨',recLv:13,reqStat:'mag',reqVal:0, exp:0, zone:'intermediate',level:13, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',hp:112,atk:25, def:13, spd:8,  gold:62},
+    {id:'m49',name:'숯늑대',         icon:'🐺',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'fire', rarity:'common', role:'fast',   trait:'ghost',hp:112,atk:25, def:13, spd:8,  gold:38},
+    {id:'m50',name:'늪지 거미',       icon:'🕷️',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'water',rarity:'common', role:'fast',   trait:null,  hp:112,atk:25, def:13, spd:8,  gold:38},
+    {id:'m51',name:'조개 갑옷병',     icon:'🐚',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'water',rarity:'common', role:'tank',   trait:null,  hp:140,atk:22, def:16, spd:7,  gold:62},
+    {id:'m52',name:'이끼 순찰자',     icon:'🌿',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'grass',rarity:'common', role:'normal', trait:null,  hp:112,atk:25, def:13, spd:8,  gold:38},
+    // Lv14
+    {id:'m53',name:'재안개 맹수',     icon:'🐆',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',hp:119,atk:27, def:14, spd:8,  gold:64},
+    {id:'m54',name:'불가시 멧양',     icon:'🐑',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'fire', rarity:'rare',   role:'tank',   trait:null,  hp:149,atk:24, def:17, spd:8,  gold:40},
+    {id:'m55',name:'거품 두꺼비',     icon:'🐊',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'water',rarity:'common', role:'tank',   trait:null,  hp:119,atk:27, def:14, spd:8,  gold:40},
+    {id:'m14',name:'트롤',           icon:'🧌',recLv:14,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:14, element:'grass',rarity:'common', role:'normal', trait:null,  hp:119,atk:27, def:14, spd:8,  gold:40},
+    {id:'m56',name:'망령 덩굴수',     icon:'👻',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',hp:119,atk:27, def:14, spd:8,  gold:40},
+    // Lv15
+    {id:'m57',name:'화염 장창병',     icon:'🗡️',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'fire', rarity:'rare',   role:'normal', trait:null,  hp:126,atk:28, def:15, spd:8,  gold:42},
+    {id:'m15',name:'독 거미',        icon:'🕷️',recLv:15,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:15, element:'water',rarity:'rare',   role:'fast',   trait:null,  hp:107,atk:28, def:13, spd:12, gold:66},
+    {id:'m58',name:'물안개 창게',     icon:'🦀',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'water',rarity:'rare',   role:'normal', trait:null,  hp:126,atk:28, def:15, spd:8,  gold:42},
+    {id:'m59',name:'버섯 전갈',       icon:'🦂',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'grass',rarity:'rare',   role:'dealer', trait:null,  hp:126,atk:28, def:15, spd:8,  gold:42},
+    {id:'m60',name:'그림자 잎사수',   icon:'🌲',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',hp:126,atk:28, def:15, spd:8,  gold:42},
+    // Lv16
+    {id:'m16',name:'화염 정령',       icon:'🔥',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',hp:132,atk:30, def:16, spd:9,  gold:67},
+    {id:'m61',name:'붉은 갈기수',     icon:'🦁',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'fire', rarity:'rare',   role:'dealer', trait:null,  hp:132,atk:30, def:16, spd:9,  gold:43},
+    {id:'m62',name:'소나기 뱀',       icon:'🐍',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'water',rarity:'rare',   role:'fast',   trait:null,  hp:132,atk:30, def:16, spd:9,  gold:43},
+    {id:'m63',name:'청류 망령새',     icon:'🦅',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:132,atk:30, def:16, spd:9,  gold:43},
+    {id:'m64',name:'고사리 곰',       icon:'🐻',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:165,atk:27, def:19, spd:8,  gold:43},
+    // Lv17
+    {id:'m65',name:'재의 유격병',     icon:'⚔️', recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'fire', rarity:'rare',   role:'fast',   trait:'ghost',hp:138,atk:31, def:16, spd:10, gold:69},
+    {id:'m66',name:'화산 독수리',     icon:'🦅',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'fire', rarity:'rare',   role:'dealer', trait:null,  hp:117,atk:31, def:14, spd:13, gold:45},
+    {id:'m67',name:'안개 기린도마뱀', icon:'🦎',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:138,atk:31, def:16, spd:10, gold:45},
+    {id:'m68',name:'망령 포자초',     icon:'👻',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',hp:138,atk:31, def:16, spd:10, gold:69},
+    {id:'m69',name:'껍질 사수',       icon:'🏹',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:172,atk:28, def:19, spd:9,  gold:45},
+    // Lv18
+    {id:'m70',name:'열기 수문장',     icon:'🛡️',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'fire', rarity:'rare',   role:'normal', trait:null,  hp:145,atk:33, def:17, spd:10, gold:47},
+    {id:'m71',name:'거울 장어',       icon:'🐟',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:145,atk:33, def:17, spd:10, gold:71},
+    {id:'m72',name:'물결 수비병',     icon:'🌊',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'water',rarity:'rare',   role:'tank',   trait:null,  hp:181,atk:30, def:20, spd:9,  gold:47},
+    {id:'m17',name:'바위 거인',       icon:'🗿',recLv:18,reqStat:'def',reqVal:0, exp:0, zone:'intermediate',level:18, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:181,atk:30, def:20, spd:9,  gold:71},
+    {id:'m73',name:'그림자 가시목',   icon:'🌵',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',hp:145,atk:33, def:17, spd:10, gold:47},
+    // Lv19
+    {id:'m74',name:'재가면 기사',     icon:'🎭',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'fire', rarity:'rare',   role:'normal', trait:'ghost',hp:152,atk:34, def:18, spd:10, gold:73},
+    {id:'m75',name:'화산 멧수소',     icon:'🐃',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'fire', rarity:'rare',   role:'tank',   trait:null,  hp:190,atk:31, def:22, spd:10, gold:48},
+    {id:'m18',name:'폭풍 늑대',       icon:'⚡',recLv:19,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:19, element:'water',rarity:'legend', role:'normal', trait:'ghost',hp:152,atk:34, def:18, spd:10, gold:96},
+    {id:'m76',name:'해류 망치게',     icon:'🦞',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'water',rarity:'rare',   role:'tank',   trait:null,  hp:190,atk:31, def:22, spd:10, gold:48},
+    {id:'m77',name:'숲그늘 암살자',   icon:'🗡️',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'grass',rarity:'rare',   role:'fast',   trait:'ghost',hp:129,atk:34, def:15, spd:14, gold:73},
+    // Lv20
+    {id:'m78',name:'불꽃 허수아비',   icon:'🎃',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'fire', rarity:'legend', role:'normal', trait:null,  hp:158,atk:36, def:19, spd:11, gold:110},
+    {id:'m79',name:'심연 망령게',     icon:'🦀',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:158,atk:36, def:19, spd:11, gold:50},
+    {id:'m80',name:'대지 수호목',     icon:'🌳',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:198,atk:32, def:23, spd:10, gold:110},
+    {id:'m81',name:'열기 순찰장',     icon:'🔱',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'fire', rarity:'rare',   role:'normal', trait:'ghost',hp:158,atk:36, def:19, spd:11, gold:50},
+    {id:'m82',name:'안개 사제',       icon:'🧙',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:158,atk:36, def:19, spd:11, gold:75},
+    // ══ 고급 advanced Lv21~30 (20마리) ══════════════════════════
+    // Lv21
+    {id:'m19',name:'암흑 기사',       icon:'🖤',recLv:21,reqStat:'mag',reqVal:0, exp:0, zone:'advanced',    level:21, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',hp:164,atk:38, def:20, spd:12, gold:100},
+    {id:'m83',name:'청해 수호자',     icon:'🐬',recLv:21,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:21, element:'water',rarity:'rare',   role:'tank',   trait:null,  hp:205,atk:34, def:24, spd:10, gold:70},
+    // Lv22
+    {id:'m84',name:'월광 덩굴수',     icon:'🌙',recLv:22,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:22, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',hp:171,atk:39, def:21, spd:12, gold:73},
+    {id:'m85',name:'용암 망령검사',   icon:'🌋',recLv:22,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:22, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',hp:171,atk:39, def:21, spd:12, gold:73},
+    // Lv23
+    {id:'m86',name:'심해 창병',       icon:'🔱',recLv:23,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:23, element:'water',rarity:'rare',   role:'normal', trait:null,  hp:178,atk:41, def:22, spd:12, gold:108},
+    {id:'m87',name:'고목 주술사',     icon:'🧙',recLv:23,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:23, element:'grass',rarity:'rare',   role:'dealer', trait:null,  hp:178,atk:41, def:22, spd:12, gold:76},
+    // Lv24
+    {id:'m88',name:'열풍 맹금',       icon:'🦅',recLv:24,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:24, element:'fire', rarity:'rare',   role:'fast',   trait:null,  hp:184,atk:42, def:22, spd:13, gold:78},
+    {id:'m89',name:'서리 망령장어',   icon:'❄️',recLv:24,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:24, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:184,atk:42, def:22, spd:13, gold:78},
+    // Lv25
+    {id:'m90',name:'대지 갑옷병',     icon:'🛡️',recLv:25,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:25, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:190,atk:44, def:23, spd:14, gold:81},
+    {id:'m91',name:'붉은 재사자',     icon:'🦁',recLv:25,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:25, element:'fire', rarity:'legend', role:'dealer', trait:'ghost',hp:190,atk:44, def:23, spd:14, gold:81},
+    // Lv26
+    {id:'m92',name:'해일 기사',       icon:'🌊',recLv:26,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:26, element:'water',rarity:'rare',   role:'normal', trait:null,  hp:197,atk:45, def:24, spd:14, gold:84},
+    {id:'m93',name:'가시왕 사슴',     icon:'🦌',recLv:26,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:26, element:'grass',rarity:'legend', role:'tank',   trait:null,  hp:197,atk:45, def:24, spd:14, gold:119},
+    // Lv27
+    {id:'m94',name:'용암 골렘',       icon:'🌋',recLv:27,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:27, element:'fire', rarity:'legend', role:'tank',   trait:null,  hp:204,atk:47, def:25, spd:14, gold:123},
+    {id:'m95',name:'청류 파수꾼',     icon:'💠',recLv:27,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:27, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:204,atk:47, def:25, spd:14, gold:87},
+    // Lv28
+    {id:'m96',name:'고대 나무정령',   icon:'🌲',recLv:28,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:28, element:'grass',rarity:'legend', role:'normal', trait:null,  hp:210,atk:48, def:26, spd:15, gold:89},
+    {id:'m97',name:'화산 근위대장',   icon:'⚔️', recLv:28,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:28, element:'fire', rarity:'legend', role:'dealer', trait:'ghost',hp:210,atk:48, def:26, spd:15, gold:127},
+    // Lv29
+    {id:'m98',name:'심연 파도룡',     icon:'🐲',recLv:29,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:29, element:'water',rarity:'legend', role:'dealer', trait:null,  hp:216,atk:50, def:27, spd:16, gold:131},
+    {id:'m99',name:'흑림 사신목',     icon:'☠️',recLv:29,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:29, element:'grass',rarity:'legend', role:'normal', trait:'ghost',hp:216,atk:50, def:27, spd:16, gold:92},
+    // Lv30
+    {id:'m100',name:'태양 심판자',    icon:'☀️',recLv:30,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:30, element:'fire', rarity:'legend', role:'dealer', trait:null,  hp:223,atk:52, def:28, spd:16, gold:220},
+    {id:'m20',name:'고대 드래곤',     icon:'🐉',recLv:30,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:30, element:'water',rarity:'legend', role:'normal', trait:null,  hp:223,atk:52, def:28, spd:16, gold:220},
   ],
 
   // ─── 칭호·승급 ────────────────────────────────────────
@@ -238,6 +391,55 @@ const GAME_DATA = {
   },
   getSlotForItem(id) { return this.SLOT_MAP[id] || null; },
 };
+
+// ═══════════════════════════════════════════════════════
+//  스킬 데이터 (stage 1 상수 — 4단계 가격 적용)
+// ═══════════════════════════════════════════════════════
+
+const DEFAULT_SKILL_LEVELS = { normal:1, fire:0, water:0, grass:0 };
+
+const SKILL_MULTIPLIERS = {
+  // ★ 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
+  // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
+  normal:  { 1:1.10, 2:1.18, 3:1.27, 4:1.36, 5:1.46, 6:1.56, 7:1.65 },
+  element: { 0:0.00, 1:1.00, 2:1.10, 3:1.20, 4:1.30, 5:1.40, 6:1.50, 7:1.60 },
+};
+
+// ★ 4단계 가격 반영 + reqPlayerLevel / targetLevel 추가
+const SKILL_BOOKS = [
+  // normal 1~7 (120/180/260/360/500/680/900)
+  {id:'sb_n1',name:'전투 마스터리북 1권',  type:'normal',level:1,targetLevel:1, reqPlayerLevel:1,  price:120, icon:'📘',desc:'기본 공격 해금 (×1.10)'},
+  {id:'sb_n2',name:'전투 마스터리북 2권',  type:'normal',level:2,targetLevel:2, reqPlayerLevel:3,  price:180, icon:'📘',desc:'기본 공격력 +18%'},
+  {id:'sb_n3',name:'전투 마스터리북 3권',  type:'normal',level:3,targetLevel:3, reqPlayerLevel:5,  price:260, icon:'📘',desc:'기본 공격력 +27%'},
+  {id:'sb_n4',name:'전투 마스터리북 4권',  type:'normal',level:4,targetLevel:4, reqPlayerLevel:8,  price:360, icon:'📘',desc:'기본 공격력 +36%'},
+  {id:'sb_n5',name:'전투 마스터리북 5권',  type:'normal',level:5,targetLevel:5, reqPlayerLevel:12, price:500, icon:'📘',desc:'기본 공격력 +46%'},
+  {id:'sb_n6',name:'전투 마스터리북 6권',  type:'normal',level:6,targetLevel:6, reqPlayerLevel:16, price:680, icon:'📘',desc:'기본 공격력 +56%'},
+  {id:'sb_n7',name:'전투 마스터리북 7권',  type:'normal',level:7,targetLevel:7, reqPlayerLevel:20, price:900, icon:'📘',desc:'기본 공격력 +65%'},
+  // fire 1~7 (90/140/210/290/400/540/720)
+  {id:'sb_f1',name:'화염 마스터리북 1권',type:'fire',  level:1,targetLevel:1, reqPlayerLevel:2,  price:90,  icon:'📕',desc:'화염 공격 해금'},
+  {id:'sb_f2',name:'화염 마스터리북 2권',type:'fire',  level:2,targetLevel:2, reqPlayerLevel:5,  price:140, icon:'📕',desc:'화염 공격력 +10%'},
+  {id:'sb_f3',name:'화염 마스터리북 3권',type:'fire',  level:3,targetLevel:3, reqPlayerLevel:8,  price:210, icon:'📕',desc:'화염 공격력 +20%'},
+  {id:'sb_f4',name:'화염 마스터리북 4권',type:'fire',  level:4,targetLevel:4, reqPlayerLevel:12, price:290, icon:'📕',desc:'화염 공격력 +30%'},
+  {id:'sb_f5',name:'화염 마스터리북 5권',type:'fire',  level:5,targetLevel:5, reqPlayerLevel:16, price:400, icon:'📕',desc:'화염 공격력 +40%'},
+  {id:'sb_f6',name:'화염 마스터리북 6권',type:'fire',  level:6,targetLevel:6, reqPlayerLevel:20, price:540, icon:'📕',desc:'화염 공격력 +50%'},
+  {id:'sb_f7',name:'화염 마스터리북 7권',type:'fire',  level:7,targetLevel:7, reqPlayerLevel:24, price:720, icon:'📕',desc:'화염 공격력 +60%'},
+  // water 1~7 (90/140/210/290/400/540/720)
+  {id:'sb_w1',name:'냉기 마스터리북 1권',type:'water', level:1,targetLevel:1, reqPlayerLevel:2,  price:90,  icon:'📗',desc:'냉기 공격 해금'},
+  {id:'sb_w2',name:'냉기 마스터리북 2권',type:'water', level:2,targetLevel:2, reqPlayerLevel:5,  price:140, icon:'📗',desc:'냉기 공격력 +10%'},
+  {id:'sb_w3',name:'냉기 마스터리북 3권',type:'water', level:3,targetLevel:3, reqPlayerLevel:8,  price:210, icon:'📗',desc:'냉기 공격력 +20%'},
+  {id:'sb_w4',name:'냉기 마스터리북 4권',type:'water', level:4,targetLevel:4, reqPlayerLevel:12, price:290, icon:'📗',desc:'냉기 공격력 +30%'},
+  {id:'sb_w5',name:'냉기 마스터리북 5권',type:'water', level:5,targetLevel:5, reqPlayerLevel:16, price:400, icon:'📗',desc:'냉기 공격력 +40%'},
+  {id:'sb_w6',name:'냉기 마스터리북 6권',type:'water', level:6,targetLevel:6, reqPlayerLevel:20, price:540, icon:'📗',desc:'냉기 공격력 +50%'},
+  {id:'sb_w7',name:'냉기 마스터리북 7권',type:'water', level:7,targetLevel:7, reqPlayerLevel:24, price:720, icon:'📗',desc:'냉기 공격력 +60%'},
+  // grass 1~7 (90/140/210/290/400/540/720)
+  {id:'sb_g1',name:'자연 마스터리북 1권',type:'grass', level:1,targetLevel:1, reqPlayerLevel:2,  price:90,  icon:'📒',desc:'자연 공격 해금'},
+  {id:'sb_g2',name:'자연 마스터리북 2권',type:'grass', level:2,targetLevel:2, reqPlayerLevel:5,  price:140, icon:'📒',desc:'자연 공격력 +10%'},
+  {id:'sb_g3',name:'자연 마스터리북 3권',type:'grass', level:3,targetLevel:3, reqPlayerLevel:8,  price:210, icon:'📒',desc:'자연 공격력 +20%'},
+  {id:'sb_g4',name:'자연 마스터리북 4권',type:'grass', level:4,targetLevel:4, reqPlayerLevel:12, price:290, icon:'📒',desc:'자연 공격력 +30%'},
+  {id:'sb_g5',name:'자연 마스터리북 5권',type:'grass', level:5,targetLevel:5, reqPlayerLevel:16, price:400, icon:'📒',desc:'자연 공격력 +40%'},
+  {id:'sb_g6',name:'자연 마스터리북 6권',type:'grass', level:6,targetLevel:6, reqPlayerLevel:20, price:540, icon:'📒',desc:'자연 공격력 +50%'},
+  {id:'sb_g7',name:'자연 마스터리북 7권',type:'grass', level:7,targetLevel:7, reqPlayerLevel:24, price:720, icon:'📒',desc:'자연 공격력 +60%'},
+];
 
 // ─── Firebase 설정 ────────────────────────────────────
 const FIREBASE_CONFIG = {
@@ -277,12 +479,21 @@ const DB = {
 
     // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
     this._fbRef.on('value', (snap) => {
-      if (this._saving) return; // 내가 저장 중일 때는 무시
       const d = snap.val();
-      if (d) {
-        this._cache = this._migrate(this._normalizeArrays(d));
+      if (!d) return;
+
+      if (this._saving) {
+        // 내가 저장 중일 때도 settings 변경은 반드시 처리
+        const newSettings = d.settings;
+        const oldSettings = (this._cache || {}).settings;
+        if (JSON.stringify(newSettings) === JSON.stringify(oldSettings)) return;
+        if (this._cache) this._cache.settings = newSettings;
         if (this._onChangeCb) this._onChangeCb();
+        return;
       }
+
+      this._cache = this._migrate(this._normalizeArrays(d));
+      if (this._onChangeCb) this._onChangeCb();
     });
   },
 
@@ -338,10 +549,16 @@ const DB = {
       if (s.stats && s.stats.moral !== undefined && s.stats.value === undefined) {
         s.stats.value = s.stats.moral; delete s.stats.moral;
       }
-      return {
+      const merged = {
         books:[], equipmentIds:{}, promotionPending:false,
         lastMonsterDate:'', monsterDailyCount:0,
         houseDecorations:[], achievements:[], farmHarvests:0,
+        // 전투 시스템 기본값 (없는 경우만 채움)
+        skillLevels:{ normal:1, fire:0, water:0, grass:0 },
+        equippedSkills: ['normal', null, null], // 장착 스킬 3슬롯
+        recentBattleOffers:[],
+        battleOffersByZone:{ dateKey:'', beginner:null, intermediate:null, advanced:null },
+        battleInProgress: null,
         ...s,
         houseDecorations: (s.houseDecorations||[]).map(p => {
           if (p.row !== undefined && p.col !== undefined) return p;
@@ -351,6 +568,25 @@ const DB = {
           return {id:p.id, area, row:Math.floor(slot/oldCols), col:slot%oldCols};
         }),
       };
+      // skillLevels: 기존 데이터 있으면 병합 (덮어쓰기 금지)
+      if (s.skillLevels) merged.skillLevels = { normal:1, fire:0, water:0, grass:0, ...s.skillLevels };
+      // equippedSkills: 없으면 기본값, 있으면 유지
+      if (s.equippedSkills) merged.equippedSkills = s.equippedSkills;
+      // 기본값 자동 보정: 항상 4칸, 노말은 항상 슬롯1에 보장
+      if (!merged.equippedSkills || !Array.isArray(merged.equippedSkills)) {
+        merged.equippedSkills = ['normal', null, null];
+      }
+      if (merged.equippedSkills.length < 3) {
+        while (merged.equippedSkills.length < 3) merged.equippedSkills.push(null);
+      }
+      // 4칸 → 3칸 마이그레이션 (기존 4칸 데이터 잘라내기)
+      if (merged.equippedSkills.length > 3) merged.equippedSkills = merged.equippedSkills.slice(0, 3);
+      // battleDaily: 없으면 기본값
+      if (!merged.battleDaily) {
+        const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+        merged.battleDaily = { dateKey: today, used: 0 };
+      }
+      return merged;
     });
     return data;
   },
@@ -589,18 +825,27 @@ const Utils = {
   },
   uid()                 { return 'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); },
 
-  // ★ 몬스터 하루 도전 횟수 체크 (2회)
+  // ★ 몬스터 하루 도전 횟수 체크 — DB settings에서 직접 읽어 항상 최신값 보장
+  _getBattleLimit() {
+    if (typeof DB !== 'undefined') {
+      const bs = (DB.getSettings()?.customBattleSettings) || {};
+      if (bs.dailyBattleLimit !== undefined) return bs.dailyBattleLimit;
+    }
+    return BATTLE_CONSTS?.dailyBattleLimit ?? 3;
+  },
   canFightMonster(student) {
-    const settings = DB.getSettings();
-    const limit = settings.monsterDailyLimit || 2;
-    if ((student.lastMonsterDate||'') !== this.todayStr()) return true;
-    return (student.monsterDailyCount||0) < limit;
+    const limit = this._getBattleLimit();
+    const today = this.todayStr();
+    const bd = student.battleDaily || {};
+    if (bd.dateKey !== today) return true;
+    return (bd.used || 0) < limit;
   },
   monsterAttemptsLeft(student) {
-    const settings = DB.getSettings();
-    const limit = settings.monsterDailyLimit || 2;
-    if ((student.lastMonsterDate||'') !== this.todayStr()) return limit;
-    return Math.max(0, limit - (student.monsterDailyCount||0));
+    const limit = this._getBattleLimit();
+    const today = this.todayStr();
+    const bd = student.battleDaily || {};
+    if (bd.dateKey !== today) return limit;
+    return Math.max(0, limit - (bd.used || 0));
   },
 };
 
@@ -733,6 +978,122 @@ function applyShopOverrides(db) {
     });
   }
 }
+
+// ── 전투 밸런스 설정 오버라이드 적용 ──────────────────────────────
+// DB settings.customBattleSettings 값으로 전투 관련 상수를 패치
+// applyShopOverrides()와 동일한 패턴 — DB.init() 후 및 onDataChange() 때 호출
+//
+// ★ 장비 원본 데이터 백업 (첫 호출 시 1회만 실행)
+// 이유: applyBattleSettings는 onDataChange마다 반복 호출됨.
+//       패치를 누적하지 않으려면 매번 "원본→패치" 순서로 적용해야 함.
+let _EQUIP_ORIGINALS = null;
+function _backupEquipOrigins() {
+  if (_EQUIP_ORIGINALS) return; // 이미 백업됨
+  _EQUIP_ORIGINALS = {};
+  Object.entries(GAME_DATA.equipment).forEach(([slot, items]) => {
+    items.forEach(item => {
+      _EQUIP_ORIGINALS[item.id] = {
+        price:   item.price,
+        lv:      item.lv,
+        name:    item.name,
+        stats:   { ...item.stats },
+        cond:    { ...(item.cond || {}) },
+        element: item.element,
+      };
+    });
+  });
+}
+
+function applyBattleSettings(db) {
+  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
+  const bs = (d.settings || {}).customBattleSettings || {};
+
+  // 1. 노말 스킬 계수 오버라이드
+  if (bs.normalMults) {
+    Object.assign(SKILL_MULTIPLIERS.normal, bs.normalMults);
+  }
+  // 2. 속성 스킬 계수 오버라이드
+  if (bs.elementMults) {
+    Object.assign(SKILL_MULTIPLIERS.element, bs.elementMults);
+  }
+  // 3. 공격 상성 배율 오버라이드
+  if (bs.elemChart) {
+    if (bs.elemChart.advantageMult !== undefined) {
+      ['water','fire','grass'].forEach(atk => {
+        ['fire','grass','water'].forEach(target => {
+          if (ELEMENT_CHART[atk] && ELEMENT_CHART[atk][target] !== undefined
+              && ELEMENT_CHART[atk][target] > 1.0) {
+            ELEMENT_CHART[atk][target] = bs.elemChart.advantageMult;
+          }
+          if (ELEMENT_CHART[atk] && ELEMENT_CHART[atk][target] !== undefined
+              && ELEMENT_CHART[atk][target] < 1.0) {
+            ELEMENT_CHART[atk][target] = bs.elemChart.disadvantageMult || 0.8;
+          }
+        });
+      });
+    }
+  }
+  // 4. 유령형 노말 감소 배율
+  if (bs.ghostNormalMult !== undefined) {
+    BATTLE_CONSTS.ghostNormalMult = bs.ghostNormalMult;
+  }
+  // 4-b. 하루 전투 횟수 오버라이드
+  if (bs.dailyBattleLimit !== undefined) {
+    BATTLE_CONSTS.dailyBattleLimit = bs.dailyBattleLimit;
+  }
+  // 4-c. 몬스터 HP/공격력 배율 (난이도 조절)
+  BATTLE_CONSTS.monsterHpMult  = (bs.monsterHpMult  !== undefined) ? bs.monsterHpMult  : 1.0;
+  BATTLE_CONSTS.monsterAtkMult = (bs.monsterAtkMult !== undefined) ? bs.monsterAtkMult : 1.0;
+  // 5. 장비 오버라이드 ─────────────────────────────────────────
+  // ★ 핵심: 매 호출마다 원본 복원 후 패치 적용 (누적 방지)
+  _backupEquipOrigins(); // 최초 1회만 실행됨
+  const eq = bs.equipment || {};
+  Object.values(GAME_DATA.equipment).forEach(slot => {
+    slot.forEach(item => {
+      const orig  = _EQUIP_ORIGINALS[item.id];
+      if (!orig) return;
+
+      // 1단계: 원본 복원 (이전 패치 제거)
+      item.price   = orig.price;
+      item.lv      = orig.lv;
+      item.name    = orig.name;
+      item.stats   = { ...orig.stats };
+      item.cond    = { ...orig.cond };
+      item.element = orig.element;
+
+      // 2단계: 커스텀 패치 적용 (있을 때만)
+      const patch = eq[item.id];
+      if (!patch) return;
+      if (patch.price   !== undefined) item.price = patch.price;
+      if (patch.lv      !== undefined) item.lv    = patch.lv;
+      if (patch.name    !== undefined) item.name  = patch.name;
+      if (patch.stats   && Object.keys(patch.stats).length)  Object.assign(item.stats, patch.stats);
+      // cond: patch.cond가 있으면 완전 교체 (0값 포함하여 원본 cond 무시)
+      if (patch.cond !== undefined) item.cond = { ...patch.cond };
+      if (patch.element !== undefined) item.element = patch.element || undefined;
+    });
+  });
+  // SLOT_MAP 캐시 무효화 (body 30개 추가로 슬롯맵 갱신 필요할 수 있음)
+  GAME_DATA._slotMap = null;
+
+  // 6. 스킬북 오버라이드
+  const sbOv = bs.skillBooks || {};
+  SKILL_BOOKS.forEach(book => {
+    const patch = sbOv[book.id];
+    if (!patch) return;
+    if (patch.price           !== undefined) book.price = patch.price;
+    if (patch.reqPlayerLevel  !== undefined) book.reqPlayerLevel = patch.reqPlayerLevel;
+    if (patch.desc            !== undefined) book.desc = patch.desc;
+  });
+}
+
+// 전투 관련 런타임 상수 (applyBattleSettings에서 패치 가능)
+const BATTLE_CONSTS = {
+  ghostNormalMult: 0.55,    // 유령형 노말 배율 (기본값)
+  dailyBattleLimit: 3,      // 하루 전투 횟수 (기본값)
+  monsterHpMult:  1.0,      // 몬스터 HP 배율 (난이도 조절)
+  monsterAtkMult: 1.0,      // 몬스터 공격력 배율 (난이도 조절)
+};
 
 // ══════════════════════════════════════════════════
 //  EMOTION SYSTEM — 오늘의 감정
@@ -950,7 +1311,741 @@ const EMOTION_PAST_TEXT = {
   "약오르다":"약이 올랐다고","후회되다":"후회됐다고",
 };
 
-// 팝업 후보 감정 선택
+// ═══════════════════════════════════════════════════════
+//  전투 시스템 4단계 — 장비/스킬북 구매 공용 함수
+// ═══════════════════════════════════════════════════════
+
+// 장비 구매 가능 여부 판정
+// 반환: { ok:bool, reason:string }
+function canBuyEquipment(student, item) {
+  const inv = student.inventory || [];
+  // 이미 인벤토리에 있는지 (보유 = 구매 불가)
+  if (inv.some(i => i.id === item.id)) return { ok:false, reason:'이미 보유 중' };
+  // 현재 착용 장비도 보유로 간주
+  const slot = GAME_DATA.getSlotForItem(item.id);
+  if (slot && (student.equipmentIds||{})[slot] === item.id) return { ok:false, reason:'이미 장착 중' };
+  // 골드
+  if ((student.gold||0) < item.price) return { ok:false, reason:`골드 부족 (${item.price}G 필요)` };
+  // 레벨
+  if ((student.level||1) < (item.lv||1)) return { ok:false, reason:`Lv.${item.lv} 이상 필요` };
+  // 스탯 조건 (0값은 조건 없음으로 처리 — 관리자가 조건 제거 시 0 저장)
+  if (item.cond && Object.keys(item.cond).length > 0) {
+    const stats = student.stats || {};
+    for (const [stat, val] of Object.entries(item.cond)) {
+      if (!val || val <= 0) continue; // 0 = 조건 없음
+      if ((stats[stat]||0) < val) {
+        const sName = (GAME_DATA.statNames||{})[stat] || stat;
+        return { ok:false, reason:`${sName} ${val} 필요` };
+      }
+    }
+  }
+  return { ok:true, reason:'' };
+}
+
+// 스킬북 구매 가능 여부 판정
+function canBuySkillBook(student, book) {
+  const current = (student.skillLevels || {})[book.type] ?? 0;
+  if (current >= book.targetLevel) return { ok:false, reason:'이미 습득' };
+  if (current !== book.targetLevel - 1) return { ok:false, reason:`이전 단계(Lv.${book.targetLevel-1}) 먼저 필요` };
+  if ((student.level||1) < (book.reqPlayerLevel||1)) return { ok:false, reason:`레벨 ${book.reqPlayerLevel} 이상 필요` };
+  if ((student.gold||0) < book.price) return { ok:false, reason:`골드 부족 (${book.price}G 필요)` };
+  return { ok:true, reason:'' };
+}
+
+// 스킬북 구매 처리 (공용 로직 — 저장은 호출자에서)
+// 반환: { ok:bool, reason:string }
+function buySkillBookLogic(student, bookId) {
+  const book = SKILL_BOOKS.find(b => b.id === bookId);
+  if (!book) return { ok:false, reason:'책을 찾을 수 없음' };
+  const check = canBuySkillBook(student, book);
+  if (!check.ok) return check;
+  student.skillLevels = student.skillLevels || { ...DEFAULT_SKILL_LEVELS };
+  student.gold -= book.price;
+  student.skillLevels[book.type] = book.targetLevel;
+  return { ok:true, reason:'', book };
+}
+
+// ═══════════════════════════════════════════════════════
+//  전투 시스템 2단계 — 턴제 전투 엔진
+//  기존 저장 데이터와 완전 호환 (새 필드만 추가)
+// ═══════════════════════════════════════════════════════
+
+// ── 날짜 키 ──
+function getTodayKey() {
+  return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+}
+
+// ── battleDaily 보정 (날짜 바뀌면 used 초기화) ──
+function normalizeBattleDaily(student) {
+  const today = getTodayKey();
+  if (!student.battleDaily || student.battleDaily.dateKey !== today) {
+    student.battleDaily = { dateKey: today, used: 0 };
+  }
+  return student.battleDaily;
+}
+
+// ── 플레이어 전투 스탯 계산 ──
+// HP = 80 + level*12, ATK/MAG/DEF/SPD = 장비 합산
+function getPlayerBattleStats(student) {
+  const c = student.combat || {};
+  const hp  = 80 + (student.level || 1) * 12;
+  const atk = c.atk || 0;
+  const mag = c.mag || 0;
+  const def = c.def || 0;
+  const spd = c.spd || 0;
+
+  // 몸통 속성 읽기
+  let armorElement = null;
+  const bodyId = (student.equipmentIds || {}).body;
+  if (bodyId) {
+    const bodyItem = GAME_DATA.getItemById(bodyId);
+    if (bodyItem && bodyItem.element) armorElement = bodyItem.element;
+  }
+
+  return { hp, atk, mag, def, spd, armorElement, level: student.level || 1 };
+}
+
+// ── 속성 상성 (공격) ──
+// water > fire > grass > water / normal = 1.0
+const ELEMENT_CHART = {
+  water: { fire: 1.4, grass: 0.8, water: 1.0 },
+  fire:  { grass: 1.4, water: 0.8, fire: 1.0 },
+  grass: { water: 1.4, fire: 0.8, grass: 1.0 },
+};
+function getElementMultiplier(attackType, targetElement) {
+  if (!attackType || attackType === 'normal' || !targetElement) return 1.0;
+  return (ELEMENT_CHART[attackType] || {})[targetElement] || 1.0;
+}
+
+// ── 몸통 방어속성 (몬스터 공격 → 플레이어 받을 때) ──
+function getDefenseElementMultiplier(monsterElement, armorElement) {
+  if (!armorElement || !monsterElement) return 1.0;
+  // 몸통 속성이 몬스터 속성에 유리하면 경감
+  const adv = ELEMENT_CHART[armorElement];
+  if (!adv) return 1.0;
+  const rel = adv[monsterElement];
+  if (rel === 1.4) return 0.85; // 유리
+  if (rel === 0.8) return 1.15; // 불리
+  return 1.0;
+}
+
+// ── 특수형 처리 (ghost: normal 55%) ──
+// ★ 7단계 조정: 0.35→0.55 (노말 원툴 방지는 유지하되 "불가능" 수준은 아니게)
+// ★ 8단계: BATTLE_CONSTS.ghostNormalMult 참조 → 관리자에서 조정 가능
+function getTraitMultiplier(monster, attackType) {
+  if (monster.trait === 'ghost' && attackType === 'normal') {
+    return (typeof BATTLE_CONSTS !== 'undefined') ? BATTLE_CONSTS.ghostNormalMult : 0.55;
+  }
+  return 1.0;
+}
+
+// ── 플레이어 → 몬스터 데미지 ──
+function calculatePlayerDamage(playerStats, monster, attackType, skillLevels) {
+  const lvl  = (skillLevels || {})[attackType] || 0;
+  if (attackType !== 'normal' && lvl < 1) return { dmg:0, miss:false, crit:false };
+  const skillTable = attackType === 'normal'
+    ? SKILL_MULTIPLIERS.normal
+    : SKILL_MULTIPLIERS.element;
+  const skillMult = skillTable[Math.min(lvl, 7)] || 1.0;
+  const stat = (attackType === 'normal') ? playerStats.atk : playerStats.mag;
+  const defFactor = 100 / (100 + (monster.def || 0));
+  const elemMult  = getElementMultiplier(attackType, monster.element);
+  const traitMult = getTraitMultiplier(monster, attackType);
+  // 레벨차 보정
+  const playerLevel  = playerStats.level || 1;
+  const monsterLevel = monster.level || monster.recLv || 1;
+  const gap       = monsterLevel - playerLevel;
+  const levelMult = gap > 0 ? Math.max(0.45, 1 - gap * 0.08) : 1.0;
+
+  // ★ 빗나감 판정 (기본 93%, SPD 차이로 ±3% 보정, 85~97% 범위)
+  const spdDiff   = (monster.spd || 0) - (playerStats.spd || 0);
+  const hitRate   = Math.min(0.97, Math.max(0.85, 0.93 - spdDiff * 0.01));
+  const miss      = Math.random() > hitRate;
+  if (miss) return { dmg: 0, miss: true, crit: false };
+
+  // ★ 급소 판정 (기본 10%, 급소 시 1.5배)
+  const critRate  = 0.10;
+  const crit      = Math.random() < critRate;
+  const critMult  = crit ? 1.5 : 1.0;
+
+  const dmg = Math.max(1, Math.round(stat * skillMult * defFactor * elemMult * traitMult * levelMult * critMult));
+  return { dmg, miss: false, crit };
+}
+
+// ── 몬스터 → 플레이어 데미지 ──
+function calculateMonsterDamage(playerStats, monster) {
+  const defFactor  = 100 / (100 + (playerStats.def || 0));
+  const armorMult  = getDefenseElementMultiplier(monster.element, playerStats.armorElement);
+
+  // ★ 몬스터 빗나감: 기본 명중 93%, 플레이어 SPD 높을수록 최대 2% 추가 회피, 범위 88~97%
+  const spdDiff = (playerStats.spd || 0) - (monster.spd || 0);
+  const hitRate = Math.min(0.97, Math.max(0.88, 0.93 - spdDiff * 0.01));
+  const miss    = Math.random() > hitRate;
+  if (miss) return { dmg: 0, miss: true, crit: false };
+
+  // ★ 몬스터 급소: 기본 6% (플레이어 10%보다 낮게), 급소 시 1.4배
+  const crit    = Math.random() < 0.06;
+  const critMult = crit ? 1.4 : 1.0;
+
+  const dmg = Math.max(1, Math.round((monster.atk || 5) * defFactor * armorMult * critMult));
+  return { dmg, miss: false, crit };
+}
+
+// ── 선턴 결정 (SPD) ──
+function decideFirstTurn(playerSpd, monsterSpd) {
+  if (playerSpd > monsterSpd) return 'player';
+  if (monsterSpd > playerSpd) return 'monster';
+  return Math.random() < 0.5 ? 'player' : 'monster';
+}
+
+// ── 전투 시작: state 객체 반환 ──
+function startBattleEngine(student, monster) {
+  const playerStats = getPlayerBattleStats(student);
+  const firstTurn   = decideFirstTurn(playerStats.spd, monster.spd || 0);
+
+  // ★ 난이도 배율 적용 (원본 monster 객체는 건드리지 않음)
+  const hpMult  = (typeof BATTLE_CONSTS !== 'undefined') ? (BATTLE_CONSTS.monsterHpMult  || 1.0) : 1.0;
+  const atkMult = (typeof BATTLE_CONSTS !== 'undefined') ? (BATTLE_CONSTS.monsterAtkMult || 1.0) : 1.0;
+  const scaledMonster = {
+    ...monster,
+    hp:  Math.round((monster.hp  || 10) * hpMult),
+    atk: Math.round((monster.atk || 5)  * atkMult),
+  };
+
+  return {
+    playerStats,
+    playerHp:    playerStats.hp,
+    playerHpMax: playerStats.hp,
+    monsterHp:    scaledMonster.hp,
+    monsterHpMax: scaledMonster.hp,
+    monster:      scaledMonster, // 배율 적용된 복사본
+    skillLevels:  { ...DEFAULT_SKILL_LEVELS, ...(student.skillLevels || {}) },
+    equippedSkill2: (student.equippedSkill2 || ['heal','guard','counter']).slice(0,3),
+    firstTurn,
+    turn:     firstTurn,
+    turnCount: 0,       // 전체 턴 수
+    monsterTurnCount: 0, // 몬스터 턴 수
+    log:      [],
+    finished: false,
+    win:      false,
+
+    // ── 몬스터 role 특성 상태 ──────────────────────
+    roleUsed:   false,       // 전투당 1회 발동 여부
+    roleBuff:   null,        // 다음 공격 강화 배율 {mult, label}
+    dealerStacks: 0,         // dealer 누적 스택 (최대 3)
+    fastTriggered: false,    // fast 발동 여부
+    fastPending:   false,    // fast 추가타 예약
+    tankTriggered: false,    // tank 발동 여부
+    normalPrepared: false,   // normal 강공 준비 여부
+
+    // ── 스킬2 상태 ────────────────────────────────
+    skill2Used:  {},         // {heal:true, guard:true, ...} 사용 완료
+    prepActive:  false,      // 일격 준비 활성
+    guardActive: false,      // 방어 활성 (이번 턴)
+    rushTurns:   0,          // 몰아치기 남은 플레이어 공격 횟수
+    counterReady: false,     // 최후의 반격 대기
+  };
+}
+
+// ── 플레이어 턴 처리 ──
+function performPlayerTurn(state, attackType) {
+  if (state.finished) return state;
+
+  // ── 스킬2 배율 계산 ──
+  let skill2Mult = 1.0;
+  let skill2Label = '';
+  if (state.prepActive) {
+    skill2Mult  = 2.3;
+    skill2Label = ' <span style="color:#FFD700;font-size:.78rem">준비한 일격이 터졌다!</span>';
+    state.prepActive = false;
+  }
+  if (state.rushTurns > 0) {
+    const rushMult = 1.15 + Math.random() * 0.20; // 115~135%
+    skill2Mult = Math.max(skill2Mult, rushMult); // prep와 중첩 시 높은 쪽
+    skill2Label += ` <span style="color:#f39c12;font-size:.78rem">거세게 몰아친다!</span>`;
+    state.rushTurns--;
+  }
+
+  const result = calculatePlayerDamage(state.playerStats, state.monster, attackType, state.skillLevels);
+  const skillLv    = (state.skillLevels[attackType] || 0);
+  const typeNames  = { normal:'일반', fire:'화염', water:'냉기', grass:'자연' };
+  const typeName   = typeNames[attackType] || attackType;
+
+  // 빗나감
+  if (result.miss) {
+    state.lastPlayerAction = { attackType, skillLv, dmg:0, elemMult:1, isGhost:false, miss:true, crit:false };
+    state.log.push(`<span class="info">${typeName} 공격 Lv${skillLv}!</span> <span style="color:#888">빗나감!</span>`);
+    state.turn = 'monster';
+    state.monsterTurnCount++;
+    return state;
+  }
+
+  const { crit } = result;
+  let dmg = Math.max(1, Math.round(result.dmg * skill2Mult));
+
+  // ── role 특성: tank — HP 60% 이하 피격 시 40% 경감 (전투 1회) ──
+  const mon = state.monster;
+  if (mon.role === 'tank' && mon.trait !== 'ghost' && !state.tankTriggered &&
+      state.monsterHp / state.monsterHpMax <= 0.6) {
+    state.tankTriggered = true;
+    dmg = Math.max(1, Math.round(dmg * 0.6));
+    state.log.push(`<span style="color:#e74c3c;font-size:.78rem">🛡️ ${mon.name}이(가) 단단히 버텨냈다! 반격 태세를 갖춘다!</span>`);
+    state.roleBuff = { mult: 1.15, label: '반격 강화!' };
+  }
+
+  state.monsterHp = Math.max(0, state.monsterHp - dmg);
+
+  // ── role 특성: fast(속공) — HP 70% 이하 첫 도달 시 다음 몬스터 턴에 추가타 예약 ──
+  const monF = state.monster;
+  if (monF.role === 'fast' && monF.trait !== 'ghost' && !state.fastTriggered && !state.fastPending &&
+      state.monsterTurnCount > 0 && state.monsterHp / state.monsterHpMax <= 0.7) {
+    state.fastPending = true;
+  }
+
+  const elemMult  = attackType !== 'normal' ? getElementMultiplier(attackType, state.monster.element) : 1.0;
+  const isGhost   = state.monster.trait === 'ghost' && attackType === 'normal';
+  state.lastPlayerAction = { attackType, skillLv, dmg, elemMult, isGhost, miss:false, crit };
+
+  let effectSpan = skill2Label;
+  if (crit)                effectSpan += '<span style="color:#FFD700;font-size:.78rem"> 급소!</span>';
+  if (isGhost)             effectSpan += '<span style="color:#bbb;font-size:.78rem"> 유령 저항!</span>';
+  else if (elemMult > 1.0) effectSpan += '<span style="color:#FF8C00;font-size:.78rem"> 효과 굉장함!</span>';
+  else if (elemMult < 1.0) effectSpan += '<span style="color:#888;font-size:.78rem"> 효과 별로...</span>';
+
+  state.log.push(
+    `<span class="info">${typeName} 공격 Lv${skillLv}!</span>` +
+    ` <span class="good">-${dmg}</span>${effectSpan}`
+  );
+
+  if (state.monsterHp <= 0) {
+    state.finished = true; state.win = true; state.turn = null;
+  } else {
+    state.turn = 'monster';
+    state.monsterTurnCount++;
+  }
+  return state;
+}
+
+// ── 몬스터 턴 처리 (role 특성 포함) ──
+function performMonsterTurn(state) {
+  if (state.finished) return state;
+  const mon = state.monster;
+  const role = mon.role || 'normal';
+  const isGhostMon = mon.trait === 'ghost';
+
+  // ── role 특성: dealer(전투 가속) — 매 몬스터 턴마다 스택 증가 ──
+  if (!isGhostMon && role === 'dealer' && state.dealerStacks < 3) {
+    state.dealerStacks++;
+    const stackLabels = ['점점 공격이 거세진다!','공격 기세가 오른다!','최고조의 공격 태세!'];
+    state.log.push(`<span style="color:#e74c3c;font-size:.78rem">⬆ ${stackLabels[state.dealerStacks-1]}</span>`);
+  }
+
+  // ── 몬스터 공격 계산 ──────────────────────────────────────────
+  const dealerMult = (!isGhostMon && role === 'dealer') ? (1 + state.dealerStacks * 0.10) : 1.0;
+  // ★ roleBuff를 normal role 세팅 이전에 읽어서 소모
+  // → 준비 턴(monsterTurnCount===2)엔 ×1.0으로 정상 공격, 다음 턴에 ×1.6 적용
+  const roleBuff = state.roleBuff;
+  state.roleBuff = null;
+  const roleAttackMult = (roleBuff ? roleBuff.mult : 1.0) * dealerMult;
+
+  // ── role 특성: normal(강공) — 2번째 몬스터 턴 시 준비 문구 + 다음 턴에 ×1.6 ──
+  if (!isGhostMon && role === 'normal' && !state.roleUsed && state.monsterTurnCount === 2) {
+    state.log.push(`<span style="color:#e74c3c;font-size:.78rem">⚡ ${mon.name}이(가) 강한 일격을 준비한다!</span>`);
+    state.roleBuff = { mult: 1.6, label: '강공!' }; // ★ 다음 턴에 소모됨
+    state.roleUsed = true;
+    // 이번 턴은 roleAttackMult = 1.0으로 정상 공격 진행
+  }
+
+  const result    = calculateMonsterDamage(state.playerStats, mon);
+  const armorMult = getDefenseElementMultiplier(mon.element, state.playerStats.armorElement);
+
+  // ── skill2: 방어 (guardActive) — 이번 피해 50% 감소 ──────────
+  const guardMult = state.guardActive ? 0.5 : 1.0;
+  if (state.guardActive) {
+    state.log.push(`<span style="color:#4fc3f7;font-size:.78rem">🛡️ 피해를 줄였다!</span>`);
+    state.guardActive = false;
+  }
+
+  // ── skill2: 몰아치기 피해증가 (rushTurns > 0일 때 받는 피해 15% 증가) ──
+  const rushDmgMult = (state.rushTurns > 0) ? 1.15 : 1.0;
+
+  // 빗나감
+  if (result.miss) {
+    state.lastMonsterAction = { dmg: 0, armorMult, miss: true, crit: false, roleLabel:'' };
+    state.log.push(`<span class="bad">${mon.name}의 공격!</span> <span style="color:#888">몬스터 공격 빗나감!</span>`);
+    // fast 추가타도 빗나감 처리 후 건너뜀
+    state.turn = 'player';
+    state.monsterTurnCount++;
+    return state;
+  }
+
+  const { crit } = result;
+  const finalDmg = Math.max(1, Math.round(result.dmg * roleAttackMult * guardMult * rushDmgMult));
+  state.lastMonsterAction = { dmg: finalDmg, armorMult, miss:false, crit, roleLabel: roleBuff?.label || '' };
+
+  // ── skill2: 최후의 반격 판정 ───────────────────────────────
+  if (state.counterReady) {
+    state.counterReady = false;
+    const counterSuccess = Math.random() < 0.5;
+    if (counterSuccess) {
+      const reflectDmg = Math.max(1, Math.round(finalDmg * 1.5));
+      state.monsterHp = Math.max(0, state.monsterHp - reflectDmg);
+      state.log.push(`<span class="good">⚡ 반격 성공! 몬스터에게 -${reflectDmg} 반사!</span>`);
+    } else {
+      state.log.push(`<span style="color:#888;font-size:.78rem">반격 실패...</span>`);
+    }
+    // 플레이어는 그대로 맞음
+  }
+
+  // ── role 특성: tank — HP 60% 이하에서 첫 피격 시 40% 감소 ──
+  // (이미 적용된 guardMult와 별개로, 피격 결과에서 체크)
+  // tank는 calculateMonsterDamage 이전에 player hp 기준으로 체크
+  // 여기서는 player hp에 실제 적용
+  let actualDmg = finalDmg;
+
+  state.playerHp = Math.max(0, state.playerHp - actualDmg);
+
+  let effectSpan = '';
+  if (roleBuff)            effectSpan += `<span style="color:#e74c3c;font-size:.78rem"> ${roleBuff.label}</span>`;
+  if (crit)                effectSpan += '<span style="color:#ef9a9a;font-size:.78rem"> 몬스터 급소!</span>';
+  if (armorMult < 1.0)     effectSpan += '<span style="color:#4fc3f7;font-size:.78rem"> 방어 상성 유리!</span>';
+  if (armorMult > 1.0)     effectSpan += '<span style="color:#ef9a9a;font-size:.78rem"> 방어 상성 불리!</span>';
+  if (dealerMult > 1.0)    effectSpan += `<span style="color:#e74c3c;font-size:.78rem"> [강화 ${Math.round(dealerMult*100)}%]</span>`;
+
+  state.log.push(
+    `<span class="bad">${mon.name}의 공격!</span>` +
+    ` <span class="bad">-${actualDmg}</span>${effectSpan}`
+  );
+
+  // ── role 특성: fast(속공) — fastPending이면 이번 턴 종료 후 추가타 ──
+  if (!isGhostMon && role === 'fast' && state.fastPending) {
+    state.fastPending = false;
+    state.fastTriggered = true;
+    state.log.push(`<span style="color:#e74c3c;font-size:.78rem">💨 ${mon.name}이(가) 재빠르게 한 번 더 덤빈다!</span>`);
+    if (state.playerHp > 0) {
+      // ★ fast 추가타: 빗나감 적용, 급소 적용 안 함 (calculateMonsterDamage 쓰면 급소 포함되므로 직접 계산)
+      const fastHit = calculateMonsterDamage(state.playerStats, mon);
+      if (!fastHit.miss) {
+        // 급소 배율 제거: fastHit.dmg에서 crit이 baked-in된 경우 역산 필요
+        // → 간단하게 기본 피해(crit 없이) 직접 계산
+        const defFactor  = 100 / (100 + (state.playerStats.def || 0));
+        const armorMult2 = getDefenseElementMultiplier(mon.element, state.playerStats.armorElement);
+        const baseDmg    = Math.max(1, Math.round((mon.atk || 5) * defFactor * armorMult2));
+        const fastDmg    = Math.max(1, Math.round(baseDmg * 0.6 * guardMult * rushDmgMult));
+        state.playerHp   = Math.max(0, state.playerHp - fastDmg);
+        state.log.push(`<span class="bad">💨 추가타! -${fastDmg}</span>`);
+      } else {
+        state.log.push(`<span style="color:#888;font-size:.78rem">추가타 빗나감!</span>`);
+      }
+    }
+  }
+
+  if (state.playerHp <= 0) {
+    state.finished = true; state.win = false; state.turn = null;
+  } else {
+    state.turn = 'player';
+    state.monsterTurnCount++;
+  }
+  return state;
+}
+
+// ── role 특성: tank — 피격 시 HP 60% 이하 + 미발동이면 40% 경감 체크 ──
+// performPlayerTurn 직전에 호출
+function applyTankTrait(state, incomingDmg) {
+  const mon = state.monster;
+  if (mon.trait === 'ghost' || mon.role !== 'tank' || state.tankTriggered) return incomingDmg;
+  if (state.monsterHp / state.monsterHpMax > 0.6) return incomingDmg;
+  // 발동
+  state.tankTriggered = true;
+  const reduced = Math.max(1, Math.round(incomingDmg * 0.6)); // 40% 감소
+  state.log.push(`<span style="color:#e74c3c;font-size:.78rem">🛡️ ${mon.name}이(가) 단단히 버텨냈다! 반격 태세를 갖춘다!</span>`);
+  state.roleBuff = { mult: 1.15, label: '반격 강화!' };
+  return reduced;
+}
+
+// ── 스킬2 처리 ───────────────────────────────────────────────
+function performSkill2(state, skill2Id) {
+  if (state.finished || state.turn !== 'player') return state;
+  if (state.skill2Used[skill2Id]) return state;
+
+  state.skill2Used[skill2Id] = true;
+
+  switch (skill2Id) {
+    case 'heal': {
+      const healAmt = Math.floor(state.playerHpMax * 0.30);
+      state.playerHp = Math.min(state.playerHpMax, state.playerHp + healAmt);
+      state.log.push(`<span class="good">💊 응급치료! +${healAmt}HP</span>`);
+      state.turn = 'monster';
+      state.monsterTurnCount++;
+      break;
+    }
+    case 'prep': {
+      state.prepActive = true;
+      state.log.push(`<span class="info">🎯 일격을 준비한다!</span>`);
+      state.turn = 'monster';
+      state.monsterTurnCount++;
+      break;
+    }
+    case 'reckless': {
+      // 무리한 공격: 스킬1 선택 후 50% 성공
+      // 실제 공격은 doSkill2Reckless(attackType)에서 처리
+      state.recklessReady = true;
+      state.log.push(`<span class="info">⚡ 무리한 공격 시도!</span>`);
+      // 아직 턴 소모 안 함 — 스킬1 선택 대기
+      break;
+    }
+    case 'guard': {
+      state.guardActive = true;
+      state.log.push(`<span class="info">🛡️ 방어 자세를 취했다!</span>`);
+      state.turn = 'monster';
+      state.monsterTurnCount++;
+      break;
+    }
+    case 'counter': {
+      state.counterReady = true;
+      state.log.push(`<span class="info">⚔️ 최후의 반격을 노린다!</span>`);
+      state.turn = 'monster';
+      state.monsterTurnCount++;
+      break;
+    }
+    case 'rush': {
+      state.rushTurns = 2;
+      state.log.push(`<span style="color:#f39c12">🔥 몰아치기 시작!</span>`);
+      state.turn = 'monster';
+      state.monsterTurnCount++;
+      break;
+    }
+  }
+  return state;
+}
+
+// 무리한 공격 — 스킬1 선택 후 50% 판정
+function performRecklessAttack(state, attackType) {
+  if (!state.recklessReady) return state;
+  state.recklessReady = false;
+  if (Math.random() < 0.5) {
+    // 성공: 2.2배 적용
+    const result = calculatePlayerDamage(state.playerStats, state.monster, attackType, state.skillLevels);
+    if (!result.miss) {
+      const dmg = Math.max(1, Math.round(result.dmg * 2.2));
+      state.monsterHp = Math.max(0, state.monsterHp - dmg);
+      const elemMult = attackType !== 'normal' ? getElementMultiplier(attackType, state.monster.element) : 1.0;
+      const isGhost  = state.monster.trait === 'ghost' && attackType === 'normal';
+      let fx = '<span style="color:#FFD700;font-size:.78rem"> 성공!</span>';
+      if (isGhost) fx += '<span style="color:#bbb;font-size:.78rem"> 유령 저항!</span>';
+      else if (elemMult > 1.0) fx += '<span style="color:#FF8C00;font-size:.78rem"> 효과 굉장함!</span>';
+      state.log.push(`<span class="good">⚡ 무리한 공격! -${dmg}</span>${fx}`);
+      state.lastPlayerAction = { attackType, skillLv:0, dmg, elemMult, isGhost, miss:false, crit:false };
+      if (state.monsterHp <= 0) { state.finished = true; state.win = true; state.turn = null; return state; }
+    } else {
+      state.log.push(`<span style="color:#888">⚡ 무리한 공격 — 빗나감!</span>`);
+    }
+  } else {
+    state.log.push(`<span style="color:#888">⚡ 무리한 공격 실패...</span>`);
+  }
+  state.turn = 'monster';
+  state.monsterTurnCount++;
+  return state;
+}
+
+// ── 전투 종료 처리 (학생 데이터 저장) ──
+// ★ 횟수 차감은 startBattle()에서 이미 완료 — 여기서는 골드/도감만 처리
+// battleInProgress 해제는 호출자(doAttack)에서 처리
+function finalizeBattle(student, monster, win) {
+  if (win) {
+    // 골드 지급
+    student.gold      = (student.gold || 0) + monster.gold;
+    student.totalGold = (student.totalGold || 0) + monster.gold;
+
+    // 도감 기록 + 도감 보상 지급
+    const isFirstKill = !(student.monsterLog || []).includes(monster.name);
+    if (isFirstKill) {
+      student.monsterLog = [...(student.monsterLog || []), monster.name];
+
+      // 최초 처치 보상 (settings.dexRewards 참조)
+      const dexRewards = (typeof DB !== 'undefined')
+        ? ((DB.getSettings() || {}).dexRewards || {}) : {};
+      if (dexRewards.firstKillEnabled && dexRewards.firstKillGold > 0) {
+        student.gold      += dexRewards.firstKillGold;
+        student.totalGold  = (student.totalGold || 0) + dexRewards.firstKillGold;
+        student._dexBonusLog = (student._dexBonusLog || []);
+        student._dexBonusLog.push({ type:'firstKill', name:monster.name, gold:dexRewards.firstKillGold });
+      }
+
+      // zone 완성 보상 체크
+      if (monster.zone && dexRewards[monster.zone]) {
+        const zoneMons = (typeof GAME_DATA !== 'undefined')
+          ? GAME_DATA.monsters.filter(m => m.zone === monster.zone) : [];
+        const killed   = student.monsterLog || [];
+        const allDone  = zoneMons.length > 0 && zoneMons.every(m => killed.includes(m.name));
+        const claimedKey = `dexZoneClaimed_${monster.zone}`;
+        if (allDone && !student[claimedKey]) {
+          student[claimedKey] = true;
+          const zr = dexRewards[monster.zone];
+          if (zr.gold > 0) {
+            student.gold      += zr.gold;
+            student.totalGold  = (student.totalGold || 0) + zr.gold;
+          }
+          if (zr.title) {
+            student.titles = [...new Set([...(student.titles || []), zr.title])];
+          }
+          student._dexBonusLog = (student._dexBonusLog || []);
+          student._dexBonusLog.push({ type:'zoneComplete', zone:monster.zone, gold:zr.gold, title:zr.title||'' });
+        }
+      }
+    }
+  }
+  // 패배: 저장 데이터 초기화 금지 — 골드/장비/스킬 일절 건드리지 않음
+  return student;
+}
+
+// ═══════════════════════════════════════════════════════
+//  전투 시스템 3단계 — 사냥터 3마리 제시 로직
+// ═══════════════════════════════════════════════════════
+
+// 사냥터 구간 정의
+const ZONE_RANGES = {
+  beginner:     { min:1,  max:10 },
+  intermediate: { min:11, max:20 },
+  advanced:     { min:21, max:30 },
+};
+
+// 슬롯별 레벨 범위 계산 (사냥터 min/max 내로 클램프)
+function getSlotLevelRange(playerLevel, slotIndex, zoneMin, zoneMax) {
+  const base = playerLevel + slotIndex - 1; // 0→P-1, 1→P, 2→P+1
+  const lo = Math.max(zoneMin, base);
+  const hi = Math.min(zoneMax, base + 1);
+  return { lo, hi };
+}
+
+// 희귀도 가중치 (슬롯별)
+const RARITY_WEIGHTS = [
+  { common:1.0, rare:0.2, legend:0.0 }, // 슬롯 0
+  { common:1.0, rare:1.4, legend:0.0 }, // 슬롯 1
+  { common:1.0, rare:1.6, legend:2.0 }, // 슬롯 2
+];
+function getRarityWeight(monster, slotIndex) {
+  return (RARITY_WEIGHTS[slotIndex] || RARITY_WEIGHTS[0])[monster.rarity] ?? 1.0;
+}
+
+// 미획득 몬스터 우대 (monsterLog는 name 배열 기준)
+function getDiscoveryWeight(player, monster) {
+  return (player.monsterLog || []).includes(monster.name) ? 1.0 : 1.5;
+}
+
+// 최근 등장 억제 (recentBattleOffers는 최근 5회 제시 이름 평탄화 배열)
+function getRecentWeight(player, monster) {
+  const recent = player.recentBattleOffers || [];
+  // 평탄화: 배열of배열 또는 배열of문자열 모두 지원
+  const flat = recent.flat ? recent.flat() : [].concat(...recent);
+  const idx = flat.lastIndexOf(monster.name);
+  if (idx < 0) return 1.0;
+  // 직전(최신 3개 안) 등장 여부 확인
+  const distFromEnd = flat.length - 1 - idx;
+  if (distFromEnd < 3)  return 0.3; // 직전 출현
+  if (distFromEnd < 9)  return 0.6; // 최근 3회 내 (3마리×3회)
+  return 1.0;
+}
+
+// 중복 / 유령 과다 방지
+function canPickMonster(candidate, pickedMonsters) {
+  // 동일 몬스터 중복 금지
+  if (pickedMonsters.some(p => p.id === candidate.id)) return false;
+  // 유령형 최대 2마리
+  const ghostCount = pickedMonsters.filter(p => p.trait === 'ghost').length;
+  if (candidate.trait === 'ghost' && ghostCount >= 2) return false;
+  return true;
+}
+
+// 가중치 기반 1개 랜덤 선택
+function weightedPick(candidates) {
+  const total = candidates.reduce((s, c) => s + (c._w || 0), 0);
+  if (total <= 0) return candidates[Math.floor(Math.random() * candidates.length)] || null;
+  let r = Math.random() * total;
+  for (const c of candidates) {
+    r -= (c._w || 0);
+    if (r <= 0) return c;
+  }
+  return candidates[candidates.length - 1];
+}
+
+// 3번 슬롯 후보: 80% 현재 범위 / 20% 과거 미획득 희귀/레어 복귀
+function getThirdSlotCandidates(player, zoneMonsters, currentRange) {
+  const inRange = zoneMonsters.filter(m => m.level >= currentRange.lo && m.level <= currentRange.hi);
+  // ★ 레벨 상한: 플레이어 레벨 +3까지만 (저레벨이 고레벨 만나는 문제 방지)
+  const maxLevel = (player.level || 1) + 3;
+  // 복귀 후보: 같은 사냥터 안, 미획득, rare/legend, 레벨 상한 이하
+  const missed = zoneMonsters.filter(m =>
+    (m.rarity === 'rare' || m.rarity === 'legend') &&
+    !(player.monsterLog || []).includes(m.name) &&
+    !inRange.includes(m) &&
+    (m.level || 1) <= maxLevel   // ★ 레벨 상한 적용
+  );
+  // 20% 확률로 복귀 후보 사용 (없으면 현재 범위)
+  if (missed.length > 0 && Math.random() < 0.2) return missed;
+  return inRange.length > 0 ? inRange : zoneMonsters.filter(m => (m.level||1) <= maxLevel);
+}
+
+// ── 메인: 사냥터 3마리 후보 생성 ──
+function generateBattleOffers(player, zone) {
+  const zoneRange = ZONE_RANGES[zone];
+  if (!zoneRange) return [];
+  const allMonsters = (typeof GAME_DATA !== 'undefined') ? GAME_DATA.monsters : [];
+  const zoneMonsters = allMonsters.filter(m => m.zone === zone);
+  if (!zoneMonsters.length) return [];
+
+  const picked = [];
+
+  for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+    // 슬롯별 레벨 범위 계산
+    let range, pool;
+    if (slotIndex === 2) {
+      // 3번 슬롯: 복귀 출현 로직
+      range = getSlotLevelRange(player.level, slotIndex, zoneRange.min, zoneRange.max);
+      pool  = getThirdSlotCandidates(player, zoneMonsters, range);
+    } else {
+      range = getSlotLevelRange(player.level, slotIndex, zoneRange.min, zoneRange.max);
+      pool  = zoneMonsters.filter(m => m.level >= range.lo && m.level <= range.hi);
+      if (!pool.length) pool = zoneMonsters; // fallback
+    }
+
+    // 중복/유령 필터 + 가중치 부여
+    const candidates = pool
+      .filter(m => canPickMonster(m, picked))
+      .map(m => ({
+        ...m,
+        _w: getRarityWeight(m, slotIndex)
+             * getDiscoveryWeight(player, m)
+             * getRecentWeight(player, m),
+      }));
+
+    // 후보 없으면 zone 전체에서 중복만 피해서 fallback
+    const fallbackPool = candidates.length > 0 ? candidates
+      : zoneMonsters
+          .filter(m => canPickMonster(m, picked))
+          .map(m => ({ ...m, _w: 1 }));
+
+    if (!fallbackPool.length) continue; // zone 전체에도 없으면 어쩔 수 없음
+    const chosen = weightedPick(fallbackPool);
+    if (chosen) {
+      // _w 필드는 내부용이므로 제거
+      const { _w, ...clean } = chosen;
+      picked.push(clean);
+    }
+  }
+
+  // recentBattleOffers 업데이트 (최근 5회 배열of배열 유지)
+  if (picked.length > 0) {
+    const names = picked.map(m => m.name);
+    const prev  = (player.recentBattleOffers || []).slice(-4); // 이전 4회 유지
+    player.recentBattleOffers = [...prev, names];              // 5번째 추가
+  }
+
+  return picked;
+}
+
+// ═══════════════════════════════════════════════════════
+//  감정 시스템
 function getReflectionCandidate(studentId) {
   const db = (typeof DB !== 'undefined') ? DB.load() : {};
   const logs = db.emotionLogs || {};
