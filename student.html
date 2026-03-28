@@ -549,6 +549,7 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
+    data.memories           = toArr(data.memories);
     data.pwResetRequests    = toArr(data.pwResetRequests);
     // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
     if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
@@ -698,12 +699,40 @@ const DB = {
     const db = this.load();
     db.artworks = (db.artworks||[]).filter(a => a.id !== id);
     this._cache = db;
-    // id 키 기반 삭제
     this._fbRef.child('artworks/' + id).remove();
-    // 전체 artworks를 id 키 기반으로 재저장 (배열/키 혼재 정리)
     const artworksObj = {};
     db.artworks.forEach(a => { artworksObj[a.id] = a; });
     this._fbRef.child('artworks').set(artworksObj);
+  },
+
+  // ── 추억 사진 ────────────────────────────────────────
+  getMemories(filter) {
+    // filter: 'public' = 전체공개, 'all' = 전체, studentId = 해당학생
+    const db = this.load();
+    const mems = db.memories || [];
+    if (filter === 'public') {
+      return mems.filter(m => m.approvalStatus === 'approved' &&
+        (m.visibilityType === 'public' ||
+         (m.visibilityType === 'class' && m.approvalStatus === 'approved')));
+    }
+    if (filter === 'all') return mems;
+    if (filter) return mems.filter(m => m.studentId === filter || m.visibilityType === 'public');
+    return mems;
+  },
+  saveMemory(mem) {
+    const db = this.load();
+    db.memories = db.memories || [];
+    const idx = db.memories.findIndex(m => m.id === mem.id);
+    if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
+    else db.memories.push(mem);
+    this._cache = db;
+    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+  },
+  deleteMemory(id) {
+    const db = this.load();
+    db.memories = (db.memories||[]).filter(m => m.id !== id);
+    this._cache = db;
+    this._fbRef.child('memories/' + id).remove();
   },
 
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
@@ -2829,7 +2858,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 /* ── 태블릿 바텀 탭 ── */
 .bottom-tabs{display:none;flex-shrink:0;background:rgba(13,13,26,.98);
-  border-top:1px solid rgba(255,215,0,.15);padding:.4rem 0 max(.4rem, env(safe-area-inset-bottom));}
+  border-top:1px solid rgba(255,215,0,.15);padding:.4rem 0 max(.4rem, env(safe-area-inset-bottom));
+  position:relative;z-index:500;pointer-events:auto;}
 .bottom-tabs-inner{display:flex;justify-content:space-around;}
 .btab{display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.3rem .5rem;
   cursor:pointer;color:var(--txt3);transition:color .2s;min-width:50px;min-height:48px;
@@ -2843,21 +2873,55 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #s-game.force-desktop .side-panel  { display:flex!important; flex-direction:column; }
 #s-game.force-desktop .main-area   { display:block!important; }
 #s-game.force-desktop .mob-bottom-nav { display:none!important; }
+#s-game.force-desktop .bottom-tabs { display:none!important; }
 #s-game.force-desktop .mobile-char-panel { display:none!important; }
 #s-game.force-desktop .main-tab-content  { display:block!important; }
 
 #s-game.force-mobile .side-panel   { display:none!important; }
 #s-game.force-mobile .main-area    { display:none!important; }
 #s-game.force-mobile .mob-bottom-nav { display:flex!important; }
+#s-game.force-mobile .bottom-tabs  { display:block!important; }
 #s-game.force-mobile .mobile-char-panel { display:none; }
 #s-game.force-mobile .mobile-char-panel.active-tab { display:block!important; }
 #s-game.force-mobile .main-tab-content { display:none; }
 #s-game.force-mobile .main-tab-content.active-tab { display:block!important; }
 
+/* force-mobile일 때 game-body를 flex column으로 — 뷰포트 너비 무관하게 적용 */
+#s-game.force-mobile .game-body {
+  display:flex!important;
+  flex-direction:column!important;
+  grid-template-columns:unset!important;
+  overflow:visible!important;
+}
+#s-game.force-mobile .main-tab-content.active-tab {
+  flex:1;
+  min-height:0;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding-bottom:80px;
+}
+#s-game.force-mobile .mobile-char-panel.active-tab {
+  flex:1;
+  min-height:0;
+  overflow-y:auto!important;
+}
+
 
 .mobile-char-panel.active-tab{display:block;}
-.main-tab-content{display:none;overflow-y:auto;padding:1.2rem;}
-.main-tab-content.active-tab{display:block;}
+.main-tab-content{display:none;padding:1.2rem;}
+.main-tab-content.active-tab{
+  display:block;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding-bottom:80px;
+  /* 바텀탭(65px) 영역 침범 방지 */
+  max-height:calc(100svh - 52px - 65px);
+  pointer-events:auto;
+}
 
 /* ── 태블릿 최적화 (768~1024px) ── */
 @media (min-width:768px) and (max-width:1024px) {
@@ -2881,22 +2945,28 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 }
 
 @media(max-width:700px){
-  .game-body{grid-template-columns:1fr;overflow:hidden;}
+  .game-body{
+    grid-template-columns:1fr;
+    overflow:visible;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
   .side-panel{display:none;}
   .main-area{display:none;}
   .bottom-tabs{display:block;}
-  .mobile-char-panel,.main-tab-content{
-    height:calc(100vh - 70px - 65px);
-    overflow-y:auto;
-    overflow-x:hidden;
-    -webkit-overflow-scrolling:touch;
-    overscroll-behavior:contain;
-  }
   /* 모바일에서 퀘스트 카드 버튼 줄바꿈 방지 */
   .mission-row { flex-wrap:nowrap; }
   .mission-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* 모바일 HUD EXP 폰트 축소 */
   .hud-exp-txt { font-size:.58rem; }
+  .mobile-char-panel,.main-tab-content{
+    flex:1;min-height:0;
+    overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+  }
 }
 @media(min-width:701px){
   .bottom-tabs{display:none;}
@@ -3160,6 +3230,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <button class="mtab"    onclick="houseTab('book',this)">📚 독서</button>
     <button class="mtab"    onclick="houseTab('deco',this)">🌸 인테리어</button>
     <button class="mtab"    onclick="houseTab('artwork',this)">🖼️ 작품</button>
+    <button class="mtab"    onclick="houseTab('memory',this)">📸 추억</button>
     <button class="mtab"    onclick="houseTab('emotion',this)">💭 감정</button>
   </div>
 
@@ -3184,14 +3255,44 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <div id="book-monthly-labels" style="display:flex;gap:4px;margin-top:4px"></div>
     </div>
 
-    <!-- 새 독서 기록 추가 폼 -->
+    <!-- 새 독서 기록 폼 -->
     <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
       border-radius:12px;padding:.9rem;margin-bottom:.9rem">
-      <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">+ 새 독서 기록</div>
-      <div style="display:flex;flex-direction:column;gap:.5rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.7rem">+ 새 독서 기록</div>
+      <div style="display:flex;flex-direction:column;gap:.55rem">
+
+        <!-- 책 제목 -->
         <input class="form-input-student" id="book-title-input" placeholder="📖 책 제목">
-        <textarea class="form-input-student" id="book-review-input" placeholder="줄거리 및 느낀점을 써주세요"
-          style="min-height:80px;resize:none;line-height:1.5"></textarea>
+
+        <!-- 핵심 주제 칩 (JS로 렌더) -->
+        <div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.35rem">이 책의 핵심 주제는?</div>
+          <div id="book-category-chips" style="display:flex;flex-wrap:wrap;gap:.3rem"></div>
+          <input class="form-input-student" id="book-custom-category-input"
+            placeholder="주제를 직접 입력하세요" style="margin-top:.4rem;display:none">
+        </div>
+
+        <!-- 별점 (JS로 렌더) -->
+        <div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">별점</div>
+          <div id="book-rating-stars" style="display:flex;gap:.35rem"></div>
+        </div>
+
+        <!-- 인상 깊은 인물 -->
+        <input class="form-input-student" id="book-char-name-input" placeholder="인상 깊은 인물은 누구인가요?">
+        <textarea class="form-input-student" id="book-char-reason-input"
+          placeholder="왜 인상 깊었나요?"
+          style="min-height:55px;resize:none;line-height:1.5"></textarea>
+
+        <!-- 줄거리 -->
+        <textarea class="form-input-student" id="book-summary-input" placeholder="줄거리를 써주세요"
+          style="min-height:65px;resize:none;line-height:1.5"></textarea>
+
+        <!-- 느낀 점 -->
+        <textarea class="form-input-student" id="book-reflection-input" placeholder="느낀 점을 써주세요"
+          style="min-height:65px;resize:none;line-height:1.5"></textarea>
+
+        <!-- 날짜 + 제출 -->
         <div style="display:flex;gap:.5rem;align-items:center">
           <input class="form-input-student" type="date" id="book-date-input" style="flex:1">
           <button class="btn-gold" style="padding:.4rem .9rem;font-size:.8rem;white-space:nowrap"
@@ -3288,7 +3389,45 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <div id="artwork-list"></div>
   </div>
 
-  <!-- 탭5: 감정 -->
+  <!-- 탭5: 추억 -->
+  <div id="house-tab-memory" style="display:none">
+    <div style="font-size:.76rem;color:var(--txt2);margin:.3rem 0 .8rem">
+      선생님이 올린 추억 사진과, 내가 공유한 사진을 볼 수 있어요 📸
+    </div>
+    <!-- 학생 추억 제출 폼 -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;padding:.9rem;margin-bottom:.9rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">📸 추억 사진 공유하기</div>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        <input class="form-input-student" id="mem-title-input" placeholder="사진 제목">
+        <textarea class="form-input-student" id="mem-desc-input" placeholder="한 줄 설명 (선택사항)"
+          style="min-height:48px;resize:none;line-height:1.5"></textarea>
+        <label style="display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;
+          border-radius:10px;border:1.5px dashed rgba(255,255,255,.2);cursor:pointer;
+          background:rgba(255,255,255,.04)">
+          <span id="mem-file-text" style="font-size:.82rem;color:var(--txt2)">📷 사진 선택하기</span>
+          <input type="file" id="mem-file-input" accept="image/*" style="display:none"
+            onchange="onMemFileSelect(this)">
+        </label>
+        <div id="mem-preview-wrap" style="display:none;text-align:center">
+          <img id="mem-preview-img" style="max-height:140px;border-radius:10px;object-fit:contain">
+        </div>
+        <div id="mem-upload-progress" style="display:none">
+          <div style="height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-bottom:.3rem">
+            <div id="mem-progress-bar" style="height:100%;background:var(--sky);border-radius:3px;width:0%;transition:width .3s"></div>
+          </div>
+          <div id="mem-progress-text" style="font-size:.7rem;color:var(--txt3)">업로드 중...</div>
+        </div>
+        <button class="btn-gold" style="padding:.45rem;font-size:.82rem" onclick="submitMemory()">
+          📸 제출 (선생님 확인 후 공유돼요)
+        </button>
+      </div>
+    </div>
+    <!-- 내 추억 목록 -->
+    <div id="mem-record-list"></div>
+  </div>
+
+  <!-- 탭6: 감정 -->
   <div id="house-tab-emotion" style="display:none;padding-bottom:.5rem">
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.8rem;flex-wrap:wrap">
       <select id="emo-month-sel" onchange="renderEmotionHistory()"
@@ -4345,6 +4484,22 @@ function buildMainHTML() {
     </div>`).join('') : '';
 
   return `
+    <!-- 오늘의 링크 — 최상단 -->
+    ${(()=>{
+      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>l.url&&l.title);
+      if (!todayLinks.length) return '';
+      return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
+        border-radius:12px;padding:.65rem .9rem;margin-bottom:.5rem">
+        <div style="font-size:.7rem;font-weight:700;color:var(--sky);margin-bottom:.4rem">🔗 오늘의 링크</div>
+        ${todayLinks.map(l=>`
+          <a href="${l.url}" target="_blank" rel="noopener"
+            style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
+              text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${l.title}</span>
+            <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
+          </a>`).join('')}
+      </div>`;
+    })()}
     ${alerts.join('')}
 
     <!-- ① 핵심 할 일 1개 강조 + 나머지 요약 -->
@@ -4441,31 +4596,18 @@ function buildMainHTML() {
       <div class="mission-list" style="margin-bottom:.6rem">${missionHtml}</div>
     </div>` : ''}
 
-    <!-- ⑤ 하단 정보 — 기본 접힘 -->
+    <!-- ⑥ 하단 정보 — 기본 접힘 -->
     <button onclick="toggleSection('bottom-section','bottom-arrow')"
       style="width:100%;padding:.4rem .7rem;border-radius:8px;background:rgba(255,255,255,.03);
         border:1px solid rgba(255,255,255,.07);color:var(--txt3);font-size:.72rem;
         cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
-      <span>📅 현황 · 감정 · 최근 활동 · 친구 방문</span>
+      <span>📅 감정 · 최근 활동 · 친구 방문</span>
       <span id="bottom-arrow" style="font-size:.7rem">▼</span>
     </button>
     <div id="bottom-section" style="display:none">
       ${emotionCard}
       <div class="today-grid" style="margin-bottom:.5rem">
-        <div class="today-card">
-          <div class="tc-label">⚔️ 추천 몬스터</div>
-          <div class="mon-mini">
-            <div class="mon-icon-big">${recMon.icon}</div>
-            <div><div class="mon-name-txt">${recMon.name}</div>
-            <div class="mon-lv-txt">Lv.${recMon.recLv} · 💰${recMon.gold}G</div>
-            <div class="mon-hp"><div class="mon-hp-fill" style="width:85%"></div></div></div>
-          </div>
-          <button class="btn-red" style="width:100%;padding:.45rem;border-radius:8px;font-size:.78rem"
-            onclick="startBattle('${recMon.id}')" ${!canFight?'disabled style="opacity:.45"':''}>
-            ${canFight?`⚔️ 도전! (${attemptsLeft}회 남음)`:'✅ 오늘 완료'}
-          </button>
-        </div>
-        <div class="today-card" style="overflow-y:auto;max-height:140px">
+        <div class="today-card" style="overflow-y:auto;max-height:160px;grid-column:1/-1">
           <div class="tc-label">📜 최근 활동</div>
           ${(()=>{
             const db2=DB.load();
@@ -4477,7 +4619,7 @@ function buildMainHTML() {
               ...(s.monsterLog||[]).slice(-2).reverse().map(m=>({icon:'⚔️',text:m+' 처치',color:'var(--red)'}))
             ];
             if(logs.length===0) return '<div style="font-size:.72rem;color:var(--txt3)">아직 기록 없어요</div>';
-            return logs.slice(0,5).map(l=>`<div style="display:flex;align-items:center;gap:.35rem;padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
+            return logs.slice(0,6).map(l=>`<div style="display:flex;align-items:center;gap:.35rem;padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
               <span style="font-size:.85rem">${l.icon}</span>
               <span style="font-size:.7rem;color:${l.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.text}</span>
             </div>`).join('');
@@ -6463,10 +6605,12 @@ function houseTab(tab, el) {
   document.getElementById('house-tab-book').style.display    = tab==='book'    ? '' : 'none';
   document.getElementById('house-tab-deco').style.display    = tab==='deco'    ? '' : 'none';
   document.getElementById('house-tab-artwork').style.display = tab==='artwork' ? '' : 'none';
+  document.getElementById('house-tab-memory').style.display  = tab==='memory'  ? '' : 'none';
   document.getElementById('house-tab-emotion').style.display = tab==='emotion' ? '' : 'none';
-  if (tab==='book')    renderBookRecords();
+  if (tab==='book')    { renderBookRecords(); initBookForm(); }
   if (tab==='artwork') { fillArtworkSubjectSelect(); renderArtworks(); }
   if (tab==='emotion') renderEmotionHistory();
+  if (tab==='memory')  renderMyMemories();
   if (tab==='deco') {
     _dCv = null;
     renderHouseDeco();
@@ -7458,8 +7602,176 @@ async function submitArtwork() {
   }
 }
 
-// ── 라이트박스 ──
-let _lbImgs = [], _lbIdx = 0;
+// ══ 추억 사진 ══
+
+function onMemFileSelect(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('mem-file-text').textContent = '📷 ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('mem-preview-wrap').style.display = '';
+    document.getElementById('mem-preview-img').src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// 이미지 압축 — 표시용(1600px, q0.78) / 썸네일(500px, q0.7)
+function compressMemImage(file, maxSize, quality) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let {width:w, height:h} = img;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = h/w*maxSize; w = maxSize; }
+          else { w = w/h*maxSize; h = maxSize; }
+        }
+        canvas.width = Math.round(w); canvas.height = Math.round(h);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(b => resolve(b), 'image/jpeg', quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function submitMemory() {
+  const title   = document.getElementById('mem-title-input')?.value.trim() || '';
+  const desc    = document.getElementById('mem-desc-input')?.value.trim() || '';
+  const fileInput = document.getElementById('mem-file-input');
+  if (!title)                          { toast('사진 제목을 입력해주세요!'); return; }
+  if (!fileInput.files || !fileInput.files[0]) { toast('사진을 선택해주세요!'); return; }
+
+  document.getElementById('mem-upload-progress').style.display = '';
+  document.getElementById('mem-progress-bar').style.width = '5%';
+  document.getElementById('mem-progress-text').textContent = '이미지 압축 중...';
+
+  try {
+    const file = fileInput.files[0];
+    const [imgBlob, thumbBlob] = await Promise.all([
+      compressMemImage(file, 1600, 0.78),
+      compressMemImage(file, 500,  0.70),
+    ]);
+    document.getElementById('mem-progress-bar').style.width = '25%';
+    document.getElementById('mem-progress-text').textContent = '업로드 중...';
+
+    const storage = firebase.storage();
+    const ts = Date.now();
+    const imgRef   = storage.ref(`memories/${CUR.id}_${ts}.jpg`);
+    const thumbRef = storage.ref(`memories/${CUR.id}_${ts}_thumb.jpg`);
+
+    await imgRef.put(imgBlob);
+    document.getElementById('mem-progress-bar').style.width = '65%';
+    await thumbRef.put(thumbBlob);
+    document.getElementById('mem-progress-bar').style.width = '85%';
+
+    const [imageUrl, thumbUrl] = await Promise.all([imgRef.getDownloadURL(), thumbRef.getDownloadURL()]);
+    document.getElementById('mem-progress-bar').style.width = '100%';
+    document.getElementById('mem-progress-text').textContent = '제출 완료!';
+
+    const memId = 'mem_' + ts + '_' + CUR.id;
+    const monthKey = Utils.todayStr().slice(0,7);
+    DB.saveMemory({
+      id: memId,
+      studentId: CUR.id,
+      studentName: CUR.name,
+      uploadedBy: 'student',
+      title, desc,
+      imageUrl, thumbUrl,
+      visibilityType: 'class',   // 우리반 공개 신청
+      approvalStatus: 'pending', // 승인 대기
+      monthKey,
+      createdAt: ts,
+      date: Utils.todayStr(),
+    });
+
+    setTimeout(() => {
+      document.getElementById('mem-title-input').value = '';
+      document.getElementById('mem-desc-input').value = '';
+      document.getElementById('mem-file-input').value = '';
+      document.getElementById('mem-file-text').textContent = '📷 사진 선택하기';
+      document.getElementById('mem-preview-wrap').style.display = 'none';
+      document.getElementById('mem-upload-progress').style.display = 'none';
+      document.getElementById('mem-progress-bar').style.width = '0%';
+      toast('📸 추억 사진 제출! 선생님 확인 후 공유돼요');
+      renderMyMemories();
+    }, 800);
+  } catch(e) {
+    toast('업로드 실패: ' + e.message);
+    document.getElementById('mem-upload-progress').style.display = 'none';
+  }
+}
+
+function renderMyMemories() {
+  const el = document.getElementById('mem-record-list');
+  if (!el) return;
+  const all = DB.getMemories('all');
+  // 내 사진 + 관리자 전체공개
+  const mine   = all.filter(m => m.studentId === CUR.id);
+  const pubAdm = all.filter(m => m.uploadedBy === 'admin' && m.visibilityType === 'public');
+  const approved = all.filter(m =>
+    m.approvalStatus === 'approved' && m.visibilityType === 'class' && m.studentId !== CUR.id
+  );
+  const list = [...mine, ...pubAdm.filter(m => !mine.find(x=>x.id===m.id)),
+                ...approved.filter(m => !mine.find(x=>x.id===m.id))];
+  list.sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+
+  if (list.length === 0) {
+    el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3);font-size:.8rem">
+      아직 추억 사진이 없어요 📸</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem">
+      ${list.map((m,i) => {
+        const myPending = m.studentId===CUR.id && m.approvalStatus==='pending';
+        return `<div style="position:relative;cursor:pointer;border-radius:10px;overflow:hidden;
+          aspect-ratio:1;background:rgba(255,255,255,.05)" onclick="openMemLightbox(${i})">
+          <img src="${m.thumbUrl||m.imageUrl}" style="width:100%;height:100%;object-fit:cover;display:block"
+            loading="lazy">
+          ${myPending?`<div style="position:absolute;bottom:0;left:0;right:0;font-size:.58rem;
+            text-align:center;background:rgba(255,180,0,.75);color:#1a1a1a;padding:.18rem;font-weight:700">확인중</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  window._memLightboxList = list;
+}
+
+let _memLbIdx = 0;
+function openMemLightbox(idx) {
+  const list = window._memLightboxList || [];
+  if (!list.length) return;
+  _memLbIdx = idx;
+  const m = list[idx];
+  const lb = document.getElementById('lightbox') || (() => {
+    const d = document.createElement('div');
+    d.id = 'lightbox';
+    d.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;flex-direction:column;align-items:center;justify-content:center';
+    d.innerHTML = `<button onclick="document.getElementById('lightbox').style.display='none'"
+      style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:#fff;font-size:1.8rem;cursor:pointer">✕</button>
+      <img id="lb-img" style="max-width:92vw;max-height:75vh;border-radius:12px;object-fit:contain">
+      <div id="lb-caption" style="color:#fff;font-size:.85rem;margin-top:.7rem;text-align:center;max-width:80vw"></div>
+      <div style="display:flex;gap:1rem;margin-top:.6rem">
+        <button onclick="navMemLb(-1)" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.2rem;padding:.4rem .9rem;border-radius:8px;cursor:pointer">‹</button>
+        <button onclick="navMemLb(1)"  style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.2rem;padding:.4rem .9rem;border-radius:8px;cursor:pointer">›</button>
+      </div>`;
+    document.body.appendChild(d); return d;
+  })();
+  lb.style.display = 'flex';
+  document.getElementById('lb-img').src = m.imageUrl || m.thumbUrl;
+  document.getElementById('lb-caption').textContent = (m.title||'') + (m.desc ? ' — ' + m.desc : '') + '  ' + (m.date||'');
+}
+function navMemLb(dir) {
+  const list = window._memLightboxList || [];
+  _memLbIdx = (_memLbIdx + dir + list.length) % list.length;
+  openMemLightbox(_memLbIdx);
+}
+
+// ══ 작품 탭 ══
 function openLightbox(imgs, idx) {
   _lbImgs = imgs; _lbIdx = idx;
   _renderLightbox();
@@ -8434,38 +8746,115 @@ function openQuestModal() {
 }
 // ══ 독서 기록 ══
 // ── 독서 기록 제출 (승인 요청) ──
-function submitBookRecord() {
-  const title  = document.getElementById('book-title-input').value.trim();
-  const review = document.getElementById('book-review-input').value.trim();
-  const date   = document.getElementById('book-date-input').value || Utils.todayStr();
-  if (!title)  { toast('책 제목을 입력해주세요!'); return; }
-  if (!review) { toast('줄거리 및 느낀점을 써주세요!'); return; }
+// ── 독서 폼 초기화 (탭 열릴 때 호출) ──
+let _bookRating = 0;
+let _bookCategory = '';
 
-  // 중복 차단: 이미 신청 or 승인된 같은 책
-  const dupPending = (CUR.pendingRewards||[]).some(r => r.type==='book' && (r.bookTitle||'').trim() === title.trim());
-  const dupBooks   = (CUR.books||[]).some(b => (b.title||'').trim() === title.trim());
+function initBookForm() {
+  // 칩 버튼 렌더
+  const chipsEl = document.getElementById('book-category-chips');
+  if (chipsEl && chipsEl.children.length === 0) {
+    ['우정','가족','용기','배려','꿈·성장','자연·생명','직접입력'].forEach(c => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'book-chip';
+      btn.textContent = c;
+      btn.style.cssText = 'padding:.28rem .7rem;border-radius:20px;font-size:.72rem;cursor:pointer;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--txt2);font-family:inherit;transition:all .15s';
+      btn.onclick = () => selectBookCategory(btn, c);
+      chipsEl.appendChild(btn);
+    });
+  }
+  // 별점 렌더
+  const starsEl = document.getElementById('book-rating-stars');
+  if (starsEl && starsEl.children.length === 0) {
+    [1,2,3,4,5].forEach(n => {
+      const span = document.createElement('span');
+      span.textContent = '⭐';
+      span.dataset.star = n;
+      span.style.cssText = 'font-size:1.5rem;cursor:pointer;opacity:.28;transition:opacity .15s';
+      span.onclick = () => selectBookRating(n);
+      starsEl.appendChild(span);
+    });
+  }
+}
+
+function selectBookCategory(el, cat) {
+  _bookCategory = cat;
+  document.querySelectorAll('.book-chip').forEach(b => {
+    b.style.background = 'rgba(255,255,255,.05)';
+    b.style.borderColor = 'rgba(255,255,255,.15)';
+    b.style.color = 'var(--txt2)';
+  });
+  el.style.background = 'rgba(255,215,0,.18)';
+  el.style.borderColor = 'var(--gold)';
+  el.style.color = 'var(--gold)';
+  const customInput = document.getElementById('book-custom-category-input');
+  if (customInput) customInput.style.display = cat === '직접입력' ? '' : 'none';
+}
+
+function selectBookRating(n) {
+  _bookRating = n;
+  document.querySelectorAll('#book-rating-stars span').forEach(s => {
+    s.style.opacity = parseInt(s.dataset.star) <= n ? '1' : '.25';
+  });
+}
+
+function submitBookRecord() {
+  const title      = document.getElementById('book-title-input')?.value.trim() || '';
+  const summary    = document.getElementById('book-summary-input')?.value.trim() || '';
+  const reflection = document.getElementById('book-reflection-input')?.value.trim() || '';
+  const date       = document.getElementById('book-date-input')?.value || Utils.todayStr();
+  const customCat  = document.getElementById('book-custom-category-input')?.value.trim() || '';
+  const charName   = document.getElementById('book-char-name-input')?.value.trim() || '';
+  const charReason = document.getElementById('book-char-reason-input')?.value.trim() || '';
+
+  if (!title)   { toast('책 제목을 입력해주세요!'); return; }
+  if (!summary) { toast('줄거리를 써주세요!'); return; }
+  if (!reflection) { toast('느낀 점을 써주세요!'); return; }
+
+  const dupPending = (CUR.pendingRewards||[]).some(r => r.type==='book' && (r.bookTitle||'').trim() === title);
+  const dupBooks   = (CUR.books||[]).some(b => (b.title||'').trim() === title);
   if (dupPending || dupBooks) { toast(`📚 "${title}"은 이미 등록된 책이에요!`); return; }
 
-  // pendingRewards에 독서 승인 요청 추가
   CUR.pendingRewards = CUR.pendingRewards || [];
   CUR.pendingRewards.push({
     id: 'book_' + Date.now(),
     type: 'book',
     label: `📖 "${title}" 독서 기록`,
     bookTitle: title,
-    bookReview: review,
+    category: _bookCategory,
+    customCategory: _bookCategory === '직접입력' ? customCat : '',
+    rating: _bookRating,
+    characterName: charName,
+    characterReason: charReason,
+    summary,
+    reflection,
+    bookReview: summary + (charName ? `\n[인물: ${charName}${charReason?' — '+charReason:''}]` : '') + '\n' + reflection,
     bookDate: date,
     exp: 30, gold: 0,
-    stat: '', statVal: 0,  // 독서 스탯 제거 (주간퀘스트와 중복)
+    stat: '', statVal: 0,
     icon: '📚',
     date: Utils.todayStr(),
+    createdAt: Date.now(),
+    teacherChecked: false,
+    teacherComment: '',
   });
   DB.saveStudent(CUR);
 
-  document.getElementById('book-title-input').value  = '';
-  document.getElementById('book-review-input').value = '';
-  document.getElementById('book-date-input').value   = '';
-  toast('📚 독서 기록 제출! 선생님 확인 후 독서 스탯이 올라가요');
+  // 폼 초기화
+  ['book-title-input','book-custom-category-input','book-char-name-input','book-char-reason-input','book-summary-input','book-reflection-input'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const ci = document.getElementById('book-custom-category-input');
+  if (ci) ci.style.display = 'none';
+  document.querySelectorAll('.book-chip').forEach(b => {
+    b.style.background='rgba(255,255,255,.05)'; b.style.borderColor='rgba(255,255,255,.15)'; b.style.color='var(--txt2)';
+  });
+  document.querySelectorAll('#book-rating-stars span').forEach(s => s.style.opacity = '.25');
+  _bookRating = 0; _bookCategory = '';
+  document.getElementById('book-date-input').value = '';
+
+  toast('📚 독서 기록 제출! 선생님 확인 후 EXP가 지급돼요');
   renderBookRecords();
   renderMain(); renderMobile();
 }
@@ -8478,7 +8867,6 @@ function renderBookRecords() {
   const books   = CUR.books || [];
   const pending = (CUR.pendingRewards||[]).filter(p=>p.type==='book');
 
-  // 월별 차트 렌더링
   renderBookMonthlyChart(books);
 
   if (books.length === 0 && pending.length === 0) {
@@ -8487,35 +8875,44 @@ function renderBookRecords() {
     return;
   }
 
+  const starStr = n => n ? '⭐'.repeat(n) : '';
+  const catLabel = b => b.category === '직접입력' && b.customCategory ? b.customCategory : (b.category || '');
+
   const allRecords = [
-    ...pending.map(p => ({
-      no: '⏳', title: p.bookTitle, review: p.bookReview,
-      date: p.bookDate||p.date, status: 'pending'
-    })),
-    ...books.slice().reverse().map((b,i) => ({
-      no: books.length - i, title: b.title,
-      review: b.review||'', date: b.date, status: 'done'
-    }))
+    ...pending.map(p => ({ ...p, _status:'pending' })),
+    ...books.slice().reverse().map(b => ({ ...b, _status:'done', bookTitle:b.title }))
   ];
 
-  el.innerHTML = allRecords.map(r => `
+  el.innerHTML = allRecords.map(r => {
+    const isPending = r._status === 'pending';
+    const cat = catLabel(r);
+    const hasDetail = r.summary || r.reflection || r.characterName;
+    return `
     <div style="background:rgba(255,255,255,.04);
-      border:1px solid ${r.status==='done'?'rgba(46,204,113,.25)':'rgba(255,215,0,.2)'};
-      border-radius:12px;padding:.85rem 1rem;margin-bottom:.55rem">
-      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
-        <span style="font-size:.7rem;font-weight:700;
-          background:${r.status==='done'?'rgba(46,204,113,.15)':'rgba(255,215,0,.12)'};
-          color:${r.status==='done'?'var(--emerald)':'var(--gold)'};
-          border-radius:20px;padding:.1rem .55rem;flex-shrink:0">
-          ${r.status==='done'?`#${r.no}`:'확인중...'}</span>
-        <span style="font-weight:700;font-size:.9rem;flex:1;min-width:0;
-          overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</span>
-        <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0">${r.date}</span>
+      border:1px solid ${isPending?'rgba(255,215,0,.2)':'rgba(46,204,113,.2)'};
+      border-radius:12px;padding:.8rem .9rem;margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+        <span style="font-size:.68rem;font-weight:700;
+          background:${isPending?'rgba(255,215,0,.12)':'rgba(46,204,113,.12)'};
+          color:${isPending?'var(--gold)':'var(--emerald)'};
+          border-radius:20px;padding:.1rem .5rem;flex-shrink:0">
+          ${isPending?'확인중':'✓ 완료'}</span>
+        <span style="font-weight:700;font-size:.88rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.bookTitle||r.title||''}</span>
+        ${cat?`<span style="font-size:.65rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:10px;padding:.1rem .45rem;flex-shrink:0">${cat}</span>`:''}
+        ${r.rating?`<span style="font-size:.7rem;flex-shrink:0">${starStr(r.rating)}</span>`:''}
+        <span style="font-size:.66rem;color:var(--txt3);flex-shrink:0">${r.bookDate||r.date||''}</span>
       </div>
-      ${r.review?`<div style="font-size:.78rem;color:var(--txt2);line-height:1.6;
-        padding:.4rem .5rem;background:rgba(255,255,255,.03);border-radius:8px">
-        ${r.review}</div>`:''}
-    </div>`).join('');
+      ${r.teacherComment?`<div style="margin-top:.4rem;font-size:.72rem;color:var(--emerald);
+        background:rgba(46,204,113,.08);border-radius:8px;padding:.3rem .5rem">
+        💬 선생님: ${r.teacherComment}</div>`:''}
+      ${hasDetail?`<details style="margin-top:.4rem"><summary style="font-size:.68rem;color:var(--txt3);cursor:pointer">상세 보기</summary>
+        <div style="margin-top:.4rem;font-size:.75rem;color:var(--txt2);line-height:1.6">
+          ${r.characterName?`<div><b>인물:</b> ${r.characterName}${r.characterReason?' — '+r.characterReason:''}</div>`:''}
+          ${r.summary?`<div style="margin-top:.25rem"><b>줄거리:</b> ${r.summary}</div>`:''}
+          ${r.reflection?`<div style="margin-top:.25rem"><b>느낀 점:</b> ${r.reflection}</div>`:''}
+        </div></details>`:''}
+    </div>`;
+  }).join('');
 }
 
 // 월별 독서 막대그래프

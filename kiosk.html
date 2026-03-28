@@ -187,6 +187,9 @@ html, body {
       <button id="kiosk-tab-emotion" onclick="switchKioskTab('emotion')"
         style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
           background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">💭 감정</button>
+      <button id="kiosk-tab-memory" onclick="switchKioskTab('memory')"
+        style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
+          background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">📸 추억</button>
     </div>
     <div class="date" id="today-date"></div>
   </div>
@@ -197,6 +200,10 @@ html, body {
   <!-- 감정 탭 -->
   <div id="kiosk-emotion-wrap" style="display:none;flex:1;overflow-y:auto;padding:.6rem .8rem 8rem;-webkit-overflow-scrolling:touch;min-height:0">
     <div id="kiosk-emotion-content"></div>
+  </div>
+  <!-- 추억 탭 -->
+  <div id="kiosk-memory-wrap" style="display:none;flex:1;overflow-y:auto;padding:.6rem .8rem 8rem;-webkit-overflow-scrolling:touch;min-height:0">
+    <div id="kiosk-memory-content"></div>
   </div>
 </div>
 
@@ -743,6 +750,7 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
+    data.memories           = toArr(data.memories);
     data.pwResetRequests    = toArr(data.pwResetRequests);
     // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
     if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
@@ -892,12 +900,40 @@ const DB = {
     const db = this.load();
     db.artworks = (db.artworks||[]).filter(a => a.id !== id);
     this._cache = db;
-    // id 키 기반 삭제
     this._fbRef.child('artworks/' + id).remove();
-    // 전체 artworks를 id 키 기반으로 재저장 (배열/키 혼재 정리)
     const artworksObj = {};
     db.artworks.forEach(a => { artworksObj[a.id] = a; });
     this._fbRef.child('artworks').set(artworksObj);
+  },
+
+  // ── 추억 사진 ────────────────────────────────────────
+  getMemories(filter) {
+    // filter: 'public' = 전체공개, 'all' = 전체, studentId = 해당학생
+    const db = this.load();
+    const mems = db.memories || [];
+    if (filter === 'public') {
+      return mems.filter(m => m.approvalStatus === 'approved' &&
+        (m.visibilityType === 'public' ||
+         (m.visibilityType === 'class' && m.approvalStatus === 'approved')));
+    }
+    if (filter === 'all') return mems;
+    if (filter) return mems.filter(m => m.studentId === filter || m.visibilityType === 'public');
+    return mems;
+  },
+  saveMemory(mem) {
+    const db = this.load();
+    db.memories = db.memories || [];
+    const idx = db.memories.findIndex(m => m.id === mem.id);
+    if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
+    else db.memories.push(mem);
+    this._cache = db;
+    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+  },
+  deleteMemory(id) {
+    const db = this.load();
+    db.memories = (db.memories||[]).filter(m => m.id !== id);
+    this._cache = db;
+    this._fbRef.child('memories/' + id).remove();
   },
 
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
@@ -2696,20 +2732,123 @@ function renderTable() {
 let KIOSK_TAB = 'quest';
 function switchKioskTab(tab) {
   KIOSK_TAB = tab;
-  const isQuest   = tab === 'quest';
-  const isEmotion = tab === 'emotion';
+  const isQuest  = tab === 'quest';
+  const isEmotion= tab === 'emotion';
+  const isMemory = tab === 'memory';
 
-  // 탭 버튼 스타일
   const qBtn = document.getElementById('kiosk-tab-quest');
   const eBtn = document.getElementById('kiosk-tab-emotion');
-  if (qBtn) { qBtn.style.background = isQuest ? 'var(--gold)' : 'transparent'; qBtn.style.color = isQuest ? '#1a1a1a' : 'var(--txt2)'; }
-  if (eBtn) { eBtn.style.background = isEmotion ? 'var(--gold)' : 'transparent'; eBtn.style.color = isEmotion ? '#1a1a1a' : 'var(--txt2)'; }
+  const mBtn = document.getElementById('kiosk-tab-memory');
+  [qBtn, eBtn, mBtn].forEach(b => { if(b){ b.style.background='transparent'; b.style.color='var(--txt2)'; b.style.border='1.5px solid rgba(255,255,255,.25)'; }});
+  const activeBtn = isQuest?qBtn : isEmotion?eBtn : mBtn;
+  if (activeBtn) { activeBtn.style.background='var(--gold)'; activeBtn.style.color='#1a1a1a'; activeBtn.style.border='none'; }
 
-  // 콘텐츠 영역 전환
-  document.getElementById('table-wrap').style.display        = isQuest   ? '' : 'none';
+  document.getElementById('table-wrap').style.display         = isQuest  ? '' : 'none';
   document.getElementById('kiosk-emotion-wrap').style.display = isEmotion ? '' : 'none';
+  document.getElementById('kiosk-memory-wrap').style.display  = isMemory  ? '' : 'none';
 
   if (isEmotion) renderEmotionBoard();
+  if (isMemory)  renderKioskMemory();
+}
+
+// ── 키오스크 추억 앨범 ──
+let _kioskMemView = 'all'; // 'all' | monthKey
+let _kioskMemLbIdx = 0;
+let _kioskMemList = [];
+
+function renderKioskMemory() {
+  const el = document.getElementById('kiosk-memory-content');
+  if (!el || !DB_DATA) return;
+
+  // 전체공개 승인된 사진만
+  const all = (DB_DATA.memories || []).filter(m =>
+    m.approvalStatus === 'approved' &&
+    (m.visibilityType === 'public' || m.visibilityType === 'class')
+  );
+  all.sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+  _kioskMemList = all;
+
+  // 월별 키 수집
+  const months = [...new Set(all.map(m => m.monthKey).filter(Boolean))].sort().reverse();
+
+  const filtered = _kioskMemView === 'all' ? all : all.filter(m => m.monthKey === _kioskMemView);
+
+  el.innerHTML = `
+    <div style="font-size:.9rem;font-weight:900;color:var(--gold);padding:.4rem .2rem .6rem;
+      border-bottom:2px solid rgba(255,215,0,.2);margin-bottom:.7rem;display:flex;align-items:center;gap:.6rem">
+      📸 우리 반 추억 앨범
+      <div style="display:flex;gap:.35rem;margin-left:auto;flex-wrap:wrap">
+        <button onclick="setKioskMemView('all')"
+          style="font-size:.72rem;padding:.2rem .6rem;border-radius:12px;cursor:pointer;font-family:inherit;
+            background:${_kioskMemView==='all'?'var(--gold)':'rgba(255,255,255,.08)'};
+            color:${_kioskMemView==='all'?'#1a1a1a':'var(--txt2)'};border:none;font-weight:700">전체</button>
+        ${months.map(mk => {
+          const [y,mo] = mk.split('-');
+          return `<button onclick="setKioskMemView('${mk}')"
+            style="font-size:.72rem;padding:.2rem .6rem;border-radius:12px;cursor:pointer;font-family:inherit;
+              background:${_kioskMemView===mk?'var(--gold)':'rgba(255,255,255,.08)'};
+              color:${_kioskMemView===mk?'#1a1a1a':'var(--txt2)'};border:none;font-weight:700">${mo}월</button>`;
+        }).join('')}
+      </div>
+    </div>
+    ${filtered.length === 0
+      ? `<div style="text-align:center;padding:3rem;color:var(--txt3)">아직 추억 사진이 없어요 📸</div>`
+      : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem">
+          ${filtered.map((m,i) => `
+            <div onclick="openKioskMemLightbox(${i})" style="cursor:pointer;border-radius:12px;overflow:hidden;
+              background:rgba(255,255,255,.05);aspect-ratio:1;position:relative">
+              <img src="${m.thumbUrl||m.imageUrl}" loading="lazy"
+                style="width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s"
+                onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform=''">
+              <div style="position:absolute;bottom:0;left:0;right:0;padding:.35rem .5rem;
+                background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:.68rem;color:#fff;
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.title||''}</div>
+            </div>`).join('')}
+        </div>`}`;
+
+  // 라이트박스 엘리먼트 준비
+  if (!document.getElementById('kiosk-lb')) {
+    const lb = document.createElement('div');
+    lb.id = 'kiosk-lb';
+    lb.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;flex-direction:column;align-items:center;justify-content:center;cursor:pointer';
+    lb.innerHTML = `
+      <button onclick="document.getElementById('kiosk-lb').style.display='none'"
+        style="position:absolute;top:1.2rem;right:1.5rem;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer">✕</button>
+      <img id="kiosk-lb-img" style="max-width:90vw;max-height:72vh;border-radius:14px;object-fit:contain">
+      <div id="kiosk-lb-cap" style="color:#fff;font-size:.88rem;margin-top:.8rem;text-align:center;max-width:80vw;line-height:1.5"></div>
+      <div style="display:flex;gap:1.2rem;margin-top:.8rem">
+        <button onclick="navKioskLb(-1);event.stopPropagation()"
+          style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;padding:.4rem 1.1rem;border-radius:10px;cursor:pointer">‹</button>
+        <button onclick="navKioskLb(1);event.stopPropagation()"
+          style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;padding:.4rem 1.1rem;border-radius:10px;cursor:pointer">›</button>
+      </div>`;
+    document.body.appendChild(lb);
+  }
+}
+
+function setKioskMemView(v) {
+  _kioskMemView = v;
+  renderKioskMemory();
+}
+
+function openKioskMemLightbox(idx) {
+  const filtered = _kioskMemView === 'all' ? _kioskMemList
+    : _kioskMemList.filter(m => m.monthKey === _kioskMemView);
+  _kioskMemLbIdx = idx;
+  const m = filtered[idx]; if (!m) return;
+  const lb = document.getElementById('kiosk-lb'); if (!lb) return;
+  lb.style.display = 'flex';
+  document.getElementById('kiosk-lb-img').src = m.imageUrl || m.thumbUrl;
+  document.getElementById('kiosk-lb-cap').textContent =
+    (m.title||'') + (m.desc ? ' — ' + m.desc : '') + '  ' + (m.date||'');
+  lb.onclick = e => { if(e.target===lb) lb.style.display='none'; };
+}
+
+function navKioskLb(dir) {
+  const filtered = _kioskMemView === 'all' ? _kioskMemList
+    : _kioskMemList.filter(m => m.monthKey === _kioskMemView);
+  _kioskMemLbIdx = (_kioskMemLbIdx + dir + filtered.length) % filtered.length;
+  openKioskMemLightbox(_kioskMemLbIdx);
 }
 
 // ── 감정 체크판 ──

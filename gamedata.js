@@ -537,6 +537,7 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
+    data.memories           = toArr(data.memories);
     data.pwResetRequests    = toArr(data.pwResetRequests);
     // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
     if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
@@ -686,12 +687,40 @@ const DB = {
     const db = this.load();
     db.artworks = (db.artworks||[]).filter(a => a.id !== id);
     this._cache = db;
-    // id 키 기반 삭제
     this._fbRef.child('artworks/' + id).remove();
-    // 전체 artworks를 id 키 기반으로 재저장 (배열/키 혼재 정리)
     const artworksObj = {};
     db.artworks.forEach(a => { artworksObj[a.id] = a; });
     this._fbRef.child('artworks').set(artworksObj);
+  },
+
+  // ── 추억 사진 ────────────────────────────────────────
+  getMemories(filter) {
+    // filter: 'public' = 전체공개, 'all' = 전체, studentId = 해당학생
+    const db = this.load();
+    const mems = db.memories || [];
+    if (filter === 'public') {
+      return mems.filter(m => m.approvalStatus === 'approved' &&
+        (m.visibilityType === 'public' ||
+         (m.visibilityType === 'class' && m.approvalStatus === 'approved')));
+    }
+    if (filter === 'all') return mems;
+    if (filter) return mems.filter(m => m.studentId === filter || m.visibilityType === 'public');
+    return mems;
+  },
+  saveMemory(mem) {
+    const db = this.load();
+    db.memories = db.memories || [];
+    const idx = db.memories.findIndex(m => m.id === mem.id);
+    if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
+    else db.memories.push(mem);
+    this._cache = db;
+    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+  },
+  deleteMemory(id) {
+    const db = this.load();
+    db.memories = (db.memories||[]).filter(m => m.id !== id);
+    this._cache = db;
+    this._fbRef.child('memories/' + id).remove();
   },
 
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
