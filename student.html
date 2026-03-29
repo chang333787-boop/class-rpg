@@ -550,6 +550,13 @@ const DB = {
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
     data.memories           = toArr(data.memories);
+    data.recorderLogs       = toArr(data.recorderLogs);
+    data.recorderSongs      = toArr(data.recorderSongs);
+    data.weeklyGoals        = toArr(data.weeklyGoals);
+    data.weeklyReflections  = toArr(data.weeklyReflections);
+    data.customWords        = toArr(data.customWords);
+    data.teacherWordSets    = toArr(data.teacherWordSets);
+    data.quizRecords        = toArr(data.quizRecords);
     data.pwResetRequests    = toArr(data.pwResetRequests);
     // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
     if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
@@ -735,6 +742,161 @@ const DB = {
     this._fbRef.child('memories/' + id).remove();
   },
 
+  // ── 주간 다짐 (월요일 목표 + 금요일 성찰) ─────────────
+  // 월요일: { id, studentId, studentName, weekKey, type:'monday_goal',
+  //   weekendText, weekendMood, focusArea, goalText, mindset,
+  //   createdAt, updatedAt }
+  // 금요일: { id, studentId, studentName, weekKey, type:'friday_reflection',
+  //   mondayGoalId, focusReflection, goalReflection, mindsetReflection,
+  //   bestMoment, nextWeekGoal, createdAt, updatedAt }
+  getWeeklyGoals(studentId) {
+    return (this.load().weeklyGoals||[]).filter(r => r.studentId === studentId);
+  },
+  getWeeklyGoal(studentId, weekKey) {
+    return (this.load().weeklyGoals||[]).find(r => r.studentId===studentId && r.weekKey===weekKey) || null;
+  },
+  getAllWeeklyGoals() { return this.load().weeklyGoals || []; },
+  saveWeeklyGoal(goal) {
+    const db = this.load();
+    db.weeklyGoals = db.weeklyGoals || [];
+    const idx = db.weeklyGoals.findIndex(r => r.id === goal.id);
+    if (idx >= 0) db.weeklyGoals[idx] = { ...db.weeklyGoals[idx], ...goal, updatedAt: Date.now() };
+    else db.weeklyGoals.push({ ...goal, updatedAt: Date.now() });
+    this._cache = db;
+    this._fbRef.child('weeklyGoals/' + goal.id).set(db.weeklyGoals.find(r=>r.id===goal.id));
+  },
+  getWeeklyReflection(studentId, weekKey) {
+    return (this.load().weeklyReflections||[]).find(r => r.studentId===studentId && r.weekKey===weekKey) || null;
+  },
+  getAllWeeklyReflections() { return this.load().weeklyReflections || []; },
+  saveWeeklyReflection(ref) {
+    const db = this.load();
+    db.weeklyReflections = db.weeklyReflections || [];
+    const idx = db.weeklyReflections.findIndex(r => r.id === ref.id);
+    if (idx >= 0) db.weeklyReflections[idx] = { ...db.weeklyReflections[idx], ...ref, updatedAt: Date.now() };
+    else db.weeklyReflections.push({ ...ref, updatedAt: Date.now() });
+    this._cache = db;
+    this._fbRef.child('weeklyReflections/' + ref.id).set(db.weeklyReflections.find(r=>r.id===ref.id));
+  },
+
+  // ── 리코더 곡 목록 ─────────────────────────────────
+  // { id, title, grade, memo, order, isFocusSong, active, createdAt, updatedAt }
+  getRecorderSongs() {
+    return (this.load().recorderSongs || [])
+      .sort((a,b) => (a.order??99) - (b.order??99));
+  },
+  getActiveRecorderSongs() {
+    return this.getRecorderSongs().filter(s => s.active !== false);
+  },
+  saveRecorderSong(song) {
+    const db = this.load();
+    db.recorderSongs = db.recorderSongs || [];
+    const idx = db.recorderSongs.findIndex(s => s.id === song.id);
+    const now = Date.now();
+    if (idx >= 0) {
+      db.recorderSongs[idx] = { ...db.recorderSongs[idx], ...song, updatedAt: now };
+    } else {
+      db.recorderSongs.push({
+        order: db.recorderSongs.length, active: true, isFocusSong: false,
+        ...song, createdAt: now, updatedAt: now
+      });
+    }
+    this._cache = db;
+    this._fbRef.child('recorderSongs').set(db.recorderSongs);
+  },
+  deleteRecorderSong(id) {
+    const db = this.load();
+    db.recorderSongs = (db.recorderSongs || []).filter(s => s.id !== id);
+    this._cache = db;
+    this._fbRef.child('recorderSongs').set(db.recorderSongs);
+  },
+
+  // ── 리코더 기록 ─────────────────────────────────────
+  // 저장 단위: 학생 + 곡 + 날짜 = 1레코드
+  // { id, studentId, studentName, songId, songTitle, date,
+  //   practiceCount(0~5), recordingUrl, recordingName,
+  //   reflection, bestToday, difficultPart, selfRating(1~5),
+  //   teacherComment, createdAt, updatedAt }
+  getAllRecorderLogs() { return this.load().recorderLogs || []; },
+  getRecorderLogs(studentId) {
+    return (this.load().recorderLogs || []).filter(r => r.studentId === studentId);
+  },
+  getRecorderLog(studentId, songId, date) {
+    return (this.load().recorderLogs || []).find(
+      r => r.studentId===studentId && r.songId===songId && r.date===date
+    ) || null;
+  },
+  saveRecorderLog(log) {
+    const db = this.load();
+    db.recorderLogs = db.recorderLogs || [];
+    const idx = db.recorderLogs.findIndex(r => r.id === log.id);
+    const now = Date.now();
+    if (idx >= 0) {
+      db.recorderLogs[idx] = { ...db.recorderLogs[idx], ...log, updatedAt: now };
+    } else {
+      db.recorderLogs.push({ ...log, createdAt: now, updatedAt: now });
+    }
+    this._cache = db;
+    this._fbRef.child('recorderLogs/' + log.id).set(
+      db.recorderLogs.find(r => r.id === log.id)
+    );
+  },
+  deleteRecorderLog(id) {
+    const db = this.load();
+    db.recorderLogs = (db.recorderLogs || []).filter(r => r.id !== id);
+    this._cache = db;
+    this._fbRef.child('recorderLogs/' + id).remove();
+  },
+
+  // ── 영어 단어장 ──────────────────────────────────────
+  // customWords: { id, word, meaning, pos, category, gradeLevel:'custom', sourceType:'custom', createdAt }
+  getCustomWords()        { return this.load().customWords || []; },
+  saveCustomWord(w) {
+    const db = this.load();
+    db.customWords = db.customWords || [];
+    const idx = db.customWords.findIndex(x=>x.id===w.id);
+    if (idx>=0) db.customWords[idx]={...db.customWords[idx],...w};
+    else db.customWords.push({...w,createdAt:Date.now()});
+    this._cache=db; this._fbRef.child('customWords').set(db.customWords);
+  },
+  deleteCustomWord(id) {
+    const db=this.load(); db.customWords=(db.customWords||[]).filter(x=>x.id!==id);
+    this._cache=db; this._fbRef.child('customWords').set(db.customWords);
+  },
+  // teacherWordSets: { id, title, wordIds[], active, createdAt }
+  getTeacherWordSets()    { return this.load().teacherWordSets || []; },
+  getActiveWordSet() {
+    return (this.load().teacherWordSets||[]).find(s=>s.active) || null;
+  },
+  saveTeacherWordSet(s) {
+    const db=this.load(); db.teacherWordSets=db.teacherWordSets||[];
+    const idx=db.teacherWordSets.findIndex(x=>x.id===s.id);
+    if (idx>=0) db.teacherWordSets[idx]={...db.teacherWordSets[idx],...s};
+    else db.teacherWordSets.push({...s,createdAt:Date.now()});
+    this._cache=db; this._fbRef.child('teacherWordSets').set(db.teacherWordSets);
+  },
+  deleteTeacherWordSet(id) {
+    const db=this.load(); db.teacherWordSets=(db.teacherWordSets||[]).filter(x=>x.id!==id);
+    this._cache=db; this._fbRef.child('teacherWordSets').set(db.teacherWordSets);
+  },
+  // 전체 단어 풀 (base + custom 합산)
+  getAllVocabWords() {
+    const custom = this.getCustomWords();
+    return [...BASE_WORDS, ...custom];
+  },
+  getWordById(id) { return this.getAllVocabWords().find(w=>w.id===id)||null; },
+  // quizRecords: { id, studentId, date, total, correct, wrongWordIds[], createdAt }
+  getQuizRecords(studentId) {
+    return (this.load().quizRecords||[]).filter(r=>r.studentId===studentId)
+      .sort((a,b)=>b.date.localeCompare(a.date));
+  },
+  getAllQuizRecords() { return this.load().quizRecords||[]; },
+  saveQuizRecord(r) {
+    const db=this.load(); db.quizRecords=db.quizRecords||[];
+    db.quizRecords.push({...r,createdAt:Date.now()});
+    this._cache=db; this._fbRef.child('quizRecords/'+r.id).set(db.quizRecords.find(x=>x.id===r.id));
+  },
+
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
   removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
@@ -852,6 +1014,19 @@ const Utils = {
     const sun = new Date(d);
     sun.setUTCDate(d.getUTCDate() - day); // 이번 주 일요일
     return sun.toISOString().slice(0,10);
+  },
+  // ISO 주차 키: 2026-W14 형태 (월요일 기준)
+  weekKey() {
+    const d = new Date(Date.now()+9*3600000);
+    const day = d.getUTCDay(); // 0=일
+    // 이번 주 월요일 찾기
+    const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d);
+    mon.setUTCDate(d.getUTCDate() + diff);
+    // ISO 주차 계산
+    const jan1 = new Date(Date.UTC(mon.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil(((mon - jan1) / 86400000 + jan1.getUTCDay() + 1) / 7);
+    return `${mon.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
   },
   isQuestDoneToday(quests, studentId, boardQuestId, questType) {
     const today = this.todayStr();
@@ -2221,6 +2396,162 @@ function saveEmotionReflection(studentId, candidate, responseType, responseText,
   return record;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 영어 단어장 — BASE_WORDS 500개 (초등 기본 단어, 퀴즈 보기 생성용)
+// ═══════════════════════════════════════════════════════════════
+const BASE_WORDS = (function(){
+const raw = [
+["base_001","I","나","pronoun","basic"],["base_002","you","너, 당신","pronoun","basic"],["base_003","he","그","pronoun","basic"],["base_004","she","그녀","pronoun","basic"],
+["base_005","it","그것","pronoun","basic"],["base_006","we","우리","pronoun","basic"],["base_007","they","그들","pronoun","basic"],["base_008","me","나를","pronoun","basic"],
+["base_009","him","그를","pronoun","basic"],["base_010","her","그녀를","pronoun","basic"],["base_011","us","우리를","pronoun","basic"],["base_012","them","그들을","pronoun","basic"],
+["base_013","my","나의","pronoun","basic"],["base_014","your","너의, 당신의","pronoun","basic"],["base_015","his","그의","pronoun","basic"],["base_016","our","우리의","pronoun","basic"],
+["base_017","their","그들의","pronoun","basic"],["base_018","this","이것, 이","pronoun","basic"],["base_019","that","저것, 저","pronoun","basic"],
+["base_020","name","이름","noun","people"],["base_021","friend","친구","noun","people"],["base_022","boy","소년, 남자아이","noun","people"],["base_023","girl","소녀, 여자아이","noun","people"],
+["base_024","baby","아기","noun","people"],["base_025","man","남자","noun","people"],["base_026","woman","여자","noun","people"],["base_027","child","아이","noun","people"],
+["base_028","children","아이들","noun","people"],["base_029","people","사람들","noun","people"],["base_030","family","가족","noun","people"],
+["base_031","mother","어머니","noun","family"],["base_032","father","아버지","noun","family"],["base_033","mom","엄마","noun","family"],["base_034","dad","아빠","noun","family"],
+["base_035","parents","부모님","noun","family"],["base_036","sister","자매, 여동생, 누나","noun","family"],["base_037","brother","형제, 남동생, 오빠","noun","family"],
+["base_038","grandma","할머니","noun","family"],["base_039","grandpa","할아버지","noun","family"],["base_040","cousin","사촌","noun","family"],
+["base_041","uncle","삼촌, 작은아버지","noun","family"],["base_042","aunt","이모, 고모, 숙모","noun","family"],
+["base_043","teacher","선생님","noun","school"],["base_044","student","학생","noun","school"],["base_045","school","학교","noun","school"],["base_046","class","수업, 반","noun","school"],
+["base_047","classroom","교실","noun","school"],["base_048","book","책","noun","school"],["base_049","notebook","공책","noun","school"],["base_050","pencil","연필","noun","school"],
+["base_051","pen","펜","noun","school"],["base_052","eraser","지우개","noun","school"],["base_053","ruler","자","noun","school"],["base_054","desk","책상","noun","school"],
+["base_055","chair","의자","noun","school"],["base_056","bag","가방","noun","school"],["base_057","paper","종이","noun","school"],["base_058","picture","그림, 사진","noun","school"],
+["base_059","computer","컴퓨터","noun","school"],["base_060","board","칠판, 보드","noun","school"],["base_061","question","질문","noun","school"],["base_062","answer","정답, 대답","noun","school"],
+["base_063","homework","숙제","noun","school"],["base_064","test","시험","noun","school"],["base_065","lesson","수업, 단원","noun","school"],["base_066","library","도서관","noun","school"],
+["base_067","break","쉬는 시간","noun","school"],["base_068","bell","종, 벨","noun","school"],
+["base_069","English","영어","noun","subject"],["base_070","math","수학","noun","subject"],["base_071","science","과학","noun","subject"],["base_072","music","음악","noun","subject"],
+["base_073","art","미술","noun","subject"],["base_074","history","역사","noun","subject"],["base_075","story","이야기","noun","subject"],["base_076","word","단어","noun","subject"],
+["base_077","sentence","문장","noun","subject"],["base_078","letter","글자, 편지","noun","subject"],["base_079","number","숫자","noun","subject"],["base_080","page","쪽, 페이지","noun","subject"],
+["base_081","game","게임","noun","activity"],["base_082","team","팀","noun","activity"],["base_083","group","모둠, 그룹","noun","activity"],["base_084","study","공부","noun","activity"],
+["base_085","practice","연습","noun","activity"],["base_086","prize","상, 상품","noun","activity"],
+["base_087","one","하나","number","number"],["base_088","two","둘","number","number"],["base_089","three","셋","number","number"],["base_090","four","넷","number","number"],
+["base_091","five","다섯","number","number"],["base_092","six","여섯","number","number"],["base_093","seven","일곱","number","number"],["base_094","eight","여덟","number","number"],
+["base_095","nine","아홉","number","number"],["base_096","ten","열","number","number"],["base_097","twenty","스무","number","number"],["base_098","thirty","서른","number","number"],
+["base_099","hundred","백","number","number"],["base_100","first","첫째의, 첫 번째","number","number"],["base_101","second","둘째의, 두 번째","number","number"],["base_102","third","셋째의, 세 번째","number","number"],
+["base_103","many","많은","adjective","quantity"],["base_104","much","많은","adjective","quantity"],["base_105","some","약간의, 몇몇의","adjective","quantity"],["base_106","all","모든","adjective","quantity"],
+["base_107","every","모든, 매","adjective","quantity"],["base_108","few","거의 없는, 몇 안 되는","adjective","quantity"],
+["base_109","time","시간","noun","time"],["base_110","day","날","noun","time"],["base_111","week","주","noun","time"],["base_112","weekend","주말","noun","time"],
+["base_113","month","달, 월","noun","time"],["base_114","year","해, 년","noun","time"],["base_115","today","오늘","noun","time"],["base_116","tomorrow","내일","noun","time"],
+["base_117","yesterday","어제","noun","time"],["base_118","morning","아침","noun","time"],["base_119","afternoon","오후","noun","time"],["base_120","evening","저녁","noun","time"],
+["base_121","night","밤","noun","time"],["base_122","early","이른, 일찍","adjective","time"],["base_123","late","늦은, 늦게","adjective","time"],["base_124","birthday","생일","noun","time"],
+["base_125","holiday","휴일","noun","time"],["base_126","vacation","방학, 휴가","noun","time"],
+["base_127","Monday","월요일","noun","time"],["base_128","Tuesday","화요일","noun","time"],["base_129","Wednesday","수요일","noun","time"],["base_130","Thursday","목요일","noun","time"],
+["base_131","Friday","금요일","noun","time"],["base_132","Saturday","토요일","noun","time"],["base_133","Sunday","일요일","noun","time"],
+["base_134","January","1월","noun","time"],["base_135","February","2월","noun","time"],["base_136","March","3월","noun","time"],["base_137","April","4월","noun","time"],
+["base_138","May","5월","noun","time"],["base_139","June","6월","noun","time"],["base_140","July","7월","noun","time"],["base_141","August","8월","noun","time"],
+["base_142","September","9월","noun","time"],["base_143","October","10월","noun","time"],["base_144","November","11월","noun","time"],["base_145","December","12월","noun","time"],
+["base_146","red","빨간색의","adjective","color"],["base_147","blue","파란색의","adjective","color"],["base_148","yellow","노란색의","adjective","color"],
+["base_149","green","초록색의","adjective","color"],["base_150","black","검은색의","adjective","color"],["base_151","white","하얀색의","adjective","color"],
+["base_152","pink","분홍색의","adjective","color"],["base_153","purple","보라색의","adjective","color"],["base_154","brown","갈색의","adjective","color"],
+["base_155","orange","주황색의","adjective","color"],["base_156","gray","회색의","adjective","color"],
+["base_157","home","집, 가정","noun","home"],["base_158","house","집","noun","home"],["base_159","room","방","noun","home"],["base_160","kitchen","부엌","noun","home"],
+["base_161","bathroom","욕실","noun","home"],["base_162","bedroom","침실","noun","home"],["base_163","door","문","noun","home"],["base_164","window","창문","noun","home"],
+["base_165","wall","벽","noun","home"],["base_166","floor","바닥","noun","home"],["base_167","bed","침대","noun","home"],["base_168","table","탁자","noun","home"],
+["base_169","sofa","소파","noun","home"],["base_170","clock","시계","noun","home"],["base_171","box","상자","noun","home"],["base_172","key","열쇠","noun","home"],
+["base_173","park","공원","noun","place"],["base_174","zoo","동물원","noun","place"],["base_175","store","가게","noun","place"],["base_176","market","시장","noun","place"],
+["base_177","hospital","병원","noun","place"],["base_178","bank","은행","noun","place"],["base_179","station","역","noun","place"],["base_180","street","거리","noun","place"],
+["base_181","road","길, 도로","noun","place"],["base_182","city","도시","noun","place"],["base_183","town","마을, 소도시","noun","place"],["base_184","country","나라, 시골","noun","place"],
+["base_185","world","세계","noun","place"],["base_186","restaurant","식당","noun","place"],["base_187","farm","농장","noun","place"],["base_188","beach","해변","noun","place"],
+["base_189","mountain","산","noun","place"],["base_190","river","강","noun","place"],
+["base_191","bus","버스","noun","transport"],["base_192","car","자동차","noun","transport"],["base_193","bike","자전거","noun","transport"],
+["base_194","train","기차","noun","transport"],["base_195","subway","지하철","noun","transport"],["base_196","taxi","택시","noun","transport"],
+["base_197","airplane","비행기","noun","transport"],["base_198","boat","보트, 배","noun","transport"],["base_199","ticket","표","noun","transport"],
+["base_200","map","지도","noun","transport"],["base_201","trip","여행","noun","transport"],
+["base_202","food","음식","noun","food"],["base_203","rice","밥, 쌀","noun","food"],["base_204","bread","빵","noun","food"],["base_205","soup","수프","noun","food"],
+["base_206","meat","고기","noun","food"],["base_207","fish","생선, 물고기","noun","food"],["base_208","chicken","닭고기, 닭","noun","food"],["base_209","egg","달걀","noun","food"],
+["base_210","noodle","국수","noun","food"],["base_211","pizza","피자","noun","food"],["base_212","cake","케이크","noun","food"],["base_213","cookie","쿠키","noun","food"],
+["base_214","candy","사탕","noun","food"],["base_215","chocolate","초콜릿","noun","food"],["base_216","breakfast","아침 식사","noun","food"],["base_217","dinner","저녁 식사","noun","food"],
+["base_218","snack","간식","noun","food"],["base_219","fruit","과일","noun","food"],["base_220","apple","사과","noun","food"],["base_221","banana","바나나","noun","food"],
+["base_222","grape","포도","noun","food"],["base_223","peach","복숭아","noun","food"],["base_224","pear","배","noun","food"],["base_225","strawberry","딸기","noun","food"],
+["base_226","watermelon","수박","noun","food"],["base_227","tomato","토마토","noun","food"],["base_228","potato","감자","noun","food"],["base_229","carrot","당근","noun","food"],
+["base_230","onion","양파","noun","food"],["base_231","corn","옥수수","noun","food"],["base_232","cucumber","오이","noun","food"],
+["base_233","water","물","noun","drink"],["base_234","milk","우유","noun","drink"],["base_235","juice","주스","noun","drink"],["base_236","tea","차","noun","drink"],
+["base_237","coffee","커피","noun","drink"],["base_238","bottle","병","noun","drink"],["base_239","cup","컵","noun","drink"],["base_240","bowl","그릇","noun","drink"],
+["base_241","dog","개","noun","animal"],["base_242","cat","고양이","noun","animal"],["base_243","bird","새","noun","animal"],["base_244","rabbit","토끼","noun","animal"],
+["base_245","bear","곰","noun","animal"],["base_246","tiger","호랑이","noun","animal"],["base_247","lion","사자","noun","animal"],["base_248","monkey","원숭이","noun","animal"],
+["base_249","elephant","코끼리","noun","animal"],["base_250","horse","말","noun","animal"],["base_251","cow","소","noun","animal"],["base_252","pig","돼지","noun","animal"],
+["base_253","duck","오리","noun","animal"],["base_254","frog","개구리","noun","animal"],["base_255","snake","뱀","noun","animal"],["base_256","turtle","거북이","noun","animal"],
+["base_257","panda","판다","noun","animal"],["base_258","mouse","쥐","noun","animal"],
+["base_259","body","몸","noun","body"],["base_260","head","머리","noun","body"],["base_261","face","얼굴","noun","body"],["base_262","eye","눈","noun","body"],
+["base_263","nose","코","noun","body"],["base_264","mouth","입","noun","body"],["base_265","ear","귀","noun","body"],["base_266","hair","머리카락","noun","body"],
+["base_267","hand","손","noun","body"],["base_268","arm","팔","noun","body"],["base_269","leg","다리","noun","body"],["base_270","foot","발","noun","body"],
+["base_271","finger","손가락","noun","body"],["base_272","neck","목","noun","body"],["base_273","back","등","noun","body"],["base_274","stomach","배, 위","noun","body"],
+["base_275","heart","심장, 마음","noun","body"],
+["base_276","clothes","옷","noun","clothes"],["base_277","shirt","셔츠","noun","clothes"],["base_278","T-shirt","티셔츠","noun","clothes"],["base_279","pants","바지","noun","clothes"],
+["base_280","skirt","치마","noun","clothes"],["base_281","dress","원피스, 드레스","noun","clothes"],["base_282","coat","코트","noun","clothes"],["base_283","jacket","재킷","noun","clothes"],
+["base_284","shoes","신발","noun","clothes"],["base_285","socks","양말","noun","clothes"],["base_286","hat","모자","noun","clothes"],["base_287","glove","장갑","noun","clothes"],
+["base_288","uniform","교복, 유니폼","noun","clothes"],
+["base_289","sun","해, 태양","noun","nature"],["base_290","moon","달","noun","nature"],["base_291","star","별","noun","nature"],["base_292","sky","하늘","noun","nature"],
+["base_293","cloud","구름","noun","nature"],["base_294","rain","비","noun","nature"],["base_295","snow","눈","noun","nature"],["base_296","wind","바람","noun","nature"],
+["base_297","weather","날씨","noun","nature"],["base_298","spring","봄","noun","nature"],["base_299","summer","여름","noun","nature"],["base_300","fall","가을","noun","nature"],
+["base_301","winter","겨울","noun","nature"],["base_302","tree","나무","noun","nature"],["base_303","flower","꽃","noun","nature"],["base_304","grass","풀","noun","nature"],
+["base_305","leaf","잎","noun","nature"],["base_306","sea","바다","noun","nature"],["base_307","lake","호수","noun","nature"],["base_308","forest","숲","noun","nature"],
+["base_309","big","큰","adjective","adjective"],["base_310","small","작은","adjective","adjective"],["base_311","tall","키 큰","adjective","adjective"],["base_312","short","짧은, 키 작은","adjective","adjective"],
+["base_313","long","긴","adjective","adjective"],["base_314","old","늙은, 오래된","adjective","adjective"],["base_315","new","새로운","adjective","adjective"],["base_316","young","어린, 젊은","adjective","adjective"],
+["base_317","good","좋은","adjective","adjective"],["base_318","bad","나쁜","adjective","adjective"],["base_319","nice","좋은, 친절한","adjective","adjective"],["base_320","kind","친절한","adjective","adjective"],
+["base_321","happy","행복한","adjective","adjective"],["base_322","sad","슬픈","adjective","adjective"],["base_323","angry","화난","adjective","adjective"],["base_324","tired","피곤한","adjective","adjective"],
+["base_325","hungry","배고픈","adjective","adjective"],["base_326","thirsty","목마른","adjective","adjective"],["base_327","sick","아픈","adjective","adjective"],["base_328","busy","바쁜","adjective","adjective"],
+["base_329","easy","쉬운","adjective","adjective"],["base_330","hard","어려운, 단단한","adjective","adjective"],["base_331","hot","뜨거운, 더운","adjective","adjective"],["base_332","cold","차가운, 추운","adjective","adjective"],
+["base_333","warm","따뜻한","adjective","adjective"],["base_334","cool","시원한, 멋진","adjective","adjective"],["base_335","fun","재미있는","adjective","adjective"],["base_336","funny","웃긴, 재미있는","adjective","adjective"],
+["base_337","cute","귀여운","adjective","adjective"],["base_338","pretty","예쁜","adjective","adjective"],["base_339","beautiful","아름다운","adjective","adjective"],["base_340","strong","강한","adjective","adjective"],
+["base_341","weak","약한","adjective","adjective"],["base_342","fast","빠른","adjective","adjective"],["base_343","slow","느린","adjective","adjective"],["base_344","clean","깨끗한","adjective","adjective"],
+["base_345","dirty","더러운","adjective","adjective"],["base_346","loud","시끄러운, 큰 소리의","adjective","adjective"],["base_347","quiet","조용한","adjective","adjective"],["base_348","same","같은","adjective","adjective"],
+["base_349","be","이다, 있다","verb","verb"],["base_350","have","가지다","verb","verb"],["base_351","do","하다","verb","verb"],["base_352","go","가다","verb","verb"],
+["base_353","come","오다","verb","verb"],["base_354","see","보다","verb","verb"],["base_355","look","보다","verb","verb"],["base_356","watch","지켜보다","verb","verb"],
+["base_357","hear","듣다","verb","verb"],["base_358","listen","귀 기울여 듣다","verb","verb"],["base_359","say","말하다","verb","verb"],["base_360","speak","말하다","verb","verb"],
+["base_361","tell","말해주다","verb","verb"],["base_362","ask","묻다","verb","verb"],["base_363","know","알다","verb","verb"],["base_364","like","좋아하다","verb","verb"],
+["base_365","love","사랑하다, 아주 좋아하다","verb","verb"],["base_366","want","원하다","verb","verb"],["base_367","need","필요로 하다","verb","verb"],["base_368","get","얻다, 받다","verb","verb"],
+["base_369","make","만들다","verb","verb"],["base_370","use","사용하다","verb","verb"],["base_371","find","찾다, 발견하다","verb","verb"],["base_372","give","주다","verb","verb"],
+["base_373","take","가져가다, 잡다","verb","verb"],["base_374","put","놓다","verb","verb"],["base_375","open","열다","verb","verb"],["base_376","close","닫다","verb","verb"],
+["base_377","bring","가져오다","verb","verb"],["base_378","help","돕다","verb","verb"],["base_379","call","부르다, 전화하다","verb","verb"],["base_380","show","보여주다","verb","verb"],
+["base_381","meet","만나다","verb","verb"],["base_382","live","살다","verb","verb"],["base_383","eat","먹다","verb","verb"],["base_384","drink","마시다","verb","verb"],
+["base_385","play","놀다, 연주하다","verb","verb"],["base_386","read","읽다","verb","verb"],["base_387","write","쓰다","verb","verb"],["base_388","draw","그리다","verb","verb"],
+["base_389","sing","노래하다","verb","verb"],["base_390","dance","춤추다","verb","verb"],["base_391","run","달리다","verb","verb"],["base_392","walk","걷다","verb","verb"],
+["base_393","jump","뛰다","verb","verb"],["base_394","sit","앉다","verb","verb"],["base_395","stand","서다","verb","verb"],["base_396","sleep","자다","verb","verb"],
+["base_397","wash","씻다","verb","verb"],["base_398","study","공부하다","verb","verb"],["base_399","learn","배우다","verb","verb"],["base_400","carry","나르다","verb","verb"],
+["base_401","here","여기","adverb","position"],["base_402","there","저기, 거기","adverb","position"],["base_403","in","안에","preposition","position"],["base_404","on","위에","preposition","position"],
+["base_405","under","아래에","preposition","position"],["base_406","behind","뒤에","preposition","position"],["base_407","near","가까이","preposition","position"],["base_408","far","먼","adjective","position"],
+["base_409","up","위로","adverb","position"],["base_410","down","아래로","adverb","position"],["base_411","left","왼쪽","noun","position"],["base_412","right","오른쪽","noun","position"],
+["base_413","inside","안쪽에","adverb","position"],["base_414","outside","밖에","adverb","position"],["base_415","together","함께","adverb","position"],
+["base_416","what","무엇","pronoun","question"],["base_417","who","누구","pronoun","question"],["base_418","where","어디","adverb","question"],["base_419","when","언제","adverb","question"],
+["base_420","why","왜","adverb","question"],["base_421","how","어떻게","adverb","question"],["base_422","yes","네","interjection","question"],["base_423","no","아니요","interjection","question"],
+["base_424","hello","안녕하세요","interjection","greeting"],["base_425","hi","안녕","interjection","greeting"],["base_426","bye","잘 가","interjection","greeting"],
+["base_427","please","제발, 부탁해요","interjection","greeting"],["base_428","sorry","미안해","interjection","greeting"],["base_429","thank","감사하다","verb","greeting"],
+["base_430","thanks","고마워","interjection","greeting"],
+["base_431","can","할 수 있다","verb","basic"],["base_432","will","~할 것이다","verb","basic"],["base_433","not","아니다, ~않다","adverb","basic"],
+["base_434","and","그리고","conjunction","basic"],["base_435","but","하지만","conjunction","basic"],["base_436","because","왜냐하면","conjunction","basic"],
+["base_437","with","~와 함께","preposition","basic"],["base_438","for","~을 위해, ~동안","preposition","basic"],["base_439","about","~에 대해","preposition","basic"],
+["base_440","line","줄","noun","subject"],["base_441","number","숫자","noun","subject"],
+["base_442","living room","거실","noun","home"],["base_443","lamp","등, 램프","noun","home"],
+["base_444","bus stop","버스 정류장","noun","place"],["base_445","shop","상점","noun","place"],
+["base_446","bicycle","자전거","noun","transport"],["base_447","ship","큰 배","noun","transport"],["base_448","seat","자리, 좌석","noun","transport"],["base_449","way","길, 방법","noun","transport"],
+["base_450","lunch","점심 식사","noun","food"],["base_451","melon","멜론, 참외류","noun","food"],
+["base_452","soda","탄산음료","noun","drink"],["base_453","glass","유리컵, 유리","noun","drink"],
+["base_454","toe","발가락","noun","body"],["base_455","tooth","이","noun","body"],
+["base_456","cap","챙 달린 모자","noun","clothes"],
+["base_457","light","밝은, 빛","adjective","color"],["base_458","dark","어두운","adjective","color"],
+["base_459","more","더 많은, 더","adjective","quantity"],["base_460","most","가장 많은, 대부분의","adjective","quantity"],["base_461","any","어떤, 무엇이든","adjective","quantity"],
+["base_462","now","지금","adverb","time"],["base_463","later","나중에","adverb","time"],
+["base_464","over","위로, 위에","preposition","position"],["base_465","in front of","앞에","preposition","position"],["base_466","next to","옆에","preposition","position"],
+["base_467","between","사이에","preposition","position"],["base_468","around","주위에, 둘레에","preposition","position"],
+["base_469","color","색칠하다","verb","verb"],["base_470","wake","깨다","verb","verb"],["base_471","clean","청소하다","verb","verb"],
+["base_472","P.E.","체육","noun","subject"],["base_473","lunch","점심","noun","school"],
+["base_474","eleven","열하나","number","number"],["base_475","twelve","열둘","number","number"],["base_476","thirteen","열셋","number","number"],
+["base_477","fourteen","열넷","number","number"],["base_478","fifteen","열다섯","number","number"],["base_479","sixteen","열여섯","number","number"],
+["base_480","seventeen","열일곱","number","number"],["base_481","eighteen","열여덟","number","number"],["base_482","nineteen","열아홉","number","number"],
+["base_483","forty","마흔","number","number"],["base_484","fifty","쉰","number","number"],["base_485","sixty","예순","number","number"],
+["base_486","seventy","일흔","number","number"],["base_487","eighty","여든","number","number"],["base_488","ninety","아흔","number","number"],
+["base_489","may","~해도 되다","verb","basic"],
+["base_490","fast","빠른","adjective","adjective"],["base_491","have","가지고 있다","verb","verb"],
+["base_492","speak","말하다","verb","verb"],["base_493","answer","대답하다","verb","verb"],
+["base_494","him","그를","pronoun","basic"],["base_495","her","그녀의","pronoun","basic"],
+["base_496","window","창문","noun","home"],["base_497","wall","벽","noun","home"],
+["base_498","forest","숲","noun","nature"],["base_499","lake","호수","noun","nature"],["base_500","sea","바다","noun","nature"]
+];
+return raw.map(([id,word,meaning,pos,category])=>({id,word,meaning,pos,category,gradeLevel:'basic',sourceType:'base'}));
+})();
+
 </script>
 <style>
 :root{
@@ -3086,14 +3417,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
           <div class="equip-grid" id="equip-grid"></div>
         </div>
       </div>
-      <!-- 능력치 — 접기/펼치기 (기본 접힘) -->
+      <!-- 능력치 — 접기/펼치기 (기본 펼침) -->
       <div class="panel-box">
         <div class="panel-label" onclick="toggleSideSection('ability-section','ability-arrow')"
           style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
           <span>📊 활동 능력치</span>
-          <span id="ability-arrow" style="font-size:.7rem;color:var(--txt3)">▼</span>
+          <span id="ability-arrow" style="font-size:.7rem;color:var(--txt3)">▲</span>
         </div>
-        <div id="ability-section" style="display:none">
+        <div id="ability-section">
           <div id="ability-bars"></div>
         </div>
       </div>
@@ -3231,12 +3562,22 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="modal-hd"><div class="modal-title">🏠 내 집 · 포트폴리오</div><button class="modal-close" onclick="closeModal('m-house')">✕</button></div>
   <div class="modal-tabs">
     <button class="mtab on" onclick="houseTab('stats',this)">📊 기록</button>
+    <button class="mtab"    onclick="houseTab('weekly',this)">📅 주간 다짐</button>
     <button class="mtab"    onclick="houseTab('book',this)">📚 독서</button>
     <button class="mtab"    onclick="houseTab('deco',this)">🌸 인테리어</button>
     <button class="mtab"    onclick="houseTab('artwork',this)">🖼️ 작품</button>
     <button class="mtab"    onclick="houseTab('memory',this)">📸 추억</button>
     <button class="mtab"    onclick="houseTab('emotion',this)">💭 감정</button>
     <button class="mtab"    id="house-tab-ach-btn" onclick="houseTab('ach',this)">🏅 업적</button>
+    <button class="mtab"    id="house-tab-recorder-btn"
+      onclick="toast('🎵 리코더 기록장은 곧 열릴 예정이에요')"
+      style="opacity:.5;position:relative">
+      🎵 리코더
+      <span style="position:absolute;top:-4px;right:-2px;font-size:.5rem;font-weight:800;
+        background:#e67e22;color:#fff;border-radius:6px;padding:.05rem .3rem;line-height:1.4">
+        예정</span>
+    </button>
+    <button class="mtab" onclick="houseTab('vocab',this)">🔤 영어 단어장</button>
   </div>
 
   <!-- 탭1: 기록 -->
@@ -3246,7 +3587,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <div id="monster-dex"></div>
   </div>
 
-  <!-- 탭2: 독서 -->
+  <!-- 탭2: 주간 다짐 -->
+  <div id="house-tab-weekly" style="display:none;padding-bottom:.5rem">
+    <div id="weekly-tab-content"></div>
+  </div>
+
+  <!-- 탭3: 독서 -->
   <div id="house-tab-book" style="display:none">
     <div style="font-size:.76rem;color:var(--txt2);margin:.3rem 0 .8rem">
       책을 읽고 기록하면 선생님 확인 후 EXP +30이 지급돼요 📚
@@ -3492,7 +3838,47 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="house-tab-ach" style="display:none;padding-bottom:.5rem">
     <div id="house-ach-list"></div>
   </div>
-</div></div>
+
+  <!-- 탭8: 리코더 기록장 (구조 준비, 현재 비활성) -->
+  <div id="house-tab-recorder" style="display:none;padding-bottom:.5rem">
+    <!-- ══ 비활성 안내 카드 ══ -->
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:2.5rem 1rem;text-align:center;
+      background:rgba(255,255,255,.03);border:1.5px dashed rgba(255,255,255,.12);
+      border-radius:16px;margin-bottom:1rem;opacity:.8">
+      <div style="font-size:2.8rem;margin-bottom:.6rem;filter:grayscale(.4)">🎵</div>
+      <div style="font-size:1rem;font-weight:800;color:var(--txt1);margin-bottom:.35rem">리코더 기록장</div>
+      <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.7rem">연습방 문이 곧 열려요</div>
+      <span style="font-size:.7rem;font-weight:700;background:rgba(230,126,34,.18);
+        color:#e67e22;border:1px solid rgba(230,126,34,.35);
+        border-radius:20px;padding:.2rem .8rem">업데이트 예정</span>
+    </div>
+
+    <!-- ══ 향후 기능 구조 (현재 hidden, 오픈 시 display 풀기) ══
+    실제 기능 열릴 때:
+    1. 위 비활성 카드 제거
+    2. 아래 renderRecorderTab() 호출
+    3. houseTab()에서 renderRecorderTab() 연결
+
+    구조:
+    - 상단: 곡 선택 드롭다운 (songId, songTitle)
+    - 날짜 목록: 접기/펼치기
+      각 날짜 안:
+        - 연습 체크 5칸 (practiceCount 0~5, 오늘만 클릭 가능)
+        - 녹음 1개 (recordingUrl, recordingName) — Firebase Storage
+        - 느낀점 textarea (reflection)
+      저장: saveRecorderLog({ id, studentId, songId, songTitle,
+                date, practiceCount, recordingUrl, recordingName,
+                reflection, updatedAt })
+    ══ --></div>
+</div>
+
+  <!-- 탭9: 영어 단어장 -->
+  <div id="house-tab-vocab" style="display:none;padding-bottom:.5rem">
+    <div id="vocab-tab-content"></div>
+  </div>
+
+</div>
 
 <div class="overlay" id="m-inv"><div class="modal">
   <div class="modal-hd"><div class="modal-title">🎒 인벤토리</div><button class="modal-close" onclick="closeModal('m-inv')">✕</button></div>
@@ -3521,6 +3907,28 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="modal-hd"><div class="modal-title">🏅 업적</div><button class="modal-close" onclick="closeModal('m-ach')">✕</button></div>
   <div id="ach-list"></div>
 </div></div>
+
+<!-- 영어 단어 퀴즈 팝업 모달 -->
+<div class="overlay" id="m-vocab-quiz" style="align-items:center">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hd">
+      <div class="modal-title" id="vq-title">📖 단어 퀴즈</div>
+      <button class="modal-close" onclick="closeModal('m-vocab-quiz')">✕</button>
+    </div>
+    <div id="vq-body" style="padding:.5rem 0;min-height:180px"></div>
+  </div>
+</div>
+
+<!-- 주간 다짐 팝업 모달 -->
+<div class="overlay" id="m-weekly" style="align-items:center">
+  <div class="modal" style="max-width:480px;max-height:85vh">
+    <div class="modal-hd">
+      <div class="modal-title" id="weekly-modal-title">📅 주간 다짐</div>
+      <button class="modal-close" onclick="closeModal('m-weekly')">✕</button>
+    </div>
+    <div id="weekly-modal-body" style="padding:.5rem 0;overflow-y:auto;max-height:calc(85vh - 60px)"></div>
+  </div>
+</div>
 
 <!-- 업적 달성 팝업 -->
 <div id="ach-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -3817,6 +4225,8 @@ function enterGame() {
   applyScale();
   renderAll();
   startAccessTimer();
+  setTimeout(() => checkWeeklyRoutine(), 1500);   // 주간 다짐 자동 팝업
+  setTimeout(() => checkVocabQuizTrigger(), 10000); // 영어 단어 퀴즈 팝업
   setTimeout(() => tryShowReflectionPopup(), 30000);
 }
 
@@ -4024,32 +4434,38 @@ function buildCharSVG(s) {
   let helmSvg = '';
   if (hp) {
     if (hp.type === 'crown') {
+      // 왕관: 머리 위로 올리고 크게
       helmSvg = `
-        <rect x="42" y="20" width="36" height="10" rx="2" fill="${hp.a}"/>
-        <polygon points="42,20 46,10 50,20" fill="${hp.a}"/>
-        <polygon points="55,20 60,12 65,20" fill="${hp.a}"/>
-        <polygon points="70,20 74,10 78,20" fill="${hp.a}"/>
-        <rect x="44" y="22" width="32" height="6" fill="${hp.b}"/>
-        <rect x="47" y="14" width="2" height="6" fill="${hp.b}"/>
-        <rect x="59" y="14" width="2" height="4" fill="${hp.b}"/>
-        <rect x="71" y="14" width="2" height="6" fill="${hp.b}"/>`;
+        <rect x="40" y="18" width="40" height="10" rx="2" fill="${hp.a}"/>
+        <polygon points="40,18 45,5 50,18" fill="${hp.a}"/>
+        <polygon points="55,18 60,8 65,18" fill="${hp.a}"/>
+        <polygon points="70,18 75,5 80,18" fill="${hp.a}"/>
+        <rect x="42" y="20" width="36" height="6" fill="${hp.b}" opacity=".6"/>
+        <circle cx="60" cy="9" r="2.5" fill="#FFD700" opacity=".9"/>
+        <circle cx="47" cy="6" r="2" fill="#FFD700" opacity=".8"/>
+        <circle cx="73" cy="6" r="2" fill="#FFD700" opacity=".8"/>`;
     } else if (hp.type === 'magic') {
+      // 마법 모자: 크고 위로 (이미 수정됨)
       helmSvg = `
-        <polygon points="60,2 48,26 72,26" fill="${hp.a}"/>
-        <polygon points="60,2 58,26 62,26" fill="${hp.b}"/>
-        <rect x="44" y="23" width="32" height="7" rx="3" fill="${hp.a}"/>
-        <rect x="44" y="23" width="32" height="3" fill="${hp.b}" opacity=".5"/>`;
+        <polygon points="60,-4 44,24 76,24" fill="${hp.a}"/>
+        <polygon points="60,-4 57,24 63,24" fill="${hp.b}"/>
+        <rect x="40" y="21" width="40" height="8" rx="4" fill="${hp.a}"/>
+        <rect x="40" y="21" width="40" height="3" fill="${hp.b}" opacity=".5"/>
+        <circle cx="60" cy="-4" r="3" fill="${hp.b}" opacity=".7"/>`;
     } else if (hp.type === 'helm' || hp.type === 'leather') {
+      // 투구/가죽: 머리 전체 덮게
       helmSvg = `
-        <rect x="40" y="16" width="40" height="22" rx="8" fill="${hp.a}"/>
-        <rect x="40" y="16" width="40" height="8" rx="8" fill="${hp.b}"/>
-        <rect x="44" y="32" width="12" height="6" rx="2" fill="${hp.b}"/>
-        <rect x="64" y="32" width="12" height="6" rx="2" fill="${hp.b}"/>
-        <rect x="42" y="18" width="6" height="2" rx="1" fill="rgba(255,255,255,.3)"/>`;
+        <rect x="38" y="14" width="44" height="24" rx="9" fill="${hp.a}"/>
+        <rect x="38" y="14" width="44" height="10" rx="9" fill="${hp.b}"/>
+        <rect x="38" y="32" width="12" height="8" rx="3" fill="${hp.b}"/>
+        <rect x="70" y="32" width="12" height="8" rx="3" fill="${hp.b}"/>
+        <rect x="40" y="16" width="7" height="3" rx="1" fill="rgba(255,255,255,.3)"/>`;
     } else {
+      // cloth: 부드러운 천 모자
       helmSvg = `
-        <path d="M42,28 Q40,12 60,10 Q80,12 78,28" fill="${hp.a}"/>
-        <path d="M42,28 Q40,12 60,10 Q80,12 78,28 Q72,20 60,20 Q48,20 42,28Z" fill="${hp.b}" opacity=".6"/>`;
+        <path d="M40,28 Q38,10 60,8 Q82,10 80,28" fill="${hp.a}"/>
+        <path d="M40,28 Q38,10 60,8 Q82,10 80,28 Q72,18 60,18 Q48,18 40,28Z" fill="${hp.b}" opacity=".5"/>
+        <ellipse cx="60" cy="28" rx="22" ry="4" fill="${hp.a}"/>`;
     }
   }
 
@@ -4222,15 +4638,35 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
     {k:'art',l:'예술',c:'ab-art'},{k:'value',l:'가치',c:'ab-moral'},{k:'health',l:'건강',c:'ab-health'},
     {k:'life',l:'생활',c:'ab-life'}];
   const maxV = Math.max(10, ...Object.values(s.stats||{}));
-  document.getElementById(abilityId).innerHTML = abDefs.map(ab => {
-    const v = s.stats?.[ab.k]||0;
-    const display = Number.isInteger(v) ? v : v.toFixed(1);
-    return `<div class="ab-row ${ab.c}">
-      <span class="ab-name">${ab.l}</span>
-      <div class="ab-bar"><div class="ab-fill" style="width:${Math.min(100,v/maxV*100)}%"></div></div>
-      <span class="ab-val">${display}</span>
-    </div>`;
-  }).join('');
+  document.getElementById(abilityId).innerHTML =
+    // 독서 (특수 능력치)
+    `<div style="font-size:.6rem;color:var(--txt3);letter-spacing:.05em;margin-bottom:.25rem;opacity:.7">
+      ✨ 특수 능력치</div>` +
+    abDefs.filter(ab => ab.k === 'read').map(ab => {
+      const v = s.stats?.[ab.k]||0;
+      const display = Number.isInteger(v) ? v : v.toFixed(1);
+      return `<div class="ab-row ${ab.c}" style="opacity:.85">
+        <span class="ab-name" style="color:var(--sky)">${ab.l}</span>
+        <div class="ab-bar" style="background:rgba(93,173,226,.12)">
+          <div class="ab-fill" style="width:${Math.min(100,v/maxV*100)}%;background:var(--sky)"></div>
+        </div>
+        <span class="ab-val" style="color:var(--sky)">${display}</span>
+      </div>`;
+    }).join('') +
+    // 구분선
+    `<div style="height:1px;background:rgba(255,255,255,.07);margin:.45rem 0"></div>
+    <div style="font-size:.6rem;color:var(--txt3);letter-spacing:.05em;margin-bottom:.25rem;opacity:.7">
+      ⚔️ 전투 활동 능력치</div>` +
+    // 나머지 능력치
+    abDefs.filter(ab => ab.k !== 'read').map(ab => {
+      const v = s.stats?.[ab.k]||0;
+      const display = Number.isInteger(v) ? v : v.toFixed(1);
+      return `<div class="ab-row ${ab.c}">
+        <span class="ab-name">${ab.l}</span>
+        <div class="ab-bar"><div class="ab-fill" style="width:${Math.min(100,v/maxV*100)}%"></div></div>
+        <span class="ab-val">${display}</span>
+      </div>`;
+    }).join('');
 }
 
 function renderMobile() {
@@ -4520,6 +4956,38 @@ function buildMainHTML() {
           </a>`).join('')}
       </div>`;
     })()}
+
+    <!-- 이번 주 목표 카드 -->
+    ${(()=>{
+      const wk   = Utils.weekKey();
+      const goal = DB.getWeeklyGoal(s.id, wk);
+      if (!goal) return `
+        <div onclick="openWeeklyModal('monday')" style="cursor:pointer;
+          background:rgba(93,173,226,.06);border:1.5px dashed rgba(93,173,226,.25);
+          border-radius:12px;padding:.6rem .9rem;margin-bottom:.5rem;
+          display:flex;align-items:center;gap:.6rem">
+          <span style="font-size:1.2rem">📅</span>
+          <div style="flex:1">
+            <div style="font-size:.75rem;font-weight:700;color:var(--sky)">이번 주 목표</div>
+            <div style="font-size:.72rem;color:var(--txt3)">이번 주 다짐을 아직 쓰지 않았어요</div>
+          </div>
+          <span style="font-size:.72rem;color:var(--sky);font-weight:700;
+            background:rgba(93,173,226,.15);border-radius:8px;padding:.2rem .6rem;white-space:nowrap">작성하기</span>
+        </div>`;
+      return `
+        <div onclick="openHouseTab('weekly')" style="cursor:pointer;
+          background:rgba(93,173,226,.07);border:1.5px solid rgba(93,173,226,.2);
+          border-radius:12px;padding:.65rem .9rem;margin-bottom:.5rem">
+          <div style="font-size:.68rem;font-weight:700;color:var(--sky);margin-bottom:.45rem">
+            📅 이번 주 목표 · 이번 주 다짐을 기억해봐요
+          </div>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap">
+            <span style="font-size:.8rem;color:var(--txt1)">💪 <b>${goal.focusArea||''}</b></span>
+            <span style="font-size:.8rem;color:var(--txt1)">🎯 <b>${goal.goalText||''}</b></span>
+            <span style="font-size:.8rem;color:var(--txt1)">🌟 <b>${goal.mindset||''}</b></span>
+          </div>
+        </div>`;
+    })()}
     ${alerts.join('')}
 
     <!-- ① 핵심 할 일 1개 강조 + 나머지 요약 -->
@@ -4578,6 +5046,12 @@ function buildMainHTML() {
         <div style="font-size:1.1rem">📊</div>
         <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">기록</div>
       </div>
+      <div onclick="openHouseTab('weekly')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(93,173,226,.2)">
+        <div style="font-size:1.1rem">📅</div>
+        <div style="font-size:.63rem;color:var(--sky);margin-top:.12rem;font-weight:700">주간 다짐</div>
+      </div>
       <div onclick="openHouseTab('book')"
         style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
           background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
@@ -4615,6 +5089,21 @@ function buildMainHTML() {
         <div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
         <div style="font-size:1.1rem">🏅</div>
         <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">업적</div>
+      </div>
+      <div onclick="toast('🎵 리코더 기록장은 곧 열릴 예정이에요')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          position:relative;opacity:.5;
+          background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1)">
+        <div style="font-size:1.1rem;filter:grayscale(.4)">🎵</div>
+        <div style="font-size:.63rem;color:var(--txt3);margin-top:.12rem">리코더</div>
+        <span style="position:absolute;top:-3px;right:-2px;font-size:.5rem;font-weight:800;
+          background:#e67e22;color:#fff;border-radius:5px;padding:.05rem .25rem;line-height:1.4">예정</span>
+      </div>
+      <div onclick="openHouseTab('vocab')"
+        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">🔤</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">영어 단어장</div>
       </div>
     </div>
 
@@ -4799,23 +5288,26 @@ function buildEquipIcon(slot, itemId) {
     if (!p) return `<svg width="${W}" height="${H}" viewBox="0 0 56 56"><text x="28" y="36" text-anchor="middle" font-size="28">🪖</text></svg>`;
     if (p.type === 'crown') {
       shapes = `
-        <rect x="12" y="28" width="32" height="12" rx="3" fill="${p.a}"/>
-        <polygon points="12,28 17,16 22,28" fill="${p.a}"/>
-        <polygon points="24,28 28,18 32,28" fill="${p.a}"/>
-        <polygon points="34,28 39,16 44,28" fill="${p.a}"/>
-        <rect x="14" y="32" width="28" height="6" fill="${p.b}" opacity=".5"/>`;
+        <rect x="10" y="28" width="36" height="12" rx="3" fill="${p.a}"/>
+        <polygon points="10,28 16,14 22,28" fill="${p.a}"/>
+        <polygon points="24,28 28,16 32,28" fill="${p.a}"/>
+        <polygon points="34,28 40,14 46,28" fill="${p.a}"/>
+        <rect x="12" y="32" width="32" height="6" fill="${p.b}" opacity=".5"/>
+        <circle cx="28" cy="16" r="2.5" fill="#FFD700" opacity=".9"/>`;
     } else if (p.type === 'magic') {
       shapes = `
-        <polygon points="28,8 14,40 42,40" fill="${p.a}"/>
-        <polygon points="28,8 26,40 30,40" fill="${p.b}" opacity=".5"/>
-        <rect x="12" y="38" width="32" height="8" rx="4" fill="${p.a}"/>`;
+        <polygon points="28,2 12,38 44,38" fill="${p.a}"/>
+        <polygon points="28,2 26,38 30,38" fill="${p.b}" opacity=".6"/>
+        <rect x="10" y="35" width="36" height="9" rx="4" fill="${p.a}"/>
+        <rect x="10" y="35" width="36" height="4" fill="${p.b}" opacity=".4"/>
+        <circle cx="28" cy="2" r="3" fill="${p.b}" opacity=".7"/>`;
     } else {
       shapes = `
-        <rect x="12" y="18" width="32" height="24" rx="8" fill="${p.a}"/>
-        <rect x="12" y="18" width="32" height="10" rx="8" fill="${p.b}"/>
-        <rect x="14" y="36" width="10" height="6" rx="2" fill="${p.b}"/>
-        <rect x="32" y="36" width="10" height="6" rx="2" fill="${p.b}"/>
-        <rect x="14" y="20" width="6" height="3" rx="1" fill="rgba(255,255,255,.3)"/>`;
+        <rect x="10" y="16" width="36" height="26" rx="9" fill="${p.a}"/>
+        <rect x="10" y="16" width="36" height="12" rx="9" fill="${p.b}"/>
+        <rect x="12" y="36" width="10" height="7" rx="2" fill="${p.b}"/>
+        <rect x="34" y="36" width="10" height="7" rx="2" fill="${p.b}"/>
+        <rect x="13" y="18" width="7" height="3" rx="1" fill="rgba(255,255,255,.3)"/>`;
     }
   } else if (slot === 'weapon') {
     const p = WEAPON_PAL[itemId];
@@ -6693,17 +7185,21 @@ function houseTab(tab, el) {
   document.querySelectorAll('#m-house .mtab').forEach(t => t.classList.remove('on'));
   el.classList.add('on');
   document.getElementById('house-tab-stats').style.display   = tab==='stats'   ? '' : 'none';
+  document.getElementById('house-tab-weekly').style.display  = tab==='weekly'  ? '' : 'none';
   document.getElementById('house-tab-book').style.display    = tab==='book'    ? '' : 'none';
   document.getElementById('house-tab-deco').style.display    = tab==='deco'    ? '' : 'none';
   document.getElementById('house-tab-artwork').style.display = tab==='artwork' ? '' : 'none';
   document.getElementById('house-tab-memory').style.display  = tab==='memory'  ? '' : 'none';
   document.getElementById('house-tab-emotion').style.display = tab==='emotion' ? '' : 'none';
   document.getElementById('house-tab-ach').style.display     = tab==='ach'     ? '' : 'none';
+  document.getElementById('house-tab-vocab').style.display   = tab==='vocab'   ? '' : 'none';
+  if (tab==='weekly')  renderWeeklyTab();
   if (tab==='book')    { renderBookRecords(); initBookForm(); }
   if (tab==='artwork') { fillArtworkSubjectSelect(); renderArtworks(); }
   if (tab==='emotion') renderEmotionHistory();
   if (tab==='memory')  renderMyMemories();
   if (tab==='ach')     renderHouseAchievements();
+  if (tab==='vocab')   renderVocabTab();
   if (tab==='deco') {
     _dCv = null;
     renderHouseDeco();
@@ -9508,6 +10004,848 @@ function renderAchievements() {
 }
 
 // 포트폴리오 내 업적 탭 전용 렌더 (house-ach-list에 출력)
+// ══════════════════════════════════════════════════════
+//  주간 다짐 (월요일 목표 ↔ 금요일 성찰)
+// ══════════════════════════════════════════════════════
+
+// 공통 상수
+const WEEKLY_MOOD_OPTS     = ['즐거웠어요','편안했어요','신났어요','보통이었어요','조금 아쉬웠어요','피곤했어요'];
+const WEEKLY_FOCUS_OPTS    = ['공부','독서','친구 관계','건강','책임감','발표','리코더','영어 단어'];
+const WEEKLY_GOAL_OPTS     = ['책 끝까지 읽기','발표할 때 손 들기','숙제 미루지 않기','친구에게 먼저 친절하게 말하기','리코더 연습하기','단어 자주 보기','끝까지 포기하지 않기'];
+const WEEKLY_MINDSET_OPTS  = ['차분하게','자신 있게','꾸준하게','즐겁게','친절하게','용기 있게','끝까지','천천히라도 해보기'];
+const WEEKLY_EFFORT_OPTS   = ['많이 노력했어요','꽤 노력했어요','조금 노력했어요','더 노력할걸 그랬어요'];
+const WEEKLY_ACHIEVE_OPTS  = ['해냈어요','거의 해냈어요','조금 했어요','아직 못 했어요'];
+const WEEKLY_MINDSET_REF   = ['잘 지켰어요','꽤 지켰어요','조금 지켰어요','아쉬웠어요'];
+const WEEKLY_BEST_OPTS     = ['끝까지 해낸 것','발표를 해본 것','친구와 잘 지낸 것','책을 읽은 것','리코더를 연습한 것','단어를 열심히 본 것','숙제를 잘 챙긴 것'];
+const WEEKLY_NEXT_OPTS     = ['더 꾸준히 하기','발표 더 용기 내기','책 더 읽기','친구에게 더 친절하게 하기','리코더 더 자주 연습하기','단어 더 자주 보기','미루지 않기'];
+
+// 선택형 칩 UI 빌더
+function buildChipForm(containerId, opts, selectedVal, allowCustom=true) {
+  const customLabel = '직접입력';
+  const isCustom = selectedVal && !opts.includes(selectedVal);
+  return `
+    <div id="${containerId}-chips" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.4rem">
+      ${opts.map(o => `
+        <button type="button" onclick="selectChip('${containerId}','${o.replace(/'/g,"\\'")}')"
+          style="padding:.32rem .75rem;border-radius:20px;font-size:.78rem;cursor:pointer;font-family:inherit;
+            border:1.5px solid ${selectedVal===o?'var(--sky)':'rgba(255,255,255,.15)'};
+            background:${selectedVal===o?'rgba(93,173,226,.2)':'rgba(255,255,255,.05)'};
+            color:${selectedVal===o?'var(--sky)':'var(--txt2)'};">${o}</button>`).join('')}
+      ${allowCustom?`<button type="button" onclick="selectChip('${containerId}','__custom__')"
+        style="padding:.32rem .75rem;border-radius:20px;font-size:.78rem;cursor:pointer;font-family:inherit;
+          border:1.5px solid ${isCustom?'var(--gold)':'rgba(255,255,255,.15)'};
+          background:${isCustom?'rgba(255,215,0,.15)':'rgba(255,255,255,.05)'};
+          color:${isCustom?'var(--gold)':'var(--txt3)'};">✏️ 직접입력</button>`:''}
+    </div>
+    <input id="${containerId}-custom" type="text" class="form-input-student"
+      placeholder="직접 입력해주세요"
+      style="display:${isCustom?'':'none'};margin-top:.1rem"
+      value="${isCustom?selectedVal:''}">
+    <input type="hidden" id="${containerId}-val" value="${selectedVal||''}">`;
+}
+
+function selectChip(containerId, val) {
+  const isCustom = val === '__custom__';
+  const customEl = document.getElementById(`${containerId}-custom`);
+  const hiddenEl = document.getElementById(`${containerId}-val`);
+  const chips    = document.querySelectorAll(`#${containerId}-chips button`);
+
+  chips.forEach(b => {
+    const bVal = b.textContent.trim().replace('✏️ ','');
+    const active = isCustom ? bVal === '직접입력' : b.textContent.trim() === val;
+    b.style.borderColor = active ? (isCustom?'var(--gold)':'var(--sky)') : 'rgba(255,255,255,.15)';
+    b.style.background  = active ? (isCustom?'rgba(255,215,0,.15)':'rgba(93,173,226,.2)') : 'rgba(255,255,255,.05)';
+    b.style.color       = active ? (isCustom?'var(--gold)':'var(--sky)') : 'var(--txt2)';
+  });
+  if (customEl) customEl.style.display = isCustom ? '' : 'none';
+  if (!isCustom && hiddenEl) hiddenEl.value = val;
+  if (isCustom && customEl) {
+    customEl.oninput = () => { if (hiddenEl) hiddenEl.value = customEl.value.trim(); };
+    customEl.focus();
+  }
+}
+
+function getChipVal(containerId) {
+  const hidden = document.getElementById(`${containerId}-val`);
+  const custom = document.getElementById(`${containerId}-custom`);
+  if (custom && custom.style.display !== 'none') return custom.value.trim();
+  return hidden ? hidden.value : '';
+}
+
+// ── 자동 팝업 체크 ──────────────────────────────────
+function checkWeeklyRoutine() {
+  if (!CUR) return;
+  const d = new Date(Date.now()+9*3600000);
+  const day = d.getUTCDay(); // 1=월, 5=금
+  const wk  = Utils.weekKey();
+  if (day === 1) {
+    const existing = DB.getWeeklyGoal(CUR.id, wk);
+    if (!existing) openWeeklyModal('monday');
+  } else if (day === 5) {
+    const existing = DB.getWeeklyReflection(CUR.id, wk);
+    if (!existing) openWeeklyModal('friday');
+  }
+}
+
+// ── 모달 열기 ────────────────────────────────────────
+function openWeeklyModal(mode) {
+  openModal('m-weekly');
+  const titleEl = document.getElementById('weekly-modal-title');
+  const bodyEl  = document.getElementById('weekly-modal-body');
+  if (!titleEl || !bodyEl) return;
+  if (mode === 'monday') {
+    titleEl.textContent = '📅 이번 주 다짐';
+    bodyEl.innerHTML = buildMondayForm();
+  } else {
+    titleEl.textContent = '📅 이번 주 돌아보기';
+    const wk   = Utils.weekKey();
+    const goal = DB.getWeeklyGoal(CUR.id, wk);
+    bodyEl.innerHTML = buildFridayForm(goal);
+  }
+}
+
+// ── 월요일 폼 ────────────────────────────────────────
+function buildMondayForm() {
+  const wk  = Utils.weekKey();
+  const existing = DB.getWeeklyGoal(CUR.id, wk);
+  if (existing) return buildMondayReadOnly(existing);
+
+  return `
+    <div style="padding:.8rem 1rem;display:flex;flex-direction:column;gap:1.1rem">
+      <!-- Q1 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+          1. 주말에 무엇을 했나요?
+        </div>
+        <input id="wk-weekend-text" class="form-input-student"
+          placeholder="예) 가족과 시간을 보냈어요 / 집에서 쉬었어요"
+          style="font-size:.84rem">
+      </div>
+      <!-- Q2 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+          2. 주말 기분은 어땠나요?
+        </div>
+        ${buildChipForm('wk-mood', WEEKLY_MOOD_OPTS, '')}
+      </div>
+      <!-- Q3 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+          3. 이번 주 내가 가장 노력할 것은?
+        </div>
+        ${buildChipForm('wk-focus', WEEKLY_FOCUS_OPTS, '')}
+      </div>
+      <!-- Q4 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+          4. 이번 주 내가 해볼 목표는?
+        </div>
+        ${buildChipForm('wk-goal', WEEKLY_GOAL_OPTS, '')}
+      </div>
+      <!-- Q5 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">
+          5. 이번 주 내 마음가짐은?
+        </div>
+        ${buildChipForm('wk-mindset', WEEKLY_MINDSET_OPTS, '')}
+      </div>
+      <button class="btn-gold" style="padding:.6rem;font-size:.88rem;font-weight:800;border-radius:12px"
+        onclick="submitMondayGoal()">✅ 다짐 저장</button>
+    </div>`;
+}
+
+function buildMondayReadOnly(g) {
+  return `
+    <div style="padding:.8rem 1rem">
+      <div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
+        border-radius:12px;padding:.9rem;margin-bottom:.7rem">
+        <div style="font-size:.72rem;color:var(--sky);font-weight:700;margin-bottom:.6rem">✅ 이번 주 다짐 완료</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🏖️ 주말: ${g.weekendText||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">😊 기분: ${g.weekendMood||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">💪 노력할 것: ${g.focusArea||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🎯 목표: ${g.goalText||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2)">🌟 마음가짐: ${g.mindset||''}</div>
+      </div>
+      <div style="font-size:.75rem;color:var(--txt3);text-align:center">이미 작성했어요! 금요일에 다시 만나요 😊</div>
+    </div>`;
+}
+
+function submitMondayGoal() {
+  const weekendText = document.getElementById('wk-weekend-text')?.value.trim() || '';
+  const weekendMood = getChipVal('wk-mood');
+  const focusArea   = getChipVal('wk-focus');
+  const goalText    = getChipVal('wk-goal');
+  const mindset     = getChipVal('wk-mindset');
+  if (!weekendText) { toast('주말에 무엇을 했는지 써주세요!'); return; }
+  if (!weekendMood) { toast('주말 기분을 선택해주세요!'); return; }
+  if (!focusArea)   { toast('이번 주 노력할 것을 선택해주세요!'); return; }
+  if (!goalText)    { toast('이번 주 목표를 선택해주세요!'); return; }
+  if (!mindset)     { toast('이번 주 마음가짐을 선택해주세요!'); return; }
+
+  const wk = Utils.weekKey();
+  const id = `weekly_goal_${wk.replace('-','_')}_${CUR.id}`;
+  DB.saveWeeklyGoal({ id, studentId:CUR.id, studentName:CUR.name,
+    weekKey:wk, type:'monday_goal', weekendText, weekendMood,
+    focusArea, goalText, mindset, createdAt:Date.now() });
+  toast('📅 이번 주 다짐 저장! 금요일에 돌아봐요 😊');
+  closeModal('m-weekly');
+  renderMain(); renderMobile();
+  if (document.getElementById('house-tab-weekly')?.style.display !== 'none') renderWeeklyTab();
+}
+
+// ── 금요일 폼 ────────────────────────────────────────
+function buildFridayForm(goal) {
+  const wk = Utils.weekKey();
+  const existing = DB.getWeeklyReflection(CUR.id, wk);
+  if (existing) return buildFridayReadOnly(goal, existing);
+
+  const focusQ   = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${goal.focusArea}'</strong>를 얼마나 노력했나요?` : '이번 주 얼마나 노력했나요?';
+  const goalQ    = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${goal.goalText}'</strong>를 어떻게 해냈나요?` : '이번 주 목표를 어떻게 해냈나요?';
+  const mindsetQ = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${goal.mindset||"마음가짐"}'</strong>으로 지내려고 얼마나 노력했나요?` : '이번 주 마음가짐을 얼마나 지켰나요?';
+
+  return `
+    <div style="padding:.8rem 1rem;display:flex;flex-direction:column;gap:1.1rem">
+      ${goal ? `
+      <div style="background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);
+        border-radius:12px;padding:.8rem;font-size:.8rem">
+        <div style="font-size:.72rem;color:var(--gold);font-weight:700;margin-bottom:.5rem">📅 이번 주 월요일 다짐</div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">🏖️ 주말에 한 일: <b>${goal.weekendText||''}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">😊 주말 기분: <b>${goal.weekendMood||''}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">💪 노력할 것: <b>${goal.focusArea||''}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">🎯 목표: <b>${goal.goalText||''}</b></div>
+        <div style="color:var(--txt2)">🌟 마음가짐: <b>${goal.mindset||''}</b></div>
+      </div>` : ''}
+      <!-- Q1 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">${focusQ}</div>
+        ${buildChipForm('wk-effort', WEEKLY_EFFORT_OPTS, '', false)}
+      </div>
+      <!-- Q2 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">${goalQ}</div>
+        ${buildChipForm('wk-achieve', WEEKLY_ACHIEVE_OPTS, '', false)}
+      </div>
+      <!-- Q3 마음가짐 성찰 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">3. ${mindsetQ}</div>
+        ${buildChipForm('wk-mindset-ref', WEEKLY_MINDSET_REF, '', false)}
+      </div>
+      <!-- Q4 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">4. 이번 주 내가 가장 잘한 점은?</div>
+        ${buildChipForm('wk-best', WEEKLY_BEST_OPTS, '')}
+      </div>
+      <!-- Q5 -->
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">5. 다음 주에는 무엇을 더 해보고 싶나요?</div>
+        ${buildChipForm('wk-next', WEEKLY_NEXT_OPTS, '')}
+      </div>
+      <button class="btn-gold" style="padding:.6rem;font-size:.88rem;font-weight:800;border-radius:12px"
+        onclick="submitFridayReflection()">✅ 돌아보기 저장</button>
+    </div>`;
+}
+
+function buildFridayReadOnly(goal, ref) {
+  return `
+    <div style="padding:.8rem 1rem">
+      ${goal ? `<div style="background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);
+        border-radius:12px;padding:.8rem;margin-bottom:.7rem;font-size:.8rem">
+        <div style="font-size:.72rem;color:var(--gold);font-weight:700;margin-bottom:.5rem">📅 이번 주 다짐</div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">💪 ${goal.focusArea}</div>
+        <div style="color:var(--txt2)">🎯 ${goal.goalText}</div>
+      </div>` : ''}
+      <div style="background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.2);
+        border-radius:12px;padding:.9rem;margin-bottom:.7rem">
+        <div style="font-size:.72rem;color:var(--emerald);font-weight:700;margin-bottom:.6rem">✅ 이번 주 돌아보기 완료</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">📊 노력: ${ref.focusReflection||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🎯 목표: ${ref.goalReflection||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🌟 마음가짐: ${ref.mindsetReflection||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">⭐ 잘한 것: ${ref.bestMoment||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2)">➡️ 다음 주: ${ref.nextWeekGoal||''}</div>
+      </div>
+    </div>`;
+}
+
+function submitFridayReflection() {
+  const focusReflection   = getChipVal('wk-effort');
+  const goalReflection    = getChipVal('wk-achieve');
+  const mindsetReflection = getChipVal('wk-mindset-ref');
+  const bestMoment        = getChipVal('wk-best');
+  const nextWeekGoal      = getChipVal('wk-next');
+  if (!focusReflection)   { toast('노력 정도를 선택해주세요!'); return; }
+  if (!goalReflection)    { toast('목표 달성을 선택해주세요!'); return; }
+  if (!mindsetReflection) { toast('마음가짐 성찰을 선택해주세요!'); return; }
+  if (!bestMoment)        { toast('잘한 점을 선택해주세요!'); return; }
+  if (!nextWeekGoal)      { toast('다음 주 목표를 선택해주세요!'); return; }
+
+  const wk   = Utils.weekKey();
+  const goal = DB.getWeeklyGoal(CUR.id, wk);
+  const id   = `weekly_ref_${wk.replace('-','_')}_${CUR.id}`;
+  DB.saveWeeklyReflection({ id, studentId:CUR.id, studentName:CUR.name,
+    weekKey:wk, type:'friday_reflection',
+    mondayGoalId: goal?.id || null,
+    focusReflection, goalReflection, mindsetReflection, bestMoment, nextWeekGoal,
+    createdAt: Date.now() });
+  toast('📅 이번 주 돌아보기 완료! 수고했어요 🎉');
+  closeModal('m-weekly');
+  renderMain(); renderMobile();
+  if (document.getElementById('house-tab-weekly')?.style.display !== 'none') renderWeeklyTab();
+}
+
+// ── 포트폴리오 주간 다짐 탭 렌더 ────────────────────
+function renderWeeklyTab() {
+  const el = document.getElementById('weekly-tab-content');
+  if (!el) return;
+  const d   = new Date(Date.now()+9*3600000);
+  const day = d.getUTCDay();
+  const wk  = Utils.weekKey();
+  const curGoal = DB.getWeeklyGoal(CUR.id, wk);
+  const curRef  = DB.getWeeklyReflection(CUR.id, wk);
+
+  // 이번 주 작성 버튼
+  let thisWeekHtml = `<div style="margin-bottom:1rem">
+    <div style="font-size:.78rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">📅 이번 주</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button onclick="openWeeklyModal('monday')"
+        style="padding:.45rem .9rem;border-radius:10px;font-size:.8rem;cursor:pointer;font-family:inherit;
+          border:1.5px solid ${curGoal?'rgba(46,204,113,.4)':'rgba(93,173,226,.4)'};
+          background:${curGoal?'rgba(46,204,113,.1)':'rgba(93,173,226,.1)'};
+          color:${curGoal?'var(--emerald)':'var(--sky)'}">
+        ${curGoal?'✅ 월요일 다짐 보기':'📝 이번 주 다짐 작성'}
+      </button>
+      <button onclick="openWeeklyModal('friday')"
+        style="padding:.45rem .9rem;border-radius:10px;font-size:.8rem;cursor:pointer;font-family:inherit;
+          border:1.5px solid ${curRef?'rgba(46,204,113,.4)':'rgba(255,215,0,.3)'};
+          background:${curRef?'rgba(46,204,113,.1)':'rgba(255,215,0,.07)'};
+          color:${curRef?'var(--emerald)':'var(--gold)'}">
+        ${curRef?'✅ 금요일 돌아보기 보기':'📝 이번 주 돌아보기 작성'}
+      </button>
+    </div>
+  </div>`;
+
+  // 이번 주 카드
+  if (curGoal || curRef) {
+    thisWeekHtml += buildWeekCard(wk, curGoal, curRef, true);
+  }
+
+  // 지난 기록 누적
+  const allGoals = DB.getWeeklyGoals(CUR.id);
+  const allRefs  = allGoals.map(g => DB.getWeeklyReflection(CUR.id, g.weekKey));
+  const allWeeks = [...new Set(allGoals.map(g=>g.weekKey))].sort().reverse();
+  const pastWeeks = allWeeks.filter(w => w !== wk);
+
+  const pastHtml = pastWeeks.length === 0 ? '' : `
+    <div style="font-size:.78rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">📚 지난 기록</div>
+    ${pastWeeks.map(w => {
+      const g = allGoals.find(x=>x.weekKey===w);
+      const r = DB.getWeeklyReflection(CUR.id, w);
+      return buildWeekCard(w, g, r, false);
+    }).join('')}`;
+
+  el.innerHTML = thisWeekHtml + pastHtml;
+}
+
+function buildWeekCard(wk, goal, ref, expanded) {
+  const id = 'wk-card-' + wk.replace(/[^a-z0-9]/gi,'_');
+  return `
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;margin-bottom:.6rem;overflow:hidden">
+      <div onclick="toggleWeekCard('${id}')" style="display:flex;align-items:center;justify-content:space-between;
+        padding:.6rem .9rem;cursor:pointer">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="font-size:.8rem;font-weight:700;color:var(--sky)">${wk}</span>
+          ${goal?`<span style="font-size:.65rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:8px;padding:.1rem .4rem">월 ✓</span>`:''}
+          ${ref ?`<span style="font-size:.65rem;background:rgba(46,204,113,.12);color:var(--emerald);border-radius:8px;padding:.1rem .4rem">금 ✓</span>`:''}
+        </div>
+        <span id="${id}-arrow" style="font-size:.7rem;color:var(--txt3)">${expanded?'▲':'▼'}</span>
+      </div>
+      <div id="${id}" style="display:${expanded?'':'none'};padding:0 .9rem .8rem">
+        ${goal?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.5rem;padding:.6rem;
+          background:rgba(255,215,0,.05);border-radius:8px;border:1px solid rgba(255,215,0,.1)">
+          <div style="font-size:.68rem;color:var(--gold);font-weight:700;margin-bottom:.35rem">📅 월요일 다짐</div>
+          <div style="margin-bottom:.2rem">🏖️ ${goal.weekendText||''} <span style="color:var(--txt3)">(${goal.weekendMood||''})</span></div>
+          <div style="margin-bottom:.2rem">💪 노력할 것: <b>${goal.focusArea||''}</b></div>
+          <div style="margin-bottom:.2rem">🎯 목표: <b>${goal.goalText||''}</b></div>
+          <div>🌟 마음가짐: <b>${goal.mindset||''}</b></div>
+        </div>`:'<div style="font-size:.75rem;color:var(--txt3);padding:.3rem 0">월요일 다짐 없음</div>'}
+        ${ref?`<div style="font-size:.78rem;color:var(--txt2);padding:.6rem;
+          background:rgba(46,204,113,.05);border-radius:8px;border:1px solid rgba(46,204,113,.1)">
+          <div style="font-size:.68rem;color:var(--emerald);font-weight:700;margin-bottom:.35rem">📅 금요일 돌아보기</div>
+          <div style="margin-bottom:.2rem">📊 노력: ${ref.focusReflection||''}</div>
+          <div style="margin-bottom:.2rem">🎯 목표: ${ref.goalReflection||''}</div>
+          <div style="margin-bottom:.2rem">🌟 마음가짐: ${ref.mindsetReflection||''}</div>
+          <div style="margin-bottom:.2rem">⭐ 잘한 것: ${ref.bestMoment||''}</div>
+          <div>➡️ 다음 주: ${ref.nextWeekGoal||''}</div>
+        </div>`:'<div style="font-size:.75rem;color:var(--txt3);padding:.3rem 0">금요일 돌아보기 없음</div>'}
+      </div>
+    </div>`;
+}
+
+function toggleWeekCard(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id+'-arrow');
+  if (!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? '' : 'none';
+  if (arrow) arrow.textContent = open ? '▲' : '▼';
+}
+
+// ══════════════════════════════════════════════════════
+//  영어 단어장 + 팝업 퀴즈
+// ══════════════════════════════════════════════════════
+
+const VOCAB_CATEGORIES = ['school','people','family','food','drink','animal','body','clothes','nature',
+  'time','place','transport','adjective','verb','number','color','home','position','question','greeting','basic','subject','activity','quantity'];
+const VOCAB_POS = ['noun','verb','adjective','adverb','pronoun','preposition','conjunction','interjection','number','other'];
+
+// ── 포트폴리오 단어장 탭 렌더 ─────────────────────────
+function renderVocabTab() {
+  const el = document.getElementById('vocab-tab-content');
+  if (!el) return;
+  const ws       = DB.getActiveWordSet();
+  const allWords = DB.getAllVocabWords();
+  const records  = DB.getQuizRecords(CUR.id);
+  const wrongIds = [...new Set(records.flatMap(r=>r.wrongWordIds||[]))];
+  const wrongWords = wrongIds.map(id=>allWords.find(w=>w.id===id)).filter(Boolean);
+  const setWords   = ws ? (ws.wordIds||[]).map(id=>allWords.find(w=>w.id===id)).filter(Boolean) : [];
+
+  // 통계
+  const totalQuiz  = records.length;
+  const totalRight = records.reduce((s,r)=>s+r.correct,0);
+  const totalQ     = records.reduce((s,r)=>s+r.total,0);
+  const accuracy   = totalQ > 0 ? Math.round(totalRight/totalQ*100) : 0;
+  const streak     = (() => {
+    let s=0; const today=Utils.todayStr();
+    for (const r of records) { if(r.correct===r.total) s++; else break; }
+    return s;
+  })();
+
+  el.innerHTML = `
+  <!-- ① 상단 상태 카드 -->
+  <div style="background:linear-gradient(135deg,rgba(93,173,226,.15),rgba(142,68,173,.12));
+    border:1px solid rgba(93,173,226,.2);border-radius:14px;padding:.9rem 1rem;margin-bottom:.9rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+      <div>
+        <div style="font-size:.7rem;color:var(--sky);font-weight:700;margin-bottom:.15rem">
+          🔤 영어 단어장
+        </div>
+        <div style="font-size:.88rem;font-weight:800;color:var(--txt1)">
+          ${ws ? ws.title : '학습 단어 없음'}
+        </div>
+        ${ws ? `<div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">${setWords.length}개 단어 학습 중</div>` : ''}
+      </div>
+      ${ws ? `<button onclick="startVocabQuiz()"
+        style="background:linear-gradient(135deg,var(--gold),#e67e22);border:none;
+          color:#1a1a1a;font-weight:800;font-size:.82rem;padding:.5rem 1.1rem;
+          border-radius:12px;cursor:pointer;font-family:inherit;white-space:nowrap;
+          box-shadow:0 3px 12px rgba(255,215,0,.25)">
+        📝 퀴즈 풀기
+      </button>` : ''}
+    </div>
+    <!-- 미니 통계 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem">
+      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:.45rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--gold)">${totalQuiz}</div>
+        <div style="font-size:.6rem;color:var(--txt3)">총 퀴즈</div>
+      </div>
+      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:.45rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--emerald)">${accuracy}%</div>
+        <div style="font-size:.6rem;color:var(--txt3)">정확도</div>
+      </div>
+      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:.45rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--sky)">${wrongIds.length}</div>
+        <div style="font-size:.6rem;color:var(--txt3)">헷갈린 단어</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 현재 학습 단어 카드 -->
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;padding:.8rem;margin-bottom:.8rem">
+    <div style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:.55rem">
+      📚 이번 학습 단어 ${setWords.length > 0 ? `<span style="color:var(--gold);font-weight:400">${setWords.length}개</span>` : ''}
+    </div>
+    ${setWords.length === 0
+      ? `<div style="text-align:center;padding:1rem 0;color:var(--txt3);font-size:.8rem">
+          선생님이 단어 세트를 지정하면 여기에 표시돼요</div>`
+      : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
+          ${setWords.map(w => `
+            <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+              border-radius:10px;padding:.4rem .6rem;display:flex;align-items:center;gap:.4rem">
+              <span style="font-weight:700;font-size:.85rem;color:var(--sky);min-width:0;
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.word}</span>
+              <span style="color:var(--txt3);font-size:.72rem;flex-shrink:0">${w.meaning.split(',')[0]}</span>
+            </div>`).join('')}
+        </div>`}
+  </div>
+
+  <!-- ③ 퀴즈 기록 -->
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;padding:.8rem;margin-bottom:.8rem">
+    <div style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:.5rem">📅 퀴즈 기록</div>
+    ${records.length === 0
+      ? `<div style="text-align:center;padding:.8rem 0;color:var(--txt3);font-size:.78rem">
+          아직 퀴즈 기록이 없어요<br><span style="font-size:.7rem">퀴즈를 풀면 여기에 기록돼요</span></div>`
+      : `<div style="display:flex;flex-direction:column;gap:.3rem">
+          ${records.slice(0,8).map(r => {
+            const pct = Math.round(r.correct/r.total*100);
+            const color = pct===100?'var(--emerald)':pct>=60?'var(--gold)':'var(--red)';
+            return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;
+              background:rgba(255,255,255,.03);border-radius:8px">
+              <span style="font-size:.7rem;color:var(--txt3);min-width:72px">${r.date}</span>
+              <!-- 바 -->
+              <div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
+              </div>
+              <span style="font-size:.78rem;font-weight:700;color:${color};min-width:32px;text-align:right">
+                ${r.correct}/${r.total}</span>
+              ${pct===100?'<span style="font-size:.65rem">✨</span>':''}
+            </div>`;
+          }).join('')}
+        </div>`}
+  </div>
+
+  <!-- ④ 헷갈린 단어 -->
+  ${wrongWords.length > 0 ? `
+  <div style="background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.15);
+    border-radius:14px;padding:.8rem">
+    <div style="font-size:.72rem;font-weight:700;color:var(--red);margin-bottom:.5rem">
+      🔁 헷갈린 단어 다시 보기 <span style="font-weight:400;color:var(--txt3)">${wrongWords.length}개</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
+      ${wrongWords.slice(0,12).map(w=>`
+        <div style="background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.15);
+          border-radius:8px;padding:.35rem .55rem;display:flex;align-items:center;gap:.35rem">
+          <span style="font-weight:700;font-size:.82rem;color:var(--red)">${w.word}</span>
+          <span style="color:var(--txt3);font-size:.7rem;flex-shrink:0">${w.meaning.split(',')[0]}</span>
+        </div>`).join('')}
+    </div>
+  </div>` : ''}`;
+}
+
+// ── 퀴즈 자동 팝업 체크 ──────────────────────────────
+function checkVocabQuizTrigger() {
+  if (!CUR) return;
+  const ws = DB.getActiveWordSet();
+  if (!ws || !ws.wordIds || ws.wordIds.length < 3) return;
+  const today = Utils.todayStr();
+  const lastKey = `vocab_quiz_shown_${CUR.id}_${today}`;
+  if (localStorage.getItem(lastKey)) return; // 하루 1회
+  // 로그인 10초 후 팝업
+  setTimeout(() => {
+    if (document.getElementById('m-vocab-quiz')?.style.display === 'flex') return;
+    showVocabQuizPrompt();
+  }, 10000);
+}
+
+function showVocabQuizPrompt() {
+  const body = document.getElementById('vq-body');
+  const titleEl = document.getElementById('vq-title');
+  if (!body || !titleEl) return;
+  titleEl.textContent = '📖 단어 퀴즈';
+  body.innerHTML = `
+    <div style="padding:1.2rem 1rem;text-align:center">
+      <div style="font-size:2rem;margin-bottom:.5rem">📝</div>
+      <div style="font-size:.95rem;font-weight:700;color:var(--txt1);margin-bottom:.4rem">잠깐 단어 보고 갈까요?</div>
+      <div style="font-size:.78rem;color:var(--txt3);margin-bottom:1.2rem">5문제만 풀면 돼요!</div>
+      <div style="display:flex;gap:.6rem;justify-content:center">
+        <button class="btn-gold" style="padding:.55rem 1.4rem;font-size:.88rem;border-radius:12px"
+          onclick="startVocabQuiz()">✏️ 풀어볼게요!</button>
+        <button onclick="closeModal('m-vocab-quiz')"
+          style="padding:.55rem 1rem;font-size:.82rem;border-radius:12px;font-family:inherit;
+            border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
+            color:var(--txt2);cursor:pointer">나중에</button>
+      </div>
+    </div>`;
+  openModal('m-vocab-quiz');
+}
+
+// ── 퀴즈 생성 + 진행 ────────────────────────────────
+let VOCAB_QUIZ = { questions:[], cur:0, correct:0, wrongIds:[] };
+
+function startVocabQuiz() {
+  const ws = DB.getActiveWordSet();
+  if (!ws) { toast('선생님이 단어 세트를 지정하지 않았어요'); return; }
+  const allWords = DB.getAllVocabWords();
+  const quizWords = (ws.wordIds||[]).map(id=>allWords.find(w=>w.id===id)).filter(Boolean);
+  if (quizWords.length < 3) { toast('단어가 3개 이상 있어야 퀴즈를 시작할 수 있어요'); return; }
+
+  // 최근 틀린 단어 가중치
+  const records = DB.getQuizRecords(CUR.id);
+  const recentWrongIds = new Set(records.slice(0,5).flatMap(r=>r.wrongWordIds||[]));
+
+  // 최근 3일 퀴즈 단어 (가중치 낮춤)
+  const recentDate = new Date(Date.now()-3*86400000).toISOString().slice(0,10);
+  const recentQuizIds = new Set(
+    records.filter(r=>r.date>=recentDate).flatMap(r=>r.wordIds||[])
+  );
+
+  // 가중치 계산
+  const weighted = quizWords.flatMap(w => {
+    const times = recentWrongIds.has(w.id) ? 3 : recentQuizIds.has(w.id) ? 1 : 2;
+    return Array(times).fill(w);
+  });
+
+  // 5문제 선택 (중복 없이)
+  const picked = [];
+  const used = new Set();
+  const shuffled = [...weighted].sort(()=>Math.random()-.5);
+  for (const w of shuffled) {
+    if (!used.has(w.id)) { picked.push(w); used.add(w.id); }
+    if (picked.length >= 5) break;
+  }
+  // 부족하면 나머지에서 채우기
+  if (picked.length < 5) {
+    for (const w of quizWords) {
+      if (!used.has(w.id)) { picked.push(w); used.add(w.id); }
+      if (picked.length >= 5) break;
+    }
+  }
+
+  // 문제 유형 배분: mc_meaning×2, mc_word×1, short_meaning×1, spelling×1
+  const types = ['mc_meaning','mc_meaning','mc_word','short_meaning','spelling']
+    .sort(()=>Math.random()-.5);
+
+  VOCAB_QUIZ = {
+    questions: picked.map((w,i)=>({word:w, type:types[i]||'mc_meaning'})),
+    cur:0, correct:0, wrongIds:[],
+    wordIds: picked.map(w=>w.id)
+  };
+
+  // 하루 1회 표시 기록
+  localStorage.setItem(`vocab_quiz_shown_${CUR.id}_${Utils.todayStr()}`, '1');
+
+  openModal('m-vocab-quiz');
+  renderVocabQuestion();
+}
+
+function renderVocabQuestion() {
+  const body = document.getElementById('vq-body');
+  const titleEl = document.getElementById('vq-title');
+  if (!body) return;
+  const { questions, cur } = VOCAB_QUIZ;
+  if (cur >= questions.length) { finishVocabQuiz(); return; }
+  const q = questions[cur];
+  const { word, type } = q;
+
+  titleEl.textContent = `📖 단어 퀴즈 ${cur+1}/5`;
+  const allWords = DB.getAllVocabWords();
+
+  if (type === 'mc_meaning') {
+    // 영어 → 한글 뜻 객관식
+    const choices = buildVocabChoices(word, allWords, 'meaning', 4);
+    body.innerHTML = `
+      <div style="padding:.8rem 1rem">
+        <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">영어 단어의 뜻은?</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold);text-align:center;
+          margin:.8rem 0 1rem;letter-spacing:.05em">${word.word}</div>
+        <div style="display:flex;flex-direction:column;gap:.4rem">
+          ${choices.map((c,i)=>`
+            <button onclick="submitVocabAnswer('${c.meaning.replace(/'/g,"\\'")}')"
+              style="text-align:left;padding:.55rem .9rem;border-radius:10px;font-size:.85rem;
+                font-family:inherit;cursor:pointer;border:1.5px solid rgba(255,255,255,.12);
+                background:rgba(255,255,255,.05);color:var(--txt1);transition:.15s"
+              onmouseenter="this.style.background='rgba(255,255,255,.1)'"
+              onmouseleave="this.style.background='rgba(255,255,255,.05)'">
+              ${['①','②','③','④'][i]} ${c.meaning}
+            </button>`).join('')}
+        </div>
+      </div>`;
+
+  } else if (type === 'mc_word') {
+    // 한글 뜻 → 영어 객관식
+    const choices = buildVocabChoices(word, allWords, 'word', 4);
+    body.innerHTML = `
+      <div style="padding:.8rem 1rem">
+        <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">한글 뜻에 맞는 영어 단어는?</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--sky);text-align:center;
+          margin:.8rem 0 1rem">${word.meaning}</div>
+        <div style="display:flex;flex-direction:column;gap:.4rem">
+          ${choices.map((c,i)=>`
+            <button onclick="submitVocabAnswer('${c.word.replace(/'/g,"\\'")}')"
+              style="text-align:left;padding:.55rem .9rem;border-radius:10px;font-size:.85rem;
+                font-family:inherit;cursor:pointer;border:1.5px solid rgba(255,255,255,.12);
+                background:rgba(255,255,255,.05);color:var(--txt1);transition:.15s"
+              onmouseenter="this.style.background='rgba(255,255,255,.1)'"
+              onmouseleave="this.style.background='rgba(255,255,255,.05)'">
+              ${['①','②','③','④'][i]} ${c.word}
+            </button>`).join('')}
+        </div>
+      </div>`;
+
+  } else if (type === 'short_meaning') {
+    // 영어 → 한글 뜻 주관식
+    body.innerHTML = `
+      <div style="padding:.8rem 1rem">
+        <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">영어 단어의 한글 뜻을 쓰세요</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold);text-align:center;
+          margin:.8rem 0 1rem">${word.word}</div>
+        <input id="vq-input" type="text" placeholder="한글 뜻 입력..."
+          style="width:100%;box-sizing:border-box;padding:.5rem .8rem;border-radius:10px;font-size:.9rem;
+            border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);
+            color:var(--txt1);font-family:inherit"
+          onkeydown="if(event.key==='Enter')checkVocabShortAnswer()">
+        <button class="btn-gold" onclick="checkVocabShortAnswer()"
+          style="width:100%;margin-top:.6rem;padding:.5rem;border-radius:10px;font-size:.85rem">
+          확인 →
+        </button>
+      </div>`;
+    setTimeout(()=>document.getElementById('vq-input')?.focus(), 100);
+
+  } else {
+    // spelling: 한글 뜻 → 영어 스펠링
+    body.innerHTML = `
+      <div style="padding:.8rem 1rem">
+        <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">한글 뜻을 보고 영어 단어를 쓰세요</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--sky);text-align:center;
+          margin:.8rem 0 1rem">${word.meaning}</div>
+        <input id="vq-input" type="text" placeholder="영어로 입력..."
+          style="width:100%;box-sizing:border-box;padding:.5rem .8rem;border-radius:10px;font-size:.9rem;
+            border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);
+            color:var(--txt1);font-family:inherit;text-transform:lowercase"
+          onkeydown="if(event.key==='Enter')checkVocabSpelling()">
+        <button class="btn-gold" onclick="checkVocabSpelling()"
+          style="width:100%;margin-top:.6rem;padding:.5rem;border-radius:10px;font-size:.85rem">
+          확인 →
+        </button>
+      </div>`;
+    setTimeout(()=>document.getElementById('vq-input')?.focus(), 100);
+  }
+}
+
+function buildVocabChoices(word, allWords, field, count) {
+  const need = count - 1; // 정답 제외 오답 수
+  const wrong = allWords.filter(w => w.id !== word.id);
+  const usedVals = new Set([word[field]]);
+  const picked = [];
+
+  // 1순위: 같은 category에서 랜덤으로 뽑기
+  const sameCat = wrong.filter(w => w.category === word.category)
+    .sort(() => Math.random() - .5);
+  for (const w of sameCat) {
+    if (picked.length >= need) break;
+    if (!usedVals.has(w[field])) { picked.push(w); usedVals.add(w[field]); }
+  }
+
+  // 2순위: 부족하면 같은 pos에서 보충
+  if (picked.length < need) {
+    const samePos = wrong.filter(w => w.pos === word.pos && w.category !== word.category)
+      .sort(() => Math.random() - .5);
+    for (const w of samePos) {
+      if (picked.length >= need) break;
+      if (!usedVals.has(w[field])) { picked.push(w); usedVals.add(w[field]); }
+    }
+  }
+
+  // 3순위: 그래도 부족하면 나머지 전체에서 보충
+  if (picked.length < need) {
+    const rest = wrong.filter(w => w.pos !== word.pos && w.category !== word.category)
+      .sort(() => Math.random() - .5);
+    for (const w of rest) {
+      if (picked.length >= need) break;
+      if (!usedVals.has(w[field])) { picked.push(w); usedVals.add(w[field]); }
+    }
+  }
+
+  return [word, ...picked].sort(() => Math.random() - .5);
+}
+
+function submitVocabAnswer(chosen) {
+  const q = VOCAB_QUIZ.questions[VOCAB_QUIZ.cur];
+  const type = q.type;
+  const isCorrect = type === 'mc_meaning'
+    ? chosen === q.word.meaning
+    : chosen === q.word.word;
+  showVocabFeedback(isCorrect, q.word);
+}
+
+function checkVocabShortAnswer() {
+  const val = document.getElementById('vq-input')?.value.trim() || '';
+  const q   = VOCAB_QUIZ.questions[VOCAB_QUIZ.cur];
+  // 뜻의 첫 번째 키워드와 비교 (쉼표 앞 첫 단어)
+  const correct = q.word.meaning.split(/[,，]/)[0].trim();
+  const isCorrect = val === correct || val === q.word.meaning;
+  showVocabFeedback(isCorrect, q.word, val);
+}
+
+function checkVocabSpelling() {
+  const val = (document.getElementById('vq-input')?.value.trim()||'').toLowerCase();
+  const q   = VOCAB_QUIZ.questions[VOCAB_QUIZ.cur];
+  const isCorrect = val === q.word.word.toLowerCase();
+  showVocabFeedback(isCorrect, q.word, val);
+}
+
+function showVocabFeedback(isCorrect, word, userAnswer) {
+  if (isCorrect) VOCAB_QUIZ.correct++;
+  else           VOCAB_QUIZ.wrongIds.push(word.id);
+
+  const body = document.getElementById('vq-body');
+  body.innerHTML = `
+    <div style="padding:1rem;text-align:center">
+      <div style="font-size:2rem;margin-bottom:.3rem">${isCorrect ? '✅' : '❌'}</div>
+      <div style="font-size:.95rem;font-weight:700;color:${isCorrect?'var(--emerald)':'var(--red)'};margin-bottom:.5rem">
+        ${isCorrect ? '맞았어요!' : '틀렸어요'}</div>
+      <div style="font-size:1.1rem;font-weight:800;color:var(--gold);margin-bottom:.2rem">${word.word}</div>
+      <div style="font-size:.88rem;color:var(--txt2);margin-bottom:.15rem">${word.meaning}</div>
+      ${!isCorrect && userAnswer ? `<div style="font-size:.75rem;color:var(--txt3)">내 답: ${userAnswer}</div>` : ''}
+      <button class="btn-gold" onclick="nextVocabQuestion()"
+        style="margin-top:.9rem;padding:.5rem 1.8rem;border-radius:12px;font-size:.88rem">
+        ${VOCAB_QUIZ.cur+1 < VOCAB_QUIZ.questions.length ? '다음 →' : '결과 보기'}
+      </button>
+    </div>`;
+}
+
+function nextVocabQuestion() {
+  VOCAB_QUIZ.cur++;
+  renderVocabQuestion();
+}
+
+function finishVocabQuiz() {
+  const { correct, questions, wrongIds, wordIds } = VOCAB_QUIZ;
+  const total = questions.length;
+  // 퀴즈 기록 저장
+  DB.saveQuizRecord({
+    id: `quiz_${Utils.todayStr()}_${CUR.id}_${Date.now()}`,
+    studentId: CUR.id,
+    date: Utils.todayStr(),
+    total, correct,
+    wrongWordIds: [...new Set(wrongIds)],
+    wordIds: wordIds || []
+  });
+
+  const body = document.getElementById('vq-body');
+  const titleEl = document.getElementById('vq-title');
+  titleEl.textContent = '📖 퀴즈 완료!';
+  body.innerHTML = `
+    <div style="padding:1.2rem 1rem;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:.4rem">
+        ${correct===total?'🎉':correct>=3?'😊':'💪'}
+      </div>
+      <div style="font-size:1.5rem;font-weight:800;color:var(--gold);margin-bottom:.3rem">
+        ${correct} / ${total}
+      </div>
+      <div style="font-size:.85rem;color:var(--txt2);margin-bottom:.8rem">
+        ${correct===total?'완벽해요! 모두 맞혔어요 ✨':correct>=3?'잘했어요! 조금만 더 연습해봐요':'괜찮아요, 틀린 단어 다시 보기로 복습해봐요'}
+      </div>
+      ${wrongIds.length>0 ? `
+      <div style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.15);
+        border-radius:10px;padding:.6rem;margin-bottom:.8rem;text-align:left">
+        <div style="font-size:.68rem;color:var(--red);font-weight:700;margin-bottom:.35rem">🔁 틀린 단어</div>
+        ${[...new Set(wrongIds)].map(id=>{
+          const w=DB.getAllVocabWords().find(x=>x.id===id);
+          return w?`<div style="font-size:.78rem;color:var(--txt2)">
+            <b style="color:var(--red)">${w.word}</b> — ${w.meaning}</div>`:'';
+        }).join('')}
+      </div>` : ''}
+      <button onclick="closeModal('m-vocab-quiz');if(document.getElementById('house-tab-vocab')?.style.display!=='none')renderVocabTab()"
+        style="padding:.5rem 1.5rem;border-radius:12px;font-family:inherit;font-size:.85rem;cursor:pointer;
+          border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:var(--txt1)">
+        닫기</button>
+    </div>`;
+
+  if (document.getElementById('house-tab-vocab')?.style.display !== 'none') renderVocabTab();
+}
+
 function renderHouseAchievements() {
   const earned = new Set(CUR.achievements || []);
   const doneList   = ACHIEVEMENTS.filter(a =>  earned.has(a.id));

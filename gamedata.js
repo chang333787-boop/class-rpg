@@ -538,6 +538,13 @@ const DB = {
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
     data.memories           = toArr(data.memories);
+    data.recorderLogs       = toArr(data.recorderLogs);
+    data.recorderSongs      = toArr(data.recorderSongs);
+    data.weeklyGoals        = toArr(data.weeklyGoals);
+    data.weeklyReflections  = toArr(data.weeklyReflections);
+    data.customWords        = toArr(data.customWords);
+    data.teacherWordSets    = toArr(data.teacherWordSets);
+    data.quizRecords        = toArr(data.quizRecords);
     data.pwResetRequests    = toArr(data.pwResetRequests);
     // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
     if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
@@ -723,6 +730,161 @@ const DB = {
     this._fbRef.child('memories/' + id).remove();
   },
 
+  // ── 주간 다짐 (월요일 목표 + 금요일 성찰) ─────────────
+  // 월요일: { id, studentId, studentName, weekKey, type:'monday_goal',
+  //   weekendText, weekendMood, focusArea, goalText, mindset,
+  //   createdAt, updatedAt }
+  // 금요일: { id, studentId, studentName, weekKey, type:'friday_reflection',
+  //   mondayGoalId, focusReflection, goalReflection, mindsetReflection,
+  //   bestMoment, nextWeekGoal, createdAt, updatedAt }
+  getWeeklyGoals(studentId) {
+    return (this.load().weeklyGoals||[]).filter(r => r.studentId === studentId);
+  },
+  getWeeklyGoal(studentId, weekKey) {
+    return (this.load().weeklyGoals||[]).find(r => r.studentId===studentId && r.weekKey===weekKey) || null;
+  },
+  getAllWeeklyGoals() { return this.load().weeklyGoals || []; },
+  saveWeeklyGoal(goal) {
+    const db = this.load();
+    db.weeklyGoals = db.weeklyGoals || [];
+    const idx = db.weeklyGoals.findIndex(r => r.id === goal.id);
+    if (idx >= 0) db.weeklyGoals[idx] = { ...db.weeklyGoals[idx], ...goal, updatedAt: Date.now() };
+    else db.weeklyGoals.push({ ...goal, updatedAt: Date.now() });
+    this._cache = db;
+    this._fbRef.child('weeklyGoals/' + goal.id).set(db.weeklyGoals.find(r=>r.id===goal.id));
+  },
+  getWeeklyReflection(studentId, weekKey) {
+    return (this.load().weeklyReflections||[]).find(r => r.studentId===studentId && r.weekKey===weekKey) || null;
+  },
+  getAllWeeklyReflections() { return this.load().weeklyReflections || []; },
+  saveWeeklyReflection(ref) {
+    const db = this.load();
+    db.weeklyReflections = db.weeklyReflections || [];
+    const idx = db.weeklyReflections.findIndex(r => r.id === ref.id);
+    if (idx >= 0) db.weeklyReflections[idx] = { ...db.weeklyReflections[idx], ...ref, updatedAt: Date.now() };
+    else db.weeklyReflections.push({ ...ref, updatedAt: Date.now() });
+    this._cache = db;
+    this._fbRef.child('weeklyReflections/' + ref.id).set(db.weeklyReflections.find(r=>r.id===ref.id));
+  },
+
+  // ── 리코더 곡 목록 ─────────────────────────────────
+  // { id, title, grade, memo, order, isFocusSong, active, createdAt, updatedAt }
+  getRecorderSongs() {
+    return (this.load().recorderSongs || [])
+      .sort((a,b) => (a.order??99) - (b.order??99));
+  },
+  getActiveRecorderSongs() {
+    return this.getRecorderSongs().filter(s => s.active !== false);
+  },
+  saveRecorderSong(song) {
+    const db = this.load();
+    db.recorderSongs = db.recorderSongs || [];
+    const idx = db.recorderSongs.findIndex(s => s.id === song.id);
+    const now = Date.now();
+    if (idx >= 0) {
+      db.recorderSongs[idx] = { ...db.recorderSongs[idx], ...song, updatedAt: now };
+    } else {
+      db.recorderSongs.push({
+        order: db.recorderSongs.length, active: true, isFocusSong: false,
+        ...song, createdAt: now, updatedAt: now
+      });
+    }
+    this._cache = db;
+    this._fbRef.child('recorderSongs').set(db.recorderSongs);
+  },
+  deleteRecorderSong(id) {
+    const db = this.load();
+    db.recorderSongs = (db.recorderSongs || []).filter(s => s.id !== id);
+    this._cache = db;
+    this._fbRef.child('recorderSongs').set(db.recorderSongs);
+  },
+
+  // ── 리코더 기록 ─────────────────────────────────────
+  // 저장 단위: 학생 + 곡 + 날짜 = 1레코드
+  // { id, studentId, studentName, songId, songTitle, date,
+  //   practiceCount(0~5), recordingUrl, recordingName,
+  //   reflection, bestToday, difficultPart, selfRating(1~5),
+  //   teacherComment, createdAt, updatedAt }
+  getAllRecorderLogs() { return this.load().recorderLogs || []; },
+  getRecorderLogs(studentId) {
+    return (this.load().recorderLogs || []).filter(r => r.studentId === studentId);
+  },
+  getRecorderLog(studentId, songId, date) {
+    return (this.load().recorderLogs || []).find(
+      r => r.studentId===studentId && r.songId===songId && r.date===date
+    ) || null;
+  },
+  saveRecorderLog(log) {
+    const db = this.load();
+    db.recorderLogs = db.recorderLogs || [];
+    const idx = db.recorderLogs.findIndex(r => r.id === log.id);
+    const now = Date.now();
+    if (idx >= 0) {
+      db.recorderLogs[idx] = { ...db.recorderLogs[idx], ...log, updatedAt: now };
+    } else {
+      db.recorderLogs.push({ ...log, createdAt: now, updatedAt: now });
+    }
+    this._cache = db;
+    this._fbRef.child('recorderLogs/' + log.id).set(
+      db.recorderLogs.find(r => r.id === log.id)
+    );
+  },
+  deleteRecorderLog(id) {
+    const db = this.load();
+    db.recorderLogs = (db.recorderLogs || []).filter(r => r.id !== id);
+    this._cache = db;
+    this._fbRef.child('recorderLogs/' + id).remove();
+  },
+
+  // ── 영어 단어장 ──────────────────────────────────────
+  // customWords: { id, word, meaning, pos, category, gradeLevel:'custom', sourceType:'custom', createdAt }
+  getCustomWords()        { return this.load().customWords || []; },
+  saveCustomWord(w) {
+    const db = this.load();
+    db.customWords = db.customWords || [];
+    const idx = db.customWords.findIndex(x=>x.id===w.id);
+    if (idx>=0) db.customWords[idx]={...db.customWords[idx],...w};
+    else db.customWords.push({...w,createdAt:Date.now()});
+    this._cache=db; this._fbRef.child('customWords').set(db.customWords);
+  },
+  deleteCustomWord(id) {
+    const db=this.load(); db.customWords=(db.customWords||[]).filter(x=>x.id!==id);
+    this._cache=db; this._fbRef.child('customWords').set(db.customWords);
+  },
+  // teacherWordSets: { id, title, wordIds[], active, createdAt }
+  getTeacherWordSets()    { return this.load().teacherWordSets || []; },
+  getActiveWordSet() {
+    return (this.load().teacherWordSets||[]).find(s=>s.active) || null;
+  },
+  saveTeacherWordSet(s) {
+    const db=this.load(); db.teacherWordSets=db.teacherWordSets||[];
+    const idx=db.teacherWordSets.findIndex(x=>x.id===s.id);
+    if (idx>=0) db.teacherWordSets[idx]={...db.teacherWordSets[idx],...s};
+    else db.teacherWordSets.push({...s,createdAt:Date.now()});
+    this._cache=db; this._fbRef.child('teacherWordSets').set(db.teacherWordSets);
+  },
+  deleteTeacherWordSet(id) {
+    const db=this.load(); db.teacherWordSets=(db.teacherWordSets||[]).filter(x=>x.id!==id);
+    this._cache=db; this._fbRef.child('teacherWordSets').set(db.teacherWordSets);
+  },
+  // 전체 단어 풀 (base + custom 합산)
+  getAllVocabWords() {
+    const custom = this.getCustomWords();
+    return [...BASE_WORDS, ...custom];
+  },
+  getWordById(id) { return this.getAllVocabWords().find(w=>w.id===id)||null; },
+  // quizRecords: { id, studentId, date, total, correct, wrongWordIds[], createdAt }
+  getQuizRecords(studentId) {
+    return (this.load().quizRecords||[]).filter(r=>r.studentId===studentId)
+      .sort((a,b)=>b.date.localeCompare(a.date));
+  },
+  getAllQuizRecords() { return this.load().quizRecords||[]; },
+  saveQuizRecord(r) {
+    const db=this.load(); db.quizRecords=db.quizRecords||[];
+    db.quizRecords.push({...r,createdAt:Date.now()});
+    this._cache=db; this._fbRef.child('quizRecords/'+r.id).set(db.quizRecords.find(x=>x.id===r.id));
+  },
+
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
   removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
@@ -840,6 +1002,19 @@ const Utils = {
     const sun = new Date(d);
     sun.setUTCDate(d.getUTCDate() - day); // 이번 주 일요일
     return sun.toISOString().slice(0,10);
+  },
+  // ISO 주차 키: 2026-W14 형태 (월요일 기준)
+  weekKey() {
+    const d = new Date(Date.now()+9*3600000);
+    const day = d.getUTCDay(); // 0=일
+    // 이번 주 월요일 찾기
+    const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d);
+    mon.setUTCDate(d.getUTCDate() + diff);
+    // ISO 주차 계산
+    const jan1 = new Date(Date.UTC(mon.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil(((mon - jan1) / 86400000 + jan1.getUTCDay() + 1) / 7);
+    return `${mon.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
   },
   isQuestDoneToday(quests, studentId, boardQuestId, questType) {
     const today = this.todayStr();
@@ -2208,3 +2383,159 @@ function saveEmotionReflection(studentId, candidate, responseType, responseText,
   }
   return record;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 영어 단어장 — BASE_WORDS 500개 (초등 기본 단어, 퀴즈 보기 생성용)
+// ═══════════════════════════════════════════════════════════════
+const BASE_WORDS = (function(){
+const raw = [
+["base_001","I","나","pronoun","basic"],["base_002","you","너, 당신","pronoun","basic"],["base_003","he","그","pronoun","basic"],["base_004","she","그녀","pronoun","basic"],
+["base_005","it","그것","pronoun","basic"],["base_006","we","우리","pronoun","basic"],["base_007","they","그들","pronoun","basic"],["base_008","me","나를","pronoun","basic"],
+["base_009","him","그를","pronoun","basic"],["base_010","her","그녀를","pronoun","basic"],["base_011","us","우리를","pronoun","basic"],["base_012","them","그들을","pronoun","basic"],
+["base_013","my","나의","pronoun","basic"],["base_014","your","너의, 당신의","pronoun","basic"],["base_015","his","그의","pronoun","basic"],["base_016","our","우리의","pronoun","basic"],
+["base_017","their","그들의","pronoun","basic"],["base_018","this","이것, 이","pronoun","basic"],["base_019","that","저것, 저","pronoun","basic"],
+["base_020","name","이름","noun","people"],["base_021","friend","친구","noun","people"],["base_022","boy","소년, 남자아이","noun","people"],["base_023","girl","소녀, 여자아이","noun","people"],
+["base_024","baby","아기","noun","people"],["base_025","man","남자","noun","people"],["base_026","woman","여자","noun","people"],["base_027","child","아이","noun","people"],
+["base_028","children","아이들","noun","people"],["base_029","people","사람들","noun","people"],["base_030","family","가족","noun","people"],
+["base_031","mother","어머니","noun","family"],["base_032","father","아버지","noun","family"],["base_033","mom","엄마","noun","family"],["base_034","dad","아빠","noun","family"],
+["base_035","parents","부모님","noun","family"],["base_036","sister","자매, 여동생, 누나","noun","family"],["base_037","brother","형제, 남동생, 오빠","noun","family"],
+["base_038","grandma","할머니","noun","family"],["base_039","grandpa","할아버지","noun","family"],["base_040","cousin","사촌","noun","family"],
+["base_041","uncle","삼촌, 작은아버지","noun","family"],["base_042","aunt","이모, 고모, 숙모","noun","family"],
+["base_043","teacher","선생님","noun","school"],["base_044","student","학생","noun","school"],["base_045","school","학교","noun","school"],["base_046","class","수업, 반","noun","school"],
+["base_047","classroom","교실","noun","school"],["base_048","book","책","noun","school"],["base_049","notebook","공책","noun","school"],["base_050","pencil","연필","noun","school"],
+["base_051","pen","펜","noun","school"],["base_052","eraser","지우개","noun","school"],["base_053","ruler","자","noun","school"],["base_054","desk","책상","noun","school"],
+["base_055","chair","의자","noun","school"],["base_056","bag","가방","noun","school"],["base_057","paper","종이","noun","school"],["base_058","picture","그림, 사진","noun","school"],
+["base_059","computer","컴퓨터","noun","school"],["base_060","board","칠판, 보드","noun","school"],["base_061","question","질문","noun","school"],["base_062","answer","정답, 대답","noun","school"],
+["base_063","homework","숙제","noun","school"],["base_064","test","시험","noun","school"],["base_065","lesson","수업, 단원","noun","school"],["base_066","library","도서관","noun","school"],
+["base_067","break","쉬는 시간","noun","school"],["base_068","bell","종, 벨","noun","school"],
+["base_069","English","영어","noun","subject"],["base_070","math","수학","noun","subject"],["base_071","science","과학","noun","subject"],["base_072","music","음악","noun","subject"],
+["base_073","art","미술","noun","subject"],["base_074","history","역사","noun","subject"],["base_075","story","이야기","noun","subject"],["base_076","word","단어","noun","subject"],
+["base_077","sentence","문장","noun","subject"],["base_078","letter","글자, 편지","noun","subject"],["base_079","number","숫자","noun","subject"],["base_080","page","쪽, 페이지","noun","subject"],
+["base_081","game","게임","noun","activity"],["base_082","team","팀","noun","activity"],["base_083","group","모둠, 그룹","noun","activity"],["base_084","study","공부","noun","activity"],
+["base_085","practice","연습","noun","activity"],["base_086","prize","상, 상품","noun","activity"],
+["base_087","one","하나","number","number"],["base_088","two","둘","number","number"],["base_089","three","셋","number","number"],["base_090","four","넷","number","number"],
+["base_091","five","다섯","number","number"],["base_092","six","여섯","number","number"],["base_093","seven","일곱","number","number"],["base_094","eight","여덟","number","number"],
+["base_095","nine","아홉","number","number"],["base_096","ten","열","number","number"],["base_097","twenty","스무","number","number"],["base_098","thirty","서른","number","number"],
+["base_099","hundred","백","number","number"],["base_100","first","첫째의, 첫 번째","number","number"],["base_101","second","둘째의, 두 번째","number","number"],["base_102","third","셋째의, 세 번째","number","number"],
+["base_103","many","많은","adjective","quantity"],["base_104","much","많은","adjective","quantity"],["base_105","some","약간의, 몇몇의","adjective","quantity"],["base_106","all","모든","adjective","quantity"],
+["base_107","every","모든, 매","adjective","quantity"],["base_108","few","거의 없는, 몇 안 되는","adjective","quantity"],
+["base_109","time","시간","noun","time"],["base_110","day","날","noun","time"],["base_111","week","주","noun","time"],["base_112","weekend","주말","noun","time"],
+["base_113","month","달, 월","noun","time"],["base_114","year","해, 년","noun","time"],["base_115","today","오늘","noun","time"],["base_116","tomorrow","내일","noun","time"],
+["base_117","yesterday","어제","noun","time"],["base_118","morning","아침","noun","time"],["base_119","afternoon","오후","noun","time"],["base_120","evening","저녁","noun","time"],
+["base_121","night","밤","noun","time"],["base_122","early","이른, 일찍","adjective","time"],["base_123","late","늦은, 늦게","adjective","time"],["base_124","birthday","생일","noun","time"],
+["base_125","holiday","휴일","noun","time"],["base_126","vacation","방학, 휴가","noun","time"],
+["base_127","Monday","월요일","noun","time"],["base_128","Tuesday","화요일","noun","time"],["base_129","Wednesday","수요일","noun","time"],["base_130","Thursday","목요일","noun","time"],
+["base_131","Friday","금요일","noun","time"],["base_132","Saturday","토요일","noun","time"],["base_133","Sunday","일요일","noun","time"],
+["base_134","January","1월","noun","time"],["base_135","February","2월","noun","time"],["base_136","March","3월","noun","time"],["base_137","April","4월","noun","time"],
+["base_138","May","5월","noun","time"],["base_139","June","6월","noun","time"],["base_140","July","7월","noun","time"],["base_141","August","8월","noun","time"],
+["base_142","September","9월","noun","time"],["base_143","October","10월","noun","time"],["base_144","November","11월","noun","time"],["base_145","December","12월","noun","time"],
+["base_146","red","빨간색의","adjective","color"],["base_147","blue","파란색의","adjective","color"],["base_148","yellow","노란색의","adjective","color"],
+["base_149","green","초록색의","adjective","color"],["base_150","black","검은색의","adjective","color"],["base_151","white","하얀색의","adjective","color"],
+["base_152","pink","분홍색의","adjective","color"],["base_153","purple","보라색의","adjective","color"],["base_154","brown","갈색의","adjective","color"],
+["base_155","orange","주황색의","adjective","color"],["base_156","gray","회색의","adjective","color"],
+["base_157","home","집, 가정","noun","home"],["base_158","house","집","noun","home"],["base_159","room","방","noun","home"],["base_160","kitchen","부엌","noun","home"],
+["base_161","bathroom","욕실","noun","home"],["base_162","bedroom","침실","noun","home"],["base_163","door","문","noun","home"],["base_164","window","창문","noun","home"],
+["base_165","wall","벽","noun","home"],["base_166","floor","바닥","noun","home"],["base_167","bed","침대","noun","home"],["base_168","table","탁자","noun","home"],
+["base_169","sofa","소파","noun","home"],["base_170","clock","시계","noun","home"],["base_171","box","상자","noun","home"],["base_172","key","열쇠","noun","home"],
+["base_173","park","공원","noun","place"],["base_174","zoo","동물원","noun","place"],["base_175","store","가게","noun","place"],["base_176","market","시장","noun","place"],
+["base_177","hospital","병원","noun","place"],["base_178","bank","은행","noun","place"],["base_179","station","역","noun","place"],["base_180","street","거리","noun","place"],
+["base_181","road","길, 도로","noun","place"],["base_182","city","도시","noun","place"],["base_183","town","마을, 소도시","noun","place"],["base_184","country","나라, 시골","noun","place"],
+["base_185","world","세계","noun","place"],["base_186","restaurant","식당","noun","place"],["base_187","farm","농장","noun","place"],["base_188","beach","해변","noun","place"],
+["base_189","mountain","산","noun","place"],["base_190","river","강","noun","place"],
+["base_191","bus","버스","noun","transport"],["base_192","car","자동차","noun","transport"],["base_193","bike","자전거","noun","transport"],
+["base_194","train","기차","noun","transport"],["base_195","subway","지하철","noun","transport"],["base_196","taxi","택시","noun","transport"],
+["base_197","airplane","비행기","noun","transport"],["base_198","boat","보트, 배","noun","transport"],["base_199","ticket","표","noun","transport"],
+["base_200","map","지도","noun","transport"],["base_201","trip","여행","noun","transport"],
+["base_202","food","음식","noun","food"],["base_203","rice","밥, 쌀","noun","food"],["base_204","bread","빵","noun","food"],["base_205","soup","수프","noun","food"],
+["base_206","meat","고기","noun","food"],["base_207","fish","생선, 물고기","noun","food"],["base_208","chicken","닭고기, 닭","noun","food"],["base_209","egg","달걀","noun","food"],
+["base_210","noodle","국수","noun","food"],["base_211","pizza","피자","noun","food"],["base_212","cake","케이크","noun","food"],["base_213","cookie","쿠키","noun","food"],
+["base_214","candy","사탕","noun","food"],["base_215","chocolate","초콜릿","noun","food"],["base_216","breakfast","아침 식사","noun","food"],["base_217","dinner","저녁 식사","noun","food"],
+["base_218","snack","간식","noun","food"],["base_219","fruit","과일","noun","food"],["base_220","apple","사과","noun","food"],["base_221","banana","바나나","noun","food"],
+["base_222","grape","포도","noun","food"],["base_223","peach","복숭아","noun","food"],["base_224","pear","배","noun","food"],["base_225","strawberry","딸기","noun","food"],
+["base_226","watermelon","수박","noun","food"],["base_227","tomato","토마토","noun","food"],["base_228","potato","감자","noun","food"],["base_229","carrot","당근","noun","food"],
+["base_230","onion","양파","noun","food"],["base_231","corn","옥수수","noun","food"],["base_232","cucumber","오이","noun","food"],
+["base_233","water","물","noun","drink"],["base_234","milk","우유","noun","drink"],["base_235","juice","주스","noun","drink"],["base_236","tea","차","noun","drink"],
+["base_237","coffee","커피","noun","drink"],["base_238","bottle","병","noun","drink"],["base_239","cup","컵","noun","drink"],["base_240","bowl","그릇","noun","drink"],
+["base_241","dog","개","noun","animal"],["base_242","cat","고양이","noun","animal"],["base_243","bird","새","noun","animal"],["base_244","rabbit","토끼","noun","animal"],
+["base_245","bear","곰","noun","animal"],["base_246","tiger","호랑이","noun","animal"],["base_247","lion","사자","noun","animal"],["base_248","monkey","원숭이","noun","animal"],
+["base_249","elephant","코끼리","noun","animal"],["base_250","horse","말","noun","animal"],["base_251","cow","소","noun","animal"],["base_252","pig","돼지","noun","animal"],
+["base_253","duck","오리","noun","animal"],["base_254","frog","개구리","noun","animal"],["base_255","snake","뱀","noun","animal"],["base_256","turtle","거북이","noun","animal"],
+["base_257","panda","판다","noun","animal"],["base_258","mouse","쥐","noun","animal"],
+["base_259","body","몸","noun","body"],["base_260","head","머리","noun","body"],["base_261","face","얼굴","noun","body"],["base_262","eye","눈","noun","body"],
+["base_263","nose","코","noun","body"],["base_264","mouth","입","noun","body"],["base_265","ear","귀","noun","body"],["base_266","hair","머리카락","noun","body"],
+["base_267","hand","손","noun","body"],["base_268","arm","팔","noun","body"],["base_269","leg","다리","noun","body"],["base_270","foot","발","noun","body"],
+["base_271","finger","손가락","noun","body"],["base_272","neck","목","noun","body"],["base_273","back","등","noun","body"],["base_274","stomach","배, 위","noun","body"],
+["base_275","heart","심장, 마음","noun","body"],
+["base_276","clothes","옷","noun","clothes"],["base_277","shirt","셔츠","noun","clothes"],["base_278","T-shirt","티셔츠","noun","clothes"],["base_279","pants","바지","noun","clothes"],
+["base_280","skirt","치마","noun","clothes"],["base_281","dress","원피스, 드레스","noun","clothes"],["base_282","coat","코트","noun","clothes"],["base_283","jacket","재킷","noun","clothes"],
+["base_284","shoes","신발","noun","clothes"],["base_285","socks","양말","noun","clothes"],["base_286","hat","모자","noun","clothes"],["base_287","glove","장갑","noun","clothes"],
+["base_288","uniform","교복, 유니폼","noun","clothes"],
+["base_289","sun","해, 태양","noun","nature"],["base_290","moon","달","noun","nature"],["base_291","star","별","noun","nature"],["base_292","sky","하늘","noun","nature"],
+["base_293","cloud","구름","noun","nature"],["base_294","rain","비","noun","nature"],["base_295","snow","눈","noun","nature"],["base_296","wind","바람","noun","nature"],
+["base_297","weather","날씨","noun","nature"],["base_298","spring","봄","noun","nature"],["base_299","summer","여름","noun","nature"],["base_300","fall","가을","noun","nature"],
+["base_301","winter","겨울","noun","nature"],["base_302","tree","나무","noun","nature"],["base_303","flower","꽃","noun","nature"],["base_304","grass","풀","noun","nature"],
+["base_305","leaf","잎","noun","nature"],["base_306","sea","바다","noun","nature"],["base_307","lake","호수","noun","nature"],["base_308","forest","숲","noun","nature"],
+["base_309","big","큰","adjective","adjective"],["base_310","small","작은","adjective","adjective"],["base_311","tall","키 큰","adjective","adjective"],["base_312","short","짧은, 키 작은","adjective","adjective"],
+["base_313","long","긴","adjective","adjective"],["base_314","old","늙은, 오래된","adjective","adjective"],["base_315","new","새로운","adjective","adjective"],["base_316","young","어린, 젊은","adjective","adjective"],
+["base_317","good","좋은","adjective","adjective"],["base_318","bad","나쁜","adjective","adjective"],["base_319","nice","좋은, 친절한","adjective","adjective"],["base_320","kind","친절한","adjective","adjective"],
+["base_321","happy","행복한","adjective","adjective"],["base_322","sad","슬픈","adjective","adjective"],["base_323","angry","화난","adjective","adjective"],["base_324","tired","피곤한","adjective","adjective"],
+["base_325","hungry","배고픈","adjective","adjective"],["base_326","thirsty","목마른","adjective","adjective"],["base_327","sick","아픈","adjective","adjective"],["base_328","busy","바쁜","adjective","adjective"],
+["base_329","easy","쉬운","adjective","adjective"],["base_330","hard","어려운, 단단한","adjective","adjective"],["base_331","hot","뜨거운, 더운","adjective","adjective"],["base_332","cold","차가운, 추운","adjective","adjective"],
+["base_333","warm","따뜻한","adjective","adjective"],["base_334","cool","시원한, 멋진","adjective","adjective"],["base_335","fun","재미있는","adjective","adjective"],["base_336","funny","웃긴, 재미있는","adjective","adjective"],
+["base_337","cute","귀여운","adjective","adjective"],["base_338","pretty","예쁜","adjective","adjective"],["base_339","beautiful","아름다운","adjective","adjective"],["base_340","strong","강한","adjective","adjective"],
+["base_341","weak","약한","adjective","adjective"],["base_342","fast","빠른","adjective","adjective"],["base_343","slow","느린","adjective","adjective"],["base_344","clean","깨끗한","adjective","adjective"],
+["base_345","dirty","더러운","adjective","adjective"],["base_346","loud","시끄러운, 큰 소리의","adjective","adjective"],["base_347","quiet","조용한","adjective","adjective"],["base_348","same","같은","adjective","adjective"],
+["base_349","be","이다, 있다","verb","verb"],["base_350","have","가지다","verb","verb"],["base_351","do","하다","verb","verb"],["base_352","go","가다","verb","verb"],
+["base_353","come","오다","verb","verb"],["base_354","see","보다","verb","verb"],["base_355","look","보다","verb","verb"],["base_356","watch","지켜보다","verb","verb"],
+["base_357","hear","듣다","verb","verb"],["base_358","listen","귀 기울여 듣다","verb","verb"],["base_359","say","말하다","verb","verb"],["base_360","speak","말하다","verb","verb"],
+["base_361","tell","말해주다","verb","verb"],["base_362","ask","묻다","verb","verb"],["base_363","know","알다","verb","verb"],["base_364","like","좋아하다","verb","verb"],
+["base_365","love","사랑하다, 아주 좋아하다","verb","verb"],["base_366","want","원하다","verb","verb"],["base_367","need","필요로 하다","verb","verb"],["base_368","get","얻다, 받다","verb","verb"],
+["base_369","make","만들다","verb","verb"],["base_370","use","사용하다","verb","verb"],["base_371","find","찾다, 발견하다","verb","verb"],["base_372","give","주다","verb","verb"],
+["base_373","take","가져가다, 잡다","verb","verb"],["base_374","put","놓다","verb","verb"],["base_375","open","열다","verb","verb"],["base_376","close","닫다","verb","verb"],
+["base_377","bring","가져오다","verb","verb"],["base_378","help","돕다","verb","verb"],["base_379","call","부르다, 전화하다","verb","verb"],["base_380","show","보여주다","verb","verb"],
+["base_381","meet","만나다","verb","verb"],["base_382","live","살다","verb","verb"],["base_383","eat","먹다","verb","verb"],["base_384","drink","마시다","verb","verb"],
+["base_385","play","놀다, 연주하다","verb","verb"],["base_386","read","읽다","verb","verb"],["base_387","write","쓰다","verb","verb"],["base_388","draw","그리다","verb","verb"],
+["base_389","sing","노래하다","verb","verb"],["base_390","dance","춤추다","verb","verb"],["base_391","run","달리다","verb","verb"],["base_392","walk","걷다","verb","verb"],
+["base_393","jump","뛰다","verb","verb"],["base_394","sit","앉다","verb","verb"],["base_395","stand","서다","verb","verb"],["base_396","sleep","자다","verb","verb"],
+["base_397","wash","씻다","verb","verb"],["base_398","study","공부하다","verb","verb"],["base_399","learn","배우다","verb","verb"],["base_400","carry","나르다","verb","verb"],
+["base_401","here","여기","adverb","position"],["base_402","there","저기, 거기","adverb","position"],["base_403","in","안에","preposition","position"],["base_404","on","위에","preposition","position"],
+["base_405","under","아래에","preposition","position"],["base_406","behind","뒤에","preposition","position"],["base_407","near","가까이","preposition","position"],["base_408","far","먼","adjective","position"],
+["base_409","up","위로","adverb","position"],["base_410","down","아래로","adverb","position"],["base_411","left","왼쪽","noun","position"],["base_412","right","오른쪽","noun","position"],
+["base_413","inside","안쪽에","adverb","position"],["base_414","outside","밖에","adverb","position"],["base_415","together","함께","adverb","position"],
+["base_416","what","무엇","pronoun","question"],["base_417","who","누구","pronoun","question"],["base_418","where","어디","adverb","question"],["base_419","when","언제","adverb","question"],
+["base_420","why","왜","adverb","question"],["base_421","how","어떻게","adverb","question"],["base_422","yes","네","interjection","question"],["base_423","no","아니요","interjection","question"],
+["base_424","hello","안녕하세요","interjection","greeting"],["base_425","hi","안녕","interjection","greeting"],["base_426","bye","잘 가","interjection","greeting"],
+["base_427","please","제발, 부탁해요","interjection","greeting"],["base_428","sorry","미안해","interjection","greeting"],["base_429","thank","감사하다","verb","greeting"],
+["base_430","thanks","고마워","interjection","greeting"],
+["base_431","can","할 수 있다","verb","basic"],["base_432","will","~할 것이다","verb","basic"],["base_433","not","아니다, ~않다","adverb","basic"],
+["base_434","and","그리고","conjunction","basic"],["base_435","but","하지만","conjunction","basic"],["base_436","because","왜냐하면","conjunction","basic"],
+["base_437","with","~와 함께","preposition","basic"],["base_438","for","~을 위해, ~동안","preposition","basic"],["base_439","about","~에 대해","preposition","basic"],
+["base_440","line","줄","noun","subject"],["base_441","number","숫자","noun","subject"],
+["base_442","living room","거실","noun","home"],["base_443","lamp","등, 램프","noun","home"],
+["base_444","bus stop","버스 정류장","noun","place"],["base_445","shop","상점","noun","place"],
+["base_446","bicycle","자전거","noun","transport"],["base_447","ship","큰 배","noun","transport"],["base_448","seat","자리, 좌석","noun","transport"],["base_449","way","길, 방법","noun","transport"],
+["base_450","lunch","점심 식사","noun","food"],["base_451","melon","멜론, 참외류","noun","food"],
+["base_452","soda","탄산음료","noun","drink"],["base_453","glass","유리컵, 유리","noun","drink"],
+["base_454","toe","발가락","noun","body"],["base_455","tooth","이","noun","body"],
+["base_456","cap","챙 달린 모자","noun","clothes"],
+["base_457","light","밝은, 빛","adjective","color"],["base_458","dark","어두운","adjective","color"],
+["base_459","more","더 많은, 더","adjective","quantity"],["base_460","most","가장 많은, 대부분의","adjective","quantity"],["base_461","any","어떤, 무엇이든","adjective","quantity"],
+["base_462","now","지금","adverb","time"],["base_463","later","나중에","adverb","time"],
+["base_464","over","위로, 위에","preposition","position"],["base_465","in front of","앞에","preposition","position"],["base_466","next to","옆에","preposition","position"],
+["base_467","between","사이에","preposition","position"],["base_468","around","주위에, 둘레에","preposition","position"],
+["base_469","color","색칠하다","verb","verb"],["base_470","wake","깨다","verb","verb"],["base_471","clean","청소하다","verb","verb"],
+["base_472","P.E.","체육","noun","subject"],["base_473","lunch","점심","noun","school"],
+["base_474","eleven","열하나","number","number"],["base_475","twelve","열둘","number","number"],["base_476","thirteen","열셋","number","number"],
+["base_477","fourteen","열넷","number","number"],["base_478","fifteen","열다섯","number","number"],["base_479","sixteen","열여섯","number","number"],
+["base_480","seventeen","열일곱","number","number"],["base_481","eighteen","열여덟","number","number"],["base_482","nineteen","열아홉","number","number"],
+["base_483","forty","마흔","number","number"],["base_484","fifty","쉰","number","number"],["base_485","sixty","예순","number","number"],
+["base_486","seventy","일흔","number","number"],["base_487","eighty","여든","number","number"],["base_488","ninety","아흔","number","number"],
+["base_489","may","~해도 되다","verb","basic"],
+["base_490","fast","빠른","adjective","adjective"],["base_491","have","가지고 있다","verb","verb"],
+["base_492","speak","말하다","verb","verb"],["base_493","answer","대답하다","verb","verb"],
+["base_494","him","그를","pronoun","basic"],["base_495","her","그녀의","pronoun","basic"],
+["base_496","window","창문","noun","home"],["base_497","wall","벽","noun","home"],
+["base_498","forest","숲","noun","nature"],["base_499","lake","호수","noun","nature"],["base_500","sea","바다","noun","nature"]
+];
+return raw.map(([id,word,meaning,pos,category])=>({id,word,meaning,pos,category,gradeLevel:'basic',sourceType:'base'}));
+})();
