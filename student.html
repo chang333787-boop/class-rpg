@@ -2664,39 +2664,41 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .badge.gold{border-color:rgba(255,215,0,.4);color:var(--gold);}
 
 /* ── 게임 바디 (데스크탑: 사이드+메인 / 모바일: 탭) ── */
-.game-body{flex:1;display:grid;grid-template-columns:minmax(220px, 22%) 1fr;overflow:hidden;}
+.game-body{flex:1;display:grid;grid-template-columns:minmax(260px, 26%) 1fr;overflow:hidden;}
 
 /* ── 사이드 패널 (데스크탑) ── */
 .side-panel{background:linear-gradient(180deg,var(--bg2),#0a1628);
-  border-right:1px solid rgba(255,215,0,.12);overflow-y:auto;padding:1rem .8rem;
-  display:flex;flex-direction:column;gap:.8rem;}
+  border-right:1px solid rgba(255,215,0,.12);overflow-y:auto;padding:1rem .9rem;
+  display:flex;flex-direction:column;gap:.7rem;}
 .side-panel::-webkit-scrollbar{width:4px;}
 .side-panel::-webkit-scrollbar-thumb{background:rgba(255,215,0,.2);border-radius:2px;}
 .char-card{background:rgba(255,215,0,.05);border:1px solid var(--border);border-radius:var(--r);
-  padding:1rem;text-align:center;position:relative;overflow:hidden;}
+  padding:.8rem;text-align:center;position:relative;overflow:hidden;}
 .char-emoji{font-size:4rem;display:block;animation:floatY 4s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(255,215,0,.3));}
-.char-cname{font-weight:700;font-size:1rem;margin:.3rem 0 .1rem;}
-.char-job{font-size:.72rem;color:var(--sky);}
-.char-combat{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.8rem;}
-.combat-stat{background:rgba(255,255,255,.04);border-radius:6px;padding:.35rem .5rem;
-  font-size:.72rem;display:flex;justify-content:space-between;align-items:center;}
+.char-cname{font-weight:700;font-size:1.05rem;margin:.3rem 0 .1rem;}
+.char-job{font-size:.75rem;color:var(--sky);}
+.char-combat{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.7rem;}
+.combat-stat{background:rgba(255,255,255,.04);border-radius:6px;padding:.35rem .55rem;
+  font-size:.78rem;display:flex;justify-content:space-between;align-items:center;}
 .combat-val{font-weight:700;color:var(--gold);}
-.panel-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:var(--r);padding:.9rem;}
-.panel-label{font-size:.7rem;color:var(--txt3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.7rem;}
-.equip-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;}
-.equip-slot{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
-  border-radius:7px;padding:.4rem .5rem;display:flex;align-items:center;gap:.35rem;cursor:pointer;transition:all .2s;}
-.equip-slot:hover{border-color:rgba(255,215,0,.3);}
-.equip-slot.has{border-color:rgba(255,215,0,.25);}
-.eslot-icon{font-size:.95rem;}
-.eslot-type{font-size:.6rem;color:var(--txt3);}
-.eslot-name{font-size:.7rem;color:var(--gold);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ab-row{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;}
+.panel-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:var(--r);padding:.8rem;}
+.panel-label{font-size:.72rem;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem;cursor:pointer;}
+/* 장비 그리드 — 5칸 세로 나열 */
+.equip-grid{display:flex;flex-direction:column;gap:.35rem;}
+.equip-slot{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:9px;padding:.45rem .65rem;display:flex;align-items:center;gap:.55rem;cursor:pointer;transition:all .2s;}
+.equip-slot:hover{border-color:rgba(255,215,0,.35);background:rgba(255,215,0,.06);}
+.equip-slot.has{border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.04);}
+.eslot-icon{flex-shrink:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
+.eslot-info{flex:1;min-width:0;}
+.eslot-type{font-size:.65rem;color:var(--txt3);margin-bottom:.05rem;}
+.eslot-name{font-size:.78rem;color:var(--gold);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ab-row{display:flex;align-items:center;gap:.5rem;margin-bottom:.45rem;}
 .ab-row:last-child{margin-bottom:0;}
-.ab-name{font-size:.72rem;color:var(--txt2);width:32px;}
-.ab-bar{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+.ab-name{font-size:.74rem;color:var(--txt2);width:36px;flex-shrink:0;}
+.ab-bar{flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
 .ab-fill{height:100%;border-radius:3px;}
-.ab-val{font-size:.7rem;font-weight:700;width:18px;text-align:right;}
+.ab-val{font-size:.72rem;font-weight:700;width:20px;text-align:right;flex-shrink:0;}
 .ab-read .ab-fill{background:linear-gradient(90deg,#E74C3C,#C0392B);}
 .ab-study .ab-fill{background:linear-gradient(90deg,#3498DB,#2980B9);}
 .ab-art .ab-fill{background:linear-gradient(90deg,#9B59B6,#8E44AD);}
@@ -2922,12 +2924,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .lm-body::-webkit-scrollbar-thumb{background:rgba(255,215,0,.2);border-radius:2px;}
 
 /* 사냥터 카드 이펙트 */
-.zone-card:not(.zone-locked):hover{transform:translateY(-6px) scale(1.02);box-shadow:0 12px 40px rgba(0,0,0,.5);}
 .zone-shine{position:absolute;top:-50%;left:-50%;width:200%;height:200%;
   background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.08) 50%,transparent 60%);
   animation:shine 3s infinite;pointer-events:none;}
 @keyframes shine{0%{transform:translateX(-100%) rotate(0deg)}100%{transform:translateX(100%) rotate(0deg)}}
-.mon-select-card:not(.mon-select-dim):hover{transform:translateY(-5px) scale(1.03);box-shadow:0 10px 30px rgba(231,76,60,.35);}
 
 /* 모바일 대형 모달 */
 @media(max-width:600px){
@@ -3046,7 +3046,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ba-log-wrap{
   background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);
   border-radius:12px;padding:.65rem .85rem;margin-bottom:.8rem;
-  min-height:72px;max-height:90px;overflow-y:auto;text-align:left;
+  min-height:72px;max-height:130px;overflow-y:auto;text-align:left;
+  scroll-behavior:smooth;
 }
 .ba-log-wrap::-webkit-scrollbar{width:3px;}
 .ba-log-wrap::-webkit-scrollbar-thumb{background:rgba(255,215,0,.2);border-radius:2px;}
@@ -3054,29 +3055,135 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ba-log{font-size:.79rem;line-height:1.75;color:var(--txt2);}
 .ba-log .good{color:#6fd49d;font-weight:700;}.ba-log .bad{color:#FF8A80;font-weight:700;}.ba-log .info{color:#7ec8e3;}
 
+/* 스킬2 이펙트 */
+@keyframes skill-ki {
+  0%   { box-shadow:0 0 0 0 rgba(255,215,0,0); transform:scale(1); }
+  30%  { box-shadow:0 0 30px 12px rgba(255,215,0,.55), inset 0 0 20px rgba(255,215,0,.25); transform:scale(1.04); }
+  60%  { box-shadow:0 0 50px 20px rgba(255,140,0,.4), inset 0 0 30px rgba(255,100,0,.2); transform:scale(1.06); }
+  100% { box-shadow:0 0 0 0 rgba(255,215,0,0); transform:scale(1); }
+}
+@keyframes skill-heal {
+  0%   { box-shadow:0 0 0 0 rgba(111,212,157,0); transform:scale(1); }
+  40%  { box-shadow:0 0 30px 14px rgba(111,212,157,.55), inset 0 0 20px rgba(111,212,157,.3); transform:scale(1.04); }
+  100% { box-shadow:0 0 0 0 rgba(111,212,157,0); transform:scale(1); }
+}
+@keyframes skill-guard {
+  0%   { box-shadow:0 0 0 0 rgba(126,200,227,0); transform:scale(1); }
+  40%  { box-shadow:0 0 28px 12px rgba(126,200,227,.6), inset 0 0 18px rgba(126,200,227,.3); transform:scale(1.03); }
+  100% { box-shadow:0 0 0 0 rgba(126,200,227,0); transform:scale(1); }
+}
+@keyframes skill-counter {
+  0%   { box-shadow:0 0 0 0 rgba(195,155,211,0); transform:scale(1); }
+  25%  { box-shadow:0 0 0 18px rgba(195,155,211,.5); transform:scale(.97); }
+  60%  { box-shadow:0 0 35px 20px rgba(195,155,211,.65); transform:scale(1.05); }
+  100% { box-shadow:0 0 0 0 rgba(195,155,211,0); transform:scale(1); }
+}
+@keyframes skill-rush {
+  0%,100% { transform:scale(1); }
+  20%  { transform:scale(.96) translateX(-3px); }
+  40%  { transform:scale(1.05) translateX(3px); box-shadow:0 0 25px 10px rgba(243,156,18,.5); }
+  60%  { transform:scale(1.08) translateX(-2px); box-shadow:0 0 40px 16px rgba(243,156,18,.6); }
+  80%  { transform:scale(1.04); }
+}
+@keyframes skill-prep {
+  0%   { transform:scale(1); filter:brightness(1); }
+  50%  { transform:scale(1.06); filter:brightness(1.4); box-shadow:0 0 30px 12px rgba(255,215,0,.5); }
+  100% { transform:scale(1); filter:brightness(1); }
+}
+.skill-fx-ki      { animation: skill-ki      .7s ease-out; }
+.skill-fx-heal    { animation: skill-heal     .7s ease-out; }
+.skill-fx-guard   { animation: skill-guard    .65s ease-out; }
+.skill-fx-counter { animation: skill-counter  .75s ease-out; }
+.skill-fx-rush    { animation: skill-rush     .8s ease-out; }
+.skill-fx-prep    { animation: skill-prep     .6s ease-out; }
+
+/* 스킬 플래시 오버레이 */
+@keyframes skill-flash {
+  0%   { opacity:0; }
+  20%  { opacity:1; }
+  100% { opacity:0; }
+}
+.skill-flash-overlay {
+  position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  animation: skill-flash .5s ease-out forwards;
+}
+
 /* 행동 버튼 */
 .bat-actions{display:flex;gap:.6rem;margin-top:.2rem;}
 .bat-btn-attack{
   flex:1;padding:.75rem;border-radius:12px;font-size:.95rem;font-weight:900;cursor:pointer;
   font-family:'Noto Sans KR',sans-serif;border:2px solid rgba(255,180,0,.6);
   background:linear-gradient(135deg,rgba(255,160,0,.25),rgba(255,200,0,.15));
-  color:var(--gold);transition:all .18s;letter-spacing:.02em;
+  color:var(--gold);transition:transform .1s,box-shadow .1s,background .18s;letter-spacing:.02em;
+  box-shadow:0 4px 0 rgba(180,100,0,.5), 0 6px 16px rgba(255,180,0,.15);
+  transform:translateY(0);
+  -webkit-tap-highlight-color:transparent;
 }
-.bat-btn-attack:hover:not(:disabled){background:linear-gradient(135deg,rgba(255,160,0,.45),rgba(255,200,0,.3));transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,180,0,.3);}
-.bat-btn-attack:disabled{opacity:.4;cursor:default;transform:none;}
+.bat-btn-attack:hover:not(:disabled){
+  background:linear-gradient(135deg,rgba(255,160,0,.45),rgba(255,200,0,.3));
+  transform:translateY(-2px);
+  box-shadow:0 6px 0 rgba(180,100,0,.5), 0 10px 24px rgba(255,180,0,.3);
+}
+.bat-btn-attack:active:not(:disabled){
+  transform:translateY(3px) scale(.97);
+  box-shadow:0 1px 0 rgba(180,100,0,.5), 0 2px 8px rgba(255,180,0,.2);
+  background:linear-gradient(135deg,rgba(255,160,0,.55),rgba(255,200,0,.4));
+}
+.bat-btn-attack:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none;}
+
 .bat-btn-skill{
   flex:1;padding:.75rem;border-radius:12px;font-size:.95rem;font-weight:900;cursor:pointer;
   font-family:'Noto Sans KR',sans-serif;border:2px solid rgba(93,173,226,.5);
   background:linear-gradient(135deg,rgba(93,173,226,.2),rgba(52,120,200,.12));
-  color:var(--sky);transition:all .18s;letter-spacing:.02em;
+  color:var(--sky);transition:transform .1s,box-shadow .1s,background .18s;letter-spacing:.02em;
+  box-shadow:0 4px 0 rgba(30,90,160,.5), 0 6px 16px rgba(93,173,226,.15);
+  transform:translateY(0);
+  -webkit-tap-highlight-color:transparent;
 }
-.bat-btn-skill:hover:not(:disabled){background:linear-gradient(135deg,rgba(93,173,226,.38),rgba(52,120,200,.25));transform:translateY(-2px);box-shadow:0 6px 20px rgba(93,173,226,.3);}
-.bat-btn-skill:disabled{opacity:.4;cursor:default;transform:none;}
+.bat-btn-skill:hover:not(:disabled){
+  background:linear-gradient(135deg,rgba(93,173,226,.38),rgba(52,120,200,.25));
+  transform:translateY(-2px);
+  box-shadow:0 6px 0 rgba(30,90,160,.5), 0 10px 24px rgba(93,173,226,.3);
+}
+.bat-btn-skill:active:not(:disabled){
+  transform:translateY(3px) scale(.97);
+  box-shadow:0 1px 0 rgba(30,90,160,.5), 0 2px 8px rgba(93,173,226,.2);
+  background:linear-gradient(135deg,rgba(93,173,226,.45),rgba(52,120,200,.35));
+}
+.bat-btn-skill:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none;}
 
 /* 공격/스킬 2단계 서브 버튼 */
 .bat-sub-row{display:flex;gap:.4rem;margin-top:.5rem;}
-.bat-sub-btn{flex:1;min-width:0;padding:.4rem .2rem;border-radius:8px;font-size:.73rem;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;text-align:center;}
+.bat-sub-btn{
+  flex:1;min-width:0;padding:.4rem .2rem;border-radius:8px;font-size:.73rem;font-weight:700;
+  cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:transform .1s,box-shadow .1s;
+  text-align:center;
+  box-shadow:0 3px 0 rgba(0,0,0,.4);
+  transform:translateY(0);
+  -webkit-tap-highlight-color:transparent;
+}
+.bat-sub-btn:active{transform:translateY(3px) scale(.96);box-shadow:0 0 0 rgba(0,0,0,.4);}
 .bat-back-btn{background:none;border:none;color:var(--txt3);font-size:.68rem;cursor:pointer;font-family:inherit;margin-bottom:.3rem;padding:0;}
+
+/* 사냥터 카드 눌림 */
+.zone-card:not(.zone-locked){
+  transition:transform .12s,box-shadow .12s;
+  -webkit-tap-highlight-color:transparent;
+}
+.zone-card:not(.zone-locked):hover{transform:translateY(-6px) scale(1.02);box-shadow:0 12px 40px rgba(0,0,0,.5);}
+.zone-card:not(.zone-locked):active{transform:translateY(2px) scale(.97);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+
+/* 몬스터 선택 카드 눌림 */
+.mon-select-card:not(.mon-select-dim){
+  transition:transform .12s,box-shadow .12s;
+  -webkit-tap-highlight-color:transparent;
+}
+.mon-select-card:not(.mon-select-dim):hover{transform:translateY(-5px) scale(1.03);box-shadow:0 10px 30px rgba(231,76,60,.35);}
+.mon-select-card:not(.mon-select-dim):active{transform:translateY(2px) scale(.96);box-shadow:0 2px 6px rgba(231,76,60,.2);}
+
+/* 도감 몬스터 카드 눌림 */
+.mon-card:hover:not(.locked){border-color:rgba(231,76,60,.48);transform:translateY(-2px);}
+.mon-card:active:not(.locked){transform:translateY(2px) scale(.96) !important;}
 
 /* 결과 */
 .ba-result-box{border-radius:14px;padding:.9rem;margin-bottom:.8rem;text-align:center;}
@@ -4627,11 +4734,13 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
     const eqItem = eqId ? GAME_DATA.getItemById(eqId) : null;
     const name   = eqItem ? eqItem.name : (s.equipment?.[sl.k] || '');
     return `<div class="equip-slot ${name?'has':''}" onclick="openModal('m-inv');renderInv()">
-      <span class="eslot-icon" style="font-size:0;display:flex;align-items:center;justify-content:center">
-        ${eqId ? buildEquipIcon(sl.k, eqId) : `<span style="font-size:1.2rem">${sl.icon}</span>`}
+      <span class="eslot-icon">
+        ${eqId ? buildEquipIcon(sl.k, eqId) : `<span style="font-size:1.4rem">${sl.icon}</span>`}
       </span>
-      <div><div class="eslot-type">${sl.l}</div>
-      <div class="eslot-name">${name||'없음'}</div></div>
+      <div class="eslot-info">
+        <div class="eslot-type">${sl.l}</div>
+        <div class="eslot-name">${name||'없음'}</div>
+      </div>
     </div>`;
   }).join('');
   const abDefs = [{k:'read',l:'독서',c:'ab-read'},{k:'study',l:'학습',c:'ab-study'},
@@ -6201,9 +6310,12 @@ function _updateBattleHpBars(state) {
 
 // 로그만 업데이트
 function _updateBattleLog(state) {
-  const logEl = document.getElementById('ba-log');
+  const logEl  = document.getElementById('ba-log');
+  const wrapEl = logEl?.closest('.ba-log-wrap');
   if (!logEl) return;
-  logEl.innerHTML = state.log.slice(-4).join('<br>') || '';
+  logEl.innerHTML = state.log.slice(-8).join('<br>') || '';
+  // 자동 스크롤 — 최신 로그가 보이게
+  if (wrapEl) requestAnimationFrame(() => { wrapEl.scrollTop = wrapEl.scrollHeight; });
 }
 
 // 전투 종료 처리
@@ -6597,37 +6709,82 @@ function setSkillSlot(slotIndex, skillType) {
 }
 
 // ── 스킬2 사용 ──
+// 스킬2 캐릭터 이펙트
+function playSkill2Effect(skill2Id) {
+  const charEl = document.getElementById('ba-char-emoji');
+  if (!charEl) return;
+
+  const fxMap = {
+    heal:     { cls:'skill-fx-heal',    flash:'rgba(111,212,157,.25)', label:'💊', txt:'#6fd49d' },
+    guard:    { cls:'skill-fx-guard',   flash:'rgba(126,200,227,.22)', label:'🛡️', txt:'#7ec8e3' },
+    counter:  { cls:'skill-fx-counter', flash:'rgba(195,155,211,.22)', label:'⚔️', txt:'#c39bd3' },
+    prep:     { cls:'skill-fx-prep',    flash:'rgba(255,215,0,.25)',   label:'🎯', txt:'#FFD700' },
+    reckless: { cls:'skill-fx-ki',      flash:'rgba(255,100,0,.25)',   label:'⚡', txt:'#FF8A80' },
+    rush:     { cls:'skill-fx-rush',    flash:'rgba(243,156,18,.22)',  label:'🔥', txt:'#f39c12' },
+  };
+  const fx = fxMap[skill2Id];
+  if (!fx) return;
+
+  // 캐릭터 애니메이션
+  charEl.classList.remove(fx.cls);
+  void charEl.offsetWidth;
+  charEl.classList.add(fx.cls);
+  setTimeout(() => charEl.classList.remove(fx.cls), 800);
+
+  // 플래시 오버레이
+  const flash = document.createElement('div');
+  flash.className = 'skill-flash-overlay';
+  flash.style.background = fx.flash;
+  charEl.style.position = 'relative';
+  charEl.appendChild(flash);
+  setTimeout(() => flash.remove(), 550);
+
+  // 스킬 이름 큰 글씨 팝업
+  const popup = document.createElement('div');
+  popup.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:1.6rem;font-weight:900;color:${fx.txt};z-index:999;pointer-events:none;
+    text-shadow:0 0 12px ${fx.txt},0 2px 4px rgba(0,0,0,.8);
+    animation:skill-flash .65s ease-out forwards;white-space:nowrap;`;
+  popup.textContent = fx.label;
+  const arena = document.getElementById('battle-arena');
+  if (arena) { arena.style.position='relative'; arena.appendChild(popup); setTimeout(()=>popup.remove(),700); }
+}
+
 function doSkill2(skill2Id) {
   if (!BATTLE_STATE || BATTLE_STATE.finished || BATTLE_STATE.turn !== 'player') return;
   if (BATTLE_STATE.skill2Used?.[skill2Id]) return;
   document.querySelectorAll('#battle-arena button').forEach(b => b.disabled = true);
 
+  // 이펙트 먼저 재생
+  playSkill2Effect(skill2Id);
+
   if (skill2Id === 'reckless') {
-    BATTLE_STATE = performSkill2(BATTLE_STATE, 'reckless');
-    _updateBattleLog(BATTLE_STATE);
-    // 무리한 공격: 0.35초 후 스킬1 피커 표시
-    setTimeout(() => _showRecklessSkillPicker(), 350);
+    setTimeout(() => {
+      BATTLE_STATE = performSkill2(BATTLE_STATE, 'reckless');
+      _updateBattleLog(BATTLE_STATE);
+      setTimeout(() => _showRecklessSkillPicker(), 300);
+    }, 250);
     return;
   }
 
-  BATTLE_STATE = performSkill2(BATTLE_STATE, skill2Id);
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.35초 후 HP 반영 및 다음 단계
   setTimeout(() => {
-    _updateBattleHpBars(BATTLE_STATE);
-    if (BATTLE_STATE.finished) {
-      setTimeout(() => _finishBattle(), 400);
-      return;
-    }
-    if (BATTLE_STATE.turn === 'monster') {
-      // 0.3초 텀 후 몬스터 턴
-      setTimeout(() => _doMonsterTurn(), 300);
-    } else {
-      BATTLE_MENU = 'main';
-      renderBattleNew();
-    }
-  }, 350);
+    BATTLE_STATE = performSkill2(BATTLE_STATE, skill2Id);
+    _updateBattleLog(BATTLE_STATE);
+
+    setTimeout(() => {
+      _updateBattleHpBars(BATTLE_STATE);
+      if (BATTLE_STATE.finished) {
+        setTimeout(() => _finishBattle(), 400);
+        return;
+      }
+      if (BATTLE_STATE.turn === 'monster') {
+        setTimeout(() => _doMonsterTurn(), 300);
+      } else {
+        BATTLE_MENU = 'main';
+        renderBattleNew();
+      }
+    }, 350);
+  }, 250);
 }
 
 function _showRecklessSkillPicker() {
