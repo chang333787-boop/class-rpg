@@ -1067,54 +1067,167 @@ const Utils = {
 
 // ─── 업적 시스템 ─────────────────────────────────────
 const ACHIEVEMENTS = [
-  // 퀘스트
-  { id:'ach_quest1',  icon:'📋', name:'첫 번째 발걸음',   desc:'첫 퀘스트 완료',          check: s => (s.totalQuests||0) >= 1,   reward:{ title:null, deco:null,  exp:20 } },
-  { id:'ach_quest10', icon:'📜', name:'퀘스트 마스터',    desc:'퀘스트 10회 완료',         check: s => (s.totalQuests||0) >= 10,  reward:{ title:null, deco:null, exp:50 } },
-  { id:'ach_quest30', icon:'🏅', name:'전설의 모험가',     desc:'퀘스트 30회 완료',         check: s => (s.totalQuests||0) >= 30,  reward:{ title:null, deco:null,  exp:100 } },
-  // 독서
-  { id:'ach_book1',   icon:'📖', name:'첫 독서',          desc:'책 1권 읽기',              check: s => (s.bookCount||0) >= 1,    reward:{ title:null, deco:'deco_bookshelf', exp:15 } },
-  { id:'ach_book5',   icon:'📚', name:'독서왕 입문',       desc:'책 5권 읽기',              check: s => (s.bookCount||0) >= 5,    reward:{ title:null, deco:null,  exp:40 } },
-  { id:'ach_book15',  icon:'🎓', name:'지식의 탑',         desc:'책 15권 읽기',             check: s => (s.bookCount||0) >= 15,   reward:{ title:null, deco:null,  exp:80 } },
-  // 몬스터
-  { id:'ach_mon1',    icon:'⚔️', name:'첫 사냥',           desc:'첫 몬스터 처치',           check: s => (s.monsterLog||[]).length >= 1,  reward:{ title:null, deco:null, exp:20 } },
-  { id:'ach_mon5',    icon:'🗡️', name:'몬스터 사냥꾼',     desc:'몬스터 5종 처치',          check: s => (s.monsterLog||[]).length >= 5,  reward:{ title:null, deco:null, exp:60 } },
-  { id:'ach_mon_all', icon:'👑', name:'몬스터 도감 완성',  desc:'모든 일반 몬스터 처치',    check: s => (s.monsterLog||[]).length >= GAME_DATA.monsters.length, reward:{ title:null, deco:'deco_trophy', exp:150 } },
-  // 농장
-  { id:'ach_farm5',   icon:'🌱', name:'초보 농부',          desc:'농장 수확 5회',            check: s => (s.farmHarvests||0) >= 5,  reward:{ title:null, deco:null, exp:30 } },
-  { id:'ach_farm20',  icon:'🌾', name:'베테랑 농부',        desc:'농장 수확 20회',           check: s => (s.farmHarvests||0) >= 20, reward:{ title:null, deco:null, exp:70 } },
-  // 장비
-  { id:'ach_equip',   icon:'🛡️', name:'완전무장',           desc:'5개 슬롯 모두 장착',       check: s => {
-      const ids = s.equipmentIds||{};
-      return ['head','body','weapon','glove','shoe'].every(k => ids[k]);
-    }, reward:{ title:null, deco:null, exp:50 } },
-  // 레벨
-  { id:'ach_lv5',     icon:'⬆️', name:'첫 번째 도약',       desc:'레벨 5 달성',              check: s => s.level >= 5,   reward:{ title:null, deco:null, exp:30 } },
-  { id:'ach_lv10',    icon:'🌟', name:'숙련자',              desc:'레벨 10 달성',             check: s => s.level >= 10,  reward:{ title:null, deco:'deco_trophy', exp:80 } },
-  { id:'ach_lv20',    icon:'💫', name:'전설의 시작',         desc:'레벨 20 달성',             check: s => s.level >= 20,  reward:{ title:null, deco:null, exp:150 } },
+  // ══ A. 퀘스트 ══════════════════════════════════════════
+  { id:'ach_quest1',   icon:'📋', name:'첫 번째 발걸음',  desc:'첫 퀘스트 완료',           check: s=>(s.totalQuests||0)>=1,   reward:{exp:20,gold:10,title:null,deco:null} },
+  { id:'ach_quest5',   icon:'📋', name:'퀘스트 입문자',   desc:'퀘스트 5회 완료',          check: s=>(s.totalQuests||0)>=5,   reward:{exp:30,gold:15,title:null,deco:null} },
+  { id:'ach_quest10',  icon:'📜', name:'퀘스트 마스터',   desc:'퀘스트 10회 완료',         check: s=>(s.totalQuests||0)>=10,  reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_quest30',  icon:'🏅', name:'믿음직한 해결사', desc:'퀘스트 30회 완료',         check: s=>(s.totalQuests||0)>=30,  reward:{exp:100,gold:60,title:'해결사',deco:null} },
+  { id:'ach_quest50',  icon:'🏆', name:'만능 해결사',     desc:'퀘스트 50회 완료',         check: s=>(s.totalQuests||0)>=50,  reward:{exp:150,gold:100,title:'만능 해결사',deco:'deco_trophy'} },
+  { id:'ach_quest_approv', icon:'✅', name:'승인왕',      desc:'퀘스트 승인 20회 이상',    check: s=>(s.totalQuests||0)>=20,  reward:{exp:60,gold:40,title:null,deco:null} },
+
+  // ══ B. 전투 / 몬스터 ════════════════════════════════════
+  { id:'ach_mon1',     icon:'⚔️', name:'첫 사냥',         desc:'첫 몬스터 처치',           check: s=>(s.monsterLog||[]).length>=1,  reward:{exp:20,gold:10,title:null,deco:null} },
+  { id:'ach_mon5',     icon:'🗡️', name:'초보 헌터',       desc:'몬스터 5종 처치',          check: s=>(s.monsterLog||[]).length>=5,  reward:{exp:40,gold:20,title:null,deco:null} },
+  { id:'ach_mon15',    icon:'⚔️', name:'숙련 헌터',       desc:'몬스터 15종 처치',         check: s=>(s.monsterLog||[]).length>=15, reward:{exp:70,gold:40,title:'헌터',deco:null} },
+  { id:'ach_mon30',    icon:'🏹', name:'베테랑 헌터',     desc:'몬스터 30종 처치',         check: s=>(s.monsterLog||[]).length>=30, reward:{exp:100,gold:60,title:'베테랑 헌터',deco:null} },
+  { id:'ach_mon60',    icon:'🔱', name:'전설의 헌터',     desc:'몬스터 60종 처치',         check: s=>(s.monsterLog||[]).length>=60, reward:{exp:150,gold:100,title:'전설의 헌터',deco:'deco_trophy'} },
+
+  // 도감 — 초급 (30종)
+  { id:'ach_dex_beg5',  icon:'🗺️', name:'초급 탐험 시작', desc:'초급 몬스터 5종 발견',    check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='beginner').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;},  reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_dex_beg15', icon:'📖', name:'초급 수집가',    desc:'초급 몬스터 15종 발견',   check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='beginner').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=15;}, reward:{exp:60,gold:40,title:null,deco:null} },
+  { id:'ach_dex_beg30', icon:'🏆', name:'초급 도감 완성', desc:'초급 몬스터 30종 모두 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='beginner').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:100,gold:80,title:'초급 도감 마스터',deco:null} },
+
+  // 도감 — 중급 (50종)
+  { id:'ach_dex_mid10', icon:'🗺️', name:'중급 탐험 시작', desc:'중급 몬스터 10종 발견',   check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='intermediate').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=10;}, reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_dex_mid25', icon:'📖', name:'중급 수집가',    desc:'중급 몬스터 25종 발견',   check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='intermediate').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=25;}, reward:{exp:80,gold:60,title:null,deco:null} },
+  { id:'ach_dex_mid50', icon:'🏆', name:'중급 도감 완성', desc:'중급 몬스터 50종 모두 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='intermediate').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:150,gold:100,title:'중급 도감 마스터',deco:'deco_trophy'} },
+
+  // 도감 — 고급 (20종)
+  { id:'ach_dex_adv5',  icon:'🗺️', name:'고급 탐험 시작', desc:'고급 몬스터 5종 발견',    check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='advanced').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;},  reward:{exp:60,gold:50,title:null,deco:null} },
+  { id:'ach_dex_adv10', icon:'📖', name:'고급 수집가',    desc:'고급 몬스터 10종 발견',   check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='advanced').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=10;}, reward:{exp:100,gold:80,title:null,deco:null} },
+  { id:'ach_dex_adv20', icon:'👑', name:'고급 도감 완성', desc:'고급 몬스터 20종 모두 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.zone==='advanced').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:200,gold:150,title:'고급 도감 마스터',deco:'deco_trophy'} },
+
+  // 도감 — 전체
+  { id:'ach_dex_25',   icon:'🔍', name:'도감 수집가',    desc:'전체 몬스터 25종 발견',    check: s=>(s.monsterLog||[]).length>=25,  reward:{exp:60,gold:40,title:null,deco:null} },
+  { id:'ach_dex_50',   icon:'🗺️', name:'도감 탐험가',    desc:'전체 몬스터 50종 발견',    check: s=>(s.monsterLog||[]).length>=50,  reward:{exp:120,gold:80,title:'탐험가',deco:null} },
+  { id:'ach_mon_all',  icon:'👑', name:'도감 완성자',    desc:'전체 몬스터 100종 모두 발견',check: s=>(s.monsterLog||[]).length>=GAME_DATA.monsters.length, reward:{exp:300,gold:200,title:'도감 마스터',deco:'deco_trophy'} },
+
+  // 희귀도 업적 — common(42) / rare(62) / legend(21)
+  { id:'ach_rar_com5',  icon:'🔵', name:'일반 몬스터 발견자', desc:'일반(common) 몬스터 5종', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;},  reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_rar_com20', icon:'🔵', name:'일반 수집가',        desc:'일반(common) 몬스터 20종',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=20;}, reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_rar_com42', icon:'🔵', name:'일반 도감 완성',     desc:'일반(common) 몬스터 전부',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:100,gold:60,title:null,deco:null} },
+  { id:'ach_rar_rare3', icon:'🟣', name:'희귀 몬스터 발견자', desc:'희귀(rare) 몬스터 첫 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='rare').map(m=>m.id);return (s.monsterLog||[]).some(id=>ms.includes(id));}, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_rar_rare20',icon:'🟣', name:'희귀 수집가',        desc:'희귀(rare) 몬스터 20종', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='rare').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=20;}, reward:{exp:80,gold:60,title:null,deco:null} },
+  { id:'ach_rar_leg1',  icon:'🌟', name:'전설의 발견자',      desc:'전설(legend) 몬스터 첫 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return (s.monsterLog||[]).some(id=>ms.includes(id));}, reward:{exp:80,gold:60,title:'전설 목격자',deco:null} },
+  { id:'ach_rar_leg10', icon:'🌟', name:'전설 추적자',        desc:'전설(legend) 몬스터 10종',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=10;}, reward:{exp:150,gold:100,title:'전설 추적자',deco:null} },
+  { id:'ach_rar_leg21', icon:'💫', name:'전설 완성자',        desc:'전설(legend) 몬스터 전부',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:250,gold:180,title:'전설의 사냥꾼',deco:'deco_trophy'} },
+
+  // 속성 업적 (element: fire/water/grass)
+  { id:'ach_el_fire',  icon:'🔥', name:'불꽃 탐험가',     desc:'불꽃 속성 몬스터 5종 이상', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.element==='fire').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;}, reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_el_water', icon:'💧', name:'물결 탐험가',     desc:'물 속성 몬스터 5종 이상',   check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.element==='water').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;}, reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_el_grass', icon:'🌿', name:'숲의 탐험가',     desc:'풀 속성 몬스터 5종 이상',   check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.element==='grass').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;}, reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_el_all',   icon:'🌈', name:'속성 수집가',     desc:'모든 속성 몬스터 각 3종 이상',check: s=>{const ml=s.monsterLog||[];const mons=GAME_DATA.monsters;return ['fire','water','grass'].every(el=>ml.filter(id=>mons.find(m=>m.id===id&&m.element===el)).length>=3);}, reward:{exp:80,gold:60,title:'속성 마스터',deco:null} },
+
+  // ══ C. 농장 ══════════════════════════════════════════════
+  { id:'ach_farm1',    icon:'🌱', name:'씨앗의 시작',     desc:'첫 씨앗 심기',              check: s=>(s.farmHarvests||0)>=1,   reward:{exp:15,gold:10,title:null,deco:null} },
+  { id:'ach_farm5',    icon:'🌿', name:'초보 농부',        desc:'농장 수확 5회',             check: s=>(s.farmHarvests||0)>=5,   reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_farm15',   icon:'🌾', name:'부지런한 농부',   desc:'농장 수확 15회',            check: s=>(s.farmHarvests||0)>=15,  reward:{exp:60,gold:40,title:null,deco:null} },
+  { id:'ach_farm20',   icon:'🚜', name:'베테랑 농부',     desc:'농장 수확 20회',            check: s=>(s.farmHarvests||0)>=20,  reward:{exp:80,gold:60,title:'농부',deco:'deco_flower'} },
+  { id:'ach_farm40',   icon:'🏡', name:'대농장주',        desc:'농장 수확 40회',            check: s=>(s.farmHarvests||0)>=40,  reward:{exp:120,gold:100,title:'대농장주',deco:null} },
+
+  // ══ D. 장비 / 성장 ═══════════════════════════════════════
+  { id:'ach_equip1',   icon:'🗡️', name:'첫 장착',         desc:'장비 1개 장착',             check: s=>Object.values(s.equipmentIds||{}).some(v=>v), reward:{exp:15,gold:10,title:null,deco:null} },
+  { id:'ach_equip3',   icon:'⚔️', name:'장비 입문자',     desc:'장비 3개 슬롯 장착',        check: s=>Object.values(s.equipmentIds||{}).filter(v=>v).length>=3, reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_equip',    icon:'🛡️', name:'완전무장',         desc:'5개 슬롯 모두 장착',        check: s=>['head','body','weapon','glove','shoe'].every(k=>(s.equipmentIds||{})[k]), reward:{exp:50,gold:40,title:'전사',deco:null} },
+  { id:'ach_equip_col',icon:'💎', name:'장비 수집가',     desc:'보관 장비 5종 이상',        check: s=>(s.inventory||[]).filter(i=>GAME_DATA.getItemById(i.id)).length>=5, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_lv5',      icon:'⬆️', name:'첫 번째 도약',    desc:'레벨 5 달성',               check: s=>s.level>=5,  reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_lv10',     icon:'🌟', name:'숙련자',           desc:'레벨 10 달성',              check: s=>s.level>=10, reward:{exp:80,gold:50,title:'숙련자',deco:'deco_trophy'} },
+  { id:'ach_lv20',     icon:'💫', name:'전설의 시작',     desc:'레벨 20 달성',              check: s=>s.level>=20, reward:{exp:150,gold:100,title:'전설',deco:null} },
+  { id:'ach_lv30',     icon:'👑', name:'전설의 경지',     desc:'레벨 30 달성',              check: s=>s.level>=30, reward:{exp:250,gold:200,title:'전설의 모험가',deco:'deco_trophy'} },
+  { id:'ach_gold1000', icon:'💰', name:'골드 모으기',     desc:'누적 골드 1000G 이상',      check: s=>(s.totalGold||s.gold||0)>=1000, reward:{exp:30,gold:0,title:null,deco:null} },
+  { id:'ach_gold5000', icon:'💎', name:'부자 모험가',     desc:'누적 골드 5000G 이상',      check: s=>(s.totalGold||s.gold||0)>=5000, reward:{exp:80,gold:0,title:'부자',deco:null} },
+
+  // ══ E. 독서 ══════════════════════════════════════════════
+  { id:'ach_book1',    icon:'📖', name:'첫 독서',          desc:'책 1권 읽기',               check: s=>(s.bookCount||0)>=1,  reward:{exp:15,gold:10,title:null,deco:'deco_bookshelf'} },
+  { id:'ach_book3',    icon:'📗', name:'독서왕 입문',      desc:'책 3권 읽기',               check: s=>(s.bookCount||0)>=3,  reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_book5',    icon:'📚', name:'꾸준한 독서가',   desc:'책 5권 읽기',               check: s=>(s.bookCount||0)>=5,  reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_book10',   icon:'📚', name:'생각하는 독자',   desc:'책 10권 읽기',              check: s=>(s.bookCount||0)>=10, reward:{exp:80,gold:60,title:'독서가',deco:null} },
+  { id:'ach_book15',   icon:'🎓', name:'지식의 탑',        desc:'책 15권 읽기',              check: s=>(s.bookCount||0)>=15, reward:{exp:120,gold:80,title:'지식인',deco:null} },
+  { id:'ach_book_char',icon:'🧑', name:'인물 탐험가',     desc:'인상 깊은 인물 기록 3회',   check: s=>(s.books||[]).filter(b=>b.characterName).length>=3, reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_book_rate',icon:'⭐', name:'별점 남기기',      desc:'독서 별점 5회 이상',        check: s=>(s.books||[]).filter(b=>b.rating>=1).length>=5, reward:{exp:20,gold:15,title:null,deco:null} },
+
+  // ══ F. 작품 ══════════════════════════════════════════════
+  { id:'ach_art1',     icon:'🎨', name:'첫 작품',          desc:'첫 작품 등록',              check: s=>(s.artworks||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_art3',     icon:'🖼️', name:'창작의 시작',     desc:'작품 3개 등록',             check: s=>(s.artworks||[]).length>=3, reward:{exp:40,gold:25,title:null,deco:null} },
+  { id:'ach_art7',     icon:'🖼️', name:'작은 전시회',     desc:'작품 7개 등록',             check: s=>(s.artworks||[]).length>=7, reward:{exp:70,gold:50,title:'예술가',deco:'deco_flower'} },
+  { id:'ach_art15',    icon:'🏛️', name:'창작 수집가',     desc:'작품 15개 등록',            check: s=>(s.artworks||[]).length>=15,reward:{exp:120,gold:80,title:'창작가',deco:null} },
+  { id:'ach_art_desc', icon:'✍️', name:'설명하는 작가',   desc:'작품 설명 3개 이상',        check: s=>(s.artworks||[]).filter(a=>a.desc&&a.desc.length>5).length>=3, reward:{exp:25,gold:15,title:null,deco:null} },
+
+  // ══ G. 추억 ══════════════════════════════════════════════
+  { id:'ach_mem1',     icon:'📸', name:'첫 추억',          desc:'첫 추억 사진 등록',         check: s=>(s.memories||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_mem5',     icon:'🗃️', name:'추억 수집가',     desc:'추억 5개 등록',             check: s=>(s.memories||[]).length>=5, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_mem10',    icon:'📷', name:'우리 반 기록가',  desc:'추억 10개 등록',            check: s=>(s.memories||[]).length>=10,reward:{exp:70,gold:50,title:'기록가',deco:null} },
+  { id:'ach_mem_desc', icon:'📝', name:'사진 설명가',     desc:'설명 있는 추억 3개 이상',   check: s=>(s.memories||[]).filter(m=>m.desc&&m.desc.length>3).length>=3, reward:{exp:25,gold:15,title:null,deco:null} },
+  { id:'ach_mem_pub',  icon:'🌐', name:'공개 추억 1호',   desc:'공개 추억 첫 등록',         check: s=>(s.memories||[]).some(m=>m.visibilityType==='class'||m.visibilityType==='public'), reward:{exp:30,gold:20,title:null,deco:null} },
+
+  // ══ H. 감정 / 주간 루틴 ══════════════════════════════════
+  { id:'ach_emo1',     icon:'💭', name:'오늘의 마음',     desc:'첫 감정 기록',              check: s=>(s.emotionHistory||[]).length>=1, reward:{exp:15,gold:10,title:null,deco:null} },
+  { id:'ach_emo5',     icon:'💬', name:'마음 일기 시작', desc:'감정 기록 5회',             check: s=>(s.emotionHistory||[]).length>=5, reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_emo15',    icon:'🌈', name:'감정 탐험가',     desc:'감정 기록 15회',            check: s=>(s.emotionHistory||[]).length>=15,reward:{exp:60,gold:40,title:null,deco:null} },
+  { id:'ach_week_mon', icon:'📅', name:'월요일 다짐 시작',desc:'첫 월요일 다짐 작성',       check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.weeklyGoals||[]).some(g=>g.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_week_fri', icon:'📅', name:'금요일 돌아보기 시작',desc:'첫 금요일 돌아보기',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.weeklyReflections||[]).some(r=>r.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_week_both',icon:'🗓️', name:'한 주 완성',     desc:'같은 주 월+금 모두 작성',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};const gs=new Set((db.weeklyGoals||[]).filter(g=>g.studentId===s.id).map(g=>g.weekKey));return (db.weeklyReflections||[]).some(r=>r.studentId===s.id&&gs.has(r.weekKey));}, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_week_3',   icon:'📆', name:'3주 루틴',        desc:'3주 이상 다짐 작성',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return [...new Set((db.weeklyGoals||[]).filter(g=>g.studentId===s.id).map(g=>g.weekKey))].length>=3;}, reward:{exp:70,gold:50,title:'루틴러',deco:null} },
+
+  // ══ I. 리코더 ════════════════════════════════════════════
+  { id:'ach_rec1',     icon:'🎵', name:'첫 연습',          desc:'리코더 첫 연습 기록',       check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).some(r=>r.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_rec5',     icon:'🎶', name:'리듬의 시작',     desc:'리코더 연습 5회 이상',      check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).filter(r=>r.studentId===s.id).length>=5;}, reward:{exp:40,gold:25,title:null,deco:null} },
+  { id:'ach_rec_sound',icon:'🎙️', name:'첫 녹음',          desc:'녹음 파일 첫 업로드',       check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).some(r=>r.studentId===s.id&&r.recordingUrl);}, reward:{exp:50,gold:35,title:null,deco:null} },
+  { id:'ach_rec_song2',icon:'🎼', name:'곡 수집가',        desc:'2곡 이상 연습 기록',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return [...new Set((db.recorderLogs||[]).filter(r=>r.studentId===s.id).map(r=>r.songId))].length>=2;}, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_rec_refl', icon:'💭', name:'성장의 귀',        desc:'느낀점 있는 연습 기록 3회', check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).filter(r=>r.studentId===s.id&&r.reflection&&r.reflection.length>2).length>=3;}, reward:{exp:30,gold:20,title:null,deco:null} },
+
+  // ══ J. 영어 단어장 ════════════════════════════════════════
+  { id:'ach_voc1',     icon:'🔤', name:'오늘의 5문제',    desc:'첫 영어 퀴즈 완료',         check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).some(r=>r.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_voc5',     icon:'📝', name:'영어 워밍업',     desc:'퀴즈 5회 완료',             check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).filter(r=>r.studentId===s.id).length>=5;}, reward:{exp:40,gold:25,title:null,deco:null} },
+  { id:'ach_voc_perfect',icon:'⭐',name:'5문제 만점',    desc:'퀴즈 5개 전부 정답',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).some(r=>r.studentId===s.id&&r.correct===r.total);}, reward:{exp:50,gold:40,title:null,deco:null} },
+  { id:'ach_voc_10',   icon:'🏅', name:'영어 발자국',     desc:'퀴즈 10회 완료',            check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).filter(r=>r.studentId===s.id).length>=10;}, reward:{exp:70,gold:50,title:'영어 친구',deco:null} },
+
+  // ══ K. 집꾸미기 / 인테리어 ═══════════════════════════════
+  { id:'ach_deco1',    icon:'🏠', name:'내 방 첫 꾸미기', desc:'장식품 첫 배치',            check: s=>(s.houseDecorations||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_deco3',    icon:'🪴', name:'작은 변화',       desc:'장식품 3개 배치',           check: s=>(s.houseDecorations||[]).length>=3, reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_deco7',    icon:'🎨', name:'분위기 만들기',   desc:'장식품 7개 배치',           check: s=>(s.houseDecorations||[]).length>=7, reward:{exp:60,gold:40,title:'인테리어',deco:null} },
+
+  // ══ L. 메타 업적 ══════════════════════════════════════════
+  { id:'ach_meta_balance', icon:'⚖️', name:'균형 잡힌 모험가', desc:'퀘스트+전투+독서 모두 달성', check: s=>(s.totalQuests||0)>=5&&(s.monsterLog||[]).length>=5&&(s.bookCount||0)>=3, reward:{exp:100,gold:80,title:'균형 모험가',deco:null} },
+  { id:'ach_meta_record',  icon:'📒', name:'기록하는 사람',    desc:'독서+작품+추억 모두 달성',   check: s=>(s.bookCount||0)>=1&&(s.artworks||[]).length>=1&&(s.memories||[]).length>=1, reward:{exp:60,gold:40,title:'기록가',deco:null} },
+  { id:'ach_meta_port',    icon:'💼', name:'포트폴리오 시작',  desc:'감정+주간다짐+독서 모두 달성',check: s=>(s.emotionHistory||[]).length>=1&&(s.bookCount||0)>=1&&(()=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.weeklyGoals||[]).some(g=>g.studentId===s.id);})(), reward:{exp:80,gold:60,title:null,deco:null} },
+  { id:'ach_meta_10ach',   icon:'🏅', name:'업적 수집가',      desc:'업적 10개 달성',             check: s=>(s.achievements||[]).length>=10, reward:{exp:80,gold:60,title:null,deco:null} },
+  { id:'ach_meta_20ach',   icon:'🏆', name:'업적 마스터',      desc:'업적 20개 달성',             check: s=>(s.achievements||[]).length>=20, reward:{exp:150,gold:100,title:'업적 마스터',deco:'deco_trophy'} },
+  { id:'ach_meta_all',     icon:'🌟', name:'만능 학생',         desc:'모든 카테고리 달성',          check: s=>{
+    const db=typeof DB!=='undefined'?DB.load():{};
+    return (s.totalQuests||0)>=1
+      && (s.monsterLog||[]).length>=1
+      && (s.farmHarvests||0)>=1
+      && (s.bookCount||0)>=1
+      && (s.artworks||[]).length>=1
+      && (s.memories||[]).length>=1
+      && (s.emotionHistory||[]).length>=1
+      && (db.weeklyGoals||[]).some(g=>g.studentId===s.id);
+  }, reward:{exp:300,gold:200,title:'만능 학생',deco:'deco_trophy'} },
 ];
 
+
 const AchievementUtils = {
-  // 학생의 새 업적 체크 → 새로 달성한 업적 배열 반환
+  // 학생의 새 업적 체크 → 새로 달성한 업적 배열 반환 (소급 포함)
   checkNew(student) {
     const earned = new Set(student.achievements || []);
     const newOnes = [];
     ACHIEVEMENTS.forEach(a => {
-      if (!earned.has(a.id) && a.check(student)) {
-        earned.add(a.id);
-        newOnes.push(a);
+      if (!earned.has(a.id)) {
+        try { if (a.check(student)) { earned.add(a.id); newOnes.push(a); } }
+        catch(e) { /* 조건 오류 무시 */ }
       }
     });
     if (newOnes.length > 0) {
       student.achievements = [...earned];
-      // 보상 지급
       newOnes.forEach(a => {
         student.exp  = (student.exp||0)  + (a.reward.exp||0);
-        student.gold = (student.gold||0) + 20; // 업적 달성 보너스 골드
+        student.gold = (student.gold||0) + (a.reward.gold||20);
+        student.totalGold = (student.totalGold||0) + (a.reward.gold||20);
         if (a.reward.title && !(student.titles||[]).includes(a.reward.title)) {
           student.titles = [...(student.titles||[]), a.reward.title];
           if (!student.title) student.title = a.reward.title;
         }
-        // 장식 보상 인벤토리 추가
         if (a.reward.deco) {
           student.inventory = student.inventory || [];
           const ex = student.inventory.find(i => i.id === a.reward.deco);
@@ -1126,9 +1239,39 @@ const AchievementUtils = {
     return newOnes;
   },
 
+  // 전체 학생 업적 일괄 재계산 (관리자용)
+  recalcAll(onProgress) {
+    if (typeof DB === 'undefined') return;
+    const students = DB.getStudents();
+    let done = 0;
+    students.forEach(s => {
+      const newOnes = this.checkNew(s);
+      DB.saveStudent(s);
+      done++;
+      if (onProgress) onProgress(done, students.length, s.name, newOnes.length);
+    });
+    return done;
+  },
+
   // 업적 진행도 (0~1)
   progress(student, ach) {
     try { return ach.check(student) ? 1 : 0; } catch(e) { return 0; }
+  },
+
+  // 카테고리별 업적 분류
+  categories: {
+    '퀘스트':   ['ach_quest1','ach_quest5','ach_quest10','ach_quest30','ach_quest50','ach_quest_approv'],
+    '전투/도감': ['ach_mon1','ach_mon5','ach_mon15','ach_mon30','ach_mon60','ach_dex_beg5','ach_dex_beg15','ach_dex_beg30','ach_dex_mid10','ach_dex_mid25','ach_dex_mid50','ach_dex_adv5','ach_dex_adv10','ach_dex_adv20','ach_dex_25','ach_dex_50','ach_mon_all','ach_rar_com5','ach_rar_com20','ach_rar_com42','ach_rar_rare3','ach_rar_rare20','ach_rar_leg1','ach_rar_leg10','ach_rar_leg21','ach_el_fire','ach_el_water','ach_el_grass','ach_el_all'],
+    '농장':      ['ach_farm1','ach_farm5','ach_farm15','ach_farm20','ach_farm40'],
+    '장비/성장': ['ach_equip1','ach_equip3','ach_equip','ach_equip_col','ach_lv5','ach_lv10','ach_lv20','ach_lv30','ach_gold1000','ach_gold5000'],
+    '독서':      ['ach_book1','ach_book3','ach_book5','ach_book10','ach_book15','ach_book_char','ach_book_rate'],
+    '작품':      ['ach_art1','ach_art3','ach_art7','ach_art15','ach_art_desc'],
+    '추억':      ['ach_mem1','ach_mem5','ach_mem10','ach_mem_desc','ach_mem_pub'],
+    '감정/주간': ['ach_emo1','ach_emo5','ach_emo15','ach_week_mon','ach_week_fri','ach_week_both','ach_week_3'],
+    '리코더':    ['ach_rec1','ach_rec5','ach_rec_sound','ach_rec_song2','ach_rec_refl'],
+    '영어단어':  ['ach_voc1','ach_voc5','ach_voc_perfect','ach_voc_10'],
+    '집꾸미기':  ['ach_deco1','ach_deco3','ach_deco7'],
+    '메타':      ['ach_meta_balance','ach_meta_record','ach_meta_port','ach_meta_10ach','ach_meta_20ach','ach_meta_all'],
   },
 };
 
@@ -4268,6 +4411,25 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <button class="btn-sm outline" onclick="dedupeAll()">정리</button>
           </div>
           <div class="setting-row">
+            <div>
+              <div class="sr-label">🏅 전체 학생 업적 재계산</div>
+              <div class="sr-sub">기존 데이터 기준으로 업적 소급 반영 · 중복 지급 없음</div>
+            </div>
+            <button class="btn-sm success" onclick="recalcAllAchievements()">재계산</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="sr-label">🏅 특정 학생 업적 재계산</div>
+              <div class="sr-sub">선택한 학생의 업적을 현재 데이터 기준으로 재판정</div>
+            </div>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <select id="ach-recalc-stu" class="form-select" style="font-size:.78rem;width:auto">
+                <option value="">학생 선택</option>
+              </select>
+              <button class="btn-sm success" onclick="recalcOneAchievement()">재계산</button>
+            </div>
+          </div>
+          <div class="setting-row">
             <div><div class="sr-label">🔄 전체 학생 수치 초기화</div><div class="sr-sub">이름·비번은 유지, 레벨·EXP·골드·아이템 초기화</div></div>
             <button class="btn-sm danger" onclick="resetAllStudents()">초기화</button>
           </div>
@@ -4430,6 +4592,7 @@ function nav(page, el) {
   if (page === 'recorder') renderRecorderPage();
   if (page === 'weekly')   renderWeeklyAdminPage();
   if (page === 'vocab')    renderVocabAdminPage();
+  if (page === 'settings') setTimeout(initAchRecalcSelect, 100);
   if (page === 'pwreset')  renderPwResetList();
   if (page === 'quests')   initQuestPage();
   if (page === 'activity')  renderActivityPage();
@@ -6914,6 +7077,47 @@ function deleteVocabWordSet(id) {
   renderVocabAdminPage();
 }
 
+
+function recalcAllAchievements() {
+  if (!confirm('전체 학생 업적을 현재 데이터 기준으로 재계산할까요?\n이미 달성한 업적은 중복 지급되지 않습니다.')) return;
+  const students = DB.getStudents();
+  let totalNew = 0;
+  const log = [];
+  students.forEach(s => {
+    const newOnes = AchievementUtils.checkNew(s);
+    if (newOnes.length > 0) {
+      totalNew += newOnes.length;
+      log.push(`${s.name}: +${newOnes.length}개 (${newOnes.map(a=>a.name).join(', ')})`);
+      DB.saveStudent(s);
+    }
+  });
+  notify(`🏅 재계산 완료! 전체 ${totalNew}개 업적 신규 달성\n${log.slice(0,5).join('\n')}${log.length>5?`\n...외 ${log.length-5}명`:''}`);
+  if (totalNew > 0) console.log('[업적 재계산]', log.join('\n'));
+}
+
+function recalcOneAchievement() {
+  const sel = document.getElementById('ach-recalc-stu');
+  const stuId = sel?.value;
+  if (!stuId) { notify('학생을 선택해주세요', 'error'); return; }
+  const students = DB.getStudents();
+  const s = students.find(x=>x.id===stuId);
+  if (!s) return;
+  const newOnes = AchievementUtils.checkNew(s);
+  DB.saveStudent(s);
+  if (newOnes.length > 0) notify(`🏅 ${s.name}: ${newOnes.length}개 업적 달성!\n${newOnes.map(a=>a.icon+' '+a.name).join(', ')}`);
+  else notify(`${s.name}: 새로 달성한 업적 없음`);
+}
+
+// 학생 선택 셀렉트 초기화 (업적 재계산용)
+function initAchRecalcSelect() {
+  const sel = document.getElementById('ach-recalc-stu');
+  if (!sel || sel.options.length > 1) return;
+  DB.getStudents().forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = s.avatar + ' ' + s.name;
+    sel.appendChild(opt);
+  });
+}
 
 function dedupeAll() {
   // 승급 중복 제거
