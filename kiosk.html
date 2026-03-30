@@ -2967,6 +2967,8 @@ function normalizeData(data) {
   data.students.forEach(s => seenIds.set(s.id, s));
   data.students = Array.from(seenIds.values());
   data.boardQuests = toArr(data.boardQuests);
+  // 추억 — Firebase에서 객체로 올 수 있으므로 배열로 변환
+  data.memories = toArr(data.memories);
   // questLogs 단일 소스 (student/admin과 동일 방식)
   data.quests = Object.values(data.questLogs || {})
     .filter(q => q != null && typeof q === 'object' && q.studentId);
