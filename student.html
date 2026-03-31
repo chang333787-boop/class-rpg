@@ -9746,7 +9746,7 @@ function submitQuestFromMain(questId) {
     boardQuestId: questId,
     boardQuestType: q.type||'special',
     label: q.name,
-    exp: q.exp, gold: q.gold, stat: q.stat||'', statVal: q.stat?1:0,
+    exp: q.exp, gold: q.gold, stat: q.stat||'', statVal: q.stat ? (parseFloat(q.statVal)||1) : 0,
     icon: q.icon||'📋',
     date: Utils.todayStr(),
   });
