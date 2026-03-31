@@ -527,10 +527,15 @@ const DB = {
       s.pendingRewards   = toArr(s.pendingRewards);
       return s;
     }).filter(Boolean);
-    // 중복 학생 제거 (같은 id가 여러 번 있을 경우 마지막 것 유지)
+    // 중복 학생 제거 후 ID 기준 정렬 (순서 항상 고정)
     const seen = new Map();
     data.students.forEach(s => seen.set(s.id, s));
-    data.students = Array.from(seen.values());
+    data.students = Array.from(seen.values())
+      .sort((a, b) => {
+        const na = parseInt((a.id||'').replace(/\D/g,'')) || 0;
+        const nb = parseInt((b.id||'').replace(/\D/g,'')) || 0;
+        return na - nb;
+      });
     // questLogs가 완료 판정의 단일 소스 (quests 배열 인덱스 충돌 방지)
     data.quests = Object.values(data.questLogs || {})
       .filter(q => q != null && typeof q === 'object' && q.studentId);
