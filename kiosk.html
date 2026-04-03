@@ -755,7 +755,20 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
-    data.memories           = toArr(data.memories);
+    // memories 중복 제거 — 같은 id가 여러 경로로 저장된 경우
+    // 앨범 지정된 것(albumId 있는 것) 우선 보존
+    {
+      const raw = toArr(data.memories);
+      const seen = new Map();
+      raw.forEach(m => {
+        if (!m || !m.id) return;
+        const prev = seen.get(m.id);
+        // 앨범 지정된 것 또는 처음 등장한 것 저장
+        if (!prev || (m.albumId && !prev.albumId)) seen.set(m.id, m);
+      });
+      data.memories = Array.from(seen.values());
+    }
+    data.memoryAlbums       = toArr(data.memoryAlbums);
     data.recorderLogs       = toArr(data.recorderLogs);
     data.recorderSongs      = toArr(data.recorderSongs);
     data.weeklyGoals        = toArr(data.weeklyGoals);
@@ -888,6 +901,10 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
+  savePromotionRequests(arr) {
+    const db = this.load(); db.promotionRequests = arr; this._cache = db;
+    this._fbRef.child('promotionRequests').set(arr);
+  },
   addPromotionRequest(r) {
     const db = this.load();
     db.promotionRequests = db.promotionRequests || [];
@@ -939,13 +956,15 @@ const DB = {
     if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
     else db.memories.push(mem);
     this._cache = db;
-    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+    // 전체 배열로 덮어쓰기 — 경로별 set은 배열 인덱스와 키가 섞여 중복 발생
+    this._fbRef.child('memories').set(db.memories);
   },
   deleteMemory(id) {
     const db = this.load();
     db.memories = (db.memories||[]).filter(m => m.id !== id);
     this._cache = db;
-    this._fbRef.child('memories/' + id).remove();
+    // 전체 배열 덮어쓰기 — 배열 인덱스 경로와 문자열 키 경로 모두 정리
+    this._fbRef.child('memories').set(db.memories);
   },
 
   // ── 주간 다짐 (월요일 목표 + 금요일 성찰) ─────────────
@@ -1103,9 +1122,30 @@ const DB = {
     this._cache=db; this._fbRef.child('quizRecords/'+r.id).set(db.quizRecords.find(x=>x.id===r.id));
   },
 
-  getPwResetRequests()    { return this.load().pwResetRequests || []; },
+  // ── 앨범 (그룹) ────────────────────────────────────────
+  // { id, name, date, desc, createdAt }
+  getAlbums()      { return this.load().memoryAlbums || []; },
+  saveAlbum(a) {
+    const db = this.load();
+    db.memoryAlbums = db.memoryAlbums || [];
+    const idx = db.memoryAlbums.findIndex(x=>x.id===a.id);
+    if (idx>=0) db.memoryAlbums[idx] = {...db.memoryAlbums[idx],...a};
+    else db.memoryAlbums.push({...a, createdAt:Date.now()});
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+  },
+  deleteAlbum(id) {
+    const db = this.load();
+    db.memoryAlbums = (db.memoryAlbums||[]).filter(a=>a.id!==id);
+    // 해당 앨범 사진들 앨범 해제
+    (db.memories||[]).forEach(m=>{ if(m.albumId===id){ m.albumId=null; m.albumName=''; } });
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+    this._fbRef.child('memories').set(db.memories);
+  },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
   removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
+  getPwResetRequests()    { return this.load().pwResetRequests || []; },
 };
 
 // ─── 유틸리티 ────────────────────────────────────────
@@ -2937,6 +2977,7 @@ window.onload = async () => {
       if (_renderTimer) clearTimeout(_renderTimer);
       _renderTimer = setTimeout(() => {
         if (KIOSK_TAB === 'emotion') renderEmotionBoard();
+        else if (KIOSK_TAB === 'memory') renderKioskMemory();
         else renderTable();
       }, 400);
     });
@@ -2978,8 +3019,18 @@ function normalizeData(data) {
       return na - nb;
     });
   data.boardQuests = toArr(data.boardQuests);
-  // 추억 — Firebase에서 객체로 올 수 있으므로 배열로 변환
-  data.memories = toArr(data.memories);
+  // 추억 — 같은 id 중복 시 앨범 지정된 것 우선 보존
+  {
+    const raw = toArr(data.memories);
+    const seen = new Map();
+    raw.forEach(m => {
+      if (!m || !m.id) return;
+      const prev = seen.get(m.id);
+      if (!prev || (m.albumId && !prev.albumId)) seen.set(m.id, m);
+    });
+    data.memories = Array.from(seen.values());
+  }
+  data.memoryAlbums = toArr(data.memoryAlbums);
   // questLogs 단일 소스 (student/admin과 동일 방식)
   data.quests = Object.values(data.questLogs || {})
     .filter(q => q != null && typeof q === 'object' && q.studentId);
@@ -3247,7 +3298,6 @@ function renderKioskMemory() {
   const el = document.getElementById('kiosk-memory-content');
   if (!el || !DB_DATA) return;
 
-  // 전체공개 승인된 사진만
   const all = (DB_DATA.memories || []).filter(m =>
     m.approvalStatus === 'approved' &&
     (m.visibilityType === 'public' || m.visibilityType === 'class')
@@ -3255,59 +3305,94 @@ function renderKioskMemory() {
   all.sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
   _kioskMemList = all;
 
-  // 월별 키 수집
-  const months = [...new Set(all.map(m => m.monthKey).filter(Boolean))].sort().reverse();
+  // 앨범 목록 수집
+  const albums = DB_DATA.memoryAlbums || [];
+  albums.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
-  const filtered = _kioskMemView === 'all' ? all : all.filter(m => m.monthKey === _kioskMemView);
+  // 현재 뷰 필터
+  let filtered;
+  if (_kioskMemView === 'all') {
+    filtered = all;
+  } else if (_kioskMemView === 'none') {
+    filtered = all.filter(m=>!m.albumId);
+  } else {
+    filtered = all.filter(m=>m.albumId===_kioskMemView);
+  }
 
   el.innerHTML = `
-    <div style="font-size:.9rem;font-weight:900;color:var(--gold);padding:.4rem .2rem .6rem;
-      border-bottom:2px solid rgba(255,215,0,.2);margin-bottom:.7rem;display:flex;align-items:center;gap:.6rem">
+    <div style="font-size:.9rem;font-weight:900;color:var(--gold);padding:.4rem .2rem .5rem;
+      border-bottom:2px solid rgba(255,215,0,.2);margin-bottom:.7rem">
       📸 우리 반 추억 앨범
-      <div style="display:flex;gap:.35rem;margin-left:auto;flex-wrap:wrap">
-        <button onclick="setKioskMemView('all')"
-          style="font-size:.72rem;padding:.2rem .6rem;border-radius:12px;cursor:pointer;font-family:inherit;
-            background:${_kioskMemView==='all'?'var(--gold)':'rgba(255,255,255,.08)'};
-            color:${_kioskMemView==='all'?'#1a1a1a':'var(--txt2)'};border:none;font-weight:700">전체</button>
-        ${months.map(mk => {
-          const [y,mo] = mk.split('-');
-          return `<button onclick="setKioskMemView('${mk}')"
-            style="font-size:.72rem;padding:.2rem .6rem;border-radius:12px;cursor:pointer;font-family:inherit;
-              background:${_kioskMemView===mk?'var(--gold)':'rgba(255,255,255,.08)'};
-              color:${_kioskMemView===mk?'#1a1a1a':'var(--txt2)'};border:none;font-weight:700">${mo}월</button>`;
-        }).join('')}
-      </div>
     </div>
+
+    <!-- 앨범 탭 -->
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.9rem">
+      <button onclick="setKioskMemView('all')"
+        style="font-size:.78rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;
+          font-family:inherit;font-weight:700;border:2px solid transparent;
+          background:${_kioskMemView==='all'?'var(--gold)':'rgba(255,255,255,.1)'};
+          color:${_kioskMemView==='all'?'#1a1a1a':'var(--txt1)'}">
+        📷 전체 (${all.length})</button>
+      ${albums.map(a => {
+        const cnt = all.filter(m=>m.albumId===a.id).length;
+        return `<button onclick="setKioskMemView('${a.id}')"
+          style="font-size:.78rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;
+            font-family:inherit;font-weight:700;border:2px solid transparent;
+            background:${_kioskMemView===a.id?'var(--gold)':'rgba(255,255,255,.1)'};
+            color:${_kioskMemView===a.id?'#1a1a1a':'var(--txt1)'}">
+          📁 ${a.name} (${cnt})</button>`;
+      }).join('')}
+      ${all.filter(m=>!m.albumId).length>0 ? `
+      <button onclick="setKioskMemView('none')"
+        style="font-size:.78rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;
+          font-family:inherit;font-weight:700;border:2px solid transparent;
+          background:${_kioskMemView==='none'?'var(--gold)':'rgba(255,255,255,.1)'};
+          color:${_kioskMemView==='none'?'#1a1a1a':'var(--txt1)'}">
+        기타 (${all.filter(m=>!m.albumId).length})</button>` : ''}
+    </div>
+
     ${filtered.length === 0
       ? `<div style="text-align:center;padding:3rem;color:var(--txt3)">아직 추억 사진이 없어요 📸</div>`
       : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem">
           ${filtered.map((m,i) => `
-            <div onclick="openKioskMemLightbox(${i})" style="cursor:pointer;border-radius:12px;overflow:hidden;
-              background:rgba(255,255,255,.05);aspect-ratio:1;position:relative">
+            <div onclick="openKioskMemLightbox(${i},${JSON.stringify(_kioskMemView).replace(/"/g,"'")})"
+              style="cursor:pointer;border-radius:12px;overflow:hidden;
+                background:rgba(255,255,255,.05);aspect-ratio:1;position:relative;transition:transform .2s"
+              onmouseenter="this.style.transform='scale(1.03)'"
+              onmouseleave="this.style.transform='scale(1)'">
               <img src="${m.thumbUrl||m.imageUrl}" loading="lazy"
-                style="width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s"
-                onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform=''">
-              <div style="position:absolute;bottom:0;left:0;right:0;padding:.35rem .5rem;
-                background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:.68rem;color:#fff;
+                style="width:100%;height:100%;object-fit:cover;display:block">
+              <div style="position:absolute;bottom:0;left:0;right:0;padding:.3rem .5rem;
+                background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:.65rem;color:#fff;
                 overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.title||''}</div>
             </div>`).join('')}
         </div>`}`;
 
-  // 라이트박스 엘리먼트 준비
+  // 라이트박스용 목록 업데이트
+  window._kioskLbFiltered = filtered;
+
   if (!document.getElementById('kiosk-lb')) {
     const lb = document.createElement('div');
     lb.id = 'kiosk-lb';
     lb.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;flex-direction:column;align-items:center;justify-content:center;cursor:pointer';
     lb.innerHTML = `
       <button onclick="document.getElementById('kiosk-lb').style.display='none'"
-        style="position:absolute;top:1.2rem;right:1.5rem;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer">✕</button>
+        style="position:absolute;top:1.2rem;right:1.5rem;background:rgba(255,255,255,.15);border:none;
+          color:#fff;font-size:1.8rem;cursor:pointer;border-radius:8px;width:44px;height:44px">✕</button>
+      <a id="kiosk-lb-download" href="" download target="_blank" title="다운로드"
+        style="position:absolute;top:1.2rem;right:4.5rem;background:rgba(255,255,255,.15);border:none;
+          color:#fff;font-size:1.1rem;border-radius:8px;width:44px;height:44px;
+          display:flex;align-items:center;justify-content:center;text-decoration:none">⬇️</a>
       <img id="kiosk-lb-img" style="max-width:90vw;max-height:72vh;border-radius:14px;object-fit:contain">
       <div id="kiosk-lb-cap" style="color:#fff;font-size:.88rem;margin-top:.8rem;text-align:center;max-width:80vw;line-height:1.5"></div>
+      <div id="kiosk-lb-counter" style="color:rgba(255,255,255,.4);font-size:.72rem;margin-top:.2rem"></div>
       <div style="display:flex;gap:1.2rem;margin-top:.8rem">
         <button onclick="navKioskLb(-1);event.stopPropagation()"
-          style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;padding:.4rem 1.1rem;border-radius:10px;cursor:pointer">‹</button>
+          style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;
+            padding:.4rem 1.1rem;border-radius:10px;cursor:pointer">‹</button>
         <button onclick="navKioskLb(1);event.stopPropagation()"
-          style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;padding:.4rem 1.1rem;border-radius:10px;cursor:pointer">›</button>
+          style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;
+            padding:.4rem 1.1rem;border-radius:10px;cursor:pointer">›</button>
       </div>`;
     document.body.appendChild(lb);
   }
@@ -3319,21 +3404,23 @@ function setKioskMemView(v) {
 }
 
 function openKioskMemLightbox(idx) {
-  const filtered = _kioskMemView === 'all' ? _kioskMemList
-    : _kioskMemList.filter(m => m.monthKey === _kioskMemView);
+  const filtered = window._kioskLbFiltered || _kioskMemList;
   _kioskMemLbIdx = idx;
   const m = filtered[idx]; if (!m) return;
   const lb = document.getElementById('kiosk-lb'); if (!lb) return;
   lb.style.display = 'flex';
   document.getElementById('kiosk-lb-img').src = m.imageUrl || m.thumbUrl;
   document.getElementById('kiosk-lb-cap').textContent =
-    (m.title||'') + (m.desc ? ' — ' + m.desc : '') + '  ' + (m.date||'');
+    (m.title||'') + (m.albumName?' ['+m.albumName+']':'') + (m.date?' · '+m.date:'');
+  const counter = document.getElementById('kiosk-lb-counter');
+  if (counter) counter.textContent = `${idx+1} / ${filtered.length}`;
+  const dlBtn = document.getElementById('kiosk-lb-download');
+  if (dlBtn) dlBtn.href = m.imageUrl || m.thumbUrl;
   lb.onclick = e => { if(e.target===lb) lb.style.display='none'; };
 }
 
 function navKioskLb(dir) {
-  const filtered = _kioskMemView === 'all' ? _kioskMemList
-    : _kioskMemList.filter(m => m.monthKey === _kioskMemView);
+  const filtered = window._kioskLbFiltered || _kioskMemList;
   _kioskMemLbIdx = (_kioskMemLbIdx + dir + filtered.length) % filtered.length;
   openKioskMemLightbox(_kioskMemLbIdx);
 }

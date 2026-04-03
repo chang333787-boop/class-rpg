@@ -542,7 +542,20 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
-    data.memories           = toArr(data.memories);
+    // memories 중복 제거 — 같은 id가 여러 경로로 저장된 경우
+    // 앨범 지정된 것(albumId 있는 것) 우선 보존
+    {
+      const raw = toArr(data.memories);
+      const seen = new Map();
+      raw.forEach(m => {
+        if (!m || !m.id) return;
+        const prev = seen.get(m.id);
+        // 앨범 지정된 것 또는 처음 등장한 것 저장
+        if (!prev || (m.albumId && !prev.albumId)) seen.set(m.id, m);
+      });
+      data.memories = Array.from(seen.values());
+    }
+    data.memoryAlbums       = toArr(data.memoryAlbums);
     data.recorderLogs       = toArr(data.recorderLogs);
     data.recorderSongs      = toArr(data.recorderSongs);
     data.weeklyGoals        = toArr(data.weeklyGoals);
@@ -675,6 +688,10 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
+  savePromotionRequests(arr) {
+    const db = this.load(); db.promotionRequests = arr; this._cache = db;
+    this._fbRef.child('promotionRequests').set(arr);
+  },
   addPromotionRequest(r) {
     const db = this.load();
     db.promotionRequests = db.promotionRequests || [];
@@ -726,13 +743,15 @@ const DB = {
     if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
     else db.memories.push(mem);
     this._cache = db;
-    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+    // 전체 배열로 덮어쓰기 — 경로별 set은 배열 인덱스와 키가 섞여 중복 발생
+    this._fbRef.child('memories').set(db.memories);
   },
   deleteMemory(id) {
     const db = this.load();
     db.memories = (db.memories||[]).filter(m => m.id !== id);
     this._cache = db;
-    this._fbRef.child('memories/' + id).remove();
+    // 전체 배열 덮어쓰기 — 배열 인덱스 경로와 문자열 키 경로 모두 정리
+    this._fbRef.child('memories').set(db.memories);
   },
 
   // ── 주간 다짐 (월요일 목표 + 금요일 성찰) ─────────────
@@ -890,9 +909,30 @@ const DB = {
     this._cache=db; this._fbRef.child('quizRecords/'+r.id).set(db.quizRecords.find(x=>x.id===r.id));
   },
 
-  getPwResetRequests()    { return this.load().pwResetRequests || []; },
+  // ── 앨범 (그룹) ────────────────────────────────────────
+  // { id, name, date, desc, createdAt }
+  getAlbums()      { return this.load().memoryAlbums || []; },
+  saveAlbum(a) {
+    const db = this.load();
+    db.memoryAlbums = db.memoryAlbums || [];
+    const idx = db.memoryAlbums.findIndex(x=>x.id===a.id);
+    if (idx>=0) db.memoryAlbums[idx] = {...db.memoryAlbums[idx],...a};
+    else db.memoryAlbums.push({...a, createdAt:Date.now()});
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+  },
+  deleteAlbum(id) {
+    const db = this.load();
+    db.memoryAlbums = (db.memoryAlbums||[]).filter(a=>a.id!==id);
+    // 해당 앨범 사진들 앨범 해제
+    (db.memories||[]).forEach(m=>{ if(m.albumId===id){ m.albumId=null; m.albumName=''; } });
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+    this._fbRef.child('memories').set(db.memories);
+  },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
   removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
+  getPwResetRequests()    { return this.load().pwResetRequests || []; },
 };
 
 // ─── 유틸리티 ────────────────────────────────────────

@@ -554,7 +554,20 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
-    data.memories           = toArr(data.memories);
+    // memories 중복 제거 — 같은 id가 여러 경로로 저장된 경우
+    // 앨범 지정된 것(albumId 있는 것) 우선 보존
+    {
+      const raw = toArr(data.memories);
+      const seen = new Map();
+      raw.forEach(m => {
+        if (!m || !m.id) return;
+        const prev = seen.get(m.id);
+        // 앨범 지정된 것 또는 처음 등장한 것 저장
+        if (!prev || (m.albumId && !prev.albumId)) seen.set(m.id, m);
+      });
+      data.memories = Array.from(seen.values());
+    }
+    data.memoryAlbums       = toArr(data.memoryAlbums);
     data.recorderLogs       = toArr(data.recorderLogs);
     data.recorderSongs      = toArr(data.recorderSongs);
     data.weeklyGoals        = toArr(data.weeklyGoals);
@@ -687,6 +700,10 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
+  savePromotionRequests(arr) {
+    const db = this.load(); db.promotionRequests = arr; this._cache = db;
+    this._fbRef.child('promotionRequests').set(arr);
+  },
   addPromotionRequest(r) {
     const db = this.load();
     db.promotionRequests = db.promotionRequests || [];
@@ -738,13 +755,15 @@ const DB = {
     if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
     else db.memories.push(mem);
     this._cache = db;
-    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+    // 전체 배열로 덮어쓰기 — 경로별 set은 배열 인덱스와 키가 섞여 중복 발생
+    this._fbRef.child('memories').set(db.memories);
   },
   deleteMemory(id) {
     const db = this.load();
     db.memories = (db.memories||[]).filter(m => m.id !== id);
     this._cache = db;
-    this._fbRef.child('memories/' + id).remove();
+    // 전체 배열 덮어쓰기 — 배열 인덱스 경로와 문자열 키 경로 모두 정리
+    this._fbRef.child('memories').set(db.memories);
   },
 
   // ── 주간 다짐 (월요일 목표 + 금요일 성찰) ─────────────
@@ -902,9 +921,30 @@ const DB = {
     this._cache=db; this._fbRef.child('quizRecords/'+r.id).set(db.quizRecords.find(x=>x.id===r.id));
   },
 
-  getPwResetRequests()    { return this.load().pwResetRequests || []; },
+  // ── 앨범 (그룹) ────────────────────────────────────────
+  // { id, name, date, desc, createdAt }
+  getAlbums()      { return this.load().memoryAlbums || []; },
+  saveAlbum(a) {
+    const db = this.load();
+    db.memoryAlbums = db.memoryAlbums || [];
+    const idx = db.memoryAlbums.findIndex(x=>x.id===a.id);
+    if (idx>=0) db.memoryAlbums[idx] = {...db.memoryAlbums[idx],...a};
+    else db.memoryAlbums.push({...a, createdAt:Date.now()});
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+  },
+  deleteAlbum(id) {
+    const db = this.load();
+    db.memoryAlbums = (db.memoryAlbums||[]).filter(a=>a.id!==id);
+    // 해당 앨범 사진들 앨범 해제
+    (db.memories||[]).forEach(m=>{ if(m.albumId===id){ m.albumId=null; m.albumName=''; } });
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+    this._fbRef.child('memories').set(db.memories);
+  },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
   removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
+  getPwResetRequests()    { return this.load().pwResetRequests || []; },
 };
 
 // ─── 유틸리티 ────────────────────────────────────────
@@ -3260,6 +3300,23 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div><div class="sh-title">📅 활동 내역</div>
         <div class="sh-sub">학생별 퀘스트 및 기타 활동 기록</div></div>
       </div>
+
+      <!-- 일일퀘스트 주간/월간 기록 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header">
+          <div class="tc-title">📋 일일퀘스트 기록</div>
+          <div style="display:flex;gap:.4rem">
+            <button class="btn-sm" id="dq-view-week" onclick="setDqView('week',this)"
+              style="background:var(--gold);color:#1a1a1a;font-weight:700">주간</button>
+            <button class="btn-sm outline" id="dq-view-month" onclick="setDqView('month',this)">월간</button>
+            <select class="form-select" id="dq-stu-filter" style="font-size:.78rem;width:auto" onchange="renderDqSummary()">
+              <option value="all">전체 학생</option>
+            </select>
+          </div>
+        </div>
+        <div id="dq-summary-wrap" style="padding:.5rem 0;overflow-x:auto"></div>
+      </div>
+
       <!-- 필터 -->
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
         <select class="form-select" id="act-student" style="width:auto" onchange="renderActivityPage()">
@@ -3935,31 +3992,61 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="page" id="p-memories">
       <div class="section-header">
         <div><div class="sh-title">📸 추억 관리</div>
-        <div class="sh-sub">우리 반 추억 사진을 관리하세요</div></div>
+        <div class="sh-sub">앨범 만들고 사진 여러 장 한번에 올리기 · 키오스크 연동</div></div>
       </div>
 
-      <!-- 관리자 사진 업로드 -->
+      <!-- 앨범(그룹) 관리 -->
       <div class="table-card" style="margin-bottom:1rem">
-        <div class="tc-header"><div class="tc-title">📤 사진 직접 올리기 (전체 공개)</div></div>
-        <div style="padding:1rem;display:flex;flex-direction:column;gap:.6rem">
-          <div style="display:flex;gap:.6rem">
-            <input class="form-input" id="adm-mem-title" placeholder="사진 제목" style="flex:1">
-            <input class="form-input" id="adm-mem-desc" placeholder="설명 (선택)" style="flex:1">
+        <div class="tc-header"><div class="tc-title">📁 앨범 관리</div></div>
+        <div style="padding:.8rem 1.2rem">
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem">
+            <input class="form-input" id="album-name-input" placeholder="앨범 이름 (예: 3월 텃밭 활동)" style="flex:2;min-width:140px">
+            <input class="form-input" id="album-date-input" type="date" style="flex:1;min-width:130px">
+            <input class="form-input" id="album-desc-input" placeholder="설명 (선택)" style="flex:2;min-width:120px">
+            <button class="btn-sm success" onclick="createAlbum()" style="white-space:nowrap">+ 앨범 추가</button>
           </div>
-          <label style="display:flex;align-items:center;gap:.6rem;padding:.5rem .8rem;
-            border-radius:10px;border:1.5px dashed rgba(255,255,255,.2);cursor:pointer;
-            background:rgba(255,255,255,.04);width:fit-content">
-            <span id="adm-mem-file-text" style="font-size:.82rem;color:var(--txt2)">📷 사진 선택</span>
-            <input type="file" id="adm-mem-file" accept="image/*" style="display:none"
-              onchange="document.getElementById('adm-mem-file-text').textContent='📷 '+this.files[0].name">
+          <div id="album-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
+        </div>
+      </div>
+
+      <!-- 다중 사진 업로드 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header"><div class="tc-title">📤 사진 올리기 (여러 장 한번에)</div></div>
+        <div style="padding:1rem;display:flex;flex-direction:column;gap:.7rem">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <select id="adm-mem-album" class="form-select" style="flex:1;min-width:160px">
+              <option value="">앨범 없음 (미분류)</option>
+            </select>
+            <input class="form-input" id="adm-mem-event-title" placeholder="행사 이름 (사진 제목 자동 생성)" style="flex:2;min-width:160px">
+            <input class="form-input" id="adm-mem-event-date" type="date" style="flex:1;min-width:130px">
+          </div>
+          <label id="adm-mem-drop-zone"
+            style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+              padding:1.4rem;border-radius:12px;border:2px dashed rgba(255,255,255,.2);
+              cursor:pointer;background:rgba(255,255,255,.03);min-height:80px;
+              transition:border-color .2s"
+            ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+            ondragleave="this.style.borderColor='rgba(255,255,255,.2)'"
+            ondrop="onMemDrop(event)">
+            <span style="font-size:1.4rem;margin-bottom:.3rem">📷</span>
+            <span style="font-size:.82rem;color:var(--txt2)">사진을 여기에 드래그하거나 클릭해서 선택</span>
+            <span style="font-size:.7rem;color:var(--txt3);margin-top:.2rem">여러 장 동시 선택 가능</span>
+            <input type="file" id="adm-mem-files" accept="image/*" multiple style="display:none"
+              onchange="onMemFilesSelect(this.files)">
           </label>
+          <!-- 미리보기 -->
+          <div id="adm-mem-previews" style="display:flex;flex-wrap:wrap;gap:.5rem"></div>
+          <!-- 업로드 진행 -->
           <div id="adm-mem-progress" style="display:none">
-            <div style="height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-bottom:.3rem">
+            <div style="height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-bottom:.3rem">
               <div id="adm-mem-prog-bar" style="height:100%;background:var(--sky);border-radius:3px;width:0%;transition:width .3s"></div>
             </div>
             <div id="adm-mem-prog-text" style="font-size:.72rem;color:var(--txt3)">업로드 중...</div>
           </div>
-          <button class="btn-sm success" style="width:fit-content" onclick="adminUploadMemory()">📸 전체 공개로 올리기</button>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn-sm success" onclick="adminUploadMemories()" style="white-space:nowrap">📸 전체 공개로 올리기</button>
+            <button class="btn-sm outline" onclick="clearMemPreviews()" style="white-space:nowrap">초기화</button>
+          </div>
         </div>
       </div>
 
@@ -3967,7 +4054,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="table-card">
         <div class="tc-header">
           <div class="tc-title">📋 추억 목록</div>
-          <div style="display:flex;gap:.4rem">
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <select id="mem-filter-album" class="form-select" style="width:auto;font-size:.78rem" onchange="renderMemoriesPage()">
+              <option value="all">전체 앨범</option>
+              <option value="none">미분류</option>
+            </select>
             <select id="mem-filter-status" class="form-select" style="width:auto;font-size:.78rem" onchange="renderMemoriesPage()">
               <option value="all">전체</option>
               <option value="pending">승인 대기</option>
@@ -4236,14 +4327,19 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <!-- ── PROMOTION ── -->
     <div class="page" id="p-promotion">
       <div class="section-header">
-        <div><div class="sh-title">⬆️ 승급 신청 관리</div>
-        <div class="sh-sub">학생이 신청한 승급을 확인하고 승인하세요</div></div>
+        <div><div class="sh-title">⬆️ 승급 관리</div>
+        <div class="sh-sub">승급 신청 확인 · 전체 학생 레벨 현황</div></div>
       </div>
-      <div class="table-card" style="margin-bottom:0"><div id="promo-list">
-        <div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">
-          대기 중인 승급 신청이 없습니다
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header"><div class="tc-title">⏳ 승급 대기</div></div>
+        <div id="promo-list" style="min-height:60px">
+          <div style="padding:1.5rem;text-align:center;color:var(--txt3);font-size:.85rem">대기 중인 승급 신청이 없습니다</div>
         </div>
-      </div></div>
+      </div>
+      <div class="table-card">
+        <div class="tc-header"><div class="tc-title">👥 전체 학생 레벨 현황</div></div>
+        <div id="promo-student-status" style="padding:.5rem 0;min-height:40px"></div>
+      </div>
     </div>
 
     <!-- ── SETTINGS ── -->
@@ -4532,6 +4628,17 @@ window.onload = async () => {
         updatePendingBadge();
         updatePromoBadge();
         updatePwResetBadge();
+        // 현재 열려 있는 탭도 재렌더
+        try {
+          const activePage = document.querySelector('.page.active')?.id?.replace('p-','');
+          if (activePage === 'weekly')   renderWeeklyAdminPage();
+          if (activePage === 'books')    renderBooksPage();
+          if (activePage === 'memories') renderMemoriesPage();
+          if (activePage === 'activity') renderActivityPage();
+          if (activePage === 'vocab')    renderVocabAdminPage();
+          if (activePage === 'stats')    renderStatsPage();
+          if (activePage === 'emotion')  renderEmotionPage();
+        } catch(e) { console.warn('탭 재렌더 오류:', e.message); }
       }
     });
   } catch(e) {
@@ -4546,21 +4653,26 @@ window.onload = async () => {
 };
 
 function renderAll() {
-  renderDashboard();
-  renderStudentTable();
-  renderApproveList();
-  renderApproveGrid();
-  renderRank();
-  renderBoardQuestList();
-  renderMonsters();
-  renderPromotionList();
-  loadSettings();
-  updatePwResetBadge();
-  updateEmotionAlertBadge();
-  renderArtworkPending();
-  renderArtworkAdmin();
-  const students = DB.getStudents();
-  document.getElementById('sb-count').textContent = `학생 수: ${students.length}명`;
+  // 각 함수를 개별 try/catch로 감싸서 한 곳 실패해도 나머지 계속 실행
+  const safe = (fn, name) => { try { fn(); } catch(e) { console.warn('renderAll 오류 ['+name+']:', e.message); } };
+  safe(renderDashboard,       'dashboard');
+  safe(renderStudentTable,    'students');
+  safe(renderApproveList,     'approveList');
+  safe(renderApproveGrid,     'approveGrid');
+  safe(renderRank,            'rank');
+  safe(renderBoardQuestList,  'questList');
+  safe(renderMonsters,        'monsters');
+  safe(renderPromotionList,   'promotion');
+  safe(loadSettings,          'settings');
+  safe(updatePwResetBadge,    'pwBadge');
+  safe(updateEmotionAlertBadge,'emotionBadge');
+  safe(renderArtworkPending,  'artPending');
+  safe(renderArtworkAdmin,    'artAdmin');
+  try {
+    const students = DB.getStudents();
+    const el = document.getElementById('sb-count');
+    if (el) el.textContent = `학생 수: ${students.length}명`;
+  } catch(e) {}
 }
 
 function updatePwResetBadge() {
@@ -4603,6 +4715,7 @@ function nav(page, el) {
   if (page === 'activity')  renderActivityPage();
   if (page === 'stats')     renderStatsPage();
   if (page === 'promotion') renderPromotionList();
+  if (page === 'rank')      renderRank();
   if (page === 'settings')  {
     renderBackupList();
     renderSubjectManage();
@@ -5500,34 +5613,106 @@ function updatePromoBadge() {
 //  PROMOTION MANAGEMENT
 // ══════════════════════════════════════════════════
 function renderPromotionList() {
-  const requests = DB.getPromotionRequests();
-  updatePromoBadge();
-  const container = document.getElementById('promo-list');
-  if (!container) return;
-  if (requests.length === 0) {
-    container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--txt3);font-size:.85rem">대기 중인 승급 신청이 없습니다</div>';
-    return;
-  }
-  container.innerHTML = requests.map(req => {
-    const s = DB.getStudent(req.studentId);
-    if (!s) return '';
-    return `<div class="approve-card">
-      <div style="font-size:2rem">⬆️</div>
-      <div class="ac-left">
-        <div class="ac-student">${s.avatar} ${s.name}</div>
-        <div class="ac-quest">Lv.${req.level} 승급 신청 · ${req.date||''}</div>
-        <div class="ac-rewards">
-          <span class="ac-tag">현재 Lv.${s.level}</span>
-          <span class="ac-tag">EXP ${s.exp}</span>
+  try {
+    const requests = DB.getPromotionRequests() || [];
+    updatePromoBadge();
+    const container = document.getElementById('promo-list');
+    if (!container) return;
+
+    const students = DB.getStudents();
+    const validIds = new Set(students.map(s => s.id));
+    const orphans  = requests.filter(r => !validIds.has(r.studentId));
+
+    // 디버그 로그
+    console.log('[승급관리] requests:', requests.length, '/ orphans:', orphans.length);
+    if (orphans.length) console.warn('[승급관리] 고아 요청:', orphans);
+
+    if (requests.length === 0) {
+      container.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--txt3);font-size:.85rem">대기 중인 승급 신청이 없습니다</div>';
+    } else {
+      container.innerHTML = requests.map(req => {
+        const s = DB.getStudent(req.studentId);
+        if (!s) {
+          return `<div class="approve-card" style="border:1px solid var(--red);opacity:.9">
+            <div style="font-size:2rem">⚠️</div>
+            <div class="ac-left">
+              <div class="ac-student" style="color:var(--red)">알 수 없는 학생</div>
+              <div class="ac-quest">studentId: ${req.studentId} · Lv.${req.level} · ${req.date||''}</div>
+              <div class="ac-rewards"><span class="ac-tag" style="background:rgba(231,76,60,.15);color:var(--red)">⚠️ 고아 요청 — 학생이 삭제됐거나 ID가 다릅니다</span></div>
+            </div>
+            <div class="ac-right">
+              <button class="btn-sm danger" onclick="rejectPromotion('${req.id}')">🗑️ 삭제</button>
+            </div>
+          </div>`;
+        }
+        return `<div class="approve-card">
+          <div style="font-size:2rem">⬆️</div>
+          <div class="ac-left">
+            <div class="ac-student">${s.avatar} ${s.name}</div>
+            <div class="ac-quest">Lv.${req.level} 승급 신청 · ${req.date||''}</div>
+            <div class="ac-rewards">
+              <span class="ac-tag">현재 Lv.${s.level||1}</span>
+              <span class="ac-tag">EXP ${s.exp||0}</span>
+            </div>
+          </div>
+          <div class="ac-right">
+            <button class="btn-sm success" onclick="approvePromotion('${req.id}')">✅ 승급 승인</button>
+            <button class="btn-sm danger" onclick="rejectPromotion('${req.id}')">✕ 반려</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      if (orphans.length > 0) {
+        container.innerHTML += `<div style="padding:.7rem 1rem;background:rgba(231,76,60,.06);
+          border-top:1px solid rgba(231,76,60,.2);display:flex;align-items:center;gap:.8rem">
+          <span style="font-size:.78rem;color:var(--red);flex:1">
+            ⚠️ 학생을 찾을 수 없는 요청 ${orphans.length}건 — 위의 🗑️ 버튼 또는 아래 일괄 정리</span>
+          <button class="btn-sm danger" onclick="cleanupOrphanPromoRequests()">🧹 일괄 정리</button>
+        </div>`;
+      }
+    }
+
+    const statusEl = document.getElementById('promo-student-status');
+    if (!statusEl) return;
+    if (students.length === 0) { statusEl.innerHTML = ''; return; }
+    statusEl.innerHTML = students.sort((a,b)=>(b.level||0)-(a.level||0)).map(s => {
+      const isPending = requests.some(r=>r.studentId===s.id);
+      const expTable  = typeof GAME_DATA !== 'undefined' ? GAME_DATA.expTable : [];
+      const curIdx = Math.min((s.level||1)-1, expTable.length-1);
+      const nxtIdx = Math.min((s.level||1),   expTable.length-1);
+      const curExp = expTable[curIdx] || 0;
+      const nxtExp = expTable[nxtIdx] || curExp+1;
+      const expPct = nxtExp > curExp ? Math.min(100,Math.round(((s.exp||0)-curExp)/(nxtExp-curExp)*100)) : 100;
+      return `<div style="display:flex;align-items:center;gap:.7rem;padding:.5rem 1.2rem;
+        border-bottom:1px solid rgba(255,255,255,.05)">
+        <span>${s.avatar||'🙂'}</span>
+        <span style="font-weight:700;font-size:.88rem;min-width:60px">${s.name}</span>
+        <span style="font-size:.78rem;font-weight:700;color:var(--sky)">Lv.${s.level||1}</span>
+        <span style="font-size:.72rem;color:var(--txt3)">${s.job||'학생'}</span>
+        <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;max-width:120px">
+          <div style="height:100%;background:linear-gradient(90deg,var(--sky),var(--purple));border-radius:3px;width:${expPct}%"></div>
         </div>
-      </div>
-      <div class="ac-right">
-        <button class="btn-sm success" onclick="approvePromotion('${req.id}')">✅ 승급 승인</button>
-        <button class="btn-sm danger"  onclick="rejectPromotion('${req.id}')">✕ 반려</button>
-      </div>
-    </div>`;
-  }).join('');
+        <span style="font-size:.7rem;color:var(--txt3)">${s.exp||0} EXP</span>
+        ${isPending?'<span style="font-size:.68rem;background:rgba(155,89,182,.2);color:var(--purple);border-radius:20px;padding:.1rem .45rem;font-weight:700">신청중</span>':''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('renderPromotionList 에러:', e);
+    const el = document.getElementById('promo-list');
+    if (el) el.innerHTML = `<div style="padding:1rem;color:var(--red)">오류: ${e.message}</div>`;
+  }
 }
+
+function cleanupOrphanPromoRequests() {
+  if (!confirm('학생을 찾을 수 없는 승급 요청을 모두 삭제할까요?')) return;
+  const validIds = new Set(DB.getStudents().map(s=>s.id));
+  const valid = DB.getPromotionRequests().filter(r=>validIds.has(r.studentId));
+  DB.savePromotionRequests(valid);
+  notify('🧹 고아 승급 요청 정리 완료');
+  renderPromotionList();
+  updatePromoBadge();
+}
+
 
 function approvePromotion(reqId) {
   const req = DB.getPromotionRequests().find(r => r.id === reqId);
@@ -5589,7 +5774,6 @@ function buildRankingHTML(students) {
   const categories = [
     { label:'레벨',   key: s => s.level||0,            fmt: (s,v) => `Lv.${v}` },
     { label:'퀘스트', key: s => s.totalQuests||0,       fmt: (s,v) => `${v}개` },
-    { label:'골드',   key: s => _totalGoldAdmin(s),     fmt: (s,v) => `${v.toLocaleString()}G` },
     { label:'독서',   key: s => s.bookCount||0,         fmt: (s,v) => `${v}권` },
   ];
 
@@ -5728,7 +5912,140 @@ function renderStatsPage() {
 // ══════════════════════════════════════════════════
 //  ACTIVITY (활동 내역)
 // ══════════════════════════════════════════════════
+// ── 일일퀘스트 주간/월간 기록 ─────────────────────────
+let _dqView = 'week';
+
+function setDqView(v, btn) {
+  _dqView = v;
+  document.querySelectorAll('#dq-view-week,#dq-view-month').forEach(b => {
+    b.style.background = 'rgba(255,255,255,.07)'; b.style.color = 'var(--txt2)'; b.className = 'btn-sm outline';
+  });
+  btn.style.background = 'var(--gold)'; btn.style.color = '#1a1a1a'; btn.className = 'btn-sm';
+  renderDqSummary();
+}
+
+function renderDqSummary() {
+  const wrap = document.getElementById('dq-summary-wrap');
+  if (!wrap) return;
+  const db = DB.load();
+  const students = DB.getStudents();
+
+  // 학생 필터 셀렉트 초기화
+  const stuSel = document.getElementById('dq-stu-filter');
+  if (stuSel && stuSel.options.length === 1) {
+    students.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.avatar + ' ' + s.name;
+      stuSel.appendChild(o);
+    });
+  }
+  const stuFilter = stuSel?.value || 'all';
+
+  const allBq = db.boardQuests || [];
+  const dailyBq = allBq.filter(q => q.type === 'daily' && q.date);
+  const logs = Object.values(db.questLogs || {})
+    .filter(q => q && (q.type === 'daily' || q.boardQuestType === 'daily') && q.studentId && q.date);
+
+  const filteredStudents = stuFilter === 'all' ? students : students.filter(s=>s.id===stuFilter);
+
+  function getWeekKey(dateStr) {
+    const d = new Date(dateStr); d.setHours(12);
+    const day = d.getDay();
+    const mon = new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    return mon.toISOString().slice(0,10);
+  }
+  const keyFn = _dqView==='week' ? getWeekKey : (d=>d.slice(0,7));
+
+  // 기간별 + 퀘스트명별 → 올라온 날짜 Set
+  // questDateMap[period][questName] = Set of dates
+  const questDateMap = {};
+  dailyBq.forEach(q => {
+    const k = keyFn(q.date);
+    if (!questDateMap[k]) questDateMap[k] = {};
+    if (!questDateMap[k][q.name]) questDateMap[k][q.name] = new Set();
+    questDateMap[k][q.name].add(q.date);
+  });
+
+  // 기간별 + 학생별 + 퀘스트명별 → 완료한 날짜 Set
+  // logDateMap[period][studentId][questName] = Set of dates
+  const logDateMap = {};
+  logs.forEach(l => {
+    const k = keyFn(l.date);
+    if (!logDateMap[k]) logDateMap[k] = {};
+    if (!logDateMap[k][l.studentId]) logDateMap[k][l.studentId] = {};
+    if (!logDateMap[k][l.studentId][l.name]) logDateMap[k][l.studentId][l.name] = new Set();
+    logDateMap[k][l.studentId][l.name].add(l.date);
+  });
+
+  const periods = Object.keys({...questDateMap,...logDateMap}).sort().reverse().slice(0,12);
+
+  if (periods.length === 0) {
+    wrap.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--txt3)">일일퀘스트 기록이 없어요</div>';
+    return;
+  }
+
+  const periodLabel = k => {
+    if (_dqView==='month') { const [y,m]=k.split('-'); return y+'년 '+parseInt(m)+'월'; }
+    const end = new Date(k); end.setDate(end.getDate()+6);
+    return k.slice(5)+'~'+end.toISOString().slice(5,10);
+  };
+
+  wrap.innerHTML = periods.map(k => {
+    const questMap = questDateMap[k] || {};          // questName → Set<dates>
+    const questNames = Object.keys(questMap);
+    const logMap    = logDateMap[k] || {};            // studentId → questName → Set<dates>
+
+    return `
+    <div style="margin:.4rem 1rem .6rem;border-radius:10px;border:1px solid rgba(255,255,255,.08);overflow:hidden">
+      <div style="background:rgba(255,255,255,.05);padding:.45rem .8rem;font-size:.75rem;
+        font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.07)">
+        📋 ${periodLabel(k)}
+        <span style="font-weight:400;color:var(--txt3);font-size:.68rem;margin-left:.4rem">
+          퀘스트 ${questNames.length}종</span>
+      </div>
+      <!-- 퀘스트 이름 + 올라온 날수 -->
+      <div style="padding:.45rem .8rem;display:flex;flex-wrap:wrap;gap:.3rem;border-bottom:1px solid rgba(255,255,255,.06)">
+        ${questNames.map((n,i)=>`<span style="font-size:.68rem;padding:.15rem .5rem;border-radius:8px;
+          background:rgba(255,255,255,.07);color:var(--txt2)">
+          <b style="color:var(--gold)">${i+1}</b> ${n}
+          <span style="color:var(--txt3)">(${questMap[n].size}일)</span></span>`).join('')}
+      </div>
+      <!-- 학생별: 퀘스트별 n/m일 -->
+      <div style="padding:.35rem 0">
+        ${filteredStudents.map(s => {
+          const stuLog = logMap[s.id] || {};
+          // 전체 완료일수 / 전체 가능일수
+          const totalAvail = questNames.reduce((a,n)=>(a+(questMap[n]?.size||0)), 0);
+          const totalDone  = questNames.reduce((a,n)=>(a+(stuLog[n]?.size||0)), 0);
+          const allDone = totalDone === totalAvail && totalAvail > 0;
+          const color = allDone?'var(--emerald)':totalDone>0?'var(--gold)':'var(--txt3)';
+          return `<div style="border-bottom:1px solid rgba(255,255,255,.04);padding:.4rem .8rem">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+              <span>${s.avatar}</span>
+              <span style="font-size:.82rem;font-weight:700;flex:1">${s.name}</span>
+              <span style="font-size:.73rem;font-weight:700;color:${color}">${totalDone}/${totalAvail}일</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.1rem;padding-left:1.6rem">
+              ${questNames.map(n => {
+                const avail = questMap[n]?.size || 0;
+                const done  = stuLog[n]?.size  || 0;
+                const c = done===avail&&avail>0?'var(--emerald)':done>0?'var(--gold)':'rgba(255,255,255,.2)';
+                return `<div style="font-size:.7rem;display:flex;align-items:center;gap:.4rem">
+                  <span style="min-width:32px;font-weight:700;color:${c}">${done}/${avail}일</span>
+                  <span style="color:${done>0?'var(--txt2)':'var(--txt3)'}">${n}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+
 function renderActivityPage() {
+  renderDqSummary();
   const db       = DB.load();
   const students = DB.getStudents();
 
@@ -6153,6 +6470,29 @@ function renderArtworkAdmin() {
 // ══════════════════════════════════════════════════
 //  BOOKS (독서 현황)
 // ══════════════════════════════════════════════════
+function parseBookContent(r) {
+  let charName = r.characterName || '', charReason = r.characterReason || '';
+  let summary = r.summary || '', reflection = r.reflection || '';
+  const raw = r.bookReview || r.review || '';
+  if (!summary && !reflection && raw) {
+    const charMatch = raw.match(/\[인물:\s*([^\n\]—–-]+?)(?:\s*[—–-]\s*([^\n\]]+))?\]/);
+    if (charMatch && !charName) { charName = (charMatch[1]||'').trim(); charReason = (charMatch[2]||'').trim(); }
+    const cleanRaw = raw.replace(/\[인물:[^\]]*\]/g,'').trim();
+    const parts = cleanRaw.split(/\n\n|\n(?=[가-힣])/);
+    if (parts.length >= 2) {
+      summary    = parts.slice(0, Math.ceil(parts.length/2)).join('\n').trim();
+      reflection = parts.slice(Math.ceil(parts.length/2)).join('\n').trim();
+    } else { summary = cleanRaw; }
+  }
+  let html = '';
+  if (charName) html += `<div style="background:rgba(155,89,182,.07);border-left:3px solid rgba(155,89,182,.4);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:rgba(155,89,182,.9);font-weight:700;margin-bottom:.15rem">🧑 인상 깊은 인물</div><div style="font-size:.8rem;color:var(--txt1);font-weight:600">${charName}</div>${charReason?`<div style="font-size:.75rem;color:var(--txt2);margin-top:.1rem">${charReason}</div>`:''}</div>`;
+  if (summary) html += `<div style="background:rgba(52,152,219,.07);border-left:3px solid rgba(52,152,219,.35);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:var(--sky);font-weight:700;margin-bottom:.15rem">📖 줄거리</div><div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap">${summary}</div></div>`;
+  if (reflection) html += `<div style="background:rgba(46,204,113,.07);border-left:3px solid rgba(46,204,113,.35);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:var(--emerald);font-weight:700;margin-bottom:.15rem">💬 느낀 점</div><div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap">${reflection}</div></div>`;
+  if (!html && raw) html = `<div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap;padding:.3rem 0">${raw}</div>`;
+  return html;
+}
+
+
 function renderBooksPage() {
   const students   = DB.getStudents();
   const filterStu  = document.getElementById('books-filter')?.value || 'all';
@@ -6171,10 +6511,10 @@ function renderBooksPage() {
   }
 
   // 학급 요약
-  const totalBooks = students.reduce((sum,s)=>(sum+(s.bookCount||0)),0);
+  const totalBooks   = students.reduce((sum,s)=>(sum+(s.bookCount||0)),0);
   const totalPending = students.reduce((sum,s)=>sum+((s.pendingRewards||[]).filter(r=>r.type==='book').length),0);
-  const avgBooks   = students.length ? (totalBooks/students.length).toFixed(1) : 0;
-  const topReader  = [...students].sort((a,b)=>(b.bookCount||0)-(a.bookCount||0))[0];
+  const avgBooks     = students.length ? (totalBooks/students.length).toFixed(1) : 0;
+  const topReader    = [...students].sort((a,b)=>(b.bookCount||0)-(a.bookCount||0))[0];
   document.getElementById('books-summary').innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem">
       <div style="text-align:center">
@@ -6186,7 +6526,7 @@ function renderBooksPage() {
         <div style="font-size:.72rem;color:var(--txt3)">1인 평균</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:1.6rem;font-weight:700;color:var(--red)">${totalPending}</div>
+        <div style="font-size:1.6rem;font-weight:700;color:${totalPending>0?'var(--red)':'var(--txt3)'}">${totalPending}</div>
         <div style="font-size:.72rem;color:var(--txt3)">확인 대기</div>
       </div>
       <div style="text-align:center">
@@ -6223,79 +6563,115 @@ function renderBooksPage() {
 
   // 전체 기록 수집 (pending + done)
   const target = filterStu==='all' ? students : students.filter(s=>s.id===filterStu);
-  let allRecs = [];
+  let pendingRecs = [], doneRecs = [];
+
   target.forEach(s => {
-    const pending = (s.pendingRewards||[]).filter(r=>r.type==='book');
-    pending.forEach(p => allRecs.push({ ...p, _sid:s.id, _sname:s.name, _savatar:s.avatar, _status:'pending' }));
-    (s.books||[]).forEach(b => allRecs.push({ ...b, bookTitle:b.title, bookDate:b.date,
-      _sid:s.id, _sname:s.name, _savatar:s.avatar, _status:'done' }));
+    (s.pendingRewards||[]).filter(r=>r.type==='book').forEach(p =>
+      pendingRecs.push({ ...p, _sid:s.id, _sname:s.name, _savatar:s.avatar, _status:'pending' })
+    );
+    (s.books||[]).forEach(b =>
+      doneRecs.push({ ...b, bookTitle:b.title, bookDate:b.date, _sid:s.id, _sname:s.name, _savatar:s.avatar, _status:'done' })
+    );
   });
 
-  // 주제 필터
+  // 필터
+  let allRecs = [...pendingRecs, ...doneRecs];
   if (filterCat !== 'all') allRecs = allRecs.filter(r => r.category === filterCat);
-  // 확인 여부 필터
   if (filterChk === 'unchecked') allRecs = allRecs.filter(r => r._status==='pending' || !r.teacherChecked);
   if (filterChk === 'checked')   allRecs = allRecs.filter(r => r._status!=='pending' && r.teacherChecked);
+  pendingRecs = allRecs.filter(r=>r._status==='pending');
+  doneRecs    = allRecs.filter(r=>r._status!=='pending');
 
-  // 정렬
-  if (sortMode === 'date-desc') allRecs.sort((a,b) => (b.bookDate||'').localeCompare(a.bookDate||''));
-  else if (sortMode === 'date-asc') allRecs.sort((a,b) => (a.bookDate||'').localeCompare(b.bookDate||''));
-  else allRecs.sort((a,b) => a._sname.localeCompare(b._sname));
+  if (sortMode === 'date-desc') doneRecs.sort((a,b)=>(b.bookDate||'').localeCompare(a.bookDate||''));
+  else if (sortMode === 'date-asc') doneRecs.sort((a,b)=>(a.bookDate||'').localeCompare(b.bookDate||''));
+  else doneRecs.sort((a,b)=>a._sname.localeCompare(b._sname));
 
   const el = document.getElementById('books-list');
   if (!el) return;
-  if (allRecs.length === 0) {
-    el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--txt3)">조건에 맞는 독서 기록이 없어요</div>`;
-    return;
-  }
 
-  const starStr = n => n ? '⭐'.repeat(n) : '-';
-  const catLabel = r => r.category === '직접입력' && r.customCategory ? r.customCategory : (r.category || '-');
+  const starStr  = n => n ? '⭐'.repeat(Math.min(n,5)) : '';
+  const catLabel = r => r.category === '직접입력' && r.customCategory ? r.customCategory : (r.category||'');
 
-  el.innerHTML = allRecs.map(r => {
+  // ── 카드 렌더 함수 ──────────────────────────────────
+  const bookCard = (r, expanded) => {
     const isPending = r._status === 'pending';
     const isChecked = !isPending && r.teacherChecked;
-    const statusColor = isPending ? 'rgba(255,215,0,.2)' : isChecked ? 'rgba(46,204,113,.18)' : 'rgba(255,255,255,.07)';
-    const badgeTxt   = isPending ? '⏳ 대기' : isChecked ? '✓ 확인완료' : '미확인';
-    const badgeColor = isPending ? 'var(--gold)' : isChecked ? 'var(--emerald)' : 'var(--txt3)';
+    const catTxt = catLabel(r);
+    const stars  = starStr(r.rating);
     return `
-    <div style="border-bottom:1px solid rgba(255,255,255,.05);padding:.8rem 1.2rem">
-      <!-- 목록 행 -->
-      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
-        <span style="font-size:.7rem;font-weight:700;color:${badgeColor};
-          background:${statusColor};border-radius:20px;padding:.15rem .55rem;flex-shrink:0">${badgeTxt}</span>
-        <span style="font-size:.85rem">${r._savatar}</span>
-        <span style="font-weight:700;font-size:.88rem">${r._sname}</span>
-        <span style="font-weight:700;font-size:.88rem;flex:1;min-width:0;color:var(--txt1)">『${r.bookTitle||r.title||''}』</span>
-        <span style="font-size:.72rem;background:rgba(93,173,226,.12);color:var(--sky);
-          border-radius:10px;padding:.1rem .45rem;flex-shrink:0">${catLabel(r)}</span>
-        <span style="font-size:.75rem;flex-shrink:0">${starStr(r.rating)}</span>
-        <span style="font-size:.7rem;color:var(--txt3);flex-shrink:0">${r.bookDate||r.date||''}</span>
-      </div>
-      <!-- 상세 보기 -->
-      <details style="margin-top:.5rem">
-        <summary style="font-size:.72rem;color:var(--sky);cursor:pointer">상세보기 / 피드백</summary>
-        <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem">
-          ${r.characterName?`<div style="font-size:.78rem"><b style="color:var(--txt3)">인상 깊은 인물:</b> ${r.characterName}${r.characterReason?` — ${r.characterReason}`:''}</div>`:''}
-          ${r.summary?`<div style="font-size:.78rem"><b style="color:var(--txt3)">줄거리:</b><div style="margin-top:.2rem;line-height:1.6;color:var(--txt2)">${r.summary}</div></div>`:''}
-          ${r.reflection?`<div style="font-size:.78rem"><b style="color:var(--txt3)">느낀 점:</b><div style="margin-top:.2rem;line-height:1.6;color:var(--txt2)">${r.reflection}</div></div>`:''}
-          ${r.bookReview&&!r.summary?`<div style="font-size:.78rem;color:var(--txt2);line-height:1.6">${r.bookReview}</div>`:''}
-          <!-- 교사 코멘트 -->
-          <div style="margin-top:.4rem;display:flex;gap:.4rem;align-items:center">
-            <input id="bk-comment-${r.id}" type="text" value="${r.teacherComment||''}"
-              placeholder="교사 코멘트 입력..."
-              style="flex:1;padding:.35rem .6rem;border-radius:8px;border:1px solid rgba(255,255,255,.15);
-                background:rgba(255,255,255,.06);color:var(--txt1);font-family:inherit;font-size:.76rem">
-            ${isPending
-              ? `<button class="btn-sm success" onclick="confirmBookRecord('${r._sid}','${r.id}')">✅ 확인 승인</button>`
-              : `<button class="btn-sm outline" onclick="saveBookComment('${r._sid}','${r.bookTitle||r.title}','${r.id}')">💾 저장</button>`}
-            ${isPending?`<button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red)" onclick="deleteBookPending('${r._sid}','${r.id}')">🗑️</button>`
-              :`<button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red)" onclick="deleteBook('${r._sid}','${r.bookTitle||r.title}')">🗑️</button>`}
-          </div>
+    <div style="border-radius:12px;margin:.5rem 1rem;padding:.85rem 1rem;
+      background:${isPending?'rgba(255,215,0,.06)':'rgba(255,255,255,.03)'};
+      border:1.5px solid ${isPending?'rgba(255,215,0,.3)':isChecked?'rgba(46,204,113,.15)':'rgba(255,255,255,.07)'}">
+
+      <!-- 상단: 상태 + 학생 + 책 제목 -->
+      <div style="display:flex;align-items:flex-start;gap:.6rem;flex-wrap:wrap;margin-bottom:.55rem">
+        <span style="flex-shrink:0;font-size:.68rem;font-weight:700;padding:.18rem .55rem;border-radius:20px;
+          background:${isPending?'rgba(255,215,0,.18)':isChecked?'rgba(46,204,113,.18)':'rgba(255,255,255,.08)'};
+          color:${isPending?'var(--gold)':isChecked?'var(--emerald)':'var(--txt3)'}">
+          ${isPending?'⏳ 확인 대기':isChecked?'✅ 확인완료':'미확인'}</span>
+        <span style="font-size:1rem">${r._savatar}</span>
+        <span style="font-weight:800;font-size:.9rem;color:var(--txt1)">${r._sname}</span>
+        <span style="font-weight:700;font-size:.88rem;color:var(--sky);flex:1;min-width:120px">
+          『${r.bookTitle||r.title||''}』</span>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+          ${catTxt?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);
+            border-radius:8px;padding:.12rem .42rem">${catTxt}</span>`:''}
+          ${stars?`<span style="font-size:.8rem">${stars}</span>`:''}
+          ${r.bookDate||r.date?`<span style="font-size:.68rem;color:var(--txt3)">${r.bookDate||r.date}</span>`:''}
         </div>
-      </details>
+      </div>
+
+      <!-- 본문 내용 (항상 표시) -->
+      <div style="display:flex;flex-direction:column;gap:.45rem;margin-bottom:.65rem">
+        ${parseBookContent(r)}
+      </div>
+
+      <!-- 교사 코멘트 + 버튼 -->
+      <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+        <input id="bk-comment-${r.id}" type="text" value="${(r.teacherComment||'').replace(/"/g,'&quot;')}"
+          placeholder="✏️ 교사 코멘트 (선택)"
+          style="flex:1;min-width:160px;padding:.38rem .65rem;border-radius:8px;
+            border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
+            color:var(--txt1);font-family:inherit;font-size:.76rem">
+        ${isPending
+          ? `<button class="btn-sm success" style="white-space:nowrap"
+              onclick="confirmBookRecord('${r._sid}','${r.id}')">✅ 확인 승인</button>
+             <button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red);white-space:nowrap"
+              onclick="deleteBookPending('${r._sid}','${r.id}')">🗑️</button>`
+          : `<button class="btn-sm outline" style="white-space:nowrap"
+              onclick="saveBookComment('${r._sid}','${r.bookTitle||r.title}','${r.id}')">💾 코멘트 저장</button>
+             <button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red);white-space:nowrap"
+              onclick="deleteBook('${r._sid}','${r.bookTitle||r.title}')">🗑️</button>`}
+      </div>
     </div>`;
-  }).join('');
+  };
+
+  // ── 렌더 ────────────────────────────────────────────
+  let html = '';
+
+  // 대기 중 → 항상 상단에 펼쳐서 표시
+  if (pendingRecs.length > 0) {
+    html += `<div style="padding:.5rem 1rem .3rem;font-size:.75rem;font-weight:800;
+      color:var(--gold);display:flex;align-items:center;gap:.5rem">
+      ⏳ 확인 대기 <span style="background:var(--gold);color:#1a1a1a;border-radius:20px;
+        padding:.05rem .5rem;font-size:.7rem">${pendingRecs.length}</span>
+    </div>`;
+    html += pendingRecs.map(r => bookCard(r, true)).join('');
+    html += `<div style="margin:.5rem 1rem;border-bottom:1px solid rgba(255,255,255,.08)"></div>`;
+  }
+
+  // 완료된 기록
+  if (doneRecs.length > 0) {
+    if (pendingRecs.length > 0)
+      html += `<div style="padding:.3rem 1rem .3rem;font-size:.72rem;font-weight:700;color:var(--txt3)">
+        ✅ 확인된 기록 (${doneRecs.length})</div>`;
+    html += doneRecs.map(r => bookCard(r, false)).join('');
+  }
+
+  if (!html) {
+    html = `<div style="padding:2rem;text-align:center;color:var(--txt3)">조건에 맞는 독서 기록이 없어요</div>`;
+  }
+  el.innerHTML = html;
 }
 
 function confirmBookRecord(studentId, pendingId) {
@@ -6419,74 +6795,207 @@ function compressAdmMemImage(file, maxSize, quality) {
   });
 }
 
-async function adminUploadMemory() {
-  const title = document.getElementById('adm-mem-title')?.value.trim() || '';
-  const desc  = document.getElementById('adm-mem-desc')?.value.trim() || '';
-  const fi    = document.getElementById('adm-mem-file');
-  if (!title)              { notify('사진 제목을 입력해주세요'); return; }
-  if (!fi.files || !fi.files[0]) { notify('사진을 선택해주세요'); return; }
+// ──────────────────────────────────────────────────────
+//  추억 앨범 관리
+// ──────────────────────────────────────────────────────
+let _memPendingFiles = []; // 업로드 대기 파일 목록
 
-  document.getElementById('adm-mem-progress').style.display = '';
-  document.getElementById('adm-mem-prog-bar').style.width = '5%';
-  document.getElementById('adm-mem-prog-text').textContent = '압축 중...';
+function createAlbum() {
+  const name = document.getElementById('album-name-input')?.value.trim();
+  const date = document.getElementById('album-date-input')?.value || todayStr();
+  const desc = document.getElementById('album-desc-input')?.value.trim() || '';
+  if (!name) { notify('앨범 이름을 입력해주세요', 'error'); return; }
+  DB.saveAlbum({ id:'alb_'+Date.now(), name, date, desc });
+  ['album-name-input','album-desc-input'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  notify('📁 앨범 "'+name+'" 생성!');
+  renderAlbumList();
+  renderMemoriesPage();
+}
 
-  try {
-    const file = fi.files[0];
-    const [imgBlob, thumbBlob] = await Promise.all([
-      compressAdmMemImage(file, 1600, 0.78),
-      compressAdmMemImage(file, 500,  0.70),
-    ]);
-    document.getElementById('adm-mem-prog-bar').style.width = '30%';
-    document.getElementById('adm-mem-prog-text').textContent = '업로드 중...';
+function renderAlbumList() {
+  const el = document.getElementById('album-list');
+  if (!el) return;
+  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  el.innerHTML = albums.length === 0
+    ? `<div style="font-size:.78rem;color:var(--txt3)">앨범 없음 — 위에서 추가하세요</div>`
+    : albums.map(a => {
+        const cnt = DB.getMemories('all').filter(m=>m.albumId===a.id).length;
+        return `<div style="display:inline-flex;align-items:center;gap:.4rem;
+          background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+          border-radius:20px;padding:.25rem .7rem .25rem .55rem;font-size:.78rem">
+          <span>📁</span>
+          <span style="font-weight:700">${a.name}</span>
+          <span style="color:var(--txt3);font-size:.68rem">${a.date||''}</span>
+          <span style="background:rgba(255,215,0,.15);color:var(--gold);border-radius:10px;
+            padding:.05rem .35rem;font-size:.65rem">${cnt}장</span>
+          <button onclick="deleteAlbum('${a.id}')" style="background:none;border:none;
+            color:var(--txt3);cursor:pointer;font-size:.7rem;padding:0">✕</button>
+        </div>`;
+      }).join('');
 
-    const storage = firebase.storage();
-    const ts = Date.now();
-    const imgRef   = storage.ref(`memories/adm_${ts}.jpg`);
-    const thumbRef = storage.ref(`memories/adm_${ts}_thumb.jpg`);
-    await imgRef.put(imgBlob);
-    document.getElementById('adm-mem-prog-bar').style.width = '65%';
-    await thumbRef.put(thumbBlob);
-    document.getElementById('adm-mem-prog-bar').style.width = '90%';
-    const [imageUrl, thumbUrl] = await Promise.all([imgRef.getDownloadURL(), thumbRef.getDownloadURL()]);
-
-    DB.saveMemory({
-      id: 'mem_adm_' + ts,
-      uploadedBy: 'admin',
-      studentId: null,
-      title, desc,
-      imageUrl, thumbUrl,
-      visibilityType: 'public',
-      approvalStatus: 'approved',
-      monthKey: todayStr().slice(0,7),
-      createdAt: ts,
-      date: todayStr(),
-    });
-
-    document.getElementById('adm-mem-title').value = '';
-    document.getElementById('adm-mem-desc').value = '';
-    document.getElementById('adm-mem-file').value = '';
-    document.getElementById('adm-mem-file-text').textContent = '📷 사진 선택';
-    document.getElementById('adm-mem-progress').style.display = 'none';
-    document.getElementById('adm-mem-prog-bar').style.width = '0%';
-    notify('📸 추억 사진 전체 공개로 업로드 완료!');
-    renderMemoriesPage();
-  } catch(e) {
-    notify('업로드 실패: ' + e.message);
-    document.getElementById('adm-mem-progress').style.display = 'none';
+  // 앨범 셀렉트도 갱신
+  const sel = document.getElementById('adm-mem-album');
+  const selFilter = document.getElementById('mem-filter-album');
+  if (sel) {
+    sel.innerHTML = '<option value="">앨범 없음 (미분류)</option>' +
+      albums.map(a=>`<option value="${a.id}">${a.name} (${a.date||''})</option>`).join('');
+  }
+  if (selFilter) {
+    const cur = selFilter.value;
+    selFilter.innerHTML = '<option value="all">전체 앨범</option><option value="none">미분류</option>' +
+      albums.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+    selFilter.value = cur;
   }
 }
 
+function deleteAlbum(id) {
+  if (!confirm('앨범을 삭제할까요? 사진은 삭제되지 않고 미분류로 이동합니다.')) return;
+  DB.deleteAlbum(id);
+  notify('앨범 삭제 완료');
+  renderAlbumList();
+  renderMemoriesPage();
+}
+
+// ── 다중 파일 선택 / 드래그앤드롭 ──────────────────────
+function onMemDrop(e) {
+  e.preventDefault();
+  document.getElementById('adm-mem-drop-zone').style.borderColor = 'rgba(255,255,255,.2)';
+  onMemFilesSelect(e.dataTransfer.files);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('adm-mem-drop-zone');
+  if (zone) zone.onclick = () => document.getElementById('adm-mem-files').click();
+});
+
+function onMemFilesSelect(files) {
+  if (!files || !files.length) return;
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    if (_memPendingFiles.find(x=>x.name===f.name && x.size===f.size)) continue;
+    _memPendingFiles.push(f);
+  }
+  renderMemPreviews();
+}
+
+function renderMemPreviews() {
+  const wrap = document.getElementById('adm-mem-previews');
+  if (!wrap) return;
+  if (_memPendingFiles.length === 0) { wrap.innerHTML=''; return; }
+  wrap.innerHTML = _memPendingFiles.map((f,i) => {
+    const url = URL.createObjectURL(f);
+    return `<div style="position:relative;width:80px;height:80px">
+      <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px">
+      <button onclick="removeMemFile(${i})" style="position:absolute;top:-4px;right:-4px;
+        background:rgba(231,76,60,.85);border:none;color:#fff;border-radius:50%;
+        width:18px;height:18px;font-size:.65rem;cursor:pointer;line-height:1;
+        display:flex;align-items:center;justify-content:center">✕</button>
+      <div style="position:absolute;bottom:0;left:0;right:0;font-size:.5rem;color:#fff;
+        background:rgba(0,0,0,.6);padding:.1rem .2rem;border-radius:0 0 8px 8px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
+    </div>`;
+  }).join('');
+}
+
+function removeMemFile(idx) {
+  _memPendingFiles.splice(idx,1);
+  renderMemPreviews();
+}
+
+function clearMemPreviews() {
+  _memPendingFiles = [];
+  document.getElementById('adm-mem-files').value = '';
+  renderMemPreviews();
+}
+
+// ── 다중 업로드 실행 ────────────────────────────────────
+async function adminUploadMemories() {
+  if (_memPendingFiles.length === 0) { notify('사진을 선택해주세요', 'error'); return; }
+  const albumId    = document.getElementById('adm-mem-album')?.value || '';
+  const eventTitle = document.getElementById('adm-mem-event-title')?.value.trim() || '';
+  const eventDate  = document.getElementById('adm-mem-event-date')?.value || todayStr();
+  const albumName  = albumId ? (DB.getAlbums().find(a=>a.id===albumId)?.name||'') : '';
+
+  const total = _memPendingFiles.length;
+  const progBar  = document.getElementById('adm-mem-prog-bar');
+  const progTxt  = document.getElementById('adm-mem-prog-text');
+  const progWrap = document.getElementById('adm-mem-progress');
+  progWrap.style.display = '';
+  progBar.style.width = '0%';
+
+  let done = 0, failed = 0;
+  for (const file of [..._memPendingFiles]) {
+    progTxt.textContent = `업로드 중 ${done+1}/${total} — ${file.name}`;
+    try {
+      const [imgBlob, thumbBlob] = await Promise.all([
+        compressAdmMemImage(file, 1600, 0.78),
+        compressAdmMemImage(file, 500,  0.70),
+      ]);
+      const storage = firebase.storage();
+      const ts = Date.now() + done;
+      const imgRef   = storage.ref(`memories/adm_${ts}.jpg`);
+      const thumbRef = storage.ref(`memories/adm_${ts}_thumb.jpg`);
+      await imgRef.put(imgBlob);
+      await thumbRef.put(thumbBlob);
+      const [imageUrl, thumbUrl] = await Promise.all([imgRef.getDownloadURL(), thumbRef.getDownloadURL()]);
+      // 제목: 이벤트 이름 있으면 "이벤트명 1", 없으면 파일명 기반
+      const idx = _memPendingFiles.indexOf(file) + 1;
+      const title = eventTitle ? (total>1 ? `${eventTitle} (${idx})` : eventTitle)
+                               : file.name.replace(/\.[^.]+$/,'');
+      DB.saveMemory({
+        id: 'mem_adm_'+ts,
+        uploadedBy: 'admin',
+        studentId: null,
+        title,
+        desc: '',
+        imageUrl, thumbUrl,
+        albumId: albumId || null,
+        albumName,
+        visibilityType: 'public',
+        approvalStatus: 'approved',
+        monthKey: eventDate.slice(0,7),
+        createdAt: ts,
+        date: eventDate,
+      });
+      done++;
+    } catch(e) {
+      failed++;
+      console.error('업로드 실패:', file.name, e);
+    }
+    progBar.style.width = Math.round((done+failed)/total*100)+'%';
+  }
+
+  progWrap.style.display = 'none';
+  clearMemPreviews();
+  document.getElementById('adm-mem-event-title').value = '';
+  notify(`📸 ${done}장 업로드 완료!${failed?` (실패 ${failed}장)`:''}`);
+  renderMemoriesPage();
+  renderAlbumList();
+}
+
+// 기존 단일 업로드 함수 — 호환성 유지
+async function adminUploadMemory() { await adminUploadMemories(); }
+
 function renderMemoriesPage() {
+  // 앨범 목록 갱신
+  renderAlbumList();
+
   const el = document.getElementById('memories-list');
   if (!el) return;
+  const albumF  = document.getElementById('mem-filter-album')?.value || 'all';
   const statusF = document.getElementById('mem-filter-status')?.value || 'all';
   const typeF   = document.getElementById('mem-filter-type')?.value   || 'all';
 
   let mems = DB.getMemories('all');
-  if (statusF !== 'all') mems = mems.filter(m => m.approvalStatus === statusF);
-  if (typeF === 'admin')   mems = mems.filter(m => m.uploadedBy === 'admin');
-  if (typeF === 'student') mems = mems.filter(m => m.uploadedBy === 'student');
-  mems.sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+  if (albumF === 'none')       mems = mems.filter(m=>!m.albumId);
+  else if (albumF !== 'all')   mems = mems.filter(m=>m.albumId===albumF);
+  if (statusF !== 'all')       mems = mems.filter(m=>m.approvalStatus===statusF);
+  if (typeF === 'admin')        mems = mems.filter(m=>m.uploadedBy==='admin');
+  if (typeF === 'student')      mems = mems.filter(m=>m.uploadedBy!=='admin');
+  mems.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  // 앨범 목록 (셀렉트 옵션용)
+  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
   if (mems.length === 0) {
     el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--txt3)">추억 사진이 없어요</div>`;
@@ -6497,30 +7006,58 @@ function renderMemoriesPage() {
   const statusColor = { pending:'var(--gold)', approved:'var(--emerald)', rejected:'var(--red)' };
 
   el.innerHTML = mems.map(m => `
-    <div style="display:flex;align-items:center;gap:.8rem;padding:.7rem 1.2rem;
+    <div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
       border-bottom:1px solid rgba(255,255,255,.05)">
-      <img src="${m.thumbUrl||m.imageUrl}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0">
+      <!-- 썸네일 (클릭→다운로드) -->
+      <a href="${m.imageUrl||m.thumbUrl}" download target="_blank" title="클릭하면 원본 다운로드"
+        style="flex-shrink:0;display:block;position:relative">
+        <img src="${m.thumbUrl||m.imageUrl}"
+          style="width:60px;height:60px;border-radius:8px;object-fit:cover;display:block">
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:8px;
+          display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s"
+          onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">
+          <span style="font-size:.8rem">⬇️</span></div>
+      </a>
       <div style="flex:1;min-width:0">
-        <div style="font-size:.85rem;font-weight:700">${m.title||'(제목없음)'}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">${m.desc||''}</div>
-        <div style="font-size:.68rem;color:var(--txt3);margin-top:.15rem">
-          ${m.uploadedBy==='admin'?'관리자 업로드':'👤 '+m.studentName} · ${m.date||''}
+        <div style="font-size:.85rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${m.title||'(제목없음)'}</div>
+        <div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">
+          ${m.uploadedBy==='admin'?'관리자':'👤 '+(m.studentName||'')} · ${m.date||''}
+        </div>
+        <!-- 앨범 지정 셀렉트 -->
+        <div style="margin-top:.35rem;display:flex;align-items:center;gap:.35rem">
+          <select id="mem-album-sel-${m.id}"
+            style="font-size:.7rem;padding:.18rem .4rem;border-radius:7px;
+              border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
+              color:var(--txt1);font-family:inherit;max-width:160px"
+            onchange="assignMemAlbum('${m.id}',this.value)">
+            <option value="">📂 미분류</option>
+            ${albums.map(a=>`<option value="${a.id}" ${m.albumId===a.id?'selected':''}>${a.name}</option>`).join('')}
+          </select>
+          ${m.albumId?`<span style="font-size:.65rem;color:var(--gold)">📁 ${m.albumName||''}</span>`:''}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
         <span style="font-size:.7rem;color:${statusColor[m.approvalStatus]||'var(--txt3)'};font-weight:700">
-          ${statusLabel[m.approvalStatus]||m.approvalStatus}
-        </span>
+          ${statusLabel[m.approvalStatus]||m.approvalStatus}</span>
         <div style="display:flex;gap:.3rem">
           ${m.approvalStatus==='pending'?`
             <button class="btn-sm success" onclick="approveMemory('${m.id}')">✅ 승인</button>
-            <button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red)" onclick="rejectMemory('${m.id}')">❌ 반려</button>`
+            <button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red)" onclick="rejectMemory('${m.id}')">❌</button>`
           : m.approvalStatus==='approved'?`
             <button class="btn-sm outline" onclick="rejectMemory('${m.id}')">내리기</button>`:''}
           <button class="btn-sm" style="background:rgba(231,76,60,.1);color:var(--red)" onclick="deleteMemory('${m.id}')">🗑️</button>
         </div>
       </div>
     </div>`).join('');
+}
+
+function assignMemAlbum(memId, albumId) {
+  const albums = DB.getAlbums();
+  const album  = albumId ? albums.find(a=>a.id===albumId) : null;
+  DB.saveMemory({ id:memId, albumId: albumId||null, albumName: album?.name||'' });
+  notify(album ? `📁 "${album.name}" 앨범으로 이동!` : '미분류로 변경');
+  renderMemoriesPage();
 }
 
 function approveMemory(id) {
@@ -7123,6 +7660,159 @@ function initAchRecalcSelect() {
     sel.appendChild(opt);
   });
 }
+
+function renderWeeklyAdminPage() {
+  const db       = DB.load();
+  const students = DB.getStudents();
+  const allGoals = db.weeklyGoals || [];
+  const allRefls = db.weeklyReflections || [];
+
+  // 이번 주 키 계산 - Utils.weekKey()와 동일한 2026-W14 형식 사용
+  const _wkNow = new Date(Date.now()+9*3600000);
+  const _wkDay = _wkNow.getUTCDay();
+  const _wkMon = new Date(_wkNow);
+  _wkMon.setUTCDate(_wkNow.getUTCDate() + (_wkDay===0?-6:1-_wkDay));
+  const _wkJan1 = new Date(Date.UTC(_wkMon.getUTCFullYear(),0,1));
+  const _wkNum = Math.ceil(((_wkMon-_wkJan1)/86400000+_wkJan1.getUTCDay()+1)/7);
+  const thisWeek = `${_wkMon.getUTCFullYear()}-W${String(_wkNum).padStart(2,'0')}`;
+
+  // 학생 필터 셀렉트 초기화
+  const stuSel = document.getElementById('wka-filter-stu');
+  if (stuSel && stuSel.options.length === 1) {
+    students.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.avatar + ' ' + s.name;
+      stuSel.appendChild(o);
+    });
+  }
+
+  // 주차 셀렉트 초기화
+  const weekSel = document.getElementById('wka-filter-week');
+  const allWeeks = [...new Set([...allGoals, ...allRefls].map(r=>r.weekKey).filter(Boolean))].sort().reverse();
+  if (weekSel && weekSel.options.length === 1) {
+    allWeeks.forEach(wk => {
+      const o = document.createElement('option');
+      o.value = wk; o.textContent = wk + ' 주';
+      weekSel.appendChild(o);
+    });
+  }
+
+  const filterStu  = stuSel?.value  || 'all';
+  const filterWeek = weekSel?.value || 'all';
+  const filterType = document.getElementById('wka-filter-type')?.value || 'all';
+
+  // 이번 주 현황
+  const thisGoals = allGoals.filter(g=>g.weekKey===thisWeek);
+  const thisRefls = allRefls.filter(r=>r.weekKey===thisWeek);
+  const monDone   = students.filter(s=>thisGoals.some(g=>g.studentId===s.id));
+  const friDone   = students.filter(s=>thisRefls.some(r=>r.studentId===s.id));
+  const bothDone  = students.filter(s=>monDone.find(x=>x.id===s.id)&&friDone.find(x=>x.id===s.id));
+  const monOnly   = monDone.filter(s=>!friDone.find(x=>x.id===s.id));
+  const noDone    = students.filter(s=>!monDone.find(x=>x.id===s.id));
+
+  const thisWeekEl = document.getElementById('weekly-this-week');
+  if (thisWeekEl) {
+    thisWeekEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:.8rem">
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--emerald)">${bothDone.length}</div>
+          <div style="font-size:.7rem;color:var(--txt3)">월+금 완료</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--sky)">${monDone.length}</div>
+          <div style="font-size:.7rem;color:var(--txt3)">월요일 작성</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--gold)">${friDone.length}</div>
+          <div style="font-size:.7rem;color:var(--txt3)">금요일 작성</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--red)">${noDone.length}</div>
+          <div style="font-size:.7rem;color:var(--txt3)">미작성</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">이번 주 (${thisWeek}) 월요일 완료</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+        ${monDone.length===0?'<span style="font-size:.75rem;color:var(--txt3)">없음</span>':
+          monDone.map(s=>`<span style="font-size:.75rem;background:rgba(93,173,226,.12);
+            color:var(--sky);border-radius:20px;padding:.15rem .55rem">${s.avatar} ${s.name}</span>`).join('')}
+      </div>`;
+  }
+
+  // 미완료 학생
+  const incEl = document.getElementById('weekly-incomplete');
+  if (incEl) {
+    if (noDone.length === 0) {
+      incEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--emerald);font-size:.85rem">✅ 이번 주 전원 작성 완료!</div>';
+    } else {
+      incEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.6rem 1.2rem">
+        ${noDone.map(s=>`<span style="font-size:.78rem;background:rgba(231,76,60,.1);
+          color:var(--red);border-radius:20px;padding:.2rem .6rem;border:1px solid rgba(231,76,60,.2)">
+          ${s.avatar} ${s.name}</span>`).join('')}
+      </div>`;
+    }
+  }
+
+  // 기록 목록
+  const listEl = document.getElementById('weekly-admin-list');
+  if (!listEl) return;
+
+  let targetStudents = filterStu==='all' ? students : students.filter(s=>s.id===filterStu);
+  const targetWeeks  = filterWeek==='all' ? allWeeks : [filterWeek];
+
+  let rows = [];
+  targetStudents.forEach(s => {
+    targetWeeks.forEach(wk => {
+      const goal = allGoals.find(g=>g.studentId===s.id&&g.weekKey===wk);
+      const refl = allRefls.find(r=>r.studentId===s.id&&r.weekKey===wk);
+      if (filterType==='both'       && !(goal&&refl)) return;
+      if (filterType==='monday_only'&& !(goal&&!refl)) return;
+      if (filterType==='none'       && (goal||refl))   return;
+      if (!goal && !refl) return; // 필터 none 아니면 빈 행 제외
+      rows.push({ s, wk, goal, refl });
+    });
+  });
+
+  if (rows.length === 0) {
+    listEl.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--txt3)">조건에 맞는 기록이 없어요</div>';
+    return;
+  }
+
+  listEl.innerHTML = rows.map(({ s, wk, goal, refl }) => {
+    const moodEmoji = ['😢','😔','😐','😊','😄'];
+    return `
+    <div style="border-bottom:1px solid rgba(255,255,255,.05);padding:.8rem 1.2rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
+        <span>${s.avatar}</span>
+        <span style="font-weight:700;font-size:.88rem">${s.name}</span>
+        <span style="font-size:.72rem;color:var(--txt3);background:rgba(255,255,255,.06);
+          border-radius:20px;padding:.1rem .45rem">${wk} 주</span>
+        ${goal?'<span style="font-size:.68rem;color:var(--sky);background:rgba(93,173,226,.1);border-radius:20px;padding:.1rem .45rem">📅 월 작성</span>':''}
+        ${refl?'<span style="font-size:.68rem;color:var(--emerald);background:rgba(46,204,113,.1);border-radius:20px;padding:.1rem .45rem">📅 금 작성</span>':''}
+      </div>
+      ${goal?`
+      <div style="background:rgba(93,173,226,.06);border-left:3px solid rgba(93,173,226,.3);
+        border-radius:0 8px 8px 0;padding:.5rem .75rem;margin-bottom:.4rem">
+        <div style="font-size:.65rem;color:var(--sky);font-weight:700;margin-bottom:.3rem">📅 월요일 다짐</div>
+        ${goal.weekendText?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">🗓 주말: ${goal.weekendText}</div>`:''}
+        ${goal.weekendMood!=null?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">기분: ${moodEmoji[goal.weekendMood]||''}</div>`:''}
+        ${goal.focusArea?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">🎯 노력영역: ${goal.focusArea}</div>`:''}
+        ${goal.goalText?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">📌 목표: ${goal.goalText}</div>`:''}
+        ${goal.mindset?`<div style="font-size:.75rem;color:var(--txt2)">💭 마음가짐: ${goal.mindset}</div>`:''}
+      </div>`:''}
+      ${refl?`
+      <div style="background:rgba(46,204,113,.06);border-left:3px solid rgba(46,204,113,.3);
+        border-radius:0 8px 8px 0;padding:.5rem .75rem">
+        <div style="font-size:.65rem;color:var(--emerald);font-weight:700;margin-bottom:.3rem">📅 금요일 돌아보기</div>
+        ${refl.focusReflection?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">노력: ${refl.focusReflection}</div>`:''}
+        ${refl.goalReflection?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">목표: ${refl.goalReflection}</div>`:''}
+        ${refl.bestMoment?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">✨ 잘한 점: ${refl.bestMoment}</div>`:''}
+        ${refl.nextWeekGoal?`<div style="font-size:.75rem;color:var(--txt2)">다음 주 목표: ${refl.nextWeekGoal}</div>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
 
 function dedupeAll() {
   // 승급 중복 제거

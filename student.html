@@ -554,7 +554,20 @@ const DB = {
     data.promotionRequests  = toArr(data.promotionRequests);
     data.boardQuests        = toArr(data.boardQuests);
     data.artworks           = toArr(data.artworks);
-    data.memories           = toArr(data.memories);
+    // memories 중복 제거 — 같은 id가 여러 경로로 저장된 경우
+    // 앨범 지정된 것(albumId 있는 것) 우선 보존
+    {
+      const raw = toArr(data.memories);
+      const seen = new Map();
+      raw.forEach(m => {
+        if (!m || !m.id) return;
+        const prev = seen.get(m.id);
+        // 앨범 지정된 것 또는 처음 등장한 것 저장
+        if (!prev || (m.albumId && !prev.albumId)) seen.set(m.id, m);
+      });
+      data.memories = Array.from(seen.values());
+    }
+    data.memoryAlbums       = toArr(data.memoryAlbums);
     data.recorderLogs       = toArr(data.recorderLogs);
     data.recorderSongs      = toArr(data.recorderSongs);
     data.weeklyGoals        = toArr(data.weeklyGoals);
@@ -687,6 +700,10 @@ const DB = {
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
+  savePromotionRequests(arr) {
+    const db = this.load(); db.promotionRequests = arr; this._cache = db;
+    this._fbRef.child('promotionRequests').set(arr);
+  },
   addPromotionRequest(r) {
     const db = this.load();
     db.promotionRequests = db.promotionRequests || [];
@@ -738,13 +755,15 @@ const DB = {
     if (idx >= 0) db.memories[idx] = { ...db.memories[idx], ...mem };
     else db.memories.push(mem);
     this._cache = db;
-    this._fbRef.child('memories/' + mem.id).set(db.memories.find(m=>m.id===mem.id));
+    // 전체 배열로 덮어쓰기 — 경로별 set은 배열 인덱스와 키가 섞여 중복 발생
+    this._fbRef.child('memories').set(db.memories);
   },
   deleteMemory(id) {
     const db = this.load();
     db.memories = (db.memories||[]).filter(m => m.id !== id);
     this._cache = db;
-    this._fbRef.child('memories/' + id).remove();
+    // 전체 배열 덮어쓰기 — 배열 인덱스 경로와 문자열 키 경로 모두 정리
+    this._fbRef.child('memories').set(db.memories);
   },
 
   // ── 주간 다짐 (월요일 목표 + 금요일 성찰) ─────────────
@@ -902,9 +921,30 @@ const DB = {
     this._cache=db; this._fbRef.child('quizRecords/'+r.id).set(db.quizRecords.find(x=>x.id===r.id));
   },
 
-  getPwResetRequests()    { return this.load().pwResetRequests || []; },
+  // ── 앨범 (그룹) ────────────────────────────────────────
+  // { id, name, date, desc, createdAt }
+  getAlbums()      { return this.load().memoryAlbums || []; },
+  saveAlbum(a) {
+    const db = this.load();
+    db.memoryAlbums = db.memoryAlbums || [];
+    const idx = db.memoryAlbums.findIndex(x=>x.id===a.id);
+    if (idx>=0) db.memoryAlbums[idx] = {...db.memoryAlbums[idx],...a};
+    else db.memoryAlbums.push({...a, createdAt:Date.now()});
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+  },
+  deleteAlbum(id) {
+    const db = this.load();
+    db.memoryAlbums = (db.memoryAlbums||[]).filter(a=>a.id!==id);
+    // 해당 앨범 사진들 앨범 해제
+    (db.memories||[]).forEach(m=>{ if(m.albumId===id){ m.albumId=null; m.albumName=''; } });
+    this._cache=db;
+    this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
+    this._fbRef.child('memories').set(db.memories);
+  },
   addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
   removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
+  getPwResetRequests()    { return this.load().pwResetRequests || []; },
 };
 
 // ─── 유틸리티 ────────────────────────────────────────
@@ -3845,6 +3885,20 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <div class="house-grid" id="house-grid"></div>
     <div style="font-size:.72rem;color:var(--txt3);margin:.8rem 0 .4rem">⚔️ 처치한 몬스터 도감</div>
     <div id="monster-dex"></div>
+
+    <!-- 일일퀘스트 기록 -->
+    <div style="margin-top:1rem">
+      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem">
+        📋 일일퀘스트 기록
+        <button id="dq-port-week-btn" onclick="setDqPortView('week',this)"
+          style="font-size:.62rem;padding:.12rem .45rem;border-radius:10px;cursor:pointer;
+            font-family:inherit;border:none;background:var(--gold);color:#1a1a1a;font-weight:700">주간</button>
+        <button id="dq-port-month-btn" onclick="setDqPortView('month',this)"
+          style="font-size:.62rem;padding:.12rem .45rem;border-radius:10px;cursor:pointer;
+            font-family:inherit;border:1px solid rgba(255,255,255,.2);background:transparent;color:var(--txt3)">월간</button>
+      </div>
+      <div id="dq-portfolio-wrap"></div>
+    </div>
   </div>
 
   <!-- 탭2: 주간 다짐 -->
@@ -4016,26 +4070,30 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       border-radius:12px;padding:.9rem;margin-bottom:.9rem">
       <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">📸 추억 사진 공유하기</div>
       <div style="display:flex;flex-direction:column;gap:.5rem">
-        <input class="form-input-student" id="mem-title-input" placeholder="사진 제목">
-        <textarea class="form-input-student" id="mem-desc-input" placeholder="한 줄 설명 (선택사항)"
-          style="min-height:48px;resize:none;line-height:1.5"></textarea>
-        <label style="display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;
-          border-radius:10px;border:1.5px dashed rgba(255,255,255,.2);cursor:pointer;
-          background:rgba(255,255,255,.04)">
-          <span id="mem-file-text" style="font-size:.82rem;color:var(--txt2)">📷 사진 선택하기</span>
-          <input type="file" id="mem-file-input" accept="image/*" style="display:none"
-            onchange="onMemFileSelect(this)">
+        <input class="form-input-student" id="mem-folder-input" placeholder="📁 폴더 이름 (예: 3월 텃밭 활동)">
+        <!-- 드래그앤드롭 or 클릭으로 여러 장 선택 -->
+        <label id="mem-drop-zone"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+            padding:1rem;border-radius:10px;border:1.5px dashed rgba(255,255,255,.2);
+            cursor:pointer;background:rgba(255,255,255,.04);min-height:70px;gap:.3rem"
+          ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+          ondragleave="this.style.borderColor='rgba(255,255,255,.2)'"
+          ondrop="onMemDrop(event)">
+          <span style="font-size:1.3rem">📷</span>
+          <span style="font-size:.78rem;color:var(--txt2)">사진을 여기에 드래그하거나 탭해서 선택</span>
+          <span style="font-size:.68rem;color:var(--txt3)">여러 장 동시 선택 가능</span>
+          <input type="file" id="mem-file-input" accept="image/*" multiple style="display:none"
+            onchange="onMemFilesSelect(this.files)">
         </label>
-        <div id="mem-preview-wrap" style="display:none;text-align:center">
-          <img id="mem-preview-img" style="max-height:140px;border-radius:10px;object-fit:contain">
-        </div>
+        <!-- 미리보기 썸네일 -->
+        <div id="mem-preview-wrap" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
         <div id="mem-upload-progress" style="display:none">
           <div style="height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-bottom:.3rem">
             <div id="mem-progress-bar" style="height:100%;background:var(--sky);border-radius:3px;width:0%;transition:width .3s"></div>
           </div>
           <div id="mem-progress-text" style="font-size:.7rem;color:var(--txt3)">업로드 중...</div>
         </div>
-        <button class="btn-gold" style="padding:.45rem;font-size:.82rem" onclick="submitMemory()">
+        <button class="btn-gold" style="padding:.45rem;font-size:.82rem" onclick="submitMemories()">
           📸 제출 (선생님 확인 후 공유돼요)
         </button>
       </div>
@@ -6041,6 +6099,101 @@ function renderMonsterOffers(zone) {
 // 도감 펼치기/접기
 function renderMonsterDexInline() { renderMonsters(); }
 
+// ── 학생 포트폴리오 일일퀘스트 기록 ──────────────────────
+let _dqPortView = 'week';
+function setDqPortView(v, btn) {
+  _dqPortView = v;
+  ['dq-port-week-btn','dq-port-month-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isActive = (id==='dq-port-week-btn' && v==='week') || (id==='dq-port-month-btn' && v==='month');
+    el.style.background = isActive ? 'var(--gold)' : 'transparent';
+    el.style.color = isActive ? '#1a1a1a' : 'var(--txt3)';
+    el.style.border = isActive ? 'none' : '1px solid rgba(255,255,255,.2)';
+  });
+  renderDqPortfolio();
+}
+
+function renderDqPortfolio() {
+  const wrap = document.getElementById('dq-portfolio-wrap');
+  if (!wrap || !CUR) return;
+  const db = DB.load();
+
+  function getWeekKey(dateStr) {
+    const d = new Date(dateStr); d.setHours(12);
+    const day = d.getDay();
+    const mon = new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    return mon.toISOString().slice(0,10);
+  }
+  const keyFn = _dqPortView==='week' ? getWeekKey : (d=>d.slice(0,7));
+  const periodLabel = k => {
+    if (_dqPortView==='month') { const [y,m]=k.split('-'); return y+'년 '+parseInt(m)+'월'; }
+    const end = new Date(k); end.setDate(end.getDate()+6);
+    return k.slice(5)+' ~ '+end.toISOString().slice(5,10);
+  };
+
+  const allBq = (db.boardQuests||[]).filter(q=>q.type==='daily'&&q.date);
+  const myLogs = Object.values(db.questLogs||{})
+    .filter(l=>l&&l.studentId===CUR.id&&(l.type==='daily'||l.boardQuestType==='daily')&&l.date);
+
+  // questDateMap[period][name] = Set<dates 올라온 날>
+  const questDateMap = {};
+  allBq.forEach(q => {
+    const k = keyFn(q.date);
+    if (!questDateMap[k]) questDateMap[k] = {};
+    if (!questDateMap[k][q.name]) questDateMap[k][q.name] = new Set();
+    questDateMap[k][q.name].add(q.date);
+  });
+  // doneDateMap[period][name] = Set<dates 내가 완료한 날>
+  const doneDateMap = {};
+  myLogs.forEach(l => {
+    const k = keyFn(l.date);
+    if (!doneDateMap[k]) doneDateMap[k] = {};
+    if (!doneDateMap[k][l.name]) doneDateMap[k][l.name] = new Set();
+    doneDateMap[k][l.name].add(l.date);
+  });
+
+  const periods = Object.keys({...questDateMap,...doneDateMap}).sort().reverse().slice(0,8);
+  if (periods.length===0) {
+    wrap.innerHTML = '<div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">일일퀘스트 기록이 없어요</div>';
+    return;
+  }
+
+  wrap.innerHTML = periods.map(k => {
+    const qMap  = questDateMap[k] || {};
+    const dMap  = doneDateMap[k]  || {};
+    const names = Object.keys(qMap);
+    const totalAvail = names.reduce((a,n)=>(a+(qMap[n]?.size||0)), 0);
+    const totalDone  = names.reduce((a,n)=>(a+(dMap[n]?.size||0)), 0);
+    const pct = totalAvail > 0 ? Math.round(totalDone/totalAvail*100) : 0;
+    const color = pct===100?'var(--emerald)':pct>=60?'var(--gold)':'var(--txt3)';
+    return `
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+      border-radius:10px;padding:.55rem .7rem;margin-bottom:.4rem">
+      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
+        <span style="font-size:.72rem;color:var(--txt3)">${periodLabel(k)}</span>
+        <span style="font-size:.75rem;font-weight:700;color:${color};margin-left:auto">
+          ${totalDone}/${totalAvail}일 완료</span>
+        ${pct===100?'<span style="font-size:.7rem">✨</span>':''}
+      </div>
+      <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:.4rem">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .5s"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.15rem">
+        ${names.map(n=>{
+          const avail = qMap[n]?.size||0;
+          const done  = dMap[n]?.size||0;
+          const c = done===avail&&avail>0?'var(--emerald)':done>0?'var(--gold)':'rgba(255,255,255,.2)';
+          return `<div style="display:flex;align-items:center;gap:.4rem;font-size:.72rem">
+            <span style="min-width:30px;font-weight:700;color:${c};flex-shrink:0">${done}/${avail}일</span>
+            <span style="color:${done>0?'var(--txt1)':'var(--txt3)'}">${n}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function toggleMonsterDex() {
   const el = document.getElementById('monster-dex-inline');
   if (!el) return;
@@ -7505,6 +7658,7 @@ function houseTab(tab, el) {
   document.getElementById('house-tab-vocab').style.display   = tab==='vocab'   ? '' : 'none';
   if (tab==='weekly')  renderWeeklyTab();
   if (tab==='book')    { renderBookRecords(); initBookForm(); }
+  if (tab==='stats')   renderDqPortfolio();
   if (tab==='artwork') { fillArtworkSubjectSelect(); renderArtworks(); }
   if (tab==='emotion') renderEmotionHistory();
   if (tab==='memory')  renderMyMemories();
@@ -8513,16 +8667,48 @@ async function submitArtwork() {
 }
 
 // ══ 추억 사진 ══
+let _memFiles = []; // 선택된 파일 목록
 
-function onMemFileSelect(input) {
-  const file = input.files[0]; if (!file) return;
-  document.getElementById('mem-file-text').textContent = '📷 ' + file.name;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('mem-preview-wrap').style.display = '';
-    document.getElementById('mem-preview-img').src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('mem-drop-zone');
+  if (zone) zone.onclick = () => document.getElementById('mem-file-input').click();
+});
+
+function onMemDrop(e) {
+  e.preventDefault();
+  document.getElementById('mem-drop-zone').style.borderColor = 'rgba(255,255,255,.2)';
+  onMemFilesSelect(e.dataTransfer.files);
+}
+
+function onMemFilesSelect(files) {
+  if (!files || !files.length) return;
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    if (_memFiles.find(x => x.name===f.name && x.size===f.size)) continue;
+    _memFiles.push(f);
+  }
+  renderMemPreviews();
+}
+
+function renderMemPreviews() {
+  const wrap = document.getElementById('mem-preview-wrap');
+  if (!wrap) return;
+  if (_memFiles.length === 0) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = _memFiles.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    return `<div style="position:relative;width:70px;height:70px">
+      <img src="${url}" style="width:70px;height:70px;object-fit:cover;border-radius:8px">
+      <button onclick="removeMemFile(${i})" style="position:absolute;top:-4px;right:-4px;
+        background:rgba(231,76,60,.85);border:none;color:#fff;border-radius:50%;
+        width:18px;height:18px;font-size:.65rem;cursor:pointer;line-height:1;
+        display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeMemFile(idx) {
+  _memFiles.splice(idx, 1);
+  renderMemPreviews();
 }
 
 // 이미지 압축 — 표시용(1600px, q0.78) / 썸네일(500px, q0.7)
@@ -8548,72 +8734,74 @@ function compressMemImage(file, maxSize, quality) {
   });
 }
 
-async function submitMemory() {
-  const title   = document.getElementById('mem-title-input')?.value.trim() || '';
-  const desc    = document.getElementById('mem-desc-input')?.value.trim() || '';
-  const fileInput = document.getElementById('mem-file-input');
-  if (!title)                          { toast('사진 제목을 입력해주세요!'); return; }
-  if (!fileInput.files || !fileInput.files[0]) { toast('사진을 선택해주세요!'); return; }
+async function submitMemories() {
+  const folder = document.getElementById('mem-folder-input')?.value.trim() || '';
+  if (!folder)           { toast('📁 폴더 이름을 입력해주세요!'); return; }
+  if (_memFiles.length === 0) { toast('📷 사진을 선택해주세요!'); return; }
 
-  document.getElementById('mem-upload-progress').style.display = '';
-  document.getElementById('mem-progress-bar').style.width = '5%';
-  document.getElementById('mem-progress-text').textContent = '이미지 압축 중...';
+  const total = _memFiles.length;
+  const progWrap = document.getElementById('mem-upload-progress');
+  const progBar  = document.getElementById('mem-progress-bar');
+  const progTxt  = document.getElementById('mem-progress-text');
+  progWrap.style.display = '';
 
-  try {
-    const file = fileInput.files[0];
-    const [imgBlob, thumbBlob] = await Promise.all([
-      compressMemImage(file, 1600, 0.78),
-      compressMemImage(file, 500,  0.70),
-    ]);
-    document.getElementById('mem-progress-bar').style.width = '25%';
-    document.getElementById('mem-progress-text').textContent = '업로드 중...';
+  let done = 0;
+  const storage = firebase.storage();
+  const monthKey = Utils.todayStr().slice(0,7);
 
-    const storage = firebase.storage();
-    const ts = Date.now();
-    const imgRef   = storage.ref(`memories/${CUR.id}_${ts}.jpg`);
-    const thumbRef = storage.ref(`memories/${CUR.id}_${ts}_thumb.jpg`);
+  for (const file of [..._memFiles]) {
+    progTxt.textContent = `업로드 중 ${done+1}/${total}...`;
+    progBar.style.width = `${Math.round(done/total*80)+5}%`;
+    try {
+      const [imgBlob, thumbBlob] = await Promise.all([
+        compressMemImage(file, 1600, 0.78),
+        compressMemImage(file, 500,  0.70),
+      ]);
+      const ts = Date.now() + done;
+      const imgRef   = storage.ref(`memories/${CUR.id}_${ts}.jpg`);
+      const thumbRef = storage.ref(`memories/${CUR.id}_${ts}_thumb.jpg`);
+      await imgRef.put(imgBlob);
+      await thumbRef.put(thumbBlob);
+      const [imageUrl, thumbUrl] = await Promise.all([imgRef.getDownloadURL(), thumbRef.getDownloadURL()]);
 
-    await imgRef.put(imgBlob);
-    document.getElementById('mem-progress-bar').style.width = '65%';
-    await thumbRef.put(thumbBlob);
-    document.getElementById('mem-progress-bar').style.width = '85%';
-
-    const [imageUrl, thumbUrl] = await Promise.all([imgRef.getDownloadURL(), thumbRef.getDownloadURL()]);
-    document.getElementById('mem-progress-bar').style.width = '100%';
-    document.getElementById('mem-progress-text').textContent = '제출 완료!';
-
-    const memId = 'mem_' + ts + '_' + CUR.id;
-    const monthKey = Utils.todayStr().slice(0,7);
-    DB.saveMemory({
-      id: memId,
-      studentId: CUR.id,
-      studentName: CUR.name,
-      uploadedBy: 'student',
-      title, desc,
-      imageUrl, thumbUrl,
-      visibilityType: 'class',   // 우리반 공개 신청
-      approvalStatus: 'pending', // 승인 대기
-      monthKey,
-      createdAt: ts,
-      date: Utils.todayStr(),
-    });
-
-    setTimeout(() => {
-      document.getElementById('mem-title-input').value = '';
-      document.getElementById('mem-desc-input').value = '';
-      document.getElementById('mem-file-input').value = '';
-      document.getElementById('mem-file-text').textContent = '📷 사진 선택하기';
-      document.getElementById('mem-preview-wrap').style.display = 'none';
-      document.getElementById('mem-upload-progress').style.display = 'none';
-      document.getElementById('mem-progress-bar').style.width = '0%';
-      toast('📸 추억 사진 제출! 선생님 확인 후 공유돼요');
-      renderMyMemories();
-    }, 800);
-  } catch(e) {
-    toast('업로드 실패: ' + e.message);
-    document.getElementById('mem-upload-progress').style.display = 'none';
+      // 제목 = 폴더이름 (장수 > 1이면 번호 붙임), 파일명은 절대 사용 안함
+      const title = total > 1 ? `${folder} (${done+1})` : folder;
+      DB.saveMemory({
+        id: 'mem_' + ts + '_' + CUR.id,
+        studentId: CUR.id,
+        studentName: CUR.name,
+        uploadedBy: 'student',
+        title,
+        desc: folder,          // 설명도 폴더명으로
+        imageUrl, thumbUrl,
+        visibilityType: 'class',
+        approvalStatus: 'pending',
+        monthKey,
+        createdAt: ts,
+        date: Utils.todayStr(),
+      });
+      done++;
+    } catch(e) {
+      toast('업로드 실패: ' + e.message);
+    }
   }
+
+  progBar.style.width = '100%';
+  progTxt.textContent = `${done}장 제출 완료!`;
+  setTimeout(() => {
+    document.getElementById('mem-folder-input').value = '';
+    document.getElementById('mem-file-input').value = '';
+    _memFiles = [];
+    renderMemPreviews();
+    progWrap.style.display = 'none';
+    progBar.style.width = '0%';
+    toast(`📸 ${done}장 제출! 선생님 확인 후 공유돼요`);
+    renderMyMemories();
+  }, 800);
 }
+
+// 구버전 호환
+async function submitMemory() { await submitMemories(); }
 
 function renderMyMemories() {
   const el = document.getElementById('mem-record-list');
@@ -9903,31 +10091,48 @@ function renderBookRecords() {
   el.innerHTML = allRecords.map(r => {
     const isPending = r._status === 'pending';
     const cat = catLabel(r);
-    const hasDetail = r.summary || r.reflection || r.characterName;
+
+    // 구 형식(bookReview만 있는 경우) → 파싱
+    let charName = r.characterName, charReason = r.characterReason;
+    let summary = r.summary, reflection = r.reflection;
+    const raw = r.bookReview || r.review || '';
+    if (!summary && !reflection && raw) {
+      const charMatch = raw.match(/\[인물:\s*([^\n\]—–-]+?)(?:\s*[—–-]\s*([^\n\]]+))?\]/);
+      if (charMatch) { charName = charName || charMatch[1]?.trim(); charReason = charReason || (charMatch[2]?.trim()||''); }
+      const cleanRaw = raw.replace(/\[인물:[^\]]*\]/g,'').trim();
+      const lines = cleanRaw.split('\n').filter(l=>l.trim());
+      if (lines.length >= 2) {
+        summary    = lines.slice(0, Math.ceil(lines.length/2)).join('\n');
+        reflection = lines.slice(Math.ceil(lines.length/2)).join('\n');
+      } else { summary = cleanRaw; }
+    }
+
     return `
     <div style="background:rgba(255,255,255,.04);
       border:1px solid ${isPending?'rgba(255,215,0,.2)':'rgba(46,204,113,.2)'};
       border-radius:12px;padding:.8rem .9rem;margin-bottom:.5rem">
-      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
         <span style="font-size:.68rem;font-weight:700;
           background:${isPending?'rgba(255,215,0,.12)':'rgba(46,204,113,.12)'};
           color:${isPending?'var(--gold)':'var(--emerald)'};
           border-radius:20px;padding:.1rem .5rem;flex-shrink:0">
           ${isPending?'확인중':'✓ 완료'}</span>
-        <span style="font-weight:700;font-size:.88rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.bookTitle||r.title||''}</span>
+        <span style="font-weight:700;font-size:.88rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${r.bookTitle||r.title||''}</span>
         ${cat?`<span style="font-size:.65rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:10px;padding:.1rem .45rem;flex-shrink:0">${cat}</span>`:''}
-        ${r.rating?`<span style="font-size:.7rem;flex-shrink:0">${starStr(r.rating)}</span>`:''}
+        ${r.rating?`<span style="font-size:.75rem;flex-shrink:0">${starStr(r.rating)}</span>`:''}
         <span style="font-size:.66rem;color:var(--txt3);flex-shrink:0">${r.bookDate||r.date||''}</span>
       </div>
-      ${r.teacherComment?`<div style="margin-top:.4rem;font-size:.72rem;color:var(--emerald);
+      <!-- 내용 (항상 표시) -->
+      <div style="display:flex;flex-direction:column;gap:.35rem;font-size:.78rem;color:var(--txt2);line-height:1.6">
+        ${charName?`<div><b style="color:var(--txt3)">🧑 인상 깊은 인물:</b> ${charName}${charReason?' — '+charReason:''}</div>`:''}
+        ${summary?`<div><b style="color:var(--txt3)">📖 줄거리:</b><div style="margin-top:.1rem;white-space:pre-wrap">${summary}</div></div>`:''}
+        ${reflection?`<div><b style="color:var(--txt3)">💬 느낀 점:</b><div style="margin-top:.1rem;white-space:pre-wrap">${reflection}</div></div>`:''}
+      </div>
+      ${r.teacherComment?`<div style="margin-top:.45rem;font-size:.72rem;color:var(--emerald);
         background:rgba(46,204,113,.08);border-radius:8px;padding:.3rem .5rem">
         💬 선생님: ${r.teacherComment}</div>`:''}
-      ${hasDetail?`<details style="margin-top:.4rem"><summary style="font-size:.68rem;color:var(--txt3);cursor:pointer">상세 보기</summary>
-        <div style="margin-top:.4rem;font-size:.75rem;color:var(--txt2);line-height:1.6">
-          ${r.characterName?`<div><b>인물:</b> ${r.characterName}${r.characterReason?' — '+r.characterReason:''}</div>`:''}
-          ${r.summary?`<div style="margin-top:.25rem"><b>줄거리:</b> ${r.summary}</div>`:''}
-          ${r.reflection?`<div style="margin-top:.25rem"><b>느낀 점:</b> ${r.reflection}</div>`:''}
-        </div></details>`:''}
     </div>`;
   }).join('');
 }
