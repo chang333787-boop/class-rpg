@@ -4233,7 +4233,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="modal" style="max-width:440px">
     <div class="modal-hd">
       <div class="modal-title" id="vq-title">📖 단어 퀴즈</div>
-      <button class="modal-close" onclick="closeModal('m-vocab-quiz')">✕</button>
+      <!-- 닫기 버튼: 팝업 강제 퀴즈 중에는 숨겨짐 -->
+      <button class="modal-close" id="vq-close-btn" onclick="closeModal('m-vocab-quiz')">✕</button>
     </div>
     <div id="vq-body" style="padding:.5rem 0;min-height:180px"></div>
   </div>
@@ -11279,31 +11280,61 @@ function checkVocabQuizTrigger() {
   // 로그인 10초 후 팝업
   setTimeout(() => {
     if (document.getElementById('m-vocab-quiz')?.style.display === 'flex') return;
-    showVocabQuizPrompt();
+    startPopupQuiz(); // 바로 퀴즈 시작 (선택 화면 없음)
   }, 10000);
 }
 
-function showVocabQuizPrompt() {
-  const body = document.getElementById('vq-body');
-  const titleEl = document.getElementById('vq-title');
-  if (!body || !titleEl) return;
-  titleEl.textContent = '📖 단어 퀴즈';
-  body.innerHTML = `
-    <div style="padding:1.2rem 1rem;text-align:center">
-      <div style="font-size:2rem;margin-bottom:.5rem">📝</div>
-      <div style="font-size:.95rem;font-weight:700;color:var(--txt1);margin-bottom:.4rem">잠깐 단어 보고 갈까요?</div>
-      <div style="font-size:.78rem;color:var(--txt3);margin-bottom:1.2rem">5문제만 풀면 돼요!</div>
-      <div style="display:flex;gap:.6rem;justify-content:center">
-        <button class="btn-gold" style="padding:.55rem 1.4rem;font-size:.88rem;border-radius:12px"
-          onclick="startVocabQuiz()">✏️ 풀어볼게요!</button>
-        <button onclick="closeModal('m-vocab-quiz')"
-          style="padding:.55rem 1rem;font-size:.82rem;border-radius:12px;font-family:inherit;
-            border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
-            color:var(--txt2);cursor:pointer">나중에</button>
-      </div>
-    </div>`;
+// ── 팝업 강제 퀴즈 (3문제 객관식, 닫기 불가) ────────────
+function startPopupQuiz() {
+  const ws = DB.getActiveWordSet();
+  if (!ws) return;
+  const allWords = DB.getAllVocabWords();
+  const quizWords = (ws.wordIds||[]).map(id=>allWords.find(w=>w.id===id)).filter(Boolean);
+  if (quizWords.length < 3) return;
+
+  const records = DB.getQuizRecords(CUR.id);
+  const recentWrongIds = new Set(records.slice(0,5).flatMap(r=>r.wrongWordIds||[]));
+  const weighted = quizWords.flatMap(w =>
+    Array(recentWrongIds.has(w.id)?3:2).fill(w)
+  );
+
+  // 3문제 선택
+  const picked = [];
+  const used = new Set();
+  for (const w of [...weighted].sort(()=>Math.random()-.5)) {
+    if (!used.has(w.id)) { picked.push(w); used.add(w.id); }
+    if (picked.length >= 3) break;
+  }
+  while (picked.length < 3) {
+    const w = quizWords.find(w=>!used.has(w.id));
+    if (!w) break;
+    picked.push(w); used.add(w.id);
+  }
+
+  // 3문제 모두 객관식 (mc_meaning / mc_word 랜덤)
+  const types = ['mc_meaning','mc_meaning','mc_word'].sort(()=>Math.random()-.5);
+
+  VOCAB_QUIZ = {
+    questions: picked.map((w,i)=>({word:w, type:types[i]||'mc_meaning'})),
+    cur:0, correct:0, wrongIds:[],
+    wordIds: picked.map(w=>w.id),
+    isPopup: true  // 팝업 퀴즈 플래그
+  };
+
+  // 닫기 버튼 숨기기 + 오버레이 클릭 차단
+  const closeBtn = document.getElementById('vq-close-btn');
+  if (closeBtn) closeBtn.style.display = 'none';
+  const overlay = document.getElementById('m-vocab-quiz');
+  if (overlay) overlay.onclick = null; // 클릭해도 안 닫힘
+
+  // 하루 1회 기록
+  localStorage.setItem(`vocab_quiz_shown_${CUR.id}_${Utils.todayStr()}`, '1');
+
   openModal('m-vocab-quiz');
+  renderVocabQuestion();
 }
+
+function showVocabQuizPrompt() { startPopupQuiz(); } // 구버전 호환
 
 // ── 퀴즈 생성 + 진행 ────────────────────────────────
 let VOCAB_QUIZ = { questions:[], cur:0, correct:0, wrongIds:[] };
@@ -11355,8 +11386,15 @@ function startVocabQuiz() {
   VOCAB_QUIZ = {
     questions: picked.map((w,i)=>({word:w, type:types[i]||'mc_meaning'})),
     cur:0, correct:0, wrongIds:[],
-    wordIds: picked.map(w=>w.id)
+    wordIds: picked.map(w=>w.id),
+    isPopup: false  // 자체 시작 퀴즈
   };
+
+  // 닫기 버튼 복원 + 오버레이 클릭 기본 동작
+  const closeBtn = document.getElementById('vq-close-btn');
+  if (closeBtn) closeBtn.style.display = '';
+  const overlay = document.getElementById('m-vocab-quiz');
+  if (overlay) overlay.onclick = e => { if(e.target===overlay) closeModal('m-vocab-quiz'); };
 
   // 하루 1회 표시 기록
   localStorage.setItem(`vocab_quiz_shown_${CUR.id}_${Utils.todayStr()}`, '1');
@@ -11374,7 +11412,9 @@ function renderVocabQuestion() {
   const q = questions[cur];
   const { word, type } = q;
 
-  titleEl.textContent = `📖 단어 퀴즈 ${cur+1}/${questions.length}`;
+  titleEl.textContent = VOCAB_QUIZ.isPopup
+    ? `🔔 오늘의 단어 확인 ${cur+1}/${questions.length}`
+    : `📖 단어 퀴즈 ${cur+1}/${questions.length}`;
   const allWords = DB.getAllVocabWords();
 
   if (type === 'mc_meaning') {
@@ -11573,6 +11613,14 @@ function finishVocabQuiz() {
   const body = document.getElementById('vq-body');
   const titleEl = document.getElementById('vq-title');
   titleEl.textContent = '📖 퀴즈 완료!';
+
+  // 팝업 퀴즈면 닫기 버튼 복원
+  if (VOCAB_QUIZ.isPopup) {
+    const closeBtn = document.getElementById('vq-close-btn');
+    if (closeBtn) closeBtn.style.display = '';
+    const overlay = document.getElementById('m-vocab-quiz');
+    if (overlay) overlay.onclick = e => { if(e.target===overlay) closeModal('m-vocab-quiz'); };
+  }
 
   // 틀린 문제 상세: 유형에 따라 무엇이 정답인지 표시
   const typeLabel = { mc_meaning:'영어→뜻', mc_word:'뜻→영어', short_meaning:'뜻 쓰기', spelling:'스펠링' };
