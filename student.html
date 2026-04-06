@@ -8636,12 +8636,6 @@ function _drawYardFarm(C) {
   ctx.fillStyle = 'rgba(0,0,0,.25)';
   ctx.fillRect(startCol*C - 2, startRow*C - 2, cols*C + 4, rows*C + 4);
 
-  // 농장 라벨
-  ctx.fillStyle = 'rgba(255,255,255,.85)';
-  ctx.font = `bold ${Math.max(C*.55, 8)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('🌾 농장', startCol*C + cols*C/2, startRow*C - 4);
-
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const gc = startCol + c;
@@ -8650,14 +8644,11 @@ function _drawYardFarm(C) {
       const slot = r * cols + c;
       const plot = farm.find(f => f.slot === slot);
 
-      if (!plot) {
-        // 빈 밭 - 흙색
-        ctx.fillStyle = '#7B4F2E';
-        ctx.fillRect(px+1, py+1, C-2, C-2);
-        ctx.strokeStyle = 'rgba(0,0,0,.3)';
-        ctx.lineWidth = .5;
-        ctx.strokeRect(px+1, py+1, C-2, C-2);
-      } else {
+      // ── 바닥: 항상 모래색 (체크무늬) ──
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#c8a855' : '#b89545';
+      ctx.fillRect(px+1, py+1, C-2, C-2);
+
+      if (plot) {
         const sd = Utils.getSeedByCrop(plot.crop);
         if (!sd) continue;
         const ready    = Utils.cropReady(plot.planted, sd.growHours);
@@ -8665,22 +8656,22 @@ function _drawYardFarm(C) {
         const withered = ready && elapsed > sd.growHours * 3600000 * 3;
         const pct      = Utils.cropProgress(plot.planted, sd.growHours);
 
-        // 배경색
-        ctx.fillStyle = ready
-          ? (withered ? '#5a4a2a' : 'rgba(39,174,96,.35)')
-          : 'rgba(74,140,42,.2)';
-        ctx.fillRect(px+1, py+1, C-2, C-2);
+        // ── 수확 가능 시 살짝 밝은 오버레이 ──
+        if (ready && !withered) {
+          ctx.fillStyle = 'rgba(39,174,96,.25)';
+          ctx.fillRect(px+1, py+1, C-2, C-2);
+        }
 
-        // 진행바
+        // ── 진행바 (하단) ──
         const barH = Math.max(2, C * .12);
-        ctx.fillStyle = 'rgba(0,0,0,.4)';
+        ctx.fillStyle = 'rgba(0,0,0,.3)';
         ctx.fillRect(px+1, py + C - barH - 1, C-2, barH);
         ctx.fillStyle = ready
           ? (withered ? '#a0806a' : '#2ecc71')
           : (plot.isMutant ? '#FFA500' : '#27ae60');
         ctx.fillRect(px+1, py + C - barH - 1, (C-2) * (pct/100), barH);
 
-        // 아이콘
+        // ── 작물 아이콘 ──
         const icon = withered ? '🍂' : ready ? sd.cropIcon : (plot.isMutant ? '⚡' : '🌱');
         const fs = Math.max(C * .55, 8);
         ctx.font = `${fs}px sans-serif`;
