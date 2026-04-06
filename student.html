@@ -3983,41 +3983,35 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
   <!-- 탭3: 인테리어 (탑뷰 SVG 방식) -->
   <div id="house-tab-deco" style="display:none">
-    <!-- 씬 전환 -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
-      <span style="font-size:.72rem;font-weight:600;color:var(--txt1)" id="deco-scene-name">🌿 마당</span>
-      <button onclick="toggleDecoScene()" id="deco-scene-btn"
-        style="padding:.26rem .7rem;border-radius:20px;border:1.5px solid rgba(255,255,255,.2);
-        background:rgba(255,255,255,.07);color:var(--txt1);font-size:.66rem;cursor:pointer">
-        🏠 집 안으로 →
+    <div style="display:flex;flex-direction:column;gap:.7rem;padding:.5rem 0">
+      <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.2rem">
+        인테리어 편집은 전체화면 모드에서 진행돼요 🎨
+      </div>
+      <button onclick="openInteriorFullscreen()"
+        style="width:100%;padding:.85rem;border-radius:14px;border:none;cursor:pointer;
+          font-family:inherit;font-size:.95rem;font-weight:800;
+          background:linear-gradient(135deg,rgba(74,140,42,.4),rgba(39,174,96,.3));
+          color:#a8e06a;border:1.5px solid rgba(74,140,42,.4)">
+        🌿 나의 마당 꾸미기
+      </button>
+      <button onclick="DECO_SCENE='indoor';openInteriorFullscreen()"
+        style="width:100%;padding:.85rem;border-radius:14px;border:none;cursor:pointer;
+          font-family:inherit;font-size:.95rem;font-weight:800;
+          background:linear-gradient(135deg,rgba(93,173,226,.25),rgba(52,73,94,.3));
+          color:#7ec8e3;border:1.5px solid rgba(93,173,226,.3)">
+        🏠 집 안 꾸미기
       </button>
     </div>
-    <!-- 모드 선택 -->
-    <div style="display:flex;gap:.4rem;margin-bottom:.4rem">
-      <button id="mode-deco-btn" class="deco-mode-btn" onclick="setDecoMode('deco',this)"
-        style="padding:.25rem .7rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(255,215,0,.4);background:rgba(255,215,0,.12);color:var(--gold);cursor:pointer;font-family:inherit">🎨 장식 배치</button>
-      <button id="mode-floor-btn" class="deco-mode-btn" onclick="setDecoMode('floor',this)"
-        style="padding:.25rem .7rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🖌️ 바닥 칠하기</button>
-    </div>
-    <!-- 장식 모드 힌트 -->
-    <div id="deco-mode-hint" style="font-size:.66rem;color:var(--txt3);margin-bottom:.45rem">
-      장식품 선택 → 원하는 칸 클릭 배치 &nbsp;|&nbsp; 배치된 칸 다시 클릭 = 제거
-    </div>
-    <!-- 바닥 타일 선택 (바닥 모드일 때만) -->
-    <div id="floor-tile-row" style="display:none;flex-wrap:wrap;gap:.3rem;margin-bottom:.45rem">
-      <button class="floor-tile-btn active" onclick="setCurFloor('grass',this)" style="padding:.2rem .55rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(74,140,42,.5);background:rgba(74,140,42,.2);color:#a8e06a;cursor:pointer;font-family:inherit">🌿 잔디</button>
-      <button class="floor-tile-btn" onclick="setCurFloor('dirt',this)" style="padding:.2rem .55rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🟫 흙</button>
-      <button class="floor-tile-btn" onclick="setCurFloor('stone',this)" style="padding:.2rem .55rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪨 돌</button>
-      <button class="floor-tile-btn" onclick="setCurFloor('sand',this)" style="padding:.2rem .55rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🏜️ 모래</button>
-      <button class="floor-tile-btn" onclick="setCurFloor('wood',this)" style="padding:.2rem .55rem;border-radius:12px;font-size:.72rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 나무</button>
-      <div style="font-size:.65rem;color:var(--txt3);width:100%;margin-top:.2rem">원하는 타일 선택 후 칸을 클릭/드래그하세요</div>
-    </div>
-    <!-- 캔버스 -->
-    <div id="house-topview" style="width:100%;border-radius:12px;overflow:hidden;margin-bottom:.8rem;
-      box-shadow:0 4px 20px rgba(0,0,0,.4)"></div>
-    <!-- 보유 장식품 -->
-    <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.4rem" id="deco-inv-label">🎒 보유 장식품</div>
-    <div id="house-deco-inv" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
+    <!-- 숨겨진 캔버스 컨테이너 (내부 상태 유지용) -->
+    <div id="house-topview" style="display:none"></div>
+    <div id="house-deco-inv" style="display:none"></div>
+    <div id="deco-inv-label" style="display:none"></div>
+    <div id="deco-scene-name" style="display:none"></div>
+    <div id="deco-scene-btn" style="display:none"></div>
+    <div id="deco-mode-hint" style="display:none"></div>
+    <div id="floor-tile-row" style="display:none"></div>
+    <div id="mode-deco-btn" style="display:none"></div>
+    <div id="mode-floor-btn" style="display:none"></div>
   </div>
 
   <!-- 탭4: 작품 전시 -->
@@ -4259,6 +4253,102 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <button class="modal-close" onclick="closeModal('m-weekly')">✕</button>
     </div>
     <div id="weekly-modal-body" style="padding:.5rem 0;overflow-y:auto;max-height:calc(85vh - 60px)"></div>
+  </div>
+</div>
+
+<!-- ── 친구 방문 전체화면 (읽기 전용) ── -->
+<div id="friend-fullscreen" style="display:none;position:fixed;inset:0;z-index:9100;
+  background:#0E1621;flex-direction:column;overflow:hidden">
+  <!-- 상단 바 -->
+  <div style="display:flex;align-items:center;gap:.8rem;padding:.55rem 1rem;
+    background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,215,0,.15);flex-shrink:0">
+    <button onclick="closeFriendFullscreen()"
+      style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+        color:#fff;padding:.35rem .85rem;border-radius:10px;cursor:pointer;
+        font-family:inherit;font-size:.82rem;font-weight:700">← 돌아가기</button>
+    <span id="ff-title" style="font-size:.9rem;font-weight:700;color:var(--gold)"></span>
+    <div style="flex:1"></div>
+    <button id="ff-scene-btn" onclick="toggleFriendScene()"
+      style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
+        cursor:pointer;border:1.5px solid rgba(255,255,255,.15);
+        background:rgba(255,255,255,.08);color:var(--txt1)">🏠 집 안 보기 →</button>
+  </div>
+  <!-- 캔버스 영역 -->
+  <div id="ff-canvas-wrap" style="flex:1;overflow:hidden;min-height:0;position:relative">
+    <div id="ff-topview" style="width:100%;height:100%"></div>
+  </div>
+  <!-- 하단 정보 -->
+  <div style="flex-shrink:0;background:rgba(0,0,0,.35);border-top:1px solid rgba(255,255,255,.08);
+    padding:.5rem 1rem;display:flex;align-items:center;gap:.6rem">
+    <span id="ff-friend-info" style="font-size:.8rem;color:var(--txt2)"></span>
+  </div>
+</div>
+
+<!-- ── 인테리어 전체화면 모드 ── -->
+<div id="interior-fullscreen" style="display:none;position:fixed;inset:0;z-index:9000;
+  background:#0E1621;flex-direction:column;overflow:hidden">
+
+  <!-- 상단 바 -->
+  <div style="display:flex;align-items:center;gap:.7rem;padding:.55rem 1rem;
+    background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,215,0,.15);flex-shrink:0">
+    <button onclick="closeInteriorFullscreen()"
+      style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+        color:#fff;padding:.35rem .85rem;border-radius:10px;cursor:pointer;
+        font-family:inherit;font-size:.82rem;font-weight:700">
+      ← 포트폴리오로
+    </button>
+    <span id="if-scene-name" style="font-size:.9rem;font-weight:700;color:var(--gold)">🌿 마당</span>
+    <div style="flex:1"></div>
+    <!-- 모드 버튼 -->
+    <button id="if-mode-deco" onclick="setDecoMode('deco',this);ifSyncModeBtn()"
+      style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
+        cursor:pointer;border:1.5px solid rgba(255,215,0,.4);
+        background:rgba(255,215,0,.12);color:var(--gold)">🎨 장식</button>
+    <button id="if-mode-floor" onclick="setDecoMode('floor',this);ifSyncModeBtn()"
+      style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
+        cursor:pointer;border:1.5px solid rgba(255,255,255,.12);
+        background:rgba(255,255,255,.06);color:var(--txt2)">🖌️ 바닥</button>
+    <!-- 씬 전환 -->
+    <button id="if-scene-btn" onclick="toggleDecoScene();ifSyncScene()"
+      style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
+        cursor:pointer;border:1.5px solid rgba(255,255,255,.15);
+        background:rgba(255,255,255,.08);color:var(--txt1)">
+      🏠 집 안으로 →
+    </button>
+  </div>
+
+  <!-- 바닥 타일 선택줄 (바닥 모드일 때만) -->
+  <div id="if-floor-row" style="display:none;padding:.4rem 1rem;gap:.4rem;flex-wrap:wrap;
+    background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+    <button class="floor-tile-btn active" onclick="setCurFloor('grass',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(74,140,42,.5);
+        background:rgba(74,140,42,.2);color:#a8e06a;cursor:pointer;font-family:inherit">🌿 잔디</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('dirt',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🟫 흙</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('stone',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪨 돌</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('sand',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🏜️ 모래</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('wood',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 나무</button>
+  </div>
+
+  <!-- 본문: 캔버스 + 장식 인벤토리 -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
+    <!-- 캔버스 (전체 폭 사용) -->
+    <div id="if-topview" style="flex:1;overflow:hidden;min-height:0;position:relative"></div>
+    <!-- 장식품 목록 (하단 슬라이드) -->
+    <div style="flex-shrink:0;background:rgba(0,0,0,.35);border-top:1px solid rgba(255,255,255,.08);
+      padding:.45rem .8rem;max-height:120px;overflow-y:auto">
+      <div style="font-size:.65rem;color:var(--txt3);margin-bottom:.3rem" id="if-inv-label">
+        🎒 보유 장식품
+      </div>
+      <div id="if-deco-inv" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
+    </div>
   </div>
 </div>
 
@@ -7631,6 +7721,7 @@ function farmCellClick(slot) {
         if (success) toast(`🎉 ${sd.cropIcon} 돌연변이 재배 성공! +${earned}G 획득!`);
         else         toast(`💀 ${sd.cropIcon} 돌연변이 재배 실패... 수확 보상 없음`);
         renderFarmModal(); renderHUD(); renderMain(); renderMobile();
+        if (_ifMode) _drawDeco(); // 마당 농장 즉시 갱신
         return;
       }
 
@@ -7647,6 +7738,7 @@ function farmCellClick(slot) {
       if (withered) toast(`🍂 ${sd.cropIcon} 시든 작물 수확... +${earned}G (${sd.sellPrice}G의 60%)`);
       else toast(`🌾 ${sd.cropIcon} 수확! +${earned}G`);
       renderFarmModal(); renderHUD(); renderMain(); renderMobile();
+      if (_ifMode) _drawDeco(); // 마당 농장 즉시 갱신
     } else {
       const rem = sd.growHours*3600000 - (Date.now()-plot.planted);
       const h = Math.floor(rem/3600000), m = Math.floor((rem%3600000)/60000);
@@ -7670,6 +7762,7 @@ function farmCellClick(slot) {
     if (sd.isMutant) toast(`⚡ ${sd.name} 심었습니다! 성공 확률 ${Math.round(sd.successRate*100)}% · ${sd.growHours}시간 후 판정`);
     else toast(`🌱 ${sd.name} 심었습니다! ${sd.growHours}시간 후 수확`);
     renderFarmModal(); renderMain(); renderMobile();
+    if (_ifMode) _drawDeco(); // 마당 농장 즉시 갱신
   }
 }
 
@@ -7751,11 +7844,7 @@ function houseTab(tab, el) {
     window._vocabShuffled = null;
     renderVocabTab();
   }
-  if (tab==='deco') {
-    _dCv = null;
-    renderHouseDeco();
-    requestAnimationFrame(() => { _dCv = null; renderHouseDeco(); });
-  }
+  if (tab==='deco') { /* 버튼으로 직접 열기 */ }
 }
 
 // 포트폴리오 열고 특정 탭 바로 활성화
@@ -7932,6 +8021,7 @@ function canPlaceDeco(r, c, w, h, area, excludeId) {
     if (area==='yard') {
       if (tr>=DY.rows || tc>=DY.cols) return false;
       if (_isHC(tr,tc)) return false;
+      if (_isFarmCell(tr,tc)) return false; // 농장 존에는 장식 배치 불가
     } else {
       if (tr>=DI.rows || tc>=DI.cols) return false;
     }
@@ -7947,12 +8037,84 @@ function canPlaceDeco(r, c, w, h, area, excludeId) {
 let SEL_DECO = null;
 let DECO_SCENE = 'yard'; // 'yard' | 'indoor'
 let _dCv = null, _dCtx = null, _dC = 28, _dW = 0, _dH = 0;
+let _ifMode = false; // 전체화면 인테리어 모드 여부
 
 // ── 그리드 상수 ──
-const DY = {cols:20, rows:14};   // 마당 (1.5배 확대)
-const DH = {cols:6,  rows:3};    // 집 건물 차지 영역 (우상단)
-const DI = {cols:12, rows:8};    // 집 안
+// 전체화면 모드: 셀 24px 기준으로 화면 크기에서 역산
+// 일반 모드(포트폴리오 내): 기존 cols/rows 유지
+const DY_NORMAL  = {cols:20, rows:14};  // 마당 일반 모드
+const DY_FULL    = {cols:50, rows:28};  // 마당 전체화면 모드
+const DI_NORMAL  = {cols:12, rows:8};   // 집 안 일반 모드
+const DI_FULL    = {cols:50, rows:28};  // 집 안 전체화면 모드
+const DH = {cols:6, rows:3};            // 집 건물 차지 영역 (우상단)
+
+// 현재 활성 그리드 (모드에 따라 전환)
+let DY = {...DY_NORMAL};
+let DI = {...DI_NORMAL};
+
 function _isHC(r,c){ return r < DH.rows && c >= (DY.cols - DH.cols); }
+
+// ── 전체화면 인테리어 모드 ──────────────────────────────
+function openInteriorFullscreen() {
+  _ifMode = true;
+  DY = {...DY_FULL};
+  DI = {...DI_FULL};
+  const fs = document.getElementById('interior-fullscreen');
+  fs.style.display = 'flex';
+  _dCv = null; _dCtx = null;
+  _ifActiveContainer = 'if-topview';
+  ifSyncScene();
+  ifSyncModeBtn();
+  // 레이아웃 완료 후 렌더
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      renderHouseDeco();
+    });
+  });
+}
+
+function closeInteriorFullscreen() {
+  _ifMode = false;
+  DY = {...DY_NORMAL};
+  DI = {...DI_NORMAL};
+  document.getElementById('interior-fullscreen').style.display = 'none';
+  _dCv = null; _dCtx = null;
+  _ifActiveContainer = 'house-topview';
+  renderHouseDeco();
+}
+
+let _ifActiveContainer = 'house-topview'; // 현재 캔버스 컨테이너
+
+function ifSyncScene() {
+  const isYard = DECO_SCENE === 'yard';
+  const sn = document.getElementById('if-scene-name');
+  const sb = document.getElementById('if-scene-btn');
+  const il = document.getElementById('if-inv-label');
+  if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
+  if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
+  if (il) il.textContent = isYard ? '🎒 보유 장식품 (마당)' : '🎒 보유 장식품 (집 안)';
+}
+
+function ifSyncModeBtn() {
+  const isFloor = DECO_MODE === 'floor';
+  const fr = document.getElementById('if-floor-row');
+  if (fr) fr.style.display = isFloor ? 'flex' : 'none';
+  ['if-mode-deco','if-mode-floor'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const active = (id === 'if-mode-deco' && !isFloor) || (id === 'if-mode-floor' && isFloor);
+    btn.style.background = active ? 'rgba(255,215,0,.12)' : 'rgba(255,255,255,.06)';
+    btn.style.color = active ? 'var(--gold)' : 'var(--txt2)';
+    btn.style.borderColor = active ? 'rgba(255,215,0,.4)' : 'rgba(255,255,255,.12)';
+  });
+}
+
+function ifSyncInv() {
+  const el = document.getElementById('if-deco-inv');
+  const srcEl = document.getElementById('house-deco-inv');
+  if (el && srcEl) el.innerHTML = srcEl.innerHTML;
+  // 클릭 이벤트는 SEL_DECO 변수 공유로 동작
+}
 
 // ── Canvas 헬퍼 ──
 function _dc(x,y,r){_dCtx.beginPath();_dCtx.arc(x,y,r,0,Math.PI*2);}
@@ -8264,22 +8426,40 @@ function renderHouseDeco() {
   _initDeco();
   _drawDeco();
   renderDecoInv();
+  if (_ifMode) { ifSyncScene(); ifSyncInv(); }
 }
 
 function _initDeco() {
-  const el = document.getElementById('house-topview');
+  const containerId = _ifActiveContainer || 'house-topview';
+  const el = document.getElementById(containerId);
+  if (!el) return;
   if (!_dCv) {
     el.innerHTML = '';
     _dCv = document.createElement('canvas');
-    _dCv.style.cssText = 'width:100%;border-radius:12px;display:block;cursor:pointer';
+    _dCv.id = 'deco-canvas';
+    _dCv.style.cssText = 'display:block;cursor:pointer;touch-action:none';
     el.appendChild(_dCv);
     _dCv.addEventListener('click', _decoClick);
   }
-  const W = el.offsetWidth || 340;
-  const C = DECO_SCENE === 'yard' ? Math.floor(W / DY.cols) : Math.floor(W / DI.cols);
-  const H = DECO_SCENE === 'yard' ? C * DY.rows : C * DI.rows;
+  // 전체화면 모드면 window 크기 직접 사용, 아니면 컨테이너 너비
+  let W, maxH;
+  if (_ifMode) {
+    // 상단바(~50px) + 바닥타일줄(~48px, 바닥모드일 때) + 하단인벤(~120px) 제외
+    const topH = DECO_MODE === 'floor' ? 98 : 50;
+    W    = window.innerWidth;
+    maxH = window.innerHeight - topH - 120;
+  } else {
+    W    = el.offsetWidth || 340;
+    maxH = 600;
+  }
+  const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
+  const rows = DECO_SCENE === 'yard' ? DY.rows : DI.rows;
+  const C = Math.floor(W / cols);
+  const H = Math.min(C * rows, maxH);
   _dW = W; _dH = H; _dC = C;
-  _dCv.width = W * 2; _dCv.height = H * 2;
+  _dCv.width  = W * 2;
+  _dCv.height = H * 2;
+  _dCv.style.width  = W + 'px';
   _dCv.style.height = H + 'px';
   _dCtx = _dCv.getContext('2d');
   _dCtx.scale(2, 2);
@@ -8426,6 +8606,97 @@ function _drawYard() {
 
   _dCv._doorX=dx; _dCv._doorY=dy; _dCv._doorW=C*.7; _dCv._doorH=C*1.02;
   _dCv._hx=hx; _dCv._hh=hh;
+
+  // ── 마당 농장 존 렌더링 (우하단, 읽기 전용) ──────────────
+  _drawYardFarm(C);
+}
+
+// ── 마당 농장 존 렌더 + 판정 헬퍼 ──────────────────────────
+function _getFarmZone() {
+  const {cols:fc, rows:fr} = getFarmLayout(CUR.level || 1);
+  // DY.rows/cols 대신 실제 캔버스에 보이는 칸 수 기준
+  const visibleCols = Math.floor(_dW / _dC);
+  const visibleRows = Math.floor(_dH / _dC);
+  const startCol = visibleCols - fc - 1;
+  const startRow = visibleRows - fr - 1;
+  return { startCol, startRow, cols: fc, rows: fr };
+}
+
+function _isFarmCell(r, c) {
+  const {startCol, startRow, cols, rows} = _getFarmZone();
+  return r >= startRow && r < startRow + rows && c >= startCol && c < startCol + cols;
+}
+
+function _drawYardFarm(C) {
+  const farm = CUR.farm || [];
+  const {startCol, startRow, cols, rows} = _getFarmZone();
+  const ctx = _dCtx;
+
+  // 농장 외곽 배경
+  ctx.fillStyle = 'rgba(0,0,0,.25)';
+  ctx.fillRect(startCol*C - 2, startRow*C - 2, cols*C + 4, rows*C + 4);
+
+  // 농장 라벨
+  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  ctx.font = `bold ${Math.max(C*.55, 8)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('🌾 농장', startCol*C + cols*C/2, startRow*C - 4);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const gc = startCol + c;
+      const gr = startRow + r;
+      const px = gc * C, py = gr * C;
+      const slot = r * cols + c;
+      const plot = farm.find(f => f.slot === slot);
+
+      if (!plot) {
+        // 빈 밭 - 흙색
+        ctx.fillStyle = '#7B4F2E';
+        ctx.fillRect(px+1, py+1, C-2, C-2);
+        ctx.strokeStyle = 'rgba(0,0,0,.3)';
+        ctx.lineWidth = .5;
+        ctx.strokeRect(px+1, py+1, C-2, C-2);
+      } else {
+        const sd = Utils.getSeedByCrop(plot.crop);
+        if (!sd) continue;
+        const ready    = Utils.cropReady(plot.planted, sd.growHours);
+        const elapsed  = Date.now() - plot.planted;
+        const withered = ready && elapsed > sd.growHours * 3600000 * 3;
+        const pct      = Utils.cropProgress(plot.planted, sd.growHours);
+
+        // 배경색
+        ctx.fillStyle = ready
+          ? (withered ? '#5a4a2a' : 'rgba(39,174,96,.35)')
+          : 'rgba(74,140,42,.2)';
+        ctx.fillRect(px+1, py+1, C-2, C-2);
+
+        // 진행바
+        const barH = Math.max(2, C * .12);
+        ctx.fillStyle = 'rgba(0,0,0,.4)';
+        ctx.fillRect(px+1, py + C - barH - 1, C-2, barH);
+        ctx.fillStyle = ready
+          ? (withered ? '#a0806a' : '#2ecc71')
+          : (plot.isMutant ? '#FFA500' : '#27ae60');
+        ctx.fillRect(px+1, py + C - barH - 1, (C-2) * (pct/100), barH);
+
+        // 아이콘
+        const icon = withered ? '🍂' : ready ? sd.cropIcon : (plot.isMutant ? '⚡' : '🌱');
+        const fs = Math.max(C * .55, 8);
+        ctx.font = `${fs}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, px + C/2, py + C/2 - barH/2);
+      }
+    }
+  }
+
+  // 농장 테두리
+  ctx.strokeStyle = 'rgba(255,180,0,.6)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(startCol*C, startRow*C, cols*C, rows*C);
+  // 저장용
+  _dCv._farmZone = {startCol, startRow, cols, rows};
 }
 
 function _drawIndoor() {
@@ -8522,6 +8793,8 @@ function _decoClick(e) {
     const c=Math.floor(mx/C), r=Math.floor(my/C);
     if(c<0||c>=DY.cols||r<0||r>=DY.rows) return;
     if(_isHC(r,c)){ toast('집 영역에는 배치할 수 없어요!'); return; }
+    // 농장 존 클릭 차단 (수확은 농장 탭에서만)
+    if(_isFarmCell(r,c)){ toast('🌾 수확은 농장 탭에서 해주세요!'); return; }
     if(DECO_MODE==='floor') { _paintFloor(r,c); return; }
     _decoPlace('yard',r,c);
   } else {
@@ -8577,11 +8850,16 @@ function toggleDecoScene(){
   DECO_SCENE=DECO_SCENE==='yard'?'indoor':'yard';
   SEL_DECO=null;
   const isYard=DECO_SCENE==='yard';
-  document.getElementById('deco-scene-btn').textContent=isYard?'🏠 집 안으로 →':'🌿 마당으로 ←';
-  document.getElementById('deco-scene-name').textContent=isYard?'🌿 마당':'🏠 집 안';
-  document.getElementById('deco-inv-label').textContent=isYard?'🎒 보유 장식품 (마당)':'🎒 보유 장식품 (집 안)';
-  _dCv=null; _dCtx=null; // 캔버스 재초기화
+  // 일반 모드 UI
+  const sBtn = document.getElementById('deco-scene-btn');
+  const sName = document.getElementById('deco-scene-name');
+  const iLabel = document.getElementById('deco-inv-label');
+  if(sBtn)   sBtn.textContent  = isYard?'🏠 집 안으로 →':'🌿 마당으로 ←';
+  if(sName)  sName.textContent = isYard?'🌿 마당':'🏠 집 안';
+  if(iLabel) iLabel.textContent= isYard?'🎒 보유 장식품':'🎒 보유 장식품 (집 안)';
+  _dCv=null; _dCtx=null;
   renderHouseDeco();
+  if(_ifMode) ifSyncScene();
   toast(isYard?'🌿 마당이에요! 집은 우상단 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
 
@@ -8591,6 +8869,7 @@ function renderDecoInv(){
   const el=document.getElementById('house-deco-inv');
   if(!inv.length){
     el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">보유한 장식품이 없어요. 상점에서 구매하세요! 🏪</div>`;
+    if(_ifMode) ifSyncInv();
     return;
   }
   const RL={common:'⚪',rare:'🔵',epic:'🟣',legend:'🟡'};
@@ -8612,6 +8891,7 @@ function renderDecoInv(){
       <div style="font-size:.58rem;margin-top:.08rem">${d.cat==='yard'?'🌿':'🏠'} ×${avail}</div>
     </div>`;
   }).join('');
+  if(_ifMode) ifSyncInv();
 }
 
 function selectDeco(id){
@@ -10342,7 +10622,94 @@ function requestPromotion() {
   toast('📨 승급 신청 완료! 선생님의 확인을 기다려주세요.');
 }
 
-// ══ 친구 방문 (포트폴리오 구경) ══
+// ── 친구 방문 전체화면 (읽기 전용) ─────────────────────
+let _ffFriend = null;
+let _ffScene  = 'yard';
+
+function openFriendFullscreen(friendId) {
+  const friend = typeof friendId === 'string' ? DB.getStudent(friendId) : friendId;
+  if (!friend) return;
+  _ffFriend = friend;
+  _ffScene  = 'yard';
+  const fs = document.getElementById('friend-fullscreen');
+  fs.style.display = 'flex';
+  document.getElementById('ff-title').textContent = friend.avatar + ' ' + friend.name + '의 집';
+  document.getElementById('ff-friend-info').textContent =
+    `Lv.${friend.level} · ${friend.job||'학생'} · 📚 ${friend.bookCount||0}권`;
+  document.getElementById('ff-scene-btn').textContent = '🏠 집 안 보기 →';
+  requestAnimationFrame(() => requestAnimationFrame(() => _renderFriendCanvas()));
+}
+
+function closeFriendFullscreen() {
+  document.getElementById('friend-fullscreen').style.display = 'none';
+  _ffFriend = null;
+}
+
+function toggleFriendScene() {
+  _ffScene = _ffScene === 'yard' ? 'indoor' : 'yard';
+  const isYard = _ffScene === 'yard';
+  document.getElementById('ff-scene-btn').textContent = isYard ? '🏠 집 안 보기 →' : '🌿 마당 보기 ←';
+  document.getElementById('ff-topview').innerHTML = '';
+  requestAnimationFrame(() => _renderFriendCanvas());
+}
+
+function _renderFriendCanvas() {
+  if (!_ffFriend) return;
+  const el = document.getElementById('ff-topview');
+  if (!el) return;
+
+  const prevCUR   = CUR;
+  const prevScene = DECO_SCENE;
+  const prevCv    = _dCv;
+  const prevCtx   = _dCtx;
+  const prevW     = _dW;
+  const prevH     = _dH;
+  const prevC     = _dC;
+  const prevIfMode = _ifMode;
+  const prevCont  = _ifActiveContainer;
+
+  // 전체화면 그리드 크기 임시 적용
+  DY = {...DY_FULL};
+  DI = {...DI_FULL};
+  CUR        = _ffFriend;
+  DECO_SCENE = _ffScene;
+  _ifMode    = true;
+
+  el.innerHTML = '';
+  const cv = document.createElement('canvas');
+  cv.style.cssText = 'display:block;cursor:default;touch-action:none';
+  el.appendChild(cv);
+
+  const topH = 50;
+  const W    = window.innerWidth;
+  const maxH = window.innerHeight - topH - 48;
+  const cols = _ffScene === 'yard' ? DY.cols : DI.cols;
+  const rows = _ffScene === 'yard' ? DY.rows : DI.rows;
+  const C    = Math.floor(W / cols);
+  const H    = Math.min(C * rows, maxH);
+
+  _dCv  = cv; _dW = W; _dH = H; _dC = C;
+  cv.width  = W * 2; cv.height = H * 2;
+  cv.style.width  = W + 'px'; cv.style.height = H + 'px';
+  _dCtx = cv.getContext('2d');
+  _dCtx.scale(2, 2);
+  _dCtx.clearRect(0, 0, W, H);
+  if (_ffScene === 'yard') _drawYard();
+  else _drawIndoor();
+
+  // 복원
+  CUR        = prevCUR;
+  DECO_SCENE = prevScene;
+  _dCv       = prevCv;
+  _dCtx      = prevCtx;
+  _dW        = prevW;
+  _dH        = prevH;
+  _dC        = prevC;
+  _ifMode    = prevIfMode;
+  _ifActiveContainer = prevCont;
+  DY = _ifMode ? {...DY_FULL} : {...DY_NORMAL};
+  DI = _ifMode ? {...DI_FULL} : {...DI_NORMAL};
+}
 function visitFriend(id) {
   const f = DB.getStudent(id);
   if (!f) return;
@@ -10429,16 +10796,15 @@ function visitFriend(id) {
     </div>
     <!-- 탭 -->
     <div class="modal-tabs" style="margin-bottom:.8rem" id="${modalId}-tabs">
-      <button class="mtab on" onclick="vfTab('${modalId}','deco',this)">🌸 인테리어</button>
+      <button class="mtab on" onclick="openFriendFullscreen('${id}')">🌸 인테리어 보기</button>
       <button class="mtab"    onclick="vfTab('${modalId}','books',this)">📚 독서</button>
       <button class="mtab"    onclick="vfTab('${modalId}','artwork',this)">🖼️ 작품</button>
     </div>
-    <!-- 인테리어 탭 -->
+    <!-- 인테리어 탭 (전체화면으로 열림) -->
     <div id="${modalId}-deco">
-      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.35rem">🌿 마당</div>
-      <div id="${modalId}-yard" style="width:100%;min-height:80px"></div>
-      <div style="font-size:.72rem;color:var(--txt3);margin:.6rem 0 .35rem">🏠 집 안</div>
-      <div id="${modalId}-indoor" style="width:100%;min-height:60px"></div>
+      <div style="text-align:center;padding:1.5rem 0;color:var(--txt3);font-size:.82rem">
+        위의 "🌸 인테리어 보기" 버튼을 눌러주세요
+      </div>
     </div>
     <!-- 독서 탭 -->
     <div id="${modalId}-books" style="display:none">
