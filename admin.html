@@ -4050,6 +4050,37 @@ tr:hover td{background:rgba(255,255,255,.02);}
         </div>
       </div>
 
+      <!-- 일괄 이름 변경 -->
+      <div class="table-card" style="margin-bottom:1rem">
+        <div class="tc-header"><div class="tc-title">✏️ 일괄 이름 변경</div></div>
+        <div style="padding:.8rem 1.2rem;display:flex;flex-direction:column;gap:.6rem">
+          <div style="font-size:.75rem;color:var(--txt3)">
+            선택한 사진들의 제목을 한번에 폴더 이름으로 바꿔요.
+            KakaoTalk 파일명 등 정리할 때 유용해요.
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+            <input class="form-input" id="bulk-rename-input"
+              placeholder="📁 새 폴더 이름 (예: 4월 과학 수업)" style="flex:2;min-width:180px">
+            <select id="bulk-rename-filter" class="form-select" style="flex:1;min-width:130px"
+              onchange="renderBulkRenameList()">
+              <option value="kakao">KakaoTalk 파일명만</option>
+              <option value="all">전체 사진</option>
+              <option value="noname">제목 없는 사진</option>
+            </select>
+          </div>
+          <!-- 선택 목록 -->
+          <div id="bulk-rename-list" style="max-height:180px;overflow-y:auto;
+            border:1px solid rgba(255,255,255,.08);border-radius:8px"></div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="btn-sm outline" onclick="toggleBulkSelectAll()">전체 선택/해제</button>
+            <span id="bulk-selected-count" style="font-size:.75rem;color:var(--txt3)">0장 선택됨</span>
+            <button class="btn-sm success" onclick="applyBulkRename()" style="margin-left:auto">
+              ✅ 선택한 사진 이름 변경
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 필터 + 목록 -->
       <div class="table-card">
         <div class="tc-header">
@@ -4308,11 +4339,16 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
       <!-- 퀴즈 현황 -->
       <div class="table-card">
-        <div class="tc-header">
+        <div class="tc-header" style="cursor:pointer" onclick="toggleVocabQuizRecords()">
           <div class="tc-title">📊 퀴즈 기록</div>
-          <select id="voc-filter-stu" class="form-select" style="width:auto;font-size:.78rem" onchange="renderVocabAdminPage()">
-            <option value="all">전체 학생</option>
-          </select>
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <select id="voc-filter-stu" class="form-select" style="width:auto;font-size:.78rem"
+              onchange="renderVocabAdminPage();event.stopPropagation()"
+              onclick="event.stopPropagation()">
+              <option value="all">전체 학생</option>
+            </select>
+            <span id="vocab-quiz-toggle-icon" style="font-size:.85rem;color:var(--txt3)">▲</span>
+          </div>
         </div>
         <div id="voc-quiz-list" style="padding:.5rem 0"></div>
       </div>
@@ -4705,7 +4741,7 @@ function nav(page, el) {
   if (page === 'reward')   populateRewardStudents();
   if (page === 'artwork')  { renderArtworkPending(); renderArtworkAdmin(); }
   if (page === 'books')    renderBooksPage();
-  if (page === 'memories') renderMemoriesPage();
+  if (page === 'memories') { renderMemoriesPage(); renderBulkRenameList(); }
   if (page === 'recorder') renderRecorderPage();
   if (page === 'weekly')   renderWeeklyAdminPage();
   if (page === 'vocab')    renderVocabAdminPage();
@@ -7019,9 +7055,20 @@ function renderMemoriesPage() {
           <span style="font-size:.8rem">⬇️</span></div>
       </a>
       <div style="flex:1;min-width:0">
-        <div style="font-size:.85rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${m.title||'(제목없음)'}</div>
-        <div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">
+        <!-- 제목 인라인 편집 -->
+        <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.15rem">
+          <input id="mem-title-inp-${m.id}"
+            value="${(m.title||'').replace(/"/g,'&quot;')}"
+            style="font-size:.82rem;font-weight:700;flex:1;min-width:0;
+              background:transparent;border:none;border-bottom:1px solid transparent;
+              color:var(--txt1);padding:.05rem .1rem;font-family:inherit;
+              outline:none;cursor:text"
+            onfocus="this.style.borderBottomColor='var(--gold)'"
+            onblur="this.style.borderBottomColor='transparent';saveMemTitle('${m.id}',this.value)"
+            onkeydown="if(event.key==='Enter'){this.blur()}"
+            placeholder="폴더 이름 입력">
+        </div>
+        <div style="font-size:.68rem;color:var(--txt3)">
           ${m.uploadedBy==='admin'?'관리자':'👤 '+(m.studentName||'')} · ${m.date||''}
         </div>
         <!-- 앨범 지정 셀렉트 -->
@@ -7050,6 +7097,87 @@ function renderMemoriesPage() {
         </div>
       </div>
     </div>`).join('');
+}
+
+function saveMemTitle(memId, newTitle) {
+  const t = (newTitle || '').trim();
+  if (!t) return;
+  const mems = DB.getMemories('all');
+  const m = mems.find(x => x.id === memId);
+  if (!m || m.title === t) return;
+  DB.saveMemory({ id: memId, title: t, desc: t });
+  notify('✅ 제목 변경: ' + t);
+}
+
+// ── 일괄 이름 변경 ────────────────────────────────────
+function renderBulkRenameList() {
+  const wrap = document.getElementById('bulk-rename-list');
+  if (!wrap) return;
+  const filter = document.getElementById('bulk-rename-filter')?.value || 'kakao';
+  const mems = DB.getMemories('all').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  const candidates = mems.filter(m => {
+    const t = (m.title || '').toLowerCase();
+    if (filter === 'kakao')  return t.startsWith('kakaotalk') || t.startsWith('kakao');
+    if (filter === 'noname') return !m.title || m.title.trim() === '';
+    return true; // all
+  });
+
+  if (candidates.length === 0) {
+    wrap.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--txt3);font-size:.78rem">
+      해당하는 사진이 없어요</div>`;
+    updateBulkCount();
+    return;
+  }
+
+  wrap.innerHTML = candidates.map(m => `
+    <label style="display:flex;align-items:center;gap:.6rem;padding:.45rem .8rem;
+      border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">
+      <input type="checkbox" class="bulk-chk" data-id="${m.id}" checked
+        onchange="updateBulkCount()"
+        style="width:15px;height:15px;flex-shrink:0;accent-color:var(--gold)">
+      <img src="${m.thumbUrl||m.imageUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.75rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+          color:${(m.title||'').toLowerCase().startsWith('kakao')?'var(--red)':'var(--txt1)'}">
+          ${m.title||'(제목없음)'}
+        </div>
+        <div style="font-size:.65rem;color:var(--txt3)">${m.date||''} · ${m.uploadedBy==='admin'?'관리자':'학생'}</div>
+      </div>
+    </label>`).join('');
+  updateBulkCount();
+}
+
+function updateBulkCount() {
+  const cnt = document.querySelectorAll('.bulk-chk:checked').length;
+  const el = document.getElementById('bulk-selected-count');
+  if (el) el.textContent = cnt + '장 선택됨';
+}
+
+function toggleBulkSelectAll() {
+  const all = document.querySelectorAll('.bulk-chk');
+  const anyUnchecked = [...all].some(c => !c.checked);
+  all.forEach(c => { c.checked = anyUnchecked; });
+  updateBulkCount();
+}
+
+function applyBulkRename() {
+  const folder = document.getElementById('bulk-rename-input')?.value.trim();
+  if (!folder) { notify('📁 새 폴더 이름을 입력해주세요', 'error'); return; }
+  const checked = [...document.querySelectorAll('.bulk-chk:checked')];
+  if (checked.length === 0) { notify('사진을 선택해주세요', 'error'); return; }
+  if (!confirm(`선택한 ${checked.length}장의 제목을 "${folder}"로 변경할까요?`)) return;
+
+  const total = checked.length;
+  checked.forEach((chk, i) => {
+    const title = total > 1 ? `${folder} (${i+1})` : folder;
+    DB.saveMemory({ id: chk.dataset.id, title, desc: folder });
+  });
+
+  notify(`✅ ${total}장 → "${folder}" 변경 완료!`);
+  document.getElementById('bulk-rename-input').value = '';
+  renderBulkRenameList();
+  renderMemoriesPage();
 }
 
 function assignMemAlbum(memId, albumId) {
@@ -7543,26 +7671,56 @@ function renderVocabAdminPage() {
     return;
   }
   const allWords = DB.getAllVocabWords();
+  const typeLabel = { mc_meaning:'영어→뜻', mc_word:'뜻→영어', short_meaning:'뜻 쓰기', spelling:'스펠링' };
   ql.innerHTML = records.map(r => {
     const s = students.find(x=>x.id===r.studentId);
     const pct = Math.round(r.correct/r.total*100);
     const wrongWords = (r.wrongWordIds||[]).map(id=>allWords.find(w=>w.id===id)).filter(Boolean);
+    const wrongDetails = r.wrongDetails || [];
     return `
-    <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem 1.2rem;
-      border-bottom:1px solid rgba(255,255,255,.05)">
-      <span>${s?.avatar||'👤'}</span>
-      <span style="font-weight:700;font-size:.85rem">${s?.name||r.studentId}</span>
-      <span style="font-size:.72rem;color:var(--txt3)">${r.date}</span>
-      <span style="font-size:.82rem;font-weight:700;
-        color:${pct===100?'var(--emerald)':pct>=60?'var(--gold)':'var(--red)'}">
-        ${r.correct}/${r.total}</span>
-      ${wrongWords.length>0?`<span style="font-size:.68rem;color:var(--txt3)">
-        틀림: ${wrongWords.map(w=>w.word).join(', ')}</span>`:''}
-      <button onclick="deleteQuizRecord('${r.id}')" style="margin-left:auto;background:none;
-        border:none;color:var(--red);cursor:pointer;font-size:.78rem;padding:.1rem .3rem"
-        title="기록 삭제">🗑️</button>
+    <div style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem 1.2rem">
+        <span>${s?.avatar||'👤'}</span>
+        <span style="font-weight:700;font-size:.85rem">${s?.name||r.studentId}</span>
+        <span style="font-size:.72rem;color:var(--txt3)">${r.date}</span>
+        <span style="font-size:.85rem;font-weight:700;
+          color:${pct===100?'var(--emerald)':pct>=60?'var(--gold)':'var(--red)'}">
+          ${r.correct}/${r.total}
+          <span style="font-size:.68rem;font-weight:400;color:var(--txt3)">(${pct}%)</span>
+        </span>
+        ${wrongWords.length===0?'<span style="font-size:.68rem;color:var(--emerald)">✨ 만점</span>':''}
+        <button onclick="deleteQuizRecord('${r.id}')" style="margin-left:auto;background:none;
+          border:none;color:var(--red);cursor:pointer;font-size:.78rem;padding:.1rem .3rem"
+          title="기록 삭제">🗑️</button>
+      </div>
+      ${wrongWords.length > 0 ? `
+      <div style="padding:.3rem 1.2rem .6rem;display:flex;flex-wrap:wrap;gap:.3rem">
+        ${wrongWords.map(w => {
+          const detail = wrongDetails.find(d=>d.wordId===w.id);
+          const type = detail?.type || 'mc_meaning';
+          let answerHint = '';
+          if (type === 'spelling') answerHint = `스펠링: <b style="color:var(--emerald)">${w.word}</b>`;
+          else if (type === 'mc_word') answerHint = `영어: <b style="color:var(--emerald)">${w.word}</b>`;
+          else answerHint = `뜻: <b style="color:var(--emerald)">${w.meaning}</b>`;
+          return `<span style="font-size:.7rem;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.2);
+            border-radius:8px;padding:.2rem .5rem;color:var(--txt2)">
+            <span style="color:var(--red);font-weight:700">${w.word}</span>
+            <span style="color:var(--txt3);font-size:.65rem">[${typeLabel[type]||type}]</span>
+            → ${answerHint}
+          </span>`;
+        }).join('')}
+      </div>` : ''}
     </div>`;
   }).join('');
+}
+
+function toggleVocabQuizRecords() {
+  const list = document.getElementById('voc-quiz-list');
+  const icon = document.getElementById('vocab-quiz-toggle-icon');
+  if (!list) return;
+  const hidden = list.style.display === 'none';
+  list.style.display = hidden ? '' : 'none';
+  if (icon) icon.textContent = hidden ? '▲' : '▼';
 }
 
 function deleteQuizRecord(id) {

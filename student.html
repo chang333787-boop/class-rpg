@@ -8803,6 +8803,15 @@ async function submitMemories() {
 // 구버전 호환
 async function submitMemory() { await submitMemories(); }
 
+function editMemTitle(memId, currentTitle) {
+  const newTitle = prompt('폴더 이름을 입력해주세요\n(파일명 대신 보여집니다)', currentTitle);
+  if (newTitle === null) return;          // 취소
+  if (!newTitle.trim()) { toast('이름을 입력해주세요'); return; }
+  DB.saveMemory({ id: memId, title: newTitle.trim(), desc: newTitle.trim() });
+  toast('✅ 이름 변경 완료!');
+  renderMyMemories();
+}
+
 function renderMyMemories() {
   const el = document.getElementById('mem-record-list');
   if (!el) return;
@@ -8842,6 +8851,9 @@ function renderMyMemories() {
           </div>
           ${myPending?`<div style="position:absolute;top:4px;right:4px;font-size:.55rem;
             background:rgba(255,180,0,.85);color:#1a1a1a;padding:.1rem .3rem;border-radius:4px;font-weight:700">확인중</div>`:''}
+          ${m.studentId===CUR.id?`<button onclick="event.stopPropagation();editMemTitle('${m.id}','${(m.title||'').replace(/'/g,'\\\'')}')"
+            style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);border:none;
+              color:#fff;font-size:.65rem;padding:.1rem .35rem;border-radius:4px;cursor:pointer">✏️</button>`:''}
         </div>`;
       }).join('')}
     </div>`;
@@ -10971,26 +10983,24 @@ function renderVocabTab() {
   })();
 
   el.innerHTML = `
-  <!-- ① 상단 상태 카드 -->
+  <!-- ① 퀴즈 풀기 버튼 (항상 상단 고정) -->
+  ${ws ? `<button onclick="startVocabQuiz()"
+    style="width:100%;background:linear-gradient(135deg,var(--gold),#e67e22);border:none;
+      color:#1a1a1a;font-weight:800;font-size:.88rem;padding:.65rem;
+      border-radius:14px;cursor:pointer;font-family:inherit;
+      box-shadow:0 3px 12px rgba(255,215,0,.25);margin-bottom:.8rem;
+      display:flex;align-items:center;justify-content:center;gap:.5rem">
+    📝 퀴즈 풀기 (${setWords.length}개 단어)
+  </button>` : `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+    border-radius:12px;padding:.7rem;text-align:center;color:var(--txt3);font-size:.78rem;margin-bottom:.8rem">
+    선생님이 단어 세트를 지정하면 퀴즈를 풀 수 있어요</div>`}
+
+  <!-- ② 상태 카드 -->
   <div style="background:linear-gradient(135deg,rgba(93,173,226,.15),rgba(142,68,173,.12));
-    border:1px solid rgba(93,173,226,.2);border-radius:14px;padding:.9rem 1rem;margin-bottom:.9rem">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
-      <div>
-        <div style="font-size:.7rem;color:var(--sky);font-weight:700;margin-bottom:.15rem">
-          🔤 영어 단어장
-        </div>
-        <div style="font-size:.88rem;font-weight:800;color:var(--txt1)">
-          ${ws ? ws.title : '학습 단어 없음'}
-        </div>
-        ${ws ? `<div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">${setWords.length}개 단어 학습 중</div>` : ''}
-      </div>
-      ${ws ? `<button onclick="startVocabQuiz()"
-        style="background:linear-gradient(135deg,var(--gold),#e67e22);border:none;
-          color:#1a1a1a;font-weight:800;font-size:.82rem;padding:.5rem 1.1rem;
-          border-radius:12px;cursor:pointer;font-family:inherit;white-space:nowrap;
-          box-shadow:0 3px 12px rgba(255,215,0,.25)">
-        📝 퀴즈 풀기
-      </button>` : ''}
+    border:1px solid rgba(93,173,226,.2);border-radius:14px;padding:.8rem 1rem;margin-bottom:.8rem">
+    <div style="font-size:.7rem;color:var(--sky);font-weight:700;margin-bottom:.1rem">🔤 영어 단어장</div>
+    <div style="font-size:.85rem;font-weight:800;color:var(--txt1);margin-bottom:.55rem">
+      ${ws ? ws.title : '학습 단어 없음'}
     </div>
     <!-- 미니 통계 -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem">
@@ -11136,25 +11146,26 @@ function startVocabQuiz() {
     return Array(times).fill(w);
   });
 
-  // 5문제 선택 (중복 없이)
+  // 10문제 선택 (중복 없이)
   const picked = [];
   const used = new Set();
   const shuffled = [...weighted].sort(()=>Math.random()-.5);
   for (const w of shuffled) {
     if (!used.has(w.id)) { picked.push(w); used.add(w.id); }
-    if (picked.length >= 5) break;
+    if (picked.length >= 10) break;
   }
   // 부족하면 나머지에서 채우기
-  if (picked.length < 5) {
+  if (picked.length < 10) {
     for (const w of quizWords) {
       if (!used.has(w.id)) { picked.push(w); used.add(w.id); }
-      if (picked.length >= 5) break;
+      if (picked.length >= 10) break;
     }
   }
 
-  // 문제 유형 배분: mc_meaning×2, mc_word×1, short_meaning×1, spelling×1
-  const types = ['mc_meaning','mc_meaning','mc_word','short_meaning','spelling']
-    .sort(()=>Math.random()-.5);
+  // 문제 유형 배분: mc_meaning×4, mc_word×2, short_meaning×2, spelling×2
+  const types = ['mc_meaning','mc_meaning','mc_meaning','mc_meaning',
+                 'mc_word','mc_word','short_meaning','short_meaning',
+                 'spelling','spelling'].sort(()=>Math.random()-.5);
 
   VOCAB_QUIZ = {
     questions: picked.map((w,i)=>({word:w, type:types[i]||'mc_meaning'})),
@@ -11178,7 +11189,7 @@ function renderVocabQuestion() {
   const q = questions[cur];
   const { word, type } = q;
 
-  titleEl.textContent = `📖 단어 퀴즈 ${cur+1}/5`;
+  titleEl.textContent = `📖 단어 퀴즈 ${cur+1}/${questions.length}`;
   const allWords = DB.getAllVocabWords();
 
   if (type === 'mc_meaning') {
@@ -11353,40 +11364,77 @@ function nextVocabQuestion() {
 function finishVocabQuiz() {
   const { correct, questions, wrongIds, wordIds } = VOCAB_QUIZ;
   const total = questions.length;
-  // 퀴즈 기록 저장
+  // 퀴즈 기록 저장 — 틀린 문제 상세 포함
+  const wrongDetails = questions
+    .filter(q => VOCAB_QUIZ.wrongIds.includes(q.word.id))
+    .map(q => ({ wordId: q.word.id, type: q.type }));
   DB.saveQuizRecord({
     id: `quiz_${Utils.todayStr()}_${CUR.id}_${Date.now()}`,
     studentId: CUR.id,
     date: Utils.todayStr(),
     total, correct,
     wrongWordIds: [...new Set(wrongIds)],
+    wrongDetails,
     wordIds: wordIds || []
   });
 
   const body = document.getElementById('vq-body');
   const titleEl = document.getElementById('vq-title');
   titleEl.textContent = '📖 퀴즈 완료!';
+
+  // 틀린 문제 상세: 유형에 따라 무엇이 정답인지 표시
+  const typeLabel = { mc_meaning:'영어→뜻', mc_word:'뜻→영어', short_meaning:'뜻 쓰기', spelling:'스펠링' };
+  const wrongDetailHTML = wrongIds.length > 0 ? `
+    <div style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.15);
+      border-radius:10px;padding:.6rem .7rem;margin-bottom:.8rem;text-align:left">
+      <div style="font-size:.68rem;color:var(--red);font-weight:700;margin-bottom:.45rem">
+        🔁 틀린 문제 — 정답 확인
+      </div>
+      ${[...new Set(wrongIds)].map(id => {
+        const w = DB.getAllVocabWords().find(x=>x.id===id);
+        if (!w) return '';
+        // 이 단어를 어떤 유형으로 틀렸는지 찾기
+        const detail = (wrongDetails||[]).find(d=>d.wordId===id);
+        const type = detail?.type || 'mc_meaning';
+        let answerLine = '';
+        if (type === 'mc_meaning' || type === 'short_meaning') {
+          answerLine = `<span style="color:var(--txt3);font-size:.72rem">영어 </span>
+            <b style="color:var(--gold)">${w.word}</b>
+            <span style="color:var(--txt3);font-size:.72rem"> → 뜻: </span>
+            <b style="color:var(--emerald)">${w.meaning}</b>`;
+        } else if (type === 'mc_word') {
+          answerLine = `<span style="color:var(--txt3);font-size:.72rem">뜻 </span>
+            <b style="color:var(--sky)">${w.meaning}</b>
+            <span style="color:var(--txt3);font-size:.72rem"> → 영어: </span>
+            <b style="color:var(--emerald)">${w.word}</b>`;
+        } else { // spelling
+          answerLine = `<span style="color:var(--txt3);font-size:.72rem">뜻 </span>
+            <b style="color:var(--sky)">${w.meaning}</b>
+            <span style="color:var(--txt3);font-size:.72rem"> → 스펠링: </span>
+            <b style="color:var(--emerald);font-size:.9rem;letter-spacing:.05em">${w.word}</b>`;
+        }
+        return `<div style="font-size:.78rem;color:var(--txt2);padding:.3rem .2rem;
+          border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;
+          gap:.5rem;flex-wrap:wrap">
+          <span style="font-size:.6rem;background:rgba(255,255,255,.07);color:var(--txt3);
+            padding:.05rem .3rem;border-radius:4px">${typeLabel[type]||type}</span>
+          ${answerLine}
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   body.innerHTML = `
     <div style="padding:1.2rem 1rem;text-align:center">
       <div style="font-size:2.5rem;margin-bottom:.4rem">
-        ${correct===total?'🎉':correct>=3?'😊':'💪'}
+        ${correct===total?'🎉':correct>=total*.7?'😊':'💪'}
       </div>
       <div style="font-size:1.5rem;font-weight:800;color:var(--gold);margin-bottom:.3rem">
         ${correct} / ${total}
       </div>
       <div style="font-size:.85rem;color:var(--txt2);margin-bottom:.8rem">
-        ${correct===total?'완벽해요! 모두 맞혔어요 ✨':correct>=3?'잘했어요! 조금만 더 연습해봐요':'괜찮아요, 틀린 단어 다시 보기로 복습해봐요'}
+        ${correct===total?'완벽해요! 모두 맞혔어요 ✨':correct>=Math.ceil(total*.7)?'잘했어요! 조금만 더 연습해봐요':'괜찮아요, 틀린 단어 정답을 확인하고 복습해봐요'}
       </div>
-      ${wrongIds.length>0 ? `
-      <div style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.15);
-        border-radius:10px;padding:.6rem;margin-bottom:.8rem;text-align:left">
-        <div style="font-size:.68rem;color:var(--red);font-weight:700;margin-bottom:.35rem">🔁 틀린 단어</div>
-        ${[...new Set(wrongIds)].map(id=>{
-          const w=DB.getAllVocabWords().find(x=>x.id===id);
-          return w?`<div style="font-size:.78rem;color:var(--txt2)">
-            <b style="color:var(--red)">${w.word}</b> — ${w.meaning}</div>`:'';
-        }).join('')}
-      </div>` : ''}
+      ${wrongDetailHTML}
       <button onclick="closeModal('m-vocab-quiz');if(document.getElementById('house-tab-vocab')?.style.display!=='none')renderVocabTab()"
         style="padding:.5rem 1.5rem;border-radius:12px;font-family:inherit;font-size:.85rem;cursor:pointer;
           border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:var(--txt1)">
