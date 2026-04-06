@@ -8439,6 +8439,13 @@ function _initDeco() {
     _dCv.id = 'deco-canvas';
     _dCv.style.cssText = 'display:block;cursor:pointer;touch-action:none';
     el.appendChild(_dCv);
+    // 터치: touchstart로 처리 + preventDefault로 click 중복 차단
+    _dCv.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      _decoClick({ clientX: t.clientX, clientY: t.clientY, target: e.target });
+    }, { passive: false });
+    // 마우스(PC)용
     _dCv.addEventListener('click', _decoClick);
   }
   // 전체화면 모드면 window 크기 직접 사용, 아니면 컨테이너 너비
@@ -8465,11 +8472,17 @@ function _initDeco() {
   _dCtx.scale(2, 2);
 }
 
+let _drawDecoRaf = null;
 function _drawDeco() {
   if (!_dCtx) return;
-  _dCtx.clearRect(0, 0, _dW, _dH);
-  if (DECO_SCENE === 'yard') _drawYard();
-  else _drawIndoor();
+  if (_drawDecoRaf) return; // 이미 RAF 예약됨 — 중복 방지
+  _drawDecoRaf = requestAnimationFrame(() => {
+    _drawDecoRaf = null;
+    if (!_dCtx) return;
+    _dCtx.clearRect(0, 0, _dW, _dH);
+    if (DECO_SCENE === 'yard') _drawYard();
+    else _drawIndoor();
+  });
 }
 
 function _drawYard() {
