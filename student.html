@@ -270,7 +270,13 @@ const GAME_DATA = {
     {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', price:15,       cat:'yard', rarity:'common', reqLv:1},
     {id:'d_y46',name:'작은 침엽수',   icon:'🌲', size:{w:2,h:2}, price:120, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, price:130, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, price:140, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, price:140, cat:'yard', rarity:'common', reqLv:1},
+
+    // ── 목재 울타리 4종 ─────────────────────────────────────
+    {id:'d_y49',name:'울타리 가로형',  icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y50',name:'울타리 세로형',  icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y51',name:'울타리 왼쪽 코너', icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', price:15,  cat:'indoor', rarity:'common', reqLv:1},
@@ -4598,14 +4604,6 @@ window.onload = async () => {
       if (typeof CUR !== 'undefined' && CUR) {
         const fresh = DB.getStudent(CUR.id);
         if (fresh) CUR = fresh;
-
-        // ★ 디버그 로그 (확인 후 제거)
-        console.log('[battle limit check]', {
-          used: CUR?.battleDaily?.used,
-          dateKey: CUR?.battleDaily?.dateKey,
-          limit: Utils._getBattleLimit(),
-          canFight: Utils.canFightMonster(CUR),
-        });
 
         if (BATTLE_STATE && !BATTLE_STATE.finished) {
           if (typeof renderHUD === 'function') renderHUD();
@@ -9546,6 +9544,73 @@ function _dTrophy(cx,cy,s){
 }
 
 // ══════════════════════════════════════════════════════════
+// ── 목재 울타리 드로우 함수 ────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+// 기둥 공통 (다른 함수에서 호출)
+function _dFencePost(cx,topY,botY,s){
+  const h=botY-topY;
+  // 그림자 오른쪽면
+  _dCtx.fillStyle='#5A2C06';_drr(cx+s*.02,topY,s*.2,h,s*.04);_dCtx.fill();
+  // 기둥 본체
+  _dCtx.fillStyle='#9A5A18';_drr(cx-s*.18,topY,s*.38,h,s*.06);_dCtx.fill();
+  // 하이라이트 왼쪽
+  _dCtx.fillStyle='#C87828';_drr(cx-s*.18,topY,s*.2,h,s*.05);_dCtx.fill();
+  // 캡
+  _dCtx.fillStyle='#5A2C06';
+  _dCtx.beginPath();_dCtx.ellipse(cx,topY,s*.24,s*.13,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#C87828';
+  _dCtx.beginPath();_dCtx.ellipse(cx-s*.02,topY-s*.02,s*.21,s*.11,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#E09838';
+  _dCtx.beginPath();_dCtx.ellipse(cx-s*.06,topY-s*.05,s*.1,s*.05,0,0,Math.PI*2);_dCtx.fill();
+}
+
+// 레일 그리기 (x, y, w, s)
+function _dFenceRail(rx,ry,rw,s){
+  _dCtx.fillStyle='#6B3808';_drr(rx,ry+s*.02,rw,s*.21,s*.03);_dCtx.fill();
+  _dCtx.fillStyle='#A86818';_drr(rx,ry,rw,s*.18,s*.03);_dCtx.fill();
+  _dCtx.fillStyle='#D4A040';_drr(rx,ry-s*.02,rw,s*.1,s*.02);_dCtx.fill();
+}
+
+// d_y49: 울타리 가로형 (1×1)
+function _dFenceHorz(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.17)';
+  _dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.76,s*.74,s*.09,0,0,Math.PI*2);_dCtx.fill();
+  // 레일 2줄 전폭 (기둥 뒤)
+  _dFenceRail(cx-s*.78,cy-s*.38,s*1.56,s);
+  _dFenceRail(cx-s*.78,cy-s*.04,s*1.56,s);
+  // 기둥
+  _dFencePost(cx,cy-s*.75,cy+s*.76,s);
+}
+
+// d_y50: 울타리 세로형 (1×1) — 기둥만
+function _dFenceVert(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.14)';
+  _dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.76,s*.2,s*.07,0,0,Math.PI*2);_dCtx.fill();
+  _dFencePost(cx,cy-s*.8,cy+s*.8,s);
+}
+
+// d_y51: 울타리 왼쪽 코너형 (┌=└) — 판자 오른쪽
+function _dFenceCornerL(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.18)';
+  _dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.76,s*.4,s*.09,0,0,Math.PI*2);_dCtx.fill();
+  // 판자 오른쪽 방향
+  _dFenceRail(cx+s*.18,cy-s*.38,s*.6,s);
+  _dFenceRail(cx+s*.18,cy-s*.04,s*.6,s);
+  _dFencePost(cx,cy-s*.8,cy+s*.8,s);
+}
+
+// d_y52: 울타리 오른쪽 코너형 (┐=┘) — 판자 왼쪽
+function _dFenceCornerR(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.18)';
+  _dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.76,s*.4,s*.09,0,0,Math.PI*2);_dCtx.fill();
+  // 판자 왼쪽 방향
+  _dFenceRail(cx-s*.78,cy-s*.38,s*.6,s);
+  _dFenceRail(cx-s*.78,cy-s*.04,s*.6,s);
+  _dFencePost(cx,cy-s*.8,cy+s*.8,s);
+}
+
+// ══════════════════════════════════════════════════════════
 // ── 2차 신규 장식 드로우 함수 ─────────────────────────────
 // ══════════════════════════════════════════════════════════
 
@@ -10661,6 +10726,11 @@ const _DFN = {
   d_y46:_dConifer,           // 작은 침엽수
   d_y47:_dRoundTreeB,        // 둥근 나무 B형
   d_y48:_dOrchard,           // 과수나무
+  // ── 목재 울타리 4종 ────────────────────────────────────
+  d_y49:_dFenceHorz,         // 울타리 가로형
+  d_y50:_dFenceVert,         // 울타리 세로형
+  d_y51:_dFenceCornerL,      // 울타리 왼쪽 코너
+  d_y52:_dFenceCornerR,      // 울타리 오른쪽 코너
 };
 
 // ── 메인 렌더 ──

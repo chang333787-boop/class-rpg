@@ -270,7 +270,13 @@ const GAME_DATA = {
     {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', price:15,       cat:'yard', rarity:'common', reqLv:1},
     {id:'d_y46',name:'작은 침엽수',   icon:'🌲', size:{w:2,h:2}, price:120, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, price:130, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, price:140, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, price:140, cat:'yard', rarity:'common', reqLv:1},
+
+    // ── 목재 울타리 4종 ─────────────────────────────────────
+    {id:'d_y49',name:'울타리 가로형',  icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y50',name:'울타리 세로형',  icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y51',name:'울타리 왼쪽 코너', icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', price:15,  cat:'indoor', rarity:'common', reqLv:1},
@@ -4758,7 +4764,7 @@ window.onload = async () => {
 
 function renderAll() {
   // 각 함수를 개별 try/catch로 감싸서 한 곳 실패해도 나머지 계속 실행
-  const safe = (fn, name) => { try { fn(); } catch(e) { console.warn('renderAll 오류 ['+name+']:', e.message); } };
+  const safe = (fn, name) => { try { fn(); } catch(e) { console.error('renderAll 오류 ['+name+']:', e); } };
   safe(renderDashboard,       'dashboard');
   safe(renderStudentTable,    'students');
   safe(renderApproveList,     'approveList');
