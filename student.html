@@ -246,6 +246,31 @@ const GAME_DATA = {
 
     // ── 건물 테마 ───────────────────────────────────────────
     {id:'d_y33',name:'나무 오두막',   icon:'🏠', size:{w:2,h:2}, price:240, cat:'yard', rarity:'legend', reqLv:1},
+
+    // ── 2차 확장: 건물/생활 ─────────────────────────────────
+    {id:'d_y34',name:'작은 창고',     icon:'🏚️', size:{w:2,h:2}, price:210, cat:'yard', rarity:'epic',   reqLv:1},
+
+    // ── 2차 확장: 농촌 심화 ─────────────────────────────────
+    {id:'d_y35',name:'밀밭 B형',      icon:'🌾', size:{w:2,h:2}, price:65,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y36',name:'보리밭',        icon:'🌾', size:{w:2,h:2}, price:65,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y37',name:'장작더미 B형',  icon:'🪵', price:35,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y38',name:'큰 바위 B형',   icon:'🪨', size:{w:2,h:1}, price:60,  cat:'yard', rarity:'rare',   reqLv:1},
+
+    // ── 2차 확장: 정적 동물 ─────────────────────────────────
+    {id:'d_y39',name:'닭 3마리',      icon:'🐔', size:{w:2,h:1}, price:70,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y40',name:'양',            icon:'🐑', size:{w:2,h:1}, price:100, cat:'yard', rarity:'rare',   reqLv:1},
+
+    // ── 2차 확장: 꽃 다양화 ─────────────────────────────────
+    {id:'d_y41',name:'라벤더 화단',   icon:'💜', price:18,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y42',name:'데이지 화단',   icon:'🌼', price:18,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y43',name:'장미 B형',      icon:'🌹', price:18,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y44',name:'튤립 B형',      icon:'🌷', price:18,       cat:'yard', rarity:'common', reqLv:1},
+
+    // ── 2차 확장: 식생/나무 ─────────────────────────────────
+    {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', price:15,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y46',name:'작은 침엽수',   icon:'🌲', size:{w:2,h:2}, price:120, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, price:130, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, price:140, cat:'yard', rarity:'rare',   reqLv:1},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', price:15,  cat:'indoor', rarity:'common', reqLv:1},
@@ -4059,6 +4084,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <button class="floor-tile-btn" onclick="setCurFloor('wood',this)" style="padding:.18rem .5rem;border-radius:8px;font-size:.7rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 나무</button>
       <button class="floor-tile-btn" onclick="setCurFloor('water',this)" style="padding:.18rem .5rem;border-radius:8px;font-size:.7rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🔵 물</button>
       <button class="floor-tile-btn" onclick="setCurFloor('flower',this)" style="padding:.18rem .5rem;border-radius:8px;font-size:.7rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🌸 꽃밭</button>
+      <button class="floor-tile-btn" onclick="setCurFloor('deck',this)" style="padding:.18rem .5rem;border-radius:8px;font-size:.7rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 데크</button>
+      <button class="floor-tile-btn" onclick="setCurFloor('dry_earth',this)" style="padding:.18rem .5rem;border-radius:8px;font-size:.7rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🟡 마른 흙</button>
+      <button class="floor-tile-btn" onclick="setCurFloor('gravel_yard',this)" style="padding:.18rem .5rem;border-radius:8px;font-size:.7rem;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">⬜ 자갈마당</button>
     </div>
     <div id="mode-deco-btn" style="display:none"></div>
     <div id="mode-floor-btn" style="display:none"></div>
@@ -4403,6 +4431,15 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <button class="floor-tile-btn" onclick="setCurFloor('flower',this)"
       style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
         background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🌸 꽃밭</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('deck',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 데크</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('dry_earth',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🟡 마른 흙</button>
+    <button class="floor-tile-btn" onclick="setCurFloor('gravel_yard',this)"
+      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
+        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">⬜ 자갈마당</button>
   </div>
 
   <!-- 본문: 캔버스 + 장식 인벤토리 -->
@@ -8380,6 +8417,10 @@ const FLOOR_TILES = {
   dark_earth: { bg:'#5a3820', alt:'#4a2e18', border:'rgba(0,0,0,.2)' },
   flower:     { bg:'#4a8c2a', alt:'#3f7a24', border:'rgba(255,255,255,.06)' },
   stone_floor:{ bg:'#9a9898', alt:'#888686', border:'rgba(0,0,0,.15)' },
+  // ── 2차 신규 타일 ──
+  deck:       { bg:'#a07838', alt:'#8c6828', border:'rgba(0,0,0,.12)' },
+  dry_earth:  { bg:'#c0a060', alt:'#b09050', border:'rgba(0,0,0,.1)' },
+  gravel_yard:{ bg:'#989080', alt:'#888070', border:'rgba(0,0,0,.12)' },
 };
 const FLOOR_TILE_COLORS = {
   grass:      { bg:'rgba(74,140,42,.2)',  color:'#a8e06a', border:'rgba(74,140,42,.5)' },
@@ -8388,11 +8429,14 @@ const FLOOR_TILE_COLORS = {
   sand:       { bg:'rgba(200,168,85,.25)',color:'#f0d080', border:'rgba(200,168,85,.5)' },
   wood:       { bg:'rgba(155,107,58,.3)', color:'#d4a870', border:'rgba(155,107,58,.5)' },
   water:      { bg:'rgba(42,122,184,.3)', color:'#7ec8e3', border:'rgba(42,122,184,.6)' },
-  brick:      { bg:'rgba(184,74,42,.3)',  color:'#e88868', border:'rgba(184,74,42,.6)' },
+  brick:      { bg:'rgba(154,88,64,.3)',  color:'#d4987a', border:'rgba(154,88,64,.6)' },
   gravel:     { bg:'rgba(138,136,120,.3)',color:'#c8c6b0', border:'rgba(138,136,120,.5)' },
   dark_earth: { bg:'rgba(90,56,32,.4)',   color:'#a07848', border:'rgba(90,56,32,.6)' },
   flower:     { bg:'rgba(74,140,42,.2)',  color:'#f0a8d0', border:'rgba(200,100,180,.5)' },
   stone_floor:{ bg:'rgba(154,152,152,.3)',color:'#d0cece', border:'rgba(154,152,152,.5)' },
+  deck:       { bg:'rgba(160,120,56,.3)', color:'#d4a870', border:'rgba(160,120,56,.5)' },
+  dry_earth:  { bg:'rgba(192,160,96,.3)', color:'#e8d0a0', border:'rgba(192,160,96,.5)' },
+  gravel_yard:{ bg:'rgba(152,144,128,.3)',color:'#ccc8b8', border:'rgba(152,144,128,.5)' },
 };
 let DECO_MODE = 'deco';   // 'deco' | 'floor'
 let CUR_FLOOR_TILE = 'grass';
@@ -8681,15 +8725,72 @@ function _drawTileTexture(type, c, r, C) {
       break;
     }
     case 'stone_floor': {
-      // 돌바닥 — 불규칙 줄 패턴
       ctx.strokeStyle='rgba(0,0,0,.22)'; ctx.lineWidth=Math.max(.8,C*.055);
-      // 대각 방향 분할선
       const sx=_tRng(r,c,0)*.3+.25, sy=_tRng(r,c,1)*.3+.25;
       ctx.beginPath(); ctx.moveTo(px+C*sx, py); ctx.lineTo(px+C*(sx+.2), py+C*.5); ctx.lineTo(px+C, py+C*(sy+.2)); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(px, py+C*sy); ctx.lineTo(px+C*(sx+.2), py+C*.5); ctx.stroke();
-      // 표면 약한 하이라이트
       ctx.fillStyle='rgba(255,255,255,.07)';
       ctx.beginPath(); ctx.ellipse(px+C*.25,py+C*.25,C*.18,C*.12,-.3,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'deck': {
+      // 목재 데크 — 가로 나무판자 결
+      const dOff = _tRng(r,c,0)*.5; // 판자 오프셋
+      ctx.strokeStyle='rgba(0,0,0,.14)'; ctx.lineWidth=Math.max(.8,C*.05);
+      // 가로 판자 경계선 (2~3줄)
+      [.33,.66].forEach(dy=>{
+        ctx.beginPath(); ctx.moveTo(px,py+C*dy); ctx.lineTo(px+C,py+C*dy); ctx.stroke();
+      });
+      // 나뭇결 (세로 방향 약한 줄)
+      ctx.strokeStyle='rgba(0,0,0,.07)'; ctx.lineWidth=Math.max(.5,C*.03);
+      for(let i=0;i<3;i++){
+        const gx=px+C*(_tRng(r,c,i+1)*.8+.05);
+        ctx.beginPath(); ctx.moveTo(gx,py); ctx.lineTo(gx+C*(_tRng(r,c,i+4)*.1-.05),py+C*.33); ctx.stroke();
+      }
+      // 밝은 면 (판자 상단)
+      ctx.fillStyle='rgba(255,255,255,.06)';
+      [0,.33,.66].forEach(dy=>{ ctx.fillRect(px,py+C*dy,C,C*.08); });
+      break;
+    }
+    case 'dry_earth': {
+      // 마른 흙 — 균열선 + 얼룩
+      ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=Math.max(.5,C*.04);
+      // 균열 패턴
+      const cx1=px+_tRng(r,c,0)*C*.6+C*.2, cy1=py+_tRng(r,c,1)*C*.6+C*.2;
+      ctx.beginPath(); ctx.moveTo(cx1,cy1);
+      ctx.lineTo(cx1+C*(_tRng(r,c,2)*.3-.15), cy1-C*(_tRng(r,c,3)*.2+.1)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx1,cy1);
+      ctx.lineTo(cx1+C*(_tRng(r,c,4)*.3+.05), cy1+C*(_tRng(r,c,5)*.2+.08)); ctx.stroke();
+      if(_tRng(r,c,6)>.5){
+        ctx.beginPath(); ctx.moveTo(cx1,cy1);
+        ctx.lineTo(cx1-C*(_tRng(r,c,7)*.25+.05), cy1+C*(_tRng(r,c,8)*.15+.05)); ctx.stroke();
+      }
+      // 얼룩 (더 밝거나 어두운 부분)
+      ctx.fillStyle='rgba(0,0,0,.1)';
+      ctx.beginPath(); ctx.ellipse(px+_tRng(r,c,9)*C,py+_tRng(r,c,10)*C,C*.12,C*.08,_tRng(r,c,11)*Math.PI,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.08)';
+      ctx.beginPath(); ctx.ellipse(px+_tRng(r,c,12)*C*.8+C*.1,py+_tRng(r,c,13)*C*.8+C*.1,C*.08,C*.05,0,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'gravel_yard': {
+      // 자갈마당 — 좀 더 크고 불규칙한 자갈
+      ctx.fillStyle='rgba(0,0,0,.16)';
+      for(let i=0;i<5;i++){
+        const gx=px+_tRng(r,c,i)*C, gy=py+_tRng(r,c,i+5)*C;
+        const gr=C*(.06+_tRng(r,c,i+10)*.06);
+        ctx.beginPath(); ctx.ellipse(gx,gy,gr,gr*.7,_tRng(r,c,i+15)*Math.PI,0,Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle='rgba(255,255,255,.12)';
+      for(let i=0;i<3;i++){
+        const gx=px+_tRng(r,c,i+18)*C*.8+C*.1, gy=py+_tRng(r,c,i+21)*C*.8+C*.1;
+        ctx.beginPath(); ctx.ellipse(gx,gy,C*.04,C*.03,_tRng(r,c,i+24)*Math.PI,0,Math.PI*2); ctx.fill();
+      }
+      // 그늘 (자갈 사이 틈)
+      ctx.fillStyle='rgba(0,0,0,.08)';
+      for(let i=0;i<2;i++){
+        const gx=px+_tRng(r,c,i+26)*C, gy=py+_tRng(r,c,i+28)*C;
+        ctx.beginPath(); ctx.ellipse(gx,gy,C*.08,C*.04,_tRng(r,c,i+30)*Math.PI,0,Math.PI*2); ctx.fill();
+      }
       break;
     }
   }
@@ -8843,21 +8944,97 @@ function _dCactus(cx,cy,s){
   });
 }
 function _dStone(cx,cy,s){
-  // 바닥 그림자
-  _dCtx.fillStyle='rgba(0,0,0,.25)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.62,s*.75,s*.15,0,0,Math.PI*2);_dCtx.fill();
-  // 돌 3개 (칸을 넉넉하게 채움)
-  // 가운데 큰 돌
-  _dCtx.fillStyle='#7a7868';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.08,s*.42,s*.3,0,0,Math.PI*2);_dCtx.fill();
-  _dCtx.fillStyle='#9a9888';_dCtx.beginPath();_dCtx.ellipse(cx-s*.06,cy-s*.14,s*.34,s*.22,0,0,Math.PI*2);_dCtx.fill();
-  // 왼쪽 작은 돌
-  _dCtx.fillStyle='#6a6858';_dCtx.beginPath();_dCtx.ellipse(cx-s*.42,cy+s*.18,s*.28,s*.2,-.2,0,Math.PI*2);_dCtx.fill();
-  _dCtx.fillStyle='#8a8878';_dCtx.beginPath();_dCtx.ellipse(cx-s*.44,cy+s*.12,s*.22,s*.16,-.2,0,Math.PI*2);_dCtx.fill();
-  // 오른쪽 작은 돌
-  _dCtx.fillStyle='#727068';_dCtx.beginPath();_dCtx.ellipse(cx+s*.4,cy+s*.14,.3*s,s*.21,.2,0,Math.PI*2);_dCtx.fill();
-  _dCtx.fillStyle='#929088';_dCtx.beginPath();_dCtx.ellipse(cx+s*.38,cy+s*.08,s*.24,s*.16,.2,0,Math.PI*2);_dCtx.fill();
-  // 이끼 점
-  _dCtx.fillStyle='#4a7a2a';
-  [[0,-.1],[-.3,.14],[.3,.1]].forEach(([dx,dy])=>{_dc(cx+dx*s,cy+dy*s,s*.05);_dCtx.fill();});
+  // 돌 바로 아래 짧고 얕은 그림자 (떠 보이지 않게)
+  _dCtx.fillStyle='rgba(0,0,0,.2)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.36,s*.7,s*.08,0,0,Math.PI*2);_dCtx.fill();
+
+  // ── 가운데 큰 돌 (불규칙 다각형) ──
+  _dCtx.fillStyle='#666658';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.28,cy+s*.28);   // 좌하
+  _dCtx.lineTo(cx-s*.44,cy+s*.08);   // 좌
+  _dCtx.lineTo(cx-s*.38,cy-s*.14);   // 좌상
+  _dCtx.lineTo(cx-s*.12,cy-s*.28);   // 상좌
+  _dCtx.lineTo(cx+s*.18,cy-s*.24);   // 상우
+  _dCtx.lineTo(cx+s*.4,cy-s*.06);    // 우상
+  _dCtx.lineTo(cx+s*.36,cy+s*.22);   // 우하
+  _dCtx.lineTo(cx+s*.06,cy+s*.32);   // 하우
+  _dCtx.closePath();_dCtx.fill();
+  // 중간 면 (밝음)
+  _dCtx.fillStyle='#8a8878';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.38,cy-s*.1);
+  _dCtx.lineTo(cx-s*.1,cy-s*.26);
+  _dCtx.lineTo(cx+s*.16,cy-s*.22);
+  _dCtx.lineTo(cx+s*.34,cy-s*.04);
+  _dCtx.lineTo(cx+s*.28,cy+s*.18);
+  _dCtx.lineTo(cx-s*.22,cy+s*.24);
+  _dCtx.lineTo(cx-s*.4,cy+s*.06);
+  _dCtx.closePath();_dCtx.fill();
+  // 상단 하이라이트
+  _dCtx.fillStyle='#a0a090';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.28,cy-s*.14);
+  _dCtx.lineTo(cx-s*.06,cy-s*.24);
+  _dCtx.lineTo(cx+s*.14,cy-s*.2);
+  _dCtx.lineTo(cx+s*.1,cy-s*.08);
+  _dCtx.lineTo(cx-s*.18,cy-s*.06);
+  _dCtx.closePath();_dCtx.fill();
+  // 하단 어두운 면 (접지감)
+  _dCtx.fillStyle='#525040';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.28,cy+s*.28);
+  _dCtx.lineTo(cx+s*.06,cy+s*.32);
+  _dCtx.lineTo(cx+s*.36,cy+s*.22);
+  _dCtx.lineTo(cx+s*.28,cy+s*.3);   // 살짝 낮게
+  _dCtx.lineTo(cx+s*.02,cy+s*.4);
+  _dCtx.lineTo(cx-s*.32,cy+s*.36);
+  _dCtx.closePath();_dCtx.fill();
+
+  // ── 왼쪽 작은 돌 ──
+  _dCtx.fillStyle='#5e5e50';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.5,cy+s*.3);_dCtx.lineTo(cx-s*.62,cy+s*.14);_dCtx.lineTo(cx-s*.56,cy-s*.02);
+  _dCtx.lineTo(cx-s*.34,cy-s*.04);_dCtx.lineTo(cx-s*.28,cy+s*.2);_dCtx.lineTo(cx-s*.4,cy+s*.34);
+  _dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='#7e7e70';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.6,cy+s*.12);_dCtx.lineTo(cx-s*.54,cy-s*.0);
+  _dCtx.lineTo(cx-s*.34,cy-s*.02);_dCtx.lineTo(cx-s*.3,cy+s*.16);_dCtx.lineTo(cx-s*.48,cy+s*.26);
+  _dCtx.closePath();_dCtx.fill();
+  // 하단 어둠
+  _dCtx.fillStyle='#464438';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.5,cy+s*.3);_dCtx.lineTo(cx-s*.4,cy+s*.34);_dCtx.lineTo(cx-s*.28,cy+s*.26);
+  _dCtx.lineTo(cx-s*.34,cy+s*.34);_dCtx.lineTo(cx-s*.52,cy+s*.38);
+  _dCtx.closePath();_dCtx.fill();
+
+  // ── 오른쪽 작은 돌 ──
+  _dCtx.fillStyle='#606254';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx+s*.44,cy+s*.28);_dCtx.lineTo(cx+s*.32,cy+s*.04);_dCtx.lineTo(cx+s*.44,cy-s*.08);
+  _dCtx.lineTo(cx+s*.62,cy-s*.02);_dCtx.lineTo(cx+s*.68,cy+s*.18);_dCtx.lineTo(cx+s*.58,cy+s*.32);
+  _dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='#7e8070';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx+s*.34,cy+s*.06);_dCtx.lineTo(cx+s*.44,cy-s*.06);
+  _dCtx.lineTo(cx+s*.6,cy-s*.0);_dCtx.lineTo(cx+s*.64,cy+s*.16);_dCtx.lineTo(cx+s*.5,cy+s*.26);
+  _dCtx.closePath();_dCtx.fill();
+  // 하단 어둠
+  _dCtx.fillStyle='#484a3c';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx+s*.44,cy+s*.28);_dCtx.lineTo(cx+s*.58,cy+s*.32);_dCtx.lineTo(cx+s*.66,cy+s*.24);
+  _dCtx.lineTo(cx+s*.62,cy+s*.34);_dCtx.lineTo(cx+s*.44,cy+s*.36);_dCtx.lineTo(cx+s*.36,cy+s*.3);
+  _dCtx.closePath();_dCtx.fill();
+
+  // ── 표면 무늬 (약하게, 자연석 느낌) ──
+  _dCtx.strokeStyle='rgba(0,0,0,.12)';_dCtx.lineWidth=s*.025;
+  // 균열선 느낌
+  _dCtx.beginPath();_dCtx.moveTo(cx-s*.1,cy-s*.18);_dCtx.lineTo(cx+s*.08,cy+s*.04);_dCtx.stroke();
+  _dCtx.beginPath();_dCtx.moveTo(cx+s*.12,cy-s*.1);_dCtx.lineTo(cx+s*.22,cy+s*.08);_dCtx.stroke();
+  // 이끼 (작고 약하게)
+  _dCtx.fillStyle='rgba(60,100,30,.35)';
+  _dc(cx+s*.2,cy+s*.14,s*.045);_dCtx.fill();
+  _dc(cx-s*.14,cy+s*.16,s*.04);_dCtx.fill();
 }
 
 // ── 집 안 가구 드로우 함수 ──
@@ -9369,6 +9546,451 @@ function _dTrophy(cx,cy,s){
 }
 
 // ══════════════════════════════════════════════════════════
+// ── 2차 신규 장식 드로우 함수 ─────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+// ── 건물 ──────────────────────────────────────────────────
+
+// d_y34: 작은 창고 (2×2)
+function _dSmallShed(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.26)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.78,s*.15,0,0,Math.PI*2);_dCtx.fill();
+  // 기단
+  _dCtx.fillStyle='#8a8070';_drr(cx-s*.72,cy+s*.34,s*1.44,s*.4,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#a09888';_drr(cx-s*.68,cy+s*.3,s*1.36,s*.26,s*.04);_dCtx.fill();
+  // 벽 (회색 판자)
+  _dCtx.fillStyle='#7a7870';_drr(cx-s*.7,cy-s*.38,s*1.4,s*.72,s*.04);_dCtx.fill();
+  _dCtx.fillStyle='#9a9888';_drr(cx-s*.66,cy-s*.42,s*1.32,s*.6,s*.03);_dCtx.fill();
+  // 판자 선
+  _dCtx.strokeStyle='#6a6860';_dCtx.lineWidth=s*.035;
+  [-s*.36,s*.0,s*.36].forEach(dx=>{_dCtx.beginPath();_dCtx.moveTo(cx+dx,cy-s*.42);_dCtx.lineTo(cx+dx,cy+s*.3);_dCtx.stroke();});
+  // 문
+  _dCtx.fillStyle='#5a4a18';_drr(cx-s*.16,cy-s*.12,s*.32,s*.44,s*.04);_dCtx.fill();
+  _dCtx.fillStyle='#7a6828';_drr(cx-s*.14,cy-s*.1,s*.28,s*.36,s*.03);_dCtx.fill();
+  _dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.1);_dCtx.lineTo(cx,cy+s*.26);_dCtx.strokeStyle='#5a4a18';_dCtx.lineWidth=s*.04;_dCtx.stroke();
+  _dCtx.fillStyle='#d4b830';_dc(cx+s*.1,cy+s*.1,s*.04);_dCtx.fill();
+  // 창문
+  _dCtx.fillStyle='rgba(160,210,255,.5)';_drr(cx-s*.5,cy-s*.34,s*.22,s*.2,s*.04);_dCtx.fill();
+  _dCtx.strokeStyle='#6a6860';_dCtx.lineWidth=s*.03;_dCtx.strokeRect(cx-s*.5,cy-s*.34,s*.22,s*.2);
+  // 지붕
+  _dCtx.fillStyle='#4a3818';_dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.82);_dCtx.lineTo(cx-s*.8,cy-s*.38);_dCtx.lineTo(cx+s*.8,cy-s*.38);_dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='#6a5428';_dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.72);_dCtx.lineTo(cx-s*.72,cy-s*.38);_dCtx.lineTo(cx+s*.72,cy-s*.38);_dCtx.closePath();_dCtx.fill();
+  _dCtx.strokeStyle='#3a2808';_dCtx.lineWidth=s*.04;
+  _dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.72);_dCtx.lineTo(cx-s*.72,cy-s*.38);_dCtx.lineTo(cx+s*.72,cy-s*.38);_dCtx.closePath();_dCtx.stroke();
+  // 지붕 처마
+  _dCtx.fillStyle='#3a2808';_drr(cx-s*.82,cy-s*.44,s*1.64,s*.1,s*.03);_dCtx.fill();
+}
+
+// ── 농촌 심화 ──────────────────────────────────────────────
+
+// d_y35: 밀밭 B형 (2×2) — 더 풍성한 이삭
+function _dWheatFieldB(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.74,s*.84,s*.14,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#7a5828';_drr(cx-s*.84,cy+s*.16,s*1.68,s*.6,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#8a6838';_drr(cx-s*.8,cy+s*.12,s*1.6,s*.44,s*.04);_dCtx.fill();
+  _dCtx.strokeStyle='#7a6010';_dCtx.lineWidth=s*.04;
+  [-s*.6,-s*.26,s*.08,s*.44].forEach(dx=>{_dCtx.beginPath();_dCtx.moveTo(cx+dx,cy+s*.56);_dCtx.lineTo(cx+dx+s*.04,cy+s*.12);_dCtx.stroke();});
+  // 풍성한 이삭 (더 둥근 형태)
+  const stemsB=[
+    [-s*.7,s*.08, s*.04],[-s*.48,s*.04,-s*.03],[-s*.26,s*.08, s*.05],[s*.0, s*.04,-s*.04],
+    [s*.22, s*.06, s*.03],[s*.44,s*.02,-s*.04],[s*.66, s*.08, s*.04],
+    [-s*.58,s*.32, s*.04],[-s*.36,s*.28,-s*.03],[-s*.14,s*.3, s*.05],[s*.08, s*.26,-s*.04],
+    [s*.3,  s*.28, s*.03],[s*.52,s*.24,-s*.04],[s*.72, s*.3,  s*.04],
+  ];
+  stemsB.forEach(([dx,dy,lean])=>{
+    _dCtx.strokeStyle='#c09818';_dCtx.lineWidth=s*.055;
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx,cy+dy);_dCtx.lineTo(cx+dx+lean,cy+dy-s*.26);_dCtx.stroke();
+    // 풍성한 이삭 (타원형)
+    _dCtx.fillStyle='#ddb020';_dCtx.beginPath();_dCtx.ellipse(cx+dx+lean,cy+dy-s*.36,s*.07,s*.12,lean*2,0,Math.PI*2);_dCtx.fill();
+    _dCtx.fillStyle='#f0c828';_dCtx.beginPath();_dCtx.ellipse(cx+dx+lean-s*.02,cy+dy-s*.34,s*.04,s*.08,lean*2,0,Math.PI*2);_dCtx.fill();
+  });
+}
+
+// d_y36: 보리밭 (2×2)
+function _dBarleyField(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.74,s*.84,s*.14,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#6a5020';_drr(cx-s*.84,cy+s*.16,s*1.68,s*.6,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#7a6030';_drr(cx-s*.8,cy+s*.12,s*1.6,s*.44,s*.04);_dCtx.fill();
+  _dCtx.strokeStyle='#6a5010';_dCtx.lineWidth=s*.04;
+  [-s*.6,-s*.26,s*.08,s*.44].forEach(dx=>{_dCtx.beginPath();_dCtx.moveTo(cx+dx,cy+s*.56);_dCtx.lineTo(cx+dx,cy+s*.12);_dCtx.stroke();});
+  // 보리 — 길쭉하고 수염 달린 이삭
+  const stemsPad=[
+    [-s*.68,s*.06],[-s*.46,s*.02],[-s*.24,s*.06],[s*.02,s*.02],[s*.24,s*.06],[s*.46,s*.02],[s*.68,s*.06],
+    [-s*.56,s*.3],[-s*.34,s*.26],[-s*.12,s*.3],[s*.12,s*.26],[s*.34,s*.3],[s*.56,s*.26],
+  ];
+  stemsPad.forEach(([dx,dy])=>{
+    const lean=(dx>0?1:-1)*s*.02;
+    _dCtx.strokeStyle='#a88510';_dCtx.lineWidth=s*.05;
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx,cy+dy);_dCtx.lineTo(cx+dx+lean,cy+dy-s*.28);_dCtx.stroke();
+    // 보리 이삭 (길쭉)
+    _dCtx.fillStyle='#c8a018';_drr(cx+dx+lean-s*.03,cy+dy-s*.44,s*.06,s*.18,s*.03);_dCtx.fill();
+    // 수염 (awns)
+    _dCtx.strokeStyle='#b89010';_dCtx.lineWidth=s*.02;
+    [-.03,0,.03].forEach(bx=>{
+      _dCtx.beginPath();_dCtx.moveTo(cx+dx+lean+bx*s,cy+dy-s*.34);_dCtx.lineTo(cx+dx+lean+bx*s+(bx>0?s*.06:-s*.06),cy+dy-s*.54);_dCtx.stroke();
+    });
+  });
+}
+
+// d_y37: 장작더미 B형 (1×1) — 다른 쌓기 패턴
+function _dLogPileB(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.18)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.64,s*.58,s*.1,0,0,Math.PI*2);_dCtx.fill();
+  const lW=s*.46, lH=s*.2;
+  // 아래 단 — 2개 교차
+  [[-s*.2,s*.32,-.1],[s*.16,s*.26,.12]].forEach(([dx,dy,rot])=>{
+    _dCtx.fillStyle='#7a4820';_drr(cx+dx-lW*.5,cy+dy-lH*.5,lW,lH,s*.04);_dCtx.fill();
+    _dCtx.fillStyle='#9a6430';_drr(cx+dx-lW*.5,cy+dy-lH*.5,lW,lH*.4,s*.03);_dCtx.fill();
+    _dCtx.strokeStyle='#5a3010';_dCtx.lineWidth=s*.022;
+    [.3,.6].forEach(t=>{_dCtx.beginPath();_dCtx.moveTo(cx+dx-lW*.5+lW*t,cy+dy-lH*.5);_dCtx.lineTo(cx+dx-lW*.5+lW*t,cy+dy+lH*.5);_dCtx.stroke();});
+    _dCtx.fillStyle='#5a3010';_dCtx.beginPath();_dCtx.ellipse(cx+dx+lW*.46,cy+dy,s*.08,lH*.42,0,0,Math.PI*2);_dCtx.fill();
+    _dCtx.fillStyle='#c07830';_dCtx.beginPath();_dCtx.ellipse(cx+dx+lW*.46,cy+dy,s*.05,lH*.28,0,0,Math.PI*2);_dCtx.fill();
+  });
+  // 중간 단
+  [[cx,cy+s*.06]].forEach(([mx,my])=>{
+    _dCtx.fillStyle='#8a5220';_drr(mx-lW*.58,my-lH*.5,lW*1.16,lH,s*.04);_dCtx.fill();
+    _dCtx.fillStyle='#aa7030';_drr(mx-lW*.58,my-lH*.5,lW*1.16,lH*.4,s*.03);_dCtx.fill();
+    _dCtx.strokeStyle='#5a3010';_dCtx.lineWidth=s*.022;
+    [.25,.55,.8].forEach(t=>{_dCtx.beginPath();_dCtx.moveTo(mx-lW*.58+lW*1.16*t,my-lH*.5);_dCtx.lineTo(mx-lW*.58+lW*1.16*t,my+lH*.5);_dCtx.stroke();});
+    _dCtx.fillStyle='#5a3010';_dCtx.beginPath();_dCtx.ellipse(mx+lW*.54,my,s*.08,lH*.42,0,0,Math.PI*2);_dCtx.fill();
+    _dCtx.fillStyle='#c07830';_dCtx.beginPath();_dCtx.ellipse(mx+lW*.54,my,s*.05,lH*.28,0,0,Math.PI*2);_dCtx.fill();
+  });
+  // 위 단 (1개, 조금 삐딱)
+  const ty=cy-s*.22;
+  _dCtx.fillStyle='#8a5220';_drr(cx-s*.06-lW*.46,ty-lH*.45,lW*.92,lH*.9,s*.04);_dCtx.fill();
+  _dCtx.fillStyle='#b07030';_drr(cx-s*.06-lW*.46,ty-lH*.45,lW*.92,lH*.36,s*.03);_dCtx.fill();
+  _dCtx.strokeStyle='#5a3010';_dCtx.lineWidth=s*.022;
+  [.35,.65].forEach(t=>{_dCtx.beginPath();_dCtx.moveTo(cx-s*.06-lW*.46+lW*.92*t,ty-lH*.45);_dCtx.lineTo(cx-s*.06-lW*.46+lW*.92*t,ty+lH*.45);_dCtx.stroke();});
+  _dCtx.fillStyle='#5a3010';_dCtx.beginPath();_dCtx.ellipse(cx-s*.06+lW*.42,ty,s*.08,lH*.4,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#c07830';_dCtx.beginPath();_dCtx.ellipse(cx-s*.06+lW*.42,ty,s*.05,lH*.27,0,0,Math.PI*2);_dCtx.fill();
+}
+
+// d_y38: 큰 바위 B형 (2×1) — 납작한 형태
+function _dLargeRockB(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.24)';_dCtx.beginPath();_dCtx.ellipse(cx+s*.06,cy+s*.58,s*.8,s*.13,0,0,Math.PI*2);_dCtx.fill();
+  // 큰 납작 바위 (좌)
+  _dCtx.fillStyle='#585648';
+  _dCtx.beginPath();_dCtx.moveTo(cx-s*.78,cy+s*.22);_dCtx.lineTo(cx-s*.72,cy-s*.12);_dCtx.lineTo(cx-s*.36,cy-s*.32);_dCtx.lineTo(cx+s*.1,cy-s*.28);_dCtx.lineTo(cx+s*.2,cy+s*.22);_dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='#7a7868';
+  _dCtx.beginPath();_dCtx.moveTo(cx-s*.74,cy+s*.1);_dCtx.lineTo(cx-s*.7,cy-s*.1);_dCtx.lineTo(cx-s*.34,cy-s*.28);_dCtx.lineTo(cx+s*.08,cy-s*.24);_dCtx.lineTo(cx+s*.18,cy+s*.1);_dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='#9a9888';_dCtx.beginPath();_dCtx.ellipse(cx-s*.36,cy-s*.12,s*.22,s*.1,-.2,0,Math.PI*2);_dCtx.fill();
+  // 작은 바위 (우)
+  _dCtx.fillStyle='#626058';
+  _dCtx.beginPath();_dCtx.moveTo(cx+s*.14,cy+s*.18);_dCtx.lineTo(cx+s*.2,cy-s*.08);_dCtx.lineTo(cx+s*.52,cy-s*.22);_dCtx.lineTo(cx+s*.8,cy-s*.04);_dCtx.lineTo(cx+s*.78,cy+s*.22);_dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='#8a8878';
+  _dCtx.beginPath();_dCtx.moveTo(cx+s*.16,cy+s*.08);_dCtx.lineTo(cx+s*.22,cy-s*.06);_dCtx.lineTo(cx+s*.5,cy-s*.18);_dCtx.lineTo(cx+s*.76,cy-s*.02);_dCtx.closePath();_dCtx.fill();
+  _dCtx.fillStyle='rgba(50,110,20,.4)';_dCtx.beginPath();_dCtx.ellipse(cx+s*.5,cy+s*.08,s*.2,s*.08,.2,0,Math.PI*2);_dCtx.fill();
+  // 균열
+  _dCtx.strokeStyle='rgba(0,0,0,.2)';_dCtx.lineWidth=s*.03;
+  _dCtx.beginPath();_dCtx.moveTo(cx-s*.2,cy-s*.24);_dCtx.lineTo(cx-s*.06,cy+s*.1);_dCtx.stroke();
+}
+
+// ── 정적 동물 ──────────────────────────────────────────────
+
+// d_y39: 닭 3마리 (2×1)
+function _dChickens(cx,cy,s){
+  // 바닥 그림자 (넓게)
+  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.56,s*.78,s*.13,0,0,Math.PI*2);_dCtx.fill();
+  // 흙/잔디 기반 (닭들이 서 있는 땅)
+  _dCtx.fillStyle='#4a7820';_drr(cx-s*.78,cy+s*.32,s*1.56,s*.26,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#5a8a28';_drr(cx-s*.74,cy+s*.28,s*1.48,s*.16,s*.06);_dCtx.fill();
+
+  const drawChicken = (bx,by,sc,bodyCol,wingCol,combCol)=>{
+    // 그림자 (개별)
+    _dCtx.fillStyle='rgba(0,0,0,.15)';_dCtx.beginPath();_dCtx.ellipse(bx,by+sc*.32,sc*.28,sc*.07,0,0,Math.PI*2);_dCtx.fill();
+    // 다리 (먼저 — 몸 아래에서 나오게)
+    _dCtx.strokeStyle='#c89020';_dCtx.lineWidth=sc*.06;_dCtx.lineCap='round';
+    _dCtx.beginPath();_dCtx.moveTo(bx-sc*.08,by+sc*.14);_dCtx.lineTo(bx-sc*.12,by+sc*.32);_dCtx.stroke();
+    _dCtx.beginPath();_dCtx.moveTo(bx+sc*.06,by+sc*.12);_dCtx.lineTo(bx+sc*.1,by+sc*.32);_dCtx.stroke();
+    // 발가락 (앞 2개)
+    _dCtx.lineWidth=sc*.04;
+    _dCtx.beginPath();_dCtx.moveTo(bx-sc*.12,by+sc*.32);_dCtx.lineTo(bx-sc*.2,by+sc*.36);_dCtx.stroke();
+    _dCtx.beginPath();_dCtx.moveTo(bx-sc*.12,by+sc*.32);_dCtx.lineTo(bx-sc*.06,by+sc*.38);_dCtx.stroke();
+    _dCtx.beginPath();_dCtx.moveTo(bx+sc*.1,by+sc*.32);_dCtx.lineTo(bx+sc*.18,by+sc*.36);_dCtx.stroke();
+    _dCtx.beginPath();_dCtx.moveTo(bx+sc*.1,by+sc*.32);_dCtx.lineTo(bx+sc*.06,by+sc*.38);_dCtx.stroke();
+    // 꼬리 깃털
+    _dCtx.fillStyle=wingCol;
+    _dCtx.beginPath();_dCtx.moveTo(bx+sc*.2,by-sc*.04);_dCtx.lineTo(bx+sc*.36,by-sc*.22);_dCtx.lineTo(bx+sc*.3,by-sc*.08);_dCtx.closePath();_dCtx.fill();
+    _dCtx.beginPath();_dCtx.moveTo(bx+sc*.18,by-sc*.02);_dCtx.lineTo(bx+sc*.32,by-sc*.14);_dCtx.lineTo(bx+sc*.26,by+sc*.02);_dCtx.closePath();_dCtx.fill();
+    // 몸통 (타원, 앞으로 기울어진 형태)
+    _dCtx.fillStyle=bodyCol;_dCtx.beginPath();_dCtx.ellipse(bx,by,sc*.26,sc*.2,-.15,0,Math.PI*2);_dCtx.fill();
+    // 날개
+    _dCtx.fillStyle=wingCol;_dCtx.beginPath();_dCtx.ellipse(bx+sc*.04,by+sc*.06,sc*.24,sc*.14,-.2,0,Math.PI*2);_dCtx.fill();
+    _dCtx.fillStyle=bodyCol;_dCtx.beginPath();_dCtx.ellipse(bx,by-sc*.02,sc*.2,sc*.14,-.15,0,Math.PI*2);_dCtx.fill();
+    // 목
+    _dCtx.fillStyle=bodyCol;_drr(bx-sc*.22,by-sc*.24,sc*.16,sc*.18,sc*.08);_dCtx.fill();
+    // 머리
+    _dCtx.fillStyle=bodyCol;_dc(bx-sc*.2,by-sc*.3,sc*.15);_dCtx.fill();
+    _dCtx.fillStyle=wingCol;_dc(bx-sc*.2,by-sc*.28,sc*.12);_dCtx.fill(); // 음영
+    // 볏
+    _dCtx.fillStyle=combCol;
+    _dCtx.beginPath();_dCtx.moveTo(bx-sc*.26,by-sc*.38);_dCtx.lineTo(bx-sc*.2,by-sc*.46);_dCtx.lineTo(bx-sc*.14,by-sc*.38);_dCtx.closePath();_dCtx.fill();
+    _dCtx.beginPath();_dCtx.moveTo(bx-sc*.2,by-sc*.38);_dCtx.lineTo(bx-sc*.14,by-sc*.44);_dCtx.lineTo(bx-sc*.08,by-sc*.38);_dCtx.closePath();_dCtx.fill();
+    // 부리
+    _dCtx.fillStyle='#d89020';_dCtx.beginPath();_dCtx.moveTo(bx-sc*.32,by-sc*.28);_dCtx.lineTo(bx-sc*.38,by-sc*.24);_dCtx.lineTo(bx-sc*.32,by-sc*.22);_dCtx.closePath();_dCtx.fill();
+    // 눈
+    _dCtx.fillStyle='#f0f0f0';_dc(bx-sc*.26,by-sc*.3,sc*.05);_dCtx.fill();
+    _dCtx.fillStyle='#1a1a1a';_dc(bx-sc*.27,by-sc*.3,sc*.03);_dCtx.fill();
+    _dCtx.fillStyle='rgba(255,255,255,.6)';_dc(bx-sc*.28,by-sc*.32,sc*.015);_dCtx.fill();
+  };
+
+  // 닭 3마리 (왼쪽부터, 조금씩 다른 색과 크기)
+  drawChicken(cx-s*.4, cy+s*.1,  s*.78, '#f0efe0','#d8d7c8','#e02010'); // 흰 닭
+  drawChicken(cx+s*.06,cy+s*.12, s*.72, '#e0b820','#c89a10','#e02010'); // 황금 닭
+  drawChicken(cx+s*.46,cy+s*.08, s*.68, '#c05018','#a84010','#d01808'); // 갈색 닭
+}
+
+// d_y40: 양 (2×1)
+function _dSheep(cx,cy,s){
+  // 바닥 그림자
+  _dCtx.fillStyle='rgba(0,0,0,.24)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.58,s*.78,s*.13,0,0,Math.PI*2);_dCtx.fill();
+  // 풀밭 기반
+  _dCtx.fillStyle='#4a7820';_drr(cx-s*.8,cy+s*.34,s*1.6,s*.26,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#5a8a28';_drr(cx-s*.76,cy+s*.3,s*1.52,s*.16,s*.06);_dCtx.fill();
+
+  // ── 다리 4개 (먼저 — 몸 아래에서 나오게) ──
+  _dCtx.fillStyle='#3a3028';
+  // 앞다리 2개
+  _drr(cx-s*.44,cy+s*.14,s*.12,s*.28,s*.04);_dCtx.fill();
+  _drr(cx-s*.28,cy+s*.14,s*.12,s*.24,s*.04);_dCtx.fill();
+  // 뒷다리 2개
+  _drr(cx+s*.2,cy+s*.12,s*.12,s*.28,s*.04);_dCtx.fill();
+  _drr(cx+s*.36,cy+s*.12,s*.12,s*.24,s*.04);_dCtx.fill();
+  // 다리 밝은 면
+  _dCtx.fillStyle='#504840';
+  _drr(cx-s*.42,cy+s*.14,s*.06,s*.26,s*.03);_dCtx.fill();
+  _drr(cx-s*.26,cy+s*.14,s*.06,s*.22,s*.03);_dCtx.fill();
+  _drr(cx+s*.22,cy+s*.12,s*.06,s*.26,s*.03);_dCtx.fill();
+  _drr(cx+s*.38,cy+s*.12,s*.06,s*.22,s*.03);_dCtx.fill();
+  // 발굽
+  _dCtx.fillStyle='#222018';
+  [cx-s*.44,cx-s*.28,cx+s*.2,cx+s*.36].forEach(lx=>{
+    _drr(lx,cy+s*.38,s*.12,s*.06,s*.03);_dCtx.fill();
+  });
+
+  // ── 몸통 (두터운 울 — 겹쳐진 덩어리로 입체감) ──
+  // 기저 (가장 어두운 울)
+  _dCtx.fillStyle='#c0bcb0';_dCtx.beginPath();_dCtx.ellipse(cx+s*.04,cy-s*.02,s*.62,s*.36,0,0,Math.PI*2);_dCtx.fill();
+  // 중간 울 덩어리들 (울퉁불퉁)
+  _dCtx.fillStyle='#d8d4c8';
+  [[-s*.32,-.06,s*.28,s*.22],[s*.08,-.08,s*.3,s*.24],[s*.42,-.04,s*.22,s*.2],[-s*.04,-.16,s*.26,s*.2],[s*.2,-.18,s*.22,s*.18]].forEach(([dx,dy,rx,ry])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,rx,ry,0,0,Math.PI*2);_dCtx.fill();
+  });
+  // 밝은 울 (상단 하이라이트)
+  _dCtx.fillStyle='#eeeac0';// 크림빛 밝은 면
+  _dCtx.fillStyle='#eae6da';
+  [[-s*.26,-.12,s*.22,s*.16],[s*.12,-.16,s*.2,s*.15],[s*.42,-.1,s*.16,s*.14]].forEach(([dx,dy,rx,ry])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,rx,ry,0,0,Math.PI*2);_dCtx.fill();
+  });
+
+  // ── 꼬리 (뒤쪽, 작은 울 덩어리) ──
+  _dCtx.fillStyle='#d8d4c8';_dCtx.beginPath();_dCtx.ellipse(cx+s*.6,cy-s*.04,s*.12,s*.1,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#eae6da';_dCtx.beginPath();_dCtx.ellipse(cx+s*.58,cy-s*.06,s*.09,s*.08,0,0,Math.PI*2);_dCtx.fill();
+
+  // ── 목 ──
+  _dCtx.fillStyle='#3a3028';_drr(cx-s*.52,cy-s*.12,s*.18,s*.22,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#504840';_drr(cx-s*.5,cy-s*.1,s*.1,s*.18,s*.04);_dCtx.fill();
+
+  // ── 머리 (검은/어두운 갈색, 뚜렷한 형태) ──
+  // 머리 기저
+  _dCtx.fillStyle='#2e2820';_dCtx.beginPath();_dCtx.ellipse(cx-s*.66,cy-s*.14,s*.22,s*.17,-.1,0,Math.PI*2);_dCtx.fill();
+  // 주둥이 부분 (약간 돌출)
+  _dCtx.fillStyle='#3a3228';_dCtx.beginPath();_dCtx.ellipse(cx-s*.8,cy-s*.1,s*.12,s*.1,.2,0,Math.PI*2);_dCtx.fill();
+  // 밝은 면
+  _dCtx.fillStyle='#484038';_dCtx.beginPath();_dCtx.ellipse(cx-s*.68,cy-s*.18,s*.14,s*.1,-.2,0,Math.PI*2);_dCtx.fill();
+  // 귀 (옆으로 처진)
+  _dCtx.fillStyle='#3a3028';_dCtx.beginPath();_dCtx.ellipse(cx-s*.58,cy-s*.26,s*.1,s*.06,-.6,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#6a5848';_dCtx.beginPath();_dCtx.ellipse(cx-s*.58,cy-s*.26,s*.07,s*.04,-.6,0,Math.PI*2);_dCtx.fill();
+  // 눈 (흰자 + 동공)
+  _dCtx.fillStyle='#e8e0d0';_dc(cx-s*.74,cy-s*.16,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#1a1410';_dc(cx-s*.75,cy-s*.16,s*.04);_dCtx.fill();
+  _dCtx.fillStyle='rgba(255,255,255,.7)';_dc(cx-s*.77,cy-s*.18,s*.015);_dCtx.fill();
+  // 콧구멍
+  _dCtx.fillStyle='#1a1208';_dc(cx-s*.84,cy-s*.06,s*.025);_dCtx.fill();
+  _dc(cx-s*.8,cy-s*.06,s*.025);_dCtx.fill();
+}
+
+// ── 꽃 다양화 ──────────────────────────────────────────────
+
+// d_y41: 라벤더 화단 (1×1)
+function _dLavender(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.2)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.6,s*.11,0,0,Math.PI*2);_dCtx.fill();
+  // 흙 기반
+  _dCtx.fillStyle='#6a4820';_drr(cx-s*.62,cy+s*.4,s*1.24,s*.36,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#825a30';_drr(cx-s*.58,cy+s*.36,s*1.16,s*.24,s*.06);_dCtx.fill();
+  // 줄기들 (7개)
+  [-.54,-.36,-.18,.0,.18,.36,.54].forEach((dx,i)=>{
+    const bend=(i%2?s*.04:-s*.04);
+    _dCtx.strokeStyle='#5a7820';_dCtx.lineWidth=s*.06;
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx*s,cy+s*.36);_dCtx.quadraticCurveTo(cx+dx*s+bend,cy,cx+dx*s+bend*.5,cy-s*.42);_dCtx.stroke();
+    // 라벤더 꽃 이삭
+    for(let j=0;j<5;j++){
+      const fy=cy-s*.22-j*s*.06;
+      _dCtx.fillStyle=j<2?'#b070e0':'#9058c8';_dc(cx+dx*s+bend*.5,fy,s*.05);_dCtx.fill();
+      _dCtx.fillStyle=j<2?'#c880f0':'#a068d8';_dc(cx+dx*s+bend*.5-s*.03,fy-s*.02,s*.03);_dCtx.fill();
+    }
+  });
+}
+
+// d_y42: 데이지 화단 (1×1)
+function _dDaisy(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.2)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.6,s*.11,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#6a4820';_drr(cx-s*.62,cy+s*.4,s*1.24,s*.36,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#2a6818';_drr(cx-s*.6,cy+s*.08,s*1.2,s*.36,s*.06);_dCtx.fill();
+  // 잎
+  _dCtx.fillStyle='#3a8020';
+  [[-s*.4,s*.2,-.3],[s*.36,s*.16,.3],[-s*.1,s*.28,0],[s*.1,s*.1,.2]].forEach(([dx,dy,rot])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.14,s*.07,rot,0,Math.PI*2);_dCtx.fill();
+  });
+  // 데이지 꽃들 (5개)
+  [[-s*.42,-s*.3],[-s*.2,-s*.42],[s*.06,-s*.36],[s*.3,-s*.28],[s*.5,-s*.44]].forEach(([dx,dy])=>{
+    // 흰 꽃잎 (8개)
+    for(let i=0;i<8;i++){
+      const a=(i/8)*Math.PI*2;
+      _dCtx.fillStyle='#f0f0e8';_dCtx.beginPath();_dCtx.ellipse(cx+dx+Math.cos(a)*s*.13,cy+dy+Math.sin(a)*s*.13,s*.07,s*.04,a,0,Math.PI*2);_dCtx.fill();
+    }
+    _dCtx.fillStyle='#e8c020';_dc(cx+dx,cy+dy,s*.09);_dCtx.fill();
+    _dCtx.fillStyle='#f0d830';_dc(cx+dx,cy+dy,s*.06);_dCtx.fill();
+  });
+}
+
+// d_y43: 장미 B형 (1×1) — 덤불형
+function _dRoseB(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.2)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.62,s*.12,0,0,Math.PI*2);_dCtx.fill();
+  // 잎 바탕
+  _dCtx.fillStyle='#1e5a10';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.12,s*.66,s*.5,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#2a7018';_dCtx.beginPath();_dCtx.ellipse(cx-s*.12,cy+s*.04,s*.6,s*.44,0,0,Math.PI*2);_dCtx.fill();
+  // 잎 디테일
+  _dCtx.fillStyle='#3a8820';
+  [[-s*.36,s*.06,-.3],[s*.32,s*.1,.3],[s*.0,-s*.04,0],[-s*.22,-.2,.4]].forEach(([dx,dy,rot])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.16,s*.08,rot,0,Math.PI*2);_dCtx.fill();
+  });
+  // 장미 꽃봉오리들 (6개, 다양한 크기)
+  [[-s*.32,-s*.3,'#c83a5a',s*.18],[-s*.04,-s*.44,'#d04468',s*.16],[s*.3,-s*.34,'#b03050',s*.14],
+   [-s*.48,-s*.14,'#d84a60',s*.12],[s*.1,-s*.18,'#e05070',s*.11],[s*.48,-s*.18,'#c83848',s*.1]].forEach(([dx,dy,c,r])=>{
+    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,r);_dCtx.fill();
+    _dCtx.fillStyle='rgba(255,200,200,.3)';_dc(cx+dx-r*.3,cy+dy-r*.3,r*.4);_dCtx.fill();
+  });
+}
+
+// d_y44: 튤립 B형 (1×1) — 더 넓게 피어난 형태
+function _dTulipB(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.2)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.62,s*.12,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#5a3c1a';_drr(cx-s*.62,cy+s*.38,s*1.24,s*.38,s*.1);_dCtx.fill();
+  _dCtx.fillStyle='#7a5430';_drr(cx-s*.58,cy+s*.34,s*1.16,s*.26,s*.08);_dCtx.fill();
+  // 줄기 4개
+  const tulipCols=['#e03880','#c82468','#e84898','#c02060'];
+  [[-s*.44],[-s*.14],[s*.16],[s*.44]].forEach((dx,i)=>{
+    _dCtx.strokeStyle='#3a8020';_dCtx.lineWidth=s*.09;
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx,cy+s*.34);_dCtx.lineTo(cx+dx+(i%2?s*.04:-s*.04),cy-s*.44);_dCtx.stroke();
+  });
+  // 잎
+  _dCtx.fillStyle='#2a7818';
+  [[-s*.28,s*.06,.4],[s*.24,s*.02,-.4]].forEach(([dx,dy,rot])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.22,s*.1,rot,0,Math.PI*2);_dCtx.fill();
+  });
+  // 꽃 (더 활짝 핀 형태)
+  [[-s*.44],[-s*.14],[s*.16],[s*.44]].forEach((dx,i)=>{
+    const c=tulipCols[i], offset=(i%2?s*.04:-s*.04);
+    const fx=cx+dx+offset, fy=cy-s*.46;
+    // 바깥 꽃잎
+    [-.3,0,.3].forEach(ang=>{
+      _dCtx.fillStyle=c;_dCtx.beginPath();_dCtx.ellipse(fx+Math.sin(ang)*s*.12,fy-s*.04+Math.cos(ang)*s*.04,s*.1,s*.18,ang,0,Math.PI*2);_dCtx.fill();
+    });
+    _dCtx.fillStyle='rgba(255,255,255,.15)';_dc(fx-s*.04,fy-s*.1,s*.05);_dCtx.fill();
+  });
+}
+
+// ── 식생/나무 ──────────────────────────────────────────────
+
+// d_y45: 키 큰 풀숲 (1×1)
+function _dTallGrass(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.18)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.52,s*.1,0,0,Math.PI*2);_dCtx.fill();
+  // 풀 줄기들 (불규칙하게)
+  const blades=[
+    [-s*.42,s*.2,'#2a7018',s*.08,-s*.08,-s*.8],[-s*.26,s*.16,'#368a20',s*.07,s*.06,-s*.86],
+    [-s*.1,s*.14,'#2a7018',s*.09,-s*.04,-s*.9],[s*.06,s*.16,'#3a9422',s*.08,s*.08,-s*.84],
+    [s*.22,s*.12,'#2a7018',s*.07,-s*.06,-s*.82],[s*.38,s*.18,'#368a20',s*.08,s*.04,-s*.88],
+    [-s*.34,s*.08,'#1e5a10',s*.06,s*.1,-s*.7],[s*.3,s*.06,'#1e5a10',s*.06,-s*.08,-s*.72],
+    [-s*.18,s*.06,'#4aaa28',s*.07,-s*.02,-s*.78],[s*.14,s*.08,'#4aaa28',s*.07,s*.04,-s*.76],
+  ];
+  blades.forEach(([bx,by,c,w,lean,height])=>{
+    _dCtx.strokeStyle=c;_dCtx.lineWidth=w;
+    _dCtx.beginPath();_dCtx.moveTo(cx+bx,cy+by);_dCtx.quadraticCurveTo(cx+bx+lean*.5,cy+height*.5,cx+bx+lean,cy+height*s);_dCtx.stroke();
+  });
+  // 씨앗 이삭 (일부)
+  [[-s*.42,-s*.6],[-s*.1,-s*.66],[s*.22,-s*.62],[s*.38,-s*.56]].forEach(([dx,dy])=>{
+    _dCtx.fillStyle='#c8a820';_dc(cx+dx,cy+dy,s*.04);_dCtx.fill();
+  });
+}
+
+// d_y46: 작은 침엽수 (2×2) — 크리스마스 트리형
+function _dConifer(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.26)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.48,s*.14,0,0,Math.PI*2);_dCtx.fill();
+  // 기둥
+  _dCtx.fillStyle='#5a3810';_drr(cx-s*.1,cy+s*.2,s*.2,s*.56,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#7a5020';_drr(cx-s*.06,cy+s*.22,s*.1,s*.52,s*.04);_dCtx.fill();
+  // 3단 삼각형 (아래서 위로 좁아짐)
+  const tiers=[
+    {y:s*.18, w:s*.78, h:s*.32, c:'#1a5010', c2:'#246a18'},
+    {y:-s*.14, w:s*.6,  h:s*.3,  c:'#1e6012', c2:'#2a781e'},
+    {y:-s*.44, w:s*.44, h:s*.28, c:'#226614', c2:'#307822'},
+    {y:-s*.7,  w:s*.3,  h:s*.26, c:'#267018', c2:'#368026'},
+  ];
+  tiers.forEach(({y,w,h,c,c2})=>{
+    _dCtx.fillStyle=c;
+    _dCtx.beginPath();_dCtx.moveTo(cx,cy+y-h);_dCtx.lineTo(cx-w,cy+y+h*.3);_dCtx.lineTo(cx+w,cy+y+h*.3);_dCtx.closePath();_dCtx.fill();
+    _dCtx.fillStyle=c2;
+    _dCtx.beginPath();_dCtx.moveTo(cx,cy+y-h);_dCtx.lineTo(cx-w*.5,cy+y+h*.3);_dCtx.lineTo(cx+w*.5,cy+y+h*.3);_dCtx.closePath();_dCtx.fill();
+  });
+  // 눈 느낌 하이라이트
+  _dCtx.fillStyle='rgba(255,255,255,.12)';
+  tiers.forEach(({y,w,h})=>{
+    _dCtx.beginPath();_dCtx.moveTo(cx,cy+y-h);_dCtx.lineTo(cx-w*.3,cy+y-h*.2);_dCtx.lineTo(cx,cy+y);_dCtx.closePath();_dCtx.fill();
+  });
+}
+
+// d_y47: 둥근 큰 나무 B형 (2×2) — 넓고 둥근 실루엣
+function _dRoundTreeB(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.25)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.7,s*.66,s*.15,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#5a3810';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.46,s*.18,s*.08,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#7a5020';_drr(cx-s*.16,cy-s*.1,s*.32,s*.6,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#9a7030';_drr(cx-s*.1,cy-s*.08,s*.16,s*.56,s*.06);_dCtx.fill();
+  // 굵은 가지
+  _dCtx.strokeStyle='#6a4020';_dCtx.lineWidth=s*.1;
+  _dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.08);_dCtx.lineTo(cx-s*.46,cy-s*.44);_dCtx.stroke();
+  _dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.12);_dCtx.lineTo(cx+s*.5,cy-s*.5);_dCtx.stroke();
+  // 크라운 (넓고 둥글게 — 올리브/짙은 초록)
+  _dCtx.fillStyle='#2a5e0e';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.2,s*.8,s*.56,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#367818';_dCtx.beginPath();_dCtx.ellipse(cx-s*.08,cy-s*.3,s*.72,s*.5,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#428a20';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.4,s*.62,s*.42,0,0,Math.PI*2);_dCtx.fill();
+  // 우측 하이라이트
+  _dCtx.fillStyle='#4ea028';_dCtx.beginPath();_dCtx.ellipse(cx+s*.28,cy-s*.52,s*.32,s*.22,.3,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='rgba(255,255,255,.08)';_dCtx.beginPath();_dCtx.ellipse(cx+s*.22,cy-s*.58,s*.14,s*.08,-.2,0,Math.PI*2);_dCtx.fill();
+}
+
+// d_y48: 과수나무 (2×2) — 열매 달린 나무
+function _dOrchard(cx,cy,s){
+  _dCtx.fillStyle='rgba(0,0,0,.25)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.7,s*.62,s*.14,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#5a3a10';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.46,s*.16,s*.08,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#7a5020';_drr(cx-s*.14,cy-s*.04,s*.28,s*.54,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#9a7030';_drr(cx-s*.08,cy-s*.02,s*.14,s*.5,s*.06);_dCtx.fill();
+  _dCtx.strokeStyle='#6a4020';_dCtx.lineWidth=s*.09;
+  _dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.02);_dCtx.lineTo(cx-s*.44,cy-s*.4);_dCtx.stroke();
+  _dCtx.beginPath();_dCtx.moveTo(cx,cy-s*.06);_dCtx.lineTo(cx+s*.46,cy-s*.44);_dCtx.stroke();
+  // 크라운 (중간 초록)
+  _dCtx.fillStyle='#286010';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.22,s*.76,s*.54,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#347a18';_dCtx.beginPath();_dCtx.ellipse(cx-s*.06,cy-s*.32,s*.68,s*.48,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#3e8e20';_dCtx.beginPath();_dCtx.ellipse(cx,cy-s*.42,s*.58,s*.4,0,0,Math.PI*2);_dCtx.fill();
+  // 열매들 (빨간 사과)
+  [[-s*.3,-s*.24],[-s*.12,-s*.42],[s*.18,-s*.28],[s*.38,-s*.44],[-s*.5,-s*.1],[s*.46,-s*.14],[-s*.22,-s*.06],[s*.14,-s*.08]].forEach(([dx,dy])=>{
+    _dCtx.fillStyle='#c02020';_dc(cx+dx,cy+dy,s*.08);_dCtx.fill();
+    _dCtx.fillStyle='#e03030';_dc(cx+dx-s*.02,cy+dy-s*.02,s*.05);_dCtx.fill();
+    // 꼭지
+    _dCtx.strokeStyle='#3a5010';_dCtx.lineWidth=s*.025;
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx,cy+dy-s*.08);_dCtx.lineTo(cx+dx,cy+dy-s*.14);_dCtx.stroke();
+  });
+}
+
+// ══════════════════════════════════════════════════════════
 // ── 신규 장식 드로우 함수 ──────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
@@ -9389,21 +10011,28 @@ function _dBush(cx,cy,s){
 
 // d_y16: 큰 화단 (2×2)
 function _dLargePlanter(cx,cy,s){
-  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.82,s*.14,0,0,Math.PI*2);_dCtx.fill();
-  // 화단 테두리 (돌)
-  _dCtx.fillStyle='#8a7860';_drr(cx-s*.82,cy+s*.2,s*1.64,s*.56,s*.1);_dCtx.fill();
-  _dCtx.fillStyle='#a09070';_drr(cx-s*.78,cy+s*.16,s*1.56,s*.44,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.74,s*.84,s*.13,0,0,Math.PI*2);_dCtx.fill();
+  // 화단 테두리 — 낮은 돌 경계 (높이 줄임)
+  _dCtx.fillStyle='#7a7060';_drr(cx-s*.84,cy+s*.44,s*1.68,s*.32,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#9a9080';_drr(cx-s*.8,cy+s*.4,s*1.6,s*.2,s*.06);_dCtx.fill();
   // 흙
-  _dCtx.fillStyle='#6B4A2a';_drr(cx-s*.72,cy-s*.16,s*1.44,s*.36,s*.06);_dCtx.fill();
-  // 꽃들 (여러 종류)
-  [[-s*.5,-s*.34,'#e8314a'],[s*.0,-s*.42,'#ff60a8'],[s*.48,-s*.32,'#FFD700'],[-s*.2,-s*.3,'#FF8C00'],[s*.28,-s*.38,'#e84090']].forEach(([dx,dy,c])=>{
-    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,s*.22);_dCtx.fill();
-    _dCtx.fillStyle='rgba(255,255,255,.3)';_dc(cx+dx-s*.06,cy+dy-s*.06,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#5a3c1e';_drr(cx-s*.76,cy-s*.02,s*1.52,s*.44,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#6a4c2a';_drr(cx-s*.72,cy-s*.04,s*1.44,s*.34,s*.04);_dCtx.fill();
+  // 잎/줄기 바닥 (녹색 배경)
+  _dCtx.fillStyle='#2a6818';_drr(cx-s*.7,cy-s*.24,s*1.4,s*.28,s*.04);_dCtx.fill();
+  // 꽃들 — 작은 꽃 여러 송이, 덜 쨍한 색
+  const flowers=[
+    [-s*.58,-s*.42,'#d45080',s*.11],[-s*.32,-s*.5,'#c06840',s*.1],[-s*.06,-s*.44,'#d06050',s*.12],
+    [s*.2,-s*.48,'#9050a8',s*.1],[s*.46,-s*.42,'#c0a030',s*.11],
+    [-s*.46,-s*.28,'#b84068',s*.09],[-.14,-s*.3,'#a84030',s*.1],[s*.14,-s*.26,'#7848a0',s*.09],[s*.44,-s*.3,'#b89030',s*.09],
+    [-s*.62,-s*.36,'#3a7830',s*.07],[s*.58,-s*.36,'#3a7830',s*.07],// 잎
+  ];
+  flowers.forEach(([dx,dy,c,r])=>{
+    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,r);_dCtx.fill();
   });
-  // 잎
-  _dCtx.fillStyle='#2a7818';
-  [[-s*.38,-s*.12],[s*.12,-s*.1],[s*.54,-s*.08],[-s*.7,-s*.06]].forEach(([dx,dy])=>{
-    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.16,s*.09,.3,0,Math.PI*2);_dCtx.fill();
+  // 꽃 중심점 (밝게)
+  [[-s*.58,-s*.42],[-s*.32,-s*.5],[-s*.06,-s*.44],[s*.2,-s*.48],[s*.46,-s*.42],[-s*.46,-s*.28],[-.14,-s*.3],[s*.14,-s*.26],[s*.44,-s*.3]].forEach(([dx,dy])=>{
+    _dCtx.fillStyle='rgba(255,240,200,.6)';_dc(cx+dx,cy+dy,s*.04);_dCtx.fill();
   });
 }
 
@@ -9438,18 +10067,25 @@ function _dGazebo(cx,cy,s){
 
 // d_y18: 돌 벤치 (2×1)
 function _dStoneBench(cx,cy,s){
-  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.6,s*.78,s*.12,0,0,Math.PI*2);_dCtx.fill();
-  // 다리 2개 (돌)
-  [[-s*.52],[s*.52]].forEach(dx=>{
-    _dCtx.fillStyle='#7a7868';_drr(cx+dx-s*.14,cy+s*.08,s*.28,s*.46,s*.06);_dCtx.fill();
-    _dCtx.fillStyle='#9a9888';_drr(cx+dx-s*.1,cy+s*.06,s*.18,s*.3,s*.04);_dCtx.fill();
-  });
+  // 바닥 그림자
+  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.58,s*.7,s*.1,0,0,Math.PI*2);_dCtx.fill();
+  // ★ 2×1이라 X가 2배 스케일됨 → x좌표를 절반으로 줘야 화면에서 정상 비율
+  // 다리 왼쪽 (스크린상 왼쪽 끝 부근)
+  _dCtx.fillStyle='#6a6858';_drr(cx-s*.46,cy+s*.08,s*.22,s*.46,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#8a8878';_drr(cx-s*.44,cy+s*.06,s*.14,s*.3,s*.04);_dCtx.fill();
+  // 다리 오른쪽
+  _dCtx.fillStyle='#6a6858';_drr(cx+s*.24,cy+s*.08,s*.22,s*.46,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#8a8878';_drr(cx+s*.26,cy+s*.06,s*.14,s*.3,s*.04);_dCtx.fill();
   // 좌석 판 (두꺼운 돌)
-  _dCtx.fillStyle='#8a8878';_drr(cx-s*.72,cy-s*.24,s*1.44,s*.32,s*.06);_dCtx.fill();
-  _dCtx.fillStyle='#aaaa98';_drr(cx-s*.7,cy-s*.32,s*1.4,s*.2,s*.05);_dCtx.fill();
-  _dCtx.strokeStyle='rgba(0,0,0,.15)';_dCtx.lineWidth=s*.04;
-  _dCtx.beginPath();_dCtx.moveTo(cx-s*.1,cy-s*.32);_dCtx.lineTo(cx-s*.1,cy-s*.12);_dCtx.stroke();
-  _dCtx.beginPath();_dCtx.moveTo(cx+s*.28,cy-s*.32);_dCtx.lineTo(cx+s*.28,cy-s*.12);_dCtx.stroke();
+  _dCtx.fillStyle='#7a7868';_drr(cx-s*.52,cy-s*.26,s*1.04,s*.34,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#9a9888';_drr(cx-s*.5,cy-s*.34,s*1.0,s*.22,s*.05);_dCtx.fill();
+  // 판 표면 질감
+  _dCtx.strokeStyle='rgba(0,0,0,.12)';_dCtx.lineWidth=s*.03;
+  [-s*.12,s*.14].forEach(dx=>{
+    _dCtx.beginPath();_dCtx.moveTo(cx+dx,cy-s*.34);_dCtx.lineTo(cx+dx,cy-s*.12);_dCtx.stroke();
+  });
+  // 하단 어두운 면 (두께감)
+  _dCtx.fillStyle='#5a5848';_drr(cx-s*.52,cy+s*.06,s*1.04,s*.08,s*.02);_dCtx.fill();
 }
 
 // d_y19: 큰 나무 B형 (2×2) — 넓은 우산형
@@ -9495,24 +10131,67 @@ function _dOrnamentalFountain(cx,cy,s){
 
 // d_y21: 장미 아치 (1×3, 세로로 긴 구조물)
 function _dRoseArch(cx,cy,s){
-  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.82,s*.52,s*.1,0,0,Math.PI*2);_dCtx.fill();
-  // 기둥 2개 (세로로 꽉)
-  [[-s*.34],[s*.34]].forEach(dx=>{
-    _dCtx.fillStyle='#6a4a10';_drr(cx+dx-s*.07,cy-s*.82,s*.14,s*1.68,s*.04);_dCtx.fill();
-    _dCtx.fillStyle='#8a6a20';_drr(cx+dx-s*.03,cy-s*.8,s*.06,s*1.64,s*.03);_dCtx.fill();
+  // 바닥 그림자 (기둥 2개 위치에 맞게 넓게)
+  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.84,s*.58,s*.12,0,0,Math.PI*2);_dCtx.fill();
+
+  // ── 기둥 2개 (확실히 구분되게, 굵게) ──
+  [[-s*.36],[s*.36]].forEach(dx=>{
+    // 기둥 기저 (넓은 받침)
+    _dCtx.fillStyle='#5a3c0e';_drr(cx+dx-s*.12,cy+s*.62,s*.24,s*.24,s*.04);_dCtx.fill();
+    _dCtx.fillStyle='#7a5420';_drr(cx+dx-s*.1,cy+s*.6,s*.2,s*.18,s*.03);_dCtx.fill();
+    // 기둥 몸체 (두껍게)
+    _dCtx.fillStyle='#6a4a12';_drr(cx+dx-s*.1,cy-s*.82,s*.2,s*1.46,s*.05);_dCtx.fill();
+    _dCtx.fillStyle='#8a6428';_drr(cx+dx-s*.07,cy-s*.8,s*.12,s*1.42,s*.04);_dCtx.fill();
+    _dCtx.fillStyle='#9a7438';_drr(cx+dx-s*.05,cy-s*.76,s*.06,s*1.34,s*.03);_dCtx.fill();
   });
-  // 가로 아치 상단
-  _dCtx.fillStyle='#6a4a10';_drr(cx-s*.4,cy-s*.86,s*.8,s*.12,s*.06);_dCtx.fill();
-  _dCtx.fillStyle='#8a6a20';_drr(cx-s*.36,cy-s*.9,s*.72,s*.08,s*.04);_dCtx.fill();
-  // 덩굴 잎
-  _dCtx.fillStyle='#2a7010';
-  [[-s*.3,-s*.6],[s*.28,-s*.54],[-s*.26,-s*.3],[s*.32,-s*.26],[-s*.3,-s*.02],[s*.26,.04],[-s*.28,s*.28],[s*.3,s*.32]].forEach(([dx,dy])=>{
-    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.14,s*.08,dx>0?.3:-.3,0,Math.PI*2);_dCtx.fill();
+
+  // ── 아치 프레임 상단 (곡선) ──
+  // 가로 직선 부분
+  _dCtx.fillStyle='#6a4a12';_drr(cx-s*.42,cy-s*.86,s*.84,s*.16,s*.06);_dCtx.fill();
+  _dCtx.fillStyle='#8a6428';_drr(cx-s*.38,cy-s*.92,s*.76,s*.1,s*.05);_dCtx.fill();
+  // 곡선 아치 (bezier)
+  _dCtx.strokeStyle='#6a4a12';_dCtx.lineWidth=s*.14;_dCtx.lineCap='round';
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.34,cy-s*.84);
+  _dCtx.quadraticCurveTo(cx,cy-s*1.16,cx+s*.34,cy-s*.84);
+  _dCtx.stroke();
+  _dCtx.strokeStyle='#8a6428';_dCtx.lineWidth=s*.08;
+  _dCtx.beginPath();
+  _dCtx.moveTo(cx-s*.3,cy-s*.84);
+  _dCtx.quadraticCurveTo(cx,cy-s*1.1,cx+s*.3,cy-s*.84);
+  _dCtx.stroke();
+
+  // ── 덩굴/잎 (아치를 타고 오르게) ──
+  _dCtx.fillStyle='#246014';
+  // 왼쪽 기둥 덩굴
+  [[-s*.42,-s*.62],[-s*.44,-s*.38],[-s*.4,-s*.14],[-s*.38,s*.12],[-s*.42,s*.36]].forEach(([dx,dy])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.16,s*.09,(dy<0?.3:-.3),0,Math.PI*2);_dCtx.fill();
   });
-  // 장미꽃
-  [[-s*.28,-s*.7,'#e8314a'],[s*.3,-s*.5,'#c8203a'],[-s*.26,-s*.14,'#ff4488'],[s*.32,s*.18,'#e02a5a']].forEach(([dx,dy,c])=>{
-    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,s*.12);_dCtx.fill();
-    _dCtx.fillStyle='#ff9898';_dc(cx+dx,cy+dy,s*.06);_dCtx.fill();
+  // 오른쪽 기둥 덩굴
+  [[s*.42,-s*.58],[s*.44,-s*.34],[s*.4,-s*.1],[s*.38,s*.14],[s*.42,s*.38]].forEach(([dx,dy])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.16,s*.09,(dy<0?-.3:.3),0,Math.PI*2);_dCtx.fill();
+  });
+  // 아치 상단 덩굴
+  _dCtx.fillStyle='#2e7a1c';
+  [[-s*.2,-s*.96],[s*.0,-s*1.06],[s*.2,-s*.96],[-s*.38,-s*.82],[s*.38,-s*.82]].forEach(([dx,dy])=>{
+    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.14,s*.09,0,0,Math.PI*2);_dCtx.fill();
+  });
+
+  // ── 장미꽃 (기둥 + 아치 상단에 분포) ──
+  // 왼쪽 기둥 꽃
+  [[-s*.46,-s*.5,'#c82a42'],[-s*.4,-.1*s,'#d83650'],[-s*.44,s*.28,'#b82038']].forEach(([dx,dy,c])=>{
+    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,s*.13);_dCtx.fill();
+    _dCtx.fillStyle='rgba(255,180,190,.5)';_dc(cx+dx-s*.04,cy+dy-s*.04,s*.07);_dCtx.fill();
+  });
+  // 오른쪽 기둥 꽃
+  [[s*.44,-s*.44,'#d83250'],[s*.4,-s*.06,'#c82a42'],[s*.44,s*.3,'#b81e36']].forEach(([dx,dy,c])=>{
+    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,s*.13);_dCtx.fill();
+    _dCtx.fillStyle='rgba(255,180,190,.5)';_dc(cx+dx-s*.04,cy+dy-s*.04,s*.07);_dCtx.fill();
+  });
+  // 아치 상단 꽃
+  [[-s*.16,-s*.98,'#e83458'],[s*.16,-s*.96,'#d82a4a'],[s*.0,-s*1.04,'#c82040']].forEach(([dx,dy,c])=>{
+    _dCtx.fillStyle=c;_dc(cx+dx,cy+dy,s*.14);_dCtx.fill();
+    _dCtx.fillStyle='rgba(255,180,190,.5)';_dc(cx+dx-s*.04,cy+dy-s*.04,s*.08);_dCtx.fill();
   });
 }
 
@@ -9534,18 +10213,38 @@ function _dWoodenCrate(cx,cy,s){
   _dCtx.fillStyle='#c8a050';_drr(cx-s*.48,cy-s*.5,s*.96,s*.12,s*.04);_dCtx.fill();
 }
 
-// d_y23: 장작더미 (1×1)
+// d_y23: 장작더미 A형 (1×1)
 function _dLogPile(cx,cy,s){
-  _dCtx.fillStyle='rgba(0,0,0,.22)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.62,s*.68,s*.12,0,0,Math.PI*2);_dCtx.fill();
-  // 통나무 3단 쌓기
-  const cols=[[-s*.46,-s*.24],[-.14,-s*.24],[s*.18,-s*.24],[-s*.3,s*.04],[s*.02,s*.04],[s*.34,s*.04],[-s*.46,s*.32],[-s*.14,s*.32],[s*.18,s*.32]];
-  cols.forEach(([dx,dy])=>{
-    _dCtx.fillStyle='#8B5020';_dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.28,s*.14,0,0,Math.PI*2);_dCtx.fill();
-    _dCtx.fillStyle='#C87840';_dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.2,s*.1,0,0,Math.PI*2);_dCtx.fill();
-    // 나이테
-    _dCtx.strokeStyle='#a06030';_dCtx.lineWidth=s*.03;
-    _dCtx.beginPath();_dCtx.ellipse(cx+dx,cy+dy,s*.1,s*.05,0,0,Math.PI*2);_dCtx.stroke();
+  _dCtx.fillStyle='rgba(0,0,0,.2)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.64,s*.64,s*.11,0,0,Math.PI*2);_dCtx.fill();
+  // 통나무 3단 쌓기 — 옆으로 눕힌 형태, 높낮이 차이
+  // 맨 아래 단 (2개, 나란히)
+  const logH=s*.22, logW=s*.54;
+  [[-s*.24,s*.28],[s*.22,s*.22]].forEach(([dx,dy])=>{
+    _dCtx.fillStyle='#7a4a18';_drr(cx+dx-logW*.5,cy+dy-logH*.5,logW,logH,s*.05);_dCtx.fill();
+    _dCtx.fillStyle='#9a6428';_drr(cx+dx-logW*.5,cy+dy-logH*.5,logW,logH*.5,s*.04);_dCtx.fill();
+    // 나뭇결
+    _dCtx.strokeStyle='#6a3a10';_dCtx.lineWidth=s*.025;
+    [.25,.5,.75].forEach(t=>{_dCtx.beginPath();_dCtx.moveTo(cx+dx-logW*.5+logW*t,cy+dy-logH*.5);_dCtx.lineTo(cx+dx-logW*.5+logW*t,cy+dy+logH*.5);_dCtx.stroke();});
+    // 끝면 (원형 단면)
+    _dCtx.fillStyle='#6a3810';_dCtx.beginPath();_dCtx.ellipse(cx+dx+logW*.48,cy+dy,s*.09,logH*.44,0,0,Math.PI*2);_dCtx.fill();
+    _dCtx.fillStyle='#c88040';_dCtx.beginPath();_dCtx.ellipse(cx+dx+logW*.48,cy+dy,s*.06,logH*.3,0,0,Math.PI*2);_dCtx.fill();
   });
+  // 가운데 단 (1개, 약간 엇갈려)
+  const mx=cx-s*.02, my=cy+s*.02;
+  _dCtx.fillStyle='#8a5420';_drr(mx-logW*.55,my-logH*.5,logW*1.1,logH,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#aa7030';_drr(mx-logW*.55,my-logH*.5,logW*1.1,logH*.45,s*.04);_dCtx.fill();
+  _dCtx.strokeStyle='#6a3a10';_dCtx.lineWidth=s*.025;
+  [.2,.45,.7].forEach(t=>{_dCtx.beginPath();_dCtx.moveTo(mx-logW*.55+logW*1.1*t,my-logH*.5);_dCtx.lineTo(mx-logW*.55+logW*1.1*t,my+logH*.5);_dCtx.stroke();});
+  _dCtx.fillStyle='#6a3810';_dCtx.beginPath();_dCtx.ellipse(mx+logW*.52,my,s*.09,logH*.44,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#c88040';_dCtx.beginPath();_dCtx.ellipse(mx+logW*.52,my,s*.06,logH*.3,0,0,Math.PI*2);_dCtx.fill();
+  // 맨 위 단 (1개)
+  const ty=cy-s*.28;
+  _dCtx.fillStyle='#8a5420';_drr(cx-logW*.48,ty-logH*.45,logW*.96,logH*.9,s*.05);_dCtx.fill();
+  _dCtx.fillStyle='#b07838';_drr(cx-logW*.48,ty-logH*.45,logW*.96,logH*.38,s*.04);_dCtx.fill();
+  _dCtx.strokeStyle='#6a3a10';_dCtx.lineWidth=s*.025;
+  [.3,.6].forEach(t=>{_dCtx.beginPath();_dCtx.moveTo(cx-logW*.48+logW*.96*t,ty-logH*.45);_dCtx.lineTo(cx-logW*.48+logW*.96*t,ty+logH*.45);_dCtx.stroke();});
+  _dCtx.fillStyle='#6a3810';_dCtx.beginPath();_dCtx.ellipse(cx+logW*.45,ty,s*.09,logH*.4,0,0,Math.PI*2);_dCtx.fill();
+  _dCtx.fillStyle='#c88040';_dCtx.beginPath();_dCtx.ellipse(cx+logW*.45,ty,s*.06,logH*.28,0,0,Math.PI*2);_dCtx.fill();
 }
 
 // d_y24: 건초더미 (1×1)
@@ -9931,6 +10630,26 @@ const _DFN = {
   d_y32:_dDuckFamily,        // 오리 가족
   // ── 건물 테마 ──────────────────────────────────────
   d_y33:_dWoodCabin,         // 나무 오두막
+  // ── 2차: 건물 ─────────────────────────────────────────
+  d_y34:_dSmallShed,         // 작은 창고
+  // ── 2차: 농촌 심화 ────────────────────────────────────
+  d_y35:_dWheatFieldB,       // 밀밭 B형
+  d_y36:_dBarleyField,       // 보리밭
+  d_y37:_dLogPileB,          // 장작더미 B형
+  d_y38:_dLargeRockB,        // 큰 바위 B형
+  // ── 2차: 정적 동물 ────────────────────────────────────
+  d_y39:_dChickens,          // 닭 3마리
+  d_y40:_dSheep,             // 양
+  // ── 2차: 꽃 다양화 ────────────────────────────────────
+  d_y41:_dLavender,          // 라벤더
+  d_y42:_dDaisy,             // 데이지
+  d_y43:_dRoseB,             // 장미 B형
+  d_y44:_dTulipB,            // 튤립 B형
+  // ── 2차: 식생/나무 ────────────────────────────────────
+  d_y45:_dTallGrass,         // 키 큰 풀숲
+  d_y46:_dConifer,           // 작은 침엽수
+  d_y47:_dRoundTreeB,        // 둥근 나무 B형
+  d_y48:_dOrchard,           // 과수나무
 };
 
 // ── 메인 렌더 ──
