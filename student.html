@@ -7647,6 +7647,8 @@ function renderFarmModal() {
 function houseTab(tab, el) {
   document.querySelectorAll('#m-house .mtab').forEach(t => t.classList.remove('on'));
   el.classList.add('on');
+  // 탭 전환 시 모달 스크롤 맨 위로
+  document.querySelector('#m-house .modal')?.scrollTo({ top: 0, behavior: 'instant' });
   document.getElementById('house-tab-stats').style.display   = tab==='stats'   ? '' : 'none';
   document.getElementById('house-tab-weekly').style.display  = tab==='weekly'  ? '' : 'none';
   document.getElementById('house-tab-book').style.display    = tab==='book'    ? '' : 'none';
@@ -10983,17 +10985,20 @@ function renderVocabTab() {
   })();
 
   el.innerHTML = `
-  <!-- ① 퀴즈 풀기 버튼 (항상 상단 고정) -->
-  ${ws ? `<button onclick="startVocabQuiz()"
-    style="width:100%;background:linear-gradient(135deg,var(--gold),#e67e22);border:none;
-      color:#1a1a1a;font-weight:800;font-size:.88rem;padding:.65rem;
-      border-radius:14px;cursor:pointer;font-family:inherit;
-      box-shadow:0 3px 12px rgba(255,215,0,.25);margin-bottom:.8rem;
-      display:flex;align-items:center;justify-content:center;gap:.5rem">
-    📝 퀴즈 풀기 (${setWords.length}개 단어)
-  </button>` : `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-    border-radius:12px;padding:.7rem;text-align:center;color:var(--txt3);font-size:.78rem;margin-bottom:.8rem">
-    선생님이 단어 세트를 지정하면 퀴즈를 풀 수 있어요</div>`}
+  <!-- ① 퀴즈 풀기 버튼 (sticky — 스크롤해도 항상 보임) -->
+  <div style="position:sticky;top:0;z-index:10;padding-bottom:.5rem;
+    background:linear-gradient(145deg,#16213E,#0F3460)">
+    ${ws ? `<button onclick="startVocabQuiz()"
+      style="width:100%;background:linear-gradient(135deg,var(--gold),#e67e22);border:none;
+        color:#1a1a1a;font-weight:800;font-size:.88rem;padding:.65rem;
+        border-radius:14px;cursor:pointer;font-family:inherit;
+        box-shadow:0 3px 12px rgba(255,215,0,.25);
+        display:flex;align-items:center;justify-content:center;gap:.5rem">
+      📝 퀴즈 풀기 (${setWords.length}개 단어)
+    </button>` : `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;padding:.7rem;text-align:center;color:var(--txt3);font-size:.78rem">
+      선생님이 단어 세트를 지정하면 퀴즈를 풀 수 있어요</div>`}
+  </div>
 
   <!-- ② 상태 카드 -->
   <div style="background:linear-gradient(135deg,rgba(93,173,226,.15),rgba(142,68,173,.12));
