@@ -11031,7 +11031,13 @@ function renderVocabTab() {
       : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
           ${setWords.map(w => `
             <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-              border-radius:10px;padding:.4rem .6rem;display:flex;align-items:center;gap:.4rem">
+              border-radius:10px;padding:.4rem .6rem;display:flex;align-items:center;gap:.4rem;
+              cursor:pointer;transition:.15s"
+              onclick="speakWord('${w.word.replace(/'/g,"\\'")}')"
+              onmouseenter="this.style.background='rgba(255,255,255,.08)'"
+              onmouseleave="this.style.background='rgba(255,255,255,.04)'"
+              title="탭하면 발음 들려줘요">
+              <span style="font-size:.75rem;flex-shrink:0">🔊</span>
               <span style="font-weight:700;font-size:.85rem;color:var(--sky);min-width:0;
                 overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.word}</span>
               <span style="color:var(--txt3);font-size:.72rem;flex-shrink:0">${w.meaning.split(',')[0]}</span>
@@ -11083,7 +11089,41 @@ function renderVocabTab() {
   </div>` : ''}`;
 }
 
-// ── 퀴즈 자동 팝업 체크 ──────────────────────────────
+// ── 영어 발음 (Web Speech API) ──────────────────────────
+function speakWord(word) {
+  if (!word) return;
+  if (!window.speechSynthesis) { toast('이 기기는 발음 기능을 지원하지 않아요'); return; }
+  // 이전 발음 중단
+  window.speechSynthesis.cancel();
+
+  const utter = new SpeechSynthesisUtterance(word);
+  utter.lang = 'en-US';
+  utter.rate = 0.85;   // 약간 느리게 — 학생이 듣기 좋게
+  utter.pitch = 1.0;
+
+  // 가장 자연스러운 영어 음성 선택
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = [
+    'Samantha','Alex','Daniel','Karen','Moira', // 좋은 영어 음성들
+    'Google US English','Microsoft Zira','Microsoft David'
+  ];
+  const enVoices = voices.filter(v => v.lang.startsWith('en'));
+  let best = null;
+  for (const name of preferred) {
+    best = enVoices.find(v => v.name.includes(name));
+    if (best) break;
+  }
+  if (!best && enVoices.length > 0) best = enVoices[0];
+  if (best) utter.voice = best;
+
+  window.speechSynthesis.speak(utter);
+}
+
+// 음성 목록 미리 로드 (일부 브라우저 필요)
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 function checkVocabQuizTrigger() {
   if (!CUR) return;
   const ws = DB.getActiveWordSet();
@@ -11199,7 +11239,9 @@ function renderVocabQuestion() {
       <div style="padding:.8rem 1rem">
         <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">영어 단어의 뜻은?</div>
         <div style="font-size:1.6rem;font-weight:800;color:var(--gold);text-align:center;
-          margin:.8rem 0 1rem;letter-spacing:.05em">${word.word}</div>
+          margin:.8rem 0 1rem;letter-spacing:.05em;cursor:pointer"
+          onclick="speakWord('${word.word}')" title="탭하면 발음">
+          ${word.word} <span style="font-size:.9rem">🔊</span></div>
         <div style="display:flex;flex-direction:column;gap:.4rem">
           ${choices.map((c,i)=>`
             <button onclick="submitVocabAnswer('${c.meaning.replace(/'/g,"\\'")}')"
@@ -11212,6 +11254,8 @@ function renderVocabQuestion() {
             </button>`).join('')}
         </div>
       </div>`;
+    // 단어 자동 발음
+    setTimeout(() => speakWord(word.word), 300);
 
   } else if (type === 'mc_word') {
     // 한글 뜻 → 영어 객관식
@@ -11240,7 +11284,9 @@ function renderVocabQuestion() {
       <div style="padding:.8rem 1rem">
         <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">영어 단어의 한글 뜻을 쓰세요</div>
         <div style="font-size:1.6rem;font-weight:800;color:var(--gold);text-align:center;
-          margin:.8rem 0 1rem">${word.word}</div>
+          margin:.8rem 0 1rem;cursor:pointer"
+          onclick="speakWord('${word.word}')" title="탭하면 발음">
+          ${word.word} <span style="font-size:.9rem">🔊</span></div>
         <input id="vq-input" type="text" placeholder="한글 뜻 입력..."
           style="width:100%;box-sizing:border-box;padding:.5rem .8rem;border-radius:10px;font-size:.9rem;
             border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);
@@ -11346,7 +11392,8 @@ function showVocabFeedback(isCorrect, word, userAnswer) {
       <div style="font-size:2rem;margin-bottom:.3rem">${isCorrect ? '✅' : '❌'}</div>
       <div style="font-size:.95rem;font-weight:700;color:${isCorrect?'var(--emerald)':'var(--red)'};margin-bottom:.5rem">
         ${isCorrect ? '맞았어요!' : '틀렸어요'}</div>
-      <div style="font-size:1.1rem;font-weight:800;color:var(--gold);margin-bottom:.2rem">${word.word}</div>
+      <div style="font-size:1.1rem;font-weight:800;color:var(--gold);margin-bottom:.2rem;
+        cursor:pointer" onclick="speakWord('${word.word}')">${word.word} 🔊</div>
       <div style="font-size:.88rem;color:var(--txt2);margin-bottom:.15rem">${word.meaning}</div>
       ${!isCorrect && userAnswer ? `<div style="font-size:.75rem;color:var(--txt3)">내 답: ${userAnswer}</div>` : ''}
       <button class="btn-gold" onclick="nextVocabQuestion()"
@@ -11419,6 +11466,8 @@ function finishVocabQuiz() {
           <span style="font-size:.6rem;background:rgba(255,255,255,.07);color:var(--txt3);
             padding:.05rem .3rem;border-radius:4px">${typeLabel[type]||type}</span>
           ${answerLine}
+          <span onclick="event.stopPropagation();speakWord('${w.word.replace(/'/g,"\\'")}')"
+            style="cursor:pointer;font-size:.72rem" title="발음 듣기">🔊</span>
         </div>`;
       }).join('')}
     </div>` : '';
