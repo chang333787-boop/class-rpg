@@ -9904,20 +9904,31 @@ function _dTulipB(cx,cy,s){
 // d_y45: 키 큰 풀숲 (1×1)
 function _dTallGrass(cx,cy,s){
   _dCtx.fillStyle='rgba(0,0,0,.18)';_dCtx.beginPath();_dCtx.ellipse(cx,cy+s*.72,s*.52,s*.1,0,0,Math.PI*2);_dCtx.fill();
-  // 풀 줄기들 (불규칙하게)
+  // 풀밭 기반
+  _dCtx.fillStyle='#3a6818';_drr(cx-s*.56,cy+s*.44,s*1.12,s*.32,s*.08);_dCtx.fill();
+  _dCtx.fillStyle='#4a7c20';_drr(cx-s*.52,cy+s*.4,s*1.04,s*.2,s*.06);_dCtx.fill();
+  // 풀 줄기들 — height는 cy 기준 절대좌표 (s 이미 포함)
   const blades=[
-    [-s*.42,s*.2,'#2a7018',s*.08,-s*.08,-s*.8],[-s*.26,s*.16,'#368a20',s*.07,s*.06,-s*.86],
-    [-s*.1,s*.14,'#2a7018',s*.09,-s*.04,-s*.9],[s*.06,s*.16,'#3a9422',s*.08,s*.08,-s*.84],
-    [s*.22,s*.12,'#2a7018',s*.07,-s*.06,-s*.82],[s*.38,s*.18,'#368a20',s*.08,s*.04,-s*.88],
-    [-s*.34,s*.08,'#1e5a10',s*.06,s*.1,-s*.7],[s*.3,s*.06,'#1e5a10',s*.06,-s*.08,-s*.72],
-    [-s*.18,s*.06,'#4aaa28',s*.07,-s*.02,-s*.78],[s*.14,s*.08,'#4aaa28',s*.07,s*.04,-s*.76],
+    [-s*.42,s*.36,'#2a7018',s*.08, s*.04,cy-s*.44],
+    [-s*.26,s*.32,'#368a20',s*.07,-s*.06,cy-s*.52],
+    [-s*.1, s*.3, '#2a7018',s*.09, s*.04,cy-s*.56],
+    [ s*.06,s*.32,'#3a9422',s*.08,-s*.06,cy-s*.48],
+    [ s*.22,s*.28,'#2a7018',s*.07, s*.06,cy-s*.5 ],
+    [ s*.38,s*.34,'#368a20',s*.08,-s*.04,cy-s*.44],
+    [-s*.34,s*.24,'#1e5a10',s*.06, s*.08,cy-s*.38],
+    [ s*.3, s*.22,'#1e5a10',s*.06,-s*.06,cy-s*.36],
+    [-s*.18,s*.22,'#4aaa28',s*.07, s*.02,cy-s*.46],
+    [ s*.14,s*.24,'#4aaa28',s*.07,-s*.04,cy-s*.42],
   ];
-  blades.forEach(([bx,by,c,w,lean,height])=>{
-    _dCtx.strokeStyle=c;_dCtx.lineWidth=w;
-    _dCtx.beginPath();_dCtx.moveTo(cx+bx,cy+by);_dCtx.quadraticCurveTo(cx+bx+lean*.5,cy+height*.5,cx+bx+lean,cy+height*s);_dCtx.stroke();
+  blades.forEach(([bx,by,c,w,lean,tipY])=>{
+    _dCtx.strokeStyle=c;_dCtx.lineWidth=w;_dCtx.lineCap='round';
+    _dCtx.beginPath();
+    _dCtx.moveTo(cx+bx, cy+by);
+    _dCtx.quadraticCurveTo(cx+bx+lean*.4, (cy+by+tipY)*.5, cx+bx+lean, tipY);
+    _dCtx.stroke();
   });
-  // 씨앗 이삭 (일부)
-  [[-s*.42,-s*.6],[-s*.1,-s*.66],[s*.22,-s*.62],[s*.38,-s*.56]].forEach(([dx,dy])=>{
+  // 씨앗 이삭
+  [[-s*.42,-s*.46],[-s*.1,-s*.58],[s*.22,-s*.52],[s*.38,-s*.46]].forEach(([dx,dy])=>{
     _dCtx.fillStyle='#c8a820';_dc(cx+dx,cy+dy,s*.04);_dCtx.fill();
   });
 }
@@ -10732,36 +10743,143 @@ function _drawYard() {
   }
   // 나무 타일은 가로줄 추가 (무늬) — texture 함수로 통합했으므로 기존 loop 삭제
 
-  // 집 건물 (우상단)
-  _dCtx.fillStyle='#A07040'; _dCtx.fillRect(hx,0,hw,hh);
-  for(let r=0;r<DH.rows;r++){_dCtx.fillStyle=r%2?'rgba(255,255,255,.03)':'rgba(0,0,0,.06)';_dCtx.fillRect(hx,r*C,hw,C);}
-  _dCtx.fillStyle='#5a3510'; _dCtx.fillRect(hx,0,hw,C*.42); // 지붕 띠
-  _dCtx.strokeStyle='#4a2e0a'; _dCtx.lineWidth=2.5;
-  _dCtx.beginPath(); _dCtx.moveTo(hx,0); _dCtx.lineTo(hx,hh); _dCtx.stroke();
-  _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(W,hh); _dCtx.stroke();
+  // ══════════════════════════════════════════════════════
+  // 집 건물 (우상단, DH: 6칸×3칸)
+  // ══════════════════════════════════════════════════════
+  {
+    const lx=hx, ly=0, lw=hw, lh=hh; // left-x, top-y, width, height
 
-  // 창문
-  [[hx+C*.28, C*.52],[hx+C*2.2, C*.52]].forEach(([wx,wy])=>{
-    _dCtx.fillStyle='#87CEEB'; _dCtx.globalAlpha=.72;
-    _drr(wx,wy,C*.82,C*.58,3); _dCtx.fill(); _dCtx.globalAlpha=1;
-    _dCtx.strokeStyle='#5a3510'; _dCtx.lineWidth=1.2; _dCtx.strokeRect(wx,wy,C*.82,C*.58);
-    _dCtx.beginPath(); _dCtx.moveTo(wx+C*.41,wy); _dCtx.lineTo(wx+C*.41,wy+C*.58); _dCtx.stroke();
-    _dCtx.beginPath(); _dCtx.moveTo(wx,wy+C*.29); _dCtx.lineTo(wx+C*.82,wy+C*.29); _dCtx.stroke();
-  });
+    // ── 지붕 (삼각 + 처마) ────────────────────────────────
+    // 처마 그림자
+    _dCtx.fillStyle='rgba(0,0,0,.22)';
+    _dCtx.fillRect(lx, lh - C*2.05, lw, C*.12);
+    // 지붕 본체 (짙은 회청 기와 느낌)
+    _dCtx.fillStyle='#3a4a58';
+    _dCtx.beginPath();
+    _dCtx.moveTo(lx-C*.1, lh-C*2.0);
+    _dCtx.lineTo(lx+lw/2, ly+C*.05);
+    _dCtx.lineTo(lx+lw+C*.1, lh-C*2.0);
+    _dCtx.closePath(); _dCtx.fill();
+    // 지붕 밝은 면
+    _dCtx.fillStyle='#4a5e70';
+    _dCtx.beginPath();
+    _dCtx.moveTo(lx+lw*.1, lh-C*2.0);
+    _dCtx.lineTo(lx+lw/2, ly+C*.1);
+    _dCtx.lineTo(lx+lw*.9, lh-C*2.0);
+    _dCtx.closePath(); _dCtx.fill();
+    // 지붕 능선
+    _dCtx.strokeStyle='#2a3848'; _dCtx.lineWidth=C*.08;
+    _dCtx.beginPath(); _dCtx.moveTo(lx+lw*.2,lh-C*2.0); _dCtx.lineTo(lx+lw/2,ly+C*.1); _dCtx.stroke();
+    _dCtx.beginPath(); _dCtx.moveTo(lx+lw*.8,lh-C*2.0); _dCtx.lineTo(lx+lw/2,ly+C*.1); _dCtx.stroke();
+    _dCtx.beginPath(); _dCtx.moveTo(lx+lw*.5,lh-C*2.0); _dCtx.lineTo(lx+lw/2,ly+C*.1); _dCtx.stroke();
+    // 처마 (지붕 하단 돌출)
+    _dCtx.fillStyle='#2e3c4a';
+    _dCtx.fillRect(lx-C*.05, lh-C*2.08, lw+C*.1, C*.14);
+    _dCtx.fillStyle='#4a5e70';
+    _dCtx.fillRect(lx-C*.05, lh-C*2.08, lw+C*.1, C*.06);
+    // 굴뚝
+    _dCtx.fillStyle='#5a4830';
+    _dCtx.fillRect(lx+lw*.7, ly+C*.18, C*.4, C*.6);
+    _dCtx.fillStyle='#7a6848';
+    _dCtx.fillRect(lx+lw*.7, ly+C*.18, C*.4, C*.12);
+    _dCtx.fillStyle='#3a2818';
+    _dCtx.fillRect(lx+lw*.68, ly+C*.12, C*.44, C*.1);
+    // 굴뚝 연기 (약하게)
+    _dCtx.fillStyle='rgba(200,200,200,.18)';
+    _dc(lx+lw*.9, ly+C*.05, C*.12); _dCtx.fill();
+    _dc(lx+lw*.88, ly-C*.04, C*.09); _dCtx.fill();
+    _dCtx.fillStyle='rgba(200,200,200,.12)';
+    _dc(lx+lw*.92, ly-C*.12, C*.07); _dCtx.fill();
 
-  // 집 이름
-  _dCtx.fillStyle='rgba(255,255,255,.55)'; _dCtx.font=`500 ${Math.max(C*.2,9)}px sans-serif`; _dCtx.textAlign='center';
-  _dCtx.fillText('🏠 내 집', hx+hw/2, C*.3);
+    // ── 벽면 ─────────────────────────────────────────────
+    // 기본 벽 (따뜻한 베이지/크림)
+    _dCtx.fillStyle='#c8a878';
+    _dCtx.fillRect(lx, lh-C*2.0, lw, C*2.0);
+    // 벽 밝은 톤
+    _dCtx.fillStyle='#d4b888';
+    _dCtx.fillRect(lx+C*.06, lh-C*1.94, lw-C*.12, C*.9);
+    // 허리 띠 (처마 아래 줄 → 분할감)
+    _dCtx.fillStyle='#a88050';
+    _dCtx.fillRect(lx, lh-C*1.06, lw, C*.06);
+    // 하단 기단 (어두운)
+    _dCtx.fillStyle='#8a6840';
+    _dCtx.fillRect(lx, lh-C*.28, lw, C*.28);
+    _dCtx.fillStyle='#a08058';
+    _dCtx.fillRect(lx, lh-C*.28, lw, C*.1);
+    // 세로 판자선 (벽 분할)
+    _dCtx.strokeStyle='rgba(0,0,0,.08)'; _dCtx.lineWidth=C*.04;
+    [lw/3, lw*2/3].forEach(ox=>{
+      _dCtx.beginPath(); _dCtx.moveTo(lx+ox, lh-C*1.94); _dCtx.lineTo(lx+ox, lh-C*.28); _dCtx.stroke();
+    });
 
-  // 문 (클릭 → 집 안)
-  const dx=hx+hw/2-C*.35, dy=hh-C*1.02;
-  _dCtx.fillStyle='#5a3010'; _drr(dx,dy,C*.7,C*1.02,4); _dCtx.fill();
-  _dCtx.strokeStyle='#3a1e08'; _dCtx.lineWidth=1.5; _dCtx.strokeRect(dx,dy,C*.7,C*1.02);
-  _dCtx.fillStyle='#7a4820'; _drr(dx+C*.06,dy+C*.06,C*.58,C*.41,3); _dCtx.fill();
-  _dCtx.fillStyle='#7a4820'; _drr(dx+C*.06,dy+C*.53,C*.58,C*.41,3); _dCtx.fill();
-  _dCtx.fillStyle='#FFD700'; _dc(dx+C*.58,dy+C*.49,C*.07); _dCtx.fill();
-  _dCtx.fillStyle='rgba(255,255,255,.72)'; _dCtx.font=`${Math.max(C*.18,8)}px sans-serif`; _dCtx.textAlign='center';
-  _dCtx.fillText('들어가기', dx+C*.35, dy-C*.1);
+    // ── 창문 2개 ─────────────────────────────────────────
+    [[lx+C*.3, lh-C*1.82],[lx+lw-C*1.3, lh-C*1.82]].forEach(([wx,wy])=>{
+      const ww=C*.88, wh=C*.68;
+      // 창틀 외부
+      _dCtx.fillStyle='#7a5828'; _drr(wx-C*.05,wy-C*.05,ww+C*.1,wh+C*.1,4); _dCtx.fill();
+      // 유리
+      _dCtx.fillStyle='#a8d4e8'; _dCtx.globalAlpha=.8;
+      _drr(wx,wy,ww,wh,3); _dCtx.fill(); _dCtx.globalAlpha=1;
+      // 창틀 십자
+      _dCtx.strokeStyle='#7a5828'; _dCtx.lineWidth=C*.06;
+      _dCtx.beginPath(); _dCtx.moveTo(wx+ww/2,wy); _dCtx.lineTo(wx+ww/2,wy+wh); _dCtx.stroke();
+      _dCtx.beginPath(); _dCtx.moveTo(wx,wy+wh/2); _dCtx.lineTo(wx+ww,wy+wh/2); _dCtx.stroke();
+      // 창문 반사 (하이라이트)
+      _dCtx.fillStyle='rgba(255,255,255,.28)';
+      _drr(wx+C*.04,wy+C*.04,ww*.4,wh*.35,2); _dCtx.fill();
+      // 창틀 상단 장식
+      _dCtx.fillStyle='#8a6838'; _drr(wx-C*.05,wy-C*.12,ww+C*.1,C*.1,2); _dCtx.fill();
+      // 창 밖 화분 (왼쪽 창에만)
+      if(wx < lx+lw/2){
+        _dCtx.fillStyle='#a05020'; _drr(wx+ww*.1,wy+wh+C*.02,ww*.35,C*.1,2); _dCtx.fill();
+        _dCtx.fillStyle='#2a7810'; _dc(wx+ww*.27,wy+wh+C*.0,C*.08); _dCtx.fill();
+      }
+    });
+
+    // ── 문 (중앙, 크고 명확하게) ─────────────────────────
+    const doorW=C*.88, doorH=C*1.05;
+    const doorX=lx+lw/2-doorW/2, doorY=lh-C*.28-doorH;
+    // 현관 계단
+    _dCtx.fillStyle='#9a8868'; _drr(doorX-C*.14,lh-C*.1,doorW+C*.28,C*.1,2); _dCtx.fill();
+    _dCtx.fillStyle='#b0a07a'; _drr(doorX-C*.08,lh-C*.2,doorW+C*.16,C*.12,2); _dCtx.fill();
+    _dCtx.fillStyle='#c4b48e'; _drr(doorX-C*.02,lh-C*.3,doorW+C*.04,C*.12,2); _dCtx.fill();
+    // 현관등
+    _dCtx.fillStyle='#c8a030'; _drr(doorX+doorW+C*.06,doorY+C*.08,C*.14,C*.22,2); _dCtx.fill();
+    _dCtx.fillStyle='rgba(255,220,100,.7)'; _dc(doorX+doorW+C*.13,doorY+C*.16,C*.07); _dCtx.fill();
+    _dCtx.fillStyle='rgba(255,220,100,.3)'; _dc(doorX+doorW+C*.13,doorY+C*.16,C*.14); _dCtx.fill();
+    // 문 틀
+    _dCtx.fillStyle='#5a3a10'; _drr(doorX-C*.08,doorY-C*.06,doorW+C*.16,doorH+C*.06,5); _dCtx.fill();
+    // 문 본체
+    _dCtx.fillStyle='#6b4820'; _drr(doorX,doorY,doorW,doorH,4); _dCtx.fill();
+    _dCtx.fillStyle='#7e5828'; _drr(doorX,doorY,doorW,doorH*.45,4); _dCtx.fill();
+    // 문 패널 장식
+    _dCtx.fillStyle='#5a3810';
+    _drr(doorX+C*.08,doorY+C*.06,doorW-C*.16,doorH*.36,3); _dCtx.fill();
+    _drr(doorX+C*.08,doorY+doorH*.46,doorW-C*.16,doorH*.46,3); _dCtx.fill();
+    _dCtx.fillStyle='rgba(255,200,100,.08)';
+    _drr(doorX+C*.1,doorY+C*.08,doorW-C*.2,doorH*.3,2); _dCtx.fill();
+    // 문 손잡이
+    _dCtx.fillStyle='#d4a820'; _dc(doorX+doorW*.72,doorY+doorH*.52,C*.07); _dCtx.fill();
+    _dCtx.fillStyle='#f0c030'; _dc(doorX+doorW*.72,doorY+doorH*.52,C*.045); _dCtx.fill();
+    // 우체통 (문 왼쪽)
+    _dCtx.fillStyle='#b82020'; _drr(doorX-C*.44,lh-C*.54,C*.24,C*.26,2); _dCtx.fill();
+    _dCtx.fillStyle='#d83030'; _drr(doorX-C*.44,lh-C*.54,C*.24,C*.1,2); _dCtx.fill();
+    _dCtx.fillStyle='#902010'; _drr(doorX-C*.46,lh-C*.56,C*.28,C*.06,2); _dCtx.fill();
+    // 우체통 기둥
+    _dCtx.fillStyle='#606060'; _drr(doorX-C*.34,lh-C*.28,C*.06,C*.28,2); _dCtx.fill();
+    // 들어가기 텍스트
+    _dCtx.fillStyle='rgba(255,255,255,.65)'; _dCtx.font=`500 ${Math.max(C*.17,8)}px sans-serif`; _dCtx.textAlign='center';
+    _dCtx.fillText('들어가기', doorX+doorW/2, doorY-C*.14);
+
+    // ── 집 이름 (지붕 위) ────────────────────────────────
+    _dCtx.fillStyle='rgba(255,255,255,.7)'; _dCtx.font=`700 ${Math.max(C*.22,10)}px sans-serif`; _dCtx.textAlign='center';
+    _dCtx.fillText(CUR.name ? `🏠 ${CUR.name}의 집` : '🏠 내 집', lx+lw/2, lh-C*2.24);
+
+    // ── 경계선 ────────────────────────────────────────────
+    _dCtx.strokeStyle='#3a2808'; _dCtx.lineWidth=2.5;
+    _dCtx.beginPath(); _dCtx.moveTo(hx,0); _dCtx.lineTo(hx,hh); _dCtx.stroke();
+    _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(W,hh); _dCtx.stroke();
+  }
 
   // 격자 (집 영역 제외)
   _dCtx.strokeStyle='rgba(255,255,255,.12)'; _dCtx.lineWidth=.5;
@@ -10838,7 +10956,13 @@ function _drawYard() {
     _dCtx.drawImage(oc, px+pad, py+pad, bw-pad*2, bh-pad*2);
   });
 
-  _dCv._doorX=dx; _dCv._doorY=dy; _dCv._doorW=C*.7; _dCv._doorH=C*1.02;
+  // 문 클릭 좌표 저장 (새 문 위치 기준)
+  {
+    const _hw=hw, _hh=hh, _hx=hx;
+    const _doorW=C*.88, _doorH=C*1.05;
+    const _doorX=_hx+_hw/2-_doorW/2, _doorY=_hh-C*.28-_doorH;
+    _dCv._doorX=_doorX; _dCv._doorY=_doorY; _dCv._doorW=_doorW; _dCv._doorH=_doorH;
+  }
   _dCv._hx=hx; _dCv._hh=hh;
 
   // ── 마당 농장 존 렌더링 (우하단, 읽기 전용) ──────────────
