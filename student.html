@@ -3559,8 +3559,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   .modal { max-width:90vw!important; max-height:88vh; }
   /* 집/인테리어, 농장 모달은 태블릿에서 거의 전체화면 */
   #m-house .modal, #m-farm .modal { width:98vw!important; max-width:98vw!important; max-height:97vh!important; padding:1rem!important; }
-  #m-house .modal { display:flex; flex-direction:column; }
-  #m-house .modal > *:last-child { flex:1; overflow-y:auto; }
+  #m-house .modal { display:flex; flex-direction:column; overflow:hidden; }
+  #m-house .house-tab-body { flex:1; overflow-y:auto; min-height:0; }
   .btn-sm { padding:.45rem 1rem!important; font-size:.84rem!important; }
   .menu-tile { padding:1.1rem .8rem!important; }
   .tile-icon { font-size:2rem!important; }
@@ -3879,6 +3879,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     </button>
     <button class="mtab" onclick="houseTab('vocab',this)">🔤 영어 단어장</button>
   </div>
+  <div class="house-tab-body">
 
   <!-- 탭1: 기록 -->
   <div id="house-tab-stats">
@@ -4195,6 +4196,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="house-tab-vocab" style="display:none;padding-bottom:.5rem">
     <div id="vocab-tab-content"></div>
   </div>
+</div>
 
 </div>
 
@@ -7647,8 +7649,8 @@ function renderFarmModal() {
 function houseTab(tab, el) {
   document.querySelectorAll('#m-house .mtab').forEach(t => t.classList.remove('on'));
   el.classList.add('on');
-  // 탭 전환 시 모달 스크롤 맨 위로
-  document.querySelector('#m-house .modal')?.scrollTo({ top: 0, behavior: 'instant' });
+  // 탭 전환 시 스크롤 맨 위로
+  document.querySelector('#m-house .house-tab-body')?.scrollTo({ top: 0, behavior: 'instant' });
   document.getElementById('house-tab-stats').style.display   = tab==='stats'   ? '' : 'none';
   document.getElementById('house-tab-weekly').style.display  = tab==='weekly'  ? '' : 'none';
   document.getElementById('house-tab-book').style.display    = tab==='book'    ? '' : 'none';
@@ -7665,7 +7667,13 @@ function houseTab(tab, el) {
   if (tab==='emotion') renderEmotionHistory();
   if (tab==='memory')  renderMyMemories();
   if (tab==='ach')     renderHouseAchievements();
-  if (tab==='vocab')   renderVocabTab();
+  if (tab==='vocab')   {
+    // 다른 탭에서 vocab으로 올 때 암기 모드 초기화
+    window._vocabMemMode  = 'normal';
+    window._vocabRevealed = new Set();
+    window._vocabShuffled = null;
+    renderVocabTab();
+  }
   if (tab==='deco') {
     _dCv = null;
     renderHouseDeco();
@@ -10969,132 +10977,264 @@ function renderVocabTab() {
   const ws       = DB.getActiveWordSet();
   const allWords = DB.getAllVocabWords();
   const records  = DB.getQuizRecords(CUR.id);
-  const wrongIds = [...new Set(records.flatMap(r=>r.wrongWordIds||[]))];
-  const wrongWords = wrongIds.map(id=>allWords.find(w=>w.id===id)).filter(Boolean);
-  const setWords   = ws ? (ws.wordIds||[]).map(id=>allWords.find(w=>w.id===id)).filter(Boolean) : [];
+  const wrongIds = [...new Set(records.flatMap(r => r.wrongWordIds || []))];
+  const wrongWords = wrongIds.map(id => allWords.find(w => w.id === id)).filter(Boolean);
+  const setWords   = ws ? (ws.wordIds || []).map(id => allWords.find(w => w.id === id)).filter(Boolean) : [];
 
   // 통계
   const totalQuiz  = records.length;
-  const totalRight = records.reduce((s,r)=>s+r.correct,0);
-  const totalQ     = records.reduce((s,r)=>s+r.total,0);
-  const accuracy   = totalQ > 0 ? Math.round(totalRight/totalQ*100) : 0;
-  const streak     = (() => {
-    let s=0; const today=Utils.todayStr();
-    for (const r of records) { if(r.correct===r.total) s++; else break; }
-    return s;
-  })();
+  const totalRight = records.reduce((s, r) => s + r.correct, 0);
+  const totalQ     = records.reduce((s, r) => s + r.total, 0);
+  const accuracy   = totalQ > 0 ? Math.round(totalRight / totalQ * 100) : 0;
+
+  // 현재 내부 탭 (없으면 기본 '단어')
+  if (!window._vocabSubTab) window._vocabSubTab = 'words';
+
+  const subTabStyle = (t) =>
+    `padding:.3rem .9rem;border-radius:20px;font-size:.78rem;font-family:inherit;cursor:pointer;border:none;font-weight:700;` +
+    (window._vocabSubTab === t
+      ? `background:var(--gold);color:#1a1a1a;`
+      : `background:rgba(255,255,255,.07);color:var(--txt3);`);
+
+  // 내부 탭 콘텐츠
+  function subContent() {
+    if (window._vocabSubTab === 'words') {
+      if (setWords.length === 0) return `
+        <div style="text-align:center;padding:2rem 0;color:var(--txt3);font-size:.82rem">
+          선생님이 단어 세트를 지정하면 여기에 표시돼요</div>`;
+
+      // 암기 모드 상태 초기화
+      if (!window._vocabMemMode) window._vocabMemMode = 'normal';
+      if (!window._vocabShuffled) window._vocabShuffled = [...setWords];
+      if (!window._vocabRevealed) window._vocabRevealed = new Set();
+
+      const words = window._vocabShuffled;
+      const mode  = window._vocabMemMode;
+
+      const modeBtn = (m, label, active) =>
+        `<button onclick="setVocabMemMode('${m}')"
+          style="font-size:.75rem;padding:.3rem .8rem;border-radius:20px;border:none;
+            cursor:pointer;font-family:inherit;font-weight:700;transition:.15s;
+            background:${active?'var(--sky)':'rgba(255,255,255,.08)'};
+            color:${active?'#0a1628':'var(--txt3)'}">
+          ${label}
+        </button>`;
+
+      const cardRows = words.map((w, i) => {
+        const revealed = window._vocabRevealed.has(w.id);
+
+        if (mode === 'hide-meaning') {
+          // 단어 보임 / 뜻 가림
+          return `<div onclick="toggleVocabReveal('${w.id}')" style="cursor:pointer;
+            background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+            border-radius:12px;padding:.6rem .8rem;display:flex;align-items:center;
+            gap:.6rem;transition:.15s;user-select:none"
+            onmouseenter="this.style.background='rgba(255,255,255,.09)'"
+            onmouseleave="this.style.background='rgba(255,255,255,.04)'"
+            title="탭하면 뜻 보기">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:800;font-size:.95rem;color:var(--sky)">${w.word}</div>
+              <div style="font-size:.8rem;margin-top:.15rem;${revealed?'color:var(--gold)':'background:rgba(255,255,255,.08);border-radius:6px;color:transparent;user-select:none'}">
+                ${w.meaning.split(',')[0]}
+              </div>
+            </div>
+            <span style="font-size:.8rem;color:${revealed?'var(--gold)':'var(--txt3)'}">${revealed?'👁️':'🙈'}</span>
+          </div>`;
+
+        } else if (mode === 'hide-word') {
+          // 뜻 보임 / 단어 첫글자만
+          const first = w.word[0];
+          const rest  = '_'.repeat(Math.max(0, w.word.length - 1));
+          return `<div onclick="toggleVocabReveal('${w.id}')" style="cursor:pointer;
+            background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+            border-radius:12px;padding:.6rem .8rem;display:flex;align-items:center;
+            gap:.6rem;transition:.15s;user-select:none"
+            onmouseenter="this.style.background='rgba(255,255,255,.09)'"
+            onmouseleave="this.style.background='rgba(255,255,255,.04)'"
+            title="탭하면 단어 보기">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:800;font-size:.95rem;
+                color:${revealed?'var(--sky)':'var(--txt1)'}">
+                ${revealed ? w.word : `<span style="color:var(--sky)">${first}</span><span style="color:var(--txt3);letter-spacing:.1em">${rest}</span>`}
+              </div>
+              <div style="font-size:.8rem;color:var(--gold);margin-top:.15rem">${w.meaning.split(',')[0]}</div>
+            </div>
+            <span style="font-size:.8rem;color:${revealed?'var(--sky)':'var(--txt3)'}">${revealed?'👁️':'🙈'}</span>
+          </div>`;
+
+        } else {
+          // 일반 모드
+          return `<div onclick="speakWord('${w.word.replace(/'/g, "\\'")}')"
+            style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+              border-radius:12px;padding:.55rem .75rem;display:flex;align-items:center;gap:.5rem;
+              cursor:pointer;transition:.15s"
+            onmouseenter="this.style.background='rgba(255,255,255,.09)'"
+            onmouseleave="this.style.background='rgba(255,255,255,.04)'"
+            title="탭하면 발음">
+            <span style="font-size:.8rem;flex-shrink:0">🔊</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:800;font-size:.88rem;color:var(--sky)">${w.word}</div>
+              <div style="font-size:.72rem;color:var(--txt3)">${w.meaning.split(',')[0]}</div>
+            </div>
+          </div>`;
+        }
+      });
+
+      return `
+        <!-- 암기 모드 선택 -->
+        <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center">
+          ${modeBtn('normal',      '📖 일반',        mode==='normal')}
+          ${modeBtn('hide-meaning','🙈 뜻 가리기',   mode==='hide-meaning')}
+          ${modeBtn('hide-word',   '🔤 단어 가리기', mode==='hide-word')}
+          ${mode !== 'normal' ? `
+          <button onclick="shuffleVocabWords()" title="순서 바꾸기"
+            style="font-size:.75rem;padding:.3rem .8rem;border-radius:20px;border:none;
+              cursor:pointer;font-family:inherit;background:rgba(255,255,255,.06);
+              color:var(--txt3);margin-left:auto">
+            🔀 순서 바꾸기
+          </button>` : ''}
+        </div>
+        <!-- 단어 그리드 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+          ${cardRows.join('')}
+        </div>`;
+
+    } else if (window._vocabSubTab === 'wrong') {
+      if (wrongWords.length === 0) return `
+        <div style="text-align:center;padding:2rem 0;color:var(--txt3);font-size:.82rem">
+          🎉 아직 틀린 단어가 없어요!</div>`;
+      return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+        ${wrongWords.map(w => `
+          <div onclick="speakWord('${w.word.replace(/'/g, "\\'")}')"
+            style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.18);
+              border-radius:12px;padding:.55rem .75rem;display:flex;align-items:center;gap:.5rem;
+              cursor:pointer;transition:.15s"
+            onmouseenter="this.style.background='rgba(231,76,60,.13)'"
+            onmouseleave="this.style.background='rgba(231,76,60,.07)'"
+            title="탭하면 발음">
+            <span style="font-size:.8rem;flex-shrink:0">🔊</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:800;font-size:.88rem;color:var(--red);
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.word}</div>
+              <div style="font-size:.72rem;color:var(--txt3)">${w.meaning.split(',')[0]}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+
+    } else { // records
+      if (records.length === 0) return `
+        <div style="text-align:center;padding:2rem 0;color:var(--txt3);font-size:.82rem">
+          아직 퀴즈 기록이 없어요</div>`;
+      return `<div style="display:flex;flex-direction:column;gap:.35rem">
+        ${records.slice(0, 20).map(r => {
+          const pct = Math.round(r.correct / r.total * 100);
+          const col = pct === 100 ? 'var(--emerald)' : pct >= 60 ? 'var(--gold)' : 'var(--red)';
+          return `<div style="display:flex;align-items:center;gap:.6rem;padding:.4rem .6rem;
+            background:rgba(255,255,255,.03);border-radius:10px">
+            <span style="font-size:.7rem;color:var(--txt3);min-width:72px">${r.date}</span>
+            <div style="flex:1;height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width .4s"></div>
+            </div>
+            <span style="font-size:.8rem;font-weight:700;color:${col};min-width:36px;text-align:right">
+              ${r.correct}/${r.total}</span>
+            ${pct === 100 ? '<span style="font-size:.7rem">✨</span>' : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+  }
 
   el.innerHTML = `
-  <!-- ① 퀴즈 풀기 버튼 (sticky — 스크롤해도 항상 보임) -->
-  <div style="position:sticky;top:0;z-index:10;padding-bottom:.5rem;
-    background:linear-gradient(145deg,#16213E,#0F3460)">
+  <!-- ─── 헤더 영역 ─── -->
+  <div style="margin-bottom:1rem">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.6rem">
+      <div>
+        <div style="font-size:.7rem;color:var(--sky);font-weight:700;margin-bottom:.15rem">🔤 영어 단어장</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--txt1)">
+          ${ws ? ws.title : '단어 세트 없음'}</div>
+        ${ws ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">이번 학습 단어 ${setWords.length}개</div>` : ''}
+      </div>
+      ${wrongWords.length > 0 ? `
+      <button onclick="window._vocabSubTab='wrong';renderVocabTab()"
+        style="font-size:.7rem;padding:.25rem .65rem;border-radius:10px;border:1px solid rgba(231,76,60,.35);
+          background:rgba(231,76,60,.1);color:var(--red);cursor:pointer;font-family:inherit;white-space:nowrap">
+        🔁 틀린 단어 ${wrongWords.length}개
+      </button>` : ''}
+    </div>
+
+    <!-- 큰 퀴즈 시작 버튼 -->
     ${ws ? `<button onclick="startVocabQuiz()"
       style="width:100%;background:linear-gradient(135deg,var(--gold),#e67e22);border:none;
-        color:#1a1a1a;font-weight:800;font-size:.88rem;padding:.65rem;
-        border-radius:14px;cursor:pointer;font-family:inherit;
-        box-shadow:0 3px 12px rgba(255,215,0,.25);
-        display:flex;align-items:center;justify-content:center;gap:.5rem">
-      📝 퀴즈 풀기 (${setWords.length}개 단어)
+        color:#1a1a1a;font-weight:800;font-size:.95rem;padding:.75rem;
+        border-radius:14px;cursor:pointer;font-family:inherit;letter-spacing:.02em;
+        box-shadow:0 4px 16px rgba(255,215,0,.3)">
+      📝 퀴즈 시작 — ${setWords.length}개 단어
     </button>` : `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-      border-radius:12px;padding:.7rem;text-align:center;color:var(--txt3);font-size:.78rem">
+      border-radius:12px;padding:.8rem;text-align:center;color:var(--txt3);font-size:.8rem">
       선생님이 단어 세트를 지정하면 퀴즈를 풀 수 있어요</div>`}
   </div>
 
-  <!-- ② 상태 카드 -->
-  <div style="background:linear-gradient(135deg,rgba(93,173,226,.15),rgba(142,68,173,.12));
-    border:1px solid rgba(93,173,226,.2);border-radius:14px;padding:.8rem 1rem;margin-bottom:.8rem">
-    <div style="font-size:.7rem;color:var(--sky);font-weight:700;margin-bottom:.1rem">🔤 영어 단어장</div>
-    <div style="font-size:.85rem;font-weight:800;color:var(--txt1);margin-bottom:.55rem">
-      ${ws ? ws.title : '학습 단어 없음'}
+  <!-- ─── 요약 카드 3개 ─── -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem">
+    <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:.65rem;text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:var(--gold)">${totalQuiz}</div>
+      <div style="font-size:.65rem;color:var(--txt3);margin-top:.1rem">총 퀴즈</div>
     </div>
-    <!-- 미니 통계 -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem">
-      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:.45rem;text-align:center">
-        <div style="font-size:1.1rem;font-weight:800;color:var(--gold)">${totalQuiz}</div>
-        <div style="font-size:.6rem;color:var(--txt3)">총 퀴즈</div>
-      </div>
-      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:.45rem;text-align:center">
-        <div style="font-size:1.1rem;font-weight:800;color:var(--emerald)">${accuracy}%</div>
-        <div style="font-size:.6rem;color:var(--txt3)">정확도</div>
-      </div>
-      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:.45rem;text-align:center">
-        <div style="font-size:1.1rem;font-weight:800;color:var(--sky)">${wrongIds.length}</div>
-        <div style="font-size:.6rem;color:var(--txt3)">헷갈린 단어</div>
-      </div>
+    <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:.65rem;text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:var(--emerald)">${accuracy}%</div>
+      <div style="font-size:.65rem;color:var(--txt3);margin-top:.1rem">정답률</div>
+    </div>
+    <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:.65rem;text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:var(--red)">${wrongIds.length}</div>
+      <div style="font-size:.65rem;color:var(--txt3);margin-top:.1rem">헷갈린 단어</div>
     </div>
   </div>
 
-  <!-- ② 현재 학습 단어 카드 -->
-  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-    border-radius:14px;padding:.8rem;margin-bottom:.8rem">
-    <div style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:.55rem">
-      📚 이번 학습 단어 ${setWords.length > 0 ? `<span style="color:var(--gold);font-weight:400">${setWords.length}개</span>` : ''}
-    </div>
-    ${setWords.length === 0
-      ? `<div style="text-align:center;padding:1rem 0;color:var(--txt3);font-size:.8rem">
-          선생님이 단어 세트를 지정하면 여기에 표시돼요</div>`
-      : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
-          ${setWords.map(w => `
-            <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-              border-radius:10px;padding:.4rem .6rem;display:flex;align-items:center;gap:.4rem;
-              cursor:pointer;transition:.15s"
-              onclick="speakWord('${w.word.replace(/'/g,"\\'")}')"
-              onmouseenter="this.style.background='rgba(255,255,255,.08)'"
-              onmouseleave="this.style.background='rgba(255,255,255,.04)'"
-              title="탭하면 발음 들려줘요">
-              <span style="font-size:.75rem;flex-shrink:0">🔊</span>
-              <span style="font-weight:700;font-size:.85rem;color:var(--sky);min-width:0;
-                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.word}</span>
-              <span style="color:var(--txt3);font-size:.72rem;flex-shrink:0">${w.meaning.split(',')[0]}</span>
-            </div>`).join('')}
-        </div>`}
+  <!-- ─── 내부 탭 ─── -->
+  <div style="display:flex;gap:.35rem;margin-bottom:.7rem">
+    <button onclick="window._vocabSubTab='words';renderVocabTab()" style="${subTabStyle('words')}">
+      학습 단어</button>
+    <button onclick="window._vocabSubTab='wrong';renderVocabTab()" style="${subTabStyle('wrong')}">
+      틀린 단어 ${wrongWords.length > 0 ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:.05rem .35rem;font-size:.65rem;margin-left:.2rem">${wrongWords.length}</span>` : ''}</button>
+    <button onclick="window._vocabSubTab='records';renderVocabTab()" style="${subTabStyle('records')}">
+      퀴즈 기록</button>
   </div>
 
-  <!-- ③ 퀴즈 기록 -->
-  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-    border-radius:14px;padding:.8rem;margin-bottom:.8rem">
-    <div style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:.5rem">📅 퀴즈 기록</div>
-    ${records.length === 0
-      ? `<div style="text-align:center;padding:.8rem 0;color:var(--txt3);font-size:.78rem">
-          아직 퀴즈 기록이 없어요<br><span style="font-size:.7rem">퀴즈를 풀면 여기에 기록돼요</span></div>`
-      : `<div style="display:flex;flex-direction:column;gap:.3rem">
-          ${records.slice(0,8).map(r => {
-            const pct = Math.round(r.correct/r.total*100);
-            const color = pct===100?'var(--emerald)':pct>=60?'var(--gold)':'var(--red)';
-            return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;
-              background:rgba(255,255,255,.03);border-radius:8px">
-              <span style="font-size:.7rem;color:var(--txt3);min-width:72px">${r.date}</span>
-              <!-- 바 -->
-              <div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
-                <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
-              </div>
-              <span style="font-size:.78rem;font-weight:700;color:${color};min-width:32px;text-align:right">
-                ${r.correct}/${r.total}</span>
-              ${pct===100?'<span style="font-size:.65rem">✨</span>':''}
-            </div>`;
-          }).join('')}
-        </div>`}
-  </div>
-
-  <!-- ④ 헷갈린 단어 -->
-  ${wrongWords.length > 0 ? `
-  <div style="background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.15);
-    border-radius:14px;padding:.8rem">
-    <div style="font-size:.72rem;font-weight:700;color:var(--red);margin-bottom:.5rem">
-      🔁 헷갈린 단어 다시 보기 <span style="font-weight:400;color:var(--txt3)">${wrongWords.length}개</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
-      ${wrongWords.slice(0,12).map(w=>`
-        <div style="background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.15);
-          border-radius:8px;padding:.35rem .55rem;display:flex;align-items:center;gap:.35rem">
-          <span style="font-weight:700;font-size:.82rem;color:var(--red)">${w.word}</span>
-          <span style="color:var(--txt3);font-size:.7rem;flex-shrink:0">${w.meaning.split(',')[0]}</span>
-        </div>`).join('')}
-    </div>
-  </div>` : ''}`;
+  <!-- ─── 내부 탭 콘텐츠 ─── -->
+  <div id="vocab-sub-content">
+    ${subContent()}
+  </div>`;
 }
 
-// ── 영어 발음 (Web Speech API) ──────────────────────────
+
+// ── 암기 모드 ─────────────────────────────────────────
+function setVocabMemMode(mode) {
+  window._vocabMemMode  = mode;
+  window._vocabRevealed = new Set();
+  // 모드 진입 시 항상 셔플
+  const ws = DB.getActiveWordSet();
+  const allWords = DB.getAllVocabWords();
+  const setWords = ws ? (ws.wordIds||[]).map(id=>allWords.find(w=>w.id===id)).filter(Boolean) : [];
+  window._vocabShuffled = [...setWords].sort(()=>Math.random()-.5);
+  renderVocabTab();
+}
+
+function shuffleVocabWords() {
+  window._vocabRevealed = new Set();
+  window._vocabShuffled = [...(window._vocabShuffled||[])].sort(()=>Math.random()-.5);
+  renderVocabTab();
+}
+
+function toggleVocabReveal(wordId) {
+  if (!window._vocabRevealed) window._vocabRevealed = new Set();
+  if (window._vocabRevealed.has(wordId)) {
+    window._vocabRevealed.delete(wordId);
+  } else {
+    window._vocabRevealed.add(wordId);
+  }
+  // 전체 재렌더 대신 해당 카드만 토글 (성능)
+  renderVocabTab();
+}
 function speakWord(word) {
   if (!word) return;
   if (!window.speechSynthesis) { toast('이 기기는 발음 기능을 지원하지 않아요'); return; }
