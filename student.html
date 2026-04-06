@@ -188,6 +188,17 @@ const GAME_DATA = {
     {id:'i_strawberry_seed',name:'딸기 씨앗',  icon:'🍓', price:120, growHours:72, sellPrice:290, crop:'strawberry', cropIcon:'🍓', reqLv:12},
   ],
 
+  // ── 돌연변이 씨앗 (일반 씨앗과 별도 관리) ───────────────────────────
+  // 수확 시 성공/실패 판정: 성공=baseSellPrice*2, 실패=0G
+  // isMutant:true 로 일반 씨앗과 구분
+  mutantSeeds: [
+    {id:'i_m_potato_seed',    name:'⚡ 번개 감자', icon:'⚡🥔', price:40,  growHours:20, baseSellPrice:40,  successRate:0.55, crop:'m_potato',     cropIcon:'⚡🥔', reqLv:1,  desc:'고위험 입문용', isMutant:true},
+    {id:'i_m_carrot_seed',    name:'✨ 황금 당근', icon:'✨🥕', price:65,  growHours:24, baseSellPrice:75,  successRate:0.52, crop:'m_carrot',     cropIcon:'✨🥕', reqLv:3,  desc:'반반 도전형',   isMutant:true},
+    {id:'i_m_corn_seed',      name:'🌈 무지개 옥수수',icon:'🌈🌽', price:95,  growHours:36, baseSellPrice:125, successRate:0.50, crop:'m_corn',       cropIcon:'🌈🌽', reqLv:5,  desc:'오차 없는 반반', isMutant:true},
+    {id:'i_m_tomato_seed',    name:'🔥 불꽃 토마토',icon:'🔥🍅', price:130, growHours:48, baseSellPrice:180, successRate:0.47, crop:'m_tomato',     cropIcon:'🔥🍅', reqLv:8,  desc:'고위험 고수익', isMutant:true},
+    {id:'i_m_strawberry_seed',name:'🌟 별빛 딸기',  icon:'🌟🍓', price:195, growHours:72, baseSellPrice:290, successRate:0.45, crop:'m_strawberry', cropIcon:'🌟🍓', reqLv:12, desc:'최고 도박형',   isMutant:true},
+  ],
+
   // ─── 장식물 ────────────────────────────────────────────
   decorations: [
     // ── 마당 (yard) ──
@@ -989,8 +1000,8 @@ const Utils = {
   cropReady(planted, growHours)    { return Date.now() - planted >= growHours * 3600000; },
   cropProgress(planted, growHours) { return Math.min(100, ((Date.now()-planted)/(growHours*3600000))*100); },
 
-  getSeedById(id)    { return GAME_DATA.seeds.find(s => s.id === id); },
-  getSeedByCrop(crop){ return GAME_DATA.seeds.find(s => s.crop === crop); },
+  getSeedById(id)    { return GAME_DATA.seeds.find(s => s.id === id) || GAME_DATA.mutantSeeds.find(s => s.id === id); },
+  getSeedByCrop(crop){ return GAME_DATA.seeds.find(s => s.crop === crop) || GAME_DATA.mutantSeeds.find(s => s.crop === crop); },
 
   condMet(student, cond) {
     return Object.entries(cond).every(([stat,val]) => (student.stats[stat]||0) >= val);
@@ -5866,8 +5877,10 @@ function renderShop() {
     return;
 
   } else if (cat === 'seed') {
-    items = GAME_DATA.seeds.map(s => {
-      const lv = CUR.level || 1;
+    const lv = CUR.level || 1;
+
+    // ── 일반 씨앗 카드 ──
+    const normalCards = GAME_DATA.seeds.map(s => {
       const locked = lv < (s.reqLv||1);
       const lockFn = locked ? `toast('Lv${s.reqLv} 이상이 되어야 구매할 수 있어요!')` : `buySeed('${s.id}')`;
       return `<div class="item-card" onclick="${lockFn}" style="opacity:${locked?.55:1}">
@@ -5877,6 +5890,40 @@ function renderShop() {
         <div class="ic-price">💰 ${s.price}G</div>
       </div>`;
     });
+
+    // ── 돌연변이 씨앗 카드 (구분선 + 별도 스타일) ──
+    const mutantCards = GAME_DATA.mutantSeeds.map(s => {
+      const locked = lv < (s.reqLv||1);
+      const lockFn = locked ? `toast('Lv${s.reqLv} 이상이 되어야 구매할 수 있어요!')` : `buySeed('${s.id}')`;
+      const pct = Math.round(s.successRate*100);
+      const successG = s.baseSellPrice * 2;
+      return `<div class="item-card" onclick="${lockFn}"
+        style="opacity:${locked?.55:1};border:1px solid rgba(255,165,0,.35);
+          background:linear-gradient(135deg,rgba(255,140,0,.08),rgba(255,80,0,.05))">
+        <div class="ic-icon">${s.icon}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
+        <div class="ic-name" style="color:#FFA500">${s.name}
+          <span style="font-size:.6rem;background:rgba(255,140,0,.2);color:#FFA500;
+            border-radius:4px;padding:.05rem .3rem;margin-left:.2rem">위험</span>
+          ${locked?`<span style="color:var(--txt3);font-size:.62rem"> Lv${s.reqLv}+</span>`:''}
+        </div>
+        <div class="ic-stats" style="color:var(--txt2)">${s.growHours}h · ${s.desc}</div>
+        <div class="ic-stats" style="color:rgba(255,165,0,.8);font-size:.62rem">
+          성공 ${pct}% → +${successG}G / 실패 → 0G
+        </div>
+        <div class="ic-price">💰 ${s.price}G</div>
+      </div>`;
+    });
+
+    const divider = `<div style="grid-column:1/-1;display:flex;align-items:center;gap:.5rem;
+      margin:.3rem 0;font-size:.72rem;font-weight:700;color:rgba(255,165,0,.8)">
+      <div style="flex:1;height:1px;background:rgba(255,165,0,.2)"></div>
+      ⚡ 돌연변이 씨앗 — 성공 시 2배 / 실패 시 0G
+      <div style="flex:1;height:1px;background:rgba(255,165,0,.2)"></div>
+    </div>`;
+
+    document.getElementById('shop-items').innerHTML =
+      normalCards.join('') + divider + mutantCards.join('');
+    return; // 아래 items.join() 건너뜀
   } else {
     items = GAME_DATA.decorations.filter(d => d.price > 0).map(d => {
       const lv = CUR.level || 1;
@@ -7564,16 +7611,36 @@ function farmCellClick(slot) {
     const sd = Utils.getSeedByCrop(plot.crop);
     if (!sd) return;
     if (Utils.cropReady(plot.planted, sd.growHours)) {
-      // 시들기: 수확 가능 시간의 2배 지나면 60%만 수확
       const elapsed = Date.now() - plot.planted;
-      const maxFresh = sd.growHours * 3600000 * 3; // 성장시간 3배까지 신선
+      const maxFresh = sd.growHours * 3600000 * 3;
       const withered = elapsed > maxFresh;
+
+      // ── 돌연변이 수확 판정 ──
+      if (plot.isMutant) {
+        const rate = plot.successRate ?? sd.successRate ?? 0.5;
+        const success = Math.random() < rate;
+        const earned = success ? (sd.baseSellPrice || sd.sellPrice) * 2 : 0;
+        if (earned > 0) {
+          CUR.gold += earned;
+          CUR.totalGold = (CUR.totalGold||0) + earned;
+        }
+        CUR.farm = (CUR.farm||[]).filter(f => f.slot !== slot);
+        CUR.farmHarvests = (CUR.farmHarvests||0) + 1;
+        DB.saveStudent(CUR);
+        checkAchievements();
+        if (success) toast(`🎉 ${sd.cropIcon} 돌연변이 재배 성공! +${earned}G 획득!`);
+        else         toast(`💀 ${sd.cropIcon} 돌연변이 재배 실패... 수확 보상 없음`);
+        renderFarmModal(); renderHUD(); renderMain(); renderMobile();
+        return;
+      }
+
+      // ── 일반 수확 ──
       const earned = withered
         ? Math.floor(sd.sellPrice * 0.6)
         : sd.sellPrice;
       CUR.gold += earned;
       CUR.totalGold = (CUR.totalGold||0) + earned;
-      CUR.farm = farm.filter(f => f.slot !== slot);
+      CUR.farm = (CUR.farm||[]).filter(f => f.slot !== slot);
       CUR.farmHarvests = (CUR.farmHarvests||0) + 1;
       DB.saveStudent(CUR);
       checkAchievements();
@@ -7590,12 +7657,18 @@ function farmCellClick(slot) {
     const inv = CUR.inventory||[];
     const invItem = inv.find(i => i.id === SEL_SEED);
     if (!invItem || invItem.qty < 1) { toast('씨앗이 없습니다!'); return; }
+    // 일반 씨앗 / 돌연변이 씨앗 모두 getSeedById로 조회
     const sd = Utils.getSeedById(SEL_SEED);
+    if (!sd) return;
     invItem.qty--;
     if (invItem.qty <= 0) CUR.inventory = inv.filter(i => i.id !== SEL_SEED);
-    CUR.farm = [...(CUR.farm||[]), {slot, crop:sd.crop, planted:Date.now()}];
+    // 돌연변이 씨앗이면 isMutant:true, successRate 저장
+    const plotData = {slot, crop:sd.crop, planted:Date.now()};
+    if (sd.isMutant) { plotData.isMutant = true; plotData.successRate = sd.successRate; }
+    CUR.farm = [...(CUR.farm||[]), plotData];
     DB.saveStudent(CUR);
-    toast(`🌱 ${sd.name} 심었습니다! ${sd.growHours}시간 후 수확`);
+    if (sd.isMutant) toast(`⚡ ${sd.name} 심었습니다! 성공 확률 ${Math.round(sd.successRate*100)}% · ${sd.growHours}시간 후 판정`);
+    else toast(`🌱 ${sd.name} 심었습니다! ${sd.growHours}시간 후 수확`);
     renderFarmModal(); renderMain(); renderMobile();
   }
 }
@@ -7614,12 +7687,14 @@ function renderFarmModal() {
   const {cols, rows} = getFarmLayout(CUR.level||1);
   const farmSize = cols * rows;
   const farm = CUR.farm||[];
-  const seeds = (CUR.inventory||[]).filter(i => GAME_DATA.seeds.find(s=>s.id===i.id) && i.qty>0);
+  const allSeedIds = new Set([...GAME_DATA.seeds, ...GAME_DATA.mutantSeeds].map(s=>s.id));
+  const seeds = (CUR.inventory||[]).filter(i => allSeedIds.has(i.id) && i.qty>0);
   document.getElementById('farm-seed-select').innerHTML = seeds.length > 0
     ? seeds.map(inv => {
         const sd = Utils.getSeedById(inv.id);
+        const mutTag = sd.isMutant ? '<span style="font-size:.55rem;color:#FFA500;font-weight:700"> ⚡돌연변이</span>' : '';
         return `<div class="seed-chip ${SEL_SEED===inv.id?'sel':''}" onclick="SEL_SEED='${inv.id}';renderFarmModal()">
-          ${sd.icon} ${sd.name} x${inv.qty}</div>`;
+          ${sd.icon} ${sd.name}${mutTag} x${inv.qty}</div>`;
       }).join('')
     : `<span style="font-size:.75rem;color:var(--txt3)">씨앗 없음 (상점에서 구매)</span>`;
 
@@ -7632,9 +7707,10 @@ function renderFarmModal() {
       const pct = sd ? Utils.cropProgress(plot.planted, sd.growHours) : 100;
       const elapsed = Date.now() - plot.planted;
       const withered = ready && sd && elapsed > sd.growHours * 3600000 * 3;
-      gridHtml += `<div class="fm-cell ${withered?'withered':ready?'ready':'growing'}" onclick="farmCellClick(${i})">
-        ${withered ? '🍂' : ready ? sd.cropIcon : '🌱'}
-        <div class="fm-prog"><div class="fm-prog-fill" style="width:${pct}%"></div></div>
+      const mutantClass = plot.isMutant ? ' mutant' : '';
+      gridHtml += `<div class="fm-cell${mutantClass} ${withered?'withered':ready?'ready':'growing'}" onclick="farmCellClick(${i})">
+        ${withered ? '🍂' : ready ? sd.cropIcon : (plot.isMutant ? '⚡' : '🌱')}
+        <div class="fm-prog"><div class="fm-prog-fill" style="width:${pct}%${plot.isMutant?';background:rgba(255,165,0,.8)':''}"></div></div>
       </div>`;
     } else {
       gridHtml += `<div class="fm-cell empty" onclick="farmCellClick(${i})">+</div>`;

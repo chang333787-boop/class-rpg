@@ -389,6 +389,17 @@ const GAME_DATA = {
     {id:'i_strawberry_seed',name:'딸기 씨앗',  icon:'🍓', price:120, growHours:72, sellPrice:290, crop:'strawberry', cropIcon:'🍓', reqLv:12},
   ],
 
+  // ── 돌연변이 씨앗 (일반 씨앗과 별도 관리) ───────────────────────────
+  // 수확 시 성공/실패 판정: 성공=baseSellPrice*2, 실패=0G
+  // isMutant:true 로 일반 씨앗과 구분
+  mutantSeeds: [
+    {id:'i_m_potato_seed',    name:'⚡ 번개 감자', icon:'⚡🥔', price:40,  growHours:20, baseSellPrice:40,  successRate:0.55, crop:'m_potato',     cropIcon:'⚡🥔', reqLv:1,  desc:'고위험 입문용', isMutant:true},
+    {id:'i_m_carrot_seed',    name:'✨ 황금 당근', icon:'✨🥕', price:65,  growHours:24, baseSellPrice:75,  successRate:0.52, crop:'m_carrot',     cropIcon:'✨🥕', reqLv:3,  desc:'반반 도전형',   isMutant:true},
+    {id:'i_m_corn_seed',      name:'🌈 무지개 옥수수',icon:'🌈🌽', price:95,  growHours:36, baseSellPrice:125, successRate:0.50, crop:'m_corn',       cropIcon:'🌈🌽', reqLv:5,  desc:'오차 없는 반반', isMutant:true},
+    {id:'i_m_tomato_seed',    name:'🔥 불꽃 토마토',icon:'🔥🍅', price:130, growHours:48, baseSellPrice:180, successRate:0.47, crop:'m_tomato',     cropIcon:'🔥🍅', reqLv:8,  desc:'고위험 고수익', isMutant:true},
+    {id:'i_m_strawberry_seed',name:'🌟 별빛 딸기',  icon:'🌟🍓', price:195, growHours:72, baseSellPrice:290, successRate:0.45, crop:'m_strawberry', cropIcon:'🌟🍓', reqLv:12, desc:'최고 도박형',   isMutant:true},
+  ],
+
   // ─── 장식물 ────────────────────────────────────────────
   decorations: [
     // ── 마당 (yard) ──
@@ -1190,8 +1201,8 @@ const Utils = {
   cropReady(planted, growHours)    { return Date.now() - planted >= growHours * 3600000; },
   cropProgress(planted, growHours) { return Math.min(100, ((Date.now()-planted)/(growHours*3600000))*100); },
 
-  getSeedById(id)    { return GAME_DATA.seeds.find(s => s.id === id); },
-  getSeedByCrop(crop){ return GAME_DATA.seeds.find(s => s.crop === crop); },
+  getSeedById(id)    { return GAME_DATA.seeds.find(s => s.id === id) || GAME_DATA.mutantSeeds.find(s => s.id === id); },
+  getSeedByCrop(crop){ return GAME_DATA.seeds.find(s => s.crop === crop) || GAME_DATA.mutantSeeds.find(s => s.crop === crop); },
 
   condMet(student, cond) {
     return Object.entries(cond).every(([stat,val]) => (student.stats[stat]||0) >= val);
