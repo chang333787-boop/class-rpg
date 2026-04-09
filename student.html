@@ -7708,7 +7708,22 @@ function _finishInfiniteBattle() {
         </div>`;
     }
     DB.saveStudent(CUR);
-    setTimeout(() => _ibNextMonster(), 1400);
+
+    // 10승 달성 시 자동 종료
+    if (IB.kills >= 10) {
+      const arenaEl2 = document.getElementById('battle-arena');
+      if (arenaEl2) {
+        arenaEl2.innerHTML = `
+          <div style="text-align:center;padding:1.4rem .8rem">
+            <div style="font-size:2rem;margin-bottom:.3rem">🏆</div>
+            <div style="font-size:1rem;font-weight:800;color:var(--gold);margin-bottom:.2rem">배틀 완료!</div>
+            <div style="font-size:.82rem;color:var(--txt3)">10마리 처치 달성!</div>
+          </div>`;
+      }
+      setTimeout(() => _endInfiniteBattleSession(false), 1600);
+    } else {
+      setTimeout(() => _ibNextMonster(), 1400);
+    }
 
   } else {
     // 패배 — 세션 종료
