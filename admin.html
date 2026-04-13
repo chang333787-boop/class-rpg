@@ -7709,7 +7709,10 @@ function renderVocabAdminPage() {
               <div style="font-weight:700;font-size:.85rem;color:${s.active?'var(--emerald)':'var(--txt1)'}">
                 ${s.active?'✅ ':''}${s.title}</div>
               <div style="font-size:.7rem;color:var(--txt3);margin-top:.2rem">
-                ${words.length}개 단어 · ${words.slice(0,5).map(w=>w.word).join(', ')}${words.length>5?'...':''}
+                ${words.length}개 단어
+              </div>
+              <div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;line-height:1.6;white-space:normal;word-break:break-all">
+                ${words.map(w=>w.word).join(' · ')}
               </div>
             </div>
             <button onclick="toggleVocabWordSet('${s.id}')"
