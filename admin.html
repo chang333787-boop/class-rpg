@@ -2936,7 +2936,6 @@ function renderPromotionList() {
     const orphans  = requests.filter(r => !validIds.has(r.studentId));
 
     // 디버그 로그
-    console.log('[승급관리] requests:', requests.length, '/ orphans:', orphans.length);
     if (orphans.length) console.warn('[승급관리] 고아 요청:', orphans);
 
     if (requests.length === 0) {
@@ -5071,7 +5070,6 @@ function recalcAllAchievements() {
     }
   });
   notify(`🏅 재계산 완료! 전체 ${totalNew}개 업적 신규 달성\n${log.slice(0,5).join('\n')}${log.length>5?`\n...외 ${log.length-5}명`:''}`);
-  if (totalNew > 0) console.log('[업적 재계산]', log.join('\n'));
 }
 
 function recalcOneAchievement() {
@@ -5806,7 +5804,6 @@ function checkAutoDailyQuests() {
   // 오늘 날짜 기록
   DB.saveSettings({ ...settings, autoDailyLastDate: today });
 
-  if (count > 0) console.log(`[자동] 일일퀘스트 ${count}개 자동 등록 완료`);
 }
 
 function restoreHiddenTemplates(type) {
