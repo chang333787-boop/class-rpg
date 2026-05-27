@@ -10492,8 +10492,12 @@ function vfTab(modalId, tab, btn) {
 }
 
 // ══ 레이아웃 모드 토글 ══
-let LAYOUT_MODE = localStorage.getItem('layoutMode') || 'desktop';
-let SCALE_MODE  = localStorage.getItem('scaleMode') === 'true'; // 비율 스케일링 on/off
+const STORAGE_KEYS = Object.freeze({
+  LAYOUT_MODE: 'layoutMode',
+  SCALE_MODE:  'scaleMode',
+});
+let LAYOUT_MODE = localStorage.getItem(STORAGE_KEYS.LAYOUT_MODE) || 'desktop';
+let SCALE_MODE  = localStorage.getItem(STORAGE_KEYS.SCALE_MODE) === 'true'; // 비율 스케일링 on/off
 const SCALE_BASE_WIDTH = 2560; // QHD 모니터 기준
 
 function applyScale() {
@@ -10515,7 +10519,7 @@ function applyScale() {
 
 function applyLayout(mode) {
   LAYOUT_MODE = mode;
-  localStorage.setItem('layoutMode', mode);
+  localStorage.setItem(STORAGE_KEYS.LAYOUT_MODE, mode);
   const game = document.getElementById('s-game');
   const btn  = document.getElementById('layout-toggle-btn');
   if (!game) return;
@@ -10544,7 +10548,7 @@ function toggleLayout() {
 
 function toggleScaleMode() {
   SCALE_MODE = !SCALE_MODE;
-  localStorage.setItem('scaleMode', SCALE_MODE);
+  localStorage.setItem(STORAGE_KEYS.SCALE_MODE, SCALE_MODE);
   const btn = document.getElementById('scale-mode-btn');
   if (btn) btn.textContent = SCALE_MODE ? '🔍 비율고정 ON' : '🔍 비율고정';
   applyScale();
