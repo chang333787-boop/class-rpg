@@ -11861,7 +11861,7 @@ function autoCloseDailyQuests() {
       changed = true;
     }
   });
-  if (changed) DB.save(db);
+  if (changed) DB._fbRef.child('boardQuests').set(db.boardQuests);
 }
 function switchMobTab(tab, el) {
   MOB_TAB = tab;
