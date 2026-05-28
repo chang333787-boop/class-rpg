@@ -2453,7 +2453,6 @@ function onAddRowInput(i) {
 
 function doAddStudents(btn) {
   const avatarMap = {1:'👦',2:'👧'};
-  const db = DB.load();
   let count = 0;
 
   for (let i = 0; i < 6; i++) {
@@ -2463,7 +2462,7 @@ function doAddStudents(btn) {
     const job      = document.getElementById(`add-job-${i}`)?.value.trim() || '미래를 꿈꾸는 학생';
     const charType = parseInt(document.getElementById(`add-char-${i}`)?.value) || 1;
     const id = 's' + (Date.now() + i);
-    db.students.push({
+    const newStudent = {
       id, name, pw, charType,
       dream: job, job: '학생',
       avatar: avatarMap[charType]||'👦',
@@ -2477,12 +2476,12 @@ function doAddStudents(btn) {
       totalQuests:0, bookCount:0,
       pendingRewards:[], promotionPending:false,
       houseDecorations:[], yardFloor:{}, lastAttendDate:'', achievements:[],
-    });
+    };
+    DB.saveStudent(newStudent);
     count++;
   }
 
   if (count === 0) { notify('이름을 최소 1명 입력해주세요', 'error'); return; }
-  DB.save(db);
   btn.closest('.overlay').remove();
   renderAll();
   populateSelectStudents();
