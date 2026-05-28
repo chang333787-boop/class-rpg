@@ -5342,40 +5342,6 @@ function dismissPwReset(reqId) {
   notify('요청을 무시했습니다');
 }
 
-// ══════════════════════════════════════════════════
-//  RANKING RESET (랭킹 초기화)
-// ══════════════════════════════════════════════════
-function resetRanking() {
-  if (!confirm('⚠️ 랭킹 초기화\n\n모든 학생의 EXP·레벨·골드·퀘스트·몬스터 기록을 초기화합니다.\n학생 이름·비밀번호·캐릭터·장비는 유지됩니다.\n\n정말 초기화하시겠습니까?')) return;
-  const students = DB.getStudents();
-  students.forEach(s => {
-    s.exp          = 0;
-    s.level        = 1;
-    s.gold         = 0;
-    s.totalQuests  = 0;
-    s.monsterLog   = [];
-    s.monsterDailyCount = 0;
-    s.lastMonsterDate   = '';
-    s.pendingRewards    = [];
-    s.books             = [];
-    s.bookCount         = 0;
-    s.stats             = { read:0, study:0, art:0, value:0, health:0, life:0 };
-    s.combat            = { atk:0, def:0, mag:0, spd:0 };
-    s.equipmentIds      = {};
-    s.inventory         = [];
-    s.houseDecorations  = [];
-    DB.saveStudent(s);
-  });
-  // 퀘스트 기록·작품도 초기화
-  const db = DB.load();
-  db.quests     = [];
-  db.artworks   = [];
-  db.boardQuests= [];
-  DB.save(db);
-  renderAll();
-  notify('🔄 랭킹 전체 초기화 완료!');
-}
-// ══════════════════════════════════════════════════
 // ── 퀘스트 템플릿 시스템 ──
 const QUEST_TEMPLATES = {
   daily: [
