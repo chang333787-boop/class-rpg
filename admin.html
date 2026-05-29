@@ -7327,40 +7327,6 @@ function saveSettings() {
   notify('⚙️ 설정 저장 완료!');
 }
 
-function resetAllStudentStats() {
-  if (!confirm('⚠️ 모든 학생의 레벨·EXP·골드·스탯·퀘스트·몬스터 기록을 초기화할까요?\n이름과 비밀번호는 유지됩니다.')) return;
-  const db = DB.load();
-  db.students = (db.students||[]).map(s => ({
-    // 기본 정보 유지
-    id: s.id, name: s.name, avatar: s.avatar,
-    pw: s.pw, charType: s.charType,
-    job: s.job, title: '',
-    // 수치 초기화
-    level: 1, exp: 0, gold: 0,
-    stats: { read:0, study:0, art:0, value:0, health:0 },
-    combat: { atk:0, def:0, mag:0, spd:0 },
-    equipmentIds: {}, equipment: {},
-    inventory: [],
-    titles: [],
-    books: [], bookCount: 0,
-    farm: [],
-    monsterLog: [], monsterDailyCount: 0, lastMonsterDate: '',
-    totalQuests: 0,
-    pendingRewards: [],
-    promotionPending: false,
-    houseDecorations: [],
-    yardFloor: {},
-    achievements: [],
-    lastAttendDate: '',
-  }));
-  // 퀘스트 로그도 초기화
-  db.quests = [];
-  db.questLogs = {};
-  DB.save(db);
-  renderAll();
-  notify('🔄 모든 학생 수치 초기화 완료!');
-}
-
 function confirmReset() {
   if (!confirm('⚠️ 모든 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다!\n\n취소하려면 [아니오], 계속하려면 [예]를 누르세요.')) return;
   const pw = prompt('교사 비밀번호를 입력하세요:');
