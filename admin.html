@@ -2330,9 +2330,10 @@ function resetAllStudents() {
     DB.saveStudent(s);
   });
   // 퀘스트 로그도 초기화
-  const db = DB.load();
-  db.quests = []; db.questLogs = {};
-  DB.save(db);
+  DB._fbRef.update({
+    quests: null,
+    questLogs: null
+  });
   renderAll();
   notify('🔄 전체 학생 수치 초기화 완료!');
 }
