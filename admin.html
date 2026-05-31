@@ -1994,7 +1994,7 @@ function renderDashboard() {
           <div style="flex:1;min-width:0">
             <div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
               ${s?.name||'?'} · ${q.name}</div>
-            <div style="font-size:.68rem;color:var(--txt3)">${q.date||''}</div>
+            <div class="text-muted-xs">${q.date||''}</div>
           </div>
           <span class="tag ${q.approved?'approved':'pending'}">${q.approved?'승인':'대기'}</span>
         </div>`;
@@ -3706,7 +3706,7 @@ function renderBooksPage() {
           ${catTxt?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);
             border-radius:8px;padding:.12rem .42rem">${catTxt}</span>`:''}
           ${stars?`<span style="font-size:.8rem">${stars}</span>`:''}
-          ${r.bookDate||r.date?`<span style="font-size:.68rem;color:var(--txt3)">${r.bookDate||r.date}</span>`:''}
+          ${r.bookDate||r.date?`<span class="text-muted-xs">${r.bookDate||r.date}</span>`:''}
         </div>
       </div>
 
@@ -4121,7 +4121,7 @@ function renderMemoriesPage() {
             onkeydown="if(event.key==='Enter'){this.blur()}"
             placeholder="폴더 이름 입력">
         </div>
-        <div style="font-size:.68rem;color:var(--txt3)">
+        <div class="text-muted-xs">
           ${m.uploadedBy==='admin'?'관리자':'👤 '+(m.studentName||'')} · ${m.date||''}
         </div>
         <!-- 앨범 지정 셀렉트 -->
@@ -5327,7 +5327,7 @@ function renderAbilityQuests() {
       <input type="checkbox" id="aq-chk-${i}" data-name="${t.name}" data-diff="${t.diff}" data-stat="${t.stat||type}"
         style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
       <label for="aq-chk-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
-      <span style="font-size:.68rem;color:var(--txt3)">${d.label}</span>
+      <span class="text-muted-xs">${d.label}</span>
       <span style="font-size:.68rem;color:var(--gold)">+${d.exp}EXP</span>
       <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderAbilityQuests()` : `hideDefaultTemplate('${type}','${t.name}')`}"
         style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
@@ -6101,7 +6101,7 @@ function renderEquipAdmin() {
         </select>` : '';
 
     const statsHtml = Object.entries(item.stats).map(([k,v]) =>
-      `<span style="font-size:.68rem;color:var(--txt3)">${statNames[k]||k}:</span>
+      `<span class="text-muted-xs">${statNames[k]||k}:</span>
        <input type="number" id="eq-s-${item.id}-${k}" value="${ov.stats?.[k]??v}"
          style="width:50px;font-size:.72rem;padding:.12rem .25rem;border-radius:4px;
          background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--txt);text-align:center">`
@@ -6119,11 +6119,11 @@ function renderEquipAdmin() {
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
         <div style="font-size:1.1rem">${item.icon}</div>
         <div style="font-size:.82rem;font-weight:600;min-width:120px">${item.name}</div>
-        <span style="font-size:.68rem;color:var(--txt3)">가격:</span>
+        <span class="text-muted-xs">가격:</span>
         <input type="number" id="eq-p-${item.id}" value="${ov.price??item.price}"
           style="width:62px;font-size:.72rem;padding:.12rem .25rem;border-radius:4px;
           background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--txt);text-align:center">
-        <span style="font-size:.68rem;color:var(--txt3)">요구Lv:</span>
+        <span class="text-muted-xs">요구Lv:</span>
         <input type="number" id="eq-lv-${item.id}" value="${ov.lv??item.lv}" min="1" max="30"
           style="width:44px;font-size:.72rem;padding:.12rem .25rem;border-radius:4px;
           background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--txt);text-align:center">
@@ -6213,11 +6213,11 @@ function renderSkillBookAdmin() {
         const ov = saved[book.id] || {};
         return `<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;flex-wrap:wrap">
           <div style="min-width:130px;font-size:.78rem">${book.name}</div>
-          <span style="font-size:.68rem;color:var(--txt3)">가격:</span>
+          <span class="text-muted-xs">가격:</span>
           <input type="number" id="sb-p-${book.id}" value="${ov.price??book.price}"
             style="width:70px;font-size:.72rem;padding:.15rem .3rem;border-radius:4px;
             background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--txt);text-align:center">
-          <span style="font-size:.68rem;color:var(--txt3)">플레이어 Lv:</span>
+          <span class="text-muted-xs">플레이어 Lv:</span>
           <input type="number" id="sb-lv-${book.id}" value="${ov.reqPlayerLevel??book.reqPlayerLevel}" min="1" max="30"
             style="width:50px;font-size:.72rem;padding:.15rem .3rem;border-radius:4px;
             background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--txt);text-align:center">
@@ -6466,14 +6466,14 @@ function renderShopManage() {
         const o = eqOv[item.id] || {};
         const os = o.stats || {};
         const statInputs = statKeys.filter(k => item.stats[k] !== undefined).map(k =>
-          `<span style="font-size:.68rem;color:var(--txt3)">${k}</span>
+          `<span class="text-muted-xs">${k}</span>
            <input class="form-input" type="number" id="sov-stat-${item.id}-${k}" value="${os[k]??item.stats[k]}" style="width:48px;padding:.15rem .3rem;font-size:.75rem;text-align:center">`
         ).join('');
         return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.04);flex-wrap:wrap">
           <span style="font-size:.82rem;min-width:90px">${item.icon} ${item.name}</span>
-          <span style="font-size:.68rem;color:var(--txt3)">가격</span>
+          <span class="text-muted-xs">가격</span>
           <input class="form-input" type="number" id="sov-price-${item.id}" value="${o.price??item.price}" style="width:60px;padding:.15rem .3rem;font-size:.75rem;text-align:center">
-          <span style="font-size:.68rem;color:var(--txt3)">Lv</span>
+          <span class="text-muted-xs">Lv</span>
           <input class="form-input" type="number" id="sov-lv-${item.id}" value="${o.lv??item.lv}" style="width:40px;padding:.15rem .3rem;font-size:.75rem;text-align:center">
           ${statInputs}
         </div>`;
@@ -6487,9 +6487,9 @@ function renderShopManage() {
       return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.04)">
         <span style="font-size:1.1rem">${d.icon}</span>
         <span style="font-size:.82rem;flex:1">${d.name}</span>
-        <span style="font-size:.68rem;color:var(--txt3)">가격</span>
+        <span class="text-muted-xs">가격</span>
         <input class="form-input" type="number" id="sov-price-${d.id}" value="${o.price??d.price}" style="width:70px;padding:.2rem .4rem;font-size:.78rem;text-align:center">
-        <span style="font-size:.68rem;color:var(--txt3)">G</span>
+        <span class="text-muted-xs">G</span>
       </div>`;
     }).join('');
   }
