@@ -163,7 +163,7 @@
             <button class="btn-sm outline" onclick="fillPreset('daily');nav('approve',document.getElementById('nav-approve'))">📋 일일퀘스트</button>
             <button class="btn-sm outline" onclick="fillPreset('special');nav('approve',document.getElementById('nav-approve'))">⭐ 특별보상</button>
           </div>
-          <div style="font-size:.72rem;color:var(--txt3)">클릭하면 승인 페이지에서 프리셋이 바로 채워져요</div>
+          <div class="text-muted-sm">클릭하면 승인 페이지에서 프리셋이 바로 채워져요</div>
         </div>
       </div>
 
@@ -265,7 +265,7 @@
         </div>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
           <button class="btn-sm success" onclick="quickApprove()">✅ 지급</button>
-          <span style="font-size:.72rem;color:var(--txt3)" id="last-preset-hint"></span>
+          <span class="text-muted-sm" id="last-preset-hint"></span>
         </div>
       </div>
       <!-- 키오스크 스타일 승인 그리드 -->
@@ -1103,7 +1103,7 @@
             <div style="height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-bottom:.3rem">
               <div id="adm-mem-prog-bar" style="height:100%;background:var(--sky);border-radius:3px;width:0%;transition:width .3s"></div>
             </div>
-            <div id="adm-mem-prog-text" style="font-size:.72rem;color:var(--txt3)">업로드 중...</div>
+            <div id="adm-mem-prog-text" class="text-muted-sm">업로드 중...</div>
           </div>
           <div style="display:flex;gap:.5rem">
             <button class="btn-sm success" onclick="adminUploadMemories()" style="white-space:nowrap">📸 전체 공개로 올리기</button>
@@ -2198,7 +2198,7 @@ function openAddStudent() {
     <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">이름을 입력하면 해당 줄이 활성화돼요. 비어있는 줄은 건너뜁니다.</div>
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse">
-      <thead><tr style="font-size:.72rem;color:var(--txt3)">
+      <thead><tr class="text-muted-sm">
         <th style="padding:.2rem;width:24px">#</th>
         <th style="padding:.2rem;text-align:left">이름 *</th>
         <th style="padding:.2rem;text-align:left">비번</th>
@@ -2777,7 +2777,7 @@ function renderPromotionList() {
         <span>${s.avatar||'🙂'}</span>
         <span style="font-weight:700;font-size:.88rem;min-width:60px">${s.name}</span>
         <span style="font-size:.78rem;font-weight:700;color:var(--sky)">Lv.${s.level||1}</span>
-        <span style="font-size:.72rem;color:var(--txt3)">${s.job||'학생'}</span>
+        <span class="text-muted-sm">${s.job||'학생'}</span>
         <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;max-width:120px">
           <div style="height:100%;background:linear-gradient(90deg,var(--sky),var(--purple));border-radius:3px;width:${expPct}%"></div>
         </div>
@@ -3608,19 +3608,19 @@ function renderBooksPage() {
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem">
       <div style="text-align:center">
         <div style="font-size:1.6rem;font-weight:700;color:var(--gold)">${totalBooks}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">학급 총 독서</div>
+        <div class="text-muted-sm">학급 총 독서</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:1.6rem;font-weight:700;color:var(--sky)">${avgBooks}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">1인 평균</div>
+        <div class="text-muted-sm">1인 평균</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:1.6rem;font-weight:700;color:${totalPending>0?'var(--red)':'var(--txt3)'}">${totalPending}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">확인 대기</div>
+        <div class="text-muted-sm">확인 대기</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:1.2rem;font-weight:700;color:var(--emerald)">${topReader?.avatar||''} ${topReader?.name||'-'}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">최다 독서 (${topReader?.bookCount||0}권)</div>
+        <div class="text-muted-sm">최다 독서 (${topReader?.bookCount||0}권)</div>
       </div>
     </div>`;
 
@@ -4301,19 +4301,19 @@ function renderRecorderPage() {
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem">
       <div style="text-align:center">
         <div style="font-size:1.5rem;font-weight:700;color:var(--gold)">${totalLogs}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">전체 기록</div>
+        <div class="text-muted-sm">전체 기록</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:1.5rem;font-weight:700;color:var(--sky)">${activeStu}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">기록 학생</div>
+        <div class="text-muted-sm">기록 학생</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:1.5rem;font-weight:700;color:var(--emerald)">${withRec}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">녹음 첨부</div>
+        <div class="text-muted-sm">녹음 첨부</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:.92rem;font-weight:700;color:var(--txt2);padding-top:.3rem">${latestDate}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">최근 연습일</div>
+        <div class="text-muted-sm">최근 연습일</div>
       </div>
     </div>`;
 
@@ -4738,7 +4738,7 @@ function renderVocabAdminPage() {
       <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem 1.2rem">
         <span>${s?.avatar||'👤'}</span>
         <span style="font-weight:700;font-size:.85rem">${s?.name||r.studentId}</span>
-        <span style="font-size:.72rem;color:var(--txt3)">${r.date}</span>
+        <span class="text-muted-sm">${r.date}</span>
         <span style="font-size:.85rem;font-weight:700;
           color:${pct===100?'var(--emerald)':pct>=60?'var(--gold)':'var(--red)'}">
           ${r.correct}/${r.total}
@@ -5092,7 +5092,7 @@ function renderPwResetList() {
       <div style="font-size:1.5rem">🔑</div>
       <div style="flex:1">
         <div style="font-weight:700;font-size:.9rem">${r.name}</div>
-        <div style="font-size:.72rem;color:var(--txt3)">${r.date} 요청</div>
+        <div class="text-muted-sm">${r.date} 요청</div>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center">
         <input class="form-input" id="newpw-${r.id}" placeholder="새 비밀번호"
