@@ -772,7 +772,7 @@
           <div style="padding:1rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
               ${[1,2,3,4,5,6,7].map(lv=>`
-              <div style="text-align:center">
+              <div class="text-center">
                 <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.2rem">Lv${lv}</div>
                 <input class="form-input" type="number" id="bs-nm-${lv}" step="0.01"
                   style="width:68px;text-align:center;font-size:.8rem">
@@ -786,7 +786,7 @@
           <div style="padding:1rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
               ${[0,1,2,3,4,5,6,7].map(lv=>`
-              <div style="text-align:center">
+              <div class="text-center">
                 <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.2rem">Lv${lv}</div>
                 <input class="form-input" type="number" id="bs-el-${lv}" step="0.01"
                   style="width:68px;text-align:center;font-size:.8rem">
@@ -1546,7 +1546,7 @@
           </div>
           <div id="emo-reward-settings-body">
             <div style="font-size:.7rem;color:var(--txt3);display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;padding:.2rem .3rem;margin-bottom:.3rem">
-              <span>보상 종류</span><span style="text-align:center">조건(회)</span><span style="text-align:center">EXP</span><span style="text-align:center">골드</span>
+              <span>보상 종류</span><span class="text-center">조건(회)</span><span class="text-center">EXP</span><span class="text-center">골드</span>
             </div>
             <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:.3rem;align-items:center;padding:.35rem .3rem;border-bottom:1px solid rgba(255,255,255,.05)">
               <span style="font-size:.82rem">💭 참여 보상</span>
@@ -3606,19 +3606,19 @@ function renderBooksPage() {
   const topReader    = [...students].sort((a,b)=>(b.bookCount||0)-(a.bookCount||0))[0];
   document.getElementById('books-summary').innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem">
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.6rem;font-weight:700;color:var(--gold)">${totalBooks}</div>
         <div class="text-muted-sm">학급 총 독서</div>
       </div>
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.6rem;font-weight:700;color:var(--sky)">${avgBooks}</div>
         <div class="text-muted-sm">1인 평균</div>
       </div>
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.6rem;font-weight:700;color:${totalPending>0?'var(--red)':'var(--txt3)'}">${totalPending}</div>
         <div class="text-muted-sm">확인 대기</div>
       </div>
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.2rem;font-weight:700;color:var(--emerald)">${topReader?.avatar||''} ${topReader?.name||'-'}</div>
         <div class="text-muted-sm">최다 독서 (${topReader?.bookCount||0}권)</div>
       </div>
@@ -4299,19 +4299,19 @@ function renderRecorderPage() {
   const summaryEl  = document.getElementById('recorder-summary');
   if (summaryEl) summaryEl.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem">
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.5rem;font-weight:700;color:var(--gold)">${totalLogs}</div>
         <div class="text-muted-sm">전체 기록</div>
       </div>
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.5rem;font-weight:700;color:var(--sky)">${activeStu}</div>
         <div class="text-muted-sm">기록 학생</div>
       </div>
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:1.5rem;font-weight:700;color:var(--emerald)">${withRec}</div>
         <div class="text-muted-sm">녹음 첨부</div>
       </div>
-      <div style="text-align:center">
+      <div class="text-center">
         <div style="font-size:.92rem;font-weight:700;color:var(--txt2);padding-top:.3rem">${latestDate}</div>
         <div class="text-muted-sm">최근 연습일</div>
       </div>
@@ -4927,19 +4927,19 @@ function renderWeeklyAdminPage() {
   if (thisWeekEl) {
     thisWeekEl.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:.8rem">
-        <div style="text-align:center">
+        <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--emerald)">${bothDone.length}</div>
           <div style="font-size:.7rem;color:var(--txt3)">월+금 완료</div>
         </div>
-        <div style="text-align:center">
+        <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--sky)">${monDone.length}</div>
           <div style="font-size:.7rem;color:var(--txt3)">월요일 작성</div>
         </div>
-        <div style="text-align:center">
+        <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--gold)">${friDone.length}</div>
           <div style="font-size:.7rem;color:var(--txt3)">금요일 작성</div>
         </div>
-        <div style="text-align:center">
+        <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--red)">${noDone.length}</div>
           <div style="font-size:.7rem;color:var(--txt3)">미작성</div>
         </div>
@@ -6444,7 +6444,7 @@ function renderShopManage() {
   if (CUR_SHOP_TAB === 'seed') {
     const seedOv = ov.seeds || {};
     el.innerHTML = `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem;display:grid;grid-template-columns:1fr 80px 80px 80px;gap:.3rem;padding:0 .3rem">
-      <span>씨앗</span><span style="text-align:center">구매가(G)</span><span style="text-align:center">수확가(G)</span><span style="text-align:center">성장(h)</span>
+      <span>씨앗</span><span class="text-center">구매가(G)</span><span class="text-center">수확가(G)</span><span class="text-center">성장(h)</span>
     </div>` +
     GAME_DATA.seeds.map(s => {
       const o = seedOv[s.id] || {};
