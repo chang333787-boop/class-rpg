@@ -245,7 +245,7 @@
           <div class="form-group">
             <label class="form-label">능력치</label>
             <div style="display:flex;gap:.5rem;align-items:center">
-              <select class="form-select" id="qa-stat" style="flex:1">
+              <select class="form-select flex-1" id="qa-stat">
                 <option value="">없음</option>
                 <option value="read">독서</option>
                 <option value="study">학습</option>
@@ -428,7 +428,7 @@
           <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📋 35EXP + 25G</div>
           <div id="qt-daily-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
           <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
-            <input class="form-input" id="qt-daily-custom" placeholder="+ 항목 직접 추가" style="flex:1">
+            <input class="form-input flex-1" id="qt-daily-custom" placeholder="+ 항목 직접 추가">
             <button class="btn-sm" onclick="addQuestTemplate('daily')">추가</button>
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;background:rgba(255,255,255,.04);border-radius:10px;padding:.5rem .7rem">
@@ -455,7 +455,7 @@
           <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📅 80EXP + 70G</div>
           <div id="qt-weekly-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
           <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
-            <input class="form-input" id="qt-weekly-custom" placeholder="+ 항목 직접 추가" style="flex:1">
+            <input class="form-input flex-1" id="qt-weekly-custom" placeholder="+ 항목 직접 추가">
             <button class="btn-sm" onclick="addQuestTemplate('weekly')">추가</button>
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;background:rgba(255,255,255,.04);border-radius:10px;padding:.5rem .7rem">
@@ -527,7 +527,7 @@
             <div class="form-group">
               <label class="form-label">능력치</label>
               <div style="display:flex;gap:.5rem;align-items:center">
-                <select class="form-select" id="nq-stat" style="flex:1">
+                <select class="form-select flex-1" id="nq-stat">
                   <option value="">없음</option>
                   <option value="read">독서</option>
                   <option value="study">학습</option>
@@ -960,7 +960,7 @@
         </div>
       </div>
       <div style="display:flex;gap:.5rem;margin-top:1rem">
-        <button class="btn-sm success" style="flex:1" onclick="saveMonsterEdit()">💾 저장</button>
+        <button class="btn-sm success flex-1" onclick="saveMonsterEdit()">💾 저장</button>
         <button class="btn-sm danger" id="me-delete-btn" style="display:none" onclick="deleteCustomMonster()">🗑️ 삭제</button>
       </div>
     </div></div>
@@ -1390,7 +1390,7 @@
         </div>
         <div style="padding:.8rem 1.2rem">
           <div style="display:flex;gap:.4rem;margin-bottom:.7rem">
-            <input class="form-input" id="voc-set-title" placeholder="세트 이름 (예: 3월 학습 단어)" style="flex:1">
+            <input class="form-input flex-1" id="voc-set-title" placeholder="세트 이름 (예: 3월 학습 단어)">
             <input class="form-input" id="voc-set-ids" placeholder="단어 ID 목록 (쉼표 구분)" style="flex:2">
             <button class="btn-sm success" onclick="addVocabWordSet()">+ 세트 추가</button>
           </div>
@@ -1510,7 +1510,7 @@
           <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.7rem">체크 해제하면 학생 화면에서 해당 과목이 숨겨져요</div>
           <div id="subject-manage-list" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.8rem"></div>
           <div style="display:flex;gap:.5rem;margin-bottom:.6rem">
-            <input class="form-input" id="subject-custom-input" placeholder="과목 직접 추가" style="flex:1">
+            <input class="form-input flex-1" id="subject-custom-input" placeholder="과목 직접 추가">
             <button class="btn-sm success" onclick="addCustomSubject()">추가</button>
           </div>
           <button class="btn-sm success" style="width:100%" onclick="saveSubjects()">💾 저장</button>
@@ -1524,10 +1524,10 @@
           </div>
           <div id="today-links-list" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.6rem"></div>
           <div style="display:flex;gap:.4rem;margin-bottom:.3rem">
-            <input class="form-input" id="link-title-input" placeholder="링크 제목" style="flex:1">
+            <input class="form-input flex-1" id="link-title-input" placeholder="링크 제목">
           </div>
           <div style="display:flex;gap:.4rem;margin-bottom:.6rem">
-            <input class="form-input" id="link-url-input" placeholder="https://..." style="flex:1">
+            <input class="form-input flex-1" id="link-url-input" placeholder="https://...">
             <button class="btn-sm success" onclick="addTodayLink()">추가</button>
           </div>
           <button class="btn-sm success" style="width:100%" onclick="saveTodayLinks()">💾 저장</button>
@@ -1582,7 +1582,7 @@
           </div>
           <div id="shop-manage-body"></div>
           <div style="display:flex;gap:.5rem;margin-top:.8rem">
-            <button class="btn-sm success" style="flex:1" onclick="saveShopOverrides()">💾 저장</button>
+            <button class="btn-sm success flex-1" onclick="saveShopOverrides()">💾 저장</button>
             <button class="btn-sm outline" onclick="resetShopOverrides()">↩️ 초기화</button>
           </div>
         </div>
@@ -1649,7 +1649,7 @@
           <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border2)">
             <div style="font-size:.78rem;font-weight:700;margin-bottom:.5rem;color:var(--accent)">🔑 관리자 비밀번호 변경</div>
             <div style="display:flex;gap:.5rem">
-              <input class="form-input" type="password" id="set-admin-pw" placeholder="새 비밀번호" style="flex:1">
+              <input class="form-input flex-1" type="password" id="set-admin-pw" placeholder="새 비밀번호">
               <button class="btn-sm success" onclick="changeAdminPw()">변경</button>
             </div>
           </div>
@@ -1917,7 +1917,7 @@ function renderDashboard() {
       return `<div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
         border-bottom:1px solid rgba(255,255,255,.04)">
         <div style="font-size:1.1rem">${s.avatar}</div>
-        <div style="flex:1">
+        <div class="flex-1">
           <div style="font-size:.84rem;font-weight:700">${s.name}
             <span style="background:rgba(142,68,173,.2);color:#c39bd3;font-size:.68rem;
               padding:.1rem .4rem;border-radius:10px;margin-left:.4rem">
@@ -1948,7 +1948,7 @@ function renderDashboard() {
       return `<div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
         border-bottom:1px solid rgba(255,255,255,.04)">
         <div style="font-size:1.1rem">${s.avatar}</div>
-        <div style="flex:1">
+        <div class="flex-1">
           <div style="font-size:.84rem;font-weight:700">${s.name}</div>
           <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${r.date||''} 요청</div>
         </div>
@@ -5090,7 +5090,7 @@ function renderPwResetList() {
       background:rgba(255,255,255,.03);border:1px solid rgba(255,215,0,.15);
       border-radius:12px;margin-bottom:.6rem">
       <div style="font-size:1.5rem">🔑</div>
-      <div style="flex:1">
+      <div class="flex-1">
         <div style="font-weight:700;font-size:.9rem">${r.name}</div>
         <div class="text-muted-sm">${r.date} 요청</div>
       </div>
@@ -5645,7 +5645,7 @@ function renderBoardQuestList() {
       border-radius:14px;padding:1rem 1.2rem;margin-bottom:.8rem">
       <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem">
         <span style="font-size:1.8rem">${q.icon||'📋'}</span>
-        <div style="flex:1">
+        <div class="flex-1">
           <div style="font-weight:700;font-size:.95rem">${q.name}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-top:.15rem">
             <span class="tag active">${typeNames[q.type]||q.type}</span>
@@ -5778,7 +5778,7 @@ function renderInactiveQuests() {
     <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem 1.2rem;
       border-bottom:1px solid rgba(255,255,255,.04);opacity:.6">
       <span style="font-size:1.2rem">${q.icon||'📋'}</span>
-      <div style="flex:1">
+      <div class="flex-1">
         <div style="font-size:.85rem;font-weight:600">${q.name}</div>
         <div style="font-size:.7rem;color:var(--txt3)">${typeNames[q.type]||q.type} · +${q.exp}EXP · +${q.gold}G</div>
       </div>
