@@ -232,3 +232,32 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .text-center {
   text-align: center;
 }
+
+.mb-1 {
+  margin-bottom: 1rem;
+}
+
+.mb-08 {
+  margin-bottom: 0.8rem;
+}
+
+.py-05 {
+  padding: 0.5rem 0;
+}
+
+.text-muted-tiny {
+  font-size: 0.7rem;
+  color: var(--txt3);
+}
+
+.w-80 {
+  width: 80px;
+}
+
+.fs-72 {
+  font-size: 0.72rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
