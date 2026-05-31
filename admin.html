@@ -2015,7 +2015,7 @@ function renderStudentTable() {
       <td>
         <div style="display:flex;align-items:center;gap:.5rem">
           <div class="progress-mini"><div class="pm-fill" style="width:${Math.min(100,((s.exp-Utils.expForLevel(s.level))/(Utils.expForNextLevel(s.level)-Utils.expForLevel(s.level)))*100)}%"></div></div>
-          <span style="font-size:.7rem;color:var(--txt3)">${s.exp}</span>
+          <span class="text-muted-tiny">${s.exp}</span>
         </div>
       </td>
       <td><div class="td-gold">💰 ${s.gold}G</div></td>
@@ -2781,7 +2781,7 @@ function renderPromotionList() {
         <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;max-width:120px">
           <div style="height:100%;background:linear-gradient(90deg,var(--sky),var(--purple));border-radius:3px;width:${expPct}%"></div>
         </div>
-        <span style="font-size:.7rem;color:var(--txt3)">${s.exp||0} EXP</span>
+        <span class="text-muted-tiny">${s.exp||0} EXP</span>
         ${isPending?'<span style="font-size:.68rem;background:rgba(155,89,182,.2);color:var(--purple);border-radius:20px;padding:.1rem .45rem;font-weight:700">신청중</span>':''}
       </div>`;
     }).join('');
@@ -3541,7 +3541,7 @@ function renderArtworkAdmin() {
               <div style="font-weight:600;font-size:.85rem">${a.title}
                 ${a.subject?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:10px;padding:.1rem .4rem;margin-left:.3rem">${a.subject}</span>`:''}
               </div>
-              <div style="font-size:.7rem;color:var(--txt3)">${a.date||''}</div>
+              <div class="text-muted-tiny">${a.date||''}</div>
               ${a.comment?`<div style="font-size:.74rem;color:var(--txt2);margin-top:.15rem">${a.comment}</div>`:''}
             </div>
             <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
@@ -4355,7 +4355,7 @@ function renderRecorderPage() {
         <span style="font-weight:700;font-size:.88rem">${s?.name||r.studentId}</span>
         <span style="font-size:.72rem;background:rgba(255,215,0,.1);color:var(--gold);
           border-radius:8px;padding:.1rem .4rem">🎵 ${r.songTitle||song?.title||'(곡 없음)'}</span>
-        <span style="font-size:.7rem;color:var(--txt3)">${r.date||''}</span>
+        <span class="text-muted-tiny">${r.date||''}</span>
         <span style="font-size:.78rem;letter-spacing:.08em;color:var(--sky);margin-left:.2rem"
           title="연습 횟수">${dots(r.practiceCount)}</span>
         <span style="margin-left:auto;font-size:.65rem;
@@ -4363,7 +4363,7 @@ function renderRecorderPage() {
             ? 'background:rgba(46,204,113,.12);color:var(--emerald);border-radius:8px;padding:.1rem .4rem'
             : 'color:var(--txt3)'}">
           ${r.recordingUrl ? '🎙️ 녹음 있음' : '녹음 없음'}</span>
-        <span id="rl-arr-${r.id}" style="font-size:.7rem;color:var(--txt3)">▼</span>
+        <span id="rl-arr-${r.id}" class="text-muted-tiny">▼</span>
       </div>
       <!-- 상세 펼치기 -->
       <div id="rl-det-${r.id}" style="display:none;padding:.4rem 1.5rem .9rem;background:rgba(255,255,255,.02)">
@@ -4929,19 +4929,19 @@ function renderWeeklyAdminPage() {
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:.8rem">
         <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--emerald)">${bothDone.length}</div>
-          <div style="font-size:.7rem;color:var(--txt3)">월+금 완료</div>
+          <div class="text-muted-tiny">월+금 완료</div>
         </div>
         <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--sky)">${monDone.length}</div>
-          <div style="font-size:.7rem;color:var(--txt3)">월요일 작성</div>
+          <div class="text-muted-tiny">월요일 작성</div>
         </div>
         <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--gold)">${friDone.length}</div>
-          <div style="font-size:.7rem;color:var(--txt3)">금요일 작성</div>
+          <div class="text-muted-tiny">금요일 작성</div>
         </div>
         <div class="text-center">
           <div style="font-size:1.4rem;font-weight:700;color:var(--red)">${noDone.length}</div>
-          <div style="font-size:.7rem;color:var(--txt3)">미작성</div>
+          <div class="text-muted-tiny">미작성</div>
         </div>
       </div>
       <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">이번 주 (${thisWeek}) 월요일 완료</div>
@@ -5780,7 +5780,7 @@ function renderInactiveQuests() {
       <span style="font-size:1.2rem">${q.icon||'📋'}</span>
       <div class="flex-1">
         <div style="font-size:.85rem;font-weight:600">${q.name}</div>
-        <div style="font-size:.7rem;color:var(--txt3)">${typeNames[q.type]||q.type} · +${q.exp}EXP · +${q.gold}G</div>
+        <div class="text-muted-tiny">${typeNames[q.type]||q.type} · +${q.exp}EXP · +${q.gold}G</div>
       </div>
       <button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
         onclick="reactivateBoardQuest('${q.id}')">↑ 재게시</button>
@@ -5990,7 +5990,7 @@ function renderMonsters() {
             ${isCustom?'<span style="font-size:.62rem;color:var(--gold);margin-left:.3rem">✏️커스텀</span>':''}
             ${m.trait==='ghost'?'<span style="font-size:.62rem;color:#ccc;margin-left:.2rem">👻</span>':''}
           </div>
-          <div style="font-size:.7rem;color:var(--txt3)">
+          <div class="text-muted-tiny">
             ${zoneLabel[m.zone]||m.zone||''} Lv.${m.level||m.recLv}
             · <span style="color:${rarityColor[m.rarity]||'var(--txt3)'}">${m.rarity||''}</span>
             · HP:${m.hp||'?'} ATK:${m.atk||'?'} DEF:${m.def||'?'} SPD:${m.spd||'?'}
@@ -6777,7 +6777,7 @@ function renderEmotionPage() {
       { label:'미입력', value:(students.length*2 - total)+'칸', color:'var(--txt3)' },
     ].map(s => `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
       border-radius:10px;padding:.5rem .9rem;text-align:center">
-      <div style="font-size:.7rem;color:var(--txt3)">${s.label}</div>
+      <div class="text-muted-tiny">${s.label}</div>
       <div style="font-size:1.1rem;font-weight:700;color:${s.color}">${s.value}</div>
     </div>`).join('');
   }
