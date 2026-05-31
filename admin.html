@@ -171,7 +171,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
         <div class="table-card">
           <div class="tc-header"><div class="tc-title">📈 학생 레벨 현황</div></div>
-          <div id="dash-level-list" style="padding:.5rem 0"></div>
+          <div id="dash-level-list" class="py-05"></div>
         </div>
         <div class="table-card">
           <div class="tc-header"><div class="tc-title">⚡ 최근 활동</div></div>
@@ -321,7 +321,7 @@
       </div>
       <!-- 목록 -->
       <div class="table-card">
-        <div id="emotion-list" style="padding:.5rem 0"></div>
+        <div id="emotion-list" class="py-05"></div>
       </div>
     </div>
 
@@ -332,7 +332,7 @@
         <div class="sh-sub">학생이 선생님께 말하고 싶다고 한 기록이에요</div></div>
       </div>
       <div class="table-card">
-        <div id="emotion-alerts-list" style="padding:.5rem 0"></div>
+        <div id="emotion-alerts-list" class="py-05"></div>
       </div>
     </div>
 
@@ -552,7 +552,7 @@
       <!-- 게시판 퀘스트 목록 -->
       <div class="table-card">
         <div class="tc-header"><div class="tc-title">📌 현재 게시중인 퀘스트</div></div>
-        <div id="board-quest-list" style="padding:.5rem 0"></div>
+        <div id="board-quest-list" class="py-05"></div>
         <div class="tc-header" style="margin-top:.5rem;border-top:1px solid var(--border2)">
           <div class="tc-title" style="color:var(--txt3)">🗄️ 비활성 퀘스트</div>
           <button class="btn-sm outline" style="font-size:.72rem" onclick="toggleInactiveQuests()">펼치기</button>
@@ -678,7 +678,7 @@
               <input type="checkbox" id="mf-ghost" onchange="renderMonsters()"> 유령형만
             </label>
           </div>
-          <div id="mon-edit-list" style="padding:.5rem 0"></div>
+          <div id="mon-edit-list" class="py-05"></div>
         </div>
         <!-- 처치 현황 -->
         <div class="table-card">
@@ -816,7 +816,7 @@
               <option value="shoe">👟 신발</option>
             </select>
           </div>
-          <div id="equip-admin-list" style="padding:.5rem 0"></div>
+          <div id="equip-admin-list" class="py-05"></div>
         </div>
         <button class="btn-sm outline" style="width:100%;margin-top:.6rem;font-size:.72rem" onclick="resetEquipSettings()">🔄 장비 수치 기본값 초기화</button>
       </div>
@@ -825,7 +825,7 @@
       <div id="bp-skillbook" style="display:none">
         <div class="table-card">
           <div class="tc-header"><div class="tc-title">📚 마스터리북 가격/조건 편집</div></div>
-          <div id="skillbook-admin-list" style="padding:.5rem 0"></div>
+          <div id="skillbook-admin-list" class="py-05"></div>
         </div>
         <button class="btn-sm outline" style="width:100%;margin-top:.6rem;font-size:.72rem" onclick="resetSkillBookSettings()">🔄 스킬북 기본값 초기화</button>
       </div>
@@ -977,7 +977,7 @@
         <div class="tc-header">
           <div class="tc-title">⏳ 승인 대기 작품</div>
         </div>
-        <div id="artwork-pending-list" style="padding:.5rem 0"></div>
+        <div id="artwork-pending-list" class="py-05"></div>
       </div>
 
       <!-- 승인 완료 작품 목록 -->
@@ -996,7 +996,7 @@
           </div>
         </div>
         <div id="artwork-orphan-wrap" style="display:none"></div>
-        <div id="artwork-admin-list" style="padding:.5rem 0"></div>
+        <div id="artwork-admin-list" class="py-05"></div>
       </div>
     </div>
 
@@ -1046,7 +1046,7 @@
             </select>
           </div>
         </div>
-        <div id="books-list" style="padding:.5rem 0"></div>
+        <div id="books-list" class="py-05"></div>
       </div>
     </div>
 
@@ -1165,7 +1165,7 @@
             </select>
           </div>
         </div>
-        <div id="memories-list" style="padding:.5rem 0"></div>
+        <div id="memories-list" class="py-05"></div>
       </div>
     </div>
 
@@ -1224,7 +1224,7 @@
             </select>
           </div>
         </div>
-        <div id="recorder-list" style="padding:.5rem 0"></div>
+        <div id="recorder-list" class="py-05"></div>
       </div>
     </div>
 
@@ -1246,7 +1246,7 @@
       <!-- 미완료 학생 알림 -->
       <div class="table-card mb-1">
         <div class="tc-header"><div class="tc-title">⚠️ 이번 주 미작성 학생</div></div>
-        <div id="weekly-incomplete" style="padding:.5rem 0"></div>
+        <div id="weekly-incomplete" class="py-05"></div>
       </div>
 
       <!-- 필터 + 기록 목록 -->
@@ -1268,7 +1268,7 @@
             </select>
           </div>
         </div>
-        <div id="weekly-admin-list" style="padding:.5rem 0"></div>
+        <div id="weekly-admin-list" class="py-05"></div>
       </div>
     </div>
 
@@ -1412,7 +1412,7 @@
             <span id="vocab-quiz-toggle-icon" style="font-size:.85rem;color:var(--txt3)">▲</span>
           </div>
         </div>
-        <div id="voc-quiz-list" style="padding:.5rem 0"></div>
+        <div id="voc-quiz-list" class="py-05"></div>
       </div>
     </div>
     </div>
@@ -1420,7 +1420,7 @@
     <!-- ── PW RESET ── -->
     <div class="page" id="p-pwreset">
       <div class="section-header"><div class="sh-title">🔑 비밀번호 초기화 요청</div></div>
-      <div id="pwreset-list" style="padding:.5rem 0"></div>
+      <div id="pwreset-list" class="py-05"></div>
     </div>
 
     <!-- ── PROMOTION ── -->
