@@ -34,7 +34,7 @@
       <div style="font-size:1.1rem;font-weight:900;color:var(--accent)">교사 관리자</div>
       <div style="font-size:.75rem;color:var(--txt3);margin-top:.25rem">우리반 성장 RPG</div>
     </div>
-    <div style="margin-bottom:.8rem">
+    <div class="mb-08">
       <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.35rem">관리자 비밀번호</div>
       <input type="password" id="admin-pw-input" class="form-input" placeholder="비밀번호 입력"
         style="margin-bottom:.2rem" onkeydown="if(event.key==='Enter')adminLogin()">
@@ -566,12 +566,12 @@
       <div class="section-header"><div class="sh-title">🎁 개별 보상 지급</div></div>
       <div class="qb-card mb-1">
         <div class="qb-title">학생 능력치 직접 수정</div>
-        <div class="form-group" style="margin-bottom:.8rem">
+        <div class="form-group mb-08">
           <label class="form-label">학생 선택</label>
           <select class="form-select" id="rw-student" onchange="loadRewardStudent()"></select>
         </div>
         <div class="ab-grid mb-1" id="reward-stats"></div>
-        <div class="form-grid" style="margin-bottom:.8rem">
+        <div class="form-grid mb-08">
           <div class="form-group">
             <label class="form-label">골드 지급/차감</label>
             <input class="form-input" type="number" id="rw-gold" value="0" placeholder="양수: 지급, 음수: 차감">
@@ -618,7 +618,7 @@
       <!-- ① 몬스터 탭 -->
       <div id="bp-monster">
         <!-- 일괄 조정 패널 -->
-        <div class="table-card" style="margin-bottom:.8rem">
+        <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">⚡ 일괄 조정</div></div>
           <div style="padding:.8rem 1rem;display:flex;flex-direction:column;gap:.6rem">
             <div style="font-size:.74rem;color:var(--txt3);margin-bottom:.2rem">적용 범위 선택 후 수치를 입력하고 적용하세요. +값=증가, -값=감소</div>
@@ -646,7 +646,7 @@
             </div>
           </div>
         </div>
-        <div class="table-card" style="margin-bottom:.8rem">
+        <div class="table-card mb-08">
           <div class="tc-header">
             <div class="tc-title">🐉 몬스터 목록 (100마리)</div>
             <div style="display:flex;gap:.4rem">
@@ -706,7 +706,7 @@
           💡 <strong>전투 밸런스</strong> 탭에서 변경한 설정은 저장 즉시 학생 화면 전투에 실시간 반영됩니다.<br>
           몬스터 개별 수치는 🐉 몬스터 탭에서, 장비·스킬북은 🛡️·📚 탭에서 편집하세요.
         </div>
-        <div class="table-card" style="margin-bottom:.8rem">
+        <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">⚙️ 전투 전역 설정</div></div>
           <div style="padding:1rem;display:flex;flex-direction:column;gap:.9rem">
             <!-- 하루 전투 횟수 -->
@@ -767,7 +767,7 @@
           </div>
         </div>
         <!-- 노말 스킬 계수 -->
-        <div class="table-card" style="margin-bottom:.8rem">
+        <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">⚔️ 노말 스킬 계수 (Lv1~7)</div></div>
           <div style="padding:1rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -781,7 +781,7 @@
           </div>
         </div>
         <!-- 속성 스킬 계수 -->
-        <div class="table-card" style="margin-bottom:.8rem">
+        <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">🔥 속성 스킬 계수 (Lv0~7)</div></div>
           <div style="padding:1rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -832,7 +832,7 @@
 
       <!-- ⑤ 도감 보상 탭 -->
       <div id="bp-dex" style="display:none">
-        <div class="table-card" style="margin-bottom:.8rem">
+        <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">🏆 도감 보상 설정</div></div>
           <div style="padding:1rem;display:flex;flex-direction:column;gap:.9rem">
             <div style="display:flex;align-items:center;gap:.8rem">
@@ -872,17 +872,17 @@
     <button class="modal-close" onclick="document.getElementById('m-artwork-edit').classList.remove('open')">✕</button>
   </div>
   <input type="hidden" id="ae-id">
-  <div class="form-group" style="margin-bottom:.8rem">
+  <div class="form-group mb-08">
     <label class="form-label">작품 제목</label>
     <input class="form-input" id="ae-title">
   </div>
-  <div class="form-group" style="margin-bottom:.8rem">
+  <div class="form-group mb-08">
     <label class="form-label">과목</label>
     <select class="form-select" id="ae-subject">
       <option value="">없음</option>
     </select>
   </div>
-  <div class="form-group" style="margin-bottom:.8rem">
+  <div class="form-group mb-08">
     <label class="form-label">작품 설명 / 선생님 코멘트</label>
     <textarea class="form-input" id="ae-comment" rows="3" style="resize:vertical"></textarea>
   </div>
@@ -898,11 +898,11 @@
   <div style="background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:.8rem;margin-bottom:1rem;font-size:.8rem;color:#e74c3c">
     ⚠️ 롤백하면 선택 날짜 이후의 <strong>모든 데이터가 삭제</strong>됩니다. 되돌릴 수 없어요!
   </div>
-  <div style="margin-bottom:.8rem">
+  <div class="mb-08">
     <div style="font-size:.8rem;font-weight:700;margin-bottom:.4rem">복원할 날짜 선택</div>
     <div id="rollback-date-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto"></div>
   </div>
-  <div style="margin-bottom:.8rem">
+  <div class="mb-08">
     <div style="font-size:.78rem;color:var(--txt2);margin-bottom:.3rem">확인을 위해 <strong>ROLLBACK</strong> 입력</div>
     <input class="form-input" id="rollback-confirm-input" placeholder="ROLLBACK">
   </div>
@@ -1447,7 +1447,7 @@
       <div class="settings-grid">
         <div class="settings-card">
           <div class="sc-head">🏫 학급 정보</div>
-          <div class="form-group" style="margin-bottom:.8rem">
+          <div class="form-group mb-08">
             <label class="form-label">학급 이름</label>
             <input class="form-input" id="set-classname" value="우리반">
           </div>
@@ -1463,7 +1463,7 @@
             <label class="form-label">보스 이름</label>
             <input class="form-input" id="set-boss-name" value="거대 트롤">
           </div>
-          <div class="form-grid" style="margin-bottom:.8rem">
+          <div class="form-grid mb-08">
             <div class="form-group">
               <label class="form-label">보스 아이콘</label>
               <input class="form-input" id="set-boss-icon" value="🧌" style="font-size:1.2rem">
@@ -2880,7 +2880,7 @@ function buildRankingHTML(students) {
         </div>
       </div>`;
     }).join('');
-    return `<div style="margin-bottom:.8rem">
+    return `<div class="mb-08">
       <div style="font-size:.72rem;color:var(--txt3);font-weight:700;margin-bottom:.4rem;padding-left:.2rem">${cat.label}</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem">${items}</div>
     </div>`;
