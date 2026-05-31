@@ -713,19 +713,19 @@
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">하루 전투 횟수</label>
               <input class="form-input" type="number" id="bs-daily-limit" value="3" min="1" max="10" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">회 (현재 기본값: 3)</span>
+              <span class="text-muted-base">회 (현재 기본값: 3)</span>
             </div>
             <!-- 무한배틀 하루 도전 횟수 -->
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">♾️ 무한배틀 횟수</label>
               <input class="form-input" type="number" id="bs-infinite-limit" value="1" min="0" max="10" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">회 / 일 (기본값: 1 · 0으로 설정하면 잠금)</span>
+              <span class="text-muted-base">회 / 일 (기본값: 1 · 0으로 설정하면 잠금)</span>
             </div>
             <!-- 유령형 노말 배율 -->
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">유령형 노말 배율</label>
               <input class="form-input" type="number" id="bs-ghost-mult" value="0.55" min="0.1" max="1.0" step="0.05" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">× (1.0 = 감소 없음, 0.55 기본)</span>
+              <span class="text-muted-base">× (1.0 = 감소 없음, 0.55 기본)</span>
             </div>
             <!-- 몬스터 난이도 배율 -->
             <div style="margin-top:.6rem;padding:.7rem;background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:10px">
@@ -734,35 +734,35 @@
               <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.5rem">
                 <label style="font-size:.82rem;font-weight:600;min-width:140px">몬스터 HP 배율</label>
                 <input class="form-input" type="number" id="bs-mon-hp-mult" value="1.0" min="0.5" max="2.0" step="0.1" style="width:80px">
-                <span style="font-size:.75rem;color:var(--txt3)">× (기본 1.0 / 전투 시 몬스터 기본 HP에 적용)</span>
+                <span class="text-muted-base">× (기본 1.0 / 전투 시 몬스터 기본 HP에 적용)</span>
               </div>
               <div style="display:flex;align-items:center;gap:.8rem">
                 <label style="font-size:.82rem;font-weight:600;min-width:140px">몬스터 공격력 배율</label>
                 <input class="form-input" type="number" id="bs-mon-atk-mult" value="1.0" min="0.5" max="2.0" step="0.1" style="width:80px">
-                <span style="font-size:.75rem;color:var(--txt3)">× (기본 1.0 / 전투 시 몬스터 기본 공격력에 적용)</span>
+                <span class="text-muted-base">× (기본 1.0 / 전투 시 몬스터 기본 공격력에 적용)</span>
               </div>
             </div>
             <!-- 공격 상성 -->
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">공격 유리 배율</label>
               <input class="form-input" type="number" id="bs-adv-mult" value="1.4" min="1.0" max="2.0" step="0.05" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">× (기본 1.4)</span>
+              <span class="text-muted-base">× (기본 1.4)</span>
             </div>
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">공격 불리 배율</label>
               <input class="form-input" type="number" id="bs-dis-mult" value="0.8" min="0.3" max="1.0" step="0.05" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">× (기본 0.8)</span>
+              <span class="text-muted-base">× (기본 0.8)</span>
             </div>
             <!-- 방어 상성 -->
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">방어 유리 배율</label>
               <input class="form-input" type="number" id="bs-def-adv" value="0.85" min="0.5" max="1.0" step="0.05" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">× 피해 경감 (기본 0.85)</span>
+              <span class="text-muted-base">× 피해 경감 (기본 0.85)</span>
             </div>
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">방어 불리 배율</label>
               <input class="form-input" type="number" id="bs-def-dis" value="1.15" min="1.0" max="2.0" step="0.05" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">× 피해 증가 (기본 1.15)</span>
+              <span class="text-muted-base">× 피해 증가 (기본 1.15)</span>
             </div>
           </div>
         </div>
@@ -838,12 +838,12 @@
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">최초 처치 보상</label>
               <label class="toggle"><input type="checkbox" id="dex-first-kill-on"><span class="toggle-slider"></span></label>
-              <span style="font-size:.75rem;color:var(--txt3)">활성화 시 첫 처치마다 골드 지급</span>
+              <span class="text-muted-base">활성화 시 첫 처치마다 골드 지급</span>
             </div>
             <div style="display:flex;align-items:center;gap:.8rem">
               <label style="font-size:.82rem;font-weight:600;min-width:140px">최초 처치 골드</label>
               <input class="form-input" type="number" id="dex-first-gold" value="10" min="0" style="width:80px">
-              <span style="font-size:.75rem;color:var(--txt3)">G (최초 처치 시 지급)</span>
+              <span class="text-muted-base">G (최초 처치 시 지급)</span>
             </div>
           </div>
           <div style="padding:.6rem 1rem;font-size:.78rem;font-weight:700;color:var(--txt1);border-top:1px solid rgba(255,255,255,.06)">zone별 도감 달성 보상</div>
@@ -852,10 +852,10 @@
             <div style="background:rgba(255,255,255,.03);border-radius:8px;padding:.7rem">
               <div style="font-size:.8rem;font-weight:700;margin-bottom:.5rem">${label} (${n}마리 완성)</div>
               <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-                <span style="font-size:.75rem;color:var(--txt3)">달성 골드:</span>
+                <span class="text-muted-base">달성 골드:</span>
                 <input class="form-input" type="number" id="dex-${z}-gold" value="100" min="0" style="width:80px">
-                <span style="font-size:.75rem;color:var(--txt3)">G</span>
-                <span style="font-size:.75rem;color:var(--txt3)">칭호:</span>
+                <span class="text-muted-base">G</span>
+                <span class="text-muted-base">칭호:</span>
                 <input class="form-input" id="dex-${z}-title" placeholder="없음" style="width:100px;font-size:.78rem">
               </div>
             </div>`).join('')}
@@ -930,7 +930,7 @@
           <div id="me-icon-picker" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.4rem"></div>
           <div style="display:flex;gap:.5rem;align-items:center">
             <input class="form-input" id="me-icon" placeholder="🐗" style="width:70px;font-size:1.3rem;text-align:center">
-            <span style="font-size:.75rem;color:var(--txt3)">직접 입력도 가능</span>
+            <span class="text-muted-base">직접 입력도 가능</span>
           </div>
         </div>
         <div class="form-group">
@@ -1116,7 +1116,7 @@
       <div class="table-card" style="margin-bottom:1rem">
         <div class="tc-header"><div class="tc-title">✏️ 일괄 이름 변경</div></div>
         <div style="padding:.8rem 1.2rem;display:flex;flex-direction:column;gap:.6rem">
-          <div style="font-size:.75rem;color:var(--txt3)">
+          <div class="text-muted-base">
             선택한 사진들의 제목을 한번에 폴더 이름으로 바꿔요.
             KakaoTalk 파일명 등 정리할 때 유용해요.
           </div>
@@ -1135,7 +1135,7 @@
             border:1px solid rgba(255,255,255,.08);border-radius:8px"></div>
           <div style="display:flex;gap:.5rem;align-items:center">
             <button class="btn-sm outline" onclick="toggleBulkSelectAll()">전체 선택/해제</button>
-            <span id="bulk-selected-count" style="font-size:.75rem;color:var(--txt3)">0장 선택됨</span>
+            <span id="bulk-selected-count" class="text-muted-base">0장 선택됨</span>
             <button class="btn-sm success" onclick="applyBulkRename()" style="margin-left:auto">
               ✅ 선택한 사진 이름 변경
             </button>
@@ -1182,7 +1182,7 @@
       <div class="table-card" style="margin-bottom:1rem">
         <div class="tc-header">
           <div class="tc-title">🎼 연습 곡 목록</div>
-          <span style="font-size:.75rem;color:var(--txt3)">★ 집중곡 지정 · 활성/비활성 관리</span>
+          <span class="text-muted-base">★ 집중곡 지정 · 활성/비활성 관리</span>
         </div>
         <div style="padding:.8rem 1.2rem">
           <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap">
@@ -4946,7 +4946,7 @@ function renderWeeklyAdminPage() {
       </div>
       <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">이번 주 (${thisWeek}) 월요일 완료</div>
       <div style="display:flex;flex-wrap:wrap;gap:.3rem">
-        ${monDone.length===0?'<span style="font-size:.75rem;color:var(--txt3)">없음</span>':
+        ${monDone.length===0?'<span class="text-muted-base">없음</span>':
           monDone.map(s=>`<span style="font-size:.75rem;background:rgba(93,173,226,.12);
             color:var(--sky);border-radius:20px;padding:.15rem .55rem">${s.avatar} ${s.name}</span>`).join('')}
       </div>`;
@@ -5655,7 +5655,7 @@ function renderBoardQuestList() {
           </div>
         </div>
         <div style="display:flex;gap:.4rem">
-          <span style="font-size:.75rem;color:var(--txt3)">${doneSids.size}/${students.length}명</span>
+          <span class="text-muted-base">${doneSids.size}/${students.length}명</span>
           <button class="btn-sm danger" style="font-size:.68rem;padding:.2rem .5rem"
             onclick="closeBoardQuest('${q.id}')">🗑️ 닫기</button>
         </div>
@@ -7048,7 +7048,7 @@ function renderTodayLinksList() {
   const el = document.getElementById('today-links-list');
   if (!el) return;
   if (_todayLinks.length === 0) {
-    el.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">등록된 링크가 없어요</div>`;
+    el.innerHTML = `<div class="text-muted-base">등록된 링크가 없어요</div>`;
     return;
   }
   el.innerHTML = _todayLinks.map((l,i) => `
