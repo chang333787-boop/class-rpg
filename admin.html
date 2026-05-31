@@ -272,7 +272,7 @@
       <div style="margin-bottom:1.2rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
           <div style="font-size:.85rem;font-weight:700;color:var(--txt1)">⚡ 빠른 승인 (키오스크 뷰)</div>
-          <button class="btn-sm outline" onclick="renderApproveGrid()" style="font-size:.72rem">🔄 새로고침</button>
+          <button class="btn-sm outline fs-72" onclick="renderApproveGrid()">🔄 새로고침</button>
         </div>
         <div id="approve-grid" style="overflow-x:auto;border-radius:var(--r);border:1px solid var(--border2)"></div>
       </div>
@@ -555,7 +555,7 @@
         <div id="board-quest-list" class="py-05"></div>
         <div class="tc-header" style="margin-top:.5rem;border-top:1px solid var(--border2)">
           <div class="tc-title" style="color:var(--txt3)">🗄️ 비활성 퀘스트</div>
-          <button class="btn-sm outline" style="font-size:.72rem" onclick="toggleInactiveQuests()">펼치기</button>
+          <button class="btn-sm outline fs-72" onclick="toggleInactiveQuests()">펼치기</button>
         </div>
         <div id="inactive-quest-list" style="display:none;padding:.5rem 0"></div>
       </div>
@@ -642,7 +642,7 @@
               </select>
               <input class="form-input" type="number" id="bulk-delta" value="5" style="width:72px;font-size:.82rem" placeholder="±값">
               <button class="btn-sm success" style="font-size:.78rem" onclick="applyBulkMonsterAdjust()">적용</button>
-              <button class="btn-sm outline" style="font-size:.72rem" onclick="resetCustomMonsters()">전체 초기화</button>
+              <button class="btn-sm outline fs-72" onclick="resetCustomMonsters()">전체 초기화</button>
             </div>
           </div>
         </div>
@@ -651,7 +651,7 @@
             <div class="tc-title">🐉 몬스터 목록 (100마리)</div>
             <div style="display:flex;gap:.4rem">
               <button class="btn-sm success" onclick="openAddMonsterModal()">+ 새 몬스터</button>
-              <button class="btn-sm outline" style="font-size:.72rem" onclick="resetCustomMonsters()">기본값 초기화</button>
+              <button class="btn-sm outline fs-72" onclick="resetCustomMonsters()">기본값 초기화</button>
             </div>
           </div>
           <!-- 필터 -->
@@ -1576,9 +1576,9 @@
           <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.7rem">가격/수치를 바꾸면 학생 화면에도 즉시 반영돼요</div>
           <!-- 탭 -->
           <div style="display:flex;gap:.4rem;margin-bottom:.8rem;flex-wrap:wrap">
-            <button class="btn-sm outline" id="shop-tab-seed"   onclick="switchShopTab('seed',this)"   style="font-size:.72rem">🌱 씨앗</button>
-            <button class="btn-sm outline" id="shop-tab-equip"  onclick="switchShopTab('equip',this)"  style="font-size:.72rem">⚔️ 장비</button>
-            <button class="btn-sm outline" id="shop-tab-deco"   onclick="switchShopTab('deco',this)"   style="font-size:.72rem">🌸 장식</button>
+            <button class="btn-sm outline fs-72" id="shop-tab-seed"   onclick="switchShopTab('seed',this)"  >🌱 씨앗</button>
+            <button class="btn-sm outline fs-72" id="shop-tab-equip"  onclick="switchShopTab('equip',this)" >⚔️ 장비</button>
+            <button class="btn-sm outline fs-72" id="shop-tab-deco"   onclick="switchShopTab('deco',this)"  >🌸 장식</button>
           </div>
           <div id="shop-manage-body"></div>
           <div style="display:flex;gap:.5rem;margin-top:.8rem">
@@ -3477,7 +3477,7 @@ function renderArtworkAdmin() {
         <div style="flex:1;font-size:.8rem;color:var(--red)">
           ⚠️ 삭제된 학생의 작품 <strong>${orphanArtworks.length}개</strong>가 있어요 (현재 ?? 로 표시)
         </div>
-        <button class="btn-sm danger" style="font-size:.72rem"
+        <button class="btn-sm danger fs-72"
           onclick="deleteOrphanArtworks()">🗑️ 정리</button>
       </div>`;
     } else {
@@ -5097,9 +5097,9 @@ function renderPwResetList() {
       <div style="display:flex;gap:.5rem;align-items:center">
         <input class="form-input" id="newpw-${r.id}" placeholder="새 비밀번호"
           style="width:100px;padding:.3rem .5rem;font-size:.78rem">
-        <button class="btn-sm success" style="font-size:.72rem"
+        <button class="btn-sm success fs-72"
           onclick="resetStudentPw('${r.id}','${r.studentId}')">초기화</button>
-        <button class="btn-sm danger" style="font-size:.72rem"
+        <button class="btn-sm danger fs-72"
           onclick="dismissPwReset('${r.id}')">무시</button>
       </div>
     </div>`).join('');
