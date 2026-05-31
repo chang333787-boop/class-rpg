@@ -209,3 +209,26 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
 .sh-title{font-size:1rem;font-weight:700;}
 .sh-sub{font-size:.75rem;color:var(--txt2);}
+
+.text-muted-sm {
+  font-size: 0.72rem;
+  color: var(--txt3);
+}
+
+.text-muted-xs {
+  font-size: 0.68rem;
+  color: var(--txt3);
+}
+
+.text-muted-base {
+  font-size: 0.75rem;
+  color: var(--txt3);
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.text-center {
+  text-align: center;
+}
