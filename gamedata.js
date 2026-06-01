@@ -1007,8 +1007,26 @@ const DB = {
     this._fbRef.child('memoryAlbums').set(db.memoryAlbums);
     this._fbRef.child('memories').set(db.memories);
   },
-  addPwResetRequest(r)    { const db=this.load(); db.pwResetRequests=[...(db.pwResetRequests||[]),r]; this.save(db); },
-  removePwResetRequest(id){ const db=this.load(); db.pwResetRequests=(db.pwResetRequests||[]).filter(r=>r.id!==id); this.save(db); },
+  addPwResetRequest(r) {
+    const db = this.load();
+    db.pwResetRequests = [...(db.pwResetRequests || []), r];
+    this._cache = db;
+    this._saving = true;
+    // 요청 단위 부분 저장 (root 전체 set 방지, id 키 기반)
+    this._fbRef.child('pwResetRequests/' + r.id).set(r).finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
+  },
+  removePwResetRequest(id) {
+    const db = this.load();
+    db.pwResetRequests = (db.pwResetRequests || []).filter(r => r.id !== id);
+    this._cache = db;
+    this._saving = true;
+    // 요청 단위 삭제 (root 전체 set 방지)
+    this._fbRef.child('pwResetRequests/' + id).remove().finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
+  },
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
 };
 
