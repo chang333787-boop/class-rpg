@@ -750,7 +750,16 @@ const DB = {
   getStudent(id)   { return this.load().students.find(s => s.id === id); },
 
   getSettings()    { return this.load().settings; },
-  saveSettings(s)  { const db = this.load(); db.settings = s; this.save(db); },
+  saveSettings(s)  {
+    const db = this.load();
+    db.settings = s;
+    this._cache = db;
+    this._saving = true;
+    // settings 노드만 부분 저장 (root 전체 set 방지)
+    this._fbRef.child('settings').set(s).finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
+  },
 
   getQuests()      { return this.load().quests || []; },
   addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
