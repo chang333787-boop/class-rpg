@@ -776,10 +776,24 @@ const DB = {
     const exists = db.promotionRequests.some(x => x && x.studentId === r.studentId && Number(x.level) === Number(r.level));
     if (exists) return false;
     db.promotionRequests.push(r);
-    this.save(db);
+    this._cache = db;
+    this._saving = true;
+    // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
+    this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
     return true;
   },
-  removePromotionRequest(id) { const db = this.load(); db.promotionRequests = (db.promotionRequests||[]).filter(r=>r.id!==id); this.save(db); },
+  removePromotionRequest(id) {
+    const db = this.load();
+    db.promotionRequests = (db.promotionRequests || []).filter(r => r.id !== id);
+    this._cache = db;
+    this._saving = true;
+    // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
+    this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
+      setTimeout(() => { this._saving = false; }, 500);
+    });
+  },
 
   async getAdminPw() {
     const snap = await this._fbAdminRef.once('value');
