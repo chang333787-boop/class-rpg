@@ -7123,11 +7123,6 @@ function exportData() {
   notify('📁 데이터 내보내기 완료!');
 }
 
-function resetToDefault() {
-  if (!confirm('학생 데이터를 기본값으로 초기화하시겠습니까?')) return;
-  DB._fbRef.remove().then(() => location.reload());
-}
-
 // ══════════════════════════════════════════════════
 //  UTILS
 // ══════════════════════════════════════════════════
