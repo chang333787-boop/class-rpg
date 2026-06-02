@@ -687,14 +687,6 @@ const DB = {
 
   load() { return this._cache; },
 
-  save(data) {
-    this._cache = data;
-    this._saving = true;
-    this._fbRef.set(data).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
-    });
-  },
-
   // ── 부분 저장 (충돌 방지) ──
   saveStudent(student) {
     const db = this.load();
