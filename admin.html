@@ -2162,16 +2162,6 @@ function quickGiveGold(id) {
   notify(`💰 ${s.name}에게 ${amt > 0 ? '+' : ''}${amt}G 지급!`);
 }
 
-function confirmDeleteStudent(id) {
-  const s = DB.getStudent(id);
-  if (!confirm(`"${s.name}" 학생을 삭제하시겠습니까?`)) return;
-  const db = DB.load();
-  db.students = db.students.filter(st => st.id !== id);
-  DB.save(db);
-  renderAll();
-  notify('🗑️ 학생이 삭제되었습니다', 'error');
-}
-
 function openAddStudent() {
   const el = document.createElement('div');
   el.className = 'overlay open';
