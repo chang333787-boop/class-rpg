@@ -762,7 +762,6 @@ const DB = {
   },
 
   getQuests()      { return this.load().quests || []; },
-  addQuest(q)      { const db = this.load(); db.quests = [...(db.quests||[]), q]; this.save(db); },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
   savePromotionRequests(arr) {
@@ -802,7 +801,6 @@ const DB = {
   setAdminPw(pw) { this._fbAdminRef.set(pw); },
 
   getArtworks(studentId) { return (this.load().artworks||[]).filter(a => a.studentId === studentId); },
-  addArtwork(a)          { const db=this.load(); db.artworks=[...(db.artworks||[]),a]; this.save(db); },
   deleteArtwork(id) {
     const db = this.load();
     db.artworks = (db.artworks||[]).filter(a => a.id !== id);
