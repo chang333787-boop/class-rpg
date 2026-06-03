@@ -691,9 +691,9 @@ function requestQuest(studentId, questId, btn) {
     date: Utils.todayStr(),
   });
 
-  // Firebase 저장 (id 키 기반 - 인덱스 충돌 없음)
+  // Firebase 저장 — pendingRewards 경로만 부분 저장 (학생 exp/gold 등 다른 필드 클로버 방지)
   // 저장 성공 후에만 완료 토스트 — 실패 시 실패 안내 + 버튼 잠금 복구
-  fbRef.child('students/'+s.id).set(s)
+  fbRef.child('students/'+s.id+'/pendingRewards').set(s.pendingRewards)
     .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청 완료!`); })
     .catch(() => { if (btn) delete btn.dataset.requesting; showToast(`⚠️ ${s.name} 신청 저장 실패 — 다시 시도해주세요`); });
 }
@@ -722,8 +722,8 @@ function cancelQuest(studentId, questId) {
   s.pendingRewards = (s.pendingRewards||[]).filter(r=>r.boardQuestId!==questId);
   const canIdx = DB_DATA.students.findIndex(x=>x.id===studentId);
   if (canIdx >= 0) {
-    // 저장 성공 후에만 취소 완료 토스트 — 실패 시 실패 안내
-    fbRef.child('students/'+s.id).set(s)
+    // pendingRewards 경로만 부분 저장 — 저장 성공 후에만 취소 완료 토스트
+    fbRef.child('students/'+s.id+'/pendingRewards').set(s.pendingRewards)
       .then(() => { showToast('↩️ 신청이 취소됐어요'); })
       .catch(() => { showToast('⚠️ 취소 저장 실패 — 다시 시도해주세요'); });
   }
