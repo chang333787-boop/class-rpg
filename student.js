@@ -5,6 +5,7 @@ let BATTLE_MON = null, BATTLE_TRIES = 0, BATTLE_DONE = false;
 let BATTLE_STATE = null; // 새 턴제 전투 엔진 상태
 let BATTLE_MENU = 'main'; // 'main' | 'attack' | 'skill'
 let MOB_TAB = 'home';
+var _lbTouchX = 0; // 라이트박스 스와이프 시작 X (인라인 ontouchstart/end가 전역 접근 → window 프로퍼티 필요, let 금지)
 
 // ══ 초기화 ══
 window.onload = async () => {
