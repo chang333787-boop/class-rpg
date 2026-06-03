@@ -126,6 +126,63 @@ for (const f of HTML_FILES) {
   else add('FAIL', `${f}: ${pj} 태그에 금지 속성 ${bad.join(', ')}`);
 }
 
+// ── 9) 안전 규칙 문서 존재 ──
+{
+  const doc = 'docs/rpg_refactor_safety_rules.md';
+  if (exists(doc)) add('PASS', `안전 규칙 문서 존재 (${doc})`);
+  else add('FAIL', `안전 규칙 문서 누락 (${doc})`);
+}
+
+// ── 10) admin 날짜 helper 재발 방지 (Utils.todayStr/weekStartStr로 통일 유지) ──
+if (exists('admin.js')) {
+  const a = read('admin.js');
+  const defToday = countMatches(a, /function\s+todayStr\(/g);
+  const defWeek  = countMatches(a, /function\s+weekStartStr\(/g);
+  // bare 호출 = 전체 호출 − Utils. 프리픽스 − 함수 정의
+  const bareToday = countMatches(a, /todayStr\(/g) - countMatches(a, /Utils\.todayStr\(/g) - defToday;
+  const bareWeek  = countMatches(a, /weekStartStr\(/g) - countMatches(a, /Utils\.weekStartStr\(/g) - defWeek;
+  const uToday = countMatches(a, /Utils\.todayStr\(/g);
+  const uWeek  = countMatches(a, /Utils\.weekStartStr\(/g);
+  const probs = [];
+  if (defToday > 0) probs.push(`function todayStr ${defToday}`);
+  if (defWeek > 0) probs.push(`function weekStartStr ${defWeek}`);
+  if (bareToday > 0) probs.push(`bare todayStr( ${bareToday}`);
+  if (bareWeek > 0) probs.push(`bare weekStartStr( ${bareWeek}`);
+  if (uToday < 1) probs.push('Utils.todayStr( 0건');
+  if (uWeek < 1) probs.push('Utils.weekStartStr( 0건');
+  if (probs.length === 0) add('PASS', `admin 날짜 helper Utils 통일 유지 (Utils.todayStr ${uToday}, Utils.weekStartStr ${uWeek})`);
+  else add('FAIL', `admin 날짜 helper 통일 위반: ${probs.join(', ')}`);
+} else {
+  add('FAIL', 'admin.js 없음 — 날짜 helper 검사 불가');
+}
+
+// ── 11) kiosk normalizeData 통일 유지 (DB._migrate(DB._normalizeArrays())) ──
+if (exists('kiosk.js')) {
+  const k = read('kiosk.js');
+  const unified = /DB\._migrate\(\s*DB\._normalizeArrays\(/.test(k);
+  const localToArr = countMatches(k, /function\s+toArr\(/g);
+  const qlAlias = countMatches(k, /data\.questLogs\s*=\s*data\.quests/g);
+  const probs = [];
+  if (!unified) probs.push('DB._migrate(DB._normalizeArrays()) 호출 없음');
+  if (localToArr > 0) probs.push(`로컬 function toArr ${localToArr}`);
+  if (qlAlias > 0) probs.push(`questLogs alias ${qlAlias}`);
+  if (probs.length === 0) add('PASS', 'kiosk normalizeData 공유 정규화 통일 유지');
+  else add('FAIL', `kiosk normalizeData 통일 위반: ${probs.join(', ')}`);
+} else {
+  add('FAIL', 'kiosk.js 없음 — normalizeData 검사 불가');
+}
+
+// ── 12) gamedata 정규화 helper 존재 (_normalizeArrays / _migrate) ──
+if (exists('gamedata.js')) {
+  const g = read('gamedata.js');
+  const hasNorm = /_normalizeArrays\s*\(\s*data\s*\)\s*\{/.test(g);
+  const hasMig  = /_migrate\s*\(\s*data\s*\)\s*\{/.test(g);
+  if (hasNorm && hasMig) add('PASS', 'gamedata 정규화 helper 존재 (_normalizeArrays/_migrate)');
+  else add('FAIL', `gamedata 정규화 helper 누락 (_normalizeArrays:${hasNorm}, _migrate:${hasMig})`);
+} else {
+  add('FAIL', 'gamedata.js 없음 — 정규화 helper 검사 불가');
+}
+
 // ── 결과 출력 ──
 const order = { PASS: 0, REVIEW: 1, FAIL: 2 };
 results.sort((a, b) => order[a.level] - order[b.level]);
