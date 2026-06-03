@@ -9,6 +9,7 @@
   --r:12px; --r2:8px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
+@keyframes ldBar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
 html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;}
 
 /* ── LAYOUT ── */
