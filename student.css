@@ -7,6 +7,7 @@
   --border:rgba(255,215,0,.18);--r:14px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
+@keyframes ldBar{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
 html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg0);color:var(--txt);overflow:hidden;}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(1px 1px at 15% 25%,rgba(255,255,255,.5),transparent),
