@@ -6,10 +6,6 @@ let CUR_TAB = 'daily';
 let fbRef = null;
 let _cancelCb = null;
 
-function toArr(v) {
-  return v == null ? [] : Array.isArray(v) ? v : Object.values(v);
-}
-
 // ── 초기화 ──
 window.onload = async () => {
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -54,38 +50,9 @@ window.onload = async () => {
 
 function normalizeData(data) {
   if (!data) return null;
-  data.students   = toArr(data.students).filter(Boolean).map(s => ({
-    ...s,
-    pendingRewards: toArr(s.pendingRewards),
-  }));
-  // 중복 학생 제거 후 ID 기준 정렬 (순서 항상 고정)
-  const seenIds = new Map();
-  data.students.forEach(s => seenIds.set(s.id, s));
-  data.students = Array.from(seenIds.values())
-    .sort((a, b) => {
-      // s1, s2, s10 ... 숫자 기준 정렬
-      const na = parseInt(a.id.replace(/\D/g,'')) || 0;
-      const nb = parseInt(b.id.replace(/\D/g,'')) || 0;
-      return na - nb;
-    });
-  data.boardQuests = toArr(data.boardQuests);
-  // 추억 — 같은 id 중복 시 앨범 지정된 것 우선 보존
-  {
-    const raw = toArr(data.memories);
-    const seen = new Map();
-    raw.forEach(m => {
-      if (!m || !m.id) return;
-      const prev = seen.get(m.id);
-      if (!prev || (m.albumId && !prev.albumId)) seen.set(m.id, m);
-    });
-    data.memories = Array.from(seen.values());
-  }
-  data.memoryAlbums = toArr(data.memoryAlbums);
-  // questLogs 단일 소스 (student/admin과 동일 방식)
-  data.quests = Object.values(data.questLogs || {})
-    .filter(q => q != null && typeof q === 'object' && q.studentId);
-  data.questLogs = data.quests; // 하위 호환
-  return data;
+  // student/admin과 동일한 공유 정규화 기준 사용 (gamedata.js의 순수 함수 직접 호출)
+  // → 신규 필드 추가 시 kiosk만 누락되는 위험 제거. DB._normalizeArrays/_migrate는 전달 data만 처리.
+  return DB._migrate(DB._normalizeArrays(data));
 }
 
 // ── 탭 전환 ──
