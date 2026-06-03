@@ -663,14 +663,14 @@ function approveReward(student, reward) {
       artUrl:  reward.artUrl   || '',
       comment: reward.artDesc  || '',
       subject: reward.subject  || '',
-      date:    reward.date     || todayStr(),
+      date:    reward.date     || Utils.todayStr(),
     });
   } else if (reward.type === 'book') {
     student.books = student.books || [];
     student.books.push({
       title:  reward.bookTitle  || reward.label,
       review: reward.bookReview || '',
-      date:   reward.bookDate   || reward.date || todayStr(),
+      date:   reward.bookDate   || reward.date || Utils.todayStr(),
     });
     student.bookCount = student.books.length;
   } else {
@@ -690,7 +690,7 @@ function approveReward(student, reward) {
     stat:         reward.stat || '',
     statVal:      reward.statVal || 0,
     icon:         reward.icon || '📋',
-    date:         todayStr(),
+    date:         Utils.todayStr(),
     approved:     true,
   });
 
@@ -750,7 +750,7 @@ function quickApprove() {
   const reward = {
     id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     label: name, exp, gold, stat, statVal: stat ? (Math.round((parseFloat(document.getElementById('reward-statval')?.value)||1)*10)/10) : 0,
-    icon, date: todayStr(),
+    icon, date: Utils.todayStr(),
   };
 
   if (studentId === 'all') {
@@ -817,8 +817,8 @@ function renderApproveGrid() {
   const students    = DB.getStudents();
   const db          = DB.load();
   const boardQuests = (db.boardQuests||[]).filter(q => q.active!==false);
-  const today       = todayStr();
-  const weekStart   = weekStartStr();
+  const today       = Utils.todayStr();
+  const weekStart   = Utils.weekStartStr();
 
   if (boardQuests.length === 0) {
     el.innerHTML = '<div style="padding:1rem;text-align:center;font-size:.82rem;color:var(--txt3)">활성 퀘스트가 없어요</div>';
@@ -886,19 +886,11 @@ function gridApprove(studentId, rewardId) {
   notify(`✅ ${s.name} · ${reward.label} 승인!`);
 }
 
-function weekStartStr() {
-  const d = new Date(Date.now()+9*3600000);
-  const day = d.getUTCDay();
-  const sun = new Date(d);
-  sun.setUTCDate(d.getUTCDate()-day);
-  return sun.toISOString().slice(0,10);
-}
-
 function renderApproveList() {
   const students  = DB.getStudents();
   const db        = DB.load();
   const container = document.getElementById('approve-list');
-  const today     = todayStr();
+  const today     = Utils.todayStr();
   const activeBQIds = new Set((db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id));
 
   // 비활성/삭제된 퀘스트 참조 pending 자동 정리
@@ -1148,7 +1140,7 @@ function approvePromotion(reqId) {
     stat:          '',
     statVal:       0,
     icon:          '⬆️',
-    date:          todayStr(),
+    date:          Utils.todayStr(),
     approved:      true,
   });
   DB.saveStudent(s);
@@ -2099,7 +2091,7 @@ function confirmBookRecord(studentId, pendingId) {
     summary: p.summary || '',
     reflection: p.reflection || '',
     review: p.bookReview || '',
-    date: p.bookDate || p.date || todayStr(),
+    date: p.bookDate || p.date || Utils.todayStr(),
     createdAt: p.createdAt || Date.now(),
     teacherChecked: true,
     teacherCheckedAt: Date.now(),
@@ -2120,7 +2112,7 @@ function confirmBookRecord(studentId, pendingId) {
     exp: p.exp||30, gold: p.gold||0,
     stat: '', statVal: 0,
     icon: '📚',
-    date: todayStr(),
+    date: Utils.todayStr(),
   });
 
   // pendingRewards에서 제거
@@ -2207,7 +2199,7 @@ let _memPendingFiles = []; // 업로드 대기 파일 목록
 
 function createAlbum() {
   const name = document.getElementById('album-name-input')?.value.trim();
-  const date = document.getElementById('album-date-input')?.value || todayStr();
+  const date = document.getElementById('album-date-input')?.value || Utils.todayStr();
   const desc = document.getElementById('album-desc-input')?.value.trim() || '';
   if (!name) { notify('앨범 이름을 입력해주세요', 'error'); return; }
   DB.saveAlbum({ id:'alb_'+Date.now(), name, date, desc });
@@ -2318,7 +2310,7 @@ async function adminUploadMemories() {
   if (_memPendingFiles.length === 0) { notify('사진을 선택해주세요', 'error'); return; }
   const albumId    = document.getElementById('adm-mem-album')?.value || '';
   const eventTitle = document.getElementById('adm-mem-event-title')?.value.trim() || '';
-  const eventDate  = document.getElementById('adm-mem-event-date')?.value || todayStr();
+  const eventDate  = document.getElementById('adm-mem-event-date')?.value || Utils.todayStr();
   const albumName  = albumId ? (DB.getAlbums().find(a=>a.id===albumId)?.name||'') : '';
 
   const total = _memPendingFiles.length;
@@ -3685,7 +3677,7 @@ function postCheckedAbilityQuests() {
       exp: d.exp, gold: d.gold,
       stat, statVal: 1,
       icon: ABILITY_ICONS[stat]||d.icon,
-      active: true, date: todayStr(),
+      active: true, date: Utils.todayStr(),
     });
     count++;
   });
@@ -3787,7 +3779,7 @@ function postCheckedQuests(type) {
       gold: goldMap[type] || 50,
       icon: iconMap[type] || '📋',
       stat, statVal,
-      dueDate: '', date: todayStr(),
+      dueDate: '', date: Utils.todayStr(),
       active: true,
     });
     count++;
@@ -3826,7 +3818,7 @@ function checkAutoDailyQuests() {
   const autoItems = settings.autoDailyQuests;
   if (!autoItems || autoItems.length === 0) return;
 
-  const today = todayStr();
+  const today = Utils.todayStr();
   if (settings.autoDailyLastDate === today) return; // 오늘 이미 처리됨
 
   const db = DB.load();
@@ -3906,7 +3898,7 @@ function addBoardQuest() {
   const quest = {
     id: 'bq_' + Date.now(),
     name, type, exp, gold, icon, stat, statVal,
-    dueDate, date: todayStr(),
+    dueDate, date: Utils.todayStr(),
     active: true,
   };
 
@@ -4013,7 +4005,7 @@ function completeQuestForStudent(questId, studentId) {
     exp:          bq.exp,
     gold:         bq.gold,
     icon:         bq.icon||'📋',
-    date:         todayStr(),
+    date:         Utils.todayStr(),
     approved:     true,
   });
 
@@ -5057,7 +5049,7 @@ function renderEmotionPage() {
 
   // 날짜 필터 초기화
   const dateSel = document.getElementById('emo-date-filter');
-  if (!dateSel.value) dateSel.value = todayStr();
+  if (!dateSel.value) dateSel.value = Utils.todayStr();
   const date = dateSel.value;
 
   // 학생 필터 셀렉트 초기화
@@ -5232,7 +5224,7 @@ const BACKUP_KEEP_DAYS = 7; // 7일치 보관
 
 async function saveBackup(auto) {
   const db = DB.load();
-  const dateKey = todayStr();
+  const dateKey = Utils.todayStr();
   // backups 경로에는 students, questLogs, boardQuests, customMonsters 등 핵심 데이터만
   const snapshot = {
     students:       db.students       || [],
@@ -5329,7 +5321,7 @@ async function confirmRollback() {
 
 // 관리자 로그인 시 자동 백업
 async function autoBackupOnLogin() {
-  const snap = await DB._fbRef.child(`backups/${todayStr()}`).once('value');
+  const snap = await DB._fbRef.child(`backups/${Utils.todayStr()}`).once('value');
   if (!snap.exists()) await saveBackup(true); // 오늘 백업 없으면 자동 저장
   renderBackupList();
 }
@@ -5444,7 +5436,7 @@ function exportData() {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `classRPG_${todayStr()}.json`;
+  a.download = `classRPG_${Utils.todayStr()}.json`;
   a.click();
   notify('📁 데이터 내보내기 완료!');
 }
@@ -5468,6 +5460,3 @@ function notify(msg, type) {
   setTimeout(() => item.remove(), 2900);
 }
 
-function todayStr() {
-  return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
-}
