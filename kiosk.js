@@ -10,10 +10,6 @@ function toArr(v) {
   return v == null ? [] : Array.isArray(v) ? v : Object.values(v);
 }
 
-function todayStr() {
-  return new Date(Date.now()+9*3600000).toISOString().slice(0,10);
-}
-
 // ── 초기화 ──
 window.onload = async () => {
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -665,12 +661,6 @@ function kSubmitEmotion(reason) {
 }
 
 // ── 퀘스트 신청 ──
-function weekStart2() {
-  const d=new Date(Date.now()+9*3600000); const day=d.getUTCDay();
-  const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
-  return mon.toISOString().slice(0,10);
-}
-
 function requestQuest(studentId, questId, btn) {
   // 1. UI 레벨 연타 방지 (즉시 잠금)
   if (btn?.dataset.requesting === '1') return;
@@ -681,12 +671,10 @@ function requestQuest(studentId, questId, btn) {
   const q = (data.boardQuests||[]).find(x=>x.id===questId);
   if (!s || !q) { if (btn) delete btn.dataset.requesting; return; }
 
-  // 2. DB 기반 중복 체크
-  const today2 = todayStr();
-  const alreadyDone = (DB_DATA.quests||[]).some(x => x && x.studentId===studentId && x.boardQuestId===questId &&
-    (q.type==='special' || q.type==='event' || (q.type==='daily'&&x.date===today2) || (q.type==='weekly'&&x.date>=weekStart2())));
-  const alreadyPending = (s.pendingRewards||[]).some(r=>r && r.boardQuestId===questId);
-  if (alreadyDone || alreadyPending) {
+  // 2. 완료/신청중 판정 — student·admin과 동일한 Utils.questStatus(일요일 주 시작) 기준으로 통일
+  //    'done'(완료 또는 승인됨) 또는 'pending'(신청중)이면 중복이므로 차단
+  const qStatus = Utils.questStatus(studentId, questId, q.type, DB_DATA.quests, s.pendingRewards, null);
+  if (qStatus !== 'none') {
     if (btn) delete btn.dataset.requesting; // 중복이면 잠금 해제
     return;
   }
@@ -700,14 +688,14 @@ function requestQuest(studentId, questId, btn) {
     exp: q.exp, gold: q.gold,
     stat: q.stat||'', statVal: q.stat?1:0,
     icon: q.icon||'📋',
-    date: todayStr(),
+    date: Utils.todayStr(),
   });
 
   // Firebase 저장 (id 키 기반 - 인덱스 충돌 없음)
+  // 저장 성공 후에만 완료 토스트 — 실패 시 실패 안내 + 버튼 잠금 복구
   fbRef.child('students/'+s.id).set(s)
-    .then(() => { /* 저장 성공 - renderTable()로 리렌더되므로 별도 해제 불필요 */ })
-    .catch(() => { if (btn) delete btn.dataset.requesting; }); // 실패 시 잠금 해제
-  showToast(`✅ ${s.name} · ${q.name} 신청 완료!`);
+    .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청 완료!`); })
+    .catch(() => { if (btn) delete btn.dataset.requesting; showToast(`⚠️ ${s.name} 신청 저장 실패 — 다시 시도해주세요`); });
 }
 
 // ── 신청 취소 확인 팝업 ──
@@ -733,8 +721,12 @@ function cancelQuest(studentId, questId) {
   if (!s) return;
   s.pendingRewards = (s.pendingRewards||[]).filter(r=>r.boardQuestId!==questId);
   const canIdx = DB_DATA.students.findIndex(x=>x.id===studentId);
-  if (canIdx >= 0) fbRef.child('students/'+s.id).set(s);
-  showToast('↩️ 신청이 취소됐어요');
+  if (canIdx >= 0) {
+    // 저장 성공 후에만 취소 완료 토스트 — 실패 시 실패 안내
+    fbRef.child('students/'+s.id).set(s)
+      .then(() => { showToast('↩️ 신청이 취소됐어요'); })
+      .catch(() => { showToast('⚠️ 취소 저장 실패 — 다시 시도해주세요'); });
+  }
 }
 
 
