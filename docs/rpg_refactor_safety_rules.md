@@ -8,15 +8,19 @@
 
 ## 1. 현재 기준
 
-- 안정화 기준 commit: `1cef839` (Phase 11-E 시점). 이후 갱신될 수 있음 — 항상 최신 main 기준으로 확인.
+- 안정화 기준 commit: `b0b8a4d` (Phase 11-J 머지 + 11-K read-only 마감 점검 시점). 이후 갱신될 수 있음 — 항상 최신 main 기준으로 확인.
 - GitHub: `chang333787-boop/class-rpg` / 운영: `funclassrpg.kr` (GitHub Pages)
 - 작업 폴더: `Projects/우리반RPG/우리반RPG_리팩토링` (영구, 원격 연결됨)
 - 현재 안전 상태:
   - `DB.save(` 0건 / `this.save(` 0건
   - 학생/자동 실행 root 저장 경로 0건
   - JS/CSS 외부화 완료 (gamedata.js + student.js + admin.js + kiosk.js / css 3종)
+  - **HTML 인라인 `<script>` 0건 / 인라인 `<style>` 0건** (11-I `_lbTouchX`, 11-J `@keyframes ldBar` 제거 완료)
+  - CSS link 캐시버스터 적용: `student/admin/kiosk.css?v=20260604`
   - 날짜 기준·kiosk 정규화 단일 소스 통일 완료
-  - `node scripts/verify-safety.mjs` → PASS 14 · REVIEW 5 · FAIL 0
+  - `node scripts/verify-safety.mjs` → **PASS 18 · REVIEW 1 · FAIL 0**
+  - 남은 REVIEW 1건 = root write 후보 5건(gamedata.js:1, admin.js:4)으로 **모두 의도된 게이팅 경로**(init 부트스트랩·import·rollback·reset·전체수치 초기화). 안전 알림으로 **유지 권장**(0으로 강제 시 신규 root write 탐지 사각 발생)
+- **리팩토링 1차 마감 가능 상태**: 저위험 외부화·인라인 제거·저장 안전·단일 소스 통일 목표 달성. 남은 후보(§11)는 저가치·선택. 기능 개발 복귀는 사용자 지시 전까지 보류.
 
 ---
 
@@ -94,6 +98,7 @@
 ## 8. 캐시 버전 규칙
 
 - HTML의 전용 JS 로드는 캐시 방지 쿼리 사용: `<script src="./student.js?v=20260602"></script>` (admin.js / kiosk.js 동일)
+- CSS link도 캐시 방지 쿼리 적용: `<link rel="stylesheet" href="./student.css?v=20260604">` (admin.css / kiosk.css 동일, 11-J에서 부착)
 - **JS(student/admin/kiosk) 또는 CSS 수정 시 → 해당 HTML의 `?v=` 갱신을 검토**한다
   - 갱신을 누락하면 운영(GitHub Pages)에서 학생 브라우저가 **옛 캐시 파일**을 볼 수 있음
 - **docs / scripts 변경은 `?v=` 갱신 불필요** (운영 로드 대상 아님)
@@ -126,9 +131,10 @@
 
 ## 11. 다음 리팩토링 후보 (참고, 저위험 우선)
 
-- `scripts/verify-safety.mjs` 점검 항목 보강 (예: 날짜 helper 중복 재발 검사, @keyframes/인라인 잔여 추적)
-- 잔여 인라인 미세 정리: 3 HTML `@keyframes ldBar` 1줄, student.html `_lbTouchX` 1줄 (저가치)
-- kiosk 로컬 잔여 유틸 정리
+> **인라인 정리는 완료** — 11-I `_lbTouchX`(student.js로 이동), 11-J `@keyframes ldBar`(css로 이동) 제거로 HTML 인라인 `<script>`/`<style>` 잔여 0건. 외부화 목표 달성, **리팩토링 1차 마감 가능**(§1).
+
+- `scripts/verify-safety.mjs` 점검 항목 추가 보강 (선택, 저가치)
+- kiosk 로컬 잔여 유틸 정리 (선택, 저가치)
 - **고위험 후보(§10)는 보류** — 기능 개발 중 해당 영역을 만질 때 표적으로 신중히
 
 ---
