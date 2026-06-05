@@ -62,33 +62,14 @@ function renderTable() {
   const allQuests = DB_DATA.quests || [];
   const el = document.getElementById('kiosk-content');
 
-  const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
-  const weekStart = (() => {
-    const d=new Date(Date.now()+9*3600000);
-    const day=d.getUTCDay();
-    const sun=new Date(d);
-    sun.setUTCDate(d.getUTCDate()-day);
-    return sun.toISOString().slice(0,10);
-  })();
-
   const allActive = (DB_DATA.boardQuests||[]).filter(q => q.active!==false);
   const activeBQIds = new Set(allActive.map(q=>q.id));
 
+  // student·admin과 동일한 Utils.questStatus(일요일 주 시작) 기준으로 통일
   function getStatus(studentId, questId, questType) {
     const s = students.find(x=>x.id===studentId);
     if (!s) return 'none';
-    if (!activeBQIds.has(questId)) return 'none';
-    const done = allQuests.filter(Boolean).some(q => {
-      if (!q || q.studentId!==studentId || q.boardQuestId!==questId) return false;
-      if (!q.date) return true;
-      if (questType==='daily')  return q.date===today;
-      if (questType==='weekly') return q.date>=weekStart;
-      return true;
-    });
-    if (done) return 'done';
-    if ((s.pendingRewards||[]).some(r => r && r.boardQuestId===questId && r.approved===true)) return 'done';
-    if ((s.pendingRewards||[]).some(r => r && r.boardQuestId===questId && !r.approved)) return 'pending';
-    return 'none';
+    return Utils.questStatus(studentId, questId, questType, allQuests, s.pendingRewards || [], activeBQIds);
   }
 
   // 스탯 아이콘/색상 정의
