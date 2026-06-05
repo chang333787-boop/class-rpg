@@ -2,7 +2,6 @@
 // FIREBASE_CONFIG는 gamedata.js에서 선언됨
 
 let DB_DATA = null;
-let CUR_TAB = 'daily';
 let fbRef = null;
 let _cancelCb = null;
 
@@ -443,8 +442,6 @@ function navKioskLb(dir) {
 }
 
 // ── 감정 체크판 ──
-let _kioskEmoStep = null; // { studentId, period }
-
 function renderEmotionBoard() {
   const el = document.getElementById('kiosk-emotion-content');
   if (!el || !DB_DATA) return;
@@ -737,11 +734,6 @@ function getDeadlineInfo(quest) {
   return { deadline, urgent, diffHr };
 }
 
-// 구버전 호환
-function getDeadline(quest) {
-  const info = getDeadlineInfo(quest);
-  return info ? info.deadline : null;
-}
 // ── 토스트 ──
 let _toastTimer = null;
 function showToast(msg) {
