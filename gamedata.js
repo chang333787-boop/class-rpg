@@ -594,7 +594,7 @@ const DB = {
       s.monsterLog       = toArr(s.monsterLog);
       s.pendingRewards   = toArr(s.pendingRewards);
       return s;
-    }).filter(Boolean);
+    }).filter(s => s && s.id && s.name); // id/name 없는 껍데기 학생 노드 제외 (렌더 불가)
     // 중복 학생 제거 후 ID 기준 정렬 (순서 항상 고정)
     const seen = new Map();
     data.students.forEach(s => seen.set(s.id, s));
