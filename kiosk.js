@@ -54,7 +54,6 @@ function normalizeData(data) {
   return DB._migrate(DB._normalizeArrays(data));
 }
 
-// ── 탭 전환 ──
 // ── 테이블 렌더 ──
 function renderTable() {
   if (!DB_DATA) return;
