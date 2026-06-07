@@ -1254,7 +1254,7 @@ const ACHIEVEMENTS = [
   { id:'ach_farm1',    icon:'🌱', name:'씨앗의 시작',     desc:'첫 씨앗 심기',              check: s=>(s.farmHarvests||0)>=1,   reward:{exp:15,gold:10,title:null,deco:null} },
   { id:'ach_farm5',    icon:'🌿', name:'초보 농부',        desc:'농장 수확 5회',             check: s=>(s.farmHarvests||0)>=5,   reward:{exp:30,gold:20,title:null,deco:null} },
   { id:'ach_farm15',   icon:'🌾', name:'부지런한 농부',   desc:'농장 수확 15회',            check: s=>(s.farmHarvests||0)>=15,  reward:{exp:60,gold:40,title:null,deco:null} },
-  { id:'ach_farm20',   icon:'🚜', name:'베테랑 농부',     desc:'농장 수확 20회',            check: s=>(s.farmHarvests||0)>=20,  reward:{exp:80,gold:60,title:'농부',deco:'deco_flower'} },
+  { id:'ach_farm20',   icon:'🚜', name:'베테랑 농부',     desc:'농장 수확 20회',            check: s=>(s.farmHarvests||0)>=20,  reward:{exp:80,gold:60,title:'농부',deco:'deco_garden'} },
   { id:'ach_farm40',   icon:'🏡', name:'대농장주',        desc:'농장 수확 40회',            check: s=>(s.farmHarvests||0)>=40,  reward:{exp:120,gold:100,title:'대농장주',deco:null} },
 
   // ══ D. 장비 / 성장 ═══════════════════════════════════════
@@ -1281,7 +1281,7 @@ const ACHIEVEMENTS = [
   // ══ F. 작품 ══════════════════════════════════════════════
   { id:'ach_art1',     icon:'🎨', name:'첫 작품',          desc:'첫 작품 등록',              check: s=>(s.artworks||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
   { id:'ach_art3',     icon:'🖼️', name:'창작의 시작',     desc:'작품 3개 등록',             check: s=>(s.artworks||[]).length>=3, reward:{exp:40,gold:25,title:null,deco:null} },
-  { id:'ach_art7',     icon:'🖼️', name:'작은 전시회',     desc:'작품 7개 등록',             check: s=>(s.artworks||[]).length>=7, reward:{exp:70,gold:50,title:'예술가',deco:'deco_flower'} },
+  { id:'ach_art7',     icon:'🖼️', name:'작은 전시회',     desc:'작품 7개 등록',             check: s=>(s.artworks||[]).length>=7, reward:{exp:70,gold:50,title:'예술가',deco:'deco_garden'} },
   { id:'ach_art15',    icon:'🏛️', name:'창작 수집가',     desc:'작품 15개 등록',            check: s=>(s.artworks||[]).length>=15,reward:{exp:120,gold:80,title:'창작가',deco:null} },
   { id:'ach_art_desc', icon:'✍️', name:'설명하는 작가',   desc:'작품 설명 3개 이상',        check: s=>(s.artworks||[]).filter(a=>a.desc&&a.desc.length>5).length>=3, reward:{exp:25,gold:15,title:null,deco:null} },
 
