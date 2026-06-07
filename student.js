@@ -172,18 +172,12 @@ function enterGame() {
 }
 
 function cleanInactivePending() {
-  const db = DB.load();
-  const activeBQIds = new Set(
-    (db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id)
-  );
   let changed = false;
 
-  // 비활성 퀘스트 pending 정리
-  const before = (CUR.pendingRewards||[]).length;
-  CUR.pendingRewards = (CUR.pendingRewards||[]).filter(r =>
-    !r.boardQuestId || activeBQIds.has(r.boardQuestId)
-  );
-  if (CUR.pendingRewards.length !== before) changed = true;
+  // [Q-1] 미승인 보상은 교사 승인 전까지 보존한다.
+  // 닫힌(비활성) boardQuest를 이유로 pendingRewards를 자동 삭제하지 않는다.
+  // (이전 동작: active boardQuest에 없는 boardQuestId의 pending을 onload마다 삭제
+  //  → 교사가 승인하기 전에 다음날/퀘스트 마감과 함께 보상이 유실되는 버그)
 
   // 구형 승급 pending 정리 (패치 전 방식으로 남아있는 ⬆️ 승급 항목)
   // 이제 승급은 즉시 지급되므로 pending에 남아있을 필요 없음
