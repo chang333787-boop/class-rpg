@@ -3961,8 +3961,18 @@ function completeQuestForStudent(questId, studentId) {
   notify(`✅ ${s.name} · "${bq.name}" 완료 처리!`);
 }
 
+// [Q-3B] 닫기/삭제 시 cleanQuestPending이 함께 지울 미승인 보상 건수 (읽기 전용 계산)
+function countPendingRewardsForQuest(questId) {
+  return DB.getStudents().reduce((a, s) =>
+    a + (s.pendingRewards||[]).filter(r => r.boardQuestId === questId && !r.approved).length, 0);
+}
+
 function closeBoardQuest(questId) {
-  if (!confirm('이 퀘스트를 게시판에서 내릴까요?')) return;
+  const pendingCnt = countPendingRewardsForQuest(questId);
+  const msg = pendingCnt > 0
+    ? `이 퀘스트를 게시판에서 내릴까요?\n\n⚠️ 이 퀘스트에 연결된 미승인 보상 ${pendingCnt}건도 함께 삭제됩니다.\n먼저 활동 승인 탭에서 승인/반려한 뒤 내리는 것을 권장합니다.`
+    : '이 퀘스트를 게시판에서 내릴까요?';
+  if (!confirm(msg)) return;
   const db = DB.load();
   db.boardQuests = (db.boardQuests||[]).map(q => q.id === questId ? {...q, active:false} : q);
   // 해당 퀘스트 pending 정리
@@ -3995,7 +4005,11 @@ function reactivateBoardQuest(questId) {
 }
 
 function deleteBoardQuest(questId) {
-  if (!confirm('이 퀘스트를 완전히 삭제할까요?')) return;
+  const pendingCnt = countPendingRewardsForQuest(questId);
+  const msg = pendingCnt > 0
+    ? `이 퀘스트를 완전히 삭제할까요?\n\n⚠️ 이 퀘스트에 연결된 미승인 보상 ${pendingCnt}건도 함께 삭제됩니다.\n먼저 활동 승인 탭에서 승인/반려한 뒤 삭제하는 것을 권장합니다.`
+    : '이 퀘스트를 완전히 삭제할까요?';
+  if (!confirm(msg)) return;
   const db = DB.load();
   db.boardQuests = (db.boardQuests||[]).filter(q => q.id !== questId);
   // 해당 퀘스트 pending 정리
