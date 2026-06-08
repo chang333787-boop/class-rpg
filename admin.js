@@ -148,16 +148,14 @@ function nav(page, el) {
 // ══════════════════════════════════════════════════
 function renderDashboard() {
   const students = DB.getStudents();
-  const db       = DB.load();
   const quests   = DB.getQuests();
   const promos   = DB.getPromotionRequests();
   const pwResets = DB.getPwResetRequests();
-  // 활성 퀘스트 ID 목록 (비활성/삭제 퀘스트 참조 pending 제외)
-  const activeBQIds = new Set((db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id));
+  // [Q-3C-2] 미승인 보상 전체를 카운트/표시 (활동 승인 탭·nav 뱃지와 동일 기준).
+  //          비활성/삭제 퀘스트 pending도 숨기지 않음(Q-1/Q-3D 보존 정책 정합).
   const pendingItems = students.flatMap(s =>
     (s.pendingRewards||[])
       .filter(r => !r.approved) // 승인된 것 제외
-      .filter(r => !r.boardQuestId || activeBQIds.has(r.boardQuestId))
       .map(r => ({...r, student:s}))
   );
   const totalPending = pendingItems.length;
