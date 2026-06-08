@@ -888,29 +888,17 @@ function gridApprove(studentId, rewardId) {
 
 function renderApproveList() {
   const students  = DB.getStudents();
-  const db        = DB.load();
   const container = document.getElementById('approve-list');
   const today     = Utils.todayStr();
-  const activeBQIds = new Set((db.boardQuests||[]).filter(q=>q.active!==false).map(q=>q.id));
 
-  // 비활성/삭제된 퀘스트 참조 pending 자동 정리
-  let cleaned = false;
-  students.forEach(s => {
-    const before = (s.pendingRewards||[]).length;
-    s.pendingRewards = (s.pendingRewards||[]).filter(r =>
-      !r.boardQuestId || activeBQIds.has(r.boardQuestId)
-    );
-    if (s.pendingRewards.length !== before) {
-      DB._fbRef.child('students/'+s.id).set(s);
-      cleaned = true;
-    }
-  });
-  if (cleaned) DB._cache = db;
-
+  // [Q-3D] 활동 승인 탭 렌더 시 pendingRewards를 삭제/저장하지 않는다.
+  //        (이전엔 비활성/삭제 퀘스트 참조 pending을 필터링한 뒤 DB에 저장 → 활동 승인 탭에
+  //         진입하는 것만으로 미승인 보상이 영구 삭제됐음. Q-1 보존 정책과 정합하도록 제거.)
+  //        비활성/삭제 퀘스트의 미승인 보상도 목록에 남겨 교사가 나중에 승인/반려할 수 있게 한다.
+  //        (reward 객체에 label/exp/gold/stat/statVal이 있어 원 퀘스트 active 여부와 무관하게 승인 가능)
   let items = students.flatMap(s =>
     (s.pendingRewards||[])
       .filter(r => !r.approved)
-      .filter(r => !r.boardQuestId || activeBQIds.has(r.boardQuestId))
       .map(r => ({...r, student: s}))
   );
 
