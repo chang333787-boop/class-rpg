@@ -981,7 +981,7 @@ function populateSelectStudents() {
 }
 
 function updatePendingBadge() {
-  const total = DB.getStudents().reduce((a,s) => a + (s.pendingRewards||[]).length, 0);
+  const total = DB.getStudents().reduce((a,s) => a + (s.pendingRewards||[]).filter(r => !r.approved).length, 0);
   const badge = document.getElementById('pending-badge');
   if (total > 0) { badge.style.display = 'inline'; badge.textContent = total; }
   else badge.style.display = 'none';
