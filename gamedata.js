@@ -755,6 +755,54 @@ const DB = {
 
   getQuests()      { return this.load().quests || []; },
 
+  // ── 오늘 일일퀘스트 자동 등록 (앱 로드 시 1회) ──
+  // [Q-2A] admin.checkAutoDailyQuests()의 핵심 로직을 공용 DB helper로 이전.
+  //        동작은 기존과 동일하며, 현재 호출처는 admin.js window.onload 한 곳뿐이다.
+  //        (student/kiosk 호출 추가는 Q-2B 이후 별도 검토)
+  ensureDailyQuests() {
+    const settings = this.getSettings();
+    const autoItems = settings.autoDailyQuests;
+    if (!autoItems || autoItems.length === 0) return;
+
+    const today = Utils.todayStr();
+    if (settings.autoDailyLastDate === today) return; // 오늘 이미 처리됨
+
+    const db = this.load();
+    db.boardQuests = db.boardQuests || [];
+
+    // 어제 일일퀘스트 중 아직 active인 것 내리기
+    db.boardQuests = db.boardQuests.map(q => {
+      if (q.type === 'daily' && q.active !== false && q.date !== today) {
+        return { ...q, active: false };
+      }
+      return q;
+    });
+
+    // 오늘 자동 등록
+    let count = 0;
+    autoItems.forEach((item, i) => {
+      if (db.boardQuests.find(q => q.name === item.name && q.active !== false)) return;
+      db.boardQuests.push({
+        id: 'bq_auto_' + today + '_' + i,
+        name: item.name,
+        type: 'daily',
+        exp: 35, gold: 25,
+        icon: '📋',
+        stat: item.stat || '',
+        statVal: item.statVal || 0,
+        dueDate: '', date: today,
+        active: true,
+      });
+      count++;
+    });
+
+    this._cache = db;
+    this._fbRef.child('boardQuests').set(db.boardQuests);
+
+    // 오늘 날짜 기록
+    this.saveSettings({ ...settings, autoDailyLastDate: today });
+  },
+
   getPromotionRequests()     { return this.load().promotionRequests || []; },
   savePromotionRequests(arr) {
     const db = this.load(); db.promotionRequests = arr; this._cache = db;

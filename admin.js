@@ -3813,49 +3813,10 @@ function saveAutoDaily() {
 }
 
 // 매일 일일퀘스트 자동 등록 체크 (앱 로드 시 실행)
+// [Q-2A] 핵심 로직은 DB.ensureDailyQuests()(gamedata.js)로 이전됨.
+//        window.onload 호출부 유지를 위한 얇은 wrapper. 동작은 기존과 동일.
 function checkAutoDailyQuests() {
-  const settings = DB.getSettings();
-  const autoItems = settings.autoDailyQuests;
-  if (!autoItems || autoItems.length === 0) return;
-
-  const today = Utils.todayStr();
-  if (settings.autoDailyLastDate === today) return; // 오늘 이미 처리됨
-
-  const db = DB.load();
-  db.boardQuests = db.boardQuests || [];
-
-  // 어제 일일퀘스트 중 아직 active인 것 내리기
-  db.boardQuests = db.boardQuests.map(q => {
-    if (q.type === 'daily' && q.active !== false && q.date !== today) {
-      return { ...q, active: false };
-    }
-    return q;
-  });
-
-  // 오늘 자동 등록
-  let count = 0;
-  autoItems.forEach((item, i) => {
-    if (db.boardQuests.find(q => q.name === item.name && q.active !== false)) return;
-    db.boardQuests.push({
-      id: 'bq_auto_' + today + '_' + i,
-      name: item.name,
-      type: 'daily',
-      exp: 35, gold: 25,
-      icon: '📋',
-      stat: item.stat || '',
-      statVal: item.statVal || 0,
-      dueDate: '', date: today,
-      active: true,
-    });
-    count++;
-  });
-
-  DB._cache = db;
-  DB._fbRef.child('boardQuests').set(db.boardQuests);
-
-  // 오늘 날짜 기록
-  DB.saveSettings({ ...settings, autoDailyLastDate: today });
-
+  return DB.ensureDailyQuests();
 }
 
 function restoreHiddenTemplates(type) {
