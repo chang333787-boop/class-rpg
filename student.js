@@ -145,6 +145,15 @@ function startAccessTimer() {
 }
 
 function enterGame() {
+  // [Q-2B] 교사가 admin을 열지 않아도 학생 첫 접속 시 오늘 일일 퀘스트가 생성되게 한다.
+  // 로직은 Q-2A에서 공통화한 DB.ensureDailyQuests()(gamedata.js)를 그대로 호출.
+  // (DB.init 완료 후 호출되는 흐름이며, 실패해도 게임 진입이 막히지 않도록 보호)
+  try {
+    if (DB.ensureDailyQuests) DB.ensureDailyQuests();
+  } catch (e) {
+    console.warn('자동 일일 퀘스트 확인 실패:', e);
+  }
+
   autoCloseDailyQuests();
   cleanInactivePending();
 
