@@ -916,9 +916,34 @@ function renderApproveList() {
     }
   });
 
+  // [Q-3E-1] boardQuest 상태 판정 (read-only) — 닫힌/삭제 퀘스트 보상 표시용
+  const _db3e = DB.load();
+  const questMap = new Map((_db3e.boardQuests || []).map(q => [q.id, q]));
+  function getRewardQuestStatus(item) {
+    if (!item.boardQuestId) return { key: 'general', badge: '' };
+    const quest = questMap.get(item.boardQuestId);
+    if (!quest) return { key: 'deleted', badge: '🗑️ 삭제된 퀘스트' };
+    if (quest.active === false) return { key: 'inactive', badge: '🚫 닫힌 퀘스트' };
+    return { key: 'active', badge: '' };
+  }
+  let inactiveCount = 0, deletedCount = 0;
+  items.forEach(item => {
+    const k = getRewardQuestStatus(item).key;
+    if (k === 'inactive') inactiveCount++;
+    else if (k === 'deleted') deletedCount++;
+  });
+  const needsReviewCount = inactiveCount + deletedCount;
+  const reviewSummary = needsReviewCount > 0 ? `
+    <div style="margin-bottom:.7rem;padding:.6rem .9rem;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:var(--r);font-size:.78rem;line-height:1.6">
+      <div style="font-weight:700;color:var(--gold)">⚠️ 확인 필요 보상 ${needsReviewCount}건</div>
+      <div style="color:var(--txt2)">${[inactiveCount>0?`🚫 닫힌 퀘스트 ${inactiveCount}건`:'', deletedCount>0?`🗑️ 삭제된 퀘스트 ${deletedCount}건`:''].filter(Boolean).join(' · ')}</div>
+      <div style="color:var(--txt3);font-size:.72rem">승인/반려는 기존과 동일하게 처리할 수 있습니다.</div>
+    </div>` : '';
+
   const html = items.map(item => {
     const isExpired = item.date && item.date < today;
     const groupCount = item.boardQuestId ? (questGroups[item.boardQuestId]||[]).length : 0;
+    const qStatus = getRewardQuestStatus(item);
     return `
     <div class="approve-card" style="${isExpired?'border-left:3px solid rgba(255,100,100,.4)':''}">
       <div style="font-size:1.5rem">${item.icon||'📋'}</div>
@@ -929,6 +954,7 @@ function renderApproveList() {
           </span>
           ${item.type==='book'?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">📚 독서</span>`:''}
           ${item.type==='artwork'?`<span style="font-size:.68rem;background:rgba(155,89,182,.12);color:var(--purple);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">🎨 작품</span>`:''}
+          ${qStatus.badge?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">${qStatus.badge}</span>`:''}
         </div>
         <div class="ac-quest">${item.label}</div>
         ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
@@ -947,7 +973,7 @@ function renderApproveList() {
     </div>`;
   }).join('');
 
-  container.innerHTML = html;
+  container.innerHTML = reviewSummary + html;
   updatePendingBadge();
 }
 
