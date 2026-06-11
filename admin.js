@@ -78,6 +78,7 @@ function renderAll() {
   safe(renderApproveGrid,     'approveGrid');
   safe(renderRank,            'rank');
   safe(renderBoardQuestList,  'questList');
+  safe(renderAutoDailyStatus, 'autoDailyStatus');
   safe(renderMonsters,        'monsters');
   safe(renderPromotionList,   'promotion');
   safe(loadSettings,          'settings');
@@ -3822,6 +3823,7 @@ function saveAutoDaily() {
   const prev = DB.getSettings();
   DB.saveSettings({ ...prev, autoDailyQuests: items });
   notify(`🔁 ${items.length}개 항목 매일 자동 등록으로 저장! 매일 아침 자동으로 게시판에 올라가요.`);
+  renderAutoDailyStatus(); // [Q-3A-1] 저장 후 현황 카드 갱신(저장 로직은 위에서 끝, 여기선 표시만)
 }
 
 // 매일 일일퀘스트 자동 등록 체크 (앱 로드 시 실행)
@@ -3829,6 +3831,68 @@ function saveAutoDaily() {
 //        window.onload 호출부 유지를 위한 얇은 wrapper. 동작은 기존과 동일.
 function checkAutoDailyQuests() {
   return DB.ensureDailyQuests();
+}
+
+// [Q-3A-1] 자동 일일퀘스트 현황 카드 (표시 전용·read-only)
+//   settings.autoDailyQuests / autoDailyLastDate / boardQuests를 읽기만 해서 상태를 보여준다.
+//   저장/삭제/DB.save·set 호출 없음. ON/OFF 토글·개별 편집 없음(Q-3F 범위).
+function renderAutoDailyStatus() {
+  const el = document.getElementById('auto-daily-status');
+  if (!el) return; // mount 없으면 조용히 종료
+
+  const db        = DB.load();
+  const settings  = db.settings || {};
+  const autoItems = settings.autoDailyQuests || [];
+  const isOn      = autoItems.length > 0;
+  const today     = Utils.todayStr();
+  const lastDate  = settings.autoDailyLastDate || '';
+  const ranToday  = lastDate === today;
+  const boardQuests = db.boardQuests || [];
+
+  const todayAutoDaily = boardQuests.filter(q =>
+    q && q.type === 'daily' && q.date === today &&
+    String(q.id || '').startsWith(`bq_auto_${today}_`));
+  const activeDaily = boardQuests.filter(q => q && q.type === 'daily' && q.active !== false);
+  const closedDaily = boardQuests.filter(q => q && q.type === 'daily' && q.active === false);
+
+  const onBadge = isOn
+    ? `<span style="font-size:.72rem;font-weight:700;color:var(--emerald);background:rgba(46,204,113,.12);border-radius:8px;padding:.1rem .5rem">ON</span>`
+    : `<span style="font-size:.72rem;font-weight:700;color:var(--txt3);background:rgba(255,255,255,.06);border-radius:8px;padding:.1rem .5rem">OFF</span>`;
+
+  const itemNames = isOn
+    ? autoItems.map(it => (it && it.name) ? it.name : '').filter(Boolean).join(', ')
+    : '';
+
+  const row = (label, value) => `
+    <div style="display:flex;justify-content:space-between;gap:.6rem;padding:.18rem 0;font-size:.78rem">
+      <span style="color:var(--txt3)">${label}</span>
+      <span style="color:var(--txt2);font-weight:600;text-align:right">${value}</span>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1rem 1.2rem;margin-bottom:.9rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
+        <span style="font-size:1.2rem">🔁</span>
+        <span style="font-weight:700;font-size:.92rem;flex:1">자동 일일퀘스트 현황</span>
+        ${onBadge}
+      </div>
+      ${isOn ? `
+        ${row('등록 항목', `${autoItems.length}개`)}
+        ${itemNames ? `<div style="font-size:.74rem;color:var(--txt3);padding:.1rem 0 .35rem;line-height:1.5">${itemNames}</div>` : ''}
+        ${row('마지막 실행', lastDate || '아직 없음')}
+        ${row('오늘 실행', ranToday ? '✅ 완료' : '아직 아님')}
+        ${row('오늘 자동 생성', `${todayAutoDaily.length}개`)}
+        ${row('현재 활성 daily', `${activeDaily.length}개`)}
+        ${row('닫힌 daily', `${closedDaily.length}개`)}
+      ` : `
+        <div style="font-size:.78rem;color:var(--txt3);padding:.2rem 0 .5rem">등록된 자동 일일퀘스트가 없습니다. 아래 일일 템플릿에서 항목을 체크해 "매일 자동 등록으로 저장"하면 켜집니다.</div>
+        ${row('현재 활성 daily', `${activeDaily.length}개`)}
+        ${row('닫힌 daily', `${closedDaily.length}개`)}
+      `}
+      <div style="font-size:.7rem;color:var(--txt3);margin-top:.6rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.06);line-height:1.55">
+        ℹ️ 자동 일일퀘스트는 교사 또는 학생이 접속할 때 확인·생성됩니다. 키오스크 단독 접속은 아직 자동 생성과 연결되어 있지 않습니다.
+      </div>
+    </div>`;
 }
 
 function restoreHiddenTemplates(type) {
@@ -3845,6 +3909,7 @@ function restoreHiddenTemplates(type) {
 // 퀘스트 페이지 진입 시 초기화
 function initQuestPage() {
   renderQuestTemplates('daily');
+  renderAutoDailyStatus(); // [Q-3A-1] 퀘스트 탭 열 때 현황 카드 갱신(read-only)
 }
 
 // 퀘스트 유형 변경 시 아이콘·EXP·골드 자동 설정
