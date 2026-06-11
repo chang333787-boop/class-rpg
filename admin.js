@@ -4091,14 +4091,14 @@ function countPendingRewardsForQuest(questId) {
 
 function closeBoardQuest(questId) {
   const pendingCnt = countPendingRewardsForQuest(questId);
+  // [Q-3F-1] 닫을 때 미승인 보상은 삭제하지 않고 보존 → 활동 승인 탭 ⚠️ 확인 필요 보상에 남음
   const msg = pendingCnt > 0
-    ? `이 퀘스트를 게시판에서 내릴까요?\n\n⚠️ 이 퀘스트에 연결된 미승인 보상 ${pendingCnt}건도 함께 삭제됩니다.\n먼저 활동 승인 탭에서 승인/반려한 뒤 내리는 것을 권장합니다.`
+    ? `이 퀘스트를 게시판에서 내릴까요?\n\n미승인 보상 ${pendingCnt}건은 삭제되지 않고 활동 승인 탭의 ⚠️ 확인 필요 보상에 남습니다.\n내린 뒤에도 교사가 승인 또는 반려로 처리할 수 있습니다.`
     : '이 퀘스트를 게시판에서 내릴까요?';
   if (!confirm(msg)) return;
   const db = DB.load();
   db.boardQuests = (db.boardQuests||[]).map(q => q.id === questId ? {...q, active:false} : q);
-  // 해당 퀘스트 pending 정리
-  cleanQuestPending(db, questId);
+  // [Q-3F-1] cleanQuestPending 호출 제거 — 미승인 보상 보존 (승인 탭에서 사후 처리)
   DB._cache = db;
   DB._fbRef.child('boardQuests').set(db.boardQuests);
   renderAll();
@@ -4128,14 +4128,14 @@ function reactivateBoardQuest(questId) {
 
 function deleteBoardQuest(questId) {
   const pendingCnt = countPendingRewardsForQuest(questId);
+  // [Q-3F-1] 삭제할 때 미승인 보상은 삭제하지 않고 보존 → 활동 승인 탭 ⚠️ 확인 필요 보상에 남음
   const msg = pendingCnt > 0
-    ? `이 퀘스트를 완전히 삭제할까요?\n\n⚠️ 이 퀘스트에 연결된 미승인 보상 ${pendingCnt}건도 함께 삭제됩니다.\n먼저 활동 승인 탭에서 승인/반려한 뒤 삭제하는 것을 권장합니다.`
+    ? `이 퀘스트를 완전히 삭제할까요?\n\n미승인 보상 ${pendingCnt}건은 삭제되지 않고 활동 승인 탭의 ⚠️ 확인 필요 보상에 남습니다.\n삭제된 퀘스트 보상으로 표시되며, 교사가 승인 또는 반려로 처리할 수 있습니다.`
     : '이 퀘스트를 완전히 삭제할까요?';
   if (!confirm(msg)) return;
   const db = DB.load();
   db.boardQuests = (db.boardQuests||[]).filter(q => q.id !== questId);
-  // 해당 퀘스트 pending 정리
-  cleanQuestPending(db, questId);
+  // [Q-3F-1] cleanQuestPending 호출 제거 — 미승인 보상 보존 (승인 탭에서 사후 처리)
   DB._cache = db;
   DB._fbRef.child('boardQuests').set(db.boardQuests);
   renderAll();
