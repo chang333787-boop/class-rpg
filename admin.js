@@ -941,7 +941,8 @@ function renderApproveList() {
       <div style="color:var(--txt3);font-size:.72rem">승인/반려는 기존과 동일하게 처리할 수 있습니다.</div>
     </div>` : '';
 
-  const html = items.map(item => {
+  // [Q-3E-2-1] 카드 렌더는 helper로 추출 (기존 카드 HTML/onclick 인자/배지/만료표시 그대로 유지)
+  const renderRewardCard = (item) => {
     const isExpired = item.date && item.date < today;
     const groupCount = item.boardQuestId ? (questGroups[item.boardQuestId]||[]).length : 0;
     const qStatus = getRewardQuestStatus(item);
@@ -972,9 +973,39 @@ function renderApproveList() {
           onclick="approveAllByQuest('${item.boardQuestId}')">전체(${groupCount})</button>` : ''}
       </div>
     </div>`;
-  }).join('');
+  };
 
-  container.innerHTML = reviewSummary + html;
+  // [Q-3E-2-1] 상태 기준 2그룹 분리 (general/active = 일반, inactive/deleted = 확인 필요)
+  //            카드 순서는 각 그룹 내부에서 기존 items 순서를 그대로 유지한다.
+  const generalItems = items.filter(item => {
+    const k = getRewardQuestStatus(item).key;
+    return k === 'general' || k === 'active';
+  });
+  const needsReviewItems = items.filter(item => {
+    const k = getRewardQuestStatus(item).key;
+    return k === 'inactive' || k === 'deleted';
+  });
+
+  const sectionHeader = (title, count, desc) => `
+    <div style="margin:.9rem 0 .5rem;display:flex;align-items:baseline;gap:.4rem">
+      <span style="font-weight:700;font-size:.82rem;color:var(--txt)">${title}</span>
+      <span style="font-size:.72rem;color:var(--txt3)">${count}건</span>
+    </div>${desc?`<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem;line-height:1.5">${desc}</div>`:''}`;
+
+  let listHtml = '';
+  // 일반 승인 대기 섹션: 일반/활성 보상이 있을 때만 표시
+  if (generalItems.length > 0) {
+    listHtml += sectionHeader('일반 승인 대기', generalItems.length, '')
+      + generalItems.map(renderRewardCard).join('');
+  }
+  // 확인 필요 보상 섹션: 닫힌/삭제 퀘스트 보상이 1건 이상일 때만 표시
+  if (needsReviewItems.length > 0) {
+    listHtml += sectionHeader('⚠️ 확인 필요 보상', needsReviewItems.length,
+      '닫힌/삭제된 퀘스트에서 온 보상입니다. 승인 또는 반려는 기존과 동일하게 처리됩니다.')
+      + needsReviewItems.map(renderRewardCard).join('');
+  }
+
+  container.innerHTML = reviewSummary + listHtml;
   updatePendingBadge();
 }
 
