@@ -145,14 +145,7 @@ function renderTable() {
               ${statBadge(q.stat, q.statVal)}
             </div>
             <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
-            ${(()=>{
-              const info=getDeadlineInfo(q);
-              if(!info) return '';
-              const color=info.urgent==='expired'?'#999':info.urgent==='critical'?'#ff4444':info.urgent==='warning'?'#ffaa00':'var(--txt2)';
-              const prefix=info.urgent==='critical'?'🔴 ':info.urgent==='warning'?'🟡 ':'⏰ ';
-              const suffix=info.urgent==='critical'?' — 곧 마감!':info.urgent==='warning'?' — 임박!':'';
-              return `<div style="font-size:.66rem;color:${color};margin-top:.15rem;font-weight:${info.urgent?'700':'400'}">${prefix}${info.deadline}까지${suffix}</div>`;
-            })()}
+            ${deadlineBadgeHtml(q)}
           </td>`;
           students.forEach(s => {
             const status = getStatus(s.id, q.id, q.type);
@@ -220,14 +213,7 @@ function renderTable() {
             ${statBadge(q.stat, q.statVal)}
           </div>
           <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
-          ${(()=>{
-            const info=getDeadlineInfo(q);
-            if(!info) return '';
-            const color = info.urgent==='expired'?'#999':info.urgent==='critical'?'#ff4444':info.urgent==='warning'?'#ffaa00':'var(--txt2)';
-            const prefix = info.urgent==='critical'?'🔴 ':info.urgent==='warning'?'🟡 ':'⏰ ';
-            const suffix = info.urgent==='critical'?' — 곧 마감!':info.urgent==='warning'?' — 임박!':'';
-            return `<div style="font-size:.66rem;color:${color};margin-top:.15rem;font-weight:${info.urgent?'700':'400'}">${prefix}${info.deadline}까지${suffix}</div>`;
-          })()}
+          ${deadlineBadgeHtml(q)}
         </td>`;
 
       students.forEach(s => {
@@ -613,13 +599,14 @@ function requestQuest(studentId, questId, btn) {
   const data = DB_DATA;
   const s = data.students.find(x=>x.id===studentId);
   const q = (data.boardQuests||[]).find(x=>x.id===questId);
-  if (!s || !q) { if (btn) delete btn.dataset.requesting; return; }
+  if (!s || !q) { if (btn) delete btn.dataset.requesting; showToast('ℹ️ 지금은 신청할 수 없는 퀘스트예요'); return; }
 
   // 2. 완료/신청중 판정 — student·admin과 동일한 Utils.questStatus(일요일 주 시작) 기준으로 통일
   //    'done'(완료 또는 승인됨) 또는 'pending'(신청중)이면 중복이므로 차단
   const qStatus = Utils.questStatus(studentId, questId, q.type, DB_DATA.quests, s.pendingRewards, null);
   if (qStatus !== 'none') {
     if (btn) delete btn.dataset.requesting; // 중복이면 잠금 해제
+    showToast('ℹ️ 이미 신청한 퀘스트예요');
     return;
   }
 
@@ -638,8 +625,8 @@ function requestQuest(studentId, questId, btn) {
   // Firebase 저장 — pendingRewards 경로만 부분 저장 (학생 exp/gold 등 다른 필드 클로버 방지)
   // 저장 성공 후에만 완료 토스트 — 실패 시 실패 안내 + 버튼 잠금 복구
   fbRef.child('students/'+s.id+'/pendingRewards').set(s.pendingRewards)
-    .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청 완료!`); })
-    .catch(() => { if (btn) delete btn.dataset.requesting; showToast(`⚠️ ${s.name} 신청 저장 실패 — 다시 시도해주세요`); });
+    .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청했어요 — 선생님 승인 후 보상을 받아요`); })
+    .catch(() => { if (btn) delete btn.dataset.requesting; showToast(`⚠️ ${s.name} 신청을 저장하지 못했어요 — 다시 시도해주세요`); });
 }
 
 // ── 신청 취소 확인 팝업 ──
@@ -668,8 +655,8 @@ function cancelQuest(studentId, questId) {
   if (canIdx >= 0) {
     // pendingRewards 경로만 부분 저장 — 저장 성공 후에만 취소 완료 토스트
     fbRef.child('students/'+s.id+'/pendingRewards').set(s.pendingRewards)
-      .then(() => { showToast('↩️ 신청이 취소됐어요'); })
-      .catch(() => { showToast('⚠️ 취소 저장 실패 — 다시 시도해주세요'); });
+      .then(() => { showToast('↩️ 신청을 취소했어요'); })
+      .catch(() => { showToast('⚠️ 취소를 저장하지 못했어요 — 다시 시도해주세요'); });
   }
 }
 
@@ -712,6 +699,27 @@ function getDeadlineInfo(quest) {
   }
 
   return { deadline, urgent, diffHr };
+}
+
+// ── 마감 임박 표시 (표시 전용 · getDeadlineInfo 재사용, 상태 판정 로직 신규 없음) ──
+function deadlineBadgeHtml(quest) {
+  const info = getDeadlineInfo(quest);
+  if (!info) return '';
+  // urgent 단계(expired/critical/warning)는 getDeadlineInfo가 이미 판정한 값을 그대로 사용
+  const STYLE = {
+    expired:  { color:'#999',    bg:'rgba(150,150,150,.15)', icon:'⌛', label:'마감됨' },
+    critical: { color:'#ff4444', bg:'rgba(255,68,68,.15)',   icon:'🔴', label:'곧 마감' },
+    warning:  { color:'#ffaa00', bg:'rgba(255,170,0,.15)',   icon:'🟡', label:'마감 임박' },
+  };
+  const u = info.urgent ? STYLE[info.urgent] : null;
+  if (u) {
+    // 임박/만료 — 알약형 배지로 더 눈에 띄게 (인라인 스타일만, CSS 파일 무변경)
+    return `<div style="display:inline-flex;align-items:center;gap:.25rem;margin-top:.2rem;
+      font-size:.66rem;font-weight:700;color:${u.color};background:${u.bg};
+      border-radius:6px;padding:.05rem .35rem">${u.icon} ${u.label} · ${info.deadline}까지</div>`;
+  }
+  // 임박 아님 — 기존 톤 유지
+  return `<div style="font-size:.66rem;color:var(--txt2);margin-top:.15rem">⏰ ${info.deadline}까지</div>`;
 }
 
 // ── 토스트 ──
