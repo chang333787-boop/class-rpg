@@ -1000,8 +1000,23 @@ function renderApproveList() {
   }
   // 확인 필요 보상 섹션: 닫힌/삭제 퀘스트 보상이 1건 이상일 때만 표시
   if (needsReviewItems.length > 0) {
-    listHtml += sectionHeader('⚠️ 확인 필요 보상', needsReviewItems.length,
-      '닫힌/삭제된 퀘스트에서 온 보상입니다. 승인 또는 반려는 기존과 동일하게 처리됩니다.')
+    // [Q-3F-2-1] 안내 문구 강화 + 가장 오래된 신청일/경과일 표시 (표시 전용, 데이터/구조 변경 없음)
+    let needsReviewDesc = '닫힌/삭제된 퀘스트에서 온 보상입니다. 오래 남기지 말고 승인 또는 반려로 정리하세요. 승인/반려는 기존과 동일하게 처리됩니다.';
+    const reviewDates = needsReviewItems
+      .map(item => item.date)
+      .filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d));
+    if (reviewDates.length > 0) {
+      const oldest = reviewDates.reduce((a, b) => (a < b ? a : b));
+      const oldestMs = Date.parse(oldest + 'T00:00:00');
+      const todayMs  = Date.parse(Utils.todayStr() + 'T00:00:00');
+      let elapsedTxt = '';
+      if (!isNaN(oldestMs) && !isNaN(todayMs) && todayMs >= oldestMs) {
+        const days = Math.floor((todayMs - oldestMs) / 86400000);
+        elapsedTxt = ` (${days}일 경과)`;
+      }
+      needsReviewDesc += `<br/>가장 오래된 신청: ${oldest}${elapsedTxt}`;
+    }
+    listHtml += sectionHeader('⚠️ 확인 필요 보상', needsReviewItems.length, needsReviewDesc)
       + needsReviewItems.map(renderRewardCard).join('');
   }
 
