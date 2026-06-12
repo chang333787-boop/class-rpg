@@ -173,7 +173,7 @@ function renderDashboard() {
       <div class="sc-value ${totalPending>0?'gold':'green'}">${totalPending}</div>
       <div class="sc-sub">${totalPending>0?'👆 클릭해서 처리':'건 (없음)'}</div></div>
     <div class="stat-card ${promos.length>0?'purple':'green'}" style="cursor:pointer" onclick="nav('promotion',document.getElementById('nav-promo'))">
-      <div class="sc-label">승급 대기</div>
+      <div class="sc-label">승급 신청</div>
       <div class="sc-value ${promos.length>0?'purple':'green'}">${promos.length}</div>
       <div class="sc-sub">${promos.length>0?'👆 클릭해서 처리':'건 (없음)'}</div></div>
     <div class="stat-card blue">
@@ -198,8 +198,15 @@ function renderDashboard() {
   }
 
   // ── 오늘 처리할 것 (보상 대기 전체) ──
+  // [PANEL-1B] 표시 전용 안내: 이 목록은 닫힌/삭제된 퀘스트 보상도 포함될 수 있음.
+  //            상세 분류(⚠️ 확인 필요 보상)는 renderApproveList(활동 승인 탭)에서 처리.
+  const dashPendingNote = `
+    <div style="padding:.5rem 1.2rem;font-size:.72rem;color:var(--txt3);line-height:1.5;
+      border-bottom:1px solid rgba(255,255,255,.04)">
+      닫힌/삭제된 퀘스트 보상도 포함될 수 있어요. 자세한 분류는 활동 승인 탭에서 확인할 수 있어요.
+    </div>`;
   document.getElementById('dash-pending').innerHTML = pendingItems.length > 0
-    ? pendingItems.map(item => `
+    ? dashPendingNote + pendingItems.map(item => `
       <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.65rem 1.2rem;
         border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s"
         onmouseover="this.style.background='rgba(255,255,255,.02)'"
@@ -324,7 +331,7 @@ function renderDashboard() {
           <span class="tag ${q.approved?'approved':'pending'}">${q.approved?'승인':'대기'}</span>
         </div>`;
       }).join('')
-    : '<div style="padding:1rem;font-size:.78rem;color:var(--txt3)">활동 기록 없음</div>';
+    : '<div style="padding:1rem;font-size:.78rem;color:var(--txt3)">아직 표시할 활동 기록이 없어요.</div>';
 }
 
 // ══════════════════════════════════════════════════
