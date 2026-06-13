@@ -3635,10 +3635,10 @@ function farmCellClick(slot) {
       toast(`🌱 ${h > 0 ? h+'시간 ' : ''}${m}분 후 수확 가능`);
     }
   } else {
-    if (!SEL_SEED) { toast('씨앗을 먼저 선택하세요!'); return; }
+    if (!SEL_SEED) { toast('씨앗을 먼저 선택해주세요!'); return; }
     const inv = CUR.inventory||[];
     const invItem = inv.find(i => i.id === SEL_SEED);
-    if (!invItem || invItem.qty < 1) { toast('씨앗이 없습니다!'); return; }
+    if (!invItem || invItem.qty < 1) { toast('씨앗이 없어요!'); return; }
     // 일반 씨앗 / 돌연변이 씨앗 모두 getSeedById로 조회
     const sd = Utils.getSeedById(SEL_SEED);
     if (!sd) return;
@@ -3649,8 +3649,8 @@ function farmCellClick(slot) {
     if (sd.isMutant) { plotData.isMutant = true; plotData.successRate = sd.successRate; }
     CUR.farm = [...(CUR.farm||[]), plotData];
     DB.saveStudent(CUR);
-    if (sd.isMutant) toast(`⚡ ${sd.name} 심었습니다! 성공 확률 ${Math.round(sd.successRate*100)}% · ${sd.growHours}시간 후 판정`);
-    else toast(`🌱 ${sd.name} 심었습니다! ${sd.growHours}시간 후 수확`);
+    if (sd.isMutant) toast(`⚡ ${sd.name} 심었어요! 성공 확률 ${Math.round(sd.successRate*100)}% · ${sd.growHours}시간 후 판정`);
+    else toast(`🌱 ${sd.name} 심었어요! ${sd.growHours}시간 후 수확`);
     renderFarmModal(); renderMain(); renderMobile();
     if (_ifMode) _drawDeco(); // 마당 농장 즉시 갱신
   }
@@ -6689,7 +6689,7 @@ function _decoPlace(area,row,col){
     DB.saveStudent(CUR); _drawDeco();
     toast(`${d?d.icon:'🌸'} 제거됨`); return;
   }
-  if(!SEL_DECO){ toast('먼저 아래 장식품을 선택하세요!'); return; }
+  if(!SEL_DECO){ toast('먼저 아래 장식품을 선택해주세요!'); return; }
   const d=GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
   if(!d) return;
   if(d.cat!==area){ toast(`이 장식은 ${d.cat==='yard'?'🌿 마당':'🏠 집 안'}에만 배치할 수 있어요!`); return; }
