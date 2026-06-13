@@ -163,6 +163,25 @@ function renderDashboard() {
   const avgLevel = students.length
     ? (students.reduce((a,s)=>a+s.level,0)/students.length).toFixed(1) : '0';
 
+  // ── [TEACHER-UX-1A] 첫 시작 안내 (표시 전용) ──
+  //     기본 placeholder 학생(학생1~6)이 하나라도 남아 있을 때만 노출.
+  //     이름을 바꾸면 자동으로 사라짐. 저장/버튼/onclick 없음.
+  const startGuideEl = document.getElementById('dash-start-guide');
+  if (startGuideEl) {
+    const isDefaultClass = students.some(s => /^학생[1-6]$/.test(String(s.name || '').trim()));
+    startGuideEl.innerHTML = isDefaultClass ? `
+      <div style="background:rgba(74,144,226,.07);border:1px solid rgba(74,144,226,.28);
+        border-radius:var(--r);padding:.9rem 1.2rem;margin-bottom:1rem;line-height:1.7">
+        <div style="font-weight:700;font-size:.9rem;color:var(--accent);margin-bottom:.3rem">🚀 처음이신가요?</div>
+        <div style="font-size:.8rem;color:var(--txt2);margin-bottom:.5rem">지금 보이는 학생1~6은 예시예요.</div>
+        <div style="font-size:.8rem;color:var(--txt2)">
+          ① 학생 목록에서 이름과 비밀번호를 우리 반 학생에 맞게 바꿔주세요.<br>
+          ② 퀘스트 관리 탭에서 퀘스트를 등록하고 자동 일일퀘스트를 켜보세요.<br>
+          ③ 설정에서 관리자 비밀번호 teacher1234를 바꿔주세요.
+        </div>
+      </div>` : '';
+  }
+
   // ── 요약 스탯 ──
   document.getElementById('stat-row').innerHTML = `
     <div class="stat-card blue" style="cursor:pointer" onclick="nav('students',document.getElementById('nav-students'))">
@@ -514,7 +533,7 @@ function openAddStudent() {
 
   el.innerHTML = `<div class="modal" style="max-width:600px">
     <div class="modal-hd">
-      <div class="modal-title">👤 학생 추가 (최대 6명)</div>
+      <div class="modal-title">👤 학생 추가 (한 번에 최대 6명)</div>
       <button class="modal-close" onclick="this.closest('.overlay').remove()">✕</button>
     </div>
     <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">이름을 입력하면 해당 줄이 활성화돼요. 비어있는 줄은 건너뜁니다.</div>
