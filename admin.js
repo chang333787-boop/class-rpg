@@ -432,7 +432,7 @@ function openStudentDetail(id) {
 }
 
 function resetStudentStats(id) {
-  if (!confirm('이 학생의 모든 수치를 초기화할까요?\n(레벨, EXP, 골드, 스탯, 퀘스트, 몬스터 기록)')) return;
+  if (!confirm('이 학생의 모든 수치를 초기화할까요?\n\n레벨·EXP·골드·스탯뿐 아니라\n승인 대기 보상, 인벤토리(장비/장식), 책·독서 기록, 업적, 칭호, 집 꾸미기까지\n학생 성장 데이터가 함께 초기화됩니다.\n이 작업은 되돌릴 수 없습니다.')) return;
   const s = DB.getStudent(id);
   if (!s) return;
   s.level = 1; s.exp = 0; s.gold = 0;
