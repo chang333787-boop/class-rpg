@@ -8439,7 +8439,7 @@ function renderQuestModal() {
           <span class="qr-rewards">${q.exp>0?`+${q.exp}EXP · `:''}${q.gold>0?`+${q.gold}G`:q.status==='self'?'보상 대기':''}</span>
         </div>
       </div>`).join('')
-    : `<div style="color:var(--txt3);font-size:.82rem;padding:1rem 0">아직 활동 내역이 없습니다<br>
+    : `<div style="color:var(--txt3);font-size:.82rem;padding:1rem 0">아직 활동 내역이 없어요<br>
        <span style="font-size:.72rem">✏️ 활동 신청 탭에서 오늘 활동을 알려주세요!</span></div>`);
 }
 

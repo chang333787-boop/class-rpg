@@ -171,11 +171,11 @@ function renderDashboard() {
     <div class="stat-card ${totalPending>0?'gold':'green'}" style="cursor:pointer" onclick="nav('approve',document.getElementById('nav-approve'))">
       <div class="sc-label">승인 대기</div>
       <div class="sc-value ${totalPending>0?'gold':'green'}">${totalPending}</div>
-      <div class="sc-sub">${totalPending>0?'👆 클릭해서 처리':'건 (없음)'}</div></div>
+      <div class="sc-sub">${totalPending>0?'👆 클릭해서 처리':'없음'}</div></div>
     <div class="stat-card ${promos.length>0?'purple':'green'}" style="cursor:pointer" onclick="nav('promotion',document.getElementById('nav-promo'))">
       <div class="sc-label">승급 신청</div>
       <div class="sc-value ${promos.length>0?'purple':'green'}">${promos.length}</div>
-      <div class="sc-sub">${promos.length>0?'👆 클릭해서 처리':'건 (없음)'}</div></div>
+      <div class="sc-sub">${promos.length>0?'👆 클릭해서 처리':'없음'}</div></div>
     <div class="stat-card blue">
       <div class="sc-label">평균 레벨</div>
       <div class="sc-value blue">${avgLevel}</div><div class="sc-sub">/ 30</div></div>`;
@@ -911,7 +911,7 @@ function renderApproveList() {
   if (APPROVE_FILTER === 'today') items = items.filter(i => i.date === today);
 
   if (items.length === 0) {
-    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.85rem;color:var(--txt3)">대기 중인 활동이 없습니다 ✅</div>';
+    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.85rem;color:var(--txt3)">대기 중인 활동이 없어요 ✅</div>';
     updatePendingBadge(); return;
   }
 
@@ -1091,7 +1091,7 @@ function renderPromotionList() {
     if (orphans.length) console.warn('[승급관리] 고아 요청:', orphans);
 
     if (requests.length === 0) {
-      container.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--txt3);font-size:.85rem">대기 중인 승급 신청이 없습니다</div>';
+      container.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--txt3);font-size:.85rem">대기 중인 승급 신청이 없어요</div>';
     } else {
       container.innerHTML = requests.map(req => {
         const s = DB.getStudent(req.studentId);
@@ -3456,7 +3456,7 @@ function renderPwResetList() {
   const el   = document.getElementById('pwreset-list');
   if (!el) return;
   if (reqs.length === 0) {
-    el.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">비밀번호 초기화 요청이 없습니다 ✅</div>';
+    el.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">비밀번호 초기화 요청이 없어요 ✅</div>';
     return;
   }
   el.innerHTML = reqs.map(r => `
@@ -3938,7 +3938,7 @@ function renderAutoDailyStatus() {
         ${row('현재 활성 daily', `${activeDaily.length}개`)}
         ${row('닫힌 daily', `${closedDaily.length}개`)}
       ` : `
-        <div style="font-size:.78rem;color:var(--txt3);padding:.2rem 0 .5rem">등록된 자동 일일퀘스트가 없습니다. 아래 일일 템플릿에서 항목을 체크해 "매일 자동 등록으로 저장"하면 켜집니다.</div>
+        <div style="font-size:.78rem;color:var(--txt3);padding:.2rem 0 .5rem">등록된 자동 일일퀘스트가 없어요. 아래 일일 템플릿에서 항목을 체크해 "매일 자동 등록으로 저장"하면 켜집니다.</div>
         ${row('현재 활성 daily', `${activeDaily.length}개`)}
         ${row('닫힌 daily', `${closedDaily.length}개`)}
       `}
@@ -4014,7 +4014,7 @@ function renderBoardQuestList() {
   if (!container) return;
 
   if (boardQuests.length === 0) {
-    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">게시중인 퀘스트가 없습니다</div>';
+    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">게시중인 퀘스트가 없어요</div>';
     return;
   }
 
@@ -4183,7 +4183,7 @@ function renderInactiveQuests() {
   const el = document.getElementById('inactive-quest-list');
   if (!el) return;
   if (inactive.length === 0) {
-    el.innerHTML = '<div style="padding:.8rem 1.2rem;font-size:.82rem;color:var(--txt3)">비활성 퀘스트가 없습니다</div>';
+    el.innerHTML = '<div style="padding:.8rem 1.2rem;font-size:.82rem;color:var(--txt3)">비활성 퀘스트가 없어요</div>';
     return;
   }
   const typeNames = { daily:'일일', weekly:'주간', special:'과제', event:'특별' };
