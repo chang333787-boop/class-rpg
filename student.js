@@ -1730,7 +1730,11 @@ function renderMonsterOffers(zone) {
   const rarityClass= { common:'ob-rarity-common', rare:'ob-rarity-rare', legend:'ob-rarity-legend' };
   const slotLabels = ['① 안정 몬스터', '② 도전 몬스터', '③ 고급 몬스터'];
 
-  el.innerHTML = offers.map((m, i) => {
+  // [STUDENT-COPY-1A] 표시 전용 안내 — 카드 클릭(startBattle) 직후 기회가 차감됨을 사전 고지.
+  //                   문구만 추가하며 전투/차감/저장 로직은 일절 건드리지 않음.
+  const battleCostNotice = `<div style="text-align:center;font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">⚔️ 도전하면 오늘 전투 기회 1회를 사용해요.</div>`;
+
+  el.innerHTML = battleCostNotice + offers.map((m, i) => {
     const isKilled = (CUR.monsterLog || []).includes(m.name);
     const badges = [
       m.element ? `<span class="offer-badge ob-elem-${m.element}">${elemLabel[m.element]||m.element}</span>` : '',
