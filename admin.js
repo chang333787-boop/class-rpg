@@ -1404,6 +1404,14 @@ function setDqExpandAll(v) {
   renderDqSummary();
 }
 
+// [RPG-ADMIN-UX-3B] 기간 블록 전체 펼침 상태 (표시 전용·저장 안 함, 기본=최근 기간만 펼침)
+let _dqPeriodExpandAll = false;
+
+function setDqPeriodExpandAll(v) {
+  _dqPeriodExpandAll = !!v;
+  renderDqSummary();
+}
+
 function setDqView(v, btn) {
   _dqView = v;
   document.querySelectorAll('#dq-view-week,#dq-view-month').forEach(b => {
@@ -1481,24 +1489,40 @@ function renderDqSummary() {
 
   // [RPG-ADMIN-UX-2B] 상단 전체 펼치기/접기 (표시 전용)
   const dqToolbar = `
-    <div style="display:flex;gap:.4rem;justify-content:flex-end;padding:.2rem .8rem .1rem">
-      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqExpandAll(true)">전체 펼치기</button>
-      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqExpandAll(false)">전체 접기</button>
+    <div style="display:flex;gap:.4rem;justify-content:flex-end;flex-wrap:wrap;padding:.2rem .8rem .1rem">
+      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqPeriodExpandAll(true)">기간 전체 펼치기</button>
+      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqPeriodExpandAll(false)">기간 전체 접기</button>
+      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqExpandAll(true)">학생 상세 전체 펼치기</button>
+      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqExpandAll(false)">학생 상세 전체 접기</button>
     </div>`;
 
-  wrap.innerHTML = dqToolbar + periods.map(k => {
+  wrap.innerHTML = dqToolbar + periods.map((k, pIdx) => {
     const questMap = questDateMap[k] || {};          // questName → Set<dates>
     const questNames = Object.keys(questMap);
     const logMap    = logDateMap[k] || {};            // studentId → questName → Set<dates>
 
+    // [RPG-ADMIN-UX-3B] 기간 헤더 요약 + 기본 접힘(최근 기간만 펼침). 기존 집계식 재사용, 변경 없음.
+    const periodAvail  = questNames.reduce((a,n)=>(a+(questMap[n]?.size||0)), 0);
+    const studentCount = filteredStudents.length;
+    let periodDoneSum = 0;
+    filteredStudents.forEach(s => {
+      const sl = logMap[s.id] || {};
+      periodDoneSum += questNames.reduce((a,n)=>(a+(sl[n]?.size||0)), 0);
+    });
+    const periodPct  = (periodAvail>0 && studentCount>0) ? Math.round(periodDoneSum/(periodAvail*studentCount)*100) : 0;
+    const periodOpen = (pIdx === 0) || _dqPeriodExpandAll;
+
     return `
-    <div style="margin:.4rem 1rem .6rem;border-radius:10px;border:1px solid rgba(255,255,255,.08);overflow:hidden">
-      <div style="background:rgba(255,255,255,.05);padding:.45rem .8rem;font-size:.75rem;
-        font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.07)">
-        📋 ${periodLabel(k)}
-        <span style="font-weight:400;color:var(--txt3);font-size:.68rem;margin-left:.4rem">
-          퀘스트 ${questNames.length}종</span>
+    <div class="dq-period" style="margin:.4rem 1rem .6rem;border-radius:10px;border:1px solid rgba(255,255,255,.08);overflow:hidden">
+      <div class="dq-period-head" style="background:rgba(255,255,255,.05);padding:.45rem .8rem;font-size:.75rem;
+        font-weight:700;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:.5rem">
+        <span style="flex:1">📋 ${periodLabel(k)}
+          <span style="font-weight:400;color:var(--txt3);font-size:.68rem;margin-left:.4rem">퀘스트 ${questNames.length}종 · 학생 ${studentCount}명 · 평균 ${periodPct}%</span>
+        </span>
+        <button class="btn-sm outline" style="font-size:.66rem;padding:.1rem .4rem;white-space:nowrap"
+          onclick="var b=this.closest('.dq-period').querySelector('.dq-period-body');var open=b.style.display!=='none';b.style.display=open?'none':'block';this.textContent=open?'펼치기':'접기'">${periodOpen?'접기':'펼치기'}</button>
       </div>
+      <div class="dq-period-body" style="display:${periodOpen?'block':'none'}">
       <!-- 퀘스트 이름 + 올라온 날수 -->
       <div style="padding:.45rem .8rem;display:flex;flex-wrap:wrap;gap:.3rem;border-bottom:1px solid rgba(255,255,255,.06)">
         ${questNames.map((n,i)=>`<span style="font-size:.68rem;padding:.15rem .5rem;border-radius:8px;
@@ -1540,6 +1564,7 @@ function renderDqSummary() {
             </div>
           </div>`;
         }).join('')}
+      </div>
       </div>
     </div>`;
   }).join('');
