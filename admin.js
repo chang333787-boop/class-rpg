@@ -4296,7 +4296,7 @@ function loadRewardStudent() {
 function applyReward(isLevelUp) {
   const id = document.getElementById('rw-student').value;
   const s = DB.getStudent(id);
-  if (!s) return;
+  if (!s) { notify('학생을 먼저 선택하세요.', 'error'); return; }
   const goldDelta = parseInt(document.getElementById('rw-gold').value)||0;
   const expDelta = parseInt(document.getElementById('rw-exp').value)||0;
   const title = document.getElementById('rw-title').value;

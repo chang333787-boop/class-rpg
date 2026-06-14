@@ -214,7 +214,7 @@
       </div>
       <!-- 활동 프리셋 -->
       <div class="qb-card mb-1">
-        <div class="qb-title">🎁 빠른 보상 지급</div>
+        <div class="qb-title">🎁 빠른 보상 대기 만들기</div>
         <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.9rem">
           <button class="btn-sm outline" onclick="fillPreset('read')">📚 독서</button>
           <button class="btn-sm outline" onclick="fillPreset('hw')">📝 숙제</button>
@@ -266,7 +266,8 @@
           </div>
         </div>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-          <button class="btn-sm success" onclick="quickApprove()">✅ 지급</button>
+          <button class="btn-sm success" onclick="quickApprove()">✅ 대기 만들기</button>
+          <span class="text-muted-sm">학생에게 보상 대기 항목을 만들어 활동 승인 흐름에 올립니다.</span>
           <span class="text-muted-sm" id="last-preset-hint"></span>
         </div>
       </div>
@@ -599,7 +600,6 @@
         </div>
         <div style="display:flex;gap:.6rem">
           <button class="btn-sm success" onclick="applyReward()">✅ 적용</button>
-          <button class="btn-sm gold" onclick="applyReward(true)">🎉 레벨업 이벤트</button>
         </div>
       </div>
     </div>
