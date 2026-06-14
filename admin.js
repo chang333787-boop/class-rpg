@@ -1396,6 +1396,13 @@ function renderStatsPage() {
 // ══════════════════════════════════════════════════
 // ── 일일퀘스트 주간/월간 기록 ─────────────────────────
 let _dqView = 'week';
+// [RPG-ADMIN-UX-2B] 일일퀘스트 기록 상세 펼침 상태 (표시 전용·저장 안 함, 재렌더 시 기본 접힘)
+let _dqExpandAll = false;
+
+function setDqExpandAll(v) {
+  _dqExpandAll = !!v;
+  renderDqSummary();
+}
 
 function setDqView(v, btn) {
   _dqView = v;
@@ -1472,7 +1479,14 @@ function renderDqSummary() {
     return k.slice(5)+'~'+end.toISOString().slice(5,10);
   };
 
-  wrap.innerHTML = periods.map(k => {
+  // [RPG-ADMIN-UX-2B] 상단 전체 펼치기/접기 (표시 전용)
+  const dqToolbar = `
+    <div style="display:flex;gap:.4rem;justify-content:flex-end;padding:.2rem .8rem .1rem">
+      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqExpandAll(true)">전체 펼치기</button>
+      <button class="btn-sm outline" style="font-size:.72rem" onclick="setDqExpandAll(false)">전체 접기</button>
+    </div>`;
+
+  wrap.innerHTML = dqToolbar + periods.map(k => {
     const questMap = questDateMap[k] || {};          // questName → Set<dates>
     const questNames = Object.keys(questMap);
     const logMap    = logDateMap[k] || {};            // studentId → questName → Set<dates>
@@ -1501,13 +1515,19 @@ function renderDqSummary() {
           const totalDone  = questNames.reduce((a,n)=>(a+(stuLog[n]?.size||0)), 0);
           const allDone = totalDone === totalAvail && totalAvail > 0;
           const color = allDone?'var(--emerald)':totalDone>0?'var(--gold)':'var(--txt3)';
-          return `<div style="border-bottom:1px solid rgba(255,255,255,.04);padding:.4rem .8rem">
-            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+          // [RPG-ADMIN-UX-2B] 요약줄 보조 정보 (기존 totalDone/totalAvail 재사용, 집계 변경 없음)
+          const undone = Math.max(0, totalAvail - totalDone);
+          const pct    = totalAvail > 0 ? Math.round(totalDone/totalAvail*100) : 0;
+          return `<div class="dq-stu" style="border-bottom:1px solid rgba(255,255,255,.04);padding:.4rem .8rem">
+            <div style="display:flex;align-items:center;gap:.5rem">
               <span>${s.avatar}</span>
               <span style="font-size:.82rem;font-weight:700;flex:1">${s.name}</span>
-              <span style="font-size:.73rem;font-weight:700;color:${color}">${totalDone}/${totalAvail}일</span>
+              <span style="font-size:.7rem;color:var(--txt3)">미완료 ${undone}일 · ${pct}%</span>
+              <span style="font-size:.73rem;font-weight:700;color:${color};min-width:48px;text-align:right">${totalDone}/${totalAvail}일</span>
+              <button class="btn-sm outline" style="font-size:.66rem;padding:.1rem .4rem;white-space:nowrap"
+                onclick="var d=this.closest('.dq-stu').querySelector('.dq-detail');var open=d.style.display!=='none';d.style.display=open?'none':'flex';this.textContent=open?'자세히':'접기'">${_dqExpandAll?'접기':'자세히'}</button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:.1rem;padding-left:1.6rem">
+            <div class="dq-detail" style="flex-direction:column;gap:.1rem;padding-left:1.6rem;margin-top:.3rem;display:${_dqExpandAll?'flex':'none'}">
               ${questNames.map(n => {
                 const avail = questMap[n]?.size || 0;
                 const done  = stuLog[n]?.size  || 0;
