@@ -390,9 +390,9 @@
         <input type="date" class="form-input" id="act-date-to" style="width:140px" onchange="renderActivityPage()">
         <button class="btn-sm outline" onclick="clearActivityFilter()">초기화</button>
       </div>
-      <!-- 테이블 -->
+      <!-- 테이블 (내부 스크롤: 활동 누적 시 페이지가 무한히 길어지지 않게 — sticky 헤더 유지) -->
       <div class="table-card">
-        <div id="activity-table-wrap" style="overflow-x:auto"></div>
+        <div id="activity-table-wrap" style="overflow-x:auto;max-height:60vh;overflow-y:auto"></div>
       </div>
     </div>
 
