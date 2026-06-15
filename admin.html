@@ -572,11 +572,13 @@
     <div class="page" id="p-reward">
       <div class="section-header"><div class="sh-title">🎁 개별 보상 지급</div></div>
       <div class="qb-card mb-1">
-        <div class="qb-title">학생 능력치 직접 수정</div>
+        <div class="qb-title">즉시 보상·능력치 조정</div>
+        <div class="text-muted-sm" style="margin-bottom:.6rem">선택한 학생에게 대기 없이 바로 반영됩니다. 골드·EXP는 더하거나 빼고, 능력치는 입력한 값으로 설정됩니다.</div>
         <div class="form-group mb-08">
           <label class="form-label">학생 선택</label>
           <select class="form-select" id="rw-student" onchange="loadRewardStudent()"></select>
         </div>
+        <div class="text-muted-sm" style="margin-bottom:.4rem">능력치는 현재값을 기준으로 최종값을 입력합니다.</div>
         <div class="ab-grid mb-1" id="reward-stats"></div>
         <div class="form-grid mb-08">
           <div class="form-group">
@@ -584,7 +586,7 @@
             <input class="form-input" type="number" id="rw-gold" value="0" placeholder="양수: 지급, 음수: 차감">
           </div>
           <div class="form-group">
-            <label class="form-label">EXP 지급</label>
+            <label class="form-label">EXP 지급/차감</label>
             <input class="form-input" type="number" id="rw-exp" value="0">
           </div>
           <div class="form-group">
