@@ -13,15 +13,20 @@ window.onload = async () => {
 
   try {
     const snap = await fbRef.once('value');
-    DB_RAW  = snap.val();
-    DB_DATA = normalizeData(DB_RAW);
+    // [HOTFIX-KIOSK-PENDING-PATH-2] DB_RAW는 원본 Firebase key를 보존(별도 clone). normalizeData는
+    //   _normalizeArrays가 입력을 in-place 변형하므로 또 다른 clone을 넘겨 DB_RAW 오염 방지.
+    const raw = snap.val();
+    DB_RAW  = cloneDataForKiosk(raw);
+    DB_DATA = normalizeData(cloneDataForKiosk(raw));
     if (!DB_DATA) { alert('데이터가 없습니다. 관리자에서 먼저 설정해주세요.'); return; }
 
     // 실시간 동기화 — 디바운스로 연속 업데이트 묶어서 처리
     let _renderTimer = null;
     fbRef.on('value', snap => {
-      DB_RAW  = snap.val();
-      DB_DATA = normalizeData(DB_RAW);
+      // [HOTFIX-KIOSK-PENDING-PATH-2] 원본 보존 clone + normalize용 별도 clone
+      const raw = snap.val();
+      DB_RAW  = cloneDataForKiosk(raw);
+      DB_DATA = normalizeData(cloneDataForKiosk(raw));
       if (_renderTimer) clearTimeout(_renderTimer);
       _renderTimer = setTimeout(() => {
         if (KIOSK_TAB === 'emotion') renderEmotionBoard();
@@ -49,6 +54,11 @@ window.onload = async () => {
     alert('서버 연결 실패: ' + e.message);
   }
 };
+
+// [HOTFIX-KIOSK-PENDING-PATH-2] Firebase 데이터 deep clone (JSON형이라 JSON clone으로 충분, structuredClone 호환성 회피)
+function cloneDataForKiosk(data) {
+  return data ? JSON.parse(JSON.stringify(data)) : null;
+}
 
 function normalizeData(data) {
   if (!data) return null;
