@@ -783,13 +783,13 @@ function quickApprove() {
       s.pendingRewards = [...(s.pendingRewards||[]), {...reward}];
       DB.saveStudent(s);
     });
-    notify(`✅ 전체 학생에게 "${name}" 보상 지급!`);
+    notify(`✅ 전체 학생에게 "${name}" 보상 대기를 만들었습니다. 승인하면 지급됩니다.`);
   } else {
     const s = DB.getStudent(studentId);
     if (!s) { notify('학생을 찾을 수 없어요', 'error'); return; }
     s.pendingRewards = [...(s.pendingRewards||[]), reward];
     DB.saveStudent(s);
-    notify(`✅ ${s.name}에게 "${name}" 보상 지급!`);
+    notify(`✅ ${s.name}에게 "${name}" 보상 대기를 만들었습니다. 승인하면 지급됩니다.`);
   }
   renderAll();
 }
