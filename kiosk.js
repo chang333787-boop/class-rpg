@@ -2,6 +2,7 @@
 // FIREBASE_CONFIG는 gamedata.js에서 선언됨
 
 let DB_DATA = null;
+let DB_RAW  = null;   // [HOTFIX-KIOSK-PENDING-PATH-1] 원본 Firebase 스냅샷 보존(실제 student 저장 key 탐색용)
 let fbRef = null;
 let _cancelCb = null;
 
@@ -12,13 +13,15 @@ window.onload = async () => {
 
   try {
     const snap = await fbRef.once('value');
-    DB_DATA = normalizeData(snap.val());
+    DB_RAW  = snap.val();
+    DB_DATA = normalizeData(DB_RAW);
     if (!DB_DATA) { alert('데이터가 없습니다. 관리자에서 먼저 설정해주세요.'); return; }
 
     // 실시간 동기화 — 디바운스로 연속 업데이트 묶어서 처리
     let _renderTimer = null;
     fbRef.on('value', snap => {
-      DB_DATA = normalizeData(snap.val());
+      DB_RAW  = snap.val();
+      DB_DATA = normalizeData(DB_RAW);
       if (_renderTimer) clearTimeout(_renderTimer);
       _renderTimer = setTimeout(() => {
         if (KIOSK_TAB === 'emotion') renderEmotionBoard();
@@ -52,6 +55,26 @@ function normalizeData(data) {
   // student/admin과 동일한 공유 정규화 기준 사용 (gamedata.js의 순수 함수 직접 호출)
   // → 신규 필드 추가 시 kiosk만 누락되는 위험 제거. DB._normalizeArrays/_migrate는 전달 data만 처리.
   return DB._migrate(DB._normalizeArrays(data));
+}
+
+// [HOTFIX-KIOSK-PENDING-PATH-1] 학생의 "실제" Firebase 저장 key 탐색.
+//   원본 students가 배열/숫자 key(students/3)로 저장돼 있을 수 있어, id로 고정 저장하면
+//   id/name 없는 껍데기 노드(students/s4/pendingRewards)가 생겨 정규화에서 무시됨.
+//   → node.id === studentId 인 실제 학생 노드의 key를 찾아 그 경로에만 부분 저장한다.
+function getStudentStorageKey(studentId) {
+  const rawStudents = DB_RAW && DB_RAW.students;
+  if (!rawStudents) return studentId;
+  // 이미 id 기반 전체 학생 노드가 있으면 그 key 사용
+  if (Object.prototype.hasOwnProperty.call(rawStudents, studentId)
+      && rawStudents[studentId] && rawStudents[studentId].id === studentId) {
+    return studentId;
+  }
+  // 배열/숫자 key 기반 실제 학생 노드 찾기 (껍데기는 id 없으므로 선택 안 됨)
+  const foundKey = Object.keys(rawStudents).find(k => {
+    const node = rawStudents[k];
+    return node && node.id === studentId;
+  });
+  return foundKey || studentId;
 }
 
 // ── 테이블 렌더 ──
@@ -624,7 +647,8 @@ function requestQuest(studentId, questId, btn) {
 
   // Firebase 저장 — pendingRewards 경로만 부분 저장 (학생 exp/gold 등 다른 필드 클로버 방지)
   // 저장 성공 후에만 완료 토스트 — 실패 시 실패 안내 + 버튼 잠금 복구
-  fbRef.child('students/'+s.id+'/pendingRewards').set(s.pendingRewards)
+  // [HOTFIX-KIOSK-PENDING-PATH-1] 실제 student 저장 key 경로에만 부분 저장(껍데기 노드 방지)
+  fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards').set(s.pendingRewards)
     .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청했어요 — 선생님 승인 후 보상을 받아요`); })
     .catch(() => { if (btn) delete btn.dataset.requesting; showToast(`⚠️ ${s.name} 신청을 저장하지 못했어요 — 다시 시도해주세요`); });
 }
@@ -654,7 +678,8 @@ function cancelQuest(studentId, questId) {
   const canIdx = DB_DATA.students.findIndex(x=>x.id===studentId);
   if (canIdx >= 0) {
     // pendingRewards 경로만 부분 저장 — 저장 성공 후에만 취소 완료 토스트
-    fbRef.child('students/'+s.id+'/pendingRewards').set(s.pendingRewards)
+    // [HOTFIX-KIOSK-PENDING-PATH-1] 실제 student 저장 key 경로에만 부분 저장
+    fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards').set(s.pendingRewards)
       .then(() => { showToast('↩️ 신청을 취소했어요'); })
       .catch(() => { showToast('⚠️ 취소를 저장하지 못했어요 — 다시 시도해주세요'); });
   }
