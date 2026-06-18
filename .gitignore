@@ -1,0 +1,11 @@
+# 기기별 로컬 설정 (각 컴퓨터에만 존재, 공유 안 함)
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Obsidian 앱 설정 (기기별 — 노트 본문(.md)은 공유, 앱 설정은 제외)
+.obsidian/
+
+# OS / 편집기 잡파일
+.DS_Store
+Thumbs.db
+desktop.ini
