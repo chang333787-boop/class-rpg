@@ -6,6 +6,21 @@ function escHtml(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// ── 이미지 아이콘 + 이모지 폴백 ──
+function iconImg(entity, kind, sizeCss) {
+  const icon = escHtml(entity?.icon || '❓');
+  const size = /^(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%)$/.test(String(sizeCss)) ? String(sizeCss) : '1.5rem';
+  const collection = GAME_DATA[kind];
+  const isBaseEntity = entity?.id && Array.isArray(collection) && collection.some(item => item.id === entity.id);
+  if (!isBaseEntity) return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">${icon}</span>`;
+
+  return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">`
+    + `<img src="./assets/${escHtml(kind)}/${escHtml(entity.id)}.png" alt="${escHtml(entity.name || '')}" `
+    + `style="display:block;width:100%;height:100%;object-fit:contain" `
+    + `onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">`
+    + `<span style="display:none">${icon}</span></span>`;
+}
 // onclick="fn('...')" 처럼 HTML 속성 안 JS 문자열 인자용 (JS 이스케이프 → HTML 이스케이프 순)
 function escJsAttr(s) {
   return escHtml(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
@@ -4474,7 +4489,7 @@ function renderMonsters() {
       const isCustom = !!m._custom;
       return `<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;
         border-bottom:1px solid rgba(255,255,255,.05);${isCustom?'background:rgba(255,215,0,.02)':''}">
-        <div style="font-size:1.5rem;width:32px;text-align:center">${m.icon}</div>
+        <div style="font-size:1.5rem;width:32px;text-align:center">${iconImg(m, 'monsters', '1.5rem')}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.85rem">${m.name}
             ${isCustom?'<span style="font-size:.62rem;color:var(--gold);margin-left:.3rem">✏️커스텀</span>':''}
