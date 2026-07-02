@@ -680,6 +680,19 @@ const DB = {
         const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
         merged.battleDaily = { dateKey: today, used: 0 };
       }
+      // monsterLog: 이름/id 혼재 → id로 통일 + 중복 제거
+      // (일반 전투=이름, 무한배틀=id로 저장되던 이력 정리 — 도감 UI/구역보상(이름 판정)과
+      //  업적(id 판정)이 서로 어긋나던 버그 수정. 매핑 안 되는 항목(옛 커스텀 이름 등)은 원본 유지.)
+      if (Array.isArray(merged.monsterLog) && merged.monsterLog.length) {
+        const nameToId = {};
+        GAME_DATA.monsters.forEach(m => { nameToId[m.name] = m.id; });
+        const seen = new Set();
+        merged.monsterLog = merged.monsterLog.reduce((out, e) => {
+          const id = nameToId[e] || e;
+          if (!seen.has(id)) { seen.add(id); out.push(id); }
+          return out;
+        }, []);
+      }
       return merged;
     });
     return data;
@@ -2397,9 +2410,9 @@ function finalizeBattle(student, monster, win) {
     student.totalGold = (student.totalGold || 0) + monster.gold;
 
     // 도감 기록 + 도감 보상 지급
-    const isFirstKill = !(student.monsterLog || []).includes(monster.name);
+    const isFirstKill = !(student.monsterLog || []).includes(monster.id);
     if (isFirstKill) {
-      student.monsterLog = [...(student.monsterLog || []), monster.name];
+      student.monsterLog = [...(student.monsterLog || []), monster.id];
 
       // 최초 처치 보상 (settings.dexRewards 참조)
       const dexRewards = (typeof DB !== 'undefined')
@@ -2416,7 +2429,7 @@ function finalizeBattle(student, monster, win) {
         const zoneMons = (typeof GAME_DATA !== 'undefined')
           ? GAME_DATA.monsters.filter(m => m.zone === monster.zone) : [];
         const killed   = student.monsterLog || [];
-        const allDone  = zoneMons.length > 0 && zoneMons.every(m => killed.includes(m.name));
+        const allDone  = zoneMons.length > 0 && zoneMons.every(m => killed.includes(m.id));
         const claimedKey = `dexZoneClaimed_${monster.zone}`;
         if (allDone && !student[claimedKey]) {
           student[claimedKey] = true;
@@ -2467,9 +2480,9 @@ function getRarityWeight(monster, slotIndex) {
   return (RARITY_WEIGHTS[slotIndex] || RARITY_WEIGHTS[0])[monster.rarity] ?? 1.0;
 }
 
-// 미획득 몬스터 우대 (monsterLog는 name 배열 기준)
+// 미획득 몬스터 우대 (monsterLog는 id 배열 기준 — _migrate에서 통일)
 function getDiscoveryWeight(player, monster) {
-  return (player.monsterLog || []).includes(monster.name) ? 1.0 : 1.5;
+  return (player.monsterLog || []).includes(monster.id) ? 1.0 : 1.5;
 }
 
 // 최근 등장 억제 (recentBattleOffers는 최근 5회 제시 이름 평탄화 배열)
@@ -2516,7 +2529,7 @@ function getThirdSlotCandidates(player, zoneMonsters, currentRange) {
   // 복귀 후보: 같은 사냥터 안, 미획득, rare/legend, 레벨 상한 이하
   const missed = zoneMonsters.filter(m =>
     (m.rarity === 'rare' || m.rarity === 'legend') &&
-    !(player.monsterLog || []).includes(m.name) &&
+    !(player.monsterLog || []).includes(m.id) &&
     !inRange.includes(m) &&
     (m.level || 1) <= maxLevel   // ★ 레벨 상한 적용
   );

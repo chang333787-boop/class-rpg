@@ -4465,7 +4465,7 @@ function renderMonsters() {
     <tr>
       <td>${s.avatar} <strong>${s.name}</strong></td>
       <td style="color:var(--red);font-weight:700">${(s.monsterLog||[]).length} / ${allMonsters.length}</td>
-      <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).join(', ')||'-'}</td>
+      <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).map(e=>{const mm=allMonsters.find(m=>m.id===e);return mm?mm.name:e;}).join(', ')||'-'}</td>
     </tr>`).join('');
 
   // 필터 적용
@@ -4834,7 +4834,7 @@ function openEditMonsterModal(monId) {
   document.getElementById('me-id').value   = m.id;
   document.getElementById('me-name').value = m.name;
   document.getElementById('me-icon').value = m.icon;
-  // 기존 몬스터는 이름/아이콘 변경 불가 (monsterLog 이름 기반)
+  // 기존 몬스터는 이름/아이콘 변경 불가 (도감/이미지 에셋이 id·이름 안정성에 의존)
   const isBase = !m._new;
   document.getElementById('me-name').disabled = isBase;
   document.getElementById('me-name').style.opacity = isBase ? '.5' : '1';
