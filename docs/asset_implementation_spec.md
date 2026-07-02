@@ -3,6 +3,12 @@
 > 작성: 2026-07-02 (Claude Code, 전체 코드 리뷰 기반)
 > 대상 작업자: Codex (또는 외부 AI 도구)
 > **먼저 읽을 것**: `README.md`, `docs/rpg_refactor_safety_rules.md` — 이 문서의 규칙이 항상 우선한다.
+>
+> ⚠️ **이 작업은 class-rpg(우리반 성장 RPG, funclassrpg.kr) 저장소 단독이다.**
+> 같은 사용자의 다른 프로젝트 — 별빛 아레나(star-arena)·배드민턴 랭킹·가지(picturebook) 등 — 와
+> **완전 별개**다. 그 프로젝트들의 파일·규칙·패치노트(PATCHNOTES.md) 관례·코드 스타일을
+> 이 저장소에 적용하지 말고, 이전 대화에서 다른 프로젝트를 다뤘더라도 그 맥락을 가져오지 말 것.
+> 판단 기준은 오직 이 저장소 안의 문서(README, docs/)다.
 
 ---
 
