@@ -14,6 +14,12 @@ function escHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// monsterLog 항목(id) → 표시용 이름 (매핑 실패 시 원본 그대로 — 옛 커스텀 이름 등)
+function monsterNameById(id) {
+  const mon = getActiveMonsters().find(m => m.id === id);
+  return mon ? mon.name : id;
+}
+
 // ── 이미지 아이콘 + 이모지 폴백 ──
 function iconImg(entity, kind, sizeCss) {
   const icon = escHtml(entity?.icon || '❓');
@@ -877,7 +883,7 @@ function buildMainHTML() {
   const {cols:_fc, rows:_fr} = getFarmLayout(s.level||1);
   const farmCells   = buildFarmMiniCells(_fc * _fr, _fc);
   const _allMons    = getActiveMonsters();
-  const alive       = _allMons.filter(m=>!(s.monsterLog||[]).includes(m.name));
+  const alive       = _allMons.filter(m=>!(s.monsterLog||[]).includes(m.id));
   const recMon      = alive.find(m=>m.recLv<=s.level)||alive[0]||_allMons[0];
 
   // 첫 번째 할 일은 강조, 나머지는 요약
@@ -1112,7 +1118,7 @@ function buildMainHTML() {
             const logs=[
               ...myQ.map(q=>({icon:q.icon||'📋',text:q.name,color:'var(--gold)'})),
               ...myB.map(b=>({icon:'📚',text:'「'+b.title+'」',color:'var(--sky)'})),
-              ...(s.monsterLog||[]).slice(-2).reverse().map(m=>({icon:'⚔️',text:m+' 처치',color:'var(--red)'}))
+              ...(s.monsterLog||[]).slice(-2).reverse().map(m=>({icon:'⚔️',text:monsterNameById(m)+' 처치',color:'var(--red)'}))
             ];
             if(logs.length===0) return '<div style="font-size:.72rem;color:var(--txt3)">아직 기록 없어요</div>';
             return logs.slice(0,6).map(l=>`<div style="display:flex;align-items:center;gap:.35rem;padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
@@ -1757,7 +1763,7 @@ function renderMonsterOffers(zone) {
   const battleCostNotice = `<div style="text-align:center;font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">⚔️ 도전하면 오늘 전투 기회 1회를 사용해요.</div>`;
 
   el.innerHTML = battleCostNotice + offers.map((m, i) => {
-    const isKilled = (CUR.monsterLog || []).includes(m.name);
+    const isKilled = (CUR.monsterLog || []).includes(m.id);
     const badges = [
       m.element ? `<span class="offer-badge ob-elem-${m.element}">${elemLabel[m.element]||m.element}</span>` : '',
       m.rarity  ? `<span class="offer-badge ${rarityClass[m.rarity]||'ob-rarity-common'}">${rarityLabel[m.rarity]||m.rarity}</span>` : '',
@@ -1898,7 +1904,7 @@ function renderMonsters() {
   const canFight = Utils.canFightMonster(CUR);
   const attemptsLeft = Utils.monsterAttemptsLeft(CUR);
   document.getElementById('monster-list').innerHTML = getActiveMonsters().map(m => {
-    const isKilled = killed.includes(m.name);
+    const isKilled = killed.includes(m.id);
     const isLocked = (m.level || m.recLv || 0) > CUR.level + 3;
     const canChallenge = canFight && !isKilled && !isLocked;
     return `<div class="mon-card ${isKilled?'killed':''} ${isLocked?'locked':''}"
@@ -2471,7 +2477,7 @@ function doFight() {
           CUR.totalGold = (CUR.totalGold||0) + mon.gold;
           const oldLv = CUR.level;
           CUR.level = Utils.levelFromExp(CUR.exp);
-          if (!(CUR.monsterLog||[]).includes(mon.name)) CUR.monsterLog = [...(CUR.monsterLog||[]), mon.name];
+          if (!(CUR.monsterLog||[]).includes(mon.id)) CUR.monsterLog = [...(CUR.monsterLog||[]), mon.id];
         }
         // ★ 횟수 차감은 startBattle()에서 완료 — 여기서는 battleInProgress 정리만
         CUR.battleInProgress = null;
@@ -3256,7 +3262,7 @@ function renderMonsterStep() {
     const zoneCards = ZONE_INFO.map(z => {
       const locked = lv < z.minLv;
       const mons   = allMons.filter(m => m.zone === z.id);
-      const kCount = mons.filter(m => killed.includes(m.name)).length;
+      const kCount = mons.filter(m => killed.includes(m.id)).length;
       const pct    = mons.length ? Math.round(kCount/mons.length*100) : 0;
       const preview = mons.slice(0,3).map(m =>
         `<div style="text-align:center">
@@ -3349,7 +3355,7 @@ function renderMonsterStep() {
     const slotLabels = ['① 안정', '② 도전', '③ 특별'];
 
     const monCards = (offers||[]).map((mon, i) => {
-      const isKilled  = killed.includes(mon.name);
+      const isKilled  = killed.includes(mon.id);
       const isSpecial = i === 2 || mon.rarity === 'legend' || mon.rarity === 'rare';
       const isLegend  = mon.rarity === 'legend';
       const bdColor   = isLegend ? 'rgba(255,215,0,.7)' : isSpecial ? 'rgba(200,120,255,.6)' : 'rgba(231,76,60,.3)';
@@ -3388,7 +3394,7 @@ function renderMonsterStep() {
 
     // 도감 진행도
     const zoneMons   = GAME_DATA.monsters.filter(m => m.zone === CUR_ZONE);
-    const zoneKilled = zoneMons.filter(m => killed.includes(m.name)).length;
+    const zoneKilled = zoneMons.filter(m => killed.includes(m.id)).length;
     const pct = zoneMons.length ? Math.round(zoneKilled/zoneMons.length*100) : 0;
 
     // 나머지 몬스터 미리보기 (오늘 후보 제외)
@@ -3399,7 +3405,7 @@ function renderMonsterStep() {
         <div style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:.6rem">이 구역의 다른 몬스터</div>
         <div style="display:flex;flex-wrap:wrap;gap:.4rem">
           ${others.map(m => {
-            const isK = killed.includes(m.name);
+            const isK = killed.includes(m.id);
             return `<div style="display:flex;align-items:center;gap:.35rem;padding:.25rem .55rem;
               border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,${isK?'.08':'.06'});
               opacity:${isK?.65:1}">
@@ -3456,11 +3462,11 @@ function renderMonsterStep() {
     ];
     const zc = dexZones.find(z=>z.id===MONSTER_DEX_ZONE)?.color || '#fff';
     const zoneMons = allMons.filter(m => m.zone === MONSTER_DEX_ZONE);
-    const killedCount = zoneMons.filter(m => killed.includes(m.name)).length;
+    const killedCount = zoneMons.filter(m => killed.includes(m.id)).length;
     const pct = zoneMons.length ? Math.round(killedCount/zoneMons.length*100) : 0;
 
     const tabsHtml = dexZones.map(z => {
-      const kc = allMons.filter(m=>m.zone===z.id&&killed.includes(m.name)).length;
+      const kc = allMons.filter(m=>m.zone===z.id&&killed.includes(m.id)).length;
       const tot= allMons.filter(m=>m.zone===z.id).length;
       const active = MONSTER_DEX_ZONE===z.id;
       return `<button onclick="MONSTER_DEX_ZONE='${z.id}';renderMonsterStep()"
@@ -3473,7 +3479,7 @@ function renderMonsterStep() {
     }).join('');
 
     const cardsHtml = zoneMons.map(m => {
-      const isKilled  = killed.includes(m.name);
+      const isKilled  = killed.includes(m.id);
       const wasMet    = isKilled || (CUR.recentBattleOffers||[]).flat().some(n=>n===m.name);
       const isSpecial = m.rarity === 'legend' || m.rarity === 'rare';
 
@@ -3810,7 +3816,7 @@ function renderHouse() {
     const zoneMons = allMons.filter(m => m.zone === z.key);
     zoneCount[z.key] = {
       total: zoneMons.length || z.target,
-      killed: zoneMons.filter(m => dex.includes(m.name)).length,
+      killed: zoneMons.filter(m => dex.includes(m.id)).length,
       mons: zoneMons,
     };
   });
@@ -3839,7 +3845,7 @@ function renderHouse() {
 
   // 처치 칩 (zone별 접이식)
   const chipsByZone = zones.map(z => {
-    const killed = zoneCount[z.key].mons.filter(m => dex.includes(m.name));
+    const killed = zoneCount[z.key].mons.filter(m => dex.includes(m.id));
     if (!killed.length) return '';
     return `<div style="margin-bottom:.5rem">
       <div style="font-size:.68rem;color:${z.color};font-weight:600;margin-bottom:.25rem">${z.label}</div>
