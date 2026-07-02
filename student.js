@@ -14,6 +14,21 @@ function escHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ── 이미지 아이콘 + 이모지 폴백 ──
+function iconImg(entity, kind, sizeCss) {
+  const icon = escHtml(entity?.icon || '❓');
+  const size = /^(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%)$/.test(String(sizeCss)) ? String(sizeCss) : '1.5rem';
+  const collection = GAME_DATA[kind];
+  const isBaseEntity = entity?.id && Array.isArray(collection) && collection.some(item => item.id === entity.id);
+  if (!isBaseEntity) return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">${icon}</span>`;
+
+  return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">`
+    + `<img src="./assets/${escHtml(kind)}/${escHtml(entity.id)}.png" alt="${escHtml(entity.name || '')}" `
+    + `style="display:block;width:100%;height:100%;object-fit:contain" `
+    + `onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">`
+    + `<span style="display:none">${icon}</span></span>`;
+}
+
 // ══ 초기화 ══
 window.onload = async () => {
   const loading = document.getElementById('loading-screen');
@@ -1754,7 +1769,7 @@ function renderMonsterOffers(zone) {
       <div>
         <div class="offer-slot-label">${slotLabels[i] || ''}</div>
         <div class="offer-card" onclick="startBattle('${m.id}')">
-          <div class="offer-icon">${m.icon}</div>
+          <div class="offer-icon">${iconImg(m, 'monsters', '2rem')}</div>
           <div class="offer-body">
             <div class="offer-name">${m.name}</div>
             <div class="offer-meta">
@@ -1889,7 +1904,7 @@ function renderMonsters() {
     return `<div class="mon-card ${isKilled?'killed':''} ${isLocked?'locked':''}"
       onclick="${canChallenge?`startBattle('${m.id}')`:''}"
       style="${isKilled||isLocked?'cursor:default':''}">
-      <div class="mc-icon">${m.icon}</div>
+      <div class="mc-icon">${iconImg(m, 'monsters', '1.6rem')}</div>
       <div class="mc-name">${m.name}</div>
       <div class="mc-lv">Lv.${m.level||m.recLv}</div>
       <div class="mc-gold">💰 ${m.gold}G</div>
@@ -2106,7 +2121,7 @@ function renderBattleNew() {
       <!-- 몬스터 -->
       <div class="ba-fighter">
         <div class="ba-fighter-name" style="color:#FF8A80">${mon.name}</div>
-        <div class="ba-emoji" id="ba-mon-emoji">${mon.icon}</div>
+        <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
         <div style="width:100%">
           <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-mon-hp" style="width:${monsterHpPct}%"></div></div>
           <div class="ba-hp-txt">${s.monsterHp} / ${s.monsterHpMax}</div>
@@ -2358,7 +2373,7 @@ function renderBattle(phase) {
       </div>
       <div class="ba-vs-icon">⚡</div>
       <div class="ba-side">
-        <div class="ba-emoji" id="ba-mon-emoji">${mon.icon}</div>
+        <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
         <div style="font-size:.75rem;font-weight:700">${mon.name}</div>
         <div class="ba-hp-wrap">
           <div class="ba-hp-bar-bg"><div class="ba-hp-bar-fill ba-mon-hp" id="ba-mon-hp" style="width:${monHpPct}%"></div></div>
@@ -3245,7 +3260,7 @@ function renderMonsterStep() {
       const pct    = mons.length ? Math.round(kCount/mons.length*100) : 0;
       const preview = mons.slice(0,3).map(m =>
         `<div style="text-align:center">
-          <div style="font-size:1.5rem">${m.icon}</div>
+          <div style="font-size:1.5rem">${iconImg(m, 'monsters', '1.5rem')}</div>
           <div style="font-size:.52rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
         </div>`).join('');
 
@@ -3355,7 +3370,7 @@ function renderMonsterStep() {
           background:rgba(0,0,0,.4);border:1px solid ${badgeColor};
           border-radius:6px;padding:.12rem .35rem">${badgeTxt}</div>`:''}
         <div style="font-size:.58rem;color:var(--txt3);margin-bottom:.3rem">${slotLabels[i]||''}</div>
-        <div style="font-size:2.3rem;margin-bottom:.3rem">${mon.icon}</div>
+        <div style="font-size:2.3rem;margin-bottom:.3rem">${iconImg(mon, 'monsters', '2.3rem')}</div>
         <div style="font-size:.85rem;font-weight:800;color:${isKilled?'var(--txt3)':isSpecial?'#fff':'var(--txt1)'};margin-bottom:.2rem">${mon.name}</div>
         <div style="font-size:.63rem;color:var(--txt3)">Lv.${mon.level||mon.recLv} ${elemE}${mon.trait==='ghost'?' 👻':''}</div>
         <div style="font-size:.67rem;color:var(--gold);margin:.2rem 0">💰${mon.gold}G</div>
@@ -3388,7 +3403,7 @@ function renderMonsterStep() {
             return `<div style="display:flex;align-items:center;gap:.35rem;padding:.25rem .55rem;
               border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,${isK?'.08':'.06'});
               opacity:${isK?.65:1}">
-              <span style="font-size:.85rem">${m.icon}</span>
+              <span style="font-size:.85rem">${iconImg(m, 'monsters', '.85rem')}</span>
               <div>
                 <div style="font-size:.63rem;font-weight:600;color:${isK?'var(--txt3)':'var(--txt2)'}">${m.name}</div>
                 <div style="font-size:.56rem;color:var(--txt3)">Lv${m.level||m.recLv}${isK?' ✓':''}</div>
@@ -3467,7 +3482,7 @@ function renderMonsterStep() {
         return `<div style="background:rgba(46,204,113,.08);border:1.5px solid rgba(46,204,113,.3);
           border-radius:12px;padding:.65rem .4rem;text-align:center${glowSpec}">
           ${isSpecial?`<div style="font-size:.52rem;color:#FFD700;font-weight:700;margin-bottom:.1rem">✨전설</div>`:''}
-          <div style="font-size:1.5rem;margin-bottom:.15rem">${m.icon}</div>
+          <div style="font-size:1.5rem;margin-bottom:.15rem">${iconImg(m, 'monsters', '1.5rem')}</div>
           <div style="font-size:.7rem;font-weight:700;color:var(--txt1)">${m.name}</div>
           <div style="font-size:.58rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
           <div style="font-size:.55rem;color:var(--emerald);background:rgba(46,204,113,.15);
@@ -3476,7 +3491,7 @@ function renderMonsterStep() {
       } else if (wasMet) {
         return `<div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.12);
           border-radius:12px;padding:.65rem .4rem;text-align:center;opacity:.8">
-          <div style="font-size:1.5rem;margin-bottom:.15rem;filter:grayscale(.4)">${m.icon}</div>
+          <div style="font-size:1.5rem;margin-bottom:.15rem;filter:grayscale(.4)">${iconImg(m, 'monsters', '1.5rem')}</div>
           <div style="font-size:.7rem;font-weight:700;color:var(--txt2)">${m.name}</div>
           <div style="font-size:.58rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
           <div style="font-size:.55rem;color:var(--txt3);background:rgba(255,255,255,.07);
