@@ -80,7 +80,7 @@ const MIME = {
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
     '/gamedata.js',
-    '/student.js?v=20260602', '/admin.js?v=20260602', '/kiosk.js?v=20260602',
+    '/student.js?v=20260702', '/admin.js?v=20260702', '/kiosk.js?v=20260702',
     '/student.css?v=20260604', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
   ];
 
@@ -134,9 +134,9 @@ for (const f of HTML_FILES) {
   if (html.includes(`${cssName}?v=20260604`)) add('PASS', `${f}: ${cssName}?v=20260604 캐시버스터`);
   else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=20260604) 미발견 — CSS 갱신 시 확인 필요`);
 
-  // 전용 JS script src 캐시버스터 ?v=20260602
-  if (html.includes(`${js}?v=20260602`)) add('PASS', `${f}: ${js}?v=20260602 캐시버스터`);
-  else add('REVIEW', `${f}: ${js} 캐시버스터(?v=20260602) 미발견 — JS 갱신 시 확인 필요`);
+  // 전용 JS script src 캐시버스터 ?v=20260702
+  if (html.includes(`${js}?v=20260702`)) add('PASS', `${f}: ${js}?v=20260702 캐시버스터`);
+  else add('REVIEW', `${f}: ${js} 캐시버스터(?v=20260702) 미발견 — JS 갱신 시 확인 필요`);
 }
 
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──

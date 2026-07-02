@@ -6,6 +6,13 @@ let DB_RAW  = null;   // [HOTFIX-KIOSK-PENDING-PATH-1] 원본 Firebase 스냅샷
 let fbRef = null;
 let _cancelCb = null;
 
+// ── HTML 이스케이프 (학생 입력 문자열 → innerHTML 삽입용) ──
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ── 초기화 ──
 window.onload = async () => {
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -379,7 +386,7 @@ function renderKioskMemory() {
                 style="width:100%;height:100%;object-fit:cover;display:block">
               <div style="position:absolute;bottom:0;left:0;right:0;padding:.3rem .5rem;
                 background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:.65rem;color:#fff;
-                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.title||''}</div>
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(m.title||'')}</div>
             </div>`).join('')}
         </div>`}`;
 

@@ -7,6 +7,13 @@ let BATTLE_MENU = 'main'; // 'main' | 'attack' | 'skill'
 let MOB_TAB = 'home';
 var _lbTouchX = 0; // 라이트박스 스와이프 시작 X (인라인 ontouchstart/end가 전역 접근 → window 프로퍼티 필요, let 금지)
 
+// ══ HTML 이스케이프 (학생 입력 문자열 → innerHTML 삽입용) ══
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ══ 초기화 ══
 window.onload = async () => {
   const loading = document.getElementById('loading-screen');
@@ -49,7 +56,7 @@ function buildLoginGrid() {
     // 이름 자체에 아이콘이 이미 포함된 경우 avatar 중복 제거
     const hasAvInName = av && nm.includes(av);
     const label = hasAvInName ? nm : (av ? `${av} ${nm}` : nm);
-    return `<button class="stu-btn" onclick="selectStudent('${s.id}',this)">${label}</button>`;
+    return `<button class="stu-btn" onclick="selectStudent('${s.id}',this)">${escHtml(label)}</button>`;
   }).join('');
 }
 
@@ -7028,6 +7035,10 @@ async function submitMemories() {
 async function submitMemory() { await submitMemories(); }
 
 function editMemTitle(memId, currentTitle) {
+  if (currentTitle === undefined) { // 호출부는 id만 전달 (제목을 onclick 인자로 넘기면 따옴표/HTML 주입 위험)
+    const m = (DB.getMemories('all') || []).find(x => x.id === memId);
+    currentTitle = (m && m.title) || '';
+  }
   const newTitle = prompt('폴더 이름을 입력해주세요\n(파일명 대신 보여집니다)', currentTitle);
   if (newTitle === null) return;          // 취소
   if (!newTitle.trim()) { toast('이름을 입력해주세요'); return; }
@@ -7071,11 +7082,11 @@ function renderMyMemories() {
             background:linear-gradient(transparent,rgba(0,0,0,.72));
             font-size:.6rem;color:rgba(255,255,255,.9);
             overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${m.title||''}
+            ${escHtml(m.title||'')}
           </div>
           ${myPending?`<div style="position:absolute;top:4px;right:4px;font-size:.55rem;
             background:rgba(255,180,0,.85);color:#1a1a1a;padding:.1rem .3rem;border-radius:4px;font-weight:700">확인중</div>`:''}
-          ${m.studentId===CUR.id?`<button onclick="event.stopPropagation();editMemTitle('${m.id}','${(m.title||'').replace(/'/g,'\\\'')}')"
+          ${m.studentId===CUR.id?`<button onclick="event.stopPropagation();editMemTitle('${m.id}')"
             style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);border:none;
               color:#fff;font-size:.65rem;padding:.1rem .35rem;border-radius:4px;cursor:pointer">✏️</button>`:''}
         </div>`;
@@ -7594,7 +7605,7 @@ function renderEmotionHistory() {
                     border-radius:8px;padding:.05rem .35rem">${r.levelLabel}</span>
                 </div>
                 ${r.reason&&r.reason!=='없음'
-                  ? `<div style="font-size:.76rem;color:var(--txt2);margin-top:.25rem">💬 ${r.reason}</div>`
+                  ? `<div style="font-size:.76rem;color:var(--txt2);margin-top:.25rem">💬 ${escHtml(r.reason)}</div>`
                   : ''}
               </div>
               <button onclick="editEmotionRecord('${r.date}','${r.period}')"
@@ -7629,7 +7640,7 @@ function showEmotionDetail(date) {
       <div style="font-size:1.5rem">${r.emotionIcon}</div>
       <div style="flex:1">
         <div style="font-size:.9rem;font-weight:700">${r.emotionLabel} · <span style="color:${groupColor[r.group]};font-size:.78rem">${r.levelLabel}</span></div>
-        ${r.reason&&r.reason!=='없음'?`<div style="font-size:.78rem;color:var(--txt2);margin-top:.2rem">💬 ${r.reason}</div>`:''}
+        ${r.reason&&r.reason!=='없음'?`<div style="font-size:.78rem;color:var(--txt2);margin-top:.2rem">💬 ${escHtml(r.reason)}</div>`:''}
       </div>
       <button onclick="editEmotionRecord('${r.date}','${r.period}')"
         style="background:none;border:1px solid rgba(255,255,255,.12);color:var(--txt3);
@@ -8672,9 +8683,9 @@ function visitFriend(id) {
             border-bottom:1px solid rgba(255,255,255,.05)">
             <span style="font-size:.7rem;color:var(--txt3);min-width:24px;flex-shrink:0">#${books.length-i}</span>
             <div style="flex:1">
-              <div style="font-size:.86rem;font-weight:600">${b.title}</div>
+              <div style="font-size:.86rem;font-weight:600">${escHtml(b.title)}</div>
               ${b.review?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem;line-height:1.5">
-                ${b.review.length>80?b.review.slice(0,80)+'...':b.review}</div>`:''}
+                ${escHtml(b.review.length>80?b.review.slice(0,80)+'...':b.review)}</div>`:''}
             </div>
             <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0">${b.date||''}</span>
           </div>`).join('')}
@@ -8688,7 +8699,7 @@ function visitFriend(id) {
               <div style="border-radius:10px;overflow:hidden;cursor:pointer"
                 onclick="openLightbox(${JSON.stringify(artworks.filter(x=>x.artUrl).map(x=>({url:x.artUrl,title:x.title||'',desc:x.comment||''})))},${i})">
                 <img src="${a.artUrl}" style="width:100%;aspect-ratio:1;object-fit:cover">
-                <div style="padding:.3rem .4rem;font-size:.72rem;font-weight:600;background:rgba(255,255,255,.04)">${a.title||''}</div>
+                <div style="padding:.3rem .4rem;font-size:.72rem;font-weight:600;background:rgba(255,255,255,.04)">${escHtml(a.title||'')}</div>
               </div>`:''
             ).join('')}
            </div>`}
