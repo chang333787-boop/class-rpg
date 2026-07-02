@@ -44,8 +44,10 @@ gamedata.js        공유 데이터 + DB 레이어 (게임 상수, Utils, Fireba
 student.html  / student.js  / student.css     학생 화면
 admin.html    / admin.js    / admin.css       관리(교사) 화면
 kiosk.html    / kiosk.js    / kiosk.css        키오스크(할 일 체크판) 화면
+assets/monsters/                               몬스터 이미지 100장 (iconImg()가 이모지 폴백과 함께 표시)
 scripts/verify-safety.mjs                      저장 안전 정적 검증 스크립트 (Node 기본 모듈만)
-docs/                                          리팩토링 안전 규칙 / 인수인계 문서
+scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test
+docs/                                          리팩토링 안전 규칙 / 인수인계 / 에셋 명세 문서
 CNAME                                          GitHub Pages 커스텀 도메인 (funclassrpg.kr)
 ```
 
@@ -72,8 +74,8 @@ CNAME                                          GitHub Pages 커스텀 도메인 
 
 - HTML에 인라인 `onclick`/`ontouchstart` 등 전역 함수·전역 변수에 의존하는 핸들러가 많다.
   → 스크립트를 모듈화하거나 `defer`로 바꾸면 **전역이 깨진다.** 평면 전역 스코프를 유지해야 한다.
-- 캐시 무효화: JS는 `?v=20260602`, CSS는 `?v=20260604` 쿼리를 붙인다.
-  JS/CSS를 수정하면 해당 HTML의 `?v=` 갱신을 검토할 것. `gamedata.js`는 `?v=` 미부착.
+- 캐시 무효화: JS는 `?v=20260702` 계열, CSS는 `?v=20260604` 쿼리를 붙인다.
+  JS/CSS를 수정하면 해당 HTML의 `?v=` 갱신을 검토할 것. `gamedata.js`도 2026-07-02부터 `?v=` 부착.
 
 ---
 
