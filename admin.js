@@ -1,4 +1,17 @@
 // ══════════════════════════════════════════════════
+//  HTML 이스케이프 (학생 입력 문자열 → innerHTML/onclick 삽입용)
+// ══════════════════════════════════════════════════
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// onclick="fn('...')" 처럼 HTML 속성 안 JS 문자열 인자용 (JS 이스케이프 → HTML 이스케이프 순)
+function escJsAttr(s) {
+  return escHtml(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
+
+// ══════════════════════════════════════════════════
 //  ADMIN LOGIN
 // ══════════════════════════════════════════════════
 async function adminLogin() {
@@ -1976,11 +1989,11 @@ function renderArtworkAdmin() {
             ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
               onclick="adminOpenArtLb(event)">`:``}
             <div style="flex:1;min-width:0">
-              <div style="font-weight:600;font-size:.85rem">${a.title}
-                ${a.subject?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:10px;padding:.1rem .4rem;margin-left:.3rem">${a.subject}</span>`:''}
+              <div style="font-weight:600;font-size:.85rem">${escHtml(a.title)}
+                ${a.subject?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:10px;padding:.1rem .4rem;margin-left:.3rem">${escHtml(a.subject)}</span>`:''}
               </div>
               <div class="text-muted-tiny">${a.date||''}</div>
-              ${a.comment?`<div style="font-size:.74rem;color:var(--txt2);margin-top:.15rem">${a.comment}</div>`:''}
+              ${a.comment?`<div style="font-size:.74rem;color:var(--txt2);margin-top:.15rem">${escHtml(a.comment)}</div>`:''}
             </div>
             <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
               <button class="btn-sm outline" style="font-size:.66rem;padding:.2rem .45rem"
@@ -2012,10 +2025,10 @@ function parseBookContent(r) {
     } else { summary = cleanRaw; }
   }
   let html = '';
-  if (charName) html += `<div style="background:rgba(155,89,182,.07);border-left:3px solid rgba(155,89,182,.4);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:rgba(155,89,182,.9);font-weight:700;margin-bottom:.15rem">🧑 인상 깊은 인물</div><div style="font-size:.8rem;color:var(--txt1);font-weight:600">${charName}</div>${charReason?`<div style="font-size:.75rem;color:var(--txt2);margin-top:.1rem">${charReason}</div>`:''}</div>`;
-  if (summary) html += `<div style="background:rgba(52,152,219,.07);border-left:3px solid rgba(52,152,219,.35);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:var(--sky);font-weight:700;margin-bottom:.15rem">📖 줄거리</div><div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap">${summary}</div></div>`;
-  if (reflection) html += `<div style="background:rgba(46,204,113,.07);border-left:3px solid rgba(46,204,113,.35);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:var(--emerald);font-weight:700;margin-bottom:.15rem">💬 느낀 점</div><div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap">${reflection}</div></div>`;
-  if (!html && raw) html = `<div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap;padding:.3rem 0">${raw}</div>`;
+  if (charName) html += `<div style="background:rgba(155,89,182,.07);border-left:3px solid rgba(155,89,182,.4);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:rgba(155,89,182,.9);font-weight:700;margin-bottom:.15rem">🧑 인상 깊은 인물</div><div style="font-size:.8rem;color:var(--txt1);font-weight:600">${escHtml(charName)}</div>${charReason?`<div style="font-size:.75rem;color:var(--txt2);margin-top:.1rem">${escHtml(charReason)}</div>`:''}</div>`;
+  if (summary) html += `<div style="background:rgba(52,152,219,.07);border-left:3px solid rgba(52,152,219,.35);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:var(--sky);font-weight:700;margin-bottom:.15rem">📖 줄거리</div><div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap">${escHtml(summary)}</div></div>`;
+  if (reflection) html += `<div style="background:rgba(46,204,113,.07);border-left:3px solid rgba(46,204,113,.35);border-radius:0 8px 8px 0;padding:.4rem .65rem"><div style="font-size:.65rem;color:var(--emerald);font-weight:700;margin-bottom:.15rem">💬 느낀 점</div><div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap">${escHtml(reflection)}</div></div>`;
+  if (!html && raw) html = `<div style="font-size:.78rem;color:var(--txt2);line-height:1.65;white-space:pre-wrap;padding:.3rem 0">${escHtml(raw)}</div>`;
   return html;
 }
 
@@ -2139,7 +2152,7 @@ function renderBooksPage() {
         <span style="font-size:1rem">${r._savatar}</span>
         <span style="font-weight:800;font-size:.9rem;color:var(--txt1)">${r._sname}</span>
         <span style="font-weight:700;font-size:.88rem;color:var(--sky);flex:1;min-width:120px">
-          『${r.bookTitle||r.title||''}』</span>
+          『${escHtml(r.bookTitle||r.title||'')}』</span>
         <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
           ${catTxt?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);
             border-radius:8px;padding:.12rem .42rem">${catTxt}</span>`:''}
@@ -2166,9 +2179,9 @@ function renderBooksPage() {
              <button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red);white-space:nowrap"
               onclick="deleteBookPending('${r._sid}','${r.id}')">🗑️</button>`
           : `<button class="btn-sm outline nowrap"
-              onclick="saveBookComment('${r._sid}','${r.bookTitle||r.title}','${r.id}')">💾 코멘트 저장</button>
+              onclick="saveBookComment('${r._sid}','${escJsAttr(r.bookTitle||r.title)}','${r.id}')">💾 코멘트 저장</button>
              <button class="btn-sm" style="background:rgba(231,76,60,.15);color:var(--red);white-space:nowrap"
-              onclick="deleteBook('${r._sid}','${r.bookTitle||r.title}')">🗑️</button>`}
+              onclick="deleteBook('${r._sid}','${escJsAttr(r.bookTitle||r.title)}')">🗑️</button>`}
       </div>
     </div>`;
   };
@@ -2549,7 +2562,7 @@ function renderMemoriesPage() {
         <!-- 제목 인라인 편집 -->
         <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.15rem">
           <input id="mem-title-inp-${m.id}"
-            value="${(m.title||'').replace(/"/g,'&quot;')}"
+            value="${escHtml(m.title||'')}"
             style="font-size:.82rem;font-weight:700;flex:1;min-width:0;
               background:transparent;border:none;border-bottom:1px solid transparent;
               color:var(--txt1);padding:.05rem .1rem;font-family:inherit;
@@ -2631,7 +2644,7 @@ function renderBulkRenameList() {
       <div style="flex:1;min-width:0">
         <div style="font-size:.75rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
           color:${(m.title||'').toLowerCase().startsWith('kakao')?'var(--red)':'var(--txt1)'}">
-          ${m.title||'(제목없음)'}
+          ${escHtml(m.title||'(제목없음)')}
         </div>
         <div style="font-size:.65rem;color:var(--txt3)">${m.date||''} · ${m.uploadedBy==='admin'?'관리자':'학생'}</div>
       </div>
@@ -5304,7 +5317,7 @@ function renderEmotionPage() {
             ${r.reason && r.reason !== '없음'
               ? `<div style="font-size:.72rem;color:var(--txt2);margin-top:.4rem;
                   padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:6px">
-                  💬 ${r.reason}</div>` : ''}
+                  💬 ${escHtml(r.reason)}</div>` : ''}
           </div>`).join('')}
       </div>
     </div>`;
