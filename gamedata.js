@@ -337,7 +337,7 @@ const GAME_DATA = {
     // Lv10
     {id:'m10',name:'오크 전사',       icon:'👹',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'fire', rarity:'legend', role:'dealer', trait:null,  hp:84, atk:26, def:10, spd:6,  gold:60},
     {id:'m39',name:'심연 망령어',     icon:'🐟',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'water',rarity:'rare',   role:'normal', trait:'ghost',hp:93, atk:20, def:10, spd:6,  gold:60},
-    {id:'m40',name:'고목 수호자',     icon:'🌳',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:116,atk:18, def:13, spd:5,  gold:28},
+    {id:'m40',name:'고목 수호자',     icon:'🌳',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'grass',rarity:'rare',   role:'tank',   trait:null,  hp:116,atk:18, def:13, spd:5,  gold:60},
     // ══ 중급 intermediate Lv11~20 (50마리) ══════════════════════
     // Lv11
     {id:'m41',name:'화염 멧토끼',     icon:'🐇',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'normal', trait:null,  hp:100,atk:22, def:11, spd:6,  gold:35},

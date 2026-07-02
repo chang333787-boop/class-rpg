@@ -4820,8 +4820,6 @@ function openAddMonsterModal() {
   document.getElementById('me-lv').value = 5;
   document.getElementById('me-gold').value = 50;
   document.getElementById('me-exp').value = 40;
-  document.getElementById('me-stat').value = 'atk';
-  document.getElementById('me-val').value = 10;
   document.getElementById('me-delete-btn').style.display = 'none';
   renderIconPicker();
   document.getElementById('m-monster-edit').classList.add('open');
@@ -4844,8 +4842,6 @@ function openEditMonsterModal(monId) {
   document.getElementById('me-lv').value   = m.recLv;
   document.getElementById('me-gold').value = m.gold;
   document.getElementById('me-exp').value  = m.exp;
-  document.getElementById('me-stat').value = m.reqStat;
-  document.getElementById('me-val').value  = m.reqVal;
   // 커스텀이거나 새로 추가한 것만 삭제 가능
   const deletable = m._custom;
   document.getElementById('me-delete-btn').style.display = deletable ? '' : 'none';
@@ -4886,8 +4882,6 @@ function saveMonsterEdit() {
     recLv: parseInt(document.getElementById('me-lv').value)||1,
     gold:  parseInt(document.getElementById('me-gold').value)||30,
     exp:   parseInt(document.getElementById('me-exp').value)||25,
-    reqStat: document.getElementById('me-stat').value,
-    reqVal:  parseInt(document.getElementById('me-val').value)||0,
     _custom: true,
     _new: isNew,
   };
