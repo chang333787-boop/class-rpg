@@ -8584,6 +8584,9 @@ function visitFriend(id) {
   const db = DB.load();
   const artworks = (db.artworks||[]).filter(a=>a.studentId===f.id);
   const books    = f.books||[];
+  // 작품 라이트박스 목록 — 7264의 window._artLbImgs 패턴과 동일 (JSON을 onclick 속성에 직접 넣으면 따옴표로 속성이 깨짐)
+  const friendArtLb = artworks.filter(x=>x.artUrl).map(x=>({url:x.artUrl,title:x.title||'',desc:x.comment||''}));
+  window._friendArtLbImgs = friendArtLb;
 
   // 읽기 전용 Canvas 렌더러 — 기존 꾸미기 렌더러 재사용
   function renderDecoCanvas(area, containerId) {
@@ -8697,7 +8700,7 @@ function visitFriend(id) {
         : `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem">
             ${artworks.map((a,i)=>a.artUrl?`
               <div style="border-radius:10px;overflow:hidden;cursor:pointer"
-                onclick="openLightbox(${JSON.stringify(artworks.filter(x=>x.artUrl).map(x=>({url:x.artUrl,title:x.title||'',desc:x.comment||''})))},${i})">
+                onclick="openLightbox(window._friendArtLbImgs,${friendArtLb.findIndex(x=>x.url===a.artUrl)})">
                 <img src="${a.artUrl}" style="width:100%;aspect-ratio:1;object-fit:cover">
                 <div style="padding:.3rem .4rem;font-size:.72rem;font-weight:600;background:rgba(255,255,255,.04)">${escHtml(a.title||'')}</div>
               </div>`:''
