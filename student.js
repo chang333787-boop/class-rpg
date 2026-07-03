@@ -26,7 +26,8 @@ function iconImg(entity, kind, sizeCss, fileId, fallbackIcon) {
   const size = /^(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%)$/.test(String(sizeCss)) ? String(sizeCss) : '1.5rem';
   const assetId = fileId || entity?.id;
   const collection = GAME_DATA[kind];
-  const isBaseEntity = assetId && (fileId || (Array.isArray(collection) && collection.some(item => item.id === entity?.id)));
+  const collectionItems = Array.isArray(collection) ? collection : Object.values(collection || {}).flat();
+  const isBaseEntity = assetId && (fileId || collectionItems.some(item => item.id === entity?.id));
   if (!isBaseEntity) return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">${icon}</span>`;
 
   return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">`
@@ -1381,7 +1382,7 @@ function renderShop() {
       return `<div class="item-card ${!check.ok&&!owned?'cant-afford':''} shop-row-card"
         onclick="${clickFn}" style="${!check.ok&&!owned?'opacity:.6':''}">
         <div style="display:flex;align-items:center;gap:.6rem;width:100%">
-          <div style="flex-shrink:0">${buildEquipIcon(cat, item.id)}</div>
+          <div style="flex-shrink:0">${iconImg(item, 'equipment', '3rem')}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
               ${item.name}${elemBadge}${badge}
@@ -1423,7 +1424,7 @@ function renderShop() {
           return `<div class="item-card ${!check.ok&&!owned?'cant-afford':''} shop-row-card"
             onclick="${clickFn}" style="${!check.ok&&!owned?'opacity:.6':''}">
             <div style="display:flex;align-items:center;gap:.6rem;width:100%">
-              <div style="flex-shrink:0">${buildEquipIcon(cat, item.id)}</div>
+              <div style="flex-shrink:0">${iconImg(item, 'equipment', '3rem')}</div>
               <div style="flex:1;min-width:0">
                 <div style="font-size:.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                   ${item.name}${badge}
@@ -8025,7 +8026,7 @@ function renderInv() {
           background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
           border-radius:10px;padding:.7rem .9rem">
           <div style="flex-shrink:0;width:48px;height:48px;display:flex;align-items:center;justify-content:center">
-            ${buildEquipIcon(slotKey, item.id)}
+            ${iconImg(item, 'equipment', '3rem')}
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:.88rem">${item.name}</div>
