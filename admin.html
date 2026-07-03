@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="./gamedata.js"></script>
+<script src="./gamedata.js?v=20260702"></script>
 <link rel="stylesheet" href="./admin.css?v=20260604">
 </head>
 <body>
@@ -953,19 +953,7 @@
           <label class="form-label">EXP 보상</label>
           <input class="form-input" type="number" id="me-exp" value="40">
         </div>
-        <div class="form-group">
-          <label class="form-label">조건 스탯</label>
-          <select class="form-select" id="me-stat">
-            <option value="atk">공격력 (ATK)</option>
-            <option value="def">방어력 (DEF)</option>
-            <option value="spd">이동속도 (SPD)</option>
-            <option value="mag">마력 (MAG)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">조건 수치</label>
-          <input class="form-input" type="number" id="me-val" value="10" min="0">
-        </div>
+        <!-- (제거됨) 조건 스탯/수치 입력 — reqStat/reqVal은 게임 로직 어디서도 판정하지 않는 죽은 필드였음 -->
       </div>
       <div style="display:flex;gap:.5rem;margin-top:1rem">
         <button class="btn-sm success flex-1" onclick="saveMonsterEdit()">💾 저장</button>
@@ -1679,6 +1667,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260702b"></script>
+<script src="./admin.js?v=20260702d"></script>
 </body>
 </html>

@@ -4465,7 +4465,7 @@ function renderMonsters() {
     <tr>
       <td>${s.avatar} <strong>${s.name}</strong></td>
       <td style="color:var(--red);font-weight:700">${(s.monsterLog||[]).length} / ${allMonsters.length}</td>
-      <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).join(', ')||'-'}</td>
+      <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).map(e=>{const mm=allMonsters.find(m=>m.id===e);return mm?mm.name:e;}).join(', ')||'-'}</td>
     </tr>`).join('');
 
   // 필터 적용
@@ -4820,8 +4820,6 @@ function openAddMonsterModal() {
   document.getElementById('me-lv').value = 5;
   document.getElementById('me-gold').value = 50;
   document.getElementById('me-exp').value = 40;
-  document.getElementById('me-stat').value = 'atk';
-  document.getElementById('me-val').value = 10;
   document.getElementById('me-delete-btn').style.display = 'none';
   renderIconPicker();
   document.getElementById('m-monster-edit').classList.add('open');
@@ -4834,7 +4832,7 @@ function openEditMonsterModal(monId) {
   document.getElementById('me-id').value   = m.id;
   document.getElementById('me-name').value = m.name;
   document.getElementById('me-icon').value = m.icon;
-  // 기존 몬스터는 이름/아이콘 변경 불가 (monsterLog 이름 기반)
+  // 기존 몬스터는 이름/아이콘 변경 불가 (도감/이미지 에셋이 id·이름 안정성에 의존)
   const isBase = !m._new;
   document.getElementById('me-name').disabled = isBase;
   document.getElementById('me-name').style.opacity = isBase ? '.5' : '1';
@@ -4844,8 +4842,6 @@ function openEditMonsterModal(monId) {
   document.getElementById('me-lv').value   = m.recLv;
   document.getElementById('me-gold').value = m.gold;
   document.getElementById('me-exp').value  = m.exp;
-  document.getElementById('me-stat').value = m.reqStat;
-  document.getElementById('me-val').value  = m.reqVal;
   // 커스텀이거나 새로 추가한 것만 삭제 가능
   const deletable = m._custom;
   document.getElementById('me-delete-btn').style.display = deletable ? '' : 'none';
@@ -4886,8 +4882,6 @@ function saveMonsterEdit() {
     recLv: parseInt(document.getElementById('me-lv').value)||1,
     gold:  parseInt(document.getElementById('me-gold').value)||30,
     exp:   parseInt(document.getElementById('me-exp').value)||25,
-    reqStat: document.getElementById('me-stat').value,
-    reqVal:  parseInt(document.getElementById('me-val').value)||0,
     _custom: true,
     _new: isNew,
   };
