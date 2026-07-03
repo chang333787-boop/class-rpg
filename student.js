@@ -21,15 +21,16 @@ function monsterNameById(id) {
 }
 
 // ── 이미지 아이콘 + 이모지 폴백 ──
-function iconImg(entity, kind, sizeCss) {
-  const icon = escHtml(entity?.icon || '❓');
+function iconImg(entity, kind, sizeCss, fileId, fallbackIcon) {
+  const icon = escHtml(fallbackIcon || entity?.icon || '❓');
   const size = /^(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%)$/.test(String(sizeCss)) ? String(sizeCss) : '1.5rem';
+  const assetId = fileId || entity?.id;
   const collection = GAME_DATA[kind];
-  const isBaseEntity = entity?.id && Array.isArray(collection) && collection.some(item => item.id === entity.id);
+  const isBaseEntity = assetId && (fileId || (Array.isArray(collection) && collection.some(item => item.id === entity?.id)));
   if (!isBaseEntity) return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">${icon}</span>`;
 
   return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">`
-    + `<img src="./assets/${escHtml(kind)}/${escHtml(entity.id)}.png" alt="${escHtml(entity.name || '')}" `
+    + `<img src="./assets/${escHtml(kind)}/${escHtml(assetId)}.png" alt="${escHtml(entity?.name || '')}" `
     + `style="display:block;width:100%;height:100%;object-fit:contain" `
     + `onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">`
     + `<span style="display:none">${icon}</span></span>`;
@@ -1524,7 +1525,7 @@ function renderShop() {
       const locked = lv < (s.reqLv||1);
       const lockFn = locked ? `toast('Lv${s.reqLv} 이상이 되어야 구매할 수 있어요!')` : `buySeed('${s.id}')`;
       return `<div class="item-card" onclick="${lockFn}" style="opacity:${locked?.55:1}">
-        <div class="ic-icon">${s.icon}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
+        <div class="ic-icon">${iconImg(s, 'seeds', '1.4rem', s.id)}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
         <div class="ic-name">${s.name}${locked?`<span style="color:var(--txt3);font-size:.62rem"> Lv${s.reqLv}+</span>`:''}</div>
         <div class="ic-stats">${s.growHours}h → ${s.sellPrice}G (순익 +${s.sellPrice-s.price}G)</div>
         <div class="ic-price">💰 ${s.price}G</div>
@@ -1540,7 +1541,7 @@ function renderShop() {
       return `<div class="item-card" onclick="${lockFn}"
         style="opacity:${locked?.55:1};border:1px solid rgba(255,165,0,.35);
           background:linear-gradient(135deg,rgba(255,140,0,.08),rgba(255,80,0,.05))">
-        <div class="ic-icon">${s.icon}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
+        <div class="ic-icon">${iconImg(s, 'seeds', '1.4rem', s.id)}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
         <div class="ic-name" style="color:#FFA500">${s.name}
           <span style="font-size:.6rem;background:rgba(255,140,0,.2);color:#FFA500;
             border-radius:4px;padding:.05rem .3rem;margin-left:.2rem">위험</span>
@@ -3601,7 +3602,7 @@ function buildFarmMiniCells(count, cols) {
     if (plot) {
       const sd = Utils.getSeedByCrop(plot.crop);
       const ready = sd && Utils.cropReady(plot.planted, sd.growHours);
-      return `<div class="fcell ${ready?'ready':'growing'}" onclick="openModal('m-farm');renderFarmModal()">${ready?sd.cropIcon:'🌱'}</div>`;
+      return `<div class="fcell ${ready?'ready':'growing'}" onclick="openModal('m-farm');renderFarmModal()">${ready?iconImg(sd, 'crops', '.9rem', sd.crop, sd.cropIcon):'🌱'}</div>`;
     }
     return `<div class="fcell empty" onclick="openModal('m-farm');renderFarmModal()">+</div>`;
   }).join('');
@@ -3720,7 +3721,7 @@ function renderFarmModal() {
       const withered = ready && sd && elapsed > sd.growHours * 3600000 * 3;
       const mutantClass = plot.isMutant ? ' mutant' : '';
       gridHtml += `<div class="fm-cell${mutantClass} ${withered?'withered':ready?'ready':'growing'}" onclick="farmCellClick(${i})">
-        ${withered ? '🍂' : ready ? sd.cropIcon : (plot.isMutant ? '⚡' : '🌱')}
+        ${withered ? '🍂' : ready ? iconImg(sd, 'crops', '1.1rem', sd.crop, sd.cropIcon) : (plot.isMutant ? '⚡' : '🌱')}
         <div class="fm-prog"><div class="fm-prog-fill" style="width:${pct}%${plot.isMutant?';background:rgba(255,165,0,.8)':''}"></div></div>
       </div>`;
     } else {
@@ -8051,7 +8052,7 @@ function renderInv() {
       seedInv.map(i => {
         const s = Utils.getSeedById(i.id);
         return `<div class="inv-slot filled">
-          <div class="inv-icon">${s.icon}</div>
+          <div class="inv-icon">${iconImg(s, 'seeds', '1.5rem', s.id)}</div>
           <div class="inv-name">${s.name}</div>
           <div class="inv-qty">x${i.qty}</div>
         </div>`;
