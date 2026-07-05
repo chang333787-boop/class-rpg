@@ -79,7 +79,7 @@ const MIME = {
   // 캐시버스터를 실제 HTML에 적힌 그대로 둔 채로 200 확인 (쿼리 있어도 실제 파일로 매핑되는지)
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
-    '/gamedata.js?v=20260702',
+    '/gamedata.js?v=20260705',
     '/student.js?v=20260705', '/admin.js?v=20260705', '/kiosk.js?v=20260702',
     '/student.css?v=20260604', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
   ];
@@ -139,9 +139,9 @@ for (const f of HTML_FILES) {
   if (html.includes(`${js}?v=${jsVer}`)) add('PASS', `${f}: ${js}?v=${jsVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 
-  // gamedata.js 캐시버스터 ?v=20260702 (2026-07-02 부착 — 배포 시 신구 파일 혼재 방지)
-  if (html.includes('gamedata.js?v=20260702')) add('PASS', `${f}: gamedata.js?v=20260702 캐시버스터`);
-  else add('REVIEW', `${f}: gamedata.js 캐시버스터(?v=20260702) 미발견 — gamedata 갱신 시 확인 필요`);
+  // gamedata.js 캐시버스터 ?v=20260705 (2026-07-05 갱신 — 업적/씨앗 문구 수정 배포)
+  if (html.includes('gamedata.js?v=20260705')) add('PASS', `${f}: gamedata.js?v=20260705 캐시버스터`);
+  else add('REVIEW', `${f}: gamedata.js 캐시버스터(?v=20260705) 미발견 — gamedata 갱신 시 확인 필요`);
 }
 
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──
