@@ -274,7 +274,7 @@ function renderDashboard() {
           ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;
             padding:.35rem .55rem;background:rgba(255,255,255,.04);border-radius:8px;
             border-left:2px solid rgba(93,173,226,.3);line-height:1.5">
-            ${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
+            ${escHtml(item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview)}</div>`:''}
         </div>
         <div style="display:flex;gap:.4rem;flex-shrink:0;padding-top:.1rem">
           <button class="btn-sm success" style="font-size:.72rem;padding:.3rem .7rem"
@@ -1013,7 +1013,7 @@ function renderApproveList() {
           ${qStatus.badge?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">${qStatus.badge}</span>`:''}
         </div>
         <div class="ac-quest">${item.label}</div>
-        ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
+        ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${escHtml(item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview)}</div>`:''}
         <div class="ac-rewards">
           <span class="ac-tag">+${item.exp}EXP</span>
           <span class="ac-tag">+${item.gold||0}G</span>
@@ -1776,11 +1776,11 @@ function renderArtworkPending() {
       <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.6rem">
         <span style="font-size:1.2rem">${item.student.avatar}</span>
         <span style="font-weight:700">${item.student.name}</span>
-        <span style="font-size:.78rem;color:var(--txt3)">· ${item.artTitle||''}</span>
+        <span style="font-size:.78rem;color:var(--txt3)">· ${escHtml(item.artTitle||'')}</span>
         <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">${item.date||''}</span>
       </div>
-      ${item.artUrl?`<img src="${item.artUrl}" style="width:100%;max-height:250px;object-fit:contain;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="adminOpenLightbox('${item.artUrl}','${item.artTitle||''}')">`:''}
-      ${item.artDesc?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.6rem">${item.artDesc}</div>`:''}
+      ${item.artUrl?`<img src="${escHtml(item.artUrl)}" style="width:100%;max-height:250px;object-fit:contain;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="adminOpenLightbox('${escJsAttr(item.artUrl)}','${escJsAttr(item.artTitle||'')}')">`:''}
+      ${item.artDesc?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.6rem">${escHtml(item.artDesc)}</div>`:''}
       <!-- 선생님 코멘트 입력 -->
       <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
         <input class="form-input" id="aw-cmt-${item.id}" placeholder="선생님 한마디 (선택)" style="flex:1;font-size:.8rem">
@@ -2845,9 +2845,9 @@ function renderRecorderPage() {
         <!-- 자기점검 -->
         ${r.reflection||r.bestToday||r.difficultPart||r.selfRating ? `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.6rem;font-size:.75rem;color:var(--txt2)">
-          ${r.reflection    ? `<div><b style="color:var(--txt3);font-size:.68rem">느낀 점</b><br>${r.reflection}</div>`       : ''}
-          ${r.bestToday     ? `<div><b style="color:var(--txt3);font-size:.68rem">잘된 점</b><br>${r.bestToday}</div>`         : ''}
-          ${r.difficultPart ? `<div><b style="color:var(--txt3);font-size:.68rem">어려운 부분</b><br>${r.difficultPart}</div>` : ''}
+          ${r.reflection    ? `<div><b style="color:var(--txt3);font-size:.68rem">느낀 점</b><br>${escHtml(r.reflection)}</div>`       : ''}
+          ${r.bestToday     ? `<div><b style="color:var(--txt3);font-size:.68rem">잘된 점</b><br>${escHtml(r.bestToday)}</div>`         : ''}
+          ${r.difficultPart ? `<div><b style="color:var(--txt3);font-size:.68rem">어려운 부분</b><br>${escHtml(r.difficultPart)}</div>` : ''}
           ${r.selfRating    ? `<div><b style="color:var(--txt3);font-size:.68rem">자기평가</b><br>${'⭐'.repeat(r.selfRating)}</div>` : ''}
         </div>` : ''}
         <!-- 교사 코멘트 -->
