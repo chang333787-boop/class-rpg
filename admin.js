@@ -5614,3 +5614,6 @@ function notify(msg, type) {
   setTimeout(() => item.remove(), 2900);
 }
 
+// [ER-2] DB 저장 실패 시 교사에게 안내 (gamedata의 _onSaveError 훅)
+window.onDbSaveError = () => notify('⚠️ 저장에 실패했어요. 인터넷 연결을 확인하고 다시 시도해주세요.', 'error');
+
