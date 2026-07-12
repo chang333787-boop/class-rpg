@@ -61,6 +61,10 @@ window.onload = async () => {
 
     renderTable();
 
+    // [ER-7] 종일 구동 대응: 화면 꺼짐 방지 + 절전 복귀 시 최신화
+    requestWakeLock();
+    document.addEventListener('visibilitychange', onKioskVisible);
+
   } catch(e) {
     console.error('[kiosk] init 실패:', e);
     showKioskError('서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.');
@@ -76,6 +80,31 @@ function showKioskError(msg) {
     + '<div style="font-size:1rem;font-weight:700;color:var(--gold);text-align:center;max-width:280px;line-height:1.5">' + escHtml(msg) + '</div>'
     + '<button onclick="location.reload()" style="margin-top:1rem;padding:.6rem 1.4rem;border:none;border-radius:20px;background:var(--gold);color:#1a1a1a;font-weight:700;font-family:inherit;font-size:.9rem;cursor:pointer">🔄 다시 시도</button>';
   el.style.display = 'flex';
+}
+
+// [ER-7] 교실 공용 태블릿 종일 구동 대응 — 화면 꺼짐 방지 + 절전 복귀 시 stale 최신화
+let _wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      _wakeLock = await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener?.('release', () => { _wakeLock = null; });
+    }
+  } catch(_) { /* 미지원/거부는 무시 */ }
+}
+async function onKioskVisible() {
+  if (document.visibilityState !== 'visible' || !fbRef) return;
+  requestWakeLock(); // 절전 시 해제되므로 재요청
+  try {
+    // 절전 중 실시간 소켓이 끊겨 갱신이 멈췄을 수 있어 수동 재조회로 최신화
+    const snap = await fbRef.once('value');
+    const raw = snap.val();
+    DB_RAW  = cloneDataForKiosk(raw);
+    DB_DATA = normalizeData(cloneDataForKiosk(raw));
+    if (KIOSK_TAB === 'emotion') renderEmotionBoard();
+    else if (KIOSK_TAB === 'memory') renderKioskMemory();
+    else renderTable();
+  } catch(_) { /* 재조회 실패는 다음 이벤트/리스너에서 회복 */ }
 }
 
 // [HOTFIX-KIOSK-PENDING-PATH-2] Firebase 데이터 deep clone (JSON형이라 JSON clone으로 충분, structuredClone 호환성 회피)
