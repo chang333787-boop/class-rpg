@@ -701,6 +701,12 @@ const DB = {
   load() { return this._cache; },
 
   // ── 부분 저장 (충돌 방지) ──
+  // 저장 실패를 조용히 삼키지 않도록: 콘솔 로깅 + 각 화면이 정의한 훅 호출(있으면 사용자 안내)
+  _onSaveError(e) {
+    console.error('[DB] 저장 실패:', e);
+    try { if (typeof window !== 'undefined' && typeof window.onDbSaveError === 'function') window.onDbSaveError(e); } catch(_) {}
+  },
+
   saveStudent(student) {
     const db = this.load();
     const idx = db.students.findIndex(s => s.id === student.id);
@@ -708,7 +714,7 @@ const DB = {
     this._cache = db;
     this._saving = true;
     // id 키 기반 저장 (인덱스 충돌 방지)
-    this._fbRef.child('students/' + student.id).set(student).finally(() => {
+    this._fbRef.child('students/' + student.id).set(student).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
@@ -721,7 +727,7 @@ const DB = {
     // questLogs에 고유 키로 저장 (완료 판정 기준)
     const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
     log._id = logId;
-    this._fbRef.child('questLogs/' + logId).set(log);
+    this._fbRef.child('questLogs/' + logId).set(log).catch(e => this._onSaveError(e));
   },
 
   saveArtwork(artwork) {
@@ -736,7 +742,7 @@ const DB = {
     };
     db.artworks.push(normalized);
     this._cache = db;
-    this._fbRef.child('artworks/' + normalized.id).set(normalized);
+    this._fbRef.child('artworks/' + normalized.id).set(normalized).catch(e => this._onSaveError(e));
   },
 
   updateArtwork(id, patch) {
@@ -746,7 +752,7 @@ const DB = {
     db.artworks[idx] = { ...db.artworks[idx], ...patch };
     this._cache = db;
     this._saving = true;
-    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).finally(() => {
+    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 300);
     });
   },
@@ -761,7 +767,7 @@ const DB = {
     this._cache = db;
     this._saving = true;
     // settings 노드만 부분 저장 (root 전체 set 방지)
-    this._fbRef.child('settings').set(s).finally(() => {
+    this._fbRef.child('settings').set(s).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
