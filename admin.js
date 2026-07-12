@@ -636,11 +636,6 @@ function doAddStudents(btn) {
   notify(`✅ ${count}명 추가 완료!`);
 }
 
-function doAddStudent(btn) {
-  // 구버전 호환용 (혹시 남아있을 경우)
-  doAddStudents(btn);
-}
-
 // approveSelfApply 호환용
 function approveSelfApply(studentId, rewardId) {
   approveSingle(studentId, rewardId);
@@ -1711,14 +1706,6 @@ function clearActivityFilter() {
   renderActivityPage();
 }
 
-function copyText(text) {
-  navigator.clipboard?.writeText(text).catch(() => {
-    const t = document.createElement('textarea');
-    t.value = text; document.body.appendChild(t);
-    t.select(); document.execCommand('copy');
-    document.body.removeChild(t);
-  });
-}
 function copyToQuestForm(text) {
   // 클립보드 복사
   navigator.clipboard?.writeText(text).catch(() => {
@@ -1739,10 +1726,6 @@ function copyToQuestForm(text) {
   notify(`📋 "${text}" → 직접입력 탭에 붙여넣기 완료!`);
 }
 
-function _totalGoldAdmin(s) {
-  return s.totalGold || s.gold || 0;
-}
-
 function renderRank() {
   const students = DB.getStudents();
   const el = document.getElementById('admin-ranking-wrap');
@@ -1755,8 +1738,6 @@ function renderRank() {
 // ══════════════════════════════════════════════════
 //  ARTWORK 관리 (학생이 올린 작품 승인/반려)
 // ══════════════════════════════════════════════════
-function populateArtworkStudents() {} // 구버전 호환용
-
 function renderArtworkPending() {
   const students = DB.getStudents();
   const pending  = [];
@@ -2316,17 +2297,6 @@ function deleteBook(studentId, bookTitle) {
   notify('독서 기록 삭제 완료');
 }
 
-function deleteBook(studentId, bookTitle) {
-  if (!confirm(`"${bookTitle}" 독서 기록을 삭제할까요?`)) return;
-  const s = DB.getStudent(studentId);
-  if (!s) return;
-  s.books = (s.books||[]).filter(b => b.title !== bookTitle);
-  s.bookCount = s.books.length;
-  DB.saveStudent(s);
-  renderBooksPage();
-  notify('독서 기록 삭제 완료');
-}
-
 // ══ 추억 관리 ══
 function compressAdmMemImage(file, maxSize, quality) {
   return new Promise(resolve => {
@@ -2527,9 +2497,6 @@ async function adminUploadMemories() {
   renderMemoriesPage();
   renderAlbumList();
 }
-
-// 기존 단일 업로드 함수 — 호환성 유지
-async function adminUploadMemory() { await adminUploadMemories(); }
 
 function renderMemoriesPage() {
   // 앨범 목록 갱신
@@ -3106,10 +3073,6 @@ function confirmAddToExistingSet() {
   SELECTED_WORD_IDS.clear();
   document.getElementById('voc-existing-set-wrap').style.display='none';
   renderVocabAdminPage();
-}
-
-function copyWordId(id) {
-  navigator.clipboard?.writeText(id).then(()=>notify('📋 '+id+' 복사!')).catch(()=>{});
 }
 
 
