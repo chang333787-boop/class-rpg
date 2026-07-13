@@ -1487,7 +1487,7 @@ function renderShop() {
             border-radius:8px;margin-bottom:.3rem;opacity:.55">
             <div style="width:28px;height:28px;border-radius:6px;background:${tc};opacity:.85;
               display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#111;font-weight:700;flex-shrink:0">
-              📖</div>
+              ${iconImg(book, 'skillbooks', '1.6rem', 'cover_' + book.type, '📖')}</div>
             <div style="flex:1;font-size:.78rem;color:${tc}">${book.name}</div>
             <span style="font-size:.68rem;color:var(--emerald)">✅ 습득완료</span>
           </div>`;
@@ -1501,7 +1501,7 @@ function renderShop() {
             onmouseout="this.style.borderColor='${check.ok ? typeBorder[type] : 'rgba(255,255,255,.06)'}'">
             <div style="width:28px;height:28px;border-radius:6px;background:${tc};
               display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#111;font-weight:700;flex-shrink:0">
-              📖</div>
+              ${iconImg(book, 'skillbooks', '1.6rem', 'cover_' + book.type, '📖')}</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:.78rem;font-weight:600;color:${tc}">${book.name}</div>
               <div style="font-size:.65rem;color:var(--txt3)">${book.desc} · Lv.${book.reqPlayerLevel}+</div>
