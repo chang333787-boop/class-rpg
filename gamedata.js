@@ -180,11 +180,11 @@ const GAME_DATA = {
   // 수확 시 성공/실패 판정: 성공=baseSellPrice*2, 실패=0G
   // isMutant:true 로 일반 씨앗과 구분
   mutantSeeds: [
-    {id:'i_m_potato_seed',    name:'⚡ 번개 감자', icon:'⚡🥔', price:20,  growHours:20, baseSellPrice:40,  successRate:0.55, crop:'m_potato',     cropIcon:'⚡🥔', reqLv:1,  desc:'고위험 입문용', isMutant:true},
-    {id:'i_m_carrot_seed',    name:'✨ 황금 당근', icon:'✨🥕', price:32,  growHours:24, baseSellPrice:75,  successRate:0.52, crop:'m_carrot',     cropIcon:'✨🥕', reqLv:3,  desc:'반반 도전형',   isMutant:true},
-    {id:'i_m_corn_seed',      name:'🌈 무지개 옥수수',icon:'🌈🌽', price:47,  growHours:36, baseSellPrice:125, successRate:0.50, crop:'m_corn',       cropIcon:'🌈🌽', reqLv:5,  desc:'오차 없는 반반', isMutant:true},
-    {id:'i_m_tomato_seed',    name:'🔥 불꽃 토마토',icon:'🔥🍅', price:65, growHours:48, baseSellPrice:180, successRate:0.47, crop:'m_tomato',     cropIcon:'🔥🍅', reqLv:8,  desc:'고위험 고수익', isMutant:true},
-    {id:'i_m_strawberry_seed',name:'🌟 별빛 딸기',  icon:'🌟🍓', price:97, growHours:72, baseSellPrice:290, successRate:0.45, crop:'m_strawberry', cropIcon:'🌟🍓', reqLv:12, desc:'최고 도박형',   isMutant:true},
+    {id:'i_m_potato_seed',    name:'⚡ 번개 감자', icon:'⚡🥔', price:20,  growHours:20, baseSellPrice:40,  successRate:0.55, crop:'m_potato',     cropIcon:'⚡🥔', reqLv:1,  desc:'특별 씨앗 입문', isMutant:true},
+    {id:'i_m_carrot_seed',    name:'✨ 황금 당근', icon:'✨🥕', price:32,  growHours:24, baseSellPrice:75,  successRate:0.52, crop:'m_carrot',     cropIcon:'✨🥕', reqLv:3,  desc:'행운의 씨앗',   isMutant:true},
+    {id:'i_m_corn_seed',      name:'🌈 무지개 옥수수',icon:'🌈🌽', price:47,  growHours:36, baseSellPrice:125, successRate:0.50, crop:'m_corn',       cropIcon:'🌈🌽', reqLv:5,  desc:'신비한 씨앗', isMutant:true},
+    {id:'i_m_tomato_seed',    name:'🔥 불꽃 토마토',icon:'🔥🍅', price:65, growHours:48, baseSellPrice:180, successRate:0.47, crop:'m_tomato',     cropIcon:'🔥🍅', reqLv:8,  desc:'희귀 씨앗', isMutant:true},
+    {id:'i_m_strawberry_seed',name:'🌟 별빛 딸기',  icon:'🌟🍓', price:97, growHours:72, baseSellPrice:290, successRate:0.45, crop:'m_strawberry', cropIcon:'🌟🍓', reqLv:12, desc:'전설의 씨앗',   isMutant:true},
   ],
 
   // ─── 장식물 ────────────────────────────────────────────
@@ -701,6 +701,12 @@ const DB = {
   load() { return this._cache; },
 
   // ── 부분 저장 (충돌 방지) ──
+  // 저장 실패를 조용히 삼키지 않도록: 콘솔 로깅 + 각 화면이 정의한 훅 호출(있으면 사용자 안내)
+  _onSaveError(e) {
+    console.error('[DB] 저장 실패:', e);
+    try { if (typeof window !== 'undefined' && typeof window.onDbSaveError === 'function') window.onDbSaveError(e); } catch(_) {}
+  },
+
   saveStudent(student) {
     const db = this.load();
     const idx = db.students.findIndex(s => s.id === student.id);
@@ -708,7 +714,7 @@ const DB = {
     this._cache = db;
     this._saving = true;
     // id 키 기반 저장 (인덱스 충돌 방지)
-    this._fbRef.child('students/' + student.id).set(student).finally(() => {
+    this._fbRef.child('students/' + student.id).set(student).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
@@ -721,7 +727,7 @@ const DB = {
     // questLogs에 고유 키로 저장 (완료 판정 기준)
     const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
     log._id = logId;
-    this._fbRef.child('questLogs/' + logId).set(log);
+    this._fbRef.child('questLogs/' + logId).set(log).catch(e => this._onSaveError(e));
   },
 
   saveArtwork(artwork) {
@@ -736,7 +742,7 @@ const DB = {
     };
     db.artworks.push(normalized);
     this._cache = db;
-    this._fbRef.child('artworks/' + normalized.id).set(normalized);
+    this._fbRef.child('artworks/' + normalized.id).set(normalized).catch(e => this._onSaveError(e));
   },
 
   updateArtwork(id, patch) {
@@ -746,7 +752,7 @@ const DB = {
     db.artworks[idx] = { ...db.artworks[idx], ...patch };
     this._cache = db;
     this._saving = true;
-    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).finally(() => {
+    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 300);
     });
   },
@@ -761,7 +767,7 @@ const DB = {
     this._cache = db;
     this._saving = true;
     // settings 노드만 부분 저장 (root 전체 set 방지)
-    this._fbRef.child('settings').set(s).finally(() => {
+    this._fbRef.child('settings').set(s).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 500);
     });
   },
@@ -1340,23 +1346,23 @@ const ACHIEVEMENTS = [
   { id:'ach_book_rate',icon:'⭐', name:'별점 남기기',      desc:'독서 별점 5회 이상',        check: s=>(s.books||[]).filter(b=>b.rating>=1).length>=5, reward:{exp:20,gold:15,title:null,deco:null} },
 
   // ══ F. 작품 ══════════════════════════════════════════════
-  { id:'ach_art1',     icon:'🎨', name:'첫 작품',          desc:'첫 작품 등록',              check: s=>(s.artworks||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
-  { id:'ach_art3',     icon:'🖼️', name:'창작의 시작',     desc:'작품 3개 등록',             check: s=>(s.artworks||[]).length>=3, reward:{exp:40,gold:25,title:null,deco:null} },
-  { id:'ach_art7',     icon:'🖼️', name:'작은 전시회',     desc:'작품 7개 등록',             check: s=>(s.artworks||[]).length>=7, reward:{exp:70,gold:50,title:'예술가',deco:'deco_garden'} },
-  { id:'ach_art15',    icon:'🏛️', name:'창작 수집가',     desc:'작품 15개 등록',            check: s=>(s.artworks||[]).length>=15,reward:{exp:120,gold:80,title:'창작가',deco:null} },
-  { id:'ach_art_desc', icon:'✍️', name:'설명하는 작가',   desc:'작품 설명 3개 이상',        check: s=>(s.artworks||[]).filter(a=>a.desc&&a.desc.length>5).length>=3, reward:{exp:25,gold:15,title:null,deco:null} },
+  { id:'ach_art1',     icon:'🎨', name:'첫 작품',          desc:'첫 작품 등록',              check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.artworks||[]).filter(a=>a.studentId===s.id).length>=1;}, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_art3',     icon:'🖼️', name:'창작의 시작',     desc:'작품 3개 등록',             check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.artworks||[]).filter(a=>a.studentId===s.id).length>=3;}, reward:{exp:40,gold:25,title:null,deco:null} },
+  { id:'ach_art7',     icon:'🖼️', name:'작은 전시회',     desc:'작품 7개 등록',             check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.artworks||[]).filter(a=>a.studentId===s.id).length>=7;}, reward:{exp:70,gold:50,title:'예술가',deco:'deco_garden'} },
+  { id:'ach_art15',    icon:'🏛️', name:'창작 수집가',     desc:'작품 15개 등록',            check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.artworks||[]).filter(a=>a.studentId===s.id).length>=15;}, reward:{exp:120,gold:80,title:'창작가',deco:null} },
+  { id:'ach_art_desc', icon:'✍️', name:'설명하는 작가',   desc:'작품 설명 3개 이상',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.artworks||[]).filter(a=>a.studentId===s.id&&a.comment&&a.comment.length>5).length>=3;}, reward:{exp:25,gold:15,title:null,deco:null} },
 
   // ══ G. 추억 ══════════════════════════════════════════════
-  { id:'ach_mem1',     icon:'📸', name:'첫 추억',          desc:'첫 추억 사진 등록',         check: s=>(s.memories||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
-  { id:'ach_mem5',     icon:'🗃️', name:'추억 수집가',     desc:'추억 5개 등록',             check: s=>(s.memories||[]).length>=5, reward:{exp:40,gold:30,title:null,deco:null} },
-  { id:'ach_mem10',    icon:'📷', name:'우리 반 기록가',  desc:'추억 10개 등록',            check: s=>(s.memories||[]).length>=10,reward:{exp:70,gold:50,title:'기록가',deco:null} },
-  { id:'ach_mem_desc', icon:'📝', name:'사진 설명가',     desc:'설명 있는 추억 3개 이상',   check: s=>(s.memories||[]).filter(m=>m.desc&&m.desc.length>3).length>=3, reward:{exp:25,gold:15,title:null,deco:null} },
-  { id:'ach_mem_pub',  icon:'🌐', name:'공개 추억 1호',   desc:'공개 추억 첫 등록',         check: s=>(s.memories||[]).some(m=>m.visibilityType==='class'||m.visibilityType==='public'), reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_mem1',     icon:'📸', name:'첫 추억',          desc:'첫 추억 사진 등록',         check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.memories||[]).filter(m=>m.studentId===s.id).length>=1;}, reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_mem5',     icon:'🗃️', name:'추억 수집가',     desc:'추억 5개 등록',             check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.memories||[]).filter(m=>m.studentId===s.id).length>=5;}, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_mem10',    icon:'📷', name:'우리 반 기록가',  desc:'추억 10개 등록',            check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.memories||[]).filter(m=>m.studentId===s.id).length>=10;}, reward:{exp:70,gold:50,title:'기록가',deco:null} },
+  { id:'ach_mem_desc', icon:'📝', name:'사진 설명가',     desc:'설명 있는 추억 3개 이상',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.memories||[]).filter(m=>m.studentId===s.id&&m.desc&&m.desc.length>3).length>=3;}, reward:{exp:25,gold:15,title:null,deco:null} },
+  { id:'ach_mem_pub',  icon:'🌐', name:'공개 추억 1호',   desc:'공개 추억 첫 등록',         check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.memories||[]).filter(m=>m.studentId===s.id).some(m=>m.visibilityType==='class'||m.visibilityType==='public');}, reward:{exp:30,gold:20,title:null,deco:null} },
 
   // ══ H. 감정 / 주간 루틴 ══════════════════════════════════
-  { id:'ach_emo1',     icon:'💭', name:'오늘의 마음',     desc:'첫 감정 기록',              check: s=>(s.emotionHistory||[]).length>=1, reward:{exp:15,gold:10,title:null,deco:null} },
-  { id:'ach_emo5',     icon:'💬', name:'마음 일기 시작', desc:'감정 기록 5회',             check: s=>(s.emotionHistory||[]).length>=5, reward:{exp:30,gold:20,title:null,deco:null} },
-  { id:'ach_emo15',    icon:'🌈', name:'감정 탐험가',     desc:'감정 기록 15회',            check: s=>(s.emotionHistory||[]).length>=15,reward:{exp:60,gold:40,title:null,deco:null} },
+  { id:'ach_emo1',     icon:'💭', name:'오늘의 마음',     desc:'첫 감정 기록',              check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return Object.values(db.emotionLogs||{}).filter(r=>r&&r.studentId===s.id).length>=1;}, reward:{exp:15,gold:10,title:null,deco:null} },
+  { id:'ach_emo5',     icon:'💬', name:'마음 일기 시작', desc:'감정 기록 5회',             check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return Object.values(db.emotionLogs||{}).filter(r=>r&&r.studentId===s.id).length>=5;}, reward:{exp:30,gold:20,title:null,deco:null} },
+  { id:'ach_emo15',    icon:'🌈', name:'감정 탐험가',     desc:'감정 기록 15회',            check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return Object.values(db.emotionLogs||{}).filter(r=>r&&r.studentId===s.id).length>=15;}, reward:{exp:60,gold:40,title:null,deco:null} },
   { id:'ach_week_mon', icon:'📅', name:'월요일 다짐 시작',desc:'첫 월요일 다짐 작성',       check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.weeklyGoals||[]).some(g=>g.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
   { id:'ach_week_fri', icon:'📅', name:'금요일 돌아보기 시작',desc:'첫 금요일 돌아보기',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.weeklyReflections||[]).some(r=>r.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
   { id:'ach_week_both',icon:'🗓️', name:'한 주 완성',     desc:'같은 주 월+금 모두 작성',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};const gs=new Set((db.weeklyGoals||[]).filter(g=>g.studentId===s.id).map(g=>g.weekKey));return (db.weeklyReflections||[]).some(r=>r.studentId===s.id&&gs.has(r.weekKey));}, reward:{exp:40,gold:30,title:null,deco:null} },
@@ -1382,8 +1388,8 @@ const ACHIEVEMENTS = [
 
   // ══ L. 메타 업적 ══════════════════════════════════════════
   { id:'ach_meta_balance', icon:'⚖️', name:'균형 잡힌 모험가', desc:'퀘스트+전투+독서 모두 달성', check: s=>(s.totalQuests||0)>=5&&(s.monsterLog||[]).length>=5&&(s.bookCount||0)>=3, reward:{exp:100,gold:80,title:'균형 모험가',deco:null} },
-  { id:'ach_meta_record',  icon:'📒', name:'기록하는 사람',    desc:'독서+작품+추억 모두 달성',   check: s=>(s.bookCount||0)>=1&&(s.artworks||[]).length>=1&&(s.memories||[]).length>=1, reward:{exp:60,gold:40,title:'기록가',deco:null} },
-  { id:'ach_meta_port',    icon:'💼', name:'포트폴리오 시작',  desc:'감정+주간다짐+독서 모두 달성',check: s=>(s.emotionHistory||[]).length>=1&&(s.bookCount||0)>=1&&(()=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.weeklyGoals||[]).some(g=>g.studentId===s.id);})(), reward:{exp:80,gold:60,title:null,deco:null} },
+  { id:'ach_meta_record',  icon:'📒', name:'기록하는 사람',    desc:'독서+작품+추억 모두 달성',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (s.bookCount||0)>=1&&(db.artworks||[]).filter(a=>a.studentId===s.id).length>=1&&(db.memories||[]).filter(m=>m.studentId===s.id).length>=1;}, reward:{exp:60,gold:40,title:'기록가',deco:null} },
+  { id:'ach_meta_port',    icon:'💼', name:'포트폴리오 시작',  desc:'감정+주간다짐+독서 모두 달성',check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return Object.values(db.emotionLogs||{}).filter(r=>r&&r.studentId===s.id).length>=1&&(s.bookCount||0)>=1&&(db.weeklyGoals||[]).some(g=>g.studentId===s.id);}, reward:{exp:80,gold:60,title:null,deco:null} },
   { id:'ach_meta_10ach',   icon:'🏅', name:'업적 수집가',      desc:'업적 10개 달성',             check: s=>(s.achievements||[]).length>=10, reward:{exp:80,gold:60,title:null,deco:null} },
   { id:'ach_meta_20ach',   icon:'🏆', name:'업적 마스터',      desc:'업적 20개 달성',             check: s=>(s.achievements||[]).length>=20, reward:{exp:150,gold:100,title:'업적 마스터',deco:'deco_trophy'} },
   { id:'ach_meta_all',     icon:'🌟', name:'만능 학생',         desc:'모든 카테고리 달성',          check: s=>{
@@ -1392,9 +1398,9 @@ const ACHIEVEMENTS = [
       && (s.monsterLog||[]).length>=1
       && (s.farmHarvests||0)>=1
       && (s.bookCount||0)>=1
-      && (s.artworks||[]).length>=1
-      && (s.memories||[]).length>=1
-      && (s.emotionHistory||[]).length>=1
+      && (db.artworks||[]).filter(a=>a.studentId===s.id).length>=1
+      && (db.memories||[]).filter(m=>m.studentId===s.id).length>=1
+      && Object.values(db.emotionLogs||{}).filter(r=>r&&r.studentId===s.id).length>=1
       && (db.weeklyGoals||[]).some(g=>g.studentId===s.id);
   }, reward:{exp:300,gold:200,title:'만능 학생',deco:'deco_trophy'} },
 ];

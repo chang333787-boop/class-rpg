@@ -19,13 +19,17 @@ window.onload = async () => {
   fbRef = firebase.database().ref('classRPG_v3');
 
   try {
-    const snap = await fbRef.once('value');
+    // 연결이 응답 없이 멎는 경우(학교 와이파이 지연 등) 대비 타임아웃 → catch에서 안내
+    const snap = await Promise.race([
+      fbRef.once('value'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('연결 시간 초과')), 12000)),
+    ]);
     // [HOTFIX-KIOSK-PENDING-PATH-2] DB_RAW는 원본 Firebase key를 보존(별도 clone). normalizeData는
     //   _normalizeArrays가 입력을 in-place 변형하므로 또 다른 clone을 넘겨 DB_RAW 오염 방지.
     const raw = snap.val();
     DB_RAW  = cloneDataForKiosk(raw);
     DB_DATA = normalizeData(cloneDataForKiosk(raw));
-    if (!DB_DATA) { alert('데이터가 없습니다. 관리자에서 먼저 설정해주세요.'); return; }
+    if (!DB_DATA) { showKioskError('아직 설정된 데이터가 없어요. 관리자에서 먼저 학급을 설정해주세요.'); return; }
 
     // 실시간 동기화 — 디바운스로 연속 업데이트 묶어서 처리
     let _renderTimer = null;
@@ -57,10 +61,51 @@ window.onload = async () => {
 
     renderTable();
 
+    // [ER-7] 종일 구동 대응: 화면 꺼짐 방지 + 절전 복귀 시 최신화
+    requestWakeLock();
+    document.addEventListener('visibilitychange', onKioskVisible);
+
   } catch(e) {
-    alert('서버 연결 실패: ' + e.message);
+    console.error('[kiosk] init 실패:', e);
+    showKioskError('서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.');
   }
 };
+
+// ── 초기화 실패 안내 화면 (스피너 고착·원시 에러 노출 방지 + 다시 시도 버튼) ──
+function showKioskError(msg) {
+  const el = document.getElementById('loading');
+  if (!el) return;
+  el.innerHTML =
+    '<div style="font-size:3rem">😢</div>'
+    + '<div style="font-size:1rem;font-weight:700;color:var(--gold);text-align:center;max-width:280px;line-height:1.5">' + escHtml(msg) + '</div>'
+    + '<button onclick="location.reload()" style="margin-top:1rem;padding:.6rem 1.4rem;border:none;border-radius:20px;background:var(--gold);color:#1a1a1a;font-weight:700;font-family:inherit;font-size:.9rem;cursor:pointer">🔄 다시 시도</button>';
+  el.style.display = 'flex';
+}
+
+// [ER-7] 교실 공용 태블릿 종일 구동 대응 — 화면 꺼짐 방지 + 절전 복귀 시 stale 최신화
+let _wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      _wakeLock = await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener?.('release', () => { _wakeLock = null; });
+    }
+  } catch(_) { /* 미지원/거부는 무시 */ }
+}
+async function onKioskVisible() {
+  if (document.visibilityState !== 'visible' || !fbRef) return;
+  requestWakeLock(); // 절전 시 해제되므로 재요청
+  try {
+    // 절전 중 실시간 소켓이 끊겨 갱신이 멈췄을 수 있어 수동 재조회로 최신화
+    const snap = await fbRef.once('value');
+    const raw = snap.val();
+    DB_RAW  = cloneDataForKiosk(raw);
+    DB_DATA = normalizeData(cloneDataForKiosk(raw));
+    if (KIOSK_TAB === 'emotion') renderEmotionBoard();
+    else if (KIOSK_TAB === 'memory') renderKioskMemory();
+    else renderTable();
+  } catch(_) { /* 재조회 실패는 다음 이벤트/리스너에서 회복 */ }
+}
 
 // [HOTFIX-KIOSK-PENDING-PATH-2] Firebase 데이터 deep clone (JSON형이라 JSON clone으로 충분, structuredClone 호환성 회피)
 function cloneDataForKiosk(data) {
