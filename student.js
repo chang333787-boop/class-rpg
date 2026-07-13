@@ -10169,3 +10169,6 @@ function toast(msg) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2400);
 }
+
+// [ER-2] DB 저장 실패 시 학생에게 안내 (gamedata의 _onSaveError 훅 — #110을 학생 화면까지 완성)
+window.onDbSaveError = () => toast('⚠️ 저장에 실패했어요. 인터넷을 확인하고 다시 해주세요.');
