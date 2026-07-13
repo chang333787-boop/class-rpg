@@ -99,16 +99,19 @@ function iconImg(entity, kind, sizeCss) {
 1. **PR-1 플러밍** ✅ (#94 머지): `iconImg()` 헬퍼 + 몬스터 렌더 지점 교체
 2. **PR-2 몬스터 에셋** ✅ (#95 머지): `assets/monsters/` 100장
 3. **PR-3 씨앗/작물** ✅ (#99 머지): 렌더 지점 교체 + 20장. `iconImg`가 4·5번째 인자(`fileId`, `fallbackIcon`)로 확장됨(student.js:24)
-4. **PR-4 장비 카드**: 아래 §6 지시문 — **현재 진행 대상**
-5. PR-5~: 스킬북/장식 카드 (선택, 별도 지시)
+4. **PR-4 장비 카드** ✅ (#101 머지, 2026-07-13): `assets/equipment/` 80장 + 상점·인벤 카드 교체(§6). `iconImg`가 중첩 컬렉션(equipment=슬롯별 객체) 지원하도록 확장됨. student.js `?v=20260713`.
+5. **PR-5 스킬북 표지**: 아래 §7 지시문 — **다음 후보**
+6. PR-6~: 장식 카드 (선택·후순위 — §7-4 페이오프 주의)
 
 각 PR 후 로컬 `python3 -m http.server 8800`으로 **로드만** 확인(버튼 클릭 금지), 검증 스크립트 통과 확인.
 
 ---
 
-## 6. PR-4 지시문 — 장비 이미지 80장 (상점·인벤토리 카드 전용)
+## 6. PR-4 지시문 — 장비 이미지 80장 (상점·인벤토리 카드 전용) ✅ 완료(#101)
 
-> 사용자 승인 완료(2026-07-03). 아래 조건을 **전부** 지킬 것. §3-3·§4의 일반 규칙도 그대로 적용.
+> ✅ **2026-07-13 #101로 머지·배포 완료.** 아래는 이력 기록. 실제 반영: 80장 전량 1:1, 상점 2곳+인벤 1곳 교체, 착용 슬롯·buildCharSVG 무변경, student.js `?v=20260713`(분기가 오래돼 20260703b→리베이스 시 상향). 다음 배치는 §7.
+>
+> (원 지시문, 2026-07-03 승인) 아래 조건을 **전부** 지킬 것. §3-3·§4의 일반 규칙도 그대로 적용.
 
 ### 6-1. 이미지 80장
 
@@ -134,3 +137,42 @@ function iconImg(entity, kind, sizeCss) {
 3. `scripts/smoke-test.mjs` 동기화: `jsVer` 맵의 `'student.js': '20260703b'` + URL 목록의 student.js 항목
 4. `node --check student.js` / verify-safety **PASS 18·REVIEW 1·FAIL 0** / smoke-test **PASS 30·REVIEW 0·FAIL 0**
 5. Firebase write 0건, 자동 머지 금지 — PR 생성 후 보고·정지
+
+---
+
+## 7. PR-5 지시문 — 스킬북 표지 4장 (상점 카드 전용)
+
+> 다음 배치 후보. 핵심 게임 루프(몬스터·씨앗·작물·장비)는 art 완료 상태 — 이건 폴리시 성격.
+
+### 7-1. 이미지 — 계열 표지 4장이면 충분
+
+스킬북은 4계열 × 7권(총 28권, `gamedata.js` `SKILL_BOOKS` 477~510행)이지만, **같은 계열의 1~7권은 위력 수치만 다르고 그림은 동일해도 된다.** 계열 표지 4장만 만든다:
+
+| 파일명 | 계열(type) | 이름 | 색/문양 |
+|---|---|---|---|
+| `assets/skillbooks/cover_normal.png` | normal | 전투 마스터리북 | 회색/은색, 검·주먹 |
+| `assets/skillbooks/cover_fire.png`   | fire   | 화염 마스터리북 | 빨강, 불꽃 |
+| `assets/skillbooks/cover_water.png`  | water  | 냉기 마스터리북 | 파랑, 눈결정·물방울 |
+| `assets/skillbooks/cover_grass.png`  | grass  | 자연 마스터리북 | 초록, 잎사귀 |
+
+- 규격: PNG 투명 배경 512×512, 100KB 이하, **몬스터/씨앗/작물/장비와 동일한 밝은 플랫 벡터 RPG 스타일**(굵은 외곽선, 채도 높은 색, 부드러운 셀 셰이딩·위 광원, 개체 하나 중앙). 텍스트·숫자·워터마크 금지.
+- (28권 개별 생성은 낭비 — 학생이 위력 숫자로만 구분. 표지 4장 권장.)
+
+### 7-2. 코드 교체 — 상점 스킬북 카드 1구역
+
+- `renderShop`의 스킬북 카드 아이콘 표시부(`${sb.icon}` 패턴)만 교체.
+- **주의: 스킬북은 `GAME_DATA.equipment`처럼 경로=id가 안 통한다.** `SKILL_BOOKS`는 최상위 const라 `GAME_DATA.skillbooks`가 없고, id도 계열표지와 1:1이 아니다(28 id → 4 파일). → PR-3 작물과 같은 **`fileId` 방식**으로 계열 매핑: `iconImg(sb, 'skillbooks', '<size>', 'cover_' + sb.type, sb.icon)`. (`fileId`가 있으면 컬렉션 조회 없이 이미지 경로 사용, 실패 시 `sb.icon` 이모지 폴백.)
+- **스킬북은 인벤토리에 저장되지 않는다**(구매 시 소비 → `skillLevels` 상승). 즉 상점 카드가 유일 노출 지점.
+- 그 외 이모지 유지: 구매 confirm·toast, admin/kiosk.
+
+### 7-3. 마무리 체크리스트 (§6-3과 동일 골자)
+
+1. 최신 main 분기 → student.js `?v=` 다음값 갱신(현재 20260713 위) + smoke-test `jsVer` 맵·URL 동기화
+2. `node --check` / verify-safety PASS 18·REVIEW 1·FAIL 0 / smoke-test PASS 30·REVIEW 0·FAIL 0
+3. Firebase write 0건, 자동 머지 금지 — PR 생성 후 보고·정지
+
+### 7-4. 장식(decorations) — 후순위·저페이오프 경고
+
+- `decorations`(약 68종: 마당 51 + 실내 14 + 업적 3, `gamedata.js` 191~291)는 상점 카드만 이미지화 가능.
+- ⚠️ **함정**: 학생이 실제로 장식을 보는 곳은 "마당·집에 배치된 모습"인데 그건 canvas `fillText`(이모지)로 §4-B 고위험 보류다. 이미지를 만들어도 **배치 모습은 이모지 그대로**, 상점 카드에서만 바뀐다 → 투자 대비 체감 최저. 68장 대량이라 급하지 않으면 보류 권장.
+- 감정 아이콘 8종은 원 명세부터 이모지 유지 권장(제외).
