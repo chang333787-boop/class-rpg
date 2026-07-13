@@ -1693,14 +1693,7 @@ function buyDeco(id) {
 let CUR_ZONE = 'beginner';
 
 // 사냥터 탭 클릭
-function openZone(zone, btn) {
-  CUR_ZONE = zone;
-  document.querySelectorAll('[id^="zone-btn-"]').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-  renderMonsterOffers(zone);
-}
-
-// 사냥터 후보 3마리 렌더
+// 사냥터 후보 3마리 렌더 (⚠️ 죽은 코드: 유일 호출자였던 구버전 openZone 제거됨 — 후속 정리 대상)
 function renderMonsterOffers(zone) {
   const el = document.getElementById('monster-offers');
   if (!el) return;
