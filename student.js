@@ -2321,7 +2321,6 @@ function _finishBattle() {
     return;
   }
 
-  const oldLv = CUR.level;
   const mon   = BATTLE_STATE.monster;
   const win   = BATTLE_STATE.win;
   finalizeBattle(CUR, mon, win);
@@ -2330,7 +2329,7 @@ function _finishBattle() {
   BATTLE_DONE = true;
   DB.saveStudent(CUR);
   renderHUD();
-  if (CUR.level > oldLv) setTimeout(() => triggerLevelUp(CUR.level), 400);
+  // 전투는 EXP 0(설계: 레벨은 학급퀘스트로만) → 레벨업 없음. 헛도는 레벨업 연출 트리거 제거 (DI-5).
   setTimeout(() => checkAchievements(), 600);
   // 도감 보상 알림
   if (CUR._dexBonusLog && CUR._dexBonusLog.length > 0) {
@@ -2470,7 +2469,6 @@ function doFight() {
         if (r.win) {
           CUR.gold += mon.gold;
           CUR.totalGold = (CUR.totalGold||0) + mon.gold;
-          const oldLv = CUR.level;
           CUR.level = Utils.levelFromExp(CUR.exp);
           if (!(CUR.monsterLog||[]).includes(mon.id)) CUR.monsterLog = [...(CUR.monsterLog||[]), mon.id];
         }
@@ -2478,7 +2476,7 @@ function doFight() {
         CUR.battleInProgress = null;
         DB.saveStudent(CUR);
         renderBattle(r.win ? 'win' : 'lose'); renderHUD();
-        if (r.win) { const oldLv2 = Utils.levelFromExp(CUR.exp - mon.gold); if (CUR.level > oldLv2) setTimeout(() => triggerLevelUp(CUR.level), 600); }
+        // 전투는 EXP 0(설계) → 레벨업 없음. exp−gold 단위혼동으로 가짜 레벨업 뜨던 트리거 제거 (DI-5).
         setTimeout(() => checkAchievements(), 800);
       }
     }, r.delay);
