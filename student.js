@@ -26,7 +26,8 @@ function iconImg(entity, kind, sizeCss, fileId, fallbackIcon) {
   const size = /^(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%)$/.test(String(sizeCss)) ? String(sizeCss) : '1.5rem';
   const assetId = fileId || entity?.id;
   const collection = GAME_DATA[kind];
-  const isBaseEntity = assetId && (fileId || (Array.isArray(collection) && collection.some(item => item.id === entity?.id)));
+  const collectionItems = Array.isArray(collection) ? collection : Object.values(collection || {}).flat();
+  const isBaseEntity = assetId && (fileId || collectionItems.some(item => item.id === entity?.id));
   if (!isBaseEntity) return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">${icon}</span>`;
 
   return `<span style="display:inline-grid;place-items:center;width:${size};height:${size}">`
@@ -1381,7 +1382,7 @@ function renderShop() {
       return `<div class="item-card ${!check.ok&&!owned?'cant-afford':''} shop-row-card"
         onclick="${clickFn}" style="${!check.ok&&!owned?'opacity:.6':''}">
         <div style="display:flex;align-items:center;gap:.6rem;width:100%">
-          <div style="flex-shrink:0">${buildEquipIcon(cat, item.id)}</div>
+          <div style="flex-shrink:0">${iconImg(item, 'equipment', '3rem')}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
               ${item.name}${elemBadge}${badge}
@@ -1423,7 +1424,7 @@ function renderShop() {
           return `<div class="item-card ${!check.ok&&!owned?'cant-afford':''} shop-row-card"
             onclick="${clickFn}" style="${!check.ok&&!owned?'opacity:.6':''}">
             <div style="display:flex;align-items:center;gap:.6rem;width:100%">
-              <div style="flex-shrink:0">${buildEquipIcon(cat, item.id)}</div>
+              <div style="flex-shrink:0">${iconImg(item, 'equipment', '3rem')}</div>
               <div style="flex:1;min-width:0">
                 <div style="font-size:.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                   ${item.name}${badge}
@@ -7267,19 +7268,19 @@ function renderArtworks() {
           <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
             background:rgba(255,215,0,.18);color:var(--gold);border:1px solid rgba(255,215,0,.3)">⏳ 확인중</span>
           ${a.subject?`<span style="font-size:.65rem;padding:.18rem .5rem;border-radius:20px;
-            background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${a.subject}</span>`:''}
+            background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${escHtml(a.subject)}</span>`:''}
         </div>
-        <div style="font-size:.92rem;font-weight:800;color:var(--txt1);margin-bottom:.25rem">${a.artTitle||''}</div>
+        <div style="font-size:.92rem;font-weight:800;color:var(--txt1);margin-bottom:.25rem">${escHtml(a.artTitle||'')}</div>
         ${a.artDesc?`<div style="font-size:.75rem;color:var(--txt2);line-height:1.55;
-          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${a.artDesc}</div>`:''}
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${escHtml(a.artDesc)}</div>`:''}
       </div>
     </div>`).join('');
 
   const approvedHtml = approved.map((a,i) => {
     const url = a.artUrl||a.link||'';
     const lbIdx = lbImgs.findIndex(x=>x.url===url);
-    const title = a.title||a.artTitle||'';
-    const desc = a.comment||a.artDesc||'';
+    const title = escHtml(a.title||a.artTitle||'');
+    const desc = escHtml(a.comment||a.artDesc||'');
     return `
     <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(46,204,113,.15);
       border-radius:14px;overflow:hidden;margin-bottom:.8rem">
@@ -7297,7 +7298,7 @@ function renderArtworks() {
           <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
             background:rgba(46,204,113,.15);color:var(--emerald);border:1px solid rgba(46,204,113,.25)">✓ 전시중</span>
           ${a.subject?`<span style="font-size:.65rem;padding:.18rem .5rem;border-radius:20px;
-            background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${a.subject}</span>`:''}
+            background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${escHtml(a.subject)}</span>`:''}
         </div>
         <div style="font-size:.92rem;font-weight:800;color:var(--txt1);margin-bottom:.25rem">${title}</div>
         ${desc?`<div style="font-size:.75rem;color:var(--txt2);line-height:1.55;margin-bottom:.3rem;
@@ -8025,7 +8026,7 @@ function renderInv() {
           background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
           border-radius:10px;padding:.7rem .9rem">
           <div style="flex-shrink:0;width:48px;height:48px;display:flex;align-items:center;justify-content:center">
-            ${buildEquipIcon(slotKey, item.id)}
+            ${iconImg(item, 'equipment', '3rem')}
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:.88rem">${item.name}</div>
@@ -8395,9 +8396,9 @@ function renderBookRecords() {
       </div>
       <!-- 내용 (항상 표시) -->
       <div style="display:flex;flex-direction:column;gap:.35rem;font-size:.78rem;color:var(--txt2);line-height:1.6">
-        ${charName?`<div><b style="color:var(--txt3)">🧑 인상 깊은 인물:</b> ${charName}${charReason?' — '+charReason:''}</div>`:''}
-        ${summary?`<div><b style="color:var(--txt3)">📖 줄거리:</b><div style="margin-top:.1rem;white-space:pre-wrap">${summary}</div></div>`:''}
-        ${reflection?`<div><b style="color:var(--txt3)">💬 느낀 점:</b><div style="margin-top:.1rem;white-space:pre-wrap">${reflection}</div></div>`:''}
+        ${charName?`<div><b style="color:var(--txt3)">🧑 인상 깊은 인물:</b> ${escHtml(charName)}${charReason?' — '+escHtml(charReason):''}</div>`:''}
+        ${summary?`<div><b style="color:var(--txt3)">📖 줄거리:</b><div style="margin-top:.1rem;white-space:pre-wrap">${escHtml(summary)}</div></div>`:''}
+        ${reflection?`<div><b style="color:var(--txt3)">💬 느낀 점:</b><div style="margin-top:.1rem;white-space:pre-wrap">${escHtml(reflection)}</div></div>`:''}
       </div>
       ${r.teacherComment?`<div style="margin-top:.45rem;font-size:.72rem;color:var(--emerald);
         background:rgba(46,204,113,.08);border-radius:8px;padding:.3rem .5rem">

@@ -274,7 +274,7 @@ function renderDashboard() {
           ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;
             padding:.35rem .55rem;background:rgba(255,255,255,.04);border-radius:8px;
             border-left:2px solid rgba(93,173,226,.3);line-height:1.5">
-            ${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
+            ${escHtml(item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview)}</div>`:''}
         </div>
         <div style="display:flex;gap:.4rem;flex-shrink:0;padding-top:.1rem">
           <button class="btn-sm success" style="font-size:.72rem;padding:.3rem .7rem"
@@ -634,11 +634,6 @@ function doAddStudents(btn) {
   renderAll();
   populateSelectStudents();
   notify(`✅ ${count}명 추가 완료!`);
-}
-
-function doAddStudent(btn) {
-  // 구버전 호환용 (혹시 남아있을 경우)
-  doAddStudents(btn);
 }
 
 // approveSelfApply 호환용
@@ -1013,7 +1008,7 @@ function renderApproveList() {
           ${qStatus.badge?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">${qStatus.badge}</span>`:''}
         </div>
         <div class="ac-quest">${item.label}</div>
-        ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview}</div>`:''}
+        ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${escHtml(item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview)}</div>`:''}
         <div class="ac-rewards">
           <span class="ac-tag">+${item.exp}EXP</span>
           <span class="ac-tag">+${item.gold||0}G</span>
@@ -1711,14 +1706,6 @@ function clearActivityFilter() {
   renderActivityPage();
 }
 
-function copyText(text) {
-  navigator.clipboard?.writeText(text).catch(() => {
-    const t = document.createElement('textarea');
-    t.value = text; document.body.appendChild(t);
-    t.select(); document.execCommand('copy');
-    document.body.removeChild(t);
-  });
-}
 function copyToQuestForm(text) {
   // 클립보드 복사
   navigator.clipboard?.writeText(text).catch(() => {
@@ -1739,10 +1726,6 @@ function copyToQuestForm(text) {
   notify(`📋 "${text}" → 직접입력 탭에 붙여넣기 완료!`);
 }
 
-function _totalGoldAdmin(s) {
-  return s.totalGold || s.gold || 0;
-}
-
 function renderRank() {
   const students = DB.getStudents();
   const el = document.getElementById('admin-ranking-wrap');
@@ -1755,8 +1738,6 @@ function renderRank() {
 // ══════════════════════════════════════════════════
 //  ARTWORK 관리 (학생이 올린 작품 승인/반려)
 // ══════════════════════════════════════════════════
-function populateArtworkStudents() {} // 구버전 호환용
-
 function renderArtworkPending() {
   const students = DB.getStudents();
   const pending  = [];
@@ -1776,11 +1757,11 @@ function renderArtworkPending() {
       <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.6rem">
         <span style="font-size:1.2rem">${item.student.avatar}</span>
         <span style="font-weight:700">${item.student.name}</span>
-        <span style="font-size:.78rem;color:var(--txt3)">· ${item.artTitle||''}</span>
+        <span style="font-size:.78rem;color:var(--txt3)">· ${escHtml(item.artTitle||'')}</span>
         <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">${item.date||''}</span>
       </div>
-      ${item.artUrl?`<img src="${item.artUrl}" style="width:100%;max-height:250px;object-fit:contain;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="adminOpenLightbox('${item.artUrl}','${item.artTitle||''}')">`:''}
-      ${item.artDesc?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.6rem">${item.artDesc}</div>`:''}
+      ${item.artUrl?`<img src="${escHtml(item.artUrl)}" style="width:100%;max-height:250px;object-fit:contain;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="adminOpenLightbox('${escJsAttr(item.artUrl)}','${escJsAttr(item.artTitle||'')}')">`:''}
+      ${item.artDesc?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.6rem">${escHtml(item.artDesc)}</div>`:''}
       <!-- 선생님 코멘트 입력 -->
       <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
         <input class="form-input" id="aw-cmt-${item.id}" placeholder="선생님 한마디 (선택)" style="flex:1;font-size:.8rem">
@@ -2316,17 +2297,6 @@ function deleteBook(studentId, bookTitle) {
   notify('독서 기록 삭제 완료');
 }
 
-function deleteBook(studentId, bookTitle) {
-  if (!confirm(`"${bookTitle}" 독서 기록을 삭제할까요?`)) return;
-  const s = DB.getStudent(studentId);
-  if (!s) return;
-  s.books = (s.books||[]).filter(b => b.title !== bookTitle);
-  s.bookCount = s.books.length;
-  DB.saveStudent(s);
-  renderBooksPage();
-  notify('독서 기록 삭제 완료');
-}
-
 // ══ 추억 관리 ══
 function compressAdmMemImage(file, maxSize, quality) {
   return new Promise(resolve => {
@@ -2527,9 +2497,6 @@ async function adminUploadMemories() {
   renderMemoriesPage();
   renderAlbumList();
 }
-
-// 기존 단일 업로드 함수 — 호환성 유지
-async function adminUploadMemory() { await adminUploadMemories(); }
 
 function renderMemoriesPage() {
   // 앨범 목록 갱신
@@ -2845,9 +2812,9 @@ function renderRecorderPage() {
         <!-- 자기점검 -->
         ${r.reflection||r.bestToday||r.difficultPart||r.selfRating ? `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.6rem;font-size:.75rem;color:var(--txt2)">
-          ${r.reflection    ? `<div><b style="color:var(--txt3);font-size:.68rem">느낀 점</b><br>${r.reflection}</div>`       : ''}
-          ${r.bestToday     ? `<div><b style="color:var(--txt3);font-size:.68rem">잘된 점</b><br>${r.bestToday}</div>`         : ''}
-          ${r.difficultPart ? `<div><b style="color:var(--txt3);font-size:.68rem">어려운 부분</b><br>${r.difficultPart}</div>` : ''}
+          ${r.reflection    ? `<div><b style="color:var(--txt3);font-size:.68rem">느낀 점</b><br>${escHtml(r.reflection)}</div>`       : ''}
+          ${r.bestToday     ? `<div><b style="color:var(--txt3);font-size:.68rem">잘된 점</b><br>${escHtml(r.bestToday)}</div>`         : ''}
+          ${r.difficultPart ? `<div><b style="color:var(--txt3);font-size:.68rem">어려운 부분</b><br>${escHtml(r.difficultPart)}</div>` : ''}
           ${r.selfRating    ? `<div><b style="color:var(--txt3);font-size:.68rem">자기평가</b><br>${'⭐'.repeat(r.selfRating)}</div>` : ''}
         </div>` : ''}
         <!-- 교사 코멘트 -->
@@ -3106,10 +3073,6 @@ function confirmAddToExistingSet() {
   SELECTED_WORD_IDS.clear();
   document.getElementById('voc-existing-set-wrap').style.display='none';
   renderVocabAdminPage();
-}
-
-function copyWordId(id) {
-  navigator.clipboard?.writeText(id).then(()=>notify('📋 '+id+' 복사!')).catch(()=>{});
 }
 
 
@@ -5650,4 +5613,7 @@ function notify(msg, type) {
   wrap.appendChild(item);
   setTimeout(() => item.remove(), 2900);
 }
+
+// [ER-2] DB 저장 실패 시 교사에게 안내 (gamedata의 _onSaveError 훅)
+window.onDbSaveError = () => notify('⚠️ 저장에 실패했어요. 인터넷 연결을 확인하고 다시 시도해주세요.', 'error');
 
