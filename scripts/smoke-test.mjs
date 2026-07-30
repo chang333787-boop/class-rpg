@@ -79,7 +79,8 @@ const MIME = {
   // 캐시버스터를 실제 HTML에 적힌 그대로 둔 채로 200 확인 (쿼리 있어도 실제 파일로 매핑되는지)
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
-    '/gamedata.js?v=20260713',
+    '/gamedata.js?v=20260730',
+    '/curriculum.js?v=20260730',
     '/student.js?v=20260713e', '/admin.js?v=20260713h', '/kiosk.js?v=20260713c',
     '/student.css?v=20260604', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
   ];
@@ -140,7 +141,7 @@ for (const f of HTML_FILES) {
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 
   // gamedata.js 캐시버스터 ?v=20260705 (2026-07-05 갱신 — 업적/씨앗 문구 수정 배포)
-  if (html.includes('gamedata.js?v=20260713')) add('PASS', `${f}: gamedata.js?v=20260713 캐시버스터`);
+  if (html.includes('gamedata.js?v=20260730')) add('PASS', `${f}: gamedata.js?v=20260730 캐시버스터`);
   else add('REVIEW', `${f}: gamedata.js 캐시버스터(?v=20260705) 미발견 — gamedata 갱신 시 확인 필요`);
 }
 
@@ -151,6 +152,9 @@ for (const f of HTML_FILES) {
     ['gamedata.js', /_normalizeArrays/, '_normalizeArrays'],
     ['gamedata.js', /_migrate/, '_migrate'],
     ['gamedata.js', /\bconst Utils\b|\bUtils\s*=\s*{/, 'Utils 정의'],
+    ['curriculum.js', /\bconst CURRICULUM\b/, 'CURRICULUM 정의'],
+    ['curriculum.js', /\bconst BASE_PROBLEMS\b/, 'BASE_PROBLEMS 정의'],
+    ['curriculum.js', /\bconst CurriculumUtils\b/, 'CurriculumUtils 정의'],
     ['student.js', /window\.onload/, 'window.onload'],
     ['admin.js', /window\.onload/, 'window.onload'],
     ['kiosk.js', /window\.onload/, 'window.onload'],
