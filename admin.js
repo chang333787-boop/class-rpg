@@ -785,9 +785,11 @@ function approveReward(student, reward) {
 
 function approveSingle(studentId, rewardId) {
   const s = DB.getStudent(studentId);
-  if (!s) return;
+  // [C9] 무음 return이면 대시보드 버튼이 '...' 상태로 영구 고착된다(교사는 멈춘 줄 앎).
+  //      찾지 못한 이유를 알리고 화면을 다시 그려 버튼 상태를 복구한다.
+  if (!s) { notify('학생을 찾을 수 없어요', 'error'); renderAll(); return; }
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
-  if (!reward) return;
+  if (!reward) { notify('이미 처리된 보상이에요', 'error'); renderAll(); return; }
   approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
   DB.saveStudent(s);
   renderAll();
@@ -1120,13 +1122,16 @@ function renderApproveList() {
 // 같은 퀘스트 전체 승인
 function approveAllByQuest(boardQuestId) {
   const students = DB.getStudents();
+  // [C10] 일괄 지급은 되돌릴 수 없는데 확인창이 없어 오클릭 위험이 컸다.
+  const targets = students.filter(s => (s.pendingRewards||[]).some(r=>r.boardQuestId===boardQuestId));
+  if (targets.length === 0) { notify('승인할 대기가 없어요', 'error'); return; }
+  const qName = (DB.load().boardQuests||[]).find(q=>q.id===boardQuestId)?.name || '이 퀘스트';
+  if (!confirm(`"${qName}" 신청 ${targets.length}명을 모두 승인할까요?\n\n보상이 즉시 지급되며 되돌릴 수 없어요.`)) return;
+
   let count = 0;
-  students.forEach(s => {
+  targets.forEach(s => {
     const reward = (s.pendingRewards||[]).find(r=>r.boardQuestId===boardQuestId);
-    if (reward) {
-      approveSingle(s.id, reward.id);
-      count++;
-    }
+    if (reward) { approveSingle(s.id, reward.id); count++; }
   });
   if (count > 0) notify(`✅ ${count}명 전체 승인 완료!`);
 }
@@ -4265,7 +4270,9 @@ function completeQuestForStudent(questId, studentId) {
   notify(`✅ ${s.name} · "${bq.name}" 완료 처리!`);
 }
 
-// [Q-3B] 닫기/삭제 시 cleanQuestPending이 함께 지울 미승인 보상 건수 (읽기 전용 계산)
+// [Q-3B] 닫기/삭제 시 남게 될 미승인 보상 건수 (읽기 전용 계산)
+// [C12] 현재 정책은 '보존' — 닫거나 삭제해도 미승인 보상은 지우지 않고
+//       활동 승인 탭의 '⚠️ 확인 필요 보상'에서 교사가 사후 처리한다(Q-3F-1).
 function countPendingRewardsForQuest(questId) {
   return DB.getStudents().reduce((a, s) =>
     a + (s.pendingRewards||[]).filter(r => r.boardQuestId === questId && !r.approved).length, 0);
@@ -4288,17 +4295,6 @@ function closeBoardQuest(questId) {
 }
 
 // 퀘스트 삭제/닫기 시 학생 pendingRewards 정리
-function cleanQuestPending(db, questId) {
-  const students = DB.getStudents(); // 정규화된 배열 사용
-  students.forEach(s => {
-    const before = (s.pendingRewards||[]).length;
-    s.pendingRewards = (s.pendingRewards||[]).filter(r => r.boardQuestId !== questId);
-    if (s.pendingRewards.length !== before) {
-      DB._fbRef.child('students/'+s.id).set(s);
-    }
-  });
-}
-
 function reactivateBoardQuest(questId) {
   const db = DB.load();
   const target = (db.boardQuests||[]).find(q => q.id === questId);
