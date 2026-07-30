@@ -5499,30 +5499,56 @@ function renderEmotionCharts(baseDate) {
 // ══════════════════════════════════════════════════
 //  BACKUP & ROLLBACK
 // ══════════════════════════════════════════════════
-const BACKUP_KEEP_DAYS = 7; // 7일치 보관
+const BACKUP_KEEP_DAYS = 14; // 14일치 보관 (구독 범위 밖이라 용량 부담이 없어 7→14로 확대)
+
+// [ER-4] 백업은 실시간 구독 루트(classRPG_v3) **밖**에 저장한다.
+//   같은 루트 안에 두면 학생이 한 번 저장할 때마다 접속 중인 모든 기기가 백업 전체를
+//   다시 내려받는다. 실측: 전체 6.4MB 중 백업이 4.9MB(75%) — 무료 티어 전송량의 주범.
+//   앱은 평소 백업을 읽지 않으므로(롤백 때만) 밖으로 빼도 동작에 영향이 없다.
+function backupsRef()       { return firebase.database().ref('classRPG_backups'); }
+// 이전 위치 — 마이그레이션 전 백업을 계속 읽기 위한 폴백(쓰기는 하지 않음)
+function legacyBackupsRef() { return DB._fbRef.child('backups'); }
+
+// 새 위치 + 옛 위치를 합쳐 반환(같은 날짜 키는 새 위치 우선)
+async function loadAllBackups() {
+  const [cur, old] = await Promise.all([
+    backupsRef().once('value'),
+    legacyBackupsRef().once('value'),
+  ]);
+  return { ...(old.val() || {}), ...(cur.val() || {}) };
+}
+async function readBackup(dateKey) {
+  const cur = await backupsRef().child(dateKey).once('value');
+  if (cur.exists()) return cur.val();
+  const old = await legacyBackupsRef().child(dateKey).once('value');
+  return old.exists() ? old.val() : null;
+}
+
+// [ER-3] 백업 대상 노드. 기존엔 아래 8개만 담겨 감정기록·독서(추억)·주간다짐·리코더·
+//   어휘·설정은 **백업조차 되지 않아** 롤백해도 복원되지 않았다.
+const BACKUP_NODES = [
+  'students', 'questLogs', 'boardQuests', 'customMonsters', 'customQuestTemplates',
+  'hiddenQuestTemplates', 'promotionRequests', 'artworks',
+  // 이번에 추가된 누락 노드
+  'settings', 'memories', 'memoryAlbums', 'emotionLogs', 'emotionReflections',
+  'emotionAlerts', 'emotionPromptStats', 'weeklyGoals', 'weeklyReflections',
+  'recorderLogs', 'recorderSongs', 'quizRecords', 'customWords', 'teacherWordSets',
+];
 
 async function saveBackup(auto) {
   const db = DB.load();
   const dateKey = Utils.todayStr();
-  // backups 경로에는 students, questLogs, boardQuests, customMonsters 등 핵심 데이터만
-  const snapshot = {
-    students:       db.students       || [],
-    questLogs:      db.questLogs      || {},
-    boardQuests:    db.boardQuests    || [],
-    customMonsters: db.customMonsters || {},
-    customQuestTemplates: db.customQuestTemplates || {},
-    hiddenQuestTemplates: db.hiddenQuestTemplates || {},
-    promotionRequests: db.promotionRequests || [],
-    artworks:       db.artworks       || [],
-    savedAt:        new Date().toISOString(),
-  };
-  await DB._fbRef.child(`backups/${dateKey}`).set(snapshot);
+  const snapshot = { savedAt: new Date().toISOString() };
+  BACKUP_NODES.forEach(k => {
+    if (db[k] !== undefined && db[k] !== null) snapshot[k] = db[k];
+  });
+  await backupsRef().child(dateKey).set(snapshot);
 
-  // 14일 초과 백업 자동 삭제
-  const snap = await DB._fbRef.child('backups').once('value');
+  // 보관기간 초과분 자동 삭제 (새 위치만 — 옛 위치는 건드리지 않는다)
+  const snap = await backupsRef().once('value');
   const allKeys = Object.keys(snap.val() || {}).sort();
   const toDelete = allKeys.slice(0, Math.max(0, allKeys.length - BACKUP_KEEP_DAYS));
-  for (const k of toDelete) await DB._fbRef.child(`backups/${k}`).remove();
+  for (const k of toDelete) await backupsRef().child(k).remove();
 
   if (!auto) { notify(`💾 ${dateKey} 백업 완료!`); renderBackupList(); }
 }
@@ -5530,8 +5556,8 @@ async function saveBackup(auto) {
 async function renderBackupList() {
   const el = document.getElementById('backup-list-wrap');
   if (!el) return;
-  const snap = await DB._fbRef.child('backups').once('value');
-  const keys = Object.keys(snap.val() || {}).sort().reverse();
+  const all = await loadAllBackups();
+  const keys = Object.keys(all).sort().reverse();
   if (keys.length === 0) {
     el.textContent = '저장된 백업 없음';
   } else {
@@ -5541,8 +5567,7 @@ async function renderBackupList() {
 }
 
 async function openRollbackModal() {
-  const snap = await DB._fbRef.child('backups').once('value');
-  const data = snap.val() || {};
+  const data = await loadAllBackups();
   const keys = Object.keys(data).sort().reverse();
 
   const el = document.getElementById('rollback-date-list');
@@ -5575,33 +5600,60 @@ async function confirmRollback() {
   const adminPw = await DB.getAdminPw();
   if (pw !== adminPw) { notify('비밀번호가 틀렸습니다', 'error'); return; }
 
-  // 백업 데이터 불러와서 복원
-  const snap = await DB._fbRef.child(`backups/${selected}`).once('value');
-  const backup = snap.val();
+  // 백업 데이터 불러와서 복원 (새 위치 → 없으면 옛 위치)
+  const backup = await readBackup(selected);
   if (!backup) { notify('백업 데이터를 찾을 수 없어요', 'error'); return; }
 
-  // 현재 데이터에서 백업 항목만 덮어쓰기
-  const db = DB.load();
-  const restored = {
-    ...db,
-    students:             backup.students             || [],
-    questLogs:            backup.questLogs            || {},
-    boardQuests:          backup.boardQuests          || [],
-    customMonsters:       backup.customMonsters       || {},
-    customQuestTemplates: backup.customQuestTemplates || {},
-    hiddenQuestTemplates: backup.hiddenQuestTemplates || {},
-    promotionRequests:    backup.promotionRequests    || [],
-    artworks:             backup.artworks             || [],
-  };
-  await DB._fbRef.set(restored);
-  notify(`✅ ${selected} 데이터로 롤백 완료! 새로고침됩니다`);
+  // 백업에 담긴 노드만 개별 경로로 복원한다.
+  //   기존엔 정규화 캐시를 통째로 root에 set 해서 ① 파생 배열 quests(약 450KB)가 실제로
+  //   저장되고 ② 백업에 없던 노드까지 캐시 값으로 덮어써졌다. 개별 set으로 바꿔 부작용 제거.
+  const nodes = BACKUP_NODES.filter(k => backup[k] !== undefined && backup[k] !== null);
+  for (const k of nodes) await DB._fbRef.child(k).set(backup[k]);
+  notify(`✅ ${selected} 데이터로 롤백 완료 (${nodes.length}개 항목) — 새로고침됩니다`);
   setTimeout(() => location.reload(), 1500);
+}
+
+// [ER-4] 옛 위치(classRPG_v3/backups)의 백업을 새 위치(classRPG_backups)로 **복사**한다.
+//   복사만 하고 옛 데이터는 지우지 않는다 — 검증 후 별도로 정리(안전 우선).
+//   이전이 끝나면 실시간 구독 대상에서 백업이 빠져 접속 시 받는 데이터가 크게 줄어든다.
+async function migrateBackupsToNewLocation() {
+  const oldSnap = await legacyBackupsRef().once('value');
+  const oldData = oldSnap.val() || {};
+  const oldKeys = Object.keys(oldData);
+  if (oldKeys.length === 0) { notify('이전할 옛 백업이 없어요 (이미 정리됨)'); return; }
+
+  const curSnap = await backupsRef().once('value');
+  const curKeys = new Set(Object.keys(curSnap.val() || {}));
+  const todo = oldKeys.filter(k => !curKeys.has(k));
+  if (todo.length === 0) { notify(`이미 ${oldKeys.length}개 모두 이전되어 있어요`); return; }
+
+  if (!confirm(`백업 ${todo.length}개를 새 위치로 복사할까요?\n\n` +
+    `· 옛 백업은 그대로 두고 복사만 합니다(데이터 삭제 없음)\n` +
+    `· 복사 후에도 롤백 목록은 똑같이 보입니다`)) return;
+
+  let done = 0;
+  const failed = [];
+  for (const k of todo) {
+    try { await backupsRef().child(k).set(oldData[k]); done++; }
+    catch (e) { console.error('[backup migrate]', k, e); failed.push(k); }
+  }
+
+  // 복사본이 실제로 저장됐는지 확인
+  const verifySnap = await backupsRef().once('value');
+  const verified = Object.keys(verifySnap.val() || {}).length;
+  renderBackupList();
+
+  if (failed.length === 0) {
+    notify(`📦 ${done}개 복사 완료 (새 위치 총 ${verified}개). 옛 백업은 그대로 남아 있어요.`);
+  } else {
+    notify(`⚠️ ${done}개 복사, ${failed.length}개 실패 — 다시 시도해주세요`, 'error');
+  }
 }
 
 // 관리자 로그인 시 자동 백업
 async function autoBackupOnLogin() {
-  const snap = await DB._fbRef.child(`backups/${Utils.todayStr()}`).once('value');
-  if (!snap.exists()) await saveBackup(true); // 오늘 백업 없으면 자동 저장
+  const today = await readBackup(Utils.todayStr());
+  if (!today) await saveBackup(true); // 오늘 백업 없으면 자동 저장
   renderBackupList();
 }
 

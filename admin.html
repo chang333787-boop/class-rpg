@@ -1593,9 +1593,13 @@
               <div><div class="sr-label">수동 백업</div><div class="sr-sub">지금 즉시 스냅샷 저장</div></div>
               <button class="btn-sm success" onclick="saveBackup()">💾 백업</button>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" style="margin-bottom:.5rem">
               <div><div class="sr-label">날짜별 롤백</div><div class="sr-sub">⚠️ 선택 날짜 이후 모든 데이터 사라짐</div></div>
               <button class="btn-sm outline" onclick="openRollbackModal()">🕐 롤백</button>
+            </div>
+            <div class="setting-row">
+              <div><div class="sr-label">백업 위치 이전</div><div class="sr-sub">옛 백업을 새 위치로 복사 — 앱이 매번 받던 데이터가 줄어 접속이 가벼워져요</div></div>
+              <button class="btn-sm outline" onclick="migrateBackupsToNewLocation()">📦 이전</button>
             </div>
             <div id="backup-list-wrap" style="margin-top:.6rem;font-size:.75rem;color:var(--txt3)">
               저장된 백업: 불러오는 중...
@@ -1667,6 +1671,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260713f"></script>
+<script src="./admin.js?v=20260713g"></script>
 </body>
 </html>
