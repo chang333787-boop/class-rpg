@@ -725,7 +725,11 @@ const DB = {
     db.quests.push(log);
     this._cache = db;
     // questLogs에 고유 키로 저장 (완료 판정 기준)
-    const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now();
+    // [B16] Date.now()만 쓰면 [전체 승인]의 동기 루프에서 같은 밀리초에 같은 키가 만들어져
+    //       기록 1건이 덮어써진다(특히 boardQuestId 없는 빠른보상은 둘 다 'manual').
+    //       지급 자체는 두 번 되지만 활동 내역·능력치 내역·집계에서 건수가 누락됐다.
+    const logId = log.studentId + '_' + (log.boardQuestId||'manual') + '_' + Date.now()
+                + '_' + Math.random().toString(36).slice(2, 7);
     log._id = logId;
     this._fbRef.child('questLogs/' + logId).set(log).catch(e => this._onSaveError(e));
   },

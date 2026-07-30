@@ -3938,10 +3938,16 @@ function postCheckedQuests(type) {
     if (!chk || !chk.checked) return;
 
     // 항목별 스탯 선택 (모든 타입)
+    // [B1] 행 select가 비어 있으면 탭 하단의 공통 능력치 설정을 쓴다.
+    //      기존엔 tabStat/tabStatVal을 읽어만 두고 쓰지 않아, 커스텀 항목처럼 행 값이 빈 경우
+    //      교사가 하단에서 능력치를 골라도 stat:''로 게시되어 능력치가 0 지급됐다.
     const statEl    = document.getElementById(`qt-stat-${type}-${i}`);
     const statValEl = document.getElementById(`qt-statval-${type}-${i}`);
-    const stat    = statEl ? statEl.value : (t.stat || '');
-    const statVal = stat ? (parseFloat(statValEl?.value)||1) : 0;
+    const rowStat = statEl ? statEl.value : (t.stat || '');
+    const stat    = rowStat || tabStat;
+    const statVal = stat
+      ? (rowStat ? (parseFloat(statValEl?.value)||1) : (tabStatVal || 1))
+      : 0;
     // 이미 같은 이름의 활성 퀘스트가 있으면 중복 방지
     if (db.boardQuests.find(q => q.name===t.name && q.active!==false)) {
       notify(`"${t.name}" 은 이미 게시중이에요`, 'error');
