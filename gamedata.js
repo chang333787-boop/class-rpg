@@ -632,9 +632,12 @@ const DB = {
     data.teacherWordSets    = toArr(data.teacherWordSets);
     data.quizRecords        = toArr(data.quizRecords);
     data.pwResetRequests    = toArr(data.pwResetRequests);
-    // emotionLogs는 키 기반 객체 유지 (배열 변환 금지)
+    data.customProblems     = toArr(data.customProblems);
+    // emotionLogs·problemRecords는 키 기반 객체 유지 (배열 변환 금지)
     if (Array.isArray(data.emotionLogs)) data.emotionLogs = {};
     data.emotionLogs = data.emotionLogs || {};
+    if (Array.isArray(data.problemRecords)) data.problemRecords = {};
+    data.problemRecords = data.problemRecords || {};
     return data;
   },
 
@@ -1010,6 +1013,37 @@ const DB = {
     db.recorderLogs = (db.recorderLogs || []).filter(r => r.id !== id);
     this._cache = db;
     this._fbRef.child('recorderLogs/' + id).remove();
+  },
+
+  // ── 교육과정 문제 은행 (curriculum.js의 BASE_PROBLEMS + 교사 추가분) ──
+  // customProblems: { id, unitId, type, q, a, choices?, alt?, hint?, level, createdAt }
+  getCustomProblems()     { return this.load().customProblems || []; },
+  saveCustomProblem(p) {
+    const db = this.load();
+    db.customProblems = db.customProblems || [];
+    const idx = db.customProblems.findIndex(x => x.id === p.id);
+    if (idx >= 0) db.customProblems[idx] = { ...db.customProblems[idx], ...p };
+    else db.customProblems.push({ ...p, createdAt: Date.now() });
+    this._cache = db;
+    this._fbRef.child('customProblems').set(db.customProblems).catch(e => this._onSaveError(e));
+  },
+  deleteCustomProblem(id) {
+    const db = this.load();
+    db.customProblems = (db.customProblems || []).filter(x => x.id !== id);
+    this._cache = db;
+    this._fbRef.child('customProblems').set(db.customProblems).catch(e => this._onSaveError(e));
+  },
+  // 문제 풀이 기록: { id, studentId, unitId, date, total, correct, wrongIds[] }
+  getProblemRecords(studentId) {
+    const all = Object.values(this.load().problemRecords || {});
+    return studentId ? all.filter(r => r && r.studentId === studentId) : all;
+  },
+  saveProblemRecord(rec) {
+    const db = this.load();
+    db.problemRecords = db.problemRecords || {};
+    db.problemRecords[rec.id] = rec;
+    this._cache = db;
+    this._fbRef.child('problemRecords/' + rec.id).set(rec).catch(e => this._onSaveError(e));
   },
 
   // ── 영어 단어장 ──────────────────────────────────────
