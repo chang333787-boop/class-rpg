@@ -3835,13 +3835,14 @@ function postCheckedAbilityQuests() {
   const db = DB.load();
   db.boardQuests = db.boardQuests || [];
   let count = 0;
+  const skipped = []; // [B12] 이름이 겹쳐 건너뛴 항목 — 기존엔 아무 말 없이 빠져서 교사가 몰랐다
   checked.forEach(chk => {
     const name = chk.dataset.name;
     const diff = chk.dataset.diff;
     const stat = chk.dataset.stat;
     const d = DIFF_INFO[diff] || DIFF_INFO.easy;
     // 이미 게시된 동일 퀘스트 스킵
-    if (db.boardQuests.find(q => q.name===name && q.active!==false)) return;
+    if (db.boardQuests.find(q => q.name===name && q.active!==false)) { skipped.push(name); return; }
     db.boardQuests.push({
       id: 'bq_'+Date.now()+'_'+count,
       name, type:'special', diff,
@@ -3857,6 +3858,10 @@ function postCheckedAbilityQuests() {
   DB._fbRef.child('boardQuests').set(db.boardQuests);
   renderBoardQuestList();
   notify(`📌 ${count}개 능력치 퀘스트 게시 완료!`);
+  // [B12] 건너뛴 항목이 있으면 별도 안내
+  if (skipped.length > 0) {
+    notify(`⚠️ 이미 게시 중이라 ${skipped.length}개는 건너뛰었어요: ${skipped.join(', ')}`, 'error');
+  }
 }
 
 function renderQuestTemplates(type) {
@@ -3977,10 +3982,23 @@ function saveAutoDaily() {
     const statVal = stat ? (parseFloat(document.getElementById(`qt-statval-daily-${i}`)?.value)||1) : 0;
     items.push({ name: t.name, stat, statVal });
   });
-  if (items.length === 0) { notify('자동 등록할 항목을 체크해주세요', 'error'); return; }
+  // [B7] 0개 체크 = 자동 등록 끄기. 기존엔 에러만 내고 저장을 거부해서 한번 켜면 끄는 수단이 없었다.
+  if (items.length === 0 &&
+      !confirm('체크한 항목이 없습니다.\n\n자동 등록을 끌까요?\n(이미 오늘 올라간 퀘스트는 그대로 남습니다)')) return;
+
   const prev = DB.getSettings();
-  DB.saveSettings({ ...prev, autoDailyQuests: items });
-  notify(`🔁 ${items.length}개 항목 매일 자동 등록으로 저장! 매일 아침 자동으로 게시판에 올라가요.`);
+  // [B7] autoDailyLastDate를 비워 오늘 안에 변경분이 반영되게 한다.
+  //   기존엔 '오늘 이미 처리됨'으로 막혀 교사가 저장해도 종일 반영되지 않았다.
+  DB.saveSettings({ ...prev, autoDailyQuests: items, autoDailyLastDate: '' });
+  if (items.length === 0) {
+    notify('⏹️ 자동 등록을 껐어요. 이제 매일 아침 자동 게시가 되지 않습니다.');
+    renderAutoDailyStatus();
+    return;
+  }
+  // 저장 직후 오늘치 반영 (다음 학생 로그인까지 기다리지 않도록)
+  if (DB.ensureDailyQuests) DB.ensureDailyQuests();
+  renderBoardQuestList();
+  notify(`🔁 ${items.length}개 항목 매일 자동 등록으로 저장! 오늘 것부터 바로 게시판에 올라갔어요.`);
   renderAutoDailyStatus(); // [Q-3A-1] 저장 후 현황 카드 갱신(저장 로직은 위에서 끝, 여기선 표시만)
 }
 
@@ -4083,13 +4101,26 @@ function onQuestTypeChange(type) {
 function addBoardQuest() {
   const name = document.getElementById('nq-name').value.trim();
   if (!name) { notify('퀘스트 이름을 입력하세요', 'error'); return; }
-  const exp     = parseInt(document.getElementById('nq-exp').value)||80;
-  const gold    = parseInt(document.getElementById('nq-gold').value)||50;
+  // [B9] 기존엔 `parseInt(v)||기본값`이라 음수(-50)는 그대로 저장되고(승인 시 보상을 깎아 레벨 하락),
+  //      0은 falsy라 조용히 기본값으로 바뀌었다. 빈칸만 기본값으로 처리한다.
+  const readNum = (elId, dflt) => {
+    const raw = (document.getElementById(elId)?.value ?? '').trim();
+    if (raw === '') return dflt;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : dflt;
+  };
+  const exp     = readNum('nq-exp', 80);
+  const gold    = readNum('nq-gold', 50);
+  if (exp < 0 || gold < 0) { notify('보상은 0 이상으로 입력해주세요', 'error'); return; }
   const icon    = document.getElementById('nq-icon').value || '📋';
   const stat    = document.getElementById('nq-stat').value;
-  const statVal = stat ? Math.round((parseFloat(document.getElementById('nq-statval')?.value)||1) * 10) / 10 : 0;
+  const statVal = stat ? Math.max(0, Math.round((parseFloat(document.getElementById('nq-statval')?.value)||1) * 10) / 10) : 0;
   const type    = document.getElementById('nq-type').value;
   const dueDate = document.getElementById('nq-due').value || '';
+
+  // [B9] 같은 이름이 이미 게시 중이면 확인 — 그대로 두면 학생이 같은 활동으로 보상을 두 번 받는다
+  const dupName = (DB.load().boardQuests || []).some(q => q.active !== false && q.name === name);
+  if (dupName && !confirm(`"${name}" 퀘스트가 이미 게시 중입니다.\n\n그래도 하나 더 등록할까요?\n(학생이 같은 활동으로 보상을 두 번 받을 수 있어요)`)) return;
 
   const quest = {
     id: 'bq_' + Date.now(),
@@ -4264,11 +4295,31 @@ function cleanQuestPending(db, questId) {
 
 function reactivateBoardQuest(questId) {
   const db = DB.load();
-  db.boardQuests = (db.boardQuests||[]).map(q => q.id === questId ? {...q, active:true} : q);
+  const target = (db.boardQuests||[]).find(q => q.id === questId);
+  if (!target) return;
+
+  // [B6] 지난 날짜의 daily를 그대로 다시 켜면, 다음 학생 접속 때 자동 마감 로직이
+  //      (date !== today) 조건으로 즉시 다시 내려버린다 → "다시 올렸는데 아이들 화면에 없다".
+  const isDaily = target.type === 'daily';
+  const today   = Utils.todayStr();
+  if (!isDaily && target.type !== 'weekly') {
+    // special/event는 완료 로그가 날짜와 무관하게 영구 완료로 판정되므로,
+    // 이전에 완료한 학생은 다시 못 한다는 점을 교사에게 알린다.
+    const doneCnt = (db.students||[]).filter(s =>
+      Utils.isQuestDoneToday(db.quests||[], s.id, questId, target.type)).length;
+    if (doneCnt > 0 && !confirm(
+      `이 퀘스트를 이미 완료한 학생이 ${doneCnt}명 있습니다.\n\n` +
+      `다시 게시해도 그 학생들은 '✅ 완료' 상태로 남아 다시 신청할 수 없어요.\n` +
+      `모두가 새로 하게 하려면 같은 이름으로 새 퀘스트를 만드는 편이 좋습니다.\n\n그래도 다시 게시할까요?`)) return;
+  }
+
+  db.boardQuests = (db.boardQuests||[]).map(q =>
+    q.id === questId ? { ...q, active:true, ...(isDaily ? { date: today } : {}) } : q
+  );
   DB._cache = db;
   DB._fbRef.child('boardQuests').set(db.boardQuests);
   renderBoardQuestList();
-  notify('✅ 퀘스트를 다시 게시했습니다');
+  notify(isDaily ? '✅ 오늘 날짜로 다시 게시했습니다' : '✅ 퀘스트를 다시 게시했습니다');
 }
 
 function deleteBoardQuest(questId) {
