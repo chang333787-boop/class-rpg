@@ -5650,6 +5650,27 @@ async function migrateBackupsToNewLocation() {
   }
 }
 
+// [ER-4] 실시간 전송량 줄이기 — 앱이 읽지 않는 중복/불필요 데이터 정리.
+//   `quests`는 questLogs에서 매 로드마다 재생성되는 **파생 배열**인데, 과거 롤백이
+//   정규화 캐시를 root에 통째로 저장하면서 DB에 실제로 남았다(낡은 스냅샷).
+//   _normalizeArrays가 항상 questLogs 기준으로 덮어쓰므로 지워도 동작에 영향이 없다.
+async function cleanupDerivedNodes() {
+  const snap = await DB._fbRef.child('quests').once('value');
+  if (!snap.exists()) { notify('정리할 중복 데이터가 없어요 ✅'); return; }
+  const v = snap.val();
+  const cnt = Array.isArray(v) ? v.length : Object.keys(v || {}).length;
+  const kb  = Math.round(JSON.stringify(v).length / 1024);
+
+  if (!confirm(
+    `중복 저장된 'quests' 데이터 ${cnt}건(약 ${kb}KB)을 지울까요?\n\n` +
+    `· 이 데이터는 활동 기록(questLogs)에서 매번 자동으로 다시 만들어집니다\n` +
+    `· 지워도 기록·통계·완료 판정에 영향이 없습니다\n` +
+    `· 접속할 때마다 오가던 데이터가 그만큼 줄어듭니다`)) return;
+
+  await DB._fbRef.child('quests').remove();
+  notify(`🧹 중복 데이터 ${kb}KB 정리 완료! 새로고침하면 적용돼요`);
+}
+
 // 관리자 로그인 시 자동 백업
 async function autoBackupOnLogin() {
   const today = await readBackup(Utils.todayStr());
