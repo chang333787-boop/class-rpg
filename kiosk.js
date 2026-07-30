@@ -758,20 +758,25 @@ function getDeadlineInfo(quest) {
   let deadline = null;
   let deadlineTime = null;
 
-  if (quest.type === 'daily') {
-    // 오늘 오후 4시 (방과후)
-    deadlineTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 15, 0, 0);
-    deadline = fmt(now) + ' 방과후';
+  // [B4] 교사가 지정한 마감일이 있으면 그것을 최우선으로 쓴다.
+  //   기존엔 daily/weekly 분기가 먼저라 dueDate가 아예 무시됐고(교사 설정이 사라짐),
+  //   daily 마감이 15:00으로 하드코딩돼 있어(주석은 '오후 4시'로 불일치)
+  //   매일 오후 3시만 지나면 모든 일일 퀘스트에 '⌛ 마감됨'이 붙었다.
+  //   그런데 requestQuest에는 마감 검사가 없어 버튼은 그대로 작동 → 표시와 동작이 모순.
+  //   일일 퀘스트는 '그날 하루'가 자연스러우므로 자정 기준으로 맞춘다(동작과 일치).
+  if (quest.dueDate) {
+    deadline = quest.dueDate;
+    deadlineTime = new Date(quest.dueDate + 'T23:59:59');
+  } else if (quest.type === 'daily') {
+    deadlineTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    deadline = fmt(now) + ' 오늘';
   } else if (quest.type === 'weekly') {
     const day = now.getDay();
     const diff = day <= 5 ? 5 - day : 6;
     const fri = new Date(now);
     fri.setDate(now.getDate() + diff);
-    deadlineTime = new Date(fri.getFullYear(), fri.getMonth(), fri.getDate(), 16, 0, 0);
-    deadline = fmt(fri) + ' 방과후';
-  } else if (quest.dueDate) {
-    deadline = quest.dueDate;
-    deadlineTime = new Date(quest.dueDate + 'T16:00:00');
+    deadlineTime = new Date(fri.getFullYear(), fri.getMonth(), fri.getDate(), 23, 59, 59);
+    deadline = fmt(fri) + ' 금요일';
   }
 
   if (!deadline) return null;
