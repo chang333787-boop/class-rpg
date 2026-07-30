@@ -683,7 +683,10 @@ function requestQuest(studentId, questId, btn) {
 
   const data = DB_DATA;
   const s = data.students.find(x=>x.id===studentId);
-  const q = (data.boardQuests||[]).find(x=>x.id===questId);
+  // [B2] 닫히거나 삭제된 퀘스트는 신청할 수 없다.
+  //   기존엔 active를 보지 않아, 교사가 방금 닫은 퀘스트도 키오스크에서는 신청이 됐다
+  //   (학생 태블릿은 student.js에서 active!==false로 막고 있어 기기마다 동작이 달랐다).
+  const q = (data.boardQuests||[]).find(x=>x.id===questId && x.active!==false);
   if (!s || !q) { if (btn) delete btn.dataset.requesting; showToast('ℹ️ 지금은 신청할 수 없는 퀘스트예요'); return; }
 
   // 2. 완료/신청중 판정 — student·admin과 동일한 Utils.questStatus(일요일 주 시작) 기준으로 통일
@@ -696,8 +699,9 @@ function requestQuest(studentId, questId, btn) {
   }
 
   s.pendingRewards = s.pendingRewards || [];
+  const newRewardId = 'pr_'+Date.now()+'_'+studentId;
   s.pendingRewards.push({
-    id: 'pr_'+Date.now()+'_'+studentId,
+    id: newRewardId,
     boardQuestId: questId,
     boardQuestType: q.type||'special',
     label: q.name,
@@ -713,7 +717,14 @@ function requestQuest(studentId, questId, btn) {
   // [HOTFIX-KIOSK-PENDING-PATH-1] 실제 student 저장 key 경로에만 부분 저장(껍데기 노드 방지)
   fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards').set(s.pendingRewards)
     .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청했어요 — 선생님 승인 후 보상을 받아요`); })
-    .catch(() => { if (btn) delete btn.dataset.requesting; showToast(`⚠️ ${s.name} 신청을 저장하지 못했어요 — 다시 시도해주세요`); });
+    .catch(() => {
+      // [C6] 저장에 실패했으면 화면에만 추가돼 있던 신청을 되돌린다.
+      //   되돌리지 않으면 다시 눌러도 '이미 신청한 퀘스트예요'가 떠서 재시도가 막혔다.
+      s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== newRewardId);
+      if (btn) delete btn.dataset.requesting;
+      showToast(`⚠️ ${s.name} 신청을 저장하지 못했어요 — 다시 눌러주세요`);
+      renderTable();
+    });
 }
 
 // ── 신청 취소 확인 팝업 ──
