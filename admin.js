@@ -536,6 +536,7 @@ function quickGiveGold(id) {
   if (isNaN(amt)) return;
   const s = DB.getStudent(id);
   s.gold = Math.max(0, s.gold + amt);
+  if (amt > 0) s.totalGold = (s.totalGold||0) + amt; // [R7] 누적 골드(차감 제외)
   DB.saveStudent(s);
   renderAll();
   notify(`💰 ${s.name}에게 ${amt > 0 ? '+' : ''}${amt}G 지급!`);
@@ -707,6 +708,7 @@ function approveReward(student, reward) {
   // 1. EXP / Gold / Level
   student.exp   = (student.exp||0)  + (reward.exp||0);
   student.gold  = (student.gold||0) + (reward.gold||0);
+  if ((reward.gold||0) > 0) student.totalGold = (student.totalGold||0) + reward.gold; // [R7] 누적 골드
   student.level = Utils.levelFromExp(student.exp);
 
   // 2. 스탯 증가 (승인 즉시 지급)
@@ -2257,6 +2259,7 @@ function confirmBookRecord(studentId, pendingId) {
   // EXP/골드/레벨 지급
   s.exp  = (s.exp||0)  + (p.exp||30);
   s.gold = (s.gold||0) + (p.gold||0);
+  if ((p.gold||0) > 0) s.totalGold = (s.totalGold||0) + p.gold; // [R7] 누적 골드
   s.level = Utils.levelFromExp(s.exp);
 
   // 퀘스트 로그 저장
@@ -4158,6 +4161,7 @@ function completeQuestForStudent(questId, studentId) {
   // 보상 지급
   s.exp   = (s.exp||0)  + bq.exp;
   s.gold  = (s.gold||0) + bq.gold;
+  if ((bq.gold||0) > 0) s.totalGold = (s.totalGold||0) + bq.gold; // [R7] 누적 골드
   s.level = Utils.levelFromExp(s.exp);
   // [A3] 교사가 설정한 능력치 수치(statVal)를 반영 — 기존엔 항상 +1이라 학생 신청 경로와 달랐다
   const statGain = Math.round((parseFloat(bq.statVal) || 1) * 10) / 10;
@@ -4352,14 +4356,18 @@ function applyReward(isLevelUp) {
   const newPw = document.getElementById('rw-pw').value;
 
   s.gold = Math.max(0, s.gold + goldDelta);
+  // [R7] 누적 골드는 '받은 골드'만 쌓는다(차감은 제외) — 골드 랭킹·누적 골드 업적 기준값
+  if (goldDelta > 0) s.totalGold = (s.totalGold||0) + goldDelta;
   s.exp += expDelta;
   s.level = Utils.levelFromExp(s.exp);
   if (title) { s.title = title; if(!(s.titles||[]).includes(title)) s.titles = [...(s.titles||[]), title]; }
   if (newPw) s.pw = newPw;
 
+  // [R3] 능력치는 소수 단위로 관리된다(퀘스트 statVal 0.5 등). parseInt로 읽으면
+  //      골드만 주려고 [적용]을 눌러도 모든 능력치의 소수점이 잘려 조용히 훼손된다.
   ['read','study','art','value','health','life'].forEach(k => {
     const el = document.getElementById(`rw-stat-${k}`);
-    if (el) s.stats[k] = parseInt(el.value)||0;
+    if (el) s.stats[k] = Math.round((parseFloat(el.value)||0) * 10) / 10;
   });
 
   DB.saveStudent(s);
