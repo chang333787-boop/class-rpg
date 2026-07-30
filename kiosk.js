@@ -702,7 +702,8 @@ function requestQuest(studentId, questId, btn) {
     boardQuestType: q.type||'special',
     label: q.name,
     exp: q.exp, gold: q.gold,
-    stat: q.stat||'', statVal: q.stat?1:0,
+    // [A3] 교사가 설정한 능력치 수치를 그대로 신청에 담는다 (기존엔 항상 1이라 학생 태블릿 신청과 결과가 달랐다)
+    stat: q.stat||'', statVal: q.stat ? (Math.round((parseFloat(q.statVal)||1)*10)/10) : 0,
     icon: q.icon||'📋',
     date: Utils.todayStr(),
   });

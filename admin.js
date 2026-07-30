@@ -691,6 +691,19 @@ function rejectPwResetDash(reqId, btn) {
 //  핵심 승인 함수 (모든 승인은 이 함수만 사용)
 // ══════════════════════════════════════════════════
 function approveReward(student, reward) {
+  // 0. [A1] 중복 지급 방지 — 이미 완료 로그가 있는 퀘스트면 보상 없이 신청만 정리.
+  //    (교사가 퀘스트 관리에서 ✔완료 처리한 뒤 남은 신청을 다시 승인하는 경로 차단)
+  if (reward.boardQuestId) {
+    const doneLogs = DB.load().quests || [];
+    const qType = reward.boardQuestType || reward.type || 'special';
+    if (Utils.isQuestDoneToday(doneLogs, student.id, reward.boardQuestId, qType)) {
+      student.pendingRewards = (student.pendingRewards||[]).filter(r =>
+        r.id !== reward.id && r.label !== reward.id
+      );
+      return student;
+    }
+  }
+
   // 1. EXP / Gold / Level
   student.exp   = (student.exp||0)  + (reward.exp||0);
   student.gold  = (student.gold||0) + (reward.gold||0);
@@ -738,7 +751,10 @@ function approveReward(student, reward) {
     stat:         reward.stat || '',
     statVal:      reward.statVal || 0,
     icon:         reward.icon || '📋',
-    date:         Utils.todayStr(),
+    // [A2] 완료일 = 학생이 신청한 날. 승인일로 덮어쓰면 주간퀘스트가 다음 주까지
+    //      완료로 잠기고 일일 집계도 승인일로 몰린다. 승인 시각은 approvedAt에 별도 기록.
+    date:         reward.date || Utils.todayStr(),
+    approvedAt:   Utils.todayStr(),
     approved:     true,
   });
 
@@ -4079,9 +4095,16 @@ function renderBoardQuestList() {
     const doneSids = new Set(
       students.filter(s => Utils.isQuestDoneToday(allQuestLogs, s.id, q.id, q.type)).map(s => s.id)
     );
+    // [A1] 신청중(대기)인 학생 표시 — 교사가 모르고 ✔완료를 눌러 중복 지급되던 것을 눈에 보이게
+    const pendingSids = new Set(
+      students.filter(s =>
+        Utils.questStatus(s.id, q.id, q.type, allQuestLogs, s.pendingRewards, null) === 'pending'
+      ).map(s => s.id)
+    );
 
     const studentRows = students.map(s => {
       const done = doneSids.has(s.id);
+      const pending = pendingSids.has(s.id);
       return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;
         border-radius:8px;background:${done?'rgba(46,204,113,.08)':'rgba(255,255,255,.03)'};
         border:1px solid ${done?'rgba(46,204,113,.2)':'rgba(255,255,255,.06)'};margin-bottom:.3rem">
@@ -4089,7 +4112,8 @@ function renderBoardQuestList() {
         <span style="font-size:.83rem;font-weight:600;flex:1">${s.name}</span>
         ${done
           ? `<span style="font-size:.72rem;color:var(--emerald);font-weight:700">✅ 완료</span>`
-          : `<button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
+          : `${pending?`<span style="font-size:.68rem;color:var(--gold);font-weight:700;margin-right:.35rem">⏳ 신청중</span>`:''}
+             <button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
               onclick="completeQuestForStudent('${q.id}','${s.id}')">✔ 완료</button>`
         }
       </div>`;
@@ -4104,7 +4128,7 @@ function renderBoardQuestList() {
           <div style="font-size:.72rem;color:var(--txt3);margin-top:.15rem">
             <span class="tag active">${typeNames[q.type]||q.type}</span>
             &nbsp;+${q.exp}EXP · +${q.gold}G
-            ${q.stat?` · ${GAME_DATA.statNames[q.stat]||q.stat} +1`:''}
+            ${q.stat?` · ${GAME_DATA.statNames[q.stat]||q.stat} +${Math.round((parseFloat(q.statVal)||1)*10)/10}`:''}
             ${q.dueDate?` · 마감 ${q.dueDate}`:''}
           </div>
         </div>
@@ -4135,21 +4159,30 @@ function completeQuestForStudent(questId, studentId) {
   s.exp   = (s.exp||0)  + bq.exp;
   s.gold  = (s.gold||0) + bq.gold;
   s.level = Utils.levelFromExp(s.exp);
+  // [A3] 교사가 설정한 능력치 수치(statVal)를 반영 — 기존엔 항상 +1이라 학생 신청 경로와 달랐다
+  const statGain = Math.round((parseFloat(bq.statVal) || 1) * 10) / 10;
   if (bq.stat) {
     s.stats = s.stats || {};
-    s.stats[bq.stat] = (s.stats[bq.stat]||0) + 1;
+    s.stats[bq.stat] = Math.round(((s.stats[bq.stat]||0) + statGain) * 10) / 10;
   }
   s.totalQuests = (s.totalQuests||0) + 1;
+
+  // [A1] 같은 퀘스트로 남아있는 신청 제거 — 안 지우면 활동 승인 탭에서 한 번 더 승인돼 보상이 2배가 된다
+  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.boardQuestId !== questId);
+
   DB.saveStudent(s);
 
-  // 퀘스트 로그 기록 (saveQuestLog 통일 구조)
+  // 퀘스트 로그 기록 (saveQuestLog 통일 구조 — approveReward와 필드 동일하게)
   DB.saveQuestLog({
     studentId,
     boardQuestId: questId,
+    boardQuestType: bq.type || 'special',
     type:         bq.type || 'special',
     name:         bq.name,
     exp:          bq.exp,
     gold:         bq.gold,
+    stat:         bq.stat || '',
+    statVal:      bq.stat ? statGain : 0,
     icon:         bq.icon||'📋',
     date:         Utils.todayStr(),
     approved:     true,
