@@ -729,11 +729,26 @@ function approveReward(student, reward) {
       date:    reward.date     || Utils.todayStr(),
     });
   } else if (reward.type === 'book') {
+    // [R4] 독서 탭(confirmBookRecord)과 같은 필드 집합으로 저장.
+    //   기존엔 title/review/date 3개만 남겨서 이 경로로 승인하면 별점·분류·인물이 사라지고,
+    //   분류 필터에서 빠지며 별점/인물 업적(ach_book_rate·ach_book_char)이 영구 미달성이 됐다.
+    // [R5] id가 없으면 교사 코멘트가 엉뚱한 책에 저장된다.
+    // teacherChecked는 false로 둔다 — 교사가 독서 탭에서 내용을 확인하기 전이므로.
     student.books = student.books || [];
     student.books.push({
-      title:  reward.bookTitle  || reward.label,
-      review: reward.bookReview || '',
-      date:   reward.bookDate   || reward.date || Utils.todayStr(),
+      id:              reward.id || ('bk_' + Date.now() + '_' + student.id),
+      title:           reward.bookTitle || reward.label || '',
+      category:        reward.category || '',
+      customCategory:  reward.customCategory || '',
+      rating:          reward.rating || 0,
+      characterName:   reward.characterName || '',
+      characterReason: reward.characterReason || '',
+      summary:         reward.summary || '',
+      reflection:      reward.reflection || '',
+      review:          reward.bookReview || '',
+      date:            reward.bookDate || reward.date || Utils.todayStr(),
+      createdAt:       reward.createdAt || Date.now(),
+      teacherChecked:  false,
     });
     student.bookCount = student.books.length;
   } else {
@@ -968,7 +983,18 @@ function renderApproveList() {
       .map(r => ({...r, student: s}))
   );
 
-  if (APPROVE_FILTER === 'today') items = items.filter(i => i.date === today);
+  // [B5] '오늘만' 필터는 일반 대기에만 적용한다.
+  //   ⚠️ 확인 필요 보상(닫힌·삭제된 퀘스트 참조)은 정의상 과거 것이라, 필터에 걸리면
+  //   섹션째 사라져 "뱃지엔 3건인데 목록은 비어 있음"이 됐다(교사는 오류로 오인).
+  if (APPROVE_FILTER === 'today') {
+    const _bqToday = new Map((DB.load().boardQuests || []).map(q => [q.id, q]));
+    items = items.filter(i => {
+      if (i.date === today) return true;
+      if (!i.boardQuestId) return false;
+      const q = _bqToday.get(i.boardQuestId);
+      return !q || q.active === false; // 삭제·닫힘 = 확인 필요 → 필터와 무관하게 표시
+    });
+  }
 
   if (items.length === 0) {
     container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.85rem;color:var(--txt3)">대기 중인 활동이 없어요 ✅</div>';
@@ -1381,6 +1407,8 @@ function renderStatsPage() {
     { key:'art',    label:'🎨 예술',  color:'#9b59b6' },
     { key:'value',  label:'💎 가치',  color:'var(--gold)' },
     { key:'health', label:'💪 건강',  color:'var(--emerald)' },
+    // [B8] 생활(life)이 빠져 있어 🏠생활 퀘스트 기록이 이 화면에서 통째로 안 보였다
+    { key:'life',   label:'🏠 생활',  color:'#5dade2' },
   ];
 
   const statCards = statDefs.map(def => {
@@ -2239,6 +2267,9 @@ function confirmBookRecord(studentId, pendingId) {
   // 확장 필드 포함해서 books[]에 저장
   s.books = s.books || [];
   s.books.push({
+    // [R5] id가 없으면 코멘트 입력칸 id가 'bk-comment-undefined'로 중복 생성되어
+    //      교사 코멘트가 엉뚱한 책에 저장된다
+    id: p.id || ('bk_' + Date.now() + '_' + s.id),
     title: p.bookTitle || p.label || '',
     category: p.category || '',
     customCategory: p.customCategory || '',
