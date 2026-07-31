@@ -10256,24 +10256,24 @@ function renderStudySubjectPick() {
 
   body.innerHTML = `
     <div style="padding:.2rem 1rem 1rem">
-      <div style="font-size:.76rem;color:var(--txt3);margin-bottom:.8rem;text-align:center">
+      <div class="st-meta" style="color:var(--txt3);margin-bottom:1.2rem;text-align:center">
         ${done >= STUDY_PER_DAY
           ? `오늘 ${done}문제 다 했어요. 더 풀고 싶으면 골라 보세요`
           : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
       </div>
-      <div style="display:grid;gap:.5rem">
+      <div style="display:grid;gap:.7rem">
         ${subjects.map(sub => `
           <button onclick="startStudySession('${sub.key}')"
-            style="display:flex;align-items:center;gap:.7rem;width:100%;padding:.8rem .9rem;
-              border-radius:12px;border:1px solid rgba(255,255,255,.1);cursor:pointer;
+            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
+              border-radius:14px;border:1px solid rgba(255,255,255,.1);cursor:pointer;
               background:rgba(255,255,255,.05);color:var(--txt);font-family:inherit;text-align:left">
-            <span style="font-size:1.5rem">${sub.icon || '📘'}</span>
+            <span style="font-size:2.2rem">${sub.icon || '📘'}</span>
             <span style="flex:1">
-              <span style="display:block;font-size:.9rem;font-weight:700">${escHtml(sub.label)}</span>
-              <span style="display:block;font-size:.68rem;color:var(--txt3);margin-top:.1rem">
+              <span class="st-subject" style="display:block;font-weight:700">${escHtml(sub.label)}</span>
+              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">
                 ${sub.units.length}단원 · 문제 ${sub.count}개</span>
             </span>
-            <span style="font-size:.9rem;color:var(--txt3)">▶</span>
+            <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
           </button>`).join('')}
       </div>
     </div>`;
@@ -10339,43 +10339,43 @@ function renderStudyQuestion() {
   let inputHtml = '';
   if (p.type === 'choice') {
     const opts = [...(p.choices || [])].sort(() => Math.random() - .5);
-    inputHtml = `<div style="display:grid;gap:.45rem">
+    inputHtml = `<div style="display:grid;gap:.6rem">
       ${opts.map(c => `
-        <button onclick="submitStudyAnswer(${JSON.stringify(String(c)).replace(/"/g, '&quot;')})"
-          style="width:100%;padding:.7rem .8rem;border-radius:10px;cursor:pointer;font-family:inherit;
+        <button class="st-opt" onclick="submitStudyAnswer(${JSON.stringify(String(c)).replace(/"/g, '&quot;')})"
+          style="width:100%;cursor:pointer;font-family:inherit;
             border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
-            color:var(--txt);font-size:.85rem;text-align:left">${escHtml(String(c))}</button>`).join('')}
+            color:var(--txt);text-align:left;word-break:keep-all">${escHtml(String(c))}</button>`).join('')}
     </div>`;
   } else {
     const ph = p.type === 'number' ? '숫자를 입력하세요' : '답을 입력하세요';
     const mode = p.type === 'number' ? 'inputmode="numeric"' : '';
     inputHtml = `
-      <div style="display:flex;gap:.4rem">
-        <input id="study-input" ${mode} placeholder="${ph}" autocomplete="off"
+      <div style="display:flex;gap:.5rem">
+        <input id="study-input" class="st-input" ${mode} placeholder="${ph}" autocomplete="off"
           onkeydown="if(event.key==='Enter'&&!event.isComposing)submitStudyAnswer(this.value)"
-          style="flex:1;padding:.7rem .8rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);
-            background:rgba(0,0,0,.25);color:var(--txt);font-size:.9rem;font-family:inherit;outline:none">
-        <button onclick="submitStudyAnswer(document.getElementById('study-input').value)"
-          style="padding:.7rem 1rem;border-radius:10px;border:none;background:var(--gold);
-            color:#1a1a1a;font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit">확인</button>
+          style="flex:1;border:1px solid rgba(255,255,255,.14);
+            background:rgba(0,0,0,.25);color:var(--txt);font-family:inherit;outline:none">
+        <button class="st-btn" onclick="submitStudyAnswer(document.getElementById('study-input').value)"
+          style="border:none;background:var(--gold);color:#1a1a1a;font-weight:700;
+            cursor:pointer;font-family:inherit;flex-shrink:0">확인</button>
       </div>`;
   }
 
   body.innerHTML = `
     ${bar}
     <div style="padding:0 1rem 1rem">
-      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">
+      <div class="st-meta" style="color:var(--txt3);margin-bottom:.8rem">
         ${escHtml(unit?.subjectLabel || '')} · ${escHtml(unit?.name || '')}
       </div>
-      <div style="font-size:1rem;font-weight:700;line-height:1.6;margin-bottom:1rem;word-break:keep-all">
+      <div class="st-q" style="margin-bottom:1.6rem">
         ${escHtml(p.q)}
       </div>
       ${inputHtml}
       ${p.hint ? `<button onclick="this.nextElementSibling.style.display='block';this.style.display='none'"
-        style="margin-top:.7rem;background:none;border:none;color:var(--txt3);font-size:.72rem;
+        style="margin-top:1rem;background:none;border:none;color:var(--txt3);font-size:1rem;
           cursor:pointer;font-family:inherit;text-decoration:underline">힌트 보기</button>
-        <div style="display:none;margin-top:.5rem;font-size:.75rem;color:var(--sky);
-          background:rgba(93,173,226,.1);padding:.5rem .7rem;border-radius:8px;word-break:keep-all">
+        <div class="st-hint" style="display:none;margin-top:.7rem;color:var(--sky);
+          background:rgba(93,173,226,.1);padding:.8rem 1rem;border-radius:10px;word-break:keep-all">
           💡 ${escHtml(p.hint)}</div>` : ''}
     </div>`;
 
@@ -10404,23 +10404,23 @@ function showStudyFeedback(p, chosen, ok) {
   const last = STUDY_SESSION.cur >= STUDY_SESSION.questions.length - 1;
   body.innerHTML = `
     <div style="padding:1.2rem 1rem;text-align:center">
-      <div style="font-size:2.4rem;margin-bottom:.5rem">${ok ? '⭕' : '❌'}</div>
-      <div style="font-size:1rem;font-weight:800;color:${ok ? 'var(--emerald)' : 'var(--red)'};margin-bottom:.8rem">
+      <div class="st-emoji" style="margin-bottom:.6rem">${ok ? '⭕' : '❌'}</div>
+      <div style="font-size:1.5rem;font-weight:800;color:${ok ? 'var(--emerald)' : 'var(--red)'};margin-bottom:1.2rem">
         ${ok ? '맞았어요!' : '아쉬워요'}
       </div>
       ${!ok ? `
-        <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:.7rem .8rem;
-          margin-bottom:.8rem;text-align:left">
-          <div style="font-size:.72rem;color:var(--txt3)">내가 쓴 답</div>
-          <div style="font-size:.85rem;color:var(--red);margin-bottom:.5rem">${escHtml(chosen)}</div>
-          <div style="font-size:.72rem;color:var(--txt3)">정답</div>
-          <div style="font-size:.9rem;font-weight:700;color:var(--emerald)">${escHtml(String(p.a))}</div>
-          ${p.hint ? `<div style="font-size:.72rem;color:var(--txt2);margin-top:.5rem;word-break:keep-all">
+        <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:1.1rem 1.2rem;
+          margin-bottom:1.2rem;text-align:left">
+          <div style="font-size:.95rem;color:var(--txt3)">내가 쓴 답</div>
+          <div style="font-size:1.25rem;color:var(--red);margin-bottom:.9rem">${escHtml(chosen)}</div>
+          <div style="font-size:.95rem;color:var(--txt3)">정답</div>
+          <div style="font-size:1.6rem;font-weight:700;color:var(--emerald)">${escHtml(String(p.a))}</div>
+          ${p.hint ? `<div style="font-size:1.05rem;color:var(--txt2);margin-top:.9rem;word-break:keep-all">
             💡 ${escHtml(p.hint)}</div>` : ''}
         </div>` : ''}
-      <button onclick="nextStudyQuestion()"
-        style="width:100%;padding:.75rem;border-radius:10px;border:none;background:var(--gold);
-          color:#1a1a1a;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit">
+      <button class="st-btn" onclick="nextStudyQuestion()"
+        style="width:100%;border:none;background:var(--gold);
+          color:#1a1a1a;font-weight:700;cursor:pointer;font-family:inherit">
         ${last ? '결과 보기' : '다음 문제'}
       </button>
     </div>`;
@@ -10468,34 +10468,34 @@ function finishStudySession() {
 
   body.innerHTML = `
     <div style="padding:1.2rem 1rem">
-      <div style="text-align:center;margin-bottom:1rem">
-        <div style="font-size:2.6rem">${emoji}</div>
-        <div style="font-size:1.5rem;font-weight:800;color:var(--gold);margin:.3rem 0">
+      <div style="text-align:center;margin-bottom:1.4rem">
+        <div class="st-emoji">${emoji}</div>
+        <div class="st-score" style="font-weight:800;color:var(--gold);margin:.4rem 0">
           ${correct} / ${total}</div>
-        <div style="font-size:.85rem;color:var(--txt2)">${msg}</div>
+        <div style="font-size:1.15rem;color:var(--txt2)">${msg}</div>
       </div>
       ${wrong.length > 0 ? `
-        <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:.7rem .8rem;margin-bottom:.9rem">
-          <div style="font-size:.74rem;font-weight:700;color:var(--red);margin-bottom:.5rem">
+        <div style="background:rgba(255,255,255,.04);border-radius:12px;padding:1rem 1.1rem;margin-bottom:1.2rem">
+          <div style="font-size:1.05rem;font-weight:700;color:var(--red);margin-bottom:.7rem">
             다시 볼 문제 ${wrong.length}개</div>
           ${wrong.slice(0, 5).map(a => {
             const p = questions.find(q => q.id === a.problemId);
             if (!p) return '';
-            return `<div style="font-size:.72rem;color:var(--txt2);padding:.3rem 0;
+            return `<div style="font-size:1rem;color:var(--txt2);padding:.55rem 0;line-height:1.5;
               border-top:1px solid rgba(255,255,255,.05);word-break:keep-all">
               ${escHtml(p.q.slice(0, 42))}${p.q.length > 42 ? '…' : ''}
-              <span style="color:var(--emerald)"> → ${escHtml(String(p.a))}</span></div>`;
+              <span style="color:var(--emerald);font-weight:700"> → ${escHtml(String(p.a))}</span></div>`;
           }).join('')}
         </div>` : ''}
-      <button onclick="closeStudyModal()"
-        style="width:100%;padding:.75rem;border-radius:10px;border:none;background:var(--gold);
-          color:#1a1a1a;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit">
+      <button class="st-btn" onclick="closeStudyModal()"
+        style="width:100%;border:none;background:var(--gold);
+          color:#1a1a1a;font-weight:700;cursor:pointer;font-family:inherit">
         끝내기
       </button>
       <button onclick="renderStudySubjectPick()"
-        style="width:100%;padding:.6rem;margin-top:.4rem;border-radius:10px;cursor:pointer;
+        style="width:100%;padding:.8rem;margin-top:.5rem;border-radius:12px;cursor:pointer;
           border:1px solid rgba(255,255,255,.12);background:none;color:var(--txt3);
-          font-size:.8rem;font-family:inherit">더 풀기</button>
+          font-size:1.05rem;font-family:inherit">더 풀기</button>
     </div>`;
 
   STUDY_SESSION = null;

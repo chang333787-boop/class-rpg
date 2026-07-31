@@ -82,7 +82,7 @@ const MIME = {
     '/gamedata.js?v=20260730',
     '/curriculum.js?v=20260731',
     '/student.js?v=20260731a', '/admin.js?v=20260713h', '/kiosk.js?v=20260713c',
-    '/student.css?v=20260604', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
+    '/student.css?v=20260731a', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
   ];
 
   let ok = 0;
@@ -130,10 +130,11 @@ for (const f of HTML_FILES) {
   if (inlineScript === 0 && styleTags === 0) add('PASS', `${f}: 인라인 <script>/<style> 0건`);
   else add('FAIL', `${f}: 인라인 잔여 (script ${inlineScript}, style ${styleTags})`);
 
-  // CSS link 캐시버스터 ?v=20260604
+  // CSS link 캐시버스터 (기대값 스냅샷 — 해당 CSS 갱신 시 여기도 동기화)
   const cssName = f.replace('.html', '.css');
-  if (html.includes(`${cssName}?v=20260604`)) add('PASS', `${f}: ${cssName}?v=20260604 캐시버스터`);
-  else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=20260604) 미발견 — CSS 갱신 시 확인 필요`);
+  const cssVer = { 'student.css': '20260731a', 'admin.css': '20260604', 'kiosk.css': '20260604' }[cssName];
+  if (html.includes(`${cssName}?v=${cssVer}`)) add('PASS', `${f}: ${cssName}?v=${cssVer} 캐시버스터`);
+  else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=${cssVer}) 미발견 — CSS 갱신 시 확인 필요`);
 
   // 전용 JS script src 캐시버스터 (기대값 스냅샷 — 해당 JS 갱신 시 여기도 동기화)
   const jsVer = { 'student.js': '20260731a', 'admin.js': '20260713h', 'kiosk.js': '20260713c' }[js];
