@@ -205,9 +205,11 @@ function enterGame() {
   applyScale();
   renderAll();
   startAccessTimer();
-  setTimeout(() => checkWeeklyRoutine(), 1500);   // 주간 다짐 자동 팝업
-  setTimeout(() => checkVocabQuizTrigger(), 10000); // 영어 단어 퀴즈 팝업
-  setTimeout(() => tryShowReflectionPopup(), 30000);
+  // [DAILY-STUDY-1] 로그인 직후 자동 팝업 3종(주간다짐 1.5초·단어퀴즈 20초·회고 30초) 폐기.
+  //   기습적으로 학습을 끊고 튀어나와 실제 도움이 안 된다는 운영 판단.
+  //   할 일은 홈 카드에서 학생이 눌러서 시작한다(오늘의 학습 카드 / 할 일 목록).
+  //   각 기능 자체는 살아 있고 진입점만 바뀜: checkWeeklyRoutine·startPopupQuiz·
+  //   tryShowReflectionPopup 함수는 보존(수동 호출·교사 안내용).
 }
 
 function cleanInactivePending() {
@@ -978,6 +980,9 @@ function buildMainHTML() {
           font-family:inherit;margin-top:.3rem;margin-bottom:.3rem">
         ▼ 할 일 더보기 (${restTodos.length}개)
       </button>` : ''}
+
+    <!-- ①-2 오늘의 학습 (매일 하는 자리에 배치) -->
+    ${buildStudyCardHTML(s)}
 
     <!-- ② 주요 메뉴 4개 -->
     <div class="sec-label">🎮 메뉴</div>
@@ -10163,3 +10168,336 @@ function toast(msg) {
 
 // [ER-2] DB 저장 실패 시 학생에게 안내 (gamedata의 _onSaveError 훅 — #110을 학생 화면까지 완성)
 window.onDbSaveError = () => toast('⚠️ 저장에 실패했어요. 인터넷을 확인하고 다시 해주세요.');
+
+// ══════════════════════════════════════════════════
+//  오늘의 학습 (교과 문제 풀이) — DAILY-STUDY-1
+//  · 하루 10문제. 학생이 과목을 고른다.
+//  · 팝업 강제 방식을 폐기하고 홈 카드에서 학생이 눌러서 시작한다.
+//  · 문항/채점은 curriculum.js(CurriculumUtils)를 그대로 쓴다.
+//  · 기록은 problemRecords에 남기고, **고른 오답까지 저장**한다(혼동 진단용).
+// ══════════════════════════════════════════════════
+
+const STUDY_PER_DAY = 10;   // 하루 분량
+let STUDY_SESSION = null;   // { subjectKey, questions[], cur, correct, answers[] }
+
+// 오늘 이 학생이 남긴 학습 기록
+function getTodayStudyRecords(studentId) {
+  if (typeof DB.getProblemRecords !== 'function') return [];
+  const today = Utils.todayStr();
+  return DB.getProblemRecords(studentId).filter(r => r && r.date === today);
+}
+
+// 홈에 붙는 "오늘의 학습" 카드
+function buildStudyCardHTML(s) {
+  if (typeof CurriculumUtils === 'undefined') return '';
+  const recs  = getTodayStudyRecords(s.id);
+  const done  = recs.reduce((n, r) => n + (r.total || 0), 0);
+  const right = recs.reduce((n, r) => n + (r.correct || 0), 0);
+  const cleared = done >= STUDY_PER_DAY;
+  const pct = done > 0 ? Math.round(right / done * 100) : 0;
+
+  return `
+    <div class="today-card" onclick="openStudyModal()"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid ${cleared?'rgba(46,204,113,.35)':'rgba(255,215,0,.28)'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">
+        <div>
+          <div style="font-size:.85rem;font-weight:800;color:${cleared?'var(--emerald)':'var(--gold)'}">
+            ${cleared ? '📚 오늘 공부 끝!' : '📚 오늘의 학습'}
+          </div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">
+            ${cleared
+              ? `${done}문제 풀었어요 · 정답률 ${pct}%`
+              : `하루 ${STUDY_PER_DAY}문제 · ${done > 0 ? `${done}문제 했어요` : '아직 안 했어요'}`}
+          </div>
+        </div>
+        <div style="font-size:.72rem;padding:.3rem .7rem;border-radius:8px;flex-shrink:0;
+          background:${cleared?'rgba(46,204,113,.15)':'var(--gold)'};
+          color:${cleared?'var(--emerald)':'#1a1a1a'};font-weight:700">
+          ${cleared ? '다시 풀기' : '시작하기'}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── 과목 선택 ──────────────────────────────────────
+function openStudyModal() {
+  if (typeof CurriculumUtils === 'undefined') { toast('학습 자료를 불러오지 못했어요'); return; }
+  openModal('m-study');
+  renderStudySubjectPick();
+}
+
+function closeStudyModal() {
+  STUDY_SESSION = null;
+  closeModal('m-study');
+  renderAll();
+}
+
+function renderStudySubjectPick() {
+  const body = document.getElementById('study-body');
+  const ttl  = document.getElementById('study-title');
+  if (!body) return;
+  if (ttl) ttl.textContent = '📚 오늘의 학습';
+
+  const active = CurriculumUtils.activeUnitIds();   // 교사가 켠 단원(없으면 전체)
+  const subjects = CurriculumUtils.subjects().map(sub => {
+    const units = sub.units.filter(u => !active || active.includes(u.id));
+    const count = units.reduce((n, u) => n + CurriculumUtils.problemsByUnit(u.id).length, 0);
+    return { ...sub, units, count };
+  }).filter(sub => sub.count > 0);
+
+  if (subjects.length === 0) {
+    body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--txt3);font-size:.82rem">
+      선생님이 공부할 단원을 정하면 여기에 나와요</div>`;
+    return;
+  }
+
+  const recs = getTodayStudyRecords(CUR.id);
+  const done = recs.reduce((n, r) => n + (r.total || 0), 0);
+
+  body.innerHTML = `
+    <div style="padding:.2rem 1rem 1rem">
+      <div style="font-size:.76rem;color:var(--txt3);margin-bottom:.8rem;text-align:center">
+        ${done >= STUDY_PER_DAY
+          ? `오늘 ${done}문제 다 했어요. 더 풀고 싶으면 골라 보세요`
+          : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
+      </div>
+      <div style="display:grid;gap:.5rem">
+        ${subjects.map(sub => `
+          <button onclick="startStudySession('${sub.key}')"
+            style="display:flex;align-items:center;gap:.7rem;width:100%;padding:.8rem .9rem;
+              border-radius:12px;border:1px solid rgba(255,255,255,.1);cursor:pointer;
+              background:rgba(255,255,255,.05);color:var(--txt);font-family:inherit;text-align:left">
+            <span style="font-size:1.5rem">${sub.icon || '📘'}</span>
+            <span style="flex:1">
+              <span style="display:block;font-size:.9rem;font-weight:700">${escHtml(sub.label)}</span>
+              <span style="display:block;font-size:.68rem;color:var(--txt3);margin-top:.1rem">
+                ${sub.units.length}단원 · 문제 ${sub.count}개</span>
+            </span>
+            <span style="font-size:.9rem;color:var(--txt3)">▶</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ── 세션 시작 ──────────────────────────────────────
+function startStudySession(subjectKey) {
+  const active = CurriculumUtils.activeUnitIds();
+  let pool = CurriculumUtils.problemsBySubject(subjectKey);
+  if (active) pool = pool.filter(p => active.includes(p.unitId));
+  if (pool.length === 0) { toast('풀 수 있는 문제가 없어요'); return; }
+
+  // 최근에 틀린 문제를 자주 나오게(단어장 복습 가중치와 같은 방식)
+  const recent = DB.getProblemRecords(CUR.id).slice(-8);
+  const wrongIds = new Set(recent.flatMap(r => r.wrongIds || []));
+  const weighted = [];
+  pool.forEach(p => {
+    const times = wrongIds.has(p.id) ? 3 : 1;
+    for (let i = 0; i < times; i++) weighted.push(p);
+  });
+
+  const picked = [];
+  const used = new Set();
+  const shuffled = weighted.sort(() => Math.random() - .5);
+  for (const p of shuffled) {
+    if (picked.length >= STUDY_PER_DAY) break;
+    if (!used.has(p.id)) { picked.push(p); used.add(p.id); }
+  }
+  // 가중 배열에서 못 채우면 나머지로 보충
+  for (const p of pool) {
+    if (picked.length >= STUDY_PER_DAY) break;
+    if (!used.has(p.id)) { picked.push(p); used.add(p.id); }
+  }
+
+  STUDY_SESSION = {
+    subjectKey,
+    questions: picked,
+    cur: 0,
+    correct: 0,
+    answers: [],       // { problemId, unitId, chosen, correct } — 고른 오답까지 저장
+  };
+  renderStudyQuestion();
+}
+
+function renderStudyQuestion() {
+  const body = document.getElementById('study-body');
+  const ttl  = document.getElementById('study-title');
+  if (!body || !STUDY_SESSION) return;
+  const { questions, cur } = STUDY_SESSION;
+  if (cur >= questions.length) { finishStudySession(); return; }
+
+  const p = questions[cur];
+  const unit = CurriculumUtils.unitById(p.unitId);
+  if (ttl) ttl.textContent = `${unit?.icon || '📚'} ${cur + 1} / ${questions.length}`;
+
+  // 진행 막대
+  const bar = `
+    <div style="height:4px;border-radius:4px;background:rgba(255,255,255,.08);margin:0 1rem .9rem;overflow:hidden">
+      <div style="height:100%;width:${Math.round(cur / questions.length * 100)}%;
+        background:var(--gold);border-radius:4px;transition:width .25s"></div>
+    </div>`;
+
+  let inputHtml = '';
+  if (p.type === 'choice') {
+    const opts = [...(p.choices || [])].sort(() => Math.random() - .5);
+    inputHtml = `<div style="display:grid;gap:.45rem">
+      ${opts.map(c => `
+        <button onclick="submitStudyAnswer(${JSON.stringify(String(c)).replace(/"/g, '&quot;')})"
+          style="width:100%;padding:.7rem .8rem;border-radius:10px;cursor:pointer;font-family:inherit;
+            border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
+            color:var(--txt);font-size:.85rem;text-align:left">${escHtml(String(c))}</button>`).join('')}
+    </div>`;
+  } else {
+    const ph = p.type === 'number' ? '숫자를 입력하세요' : '답을 입력하세요';
+    const mode = p.type === 'number' ? 'inputmode="numeric"' : '';
+    inputHtml = `
+      <div style="display:flex;gap:.4rem">
+        <input id="study-input" ${mode} placeholder="${ph}" autocomplete="off"
+          onkeydown="if(event.key==='Enter'&&!event.isComposing)submitStudyAnswer(this.value)"
+          style="flex:1;padding:.7rem .8rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);
+            background:rgba(0,0,0,.25);color:var(--txt);font-size:.9rem;font-family:inherit;outline:none">
+        <button onclick="submitStudyAnswer(document.getElementById('study-input').value)"
+          style="padding:.7rem 1rem;border-radius:10px;border:none;background:var(--gold);
+            color:#1a1a1a;font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit">확인</button>
+      </div>`;
+  }
+
+  body.innerHTML = `
+    ${bar}
+    <div style="padding:0 1rem 1rem">
+      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">
+        ${escHtml(unit?.subjectLabel || '')} · ${escHtml(unit?.name || '')}
+      </div>
+      <div style="font-size:1rem;font-weight:700;line-height:1.6;margin-bottom:1rem;word-break:keep-all">
+        ${escHtml(p.q)}
+      </div>
+      ${inputHtml}
+      ${p.hint ? `<button onclick="this.nextElementSibling.style.display='block';this.style.display='none'"
+        style="margin-top:.7rem;background:none;border:none;color:var(--txt3);font-size:.72rem;
+          cursor:pointer;font-family:inherit;text-decoration:underline">힌트 보기</button>
+        <div style="display:none;margin-top:.5rem;font-size:.75rem;color:var(--sky);
+          background:rgba(93,173,226,.1);padding:.5rem .7rem;border-radius:8px;word-break:keep-all">
+          💡 ${escHtml(p.hint)}</div>` : ''}
+    </div>`;
+
+  const inp = document.getElementById('study-input');
+  if (inp) setTimeout(() => inp.focus(), 60);
+}
+
+function submitStudyAnswer(chosen) {
+  if (!STUDY_SESSION) return;
+  const p = STUDY_SESSION.questions[STUDY_SESSION.cur];
+  if (!p) return;
+  const val = String(chosen == null ? '' : chosen).trim();
+  if (!val) { toast('답을 입력해 주세요'); return; }
+
+  const ok = CurriculumUtils.isCorrect(p, val);
+  if (ok) STUDY_SESSION.correct++;
+  // 고른 답을 그대로 남긴다 — 무엇과 헷갈리는지 나중에 볼 수 있게
+  STUDY_SESSION.answers.push({ problemId: p.id, unitId: p.unitId, chosen: val, correct: ok });
+  showStudyFeedback(p, val, ok);
+}
+
+// 틀렸을 때 정답을 바로 보여준다(교정 피드백)
+function showStudyFeedback(p, chosen, ok) {
+  const body = document.getElementById('study-body');
+  if (!body) return;
+  const last = STUDY_SESSION.cur >= STUDY_SESSION.questions.length - 1;
+  body.innerHTML = `
+    <div style="padding:1.2rem 1rem;text-align:center">
+      <div style="font-size:2.4rem;margin-bottom:.5rem">${ok ? '⭕' : '❌'}</div>
+      <div style="font-size:1rem;font-weight:800;color:${ok ? 'var(--emerald)' : 'var(--red)'};margin-bottom:.8rem">
+        ${ok ? '맞았어요!' : '아쉬워요'}
+      </div>
+      ${!ok ? `
+        <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:.7rem .8rem;
+          margin-bottom:.8rem;text-align:left">
+          <div style="font-size:.72rem;color:var(--txt3)">내가 쓴 답</div>
+          <div style="font-size:.85rem;color:var(--red);margin-bottom:.5rem">${escHtml(chosen)}</div>
+          <div style="font-size:.72rem;color:var(--txt3)">정답</div>
+          <div style="font-size:.9rem;font-weight:700;color:var(--emerald)">${escHtml(String(p.a))}</div>
+          ${p.hint ? `<div style="font-size:.72rem;color:var(--txt2);margin-top:.5rem;word-break:keep-all">
+            💡 ${escHtml(p.hint)}</div>` : ''}
+        </div>` : ''}
+      <button onclick="nextStudyQuestion()"
+        style="width:100%;padding:.75rem;border-radius:10px;border:none;background:var(--gold);
+          color:#1a1a1a;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit">
+        ${last ? '결과 보기' : '다음 문제'}
+      </button>
+    </div>`;
+}
+
+function nextStudyQuestion() {
+  if (!STUDY_SESSION) return;
+  STUDY_SESSION.cur++;
+  renderStudyQuestion();
+}
+
+function finishStudySession() {
+  if (!STUDY_SESSION) return;
+  const { subjectKey, questions, correct, answers } = STUDY_SESSION;
+  const total = questions.length;
+  const wrongIds = answers.filter(a => !a.correct).map(a => a.problemId);
+  const pct = total > 0 ? Math.round(correct / total * 100) : 0;
+
+  // 기록 저장 — unitId는 이번 세션에서 가장 많이 나온 단원
+  const unitCount = {};
+  answers.forEach(a => { unitCount[a.unitId] = (unitCount[a.unitId] || 0) + 1; });
+  const mainUnit = Object.entries(unitCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+
+  if (typeof DB.saveProblemRecord === 'function') {
+    DB.saveProblemRecord({
+      id: `prob_${Utils.todayStr()}_${CUR.id}_${Date.now()}`,
+      studentId: CUR.id,
+      date: Utils.todayStr(),
+      subjectKey,
+      unitId: mainUnit,
+      total, correct,
+      wrongIds,
+      answers,          // 고른 답까지 보존
+    });
+  }
+
+  const emoji = pct === 100 ? '🏆' : pct >= 80 ? '👏' : pct >= 50 ? '💪' : '🌱';
+  const msg   = pct === 100 ? '다 맞았어요!' : pct >= 80 ? '잘했어요!' : pct >= 50 ? '조금만 더!' : '천천히 해봐요';
+  const wrong = answers.filter(a => !a.correct);
+
+  const body = document.getElementById('study-body');
+  const ttl  = document.getElementById('study-title');
+  if (ttl) ttl.textContent = '📚 학습 결과';
+  if (!body) return;
+
+  body.innerHTML = `
+    <div style="padding:1.2rem 1rem">
+      <div style="text-align:center;margin-bottom:1rem">
+        <div style="font-size:2.6rem">${emoji}</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--gold);margin:.3rem 0">
+          ${correct} / ${total}</div>
+        <div style="font-size:.85rem;color:var(--txt2)">${msg}</div>
+      </div>
+      ${wrong.length > 0 ? `
+        <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:.7rem .8rem;margin-bottom:.9rem">
+          <div style="font-size:.74rem;font-weight:700;color:var(--red);margin-bottom:.5rem">
+            다시 볼 문제 ${wrong.length}개</div>
+          ${wrong.slice(0, 5).map(a => {
+            const p = questions.find(q => q.id === a.problemId);
+            if (!p) return '';
+            return `<div style="font-size:.72rem;color:var(--txt2);padding:.3rem 0;
+              border-top:1px solid rgba(255,255,255,.05);word-break:keep-all">
+              ${escHtml(p.q.slice(0, 42))}${p.q.length > 42 ? '…' : ''}
+              <span style="color:var(--emerald)"> → ${escHtml(String(p.a))}</span></div>`;
+          }).join('')}
+        </div>` : ''}
+      <button onclick="closeStudyModal()"
+        style="width:100%;padding:.75rem;border-radius:10px;border:none;background:var(--gold);
+          color:#1a1a1a;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit">
+        끝내기
+      </button>
+      <button onclick="renderStudySubjectPick()"
+        style="width:100%;padding:.6rem;margin-top:.4rem;border-radius:10px;cursor:pointer;
+          border:1px solid rgba(255,255,255,.12);background:none;color:var(--txt3);
+          font-size:.8rem;font-family:inherit">더 풀기</button>
+    </div>`;
+
+  STUDY_SESSION = null;
+  if (typeof checkAchievements === 'function') checkAchievements();
+}
