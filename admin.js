@@ -80,6 +80,7 @@ window.onload = async () => {
           if (activePage === 'books')    renderBooksPage();
           if (activePage === 'memories') renderMemoriesPage();
           if (activePage === 'activity') renderActivityPage();
+          if (activePage === 'study')    renderStudyScopePage();
           if (activePage === 'vocab')    renderVocabAdminPage();
           if (activePage === 'stats')    renderStatsPage();
           if (activePage === 'emotion')  renderEmotionPage();
@@ -132,12 +133,12 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','vocab','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','vocab','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
   rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
   memories:'📸 추억 관리',
   recorder:'🎵 리코더 관리',
-  weekly:'📅 주간 다짐', vocab:'📖 영어 단어장',
+  weekly:'📅 주간 다짐', study:'📚 학습 범위', vocab:'📖 영어 단어장',
   monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역', emotion:'💭 감정 현황', emotionalerts:'🔔 감정 대화 요청'};
 
 function nav(page, el) {
@@ -154,6 +155,7 @@ function nav(page, el) {
   if (page === 'memories') { renderMemoriesPage(); renderBulkRenameList(); }
   if (page === 'recorder') renderRecorderPage();
   if (page === 'weekly')   renderWeeklyAdminPage();
+  if (page === 'study')    renderStudyScopePage();
   if (page === 'vocab')    renderVocabAdminPage();
   if (page === 'settings') setTimeout(initAchRecalcSelect, 100);
   if (page === 'pwreset')  renderPwResetList();
@@ -5815,3 +5817,139 @@ function notify(msg, type) {
 // [ER-2] DB 저장 실패 시 교사에게 안내 (gamedata의 _onSaveError 훅)
 window.onDbSaveError = () => notify('⚠️ 저장에 실패했어요. 인터넷 연결을 확인하고 다시 시도해주세요.', 'error');
 
+
+// ══════════════════════════════════════════════════
+//  📚 학습 범위 — 교사가 진도에 맞는 단원만 켠다 (STUDY-SCOPE-1)
+//   · settings.activeProblemUnits = [unitId, ...]
+//   · 비어 있거나 없으면 "전체 허용"(CurriculumUtils.activeUnitIds가 null 반환)
+//   · 학생 화면은 켜진 단원의 문제만 출제한다
+// ══════════════════════════════════════════════════
+
+function _activeUnitSet() {
+  const list = (DB.getSettings() || {}).activeProblemUnits;
+  return new Set(Array.isArray(list) ? list : []);
+}
+
+function renderStudyScopePage() {
+  const body = document.getElementById('study-scope-body');
+  if (!body) return;
+  if (typeof CurriculumUtils === 'undefined') {
+    body.innerHTML = `<div class="card"><div class="empty-state">학습 자료를 불러오지 못했습니다</div></div>`;
+    return;
+  }
+
+  const active = _activeUnitSet();
+  const subjects = CurriculumUtils.subjects();
+  const allUnits = subjects.flatMap(s => s.units.map(u => u.id));
+  const onCount  = active.size;
+  const isAllOpen = onCount === 0;   // 아무것도 안 켜면 전체 허용
+
+  // 학급 전체가 이 단원을 얼마나 풀었는지(참고용)
+  const recs = (typeof DB.getProblemRecords === 'function') ? DB.getProblemRecords() : [];
+  const stat = {};
+  for (const r of recs) for (const a of (r.answers || [])) {
+    if (!a || !a.unitId) continue;
+    stat[a.unitId] = stat[a.unitId] || { t: 0, c: 0 };
+    stat[a.unitId].t++; if (a.correct) stat[a.unitId].c++;
+  }
+
+  body.innerHTML = `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <div style="font-weight:700;margin-bottom:.2rem">
+            ${isAllOpen
+              ? '지금은 <span style="color:#1a7f4b">모든 단원</span>이 열려 있습니다'
+              : `지금은 <span style="color:#1a7f4b">${onCount}개 단원</span>만 열려 있습니다`}
+          </div>
+          <div class="text-muted-sm">
+            ${isAllOpen
+              ? '단원을 하나라도 켜면 그 단원만 학생에게 나옵니다. 진도에 맞춰 골라 주세요.'
+              : '학생 화면에는 켜진 단원의 문제만 나옵니다.'}
+          </div>
+        </div>
+        <button class="btn-sm" onclick="setAllStudyUnits(true)">전체 켜기</button>
+        <button class="btn-sm outline" onclick="setAllStudyUnits(false)">전체 끄기(=모든 단원 허용)</button>
+      </div>
+    </div>
+
+    ${subjects.map(sub => {
+      const onInSub = sub.units.filter(u => active.has(u.id)).length;
+      return `
+      <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1.02rem">
+          <span>${sub.icon || '📘'} ${escHtml(sub.label)}</span>
+          <span class="text-muted-sm">${onInSub}/${sub.units.length} 단원 켜짐</span>
+          <button class="btn-sm" style="margin-left:auto"
+            onclick="setSubjectStudyUnits('${sub.key}',true)">이 과목 전부</button>
+          <button class="btn-sm outline"
+            onclick="setSubjectStudyUnits('${sub.key}',false)">해제</button>
+        </div>
+        <div style="display:grid;gap:.5rem;margin-top:.6rem">
+          ${sub.units.map(u => {
+            const n = CurriculumUtils.problemsByUnit(u.id).length;
+            const st = stat[u.id];
+            const pct = st && st.t >= 5 ? Math.round(st.c / st.t * 100) : null;
+            const on = active.has(u.id);
+            return `
+            <label style="display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;
+              border:1px solid ${on ? 'rgba(26,127,75,.35)' : 'var(--line, rgba(0,0,0,.1))'};
+              border-radius:10px;cursor:pointer;background:${on ? 'rgba(26,127,75,.06)' : 'transparent'}">
+              <input type="checkbox" ${on ? 'checked' : ''}
+                onchange="toggleStudyUnit('${u.id}', this.checked)"
+                style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
+              <span style="flex:1;min-width:0">
+                <span style="display:block;font-weight:600">${u.no}. ${escHtml(u.name)}</span>
+                <span class="text-muted-sm">
+                  문제 ${n}개${pct !== null ? ` · 학급 정답률 ${pct}% (${st.t}회 풀이)` : ' · 아직 푼 기록 없음'}
+                </span>
+              </span>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+
+    <div class="card">
+      <div class="text-muted-sm">
+        · 아무 단원도 켜지 않으면 <b>모든 단원</b>이 학생에게 나옵니다(기본값).<br>
+        · 바꾸면 바로 저장되고 학생 화면에 반영됩니다.<br>
+        · 켜진 단원에 문제가 없으면 학생 화면에 아무것도 나오지 않으니 주의하세요.
+      </div>
+    </div>`;
+}
+
+function _saveActiveUnits(arr) {
+  const prev = DB.getSettings();
+  DB.saveSettings({ ...prev, activeProblemUnits: arr });
+}
+
+function toggleStudyUnit(unitId, on) {
+  const set = _activeUnitSet();
+  if (on) set.add(unitId); else set.delete(unitId);
+  _saveActiveUnits([...set]);
+  renderStudyScopePage();
+}
+
+function setSubjectStudyUnits(subjectKey, on) {
+  const sub = CurriculumUtils.subjects().find(s => s.key === subjectKey);
+  if (!sub) return;
+  const set = _activeUnitSet();
+  sub.units.forEach(u => { if (on) set.add(u.id); else set.delete(u.id); });
+  _saveActiveUnits([...set]);
+  renderStudyScopePage();
+  notify(on ? `${sub.label} 단원을 모두 켰습니다` : `${sub.label} 단원을 해제했습니다`);
+}
+
+function setAllStudyUnits(on) {
+  if (!on) {
+    _saveActiveUnits([]);
+    renderStudyScopePage();
+    notify('모든 단원이 열렸습니다(범위 지정 해제)');
+    return;
+  }
+  const all = CurriculumUtils.subjects().flatMap(s => s.units.map(u => u.id));
+  _saveActiveUnits(all);
+  renderStudyScopePage();
+  notify('전체 단원을 켰습니다');
+}
