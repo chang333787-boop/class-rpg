@@ -11,7 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="./gamedata.js?v=20260730"></script>
 <script src="./curriculum.js?v=20260731"></script>
-<link rel="stylesheet" href="./student.css?v=20260604">
+<link rel="stylesheet" href="./student.css?v=20260731a">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -657,6 +657,17 @@
   </div>
 </div>
 
+<!-- 오늘의 학습 (교과 문제 풀이) -->
+<div class="overlay" id="m-study" style="align-items:center">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="modal-title" id="study-title">📚 오늘의 학습</div>
+      <button class="modal-close" onclick="closeStudyModal()">✕</button>
+    </div>
+    <div id="study-body" style="padding:.5rem 0;min-height:200px"></div>
+  </div>
+</div>
+
 <!-- 주간 다짐 팝업 모달 -->
 <div class="overlay" id="m-weekly" style="align-items:center">
   <div class="modal" style="max-width:480px;max-height:85vh">
@@ -896,7 +907,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260713e"></script>
+<script src="./student.js?v=20260731a"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

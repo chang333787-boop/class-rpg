@@ -334,6 +334,44 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   border-radius:20px;padding:1.3rem 1.4rem;width:min(540px,100%);max-height:90vh;
   overflow-y:auto;box-shadow:0 0 80px rgba(255,200,0,.08),0 30px 80px rgba(0,0,0,.6);animation:modalPop .28s ease;}
 .modal::-webkit-scrollbar{width:4px;}
+
+/* ── 오늘의 학습 모달 — 공부용이라 크게 (DAILY-STUDY-1) ──
+   크롬북·태블릿에서 위아래를 거의 가득 채운다. 글씨도 본문 기준으로 키움.
+   내용이 적어도 높이가 유지되도록 min-height + flex로 늘린다. */
+#m-study .modal{
+  width:min(820px,96vw);
+  max-height:97vh;
+  min-height:min(92vh,900px);
+  padding:1.5rem 1.7rem;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#m-study .modal-title{font-size:1.5rem;}
+#m-study .modal-close{font-size:1.9rem;}
+#m-study .modal-hd{margin-bottom:1.1rem;flex-shrink:0;}
+#study-body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;}
+/* 학습 화면 안의 글자·버튼 크기 (공부용 확대) */
+#study-body .st-q{font-size:1.6rem;line-height:1.55;font-weight:700;word-break:keep-all;}
+#study-body .st-meta{font-size:.95rem;}
+#study-body .st-opt{font-size:1.25rem;padding:1.05rem 1.2rem;border-radius:14px;}
+#study-body .st-input{font-size:1.35rem;padding:1rem 1.1rem;border-radius:14px;}
+#study-body .st-btn{font-size:1.2rem;padding:1rem 1.4rem;border-radius:14px;}
+#study-body .st-subject{font-size:1.25rem;}
+#study-body .st-subject-sub{font-size:.9rem;}
+#study-body .st-hint{font-size:1.05rem;}
+#study-body .st-score{font-size:3rem;}
+#study-body .st-emoji{font-size:4rem;}
+/* 세로로 긴 화면(태블릿 세로)에서는 빈 공간이 과하게 남지 않게 */
+@media (orientation:portrait){
+  #m-study .modal{min-height:min(76vh,780px);}
+}
+/* 세로가 짧은 크롬북(1366×610 등)에서는 여백만 줄이고 글씨는 유지 */
+@media (orientation:landscape) and (max-height:700px){
+  #m-study .modal{min-height:96vh;max-height:98vh;padding:1rem 1.3rem;}
+  #m-study .modal-hd{margin-bottom:.6rem;}
+  #study-body .st-q{font-size:1.4rem;}
+  #study-body .st-emoji{font-size:3rem;}
+  #study-body .st-score{font-size:2.4rem;}
+}
 .modal::-webkit-scrollbar-thumb{background:rgba(255,215,0,.2);border-radius:2px;}
 @keyframes modalPop{from{opacity:0;transform:scale(.94) translateY(12px)}to{opacity:1;transform:none}}
 .modal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;}
