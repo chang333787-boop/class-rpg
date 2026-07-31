@@ -10464,15 +10464,28 @@ function renderStudyQuestion() {
       </div>`;
   }
 
+  // 듣기 문항 — audio가 있으면 소리 버튼을 크게 띄우고 자동으로 한 번 읽어 준다
+  const audioHtml = p.audio ? `
+    <div style="text-align:center;margin-bottom:1.4rem">
+      <button onclick="speakWord(${JSON.stringify(String(p.audio)).replace(/"/g, '&quot;')})"
+        style="display:inline-flex;align-items:center;gap:.6rem;padding:1.1rem 2rem;border-radius:16px;
+          border:1px solid rgba(93,173,226,.4);background:rgba(93,173,226,.14);color:var(--sky);
+          font-family:inherit;font-size:1.25rem;font-weight:700;cursor:pointer">
+        <span style="font-size:1.8rem">🔊</span> 다시 듣기
+      </button>
+      <div style="font-size:.9rem;color:var(--txt3);margin-top:.6rem">잘 안 들리면 버튼을 눌러 보세요</div>
+    </div>` : '';
+
   body.innerHTML = `
     ${bar}
     <div style="padding:0 1rem 1rem">
       <div class="st-meta" style="color:var(--txt3);margin-bottom:.8rem">
         ${escHtml(unit?.subjectLabel || '')} · ${escHtml(unit?.name || '')}
       </div>
-      <div class="st-q" style="margin-bottom:1.6rem">
+      <div class="st-q" style="margin-bottom:${p.audio ? '1rem' : '1.6rem'}">
         ${escHtml(p.q)}
       </div>
+      ${audioHtml}
       ${inputHtml}
       ${p.hint ? `<button onclick="this.nextElementSibling.style.display='block';this.style.display='none'"
         style="margin-top:1rem;background:none;border:none;color:var(--txt3);font-size:1rem;
@@ -10484,6 +10497,8 @@ function renderStudyQuestion() {
 
   const inp = document.getElementById('study-input');
   if (inp) setTimeout(() => inp.focus(), 60);
+  // 듣기 문항은 화면이 뜨면 한 번 자동으로 읽어 준다(학생이 버튼을 못 찾는 것 방지)
+  if (p.audio && typeof speakWord === 'function') setTimeout(() => speakWord(String(p.audio)), 350);
 }
 
 function submitStudyAnswer(chosen) {
