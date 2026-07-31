@@ -918,13 +918,22 @@ function buildMainHTML() {
     </div>`).join('') : '';
 
   return `
-    <!-- 오늘의 링크 — 최상단 -->
+    <!-- 오늘의 링크 — 기본 접힘 (HOME-PLACE-1)
+         링크가 8개면 278px를 먹어 크롬북(1366×610)에서 학습·퀘스트가 전부 화면 밖으로
+         밀려났다. 헤더만 남기고 접어 둔다. 개수는 헤더에 표시. -->
     ${(()=>{
       const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>l.url&&l.title);
       if (!todayLinks.length) return '';
       return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
-        border-radius:12px;padding:.65rem .9rem;margin-bottom:.5rem">
-        <div style="font-size:.7rem;font-weight:700;color:var(--sky);margin-bottom:.4rem">🔗 오늘의 링크</div>
+        border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
+        <button onclick="toggleSection('today-links','today-links-arrow')"
+          style="width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+            display:flex;align-items:center;gap:.4rem;color:var(--sky)">
+          <span style="font-size:.75rem;font-weight:700">🔗 오늘의 링크</span>
+          <span style="font-size:.68rem;color:var(--txt3)">${todayLinks.length}개</span>
+          <span id="today-links-arrow" style="margin-left:auto;font-size:.7rem;color:var(--txt3)">▼</span>
+        </button>
+        <div id="today-links" style="display:none;margin-top:.4rem">
         ${todayLinks.map(l=>`
           <a href="${l.url}" target="_blank" rel="noopener"
             style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
@@ -932,6 +941,7 @@ function buildMainHTML() {
             <span style="font-size:.8rem;color:var(--sky);font-weight:600">${l.title}</span>
             <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
           </a>`).join('')}
+        </div>
       </div>`;
     })()}
 
@@ -968,7 +978,11 @@ function buildMainHTML() {
     })()}
     ${alerts.join('')}
 
-    <!-- ① 핵심 할 일 1개 강조 + 나머지 요약 -->
+    <!-- ① 오늘의 학습 — 매일 하는 핵심 기능이라 할 일보다 위 (HOME-PLACE-1) -->
+    <div class="sec-label">📚 오늘의 공부</div>
+    ${buildStudyCardHTML(s)}
+
+    <!-- ② 핵심 할 일 1개 강조 + 나머지 요약 -->
     <div class="sec-label">✅ 오늘 할 일</div>
     ${topTodoHtml}
     ${restTodos.length > 0 ? `
@@ -981,10 +995,7 @@ function buildMainHTML() {
         ▼ 할 일 더보기 (${restTodos.length}개)
       </button>` : ''}
 
-    <!-- ①-2 오늘의 학습 (매일 하는 자리에 배치) -->
-    ${buildStudyCardHTML(s)}
-
-    <!-- ② 주요 메뉴 4개 -->
+    <!-- ③ 주요 메뉴 4개 -->
     <div class="sec-label">🎮 메뉴</div>
     <div class="menu-grid" style="margin-bottom:.5rem">
       <div class="menu-tile mt-quest" onclick="openQuestModal()">
