@@ -81,8 +81,8 @@ const MIME = {
     '/student.html', '/admin.html', '/kiosk.html',
     '/gamedata.js?v=20260730',
     '/curriculum.js?v=20260731e',
-    '/student.js?v=20260731c', '/admin.js?v=20260713h', '/kiosk.js?v=20260713c',
-    '/student.css?v=20260731a', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
+    '/student.js?v=20260731d', '/admin.js?v=20260713h', '/kiosk.js?v=20260713c',
+    '/student.css?v=20260731b', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
   ];
 
   let ok = 0;
@@ -132,12 +132,12 @@ for (const f of HTML_FILES) {
 
   // CSS link 캐시버스터 (기대값 스냅샷 — 해당 CSS 갱신 시 여기도 동기화)
   const cssName = f.replace('.html', '.css');
-  const cssVer = { 'student.css': '20260731a', 'admin.css': '20260604', 'kiosk.css': '20260604' }[cssName];
+  const cssVer = { 'student.css': '20260731b', 'admin.css': '20260604', 'kiosk.css': '20260604' }[cssName];
   if (html.includes(`${cssName}?v=${cssVer}`)) add('PASS', `${f}: ${cssName}?v=${cssVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=${cssVer}) 미발견 — CSS 갱신 시 확인 필요`);
 
   // 전용 JS script src 캐시버스터 (기대값 스냅샷 — 해당 JS 갱신 시 여기도 동기화)
-  const jsVer = { 'student.js': '20260731c', 'admin.js': '20260713h', 'kiosk.js': '20260713c' }[js];
+  const jsVer = { 'student.js': '20260731d', 'admin.js': '20260713h', 'kiosk.js': '20260713c' }[js];
   if (html.includes(`${js}?v=${jsVer}`)) add('PASS', `${f}: ${js}?v=${jsVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 

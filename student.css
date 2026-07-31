@@ -348,7 +348,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #m-study .modal-title{font-size:1.5rem;}
 #m-study .modal-close{font-size:1.9rem;}
 #m-study .modal-hd{margin-bottom:1.1rem;flex-shrink:0;}
-#study-body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;}
+#study-body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-start;}
+/* 결과·피드백 화면은 세로 중앙에 오는 편이 보기 좋다 */
+#study-body > .st-center{margin:auto 0}
 /* 학습 화면 안의 글자·버튼 크기 (공부용 확대) */
 #study-body .st-q{font-size:1.6rem;line-height:1.55;font-weight:700;word-break:keep-all;}
 #study-body .st-meta{font-size:.95rem;}
@@ -360,6 +362,53 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #study-body .st-hint{font-size:1.05rem;}
 #study-body .st-score{font-size:3rem;}
 #study-body .st-emoji{font-size:4rem;}
+/* ── 아이들용 아기자기 스타일 (STUDY-CUTE-1) ──
+   공부 화면이라 딱딱하지 않게. 모서리를 더 둥글게, 색을 부드럽게,
+   누를 때 말랑하게 반응하도록. 다크 판타지 톤은 유지한다. */
+#m-study .modal{border-radius:26px}
+#study-body .st-opt{
+  border-radius:18px;
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1), background .15s, border-color .15s;
+}
+#study-body .st-opt:hover{
+  transform:translateY(-2px) scale(1.01);
+  background:rgba(255,255,255,.10);
+  border-color:rgba(255,215,0,.4);
+}
+#study-body .st-opt:active{transform:translateY(1px) scale(.99)}
+#study-body .st-input{border-radius:18px}
+#study-body .st-btn{border-radius:18px;transition:transform .12s cubic-bezier(.34,1.56,.64,1),filter .15s}
+#study-body .st-btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
+#study-body .st-btn:active{transform:translateY(1px)}
+/* 과목 고르기 카드 — 통통 튀는 반응 */
+#study-body .st-subject-card{
+  border-radius:20px;
+  transition:transform .14s cubic-bezier(.34,1.56,.64,1), background .15s, border-color .15s;
+}
+#study-body .st-subject-card:hover{
+  transform:translateY(-3px) scale(1.015);
+  background:rgba(255,255,255,.09);
+  border-color:rgba(255,215,0,.35);
+}
+#study-body .st-subject-card:active{transform:translateY(0) scale(.99)}
+/* 정답·오답 반응 */
+@keyframes st-pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes st-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+#study-body .st-emoji{animation:st-pop .42s cubic-bezier(.34,1.56,.64,1)}
+#study-body .st-emoji.wrong{animation:st-shake .45s ease}
+/* 진행 막대 — 둥글고 반짝이게 */
+#study-body .st-bar{height:10px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+#study-body .st-bar > i{
+  display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,#FFD86B,#FFC93C);
+  box-shadow:0 0 12px rgba(255,215,0,.5);
+  transition:width .35s cubic-bezier(.34,1.56,.64,1);
+}
+/* 별점 — 오늘 얼마나 했는지 한눈에 */
+#study-body .st-stars{font-size:1.5rem;letter-spacing:.15rem}
+@media (prefers-reduced-motion: reduce){
+  #study-body *{animation:none !important;transition:none !important}
+}
 /* 세로로 긴 화면(태블릿 세로)에서는 빈 공간이 과하게 남지 않게 */
 @media (orientation:portrait){
   #m-study .modal{min-height:min(76vh,780px);}

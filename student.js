@@ -10294,9 +10294,9 @@ function renderStudySubjectPick() {
         ${subjects.map(sub => {
           const pct = sub.t >= 3 ? Math.round(sub.c / sub.t * 100) : null;
           return `
-          <button onclick="renderStudyUnitPick('${sub.key}')"
+          <button class="st-subject-card" onclick="renderStudyUnitPick('${sub.key}')"
             style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
-              border-radius:14px;border:1px solid rgba(255,255,255,.1);cursor:pointer;
+              border:1px solid rgba(255,255,255,.1);cursor:pointer;
               background:rgba(255,255,255,.05);color:var(--txt);font-family:inherit;text-align:left">
             <span style="font-size:2.2rem">${sub.icon || '📘'}</span>
             <span style="flex:1;min-width:0">
@@ -10432,11 +10432,14 @@ function renderStudyQuestion() {
   const unit = CurriculumUtils.unitById(p.unitId);
   if (ttl) ttl.textContent = `${unit?.icon || '📚'} ${cur + 1} / ${questions.length}`;
 
-  // 진행 막대
+  // 진행 막대 — 몇 문제 남았는지 한눈에
   const bar = `
-    <div style="height:4px;border-radius:4px;background:rgba(255,255,255,.08);margin:0 1rem .9rem;overflow:hidden">
-      <div style="height:100%;width:${Math.round(cur / questions.length * 100)}%;
-        background:var(--gold);border-radius:4px;transition:width .25s"></div>
+    <div style="margin:0 1rem .9rem">
+      <div class="st-bar"><i style="width:${Math.round(cur / questions.length * 100)}%"></i></div>
+      <div style="display:flex;justify-content:space-between;margin-top:.35rem">
+        <span style="font-size:.85rem;color:var(--txt3)">${'⭐'.repeat(Math.min(cur, 10))}</span>
+        <span style="font-size:.85rem;color:var(--txt3)">${questions.length - cur}문제 남았어요</span>
+      </div>
     </div>`;
 
   let inputHtml = '';
@@ -10521,8 +10524,8 @@ function showStudyFeedback(p, chosen, ok) {
   if (!body) return;
   const last = STUDY_SESSION.cur >= STUDY_SESSION.questions.length - 1;
   body.innerHTML = `
-    <div style="padding:1.2rem 1rem;text-align:center">
-      <div class="st-emoji" style="margin-bottom:.6rem">${ok ? '⭕' : '❌'}</div>
+    <div class="st-center" style="padding:1.2rem 1rem;text-align:center">
+      <div class="st-emoji ${ok ? '' : 'wrong'}" style="margin-bottom:.6rem">${ok ? '🎉' : '🤔'}</div>
       <div style="font-size:1.5rem;font-weight:800;color:${ok ? 'var(--emerald)' : 'var(--red)'};margin-bottom:1.2rem">
         ${ok ? '맞았어요!' : '아쉬워요'}
       </div>
@@ -10585,7 +10588,7 @@ function finishStudySession() {
   if (!body) return;
 
   body.innerHTML = `
-    <div style="padding:1.2rem 1rem">
+    <div class="st-center" style="padding:1.2rem 1rem">
       <div style="text-align:center;margin-bottom:1.4rem">
         <div class="st-emoji">${emoji}</div>
         <div class="st-score" style="font-weight:800;color:var(--gold);margin:.4rem 0">
