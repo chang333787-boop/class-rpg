@@ -80,7 +80,7 @@ const MIME = {
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
     '/gamedata.js?v=20260730',
-    '/curriculum.js?v=20260731d',
+    '/curriculum.js?v=20260731e',
     '/student.js?v=20260731c', '/admin.js?v=20260713h', '/kiosk.js?v=20260713c',
     '/student.css?v=20260731a', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
   ];
