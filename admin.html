@@ -76,6 +76,7 @@
     <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon">📚</span> 독서 현황</div>
     <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon">📸</span> 추억 관리</div>
     <div class="nav-item" onclick="nav('weekly',this)"><span class="nav-icon">📅</span> 주간 다짐</div>
+    <div class="nav-item" onclick="nav('study',this)"><span class="nav-icon">📚</span> 학습 범위</div>
     <div class="nav-item" onclick="nav('vocab',this)"><span class="nav-icon">📖</span> 영어 단어장</div>
     <div class="nav-item" onclick="nav('recorder',this)"><span class="nav-icon">🎵</span> 리코더 관리</div>
     <div class="nav-item" onclick="nav('monsters',this)"><span class="nav-icon">⚔️</span> 몬스터 관리</div>
@@ -1269,6 +1270,17 @@
       </div>
     </div>
 
+    <!-- ── STUDY SCOPE (오늘의 학습 범위) ── -->
+    <div class="page" id="p-study">
+      <div class="section-header">
+        <div>
+          <div class="sh-title">📚 학습 범위</div>
+          <div class="sh-sub">진도에 맞는 단원만 켜 두면 학생 화면에 그 단원 문제만 나옵니다</div>
+        </div>
+      </div>
+      <div id="study-scope-body"></div>
+    </div>
+
     <!-- ── VOCAB ── -->
     <div class="page" id="p-vocab">
       <div class="section-header">
@@ -1676,6 +1688,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260713h"></script>
+<script src="./admin.js?v=20260731a"></script>
 </body>
 </html>
