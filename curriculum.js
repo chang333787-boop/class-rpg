@@ -194,6 +194,150 @@ const BASE_PROBLEMS = [
   { id:'p_so413_04', unitId:'so4-1-3', type:'choice', level:1, q:'상품이 어디에서 왔는지 알아보는 방법으로 알맞지 않은 것은?', choices:['눈을 감고 상상하기','포장지의 표시 살펴보기','큐아르(QR) 코드 찍어 보기','누리집에서 찾아보기'], a:'눈을 감고 상상하기', hint:'포장지에 생산지가 적혀 있어요' },
   { id:'p_so413_05', unitId:'so4-1-3', type:'choice', level:2, q:'지역과 지역이 물건·기술·문화 등을 서로 주고받는 것을 무엇이라 할까요?', choices:['교류','경쟁','저축','독점'], a:'교류', hint:'서로 오가며 주고받아요' },
   { id:'p_so413_06', unitId:'so4-1-3', type:'choice', level:2, q:'지역 간에 교류가 이루어지는 까닭으로 알맞은 것은?', choices:['지역마다 자연환경과 생산물이 다르기 때문','모든 지역이 똑같은 물건을 만들기 때문','교류를 하면 물건이 사라지기 때문','다른 지역과 만나면 안 되기 때문'], a:'지역마다 자연환경과 생산물이 다르기 때문', hint:'서로 다르니까 주고받을 것이 생겨요' },
+  // ── 수학 1. 큰 수 (추가) ──────────────────────
+  { id:'p_ma411_09', unitId:'ma4-1-1', type:'number', level:1, q:'10000이 7개인 수는 얼마일까요?', a:'70000', hint:'10000 × 7' },
+  { id:'p_ma411_10', unitId:'ma4-1-1', type:'number', level:1, q:'숫자 85310에서 만의 자리 숫자는 무엇일까요?', a:'8', hint:'왼쪽 첫 자리가 만의 자리예요' },
+  { id:'p_ma411_11', unitId:'ma4-1-1', type:'choice', level:2, q:'다음 중 가장 작은 수는?', choices:['40200','40020','42000','40002'], a:'40002', hint:'앞자리부터 차례로 비교해요' },
+  { id:'p_ma411_12', unitId:'ma4-1-1', type:'number', level:2, q:'1000만이 10개 모이면 얼마일까요? (억 단위로, 숫자만 — 1억이면 1)', a:'1', hint:'1000만 × 10 = 1억' },
+  { id:'p_ma411_13', unitId:'ma4-1-1', type:'number', level:2, q:'52000에서 10000씩 3번 뛰어 센 수는?', a:'82000', hint:'10000씩 커지면 만의 자리가 1씩 늘어요' },
+  { id:'p_ma411_14', unitId:'ma4-1-1', type:'choice', level:2, q:'"이천삼백사십오"를 숫자로 바르게 쓴 것은?', choices:['2345','23450','20345','2045'], a:'2345', hint:'천·백·십·일 자리를 차례로 놓아요' },
+  { id:'p_ma411_15', unitId:'ma4-1-1', type:'number', level:3, q:'3, 1, 9, 4를 한 번씩 써서 만들 수 있는 가장 작은 네 자리 수는?', a:'1349', hint:'작은 숫자를 앞자리부터 놓아요' },
+
+  // ── 수학 2. 각도 (추가) ──────────────────────
+  { id:'p_ma412_08', unitId:'ma4-1-2', type:'choice', level:1, q:'평각은 몇 도일까요?', choices:['90도','180도','270도','360도'], a:'180도', hint:'일직선으로 펴진 각이에요' },
+  { id:'p_ma412_09', unitId:'ma4-1-2', type:'choice', level:1, q:'크기가 89도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'예각', hint:'90도보다 작으면 예각' },
+  { id:'p_ma412_10', unitId:'ma4-1-2', type:'number', level:2, q:'45도 + 30도 = 몇 도일까요? (숫자만)', a:'75', hint:'각도끼리 더해요' },
+  { id:'p_ma412_11', unitId:'ma4-1-2', type:'number', level:2, q:'120도 − 45도 = 몇 도일까요? (숫자만)', a:'75', hint:'각도끼리 빼요' },
+  { id:'p_ma412_12', unitId:'ma4-1-2', type:'number', level:2, q:'삼각형에서 두 각이 30도, 60도일 때 나머지 한 각은 몇 도일까요?', a:'90', hint:'180 − (30 + 60)' },
+  { id:'p_ma412_13', unitId:'ma4-1-2', type:'number', level:2, q:'직각을 반으로 나눈 각은 몇 도일까요? (숫자만)', a:'45', hint:'90 ÷ 2' },
+  { id:'p_ma412_14', unitId:'ma4-1-2', type:'number', level:3, q:'사각형에서 세 각이 70도, 110도, 85도일 때 나머지 한 각은 몇 도일까요?', a:'95', hint:'360 − (70 + 110 + 85)' },
+  { id:'p_ma412_15', unitId:'ma4-1-2', type:'choice', level:3, q:'세 각이 모두 60도인 삼각형에서 세 각의 합은?', choices:['180도','150도','200도','120도'], a:'180도', hint:'60 × 3' },
+
+  // ── 수학 3. 곱셈과 나눗셈 (추가) ──────────────
+  { id:'p_ma413_09', unitId:'ma4-1-3', type:'number', level:1, q:'302 × 30 = ?', a:'9060', hint:'302 × 3 = 906, 뒤에 0을 붙여요' },
+  { id:'p_ma413_10', unitId:'ma4-1-3', type:'number', level:1, q:'240 × 20 = ?', a:'4800', hint:'24 × 2 = 48, 0을 두 개 붙여요' },
+  { id:'p_ma413_11', unitId:'ma4-1-3', type:'number', level:2, q:'216 × 34 = ?', a:'7344', hint:'216×30 = 6480, 216×4 = 864' },
+  { id:'p_ma413_12', unitId:'ma4-1-3', type:'number', level:2, q:'560 ÷ 40 = ?', a:'14', hint:'56 ÷ 4 로 생각해 보세요' },
+  { id:'p_ma413_13', unitId:'ma4-1-3', type:'number', level:2, q:'391 ÷ 17 = ?', a:'23', hint:'17 × 23 = 391' },
+  { id:'p_ma413_14', unitId:'ma4-1-3', type:'number', level:3, q:'275 ÷ 18 의 나머지는 얼마일까요?', a:'5', hint:'18 × 15 = 270' },
+  { id:'p_ma413_15', unitId:'ma4-1-3', type:'number', level:3, q:'색종이 432장을 24명에게 똑같이 나누어 주면 한 사람이 몇 장씩 받을까요?', a:'18', hint:'432 ÷ 24' },
+
+  // ── 수학 4. 평면도형의 이동 (추가) ────────────
+  { id:'p_ma414_07', unitId:'ma4-1-4', type:'choice', level:1, q:'도형을 왼쪽으로 밀면 무엇이 달라질까요?', choices:['위치','모양','크기','아무것도 안 달라짐'], a:'위치', hint:'밀기는 자리만 옮겨요' },
+  { id:'p_ma414_08', unitId:'ma4-1-4', type:'choice', level:1, q:'도형을 위쪽으로 뒤집으면 어떻게 될까요?', choices:['위아래가 바뀐다','좌우가 바뀐다','크기가 커진다','변화 없다'], a:'위아래가 바뀐다', hint:'뒤집는 방향으로 바뀌어요' },
+  { id:'p_ma414_09', unitId:'ma4-1-4', type:'number', level:2, q:'도형을 시계 방향으로 90도씩 2번 돌리면 모두 몇 도를 돌린 걸까요? (숫자만)', a:'180', hint:'90 × 2' },
+  { id:'p_ma414_10', unitId:'ma4-1-4', type:'choice', level:2, q:'도형을 왼쪽으로 두 번 뒤집으면 어떻게 될까요?', choices:['처음과 같아진다','좌우가 바뀐다','위아래가 바뀐다','크기가 작아진다'], a:'처음과 같아진다', hint:'두 번 뒤집으면 원래대로 돌아와요' },
+  { id:'p_ma414_11', unitId:'ma4-1-4', type:'number', level:2, q:'도형을 시계 방향으로 90도씩 몇 번 돌려야 처음과 같아질까요? (숫자만)', a:'4', hint:'360 ÷ 90' },
+  { id:'p_ma414_12', unitId:'ma4-1-4', type:'choice', level:2, q:'점을 오른쪽으로 3칸, 아래로 2칸 옮겼습니다. 이런 이동을 무엇이라 할까요?', choices:['밀기','뒤집기','돌리기','늘이기'], a:'밀기', hint:'자리만 옮기는 이동이에요' },
+  { id:'p_ma414_13', unitId:'ma4-1-4', type:'choice', level:3, q:'도형을 시계 반대 방향으로 90도 돌린 것과 같은 결과가 되는 것은?', choices:['시계 방향으로 270도 돌리기','시계 방향으로 90도 돌리기','오른쪽으로 뒤집기','아래로 밀기'], a:'시계 방향으로 270도 돌리기', hint:'한 바퀴는 360도예요' },
+  { id:'p_ma414_14', unitId:'ma4-1-4', type:'choice', level:3, q:'무늬를 꾸밀 때 같은 모양을 반복해서 옮기는 방법이 아닌 것은?', choices:['색칠하기','밀기','뒤집기','돌리기'], a:'색칠하기', hint:'이동 방법은 밀기·뒤집기·돌리기 세 가지예요' },
+  { id:'p_ma414_15', unitId:'ma4-1-4', type:'number', level:3, q:'도형을 시계 방향으로 180도 돌린 뒤 다시 180도 돌렸습니다. 모두 몇 도를 돌린 걸까요? (숫자만)', a:'360', hint:'180 + 180' },
+
+  // ── 수학 5. 막대그래프 (추가) ─────────────────
+  { id:'p_ma415_15', unitId:'ma4-1-5', type:'choice', level:1, q:'막대그래프에서 가로와 세로 중 무엇을 나타내는지 적는 곳을 무엇이라 할까요?', choices:['항목과 눈금','제목','범례','축척'], a:'항목과 눈금', hint:'가로·세로에 무엇을 나타낼지 정해요' },
+  { id:'p_ma415_07', unitId:'ma4-1-5', type:'number', level:1, q:'눈금 한 칸이 1명인 막대그래프에서 막대가 8칸이면 몇 명일까요?', a:'8', hint:'한 칸이 1명이에요' },
+  { id:'p_ma415_08', unitId:'ma4-1-5', type:'number', level:2, q:'눈금 한 칸이 5권인 막대그래프에서 막대가 6칸이면 몇 권일까요?', a:'30', hint:'5 × 6' },
+  { id:'p_ma415_09', unitId:'ma4-1-5', type:'number', level:2, q:'좋아하는 과일을 조사했더니 사과 12명, 배 8명, 귤 15명이었습니다. 조사한 학생은 모두 몇 명일까요?', a:'35', hint:'12 + 8 + 15' },
+  { id:'p_ma415_10', unitId:'ma4-1-5', type:'number', level:2, q:'가장 많은 항목이 20명, 가장 적은 항목이 7명입니다. 차이는 몇 명일까요?', a:'13', hint:'20 − 7' },
+  { id:'p_ma415_11', unitId:'ma4-1-5', type:'choice', level:2, q:'막대그래프에서 막대가 가장 긴 항목은 무엇을 뜻할까요?', choices:['가장 많은 것','가장 적은 것','가장 비싼 것','가장 오래된 것'], a:'가장 많은 것', hint:'막대가 길수록 수가 많아요' },
+  { id:'p_ma415_12', unitId:'ma4-1-5', type:'number', level:3, q:'눈금 한 칸이 4명인 막대그래프에서 28명을 나타내려면 몇 칸을 그려야 할까요?', a:'7', hint:'28 ÷ 4' },
+  { id:'p_ma415_13', unitId:'ma4-1-5', type:'choice', level:3, q:'자료를 조사해 막대그래프로 나타내는 순서로 알맞은 것은?', choices:['자료 조사 → 표 만들기 → 막대그래프 그리기','막대그래프 그리기 → 자료 조사','표 만들기 → 자료 조사','제목 정하기 → 막대 색칠하기'], a:'자료 조사 → 표 만들기 → 막대그래프 그리기', hint:'먼저 자료를 모아야 해요' },
+  { id:'p_ma415_14', unitId:'ma4-1-5', type:'number', level:3, q:'눈금 한 칸이 2명인 막대그래프에서 어떤 항목의 막대가 9칸입니다. 몇 명일까요?', a:'18', hint:'2 × 9' },
+
+  // ── 수학 6. 규칙과 관계 (추가) ────────────────
+  { id:'p_ma416_09', unitId:'ma4-1-6', type:'number', level:1, q:'5, 10, 15, 20, □ … 빈칸에 알맞은 수는?', a:'25', hint:'5씩 커지고 있어요' },
+  { id:'p_ma416_10', unitId:'ma4-1-6', type:'number', level:1, q:'81, 72, 63, 54, □ … 빈칸에 알맞은 수는?', a:'45', hint:'9씩 작아져요' },
+  { id:'p_ma416_11', unitId:'ma4-1-6', type:'number', level:2, q:'3, 9, 27, □ … 빈칸에 알맞은 수는?', a:'81', hint:'3배씩 커져요' },
+  { id:'p_ma416_12', unitId:'ma4-1-6', type:'number', level:2, q:'12 + 8 = □ + 5 에서 □에 알맞은 수는?', a:'15', hint:'12+8을 먼저 계산해요' },
+  { id:'p_ma416_13', unitId:'ma4-1-6', type:'number', level:2, q:'20 − 7 = □ − 10 에서 □에 알맞은 수는?', a:'23', hint:'20−7을 먼저 계산하고, 거기에 10을 더해요' },
+  { id:'p_ma416_14', unitId:'ma4-1-6', type:'choice', level:3, q:'등호(=)의 뜻으로 알맞은 것은?', choices:['양쪽의 크기가 같다','왼쪽이 더 크다','오른쪽이 더 크다','계산하라는 뜻이다'], a:'양쪽의 크기가 같다', hint:'저울이 균형을 이룬 모습이에요' },
+  { id:'p_ma416_15', unitId:'ma4-1-6', type:'number', level:3, q:'첫째 줄 2개, 둘째 줄 4개, 셋째 줄 6개… 여섯째 줄에는 몇 개일까요?', a:'12', hint:'2씩 늘어나요. 2 × 6' },
+
+  // ── 영어 L1. My Name Is Amy (추가) ───────────
+  { id:'p_en411_07', unitId:'en4-1-1', type:'choice', level:1, q:'"Hi, I\'m Suho." 에서 Suho는 무엇일까요?', choices:['이름','나이','사는 곳','좋아하는 것'], a:'이름', hint:'I\'m 뒤에 이름을 말해요' },
+  { id:'p_en411_08', unitId:'en4-1-1', type:'choice', level:1, q:'헤어질 때 하는 인사로 알맞은 것은?', choices:['Good bye.','Nice to meet you.','My name is Tom.','Here you are.'], a:'Good bye.', hint:'안녕히 가세요' },
+  { id:'p_en411_09', unitId:'en4-1-1', type:'short', level:2, q:'"이름"을 뜻하는 영어 단어를 쓰세요.', a:'name', alt:['Name'], hint:'n으로 시작하는 네 글자' },
+  { id:'p_en411_10', unitId:'en4-1-1', type:'choice', level:2, q:'"Nice to meet you." 에 대한 대답으로 알맞은 것은?', choices:['Nice to meet you, too.','No, thank you.','It is a pen.','I am hungry.'], a:'Nice to meet you, too.', hint:'나도 반가워' },
+  { id:'p_en411_11', unitId:'en4-1-1', type:'choice', level:2, q:'아침에 만난 선생님께 하는 인사는?', choices:['Good morning.','Good night.','See you later.','I am sorry.'], a:'Good morning.', hint:'morning = 아침' },
+
+  // ── 영어 L2. I'm Happy (추가) ────────────────
+  { id:'p_en412_16', unitId:'en4-1-2', type:'short', level:1, q:'"행복한"을 뜻하는 영어 단어를 쓰세요.', a:'happy', alt:['Happy'], hint:'h로 시작해요' },
+  { id:'p_en412_17', unitId:'en4-1-2', type:'choice', level:1, q:'"I\'m tired." 는 어떤 기분일까요?', choices:['피곤하다','신난다','배부르다','춥다'], a:'피곤하다', hint:'tired = 피곤한' },
+  { id:'p_en412_18', unitId:'en4-1-2', type:'choice', level:2, q:'친구가 슬퍼 보일 때 물어볼 말로 알맞은 것은?', choices:['Are you okay?','How much is it?','What time is it?','Let\'s eat.'], a:'Are you okay?', hint:'괜찮니?' },
+  { id:'p_en412_19', unitId:'en4-1-2', type:'short', level:2, q:'"목마른"을 뜻하는 영어 단어를 쓰세요.', a:'thirsty', alt:['Thirsty'], hint:'th로 시작해요' },
+  { id:'p_en412_20', unitId:'en4-1-2', type:'choice', level:2, q:'"I\'m fine." 의 뜻으로 알맞은 것은?', choices:['나는 괜찮아.','나는 배고파.','나는 다섯 살이야.','나는 학생이야.'], a:'나는 괜찮아.', hint:'fine = 좋은, 괜찮은' },
+
+  // ── 영어 L3. Don't Sit Here (추가) ───────────
+  { id:'p_en413_15', unitId:'en4-1-3', type:'choice', level:1, q:'"Don\'t touch." 의 뜻은?', choices:['만지지 마.','만져 봐.','들어 봐.','보지 마.'], a:'만지지 마.', hint:'touch = 만지다' },
+  { id:'p_en413_16', unitId:'en4-1-3', type:'choice', level:1, q:'복도에서 친구에게 "뛰지 마"라고 하려면?', choices:['Don\'t run.','Let\'s run.','I can run.','Do you run?'], a:'Don\'t run.', hint:'금지는 Don\'t로 시작해요' },
+  { id:'p_en413_17', unitId:'en4-1-3', type:'choice', level:2, q:'"Don\'t open the door." 의 뜻은?', choices:['문을 열지 마세요.','문을 닫지 마세요.','문을 여세요.','문이 열려 있어요.'], a:'문을 열지 마세요.', hint:'open = 열다' },
+  { id:'p_en413_18', unitId:'en4-1-3', type:'short', level:2, q:'"밀다"를 뜻하는 영어 단어를 쓰세요.', a:'push', alt:['Push'], hint:'p로 시작하는 네 글자' },
+  { id:'p_en413_19', unitId:'en4-1-3', type:'choice', level:2, q:'"Don\'t" 는 무엇을 줄인 말일까요?', choices:['do not','did not','does not','done not'], a:'do not', hint:'do와 not을 합친 말이에요' },
+  { id:'p_en413_20', unitId:'en4-1-3', type:'choice', level:2, q:'"Don\'t be late." 의 뜻은?', choices:['늦지 마.','일찍 와.','기다려.','서두르지 마.'], a:'늦지 마.', hint:'late = 늦은' },
+
+  // ── 영어 L4. Let's Play Basketball (추가) ────
+  { id:'p_en414_15', unitId:'en4-1-4', type:'choice', level:1, q:'"Let\'s go." 의 뜻은?', choices:['우리 가자.','나는 갔어.','너 갈래?','가지 마.'], a:'우리 가자.', hint:'Let\'s = 우리 ~하자' },
+  { id:'p_en414_16', unitId:'en4-1-4', type:'choice', level:1, q:'"Let\'s eat lunch." 는 무엇을 하자는 말일까요?', choices:['점심 먹기','아침 먹기','운동하기','공부하기'], a:'점심 먹기', hint:'lunch = 점심' },
+  { id:'p_en414_17', unitId:'en4-1-4', type:'choice', level:2, q:'"Let\'s ~" 제안을 거절할 때 알맞은 말은?', choices:['Sorry, I can\'t.','Good idea!','Yes, let\'s.','Sure.'], a:'Sorry, I can\'t.', hint:'미안해, 안 될 것 같아' },
+  { id:'p_en414_18', unitId:'en4-1-4', type:'short', level:2, q:'"농구"를 뜻하는 영어 단어를 쓰세요.', a:'basketball', alt:['Basketball'], hint:'basket + ball' },
+  { id:'p_en414_19', unitId:'en4-1-4', type:'choice', level:2, q:'"우리 같이 노래하자"를 영어로 알맞게 쓴 것은?', choices:['Let\'s sing together.','Don\'t sing.','I sing well.','Can you sing?'], a:'Let\'s sing together.', hint:'together = 함께' },
+  { id:'p_en414_20', unitId:'en4-1-4', type:'short', level:1, q:'"축구"를 뜻하는 영어 단어를 쓰세요.', a:'soccer', alt:['Soccer','football','Football'], hint:'s로 시작해요' },
+
+  // ── 영어 L5. I Want Chicken (추가) ───────────
+  { id:'p_en415_16', unitId:'en4-1-5', type:'short', level:1, q:'"빵"을 뜻하는 영어 단어를 쓰세요.', a:'bread', alt:['Bread'], hint:'b로 시작해요' },
+  { id:'p_en415_17', unitId:'en4-1-5', type:'choice', level:1, q:'"I want water." 의 뜻은?', choices:['나는 물을 원해.','나는 물을 마셨어.','물이 차가워.','물이 없어.'], a:'나는 물을 원해.', hint:'want = 원하다' },
+  { id:'p_en415_18', unitId:'en4-1-5', type:'choice', level:2, q:'음식을 권할 때 "고맙지만 괜찮아"라고 답하려면?', choices:['No, thank you.','Yes, please.','Here you are.','You\'re welcome.'], a:'No, thank you.', hint:'정중하게 거절하는 말이에요' },
+  { id:'p_en415_19', unitId:'en4-1-5', type:'choice', level:2, q:'"Here you are." 는 어떤 상황에서 쓸까요?', choices:['물건을 건네줄 때','헤어질 때','처음 만났을 때','사과할 때'], a:'물건을 건네줄 때', hint:'여기 있어' },
+  { id:'p_en415_20', unitId:'en4-1-5', type:'short', level:1, q:'"우유"가 아니라 "주스"를 뜻하는 영어 단어를 쓰세요.', a:'juice', alt:['Juice'], hint:'j로 시작해요' },
+
+  // ── 영어 L6. Where's My Cap? (추가) ──────────
+  { id:'p_en416_16', unitId:'en4-1-6', type:'choice', level:1, q:'"It\'s in the bag." 의 뜻은?', choices:['가방 안에 있어.','가방 위에 있어.','가방 아래에 있어.','가방이 없어.'], a:'가방 안에 있어.', hint:'in = ~안에' },
+  { id:'p_en416_17', unitId:'en4-1-6', type:'short', level:1, q:'"책상"을 뜻하는 영어 단어를 쓰세요.', a:'desk', alt:['Desk'], hint:'d로 시작하는 네 글자' },
+  { id:'p_en416_18', unitId:'en4-1-6', type:'choice', level:2, q:'"~위에"를 뜻하는 영어 단어는?', choices:['on','in','under','out'], a:'on', hint:'책상 위 = on the desk' },
+  { id:'p_en416_19', unitId:'en4-1-6', type:'choice', level:2, q:'"Where is my bag?" 에 대한 대답으로 알맞은 것은?', choices:['It\'s under the chair.','It\'s a bag.','Yes, it is.','I like bags.'], a:'It\'s under the chair.', hint:'어디 있는지 답해야 해요' },
+  { id:'p_en416_20', unitId:'en4-1-6', type:'short', level:1, q:'"모자"를 뜻하는 영어 단어를 쓰세요. (c로 시작)', a:'cap', alt:['Cap'], hint:'c로 시작하는 세 글자' },
+
+  // ── 사회 1. 지도로 만나는 우리 지역 (추가) ────
+  { id:'p_so411_09', unitId:'so4-1-1', type:'choice', level:1, q:'위에서 내려다본 땅의 모습을 일정하게 줄여서 나타낸 것을 무엇이라 할까요?', choices:['지도','사진','그림','일기'], a:'지도', hint:'약속된 기호로 나타내요' },
+  { id:'p_so411_10', unitId:'so4-1-1', type:'choice', level:1, q:'지도에서 동서남북을 알려 주는 것은?', choices:['방위표','축척','범례','등고선'], a:'방위표', hint:'화살표로 북쪽을 가리켜요' },
+  { id:'p_so411_11', unitId:'so4-1-1', type:'choice', level:1, q:'지도에서 북쪽의 반대 방향은?', choices:['남쪽','동쪽','서쪽','북서쪽'], a:'남쪽', hint:'지도 아래쪽이에요' },
+  { id:'p_so411_12', unitId:'so4-1-1', type:'choice', level:2, q:'등고선에서 색이 진할수록 무엇을 나타낼까요?', choices:['땅이 높음','땅이 낮음','물이 깊음','사람이 많음'], a:'땅이 높음', hint:'높은 곳일수록 진하게 칠해요' },
+  { id:'p_so411_13', unitId:'so4-1-1', type:'choice', level:2, q:'다음 중 인문환경에 해당하는 것은?', choices:['도로','산','바다','하천'], a:'도로', hint:'사람이 만든 것이 인문환경이에요' },
+  { id:'p_so411_14', unitId:'so4-1-1', type:'choice', level:2, q:'우리 지역의 위치를 설명할 때 알맞지 않은 것은?', choices:['내가 좋아하는 색','이웃한 시·군','바다와 접해 있는지','지도에서의 방위'], a:'내가 좋아하는 색', hint:'위치는 사실로 설명해요' },
+  { id:'p_so411_15', unitId:'so4-1-1', type:'choice', level:2, q:'디지털 영상 지도의 좋은 점으로 알맞은 것은?', choices:['확대·축소하며 자세히 볼 수 있다','종이보다 무겁다','한 번 보면 지울 수 없다','색깔이 없다'], a:'확대·축소하며 자세히 볼 수 있다', hint:'손가락으로 크게 볼 수 있어요' },
+  { id:'p_so411_16', unitId:'so4-1-1', type:'choice', level:2, q:'축척이 필요한 까닭으로 알맞은 것은?', choices:['넓은 땅을 종이에 담기 위해','색을 예쁘게 칠하기 위해','글씨를 크게 쓰기 위해','지도를 접기 위해'], a:'넓은 땅을 종이에 담기 위해', hint:'실제 거리를 줄여서 그려요' },
+  { id:'p_so411_17', unitId:'so4-1-1', type:'choice', level:2, q:'다음 중 자연환경끼리 짝지어진 것은?', choices:['산과 하천','학교와 공원','도로와 다리','시장과 병원'], a:'산과 하천', hint:'자연이 만든 것이에요' },
+  { id:'p_so411_18', unitId:'so4-1-1', type:'choice', level:3, q:'지도에서 범례를 먼저 보아야 하는 까닭은?', choices:['기호가 무엇을 뜻하는지 알기 위해','지도를 접기 위해','색을 칠하기 위해','제목을 정하기 위해'], a:'기호가 무엇을 뜻하는지 알기 위해', hint:'기호 설명표예요' },
+  { id:'p_so411_19', unitId:'so4-1-1', type:'choice', level:3, q:'우리 지역을 조사하는 방법으로 알맞지 않은 것은?', choices:['상상해서 지어내기','지도 살펴보기','직접 답사하기','어른께 여쭤보기'], a:'상상해서 지어내기', hint:'조사는 사실을 확인하는 일이에요' },
+  { id:'p_so411_20', unitId:'so4-1-1', type:'choice', level:3, q:'지도에 방위표가 없을 때의 약속으로 알맞은 것은?', choices:['위쪽이 북쪽이다','위쪽이 남쪽이다','오른쪽이 북쪽이다','정해진 것이 없다'], a:'위쪽이 북쪽이다', hint:'지도의 기본 약속이에요' },
+
+  // ── 사회 2. 우리 지역의 국가유산 (추가) ────────
+  { id:'p_so412_07', unitId:'so4-1-2', type:'choice', level:1, q:'국가유산을 조사할 때 직접 찾아가 보는 것을 무엇이라 할까요?', choices:['답사','상상','토론','발표'], a:'답사', hint:'현장에 직접 가는 거예요' },
+  { id:'p_so412_08', unitId:'so4-1-2', type:'choice', level:1, q:'다음 중 국가유산이 아닌 것은?', choices:['오늘 산 장난감','석굴암','판소리','경복궁'], a:'오늘 산 장난감', hint:'오래 전부터 전해 온 것이어야 해요' },
+  { id:'p_so412_09', unitId:'so4-1-2', type:'choice', level:1, q:'탈춤·판소리처럼 사람에게서 사람으로 전해지는 것은 어떤 유산일까요?', choices:['무형유산','문화유산','자연유산','기록유산'], a:'무형유산', hint:'형태가 없어요' },
+  { id:'p_so412_10', unitId:'so4-1-2', type:'choice', level:2, q:'국가유산을 보호해야 하는 까닭으로 알맞은 것은?', choices:['한번 사라지면 되돌릴 수 없어서','돈을 벌 수 있어서','새로 만들기 쉬워서','아무도 안 봐서'], a:'한번 사라지면 되돌릴 수 없어서', hint:'조상들이 남긴 소중한 것이에요' },
+  { id:'p_so412_11', unitId:'so4-1-2', type:'choice', level:2, q:'국가유산을 안내해 주는 사람을 무엇이라 할까요?', choices:['문화 해설사','운전기사','경찰관','소방관'], a:'문화 해설사', hint:'유산에 대해 설명해 줘요' },
+  { id:'p_so412_12', unitId:'so4-1-2', type:'choice', level:2, q:'답사를 갈 때 미리 준비할 것으로 알맞지 않은 것은?', choices:['친구 도시락 뺏을 계획','조사할 내용 정하기','사진기와 수첩','가는 길 알아보기'], a:'친구 도시락 뺏을 계획', hint:'답사 준비물과 계획을 세워요' },
+  { id:'p_so412_13', unitId:'so4-1-2', type:'choice', level:2, q:'천연기념물로 지정된 나무나 동물은 어떤 유산에 속할까요?', choices:['자연유산','문화유산','무형유산','기록유산'], a:'자연유산', hint:'자연이 만든 소중한 것이에요' },
+  { id:'p_so412_14', unitId:'so4-1-2', type:'choice', level:2, q:'국가유산 조사 방법으로 알맞은 것끼리 짝지어진 것은?', choices:['답사·누리집 검색','낙서·훼손','비밀로 하기·숨기기','상상·추측'], a:'답사·누리집 검색', hint:'사실을 확인하는 방법이에요' },
+  { id:'p_so412_15', unitId:'so4-1-2', type:'choice', level:3, q:'우리 지역의 역사를 알 수 있는 장소로 알맞지 않은 것은?', choices:['놀이공원','박물관','유적지','향교'], a:'놀이공원', hint:'옛 모습이 남아 있는 곳을 찾아요' },
+  { id:'p_so412_16', unitId:'so4-1-2', type:'choice', level:3, q:'국가유산 답사 보고서에 들어갈 내용으로 알맞지 않은 것은?', choices:['내가 좋아하는 가수 이름','답사한 날짜','알게 된 점','느낀 점'], a:'내가 좋아하는 가수 이름', hint:'답사와 관련된 내용을 적어요' },
+  { id:'p_so412_17', unitId:'so4-1-2', type:'choice', level:3, q:'2024년부터 \'문화재\' 대신 쓰기로 한 말은 무엇일까요?', choices:['국가유산','문화상품','전통물품','역사자료'], a:'국가유산', hint:'유산이라는 말로 바뀌었어요' },
+  { id:'p_so412_18', unitId:'so4-1-2', type:'choice', level:3, q:'국가유산을 아끼는 태도로 알맞은 것은?', choices:['안내판의 내용을 잘 읽고 지킨다','기념으로 조금 가져온다','올라가서 사진을 찍는다','이름을 새긴다'], a:'안내판의 내용을 잘 읽고 지킨다', hint:'모두의 유산이에요' },
+
+  // ── 사회 3. 경제활동과 지역 간 교류 (추가) ─────
+  { id:'p_so413_07', unitId:'so4-1-3', type:'choice', level:1, q:'물건을 만들어 내는 활동을 무엇이라 할까요?', choices:['생산','소비','저축','교환'], a:'생산', hint:'만들어 내는 일이에요' },
+  { id:'p_so413_08', unitId:'so4-1-3', type:'choice', level:1, q:'돈을 내고 물건을 사서 쓰는 활동을 무엇이라 할까요?', choices:['소비','생산','기부','저축'], a:'소비', hint:'사서 쓰는 일이에요' },
+  { id:'p_so413_09', unitId:'so4-1-3', type:'choice', level:1, q:'다음 중 생산 활동에 해당하는 것은?', choices:['농부가 벼를 기른다','과자를 사 먹는다','영화를 본다','용돈을 받는다'], a:'농부가 벼를 기른다', hint:'무언가를 만들어 내는 일이에요' },
+  { id:'p_so413_10', unitId:'so4-1-3', type:'choice', level:2, q:'합리적 선택을 할 때 고려하지 않아도 되는 것은?', choices:['포장지 색깔이 내 기분에 맞는지','가격','품질','필요한 물건인지'], a:'포장지 색깔이 내 기분에 맞는지', hint:'꼭 필요한 기준을 따져요' },
+  { id:'p_so413_11', unitId:'so4-1-3', type:'choice', level:2, q:'상품의 생산지를 알 수 있는 방법으로 알맞은 것은?', choices:['포장지의 원산지 표시 확인','물건 무게 재기','친구에게 물어보기','색깔 보기'], a:'포장지의 원산지 표시 확인', hint:'포장지에 적혀 있어요' },
+  { id:'p_so413_12', unitId:'so4-1-3', type:'choice', level:2, q:'우리 지역에서 나지 않는 물건을 구할 수 있는 까닭은?', choices:['다른 지역과 교류하기 때문','우리 지역이 넓기 때문','물건이 저절로 생기기 때문','사람이 많기 때문'], a:'다른 지역과 교류하기 때문', hint:'서로 주고받아요' },
+  { id:'p_so413_13', unitId:'so4-1-3', type:'choice', level:2, q:'다음 중 지역 간 교류의 예로 알맞지 않은 것은?', choices:['혼자 방에서 책 읽기','다른 지역 특산물 사기','자매결연 도시와 문화 행사','다른 지역으로 여행 가기'], a:'혼자 방에서 책 읽기', hint:'교류는 서로 오가는 일이에요' },
+  { id:'p_so413_14', unitId:'so4-1-3', type:'choice', level:2, q:'희소성 때문에 우리는 무엇을 해야 할까요?', choices:['선택','포기 없이 다 갖기','저축만 하기','생산 중단'], a:'선택', hint:'다 가질 수 없으니 골라야 해요' },
+  { id:'p_so413_15', unitId:'so4-1-3', type:'choice', level:3, q:'현명한 소비 생활의 모습으로 알맞은 것은?', choices:['필요한 것을 미리 계획해 사기','충동적으로 사기','비싼 것만 사기','친구를 따라 사기'], a:'필요한 것을 미리 계획해 사기', hint:'계획을 세워요' },
+  { id:'p_so413_16', unitId:'so4-1-3', type:'choice', level:3, q:'지역마다 생산하는 물건이 다른 까닭으로 알맞은 것은?', choices:['자연환경과 기술이 다르기 때문','사람 수가 같기 때문','모두 같은 물건을 만들기 때문','교류를 안 하기 때문'], a:'자연환경과 기술이 다르기 때문', hint:'바다가 있는 곳과 산이 있는 곳은 달라요' },
+  { id:'p_so413_17', unitId:'so4-1-3', type:'choice', level:3, q:'경제적 교류가 지역에 주는 좋은 점으로 알맞은 것은?', choices:['서로 부족한 것을 채울 수 있다','물건이 사라진다','값이 무조건 오른다','사람이 줄어든다'], a:'서로 부족한 것을 채울 수 있다', hint:'서로 도움이 돼요' },
+  { id:'p_so413_18', unitId:'so4-1-3', type:'choice', level:3, q:'용돈 기입장을 쓰면 좋은 점으로 알맞은 것은?', choices:['돈을 어디에 썼는지 알 수 있다','돈이 저절로 늘어난다','물건값이 싸진다','생산이 늘어난다'], a:'돈을 어디에 썼는지 알 수 있다', hint:'쓴 내역을 기록해요' },
 ];
 
 // ── 4-2 이관 대기 문항 (2022 개정에서 4학년 2학기 범위로 이동) ──
