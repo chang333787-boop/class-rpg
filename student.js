@@ -10232,6 +10232,31 @@ function closeStudyModal() {
   renderAll();
 }
 
+// 단원별 성취도 — 내가 푼 기록에서 단원마다 몇 개 중 몇 개를 맞혔는지
+//   answers[]가 있는 기록만 집계한다(단원 정보가 거기 들어 있음).
+function getUnitStats(studentId) {
+  if (typeof DB.getProblemRecords !== 'function') return {};
+  const st = {};
+  for (const r of DB.getProblemRecords(studentId)) {
+    for (const a of (r.answers || [])) {
+      if (!a || !a.unitId) continue;
+      st[a.unitId] = st[a.unitId] || { t: 0, c: 0 };
+      st[a.unitId].t++;
+      if (a.correct) st[a.unitId].c++;
+    }
+  }
+  return st;
+}
+
+// 성취도 → 색·라벨 (아이에게 순위가 아니라 상태를 보여준다)
+function unitLevelOf(stat) {
+  if (!stat || stat.t < 3) return { key: 'none',  color: 'var(--txt3)',   label: '아직 안 풀어봤어요', pct: null };
+  const pct = Math.round(stat.c / stat.t * 100);
+  if (pct >= 80) return { key: 'good', color: 'var(--emerald)', label: '잘하고 있어요', pct };
+  if (pct >= 60) return { key: 'mid',  color: 'var(--gold)',    label: '조금만 더',     pct };
+  return               { key: 'weak', color: 'var(--red)',     label: '더 연습해요',   pct };
+}
+
 function renderStudySubjectPick() {
   const body = document.getElementById('study-body');
   const ttl  = document.getElementById('study-title');
@@ -10239,14 +10264,18 @@ function renderStudySubjectPick() {
   if (ttl) ttl.textContent = '📚 오늘의 학습';
 
   const active = CurriculumUtils.activeUnitIds();   // 교사가 켠 단원(없으면 전체)
+  const stats  = getUnitStats(CUR.id);
   const subjects = CurriculumUtils.subjects().map(sub => {
     const units = sub.units.filter(u => !active || active.includes(u.id));
     const count = units.reduce((n, u) => n + CurriculumUtils.problemsByUnit(u.id).length, 0);
-    return { ...sub, units, count };
+    let t = 0, c = 0;
+    units.forEach(u => { const s = stats[u.id]; if (s) { t += s.t; c += s.c; } });
+    const weak = units.filter(u => unitLevelOf(stats[u.id]).key === 'weak').length;
+    return { ...sub, units, count, t, c, weak };
   }).filter(sub => sub.count > 0);
 
   if (subjects.length === 0) {
-    body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--txt3);font-size:.82rem">
+    body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--txt3);font-size:1rem">
       선생님이 공부할 단원을 정하면 여기에 나와요</div>`;
     return;
   }
@@ -10262,27 +10291,100 @@ function renderStudySubjectPick() {
           : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
       </div>
       <div style="display:grid;gap:.7rem">
-        ${subjects.map(sub => `
-          <button onclick="startStudySession('${sub.key}')"
+        ${subjects.map(sub => {
+          const pct = sub.t >= 3 ? Math.round(sub.c / sub.t * 100) : null;
+          return `
+          <button onclick="renderStudyUnitPick('${sub.key}')"
             style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
               border-radius:14px;border:1px solid rgba(255,255,255,.1);cursor:pointer;
               background:rgba(255,255,255,.05);color:var(--txt);font-family:inherit;text-align:left">
             <span style="font-size:2.2rem">${sub.icon || '📘'}</span>
-            <span style="flex:1">
+            <span style="flex:1;min-width:0">
               <span class="st-subject" style="display:block;font-weight:700">${escHtml(sub.label)}</span>
               <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">
-                ${sub.units.length}단원 · 문제 ${sub.count}개</span>
+                ${sub.units.length}단원 · 문제 ${sub.count}개${pct !== null ? ` · 정답률 ${pct}%` : ''}
+                ${sub.weak > 0 ? `<span style="color:var(--red)"> · 약한 단원 ${sub.weak}개</span>` : ''}
+              </span>
             </span>
             <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
-          </button>`).join('')}
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+// ── 단원 선택 — 내가 어느 단원을 모르는지 보면서 고른다 ──
+function renderStudyUnitPick(subjectKey) {
+  const body = document.getElementById('study-body');
+  const ttl  = document.getElementById('study-title');
+  if (!body) return;
+
+  const sub = CurriculumUtils.subjects().find(s => s.key === subjectKey);
+  if (!sub) { renderStudySubjectPick(); return; }
+  if (ttl) ttl.textContent = `${sub.icon || '📘'} ${sub.label} — 단원 고르기`;
+
+  const active = CurriculumUtils.activeUnitIds();
+  const stats  = getUnitStats(CUR.id);
+  const units  = sub.units
+    .filter(u => !active || active.includes(u.id))
+    .map(u => ({ ...u, count: CurriculumUtils.problemsByUnit(u.id).length, stat: stats[u.id] }))
+    .filter(u => u.count > 0);
+
+  body.innerHTML = `
+    <div style="padding:.2rem 1rem 1rem">
+      <button onclick="renderStudySubjectPick()"
+        style="background:none;border:none;color:var(--txt3);font-size:1rem;cursor:pointer;
+          font-family:inherit;padding:0 0 .8rem">← 과목 다시 고르기</button>
+
+      <button onclick="startStudySession('${subjectKey}')"
+        style="display:flex;align-items:center;gap:.8rem;width:100%;padding:1rem 1.2rem;margin-bottom:1rem;
+          border-radius:14px;border:1px solid rgba(255,215,0,.35);cursor:pointer;
+          background:rgba(255,215,0,.1);color:var(--txt);font-family:inherit;text-align:left">
+        <span style="font-size:1.8rem">🎲</span>
+        <span style="flex:1">
+          <span style="display:block;font-size:1.15rem;font-weight:700;color:var(--gold)">전체에서 골고루</span>
+          <span style="display:block;font-size:.9rem;color:var(--txt3);margin-top:.15rem">
+            모든 단원에서 섞어서 ${STUDY_PER_DAY}문제</span>
+        </span>
+      </button>
+
+      <div class="st-meta" style="color:var(--txt3);margin-bottom:.6rem">단원별로 풀기</div>
+      <div style="display:grid;gap:.55rem">
+        ${units.map(u => {
+          const lv = unitLevelOf(u.stat);
+          const bar = lv.pct !== null ? lv.pct : 0;
+          return `
+          <button onclick="startStudySession('${subjectKey}','${u.id}')"
+            style="display:flex;align-items:center;gap:.9rem;width:100%;padding:.95rem 1.1rem;
+              border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;color:var(--txt);
+              border:1px solid ${lv.key === 'weak' ? 'rgba(231,76,60,.35)' : 'rgba(255,255,255,.1)'};
+              background:rgba(255,255,255,.045)">
+            <span style="flex:1;min-width:0">
+              <span style="display:block;font-size:1.1rem;font-weight:700">
+                ${u.no}. ${escHtml(u.name)}</span>
+              <span style="display:flex;align-items:center;gap:.5rem;margin-top:.45rem">
+                <span style="flex:1;height:6px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden">
+                  <span style="display:block;height:100%;width:${bar}%;border-radius:6px;background:${lv.color}"></span>
+                </span>
+                <span style="font-size:.85rem;color:${lv.color};flex-shrink:0;font-weight:700">
+                  ${lv.pct !== null ? lv.pct + '%' : '—'}</span>
+              </span>
+              <span style="display:block;font-size:.82rem;color:var(--txt3);margin-top:.3rem">
+                ${lv.label} · 문제 ${u.count}개${u.stat ? ` · ${u.stat.c}/${u.stat.t} 맞힘` : ''}</span>
+            </span>
+            <span style="font-size:1.2rem;color:var(--txt3)">▶</span>
+          </button>`;
+        }).join('')}
       </div>
     </div>`;
 }
 
 // ── 세션 시작 ──────────────────────────────────────
-function startStudySession(subjectKey) {
+function startStudySession(subjectKey, unitId) {
   const active = CurriculumUtils.activeUnitIds();
-  let pool = CurriculumUtils.problemsBySubject(subjectKey);
+  let pool = unitId
+    ? CurriculumUtils.problemsByUnit(unitId)       // 단원 하나만 골라 풀기
+    : CurriculumUtils.problemsBySubject(subjectKey);
   if (active) pool = pool.filter(p => active.includes(p.unitId));
   if (pool.length === 0) { toast('풀 수 있는 문제가 없어요'); return; }
 
@@ -10310,6 +10412,7 @@ function startStudySession(subjectKey) {
 
   STUDY_SESSION = {
     subjectKey,
+    unitId: unitId || '',   // 단원 지정이면 결과 화면에서 그 단원으로 되돌아간다
     questions: picked,
     cur: 0,
     correct: 0,
@@ -10434,7 +10537,7 @@ function nextStudyQuestion() {
 
 function finishStudySession() {
   if (!STUDY_SESSION) return;
-  const { subjectKey, questions, correct, answers } = STUDY_SESSION;
+  const { subjectKey, unitId: sessionUnit, questions, correct, answers } = STUDY_SESSION;
   const total = questions.length;
   const wrongIds = answers.filter(a => !a.correct).map(a => a.problemId);
   const pct = total > 0 ? Math.round(correct / total * 100) : 0;
@@ -10492,7 +10595,7 @@ function finishStudySession() {
           color:#1a1a1a;font-weight:700;cursor:pointer;font-family:inherit">
         끝내기
       </button>
-      <button onclick="renderStudySubjectPick()"
+      <button onclick="${sessionUnit ? `renderStudyUnitPick('${subjectKey}')` : 'renderStudySubjectPick()'}"
         style="width:100%;padding:.8rem;margin-top:.5rem;border-radius:12px;cursor:pointer;
           border:1px solid rgba(255,255,255,.12);background:none;color:var(--txt3);
           font-size:1.05rem;font-family:inherit">더 풀기</button>
