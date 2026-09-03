@@ -4,21 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>수채화 따라하기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <!-- 우리반 성장 RPG 연동: 학생 로그인·기록 동기화·작품 제출. 라이브러리가 없어도(오프라인·파일 직접 열기) 손님 모드로 동작 -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="../gamedata.js?v=20260730"></script>
 <style>
-  :root { --paper:#f6f5f1; --ink:#22282e; --card:#fff; --line:#ddd8cc; --accent:#2f5fa8; --ok:#2e7d5b; --warn:#c96a1c; --tip:#fff4d6; --muted:#6f7780; --wash:#e7eef8; }
+  /* 디자인 톤: 영어 복습앱(Warm Paper v2)과 통일 — 종이색 배경, 흰 카드, 코랄 포인트, 세이지 완료, Jua 큰 제목 + Pretendard 본문 */
+  :root { --paper:#f8f6f1; --paper-2:#f1ede4; --ink:#2a2420; --card:#fff; --line:rgba(60,45,30,.10); --line-2:rgba(60,45,30,.18);
+    --accent:#d4704f; --accent-dk:#b85a3c; --ok:#5f9b74; --ok-dk:#4a7f5c; --warn:#c8962e; --tip:#fff7e3; --muted:#7a6f66; --wash:#fbe9e2;
+    --sky:#4f8fbf; --sky-soft:#e6f0f8; --sh:0 1px 2px rgba(60,45,30,.06),0 3px 8px rgba(60,45,30,.05);
+    --font-ui:'Jua','Pretendard Variable',Pretendard,'맑은 고딕','Malgun Gothic',sans-serif;
+    --font-body:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'맑은 고딕','Malgun Gothic','Segoe UI',sans-serif;
+    --font-hand:'Nanum Pen Script','Jua',cursive; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; height:100%; }
-  body { font-family: -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; background:var(--paper); color:var(--ink); font-size:19px; line-height:1.5; }
-  .serif { font-family:"Noto Serif KR","Noto Serif CJK KR","Nanum Myeongjo",Batang,serif; }
-  button { font-family:inherit; font-size:19px; border:1px solid #ddd7c9; border-radius:10px; padding:12px 20px; cursor:pointer; background:#fff; color:var(--ink); }
+  body { font-family:var(--font-body); background:var(--paper); color:var(--ink); font-size:19px; line-height:1.5; }
+  .serif { font-family:var(--font-ui); font-weight:400; letter-spacing:-.01em; }
+  .hand { font-family:var(--font-hand); color:var(--accent); font-size:22px; letter-spacing:.02em; line-height:1.1; }
+  button { font-family:inherit; font-size:19px; font-weight:700; border:1.5px solid var(--line-2); border-radius:14px; padding:12px 20px; cursor:pointer; background:#fff; color:var(--ink); transition:transform .06s; }
   button:active { transform:translateY(1px); }
-  button.primary { background:var(--accent); color:#fff; font-weight:700; border-color:var(--accent); }
-  button.ok { background:var(--ok); color:#fff; font-weight:700; border-color:var(--ok); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 3px 0 var(--accent-dk); }
+  button.primary:active { box-shadow:0 1px 0 var(--accent-dk); }
+  button.ok { background:var(--ok); color:#fff; border-color:var(--ok); box-shadow:0 3px 0 var(--ok-dk); }
+  button.ok:active { box-shadow:0 1px 0 var(--ok-dk); }
   button.ghost { background:transparent; border-color:transparent; color:var(--muted); }
   button:disabled { opacity:.5; }
   .screen { display:none; min-height:100%; padding:16px; max-width:900px; margin:0 auto; }
@@ -26,19 +38,19 @@
 
   /* ---- 홈 ---- */
   .top { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-  .top h1 { font-size:25px; margin:0; }
-  .promise { background:none; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:10px 2px; margin:0 0 14px; font-size:17px; display:flex; gap:18px; flex-wrap:wrap; }
-  .promise b { color:var(--accent); }
+  .top h1 { font-size:27px; margin:0; }
+  .promise { background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--sh); padding:12px 16px; margin:0 0 14px; font-size:17px; display:flex; gap:18px; flex-wrap:wrap; align-items:center; }
+  .promise b { font-family:var(--font-hand); font-weight:400; font-size:24px; color:var(--accent); line-height:1; }
   .lessons { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:14px; }
-  .lesson { background:var(--card); border-radius:12px; padding:16px 18px; border:1px solid #eceae3; box-shadow:0 1px 3px rgba(60,50,30,.06); cursor:pointer; position:relative; }
+  .lesson { background:var(--card); border-radius:18px; padding:16px 18px; border:1px solid var(--line); box-shadow:var(--sh); cursor:pointer; position:relative; }
   .lesson h2 { font-size:21px; margin:6px 0 2px; }
-  .lesson .tech { font-size:13px; color:var(--accent); font-weight:600; letter-spacing:.02em; }
+  .lesson .tech { font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.02em; }
   .lesson p { margin:4px 0 0; font-size:15px; color:var(--muted); }
   .lesson .done { position:absolute; top:12px; right:14px; font-size:14px; color:var(--ok); font-weight:700; }
   .lesson.bonus { border-style:dashed; }
   .part-hd { grid-column:1/-1; margin:18px 0 0; padding:0 2px; }
   .part-hd:first-child { margin-top:2px; }
-  .part-hd h2 { font-size:20px; margin:0; display:flex; align-items:center; gap:9px; }
+  .part-hd h2 { font-family:var(--font-ui); font-weight:400; font-size:23px; margin:0; display:flex; align-items:center; gap:9px; letter-spacing:-.01em; }
   .dab { vertical-align:-5px; flex:none; }
   .part-hd .sub { font-size:14px; color:var(--muted); margin:2px 0 0; }
   .part-hd .grade { display:none; font-size:12px; color:#8a5a00; }
@@ -69,15 +81,15 @@
   .bar { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   .bar .title { font-weight:700; font-size:19px; flex:1; }
   .dots { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-  .dots i { width:11px; height:11px; border-radius:50%; background:#d6d3cc; display:block; }
+  .dots i { width:11px; height:11px; border-radius:50%; background:var(--line-2); display:block; }
   .dots i.cur { background:var(--accent); transform:scale(1.3); }
   .dots i.done { background:var(--ok); }
-  .card { background:var(--card); border-radius:14px; padding:18px; border:1px solid #eceae3; box-shadow:0 1px 4px rgba(60,50,30,.07); }
-  .art { background:#efece4; border-radius:16px; overflow:hidden; aspect-ratio: 40/26; width:100%; max-width: calc(40vh * 40 / 26); margin:0 auto; position:relative; }
+  .card { background:var(--card); border-radius:18px; padding:18px; border:1px solid var(--line); box-shadow:var(--sh); }
+  .art { background:var(--paper-2); border-radius:16px; overflow:hidden; aspect-ratio: 40/26; width:100%; max-width: calc(40vh * 40 / 26); margin:0 auto; position:relative; }
   .art svg { width:100%; height:100%; display:block; }
   .art video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
   .art.showvid video { display:block; }
-  .art .vidToggle { position:absolute; right:10px; bottom:10px; z-index:2; font-size:14px; padding:7px 14px; border-radius:8px; background:rgba(255,255,255,.94); border:1px solid #ddd7c9; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .art .vidToggle { position:absolute; right:10px; bottom:10px; z-index:2; font-size:14px; padding:7px 14px; border-radius:999px; background:rgba(255,255,255,.96); border:1.5px solid var(--line-2); box-shadow:0 1px 3px rgba(0,0,0,.12); }
   body.tv .art .vidToggle { font-size:19px; padding:10px 18px; }
   .compare .art { max-width:none; }
   .meters { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 4px; }
@@ -86,42 +98,43 @@
   .quiz button i { width:18px; height:18px; border-radius:50%; display:inline-block; }
   .quiz button.sel { border-color:var(--accent); background:var(--wash); }
   .quiz .qmsg { font-size:15px; color:var(--ok); font-weight:600; }
-  .meter { background:#f3f2ee; border-radius:12px; padding:7px 13px; font-size:17px; }
+  .meter { background:var(--paper-2); border-radius:999px; padding:7px 15px; font-size:17px; font-weight:600; }
   .meter b { font-size:20px; letter-spacing:2px; }
   .step-no { font-size:15px; color:var(--muted); margin-top:8px; }
   .text { font-size:24px; font-weight:700; margin:4px 0; line-height:1.4; }
   .sub { font-size:18px; color:#444; margin:2px 0 6px; }
-  .term { display:inline-block; font-size:14px; color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:1px 8px; margin-left:6px; vertical-align:middle; font-weight:600; }
-  .tip { display:none; background:var(--tip); border-left:6px solid #f2b530; border-radius:10px; padding:11px 14px; margin-top:12px; font-size:16px; line-height:1.55; }
+  .term { display:inline-block; font-size:14px; color:var(--accent); background:var(--wash); border:1px solid transparent; border-radius:999px; padding:2px 10px; margin-left:6px; vertical-align:middle; font-weight:700; }
+  .tip { display:none; background:var(--tip); border-left:6px solid var(--warn); border-radius:12px; padding:11px 14px; margin-top:12px; font-size:16px; line-height:1.55; }
   body.teacher .tip { display:block; }
   .tip b { color:#8a5a00; }
   .nav { display:flex; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap; }
   .nav .spacer { flex:1; }
-  .timer { display:flex; align-items:center; gap:16px; margin-top:12px; background:#eef5ff; border-radius:14px; padding:12px 16px; }
+  .timer { display:flex; align-items:center; gap:16px; margin-top:12px; background:var(--sky-soft); border-radius:16px; padding:12px 16px; }
   .timer .t { font-size:38px; font-weight:800; font-variant-numeric:tabular-nums; min-width:110px; }
   .timer .msg { font-size:17px; color:#345; }
   .compare { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px; }
-  .compare > div { border-radius:14px; padding:10px; border:2px solid var(--line); }
-  .compare .good { border-color:var(--ok); background:#f0fbf5; }
-  .compare .bad { border-color:var(--warn); background:#fff6ee; }
+  .compare > div { border-radius:16px; padding:10px; border:2px solid var(--line-2); }
+  .compare .good { border-color:var(--ok); background:#e4f2e9; }
+  .compare .bad { border-color:var(--accent); background:var(--wash); }
   .compare h4 { margin:0 0 6px; font-size:18px; }
   .compare p { margin:6px 0 0; font-size:16px; }
-  .chip { display:inline-block; background:#fff; border:1px solid var(--line); border-radius:4px; padding:3px 12px; font-size:15px; margin:3px 4px 3px 0; }
+  .chip { display:inline-block; background:#fff; border:1.5px solid var(--line-2); border-radius:999px; padding:4px 13px; font-size:15px; font-weight:600; color:var(--muted); margin:3px 4px 3px 0; }
   .finish { text-align:center; padding:24px 10px; }
   .finish .big { font-size:64px; }
-  .checks label { display:flex; gap:10px; align-items:center; font-size:19px; background:#f6f5f1; border-radius:12px; padding:11px; margin:8px 0; }
+  .finish .text { font-family:var(--font-ui); font-weight:400; font-size:30px; }
+  .checks label { display:flex; gap:10px; align-items:center; font-size:19px; background:var(--paper-2); border-radius:14px; padding:11px; margin:8px 0; }
   .checks input { width:24px; height:24px; }
   .reflect { margin-top:14px; border-top:1px dashed var(--line); padding-top:12px; }
   .reflect .moods { display:flex; gap:8px; margin:6px 0; }
   .reflect .moods button { font-size:30px; padding:6px 14px; border:2px solid transparent; }
   .reflect .moods button.sel { border-color:var(--accent); background:var(--wash); }
-  .reflect input { width:100%; font-size:17px; padding:10px; border:1px solid var(--line); border-radius:10px; font-family:inherit; }
+  .reflect input { width:100%; font-size:17px; padding:11px 13px; border:2px solid var(--line-2); border-radius:12px; font-family:inherit; background:#fff; }
   .reflect .lbl { font-size:15px; color:var(--muted); }
 
   /* ---- 기록 ---- */
   .gal h3 { margin:18px 0 8px; font-size:18px; }
   .thumbs { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:10px; }
-  .thumb { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; cursor:pointer; }
+  .thumb { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; cursor:pointer; box-shadow:var(--sh); }
   .thumb img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
   .thumb .cap { font-size:13px; padding:6px 8px; color:var(--muted); display:flex; justify-content:space-between; }
   .viewer { position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px; padding:16px; z-index:50; }
@@ -156,13 +169,14 @@
 <!-- ============ 홈 ============ -->
 <div class="screen on" id="home">
   <div class="top">
-    <h1 class="serif">수채화 따라하기 <svg width="46" height="16" viewBox="0 0 60 20" aria-hidden="true" style="vertical-align:-1px"><ellipse cx="10" cy="11" rx="9" ry="6" fill="#3f74c9" opacity=".5"/><ellipse cx="30" cy="9" rx="9" ry="6" fill="#e8a33d" opacity=".55"/><ellipse cx="50" cy="12" rx="9" ry="6" fill="#3f9d63" opacity=".5"/></svg> <span style="font-size:15px; color:var(--muted); font-weight:400; font-family:-apple-system,'Malgun Gothic',sans-serif">물감과 친해지기부터 나만의 그림까지</span></h1>
+    <h1 class="serif">수채화 따라하기 <svg width="46" height="16" viewBox="0 0 60 20" aria-hidden="true" style="vertical-align:-1px"><ellipse cx="10" cy="11" rx="9" ry="6" fill="#3f74c9" opacity=".5"/><ellipse cx="30" cy="9" rx="9" ry="6" fill="#e8a33d" opacity=".55"/><ellipse cx="50" cy="12" rx="9" ry="6" fill="#3f9d63" opacity=".5"/></svg> <span class="hand" style="font-weight:400; font-family:-apple-system,'Malgun Gothic',sans-serif">물감과 친해지기부터 나만의 그림까지</span></h1>
     <div><button class="ghost" id="stuBtn"></button><button class="ghost" id="galBtn">내 기록</button><button class="ghost" id="tvBtn">TV 수업</button><button class="ghost" id="teacherBtn">선생님</button></div>
   </div>
   <div class="promise"><span><b>오늘의 약속</b></span><span>① 실수해도 괜찮아요, 실험이니까</span><span>② 붓은 살살, 문지르지 않기</span><span>③ 마를 때까지 기다리기</span></div>
   <p style="margin:0 0 12px; color:var(--muted); font-size:16px">태블릿을 보면서 한 단계씩 종이에 해 봐요. 기법 이름을 기억해 두면 다음 그림에서 골라 쓸 수 있어요. <span id="teacherHint" style="display:none; color:#8a5a00">선생님 모드: 각 단계 아래에 지도 포인트와 성취기준이 보입니다.</span></p>
   <div class="lessons" id="lessonList"></div>
-  <p style="margin-top:20px; font-size:14px; color:var(--muted)">진행 상황과 사진은 이 태블릿 안에만 저장돼요. <button class="ghost" id="resetBtn" style="font-size:14px; padding:4px 8px">진행 초기화</button></p>
+  <p class="tip" style="margin-top:20px; font-size:15px"><b>선생님용 인쇄물</b> · <a href="worksheets.html" target="_blank" rel="noopener" style="color:var(--accent)">학습지 17장 (A4, 도화지에 인쇄)</a> · <a href="pilot-log.html" target="_blank" rel="noopener" style="color:var(--accent)">파일럿 수업기록지 2장</a> · 영상이 있는 단계: 3차시 2·4단계, 4차시 2단계, 6차시 3·5단계, 15차시 2단계 (그림 오른쪽 아래 "실제 영상 보기")</p>
+  <p style="margin-top:20px; font-size:14px; color:var(--muted)">진행 상황과 사진은 내 계정(또는 손님이면 이 태블릿)에 저장돼요. <button class="ghost" id="resetBtn" style="font-size:14px; padding:4px 8px">진행 초기화</button></p>
 </div>
 
 <!-- ============ 차시 ============ -->

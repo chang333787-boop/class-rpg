@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>수채화 학습지 (인쇄용)</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic','맑은 고딕',sans-serif; background:#e8e8ee; color:#222; }
+
+  .sheet {
+    width: 210mm; height: 296mm;
+    padding: 12mm 14mm 9mm;
+    background: #fff;
+    margin: 8mm auto;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    position: sticky; top:0; z-index:9;
+    background:#334; color:#fff; padding:10px 16px;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    font-size:14px;
+  }
+  .toolbar button {
+    font-size:15px; padding:8px 18px; border:none; border-radius:8px;
+    background:#5b8def; color:#fff; cursor:pointer; font-weight:bold;
+  }
+  .toolbar small { opacity:.85; line-height:1.4; }
+
+  .hd { display:flex; align-items:center; gap:4mm; border-bottom:1.6px solid #333; padding-bottom:2.5mm; margin-bottom:3mm; }
+  .hd .num {
+    width:11mm; height:11mm; border:1.6px solid #333; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14pt; font-weight:bold; flex:none;
+  }
+  .hd .tt { flex:1; }
+  .hd .tt b { font-size:15pt; }
+  .hd .tt span { display:block; font-size:9pt; color:#666; margin-top:.5mm; }
+  .hd .who { font-size:10pt; color:#333; text-align:right; line-height:2; white-space:nowrap; }
+  .hd .who i { font-style:normal; color:#888; letter-spacing:.5mm; }
+
+  .goal { font-size:10pt; margin-bottom:2.5mm; color:#333; }
+  .goal b { border-bottom:2px solid #f4b942; }
+  .goal .mat { color:#777; font-size:8.5pt; }
+
+  .howto { border:1.2px solid #b9b3a4; background:#fbfaf6; border-radius:2.5mm; padding:2.5mm 4mm; margin-bottom:3mm; font-size:9.5pt; line-height:1.6; }
+  .howto .t { font-weight:700; font-size:9pt; color:#8a5a00; margin-right:2mm; }
+  .howto ol { margin:.5mm 0 0; padding-left:5.5mm; }
+  .howto li b { color:#111; }
+  .dose { letter-spacing:.2mm; }
+
+  .box { border:1.4px solid #999; border-radius:3mm; position:relative; }
+  .box .lab {
+    position:absolute; top:2mm; left:3mm; font-size:9pt; color:#777;
+    background:#fff; padding:0 1mm; line-height:1.35; max-width:92%;
+  }
+  .box .lab b { color:#333; font-size:9.5pt; }
+
+  .row2 { display:flex; gap:4mm; }
+  .row2 > * { flex:1; }
+
+  .note { font-size:8.5pt; color:#888; margin-top:1.2mm; line-height:1.5; }
+
+  .ft {
+    margin-top:auto; padding-top:2mm; border-top:1px solid #bbb;
+    font-size:10pt; display:flex; align-items:center; gap:3mm; flex-wrap:wrap;
+  }
+  .ft .fx { font-size:13pt; letter-spacing:1.5mm; }
+  .ft .line { flex:1; border-bottom:1px solid #999; min-width:45mm; height:6mm; }
+  .ft .app { width:100%; font-size:8pt; color:#999; }
+
+  .chk { list-style:none; font-size:10pt; line-height:1.9; }
+  .chk li::before { content:'□  '; font-size:10.5pt; }
+
+  .dashline { border-bottom:1.2px dashed #bbb; }
+
+  /* 인쇄 규칙은 반드시 맨 아래 (뒤에 오는 규칙이 이겨야 함) */
+  @media print {
+    body { background:#fff; }
+    .sheet { margin:0; box-shadow:none; page-break-after:always; }
+    .sheet:last-of-type { page-break-after:auto; }
+    .toolbar { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()">인쇄하기</button>
+  <small>
+    총 17장 (기본 9장 + 반복 연습장 2장 + 심화 6장) · <b>200g 이상 도화지</b>에 인쇄하세요.<br>
+    각 장의 "이렇게 해요" 순서만 따라 하면 <b>태블릿 없이도 수업이 됩니다.</b>
+    잉크젯 잉크는 물에 번질 수 있어요 → 레이저 프린터 권장. 필요한 쪽만 골라 인쇄해도 됩니다.
+  </small>
+</div>
+
+<!-- ═════════ 0. 준비하기 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">0</div>
+    <div class="tt"><b>준비하기 — 붓 연습</b><span>재료와 용구 · [4미02-02]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal"><b>붓·물·물감·종이를 바르게 준비해요.</b> <span class="mat">준비물: 굵은 붓·가는 붓, 물통 2개, 팔레트(말린 물감), 걸레</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>팔레트 물감이 <b>말라 있는지</b> 확인해요. (전날 짜서 말려 두어요 — 말라야 양 조절이 돼요)</li>
+      <li>물통은 <b>두 개</b>: 붓 씻는 물 / 색 만들 때만 쓰는 깨끗한 물.</li>
+      <li>붓은 연필처럼 잡아요. <b>세우면 가는 선, 눕히면 넓은 면.</b> 문지르지 말고 미끄러지듯 한 번에.</li>
+      <li>붓 씻기: 물에서 흔들흔들 → 물통 옆에 톡톡 → 걸레에 톡톡. <b>색을 바꿀 때마다!</b></li>
+    </ol>
+  </div>
+
+  <ul class="chk" style="margin-bottom:3mm; display:flex; gap:8mm; flex-wrap:wrap;">
+    <li>물감이 말라 있어요</li><li>물통이 두 개 있어요</li><li>붓이 두 자루(굵은·가는) 있어요</li>
+  </ul>
+
+  <div class="box" style="height:56mm; margin-bottom:3.5mm;">
+    <div class="lab"><b>연습 1 — 붓끝을 세워서, 가는 선 3개</b> · 점선을 따라 멈추지 말고 한 번에</div>
+    <div style="padding:13mm 10mm 0;">
+      <div class="dashline" style="margin-bottom:12mm;"></div>
+      <div class="dashline" style="margin-bottom:12mm;"></div>
+      <div class="dashline"></div>
+    </div>
+  </div>
+
+  <div class="box" style="height:56mm; margin-bottom:3.5mm;">
+    <div class="lab"><b>연습 2 — 붓을 눕혀서, 넓은 면 3개</b> · 스케이트 타듯 한 번에</div>
+    <div style="padding:12mm 10mm 0; display:flex; gap:6mm;">
+      <div style="flex:1; height:38mm; border:1.2px dashed #bbb; border-radius:2mm;"></div>
+      <div style="flex:1; height:38mm; border:1.2px dashed #bbb; border-radius:2mm;"></div>
+      <div style="flex:1; height:38mm; border:1.2px dashed #bbb; border-radius:2mm;"></div>
+    </div>
+  </div>
+
+  <div class="box" style="height:26mm;">
+    <div class="lab"><b>연습 3 — 붓 씻기</b> · 씻은 붓으로 이 칸에 자유롭게. 물이 탁해지면 색도 탁해져요!</div>
+  </div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '준비하기' 차시와 함께 쓰면 그림 시범도 볼 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 3. 물의 양과 진하기 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">3</div>
+    <div class="tt"><b>물의 양과 진하기</b><span>명도 단계 · [4미02-02] [4미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal"><b>같은 파랑</b>으로 연한 색부터 진한 색까지. 밝기는 물의 양으로 조절해요! <span class="mat">준비물: 파랑 물감, 굵은 붓·가는 붓</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>붓을 물에 <b>흠뻑</b> 적시고 파랑을 <b>조금만</b> → ① 칸. <span class="dose">💧💧💧🎨</span> (물이 뚝 떨어지면 걸레에 한 번 톡)</li>
+      <li>걸레에 <b>톡톡 두 번</b>, 파랑을 더 묻혀서 → ② 칸. <span class="dose">💧💧🎨🎨</span> (물 반, 물감 반 — 기본 농도!)</li>
+      <li>물은 거의 없이 물감을 <b>많이</b> → ③ 칸. <span class="dose">💧🎨🎨🎨</span> (뻑뻑하면 물 한 방울만 더)</li>
+      <li>가는 붓으로 아래 칸에 <b>세 농도의 선</b>을 그어요. 같은 색인데 셋 다 달라요!</li>
+    </ol>
+  </div>
+
+  <div class="box" style="height:42mm; margin-bottom:3mm;">
+    <div class="lab"><b>① 연하게</b> — 물 많이, 물감 조금 <span class="dose">💧💧💧 🎨</span></div>
+  </div>
+  <div class="box" style="height:42mm; margin-bottom:3mm;">
+    <div class="lab"><b>② 중간</b> — 물 반, 물감 반 <span class="dose">💧💧 🎨🎨</span></div>
+  </div>
+  <div class="box" style="height:42mm; margin-bottom:3mm;">
+    <div class="lab"><b>③ 진하게</b> — 물 조금, 물감 많이 <span class="dose">💧 🎨🎨🎨</span></div>
+  </div>
+
+  <div class="box" style="height:36mm;">
+    <div class="lab"><b>④ 세 농도의 선 긋기</b> — 연한 선 / 중간 선 / 진한 선</div>
+    <div style="padding:12mm 10mm 0;">
+      <div class="dashline" style="margin-bottom:8mm;"></div>
+      <div class="dashline" style="margin-bottom:8mm;"></div>
+      <div class="dashline"></div>
+    </div>
+  </div>
+  <div class="note">확인: ①→②→③이 한눈에 <b>점점 진해</b> 보이면 성공. 비슷하면 "물 줄이기(걸레 톡톡)"를 못 한 것 — ③만 다시!</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '물의 양과 진하기' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 4. 색 섞기 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">4</div>
+    <div class="tt"><b>색 섞기</b><span>삼원색과 이차색 · [4미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">빨강·노랑·파랑 세 색으로 여러 색을 만들어요. <span class="mat">준비물: 삼원색 물감, 굵은 붓, 깨끗한 물통</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>섞기 전에 <b>예상한 색 이름을 먼저 써요.</b> (예상 → 섞기 → 확인 순서!)</li>
+      <li>팔레트 빈 칸에 <b>연한 색을 먼저</b> 놓고, 진한 색(빨강·파랑)을 <b>아주 조금씩</b> 섞어요.</li>
+      <li>색을 바꿀 때마다 <b>붓을 씻고</b>, 색은 <b>깨끗한 물통</b>으로만 만들어요.</li>
+      <li>연한 색이 필요하면 흰색이 아니라 <b>물</b>을 더해요.</li>
+      <li>다 갈색이 나오면: 붓을 안 씻었거나, 탁한 물을 썼거나, 세 색을 다 넣은 거예요.</li>
+    </ol>
+  </div>
+
+  <div style="display:flex; font-size:8.5pt; color:#777; padding:0 2mm 1mm;">
+    <div style="flex:1.2;">무엇을 섞나요?</div>
+    <div style="width:38mm;">예상한 색 이름 쓰기</div>
+    <div style="width:42mm; text-align:center;">섞어서 원에 칠하기<br>(밖으로 나가도 괜찮아요)</div>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:2.2mm; display:flex; align-items:center; padding:0 4mm;">
+    <div style="flex:1.2; font-size:11.5pt;"><b>노랑</b> ＋ <b>빨강</b> 조금</div>
+    <div style="width:38mm;"><div class="dashline" style="width:30mm; height:7mm;"></div></div>
+    <div style="width:42mm; display:flex; justify-content:center;"><div style="width:27mm; height:27mm; border:1.3px dashed #aaa; border-radius:50%;"></div></div>
+  </div>
+  <div class="box" style="flex:1; margin-bottom:2.2mm; display:flex; align-items:center; padding:0 4mm;">
+    <div style="flex:1.2; font-size:11.5pt;"><b>노랑</b> ＋ <b>파랑</b> 조금 <span style="font-size:8pt;color:#888;">(붓 씻고!)</span></div>
+    <div style="width:38mm;"><div class="dashline" style="width:30mm; height:7mm;"></div></div>
+    <div style="width:42mm; display:flex; justify-content:center;"><div style="width:27mm; height:27mm; border:1.3px dashed #aaa; border-radius:50%;"></div></div>
+  </div>
+  <div class="box" style="flex:1; margin-bottom:2.2mm; display:flex; align-items:center; padding:0 4mm;">
+    <div style="flex:1.2; font-size:11.5pt;"><b>빨강</b> ＋ <b>파랑</b> 조금 <span style="font-size:8pt;color:#888;">(붓 씻고!)</span></div>
+    <div style="width:38mm;"><div class="dashline" style="width:30mm; height:7mm;"></div></div>
+    <div style="width:42mm; display:flex; justify-content:center;"><div style="width:27mm; height:27mm; border:1.3px dashed #aaa; border-radius:50%;"></div></div>
+  </div>
+  <div class="box" style="flex:1; margin-bottom:2.2mm; display:flex; align-items:center; padding:0 4mm;">
+    <div style="flex:1.2; font-size:11.5pt;"><b>주황</b> ＋ <b>물 많이</b> <span class="dose">💧💧💧</span><br><span style="font-size:8pt;color:#888;">연한 색은 흰색이 아니라 물로!</span></div>
+    <div style="width:38mm;"><div class="dashline" style="width:30mm; height:7mm;"></div></div>
+    <div style="width:42mm; display:flex; justify-content:center;"><div style="width:27mm; height:27mm; border:1.3px dashed #aaa; border-radius:50%;"></div></div>
+  </div>
+  <div class="box" style="flex:1; margin-bottom:2.2mm; display:flex; align-items:center; padding:0 4mm;">
+    <div style="flex:1.2; font-size:11.5pt;"><b>빨강＋노랑＋파랑</b> 다 섞으면?<br><span style="font-size:8pt;color:#888;">흙·나무 줄기·그림자에 쓰는 색</span></div>
+    <div style="width:38mm;"><div class="dashline" style="width:30mm; height:7mm;"></div></div>
+    <div style="width:42mm; display:flex; justify-content:center;"><div style="width:27mm; height:27mm; border:1.3px dashed #aaa; border-radius:50%;"></div></div>
+  </div>
+
+  <div class="note">확인: 주황·초록·보라 세 가지가 모두 나왔나요?</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '색 섞기' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 5. 평칠과 그러데이션 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">5</div>
+    <div class="tt"><b>평칠과 그러데이션</b><span>평칠 · 그러데이션 · [4미02-02]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">줄이 안 생기게 고르게 칠하고, 점점 연하게 만들어요. <span class="mat">준비물: 물감 한 색, 굵은 붓, 종이테이프</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>종이 네 변을 테이프로 붙이고, 팔레트에 중간 농도 물감을 <b>넉넉히</b> 만들어 두어요. <span class="dose">💧💧🎨🎨</span></li>
+      <li><b>평칠(위 상자):</b> 왼쪽→오른쪽 한 줄을 한 번에 → 바로 아래 <b>살짝 겹치게</b> 또 한 줄 → 앞줄이 마르기 전에 빠르게. 상자 하나를 30초 안에! (시계가 없으면 마음속으로 서른까지)</li>
+      <li>다 칠했으면 <b>만지지 말고</b> 말려요. 얼룩은 마르면 옅어져요.</li>
+      <li><b>그러데이션(아래 상자):</b> 맨 윗줄은 진하게 시작. <span class="dose">💧🎨🎨🎨</span></li>
+      <li>다음 줄부터는 <b>붓을 물에만 살짝 담갔다가</b> 칠해요(물감은 더 안 묻혀요) → 점점 연해져요. 마지막 줄은 거의 물만.</li>
+    </ol>
+  </div>
+
+  <div class="box" style="height:74mm; margin-bottom:3mm;">
+    <div class="lab"><b>평칠</b> — 왼→오, 겹치게, 빠르게 (30초)</div>
+  </div>
+
+  <div style="display:flex; gap:3mm; height:80mm; margin-bottom:1mm;">
+    <div class="box" style="flex:1;">
+      <div class="lab"><b>그러데이션</b> — 맨 위 진하게, 아래로 갈수록 물만 더해요</div>
+    </div>
+    <div style="width:15mm; display:flex; flex-direction:column; justify-content:space-between; align-items:center; font-size:8.5pt; color:#777; padding:7mm 0;">
+      <span>진하게</span><span style="font-size:12pt;">▼</span><span>물만<br>더해요</span><span style="font-size:12pt;">▼</span><span>연하게</span>
+    </div>
+  </div>
+  <div class="note">확인: 위→아래로 <b>부드럽게</b> 연해지면 성공. 줄무늬가 보이면 "빨리, 겹치게, 물만 더하기" 한 번 더. 하늘·바다·노을이 다 이 기법이에요.</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '평칠과 그러데이션' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 6. 번지기 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">6</div>
+    <div class="tt"><b>번지기</b><span>습식 기법 (젖은 종이 위) · [4미02-02]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">젖은 종이 위에서 색이 <b>스스로</b> 퍼지게 해요. <span class="mat">준비물: 두세 가지 색, 굵은 붓, 깨끗한 물, 종이테이프</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>종이 네 변을 테이프로 붙여요. (얇은 종이는 물을 못 먹어 번지지 않아요)</li>
+      <li>깨끗한 붓에 <b>물만</b> 묻혀 상자 안을 칠해요. 반짝일 정도로, 웅덩이는 안 되게. <span class="dose">💧💧💧</span></li>
+      <li>물이 스며드는 동안 <b>진한 물감</b>을 준비해요. <span class="dose">💧🎨🎨🎨</span> (진해야 퍼져요!)</li>
+      <li>젖은 곳에 붓을 <b>한 번만 살짝</b> 대고 바로 손을 떼요. 문지르면 안 돼요. 색이 퍼지는 걸 구경!</li>
+      <li>씻은 붓(물만)으로 색의 가장자리를 <b>살살 끌면</b> 더 멀리, 더 옅게 퍼져요.</li>
+      <li>아래 상자엔 두세 색을 톡, 톡. 만나서 저절로 섞이게 두고, <b>절대 만지지 말고</b> 말려요.</li>
+    </ol>
+  </div>
+
+  <div class="box" style="height:66mm; margin-bottom:3mm;">
+    <div class="lab"><b>한 색 번지기</b> — 물만 칠하기 → 진한 물감 한 번 톡 → 씻은 붓으로 살살 끌기</div>
+  </div>
+
+  <div class="box" style="height:66mm; margin-bottom:2mm;">
+    <div class="lab"><b>여러 색이 만나요</b> — 붓을 씻어 가며 두세 색을 톡, 톡</div>
+  </div>
+
+  <div style="font-size:10pt; display:flex; gap:2mm; align-items:center; margin-top:1mm;">
+    마른 그림이 무엇처럼 보이나요? (구름? 바다? 불꽃?) <span style="flex:1; border-bottom:1px solid #999; height:6mm;"></span>
+  </div>
+  <div class="note">확인: 색의 가장자리가 <b>흐릿하게</b> 퍼지면 성공. 테두리가 또렷하면 종이가 말라 있었던 것 → 물을 다시 칠하고 재도전.</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '번지기' 차시에서 실제 영상도 볼 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 7. 겹쳐 칠하기 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">7</div>
+    <div class="tt"><b>겹쳐 칠하기</b><span>건식 기법 · 글레이징 · [4미02-02]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal"><b>완전히 마른 뒤</b>에 칠하면 퍼지지 않고 겹쳐요. <span class="mat">준비물: 노랑·파랑 물감, 굵은 붓</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>왼쪽 점선 원에 <b>연한 노랑</b>을 칠해요. <span class="dose">💧💧💧🎨</span> (첫 색은 반드시 연하게 — 밝은 색부터가 순서!)</li>
+      <li><b>완전히 마를 때까지</b> 기다려요. 손등을 대 봐서 <b>차갑지 않으면</b> 마른 거예요. (3분쯤 — 그동안 붓을 씻어요)</li>
+      <li>오른쪽 원에 <b>파랑</b>을 한 번에 쓱, 노랑과 반쯤 겹치게. <span class="dose">💧💧🎨🎨</span> 같은 자리를 문지르면 아래 색이 녹아 탁해져요!</li>
+      <li>아래 상자: 원을 파랑으로 칠하고 → 마른 뒤 → <b>아래쪽 절반만 같은 색으로 한 번 더.</b> 겹칠수록 진해져요 = 그림자!</li>
+    </ol>
+  </div>
+
+  <div class="box" style="height:74mm; margin-bottom:3mm;">
+    <div class="lab"><b>겹치기</b> — ① 왼쪽 원 연한 노랑 → 완전히 마른 뒤 → ② 오른쪽 원 파랑. 겹친 곳은 무슨 색?</div>
+    <div style="height:100%; display:flex; align-items:center; justify-content:center;">
+      <div style="position:relative; width:86mm; height:48mm;">
+        <div style="position:absolute; left:0; top:0; width:48mm; height:48mm; border:1.3px dashed #bbb; border-radius:50%;"></div>
+        <div style="position:absolute; right:0; top:0; width:48mm; height:48mm; border:1.3px dashed #bbb; border-radius:50%;"></div>
+        <span style="position:absolute; left:5mm; top:22mm; font-size:9pt; color:#999;">①노랑</span>
+        <span style="position:absolute; right:5mm; top:22mm; font-size:9pt; color:#999;">②파랑</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="box" style="height:62mm; margin-bottom:1mm;">
+    <div class="lab"><b>그림자 만들기</b> — 원을 칠하고, 마른 뒤 아래 절반만 같은 색 한 번 더 = 공처럼!</div>
+    <div style="height:100%; display:flex; align-items:center; justify-content:center;">
+      <div style="width:42mm; height:42mm; border:1.3px dashed #bbb; border-radius:50%;"></div>
+    </div>
+  </div>
+  <div class="note">확인: 겹친 테두리가 <b>또렷</b>하면 성공. 번졌다면 덜 말랐을 때 칠한 거예요. (번지기 차시와 뭐가 다른지 비교!)</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '겹쳐 칠하기' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 8. 크레파스 배수 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">8</div>
+    <div class="tt"><b>크레파스 배수</b><span>배수 기법 (배틱) · [4미02-02]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">크레파스(기름)가 물감(물)을 밀어내는 성질로 무늬를 만들어요. <span class="mat">준비물: 흰 크레파스(또는 양초), 물감, 굵은 붓, 검정 네임펜</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>흰 크레파스로 아래 칸에 무늬를 <b>꾹꾹 눌러</b> 그려요. 별·물결·눈송이·내 이름… (세게 눌러 두껍게! 약하면 무늬가 안 나와요. 안 보이면 종이를 기울여 확인)</li>
+      <li>그 위에 <b>연한 물감</b>을 넓게 한 번에 칠해요. <span class="dose">💧💧💧🎨</span> (진하면 무늬가 묻혀요. 같은 곳을 여러 번 문지르지 않기)</li>
+      <li>무늬가 하얗게 드러나는 걸 관찰해요 — 기름과 물은 서로 밀어내니까!</li>
+      <li>마른 뒤, 검정 네임펜으로 윤곽을 그려 넣으면 선이 또렷하게 남아요.</li>
+    </ol>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:2mm;">
+    <div class="lab"><b>여기에 크게</b> — 밤하늘의 별? 바닷속 물결? 주제를 정해서</div>
+  </div>
+  <div class="note">확인: 무늬가 하얗게 또렷이 남으면 성공. 희미하면 → 크레파스를 <b>더 세게</b>, 물감은 <b>더 연하게</b>.</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '크레파스 배수' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 9. 작품 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">9</div>
+    <div class="tt"><b>작품: 저녁 하늘과 언덕</b><span>기법 종합 · [4미02-01] [4미02-02] [4미02-03] [4미02-04]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">배운 기법을 <b>골라 써서</b> 그림을 완성해요. 시작 전에 네 변을 테이프로! <span class="mat">준비물: 삼원색, 굵은 붓·가는 붓, 네임펜(선택)</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>점선 <b>위쪽에만 물</b>을 칠해요. 반짝일 정도로. (번지기 준비 — 아래 언덕 자리엔 물 X)</li>
+      <li>맨 위에 파랑, 가운데에 주황·분홍을 <b>톡톡.</b> 저절로 퍼지게 두어요. 톡톡은 세 번만! <span class="dose">💧🎨🎨🎨</span></li>
+      <li>하늘이 <b>완전히 마를 때까지</b> 기다리며, 노랑+파랑으로 <b>진한 초록</b>을 만들어 두어요.</li>
+      <li>아래쪽에 언덕 두 개를 겹쳐 칠해요. <b>앞 언덕이 더 진하게</b> — 멀고 가까움이 생겨요.</li>
+      <li>마른 뒤 가는 붓으로 나무·집을 진하게 <span class="dose">💧🎨🎨🎨</span>, 마지막에 네임펜 윤곽.</li>
+    </ol>
+  </div>
+
+  <div style="font-size:9.5pt; display:flex; gap:2mm; align-items:center; margin-bottom:2mm;">
+    내 그림에는 저녁 하늘 아래 <span style="flex:1; border-bottom:1px solid #999; height:5mm;"></span> 이/가 있어요. <span style="font-size:8pt;color:#888;">(언덕? 나무? 집? 바다?)</span>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:2mm;">
+    <div class="lab"><b>작품 칸</b></div>
+    <div style="position:absolute; left:4mm; right:4mm; top:56%; border-bottom:1px dashed #ddd;"></div>
+    <div style="position:absolute; right:5mm; top:56%; transform:translateY(-110%); font-size:8pt; color:#bbb;">△ 이 선 위쪽만 물 칠하기 (하늘)</div>
+  </div>
+
+  <div style="font-size:9pt; margin-bottom:.5mm;">내가 쓴 기법에 모두 표시해요:</div>
+  <div style="display:flex; flex-wrap:wrap; gap:1.5mm 5mm; font-size:9pt;">
+    <span>□ 하늘: 번지기(젖은 종이)</span>
+    <span>□ 언덕: 겹쳐 칠하기(마른 뒤)</span>
+    <span>□ 나무·집: 진한 농도(물 조금)</span>
+    <span>□ 윤곽: 네임펜/가는 붓</span>
+  </div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">완성작은 태블릿 앱에서 사진으로 남기면 처음 차시와 비교할 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 10. 질감 효과 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">10</div>
+    <div class="tt"><b>질감 효과</b><span>소금 · 닦아내기 · 뿌리기 · [4미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">소금, 휴지, 물감 튕기기로 <b>질감</b>을 만들어요. 정답이 없는 실험 시간! <span class="mat">준비물: 소금, 휴지, 물감, 신문지(바닥)</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li><b>소금:</b> 칸에 색을 칠하고 <b>반짝이게 젖어 있을 때</b> 소금을 톡톡. 마르면 손으로 털어요 → 눈꽃 무늬! (마른 뒤 뿌리면 안 생겨요)</li>
+      <li><b>휴지 구름:</b> 젖은 하늘색 위를 뭉친 휴지로 <b>꾹 누르고 떼기.</b> 문지르지 않기!</li>
+      <li><b>뿌리기:</b> 진한 물감 <span class="dose">💧🎨🎨🎨</span> 을 붓에 묻혀 손가락으로 튕겨요. 신문지 깔고!</li>
+    </ol>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:3mm;">
+    <div class="lab"><b>① 소금 눈꽃</b> — 젖어 있을 때 톡톡, 마르면 털기 (눈·밤하늘·바위)</div>
+  </div>
+  <div class="box" style="flex:1; margin-bottom:3mm;">
+    <div class="lab"><b>② 휴지 구름</b> — 꾹 누르고 떼기</div>
+  </div>
+  <div class="box" style="flex:1; margin-bottom:3mm;">
+    <div class="lab"><b>③ 뿌리기</b> — 손가락으로 튕기기 (별·꽃가루·불꽃놀이)</div>
+  </div>
+
+  <div style="font-size:9.5pt;">가장 마음에 든 효과는? &nbsp; □ 소금 눈꽃 &nbsp; □ 휴지 구름 &nbsp; □ 뿌리기 &nbsp;→ 다음 작품에 하나 골라 써 봐요!</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '질감 효과' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 연습장 A ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">A</div>
+    <div class="tt"><b>반복 연습장 — 물 조절 훈련</b><span>'물의 양과 진하기' 복습 · 여러 번 반복해서 손에 익혀요</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">이번엔 <b>5단계</b>에 도전! 왼쪽 칸은 물 많이 <span class="dose">💧💧💧</span>, 오른쪽으로 갈수록 물감을 조금씩 더해요.</div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>1회차: 왼쪽부터 한 칸씩. 칸을 넘어갈 때마다 <b>걸레에 톡톡 + 물감 조금 더.</b></li>
+      <li>한 줄 끝나면 다섯 칸이 다 달라 보이는지 스스로 확인하고 ○△ 표시.</li>
+      <li>2·3회차는 다른 색으로 반복 — 회차가 갈수록 나아지는 게 목표예요.</li>
+    </ol>
+  </div>
+
+  <div style="display:flex; font-size:8.5pt; color:#777; padding:0 1mm 1mm;">
+    <div style="flex:1;">① 연하게 💧💧💧🎨</div><div style="flex:1; text-align:center;">→ 조금씩 진하게 →</div><div style="flex:1; text-align:right;">⑤ 진하게 💧🎨🎨🎨</div>
+  </div>
+
+  <div style="margin-bottom:2mm;">
+    <div style="display:flex; gap:2mm; height:34mm;">
+      <div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div>
+    </div>
+    <div style="font-size:8.5pt; color:#666; padding:1mm 1mm 0;">1회차 (파랑) — 다섯 칸이 모두 달라 보이면 ○, 비슷한 칸이 있으면 △ : (&nbsp;&nbsp;&nbsp;&nbsp;)</div>
+  </div>
+  <div style="margin-bottom:2mm;">
+    <div style="display:flex; gap:2mm; height:34mm;">
+      <div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div>
+    </div>
+    <div style="font-size:8.5pt; color:#666; padding:1mm 1mm 0;">2회차 (빨강) — 1회차보다 나아졌으면 ○ : (&nbsp;&nbsp;&nbsp;&nbsp;)</div>
+  </div>
+  <div style="margin-bottom:2mm;">
+    <div style="display:flex; gap:2mm; height:34mm;">
+      <div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div><div class="box" style="flex:1;"></div>
+    </div>
+    <div style="font-size:8.5pt; color:#666; padding:1mm 1mm 0;">3회차 (좋아하는 색) — 가장 잘된 회차는? 1 · 2 · 3</div>
+  </div>
+
+  <div class="box" style="height:24mm; margin-bottom:1mm;">
+    <div class="lab"><b>보너스 도전</b> — 가는 붓으로 연한 선→진한 선 5개</div>
+  </div>
+  <div class="note">잘 안 되는 칸은 대부분 "물을 줄이는 법"이 문제예요 → 걸레에 톡톡 두 번!</div>
+
+  <div class="ft">
+    <span>연습하고 나니 어때요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">드릴 연습장은 아침 활동·자투리 시간에 반복해서 써요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 연습장 B ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">B</div>
+    <div class="tt"><b>반복 연습장 — 평칠 30초 도전</b><span>'평칠과 그러데이션' 복습 · 빨리, 겹치게, 한 번에!</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">네모 하나를 <b>30초 안에</b> 줄무늬 없이 고르게! <span class="mat">시계가 없으면 마음속으로 천천히 서른까지 세면서.</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>시작 전에 물감을 <b>넉넉히</b> 만들어 두어요. <span class="dose">💧💧🎨🎨</span> (중간에 모자라면 앞이 말라버려요)</li>
+      <li>왼→오 한 줄, 바로 아래 <b>살짝 겹치게</b> 다음 줄. 멈추지 말고, 마르기 전에.</li>
+      <li>한 칸 끝나면 만지지 말고 다음 칸에 도전. 도전 5·6은 그러데이션(위 진하게→물만 더하기)으로!</li>
+    </ol>
+  </div>
+
+  <div style="display:flex; gap:4mm; margin-bottom:2.5mm;">
+    <div style="flex:1;"><div class="box" style="height:44mm;"></div><div style="font-size:8.5pt;color:#666;padding-top:.5mm;">도전 1 — 줄무늬 없음 ○ / 있음 △ : (&nbsp;&nbsp;&nbsp;)</div></div>
+    <div style="flex:1;"><div class="box" style="height:44mm;"></div><div style="font-size:8.5pt;color:#666;padding-top:.5mm;">도전 2 : (&nbsp;&nbsp;&nbsp;)</div></div>
+  </div>
+  <div style="display:flex; gap:4mm; margin-bottom:2.5mm;">
+    <div style="flex:1;"><div class="box" style="height:44mm;"></div><div style="font-size:8.5pt;color:#666;padding-top:.5mm;">도전 3 : (&nbsp;&nbsp;&nbsp;)</div></div>
+    <div style="flex:1;"><div class="box" style="height:44mm;"></div><div style="font-size:8.5pt;color:#666;padding-top:.5mm;">도전 4 — 다른 색으로 : (&nbsp;&nbsp;&nbsp;)</div></div>
+  </div>
+  <div style="display:flex; gap:4mm; margin-bottom:1mm;">
+    <div style="flex:1;"><div class="box" style="height:44mm;"></div><div style="font-size:8.5pt;color:#666;padding-top:.5mm;">도전 5 — 그러데이션으로 : (&nbsp;&nbsp;&nbsp;)</div></div>
+    <div style="flex:1;"><div class="box" style="height:44mm;"></div><div style="font-size:8.5pt;color:#666;padding-top:.5mm;">도전 6 — 그러데이션으로 : (&nbsp;&nbsp;&nbsp;)</div></div>
+  </div>
+  <div class="note">가장 잘된 네모에 크게 ○표. 줄무늬는 속도 문제예요 — "빨리, 겹치게, 한 번에" 세 마디만 기억!</div>
+
+  <div class="ft">
+    <span>연습하고 나니 어때요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">드릴 연습장은 아침 활동·자투리 시간에 반복해서 써요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 11. 색상환과 보색 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">11</div>
+    <div class="tt"><b>색상환과 보색</b><span>색상환 · 보색 대비 · [6미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">12색 색상환을 만들고, 마주 보는 색의 힘을 알아요. <span class="mat">준비물: 빨강·노랑·파랑 물감, 굵은 붓, 깨끗한 물통</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>시계라고 생각해요: <b>12시에 빨강, 4시에 노랑, 8시에 파랑</b> (삼원색부터).</li>
+      <li>그 사이 한가운데: <b>2시 주황, 6시 초록, 10시 보라</b> — 양옆 두 색을 반반 섞어요.</li>
+      <li>남은 6칸은 <b>이웃한 두 칸을 섞으면</b> 그 사이 색이 나와요. 색을 바꿀 때마다 붓 씻기!</li>
+      <li>다 마르면 <b>마주 보는 색끼리</b> 연필로 이어요: 빨강↔초록, 노랑↔보라, 파랑↔주황. 이 짝이 <b>보색</b>!</li>
+      <li>아래 칸에 보색 두 가지로 체크무늬·줄무늬를 칠해 봐요. 나란히 두면 선명, 섞으면 탁해요.</li>
+    </ol>
+  </div>
+
+  <div style="display:flex; justify-content:center; margin-bottom:2mm;">
+    <svg width="118mm" height="118mm" viewBox="-118 -118 236 236">
+      <circle r="100" fill="none" stroke="#bbb" stroke-width="1.4"/>
+      <circle r="35" fill="none" stroke="#bbb" stroke-width="1.4"/>
+      <g stroke="#bbb" stroke-width="1.2">
+        <line x1="9.1" y1="-33.8" x2="25.9" y2="-96.6"/><line x1="24.7" y1="-24.7" x2="70.7" y2="-70.7"/>
+        <line x1="33.8" y1="-9.1" x2="96.6" y2="-25.9"/><line x1="33.8" y1="9.1" x2="96.6" y2="25.9"/>
+        <line x1="24.7" y1="24.7" x2="70.7" y2="70.7"/><line x1="9.1" y1="33.8" x2="25.9" y2="96.6"/>
+        <line x1="-9.1" y1="33.8" x2="-25.9" y2="96.6"/><line x1="-24.7" y1="24.7" x2="-70.7" y2="70.7"/>
+        <line x1="-33.8" y1="9.1" x2="-96.6" y2="25.9"/><line x1="-33.8" y1="-9.1" x2="-96.6" y2="-25.9"/>
+        <line x1="-24.7" y1="-24.7" x2="-70.7" y2="-70.7"/><line x1="-9.1" y1="-33.8" x2="-25.9" y2="-96.6"/>
+      </g>
+      <text y="-106" text-anchor="middle" font-size="10" fill="#888">12시 · 빨강</text>
+      <text x="94" y="60" font-size="10" fill="#888">4시 · 노랑</text>
+      <text x="-94" y="60" text-anchor="end" font-size="10" fill="#888">8시 · 파랑</text>
+      <text y="4" text-anchor="middle" font-size="9" fill="#bbb">색상환</text>
+    </svg>
+  </div>
+
+  <div class="box" style="flex:1; min-height:24mm; margin-bottom:1mm;">
+    <div class="lab"><b>보색 무늬</b> — 마주 보는 색 짝 하나를 골라 체크무늬나 줄무늬로</div>
+  </div>
+  <div class="note">확인: 무지개 순서로 자연스럽게 이어지면 성공. 탁해진 칸은 멀리 있는 색을 섞었거나 붓을 안 씻은 거예요. 완성한 색상환은 오려서 책상이나 교실에 붙여 두면 "무슨 색을 고를까"의 지도가 돼요.</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '색상환과 보색' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 12. 명암과 입체 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">12</div>
+    <div class="tt"><b>명암과 입체</b><span>명암 3단계 · 글레이징 · [6미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">밝음·중간·어두움을 나눠 칠해 <b>공처럼</b> 보이게 해요. <span class="mat">준비물: 한 가지 색 물감, 굵은 붓·가는 붓, 연필</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>빛이 어디서 오는지 정하고, 왼쪽 위 네모에 <b>화살표로 표시</b>해요. (명암의 절반은 빛 방향 정하기!)</li>
+      <li>원 전체를 <b>연하게</b> 칠하되, 빛 쪽 한 곳은 <b>종이 그대로</b> 남겨요 = 반짝이는 곳. <span class="dose">💧💧💧🎨</span> (남길 자리를 연필로 미리 작게 표시)</li>
+      <li><b>완전히 마르면</b>(손등 확인) 빛 반대쪽 <b>절반만</b> 한 번 더. 경계는 달 모양으로 둥글게. <span class="dose">💧💧🎨🎨</span></li>
+      <li>또 마르면 가장자리 <b>좁은 부분만</b> 한 번 더 → 밝음·중간·어두움 3단계 완성!</li>
+      <li>빛 반대쪽 바닥에 납작한 타원 <b>그림자</b>를 붙여 그려요. <span class="dose">💧🎨🎨🎨</span></li>
+    </ol>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:3mm;">
+    <div class="lab"><b>연습 1 — 명암 공</b> · 점선 원에 3단계로. 어두움은 테두리가 아니라 "빛의 반대쪽"!</div>
+    <div style="position:absolute; left:5mm; top:9mm; width:24mm; height:20mm; border:1px dashed #ccc; border-radius:2mm; font-size:8pt; color:#aaa; text-align:center; padding-top:1mm;">빛 방향<br>화살표</div>
+    <div style="height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+      <div style="width:62mm; height:62mm; border:1.3px dashed #bbb; border-radius:50%;"></div>
+      <div style="width:70mm; height:11mm; border:1.2px dashed #ddd; border-radius:50%; margin-top:2mm;"></div>
+    </div>
+  </div>
+
+  <div class="box" style="height:64mm; margin-bottom:1mm;">
+    <div class="lab"><b>연습 2 — 과일로 도전</b> · 사과나 귤을 같은 방법으로 (다음 차시 준비!)</div>
+  </div>
+  <div class="note">확인: 공처럼 둥글어 보이면 성공. 테두리만 진한 동그라미가 됐다면 → 어두움을 반대쪽 "절반"에 다시.</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '명암과 입체' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 13. 멀리와 가까이 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">13</div>
+    <div class="tt"><b>멀리와 가까이</b><span>공기 원근 · [6미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal"><b>멀수록 연하게, 가까울수록 진하게.</b> 진하기 차이가 깊이를 만들어요. <span class="mat">준비물: 파랑(또는 보라) 물감, 굵은 붓·가는 붓</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>위 상자엔 연한 능선이 미리 그려져 있어요. <b>제일 위(먼) 산부터</b>: 물 많이, 아주 연하게. <span class="dose">💧💧💧🎨</span></li>
+      <li><b>마르면</b> 가운데 산을 중간 진하기로. <span class="dose">💧💧🎨🎨</span> 앞 산이 먼 산을 살짝 가려요.</li>
+      <li>또 마르면 <b>제일 앞 산을 진하게.</b> <span class="dose">💧🎨🎨🎨</span> 나무·바위 같은 세부는 <b>앞 산에만!</b> (멀리 있는 건 뭉개져 보여요)</li>
+      <li>아래 상자엔 <b>내가 능선을 연필로 그려서</b> 같은 순서로 한 번 더.</li>
+    </ol>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:3mm;">
+    <div class="lab"><b>연습 1</b> — 능선 따라: 먼 산 연하게 → 중간 → 앞 산 진하게</div>
+    <svg style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 200 100" preserveAspectRatio="none">
+      <path d="M0 34 L28 20 L46 30 L68 16 L88 28 L112 18 L138 27 L166 19 L200 30" fill="none" stroke="#ddd" stroke-width=".8"/>
+      <path d="M0 58 L30 44 L60 54 L92 42 L124 52 L158 44 L200 52" fill="none" stroke="#ddd" stroke-width=".8"/>
+      <path d="M0 82 L36 66 L78 78 L124 66 L164 76 L200 70" fill="none" stroke="#ddd" stroke-width=".8"/>
+    </svg>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:1mm;">
+    <div class="lab"><b>연습 2</b> — 내가 능선 세 줄을 그리고, 같은 순서로</div>
+  </div>
+  <div class="note">확인: 연함→진함 순서로 멀고 가까움이 보이면 성공. 세 산이 같은 진하기면 평평해 보여요. '작품' 차시의 "앞 언덕 더 진하게"가 바로 이 원리!</div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '멀리와 가까이' 차시와 함께 쓸 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 14. 관찰해서 그리기 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">14</div>
+    <div class="tt"><b>관찰해서 그리기</b><span>관찰 정물 · [6미01-01] [6미02-03]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">진짜 과일을 관찰하고 배운 기법으로 그려요. 기준은 "똑같이"가 아니라 <b>"관찰한 것을 담았는가"</b>! <span class="mat">준비물: 진짜 과일 1개, 물감, 붓 2자루, 연필</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>그리기 전에 <b>1분 동안 보기만</b> 해요. 만져 보고, 돌려 보고. 색이 몇 가지 보이나요?</li>
+      <li>찾은 색을 아래 관찰 기록에 <b>세 가지 이상</b> 써요. (빨강 속 노랑, 연두, 갈색 반점까지!)</li>
+      <li>연필로 <b>크게, 연하게</b> 모양을 잡아요. 그리기 칸의 반을 차지할 만큼. 지우개는 되도록 안 쓰기.</li>
+      <li>제일 <b>밝은 색부터</b> 전체를 연하게. 반짝이는 곳은 종이 그대로 남겨요. <span class="dose">💧💧💧🎨</span></li>
+      <li><b>마르면</b> 어두운 쪽을 겹쳐 칠하고, 관찰한 다른 색들도 살짝 얹어요.</li>
+      <li>가는 붓으로 꼭지 같은 세부 + 아래 그림자. <span class="dose">💧🎨🎨🎨</span></li>
+    </ol>
+  </div>
+
+  <div style="font-size:9.5pt; margin-bottom:2mm; display:flex; gap:3mm; align-items:center;">
+    <b>관찰 기록</b> — 내 과일에서 찾은 색:
+    ① <span style="width:24mm; border-bottom:1px solid #999; height:5mm; display:inline-block;"></span>
+    ② <span style="width:24mm; border-bottom:1px solid #999; height:5mm; display:inline-block;"></span>
+    ③ <span style="width:24mm; border-bottom:1px solid #999; height:5mm; display:inline-block;"></span>
+    ④ <span style="width:24mm; border-bottom:1px solid #999; height:5mm; display:inline-block;"></span>
+  </div>
+
+  <div class="box" style="flex:1; margin-bottom:2mm;">
+    <div class="lab"><b>그리기 칸</b> — 크게! 반짝이는 곳은 남기고, 관찰한 색을 다 써 봐요</div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:1.5mm 5mm; font-size:9pt;">
+    <span>□ 색을 세 가지 이상 찾았어요</span>
+    <span>□ 반짝이는 곳을 종이색으로 남겼어요</span>
+    <span>□ 어두운 쪽을 겹쳐 칠했어요</span>
+    <span>□ 실물과 나란히 놓고 비교했어요</span>
+  </div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">실물과 그림을 나란히 놓고 태블릿 앱에서 사진으로 남겨 보세요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 15. 마음을 색으로 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">15</div>
+    <div class="tt"><b>마음을 색으로</b><span>따뜻한 색 · 차가운 색 · [6미01-02]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">기분과 느낌을 색과 번지기로 표현해요. <b>정답이 없는</b> 시간! <span class="mat">준비물: 물감, 굵은 붓, 깨끗한 물</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>색을 두 편으로 나눠요: <b>따뜻한 색</b>(빨강·주황·노랑 — 모닥불, 여름) / <b>차가운 색</b>(파랑·초록·보라 — 바다, 겨울). 아래 분류 칸에 써 보세요.</li>
+      <li>지금 내 기분은 무슨 색? 왼쪽 칸에 물을 칠하고 그 색으로 <b>크게 번지기.</b> <span class="dose">💧💧💧</span> 이유는 아직 비밀!</li>
+      <li>기분이 두 가지라면? 오른쪽 칸에 두 색을 옆에서 번지게 해 <b>저절로 만나게</b> 두어요. 붓으로 섞지 않기.</li>
+      <li>마르면 제목을 붙여요. "월요일 아침", "이기기 직전"…</li>
+      <li>짝과 바꿔 보고 <b>"무슨 기분 같아?"를 먼저 맞히게</b> 한 뒤 제목을 공개해요.</li>
+    </ol>
+  </div>
+
+  <div style="font-size:9.5pt; margin-bottom:2mm; display:flex; gap:4mm;">
+    <span><b>따뜻한 색:</b> <span style="width:38mm; border-bottom:1px solid #999; height:5mm; display:inline-block;"></span></span>
+    <span><b>차가운 색:</b> <span style="width:38mm; border-bottom:1px solid #999; height:5mm; display:inline-block;"></span></span>
+  </div>
+
+  <div style="display:flex; gap:4mm; flex:1; margin-bottom:2mm;">
+    <div class="box" style="flex:1;"><div class="lab"><b>지금 내 기분</b> — 한 색으로 크게 번지기</div></div>
+    <div class="box" style="flex:1;"><div class="lab"><b>두 기분이 만나면</b> — 두 색이 저절로 만나게</div></div>
+  </div>
+
+  <div style="font-size:10pt; display:flex; gap:3mm; align-items:center; margin-bottom:1mm;">
+    <span>작품 제목:</span><span style="flex:1; border-bottom:1px solid #999; height:6mm;"></span>
+    <span style="font-size:8.5pt; color:#888;">짝이 맞힌 기분:</span><span style="width:30mm; border-bottom:1px solid #999; height:6mm;"></span>
+  </div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">태블릿 앱 '마음을 색으로' 차시에서 실제 번지기 영상도 볼 수 있어요.</span>
+  </div>
+</div>
+
+<!-- ═════════ 16. 나만의 작품 계획서 ═════════ -->
+<div class="sheet">
+  <div class="hd">
+    <div class="num">16</div>
+    <div class="tt"><b>나만의 작품 — 계획서와 감상 기록</b><span>계획 · 제작 · 감상 · [6미02-01] [6미02-04] [6미03-04]</span></div>
+    <div class="who">이름 <i>＿＿＿＿＿＿</i><br>날짜 <i>＿＿＿＿＿＿</i></div>
+  </div>
+  <div class="goal">주제와 기법을 스스로 골라 <b>새 도화지에</b> 작품을 그려요. 이 장은 계획서 — 그림은 큰 종이에! <span class="mat">준비물: 물감, 붓 2자루, 새 도화지</span></div>
+
+  <div class="howto"><span class="t">이렇게 해요</span>
+    <ol>
+      <li>보여주고 싶은 것을 <b>한 문장</b>으로 정해요. 안 떠오르면 지금까지 그린 것 중 "더 해 보고 싶었던 것"을 골라요.</li>
+      <li>배운 기법 중 <b>3가지를 골라</b> 어디에 쓸지 계획해요.</li>
+      <li>순서 세 가지만 지켜요: <b>넓은 곳 먼저, 밝은 색 먼저, 마른 뒤에 겹치기.</b></li>
+      <li>중간에 한 번, 한 걸음 물러나서 봐요. "망쳤다" 싶으면 위에 더할 수 있는 기법(소금·뿌리기·닦아내기)을 떠올려요.</li>
+      <li>완성하면 구석에 제목과 이름. 그리고 <b>감상회</b> — 친구 작품에서 좋은 점을 한 가지씩!</li>
+    </ol>
+  </div>
+
+  <div style="font-size:10pt; display:flex; gap:2mm; align-items:center; margin-bottom:2.5mm;">
+    <b>내 주제</b> (한 문장): <span style="flex:1; border-bottom:1px solid #999; height:6mm;"></span>
+  </div>
+
+  <div class="box" style="height:34mm; margin-bottom:2.5mm; padding:8mm 4mm 2mm;">
+    <div class="lab"><b>쓸 기법 3가지에 ○ 하고, 어디에 쓸지 이어서 써요</b></div>
+    <div style="display:flex; flex-wrap:wrap; gap:1mm 4mm; font-size:9pt; color:#444;">
+      <span>번지기</span><span>평칠</span><span>그러데이션</span><span>겹쳐 칠하기</span><span>크레파스 배수</span><span>소금</span><span>뿌리기</span><span>닦아내기</span><span>보색</span><span>명암</span><span>원근</span>
+    </div>
+    <div style="font-size:9pt; margin-top:1.5mm; line-height:2;">
+      ① <span style="width:26mm; border-bottom:1px solid #aaa; display:inline-block;"></span> 을/를 <span style="width:34mm; border-bottom:1px solid #aaa; display:inline-block;"></span> 에 &nbsp;
+      ② <span style="width:26mm; border-bottom:1px solid #aaa; display:inline-block;"></span> 을/를 <span style="width:34mm; border-bottom:1px solid #aaa; display:inline-block;"></span> 에 &nbsp;
+      ③ <span style="width:26mm; border-bottom:1px solid #aaa; display:inline-block;"></span> 을/를 <span style="width:34mm; border-bottom:1px solid #aaa; display:inline-block;"></span> 에
+    </div>
+  </div>
+
+  <div class="box" style="height:26mm; margin-bottom:2.5mm;">
+    <div class="lab"><b>중간 점검</b> (마르는 동안) — 지금까지 잘된 것 / 더하고 싶은 것 한 가지씩</div>
+  </div>
+
+  <div class="box" style="height:38mm; margin-bottom:2.5mm; padding:8mm 4mm 2mm;">
+    <div class="lab"><b>감상회 기록</b> — 친구 작품에서 찾은 좋은 점</div>
+    <div style="font-size:9.5pt; line-height:2.4;">
+      <span style="color:#777;">＿＿＿의 작품:</span> <span style="width:120mm; border-bottom:1px solid #aaa; display:inline-block;"></span><br>
+      <span style="color:#777;">＿＿＿의 작품:</span> <span style="width:120mm; border-bottom:1px solid #aaa; display:inline-block;"></span>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:1.5mm 5mm; font-size:9pt;">
+    <span>□ 주제를 한 문장으로 정했어요</span>
+    <span>□ 계획한 기법을 2가지 이상 썼어요</span>
+    <span>□ 제목과 이름을 썼어요</span>
+    <span>□ 친구 작품의 좋은 점을 말했어요</span>
+  </div>
+
+  <div class="ft">
+    <span>오늘 어땠나요?</span><span class="fx">😊 😐 🙁</span>
+    <span>왜냐하면</span><span class="line"></span>
+    <span class="app">이 차시는 학기마다 반복해도 좋아요 — 작품 사진이 쌓이면 성장 앨범이 됩니다.</span>
+  </div>
+</div>
+
+</body>
+</html>
