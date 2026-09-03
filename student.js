@@ -174,6 +174,106 @@ function startAccessTimer() {
   }, 30000); // 30초마다 체크
 }
 
+// ══════════════════════════════════════════════════
+//  영어 복습앱 연동 (ENGLISH-LINK-1)
+//  · 영어 학습은 별도 앱(https://jeongrim-english.web.app)에서 하고, RPG는 그 기록을
+//    **읽어서** 보상만 준다. 영어앱이 RPG DB에 쓰는 일은 없다(규칙·저장 경로 불변).
+//  · 영어앱 기록은 다른 Firebase 프로젝트(jeongrim-equip)의 Firestore에 있으므로
+//    compat SDK로 두 번째 앱('english')을 띄워 읽는다. 기본 앱/RTDB와 완전히 분리.
+//  · 보상은 CUR.pendingRewards에 **approved:false**로 push → 교사가 admin 승인 대기열에서
+//    승인(approveReward)하면 지급. (approved:true로 넣으면 수령 경로가 없어 영원히 안 들어온다)
+//    이미 만든 보상은 CUR.englishRewards[key]=true 로 막는다(학생 레코드 필드 1개 추가).
+//  · 실패(오프라인·이름 불일치·SDK 미로드)는 조용히 건너뛰고 게임 진입을 막지 않는다.
+// ══════════════════════════════════════════════════
+const ENGLISH_APP = {
+  url: 'https://jeongrim-english.web.app/',
+  pass: '1234',                       // 영어앱 반 비밀번호(자동 입장 링크에 사용)
+  cls: 'jeongrim',                    // 영어앱 Firestore 문서 접두어
+  firebase: {
+    apiKey: 'AIzaSyBCUbY4A-wiWJFV35l966Dz6VvrJ7mI3Gc', authDomain: 'jeongrim-equip.firebaseapp.com',
+    projectId: 'jeongrim-equip', storageBucket: 'jeongrim-equip.firebasestorage.app',
+    messagingSenderId: '714906976935', appId: '1:714906976935:web:a745b77bf747cc9218d182',
+  },
+  reward: {                           // 단가 — 퀵승인 기본(30/30)보다 살짝 낮게
+    daily:  { exp: 20, gold: 15, label: '🔤 영어 복습 (오늘 공부함)' },
+    test:   { exp: 30, gold: 20, label: '🔤 영어 테스트 90% 이상' },
+    lesson: { exp: 80, gold: 50, label: '🔤 영어 단원 마스터' },
+  },
+  lessonName: { L1:'1단원', L2:'2단원', L3:'3단원', L4:'4단원', L5:'5단원', L6:'6단원', L7:'7단원',
+                Bweek:'요일', Bnum:'숫자', Bcolor:'색깔', Bmonth:'달', Bfamily:'가족' },
+};
+
+function englishAppLink() {
+  const name = (CUR && CUR.name) ? CUR.name : '';
+  return ENGLISH_APP.url + '?name=' + encodeURIComponent(name) + '&k=' + encodeURIComponent(ENGLISH_APP.pass);
+}
+
+let _englishFs = null;       // 두 번째 앱의 Firestore 핸들
+let _englishLastSync = 0;
+function _englishStore() {
+  if (_englishFs) return _englishFs;
+  if (typeof firebase === 'undefined' || typeof firebase.firestore !== 'function') return null;
+  let app = null;
+  try { app = firebase.app('english'); } catch (e) { app = firebase.initializeApp(ENGLISH_APP.firebase, 'english'); }
+  _englishFs = firebase.firestore(app);
+  return _englishFs;
+}
+
+// 영어앱 기록 → 보상. 로그인 직후 1회, 이후 5분마다(renderAll 등에서 호출돼도 안전).
+async function syncEnglishRewards(force) {
+  if (!CUR || !CUR.name) return;
+  const now = Date.now();
+  if (!force && now - _englishLastSync < 5 * 60 * 1000) return;
+  _englishLastSync = now;
+  const fs = _englishStore();
+  if (!fs) return;
+  let data = null;
+  try {
+    const snap = await fs.collection('english').doc(ENGLISH_APP.pass).collection('students')
+      .doc(ENGLISH_APP.cls + '_' + CUR.name).get();
+    if (!snap.exists) return;              // 영어앱에 같은 이름이 없음 — 조용히 종료
+    data = snap.data() || {};
+  } catch (e) { console.warn('영어앱 기록 읽기 실패:', e); return; }
+
+  const today = Utils.todayStr();
+  const given = CUR.englishRewards || {};
+  const adds = [];
+  const push = (key, r, extra) => {
+    if (given[key]) return;
+    given[key] = true;
+    adds.push({
+      id: 'r_eng_' + key.replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + now,
+      studentId: CUR.id, boardQuestId: null, boardQuestType: 'english', type: 'english',
+      name: r.label + (extra ? ' ' + extra : ''), label: r.label + (extra ? ' ' + extra : ''),
+      exp: r.exp, gold: r.gold, stat: '', statVal: 0, icon: '🔤', date: today, approved: false,
+    });
+  };
+
+  // ① 오늘 영어앱에서 공부했으면 하루 1회
+  if (data.lastDay === today) push('daily_' + today, ENGLISH_APP.reward.daily);
+  // ② 테스트 90% 이상 — 회차마다 1회
+  const tests = data.tests || {};
+  Object.keys(tests).forEach(k => {
+    (tests[k] || []).forEach((t, i) => {
+      if (t && t.total > 0 && t.ok / t.total >= 0.9)
+        push('test_' + k + '_' + i, ENGLISH_APP.reward.test, '(' + t.ok + '/' + t.total + ')');
+    });
+  });
+  // ③ 단원 숙달 100% — 단원당 1회
+  const lessons = data.lessons || {};
+  Object.keys(lessons).forEach(k => {
+    if (lessons[k] === 100) push('lesson_' + k, ENGLISH_APP.reward.lesson, ENGLISH_APP.lessonName[k] || k);
+  });
+
+  if (!adds.length) return;
+  CUR.englishRewards = given;
+  CUR.pendingRewards = [...(CUR.pendingRewards || []), ...adds];
+  DB.saveStudent(CUR);
+  renderAll();
+  const exp = adds.reduce((n, r) => n + r.exp, 0), gold = adds.reduce((n, r) => n + r.gold, 0);
+  toast(`🔤 영어 복습 보상 ${adds.length}개 신청됐어요 (+${exp}EXP +${gold}G) · 선생님 승인 후 지급됩니다`);
+}
+
 function enterGame() {
   // [Q-2B] 교사가 admin을 열지 않아도 학생 첫 접속 시 오늘 일일 퀘스트가 생성되게 한다.
   // 로직은 Q-2A에서 공통화한 DB.ensureDailyQuests()(gamedata.js)를 그대로 호출.
@@ -205,6 +305,8 @@ function enterGame() {
   applyScale();
   renderAll();
   startAccessTimer();
+  // [ENGLISH-LINK-1] 영어 복습앱 기록 → 보상 (실패해도 진입에 영향 없음)
+  setTimeout(() => { try { syncEnglishRewards(true); } catch (e) { console.warn('영어앱 연동:', e); } }, 800);
   // [DAILY-STUDY-1] 로그인 직후 자동 팝업 3종(주간다짐 1.5초·단어퀴즈 20초·회고 30초) 폐기.
   //   기습적으로 학습을 끊고 튀어나와 실제 도움이 안 된다는 운영 판단.
   //   할 일은 홈 카드에서 학생이 눌러서 시작한다(오늘의 학습 카드 / 할 일 목록).
@@ -10283,9 +10385,33 @@ function renderStudySubjectPick() {
     units.forEach(u => { const s = stats[u.id]; if (s) { t += s.t; c += s.c; } });
     const weak = units.filter(u => unitLevelOf(stats[u.id]).key === 'weak').length;
     return { ...sub, units, count, t, c, weak };
-  }).filter(sub => sub.count > 0);
+  }).filter(sub => sub.count > 0 && sub.key !== 'english');   // [ENGLISH-LINK-1] 영어는 영어앱으로
 
-  if (subjects.length === 0) {
+  // [ENGLISH-LINK-1] 외부 학습 앱 카드 — RPG 내부 문항 대신 전용 앱으로 보낸다.
+  //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
+  const EXTERNAL_STUDY = [
+    { key: 'english', icon: '🔤', title: '영어 복습앱',
+      sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 EXP·골드',
+      href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)' },
+    { key: 'watercolor', icon: '🎨', title: '수채화 기초',
+      sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
+      href: 'watercolor/index.html?sid=' + encodeURIComponent(CUR.id),
+      border: 'rgba(155,120,220,.45)', bg: 'rgba(155,120,220,.10)' },
+  ];
+  const externalCards = EXTERNAL_STUDY.map(x => `
+          <a class="st-subject-card" href="${x.href}" target="_blank" rel="noopener"
+            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
+              border:1px solid ${x.border};cursor:pointer;text-decoration:none;
+              background:${x.bg};color:var(--txt);font-family:inherit;text-align:left;box-sizing:border-box">
+            <span style="font-size:2.2rem">${x.icon}</span>
+            <span style="flex:1;min-width:0">
+              <span class="st-subject" style="display:block;font-weight:700">${escHtml(x.title)}</span>
+              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">${escHtml(x.sub)}</span>
+            </span>
+            <span style="font-size:1.3rem;color:var(--txt3)">↗</span>
+          </a>`).join('');
+
+  if (subjects.length === 0 && !externalCards) {
     body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--txt3);font-size:1rem">
       선생님이 공부할 단원을 정하면 여기에 나와요</div>`;
     return;
@@ -10302,6 +10428,7 @@ function renderStudySubjectPick() {
           : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
       </div>
       <div style="display:grid;gap:.7rem">
+        ${externalCards}
         ${subjects.map(sub => {
           const pct = sub.t >= 3 ? Math.round(sub.c / sub.t * 100) : null;
           return `
