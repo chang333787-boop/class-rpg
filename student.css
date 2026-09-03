@@ -422,6 +422,27 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background-image:linear-gradient(rgba(43,58,85,.09) 1px,transparent 1px),
                    linear-gradient(90deg,rgba(43,58,85,.09) 1px,transparent 1px);
   background-size:26px 26px;}
+/* 문항 그림(FIG-1) — 선 색은 글자색, 배경은 살짝 밝은 판 */
+#study-body .st-fig{color:var(--txt);margin:0 0 1rem;padding:.7rem .6rem;border-radius:12px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);}
+/* 모드 칩(STUDY-MODES-1) — 계산/문장제/개념, OX/상황/추론 */
+#study-body .st-chips{display:flex;gap:.45rem;flex-wrap:wrap;margin:0 0 1rem;}
+#study-body .st-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem .85rem;border-radius:999px;
+  border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--txt2);
+  font-family:inherit;font-size:.95rem;font-weight:700;cursor:pointer;transition:transform .12s,background .15s;}
+#study-body .st-chip:hover{background:rgba(255,255,255,.1);transform:translateY(-1px);}
+#study-body .st-chip.on{background:rgba(255,215,0,.16);border-color:rgba(255,215,0,.5);color:var(--gold);}
+#study-body .st-chip:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+#study-body .st-chip-n{font-size:.78rem;font-weight:600;color:var(--txt3);background:rgba(0,0,0,.25);
+  padding:.1rem .45rem;border-radius:999px;}
+#study-body .st-chip.on .st-chip-n{color:var(--gold);}
+/* OX 문항(SOCIAL-TYPES-1) — 좌우 큰 버튼 */
+#study-body .st-ox{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;}
+#study-body .st-ox-btn{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:1.2rem .8rem;
+  border-radius:16px;border:1px solid rgba(46,204,113,.4);background:rgba(46,204,113,.09);color:var(--txt);
+  font-family:inherit;font-size:1.15rem;font-weight:700;cursor:pointer;}
+#study-body .st-ox-btn.x{border-color:rgba(231,76,60,.4);background:rgba(231,76,60,.09);}
+#study-body .st-ox-mark{font-size:2.6rem;line-height:1;}
 #study-body .st-stars{font-size:1.5rem;letter-spacing:.15rem}
 @media (prefers-reduced-motion: reduce){
   #study-body *{animation:none !important;transition:none !important}
