@@ -1,0 +1,19 @@
+# GitHub Pages 빌드 설정
+#
+# 목적: 웹에는 앱 화면(student/admin/kiosk)만 올리고, 개발·운영 문서(.md)는 올리지 않는다.
+#
+# 배경(2026-09-03): index.html이 없던 동안 GitHub Pages가 README.md를 사이트 첫 화면으로
+# 렌더링했고(funclassrpg.kr 접속 시 개발 문서가 보임), docs/ 아래 문서도 전부 공개 페이지가
+# 되어 있었다. 그중 docs/rpg_teacher_operation_guide.md 에는 관리자·학생 기본 비밀번호가
+# 적혀 있어 외부에 노출됐다. 아래 exclude 는 그 문서들을 빌드 산출물에서 제외한다.
+#
+# 주의: 앱 코드(*.html, *.js, *.css, assets/)는 여기에 넣지 말 것 — 넣으면 사이트가 깨진다.
+# 확인 결과 앱은 docs/ · scripts/ 를 참조하지 않는다(2026-09-03 grep 확인).
+exclude:
+  - README.md
+  - AGENTS.md
+  - CLAUDE.md
+  - CLAUDE.local.md
+  - docs
+  - scripts
+  - .gitignore

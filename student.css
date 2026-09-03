@@ -405,6 +405,23 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   transition:width .35s cubic-bezier(.34,1.56,.64,1);
 }
 /* 별점 — 오늘 얼마나 했는지 한눈에 */
+/* 풀이 연습장(수학) — 어두운 화면 위에 올려둔 '종이' */
+#study-body .st-scratch{margin:0 0 1.4rem;border-radius:16px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.16);background:#F7F5EC;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+#study-body .st-scratch-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+  padding:.45rem .5rem .45rem .9rem;background:rgba(43,58,85,.07);
+  color:#5A6478;font-size:.92rem;font-weight:700;}
+#study-body .st-scratch-clear{border:1px solid rgba(43,58,85,.22);background:#fff;color:#5A6478;
+  font-family:inherit;font-size:.9rem;font-weight:700;padding:.4rem .85rem;border-radius:10px;
+  cursor:pointer;flex-shrink:0;transition:background .15s,transform .1s;}
+#study-body .st-scratch-clear:hover{background:#EDEAE0;}
+#study-body .st-scratch-clear:active{transform:translateY(1px);}
+/* touch-action:none — 손가락으로 그릴 때 페이지가 같이 스크롤되지 않게 */
+#study-body #study-scratch{display:block;width:100%;height:clamp(130px,24vh,200px);
+  touch-action:none;cursor:crosshair;
+  background-image:linear-gradient(rgba(43,58,85,.09) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(43,58,85,.09) 1px,transparent 1px);
+  background-size:26px 26px;}
 #study-body .st-stars{font-size:1.5rem;letter-spacing:.15rem}
 @media (prefers-reduced-motion: reduce){
   #study-body *{animation:none !important;transition:none !important}

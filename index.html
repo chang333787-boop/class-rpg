@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>우리반 성장 RPG</title>
+<meta name="robots" content="noindex">
+<!-- 주소창에 funclassrpg.kr 만 치면 학생 화면으로 보낸다.
+     JS가 막혀 있어도 meta refresh 로 넘어가고, 그것도 안 되면 아래 버튼으로 간다. -->
+<meta http-equiv="refresh" content="0; url=./student.html">
+<script>location.replace('./student.html');</script>
+<style>
+  html,body{height:100%;margin:0;background:#0E1621;color:#E8EDF5;
+    font-family:'Noto Sans KR','Malgun Gothic',sans-serif;}
+  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:1.1rem;text-align:center;padding:1rem;}
+  .logo{font-size:3rem}
+  .name{font-size:1.05rem;font-weight:700;color:#FFD700}
+  .go{margin-top:.4rem;display:inline-block;padding:.85rem 1.8rem;border-radius:14px;
+    background:#FFD700;color:#1a1a1a;font-weight:700;text-decoration:none;font-size:1.05rem}
+  .sub{font-size:.85rem;color:#8A94A6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">🏫</div>
+  <div class="name">우리반 성장 RPG</div>
+  <a class="go" href="./student.html">학생 화면으로 들어가기</a>
+  <div class="sub">잠시 뒤 자동으로 넘어갑니다</div>
+</div>
+</body>
+</html>
