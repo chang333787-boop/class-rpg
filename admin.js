@@ -5825,6 +5825,25 @@ window.onDbSaveError = () => notify('⚠️ 저장에 실패했어요. 인터넷
 //   · 학생 화면은 켜진 단원의 문제만 출제한다
 // ══════════════════════════════════════════════════
 
+// [STUDY-REWARD-1] 오늘의 공부 보상 설정 — settings.studyReward (student.js의 studyRewardCfg와 기본값 동일)
+function _studyRewardCfg() {
+  const s = DB.getSettings() || {};
+  const d = { enabled: true, mode: 'auto', exp: 30, gold: 20, bonusPct: 80, bonusExp: 20, bonusGold: 10 };
+  return { ...d, ...(s.studyReward || {}) };
+}
+function saveStudyRewardCfg() {
+  const num = (id, def) => { const v = parseInt(document.getElementById(id)?.value); return Number.isFinite(v) && v >= 0 ? v : def; };
+  const mode = document.querySelector('input[name="sr-mode"]:checked')?.value === 'approve' ? 'approve' : 'auto';
+  const cfg = {
+    enabled: !!document.getElementById('sr-enabled')?.checked, mode,
+    exp: num('sr-exp', 30), gold: num('sr-gold', 20), bonusPct: Math.min(100, num('sr-pct', 80)),
+    bonusExp: num('sr-bexp', 20), bonusGold: num('sr-bgold', 10),
+  };
+  DB.saveSettings({ ...DB.getSettings(), studyReward: cfg });
+  notify(cfg.enabled ? `오늘의 공부 보상 저장 (${cfg.mode === 'approve' ? '승인 후' : '바로'} +${cfg.exp}EXP +${cfg.gold}G)` : '오늘의 공부 보상을 껐습니다');
+  renderStudyScopePage();
+}
+
 function _activeUnitSet() {
   const list = (DB.getSettings() || {}).activeProblemUnits;
   return new Set(Array.isArray(list) ? list : []);
@@ -5853,7 +5872,37 @@ function renderStudyScopePage() {
     stat[a.unitId].t++; if (a.correct) stat[a.unitId].c++;
   }
 
+  const rw = _studyRewardCfg();
   body.innerHTML = `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.02rem;margin-bottom:.5rem">
+        <span>🎁 오늘의 공부 보상</span>
+        <span class="text-muted-sm">하루 ${typeof STUDY_PER_DAY !== 'undefined' ? STUDY_PER_DAY : 10}문제를 채우면 1회</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem .9rem;align-items:end">
+        <label style="display:flex;align-items:center;gap:.5rem;grid-column:1/-1">
+          <input type="checkbox" id="sr-enabled" ${rw.enabled ? 'checked' : ''} style="width:18px;height:18px">
+          <span>보상 주기</span>
+        </label>
+        <div style="grid-column:1/-1;display:flex;gap:1.2rem;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:.4rem">
+            <input type="radio" name="sr-mode" value="auto" ${rw.mode !== 'approve' ? 'checked' : ''}> 바로 지급</label>
+          <label style="display:flex;align-items:center;gap:.4rem">
+            <input type="radio" name="sr-mode" value="approve" ${rw.mode === 'approve' ? 'checked' : ''}> 선생님 승인 후 지급</label>
+        </div>
+        <div><div class="text-muted-sm">EXP</div><input class="form-input" type="number" id="sr-exp" value="${rw.exp}"></div>
+        <div><div class="text-muted-sm">골드</div><input class="form-input" type="number" id="sr-gold" value="${rw.gold}"></div>
+        <div><div class="text-muted-sm">보너스 기준 정답률(%)</div><input class="form-input" type="number" id="sr-pct" value="${rw.bonusPct}"></div>
+        <div><div class="text-muted-sm">보너스 EXP</div><input class="form-input" type="number" id="sr-bexp" value="${rw.bonusExp}"></div>
+        <div><div class="text-muted-sm">보너스 골드</div><input class="form-input" type="number" id="sr-bgold" value="${rw.bonusGold}"></div>
+        <button class="btn-sm" onclick="saveStudyRewardCfg()">저장</button>
+      </div>
+      <div class="text-muted-sm" style="margin-top:.6rem">
+        · 4학년 교과 문제만 집계합니다. <b>1~3학년 보충</b>은 보상과 무관합니다.<br>
+        · '선생님 승인 후 지급'을 고르면 보상 지급 탭 대기열에 뜹니다.
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:1rem">
       <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
         <div style="flex:1;min-width:220px">

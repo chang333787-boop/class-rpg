@@ -10319,8 +10319,8 @@ function buildStudyCardHTML(s) {
           </div>
           <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">
             ${cleared
-              ? `${done}문제 풀었어요 · 정답률 ${pct}%`
-              : `하루 ${STUDY_PER_DAY}문제 · ${done > 0 ? `${done}문제 했어요` : '아직 안 했어요'}`}
+              ? `${done}문제 풀었어요 · 정답률 ${pct}%${(s.studyRewards||{})[Utils.todayStr()] ? ' · 🎁 보상 받음' : ''}`
+              : `하루 ${STUDY_PER_DAY}문제 · ${done > 0 ? `${done}문제 했어요` : '아직 안 했어요'}${studyRewardCfg().enabled ? ` · 다 풀면 +${studyRewardCfg().exp}EXP` : ''}`}
           </div>
         </div>
         <div style="font-size:.72rem;padding:.3rem .7rem;border-radius:8px;flex-shrink:0;
@@ -10785,6 +10785,82 @@ function nextStudyQuestion() {
   renderStudyQuestion();
 }
 
+// ── 오늘의 공부 보상 (STUDY-REWARD-1) ──────────────────────
+// 하루 10문제(STUDY_PER_DAY)를 채우면 1회 지급. 정답률이 기준 이상이면 보너스.
+// 설정은 settings.studyReward — 교사 화면 '학습 범위'에서 바꾼다. 없으면 아래 기본값.
+//   mode 'auto'    : 감정 보상과 같은 방식 — 즉시 지급 + questLog
+//   mode 'approve' : pendingRewards(approved:false) → 교사 승인 후 지급
+// 보충(1~3학년, 세션 review:true) 기록은 집계에서 빼서 보상과 무관하게 둔다.
+function studyRewardCfg() {
+  const s = (typeof DB.getSettings === 'function' && DB.getSettings()) || {};
+  const d = { enabled: true, mode: 'auto', exp: 30, gold: 20, bonusPct: 80, bonusExp: 20, bonusGold: 10 };
+  return { ...d, ...(s.studyReward || {}) };
+}
+
+function grantStudyReward(justSaved) {
+  const cfg = studyRewardCfg();
+  if (!cfg.enabled) return null;
+  const today = Utils.todayStr();
+  CUR.studyRewards = CUR.studyRewards || {};
+  if (CUR.studyRewards[today]) return { already: true, ...CUR.studyRewards[today] };
+
+  // 오늘 기록 합산 — 방금 저장한 기록이 캐시에 아직 없으면 직접 더한다
+  const recs = getTodayStudyRecords(CUR.id).filter(r => !r.review);
+  let done  = recs.reduce((n, r) => n + (r.total || 0), 0);
+  let right = recs.reduce((n, r) => n + (r.correct || 0), 0);
+  if (justSaved && !recs.some(r => r.id === justSaved.id)) { done += justSaved.total; right += justSaved.correct; }
+  if (done < STUDY_PER_DAY) return { need: STUDY_PER_DAY - done };
+
+  const pct   = Math.round(right / done * 100);
+  const bonus = pct >= cfg.bonusPct;
+  const exp   = (cfg.exp  || 0) + (bonus ? (cfg.bonusExp  || 0) : 0);
+  const gold  = (cfg.gold || 0) + (bonus ? (cfg.bonusGold || 0) : 0);
+  const label = `📚 오늘의 공부 ${done}문제 완료${bonus ? ` · 정답률 ${pct}%` : ''}`;
+  const rec   = { exp, gold, pct, bonus, mode: cfg.mode, date: today };
+
+  if (cfg.mode === 'approve') {
+    CUR.pendingRewards = [...(CUR.pendingRewards || []), {
+      id: 'r_study_' + today + '_' + Date.now(), studentId: CUR.id,
+      boardQuestId: null, boardQuestType: 'study', type: 'study',
+      name: label, label, exp, gold, stat: '', statVal: 0, icon: '📚', date: today, approved: false,
+    }];
+  } else {
+    CUR.exp       = (CUR.exp || 0) + exp;
+    CUR.gold      = (CUR.gold || 0) + gold;
+    CUR.totalGold = (CUR.totalGold || 0) + gold;
+    const oldLv = CUR.level;
+    CUR.level = Utils.levelFromExp(CUR.exp);
+    DB.saveQuestLog({
+      studentId: CUR.id, boardQuestId: null, boardQuestType: 'study', type: 'study',
+      name: label, exp, gold, stat: '', statVal: 0, icon: '📚', date: today, approved: true,
+    });
+    if (CUR.level > oldLv) rec.levelUp = CUR.level;
+  }
+  CUR.studyRewards[today] = rec;
+  DB.saveStudent(CUR);
+  if (typeof renderAll === 'function') renderAll();
+  if (rec.levelUp && typeof triggerLevelUp === 'function') setTimeout(() => triggerLevelUp(rec.levelUp), 400);
+  return rec;
+}
+
+// 결과 화면에 붙는 보상 안내
+function studyRewardBannerHTML(r) {
+  if (!r) return '';
+  const box = (bg, bd, inner) => `
+    <div style="background:${bg};border:1px solid ${bd};border-radius:14px;padding:.9rem 1.1rem;
+      margin-bottom:1.2rem;text-align:center;font-size:1.05rem;line-height:1.5;word-break:keep-all">${inner}</div>`;
+  if (r.need) return box('rgba(255,255,255,.04)', 'rgba(255,255,255,.1)',
+    `<span style="color:var(--txt3)">${r.need}문제 더 풀면 오늘의 보상!</span>`);
+  if (r.already) return box('rgba(255,255,255,.04)', 'rgba(255,255,255,.1)',
+    `<span style="color:var(--txt3)">오늘 보상은 이미 받았어요 ✓</span>`);
+  if (r.mode === 'approve') return box('rgba(255,215,0,.08)', 'rgba(255,215,0,.3)',
+    `🎁 <b style="color:var(--gold)">+${r.exp}EXP +${r.gold}G</b><br>
+     <span style="font-size:.95rem;color:var(--txt3)">선생님 승인 후 지급돼요</span>`);
+  return box('rgba(46,204,113,.1)', 'rgba(46,204,113,.35)',
+    `🎁 <b style="color:var(--emerald)">+${r.exp}EXP +${r.gold}G</b> 받았어요!
+     ${r.bonus ? `<br><span style="font-size:.95rem;color:var(--gold)">⭐ 정답률 ${r.pct}% 보너스 포함</span>` : ''}`);
+}
+
 function finishStudySession() {
   if (!STUDY_SESSION) return;
   const { subjectKey, unitId: sessionUnit, questions, correct, answers } = STUDY_SESSION;
@@ -10797,9 +10873,10 @@ function finishStudySession() {
   answers.forEach(a => { unitCount[a.unitId] = (unitCount[a.unitId] || 0) + 1; });
   const mainUnit = Object.entries(unitCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 
+  const recId = `prob_${Utils.todayStr()}_${CUR.id}_${Date.now()}`;
   if (typeof DB.saveProblemRecord === 'function') {
     DB.saveProblemRecord({
-      id: `prob_${Utils.todayStr()}_${CUR.id}_${Date.now()}`,
+      id: recId,
       studentId: CUR.id,
       date: Utils.todayStr(),
       subjectKey,
@@ -10807,8 +10884,12 @@ function finishStudySession() {
       total, correct,
       wrongIds,
       answers,          // 고른 답까지 보존
+      review: !!STUDY_SESSION.review,   // 보충(1~3학년) 세션이면 true — 보상 집계에서 뺀다
     });
   }
+
+  // [STUDY-REWARD-1] 오늘 10문제를 채우면 하루 1회 보상
+  const reward = STUDY_SESSION.review ? null : grantStudyReward({ id: recId, total, correct });
 
   const emoji = pct === 100 ? '🏆' : pct >= 80 ? '👏' : pct >= 50 ? '💪' : '🌱';
   const msg   = pct === 100 ? '다 맞았어요!' : pct >= 80 ? '잘했어요!' : pct >= 50 ? '조금만 더!' : '천천히 해봐요';
@@ -10827,6 +10908,7 @@ function finishStudySession() {
           ${correct} / ${total}</div>
         <div style="font-size:1.15rem;color:var(--txt2)">${msg}</div>
       </div>
+      ${studyRewardBannerHTML(reward)}
       ${wrong.length > 0 ? `
         <div style="background:rgba(255,255,255,.04);border-radius:12px;padding:1rem 1.1rem;margin-bottom:1.2rem">
           <div style="font-size:1.05rem;font-weight:700;color:var(--red);margin-bottom:.7rem">
