@@ -180,8 +180,9 @@ function startAccessTimer() {
 //    **읽어서** 보상만 준다. 영어앱이 RPG DB에 쓰는 일은 없다(규칙·저장 경로 불변).
 //  · 영어앱 기록은 다른 Firebase 프로젝트(jeongrim-equip)의 Firestore에 있으므로
 //    compat SDK로 두 번째 앱('english')을 띄워 읽는다. 기본 앱/RTDB와 완전히 분리.
-//  · 보상은 emotion 보상과 같은 형식으로 CUR.pendingRewards에 push(approved:true).
-//    이미 준 보상은 CUR.englishRewards[key]=true 로 막는다(학생 레코드 필드 1개 추가).
+//  · 보상은 CUR.pendingRewards에 **approved:false**로 push → 교사가 admin 승인 대기열에서
+//    승인(approveReward)하면 지급. (approved:true로 넣으면 수령 경로가 없어 영원히 안 들어온다)
+//    이미 만든 보상은 CUR.englishRewards[key]=true 로 막는다(학생 레코드 필드 1개 추가).
 //  · 실패(오프라인·이름 불일치·SDK 미로드)는 조용히 건너뛰고 게임 진입을 막지 않는다.
 // ══════════════════════════════════════════════════
 const ENGLISH_APP = {
@@ -244,7 +245,7 @@ async function syncEnglishRewards(force) {
       id: 'r_eng_' + key.replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + now,
       studentId: CUR.id, boardQuestId: null, boardQuestType: 'english', type: 'english',
       name: r.label + (extra ? ' ' + extra : ''), label: r.label + (extra ? ' ' + extra : ''),
-      exp: r.exp, gold: r.gold, stat: '', statVal: 0, icon: '🔤', date: today, approved: true,
+      exp: r.exp, gold: r.gold, stat: '', statVal: 0, icon: '🔤', date: today, approved: false,
     });
   };
 
@@ -270,7 +271,7 @@ async function syncEnglishRewards(force) {
   DB.saveStudent(CUR);
   renderAll();
   const exp = adds.reduce((n, r) => n + r.exp, 0), gold = adds.reduce((n, r) => n + r.gold, 0);
-  toast(`🔤 영어 복습 보상 ${adds.length}개 도착! (+${exp}EXP +${gold}G) 보상함에서 받으세요`);
+  toast(`🔤 영어 복습 보상 ${adds.length}개 신청됐어요 (+${exp}EXP +${gold}G) · 선생님 승인 후 지급됩니다`);
 }
 
 function enterGame() {
@@ -10390,7 +10391,7 @@ function renderStudySubjectPick() {
   //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
   const EXTERNAL_STUDY = [
     { key: 'english', icon: '🔤', title: '영어 복습앱',
-      sub: '단어·표현·듣기·말하기 · 공부하면 보상이 RPG로 와요',
+      sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 EXP·골드',
       href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)' },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
