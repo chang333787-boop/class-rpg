@@ -195,7 +195,7 @@ const ENGLISH_APP = {
     messagingSenderId: '714906976935', appId: '1:714906976935:web:a745b77bf747cc9218d182',
   },
   reward: {                           // 단가 — 퀵승인 기본(30/30)보다 살짝 낮게
-    daily:  { exp: 20, gold: 15, label: '🔤 영어 복습 (오늘 공부함)' },
+    daily:  { exp: 20, gold: 15, label: '🔤 영어 복습 하루 목표 달성' },
     test:   { exp: 30, gold: 20, label: '🔤 영어 테스트 90% 이상' },
     lesson: { exp: 80, gold: 50, label: '🔤 영어 단원 마스터' },
   },
@@ -249,8 +249,11 @@ async function syncEnglishRewards(force) {
     });
   };
 
-  // ① 오늘 영어앱에서 공부했으면 하루 1회
-  if (data.lastDay === today) push('daily_' + today, ENGLISH_APP.reward.daily);
+  // ① 오늘 영어앱 "하루 목표"(기본 20문제, 영어앱 설정값)를 채웠을 때만 하루 1회
+  //    — 한 문제만 풀고 보상 받는 일이 없도록 기준을 명확히 한다. (영어앱이 today/todayN/goal을 올려 준다)
+  const goal = Math.max(10, Number(data.goal) || 20);
+  if (data.today === today && Number(data.todayN || 0) >= goal)
+    push('daily_' + today, ENGLISH_APP.reward.daily, '(' + data.todayN + '/' + goal + '문제)');
   // ② 테스트 90% 이상 — 회차마다 1회
   const tests = data.tests || {};
   Object.keys(tests).forEach(k => {
