@@ -10490,6 +10490,17 @@ function renderStudyQuestion() {
       <div style="font-size:.9rem;color:var(--txt3);margin-top:.6rem">잘 안 들리면 버튼을 눌러 보세요</div>
     </div>` : '';
 
+  // 수학은 세로셈·자리 계산을 손으로 써 봐야 풀린다. 문제 아래에 필기 공간을 둔다.
+  // 저장하지 않는다 — 그 문제를 푸는 동안만 쓰는 연습장이고, 다음 문제로 넘어가면 새 종이가 된다.
+  const scratchHtml = STUDY_SESSION.subjectKey === 'math' ? `
+    <div class="st-scratch">
+      <div class="st-scratch-head">
+        <span>✏️ 여기에 풀어 보세요</span>
+        <button type="button" class="st-scratch-clear" onclick="clearStudyScratch()">🧹 지우기</button>
+      </div>
+      <canvas id="study-scratch"></canvas>
+    </div>` : '';
+
   body.innerHTML = `
     ${bar}
     <div style="padding:0 1rem 1rem">
@@ -10500,6 +10511,7 @@ function renderStudyQuestion() {
         ${escHtml(p.q)}
       </div>
       ${audioHtml}
+      ${scratchHtml}
       ${inputHtml}
       ${p.hint ? `<button onclick="this.nextElementSibling.style.display='block';this.style.display='none'"
         style="margin-top:1rem;background:none;border:none;color:var(--txt3);font-size:1rem;
@@ -10509,10 +10521,92 @@ function renderStudyQuestion() {
           💡 ${escHtml(p.hint)}</div>` : ''}
     </div>`;
 
+  initStudyScratch();
   const inp = document.getElementById('study-input');
   if (inp) setTimeout(() => inp.focus(), 60);
   // 듣기 문항은 화면이 뜨면 한 번 자동으로 읽어 준다(학생이 버튼을 못 찾는 것 방지)
   if (p.audio && typeof speakWord === 'function') setTimeout(() => speakWord(String(p.audio)), 350);
+}
+
+// ── 풀이 연습장(수학) ──────────────────────────────
+// 손으로 세로셈을 쓰는 공간. 기능은 둘뿐이다 — 필기 · 지우기.
+// 저장하지 않고, 문제를 넘기면(renderStudyQuestion 재렌더) 새 종이가 된다.
+let SCRATCH_CTX = null;       // 현재 연습장 2D 컨텍스트
+let SCRATCH_ONRESIZE = null;  // 창 크기 변경 핸들러(중복 등록 방지용)
+
+function initStudyScratch() {
+  const cv = document.getElementById('study-scratch');
+  if (!cv) { SCRATCH_CTX = null; return; }
+
+  // 캔버스 실제 픽셀을 화면 배율(dpr)에 맞춘다. 안 맞추면 선이 흐리게 번진다.
+  const fit = () => {
+    const el = document.getElementById('study-scratch');
+    if (!el) {  // 학습 화면을 떠났으면 핸들러를 걷어낸다
+      if (SCRATCH_ONRESIZE) { window.removeEventListener('resize', SCRATCH_ONRESIZE); SCRATCH_ONRESIZE = null; }
+      return;
+    }
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = el.clientWidth, h = el.clientHeight;
+    if (!w || !h) return;
+    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    const ctx = el.getContext('2d');   // 같은 캔버스면 항상 같은 컨텍스트가 돌아온다
+    // 크기가 그대로면 그린 것을 건드리지 않는다.
+    // 다만 쓸 수 있는 상태로는 만들어 놓고 나간다(안 그러면 필기가 먹힌다).
+    if (el.width === pw && el.height === ph) { SCRATCH_CTX = ctx; return; }
+    const prev = (el.width && el.height) ? el.toDataURL() : null;
+    el.width = pw; el.height = ph;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineWidth = 2.6; ctx.strokeStyle = '#2B3A55'; ctx.fillStyle = '#2B3A55';
+    SCRATCH_CTX = ctx;
+    // 크기가 바뀌어도 쓰던 풀이는 살려 둔다
+    if (prev) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0, w, h); img.src = prev; }
+  };
+  fit();
+
+  if (SCRATCH_ONRESIZE) window.removeEventListener('resize', SCRATCH_ONRESIZE);
+  SCRATCH_ONRESIZE = fit;
+  window.addEventListener('resize', SCRATCH_ONRESIZE);
+
+  // 마우스·손가락·스타일러스를 한 갈래로 받는다(pointer 이벤트)
+  let drawing = false, lx = 0, ly = 0;
+  const at = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+  cv.onpointerdown = e => {
+    if (!SCRATCH_CTX) return;
+    drawing = true;
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    [lx, ly] = at(e);
+    SCRATCH_CTX.beginPath();                                  // 톡 찍기만 해도 점이 남게
+    SCRATCH_CTX.arc(lx, ly, SCRATCH_CTX.lineWidth / 2, 0, Math.PI * 2);
+    SCRATCH_CTX.fill();
+    e.preventDefault();
+  };
+  cv.onpointermove = e => {
+    if (!drawing || !SCRATCH_CTX) return;
+    const [x, y] = at(e);
+    SCRATCH_CTX.beginPath();
+    SCRATCH_CTX.moveTo(lx, ly); SCRATCH_CTX.lineTo(x, y); SCRATCH_CTX.stroke();
+    lx = x; ly = y;
+    e.preventDefault();
+  };
+  const stop = e => {
+    if (!drawing) return;
+    drawing = false;
+    try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  cv.onpointerup = stop;
+  cv.onpointercancel = stop;
+}
+
+function clearStudyScratch() {
+  const cv = document.getElementById('study-scratch');
+  if (!cv) return;
+  const ctx = SCRATCH_CTX || cv.getContext('2d');
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);   // dpr 변환을 잠시 몰아내고 캔버스 전체를 지운다
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.restore();
 }
 
 function submitStudyAnswer(chosen) {
