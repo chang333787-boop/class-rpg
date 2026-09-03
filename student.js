@@ -10386,22 +10386,31 @@ function renderStudySubjectPick() {
     return { ...sub, units, count, t, c, weak };
   }).filter(sub => sub.count > 0 && sub.key !== 'english');   // [ENGLISH-LINK-1] 영어는 영어앱으로
 
-  // [ENGLISH-LINK-1] 영어 복습앱 링크 카드 — RPG 내부 영어 문항 대신 전용 앱으로 보낸다
-  const englishCard = `
-          <a class="st-subject-card" href="${englishAppLink()}" target="_blank" rel="noopener"
+  // [ENGLISH-LINK-1] 외부 학습 앱 카드 — RPG 내부 문항 대신 전용 앱으로 보낸다.
+  //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
+  const EXTERNAL_STUDY = [
+    { key: 'english', icon: '🔤', title: '영어 복습앱',
+      sub: '단어·표현·듣기·말하기 · 공부하면 보상이 RPG로 와요',
+      href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)' },
+    { key: 'watercolor', icon: '🎨', title: '수채화 기초',
+      sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
+      href: 'watercolor/index.html?sid=' + encodeURIComponent(CUR.id),
+      border: 'rgba(155,120,220,.45)', bg: 'rgba(155,120,220,.10)' },
+  ];
+  const externalCards = EXTERNAL_STUDY.map(x => `
+          <a class="st-subject-card" href="${x.href}" target="_blank" rel="noopener"
             style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
-              border:1px solid rgba(255,215,0,.35);cursor:pointer;text-decoration:none;
-              background:rgba(255,215,0,.08);color:var(--txt);font-family:inherit;text-align:left;box-sizing:border-box">
-            <span style="font-size:2.2rem">🔤</span>
+              border:1px solid ${x.border};cursor:pointer;text-decoration:none;
+              background:${x.bg};color:var(--txt);font-family:inherit;text-align:left;box-sizing:border-box">
+            <span style="font-size:2.2rem">${x.icon}</span>
             <span style="flex:1;min-width:0">
-              <span class="st-subject" style="display:block;font-weight:700">영어 복습앱</span>
-              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">
-                단어·표현·듣기·말하기 · 공부하면 보상이 RPG로 와요</span>
+              <span class="st-subject" style="display:block;font-weight:700">${escHtml(x.title)}</span>
+              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">${escHtml(x.sub)}</span>
             </span>
             <span style="font-size:1.3rem;color:var(--txt3)">↗</span>
-          </a>`;
+          </a>`).join('');
 
-  if (subjects.length === 0 && !englishCard) {
+  if (subjects.length === 0 && !externalCards) {
     body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--txt3);font-size:1rem">
       선생님이 공부할 단원을 정하면 여기에 나와요</div>`;
     return;
@@ -10418,7 +10427,7 @@ function renderStudySubjectPick() {
           : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
       </div>
       <div style="display:grid;gap:.7rem">
-        ${englishCard}
+        ${externalCards}
         ${subjects.map(sub => {
           const pct = sub.t >= 3 ? Math.round(sub.c / sub.t * 100) : null;
           return `
