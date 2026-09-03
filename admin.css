@@ -31,9 +31,13 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .sidebar-student-count{font-size:.75rem;color:var(--txt3);}
 
 /* ── MAIN ── */
-.main{overflow-y:auto;background:var(--bg);}
-.main::-webkit-scrollbar{width:5px;}
-.main::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px;}
+.main{overflow-y:auto;background:var(--bg);scrollbar-gutter:stable;
+  scrollbar-width:auto;scrollbar-color:rgba(255,255,255,.28) rgba(255,255,255,.04);}
+/* 스크롤바가 5px·8% 투명이라 "스크롤이 없다"고 보였음 → 잡을 수 있는 굵기와 대비로 */
+.main::-webkit-scrollbar{width:14px;}
+.main::-webkit-scrollbar-track{background:rgba(255,255,255,.04);}
+.main::-webkit-scrollbar-thumb{background:rgba(255,255,255,.28);border-radius:7px;border:3px solid var(--bg);}
+.main::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.45);}
 
 /* ── TOPBAR ── */
 .topbar{position:sticky;top:0;z-index:50;background:rgba(14,22,33,.96);border-bottom:1px solid var(--border2);
