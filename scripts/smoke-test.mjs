@@ -27,7 +27,7 @@ const rel = (f) => path.join(ROOT, f);
 const exists = (f) => fs.existsSync(rel(f));
 const read = (f) => fs.readFileSync(rel(f), 'utf8');
 
-const JS_FILES = ['gamedata.js', 'student.js', 'admin.js', 'kiosk.js'];
+const JS_FILES = ['gamedata.js', 'curriculum.js', 'figures.js', 'student.js', 'admin.js', 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -80,9 +80,9 @@ const MIME = {
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
     '/gamedata.js?v=20260730',
-    '/curriculum.js?v=20260731h',
-    '/student.js?v=20260903c', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
-    '/student.css?v=20260903a', '/admin.css?v=20260903a', '/kiosk.css?v=20260604',
+    '/curriculum.js?v=20260903a', '/figures.js?v=20260903a',
+    '/student.js?v=20260903d', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
+    '/student.css?v=20260903b', '/admin.css?v=20260903a', '/kiosk.css?v=20260604',
   ];
 
   let ok = 0;
@@ -132,12 +132,12 @@ for (const f of HTML_FILES) {
 
   // CSS link 캐시버스터 (기대값 스냅샷 — 해당 CSS 갱신 시 여기도 동기화)
   const cssName = f.replace('.html', '.css');
-  const cssVer = { 'student.css': '20260903a', 'admin.css': '20260903a', 'kiosk.css': '20260604' }[cssName];
+  const cssVer = { 'student.css': '20260903b', 'admin.css': '20260903a', 'kiosk.css': '20260604' }[cssName];
   if (html.includes(`${cssName}?v=${cssVer}`)) add('PASS', `${f}: ${cssName}?v=${cssVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=${cssVer}) 미발견 — CSS 갱신 시 확인 필요`);
 
   // 전용 JS script src 캐시버스터 (기대값 스냅샷 — 해당 JS 갱신 시 여기도 동기화)
-  const jsVer = { 'student.js': '20260903c', 'admin.js': '20260903b', 'kiosk.js': '20260713c' }[js];
+  const jsVer = { 'student.js': '20260903d', 'admin.js': '20260903b', 'kiosk.js': '20260713c' }[js];
   if (html.includes(`${js}?v=${jsVer}`)) add('PASS', `${f}: ${js}?v=${jsVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 

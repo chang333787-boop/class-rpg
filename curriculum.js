@@ -85,6 +85,13 @@ const CURRICULUM = {
 //   level : 1(기본) 2(보통) 3(도전)
 //   audio : 듣기 문항에서 읽어 줄 영어 텍스트. 있으면 학생 화면에 🔊 버튼이 나온다
 //           (Web Speech API — 단어·문장 모두 가능. 기기가 지원 안 하면 텍스트로 폴백)
+//   fig   : 문제 위에 그리는 그림 { kind, ... } — 규격은 figures.js 상단. 없으면 텍스트만.
+//           도형·각도·시계·분수처럼 눈으로 봐야 하는 문항에 넣는다. (FIG-1)
+//   사회 cat 추가 (SOCIAL-TYPES-1) — 암기가 아니라 생각하는 방식으로 가른다:
+//             'ox'        O/X. type:'choice', choices:['O','X'] 고정. 문장이 명확히 참/거짓
+//             'situation' 상황 판단. 짧은 상황 → 이때 알맞은 행동은?
+//             'reason'    논리 추론. ~인 까닭은? / ~하면 어떤 일이 생길까?
+//   학생 화면은 cat별로 '모드'를 골라 풀 수 있다(수학: 계산/문장제/개념, 사회: 개념/OX/상황/추론).
 const BASE_PROBLEMS = [
   // ── 수학 1. 큰 수 ─────────────────────────────
   { id:'p_ma411_01', unitId:'ma4-1-1', type:'number', cat:'calc', level:1, q:'10000이 3개, 1000이 5개인 수는 얼마일까요?', a:'35000', hint:'10000이 3개 → 30000, 1000이 5개 → 5000' },
@@ -97,13 +104,13 @@ const BASE_PROBLEMS = [
   { id:'p_ma411_08', unitId:'ma4-1-1', type:'number', cat:'calc', level:3, q:'0, 2, 5, 8을 한 번씩 써서 만들 수 있는 가장 큰 네 자리 수는?', a:'8520', hint:'큰 숫자를 앞자리부터 놓아요' },
 
   // ── 수학 2. 각도 ──────────────────────────────
-  { id:'p_ma412_01', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, q:'직각은 몇 도일까요?', choices:['45도','90도','180도','360도'], a:'90도', hint:'ㄱ자 모양의 각이에요' },
-  { id:'p_ma412_02', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, q:'크기가 60도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'예각', hint:'0도보다 크고 90도보다 작으면 예각' },
-  { id:'p_ma412_03', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, q:'크기가 120도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'둔각', hint:'90도보다 크고 180도보다 작으면 둔각' },
+  { id:'p_ma412_01', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, fig:{ kind:'angle', deg:90 }, q:'직각은 몇 도일까요?', choices:['45도','90도','180도','360도'], a:'90도', hint:'ㄱ자 모양의 각이에요' },
+  { id:'p_ma412_02', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, fig:{ kind:'angle', deg:60 }, q:'크기가 60도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'예각', hint:'0도보다 크고 90도보다 작으면 예각' },
+  { id:'p_ma412_03', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, fig:{ kind:'angle', deg:120 }, q:'크기가 120도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'둔각', hint:'90도보다 크고 180도보다 작으면 둔각' },
   { id:'p_ma412_04', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'삼각형 세 각의 크기의 합은 몇 도일까요? (숫자만)', a:'180', hint:'세 각을 모으면 일직선이 돼요' },
   { id:'p_ma412_05', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'사각형 네 각의 크기의 합은 몇 도일까요? (숫자만)', a:'360', hint:'삼각형 두 개로 나눌 수 있어요' },
-  { id:'p_ma412_06', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'삼각형에서 두 각이 50도, 70도일 때 나머지 한 각은 몇 도일까요?', a:'60', hint:'180 − (50 + 70)' },
-  { id:'p_ma412_07', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, q:'사각형에서 세 각이 90도, 80도, 100도일 때 나머지 한 각은 몇 도일까요?', a:'90', hint:'360 − (90 + 80 + 100)' },
+  { id:'p_ma412_06', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:3, angles:[50,70,'?'] }, q:'삼각형에서 두 각이 50도, 70도일 때 나머지 한 각은 몇 도일까요?', a:'60', hint:'180 − (50 + 70)' },
+  { id:'p_ma412_07', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, fig:{ kind:'polygon', n:4, angles:[90,80,100,'?'] }, q:'사각형에서 세 각이 90도, 80도, 100도일 때 나머지 한 각은 몇 도일까요?', a:'90', hint:'360 − (90 + 80 + 100)' },
 
   // ── 수학 3. 곱셈과 나눗셈 ─────────────────────
   { id:'p_ma413_01', unitId:'ma4-1-3', type:'number', cat:'calc', level:1, q:'213 × 30 = ?', a:'6390', hint:'213 × 3 = 639, 뒤에 0을 붙여요' },
@@ -118,10 +125,10 @@ const BASE_PROBLEMS = [
   // ── 수학 4. 평면도형의 이동 ───────────────────
   { id:'p_ma414_01', unitId:'ma4-1-4', type:'choice', cat:'concept', level:1, q:'도형을 밀면 무엇이 변할까요?', choices:['모양','크기','위치','방향'], a:'위치', hint:'밀기는 자리만 옮기는 이동이에요' },
   { id:'p_ma414_02', unitId:'ma4-1-4', type:'choice', cat:'concept', level:1, q:'도형을 뒤집거나 돌려도 변하지 않는 것은?', choices:['모양과 크기','위치','방향','색깔'], a:'모양과 크기', hint:'이동해도 도형 자체는 그대로예요' },
-  { id:'p_ma414_03', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, q:'도형을 오른쪽으로 뒤집으면 어떻게 될까요?', choices:['좌우가 바뀐다','위아래가 바뀐다','아무 변화 없다','크기가 커진다'], a:'좌우가 바뀐다', hint:'거울에 비친 모습을 떠올려요' },
-  { id:'p_ma414_04', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, q:'도형을 아래쪽으로 뒤집으면 어떻게 될까요?', choices:['위아래가 바뀐다','좌우가 바뀐다','변화 없다','작아진다'], a:'위아래가 바뀐다', hint:'물에 비친 모습처럼요' },
+  { id:'p_ma414_03', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, fig:{ kind:'move', shape:'F', op:'flip-h' }, q:'도형을 오른쪽으로 뒤집으면 어떻게 될까요?', choices:['좌우가 바뀐다','위아래가 바뀐다','아무 변화 없다','크기가 커진다'], a:'좌우가 바뀐다', hint:'거울에 비친 모습을 떠올려요' },
+  { id:'p_ma414_04', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, fig:{ kind:'move', shape:'F', op:'flip-v' }, q:'도형을 아래쪽으로 뒤집으면 어떻게 될까요?', choices:['위아래가 바뀐다','좌우가 바뀐다','변화 없다','작아진다'], a:'위아래가 바뀐다', hint:'물에 비친 모습처럼요' },
   { id:'p_ma414_05', unitId:'ma4-1-4', type:'number', cat:'calc', level:2, q:'도형을 시계 방향으로 90도씩 4번 돌리면 처음과 같아집니다. 모두 몇 도를 돌린 걸까요? (숫자만)', a:'360', hint:'90 × 4' },
-  { id:'p_ma414_06', unitId:'ma4-1-4', type:'choice', cat:'concept', level:3, q:'도형을 시계 방향으로 180도 돌린 것과 같은 결과가 되는 것은?', choices:['시계 반대 방향으로 180도 돌리기','오른쪽으로 밀기','90도 돌리기','뒤집지 않기'], a:'시계 반대 방향으로 180도 돌리기', hint:'반 바퀴는 어느 쪽으로 돌려도 같아요' },
+  { id:'p_ma414_06', unitId:'ma4-1-4', type:'choice', cat:'concept', level:3, fig:{ kind:'move', shape:'L', op:'rot180' }, q:'도형을 시계 방향으로 180도 돌린 것과 같은 결과가 되는 것은?', choices:['시계 반대 방향으로 180도 돌리기','오른쪽으로 밀기','90도 돌리기','뒤집지 않기'], a:'시계 반대 방향으로 180도 돌리기', hint:'반 바퀴는 어느 쪽으로 돌려도 같아요' },
 
   // ── 수학 5. 막대그래프 ───────────────────────
   { id:'p_ma415_01', unitId:'ma4-1-5', type:'choice', cat:'concept', level:1, q:'막대그래프에서 막대의 길이는 무엇을 나타낼까요?', choices:['자료의 수량','자료의 이름','조사한 날짜','조사한 사람'], a:'자료의 수량', hint:'길수록 많다는 뜻이에요' },
@@ -217,12 +224,12 @@ const BASE_PROBLEMS = [
 
   // ── 수학 2. 각도 (추가) ──────────────────────
   { id:'p_ma412_08', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, q:'평각은 몇 도일까요?', choices:['90도','180도','270도','360도'], a:'180도', hint:'일직선으로 펴진 각이에요' },
-  { id:'p_ma412_09', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, q:'크기가 89도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'예각', hint:'90도보다 작으면 예각' },
+  { id:'p_ma412_09', unitId:'ma4-1-2', type:'choice', cat:'concept', level:1, fig:{ kind:'angle', deg:89 }, q:'크기가 89도인 각은 어떤 각일까요?', choices:['예각','직각','둔각','평각'], a:'예각', hint:'90도보다 작으면 예각' },
   { id:'p_ma412_10', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'45도 + 30도 = 몇 도일까요? (숫자만)', a:'75', hint:'각도끼리 더해요' },
   { id:'p_ma412_11', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'120도 − 45도 = 몇 도일까요? (숫자만)', a:'75', hint:'각도끼리 빼요' },
-  { id:'p_ma412_12', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'삼각형에서 두 각이 30도, 60도일 때 나머지 한 각은 몇 도일까요?', a:'90', hint:'180 − (30 + 60)' },
+  { id:'p_ma412_12', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:3, angles:[30,60,'?'] }, q:'삼각형에서 두 각이 30도, 60도일 때 나머지 한 각은 몇 도일까요?', a:'90', hint:'180 − (30 + 60)' },
   { id:'p_ma412_13', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'직각을 반으로 나눈 각은 몇 도일까요? (숫자만)', a:'45', hint:'90 ÷ 2' },
-  { id:'p_ma412_14', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, q:'사각형에서 세 각이 70도, 110도, 85도일 때 나머지 한 각은 몇 도일까요?', a:'95', hint:'360 − (70 + 110 + 85)' },
+  { id:'p_ma412_14', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, fig:{ kind:'polygon', n:4, angles:[70,110,85,'?'] }, q:'사각형에서 세 각이 70도, 110도, 85도일 때 나머지 한 각은 몇 도일까요?', a:'95', hint:'360 − (70 + 110 + 85)' },
   { id:'p_ma412_15', unitId:'ma4-1-2', type:'choice', cat:'concept', level:3, q:'세 각이 모두 60도인 삼각형에서 세 각의 합은?', choices:['180도','150도','200도','120도'], a:'180도', hint:'60 × 3' },
 
   // ── 수학 3. 곱셈과 나눗셈 (추가) ──────────────
@@ -236,12 +243,12 @@ const BASE_PROBLEMS = [
 
   // ── 수학 4. 평면도형의 이동 (추가) ────────────
   { id:'p_ma414_07', unitId:'ma4-1-4', type:'choice', cat:'concept', level:1, q:'도형을 왼쪽으로 밀면 무엇이 달라질까요?', choices:['위치','모양','크기','아무것도 안 달라짐'], a:'위치', hint:'밀기는 자리만 옮겨요' },
-  { id:'p_ma414_08', unitId:'ma4-1-4', type:'choice', cat:'concept', level:1, q:'도형을 위쪽으로 뒤집으면 어떻게 될까요?', choices:['위아래가 바뀐다','좌우가 바뀐다','크기가 커진다','변화 없다'], a:'위아래가 바뀐다', hint:'뒤집는 방향으로 바뀌어요' },
+  { id:'p_ma414_08', unitId:'ma4-1-4', type:'choice', cat:'concept', level:1, fig:{ kind:'move', shape:'P', op:'flip-v' }, q:'도형을 위쪽으로 뒤집으면 어떻게 될까요?', choices:['위아래가 바뀐다','좌우가 바뀐다','크기가 커진다','변화 없다'], a:'위아래가 바뀐다', hint:'뒤집는 방향으로 바뀌어요' },
   { id:'p_ma414_09', unitId:'ma4-1-4', type:'number', cat:'calc', level:2, q:'도형을 시계 방향으로 90도씩 2번 돌리면 모두 몇 도를 돌린 걸까요? (숫자만)', a:'180', hint:'90 × 2' },
-  { id:'p_ma414_10', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, q:'도형을 왼쪽으로 두 번 뒤집으면 어떻게 될까요?', choices:['처음과 같아진다','좌우가 바뀐다','위아래가 바뀐다','크기가 작아진다'], a:'처음과 같아진다', hint:'두 번 뒤집으면 원래대로 돌아와요' },
-  { id:'p_ma414_11', unitId:'ma4-1-4', type:'number', cat:'calc', level:2, q:'도형을 시계 방향으로 90도씩 몇 번 돌려야 처음과 같아질까요? (숫자만)', a:'4', hint:'360 ÷ 90' },
+  { id:'p_ma414_10', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, fig:{ kind:'move', shape:'F', op:'flip-h' }, q:'도형을 왼쪽으로 두 번 뒤집으면 어떻게 될까요?', choices:['처음과 같아진다','좌우가 바뀐다','위아래가 바뀐다','크기가 작아진다'], a:'처음과 같아진다', hint:'두 번 뒤집으면 원래대로 돌아와요' },
+  { id:'p_ma414_11', unitId:'ma4-1-4', type:'number', cat:'calc', level:2, fig:{ kind:'move', shape:'L', op:'rot90' }, q:'도형을 시계 방향으로 90도씩 몇 번 돌려야 처음과 같아질까요? (숫자만)', a:'4', hint:'360 ÷ 90' },
   { id:'p_ma414_12', unitId:'ma4-1-4', type:'choice', cat:'concept', level:2, q:'점을 오른쪽으로 3칸, 아래로 2칸 옮겼습니다. 이런 이동을 무엇이라 할까요?', choices:['밀기','뒤집기','돌리기','늘이기'], a:'밀기', hint:'자리만 옮기는 이동이에요' },
-  { id:'p_ma414_13', unitId:'ma4-1-4', type:'choice', cat:'concept', level:3, q:'도형을 시계 반대 방향으로 90도 돌린 것과 같은 결과가 되는 것은?', choices:['시계 방향으로 270도 돌리기','시계 방향으로 90도 돌리기','오른쪽으로 뒤집기','아래로 밀기'], a:'시계 방향으로 270도 돌리기', hint:'한 바퀴는 360도예요' },
+  { id:'p_ma414_13', unitId:'ma4-1-4', type:'choice', cat:'concept', level:3, fig:{ kind:'move', shape:'arrow', op:'rot90' }, q:'도형을 시계 반대 방향으로 90도 돌린 것과 같은 결과가 되는 것은?', choices:['시계 방향으로 270도 돌리기','시계 방향으로 90도 돌리기','오른쪽으로 뒤집기','아래로 밀기'], a:'시계 방향으로 270도 돌리기', hint:'한 바퀴는 360도예요' },
   { id:'p_ma414_14', unitId:'ma4-1-4', type:'choice', cat:'concept', level:3, q:'무늬를 꾸밀 때 같은 모양을 반복해서 옮기는 방법이 아닌 것은?', choices:['색칠하기','밀기','뒤집기','돌리기'], a:'색칠하기', hint:'이동 방법은 밀기·뒤집기·돌리기 세 가지예요' },
   { id:'p_ma414_15', unitId:'ma4-1-4', type:'number', cat:'calc', level:3, q:'도형을 시계 방향으로 180도 돌린 뒤 다시 180도 돌렸습니다. 모두 몇 도를 돌린 걸까요? (숫자만)', a:'360', hint:'180 + 180' },
 
@@ -396,22 +403,22 @@ const BASE_PROBLEMS = [
   { id:'p_ma412_107', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, q:'사각형 네 각의 크기의 합은 몇 도일까요? 숫자만 쓰세요.', a:'360', hint:'사각형은 삼각형 2개로 나눌 수 있습니다.' },
   { id:'p_ma412_108', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, q:'60도 + 75도 는 몇 도일까요? 숫자만 쓰세요.', a:'135', hint:'받아올림에 주의하며 더하세요.' },
   { id:'p_ma412_109', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, q:'130도 - 45도 는 몇 도일까요? 숫자만 쓰세요.', a:'85', hint:'받아내림에 주의하며 빼세요.' },
-  { id:'p_ma412_110', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, q:'삼각형의 두 각의 크기가 50도, 60도입니다. 나머지 한 각은 몇 도일까요?', a:'70', hint:'180도에서 두 각을 빼세요.' },
-  { id:'p_ma412_111', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, q:'삼각형의 두 각의 크기가 90도, 35도입니다. 나머지 한 각은 몇 도일까요?', a:'55', hint:'세 각의 합이 180도임을 이용하세요.' },
+  { id:'p_ma412_110', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, fig:{ kind:'polygon', n:3, angles:[50,60,'?'] }, q:'삼각형의 두 각의 크기가 50도, 60도입니다. 나머지 한 각은 몇 도일까요?', a:'70', hint:'180도에서 두 각을 빼세요.' },
+  { id:'p_ma412_111', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, fig:{ kind:'polygon', n:3, shape:'right', angles:[90,35,'?'] }, q:'삼각형의 두 각의 크기가 90도, 35도입니다. 나머지 한 각은 몇 도일까요?', a:'55', hint:'세 각의 합이 180도임을 이용하세요.' },
   { id:'p_ma412_112', unitId:'ma4-1-2', type:'number', cat:'calc', level:1, q:'직각 2개를 이어 붙이면 몇 도일까요? 숫자만 쓰세요.', a:'180', hint:'90도를 두 번 더해 보세요.' },
-  { id:'p_ma412_113', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'사각형의 세 각의 크기가 100도, 80도, 95도입니다. 나머지 한 각은 몇 도일까요?', a:'85', hint:'360도에서 세 각의 합을 빼세요.' },
-  { id:'p_ma412_114', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'사각형의 세 각의 크기가 90도, 90도, 70도입니다. 나머지 한 각은 몇 도일까요?', a:'110', hint:'네 각의 합은 360도입니다.' },
-  { id:'p_ma412_115', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'삼각형의 두 각의 크기가 각각 45도입니다. 나머지 한 각은 몇 도일까요?', a:'90', hint:'같은 각 두 개를 먼저 더하세요.' },
+  { id:'p_ma412_113', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:4, angles:[100,80,95,'?'] }, q:'사각형의 세 각의 크기가 100도, 80도, 95도입니다. 나머지 한 각은 몇 도일까요?', a:'85', hint:'360도에서 세 각의 합을 빼세요.' },
+  { id:'p_ma412_114', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:4, angles:[90,90,70,'?'] }, q:'사각형의 세 각의 크기가 90도, 90도, 70도입니다. 나머지 한 각은 몇 도일까요?', a:'110', hint:'네 각의 합은 360도입니다.' },
+  { id:'p_ma412_115', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:3, angles:[45,45,'?'] }, q:'삼각형의 두 각의 크기가 각각 45도입니다. 나머지 한 각은 몇 도일까요?', a:'90', hint:'같은 각 두 개를 먼저 더하세요.' },
   { id:'p_ma412_116', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'25도 + 40도 + 65도 는 몇 도일까요? 숫자만 쓰세요.', a:'130', hint:'앞의 두 각을 먼저 더해 보세요.' },
   { id:'p_ma412_117', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'180도에서 30도와 45도를 뺀 각도는 몇 도일까요?', a:'105', hint:'뺄 두 각을 먼저 더한 뒤 한 번에 빼세요.' },
   { id:'p_ma412_118', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'한 직선 위에 두 각이 나란히 있습니다. 한 각이 115도이면 다른 한 각은 몇 도일까요?', a:'65', hint:'직선이 이루는 각은 180도입니다.' },
-  { id:'p_ma412_119', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'시계가 3시 정각을 가리킬 때 긴바늘과 짧은바늘이 이루는 작은 쪽 각은 몇 도일까요?', a:'90', hint:'시계 한 칸은 30도입니다.' },
-  { id:'p_ma412_120', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'시계가 6시 정각을 가리킬 때 긴바늘과 짧은바늘이 이루는 각은 몇 도일까요?', a:'180', hint:'두 바늘이 몇 칸 떨어져 있는지 세어 보세요.' },
+  { id:'p_ma412_119', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'clock', h:3, m:0 }, q:'시계가 3시 정각을 가리킬 때 긴바늘과 짧은바늘이 이루는 작은 쪽 각은 몇 도일까요?', a:'90', hint:'시계 한 칸은 30도입니다.' },
+  { id:'p_ma412_120', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'clock', h:6, m:0 }, q:'시계가 6시 정각을 가리킬 때 긴바늘과 짧은바늘이 이루는 각은 몇 도일까요?', a:'180', hint:'두 바늘이 몇 칸 떨어져 있는지 세어 보세요.' },
   { id:'p_ma412_121', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'35도 + 48도 + 52도 는 몇 도일까요? 숫자만 쓰세요.', a:'135', hint:'뒤의 두 각을 먼저 더하면 편합니다.' },
   { id:'p_ma412_122', unitId:'ma4-1-2', type:'choice', cat:'concept', level:2, q:'다음 각도 중 직각보다 크고 180도보다 작은 각은 어느 것일까요?', choices:['45도','88도','90도','110도'], a:'110도', hint:'90도보다 큰 각을 찾으세요.' },
-  { id:'p_ma412_123', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'삼각형에서 두 각의 크기가 서로 같고 나머지 한 각이 80도입니다. 크기가 같은 한 각은 몇 도일까요?', a:'50', hint:'남은 각도를 똑같이 둘로 나누세요.' },
-  { id:'p_ma412_124', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'사각형에서 세 각의 크기가 모두 85도입니다. 나머지 한 각은 몇 도일까요?', a:'105', hint:'85도를 세 번 더한 뒤 360도에서 빼세요.' },
-  { id:'p_ma412_125', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, q:'시계가 4시 정각을 가리킬 때 긴바늘과 짧은바늘이 이루는 작은 쪽 각은 몇 도일까요?', a:'120', hint:'한 칸이 30도이고 네 칸 떨어져 있습니다.' },
+  { id:'p_ma412_123', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:3, angles:['?','?',80] }, q:'삼각형에서 두 각의 크기가 서로 같고 나머지 한 각이 80도입니다. 크기가 같은 한 각은 몇 도일까요?', a:'50', hint:'남은 각도를 똑같이 둘로 나누세요.' },
+  { id:'p_ma412_124', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'polygon', n:4, angles:[85,85,85,'?'] }, q:'사각형에서 세 각의 크기가 모두 85도입니다. 나머지 한 각은 몇 도일까요?', a:'105', hint:'85도를 세 번 더한 뒤 360도에서 빼세요.' },
+  { id:'p_ma412_125', unitId:'ma4-1-2', type:'number', cat:'calc', level:2, fig:{ kind:'clock', h:4, m:0 }, q:'시계가 4시 정각을 가리킬 때 긴바늘과 짧은바늘이 이루는 작은 쪽 각은 몇 도일까요?', a:'120', hint:'한 칸이 30도이고 네 칸 떨어져 있습니다.' },
   { id:'p_ma412_126', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, q:'어떤 각에 40도를 더해야 하는데 잘못하여 40도를 뺐더니 25도가 되었습니다. 바르게 계산하면 몇 도일까요?', a:'105', hint:'먼저 어떤 각이 몇 도인지 거꾸로 구하세요.' },
   { id:'p_ma412_127', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, q:'두 각의 크기의 합은 140도이고 차는 20도입니다. 큰 각은 몇 도일까요?', a:'80', hint:'합에 차를 더한 뒤 반으로 나누어 보세요.' },
   { id:'p_ma412_128', unitId:'ma4-1-2', type:'number', cat:'calc', level:3, q:'삼각형에서 한 각의 크기가 나머지 두 각의 크기의 합과 같습니다. 그 각은 몇 도일까요?', a:'90', hint:'세 각의 합 180도를 똑같이 둘로 나누어 보세요.' },
@@ -1351,9 +1358,17 @@ const CurriculumUtils = {
   isCorrect(problem, userAnswer) {
     if (!problem) return false;
     const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, '');
-    const ua = norm(userAnswer);
+    let ua = norm(userAnswer);
     if (!ua) return false;
     if (ua === norm(problem.a)) return true;
-    return (problem.alt || []).some(x => norm(x) === ua);
+    if ((problem.alt || []).some(x => norm(x) === ua)) return true;
+    // 수 입력 문항은 "35명", "6390원", "90도"처럼 단위를 붙여 써도 맞게 — 숫자·소수점·분수·음수만 남긴다
+    if (problem.type === 'number') {
+      const digits = v => String(v).replace(/[^0-9.\/-]/g, '');
+      const u = digits(ua), a = digits(problem.a);
+      if (u && a && u === a) return true;
+      if ((problem.alt || []).some(x => digits(x) === u && u)) return true;
+    }
+    return false;
   },
 };

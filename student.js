@@ -10291,7 +10291,37 @@ window.onDbSaveError = () => toast('⚠️ 저장에 실패했어요. 인터넷�
 // ══════════════════════════════════════════════════
 
 const STUDY_PER_DAY = 10;   // 하루 분량
-let STUDY_SESSION = null;   // { subjectKey, questions[], cur, correct, answers[] }
+let STUDY_SESSION = null;   // { subjectKey, questions[], cur, correct, answers[], cat?, review?, grade? }
+
+// [STUDY-MODES-1] 문제 성격(cat)별 모드 — 영어앱의 연습 모드처럼 고르게 한다. null = 골고루
+let STUDY_CAT = null;
+const STUDY_MODES = {
+  math:   [{ key: 'calc', icon: '🔢', label: '계산 연습' }, { key: 'word', icon: '📖', label: '문장제' }, { key: 'concept', icon: '💡', label: '개념' }],
+  social: [{ key: 'concept', icon: '💡', label: '개념' }, { key: 'ox', icon: '⭕', label: 'OX 퀴즈' },
+           { key: 'situation', icon: '🧭', label: '상황 판단' }, { key: 'reason', icon: '🔍', label: '따져보기' }, { key: 'apply', icon: '🧩', label: '적용' }],
+};
+const catOk = p => !STUDY_CAT || p.cat === STUDY_CAT;
+
+// 보충(1~3학년, curriculum_review.js) — 파일이 없으면 모든 함수가 빈 값을 돌려준다
+const Review = {
+  on()            { return typeof REVIEW_CURRICULUM !== 'undefined' && typeof REVIEW_PROBLEMS !== 'undefined'; },
+  grades()        { return this.on() ? Object.entries(REVIEW_CURRICULUM.math.grades).map(([g, v]) => ({ grade: g, ...v })) : []; },
+  units(grade)    { const g = this.on() && REVIEW_CURRICULUM.math.grades[grade]; return g ? g.units : []; },
+  unitById(id)    { for (const g of this.grades()) { const u = g.units.find(x => x.id === id); if (u) return { ...u, grade: g.grade, subjectLabel: `${g.label} 보충`, icon: '🧮' }; } return null; },
+  problemsByUnit(id) { return this.on() ? REVIEW_PROBLEMS.filter(p => p.unitId === id) : []; },
+  problemsByGrade(grade) { const ids = new Set(this.units(grade).map(u => u.id)); return this.on() ? REVIEW_PROBLEMS.filter(p => ids.has(p.unitId)) : []; },
+};
+// 단원 정보 — 교과(4-1) 먼저, 없으면 보충
+function studyUnitInfo(unitId) { return CurriculumUtils.unitById(unitId) || Review.unitById(unitId); }
+
+// 모드 칩 한 줄 (수학·사회·보충 공용). counts: {cat: n}
+function studyModeChipsHTML(modes, counts, onclickFn) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const chip = (key, icon, label, n) => `
+    <button class="st-chip ${STUDY_CAT === key ? 'on' : ''}" ${n ? '' : 'disabled'}
+      onclick="${onclickFn}(${key ? `'${key}'` : 'null'})">${icon} ${label}<span class="st-chip-n">${n}</span></button>`;
+  return `<div class="st-chips">${chip(null, '🎲', '골고루', total)}${modes.map(m => chip(m.key, m.icon, m.label, counts[m.key] || 0)).join('')}</div>`;
+}
 
 // 오늘 이 학생이 남긴 학습 기록
 function getTodayStudyRecords(studentId) {
@@ -10411,7 +10441,22 @@ function renderStudySubjectPick() {
             <span style="font-size:1.3rem;color:var(--txt3)">↗</span>
           </a>`).join('');
 
-  if (subjects.length === 0 && !externalCards) {
+  // [STUDY-MODES-1] 1~3학년 수학 보충 — 보상 없이 연습만. curriculum_review.js가 있을 때만 보인다
+  const reviewCard = Review.on() ? `
+          <button class="st-subject-card" onclick="renderReviewGradePick()"
+            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
+              border:1px solid rgba(46,204,113,.35);cursor:pointer;background:rgba(46,204,113,.07);
+              color:var(--txt);font-family:inherit;text-align:left">
+            <span style="font-size:2.2rem">🧮</span>
+            <span style="flex:1;min-width:0">
+              <span class="st-subject" style="display:block;font-weight:700">1~3학년 수학 보충</span>
+              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">
+                예전에 배운 것 다시 연습 · 보상은 없어요</span>
+            </span>
+            <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
+          </button>` : '';
+
+  if (subjects.length === 0 && !externalCards && !reviewCard) {
     body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--txt3);font-size:1rem">
       선생님이 공부할 단원을 정하면 여기에 나와요</div>`;
     return;
@@ -10447,8 +10492,105 @@ function renderStudySubjectPick() {
             <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
           </button>`;
         }).join('')}
+        ${reviewCard}
       </div>
     </div>`;
+}
+
+// ── 보충(1~3학년) 학년 → 단원 선택 ──
+function renderReviewGradePick() {
+  const body = document.getElementById('study-body');
+  const ttl  = document.getElementById('study-title');
+  if (!body || !Review.on()) { renderStudySubjectPick(); return; }
+  if (ttl) ttl.textContent = '🧮 수학 보충 — 학년 고르기';
+  const stats = getUnitStats(CUR.id);
+  body.innerHTML = `
+    <div style="padding:.2rem 1rem 1rem">
+      <button onclick="renderStudySubjectPick()"
+        style="background:none;border:none;color:var(--txt3);font-size:1rem;cursor:pointer;font-family:inherit;padding:0 0 .8rem">← 과목 다시 고르기</button>
+      <div class="st-meta" style="color:var(--txt3);margin-bottom:.6rem">보충은 보상 없이 연습만 해요</div>
+      <div style="display:grid;gap:.6rem">
+        ${Review.grades().map(g => {
+          const n = Review.problemsByGrade(g.grade).length;
+          let t = 0, c = 0; g.units.forEach(u => { const st = stats[u.id]; if (st) { t += st.t; c += st.c; } });
+          return `
+          <button class="st-subject-card" onclick="renderReviewUnitPick('${g.grade}')"
+            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.1rem 1.2rem;border-radius:14px;
+              border:1px solid rgba(255,255,255,.12);cursor:pointer;background:rgba(255,255,255,.05);
+              color:var(--txt);font-family:inherit;text-align:left">
+            <span style="font-size:2rem">${['', '1️⃣', '2️⃣', '3️⃣'][+g.grade] || '🔢'}</span>
+            <span style="flex:1;min-width:0">
+              <span class="st-subject" style="display:block;font-weight:700">${escHtml(g.label)} 수학</span>
+              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">
+                ${g.units.length}단원 · 문제 ${n}개${t ? ` · 정답률 ${Math.round(c / t * 100)}%` : ''}</span>
+            </span>
+            <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function setReviewCat(grade, cat) { STUDY_CAT = cat; renderReviewUnitPick(grade); }
+
+function renderReviewUnitPick(grade) {
+  const body = document.getElementById('study-body');
+  const ttl  = document.getElementById('study-title');
+  if (!body || !Review.on()) { renderStudySubjectPick(); return; }
+  const g = Review.grades().find(x => x.grade === String(grade));
+  if (!g) { renderReviewGradePick(); return; }
+  if (ttl) ttl.textContent = `🧮 ${g.label} 수학 — 단원 고르기`;
+  if (STUDY_CAT && !STUDY_MODES.math.some(m => m.key === STUDY_CAT)) STUDY_CAT = null;
+  const stats = getUnitStats(CUR.id);
+  const all = Review.problemsByGrade(g.grade);
+  const counts = {}; all.forEach(p => { counts[p.cat] = (counts[p.cat] || 0) + 1; });
+  const units = g.units
+    .map(u => ({ ...u, count: Review.problemsByUnit(u.id).filter(catOk).length, stat: stats[u.id] }))
+    .filter(u => u.count > 0);
+  body.innerHTML = `
+    <div style="padding:.2rem 1rem 1rem">
+      <button onclick="renderReviewGradePick()"
+        style="background:none;border:none;color:var(--txt3);font-size:1rem;cursor:pointer;font-family:inherit;padding:0 0 .8rem">← 학년 다시 고르기</button>
+      ${studyModeChipsHTML(STUDY_MODES.math, counts, `setReviewCat.bind(null,'${g.grade}')`)}
+      <button onclick="startReviewSession('${g.grade}')"
+        style="display:flex;align-items:center;gap:.8rem;width:100%;padding:1rem 1.2rem;margin-bottom:1rem;
+          border-radius:14px;border:1px solid rgba(46,204,113,.35);cursor:pointer;
+          background:rgba(46,204,113,.08);color:var(--txt);font-family:inherit;text-align:left">
+        <span style="font-size:1.8rem">🎲</span>
+        <span style="flex:1">
+          <span style="display:block;font-size:1.15rem;font-weight:700;color:var(--emerald)">전체에서 골고루</span>
+          <span style="display:block;font-size:.9rem;color:var(--txt3);margin-top:.15rem">${g.label} 모든 단원에서 ${STUDY_PER_DAY}문제</span>
+        </span>
+      </button>
+      <div class="st-meta" style="color:var(--txt3);margin-bottom:.6rem">단원별로 풀기</div>
+      <div style="display:grid;gap:.55rem">
+        ${units.map(u => {
+          const lv = unitLevelOf(u.stat);
+          return `
+          <button onclick="startReviewSession('${g.grade}','${u.id}')"
+            style="display:flex;align-items:center;gap:.9rem;width:100%;padding:.95rem 1.1rem;border-radius:12px;cursor:pointer;
+              font-family:inherit;text-align:left;color:var(--txt);background:rgba(255,255,255,.045);
+              border:1px solid ${lv.key === 'weak' ? 'rgba(231,76,60,.35)' : 'rgba(255,255,255,.1)'}">
+            <span style="flex:1;min-width:0">
+              <span style="display:block;font-size:1.1rem;font-weight:700">${u.no}. ${escHtml(u.name)}</span>
+              <span style="display:block;font-size:.82rem;color:var(--txt3);margin-top:.3rem">
+                ${lv.label} · 문제 ${u.count}개${u.stat ? ` · ${u.stat.c}/${u.stat.t} 맞힘` : ''}</span>
+            </span>
+            <span style="font-size:1.2rem;color:var(--txt3)">▶</span>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function startReviewSession(grade, unitId) {
+  let pool = unitId ? Review.problemsByUnit(unitId) : Review.problemsByGrade(grade);
+  pool = pool.filter(catOk);
+  if (pool.length === 0) { toast('풀 수 있는 문제가 없어요'); return; }
+  const picked = pickStudyQuestions(pool);
+  STUDY_SESSION = { subjectKey: 'math', unitId: unitId || '', cat: STUDY_CAT, review: true, grade: String(grade),
+    questions: picked, cur: 0, correct: 0, answers: [] };
+  renderStudyQuestion();
 }
 
 // ── 단원 선택 — 내가 어느 단원을 모르는지 보면서 고른다 ──
@@ -10463,9 +10605,15 @@ function renderStudyUnitPick(subjectKey) {
 
   const active = CurriculumUtils.activeUnitIds();
   const stats  = getUnitStats(CUR.id);
+  // [STUDY-MODES-1] 이 과목에 모드가 있으면 칩을 보여주고, 고른 모드로 단원별 문제 수를 센다
+  const modes = STUDY_MODES[subjectKey] || [];
+  if (STUDY_CAT && !modes.some(m => m.key === STUDY_CAT)) STUDY_CAT = null;
+  const counts = {};
+  sub.units.filter(u => !active || active.includes(u.id))
+    .forEach(u => CurriculumUtils.problemsByUnit(u.id).forEach(p => { counts[p.cat] = (counts[p.cat] || 0) + 1; }));
   const units  = sub.units
     .filter(u => !active || active.includes(u.id))
-    .map(u => ({ ...u, count: CurriculumUtils.problemsByUnit(u.id).length, stat: stats[u.id] }))
+    .map(u => ({ ...u, count: CurriculumUtils.problemsByUnit(u.id).filter(catOk).length, stat: stats[u.id] }))
     .filter(u => u.count > 0);
 
   body.innerHTML = `
@@ -10473,6 +10621,7 @@ function renderStudyUnitPick(subjectKey) {
       <button onclick="renderStudySubjectPick()"
         style="background:none;border:none;color:var(--txt3);font-size:1rem;cursor:pointer;
           font-family:inherit;padding:0 0 .8rem">← 과목 다시 고르기</button>
+      ${modes.length ? studyModeChipsHTML(modes, counts, `setStudyCat.bind(null,'${subjectKey}')`) : ''}
 
       <button onclick="startStudySession('${subjectKey}')"
         style="display:flex;align-items:center;gap:.8rem;width:100%;padding:1rem 1.2rem;margin-bottom:1rem;
@@ -10518,14 +10667,31 @@ function renderStudyUnitPick(subjectKey) {
 }
 
 // ── 세션 시작 ──────────────────────────────────────
+function setStudyCat(subjectKey, cat) { STUDY_CAT = cat; renderStudyUnitPick(subjectKey); }
+
 function startStudySession(subjectKey, unitId) {
   const active = CurriculumUtils.activeUnitIds();
   let pool = unitId
     ? CurriculumUtils.problemsByUnit(unitId)       // 단원 하나만 골라 풀기
     : CurriculumUtils.problemsBySubject(subjectKey);
   if (active) pool = pool.filter(p => active.includes(p.unitId));
+  pool = pool.filter(catOk);                       // [STUDY-MODES-1] 고른 모드만
   if (pool.length === 0) { toast('풀 수 있는 문제가 없어요'); return; }
+  const picked = pickStudyQuestions(pool);
+  STUDY_SESSION = {
+    subjectKey,
+    unitId: unitId || '',   // 단원 지정이면 결과 화면에서 그 단원으로 되돌아간다
+    cat: STUDY_CAT,
+    questions: picked,
+    cur: 0,
+    correct: 0,
+    answers: [],       // { problemId, unitId, chosen, correct } — 고른 오답까지 저장
+  };
+  renderStudyQuestion();
+}
 
+// 풀에서 하루 분량을 뽑는다 — 교과·보충 공용
+function pickStudyQuestions(pool) {
   // 최근에 틀린 문제를 자주 나오게(단어장 복습 가중치와 같은 방식)
   const recent = DB.getProblemRecords(CUR.id).slice(-8);
   const wrongIds = new Set(recent.flatMap(r => r.wrongIds || []));
@@ -10547,16 +10713,7 @@ function startStudySession(subjectKey, unitId) {
     if (picked.length >= STUDY_PER_DAY) break;
     if (!used.has(p.id)) { picked.push(p); used.add(p.id); }
   }
-
-  STUDY_SESSION = {
-    subjectKey,
-    unitId: unitId || '',   // 단원 지정이면 결과 화면에서 그 단원으로 되돌아간다
-    questions: picked,
-    cur: 0,
-    correct: 0,
-    answers: [],       // { problemId, unitId, chosen, correct } — 고른 오답까지 저장
-  };
-  renderStudyQuestion();
+  return picked;
 }
 
 function renderStudyQuestion() {
@@ -10567,8 +10724,10 @@ function renderStudyQuestion() {
   if (cur >= questions.length) { finishStudySession(); return; }
 
   const p = questions[cur];
-  const unit = CurriculumUtils.unitById(p.unitId);
+  const unit = studyUnitInfo(p.unitId);
   if (ttl) ttl.textContent = `${unit?.icon || '📚'} ${cur + 1} / ${questions.length}`;
+  // [FIG-1] 그림이 있는 문항은 문제 위에 그린다(렌더러 없거나 모르는 kind면 빈 문자열)
+  const figHtml = (p.fig && typeof Figures !== 'undefined') ? Figures.render(p.fig) : '';
 
   // 진행 막대 — 몇 문제 남았는지 한눈에
   const bar = `
@@ -10581,7 +10740,14 @@ function renderStudyQuestion() {
     </div>`;
 
   let inputHtml = '';
-  if (p.type === 'choice') {
+  const isOX = p.type === 'choice' && (p.cat === 'ox' || ((p.choices || []).length === 2 && (p.choices || []).every(c => c === 'O' || c === 'X')));
+  if (isOX) {
+    // [SOCIAL-TYPES-1] OX는 섞지 않고 좌우 큰 버튼 두 개
+    inputHtml = `<div class="st-ox">
+      <button class="st-opt st-ox-btn" onclick="submitStudyAnswer('O')"><span class="st-ox-mark">⭕</span>맞아요</button>
+      <button class="st-opt st-ox-btn x" onclick="submitStudyAnswer('X')"><span class="st-ox-mark">❌</span>틀려요</button>
+    </div>`;
+  } else if (p.type === 'choice') {
     const opts = [...(p.choices || [])].sort(() => Math.random() - .5);
     inputHtml = `<div style="display:grid;gap:.6rem">
       ${opts.map(c => `
@@ -10634,6 +10800,7 @@ function renderStudyQuestion() {
       <div class="st-meta" style="color:var(--txt3);margin-bottom:.8rem">
         ${escHtml(unit?.subjectLabel || '')} · ${escHtml(unit?.name || '')}
       </div>
+      ${figHtml ? `<div class="st-fig">${figHtml}</div>` : ''}
       <div class="st-q" style="margin-bottom:${p.audio ? '1rem' : '1.6rem'}">
         ${escHtml(p.q)}
       </div>
@@ -10863,7 +11030,7 @@ function studyRewardBannerHTML(r) {
 
 function finishStudySession() {
   if (!STUDY_SESSION) return;
-  const { subjectKey, unitId: sessionUnit, questions, correct, answers } = STUDY_SESSION;
+  const { subjectKey, unitId: sessionUnit, questions, correct, answers, review, grade } = STUDY_SESSION;
   const total = questions.length;
   const wrongIds = answers.filter(a => !a.correct).map(a => a.problemId);
   const pct = total > 0 ? Math.round(correct / total * 100) : 0;
@@ -10927,7 +11094,7 @@ function finishStudySession() {
           color:#1a1a1a;font-weight:700;cursor:pointer;font-family:inherit">
         끝내기
       </button>
-      <button onclick="${sessionUnit ? `renderStudyUnitPick('${subjectKey}')` : 'renderStudySubjectPick()'}"
+      <button onclick="${review ? `renderReviewUnitPick('${grade}')` : sessionUnit ? `renderStudyUnitPick('${subjectKey}')` : 'renderStudySubjectPick()'}"
         style="width:100%;padding:.8rem;margin-top:.5rem;border-radius:12px;cursor:pointer;
           border:1px solid rgba(255,255,255,.12);background:none;color:var(--txt3);
           font-size:1.05rem;font-family:inherit">더 풀기</button>
