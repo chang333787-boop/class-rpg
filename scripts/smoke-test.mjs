@@ -82,7 +82,7 @@ const MIME = {
     '/gamedata.js?v=20260730',
     '/curriculum.js?v=20260731h',
     '/student.js?v=20260903c', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
-    '/student.css?v=20260903a', '/admin.css?v=20260604', '/kiosk.css?v=20260604',
+    '/student.css?v=20260903a', '/admin.css?v=20260903a', '/kiosk.css?v=20260604',
   ];
 
   let ok = 0;
@@ -132,7 +132,7 @@ for (const f of HTML_FILES) {
 
   // CSS link 캐시버스터 (기대값 스냅샷 — 해당 CSS 갱신 시 여기도 동기화)
   const cssName = f.replace('.html', '.css');
-  const cssVer = { 'student.css': '20260903a', 'admin.css': '20260604', 'kiosk.css': '20260604' }[cssName];
+  const cssVer = { 'student.css': '20260903a', 'admin.css': '20260903a', 'kiosk.css': '20260604' }[cssName];
   if (html.includes(`${cssName}?v=${cssVer}`)) add('PASS', `${f}: ${cssName}?v=${cssVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=${cssVer}) 미발견 — CSS 갱신 시 확인 필요`);
 
