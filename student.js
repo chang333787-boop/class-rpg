@@ -6494,8 +6494,17 @@ let _drawDecoRaf = null;
 //  · 비율을 억지로 늘리지 않는다. 기존 _DFN 경로의 ctx.scale(w/h) 왜곡은 SVG가 들어오는
 //    장식부터 자연히 사라진다(에셋이 없는 장식은 지금 모습 그대로 — 이번 변경으로 안 바뀜).
 //  · <img>는 intrinsic 크기가 있어야 캔버스에 그릴 수 있으므로 SVG에 width/height 속성 필수.
-// 뒤→앞 정렬(윗줄 먼저). 같은 줄이면 왼쪽 먼저. 원본 배열은 건드리지 않는다.
-function _decoSorted(list) { return [...list].sort((a,b) => (a.row-b.row) || (a.col-b.col)); }
+// 뒤→앞 정렬 — 기준은 시작 줄이 아니라 **발밑 줄**(row + 높이).
+//   세로 3칸 장미 아치를 2줄에 놓으면 발밑은 4줄이다. 시작 줄로 정렬하면
+//   3줄에 있는 장식보다 먼저 그려져, 앞에 있어야 할 아치가 뒤로 밀린다.
+//   같은 발밑 줄이면 왼쪽 먼저. 원본 배열은 건드리지 않는다.
+function _decoFootRow(p) {
+  const d = GAME_DATA.decorations.find(x => x.id === p.id);
+  return (p.row || 0) + (((d && d.size) ? d.size.h : 1) - 1);
+}
+function _decoSorted(list) {
+  return [...list].sort((a, b) => (_decoFootRow(a) - _decoFootRow(b)) || (a.col - b.col));
+}
 const _DECO_IMG = {};   // id → {img, ok} | {ok:false}  (없는 파일은 한 번만 시도)
 function _decoImg(id) {
   const hit = _DECO_IMG[id];
@@ -10382,16 +10391,26 @@ function openPwReset() {
 
 // ══ 일일 퀘스트 자동 마감 (게임 진입 시 실행) ══
 function autoCloseDailyQuests() {
-  const db = DB.load();
+  // [Q1] boardQuests 통짜 set 금지 — 학생 기기의 낡은 목록으로 전체를 덮어쓰면
+  //   그 사이 교사가 추가한 퀘스트가 사라진다. 배열 인덱스도 기기마다 다르므로
+  //   서버의 현재 목록 위에 적용하는 transaction으로 처리한다.
   const today = Utils.todayStr();
-  let changed = false;
-  (db.boardQuests||[]).forEach(q => {
-    if (q.active && q.type === 'daily' && q.date && q.date !== today) {
-      q.active = false;
-      changed = true;
-    }
-  });
-  if (changed) DB._fbRef.child('boardQuests').set(db.boardQuests);
+  const closeStale = (list) => {
+    let changed = false;
+    const next = (list || []).map(q => {
+      if (q && q.active && q.type === 'daily' && q.date && q.date !== today) {
+        changed = true;
+        return { ...q, active: false };
+      }
+      return q;
+    });
+    return changed ? next : null;
+  };
+  const db = DB.load();
+  const local = closeStale(db.boardQuests);
+  if (!local) return;
+  db.boardQuests = local; // 화면 즉시 반영용 로컬 캐시
+  DB._fbRef.child('boardQuests').transaction(cur => closeStale(cur) || undefined);
 }
 function switchMobTab(tab, el) {
   MOB_TAB = tab;

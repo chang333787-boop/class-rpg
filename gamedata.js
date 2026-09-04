@@ -783,8 +783,7 @@ const DB = {
 
   // ── 오늘 일일퀘스트 자동 등록 (앱 로드 시 1회) ──
   // [Q-2A] admin.checkAutoDailyQuests()의 핵심 로직을 공용 DB helper로 이전.
-  //        동작은 기존과 동일하며, 현재 호출처는 admin.js window.onload 한 곳뿐이다.
-  //        (student/kiosk 호출 추가는 Q-2B 이후 별도 검토)
+  //        호출처: admin.js window.onload + student.js enterGame() ([Q-2B]).
   ensureDailyQuests() {
     const settings = this.getSettings();
     const autoItems = settings.autoDailyQuests;
@@ -793,37 +792,42 @@ const DB = {
     const today = Utils.todayStr();
     if (settings.autoDailyLastDate === today) return; // 오늘 이미 처리됨
 
-    const db = this.load();
-    db.boardQuests = db.boardQuests || [];
-
-    // 어제 일일퀘스트 중 아직 active인 것 내리기
-    db.boardQuests = db.boardQuests.map(q => {
-      if (q.type === 'daily' && q.active !== false && q.date !== today) {
-        return { ...q, active: false };
+    // [Q1] boardQuests 통짜 set 금지.
+    //   학생 여러 명이 아침에 동시 접속하면 각자 자기 기기의 낡은 목록으로 전체를 덮어써,
+    //   그 사이 교사가 추가한 퀘스트가 소리 없이 사라졌다.
+    //   인덱스 부분 저장도 안 된다 — 배열 인덱스는 기기마다 가리키는 퀘스트가 다르다.
+    //   서버의 현재 목록 위에 적용하는 transaction으로 처리한다(경합 시 Firebase가 재시도).
+    const applyDaily = (list) => {
+      const next = (list || []).slice();
+      // 어제 일일퀘스트 중 아직 active인 것 내리기
+      for (let i = 0; i < next.length; i++) {
+        const q = next[i];
+        if (q && q.type === 'daily' && q.active !== false && q.date !== today) {
+          next[i] = { ...q, active: false };
+        }
       }
-      return q;
-    });
-
-    // 오늘 자동 등록
-    let count = 0;
-    autoItems.forEach((item, i) => {
-      if (db.boardQuests.find(q => q.name === item.name && q.active !== false)) return;
-      db.boardQuests.push({
-        id: 'bq_auto_' + today + '_' + i,
-        name: item.name,
-        type: 'daily',
-        exp: 35, gold: 25,
-        icon: '📋',
-        stat: item.stat || '',
-        statVal: item.statVal || 0,
-        dueDate: '', date: today,
-        active: true,
+      // 오늘 자동 등록
+      autoItems.forEach((item, i) => {
+        if (next.find(q => q && q.name === item.name && q.active !== false)) return;
+        next.push({
+          id: 'bq_auto_' + today + '_' + i,
+          name: item.name,
+          type: 'daily',
+          exp: 35, gold: 25,
+          icon: '📋',
+          stat: item.stat || '',
+          statVal: item.statVal || 0,
+          dueDate: '', date: today,
+          active: true,
+        });
       });
-      count++;
-    });
+      return next;
+    };
 
+    const db = this.load();
+    db.boardQuests = applyDaily(db.boardQuests); // 화면 즉시 반영용 로컬 캐시
     this._cache = db;
-    this._fbRef.child('boardQuests').set(db.boardQuests);
+    this._fbRef.child('boardQuests').transaction(cur => applyDaily(cur));
 
     // 오늘 날짜 기록
     this.saveSettings({ ...settings, autoDailyLastDate: today });
