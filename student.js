@@ -208,6 +208,94 @@ function englishAppLink() {
   return ENGLISH_APP.url + '?name=' + encodeURIComponent(name) + '&k=' + encodeURIComponent(ENGLISH_APP.pass);
 }
 
+// ── [ENGLISH-EMBED-1] 외부 학습 앱 전체화면 모달 (iframe) ──
+//   · 새 탭으로 나가면 "영어만 다른 사이트"로 보인다는 학생 반응 → RPG 화면 안에서 연다.
+//   · allow="autoplay; microphone": 듣기·말하기가 iframe 안에서 막히지 않게.
+//   · 닫기 버튼 · ESC · 브라우저 뒤로가기(popstate) 모두로 닫힌다 — 아이가 갇히지 않게.
+//   · 8초 안에 load가 안 오거나 오프라인이면 "새 탭으로 열기" 링크를 크게 보여 준다(폴백).
+//   · 마크업은 처음 열 때 만든다(student.html 수정 최소화). 수채화 등 다른 앱은 다음 Phase.
+let _embedState = null;   // { key, href, loaded, timer }
+function _embedEl() {
+  let el = document.getElementById('m-embed');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'm-embed';
+  el.style.cssText = 'position:fixed;inset:0;z-index:9000;background:#0f1424;display:none;flex-direction:column';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;background:#16213E;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
+      <span id="embed-title" style="font-weight:700;color:var(--gold);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+      <a id="embed-newtab" href="#" target="_blank" rel="noopener"
+        style="font-size:.78rem;color:var(--txt3);text-decoration:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.25rem .55rem">새 탭으로 열기 ↗</a>
+      <button onclick="closeExternalEmbed()" aria-label="닫기"
+        style="background:none;border:none;color:var(--txt);font-size:1.35rem;cursor:pointer;padding:.1rem .4rem;font-family:inherit">✕</button>
+    </div>
+    <div id="embed-body" style="flex:1;position:relative;min-height:0">
+      <iframe id="embed-frame" title="외부 학습 앱" allow="autoplay; microphone; fullscreen"
+        style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff"></iframe>
+      <div id="embed-fallback" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:.9rem;background:#0f1424;color:var(--txt);text-align:center;padding:1.5rem">
+        <div style="font-size:2.2rem">📡</div>
+        <div style="font-size:1.05rem;font-weight:700">앱을 불러오지 못했어요</div>
+        <div style="font-size:.9rem;color:var(--txt3)">인터넷 연결을 확인하거나 아래 버튼으로 새 탭에서 열어 보세요.</div>
+        <a id="embed-fallback-link" href="#" target="_blank" rel="noopener"
+          style="background:var(--gold);color:#1a1a1a;font-weight:700;border-radius:12px;padding:.7rem 1.2rem;text-decoration:none">새 탭으로 열기 ↗</a>
+        <button onclick="closeExternalEmbed()" style="background:none;border:1px solid rgba(255,255,255,.2);color:var(--txt3);border-radius:10px;padding:.5rem 1rem;cursor:pointer;font-family:inherit">닫기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('#embed-frame').addEventListener('load', () => {
+    if (_embedState) { _embedState.loaded = true; clearTimeout(_embedState.timer); }
+  });
+  return el;
+}
+function openExternalEmbed(key) {
+  const item = { english: { title: '🔤 영어 복습앱', href: englishAppLink() } }[key];
+  if (!item) return;
+  const el = _embedEl();
+  const frame = el.querySelector('#embed-frame'), fb = el.querySelector('#embed-fallback');
+  el.querySelector('#embed-title').textContent = item.title;
+  el.querySelector('#embed-newtab').href = item.href;
+  el.querySelector('#embed-fallback-link').href = item.href;
+  fb.style.display = 'none';
+  const st = { key, href: item.href, loaded: false, timer: null, token: Date.now() };
+  _embedState = st;
+  frame.src = item.href;
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // 뒤로가기로 닫히게 — 히스토리 한 칸 추가 (이미 embed 상태면 또 쌓지 않는다)
+  try { if (!(history.state && history.state.embed)) history.pushState({ embed: key }, '', location.href); } catch (e) {}
+  // 폴백 판정: iframe의 load는 오류 페이지에서도 발생하므로 믿지 않는다.
+  //   ① 오프라인이면 즉시 ② 도달 가능 여부를 no-cors fetch로 확인(6초 안에 실패/타임아웃 → 폴백)
+  const showFb = () => { if (_embedState === st) fb.style.display = 'flex'; };
+  if (navigator.onLine === false) { showFb(); return; }
+  try {
+    const ctrl = ('AbortController' in window) ? new AbortController() : null;
+    st.timer = setTimeout(() => { try { ctrl && ctrl.abort(); } catch (e) {} showFb(); }, 6000);
+    fetch(item.href, { mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+      .then(() => { clearTimeout(st.timer); })
+      .catch(() => { clearTimeout(st.timer); showFb(); });
+  } catch (e) { showFb(); }
+}
+function closeExternalEmbed(fromPop) {
+  const el = document.getElementById('m-embed');
+  if (!el || el.style.display === 'none') return;
+  if (_embedState) clearTimeout(_embedState.timer);
+  el.querySelector('#embed-frame').src = 'about:blank';   // 소리·타이머 정지
+  el.style.display = 'none';
+  document.body.style.overflow = '';
+  _embedState = null;
+  if (!fromPop && history.state && history.state.embed) {
+    // 우리가 쌓은 한 칸을 되돌린다. popstate가 뒤늦게 와도 이미 닫혀 있어 무해(idempotent).
+    try { history.back(); } catch (e) {}
+  }
+  // 돌아오면 보상 동기화 한 번 더 (방금 공부한 것 반영)
+  try { syncEnglishRewards(true); } catch (e) {}
+}
+window.addEventListener('popstate', () => {
+  // 모달이 열려 있는데 embed 상태가 사라졌다면(뒤로가기) 닫는다
+  if (!(history.state && history.state.embed)) closeExternalEmbed(true);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeExternalEmbed(); });
+
 let _englishFs = null;       // 두 번째 앱의 Firestore 핸들
 let _englishLastSync = 0;
 function _englishStore() {
@@ -10425,13 +10513,25 @@ function renderStudySubjectPick() {
   const EXTERNAL_STUDY = [
     { key: 'english', icon: '🔤', title: '영어 복습앱',
       sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 EXP·골드',
-      href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)' },
+      href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)',
+      embed: true },   // [ENGLISH-EMBED-1] 새 탭 대신 RPG 안 전체화면 모달로
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + encodeURIComponent(CUR.id),
       border: 'rgba(155,120,220,.45)', bg: 'rgba(155,120,220,.10)' },
   ];
-  const externalCards = EXTERNAL_STUDY.map(x => `
+  const externalCards = EXTERNAL_STUDY.map(x => x.embed ? `
+          <button class="st-subject-card" onclick="openExternalEmbed('${x.key}')"
+            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
+              border:1px solid ${x.border};cursor:pointer;
+              background:${x.bg};color:var(--txt);font-family:inherit;text-align:left;box-sizing:border-box">
+            <span style="font-size:2.2rem">${x.icon}</span>
+            <span style="flex:1;min-width:0">
+              <span class="st-subject" style="display:block;font-weight:700">${escHtml(x.title)}</span>
+              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">${escHtml(x.sub)}</span>
+            </span>
+            <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
+          </button>` : `
           <a class="st-subject-card" href="${x.href}" target="_blank" rel="noopener"
             style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
               border:1px solid ${x.border};cursor:pointer;text-decoration:none;
