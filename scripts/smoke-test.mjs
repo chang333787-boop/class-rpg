@@ -27,7 +27,7 @@ const rel = (f) => path.join(ROOT, f);
 const exists = (f) => fs.existsSync(rel(f));
 const read = (f) => fs.readFileSync(rel(f), 'utf8');
 
-const JS_FILES = ['gamedata.js', 'curriculum.js', 'figures.js', 'student.js', 'admin.js', 'kiosk.js'];
+const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'figures.js', 'student.js', 'admin.js', 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -80,7 +80,7 @@ const MIME = {
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
     '/gamedata.js?v=20260730',
-    '/curriculum.js?v=20260903a', '/figures.js?v=20260903a',
+    '/curriculum.js?v=20260903a', '/curriculum_review.js?v=20260903a', '/figures.js?v=20260903a',
     '/student.js?v=20260903f', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
     '/student.css?v=20260903b', '/admin.css?v=20260903a', '/kiosk.css?v=20260604',
   ];
