@@ -1,0 +1,34 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_i7 TV 2×1 · 나무 장식장 위 브라운관 TV · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M40,184 L160,172 L198,192 L110,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="100" cy="184" rx="84" ry="12" fill="#000" opacity=".28"/>
+<!-- 장식장 -->
+<path class="o" d="M16,138 h168 v44 h-168z" fill="#8a5f38"/>
+<path class="o" d="M12,130 h176 v10 h-176z" fill="#a87a4a"/><path d="M18,134 h164" stroke="#c79a62" stroke-width="2"/>
+<g class="i" fill="#9c6e42"><rect x="24" y="146" width="70" height="30" rx="2"/><rect x="106" y="146" width="70" height="30" rx="2"/></g>
+<path d="M30,150 h58 M112,150 h58" stroke="#b58a56" stroke-width="1.4"/>
+<g fill="#d9a53a" stroke="#2b2118" stroke-width="1.3"><circle cx="86" cy="161" r="3"/><circle cx="114" cy="161" r="3"/></g>
+<g class="i" fill="#5a3a20"><rect x="20" y="182" width="10" height="8"/><rect x="170" y="182" width="10" height="8"/></g>
+<!-- TV 본체 -->
+<path class="o" d="M36,62 h128 v70 h-128z" fill="#7a5230"/>
+<path d="M40,66 h120 v62 h-120z" fill="#8f6339"/>
+<path d="M42,68 h116" stroke="#b58a56" stroke-width="2"/>
+<!-- 화면 (풍경) -->
+<path class="o" d="M46,72 h90 v52 h-90z" fill="#5fa0c8"/>
+<path d="M46,110 q22,-16 44,-6 q22,-14 46,4 v16 h-90z" fill="#6aa04a"/>
+<path d="M46,118 q20,-8 44,-2 q24,-8 46,2 v6 h-90z" fill="#4f7a2e"/>
+<circle cx="120" cy="86" r="8" fill="#f2c25a"/><path d="M60,84 q6,-6 14,0 M70,82 q4,-4 8,0" stroke="#fff" stroke-width="3" fill="none" opacity=".9" stroke-linecap="round"/>
+<path d="M48,74 l10,0 l-10,10z" fill="#fff" opacity=".35"/>
+<!-- 조작부 -->
+<g fill="#3d3833" stroke="#2b2118" stroke-width="1.4"><circle cx="150" cy="84" r="5"/><circle cx="150" cy="100" r="5"/></g>
+<path d="M150,80 v4 M147,100 h6" stroke="#b3ada0" stroke-width="1.5"/>
+<g stroke="#5a3a20" stroke-width="1.5"><path d="M143,112 h14 M143,116 h14 M143,120 h14"/></g>
+<!-- 안테나 -->
+<path d="M100,62 l-24,-38 M100,62 l24,-38" stroke="#3d3833" stroke-width="3" stroke-linecap="round"/>
+<g fill="#77706a" stroke="#2b2118" stroke-width="1.3"><circle cx="76" cy="24" r="3"/><circle cx="124" cy="24" r="3"/></g>
+<path class="i" d="M92,54 h16 v8 h-16z" fill="#3d3833"/>
+<!-- 장식장 위 소품 -->
+<path class="i" d="M20,120 l2,-10 h10 l2,10z" fill="#c0392b"/><path d="M22,114 h10" stroke="#e8636d" stroke-width="1.5"/>
+<g fill="#4f7a2e" stroke="#2b2118" stroke-width="1.3"><ellipse cx="176" cy="118" rx="6" ry="4"/><ellipse cx="170" cy="122" rx="5" ry="3.5"/></g><path class="i" d="M166,130 l2,-6 h12 l2,6z" fill="#a05a2a"/>
+</svg>

@@ -1,0 +1,30 @@
+<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+<!-- d_i8 소파 3×1 · 3인용, 쿠션·담요 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M50,184 L250,170 L298,192 L150,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="150" cy="184" rx="134" ry="13" fill="#000" opacity=".28"/>
+<!-- 등받이 -->
+<path class="o" d="M30,96 q0,-10 10,-10 h220 q10,0 10,10 v58 h-240z" fill="#8a4a3a"/>
+<path d="M40,96 h220" stroke="#a65a48" stroke-width="3"/>
+<g stroke="#6b3628" stroke-width="2" opacity=".8"><path d="M110,92 v58 M190,92 v58"/></g>
+<g fill="#6b3628"><circle cx="70" cy="118" r="3"/><circle cx="150" cy="118" r="3"/><circle cx="230" cy="118" r="3"/></g>
+<!-- 팔걸이 -->
+<path class="o" d="M10,116 q0,-14 14,-14 h16 v70 h-30z" fill="#9c5647"/>
+<path class="o" d="M260,102 h16 q14,0 14,14 v56 h-30z" fill="#9c5647"/>
+<path d="M18,110 q4,-6 12,-4 M270,106 q8,-2 12,4" stroke="#b56a58" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+<!-- 좌석 쿠션 3 -->
+<g class="o" fill="#a65a48"><path d="M40,140 h72 q6,0 6,6 v28 h-84 v-28 q0,-6 6,-6z"/><path d="M118,140 h64 q6,0 6,6 v28 h-76 v-28 q0,-6 6,-6z"/><path d="M188,140 h66 q6,0 6,6 v28 h-78 v-28 q0,-6 6,-6z"/></g>
+<path d="M44,146 h66 M124,146 h58 M192,146 h62" stroke="#c07460" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M40,168 h214" stroke="#6b3628" stroke-width="2" opacity=".7"/>
+<!-- 밑단 + 다리 -->
+<path class="i" d="M34,174 h232 v8 h-232z" fill="#6b3628"/>
+<g class="i" fill="#5a3a20"><path d="M40,182 l2,10 h8 l2,-10z"/><path d="M248,182 l2,10 h8 l2,-10z"/><path d="M144,182 l2,10 h8 l2,-10z"/></g>
+<!-- 던지는 쿠션 -->
+<g transform="translate(74,124) rotate(-8)"><path class="i" d="M-18,-14 h36 v28 h-36z" fill="#d9a53a"/><path d="M-12,-8 l24,16 M12,-8 l-24,16" stroke="#e8c26a" stroke-width="2"/></g>
+<!-- 담요 (오른쪽 팔걸이에 걸침) -->
+<path class="i" d="M226,102 q10,-10 24,-6 q14,4 18,20 l-8,44 q-14,-8 -26,-2 q-6,-30 -8,-56z" fill="#5f8f38"/>
+<g stroke="#4f7a2e" stroke-width="2" opacity=".8"><path d="M236,110 q8,4 12,16 M232,124 q8,4 14,18 M230,138 q8,4 14,14"/></g>
+<path d="M232,100 l4,-6 M240,98 l4,-6 M248,98 l4,-6" stroke="#86ad50" stroke-width="2" stroke-linecap="round"/>
+<!-- 바닥 러그 자락 -->
+<path d="M120,190 h60" stroke="#8c8578" stroke-width="2" opacity=".6"/>
+</svg>

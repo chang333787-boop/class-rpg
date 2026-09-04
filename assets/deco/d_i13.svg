@@ -1,0 +1,30 @@
+<svg width="100" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 300">
+<!-- d_i13 마법 거울 1×2 (legend) · 금테 전신거울, 보랏빛 발광 · footprint y100~300 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
+<radialGradient id="g" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#d9b8ff"/><stop offset=".6" stop-color="#8a5ed6"/><stop offset="1" stop-color="#4a2c8a"/></radialGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#b98ae6" stop-opacity=".55"/><stop offset="1" stop-color="#b98ae6" stop-opacity="0"/></radialGradient>
+</defs>
+<circle cx="50" cy="160" r="70" fill="url(#glow)"/>
+<path d="M22,282 L78,270 L98,290 L44,298 Z" fill="#000" opacity=".2"/>
+<ellipse cx="50" cy="286" rx="40" ry="9" fill="#000" opacity=".28"/>
+<!-- 받침 -->
+<path class="o" d="M20,270 q30,-8 60,0 v14 q-30,8 -60,0z" fill="#b8892e"/>
+<path d="M26,274 q24,-6 48,0" stroke="#e8c26a" stroke-width="2.5" fill="none"/>
+<g class="i" fill="#8a5ed6"><circle cx="50" cy="278" r="4"/></g>
+<!-- 프레임 (금) -->
+<path class="o" d="M16,262 v-180 q0,-40 34,-40 q34,0 34,40 v180z" fill="#b8892e"/>
+<path d="M22,258 v-176 q0,-34 28,-34 q28,0 28,34 v176" fill="none" stroke="#e8c26a" stroke-width="3"/>
+<!-- 거울면 -->
+<path class="i" d="M26,254 v-172 q0,-30 24,-30 q24,0 24,30 v172z" fill="url(#g)"/>
+<path d="M32,120 q0,-24 12,-40" stroke="#efe0ff" stroke-width="4" stroke-linecap="round" opacity=".8" fill="none"/>
+<path d="M36,180 v40" stroke="#efe0ff" stroke-width="2.5" stroke-linecap="round" opacity=".5"/>
+<!-- 별·반짝 -->
+<g fill="#fff"><path d="M60,110 l2,6 l6,2 l-6,2 l-2,6 l-2,-6 l-6,-2 l6,-2z"/><path d="M42,200 l1.5,4 l4,1.5 l-4,1.5 l-1.5,4 l-1.5,-4 l-4,-1.5 l4,-1.5z"/><circle cx="64" cy="160" r="1.8"/><circle cx="38" cy="236" r="1.5"/></g>
+<!-- 프레임 장식 -->
+<g class="i" fill="#d9a53a"><circle cx="50" cy="46" r="8"/><circle cx="16" cy="120" r="5"/><circle cx="84" cy="120" r="5"/><circle cx="16" cy="200" r="5"/><circle cx="84" cy="200" r="5"/></g>
+<circle cx="50" cy="46" r="3.5" fill="#8a5ed6" stroke="#2b2118" stroke-width="1.2"/>
+<path d="M30,52 q10,-8 20,-4 M70,52 q-10,-8 -20,-4" stroke="#7a5a1e" stroke-width="2" fill="none"/>
+<path d="M18,262 h64" stroke="#7a5a1e" stroke-width="2"/>
+<!-- 바닥에 떨어진 빛 -->
+<ellipse cx="50" cy="288" rx="24" ry="3" fill="#b98ae6" opacity=".5"/>
+</svg>

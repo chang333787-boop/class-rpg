@@ -1,0 +1,48 @@
+<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+<!-- d_y28 헛간 3×2 · footprint y100~300 · 지붕이 위 여유칸으로 솟음 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M60,282 L250,262 L300,290 L150,300 Z" fill="#000" opacity=".2"/>
+<ellipse cx="150" cy="284" rx="140" ry="16" fill="#000" opacity=".28"/>
+<!-- 기단 -->
+<path class="i" d="M14,262 h272 v20 h-272z" fill="#8c8578"/><path d="M18,266 h264" stroke="#b3ada0" stroke-width="3"/>
+<!-- 벽 -->
+<path class="o" d="M22,150 h256 v112 h-256z" fill="#b5392b"/>
+<g stroke="#8f2a1e" stroke-width="2" opacity=".85"><path d="M22,170 h256 M22,192 h256 M22,214 h256 M22,236 h256"/></g>
+<path d="M22,150 h256 v14 h-256z" fill="#000" opacity=".16"/>
+<!-- 흰 트림 -->
+<g class="i" fill="#efe6d4"><rect x="16" y="146" width="268" height="8"/><rect x="16" y="150" width="8" height="112"/><rect x="276" y="150" width="8" height="112"/></g>
+<!-- 지붕 (갬브럴) -->
+<path class="o" d="M6,152 L36,96 L150,64 L264,96 L294,152 Z" fill="#4e5459"/>
+<path d="M36,96 L150,64 L264,96 L150,72 Z" fill="#5f666c"/>
+<g stroke="#3a3f44" stroke-width="1.8" opacity=".8"><path d="M20,128 L128,94 M28,112 L136,80 M172,94 L280,128 M164,80 L272,112 M14,140 L120,106 M180,106 L286,140"/></g>
+<path d="M6,152 L36,96 L150,64 L264,96 L294,152" fill="none" stroke="#2b2118" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M148,64 l4,0" stroke="#b3ada0" stroke-width="3"/>
+<!-- 처마 그림자 -->
+<path d="M14,152 h272 v6 h-272z" fill="#000" opacity=".25"/>
+<!-- 다락 창 -->
+<path class="i" d="M126,104 h48 v34 h-48z" fill="#3b2a1c"/>
+<path d="M126,104 h48 v34 h-48z" fill="none" stroke="#efe6d4" stroke-width="4"/>
+<path d="M150,104 v34 M126,121 h48" stroke="#efe6d4" stroke-width="3"/>
+<path d="M130,108 l10,0 l-10,10z" fill="#6d8ea3" opacity=".6"/>
+<!-- 건초 (다락에서 삐져나옴) -->
+<path d="M154,124 q10,-6 16,0 q-2,8 -12,10z" fill="#d9b24a" stroke="#2b2118" stroke-width="1.4"/>
+<path d="M156,128 l8,-3 M158,132 l8,-1" stroke="#b8901a" stroke-width="1.4"/>
+<!-- 큰 문 -->
+<path class="o" d="M96,176 h108 v86 h-108z" fill="#6d3f24"/>
+<path d="M96,176 h108 v86 h-108z" fill="none" stroke="#efe6d4" stroke-width="6"/>
+<path d="M96,176 L204,262 M204,176 L96,262 M150,176 v86" stroke="#efe6d4" stroke-width="5"/>
+<path d="M104,184 v72 M120,184 v72 M136,184 v72 M164,184 v72 M180,184 v72 M196,184 v72" stroke="#5a3218" stroke-width="1.6" opacity=".8"/>
+<circle cx="142" cy="222" r="3" fill="#3d3833"/><circle cx="158" cy="222" r="3" fill="#3d3833"/>
+<!-- 옆 창 2 -->
+<g><rect class="i" x="40" y="182" width="34" height="28" fill="#6d8ea3"/><path d="M40,182 h34 v28 h-34z" fill="none" stroke="#efe6d4" stroke-width="4"/><path d="M57,182 v28 M40,196 h34" stroke="#efe6d4" stroke-width="2.5"/><path d="M44,186 l8,0 l-8,8z" fill="#fff" opacity=".45"/></g>
+<g><rect class="i" x="226" y="182" width="34" height="28" fill="#6d8ea3"/><path d="M226,182 h34 v28 h-34z" fill="none" stroke="#efe6d4" stroke-width="4"/><path d="M243,182 v28 M226,196 h34" stroke="#efe6d4" stroke-width="2.5"/><path d="M230,186 l8,0 l-8,8z" fill="#fff" opacity=".45"/></g>
+<!-- 문 옆 랜턴 -->
+<path d="M214,190 h10" stroke="#3d3833" stroke-width="3"/><path class="i" d="M220,190 l-5,4 v12 h10 v-12z" fill="#f2c25a"/><circle cx="220" cy="200" r="3" fill="#fff4c2"/>
+<!-- 풍향계 -->
+<path d="M150,64 v-22" stroke="#3d3833" stroke-width="3"/><path d="M138,50 h24" stroke="#3d3833" stroke-width="2.5"/><path d="M150,42 l10,-5 l-10,-5z" fill="#d9a53a" stroke="#2b2118" stroke-width="1.5"/><path d="M150,42 l-8,-4 v8z" fill="#3d3833"/>
+<!-- 문 앞 건초 뭉치·바퀴자국 -->
+<path class="i" d="M30,282 l6,-14 h26 l6,14z" fill="#d9b24a"/><path d="M38,272 h20 M36,278 h24" stroke="#b8901a" stroke-width="1.6"/>
+<g fill="#6b4d2e" opacity=".7"><ellipse cx="120" cy="290" rx="18" ry="2.5"/><ellipse cx="180" cy="290" rx="18" ry="2.5"/></g>
+<g fill="#c9702e" stroke="#7a4a1a" stroke-width="1"><ellipse cx="262" cy="286" rx="6" ry="3.5" transform="rotate(-20 262 286)"/></g>
+<path d="M70,292 l2,-9 l3,9z M76,292 l2,-12 l3,12z" fill="#4f7a2e"/>
+</svg>

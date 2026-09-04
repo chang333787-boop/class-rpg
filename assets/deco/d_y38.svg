@@ -1,0 +1,26 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_y38 큰 바위 B형(이끼 바위·갈라짐·고사리) 2×1 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M60,184 L160,172 L198,192 L120,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="100" cy="184" rx="86" ry="13" fill="#000" opacity=".28"/>
+<!-- 두 덩어리로 갈라진 바위 -->
+<path class="o" d="M14,178 L20,140 L44,112 L84,102 L98,110 L92,176 Z" fill="#7d8577"/>
+<path class="o" d="M102,176 L108,112 L136,102 L172,120 L188,156 L182,180 Z" fill="#7d8577"/>
+<path d="M22,142 L46,118 L84,108 L88,130 L60,142 Z" fill="#a4ab9c"/>
+<path d="M110,116 L136,108 L166,124 L150,140 L118,136 Z" fill="#9aa193"/>
+<path d="M88,130 L92,174 L24,174 L22,150 L60,142 Z" fill="#666e60"/>
+<path d="M118,136 L150,140 L184,160 L180,178 L104,176 Z" fill="#5f675a"/>
+<!-- 갈라진 틈 (어둡게) -->
+<path d="M96,112 L94,176 L104,176 L106,114 Z" fill="#2f2a24"/>
+<!-- 이끼 덮개 -->
+<g fill="#66963a" stroke="#2b2118" stroke-width="1.5"><path d="M30,136 q16,-26 52,-26 q12,0 12,10 q-16,8 -34,10 q-16,6 -30,6z"/><path d="M112,122 q20,-16 48,-8 q10,4 6,12 q-18,-2 -32,4 q-14,2 -22,-8z"/><path d="M160,150 q10,-4 20,4 q-4,8 -14,6z"/></g>
+<g fill="#86ad50"><path d="M40,124 q14,-12 34,-10 q-14,6 -30,12z"/><path d="M122,120 q14,-8 30,-4 q-14,2 -26,8z"/></g>
+<g fill="#4f7a2e"><circle cx="72" cy="126" r="2.5"/><circle cx="54" cy="134" r="2"/><circle cx="150" cy="128" r="2.4"/><circle cx="168" cy="154" r="2"/></g>
+<!-- 고사리 (틈에서) -->
+<g fill="none" stroke="#4f7a2e" stroke-width="3" stroke-linecap="round"><path d="M100,150 q-10,-20 -30,-26 M100,150 q12,-22 34,-24 M100,146 q0,-22 4,-40"/></g>
+<g fill="#66963a"><path d="M82,134 l-6,-4 l7,-1z M88,140 l-7,-3 l7,-2z M76,128 l-5,-4 l6,0z M118,134 l6,-4 l-7,-1z M112,140 l7,-3 l-7,-2z M124,128 l5,-4 l-6,0z M100,120 l-4,-5 l6,-1z M102,130 l5,-4 l-6,-1z"/></g>
+<!-- 잔돌·풀 -->
+<g fill="#8c8578" stroke="#3a332b" stroke-width="1.2"><ellipse cx="12" cy="188" rx="7" ry="4"/><ellipse cx="192" cy="186" rx="5" ry="3"/></g>
+<g fill="#4f7a2e"><path d="M40,184 l2,-10 l3,10z M46,184 l2,-13 l3,13z M160,184 l2,-9 l3,9z M166,184 l2,-12 l3,12z"/></g>
+<g fill="#86ad50"><path d="M43,184 l1.5,-7 l1.5,7z M163,184 l1.5,-6 l1.5,6z"/></g>
+</svg>

@@ -1,0 +1,25 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_y18 돌 벤치 2×1 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M40,182 L150,170 L198,190 L112,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="100" cy="184" rx="82" ry="12" fill="#000" opacity=".28"/>
+<!-- 받침돌 2개 -->
+<g class="o" fill="#8c8578"><path d="M34,150 l4,-10 h30 l4,10 v30 h-38z"/><path d="M128,150 l4,-10 h30 l4,10 v30 h-38z"/></g>
+<g fill="#b3ada0"><path d="M38,150 l3,-8 h22 v10 h-25z"/><path d="M132,150 l3,-8 h22 v10 h-25z"/></g>
+<path d="M40,166 h12 M140,170 h14" stroke="#5f5850" stroke-width="2" stroke-linecap="round"/>
+<!-- 상판 (두꺼운 돌판, 모서리 깨짐) -->
+<path class="o" d="M18,126 h164 l-3,10 h-8 v14 h-146 v-14 h-10z" fill="#a39d90"/>
+<path class="i" d="M18,126 h164 l-3,10 h-164z" fill="#c4bfb2"/>
+<path d="M30,131 h130" stroke="#dcd7ca" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M26,146 h140" stroke="#7a746a" stroke-width="1.6" opacity=".8"/>
+<path d="M60,140 l8,6 M132,138 l-6,8" stroke="#6f695f" stroke-width="1.6" stroke-linecap="round"/>
+<!-- 깨진 모서리 -->
+<path d="M182,126 l-6,4 l-2,6" stroke="#2b2118" stroke-width="1.8" fill="#8c8578"/>
+<!-- 이끼 -->
+<path d="M22,150 q8,-6 16,0 q6,4 12,-2" stroke="#66963a" stroke-width="4" fill="none" stroke-linecap="round"/>
+<path d="M150,151 q6,-5 12,0" stroke="#4f7a2e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+<circle cx="48" cy="176" r="3" fill="#66963a"/><circle cx="160" cy="178" r="2.5" fill="#66963a"/>
+<!-- 잔돌·풀 -->
+<g fill="#8c8578" stroke="#3a332b" stroke-width="1.2"><ellipse cx="14" cy="186" rx="6" ry="3.5"/><ellipse cx="190" cy="184" rx="5" ry="3"/></g>
+<path d="M84,184 l2,-9 l3,9 M92,184 l2,-11 l3,11" fill="#4f7a2e" stroke="#4f7a2e" stroke-width="1"/>
+</svg>

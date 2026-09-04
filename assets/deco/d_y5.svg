@@ -1,0 +1,28 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_y5 정원 벤치 2×1 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M40,182 L150,168 L196,190 L110,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="100" cy="182" rx="80" ry="12" fill="#000" opacity=".28"/>
+<!-- 뒷다리 -->
+<g class="i" fill="#5a3a20"><rect x="36" y="118" width="12" height="30" rx="2"/><rect x="152" y="118" width="12" height="30" rx="2"/></g>
+<!-- 등받이 기둥 -->
+<g class="i" fill="#5a3a20"><rect x="38" y="70" width="10" height="52" rx="2"/><rect x="152" y="70" width="10" height="52" rx="2"/></g>
+<!-- 등받이 널 2 -->
+<path class="o" d="M28,74 h144 v14 h-144z" fill="#9c6e42"/><path d="M34,78 h132" stroke="#c79a62" stroke-width="2"/><path d="M50,84 h40 M110,84 h50" stroke="#7a5230" stroke-width="1.5" opacity=".8"/>
+<path class="o" d="M28,96 h144 v12 h-144z" fill="#8a5f38"/><path d="M34,100 h132" stroke="#b58a56" stroke-width="1.6"/>
+<!-- 앉는 판 (3장, 약간 앞으로) -->
+<path class="o" d="M22,122 h156 v14 h-156z" fill="#9c6e42"/><path d="M28,126 h144" stroke="#c79a62" stroke-width="2"/><path d="M60,132 h30 M120,132 h40" stroke="#7a5230" stroke-width="1.5" opacity=".8"/>
+<path class="o" d="M22,140 h156 v13 h-156z" fill="#8f6339"/><path d="M28,144 h144" stroke="#b58a56" stroke-width="1.6"/>
+<path class="o" d="M22,157 h156 v12 h-156z" fill="#7f5630"/>
+<!-- 앞다리 -->
+<g class="o" fill="#5a3a20"><rect x="28" y="152" width="14" height="30" rx="2"/><rect x="158" y="152" width="14" height="30" rx="2"/></g>
+<path d="M32,156 v22 M162,156 v22" stroke="#7a5230" stroke-width="2"/>
+<!-- 가로 버팀목 -->
+<path class="i" d="M42,170 h116 v6 h-116z" fill="#5a3a20"/>
+<!-- 못 -->
+<g fill="#3d3833"><circle cx="42" cy="129" r="2"/><circle cx="158" cy="129" r="2"/><circle cx="42" cy="80" r="2"/><circle cx="158" cy="80" r="2"/></g>
+<!-- 이끼·낙엽 -->
+<path d="M30,180 q10,-6 20,-2" stroke="#66963a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+<g fill="#c9702e" stroke="#7a4a1a" stroke-width="1"><ellipse cx="184" cy="186" rx="7" ry="4" transform="rotate(-25 184 186)"/><ellipse cx="20" cy="190" rx="6" ry="3.5" transform="rotate(20 20 190)"/></g>
+<path d="M70,184 l6,-2 l5,2" stroke="#5a3a20" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>
