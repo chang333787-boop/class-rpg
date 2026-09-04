@@ -1,0 +1,32 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_y39 닭 3마리 2×1 · 수탉 1 + 암탉 2, 모이 쪼기 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
+<g id="hen"><ellipse cy="0" rx="20" ry="6" fill="#000" opacity=".28"/><path d="M-6,-8 v8 M4,-8 v8" stroke="#e8892c" stroke-width="3"/><path d="M-10,0 h8 l-3,3z M0,0 h8 l-3,3z" fill="#e8892c" stroke="#2b2118" stroke-width="1.5"/><path class="o" d="M-24,-22 q8,16 30,12 q12,-2 14,-12 q-4,-14 -22,-14 q-20,0 -22,14z" fill="#f4efe4"/><path d="M-24,-22 q4,-6 2,-12 l-8,2 q0,8 6,10z" fill="#e2dccd" stroke="#2b2118" stroke-width="1.8"/><path d="M-12,-20 q10,-2 20,2 M-8,-14 q10,2 18,-2" stroke="#cfc8b6" stroke-width="1.5" fill="none"/><circle class="o" cx="18" cy="-34" r="9" fill="#f4efe4"/><path class="i" d="M12,-43 l3,-5 l3,5 l3,-4 l1,5z" fill="#c9302c"/><path class="i" d="M26,-34 l9,2 l-9,3z" fill="#e8892c"/><path d="M22,-30 l0,5 l-3,-1z" fill="#c9302c" stroke="#2b2118" stroke-width="1.2"/><circle cx="21" cy="-36" r="1.7" fill="#2b2118"/></g>
+</defs>
+<path d="M30,184 L150,176 L196,190 L90,198 Z" fill="#000" opacity=".16"/>
+<!-- 모이 -->
+<g fill="#d9b24a" stroke="#7a5a1a" stroke-width=".8"><ellipse cx="60" cy="186" rx="2.2" ry="1.4"/><ellipse cx="68" cy="190" rx="2" ry="1.3"/><ellipse cx="54" cy="192" rx="2" ry="1.3"/><ellipse cx="130" cy="194" rx="2.2" ry="1.4"/><ellipse cx="138" cy="190" rx="2" ry="1.3"/></g>
+<!-- 수탉 (뒤, 큼) -->
+<g transform="translate(118,168)">
+  <ellipse cy="0" rx="26" ry="7" fill="#000" opacity=".28"/>
+  <path d="M-8,-10 v10 M6,-10 v10" stroke="#e8892c" stroke-width="3.5"/>
+  <path d="M-13,0 h10 l-4,4z M1,0 h10 l-4,4z" fill="#e8892c" stroke="#2b2118" stroke-width="1.5"/>
+  <!-- 꼬리 깃 -->
+  <g class="i"><path d="M-26,-30 q-16,-18 -6,-34 q6,14 12,20z" fill="#2f5d3a"/><path d="M-30,-24 q-20,-10 -18,-28 q10,10 20,16z" fill="#3b6f47"/><path d="M-28,-18 q-22,0 -26,-14 q14,2 24,8z" fill="#2f5d3a"/></g>
+  <path class="o" d="M-28,-28 q6,22 34,18 q16,-2 18,-16 q-4,-18 -26,-20 q-24,-2 -26,18z" fill="#c9702e"/>
+  <path d="M-14,-24 q12,-4 24,2 M-10,-16 q12,4 22,-2" stroke="#a5561e" stroke-width="1.8" fill="none"/>
+  <path d="M-16,-30 q10,-6 22,-2" stroke="#e8a04a" stroke-width="2" fill="none"/>
+  <path class="i" d="M4,-30 q8,-16 22,-12" fill="none" stroke-width="2.5"/>
+  <circle class="o" cx="26" cy="-46" r="11" fill="#e8a04a"/>
+  <path class="i" d="M18,-58 l3,-7 l4,6 l3,-7 l4,7 l2,-4 l1,6z" fill="#c9302c"/>
+  <path class="i" d="M36,-46 l11,2 l-11,4z" fill="#e8892c"/>
+  <path d="M31,-40 l-1,8 l-5,-2z" fill="#c9302c" stroke="#2b2118" stroke-width="1.3"/>
+  <circle cx="29" cy="-48" r="2" fill="#2b2118"/>
+</g>
+<!-- 암탉 2 (앞) -->
+<use href="#hen" transform="translate(56,182)"/>
+<use href="#hen" transform="translate(160,188) scale(-.9,.9)"/>
+<!-- 깃털·풀 -->
+<path d="M96,146 q6,-3 8,3 q-6,2 -8,-3z" fill="#f4efe4" stroke="#2b2118" stroke-width="1.2"/>
+<g fill="#4f7a2e"><path d="M12,188 l2,-9 l3,9z M18,188 l2,-12 l3,12z M186,180 l2,-8 l3,8z"/></g>
+</svg>

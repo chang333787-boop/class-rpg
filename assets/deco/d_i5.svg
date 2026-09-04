@@ -1,0 +1,28 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_i5 책상 2×1 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M40,184 L160,170 L198,192 L110,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="100" cy="184" rx="84" ry="12" fill="#000" opacity=".28"/>
+<!-- 다리 -->
+<g class="i" fill="#5a3a20"><rect x="22" y="128" width="12" height="52" rx="2"/><rect x="166" y="128" width="12" height="52" rx="2"/></g>
+<path d="M26,132 v44 M170,132 v44" stroke="#7a5230" stroke-width="2"/>
+<!-- 서랍장 (오른쪽) -->
+<path class="o" d="M110,128 h60 v54 h-60z" fill="#8a5f38"/>
+<g class="i" fill="#9c6e42"><rect x="116" y="134" width="48" height="18" rx="2"/><rect x="116" y="158" width="48" height="18" rx="2"/></g>
+<path d="M120,138 h40 M120,162 h40" stroke="#b58a56" stroke-width="1.5"/>
+<g fill="#d9a53a" stroke="#2b2118" stroke-width="1.4"><circle cx="140" cy="143" r="3.2"/><circle cx="140" cy="167" r="3.2"/></g>
+<!-- 뒤판 -->
+<path d="M34,128 h76 v50 h-76z" fill="#6f4a26"/><path d="M40,134 h64 M40,150 h64 M40,166 h64" stroke="#5a3a20" stroke-width="1.5" opacity=".8"/>
+<!-- 상판 (두껍게) -->
+<path class="o" d="M12,112 h176 v10 h-176z" fill="#7a5230"/>
+<path class="o" d="M12,100 h176 v12 h-176z" fill="#a87a4a"/>
+<path d="M20,105 h160" stroke="#c79a62" stroke-width="2.2"/><path d="M40,109 h50 M120,109 h40" stroke="#8a5f38" stroke-width="1.4" opacity=".8"/>
+<!-- 펼친 책 -->
+<g transform="translate(70,92)"><path class="i" d="M-30,4 q15,-6 30,0 q15,-6 30,0 v10 q-15,-4 -30,2 q-15,-6 -30,-2z" fill="#efe6d4"/><path d="M0,4 v12" stroke="#2b2118" stroke-width="1.5"/><path d="M-24,8 h18 M-24,11 h14 M6,8 h18 M6,11 h16" stroke="#8c8578" stroke-width="1.2"/><path class="i" d="M-32,6 h64 v3 h-64z" fill="#c0392b"/></g>
+<!-- 연필꽂이 -->
+<g transform="translate(150,92)"><path class="i" d="M-10,-4 h20 v14 h-20z" fill="#5f5850"/><path d="M-6,-6 v-14 M0,-4 v-18 M6,-6 v-12" stroke="#d9a53a" stroke-width="3"/><path d="M-6,-20 l0,-4 M0,-22 l0,-4" stroke="#2b2118" stroke-width="2"/><path d="M6,-18 l0,-4" stroke="#c0392b" stroke-width="2.5"/></g>
+<!-- 머그 -->
+<g transform="translate(24,92)"><path class="i" d="M-8,-8 h16 v16 h-16z" fill="#4a7f9e"/><path d="M8,-4 q8,0 8,5 q0,5 -8,5" fill="none" stroke="#2b2118" stroke-width="2"/><path d="M-5,-5 h10" stroke="#6d9fb8" stroke-width="2"/><path d="M-3,-14 q2,-4 0,-8 M3,-12 q2,-4 0,-8" stroke="#fff" stroke-width="1.5" opacity=".6" fill="none"/></g>
+<!-- 종이 -->
+<path class="i" d="M96,86 l22,-4 l4,14 l-22,4z" fill="#efe6d4"/><path d="M100,90 l14,-3 M101,94 l12,-2" stroke="#8c8578" stroke-width="1"/>
+</svg>

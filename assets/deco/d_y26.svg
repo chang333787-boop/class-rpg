@@ -1,0 +1,24 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_y26 큰 바위 2×1 · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M60,184 L160,172 L198,192 L120,198 Z" fill="#000" opacity=".2"/>
+<ellipse cx="98" cy="184" rx="86" ry="13" fill="#000" opacity=".28"/>
+<!-- 본체 -->
+<path class="o" d="M16,178 L22,144 L48,116 L92,104 L138,108 L170,128 L186,158 L180,180 Z" fill="#8c8578"/>
+<!-- 밝은 면(왼쪽 위) -->
+<path d="M24,146 L50,120 L92,108 L120,112 L100,140 L60,150 Z" fill="#b3ada0"/>
+<path d="M92,108 L138,112 L166,130 L140,136 L120,116 Z" fill="#a39d90"/>
+<!-- 어두운 면(오른쪽 아래) -->
+<path d="M120,116 L140,136 L166,130 L184,160 L178,178 L128,176 L104,144 Z" fill="#6f695f"/>
+<path d="M24,146 L60,150 L100,140 L104,144 L128,176 L22,176 Z" fill="#7f796e"/>
+<!-- 균열선 -->
+<g stroke="#5f5850" stroke-width="2" fill="none" stroke-linecap="round"><path d="M100,140 L104,144 L128,176 M60,150 L58,168 M140,136 L150,158"/></g>
+<path d="M48,124 l14,-6 M132,116 l12,8" stroke="#dcd7ca" stroke-width="2" stroke-linecap="round"/>
+<!-- 이끼 (위·왼쪽) -->
+<g fill="#66963a" stroke="#2b2118" stroke-width="1.4"><path d="M54,118 q12,-14 30,-8 q10,-2 14,6 q-14,4 -28,4 q-10,4 -16,-2z"/><path d="M28,150 q6,-10 16,-6 q-2,8 -10,10z"/></g>
+<path d="M62,116 q10,-6 20,-4 M34,150 q4,-4 8,-3" stroke="#86ad50" stroke-width="2" fill="none" stroke-linecap="round"/>
+<!-- 밑 잔돌·풀 -->
+<g fill="#8c8578" stroke="#3a332b" stroke-width="1.2"><ellipse cx="12" cy="186" rx="7" ry="4"/><ellipse cx="190" cy="186" rx="6" ry="3.5"/><ellipse cx="150" cy="190" rx="5" ry="3"/></g>
+<g fill="#4f7a2e"><path d="M30,184 l2,-10 l3,10z M36,184 l2,-13 l3,13z M170,182 l2,-9 l3,9z M176,182 l2,-12 l3,12z"/></g>
+<g fill="#86ad50"><path d="M33,184 l1.5,-7 l1.5,7z M173,182 l1.5,-6 l1.5,6z"/></g>
+</svg>
