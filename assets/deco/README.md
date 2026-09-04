@@ -5,4 +5,6 @@
 
 ⚠️ `<svg>`에 **width·height 속성 필수** — 없으면 캔버스에 안 그려진다.
 규격: `docs/deco_svg_spec.md`
-예제: `_example_sofa_3x1.svg` (밑줄로 시작 → 장식 id와 겹치지 않아 화면에 안 뜸)
+예제: `example-sofa-3x1.svg`
+
+⚠️ **파일명을 밑줄(`_`)로 시작하지 말 것.** Jekyll이 배포에서 빼버려 404가 된다(2026-09-04 실측).
