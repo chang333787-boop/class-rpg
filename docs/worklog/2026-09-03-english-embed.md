@@ -26,6 +26,7 @@
   ④ popstate 핸들러: state에 embed가 남아 있으면 유지, state가 사라지면 닫힘 ✅ (미리보기 창이 실제 history.back()을 수행하지 않아 합성 popstate로 검증)
   ⑤ 잘못된 주소(127.0.0.1:9) → no-cors fetch 실패로 폴백 화면 표시, "새 탭으로 열기" 링크 정확 ✅ (iframe load 이벤트는 오류 페이지에서도 발생해 신뢰하지 않음 — 하네스에서 발견해 fetch 방식으로 교체)
   ⑥ ✕(closeExternalEmbed) → 닫힘 ✅
+  ⑦ **크롬북 1366×610**(대장 추가 항목): 오버레이 rect (0,0,1366,610) = 뷰포트 전체 · 헤더 50px · iframe 1366×560으로 본문 영역 꽉 채움 · z-index 9000 · body 스크롤 잠금 ✅
 - 하네스 중 발견·수정 2건: (a) iframe load 기반 폴백은 오류 페이지에서 오작동 → fetch 도달성 검사로 교체 (b) 닫기 직후 재열기 경합 → embed 상태 있으면 pushState 중복 안 함 + popstate는 state 소실 시에만 닫음.
 - 영어앱 쪽: iframe 안에서는 "▶ 시작하기" 탭 화면(제스처 워밍업) 배포 완료(https://jeongrim-english.web.app). 크롬북 실기기 소리는 배포 후 사용자 1회 확인.
 
