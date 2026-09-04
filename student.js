@@ -553,6 +553,28 @@ function buildCharSVG(s) {
     e_b8:   {a:'#F9A825',b:'#F57F17',c:'#FFF176',belt:'#E65100'},
     e_b9:   {a:'#37474F',b:'#1C313A',c:'#546E7A',belt:'#FFD700'},
     e_b10:  {a:'#880E4F',b:'#560027',c:'#C2185B',belt:'#FFD700'},
+    // [CHAR-PAL-1] 물(e_b11~20)·풀(e_b21~30) 몸통 30종이 팔레트에 없어
+    //   BODY_PAL.none(기본 파란 옷)으로 그려지고 있었다. 등급이 오를수록 진해진다.
+    e_b11:  {a:'#B3E5FC',b:'#4FC3F7',c:'#E1F5FE',belt:'#0277BD'},
+    e_b12:  {a:'#81D4FA',b:'#29B6F6',c:'#E1F5FE',belt:'#01579B'},
+    e_b13:  {a:'#4FC3F7',b:'#039BE5',c:'#B3E5FC',belt:'#01579B'},
+    e_b14:  {a:'#29B6F6',b:'#0288D1',c:'#81D4FA',belt:'#014A7F'},
+    e_b15:  {a:'#039BE5',b:'#0277BD',c:'#4FC3F7',belt:'#013A63'},
+    e_b16:  {a:'#0288D1',b:'#01579B',c:'#29B6F6',belt:'#FFD54F'},
+    e_b17:  {a:'#0277BD',b:'#014A7F',c:'#039BE5',belt:'#FFD54F'},
+    e_b18:  {a:'#01579B',b:'#013A63',c:'#0288D1',belt:'#FFC107'},
+    e_b19:  {a:'#014A7F',b:'#002F4B',c:'#0277BD',belt:'#FFD700'},
+    e_b20:  {a:'#003D66',b:'#00243D',c:'#0288D1',belt:'#FFD700'},
+    e_b21:  {a:'#C8E6C9',b:'#81C784',c:'#E8F5E9',belt:'#33691E'},
+    e_b22:  {a:'#A5D6A7',b:'#66BB6A',c:'#E8F5E9',belt:'#2E7D32'},
+    e_b23:  {a:'#81C784',b:'#4CAF50',c:'#C8E6C9',belt:'#2E7D32'},
+    e_b24:  {a:'#66BB6A',b:'#43A047',c:'#A5D6A7',belt:'#1B5E20'},
+    e_b25:  {a:'#4CAF50',b:'#388E3C',c:'#81C784',belt:'#1B5E20'},
+    e_b26:  {a:'#43A047',b:'#2E7D32',c:'#66BB6A',belt:'#FFD54F'},
+    e_b27:  {a:'#388E3C',b:'#1B5E20',c:'#4CAF50',belt:'#FFD54F'},
+    e_b28:  {a:'#2E7D32',b:'#155A1A',c:'#43A047',belt:'#FFC107'},
+    e_b29:  {a:'#1B5E20',b:'#0D3D12',c:'#388E3C',belt:'#FFD700'},
+    e_b30:  {a:'#14501A',b:'#08300D',c:'#2E7D32',belt:'#FFD700'},
   };
   const SHOE_PAL = {
     none:'#4E342E', e_s1:'#5D4037', e_s2:'#795548', e_s3:'#7B1FA2',
@@ -587,6 +609,17 @@ function buildCharSVG(s) {
     e_w8:{a:'#FFE082',b:'#F9A825',type:'sword'},
     e_w9:{a:'#B0BEC5',b:'#37474F',type:'sword'},
     e_w10:{a:'#F48FB1',b:'#880E4F',type:'sword'},
+    // [CHAR-PAL-1] 스태프 10종이 팔레트에 없어 무기가 아예 안 그려지고 있었다.
+    e_ws1:{a:'#C5A880',b:'#8D6E63',type:'staff'},
+    e_ws2:{a:'#B0BEC5',b:'#607D8B',type:'staff'},
+    e_ws3:{a:'#CE93D8',b:'#8E24AA',type:'staff'},
+    e_ws4:{a:'#90CAF9',b:'#1E88E5',type:'staff'},
+    e_ws5:{a:'#A5D6A7',b:'#43A047',type:'staff'},
+    e_ws6:{a:'#FFCC80',b:'#FB8C00',type:'staff'},
+    e_ws7:{a:'#F48FB1',b:'#D81B60',type:'staff'},
+    e_ws8:{a:'#B39DDB',b:'#5E35B1',type:'staff'},
+    e_ws9:{a:'#80DEEA',b:'#00ACC1',type:'staff'},
+    e_ws10:{a:'#FFE082',b:'#FFA000',type:'staff'},
   };
 
   const bp   = BODY_PAL[bodyId]  || BODY_PAL.none;
