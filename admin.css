@@ -52,6 +52,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .btn-sm.outline{background:transparent;border:1px solid var(--border);color:var(--txt2);}
 .btn-sm.outline:hover{background:rgba(255,255,255,.05);}
 .btn-sm.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1a1a;}
+/* [KIOSK-LINK-1] topbar의 <a>를 btn-sm과 같은 모양으로 (버튼용 규칙엔 없는 것만 보탬) */
+a.btn-sm{display:inline-block;text-decoration:none;line-height:1.4;}
 .admin-badge{font-size:.72rem;color:var(--txt3);background:rgba(255,255,255,.04);
   border:1px solid var(--border2);border-radius:20px;padding:.25rem .7rem;}
 
