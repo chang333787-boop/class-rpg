@@ -6486,6 +6486,41 @@ function _initDeco() {
 }
 
 let _drawDecoRaf = null;
+// ══ 장식 SVG 파이프라인 (DECO-SVG-1) ══════════════════════
+//  assets/deco/<id>.svg 가 있으면 그 그림을 쓰고, 없으면 기존 _DFN 캔버스 그림을 그대로 쓴다.
+//  · SVG는 "발밑 기준"으로 놓는다 — footprint 폭에 맞추고, 아래 끝을 footprint 바닥에 붙이고,
+//    남는 높이는 위로 넘치게 둔다(가로등·아치처럼 위로 솟는 것을 눌러 담지 않기 위해).
+//    따라서 SVG viewBox = footprint 비율 + 위로 필요한 여유. 원점은 발밑 중앙.
+//  · 비율을 억지로 늘리지 않는다. 기존 _DFN 경로의 ctx.scale(w/h) 왜곡은 SVG가 들어오는
+//    장식부터 자연히 사라진다(에셋이 없는 장식은 지금 모습 그대로 — 이번 변경으로 안 바뀜).
+//  · <img>는 intrinsic 크기가 있어야 캔버스에 그릴 수 있으므로 SVG에 width/height 속성 필수.
+// 뒤→앞 정렬(윗줄 먼저). 같은 줄이면 왼쪽 먼저. 원본 배열은 건드리지 않는다.
+function _decoSorted(list) { return [...list].sort((a,b) => (a.row-b.row) || (a.col-b.col)); }
+const _DECO_IMG = {};   // id → {img, ok} | {ok:false}  (없는 파일은 한 번만 시도)
+function _decoImg(id) {
+  const hit = _DECO_IMG[id];
+  if (hit) return hit.ok ? hit.img : null;
+  const img = new Image();
+  const rec = { img, ok: false };
+  _DECO_IMG[id] = rec;
+  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) _drawDeco(); };
+  img.onerror = () => { rec.ok = false; };
+  img.src = './assets/deco/' + encodeURIComponent(id) + '.svg';
+  return null;
+}
+
+// 장식 하나를 놓는다. SVG가 준비됐으면 true, 아니면 false(호출부가 기존 방식으로 그림).
+function _drawDecoSVG(id, px, py, bw, bh) {
+  const img = _decoImg(id);
+  if (!img) return false;
+  const nw = img.naturalWidth, nh = img.naturalHeight;
+  if (!nw || !nh) return false;
+  const w = bw;                    // 땅에 닿는 폭 = footprint 폭
+  const h = w * (nh / nw);         // 비율 유지 — 늘이지 않는다
+  _dCtx.drawImage(img, px, py + bh - h, w, h);   // 아래 끝을 footprint 바닥에 맞춤
+  return true;
+}
+
 function _drawDeco() {
   if (!_dCtx) return;
   if (_drawDecoRaf) return; // 이미 RAF 예약됨 — 중복 방지
@@ -6693,12 +6728,14 @@ function _drawYard() {
   }
 
   // 배치된 마당 장식 - footprint 전체를 채우는 bounding box 렌더
-  (CUR.houseDecorations||[]).filter(p=>p.area==='yard').forEach(p=>{
+  // [DECO-SVG-1] 뒤(윗줄)부터 그린다 — SVG가 위로 넘칠 수 있어 앞줄이 가리게 해야 한다
+  _decoSorted((CUR.houseDecorations||[]).filter(p=>p.area==='yard')).forEach(p=>{
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
     const sz=d.size||{w:1,h:1};
     const px=p.col*C, py=p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
+    if(_drawDecoSVG(p.id, px, py, bw, bh)) return;   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;
@@ -6856,12 +6893,13 @@ function _drawIndoor() {
   }
 
   // 배치된 가구
-  (CUR.houseDecorations||[]).filter(p=>p.area==='indoor').forEach(p=>{
+  _decoSorted((CUR.houseDecorations||[]).filter(p=>p.area==='indoor')).forEach(p=>{
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
     const sz=d.size||{w:1,h:1};
     const px=offX+p.col*C, py=offY+p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
+    if(_drawDecoSVG(p.id, px, py, bw, bh)) return;   // [DECO-SVG-1]
     const cx=px+bw/2, cy=py+bh/2;
     const s = Math.min(bw, bh) * 0.62;
     if(fn){
