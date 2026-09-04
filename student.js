@@ -1413,47 +1413,6 @@ function toggleSideSection(sectionId, arrowId) {
   if (arrow) arrow.textContent = open ? '▲' : '▼';
 }
 
-function toggleExtraMenu() {
-  const grid = document.getElementById('extra-menu-grid');
-  const arrow = document.getElementById('extra-menu-arrow');
-  if (!grid) return;
-  const open = grid.style.display === 'none' || grid.style.display === '';
-  grid.style.display = open ? 'block' : 'none';
-  if (arrow) arrow.textContent = open ? '▲' : '▼';
-}
-
-function claimRewards() {
-  const pending = CUR.pendingRewards || [];
-  // 승인된 보상만 수령 (approved:true)
-  const approved = pending.filter(r => r.approved === true);
-  if (!approved.length) {
-    toast('아직 선생님이 승인한 보상이 없어요!');
-    return;
-  }
-  let totalExp = 0, totalGold = 0;
-  approved.forEach(r => {
-    totalExp  += r.exp  || 0;
-    totalGold += r.gold || 0;
-    if (r.stat && r.statVal) {
-      CUR.stats = CUR.stats || {};
-      CUR.stats[r.stat] = Math.round(((CUR.stats[r.stat]||0) + r.statVal) * 10) / 10;
-    }
-    // questLog는 관리자 approveReward에서 이미 저장됨 → 여기서 중복 저장 제거
-  });
-  // 승인된 것만 제거, 대기중인 것은 유지
-  CUR.pendingRewards = pending.filter(r => r.approved !== true);
-  const oldLv = CUR.level;
-  CUR.gold += totalGold;
-  CUR.totalGold = (CUR.totalGold||0) + totalGold;
-  CUR.exp  += totalExp;
-  CUR.level = Utils.levelFromExp(CUR.exp);
-  DB.saveStudent(CUR);
-  if (CUR.level > oldLv) triggerLevelUp(CUR.level);
-  checkAchievements();
-  renderAll();
-  toast(`💰+${totalGold}G  ⚡+${totalExp}EXP 획득!`);
-}
-
 // ══ 상점 ══
 function buildEquipIcon(slot, itemId) {
   const BODY_PAL = {
@@ -1934,102 +1893,6 @@ function buyDeco(id) {
 // ── 현재 열린 사냥터 zone ──
 let CUR_ZONE = 'beginner';
 
-// 사냥터 탭 클릭
-// 사냥터 후보 3마리 렌더 (⚠️ 죽은 코드: 유일 호출자였던 구버전 openZone 제거됨 — 후속 정리 대상)
-function renderMonsterOffers(zone) {
-  const el = document.getElementById('monster-offers');
-  if (!el) return;
-
-  const canFight     = Utils.canFightMonster(CUR);
-
-  if (!canFight) {
-    const limit = (typeof BATTLE_CONSTS !== 'undefined') ? BATTLE_CONSTS.dailyBattleLimit : 3;
-    el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt2);font-size:.85rem">
-      오늘 전투 횟수(${limit}회)를 모두 사용했어요!<br>
-      <span style="font-size:.72rem;color:var(--txt3)">내일 다시 도전하세요 💪</span>
-    </div>`;
-    return;
-  }
-
-  // ── 리롤 방지: 오늘의 후보를 zone별로 캐시 ──────────────────
-  const today = Utils.todayStr();
-
-  // battleOffersByZone 초기화 (없거나 날짜 바뀌면 리셋)
-  if (!CUR.battleOffersByZone || CUR.battleOffersByZone.dateKey !== today) {
-    CUR.battleOffersByZone = { dateKey: today, beginner: null, intermediate: null, advanced: null };
-  }
-
-  let offers;
-  if (CUR.battleOffersByZone[zone]) {
-    const saved = CUR.battleOffersByZone[zone];
-    if (Array.isArray(saved) && saved.length > 0 && typeof saved[0] === 'string') {
-      offers = saved.map(id => GAME_DATA.monsters.find(m => m.id === id)).filter(Boolean);
-    } else {
-      offers = saved;
-    }
-    // 복원 결과가 3마리 미만이면 캐시 무효화 후 새로 생성
-    if (!offers || offers.length < 3) {
-      CUR.battleOffersByZone[zone] = null;
-      offers = null;
-    }
-  }
-
-  if (!offers) {
-    // 새로 생성
-    offers = generateBattleOffers(CUR, zone);
-    if (offers.length) {
-      CUR.battleOffersByZone[zone] = offers.map(m => m.id);
-      DB.saveStudent(CUR);
-    }
-  }
-
-  if (!offers || !offers.length) {
-    el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3);font-size:.82rem">
-      이 사냥터에 도전할 몬스터가 없어요
-    </div>`;
-    return;
-  }
-
-  const elemLabel  = { fire:'🔥 불', water:'💧 물', grass:'🌿 풀' };
-  const rarityLabel= { common:'일반', rare:'희귀', legend:'전설' };
-  const rarityClass= { common:'ob-rarity-common', rare:'ob-rarity-rare', legend:'ob-rarity-legend' };
-  const slotLabels = ['① 안정 몬스터', '② 도전 몬스터', '③ 고급 몬스터'];
-
-  // [STUDENT-COPY-1A] 표시 전용 안내 — 카드 클릭(startBattle) 직후 기회가 차감됨을 사전 고지.
-  //                   문구만 추가하며 전투/차감/저장 로직은 일절 건드리지 않음.
-  const battleCostNotice = `<div style="text-align:center;font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">⚔️ 도전하면 오늘 전투 기회 1회를 사용해요.</div>`;
-
-  el.innerHTML = battleCostNotice + offers.map((m, i) => {
-    const isKilled = (CUR.monsterLog || []).includes(m.id);
-    const badges = [
-      m.element ? `<span class="offer-badge ob-elem-${m.element}">${elemLabel[m.element]||m.element}</span>` : '',
-      m.rarity  ? `<span class="offer-badge ${rarityClass[m.rarity]||'ob-rarity-common'}">${rarityLabel[m.rarity]||m.rarity}</span>` : '',
-      m.trait==='ghost' ? `<span class="offer-badge ob-ghost">👻 유령형</span>` : '',
-      isKilled ? `<span class="offer-badge ob-done">✓ 처치완료</span>` : `<span class="offer-badge ob-new">NEW</span>`,
-    ].filter(Boolean).join('');
-
-    return `
-      <div>
-        <div class="offer-slot-label">${slotLabels[i] || ''}</div>
-        <div class="offer-card" onclick="startBattle('${m.id}')">
-          <div class="offer-icon">${iconImg(m, 'monsters', '2rem')}</div>
-          <div class="offer-body">
-            <div class="offer-name">${m.name}</div>
-            <div class="offer-meta">
-              <span style="color:var(--txt3)">Lv.${m.level}</span>
-              <span style="color:var(--gold)">💰 ${m.gold}G</span>
-              ${badges}
-            </div>
-          </div>
-          <div class="offer-arrow">›</div>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-// 도감 펼치기/접기
-function renderMonsterDexInline() { renderMonsters(); }
-
 // ── 학생 포트폴리오 일일퀘스트 기록 ──────────────────────
 let _dqPortView = 'week';
 function setDqPortView(v, btn) {
@@ -2123,17 +1986,6 @@ function renderDqPortfolio() {
       </div>
     </div>`;
   }).join('');
-}
-
-function toggleMonsterDex() {
-  const el = document.getElementById('monster-dex-inline');
-  if (!el) return;
-  if (el.style.display === 'none') {
-    el.style.display = '';
-    renderMonsters();
-  } else {
-    el.style.display = 'none';
-  }
 }
 
 function renderMonsters() {
@@ -3782,12 +3634,6 @@ function selectMonsterCard(monId) {
   startBattle(monId);
 }
 
-function openZone(zone, btn) {
-  CUR_ZONE = zone;
-  MONSTER_STEP = 'monster';
-  renderMonsterStep();
-}
-
 // ══ 보스 ══
 function openBoss() {
   const settings = DB.getSettings();
@@ -4172,12 +4018,6 @@ function setCurFloor(type, btn) {
     btn.style.color = fc.color||'var(--gold)';
     btn.style.borderColor = fc.border||'rgba(255,255,255,.3)';
   }
-}
-
-// 셀별 바닥 타일 가져오기
-function getCellFloor(r, c) {
-  const key = r+'_'+c;
-  return (CUR.yardFloor||{})[key] || 'grass';
 }
 
 // 장식 크기 가져오기 (없으면 1x1)
@@ -7070,13 +6910,6 @@ function selectDeco(id){
     else toast(`${d?.icon} 선택됨 — 원하는 칸에 클릭!`);
   }
 }
-
-// 구버전 호환
-function placeHouseDeco(id){ selectDeco(id); }
-function removeHouseDeco(slot){
-  const item=(CUR.houseDecorations||[]).find(p=>p.slot===slot||(p.col!==undefined&&p.col===slot%3));
-  if(item) _decoPlace(item.area||'yard', item.row||0, item.col||0);
-}
 // ══ 작품 전시 (Storage 업로드) ══
 
 // 이미지 미리보기
@@ -7333,9 +7166,6 @@ async function submitMemories() {
     renderMyMemories();
   }, 800);
 }
-
-// 구버전 호환
-async function submitMemory() { await submitMemories(); }
 
 function editMemTitle(memId, currentTitle) {
   if (currentTitle === undefined) { // 호출부는 id만 전달 (제목을 onclick 인자로 넘기면 따옴표/HTML 주입 위험)
@@ -8761,9 +8591,6 @@ function renderQuestModal() {
        <span style="font-size:.72rem">✏️ 활동 신청 탭에서 오늘 활동을 알려주세요!</span></div>`);
 }
 
-// ══ 승급 시스템 ══
-function openPromoModal() { openModal('m-promo'); renderPromoModal(); }
-
 function renderPromoModal() {
   const s = CUR;
   const alreadyRequested = DB.getPromotionRequests().find(r => r.studentId === s.id);
@@ -9155,45 +8982,6 @@ function renderRankingModal() {
   const students = DB.getStudents();
   const el = document.getElementById('rank-modal-body');
   if (el) el.innerHTML = buildRankingHTML(students);
-}
-
-function renderAchievements() {
-  const earned = new Set(CUR.achievements || []);
-  const doneList   = ACHIEVEMENTS.filter(a =>  earned.has(a.id));
-  const lockedList = ACHIEVEMENTS.filter(a => !earned.has(a.id));
-  const el = document.getElementById('ach-list');
-
-  const rewardText = a => {
-    const parts = [];
-    if (a.reward.exp)   parts.push(`+${a.reward.exp}EXP`);
-    parts.push('+20G');
-    if (a.reward.title) parts.push(`칭호 "${a.reward.title}"`);
-    if (a.reward.deco)  parts.push('특별 장식');
-    return parts.join(' · ');
-  };
-
-  const render = (list, locked) => list.map(a => `
-    <div class="ach-item ${locked?'locked':''}">
-      <div class="ach-icon">${a.icon}</div>
-      <div class="ach-body">
-        <div class="ach-name">${a.name}</div>
-        <div class="ach-desc">${a.desc}</div>
-        <div class="ach-reward">🎁 ${rewardText(a)}</div>
-      </div>
-      <div class="ach-badge ${locked?'locked':'done'}">${locked?'🔒':'✅'}</div>
-    </div>`).join('');
-
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-      <div style="font-size:.82rem;color:var(--txt2)">달성 <span style="color:var(--gold);font-weight:700">${doneList.length}</span> / 전체 ${ACHIEVEMENTS.length}</div>
-      <div style="font-size:.72rem;color:var(--txt3)">업적 달성 시 EXP·골드·칭호 획득!</div>
-    </div>
-    <div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin-bottom:1.2rem;overflow:hidden">
-      <div style="height:100%;width:${Math.round(doneList.length/ACHIEVEMENTS.length*100)}%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;transition:width .6s ease"></div>
-    </div>
-    ${doneList.length > 0 ? `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">✅ 달성한 업적 (${doneList.length})</div>${render(doneList, false)}` : ''}
-    <div style="font-size:.72rem;color:var(--txt3);margin:.8rem 0 .5rem">🔒 미달성 업적 (${lockedList.length})</div>
-    ${render(lockedList, true)}`;
 }
 
 // 포트폴리오 내 업적 탭 전용 렌더 (house-ach-list에 출력)
@@ -9890,19 +9678,6 @@ if (window.speechSynthesis) {
   window.speechSynthesis.getVoices();
   window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
-function checkVocabQuizTrigger() {
-  if (!CUR) return;
-  const ws = DB.getActiveWordSet();
-  if (!ws || !ws.wordIds || ws.wordIds.length < 3) return;
-  const today = Utils.todayStr();
-  const lastKey = `vocab_quiz_shown_${CUR.id}_${today}`;
-  if (localStorage.getItem(lastKey)) return; // 하루 1회
-  // 로그인 10초 후 팝업
-  setTimeout(() => {
-    if (document.getElementById('m-vocab-quiz')?.style.display === 'flex') return;
-    startPopupQuiz(); // 바로 퀴즈 시작 (선택 화면 없음)
-  }, 10000);
-}
 
 // ── 팝업 강제 퀴즈 (3문제 객관식, 닫기 불가) ────────────
 function startPopupQuiz() {
@@ -9953,8 +9728,6 @@ function startPopupQuiz() {
   openModal('m-vocab-quiz');
   renderVocabQuestion();
 }
-
-function showVocabQuizPrompt() { startPopupQuiz(); } // 구버전 호환
 
 // ── 퀴즈 생성 + 진행 ────────────────────────────────
 let VOCAB_QUIZ = { questions:[], cur:0, correct:0, wrongIds:[] };
