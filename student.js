@@ -214,6 +214,26 @@ function englishAppLink() {
 //   · 닫기 버튼 · ESC · 브라우저 뒤로가기(popstate) 모두로 닫힌다 — 아이가 갇히지 않게.
 //   · 8초 안에 load가 안 오거나 오프라인이면 "새 탭으로 열기" 링크를 크게 보여 준다(폴백).
 //   · 마크업은 처음 열 때 만든다(student.html 수정 최소화). 수채화 등 다른 앱은 다음 Phase.
+// 외부 학습 앱 목록 — 오늘의 학습 과목 선택 화면의 카드이자, 모달(openExternalEmbed)이 여는 대상.
+//   다음 앱은 여기 한 줄만 추가. embed:true면 RPG 안 전체화면 모달, 아니면 새 탭.
+//   [WATERCOLOR-EMBED-1] 수채화·데생도 모달로(같은 도메인이라 소리·카메라·기록 모두 iframe 안에서 그대로 동작).
+function externalStudyItems() {
+  const sid = encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.id) || '');
+  return [
+    { key: 'english', icon: '🔤', title: '영어 복습앱',
+      sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 EXP·골드',
+      href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)',
+      embed: true },   // [ENGLISH-EMBED-1] 새 탭 대신 RPG 안 전체화면 모달로
+    { key: 'watercolor', icon: '🎨', title: '수채화 기초',
+      sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
+      href: 'watercolor/index.html?sid=' + sid,
+      border: 'rgba(155,120,220,.45)', bg: 'rgba(155,120,220,.10)', embed: true },
+    { key: 'drawing', icon: '✏️', title: '데생 기초',
+      sub: '연필로 선·명암·형태 익히기 10차시 · 작품 사진은 선생님 확인 후 전시',
+      href: 'watercolor/index.html?course=drawing&sid=' + sid,
+      border: 'rgba(200,200,210,.40)', bg: 'rgba(200,200,210,.08)', embed: true },
+  ];
+}
 let _embedState = null;   // { key, href, loaded, timer }
 function _embedEl() {
   let el = document.getElementById('m-embed');
@@ -230,7 +250,7 @@ function _embedEl() {
         style="background:none;border:none;color:var(--txt);font-size:1.35rem;cursor:pointer;padding:.1rem .4rem;font-family:inherit">✕</button>
     </div>
     <div id="embed-body" style="flex:1;position:relative;min-height:0">
-      <iframe id="embed-frame" title="외부 학습 앱" allow="autoplay; microphone; fullscreen"
+      <iframe id="embed-frame" title="외부 학습 앱" allow="autoplay; microphone; camera; fullscreen"
         style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff"></iframe>
       <div id="embed-fallback" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:.9rem;background:#0f1424;color:var(--txt);text-align:center;padding:1.5rem">
         <div style="font-size:2.2rem">📡</div>
@@ -248,8 +268,12 @@ function _embedEl() {
   return el;
 }
 function openExternalEmbed(key) {
-  const item = { english: { title: '🔤 영어 복습앱', href: englishAppLink() } }[key];
-  if (!item) return;
+  const x = externalStudyItems().find(i => i.key === key && i.embed);
+  if (!x) return;
+  const item = { title: x.icon + ' ' + x.title, href: x.href };
+  // 같은 도메인(수채화·데생)이면 no-cors가 아니라 보통 HEAD로 확인해 상태 코드까지 본다(404 페이지도 폴백)
+  let sameOrigin = false;
+  try { sameOrigin = new URL(item.href, location.href).origin === location.origin; } catch (e) {}
   const el = _embedEl();
   const frame = el.querySelector('#embed-frame'), fb = el.querySelector('#embed-fallback');
   el.querySelector('#embed-title').textContent = item.title;
@@ -270,14 +294,16 @@ function openExternalEmbed(key) {
   try {
     const ctrl = ('AbortController' in window) ? new AbortController() : null;
     st.timer = setTimeout(() => { try { ctrl && ctrl.abort(); } catch (e) {} showFb(); }, 6000);
-    fetch(item.href, { mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
-      .then(() => { clearTimeout(st.timer); })
+    const opts = sameOrigin ? { method: 'HEAD', cache: 'no-store' } : { mode: 'no-cors', cache: 'no-store' };
+    fetch(item.href, { ...opts, signal: ctrl ? ctrl.signal : undefined })
+      .then(r => { clearTimeout(st.timer); if (sameOrigin && r && !r.ok) showFb(); })
       .catch(() => { clearTimeout(st.timer); showFb(); });
   } catch (e) { showFb(); }
 }
 function closeExternalEmbed(fromPop) {
   const el = document.getElementById('m-embed');
   if (!el || el.style.display === 'none') return;
+  const closedKey = _embedState && _embedState.key;
   if (_embedState) clearTimeout(_embedState.timer);
   el.querySelector('#embed-frame').src = 'about:blank';   // 소리·타이머 정지
   el.style.display = 'none';
@@ -287,8 +313,9 @@ function closeExternalEmbed(fromPop) {
     // 우리가 쌓은 한 칸을 되돌린다. popstate가 뒤늦게 와도 이미 닫혀 있어 무해(idempotent).
     try { history.back(); } catch (e) {}
   }
-  // 돌아오면 보상 동기화 한 번 더 (방금 공부한 것 반영)
-  try { syncEnglishRewards(true); } catch (e) {}
+  // 돌아오면 영어 보상 동기화 한 번 더 (방금 공부한 것 반영). 수채화·데생의 작품 제출은
+  // iframe이 같은 RTDB의 students/<key>/pendingRewards에 직접 쓰고, DB.onDataChange가 CUR을 갱신한다.
+  if (closedKey === 'english') { try { syncEnglishRewards(true); } catch (e) {} }
 }
 window.addEventListener('popstate', () => {
   // 모달이 열려 있는데 embed 상태가 사라졌다면(뒤로가기) 닫는다
@@ -10600,16 +10627,7 @@ function renderStudySubjectPick() {
 
   // [ENGLISH-LINK-1] 외부 학습 앱 카드 — RPG 내부 문항 대신 전용 앱으로 보낸다.
   //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
-  const EXTERNAL_STUDY = [
-    { key: 'english', icon: '🔤', title: '영어 복습앱',
-      sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 EXP·골드',
-      href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)',
-      embed: true },   // [ENGLISH-EMBED-1] 새 탭 대신 RPG 안 전체화면 모달로
-    { key: 'watercolor', icon: '🎨', title: '수채화 기초',
-      sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
-      href: 'watercolor/index.html?sid=' + encodeURIComponent(CUR.id),
-      border: 'rgba(155,120,220,.45)', bg: 'rgba(155,120,220,.10)' },
-  ];
+  const EXTERNAL_STUDY = externalStudyItems();   // [WATERCOLOR-EMBED-1] 정의는 최상위 externalStudyItems()
   const externalCards = EXTERNAL_STUDY.map(x => x.embed ? `
           <button class="st-subject-card" onclick="openExternalEmbed('${x.key}')"
             style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
