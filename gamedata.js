@@ -230,6 +230,7 @@ const GAME_DATA = {
     // ── 연못/물가 테마 ──────────────────────────────────────
     {id:'d_y29',name:'갈대 묶음',     icon:'🌿', price:20,  cat:'yard',   rarity:'common', reqLv:1},
     {id:'d_y30',name:'징검돌',        icon:'🪨', price:15,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y31',name:'작은 연못',     icon:'🪷', size:{w:3,h:3}, price:220, cat:'yard', rarity:'epic',   reqLv:1},
     {id:'d_y32',name:'오리 가족',     icon:'🦆', size:{w:2,h:1}, price:65, cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 건물 테마 ───────────────────────────────────────────
