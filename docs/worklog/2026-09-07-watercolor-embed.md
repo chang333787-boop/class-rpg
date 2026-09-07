@@ -1,4 +1,4 @@
-# 2026-09-04 (기기: 학교 Windows) — 수채화·데생도 RPG 안 전체화면 모달로 (WATERCOLOR-EMBED-1)
+# 2026-09-07 (기기: 학교 Windows) — 수채화·데생도 RPG 안 전체화면 모달로 (WATERCOLOR-EMBED-1)
 
 > 담당: 학습 조수 세션(영어앱 + 수채화·데생 통합 담당). 보스 2기 배정 6. #156(ENGLISH-EMBED-1)의 후속 — 새 모달을 만들지 않고 영어 모달을 그대로 쓴다.
 
@@ -23,7 +23,7 @@
 - 격리 하네스(브라우저, 운영 write 0): 모달 블록(`externalStudyItems`~`keydown` 리스너)을 텍스트 추출, worktree 루트를 정적 서빙(8767)해 **실제 `watercolor/index.html`을 같은 도메인 iframe으로** 로드 — ① 수채화 열림·src·allow(camera 포함) ② 데생 열림(`?course=drawing`) ③ HEAD 폴백: 없는 경로(`watercolor/nope.html`)는 폴백 화면 ④ ESC/✕/popstate 닫기 ⑤ 닫을 때 영어가 아니면 syncEnglishRewards 미호출 ⑥ 손님 모드로 한 단계 진행(로컬 저장만, Firebase write 0).
 - 실기기(크롬북·태블릿): 학생 로그인 → 작품 사진 제출 → admin 승인 대기에 뜨는지 — **사용자**.
 
-## 검증 결과 (2026-09-04)
+## 검증 결과 (2026-09-07)
 - `node --check` OK · verify-safety **PASS 18 · REVIEW 1 · FAIL 0** · smoke-test **PASS 33 · FAIL 0**
 - 브라우저 하네스(worktree 루트 정적 서빙 8767, 모달 블록 텍스트 추출, 손님 모드만 → 운영 write 0):
   ① 수채화 카드 → 모달 열림 · src `watercolor/index.html?sid=…` · allow `autoplay; microphone; camera; fullscreen` · history.state={embed:'watercolor'} · iframe 안 문서 제목 "수채화 따라하기", COURSE_KEY=watercolor · 폴백 미표시 ✅
