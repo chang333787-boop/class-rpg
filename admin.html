@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="./gamedata.js?v=20260904q1"></script>
 <script src="./curriculum.js?v=20260903a"></script>
-<link rel="stylesheet" href="./admin.css?v=20260903a">
+<link rel="stylesheet" href="./admin.css?v=20260904k">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:#0E1621;
@@ -94,6 +94,9 @@
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">📊 대시보드</div>
       <div class="topbar-right">
+        <!-- [KIOSK-LINK-1] 키오스크(우리반 할 일 체크판)는 그동안 어느 화면에서도 링크가 없어
+             주소를 직접 쳐야만 열렸다. 교사 화면에서 새 탭으로 바로 열 수 있게 한다. -->
+        <a class="btn-sm outline" href="./kiosk.html" target="_blank" rel="noopener">🖥 키오스크 열기</a>
         <div class="admin-badge">👨‍🏫 교사 모드</div>
       </div>
     </div>
