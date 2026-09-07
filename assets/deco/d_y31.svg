@@ -1,0 +1,43 @@
+<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+<!-- d_y31 작은 연못 3×3 (epic) · footprint y100~400 · 돌 테두리 + 진흙 기슭 + 물 + 연꽃·연잎 + 갈대 + 개구리 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
+<radialGradient id="pw" cx=".42" cy=".38" r=".72"><stop offset="0" stop-color="#5cb2e0"/><stop offset=".6" stop-color="#3288c0"/><stop offset="1" stop-color="#1c5f8e"/></radialGradient>
+<g id="pad"><path d="M14,0 A14,9 0 1 1 9,-7 L0,0 Z" fill="#4f9a3a" stroke="#2b2118" stroke-width="1.6"/><path d="M-9,-3 a7,3 0 0 1 9,-3" stroke="#8fd46a" stroke-width="1.6" fill="none"/></g>
+</defs>
+<!-- 바깥 진흙·모래 기슭 -->
+<path d="M150,138 C214,132 270,170 276,236 C282,300 246,356 170,362 C90,368 30,324 26,254 C22,190 84,144 150,138 Z" fill="#9c8560" class="o"/>
+<path d="M150,150 C208,146 260,180 264,238 C268,294 236,342 168,348 C100,354 44,316 40,254 C36,198 96,154 150,150 Z" fill="#6b5a40" opacity=".7"/>
+<!-- 물 -->
+<path d="M150,160 C202,156 248,188 252,240 C256,290 228,332 166,336 C104,342 54,306 50,254 C46,204 100,164 150,160 Z" fill="#1f5f8c" class="i"/>
+<path d="M148,170 C196,166 238,196 242,240 C246,284 220,322 164,326 C108,330 62,298 58,254 C54,208 104,174 148,170 Z" fill="url(#pw)"/>
+<!-- 얕은 곳 밝은 면·반사 -->
+<ellipse cx="110" cy="214" rx="34" ry="10" fill="#fff" opacity=".22"/>
+<g fill="none" stroke="#dff2fa" stroke-linecap="round" opacity=".55"><path d="M92,244 q16,-4 32,0" stroke-width="2"/><path d="M186,214 q14,-4 28,0" stroke-width="1.8"/><path d="M150,300 q18,-5 36,0" stroke-width="2"/><path d="M84,280 q12,-4 24,0" stroke-width="1.6"/></g>
+<!-- 돌 테두리 (불규칙) -->
+<g fill="#8c8578" class="i">
+<ellipse cx="150" cy="140" rx="16" ry="9"/><ellipse cx="190" cy="146" rx="13" ry="8"/><ellipse cx="226" cy="164" rx="14" ry="8"/><ellipse cx="256" cy="196" rx="12" ry="8"/><ellipse cx="272" cy="236" rx="11" ry="9"/><ellipse cx="270" cy="278" rx="13" ry="8"/><ellipse cx="254" cy="318" rx="14" ry="8"/><ellipse cx="220" cy="350" rx="15" ry="8"/><ellipse cx="178" cy="362" rx="14" ry="8"/><ellipse cx="132" cy="364" rx="15" ry="8"/><ellipse cx="88" cy="352" rx="14" ry="8"/><ellipse cx="52" cy="322" rx="13" ry="8"/><ellipse cx="30" cy="282" rx="11" ry="8"/><ellipse cx="28" cy="240" rx="12" ry="9"/><ellipse cx="44" cy="200" rx="13" ry="8"/><ellipse cx="76" cy="166" rx="14" ry="8"/><ellipse cx="112" cy="146" rx="14" ry="8"/>
+</g>
+<g fill="#b3ada0"><ellipse cx="146" cy="137" rx="8" ry="3.5"/><ellipse cx="222" cy="161" rx="7" ry="3"/><ellipse cx="268" cy="233" rx="5" ry="3.5"/><ellipse cx="216" cy="347" rx="7" ry="3"/><ellipse cx="128" cy="361" rx="7" ry="3"/><ellipse cx="48" cy="319" rx="6" ry="3"/><ellipse cx="40" cy="197" rx="6" ry="3"/><ellipse cx="108" cy="143" rx="7" ry="3"/></g>
+<g fill="#66963a"><path d="M60,176 q8,-8 18,-4 q-4,6 -12,7z"/><path d="M236,330 q8,-6 16,-2 q-4,6 -12,5z"/><path d="M96,362 q6,-5 14,-2 q-4,5 -10,4z"/></g>
+<!-- 연잎·연꽃 -->
+<use href="#pad" transform="translate(112,262) scale(1.3)"/>
+<use href="#pad" transform="translate(196,246) scale(1.15) rotate(35)"/>
+<use href="#pad" transform="translate(154,304) scale(1.1) rotate(-50)"/>
+<use href="#pad" transform="translate(84,224) scale(.9) rotate(70)"/>
+<g transform="translate(196,246)"><g fill="#f5a0c6" class="i"><ellipse cx="-6" cy="-3" rx="4" ry="8" transform="rotate(-35 -6 -3)"/><ellipse cx="6" cy="-3" rx="4" ry="8" transform="rotate(35 6 -3)"/><ellipse cx="0" cy="-7" rx="4.5" ry="9"/></g><g fill="#ffd0e4"><ellipse cx="-3" cy="-4" rx="2" ry="5" transform="rotate(-20 -3 -4)"/><ellipse cx="3" cy="-4" rx="2" ry="5" transform="rotate(20 3 -4)"/></g><circle cy="-2" r="2.5" fill="#ffe27a"/></g>
+<g transform="translate(154,304)"><g fill="#fff" class="i"><ellipse cx="-5" cy="-3" rx="3.4" ry="7" transform="rotate(-35 -5 -3)"/><ellipse cx="5" cy="-3" rx="3.4" ry="7" transform="rotate(35 5 -3)"/><ellipse cx="0" cy="-6" rx="3.8" ry="8"/></g><circle cy="-2" r="2.2" fill="#ffe27a"/></g>
+<!-- 개구리 (연잎 위) -->
+<g transform="translate(112,256)"><ellipse cy="0" rx="12" ry="7" fill="#5fa03a" class="i"/><ellipse cx="-4" cy="-1" rx="6" ry="4" fill="#7fc25a"/><circle cx="-6" cy="-7" r="3.6" fill="#5fa03a" class="i"/><circle cx="4" cy="-7" r="3.6" fill="#5fa03a" class="i"/><circle cx="-6" cy="-7.5" r="1.4" fill="#2b2118"/><circle cx="4" cy="-7.5" r="1.4" fill="#2b2118"/><path d="M-10,4 l-6,4 M10,4 l6,4" stroke="#2b2118" stroke-width="2" stroke-linecap="round"/><path d="M-4,-2 q3,2 6,0" stroke="#2b2118" stroke-width="1.2" fill="none"/></g>
+<!-- 갈대 (뒤쪽 왼쪽·오른쪽) -->
+<g fill="none" stroke="#2b2118" stroke-width="7" stroke-linecap="round"><path d="M56,196 q-4,-26 2,-52 M68,192 q0,-30 8,-58 M80,196 q6,-24 16,-44"/></g>
+<g fill="none" stroke="#5f8f38" stroke-width="4.2" stroke-linecap="round"><path d="M56,196 q-4,-26 2,-52 M68,192 q0,-30 8,-58 M80,196 q6,-24 16,-44"/></g>
+<g fill="#7a4a1a" class="i"><ellipse cx="58" cy="140" rx="5" ry="14"/><ellipse cx="76" cy="130" rx="5" ry="14"/><ellipse cx="96" cy="148" rx="4.5" ry="12"/></g>
+<g fill="none" stroke="#2b2118" stroke-width="7" stroke-linecap="round"><path d="M250,326 q6,-22 0,-44 M262,320 q4,-24 12,-46"/></g>
+<g fill="none" stroke="#5f8f38" stroke-width="4.2" stroke-linecap="round"><path d="M250,326 q6,-22 0,-44 M262,320 q4,-24 12,-46"/></g>
+<g fill="#7a4a1a" class="i"><ellipse cx="250" cy="278" rx="5" ry="13"/><ellipse cx="274" cy="270" rx="4.5" ry="12"/></g>
+<!-- 잠자리 -->
+<g transform="translate(214,196) rotate(-20)"><path d="M0,0 l12,-3" stroke="#2b2118" stroke-width="2.4" stroke-linecap="round"/><ellipse cx="-2" cy="-7" rx="8" ry="2.8" fill="#9ee2ff" opacity=".85" transform="rotate(-22 -2 -7)"/><ellipse cx="7" cy="-8" rx="8" ry="2.8" fill="#9ee2ff" opacity=".85" transform="rotate(22 7 -8)"/><circle cx="-2" cy="-1" r="2.4" fill="#2b2118"/></g>
+<!-- 바닥 풀·돌 -->
+<g fill="#4f7a2e"><path d="M20,372 l2,-10 l3,10z M26,372 l2,-13 l3,13z M270,378 l2,-9 l3,9z M276,378 l2,-12 l3,12z"/></g>
+<g fill="#8c8578" stroke="#3a332b" stroke-width="1.2"><ellipse cx="288" cy="356" rx="6" ry="3.5"/><ellipse cx="14" cy="330" rx="5" ry="3"/></g>
+</svg>
