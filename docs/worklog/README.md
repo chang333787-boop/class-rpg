@@ -25,3 +25,7 @@ git log 검색으로는 안 잡히는 작업만 여기 적는다. (전체 목록
 
 - [2026-09-04-q1-boardquests.md](2026-09-04-q1-boardquests.md) — 퀘스트판 유실 버그(Q1) 수정.
   PR #164에 deco 작업과 함께 squash되어 커밋 제목이 `fix(deco): ...`다. `--grep=퀘스트`·`--grep=boardQuests` 모두 안 잡힌다.
+
+- [2026-09-07-char-doll.md](2026-09-07-char-doll.md) — 캐릭터 종이인형 + 죽은 코드 정리.
+  커밋으로는 안 남는 것들이 들어 있다: 캐시버스터 글자 예약표, worktree 규칙,
+  `new RegExp` 안에서 `[\s\S]`가 죽는 함정, rebase 때 남의 캐시버스터를 되돌리는 사고.
