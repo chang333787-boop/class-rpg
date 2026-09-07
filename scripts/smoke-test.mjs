@@ -79,7 +79,7 @@ const MIME = {
   // 캐시버스터를 실제 HTML에 적힌 그대로 둔 채로 200 확인 (쿼리 있어도 실제 파일로 매핑되는지)
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
-    '/gamedata.js?v=20260904q1',
+    '/gamedata.js?v=20260907c',
     '/curriculum.js?v=20260903a', '/curriculum_review.js?v=20260903a', '/figures.js?v=20260903a',
     '/student.js?v=20260904em', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
     '/student.css?v=20260903b', '/admin.css?v=20260904k', '/kiosk.css?v=20260604',
@@ -142,7 +142,7 @@ for (const f of HTML_FILES) {
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 
   // gamedata.js 캐시버스터 ?v=20260705 (2026-07-05 갱신 — 업적/씨앗 문구 수정 배포)
-  if (html.includes('gamedata.js?v=20260904q1')) add('PASS', `${f}: gamedata.js?v=20260904q1 캐시버스터`);
+  if (html.includes('gamedata.js?v=20260907c')) add('PASS', `${f}: gamedata.js?v=20260907c 캐시버스터`);
   else add('REVIEW', `${f}: gamedata.js 캐시버스터(?v=20260705) 미발견 — gamedata 갱신 시 확인 필요`);
 }
 
