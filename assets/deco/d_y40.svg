@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
 <!-- d_y40 양 2×1 · 풀 뜯는 어미 + 새끼 양 · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
 <path d="M30,184 L150,174 L196,190 L90,198 Z" fill="#000" opacity=".18"/>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
 <!-- d_i11 수족관 3×1 · 나무 받침장 위 긴 수조 · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
 <linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd0ea"/><stop offset="1" stop-color="#4a92b5"/></linearGradient>
