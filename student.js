@@ -6491,6 +6491,96 @@ function _drawDecoSVG(id, px, py, bw, bh) {
   return true;
 }
 
+// ══ 바닥 SVG 파이프라인 (FLOOR-SVG-1) ══════════════════════
+//  assets/floor/<name>.svg — 바닥은 100×100 조각을 셀마다 drawImage(c*C, r*C, C, C)로 찍는다.
+//  · base: FLOOR_TILES 키 → tile_<키>[_a~_d]. 변형은 (r,c) 해시로 고정(다시 그려도 안 바뀜).
+//  · 잔디 번짐: 잔디가 아닌 칸의 4방 이웃이 잔디면 fringe_grass_{n,e,s,w}(2종 교차),
+//    두 변이 잔디면 in_<모서리>, 변은 아닌데 대각선만 잔디면 out_<모서리>. (꽃밭은 잔디로 친다)
+//  · 물가: 물 칸의 이웃이 물이 아니면 shore_{n,e,s,w} / in_* / out_*. 잔디 번짐 위에 그린다.
+//  · base 파일이 없거나 아직 안 왔으면 false → 호출부가 기존 fillRect+텍스처로 그린다(폴백).
+//    오버레이 조각이 없으면 그 조각만 건너뛴다.
+//  · FLOOR_SVG=false 로 두면 전부 기존 방식(단색)으로 돌아간다.
+const FLOOR_SVG = true;
+const _FLOOR_IMG = {};   // name → {img, ok}  (없는 파일은 한 번만 시도)
+function _floorImg(name) {
+  const hit = _FLOOR_IMG[name];
+  if (hit) return hit.ok ? hit.img : null;
+  const img = new Image();
+  const rec = { img, ok: false };
+  _FLOOR_IMG[name] = rec;
+  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) _drawDeco(); };
+  img.onerror = () => { rec.ok = false; };
+  img.src = './assets/floor/' + encodeURIComponent(name) + '.svg';
+  return null;
+}
+const _FLOOR_VARIANTS = { grass:4, dirt:4, stone:2, flower:2, dry_earth:2, sand:2, water:2 };
+function _floorBaseName(type, r, c) {
+  const n = _FLOOR_VARIANTS[type] || 0;
+  if (!n) return 'tile_' + type;
+  return 'tile_' + type + '_' + 'abcd'[(r*3 + c*7 + (r*c)%5) % n];
+}
+function _floorIsGrass(t) { return t === 'grass' || t === 'flower'; }
+// 셀 하나(base + 가장자리). typeAt(r,c) → 타입 | null(격자 밖·집 영역 = 경계 없음으로 취급)
+function _drawFloorSVG(type, r, c, px, py, C, typeAt) {
+  const base = _floorImg(_floorBaseName(type, r, c));
+  if (!base) return false;
+  _dCtx.drawImage(base, px, py, C, C);
+  const T = (dr, dc) => { const t = typeAt(r + dr, c + dc); return (t == null) ? type : t; };
+  const put = name => { const img = _floorImg(name); if (img) _dCtx.drawImage(img, px, py, C, C); };
+  if (!_floorIsGrass(type)) {
+    const n = _floorIsGrass(T(-1, 0)), e = _floorIsGrass(T(0, 1)), s = _floorIsGrass(T(1, 0)), w = _floorIsGrass(T(0, -1));
+    const v = ((r*5 + c*3) % 2) ? '2' : '';
+    if (n) put('fringe_grass_n' + v);
+    if (e) put('fringe_grass_e' + v);
+    if (s) put('fringe_grass_s' + v);
+    if (w) put('fringe_grass_w' + v);
+    if (n && e) put('fringe_grass_in_ne');
+    if (n && w) put('fringe_grass_in_nw');
+    if (s && e) put('fringe_grass_in_se');
+    if (s && w) put('fringe_grass_in_sw');
+    if (!n && !e && _floorIsGrass(T(-1, 1)))  put('fringe_grass_out_ne');
+    if (!n && !w && _floorIsGrass(T(-1, -1))) put('fringe_grass_out_nw');
+    if (!s && !e && _floorIsGrass(T(1, 1)))   put('fringe_grass_out_se');
+    if (!s && !w && _floorIsGrass(T(1, -1)))  put('fringe_grass_out_sw');
+  }
+  if (type === 'water') {
+    const n = T(-1, 0) !== 'water', e = T(0, 1) !== 'water', s = T(1, 0) !== 'water', w = T(0, -1) !== 'water';
+    if (n) put('shore_n');
+    if (e) put('shore_e');
+    if (s) put('shore_s');
+    if (w) put('shore_w');
+    if (n && e) put('shore_in_ne');
+    if (n && w) put('shore_in_nw');
+    if (s && e) put('shore_in_se');
+    if (s && w) put('shore_in_sw');
+    if (!n && !e && T(-1, 1) !== 'water')  put('shore_out_ne');
+    if (!n && !w && T(-1, -1) !== 'water') put('shore_out_nw');
+    if (!s && !e && T(1, 1) !== 'water')   put('shore_out_se');
+    if (!s && !w && T(1, -1) !== 'water')  put('shore_out_sw');
+  }
+  return true;
+}
+// 집 안 벽 띠(벽지+걸레받이+창)와 마루. 그려졌으면 true(호출부가 구식 창문을 생략).
+function _drawIndoorFloorSVG(offX, offY, C, W) {
+  const wood = _floorImg('tile_indoor_wood');
+  if (wood) for (let r = 0; r < DI.rows; r++) for (let c = 0; c < DI.cols; c++) _dCtx.drawImage(wood, offX + c*C, offY + r*C, C, C);
+  const wall = _floorImg('wall_floral');
+  if (!wall) return false;
+  // 벽 타일의 아래 끝을 바닥 윗선(offY)에 맞추고 위로 채운다. 맨 윗줄은 잘려도 된다.
+  const x0 = offX - Math.ceil(offX / C) * C;
+  for (let y = offY - C; y > -C; y -= C) for (let x = x0; x < W; x += C) _dCtx.drawImage(wall, x, y, C, C);
+  const bb = _floorImg('wall_baseboard');
+  if (bb) for (let x = x0; x < W; x += C) _dCtx.drawImage(bb, x, offY - C, C, C);
+  const win = _floorImg('wall_window');
+  if (win) [1, 5, 9].forEach(cc => { if (cc < DI.cols) _dCtx.drawImage(win, offX + cc*C, offY - C, C, C); });
+  return true;
+}
+function _isFloorLayerDeco(p) {
+  const d = GAME_DATA.decorations.find(x => x.id === p.id);
+  return !!(d && d.layer === 'floor');
+}
+// ══ /FLOOR-SVG-1 ══════════════════════════════════════════
+
 function _drawDeco() {
   if (!_dCtx) return;
   if (_drawDecoRaf) return; // 이미 RAF 예약됨 — 중복 방지
@@ -6508,11 +6598,15 @@ function _drawYard() {
   const hx = (DY.cols - DH.cols) * C, hh = DH.rows * C, hw = DH.cols * C;
 
   // 셀별 바닥 타일
+  // [FLOOR-SVG-1] 이웃 타입 조회 — 격자 밖·집 영역은 null(경계 없음)
+  const _yardTypeAt = (rr, cc) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
+    ? null : ((CUR.yardFloor||{})[rr+'_'+cc] || 'grass');
   for(let r=0;r<DY.rows;r++) for(let c=0;c<DY.cols;c++){
     if(_isHC(r,c)) continue;
     const tkey = r+'_'+c;
     const ttype = (CUR.yardFloor||{})[tkey]||'grass';
     const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
+    if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
     _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;
     _dCtx.fillRect(c*C, r*C, C, C);
     _drawTileTexture(ttype, c, r, C);
@@ -6837,33 +6931,11 @@ function _drawIndoor() {
   _dCtx.fillStyle='#C4955A'; _dCtx.fillRect(offX,offY,DI.cols*C,DI.rows*C);
   for(let r=0;r<DI.rows;r++){_dCtx.fillStyle=r%2?'rgba(255,255,255,.03)':'rgba(0,0,0,.05)';_dCtx.fillRect(offX,offY+r*C,DI.cols*C,C);}
 
-  // 창문 (위쪽 벽)
-  if(offY > 14){
-    const wh=Math.min(offY*.55, C*.7);
-    [offX+C, offX+C*4.5, offX+C*8.5].forEach(wx=>{
-      _dCtx.fillStyle='#87CEEB'; _dCtx.globalAlpha=.7;
-      _drr(wx, offY*.28, C*.88, wh, 3); _dCtx.fill(); _dCtx.globalAlpha=1;
-      _dCtx.strokeStyle='#5a3510'; _dCtx.lineWidth=1; _dCtx.strokeRect(wx, offY*.28, C*.88, wh);
-      _dCtx.beginPath(); _dCtx.moveTo(wx+C*.44, offY*.28); _dCtx.lineTo(wx+C*.44, offY*.28+wh); _dCtx.stroke();
-    });
-  }
+  // [FLOOR-SVG-1] 벽지·걸레받이·창 + 마루 (조각이 없으면 위 단색 그대로)
+  const wallSvgOk = FLOOR_SVG && _drawIndoorFloorSVG(offX, offY, C, W);
 
-  // 격자
-  _dCtx.strokeStyle='rgba(0,0,0,.1)'; _dCtx.lineWidth=.5;
-  for(let c=0;c<=DI.cols;c++){_dCtx.beginPath();_dCtx.moveTo(offX+c*C,offY);_dCtx.lineTo(offX+c*C,offY+DI.rows*C);_dCtx.stroke();}
-  for(let r=0;r<=DI.rows;r++){_dCtx.beginPath();_dCtx.moveTo(offX,offY+r*C);_dCtx.lineTo(offX+DI.cols*C,offY+r*C);_dCtx.stroke();}
-
-  // 선택 하이라이트
-  if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='indoor'){
-    _dCtx.fillStyle='rgba(255,220,100,.09)';
-    for(let r=0;r<DI.rows;r++) for(let c=0;c<DI.cols;c++){
-      if(!(CUR.houseDecorations||[]).find(p=>p.area==='indoor'&&p.row===r&&p.col===c))
-        _dCtx.fillRect(offX+c*C+1,offY+r*C+1,C-2,C-2);
-    }
-  }
-
-  // 배치된 가구
-  _decoSorted((CUR.houseDecorations||[]).filter(p=>p.area==='indoor')).forEach(p=>{
+  // 가구 하나 그리기 (SVG → _DFN → 이모지 순 폴백)
+  const _drawIndoorItem = p => {
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
     const sz=d.size||{w:1,h:1};
@@ -6892,7 +6964,38 @@ function _drawIndoor() {
       ox.fillText(d.icon,base/2,base/2);
       _dCtx.drawImage(oc, px+2, py+2, bw-4, bh-4);
     }
-  });
+  };
+  const _indoorPlaced = (CUR.houseDecorations||[]).filter(p=>p.area==='indoor');
+  // [FLOOR-SVG-1] 바닥 레이어(러그) — 격자·가구보다 먼저
+  _decoSorted(_indoorPlaced.filter(_isFloorLayerDeco)).forEach(_drawIndoorItem);
+
+  // 창문 (위쪽 벽) — 벽 SVG가 그려졌으면 생략
+  if(offY > 14 && !wallSvgOk){
+    const wh=Math.min(offY*.55, C*.7);
+    [offX+C, offX+C*4.5, offX+C*8.5].forEach(wx=>{
+      _dCtx.fillStyle='#87CEEB'; _dCtx.globalAlpha=.7;
+      _drr(wx, offY*.28, C*.88, wh, 3); _dCtx.fill(); _dCtx.globalAlpha=1;
+      _dCtx.strokeStyle='#5a3510'; _dCtx.lineWidth=1; _dCtx.strokeRect(wx, offY*.28, C*.88, wh);
+      _dCtx.beginPath(); _dCtx.moveTo(wx+C*.44, offY*.28); _dCtx.lineTo(wx+C*.44, offY*.28+wh); _dCtx.stroke();
+    });
+  }
+
+  // 격자
+  _dCtx.strokeStyle='rgba(0,0,0,.1)'; _dCtx.lineWidth=.5;
+  for(let c=0;c<=DI.cols;c++){_dCtx.beginPath();_dCtx.moveTo(offX+c*C,offY);_dCtx.lineTo(offX+c*C,offY+DI.rows*C);_dCtx.stroke();}
+  for(let r=0;r<=DI.rows;r++){_dCtx.beginPath();_dCtx.moveTo(offX,offY+r*C);_dCtx.lineTo(offX+DI.cols*C,offY+r*C);_dCtx.stroke();}
+
+  // 선택 하이라이트
+  if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='indoor'){
+    _dCtx.fillStyle='rgba(255,220,100,.09)';
+    for(let r=0;r<DI.rows;r++) for(let c=0;c<DI.cols;c++){
+      if(!(CUR.houseDecorations||[]).find(p=>p.area==='indoor'&&p.row===r&&p.col===c))
+        _dCtx.fillRect(offX+c*C+1,offY+r*C+1,C-2,C-2);
+    }
+  }
+
+  // 배치된 가구 (바닥 레이어 제외 — 러그는 위에서 먼저 그렸다)
+  _decoSorted(_indoorPlaced.filter(p=>!_isFloorLayerDeco(p))).forEach(_drawIndoorItem);
 
   // 나가기 문
   const dx=offX+DI.cols*C/2-C*.35, dy=offY+DI.rows*C-C*.75;

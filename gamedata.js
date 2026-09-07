@@ -285,6 +285,9 @@ const GAME_DATA = {
     {id:'d_i12',name:'황금 책장',     icon:'📖', size:{w:2,h:2}, price:300, cat:'indoor', rarity:'legend', reqLv:1},
     {id:'d_i13',name:'마법 거울',     icon:'🪞', size:{w:1,h:2}, price:375, cat:'indoor', rarity:'legend', reqLv:1},
     {id:'d_i14',name:'왕의 의자',     icon:'👑', size:{w:1,h:2}, price:450, cat:'indoor', rarity:'legend', reqLv:1},
+    // ── 러그 (layer:'floor' = 가구·캐릭터 뒤 바닥 레이어에 그림, FLOOR-SVG-1) ──
+    {id:'d_i15',name:'둥근 러그',     icon:'🟠', size:{w:2,h:2}, price:90,  cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
+    {id:'d_i16',name:'네모 러그',     icon:'🟦', size:{w:3,h:2}, price:120, cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
     // ── 업적 전용 (상점 미판매, price:0) ──
     {id:'deco_trophy',    name:'트로피 (업적)',    icon:'🏆', price:0, cat:'yard',   rarity:'legend', reqLv:1},
     {id:'deco_bookshelf', name:'황금 책장 (업적)', icon:'📚', price:0, cat:'indoor', rarity:'legend', reqLv:1},
