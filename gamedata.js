@@ -2310,10 +2310,7 @@ function performMonsterTurn(state) {
     // 플레이어는 그대로 맞음
   }
 
-  // ── role 특성: tank — HP 60% 이하에서 첫 피격 시 40% 감소 ──
-  // (이미 적용된 guardMult와 별개로, 피격 결과에서 체크)
-  // tank는 calculateMonsterDamage 이전에 player hp 기준으로 체크
-  // 여기서는 player hp에 실제 적용
+  // 실제로 깎이는 값 — 아래 HP 차감과 표시 문구가 같은 값을 쓰도록 따로 둔다.
   let actualDmg = finalDmg;
 
   state.playerHp = Math.max(0, state.playerHp - actualDmg);
@@ -2360,20 +2357,6 @@ function performMonsterTurn(state) {
     state.monsterTurnCount++;
   }
   return state;
-}
-
-// ── role 특성: tank — 피격 시 HP 60% 이하 + 미발동이면 40% 경감 체크 ──
-// performPlayerTurn 직전에 호출
-function applyTankTrait(state, incomingDmg) {
-  const mon = state.monster;
-  if (mon.trait === 'ghost' || mon.role !== 'tank' || state.tankTriggered) return incomingDmg;
-  if (state.monsterHp / state.monsterHpMax > 0.6) return incomingDmg;
-  // 발동
-  state.tankTriggered = true;
-  const reduced = Math.max(1, Math.round(incomingDmg * 0.6)); // 40% 감소
-  state.log.push(`<span style="color:#e74c3c;font-size:.78rem">🛡️ ${mon.name}이(가) 단단히 버텨냈다! 반격 태세를 갖춘다!</span>`);
-  state.roleBuff = { mult: 1.15, label: '반격 강화!' };
-  return reduced;
 }
 
 // ── 스킬2 처리 ───────────────────────────────────────────────
