@@ -1,8 +1,8 @@
-<svg width="100" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 300">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 300">
 <!-- d_i13 마법 거울 1×2 (legend) · 금테 전신거울, 보랏빛 발광 · footprint y100~300 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
 <radialGradient id="g" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#d9b8ff"/><stop offset=".6" stop-color="#8a5ed6"/><stop offset="1" stop-color="#4a2c8a"/></radialGradient>
-<radialGradient id="glow"><stop offset="0" stop-color="#b98ae6" stop-opacity=".55"/><stop offset="1" stop-color="#b98ae6" stop-opacity="0"/></radialGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#b98ae6" stop-opacity=".22"/><stop offset="1" stop-color="#b98ae6" stop-opacity="0"/></radialGradient>
 </defs>
 <circle cx="50" cy="160" r="70" fill="url(#glow)"/>
 <path d="M22,282 L78,270 L98,290 L44,298 Z" fill="#000" opacity=".2"/>
@@ -19,7 +19,7 @@
 <path d="M32,120 q0,-24 12,-40" stroke="#efe0ff" stroke-width="4" stroke-linecap="round" opacity=".8" fill="none"/>
 <path d="M36,180 v40" stroke="#efe0ff" stroke-width="2.5" stroke-linecap="round" opacity=".5"/>
 <!-- 별·반짝 -->
-<g fill="#fff"><path d="M60,110 l2,6 l6,2 l-6,2 l-2,6 l-2,-6 l-6,-2 l6,-2z"/><path d="M42,200 l1.5,4 l4,1.5 l-4,1.5 l-1.5,4 l-1.5,-4 l-4,-1.5 l4,-1.5z"/><circle cx="64" cy="160" r="1.8"/><circle cx="38" cy="236" r="1.5"/></g>
+<g fill="#fff"><path d="M60,110 l2,6 l6,2 l-6,2 l-2,6 l-2,-6 l-6,-2 l6,-2z"/></g>
 <!-- 프레임 장식 -->
 <g class="i" fill="#d9a53a"><circle cx="50" cy="46" r="8"/><circle cx="16" cy="120" r="5"/><circle cx="84" cy="120" r="5"/><circle cx="16" cy="200" r="5"/><circle cx="84" cy="200" r="5"/></g>
 <circle cx="50" cy="46" r="3.5" fill="#8a5ed6" stroke="#2b2118" stroke-width="1.2"/>

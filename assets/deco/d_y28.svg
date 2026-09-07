@@ -1,4 +1,4 @@
-<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
 <!-- d_y28 헛간 3×2 · footprint y100~300 · 지붕이 위 여유칸으로 솟음 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
 <path d="M60,282 L250,262 L300,290 L150,300 Z" fill="#000" opacity=".2"/>
