@@ -405,6 +405,8 @@ function enterGame() {
   autoCloseDailyQuests();
   cleanInactivePending();
 
+  loadCharDolls();   // [CHAR-DOLL-1] 캐릭터 SVG 84장 미리 받기(실패해도 게임 진행에 영향 없음)
+
   // ★ 미완료 전투 감지: 전투 도중 창을 닫고 재접속한 경우
   // 횟수는 startBattle()에서 이미 차감됐으므로 상태만 정리 (패배 처리)
   if (CUR.battleInProgress) {
@@ -840,9 +842,100 @@ function buildCharSVG(s) {
 </svg>`;
 }
 
+// ══ 캐릭터 종이인형 (CHAR-DOLL-1) ══════════════════════════════
+//  assets/char/ 의 SVG 84장을 겹쳐 캐릭터를 그린다.
+//  합성 규칙 원본: 클로드코드\성장rpg_svg\char\README.md "합성 (코드)" 절.
+//  · buildCharSVG(기존 코드 그림)는 한 줄도 건드리지 않는다. 에셋이 안 오면 그대로 폴백.
+//  · 파일은 로그인 직후 한 번에 받아 문자열로 캐시한다(84장 약 183KB).
+//  · CHAR_DOLL 을 false 로 두면 즉시 예전 그림으로 돌아간다.
+const CHAR_DOLL = true;
+
+const _CHAR_SVG = {};        // 'base_1' | 'body_e_b3' ... → 바깥 <svg> 벗긴 내용
+let _charDollReady = false;
+let _charDollLoading = false;
+
+// 바깥 <svg …> … </svg> 벗기기
+function _charInner(txt) {
+  return String(txt).replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+}
+// class 로만 구분된 그룹 하나를 집어오기 / 떼어내기 (그룹 안에 중첩 <g> 없음이 보장됨)
+function _charGroupRe(cls) {
+  return new RegExp('<g class="' + cls + '"[^>]*>[\\s\\S]*?<\\/g>');
+}
+function _grabGroup(svg, cls) { const m = svg.match(_charGroupRe(cls)); return m ? m[0] : ''; }
+function _dropGroup(svg, cls) { return svg.replace(_charGroupRe(cls), ''); }
+
+// 받아올 84장의 이름
+function _charFileNames() {
+  const out = [];
+  for (let i = 1; i <= 4;  i++) out.push('base_' + i);
+  for (let i = 1; i <= 30; i++) out.push('body_e_b' + i);
+  for (let i = 1; i <= 10; i++) out.push('head_e_h' + i, 'glove_e_g' + i, 'shoe_e_s' + i,
+                                         'weapon_e_w' + i, 'weapon_e_ws' + i);
+  return out;
+}
+
+// 로그인 직후 1회. 실패한 파일은 그 슬롯만 빠지고 나머지는 그대로 그린다.
+function loadCharDolls() {
+  if (!CHAR_DOLL || _charDollLoading || _charDollReady) return;
+  _charDollLoading = true;
+  const names = _charFileNames();
+  Promise.all(names.map(n =>
+    fetch('./assets/char/' + n + '.svg')
+      .then(r => r.ok ? r.text() : null)
+      .then(t => { if (t) _CHAR_SVG[n] = _charInner(t); })
+      .catch(() => {})
+  )).then(() => {
+    // base 가 하나도 없으면 종이인형을 쓸 수 없다 — 예전 그림 유지
+    const anyBase = ['base_1','base_2','base_3','base_4'].some(b => _CHAR_SVG[b]);
+    if (!anyBase) { console.warn('캐릭터 에셋 로드 실패 — 기존 그림 유지'); return; }
+    _charDollReady = true;
+    try { renderAll(); } catch (e) { /* 화면이 아직 없으면 다음 렌더에 반영된다 */ }
+  });
+}
+
+// 종이인형 합성. base 가 없으면 null 을 돌려 호출부가 폴백하게 한다.
+function buildCharDoll(s) {
+  const ct = (s && s.charType >= 1 && s.charType <= 4) ? s.charType : 1;
+  let base = _CHAR_SVG['base_' + ct];
+  if (!base) return null;
+
+  const eq = (s && s.equipmentIds) || {};
+  const pick = (slot, id) => (id && id !== 'none') ? (_CHAR_SVG[slot + '_' + id] || '') : '';
+
+  // 머리: 투구를 쓰면 base 의 정수리(hair-top)를 뺀다. 왕관처럼 정수리를 안 덮는 것은 남긴다.
+  const headSvg = pick('head', eq.head);
+  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) base = _dropGroup(base, 'hair-top');
+
+  // 손: 손가락(fingers-front)은 무기 자루 앞에 다시 그려야 해서 따로 떼어 둔다.
+  let fingers = _grabGroup(base, 'fingers-front');
+  base = _dropGroup(base, 'fingers-front');
+
+  let out = base + pick('shoe', eq.shoe) + pick('body', eq.body);
+
+  const gloveSvg = pick('glove', eq.glove);
+  if (gloveSvg) {                       // 장갑이 있으면 손가락도 장갑 것을 쓴다
+    fingers = _grabGroup(gloveSvg, 'fingers-front');
+    out += _dropGroup(gloveSvg, 'fingers-front');
+  }
+
+  out += headSvg + pick('weapon', eq.weapon) + fingers;
+  return '<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
+       + 'style="width:100%;height:100%">' + out + '</svg>';
+}
+
+// 화면이 쓰는 입구. 에셋이 준비됐으면 종이인형, 아니면 예전 그림.
+function charSVG(s) {
+  if (CHAR_DOLL && _charDollReady) {
+    const doll = buildCharDoll(s);
+    if (doll) return doll;
+  }
+  return buildCharSVG(s);
+}
+
 function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId, s) {
   const svgWrap = document.getElementById(svgWrapId);
-  if (svgWrap) svgWrap.innerHTML = buildCharSVG(s);
+  if (svgWrap) svgWrap.innerHTML = charSVG(s);
   document.getElementById(cnameId).textContent = s.name;
   document.getElementById(jobId).textContent   = '⚗️ ' + (s.job || '');
   const combatNames = {atk:'공격력',def:'방어력',mag:'마력',spd:'속도'};
@@ -2228,7 +2321,7 @@ function renderBattleNew() {
       <!-- 플레이어 -->
       <div class="ba-fighter">
         <div class="ba-fighter-name" style="color:#7ec8e3">${player.name}</div>
-        <div class="ba-fighter-icon" style="width:80px;height:100px;margin:0 auto" id="ba-char-emoji">${buildCharSVG(player)}</div>
+        <div class="ba-fighter-icon" style="width:80px;height:100px;margin:0 auto" id="ba-char-emoji">${charSVG(player)}</div>
         <div style="width:100%">
           <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-char-hp" style="width:${playerHpPct}%"></div></div>
           <div class="ba-hp-txt">${s.playerHp} / ${s.playerHpMax}</div>
@@ -2484,7 +2577,7 @@ function renderBattle(phase) {
     <div class="ba-vs">
       <div class="ba-side">
         <div class="ba-emoji" id="ba-char-emoji" style="font-size:0;width:70px;height:90px;margin:0 auto">
-          ${buildCharSVG(s)}
+          ${charSVG(s)}
         </div>
         <div style="font-size:.75rem;font-weight:700">${s.name}</div>
         <div class="ba-hp-wrap">
