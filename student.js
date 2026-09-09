@@ -10687,6 +10687,24 @@ const STUDY_PER_DAY = 10;   // 하루 분량
 //  · 계산은 학생당 수 ms지만 매 렌더 반복은 낭비라 메모리에 캐시하고
 //    기록이 바뀔 때(onDataChange)와 세션이 끝날 때만 버린다.
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  [READING-1] 지문 세트 — 지문 1편에 문항 4개가 딸린다.
+//  · 문항은 보통 문항과 같은 풀에 있다(cat 'read', passageId를 가짐).
+//    그래야 숙달도·복습 주기·보상·기록·교사 학습 범위가 그대로 걸린다.
+//  · 한 세션에 지문 세트는 하나만, 그리고 그 문항 4개는 연속으로 나온다
+//    (중간에 다른 문제가 끼면 지문을 다시 읽어야 하므로).
+//  · curriculum_reading.js가 없으면 지문 문항 자체가 없어 앱은 지금까지처럼 돈다.
+// ══════════════════════════════════════════════════
+function passageById(id) {
+  if (typeof READING_PASSAGES === 'undefined' || !id) return null;
+  return READING_PASSAGES.find(p => p.id === id) || null;
+}
+let _passageOpen = '';   // 지금 펼쳐 둔 지문 id — 같은 지문의 두 번째 문항부터는 접어 둔다
+function togglePassage(id) {
+  _passageOpen = (_passageOpen === id) ? '' : id;
+  renderStudyQuestion();
+}
+
 const MASTERY_GAP = [0, 1, 2, 4, 7, 14];   // 별 0~5일 때 며칠 뒤에 다시 볼지
 let _masteryCache = null, _masteryOwner = null;
 function invalidateMastery() { _masteryCache = null; _masteryOwner = null; }
@@ -11237,7 +11255,30 @@ function pickStudyQuestions(pool) {
     if (picked.length >= STUDY_PER_DAY) break;
     if (!used.has(p.id)) { picked.push(p); used.add(p.id); }
   }
-  return picked;
+  return orderPassageSets(picked, pool);
+}
+
+// [READING-1] 지문 세트 정리 — 세트는 한 세션에 하나만 두고, 그 문항들은 연속으로 놓는다.
+//   복습(onlyDue)으로 세트 중 일부만 뽑혔으면 그 문항만 지문과 함께 낸다(보스 승인).
+function orderPassageSets(picked, pool) {
+  const setOf = p => p && p.passageId ? p.passageId : '';
+  const sets = [...new Set(picked.map(setOf).filter(Boolean))];
+  if (sets.length === 0) return picked;
+  const keep = sets[0];                                   // 남길 세트 하나
+  let out = picked.filter(p => !setOf(p) || setOf(p) === keep);
+  // 빠진 만큼 지문 없는 문항으로 채운다
+  const used = new Set(out.map(p => p.id));
+  for (const p of pool) {
+    if (out.length >= picked.length) break;
+    if (!used.has(p.id) && !setOf(p)) { out.push(p); used.add(p.id); }
+  }
+  // 남긴 세트의 문항을 한자리에 모은다(첫 번째가 있던 자리에, 세트 안에서는 원래 순서대로)
+  const setItems = out.filter(p => setOf(p) === keep)
+    .sort((a, b) => String(a.id) < String(b.id) ? -1 : 1);
+  const rest = out.filter(p => setOf(p) !== keep);
+  const at = out.findIndex(p => setOf(p) === keep);
+  rest.splice(Math.max(0, Math.min(at, rest.length)), 0, ...setItems);
+  return rest;
 }
 
 function renderStudyQuestion() {
@@ -11319,6 +11360,26 @@ function renderStudyQuestion() {
       <div style="font-size:.9rem;color:var(--txt3);margin-top:.6rem">잘 안 들리면 버튼을 눌러 보세요</div>
     </div>`;
 
+  // [READING-1] 지문 카드 — 40vh까지만 쓰고 넘치면 그 안에서 스크롤한다(태블릿 세로 대비).
+  //   같은 지문의 두 번째 문항부터는 접어 두고 "지문 다시 보기"로 펼친다.
+  const _psg = p.passageId ? passageById(p.passageId) : null;
+  if (_psg && !STUDY_SESSION._psgSeen) {
+    _passageOpen = _psg.id; STUDY_SESSION._psgSeen = _psg.id;   // 그 지문의 첫 문항은 펼쳐서 보여 준다
+  }
+  const _psgOpen = _psg && _passageOpen === _psg.id;
+  const passageHtml = !_psg ? '' : `
+    <div style="border:1px solid rgba(93,173,226,.35);background:rgba(93,173,226,.07);
+      border-radius:14px;padding:.9rem 1rem;margin-bottom:1.1rem">
+      <button type="button" onclick="togglePassage('${_psg.id}')"
+        style="display:flex;align-items:center;gap:.5rem;width:100%;background:none;border:none;
+          padding:0;cursor:pointer;color:var(--sky);font-family:inherit;font-size:1rem;font-weight:700;text-align:left">
+        <span>📖</span><span style="flex:1">${escHtml(_psg.title || '지문')}</span>
+        <span style="font-size:.85rem;color:var(--txt3);font-weight:600">${_psgOpen ? '접기 ▲' : '지문 다시 보기 ▼'}</span>
+      </button>
+      ${_psgOpen ? `<div style="max-height:40vh;overflow-y:auto;margin-top:.7rem;
+        font-size:1.05rem;line-height:1.8;color:var(--txt2);white-space:pre-wrap;word-break:keep-all">${escHtml(_psg.text || '')}</div>` : ''}
+    </div>`;
+
   // 수학은 세로셈·자리 계산을 손으로 써 봐야 풀린다. 문제 아래에 필기 공간을 둔다.
   // 저장하지 않는다 — 그 문제를 푸는 동안만 쓰는 연습장이고, 다음 문제로 넘어가면 새 종이가 된다.
   const scratchHtml = STUDY_SESSION.subjectKey === 'math' ? `
@@ -11337,6 +11398,7 @@ function renderStudyQuestion() {
         ${escHtml(unit?.subjectLabel || '')} · ${escHtml(unit?.name || '')}
       </div>
       ${figHtml ? `<div class="st-fig">${figHtml}</div>` : ''}
+      ${passageHtml}
       <div class="st-q" style="margin-bottom:${p.audio ? '1rem' : '1.6rem'}">
         ${escHtml(p.q)}
       </div>
@@ -11521,6 +11583,10 @@ function showStudyFeedback(p, chosen, ok) {
 function nextStudyQuestion() {
   if (!STUDY_SESSION) return;
   STUDY_SESSION.cur++;
+  // [READING-1] 지문이 바뀌면 새 지문은 펼쳐서 보여 준다(같은 지문이면 접힌 채로 이어 푼다)
+  const _nx = STUDY_SESSION.questions[STUDY_SESSION.cur];
+  if (!_nx || _nx.passageId !== STUDY_SESSION._psgSeen) STUDY_SESSION._psgSeen = '';   // 새 지문이면 다음 렌더에서 펼친다
+  else _passageOpen = '';   // 같은 지문이면 접어 둔다 — 이미 읽은 글을 매번 밀어 올리지 않는다
   renderStudyQuestion();
 }
 

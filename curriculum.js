@@ -2288,7 +2288,9 @@ const CurriculumUtils = {
   // 기본 문제 + 교사가 추가한 문제
   allProblems() {
     const custom = (typeof DB !== 'undefined') ? (DB.getCustomProblems ? DB.getCustomProblems() : []) : [];
-    return [...BASE_PROBLEMS, ...custom];
+    // [READING-1] 지문 딸린 독해 문항(curriculum_reading.js). 파일이 없으면 그냥 빠진다.
+    const reading = (typeof READING_ITEMS !== 'undefined') ? READING_ITEMS : [];
+    return [...BASE_PROBLEMS, ...reading, ...custom];
   },
   problemsByUnit(unitId) { return this.allProblems().filter(p => p.unitId === unitId); },
   problemsBySubject(subjectKey) {

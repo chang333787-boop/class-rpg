@@ -27,7 +27,7 @@ const rel = (f) => path.join(ROOT, f);
 const exists = (f) => fs.existsSync(rel(f));
 const read = (f) => fs.readFileSync(rel(f), 'utf8');
 
-const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'figures.js', 'student.js', 'admin.js', 'kiosk.js'];
+const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', 'student.js', 'admin.js', 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -80,8 +80,8 @@ const MIME = {
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
     '/gamedata.js?v=20260907j',
-    '/curriculum.js?v=20260909d', '/curriculum_review.js?v=20260907q', '/figures.js?v=20260903a',
-    '/student.js?v=20260909j', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
+    '/curriculum.js?v=20260909e', '/curriculum_review.js?v=20260907q', '/curriculum_reading.js?v=20260909a', '/figures.js?v=20260903a',
+    '/student.js?v=20260909k', '/admin.js?v=20260903b', '/kiosk.js?v=20260713c',
     '/student.css?v=20260907f', '/admin.css?v=20260904k', '/kiosk.css?v=20260604',
   ];
 
@@ -137,7 +137,7 @@ for (const f of HTML_FILES) {
   else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=${cssVer}) 미발견 — CSS 갱신 시 확인 필요`);
 
   // 전용 JS script src 캐시버스터 (기대값 스냅샷 — 해당 JS 갱신 시 여기도 동기화)
-  const jsVer = { 'student.js': '20260909j', 'admin.js': '20260903b', 'kiosk.js': '20260713c' }[js];
+  const jsVer = { 'student.js': '20260909k', 'admin.js': '20260903b', 'kiosk.js': '20260713c' }[js];
   if (html.includes(`${js}?v=${jsVer}`)) add('PASS', `${f}: ${js}?v=${jsVer} 캐시버스터`);
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 
