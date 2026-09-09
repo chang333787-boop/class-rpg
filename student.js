@@ -1015,6 +1015,67 @@ function renderMain() {
   }
 }
 
+// ══ 내 보상 목록 (REWARD-LIST-1) ═══════════════════════════════
+//  대기 배너·승인 배너를 누르면 "기다리는 중 / 최근 받은 보상"을 한 화면에서 본다.
+//  읽기만 한다 — 학생 스키마 변경·Firebase 쓰기 없음.
+//  홈의 "📜 최근 활동"(접힌 칸)은 그대로 두고 여기서 링크만 건다.
+const REWARD_LIST_MAX = 20;
+
+function openRewardList() { openModal('m-reward'); renderRewardList(); }
+
+function _rewardAmountHTML(exp, gold) {
+  const parts = [];
+  if (exp)  parts.push(`<span style="color:var(--gold)">+${exp} EXP</span>`);
+  if (gold) parts.push(`<span style="color:var(--gold)">+${gold} G</span>`);
+  return parts.join(' ');
+}
+
+function _rewardRowHTML(icon, name, exp, gold, right) {
+  return `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .2rem;
+      border-bottom:1px solid rgba(255,255,255,.05)">
+    <span style="font-size:1.05rem;flex-shrink:0">${escHtml(icon || '📋')}</span>
+    <span style="flex:1;min-width:0;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;
+      white-space:nowrap">${escHtml(name || '')}</span>
+    <span style="font-size:.76rem;flex-shrink:0">${_rewardAmountHTML(exp, gold)}</span>
+    ${right ? `<span style="font-size:.7rem;color:var(--txt3);flex-shrink:0">${escHtml(right)}</span>` : ''}
+  </div>`;
+}
+
+function renderRewardList() {
+  const el = document.getElementById('reward-list-body');
+  if (!el) return;
+  const s = CUR;
+
+  const waiting = (s.pendingRewards || []).filter(r => !r.approved);
+  const done = (DB.load().quests || [])
+    .filter(q => q && q.studentId === s.id && q.approved === true)
+    .sort((a, b) => _questLogTime(b) - _questLogTime(a))
+    .slice(0, REWARD_LIST_MAX);
+
+  const sec = (title, count, inner) => `
+    <div style="margin-bottom:.9rem">
+      <div style="font-size:.78rem;color:var(--txt2);margin-bottom:.3rem">${title} ${count}개</div>
+      ${inner}
+    </div>`;
+  const empty = msg => `<div style="font-size:.78rem;color:var(--txt3);padding:.5rem .2rem">${msg}</div>`;
+
+  el.innerHTML =
+    sec('⏳ 선생님 확인 기다리는 중', waiting.length,
+        waiting.length
+          ? waiting.map(r => _rewardRowHTML(r.icon, r.label, r.exp, r.gold, '')).join('')
+          : empty('지금 기다리는 게 없어요.'))
+    + sec('✅ 받은 보상', done.length,
+        done.length
+          ? done.map(q => _rewardRowHTML(q.icon, q.name, q.exp, q.gold, q.approvedAt || q.date || '')).join('')
+            + (done.length >= REWARD_LIST_MAX
+                ? `<div style="font-size:.7rem;color:var(--txt3);padding:.4rem .2rem">최근 ${REWARD_LIST_MAX}개만 보여요.</div>` : '')
+          : empty('아직 받은 보상이 없어요.'))
+    + `<button onclick="closeModal('m-reward');toggleSection('bottom-section','bottom-arrow')"
+        style="width:100%;padding:.45rem;border-radius:8px;background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.08);color:var(--txt2);font-size:.76rem;
+          cursor:pointer;font-family:inherit">📜 전체 기록 보기 (감정 · 최근 활동)</button>`;
+}
+
 // ══ 보상 승인 알림 (REWARD-STATUS-1) ═══════════════════════════
 //  문제: 교사가 승인하면 pendingRewards 에서 사라지고 EXP·골드만 조용히 늘어,
 //        학생 입장에서 "내가 낸 게 어떻게 됐지"가 영영 닫히지 않았다.
@@ -1089,22 +1150,22 @@ function buildMainHTML() {
   //   name 은 학생이 쓴 제목(작품 등)이 들어오므로 반드시 escHtml.
   const approvedNew = getUnseenApprovals(s);
   if (approvedNew.length)
-    alerts.push(`<div class="reward-banner" style="margin-bottom:.6rem">
+    alerts.push(`<div class="reward-banner" onclick="openRewardList()" style="margin-bottom:.6rem;cursor:pointer">
       <div class="rb-icon">✅</div>
       <div class="rb-body">
         <div class="rb-title green">선생님이 확인해 주셨어요 · ${approvedNew.length}개</div>
         ${approvedNew.slice(0,5).map(q=>`<div class="rb-desc" style="font-size:.88rem;color:var(--txt)">${escHtml(q.icon||'📋')} ${escHtml(q.name||'')}${(q.exp||0)?` <span style="color:var(--gold)">+${q.exp} EXP</span>`:''}${(q.gold||0)?` <span style="color:var(--gold)">+${q.gold} G</span>`:''}</div>`).join('')}
         ${approvedNew.length>5?`<div class="rb-desc">…외 ${approvedNew.length-5}개</div>`:''}
       </div>
-      <button class="btn-gold" onclick="dismissRewardSeen()" style="padding:.4rem .9rem;font-size:.78rem;flex-shrink:0">확인</button>
+      <button class="btn-gold" onclick="event.stopPropagation();dismissRewardSeen()" style="padding:.4rem .9rem;font-size:.78rem;flex-shrink:0">확인</button>
     </div>`);
 
   if (waitingCount > 0)
-    alerts.push(`<div class="reward-banner" style="margin-bottom:.6rem;opacity:.85">
+    alerts.push(`<div class="reward-banner" onclick="openRewardList()" style="margin-bottom:.6rem;opacity:.85;cursor:pointer">
       <div class="rb-icon">⏳</div>
       <div class="rb-body"><div class="rb-title" style="color:var(--sky)">선생님 확인 기다리는 중 ${waitingCount}개</div>
       <div class="rb-desc" style="font-size:.88rem;color:var(--txt)">${(s.pendingRewards||[]).filter(r=>!r.approved).map(r=>escHtml(r.label||'')).join(' · ')}</div></div>
-      <div style="font-size:.72rem;color:var(--txt3);flex-shrink:0;padding:.4rem .6rem">선생님 확인 중</div>
+      <div style="font-size:.72rem;color:var(--txt3);flex-shrink:0;padding:.4rem .6rem">보기 ›</div>
     </div>`);
   if (canPromo)
     alerts.push(`<div class="promo-banner" onclick="openModal('m-promo')" style="cursor:pointer;margin-bottom:.6rem">
@@ -1180,7 +1241,7 @@ function buildMainHTML() {
     todos.push({type:'info', icon:'⏳', badge:waitingCount,
       title:`선생님 확인 기다리는 중 ${waitingCount}개`,
       sub:(s.pendingRewards||[]).filter(r=>!r.approved).slice(0,2).map(r=>r.label).join(' · '),
-      action:null, btnLabel:'대기중'});
+      action:"openRewardList()", btnLabel:'보기'});
 
   // 2순위: 시든 작물 경고
   const witheredCount = (s.farm||[]).filter(p=>{
@@ -1553,7 +1614,7 @@ function buildMainHTML() {
             if(logs.length===0) return '<div style="font-size:.72rem;color:var(--txt3)">아직 기록 없어요</div>';
             return logs.slice(0,6).map(l=>`<div style="display:flex;align-items:center;gap:.35rem;padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
               <span style="font-size:.85rem">${l.icon}</span>
-              <span style="font-size:.7rem;color:${l.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.text}</span>
+              <span style="font-size:.7rem;color:${l.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(l.text||'')}</span>
             </div>`).join('');
           })()}
         </div>
