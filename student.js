@@ -9981,8 +9981,12 @@ function speakWord(word, opts) {
 // [KOREAN-B] 이 기기에 그 언어 음성이 있는지 — 없으면 듣기 문항을 안내와 함께 건너뛰게 한다
 function hasVoiceFor(lang) {
   if (!window.speechSynthesis) return false;
+  const vs = window.speechSynthesis.getVoices() || [];
+  // [VOICE-READY-1] 음성 목록은 비동기로 채워진다. 아직 비어 있는 것은 '없다'가 아니라 '모른다'이므로
+  //   없다고 단정하면 페이지를 열자마자 들어온 학생에게 "소리가 나오지 않아요"가 잘못 뜬다.
+  if (!vs.length) return true;
   const head = String(lang || 'en').slice(0, 2);
-  return (window.speechSynthesis.getVoices() || []).some(v => v.lang && v.lang.replace('_', '-').startsWith(head));
+  return vs.some(v => v.lang && v.lang.replace('_', '-').startsWith(head));
 }
 // 문항의 언어 — 문항이 정해 두었으면 그것, 아니면 국어 단원이면 한국어(그 밖에는 지금까지처럼 영어)
 function problemLang(p) {
@@ -10033,7 +10037,15 @@ function dictationDiffHtml(answer, input) {
 // 음성 목록 미리 로드 (일부 브라우저 필요)
 if (window.speechSynthesis) {
   window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    window.speechSynthesis.getVoices();
+    // [VOICE-READY-1] 목록이 늦게 왔을 때 이미 열려 있는 듣기 문항을 한 번 다시 그린다
+    //   (목록이 없어 안내가 떴다면 소리 버튼으로, 정말 없다면 안내로 바뀐다)
+    try {
+      const q = STUDY_SESSION && STUDY_SESSION.questions[STUDY_SESSION.cur];
+      if (q && q.audio && document.getElementById('study-body')) renderStudyQuestion();
+    } catch (e) {}
+  };
 }
 
 // ── 팝업 강제 퀴즈 (3문제 객관식, 닫기 불가) ────────────
