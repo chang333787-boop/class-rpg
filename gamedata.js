@@ -741,6 +741,41 @@ const DB = {
     this._fbRef.child('questLogs/' + logId).set(log).catch(e => this._onSaveError(e));
   },
 
+  // ── 학생 쪽지 (NOTES-1) ────────────────────────────────────
+  //  studentNotes/<studentId>/<noteId> 개별 경로로만 읽고 쓴다.
+  //  학생 객체 필드로 두지 않는 이유: saveStudent 는 students/<id> 를 통짜 set 하고
+  //  호출처가 64곳(student.js 37 · admin.js 25 · 여기 2)이라 대부분 학생 브라우저에서 돈다.
+  //  쪽지를 모르는 낡은 학생 사본이 한 번만 저장돼도 교사가 쓴 쪽지가 통째로 사라진다
+  //  — Q1(boardQuests 통짜 set)과 같은 실패 방식이다.
+  //  같은 이유로 여기서도 studentNotes 통짜 set 을 하지 않는다(쪽지 하나씩 개별 경로).
+  getStudentNotes(studentId) {
+    const mine = (this.load().studentNotes || {})[studentId] || {};
+    return Object.keys(mine)
+      .filter(k => mine[k] && typeof mine[k] === 'object')
+      .map(k => ({ ...mine[k], id: k }))
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  },
+  saveStudentNote(studentId, note) {
+    const db = this.load();
+    db.studentNotes = db.studentNotes || {};
+    db.studentNotes[studentId] = db.studentNotes[studentId] || {};
+    const id  = note.id || ('n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+    const now = Date.now();
+    const rec = { ...note, id, updatedAt: now, createdAt: note.createdAt || now };
+    db.studentNotes[studentId][id] = rec;
+    this._cache = db;
+    this._fbRef.child('studentNotes/' + studentId + '/' + id).set(rec)
+      .catch(e => this._onSaveError(e));
+    return rec;
+  },
+  deleteStudentNote(studentId, noteId) {
+    const db = this.load();
+    if (db.studentNotes && db.studentNotes[studentId]) delete db.studentNotes[studentId][noteId];
+    this._cache = db;
+    this._fbRef.child('studentNotes/' + studentId + '/' + noteId).remove()
+      .catch(e => this._onSaveError(e));
+  },
+
   saveArtwork(artwork) {
     const db = this.load();
     db.artworks = db.artworks || [];

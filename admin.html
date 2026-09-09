@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="./gamedata.js?v=20260907j"></script>
+<script src="./gamedata.js?v=20260909a"></script>
 <script src="./curriculum.js?v=20260909e"></script>
 <link rel="stylesheet" href="./admin.css?v=20260904k">
 </head>
@@ -195,6 +195,7 @@
           <div class="tc-title">👥 학생 목록</div>
           <div class="tc-actions">
             <button class="btn-sm" onclick="openAddStudent()">+ 학생 추가</button>
+            <button class="btn-sm outline" onclick="openBulkNotes()">📝 쪽지 일괄</button>
           </div>
         </div>
         <div style="overflow-x:auto">
@@ -1680,6 +1681,12 @@
 </div><!-- /.app (admin-app) -->
 
 <!-- ════ STUDENT DETAIL MODAL ════ -->
+<!-- 쪽지 일괄 입력 (NOTES-1) -->
+<div class="overlay" id="m-bulk-note"><div class="modal large-modal">
+  <div class="modal-hd"><div class="modal-title">📝 쪽지 일괄 주기</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+  <div id="bulk-note-body" style="padding:.5rem 0"></div>
+</div></div>
+
 <div class="overlay" id="m-student"><div class="modal">
   <div class="modal-hd">
     <div class="modal-title" id="modal-student-title">학생 상세</div>
@@ -1691,6 +1698,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260903b"></script>
+<script src="./admin.js?v=20260909a"></script>
 </body>
 </html>
