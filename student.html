@@ -632,6 +632,12 @@
 </div></div>
 
 <!-- 승급 모달 -->
+<!-- 내 보상 (REWARD-LIST-1) — 대기 배너·승인 배너에서 연다 -->
+<div class="overlay" id="m-reward"><div class="modal" style="max-width:460px">
+  <div class="modal-hd"><div class="modal-title">🎁 내 보상</div><button class="modal-close" onclick="closeModal('m-reward')">✕</button></div>
+  <div id="reward-list-body" style="padding:.5rem 0"></div>
+</div></div>
+
 <div class="overlay" id="m-promo"><div class="modal" style="max-width:400px">
   <div class="modal-hd"><div class="modal-title">⬆️ 승급 신청</div><button class="modal-close" onclick="closeModal('m-promo')">✕</button></div>
   <div class="promo-modal-inner" id="promo-body"></div>
@@ -910,7 +916,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260909h"></script>
+<script src="./student.js?v=20260909i"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
