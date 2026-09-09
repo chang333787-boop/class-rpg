@@ -9868,33 +9868,100 @@ function toggleVocabReveal(wordId) {
   // 전체 재렌더 대신 해당 카드만 토글 (성능)
   renderVocabTab();
 }
-function speakWord(word) {
+// [KOREAN-B] 읽어 주기 — 두 번째 인자로 언어·속도를 받는다.
+//   speakWord('apple')            → 지금까지와 똑같다(영어, 0.85). 기존 호출부는 손대지 않았다.
+//   speakWord('문장', 'ko-KR')     → 한국어
+//   speakWord('문장', { lang:'ko-KR', rate:0.8 })  → 받아쓰기처럼 또박또박
+function speakWord(word, opts) {
   if (!word) return;
   if (!window.speechSynthesis) { toast('이 기기는 발음 기능을 지원하지 않아요'); return; }
+  const o = (typeof opts === 'string') ? { lang: opts } : (opts || {});
+  const lang = o.lang || 'en-US';
   // 이전 발음 중단
   window.speechSynthesis.cancel();
 
   const utter = new SpeechSynthesisUtterance(word);
-  utter.lang = 'en-US';
-  utter.rate = 0.85;   // 약간 느리게 — 학생이 듣기 좋게
+  utter.lang = lang;
+  utter.rate = (typeof o.rate === 'number') ? o.rate : 0.85;   // 약간 느리게 — 학생이 듣기 좋게
   utter.pitch = 1.0;
 
-  // 가장 자연스러운 영어 음성 선택
   const voices = window.speechSynthesis.getVoices();
-  const preferred = [
-    'Samantha','Alex','Daniel','Karen','Moira', // 좋은 영어 음성들
-    'Google US English','Microsoft Zira','Microsoft David'
-  ];
-  const enVoices = voices.filter(v => v.lang.startsWith('en'));
+  const head = lang.slice(0, 2);
+  const same = voices.filter(v => v.lang && v.lang.replace('_', '-').startsWith(head));
   let best = null;
-  for (const name of preferred) {
-    best = enVoices.find(v => v.name.includes(name));
-    if (best) break;
+  if (head === 'en') {
+    // 가장 자연스러운 영어 음성 선택
+    const preferred = [
+      'Samantha','Alex','Daniel','Karen','Moira', // 좋은 영어 음성들
+      'Google US English','Microsoft Zira','Microsoft David'
+    ];
+    for (const name of preferred) {
+      best = same.find(v => v.name.includes(name));
+      if (best) break;
+    }
+  } else if (head === 'ko') {
+    // 한국어는 기기 기본 음성으로 충분하다(영어와 달리 발음이 어색해지지 않는다)
+    for (const name of ['Google 한국의', 'Microsoft Heami', 'Yuna', 'Google Korean']) {
+      best = same.find(v => v.name.includes(name));
+      if (best) break;
+    }
   }
-  if (!best && enVoices.length > 0) best = enVoices[0];
+  if (!best && same.length > 0) best = same[0];
   if (best) utter.voice = best;
 
   window.speechSynthesis.speak(utter);
+}
+
+// [KOREAN-B] 이 기기에 그 언어 음성이 있는지 — 없으면 듣기 문항을 안내와 함께 건너뛰게 한다
+function hasVoiceFor(lang) {
+  if (!window.speechSynthesis) return false;
+  const head = String(lang || 'en').slice(0, 2);
+  return (window.speechSynthesis.getVoices() || []).some(v => v.lang && v.lang.replace('_', '-').startsWith(head));
+}
+// 문항의 언어 — 문항이 정해 두었으면 그것, 아니면 국어 단원이면 한국어(그 밖에는 지금까지처럼 영어)
+function problemLang(p) {
+  if (p && p.lang) return p.lang;
+  return (p && String(p.unitId || '').startsWith('ko')) ? 'ko-KR' : 'en-US';
+}
+
+// ── 받아쓰기 채점 ──────────────────────────────────────────
+// 맞춤법(글자)이 1순위고 띄어쓰기는 따로 알려 준다. 정책이 바뀌면 이 상수만 true로 바꾸면 된다.
+const DICTATION_STRICT_SPACING = false;
+function dictationGrade(p, val) {
+  const nosp  = s => String(s == null ? '' : s).replace(/\s+/g, '');
+  // 띄어쓰기는 '어디서 띄었는가'만 본다(어절 길이의 모양). 글자를 틀렸다고 띄어쓰기까지 틀렸다고 알리면 안 된다.
+  const shape = s => String(s == null ? '' : s).trim().split(/\s+/).map(w => w.length).join('-');
+  const charOk = nosp(val) === nosp(p.a);
+  const spaceOk = shape(val) === shape(p.a);
+  return { ok: DICTATION_STRICT_SPACING ? (charOk && spaceOk) : charOk, charOk, spaceOk };
+}
+// 정답 글자와 학생이 쓴 글자를 맞춰 본다(가장 긴 공통 부분 기준) → 정답 글자마다 맞았는지 표시
+function dictationMarks(answer, input) {
+  const A = String(answer).replace(/\s+/g, ''), B = String(input || '').replace(/\s+/g, '');
+  const n = A.length, m = B.length;
+  const d = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++)
+    d[i][j] = A[i - 1] === B[j - 1] ? d[i - 1][j - 1] + 1 : Math.max(d[i - 1][j], d[i][j - 1]);
+  const okIdx = new Set();
+  let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (A[i - 1] === B[j - 1]) { okIdx.add(i - 1); i--; j--; }
+    else if (d[i - 1][j] >= d[i][j - 1]) i--; else j--;
+  }
+  return { okIdx, matched: okIdx.size, total: n };
+}
+// 정답 문장을 글자마다 색으로 보여 준다 — 맞은 글자는 그대로, 틀리거나 빠뜨린 글자는 빨갛게
+function dictationDiffHtml(answer, input) {
+  const { okIdx } = dictationMarks(answer, input);
+  let k = 0, out = '';
+  for (const ch of String(answer)) {
+    if (/\s/.test(ch)) { out += ' '; continue; }
+    const good = okIdx.has(k); k++;
+    out += good
+      ? `<span style="color:var(--emerald)">${escHtml(ch)}</span>`
+      : `<span style="color:var(--red);font-weight:800;border-bottom:2px solid var(--red)">${escHtml(ch)}</span>`;
+  }
+  return out;
 }
 
 // 음성 목록 미리 로드 (일부 브라우저 필요)
@@ -10475,6 +10542,9 @@ let STUDY_SESSION = null;   // { subjectKey, questions[], cur, correct, answers[
 let STUDY_CAT = null;
 const STUDY_MODES = {
   math:   [{ key: 'calc', icon: '🔢', label: '계산 연습' }, { key: 'word', icon: '📖', label: '문장제' }, { key: 'concept', icon: '💡', label: '개념' }],
+  korean: [{ key: 'dictation', icon: '🔊', label: '받아쓰기' }, { key: 'vocab', icon: '📗', label: '낱말' },
+           { key: 'spell', icon: '✏️', label: '맞춤법' }, { key: 'grammar', icon: '🧩', label: '문법' },
+           { key: 'read', icon: '🧠', label: '생각하기' }],
   social: [{ key: 'concept', icon: '💡', label: '개념' }, { key: 'ox', icon: '⭕', label: 'OX 퀴즈' },
            { key: 'situation', icon: '🧭', label: '상황 판단' }, { key: 'reason', icon: '🔍', label: '따져보기' }, { key: 'apply', icon: '🧩', label: '적용' }],
 };
@@ -10953,16 +11023,28 @@ function renderStudyQuestion() {
   }
 
   // 듣기 문항 — audio가 있으면 소리 버튼을 크게 띄우고 자동으로 한 번 읽어 준다
-  const audioHtml = p.audio ? `
+  // [KOREAN-B] 국어(받아쓰기)는 한국어로, 또박또박(0.8) 읽는다. 기기에 그 언어 음성이 없으면 안내하고 건너뛴다.
+  const pLang = problemLang(p);
+  const speakOpt = JSON.stringify({ lang: pLang, rate: p.cat === 'dictation' ? 0.8 : 0.85 }).replace(/"/g, '&quot;');
+  // 안내·건너뛰기는 한국어 문항에만 적용한다 — 영어 듣기 문항의 동작은 지금까지와 똑같이 둔다(회귀 0)
+  const noVoice = p.audio && String(pLang).startsWith('ko') && !hasVoiceFor(pLang);
+  const audioHtml = !p.audio ? '' : noVoice ? `
+    <div style="text-align:center;margin-bottom:1.4rem;background:rgba(255,255,255,.05);border-radius:12px;padding:1.1rem">
+      <div style="font-size:1.6rem">🔇</div>
+      <div style="font-weight:700;margin:.4rem 0">이 기기에서는 ${pLang.startsWith('ko') ? '한국어' : '영어'} 소리가 나오지 않아요</div>
+      <div style="font-size:.92rem;color:var(--txt3);margin-bottom:.8rem">선생님께 알려 주세요. 이 문제는 건너뛰어도 됩니다.</div>
+      <button onclick="nextStudyQuestion()" style="border:1px solid rgba(255,255,255,.2);background:none;color:var(--txt2);
+        border-radius:10px;padding:.55rem 1.1rem;cursor:pointer;font-family:inherit">이 문제 건너뛰기</button>
+    </div>` : `
     <div style="text-align:center;margin-bottom:1.4rem">
-      <button onclick="speakWord(${JSON.stringify(String(p.audio)).replace(/"/g, '&quot;')})"
+      <button onclick="speakWord(${JSON.stringify(String(p.audio)).replace(/"/g, '&quot;')}, ${speakOpt})"
         style="display:inline-flex;align-items:center;gap:.6rem;padding:1.1rem 2rem;border-radius:16px;
           border:1px solid rgba(93,173,226,.4);background:rgba(93,173,226,.14);color:var(--sky);
           font-family:inherit;font-size:1.25rem;font-weight:700;cursor:pointer">
         <span style="font-size:1.8rem">🔊</span> 다시 듣기
       </button>
       <div style="font-size:.9rem;color:var(--txt3);margin-top:.6rem">잘 안 들리면 버튼을 눌러 보세요</div>
-    </div>` : '';
+    </div>`;
 
   // 수학은 세로셈·자리 계산을 손으로 써 봐야 풀린다. 문제 아래에 필기 공간을 둔다.
   // 저장하지 않는다 — 그 문제를 푸는 동안만 쓰는 연습장이고, 다음 문제로 넘어가면 새 종이가 된다.
@@ -11000,7 +11082,8 @@ function renderStudyQuestion() {
   const inp = document.getElementById('study-input');
   if (inp) setTimeout(() => inp.focus(), 60);
   // 듣기 문항은 화면이 뜨면 한 번 자동으로 읽어 준다(학생이 버튼을 못 찾는 것 방지)
-  if (p.audio && typeof speakWord === 'function') setTimeout(() => speakWord(String(p.audio)), 350);
+  if (p.audio && typeof speakWord === 'function' && !(String(problemLang(p)).startsWith('ko') && !hasVoiceFor(problemLang(p))))
+    setTimeout(() => speakWord(String(p.audio), { lang: problemLang(p), rate: p.cat === 'dictation' ? 0.8 : 0.85 }), 350);
 }
 
 // ── 풀이 연습장(수학) ──────────────────────────────
@@ -11091,7 +11174,9 @@ function submitStudyAnswer(chosen) {
   const val = String(chosen == null ? '' : chosen).trim();
   if (!val) { toast('답을 입력해 주세요'); return; }
 
-  const ok = CurriculumUtils.isCorrect(p, val);
+  // [KOREAN-B] 받아쓰기는 띄어쓰기를 따로 보므로 전용 채점을 쓴다. 다른 문항은 지금까지와 같다.
+  const dict = (p.cat === 'dictation') ? dictationGrade(p, val) : null;
+  const ok = dict ? dict.ok : CurriculumUtils.isCorrect(p, val);
   if (ok) STUDY_SESSION.correct++;
   // 고른 답을 그대로 남긴다 — 무엇과 헷갈리는지 나중에 볼 수 있게
   STUDY_SESSION.answers.push({ problemId: p.id, unitId: p.unitId, chosen: val, correct: ok });
@@ -11103,6 +11188,29 @@ function showStudyFeedback(p, chosen, ok) {
   const body = document.getElementById('study-body');
   if (!body) return;
   const last = STUDY_SESSION.cur >= STUDY_SESSION.questions.length - 1;
+  // [KOREAN-B] 받아쓰기 — 어디를 틀렸는지 글자로 짚어 준다(맞은 글자는 초록, 틀리거나 빠뜨린 글자는 빨강)
+  if (p.cat === 'dictation') {
+    const g = dictationGrade(p, chosen), m = dictationMarks(p.a, chosen);
+    body.innerHTML = `
+      <div class="st-center" style="padding:1.2rem 1rem;text-align:center">
+        <div class="st-emoji ${ok ? '' : 'wrong'}" style="margin-bottom:.5rem">${ok ? '🎉' : '🤔'}</div>
+        <div style="font-size:1.4rem;font-weight:800;color:${ok ? 'var(--emerald)' : 'var(--red)'};margin-bottom:.3rem">
+          ${ok ? '맞았어요!' : '아쉬워요'}</div>
+        <div style="font-size:1rem;color:var(--txt3);margin-bottom:1.1rem">맞은 글자 ${m.matched} / ${m.total}</div>
+        <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:1.1rem 1.2rem;text-align:left">
+          <div style="font-size:.92rem;color:var(--txt3)">내가 쓴 것</div>
+          <div style="font-size:1.2rem;margin-bottom:.9rem;word-break:keep-all">${escHtml(String(chosen))}</div>
+          <div style="font-size:.92rem;color:var(--txt3)">정답</div>
+          <div style="font-size:1.45rem;font-weight:700;letter-spacing:.02em;word-break:keep-all">${dictationDiffHtml(p.a, chosen)}</div>
+          ${!g.spaceOk ? `<div style="font-size:.95rem;color:var(--gold);margin-top:.9rem">
+            ✏️ 글자는 ${g.charOk ? '모두 맞았어요' : '위를 보세요'}. 띄어쓰기가 정답과 달라요${DICTATION_STRICT_SPACING ? '' : ' (점수에는 넣지 않았어요)'}.</div>` : ''}
+        </div>
+        <button class="st-btn" onclick="nextStudyQuestion()"
+          style="width:100%;margin-top:1.2rem;border:none;background:var(--gold);color:#1a1a1a;
+            font-weight:700;cursor:pointer;font-family:inherit">${last ? '결과 보기' : '다음 문제'}</button>
+      </div>`;
+    return;
+  }
   body.innerHTML = `
     <div class="st-center" style="padding:1.2rem 1rem;text-align:center">
       <div class="st-emoji ${ok ? '' : 'wrong'}" style="margin-bottom:.6rem">${ok ? '🎉' : '🤔'}</div>
