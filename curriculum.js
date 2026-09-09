@@ -48,7 +48,16 @@ const CURRICULUM = {
           { id:'ko4-2-5', no:5, name:'2학기 · 오가는 마음' },
           { id:'ko4-2-6', no:6, name:'2학기 · 상상의 날개' },
           { id:'ko4-2-7', no:7, name:'2학기 · 독서 단원 생각을 나누며 책을 읽어요' },
-          { id:'ko4-d1', no:1, name:'받아쓰기 1급' },   // [KOREAN-B] 급수는 단원으로 둔다(학생이 급수를 골라 풀고 교사 학습 범위에도 잡힌다)
+          { id:'ko4-d1', no:1, name:'받아쓰기 1급' },
+          { id:'ko4-d2', no:2, name:'받아쓰기 2급 (받침 있는 낱말)' },
+          { id:'ko4-d3', no:3, name:'받아쓰기 3급 (겹받침)' },
+          { id:'ko4-d4', no:4, name:'받아쓰기 4급 (소리와 다른 글자)' },
+          { id:'ko4-d5', no:5, name:'받아쓰기 5급 (된소리·거센소리)' },
+          { id:'ko4-d6', no:6, name:'받아쓰기 6급 (헷갈리는 낱말)' },
+          { id:'ko4-d7', no:7, name:'받아쓰기 7급 (띄어쓰기)' },
+          { id:'ko4-d8', no:8, name:'받아쓰기 8급 (이·히와 말끝)' },
+          { id:'ko4-d9', no:9, name:'받아쓰기 9급 (겹받침 심화)' },
+          { id:'ko4-d10', no:10, name:'받아쓰기 10급 (종합)' },   // [KOREAN-B] 급수는 단원으로 둔다(학생이 급수를 골라 풀고 교사 학습 범위에도 잡힌다)
           { id:'ko4-2-8', no:8, name:'2학기 · 매체 단원 자료를 활용하여 발표해요' },
         ],
       },
@@ -2099,6 +2108,107 @@ const BASE_PROBLEMS = [
   { id:'p_kod1_08', unitId:'ko4-d1', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'나는 일기를 쓰고 잠자리에 들었다.', audio:'나는 일기를 쓰고 잠자리에 들었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 잠자리
   { id:'p_kod1_09', unitId:'ko4-d1', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'형은 언제나 약속을 잘 지킨다.', audio:'형은 언제나 약속을 잘 지킨다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 언제나
   { id:'p_kod1_10', unitId:'ko4-d1', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'우리 집 마당에 예쁜 꽃이 피었다.', audio:'우리 집 마당에 예쁜 꽃이 피었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 꽃이
+  // ── 받아쓰기 2~10급 (KOREAN-DICT) — 급수가 오를수록 맞춤법이 어려워진다(어휘는 4학년 그대로).
+  //    문장은 전부 자체 제작. a와 audio가 같고 lang은 ko-KR.
+  // 2급 받침 있는 낱말 — 10문장
+  { id:'p_kod2_01', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'창문 너머로 구름이 지나간다.', audio:'창문 너머로 구름이 지나간다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 창문·구름
+  { id:'p_kod2_02', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'산에서 바람이 세게 분다.', audio:'산에서 바람이 세게 분다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 산·바람
+  { id:'p_kod2_03', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'저녁에 김치와 밥을 먹었다.', audio:'저녁에 김치와 밥을 먹었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 밥
+  { id:'p_kod2_04', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'방문을 살며시 열었다.', audio:'방문을 살며시 열었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 문
+  { id:'p_kod2_05', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'겨울에 눈사람이 녹았다.', audio:'겨울에 눈사람이 녹았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 눈사람
+  { id:'p_kod2_06', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'발을 씻고 침대에 누웠다.', audio:'발을 씻고 침대에 누웠다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 발
+  { id:'p_kod2_07', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'강물이 아래로 흐른다.', audio:'강물이 아래로 흐른다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 강물
+  { id:'p_kod2_08', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'공을 던지며 신나게 놀았다.', audio:'공을 던지며 신나게 놀았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 공
+  { id:'p_kod2_09', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'깜깜한 밤에 별을 세었다.', audio:'깜깜한 밤에 별을 세었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 밤·별
+  { id:'p_kod2_10', unitId:'ko4-d2', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'새 신발을 신고 뛰어다녔다.', audio:'새 신발을 신고 뛰어다녔다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 받침 신발
+  // 3급 겹받침 — 10문장
+  { id:'p_kod3_01', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'할머니가 마루에 앉았다.', audio:'할머니가 마루에 앉았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 앉
+  { id:'p_kod3_02', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'간식이 생각보다 많았다.', audio:'간식이 생각보다 많았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 많
+  { id:'p_kod3_03', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'옆집 아저씨는 아직 젊다.', audio:'옆집 아저씨는 아직 젊다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 젊
+  { id:'p_kod3_04', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'강아지가 하루를 굶었다.', audio:'강아지가 하루를 굶었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 굶
+  { id:'p_kod3_05', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'사촌이 감기를 앓았다.', audio:'사촌이 감기를 앓았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 앓
+  { id:'p_kod3_06', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'매운 음식은 정말 싫다.', audio:'매운 음식은 정말 싫다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 싫
+  { id:'p_kod3_07', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'필통 안에 지우개가 없다.', audio:'필통 안에 지우개가 없다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 없
+  { id:'p_kod3_08', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'이른 아침에 닭이 울었다.', audio:'이른 아침에 닭이 울었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 닭
+  { id:'p_kod3_09', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'누나 몫으로 빵을 남겼다.', audio:'누나 몫으로 빵을 남겼다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 몫
+  { id:'p_kod3_10', unitId:'ko4-d3', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'보름달이 무척 밝았다.', audio:'보름달이 무척 밝았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 밝
+  // 4급 소리와 다른 글자 — 10문장
+  { id:'p_kod4_01', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'짝과 같이 그림을 그렸다.', audio:'짝과 같이 그림을 그렸다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[가치] 같이
+  { id:'p_kod4_02', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'굳이 먼 길로 돌아왔다.', audio:'굳이 먼 길로 돌아왔다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[구지] 굳이
+  { id:'p_kod4_03', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'라면 국물이 아주 뜨거웠다.', audio:'라면 국물이 아주 뜨거웠다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[궁물] 국물
+  { id:'p_kod4_04', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'언니는 집안의 맏이다.', audio:'언니는 집안의 맏이다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[마지] 맏이
+  { id:'p_kod4_05', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'일찍 일어나 해돋이를 보았다.', audio:'일찍 일어나 해돋이를 보았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[해도지] 해돋이
+  { id:'p_kod4_06', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'오빠는 결심을 굳혔다.', audio:'오빠는 결심을 굳혔다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[구치다] 굳히다
+  { id:'p_kod4_07', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'뚜껑이 저절로 닫혔다.', audio:'뚜껑이 저절로 닫혔다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[다치다] 닫히다
+  { id:'p_kod4_08', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'색종이를 벽에 붙였다.', audio:'색종이를 벽에 붙였다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[부치다] 붙이다
+  { id:'p_kod4_09', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'이야기의 끝이 참 슬펐다.', audio:'이야기의 끝이 참 슬펐다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[끄치] 끝이
+  { id:'p_kod4_10', unitId:'ko4-d4', type:'short', cat:'dictation', level:1, q:'잘 듣고 문장을 그대로 써 보세요.', a:'앞머리가 조금 길어졌다.', audio:'앞머리가 조금 길어졌다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 소리[암머리] 앞머리
+  // 5급 된소리·거센소리 — 10문장
+  { id:'p_kod5_01', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'아버지께서 손톱을 깎으셨다.', audio:'아버지께서 손톱을 깎으셨다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 된소리 깎
+  { id:'p_kod5_02', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'바람에 나무가 꺾였다.', audio:'바람에 나무가 꺾였다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 된소리 꺾
+  { id:'p_kod5_03', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'강가에서 낚시를 했다.', audio:'강가에서 낚시를 했다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 된소리 낚
+  { id:'p_kod5_04', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'책상을 걸레로 닦았다.', audio:'책상을 걸레로 닦았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 된소리 닦
+  { id:'p_kod5_05', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'누룽지를 꼭꼭 씹었다.', audio:'누룽지를 꼭꼭 씹었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 된소리 꼭·씹
+  { id:'p_kod5_06', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'낙엽을 한곳에 쌓았다.', audio:'낙엽을 한곳에 쌓았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 된소리 쌓
+  { id:'p_kod5_07', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'바다가 정말 좋다.', audio:'바다가 정말 좋다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 거센소리 좋다[조타]
+  { id:'p_kod5_08', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'우산을 신발장에 놓고 왔다.', audio:'우산을 신발장에 놓고 왔다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 거센소리 놓고[노코]
+  { id:'p_kod5_09', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'잘 익은 사과가 빨갛다.', audio:'잘 익은 사과가 빨갛다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 거센소리 빨갛다[빨가타]
+  { id:'p_kod5_10', unitId:'ko4-d5', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'생일을 축하해 주었다.', audio:'생일을 축하해 주었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 거센소리 축하[추카]
+  // 6급 헷갈리는 낱말 — 10문장
+  { id:'p_kod6_01', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'나는 커서 화가가 되고 싶다.', audio:'나는 커서 화가가 되고 싶다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 되다/돼다 - 되고
+  { id:'p_kod6_02', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'찬물은 마시지 않았다.', audio:'찬물은 마시지 않았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 안/않 - 않았다
+  { id:'p_kod6_03', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'상처가 다 나았다.', audio:'상처가 다 나았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 낫다(병이 낫다)
+  { id:'p_kod6_04', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'울타리가 아주 낮다.', audio:'울타리가 아주 낮다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 낮다(높이가 낮다)
+  { id:'p_kod6_05', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'고양이가 새끼를 낳았다.', audio:'고양이가 새끼를 낳았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 낳다(새끼를 낳다)
+  { id:'p_kod6_06', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'쌍둥이도 성격이 다르다.', audio:'쌍둥이도 성격이 다르다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 다르다/틀리다 - 다르다
+  { id:'p_kod6_07', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'실내화를 잃어버렸다.', audio:'실내화를 잃어버렸다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 잃다/잊다 - 잃어버리다
+  { id:'p_kod6_08', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'지도에서 북쪽을 가리켰다.', audio:'지도에서 북쪽을 가리켰다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 가리키다/가르치다 - 가리키다
+  { id:'p_kod6_09', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'반드시 이기고 말겠다.', audio:'반드시 이기고 말겠다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 반드시/반듯이 - 반드시
+  { id:'p_kod6_10', unitId:'ko4-d6', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'편지를 우체통에 부쳤다.', audio:'편지를 우체통에 부쳤다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 부치다/붙이다 - 부치다
+  // 7급 띄어쓰기 — 10문장
+  { id:'p_kod7_01', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'내가 원하는 것은 자전거다.', audio:'내가 원하는 것은 자전거다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 것(의존 명사)
+  { id:'p_kod7_02', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'혼자서도 할 수 있다.', audio:'혼자서도 할 수 있다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 수(의존 명사)
+  { id:'p_kod7_03', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'봄이 올 때가 기다려진다.', audio:'봄이 올 때가 기다려진다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 때(의존 명사)
+  { id:'p_kod7_04', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'아픈 데를 살살 문질렀다.', audio:'아픈 데를 살살 문질렀다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 데(의존 명사)
+  { id:'p_kod7_05', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'오리 세 마리가 헤엄친다.', audio:'오리 세 마리가 헤엄친다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 단위 마리
+  { id:'p_kod7_06', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'딱지를 열 장 접었다.', audio:'딱지를 열 장 접었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 단위 장
+  { id:'p_kod7_07', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'줄넘기를 백 번 넘었다.', audio:'줄넘기를 백 번 넘었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 단위 번
+  { id:'p_kod7_08', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'위인전 두 권을 빌렸다.', audio:'위인전 두 권을 빌렸다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 단위 권
+  { id:'p_kod7_09', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'다리가 아파서 못 걸었다.', audio:'다리가 아파서 못 걸었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 못
+  { id:'p_kod7_10', unitId:'ko4-d7', type:'short', cat:'dictation', level:2, q:'잘 듣고 문장을 그대로 써 보세요.', a:'국이 짜서 안 먹었다.', audio:'국이 짜서 안 먹었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 안
+  // 8급 이·히와 말끝 — 10문장
+  { id:'p_kod8_01', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'이모는 계획을 꼼꼼히 세웠다.', audio:'이모는 계획을 꼼꼼히 세웠다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 부사 꼼꼼히
+  { id:'p_kod8_02', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'솔직히 말하니 마음이 편했다.', audio:'솔직히 말하니 마음이 편했다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 부사 솔직히
+  { id:'p_kod8_03', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'아기가 가만히 손을 흔들었다.', audio:'아기가 가만히 손을 흔들었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 부사 가만히
+  { id:'p_kod8_04', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'장난감을 일일이 정리했다.', audio:'장난감을 일일이 정리했다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 부사 일일이
+  { id:'p_kod8_05', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'운동화를 나란히 벗어 두었다.', audio:'운동화를 나란히 벗어 두었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 부사 나란히
+  { id:'p_kod8_06', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'이번에는 내가 발표할게.', audio:'이번에는 내가 발표할게.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 어미 -ㄹ게 (발표할게)
+  { id:'p_kod8_07', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'내일 물감을 빌려줄게.', audio:'내일 물감을 빌려줄게.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 어미 -ㄹ게 (빌려줄게)
+  { id:'p_kod8_08', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'이따가 도서관에 갈까.', audio:'이따가 도서관에 갈까.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 어미 -ㄹ까 (갈까)
+  { id:'p_kod8_09', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'할아버지께서 주신 시계예요.', audio:'할아버지께서 주신 시계예요.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 예요 (받침 없는 말 뒤)
+  { id:'p_kod8_10', unitId:'ko4-d8', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'이것은 제 수첩이에요.', audio:'이것은 제 수첩이에요.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 이에요 (받침 있는 말 뒤)
+  // 9급 겹받침 심화 — 10문장
+  { id:'p_kod9_01', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'넓은 잔디밭에서 뛰어놀았다.', audio:'넓은 잔디밭에서 뛰어놀았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 넓 (넓은)
+  { id:'p_kod9_02', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'징검다리를 밟고 지나갔다.', audio:'징검다리를 밟고 지나갔다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 밟 (밟고)
+  { id:'p_kod9_03', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'화분에 흙을 가득 담았다.', audio:'화분에 흙을 가득 담았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 흙 (흙을)
+  { id:'p_kod9_04', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'삶은 달걀이 참 고소하다.', audio:'삶은 달걀이 참 고소하다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 삶 (삶은)
+  { id:'p_kod9_05', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'무대에서 시를 읊었다.', audio:'무대에서 시를 읊었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 읊 (읊었다)
+  { id:'p_kod9_06', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'나뭇잎이 노랗게 물들었다.', audio:'나뭇잎이 노랗게 물들었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 사이시옷 나뭇잎
+  { id:'p_kod9_07', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'바닷가에서 조개를 주웠다.', audio:'바닷가에서 조개를 주웠다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 사이시옷 바닷가
+  { id:'p_kod9_08', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'햇볕이 따뜻하게 내리쬐었다.', audio:'햇볕이 따뜻하게 내리쬐었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 사이시옷 햇볕
+  { id:'p_kod9_09', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'촛불을 끄고 소원을 빌었다.', audio:'촛불을 끄고 소원을 빌었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 사이시옷 촛불
+  { id:'p_kod9_10', unitId:'ko4-d9', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'빗물이 골목에 고였다.', audio:'빗물이 골목에 고였다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 사이시옷 빗물
+  // 10급 종합 — 10문장
+  { id:'p_kod10_01', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'얇은 옷을 입을 수 있다.', audio:'얇은 옷을 입을 수 있다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 얇 + 띄어쓰기 수
+  { id:'p_kod10_02', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'내가 이름표를 반듯이 붙였다.', audio:'내가 이름표를 반듯이 붙였다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 반듯이와 반드시 구별 + 소리와 다른 글자 붙이다[부치다]
+  { id:'p_kod10_03', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'지붕이 하얗게 변한 것 같다.', audio:'지붕이 하얗게 변한 것 같다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 거센소리 하얗게[하야케] + 띄어쓰기 것
+  { id:'p_kod10_04', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'동생은 아침밥을 굶지 않는다.', audio:'동생은 아침밥을 굶지 않는다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 굶 + 안과 않 구별
+  { id:'p_kod10_05', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'어두워질 때는 조심해야 돼.', audio:'어두워질 때는 조심해야 돼.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 되와 돼 구별 + 띄어쓰기 때
+  { id:'p_kod10_06', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'냇가에서 물놀이를 실컷 했다.', audio:'냇가에서 물놀이를 실컷 했다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 사이시옷 냇가 + 소리와 다른 글자 물놀이
+  { id:'p_kod10_07', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'버스에는 앉을 데가 없었다.', audio:'버스에는 앉을 데가 없었다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 앉 + 띄어쓰기 데
+  { id:'p_kod10_08', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'양말 두 켤레를 개어 놓을게.', audio:'양말 두 켤레를 개어 놓을게.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 띄어쓰기 단위 켤레 + 어미 -ㄹ게(놓을게)
+  { id:'p_kod10_09', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'물통을 깜빡 잊을 뻔했다.', audio:'물통을 깜빡 잊을 뻔했다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 잊다와 잃다 구별 + 띄어쓰기 뻔
+  { id:'p_kod10_10', unitId:'ko4-d10', type:'short', cat:'dictation', level:3, q:'잘 듣고 문장을 그대로 써 보세요.', a:'짧은 연필을 뾰족하게 깎았다.', audio:'짧은 연필을 뾰족하게 깎았다.', lang:'ko-KR', hint:'천천히 다시 들어 보세요. 소리와 다르게 적는 글자가 있는지 살펴보세요.' },   // 겹받침 짧 + 된소리 뾰·깎
 ];
 
 // ── 4-2 이관 대기 문항 (2022 개정에서 4학년 2학기 범위로 이동) ──
