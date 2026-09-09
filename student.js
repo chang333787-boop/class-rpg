@@ -1015,6 +1015,58 @@ function renderMain() {
   }
 }
 
+// ══ 보상 승인 알림 (REWARD-STATUS-1) ═══════════════════════════
+//  문제: 교사가 승인하면 pendingRewards 에서 사라지고 EXP·골드만 조용히 늘어,
+//        학생 입장에서 "내가 낸 게 어떻게 됐지"가 영영 닫히지 않았다.
+//        승인 이력은 접혀 있는 "📜 최근 활동" 5개뿐이라 눈에 띄지 않는다.
+//  방법: 승인된 questLog 중 아직 안 본 것을 홈 배너로 보여주고, 닫으면 시각을 남긴다.
+//  · 학생 스키마 변경·Firebase 쓰기 없음. 확인 시각은 그 기기 localStorage 에만 둔다.
+//  · [DAILY-STUDY-1] 에서 로그인 자동 팝업 3종을 폐기했으므로 모달이 아니라 홈 카드로 낸다.
+const REWARD_SEEN_PREFIX = 'rpg.rewardSeen.';
+
+// 이 기기에서 마지막으로 확인한 시각(ms). 처음이면 오늘 0시부터 본다.
+//   (0으로 두면 지난 학기 승인까지 한꺼번에 쏟아진다)
+function _rewardSeenAt(sid) {
+  let v = null;
+  try { v = localStorage.getItem(REWARD_SEEN_PREFIX + sid); } catch (e) {}
+  if (v && Number(v) > 0) return Number(v);
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return t.getTime();
+}
+
+// questLog 하나의 승인 시각(ms).
+//   approvedAt 은 날짜 문자열(YYYY-MM-DD)뿐이라 같은 날 안에서는 순서를 못 가린다.
+//   DB.saveQuestLog 가 만드는 _id 에 Date.now() 가 들어 있어 그걸 쓴다:
+//     `${studentId}_${boardQuestId|manual}_${Date.now()}_${rand5}`
+//   studentId·boardQuestId 에 '_' 가 들어갈 수 있으므로(예: bq_auto_2026-09-04_0)
+//   앞에서 세지 않고 **뒤에서 두 번째** 조각을 쓴다.
+function _questLogTime(q) {
+  const parts = String((q && q._id) || '').split('_');
+  const ms = parts.length >= 2 ? Number(parts[parts.length - 2]) : NaN;
+  if (ms > 0) return ms;
+  const d = Date.parse((q && (q.approvedAt || q.date)) || '');   // _id 없는 옛 기록
+  return d > 0 ? d : 0;
+}
+
+function getUnseenApprovals(s) {
+  const seen = _rewardSeenAt(s.id);
+  return (DB.load().quests || [])
+    .filter(q => q && q.studentId === s.id && q.approved === true && _questLogTime(q) > seen)
+    .sort((a, b) => _questLogTime(a) - _questLogTime(b));
+}
+
+// 확인 버튼 — 시각만 남기고 다시 그린다. 서버에 쓰지 않는다.
+//   교사 PC와 학생 크롬북의 시계가 어긋나면 승인 시각이 학생 기준 "미래"일 수 있다.
+//   그때 Date.now()만 넣으면 그 항목이 안 지워져 배너가 영영 남는다(고치려던 문제가 되돌아온다).
+//   지금 화면에 보여준 것 중 가장 늦은 시각까지 확실히 넘긴다.
+function dismissRewardSeen() {
+  const shown = getUnseenApprovals(CUR);
+  const last  = shown.length ? _questLogTime(shown[shown.length - 1]) : 0;
+  const at    = Math.max(Date.now(), last);
+  try { localStorage.setItem(REWARD_SEEN_PREFIX + CUR.id, String(at)); } catch (e) {}
+  renderAll();
+}
+
 function buildMainHTML() {
   const s        = CUR;
   const settings = DB.getSettings();
@@ -1033,11 +1085,25 @@ function buildMainHTML() {
   // ── 긴급 알림 배너 ──
   const alerts = [];
 
+  // 선생님이 확인해 준 것 — 아직 안 본 것만. 확인을 누르면 사라진다.
+  //   name 은 학생이 쓴 제목(작품 등)이 들어오므로 반드시 escHtml.
+  const approvedNew = getUnseenApprovals(s);
+  if (approvedNew.length)
+    alerts.push(`<div class="reward-banner" style="margin-bottom:.6rem">
+      <div class="rb-icon">✅</div>
+      <div class="rb-body">
+        <div class="rb-title green">선생님이 확인해 주셨어요 · ${approvedNew.length}개</div>
+        ${approvedNew.slice(0,5).map(q=>`<div class="rb-desc" style="font-size:.88rem;color:var(--txt)">${escHtml(q.icon||'📋')} ${escHtml(q.name||'')}${(q.exp||0)?` <span style="color:var(--gold)">+${q.exp} EXP</span>`:''}${(q.gold||0)?` <span style="color:var(--gold)">+${q.gold} G</span>`:''}</div>`).join('')}
+        ${approvedNew.length>5?`<div class="rb-desc">…외 ${approvedNew.length-5}개</div>`:''}
+      </div>
+      <button class="btn-gold" onclick="dismissRewardSeen()" style="padding:.4rem .9rem;font-size:.78rem;flex-shrink:0">확인</button>
+    </div>`);
+
   if (waitingCount > 0)
     alerts.push(`<div class="reward-banner" style="margin-bottom:.6rem;opacity:.85">
       <div class="rb-icon">⏳</div>
-      <div class="rb-body"><div class="rb-title" style="color:var(--sky)">퀘스트 승인 대기중 ${waitingCount}건</div>
-      <div class="rb-desc">${(s.pendingRewards||[]).filter(r=>!r.approved).map(r=>r.label).join(' · ')}</div></div>
+      <div class="rb-body"><div class="rb-title" style="color:var(--sky)">선생님 확인 기다리는 중 ${waitingCount}개</div>
+      <div class="rb-desc" style="font-size:.88rem;color:var(--txt)">${(s.pendingRewards||[]).filter(r=>!r.approved).map(r=>escHtml(r.label||'')).join(' · ')}</div></div>
       <div style="font-size:.72rem;color:var(--txt3);flex-shrink:0;padding:.4rem .6rem">선생님 확인 중</div>
     </div>`);
   if (canPromo)
@@ -1112,7 +1178,7 @@ function buildMainHTML() {
   // 승인된 보상은 자동 지급됨 (받기 버튼 단계 제거)
   if (waitingCount > 0)
     todos.push({type:'info', icon:'⏳', badge:waitingCount,
-      title:`퀘스트 승인 대기중 ${waitingCount}건`,
+      title:`선생님 확인 기다리는 중 ${waitingCount}개`,
       sub:(s.pendingRewards||[]).filter(r=>!r.approved).slice(0,2).map(r=>r.label).join(' · '),
       action:null, btnLabel:'대기중'});
 
