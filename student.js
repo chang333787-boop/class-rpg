@@ -45,6 +45,7 @@ window.onload = async () => {
     applyShopOverrides(); // 상점 오버라이드 적용
     applyBattleSettings(); // 전투 밸런스 오버라이드 적용
     DB.onDataChange(() => {
+      invalidateMastery();   // [MASTERY-1] 기록이 바뀌면 별·복습일을 다시 센다
       applyShopOverrides();
       applyBattleSettings();
       if (typeof CUR !== 'undefined' && CUR) {
@@ -10675,6 +10676,80 @@ window.onDbSaveError = () => toast('⚠️ 저장에 실패했어요. 인터넷�
 // ══════════════════════════════════════════════════
 
 const STUDY_PER_DAY = 10;   // 하루 분량
+
+// ══════════════════════════════════════════════════
+//  [MASTERY-1] 문항별 숙달도(별 0~5)와 복습 주기
+//  · 새로 저장하는 것이 없다. 이미 쌓이는 problemRecords(문항별 정답 여부 + 날짜)를
+//    날짜순으로 재생해 문항마다 별과 '다음 복습일'을 계산한다 → 학생 스키마·백업 그대로.
+//  · 규칙은 영어 복습앱과 같다: 맞으면 별 +1(최대 5), 틀리면 −1(최소 0),
+//    다음 복습일 = 마지막으로 푼 날 + GAP[별]. 별 0은 GAP 0이라 늘 복습 대상이 된다.
+//  · 보충(review:true) 기록은 뺀다(보상 집계와 같은 기준).
+//  · 계산은 학생당 수 ms지만 매 렌더 반복은 낭비라 메모리에 캐시하고
+//    기록이 바뀔 때(onDataChange)와 세션이 끝날 때만 버린다.
+// ══════════════════════════════════════════════════
+const MASTERY_GAP = [0, 1, 2, 4, 7, 14];   // 별 0~5일 때 며칠 뒤에 다시 볼지
+let _masteryCache = null, _masteryOwner = null;
+function invalidateMastery() { _masteryCache = null; _masteryOwner = null; }
+function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function masteryMap(studentId) {
+  const id = studentId || (typeof CUR !== 'undefined' && CUR ? CUR.id : '');
+  if (_masteryCache && _masteryOwner === id) return _masteryCache;
+  const m = new Map();
+  try {
+    const recs = (typeof DB.getProblemRecords === 'function' ? DB.getProblemRecords(id) : [])
+      .filter(r => r && !r.review && Array.isArray(r.answers))
+      .sort((a, b) => String(a.date) < String(b.date) ? -1 : String(a.date) > String(b.date) ? 1 : 0);
+    for (const r of recs) for (const a of r.answers) {
+      if (!a || !a.problemId) continue;
+      const p = m.get(a.problemId) || { lv: 0, last: '' };
+      p.lv = a.correct ? Math.min(5, p.lv + 1) : Math.max(0, p.lv - 1);
+      p.last = r.date || p.last;
+      m.set(a.problemId, p);
+    }
+    for (const [, p] of m) p.next = p.last ? addDaysStr(p.last, MASTERY_GAP[p.lv]) : '';
+  } catch (e) { /* 기록이 없거나 모양이 다르면 빈 채로 둔다 — 처음 쓰는 학생과 같다 */ }
+  _masteryCache = m; _masteryOwner = id;
+  return m;
+}
+// 한 번이라도 푼 문항인가 / 오늘 다시 볼 때가 됐는가
+function masteryOf(problemId) { return masteryMap().get(problemId) || null; }
+function isDueForReview(problemId) {
+  const p = masteryMap().get(problemId);
+  if (!p) return false;                       // 아직 안 푼 것은 '복습'이 아니라 '새 문항'
+  return !p.next || p.next <= Utils.todayStr();
+}
+function starsText(lv) { return '★'.repeat(lv) + '☆'.repeat(5 - lv); }
+
+// 교사가 켠 단원 안에서, 과목별로 오늘 복습할 문항 수 — 규칙은 학습 세션과 똑같이 건다
+function dueCountsBySubject() {
+  const active = CurriculumUtils.activeUnitIds();
+  const out = [];
+  for (const sub of CurriculumUtils.subjects()) {
+    if (sub.key === 'english') continue;      // [ENGLISH-LINK-1] 영어는 영어앱으로
+    let n = 0;
+    for (const u of sub.units) {
+      if (active && !active.includes(u.id)) continue;
+      for (const p of CurriculumUtils.problemsByUnit(u.id)) if (isDueForReview(p.id)) n++;
+    }
+    if (n > 0) out.push({ key: sub.key, label: sub.label, icon: sub.icon, n });
+  }
+  return out;
+}
+// 단원 한 개의 별 평균과 복습 개수
+function unitMastery(unitId) {
+  const ps = CurriculumUtils.problemsByUnit(unitId);
+  let sum = 0, seen = 0, due = 0;
+  for (const p of ps) {
+    const m = masteryOf(p.id);
+    if (m) { sum += m.lv; seen++; if (isDueForReview(p.id)) due++; }
+  }
+  return { avg: seen ? Math.round(sum / seen) : 0, seen, due, total: ps.length };
+}
 let STUDY_SESSION = null;   // { subjectKey, questions[], cur, correct, answers[], cat?, review?, grade? }
 
 // [STUDY-MODES-1] 문제 성격(cat)별 모드 — 영어앱의 연습 모드처럼 고르게 한다. null = 골고루
@@ -10804,6 +10879,32 @@ function renderStudySubjectPick() {
     return { ...sub, units, count, t, c, weak };
   }).filter(sub => sub.count > 0 && sub.key !== 'english');   // [ENGLISH-LINK-1] 영어는 영어앱으로
 
+  // [MASTERY-1] 오늘 복습할 것 — 과목별로 나눠 보여 주고, 누르면 그 과목의 복습 세션을 연다.
+  //   과목을 섞지 않는다(기록·보상·문항 렌더가 과목 단위라 섞으면 집계가 흔들린다).
+  const dueList = dueCountsBySubject();
+  const dueTotal = dueList.reduce((n, d) => n + d.n, 0);
+  const dueCard = dueTotal === 0 ? '' : `
+          <div style="padding:1.1rem 1.2rem;border-radius:14px;margin-bottom:.9rem;
+            border:1px solid rgba(93,173,226,.4);background:rgba(93,173,226,.10)">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem">
+              <span style="font-size:1.6rem">🔁</span>
+              <span style="font-size:1.15rem;font-weight:800;color:var(--sky)">오늘 복습할 것 ${dueTotal}개</span>
+            </div>
+            <div style="font-size:.88rem;color:var(--txt3);margin-bottom:.8rem">한 번 푼 문제를 잊을 때쯤 다시 보여 줘요</div>
+            <div style="display:grid;gap:.45rem">
+              ${dueList.map(d => `
+                <button onclick="startStudySession('${d.key}','',true)"
+                  style="display:flex;align-items:center;gap:.7rem;width:100%;padding:.7rem .9rem;border-radius:11px;
+                    cursor:pointer;font-family:inherit;text-align:left;color:var(--txt);
+                    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)">
+                  <span style="font-size:1.3rem">${d.icon || '📘'}</span>
+                  <span style="flex:1;font-weight:700">${escHtml(d.label)}</span>
+                  <span style="font-weight:800;color:var(--sky)">${d.n}개</span>
+                  <span style="color:var(--txt3)">▶</span>
+                </button>`).join('')}
+            </div>
+          </div>`;
+
   // [ENGLISH-LINK-1] 외부 학습 앱 카드 — RPG 내부 문항 대신 전용 앱으로 보낸다.
   //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
   const EXTERNAL_STUDY = externalStudyItems();   // [WATERCOLOR-EMBED-1] 정의는 최상위 externalStudyItems()
@@ -10862,6 +10963,7 @@ function renderStudySubjectPick() {
           ? `오늘 ${done}문제 다 했어요. 더 풀고 싶으면 골라 보세요`
           : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
       </div>
+      ${dueCard}
       <div style="display:grid;gap:.7rem">
         ${externalCards}
         ${subjects.map(sub => {
@@ -10965,6 +11067,14 @@ function renderReviewUnitPick(grade) {
               <span style="display:block;font-size:1.1rem;font-weight:700">${u.no}. ${escHtml(u.name)}</span>
               <span style="display:block;font-size:.82rem;color:var(--txt3);margin-top:.3rem">
                 ${lv.label} · 문제 ${u.count}개${u.stat ? ` · ${u.stat.c}/${u.stat.t} 맞힘` : ''}</span>
+              ${(() => {   // [MASTERY-1] 별 평균과 오늘 복습할 개수
+                const mm = unitMastery(u.id);
+                if (!mm.seen) return '';
+                return `<span style="display:block;font-size:.82rem;margin-top:.25rem">
+                  <span style="color:var(--gold);letter-spacing:.06em">${starsText(mm.avg)}</span>
+                  <span style="color:var(--txt3)"> · ${mm.seen}/${mm.total}개 풀어 봤어요</span>
+                  ${mm.due ? `<span style="color:var(--sky);font-weight:700"> · 복습 ${mm.due}개</span>` : ''}</span>`;
+              })()}
             </span>
             <span style="font-size:1.2rem;color:var(--txt3)">▶</span>
           </button>`;
@@ -11048,6 +11158,14 @@ function renderStudyUnitPick(subjectKey) {
               </span>
               <span style="display:block;font-size:.82rem;color:var(--txt3);margin-top:.3rem">
                 ${lv.label} · 문제 ${u.count}개${u.stat ? ` · ${u.stat.c}/${u.stat.t} 맞힘` : ''}</span>
+              ${(() => {   // [MASTERY-1] 별 평균과 오늘 복습할 개수
+                const mm = unitMastery(u.id);
+                if (!mm.seen) return '';
+                return `<span style="display:block;font-size:.82rem;margin-top:.25rem">
+                  <span style="color:var(--gold);letter-spacing:.06em">${starsText(mm.avg)}</span>
+                  <span style="color:var(--txt3)"> · ${mm.seen}/${mm.total}개 풀어 봤어요</span>
+                  ${mm.due ? `<span style="color:var(--sky);font-weight:700"> · 복습 ${mm.due}개</span>` : ''}</span>`;
+              })()}
             </span>
             <span style="font-size:1.2rem;color:var(--txt3)">▶</span>
           </button>`;
@@ -11059,13 +11177,20 @@ function renderStudyUnitPick(subjectKey) {
 // ── 세션 시작 ──────────────────────────────────────
 function setStudyCat(subjectKey, cat) { STUDY_CAT = cat; renderStudyUnitPick(subjectKey); }
 
-function startStudySession(subjectKey, unitId) {
+function startStudySession(subjectKey, unitId, onlyDue) {
   const active = CurriculumUtils.activeUnitIds();
   let pool = unitId
     ? CurriculumUtils.problemsByUnit(unitId)       // 단원 하나만 골라 풀기
     : CurriculumUtils.problemsBySubject(subjectKey);
   if (active) pool = pool.filter(p => active.includes(p.unitId));
   pool = pool.filter(catOk);                       // [STUDY-MODES-1] 고른 모드만
+  // [MASTERY-1] 복습 세션 — 오늘 다시 볼 때가 된 것만. 그 밖의 규칙(하루 분량·학습 범위·
+  //   모드·보상)은 보통 세션과 똑같이 간다. 새 보상 경로를 만들지 않는다.
+  if (onlyDue) {
+    const due = pool.filter(p => isDueForReview(p.id));
+    if (due.length === 0) { toast('오늘 복습할 것을 다 했어요'); renderStudySubjectPick(); return; }
+    pool = due;
+  }
   if (pool.length === 0) { toast('풀 수 있는 문제가 없어요'); return; }
   const picked = pickStudyQuestions(pool);
   STUDY_SESSION = {
@@ -11091,15 +11216,24 @@ function pickStudyQuestions(pool) {
     for (let i = 0; i < times; i++) weighted.push(p);
   });
 
+  // [MASTERY-1] 순위를 얹는다 — 0: 복습일이 지난 것, 1: 아직 안 푼 것, 2: 다음에 볼 것.
+  //   가중 배열(최근 오답 ×3)은 그대로 두고, 섞은 뒤 순위로만 안정 정렬해서
+  //   같은 순위 안에서는 지금까지의 무작위·가중 순서가 유지되게 한다.
+  const _today = Utils.todayStr();
+  const rankOf = p => {
+    const m = masteryOf(p.id);
+    if (!m) return 1;
+    return (m.next && m.next > _today) ? 2 : 0;
+  };
   const picked = [];
   const used = new Set();
-  const shuffled = weighted.sort(() => Math.random() - .5);
+  const shuffled = weighted.sort(() => Math.random() - .5).sort((a, b) => rankOf(a) - rankOf(b));
   for (const p of shuffled) {
     if (picked.length >= STUDY_PER_DAY) break;
     if (!used.has(p.id)) { picked.push(p); used.add(p.id); }
   }
-  // 가중 배열에서 못 채우면 나머지로 보충
-  for (const p of pool) {
+  // 가중 배열에서 못 채우면 나머지로 보충(여기서도 복습일이 지난 것을 먼저)
+  for (const p of pool.slice().sort((a, b) => rankOf(a) - rankOf(b))) {
     if (picked.length >= STUDY_PER_DAY) break;
     if (!used.has(p.id)) { picked.push(p); used.add(p.id); }
   }
@@ -11317,6 +11451,11 @@ function submitStudyAnswer(chosen) {
   const dict = (p.cat === 'dictation') ? dictationGrade(p, val) : null;
   const ok = dict ? dict.ok : CurriculumUtils.isCorrect(p, val);
   if (ok) STUDY_SESSION.correct++;
+  // [MASTERY-1] 이 문제의 별이 어떻게 바뀌는지 — 화면에 보여 주려고 미리 계산해 둔다
+  //   (실제 저장은 세션이 끝날 때 problemRecords로 남고, 별은 거기서 다시 계산된다)
+  const _mBefore = (masteryOf(p.id) || { lv: 0 }).lv;
+  STUDY_SESSION.starBefore = _mBefore;
+  STUDY_SESSION.starAfter = ok ? Math.min(5, _mBefore + 1) : Math.max(0, _mBefore - 1);
   // 고른 답을 그대로 남긴다 — 무엇과 헷갈리는지 나중에 볼 수 있게
   STUDY_SESSION.answers.push({ problemId: p.id, unitId: p.unitId, chosen: val, correct: ok });
   showStudyFeedback(p, val, ok);
@@ -11365,6 +11504,11 @@ function showStudyFeedback(p, chosen, ok) {
           <div style="font-size:1.6rem;font-weight:700;color:var(--emerald)">${escHtml(String(p.a))}</div>
           ${p.hint ? `<div style="font-size:1.05rem;color:var(--txt2);margin-top:.9rem;word-break:keep-all">
             💡 ${escHtml(p.hint)}</div>` : ''}
+        </div>` : ''}
+      ${STUDY_SESSION && STUDY_SESSION.starAfter !== undefined ? `
+        <div style="font-size:.95rem;color:var(--txt3);margin-bottom:.9rem">
+          <span style="color:var(--gold);letter-spacing:.06em">${starsText(STUDY_SESSION.starBefore)}</span>
+          → <span style="color:var(--gold);letter-spacing:.06em;font-weight:800">${starsText(STUDY_SESSION.starAfter)}</span>
         </div>` : ''}
       <button class="st-btn" onclick="nextStudyQuestion()"
         style="width:100%;border:none;background:var(--gold);
@@ -11529,5 +11673,6 @@ function finishStudySession() {
     </div>`;
 
   STUDY_SESSION = null;
+  invalidateMastery();   // [MASTERY-1] 방금 푼 것이 별·복습일에 바로 반영되게
   if (typeof checkAchievements === 'function') checkAchievements();
 }
