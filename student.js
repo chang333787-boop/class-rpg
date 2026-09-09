@@ -1016,6 +1016,93 @@ function renderMain() {
   }
 }
 
+// ══ 내 쪽지 (NOTES-1) ══════════════════════════════════════════
+//  교사가 studentNotes/<sid>/<noteId> 에 써 준 쪽지를 읽기만 한다.
+//  학생 쓰기 없음 — 새 쪽지 확인 시각만 그 기기 localStorage 에 남긴다(#183 과 같은 방식).
+//  비밀번호 항목은 없다(교사 화면에서 아예 받지 않는다).
+const NOTE_SEEN_PREFIX = 'rpg.noteSeen.';
+
+function _noteSeenAt(sid) {
+  let v = null;
+  try { v = localStorage.getItem(NOTE_SEEN_PREFIX + sid); } catch (e) {}
+  if (v && Number(v) > 0) return Number(v);
+  const t = new Date(); t.setHours(0, 0, 0, 0);   // 처음이면 오늘 0시부터
+  return t.getTime();
+}
+
+function getMyNotes() {
+  return (DB.getStudentNotes ? DB.getStudentNotes(CUR.id) : []);
+}
+
+function getUnseenNotes() {
+  const seen = _noteSeenAt(CUR.id);
+  return getMyNotes().filter(n => (n.updatedAt || 0) > seen);
+}
+
+// 확인 — 교사 기기와 시계가 어긋나도 확실히 닫히게 max 를 쓴다(#183 과 같은 이유).
+function dismissNoteSeen() {
+  const shown = getUnseenNotes();
+  const last  = shown.reduce((m, n) => Math.max(m, n.updatedAt || 0), 0);
+  try { localStorage.setItem(NOTE_SEEN_PREFIX + CUR.id, String(Math.max(Date.now(), last))); } catch (e) {}
+  renderAll();
+}
+
+function openNoteList() { openModal('m-note'); renderNoteList(); }
+
+// 클립보드가 막힌 크롬북에서도 쓸 수 있게, 실패하면 그 칸을 선택해 준다.
+function copyNoteText(el, text) {
+  const done = () => toast('✅ 복사했어요!');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => selectNoteText(el));
+      return;
+    }
+  } catch (e) {}
+  selectNoteText(el);
+}
+function selectNoteText(el) {
+  const target = el && el.parentElement && el.parentElement.querySelector('[data-note-val]');
+  if (!target) { toast('길게 눌러서 복사해 주세요.'); return; }
+  try {
+    const r = document.createRange(); r.selectNodeContents(target);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    toast('선택했어요 — 길게 눌러 복사하세요.');
+  } catch (e) { toast('길게 눌러서 복사해 주세요.'); }
+}
+
+function toggleNotePw(el) {   // 값 가림/보임 토글 (아이디처럼 남에게 안 보이게)
+  const v = el.querySelector('[data-note-val]');
+  if (!v) return;
+  const real = v.getAttribute('data-note-val');
+  const hidden = v.textContent.indexOf(String.fromCharCode(9679)) === 0;
+  v.textContent = hidden ? real : String.fromCharCode(9679, 9679, 9679, 9679, 9679, 9679);
+}
+
+function renderNoteList() {
+  const el = document.getElementById('note-body');
+  if (!el) return;
+  const notes = getMyNotes();
+  el.innerHTML = notes.length ? notes.map(n => `
+    <div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.6rem .7rem;margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+        <span style="font-size:1.05rem">${n.kind === 'account' ? '🔑' : '📝'}</span>
+        <b style="font-size:.9rem;flex:1">${escHtml(n.site || '쪽지')}</b>
+        ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener"
+          class="btn-gold" style="display:inline-block;padding:.25rem .6rem;font-size:.72rem;
+          font-weight:700;text-decoration:none;border-radius:50px;box-shadow:none;animation:none">🔗 사이트 열기</a>` : ''}
+      </div>
+      ${n.loginId ? `<div onclick="toggleNotePw(this)"
+          style="display:flex;align-items:center;gap:.4rem;font-size:.84rem;padding:.25rem 0;cursor:pointer">
+        <span style="color:var(--txt2);font-size:.76rem;width:3rem">아이디</span>
+        <span data-note-val="${escHtml(n.loginId)}" style="flex:1">${escHtml(n.loginId)}</span>
+        <button class="btn-gold" style="padding:.2rem .5rem;font-size:.7rem"
+          onclick="event.stopPropagation();copyNoteText(this, ${JSON.stringify(n.loginId)})">📋 복사</button>
+      </div>` : ''}
+      ${n.memo ? `<div style="font-size:.82rem;color:var(--txt);margin-top:.25rem;white-space:pre-wrap">${escHtml(n.memo)}</div>` : ''}
+    </div>`).join('')
+    : '<div style="font-size:.8rem;color:var(--txt3);padding:.6rem .2rem">아직 받은 쪽지가 없어요.</div>';
+}
+
 // ══ 내 보상 목록 (REWARD-LIST-1) ═══════════════════════════════
 //  대기 배너·승인 배너를 누르면 "기다리는 중 / 최근 받은 보상"을 한 화면에서 본다.
 //  읽기만 한다 — 학생 스키마 변경·Firebase 쓰기 없음.
@@ -1168,6 +1255,20 @@ function buildMainHTML() {
       <div class="rb-desc" style="font-size:.88rem;color:var(--txt)">${(s.pendingRewards||[]).filter(r=>!r.approved).map(r=>escHtml(r.label||'')).join(' · ')}</div></div>
       <div style="font-size:.72rem;color:var(--txt3);flex-shrink:0;padding:.4rem .6rem">보기 ›</div>
     </div>`);
+  // 새로 온 쪽지 — 보상 배너 아래(지시). 확인을 누르면 사라진다. 학생 쓰기 없음.
+  const newNotes = getUnseenNotes();
+  if (newNotes.length)
+    alerts.push(`<div class="reward-banner" onclick="openNoteList()" style="margin-bottom:.6rem;cursor:pointer">
+      <div class="rb-icon">📝</div>
+      <div class="rb-body">
+        <div class="rb-title gold">선생님이 쪽지를 줬어요 · ${newNotes.length}개</div>
+        <div class="rb-desc" style="font-size:.88rem;color:var(--txt)">${
+          newNotes.slice(0,3).map(n=>escHtml(n.site||n.memo||'쪽지')).join(' · ')}</div>
+      </div>
+      <button class="btn-gold" onclick="event.stopPropagation();dismissNoteSeen()"
+        style="padding:.4rem .9rem;font-size:.78rem;flex-shrink:0">확인</button>
+    </div>`);
+
   if (canPromo)
     alerts.push(`<div class="promo-banner" onclick="openModal('m-promo')" style="cursor:pointer;margin-bottom:.6rem">
       <div class="rb-icon">⬆️</div>
@@ -1243,6 +1344,14 @@ function buildMainHTML() {
       title:`선생님 확인 기다리는 중 ${waitingCount}개`,
       sub:(s.pendingRewards||[]).filter(r=>!r.approved).slice(0,2).map(r=>r.label).join(' · '),
       action:"openRewardList()", btnLabel:'보기'});
+
+  // 쪽지 — 있으면 언제든 다시 볼 수 있게
+  const myNoteCount = getMyNotes().length;
+  if (myNoteCount > 0)
+    todos.push({type:'info', icon:'📝', badge:myNoteCount,
+      title:`내 쪽지 ${myNoteCount}개`,
+      sub:'선생님이 준 안내를 다시 볼 수 있어요',
+      action:"openNoteList()", btnLabel:'보기'});
 
   // 2순위: 시든 작물 경고
   const witheredCount = (s.farm||[]).filter(p=>{

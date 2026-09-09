@@ -452,6 +452,11 @@ function openStudentDetail(id) {
           </div>`).join('')}
       </div>
     </div>
+    <div class="modal-section">
+      <div class="ms-label">📝 쪽지 (학생은 읽기만 합니다)</div>
+      <div id="note-list-${id}" style="margin-bottom:.6rem"></div>
+      ${noteFormHTML(id)}
+    </div>
     <div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">
       <button class="btn-sm success" onclick="saveStudentDetail('${id}')">✅ 저장</button>
       <button class="btn-sm danger" onclick="resetStudentStats('${id}')" style="font-size:.75rem">🔄 수치 초기화</button>
@@ -459,6 +464,187 @@ function openStudentDetail(id) {
     </div>`;
 
   document.getElementById('m-student').classList.add('open');
+  renderStudentNotes(id);   // [NOTES-1]
+}
+
+// ══ 학생 쪽지 (NOTES-1) ════════════════════════════════════════
+//  교사가 학생마다 쪽지를 써 주고(외부 학습 사이트 안내가 주 용도) 학생은 읽기만 한다.
+//  저장은 DB.saveStudentNote / DB.deleteStudentNote — studentNotes/<sid>/<noteId> 개별 경로.
+//  통짜 set 은 쓰지 않는다(교사가 두 화면에서 만져도 서로 지우지 않게).
+//  ★ 비밀번호 칸은 일부러 없다. 이 앱은 인증이 없고 공개 사이트라 DB 를 누구나 읽을 수 있다.
+//    화면에서 가려도 저장된 값 자체는 못 지킨다 — 그래서 아예 받지 않는다.
+const NOTE_PW_WARNING = '⚠️ 비밀번호는 여기에 적지 마세요. 이 앱은 인증이 없어 누구나 읽을 수 있는 곳에 저장됩니다.';
+
+function _noteWarnHTML() {
+  return `<div style="font-size:.7rem;color:#E67E22;background:rgba(230,126,34,.08);
+    border:1px solid rgba(230,126,34,.25);border-radius:6px;padding:.4rem .6rem;margin-bottom:.6rem">
+    ${escHtml(NOTE_PW_WARNING)}</div>`;
+}
+
+function renderStudentNotes(sid) {
+  const el = document.getElementById('note-list-' + sid);
+  if (!el) return;
+  const notes = DB.getStudentNotes(sid);
+  el.innerHTML = notes.length ? notes.map(n => `
+    <div style="border:1px solid var(--border2);border-radius:8px;padding:.5rem .6rem;margin-bottom:.4rem">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
+        <span style="font-size:.9rem">${n.kind === 'account' ? '🔑' : '📝'}</span>
+        <b style="font-size:.82rem;flex:1">${escHtml(n.site || n.memo || '(제목 없음)')}</b>
+        <button class="btn-sm outline" style="font-size:.68rem;padding:.2rem .5rem"
+          onclick="editStudentNote('${sid}','${n.id}')">수정</button>
+        <button class="btn-sm danger" style="font-size:.68rem;padding:.2rem .5rem"
+          onclick="removeStudentNote('${sid}','${n.id}')">삭제</button>
+      </div>
+      ${n.kind === 'account' ? `<div style="font-size:.72rem;color:var(--txt2)">
+        ${n.url ? escHtml(n.url) + ' · ' : ''}아이디 ${escHtml(n.loginId || '-')}</div>` : ''}
+      ${n.memo ? `<div style="font-size:.72rem;color:var(--txt2);margin-top:.15rem">${escHtml(n.memo)}</div>` : ''}
+    </div>`).join('') : '<div style="font-size:.75rem;color:var(--txt3)">아직 쪽지가 없어요.</div>';
+}
+
+function noteFormHTML(sid) {
+  return `${_noteWarnHTML()}
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">종류</label>
+        <select class="form-select" id="nf-kind-${sid}">
+          <option value="account">사이트 안내</option><option value="memo">그냥 메모</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">사이트 이름 / 제목</label>
+        <input class="form-input" id="nf-site-${sid}" placeholder="예: 영어 복습앱"></div>
+      <div class="form-group"><label class="form-label">주소</label>
+        <input class="form-input" id="nf-url-${sid}" placeholder="https://..."></div>
+      <div class="form-group"><label class="form-label">아이디</label>
+        <input class="form-input" id="nf-id-${sid}"></div>
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">메모</label>
+        <input class="form-input" id="nf-memo-${sid}" placeholder="아이들에게 해 줄 말"></div>
+    </div>
+    <input type="hidden" id="nf-editing-${sid}" value="">
+    <button class="btn-sm success" style="margin-top:.4rem" onclick="submitStudentNote('${sid}')">쪽지 저장</button>
+    <button class="btn-sm outline" style="margin-top:.4rem" onclick="clearNoteForm('${sid}')">비우기</button>`;
+}
+
+function clearNoteForm(sid) {
+  ['site','url','id','memo','editing'].forEach(k => {
+    const el = document.getElementById('nf-' + k + '-' + sid); if (el) el.value = '';
+  });
+}
+
+function editStudentNote(sid, noteId) {
+  const n = DB.getStudentNotes(sid).find(x => x.id === noteId);
+  if (!n) return;
+  const set = (k, v) => { const el = document.getElementById('nf-' + k + '-' + sid); if (el) el.value = v || ''; };
+  set('kind', n.kind || 'account'); set('site', n.site); set('url', n.url);
+  set('id', n.loginId); set('memo', n.memo); set('editing', n.id);
+  notify('✏️ 내용을 바꾸고 [쪽지 저장]을 누르세요.');
+}
+
+function submitStudentNote(sid) {
+  const get = k => (document.getElementById('nf-' + k + '-' + sid) || {}).value || '';
+  const site = get('site').trim(), memo = get('memo').trim();
+  if (!site && !memo) { notify('⚠️ 사이트 이름이나 메모 중 하나는 적어 주세요.'); return; }
+  const editing = get('editing');
+  const base = editing ? (DB.getStudentNotes(sid).find(x => x.id === editing) || {}) : {};
+  DB.saveStudentNote(sid, {
+    id: editing || undefined, createdAt: base.createdAt,
+    kind: get('kind') || 'account',
+    site, url: get('url').trim(), loginId: get('id').trim(), memo,
+  });
+  clearNoteForm(sid);
+  renderStudentNotes(sid);
+  notify('✅ 쪽지를 저장했어요.');
+}
+
+function removeStudentNote(sid, noteId) {
+  if (!confirm('이 쪽지를 지울까요?')) return;
+  DB.deleteStudentNote(sid, noteId);
+  renderStudentNotes(sid);
+  notify('🗑️ 쪽지를 지웠어요.');
+}
+
+// ── 쪽지 일괄 주기 ─────────────────────────────────────────
+//  사이트 하나를 반 전체에 줄 때. 공통 정보는 위에 한 번, 아이디만 학생별로 넣는다.
+//  저장은 학생마다 개별 경로 한 건씩(DB.saveStudentNote) — 통짜 set 없음.
+function openBulkNotes() {
+  document.getElementById('m-bulk-note').classList.add('open');
+  renderBulkNotes();
+}
+
+function renderBulkNotes() {
+  const el = document.getElementById('bulk-note-body');
+  if (!el) return;
+  const students = DB.load().students || [];
+  el.innerHTML = `
+    ${_noteWarnHTML()}
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">사이트 이름</label>
+        <input class="form-input" id="bn-site" placeholder="예: 영어 복습앱"></div>
+      <div class="form-group"><label class="form-label">주소</label>
+        <input class="form-input" id="bn-url" placeholder="https://..."></div>
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">공통 메모 (모두에게 같이 들어갑니다)</label>
+        <input class="form-input" id="bn-memo"></div>
+    </div>
+
+    <div class="ms-label" style="margin-top:.8rem">붙여넣기 (선택)</div>
+    <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.3rem">
+      엑셀·한글 표에서 <b>이름 / 아이디</b> 두 칸을 복사해 붙여넣으면 아래 표가 채워집니다.
+      이름이 안 맞는 줄은 <span style="color:var(--red)">빨갛게</span> 표시되고 저장되지 않습니다.
+    </div>
+    <textarea class="form-input" id="bn-paste" rows="3"
+      style="font-family:ui-monospace,Consolas,monospace;font-size:.75rem"
+      placeholder="홍길동&#9;hong01&#10;김철수&#9;kim02"></textarea>
+    <button class="btn-sm outline" style="margin-top:.3rem" onclick="applyBulkPaste()">표에 채우기</button>
+
+    <div class="ms-label" style="margin-top:.8rem">학생별 아이디</div>
+    <div id="bn-unmatched" style="font-size:.72rem;color:var(--red);margin-bottom:.3rem"></div>
+    <div style="max-height:260px;overflow-y:auto">
+      ${students.map(st => `
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0">
+          <span style="width:5.5rem;font-size:.78rem;flex-shrink:0">${escHtml(st.name)}</span>
+          <input class="form-input" id="bn-id-${st.id}" style="flex:1" placeholder="아이디 (비우면 안 줌)">
+        </div>`).join('')}
+    </div>
+    <button class="btn-sm success" style="margin-top:.6rem" onclick="submitBulkNotes()">📝 적은 학생에게 한 번에 주기</button>`;
+}
+
+// 붙여넣은 표를 학생 행에 채운다. 이름이 안 맞으면 저장하지 않고 알려준다.
+function applyBulkPaste() {
+  const raw = (document.getElementById('bn-paste') || {}).value || '';
+  const students = DB.load().students || [];
+  const byName = new Map(students.map(st => [String(st.name).replace(/\s/g, ''), st]));
+  const unmatched = [];
+  let filled = 0;
+  const LF = String.fromCharCode(10), CR = String.fromCharCode(13);
+  raw.split(LF).forEach(rawLine => {
+    const line = rawLine.split(CR).join('');
+    if (!line.trim()) return;
+    const cols = line.split(/	|,|\s{2,}/).map(c => c.trim()).filter(Boolean);
+    if (cols.length < 2) { unmatched.push(line.trim()); return; }
+    const st = byName.get(cols[0].replace(/\s/g, ''));
+    if (!st) { unmatched.push(cols[0]); return; }
+    const input = document.getElementById('bn-id-' + st.id);
+    if (input) { input.value = cols[1]; filled++; }
+  });
+  const box = document.getElementById('bn-unmatched');
+  if (box) box.textContent = unmatched.length
+    ? ('⚠️ 이름을 못 찾은 줄 ' + unmatched.length + '개: ' + unmatched.join(', ') + ' — 이 줄은 저장되지 않습니다.')
+    : '';
+  notify(filled ? ('✅ ' + filled + '명 채웠어요.') : '⚠️ 채운 줄이 없어요.');
+}
+
+function submitBulkNotes() {
+  const site = (document.getElementById('bn-site') || {}).value.trim();
+  const url  = (document.getElementById('bn-url')  || {}).value.trim();
+  const memo = (document.getElementById('bn-memo') || {}).value.trim();
+  if (!site) { notify('⚠️ 사이트 이름을 적어 주세요.'); return; }
+  const students = DB.load().students || [];
+  const targets = students.filter(st => ((document.getElementById('bn-id-' + st.id) || {}).value || '').trim());
+  if (!targets.length) { notify('⚠️ 아이디를 적은 학생이 없어요.'); return; }
+  if (!confirm(targets.length + '명에게 "' + site + '" 쪽지를 줄까요?')) return;
+  targets.forEach(st => DB.saveStudentNote(st.id, {
+    kind: 'account', site, url, memo,
+    loginId: (document.getElementById('bn-id-' + st.id).value || '').trim(),
+  }));
+  closeModal();
+  notify('✅ ' + targets.length + '명에게 쪽지를 줬어요.');
 }
 
 function resetStudentStats(id) {
@@ -5535,6 +5721,7 @@ const BACKUP_NODES = [
   'settings', 'memories', 'memoryAlbums', 'emotionLogs', 'emotionReflections',
   'emotionAlerts', 'emotionPromptStats', 'weeklyGoals', 'weeklyReflections',
   'recorderLogs', 'recorderSongs', 'quizRecords', 'customWords', 'teacherWordSets',
+  'studentNotes',   // [NOTES-1] 교사가 학생에게 준 쪽지 — 잃으면 안 되는 데이터
 ];
 
 async function saveBackup(auto) {
