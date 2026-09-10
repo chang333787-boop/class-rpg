@@ -600,6 +600,23 @@ const DB = {
       return s;
     }).filter(s => s && s.id && s.name); // id/name 없는 껍데기 학생 노드 제외 (렌더 불가)
     // 중복 학생 제거 후 ID 기준 정렬 (순서 항상 고정)
+    //
+    // [DUP-STUDENT-1] students 에는 같은 학생이 두 벌 있다.
+    //   2026-03-14 까지 students/<배열인덱스> 로 저장하다가(1cd703d)
+    //   03-15 부터 students/<id> 로 바꿨는데(b46f0b0) 옛 숫자 키 노드를 옮기거나 지우지 않았다.
+    //   운영 DB 에 지금도 숫자 키(낡은 스냅샷) + id 키(현재 본)가 함께 있다.
+    //
+    //   아래 seen.set 은 "나중 것 승"이라 낡은 본이 이길 것처럼 보이지만 그렇지 않다.
+    //   Object.keys/values 는 **정수형 키를 항상 먼저(오름차순), 문자열 키를 그 뒤에** 돌려준다
+    //   (OrdinaryOwnPropertyKeys). 학생 id 는 항상 's' 로 시작하므로
+    //   (doAddStudents: 's' + Date.now(), 기본 학생 s1~s6) 정수형 키가 될 수 없다.
+    //   → 숫자 키가 먼저, id 키가 뒤 → id 본이 **항상** 이긴다. 우연이 아니라 명세다.
+    //
+    //   ⚠️ 다만 이 정확성은 **그 순서에 기대고 있다.**
+    //     여기에 키 정렬을 넣거나, 학생 id 형식을 숫자로 바꾸거나, Map·배열 등 다른 자료구조로
+    //     옮기면 **조용히 깨진다**(낡은 레벨·골드가 이겨 화면이 과거로 보이고, 그 상태로
+    //     저장되면 진행이 사라진다). 에러는 안 난다.
+    //     scripts/smoke-test.mjs 의 "학생 중복 시 id 키 본 우선" 검사가 이 자리를 지킨다.
     const seen = new Map();
     data.students.forEach(s => seen.set(s.id, s));
     data.students = Array.from(seen.values())
