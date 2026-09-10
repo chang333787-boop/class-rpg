@@ -887,6 +887,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 /* 모바일 전용 캐릭터 패널 (탭으로 전환) */
 /* ── 레이아웃 강제 모드 ── */
+/* [HUDBTN-1] 주의: 아래 force-desktop 6줄은 지금 도달할 수 없다.
+   이 클래스를 add하는 코드가 어디에도 없다(student.js의 applyLayout은 remove만 한다).
+   그래서 '🖥️ 데스크탑' 버튼은 이름이 말하는 일을 하지 못한다.
+   나중에 토글을 제대로 붙일 때 쓸 자리라 남겨 둔다. 지우지 말 것. */
 #s-game.force-desktop .side-panel  { display:flex!important; flex-direction:column; }
 #s-game.force-desktop .main-area   { display:block!important; }
 #s-game.force-desktop .mob-bottom-nav { display:none!important; }
@@ -962,6 +966,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 }
 
 @media(max-width:700px){
+  /* [HUDBTN-1] 폰에서는 상단 줄의 두 버튼을 뺀다.
+     · 🖥️ 데스크탑 — 700px 이하에서는 .side-panel이 어차피 숨겨져 데스크탑 배치가 나올 수 없고,
+       force-desktop을 add하는 코드도 없다. 두 모바일 배치를 오갈 뿐인데 이름이 화면과 맞지 않는다.
+     · 🔍 비율고정 — 2560px 기준으로 깔고 축소하는 기능이라 375px에서 배율이 0.146이 된다(글자를 못 읽는다).
+     빼도 잃는 기능이 없다. 배치는 폭에 따라 미디어쿼리가 고른다.
+     이미 켜 둔 기기가 갇히지 않도록 student.js의 applyScale()에서 좁은 폭이면 스케일을 걷어낸다. */
+  #layout-toggle-btn, #scale-mode-btn { display:none; }
   .game-body{
     grid-template-columns:1fr;
     overflow:visible;
