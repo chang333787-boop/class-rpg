@@ -1023,3 +1023,24 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ach-badge{font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:10px;flex-shrink:0;}
 .ach-badge.done{background:rgba(46,204,113,.2);color:var(--emerald);}
 .ach-badge.locked{background:rgba(255,255,255,.06);color:var(--txt3);}
+
+/* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════
+   기준 44×44px. @media (pointer: coarse) 안에서만 — 마우스 환경은 안 바뀐다.
+   파일 맨 끝에 두어 앞의 기본 규칙을 순서로 이긴다.
+   ══════════════════════════════════════════════════════════════ */
+@media (pointer: coarse){
+  /* student.css 에는 .btn-sm 기본 규칙이 아예 없었다 — 여기서 신설한다.
+     student.js 의 '신청' 버튼처럼 인라인 padding 이 있어도 min-height 는 먹는다. */
+  .btn-sm{min-height:44px;}
+  /* 앱에서 가장 작은 누를 거리(17×27)인데 모달마다 하나씩 있어 가장 자주 쓴다.
+     음수 margin 으로 옆 제목이 밀려나지 않게 한다. */
+  .modal-close{padding:.55rem;margin:-.55rem;min-width:44px;min-height:44px;}
+  .hud-ava{width:44px;height:44px;}
+  /* student.css:958 의 .mtab{padding:...!important}(768~1024px 태블릿 구간)가
+     여기를 이겨 40px 에 머문다. 그 자리를 넘으려면 여기도 !important 가 필요하다. */
+  .mtab{padding:.62rem 1rem!important;min-height:44px;}
+  .todo-btn{padding:.62rem 1rem;min-height:44px;}
+  /* 접기/펼치기 라벨 — cursor:pointer 인데 세로가 16px 뿐이었다.
+     padding 만으로는 44 에 못 미쳐 min-height 로 확실히 잡는다. */
+  .panel-label{padding:.7rem 0;margin-bottom:0;min-height:44px;}
+}

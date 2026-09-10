@@ -309,3 +309,20 @@ tr:hover td{background:rgba(255,255,255,.02);}
   .nav-item{padding:.8rem 1.2rem;min-height:44px;}
   .sidebar-bottom .btn-sm{min-height:44px;}
 }
+
+/* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════
+   기준 44×44px. 교사는 노트북 마우스로도 쓰므로 전부 키우면 데스크톱이 뭉툭해진다.
+   → @media (pointer: coarse) 안에서만 키운다. 마우스 환경은 한 픽셀도 안 바뀐다.
+   ⚠️ 이 버튼들은 admin.js 에서 **인라인 style 로 padding 이 박혀 있어**
+      CSS 의 padding 은 안 먹는다(예: admin.js 승급 카드의 승인·거절 버튼).
+      min-height/min-width 는 인라인 padding 과 충돌하지 않으므로 그것만 쓴다.
+   선례: 위쪽 [NARROW-1] 의 .sidebar-bottom .btn-sm{min-height:44px}
+   ══════════════════════════════════════════════════════════════ */
+@media (pointer: coarse){
+  .btn-sm{min-height:44px;}
+  /* ✕ 거절은 29×26 으로 가장 작은데, 누르면 되돌리기 어려워 오클릭 비용이 크다 */
+  .btn-sm.danger{min-width:44px;}
+  /* 사이드바 아래 "← 학생 화면으로" — 세로 17px 이라 padding 으로 키운다(인라인 padding 없음) */
+  /* padding 만으로는 39px 에 그쳐 min-height 로 확실히 잡는다 */
+  .sidebar-bottom a{display:block;padding:.7rem 0;min-height:44px;}
+}
