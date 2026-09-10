@@ -79,7 +79,7 @@ const MIME = {
   // 캐시버스터를 실제 HTML에 적힌 그대로 둔 채로 200 확인 (쿼리 있어도 실제 파일로 매핑되는지)
   const urls = [
     '/student.html', '/admin.html', '/kiosk.html',
-    '/gamedata.js?v=20260910c',
+    '/gamedata.js?v=20260910d',
     '/curriculum.js?v=20260909e', '/curriculum_review.js?v=20260907q', '/curriculum_reading.js?v=20260909a', '/figures.js?v=20260903a',
     '/student.js?v=20260910c', '/admin.js?v=20260910f', '/kiosk.js?v=20260713c',
     '/student.css?v=20260907f', '/admin.css?v=20260904k', '/kiosk.css?v=20260604',
@@ -142,7 +142,7 @@ for (const f of HTML_FILES) {
   else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
 
   // gamedata.js 캐시버스터 ?v=20260705 (2026-07-05 갱신 — 업적/씨앗 문구 수정 배포)
-  if (html.includes('gamedata.js?v=20260910c')) add('PASS', `${f}: gamedata.js?v=20260910c 캐시버스터`);
+  if (html.includes('gamedata.js?v=20260910d')) add('PASS', `${f}: gamedata.js?v=20260910d 캐시버스터`);
   else add('REVIEW', `${f}: gamedata.js 캐시버스터(?v=20260705) 미발견 — gamedata 갱신 시 확인 필요`);
 }
 
@@ -167,6 +167,41 @@ for (const f of HTML_FILES) {
     if (!exists(f)) { add('FAIL', `${f}: 파일 없음 (${label})`); continue; }
     if (re.test(read(f))) add('PASS', `${f}: ${label} 존재`);
     else add('FAIL', `${f}: ${label} 미발견`);
+  }
+}
+
+
+// ── [DUP-STUDENT-1] 학생 중복 시 id 키 본 우선 ──────────────────
+//  students 에는 옛 숫자 키(낡은 스냅샷)와 지금 id 키(현재 본)가 함께 있다.
+//  _normalizeArrays 의 "나중 것 승"이 맞게 동작하는 건 Object.keys 가
+//  정수형 키를 먼저 돌려주기 때문이다(gamedata.js 그 자리 주석 참고).
+//  그 전제가 깨지면 낡은 레벨·골드가 이겨 화면이 과거로 보이고, 그 상태로
+//  저장되면 진행이 사라진다 — 에러는 안 난다. 그래서 여기서 값으로 잡는다.
+{
+  const vm = await import('node:vm');
+  const OLD = { level: 16, gold: 34641 };
+  const NEW = { level: 21, gold: 50984 };
+  const ids = ['s1773621060764', 's1773621060765', 's1773621060766'];
+  const names = ['가나다', '라마바', '사아자'];
+  const raw = {};
+  raw['0'] = { pendingRewards: { r: { label: '껍데기' } } };          // id·name 없는 옛 노드
+  ids.forEach((id, i) => { raw[String(i + 1)] = { id, name: names[i], ...OLD }; });  // 낡은 본
+  ids.forEach((id, i) => { raw[id] = { id, name: names[i], ...NEW }; });            // 현재 본
+
+  try {
+    const sb = { console, window: {}, setTimeout,
+      document: { getElementById: () => null, querySelectorAll: () => [] },
+      localStorage: { getItem: () => null, setItem: () => {} }, alert: () => {} };
+    sb.globalThis = sb;
+    vm.createContext(sb);
+    vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+    const out = sb.__DB._normalizeArrays({ students: JSON.parse(JSON.stringify(raw)) }).students;
+    const okCount = out.length === ids.length;
+    const okWinner = out.every(s => s.level === NEW.level && s.gold === NEW.gold);
+    if (okCount && okWinner) add('PASS', `학생 중복 시 id 키 본 우선 (숫자 키 ${ids.length} + id 키 ${ids.length} → ${out.length}명, 최신값 채택)`);
+    else add('FAIL', `학생 중복 처리 깨짐 — ${out.length}명, 레벨 ${out.map(s => s.level).join('/')} (기대: ${ids.length}명 전원 ${NEW.level})`);
+  } catch (e) {
+    add('FAIL', `학생 중복 검사 실행 실패: ${e.message}`);
   }
 }
 
