@@ -422,7 +422,7 @@ function enterGame() {
   applyLayout(LAYOUT_MODE);
   // 비율고정 버튼 초기 상태 복원
   const sBtn = document.getElementById('scale-mode-btn');
-  if (sBtn) sBtn.textContent = SCALE_MODE ? '🔍 비율고정 ON' : '🔍 비율고정';
+  if (sBtn) sBtn.textContent = SCALE_MODE ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
   applyScale();
   renderAll();
   startAccessTimer();
@@ -1248,6 +1248,12 @@ function buildMainHTML() {
       <button class="btn-gold" onclick="event.stopPropagation();dismissRewardSeen()" style="padding:.4rem .9rem;font-size:.78rem;flex-shrink:0">확인</button>
     </div>`);
 
+  // [UI375-3] '선생님 확인 기다리는 중'은 여기(배너) 한 곳에만 둔다.
+  //   전에는 '오늘 할 일' 카드에도 같은 문장이 있어 홈에 두 번 나왔고,
+  //   학생이 할 일이 두 개인 줄 알았다(UI 점검 P0-4).
+  //   배너를 남기는 쪽을 골랐다 — 신청이 접수됐는지 알리는 것이 이 안내의 목적이고,
+  //   배너는 '할 일 더보기'를 펼치지 않아도 보인다.
+  //   '오늘 할 일'에는 학생이 지금 할 수 있는 것만 남긴다(기다리는 중은 할 게 없다).
   if (waitingCount > 0)
     alerts.push(`<div class="reward-banner" onclick="openRewardList()" style="margin-bottom:.6rem;opacity:.85;cursor:pointer">
       <div class="rb-icon">⏳</div>
@@ -1338,13 +1344,6 @@ function buildMainHTML() {
   // ── 오늘 할 일 카드 ──
   const todos = [];
 
-  // 승인된 보상은 자동 지급됨 (받기 버튼 단계 제거)
-  if (waitingCount > 0)
-    todos.push({type:'info', icon:'⏳', badge:waitingCount,
-      title:`선생님 확인 기다리는 중 ${waitingCount}개`,
-      sub:(s.pendingRewards||[]).filter(r=>!r.approved).slice(0,2).map(r=>r.label).join(' · '),
-      action:"openRewardList()", btnLabel:'보기'});
-
   // 쪽지 — 있으면 언제든 다시 볼 수 있게
   const myNoteCount = getMyNotes().length;
   if (myNoteCount > 0)
@@ -1390,6 +1389,7 @@ function buildMainHTML() {
       action:"openMonsterModal()", btnLabel:'도전'});
 
   // 6순위: 퀘스트 → 미션 섹션으로 통합했으므로 제거
+  //   '선생님 확인 기다리는 중'도 여기 두지 않는다 — 위 배너 한 곳에서만 알린다([UI375-3]).
 
   // 7순위: 힌트성
   const todayBook = (s.books||[]).find(b=>b.date===Utils.todayStr());
@@ -9340,7 +9340,7 @@ function applyLayout(mode) {
   game.classList.remove('force-mobile', 'force-desktop');
   if (mode === 'mobile') {
     game.classList.add('force-mobile');
-    if (btn) btn.textContent = '📱 모바일';
+    if (btn) btn.textContent = hudBtnText('📱', '모바일');
     const mainTab = document.getElementById('mob-main-tab');
     if (mainTab) {
       document.querySelectorAll('.main-tab-content, .mobile-char-panel').forEach(el => el.classList.remove('active-tab'));
@@ -9350,10 +9350,27 @@ function applyLayout(mode) {
       if (homeBtn) homeBtn.classList.add('active');
     }
   } else {
-    if (btn) btn.textContent = '🖥️ 데스크탑';
+    if (btn) btn.textContent = hudBtnText('🖥️', '데스크탑');
   }
   applyScale();
 }
+
+// [UI375-1] 375px 상단 줄이 오른쪽으로 잘린다(💻 데스크탑이 잘리고 🔍 비율고정은 안 보임).
+//   숨기면 폰에서 데스크탑으로 돌아갈 길이 없어지므로 글자만 빼고 아이콘은 남긴다.
+//   폭이 바뀌면(가로/세로 돌리기) 다시 맞춘다.
+const HUD_NARROW_PX = 430;
+function hudBtnText(icon, label) {
+  return window.innerWidth <= HUD_NARROW_PX ? icon : icon + ' ' + label;
+}
+function syncHudButtons() {
+  const lb = document.getElementById('layout-toggle-btn');
+  if (lb) lb.textContent = LAYOUT_MODE === 'mobile'
+    ? hudBtnText('📱', '모바일') : hudBtnText('🖥️', '데스크탑');
+  const sb = document.getElementById('scale-mode-btn');
+  if (sb) sb.textContent = SCALE_MODE
+    ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
+}
+window.addEventListener('resize', syncHudButtons);
 
 function toggleLayout() {
   applyLayout(LAYOUT_MODE === 'desktop' ? 'mobile' : 'desktop');
@@ -9363,7 +9380,7 @@ function toggleScaleMode() {
   SCALE_MODE = !SCALE_MODE;
   localStorage.setItem(STORAGE_KEYS.SCALE_MODE, SCALE_MODE);
   const btn = document.getElementById('scale-mode-btn');
-  if (btn) btn.textContent = SCALE_MODE ? '🔍 비율고정 ON' : '🔍 비율고정';
+  if (btn) btn.textContent = SCALE_MODE ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
   applyScale();
 }
 

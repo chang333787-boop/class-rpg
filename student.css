@@ -102,7 +102,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .hud-exp-bar{flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;min-width:0;}
 .hud-exp-fill{height:100%;background:linear-gradient(90deg,var(--emerald),#27AE60);border-radius:3px;transition:width .8s ease;}
 .hud-exp-txt{font-size:.6rem;color:var(--txt2);white-space:nowrap;flex-shrink:0;}
-.hud-badges{display:flex;gap:.5rem;flex-shrink:0;}
+.hud-badges{display:flex;gap:.5rem;flex-shrink:0;min-width:0;}
 .badge{display:flex;align-items:center;gap:.25rem;background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:.25rem .6rem;font-size:.8rem;font-weight:700;}
 .badge.lv{border-color:rgba(93,173,226,.4);color:var(--sky);}
@@ -127,10 +127,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .char-emoji{font-size:4rem;display:block;animation:floatY 4s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(217,164,65,.3));}
 .char-cname{font-weight:700;font-size:1.05rem;margin:.3rem 0 .1rem;}
 .char-job{font-size:.75rem;color:var(--sky);}
-.char-combat{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.7rem;}
+/* [UI375-2] 1fr 칸은 최소 너비가 '내용 전체'라 칸이 컨테이너보다 넓어진다
+   → 오른쪽(방어력·속도) 숫자가 화면 밖으로 밀린다. minmax(0,·)로 칸을 줄일 수 있게 한다. */
+.char-combat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.3rem;margin-top:.7rem;}
 .combat-stat{background:rgba(255,255,255,.04);border-radius:6px;padding:.35rem .55rem;
-  font-size:.78rem;display:flex;justify-content:space-between;align-items:center;}
-.combat-val{font-weight:700;color:var(--gold);}
+  font-size:.78rem;display:flex;justify-content:space-between;align-items:center;
+  gap:.3rem;min-width:0;}
+.combat-stat > span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.combat-val{font-weight:700;color:var(--gold);flex-shrink:0;}
 .panel-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:var(--r);padding:.8rem;}
 .panel-label{font-size:.72rem;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem;cursor:pointer;}
 /* 장비 그리드 — 5칸 세로 나열 */
