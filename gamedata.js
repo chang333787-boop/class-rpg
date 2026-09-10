@@ -910,6 +910,40 @@ const DB = {
   setAdminPw(pw) { this._fbAdminRef.set(pw); },
 
   getArtworks(studentId) { return (this.load().artworks||[]).filter(a => a.studentId === studentId); },
+  // [ARTFREE-1] 학생 통짜 set 대신 pendingRewards 한 갈래만 쓴다.
+  //   기존 submitArtwork가 saveStudent(CUR)로 학생 전체를 덮어써서, 그 사이 다른 곳에서 바뀐
+  //   값(경험치·골드 등)을 되돌리는 자리였다. 여기서는 students/<id>/pendingRewards만 건드린다.
+  addPendingReward(student, reward) {
+    const db = this.load();
+    const s = (db.students || []).find(x => x.id === student.id) || student;
+    s.pendingRewards = [...(s.pendingRewards || []), reward];
+    this._cache = db;
+    if (student !== s) student.pendingRewards = s.pendingRewards;
+    return this._fbRef.child('students/' + s.id + '/pendingRewards').set(s.pendingRewards)
+      .catch(e => this._onSaveError(e));
+  },
+
+  // [ARTFREE-1] 좋아요 — artworks/<id>/likes/<studentId> 한 칸만 쓴다(작품 통짜 set 금지).
+  setArtworkLike(artId, studentId, on) {
+    const db = this.load();
+    const a = (db.artworks || []).find(x => x.id === artId);
+    if (!a) return Promise.resolve();
+    a.likes = a.likes || {};
+    if (on) a.likes[studentId] = true; else delete a.likes[studentId];
+    this._cache = db;
+    const ref = this._fbRef.child('artworks/' + artId + '/likes/' + studentId);
+    return (on ? ref.set(true) : ref.remove()).catch(e => this._onSaveError(e));
+  },
+
+  // [ARTFREE-1] 작품 내리기 — 갤러리에서만 감춘다(지우지 않는다). hidden 한 칸만 쓴다.
+  hideArtwork(id, hidden) {
+    const db = this.load();
+    const a = (db.artworks || []).find(x => x.id === id);
+    if (a) { a.hidden = !!hidden; this._cache = db; }
+    return this._fbRef.child('artworks/' + id + '/hidden').set(!!hidden)
+      .catch(e => this._onSaveError(e));
+  },
+
   deleteArtwork(id) {
     const db = this.load();
     db.artworks = (db.artworks||[]).filter(a => a.id !== id);
