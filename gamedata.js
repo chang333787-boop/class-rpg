@@ -777,7 +777,19 @@ const DB = {
   //  왜 BACKUP_NODES 에 넣지 않는가:
   //    잃어도 다시 쌓이는 통계다. 넣으면 백업이 또 커진다 —
   //    2026-09-10 기준 backups 가 이미 루트 7.6MB 의 73%(5.6MB)를 차지하고 있다.
-  GOLD_SOURCES: ['farm', 'battle', 'infinite', 'quest', 'study', 'artwork'],
+  GOLD_SOURCES: ['farm', 'battle', 'infinite', 'quest', 'study', 'artwork', 'english'],
+
+  //  교사 승인 보상의 종류(boardQuestType/type) → 위 경로 이름.
+  //  · daily·weekly·special 은 다 '퀘스트'라 quest 로 묶는다. 감사 때 셋을 나눠 볼 일이 없었다.
+  //  · book·emotion·promotion 은 **일부러 뺐다.** 7경로에 없고, 셋 다 questLogs 에 이미 남는다
+  //    (2026-09-10 실측 기준 셋을 합쳐 1,705G — 학급 누적 254,422G 의 0.7%).
+  //    나중에 넣기로 하면 GOLD_SOURCES 에 이름 하나 추가하고 이 표에 한 줄 더하면 된다.
+  GOLD_SOURCE_BY_TYPE: {
+    quest: 'quest', daily: 'quest', weekly: 'quest', special: 'quest',
+    study: 'study', artwork: 'artwork', english: 'english',
+  },
+  //  모르는 종류면 null 을 준다 → logGold 가 조용히 넘어간다(기록 안 함, 지급은 정상).
+  goldSourceOf(type) { return this.GOLD_SOURCE_BY_TYPE[type] || null; },
   logGold(studentId, source, amount) {
     try {
       const amt = Math.round(Number(amount) || 0);

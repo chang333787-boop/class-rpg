@@ -965,7 +965,12 @@ function approveReward(student, reward) {
   // 1. EXP / Gold / Level
   student.exp   = (student.exp||0)  + (reward.exp||0);
   student.gold  = (student.gold||0) + (reward.gold||0);
-  if ((reward.gold||0) > 0) student.totalGold = (student.totalGold||0) + reward.gold; // [R7] 누적 골드
+  if ((reward.gold||0) > 0) {
+    student.totalGold = (student.totalGold||0) + reward.gold; // [R7] 누적 골드
+    // [GOLD-LOG-1] 승인 시점이 곧 지급 시점이다. 기록 실패는 무시된다(logGold 안에서 catch) —
+    //   교사가 승인을 눌렀는데 로그 때문에 지급이 안 되는 일은 없어야 한다.
+    DB.logGold(student.id, DB.goldSourceOf(reward.boardQuestType || reward.type), reward.gold);
+  }
   student.level = Utils.levelFromExp(student.exp);
 
   // 2. 스탯 증가 (승인 즉시 지급)
@@ -2576,7 +2581,12 @@ function confirmBookRecord(studentId, pendingId) {
   // EXP/골드/레벨 지급
   s.exp  = (s.exp||0)  + (p.exp||30);
   s.gold = (s.gold||0) + (p.gold||0);
-  if ((p.gold||0) > 0) s.totalGold = (s.totalGold||0) + p.gold; // [R7] 누적 골드
+  if ((p.gold||0) > 0) {
+    s.totalGold = (s.totalGold||0) + p.gold; // [R7] 누적 골드
+    // [GOLD-LOG-1] type 'book' 은 아직 GOLD_SOURCE_BY_TYPE 에 없어 **기록되지 않는다**(지급은 정상).
+    //   호출을 미리 붙여 둔다 — 독서를 경로로 넣기로 하면 그 표에 한 줄만 더하면 된다.
+    DB.logGold(s.id, DB.goldSourceOf(p.boardQuestType || p.type || 'book'), p.gold);
+  }
   s.level = Utils.levelFromExp(s.exp);
 
   // 퀘스트 로그 저장
@@ -4197,7 +4207,10 @@ function completeQuestForStudent(questId, studentId) {
   // 보상 지급
   s.exp   = (s.exp||0)  + bq.exp;
   s.gold  = (s.gold||0) + bq.gold;
-  if ((bq.gold||0) > 0) s.totalGold = (s.totalGold||0) + bq.gold; // [R7] 누적 골드
+  if ((bq.gold||0) > 0) {
+    s.totalGold = (s.totalGold||0) + bq.gold; // [R7] 누적 골드
+    DB.logGold(s.id, DB.goldSourceOf(bq.type), bq.gold);   // [GOLD-LOG-1]
+  }
   s.level = Utils.levelFromExp(s.exp);
   // [A3] 교사가 설정한 능력치 수치(statVal)를 반영 — 기존엔 항상 +1이라 학생 신청 경로와 달랐다
   const statGain = Math.round((parseFloat(bq.statVal) || 1) * 10) / 10;
