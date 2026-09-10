@@ -102,6 +102,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .hud-exp-bar{flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;min-width:0;}
 .hud-exp-fill{height:100%;background:linear-gradient(90deg,var(--emerald),#27AE60);border-radius:3px;transition:width .8s ease;}
 .hud-exp-txt{font-size:.6rem;color:var(--txt2);white-space:nowrap;flex-shrink:0;}
+/* [WORDS-1] EXP 가 무슨 말인지 한 번만 알려 준다. 숫자(40 / 5020 EXP)는 그대로 둔다.
+   좁은 폭에서는 감춘다 — 431px 에 넣어 보니 EXP 바가 41px 까지 눌렸다.
+   기준은 700px — [HUDBTN-1] 이 상단 두 버튼을 빼는 것과 같은 자리다. */
+.hud-exp-label{font-size:.6rem;color:var(--txt3);white-space:nowrap;flex-shrink:0;}
+@media(max-width:700px){ .hud-exp-label{display:none;} }
+/* [WORDS-1] 상단 두 버튼 — student.html 인라인 style 을 그대로 옮겨 온 것.
+   클래스로 빼야 아래 [TOUCH-44] 에서 44px 을 줄 수 있다. */
+.hud-mini-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  color:var(--txt2);border-radius:8px;padding:.2rem .5rem;font-size:.7rem;
+  cursor:pointer;white-space:nowrap;}
 .hud-badges{display:flex;gap:.5rem;flex-shrink:0;min-width:0;}
 .badge{display:flex;align-items:center;gap:.25rem;background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:.25rem .6rem;font-size:.8rem;font-weight:700;}
@@ -889,7 +899,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* ── 레이아웃 강제 모드 ── */
 /* [HUDBTN-1] 주의: 아래 force-desktop 6줄은 지금 도달할 수 없다.
    이 클래스를 add하는 코드가 어디에도 없다(student.js의 applyLayout은 remove만 한다).
-   그래서 '🖥️ 데스크탑' 버튼은 이름이 말하는 일을 하지 못한다.
+   그래서 '🖥️ 넓게 보기' 버튼은 이름이 말하는 일을 하지 못한다.
    나중에 토글을 제대로 붙일 때 쓸 자리라 남겨 둔다. 지우지 말 것. */
 #s-game.force-desktop .side-panel  { display:flex!important; flex-direction:column; }
 #s-game.force-desktop .main-area   { display:block!important; }
@@ -967,9 +977,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 @media(max-width:700px){
   /* [HUDBTN-1] 폰에서는 상단 줄의 두 버튼을 뺀다.
-     · 🖥️ 데스크탑 — 700px 이하에서는 .side-panel이 어차피 숨겨져 데스크탑 배치가 나올 수 없고,
+     · 🖥️ 넓게 보기 — 700px 이하에서는 .side-panel이 어차피 숨겨져 데스크탑 배치가 나올 수 없고,
        force-desktop을 add하는 코드도 없다. 두 모바일 배치를 오갈 뿐인데 이름이 화면과 맞지 않는다.
-     · 🔍 비율고정 — 2560px 기준으로 깔고 축소하는 기능이라 375px에서 배율이 0.146이 된다(글자를 못 읽는다).
+     · 🔍 화면 맞춤 — 2560px 기준으로 깔고 축소하는 기능이라 375px에서 배율이 0.146이 된다(글자를 못 읽는다).
      빼도 잃는 기능이 없다. 배치는 폭에 따라 미디어쿼리가 고른다.
      이미 켜 둔 기기가 갇히지 않도록 student.js의 applyScale()에서 좁은 폭이면 스케일을 걷어낸다. */
   #layout-toggle-btn, #scale-mode-btn { display:none; }
@@ -1043,4 +1053,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   /* 접기/펼치기 라벨 — cursor:pointer 인데 세로가 16px 뿐이었다.
      padding 만으로는 44 에 못 미쳐 min-height 로 확실히 잡는다. */
   .panel-label{padding:.7rem 0;margin-bottom:0;min-height:44px;}
+  /* [WORDS-1] 상단 두 버튼(넓게 보기 / 화면 맞춤). 700px 이하에서는 숨겨지므로
+     실제로 커지는 곳은 태블릿 이상 터치 화면이다. */
+  .hud-mini-btn{min-height:44px;}
 }
