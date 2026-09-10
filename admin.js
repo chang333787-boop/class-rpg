@@ -942,6 +942,7 @@ function approveReward(student, reward) {
       artUrl:  reward.artUrl   || '',
       comment: reward.artDesc  || '',
       subject: reward.subject  || '',
+      kind:    reward.kind     || 'lesson',   // [ARTFREE-1] 수업 작품 / 자유 작품 구분
       date:    reward.date     || Utils.todayStr(),
     });
   } else if (reward.type === 'book') {
@@ -2005,25 +2006,45 @@ function renderRank() {
 // ══════════════════════════════════════════════════
 //  ARTWORK 관리 (학생이 올린 작품 승인/반려)
 // ══════════════════════════════════════════════════
+// [ARTFREE-1] 수업 작품과 자유 작품을 갈라 본다. '전체'가 기본.
+let ART_KIND_FILTER = 'all';   // 'all' | 'lesson' | 'free'
+function setArtKindFilter(k) {
+  ART_KIND_FILTER = k;
+  renderArtworkPending(); renderArtworkAdmin();
+}
+const artKindOf = x => (x && x.kind) || 'lesson';   // 예전 데이터는 kind가 없다 → 수업 작품으로 본다
+function artKindChips() {
+  return `<div style="display:flex;gap:.35rem;padding:.6rem 1.2rem">
+    ${[['all', '전체'], ['lesson', '🎨 수업'], ['free', '✏️ 자유']].map(k => `
+      <button class="btn-sm ${ART_KIND_FILTER === k[0] ? '' : 'outline'}" style="font-size:.72rem"
+        onclick="setArtKindFilter('${k[0]}')">${k[1]}</button>`).join('')}
+  </div>`;
+}
+
 function renderArtworkPending() {
   const students = DB.getStudents();
   const pending  = [];
   students.forEach(s => {
-    (s.pendingRewards||[]).filter(r=>r.type==='artwork').forEach(r => {
-      pending.push({student:s, ...r});
-    });
+    (s.pendingRewards||[]).filter(r=>r.type==='artwork')
+      .filter(r => ART_KIND_FILTER === 'all' || artKindOf(r) === ART_KIND_FILTER)
+      .forEach(r => {
+        pending.push({student:s, ...r});
+      });
   });
   const el = document.getElementById('artwork-pending-list');
   if (!el) return;
   if (pending.length === 0) {
-    el.innerHTML = '<div style="padding:1rem;color:var(--txt3);font-size:.83rem;text-align:center">대기 중인 작품이 없어요</div>';
+    el.innerHTML = artKindChips() + '<div style="padding:1rem;color:var(--txt3);font-size:.83rem;text-align:center">대기 중인 작품이 없어요</div>';
     return;
   }
-  el.innerHTML = pending.map(item => `
+  el.innerHTML = artKindChips() + pending.map(item => `
     <div style="padding:.9rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.6rem">
         <span style="font-size:1.2rem">${item.student.avatar}</span>
         <span style="font-weight:700">${item.student.name}</span>
+        ${artKindOf(item) === 'free'
+          ? '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(93,173,226,.16);color:var(--sky)">자유</span>'
+          : '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(46,204,113,.16);color:var(--emerald)">수업</span>'}
         <span style="font-size:.78rem;color:var(--txt3)">· ${escHtml(item.artTitle||'')}</span>
         <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">${item.date||''}</span>
       </div>
@@ -2174,7 +2195,8 @@ function adminLbNav(dir) {
 
 function renderArtworkAdmin() {
   const db = DB.load();
-  const allArtworks = (db.artworks||[]).slice().reverse();
+  const allArtworks = (db.artworks||[]).slice().reverse()
+    .filter(a => ART_KIND_FILTER === 'all' || artKindOf(a) === ART_KIND_FILTER);   // [ARTFREE-1]
   const students = DB.getStudents();
   const el = document.getElementById('artwork-admin-list');
   if (!el) return;
@@ -2261,6 +2283,8 @@ function renderArtworkAdmin() {
             <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
               <button class="btn-sm outline" style="font-size:.66rem;padding:.2rem .45rem"
                 onclick="openEditArtworkModal('${a.id}')">✏️ 편집</button>
+              <button class="btn-sm outline" style="font-size:.66rem;padding:.2rem .45rem"
+                onclick="toggleArtworkHidden('${a.id}')">${a.hidden ? '👁️ 다시 걸기' : '🙈 내리기'}</button>
               <button class="btn-sm danger" style="font-size:.66rem;padding:.2rem .45rem"
                 onclick="deleteArtwork('${a.id}')">🗑️</button>
             </div>
@@ -3765,6 +3789,17 @@ function dedupeAll() {
 
   notify('✅ 중복 데이터 정리 완료!');
   renderAll();
+}
+
+// [ARTFREE-1] 작품 내리기 — 지우지 않고 갤러리에서만 감춘다(부적절한 사진을 즉시 뺄 수단).
+//   hidden 한 칸만 쓴다(작품 통짜 set 아님). 다시 걸 수도 있다.
+function toggleArtworkHidden(id) {
+  const a = (DB.load().artworks||[]).find(x => x.id === id);
+  if (!a) return;
+  const next = !a.hidden;
+  DB.hideArtwork(id, next);
+  notify(next ? '작품을 내렸어요 (우리 반 그림에서 안 보입니다)' : '작품을 다시 걸었어요');
+  renderArtworkAdmin();
 }
 
 function deleteArtwork(id) {

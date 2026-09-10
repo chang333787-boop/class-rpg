@@ -7458,10 +7458,11 @@ async function submitArtwork() {
         document.getElementById('aw-progress-text').textContent = '완료! 선생님 확인 대기 중...';
 
         // pendingRewards에 작품 승인 요청 추가
-        CUR.pendingRewards = CUR.pendingRewards || [];
-        CUR.pendingRewards.push({
+        // [ARTFREE-1] 학생 통짜 set → pendingRewards 한 갈래만. 그 사이 바뀐 경험치·골드를 되돌리지 않는다.
+        DB.addPendingReward(CUR, {
           id: 'art_' + Date.now(),
           type: 'artwork',
+          kind: 'lesson',
           label: `🎨 "${title}" 작품 제출`,
           artTitle: title,
           artDesc: desc,
@@ -7471,7 +7472,6 @@ async function submitArtwork() {
           icon: '🎨',
           date: Utils.todayStr(),
         });
-        DB.saveStudent(CUR);
 
         // 폼 초기화
         setTimeout(() => {
@@ -10787,6 +10787,243 @@ window.onDbSaveError = () => toast('⚠️ 저장에 실패했어요. 인터넷�
 const STUDY_PER_DAY = 10;   // 하루 분량
 
 // ══════════════════════════════════════════════════
+//  [ARTFREE-1] 우리 반 작품 올리기 — 수업과 무관하게 아무 그림이나 올리는 통로
+//  · 디지털 드로잉 결과물이 주 용도라 제목을 안 써도 올라간다(수업 작품은 기존 규칙 그대로).
+//  · 올리면 '내 작품'에는 바로 보이고 '확인 중' 딱지가 붙는다.
+//    선생님이 확인해야 '우리 반 그림'에 걸린다 — 그냥 올리는 느낌과 안전을 함께.
+//  · 저장은 기존 Storage artworks/ 경로를 그대로 쓰고 파일명만 free_ 로 구분한다.
+//  · 학생 통짜 set을 하지 않는다(DB.addPendingReward가 pendingRewards 한 갈래만 쓴다).
+// ══════════════════════════════════════════════════
+const FREE_ART_EXP = 0;          // 자유 작품 보상 — 갤러리에 걸리는 것 자체가 보상(값만 바꾸면 지급)
+const FREE_ART_GOLD = 0;
+const FREE_ART_MAX_DAY = 5;      // 하루 올릴 수 있는 장수
+const FREE_ART_MAX_TOTAL = 30;   // 한 사람이 쌓아 둘 수 있는 장수
+const FREE_ART_PX = 1200;        // 드로잉은 800px이면 선이 뭉갠다
+
+let _afTab = 'class';            // 'class' 우리 반 그림 · 'mine' 내 작품
+let _afBlob = null, _afName = '';
+
+function myFreeArtCount() {
+  const today = Utils.todayStr();
+  const mine = DB.getArtworks(CUR.id).filter(a => (a.kind || 'lesson') === 'free');
+  const pend = (CUR.pendingRewards || []).filter(r => r.type === 'artwork' && r.kind === 'free');
+  return {
+    today: mine.filter(a => a.date === today).length + pend.filter(r => r.date === today).length,
+    total: mine.length + pend.length,
+  };
+}
+// 갤러리에 거는 목록 — 승인됐고 내려지지 않은 것
+function galleryArtworks() {
+  return (DB.load().artworks || []).filter(a => a && !a.hidden).slice().reverse();
+}
+function artLikeCount(a) { return Object.keys(a.likes || {}).length; }
+function iLikedArt(a) { return !!(a.likes || {})[CUR.id]; }
+function toggleArtLike(id) {
+  const a = (DB.load().artworks || []).find(x => x.id === id);
+  if (!a) return;
+  DB.setArtworkLike(id, CUR.id, !iLikedArt(a));
+  renderArtFree();
+}
+
+function openArtFree(tab) {
+  _afTab = tab || 'class';
+  _afBlob = null; _afName = '';
+  const el = _artFreeEl();
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  renderArtFree();
+}
+function closeArtFree() {
+  const el = document.getElementById('m-artfree');
+  if (el) el.style.display = 'none';
+  document.body.style.overflow = '';
+  _afBlob = null;
+  if (typeof renderArtworks === 'function' && document.getElementById('artwork-list')) renderArtworks();
+}
+function _artFreeEl() {
+  let el = document.getElementById('m-artfree');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'm-artfree';
+  el.style.cssText = 'position:fixed;inset:0;z-index:8500;background:#14130f;display:none;flex-direction:column';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;background:#1b1a17;
+      border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0">
+      <span style="font-weight:800;color:var(--gold);flex:1">🎨 우리 반 작품</span>
+      <button onclick="closeArtFree()" aria-label="닫기" style="background:none;border:none;color:var(--txt);
+        font-size:1.35rem;cursor:pointer;padding:.1rem .4rem;font-family:inherit">✕</button>
+    </div>
+    <div id="artfree-body" style="flex:1;overflow-y:auto;padding:.9rem"></div>`;
+  document.body.appendChild(el);
+  return el;
+}
+
+// 사진 고르기 — 찍기와 파일 고르기 둘 다
+function pickArtFree(useCamera) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  if (useCamera) inp.setAttribute('capture', 'environment');
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    _afName = f.name || '';
+    try {
+      _afBlob = await resizeImage(f, FREE_ART_PX);
+      renderArtFree('upload');
+    } catch (e) { toast('사진을 읽지 못했어요'); }
+  };
+  inp.click();
+}
+
+async function submitArtFree() {
+  if (!_afBlob) { toast('먼저 그림을 골라 주세요'); return; }
+  const raw = (document.getElementById('af-title') || {}).value || '';
+  const title = raw.trim() || '제목 없는 그림';
+  const cnt = myFreeArtCount();
+  if (cnt.today >= FREE_ART_MAX_DAY) { toast(`오늘은 ${FREE_ART_MAX_DAY}장까지 올릴 수 있어요`); return; }
+  if (cnt.total >= FREE_ART_MAX_TOTAL) { toast(`작품은 ${FREE_ART_MAX_TOTAL}장까지 모을 수 있어요`); return; }
+
+  renderArtFree('uploading');
+  try {
+    const filename = 'artworks/free_' + CUR.id + '_' + Date.now() + '.jpg';
+    const ref = firebase.storage().ref(filename);
+    const task = ref.put(_afBlob);
+    task.on('state_changed',
+      snap => {
+        const bar = document.getElementById('af-bar');
+        if (bar && snap.totalBytes) bar.style.width = Math.round(snap.bytesTransferred / snap.totalBytes * 100) + '%';
+      },
+      err => { console.warn('[artfree] 업로드 실패', err); renderArtFree('failed'); },
+      async () => {
+        try {
+          const url = await ref.getDownloadURL();
+          // 학생 통짜 set을 하지 않는다 — pendingRewards 한 갈래만 쓴다
+          await DB.addPendingReward(CUR, {
+            id: 'art_' + Date.now(),
+            type: 'artwork', kind: 'free',
+            label: `🎨 "${title}" 그림 올림`,
+            artTitle: title, artDesc: '', artUrl: url, subject: '',
+            exp: FREE_ART_EXP, gold: FREE_ART_GOLD, icon: '🎨',
+            date: Utils.todayStr(),
+          });
+          _afBlob = null;
+          _afTab = 'mine';
+          renderArtFree();
+          toast('🎨 올렸어요! 선생님이 확인하면 우리 반 그림에 걸려요');
+          if (typeof renderMain === 'function') { renderMain(); renderMobile(); }
+        } catch (e) { console.warn('[artfree] 저장 실패', e); renderArtFree('failed'); }
+      }
+    );
+  } catch (e) { console.warn('[artfree] 올리기 오류', e); renderArtFree('failed'); }
+}
+
+function renderArtFree(mode) {
+  const body = document.getElementById('artfree-body');
+  if (!body) return;
+  const cnt = myFreeArtCount();
+  const tabs = `
+    <div style="display:flex;gap:.4rem;margin-bottom:.9rem">
+      ${[['class', '우리 반 그림'], ['mine', '내 작품']].map(t => `
+        <button onclick="_afTab='${t[0]}';renderArtFree()"
+          style="flex:1;padding:.6rem;border-radius:10px;font-family:inherit;font-size:.92rem;cursor:pointer;
+            border:1px solid ${_afTab === t[0] ? 'rgba(200,150,46,.45)' : 'rgba(255,255,255,.12)'};
+            background:${_afTab === t[0] ? 'rgba(200,150,46,.16)' : 'rgba(255,255,255,.04)'};
+            color:${_afTab === t[0] ? 'var(--gold)' : 'var(--txt3)'};font-weight:${_afTab === t[0] ? '700' : '400'}">
+          ${t[1]}</button>`).join('')}
+    </div>`;
+
+  // 올리기 칸
+  let up = '';
+  if (mode === 'uploading') {
+    up = `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1rem;margin-bottom:.9rem">
+      <div style="font-weight:700;margin-bottom:.5rem">올리는 중이에요</div>
+      <div style="height:9px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden">
+        <div id="af-bar" style="height:100%;width:8%;background:var(--sky);border-radius:99px;transition:width .2s"></div>
+      </div>
+      <div style="font-size:.8rem;color:var(--txt3);margin-top:.5rem">잠깐만 기다려 주세요</div></div>`;
+  } else if (mode === 'failed') {
+    up = `<div style="border:1px solid rgba(210,112,90,.5);background:rgba(210,112,90,.12);border-radius:14px;padding:1rem;margin-bottom:.9rem">
+      <div style="font-weight:700;color:var(--red)">😢 올리지 못했어요</div>
+      <div style="font-size:.85rem;color:var(--txt3);margin:.4rem 0 .7rem">인터넷이 잠깐 끊긴 것 같아요. 고른 그림은 그대로 있어요.</div>
+      <div style="display:flex;gap:.5rem">
+        <button onclick="submitArtFree()" style="flex:1;padding:.7rem;border-radius:10px;border:none;
+          background:var(--gold);color:#191510;font-family:inherit;font-weight:700;cursor:pointer">다시 올리기</button>
+        <button onclick="renderArtFree('upload')" style="flex:1;padding:.7rem;border-radius:10px;
+          border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--txt);
+          font-family:inherit;cursor:pointer">나중에 하기</button>
+      </div></div>`;
+  } else if (_afTab === 'mine' || mode === 'upload') {
+    const has = !!_afBlob;
+    up = `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1rem;margin-bottom:.9rem">
+      <div style="display:flex;gap:.6rem;margin-bottom:${has ? '.8rem' : '0'}">
+        <button onclick="pickArtFree(true)" style="flex:1;padding:1rem .5rem;border-radius:12px;cursor:pointer;
+          border:1px dashed rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:var(--txt);font-family:inherit">
+          <div style="font-size:1.5rem">📷</div>사진 찍기</button>
+        <button onclick="pickArtFree(false)" style="flex:1;padding:1rem .5rem;border-radius:12px;cursor:pointer;
+          border:1px dashed rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:var(--txt);font-family:inherit">
+          <div style="font-size:1.5rem">🖼️</div>파일 고르기</button>
+      </div>
+      ${has ? `
+        <div style="font-size:.82rem;color:var(--txt3);margin-bottom:.5rem">고른 그림: ${escHtml(_afName || '그림')}</div>
+        <input id="af-title" placeholder="제목 (안 써도 괜찮아요)" maxlength="30"
+          style="width:100%;padding:.75rem;border-radius:10px;border:1px solid rgba(255,255,255,.12);
+            background:#191816;color:var(--txt);font-family:inherit;font-size:1rem">
+        <button onclick="submitArtFree()" style="width:100%;margin-top:.7rem;padding:.9rem;border-radius:12px;
+          border:none;background:var(--gold);color:#191510;font-family:inherit;font-size:1.05rem;font-weight:800;cursor:pointer">올리기</button>
+        <div style="font-size:.78rem;color:var(--txt3);text-align:center;margin-top:.5rem">
+          오늘 ${cnt.today}장 올렸어요 · 하루 ${FREE_ART_MAX_DAY}장까지</div>` : ''}
+    </div>`;
+  }
+
+  // 목록
+  const tag = (t, c, bg) => `<span style="display:inline-block;font-size:.68rem;padding:.1rem .45rem;border-radius:99px;margin-right:.25rem;background:${bg};color:${c}">${t}</span>`;
+  let list = '';
+  if (_afTab === 'class') {
+    const arts = galleryArtworks();
+    list = arts.length === 0
+      ? `<div style="text-align:center;padding:2.5rem 0;color:var(--txt3);font-size:.9rem">아직 걸린 그림이 없어요 🎨</div>`
+      : `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem">${arts.map(a => {
+          const who = (DB.getStudent(a.studentId) || {}).name || '친구';
+          const liked = iLikedArt(a), n = artLikeCount(a);
+          return `<div style="min-width:0;border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04)">
+            <img src="${escHtml(a.artUrl || '')}" alt="" loading="lazy"
+              style="width:100%;height:110px;object-fit:cover;display:block;background:#0f0e0c">
+            <div style="padding:.5rem .55rem">
+              <div style="font-size:.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(a.title || '제목 없는 그림')}</div>
+              <div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:var(--txt3);margin-top:.2rem">
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(who)}</span>
+                <button onclick="toggleArtLike('${a.id}')" style="background:none;border:none;cursor:pointer;
+                  font-family:inherit;font-size:.75rem;padding:.1rem .2rem;color:${liked ? 'var(--red)' : 'var(--txt3)'}">
+                  ${liked ? '❤️' : '🤍'} ${n}</button>
+              </div>
+            </div></div>`;
+        }).join('')}</div>`;
+  } else {
+    const mine = DB.getArtworks(CUR.id).slice().reverse();
+    const pend = (CUR.pendingRewards || []).filter(r => r.type === 'artwork').slice().reverse();
+    const rows = [
+      ...pend.map(r => ({ url: r.artUrl, title: r.artTitle, kind: r.kind || 'lesson', wait: true })),
+      ...mine.map(a => ({ url: a.artUrl, title: a.title, kind: a.kind || 'lesson', wait: false, hidden: a.hidden })),
+    ];
+    list = rows.length === 0
+      ? `<div style="text-align:center;padding:2.5rem 0;color:var(--txt3);font-size:.9rem">아직 올린 그림이 없어요<br><span style="font-size:.8rem">위에서 첫 그림을 올려 보세요</span></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem">${rows.map(r => `
+          <div style="min-width:0;border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04)">
+            <img src="${escHtml(r.url || '')}" alt="" loading="lazy"
+              style="width:100%;height:110px;object-fit:cover;display:block;background:#0f0e0c">
+            <div style="padding:.5rem .55rem">
+              <div style="font-size:.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.title || '제목 없는 그림')}</div>
+              <div style="margin-top:.25rem">
+                ${r.kind === 'free' ? tag('자유', 'var(--sky)', 'rgba(93,173,226,.16)') : tag('수업', 'var(--emerald)', 'rgba(46,204,113,.16)')}
+                ${r.wait ? tag('확인 중', 'var(--gold)', 'rgba(200,150,46,.18)') : ''}
+                ${r.hidden ? tag('내려짐', 'var(--txt3)', 'rgba(255,255,255,.08)') : ''}
+              </div>
+            </div></div>`).join('')}</div>`;
+  }
+  body.innerHTML = tabs + up + list;
+}
+
+// ══════════════════════════════════════════════════
 //  [MASTERY-1] 문항별 숙달도(별 0~5)와 복습 주기
 //  · 새로 저장하는 것이 없다. 이미 쌓이는 problemRecords(문항별 정답 여부 + 날짜)를
 //    날짜순으로 재생해 문항마다 별과 '다음 복습일'을 계산한다 → 학생 스키마·백업 그대로.
@@ -10928,7 +11165,21 @@ function buildStudyCardHTML(s) {
   const cleared = done >= STUDY_PER_DAY;
   const pct = done > 0 ? Math.round(right / done * 100) : 0;
 
-  return `
+  // [ARTFREE-1] 그림 올리기는 집 탭 안쪽에 있어 아이들이 못 찾았다 — 홈에서 바로 들어가게 한다
+  const artCard = `
+    <div class="today-card" onclick="openArtFree('class')"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(200,150,46,.3);margin-top:.5rem">
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:1.4rem">🎨</span>
+        <div style="flex:1">
+          <div style="font-size:.85rem;font-weight:800;color:var(--gold)">우리 반 작품</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">그린 그림을 올리고 친구들 작품도 봐요</div>
+        </div>
+        <span style="color:var(--txt3)">▶</span>
+      </div>
+    </div>`;
+
+  return artCard + `
     <div class="today-card" onclick="openStudyModal()"
       style="cursor:pointer;grid-column:1/-1;border:1px solid ${cleared?'rgba(46,204,113,.35)':'rgba(255,215,0,.28)'}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">
