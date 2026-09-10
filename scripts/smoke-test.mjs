@@ -33,6 +33,32 @@ const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
 const PAGE_JS = { 'student.html': 'student.js', 'admin.html': 'admin.js', 'kiosk.html': 'kiosk.js' };
 
+// [BUSTER-1] 캐시버스터 단일 출처 — 값을 여기 적어 두지 않는다.
+//   전에는 기대값을 이 파일에 하드코딩해 두고 대조했다. 그래서 캐시버스터를 올릴 때마다
+//   html 1곳 + 이 파일 3곳을 같이 고쳐야 했고, rebase 충돌이 거의 매번 그 자리에서 났다.
+//   이제 **html에 적힌 것이 정답**이고, 이 파일은 html에서 읽어 온다.
+//   대신 '값이 스냅샷과 같은가'라는 (이제 자동 통과가 될) 검사를 버리고,
+//   실제로 자주 깨지는 세 가지를 본다 → 아래 [BUSTER-1] 검사 ①②③.
+const localRefs = (html) =>
+  [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+    .map((m) => m[1])
+    .filter((u) => !/^(?:https?:)?\/\//.test(u) && !u.startsWith('data:') && !u.startsWith('#'))
+    .map((u) => {
+      const [pathPart, query] = u.split('?');
+      return { raw: u, file: pathPart.replace(/^\.\//, ''), ver: (query || '').replace(/^v=/, '') };
+    });
+
+// html별 참조 목록 (자산 = js·css, 페이지 = html 링크)
+const HTML_REFS = {};
+for (const f of HTML_FILES) {
+  if (!exists(f)) { HTML_REFS[f] = { assets: [], pages: [] }; continue; }
+  const refs = localRefs(read(f));
+  HTML_REFS[f] = {
+    assets: refs.filter((r) => /\.(js|css)$/.test(r.file)),
+    pages:  refs.filter((r) => /\.html$/.test(r.file)),
+  };
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -76,13 +102,13 @@ const MIME = {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address();
 
-  // 캐시버스터를 실제 HTML에 적힌 그대로 둔 채로 200 확인 (쿼리 있어도 실제 파일로 매핑되는지)
+  // [BUSTER-1] 목록을 손으로 적지 않는다 — html에 적힌 참조 그대로 받아 온다
+  //   (쿼리가 붙어 있어도 실제 파일로 매핑되는지 확인하는 것이 목적)
   const urls = [
-    '/student.html', '/admin.html', '/kiosk.html',
-    '/gamedata.js?v=20260910e',
-    '/curriculum.js?v=20260909e', '/curriculum_review.js?v=20260907q', '/curriculum_reading.js?v=20260909a', '/figures.js?v=20260903a',
-    '/student.js?v=20260910g', '/admin.js?v=20260910h', '/kiosk.js?v=20260713c',
-    '/student.css?v=20260910c', '/admin.css?v=20260910b', '/kiosk.css?v=20260604',
+    ...HTML_FILES.map((f) => '/' + f),
+    ...[...new Set(
+      HTML_FILES.flatMap((f) => HTML_REFS[f].assets.map((r) => '/' + r.file + (r.ver ? '?v=' + r.ver : '')))
+    )],
   ];
 
   let ok = 0;
@@ -130,20 +156,49 @@ for (const f of HTML_FILES) {
   if (inlineScript === 0 && styleTags === 0) add('PASS', `${f}: 인라인 <script>/<style> 0건`);
   else add('FAIL', `${f}: 인라인 잔여 (script ${inlineScript}, style ${styleTags})`);
 
-  // CSS link 캐시버스터 (기대값 스냅샷 — 해당 CSS 갱신 시 여기도 동기화)
-  const cssName = f.replace('.html', '.css');
-  const cssVer = { 'student.css': '20260910c', 'admin.css': '20260910b', 'kiosk.css': '20260604' }[cssName];
-  if (html.includes(`${cssName}?v=${cssVer}`)) add('PASS', `${f}: ${cssName}?v=${cssVer} 캐시버스터`);
-  else add('REVIEW', `${f}: ${cssName} 캐시버스터(?v=${cssVer}) 미발견 — CSS 갱신 시 확인 필요`);
+  // [BUSTER-1] 캐시버스터 값 대조는 여기서 하지 않는다(html이 단일 출처).
+  //   대신 아래 [BUSTER-1] 검사 ①②③이 실제로 깨지는 자리를 본다.
+}
 
-  // 전용 JS script src 캐시버스터 (기대값 스냅샷 — 해당 JS 갱신 시 여기도 동기화)
-  const jsVer = { 'student.js': '20260910g', 'admin.js': '20260910h', 'kiosk.js': '20260713c' }[js];
-  if (html.includes(`${js}?v=${jsVer}`)) add('PASS', `${f}: ${js}?v=${jsVer} 캐시버스터`);
-  else add('REVIEW', `${f}: ${js} 캐시버스터(?v=${jsVer}) 미발견 — JS 갱신 시 확인 필요`);
+// ── [BUSTER-1] 캐시버스터 세 가지 검사 ─────────────────────────
+{
+  // ① 여러 html이 같은 파일을 참조하면 버전도 같아야 한다.
+  //    gamedata.js를 student·admin·kiosk 셋이 참조하는데, 한 곳만 올리고 빠뜨리기 쉽다.
+  //    그러면 그 화면만 옛 코드를 물고 돌아 재현이 어려운 버그가 된다.
+  const byFile = new Map();
+  for (const f of HTML_FILES) {
+    for (const r of HTML_REFS[f].assets) {
+      if (!byFile.has(r.file)) byFile.set(r.file, []);
+      byFile.get(r.file).push({ html: f, ver: r.ver });
+    }
+  }
+  const shared = [...byFile.entries()].filter(([, uses]) => uses.length > 1);
+  const mismatched = shared.filter(([, uses]) => new Set(uses.map((u) => u.ver)).size > 1);
+  if (mismatched.length === 0) {
+    add('PASS', `공유 파일 ${shared.length}개의 캐시버스터가 html 사이에서 일치` +
+      (shared.length ? ` (${shared.map(([file, uses]) => `${file}=${uses[0].ver || '없음'}×${uses.length}`).join(', ')})` : ''));
+  } else {
+    add('FAIL', '공유 파일 캐시버스터 불일치: ' + mismatched
+      .map(([file, uses]) => `${file} → ${uses.map((u) => `${u.html}:${u.ver || '없음'}`).join(' / ')}`).join(' · '));
+  }
 
-  // gamedata.js 캐시버스터 ?v=20260705 (2026-07-05 갱신 — 업적/씨앗 문구 수정 배포)
-  if (html.includes('gamedata.js?v=20260910e')) add('PASS', `${f}: gamedata.js?v=20260910e 캐시버스터`);
-  else add('REVIEW', `${f}: gamedata.js 캐시버스터(?v=20260705) 미발견 — gamedata 갱신 시 확인 필요`);
+  // ② 참조한 파일이 저장소에 실제로 있어야 한다(경로 오타 방어).
+  const allRefs = HTML_FILES.flatMap((f) =>
+    [...HTML_REFS[f].assets, ...HTML_REFS[f].pages].map((r) => ({ ...r, html: f })));
+  const missingRefs = allRefs.filter((r) => !exists(r.file));
+  if (missingRefs.length === 0) add('PASS', `html이 참조하는 로컬 파일 ${allRefs.length}건 모두 존재`);
+  else add('FAIL', '없는 파일 참조: ' + missingRefs.map((r) => `${r.html} → ${r.raw}`).join(', '));
+
+  // ③ js·css 참조에는 캐시버스터가 반드시 있어야 한다.
+  //    빠지면 학생 브라우저가 옛 파일을 계속 쓴다(배포해도 안 바뀌는 것처럼 보인다).
+  const noVer = HTML_FILES.flatMap((f) =>
+    HTML_REFS[f].assets.filter((r) => !r.ver).map((r) => `${f} → ${r.raw}`));
+  if (noVer.length === 0) {
+    const total = HTML_FILES.reduce((n, f) => n + HTML_REFS[f].assets.length, 0);
+    add('PASS', `js·css 참조 ${total}건 모두 ?v= 캐시버스터 있음`);
+  } else {
+    add('FAIL', '캐시버스터 없는 참조: ' + noVer.join(', '));
+  }
 }
 
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──
