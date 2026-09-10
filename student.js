@@ -9319,26 +9319,44 @@ const SCALE_BASE_WIDTH = 2560; // QHD 모니터 기준
 //   여기서 스케일을 걷어내고 나간다 → 다음 접속에 저절로 정상으로 돌아온다.
 //   설정값(SCALE_MODE) 자체는 지우지 않는다. 큰 화면으로 가면 다시 살아난다.
 const SCALE_MIN_WIDTH = 701;   // student.css의 배치 분기점(700/701)과 같은 값
+
+// [SCALEMIN-1] 너무 작게 줄여야 하면 아예 적용하지 않는다.
+//   기준 폭이 2560px이라 화면이 좁을수록 배율이 뚝 떨어진다 — 701px에서 0.274,
+//   768px에서 0.300이다. 폰만큼은 아니어도 작은 태블릿에서 켜면 역시 글자를 못 읽는다.
+//   하한을 0.6으로 두면 2560 × 0.6 = 1536px 이상에서만 실제로 걸린다.
+//   두 값은 상수로 둔다(나중에 조정 가능하게).
+const SCALE_MIN_RATIO = 0.6;
+const SCALE_MIN_RATIO_WIDTH = Math.ceil(SCALE_BASE_WIDTH * SCALE_MIN_RATIO);   // 1536px
+let _scaleBlockedNoticed = false;   // 알림은 한 번만 (applyScale은 resize마다 불린다)
+
 function applyScale() {
   const game = document.getElementById('s-game');
   if (!game) return;
-  if (window.innerWidth < SCALE_MIN_WIDTH) {
+  const clear = () => {
     game.style.transform = '';
     game.style.width  = '';
     game.style.height = '';
-    return;
-  }
+  };
+  if (window.innerWidth < SCALE_MIN_WIDTH) { clear(); return; }
   if (SCALE_MODE && LAYOUT_MODE === 'desktop') {
     const ratio = Math.min(window.innerWidth / SCALE_BASE_WIDTH, 1); // 1440px 이상은 스케일 안함
+    // [SCALEMIN-1] 하한에 걸리면 걷어내고 한 번 알린다.
+    //   아무 일도 안 일어나면 아이는 버튼이 고장 났다고 느낀다.
+    if (ratio < SCALE_MIN_RATIO) {
+      clear();
+      if (!_scaleBlockedNoticed) {
+        _scaleBlockedNoticed = true;
+        if (typeof toast === 'function') toast('이 화면에서는 화면 맞춤이 적용되지 않아요');
+      }
+      return;
+    }
     const h = window.innerHeight / ratio;
     game.style.transformOrigin = 'top left';
     game.style.transform = `scale(${ratio})`;
     game.style.width  = SCALE_BASE_WIDTH + 'px';
     game.style.height = h + 'px';
   } else {
-    game.style.transform = '';
-    game.style.width  = '';
-    game.style.height = '';
+    clear();
   }
 }
 
@@ -9390,6 +9408,7 @@ function toggleLayout() {
 
 function toggleScaleMode() {
   SCALE_MODE = !SCALE_MODE;
+  _scaleBlockedNoticed = false;   // [SCALEMIN-1] 누를 때마다 결과를 알려 준다
   localStorage.setItem(STORAGE_KEYS.SCALE_MODE, SCALE_MODE);
   const btn = document.getElementById('scale-mode-btn');
   if (btn) btn.textContent = SCALE_MODE ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
