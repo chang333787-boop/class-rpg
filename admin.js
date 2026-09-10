@@ -140,6 +140,43 @@ const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',appr
   weekly:'📅 주간 다짐', study:'📚 학습 범위',
   monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역', emotion:'💭 감정 현황', emotionalerts:'🔔 감정 대화 요청'};
 
+// ══ [NARROW-1] 좁은 화면 메뉴 서랍 ════════════════════════════
+//  768px 이하에서만 의미가 있다. 넓은 화면에서는 햄버거 버튼이 CSS 로 숨겨져 있어
+//  이 함수들이 호출될 일이 없고, 호출돼도 .is-open 클래스는 넓은 화면 규칙에 영향을 주지 않는다.
+//  메뉴 항목은 기존 .nav-item 그대로라 nav(page, el) 을 그대로 쓴다 — 고르면 서랍만 닫는다.
+//  body 스크롤 잠금은 넣지 않는다(모달이 아니고, 되돌리는 자리에서 버그가 나기 쉽다).
+function _navEls() {
+  return {
+    sidebar:  document.getElementById('admin-sidebar'),
+    backdrop: document.getElementById('nav-backdrop'),
+    btn:      document.getElementById('nav-toggle-btn'),
+  };
+}
+function openNav() {
+  const { sidebar, backdrop, btn } = _navEls();
+  sidebar?.classList.add('is-open');
+  backdrop?.classList.add('is-open');
+  btn?.setAttribute('aria-expanded', 'true');
+}
+function closeNav() {
+  const { sidebar, backdrop, btn } = _navEls();
+  sidebar?.classList.remove('is-open');
+  backdrop?.classList.remove('is-open');
+  btn?.setAttribute('aria-expanded', 'false');
+}
+function toggleNav() {
+  const { sidebar } = _navEls();
+  if (sidebar?.classList.contains('is-open')) closeNav(); else openNav();
+}
+// 닫는 방법 3가지: 바깥(백드롭) 클릭 · ESC · 메뉴 고르기
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNav(); });
+document.addEventListener('DOMContentLoaded', () => {
+  // 항목 21개에 각각 onclick 을 더하지 않고 사이드바 한 곳에서 위임받는다.
+  document.getElementById('admin-sidebar')?.addEventListener('click', e => {
+    if (e.target.closest('.nav-item')) closeNav();
+  });
+});
+
 function nav(page, el) {
   pages.forEach(p => document.getElementById('p-'+p)?.classList.remove('active'));
   document.getElementById('p-'+page)?.classList.add('active');

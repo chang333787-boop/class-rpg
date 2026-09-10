@@ -14,7 +14,9 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 /* ── LAYOUT ── */
 .app{display:grid;grid-template-columns:220px 1fr;height:100vh;overflow:hidden;}
-@media(max-width:768px){.app{grid-template-columns:1fr;}.sidebar{display:none;}}
+/* 좁은 화면에서는 1열. 사이드바 숨김·서랍 처리는 파일 맨 아래 [NARROW-1] 블록에 있다
+   — 여기에 .sidebar{display:none} 을 두면 바로 아래 .sidebar{display:flex} 에 밀린다. */
+@media(max-width:768px){.app{grid-template-columns:1fr;}}
 
 /* ── SIDEBAR ── */
 .sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
@@ -267,4 +269,43 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 .nowrap {
   white-space: nowrap;
+}
+
+/* ══ [NARROW-1] 좁은 화면: 사이드바를 서랍으로 ═══════════════════
+   문제였던 것: admin.css 위쪽 @media 안의 `.sidebar{display:none}` 이
+   바로 뒤에 오는 `.sidebar{display:flex}` 에 밀려 안 먹었다.
+   미디어쿼리는 특수성을 올려주지 않는다 — 선택자 급이 같으면 **뒤에 오는 쪽이 이긴다**.
+   그래서 1열로 접히기는 하는데 사이드바가 맨 위 한 칸을 통째로 차지해
+   본문이 아래로 밀렸다(480px 에서 본문 시작 y=501px, 첫 화면에 한 줄도 안 보임).
+   → 이 블록을 **파일 맨 끝**에 두어 순서로 이기게 한다. 새 규칙은 전부
+     @media(max-width:768px) 안에만 둔다 — 넓은 화면 동작은 한 픽셀도 안 바뀐다.
+   ══════════════════════════════════════════════════════════════ */
+.nav-toggle{
+  display:none;                       /* 넓은 화면에서는 없음 */
+  align-items:center;justify-content:center;
+  width:44px;height:44px;flex-shrink:0;      /* 터치 영역 44px */
+  margin-right:.6rem;
+  background:transparent;border:1px solid var(--border);border-radius:var(--r2);
+  color:var(--txt);font-size:1.15rem;line-height:1;cursor:pointer;
+  font-family:inherit;
+}
+.nav-toggle:hover{background:rgba(74,144,226,.08);}
+.topbar-left{display:flex;align-items:center;min-width:0;}
+.nav-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;}
+
+@media(max-width:768px){
+  .nav-toggle{display:flex;}
+  /* 기본은 숨김. 햄버거를 누르면 .is-open 으로 왼쪽에서 나온다. */
+  .sidebar{
+    display:none;
+    position:fixed;top:0;left:0;bottom:0;
+    width:min(280px,86vw);
+    z-index:1000;
+    box-shadow:4px 0 24px rgba(0,0,0,.55);
+  }
+  .sidebar.is-open{display:flex;}
+  .nav-backdrop.is-open{display:block;}
+  /* 손가락으로 누를 수 있게 (P1 터치 영역 44px) */
+  .nav-item{padding:.8rem 1.2rem;min-height:44px;}
+  .sidebar-bottom .btn-sm{min-height:44px;}
 }

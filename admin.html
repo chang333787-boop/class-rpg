@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="./gamedata.js?v=20260910d"></script>
 <script src="./curriculum.js?v=20260909e"></script>
-<link rel="stylesheet" href="./admin.css?v=20260904k">
+<link rel="stylesheet" href="./admin.css?v=20260910a">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:#0E1621;
@@ -53,7 +53,7 @@
 
 <div class="app" id="admin-app" style="display:none">
   <!-- ════ SIDEBAR ════ -->
-  <div class="sidebar">
+  <div class="sidebar" id="admin-sidebar">
     <div class="sidebar-logo">
       <div class="logo-title">🏫 우리반 성장 RPG</div>
       <div class="logo-sub">교사 관리자 페이지</div>
@@ -88,10 +88,18 @@
     </div>
   </div>
 
+  <!-- [NARROW-1] 서랍 뒤 어두운 막 — 누르면 닫힌다. 768px 이하에서만 보인다. -->
+  <div class="nav-backdrop" id="nav-backdrop" onclick="closeNav()"></div>
+
   <!-- ════ MAIN ════ -->
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title" id="topbar-title">📊 대시보드</div>
+      <div class="topbar-left">
+        <!-- [NARROW-1] 좁은 화면 전용. admin.css 에서 768px 이하에만 보인다. -->
+        <button class="nav-toggle" onclick="toggleNav()" aria-label="메뉴 열기"
+          aria-controls="admin-sidebar" aria-expanded="false" id="nav-toggle-btn">☰</button>
+        <div class="topbar-title" id="topbar-title">📊 대시보드</div>
+      </div>
       <div class="topbar-right">
         <!-- [KIOSK-LINK-1] 키오스크(우리반 할 일 체크판)는 그동안 어느 화면에서도 링크가 없어
              주소를 직접 쳐야만 열렸다. 교사 화면에서 새 탭으로 바로 열 수 있게 한다. -->
@@ -1552,6 +1560,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260910f"></script>
+<script src="./admin.js?v=20260910g"></script>
 </body>
 </html>
