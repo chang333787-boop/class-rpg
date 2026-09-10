@@ -330,14 +330,20 @@ function renderDashboard() {
     document.getElementById('dash-promo-list').innerHTML = promos.map(r => {
       const s = DB.getStudent(r.studentId);
       if (!s) return '';
+      // [PROMO-LV] 승급 요청에는 level 하나만 들어 있다(student.js requestPromotion:
+      //   {id, studentId, studentName, level, date}). currentLevel·targetLevel 은
+      //   저장하는 곳이 없어 "Lv.undefined → undefined" 로 찍히고 있었다.
+      //   신청 구조는 건드리지 않는다 — 이미 저장된 요청도 그대로 보여야 한다.
+      //   level 이 없는 옛 요청은 학생의 현재 레벨로 대신한다.
+      const lv = (r.level != null) ? r.level : s.level;
       return `<div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
         border-bottom:1px solid rgba(255,255,255,.04)">
         <div style="font-size:1.1rem">${s.avatar}</div>
         <div class="flex-1">
-          <div style="font-size:.84rem;font-weight:700">${s.name}
+          <div style="font-size:.84rem;font-weight:700">${escHtml(s.name)}
             <span style="background:rgba(142,68,173,.2);color:#c39bd3;font-size:.68rem;
               padding:.1rem .4rem;border-radius:10px;margin-left:.4rem">
-              Lv.${r.currentLevel} → ${r.targetLevel}
+              ${lv != null ? `Lv.${lv} ` : ''}승급
             </span>
           </div>
           <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${r.date||''}</div>
