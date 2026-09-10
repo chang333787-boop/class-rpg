@@ -693,12 +693,40 @@ function resetAllStudents() {
 
 function saveStudentDetail(id) {
   const s = DB.getStudent(id);
+
+  // [GOLD-GUARD-1] 골드는 다른 필드보다 **먼저** 판정한다.
+  //   DB.getStudent()는 캐시 객체를 그대로 돌려주므로, 필드를 바꾼 뒤 확인 창에서 취소하면
+  //   저장은 안 되지만 바뀐 값이 캐시에 남는다. 그래서 아무것도 건드리기 전에 묻는다.
+  const prevGold = s.gold || 0;
+  const newGold  = parseInt(document.getElementById('det-gold').value) || 0;
+  const goldDelta = newGold - prevGold;
+
+  // 오타 방어 — 현재 골드의 10배를 넘거나 한 번에 +50,000G 이상 늘리면 되묻는다.
+  //   (2026-09-10 골드 감사: 게임으로는 만들어질 수 없는 89만G 두 건이 확인됐고,
+  //    gold만 늘고 totalGold가 안 늘어난 경로는 이 입력칸뿐이었다. docs/rpg_gold_audit_20260910.md §1-1)
+  //   1,000G 미만의 소액 수정은 묻지 않는다(신규 학생 초기값 설정 등에서 성가시지 않도록).
+  const bigMultiple = prevGold > 0 && newGold > prevGold * 10 && goldDelta >= 1000;
+  const bigJump     = goldDelta >= 50000;
+  if (goldDelta > 0 && (bigMultiple || bigJump)) {
+    const ok = confirm(
+      `${s.name}의 골드를
+
+  ${prevGold.toLocaleString()}G  →  ${newGold.toLocaleString()}G  (+${goldDelta.toLocaleString()}G)
+
+로 바꿉니다. 정말 바꿀까요?`
+    );
+    if (!ok) return;   // 다른 필드도 아직 안 건드린 상태 — 그대로 빠져나간다
+  }
+
   s.name = document.getElementById('det-name').value;
   s.job = document.getElementById('det-job').value;
   s.title = document.getElementById('det-title').value;
   s.pw = document.getElementById('det-pw').value;
   s.level = parseInt(document.getElementById('det-lv').value) || 1;
-  s.gold  = parseInt(document.getElementById('det-gold').value) || 0;
+  s.gold  = newGold;
+  // [R7][GOLD-GUARD-1] 누적 골드 — quickGiveGold와 같은 규칙: 늘어난 만큼만 반영, 차감은 제외.
+  //   이게 없으면 gold > totalGold가 되어 '얼마나 벌었나' 통계·골드 랭킹·누적 골드 업적이 어긋난다.
+  if (goldDelta > 0) s.totalGold = (s.totalGold || 0) + goldDelta;
   // ★ exp 필드를 직접 입력했으면 그대로, 아니면 level에 맞는 exp 최솟값으로 맞춤
   const inputExp = parseInt(document.getElementById('det-exp').value) || 0;
   const levelFromInputExp = Utils.levelFromExp(inputExp);
