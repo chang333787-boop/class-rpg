@@ -79,6 +79,7 @@
         <span class="promotion-badge" id="promo-badge" style="display:none" onclick="openModal('m-promo')">⬆ 승급 가능!</span>
       </div>
       <div class="hud-exp-row">
+        <span class="hud-exp-label">경험치(EXP)</span>
         <div class="hud-exp-bar"><div class="hud-exp-fill" id="hud-exp-fill"></div></div>
         <div class="hud-exp-txt" id="hud-exp-txt">- EXP</div>
       </div>
@@ -86,14 +87,8 @@
     <div class="hud-badges">
       <div class="badge lv">⚡ Lv.<span id="hud-lv">1</span></div>
       <div class="badge gold">💰 <span id="hud-gold">0</span>G</div>
-      <button id="layout-toggle-btn" onclick="toggleLayout()"
-        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-        color:var(--txt2);border-radius:8px;padding:.2rem .5rem;font-size:.7rem;
-        cursor:pointer;white-space:nowrap">🖥️ 데스크탑</button>
-      <button id="scale-mode-btn" onclick="toggleScaleMode()"
-        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-        color:var(--txt2);border-radius:8px;padding:.2rem .5rem;font-size:.7rem;
-        cursor:pointer;white-space:nowrap">🔍 비율고정</button>
+      <button id="layout-toggle-btn" class="hud-mini-btn" onclick="toggleLayout()">🖥️ 넓게 보기</button>
+      <button id="scale-mode-btn" class="hud-mini-btn" onclick="toggleScaleMode()">🔍 화면 맞춤</button>
     </div>
   </div>
 
@@ -271,12 +266,12 @@
 </div></div>
 
 <div class="overlay" id="m-house"><div class="modal">
-  <div class="modal-hd"><div class="modal-title">🏠 내 집 · 포트폴리오</div><button class="modal-close" onclick="closeModal('m-house')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">🏠 내 집 · 내 기록</div><button class="modal-close" onclick="closeModal('m-house')">✕</button></div>
   <div class="modal-tabs">
     <button class="mtab on" onclick="houseTab('stats',this)">📊 기록</button>
     <button class="mtab"    onclick="houseTab('weekly',this)">📅 주간 다짐</button>
     <button class="mtab"    onclick="houseTab('book',this)">📚 독서</button>
-    <button class="mtab"    onclick="houseTab('deco',this)">🌸 인테리어</button>
+    <button class="mtab"    onclick="houseTab('deco',this)">🌸 꾸미기</button>
     <button class="mtab"    onclick="houseTab('artwork',this)">🖼️ 작품</button>
     <button class="mtab"    onclick="houseTab('memory',this)">📸 추억</button>
     <button class="mtab"    onclick="houseTab('emotion',this)">💭 감정</button>
@@ -321,7 +316,7 @@
   <!-- 탭3: 독서 -->
   <div id="house-tab-book" style="display:none">
     <div style="font-size:.76rem;color:var(--txt2);margin:.3rem 0 .8rem">
-      책을 읽고 기록하면 선생님 확인 후 EXP +30이 지급돼요 📚
+      책을 읽고 기록하면 선생님 확인 후 경험치 +30이 지급돼요 📚
     </div>
 
     <!-- 월별 독서 그래프 -->
@@ -385,7 +380,7 @@
   <div id="house-tab-deco" style="display:none">
     <div style="display:flex;flex-direction:column;gap:.7rem;padding:.5rem 0">
       <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.2rem">
-        인테리어 편집은 전체화면 모드에서 진행돼요 🎨
+        꾸미기는 전체화면 모드에서 할 수 있어요 🎨
       </div>
       <button onclick="openInteriorFullscreen()"
         style="width:100%;padding:.85rem;border-radius:14px;border:none;cursor:pointer;
@@ -617,7 +612,7 @@
 </div>
 
 <div class="overlay" id="m-inv"><div class="modal">
-  <div class="modal-hd"><div class="modal-title">🎒 인벤토리</div><button class="modal-close" onclick="closeModal('m-inv')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">🎒 가방</div><button class="modal-close" onclick="closeModal('m-inv')">✕</button></div>
   <div class="modal-tabs">
     <button class="mtab on" onclick="invTab('equip',this)">⚔️ 장비</button>
     <button class="mtab" onclick="invTab('skill',this)">📖 스킬</button>
@@ -717,7 +712,7 @@
       style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
         color:#fff;padding:.35rem .85rem;border-radius:10px;cursor:pointer;
         font-family:inherit;font-size:.82rem;font-weight:700">
-      ← 포트폴리오로
+      ← 내 기록으로
     </button>
     <span id="if-scene-name" style="font-size:.9rem;font-weight:700;color:var(--gold)">🌿 마당</span>
     <div style="flex:1"></div>

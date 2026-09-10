@@ -222,7 +222,7 @@ function externalStudyItems() {
   const sid = encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.id) || '');
   return [
     { key: 'english', icon: '🔤', title: '영어 복습앱',
-      sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 EXP·골드',
+      sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 경험치·골드',
       href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)',
       embed: true },   // [ENGLISH-EMBED-1] 새 탭 대신 RPG 안 전체화면 모달로
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
@@ -420,9 +420,9 @@ function enterGame() {
 
   document.getElementById('s-game').classList.add('active');
   applyLayout(LAYOUT_MODE);
-  // 비율고정 버튼 초기 상태 복원
+  // 화면 맞춤 버튼 초기 상태 복원
   const sBtn = document.getElementById('scale-mode-btn');
-  if (sBtn) sBtn.textContent = SCALE_MODE ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
+  if (sBtn) sBtn.textContent = SCALE_MODE ? hudBtnText('🔍', '화면 맞춤 ON') : hudBtnText('🔍', '화면 맞춤');
   applyScale();
   renderAll();
   startAccessTimer();
@@ -1602,7 +1602,7 @@ function buildMainHTML() {
       </div>
       <div class="menu-tile" onclick="openModal('m-inv');renderInv()"
         style="border-color:rgba(255,255,255,.1)">
-        <div class="tile-icon">🎒</div><div class="tile-name">인벤토리</div>
+        <div class="tile-icon">🎒</div><div class="tile-name">가방</div>
         <div class="tile-desc">아이템</div>
       </div>
       <div class="menu-tile" onclick="openModal('m-rank');renderRankingModal()"
@@ -1637,7 +1637,7 @@ function buildMainHTML() {
         style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
           background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
         <div style="font-size:1.1rem">🌸</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">인테리어</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">꾸미기</div>
       </div>
       <div onclick="openHouseTab('artwork')"
         style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
@@ -8890,7 +8890,7 @@ function submitBookRecord() {
   _bookRating = 0; _bookCategory = '';
   document.getElementById('book-date-input').value = '';
 
-  toast('📚 독서 기록 제출! 선생님 확인 후 EXP가 지급돼요');
+  toast('📚 독서 기록 제출! 선생님 확인 후 경험치가 지급돼요');
   renderBookRecords();
   renderMain(); renderMobile();
 }
@@ -9248,14 +9248,14 @@ function visitFriend(id) {
     </div>
     <!-- 탭 -->
     <div class="modal-tabs" style="margin-bottom:.8rem" id="${modalId}-tabs">
-      <button class="mtab on" onclick="openFriendFullscreen('${id}')">🌸 인테리어 보기</button>
+      <button class="mtab on" onclick="openFriendFullscreen('${id}')">🌸 꾸미기 보기</button>
       <button class="mtab"    onclick="vfTab('${modalId}','books',this)">📚 독서</button>
       <button class="mtab"    onclick="vfTab('${modalId}','artwork',this)">🖼️ 작품</button>
     </div>
     <!-- 인테리어 탭 (전체화면으로 열림) -->
     <div id="${modalId}-deco">
       <div style="text-align:center;padding:1.5rem 0;color:var(--txt3);font-size:.82rem">
-        위의 "🌸 인테리어 보기" 버튼을 눌러주세요
+        위의 "🌸 꾸미기 보기" 버튼을 눌러주세요
       </div>
     </div>
     <!-- 독서 탭 -->
@@ -9317,7 +9317,7 @@ let LAYOUT_MODE = localStorage.getItem(STORAGE_KEYS.LAYOUT_MODE) || 'desktop';
 let SCALE_MODE  = localStorage.getItem(STORAGE_KEYS.SCALE_MODE) === 'true'; // 비율 스케일링 on/off
 const SCALE_BASE_WIDTH = 2560; // QHD 모니터 기준
 
-// [HUDBTN-1] 좁은 화면에서는 비율고정을 무시한다.
+// [HUDBTN-1] 좁은 화면에서는 화면 맞춤을 무시한다.
 //   2560px 기준으로 깔고 줄이는 기능이라 375px에서는 배율이 0.146이 되어 글자를 못 읽는다.
 //   폰에서는 이 버튼을 숨기므로(student.css), 예전에 켜 둔 기기가 되돌릴 수단 없이 갇히지 않도록
 //   여기서 스케일을 걷어내고 나간다 → 다음 접속에 저절로 정상으로 돌아온다.
@@ -9384,13 +9384,13 @@ function applyLayout(mode) {
       if (homeBtn) homeBtn.classList.add('active');
     }
   } else {
-    if (btn) btn.textContent = hudBtnText('🖥️', '데스크탑');
+    if (btn) btn.textContent = hudBtnText('🖥️', '넓게 보기');
   }
   applyScale();
 }
 
-// [UI375-1] 375px 상단 줄이 오른쪽으로 잘린다(💻 데스크탑이 잘리고 🔍 비율고정은 안 보임).
-//   숨기면 폰에서 데스크탑으로 돌아갈 길이 없어지므로 글자만 빼고 아이콘은 남긴다.
+// [UI375-1] 375px 상단 줄이 오른쪽으로 잘린다(🖥️ 넓게 보기가 잘리고 🔍 화면 맞춤은 안 보임).
+//   숨기면 폰에서 넓게 보기로 돌아갈 길이 없어지므로 글자만 빼고 아이콘은 남긴다.
 //   폭이 바뀌면(가로/세로 돌리기) 다시 맞춘다.
 const HUD_NARROW_PX = 430;
 function hudBtnText(icon, label) {
@@ -9399,10 +9399,10 @@ function hudBtnText(icon, label) {
 function syncHudButtons() {
   const lb = document.getElementById('layout-toggle-btn');
   if (lb) lb.textContent = LAYOUT_MODE === 'mobile'
-    ? hudBtnText('📱', '모바일') : hudBtnText('🖥️', '데스크탑');
+    ? hudBtnText('📱', '모바일') : hudBtnText('🖥️', '넓게 보기');
   const sb = document.getElementById('scale-mode-btn');
   if (sb) sb.textContent = SCALE_MODE
-    ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
+    ? hudBtnText('🔍', '화면 맞춤 ON') : hudBtnText('🔍', '화면 맞춤');
 }
 window.addEventListener('resize', syncHudButtons);
 
@@ -9415,7 +9415,7 @@ function toggleScaleMode() {
   _scaleBlockedNoticed = false;   // [SCALEMIN-1] 누를 때마다 결과를 알려 준다
   localStorage.setItem(STORAGE_KEYS.SCALE_MODE, SCALE_MODE);
   const btn = document.getElementById('scale-mode-btn');
-  if (btn) btn.textContent = SCALE_MODE ? hudBtnText('🔍', '비율고정 ON') : hudBtnText('🔍', '비율고정');
+  if (btn) btn.textContent = SCALE_MODE ? hudBtnText('🔍', '화면 맞춤 ON') : hudBtnText('🔍', '화면 맞춤');
   applyScale();
 }
 
@@ -10025,7 +10025,7 @@ function renderHouseAchievements() {
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
       <div style="font-size:.82rem;color:var(--txt2)">달성 <span style="color:var(--gold);font-weight:700">${doneList.length}</span> / ${ACHIEVEMENTS.length}</div>
-      <div style="font-size:.72rem;color:var(--txt3)">EXP·골드·칭호 획득!</div>
+      <div style="font-size:.72rem;color:var(--txt3)">경험치·골드·칭호 획득!</div>
     </div>
     <div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin-bottom:1rem;overflow:hidden">
       <div style="height:100%;width:${Math.round(doneList.length/ACHIEVEMENTS.length*100)}%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;transition:width .6s ease"></div>
