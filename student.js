@@ -9313,9 +9313,21 @@ let LAYOUT_MODE = localStorage.getItem(STORAGE_KEYS.LAYOUT_MODE) || 'desktop';
 let SCALE_MODE  = localStorage.getItem(STORAGE_KEYS.SCALE_MODE) === 'true'; // 비율 스케일링 on/off
 const SCALE_BASE_WIDTH = 2560; // QHD 모니터 기준
 
+// [HUDBTN-1] 좁은 화면에서는 비율고정을 무시한다.
+//   2560px 기준으로 깔고 줄이는 기능이라 375px에서는 배율이 0.146이 되어 글자를 못 읽는다.
+//   폰에서는 이 버튼을 숨기므로(student.css), 예전에 켜 둔 기기가 되돌릴 수단 없이 갇히지 않도록
+//   여기서 스케일을 걷어내고 나간다 → 다음 접속에 저절로 정상으로 돌아온다.
+//   설정값(SCALE_MODE) 자체는 지우지 않는다. 큰 화면으로 가면 다시 살아난다.
+const SCALE_MIN_WIDTH = 701;   // student.css의 배치 분기점(700/701)과 같은 값
 function applyScale() {
   const game = document.getElementById('s-game');
   if (!game) return;
+  if (window.innerWidth < SCALE_MIN_WIDTH) {
+    game.style.transform = '';
+    game.style.width  = '';
+    game.style.height = '';
+    return;
+  }
   if (SCALE_MODE && LAYOUT_MODE === 'desktop') {
     const ratio = Math.min(window.innerWidth / SCALE_BASE_WIDTH, 1); // 1440px 이상은 스케일 안함
     const h = window.innerHeight / ratio;
