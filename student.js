@@ -2914,6 +2914,7 @@ function doFight() {
         if (r.win) {
           CUR.gold += mon.gold;
           CUR.totalGold = (CUR.totalGold||0) + mon.gold;
+          DB.logGold(CUR.id, 'battle', mon.gold);   // [GOLD-LOG-1]
           CUR.level = Utils.levelFromExp(CUR.exp);
           if (!(CUR.monsterLog||[]).includes(mon.id)) CUR.monsterLog = [...(CUR.monsterLog||[]), mon.id];
         }
@@ -3632,6 +3633,7 @@ function _endInfiniteBattleSession(forfeit) {
   CUR.infiniteBattleTotalKills = (CUR.infiniteBattleTotalKills || 0) + IB.kills;
   CUR.gold += IB.gold;
   CUR.totalGold = (CUR.totalGold || 0) + IB.gold;
+  DB.logGold(CUR.id, 'infinite', IB.gold);   // [GOLD-LOG-1] 세션 누적분을 한 번에
   CUR.infiniteBattleLastResult = {
     zone: IB.zone, kills: IB.kills, gold: IB.gold,
     forfeit, endedAt: Date.now(),
@@ -4063,6 +4065,7 @@ function farmCellClick(slot) {
         if (earned > 0) {
           CUR.gold += earned;
           CUR.totalGold = (CUR.totalGold||0) + earned;
+          DB.logGold(CUR.id, 'farm', earned);   // [GOLD-LOG-1]
         }
         CUR.farm = (CUR.farm||[]).filter(f => f.slot !== slot);
         CUR.farmHarvests = (CUR.farmHarvests||0) + 1;
@@ -4081,6 +4084,7 @@ function farmCellClick(slot) {
         : sd.sellPrice;
       CUR.gold += earned;
       CUR.totalGold = (CUR.totalGold||0) + earned;
+      DB.logGold(CUR.id, 'farm', earned);   // [GOLD-LOG-1]
       CUR.farm = (CUR.farm||[]).filter(f => f.slot !== slot);
       CUR.farmHarvests = (CUR.farmHarvests||0) + 1;
       DB.saveStudent(CUR);
@@ -11365,6 +11369,7 @@ function grantStudyReward(justSaved) {
     CUR.exp       = (CUR.exp || 0) + exp;
     CUR.gold      = (CUR.gold || 0) + gold;
     CUR.totalGold = (CUR.totalGold || 0) + gold;
+    DB.logGold(CUR.id, 'study', gold);   // [GOLD-LOG-1] 승인 모드는 admin 승인 시점에 기록(후속)
     const oldLv = CUR.level;
     CUR.level = Utils.levelFromExp(CUR.exp);
     DB.saveQuestLog({

@@ -758,6 +758,42 @@ const DB = {
     this._fbRef.child('questLogs/' + logId).set(log).catch(e => this._onSaveError(e));
   },
 
+  // ── 골드 수입 기록 (GOLD-LOG-1) ──────────────────────────────
+  //  goldDaily/<studentId>_<date> 에 **경로별 하루 합계만** 쌓는다.
+  //
+  //  왜 이벤트마다가 아니라 하루 요약인가 (2026-09-10 실측):
+  //    학생 1인이 하루에 만드는 골드 이벤트가 약 25건(농장 3 · 전투 3 · 무한배틀 10 · 퀘스트 8…)이다.
+  //    이벤트마다 남기면 1년 약 3.2MB, 하루 요약이면 151KB — 21배 차이다.
+  //    DB.init() 이 루트에 on('value') 를 걸어 두어서, 루트가 커지면 접속한 모든 학생이 그 비용을 나눠 진다.
+  //
+  //  왜 ServerValue.increment 인가:
+  //    필드 하나만 서버에서 더한다. 통짜 set 도 transaction 도 안 쓴다 — 여러 명이 같은 순간에
+  //    올려도 서버 원자 연산이라 어긋나지 않는다(Q1 의 통짜 set 경합 문제가 여기선 생기지 않는다).
+  //
+  //  왜 실패를 무시하는가:
+  //    이 기록은 **통계용**이고 진실의 원본은 학생의 gold/totalGold 다.
+  //    로그가 안 남았다고 해서 수확이 취소되거나 아이 화면이 멈추면 안 된다.
+  //
+  //  왜 BACKUP_NODES 에 넣지 않는가:
+  //    잃어도 다시 쌓이는 통계다. 넣으면 백업이 또 커진다 —
+  //    2026-09-10 기준 backups 가 이미 루트 7.6MB 의 73%(5.6MB)를 차지하고 있다.
+  GOLD_SOURCES: ['farm', 'battle', 'infinite', 'quest', 'study', 'artwork'],
+  logGold(studentId, source, amount) {
+    try {
+      const amt = Math.round(Number(amount) || 0);
+      if (!studentId || amt <= 0) return;
+      if (!this.GOLD_SOURCES.includes(source)) return;
+      const inc = (typeof firebase !== 'undefined')
+        && firebase.database && firebase.database.ServerValue
+        && firebase.database.ServerValue.increment;
+      if (!inc || !this._fbRef) return;
+      const day = Utils.todayStr();
+      this._fbRef.child('goldDaily/' + studentId + '_' + day)
+        .update({ s: studentId, d: day, [source]: inc(amt) })
+        .catch(() => {});          // 통계 실패는 조용히 넘어간다
+    } catch (e) { /* 위와 같은 이유 — 게임 진행을 막지 않는다 */ }
+  },
+
   // ── 학생 쪽지 (NOTES-1) ────────────────────────────────────
   //  studentNotes/<studentId>/<noteId> 개별 경로로만 읽고 쓴다.
   //  학생 객체 필드로 두지 않는 이유: saveStudent 는 students/<id> 를 통짜 set 하고
@@ -2497,6 +2533,7 @@ function finalizeBattle(student, monster, win) {
     // 골드 지급
     student.gold      = (student.gold || 0) + monster.gold;
     student.totalGold = (student.totalGold || 0) + monster.gold;
+    if (typeof DB !== 'undefined') DB.logGold(student.id, 'battle', monster.gold);   // [GOLD-LOG-1]
 
     // 도감 기록 + 도감 보상 지급
     const isFirstKill = !(student.monsterLog || []).includes(monster.id);
@@ -2509,6 +2546,7 @@ function finalizeBattle(student, monster, win) {
       if (dexRewards.firstKillEnabled && dexRewards.firstKillGold > 0) {
         student.gold      += dexRewards.firstKillGold;
         student.totalGold  = (student.totalGold || 0) + dexRewards.firstKillGold;
+        DB.logGold(student.id, 'battle', dexRewards.firstKillGold);   // [GOLD-LOG-1]
         student._dexBonusLog = (student._dexBonusLog || []);
         student._dexBonusLog.push({ type:'firstKill', name:monster.name, gold:dexRewards.firstKillGold });
       }
@@ -2526,6 +2564,7 @@ function finalizeBattle(student, monster, win) {
           if (zr.gold > 0) {
             student.gold      += zr.gold;
             student.totalGold  = (student.totalGold || 0) + zr.gold;
+            DB.logGold(student.id, 'battle', zr.gold);   // [GOLD-LOG-1]
           }
           if (zr.title) {
             student.titles = [...new Set([...(student.titles || []), zr.title])];
