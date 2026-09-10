@@ -1520,6 +1520,10 @@ const ACHIEVEMENTS = [
   // ══ K. 집꾸미기 / 인테리어 ═══════════════════════════════
   { id:'ach_deco1',    icon:'🏠', name:'내 방 첫 꾸미기', desc:'장식품 첫 배치',            check: s=>(s.houseDecorations||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
   { id:'ach_deco3',    icon:'🪴', name:'작은 변화',       desc:'장식품 3개 배치',           check: s=>(s.houseDecorations||[]).length>=3, reward:{exp:30,gold:20,title:null,deco:null} },
+  // [WORDS-1] 아래 보상 칭호 '인테리어'는 화면 말을 '꾸미기'로 바꿀 때도 그대로 둔다.
+  //   s.titles 는 문자열 배열로 저장되고(아래 checkNew) 이미 받은 학생 데이터에
+  //   그 문자열이 들어 있다. 이름만 바꾸면 옛 칭호가 남은 채 새 칭호가 하나 더 붙는다.
+  //   바꿀 거면 학생 데이터 마이그레이션이 같이 가야 한다.
   { id:'ach_deco7',    icon:'🎨', name:'분위기 만들기',   desc:'장식품 7개 배치',           check: s=>(s.houseDecorations||[]).length>=7, reward:{exp:60,gold:40,title:'인테리어',deco:null} },
 
   // ══ L. 메타 업적 ══════════════════════════════════════════

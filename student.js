@@ -9374,7 +9374,7 @@ function applyLayout(mode) {
   game.classList.remove('force-mobile', 'force-desktop');
   if (mode === 'mobile') {
     game.classList.add('force-mobile');
-    if (btn) btn.textContent = hudBtnText('📱', '모바일');
+    if (btn) btn.textContent = hudBtnText('📱', '좁게 보기');
     const mainTab = document.getElementById('mob-main-tab');
     if (mainTab) {
       document.querySelectorAll('.main-tab-content, .mobile-char-panel').forEach(el => el.classList.remove('active-tab'));
@@ -9399,7 +9399,7 @@ function hudBtnText(icon, label) {
 function syncHudButtons() {
   const lb = document.getElementById('layout-toggle-btn');
   if (lb) lb.textContent = LAYOUT_MODE === 'mobile'
-    ? hudBtnText('📱', '모바일') : hudBtnText('🖥️', '넓게 보기');
+    ? hudBtnText('📱', '좁게 보기') : hudBtnText('🖥️', '넓게 보기');
   const sb = document.getElementById('scale-mode-btn');
   if (sb) sb.textContent = SCALE_MODE
     ? hudBtnText('🔍', '화면 맞춤 ON') : hudBtnText('🔍', '화면 맞춤');
