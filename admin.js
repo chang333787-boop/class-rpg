@@ -2039,11 +2039,11 @@ function renderArtworkPending() {
     <div style="padding:.9rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.6rem">
         <span style="font-size:1.2rem">${item.student.avatar}</span>
-        <span style="font-weight:700">${item.student.name}</span>
+        <span style="font-weight:700">${escHtml(item.student.name || '')}</span>
         ${artKindOf(item) === 'free'
           ? '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(93,173,226,.16);color:var(--sky)">자유</span>'
           : '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(46,204,113,.16);color:var(--emerald)">수업</span>'}
-        <span style="font-size:.78rem;color:var(--txt3)">· ${escHtml(item.artTitle||'')}</span>
+        <span style="font-size:.78rem;color:var(--txt3)">· ${escHtml(item.artTitle || '제목 없는 그림')}</span>
         <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">${item.date||''}</span>
       </div>
       ${item.artUrl?`<img src="${escHtml(item.artUrl)}" style="width:100%;max-height:250px;object-fit:contain;border-radius:8px;margin-bottom:.6rem;cursor:pointer" onclick="adminOpenLightbox('${escJsAttr(item.artUrl)}','${escJsAttr(item.artTitle||'')}')">`:''}
@@ -2262,7 +2262,7 @@ function renderArtworkAdmin() {
         onclick="this.parentElement.querySelector('.aw-detail').style.display=
           this.parentElement.querySelector('.aw-detail').style.display==='none'?'':'none'">
         <span style="font-size:1.2rem">${s?.avatar||'?'}</span>
-        <span style="font-weight:700;flex:1">${s?.name||'?'}</span>
+        <span style="font-weight:700;flex:1">${escHtml(s?.name || '?')}</span>
         <span style="font-size:.75rem;color:var(--sky)">${arts.length}점</span>
         <span style="color:var(--txt3);font-size:.9rem">›</span>
       </div>
@@ -2272,7 +2272,7 @@ function renderArtworkAdmin() {
             ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
               onclick="adminOpenArtLb(event)">`:``}
             <div style="flex:1;min-width:0">
-              <div style="font-weight:600;font-size:.85rem">${escHtml(a.title)}
+              <div style="font-weight:600;font-size:.85rem">${escHtml(a.title || '제목 없는 그림')}
                 ${a.subject?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:10px;padding:.1rem .4rem;margin-left:.3rem">${escHtml(a.subject)}</span>`:''}
               </div>
               <div class="text-muted-tiny">${a.date||''}</div>
