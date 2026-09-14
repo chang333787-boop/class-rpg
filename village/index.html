@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>우리반 마을 · 시뮬 43차 — G1·G2 손질</title>
+<title>우리반 마을 · 시뮬 44차 — 저장 형식 v2(구역 문자열)</title>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:#0f1116;
@@ -1367,7 +1367,7 @@ function placeAt(kind, x, y, rot) {
   const rec = { k: kind, root: idx(x, y), rot: rot };
   footprint(kind, x, y, rot).forEach(([px, py]) => { cells[idx(px, py)] = rec; });
   placedTotal++;
-  dirtyChunks.add(chunkOfCell(rec.root)); mapDirty = true;
+  dirtyChunks.add(chunkOfCell(rec.root)); mapDirty = true; dirtyPlots.add(plotOf(x, y));
   if (kind === 'house' || K[kind].road) folksDirty = true;   // 사람이 생기거나 길이 열렸다
   amenityChanged(kind, x, y, rot);                      // 주변 가치(F33)
   return true;
@@ -1381,7 +1381,7 @@ function removeAt(x, y) {
     if (inb(px, py) && cells[idx(px, py)] === rec) cells[idx(px, py)] = null;
   });
   placedTotal--;
-  dirtyChunks.add(chunkOfCell(rec.root)); mapDirty = true;
+  dirtyChunks.add(chunkOfCell(rec.root)); mapDirty = true; dirtyPlots.add(plotOf(cX(rec.root), cY(rec.root)));
   if (kind === 'sign' && signSprites.has(rec.root)) refreshSignSprites();
   if (kind === 'house' || K[kind].road) folksDirty = true;
   if (kind === 'house') amen.delete(rec.root); else amenityChanged(kind, cX(rec.root), cY(rec.root), rec.rot);   // 주변 가치(F33)
@@ -2652,7 +2652,7 @@ function exportFile() {
 function importText(txt) {
   let d = null;
   try { d = JSON.parse(txt); } catch (e) { fileStats.거절++; return '마을 파일이 아니에요(읽을 수 없는 내용)'; }
-  if (!d || typeof d !== 'object' || typeof d.v !== 'number' || !Array.isArray(d.items)) { fileStats.거절++; return '마을 파일이 아니에요(모양이 다름)'; }
+  if (!d || typeof d !== 'object' || typeof d.v !== 'number' || !(Array.isArray(d.items) || (d.plotStr && typeof d.plotStr === 'object' && Array.isArray(d.palette)))) { fileStats.거절++; return '마을 파일이 아니에요(모양이 다름)'; }
   if (d.v > SAVE_V) { fileStats.거절++; return '더 새 판에서 저장한 파일이에요(v' + d.v + ')'; }
   if (!STORAGE_OK) { fileStats.거절++; return '이 창에서는 저장소가 막혀 있어 가져올 수 없어요 — 파일을 바탕화면에서 두 번 눌러 여세요'; }
   try {
@@ -3178,7 +3178,7 @@ function drawFolks(now) {
    물건 하나가 네 값뿐이라 그대로 RTDB 에 올릴 수 있다.
    학생 id 가 아직 없어 자리만 잡아 뒀다(SID).
    ══════════════════════════════════════════════════════════════ */
-const SAVE_V = 1;
+const SAVE_V = 2;                       // v2 = 구역 문자열 + palette (G5 ③). v1(items) 은 읽기만
 const SID = (QS.get('sid') || 'guest').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || 'guest';   // ?sid=<학생id>, 없으면 guest (G5 훅)
 const SAVE_KEY = 'rpg.village.' + SID;
 let saveBroken = false;                   // 저장이 막혔는가(용량 초과 등)
@@ -3198,7 +3198,54 @@ const STORAGE_OK = (function probeStorage() {
 let saveTimer = 0;
 let savingOff = false;                    // 시연용 화면에서는 저장하지 않는다
 
+/* ── v2: 구역 문자열 ── */
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const dirtyPlots = new Set(), plotStrCache = new Map();          // 구역 "px,py" → 문자열
+let lastSave = { 구역수: 0, 바뀐구역: 0, 크기: 0, 형식: '-' };
+function paletteNow() { const set = new Set(); cells.forEach((rec, i) => { if (rec && rec.root === i) set.add(rec.k); }); return [...set].sort(); }
+function encodePlot(px, py, palIdx) {
+  let out = '', run = 0, any = false;
+  for (let y = py * PLOT; y < Math.min(H, (py + 1) * PLOT); y++) for (let x = px * PLOT; x < Math.min(W, (px + 1) * PLOT); x++) {
+    const i = idx(x, y), rec = cells[i];
+    if (!rec || rec.root !== i) { run++; continue; }
+    if (run) { out += '~' + run.toString(36) + '.'; run = 0; }
+    const v = palIdx.get(rec.k) * 4 + (rec.rot & 3); out += B64[v >> 6] + B64[v & 63]; any = true;
+  }
+  return any ? out : '';
+}
+function decodePlot(str, px, py, pal, out) {
+  let i = 0, p = 0; const x0 = px * PLOT, y0 = py * PLOT, w = Math.min(W, x0 + PLOT) - x0;
+  while (p < str.length) {
+    if (str[p] === '~') { const e = str.indexOf('.', p); i += parseInt(str.slice(p + 1, e), 36); p = e + 1; continue; }
+    const v = B64.indexOf(str[p]) * 64 + B64.indexOf(str[p + 1]); p += 2;
+    const kind = pal[v >> 2], rot = v & 3, x = x0 + (i % w), y = y0 + ((i / w) | 0); i++;
+    out.push({ id: kind, x, y, rot });
+  }
+}
+/* 바뀐 구역만 다시 인코딩한다. 나머지는 캐시. */
+function plotStrings() {
+  const pal = paletteNow(), palIdx = new Map(pal.map((k, n) => [k, n])), ps = {};
+  const palChanged = JSON.stringify(pal) !== plotStrCache.get('__pal');
+  let changed = 0;
+  for (let py = 0; py < NPY; py++) for (let px = 0; px < NPX; px++) {
+    const key = px + ',' + py;
+    let str;
+    if (palChanged || dirtyPlots.has(key) || !plotStrCache.has(key)) { str = encodePlot(px, py, palIdx); plotStrCache.set(key, str); changed++; }
+    else str = plotStrCache.get(key);
+    if (str) ps[px + '_' + py] = str;
+  }
+  plotStrCache.set('__pal', JSON.stringify(pal)); dirtyPlots.clear();
+  return { pal, ps, changed };
+}
 function serialize() {
+  const { pal, ps, changed } = plotStrings();
+  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
+  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at]; });
+  lastSave = { 구역수: Object.keys(ps).length, 바뀐구역: changed, 크기: 0, 형식: 'v2' };
+  return { v: SAVE_V, w: W, h: H, palette: pal, plotStr: ps, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: [...unlocked], goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
+}
+/* 옛 형식(v1) — 시험·비교용으로만 남긴다 */
+function serializeV1() {
   const items = [], seen = new Set();
   cells.forEach(rec => {
     if (!rec || seen.has(rec)) return;
@@ -3208,7 +3255,7 @@ function serialize() {
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
   const unlockedList = [...unlocked];
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at]; });
-  return { v: SAVE_V, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
+  return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
 
 let noStorageShown = false;
@@ -3234,7 +3281,7 @@ function saveNow() {
   if (savingOff) return;
   if (!STORAGE_OK) { noteNoStorage(); return; }   // 환경이 안 받는다 — 붉은 경고를 띄우지 않는다
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(serialize()));
+    const txt = JSON.stringify(serialize()); localStorage.setItem(SAVE_KEY, txt); lastSave.크기 = txt.length;
     saveDirty = false;
     if (saveBroken) { saveBroken = false; saveWarned = false; }
     flashSaved('저장됨');
@@ -3278,7 +3325,8 @@ function loadSaved() {
   }
   let d = null;
   try { d = JSON.parse(raw); } catch (e) { return stash('저장본이 깨졌음(JSON 아님)'); }
-  if (!d || typeof d !== 'object' || !Array.isArray(d.items))
+  const isV1 = !!(d && Array.isArray(d.items)), isV2 = !!(d && d.plotStr && typeof d.plotStr === 'object' && Array.isArray(d.palette));
+  if (!d || typeof d !== 'object' || (!isV1 && !isV2))
     return stash('저장본 모양이 다름');
   if (typeof d.v !== 'number' || d.v > SAVE_V)
     return stash('모르는 저장본 버전 ' + d.v);
@@ -3288,7 +3336,9 @@ function loadSaved() {
 
   if (d.clock && typeof d.clock.t === 'number') { SIM.t = Math.max(0, d.clock.t); if (d.clock.speed) SIM.speed = d.clock.speed; if (d.clock.speed === 0) { SIM.paused = true; document.querySelectorAll('#spd button').forEach(b => b.classList.toggle('on', +b.dataset.s === 0)); } }
   let placedN = 0, skipped = 0;
-  d.items.forEach(it => {
+  let items = d.items;
+  if (isV2) { items = []; for (const key in d.plotStr) { const [px, py] = key.split('_').map(Number); if (!(px >= 0 && py >= 0 && px < NPX && py < NPY)) continue; try { decodePlot(String(d.plotStr[key]), px, py, d.palette, items); } catch (e) { skipped++; } } }
+  items.forEach(it => {
     if (!it || !K[it.id]) { skipped++; return; }
     const x = it.x | 0, y = it.y | 0, rot = (it.rot | 0) & 3;
     if (!inb(x, y)) { skipped++; return; }
@@ -3310,6 +3360,7 @@ function loadSaved() {
   if (Array.isArray(d.plots)) d.plots.forEach(k => { const [px, py] = String(k).split(',').map(Number); openPlot(px, py, true); });
   cells.forEach((rec, i) => { if (rec && rec.root === i) { const [px, py] = plotOf(cX(i), cY(i)).split(',').map(Number); openPlot(px, py, true); } });
   if (!plots.size) openPlot((NPX / 2) | 0, (NPY / 2) | 0, true);
+  if (isV1) { try { localStorage.setItem(SAVE_KEY + '.backup', raw); } catch (e) {} lastSave.형식 = 'v1→v2'; setTimeout(() => { if (!savingOff) { saveDirty = true; saveNow(); } }, 0); }   // 옛 형식은 원문을 옆에 두고 v2 로 다시 쓴다(말없이 버리지 않기)
   plotsEarned = typeof d.plotsEarned === 'number' ? d.plotsEarned : Math.max(0, plots.size - 1);
   if (!hasHouses) cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house') res.set(i, 1); });   // else 로 두면 뒤에 끼어드는 if 에 붙어 버린다(17차에서 잡음)
   cells.forEach((rec, i) => { if (rec && rec.root === i && LOCK_POP[rec.k]) unlocked.add(rec.k); });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
@@ -3649,7 +3700,7 @@ window.__snapshot = () => {
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = v.t; });
   return { 물건: items, 집: houses, 구역: [...plots].sort(), 표지판: signsObj, 꿈: DREAM.text || '', 흐름: HIST.length, 목표: [...goalsDone].sort(), 해금: [...unlocked].sort(), 이름: names, 인구: population(), 시계: Math.round(SIM.t), 저장키: SAVE_KEY };
 };
-window.__saveKey = () => SAVE_KEY; window.__flushStats = () => ({ ...flushStats, dirty: saveDirty });
+window.__saveKey = () => SAVE_KEY; window.__exportV1 = () => JSON.stringify(serializeV1()); window.__lastSave = () => ({ ...lastSave, dirty지금: dirtyPlots.size }); window.__flushStats = () => ({ ...flushStats, dirty: saveDirty });
 window.__put = (kind, x, y, rot) => { const why = canPlace(kind, x, y, rot || 0);
   if (why !== true) return why; placeAt(kind, x, y, rot || 0); updateCount(); return true; };
 window.__rot = () => { rotate(); return selRot; };
