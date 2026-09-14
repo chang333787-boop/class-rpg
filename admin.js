@@ -132,9 +132,9 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
-  rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
+  rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황', villages:'🏘️ 우리 마을',
   memories:'📸 추억 관리',
   recorder:'🎵 리코더 관리',
   weekly:'📅 주간 다짐', study:'📚 학습 범위',
@@ -207,6 +207,65 @@ function nav(page, el) {
   }
   if (page === 'emotion')        renderEmotionPage();
   if (page === 'emotionalerts')  renderEmotionAlerts();
+  if (page === 'villages')       renderVillagesPage();
+}
+
+// ══════════════════════════════════════════════════
+//  [VILLAGE-ADMIN-1] 우리 마을 — 읽기만
+// ══════════════════════════════════════════════════
+//  classRPG_villages(루트 밖, village/sync.js 가 쓰는 자리)를 **REST GET 으로만** 읽는다. 쓰기 0.
+//  · SDK once('value') 로 통째로 받지 않는다 — 구역 문자열까지 받으면 학생당 최대 약 135KB.
+//    대신 ① 목록은 ?shallow=true ② 학생마다 meta(수 KB) · plots?shallow=true(키만) · session 만.
+//  · 구경 링크는 아직 두지 않는다. 마을(index.html)이 ?visit= 를 받지 않는다(44·45차 확인).
+//    ?sid=<학생> 링크도 두지 않는다 — 교사 기기가 session 주인이 되어 학생 쪽이 구경 모드로 밀려난다.
+const VILLAGE_STALE_MS = 90000;   // village/sync.js 의 staleMs 와 같다 — 이 안에 박동이 있으면 "열려 있음"
+async function renderVillagesPage() {
+  const tbody = document.getElementById('villages-table');
+  const sum = document.getElementById('villages-summary');
+  const note = document.getElementById('villages-note');
+  if (!tbody) return;
+  const students = [];
+  const seen = new Set();
+  (DB.getStudents() || []).forEach(s => { if (s && s.id && !seen.has(s.id)) { seen.add(s.id); students.push(s); } });
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--txt3)">불러오는 중…</td></tr>`;
+  sum.textContent = ''; note.textContent = '';
+
+  const base = FIREBASE_CONFIG.databaseURL + '/classRPG_villages';
+  const getJSON = async path => { const r = await fetch(base + path); if (!r.ok) throw new Error(r.status); return r.json(); };
+  let list;
+  try { list = await getJSON('.json?shallow=true') || {}; }
+  catch (e) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--red)">마을 목록을 읽지 못했어요 (${escHtml(String(e.message || e))})</td></tr>`; return; }
+
+  const rows = await Promise.all(students.map(async s => {
+    if (!list[s.id]) return { s, has: false };
+    const enc = encodeURIComponent(s.id);
+    try {
+      const [meta, plots, session] = await Promise.all([
+        getJSON('/' + enc + '/meta.json'), getJSON('/' + enc + '/plots.json?shallow=true'), getJSON('/' + enc + '/session.json')]);
+      const houses = meta && meta.houses && typeof meta.houses === 'object' ? Object.values(meta.houses) : [];
+      return { s, has: true, plots: plots ? Object.keys(plots).length : 0, houses: houses.length,
+               people: houses.reduce((n, h) => n + (Array.isArray(h) ? (h[0] | 0) : 0), 0),
+               savedAt: meta && typeof meta.savedAt === 'number' ? meta.savedAt : null,
+               open: !!(session && typeof session.at === 'number' && Date.now() - session.at < VILLAGE_STALE_MS) };
+    } catch (e) { return { s, has: true, error: String(e.message || e) }; }
+  }));
+
+  const fmt = ms => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const muted = t => `<span style="color:var(--txt3)">${t}</span>`;
+  tbody.innerHTML = rows.map(r => {
+    const name = escHtml(r.s.name || r.s.id);
+    if (!r.has) return `<tr><td>${name}</td><td>${muted('아직 없음')}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+    if (r.error) return `<tr><td>${name}</td><td>있음</td><td colspan="5" style="color:var(--red)">읽기 실패 (${escHtml(r.error)})</td></tr>`;
+    return `<tr><td>${name}</td><td>있음</td><td>${r.plots}</td><td>${r.houses}</td><td>${r.people}</td>`
+         + `<td>${r.savedAt ? fmt(r.savedAt) : muted('-')}</td><td>${r.open ? '🟢 열려 있음' : muted('닫힘')}</td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--txt3)">학생이 없어요</td></tr>`;
+
+  const n = rows.filter(r => r.has).length;
+  const orphan = Object.keys(list).filter(id => !seen.has(id));
+  sum.textContent = `${students.length}명 중 ${n}명 저장됨`;
+  note.innerHTML = (n === 0 ? '아직 온라인에 저장된 마을이 없어요. 마을 저장 규칙을 게시하고 마을 새 판이 올라간 뒤부터 쌓입니다.<br>' : '')
+    + (orphan.length ? `학생 목록에 없는 마을 ${orphan.length}개: ${orphan.map(escHtml).join(', ')}<br>` : '')
+    + '마을 구경 링크는 마을 쪽에서 구경 모드(?visit=)를 지원한 뒤 붙입니다.';
 }
 
 // ══════════════════════════════════════════════════
