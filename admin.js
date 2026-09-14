@@ -430,7 +430,7 @@ function renderDashboard() {
         border-bottom:1px solid rgba(255,255,255,.04)">
         <div style="font-size:1.1rem">${s.avatar}</div>
         <div class="flex-1">
-          <div style="font-size:.84rem;font-weight:700">${s.name}</div>
+          <div style="font-size:.84rem;font-weight:700">${escHtml(s.name)}</div>
           <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${r.date||''} 요청</div>
         </div>
         <div style="display:flex;gap:.4rem;flex-shrink:0">
@@ -455,7 +455,7 @@ function renderDashboard() {
       return `<div style="display:flex;align-items:center;gap:.8rem;padding:.5rem 1rem;">
         <div style="font-size:1.1rem;width:28px;text-align:center">${s.avatar}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${s.name}</div>
+          <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${escHtml(s.name)}</div>
           <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
             <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4A90E2,#5BA8F5);border-radius:2px"></div>
           </div>
@@ -491,7 +491,7 @@ function renderStudentTable() {
   document.getElementById('student-table').innerHTML = students.map(s => `
     <tr>
       <td><div class="td-avatar">${s.avatar}</div></td>
-      <td><div class="td-name">${s.name}</div></td>
+      <td><div class="td-name">${escHtml(s.name)}</div></td>
       <td><div class="td-level">Lv.${s.level}</div></td>
       <td>
         <div style="display:flex;align-items:center;gap:.5rem">
@@ -1242,7 +1242,7 @@ function renderApproveGrid() {
       <th style="padding:.5rem .8rem;text-align:left;font-size:.78rem;border:1px solid var(--border2);min-width:160px;position:sticky;left:0;background:var(--bg3);z-index:5">퀘스트</th>
       ${students.map(s=>`<th style="padding:.4rem .3rem;text-align:center;font-size:.72rem;border:1px solid var(--border2);min-width:64px">
         <div style="font-size:1rem">${s.avatar}</div>
-        <div>${s.name}</div>
+        <div>${escHtml(s.name)}</div>
       </th>`).join('')}
     </tr></thead><tbody>`;
 
@@ -1524,7 +1524,7 @@ function renderPromotionList() {
         return `<div class="approve-card">
           <div style="font-size:2rem">⬆️</div>
           <div class="ac-left">
-            <div class="ac-student">${s.avatar} ${s.name}</div>
+            <div class="ac-student">${s.avatar} ${escHtml(s.name)}</div>
             <div class="ac-quest">Lv.${req.level} 승급 신청 · ${req.date||''}</div>
             <div class="ac-rewards">
               <span class="ac-tag">현재 Lv.${s.level||1}</span>
@@ -1565,7 +1565,7 @@ function renderPromotionList() {
       return `<div style="display:flex;align-items:center;gap:.7rem;padding:.5rem 1.2rem;
         border-bottom:1px solid rgba(255,255,255,.05)">
         <span>${s.avatar||'🙂'}</span>
-        <span style="font-weight:700;font-size:.88rem;min-width:60px">${s.name}</span>
+        <span style="font-weight:700;font-size:.88rem;min-width:60px">${escHtml(s.name)}</span>
         <span style="font-size:.78rem;font-weight:700;color:var(--sky)">Lv.${s.level||1}</span>
         <span class="text-muted-sm">${s.job||'학생'}</span>
         <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;max-width:120px">
@@ -1665,7 +1665,7 @@ function buildRankingHTML(students) {
         <span style="font-size:1.3rem;flex-shrink:0">${medals[i]}</span>
         <span style="font-size:1.1rem;flex-shrink:0">${s.avatar||''}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
+          <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.name)}</div>
           <div style="font-size:.75rem;color:var(--gold);font-weight:700">${cat.fmt(s,val)}</div>
         </div>
       </div>`;
@@ -1781,7 +1781,7 @@ function renderStatsPage() {
       background:rgba(255,255,255,.04);border-radius:12px;margin-bottom:1rem">
       <span style="font-size:2rem">${s.avatar}</span>
       <div>
-        <div style="font-weight:700">${s.name} <span style="font-size:.76rem;color:var(--txt3)">Lv.${s.level}</span></div>
+        <div style="font-weight:700">${escHtml(s.name)} <span style="font-size:.76rem;color:var(--txt3)">Lv.${s.level}</span></div>
         <div style="font-size:.75rem;color:var(--txt2);margin-top:.15rem">
           📚${s.stats?.read||0} ✏️${s.stats?.study||0} 🎨${s.stats?.art||0} 💎${s.stats?.value||0} 💪${s.stats?.health||0} 🏠${s.stats?.life||0}
         </div>
@@ -1944,7 +1944,7 @@ function renderDqSummary() {
           return `<div class="dq-stu" style="border-bottom:1px solid rgba(255,255,255,.04);padding:.4rem .8rem">
             <div style="display:flex;align-items:center;gap:.5rem">
               <span>${s.avatar}</span>
-              <span style="font-size:.82rem;font-weight:700;flex:1">${s.name}</span>
+              <span style="font-size:.82rem;font-weight:700;flex:1">${escHtml(s.name)}</span>
               <span style="font-size:.7rem;color:var(--txt3)">미완료 ${undone}일 · ${pct}%</span>
               <span style="font-size:.73rem;font-weight:700;color:${color};min-width:48px;text-align:right">${totalDone}/${totalAvail}일</span>
               <button class="btn-sm outline" style="font-size:.66rem;padding:.1rem .4rem;white-space:nowrap"
@@ -3456,7 +3456,7 @@ function renderWeeklyAdminPage() {
       <div style="display:flex;flex-wrap:wrap;gap:.3rem">
         ${monDone.length===0?'<span class="text-muted-base">없음</span>':
           monDone.map(s=>`<span style="font-size:.75rem;background:rgba(93,173,226,.12);
-            color:var(--sky);border-radius:20px;padding:.15rem .55rem">${s.avatar} ${s.name}</span>`).join('')}
+            color:var(--sky);border-radius:20px;padding:.15rem .55rem">${s.avatar} ${escHtml(s.name)}</span>`).join('')}
       </div>`;
   }
 
@@ -3469,7 +3469,7 @@ function renderWeeklyAdminPage() {
       incEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.6rem 1.2rem">
         ${noDone.map(s=>`<span style="font-size:.78rem;background:rgba(231,76,60,.1);
           color:var(--red);border-radius:20px;padding:.2rem .6rem;border:1px solid rgba(231,76,60,.2)">
-          ${s.avatar} ${s.name}</span>`).join('')}
+          ${s.avatar} ${escHtml(s.name)}</span>`).join('')}
       </div>`;
     }
   }
@@ -3505,7 +3505,7 @@ function renderWeeklyAdminPage() {
     <div style="border-bottom:1px solid rgba(255,255,255,.05);padding:.8rem 1.2rem">
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
         <span>${s.avatar}</span>
-        <span style="font-weight:700;font-size:.88rem">${s.name}</span>
+        <span style="font-weight:700;font-size:.88rem">${escHtml(s.name)}</span>
         <span style="font-size:.72rem;color:var(--txt3);background:rgba(255,255,255,.06);
           border-radius:20px;padding:.1rem .45rem">${wk} 주</span>
         ${goal?'<span style="font-size:.68rem;color:var(--sky);background:rgba(93,173,226,.1);border-radius:20px;padding:.1rem .45rem">📅 월 작성</span>':''}
@@ -4220,7 +4220,7 @@ function renderBoardQuestList() {
         border-radius:8px;background:${done?'rgba(46,204,113,.08)':'rgba(255,255,255,.03)'};
         border:1px solid ${done?'rgba(46,204,113,.2)':'rgba(255,255,255,.06)'};margin-bottom:.3rem">
         <span style="font-size:1rem">${s.avatar}</span>
-        <span style="font-size:.83rem;font-weight:600;flex:1">${s.name}</span>
+        <span style="font-size:.83rem;font-weight:600;flex:1">${escHtml(s.name)}</span>
         ${done
           ? `<span style="font-size:.72rem;color:var(--emerald);font-weight:700">✅ 완료</span>`
           : `${pending?`<span style="font-size:.68rem;color:var(--gold);font-weight:700;margin-right:.35rem">⏳ 신청중</span>`:''}
@@ -4451,7 +4451,7 @@ function populateRewardStudents() {
   const sel = document.getElementById('rw-student');
   const students = DB.getStudents();
   // ★ 버그 수정: innerHTML 초기화 후 재구성 (중복 방지)
-  sel.innerHTML = students.map(s => `<option value="${s.id}">${s.avatar} ${s.name}</option>`).join('');
+  sel.innerHTML = students.map(s => `<option value="${s.id}">${s.avatar} ${escHtml(s.name)}</option>`).join('');
   loadRewardStudent();
 }
 
@@ -4589,7 +4589,7 @@ function renderMonsters() {
   const killTbl = document.getElementById('monster-kill-table');
   if (killTbl) killTbl.innerHTML = students.map(s => `
     <tr>
-      <td>${s.avatar} <strong>${s.name}</strong></td>
+      <td>${s.avatar} <strong>${escHtml(s.name)}</strong></td>
       <td style="color:var(--red);font-weight:700">${(s.monsterLog||[]).length} / ${allMonsters.length}</td>
       <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).map(e=>{const mm=allMonsters.find(m=>m.id===e);return mm?mm.name:e;}).join(', ')||'-'}</td>
     </tr>`).join('');
