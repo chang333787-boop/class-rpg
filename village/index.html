@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>우리반 마을 · 시뮬 44차 — 저장 형식 v2(구역 문자열)</title>
+<title>우리반 마을 · 시뮬 45차 — 저장층 sync + palette·sid 결함</title>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:#0f1116;
@@ -224,6 +224,7 @@
   };
 </script>
 
+<script src="./sync.js"></script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
 </script>
@@ -2642,6 +2643,7 @@ function rhythmTick(f, i, now) {
    ══════════════════════════════════════════════════════════════ */
 const fileStats = { 내보냄: 0, 가져옴: 0, 거절: 0 };
 function exportText() { return JSON.stringify(serialize()); }
+function reopenUrl() { const q = new URLSearchParams(location.search); q.set('r', String(Date.now())); return location.pathname + '?' + q.toString(); }   // sid·dev 를 잃지 않는다(결함 B)
 function exportFile() {
   const txt = exportText(), d = new Date(), stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); a.download = '우리반마을_' + SID + '_' + stamp + '.json';
@@ -2669,7 +2671,7 @@ document.getElementById('importBtn').onclick = () => document.getElementById('im
 document.getElementById('importFile').onchange = (e) => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   const rd = new FileReader();
-  rd.onload = () => { const r = importText(String(rd.result)); if (r === true) { toast('⬆️ 마을을 가져왔어요 — 다시 열어요', true); setTimeout(() => location.replace(location.pathname + '?r=' + Date.now()), 600); } else toast(r); e.target.value = ''; };
+  rd.onload = () => { const r = importText(String(rd.result)); if (r === true) { toast('⬆️ 마을을 가져왔어요 — 다시 열어요', true); setTimeout(() => location.replace(reopenUrl()), 600); } else toast(r); e.target.value = ''; };
   rd.readAsText(f);
 };
 window.__exportText = exportText;
@@ -2740,7 +2742,7 @@ document.getElementById('friendsClose').onclick = () => document.getElementById(
 document.getElementById('likeBtn').onclick = () => { if (!VISIT.on) return; const l = likes(); const id = VISIT.who.id; if (l[id]) delete l[id]; else l[id] = 1;
   try { localStorage.setItem(likeKey(), JSON.stringify(l)); } catch (e) {}
   document.getElementById('likeBtn').classList.toggle('on', !!l[id]); toast(l[id] ? '❤️ 좋아요! ' + VISIT.who.nm + '의 마을 ❤️ ' + likeCount(VISIT.who) : '좋아요를 거뒀어요', true); sndFx('pop'); };
-document.getElementById('backBtn').onclick = () => { location.replace(location.pathname + '?r=' + Date.now()); };   // 내 저장본에서 다시 — 구경 중엔 한 글자도 안 썼다
+document.getElementById('backBtn').onclick = () => { location.replace(reopenUrl()); };   // 내 저장본에서 다시 — 구경 중엔 한 글자도 안 썼다
 window.__friends = () => ({ 구경중: VISIT.on, 누구: VISIT.who ? VISIT.who.nm : null, 목록: FRIENDS.map(f => [f.nm, friendCounts(f).집, likeCount(f)]), 좋아요: likes() });
 window.__visit = (k) => visitFriend(FRIENDS[k]);
 window.__save = () => { saveNow(); return !savingOff; };
@@ -3202,7 +3204,8 @@ let savingOff = false;                    // 시연용 화면에서는 저장하
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const dirtyPlots = new Set(), plotStrCache = new Map();          // 구역 "px,py" → 문자열
 let lastSave = { 구역수: 0, 바뀐구역: 0, 크기: 0, 형식: '-' };
-function paletteNow() { const set = new Set(); cells.forEach((rec, i) => { if (rec && rec.root === i) set.add(rec.k); }); return [...set].sort(); }
+let PALETTE = [];                                                   // 저장본에서 이어받고, 새 종류는 끝에만 붙인다(번호 불변 — 정렬하면 안 건드린 구역 문자열까지 바뀐다)
+function paletteNow() { cells.forEach((rec, i) => { if (rec && rec.root === i && !PALETTE.includes(rec.k)) PALETTE.push(rec.k); }); return PALETTE.slice(); }
 function encodePlot(px, py, palIdx) {
   let out = '', run = 0, any = false;
   for (let y = py * PLOT; y < Math.min(H, (py + 1) * PLOT); y++) for (let x = px * PLOT; x < Math.min(W, (px + 1) * PLOT); x++) {
@@ -3225,7 +3228,7 @@ function decodePlot(str, px, py, pal, out) {
 /* 바뀐 구역만 다시 인코딩한다. 나머지는 캐시. */
 function plotStrings() {
   const pal = paletteNow(), palIdx = new Map(pal.map((k, n) => [k, n])), ps = {};
-  const palChanged = JSON.stringify(pal) !== plotStrCache.get('__pal');
+  const palChanged = false;                                          // 번호가 안 밀리니 캐시는 그대로
   let changed = 0;
   for (let py = 0; py < NPY; py++) for (let px = 0; px < NPX; px++) {
     const key = px + ',' + py;
@@ -3337,7 +3340,7 @@ function loadSaved() {
   if (d.clock && typeof d.clock.t === 'number') { SIM.t = Math.max(0, d.clock.t); if (d.clock.speed) SIM.speed = d.clock.speed; if (d.clock.speed === 0) { SIM.paused = true; document.querySelectorAll('#spd button').forEach(b => b.classList.toggle('on', +b.dataset.s === 0)); } }
   let placedN = 0, skipped = 0;
   let items = d.items;
-  if (isV2) { items = []; for (const key in d.plotStr) { const [px, py] = key.split('_').map(Number); if (!(px >= 0 && py >= 0 && px < NPX && py < NPY)) continue; try { decodePlot(String(d.plotStr[key]), px, py, d.palette, items); } catch (e) { skipped++; } } }
+  if (isV2) { PALETTE = d.palette.map(String); items = []; for (const key in d.plotStr) { const [px, py] = key.split('_').map(Number); if (!(px >= 0 && py >= 0 && px < NPX && py < NPY)) continue; try { decodePlot(String(d.plotStr[key]), px, py, d.palette, items); } catch (e) { skipped++; } } }
   items.forEach(it => {
     if (!it || !K[it.id]) { skipped++; return; }
     const x = it.x | 0, y = it.y | 0, rot = (it.rot | 0) & 3;
@@ -3455,6 +3458,7 @@ else if (hash.indexOf('adv') >= 0) {
   }
   if (hash.indexOf('house') >= 0) setMode('house', null);
 } else {
+  if (window.VillageSync) { try { await VillageSync.boot({ sid: SID }); } catch (e) { console.warn('VillageSync.boot', e); } }   // 원격 판을 저장본 자리에 먼저(G5 ④)
   const r = loadSaved();
   if (r.ok && r.placed > 0) {
     startInfo = '저장본에서 ' + r.placed + '개 되살림'
@@ -3700,7 +3704,7 @@ window.__snapshot = () => {
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = v.t; });
   return { 물건: items, 집: houses, 구역: [...plots].sort(), 표지판: signsObj, 꿈: DREAM.text || '', 흐름: HIST.length, 목표: [...goalsDone].sort(), 해금: [...unlocked].sort(), 이름: names, 인구: population(), 시계: Math.round(SIM.t), 저장키: SAVE_KEY };
 };
-window.__saveKey = () => SAVE_KEY; window.__exportV1 = () => JSON.stringify(serializeV1()); window.__lastSave = () => ({ ...lastSave, dirty지금: dirtyPlots.size }); window.__flushStats = () => ({ ...flushStats, dirty: saveDirty });
+window.__saveKey = () => SAVE_KEY; window.__reopenUrl = reopenUrl; window.__palette = () => PALETTE.slice(); window.__exportV1 = () => JSON.stringify(serializeV1()); window.__lastSave = () => ({ ...lastSave, dirty지금: dirtyPlots.size }); window.__flushStats = () => ({ ...flushStats, dirty: saveDirty });
 window.__put = (kind, x, y, rot) => { const why = canPlace(kind, x, y, rot || 0);
   if (why !== true) return why; placeAt(kind, x, y, rot || 0); updateCount(); return true; };
 window.__rot = () => { rotate(); return selRot; };
@@ -3961,6 +3965,7 @@ function loop() {
 })();
 resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
+if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
 </script>
 </body>
 </html>
