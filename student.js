@@ -1750,7 +1750,7 @@ function buildMainHTML() {
           <div class="tc-label">👥 친구 방문</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
           ${allStudents.map(f=>`<div class="friend-row" onclick="visitFriend('${f.id}')">
-            <span>${f.avatar} ${f.name}</span>
+            <span>${f.avatar} ${escHtml(f.name)}</span>
             <span style="font-size:.7rem;color:var(--txt3)">Lv.${f.level} →</span>
           </div>`).join('')}
           </div>
@@ -7847,7 +7847,7 @@ function renderArtworks() {
   const pendingHtml = pending.map(a => `
     <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,215,0,.2);
       border-radius:14px;overflow:hidden;margin-bottom:.8rem">
-      ${a.artUrl?`<img src="${a.artUrl}" style="width:100%;max-height:200px;object-fit:cover;display:block">`:''}
+      ${a.artUrl?`<img src="${escHtml(a.artUrl)}" style="width:100%;max-height:200px;object-fit:cover;display:block">`:''}
       <div style="padding:.75rem .9rem">
         <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap">
           <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
@@ -7870,7 +7870,7 @@ function renderArtworks() {
     <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(46,204,113,.15);
       border-radius:14px;overflow:hidden;margin-bottom:.8rem">
       ${url?`<div style="position:relative;cursor:pointer" onclick="openLightbox(window._artLbImgs,${lbIdx})">
-        <img src="${url}" style="width:100%;max-height:220px;object-fit:cover;display:block"
+        <img src="${escHtml(url)}" style="width:100%;max-height:220px;object-fit:cover;display:block"
           onerror="this.parentElement.style.display='none'">
         <div style="position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .2s"
           onmouseover="this.style.background='rgba(0,0,0,.15)'" onmouseout="this.style.background='rgba(0,0,0,0)'">
@@ -9254,7 +9254,7 @@ function visitFriend(id) {
   el.id = modalId+'-overlay';
   el.innerHTML = `<div class="modal" style="max-width:460px">
     <div class="modal-hd">
-      <div class="modal-title">${f.avatar} ${f.name}의 집</div>
+      <div class="modal-title">${f.avatar} ${escHtml(f.name)}의 집</div>
       <button class="modal-close" onclick="this.closest('.overlay').remove()">✕</button>
     </div>
     <!-- 프로필 -->
@@ -9262,8 +9262,8 @@ function visitFriend(id) {
       background:rgba(255,255,255,.04);border-radius:12px;margin-bottom:.8rem">
       <div style="font-size:2.8rem">${f.avatar}</div>
       <div>
-        <div style="font-weight:700">${f.name}
-          ${f.title?`<span style="font-size:.72rem;color:var(--gold);margin-left:.3rem">[${f.title}]</span>`:''}
+        <div style="font-weight:700">${escHtml(f.name)}
+          ${f.title?`<span style="font-size:.72rem;color:var(--gold);margin-left:.3rem">[${escHtml(f.title)}]</span>`:''}
         </div>
         <div style="font-size:.76rem;color:var(--txt2);margin-top:.2rem">
           Lv.${f.level} · 📚${f.bookCount||0}권 · ⚔️${(f.monsterLog||[]).length}마리
@@ -9306,7 +9306,7 @@ function visitFriend(id) {
             ${artworks.map((a,i)=>a.artUrl?`
               <div style="border-radius:10px;overflow:hidden;cursor:pointer"
                 onclick="openLightbox(window._friendArtLbImgs,${friendArtLb.findIndex(x=>x.url===a.artUrl)})">
-                <img src="${a.artUrl}" style="width:100%;aspect-ratio:1;object-fit:cover">
+                <img src="${escHtml(a.artUrl)}" style="width:100%;aspect-ratio:1;object-fit:cover">
                 <div style="padding:.3rem .4rem;font-size:.72rem;font-weight:600;background:rgba(255,255,255,.04)">${escHtml(a.title||'')}</div>
               </div>`:''
             ).join('')}

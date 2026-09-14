@@ -522,7 +522,7 @@ function openStudentDetail(id) {
       <div class="ms-label">기본 정보</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">이름</label>
-          <input class="form-input" id="det-name" value="${s.name}"></div>
+          <input class="form-input" id="det-name" value="${escHtml(s.name)}"></div>
         <div class="form-group"><label class="form-label">직업(장래희망)</label>
           <input class="form-input" id="det-job" value="${s.job||''}"></div>
         <div class="form-group"><label class="form-label">칭호</label>
