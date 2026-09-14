@@ -19,7 +19,7 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 - 외부 의존성(전부 CDN, npm 설치 없음):
   - Firebase 9.23.0 compat SDK (`app` / `database` / `storage`)
   - Chart.js 4.4.0 (student/admin 통계 차트)
-- 현재 상태: 리팩토링 1차 마감(아래 [현재 안정화 상태](#현재-안정화-상태) 참고). 기능 개발은 보류 중.
+- 현재 상태: 리팩토링 1차 마감(2026-07) 뒤 **2026-09부터 기능 개발 재개.** 학습(국어·수학·사회 문항·받아쓰기·지문·별과 복습)·작품·쪽지·미니 세상 마을이 더해졌다. 아래 [현재 안정화 상태](#현재-안정화-상태) 참고.
 
 ---
 
@@ -32,6 +32,8 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 | 학생 | `student.html` | 학생 본인 화면. 캐릭터·퀘스트·보상 수령·농장·전투·작품 등 |
 | 관리(교사) | `admin.html` | 교사용 관리 화면. 학생 관리, 퀘스트/보상 승인, 설정, 백업/복원/초기화 |
 | 키오스크 | `kiosk.html` | 교실 공용 "할 일 체크판". 학생이 퀘스트 신청/취소(부분 저장 위주) |
+| 우리 마을 | `village/index.html` | 미니 세상 마을(three.js). 학생 홈 🏘️ 타일이 iframe으로 연다(`?sid=<학생id>`). 교과 연결 없음 |
+| 수채화·데생 | `watercolor/index.html` | 수채화 16차시·데생 10차시 앱. 학생 홈에서 iframe으로 연다 |
 
 ---
 
@@ -44,9 +46,17 @@ gamedata.js        공유 데이터 + DB 레이어 (게임 상수, Utils, Fireba
 student.html  / student.js  / student.css     학생 화면
 admin.html    / admin.js    / admin.css       관리(교사) 화면
 kiosk.html    / kiosk.js    / kiosk.css        키오스크(할 일 체크판) 화면
+curriculum.js / curriculum_review.js           학습 문항 은행(국어·수학·사회) + 복습 문항 · CurriculumUtils
+curriculum_reading.js                          국어 지문 세트(READING_PASSAGES·READING_ITEMS, 지문 20편×4문항)
+figures.js                                     수학 문항 그림(SVG)
 assets/monsters/                               몬스터 이미지 100장 (iconImg()가 이모지 폴백과 함께 표시)
+assets/char · deco · floor · seeds · crops …   캐릭터 종이인형 84 · 장식 SVG · 바닥 타일 · 씨앗 등
+village/                                       우리 마을: index.html · sync.js(원격 저장층) · vendor/three.module.js
+watercolor/                                    수채화·데생 앱
 scripts/verify-safety.mjs                      저장 안전 정적 검증 스크립트 (Node 기본 모듈만)
-scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test
+scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test (캐시버스터는 html에서 읽어 교차검증)
+scripts/unit/run.mjs                           student.js 순수 함수 단위 테스트(함수 본문만 떼어 vm 실행)
+scripts/village-sync/                          sync.js 가짜 RTDB 대조 시험
 docs/                                          리팩토링 안전 규칙 / 인수인계 / 에셋 명세 문서
 CNAME                                          GitHub Pages 커스텀 도메인 (funclassrpg.kr)
 ```
@@ -74,8 +84,10 @@ CNAME                                          GitHub Pages 커스텀 도메인 
 
 - HTML에 인라인 `onclick`/`ontouchstart` 등 전역 함수·전역 변수에 의존하는 핸들러가 많다.
   → 스크립트를 모듈화하거나 `defer`로 바꾸면 **전역이 깨진다.** 평면 전역 스코프를 유지해야 한다.
-- 캐시 무효화: JS는 `?v=20260702` 계열, CSS는 `?v=20260604` 쿼리를 붙인다.
-  JS/CSS를 수정하면 해당 HTML의 `?v=` 갱신을 검토할 것. `gamedata.js`도 2026-07-02부터 `?v=` 부착.
+- 캐시 무효화: 모든 JS/CSS에 `?v=<날짜><접미>`를 붙인다(예: `student.js?v=20260915q1a`).
+  - **html 한 곳만 고친다**(smoke-test가 html에서 읽는다, #205).
+  - `gamedata.js`·`curriculum.js`처럼 여러 화면이 쓰는 파일은 student·admin·kiosk html에서 **같은 값으로 함께** 올린다.
+  - 충돌이 안 났어도 main보다 앞선 값인지 눈으로 확인한다(같은 값으로 조용히 병합되면 옛 캐시가 배포된다).
 
 ---
 
@@ -126,9 +138,12 @@ curl -s "https://funclassrpg.kr/student.js?v=20260602&cb=$(date +%s)"
 | `emotionLogs` | 감정 기록 |
 | `settings` | 학급 설정(반 이름, 보스, 보상 기준 등) |
 | `customMonsters` / `customQuestTemplates` / `hiddenQuestTemplates` | 교사 커스텀/숨김 항목 |
-| `backups` | 관리 화면에서 만든 백업 스냅샷 |
+| `studentNotes` | 교사가 학생마다 써 준 쪽지(`studentNotes/<sid>/<noteId>`, 비밀번호 칸 없음) |
+| `backups` | **옛 위치**(읽기 폴백만). 새 백업은 루트 밖 `classRPG_backups`에 쓴다 |
 
-- 관리자 비밀번호는 별도 키 `classRPG_adminPw`에 저장된다.
+- `classRPG_v3` 밖의 루트 키: `classRPG_adminPw`(관리자 인증값) · `classRPG_backups`(백업 스냅샷, BACKUP_NODES 23개 노드) · `classRPG_villages/<sid>`(마을 원격 저장, 규칙 게시 뒤 사용).
+- **비밀번호 값은 문서·쪽지·커밋 어디에도 적지 않는다.**
+- REST로 직접 읽을 때: 배열 필드는 객체맵으로 올 수 있다(`Array.isArray` 확인 후 `Object.values`). `students`는 숫자 키 옛 사본과 id 키 본이 함께 있으니 **id로 중복 제거**한다.
 - **저장 안전 원칙**: 루트 전체 쓰기(`_fbRef.set/remove/update`)는 학생 데이터 클로버 위험(footgun)이라 일반 작업에서 금지한다.
   단일 노드만 바꿀 땐 `child('...')` 부분 저장을 쓴다(예: kiosk의 `child('students/<id>/pendingRewards').set(...)`).
 - **루트 쓰기가 허용되는 곳은 의도된 게이팅 경로뿐**: 데이터 가져오기(import) / 백업 롤백 / 전체 초기화(reset, 비밀번호 확인) / 전체 수치 초기화 / 빈 DB 최초 부트스트랩.
@@ -146,6 +161,7 @@ node scripts/verify-safety.mjs
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
 - 현재 기대 결과: **`PASS 18 · REVIEW 1 · FAIL 0`** (exit code 0)
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 28 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 49 · FAIL 0`** (2026-09-15 기준)
 - 남은 `REVIEW 1`건 = 루트 쓰기 후보(`gamedata.js` 1 + `admin.js` 4). 전부 위의 **의도된 게이팅 경로**다.
   0으로 강제하지 않는다 — 강제하면 새로 추가되는 진짜 루트 쓰기를 못 잡는 사각이 생긴다. **안전 알림으로 유지**한다.
 
@@ -159,7 +175,8 @@ HTML 인라인 `<script>`/`<style>` 잔여 등.
 
 리팩토링/안정화 작업은 다음 규칙을 따른다(상세는 `docs/rpg_refactor_safety_rules.md`).
 
-- **협업 방식**: GPT 감독 + Claude Code 작업자 + 사용자 승인. **Codex는 기본 사용하지 않는다.**
+- **협업 방식**(2026-09~): 학교 Windows에서 Claude Code "보스" 세션이 조율하고 조수 세션들이 worktree에서 PR을 올린다. **머지는 보스만.** 사용자 결정(가격·로그인·데이터 삭제·규칙 게시)은 사용자가 한다. 맥북 쪽은 GPT 감독(CLAUDE.md §3).
+- 메인 clone은 항상 `main`, 작업은 `git worktree`로 따로.
 - **한 작업 = 한 목표**. 기능 추가와 리팩토링을 한 작업에 섞지 않는다.
 - `git checkout main && git pull --ff-only`로 시작, read-only 조사 먼저, 작은 수정, 시작/끝 검증.
 - `git add .` **금지** — 변경한 특정 파일만 add 한다.
@@ -185,15 +202,18 @@ HTML 인라인 `<script>`/`<style>` 잔여 등.
 ## 참고 문서
 
 - `docs/rpg_refactor_safety_rules.md` — **현행 안전 규칙**(저장 규칙·날짜/정규화·캐시 버전·고위험 보류·검증 절차)
+- `docs/rpg_teacher_operation_guide.md` — 교사용 운영 가이드(마을·쪽지·작품·국어·별과 복습 포함)
+- `docs/worklog/` — 날짜별 작업 기록. `docs/worklog/README.md`에 커밋 제목으로 못 찾는 기록 색인
 - `docs/rpg_refactor_codex_handoff.md` — 과거 인수인계/이력 배경(참고용, 일부 옛 기준 포함)
 
 ---
 
 ## 현재 안정화 상태
 
-- 기준 commit: `7c3350e` (리팩토링 1차 마감)
-- `verify-safety.mjs` → `PASS 18 · REVIEW 1 · FAIL 0`
+- 리팩토링 1차 마감 commit: `7c3350e` (2026-07)
+- 2026-09-15 main 기준: `verify-safety` 18/1/0 · `smoke-test` 28/0/0 · `unit/run` 49/0
+- 열린 게이트: Firebase 규칙 게시 → #214(마을 45차 서버 저장) 머지. 규칙 전에는 마을이 기기(localStorage)에만 저장된다
 - JS/CSS 외부화 완료, HTML 인라인 `<script>`/`<style>` 잔여 **0건**
 - `DB.save(`/`this.save(` 0건, 루트 저장 위험 정리됨
 - 날짜 기준·kiosk 정규화 단일 소스 통일 완료
-- 기능 개발 복귀는 사용자 지시 전까지 보류
+- 보안 Phase1(익명 Auth + 규칙)은 설계 단계, 결정은 사용자
