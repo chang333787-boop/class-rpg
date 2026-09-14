@@ -10455,9 +10455,11 @@ const MASTERY_GAP = [0, 1, 2, 4, 7, 14];   // 별 0~5일 때 며칠 뒤에 다�
 let _masteryCache = null, _masteryOwner = null;
 function invalidateMastery() { _masteryCache = null; _masteryOwner = null; }
 function addDaysStr(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
+  // [MASTERY-TZ-1] 날짜만 다루므로 UTC 로만 센다. 전에는 로컬 자정을 만들고 toISOString(UTC)으로 찍어
+  //   KST(UTC+9)에서 항상 하루가 빠졌다 — 오늘 맞힌 문항이 오늘 바로 '복습'으로 떴다.
+  const d = new Date(dateStr + 'T00:00:00Z');
   if (isNaN(d)) return dateStr;
-  d.setDate(d.getDate() + n);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 function masteryMap(studentId) {
