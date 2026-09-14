@@ -1,0 +1,4 @@
+# [VILLAGE-1] village/ 는 디자인 폴더(성장rpg_3d) 원본을 바이트 그대로 복사한다.
+#   원본 html 은 줄 끝이 CRLF 인데 core.autocrlf=true 면 커밋 때 LF 로 바뀌어
+#   배포 파일 해시가 원본과 달라진다. 이 폴더만 줄 끝 변환을 끈다.
+village/** -text
