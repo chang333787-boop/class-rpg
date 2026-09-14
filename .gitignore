@@ -9,3 +9,6 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 로컬 작업 산출물(마을 백업 등) — scripts/village-backup.mjs 의 기본 출력 자리
+tmp/
