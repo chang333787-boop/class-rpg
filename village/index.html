@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>우리반 마을 · 시뮬 42차 — 닫힐 때 저장·sid</title>
+<title>우리반 마을 · 시뮬 43차 — G1·G2 손질</title>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:#0f1116;
@@ -2365,9 +2365,11 @@ const GOALS = [
   { id: 'well',   t: '우물 하나 놓기',      ok: () => countKind('well') >= 1 },
   { id: 'shop',   t: '가게 하나 열기',      ok: () => countKind('shop') >= 1 },
   { id: 'pop10',  t: '인구 10명',           ok: () => population() >= 10 },
+  { id: 'deco5',  t: '긴의자·꽃밭 5개 놓기',  ok: () => countKind('bench') + countKind('flower') >= 5 },
   { id: 'happy',  t: '😊 집 하나 만들기',   ok: () => { let f = false; res.forEach((v, root) => { const st = sat.get(root); if (v > 0 && st && st.n >= NEEDS.length) f = true; }); return f; } },
   { id: 'play',   t: '놀이터 놓기',         ok: () => countKind('play') >= 1 },
   { id: 'lv2',    t: '2층 집 하나',         ok: () => { let f = false; hinfo.forEach(h => { if (h.lv >= 2) f = true; }); return f; } },
+  { id: 'avenue3', t: '큰길 3장 잇기',       ok: () => countKind('avenue') >= 3 },
   { id: 'pop30',  t: '인구 30명',           ok: () => population() >= 30 },
   { id: 'plaza',  t: '광장 만들기',         ok: () => countKind('plaza') >= 1 },
   { id: 'lv3',    t: '3층 집 하나',         ok: () => { let f = false; hinfo.forEach(h => { if (h.lv >= 3) f = true; }); return f; } },
@@ -2543,7 +2545,7 @@ const isNightHour = h => h >= 20 || h < 6;
 const isSchoolHour = h => h >= 8 && h < 14;
 /* ── 일터와 일자리(F27) ── */
 const isWorkHour = h => h >= 9 && h < 17;
-const JOB_POP = 10;                                   // 이 인구부터 "일할 곳이 없어요"를 따진다(첫 집 몇 채에서 바로 😐 가 되지 않게)
+const JOB_POP = 20;   // 43차: 인구 20 부터(10 은 첫 성장을 막았다 — G1 실측)                                   // 이 인구부터 "일할 곳이 없어요"를 따진다(첫 집 몇 채에서 바로 😐 가 되지 않게)
 const jobCount = new Map();                           // 일터 root → 붙은 어른 수
 const jobStats = { 일자리: 0, 찬자리: 0, 일없는어른: 0, 출근: 0 };
 let jobRR = 0;
