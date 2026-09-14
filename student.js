@@ -241,6 +241,13 @@ function externalStudyItems() {
       sub: '연필로 선·명암·형태 익히기 10차시 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?course=drawing&sid=' + sid,
       border: 'rgba(200,200,210,.40)', bg: 'rgba(200,200,210,.08)', embed: true },
+    // [VILLAGE-DOOR-1] 미니 세상 마을(G5 ②). 공부가 아니라 "오늘의 학습" 카드에서는 뺀다(study:false) —
+    //   홈 메뉴의 🏘️ 타일이 여는 문이다. 저장은 아직 이 기기 localStorage(rpg.village.<sid>).
+    //   autoFocus: 3D 조작 키(R·스페이스·Ctrl+Z)가 캔버스를 한 번 누르기 전에는 부모로 샜다(G5 설계 §1 실측).
+    { key: 'village', icon: '🏘️', title: '우리 마을',
+      sub: '집을 짓고 주민이 이사 오는 미니 세상',
+      href: 'village/index.html?sid=' + sid,
+      border: 'rgba(120,200,140,.40)', bg: 'rgba(120,200,140,.08)', embed: true, study: false, autoFocus: true },
   ];
 }
 let _embedState = null;   // { key, href, loaded, timer }
@@ -273,6 +280,9 @@ function _embedEl() {
   document.body.appendChild(el);
   el.querySelector('#embed-frame').addEventListener('load', () => {
     if (_embedState) { _embedState.loaded = true; clearTimeout(_embedState.timer); }
+    // [VILLAGE-DOOR-1] autoFocus 인 앱만 iframe 에 포커스를 넘긴다. 다른 앱(영어·수채화·데생)은 그대로 둔다 —
+    //   포커스가 iframe 으로 가면 부모의 Esc 닫기가 안 들린다.
+    if (_embedState && _embedState.autoFocus) { try { el.querySelector('#embed-frame').contentWindow.focus(); } catch (e) {} }
   });
   return el;
 }
@@ -289,7 +299,7 @@ function openExternalEmbed(key) {
   el.querySelector('#embed-newtab').href = item.href;
   el.querySelector('#embed-fallback-link').href = item.href;
   fb.style.display = 'none';
-  const st = { key, href: item.href, loaded: false, timer: null, token: Date.now() };
+  const st = { key, href: item.href, loaded: false, timer: null, token: Date.now(), autoFocus: !!x.autoFocus };
   _embedState = st;
   frame.src = item.href;
   el.style.display = 'flex';
@@ -1617,6 +1627,12 @@ function buildMainHTML() {
         style="border-color:rgba(255,215,0,.2)">
         <div class="tile-icon">🏆</div><div class="tile-name">랭킹</div>
         <div class="tile-desc">우리반 순위</div>
+      </div>
+      <!-- [VILLAGE-DOOR-1] 3칸 격자에 6개가 꽉 차 있어 7번째는 한 줄 전체로 둔다(하나만 덩그러니 남지 않게). -->
+      <div class="menu-tile" onclick="openExternalEmbed('village')"
+        style="grid-column:1/-1;border-color:rgba(120,200,140,.35)">
+        <div class="tile-icon">🏘️</div><div class="tile-name">우리 마을</div>
+        <div class="tile-desc">짓고 · 키우기</div>
       </div>
     </div>
 
@@ -10669,7 +10685,7 @@ function renderStudySubjectPick() {
 
   // [ENGLISH-LINK-1] 외부 학습 앱 카드 — RPG 내부 문항 대신 전용 앱으로 보낸다.
   //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
-  const EXTERNAL_STUDY = externalStudyItems();   // [WATERCOLOR-EMBED-1] 정의는 최상위 externalStudyItems()
+  const EXTERNAL_STUDY = externalStudyItems().filter(x => x.study !== false);   // [WATERCOLOR-EMBED-1] 정의는 최상위 externalStudyItems() · [VILLAGE-DOOR-1] 마을은 뺀다
   const externalCards = EXTERNAL_STUDY.map(x => x.embed ? `
           <button class="st-subject-card" onclick="openExternalEmbed('${x.key}')"
             style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
