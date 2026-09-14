@@ -167,6 +167,14 @@ function startAccessTimer() {
       // 데이터 저장 후 로그아웃
       DB.saveStudent(CUR);
       CUR = null;
+      // [EMBED-LOGOUT-1] 열려 있던 창을 닫는다. #m-embed(영어·수채화·데생)와 .overlay 모달은
+      //   s-game 밖(body)에 붙어 있어서 s-game 을 숨겨도 로그인 화면 위에 그대로 남았다 —
+      //   접속 시간이 끝나도 앱을 계속 쓸 수 있었다.
+      //   CUR = null 뒤에 닫는다: 영어 창을 닫을 때 부르는 syncEnglishRewards 가 CUR 이 없으면
+      //   바로 돌아가므로, 로그아웃 순간에 새 쓰기가 끼어들지 않는다(다음 로그인 때 동기화된다).
+      //   .overlay 를 닫는 것은 바깥을 눌러 닫는 것(overlay click)과 같은 동작이다.
+      try { closeExternalEmbed(); } catch (e) {}
+      document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
       document.getElementById('s-game').classList.remove('active');
       hideScreen('s-game');
       showScreen('s-login');
