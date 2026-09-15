@@ -21,6 +21,7 @@
 //   quad     { type, deg?, angles? }           사각형. type trapezoid|parallelogram|rhombus|rectangle|square
 //                                             deg=왼쪽 아래 각(평행사변형·마름모), angles:[70,'?',null,null] 꼭짓점 각 표기
 //                                             (꼭짓점 순서: 왼쪽 아래 → 오른쪽 아래 → 오른쪽 위 → 왼쪽 위)
+//   bar      { labels, values, unit?, step?, q? }  막대그래프(세로). q:[i]면 그 항목은 막대 없이 ?
 //   lines    { type, label? }                 두 직선. type perp(수직)|parallel(평행)|distance(평행선 사이 수선, label 길이)
 // ══════════════════════════════════════════════════
 
@@ -215,6 +216,37 @@ const Figures = (() => {
       out += `<polyline points="${vals.map((v, i) => px(i).toFixed(1) + ',' + py(v).toFixed(1)).join(' ')}" stroke="${ACC}" stroke-width="3"/>`;
       out += vals.map((v, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="4" fill="currentColor" stroke="none"/>`).join('');
       out += labs.map((s, i) => `<text x="${px(i).toFixed(1)}" y="${yB + 18}" font-size="10.5" fill="currentColor" stroke="none" text-anchor="middle" font-family="inherit">${esc(s)}</text>`).join('');
+      return wrap(out, Wd, Hd);
+    },
+    // [FIG-BAR-1] 막대그래프 — 세로 막대. q:[칸 번호]인 항목은 막대 없이 '?'(문항이 그 값을 묻을 때)
+    bar(f) {
+      const labs = (Array.isArray(f.labels) ? f.labels : []).slice(0, 6);
+      const qs = new Set(Array.isArray(f.q) ? f.q : []);
+      const vals = labs.map((_, i) => qs.has(i) ? NaN : toNum((f.values || [])[i], NaN));
+      const known = vals.filter(Number.isFinite);
+      if (labs.length < 2 || !known.length || known.length + qs.size !== labs.length) return '';
+      const hi = Math.max(...known);
+      const step = toNum(f.step, 0) > 0 ? toNum(f.step) : (() => { const r = hi / 5; const p = Math.pow(10, Math.floor(Math.log10(r || 1))); return [1, 2, 5, 10].map(k => k * p).find(k => k >= r) || p * 10; })();
+      const max = Math.max(step, Math.ceil(hi / step - 1e-9) * step);
+      const Wd = 260, Hd = 160, x0 = 46, x1 = 246, yT = 22, yB = 126;
+      const py = v => yB - v / max * (yB - yT);
+      const gx = (x1 - x0) / labs.length, bw = Math.min(30, gx * .55), px = i => x0 + gx * (i + .5);
+      let out = '';
+      const n = Math.round(max / step);
+      for (let k = 0; k <= n; k++) {
+        const y = py(k * step);
+        out += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke-width="${k === 0 ? 2 : .8}" stroke-opacity="${k === 0 ? 1 : .35}"/>`;
+        out += `<text x="${x0 - 6}" y="${(y + 4).toFixed(1)}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">${esc(k * step)}</text>`;
+      }
+      out += `<line x1="${x0}" y1="${yT - 6}" x2="${x0}" y2="${yB}"/>`;
+      if (f.unit) out += `<text x="${x0 - 6}" y="${yT - 10}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">(${esc(f.unit)})</text>`;
+      out += labs.map((s, i) => {
+        const x = px(i);
+        const body = Number.isFinite(vals[i])
+          ? `<rect x="${(x - bw / 2).toFixed(1)}" y="${py(vals[i]).toFixed(1)}" width="${bw.toFixed(1)}" height="${(yB - py(vals[i])).toFixed(1)}" fill="${ACC2}"/>`
+          : txt(x, yB - 14, '?', 16);
+        return body + `<text x="${x.toFixed(1)}" y="${yB + 18}" font-size="10.5" fill="currentColor" stroke="none" text-anchor="middle" font-family="inherit">${esc(s)}</text>`;
+      }).join('');
       return wrap(out, Wd, Hd);
     },
     // [FIG-LINE-QUAD-1] 사각형 — 평행한 변은 화살표(>, >>), 길이가 같은 변은 눈금, 직각은 ㄱ 표시
