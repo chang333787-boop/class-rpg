@@ -2538,8 +2538,7 @@ function buySkillBookLogic(student, bookId) {
   if (!check.ok) return check;
   student.skillLevels = student.skillLevels || { ...DEFAULT_SKILL_LEVELS };
   student.gold -= book.price;
-  if (typeof DB !== 'undefined') DB.logSpend(student.id, 'skill', book.price);   // [GOLD-SPEND-1]
-  student.skillLevels[book.type] = book.targetLevel;
+  student.skillLevels[book.type] = book.targetLevel;   // 지출 기록(logSpend)은 저장 뒤 호출자(buySkillBook)에서 [GOLD-SPEND-2]
   return { ok:true, reason:'', book };
 }
 

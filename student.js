@@ -2288,6 +2288,7 @@ function buySkillBook(bookId) {
   const result = buySkillBookLogic(CUR, bookId);
   if (!result.ok) { toast(`🔒 ${result.reason}`); return; }
   DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'skill', book.price);   // [GOLD-SPEND-2] 저장 뒤
   renderShop();
   renderHUD();
   toast(`✅ ${book.name} 구매! ${typeLabel} Lv.${book.targetLevel} 습득!`);
@@ -2309,12 +2310,13 @@ function buyEquip(itemId) {
   if (!confirm(`${item.icon} ${item.name} 구매 (${item.price}G)?`)) return;
 
   CUR.gold -= item.price;
-  DB.logSpend(CUR.id, 'equip', item.price);   // [GOLD-SPEND-1]
   // 기존 착용 장비 인벤 반환
   const oldId = (CUR.equipmentIds||{})[slot];
   if (oldId && oldId !== itemId) returnEquipToInv(oldId);
   Utils.equipItem(CUR, item);
-  DB.saveStudent(CUR); renderAll(); renderShop();
+  DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'equip', item.price);   // [GOLD-SPEND-2] 저장 뒤
+  renderAll(); renderShop();
   checkAchievements();
   toast(`✅ ${item.name} 구매 및 장착!`);
 }
@@ -2329,11 +2331,12 @@ function buySeed(id) {
   const seed = Utils.getSeedById(id);
   if (!seed || CUR.gold < seed.price) { toast('💸 골드 부족!'); return; }
   CUR.gold -= seed.price;
-  DB.logSpend(CUR.id, 'seed', seed.price);   // [GOLD-SPEND-1] 일반·돌연변이 씨앗 모두(getSeedById 가 둘 다 찾는다)
   CUR.inventory = CUR.inventory || [];
   const ex = CUR.inventory.find(i => i.id === id);
   if (ex) ex.qty++; else CUR.inventory.push({id, qty:1});
-  DB.saveStudent(CUR); renderShop(); renderHUD();
+  DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'seed', seed.price);   // [GOLD-SPEND-2] 저장 뒤 · 일반·돌연변이 씨앗 모두
+  renderShop(); renderHUD();
   toast(`✅ ${seed.name} 구매!`);
 }
 
@@ -2341,11 +2344,12 @@ function buyDeco(id) {
   const deco = GAME_DATA.decorations.find(d => d.id === id);
   if (!deco || CUR.gold < deco.price) { toast('💸 골드 부족!'); return; }
   CUR.gold -= deco.price;
-  DB.logSpend(CUR.id, 'deco', deco.price);   // [GOLD-SPEND-1] 장식·가구·러그
   CUR.inventory = CUR.inventory || [];
   const ex = CUR.inventory.find(i => i.id === id);
   if (ex) ex.qty++; else CUR.inventory.push({id, qty:1});
-  DB.saveStudent(CUR); renderShop(); renderHUD();
+  DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'deco', deco.price);   // [GOLD-SPEND-2] 저장 뒤 · 장식·가구·러그
+  renderShop(); renderHUD();
   toast(`✅ ${deco.name} 구매!`);
 }
 
