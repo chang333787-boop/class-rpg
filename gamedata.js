@@ -16,7 +16,12 @@ const BALANCE = {
   player: { hpBase: 80, hpPerLevel: 12 },
 
   // 장비 등급 1~10 을 여는 레벨 — 머리·몸통·무기·장갑·신발 전 슬롯 공통 (B-1 §4.3)
-  equipment: { tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30] },
+  // 장비 가격 (B-2e, B-1 §4.3) — 독립 50종: price = round(c × 능력치합^p) + 줄의 priceAdj · 복사 30종(물·풀 몸통·스태프)은 원본 가격을 따른다
+  //   ★ 곡선은 칸별 로그 회귀(B-1). priceAdj 는 옛 손값을 100% 그대로 두는 차이 — 없애면 아이가 보는 가격이 바뀐다(사용자 결정).
+  equipment: {
+    tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30],
+    price: { head: { c: 7.34, p: 1.212 }, body: { c: 3.24, p: 1.477 }, weapon: { c: 1.24, p: 1.351 }, glove: { c: 2.8, p: 1.461 }, shoe: { c: 1.47, p: 1.756 } },
+  },
 
   // 몬스터 능력치 (B-2c, B-1 §4.1) — _mon(shape, 줄, 보정)이 쓴다
   //   레벨 기본값 BASE(L)[s] = round(a + b·L) + baseAdjust[s][L]
@@ -120,9 +125,15 @@ const BALANCE = {
 
 // ─── 장비 표 만들기 (B-2b) ─────────────────────────────────
 // 등급 i(0~9) 장비의 레벨 = BALANCE.equipment.tierLevels[i]. 키 순서는 옛 표와 같게(id·name·lv·stats·cond·price·icon·element).
-function _equipTiers(rows) {
+// 칸별 가격 곡선 — 능력치 합(atk·def·mag·spd)에 대한 거듭제곱
+function _equipPrice(slot, stats) {
+  const c = BALANCE.equipment.price[slot];
+  const sum = Object.values(stats).reduce((a, v) => a + v, 0);
+  return Math.round(c.c * Math.pow(sum, c.p));
+}
+function _equipTiers(slot, rows) {
   return rows.map((r, i) => {
-    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: r.price, icon: r.icon };
+    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: _equipPrice(slot, r.stats) + (r.priceAdj || 0), icon: r.icon };
     if (r.element !== undefined) item.element = r.element;
     return item;
   });
@@ -137,29 +148,29 @@ function _equipCopy(source, opt, rows) {
     return item;
   });
 }
-const _EQUIP_BODY_FIRE = _equipTiers([
-  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      price:45,   icon:'👕', element:'fire'},
-  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       price:65,  icon:'🥋', element:'fire'},
-  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       price:95,  icon:'🧥', element:'fire'},
-  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       price:140,  icon:'🛡️', element:'fire'},
-  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       price:200,  icon:'🔬', element:'fire'},
-  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      price:280,  icon:'⚔️', element:'fire'},
-  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     price:380,  icon:'✨', element:'fire'},
-  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     price:490,  icon:'💛', element:'fire'},
-  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     price:625, icon:'🌟', element:'fire'},
-  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     price:775, icon:'👑', element:'fire'},
+const _EQUIP_BODY_FIRE = _equipTiers('body', [
+  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      priceAdj:+10,    icon:'👕', element:'fire'},
+  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       priceAdj:-18,   icon:'🥋', element:'fire'},
+  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       priceAdj:-2,   icon:'🧥', element:'fire'},
+  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       priceAdj:-20,   icon:'🛡️', element:'fire'},
+  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       priceAdj:-13,   icon:'🔬', element:'fire'},
+  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      priceAdj:+10,   icon:'⚔️', element:'fire'},
+  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     priceAdj:-19,   icon:'✨', element:'fire'},
+  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     priceAdj:+69,   icon:'💛', element:'fire'},
+  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     priceAdj:+33,  icon:'🌟', element:'fire'},
+  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     priceAdj:+22,  icon:'👑', element:'fire'},
 ]);
-const _EQUIP_SWORD = _equipTiers([
-  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 price:45,   icon:'🗡️'},
-  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  price:70,  icon:'⚔️'},
-  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  price:100,  icon:'🔷'},
-  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  price:150,  icon:'🔱'},
-  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  price:210,  icon:'🏹'},
-  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, price:300,  icon:'⚔️'},
-  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},price:400,  icon:'🌟'},
-  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},price:525, icon:'✨'},
-  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},price:675, icon:'💎'},
-  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},price:850, icon:'🌈'},
+const _EQUIP_SWORD = _equipTiers('weapon', [
+  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 priceAdj:+5,    icon:'🗡️'},
+  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  priceAdj:-1,   icon:'⚔️'},
+  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  priceAdj:-6,   icon:'🔷'},
+  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  priceAdj:-13,   icon:'🔱'},
+  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  priceAdj:-15,   icon:'🏹'},
+  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, priceAdj:+1,   icon:'⚔️'},
+  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},priceAdj:-1,   icon:'🌟'},
+  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},priceAdj:+8,  icon:'✨'},
+  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},priceAdj:+25,  icon:'💎'},
+  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},priceAdj:+51,  icon:'🌈'},
 ]);
 
 
@@ -245,17 +256,17 @@ const GAME_DATA = {
   // ★ B-2b: 등급 i 의 레벨 = BALANCE.equipment.tierLevels[i] (_equipTiers) ·
   //   물·풀 몸통 = 불 몸통 복사, 스태프 = 검 거울 (_equipCopy) — 능력치·가격은 원본 줄 하나만 고치면 따라온다
   equipment: {
-    head: _equipTiers([
-      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      price:35,   icon:'🎩'},
-      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        price:50,  icon:'🪖'},
-      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        price:75,  icon:'🧙'},
-      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        price:110,  icon:'⛑️'},
-      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        price:160,  icon:'🎓'},
-      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       price:225,  icon:'🛡️'},
-      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      price:310,  icon:'🔮'},
-      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      price:410,  icon:'👑'},
-      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      price:525, icon:'💎'},
-      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      price:650, icon:'👑'},
+    head: _equipTiers('head', [
+      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      priceAdj:+7,    icon:'🎩'},
+      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        priceAdj:-14,   icon:'🪖'},
+      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        priceAdj:-3,   icon:'🧙'},
+      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        priceAdj:-39,   icon:'⛑️'},
+      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        priceAdj:+11,   icon:'🎓'},
+      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       priceAdj:-19,   icon:'🛡️'},
+      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      priceAdj:+66,   icon:'🔮'},
+      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      priceAdj:+47,   icon:'👑'},
+      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      priceAdj:+54,  icon:'💎'},
+      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      priceAdj:-70,  icon:'👑'},
     ]),
     body: [
       // ★ e_b1~e_b10 = 불(fire) — 기존 ID 완전 유지, 조건=건강+생활 (능력치·가격 원본: _EQUIP_BODY_FIRE)
@@ -305,29 +316,29 @@ const GAME_DATA = {
         {id:'e_ws10',name:'영웅의 스태프',  cond:{study:21,art:17},   icon:'🔯'},
       ]),
     ],
-    glove: _equipTiers([
-      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      price:25,   icon:'🧤'},
-      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     price:35,   icon:'🥊'},
-      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      price:50,  icon:'✋'},
-      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      price:70,  icon:'⚙️'},
-      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      price:100,  icon:'🔬'},
-      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     price:140,  icon:'🏆'},
-      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    price:190,  icon:'💫'},
-      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    price:250,  icon:'💛'},
-      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    price:320,  icon:'💎'},
-      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  price:400,  icon:'🌟'},
+    glove: _equipTiers('glove', [
+      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      priceAdj:+4,    icon:'🧤'},
+      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     priceAdj:-13,    icon:'🥊'},
+      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      priceAdj:+2,   icon:'✋'},
+      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      priceAdj:+1,   icon:'⚙️'},
+      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      priceAdj:-6,   icon:'🔬'},
+      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     priceAdj:+8,   icon:'🏆'},
+      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    priceAdj:-1,   icon:'💫'},
+      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    priceAdj:+27,   icon:'💛'},
+      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    priceAdj:+29,   icon:'💎'},
+      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  priceAdj:-43,   icon:'🌟'},
     ]),
-    shoe: _equipTiers([
-      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      price:30,   icon:'👟'},
-      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        price:42,   icon:'👠'},
-      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        price:60,  icon:'✨'},
-      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        price:85,  icon:'🥾'},
-      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        price:120,  icon:'🔬'},
-      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       price:170,  icon:'⚔️'},
-      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      price:235,  icon:'💫'},
-      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      price:310,  icon:'💛'},
-      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      price:395,  icon:'💎'},
-      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      price:490,  icon:'🌈'},
+    shoe: _equipTiers('shoe', [
+      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      priceAdj:+5,    icon:'👟'},
+      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        priceAdj:-15,    icon:'👠'},
+      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        priceAdj:+3,   icon:'✨'},
+      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        priceAdj:-14,   icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        priceAdj:+5,   icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       priceAdj:-1,   icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      priceAdj:+22,   icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      priceAdj:+27,   icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      priceAdj:+5,   icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      priceAdj:-21,   icon:'🌈'},
     ]),
   },
   // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
