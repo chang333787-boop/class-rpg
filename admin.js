@@ -1003,7 +1003,8 @@ function approvePwResetDash(reqId, studentId, btn) {
   DB.saveStudent(s);
   DB.removePwResetRequest(reqId);
   renderAll();
-  notify(`✅ ${s.name} 비밀번호 → "${newPw}" 초기화 완료!`);
+  // [PW-NOTIFY-1] 교사 화면은 TV 로 미러링된다 — 알림에 새 비밀번호 값을 띄우지 않는다
+  notify(`✅ ${s.name} 비밀번호 초기화 완료 · 학생 상세에서 확인`);
 }
 
 function rejectPwResetDash(reqId, btn) {
@@ -3646,7 +3647,8 @@ function resetStudentPw(reqId, studentId) {
   DB.removePwResetRequest(reqId);
   renderPwResetList();
   updatePwResetBadge();
-  notify(`✅ ${s.name} 비밀번호 초기화 완료! 새 비밀번호: ${newPw}`);
+  // [PW-NOTIFY-1] 교사 화면은 TV 로 미러링된다 — 알림에 새 비밀번호 값을 띄우지 않는다
+  notify(`✅ ${s.name} 비밀번호 초기화 완료 · 학생 상세에서 확인`);
 }
 
 function dismissPwReset(reqId) {

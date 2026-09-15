@@ -342,6 +342,35 @@ cur = 'buster-check';
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'admin 비번 초기화 알림(PW-NOTIFY-1)';
+{
+  //  교사 PC 는 TV 로 미러링된다. 초기화 알림(notify)에 새 비밀번호 값이 찍히면 반 아이들이 본다.
+  const ADMIN = read('admin.js');
+  const run = (fnName, call) => {
+    const said = [];
+    const stu = { id: 's1', name: '학생1', pw: 'old' };
+    const sb = {
+      notify: (m) => said.push(String(m)), prompt: () => 'zq7Secret',
+      document: { getElementById: (id) => (id.startsWith('newpw-') ? { value: ' zq7Secret ' } : null) },
+      DB: { getStudent: () => stu, saveStudent() {}, removePwResetRequest() {} },
+      renderAll() {}, renderPwResetList() {}, updatePwResetBadge() {},
+    };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(sliceFn(ADMIN, fnName) + `\n${call};`, sb);
+    return { said, stu };
+  };
+  for (const [fn, call] of [['approvePwResetDash', "approvePwResetDash('r1','s1',{})"], ['resetStudentPw', "resetStudentPw('r1','s1')"]]) {
+    test(`${fn}: 비번은 바뀌고 알림엔 값이 없다`, () => {
+      const { said, stu } = run(fn, call);
+      eq(stu.pw, 'zq7Secret', '저장된 비번');
+      if (!said.length) throw new Error('알림이 없음');
+      const leak = said.filter(m => m.includes('zq7Secret'));
+      if (leak.length) throw new Error('알림에 새 비번 값: ' + JSON.stringify(leak));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
