@@ -277,7 +277,7 @@ const GAME_DATA = {
   // ─── 장비 (4단계: 가격/조건 정비, body 30개, 기존 ID 완전 유지) ────────────
   // ★ cond = 구매 조건 (slot 규칙 반영), 기존 보유 장비엔 cond 미적용
   // 머리=가치+생활, 불몸통=건강+생활, 물몸통=학습+생활, 풀몸통=예술+생활
-  // 검=건강+생활, 지팡이=학습+예술, 장갑=가치+건강, 신발=예술+건강
+  // 검=건강+생활, 지팡이=학습+예술, 장갑=가치+건강, 신발=생활+건강(DRAFT 신발 조건 art→life, docs/rpg_balance_equip_gaps_20260915.md ③안)
   // ★ B-2b: 등급 i 의 레벨 = BALANCE.equipment.tierLevels[i] (_equipTiers) ·
   //   물·풀 몸통 = 불 몸통 복사, 스태프 = 검 거울 (_equipCopy) — 능력치·가격은 원본 줄 하나만 고치면 따라온다
   equipment: {
@@ -355,15 +355,15 @@ const GAME_DATA = {
     ]),
     shoe: _equipTiers('shoe', [
       {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      priceAdj:+5,    icon:'👟'},
-      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        priceAdj:-15,    icon:'👠'},
-      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        priceAdj:+3,   icon:'✨'},
-      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        priceAdj:-14,   icon:'🥾'},
-      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        priceAdj:+5,   icon:'🔬'},
-      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       priceAdj:-1,   icon:'⚔️'},
-      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      priceAdj:+22,   icon:'💫'},
-      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      priceAdj:+27,   icon:'💛'},
-      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      priceAdj:+5,   icon:'💎'},
-      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      priceAdj:-21,   icon:'🌈'},
+      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{life:2,health:1},        priceAdj:-15,    icon:'👠'},
+      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{life:4,health:2},        priceAdj:+3,   icon:'✨'},
+      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{life:6,health:4},        priceAdj:-14,   icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{life:8,health:6},        priceAdj:+5,   icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{life:10,health:8},       priceAdj:-1,   icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{life:13,health:10},      priceAdj:+22,   icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{life:16,health:13},      priceAdj:+27,   icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{life:19,health:15},      priceAdj:+5,   icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{life:21,health:17},      priceAdj:-21,   icon:'🌈'},
     ]),
   },
   // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
