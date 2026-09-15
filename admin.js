@@ -4692,35 +4692,46 @@ function loadBattleSettings() {
   });
 }
 
+// [BATTLE-SET-NAN-1] 칸 값 읽기. 빈 칸·글자는 기본값.
+//   예전 `parseInt(무한배틀 칸) ?? 1` 은 NaN 을 못 걸러(?? 는 null/undefined 만) set 에 NaN 이 들어갔고,
+//   SDK 가 "value argument contains NaN" 으로 **던져 전투 설정 저장이 통째로 실패**했다(칸을 지우고 저장하면).
+//   zeroOk: 0 을 값으로 받는 칸(무한배틀 0회 = 막기). 나머지는 예전 `|| 기본값` 처럼 0 이하 → 기본값.
+function battleNum(id, def, opts) {
+  const int = !!(opts && opts.int), zeroOk = !!(opts && opts.zeroOk);
+  const el = document.getElementById(id);
+  const n = el ? (int ? parseInt(el.value, 10) : parseFloat(el.value)) : NaN;
+  return Number.isFinite(n) && (zeroOk ? n >= 0 : n > 0) ? n : def;
+}
+
 function saveBattleSettings() {
   const db = DB.load();
   db.settings = db.settings || {};
   const normalMults = {};
   [1,2,3,4,5,6,7].forEach(lv => {
-    normalMults[lv] = parseFloat(document.getElementById(`bs-nm-${lv}`)?.value) || SKILL_MULTIPLIERS.normal[lv];
+    normalMults[lv] = battleNum(`bs-nm-${lv}`, SKILL_MULTIPLIERS.normal[lv]);
   });
   const elementMults = {};
   [0,1,2,3,4,5,6,7].forEach(lv => {
-    elementMults[lv] = parseFloat(document.getElementById(`bs-el-${lv}`)?.value) || SKILL_MULTIPLIERS.element[lv];
+    elementMults[lv] = battleNum(`bs-el-${lv}`, SKILL_MULTIPLIERS.element[lv]);
   });
   // [BATTLE-SET-1] 장비·스킬북 조정값(equipment·skillBooks)은 다른 화면이 같은 노드 아래 저장한다.
   //   통째로 새 객체를 만들면 set 이 그것들을 운영에서 지웠다 → 기존 값을 먼저 펼친다.
   db.settings.customBattleSettings = {
     ...(db.settings.customBattleSettings || {}),
-    dailyBattleLimit:    parseInt(document.getElementById('bs-daily-limit').value) || 3,
-    infiniteBattleLimit: parseInt(document.getElementById('bs-infinite-limit').value) ?? 1,
-    ghostNormalMult:  parseFloat(document.getElementById('bs-ghost-mult').value) || 0.55,
-    monsterHpMult:    parseFloat(document.getElementById('bs-mon-hp-mult').value)  || 1.0,
-    monsterAtkMult:   parseFloat(document.getElementById('bs-mon-atk-mult').value) || 1.0,
+    dailyBattleLimit:    battleNum('bs-daily-limit', 3, { int: true }),
+    infiniteBattleLimit: battleNum('bs-infinite-limit', 1, { int: true, zeroOk: true }),
+    ghostNormalMult:  battleNum('bs-ghost-mult', 0.55),
+    monsterHpMult:    battleNum('bs-mon-hp-mult', 1.0),
+    monsterAtkMult:   battleNum('bs-mon-atk-mult', 1.0),
     normalMults,
     elementMults,
     elemChart: {
-      advantageMult:    parseFloat(document.getElementById('bs-adv-mult').value) || 1.4,
-      disadvantageMult: parseFloat(document.getElementById('bs-dis-mult').value) || 0.8,
+      advantageMult:    battleNum('bs-adv-mult', 1.4),
+      disadvantageMult: battleNum('bs-dis-mult', 0.8),
     },
     defChart: {
-      advantageMult:    parseFloat(document.getElementById('bs-def-adv').value) || 0.85,
-      disadvantageMult: parseFloat(document.getElementById('bs-def-dis').value) || 1.15,
+      advantageMult:    battleNum('bs-def-adv', 0.85),
+      disadvantageMult: battleNum('bs-def-dis', 1.15),
     },
   };
   DB._cache = db;
@@ -4729,16 +4740,21 @@ function saveBattleSettings() {
   notify('✅ 전투 설정 저장 완료! 학생 화면에 즉시 반영됩니다.');
 }
 
+// [BATTLE-RESET-KEEP-1] "기본값으로 초기화"는 **전투 배율만** 되돌린다.
+//   예전엔 customBattleSettings 를 통째 remove 해서 하루 전투 횟수(운영 5 → 3)·무한배틀 횟수·장비·스킬북 조정까지 사라졌다.
+const BATTLE_RESET_KEYS = ['ghostNormalMult', 'monsterHpMult', 'monsterAtkMult', 'normalMults', 'elementMults', 'elemChart', 'defChart'];
 function resetBattleSettings() {
-  if (!confirm('전투 설정을 기본값으로 초기화할까요?')) return;
+  if (!confirm('전투 배율(스킬 계수·상성·몬스터 체력/공격·유령 배율)을 기본값으로 되돌릴까요?\n\n하루 전투 횟수·무한배틀 횟수·장비·스킬북 조정은 그대로 둡니다.')) return;
   const db = DB.load();
   db.settings = db.settings || {};
-  delete db.settings.customBattleSettings;
+  const cbs = db.settings.customBattleSettings || {};
+  BATTLE_RESET_KEYS.forEach(k => { delete cbs[k]; });
+  db.settings.customBattleSettings = cbs;
   DB._cache = db;
-  DB._fbRef.child('settings/customBattleSettings').remove();
+  DB._fbRef.child('settings/customBattleSettings').update(Object.fromEntries(BATTLE_RESET_KEYS.map(k => [k, null])));
   applyBattleSettings(db);
   loadBattleSettings();
-  notify('🔄 전투 설정 기본값으로 초기화');
+  notify('🔄 전투 배율을 기본값으로 — 횟수·장비·스킬북은 그대로 (학생 화면은 새로고침 뒤 완전히 반영)');
 }
 
 // ── 장비 편집 ──────────────────────────────────────────

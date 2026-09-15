@@ -581,6 +581,70 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'admin 전투 설정 저장·초기화(BATTLE-SET-NAN-1·BATTLE-RESET-KEEP-1)';
+{
+  const ADMIN = read('admin.js');
+  const hasNan = (v) => v !== null && typeof v === 'object' ? Object.values(v).some(hasNan) : (typeof v === 'number' && Number.isNaN(v));
+  const run = (fields, initialCbs, confirmAns = true, fn = 'saveBattleSettings') => {
+    const writes = [], said = [];
+    const db = { settings: { customBattleSettings: JSON.parse(JSON.stringify(initialCbs)) } };
+    const sb = {
+      document: { getElementById: (id) => (id in fields ? { value: fields[id] } : { value: '' }) },
+      confirm: () => confirmAns, notify: (m) => said.push(m), loadBattleSettings() {}, applyBattleSettings() {},
+      SKILL_MULTIPLIERS: { normal: { 1: 1, 2: 1.1, 3: 1.2, 4: 1.3, 5: 1.4, 6: 1.5, 7: 1.6 }, element: { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1 } },
+      DB: { load: () => db, _cache: null, _fbRef: { child: (p) => ({
+        // 실제 SDK 처럼 NaN 이 들어 있으면 던진다(에뮬레이터에서 확인: "value argument contains NaN")
+        set: (v) => { if (hasNan(v)) throw new Error('set failed: value argument contains NaN'); writes.push(['set', p, JSON.parse(JSON.stringify(v))]); },
+        update: (v) => { writes.push(['update', p, JSON.parse(JSON.stringify(v))]); },
+        remove: () => writes.push(['remove', p]),
+      }) } },
+    };
+    sb.globalThis = sb; vm.createContext(sb);
+    const pieces = [];
+    try { pieces.push(sliceFn(ADMIN, 'battleNum')); } catch (e) { /* main 에는 없음 */ }
+    const keysLine = /^const BATTLE_RESET_KEYS = [^\n]*\n/m.exec(ADMIN);
+    if (keysLine) pieces.push(keysLine[0]);
+    pieces.push(sliceFn(ADMIN, fn));
+    let err = null;
+    try { vm.runInContext(pieces.join('\n') + `\n${fn}();`, sb); } catch (e) { err = e.message; }
+    return { writes, said, db, err };
+  };
+  const cbs0 = { dailyBattleLimit: 5, equipment: { e1: { atk: 3 } }, skillBooks: { b1: { price: 9 } }, ghostNormalMult: 0.4, normalMults: { 1: 2 } };
+  {
+    const r = run({ 'bs-daily-limit': '5', 'bs-infinite-limit': '' }, cbs0);
+    test('무한배틀 칸 비움 → 저장이 던지지 않고 1 로 저장 · 알림', () => {
+      if (r.err) throw new Error('저장 실패: ' + r.err);
+      eq(r.writes.length, 1); eq(r.writes[0][2].infiniteBattleLimit, 1); eq(r.writes[0][2].dailyBattleLimit, 5);
+      if (!r.said.length) throw new Error('알림 없음');
+    });
+    test('저장값 어디에도 NaN 없음 · 장비·스킬북 보존', () => { eq(hasNan(r.writes[0][2]), false); eq(r.writes[0][2].equipment, cbs0.equipment); eq(r.writes[0][2].skillBooks, cbs0.skillBooks); });
+  }
+  {
+    const r = run({ 'bs-daily-limit': 'abc', 'bs-infinite-limit': '0', 'bs-ghost-mult': '', 'bs-mon-hp-mult': '1.5', 'bs-nm-1': 'x' }, {});
+    test('칸 전수: 글자 → 기본값 · 무한배틀 0 은 0 · 숫자는 그대로', () => {
+      if (r.err) throw new Error(r.err);
+      const v = r.writes[0][2];
+      eq([v.dailyBattleLimit, v.infiniteBattleLimit, v.ghostNormalMult, v.monsterHpMult, v.normalMults[1], v.elemChart.advantageMult], [3, 0, 0.55, 1.5, 1, 1.4]);
+    });
+  }
+  {
+    const r = run({}, cbs0, true, 'resetBattleSettings');
+    test('초기화 → 배율 키만 null update · 하루 횟수·장비·스킬북 보존(통째 remove 없음)', () => {
+      if (r.err) throw new Error(r.err);
+      eq(r.writes.filter(w => w[0] === 'remove').length, 0, 'remove');
+      const u = r.writes.find(w => w[0] === 'update');
+      if (!u) throw new Error('update 없음: ' + JSON.stringify(r.writes));
+      eq(Object.keys(u[2]).sort(), ['defChart', 'elemChart', 'elementMults', 'ghostNormalMult', 'monsterAtkMult', 'monsterHpMult', 'normalMults']);
+      eq(Object.values(u[2]).every(x => x === null), true);
+      const c = r.db.settings.customBattleSettings;
+      eq([c.dailyBattleLimit, c.equipment, c.skillBooks, c.ghostNormalMult], [5, cbs0.equipment, cbs0.skillBooks, undefined]);
+    });
+    const r2 = run({}, cbs0, false, 'resetBattleSettings');
+    test('초기화 확인창 취소 → 쓰기 0', () => eq(r2.writes, []));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
