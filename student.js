@@ -7530,9 +7530,41 @@ function selectDeco(id){
 }
 // ══ 작품 전시 (Storage 업로드) ══
 
+// [SCAN-LINK-1] 학습지 스캔 — scan/index.html을 전체화면 iframe으로 열고, 결과 JPEG(≤500KB)를 postMessage로 받는다.
+//   받은 Blob은 submitArtwork가 사진 대신 그대로 올린다(같은 Storage 경로·같은 승인·보상·좋아요, kind:'worksheet').
+let AW_SCAN_BLOB = null;
+function openWorksheetScan() {
+  closeWorksheetScan();
+  const el = document.createElement('div');
+  el.id = 'scan-overlay';
+  el.style.cssText = 'position:fixed;inset:0;z-index:99990;background:#f8f6f1;display:flex;flex-direction:column';
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .7rem;background:#16213E;flex-shrink:0">
+      <span style="color:#fff;font-weight:700;flex:1">📄 학습지 스캔</span>
+      <button onclick="closeWorksheetScan()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:.35rem .8rem;font-family:inherit;cursor:pointer">✕ 닫기</button>
+    </div>
+    <iframe src="scan/index.html?v=20260915stq" title="학습지 스캔" allow="camera" style="flex:1;border:0;width:100%;background:#f8f6f1"></iframe>`;
+  document.body.appendChild(el);
+}
+function closeWorksheetScan() { const el = document.getElementById('scan-overlay'); if (el) el.remove(); }
+window.addEventListener('message', ev => {
+  const d = ev.data;
+  if (ev.origin !== location.origin || !d || d.type !== 'scan-result' || !(d.blob instanceof Blob)) return;
+  if (d.blob.size > 600 * 1024 || d.blob.type !== 'image/jpeg') { toast('스캔 사진을 받지 못했어요. 다시 해 주세요.'); return; }
+  AW_SCAN_BLOB = d.blob;
+  const fi = document.getElementById('aw-file-input'); if (fi) fi.value = '';
+  const txt = document.getElementById('aw-file-text'); if (txt) txt.textContent = '📄 스캔한 학습지 (사진을 고르면 바뀌어요)';
+  const img = document.getElementById('aw-preview-img'), wrap = document.getElementById('aw-preview-wrap');
+  if (img && wrap) { img.src = URL.createObjectURL(d.blob); wrap.style.display = ''; }
+  closeWorksheetScan();
+  toast('📄 학습지 스캔 완료! 제목을 쓰고 제출해요');
+  const t = document.getElementById('aw-title-input');
+  if (t && !t.value) setTimeout(() => t.focus(), 100);
+});
+
 // 이미지 미리보기
 function previewArtwork(input) {
   if (!input.files || !input.files[0]) return;
+  AW_SCAN_BLOB = null;   // [SCAN-LINK-1] 사진을 새로 고르면 스캔본 대신 그 사진
   const file = input.files[0];
   document.getElementById('aw-file-text').textContent = '📷 ' + file.name;
   const reader = new FileReader();
@@ -7574,7 +7606,8 @@ async function submitArtwork() {
   const fileInput = document.getElementById('aw-file-input');
 
   if (!title) { toast('작품 제목을 입력해주세요!'); return; }
-  if (!fileInput.files || !fileInput.files[0]) { toast('사진을 선택해주세요!'); return; }
+  const scanned = AW_SCAN_BLOB;   // [SCAN-LINK-1] 스캔본이 있으면 사진 대신
+  if (!scanned && (!fileInput.files || !fileInput.files[0])) { toast('사진을 선택하거나 학습지를 스캔해 주세요!'); return; }
 
   // 중복 차단: 같은 제목으로 이미 대기중이거나 전시중인 작품
   const dupPending = (CUR.pendingRewards||[]).some(r => r.type==='artwork' && (r.artTitle||'').trim() === title.trim());
@@ -7589,7 +7622,7 @@ async function submitArtwork() {
 
   try {
     // 이미지 리사이징
-    const blob = await resizeImage(fileInput.files[0]);
+    const blob = scanned || await resizeImage(fileInput.files[0]);   // 스캔본은 이미 반듯하게 펴고 ≤500KB로 줄였다
     document.getElementById('aw-progress-bar').style.width = '30%';
     document.getElementById('aw-progress-text').textContent = '올리는 중이에요…';
 
@@ -7619,8 +7652,8 @@ async function submitArtwork() {
         DB.addPendingReward(CUR, {
           id: 'art_' + Date.now(),
           type: 'artwork',
-          kind: 'lesson',
-          label: `🎨 "${title}" 작품 제출`,
+          kind: scanned ? 'worksheet' : 'lesson',   // [SCAN-LINK-1] 스캔한 학습지 — 승인·보상·좋아요는 작품과 같다
+          label: scanned ? `📄 "${title}" 학습지 제출` : `🎨 "${title}" 작품 제출`,
           artTitle: title,
           artDesc: desc,
           artUrl: url,
@@ -7636,10 +7669,11 @@ async function submitArtwork() {
           document.getElementById('aw-desc-input').value   = '';
           document.getElementById('aw-file-input').value   = '';
           document.getElementById('aw-file-text').textContent = '📷 사진 선택하기';
+          AW_SCAN_BLOB = null;
           document.getElementById('aw-preview-wrap').style.display = 'none';
           document.getElementById('aw-upload-progress').style.display = 'none';
           document.getElementById('aw-progress-bar').style.width = '0%';
-          toast('🎨 작품 제출 완료! 선생님 확인 후 전시돼요');
+          toast(scanned ? '📄 학습지 제출 완료! 선생님 확인 후 전시돼요' : '🎨 작품 제출 완료! 선생님 확인 후 전시돼요');
           renderArtworks();
           renderMain(); renderMobile();
         }, 800);
@@ -10555,7 +10589,7 @@ function renderArtFree(mode) {
             <div style="padding:.5rem .55rem">
               <div style="font-size:.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.title || '제목 없는 그림')}</div>
               <div style="margin-top:.25rem">
-                ${r.kind === 'free' ? tag('자유', 'var(--sky)', 'rgba(93,173,226,.16)') : tag('수업', 'var(--emerald)', 'rgba(46,204,113,.16)')}
+                ${r.kind === 'free' ? tag('자유', 'var(--sky)', 'rgba(93,173,226,.16)') : r.kind === 'worksheet' ? tag('학습지', 'var(--gold)', 'rgba(200,150,46,.16)') : tag('수업', 'var(--emerald)', 'rgba(46,204,113,.16)')}
                 ${r.wait ? tag('확인 중', 'var(--gold)', 'rgba(200,150,46,.18)') : ''}
                 ${r.hidden ? tag('내려짐', 'var(--txt3)', 'rgba(255,255,255,.08)') : ''}
               </div>

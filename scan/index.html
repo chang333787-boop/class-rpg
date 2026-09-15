@@ -58,7 +58,7 @@
     <p class="tip" id="tip2">초록 선이 <b>종이 가장자리</b>에 맞나요? 안 맞으면 <b>동그라미를 끌어</b> 모서리에 놓아요.</p>
     <div id="stage"><canvas id="photo"></canvas><svg id="quad"></svg><div id="loupe"><canvas id="loupeC" width="110" height="110"></canvas></div></div>
     <div class="seg" role="group" aria-label="스캔 색">
-      <button data-mode="gray" class="on">흑백(글씨 선명)</button><button data-mode="color">컬러</button><button data-mode="none">보정만</button>
+      <button data-mode="color" class="on">컬러(색연필·형광펜)</button><button data-mode="gray">흑백(글씨 선명)</button><button data-mode="none">보정만</button>
     </div>
     <div class="row">
       <button class="btn sub" id="retake">다시 찍기</button>
@@ -82,11 +82,11 @@
   </section>
 </div>
 
-<script src="scan.js?v=20260915sta"></script>
+<script src="scan.js?v=20260915stq"></script>
 <script>
 (function () {
   const $ = id => document.getElementById(id);
-  let prep = null, corners = null, mode = 'gray', last = null;
+  let prep = null, corners = null, mode = 'color', last = null;   // 기본 컬러(판정: 색연필·형광펜 학습지가 많다)
   const show = n => { ['step1', 'step2', 'step3', 'busy'].forEach(s => $(s).hidden = s !== n);
     [1, 2, 3].forEach(i => $('s' + i).classList.toggle('on', n === 'step' + i || (n === 'busy' && i === 2))); };
 
@@ -183,7 +183,7 @@
     for (const u of urls) {
       const blob = await (await fetch(u)).blob();
       const p = await Scan.prepare(blob);
-      const r = await Scan.finish(p, p.detect.corners, opt.mode || 'gray');
+      const r = await Scan.finish(p, p.detect.corners, opt.mode || 'color');
       out.push({ url: u, ok: p.detect.ok, mode: p.detect.mode, score: +p.detect.score.toFixed(2), corners: p.detect.corners.map(q => q.map(v => Math.round(v))),
         smallW: p.small.data.width, detectMs: p.ms, ...r.ms, kb: Math.round(r.blob.size / 1024), size: r.width + 'x' + r.height, quality: r.quality, resultUrl: r.url });
     }
