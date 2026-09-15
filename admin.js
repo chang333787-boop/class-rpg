@@ -304,11 +304,10 @@ function renderDashboard() {
   if (startGuideEl) {
     const isDefaultClass = students.some(s => /^학생[1-6]$/.test(String(s.name || '').trim()));
     startGuideEl.innerHTML = isDefaultClass ? `
-      <div style="background:rgba(74,144,226,.07);border:1px solid rgba(74,144,226,.28);
-        border-radius:var(--r);padding:.9rem 1.2rem;margin-bottom:1rem;line-height:1.7">
-        <div style="font-weight:700;font-size:.9rem;color:var(--accent);margin-bottom:.3rem">🚀 처음이신가요?</div>
-        <div style="font-size:.8rem;color:var(--txt2);margin-bottom:.5rem">지금 보이는 학생1~6은 예시예요.</div>
-        <div style="font-size:.8rem;color:var(--txt2)">
+      <div class="dash-guide">
+        <div class="dash-guide-title">🚀 처음이신가요?</div>
+        <div class="dash-guide-text dash-guide-lead">지금 보이는 학생1~6은 예시예요.</div>
+        <div class="dash-guide-text">
           ① 학생 목록에서 이름과 비밀번호를 우리 반 학생에 맞게 바꿔주세요.<br>
           ② 퀘스트 관리 탭에서 퀘스트를 등록하고 자동 일일퀘스트를 켜보세요.<br>
           ③ 설정에서 관리자 비밀번호를 우리 반만 아는 값으로 바꿔주세요.
@@ -467,7 +466,7 @@ function renderDashboard() {
         <div style="flex:1;min-width:0">
           <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${escHtml(s.name)}</div>
           <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4A90E2,#5BA8F5);border-radius:2px"></div>
+            <div class="dash-lv-fill" style="width:${pct}%"></div>
           </div>
         </div>
         <div style="font-size:.78rem;color:var(--accent);font-weight:700;white-space:nowrap">Lv.${s.level}</div>
@@ -1273,7 +1272,7 @@ function renderApproveGrid() {
   boardQuests.forEach(q => {
     html += `<tr>
       <td style="padding:.4rem .8rem;font-size:.78rem;font-weight:600;border:1px solid var(--border2);position:sticky;left:0;background:var(--bg2);z-index:4">
-        ${q.icon||'📋'} ${q.name}
+        ${q.icon||'📋'} ${escHtml(q.name)}
         <div style="font-size:.65rem;color:var(--gold);font-weight:400">+${q.exp}EXP +${q.gold}G</div>
       </td>`;
     students.forEach(s => {
@@ -1783,7 +1782,7 @@ function renderStatsPage() {
     const rows = entries.map(q => `
       <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
         <td style="padding:.4rem .8rem;font-size:.75rem;color:var(--txt3);white-space:nowrap">${q.date||''}</td>
-        <td style="padding:.4rem .8rem;font-size:.82rem;font-weight:600">${q.name||''}</td>
+        <td style="padding:.4rem .8rem;font-size:.82rem;font-weight:600">${escHtml(q.name||'')}</td>
         <td style="padding:.4rem .8rem;text-align:center;font-size:.75rem;color:${def.color};font-weight:700">+${q.statVal||1}</td>
       </tr>`).join('');
 
@@ -2091,7 +2090,7 @@ function renderActivityPage() {
           <td style="padding:.45rem .8rem;text-align:center">
             ${log.type==='artwork' ? '<span style="font-size:1.1rem" title="작품">🎨</span>'
             : log.type==='book'    ? '<span style="font-size:1.1rem" title="독서">📚</span>'
-            : log.name ? `<button onclick="copyToQuestForm('${(log.name||'').replace(/'/g,"\\'")}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)"
+            : log.name ? `<button onclick="copyToQuestForm('${escJsAttr(log.name||'')}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)"
               style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;
               color:var(--txt3);cursor:pointer;font-size:.75rem;padding:.2rem .45rem"
               title="복사 + 직접입력에 붙여넣기">📋</button>` : ''}
@@ -2587,7 +2586,7 @@ function renderBooksPage() {
 
       <!-- 교사 코멘트 + 버튼 -->
       <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-        <input id="bk-comment-${r.id}" type="text" value="${(r.teacherComment||'').replace(/"/g,'&quot;')}"
+        <input id="bk-comment-${r.id}" type="text" value="${escHtml(r.teacherComment||'')}"
           placeholder="✏️ 교사 코멘트 (선택)"
           style="flex:1;min-width:160px;padding:.38rem .65rem;border-radius:8px;
             border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
@@ -2781,7 +2780,7 @@ function renderAlbumList() {
           background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
           border-radius:20px;padding:.25rem .7rem .25rem .55rem;font-size:.78rem">
           <span>📁</span>
-          <span style="font-weight:700">${a.name}</span>
+          <span style="font-weight:700">${escHtml(a.name)}</span>
           <span style="color:var(--txt3);font-size:.68rem">${a.date||''}</span>
           <span style="background:rgba(255,215,0,.15);color:var(--gold);border-radius:10px;
             padding:.05rem .35rem;font-size:.65rem">${cnt}장</span>
@@ -2795,12 +2794,12 @@ function renderAlbumList() {
   const selFilter = document.getElementById('mem-filter-album');
   if (sel) {
     sel.innerHTML = '<option value="">앨범 없음 (미분류)</option>' +
-      albums.map(a=>`<option value="${a.id}">${a.name} (${a.date||''})</option>`).join('');
+      albums.map(a=>`<option value="${a.id}">${escHtml(a.name)} (${a.date||''})</option>`).join('');
   }
   if (selFilter) {
     const cur = selFilter.value;
     selFilter.innerHTML = '<option value="all">전체 앨범</option><option value="none">미분류</option>' +
-      albums.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+      albums.map(a=>`<option value="${a.id}">${escHtml(a.name)}</option>`).join('');
     selFilter.value = cur;
   }
 }
@@ -2999,7 +2998,7 @@ function renderMemoriesPage() {
               color:var(--txt1);font-family:inherit;max-width:160px"
             onchange="assignMemAlbum('${m.id}',this.value)">
             <option value="">📂 미분류</option>
-            ${albums.map(a=>`<option value="${a.id}" ${m.albumId===a.id?'selected':''}>${a.name}</option>`).join('')}
+            ${albums.map(a=>`<option value="${a.id}" ${m.albumId===a.id?'selected':''}>${escHtml(a.name)}</option>`).join('')}
           </select>
           ${m.albumId?`<span style="font-size:.65rem;color:var(--gold)">📁 ${m.albumName||''}</span>`:''}
         </div>
@@ -3311,9 +3310,9 @@ function renderRecorderSongs() {
           color:${s.isFocusSong ? 'var(--gold)' : 'rgba(255,255,255,.2)'}">${s.isFocusSong ? '★' : '☆'}</button>
       <div style="flex:1;min-width:0">
         <span style="font-weight:700;font-size:.86rem;color:${s.isFocusSong ? 'var(--gold)' : 'var(--txt1)'}">
-          🎵 ${s.title}</span>
+          🎵 ${escHtml(s.title)}</span>
         ${s.grade ? `<span style="font-size:.7rem;color:var(--txt3);margin-left:.4rem">${s.grade}</span>` : ''}
-        ${s.memo  ? `<span style="font-size:.7rem;color:var(--txt3);margin-left:.3rem">· ${s.memo}</span>` : ''}
+        ${s.memo  ? `<span style="font-size:.7rem;color:var(--txt3);margin-left:.3rem">· ${escHtml(s.memo)}</span>` : ''}
       </div>
       <button onclick="toggleSongActive('${s.id}')"
         style="font-size:.68rem;padding:.15rem .4rem;border-radius:6px;cursor:pointer;font-family:inherit;
@@ -4291,7 +4290,7 @@ function renderBoardQuestList() {
       <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem">
         <span style="font-size:1.8rem">${q.icon||'📋'}</span>
         <div class="flex-1">
-          <div style="font-weight:700;font-size:.95rem">${q.name}</div>
+          <div style="font-weight:700;font-size:.95rem">${escHtml(q.name)}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-top:.15rem">
             <span class="tag active">${typeNames[q.type]||q.type}</span>
             &nbsp;+${q.exp}EXP · +${q.gold}G
@@ -4462,7 +4461,7 @@ function renderInactiveQuests() {
       border-bottom:1px solid rgba(255,255,255,.04);opacity:.6">
       <span style="font-size:1.2rem">${q.icon||'📋'}</span>
       <div class="flex-1">
-        <div style="font-size:.85rem;font-weight:600">${q.name}</div>
+        <div style="font-size:.85rem;font-weight:600">${escHtml(q.name)}</div>
         <div class="text-muted-tiny">${typeNames[q.type]||q.type} · +${q.exp}EXP · +${q.gold}G</div>
       </div>
       <button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
@@ -4673,7 +4672,7 @@ function renderMonsters() {
         border-bottom:1px solid rgba(255,255,255,.05);${isCustom?'background:rgba(255,215,0,.02)':''}">
         <div style="font-size:1.5rem;width:32px;text-align:center">${iconImg(m, 'monsters', '1.5rem')}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.85rem">${m.name}
+          <div style="font-weight:700;font-size:.85rem">${escHtml(m.name)}
             ${isCustom?'<span style="font-size:.62rem;color:var(--gold);margin-left:.3rem">✏️커스텀</span>':''}
             ${m.trait==='ghost'?'<span style="font-size:.62rem;color:#ccc;margin-left:.2rem">👻</span>':''}
           </div>
@@ -5827,8 +5826,8 @@ function renderTodayLinksList() {
       background:rgba(93,173,226,.08);border:1px solid rgba(93,173,226,.2);border-radius:8px">
       <span style="font-size:.8rem">🔗</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:.8rem;font-weight:600;color:var(--sky)">${l.title}</div>
-        <div style="font-size:.65rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.url}</div>
+        <div style="font-size:.8rem;font-weight:600;color:var(--sky)">${escHtml(l.title)}</div>
+        <div style="font-size:.65rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(l.url)}</div>
       </div>
       <button onclick="removeTodayLink(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">🗑️</button>
     </div>`).join('');
