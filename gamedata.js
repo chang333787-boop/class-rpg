@@ -1185,6 +1185,11 @@ const DB = {
         && firebase.database && firebase.database.ServerValue
         && firebase.database.ServerValue.increment;
       if (!inc || !this._fbRef) return;
+      // [GOLD-SPEND-2] 학생 노드별 구독 판(_snaps)에서만 쓴다. root 를 통째로 구독하는 판에서는 이 update() 가
+      //   동기 value 이벤트를 띄워 CUR 이 옛 캐시로 바뀌고, 이어진 saveStudent 가 **골드 차감을 지워 구매가 공짜**가 된다
+      //   (#218 revert 원인, real-sdk --profile=root FREE_ITEM). 학생 기기도 시작 REST 확인이 실패하면 root 판으로 떨어지므로
+      //   profile 이 아니라 실제 구독 모드(_snaps)로 가른다. 골드 유실 수정(#288)이 root 판을 막으면 이 줄을 풀어도 된다.
+      if (!this._snaps) return;
       const day = Utils.todayStr();
       this._fbRef.child('goldDaily/' + studentId + '_' + day)
         .update({ s: studentId, d: day, ['x_' + sink]: inc(amt) })

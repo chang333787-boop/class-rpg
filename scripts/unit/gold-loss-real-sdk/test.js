@@ -4,12 +4,17 @@
 //   ?case=buySeed  실제 buySeed(첫 씨앗)                           → OK (골드 차감 + 씨앗 1)
 //   ?case=farm     실제 farmCellClick 으로 다 자란 작물 수확        → NO_LOSS (운영 증상: 농장 5,220G 유실)
 //   ?case=infinite 실제 _endInfiniteBattleSession(무한배틀 15G)    → NO_LOSS (운영 증상: 무한배틀 73G 유실)
+//   ?case=buyEquip 실제 buyEquip('e_h1' 천 모자)                    → OK (골드 차감 + 머리 칸 장착)   [GOLD-SPEND-2]
+//   ?case=buyDeco  실제 buyDeco(첫 유료 장식)                       → OK (골드 차감 + 가방 1)
+//   ?case=skill    실제 buySkillBook('sb_f1' 화염 1권)               → OK (골드 차감 + 화염 Lv1)
+//   구매 4종은 logSpend(지출 기록)가 goldDaily 에 x_ 필드를 남겼는지도 적는다(spendLogged).
 // 흐름: SDK 로컬에 준비(업적 전부·밭) → 로그인 → 한가(_saving 풀림) → 케이스 실행 → SDK 로컬 값으로 판정.
 (function () {
   const Q = window.__Q1;
   const out = (k, v) => { Q.log.push(k + '=' + JSON.stringify(v)); };
   const CASE = new URLSearchParams(location.search).get('case') || 'battle';
-  const KNOWN = ['battle', 'buySeed', 'farm', 'infinite'];
+  const KNOWN = ['battle', 'buySeed', 'farm', 'infinite', 'buyEquip', 'buyDeco', 'skill'];
+  const BUYS = { buySeed: 'seed', buyEquip: 'equip', buyDeco: 'deco', skill: 'skill' };
   const t0 = Date.now();
   (function wait() {
     const ls = document.getElementById('loading-screen');
@@ -49,13 +54,24 @@
       const before = CUR.totalGold || 0;
       const goldBefore = CUR.gold || 0;
       const objBefore = CUR;
-      let seedId = null, invBefore = 0, expectGain = 0;
+      let seedId = null, invBefore = 0, expectGain = 0, price = 0, itemId = null;
+      window.confirm = () => true;   // 구매 확인창은 '예'
       try {
         if (CASE === 'buySeed') {
           const s0 = (GAME_DATA.seeds || [])[0]; seedId = s0.id;
           invBefore = ((CUR.inventory || []).find(i => i.id === seedId) || { qty: 0 }).qty;
           out('seed', { id: s0.id, price: s0.price });
           buySeed(seedId);
+        } else if (CASE === 'buyEquip') {
+          const it = GAME_DATA.getItemById('e_h1'); itemId = it.id; price = it.price;
+          out('item', { id: it.id, price }); buyEquip(it.id);
+        } else if (CASE === 'buyDeco') {
+          const d = GAME_DATA.decorations.find(x => x.price > 0); itemId = d.id; price = d.price;
+          invBefore = ((CUR.inventory || []).find(i => i.id === d.id) || { qty: 0 }).qty;
+          out('deco', { id: d.id, price }); buyDeco(d.id);
+        } else if (CASE === 'skill') {
+          const b = SKILL_BOOKS.find(x => x.id === 'sb_f1'); itemId = b.id; price = b.price;
+          out('book', { id: b.id, price }); buySkillBook(b.id);
         } else if (CASE === 'farm') {
           expectGain = sd.sellPrice;
           out('crop', { crop: sd.crop, sellPrice: sd.sellPrice });
@@ -84,13 +100,23 @@
           out('sdkLocal.seedQty', qty);
           out('VERDICT', (st.gold === goldBefore - price && qty === invBefore + 1) ? 'OK'
             : (qty === invBefore + 1 && st.gold === goldBefore) ? 'FREE_ITEM' : 'BROKEN');
+        } else if (CASE === 'buyEquip' || CASE === 'buyDeco' || CASE === 'skill') {
+          const got = CASE === 'buyEquip' ? (st.equipmentIds || {}).head === itemId
+            : CASE === 'buyDeco' ? ((st.inventory ? Object.values(st.inventory) : []).find(i => i && i.id === itemId) || { qty: 0 }).qty === invBefore + 1
+            : ((st.skillLevels || {}).fire || 0) >= 1;
+          out('sdkLocal.gotItem', got);
+          out('VERDICT', (st.gold === goldBefore - price && got) ? 'OK' : (got && st.gold === goldBefore) ? 'FREE_ITEM' : 'BROKEN');
         } else {
           if (CASE === 'farm') out('sdkLocal.farmLeft', st.farm ? Object.values(st.farm).length : 0);
           out('expectTotal', before + expectGain);
           out('VERDICT', (st.totalGold >= before + expectGain) ? 'NO_LOSS' : 'LOSS');
         }
         return Q.db.ref('classRPG_v3/goldDaily').once('value');
-      }).then(s => { out('goldDaily', s.val()); done(); });
+      }).then(s => {
+        const gd = s.val(); out('goldDaily', gd);
+        if (BUYS[CASE]) { const rec = Object.values(gd || {}).find(r => r && r.s === Q.sid) || {}; out('spendLogged', rec['x_' + BUYS[CASE]] || 0); }
+        done();
+      });
     }, 1800);
   })();
   function done() {
