@@ -15,6 +15,11 @@ const BALANCE = {
   // 플레이어 HP = hpBase + 레벨 × hpPerLevel (ATK/MAG/DEF/SPD는 장비 합산)
   player: { hpBase: 80, hpPerLevel: 12 },
 
+  // 경험치표 (B-2i, B-1 §2.1) — expTable[k] = expTable[k−1] + need(k), need(1) = firstNeed,
+  //   need(k) = need(k−1) + steps 중 k 이상인 마지막 증가폭 + incAdjust[k]. 초반 빠르게(+60) · Lv12~ 완만하게(+100) · 끝 두 칸만 크게.
+  //   ★ 값을 바꾸면 모든 아이의 레벨 속도가 바뀐다(사용자 결정). 이미 쌓인 EXP 는 안 바뀌고 레벨 표시가 바뀐다.
+  exp: { firstNeed: 100, steps: [[2, 40], [3, 60], [11, 80], [12, 100]], incAdjust: { 29: +80, 30: +320 }, maxIndex: 30 },
+
   // 장비 등급 1~10 을 여는 레벨 — 머리·몸통·무기·장갑·신발 전 슬롯 공통 (B-1 §4.3)
   // 장비 가격 (B-2e, B-1 §4.3) — 독립 50종: price = round(c × 능력치합^p) + 줄의 priceAdj · 복사 30종(물·풀 몸통·스태프)은 원본 가격을 따른다
   //   ★ 곡선은 칸별 로그 회귀(B-1). priceAdj 는 옛 손값을 100% 그대로 두는 차이 — 없애면 아이가 보는 가격이 바뀐다(사용자 결정).
@@ -51,6 +56,9 @@ const BALANCE = {
   seedSell: { ratioBase: 3.33, ratioPerTier: 0.375 },
   // 속성 마스터리북 가격 (B-2g) — 화염 n권 price = round(노말 n권 price × elementPriceRatio) + 줄의 priceAdj (냉기·자연은 화염 복사)
   bookPrice: { elementPriceRatio: 0.8 },
+  // 장식 가격 (B-2h) — 유료 장식 price = decoPrice[희귀도] + 줄의 priceAdj (희귀도별 가운데 값을 5G 단위로). 업적 장식(price 0)은 그대로.
+  //   ★ 장식은 취향값이라 곡선 대신 기준가만 둔다. priceAdj 를 줄이면 아이가 보는 가격이 바뀐다(사용자 결정 — docs/rpg_balance_deco_price_20260915.md).
+  decoPrice: { common: 20, rare: 70, epic: 210, legend: 375 },
 
   // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
   // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
@@ -189,6 +197,17 @@ function _monBaseStat(level, stat) {
   const c = BALANCE.monsterStats.base[stat];
   return Math.round(c.a + c.b * level) + (BALANCE.monsterStats.baseAdjust[stat][level] || 0);
 }
+// ─── 경험치표 (B-2i) ─────────────────────────────────────
+function _expTable() {
+  const c = BALANCE.exp, t = [0];
+  let need = c.firstNeed;
+  for (let k = 1; k <= c.maxIndex; k++) {
+    if (k > 1) { let add = 0; for (const [from, a] of c.steps) if (k >= from) add = a; need += add + (c.incAdjust[k] || 0); }
+    t.push(t[k - 1] + need);
+  }
+  return t;
+}
+
 function _mon(shape, row, adjust) {
   const k = BALANCE.monsterStats.shapes[shape];
   const adj = adjust || {};
@@ -204,11 +223,7 @@ const GAME_DATA = {
   // ─── EXP 레벨 테이블 (밸런스 조정: 초반 빠르게, 후반 완만하게) ───
   // 하루 퀘스트 2~3개(각 30~50EXP) 기준 → 초반 매일 레벨업, Lv10+ 3~5일에 1번
   // expTable[i] = Lv(i+1)이 되기 위한 누적 EXP
-  expTable: [
-      0,  100,  240,  440,  700, 1020, 1400, 1840, 2340, 2900,  // Lv 1~10
-   3520, 4220, 5020, 5920, 6920, 8020, 9220,10520,11920,13420,  // Lv11~20
-  15020,16720,18520,20420,22420,24520,26720,29020,31420,34000,37000 // Lv21~31
-  ],
+  expTable: _expTable(),   // B-2i: BALANCE.exp 에서 계산 (0, 100, 240, 440, … 34000, 37000)
 
   // ─── 초기 학생 데이터 (가치 스탯, 새 EXP 기준) ──────────────
   defaultStudents: [
@@ -372,103 +387,103 @@ const GAME_DATA = {
   decorations: [
     // ── 마당 (yard) ──
     // ⚪ 일반 Lv1+
-    {id:'d_y1', name:'장미 꽃밭',    icon:'🌹', price:12,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y2', name:'튤립',          icon:'🌷', price:17,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y3', name:'선인장',        icon:'🌵', price:20,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y4', name:'정원석',        icon:'🪨', price:25,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y1', name:'장미 꽃밭',    icon:'🌹', priceAdj:-8,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y2', name:'튤립',          icon:'🌷', priceAdj:-3,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y3', name:'선인장',        icon:'🌵', priceAdj:0,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y4', name:'정원석',        icon:'🪨', priceAdj:+5,  cat:'yard',   rarity:'common', reqLv:1},
     // 🔵 희귀 Lv5+
-    {id:'d_y5', name:'정원 벤치',     icon:'🪑', size:{w:2,h:1}, price:50, cat:'yard',   rarity:'rare',   reqLv:1},
-    {id:'d_y6', name:'가로등',        icon:'🏮', price:62, cat:'yard',   rarity:'rare',   reqLv:1},
-    {id:'d_y7', name:'해바라기 화단', icon:'🌻', price:75, cat:'yard',   rarity:'rare',   reqLv:1},
-    {id:'d_y8', name:'허수아비',      icon:'🧹', price:95, cat:'yard',   rarity:'rare',   reqLv:1},
+    {id:'d_y5', name:'정원 벤치',     icon:'🪑', size:{w:2,h:1}, priceAdj:-20, cat:'yard',   rarity:'rare',   reqLv:1},
+    {id:'d_y6', name:'가로등',        icon:'🏮', priceAdj:-8, cat:'yard',   rarity:'rare',   reqLv:1},
+    {id:'d_y7', name:'해바라기 화단', icon:'🌻', priceAdj:+5, cat:'yard',   rarity:'rare',   reqLv:1},
+    {id:'d_y8', name:'허수아비',      icon:'🧹', priceAdj:+25, cat:'yard',   rarity:'rare',   reqLv:1},
     // 🟣 영웅 Lv10+
-    {id:'d_y9', name:'작은 나무',     icon:'🌲', size:{w:2,h:2}, price:150, cat:'yard',   rarity:'epic',   reqLv:1},
-    {id:'d_y10',name:'분수',          icon:'⛲', size:{w:2,h:2}, price:187, cat:'yard',   rarity:'epic',   reqLv:1},
-    {id:'d_y11',name:'풍차',          icon:'🌀', size:{w:2,h:2}, price:225, cat:'yard',   rarity:'epic',   reqLv:1},
+    {id:'d_y9', name:'작은 나무',     icon:'🌲', size:{w:2,h:2}, priceAdj:-60, cat:'yard',   rarity:'epic',   reqLv:1},
+    {id:'d_y10',name:'분수',          icon:'⛲', size:{w:2,h:2}, priceAdj:-23, cat:'yard',   rarity:'epic',   reqLv:1},
+    {id:'d_y11',name:'풍차',          icon:'🌀', size:{w:2,h:2}, priceAdj:+15, cat:'yard',   rarity:'epic',   reqLv:1},
     // 🟡 전설 Lv20+
-    {id:'d_y12',name:'벚나무',        icon:'🌸', size:{w:3,h:3}, price:300, cat:'yard',   rarity:'legend', reqLv:1},
-    {id:'d_y13',name:'마법 정원석',   icon:'💎', price:375, cat:'yard',   rarity:'legend', reqLv:1},
-    {id:'d_y14',name:'황금 석등',     icon:'🌟', price:450, cat:'yard',   rarity:'legend', reqLv:1},
+    {id:'d_y12',name:'벚나무',        icon:'🌸', size:{w:3,h:3}, priceAdj:-75, cat:'yard',   rarity:'legend', reqLv:1},
+    {id:'d_y13',name:'마법 정원석',   icon:'💎', priceAdj:0, cat:'yard',   rarity:'legend', reqLv:1},
+    {id:'d_y14',name:'황금 석등',     icon:'🌟', priceAdj:+75, cat:'yard',   rarity:'legend', reqLv:1},
 
     // ── 공원/정원 테마 ─────────────────────────────────────
-    {id:'d_y15',name:'낮은 관목',     icon:'🌿', price:17,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y16',name:'큰 화단',       icon:'🌺', size:{w:2,h:2}, price:70, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y17',name:'정자',          icon:'⛩️', size:{w:2,h:2}, price:110, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y18',name:'돌 벤치',       icon:'🪑', size:{w:2,h:1}, price:60, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y19',name:'큰 나무 B',     icon:'🌳', size:{w:2,h:2}, price:130, cat:'yard', rarity:'epic',   reqLv:1},
-    {id:'d_y20',name:'조형 분수',     icon:'⛲', size:{w:3,h:3}, price:260, cat:'yard', rarity:'epic',   reqLv:1},
-    {id:'d_y21',name:'장미 아치',     icon:'🌹', size:{w:1,h:3}, price:90, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y15',name:'낮은 관목',     icon:'🌿', priceAdj:-3,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y16',name:'큰 화단',       icon:'🌺', size:{w:2,h:2}, priceAdj:0, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y17',name:'정자',          icon:'⛩️', size:{w:2,h:2}, priceAdj:+40, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y18',name:'돌 벤치',       icon:'🪑', size:{w:2,h:1}, priceAdj:-10, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y19',name:'큰 나무 B',     icon:'🌳', size:{w:2,h:2}, priceAdj:-80, cat:'yard', rarity:'epic',   reqLv:1},
+    {id:'d_y20',name:'조형 분수',     icon:'⛲', size:{w:3,h:3}, priceAdj:+50, cat:'yard', rarity:'epic',   reqLv:1},
+    {id:'d_y21',name:'장미 아치',     icon:'🌹', size:{w:1,h:3}, priceAdj:+20, cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 농촌 테마 ───────────────────────────────────────────
-    {id:'d_y22',name:'나무상자',      icon:'📦', price:22,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y23',name:'장작더미',      icon:'🪵', price:30,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y24',name:'건초더미',      icon:'🌾', price:20,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y25',name:'밀밭',          icon:'🌾', size:{w:2,h:2}, price:60, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y26',name:'큰 바위',       icon:'🪨', size:{w:2,h:1}, price:55, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y27',name:'우물',          icon:'🪣', size:{w:2,h:2}, price:95, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y28',name:'헛간',          icon:'🏚️', size:{w:3,h:2}, price:340, cat:'yard', rarity:'legend', reqLv:1},
+    {id:'d_y22',name:'나무상자',      icon:'📦', priceAdj:+2,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y23',name:'장작더미',      icon:'🪵', priceAdj:+10,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y24',name:'건초더미',      icon:'🌾', priceAdj:0,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y25',name:'밀밭',          icon:'🌾', size:{w:2,h:2}, priceAdj:-10, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y26',name:'큰 바위',       icon:'🪨', size:{w:2,h:1}, priceAdj:-15, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y27',name:'우물',          icon:'🪣', size:{w:2,h:2}, priceAdj:+25, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y28',name:'헛간',          icon:'🏚️', size:{w:3,h:2}, priceAdj:-35, cat:'yard', rarity:'legend', reqLv:1},
 
     // ── 연못/물가 테마 ──────────────────────────────────────
-    {id:'d_y29',name:'갈대 묶음',     icon:'🌿', price:20,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y30',name:'징검돌',        icon:'🪨', price:15,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y31',name:'작은 연못',     icon:'🪷', size:{w:3,h:3}, price:220, cat:'yard', rarity:'epic',   reqLv:1},
-    {id:'d_y32',name:'오리 가족',     icon:'🦆', size:{w:2,h:1}, price:65, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y29',name:'갈대 묶음',     icon:'🌿', priceAdj:0,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y30',name:'징검돌',        icon:'🪨', priceAdj:-5,  cat:'yard',   rarity:'common', reqLv:1},
+    {id:'d_y31',name:'작은 연못',     icon:'🪷', size:{w:3,h:3}, priceAdj:+10, cat:'yard', rarity:'epic',   reqLv:1},
+    {id:'d_y32',name:'오리 가족',     icon:'🦆', size:{w:2,h:1}, priceAdj:-5, cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 건물 테마 ───────────────────────────────────────────
-    {id:'d_y33',name:'나무 오두막',   icon:'🏠', size:{w:2,h:2}, price:240, cat:'yard', rarity:'legend', reqLv:1},
+    {id:'d_y33',name:'나무 오두막',   icon:'🏠', size:{w:2,h:2}, priceAdj:-135, cat:'yard', rarity:'legend', reqLv:1},
 
     // ── 2차 확장: 건물/생활 ─────────────────────────────────
-    {id:'d_y34',name:'작은 창고',     icon:'🏚️', size:{w:2,h:2}, price:210, cat:'yard', rarity:'epic',   reqLv:1},
+    {id:'d_y34',name:'작은 창고',     icon:'🏚️', size:{w:2,h:2}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1},
 
     // ── 2차 확장: 농촌 심화 ─────────────────────────────────
-    {id:'d_y35',name:'밀밭 B형',      icon:'🌾', size:{w:2,h:2}, price:65,  cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y36',name:'보리밭',        icon:'🌾', size:{w:2,h:2}, price:65,  cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y37',name:'장작더미 B형',  icon:'🪵', price:35,       cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y38',name:'큰 바위 B형',   icon:'🪨', size:{w:2,h:1}, price:60,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y35',name:'밀밭 B형',      icon:'🌾', size:{w:2,h:2}, priceAdj:-5,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y36',name:'보리밭',        icon:'🌾', size:{w:2,h:2}, priceAdj:-5,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y37',name:'장작더미 B형',  icon:'🪵', priceAdj:+15,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y38',name:'큰 바위 B형',   icon:'🪨', size:{w:2,h:1}, priceAdj:-10,  cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 2차 확장: 정적 동물 ─────────────────────────────────
-    {id:'d_y39',name:'닭 3마리',      icon:'🐔', size:{w:2,h:1}, price:70,  cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y40',name:'양',            icon:'🐑', size:{w:2,h:1}, price:100, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y39',name:'닭 3마리',      icon:'🐔', size:{w:2,h:1}, priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y40',name:'양',            icon:'🐑', size:{w:2,h:1}, priceAdj:+30, cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 2차 확장: 꽃 다양화 ─────────────────────────────────
-    {id:'d_y41',name:'라벤더 화단',   icon:'💜', price:18,       cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y42',name:'데이지 화단',   icon:'🌼', price:18,       cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y43',name:'장미 B형',      icon:'🌹', price:18,       cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y44',name:'튤립 B형',      icon:'🌷', price:18,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y41',name:'라벤더 화단',   icon:'💜', priceAdj:-2,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y42',name:'데이지 화단',   icon:'🌼', priceAdj:-2,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y43',name:'장미 B형',      icon:'🌹', priceAdj:-2,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y44',name:'튤립 B형',      icon:'🌷', priceAdj:-2,       cat:'yard', rarity:'common', reqLv:1},
 
     // ── 2차 확장: 식생/나무 ─────────────────────────────────
-    {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', price:15,       cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y46',name:'작은 침엽수',   icon:'🌲', size:{w:2,h:2}, price:120, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, price:130, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, price:140, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', priceAdj:-5,       cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y46',name:'작은 침엽수',   icon:'🌲', size:{w:2,h:2}, priceAdj:+50, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, priceAdj:+60, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, priceAdj:+120, cat:'yard', rarity:'common', reqLv:1},
 
     // ── 목재 울타리 4종 ─────────────────────────────────────
-    {id:'d_y49',name:'울타리 가로형',  icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y50',name:'울타리 세로형',  icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y51',name:'울타리 왼쪽 코너', icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', price:10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y49',name:'울타리 가로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y50',name:'울타리 세로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y51',name:'울타리 왼쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
-    {id:'d_i1', name:'화분',          icon:'🪴', price:15,  cat:'indoor', rarity:'common', reqLv:1},
-    {id:'d_i2', name:'램프',          icon:'💡', price:20,  cat:'indoor', rarity:'common', reqLv:1},
-    {id:'d_i3', name:'시계',          icon:'🕰️', price:25,  cat:'indoor', rarity:'common', reqLv:1},
-    {id:'d_i4', name:'그림 액자',     icon:'🖼️', price:30,  cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i1', name:'화분',          icon:'🪴', priceAdj:-5,  cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i2', name:'램프',          icon:'💡', priceAdj:0,  cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i3', name:'시계',          icon:'🕰️', priceAdj:+5,  cat:'indoor', rarity:'common', reqLv:1},
+    {id:'d_i4', name:'그림 액자',     icon:'🖼️', priceAdj:+10,  cat:'indoor', rarity:'common', reqLv:1},
     // 🔵 희귀 Lv5+
-    {id:'d_i5', name:'책상',          icon:'🖥️', size:{w:2,h:1}, price:50, cat:'indoor', rarity:'rare',   reqLv:1},
-    {id:'d_i6', name:'책장',          icon:'📚', size:{w:1,h:2}, price:70, cat:'indoor', rarity:'rare',   reqLv:1},
-    {id:'d_i7', name:'TV',            icon:'📺', size:{w:2,h:1}, price:80, cat:'indoor', rarity:'rare',   reqLv:1},
-    {id:'d_i8', name:'소파',          icon:'🛋️', size:{w:3,h:1}, price:95, cat:'indoor', rarity:'rare',   reqLv:1},
+    {id:'d_i5', name:'책상',          icon:'🖥️', size:{w:2,h:1}, priceAdj:-20, cat:'indoor', rarity:'rare',   reqLv:1},
+    {id:'d_i6', name:'책장',          icon:'📚', size:{w:1,h:2}, priceAdj:0, cat:'indoor', rarity:'rare',   reqLv:1},
+    {id:'d_i7', name:'TV',            icon:'📺', size:{w:2,h:1}, priceAdj:+10, cat:'indoor', rarity:'rare',   reqLv:1},
+    {id:'d_i8', name:'소파',          icon:'🛋️', size:{w:3,h:1}, priceAdj:+25, cat:'indoor', rarity:'rare',   reqLv:1},
     // 🟣 영웅 Lv10+
-    {id:'d_i9', name:'피아노',        icon:'🎹', size:{w:2,h:2}, price:150, cat:'indoor', rarity:'epic',   reqLv:1},
-    {id:'d_i10',name:'침대',          icon:'🛏️', size:{w:2,h:2}, price:187, cat:'indoor', rarity:'epic',   reqLv:1},
-    {id:'d_i11',name:'수족관',        icon:'🐠', size:{w:3,h:1}, price:225, cat:'indoor', rarity:'epic',   reqLv:1},
+    {id:'d_i9', name:'피아노',        icon:'🎹', size:{w:2,h:2}, priceAdj:-60, cat:'indoor', rarity:'epic',   reqLv:1},
+    {id:'d_i10',name:'침대',          icon:'🛏️', size:{w:2,h:2}, priceAdj:-23, cat:'indoor', rarity:'epic',   reqLv:1},
+    {id:'d_i11',name:'수족관',        icon:'🐠', size:{w:3,h:1}, priceAdj:+15, cat:'indoor', rarity:'epic',   reqLv:1},
     // 🟡 전설 Lv20+
-    {id:'d_i12',name:'황금 책장',     icon:'📖', size:{w:2,h:2}, price:300, cat:'indoor', rarity:'legend', reqLv:1},
-    {id:'d_i13',name:'마법 거울',     icon:'🪞', size:{w:1,h:2}, price:375, cat:'indoor', rarity:'legend', reqLv:1},
-    {id:'d_i14',name:'왕의 의자',     icon:'👑', size:{w:1,h:2}, price:450, cat:'indoor', rarity:'legend', reqLv:1},
+    {id:'d_i12',name:'황금 책장',     icon:'📖', size:{w:2,h:2}, priceAdj:-75, cat:'indoor', rarity:'legend', reqLv:1},
+    {id:'d_i13',name:'마법 거울',     icon:'🪞', size:{w:1,h:2}, priceAdj:0, cat:'indoor', rarity:'legend', reqLv:1},
+    {id:'d_i14',name:'왕의 의자',     icon:'👑', size:{w:1,h:2}, priceAdj:+75, cat:'indoor', rarity:'legend', reqLv:1},
     // ── 러그 (layer:'floor' = 가구·캐릭터 뒤 바닥 레이어에 그림, FLOOR-SVG-1) ──
-    {id:'d_i15',name:'둥근 러그',     icon:'🟠', size:{w:2,h:2}, price:90,  cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
-    {id:'d_i16',name:'네모 러그',     icon:'🟦', size:{w:3,h:2}, price:120, cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
+    {id:'d_i15',name:'둥근 러그',     icon:'🟠', size:{w:2,h:2}, priceAdj:+20,  cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
+    {id:'d_i16',name:'네모 러그',     icon:'🟦', size:{w:3,h:2}, priceAdj:+50, cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
     // ── 업적 전용 (상점 미판매, price:0) ──
     {id:'deco_trophy',    name:'트로피 (업적)',    icon:'🏆', price:0, cat:'yard',   rarity:'legend', reqLv:1},
     {id:'deco_bookshelf', name:'황금 책장 (업적)', icon:'📚', price:0, cat:'indoor', rarity:'legend', reqLv:1},
@@ -655,6 +670,14 @@ GAME_DATA.seeds = GAME_DATA.seeds.map((s, t) => {
 });
 
 // 돌연변이 씨앗 (B-2f) — i 번째 줄 = i 번째 일반 씨앗의 돌연변이
+// 장식 가격 (B-2h) — priceAdj 자리에 price = BALANCE.decoPrice[희귀도] + priceAdj 를 넣는다(키 순서 옛 표와 같음)
+GAME_DATA.decorations = GAME_DATA.decorations.map(d => {
+  if (!('priceAdj' in d)) return d;
+  const out = {};
+  for (const k of Object.keys(d)) { if (k === 'priceAdj') out.price = BALANCE.decoPrice[d.rarity] + d.priceAdj; else out[k] = d[k]; }
+  return out;
+});
+
 GAME_DATA.mutantSeeds = [
     { id:'i_m_potato_seed', name:'⚡ 번개 감자', icon:'⚡🥔', priceAdj:+1, crop:'m_potato', cropIcon:'⚡🥔', desc:'특별 씨앗 입문' },
     { id:'i_m_carrot_seed', name:'✨ 황금 당근', icon:'✨🥕', crop:'m_carrot', cropIcon:'✨🥕', desc:'행운의 씨앗' },

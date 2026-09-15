@@ -362,6 +362,23 @@ td{font-size:.875rem;}
   }
 }
 
+/* ══ [D3-ADMIN-4] 교사 화면 375 나머지 — 19개 메뉴 페이지 전수 촬영에서 나온 것. CSS만 ══
+   · 상단 줄: 제목이 '설/정'·'감정/현황'으로, '키오스크 열/기'로 접혔다(모든 페이지 공통).
+     → 제목·버튼 줄바꿈 금지, 좁으면 '👨‍🏫 교사 모드' 표시 뱃지(누르는 기능 없음)를 숨겨 자리 확보.
+   · 감정 현황: 그래프 두 개가 인라인 2칸 grid라 칸이 149px — 그래프가 잘림 → 600px 이하 1칸.
+   · 게임 설정: .settings-grid 1fr 칸이 내용 최소 폭 때문에 8px 넘침 → minmax(0,1fr). */
+@media(max-width:600px){
+  .topbar-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .topbar-left{min-width:0;flex:1;}
+  .topbar-right .btn-sm{white-space:nowrap;}
+  .topbar-right .admin-badge{display:none;}
+  #p-emotion div:has(> .table-card > canvas){grid-template-columns:minmax(0,1fr)!important;}
+  .settings-grid{grid-template-columns:minmax(0,1fr);}
+  /* 게임 설정 > 상점 가격 표(admin.js 인라인 1fr+80px×3) — 카드가 좁아지면 이름 칸이 18px로 눌림 → 표만 가로 스크롤 */
+  #shop-manage-body{overflow-x:auto;}
+  #shop-manage-body > div{min-width:360px;}
+}
+
 /* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════
    기준 44×44px. 교사는 노트북 마우스로도 쓰므로 전부 키우면 데스크톱이 뭉툭해진다.
    → @media (pointer: coarse) 안에서만 키운다. 마우스 환경은 한 픽셀도 안 바뀐다.

@@ -1804,9 +1804,21 @@ function buildMainHTML() {
     </div>`;
 }
 // ══ 보상 받기 ══
+// [HOME-TOGGLE-MOBILE-1] buildMainHTML 은 데스크톱(#main-area)과 모바일(#mob-main-tab)에 **두 번** 그려져
+//   같은 id 가 두 벌 생긴다. getElementById 는 DOM 앞쪽(#main-area, 폰에선 display:none)을 돌려줘서
+//   폰에서 펼침 버튼을 누르면 안 보이는 데스크톱 쪽만 열리고 화면은 그대로였다(아이폰 "오늘의 링크" 안 눌림).
+//   → 같은 id 중 **지금 보이는 판** 안의 것을 고른다. 판 밖(모달 등)에 있는 id 는 그대로 첫 번째.
+function _homeEl(id) {
+  const all = document.querySelectorAll('[id="' + id + '"]');
+  for (const el of all) {
+    const box = el.closest('#main-area, #mob-main-tab');
+    if (!box || box.getClientRects().length) return el;   // display:none 조상이면 getClientRects 가 비어 있다
+  }
+  return all[0] || null;
+}
 function toggleRestTodo() {
-  const wrap = document.getElementById('rest-todo-wrap');
-  const btn  = document.getElementById('rest-todo-btn');
+  const wrap = _homeEl('rest-todo-wrap');
+  const btn  = _homeEl('rest-todo-btn');
   if (!wrap) return;
   const open = wrap.style.display === 'none';
   wrap.style.display = open ? '' : 'none';
@@ -1816,8 +1828,8 @@ function toggleRestTodo() {
 }
 
 function toggleSection(sectionId, arrowId) {
-  const sec = document.getElementById(sectionId);
-  const arrow = document.getElementById(arrowId);
+  const sec = _homeEl(sectionId);   // [HOME-TOGGLE-MOBILE-1]
+  const arrow = _homeEl(arrowId);
   if (!sec) return;
   const open = sec.style.display === 'none';
   sec.style.display = open ? '' : 'none';
@@ -10134,8 +10146,7 @@ function checkAchievements() {
     document.getElementById('ach-popup').style.display      = 'block';
     document.getElementById('ach-popup-bg').style.display   = 'block';
     // 알림 타일 빨간점
-    const notif = document.getElementById('ach-tile-notif');
-    if (notif) notif.style.display = '';
+    document.querySelectorAll('[id="ach-tile-notif"]').forEach(n => { n.style.display = ''; });   // [HOME-TOGGLE-MOBILE-1] 두 판 모두
     // 3초 후 자동 닫기 (다음 업적)
     setTimeout(() => { closeAchPopup(); setTimeout(showNext, 300); }, 3000);
   };
