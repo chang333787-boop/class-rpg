@@ -345,6 +345,21 @@ td{font-size:.875rem;}
   .tc-header{flex-wrap:wrap;gap:.5rem;}
   .tc-actions{flex-wrap:wrap;}
   .topbar{padding:.6rem 1rem;gap:.5rem;}
+  /* [D3-ADMIN-3] 좁은 폭 표 가로 스크롤 안내 — #266에서 표를 가로 스크롤로 바꿨지만
+     375에서 오른쪽 칸(골드·칭호·관리 버튼)이 있는지 알 수 없었다.
+     ① 스크롤 그림자: 더 밀 수 있는 쪽 가장자리에만 어두운 띠가 생긴다(끝까지 밀면 사라짐 — background-attachment local/scroll 기법, JS 0).
+     ② 표가 든 카드 머리에 '↔ 옆으로 밀어서 더 보기' 한 줄. */
+  .table-card div:has(> table), #approve-grid{
+    background:
+      linear-gradient(to right, var(--card) 30%, rgba(36,30,22,0)) left center / 40px 100% no-repeat local,
+      linear-gradient(to left,  var(--card) 30%, rgba(36,30,22,0)) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.55), rgba(0,0,0,0)) left center / 16px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.55), rgba(0,0,0,0)) right center / 16px 100% no-repeat scroll;
+    background-color:var(--card);
+  }
+  .table-card:has(table) .tc-header::after{
+    content:'↔ 옆으로 밀어서 더 보기';flex-basis:100%;font-size:.8125rem;color:var(--txt3);
+  }
 }
 
 /* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════

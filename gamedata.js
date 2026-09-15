@@ -16,7 +16,12 @@ const BALANCE = {
   player: { hpBase: 80, hpPerLevel: 12 },
 
   // 장비 등급 1~10 을 여는 레벨 — 머리·몸통·무기·장갑·신발 전 슬롯 공통 (B-1 §4.3)
-  equipment: { tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30] },
+  // 장비 가격 (B-2e, B-1 §4.3) — 독립 50종: price = round(c × 능력치합^p) + 줄의 priceAdj · 복사 30종(물·풀 몸통·스태프)은 원본 가격을 따른다
+  //   ★ 곡선은 칸별 로그 회귀(B-1). priceAdj 는 옛 손값을 100% 그대로 두는 차이 — 없애면 아이가 보는 가격이 바뀐다(사용자 결정).
+  equipment: {
+    tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30],
+    price: { head: { c: 7.34, p: 1.212 }, body: { c: 3.24, p: 1.477 }, weapon: { c: 1.24, p: 1.351 }, glove: { c: 2.8, p: 1.461 }, shoe: { c: 1.47, p: 1.756 } },
+  },
 
   // 몬스터 능력치 (B-2c, B-1 §4.1) — _mon(shape, 줄, 보정)이 쓴다
   //   레벨 기본값 BASE(L)[s] = round(a + b·L) + baseAdjust[s][L]
@@ -37,6 +42,10 @@ const BALANCE = {
   //   ★ 곡선은 100종 제곱오차 최소로 고른 값(5,570G → 곡선만 쓰면 5,572G). 보정은 옛 손값을 100% 그대로 두는 차이.
   //   ★ 보정을 0으로 하면 아이가 보는 골드가 바뀐다 — docs/rpg_balance_gold_curve_20260915.md (G1 전부 0 · G2 이상치 11종만 0) 는 사용자 결정.
   monsterGold: { base: { a: 10.5, b: 2.4 }, rarity: { common: 1, rare: 1.15, legend: 1.75 } },
+
+  // 돌연변이 씨앗 (B-2f) — 같은 등급 일반 씨앗의 성장시간·판매가·레벨을 쓰고, 가격 = round(일반 × priceMult) + 줄의 priceAdj,
+  //   성공률 = floor((successBase − successPerTier × 등급) × 100) / 100. 성공 시 판매가 ×2 는 student.js 수확 코드.
+  mutantSeed: { priceMult: 1.6, successBase: 0.55, successPerTier: 0.025 },
 
   // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
   // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
@@ -120,9 +129,15 @@ const BALANCE = {
 
 // ─── 장비 표 만들기 (B-2b) ─────────────────────────────────
 // 등급 i(0~9) 장비의 레벨 = BALANCE.equipment.tierLevels[i]. 키 순서는 옛 표와 같게(id·name·lv·stats·cond·price·icon·element).
-function _equipTiers(rows) {
+// 칸별 가격 곡선 — 능력치 합(atk·def·mag·spd)에 대한 거듭제곱
+function _equipPrice(slot, stats) {
+  const c = BALANCE.equipment.price[slot];
+  const sum = Object.values(stats).reduce((a, v) => a + v, 0);
+  return Math.round(c.c * Math.pow(sum, c.p));
+}
+function _equipTiers(slot, rows) {
   return rows.map((r, i) => {
-    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: r.price, icon: r.icon };
+    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: _equipPrice(slot, r.stats) + (r.priceAdj || 0), icon: r.icon };
     if (r.element !== undefined) item.element = r.element;
     return item;
   });
@@ -137,29 +152,29 @@ function _equipCopy(source, opt, rows) {
     return item;
   });
 }
-const _EQUIP_BODY_FIRE = _equipTiers([
-  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      price:45,   icon:'👕', element:'fire'},
-  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       price:65,  icon:'🥋', element:'fire'},
-  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       price:95,  icon:'🧥', element:'fire'},
-  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       price:140,  icon:'🛡️', element:'fire'},
-  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       price:200,  icon:'🔬', element:'fire'},
-  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      price:280,  icon:'⚔️', element:'fire'},
-  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     price:380,  icon:'✨', element:'fire'},
-  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     price:490,  icon:'💛', element:'fire'},
-  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     price:625, icon:'🌟', element:'fire'},
-  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     price:775, icon:'👑', element:'fire'},
+const _EQUIP_BODY_FIRE = _equipTiers('body', [
+  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      priceAdj:+10,    icon:'👕', element:'fire'},
+  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       priceAdj:-18,   icon:'🥋', element:'fire'},
+  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       priceAdj:-2,   icon:'🧥', element:'fire'},
+  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       priceAdj:-20,   icon:'🛡️', element:'fire'},
+  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       priceAdj:-13,   icon:'🔬', element:'fire'},
+  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      priceAdj:+10,   icon:'⚔️', element:'fire'},
+  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     priceAdj:-19,   icon:'✨', element:'fire'},
+  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     priceAdj:+69,   icon:'💛', element:'fire'},
+  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     priceAdj:+33,  icon:'🌟', element:'fire'},
+  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     priceAdj:+22,  icon:'👑', element:'fire'},
 ]);
-const _EQUIP_SWORD = _equipTiers([
-  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 price:45,   icon:'🗡️'},
-  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  price:70,  icon:'⚔️'},
-  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  price:100,  icon:'🔷'},
-  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  price:150,  icon:'🔱'},
-  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  price:210,  icon:'🏹'},
-  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, price:300,  icon:'⚔️'},
-  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},price:400,  icon:'🌟'},
-  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},price:525, icon:'✨'},
-  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},price:675, icon:'💎'},
-  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},price:850, icon:'🌈'},
+const _EQUIP_SWORD = _equipTiers('weapon', [
+  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 priceAdj:+5,    icon:'🗡️'},
+  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  priceAdj:-1,   icon:'⚔️'},
+  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  priceAdj:-6,   icon:'🔷'},
+  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  priceAdj:-13,   icon:'🔱'},
+  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  priceAdj:-15,   icon:'🏹'},
+  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, priceAdj:+1,   icon:'⚔️'},
+  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},priceAdj:-1,   icon:'🌟'},
+  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},priceAdj:+8,  icon:'✨'},
+  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},priceAdj:+25,  icon:'💎'},
+  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},priceAdj:+51,  icon:'🌈'},
 ]);
 
 
@@ -245,17 +260,17 @@ const GAME_DATA = {
   // ★ B-2b: 등급 i 의 레벨 = BALANCE.equipment.tierLevels[i] (_equipTiers) ·
   //   물·풀 몸통 = 불 몸통 복사, 스태프 = 검 거울 (_equipCopy) — 능력치·가격은 원본 줄 하나만 고치면 따라온다
   equipment: {
-    head: _equipTiers([
-      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      price:35,   icon:'🎩'},
-      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        price:50,  icon:'🪖'},
-      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        price:75,  icon:'🧙'},
-      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        price:110,  icon:'⛑️'},
-      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        price:160,  icon:'🎓'},
-      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       price:225,  icon:'🛡️'},
-      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      price:310,  icon:'🔮'},
-      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      price:410,  icon:'👑'},
-      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      price:525, icon:'💎'},
-      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      price:650, icon:'👑'},
+    head: _equipTiers('head', [
+      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      priceAdj:+7,    icon:'🎩'},
+      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        priceAdj:-14,   icon:'🪖'},
+      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        priceAdj:-3,   icon:'🧙'},
+      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        priceAdj:-39,   icon:'⛑️'},
+      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        priceAdj:+11,   icon:'🎓'},
+      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       priceAdj:-19,   icon:'🛡️'},
+      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      priceAdj:+66,   icon:'🔮'},
+      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      priceAdj:+47,   icon:'👑'},
+      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      priceAdj:+54,  icon:'💎'},
+      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      priceAdj:-70,  icon:'👑'},
     ]),
     body: [
       // ★ e_b1~e_b10 = 불(fire) — 기존 ID 완전 유지, 조건=건강+생활 (능력치·가격 원본: _EQUIP_BODY_FIRE)
@@ -305,29 +320,29 @@ const GAME_DATA = {
         {id:'e_ws10',name:'영웅의 스태프',  cond:{study:21,art:17},   icon:'🔯'},
       ]),
     ],
-    glove: _equipTiers([
-      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      price:25,   icon:'🧤'},
-      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     price:35,   icon:'🥊'},
-      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      price:50,  icon:'✋'},
-      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      price:70,  icon:'⚙️'},
-      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      price:100,  icon:'🔬'},
-      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     price:140,  icon:'🏆'},
-      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    price:190,  icon:'💫'},
-      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    price:250,  icon:'💛'},
-      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    price:320,  icon:'💎'},
-      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  price:400,  icon:'🌟'},
+    glove: _equipTiers('glove', [
+      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      priceAdj:+4,    icon:'🧤'},
+      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     priceAdj:-13,    icon:'🥊'},
+      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      priceAdj:+2,   icon:'✋'},
+      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      priceAdj:+1,   icon:'⚙️'},
+      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      priceAdj:-6,   icon:'🔬'},
+      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     priceAdj:+8,   icon:'🏆'},
+      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    priceAdj:-1,   icon:'💫'},
+      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    priceAdj:+27,   icon:'💛'},
+      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    priceAdj:+29,   icon:'💎'},
+      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  priceAdj:-43,   icon:'🌟'},
     ]),
-    shoe: _equipTiers([
-      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      price:30,   icon:'👟'},
-      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        price:42,   icon:'👠'},
-      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        price:60,  icon:'✨'},
-      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        price:85,  icon:'🥾'},
-      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        price:120,  icon:'🔬'},
-      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       price:170,  icon:'⚔️'},
-      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      price:235,  icon:'💫'},
-      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      price:310,  icon:'💛'},
-      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      price:395,  icon:'💎'},
-      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      price:490,  icon:'🌈'},
+    shoe: _equipTiers('shoe', [
+      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      priceAdj:+5,    icon:'👟'},
+      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        priceAdj:-15,    icon:'👠'},
+      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        priceAdj:+3,   icon:'✨'},
+      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        priceAdj:-14,   icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        priceAdj:+5,   icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       priceAdj:-1,   icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      priceAdj:+22,   icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      priceAdj:+27,   icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      priceAdj:+5,   icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      priceAdj:-21,   icon:'🌈'},
     ]),
   },
   // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
@@ -345,13 +360,8 @@ const GAME_DATA = {
   // ── 돌연변이 씨앗 (일반 씨앗과 별도 관리) ───────────────────────────
   // 수확 시 성공/실패 판정: 성공=baseSellPrice*2, 실패=0G
   // isMutant:true 로 일반 씨앗과 구분
-  mutantSeeds: [
-    {id:'i_m_potato_seed',    name:'⚡ 번개 감자', icon:'⚡🥔', price:20,  growHours:20, baseSellPrice:40,  successRate:0.55, crop:'m_potato',     cropIcon:'⚡🥔', reqLv:1,  desc:'특별 씨앗 입문', isMutant:true},
-    {id:'i_m_carrot_seed',    name:'✨ 황금 당근', icon:'✨🥕', price:32,  growHours:24, baseSellPrice:75,  successRate:0.52, crop:'m_carrot',     cropIcon:'✨🥕', reqLv:3,  desc:'행운의 씨앗',   isMutant:true},
-    {id:'i_m_corn_seed',      name:'🌈 무지개 옥수수',icon:'🌈🌽', price:47,  growHours:36, baseSellPrice:125, successRate:0.50, crop:'m_corn',       cropIcon:'🌈🌽', reqLv:5,  desc:'신비한 씨앗', isMutant:true},
-    {id:'i_m_tomato_seed',    name:'🔥 불꽃 토마토',icon:'🔥🍅', price:65, growHours:48, baseSellPrice:180, successRate:0.47, crop:'m_tomato',     cropIcon:'🔥🍅', reqLv:8,  desc:'희귀 씨앗', isMutant:true},
-    {id:'i_m_strawberry_seed',name:'🌟 별빛 딸기',  icon:'🌟🍓', price:97, growHours:72, baseSellPrice:290, successRate:0.45, crop:'m_strawberry', cropIcon:'🌟🍓', reqLv:12, desc:'전설의 씨앗',   isMutant:true},
-  ],
+  // ★ B-2f: 값은 GAME_DATA 정의 바로 뒤 _mutantSeeds() 가 일반 씨앗 + BALANCE.mutantSeed 로 채운다(키 순서 옛 표와 같음)
+  mutantSeeds: [],
 
   // ─── 장식물 ────────────────────────────────────────────
   decorations: [
@@ -632,6 +642,20 @@ const GAME_DATA = {
   getSlotForItem(id) { return this.SLOT_MAP[id] || null; },
 };
 
+// 돌연변이 씨앗 (B-2f) — i 번째 줄 = i 번째 일반 씨앗의 돌연변이
+GAME_DATA.mutantSeeds = [
+    { id:'i_m_potato_seed', name:'⚡ 번개 감자', icon:'⚡🥔', priceAdj:+1, crop:'m_potato', cropIcon:'⚡🥔', desc:'특별 씨앗 입문' },
+    { id:'i_m_carrot_seed', name:'✨ 황금 당근', icon:'✨🥕', crop:'m_carrot', cropIcon:'✨🥕', desc:'행운의 씨앗' },
+    { id:'i_m_corn_seed', name:'🌈 무지개 옥수수', icon:'🌈🌽', priceAdj:-1, crop:'m_corn', cropIcon:'🌈🌽', desc:'신비한 씨앗' },
+    { id:'i_m_tomato_seed', name:'🔥 불꽃 토마토', icon:'🔥🍅', priceAdj:+1, crop:'m_tomato', cropIcon:'🔥🍅', desc:'희귀 씨앗' },
+    { id:'i_m_strawberry_seed', name:'🌟 별빛 딸기', icon:'🌟🍓', priceAdj:+1, crop:'m_strawberry', cropIcon:'🌟🍓', desc:'전설의 씨앗' },
+].map((r, t) => {
+  const s = GAME_DATA.seeds[t], c = BALANCE.mutantSeed;
+  return { id: r.id, name: r.name, icon: r.icon, price: Math.round(s.price * c.priceMult) + (r.priceAdj || 0), growHours: s.growHours,
+    baseSellPrice: s.sellPrice, successRate: Math.floor((c.successBase - c.successPerTier * t) * 100 + 1e-9) / 100,
+    crop: r.crop, cropIcon: r.cropIcon, reqLv: s.reqLv, desc: r.desc, isMutant: true };
+});
+
 // ═══════════════════════════════════════════════════════
 //  스킬 데이터 (stage 1 상수 — 4단계 가격 적용)
 // ═══════════════════════════════════════════════════════
@@ -662,23 +686,31 @@ const SKILL_BOOKS = [
   {id:'sb_f5',name:'화염 마스터리북 5권',type:'fire',  level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📕',desc:'화염 공격력 +40%'},
   {id:'sb_f6',name:'화염 마스터리북 6권',type:'fire',  level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📕',desc:'화염 공격력 +50%'},
   {id:'sb_f7',name:'화염 마스터리북 7권',type:'fire',  level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📕',desc:'화염 공격력 +60%'},
-  // water 1~7 (90/140/210/290/400/540/720)
-  {id:'sb_w1',name:'냉기 마스터리북 1권',type:'water', level:1,targetLevel:1, reqPlayerLevel:2,  price:45,  icon:'📗',desc:'냉기 공격 해금'},
-  {id:'sb_w2',name:'냉기 마스터리북 2권',type:'water', level:2,targetLevel:2, reqPlayerLevel:5,  price:70, icon:'📗',desc:'냉기 공격력 +10%'},
-  {id:'sb_w3',name:'냉기 마스터리북 3권',type:'water', level:3,targetLevel:3, reqPlayerLevel:8,  price:105, icon:'📗',desc:'냉기 공격력 +20%'},
-  {id:'sb_w4',name:'냉기 마스터리북 4권',type:'water', level:4,targetLevel:4, reqPlayerLevel:12, price:145, icon:'📗',desc:'냉기 공격력 +30%'},
-  {id:'sb_w5',name:'냉기 마스터리북 5권',type:'water', level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📗',desc:'냉기 공격력 +40%'},
-  {id:'sb_w6',name:'냉기 마스터리북 6권',type:'water', level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📗',desc:'냉기 공격력 +50%'},
-  {id:'sb_w7',name:'냉기 마스터리북 7권',type:'water', level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📗',desc:'냉기 공격력 +60%'},
-  // grass 1~7 (90/140/210/290/400/540/720)
-  {id:'sb_g1',name:'자연 마스터리북 1권',type:'grass', level:1,targetLevel:1, reqPlayerLevel:2,  price:45,  icon:'📒',desc:'자연 공격 해금'},
-  {id:'sb_g2',name:'자연 마스터리북 2권',type:'grass', level:2,targetLevel:2, reqPlayerLevel:5,  price:70, icon:'📒',desc:'자연 공격력 +10%'},
-  {id:'sb_g3',name:'자연 마스터리북 3권',type:'grass', level:3,targetLevel:3, reqPlayerLevel:8,  price:105, icon:'📒',desc:'자연 공격력 +20%'},
-  {id:'sb_g4',name:'자연 마스터리북 4권',type:'grass', level:4,targetLevel:4, reqPlayerLevel:12, price:145, icon:'📒',desc:'자연 공격력 +30%'},
-  {id:'sb_g5',name:'자연 마스터리북 5권',type:'grass', level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📒',desc:'자연 공격력 +40%'},
-  {id:'sb_g6',name:'자연 마스터리북 6권',type:'grass', level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📒',desc:'자연 공격력 +50%'},
-  {id:'sb_g7',name:'자연 마스터리북 7권',type:'grass', level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📒',desc:'자연 공격력 +60%'},
 ];
+// ★ B-2f: 냉기·자연 마스터리북 = 같은 권의 화염 마스터리북 복사(권·목표 레벨·필요 레벨·가격), 이름·아이콘·설명만 따로
+function _bookCopy(type, rows) {
+  const fire = SKILL_BOOKS.filter(b => b.type === 'fire');
+  return rows.map((r, i) => ({ id: r.id, name: r.name, type, level: fire[i].level, targetLevel: fire[i].targetLevel,
+    reqPlayerLevel: fire[i].reqPlayerLevel, price: fire[i].price, icon: r.icon, desc: r.desc }));
+}
+SKILL_BOOKS.push(..._bookCopy('water', [
+  { id:'sb_w1', name:'냉기 마스터리북 1권', icon:'📗', desc:'냉기 공격 해금' },
+  { id:'sb_w2', name:'냉기 마스터리북 2권', icon:'📗', desc:'냉기 공격력 +10%' },
+  { id:'sb_w3', name:'냉기 마스터리북 3권', icon:'📗', desc:'냉기 공격력 +20%' },
+  { id:'sb_w4', name:'냉기 마스터리북 4권', icon:'📗', desc:'냉기 공격력 +30%' },
+  { id:'sb_w5', name:'냉기 마스터리북 5권', icon:'📗', desc:'냉기 공격력 +40%' },
+  { id:'sb_w6', name:'냉기 마스터리북 6권', icon:'📗', desc:'냉기 공격력 +50%' },
+  { id:'sb_w7', name:'냉기 마스터리북 7권', icon:'📗', desc:'냉기 공격력 +60%' },
+]));
+SKILL_BOOKS.push(..._bookCopy('grass', [
+  { id:'sb_g1', name:'자연 마스터리북 1권', icon:'📒', desc:'자연 공격 해금' },
+  { id:'sb_g2', name:'자연 마스터리북 2권', icon:'📒', desc:'자연 공격력 +10%' },
+  { id:'sb_g3', name:'자연 마스터리북 3권', icon:'📒', desc:'자연 공격력 +20%' },
+  { id:'sb_g4', name:'자연 마스터리북 4권', icon:'📒', desc:'자연 공격력 +30%' },
+  { id:'sb_g5', name:'자연 마스터리북 5권', icon:'📒', desc:'자연 공격력 +40%' },
+  { id:'sb_g6', name:'자연 마스터리북 6권', icon:'📒', desc:'자연 공격력 +50%' },
+  { id:'sb_g7', name:'자연 마스터리북 7권', icon:'📒', desc:'자연 공격력 +60%' },
+]));
 
 // ─── Firebase 설정 ────────────────────────────────────
 const FIREBASE_CONFIG = {
@@ -701,33 +733,16 @@ const DB = {
   _onChangeCb: null,
   _saving: false,
 
-  async init() {
+  async init(opts) {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     this._fbRef = firebase.database().ref(this.KEY);
     this._fbAdminRef = firebase.database().ref(this.ADMIN_KEY);
-
-    // 초기 데이터 로드 — [INIT-SINGLE-LOAD-1] once('value') 대신 on('value') 의 첫 스냅샷.
-    //   once 가 끝나면 SDK 가 그 구독을 내리고 캐시를 버려, 곧이어 건 on 이 root 를 **통째로 한 번 더** 받았다
-    //   (에뮬레이터 + SDK 9.23 실측 2배). 첫 리스너를 붙여 둔 채 아래 실시간 리스너를 걸면 SDK 캐시에서 바로 받는다.
-    let firstLoadResolve = null;
-    const firstLoad = (s) => { if (firstLoadResolve) { firstLoadResolve(s); firstLoadResolve = null; } };
-    const snap = await new Promise((resolve, reject) => {
-      firstLoadResolve = resolve;
-      this._fbRef.on('value', firstLoad, reject);
-    });
-    let data = snap.val();
-
-    if (!data) {
-      data = this._defaultData();
-      await this._fbRef.set(data);
-    }
-    this._cache = this._migrate(this._normalizeArrays(data));
-
-    // 첫 리스너는 아래 실시간 리스너를 건 **뒤**에 뗀다 — 먼저 떼면 구독이 끊겨 root 를 다시 통째로 받는다
-    setTimeout(() => this._fbRef.off('value', firstLoad), 0);
+    this._profile = (opts && opts.profile) || null;   // [STUDENT-COLD-1] 'student' = 학생 기기
 
     // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
-    this._fbRef.on('value', (snap) => {
+    //   [STUDENT-COLD-1] 본문은 그대로 두고 이름만 붙였다: root 판은 root on('value') 로,
+    //   학생 판은 노드별 구독을 합친 "가상 root 스냅샷"으로 **같은 함수**를 부른다.
+    const liveHandler = (snap) => {
       const d = snap.val();
       if (!d) return;
 
@@ -743,7 +758,124 @@ const DB = {
 
       this._cache = this._migrate(this._normalizeArrays(d));
       if (this._onChangeCb) this._onChangeCb();
+    };
+    this._liveHandler = liveHandler;
+
+    if (this._profile === 'student' && await this._initStudentNodes()) return;
+
+    // 초기 데이터 로드 — [INIT-SINGLE-LOAD-1] once('value') 대신 on('value') 의 첫 스냅샷.
+    //   once 가 끝나면 SDK 가 그 구독을 내리고 캐시를 버려, 곧이어 건 on 이 root 를 **통째로 한 번 더** 받았다
+    //   (에뮬레이터 + SDK 9.23 실측 2배). 첫 리스너를 붙여 둔 채 아래 실시간 리스너를 걸면 SDK 캐시에서 바로 받는다.
+    let firstLoadResolve = null;
+    const firstLoad = (s) => { if (firstLoadResolve) { firstLoadResolve(s); firstLoadResolve = null; } };
+    const snap = await new Promise((resolve, reject) => {
+      firstLoadResolve = resolve;
+      this._fbRef.on('value', firstLoad, reject);
     });
+    let data = snap.val();
+
+    if (!data) {
+      data = this._defaultData();
+      if (this._profile !== 'student') await this._rootSet(data);   // [STUDENT-COLD-1] G1 — 빈 DB 설치는 교사 화면만
+    }
+    this._cache = this._migrate(this._normalizeArrays(data));
+
+    // 첫 리스너는 아래 실시간 리스너를 건 **뒤**에 뗀다 — 먼저 떼면 구독이 끊겨 root 를 다시 통째로 받는다
+    setTimeout(() => this._fbRef.off('value', firstLoad), 0);
+
+    this._fbRef.on('value', liveHandler);
+  },
+
+  // ── [STUDENT-COLD-1] 학생 기기 부분 캐시 ─────────────────────
+  //  설계: 클로드코드/보고_20260915/설계_S2_부분캐시가드_rf.md
+  //  학생 기기는 큰데 남의 것은 안 쓰는 노드를 root 구독에서 빼고(COLD), 로그인 뒤 내 것만 키 범위로 받는다(MINE).
+  //  교사(admin)·키오스크는 지금처럼 root 통째. 이 판에서는 캐시가 **부분**이므로 root 통째 저장을 막는다(G1).
+  //  quests 는 _normalizeArrays 가 questLogs 에서 늘 다시 만들어 서버 값을 안 쓴다(옛 롤백이 남긴 사본).
+  STUDENT_COLD: ['quests', 'quizRecords', 'emotionLogs', 'emotionReflections', 'backups'],
+  STUDENT_MINE: ['emotionLogs', 'emotionReflections'],   // 키가 `<sid>_…` 로 시작 → orderByKey 범위, 색인 불필요
+  //  지금 운영에 없어도(null) 학생 화면이 읽는 노드 — 나중에 생기면 바로 받도록 미리 구독(null 구독은 비용 0)
+  STUDENT_KNOWN: ['settings', 'students', 'questLogs', 'boardQuests', 'artworks', 'memories', 'memoryAlbums',
+    'promotionRequests', 'pwResetRequests', 'weeklyGoals', 'weeklyReflections', 'customProblems', 'customWords',
+    'teacherWordSets', 'recorderLogs', 'recorderSongs', 'problemRecords', 'studentNotes', 'emotionPromptStats',
+    'emotionAlerts', 'goldDaily', 'customMonsters', 'customQuestTemplates', 'hiddenQuestTemplates'],
+
+  // G1: 부분 캐시로 root 통째 저장하면 빠진 노드가 운영에서 지워진다
+  _rootSet(data) {
+    if (this._profile === 'student') throw new Error('[STUDENT-COLD-1] 학생 기기는 root 통째 저장 금지(부분 캐시)');
+    return this._fbRef.set(data);
+  },
+
+  _studentVal() {
+    const d = {};
+    for (const k of Object.keys(this._snaps || {})) { const v = this._snaps[k] && this._snaps[k].val(); if (v != null) d[k] = v; }
+    return d;
+  },
+  _studentEmit() { if (this._liveHandler) this._liveHandler({ val: () => this._studentVal() }); },
+
+  // 노드 이름: shallow REST(수백 바이트) ∪ STUDENT_KNOWN − STUDENT_COLD. 실패하면 false → root 판으로
+  async _initStudentNodes() {
+    let names;
+    try {
+      const base = new URL(firebase.app().options.databaseURL);
+      const u = new URL(base.origin + base.pathname.replace(/\/+$/, '') + '/' + this.KEY + '.json');
+      base.searchParams.forEach((v, k) => u.searchParams.set(k, v));   // 에뮬레이터 ?ns= 유지
+      u.searchParams.set('shallow', 'true');
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const t = ctl ? setTimeout(() => ctl.abort(), 8000) : 0;
+      const res = await fetch(u.toString(), ctl ? { signal: ctl.signal } : undefined);
+      if (t) clearTimeout(t);
+      if (!res.ok) return false;
+      const top = await res.json();
+      if (!top || typeof top !== 'object') return false;   // 빈 DB → root 판(학생은 기본값도 안 씀)
+      names = [...new Set([...Object.keys(top), ...this.STUDENT_KNOWN])].filter(n => !this.STUDENT_COLD.includes(n));
+    } catch (e) { return false; }
+
+    this._snaps = {};
+    this._studentReady = false;
+    await Promise.all(names.map(name => new Promise((resolve, reject) => {
+      let first = true;
+      this._fbRef.child(name).on('value', (s) => {
+        this._snaps[name] = s;
+        if (first) { first = false; resolve(); return; }
+        if (this._studentReady) this._studentEmit();
+      }, reject);
+    })));
+    this._cache = this._migrate(this._normalizeArrays(this._studentVal()));
+    this._studentReady = true;
+    return true;
+  },
+
+  // 학생 로그인 직후, 첫 화면 그리기 전에 부른다(G3). 학생이 바뀌면 이전 구독을 떼고 비운다(G7).
+  attachMine(sid) {
+    if (!this._snaps) return Promise.resolve();          // root 판이면 이미 전부 있음
+    (this._mineOffs || []).forEach(off => off());
+    this._mineOffs = [];
+    for (const n of this.STUDENT_MINE) { delete this._snaps[n]; if (this._cache) this._cache[n] = {}; }
+    if (!sid) return Promise.resolve();
+    const one = (name) => new Promise((resolve) => {
+      const q = this._fbRef.child(name).orderByKey().startAt(sid + '_').endAt(sid + '_\uf8ff');
+      let first = true;
+      const cb = (s) => {
+        this._snaps[name] = s;
+        if (first) { first = false; resolve(); } else if (this._studentReady) this._studentEmit();
+      };
+      q.on('value', cb);
+      this._mineOffs.push(() => q.off('value', cb));
+    });
+    const loaded = Promise.all(this.STUDENT_MINE.map(one)).then(() => {
+      // 첫 판은 캐시에 바로 넣는다 — 로그인 순간 _saving 이면 핸들러가 settings 만 보고 돌아가기 때문
+      //   (emotionLogs·emotionReflections 는 _normalizeArrays 에서 키 객체 그대로라 같은 모양)
+      for (const n of this.STUDENT_MINE) if (this._cache) this._cache[n] = (this._snaps[n] && this._snaps[n].val()) || {};
+      if (this._onChangeCb) this._onChangeCb();
+    });
+    // 8초 안에 안 오면 전체를 한 번 받아 내 것만 거른다(느려도 틀리지 않게)
+    const slow = new Promise(r => setTimeout(r, 8000)).then(() => Promise.all(this.STUDENT_MINE.map(n =>
+      this._snaps[n] ? null : this._fbRef.child(n).once('value').then(s => {
+        const all = s.val() || {}, mine = {};
+        for (const k of Object.keys(all)) if (k.startsWith(sid + '_')) mine[k] = all[k];
+        if (this._cache && !this._snaps[n]) this._cache[n] = mine;
+      })))).catch(() => {});
+    return Promise.race([loaded, slow]);
   },
 
   onDataChange(fn) { this._onChangeCb = fn; },
@@ -1033,6 +1165,18 @@ const DB = {
     this._fbRef.child('artworks/' + normalized.id).set(normalized).catch(e => this._onSaveError(e));
   },
 
+  // [ART-RAW-KEY-1] 작품이 실제로 저장된 키들. 운영 artworks 는 옛 배열(숫자 키 0,1,2…)이라
+  //   `artworks/<작품id>/…` 에 쓰면 진짜 작품은 그대로이고 유령 조각만 생겼다(내리기가 학생 화면에 안 먹음).
+  //   서버 판에서 value.id 가 같은 키를 모두 찾는다(숫자 키·id 키 둘 다 있으면 둘 다). 없으면 id 키.
+  //   root 구독이 이미 받아 둔 판이라 once 는 SDK 캐시에서 바로 온다(추가 다운로드 없음).
+  _artworkKeys(id) {
+    return this._fbRef.child('artworks').once('value').then(snap => {
+      const raw = snap.val() || {};
+      const keys = Object.keys(raw).filter(k => raw[k] && raw[k].id === id);
+      return keys.length ? keys : [id];
+    }, () => [id]);
+  },
+
   updateArtwork(id, patch) {
     const db = this.load();
     const idx = (db.artworks||[]).findIndex(a => a.id === id);
@@ -1040,7 +1184,8 @@ const DB = {
     db.artworks[idx] = { ...db.artworks[idx], ...patch };
     this._cache = db;
     this._saving = true;
-    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).catch(e => this._onSaveError(e)).finally(() => {
+    const rec = db.artworks[idx];
+    return this._artworkKeys(id).then(keys => Promise.all(keys.map(k => this._fbRef.child('artworks/' + k).set(rec)))).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 300);
     });
   },
@@ -1195,8 +1340,46 @@ const DB = {
     a.likes = a.likes || {};
     if (on) a.likes[studentId] = true; else delete a.likes[studentId];
     this._cache = db;
-    const ref = this._fbRef.child('artworks/' + artId + '/likes/' + studentId);
-    return (on ? ref.set(true) : ref.remove()).catch(e => this._onSaveError(e));
+    return this._artworkKeys(artId).then(keys => Promise.all(keys.map(k => {   // [ART-RAW-KEY-1]
+      const ref = this._fbRef.child('artworks/' + k + '/likes/' + studentId);
+      return on ? ref.set(true) : ref.remove();
+    }))).catch(e => this._onSaveError(e));
+  },
+
+  // [ART-KEY-FIX-1] artworks 서버 판(raw) → "작품 id = 키" 로 맞추는 **바뀔 키만** 담은 update 객체(순수 함수, 쓰기 없음).
+  //   · 옛 숫자 키 작품은 id 키로 옮기고, 그 id 키에 쓰여 있던 유령 조각(hidden·likes)은 합친다
+  //   · 같은 작품이 id 키에 이미 있으면 숫자 키만 지운다 · keep(a) 가 false 면 지운다(그 작품의 유령 조각도)
+  //   · 이미 제 모양인 키(그 순간 올라온 새 작품)는 건드리지 않는다
+  //   숫자 키 하나만 지우면 배열에 null 구멍이 생겨 `a.id` 를 읽는 화면이 깨지므로, 지울 때도 이걸로 모양을 같이 맞춘다.
+  _artworkKeyFix(raw, keep) {
+    raw = raw || {};
+    const keys = Object.keys(raw);
+    const upd = {};
+    const mergedGhost = new Set();
+    let moved = 0, removed = 0;
+    const hasRealAt = k => !!(raw[k] && raw[k].id === k);
+    for (const k of keys) {
+      const a = raw[k];
+      if (!a || !a.id) continue;                               // id 없는 것은 아래에서
+      if (a.id === k) {                                        // 이미 제 모양
+        if (!keep(a)) { upd[k] = null; removed++; }
+        continue;
+      }
+      upd[k] = null;                                           // 키가 id 가 아님(옛 숫자 키 등)
+      if (!keep(a)) { removed++; continue; }
+      if (hasRealAt(a.id) || (upd[a.id] && upd[a.id].id)) { removed++; continue; }   // 같은 작품이 이미 id 키에 → 중복
+      const piece = raw[a.id] && !raw[a.id].id ? raw[a.id] : {};                    // 유령 조각
+      const rec = { ...a, ...piece, likes: { ...(a.likes || {}), ...(piece.likes || {}) } };
+      if (!Object.keys(rec.likes).length) delete rec.likes;
+      upd[a.id] = rec; mergedGhost.add(a.id); moved++;
+    }
+    for (const k of keys) {                                    // id 없는 레코드: 옮긴 작품에 합쳐진 조각이 아니면 버린다
+      const a = raw[k];
+      if (a && a.id) continue;
+      if (mergedGhost.has(k)) continue;
+      upd[k] = null; removed++;
+    }
+    return { upd, moved, removed };
   },
 
   // [ARTFREE-1] 작품 내리기 — 갤러리에서만 감춘다(지우지 않는다). hidden 한 칸만 쓴다.
@@ -1204,18 +1387,22 @@ const DB = {
     const db = this.load();
     const a = (db.artworks || []).find(x => x.id === id);
     if (a) { a.hidden = !!hidden; this._cache = db; }
-    return this._fbRef.child('artworks/' + id + '/hidden').set(!!hidden)
+    return this._artworkKeys(id)   // [ART-RAW-KEY-1] 숫자 키 판이어도 진짜 작품(들)에 쓴다
+      .then(keys => Promise.all(keys.map(k => this._fbRef.child('artworks/' + k + '/hidden').set(!!hidden))))
       .catch(e => this._onSaveError(e));
   },
 
   deleteArtwork(id) {
     const db = this.load();
-    db.artworks = (db.artworks||[]).filter(a => a.id !== id);
+    db.artworks = (db.artworks||[]).filter(a => a && a.id !== id);
     this._cache = db;
-    this._fbRef.child('artworks/' + id).remove();
-    const artworksObj = {};
-    db.artworks.forEach(a => { artworksObj[a.id] = a; });
-    this._fbRef.child('artworks').set(artworksObj);
+    // [ART-KEY-FIX-1] 캐시 판 통째 set 대신 서버 판에서 바뀔 키만 — 그 순간 올라온 작품을 지우지 않고,
+    //   숫자 키 판이면 모양도 같이 맞춰 null 구멍을 안 남긴다
+    const node = this._fbRef.child('artworks');
+    return node.once('value').then(snap => {
+      const { upd } = this._artworkKeyFix(snap.val(), a => a.id !== id);
+      if (Object.keys(upd).length) return node.update(upd);
+    }).catch(e => this._onSaveError(e));
   },
 
   // ── 추억 사진 ────────────────────────────────────────
@@ -2110,6 +2297,7 @@ const DB_EMOTION = {
   // 날짜별 전체 조회
   getByDate(date) {
     const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    if (typeof DB !== 'undefined' && DB._snaps) console.warn('[STUDENT-COLD-1] 학생 기기 캐시엔 내 감정 기록만 있음 — getByDate 는 교사·키오스크용');   // G6
     return Object.values(db.emotionLogs || {}).filter(r => r && r.date === date);
   },
 

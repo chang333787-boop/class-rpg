@@ -211,9 +211,7 @@ function renderTable() {
       });
 
       // 섹션 헤더
-      totalHtml += `<div style="font-size:.9rem;font-weight:900;color:var(--gold);
-        padding:.5rem .8rem;margin-top:.6rem;background:${sec.color};
-        border-left:3px solid ${sec.border};border-radius:0 8px 8px 0;">
+      totalHtml += `<div class="k-sec" style="background:${sec.color};border-left:3px solid ${sec.border}">
         ${sec.label}
       </div>`;
 
@@ -221,9 +219,9 @@ function renderTable() {
       totalHtml += `<table id="kiosk-table" style="margin-bottom:.3rem">
         <thead><tr>
           <th class="quest-th">할 일</th>
-          ${students.map(s=>`<th style="font-size:.8rem">
-            <div style="font-size:1.2rem">${s.avatar}</div>
-            <div style="font-size:.72rem;margin-top:2px">${escHtml(s.name)}</div>
+          ${students.map(s=>`<th class="k-stu-th">
+            <div class="k-stu-ava">${s.avatar}</div>
+            <div class="k-stu-name">${escHtml(s.name)}</div>
           </th>`).join('')}
         </tr></thead><tbody>`;
 
@@ -256,18 +254,15 @@ function renderTable() {
       // 스탯별 그룹 헤더 행 + 퀘스트 행
       Object.entries(statGroups).forEach(([stat, qs]) => {
         const b = STAT_BADGE[stat];
-        totalHtml += `<tr><td colspan="${students.length+1}"
-          style="padding:.3rem .7rem;background:${b.color};border-left:2px solid ${b.border};
-            font-size:.72rem;font-weight:700;color:#fff">
+        totalHtml += `<tr><td colspan="${students.length+1}" class="k-grp"
+          style="background:${b.color};border-left:2px solid ${b.border}">
           ${b.icon} ${b.label} 퀘스트
         </td></tr>`;
         addQuestRows(qs);
       });
 
       if (noStat.length > 0) {
-        totalHtml += `<tr><td colspan="${students.length+1}"
-          style="padding:.3rem .7rem;background:rgba(255,255,255,.05);
-            font-size:.72rem;font-weight:700;color:var(--txt2)">
+        totalHtml += `<tr><td colspan="${students.length+1}" class="k-grp k-grp-etc">
           📋 기타
         </td></tr>`;
         addQuestRows(noStat);
@@ -279,18 +274,16 @@ function renderTable() {
 
     // 일반 섹션 (과제/특별) - 기존 방식 유지
     totalHtml += `
-      <div style="font-size:.9rem;font-weight:900;color:var(--gold);
-        padding:.5rem .8rem;margin-top:.6rem;background:${sec.color};
-        border-left:3px solid ${sec.border};border-radius:0 8px 8px 0;">
+      <div class="k-sec" style="background:${sec.color};border-left:3px solid ${sec.border}">
         ${sec.label}
       </div>`;
 
     totalHtml += `<table id="kiosk-table" style="margin-bottom:.3rem">
       <thead><tr>
         <th class="quest-th">할 일</th>
-        ${students.map(s=>`<th style="font-size:.8rem">
-          <div style="font-size:1.2rem">${s.avatar}</div>
-          <div style="font-size:.72rem;margin-top:2px">${escHtml(s.name)}</div>
+        ${students.map(s=>`<th class="k-stu-th">
+          <div class="k-stu-ava">${s.avatar}</div>
+          <div class="k-stu-name">${escHtml(s.name)}</div>
         </th>`).join('')}
       </tr></thead>
       <tbody>`;
@@ -427,7 +420,7 @@ function renderKioskMemory() {
       ? `<div style="text-align:center;padding:3rem;color:var(--txt3)">아직 추억 사진이 없어요 📸</div>`
       : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem">
           ${filtered.map((m,i) => `
-            <div onclick="openKioskMemLightbox(${i},${JSON.stringify(_kioskMemView).replace(/"/g,"'")})"
+            <div onclick="openKioskMemLightbox(${i})"
               style="cursor:pointer;border-radius:12px;overflow:hidden;
                 background:rgba(255,255,255,.05);aspect-ratio:1;position:relative;transition:transform .2s"
               onmouseenter="this.style.transform='scale(1.03)'"
@@ -531,9 +524,9 @@ function renderEmotionBoard() {
             </td>
             <td style="padding:.4rem;border:1px solid var(--border);text-align:center">
               ${am
-                ? `<div style="font-size:1.4rem">${am.emotionIcon}</div>
-                   <div style="font-size:.68rem;color:var(--txt2)">${am.emotionLabel}</div>
-                   <div style="font-size:.6rem;color:var(--txt3)">${am.levelLabel}</div>
+                ? `<div style="font-size:1.4rem">${escHtml(am.emotionIcon)}</div>
+                   <div style="font-size:.68rem;color:var(--txt2)">${escHtml(am.emotionLabel)}</div>
+                   <div style="font-size:.6rem;color:var(--txt3)">${escHtml(am.levelLabel)}</div>
                    <button onclick="openKioskEmotion('${s.id}','am')"
                      style="font-size:.6rem;background:none;border:1px solid rgba(255,255,255,.15);
                      color:var(--txt3);border-radius:6px;padding:.1rem .4rem;cursor:pointer;margin-top:.2rem">수정</button>`
@@ -544,9 +537,9 @@ function renderEmotionBoard() {
             </td>
             <td style="padding:.4rem;border:1px solid var(--border);text-align:center">
               ${pm
-                ? `<div style="font-size:1.4rem">${pm.emotionIcon}</div>
-                   <div style="font-size:.68rem;color:var(--txt2)">${pm.emotionLabel}</div>
-                   <div style="font-size:.6rem;color:var(--txt3)">${pm.levelLabel}</div>
+                ? `<div style="font-size:1.4rem">${escHtml(pm.emotionIcon)}</div>
+                   <div style="font-size:.68rem;color:var(--txt2)">${escHtml(pm.emotionLabel)}</div>
+                   <div style="font-size:.6rem;color:var(--txt3)">${escHtml(pm.levelLabel)}</div>
                    <button onclick="openKioskEmotion('${s.id}','pm')"
                      style="font-size:.6rem;background:none;border:1px solid rgba(255,255,255,.15);
                      color:var(--txt3);border-radius:6px;padding:.1rem .4rem;cursor:pointer;margin-top:.2rem">수정</button>`
@@ -586,7 +579,7 @@ function openKioskEmotion(studentId, period) {
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;
       padding:1.2rem;width:90%;max-width:460px;max-height:90vh;overflow-y:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
-        <div style="font-weight:700">${s?.avatar} ${s?.name} · ${label}</div>
+        <div style="font-weight:700">${escHtml(s?.avatar)} ${escHtml(s?.name)} · ${label}</div>
         <button onclick="document.getElementById('kiosk-emo-popup').style.display='none'"
           style="background:none;border:none;color:var(--txt2);font-size:1.2rem;cursor:pointer">✕</button>
       </div>
@@ -823,12 +816,10 @@ function deadlineBadgeHtml(quest) {
   const u = info.urgent ? STYLE[info.urgent] : null;
   if (u) {
     // 임박/만료 — 알약형 배지로 더 눈에 띄게 (인라인 스타일만, CSS 파일 무변경)
-    return `<div style="display:inline-flex;align-items:center;gap:.25rem;margin-top:.2rem;
-      font-size:.66rem;font-weight:700;color:${u.color};background:${u.bg};
-      border-radius:6px;padding:.05rem .35rem">${u.icon} ${u.label} · ${info.deadline}까지</div>`;
+    return `<div class="k-due k-due-urgent" style="color:${u.color};background:${u.bg}">${u.icon} ${u.label} · ${info.deadline}까지</div>`;
   }
   // 임박 아님 — 기존 톤 유지
-  return `<div style="font-size:.66rem;color:var(--txt2);margin-top:.15rem">⏰ ${info.deadline}까지</div>`;
+  return `<div class="k-due">⏰ ${info.deadline}까지</div>`;
 }
 
 // ── 토스트 ──

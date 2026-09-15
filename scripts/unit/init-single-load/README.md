@@ -14,3 +14,14 @@
 |---|---|---|---|---|
 | main (once → on) | 1,063,465 | **2,126,980** | 1 | ✅ |
 | INIT-SINGLE-LOAD-1 | 1,063,465 | **1,063,588** | 1 | ✅ |
+
+## STUDENT-COLD-1 학생 판 — `student-profile.html?v=main|s2&sid=s1&ns=demo-s2`
+가짜 운영 모양(757,486B: questLogs 900·quests 900·emotionLogs 760(내 것 31)·emotionReflections 160(내 것 7)·quizRecords 160 …)을 `classRPG_v3` 에 넣고 연다.
+페이지가 `DB.init({profile:'student'})` → `DB.attachMine(sid)` 뒤 바이트·캐시를 재고, 에뮬레이터 REST 로 내 감정·남의 감정·settings·부팅 때 없던 promotionRequests 를 써서 실시간 반영을 본다(끝나면 되돌림).
+캐시 비교: 같은 탭에서 root 를 REST 로 받아 `_migrate(_normalizeArrays(root))` 한 값과 노드별 JSON 비교(감정 두 노드는 내 것만, quizRecords 는 []).
+
+2026-09-15 결과
+| | 켤 때 받은 바이트 | 캐시가 root 판과 다른 노드 | 내 감정 새 기록 | 남의 감정 새 기록 | settings | 부팅 뒤 생긴 promotionRequests |
+|---|---|---|---|---|---|---|
+| main (root) | 757,960 | — | 반영 | 반영 | 반영 | 반영 |
+| STUDENT-COLD-1 | **225,141** | **없음**(21노드, quests 도 같음) | 반영 | **안 받음** | 반영 | 반영 |
