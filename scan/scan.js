@@ -304,7 +304,7 @@ const Scan = (() => {
     const detect = detectCorners(small.data);
     return { img, small, detect, ms: Math.round(performance.now() - t0) };
   }
-  async function finish(prep, cornersSmall, mode = 'gray') {
+  async function finish(prep, cornersSmall, mode = 'color') {
     const t0 = performance.now();
     const src = scaledImageData(prep.img, SOURCE_MAX);
     const s = src.k / prep.small.k;
