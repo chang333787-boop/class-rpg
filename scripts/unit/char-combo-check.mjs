@@ -127,6 +127,8 @@ const names = [];
 for (let i = 1; i <= 4; i++) names.push('base_' + i);
 for (let i = 1; i <= 30; i++) names.push('body_e_b' + i);
 for (let i = 1; i <= 10; i++) names.push('head_e_h' + i, 'glove_e_g' + i, 'shoe_e_s' + i, 'weapon_e_w' + i, 'weapon_e_ws' + i);
+// 목록 밖의 추가 부품(물리 12종 e_h3p 같은 새 id)도 같은 규칙으로 검사한다 — 파일명 규칙 <slot>_e_<id>.svg
+for (const f of fs.readdirSync(DIR)) { const m = /^(head|body|glove|shoe|weapon)_e_[a-z0-9]+\.svg$/.exec(f); if (m && !names.includes(f.slice(0, -4))) names.push(f.slice(0, -4)); }
 const F = {};
 let missing = 0;
 for (const n of names) {
