@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 우리반 성장 RPG — 순수 함수 단위 테스트 (read-only, 앱 코드 수정 없음)
 //
-//  · scripts/smoke-test.mjs(구조·HTTP)와 별개. smoke 기준선(28)은 건드리지 않는다.
+//  · scripts/smoke-test.mjs(구조·HTTP)와 별개. smoke 기준선(29)은 건드리지 않는다.
 //  · student.js 는 최상위에서 document 를 만지므로 통째로 로드하지 않고,
 //    함수 이름으로 **본문만 잘라내어** vm 샌드박스에서 돌린다(아래 sliceFn).
 //    함수가 이름을 바꾸거나 사라지면 여기서 FAIL 이 난다 — 그게 의도다.
