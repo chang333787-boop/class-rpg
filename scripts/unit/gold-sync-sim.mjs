@@ -14,8 +14,8 @@
 //  재는 것: 기대 totalGold(처음 값 + 모든 지급) − 서버 최종 totalGold = 유실.
 //           goldDaily 합과 비교해 "로그는 남았는데 학생 값은 빠진" 운영 증상과 같은 모양인지도 본다.
 //
-//  사용: node scripts/unit/gold-sync-sim.mjs            (시나리오 A~E + 무작위 200판)
-//        node scripts/unit/gold-sync-sim.mjs --expect-fixed   (수정 뒤: 유실이 하나라도 있으면 exit 1)
+//  사용: node scripts/unit/gold-sync-sim.mjs            (시나리오 M1·A~E + 무작위 200판 + 교사 승인 반영 R1·R2)
+//        node scripts/unit/gold-sync-sim.mjs --expect-fixed   (수정 뒤: 유실이 하나라도 있거나 교사 승인 반영이 2초를 넘으면 exit 1)
 //  기본 모드는 재현용이라 유실이 나와도 exit 0, 대신 요약에 REPRO 로 적는다.
 
 import fs from 'node:fs';
@@ -313,8 +313,39 @@ for (let r = 1; r <= 200; r++) {
   fuzzRuns++; if (t.expected !== t.total) { fuzzLossRuns++; fuzzLost += t.expected - t.total; }
 }
 
+// ── 교사 승인이 학생 화면(CUR)에 몇 ms 뒤 보이는가 (REFLECT-2S) ──────────
+//  보스 설계 메모의 합격 조건: "교사 승인이 학생 화면에 2초 안에 반영". 유실과 따로, **보이기까지 걸린 시간**을 잰다.
+//  학생 CUR.totalGold 에서 학생 자신이 번 몫을 뺀 값이 처음 +50 에 닿은 시각 − 승인 시각.
+//  _saving 창 동안 원격 변경을 버리는 코드면 학생이 계속 저장하는 동안 영영(또는 한참) 안 보인다.
+const REFLECT_LIMIT_MS = 2000;
+const reflects = [];
+async function reflectCase(name, desc, { studentEvery = 0 }) {
+  const clock = makeClock();
+  const world = makeWorld({ seedData: seed({ pendingGold: 50 }), clock });
+  world.grantedBy = {}; world.granted = 0;
+  const sid = sidOf(1);
+  const stu = await bootStudent(world, clock, sid, { up: 80, down: 80 });
+  const tea = await bootTeacher(world, clock, { up: 40, down: 40 });
+  let own = 0;
+  if (studentEvery) for (let t = 1000; t <= 12000; t += studentEvery) clock.at(t, () => { stu.earn(3); own += 3; });
+  const APPROVE_AT = 3000;
+  clock.at(APPROVE_AT, () => tea.approveSingle(sid, 'rw_1'));
+  let seenAt = null;
+  for (let t = APPROVE_AT; t <= APPROVE_AT + 10000; t += 50) {
+    clock.at(t, () => { if (seenAt === null && (stu.CUR.totalGold || 0) - own >= 1050) seenAt = clock.now; });
+  }
+  await clock.run();
+  const ms = seenAt === null ? null : seenAt - APPROVE_AT;
+  reflects.push({ name, desc, ms, ok: ms !== null && ms <= REFLECT_LIMIT_MS });
+}
+await reflectCase('R1', '학생 한가 — 교사 승인 50G', { studentEvery: 0 });
+await reflectCase('R2', '학생이 0.4초마다 저장(무한배틀·연속 수확) 중 교사 승인 50G', { studentEvery: 400 });
+
 // ── 보고 ────────────────────────────────────────────────
 let anyLoss = false;
+console.log(`교사 승인 → 학생 화면 반영 (기준 ${REFLECT_LIMIT_MS}ms 이내):`);
+for (const r of reflects) console.log(`${r.ok ? '✅' : '🔴'} ${r.name} | ${r.ms === null ? '10초 안에 안 보임' : r.ms + 'ms'} | ${r.desc}`);
+const reflectFail = reflects.some(r => !r.ok);
 console.log(`모드: logGold ${LOG_AFTER_SAVE ? 'saveStudent 뒤(실험)' : 'saveStudent 앞(지금 코드)'}`);
 console.log('시나리오 | 유실G | 기대 totalGold | 서버 totalGold | goldDaily 로그 | 설명');
 for (const x of results) {
@@ -324,8 +355,9 @@ for (const x of results) {
 console.log(`무작위 ${fuzzRuns}판(학생 1 + 교사 1, 지연 20~420ms, 25동작): 유실 난 판 ${fuzzLossRuns} · 유실 합 ${fuzzLost}G`);
 if (fuzzLossRuns) anyLoss = true;
 if (EXPECT_FIXED) {
-  console.log(anyLoss ? '\n최종 결과: ❌ FAIL (유실 재현됨 — 수정이 아직 안 막음)' : '\n최종 결과: ✅ PASS (유실 0)');
-  process.exit(anyLoss ? 1 : 0);
+  const bad = anyLoss || reflectFail;
+  console.log(bad ? `\n최종 결과: ❌ FAIL (${[anyLoss && '유실 재현', reflectFail && '교사 승인 반영 2초 초과'].filter(Boolean).join(' · ')})` : '\n최종 결과: ✅ PASS (유실 0 · 반영 2초 이내)');
+  process.exit(bad ? 1 : 0);
 } else {
   console.log(anyLoss ? '\n최종 결과: 🔴 REPRO (지금 코드에서 유실 재현 — 수정 PR 뒤 --expect-fixed 로 0 확인)' : '\n최종 결과: ✅ 유실 0');
 }

@@ -16,7 +16,12 @@ const BALANCE = {
   player: { hpBase: 80, hpPerLevel: 12 },
 
   // 장비 등급 1~10 을 여는 레벨 — 머리·몸통·무기·장갑·신발 전 슬롯 공통 (B-1 §4.3)
-  equipment: { tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30] },
+  // 장비 가격 (B-2e, B-1 §4.3) — 독립 50종: price = round(c × 능력치합^p) + 줄의 priceAdj · 복사 30종(물·풀 몸통·스태프)은 원본 가격을 따른다
+  //   ★ 곡선은 칸별 로그 회귀(B-1). priceAdj 는 옛 손값을 100% 그대로 두는 차이 — 없애면 아이가 보는 가격이 바뀐다(사용자 결정).
+  equipment: {
+    tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30],
+    price: { head: { c: 7.34, p: 1.212 }, body: { c: 3.24, p: 1.477 }, weapon: { c: 1.24, p: 1.351 }, glove: { c: 2.8, p: 1.461 }, shoe: { c: 1.47, p: 1.756 } },
+  },
 
   // 몬스터 능력치 (B-2c, B-1 §4.1) — _mon(shape, 줄, 보정)이 쓴다
   //   레벨 기본값 BASE(L)[s] = round(a + b·L) + baseAdjust[s][L]
@@ -32,6 +37,11 @@ const BALANCE = {
       fast: { hp: 0.85, atk: 1, def: 0.85, spd: 1.25 },    // 속공형 12종
     },
   },
+
+  // 몬스터 골드 (B-2d, B-1 §4.2) — gold = round((a + b·L) × rarity[희귀도]) + 그 몬스터 줄의 보정 gold
+  //   ★ 곡선은 100종 제곱오차 최소로 고른 값(5,570G → 곡선만 쓰면 5,572G). 보정은 옛 손값을 100% 그대로 두는 차이.
+  //   ★ 보정을 0으로 하면 아이가 보는 골드가 바뀐다 — docs/rpg_balance_gold_curve_20260915.md (G1 전부 0 · G2 이상치 11종만 0) 는 사용자 결정.
+  monsterGold: { base: { a: 10.5, b: 2.4 }, rarity: { common: 1, rare: 1.15, legend: 1.75 } },
 
   // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
   // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
@@ -115,9 +125,15 @@ const BALANCE = {
 
 // ─── 장비 표 만들기 (B-2b) ─────────────────────────────────
 // 등급 i(0~9) 장비의 레벨 = BALANCE.equipment.tierLevels[i]. 키 순서는 옛 표와 같게(id·name·lv·stats·cond·price·icon·element).
-function _equipTiers(rows) {
+// 칸별 가격 곡선 — 능력치 합(atk·def·mag·spd)에 대한 거듭제곱
+function _equipPrice(slot, stats) {
+  const c = BALANCE.equipment.price[slot];
+  const sum = Object.values(stats).reduce((a, v) => a + v, 0);
+  return Math.round(c.c * Math.pow(sum, c.p));
+}
+function _equipTiers(slot, rows) {
   return rows.map((r, i) => {
-    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: r.price, icon: r.icon };
+    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: _equipPrice(slot, r.stats) + (r.priceAdj || 0), icon: r.icon };
     if (r.element !== undefined) item.element = r.element;
     return item;
   });
@@ -132,29 +148,29 @@ function _equipCopy(source, opt, rows) {
     return item;
   });
 }
-const _EQUIP_BODY_FIRE = _equipTiers([
-  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      price:45,   icon:'👕', element:'fire'},
-  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       price:65,  icon:'🥋', element:'fire'},
-  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       price:95,  icon:'🧥', element:'fire'},
-  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       price:140,  icon:'🛡️', element:'fire'},
-  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       price:200,  icon:'🔬', element:'fire'},
-  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      price:280,  icon:'⚔️', element:'fire'},
-  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     price:380,  icon:'✨', element:'fire'},
-  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     price:490,  icon:'💛', element:'fire'},
-  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     price:625, icon:'🌟', element:'fire'},
-  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     price:775, icon:'👑', element:'fire'},
+const _EQUIP_BODY_FIRE = _equipTiers('body', [
+  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      priceAdj:+10,    icon:'👕', element:'fire'},
+  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       priceAdj:-18,   icon:'🥋', element:'fire'},
+  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       priceAdj:-2,   icon:'🧥', element:'fire'},
+  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       priceAdj:-20,   icon:'🛡️', element:'fire'},
+  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       priceAdj:-13,   icon:'🔬', element:'fire'},
+  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      priceAdj:+10,   icon:'⚔️', element:'fire'},
+  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     priceAdj:-19,   icon:'✨', element:'fire'},
+  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     priceAdj:+69,   icon:'💛', element:'fire'},
+  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     priceAdj:+33,  icon:'🌟', element:'fire'},
+  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     priceAdj:+22,  icon:'👑', element:'fire'},
 ]);
-const _EQUIP_SWORD = _equipTiers([
-  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 price:45,   icon:'🗡️'},
-  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  price:70,  icon:'⚔️'},
-  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  price:100,  icon:'🔷'},
-  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  price:150,  icon:'🔱'},
-  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  price:210,  icon:'🏹'},
-  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, price:300,  icon:'⚔️'},
-  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},price:400,  icon:'🌟'},
-  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},price:525, icon:'✨'},
-  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},price:675, icon:'💎'},
-  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},price:850, icon:'🌈'},
+const _EQUIP_SWORD = _equipTiers('weapon', [
+  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 priceAdj:+5,    icon:'🗡️'},
+  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  priceAdj:-1,   icon:'⚔️'},
+  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  priceAdj:-6,   icon:'🔷'},
+  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  priceAdj:-13,   icon:'🔱'},
+  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  priceAdj:-15,   icon:'🏹'},
+  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, priceAdj:+1,   icon:'⚔️'},
+  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},priceAdj:-1,   icon:'🌟'},
+  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},priceAdj:+8,  icon:'✨'},
+  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},priceAdj:+25,  icon:'💎'},
+  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},priceAdj:+51,  icon:'🌈'},
 ]);
 
 
@@ -166,11 +182,11 @@ function _monBaseStat(level, stat) {
 }
 function _mon(shape, row, adjust) {
   const k = BALANCE.monsterStats.shapes[shape];
-  const out = {};
-  for (const key of Object.keys(row)) {
-    if (key === 'gold') ['hp', 'atk', 'def', 'spd'].forEach(s => { out[s] = Math.round(_monBaseStat(row.level, s) * k[s]) + ((adjust && adjust[s]) || 0); });
-    out[key] = row[key];
-  }
+  const adj = adjust || {};
+  const out = { ...row };
+  ['hp', 'atk', 'def', 'spd'].forEach(s => { out[s] = Math.round(_monBaseStat(row.level, s) * k[s]) + (adj[s] || 0); });
+  const g = BALANCE.monsterGold;
+  out.gold = Math.round((g.base.a + g.base.b * row.level) * g.rarity[row.rarity]) + (adj.gold || 0);
   return out;
 }
 
@@ -240,17 +256,17 @@ const GAME_DATA = {
   // ★ B-2b: 등급 i 의 레벨 = BALANCE.equipment.tierLevels[i] (_equipTiers) ·
   //   물·풀 몸통 = 불 몸통 복사, 스태프 = 검 거울 (_equipCopy) — 능력치·가격은 원본 줄 하나만 고치면 따라온다
   equipment: {
-    head: _equipTiers([
-      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      price:35,   icon:'🎩'},
-      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        price:50,  icon:'🪖'},
-      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        price:75,  icon:'🧙'},
-      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        price:110,  icon:'⛑️'},
-      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        price:160,  icon:'🎓'},
-      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       price:225,  icon:'🛡️'},
-      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      price:310,  icon:'🔮'},
-      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      price:410,  icon:'👑'},
-      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      price:525, icon:'💎'},
-      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      price:650, icon:'👑'},
+    head: _equipTiers('head', [
+      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      priceAdj:+7,    icon:'🎩'},
+      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        priceAdj:-14,   icon:'🪖'},
+      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        priceAdj:-3,   icon:'🧙'},
+      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        priceAdj:-39,   icon:'⛑️'},
+      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        priceAdj:+11,   icon:'🎓'},
+      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       priceAdj:-19,   icon:'🛡️'},
+      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      priceAdj:+66,   icon:'🔮'},
+      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      priceAdj:+47,   icon:'👑'},
+      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      priceAdj:+54,  icon:'💎'},
+      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      priceAdj:-70,  icon:'👑'},
     ]),
     body: [
       // ★ e_b1~e_b10 = 불(fire) — 기존 ID 완전 유지, 조건=건강+생활 (능력치·가격 원본: _EQUIP_BODY_FIRE)
@@ -300,29 +316,29 @@ const GAME_DATA = {
         {id:'e_ws10',name:'영웅의 스태프',  cond:{study:21,art:17},   icon:'🔯'},
       ]),
     ],
-    glove: _equipTiers([
-      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      price:25,   icon:'🧤'},
-      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     price:35,   icon:'🥊'},
-      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      price:50,  icon:'✋'},
-      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      price:70,  icon:'⚙️'},
-      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      price:100,  icon:'🔬'},
-      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     price:140,  icon:'🏆'},
-      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    price:190,  icon:'💫'},
-      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    price:250,  icon:'💛'},
-      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    price:320,  icon:'💎'},
-      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  price:400,  icon:'🌟'},
+    glove: _equipTiers('glove', [
+      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      priceAdj:+4,    icon:'🧤'},
+      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     priceAdj:-13,    icon:'🥊'},
+      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      priceAdj:+2,   icon:'✋'},
+      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      priceAdj:+1,   icon:'⚙️'},
+      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      priceAdj:-6,   icon:'🔬'},
+      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     priceAdj:+8,   icon:'🏆'},
+      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    priceAdj:-1,   icon:'💫'},
+      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    priceAdj:+27,   icon:'💛'},
+      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    priceAdj:+29,   icon:'💎'},
+      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  priceAdj:-43,   icon:'🌟'},
     ]),
-    shoe: _equipTiers([
-      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      price:30,   icon:'👟'},
-      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        price:42,   icon:'👠'},
-      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        price:60,  icon:'✨'},
-      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        price:85,  icon:'🥾'},
-      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        price:120,  icon:'🔬'},
-      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       price:170,  icon:'⚔️'},
-      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      price:235,  icon:'💫'},
-      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      price:310,  icon:'💛'},
-      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      price:395,  icon:'💎'},
-      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      price:490,  icon:'🌈'},
+    shoe: _equipTiers('shoe', [
+      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      priceAdj:+5,    icon:'👟'},
+      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        priceAdj:-15,    icon:'👠'},
+      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        priceAdj:+3,   icon:'✨'},
+      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        priceAdj:-14,   icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        priceAdj:+5,   icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       priceAdj:-1,   icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      priceAdj:+22,   icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      priceAdj:+27,   icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      priceAdj:+5,   icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      priceAdj:-21,   icon:'🌈'},
     ]),
   },
   // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
@@ -462,140 +478,141 @@ const GAME_DATA = {
   // ★ m21~m100: 신규 추가
   // 유령형 31마리: 초급3 / 중급20 / 고급8
   // ★ B-2c: 능력치는 _mon('base'|'tank'|'fast', 줄, 보정) — BALANCE.monsterStats 에서 계산
+  // ★ B-2d: 골드도 _mon 이 BALANCE.monsterGold 곡선으로 계산 — 줄의 { gold: ±n } 은 옛 손값과의 차이
   monsters: [
     // ══ 초급 beginner Lv1~10 (30마리) ══════════════════════════
     // Lv1
-    _mon('base', {id:'m1', name:'슬라임',         icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'grass',rarity:'common', role:'normal', trait:null,  gold:18}),
-    _mon('fast', {id:'m21',name:'불씨 참새',       icon:'🐦',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'fire', rarity:'common', role:'normal', trait:null,  gold:18}),
-    _mon('base', {id:'m22',name:'물방울 젤리',     icon:'🫧',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'water',rarity:'common', role:'normal', trait:null,  gold:18}),
+    _mon('base', {id:'m1', name:'슬라임',         icon:'🟢',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'grass',rarity:'common', role:'normal', trait:null}, { gold: +5 }),
+    _mon('fast', {id:'m21',name:'불씨 참새',       icon:'🐦',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'fire', rarity:'common', role:'normal', trait:null}, { gold: +5 }),
+    _mon('base', {id:'m22',name:'물방울 젤리',     icon:'🫧',recLv:1, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:1,  element:'water',rarity:'common', role:'normal', trait:null}, { gold: +5 }),
     // Lv2
-    _mon('base', {id:'m2', name:'아기 멧돼지',     icon:'🐗',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'fire', rarity:'common', role:'normal', trait:null,  gold:19}),
-    _mon('base', {id:'m23',name:'거품 개구리',     icon:'🐸',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'water',rarity:'common', role:'normal', trait:null,  gold:19}),
-    _mon('fast', {id:'m24',name:'새싹 다람쥐',     icon:'🐿️',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'grass',rarity:'common', role:'normal', trait:null,  gold:19}),
+    _mon('base', {id:'m2', name:'아기 멧돼지',     icon:'🐗',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'fire', rarity:'common', role:'normal', trait:null}, { gold: +4 }),
+    _mon('base', {id:'m23',name:'거품 개구리',     icon:'🐸',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'water',rarity:'common', role:'normal', trait:null}, { gold: +4 }),
+    _mon('fast', {id:'m24',name:'새싹 다람쥐',     icon:'🐿️',recLv:2, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:2,  element:'grass',rarity:'common', role:'normal', trait:null}, { gold: +4 }),
     // Lv3
-    _mon('fast', {id:'m25',name:'꼬마 화염벌',     icon:'🐝',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'fire', rarity:'common', role:'fast',   trait:null,  gold:20}),
-    _mon('tank', {id:'m26',name:'조약돌 게',       icon:'🦀',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'water',rarity:'common', role:'tank',   trait:null,  gold:20}),
-    _mon('base', {id:'m27',name:'덩굴 병아리',     icon:'🐣',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'grass',rarity:'common', role:'normal', trait:null,  gold:20}),
+    _mon('fast', {id:'m25',name:'꼬마 화염벌',     icon:'🐝',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'fire', rarity:'common', role:'fast',   trait:null}, { gold: +2 }),
+    _mon('tank', {id:'m26',name:'조약돌 게',       icon:'🦀',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'water',rarity:'common', role:'tank',   trait:null}, { gold: +2 }),
+    _mon('base', {id:'m27',name:'덩굴 병아리',     icon:'🐣',recLv:3, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:3,  element:'grass',rarity:'common', role:'normal', trait:null}, { gold: +2 }),
     // Lv4
-    _mon('base', {id:'m28',name:'불꽃 강아지',     icon:'🐕',recLv:4, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'fire', rarity:'common', role:'normal', trait:null,  gold:21}),
-    _mon('fast', {id:'m4', name:'들쥐',           icon:'🐭',recLv:4, reqStat:'spd',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'water',rarity:'common', role:'fast',   trait:null,  gold:21}),
-    _mon('base', {id:'m29',name:'이끼 버섯이',     icon:'🍄',recLv:4, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'grass',rarity:'common', role:'normal', trait:null,  gold:21}),
+    _mon('base', {id:'m28',name:'불꽃 강아지',     icon:'🐕',recLv:4, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'fire', rarity:'common', role:'normal', trait:null}, { gold: +1 }),
+    _mon('fast', {id:'m4', name:'들쥐',           icon:'🐭',recLv:4, reqStat:'spd',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'water',rarity:'common', role:'fast',   trait:null}, { gold: +1 }),
+    _mon('base', {id:'m29',name:'이끼 버섯이',     icon:'🍄',recLv:4, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:4,  element:'grass',rarity:'common', role:'normal', trait:null}, { gold: +1 }),
     // Lv5
-    _mon('fast', {id:'m30',name:'재털이 고양이',   icon:'🐈',recLv:5, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'fire', rarity:'common', role:'fast',   trait:null,  gold:22}),
-    _mon('tank', {id:'m5', name:'돌거북',         icon:'🐢',recLv:5, reqStat:'def',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'water',rarity:'common', role:'tank',   trait:null,  gold:22}),
-    _mon('base', {id:'m31',name:'잎새 사슴벌레',   icon:'🦋',recLv:5, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'grass',rarity:'common', role:'normal', trait:null,  gold:22}),
+    _mon('fast', {id:'m30',name:'재털이 고양이',   icon:'🐈',recLv:5, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'fire', rarity:'common', role:'fast',   trait:null}, { gold: -1 }),
+    _mon('tank', {id:'m5', name:'돌거북',         icon:'🐢',recLv:5, reqStat:'def',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'water',rarity:'common', role:'tank',   trait:null}, { gold: -1 }),
+    _mon('base', {id:'m31',name:'잎새 사슴벌레',   icon:'🦋',recLv:5, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:5,  element:'grass',rarity:'common', role:'normal', trait:null}, { gold: -1 }),
     // Lv6
-    _mon('base', {id:'m6', name:'고블린',         icon:'👺',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'fire', rarity:'common', role:'normal', trait:null,  gold:24}),
-    _mon('base', {id:'m32',name:'안개 오리',       icon:'🦆',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'water',rarity:'common', role:'normal', trait:null,  gold:24}),
-    _mon('tank', {id:'m33',name:'덩굴 두더지',     icon:'🦔',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'grass',rarity:'common', role:'tank',   trait:null,  gold:24}, { def: +1 }),
+    _mon('base', {id:'m6', name:'고블린',         icon:'👺',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'fire', rarity:'common', role:'normal', trait:null}, { gold: -1 }),
+    _mon('base', {id:'m32',name:'안개 오리',       icon:'🦆',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'water',rarity:'common', role:'normal', trait:null}, { gold: -1 }),
+    _mon('tank', {id:'m33',name:'덩굴 두더지',     icon:'🦔',recLv:6, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:6,  element:'grass',rarity:'common', role:'tank',   trait:null}, { def: +1, gold: -1 }),
     // Lv7
-    _mon('fast', {id:'m34',name:'불꽃 박쥐',       icon:'🦇',recLv:7, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'fire', rarity:'rare',   role:'normal', trait:'ghost',gold:34}),
-    _mon('base', {id:'m3', name:'마법 애벌레',     icon:'🐛',recLv:7, reqStat:'mag',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'water',rarity:'rare',   role:'dealer', trait:'ghost',gold:34}),
-    _mon('fast', {id:'m7', name:'숲 늑대',        icon:'🐺',recLv:7, reqStat:'spd',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'grass',rarity:'rare',   role:'fast',   trait:null,  gold:34}),
+    _mon('fast', {id:'m34',name:'불꽃 박쥐',       icon:'🦇',recLv:7, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'fire', rarity:'rare',   role:'normal', trait:'ghost'}, { gold: +3 }),
+    _mon('base', {id:'m3', name:'마법 애벌레',     icon:'🐛',recLv:7, reqStat:'mag',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'water',rarity:'rare',   role:'dealer', trait:'ghost'}, { gold: +3 }),
+    _mon('fast', {id:'m7', name:'숲 늑대',        icon:'🐺',recLv:7, reqStat:'spd',reqVal:0, exp:0, zone:'beginner',    level:7,  element:'grass',rarity:'rare',   role:'fast',   trait:null}, { gold: +3 }),
     // Lv8
-    _mon('base', {id:'m35',name:'유황 두더지',     icon:'🐀',recLv:8, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'fire', rarity:'rare',   role:'tank',   trait:null,  gold:36}),
-    _mon('base', {id:'m8', name:'마도 고양이',     icon:'🐱',recLv:8, reqStat:'mag',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'water',rarity:'rare',   role:'normal', trait:null,  gold:36}),
-    _mon('tank', {id:'m36',name:'껍질 사슴',       icon:'🦌',recLv:8, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:36}),
+    _mon('base', {id:'m35',name:'유황 두더지',     icon:'🐀',recLv:8, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'fire', rarity:'rare',   role:'tank',   trait:null}, { gold: +2 }),
+    _mon('base', {id:'m8', name:'마도 고양이',     icon:'🐱',recLv:8, reqStat:'mag',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'water',rarity:'rare',   role:'normal', trait:null}, { gold: +2 }),
+    _mon('tank', {id:'m36',name:'껍질 사슴',       icon:'🦌',recLv:8, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:8,  element:'grass',rarity:'rare',   role:'tank',   trait:null}, { gold: +2 }),
     // Lv9
-    _mon('base', {id:'m37',name:'재의 기사견',     icon:'🐩',recLv:9, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'fire', rarity:'rare',   role:'normal', trait:null,  gold:38}),
-    _mon('tank', {id:'m38',name:'소용돌이 거북',   icon:'🐠',recLv:9, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'water',rarity:'rare',   role:'tank',   trait:null,  gold:38}),
-    _mon('tank', {id:'m9', name:'강철 딱정벌레',   icon:'🪲',recLv:9, reqStat:'def',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:38}),
+    _mon('base', {id:'m37',name:'재의 기사견',     icon:'🐩',recLv:9, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'fire', rarity:'rare',   role:'normal', trait:null}, { gold: +1 }),
+    _mon('tank', {id:'m38',name:'소용돌이 거북',   icon:'🐠',recLv:9, reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'water',rarity:'rare',   role:'tank',   trait:null}, { gold: +1 }),
+    _mon('tank', {id:'m9', name:'강철 딱정벌레',   icon:'🪲',recLv:9, reqStat:'def',reqVal:0, exp:0, zone:'beginner',    level:9,  element:'grass',rarity:'rare',   role:'tank',   trait:null}, { gold: +1 }),
     // Lv10
-    _mon('base', {id:'m10',name:'오크 전사',       icon:'👹',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'fire', rarity:'legend', role:'dealer', trait:null,  gold:60}, { hp: -9, atk: +6 }),
-    _mon('base', {id:'m39',name:'심연 망령어',     icon:'🐟',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:60}),
-    _mon('tank', {id:'m40',name:'고목 수호자',     icon:'🌳',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:60}, { def: +1 }),
+    _mon('base', {id:'m10',name:'오크 전사',       icon:'👹',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'fire', rarity:'legend', role:'dealer', trait:null}, { hp: -9, atk: +6 }),
+    _mon('base', {id:'m39',name:'심연 망령어',     icon:'🐟',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: +20 }),
+    _mon('tank', {id:'m40',name:'고목 수호자',     icon:'🌳',recLv:10,reqStat:'atk',reqVal:0, exp:0, zone:'beginner',    level:10, element:'grass',rarity:'rare',   role:'tank',   trait:null}, { def: +1, gold: +20 }),
     // ══ 중급 intermediate Lv11~20 (50마리) ══════════════════════
     // Lv11
-    _mon('base', {id:'m41',name:'화염 멧토끼',     icon:'🐇',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'normal', trait:null,  gold:35}),
-    _mon('base', {id:'m42',name:'재그늘 사냥개',   icon:'🐕‍🦺',recLv:11,reqStat:'atk',reqVal:0,exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'fast',   trait:null,  gold:35}),
-    _mon('base', {id:'m43',name:'물결 족제비',     icon:'🦦',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'water',rarity:'common', role:'fast',   trait:null,  gold:35}),
-    _mon('base', {id:'m11',name:'그림자 늑대',     icon:'🦊',recLv:11,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:11, element:'grass',rarity:'common', role:'normal', trait:'ghost',gold:35}),
-    _mon('fast', {id:'m44',name:'잎날 도마뱀',     icon:'🦎',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'grass',rarity:'common', role:'fast',   trait:null,  gold:35}, { spd: +1 }),
+    _mon('base', {id:'m41',name:'화염 멧토끼',     icon:'🐇',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'normal', trait:null}, { gold: -2 }),
+    _mon('base', {id:'m42',name:'재그늘 사냥개',   icon:'🐕‍🦺',recLv:11,reqStat:'atk',reqVal:0,exp:0, zone:'intermediate',level:11, element:'fire', rarity:'common', role:'fast',   trait:null}, { gold: -2 }),
+    _mon('base', {id:'m43',name:'물결 족제비',     icon:'🦦',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'water',rarity:'common', role:'fast',   trait:null}, { gold: -2 }),
+    _mon('base', {id:'m11',name:'그림자 늑대',     icon:'🦊',recLv:11,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:11, element:'grass',rarity:'common', role:'normal', trait:'ghost'}, { gold: -2 }),
+    _mon('fast', {id:'m44',name:'잎날 도마뱀',     icon:'🦎',recLv:11,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:11, element:'grass',rarity:'common', role:'fast',   trait:null}, { spd: +1, gold: -2 }),
     // Lv12
-    _mon('base', {id:'m45',name:'불사슴',         icon:'🦌',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'fire', rarity:'common', role:'dealer', trait:null,  gold:37}),
-    _mon('tank', {id:'m12',name:'철 골렘',        icon:'🤖',recLv:12,reqStat:'def',reqVal:0, exp:0, zone:'intermediate',level:12, element:'water',rarity:'common', role:'tank',   trait:null,  gold:37}, { hp: -1, atk: -1 }),
-    _mon('base', {id:'m46',name:'안개 수비병',     icon:'👤',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'water',rarity:'common', role:'normal', trait:'ghost',gold:37}),
-    _mon('fast', {id:'m47',name:'가시 까마귀',     icon:'🐦‍⬛',recLv:12,reqStat:'atk',reqVal:0,exp:0, zone:'intermediate',level:12, element:'grass',rarity:'common', role:'fast',   trait:null,  gold:37}),
-    _mon('base', {id:'m48',name:'숲그림 버섯병',   icon:'🍄',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'grass',rarity:'common', role:'normal', trait:null,  gold:37}),
+    _mon('base', {id:'m45',name:'불사슴',         icon:'🦌',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'fire', rarity:'common', role:'dealer', trait:null}, { gold: -2 }),
+    _mon('tank', {id:'m12',name:'철 골렘',        icon:'🤖',recLv:12,reqStat:'def',reqVal:0, exp:0, zone:'intermediate',level:12, element:'water',rarity:'common', role:'tank',   trait:null}, { hp: -1, atk: -1, gold: -2 }),
+    _mon('base', {id:'m46',name:'안개 수비병',     icon:'👤',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'water',rarity:'common', role:'normal', trait:'ghost'}, { gold: -2 }),
+    _mon('fast', {id:'m47',name:'가시 까마귀',     icon:'🐦‍⬛',recLv:12,reqStat:'atk',reqVal:0,exp:0, zone:'intermediate',level:12, element:'grass',rarity:'common', role:'fast',   trait:null}, { gold: -2 }),
+    _mon('base', {id:'m48',name:'숲그림 버섯병',   icon:'🍄',recLv:12,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:12, element:'grass',rarity:'common', role:'normal', trait:null}, { gold: -2 }),
     // Lv13
-    _mon('base', {id:'m13',name:'마도 정령',       icon:'💨',recLv:13,reqStat:'mag',reqVal:0, exp:0, zone:'intermediate',level:13, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',gold:62}),
-    _mon('base', {id:'m49',name:'숯늑대',         icon:'🐺',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'fire', rarity:'common', role:'fast',   trait:'ghost',gold:38}),
-    _mon('base', {id:'m50',name:'늪지 거미',       icon:'🕷️',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'water',rarity:'common', role:'fast',   trait:null,  gold:38}),
-    _mon('tank', {id:'m51',name:'조개 갑옷병',     icon:'🐚',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'water',rarity:'common', role:'tank',   trait:null,  gold:62}, { atk: -1 }),
-    _mon('base', {id:'m52',name:'이끼 순찰자',     icon:'🌿',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'grass',rarity:'common', role:'normal', trait:null,  gold:38}),
+    _mon('base', {id:'m13',name:'마도 정령',       icon:'💨',recLv:13,reqStat:'mag',reqVal:0, exp:0, zone:'intermediate',level:13, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost'}, { gold: +14 }),
+    _mon('base', {id:'m49',name:'숯늑대',         icon:'🐺',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'fire', rarity:'common', role:'fast',   trait:'ghost'}, { gold: -4 }),
+    _mon('base', {id:'m50',name:'늪지 거미',       icon:'🕷️',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'water',rarity:'common', role:'fast',   trait:null}, { gold: -4 }),
+    _mon('tank', {id:'m51',name:'조개 갑옷병',     icon:'🐚',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'water',rarity:'common', role:'tank',   trait:null}, { atk: -1, gold: +20 }),
+    _mon('base', {id:'m52',name:'이끼 순찰자',     icon:'🌿',recLv:13,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:13, element:'grass',rarity:'common', role:'normal', trait:null}, { gold: -4 }),
     // Lv14
-    _mon('base', {id:'m53',name:'재안개 맹수',     icon:'🐆',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',gold:64}),
-    _mon('tank', {id:'m54',name:'불가시 멧양',     icon:'🐑',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'fire', rarity:'rare',   role:'tank',   trait:null,  gold:40}, { spd: +1 }),
-    _mon('base', {id:'m55',name:'거품 두꺼비',     icon:'🐊',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'water',rarity:'common', role:'tank',   trait:null,  gold:40}),
-    _mon('base', {id:'m14',name:'트롤',           icon:'🧌',recLv:14,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:14, element:'grass',rarity:'common', role:'normal', trait:null,  gold:40}),
-    _mon('base', {id:'m56',name:'망령 덩굴수',     icon:'👻',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',gold:40}),
+    _mon('base', {id:'m53',name:'재안개 맹수',     icon:'🐆',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost'}, { gold: +13 }),
+    _mon('tank', {id:'m54',name:'불가시 멧양',     icon:'🐑',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'fire', rarity:'rare',   role:'tank',   trait:null}, { spd: +1, gold: -11 }),
+    _mon('base', {id:'m55',name:'거품 두꺼비',     icon:'🐊',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'water',rarity:'common', role:'tank',   trait:null}, { gold: -4 }),
+    _mon('base', {id:'m14',name:'트롤',           icon:'🧌',recLv:14,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:14, element:'grass',rarity:'common', role:'normal', trait:null}, { gold: -4 }),
+    _mon('base', {id:'m56',name:'망령 덩굴수',     icon:'👻',recLv:14,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:14, element:'grass',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -11 }),
     // Lv15
-    _mon('base', {id:'m57',name:'화염 장창병',     icon:'🗡️',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'fire', rarity:'rare',   role:'normal', trait:null,  gold:42}),
-    _mon('fast', {id:'m15',name:'독 거미',        icon:'🕷️',recLv:15,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:15, element:'water',rarity:'rare',   role:'fast',   trait:null,  gold:66}, { spd: +2 }),
-    _mon('base', {id:'m58',name:'물안개 창게',     icon:'🦀',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'water',rarity:'rare',   role:'normal', trait:null,  gold:42}),
-    _mon('base', {id:'m59',name:'버섯 전갈',       icon:'🦂',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'grass',rarity:'rare',   role:'dealer', trait:null,  gold:42}),
-    _mon('base', {id:'m60',name:'그림자 잎사수',   icon:'🌲',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',gold:42}),
+    _mon('base', {id:'m57',name:'화염 장창병',     icon:'🗡️',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'fire', rarity:'rare',   role:'normal', trait:null}, { gold: -11 }),
+    _mon('fast', {id:'m15',name:'독 거미',        icon:'🕷️',recLv:15,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:15, element:'water',rarity:'rare',   role:'fast',   trait:null}, { spd: +2, gold: +13 }),
+    _mon('base', {id:'m58',name:'물안개 창게',     icon:'🦀',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'water',rarity:'rare',   role:'normal', trait:null}, { gold: -11 }),
+    _mon('base', {id:'m59',name:'버섯 전갈',       icon:'🦂',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'grass',rarity:'rare',   role:'dealer', trait:null}, { gold: -11 }),
+    _mon('base', {id:'m60',name:'그림자 잎사수',   icon:'🌲',recLv:15,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:15, element:'grass',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -11 }),
     // Lv16
-    _mon('base', {id:'m16',name:'화염 정령',       icon:'🔥',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',gold:67}),
-    _mon('base', {id:'m61',name:'붉은 갈기수',     icon:'🦁',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'fire', rarity:'rare',   role:'dealer', trait:null,  gold:43}),
-    _mon('base', {id:'m62',name:'소나기 뱀',       icon:'🐍',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'water',rarity:'rare',   role:'fast',   trait:null,  gold:43}),
-    _mon('base', {id:'m63',name:'청류 망령새',     icon:'🦅',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:43}),
-    _mon('tank', {id:'m64',name:'고사리 곰',       icon:'🐻',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:43}),
+    _mon('base', {id:'m16',name:'화염 정령',       icon:'🔥',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost'}, { gold: +11 }),
+    _mon('base', {id:'m61',name:'붉은 갈기수',     icon:'🦁',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'fire', rarity:'rare',   role:'dealer', trait:null}, { gold: -13 }),
+    _mon('base', {id:'m62',name:'소나기 뱀',       icon:'🐍',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'water',rarity:'rare',   role:'fast',   trait:null}, { gold: -13 }),
+    _mon('base', {id:'m63',name:'청류 망령새',     icon:'🦅',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -13 }),
+    _mon('tank', {id:'m64',name:'고사리 곰',       icon:'🐻',recLv:16,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:16, element:'grass',rarity:'rare',   role:'tank',   trait:null}, { gold: -13 }),
     // Lv17
-    _mon('base', {id:'m65',name:'재의 유격병',     icon:'⚔️', recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'fire', rarity:'rare',   role:'fast',   trait:'ghost',gold:69}),
-    _mon('fast', {id:'m66',name:'화산 독수리',     icon:'🦅',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'fire', rarity:'rare',   role:'dealer', trait:null,  gold:45}),
-    _mon('base', {id:'m67',name:'안개 기린도마뱀', icon:'🦎',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:45}),
-    _mon('base', {id:'m68',name:'망령 포자초',     icon:'👻',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',gold:69}),
-    _mon('tank', {id:'m69',name:'껍질 사수',       icon:'🏹',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:45}, { hp: -1 }),
+    _mon('base', {id:'m65',name:'재의 유격병',     icon:'⚔️', recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'fire', rarity:'rare',   role:'fast',   trait:'ghost'}, { gold: +10 }),
+    _mon('fast', {id:'m66',name:'화산 독수리',     icon:'🦅',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'fire', rarity:'rare',   role:'dealer', trait:null}, { gold: -14 }),
+    _mon('base', {id:'m67',name:'안개 기린도마뱀', icon:'🦎',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -14 }),
+    _mon('base', {id:'m68',name:'망령 포자초',     icon:'👻',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'grass',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: +10 }),
+    _mon('tank', {id:'m69',name:'껍질 사수',       icon:'🏹',recLv:17,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:17, element:'grass',rarity:'rare',   role:'tank',   trait:null}, { hp: -1, gold: -14 }),
     // Lv18
-    _mon('base', {id:'m70',name:'열기 수문장',     icon:'🛡️',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'fire', rarity:'rare',   role:'normal', trait:null,  gold:47}),
-    _mon('base', {id:'m71',name:'거울 장어',       icon:'🐟',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:71}),
-    _mon('tank', {id:'m72',name:'물결 수비병',     icon:'🌊',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'water',rarity:'rare',   role:'tank',   trait:null,  gold:47}),
-    _mon('tank', {id:'m17',name:'바위 거인',       icon:'🗿',recLv:18,reqStat:'def',reqVal:0, exp:0, zone:'intermediate',level:18, element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:71}),
-    _mon('base', {id:'m73',name:'그림자 가시목',   icon:'🌵',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',gold:47}),
+    _mon('base', {id:'m70',name:'열기 수문장',     icon:'🛡️',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'fire', rarity:'rare',   role:'normal', trait:null}, { gold: -15 }),
+    _mon('base', {id:'m71',name:'거울 장어',       icon:'🐟',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: +9 }),
+    _mon('tank', {id:'m72',name:'물결 수비병',     icon:'🌊',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'water',rarity:'rare',   role:'tank',   trait:null}, { gold: -15 }),
+    _mon('tank', {id:'m17',name:'바위 거인',       icon:'🗿',recLv:18,reqStat:'def',reqVal:0, exp:0, zone:'intermediate',level:18, element:'grass',rarity:'rare',   role:'tank',   trait:null}, { gold: +9 }),
+    _mon('base', {id:'m73',name:'그림자 가시목',   icon:'🌵',recLv:18,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:18, element:'grass',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -15 }),
     // Lv19
-    _mon('base', {id:'m74',name:'재가면 기사',     icon:'🎭',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'fire', rarity:'rare',   role:'normal', trait:'ghost',gold:73}),
-    _mon('tank', {id:'m75',name:'화산 멧수소',     icon:'🐃',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'fire', rarity:'rare',   role:'tank',   trait:null,  gold:48}, { spd: +1 }),
-    _mon('base', {id:'m18',name:'폭풍 늑대',       icon:'⚡',recLv:19,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:19, element:'water',rarity:'legend', role:'normal', trait:'ghost',gold:96}),
-    _mon('tank', {id:'m76',name:'해류 망치게',     icon:'🦞',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'water',rarity:'rare',   role:'tank',   trait:null,  gold:48}, { spd: +1 }),
-    _mon('fast', {id:'m77',name:'숲그늘 암살자',   icon:'🗡️',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'grass',rarity:'rare',   role:'fast',   trait:'ghost',gold:73}, { spd: +1 }),
+    _mon('base', {id:'m74',name:'재가면 기사',     icon:'🎭',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'fire', rarity:'rare',   role:'normal', trait:'ghost'}, { gold: +8 }),
+    _mon('tank', {id:'m75',name:'화산 멧수소',     icon:'🐃',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'fire', rarity:'rare',   role:'tank',   trait:null}, { spd: +1, gold: -17 }),
+    _mon('base', {id:'m18',name:'폭풍 늑대',       icon:'⚡',recLv:19,reqStat:'spd',reqVal:0, exp:0, zone:'intermediate',level:19, element:'water',rarity:'legend', role:'normal', trait:'ghost'}, { gold: -2 }),
+    _mon('tank', {id:'m76',name:'해류 망치게',     icon:'🦞',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'water',rarity:'rare',   role:'tank',   trait:null}, { spd: +1, gold: -17 }),
+    _mon('fast', {id:'m77',name:'숲그늘 암살자',   icon:'🗡️',recLv:19,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:19, element:'grass',rarity:'rare',   role:'fast',   trait:'ghost'}, { spd: +1, gold: +8 }),
     // Lv20
-    _mon('base', {id:'m78',name:'불꽃 허수아비',   icon:'🎃',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'fire', rarity:'legend', role:'normal', trait:null,  gold:110}),
-    _mon('base', {id:'m79',name:'심연 망령게',     icon:'🦀',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:50}),
-    _mon('tank', {id:'m80',name:'대지 수호목',     icon:'🌳',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:110}),
-    _mon('base', {id:'m81',name:'열기 순찰장',     icon:'🔱',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'fire', rarity:'rare',   role:'normal', trait:'ghost',gold:50}),
-    _mon('base', {id:'m82',name:'안개 사제',       icon:'🧙',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:75}),
+    _mon('base', {id:'m78',name:'불꽃 허수아비',   icon:'🎃',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'fire', rarity:'legend', role:'normal', trait:null}, { gold: +8 }),
+    _mon('base', {id:'m79',name:'심연 망령게',     icon:'🦀',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -17 }),
+    _mon('tank', {id:'m80',name:'대지 수호목',     icon:'🌳',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'grass',rarity:'rare',   role:'tank',   trait:null}, { gold: +43 }),
+    _mon('base', {id:'m81',name:'열기 순찰장',     icon:'🔱',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'fire', rarity:'rare',   role:'normal', trait:'ghost'}, { gold: -17 }),
+    _mon('base', {id:'m82',name:'안개 사제',       icon:'🧙',recLv:20,reqStat:'atk',reqVal:0, exp:0, zone:'intermediate',level:20, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}, { gold: +8 }),
     // ══ 고급 advanced Lv21~30 (20마리) ══════════════════════════
     // Lv21
-    _mon('base', {id:'m19',name:'암흑 기사',       icon:'🖤',recLv:21,reqStat:'mag',reqVal:0, exp:0, zone:'advanced',    level:21, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',gold:100}),
-    _mon('tank', {id:'m83',name:'청해 수호자',     icon:'🐬',recLv:21,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:21, element:'water',rarity:'rare',   role:'tank',   trait:null,  gold:70}, { spd: -1 }),
+    _mon('base', {id:'m19',name:'암흑 기사',       icon:'🖤',recLv:21,reqStat:'mag',reqVal:0, exp:0, zone:'advanced',    level:21, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost'}, { gold: +30 }),
+    _mon('tank', {id:'m83',name:'청해 수호자',     icon:'🐬',recLv:21,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:21, element:'water',rarity:'rare',   role:'tank',   trait:null}, { spd: -1 }),
     // Lv22
-    _mon('base', {id:'m84',name:'월광 덩굴수',     icon:'🌙',recLv:22,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:22, element:'grass',rarity:'rare',   role:'normal', trait:'ghost',gold:73}),
-    _mon('base', {id:'m85',name:'용암 망령검사',   icon:'🌋',recLv:22,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:22, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost',gold:73}),
+    _mon('base', {id:'m84',name:'월광 덩굴수',     icon:'🌙',recLv:22,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:22, element:'grass',rarity:'rare',   role:'normal', trait:'ghost'}),
+    _mon('base', {id:'m85',name:'용암 망령검사',   icon:'🌋',recLv:22,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:22, element:'fire', rarity:'rare',   role:'dealer', trait:'ghost'}),
     // Lv23
-    _mon('base', {id:'m86',name:'심해 창병',       icon:'🔱',recLv:23,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:23, element:'water',rarity:'rare',   role:'normal', trait:null,  gold:108}),
-    _mon('base', {id:'m87',name:'고목 주술사',     icon:'🧙',recLv:23,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:23, element:'grass',rarity:'rare',   role:'dealer', trait:null,  gold:76}),
+    _mon('base', {id:'m86',name:'심해 창병',       icon:'🔱',recLv:23,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:23, element:'water',rarity:'rare',   role:'normal', trait:null}, { gold: +32 }),
+    _mon('base', {id:'m87',name:'고목 주술사',     icon:'🧙',recLv:23,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:23, element:'grass',rarity:'rare',   role:'dealer', trait:null}),
     // Lv24
-    _mon('base', {id:'m88',name:'열풍 맹금',       icon:'🦅',recLv:24,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:24, element:'fire', rarity:'rare',   role:'fast',   trait:null,  gold:78}),
-    _mon('base', {id:'m89',name:'서리 망령장어',   icon:'❄️',recLv:24,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:24, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:78}),
+    _mon('base', {id:'m88',name:'열풍 맹금',       icon:'🦅',recLv:24,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:24, element:'fire', rarity:'rare',   role:'fast',   trait:null}),
+    _mon('base', {id:'m89',name:'서리 망령장어',   icon:'❄️',recLv:24,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:24, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}),
     // Lv25
-    _mon('base', {id:'m90',name:'대지 갑옷병',     icon:'🛡️',recLv:25,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:25, element:'grass',rarity:'rare',   role:'tank',   trait:null,  gold:81}),
-    _mon('base', {id:'m91',name:'붉은 재사자',     icon:'🦁',recLv:25,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:25, element:'fire', rarity:'legend', role:'dealer', trait:'ghost',gold:81}),
+    _mon('base', {id:'m90',name:'대지 갑옷병',     icon:'🛡️',recLv:25,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:25, element:'grass',rarity:'rare',   role:'tank',   trait:null}),
+    _mon('base', {id:'m91',name:'붉은 재사자',     icon:'🦁',recLv:25,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:25, element:'fire', rarity:'legend', role:'dealer', trait:'ghost'}, { gold: -42 }),
     // Lv26
-    _mon('base', {id:'m92',name:'해일 기사',       icon:'🌊',recLv:26,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:26, element:'water',rarity:'rare',   role:'normal', trait:null,  gold:84}),
-    _mon('base', {id:'m93',name:'가시왕 사슴',     icon:'🦌',recLv:26,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:26, element:'grass',rarity:'legend', role:'tank',   trait:null,  gold:119}),
+    _mon('base', {id:'m92',name:'해일 기사',       icon:'🌊',recLv:26,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:26, element:'water',rarity:'rare',   role:'normal', trait:null}),
+    _mon('base', {id:'m93',name:'가시왕 사슴',     icon:'🦌',recLv:26,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:26, element:'grass',rarity:'legend', role:'tank',   trait:null}, { gold: -9 }),
     // Lv27
-    _mon('base', {id:'m94',name:'용암 골렘',       icon:'🌋',recLv:27,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:27, element:'fire', rarity:'legend', role:'tank',   trait:null,  gold:123}),
-    _mon('base', {id:'m95',name:'청류 파수꾼',     icon:'💠',recLv:27,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:27, element:'water',rarity:'rare',   role:'normal', trait:'ghost',gold:87}),
+    _mon('base', {id:'m94',name:'용암 골렘',       icon:'🌋',recLv:27,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:27, element:'fire', rarity:'legend', role:'tank',   trait:null}, { gold: -9 }),
+    _mon('base', {id:'m95',name:'청류 파수꾼',     icon:'💠',recLv:27,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:27, element:'water',rarity:'rare',   role:'normal', trait:'ghost'}),
     // Lv28
-    _mon('base', {id:'m96',name:'고대 나무정령',   icon:'🌲',recLv:28,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:28, element:'grass',rarity:'legend', role:'normal', trait:null,  gold:89}),
-    _mon('base', {id:'m97',name:'화산 근위대장',   icon:'⚔️', recLv:28,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:28, element:'fire', rarity:'legend', role:'dealer', trait:'ghost',gold:127}),
+    _mon('base', {id:'m96',name:'고대 나무정령',   icon:'🌲',recLv:28,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:28, element:'grass',rarity:'legend', role:'normal', trait:null}, { gold: -47 }),
+    _mon('base', {id:'m97',name:'화산 근위대장',   icon:'⚔️', recLv:28,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:28, element:'fire', rarity:'legend', role:'dealer', trait:'ghost'}, { gold: -9 }),
     // Lv29
-    _mon('base', {id:'m98',name:'심연 파도룡',     icon:'🐲',recLv:29,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:29, element:'water',rarity:'legend', role:'dealer', trait:null,  gold:131}),
-    _mon('base', {id:'m99',name:'흑림 사신목',     icon:'☠️',recLv:29,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:29, element:'grass',rarity:'legend', role:'normal', trait:'ghost',gold:92}),
+    _mon('base', {id:'m98',name:'심연 파도룡',     icon:'🐲',recLv:29,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:29, element:'water',rarity:'legend', role:'dealer', trait:null}, { gold: -9 }),
+    _mon('base', {id:'m99',name:'흑림 사신목',     icon:'☠️',recLv:29,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:29, element:'grass',rarity:'legend', role:'normal', trait:'ghost'}, { gold: -48 }),
     // Lv30
-    _mon('base', {id:'m100',name:'태양 심판자',    icon:'☀️',recLv:30,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:30, element:'fire', rarity:'legend', role:'dealer', trait:null,  gold:220}),
-    _mon('base', {id:'m20',name:'고대 드래곤',     icon:'🐉',recLv:30,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:30, element:'water',rarity:'legend', role:'normal', trait:null,  gold:220}),
+    _mon('base', {id:'m100',name:'태양 심판자',    icon:'☀️',recLv:30,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:30, element:'fire', rarity:'legend', role:'dealer', trait:null}, { gold: +76 }),
+    _mon('base', {id:'m20',name:'고대 드래곤',     icon:'🐉',recLv:30,reqStat:'atk',reqVal:0, exp:0, zone:'advanced',    level:30, element:'water',rarity:'legend', role:'normal', trait:null}, { gold: +76 }),
   ],
 
   // ─── 칭호·승급 ────────────────────────────────────────
