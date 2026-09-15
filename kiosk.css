@@ -115,6 +115,26 @@ html, body {
   height:calc(100vh - 130px);color:var(--txt2);gap:.8rem;
 }
 
+/* ══ [D3-KIOSK-1] 키오스크 — 교실 TV·전자칠판에서 멀리서 본다. 디자인 시스템 v1(#242) 글자 단계. CSS만 ══
+   · 학생 이름(표 머리) 12px·퀘스트 이름 13px·보상 11px·날짜 12.5px → 15/16/13/14px.
+   · 상단 줄 48px 고정 + 줄바꿈 없음 → 좁은 창(태블릿 세로·반쪽 창)에서 탭 글자가 세로로 쌓였다
+     ("퀘/스/트") → 높이 자동 + 줄바꿈 허용.
+   · 섹션 색(일일 파랑·주간 초록·과제 금색·특별 보라)은 kiosk.js 인라인이고 종류 구분이라 그대로. */
+#header{height:auto;min-height:56px;flex-wrap:wrap;row-gap:.4rem;padding:.4rem 1rem;}
+#header .title{font-size:1.25rem;white-space:nowrap;}
+#header .date{font-size:.875rem;white-space:nowrap;}
+#class-name{white-space:nowrap;font-size:.875rem!important;}
+.qtab{font-size:1rem;min-height:40px;padding:0 1.1rem;white-space:nowrap;display:inline-flex;align-items:center;gap:.3rem;}
+#kiosk-table th{font-size:.9375rem;padding:.6rem .5rem;}
+#kiosk-table th.quest-th{font-size:.9375rem;}
+#kiosk-table td.quest-name{font-size:1rem;}
+#kiosk-table td.quest-name .quest-reward{font-size:.8125rem;}
+.cell-btn{border-color:rgba(239,231,217,.28);font-size:.8125rem;}
+#empty-msg{font-size:1rem;}
+@media(max-width:600px){
+  #header .date{margin-left:0;}
+}
+
 /* ── 토스트 ── */
 #toast {
   position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);
