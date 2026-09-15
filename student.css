@@ -799,6 +799,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 }
 .zone-card:not(.zone-locked):hover{transform:translateY(-6px) scale(1.02);box-shadow:0 12px 40px rgba(0,0,0,.5);}
 .zone-card:not(.zone-locked):active{transform:translateY(2px) scale(.97);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+/* [D3-ZONE375-1] 사냥터 구역 카드 375 폭 — 3칸 고정(student.js 인라인 grid)이라 카드가 94px, 내용은 141px.
+   구역 이름이 '초/급/사/냥/터' 세로로 쌓이고 몬스터 미리보기·보상 줄이 잘렸다.
+   좁은 폭에서만 1칸으로. 부모에 class가 없어 `:has(> .zone-card)`로 잡는다(크롬북 크롬 105+).
+   카드 여백(인라인 1.2rem)은 1칸이면 충분히 넓어 그대로 둔다. */
+@media (max-width:600px){
+  div:has(> .zone-card){grid-template-columns:minmax(0,1fr)!important;gap:var(--sp-1,8px)!important;}
+}
 
 /* 몬스터 선택 카드 눌림 */
 .mon-select-card:not(.mon-select-dim){
