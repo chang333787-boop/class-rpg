@@ -2748,7 +2748,7 @@ function createAlbum() {
 function renderAlbumList() {
   const el = document.getElementById('album-list');
   if (!el) return;
-  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const albums = [...DB.getAlbums()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // [CACHE-SORT-1] 복사 뒤 정렬
   el.innerHTML = albums.length === 0
     ? `<div style="font-size:.78rem;color:var(--txt3)">앨범 없음 — 위에서 추가하세요</div>`
     : albums.map(a => {
@@ -2922,10 +2922,12 @@ function renderMemoriesPage() {
   if (statusF !== 'all')       mems = mems.filter(m=>m.approvalStatus===statusF);
   if (typeF === 'admin')        mems = mems.filter(m=>m.uploadedBy==='admin');
   if (typeF === 'student')      mems = mems.filter(m=>m.uploadedBy!=='admin');
-  mems.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  // [CACHE-SORT-1] 필터가 모두 '전체'면 mems 는 DB.getMemories('all') 이 돌려준 **캐시 배열 그 자체**다.
+  //   제자리 정렬하면 캐시가 뒤섞이고, saveMemory/saveAlbum 이 배열을 통째로 set 해 **재배치된 순서가 운영 DB 에 저장**된다(#228 과 같은 종류).
+  mems = [...mems].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
   // 앨범 목록 (셀렉트 옵션용)
-  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const albums = [...DB.getAlbums()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // [CACHE-SORT-1] 복사 뒤 정렬
 
   if (mems.length === 0) {
     el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--txt3)">추억 사진이 없어요</div>`;
@@ -3008,7 +3010,7 @@ function renderBulkRenameList() {
   const wrap = document.getElementById('bulk-rename-list');
   if (!wrap) return;
   const filter = document.getElementById('bulk-rename-filter')?.value || 'kakao';
-  const mems = DB.getMemories('all').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const mems = [...DB.getMemories('all')].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));   // [CACHE-SORT-1] 복사 뒤 정렬
 
   const candidates = mems.filter(m => {
     const t = (m.title || '').toLowerCase();
