@@ -17,6 +17,11 @@
 //    ④ 사냥터 카드 레벨 1~30 × 도감·최근 등장 3상태 × 40회 — 뽑힌 몬스터와 recentBattleOffers
 //    ⑤ 경계값    난수를 코드 속 문턱값(0.06·0.1·0.2·0.5·명중 0.85~0.97) 바로 위·아래·정확히로 고정해 같은 계산 — 문턱이 1e-9만 움직여도 잡는다
 //  모든 비교는 JSON 문자열의 sha256 + Math.random 호출 횟수.
+//
+//  --quick  PR 사전 검사용(몇 초): 설정 2벌(없음·운영) · ① 정적 표 전부 · ② 전부 · ③ 레벨 3 × 몸통 2 × 대본 5 · ④ 레벨 3칸 간격 × 10회 · ⑤ 그대로.
+//           ① 에 GAME_DATA 전체(몬스터·장비·가격·씨앗)·스킬북이 들어 있어 **데이터가 한 칸만 바뀌어도** 잡힌다.
+//  --review 달라도 exit 0 (요약 줄에 "다름"만 적음) — 값을 일부러 바꾸는 PR 의 사전 검사에서 FAIL 대신 기록으로 쓸 때.
+//  마지막 줄 `요약: …` 은 scripts/unit/precheck.mjs 가 읽는 모양.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,7 +44,10 @@ const EXTREME = {
   equipment: { e_w1: { price: 999, stats: { atk: 30 } }, e_b1: { element: 'water', cond: { value: 3 } }, e_h1: { lv: 4, name: '시험 모자' } },
   skillBooks: { sb_n1: { price: 1, reqPlayerLevel: 9, desc: '시험' } },
 };
-const SETTINGS_SEQ = [['없음', {}], ['운영', PROD], ['극단', EXTREME], ['극단→없음', {}]];
+const QUICK = process.argv.includes('--quick');
+const REVIEW = process.argv.includes('--review');
+const SETTINGS_SEQ = QUICK ? [['없음', {}], ['운영', PROD]]
+  : [['없음', {}], ['운영', PROD], ['극단', EXTREME], ['극단→없음', {}]];
 
 function world(src, seed) {
   const rng = makeRng(seed);
@@ -75,6 +83,10 @@ const SCRIPTS = [
   ['prep', 'normal'], ['guard', 'fire', 'guard', 'fire'],
   ['counter', 'normal', 'counter', 'normal'], ['rush', 'normal'], ['reckless', 'r:water', 'reckless', 'r:normal', 'normal'],
 ];
+// 전투 기록(③)에만 쓰는 목록 — --quick 이면 줄인다
+const B_ELEMS = QUICK ? [null, 'water'] : ELEMS;
+const B_LEVELS = QUICK ? [1, 12, 25] : LEVELS;
+const B_SCRIPTS = QUICK ? [SCRIPTS[0], SCRIPTS[1], SCRIPTS[4], SCRIPTS[7], SCRIPTS[9]] : SCRIPTS;
 
 function student(W, level, elem) {
   const bodies = W.GAME_DATA.equipment.body;
@@ -88,7 +100,7 @@ function student(W, level, elem) {
 }
 
 function battles(W, sink) {
-  for (const mon of W.GAME_DATA.monsters) for (const lv of LEVELS) for (const el of ELEMS) for (const sc of SCRIPTS) {
+  for (const mon of W.GAME_DATA.monsters) for (const lv of B_LEVELS) for (const el of B_ELEMS) for (const sc of B_SCRIPTS) {
     let s = W.startBattleEngine(student(W, lv, el), mon);
     sink.add(['start', s, W.calls()]);
     for (let t = 0; t < 60 && !s.finished; t++) {
@@ -117,9 +129,9 @@ function formulas(W, sink) {
 
 function offers(W, sink) {
   const mons = W.GAME_DATA.monsters;
-  for (let lv = 1; lv <= 30; lv++) for (const zone of Object.keys(W.ZONE_RANGES)) for (const mode of ['새내기', '절반', '전부']) {
+  for (let lv = 1; lv <= 30; lv += QUICK ? 3 : 1) for (const zone of Object.keys(W.ZONE_RANGES)) for (const mode of ['새내기', '절반', '전부']) {
     const p = { level: lv, monsterLog: mode === '새내기' ? [] : mode === '절반' ? mons.filter((m, i) => i % 2).map(m => m.id) : mons.map(m => m.id), recentBattleOffers: [] };
-    for (let k = 0; k < 40; k++) sink.add(['o', W.generateBattleOffers(p, zone).map(m => m.id), p.recentBattleOffers, W.calls()]);
+    for (let k = 0; k < (QUICK ? 10 : 40); k++) sink.add(['o', W.generateBattleOffers(p, zone).map(m => m.id), p.recentBattleOffers, W.calls()]);
     for (let i = 0; i < 3; i++) sink.add(['r', W.getSlotLevelRange(lv, i, W.ZONE_RANGES[zone].min, W.ZONE_RANGES[zone].max)]);
   }
 }
@@ -182,4 +194,5 @@ for (const k of Object.keys(A)) {
 }
 console.log(lines.join('\n'));
 console.log(`\n${diff === 0 ? '✅ 출력 100% 동일' : `❌ 다른 항목 ${diff}개`} (A ${arg('a') || arg('a-ref', 'origin/main') + ':gamedata.js'} · B ${arg('b', 'gamedata.js')})`);
-process.exit(diff === 0 ? 0 : 1);
+console.log(`요약: ${diff === 0 ? 'PASS' : REVIEW ? 'REVIEW' : 'FAIL'} · 밸런스 출력 ${diff === 0 ? '동일' : `다름 ${diff}/${Object.keys(A).length}항목`}${QUICK ? ' (quick)' : ''}`);
+process.exit(diff === 0 || REVIEW ? 0 : 1);
