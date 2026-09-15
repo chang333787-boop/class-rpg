@@ -371,6 +371,27 @@ cur = 'admin 비번 초기화 알림(PW-NOTIFY-1)';
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'admin 학생 상세 비번 가림(DET-PW-MASK-1)';
+{
+  //  학생 상세를 열면 비밀번호 칸이 TV 에 그대로 보였다. 기본은 가림(type=password), [보기] 로만 잠깐.
+  const ADMIN = read('admin.js');
+  // openStudentDetail 은 화면 전체를 그리므로 통째로 돌리지 않고, 비밀번호 칸 줄만 본다
+  const m = /<input[^>]*id="det-pw"[^>]*>/.exec(sliceFn(ADMIN, 'openStudentDetail'));
+  test('det-pw 칸이 있다', () => { if (!m) throw new Error('det-pw input 없음'); });
+  test('det-pw 는 기본 가림(type=password)', () => { if (!m || !/type="password"/.test(m[0])) throw new Error(m ? m[0] : '없음'); });
+  test('det-pw 값은 escHtml 로 넣는다', () => { if (!m || !/value="\$\{escHtml\(/.test(m[0])) throw new Error(m ? m[0] : '없음'); });
+  test('toggleDetPw: 보기 ↔ 가리기', () => {
+    const inp = { type: 'password' }, btn = { textContent: '보기' };
+    const sb = { document: { getElementById: (id) => (id === 'det-pw' ? inp : id === 'det-pw-toggle' ? btn : null) } };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(sliceFn(ADMIN, 'toggleDetPw') + '\ntoggleDetPw();', sb);
+    eq([inp.type, btn.textContent], ['text', '가리기'], '한 번');
+    vm.runInContext('toggleDetPw();', sb);
+    eq([inp.type, btn.textContent], ['password', '보기'], '두 번');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);

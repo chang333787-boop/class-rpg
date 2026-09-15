@@ -26,15 +26,23 @@ node scripts/balance/gate.mjs --gamedata <옛 gamedata.js>                      
 | G4 | 같은 Lv 승률의 인접 레벨 차 15%p 이하 (3등급 모두) |
 | G5 | Lv+3 풀장비 30~45% |
 
-## 기준선 (2026-09-15, main c7dd500, 칸당 400판)
+## 기준선 (2026-09-15 B-4 정정 뒤, main 9d1448c, 칸당 400판)
 | 계수 | G1 | G2 | G3 | G4 | G5 | 통과 |
 |---|---|---|---|---|---|---|
 | 코드 기본값 | 0/20 | 0/20 | 0/20 | 57/57 ✅ | 1/14 | 1/5 |
-| 운영(HP×1.5·ATK×1.6) | 1/20 | 3/20 | 0/20 | 46/57 | 3/14 | 0/5 |
-| (#173 이전 gamedata, 기본, Lv1~10) | 0/10 | 0/10 | 0/10 | 25/27 (Lv2→3 +100%p) | 1/7 | 0/5 |
+| 운영(HP×1.5·ATK×1.6) | 1/20 | 2/20 | 0/20 | 44/57 | 3/14 | 0/5 |
+| (#173 이전 gamedata, 기본, Lv1~10, 200판) | 0/10 | 0/10 | 0/10 | 25/27 (Lv2→3 +100%p) | 1/7 | 0/5 |
 
-지금 계수로는 목표를 못 맞춘다. 이 표는 B-4 계수 제안이 넘어야 할 기준선이다.
+B-4 정정: 학생 기본 def 를 6→0 으로(실학생 combat = 장비 합). 운영 행이 G2 3→2 · G4 46→44 로 바뀜.
+지금 계수로는 목표를 못 맞춘다. **B-4 결론: G1~G3 동시 목표는 이 전투 구조에서 계수로 도달 불가** — `docs/rpg_balance_b4_proposal_20260915.md`.
 G3(맨몸)은 계수만으로는 불가 — ATK 가 장비에서만 나오고 최소 피해가 1이라 맨몸 승률은 0% 고정(B-1 §1).
+
+## 계수 제안 시뮬 (B-4)
+```
+node scripts/balance/gate.mjs --settings scripts/balance/settings/prod-20260915.json --proposal scripts/balance/proposals/s1-difficulty-2x.json
+```
+`proposals/*.json` = `{ name, settings, balance, patches, growth }` — 전부 **메모리에서만** 적용(gamedata.js·운영 설정은 안 바뀜).
+`balance` 는 `BALANCE` 깊은 병합, `patches`·`growth` 는 코드에 아직 없는 **구조 제안**이라 적용하려면 코드 PR 이 필요하다.
 
 ## 출력 동일 대조표 (B-2 구조 리팩토링용)
 
