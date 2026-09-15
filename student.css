@@ -1201,6 +1201,19 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
   .badge{font-size:.8rem;}
 }
 
+/* ══ [D3-BTN-1] 버튼 글자 대비 — 디자인 시스템 v1. CSS만 ═════════════
+   흰 글자가 밝은 색 버튼 위에서 4.5:1 미달이던 것(16px 이하 글자라 큰 글자 3:1 기준 아님):
+   · 농장 할 일 버튼  흰/#2ECC71 2.1  → 바탕색 글자 8.9
+   · 도전·긴급 버튼   흰/#E74C3C 3.8  → 바탕 #C0392B 5.4
+   · 빨강 그라데(입장하기·전투·보스 배너) 흰/#E74C3C 3.8 → #D0433A→#B93A2F 4.6~5.7
+   · 알림 숫자 뱃지(메뉴·할 일)       흰/#E74C3C 3.8  → #C0392B 5.4
+   색 이름(--red)은 그대로 — 테두리·글자색으로 쓰는 곳은 안 바뀐다.
+   ══════════════════════════════════════════════════════════════ */
+.todo-btn.farm{color:var(--bg0);}
+.todo-btn.urgent,.todo-btn.monster{background:#C0392B;}
+.btn-red,.btn-battle,.bb-btn{background:linear-gradient(135deg,#D0433A,#B93A2F);}
+.tile-notif,.todo-badge{background:#C0392B;}
+
 /* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════
    기준 44×44px. @media (pointer: coarse) 안에서만 — 마우스 환경은 안 바뀐다.
    파일 맨 끝에 두어 앞의 기본 규칙을 순서로 이긴다.
