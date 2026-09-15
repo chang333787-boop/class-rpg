@@ -55,7 +55,8 @@ const BALANCE = {
   // 일반 씨앗 판매가 (B-2g) — sellPrice = round(price × (ratioBase + ratioPerTier × 등급)) + 줄의 sellAdj. 등급이 오를수록 이윤율이 오른다(B-1 §3.4).
   seedSell: { ratioBase: 3.33, ratioPerTier: 0.375 },
   // 속성 마스터리북 가격 (B-2g) — 화염 n권 price = round(노말 n권 price × elementPriceRatio) + 줄의 priceAdj (냉기·자연은 화염 복사)
-  bookPrice: { elementPriceRatio: 0.8 },
+  //   노말 n권 가격 (B-2j) = 1권 first, 간격 firstInc 에서 시작해 incSteps(권 번호 이상이면 그 폭씩) 만큼 벌어짐 → 60·90·130·180·250·340·450
+  bookPrice: { elementPriceRatio: 0.8, normal: { first: 60, firstInc: 30, incSteps: [[3, 10], [5, 20]] } },
   // 장식 가격 (B-2h) — 유료 장식 price = decoPrice[희귀도] + 줄의 priceAdj (희귀도별 가운데 값을 5G 단위로). 업적 장식(price 0)은 그대로.
   //   ★ 장식은 취향값이라 곡선 대신 기준가만 둔다. priceAdj 를 줄이면 아이가 보는 가격이 바뀐다(사용자 결정 — docs/rpg_balance_deco_price_20260915.md).
   decoPrice: { common: 20, rare: 70, epic: 210, legend: 375 },
@@ -704,15 +705,23 @@ const SKILL_MULTIPLIERS = {
 };
 
 // ★ 4단계 가격 반영 + reqPlayerLevel / targetLevel 추가
+// 노말 마스터리북 가격 (B-2j) — BALANCE.bookPrice.normal 계단
+function _normalBookPrice(n) {
+  const c = BALANCE.bookPrice.normal;
+  let p = c.first, inc = c.firstInc;
+  for (let k = 2; k <= n; k++) { if (k > 2) { let d = 0; for (const [from, a] of c.incSteps) if (k >= from) d = a; inc += d; } p += inc; }
+  return p;
+}
+
 const SKILL_BOOKS = [
   // normal 1~7 (120/180/260/360/500/680/900)
-  {id:'sb_n1',name:'전투 마스터리북 1권',  type:'normal',level:1,targetLevel:1, reqPlayerLevel:1,  price:60, icon:'📘',desc:'기본 공격 해금 (×1.10)'},
-  {id:'sb_n2',name:'전투 마스터리북 2권',  type:'normal',level:2,targetLevel:2, reqPlayerLevel:3,  price:90, icon:'📘',desc:'기본 공격력 +18%'},
-  {id:'sb_n3',name:'전투 마스터리북 3권',  type:'normal',level:3,targetLevel:3, reqPlayerLevel:5,  price:130, icon:'📘',desc:'기본 공격력 +27%'},
-  {id:'sb_n4',name:'전투 마스터리북 4권',  type:'normal',level:4,targetLevel:4, reqPlayerLevel:8,  price:180, icon:'📘',desc:'기본 공격력 +36%'},
-  {id:'sb_n5',name:'전투 마스터리북 5권',  type:'normal',level:5,targetLevel:5, reqPlayerLevel:12, price:250, icon:'📘',desc:'기본 공격력 +46%'},
-  {id:'sb_n6',name:'전투 마스터리북 6권',  type:'normal',level:6,targetLevel:6, reqPlayerLevel:16, price:340, icon:'📘',desc:'기본 공격력 +56%'},
-  {id:'sb_n7',name:'전투 마스터리북 7권',  type:'normal',level:7,targetLevel:7, reqPlayerLevel:20, price:450, icon:'📘',desc:'기본 공격력 +65%'},
+  {id:'sb_n1',name:'전투 마스터리북 1권',  type:'normal',level:1,targetLevel:1, reqPlayerLevel:1,  price:_normalBookPrice(1), icon:'📘',desc:'기본 공격 해금 (×1.10)'},
+  {id:'sb_n2',name:'전투 마스터리북 2권',  type:'normal',level:2,targetLevel:2, reqPlayerLevel:3,  price:_normalBookPrice(2), icon:'📘',desc:'기본 공격력 +18%'},
+  {id:'sb_n3',name:'전투 마스터리북 3권',  type:'normal',level:3,targetLevel:3, reqPlayerLevel:5,  price:_normalBookPrice(3), icon:'📘',desc:'기본 공격력 +27%'},
+  {id:'sb_n4',name:'전투 마스터리북 4권',  type:'normal',level:4,targetLevel:4, reqPlayerLevel:8,  price:_normalBookPrice(4), icon:'📘',desc:'기본 공격력 +36%'},
+  {id:'sb_n5',name:'전투 마스터리북 5권',  type:'normal',level:5,targetLevel:5, reqPlayerLevel:12, price:_normalBookPrice(5), icon:'📘',desc:'기본 공격력 +46%'},
+  {id:'sb_n6',name:'전투 마스터리북 6권',  type:'normal',level:6,targetLevel:6, reqPlayerLevel:16, price:_normalBookPrice(6), icon:'📘',desc:'기본 공격력 +56%'},
+  {id:'sb_n7',name:'전투 마스터리북 7권',  type:'normal',level:7,targetLevel:7, reqPlayerLevel:20, price:_normalBookPrice(7), icon:'📘',desc:'기본 공격력 +65%'},
   // fire 1~7 (90/140/210/290/400/540/720)
   {id:'sb_f1',name:'화염 마스터리북 1권',type:'fire',  level:1,targetLevel:1, reqPlayerLevel:2,  priceAdj:-3,  icon:'📕',desc:'화염 공격 해금'},
   {id:'sb_f2',name:'화염 마스터리북 2권',type:'fire',  level:2,targetLevel:2, reqPlayerLevel:5,  priceAdj:-2, icon:'📕',desc:'화염 공격력 +10%'},
