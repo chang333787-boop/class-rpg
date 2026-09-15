@@ -40,6 +40,35 @@ const TARGET = { 풀장비: [0.65, 0.80], 무기만: [0.45, 0.60], 맨몸: [0.25
 const CLIFF = 0.15, PLUS3 = [0.30, 0.45];
 
 const W = loadWorld({ gamedata, settings, balance: proposal.balance || null, patches: proposal.patches || null, seed: SEED });
+
+// ── --quick: PR 사전 검사용 회귀 경보(몇 초) ─────────────────────
+//  목표 곡선(G1~G5) 판정이 아니라 "전투가 크게 망가졌나"만 본다. 기준은 2026-09-15 main 운영 설정에서 여유 있게 통과하는 값.
+//   Q1 같은 Lv 물리 풀장비 승률 최저 ≥ 50%   (지금 운영 최저 77%, "장비 맞춰도 못 이김" 회귀)
+//   Q2 Lv1·Lv2 풀장비 ≥ 90%                 (지금 100%, #172 B1 Lv1~2 0% 같은 회귀)
+//   Q3 풀장비 인접 레벨 절벽 ≤ 35%p          (지금 최대 23%p)
+//  사용: node scripts/balance/gate.mjs --quick --settings scripts/balance/settings/prod-20260915.json
+if (flag('quick')) {
+  const NQ = Number(arg('n', 40));
+  const full = [], wpn = [];
+  for (let lv = 1; lv <= MAX; lv++) {
+    full[lv] = winRate(W, makeStudent(W, lv, '풀장비'), lv, NQ).win;
+    wpn[lv] = winRate(W, makeStudent(W, lv, '무기만'), lv, NQ).win;
+  }
+  const fails = [];
+  const minLv = full.indexOf(Math.min(...full.slice(1)));
+  if (full[minLv] < 0.5) fails.push(`Q1 Lv${minLv} 풀장비 ${Math.round(full[minLv] * 100)}% < 50%`);
+  [1, 2].forEach(lv => { if (full[lv] < 0.9) fails.push(`Q2 Lv${lv} 풀장비 ${Math.round(full[lv] * 100)}% < 90%`); });
+  let maxJump = 0, jumpAt = 2;
+  for (let lv = 2; lv <= MAX; lv++) { const d = Math.abs(full[lv] - full[lv - 1]); if (d > maxJump) { maxJump = d; jumpAt = lv; } }
+  if (maxJump > 0.35) fails.push(`Q3 풀장비 Lv${jumpAt - 1}→${jumpAt} ${Math.round(maxJump * 100)}%p > 35%p`);
+  const row = a => a.slice(1).map(v => Math.round(v * 100)).join(' ');
+  console.log(`밸런스 게이트 quick · 몬스터 HP×${W.BATTLE_CONSTS.monsterHpMult} ATK×${W.BATTLE_CONSTS.monsterAtkMult} · 칸당 ${NQ}판`);
+  console.log(`풀장비 같은Lv  ${row(full)}`);
+  console.log(`무기만 같은Lv  ${row(wpn)}  (참고)`);
+  fails.forEach(f => console.log('❌ ' + f));
+  console.log(`요약: ${fails.length ? 'FAIL' : 'PASS'} · 풀장비 최저 Lv${minLv} ${Math.round(full[minLv] * 100)}% · Lv1/2 ${Math.round(full[1] * 100)}/${Math.round(full[2] * 100)}% · 최대 절벽 ${Math.round(maxJump * 100)}%p (quick)`);
+  process.exit(fails.length ? 1 : 0);
+}
 const bc = W.BATTLE_CONSTS;
 const pct = r => (r == null ? '—' : `${Math.round(r.win * 100)}%`);
 const out = [];
