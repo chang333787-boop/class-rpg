@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><title>gold-m1</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const P = new URLSearchParams(location.search), V = P.get('v'), PROFILE = P.get('profile') || null, NS = 'demo-gold';
+firebase.initializeApp({ databaseURL: 'http://127.0.0.1:9000?ns=' + NS });   // 에뮬레이터만
+</script>
+<script>document.write('<script src="' + V + '/gamedata.js"><\/script>');</script>
+<pre id="out">running</pre>
+<script>
+const REST = (p) => 'http://127.0.0.1:9000/classRPG_v3/' + p + '.json?ns=' + NS;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+(async () => {
+  await fetch(REST(''), { method: 'PUT', body: JSON.stringify({ settings: { className: '시험' }, students: { s1: { id: 's1', name: '가', pw: 'x', level: 3, exp: 300, gold: 1000, totalGold: 1000, pendingRewards: [] } }, questLogs: { s1_x: { studentId: 's1', date: '2026-09-01' } } }) });
+  await DB.init(PROFILE ? { profile: PROFILE } : undefined);
+  if (PROFILE && DB.attachMine) await DB.attachMine('s1');
+  // student.js 의 onDataChange CUR 갱신 + 전투 승리 순서 그대로
+  let CUR = JSON.parse(JSON.stringify(DB.getStudent('s1')));
+  DB.onDataChange(() => { const f = DB.getStudent(CUR.id); if (f) CUR = f; });
+  await sleep(800);
+  for (let i = 0; i < 3; i++) {
+    CUR.gold += 10; CUR.totalGold = (CUR.totalGold || 0) + 10;
+    DB.logGold(CUR.id, 'battle', 10);
+    DB.saveStudent(CUR);
+    await sleep(1200);
+  }
+  await sleep(1500);
+  const srv = await fetch(REST('students/s1')).then(r => r.json());
+  const gd = await fetch(REST('goldDaily')).then(r => r.json());
+  window.__res = { v: V, profile: PROFILE, totalGold: srv.totalGold, gold: srv.gold, goldDailyBattle: Object.values(gd || {}).reduce((a, r) => a + (r.battle || 0), 0) };
+  document.getElementById('out').textContent = JSON.stringify(window.__res);
+})().catch(e => { window.__res = 'ERR ' + e.stack; document.getElementById('out').textContent = window.__res; });
+</script>

@@ -6,11 +6,12 @@
 //   buySeed : 실제 buySeed(첫 씨앗) → 골드 차감 + 씨앗 1 이어야(OK). 로그를 저장 전에 쓰는 코드면 FREE_ITEM
 //  사용: node scripts/unit/gold-loss-real-sdk/run.mjs [battle|buySeed|farm|infinite]   → 케이스별 판정 출력(인자 없으면 전부)
 //        node scripts/unit/gold-loss-real-sdk/run.mjs --expect-fixed      → 기대와 다른 케이스가 있으면 exit 1
+//        --profile=student|root|both (기본 root) — student = 학생 기기 판(STUDENT-COLD-1 노드별 구독), root = 교사·옛 판
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { execFile } from 'node:child_process'; import { promisify } from 'node:util'; import { fileURLToPath } from 'node:url';
 const run = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO = path.resolve(HERE, '..', '..', '..');
+const REPO = process.env.Q1_REPO || path.resolve(HERE, '..', '..', '..');   // Q1_REPO=<다른 체크아웃> 이면 그 앱 코드로
 const EXPECT_FIXED = process.argv.includes('--expect-fixed');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const srv = http.createServer((req, res) => {
@@ -34,19 +35,21 @@ await new Promise(r => srv.listen(0, '127.0.0.1', r));
 // 케이스마다 새 브라우저 한 번. 기대값: battle=NO_LOSS · buySeed=OK
 const CASES = { battle: 'NO_LOSS', buySeed: 'OK', farm: 'NO_LOSS', infinite: 'NO_LOSS' };
 const only = process.argv.slice(2).find(a => !a.startsWith('--'));
+const PROF = ((process.argv.find(a => a.startsWith('--profile=')) || '--profile=root').split('=')[1]);
+const PROFILES = PROF === 'both' ? ['root', 'student'] : [PROF];
 let bad = 0;
-for (const [name, want] of Object.entries(CASES)) {
+for (const profile of PROFILES) for (const [name, want] of Object.entries(CASES)) {
   if (only && only !== name) continue;
   const { stdout } = await run('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${process.env.TEMP}/qa_q1_realsdk_${name}`, '--virtual-time-budget=20000', '--dump-dom',
-     `http://127.0.0.1:${srv.address().port}/student.html?case=${name}`], { maxBuffer: 1e8, timeout: 120000 });
+    ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${process.env.TEMP}/qa_q1_realsdk_${profile}_${name}`, '--virtual-time-budget=20000', '--dump-dom',
+     `http://127.0.0.1:${srv.address().port}/student.html?case=${name}&profile=${profile}`], { maxBuffer: 1e8, timeout: 120000 });
   const text = (stdout.match(/<pre id="q1-out">([\s\S]*?)<\/pre>/) || [, 'no output — title: ' + (stdout.match(/<title>([^<]*)/) || [])[1]])[1].replace(/&quot;/g, '"');
   const verdict = (text.match(/VERDICT="(\w+)"/) || [])[1] || 'UNKNOWN';
   const ok = verdict === want;
   if (!ok) bad++;
-  console.log(`== ${name} (기대 ${want})`);
+  console.log(`== [${profile}] ${name} (기대 ${want})`);
   console.log(text);
-  console.log(ok ? `✅ ${name}: ${verdict}` : `🔴 ${name}: ${verdict} — ${verdict === 'LOSS' ? '얻은 골드가 totalGold 에 안 들어감(goldDaily 는 남음)' : verdict === 'FREE_ITEM' ? '구매했는데 골드가 안 빠짐' : '판정 불가/깨짐'}`);
+  console.log(ok ? `✅ [${profile}] ${name}: ${verdict}` : `🔴 [${profile}] ${name}: ${verdict} — ${verdict === 'LOSS' ? '얻은 골드가 totalGold 에 안 들어감(goldDaily 는 남음)' : verdict === 'FREE_ITEM' ? '구매했는데 골드가 안 빠짐' : '판정 불가/깨짐'}`);
   console.log('');
 }
 srv.close();

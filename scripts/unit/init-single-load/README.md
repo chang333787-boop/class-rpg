@@ -25,3 +25,12 @@
 |---|---|---|---|---|---|---|
 | main (root) | 757,960 | — | 반영 | 반영 | 반영 | 반영 |
 | STUDENT-COLD-1 | **225,141** | **없음**(21노드, quests 도 같음) | 반영 | **안 받음** | 반영 | 반영 |
+
+## STUDENT-GOLDDAILY-COLD-1 — `gold-m1.html?v=<폴더>[&profile=student]` (ns demo-gold, 페이지가 시작 때 가짜 학생 1명 PUT)
+student.js 와 같은 순서(`CUR.gold += 10 → DB.logGold → DB.saveStudent`, onDataChange 로 CUR 갱신)로 전투 3번(+30G) 뒤 서버 값.
+2026-09-15 결과(실제 SDK 9.23 + 에뮬레이터)
+| 모드 | 서버 totalGold | goldDaily battle |
+|---|---|---|
+| root 판(교사·옛 학생) | 1000 — 30 유실 | 30 |
+| 학생 판, goldDaily 구독(#337) | 1000 — 30 유실 | 30 |
+| 학생 판, goldDaily COLD(이 변경) | **1030 — 유실 0** | 30 |
