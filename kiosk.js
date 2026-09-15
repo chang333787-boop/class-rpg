@@ -218,7 +218,7 @@ function renderTable() {
           <th class="quest-th">할 일</th>
           ${students.map(s=>`<th style="font-size:.8rem">
             <div style="font-size:1.2rem">${s.avatar}</div>
-            <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
+            <div style="font-size:.72rem;margin-top:2px">${escHtml(s.name)}</div>
           </th>`).join('')}
         </tr></thead><tbody>`;
 
@@ -226,7 +226,7 @@ function renderTable() {
         questList.forEach(q => {
           totalHtml += `<tr><td class="quest-name">
             <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-              ${q.icon||'📋'} ${q.name}
+              ${q.icon||'📋'} ${escHtml(q.name)}
               ${statBadge(q.stat, q.statVal)}
             </div>
             <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
@@ -237,7 +237,7 @@ function renderTable() {
             if (status === 'done') {
               totalHtml += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
             } else if (status === 'pending') {
-              totalHtml += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
+              totalHtml += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}',${escHtml(JSON.stringify(s.name||''))},${escHtml(JSON.stringify(q.name||''))})">
                 ⏳<span style="font-size:.55rem">신청중</span></div></td>`;
             } else {
               totalHtml += `<td><div class="cell-btn" onclick="requestQuest('${s.id}','${q.id}',this)">
@@ -285,7 +285,7 @@ function renderTable() {
         <th class="quest-th">할 일</th>
         ${students.map(s=>`<th style="font-size:.8rem">
           <div style="font-size:1.2rem">${s.avatar}</div>
-          <div style="font-size:.72rem;margin-top:2px">${s.name}</div>
+          <div style="font-size:.72rem;margin-top:2px">${escHtml(s.name)}</div>
         </th>`).join('')}
       </tr></thead>
       <tbody>`;
@@ -294,7 +294,7 @@ function renderTable() {
       totalHtml += `<tr>
         <td class="quest-name">
           <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-            ${q.icon||'📋'} ${q.name}
+            ${q.icon||'📋'} ${escHtml(q.name)}
             ${statBadge(q.stat, q.statVal)}
           </div>
           <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
@@ -306,7 +306,7 @@ function renderTable() {
         if (status === 'done') {
           totalHtml += `<td><div class="cell-btn done">✓<span style="font-size:.6rem">완료</span></div></td>`;
         } else if (status === 'pending') {
-          totalHtml += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}','${s.name}','${q.name}')">
+          totalHtml += `<td><div class="cell-btn pending" onclick="requestCancel('${s.id}','${q.id}',${escHtml(JSON.stringify(s.name||''))},${escHtml(JSON.stringify(q.name||''))})">
             ⏳<span style="font-size:.55rem">신청중</span>
           </div></td>`;
         } else {
@@ -407,7 +407,7 @@ function renderKioskMemory() {
             font-family:inherit;font-weight:700;border:2px solid transparent;
             background:${_kioskMemView===a.id?'var(--gold)':'rgba(255,255,255,.1)'};
             color:${_kioskMemView===a.id?'#1a1a1a':'var(--txt1)'}">
-          📁 ${a.name} (${cnt})</button>`;
+          📁 ${escHtml(a.name)} (${cnt})</button>`;
       }).join('')}
       ${all.filter(m=>!m.albumId).length>0 ? `
       <button onclick="setKioskMemView('none')"
@@ -427,7 +427,7 @@ function renderKioskMemory() {
                 background:rgba(255,255,255,.05);aspect-ratio:1;position:relative;transition:transform .2s"
               onmouseenter="this.style.transform='scale(1.03)'"
               onmouseleave="this.style.transform='scale(1)'">
-              <img src="${m.thumbUrl||m.imageUrl}" loading="lazy"
+              <img src="${escHtml(m.thumbUrl||m.imageUrl)}" loading="lazy"
                 style="width:100%;height:100%;object-fit:cover;display:block">
               <div style="position:absolute;bottom:0;left:0;right:0;padding:.3rem .5rem;
                 background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:.65rem;color:#fff;
@@ -522,7 +522,7 @@ function renderEmotionBoard() {
           const pm = getEmo(s.id, 'pm');
           return `<tr>
             <td style="padding:.6rem;border:1px solid var(--border);font-size:.88rem;font-weight:700">
-              ${s.avatar} ${s.name}
+              ${s.avatar} ${escHtml(s.name)}
             </td>
             <td style="padding:.4rem;border:1px solid var(--border);text-align:center">
               ${am
