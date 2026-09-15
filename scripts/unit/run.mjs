@@ -645,6 +645,34 @@ cur = 'admin 전투 설정 저장·초기화(BATTLE-SET-NAN-1·BATTLE-RESET-KEEP
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = '홈 펼침 상태 유지(HOME-KEEP-OPEN-1)';
+try {
+  //  onDataChange 가 홈을 다시 그리면(innerHTML) 펼친 섹션이 접혔다. 펼친 것만 기억해 다시 펼치는지.
+  const STU = read('student.js');
+  const mkBox = (ids) => {
+    const els = {};
+    for (const id of ids) els[id] = { id, style: { display: 'none' }, textContent: id.endsWith('arrow') ? '▼' : '' };
+    return { els, querySelector: (sel) => { const m = /\[id="([^"]+)"\]/.exec(sel); return m ? els[m[1]] || null : null; } };
+  };
+  const ids = ['today-links', 'today-links-arrow', 'quest-section', 'quest-arrow'];
+  let box = mkBox(ids);
+  const sb = { document: { querySelectorAll: (sel) => { const m = /\[id="([^"]+)"\]/.exec(sel); return m && box.els[m[1]] ? [box.els[m[1]]] : []; } } };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext([sliceFn(STU, '_homeEl').replace("el.closest('#main-area, #mob-main-tab')", 'null'), sliceFn(STU, 'toggleSection'), sliceConst(STU, '_homeOpen'), sliceFn(STU, '_restoreHomeOpen'),
+    'globalThis.__t = toggleSection; globalThis.__r = _restoreHomeOpen;'].join('\n'), sb);
+  sb.__t('today-links', 'today-links-arrow');
+  box = mkBox(ids);            // 다시 그리기: 새 요소는 기본 접힘
+  sb.__r(box);
+  test('펼친 오늘의 링크는 다시 그린 뒤에도 펼침·화살표 ▲', () => eq([box.els['today-links'].style.display, box.els['today-links-arrow'].textContent], ['', '▲']));
+  test('안 펼친 퀘스트 섹션은 그대로 접힘', () => eq(box.els['quest-section'].style.display, 'none'));
+  sb.__t('today-links', 'today-links-arrow');   // 이제 접음
+  box = mkBox(ids); sb.__r(box);
+  test('접은 뒤 다시 그리면 접힘', () => eq(box.els['today-links'].style.display, 'none'));
+} catch (e) {
+  test('홈 펼침 유지 함수가 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
