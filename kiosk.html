@@ -6,7 +6,7 @@
 <title>우리반 할 일 체크판</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="./kiosk.css?v=20260915d3a">
+<link rel="stylesheet" href="./kiosk.css?v=20260915d3b">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -37,17 +37,14 @@
 <div id="main-wrap" style="display:none;width:100%">
   <div id="header">
     <div class="title">우리반 할 일</div>
-    <div id="class-name" style="font-size:.78rem;color:var(--txt2)"></div>
+    <div id="class-name"></div>
     <div style="display:flex;gap:.4rem;margin-left:auto">
-      <button id="kiosk-tab-quest" onclick="switchKioskTab('quest')"
-        style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
-          background:var(--gold);color:#1a1a1a;border:none">📋 퀘스트</button>
-      <button id="kiosk-tab-emotion" onclick="switchKioskTab('emotion')"
-        style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
-          background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">💭 감정</button>
-      <button id="kiosk-tab-memory" onclick="switchKioskTab('memory')"
-        style="font-size:.82rem;padding:.35rem .9rem;border-radius:20px;cursor:pointer;font-family:inherit;font-weight:700;
-          background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">📸 추억</button>
+      <button id="kiosk-tab-quest" onclick="switchKioskTab('quest')" class="kiosk-tab"
+        style="background:var(--gold);color:#1a1a1a;border:none">📋 퀘스트</button>
+      <button id="kiosk-tab-emotion" onclick="switchKioskTab('emotion')" class="kiosk-tab"
+        style="background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">💭 감정</button>
+      <button id="kiosk-tab-memory" onclick="switchKioskTab('memory')" class="kiosk-tab"
+        style="background:transparent;color:var(--txt2);border:1.5px solid rgba(255,255,255,.25)">📸 추억</button>
     </div>
     <div class="date" id="today-date"></div>
   </div>
@@ -70,6 +67,6 @@
 
 <script src="./gamedata.js?v=20260915rfo"></script>
 
-<script src="./kiosk.js?v=20260915q3p"></script>
+<script src="./kiosk.js?v=20260915d3c"></script>
 </body>
 </html>
