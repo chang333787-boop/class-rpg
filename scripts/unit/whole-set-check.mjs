@@ -8,7 +8,7 @@
 //  여러 기기가 쓰면 child('<모음>/' + id).set / .remove / transaction 으로.
 //
 //  사용: node scripts/unit/whole-set-check.mjs   (FAIL 1개 이상이면 exit 1)
-//  smoke(28)·unit(60) 기준선과 별개 파일 — 숫자를 바꾸지 않는다.
+//  smoke·unit 기준선과 별개 파일 — 숫자를 바꾸지 않는다.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +21,7 @@ const FILES = ['gamedata.js', 'admin.js', 'student.js', 'kiosk.js'];
 //  학생 기기에서도 불리는 곳(gamedata 의 학생 경로)은 why 에 "여러 기기" 로 적고 줄이는 게 목표.
 const BASELINE = {
   'gamedata.js': {
-    settings:          { n: 1, why: '교사 + 학생 기기(ensureDailyQuests 가 autoDailyLastDate 쓰려고 settings 통째) — 한 칸 쓰기로 줄일 후보' },
+    settings:          { n: 1, why: '교사만(saveSettings) — 학생 아침 자동등록은 #279 부터 settings/autoDailyLastDate 한 칸' },
     artworks:          { n: 1, why: '교사 삭제 — id 키 객체로 씀(artworksObj)' },
     customProblems:    { n: 2, why: '교사만' },
     memories:          { n: 3, why: '여러 기기(학생 올리기↔교사 승인) — 판정 대기, 보고_20260915/판정_추억사진_저장방식_rf.md' },
