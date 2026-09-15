@@ -1,0 +1,1 @@
+{ "name": "S1 난이도 계수만 (HP×2.0 · ATK×2.0)", "settings": { "monsterHpMult": 2.0, "monsterAtkMult": 2.0 } }
