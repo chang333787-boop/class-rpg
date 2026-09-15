@@ -33,6 +33,8 @@ const CHECKS = [
   { name: 'buster-check', file: 'scripts/unit/buster-check.mjs',     args: [BASE, 'HEAD'],                    pick: /요약:[^\n]*/ },
   { name: 'whole-set',    file: 'scripts/unit/whole-set-check.mjs',  args: [],                                pick: /요약:[^\n]*/ },
   { name: 'save-order',   file: 'scripts/unit/save-order-check.mjs', args: ['--baseline', SAVE_BASELINE],     pick: /요약:[^\n]*/ },
+  // [CHAR-COMBO-CHECK-1] 캐릭터 종이인형 84장 조립 규칙(잘림·뚫림·무기-모자 닿음). assets/char 를 고친 PR 은 여기서 잡힌다.
+  { name: 'char-combo',   file: 'scripts/unit/char-combo-check.mjs', args: [],                                pick: /요약:[^\n]*/ },
 ];
 // 폴더에 있는 다른 자기검사 시뮬들(각자 exit 코드로 판정)
 for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'student-known-check']) {
