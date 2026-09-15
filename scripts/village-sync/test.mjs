@@ -245,6 +245,16 @@ await test('B8 keepalive 가 떨어져도 다음 열기에 올림', async () => 
   assert.equal(w.rtdb.get(ROOT + '/plots/4_4'), 'AF');
 });
 
+await test('B9 마을 이름(meta.name) — 12자까지 올리고 다른 기기가 받음 · 없으면 키 없음', async () => {
+  const w = world(); const d = device(w); d.save(V2({ '4_4': 'AE' })); await d.sync.boot(); d.sync.attach();
+  assert.equal(w.rtdb.get(ROOT + '/meta/name'), null);                      // 이름 없음 → 키 없음
+  d.save(V2({ '4_4': 'AE' }, { name: '  우리 반 꿈나무 마을이에요  ' })); await w.clock.advance(3500);
+  assert.equal(w.rtdb.get(ROOT + '/meta/name'), '우리 반 꿈나무 마을이');      // 앞뒤 공백 빼고 12자
+  d.sync.onPageHide(); d.sync.close(); await w.clock.advance(100000);
+  const d2 = device(w); await d2.sync.boot();                               // 다른 기기(빈 저장소)
+  assert.equal(d2.local().name, '우리 반 꿈나무 마을이');
+});
+
 const pass = results.filter(r => r[0] === 'PASS').length, fail = results.length - pass;
 for (const r of results) console.log((r[0] === 'PASS' ? '✅' : '❌') + ' ' + r[1] + (r[2] ? '  ← ' + r[2] : ''));
 console.log(`\n요약: PASS ${pass} · FAIL ${fail}`);
