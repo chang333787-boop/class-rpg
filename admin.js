@@ -1551,7 +1551,10 @@ function renderPromotionList() {
     const statusEl = document.getElementById('promo-student-status');
     if (!statusEl) return;
     if (students.length === 0) { statusEl.innerHTML = ''; return; }
-    statusEl.innerHTML = students.sort((a,b)=>(b.level||0)-(a.level||0)).map(s => {
+    // [STUDENT-ORDER-1] 복사해서 정렬한다. students 는 DB.getStudents() 가 돌려준 **캐시 배열 그 자체**라
+    //   제자리 sort 하면 캐시 순서가 레벨순으로 바뀌고, 학생 목록 등 다른 화면이 그 순서를 따른다.
+    //   다음 쓰기(쪽지 등)가 루트 on('value') 를 깨우면 재정규화로 id순으로 돌아가 "순서가 바뀌었다"로 보였다.
+    statusEl.innerHTML = [...students].sort((a,b)=>(b.level||0)-(a.level||0)).map(s => {
       const isPending = requests.some(r=>r.studentId===s.id);
       const expTable  = typeof GAME_DATA !== 'undefined' ? GAME_DATA.expTable : [];
       const curIdx = Math.min((s.level||1)-1, expTable.length-1);
