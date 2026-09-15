@@ -1176,6 +1176,11 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .hud-exp-bar{height:8px;border-radius:4px;}
 .hud-exp-fill{border-radius:4px;}
 .hud-exp-txt,.hud-exp-label{font-size:var(--fs-xs);}
+/* [D3-TINY-1] 12px 미만 표(보고_20260915/디자인3_12px미만_표.md)에서 CSS로 닿는 곳:
+   · 칭호 뱃지 11.2px·보라 글자 대비 3.39 → 12px·--purple-t(대비 7 이상)
+   · 상점 능력치 줄 .ic-stats 10.2px → 12px */
+.hud-title-badge{font-size:var(--fs-xs);color:var(--purple-t);}
+.ic-stats{font-size:var(--fs-xs);}
 .badge{font-size:var(--fs-sm);}
 .hud-mini-btn{font-size:var(--fs-xs);border-radius:var(--r-sm);}
 
@@ -1229,7 +1234,7 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
   .hud{padding:var(--sp-1) var(--sp-2);gap:var(--sp-1);}
   /* 375 HUD는 이름·EXP·레벨·골드가 한 줄 — 여기서 글자를 키우면 이름이 '학…'으로 잘린다 */
   .hud-name{font-size:.9rem;}
-  .hud-exp-txt{font-size:.6875rem;}
+  .hud-exp-txt{font-size:.75rem;} /* [D3-TINY-1] 11 → 12px (375에서 이름 잘림 없는지 캡처로 확인) */
   .badge{font-size:.8rem;}
 }
 
