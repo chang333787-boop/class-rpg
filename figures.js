@@ -23,6 +23,7 @@
 //   quad     { type, deg?, angles? }           사각형. type trapezoid|parallelogram|rhombus|rectangle|square
 //                                             deg=왼쪽 아래 각(평행사변형·마름모), angles:[70,'?',null,null] 꼭짓점 각 표기
 //                                             (꼭짓점 순서: 왼쪽 아래 → 오른쪽 아래 → 오른쪽 위 → 왼쪽 위)
+//   hundred  { parts, cross?, wholes?, unit? }  소수 모눈(10×10=1). parts 색칠 칸 수, cross 빗금, wholes 다 칠한 모눈 장수
 //   bar      { labels, values, unit?, step?, q? }  막대그래프(세로). q:[i]면 그 항목은 막대 없이 ?
 //   lines    { type, label? }                 두 직선. type perp(수직)|parallel(평행)|distance(평행선 사이 수선, label 길이)
 // ══════════════════════════════════════════════════
@@ -260,6 +261,41 @@ const Figures = (() => {
       out += vals.map((v, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="4" fill="currentColor" stroke="none"/>`).join('');
       out += labs.map((s, i) => `<text x="${px(i).toFixed(1)}" y="${yB + 18}" font-size="10.5" fill="currentColor" stroke="none" text-anchor="middle" font-family="inherit">${esc(s)}</text>`).join('');
       return wrap(out, Wd, Hd);
+    },
+    // [FIG-HUNDRED-1] 소수 모눈 — 10×10 모눈 한 장 = 1. parts:[30,50] 앞에서부터 색 두 가지로 칠함, cross:40 칠한 칸 끝에서 40칸 빗금(뺄셈)
+    //   wholes:2면 다 칠한 모눈 2장을 앞에 둔다(1.45 = 모눈 1장 + 45칸). unit:'0.1'이면 세로 10줄(0.1 칸)만 긋는다.
+    hundred(f) {
+      const parts = (Array.isArray(f.parts) ? f.parts : []).map(v => Math.max(0, Math.min(100, toNum(v, 0))));
+      const wholes = Math.max(0, Math.min(2, toNum(f.wholes, 0)));
+      const tenths = f.unit === '0.1';
+      const total = parts.reduce((a, v) => a + v, 0);
+      if (total > 100) return '';
+      const cross = Math.max(0, Math.min(total, toNum(f.cross, 0)));
+      const sheets = wholes + 1, gap = 12, size = Math.min(100, (236 - gap * (sheets - 1)) / sheets), c = size / 10;
+      const y0 = (130 - size) / 2;
+      const fills = [ACC, ACC2];
+      let out = '';
+      for (let s = 0; s < sheets; s++) {
+        const x0 = (240 - (size * sheets + gap * (sheets - 1))) / 2 + s * (size + gap);
+        if (s < wholes) out += `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" fill="${ACC}" stroke="none"/>`;
+        else {
+          let idx = 0;
+          parts.forEach((v, pi) => { for (let j = 0; j < v; j++, idx++) {
+            const col = Math.floor(idx / 10), row = idx % 10;   // 세로줄(0.1)부터 채운다
+            out += `<rect x="${(x0 + col * c).toFixed(1)}" y="${(y0 + row * c).toFixed(1)}" width="${c.toFixed(1)}" height="${c.toFixed(1)}" fill="${fills[pi % 2]}" stroke="none"/>`;
+          } });
+          for (let j = total - cross; j < total; j++) {
+            const col = Math.floor(j / 10), row = j % 10, x = x0 + col * c, y = y0 + row * c;
+            out += `<path d="M${(x + 1).toFixed(1)} ${(y + c - 1).toFixed(1)} L${(x + c - 1).toFixed(1)} ${(y + 1).toFixed(1)}" stroke-width="1.6"/>`;
+          }
+        }
+        for (let i = 0; i <= 10; i++) {
+          const w = i % 10 === 0 ? 2 : .8;
+          out += `<line x1="${(x0 + i * c).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${(x0 + i * c).toFixed(1)}" y2="${(y0 + size).toFixed(1)}" stroke-width="${w}"/>`;
+          if (!tenths || i % 10 === 0) out += `<line x1="${x0.toFixed(1)}" y1="${(y0 + i * c).toFixed(1)}" x2="${(x0 + size).toFixed(1)}" y2="${(y0 + i * c).toFixed(1)}" stroke-width="${w}"/>`;
+        }
+      }
+      return wrap(out);
     },
     // [FIG-BAR-1] 막대그래프 — 세로 막대. q:[칸 번호]인 항목은 막대 없이 '?'(문항이 그 값을 묻을 때)
     bar(f) {
