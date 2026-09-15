@@ -11238,9 +11238,8 @@ function renderStudyQuestion() {
       </div>
       ${figHtml ? `<div class="st-fig">${figHtml}</div>` : ''}
       ${passageHtml}
-      <div class="st-q" style="margin-bottom:${p.audio ? '1rem' : '1.6rem'}">
-        ${escHtml(p.q)}
-      </div>
+      <!-- [STUDY-Q-NEWLINE-1] 물음의 줄바꿈(자료 줄 ↔ 묻는 말)을 살린다. pre-line이라 앞뒤 공백 없이 붙여 쓴다 -->
+      <div class="st-q" style="margin-bottom:${p.audio ? '1rem' : '1.6rem'};white-space:pre-line">${escHtml(p.q)}</div>
       ${audioHtml}
       ${scratchHtml}
       ${inputHtml}
