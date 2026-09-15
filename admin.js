@@ -266,7 +266,9 @@ async function renderVillagesPage() {
     const name = escHtml(r.s.name || r.s.id);
     if (!r.has) return `<tr><td>${name}</td><td>${muted('아직 없음')}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     if (r.error) return `<tr><td>${name}</td><td>있음</td><td colspan="5" style="color:var(--red)">읽기 실패 (${escHtml(r.error)})</td></tr>`;
-    return `<tr><td>${name}</td><td>있음</td><td>${r.plots}</td><td>${r.houses}</td><td>${r.people}</td>`
+    // [VILLAGE-VISIT-LINK-1] 구경 모드(?visit=)는 읽기만: sync 를 안 띄워 session 도 안 가져간다(sid 없음 = guest)
+    const visit = `<a href="village/index.html?visit=${encodeURIComponent(r.s.id)}" target="_blank" rel="noopener" style="margin-left:.4rem;font-size:.8em">🏘️ 구경</a>`;
+    return `<tr><td>${name}${visit}</td><td>있음</td><td>${r.plots}</td><td>${r.houses}</td><td>${r.people}</td>`
          + `<td>${r.savedAt ? fmt(r.savedAt) : muted('-')}</td><td>${r.open ? '🟢 열려 있음' : muted('닫힘')}</td></tr>`;
   }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--txt3)">학생이 없어요</td></tr>`;
 
@@ -275,7 +277,7 @@ async function renderVillagesPage() {
   sum.textContent = `${students.length}명 중 ${n}명 저장됨`;
   note.innerHTML = (n === 0 ? '아직 온라인에 저장된 마을이 없어요. 마을 저장 규칙을 게시하고 마을 새 판이 올라간 뒤부터 쌓입니다.<br>' : '')
     + (orphan.length ? `학생 목록에 없는 마을 ${orphan.length}개: ${orphan.map(escHtml).join(', ')}<br>` : '')
-    + '마을 구경 링크는 마을 쪽에서 구경 모드(?visit=)를 지원한 뒤 붙입니다.';
+    + '🏘️ 구경은 새 탭에서 읽기만 합니다 — 마을을 바꾸거나 학생 기기의 마을을 닫게 하지 않아요.';
 }
 
 // ══════════════════════════════════════════════════
