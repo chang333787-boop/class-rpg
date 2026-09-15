@@ -1,5 +1,6 @@
 // ══ 상태 ══
 let CUR = null, SEL_STUDENT = null, SEL_CHAR = null;
+let _curSeenJson = null;   // [SYNC-MERGE-1] 마지막으로 서버에서 받아들인 내 레코드(JSON) — 같은 내용의 에코로 CUR 을 되감지 않기 위해
 let SHOP_TAB = 'head', INV_TAB = 'equip', SEL_SEED = null, CUR_EQUIP_SLOT = 'all';
 let BATTLE_MON = null, BATTLE_TRIES = 0, BATTLE_DONE = false;
 let BATTLE_STATE = null; // 새 턴제 전투 엔진 상태
@@ -61,8 +62,15 @@ window.onload = async () => {
       applyShopOverrides();
       applyBattleSettings();
       if (typeof CUR !== 'undefined' && CUR) {
+        // [SYNC-MERGE-1] 골드 유실 M1 차단: logGold/logSpend 의 update() 가 띄우는 로컬 에코는 내 레코드가
+        //   그대로인 스냅샷이다. 그때 CUR 을 갈아끼우면 아직 저장 전인 변경(gold += g)이 옛 캐시로 되돌아가고
+        //   바로 이어지는 saveStudent 가 그 옛 값을 통째로 덮는다(2026-09-15 실측: 전투 1번에 10G 증발).
+        //   → 내 레코드가 직전에 받아들인 것과 **내용이 같으면** CUR 을 건드리지 않는다.
         const fresh = DB.getStudent(CUR.id);
-        if (fresh) CUR = fresh;
+        if (fresh) {
+          const seen = JSON.stringify(fresh);
+          if (seen !== _curSeenJson) { _curSeenJson = seen; CUR = fresh; }
+        }
 
         if (BATTLE_STATE && !BATTLE_STATE.finished) {
           if (typeof renderHUD === 'function') renderHUD();
@@ -142,6 +150,7 @@ function doLogin() {
     document.getElementById('login-err').textContent = '비밀번호가 틀렸어요!'; return;
   }
   CUR = JSON.parse(JSON.stringify(student));
+  _curSeenJson = JSON.stringify(student);   // [SYNC-MERGE-1] 로그인 시점의 서버 레코드
   if (!CUR.charType) {
     hideScreen('s-login');
     showScreen('s-charsel');

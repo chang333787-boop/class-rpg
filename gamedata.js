@@ -624,6 +624,7 @@ const DB = {
   _fbAdminRef: null,
   _onChangeCb: null,
   _saving: false,
+  _pendingSnap: null,   // [SYNC-MERGE-1] 저장 창(_saving) 동안 도착한 마지막 스냅샷 — 버리지 않고 창이 닫힐 때 적용
 
   async init() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -639,6 +640,7 @@ const DB = {
       await this._fbRef.set(data);
     }
     this._cache = this._migrate(this._normalizeArrays(data));
+    this._studentsJson = JSON.stringify(data.students);   // [SYNC-MERGE-1] 마지막으로 적용한 students 노드 원문
 
     // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
     this._fbRef.on('value', (snap) => {
@@ -646,6 +648,9 @@ const DB = {
       if (!d) return;
 
       if (this._saving) {
+        // [SYNC-MERGE-1] 저장 창 동안 온 변경(교사 승인·다른 탭)을 버리면 캐시가 그걸 모른 채
+        //   다음 저장이 옛 사본으로 덮는다(M2). 마지막 스냅샷만 기억해 두고 _endSaving() 에서 적용한다.
+        this._pendingSnap = d;
         // 내가 저장 중일 때도 settings 변경은 반드시 처리
         const newSettings = d.settings;
         const oldSettings = (this._cache || {}).settings;
@@ -655,12 +660,36 @@ const DB = {
         return;
       }
 
-      this._cache = this._migrate(this._normalizeArrays(d));
+      this._applySnapshot(d);
       if (this._onChangeCb) this._onChangeCb();
     });
   },
 
   onDataChange(fn) { this._onChangeCb = fn; },
+
+  // [SYNC-MERGE-1] 스냅샷을 캐시로 만들되, students 노드 원문이 지난번과 같으면 학생 객체 배열을 그대로 둔다.
+  //   logGold/logSpend 의 update() 는 goldDaily 만 바꾸는데도 루트 on('value') 가 동기로 뜬다. 그때 students 를
+  //   새 객체로 다시 만들면 student.js 가 CUR 을 그 새 객체(=저장 전 옛 값)로 갈아끼워 아직 저장 안 된 변경이
+  //   사라지고, 바로 이어지는 saveStudent 가 옛 값을 통째로 덮었다(2026-09-15 실측: 전투 1번에 10G, 하루 5,220G).
+  _applySnapshot(d) {
+    const sj = JSON.stringify(d.students);
+    const next = this._migrate(this._normalizeArrays(d));
+    if (this._cache && this._cache.students && sj === this._studentsJson) next.students = this._cache.students;
+    this._studentsJson = sj;
+    this._cache = next;
+  },
+
+  // [SYNC-MERGE-1] 저장 창을 닫는 유일한 자리(7곳의 setTimeout 이 이걸 부른다).
+  //   창 동안 미뤄 둔 스냅샷이 있으면 정상 경로(normalize → cache → 콜백)로 지금 적용한다.
+  //   SDK 는 내 set 을 서버 확인 전에도 스냅샷에 겹쳐 보여 주므로, 여기서 적용해도 방금 저장한 값이 되돌아가지 않는다.
+  _endSaving() {
+    this._saving = false;
+    const d = this._pendingSnap;
+    if (!d) return;
+    this._pendingSnap = null;
+    this._applySnapshot(d);
+    if (this._onChangeCb) this._onChangeCb();
+  },
 
   _defaultData() {
     return {
@@ -830,7 +859,7 @@ const DB = {
     this._saving = true;
     // id 키 기반 저장 (인덱스 충돌 방지)
     this._fbRef.child('students/' + student.id).set(student).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);
     });
   },
 
@@ -955,7 +984,7 @@ const DB = {
     this._cache = db;
     this._saving = true;
     return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 300);
+      setTimeout(() => this._endSaving(), 300);
     });
   },
 
@@ -970,7 +999,7 @@ const DB = {
     this._saving = true;
     // settings 노드만 부분 저장 (root 전체 set 방지)
     this._fbRef.child('settings').set(s).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);
     });
   },
 
@@ -1044,7 +1073,7 @@ const DB = {
     this._saving = true;
     // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
     this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);
     });
     return true;
   },
@@ -1055,7 +1084,7 @@ const DB = {
     this._saving = true;
     // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
     this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);
     });
   },
 
@@ -1312,7 +1341,7 @@ const DB = {
     this._saving = true;
     // 요청 단위 부분 저장 (root 전체 set 방지, id 키 기반)
     this._fbRef.child('pwResetRequests/' + r.id).set(r).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);
     });
   },
   removePwResetRequest(id) {
@@ -1322,7 +1351,7 @@ const DB = {
     this._saving = true;
     // 요청 단위 삭제 (root 전체 set 방지)
     this._fbRef.child('pwResetRequests/' + id).remove().finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);
     });
   },
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
