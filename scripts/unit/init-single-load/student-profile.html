@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><title>s2-profile</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const P = new URLSearchParams(location.search), V = P.get('v'), NS = P.get('ns') || 'demo-s2', SID = P.get('sid') || 's1';
+firebase.initializeApp({ databaseURL: 'http://127.0.0.1:9000?ns=' + NS });   // 에뮬레이터만
+</script>
+<script>document.write('<script src="' + V + '/gamedata.js"><\/script>');</script>
+<pre id="out">running</pre>
+<script>
+const REST = (p) => 'http://127.0.0.1:9000/classRPG_v3/' + p + '.json?ns=' + NS;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+(async () => {
+  const repo = firebase.database()._delegate._repoInternal;
+  let changes = 0; DB.onDataChange(() => changes++);
+  await DB.init({ profile: 'student' });
+  if (DB.attachMine) await DB.attachMine(SID);
+  await sleep(1200);
+  const bytesBoot = repo.stats_.get().bytes_received;
+  const snapCache = JSON.parse(JSON.stringify(DB._cache));
+  // 실시간: 내 감정 1건 · 남의 감정 1건 · settings · 부팅 때 없던 promotionRequests
+  await fetch(REST('emotionLogs/' + SID + '_2026-09-15_pm'), { method: 'PUT', body: JSON.stringify({ studentId: SID, date: '2026-09-15', period: 'pm' }) });
+  await fetch(REST('emotionLogs/zz_other_pm'), { method: 'PUT', body: JSON.stringify({ studentId: 'zz' }) });
+  await fetch(REST('settings/touch'), { method: 'PUT', body: '1' });
+  await fetch(REST('promotionRequests/id_p1'), { method: 'PUT', body: JSON.stringify({ id: 'id_p1', studentId: SID, level: 3 }) });
+  await sleep(1500);
+  const c = DB._cache;
+  window.__res = {
+    v: V, bytesBoot, profile: DB._profile || null, snaps: !!DB._snaps,
+    cache: snapCache,
+    live: { myEmotion: !!(c.emotionLogs || {})[SID + '_2026-09-15_pm'], otherEmotion: !!(c.emotionLogs || {})['zz_other_pm'],
+            settingsTouch: (c.settings || {}).touch === 1, promo: (c.promotionRequests || []).some(r => r && r.id === 'id_p1') },
+    changes,
+  };
+  document.getElementById('out').textContent = 'done ' + bytesBoot;
+  // 다음 판을 위해 되돌리기
+  await fetch(REST('emotionLogs/' + SID + '_2026-09-15_pm'), { method: 'DELETE' });
+  await fetch(REST('emotionLogs/zz_other_pm'), { method: 'DELETE' });
+  await fetch(REST('settings/touch'), { method: 'DELETE' });
+  await fetch(REST('promotionRequests'), { method: 'DELETE' });
+})().catch(e => { window.__res = 'ERR ' + e.stack; document.getElementById('out').textContent = window.__res; });
+</script>

@@ -733,33 +733,16 @@ const DB = {
   _onChangeCb: null,
   _saving: false,
 
-  async init() {
+  async init(opts) {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     this._fbRef = firebase.database().ref(this.KEY);
     this._fbAdminRef = firebase.database().ref(this.ADMIN_KEY);
-
-    // 초기 데이터 로드 — [INIT-SINGLE-LOAD-1] once('value') 대신 on('value') 의 첫 스냅샷.
-    //   once 가 끝나면 SDK 가 그 구독을 내리고 캐시를 버려, 곧이어 건 on 이 root 를 **통째로 한 번 더** 받았다
-    //   (에뮬레이터 + SDK 9.23 실측 2배). 첫 리스너를 붙여 둔 채 아래 실시간 리스너를 걸면 SDK 캐시에서 바로 받는다.
-    let firstLoadResolve = null;
-    const firstLoad = (s) => { if (firstLoadResolve) { firstLoadResolve(s); firstLoadResolve = null; } };
-    const snap = await new Promise((resolve, reject) => {
-      firstLoadResolve = resolve;
-      this._fbRef.on('value', firstLoad, reject);
-    });
-    let data = snap.val();
-
-    if (!data) {
-      data = this._defaultData();
-      await this._fbRef.set(data);
-    }
-    this._cache = this._migrate(this._normalizeArrays(data));
-
-    // 첫 리스너는 아래 실시간 리스너를 건 **뒤**에 뗀다 — 먼저 떼면 구독이 끊겨 root 를 다시 통째로 받는다
-    setTimeout(() => this._fbRef.off('value', firstLoad), 0);
+    this._profile = (opts && opts.profile) || null;   // [STUDENT-COLD-1] 'student' = 학생 기기
 
     // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
-    this._fbRef.on('value', (snap) => {
+    //   [STUDENT-COLD-1] 본문은 그대로 두고 이름만 붙였다: root 판은 root on('value') 로,
+    //   학생 판은 노드별 구독을 합친 "가상 root 스냅샷"으로 **같은 함수**를 부른다.
+    const liveHandler = (snap) => {
       const d = snap.val();
       if (!d) return;
 
@@ -775,7 +758,124 @@ const DB = {
 
       this._cache = this._migrate(this._normalizeArrays(d));
       if (this._onChangeCb) this._onChangeCb();
+    };
+    this._liveHandler = liveHandler;
+
+    if (this._profile === 'student' && await this._initStudentNodes()) return;
+
+    // 초기 데이터 로드 — [INIT-SINGLE-LOAD-1] once('value') 대신 on('value') 의 첫 스냅샷.
+    //   once 가 끝나면 SDK 가 그 구독을 내리고 캐시를 버려, 곧이어 건 on 이 root 를 **통째로 한 번 더** 받았다
+    //   (에뮬레이터 + SDK 9.23 실측 2배). 첫 리스너를 붙여 둔 채 아래 실시간 리스너를 걸면 SDK 캐시에서 바로 받는다.
+    let firstLoadResolve = null;
+    const firstLoad = (s) => { if (firstLoadResolve) { firstLoadResolve(s); firstLoadResolve = null; } };
+    const snap = await new Promise((resolve, reject) => {
+      firstLoadResolve = resolve;
+      this._fbRef.on('value', firstLoad, reject);
     });
+    let data = snap.val();
+
+    if (!data) {
+      data = this._defaultData();
+      if (this._profile !== 'student') await this._rootSet(data);   // [STUDENT-COLD-1] G1 — 빈 DB 설치는 교사 화면만
+    }
+    this._cache = this._migrate(this._normalizeArrays(data));
+
+    // 첫 리스너는 아래 실시간 리스너를 건 **뒤**에 뗀다 — 먼저 떼면 구독이 끊겨 root 를 다시 통째로 받는다
+    setTimeout(() => this._fbRef.off('value', firstLoad), 0);
+
+    this._fbRef.on('value', liveHandler);
+  },
+
+  // ── [STUDENT-COLD-1] 학생 기기 부분 캐시 ─────────────────────
+  //  설계: 클로드코드/보고_20260915/설계_S2_부분캐시가드_rf.md
+  //  학생 기기는 큰데 남의 것은 안 쓰는 노드를 root 구독에서 빼고(COLD), 로그인 뒤 내 것만 키 범위로 받는다(MINE).
+  //  교사(admin)·키오스크는 지금처럼 root 통째. 이 판에서는 캐시가 **부분**이므로 root 통째 저장을 막는다(G1).
+  //  quests 는 _normalizeArrays 가 questLogs 에서 늘 다시 만들어 서버 값을 안 쓴다(옛 롤백이 남긴 사본).
+  STUDENT_COLD: ['quests', 'quizRecords', 'emotionLogs', 'emotionReflections', 'backups'],
+  STUDENT_MINE: ['emotionLogs', 'emotionReflections'],   // 키가 `<sid>_…` 로 시작 → orderByKey 범위, 색인 불필요
+  //  지금 운영에 없어도(null) 학생 화면이 읽는 노드 — 나중에 생기면 바로 받도록 미리 구독(null 구독은 비용 0)
+  STUDENT_KNOWN: ['settings', 'students', 'questLogs', 'boardQuests', 'artworks', 'memories', 'memoryAlbums',
+    'promotionRequests', 'pwResetRequests', 'weeklyGoals', 'weeklyReflections', 'customProblems', 'customWords',
+    'teacherWordSets', 'recorderLogs', 'recorderSongs', 'problemRecords', 'studentNotes', 'emotionPromptStats',
+    'emotionAlerts', 'goldDaily', 'customMonsters', 'customQuestTemplates', 'hiddenQuestTemplates'],
+
+  // G1: 부분 캐시로 root 통째 저장하면 빠진 노드가 운영에서 지워진다
+  _rootSet(data) {
+    if (this._profile === 'student') throw new Error('[STUDENT-COLD-1] 학생 기기는 root 통째 저장 금지(부분 캐시)');
+    return this._fbRef.set(data);
+  },
+
+  _studentVal() {
+    const d = {};
+    for (const k of Object.keys(this._snaps || {})) { const v = this._snaps[k] && this._snaps[k].val(); if (v != null) d[k] = v; }
+    return d;
+  },
+  _studentEmit() { if (this._liveHandler) this._liveHandler({ val: () => this._studentVal() }); },
+
+  // 노드 이름: shallow REST(수백 바이트) ∪ STUDENT_KNOWN − STUDENT_COLD. 실패하면 false → root 판으로
+  async _initStudentNodes() {
+    let names;
+    try {
+      const base = new URL(firebase.app().options.databaseURL);
+      const u = new URL(base.origin + base.pathname.replace(/\/+$/, '') + '/' + this.KEY + '.json');
+      base.searchParams.forEach((v, k) => u.searchParams.set(k, v));   // 에뮬레이터 ?ns= 유지
+      u.searchParams.set('shallow', 'true');
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const t = ctl ? setTimeout(() => ctl.abort(), 8000) : 0;
+      const res = await fetch(u.toString(), ctl ? { signal: ctl.signal } : undefined);
+      if (t) clearTimeout(t);
+      if (!res.ok) return false;
+      const top = await res.json();
+      if (!top || typeof top !== 'object') return false;   // 빈 DB → root 판(학생은 기본값도 안 씀)
+      names = [...new Set([...Object.keys(top), ...this.STUDENT_KNOWN])].filter(n => !this.STUDENT_COLD.includes(n));
+    } catch (e) { return false; }
+
+    this._snaps = {};
+    this._studentReady = false;
+    await Promise.all(names.map(name => new Promise((resolve, reject) => {
+      let first = true;
+      this._fbRef.child(name).on('value', (s) => {
+        this._snaps[name] = s;
+        if (first) { first = false; resolve(); return; }
+        if (this._studentReady) this._studentEmit();
+      }, reject);
+    })));
+    this._cache = this._migrate(this._normalizeArrays(this._studentVal()));
+    this._studentReady = true;
+    return true;
+  },
+
+  // 학생 로그인 직후, 첫 화면 그리기 전에 부른다(G3). 학생이 바뀌면 이전 구독을 떼고 비운다(G7).
+  attachMine(sid) {
+    if (!this._snaps) return Promise.resolve();          // root 판이면 이미 전부 있음
+    (this._mineOffs || []).forEach(off => off());
+    this._mineOffs = [];
+    for (const n of this.STUDENT_MINE) { delete this._snaps[n]; if (this._cache) this._cache[n] = {}; }
+    if (!sid) return Promise.resolve();
+    const one = (name) => new Promise((resolve) => {
+      const q = this._fbRef.child(name).orderByKey().startAt(sid + '_').endAt(sid + '_\uf8ff');
+      let first = true;
+      const cb = (s) => {
+        this._snaps[name] = s;
+        if (first) { first = false; resolve(); } else if (this._studentReady) this._studentEmit();
+      };
+      q.on('value', cb);
+      this._mineOffs.push(() => q.off('value', cb));
+    });
+    const loaded = Promise.all(this.STUDENT_MINE.map(one)).then(() => {
+      // 첫 판은 캐시에 바로 넣는다 — 로그인 순간 _saving 이면 핸들러가 settings 만 보고 돌아가기 때문
+      //   (emotionLogs·emotionReflections 는 _normalizeArrays 에서 키 객체 그대로라 같은 모양)
+      for (const n of this.STUDENT_MINE) if (this._cache) this._cache[n] = (this._snaps[n] && this._snaps[n].val()) || {};
+      if (this._onChangeCb) this._onChangeCb();
+    });
+    // 8초 안에 안 오면 전체를 한 번 받아 내 것만 거른다(느려도 틀리지 않게)
+    const slow = new Promise(r => setTimeout(r, 8000)).then(() => Promise.all(this.STUDENT_MINE.map(n =>
+      this._snaps[n] ? null : this._fbRef.child(n).once('value').then(s => {
+        const all = s.val() || {}, mine = {};
+        for (const k of Object.keys(all)) if (k.startsWith(sid + '_')) mine[k] = all[k];
+        if (this._cache && !this._snaps[n]) this._cache[n] = mine;
+      })))).catch(() => {});
+    return Promise.race([loaded, slow]);
   },
 
   onDataChange(fn) { this._onChangeCb = fn; },
@@ -2197,6 +2297,7 @@ const DB_EMOTION = {
   // 날짜별 전체 조회
   getByDate(date) {
     const db = (typeof DB !== 'undefined') ? DB.load() : {};
+    if (typeof DB !== 'undefined' && DB._snaps) console.warn('[STUDENT-COLD-1] 학생 기기 캐시엔 내 감정 기록만 있음 — getByDate 는 교사·키오스크용');   // G6
     return Object.values(db.emotionLogs || {}).filter(r => r && r.date === date);
   },
 

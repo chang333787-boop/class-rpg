@@ -53,7 +53,7 @@ function iconImg(entity, kind, sizeCss, fileId, fallbackIcon) {
 window.onload = async () => {
   const loading = document.getElementById('loading-screen');
   try {
-    await DB.init();
+    await DB.init({ profile: 'student' });   // [STUDENT-COLD-1] 남의 감정 기록 등 큰 노드는 안 받는다(로그인 뒤 내 것만)
     applyShopOverrides(); // 상점 오버라이드 적용
     applyBattleSettings(); // 전투 밸런스 오버라이드 적용
     DB.onDataChange(() => {
@@ -130,6 +130,7 @@ function checkAccessTime() {
 
 function doLogin() {
   if (!SEL_STUDENT) { document.getElementById('login-err').textContent = '이름을 선택해주세요!'; return; }
+  if (doLogin._pending) return;              // [STUDENT-COLD-1] 내 기록 받는 중 엔터 두 번 → enterGame 두 번 막기
 
   // 접속 시간 체크 (8:30~16:00만 허용)
   if (checkAccessTime()) {
@@ -142,13 +143,21 @@ function doLogin() {
     document.getElementById('login-err').textContent = '비밀번호가 틀렸어요!'; return;
   }
   CUR = JSON.parse(JSON.stringify(student));
-  if (!CUR.charType) {
-    hideScreen('s-login');
-    showScreen('s-charsel');
-  } else {
-    hideScreen('s-login');
-    enterGame();
-  }
+  // [STUDENT-COLD-1] G3 — 내 감정 기록·되돌아보기를 받은 뒤에 첫 화면(오늘 감정·팝업 판정)을 그린다
+  doLogin._pending = true;
+  const btn = document.querySelector('#s-login button[onclick*="doLogin"]');
+  if (btn) btn.disabled = true;
+  DB.attachMine(CUR.id).then(() => {
+    doLogin._pending = false;
+    if (btn) btn.disabled = false;
+    if (!CUR.charType) {
+      hideScreen('s-login');
+      showScreen('s-charsel');
+    } else {
+      hideScreen('s-login');
+      enterGame();
+    }
+  });
 }
 
 function selChar(type, el) {
