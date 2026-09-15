@@ -1005,7 +1005,7 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
     const name   = eqItem ? eqItem.name : (s.equipment?.[sl.k] || '');
     return `<div class="equip-slot ${name?'has':''}" onclick="openModal('m-inv');renderInv()">
       <span class="eslot-icon">
-        ${eqId ? buildEquipIcon(sl.k, eqId) : `<span style="font-size:1.4rem">${sl.icon}</span>`}
+        ${eqItem ? iconImg(eqItem, 'equipment', '2.2rem') : `<span style="font-size:1.4rem">${sl.icon}</span>`}   <!-- [EQUIP-ICON-1] 상점·가방과 같은 PNG(셀셰이딩) -->
       </span>
       <div class="eslot-info">
         <div class="eslot-type">${sl.l}</div>
@@ -8588,7 +8588,7 @@ function renderInv() {
       return `<div style="background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);
         border-radius:10px;padding:.5rem .3rem;text-align:center">
         <div style="display:flex;justify-content:center;align-items:center;height:40px">
-          ${eqItem ? buildEquipIcon(sl.k, eqItem.id) : `<span style="font-size:1.4rem">${sl.icon}</span>`}
+          ${eqItem ? iconImg(eqItem, 'equipment', '2.2rem') : `<span style="font-size:1.4rem">${sl.icon}</span>`}   <!-- [EQUIP-ICON-1] -->
         </div>
         <div style="font-size:.58rem;color:var(--txt3);margin:.15rem 0">${sl.l}</div>
         <div style="font-size:.6rem;color:var(--gold);font-weight:600;
@@ -10994,6 +10994,9 @@ function renderStudyUnitPick(subjectKey) {
 function setStudyCat(subjectKey, cat) { STUDY_CAT = cat; renderStudyUnitPick(subjectKey); }
 
 function startStudySession(subjectKey, unitId, onlyDue) {
+  // [MASTERY-DUE-1] 복습 카드의 숫자는 모드와 상관없이 센다 → 복습 세션도 모드를 풀고 연다.
+  //   전에는 다른 과목에서 고른 모드(받아쓰기 등)가 남아 "수학 6개"를 눌러도 0문제가 됐다.
+  if (onlyDue) STUDY_CAT = null;
   const active = CurriculumUtils.activeUnitIds();
   let pool = unitId
     ? CurriculumUtils.problemsByUnit(unitId)       // 단원 하나만 골라 풀기
