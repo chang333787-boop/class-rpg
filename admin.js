@@ -1628,7 +1628,9 @@ function approvePromotion(reqId) {
     return;
   }
   // 직업명 자동 변경 (장래희망 기반)
-  const newJob = Utils.getJobTitle(s.job || s.dream || '', req.level);
+  //   [PROMO-JOB-DREAM-1] 꿈이 먼저. 예전엔 job 이 먼저라 Lv20 승급 때 이미 "대학생"인 job 을 꿈으로 써서
+  //   "대학생 지망생"이 됐다(운영 3명). 학생 화면(student.js)은 원래 dream || job 순서.
+  const newJob = Utils.getJobTitle(s.dream || s.job || '', req.level);
   const oldJob = s.job || '';
   s.job = newJob;
   // 승급 보상 즉시 지급 (받기 버튼 없이)

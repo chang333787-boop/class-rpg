@@ -41,18 +41,25 @@
   const arr = v => Array.isArray(v) ? v.filter(x => x != null) : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : [];
   const objOrArr = v => { if (Array.isArray(v)) { const o = {}; v.forEach((x, i) => { if (x != null) o['c' + i] = x; }); return o; } return (v && typeof v === 'object') ? v : {}; };
 
+  // [VILLAGE-NAME-1] 65차 마을 이름(meta.name) — 문자열 12자까지, 비었으면 키를 아예 안 둔다
+  //   (이름 없는 마을의 meta 모양·해시가 그대로라 이 변경만으로 다시 올리지 않는다)
+  const NAME_MAX = 12;
+  const cleanName = v => (typeof v === 'string' && v.trim()) ? Array.from(v.trim()).slice(0, NAME_MAX).join('') : '';
+
   function fromVillage(d) {                       // 마을 v2(평평함) → { meta, plots }
     if (!d || typeof d !== 'object' || d.v < 2 || !d.plotStr) return null;
+    const name = cleanName(d.name);
     return {
       meta: { v: d.v, w: d.w, h: d.h, palette: d.palette || [], clock: d.clock || null, houses: cKeys(d.houses), signs: cKeys(d.signs),
               unlocked: d.unlocked || [], goals: d.goals || [], festSeen: !!d.festSeen, dream: d.dream || '',
-              plotsOpen: d.plots || [], plotsEarned: d.plotsEarned || 0, hist: d.hist || [] },
+              plotsOpen: d.plots || [], plotsEarned: d.plotsEarned || 0, hist: d.hist || [], ...(name ? { name } : {}) },
       plots: Object.assign({}, d.plotStr)
     };
   }
   function toVillage(r) {                          // 원격 { meta, plots } → 마을 v2
     const m = r.meta;
-    return { v: m.v || 2, w: m.w, h: m.h, palette: arr(m.palette), plotStr: Object.assign({}, r.plots || {}),
+    const name = cleanName(m.name);
+    return { ...(name ? { name } : {}), v: m.v || 2, w: m.w, h: m.h, palette: arr(m.palette), plotStr: Object.assign({}, r.plots || {}),
              clock: m.clock || { t: 0, speed: 1 }, houses: unC(objOrArr(m.houses)), unlocked: arr(m.unlocked), goals: arr(m.goals),
              festSeen: !!m.festSeen, dream: m.dream || '', plots: arr(m.plotsOpen), plotsEarned: m.plotsEarned || 0,
              signs: unC(objOrArr(m.signs)), hist: arr(m.hist) };

@@ -33,7 +33,7 @@ const srv = http.createServer((req, res) => {
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 
 // 케이스마다 새 브라우저 한 번. 기대값: battle=NO_LOSS · buySeed=OK
-const CASES = { battle: 'NO_LOSS', buySeed: 'OK', farm: 'NO_LOSS', infinite: 'NO_LOSS' };
+const CASES = { battle: 'NO_LOSS', buySeed: 'OK', farm: 'NO_LOSS', infinite: 'NO_LOSS', buyEquip: 'OK', buyDeco: 'OK', skill: 'OK' };
 const only = process.argv.slice(2).find(a => !a.startsWith('--'));
 const PROF = ((process.argv.find(a => a.startsWith('--profile=')) || '--profile=root').split('=')[1]);
 const PROFILES = PROF === 'both' ? ['root', 'student'] : [PROF];
