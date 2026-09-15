@@ -880,6 +880,7 @@ function buildCharSVG(s) {
 //  · 파일은 로그인 직후 한 번에 받아 문자열로 캐시한다(84장 약 183KB).
 //  · CHAR_DOLL 을 false 로 두면 즉시 예전 그림으로 돌아간다.
 const CHAR_DOLL = true;
+const CHAR_BUNDLE_V = '20260915d2d';   // [CHAR-BUNDLE-1] all.json 캐시버스터 — 84장을 고치고 묶음을 다시 만들면 올린다
 
 const _CHAR_SVG = {};        // 'base_1' | 'body_e_b3' ... → 바깥 <svg> 벗긴 내용
 let _charDollReady = false;
@@ -913,12 +914,24 @@ function loadCharDolls() {
   if (!CHAR_DOLL || _charDollLoading || _charDollReady) return;
   _charDollLoading = true;
   const names = _charFileNames();
-  Promise.all(names.map(n =>
+  // [CHAR-BUNDLE-1] 84장을 한 번에: assets/char/all.json ({이름: svg문자열}, scripts/char-bundle.mjs 가 만든다).
+  //   묶음이 없거나(404) 깨지면 예전처럼 84장 개별 fetch 로 폴백. 버스터는 묶음 파일 이름 뒤 ?v= 로.
+  const _loadBundle = () => fetch('./assets/char/all.json?v=' + CHAR_BUNDLE_V)
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      if (!j || typeof j !== 'object') return false;
+      let n = 0;
+      for (const k of names) { if (typeof j[k] === 'string' && j[k].indexOf('<svg') !== -1) { _CHAR_SVG[k] = _charInner(j[k]); n++; } }
+      return n >= 4;   // base 4장이 들어올 만큼은 왔어야 묶음으로 친다
+    })
+    .catch(() => false);
+  const _loadEach = () => Promise.all(names.map(n =>
     fetch('./assets/char/' + n + '.svg')
       .then(r => r.ok ? r.text() : null)
       .then(t => { if (t) _CHAR_SVG[n] = _charInner(t); })
       .catch(() => {})
-  )).then(() => {
+  ));
+  _loadBundle().then(ok => ok ? null : _loadEach()).then(() => {
     // base 가 하나도 없으면 종이인형을 쓸 수 없다 — 그때만 예전 그림
     const anyBase = ['base_1','base_2','base_3','base_4'].some(b => _CHAR_SVG[b]);
     if (!anyBase) { console.warn('캐릭터 에셋 로드 실패 — 기존 그림 유지'); _charDollFailed = true; _redrawCharSpots(); return; }
