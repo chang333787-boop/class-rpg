@@ -47,6 +47,11 @@ const BALANCE = {
   //   성공률 = floor((successBase − successPerTier × 등급) × 100) / 100. 성공 시 판매가 ×2 는 student.js 수확 코드.
   mutantSeed: { priceMult: 1.6, successBase: 0.55, successPerTier: 0.025 },
 
+  // 일반 씨앗 판매가 (B-2g) — sellPrice = round(price × (ratioBase + ratioPerTier × 등급)) + 줄의 sellAdj. 등급이 오를수록 이윤율이 오른다(B-1 §3.4).
+  seedSell: { ratioBase: 3.33, ratioPerTier: 0.375 },
+  // 속성 마스터리북 가격 (B-2g) — 화염 n권 price = round(노말 n권 price × elementPriceRatio) + 줄의 priceAdj (냉기·자연은 화염 복사)
+  bookPrice: { elementPriceRatio: 0.8 },
+
   // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
   // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
   skill: {
@@ -350,11 +355,11 @@ const GAME_DATA = {
   seeds: [
     // reqLv: 해당 레벨 이상이어야 상점에서 구매 가능
     // 고급 씨앗일수록 시간당 수익이 더 높음 → 레벨업 동기 강화
-    {id:'i_potato_seed',    name:'감자 씨앗',  icon:'🥔', price:12,  growHours:20, sellPrice:40,  crop:'potato',     cropIcon:'🥔', reqLv:1},
-    {id:'i_carrot_seed',    name:'당근 씨앗',  icon:'🥕', price:20,  growHours:24, sellPrice:75,  crop:'carrot',     cropIcon:'🥕', reqLv:3},
-    {id:'i_corn_seed',      name:'옥수수 씨앗',icon:'🌽', price:30,  growHours:36, sellPrice:125, crop:'corn',       cropIcon:'🌽', reqLv:5},
-    {id:'i_tomato_seed',    name:'토마토 씨앗',icon:'🍅', price:40,  growHours:48, sellPrice:180, crop:'tomato',     cropIcon:'🍅', reqLv:8},
-    {id:'i_strawberry_seed',name:'딸기 씨앗',  icon:'🍓', price:60, growHours:72, sellPrice:290, crop:'strawberry', cropIcon:'🍓', reqLv:12},
+    {id:'i_potato_seed',    name:'감자 씨앗',  icon:'🥔', price:12,  growHours:20, sellAdj:0,  crop:'potato',     cropIcon:'🥔', reqLv:1},
+    {id:'i_carrot_seed',    name:'당근 씨앗',  icon:'🥕', price:20,  growHours:24, sellAdj:+1,  crop:'carrot',     cropIcon:'🥕', reqLv:3},
+    {id:'i_corn_seed',      name:'옥수수 씨앗',icon:'🌽', price:30,  growHours:36, sellAdj:+3, crop:'corn',       cropIcon:'🌽', reqLv:5},
+    {id:'i_tomato_seed',    name:'토마토 씨앗',icon:'🍅', price:40,  growHours:48, sellAdj:+2, crop:'tomato',     cropIcon:'🍅', reqLv:8},
+    {id:'i_strawberry_seed',name:'딸기 씨앗',  icon:'🍓', price:60, growHours:72, sellAdj:0, crop:'strawberry', cropIcon:'🍓', reqLv:12},
   ],
 
   // ── 돌연변이 씨앗 (일반 씨앗과 별도 관리) ───────────────────────────
@@ -642,6 +647,13 @@ const GAME_DATA = {
   getSlotForItem(id) { return this.SLOT_MAP[id] || null; },
 };
 
+// 일반 씨앗 판매가 (B-2g) — sellAdj 자리에 sellPrice 를 넣는다(키 순서 옛 표와 같음). 돌연변이 씨앗이 이 값을 읽으므로 그보다 먼저.
+GAME_DATA.seeds = GAME_DATA.seeds.map((s, t) => {
+  const c = BALANCE.seedSell, out = {};
+  for (const k of Object.keys(s)) { if (k === 'sellAdj') out.sellPrice = Math.round(s.price * (c.ratioBase + c.ratioPerTier * t)) + s.sellAdj; else out[k] = s[k]; }
+  return out;
+});
+
 // 돌연변이 씨앗 (B-2f) — i 번째 줄 = i 번째 일반 씨앗의 돌연변이
 GAME_DATA.mutantSeeds = [
     { id:'i_m_potato_seed', name:'⚡ 번개 감자', icon:'⚡🥔', priceAdj:+1, crop:'m_potato', cropIcon:'⚡🥔', desc:'특별 씨앗 입문' },
@@ -679,14 +691,24 @@ const SKILL_BOOKS = [
   {id:'sb_n6',name:'전투 마스터리북 6권',  type:'normal',level:6,targetLevel:6, reqPlayerLevel:16, price:340, icon:'📘',desc:'기본 공격력 +56%'},
   {id:'sb_n7',name:'전투 마스터리북 7권',  type:'normal',level:7,targetLevel:7, reqPlayerLevel:20, price:450, icon:'📘',desc:'기본 공격력 +65%'},
   // fire 1~7 (90/140/210/290/400/540/720)
-  {id:'sb_f1',name:'화염 마스터리북 1권',type:'fire',  level:1,targetLevel:1, reqPlayerLevel:2,  price:45,  icon:'📕',desc:'화염 공격 해금'},
-  {id:'sb_f2',name:'화염 마스터리북 2권',type:'fire',  level:2,targetLevel:2, reqPlayerLevel:5,  price:70, icon:'📕',desc:'화염 공격력 +10%'},
-  {id:'sb_f3',name:'화염 마스터리북 3권',type:'fire',  level:3,targetLevel:3, reqPlayerLevel:8,  price:105, icon:'📕',desc:'화염 공격력 +20%'},
-  {id:'sb_f4',name:'화염 마스터리북 4권',type:'fire',  level:4,targetLevel:4, reqPlayerLevel:12, price:145, icon:'📕',desc:'화염 공격력 +30%'},
-  {id:'sb_f5',name:'화염 마스터리북 5권',type:'fire',  level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📕',desc:'화염 공격력 +40%'},
-  {id:'sb_f6',name:'화염 마스터리북 6권',type:'fire',  level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📕',desc:'화염 공격력 +50%'},
-  {id:'sb_f7',name:'화염 마스터리북 7권',type:'fire',  level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📕',desc:'화염 공격력 +60%'},
+  {id:'sb_f1',name:'화염 마스터리북 1권',type:'fire',  level:1,targetLevel:1, reqPlayerLevel:2,  priceAdj:-3,  icon:'📕',desc:'화염 공격 해금'},
+  {id:'sb_f2',name:'화염 마스터리북 2권',type:'fire',  level:2,targetLevel:2, reqPlayerLevel:5,  priceAdj:-2, icon:'📕',desc:'화염 공격력 +10%'},
+  {id:'sb_f3',name:'화염 마스터리북 3권',type:'fire',  level:3,targetLevel:3, reqPlayerLevel:8,  priceAdj:+1, icon:'📕',desc:'화염 공격력 +20%'},
+  {id:'sb_f4',name:'화염 마스터리북 4권',type:'fire',  level:4,targetLevel:4, reqPlayerLevel:12, priceAdj:+1, icon:'📕',desc:'화염 공격력 +30%'},
+  {id:'sb_f5',name:'화염 마스터리북 5권',type:'fire',  level:5,targetLevel:5, reqPlayerLevel:16, priceAdj:0, icon:'📕',desc:'화염 공격력 +40%'},
+  {id:'sb_f6',name:'화염 마스터리북 6권',type:'fire',  level:6,targetLevel:6, reqPlayerLevel:20, priceAdj:-2, icon:'📕',desc:'화염 공격력 +50%'},
+  {id:'sb_f7',name:'화염 마스터리북 7권',type:'fire',  level:7,targetLevel:7, reqPlayerLevel:24, priceAdj:0, icon:'📕',desc:'화염 공격력 +60%'},
 ];
+// 화염 마스터리북 가격 (B-2g) — priceAdj 자리에 price = 같은 권 노말 × elementPriceRatio + priceAdj
+{
+  const normal = SKILL_BOOKS.filter(b => b.type === 'normal');
+  SKILL_BOOKS.forEach((b, i) => {
+    if (b.type !== 'fire') return;
+    const n = normal[b.level - 1], out = {};
+    for (const k of Object.keys(b)) { if (k === 'priceAdj') out.price = Math.round(n.price * BALANCE.bookPrice.elementPriceRatio) + b.priceAdj; else out[k] = b[k]; }
+    SKILL_BOOKS[i] = out;
+  });
+}
 // ★ B-2f: 냉기·자연 마스터리북 = 같은 권의 화염 마스터리북 복사(권·목표 레벨·필요 레벨·가격), 이름·아이콘·설명만 따로
 function _bookCopy(type, rows) {
   const fire = SKILL_BOOKS.filter(b => b.type === 'fire');
