@@ -17,6 +17,11 @@
 //   shapes   { items:[...] }                  도형 나열. circle|triangle|square|rect|star|heart
 //   move     { shape, op }                    평면도형 이동 전/후. shape L|F|P|arrow, op flip-h|flip-v|rot90|rot180|'?'
 //   ruler    { len, unit? }                   자 위의 막대
+//   line     { labels, values, unit?, min?, max?, step? }  꺾은선그래프. min>0이면 세로축 아래에 물결선
+//   quad     { type, deg?, angles? }           사각형. type trapezoid|parallelogram|rhombus|rectangle|square
+//                                             deg=왼쪽 아래 각(평행사변형·마름모), angles:[70,'?',null,null] 꼭짓점 각 표기
+//                                             (꼭짓점 순서: 왼쪽 아래 → 오른쪽 아래 → 오른쪽 위 → 왼쪽 위)
+//   lines    { type, label? }                 두 직선. type perp(수직)|parallel(평행)|distance(평행선 사이 수선, label 길이)
 // ══════════════════════════════════════════════════
 
 const Figures = (() => {
@@ -180,6 +185,90 @@ const Figures = (() => {
       }
       out += `<rect x="${x0}" y="34" width="${len * px}" height="18" fill="${ACC}"/>${txt(x0 + len * px / 2, 25, `? ${unit}`, 13)}`;
       return wrap(out);
+    },
+    // [FIG-LINE-QUAD-1] 꺾은선그래프 — 점을 찍고 선분으로 잇는다. 값은 문항 글에도 있으니 점 옆에 숫자는 쓰지 않는다(그래프를 읽게).
+    line(f) {
+      const vals = (Array.isArray(f.values) ? f.values : []).map(v => toNum(v, NaN)).slice(0, 8);
+      const labs = (Array.isArray(f.labels) ? f.labels : []).slice(0, vals.length);
+      if (vals.length < 2 || vals.some(v => !Number.isFinite(v))) return '';
+      const hi = Math.max(...vals);
+      const min = toNum(f.min, 0);
+      const step = toNum(f.step, 0) > 0 ? toNum(f.step) : (() => { const r = (hi - min) / 5; const p = Math.pow(10, Math.floor(Math.log10(r || 1))); return [1, 2, 5, 10].map(k => k * p).find(k => k >= r) || p * 10; })();
+      const max = toNum(f.max, 0) > min ? toNum(f.max) : min + Math.ceil((hi - min) / step - 1e-9) * step;
+      if (max <= min) return '';
+      const dec = (String(step).split('.')[1] || '').length;
+      const Wd = 260, Hd = 160, x0 = 46, x1 = 246, yT = 22, yB = 126;
+      const yM = min > 0 ? yB - 16 : yB;   // 0부터 시작하지 않으면 0과 최솟값 사이를 물결선으로 줄인다
+      const py = v => yM - (v - min) / (max - min) * (yM - yT);
+      const gx = (x1 - x0) / vals.length, px = i => x0 + gx * (i + .5);
+      let out = '';
+      const n = Math.round((max - min) / step);
+      for (let k = 0; k <= n; k++) {
+        const v = min + k * step, y = py(v);
+        out += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke-width="${k === 0 && !(min > 0) ? 2 : .8}" stroke-opacity="${k === 0 && !(min > 0) ? 1 : .35}"/>`;
+        if (n <= 10 || k % 2 === 0) out += `<text x="${x0 - 6}" y="${(y + 4).toFixed(1)}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">${esc(v.toFixed(dec))}</text>`;
+      }
+      out += `<line x1="${x0}" y1="${yT - 6}" x2="${x0}" y2="${yB}"/>`;
+      if (min > 0) out += `<line x1="${x0}" y1="${yB}" x2="${x1}" y2="${yB}"/><text x="${x0 - 6}" y="${yB + 4}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">0</text>`
+        + `<path d="M${x0 - 5} ${yB - 5} l5 -3 l-5 -3 l5 -3" stroke-width="1.8"/>`;   // 물결선(0과 최솟값 사이)
+      if (f.unit) out += `<text x="${x0 - 6}" y="${yT - 10}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">(${esc(f.unit)})</text>`;
+      out += `<polyline points="${vals.map((v, i) => px(i).toFixed(1) + ',' + py(v).toFixed(1)).join(' ')}" stroke="${ACC}" stroke-width="3"/>`;
+      out += vals.map((v, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="4" fill="currentColor" stroke="none"/>`).join('');
+      out += labs.map((s, i) => `<text x="${px(i).toFixed(1)}" y="${yB + 18}" font-size="10.5" fill="currentColor" stroke="none" text-anchor="middle" font-family="inherit">${esc(s)}</text>`).join('');
+      return wrap(out, Wd, Hd);
+    },
+    // [FIG-LINE-QUAD-1] 사각형 — 평행한 변은 화살표(>, >>), 길이가 같은 변은 눈금, 직각은 ㄱ 표시
+    quad(f) {
+      const type = f.type || 'parallelogram';
+      const cy0 = 108;
+      let pts;
+      if (type === 'trapezoid') pts = [[40, cy0], [200, cy0], [160, 30], [80, 30]];
+      else if (type === 'rectangle') pts = [[45, cy0], [195, cy0], [195, 32], [45, 32]];
+      else if (type === 'square') pts = [[82, cy0], [158, cy0], [158, 32], [82, 32]];
+      else {
+        const rh = type === 'rhombus';
+        const deg = Math.max(30, Math.min(150, toNum(f.deg, rh ? 60 : 65)));
+        const a = deg * Math.PI / 180, b = rh ? 88 : 120, s = rh ? 88 : 80;
+        const dx = s * Math.cos(a), dy = s * Math.sin(a), sc = Math.min(1, 76 / dy);
+        const B = b * sc, DX = dx * sc, DY = dy * sc;
+        const left = (240 - (B + Math.abs(DX))) / 2 + (DX < 0 ? -DX : 0);
+        pts = [[left, cy0], [left + B, cy0], [left + B + DX, cy0 - DY], [left + DX, cy0 - DY]];
+      }
+      const cx = pts.reduce((s, p) => s + p[0], 0) / 4, cy = pts.reduce((s, p) => s + p[1], 0) / 4;
+      const mid = (i) => { const p = pts[i], q = pts[(i + 1) % 4]; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.atan2(q[1] - p[1], q[0] - p[0])]; };
+      const chevron = (i, k) => { const [mx, my, t0] = mid(i), t = i >= 2 ? t0 + Math.PI : t0; let d = '';
+        for (let j = 0; j < k; j++) { const o = (j - (k - 1) / 2) * 7, x = mx + o * Math.cos(t), y = my + o * Math.sin(t);
+          d += `M${(x - 5 * Math.cos(t) - 4 * Math.sin(t)).toFixed(1)} ${(y - 5 * Math.sin(t) + 4 * Math.cos(t)).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x - 5 * Math.cos(t) + 4 * Math.sin(t)).toFixed(1)} ${(y - 5 * Math.sin(t) - 4 * Math.cos(t)).toFixed(1)} `; }
+        return `<path d="${d}" stroke="${ACC}" stroke-width="2.4"/>`; };
+      const tick = (i) => { const [mx, my, t] = mid(i); const nx = -Math.sin(t) * 6, ny = Math.cos(t) * 6;
+        return `<line x1="${(mx - nx).toFixed(1)}" y1="${(my - ny).toFixed(1)}" x2="${(mx + nx).toFixed(1)}" y2="${(my + ny).toFixed(1)}" stroke-width="2"/>`; };
+      const right = (i) => { const p = pts[i], a = pts[(i + 1) % 4], b = pts[(i + 3) % 4];
+        const u = [(a[0] - p[0]), (a[1] - p[1])], v = [(b[0] - p[0]), (b[1] - p[1])], lu = Math.hypot(...u), lv = Math.hypot(...v), k = 12;
+        const q1 = [p[0] + u[0] / lu * k, p[1] + u[1] / lu * k], q2 = [p[0] + v[0] / lv * k, p[1] + v[1] / lv * k];
+        return `<path d="M${q1[0].toFixed(1)} ${q1[1].toFixed(1)} L${(q1[0] + q2[0] - p[0]).toFixed(1)} ${(q1[1] + q2[1] - p[1]).toFixed(1)} L${q2[0].toFixed(1)} ${q2[1].toFixed(1)}" stroke-width="1.6"/>`; };
+      let marks = '';
+      if (type === 'trapezoid') marks = chevron(0, 1) + chevron(2, 1);
+      else if (type === 'parallelogram') marks = chevron(0, 1) + chevron(2, 1) + chevron(1, 2) + chevron(3, 2);
+      else if (type === 'rhombus') marks = [0, 1, 2, 3].map(tick).join('');   // 마름모는 네 변이 같다는 눈금만(화살표까지 겹치면 복잡)
+      else if (type === 'rectangle') marks = [0, 1, 2, 3].map(right).join('');
+      else if (type === 'square') marks = [0, 1, 2, 3].map(right).join('') + [0, 1, 2, 3].map(tick).join('');
+      const angs = Array.isArray(f.angles) ? f.angles : [];
+      const labels = angs.slice(0, 4).map((a, i) => {
+        if (a == null) return '';
+        const [x, y] = pts[i]; const dx = cx - x, dy = cy - y, len = Math.hypot(dx, dy) || 1;
+        return txt(x + dx / len * 26, y + dy / len * 26 + 5, a === '?' ? '?' : a + '°', 13);
+      }).join('');
+      return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
+    },
+    // [FIG-LINE-QUAD-1] 두 직선 — 수직·평행·평행선 사이의 거리
+    lines(f) {
+      if (f.type === 'perp') return wrap(`<line x1="30" y1="96" x2="210" y2="96"/><line x1="120" y1="14" x2="120" y2="120"/>
+        <path d="M120 82 L134 82 L134 96" stroke-width="1.8"/>`);
+      const par = `<line x1="20" y1="34" x2="220" y2="34"/><line x1="20" y1="100" x2="220" y2="100"/>`;
+      if (f.type === 'parallel') return wrap(par);
+      if (f.type === 'distance') return wrap(`${par}<line x1="120" y1="34" x2="120" y2="100" stroke="${ACC}" stroke-width="3"/>
+        <path d="M120 86 L134 86 L134 100" stroke-width="1.6"/>${txt(160, 72, f.label != null ? f.label : '?', 14)}`);
+      return '';
     },
   };
 
