@@ -11122,6 +11122,25 @@ function renderStudyQuestion() {
             border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
             color:var(--txt);text-align:left;word-break:keep-all">${escHtml(String(c))}</button>`).join('')}
     </div>`;
+  } else if (p.type === 'fraction') {
+    // [FRACTION-INPUT-1] 분수 입력칸 — 자연수·분자·분모 세 칸, 모두 숫자 키패드(태블릿에서 / 와 '와'를 칠 일이 없게).
+    //   자연수 칸은 비워도 된다(진분수). 제출값은 지금 기록과 같은 문자열('4와 2/5')로 만든다 → 기록 모양 그대로.
+    const box = 'width:3.6rem;text-align:center;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.25);color:var(--txt);font-family:inherit;outline:none;font-size:1.4rem;padding:.45rem 0;border-radius:10px';
+    const key = `onkeydown="if(event.key==='Enter'&&!event.isComposing)submitFractionInputs()"`;
+    inputHtml = `
+      <div class="st-frac" style="display:flex;align-items:center;justify-content:center;gap:.7rem;flex-wrap:wrap">
+        <label style="display:flex;flex-direction:column;align-items:center;gap:.25rem">
+          <input id="study-fw" inputmode="numeric" autocomplete="off" maxlength="3" ${key} style="${box};height:4.2rem" aria-label="자연수">
+          <span style="font-size:.8rem;color:var(--txt3)">자연수</span></label>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:.3rem">
+          <input id="study-fn" inputmode="numeric" autocomplete="off" maxlength="3" ${key} style="${box}" aria-label="분자">
+          <div style="width:4.2rem;height:3px;background:var(--txt);border-radius:2px"></div>
+          <input id="study-fd" inputmode="numeric" autocomplete="off" maxlength="3" ${key} style="${box}" aria-label="분모">
+        </div>
+        <button class="st-btn" onclick="submitFractionInputs()"
+          style="border:none;background:var(--gold);color:#1a1a1a;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">확인</button>
+      </div>
+      <div style="text-align:center;font-size:.85rem;color:var(--txt3);margin-top:.5rem">진분수면 자연수 칸은 비워 두세요</div>`;
   } else {
     const ph = p.type === 'number' ? '숫자를 입력하세요' : '답을 입력하세요';
     const mode = p.type === 'number' ? 'inputmode="numeric"' : '';
@@ -11215,7 +11234,7 @@ function renderStudyQuestion() {
     </div>`;
 
   initStudyScratch();
-  const inp = document.getElementById('study-input');
+  const inp = document.getElementById('study-input') || document.getElementById('study-fw');
   if (inp) setTimeout(() => inp.focus(), 60);
   // 듣기 문항은 화면이 뜨면 한 번 자동으로 읽어 준다(학생이 버튼을 못 찾는 것 방지)
   if (p.audio && typeof speakWord === 'function' && !(String(problemLang(p)).startsWith('ko') && !hasVoiceFor(problemLang(p))))
@@ -11324,6 +11343,17 @@ function submitStudyAnswer(chosen) {
   showStudyFeedback(p, val, ok);
 }
 
+// [FRACTION-INPUT-1] 분수 칸 세 개 → '4와 2/5' 문자열로 제출. 빈 칸·분모 0은 제출 전에 알려 준다.
+function fractionJosa(w) { return /[013678]$/.test(String(w)) ? '과' : '와'; }   // 일·삼·육·칠·팔·십(영)은 받침 → 과
+function submitFractionInputs() {
+  const g = id => ((document.getElementById(id) || {}).value || '').replace(/[^0-9０-９]/g, '');
+  const w = g('study-fw'), n = g('study-fn'), d = g('study-fd');
+  if (!n && !d) { if (w) submitStudyAnswer(w); else toast('답을 입력해 주세요'); return; }
+  if (!n) { toast('분자를 써 주세요'); return; }
+  if (!d || Number(d) === 0) { toast('분모를 써 주세요'); return; }
+  submitStudyAnswer(w && Number(w) > 0 ? `${w}${fractionJosa(w)} ${n}/${d}` : `${n}/${d}`);
+}
+
 // 틀렸을 때 정답을 바로 보여준다(교정 피드백)
 function showStudyFeedback(p, chosen, ok) {
   const body = document.getElementById('study-body');
@@ -11358,6 +11388,14 @@ function showStudyFeedback(p, chosen, ok) {
       <div style="font-size:1.5rem;font-weight:800;color:${ok ? 'var(--emerald)' : 'var(--red)'};margin-bottom:1.2rem">
         ${ok ? '맞았어요!' : '아쉬워요'}
       </div>
+      ${ok && p.type === 'fraction' && CurriculumUtils.fractionMatch(p, chosen) === 'equal' ? (() => {
+        // [FRACTION-INPUT-1] 값은 맞았지만 모양이 다를 때 — 맞았다고 하고, 정답 모양을 보여 준다
+        const u = CurriculumUtils.parseFraction(chosen) || {};
+        const msg = (u.n >= u.d) ? '대분수로 바꿔 써 볼까요?' : '문제에서 쓰는 모양으로도 써 봐요.';
+        return `<div style="background:rgba(255,215,0,.08);border-radius:12px;padding:.9rem 1.1rem;margin-bottom:1.1rem;text-align:left;word-break:keep-all">
+          <div style="font-size:1.05rem;color:var(--gold);font-weight:700">값이 같아요! ${msg}</div>
+          <div style="font-size:.95rem;color:var(--txt3);margin-top:.35rem">내가 쓴 답 ${escHtml(chosen)} → 정답 모양 <b style="color:var(--emerald);font-size:1.15rem">${escHtml(String(p.a))}</b></div></div>`;
+      })() : ''}
       ${!ok ? `
         <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:1.1rem 1.2rem;
           margin-bottom:1.2rem;text-align:left">

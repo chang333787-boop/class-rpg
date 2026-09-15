@@ -33,13 +33,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .title-sub{color:var(--txt2);font-size:.9rem;letter-spacing:.25em;margin:.6rem 0 2.5rem;text-align:center;}
 .title-floaters{display:flex;gap:1.2rem;margin-bottom:2.5rem;}
 .floater{width:72px;height:88px;background:rgba(255,255,255,.04);border:1.5px solid var(--border);
-  border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;
+  border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:2.2rem;
   animation:floatY 3s ease-in-out infinite;}
 .floater:nth-child(2){animation-delay:.25s;}.floater:nth-child(3){animation-delay:.5s;}.floater:nth-child(4){animation-delay:.75s;}
 @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px);}}
 .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--bg0);
   font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:1.1rem;
-  padding:.9rem 2.8rem;border:none;border-radius:50px;cursor:pointer;
+  padding:.9rem 2.8rem;border:none;border-radius:var(--r-pill);cursor:pointer;
   box-shadow:0 0 30px rgba(214,166,74,.4);transition:transform .2s;
   animation:btnGlow 2.5s ease-in-out infinite;}
 .btn-gold:hover{transform:scale(1.06);}
@@ -47,21 +47,21 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 /* ── 로그인 ── */
 #s-login{background:radial-gradient(ellipse at 50% 40%,#2A2218,var(--bg0) 70%);}
-.login-card{background:rgba(15,52,96,.85);border:1px solid var(--border);border-radius:22px;
+.login-card{background:rgba(15,52,96,.85);border:1px solid var(--border);border-radius:var(--r-lg);
   padding:2.2rem;width:clamp(300px,90vw,400px);box-shadow:0 20px 60px rgba(0,0,0,.5);}
 .login-head{font-family:'Gowun Batang',serif;font-size:1.4rem;color:var(--gold);text-align:center;margin-bottom:1.6rem;}
 .student-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.2rem;}
-.stu-btn{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;
+.stu-btn{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.1);border-radius:var(--r-sm);
   padding:.7rem .8rem;color:var(--txt);cursor:pointer;font-family:'Noto Sans KR',sans-serif;
   font-size:.88rem;transition:all .2s;display:flex;align-items:center;gap:.5rem;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .stu-btn:hover,.stu-btn.sel{background:rgba(217,164,65,.12);border-color:var(--gold);color:var(--gold);}
 .login-input{width:100%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.15);
-  border-radius:10px;padding:.75rem 1rem;color:var(--txt);font-size:.95rem;
+  border-radius:var(--r-sm);padding:.75rem 1rem;color:var(--txt);font-size:.95rem;
   font-family:'Noto Sans KR',sans-serif;margin-bottom:.9rem;outline:none;transition:border-color .2s;}
 .login-input:focus{border-color:var(--gold);}
 .btn-red{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;font-family:'Noto Sans KR',sans-serif;
-  font-weight:700;font-size:.95rem;padding:.8rem;border:none;border-radius:10px;cursor:pointer;width:100%;transition:all .2s;}
+  font-weight:700;font-size:.95rem;padding:.8rem;border:none;border-radius:var(--r-sm);cursor:pointer;width:100%;transition:all .2s;}
 .btn-red:hover{transform:scale(1.02);}
 .login-err{color:var(--red);font-size:.78rem;text-align:center;margin-top:.5rem;min-height:1em;}
 .login-admin-link{text-align:center;margin-top:.8rem;}
@@ -73,7 +73,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .charsel-sub{color:var(--txt2);font-size:.85rem;margin-bottom:2rem;text-align:center;}
 .char-options{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:center;margin-bottom:2rem;}
 .char-opt{width:110px;height:140px;background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.1);
-  border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:var(--r-lg);display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:.5rem;cursor:pointer;transition:all .25s;font-size:3rem;}
 .char-opt:hover{transform:translateY(-5px);border-color:rgba(217,164,65,.5);}
 .char-opt.sel{border-color:var(--gold);background:rgba(217,164,65,.1);box-shadow:0 0 20px rgba(217,164,65,.2);}
@@ -93,9 +93,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .hud-name-row{display:flex;align-items:center;gap:.5rem;min-width:0;}
 .hud-name{font-weight:700;font-size:.9rem;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
 .hud-title-badge{font-size:.7rem;color:var(--purple);background:rgba(155,89,182,.12);
-  border:1px solid rgba(155,89,182,.3);border-radius:20px;padding:.1rem .5rem;}
+  border:1px solid rgba(155,89,182,.3);border-radius:var(--r-lg);padding:.1rem .5rem;}
 .promotion-badge{font-size:.7rem;color:var(--gold);background:rgba(217,164,65,.15);
-  border:1px solid rgba(217,164,65,.5);border-radius:20px;padding:.1rem .5rem;
+  border:1px solid rgba(217,164,65,.5);border-radius:var(--r-lg);padding:.1rem .5rem;
   animation:promoBlink 1s ease-in-out infinite;cursor:pointer;}
 @keyframes promoBlink{0%,100%{opacity:1}50%{opacity:.5;}}
 .hud-exp-row{display:flex;align-items:center;gap:.5rem;margin-top:.25rem;min-width:0;}
@@ -110,11 +110,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* [WORDS-1] 상단 두 버튼 — student.html 인라인 style 을 그대로 옮겨 온 것.
    클래스로 빼야 아래 [TOUCH-44] 에서 44px 을 줄 수 있다. */
 .hud-mini-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-  color:var(--txt2);border-radius:8px;padding:.2rem .5rem;font-size:.7rem;
+  color:var(--txt2);border-radius:var(--r-sm);padding:.2rem .5rem;font-size:.7rem;
   cursor:pointer;white-space:nowrap;}
 .hud-badges{display:flex;gap:.5rem;flex-shrink:0;min-width:0;}
 .badge{display:flex;align-items:center;gap:.25rem;background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:.25rem .6rem;font-size:.8rem;font-weight:700;}
+  border:1px solid rgba(255,255,255,.1);border-radius:var(--r-lg);padding:.25rem .6rem;font-size:.8rem;font-weight:700;}
 .badge.lv{border-color:rgba(93,173,226,.4);color:var(--sky);}
 .badge.gold{border-color:rgba(217,164,65,.4);color:var(--gold);}
 
@@ -150,7 +150,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 장비 그리드 — 5칸 세로 나열 */
 .equip-grid{display:flex;flex-direction:column;gap:.35rem;}
 .equip-slot{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-  border-radius:9px;padding:.45rem .65rem;display:flex;align-items:center;gap:.55rem;cursor:pointer;transition:all .2s;}
+  border-radius:var(--r-sm);padding:.45rem .65rem;display:flex;align-items:center;gap:.55rem;cursor:pointer;transition:all .2s;}
 .equip-slot:hover{border-color:rgba(217,164,65,.35);background:rgba(217,164,65,.06);}
 .equip-slot.has{border-color:rgba(217,164,65,.3);background:rgba(217,164,65,.04);}
 .eslot-icon{flex-shrink:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
@@ -196,7 +196,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .rb-desc{font-size:.76rem;color:var(--txt2);margin-top:.15rem;}
 .rb-tags{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem;}
 .rb-tag{background:rgba(217,164,65,.12);border:1px solid rgba(217,164,65,.28);
-  border-radius:20px;padding:.15rem .55rem;font-size:.73rem;color:var(--gold);font-weight:700;}
+  border-radius:var(--r-lg);padding:.15rem .55rem;font-size:.73rem;color:var(--gold);font-weight:700;}
 
 /* ── 메뉴 타일 ── */
 .menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.2rem;}
@@ -220,7 +220,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .tile-icon{font-size:2rem;}.tile-name{font-size:.85rem;font-weight:700;}
 .tile-desc{font-size:.68rem;color:var(--txt2);text-align:center;}
 .tile-notif{position:absolute;top:.5rem;right:.5rem;background:var(--red);color:#fff;
-  font-size:.62rem;font-weight:700;padding:.1rem .38rem;border-radius:10px;}
+  font-size:.62rem;font-weight:700;padding:.1rem .38rem;border-radius:var(--r-sm);}
 
 /* ── 오늘 현황 ── */
 .today-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;}
@@ -258,7 +258,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 기본 카드 */
 .todo-card{display:flex;align-items:center;gap:.9rem;
   background:var(--bg3);border:1px solid rgba(255,255,255,.07);
-  border-radius:12px;padding:.75rem 1rem;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  border-radius:var(--r);padding:.75rem 1rem;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
 .todo-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;}
 .todo-card:hover{transform:translateX(3px);border-color:rgba(255,255,255,.18);}
 .todo-card:active{transform:translateX(1px);}
@@ -314,8 +314,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .todo-sub{font-size:.72rem;color:var(--txt2);}
 .todo-arrow{color:var(--txt3);font-size:.9rem;flex-shrink:0;}
 .todo-badge{background:var(--red);color:#fff;font-size:.62rem;font-weight:700;
-  padding:.1rem .38rem;border-radius:10px;flex-shrink:0;}
-.todo-btn{font-size:.72rem;font-weight:700;padding:.3rem .7rem;border-radius:20px;
+  padding:.1rem .38rem;border-radius:var(--r-sm);flex-shrink:0;}
+.todo-btn{font-size:.72rem;font-weight:700;padding:.3rem .7rem;border-radius:var(--r-lg);
   border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;flex-shrink:0;transition:all .2s;}
 .todo-btn.urgent,.todo-btn.monster{background:var(--red);color:#fff;}
 .todo-btn.quest{background:var(--gold);color:#1a1a1a;}
@@ -328,7 +328,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .mission-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1.2rem;}
 .mission-row{display:flex;align-items:center;gap:.7rem;
   background:var(--bg3);border:1px solid rgba(255,255,255,.07);
-  border-radius:10px;padding:.6rem .9rem;cursor:pointer;transition:all .2s;}
+  border-radius:var(--r-sm);padding:.6rem .9rem;cursor:pointer;transition:all .2s;}
 .mission-row.done{opacity:.55;}
 .mission-row.pending{opacity:.8;border-color:rgba(217,164,65,.2);}
 .mission-row:hover{border-color:rgba(217,164,65,.2);}
@@ -345,7 +345,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   align-items:center;justify-content:center;padding:.7rem;backdrop-filter:blur(6px);}
 .overlay.open{display:flex;}
 .modal{background:linear-gradient(145deg,#241E16,#3A2E20);border:1px solid var(--border);
-  border-radius:20px;padding:1.3rem 1.4rem;width:min(540px,100%);max-height:90vh;
+  border-radius:var(--r-lg);padding:1.3rem 1.4rem;width:min(540px,100%);max-height:90vh;
   overflow-y:auto;box-shadow:0 0 80px rgba(214,166,74,.08),0 30px 80px rgba(0,0,0,.6);animation:modalPop .28s ease;}
 .modal::-webkit-scrollbar{width:4px;}
 
@@ -368,9 +368,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 학습 화면 안의 글자·버튼 크기 (공부용 확대) */
 #study-body .st-q{font-size:1.6rem;line-height:1.55;font-weight:700;word-break:keep-all;}
 #study-body .st-meta{font-size:.95rem;}
-#study-body .st-opt{font-size:1.25rem;padding:1.05rem 1.2rem;border-radius:14px;}
-#study-body .st-input{font-size:1.35rem;padding:1rem 1.1rem;border-radius:14px;}
-#study-body .st-btn{font-size:1.2rem;padding:1rem 1.4rem;border-radius:14px;}
+#study-body .st-opt{font-size:1.25rem;padding:1.05rem 1.2rem;border-radius:var(--r);}
+#study-body .st-input{font-size:1.35rem;padding:1rem 1.1rem;border-radius:var(--r);}
+#study-body .st-btn{font-size:1.2rem;padding:1rem 1.4rem;border-radius:var(--r);}
 #study-body .st-subject{font-size:1.25rem;}
 #study-body .st-subject-sub{font-size:.9rem;}
 #study-body .st-hint{font-size:1.05rem;}
@@ -379,9 +379,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* ── 아이들용 아기자기 스타일 (STUDY-CUTE-1) ──
    공부 화면이라 딱딱하지 않게. 모서리를 더 둥글게, 색을 부드럽게,
    누를 때 말랑하게 반응하도록. 다크 판타지 톤은 유지한다. */
-#m-study .modal{border-radius:26px}
+#m-study .modal{border-radius:var(--r-lg)}
 #study-body .st-opt{
-  border-radius:18px;
+  border-radius:var(--r-lg);
   transition:transform .12s cubic-bezier(.34,1.56,.64,1), background .15s, border-color .15s;
 }
 #study-body .st-opt:hover{
@@ -390,13 +390,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   border-color:rgba(217,164,65,.4);
 }
 #study-body .st-opt:active{transform:translateY(1px) scale(.99)}
-#study-body .st-input{border-radius:18px}
-#study-body .st-btn{border-radius:18px;transition:transform .12s cubic-bezier(.34,1.56,.64,1),filter .15s}
+#study-body .st-input{border-radius:var(--r-lg)}
+#study-body .st-btn{border-radius:var(--r-lg);transition:transform .12s cubic-bezier(.34,1.56,.64,1),filter .15s}
 #study-body .st-btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
 #study-body .st-btn:active{transform:translateY(1px)}
 /* 과목 고르기 카드 — 통통 튀는 반응 */
 #study-body .st-subject-card{
-  border-radius:20px;
+  border-radius:var(--r-lg);
   transition:transform .14s cubic-bezier(.34,1.56,.64,1), background .15s, border-color .15s;
 }
 #study-body .st-subject-card:hover{
@@ -411,22 +411,22 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #study-body .st-emoji{animation:st-pop .42s cubic-bezier(.34,1.56,.64,1)}
 #study-body .st-emoji.wrong{animation:st-shake .45s ease}
 /* 진행 막대 — 둥글고 반짝이게 */
-#study-body .st-bar{height:10px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+#study-body .st-bar{height:10px;border-radius:var(--r-pill);background:rgba(255,255,255,.09);overflow:hidden}
 #study-body .st-bar > i{
-  display:block;height:100%;border-radius:99px;
+  display:block;height:100%;border-radius:var(--r-pill);
   background:linear-gradient(90deg,#FFD86B,#FFC93C);
   box-shadow:0 0 12px rgba(217,164,65,.5);
   transition:width .35s cubic-bezier(.34,1.56,.64,1);
 }
 /* 별점 — 오늘 얼마나 했는지 한눈에 */
 /* 풀이 연습장(수학) — 어두운 화면 위에 올려둔 '종이' */
-#study-body .st-scratch{margin:0 0 1.4rem;border-radius:16px;overflow:hidden;
+#study-body .st-scratch{margin:0 0 1.4rem;border-radius:var(--r);overflow:hidden;
   border:1px solid rgba(255,255,255,.16);background:#F7F5EC;box-shadow:0 4px 14px rgba(0,0,0,.25);}
 #study-body .st-scratch-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;
   padding:.45rem .5rem .45rem .9rem;background:rgba(43,58,85,.07);
   color:#5A6478;font-size:.92rem;font-weight:700;}
 #study-body .st-scratch-clear{border:1px solid rgba(43,58,85,.22);background:#fff;color:#5A6478;
-  font-family:inherit;font-size:.9rem;font-weight:700;padding:.4rem .85rem;border-radius:10px;
+  font-family:inherit;font-size:.9rem;font-weight:700;padding:.4rem .85rem;border-radius:var(--r-sm);
   cursor:pointer;flex-shrink:0;transition:background .15s,transform .1s;}
 #study-body .st-scratch-clear:hover{background:#EDEAE0;}
 #study-body .st-scratch-clear:active{transform:translateY(1px);}
@@ -437,23 +437,23 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
                    linear-gradient(90deg,rgba(43,58,85,.09) 1px,transparent 1px);
   background-size:26px 26px;}
 /* 문항 그림(FIG-1) — 선 색은 글자색, 배경은 살짝 밝은 판 */
-#study-body .st-fig{color:var(--txt);margin:0 0 1rem;padding:.7rem .6rem;border-radius:12px;
+#study-body .st-fig{color:var(--txt);margin:0 0 1rem;padding:.7rem .6rem;border-radius:var(--r);
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);}
 /* 모드 칩(STUDY-MODES-1) — 계산/문장제/개념, OX/상황/추론 */
 #study-body .st-chips{display:flex;gap:.45rem;flex-wrap:wrap;margin:0 0 1rem;}
-#study-body .st-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem .85rem;border-radius:999px;
+#study-body .st-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem .85rem;border-radius:var(--r-pill);
   border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--txt2);
   font-family:inherit;font-size:.95rem;font-weight:700;cursor:pointer;transition:transform .12s,background .15s;}
 #study-body .st-chip:hover{background:rgba(255,255,255,.1);transform:translateY(-1px);}
 #study-body .st-chip.on{background:rgba(217,164,65,.16);border-color:rgba(217,164,65,.5);color:var(--gold);}
 #study-body .st-chip:disabled{opacity:.35;cursor:not-allowed;transform:none;}
 #study-body .st-chip-n{font-size:.78rem;font-weight:600;color:var(--txt3);background:rgba(0,0,0,.25);
-  padding:.1rem .45rem;border-radius:999px;}
+  padding:.1rem .45rem;border-radius:var(--r-pill);}
 #study-body .st-chip.on .st-chip-n{color:var(--gold);}
 /* OX 문항(SOCIAL-TYPES-1) — 좌우 큰 버튼 */
 #study-body .st-ox{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;}
 #study-body .st-ox-btn{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:1.2rem .8rem;
-  border-radius:16px;border:1px solid rgba(46,204,113,.4);background:rgba(46,204,113,.09);color:var(--txt);
+  border-radius:var(--r);border:1px solid rgba(46,204,113,.4);background:rgba(46,204,113,.09);color:var(--txt);
   font-family:inherit;font-size:1.15rem;font-weight:700;cursor:pointer;}
 #study-body .st-ox-btn.x{border-color:rgba(231,76,60,.4);background:rgba(231,76,60,.09);}
 #study-body .st-ox-mark{font-size:2.6rem;line-height:1;}
@@ -488,7 +488,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .modal-close{background:none;border:none;color:var(--txt3);font-size:1.3rem;cursor:pointer;transition:color .2s;}
 .modal-close:hover{color:var(--txt);}
 .modal-tabs{display:flex;gap:.3rem;margin-bottom:.7rem;flex-wrap:wrap;}
-.mtab{padding:.28rem .75rem;border-radius:20px;background:rgba(255,255,255,.05);
+.mtab{padding:.28rem .75rem;border-radius:var(--r-lg);background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.1);color:var(--txt2);cursor:pointer;
   font-size:.78rem;font-family:'Noto Sans KR',sans-serif;transition:all .2s;}
 .mtab.on{background:rgba(217,164,65,.14);border-color:var(--gold);color:var(--gold);}
@@ -535,19 +535,19 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 퀘스트 */
 .quest-list{display:flex;flex-direction:column;gap:.4rem;}
 .quest-row{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-  border-radius:10px;padding:.6rem .8rem;display:flex;align-items:center;gap:.7rem;}
+  border-radius:var(--r-sm);padding:.6rem .8rem;display:flex;align-items:center;gap:.7rem;}
 .qr-icon{font-size:1.2rem;width:30px;text-align:center;}
 .qr-body{flex:1;}.qr-name{font-weight:700;font-size:.84rem;}
 .qr-desc{font-size:.68rem;color:var(--txt2);margin-top:.08rem;}
 .qr-right{display:flex;flex-direction:column;align-items:flex-end;gap:.2rem;}
-.qr-status{font-size:.66rem;font-weight:700;padding:.12rem .45rem;border-radius:20px;}
+.qr-status{font-size:.66rem;font-weight:700;padding:.12rem .45rem;border-radius:var(--r-lg);}
 .qr-status.approved{background:rgba(46,204,113,.2);color:var(--emerald);}
 .qr-status.waiting{background:rgba(255,255,255,.06);color:var(--txt3);}
 .qr-rewards{font-size:.66rem;color:var(--sky);}
 
 /* 상점 */
 .shop-gold-bar{font-size:.82rem;color:var(--gold);margin-bottom:.7rem;
-  background:rgba(217,164,65,.07);border:1px solid rgba(217,164,65,.2);border-radius:8px;padding:.4rem .7rem;}
+  background:rgba(217,164,65,.07);border:1px solid rgba(217,164,65,.2);border-radius:var(--r-sm);padding:.4rem .7rem;}
 .item-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;}
 /* [D3-SHOP375-1] 3칸 고정이라 375 폭에서 장비 카드(이름·능력치·가격 가로 한 줄)가 칸마다 182px를 요구해
    합 555px가 310px 모달 밖으로 넘치고 글자가 한 글자씩 세로로 쌓였다.
@@ -562,7 +562,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   .item-grid:not(:has(> .item-card)){grid-template-columns:minmax(0,1fr);}
 }
 .item-card{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);
-  border-radius:10px;padding:.5rem .65rem;cursor:pointer;transition:all .2s;}
+  border-radius:var(--r-sm);padding:.5rem .65rem;cursor:pointer;transition:all .2s;}
 .item-card:hover{border-color:rgba(217,164,65,.38);background:rgba(217,164,65,.05);}
 .item-card.cant-afford{opacity:.5;}
 .item-card.cond-fail{border-color:rgba(231,76,60,.2);}
@@ -577,26 +577,26 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 몬스터 */
 .monster-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;}
 .mon-card{background:rgba(231,76,60,.05);border:1.5px solid rgba(231,76,60,.18);
-  border-radius:10px;padding:.6rem .4rem;cursor:pointer;transition:all .22s;text-align:center;}
+  border-radius:var(--r-sm);padding:.6rem .4rem;cursor:pointer;transition:all .22s;text-align:center;}
 .mon-card:hover:not(.locked){border-color:rgba(231,76,60,.48);transform:translateY(-2px);}
 .mon-card.killed{border-color:rgba(255,255,255,.06);opacity:.55;}
 .mon-card.locked{opacity:.35;cursor:default;}
 .mc-icon{font-size:1.6rem;margin-bottom:.2rem;}.mc-name{font-weight:700;font-size:.78rem;}
 .mc-lv{font-size:.65rem;color:var(--txt2);}.mc-gold{color:var(--gold);font-size:.7rem;font-weight:700;margin-top:.15rem;}
-.mc-tag{display:inline-block;margin-top:.2rem;padding:.08rem .35rem;border-radius:10px;font-size:.6rem;font-weight:700;}
+.mc-tag{display:inline-block;margin-top:.2rem;padding:.08rem .35rem;border-radius:var(--r-sm);font-size:.6rem;font-weight:700;}
 .tag-new{background:rgba(231,76,60,.28);color:#FF8A80;}
 .tag-done{background:rgba(255,255,255,.06);color:var(--txt3);}
 /* ── 사냥터 후보 카드 ── */
 .offer-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;
   background:rgba(231,76,60,.05);border:1.5px solid rgba(231,76,60,.2);
-  border-radius:12px;cursor:pointer;transition:all .2s;}
+  border-radius:var(--r);cursor:pointer;transition:all .2s;}
 .offer-card:hover:not(.offer-locked){border-color:rgba(231,76,60,.5);background:rgba(231,76,60,.1);transform:translateX(3px);}
 .offer-card.offer-locked{opacity:.38;cursor:default;}
 .offer-icon{font-size:2rem;flex-shrink:0;}
 .offer-body{flex:1;min-width:0;}
 .offer-name{font-weight:700;font-size:.88rem;}
 .offer-meta{font-size:.68rem;color:var(--txt2);margin-top:.15rem;display:flex;gap:.35rem;flex-wrap:wrap;}
-.offer-badge{display:inline-block;padding:.1rem .38rem;border-radius:8px;font-size:.62rem;font-weight:700;}
+.offer-badge{display:inline-block;padding:.1rem .38rem;border-radius:var(--r-sm);font-size:.62rem;font-weight:700;}
 .ob-elem-fire{background:rgba(231,76,60,.25);color:#FF8A80;}
 .ob-elem-water{background:rgba(52,152,219,.25);color:#7ec8e3;}
 .ob-elem-grass{background:rgba(39,174,96,.25);color:#6fd49d;}
@@ -635,7 +635,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.5rem;
   margin-bottom:.9rem;
   background:linear-gradient(180deg,rgba(255,255,255,.02) 0%,transparent 100%);
-  border-radius:16px;padding:.8rem .5rem;
+  border-radius:var(--r);padding:.8rem .5rem;
 }
 .ba-fighter{display:flex;flex-direction:column;align-items:center;gap:.3rem;}
 .ba-fighter-name{font-size:.82rem;font-weight:800;letter-spacing:.02em;}
@@ -654,7 +654,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 전투 로그 */
 .ba-log-wrap{
   background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;padding:.65rem .85rem;margin-bottom:.8rem;
+  border-radius:var(--r);padding:.65rem .85rem;margin-bottom:.8rem;
   min-height:72px;max-height:130px;overflow-y:auto;text-align:left;
   scroll-behavior:smooth;
 }
@@ -738,7 +738,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 행동 버튼 */
 .bat-actions{display:flex;gap:.6rem;margin-top:.2rem;}
 .bat-btn-attack{
-  flex:1;padding:.75rem;border-radius:12px;font-size:.95rem;font-weight:900;cursor:pointer;
+  flex:1;padding:.75rem;border-radius:var(--r);font-size:.95rem;font-weight:900;cursor:pointer;
   font-family:'Noto Sans KR',sans-serif;border:2px solid rgba(255,180,0,.6);
   background:linear-gradient(135deg,rgba(255,160,0,.25),rgba(214,166,74,.15));
   color:var(--gold);transition:transform .1s,box-shadow .1s,background .18s;letter-spacing:.02em;
@@ -759,7 +759,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .bat-btn-attack:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none;}
 
 .bat-btn-skill{
-  flex:1;padding:.75rem;border-radius:12px;font-size:.95rem;font-weight:900;cursor:pointer;
+  flex:1;padding:.75rem;border-radius:var(--r);font-size:.95rem;font-weight:900;cursor:pointer;
   font-family:'Noto Sans KR',sans-serif;border:2px solid rgba(93,173,226,.5);
   background:linear-gradient(135deg,rgba(93,173,226,.2),rgba(52,120,200,.12));
   color:var(--sky);transition:transform .1s,box-shadow .1s,background .18s;letter-spacing:.02em;
@@ -782,7 +782,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* 공격/스킬 2단계 서브 버튼 */
 .bat-sub-row{display:flex;gap:.4rem;margin-top:.5rem;}
 .bat-sub-btn{
-  flex:1;min-width:0;padding:.4rem .2rem;border-radius:8px;font-size:.73rem;font-weight:700;
+  flex:1;min-width:0;padding:.4rem .2rem;border-radius:var(--r-sm);font-size:.73rem;font-weight:700;
   cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:transform .1s,box-shadow .1s;
   text-align:center;
   box-shadow:0 3px 0 rgba(0,0,0,.4);
@@ -820,7 +820,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .mon-card:active:not(.locked){transform:translateY(2px) scale(.96) !important;}
 
 /* 결과 */
-.ba-result-box{border-radius:14px;padding:.9rem;margin-bottom:.8rem;text-align:center;}
+.ba-result-box{border-radius:var(--r);padding:.9rem;margin-bottom:.8rem;text-align:center;}
 .ba-result-win{background:rgba(217,164,65,.1);border:1.5px solid rgba(217,164,65,.35);}
 .ba-result-lose{background:rgba(231,76,60,.08);border:1.5px solid rgba(231,76,60,.3);}
 
@@ -837,11 +837,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes dmgFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-50px) scale(1.2)}}
 .btn-ok{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--bg0);
   font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:1rem;
-  padding:.8rem 2.5rem;border:none;border-radius:50px;cursor:pointer;transition:all .2s;margin-top:.5rem;}
+  padding:.8rem 2.5rem;border:none;border-radius:var(--r-pill);cursor:pointer;transition:all .2s;margin-top:.5rem;}
 .btn-ok:hover{transform:scale(1.05);}
 .btn-battle{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;
   font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:1rem;
-  padding:.8rem 2.5rem;border:none;border-radius:50px;cursor:pointer;transition:all .2s;}
+  padding:.8rem 2.5rem;border:none;border-radius:var(--r-pill);cursor:pointer;transition:all .2s;}
 .btn-battle:hover{transform:scale(1.05);}.btn-battle:disabled{opacity:.5;cursor:default;transform:none;}
 
 /* ── 전투 속성 이펙트 (레벨별) ── */
@@ -876,7 +876,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .fm-prog-fill{height:100%;background:linear-gradient(90deg,var(--emerald),#27AE60);}
 .farm-seed-list{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;}
 .seed-chip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
-  border-radius:20px;padding:.2rem .6rem;font-size:.75rem;cursor:pointer;transition:all .2s;}
+  border-radius:var(--r-lg);padding:.2rem .6rem;font-size:.75rem;cursor:pointer;transition:all .2s;}
 .seed-chip:hover,.seed-chip.sel{border-color:var(--gold);color:var(--gold);}
 /* [D3-FARM-1] 농장 — 디자인 시스템 v1(#242). CSS만.
    · 빈 밭 칸이 초록 8% 네모 + 작은 '+'라 밭처럼 안 보였다 → 흙색 칸(갈색 한 벌 안), 자라는 칸만 초록 테두리.
@@ -896,7 +896,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 /* 집 */
 .house-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:1rem;}
-.house-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:.9rem;}
+.house-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:.9rem;}
 .hs-label{font-size:.7rem;color:var(--txt3);margin-bottom:.4rem;}
 .hs-value{font-size:1.4rem;font-weight:900;}
 .hs-sub{font-size:.7rem;color:var(--txt2);margin-top:.15rem;}
@@ -908,15 +908,15 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .hs-sub{font-size:var(--fs-sm);margin-top:var(--sp-h);}
 .book-item{background:var(--bg2);font-size:var(--fs-sm);padding:var(--sp-1) var(--sp-2);}
 .book-list{display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem;max-height:160px;overflow-y:auto;}
-.book-item{background:rgba(255,255,255,.04);border-radius:8px;padding:.45rem .7rem;font-size:.78rem;
+.book-item{background:rgba(255,255,255,.04);border-radius:var(--r-sm);padding:.45rem .7rem;font-size:.78rem;
   display:flex;align-items:center;gap:.5rem;}
 .dex-chip{font-size:.78rem;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.2);
-  border-radius:8px;padding:.2rem .55rem;display:inline-block;margin:.2rem;}
+  border-radius:var(--r-sm);padding:.2rem .55rem;display:inline-block;margin:.2rem;}
 
 /* 인벤토리 */
 .inv-slots{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;}
 .inv-slot{aspect-ratio:1;background:rgba(255,255,255,.03);border:1.5px solid rgba(255,255,255,.08);
-  border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:var(--r-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:.2rem;cursor:pointer;transition:all .2s;padding:.3rem;}
 .inv-slot:hover{border-color:rgba(217,164,65,.35);}
 .inv-slot.filled{border-color:rgba(217,164,65,.22);}
@@ -929,7 +929,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 /* 활동신청·독서 폼 */
 .form-input-student{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
-  border-radius:10px;padding:.55rem .8rem;color:var(--txt);font-size:.83rem;
+  border-radius:var(--r-sm);padding:.55rem .8rem;color:var(--txt);font-size:.83rem;
   font-family:'Noto Sans KR',sans-serif;outline:none;box-sizing:border-box;}
 .form-input-student:focus{border-color:rgba(217,164,65,.4);background:rgba(217,164,65,.05);}
 .form-input-student option{background:#1a2535;color:var(--txt);}
@@ -1086,7 +1086,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   animation:bossGlow 2s ease-in-out infinite;}
 @keyframes bossGlow{0%,100%{box-shadow:0 0 10px rgba(231,76,60,.1)}50%{box-shadow:0 0 25px rgba(231,76,60,.3);}}
 .bb-btn{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;
-  font-size:.78rem;font-weight:700;padding:.4rem .9rem;border-radius:20px;
+  font-size:.78rem;font-weight:700;padding:.4rem .9rem;border-radius:var(--r-lg);
   font-family:'Noto Sans KR',sans-serif;border:none;cursor:pointer;flex-shrink:0;}
 @keyframes achPop{from{opacity:0;transform:translate(-50%,-50%) scale(.7)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 .ach-item{display:flex;align-items:center;gap:.9rem;padding:.8rem 0;border-bottom:1px solid rgba(255,255,255,.05);}
@@ -1116,7 +1116,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ach-name{font-weight:700;font-size:.88rem;}
 .ach-desc{font-size:.72rem;color:var(--txt2);margin-top:.1rem;}
 .ach-reward{font-size:.7rem;color:var(--gold);margin-top:.2rem;}
-.ach-badge{font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:10px;flex-shrink:0;}
+.ach-badge{font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:var(--r-sm);flex-shrink:0;}
 .ach-badge.done{background:rgba(46,204,113,.2);color:var(--emerald);}
 .ach-badge.locked{background:rgba(255,255,255,.06);color:var(--txt3);}
 
@@ -1134,6 +1134,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   --line:rgba(239,231,217,.10);--border-strong:rgba(217,164,65,.45);
   --fs-xs:.75rem;--fs-sm:.875rem;--fs-md:1rem;--fs-lg:1.125rem;--fs-xl:1.375rem;--fs-2xl:1.75rem;
   --sp-h:4px;--sp-1:8px;--sp-2:16px;--sp-3:24px;--sp-4:32px;
+  /* [D3-RADIUS-1] 모서리 4단. 파일 전체의 border-radius Npx 60곳을 이 넷으로 바꿨다(22종 → 4단 + 작은 막대용 2~6px·50%):
+     8~10px → --r-sm(버튼·작은 칸) · 12~16px → --r(카드) · 18~26px → --r-lg(모달·큰 카드) · 50/99/999px → --r-pill(칩·알약 버튼). */
   --r-sm:8px;--r-lg:20px;--r-pill:999px;
 }
 /* 학교망에서 구글 폰트가 막히면 지금은 브라우저 기본 sans-serif로 떨어진다 → 한글 고딕을 명시 */

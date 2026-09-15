@@ -1593,24 +1593,24 @@ const BASE_PROBLEMS = [
   //  (수 입력칸이 inputmode=numeric이라 태블릿에서 / 를 치기 어렵다).
   //  꺾은선그래프는 선그래프 그림 렌더러가 없어 자료를 표로 준다.
   // ma4-2-1 2학기 · 분수의 덧셈과 뺄셈
-  { id:'p_ma421_01', unitId:'ma4-2-1', type:'choice', cat:'calc', level:1, q:'1/5 + 2/5 를 계산하면 얼마일까요?', choices:['3/5', '3/10', '1/5', '4/5'], a:'3/5', hint:'분모는 그대로 두고 분자끼리 더해요.' },
-  { id:'p_ma421_02', unitId:'ma4-2-1', type:'choice', cat:'calc', level:1, q:'2/7 + 3/7 를 계산하면 얼마일까요?', choices:['5/7', '5/14', '1/7', '6/7'], a:'5/7', hint:'분모는 그대로 두고 분자끼리 더해요.' },
-  { id:'p_ma421_03', unitId:'ma4-2-1', type:'choice', cat:'calc', level:1, q:'3/9 + 4/9 를 계산하면 얼마일까요?', choices:['7/9', '7/18', '1/9', '8/9'], a:'7/9', hint:'분모는 그대로 두고 분자끼리 더해요.' },
-  { id:'p_ma421_04', unitId:'ma4-2-1', type:'choice', cat:'calc', level:1, q:'4/6 − 1/6 를 계산하면 얼마일까요?', choices:['3/6', '5/6', '2/6', '3/12'], a:'3/6', hint:'분모는 그대로 두고 분자끼리 빼요.' },
-  { id:'p_ma421_05', unitId:'ma4-2-1', type:'choice', cat:'calc', level:1, q:'7/8 − 3/8 를 계산하면 얼마일까요?', choices:['4/8', '10/8', '3/8', '4/16'], a:'4/8', hint:'분모는 그대로 두고 분자끼리 빼요.' },
-  { id:'p_ma421_06', unitId:'ma4-2-1', type:'choice', cat:'calc', level:1, q:'5/9 − 2/9 를 계산하면 얼마일까요?', choices:['3/9', '7/9', '2/9', '3/18'], a:'3/9', hint:'분모는 그대로 두고 분자끼리 빼요.' },
-  { id:'p_ma421_07', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'4/5 + 3/5 를 계산하여 대분수로 나타내면 얼마일까요?', choices:['1과 2/5', '7/10', '1과 3/5', '2/5'], a:'1과 2/5', hint:'분자끼리 더한 가분수를 자연수와 진분수로 나누어 보세요.' },
-  { id:'p_ma421_08', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'5/7 + 6/7 를 계산하여 대분수로 나타내면 얼마일까요?', choices:['1과 4/7', '11/14', '1과 5/7', '4/7'], a:'1과 4/7', hint:'분자끼리 더한 가분수를 자연수와 진분수로 나누어 보세요.' },
-  { id:'p_ma421_09', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'1과 2/7 + 2와 3/7 를 계산하면 얼마일까요?', choices:['3과 5/7', '4와 5/7', '3과 5/14', '2와 5/7'], a:'3과 5/7', hint:'자연수는 자연수끼리, 분수는 분수끼리 더해요.' },
-  { id:'p_ma421_10', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'3과 1/6 + 1과 4/6 를 계산하면 얼마일까요?', choices:['4와 5/6', '5와 5/6', '4와 5/12', '3과 5/6'], a:'4와 5/6', hint:'자연수는 자연수끼리, 분수는 분수끼리 더해요.' },
-  { id:'p_ma421_11', unitId:'ma4-2-1', type:'choice', cat:'calc', level:3, q:'2와 3/5 + 1과 4/5 를 계산하면 얼마일까요?', choices:['4와 2/5', '3과 3/5', '3과 2/5', '5와 2/5'], a:'4와 2/5', hint:'분수끼리 더한 값이 1보다 크면 자연수로 1을 올려요.' },
-  { id:'p_ma421_12', unitId:'ma4-2-1', type:'choice', cat:'calc', level:3, q:'1과 5/8 + 3과 6/8 를 계산하면 얼마일까요?', choices:['5와 3/8', '4와 4/8', '4와 3/8', '6과 3/8'], a:'5와 3/8', hint:'분수끼리 더한 값이 1보다 크면 자연수로 1을 올려요.' },
-  { id:'p_ma421_13', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'3과 5/8 − 1과 2/8 를 계산하면 얼마일까요?', choices:['2와 3/8', '3과 3/8', '4와 3/8', '2와 7/8'], a:'2와 3/8', hint:'자연수는 자연수끼리, 분수는 분수끼리 빼요.' },
-  { id:'p_ma421_14', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'4와 6/9 − 2와 1/9 를 계산하면 얼마일까요?', choices:['2와 5/9', '3과 5/9', '6과 5/9', '2와 7/9'], a:'2와 5/9', hint:'자연수는 자연수끼리, 분수는 분수끼리 빼요.' },
-  { id:'p_ma421_15', unitId:'ma4-2-1', type:'choice', cat:'calc', level:2, q:'1 − 3/8 을 계산하면 얼마일까요?', choices:['5/8', '3/8', '4/8', '2/8'], a:'5/8', hint:'1을 8/8로 바꾸어 계산해 보세요.' },
-  { id:'p_ma421_16', unitId:'ma4-2-1', type:'choice', cat:'calc', level:3, q:'3 − 1과 2/5 를 계산하면 얼마일까요?', choices:['1과 3/5', '2와 2/5', '1과 2/5', '2와 3/5'], a:'1과 3/5', hint:'3을 2와 5/5로 바꾸어 계산해 보세요.' },
-  { id:'p_ma421_17', unitId:'ma4-2-1', type:'choice', cat:'calc', level:3, q:'4와 1/6 − 1과 5/6 를 계산하면 얼마일까요?', choices:['2와 2/6', '3과 4/6', '3과 2/6', '1과 2/6'], a:'2와 2/6', hint:'빼는 분수가 더 크면 자연수에서 1을 분수로 바꾸어 빼요.' },
-  { id:'p_ma421_18', unitId:'ma4-2-1', type:'choice', cat:'calc', level:3, q:'5와 2/7 − 2와 6/7 를 계산하면 얼마일까요?', choices:['2와 3/7', '3과 4/7', '3과 3/7', '1과 3/7'], a:'2와 3/7', hint:'빼는 분수가 더 크면 자연수에서 1을 분수로 바꾸어 빼요.' },
+  { id:'p_ma421_01', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:1, q:'1/5 + 2/5 를 계산하면 얼마일까요?', a:'3/5', hint:'분모는 그대로 두고 분자끼리 더해요.' },
+  { id:'p_ma421_02', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:1, q:'2/7 + 3/7 를 계산하면 얼마일까요?', a:'5/7', hint:'분모는 그대로 두고 분자끼리 더해요.' },
+  { id:'p_ma421_03', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:1, q:'3/9 + 4/9 를 계산하면 얼마일까요?', a:'7/9', hint:'분모는 그대로 두고 분자끼리 더해요.' },
+  { id:'p_ma421_04', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:1, q:'4/6 − 1/6 를 계산하면 얼마일까요?', a:'3/6', hint:'분모는 그대로 두고 분자끼리 빼요.' },
+  { id:'p_ma421_05', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:1, q:'7/8 − 3/8 를 계산하면 얼마일까요?', a:'4/8', hint:'분모는 그대로 두고 분자끼리 빼요.' },
+  { id:'p_ma421_06', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:1, q:'5/9 − 2/9 를 계산하면 얼마일까요?', a:'3/9', hint:'분모는 그대로 두고 분자끼리 빼요.' },
+  { id:'p_ma421_07', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'4/5 + 3/5 를 계산하여 대분수로 나타내면 얼마일까요?', a:'1과 2/5', hint:'분자끼리 더한 가분수를 자연수와 진분수로 나누어 보세요.' },
+  { id:'p_ma421_08', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'5/7 + 6/7 를 계산하여 대분수로 나타내면 얼마일까요?', a:'1과 4/7', hint:'분자끼리 더한 가분수를 자연수와 진분수로 나누어 보세요.' },
+  { id:'p_ma421_09', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'1과 2/7 + 2와 3/7 를 계산하면 얼마일까요?', a:'3과 5/7', hint:'자연수는 자연수끼리, 분수는 분수끼리 더해요.' },
+  { id:'p_ma421_10', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'3과 1/6 + 1과 4/6 를 계산하면 얼마일까요?', a:'4와 5/6', hint:'자연수는 자연수끼리, 분수는 분수끼리 더해요.' },
+  { id:'p_ma421_11', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:3, q:'2와 3/5 + 1과 4/5 를 계산하면 얼마일까요?', a:'4와 2/5', hint:'분수끼리 더한 값이 1보다 크면 자연수로 1을 올려요.' },
+  { id:'p_ma421_12', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:3, q:'1과 5/8 + 3과 6/8 를 계산하면 얼마일까요?', a:'5와 3/8', hint:'분수끼리 더한 값이 1보다 크면 자연수로 1을 올려요.' },
+  { id:'p_ma421_13', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'3과 5/8 − 1과 2/8 를 계산하면 얼마일까요?', a:'2와 3/8', hint:'자연수는 자연수끼리, 분수는 분수끼리 빼요.' },
+  { id:'p_ma421_14', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'4와 6/9 − 2와 1/9 를 계산하면 얼마일까요?', a:'2와 5/9', hint:'자연수는 자연수끼리, 분수는 분수끼리 빼요.' },
+  { id:'p_ma421_15', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:2, q:'1 − 3/8 을 계산하면 얼마일까요?', a:'5/8', hint:'1을 8/8로 바꾸어 계산해 보세요.' },
+  { id:'p_ma421_16', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:3, q:'3 − 1과 2/5 를 계산하면 얼마일까요?', a:'1과 3/5', hint:'3을 2와 5/5로 바꾸어 계산해 보세요.' },
+  { id:'p_ma421_17', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:3, q:'4와 1/6 − 1과 5/6 를 계산하면 얼마일까요?', a:'2와 2/6', hint:'빼는 분수가 더 크면 자연수에서 1을 분수로 바꾸어 빼요.' },
+  { id:'p_ma421_18', unitId:'ma4-2-1', type:'fraction', cat:'calc', level:3, q:'5와 2/7 − 2와 6/7 를 계산하면 얼마일까요?', a:'2와 3/7', hint:'빼는 분수가 더 크면 자연수에서 1을 분수로 바꾸어 빼요.' },
   { id:'p_ma421_19', unitId:'ma4-2-1', type:'choice', cat:'concept', level:1, q:'분모가 같은 분수끼리 더할 때 알맞은 방법은 무엇일까요?', choices:['분모는 그대로 두고 분자끼리 더한다', '분모끼리 더하고 분자끼리 더한다', '분모끼리만 더한다', '분자와 분모를 서로 바꾸어 더한다'], a:'분모는 그대로 두고 분자끼리 더한다', hint:'분모가 같은 분수의 덧셈을 떠올려 보세요.' },
   { id:'p_ma421_20', unitId:'ma4-2-1', type:'choice', cat:'concept', level:1, q:'1을 분모가 6인 분수로 나타내면 얼마일까요?', choices:['6/6', '1/6', '6/1', '5/6'], a:'6/6', hint:'전체를 6칸으로 나누었을 때 전체는 몇 칸인지 생각해 보세요.' },
   { id:'p_ma421_21', unitId:'ma4-2-1', type:'choice', cat:'concept', level:2, q:'대분수 2와 3/4 을 가분수로 나타내면 얼마일까요?', choices:['11/4', '5/4', '9/4', '23/4'], a:'11/4', hint:'2는 4분의 몇인지 먼저 생각해 보세요.' },
@@ -2727,6 +2727,11 @@ const BASE_PROBLEMS = [
 // { q:'"I get up at seven." 의 뜻은?', choices:['나는 7시에 일어난다.','나는 7시에 잔다.','나는 7살이다.','나는 7시에 먹는다.'], a:'나는 7시에 일어난다.', hint:'get up = 일어나다' },
 
 // ── 조회 헬퍼 (영어 단어장 패턴과 동일하게 기본 + 교사 추가를 합쳐서 제공) ──
+// [FRACTION-INPUT-1] 분수 문항(type:'fraction') — 값은 같지만 모양이 다른 답(가분수 22/5, 받아올림 안 한 3과 7/5,
+//   크기가 같은 1/2 ↔ 3/6)을 어떻게 볼지. false(기본) = 정답으로 인정하고 결과 화면에서 정답 모양을 안내한다
+//   (계산을 맞게 한 아이를 틀렸다고 하지 않는다 — 보스 판정 09-15). true = 정답과 같은 모양만 인정.
+const FRACTION_REQUIRE_MIXED = false;
+
 const CurriculumUtils = {
   // 현재 학기(설정에서 지정, 없으면 4-1)
   termKey() {
@@ -2778,9 +2783,32 @@ const CurriculumUtils = {
     return Array.isArray(list) && list.length ? list : null;
   },
 
+  // [FRACTION-INPUT-1] '4와 2/5' · '4 2/5' · '22/5' · '3' → { w, n, d } (못 읽으면 null). 전각 숫자도 받는다.
+  parseFraction(v) {
+    let t = String(v == null ? '' : v).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[와과]/g, ' ').replace(/\s*\/\s*/g, '/').trim().replace(/\s+/g, ' ');
+    let m;
+    if ((m = t.match(/^(\d+) (\d+)\/(\d+)$/))) return { w: +m[1], n: +m[2], d: +m[3] };
+    if ((m = t.match(/^(\d+)\/(\d+)$/))) return { w: 0, n: +m[1], d: +m[2] };
+    if ((m = t.match(/^(\d+)$/))) return { w: +m[1], n: 0, d: 1 };
+    return null;
+  },
+  // 'exact'(정답과 같은 모양) · 'equal'(값만 같음) · 'wrong'
+  fractionMatch(problem, userAnswer) {
+    const a = this.parseFraction(problem && problem.a), u = this.parseFraction(userAnswer);
+    if (!a || !u || !a.d || !u.d) return 'wrong';
+    if (a.w === u.w && a.n === u.n && a.d === u.d) return 'exact';
+    if (a.n === 0 && u.n === 0 && a.w === u.w) return 'exact';
+    return (a.w * a.d + a.n) * u.d === (u.w * u.d + u.n) * a.d ? 'equal' : 'wrong';
+  },
+
   // 정답 판정 — 초등 대상이라 관대하게(공백/대소문자 무시, 별칭 허용)
   isCorrect(problem, userAnswer) {
     if (!problem) return false;
+    if (problem.type === 'fraction') {
+      const fm = this.fractionMatch(problem, userAnswer);
+      if (fm === 'exact' || (fm === 'equal' && !FRACTION_REQUIRE_MIXED)) return true;
+    }
     const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, '');
     let ua = norm(userAnswer);
     if (!ua) return false;
