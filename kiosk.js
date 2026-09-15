@@ -20,10 +20,15 @@ window.onload = async () => {
 
   try {
     // 연결이 응답 없이 멎는 경우(학교 와이파이 지연 등) 대비 타임아웃 → catch에서 안내
+    // [INIT-SINGLE-LOAD-1] once('value') 뒤 on('value') 는 root 를 두 번 통째로 받는다(SDK 가 once 캐시를 버림).
+    //   첫 스냅샷도 on 으로 받고, 아래 실시간 리스너를 건 뒤에 뗀다.
+    let firstResolve = null;
+    const firstLoad = (s) => { if (firstResolve) { firstResolve(s); firstResolve = null; } };
     const snap = await Promise.race([
-      fbRef.once('value'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('연결 시간 초과')), 12000)),
+      new Promise((resolve) => { firstResolve = resolve; fbRef.on('value', firstLoad); }),
+      new Promise((_, reject) => setTimeout(() => { fbRef.off('value', firstLoad); reject(new Error('연결 시간 초과')); }, 12000)),
     ]);
+    setTimeout(() => fbRef.off('value', firstLoad), 0);   // 이 줄과 아래 fbRef.on 사이에 await 없음 → on 이 먼저 걸린다
     // [HOTFIX-KIOSK-PENDING-PATH-2] DB_RAW는 원본 Firebase key를 보존(별도 clone). normalizeData는
     //   _normalizeArrays가 입력을 in-place 변형하므로 또 다른 clone을 넘겨 DB_RAW 오염 방지.
     const raw = snap.val();

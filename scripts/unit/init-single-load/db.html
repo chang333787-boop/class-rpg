@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><title>db-init-bytes</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// 에뮬레이터만: gamedata 가 initializeApp(운영) 하기 전에 기본 앱을 에뮬레이터로 먼저 만든다
+const V = new URLSearchParams(location.search).get('v');
+firebase.initializeApp({ databaseURL: 'http://127.0.0.1:9000?ns=' + (new URLSearchParams(location.search).get('ns') || 'demo-boot') });
+</script>
+<script>document.write('<script src="' + V + '/gamedata.js"><\/script>');</script>
+<pre id="out">running</pre>
+<script>
+(async () => {
+  const repo = firebase.database()._delegate._repoInternal;
+  let changes = 0;
+  DB.onDataChange(() => { changes++; });
+  const t0 = performance.now();
+  await DB.init();
+  const initMs = Math.round(performance.now() - t0);
+  const afterInit = repo.stats_.get().bytes_received;
+  const settingsOk = !!(DB.getSettings && DB.getSettings());
+  // 다른 기기 흉내: REST 로 settings 한 칸 바꿈(에뮬레이터) → 실시간 리스너가 받는지
+  await new Promise(r => setTimeout(r, 1500));
+  const before = changes;
+  await fetch('http://127.0.0.1:9000/classRPG_v3/settings/touch.json?ns=' + (new URLSearchParams(location.search).get('ns') || 'demo-boot'), { method: 'PUT', body: String(Date.now()) });
+  await new Promise(r => setTimeout(r, 1500));
+  window.__res = { v: V, initMs, bytesAfterInit: afterInit, bytesTotal: repo.stats_.get().bytes_received, onChangeDuringBoot: before, liveUpdateSeen: changes > before, settingsOk,
+    listeners: Object.keys(repo.infoData_ ? {} : {}).length };
+  document.getElementById('out').textContent = JSON.stringify(window.__res, null, 1);
+})().catch(e => { window.__res = 'ERR ' + e.stack; document.getElementById('out').textContent = window.__res; });
+</script>
