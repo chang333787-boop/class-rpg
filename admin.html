@@ -170,7 +170,7 @@
           </div>
         </div>
         <div style="padding:.9rem 1.2rem">
-          <div class="text-muted-sm" style="margin-bottom:.6rem">프리셋 버튼은 바로 지급하지 않고, 보상 양식을 채운 뒤 활동승인 탭으로 이동합니다.</div>
+          <div class="text-muted-sm" style="margin-bottom:.6rem">자주 주는 보상 버튼은 바로 지급하지 않고, 보상 칸을 채운 뒤 활동 승인 탭으로 이동해요.</div>
           <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem">
             <button class="btn-sm outline" onclick="fillPreset('read');nav('approve',document.getElementById('nav-approve'))">📚 독서</button>
             <button class="btn-sm outline" onclick="fillPreset('hw');nav('approve',document.getElementById('nav-approve'))">📝 숙제</button>
@@ -181,7 +181,7 @@
             <button class="btn-sm outline" onclick="fillPreset('daily');nav('approve',document.getElementById('nav-approve'))">📋 일일퀘스트</button>
             <button class="btn-sm outline" onclick="fillPreset('special');nav('approve',document.getElementById('nav-approve'))">⭐ 특별보상</button>
           </div>
-          <div class="text-muted-sm">클릭하면 승인 페이지에서 프리셋이 바로 채워져요</div>
+          <div class="text-muted-sm">누르면 승인 페이지에서 보상 칸이 바로 채워져요</div>
         </div>
       </div>
 
@@ -574,7 +574,7 @@
 
       <!-- 게시판 퀘스트 목록 -->
       <div class="table-card">
-        <div class="tc-header"><div class="tc-title">📌 현재 게시중인 퀘스트</div></div>
+        <div class="tc-header"><div class="tc-title">📌 지금 게시 중인 퀘스트</div></div>
         <div id="board-quest-list" class="py-05"></div>
         <div class="tc-header" style="margin-top:.5rem;border-top:1px solid var(--border2)">
           <div class="tc-title" style="color:var(--txt3)">🗄️ 비활성 퀘스트</div>
@@ -826,8 +826,8 @@
       <div id="bp-equip" style="display:none">
         <div style="background:rgba(52,152,219,.06);border:1px solid rgba(52,152,219,.2);border-radius:10px;
           padding:.7rem 1rem;margin-bottom:.8rem;font-size:.75rem;color:var(--txt2)">
-          💡 <strong>장비 편집</strong> — 가격·요구레벨·전투 수치·구매조건(cond)·몸통 속성을 조정할 수 있어요.<br>
-          구매조건은 <em>새로 구매할 때만</em> 적용됩니다. 기존 보유 장비는 영향 없음.
+          💡 <strong>장비 편집</strong> — 가격·요구레벨·전투 수치·구매 조건·몸통 속성을 조정할 수 있어요.<br>
+          구매 조건은 <em>새로 살 때만</em> 적용돼요. 이미 가진 장비는 그대로예요.
         </div>
         <div class="table-card">
           <div class="tc-header">
@@ -1209,7 +1209,7 @@
       <div class="section-header">
         <div>
           <div class="sh-title">🎵 리코더 관리</div>
-          <div class="sh-sub">연습 곡을 관리하고 학생 기록을 확인하세요 · 학생 탭은 오픈 준비중</div>
+          <div class="sh-sub">연습 곡을 관리하고 학생 기록을 확인하세요 · 학생 탭은 여는 준비 중</div>
         </div>
       </div>
 
@@ -1495,7 +1495,7 @@
           <div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.15);border-radius:10px;padding:.8rem;margin-bottom:.8rem">
             <div style="font-size:.8rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">💾 백업 & 롤백</div>
             <div class="setting-row" style="margin-bottom:.5rem">
-              <div><div class="sr-label">수동 백업</div><div class="sr-sub">지금 즉시 스냅샷 저장</div></div>
+              <div><div class="sr-label">수동 백업</div><div class="sr-sub">지금 백업 만들기</div></div>
               <button class="btn-sm success" onclick="saveBackup()">💾 백업</button>
             </div>
             <div class="setting-row" style="margin-bottom:.5rem">
@@ -1547,11 +1547,11 @@
             <button class="btn-sm danger" onclick="confirmReset()">초기화</button>
           </div>
           <div class="setting-row">
-            <div><div class="sr-label">데이터 내보내기</div><div class="sr-sub">JSON 파일로 저장</div></div>
+            <div><div class="sr-label">데이터 내보내기</div><div class="sr-sub">백업 파일로 저장</div></div>
             <button class="btn-sm outline" onclick="exportData()">내보내기</button>
           </div>
           <div class="setting-row">
-            <div><div class="sr-label">데이터 가져오기</div><div class="sr-sub">JSON 파일 복원</div></div>
+            <div><div class="sr-label">데이터 가져오기</div><div class="sr-sub">백업 파일로 되돌리기</div></div>
             <button class="btn-sm outline" onclick="document.getElementById('import-file').click()">가져오기</button>
             <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
           </div>
@@ -1586,6 +1586,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260915rfr"></script>
+<script src="./admin.js?v=20260915q2e"></script>
 </body>
 </html>
