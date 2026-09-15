@@ -4,7 +4,7 @@
 //  PR 마다 따로 돌리던 검사를 한 명령으로 묶는다. 각 검사는 **따로 프로세스**로 돌려 서로 영향이 없고,
 //  기준선 숫자는 각 스크립트가 원래 쓰는 것을 그대로 쓴다(이 파일은 판정을 바꾸지 않고 모으기만 한다).
 //
-//  사용: node scripts/unit/precheck.mjs [--base origin/main] [--gold] [--save-order-baseline N]
+//  사용: node scripts/unit/precheck.mjs [--base origin/main] [--gold] [--save-order-baseline N] [--balance-strict]
 //    --base    buster-check 비교 기준(기본 origin/main). 현재 체크아웃(HEAD)을 검사한다.
 //    --gold    느린 골드 검사도 돌린다: gold-sync-sim · gold-loss-real-sdk(엣지 필요). 저장 경로를 건드린 PR이면 켤 것.
 //    --save-order-baseline N   save-order-check 기준선(기본 11 = 2026-09-15 main). 새 자리가 늘면 FAIL.
@@ -38,6 +38,13 @@ const CHECKS = [
 for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'student-known-check']) {
   CHECKS.push({ name: f, file: `scripts/unit/${f}.mjs`, args: [], pick: /(최종 결과:[^\n]*|PASS[^\n]*|FAIL[^\n]*)$/m, optional: true });
 }
+// [PRECHECK-BALANCE-1] 밸런스 빠른 검사(밸런스 조수 제공, 각 약 2초).
+//   identity: main 대비 밸런스 출력이 같은가. --review 라 달라도 exit 0 이고 요약 줄이 'REVIEW' → 여기서 REVIEW 로 표시
+//             (값을 일부러 바꾸는 PR 이 있으므로). 구조만 옮기는 PR 은 `--balance-strict` 로 FAIL 로 셈.
+//   gate:     운영 설정 기준 회귀 경보(풀장비 최저 ≥50%·Lv1/2 ≥90%·절벽 ≤35%p). 걸리면 exit 1 → FAIL.
+const BALANCE_STRICT = argv.includes('--balance-strict');
+CHECKS.push({ name: 'balance-identity', file: 'scripts/balance/identity.mjs', args: BALANCE_STRICT ? ['--quick'] : ['--quick', '--review'], pick: /요약:[^\n]*/, optional: true, balanceReview: !BALANCE_STRICT });
+CHECKS.push({ name: 'balance-gate', file: 'scripts/balance/gate.mjs', args: ['--quick', '--settings', 'scripts/balance/settings/prod-20260915.json'], pick: /요약:[^\n]*/, optional: true });
 if (GOLD) {
   CHECKS.push({ name: 'gold-sync-sim', file: 'scripts/unit/gold-sync-sim.mjs', args: GOLD_STRICT ? ['--expect-fixed'] : [], pick: /무작위[^\n]*/, gold: true, timeout: 900000 });
   CHECKS.push({ name: 'gold-real-sdk', file: 'scripts/unit/gold-loss-real-sdk/run.mjs', args: GOLD_STRICT ? ['--expect-fixed'] : [], pick: /최종 결과:[^\n]*/, gold: true, timeout: 900000 });
@@ -58,6 +65,7 @@ for (const c of CHECKS) {
   if (r.error) status = 'FAIL';
   if (c.gold && !GOLD_STRICT) status = /LOSS|REPRO|유실 난 판 [1-9]/.test(outText) ? 'REVIEW' : 'PASS';
   if (c.name === 'save-order' && status === 'PASS' && /저장보다 앞선 다른 경로 쓰기 [1-9]/.test(outText)) status = 'REVIEW';
+  if (c.balanceReview && status === 'PASS' && /요약: REVIEW/.test(outText)) status = 'REVIEW';
   rows.push({ ...c, status, line, sec: ((Date.now() - t0) / 1000).toFixed(1) });
 }
 
