@@ -1800,6 +1800,19 @@ const Utils = {
   },
 
   // 장래희망 + 레벨로 직업명 생성
+  // [DERIVED-JOB-COMBAT-1] 직업·전투 능력치는 **저장값이 아니라 매번 계산**한다.
+  //   저장값은 승급 순서 버그(job||dream)·장비 기본 수치가 바뀐 뒤 누적으로 어긋났다(운영 대조: 직업 4·전투 3명).
+  //   화면·전투·친구 보기가 모두 이 두 함수만 쓴다. 저장 필드(job·combat)는 옛 판 호환으로 계속 쓰지만 읽지 않는다.
+  jobOf(s) { return this.getJobTitle((s && s.dream) || '', (s && s.level) || 1); },
+  combatOf(s) {
+    const c = { atk: 0, def: 0, mag: 0, spd: 0 };
+    const ids = (s && s.equipmentIds) || {};
+    for (const slot of Object.keys(ids)) {
+      const it = ids[slot] && GAME_DATA.getItemById(ids[slot]);
+      if (it) for (const k of Object.keys(it.stats || {})) c[k] = (c[k] || 0) + it.stats[k];
+    }
+    return c;
+  },
   getJobTitle(dream, level) {
     if (!dream) dream = '직장인';
     // 장래희망에서 핵심 단어 추출
@@ -2573,7 +2586,7 @@ function normalizeBattleDaily(student) {
 // ── 플레이어 전투 스탯 계산 ──
 // HP = BALANCE.player.hpBase + level × hpPerLevel (80 + level*12), ATK/MAG/DEF/SPD = 장비 합산
 function getPlayerBattleStats(student) {
-  const c = student.combat || {};
+  const c = Utils.combatOf(student);   // [DERIVED-JOB-COMBAT-1]
   const hp  = BALANCE.player.hpBase + (student.level || 1) * BALANCE.player.hpPerLevel;
   const atk = c.atk || 0;
   const mag = c.mag || 0;

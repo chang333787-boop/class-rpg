@@ -510,7 +510,7 @@ function renderStudentTable() {
       </td>
       <td><div class="td-gold">💰 ${s.gold}G</div></td>
       <td><span style="font-size:.78rem;color:var(--purple)">${s.title||'-'}</span></td>
-      <td><span style="font-size:.75rem;color:var(--txt2)">${s.job||'-'}</span></td>
+      <td><span style="font-size:.75rem;color:var(--txt2)">${escHtml(Utils.jobOf(s))}</span></td>
       <td><div class="td-actions">
         <button class="btn-sm" onclick="openStudentDetail('${s.id}')">상세</button>
         <button class="btn-sm success" style="font-size:.7rem" onclick="quickGiveGold('${s.id}')">+골드</button>
@@ -1590,7 +1590,7 @@ function renderPromotionList() {
         <span>${s.avatar||'🙂'}</span>
         <span style="font-weight:700;font-size:.88rem;min-width:60px">${escHtml(s.name)}</span>
         <span style="font-size:.78rem;font-weight:700;color:var(--sky)">Lv.${s.level||1}</span>
-        <span class="text-muted-sm">${s.job||'학생'}</span>
+        <span class="text-muted-sm">${escHtml(Utils.jobOf(s))}</span>
         <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;max-width:120px">
           <div style="height:100%;background:linear-gradient(90deg,var(--sky),var(--purple));border-radius:3px;width:${expPct}%"></div>
         </div>

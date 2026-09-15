@@ -1001,9 +1001,9 @@ function renderCharCard(svgWrapId, cnameId, jobId, combatId, equipId, abilityId,
   const svgWrap = document.getElementById(svgWrapId);
   if (svgWrap) svgWrap.innerHTML = charSVG(s);
   document.getElementById(cnameId).textContent = s.name;
-  document.getElementById(jobId).textContent   = '⚗️ ' + (s.job || '');
+  document.getElementById(jobId).textContent   = '⚗️ ' + Utils.jobOf(s);   // [DERIVED-JOB-COMBAT-1]
   const combatNames = {atk:'공격력',def:'방어력',mag:'마력',spd:'속도'};
-  document.getElementById(combatId).innerHTML = Object.entries(s.combat||{}).map(([k,v]) =>
+  document.getElementById(combatId).innerHTML = Object.entries(Utils.combatOf(s)).map(([k,v]) =>
     `<div class="combat-stat"><span>${combatNames[k]||k}</span><span class="combat-val">${v}</span></div>`
   ).join('');
   const slotDefs = [{k:'head',icon:'🪖',l:'머리'},{k:'body',icon:'🥋',l:'옷'},
@@ -2948,7 +2948,7 @@ function renderBattle(phase) {
 function doFight() {
   const mon = BATTLE_MON, s = CUR;
   const settings = DB.getSettings();
-  const playerStat = s.combat[mon.reqStat] || 0;
+  const playerStat = Utils.combatOf(s)[mon.reqStat] || 0;   // [DERIVED-JOB-COMBAT-1]
   const winRate = (playerStat >= mon.reqVal ? (settings.monsterWinRate||80) : 10) / 100;
   const win = Math.random() < winRate;
   BATTLE_TRIES++;
@@ -9251,7 +9251,7 @@ function openFriendFullscreen(friendId) {
   fs.style.display = 'flex';
   document.getElementById('ff-title').textContent = friend.avatar + ' ' + friend.name + '의 집';
   document.getElementById('ff-friend-info').textContent =
-    `Lv.${friend.level} · ${friend.job||'학생'} · 📚 ${friend.bookCount||0}권`;
+    `Lv.${friend.level} · ${Utils.jobOf(friend)} · 📚 ${friend.bookCount||0}권`;
   document.getElementById('ff-scene-btn').textContent = '🏠 집 안 보기 →';
   requestAnimationFrame(() => requestAnimationFrame(() => _renderFriendCanvas()));
 }
