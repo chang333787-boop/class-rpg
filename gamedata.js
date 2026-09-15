@@ -15,6 +15,11 @@ const BALANCE = {
   // 플레이어 HP = hpBase + 레벨 × hpPerLevel (ATK/MAG/DEF/SPD는 장비 합산)
   player: { hpBase: 80, hpPerLevel: 12 },
 
+  // 경험치표 (B-2i, B-1 §2.1) — expTable[k] = expTable[k−1] + need(k), need(1) = firstNeed,
+  //   need(k) = need(k−1) + steps 중 k 이상인 마지막 증가폭 + incAdjust[k]. 초반 빠르게(+60) · Lv12~ 완만하게(+100) · 끝 두 칸만 크게.
+  //   ★ 값을 바꾸면 모든 아이의 레벨 속도가 바뀐다(사용자 결정). 이미 쌓인 EXP 는 안 바뀌고 레벨 표시가 바뀐다.
+  exp: { firstNeed: 100, steps: [[2, 40], [3, 60], [11, 80], [12, 100]], incAdjust: { 29: +80, 30: +320 }, maxIndex: 30 },
+
   // 장비 등급 1~10 을 여는 레벨 — 머리·몸통·무기·장갑·신발 전 슬롯 공통 (B-1 §4.3)
   // 장비 가격 (B-2e, B-1 §4.3) — 독립 50종: price = round(c × 능력치합^p) + 줄의 priceAdj · 복사 30종(물·풀 몸통·스태프)은 원본 가격을 따른다
   //   ★ 곡선은 칸별 로그 회귀(B-1). priceAdj 는 옛 손값을 100% 그대로 두는 차이 — 없애면 아이가 보는 가격이 바뀐다(사용자 결정).
@@ -188,6 +193,17 @@ function _monBaseStat(level, stat) {
   const c = BALANCE.monsterStats.base[stat];
   return Math.round(c.a + c.b * level) + (BALANCE.monsterStats.baseAdjust[stat][level] || 0);
 }
+// ─── 경험치표 (B-2i) ─────────────────────────────────────
+function _expTable() {
+  const c = BALANCE.exp, t = [0];
+  let need = c.firstNeed;
+  for (let k = 1; k <= c.maxIndex; k++) {
+    if (k > 1) { let add = 0; for (const [from, a] of c.steps) if (k >= from) add = a; need += add + (c.incAdjust[k] || 0); }
+    t.push(t[k - 1] + need);
+  }
+  return t;
+}
+
 function _mon(shape, row, adjust) {
   const k = BALANCE.monsterStats.shapes[shape];
   const adj = adjust || {};
@@ -203,11 +219,7 @@ const GAME_DATA = {
   // ─── EXP 레벨 테이블 (밸런스 조정: 초반 빠르게, 후반 완만하게) ───
   // 하루 퀘스트 2~3개(각 30~50EXP) 기준 → 초반 매일 레벨업, Lv10+ 3~5일에 1번
   // expTable[i] = Lv(i+1)이 되기 위한 누적 EXP
-  expTable: [
-      0,  100,  240,  440,  700, 1020, 1400, 1840, 2340, 2900,  // Lv 1~10
-   3520, 4220, 5020, 5920, 6920, 8020, 9220,10520,11920,13420,  // Lv11~20
-  15020,16720,18520,20420,22420,24520,26720,29020,31420,34000,37000 // Lv21~31
-  ],
+  expTable: _expTable(),   // B-2i: BALANCE.exp 에서 계산 (0, 100, 240, 440, … 34000, 37000)
 
   // ─── 초기 학생 데이터 (가치 스탯, 새 EXP 기준) ──────────────
   defaultStudents: [
