@@ -9546,18 +9546,17 @@ function buildRankingHTML(students) {
   const rows = categories.map(cat => {
     const top3 = students.slice().sort((a,b) => cat.key(b)-cat.key(a)).slice(0,3);
     const items = top3.map((s,i) => `
-      <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;
-        background:rgba(255,255,255,.05);border-radius:10px;flex:1;min-width:0">
-        <span style="font-size:1.3rem;flex-shrink:0">${medals[i]}</span>
-        <span style="font-size:1rem;flex-shrink:0">${s.avatar||''}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
-          <div style="font-size:.73rem;color:var(--gold);font-weight:700">${cat.fmt(s,cat.key(s))}</div>
+      <div class="rk-item">
+        <span class="rk-medal">${medals[i]}</span>
+        <span class="rk-ava">${s.avatar||''}</span>
+        <div class="rk-body">
+          <div class="rk-name">${s.name}</div>
+          <div class="rk-val">${cat.fmt(s,cat.key(s))}</div>
         </div>
       </div>`).join('');
-    return `<div style="margin-bottom:.9rem">
-      <div style="font-size:.7rem;color:var(--txt3);font-weight:700;margin-bottom:.35rem;padding-left:.1rem">${cat.label}</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem">${items}</div>
+    return `<div class="rk-group">
+      <div class="rk-label">${cat.label}</div>
+      <div class="rk-grid">${items}</div>
     </div>`;
   }).join('');
   return rows;
