@@ -1062,8 +1062,11 @@ const DB = {
     this._cache = db;
     this._fbRef.child('boardQuests').transaction(cur => applyDaily(cur));
 
-    // 오늘 날짜 기록
-    this.saveSettings({ ...settings, autoDailyLastDate: today });
+    // 오늘 날짜 기록 — [DAILY-DATE-FIELD-1] 이 한 칸만 쓴다.
+    //   예전엔 saveSettings 로 settings 통째 set 이라, 학생 기기가 아침에 이걸 부르는 순간(왕복 시간 안)
+    //   교사가 바꾼 설정(보스 켜기 등)을 옛 캐시 값으로 되돌렸다.
+    settings.autoDailyLastDate = today;
+    this._fbRef.child('settings/autoDailyLastDate').set(today).catch(e => this._onSaveError(e));
   },
 
   getPromotionRequests()     { return this.load().promotionRequests || []; },
