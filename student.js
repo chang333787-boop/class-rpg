@@ -884,6 +884,8 @@ const CHAR_DOLL = true;
 const _CHAR_SVG = {};        // 'base_1' | 'body_e_b3' ... → 바깥 <svg> 벗긴 내용
 let _charDollReady = false;
 let _charDollLoading = false;
+let _charDollFailed = false;   // [CHAR-FIRST-1] 84장을 못 받았을 때만 true → 그때만 옛 그림(buildCharSVG)
+const _CHAR_DOLL_WAIT_MS = 15000;   // 이보다 오래 안 오면 일단 옛 그림, 뒤늦게 오면 다시 종이인형
 
 // 바깥 <svg …> … </svg> 벗기기
 function _charInner(txt) {
@@ -917,11 +919,32 @@ function loadCharDolls() {
       .then(t => { if (t) _CHAR_SVG[n] = _charInner(t); })
       .catch(() => {})
   )).then(() => {
-    // base 가 하나도 없으면 종이인형을 쓸 수 없다 — 예전 그림 유지
+    // base 가 하나도 없으면 종이인형을 쓸 수 없다 — 그때만 예전 그림
     const anyBase = ['base_1','base_2','base_3','base_4'].some(b => _CHAR_SVG[b]);
-    if (!anyBase) { console.warn('캐릭터 에셋 로드 실패 — 기존 그림 유지'); return; }
-    _charDollReady = true;
-    try { renderAll(); } catch (e) { /* 화면이 아직 없으면 다음 렌더에 반영된다 */ }
+    if (!anyBase) { console.warn('캐릭터 에셋 로드 실패 — 기존 그림 유지'); _charDollFailed = true; _redrawCharSpots(); return; }
+    _charDollReady = true; _charDollFailed = false;
+    _redrawCharSpots();   // [CHAR-FIRST-1] 화면 전체(renderAll)가 아니라 캐릭터 자리만
+  });
+  // 느린 망: 너무 오래 안 오면 빈 자리 대신 옛 그림을 보인다. 뒤늦게 오면 위 then 이 다시 종이인형으로 바꾼다.
+  setTimeout(() => { if (!_charDollReady && !_charDollFailed) { _charDollFailed = true; _redrawCharSpots(); } }, _CHAR_DOLL_WAIT_MS);
+}
+// [CHAR-FIRST-1] 로그인 전 페이지 로드 직후부터 받기 시작한다(로그인 화면 동안 84장이 미리 온다).
+try { loadCharDolls(); } catch (e) { /* fetch 없는 환경이면 로그인 뒤 호출이 다시 시도한다 */ }
+
+// [CHAR-FIRST-1] 84장이 오기 전 자리 — 그림자와 흐린 실루엣만. 옛 그림을 먼저 보이지 않는다.
+function _charPlaceholderSVG() {
+  return '<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">'
+       + '<ellipse cx="60" cy="151" rx="26" ry="5" fill="#000" opacity=".28"/>'
+       + '<g fill="#fff" opacity=".07"><circle cx="60" cy="42" r="22"/><rect x="40" y="60" width="40" height="44" rx="6"/>'
+       + '<rect x="43" y="100" width="15" height="32" rx="5"/><rect x="62" y="100" width="15" height="32" rx="5"/></g></svg>';
+}
+// [CHAR-FIRST-1] 캐릭터가 그려지는 자리만 다시 그린다(캐릭터 카드·모바일 카드·전투 무대). 없는 자리는 건너뛴다.
+function _redrawCharSpots() {
+  if (typeof CUR === 'undefined' || !CUR) return;
+  ['char-svg-wrap', 'mob-char-svg-wrap', 'ba-char-emoji'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    try { el.innerHTML = charSVG(CUR); } catch (e) { /* 그 자리만 건너뛴다 */ }
   });
 }
 
@@ -961,6 +984,7 @@ function charSVG(s) {
     const doll = buildCharDoll(s);
     if (doll) return doll;
   }
+  if (CHAR_DOLL && !_charDollFailed) return _charPlaceholderSVG();   // [CHAR-FIRST-1] 받는 중 — 옛 그림을 먼저 보이지 않는다
   return buildCharSVG(s);
 }
 

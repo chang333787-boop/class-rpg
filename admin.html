@@ -11,10 +11,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="./gamedata.js?v=20260910g"></script>
 <script src="./curriculum.js?v=20260915stb"></script>
-<link rel="stylesheet" href="./admin.css?v=20260910b">
+<link rel="stylesheet" href="./admin.css?v=20260915d2a">
 </head>
 <body>
-<div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:#0E1621;
+<div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:var(--bg);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
   <div style="font-size:3rem">🏫</div>
   <div style="font-size:1rem;font-weight:700;color:#FFD700">교사 관리자</div>
@@ -25,9 +25,9 @@
 </div>
 
 <!-- ════ 관리자 로그인 ════ -->
-<div id="admin-login-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
+<div id="admin-login-screen" style="position:fixed;inset:0;z-index:999999;background:var(--bg);
   display:flex;align-items:center;justify-content:center">
-  <div style="background:#1A2535;border:1px solid rgba(74,144,226,.3);border-radius:16px;
+  <div style="background:var(--bg2);border:1px solid rgba(217,164,65,.3);border-radius:16px;
     padding:2.4rem;width:min(360px,92vw);box-shadow:0 30px 60px rgba(0,0,0,.5)">
     <div style="text-align:center;margin-bottom:1.8rem">
       <div style="font-size:2.5rem;margin-bottom:.5rem">🏫</div>
@@ -1395,7 +1395,7 @@
           </div>
           <div class="setting-row">
             <div><div class="sr-label">몬스터 하루 도전 횟수</div></div>
-            <input class="form-input" id="set-monster-limit" style="width:70px" value="2" type="number" min="1" max="5">
+            <input class="form-input" id="set-monster-limit" style="width:70px" value="3" type="number" min="1" max="10">
           </div>
           <div class="setting-row">
             <div><div class="sr-label">⏰ 학생 접속 허용 시간</div><div class="sr-sub">이 시간 외에는 로그인 불가</div></div>
@@ -1588,6 +1588,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260915q3d"></script>
+<script src="./admin.js?v=20260915q3h"></script>
 </body>
 </html>

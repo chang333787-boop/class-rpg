@@ -26,6 +26,16 @@ function escJsAttr(s) {
   return escHtml(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
+// 링크·오디오 주소 검사 (Q3-URL-2) — student.js safeUrl 과 같은 규칙. http/https 만, 다른 스킴은 빈 문자열.
+//  브라우저가 주소 속 탭·줄바꿈을 무시하므로 제어 문자(코드 0~31, 127)를 먼저 지운다.
+function safeUrl(u) {
+  const s = [...String(u == null ? '' : u)].filter(ch => ch.charCodeAt(0) > 31 && ch.charCodeAt(0) !== 127).join('').trim();
+  if (!s) return '';
+  if (/^https?:[/][/]/i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return '';
+  return 'https://' + s.replace(/^[/]+/, '');
+}
+
 // ══════════════════════════════════════════════════
 //  ADMIN LOGIN
 // ══════════════════════════════════════════════════
@@ -2379,7 +2389,7 @@ function renderArtworkAdmin() {
       <div class="aw-detail" style="display:none;padding:0 1.2rem .8rem">
         ${arts.map(a=>`
           <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.6rem 0;border-top:1px solid rgba(255,255,255,.04)">
-            ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
+            ${a.artUrl?`<img src="${escHtml(a.artUrl)}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
               onclick="adminOpenArtLb(event)">`:``}
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:.85rem">${escHtml(a.title || '제목 없는 그림')}
@@ -2748,7 +2758,7 @@ function createAlbum() {
 function renderAlbumList() {
   const el = document.getElementById('album-list');
   if (!el) return;
-  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const albums = [...DB.getAlbums()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // [CACHE-SORT-1] 복사 뒤 정렬
   el.innerHTML = albums.length === 0
     ? `<div style="font-size:.78rem;color:var(--txt3)">앨범 없음 — 위에서 추가하세요</div>`
     : albums.map(a => {
@@ -2922,10 +2932,12 @@ function renderMemoriesPage() {
   if (statusF !== 'all')       mems = mems.filter(m=>m.approvalStatus===statusF);
   if (typeF === 'admin')        mems = mems.filter(m=>m.uploadedBy==='admin');
   if (typeF === 'student')      mems = mems.filter(m=>m.uploadedBy!=='admin');
-  mems.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  // [CACHE-SORT-1] 필터가 모두 '전체'면 mems 는 DB.getMemories('all') 이 돌려준 **캐시 배열 그 자체**다.
+  //   제자리 정렬하면 캐시가 뒤섞이고, saveMemory/saveAlbum 이 배열을 통째로 set 해 **재배치된 순서가 운영 DB 에 저장**된다(#228 과 같은 종류).
+  mems = [...mems].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
   // 앨범 목록 (셀렉트 옵션용)
-  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const albums = [...DB.getAlbums()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // [CACHE-SORT-1] 복사 뒤 정렬
 
   if (mems.length === 0) {
     el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--txt3)">추억 사진이 없어요</div>`;
@@ -2939,9 +2951,9 @@ function renderMemoriesPage() {
     <div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
       border-bottom:1px solid rgba(255,255,255,.05)">
       <!-- 썸네일 (클릭→다운로드) -->
-      <a href="${m.imageUrl||m.thumbUrl}" download target="_blank" title="클릭하면 원본 다운로드"
+      <a href="${escHtml(safeUrl(m.imageUrl||m.thumbUrl))}" download target="_blank" title="클릭하면 원본 다운로드"
         style="flex-shrink:0;display:block;position:relative">
-        <img src="${m.thumbUrl||m.imageUrl}"
+        <img src="${escHtml(m.thumbUrl||m.imageUrl)}"
           style="width:60px;height:60px;border-radius:8px;object-fit:cover;display:block">
         <div style="position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:8px;
           display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s"
@@ -3008,7 +3020,7 @@ function renderBulkRenameList() {
   const wrap = document.getElementById('bulk-rename-list');
   if (!wrap) return;
   const filter = document.getElementById('bulk-rename-filter')?.value || 'kakao';
-  const mems = DB.getMemories('all').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const mems = [...DB.getMemories('all')].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));   // [CACHE-SORT-1] 복사 뒤 정렬
 
   const candidates = mems.filter(m => {
     const t = (m.title || '').toLowerCase();
@@ -3030,7 +3042,7 @@ function renderBulkRenameList() {
       <input type="checkbox" class="bulk-chk" data-id="${m.id}" checked
         onchange="updateBulkCount()"
         style="width:15px;height:15px;flex-shrink:0;accent-color:var(--gold)">
-      <img src="${m.thumbUrl||m.imageUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0">
+      <img src="${escHtml(m.thumbUrl||m.imageUrl)}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0">
       <div style="flex:1;min-width:0">
         <div style="font-size:.75rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
           color:${(m.title||'').toLowerCase().startsWith('kakao')?'var(--red)':'var(--txt1)'}">
@@ -3193,9 +3205,9 @@ function renderRecorderPage() {
       <div onclick="toggleRecLog('${r.id}')"
         style="display:flex;align-items:center;gap:.6rem;padding:.65rem 1.2rem;cursor:pointer">
         <span style="font-size:.95rem">${s?.avatar||'👤'}</span>
-        <span style="font-weight:700;font-size:.88rem">${s?.name||r.studentId}</span>
+        <span style="font-weight:700;font-size:.88rem">${escHtml(s?.name||r.studentId)}</span>
         <span style="font-size:.72rem;background:rgba(255,215,0,.1);color:var(--gold);
-          border-radius:8px;padding:.1rem .4rem">🎵 ${r.songTitle||song?.title||'(곡 없음)'}</span>
+          border-radius:8px;padding:.1rem .4rem">🎵 ${escHtml(r.songTitle||song?.title||'(곡 없음)')}</span>
         <span class="text-muted-tiny">${r.date||''}</span>
         <span style="font-size:.78rem;letter-spacing:.08em;color:var(--sky);margin-left:.2rem"
           title="연습 횟수">${dots(r.practiceCount)}</span>
@@ -3211,9 +3223,9 @@ function renderRecorderPage() {
         ${r.recordingUrl ? `
         <div style="margin-bottom:.7rem">
           <div style="font-size:.68rem;color:var(--emerald);font-weight:700;margin-bottom:.3rem">🎙️ 녹음 파일</div>
-          ${r.recordingName ? `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.25rem">${r.recordingName}</div>` : ''}
-          <audio controls src="${r.recordingUrl}" style="width:100%;height:36px" preload="none"></audio>
-          <a href="${r.recordingUrl}" target="_blank" rel="noopener"
+          ${r.recordingName ? `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.25rem">${escHtml(r.recordingName)}</div>` : ''}
+          <audio controls src="${escHtml(safeUrl(r.recordingUrl))}" style="width:100%;height:36px" preload="none"></audio>
+          <a href="${escHtml(safeUrl(r.recordingUrl))}" target="_blank" rel="noopener"
             style="font-size:.68rem;color:var(--sky);display:inline-block;margin-top:.25rem;text-decoration:none">
             ↗ 새 창에서 열기</a>
         </div>` : ''}
@@ -3223,11 +3235,11 @@ function renderRecorderPage() {
           ${r.reflection    ? `<div><b style="color:var(--txt3);font-size:.68rem">느낀 점</b><br>${escHtml(r.reflection)}</div>`       : ''}
           ${r.bestToday     ? `<div><b style="color:var(--txt3);font-size:.68rem">잘된 점</b><br>${escHtml(r.bestToday)}</div>`         : ''}
           ${r.difficultPart ? `<div><b style="color:var(--txt3);font-size:.68rem">어려운 부분</b><br>${escHtml(r.difficultPart)}</div>` : ''}
-          ${r.selfRating    ? `<div><b style="color:var(--txt3);font-size:.68rem">자기평가</b><br>${'⭐'.repeat(r.selfRating)}</div>` : ''}
+          ${r.selfRating    ? `<div><b style="color:var(--txt3);font-size:.68rem">자기평가</b><br>${'⭐'.repeat(Math.max(0, Math.min(5, r.selfRating|0)))}</div>` : ''}
         </div>` : ''}
         <!-- 교사 코멘트 -->
         <div style="display:flex;gap:.4rem;align-items:center">
-          <input id="${rid}-comment" type="text" value="${r.teacherComment||''}"
+          <input id="${rid}-comment" type="text" value="${escHtml(r.teacherComment||'')}"
             placeholder="교사 코멘트 입력..."
             style="flex:1;padding:.3rem .6rem;border-radius:8px;font-size:.75rem;font-family:inherit;
               border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--txt1)">
@@ -4671,7 +4683,10 @@ function saveBattleSettings() {
   [0,1,2,3,4,5,6,7].forEach(lv => {
     elementMults[lv] = parseFloat(document.getElementById(`bs-el-${lv}`)?.value) || SKILL_MULTIPLIERS.element[lv];
   });
+  // [BATTLE-SET-1] 장비·스킬북 조정값(equipment·skillBooks)은 다른 화면이 같은 노드 아래 저장한다.
+  //   통째로 새 객체를 만들면 set 이 그것들을 운영에서 지웠다 → 기존 값을 먼저 펼친다.
   db.settings.customBattleSettings = {
+    ...(db.settings.customBattleSettings || {}),
     dailyBattleLimit:    parseInt(document.getElementById('bs-daily-limit').value) || 3,
     infiniteBattleLimit: parseInt(document.getElementById('bs-infinite-limit').value) ?? 1,
     ghostNormalMult:  parseFloat(document.getElementById('bs-ghost-mult').value) || 0.55,
@@ -5731,7 +5746,8 @@ function loadSettings() {
   document.getElementById('set-base-gold').value    = s.baseGold||30;
   document.getElementById('set-monster-rate').value = s.monsterWinRate||80;
   const limitEl = document.getElementById('set-monster-limit');
-  if (limitEl) limitEl.value = s.monsterDailyLimit||2;
+  // [BATTLE-SET-1] 이 칸은 예전에 settings.monsterDailyLimit(읽는 곳 0)에 썼다. 실제 전투가 읽는 키로 통일.
+  if (limitEl) limitEl.value = (s.customBattleSettings || {}).dailyBattleLimit ?? 3;
   const startEl = document.getElementById('set-access-start');
   const endEl   = document.getElementById('set-access-end');
   if (startEl) startEl.value = s.accessStart||'08:30';
@@ -5805,7 +5821,7 @@ function saveSettings() {
     baseExp:          parseInt(document.getElementById('set-base-exp').value)||30,
     baseGold:         parseInt(document.getElementById('set-base-gold').value)||30,
     monsterWinRate:   parseInt(document.getElementById('set-monster-rate').value)||80,
-    monsterDailyLimit: limitEl ? (parseInt(limitEl.value)||2) : 2,
+    ...(limitEl ? { customBattleSettings: { ...(prev.customBattleSettings || {}), dailyBattleLimit: parseInt(limitEl.value) || 3 } } : {}),   // [BATTLE-SET-1]
     accessStart: document.getElementById('set-access-start')?.value || '08:30',
     accessEnd:   document.getElementById('set-access-end')?.value   || '16:00',
   });

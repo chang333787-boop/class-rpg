@@ -461,6 +461,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @media (prefers-reduced-motion: reduce){
   #study-body *{animation:none !important;transition:none !important}
 }
+/* [D3-STUDY-1] 375 폭: 모달 안 여백 27px + 과목 카드 여백 19px + 아이콘 35px + 간격 16px + 화살표를 빼면
+   설명 글자 칸이 150px 남짓이라 '단어·표현·듣기·말하기…'가 4줄로 접혔다. 여백을 8px 단위로 줄여 글자 칸을 넓힌다.
+   과목 카드의 여백·간격은 student.js 템플릿 인라인이라 이 한 곳만 !important(클래스 선택자, 속성 선택자 아님). */
+@media (max-width:600px){
+  #m-study .modal{padding:var(--sp-2,16px);border-radius:var(--r-lg,20px);}
+  #study-body .st-subject-card{padding:var(--sp-2,16px)!important;gap:12px!important;}
+  #study-body .st-subject-card > span:first-child{font-size:1.75rem!important;}
+}
 /* 세로로 긴 화면(태블릿 세로)에서는 빈 공간이 과하게 남지 않게 */
 @media (orientation:portrait){
   #m-study .modal{min-height:min(76vh,780px);}
@@ -541,6 +549,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .shop-gold-bar{font-size:.82rem;color:var(--gold);margin-bottom:.7rem;
   background:rgba(217,164,65,.07);border:1px solid rgba(217,164,65,.2);border-radius:8px;padding:.4rem .7rem;}
 .item-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;}
+/* [D3-SHOP375-1] 3칸 고정이라 375 폭에서 장비 카드(이름·능력치·가격 가로 한 줄)가 칸마다 182px를 요구해
+   합 555px가 310px 모달 밖으로 넘치고 글자가 한 글자씩 세로로 쌓였다.
+   768 폭 무기 탭도 같은 이유로 8장이 넘쳤다.
+   장비 줄 카드(.shop-row-card)가 든 그리드: 260px 이상씩 자동 칸 (375→1칸 · 768→2칸 · 1366→3칸 그대로).
+   마스터리북 탭은 칸마다 '종류 묶음(가로 줄 목록)'이 들어가(.item-card 아님) 375에서 100px 칸에 세로 글자 → 좁은 폭 1칸.
+   씨앗·장식 탭(작은 .item-card 타일)은 3칸 그대로.
+   1fr 칸은 최소 폭이 '내용 전체'라 min-width:0 을 같이 준다([UI375-2]와 같은 이유). */
+.item-grid:has(> .shop-row-card){grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));}
+.item-grid > *{min-width:0;}
+@media(max-width:700px){
+  .item-grid:not(:has(> .item-card)){grid-template-columns:minmax(0,1fr);}
+}
 .item-card{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);
   border-radius:10px;padding:.5rem .65rem;cursor:pointer;transition:all .2s;}
 .item-card:hover{border-color:rgba(217,164,65,.38);background:rgba(217,164,65,.05);}
@@ -1033,6 +1053,94 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ach-badge{font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:10px;flex-shrink:0;}
 .ach-badge.done{background:rgba(46,204,113,.2);color:var(--emerald);}
 .ach-badge.locked{background:rgba(255,255,255,.06);color:var(--txt3);}
+
+/* ══ [D3-HOME-1] 디자인 시스템 v1 — 학생 홈 (시안) ═════════════════
+   근거: 보고_20260915/디자인3_디자인시스템.html. 기능·JS 변경 0, CSS만.
+   · 갈색 한 벌: HUD·사이드·바텀탭·로그인 카드의 남색(13,13,26 / #0a1628 / 15,52,96)을 --bg1/--bg2로.
+   · --txt3 #7E6E5A → #A8957A (bg3 위 대비 2.7 → 4.6). 이름은 그대로라 인라인 var(--txt3) 1곳도 안 고치고 따라온다.
+   · 글자 6단(12/14/16/18/22/28)·간격 8px 단위. 섹션 제목 자간·대문자 변환 제거.
+   · [TOUCH-44] 블록보다 위에 둔다(그 블록이 맨 끝이어야 함).
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --bg1:#1C1712;--bg2h:#2E251A;
+  --txt3:#A8957A;
+  --gold-t:#F0C060;--purple-t:#C39BD3;--red-t:#FF8A80;
+  --line:rgba(239,231,217,.10);--border-strong:rgba(217,164,65,.45);
+  --fs-xs:.75rem;--fs-sm:.875rem;--fs-md:1rem;--fs-lg:1.125rem;--fs-xl:1.375rem;--fs-2xl:1.75rem;
+  --sp-h:4px;--sp-1:8px;--sp-2:16px;--sp-3:24px;--sp-4:32px;
+  --r-sm:8px;--r-lg:20px;--r-pill:999px;
+}
+/* 학교망에서 구글 폰트가 막히면 지금은 브라우저 기본 sans-serif로 떨어진다 → 한글 고딕을 명시 */
+html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif;}
+
+/* 로그인 — 남색 카드 → 갈색 */
+.login-card{background:var(--bg2);border-color:var(--border-strong);}
+.login-head{font-family:inherit;font-weight:800;color:var(--gold-t);}
+.stu-btn{font-size:var(--fs-md);min-height:48px;}
+.login-admin-link a{font-size:var(--fs-sm);color:var(--txt3);}
+
+/* HUD */
+.hud{background:var(--bg1);border-bottom:1px solid var(--border);padding:var(--sp-1) var(--sp-2);gap:var(--sp-2);}
+.hud-name{font-size:var(--fs-md);color:var(--gold-t);}
+.hud-exp-bar{height:8px;border-radius:4px;}
+.hud-exp-fill{border-radius:4px;}
+.hud-exp-txt,.hud-exp-label{font-size:var(--fs-xs);}
+.badge{font-size:var(--fs-sm);}
+.hud-mini-btn{font-size:var(--fs-xs);border-radius:var(--r-sm);}
+
+/* 사이드 패널 (768↑) */
+/* 사이드는 flex 세로 + 고정 높이라 여백을 키우면 캐릭터 카드(overflow:hidden)가 눌려 잘린다 — 여백은 그대로 */
+.side-panel{background:var(--bg1);border-right:1px solid var(--border);}
+/* 캐릭터 카드는 높이가 캐릭터 무대에 맞춰져 있어 여백·글자 크기를 키우면 잘린다 — 색만 바꾼다 */
+.char-card,.panel-box{background:var(--bg2);border-color:var(--border);}
+.side-panel > .char-card{flex-shrink:0;}
+.combat-stat{background:var(--bg0);}
+.panel-label{font-size:var(--fs-sm);font-weight:700;color:var(--txt2);letter-spacing:0;text-transform:none;}
+.equip-slot{background:var(--bg0);border-color:var(--line);border-radius:var(--r-sm);}
+.eslot-type{font-size:var(--fs-xs);}
+.eslot-name{font-size:var(--fs-sm);color:var(--gold-t);}
+.ab-row{margin-bottom:var(--sp-1);}
+.ab-name{font-size:var(--fs-sm);width:40px;}
+.ab-val{font-size:var(--fs-sm);}
+
+/* 본문 */
+.main-area{padding:var(--sp-3);}
+.sec-label{font-size:var(--fs-sm);font-weight:700;color:var(--txt2);letter-spacing:0;text-transform:none;
+  margin:var(--sp-3) 0 var(--sp-1);}
+.sec-label::after{background:var(--line);}
+.today-card{background:var(--bg2);border-color:var(--border);padding:var(--sp-2);margin-bottom:var(--sp-1);}
+.todo-card{background:var(--bg2);border-color:var(--line);border-radius:var(--r);padding:var(--sp-2);gap:var(--sp-2);}
+.todo-title{font-size:var(--fs-md);}
+.todo-sub{font-size:var(--fs-sm);}
+.todo-btn{font-size:var(--fs-sm);min-height:40px;padding:0 var(--sp-2);}
+.todo-badge{font-size:var(--fs-xs);}
+.mission-name{font-size:var(--fs-md);}
+.mission-reward{font-size:var(--fs-sm);color:var(--gold-t);}
+
+/* 메뉴 타일 */
+.menu-grid{gap:var(--sp-2);margin-bottom:var(--sp-2);}
+.menu-tile{background:var(--bg2);border-color:var(--border);padding:var(--sp-3) var(--sp-2);gap:var(--sp-1);}
+.tile-icon{font-size:2.25rem;line-height:1;}
+.tile-name{font-size:var(--fs-md);font-weight:800;}
+.tile-desc{font-size:var(--fs-sm);}
+.tile-notif{font-size:var(--fs-xs);padding:2px var(--sp-1);border-radius:var(--r-pill);}
+
+/* 바텀 탭 (700↓) */
+.bottom-tabs{background:var(--bg1);border-top:1px solid var(--border);}
+.btab-icon{font-size:1.5rem;}
+.btab-label{font-size:var(--fs-xs);}
+
+@media(max-width:700px){
+  .main-tab-content{padding:var(--sp-2);}
+  .menu-grid{gap:var(--sp-1);}
+  .menu-tile{padding:var(--sp-2) var(--sp-1);}
+  .tile-desc{font-size:var(--fs-xs);}
+  .hud{padding:var(--sp-1) var(--sp-2);gap:var(--sp-1);}
+  /* 375 HUD는 이름·EXP·레벨·골드가 한 줄 — 여기서 글자를 키우면 이름이 '학…'으로 잘린다 */
+  .hud-name{font-size:.9rem;}
+  .hud-exp-txt{font-size:.6875rem;}
+  .badge{font-size:.8rem;}
+}
 
 /* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════
    기준 44×44px. @media (pointer: coarse) 안에서만 — 마우스 환경은 안 바뀐다.
