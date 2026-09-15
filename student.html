@@ -452,6 +452,9 @@
           <input type="file" id="aw-file-input" accept="image/*" style="display:none"
             onchange="previewArtwork(this)">
         </label>
+        <!-- [SCAN-LINK-1] 종이 학습지는 스캔해서 올린다(테두리 찾기·반듯하게 펴기·밝게) -->
+        <button type="button" onclick="openWorksheetScan()" style="padding:.55rem;border:1.5px dashed rgba(93,173,226,.45);border-radius:10px;
+          cursor:pointer;font-size:.8rem;color:var(--sky);background:rgba(93,173,226,.06);font-family:inherit">📄 학습지 스캔하기</button>
         <div id="aw-upload-progress" style="display:none">
           <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden">
             <div id="aw-progress-bar" style="height:100%;background:var(--gold);width:0%;transition:width .3s;border-radius:2px"></div>
@@ -901,7 +904,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260915q3u"></script>
+<script src="./student.js?v=20260915stq"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
