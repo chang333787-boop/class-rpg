@@ -282,6 +282,66 @@ cur = 'gamedata._normalizeArrays';
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'buster-check';
+{
+  const { check } = await import('./buster-check.mjs');
+  const page = (js, gd, cur2) => `<script src="./gamedata.js?v=${gd}"></script><script src="./curriculum.js?v=${cur2}"></script><script src="./${js}"></script><link href="https://x/y.css?v=1">`;
+  const H = (st, ad, ki) => ({ 'student.html': st, 'admin.html': ad, 'kiosk.html': ki });
+  const base = H(page('student.js?v=20260914b', '20260910g', '20260909e'), page('admin.js?v=20260910k', '20260910g', '20260909e'), '<script src="./gamedata.js?v=20260910g"></script>');
+  const lv = (r, l) => r.filter(x => x.level === l).map(x => x.msg);
+  test('고친 파일 버스터 올림 → FAIL 0', () => {
+    const head = { ...base, 'student.html': page('student.js?v=20260915q1a', '20260910g', '20260909e') };
+    eq(lv(check({ changed: new Set(['student.js']), baseHtml: base, headHtml: head }), 'FAIL').length, 0);
+  });
+  test('고쳤는데 버스터 그대로 → FAIL', () => {
+    const r = check({ changed: new Set(['student.js']), baseHtml: base, headHtml: base });
+    eq(lv(r, 'FAIL').length, 1);
+  });
+  test('rebase 뒤 날짜가 main 보다 과거 (0914q1a < main 0915q3a) → FAIL', () => {
+    const main = { ...base, 'student.html': page('student.js?v=20260915q3a', '20260910g', '20260909e') };
+    const head = { ...base, 'student.html': page('student.js?v=20260914q1a', '20260910g', '20260909e') };
+    eq(lv(check({ changed: new Set(['student.js']), baseHtml: main, tipHtml: main, headHtml: head }), 'FAIL').length, 1);
+  });
+  test('뒤처진 브랜치: 안 건드린 줄은 main 값이 남으므로 FAIL 아님 (#218 오탐 방지)', () => {
+    const tip = { ...base, 'admin.html': page('admin.js?v=20260915q3a', '20260910g', '20260909e') };
+    const head = { ...base, 'student.html': page('student.js?v=20260915bla', '20260910g', '20260909e') };
+    eq(lv(check({ changed: new Set(['student.js']), baseHtml: base, tipHtml: tip, headHtml: head }), 'FAIL').length, 0);
+  });
+  test('뒤처진 브랜치가 admin.js 를 고쳤는데 버스터 안 올림 → main 이 딴 PR로 올렸어도 FAIL', () => {
+    const tip = { ...base, 'admin.html': page('admin.js?v=20260915q3a', '20260910g', '20260909e') };
+    eq(lv(check({ changed: new Set(['admin.js']), baseHtml: base, tipHtml: tip, headHtml: base }), 'FAIL').length, 1);
+  });
+  test('main 도 같은 버스터 줄을 바꿈 → 충돌 예상 REVIEW', () => {
+    const tip = { ...base, 'admin.html': page('admin.js?v=20260915q3a', '20260910g', '20260909e') };
+    const head = { ...base, 'admin.html': page('admin.js?v=20260915bla', '20260910g', '20260909e') };
+    const r = check({ changed: new Set(['admin.js']), baseHtml: base, tipHtml: tip, headHtml: head });
+    if (!lv(r, 'REVIEW').some(m => m.includes('충돌'))) throw new Error('충돌 예고 없음');
+  });
+  test('같은 날 다른 세션 코드 (main rfa → q3a) → 통과 (#220 오탐 방지)', () => {
+    const main = { ...base, 'admin.html': page('admin.js?v=20260915rfa', '20260910g', '20260909e') };
+    const head = { ...base, 'admin.html': page('admin.js?v=20260915q3a', '20260910g', '20260909e') };
+    eq(lv(check({ changed: new Set(['admin.js']), baseHtml: main, tipHtml: main, headHtml: head }), 'FAIL').length, 0);
+  });
+  test('안 고친 파일 버스터가 뒤로 감 → FAIL', () => {
+    const main = { ...base, 'admin.html': page('admin.js?v=20260915q3a', '20260910g', '20260909e') };   // head 는 옛 20260910k 로 되돌림
+    eq(lv(check({ changed: new Set(['student.js']), baseHtml: main, tipHtml: main, headHtml: { ...main, 'admin.html': base['admin.html'], 'student.html': page('student.js?v=20260915q1a', '20260910g', '20260909e') } }), 'FAIL').length, 1);
+  });
+  test('gamedata 를 한 html 에서만 올림 → 불일치 FAIL', () => {
+    const head = { ...base, 'student.html': page('student.js?v=20260914b', '20260915q1a', '20260909e') };
+    const f = lv(check({ changed: new Set(['gamedata.js']), baseHtml: base, headHtml: head }), 'FAIL');
+    if (!f.some(m => m.includes('html 마다 다름'))) throw new Error('불일치 못 잡음: ' + JSON.stringify(f));
+  });
+  test('세 html 동시에 올림 → FAIL 0', () => {
+    const head = H(page('student.js?v=20260914b', '20260915q1b', '20260909e'), page('admin.js?v=20260910k', '20260915q1b', '20260909e'), '<script src="./gamedata.js?v=20260915q1b"></script>');
+    eq(lv(check({ changed: new Set(['gamedata.js']), baseHtml: base, headHtml: head }), 'FAIL').length, 0);
+  });
+  test('?v= 없는 로컬 참조 → REVIEW, 외부 URL 무시', () => {
+    const head = { ...base, 'kiosk.html': base['kiosk.html'] + '<script src="./kiosk.js"></script>' };
+    eq(lv(check({ changed: new Set(), baseHtml: base, headHtml: head }), 'REVIEW').length, 1);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
