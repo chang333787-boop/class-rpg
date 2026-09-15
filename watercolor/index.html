@@ -224,6 +224,8 @@ document.write('<script src="course_' + COURSE_KEY + '.js?v=20260903"><\/script>
 /* 공통 필터: ptx=도화지 요철 질감, wc=물감 가장자리 번짐(변위). 애니메이션 요소는 필터 밖에 둘 것(성능). */
 
 /* ===== 코스 데이터 ===== */
+/* 학생 이름·성찰 글·오류 문구는 서버/입력에서 오므로 innerHTML에 넣기 전에 반드시 escHtml (student.js와 같은 함수) */
+function escHtml(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 const COURSE = window.COURSE_DATA;
 if (!COURSE){ document.body.innerHTML = '<p style="padding:24px; font-size:18px">코스 파일(course_' + COURSE_KEY + '.js)을 찾을 수 없어요. 주소의 course 값을 확인하세요.</p>'; throw new Error('no course'); }
 const LESSONS = COURSE.lessons, PARTS = COURSE.parts, ART = COURSE.art || {}, NS = COURSE.ns || COURSE.key;
@@ -319,9 +321,9 @@ let stuSel = null;
 function openStuPick(){ const g = $('stuGrid'), hint = $('stuHint'), pwRow = $('stuPwRow'); stuSel = null; pwRow.style.display = 'none'; $('stuErr').textContent = ''; $('stuPw').value = '';
   if (RPG.ready){
     hint.textContent = '우리반 성장 RPG와 같은 이름·비밀번호예요. 진행과 사진이 내 계정에 저장돼요.';
-    g.innerHTML = RPG.students.map(s => `<button data-id="${s.id}" style="padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:2px"><span style="font-size:26px">${s.avatar || '🙂'}</span><span style="font-size:15px">${s.name}</span></button>`).join('');
+    g.innerHTML = RPG.students.map(s => `<button data-id="${escHtml(s.id)}" style="padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:2px"><span style="font-size:26px">${escHtml(s.avatar || '🙂')}</span><span style="font-size:15px">${escHtml(s.name)}</span></button>`).join('');
     g.querySelectorAll('button').forEach(b => b.onclick = () => { stuSel = b.dataset.id; g.querySelectorAll('button').forEach(x => x.style.borderColor = x===b ? 'var(--accent)' : ''); pwRow.style.display = 'flex'; $('stuPw').focus(); });
-    const pre = new URLSearchParams(location.search).get('sid'); const pb = pre && g.querySelector(`button[data-id="${pre}"]`); if (pb) pb.click();
+    const pre = new URLSearchParams(location.search).get('sid'); const pb = pre && [...g.querySelectorAll('button')].find(b => b.dataset.id === pre); if (pb) pb.click();
   } else {
     hint.textContent = 'RPG 서버에 연결하지 못했어요' + (RPG.error ? ' (' + RPG.error + ')' : '') + '. 손님으로 쓰면 이 태블릿에만 저장돼요.';
     g.innerHTML = '';
@@ -443,11 +445,11 @@ function beep(){ try { const ac = new (window.AudioContext||window.webkitAudioCo
 /* ---- 기록 화면 ---- */
 async function openGallery(){
   show('galScreen'); const body = $('galBody'); body.innerHTML = '<div class="empty">불러오는 중…</div>';
-  let photos = []; try { photos = await db.all(); } catch(e){ body.innerHTML = `<div class="empty">사진을 불러올 수 없어요: ${e.message}</div>`; return; }
+  let photos = []; try { photos = await db.all(); } catch(e){ body.innerHTML = `<div class="empty">사진을 불러올 수 없어요: ${escHtml(e.message)}</div>`; return; }
   const mine = p => String(p.student == null ? '0' : p.student) === (student || '0') && (p.course || 'watercolor') === COURSE.key;
   const groups = LESSONS.map(L => ({L, ps: photos.filter(p => p.lesson === L.id && mine(p)).sort((a,b)=>a.ts-b.ts), r: reflect[L.id]})).filter(g => g.ps.length || (g.r && (g.r.mood || g.r.why)));
   if (!groups.length){ body.innerHTML = '<div class="empty">아직 기록이 없어요. 차시를 마칠 때 작품 사진을 남겨 보세요.</div>'; return; }
-  body.innerHTML = groups.map(g => `<h3>${g.L.id}. ${g.L.title}${g.r&&g.r.mood?`<span style="font-size:22px">${g.r.mood}</span>`:''}${g.r&&g.r.why?`<span class="lbl" style="font-weight:400; font-size:15px; color:var(--muted)"> — ${g.r.why}</span>`:''}</h3>
+  body.innerHTML = groups.map(g => `<h3>${g.L.id}. ${g.L.title}${g.r&&g.r.mood?`<span style="font-size:22px">${escHtml(g.r.mood)}</span>`:''}${g.r&&g.r.why?`<span class="lbl" style="font-weight:400; font-size:15px; color:var(--muted)"> — ${escHtml(g.r.why)}</span>`:''}</h3>
     <div class="thumbs">${g.ps.map(p => `<div class="thumb" data-id="${p.id}"><img src="${p.data}" alt=""><div class="cap"><span>${dateStr(p.ts)}</span></div></div>`).join('') || '<div class="empty" style="padding:6px">사진 없음</div>'}</div>`).join('');
   body.querySelectorAll('.thumb').forEach(t => t.onclick = () => { const p = photos.find(x => x.id === +t.dataset.id); const L = LESSONS.find(l => l.id === p.lesson); $('viewerImg').src = p.data; $('viewerInfo').textContent = `${L.id}. ${L.title} · ${dateStr(p.ts)}`; $('viewer').classList.add('on'); $('viewerDel').onclick = async () => { if (confirm('이 사진을 지울까요?')) { await db.del(p.id); $('viewer').classList.remove('on'); openGallery(); } }; });
 }
