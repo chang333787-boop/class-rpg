@@ -3601,30 +3601,7 @@ async function dedupeAll() {
 async function normalizeArtworkKeys(keep) {
   const node = DB._fbRef.child('artworks');
   const raw = (await node.once('value')).val() || {};
-  const keys = Object.keys(raw);
-  const upd = {};
-  let moved = 0, removed = 0;
-  const hasRealAt = k => !!(raw[k] && raw[k].id === k);
-  for (const k of keys) {
-    const a = raw[k];
-    if (a && a.id === k) {                                   // 이미 제 모양
-      if (!keep(a)) { upd[k] = null; removed++; }
-      continue;
-    }
-    if (a && a.id) {                                         // 키가 id 가 아님(옛 숫자 키 등)
-      upd[k] = null;
-      if (!keep(a)) { removed++; continue; }
-      if (hasRealAt(a.id) || (upd[a.id] && upd[a.id].id)) { removed++; continue; }   // 같은 작품이 이미 id 키에 있음 → 중복
-      const piece = raw[a.id] && !raw[a.id].id ? raw[a.id] : {};                    // 유령 조각(hidden·likes)
-      upd[a.id] = { ...a, ...piece, likes: { ...(a.likes || {}), ...(piece.likes || {}) } };
-      if (!Object.keys(upd[a.id].likes).length) delete upd[a.id].likes;
-      moved++;
-      continue;
-    }
-    // id 없는 레코드: 다른 작품의 유령 조각이면 위에서 합쳐졌다. 아니면 버린다
-    if (keys.some(j => raw[j] && raw[j].id === k && j !== k)) continue;
-    upd[k] = null; removed++;
-  }
+  const { upd, moved, removed } = DB._artworkKeyFix(raw, keep);   // [ART-KEY-FIX-1] 규칙은 gamedata 한 곳(작품 지우기도 같이 씀)
   if (Object.keys(upd).length) await node.update(upd);
   return { moved, removed };
 }

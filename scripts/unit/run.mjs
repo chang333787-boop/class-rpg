@@ -407,7 +407,10 @@ try {
   const runNorm = async (raw, keepSrc) => {
     const writes = [];
     const node = { once: async () => ({ val: () => JSON.parse(JSON.stringify(raw)) }), update: async (u) => { writes.push(u); }, set: async () => { writes.push('SET'); } };
-    const sb = { DB: { _fbRef: { child: (p) => { if (p !== 'artworks') throw new Error('다른 경로: ' + p); return node; } } } };
+    // 규칙은 gamedata DB._artworkKeyFix(ART-KEY-FIX-1) — 실제 gamedata.js 에서 가져온다
+    const gd = { console, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+    gd.globalThis = gd; vm.createContext(gd); vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', gd);
+    const sb = { DB: { _artworkKeyFix: gd.__DB._artworkKeyFix, _fbRef: { child: (p) => { if (p !== 'artworks') throw new Error('다른 경로: ' + p); return node; } } } };
     sb.globalThis = sb; vm.createContext(sb);
     vm.runInContext(sliceAsync('normalizeArtworkKeys') + '\nglobalThis.__n = normalizeArtworkKeys;', sb);
     const r = await sb.__n(vm.runInContext(keepSrc, sb));
@@ -442,6 +445,66 @@ try {
   test('dedupeAll: 확인창 취소 → 쓰기 0', () => eq(wrote, []));
 } catch (e) {
   test('작품 키 정리 함수·확인창이 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = 'gamedata 작품 쓰기가 실제 키에(ART-RAW-KEY-1)';
+{
+  //  운영 artworks 는 숫자 키. 내리기·좋아요·고치기가 artworks/<id>/… 에 쓰면 진짜 작품은 그대로, 유령만 생겼다.
+  //  세 모양(숫자 키만 · id 키만 · 둘 다) 모두에서 **value.id 가 같은 키 전부**에 쓰이고 유령 키가 없어야 한다.
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const memRef = (root) => {
+    const seg = (p) => p.split('/').filter(Boolean);
+    const get = (p) => seg(p).reduce((c, k) => (c == null ? null : c[k] ?? null), root.tree);
+    const put = (p, v) => { const ks = seg(p); let c = root.tree; for (const k of ks.slice(0, -1)) { if (c[k] == null || typeof c[k] !== 'object') c[k] = {}; c = c[k]; } if (v == null) delete c[ks.at(-1)]; else c[ks.at(-1)] = clone(v); };
+    const ref = (p) => ({ child: (k) => ref(p + '/' + k), once: async () => ({ val: () => clone(get(p)) }), set: async (v) => put(p, v), remove: async () => put(p, null),
+      update: async (o) => { for (const k of Object.keys(o)) put(p + '/' + k, o[k]); } });
+    return ref('');
+  };
+  const boot = (artworks) => {
+    const sb = { console, window: {}, setTimeout: (f) => f(), document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+    const root = { tree: { artworks: clone(artworks) } };
+    const DB = sb.__DB;
+    DB._fbRef = memRef(root);
+    DB._cache = DB._normalizeArrays(clone({ artworks, students: [], settings: {} }));
+    DB._onSaveError = (e) => { throw e; };
+    return { DB, root };
+  };
+  const art = { id: 'art_1', studentId: 's1', title: '그림' };
+  const layouts = {
+    '숫자 키만(운영 지금)': { 0: art, 1: { id: 'art_2', studentId: 's2' } },
+    'id 키만': { art_1: art, art_2: { id: 'art_2', studentId: 's2' } },
+    '둘 다(섞인 판)': { 0: art, art_1: art, art_2: { id: 'art_2', studentId: 's2' } },
+  };
+  const copies = (tree) => Object.entries(tree.artworks).filter(([, v]) => v && v.id === 'art_1');
+  const ghosts = (tree) => Object.entries(tree.artworks).filter(([, v]) => !v || !v.id).map(([k]) => k);
+  const results2 = [];
+  for (const [name, lay] of Object.entries(layouts)) {
+    let r = boot(lay); await r.DB.hideArtwork('art_1', true);
+    results2.push([`${name}: 내리기 → 모든 복사본 hidden · 유령 0`, () => { const c = copies(r.root.tree); if (!c.length || c.some(([, v]) => v.hidden !== true)) throw new Error(JSON.stringify(r.root.tree)); eq(ghosts(r.root.tree), []); }]);
+    const r2 = boot(lay); await r2.DB.setArtworkLike('art_1', 's9', true);
+    results2.push([`${name}: 좋아요 → 모든 복사본 likes.s9 · 유령 0`, () => { const c = copies(r2.root.tree); if (!c.length || c.some(([, v]) => !(v.likes && v.likes.s9))) throw new Error(JSON.stringify(r2.root.tree)); eq(ghosts(r2.root.tree), []); }]);
+    const r3 = boot(lay); await r3.DB.updateArtwork('art_1', { title: '새 제목' });
+    results2.push([`${name}: 고치기 → 복사본 수 그대로 · 제목 바뀜`, () => { const before = Object.values(lay).filter(v => v.id === 'art_1').length; const c = copies(r3.root.tree); eq(c.length, before, '복사본 수'); if (c.some(([, v]) => v.title !== '새 제목')) throw new Error(JSON.stringify(r3.root.tree)); }]);
+    results2.push([`${name}: 다른 작품(art_2)은 안 건드림`, () => eq(Object.values(r.root.tree.artworks).find(v => v && v.id === 'art_2').hidden, undefined)]);
+    // [ART-KEY-FIX-1] 지우기: 캐시에 없는 새 작품(그 순간 다른 기기가 올림)이 서버에 있어도 살아남고, 숫자 키 구멍·유령이 안 남는다
+    const r4 = boot(lay); r4.root.tree.artworks.new_1 = { id: 'new_1', studentId: 's3' };
+    await r4.DB.deleteArtwork('art_1');
+    results2.push([`${name}: 지우기 → 복사본 0 · art_2 남음 · 그 순간 올라온 new_1 남음 · 숫자 키·유령 0`, () => {
+      const t = r4.root.tree.artworks;
+      eq(copies(r4.root.tree).length, 0, 'art_1 복사본');
+      eq(Object.keys(t).sort(), ['art_2', 'new_1']);
+      eq(ghosts(r4.root.tree), []);
+    }]);
+  }
+  {
+    const r5 = boot({ 0: art, art_1: { hidden: true }, 1: { id: 'art_2', studentId: 's2' } });
+    await r5.DB.deleteArtwork('art_1');
+    results2.push(['지우기: 지운 작품의 유령 조각(hidden)도 같이 사라진다', () => eq(Object.keys(r5.root.tree.artworks), ['art_2'])]);
+  }
+  for (const [n, f] of results2) test(n, f);
 }
 
 // ═══════════════════════════════════════════════════════════════
