@@ -799,6 +799,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 }
 .zone-card:not(.zone-locked):hover{transform:translateY(-6px) scale(1.02);box-shadow:0 12px 40px rgba(0,0,0,.5);}
 .zone-card:not(.zone-locked):active{transform:translateY(2px) scale(.97);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+/* [D3-ZONE375-1] 사냥터 구역 카드 375 폭 — 3칸 고정(student.js 인라인 grid)이라 카드가 94px, 내용은 141px.
+   구역 이름이 '초/급/사/냥/터' 세로로 쌓이고 몬스터 미리보기·보상 줄이 잘렸다.
+   좁은 폭에서만 1칸으로. 부모에 class가 없어 `:has(> .zone-card)`로 잡는다(크롬북 크롬 105+).
+   카드 여백(인라인 1.2rem)은 1칸이면 충분히 넓어 그대로 둔다. */
+@media (max-width:600px){
+  div:has(> .zone-card){grid-template-columns:minmax(0,1fr)!important;gap:var(--sp-1,8px)!important;}
+}
 
 /* 몬스터 선택 카드 눌림 */
 .mon-select-card:not(.mon-select-dim){
@@ -1085,6 +1092,25 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ach-item{display:flex;align-items:center;gap:.9rem;padding:.8rem 0;border-bottom:1px solid rgba(255,255,255,.05);}
 .ach-item:last-child{border-bottom:none;}
 .ach-item.locked{opacity:.4;}
+/* [D3-MODALS-1] 아직 못 받은 업적 — 흐리게 40%라 설명·보상 글자가 대비 2:1 아래로 떨어져
+   "무엇을 하면 받는지"를 못 읽었다. 잠김 표시는 자물쇠 뱃지가 하므로 65%로 올린다. */
+.ach-item.locked{opacity:.65;}
+
+/* [D3-MODALS-1] 우리반 랭킹 375 폭 — 한 줄 3칸(인라인 grid)에 메달·얼굴·이름·값을 가로로 넣어
+   칸이 96px 이 되자 이름이 '학'까지만 보이고 '12,345G'가 옆 칸 메달 위로 넘쳤다.
+   좁은 폭에서만 칸 안을 세로(메달 → 얼굴 → 이름 → 값)로 쌓는다.
+   buildRankingHTML 템플릿이 인라인뿐이라 #rank-modal-body 아래 구조 선택자 + !important —
+   인라인→class 이전(골드 PR 뒤)에서 class로 바꿀 자리. */
+@media (max-width:600px){
+  #rank-modal-body > div > div:last-child > div{
+    flex-direction:column!important;align-items:center!important;text-align:center;
+    gap:2px!important;padding:var(--sp-1) var(--sp-h)!important;
+  }
+  #rank-modal-body > div > div:last-child > div > div{flex:none!important;width:100%;}
+  #rank-modal-body > div > div:last-child > div > div > div:first-child{font-size:.8125rem!important;}
+  #rank-modal-body > div > div:last-child > div > div > div:last-child{font-size:.875rem!important;white-space:nowrap;}
+  #rank-modal-body > div > div:first-child{font-size:var(--fs-sm)!important;color:var(--txt2)!important;}
+}
 .ach-icon{font-size:1.8rem;width:40px;text-align:center;flex-shrink:0;}
 .ach-body{flex:1;}
 .ach-name{font-weight:700;font-size:.88rem;}
@@ -1181,6 +1207,19 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
   .hud-exp-txt{font-size:.6875rem;}
   .badge{font-size:.8rem;}
 }
+
+/* ══ [D3-BTN-1] 버튼 글자 대비 — 디자인 시스템 v1. CSS만 ═════════════
+   흰 글자가 밝은 색 버튼 위에서 4.5:1 미달이던 것(16px 이하 글자라 큰 글자 3:1 기준 아님):
+   · 농장 할 일 버튼  흰/#2ECC71 2.1  → 바탕색 글자 8.9
+   · 도전·긴급 버튼   흰/#E74C3C 3.8  → 바탕 #C0392B 5.4
+   · 빨강 그라데(입장하기·전투·보스 배너) 흰/#E74C3C 3.8 → #D0433A→#B93A2F 4.6~5.7
+   · 알림 숫자 뱃지(메뉴·할 일)       흰/#E74C3C 3.8  → #C0392B 5.4
+   색 이름(--red)은 그대로 — 테두리·글자색으로 쓰는 곳은 안 바뀐다.
+   ══════════════════════════════════════════════════════════════ */
+.todo-btn.farm{color:var(--bg0);}
+.todo-btn.urgent,.todo-btn.monster{background:#C0392B;}
+.btn-red,.btn-battle,.bb-btn{background:linear-gradient(135deg,#D0433A,#B93A2F);}
+.tile-notif,.todo-badge{background:#C0392B;}
 
 /* ══ [TOUCH-44] 손가락으로 누를 때만 버튼을 키운다 ════════════════
    기준 44×44px. @media (pointer: coarse) 안에서만 — 마우스 환경은 안 바뀐다.
