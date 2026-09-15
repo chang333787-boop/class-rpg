@@ -1,6 +1,6 @@
 # 우리 마을 온라인 저장 — 운영 첫 확인 절차서
 
-> **언제**: Firebase 규칙 게시 → PR #214(마을 45차) 머지 → GitHub Pages 배포가 끝난 **직후 한 번.**
+> **언제**: Firebase 규칙 게시 → PR #214(마을 59차 서버용) 머지 → GitHub Pages 배포가 끝난 **직후 한 번.**
 > **왜**: 에뮬레이터로 전부 확인했지만 에뮬레이터 ≠ 운영입니다(CORS · keepalive · 규칙 실제 적용). 아이들이 쓰기 전에 시험 계정으로 한 바퀴.
 > **누가**: 로그인·비밀번호·클릭 = **선생님** · 읽기(GET) 확인 = **보스/조수** · 실패하면 되돌리기 판단 = **보스**.
 > 걸리는 시간: 약 15분. 준비물: 교사 PC 1대 + (5번용) 크롬북 1대 또는 같은 PC의 시크릿 창.
@@ -20,8 +20,8 @@ SID=s1774671589091
 | 규칙이 게시됐다 | 선생님이 콘솔 규칙 탭에 `classRPG_villages` 조각이 보이는지 한 번 봄 | 보임 |
 | #214 가 main 에 들어갔다 | `gh pr view 214 --json state -q .state` | `MERGED` |
 | Pages 가 그 커밋으로 배포됐다 | `gh api repos/chang333787-boop/class-rpg/pages/builds/latest -q '.status+" "+.commit[0:7]'` | `built <main 끝 커밋>` |
-| 배포된 마을이 45차다 | `curl -s https://funclassrpg.kr/village/index.html \| sha256sum` | `a3ae9d35…` 로 시작 |
-| 배포된 sync.js 가 저장소 원본이다 | `curl -s https://funclassrpg.kr/village/sync.js \| sha256sum` | `cedd2743…` 로 시작 |
+| 배포된 마을이 59차 서버용이다 | `curl -s https://funclassrpg.kr/village/index.html \| sha256sum` | `fc6d9160…` 로 시작 |
+| 배포된 sync.js 가 저장소 원본이다 | `curl -s https://funclassrpg.kr/village/sync.js \| sha256sum` | `3259e716…` 로 시작 |
 | 시작 전 비어 있다 | `curl -s "$DB/classRPG_villages/$SID.json"` | `null` (이미 있으면 적어 두고 진행) |
 
 ## 1. 백업 먼저 (보스)

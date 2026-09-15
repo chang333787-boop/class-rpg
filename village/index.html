@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>우리반 마을 · 시뮬 44차 — 저장 형식 v2(구역 문자열)</title>
+<title>우리반 마을 · 시뮬 59차 — 길가 장식 3 · 계절 장식 2</title>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:#0f1116;
@@ -60,6 +60,15 @@
   #goals{position:fixed;left:12px;top:62px;z-index:7;background:#16241af2;border:1px solid #2d5d3c;border-left:4px solid #5fc27e;border-radius:10px;
     padding:10px 14px;font:13px/1.6 'Malgun Gothic',sans-serif;color:#e8f5ea;max-width:min(80vw,340px);box-shadow:0 8px 24px #0009;display:none}
   #goals.show{display:block}
+  #guide{position:fixed;inset:0;z-index:20;background:#0f111699;display:none;align-items:center;justify-content:center;padding:20px}
+  #guide.show{display:flex}
+  #guide .card{background:#1a1d26;border:1px solid #3a4050;border-radius:16px;padding:22px 24px;width:min(92vw,420px);box-shadow:0 12px 40px #000b;font:16px/1.6 'Malgun Gothic',sans-serif;color:#e8e6e0;text-align:center}
+  #guide .pic{font-size:56px;line-height:1.2;margin-bottom:8px}
+  #guide .txt{min-height:78px}#guide .txt b{color:#e8b04b}
+  #guide .dots{margin:8px 0 12px;color:#556}#guide .dots b{color:#e8b04b}
+  #guide .btns{display:flex;gap:10px;justify-content:center}
+  #guide button{background:#222630;border:1px solid #3a4050;color:#e8e6e0;border-radius:10px;padding:10px 18px;font-size:16px;cursor:pointer;min-height:44px;min-width:110px}
+  #guide button.main{background:#e8b04b;color:#1a1d26;border-color:#e8b04b;font-weight:800}
   #fileBtn{flex:0 0 auto;pointer-events:auto;background:#222630dd;border:1px solid #3a4050;color:#e8e6e0;border-radius:9px;min-width:44px;min-height:44px;padding:0;font-size:18px;cursor:pointer}
   #filebox{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:8;background:#1a1d26f5;border:1px solid #3a4050;border-radius:12px;padding:12px 16px;
     font:13px/1.6 'Malgun Gothic',sans-serif;color:#e8e6e0;min-width:260px;max-width:min(90vw,380px);box-shadow:0 8px 24px #0009;display:none}
@@ -196,6 +205,7 @@
 
 <canvas id="mini" width="160" height="120"></canvas>
 <div id="goals"></div>
+<div id="guide"><div class="card"><div class="pic" id="guidePic"></div><div class="txt" id="guideTxt"></div><div class="dots" id="guideDots"></div><div class="btns"><button id="guideSkip">건너뛰기</button><button id="guideNext" class="main">다음</button></div></div></div>
 <div id="filebox"><div class="t">📦 마을 파일 <button id="fileClose">✕</button></div>
   <button id="exportBtn">⬇️ 내 마을 파일로 저장</button>
   <button id="importBtn">⬆️ 파일에서 마을 가져오기</button><input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -224,6 +234,7 @@
   };
 </script>
 
+<script src="./sync.js"></script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
 </script>
@@ -267,6 +278,8 @@ const ROOFS = [0xf2889e, 0x79cfd4, 0xf6c667, 0xa89ae0, 0xef9a7a, 0x8fbdf0, 0x8ad
 /* 주소 끝 #w=128,fill=25,people=30 → 판 크기·채움 비율·사람 수를 정해 **재기 위한** 모드.
    실제 판 크기는 설계 문서(시뮬레이션_설계_20260914.md)에서 정한다. */
 const QS = new URLSearchParams(location.search); const DEV = QS.get('dev') === '1';   // ?dev=1 일 때만 #fresh·파괴성 훅(G5 첫 PR 훅)
+const VISIT_SID = (QS.get('visit') || '').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || null;   // 친구 마을 구경(읽기만)
+const VISIT_SRC = DEV ? QS.get('visitsrc') : null;   // 시험용: 원격 대신 이 주소에서 { meta, plots } 를 받는다
 const HP = {};
 location.hash.slice(1).split(',').forEach(kv => { const [k, v] = kv.split('='); if (v !== undefined) HP[k] = isNaN(+v) ? v : +v; });
 const OFF = new Set(String(HP.off || '').split('+').filter(Boolean));   // 재기용: #off=faces+folks+… (쉼표는 해시 구분자라 + 로)
@@ -308,6 +321,18 @@ const K = {
     { g:'cone',c:0x8ed455, s:[.13,.42,.13], p:[1.1,.31,.8] },
     { g:'cone',c:0x8ed455, s:[.15,.50,.15], p:[.2,.35,-1.1] },
     { g:'cone',c:0x8ed455, s:[.14,.46,.14], p:[-.4,.33,1.0] } ] },
+  crosswalk:{ nm:'횡단보도', ic:'🚸', grp:'바닥', w:1, h:2, g:2, road:true, cap:200, parts:[
+    { g:'box', c:0x3a3a40, s:[CS,.16,CS*2],   p:[0,.08,0] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,-2.6] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,-.9] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,.9] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,2.6] } ] },
+  treerow:{ nm:'가로수 열', ic:'🌳', grp:'바닥', w:1, h:3, g:3, road:true, cap:200, parts:[
+    { g:'box', c:P.pave,   s:[CS,.16,CS*3],   p:[0,.08,0] },
+    { g:'box', c:P.stoneD, s:[.6,.3,CS*3],    p:[-1.5,.15,0] },
+    { g:'cyl', c:0xc9a071, s:[.16,1.2,.16],   p:[-1.5,.8,-4] }, { g:'sph', c:P.leaf, s:[.8,.75,.8], p:[-1.5,1.9,-4] },
+    { g:'cyl', c:0xc9a071, s:[.16,1.2,.16],   p:[-1.5,.8,0] },  { g:'sph', c:P.leaf, s:[.8,.75,.8], p:[-1.5,1.9,0] },
+    { g:'cyl', c:0xc9a071, s:[.16,1.2,.16],   p:[-1.5,.8,4] },  { g:'sph', c:P.leaf, s:[.8,.75,.8], p:[-1.5,1.9,4] } ] },
   gravel:{ nm:'자갈길', ic:'⬛', grp:'바닥', w:1, h:1, g:2, cap:700, parts:[
     { g:'box', c:P.gravel, s:[CS*.94,.14,CS*.94], p:[0,.07,0] },
     { g:'sph', c:P.stoneD, s:[.30,.16,.30], p:[-.9,.16,-.7] },
@@ -333,6 +358,27 @@ const K = {
   rock:  { nm:'바위', ic:'🪨', grp:'낮은 것', w:1, h:1, g:12, cap:150, parts:[
     { g:'sph', c:P.stone,  s:[.92,.70,.86], p:[.1,.50,0] },
     { g:'sph', c:P.stoneD, s:[.46,.34,.44], p:[-.85,.26,.35] } ] },
+  trashcan:{ nm:'쓰레기통', ic:'🗑️', grp:'낮은 것', w:1, h:1, g:0, cap:150, parts:[
+    { g:'cyl', c:0x3f8f4a, s:[.5,1.1,.5],  p:[0,.55,0] },
+    { g:'cyl', c:0x2f6e38, s:[.56,.14,.56], p:[0,1.17,0] } ] },
+  mailbox: { nm:'우체통', ic:'📪', grp:'낮은 것', w:1, h:1, g:0, cap:150, parts:[
+    { g:'cyl', c:P.metalD, s:[.08,1.1,.08], p:[0,.55,0] },
+    { g:'box', c:P.red,    s:[.7,.8,.5],    p:[0,1.5,0] },
+    { g:'box', c:0xf2f2f2, s:[.5,.12,.06],  p:[0,1.5,.26] } ] },
+  minibench:{ nm:'짧은 의자', ic:'🪑', grp:'낮은 것', need:'쉼', w:1, h:1, g:0, cap:150, parts:[
+    { g:'box', c:P.wood,   s:[1.8,.14,.6],  p:[0,.9,0] },
+    { g:'box', c:P.wood,   s:[1.8,.6,.12],  p:[0,1.5,-.28] },
+    { g:'box', c:P.metalD, s:[.12,.9,.5],   p:[-.75,.45,0] },
+    { g:'box', c:P.metalD, s:[.12,.9,.5],   p:[.75,.45,0] } ] },
+  leafpile:{ nm:'낙엽 더미', ic:'🍂', grp:'낮은 것', w:1, h:1, g:0, cap:120, season:2, parts:[
+    { g:'sph', c:0xe08a3a, s:[1.2,.6,1.1],  p:[0,.3,0] },
+    { g:'sph', c:0xc9702a, s:[.8,.45,.8],   p:[.4,.55,.2] },
+    { g:'cyl', c:P.wood,   s:[.06,1.8,.06], p:[-.7,.9,-.4], rz:.5 } ] },
+  snowman: { nm:'눈사람', ic:'⛄', grp:'낮은 것', w:1, h:1, g:0, cap:120, season:3, parts:[
+    { g:'sph', c:0xf4f7fa, s:[1.1,1.0,1.1], p:[0,.9,0] },
+    { g:'sph', c:0xf4f7fa, s:[.8,.75,.8],   p:[0,2.2,0] },
+    { g:'sph', c:0xf4f7fa, s:[.6,.55,.6],   p:[0,3.1,0] },
+    { g:'cone',c:0xf08a3a, s:[.12,.5,.12],  p:[0,3.1,.5], rx:Math.PI/2 } ] },
   stump: { nm:'그루터기', ic:'🪵', grp:'낮은 것', w:1, h:1, g:14, cap:120, parts:[
     { g:'cyl', c:P.woodD, s:[.62,.56,.62], p:[0,.28,0] },
     { g:'cyl', c:P.woodL, s:[.56,.06,.56], p:[0,.58,0] },
@@ -374,6 +420,14 @@ const K = {
     { g:'cyl', c:P.stoneD, s:[.30,.12,.30], p:[0,.07,0] },
     { g:'cone',c:P.red,    s:[.62,.90,.10], p:[.42,3.55,0], rz:-Math.PI/2 },
     { g:'sph', c:P.glow,   s:[.13,.13,.13], p:[0,4.06,0], emis:0.8 } ] },
+  fruit: { nm:'과일나무', ic:'🍎', grp:'키 큰 것', w:1, h:1, g:28, cap:100, parts:[
+    { g:'cyl', c:0xb8895f, s:[.28,1.5,.28],  p:[0,.75,0] },
+    { g:'sph', c:P.leaf,   s:[1.35,1.2,1.35],p:[0,2.3,0] },
+    { g:'sph', c:P.leafL,  s:[.95,.85,.95],  p:[.5,2.95,-.3] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[.7,2.1,.9] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[-.8,2.4,.7] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[.2,1.9,1.2] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[-.4,2.9,1.0] } ] },
   bigtree:{ nm:'큰나무', ic:'🌲', grp:'키 큰 것', w:1, h:1, g:30, cap:100, parts:[
     { g:'cyl', c:0xb8895f, s:[.52,2.6,.52],  p:[0,1.3,0] },
     { g:'sph', c:P.leaf,   s:[2.15,2.0,2.15],p:[0,3.9,0] },
@@ -668,7 +722,7 @@ const HOUSE_LV = [null, houseParts(1), houseParts(2), houseParts(3)];
 const HOUSE_CAPS = [0, 2, 4, 6];
 const GROW_TICKS = 1800;                          // 하루 내내 😊 면 한 층
 /* ── 주변 가치(F33): 집 둘레 4칸의 꾸미기 무게. 놓을 때·치울 때만 센다 ── */
-const DECO = { tree:1, bigtree:1.5, flower:1, lawn:.5, bush:.6, pot:.5, lamp:.5, bench:1, fence:.3, wall:.2, stump:.3, logs:.2, rock:.3, flag:.3, post:.2, gravel:.2, laundry:.3, bridge:.3, statue:1, sbridge:.5, pond:1, fountain:1 };
+const DECO = { tree:1, fruit:1.2, bigtree:1.5, trashcan:.5, mailbox:.5, minibench:.5, leafpile:.5, snowman:.5, flower:1, lawn:.5, bush:.6, pot:.5, lamp:.5, bench:1, fence:.3, wall:.2, stump:.3, logs:.2, rock:.3, flag:.3, post:.2, gravel:.2, laundry:.3, bridge:.3, statue:1, sbridge:.5, pond:1, fountain:1 };
 const AMEN_R = 4, AMEN_MAX = 6;
 const amen = new Map();                                // 집 root → 점수
 function amenityOf(root) {
@@ -694,7 +748,7 @@ const amenOf = root => amen.has(root) ? amen.get(root) : (amen.set(root, amenity
 const growMul = root => { const a = amenOf(root); return a <= 0 ? 1.15 : 1 - 0.3 * Math.min(a, AMEN_MAX) / AMEN_MAX; };   // 6 → ×0.7 · 0 → ×1.15
 const amenText = root => { const a = amenOf(root); return a >= 3 ? ' · 나무가 많아 좋아요' : a <= 0 ? ' · 거리가 좀 삭막해요' : ''; };
 /* 해금 — 인구 문턱과 열리는 물건 */
-const UNLOCKS = [ { pop:10, kinds:['fountain','pavilion'] }, { pop:30, kinds:['clock','windmill','dream'] }, { pop:80, kinds:['green','sbridge','library'] }, { pop:200, kinds:['school','station','museum'] } ];
+const UNLOCKS = [ { pop:10, kinds:['fountain','pavilion'] }, { pop:30, kinds:['clock','windmill','dream'] }, { pop:50, kinds:['library'] }, { pop:80, kinds:['green','sbridge','station'] }, { pop:120, kinds:['school'] }, { pop:160, kinds:['museum'] } ];   // 47차: 특별 4종은 한 개씩(광장 뒤 곡선)
 const LOCK_POP = {}; UNLOCKS.forEach(u => u.kinds.forEach(k => LOCK_POP[k] = u.pop));
 const unlocked = new Set();
 function lockedWhy(kind) { const need = LOCK_POP[kind]; if (!need || unlocked.has(kind)) return true; return '인구 ' + need + '명이면 열려요'; }
@@ -969,7 +1023,7 @@ function seasonTick() {
     const first = seasonNow < 0;
     seasonNow = si;
     chunks.forEach(ch => { if (ch.built) dirtyChunks.add(chunkKey(ch.cx, ch.cz)); });   // 잎 색을 다시 합친다(보이는 것부터)
-    forestSeason();
+    forestSeason(); if (!first) buildTray();   /* 계절 장식 트레이 갱신(59차) */
     if (!first) toast(['🌸 봄이 왔어요', '☀️ 여름이에요', '🍂 가을이에요', '❄️ 겨울이에요'][si], true);
   }
   /* 바닥·하늘은 하루에 걸쳐 부드럽게 */
@@ -1155,6 +1209,89 @@ for (const g in GEO) {
   const geo = GEO[g];
   BASE[g] = { pos: geo.attributes.position.array, nrm: geo.attributes.normal.array, idx: geo.index.array, nv: geo.attributes.position.count };
 }
+
+/* ══════════════════════════════════════════════════════════════
+   glb 모델(54차) — 디자인 2의 저폴리 모델(assets/models)을 '부위 하나'로 쓴다.
+   · 최소 파서: GLB(JSON+BIN) → 노드 TRS 적용한 정점·법선·인덱스 + 정점마다 재료 번호. 블렌더 기본 내보내기(정점 float32·인덱스 u16/u32·stride 없음)만.
+   · 모델은 base64 로 안에 넣는다(file:// 는 fetch 가 막힌다). 서버용 판은 base64 를 비우고 ./assets/models/ 에서 fetch.
+   · 없으면(#glb=none · fetch 실패) 프리미티브 그대로. #glb=house+tree+person+shop 으로 종류별 켜기(측정용).
+   ══════════════════════════════════════════════════════════════ */
+const MODEL_URL = './assets/models/';
+const MODEL_B64 = { /* 서버용: 모델은 ./assets/models/*.glb 를 상대 경로로 받는다(54차) */ };
+const GLB_KIND = { house: 'house', tree: 'tree_round', bigtree: 'tree_pine', fruit: 'tree_fruit', shop: 'shop', school: 'school', library: 'library', station: 'station', museum: 'museum', crosswalk: 'crosswalk', treerow: 'treerow', trashcan: 'trashcan', mailbox: 'mailbox', minibench: 'minibench', leafpile: 'leafpile', snowman: 'snowman', well: 'well', fountain: 'fountain', lamp: 'lamp', pond: 'pond', pavilion: 'pavilion', play: 'playground', bench: 'bench' };
+const GLB_PROP = new Set(['well', 'fountain', 'lamp', 'pond', 'pavilion', 'play', 'bench']);
+const GLB_SPECIAL = new Set(['school', 'library', 'station', 'museum']);
+const GLB_STREET = new Set(['crosswalk', 'treerow']);
+const GLB_DECO = new Set(['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman']);   // 길가·계절 장식은 'deco'(59차)   // 길 조각 둘은 'street' 로(58차)   // 특별 4종은 'special' 로 켜고 끈다(57차)   // 물건 7종은 'props' 하나로 켜고 끈다(55차)   // 종류 → 모델(집 2·3층은 partsOf 에서)
+const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_round', 'tree_pine', 'tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'], person: ['person'], shop: ['shop'], props: ['well', 'fountain', 'lamp', 'pond', 'pavilion', 'playground', 'bench'], special: ['school', 'library', 'station', 'museum'], visitor: ['visitor'], street: ['crosswalk', 'treerow'], deco: ['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman'] };
+const GLB_ON = new Set(HP.glb == null ? ['house', 'tree', 'person', 'shop', 'props', 'special', 'visitor', 'street', 'deco'] : String(HP.glb).split('+').filter(x => x && x !== 'none'));
+if (OFF.has('glb')) GLB_ON.clear();
+const GLB = {};                                       // 모델 이름 → { pos, nrm, idx, nv, vcol, vkind, tri }
+const VKIND = { roof: 1, leaf: 2, leaf2: 3, window: 4, sign: 5, lamp: 6 };   // 정점 종류: 지붕 색 돌리기 · 잎 계절색 · 창 밤불 · 빛나는 것
+function parseGLB(buf) {
+  const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('glb 아님');
+  const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
+  const bo = 20 + jl, bl = dv.getUint32(bo, true), bin = buf.slice(bo + 8, bo + 8 + bl);
+  const CT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array }, NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+  const acc = i => { const a = json.accessors[i], bv = json.bufferViews[a.bufferView]; return new CT[a.componentType](bin, (bv.byteOffset || 0) + (a.byteOffset || 0), a.count * NC[a.type]); };
+  const mats = (json.materials || []).map(m => { const c = (m.pbrMetallicRoughness && m.pbrMetallicRoughness.baseColorFactor) || [1, 1, 1, 1]; return { name: m.name || '', color: [c[0], c[1], c[2]] }; });
+  const pos = [], nrm = [], idx = [], vmat = [];
+  const N3 = new THREE.Matrix3(), tv = new THREE.Vector3(), tp = new THREE.Vector3(), tq = new THREE.Quaternion(), ts = new THREE.Vector3();
+  function node(ni, parent) {
+    const n = json.nodes[ni], m = new THREE.Matrix4();
+    if (n.matrix) m.fromArray(n.matrix); else m.compose(tp.fromArray(n.translation || [0, 0, 0]), tq.fromArray(n.rotation || [0, 0, 0, 1]), ts.fromArray(n.scale || [1, 1, 1]));
+    m.premultiply(parent);
+    if (n.mesh != null) json.meshes[n.mesh].primitives.forEach(p => {
+      if (p.mode != null && p.mode !== 4) return;
+      const Pa = acc(p.attributes.POSITION), Na = p.attributes.NORMAL != null ? acc(p.attributes.NORMAL) : null, Ia = p.indices != null ? acc(p.indices) : null, off = pos.length / 3, nv = Pa.length / 3;
+      N3.getNormalMatrix(m);
+      for (let v = 0; v < nv; v++) {
+        tv.set(Pa[v * 3], Pa[v * 3 + 1], Pa[v * 3 + 2]).applyMatrix4(m); pos.push(tv.x, tv.y, tv.z);
+        if (Na) tv.set(Na[v * 3], Na[v * 3 + 1], Na[v * 3 + 2]).applyMatrix3(N3).normalize(); else tv.set(0, 1, 0);
+        nrm.push(tv.x, tv.y, tv.z); vmat.push(p.material == null ? 0 : p.material);
+      }
+      if (Ia) for (let t = 0; t < Ia.length; t++) idx.push(Ia[t] + off); else for (let t = 0; t < nv; t++) idx.push(t + off);
+    });
+    (n.children || []).forEach(c => node(c, m));
+  }
+  const sc = json.scenes ? json.scenes[json.scene || 0] : { nodes: json.nodes.map((_, i) => i) };
+  sc.nodes.forEach(ni => node(ni, new THREE.Matrix4()));
+  const nv = pos.length / 3, vcol = new Float32Array(nv * 3), vkind = new Uint8Array(nv);
+  for (let v = 0; v < nv; v++) { const mt = mats[vmat[v]] || { name: '', color: [1, 1, 1] }; vcol[v * 3] = mt.color[0]; vcol[v * 3 + 1] = mt.color[1]; vcol[v * 3 + 2] = mt.color[2]; vkind[v] = VKIND[mt.name] || 0; }
+  return { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv, vcol, vkind, vmat: Uint8Array.from(vmat), mats, tri: idx.length / 3 };
+}
+function b64buf(t) { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
+function glbRegister(name, buf) { const g = parseGLB(buf); GLB[name] = g; BASE['glb:' + name] = g; }
+const FRUIT_MODELS = ['tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'];
+const GLB_PARTS = {};
+function glbParts(kind, name) {                     // 켜져 있고 모델이 있으면 '부위 하나', 아니면 null(프리미티브)
+  if (!GLB_ON.has(kind) || !GLB[name]) return null;
+  return GLB_PARTS[name] || (GLB_PARTS[name] = [{ g: 'glb:' + name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
+}
+/* 모델 한 재료만 떼어 BufferGeometry 로(사람: 재료별 InstancedMesh) */
+function glbSubGeo(g, matName) {
+  const mi = g.mats.findIndex(m => m.name === matName); if (mi < 0) return null;
+  const map = new Int32Array(g.nv).fill(-1), pos = [], nrm = [], idx = [];
+  for (let t = 0; t < g.idx.length; t += 3) {
+    if (g.vmat[g.idx[t]] !== mi) continue;
+    for (let k = 0; k < 3; k++) { const v = g.idx[t + k]; if (map[v] < 0) { map[v] = pos.length / 3; pos.push(g.pos[v * 3], g.pos[v * 3 + 1], g.pos[v * 3 + 2]); nrm.push(g.nrm[v * 3], g.nrm[v * 3 + 1], g.nrm[v * 3 + 2]); } idx.push(map[v]); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setIndex(idx); geo.computeBoundingSphere();
+  return geo;
+}
+const glbStats = { 안에서: 0, 받아서: 0, 실패: 0 };
+let glbLateApply = null;                              // 서버용 판: 모델이 늦게 오면 청크·사람 다시(아래 folkPoolBuild 뒤에 채움)
+(function glbLoad() {
+  const want = new Set(); GLB_ON.forEach(k => (GLB_NEED[k] || []).forEach(n => want.add(n)));
+  const late = [];
+  want.forEach(n => {
+    if (MODEL_B64[n]) { try { glbRegister(n, b64buf(MODEL_B64[n])); glbStats.안에서++; } catch (e) { glbStats.실패++; console.warn('모델 못 읽음', n, e); } }
+    else late.push(fetch(MODEL_URL + n + '.glb').then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(buf => { glbRegister(n, buf); glbStats.받아서++; }).catch(e => { glbStats.실패++; console.warn('모델 없음 → 프리미티브', n, e); }));
+  });
+  if (late.length) Promise.all(late).then(() => { if (glbLateApply) glbLateApply(); });
+})();
+window.__glb = () => ({ 켠것: [...GLB_ON], 모델: Object.keys(GLB), 사람부위: PERSON_PARTS.length, 손님부위: VISITOR_PARTS.length, 삼각: Object.fromEntries(Object.entries(GLB).map(([k, g]) => [k, g.tri])), ...glbStats });
 const _m = new THREE.Matrix4(), _n3 = new THREE.Matrix3(), _v = new THREE.Vector3(), _col = new THREE.Color();
 const _p = new THREE.Vector3(), _sc = new THREE.Vector3();
 const qLocal = new THREE.Quaternion(), qWorld = new THREE.Quaternion();
@@ -1180,7 +1317,11 @@ function partMatrix(kind, x, y, rot, pt, out) {
   return out.compose(_p, qWorld, _sc);
 }
 function bucketOf(pt) { return pt.op ? 'glass' : 'lit'; }
-function partsOf(rec) { return rec.k === 'house' ? HOUSE_LV[houseLv(rec.root)] : K[rec.k].parts; }
+function partsOf(rec) {
+  if (rec.k === 'house') { const lv = houseLv(rec.root); return glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house') || HOUSE_LV[lv]; }
+  if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
+  const mn = GLB_KIND[rec.k]; return (mn && glbParts(rec.k === 'bigtree' ? 'tree' : GLB_PROP.has(rec.k) ? 'props' : GLB_SPECIAL.has(rec.k) ? 'special' : GLB_STREET.has(rec.k) ? 'street' : GLB_DECO.has(rec.k) ? 'deco' : rec.k, mn)) || K[rec.k].parts;
+}
 
 function buildChunk(cx, cz) {
   const key = chunkKey(cx, cz);
@@ -1201,11 +1342,14 @@ function buildChunk(cx, cz) {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
       partMatrix(rec.k, x, y, rec.rot, pt, _m); _n3.getNormalMatrix(_m);
-      _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
+      const vc = base.vcol, vk = base.vkind;
+      if (!vc) _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
       for (let v = 0; v < base.nv; v++) {
         _v.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(_m); b.pos.push(_v.x, _v.y, _v.z);
         _v.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(_n3).normalize(); b.nrm.push(_v.x, _v.y, _v.z);
-        b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : 0); b.night.push(lit && pt.c === P.glass ? 1 : 0);
+        let kind = 0;
+        if (vc) { kind = vk[v]; if (kind === 1) _col.setHex(roofC); else if (kind === 2 || kind === 3) _col.setHex(seasonColor(kind === 2 ? P.leaf : P.leafL)); else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
+        b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? 1 : 0);
       }
       for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off);
     });
@@ -1620,7 +1764,7 @@ function act(clientX, clientY) {
     if (who) { FOLLOW.f = who; FOLLOW.until = performance.now() + 6000; toast(folkCard(who), true); return; }   // 카드 + 6초 따라가기(F20)
     const rec = c.inside ? cells[idx(c.x, c.y)] : null;
     if (rec && rec.k === 'sign') { writeSign(rec); return; }
-    if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘', true); return; }
+    if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘' + (topSign() ? ' · 가장 많이 읽힌 표지판 「' + topSign().t + '」 ' + topSign().reads + '번' : '') + (topLike() ? ' · 손님이 좋아한 곳: ' + topLike().nm : ''), true); return; }
     if (rec && rec.k === 'dream') {                   // 꿈나무: 꿈을 적거나 본다
       if (VISIT.on) { toast('🌟 ' + (DREAM.text || '(아직 꿈을 안 적었어요)'), true); return; }
       if (!DREAM.text) { const t = prompt('꿈나무에 네 꿈을 적어 봐 (한 줄)', ''); if (t != null && t.trim()) { DREAM.text = t.trim().slice(0, 40); markDirty(); toast('🌟 꿈나무에 적었어요: ' + DREAM.text, true); } }
@@ -1813,7 +1957,7 @@ function buildTray() {
     tabs.appendChild(b);
   });
 
-  ORDER.filter(k => K[k].grp === curGroup).forEach(kind => {
+  ORDER.filter(k => K[k].grp === curGroup && (K[k].season == null || K[k].season === seasonIdx())).forEach(kind => {   /* 계절 장식(59차): 가을·겨울에만 트레이에 */
     const k = K[kind];
     const el = document.createElement('div');
     const lw = lockedWhy(kind);
@@ -1872,7 +2016,7 @@ const SKIN = { 1:0xFFCC80, 2:0xFDDCB5, 3:0xC68642, 4:0x8D5524 };
 const HAIR = { 1:0x3E1F00, 2:0x6A1B9A, 3:0x0D2B6B, 4:0x1B5E20 };
 const TOPC = { 1:0x3E2723, 2:0x7B1FA2, 3:0x1565C0, 4:0x2E7D32 };
 
-const PERSON_PARTS = [
+const PERSON_PARTS_PRIM = [
   { g:'cyl',  c:'top',   s:[.55,1.15,.42], p:[0,.90,0] },
   { g:'cyl',  c:0x3b4252,s:[.50,.75,.38],  p:[0,.28,0] },
   { g:'cyl',  c:'skin',  s:[.15,.85,.15],  p:[-.62,.95,0] },
@@ -1912,6 +2056,7 @@ function simDay()  { return Math.floor(SIM.t / DAY_MS) + 1; }
 let savedDay = 1;
 function simHour() { return (DAY_START_H + (SIM.t % DAY_MS) / DAY_MS * 24) % 24; }
 function setSpeed(n) {
+  if (VISIT.remote && n !== 0) { toast('구경 중엔 시간이 멈춰 있어요', true); return; }
   if (n === 0) SIM.paused = true; else { SIM.paused = false; SIM.speed = n; }
   document.querySelectorAll('#spd button').forEach(b => b.classList.toggle('on', +b.dataset.s === (SIM.paused ? 0 : SIM.speed)));
   toast(n === 0 ? '멈췄어요' : n + '배속', true);
@@ -1926,7 +2071,7 @@ function drawClock() {
   if (d === clockShownDay && h === clockShownH) return;
   clockShownDay = d; clockShownH = h;
   document.getElementById('clockDay').textContent = ['🌸','☀️','🍂','❄️'][seasonIdx()] + ' ' + d + '일째';
-  if (d !== savedDay) { histPush(savedDay); savedDay = d; markDirty(); }   // 하루 넘어가면 어제 점 하나 + 시계 저장(F35)
+  if (d !== savedDay) { histPush(savedDay); dayNote(savedDay); savedDay = d; markDirty(); }   // 하루 넘어가면 어제 점 하나 + 어제 소식 + 시계 저장(F35·53차)
   document.getElementById('clockTime').textContent = (h < 12 ? (h < 6 ? '새벽 ' : '아침 ') : (h < 18 ? '낮 ' : '밤 ')) + (h % 12 || 12) + '시';
 }
 /* 낮·밤 — 빛의 세기와 하늘색만. 해 각도는 F7 에서. */
@@ -1997,14 +2142,34 @@ function blockedFor(cell, who) {
    놓기 한 번마다 맞추면 죽 끌어 놓을 때 같은 일을 열여섯 번 한다. */
 let folksDirty = true;
 
-const folkPool = PERSON_PARTS.map(pt => {
-  const im = new THREE.InstancedMesh(GEO[pt.g],
-    new THREE.MeshLambertMaterial({ color:0xffffff, flatShading:true }), FOLK_CAP);
-  im.castShadow = true; im.receiveShadow = true;
-  im.count = 0; im.frustumCulled = false;
-  scene.add(im);
-  return im;
-});
+let PERSON_PARTS = PERSON_PARTS_PRIM, folkPool = [];
+function personGlbParts() {                          // glb 사람(54차): 재료별 부위, 첫 부위(셔츠)가 클릭 판정용
+  const g = GLB.person; if (!g || !GLB_ON.has('person')) return null;
+  const spec = [['shirt', 'top'], ['pants', 0x3b4252], ['skin', 'skin'], ['hair', 'hair'], ['shoe', 0x2a1b10]], out = [];
+  for (const [mat, c] of spec) { const geo = glbSubGeo(g, mat); if (geo) out.push({ g: 'glb', geo, c, s: [1.3, 1.3, 1.3], p: [0, 0, 0] })   /* 1.85 → 2.4: 문(2.0)보다 조금 큰 치비, 44px 화면에서도 보이게 */; }
+  return out.length ? out : null;
+}
+let VISITOR_PARTS = [];
+function visitorGlbParts() {                         // 손님(관광객) glb(57차): 셔츠·바지·모자·배낭·카메라는 모델 색, 피부·머리는 4벌
+  const g = GLB.visitor; if (!g || !GLB_ON.has('visitor')) return [];
+  const out = []; const hexOf = n => { const m = g.mats.find(x => x.name === n); return m ? _col.setRGB(m.color[0], m.color[1], m.color[2]).getHex() : 0x888888; };
+  for (const mat of ['shirt', 'pants', 'skin', 'hair', 'shoe', 'hat', 'bag', 'cam']) { const geo = glbSubGeo(g, mat); if (geo) out.push({ g: 'glb', geo, c: mat === 'skin' ? 'skin' : mat === 'hair' ? 'hair' : hexOf(mat), s: [1.3, 1.3, 1.3], p: [0, 0, 0] }); }
+  return out;
+}
+function folkPoolBuild(parts) {
+  folkPool.forEach(m => { scene.remove(m); m.dispose(); });
+  PERSON_PARTS = parts; VISITOR_PARTS = visitorGlbParts();
+  folkPool = parts.concat(VISITOR_PARTS).map(pt => {
+    const im = new THREE.InstancedMesh(pt.geo || GEO[pt.g],
+      new THREE.MeshLambertMaterial({ color:0xffffff, flatShading:true }), FOLK_CAP);
+    im.castShadow = true; im.receiveShadow = true;
+    im.count = folks.length; im.frustumCulled = false;
+    scene.add(im);
+    return im;
+  });
+}
+folkPoolBuild(personGlbParts() || PERSON_PARTS_PRIM);
+glbLateApply = () => { chunks.forEach((ch, key) => { if (ch.built) dirtyChunks.add(key); }); const pp = personGlbParts(); if (pp) folkPoolBuild(pp); };
 
 const isRoad = i => { const c = cells[i]; return !!(c && K[c.k].road); };
 
@@ -2064,6 +2229,14 @@ function roadBFS(from, who, radius) {
 }
 
 /* 목적지를 하나 고른다 — 무엇이든 옆에 있는 길 칸을 좋아한다(집·광장·우물 앞) */
+/* 시간대별로 끌리는 필요(F26): 아침 물 · 낮 장보기 · 오후 놀이 · 저녁 쉼 */
+function hourPref(h) { return h >= 6 && h < 9 ? '물' : h >= 14 && h < 17 ? '놀이' : h >= 17 && h < 19 ? '장보기' : h >= 19 && h < 21 ? '쉼' : null; }   // 장보기는 퇴근 뒤 17~19(54차·보스 14:50)
+function needBeside(i) {
+  const x = cX(i), y = cY(i);
+  for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && K[c.k].need) return K[c.k].need; }
+  return null;
+}
+const destLog = { 전체: 0, 후보: 0, 고름: 0 };   // 시간대 끌림이 있는 시각에 고른 목적지 중 몇 번을 그 필요로 갔나
 function pickDestination(f, who) {
   const here = f.path ? f.path[f.path.length - 1] : f.base;
   if (here < 0 || !isRoad(here)) { f.state = 'mill'; f.until = 0; return; }
@@ -2091,7 +2264,10 @@ function pickDestination(f, who) {
   let festPool = null;
   if (EV.fest && EV.festRoot >= 0) festPool = nice.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && c.root === EV.festRoot; }); });
-  const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
+  const pref = hourPref(simHour()), timely = pref ? errand.filter(i => needBeside(i) === pref) : [];   // 시간대별(F26)
+  const useTimely = !!(timely.length && !(festPool && festPool.length) && Math.random() < 0.85);
+  if (pref) { destLog.후보 += timely.length ? 1 : 0; destLog.고름 += useTimely ? 1 : 0; destLog.전체++; }
+  const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : useTimely ? timely : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
   let goal = pool[(Math.random() * pool.length) | 0];
   if (f.visitor) { const g = visitorGoal(f, reach); if (g >= 0) goal = g; }
 
@@ -2373,8 +2549,14 @@ const GOALS = [
   { id: 'pop30',  t: '인구 30명',           ok: () => population() >= 30 },
   { id: 'plaza',  t: '광장 만들기',         ok: () => countKind('plaza') >= 1 },
   { id: 'lv3',    t: '3층 집 하나',         ok: () => { let f = false; hinfo.forEach(h => { if (h.lv >= 3) f = true; }); return f; } },
+  { id: 'library1', t: '도서관 세우기',       ok: () => countKind('library') >= 1 },
   { id: 'fest',   t: '광장 축제 열기',      ok: () => EV.festSeen },
   { id: 'pop80',  t: '인구 80명',           ok: () => population() >= 80 },
+  { id: 'station1', t: '기차역 세우기 — 손님이 와요', ok: () => countKind('station') >= 1 },
+  { id: 'pop120', t: '인구 120명',          ok: () => population() >= 120 },
+  { id: 'school1',  t: '학교 세우기',        ok: () => countKind('school') >= 1 },
+  { id: 'pop160', t: '인구 160명',          ok: () => population() >= 160 },
+  { id: 'museum1',  t: '박물관 세우기',      ok: () => countKind('museum') >= 1 },
   { id: 'pop200', t: '인구 200명',          ok: () => population() >= 200 },
 ];
 const goalsDone = new Set();
@@ -2463,7 +2645,7 @@ function pickFolk(clientX, clientY) {
   if (!folks.length || mapMode) return null;
   folkNdc.set((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
   folkRay.setFromCamera(folkNdc, camera);
-  const hits = folkRay.intersectObject(folkPool[0], false);
+  const hits = folkRay.intersectObjects(VISITOR_PARTS.length ? [folkPool[0], folkPool[PERSON_PARTS.length]] : [folkPool[0]], false);
   if (!hits.length || hits[0].instanceId == null) return null;
   return folks[hits[0].instanceId] || null;
 }
@@ -2476,6 +2658,17 @@ function histPoint(d) {
   let homes = 0, happy = 0; res.forEach((v, root) => { if (v > 0 && cells[root]) { homes++; if (faceOfHome(root) === 0) happy++; } });
   return { d, 인구: population(), 만족: homes ? Math.round(happy / homes * 100) : 0, 일자리: jobStats.일자리 ? Math.round(jobStats.찬자리 / jobStats.일자리 * 100) : 0 };
 }
+/* 어제 소식(53차): 손님·읽힘·이웃이 있었던 날만 한 줄 */
+const dayBook = { 손님: 0, 읽힘: 0, 이웃: 0, 마지막: '' };
+function dayNote(d) {
+  if (VISIT.on) return;                                   /* 구경 중엔 남의 마을 소식이라 안 보인다. 시연 판(#adv 등)에선 보인다 */
+  const v = visitStats.온손님 - dayBook.손님, r = visitStats.읽음 - dayBook.읽힘, n = (typeof neighborStats !== 'undefined' ? neighborStats.옴 : 0) - dayBook.이웃;
+  dayBook.손님 = visitStats.온손님; dayBook.읽힘 = visitStats.읽음; dayBook.이웃 = typeof neighborStats !== 'undefined' ? neighborStats.옴 : 0;
+  if (v + r + n <= 0) return;
+  const parts = []; if (v) parts.push('손님 ' + v + '명'); if (n) parts.push('이웃 ' + n + '명'); if (r) parts.push('표지판 ' + r + '번 읽힘');
+  dayBook.마지막 = '📰 어제: ' + parts.join(' · '); toast(dayBook.마지막, true);
+}
+window.__dayNote = () => ({ ...dayBook });
 function histPush(d) {
   if (VISIT.on || savingOff) return;
   if (HIST.length && HIST[HIST.length - 1].d >= d) return;   // 같은 날 두 번 없음
@@ -2642,6 +2835,7 @@ function rhythmTick(f, i, now) {
    ══════════════════════════════════════════════════════════════ */
 const fileStats = { 내보냄: 0, 가져옴: 0, 거절: 0 };
 function exportText() { return JSON.stringify(serialize()); }
+function reopenUrl() { const q = new URLSearchParams(location.search); q.delete('visit'); q.delete('visitsrc'); q.set('r', String(Date.now())); return location.pathname + '?' + q.toString(); }   // sid·dev 를 잃지 않는다(결함 B)
 function exportFile() {
   const txt = exportText(), d = new Date(), stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); a.download = '우리반마을_' + SID + '_' + stamp + '.json';
@@ -2669,7 +2863,7 @@ document.getElementById('importBtn').onclick = () => document.getElementById('im
 document.getElementById('importFile').onchange = (e) => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   const rd = new FileReader();
-  rd.onload = () => { const r = importText(String(rd.result)); if (r === true) { toast('⬆️ 마을을 가져왔어요 — 다시 열어요', true); setTimeout(() => location.replace(location.pathname + '?r=' + Date.now()), 600); } else toast(r); e.target.value = ''; };
+  rd.onload = () => { const r = importText(String(rd.result)); if (r === true) { toast('⬆️ 마을을 가져왔어요 — 다시 열어요', true); setTimeout(() => location.replace(reopenUrl()), 600); } else toast(r); e.target.value = ''; };
   rd.readAsText(f);
 };
 window.__exportText = exportText;
@@ -2735,12 +2929,50 @@ function visitFriend(fr) {
   toast('🏘️ ' + fr.nm + '의 마을이에요 — 구경만 할 수 있어요', true);
   return n;
 }
+/* ── ?visit=<sid>: 원격(REST GET, 읽기만) → 읽기 전용 구경 (46차) ── */
+const REMOTE_DB = 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app';
+const rArr = v => Array.isArray(v) ? v.filter(x => x != null) : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : [];
+const rObj = v => { const o = {}; if (Array.isArray(v)) v.forEach((x, i) => { if (x != null) o[i] = x; }); else if (v && typeof v === 'object') for (const k in v) if (v[k] != null) o[k.replace(/^c/, '')] = v[k]; return o; };
+function remoteToVillage(r) {                                   // sync.js 의 toVillage 와 같은 규칙
+  const m = r && r.meta; if (!m || typeof m !== 'object') return null;
+  return { v: m.v || 2, w: m.w || W, h: m.h || H, palette: rArr(m.palette), plotStr: Object.assign({}, (r.plots && typeof r.plots === 'object' && !Array.isArray(r.plots)) ? r.plots : {}),
+           clock: m.clock || { t: 0, speed: 1 }, houses: rObj(m.houses), unlocked: rArr(m.unlocked), goals: rArr(m.goals), festSeen: !!m.festSeen, dream: m.dream || '',
+           plots: rArr(m.plotsOpen), plotsEarned: m.plotsEarned || 0, signs: rObj(m.signs), hist: rArr(m.hist) };
+}
+function visitBar(text, showBack) {
+  const bar = document.getElementById('visitBar'); bar.classList.add('show');
+  bar.querySelector('#visitName').textContent = text; bar.childNodes[0].textContent = '🏘️ ';
+  document.getElementById('likeBtn').style.display = 'none'; document.getElementById('backBtn').style.display = showBack ? '' : 'none';
+}
+function applyVisit(d, who) {
+  clearTimeout(saveTimer); savingOff = true; VISIT.on = true; VISIT.remote = true; VISIT.who = { id: who, nm: who };
+  setMode(null, null); overlayClear(); clearBoard();
+  const r = loadSaved(JSON.stringify(d));
+  SIM.paused = true; document.querySelectorAll('#spd button').forEach(b => { b.classList.toggle('on', +b.dataset.s === 0); b.disabled = true; });
+  folksDirty = true; updateCount(); document.getElementById('fitBtn').onclick();
+  visitBar(who + '의 마을 · 구경만 할 수 있어요(시간 멈춤)', true);
+  VISIT.msg = r.ok ? '구경 중' : '저장본을 읽지 못했어요: ' + r.why; return r;
+}
+async function visitRemoteStart(sid) {
+  visitBar(sid + '의 마을을 불러오는 중…', false);
+  let data = null, err = '';
+  try {
+    const url = VISIT_SRC || (REMOTE_DB + '/classRPG_villages/' + encodeURIComponent(sid) + '.json');
+    const res = await fetch(url, { method: 'GET' }); if (!res.ok) err = 'HTTP ' + res.status; else data = await res.json();
+  } catch (e) { err = String(e); }
+  const d = data && data.meta ? remoteToVillage(data) : null;
+  if (!d || !d.plotStr) { VISIT.on = true; VISIT.remote = true; VISIT.msg = '아직 마을이 없어요' + (err ? ' (' + err + ')' : ''); visitBar(sid + ' — 아직 마을이 없어요', true); toast('아직 마을이 없어요 — 친구가 먼저 지어야 해요', true); return false; }
+  applyVisit(d, sid); return true;
+}
+if (VISIT_SID) setTimeout(() => visitRemoteStart(VISIT_SID), 0);
+window.__visitLoad = (obj) => applyVisit(obj.meta ? remoteToVillage(obj) : obj, 'test');
+window.__visitState = () => ({ 구경: VISIT.on, 원격: !!VISIT.remote, 멈춤: SIM.paused, 안내: VISIT.msg || '', 저장꺼짐: savingOff });
 document.getElementById('classBtn').onclick = () => { if (VISIT.on) return; renderFriends(); document.getElementById('friends').classList.toggle('show'); };
 document.getElementById('friendsClose').onclick = () => document.getElementById('friends').classList.remove('show');
 document.getElementById('likeBtn').onclick = () => { if (!VISIT.on) return; const l = likes(); const id = VISIT.who.id; if (l[id]) delete l[id]; else l[id] = 1;
   try { localStorage.setItem(likeKey(), JSON.stringify(l)); } catch (e) {}
   document.getElementById('likeBtn').classList.toggle('on', !!l[id]); toast(l[id] ? '❤️ 좋아요! ' + VISIT.who.nm + '의 마을 ❤️ ' + likeCount(VISIT.who) : '좋아요를 거뒀어요', true); sndFx('pop'); };
-document.getElementById('backBtn').onclick = () => { location.replace(location.pathname + '?r=' + Date.now()); };   // 내 저장본에서 다시 — 구경 중엔 한 글자도 안 썼다
+document.getElementById('backBtn').onclick = () => { location.replace(reopenUrl()); };   // 내 저장본에서 다시 — 구경 중엔 한 글자도 안 썼다
 window.__friends = () => ({ 구경중: VISIT.on, 누구: VISIT.who ? VISIT.who.nm : null, 목록: FRIENDS.map(f => [f.nm, friendCounts(f).집, likeCount(f)]), 좋아요: likes() });
 window.__visit = (k) => visitFriend(FRIENDS[k]);
 window.__save = () => { saveNow(); return !savingOff; };
@@ -2869,7 +3101,22 @@ let visitTimer = 0; const visitStats = { 온손님: 0, 간손님: 0, 오늘: 0, 
 /* 글이 있는 표지판·꿈나무인가 */
 const readable = c => (c.k === 'sign' && !!(signs.get(c.root) || {}).t) || (c.k === 'dream' && !!DREAM.text);
 function stationRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'station') r = i; }); return r; }
+const NEIGHBOR_POP = 30, NEIGHBOR_EVERY = 2400, NEIGHBOR_STAY = 60000;   // 인구 30 부터, 4분마다 1명, 60초 구경
+let neighborTimer = 0; const neighborStats = { 옴: 0, 감: 0 };
+function neighborTick(now) {
+  if (++neighborTimer < NEIGHBOR_EVERY) return; neighborTimer = 0;
+  if (VISIT.on || population() < NEIGHBOR_POP || folks.some(f => f.neighbor) || folks.length >= FOLK_CAP) return;
+  let start = -1; cells.forEach((rec, i) => { if (start < 0 && rec && rec.root === i && rec.k === 'house') start = roadBeside(rec); });   // 어느 집 앞 길에서 먼 끝을 찾는다
+  if (start < 0) return;
+  const { reach } = roadBFS(start, undefined, 60); if (reach.length < 8) return;
+  const b = reach[reach.length - 1];                                              // 길 먼 끝 = 마을 입구
+  folks.push({ home: b, ct: (Math.random() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
+    x: wx(cX(b)), z: wz(cY(b)), px: wx(cX(b)), pz: wz(cY(b)), dir: 0, pdir: 0, path: [b], step: 0, seg: 0, state: 'idle', mx: 0, mz: 0, mt: 0 });
+  folkPool.forEach(m => m.count = folks.length); neighborStats.옴++;
+  toast('🚶 이웃 마을 아이가 구경 왔어요', true);
+}
 function visitTick(now) {
+  neighborTick(now);
   if (++visitTimer < VISIT_EVERY) return; visitTimer = 0;
   const sr = stationRoot(); if (sr < 0) return;
   const b = roadBeside(cells[sr]); if (b < 0) return;
@@ -2896,9 +3143,14 @@ function visitorGoal(f, reach) {
   }
   const sights = reach.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && SIGHTS.has(c.k); }); });
-  return sights.length ? sights[(Math.random() * sights.length) | 0] : -1;
+  if (!sights.length) return -1;
+  const g = sights[(Math.random() * sights.length) | 0]; const b = buildingBeside(g); if (b && SIGHTS.has(b.k)) visitLikes[b.k] = (visitLikes[b.k] || 0) + 1;   // 손님이 좋아한 곳(50차)
+  return g;
 }
-function visitorLeave(f, i) { folks.splice(i, 1); releaseAll(i); claimed.clear(); claimed2.clear(); folkPool.forEach(m => m.count = folks.length); visitStats.간손님++; }
+const visitLikes = {};
+function topSign() { let best = null; signs.forEach((v, root) => { if (v.t && (v.reads || 0) > 0 && (!best || v.reads > best.reads)) best = { t: v.t, reads: v.reads }; }); return best; }
+function topLike() { let k = null, n = 0; for (const key in visitLikes) if (visitLikes[key] > n) { n = visitLikes[key]; k = key; } return k ? { nm: K[k].nm, n } : null; }
+function visitorLeave(f, i) { if (f.neighbor) neighborStats.감++; folks.splice(i, 1); releaseAll(i); claimed.clear(); claimed2.clear(); folkPool.forEach(m => m.count = folks.length); visitStats.간손님++; }
 
 /* ══════════════════════════════════════════════════════════════
    표지판 글(F26). signs: root → { t, at }. 팻말 Sprite 는 최근 20개만.
@@ -2932,6 +3184,7 @@ function refreshSignSprites() {
 }
 function writeSign(rec) {
   if (VISIT.on) { const v = signs.get(rec.root); toast(v && v.t ? '🪧 ' + v.t : '🪧 (빈 표지판)', true); return; }
+  { const v = signs.get(rec.root); if (v && v.t && (v.reads || 0) > 0) toast('🪧 「' + v.t + '」 손님 ' + v.reads + '명이 읽었어요', true); }
   const cur = signs.get(rec.root);
   const t = prompt('표지판에 뭐라고 쓸까? (한 줄)', cur ? cur.t : '');
   if (t == null) return; const tt = t.trim().slice(0, 20);
@@ -2949,7 +3202,7 @@ function syncFolks() {
   /* 없어진 집의 사람은 뺀다 */
   for (let i = folks.length - 1; i >= 0; i--) {
     const rec = cells[folks[i].home];
-    if (folks[i].visitor) { if (!rec || rec.k !== 'station') { folks.splice(i, 1); claimed.clear(); claimed2.clear(); } continue; }
+    if (folks[i].visitor) { if (!folks[i].neighbor && (!rec || rec.k !== 'station')) { folks.splice(i, 1); claimed.clear(); claimed2.clear(); } continue; }   // 이웃 구경꾼은 역이 없어도 남는다(52차)
     if (!rec || rec.k !== 'house' || rec.root !== folks[i].home) { if (folks[i].arriving) movers = Math.max(0, movers - 1); if (folks[i].inside) leave(folks[i], '쫓겨남'); folks.splice(i, 1); claimed.clear(); claimed2.clear(); }
   }
   /* 없어진 집의 주민 기록도 지운다 */
@@ -3028,11 +3281,14 @@ function tickFolks(dt, now) {
         if (f.arriving) { arrive(f, i); continue; }  // 집 앞에 닿았다 — 들어가 산다
         if (f.visitor && now >= f.leaveAt && from === f.base) { visitorLeave(f, i); continue; }   // 손님이 역에 닿았다 — 떠난다(F30)
         if (f.visitor && f.readTarget != null && touchesRoot(from, f.readTarget) && !f.read.has(f.readTarget)) {   // 표지판 앞 — 2초 읽는다(F37)
-          f.read.add(f.readTarget); f.readTarget = null; visitStats.읽음++; f.faceShow = 5; f.faceUntil = now + 2000;
+          f.read.add(f.readTarget); visitStats.읽음++; f.faceShow = 5; f.faceUntil = now + 2000;
+          { const sv = signs.get(f.readTarget); if (sv) { sv.reads = (sv.reads || 0) + 1; markDirty(); } else if (cells[f.readTarget] && cells[f.readTarget].k === 'dream') DREAM.reads = (DREAM.reads || 0) + 1; }   // 표지판 인기(50차)
+          f.readTarget = null;
           f.state = 'idle'; f.until = now + 2000; f.walking = false; f.path = [from]; f.step = 0; releaseAll(i); claim(from, i); continue; }
         if (f.goal === 'home' && from === f.base) { enterPlace(f, i, f.home, from, 1e15); rhythmStats.귀가++; continue; }      // 밤: 집에(F24)
-        if (f.goal === 'work' && f.job != null && cells[f.job] && touchesRoot(from, f.job)) { enterPlace(f, i, f.job, from, 1e15); jobStats.출근++; continue; }   // 일터에 닿았다(F27)
+        if (f.goal === 'work' && f.job != null && cells[f.job] && touchesRoot(from, f.job)) { enterPlace(f, i, f.job, from, 1e15); jobStats.출근++; { const bb = cells[f.job]; if (bb) { f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; } } continue; }   // 일터에 닿았다(F27)
         if (f.goal === 'school') { const sr = schoolNow(); if (sr >= 0 && buildingBeside(from) && buildingBeside(from).root === sr) { enterPlace(f, i, sr, from, 1e15); rhythmStats.등교++; continue; } }
+        if (!f.visitor) { const bb = buildingBeside(from); if (bb && (K[bb.k].need || K[bb.k].jobs)) { f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; } }   // 닿기만 해도 센다 — 좋아하는 곳(F20, 51차)
         if (tryEnter(f, i, from)) continue;          // 볼 일 보러 들어간다(F10)
         f.state = 'idle'; f.until = now + 400 + Math.random() * 900;   // 길 위에 서 있는 동안 그 칸을 막으므로 짧게
         f.walking = false; f.path = [from]; f.step = 0; releaseAll(i); claim(from, i); continue; }
@@ -3143,8 +3399,10 @@ const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
 function drawFolks(now) {
   if (!folks.length || OFF.has('folks')) return;
   const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS);   // 이전 틱 → 이번 틱 사이 어디쯤인가
-  PERSON_PARTS.forEach((pt, pi) => {
-    const im = folkPool[pi];
+  const hasV = VISITOR_PARTS.length > 0;                        // 손님 모델이 있으면 역 손님은 손님 부위로만 그린다(57차)
+  const tourist = f => !!f.visitor && !f.neighbor;
+  const draw = (parts, base, mine) => parts.forEach((pt, pi) => {
+    const im = folkPool[base + pi];
     folks.forEach((f, i) => {
       const bob = f.walking ? Math.abs(Math.sin(now / 150 + i)) * 0.09 : 0;
       const th = f.dir, co = Math.cos(th), si = Math.sin(th);
@@ -3152,7 +3410,7 @@ function drawFolks(now) {
       const pz = -pt.p[0] * si + pt.p[2] * co;
       const fx = f.px == null ? f.x : f.px + (f.x - f.px) * a;
       const fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a;
-      if (f.state === 'inside' || (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60))) { folkDummy.position.set(0, -50, 0); folkDummy.scale.set(0, 0, 0); folkDummy.updateMatrix(); im.setMatrixAt(i, folkDummy.matrix); return; }
+      if (!mine(f) || f.state === 'inside' || (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60))) { folkDummy.position.set(0, -50, 0); folkDummy.scale.set(0, 0, 0); folkDummy.updateMatrix(); im.setMatrixAt(i, folkDummy.matrix); return; }
       folkDummy.position.set(fx + px, pt.p[1] + bob, fz + pz);
       folkDummy.rotation.set(0, th, 0);
       folkDummy.scale.set(pt.s[0], pt.s[1], pt.s[2]);
@@ -3166,6 +3424,8 @@ function drawFolks(now) {
     im.instanceMatrix.needsUpdate = true;
     if (im.instanceColor) im.instanceColor.needsUpdate = true;
   });
+  draw(PERSON_PARTS, 0, f => !(hasV && tourist(f)));
+  if (hasV) draw(VISITOR_PARTS, PERSON_PARTS.length, tourist);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3202,7 +3462,8 @@ let savingOff = false;                    // 시연용 화면에서는 저장하
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const dirtyPlots = new Set(), plotStrCache = new Map();          // 구역 "px,py" → 문자열
 let lastSave = { 구역수: 0, 바뀐구역: 0, 크기: 0, 형식: '-' };
-function paletteNow() { const set = new Set(); cells.forEach((rec, i) => { if (rec && rec.root === i) set.add(rec.k); }); return [...set].sort(); }
+let PALETTE = [];                                                   // 저장본에서 이어받고, 새 종류는 끝에만 붙인다(번호 불변 — 정렬하면 안 건드린 구역 문자열까지 바뀐다)
+function paletteNow() { cells.forEach((rec, i) => { if (rec && rec.root === i && !PALETTE.includes(rec.k)) PALETTE.push(rec.k); }); return PALETTE.slice(); }
 function encodePlot(px, py, palIdx) {
   let out = '', run = 0, any = false;
   for (let y = py * PLOT; y < Math.min(H, (py + 1) * PLOT); y++) for (let x = px * PLOT; x < Math.min(W, (px + 1) * PLOT); x++) {
@@ -3225,7 +3486,7 @@ function decodePlot(str, px, py, pal, out) {
 /* 바뀐 구역만 다시 인코딩한다. 나머지는 캐시. */
 function plotStrings() {
   const pal = paletteNow(), palIdx = new Map(pal.map((k, n) => [k, n])), ps = {};
-  const palChanged = JSON.stringify(pal) !== plotStrCache.get('__pal');
+  const palChanged = false;                                          // 번호가 안 밀리니 캐시는 그대로
   let changed = 0;
   for (let py = 0; py < NPY; py++) for (let px = 0; px < NPX; px++) {
     const key = px + ',' + py;
@@ -3240,7 +3501,7 @@ function plotStrings() {
 function serialize() {
   const { pal, ps, changed } = plotStrings();
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
-  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at]; });
+  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   lastSave = { 구역수: Object.keys(ps).length, 바뀐구역: changed, 크기: 0, 형식: 'v2' };
   return { v: SAVE_V, w: W, h: H, palette: pal, plotStr: ps, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: [...unlocked], goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
@@ -3254,7 +3515,7 @@ function serializeV1() {
   });
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
   const unlockedList = [...unlocked];
-  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at]; });
+  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
 
@@ -3311,9 +3572,9 @@ window.addEventListener('pagehide', () => flushSave('pagehide'));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave('hidden'); });
 
 /* 저장본 읽기 — 깨져 있어도 절대 던지지 않는다. 못 읽으면 빈 판으로 시작한다. */
-function loadSaved() {
-  let raw = null;
-  try { raw = localStorage.getItem(SAVE_KEY); if (!raw && SID === 'guest') raw = localStorage.getItem('rpg.village.demo'); }   // 옛 demo 저장본은 guest 로 이어받는다
+function loadSaved(rawOverride) {
+  let raw = rawOverride || null;
+  try { if (!raw) raw = localStorage.getItem(SAVE_KEY); if (!raw && SID === 'guest') raw = localStorage.getItem('rpg.village.demo'); }   // 옛 demo 저장본은 guest 로 이어받는다
   catch (e) { return { ok:false, why:'저장소를 읽을 수 없음' }; }
   if (!raw) return { ok:false, why:'저장본 없음' };
 
@@ -3337,7 +3598,7 @@ function loadSaved() {
   if (d.clock && typeof d.clock.t === 'number') { SIM.t = Math.max(0, d.clock.t); if (d.clock.speed) SIM.speed = d.clock.speed; if (d.clock.speed === 0) { SIM.paused = true; document.querySelectorAll('#spd button').forEach(b => b.classList.toggle('on', +b.dataset.s === 0)); } }
   let placedN = 0, skipped = 0;
   let items = d.items;
-  if (isV2) { items = []; for (const key in d.plotStr) { const [px, py] = key.split('_').map(Number); if (!(px >= 0 && py >= 0 && px < NPX && py < NPY)) continue; try { decodePlot(String(d.plotStr[key]), px, py, d.palette, items); } catch (e) { skipped++; } } }
+  if (isV2) { PALETTE = d.palette.map(String); items = []; for (const key in d.plotStr) { const [px, py] = key.split('_').map(Number); if (!(px >= 0 && py >= 0 && px < NPX && py < NPY)) continue; try { decodePlot(String(d.plotStr[key]), px, py, d.palette, items); } catch (e) { skipped++; } } }
   items.forEach(it => {
     if (!it || !K[it.id]) { skipped++; return; }
     const x = it.x | 0, y = it.y | 0, rot = (it.rot | 0) & 3;
@@ -3355,12 +3616,12 @@ function loadSaved() {
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
   if (Array.isArray(d.hist)) HIST = d.hist.filter(p => p && typeof p.d === 'number').slice(-HIST_MAX);   // 마을 흐름(F35)
   if (typeof d.dream === 'string') DREAM.text = d.dream.slice(0, 40);
-  if (d.signs && typeof d.signs === 'object') { for (const r in d.signs) { const v = d.signs[r]; const rec = cells[+r]; if (rec && rec.k === 'sign' && rec.root === +r && Array.isArray(v) && v[0]) signs.set(+r, { t: String(v[0]).slice(0, 20), at: +v[1] || 0 }); } setTimeout(refreshSignSprites, 0); }
+  if (d.signs && typeof d.signs === 'object') { for (const r in d.signs) { const v = d.signs[r]; const rec = cells[+r]; if (rec && rec.k === 'sign' && rec.root === +r && Array.isArray(v) && v[0]) signs.set(+r, { t: String(v[0]).slice(0, 20), at: +v[1] || 0, reads: +v[2] || 0 }); } setTimeout(refreshSignSprites, 0); }
   /* 구역: 저장본에 있으면 그대로. 없으면(옛 저장본) 물건이 있는 구역을 연다 — 말없이 잠그지 않는다 */
   if (Array.isArray(d.plots)) d.plots.forEach(k => { const [px, py] = String(k).split(',').map(Number); openPlot(px, py, true); });
   cells.forEach((rec, i) => { if (rec && rec.root === i) { const [px, py] = plotOf(cX(i), cY(i)).split(',').map(Number); openPlot(px, py, true); } });
   if (!plots.size) openPlot((NPX / 2) | 0, (NPY / 2) | 0, true);
-  if (isV1) { try { localStorage.setItem(SAVE_KEY + '.backup', raw); } catch (e) {} lastSave.형식 = 'v1→v2'; setTimeout(() => { if (!savingOff) { saveDirty = true; saveNow(); } }, 0); }   // 옛 형식은 원문을 옆에 두고 v2 로 다시 쓴다(말없이 버리지 않기)
+  if (isV1 && !VISIT.on) { try { localStorage.setItem(SAVE_KEY + '.backup', raw); } catch (e) {} lastSave.형식 = 'v1→v2'; setTimeout(() => { if (!savingOff) { saveDirty = true; saveNow(); } }, 0); }   // 옛 형식은 원문을 옆에 두고 v2 로 다시 쓴다(말없이 버리지 않기)
   plotsEarned = typeof d.plotsEarned === 'number' ? d.plotsEarned : Math.max(0, plots.size - 1);
   if (!hasHouses) cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house') res.set(i, 1); });   // else 로 두면 뒤에 끼어드는 if 에 붙어 버린다(17차에서 잡음)
   cells.forEach((rec, i) => { if (rec && rec.root === i && LOCK_POP[rec.k]) unlocked.add(rec.k); });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
@@ -3454,7 +3715,10 @@ else if (hash.indexOf('adv') >= 0) {
     roads.forEach(rec => removeAt(cX(rec.root), cY(rec.root)));
   }
   if (hash.indexOf('house') >= 0) setMode('house', null);
+} else if (VISIT_SID) {
+  savingOff = true; startInfo = '친구 마을 구경(읽기만): ' + VISIT_SID;
 } else {
+  if (window.VillageSync) { try { await VillageSync.boot({ sid: SID }); } catch (e) { console.warn('VillageSync.boot', e); } }   // 원격 판을 저장본 자리에 먼저(G5 ④)
   const r = loadSaved();
   if (r.ok && r.placed > 0) {
     startInfo = '저장본에서 ' + r.placed + '개 되살림'
@@ -3466,7 +3730,7 @@ else if (hash.indexOf('adv') >= 0) {
     for (let x = sx0; x < sx0 + 12; x++) placeAt('road', x, sy0);   // 첫 구역 한가운데 12칸
     startInfo = r.ok ? '저장본이 비어 있어 기본 판' : ('기본 판 — ' + r.why);
     markDirty();                          // 기본 판도 바로 저장해 둔다
-    setTimeout(() => goalsPeek(20000), 1500);   // 첫 세 걸음(F14 목표판)을 20초 펼쳐 둔다
+    setTimeout(() => { if (!guideStart()) goalsPeek(20000); }, 1500);   // 첫 열기 안내 3장 → 닫히면 목표판 20초(F25)
   }
 }
 if (!STORAGE_OK) { startInfo += ' · 이 창은 저장을 못 받음(미리보기 등)'; setTimeout(noteNoStorage, 400); }
@@ -3621,10 +3885,39 @@ window.__wishes = () => ({ ...wishStats, 지금: folks.filter(f => f.wish).map(f
 window.__setSign = (x, y, t) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'sign') return false; signs.set(rec.root, { t: String(t).slice(0, 20), at: SIM.t }); refreshSignSprites(); markDirty(); return true; };
 window.__setDream = (t) => { DREAM.text = String(t || '').slice(0, 40); return DREAM.text; };
 window.__stationAt = () => { const r = stationRoot(); return r < 0 ? null : [cX(r), cY(r)]; };
+window.__neighbors = () => ({ ...neighborStats, 지금: folks.filter(f => f.neighbor).length, 문턱: NEIGHBOR_POP });
 window.__visitors = () => ({ ...visitStats, 지금: folks.filter(f => f.visitor).length, 읽는중: folks.filter(f => f.visitor && f.faceShow === 5 && SIM.t <= f.faceUntil).length, 읽으러: folks.filter(f => f.visitor && f.readTarget != null).length });
 window.__followFolk = (k) => { const f = folks[k]; if (!f) return null; FOLLOW.f = f; FOLLOW.until = performance.now() + 6000; return folkCard(f); };
 window.__follow = () => ({ 따라가는중: !!FOLLOW.f, 목표: [+camTarget.x.toFixed(1), +camTarget.z.toFixed(1)], 사람: FOLLOW.f ? [+FOLLOW.f.x.toFixed(1), +FOLLOW.f.z.toFixed(1)] : null });
+window.__favAll = () => folks.filter(f => !f.visitor && !f.arriving).map(f => [folkName(f), favPlace(f), f.visits || {}]);
 window.__fav = (k) => folks[k] ? { 이름: folkName(folks[k]), 곳: favPlace(folks[k]), 방문: folks[k].visits || {} } : null;
+/* ── 첫 열기 3장 안내(48차) ── */
+const GUIDE = { on: false, i: 0, seen: false, shown: 0 };
+const GUIDE_KEY = () => 'rpg.guide.' + SID;
+const GUIDE_CARDS = [
+  { pic: '⬜➡️⬜⬜', txt: '아래에서 <b>길</b>을 고르고 칸을 누르면 놓여요.<br>칸 위를 <b>끌면 연달아</b> 놓여요.' },
+  { pic: '🏠🛣️🏠', txt: '<b>집은 길 옆</b>에 놓아요.<br>길이 <b>6칸</b> 이어지면 첫 주민이 걸어와요.' },
+  { pic: '🎯 ▶▶', txt: '🎯 을 누르면 <b>지금 목표</b>가 보여요.<br>기다리기 지루하면 <b>2× 4×</b> 를 눌러요.' } ];
+function guideSeen() { try { return localStorage.getItem(GUIDE_KEY()) === '1'; } catch (e) { return false; } }
+function guideRender() { const c = GUIDE_CARDS[GUIDE.i]; document.getElementById('guidePic').textContent = c.pic; document.getElementById('guideTxt').innerHTML = c.txt;
+  document.getElementById('guideDots').innerHTML = GUIDE_CARDS.map((_, k) => k === GUIDE.i ? '<b>●</b>' : '○').join(' ');
+  document.getElementById('guideNext').textContent = GUIDE.i === GUIDE_CARDS.length - 1 ? '시작!' : '다음'; }
+function guideStart(force) {
+  if (!force && (guideSeen() || VISIT.on || savingOff)) return false;      // 옛 저장본·구경·시연 판엔 안 뜸
+  GUIDE.on = true; GUIDE.i = 0; GUIDE.shown++; document.getElementById('guide').classList.add('show'); guideRender(); return true;
+}
+function guideEnd(how) {
+  GUIDE.on = false; document.getElementById('guide').classList.remove('show');
+  try { localStorage.setItem(GUIDE_KEY(), '1'); } catch (e) {} GUIDE.seen = true;
+  goalsPeek(20000);                                                        // 안내 뒤 목표판(F25)
+}
+document.getElementById('guideNext').onclick = () => { if (GUIDE.i < GUIDE_CARDS.length - 1) { GUIDE.i++; guideRender(); } else guideEnd('끝'); };
+document.getElementById('guideSkip').onclick = () => guideEnd('건너뜀');
+if (DEV && QS.get('guide') === '1') setTimeout(() => guideStart(true), 1600);
+window.__guide = () => ({ 보임: GUIDE.on, 장: GUIDE.i + 1, 본적: guideSeen(), 뜬횟수: GUIDE.shown });
+window.__destLog = (reset) => { const o = { ...destLog, 끌림: hourPref(simHour()), 시: +simHour().toFixed(1) }; if (reset) { destLog.전체 = destLog.후보 = destLog.고름 = 0; } return o; };
+window.__destMix = () => { const m = { 물: 0, 장보기: 0, 놀이: 0, 쉼: 0, 배움: 0, 기타: 0, 시: +simHour().toFixed(1), 끌림: hourPref(simHour()) }; folks.forEach(f => { if (f.state !== 'walk' || !f.path || f.visitor || f.goal) return; const n = needBeside(f.path[f.path.length - 1]); m[n && m[n] != null ? n : '기타']++; }); return m; };
+window.__signStats = () => ({ 표지판: [...signs.values()].map(v => [v.t, v.reads || 0]), 으뜸: topSign(), 좋아한곳: topLike(), 집계: { ...visitLikes } });
 window.__houseText = (x, y) => { const rec = cells[idx(x, y)]; return rec && rec.k === 'house' ? satText(rec) : '집 없음'; };
 window.__placeText = (x, y) => { const rec = cells[idx(x, y)]; return rec ? K[rec.k].nm + ' · ' + jobText(rec) : '없음'; };
 window.__rhythm = () => { let home = 0, sch = 0, out = 0; folks.forEach(f => { if (f.state === 'inside' && f.inside.root === f.home) home++; else if (f.state === 'inside' && cells[f.inside.root] && cells[f.inside.root].k === 'school') sch++; else if (!f.arriving) out++; }); return { 시: +simHour().toFixed(1), 집안: home, 학교안: sch, 밖: out, ...rhythmStats }; };
@@ -3700,7 +3993,7 @@ window.__snapshot = () => {
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = v.t; });
   return { 물건: items, 집: houses, 구역: [...plots].sort(), 표지판: signsObj, 꿈: DREAM.text || '', 흐름: HIST.length, 목표: [...goalsDone].sort(), 해금: [...unlocked].sort(), 이름: names, 인구: population(), 시계: Math.round(SIM.t), 저장키: SAVE_KEY };
 };
-window.__saveKey = () => SAVE_KEY; window.__exportV1 = () => JSON.stringify(serializeV1()); window.__lastSave = () => ({ ...lastSave, dirty지금: dirtyPlots.size }); window.__flushStats = () => ({ ...flushStats, dirty: saveDirty });
+window.__saveKey = () => SAVE_KEY; window.__reopenUrl = reopenUrl; window.__palette = () => PALETTE.slice(); window.__exportV1 = () => JSON.stringify(serializeV1()); window.__lastSave = () => ({ ...lastSave, dirty지금: dirtyPlots.size }); window.__flushStats = () => ({ ...flushStats, dirty: saveDirty });
 window.__put = (kind, x, y, rot) => { const why = canPlace(kind, x, y, rot || 0);
   if (why !== true) return why; placeAt(kind, x, y, rot || 0); updateCount(); return true; };
 window.__rot = () => { rotate(); return selRot; };
@@ -3961,6 +4254,7 @@ function loop() {
 })();
 resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
+if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
 </script>
 </body>
 </html>
