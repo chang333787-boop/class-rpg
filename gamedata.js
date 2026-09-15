@@ -806,6 +806,35 @@ const DB = {
     } catch (e) { /* 위와 같은 이유 — 게임 진행을 막지 않는다 */ }
   },
 
+  // ── 골드 지출 기록 (GOLD-SPEND-1) ────────────────────────────
+  //  수입(logGold)과 **같은 레코드** goldDaily/<studentId>_<date> 에 지출 필드를 더한다.
+  //  필드 이름은 x_ 로 시작한다 — 수입 7경로와 섞여 합산되는 사고를 막으려고 앞머리로 가른다.
+  //
+  //  왜 필요한가 (2026-09-14 첫 실측):
+  //    강지원 farm 7,250G = 밭 25칸 × 딸기 판매가 290G. 그런데 씨앗값 25 × 60G = 1,500G 가
+  //    어디에도 안 남아 순수익(5,750G)을 볼 수 없었다. 수입만으로는 인플레이션을 잴 수 없다.
+  //
+  //  logGold 와 따로 둔 이유: 이미 운영 중인 수입 기록 코드를 건드리지 않기 위해서다
+  //    (고치다가 새로 만든 실수를 피한다). 원칙은 똑같다 — increment 필드 하나, 실패는 무시.
+  //
+  //  3D 마을은 골드를 쓰지 않는다(2026-09-15 확인, 사용자 결정으로 무료). 여기에 경로 없음.
+  SPEND_SINKS: ['equip', 'skill', 'seed', 'deco'],
+  logSpend(studentId, sink, amount) {
+    try {
+      const amt = Math.round(Number(amount) || 0);
+      if (!studentId || amt <= 0) return;
+      if (!this.SPEND_SINKS.includes(sink)) return;
+      const inc = (typeof firebase !== 'undefined')
+        && firebase.database && firebase.database.ServerValue
+        && firebase.database.ServerValue.increment;
+      if (!inc || !this._fbRef) return;
+      const day = Utils.todayStr();
+      this._fbRef.child('goldDaily/' + studentId + '_' + day)
+        .update({ s: studentId, d: day, ['x_' + sink]: inc(amt) })
+        .catch(() => {});          // 통계 실패는 조용히 넘어간다 — 구매는 이미 끝났다
+    } catch (e) { /* 게임 진행을 막지 않는다 */ }
+  },
+
   // ── 학생 쪽지 (NOTES-1) ────────────────────────────────────
   //  studentNotes/<studentId>/<noteId> 개별 경로로만 읽고 쓴다.
   //  학생 객체 필드로 두지 않는 이유: saveStudent 는 students/<id> 를 통짜 set 하고
@@ -2069,6 +2098,7 @@ function buySkillBookLogic(student, bookId) {
   if (!check.ok) return check;
   student.skillLevels = student.skillLevels || { ...DEFAULT_SKILL_LEVELS };
   student.gold -= book.price;
+  if (typeof DB !== 'undefined') DB.logSpend(student.id, 'skill', book.price);   // [GOLD-SPEND-1]
   student.skillLevels[book.type] = book.targetLevel;
   return { ok:true, reason:'', book };
 }
