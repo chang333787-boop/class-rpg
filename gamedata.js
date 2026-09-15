@@ -533,6 +533,7 @@ const DB = {
   _fbAdminRef: null,
   _onChangeCb: null,
   _saving: false,
+  _deferredSnap: null,   // [SAVING-DROP-1] _saving 동안 온 원격 스냅샷 중 마지막 것 — 창이 끝나면 적용
 
   async init() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -555,6 +556,13 @@ const DB = {
       if (!d) return;
 
       if (this._saving) {
+        // [SAVING-DROP-1] 저장 창 동안 온 원격 변경을 **버리지 않고** 마지막 스냅샷을 기억한다.
+        //   전에는 여기서 settings 말고는 그냥 return 해서, 그 사이 다른 기기가 쓴 것(학생 +EXP, 사진 업로드)을
+        //   이 기기 캐시가 끝내 모른 채 남았다. 그 뒤 이 기기가 같은 학생·같은 배열을 통째로 set 하면
+        //   **다른 기기의 변경이 지워졌다**(시뮬 재현: 교사 저장 직후 학생 +50EXP → 2초 뒤 교사 저장 → EXP 되돌아감).
+        //   창이 끝나는 _endSaving() 에서 적용한다. 창 도중에 바로 적용하지 않는 이유는 원래 _saving 의 뜻
+        //   (내 저장 중에 캐시가 흔들리지 않게)을 그대로 두기 위해서다.
+        this._deferredSnap = d;
         // 내가 저장 중일 때도 settings 변경은 반드시 처리
         const newSettings = d.settings;
         const oldSettings = (this._cache || {}).settings;
@@ -564,9 +572,20 @@ const DB = {
         return;
       }
 
+      this._deferredSnap = null;
       this._cache = this._migrate(this._normalizeArrays(d));
       if (this._onChangeCb) this._onChangeCb();
     });
+  },
+
+  // [SAVING-DROP-1] 저장 창을 닫고, 창 동안 미뤄 둔 원격 스냅샷이 있으면 이제 적용한다.
+  _endSaving() {
+    this._saving = false;
+    const d = this._deferredSnap;
+    this._deferredSnap = null;
+    if (!d) return;
+    this._cache = this._migrate(this._normalizeArrays(d));
+    if (this._onChangeCb) this._onChangeCb();
   },
 
   onDataChange(fn) { this._onChangeCb = fn; },
@@ -739,7 +758,7 @@ const DB = {
     this._saving = true;
     // id 키 기반 저장 (인덱스 충돌 방지)
     this._fbRef.child('students/' + student.id).set(student).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => { this._endSaving(); }, 500);
     });
   },
 
@@ -864,7 +883,7 @@ const DB = {
     this._cache = db;
     this._saving = true;
     return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 300);
+      setTimeout(() => { this._endSaving(); }, 300);
     });
   },
 
@@ -879,7 +898,7 @@ const DB = {
     this._saving = true;
     // settings 노드만 부분 저장 (root 전체 set 방지)
     this._fbRef.child('settings').set(s).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => { this._endSaving(); }, 500);
     });
   },
 
@@ -953,7 +972,7 @@ const DB = {
     this._saving = true;
     // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
     this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => { this._endSaving(); }, 500);
     });
     return true;
   },
@@ -964,7 +983,7 @@ const DB = {
     this._saving = true;
     // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
     this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => { this._endSaving(); }, 500);
     });
   },
 
@@ -1221,7 +1240,7 @@ const DB = {
     this._saving = true;
     // 요청 단위 부분 저장 (root 전체 set 방지, id 키 기반)
     this._fbRef.child('pwResetRequests/' + r.id).set(r).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => { this._endSaving(); }, 500);
     });
   },
   removePwResetRequest(id) {
@@ -1231,7 +1250,7 @@ const DB = {
     this._saving = true;
     // 요청 단위 삭제 (root 전체 set 방지)
     this._fbRef.child('pwResetRequests/' + id).remove().finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => { this._endSaving(); }, 500);
     });
   },
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
