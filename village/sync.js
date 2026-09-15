@@ -255,6 +255,11 @@
     /* ── 닫힐 때 — 전부 아니면 하나도 안 보냄 ── */
     function onPageHide() {
       if (GUEST || !st.owner) return 'skip';
+      const r = pushOnHide();
+      releaseSession();
+      return r;
+    }
+    function pushOnHide() {
       const { snap } = readLocal(); const d = diff(snap, st.book);
       if (!d.any) return 'clean';
       const body = JSON.stringify(bodyFor(snap, d));
@@ -262,6 +267,17 @@
       if (body.length > o.keepaliveLimit) return 'too-big';
       try { st.stats.keepalive++; doFetch(url(''), { method: 'PATCH', keepalive: true, body }); } catch (e) {}
       return 'sent';   // 응답을 못 기다리니 장부는 그대로. 다음 열기에서 원격 meta.dev 가 이 기기면 로컬을 믿는다
+    }
+    // [SYNC-SESSION-RELEASE-1] 닫힐 때 session 을 "오래된 것"으로 만든다(at=0). dev 는 그대로 둔다.
+    //   전에는 닫아도 session 이 90초 남아, 곧바로 다른 기기에서 열면 "다른 기기에서 열려 있어요" 물음이 떴고
+    //   되살리기(village-restore)도 90초를 기다려야 했다.
+    //   · 주인일 때만 보낸다 — 주인을 이미 잃은 기기는 onPageHide 첫 줄에서 돌아가므로 새 주인을 건드리지 않는다.
+    //   · onDisconnect 가 아니라 이 기기가 스스로 닫힐 때 한 번이라, 옛 기기 연결이 늦게 끊겨 새 주인을 지우는 경합이 없다.
+    //   · dev 를 남기므로 규칙(session 에 dev·at 필수)도 통과한다. keepalive 가 막히면 예전처럼 90초 뒤 풀린다.
+    function releaseSession() {
+      try { st.stats.keepalive++; doFetch(url('session'), { method: 'PATCH', keepalive: true, body: JSON.stringify({ at: 0 }) }); } catch (e) {}
+      st.owner = false;
+      clearT(st.beatT); st.beatT = 0;
     }
 
     function close() { st.closed = true; clearT(st.pollT); clearT(st.beatT); if (st.unwatch) { try { st.unwatch(); } catch (e) {} st.unwatch = null; } }
