@@ -1085,6 +1085,25 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ach-item{display:flex;align-items:center;gap:.9rem;padding:.8rem 0;border-bottom:1px solid rgba(255,255,255,.05);}
 .ach-item:last-child{border-bottom:none;}
 .ach-item.locked{opacity:.4;}
+/* [D3-MODALS-1] 아직 못 받은 업적 — 흐리게 40%라 설명·보상 글자가 대비 2:1 아래로 떨어져
+   "무엇을 하면 받는지"를 못 읽었다. 잠김 표시는 자물쇠 뱃지가 하므로 65%로 올린다. */
+.ach-item.locked{opacity:.65;}
+
+/* [D3-MODALS-1] 우리반 랭킹 375 폭 — 한 줄 3칸(인라인 grid)에 메달·얼굴·이름·값을 가로로 넣어
+   칸이 96px 이 되자 이름이 '학'까지만 보이고 '12,345G'가 옆 칸 메달 위로 넘쳤다.
+   좁은 폭에서만 칸 안을 세로(메달 → 얼굴 → 이름 → 값)로 쌓는다.
+   buildRankingHTML 템플릿이 인라인뿐이라 #rank-modal-body 아래 구조 선택자 + !important —
+   인라인→class 이전(골드 PR 뒤)에서 class로 바꿀 자리. */
+@media (max-width:600px){
+  #rank-modal-body > div > div:last-child > div{
+    flex-direction:column!important;align-items:center!important;text-align:center;
+    gap:2px!important;padding:var(--sp-1) var(--sp-h)!important;
+  }
+  #rank-modal-body > div > div:last-child > div > div{flex:none!important;width:100%;}
+  #rank-modal-body > div > div:last-child > div > div > div:first-child{font-size:.8125rem!important;}
+  #rank-modal-body > div > div:last-child > div > div > div:last-child{font-size:.875rem!important;white-space:nowrap;}
+  #rank-modal-body > div > div:first-child{font-size:var(--fs-sm)!important;color:var(--txt2)!important;}
+}
 .ach-icon{font-size:1.8rem;width:40px;text-align:center;flex-shrink:0;}
 .ach-body{flex:1;}
 .ach-name{font-weight:700;font-size:.88rem;}

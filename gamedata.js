@@ -3,6 +3,146 @@
 //  ★ 밸런스 v2: 인성→가치, EXP/골드/농장 전면 조정
 // ====================================================
 
+// ═══════════════════════════════════════════════════════
+//  BALANCE — 전투·사냥터 계수의 **코드 기본값** 한 곳 (B-2, 공식 설명: docs/rpg_balance_model.md)
+//  ★ 여기 값은 원본이다. 런타임 표(SKILL_MULTIPLIERS·ELEMENT_CHART·BATTLE_CONSTS)는 이것을 복사해 만들고,
+//    관리자 설정(applyBattleSettings)은 그 런타임 표만 덮는다. BALANCE 자체를 코드에서 바꾸지 말 것.
+//  ★ 운영 값(몬스터 HP×1.5 · ATK×1.6 · 하루 5회)은 관리자 설정이지 여기 기본값이 아니다.
+//  ★ 값을 바꾸면 아이가 보는 전투가 바뀐다 — scripts/balance/gate.mjs 로 전후 표를 먼저 볼 것.
+//    구조만 옮길 때는 scripts/balance/identity.mjs 가 "출력 100% 동일"을 확인한다.
+// ═══════════════════════════════════════════════════════
+const BALANCE = {
+  // 플레이어 HP = hpBase + 레벨 × hpPerLevel (ATK/MAG/DEF/SPD는 장비 합산)
+  player: { hpBase: 80, hpPerLevel: 12 },
+
+  // 장비 등급 1~10 을 여는 레벨 — 머리·몸통·무기·장갑·신발 전 슬롯 공통 (B-1 §4.3)
+  equipment: { tierLevels: [1, 5, 7, 10, 13, 16, 20, 24, 28, 30] },
+
+  // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
+  // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
+  skill: {
+    maxLevel: 7,
+    normal:  { 1:1.10, 2:1.18, 3:1.27, 4:1.36, 5:1.46, 6:1.56, 7:1.65 },
+    element: { 0:0.00, 1:1.00, 2:1.10, 3:1.20, 4:1.30, 5:1.40, 6:1.50, 7:1.60 },
+  },
+
+  // 속성 상성 (공격) — water > fire > grass > water
+  element: { advantage: 1.4, disadvantage: 0.8, same: 1.0 },
+
+  // 피해 공통: 공격 × defScale / (defScale + 방어), 최소 minDamage
+  damage: { defScale: 100, minDamage: 1 },
+
+  // 플레이어 → 몬스터
+  playerAttack: {
+    hit:  { base: 0.93, perSpd: 0.01, min: 0.85, max: 0.97 },   // 명중 = base − (몬스터SPD − 내SPD) × perSpd
+    crit: { rate: 0.10, mult: 1.5 },
+    levelGap: { perLevel: 0.08, floor: 0.45 },                  // 몬스터가 높을 때만: max(floor, 1 − 차 × perLevel)
+  },
+
+  // 몬스터 → 플레이어
+  monsterAttack: {
+    hit:  { base: 0.93, perSpd: 0.01, min: 0.88, max: 0.97 },   // 명중 = base − (내SPD − 몬스터SPD) × perSpd
+    crit: { rate: 0.06, mult: 1.4 },
+  },
+
+  // 몬스터 데이터에 hp/atk가 없을 때 · SPD 같을 때 플레이어 선공 확률
+  monster: { hpFallback: 10, atkFallback: 5, firstTurnTie: 0.5 },
+
+  // 몬스터 역할 기믹 (performPlayerTurn · performMonsterTurn)
+  role: {
+    tank:   { hpRatio: 0.6, damageTaken: 0.6, counterBuff: 1.15 },  // HP 60% 이하 첫 피격 40% 경감 → 다음 공격 ×1.15
+    fast:   { hpRatio: 0.7, extraHitMult: 0.6 },                    // HP 70% 이하 첫 도달 → 다음 몬스터 턴 추가타(급소 없음) ×0.6
+    dealer: { maxStacks: 3, perStack: 0.10 },                       // 몬스터 턴마다 +10%, 최대 3
+    normal: { onMonsterTurn: 2, buff: 1.6 },                        // monsterTurnCount===2 에 준비 → 다음 공격 ×1.6
+  },
+
+  // 전투 스킬 (skill2)
+  skill2: {
+    healRatio: 0.30,
+    prepMult: 2.3,
+    rush: { turns: 2, multMin: 1.15, multSpread: 0.20, damageTaken: 1.15 },
+    guardMult: 0.5,
+    counter: { chance: 0.5, reflectMult: 1.5 },
+    reckless: { chance: 0.5, mult: 2.2 },
+  },
+
+  // 관리자 설정이 덮을 수 있는 값의 기본 (BATTLE_CONSTS 초기값 · 설정이 없을 때 되돌아갈 값)
+  settingsDefaults: {
+    ghostNormalMult: 0.55,     // ★ 7단계 조정: 0.35→0.55 (노말 원툴 방지는 유지하되 "불가능" 수준은 아니게)
+    dailyBattleLimit: 3,
+    infiniteBattleLimit: 1,
+    monsterHpMult: 1.0,
+    monsterAtkMult: 1.0,
+    defAdvMult: 0.85,          // 몸통 방어 상성 유리 (받는 피해 배율)
+    defDisMult: 1.15,          // 몸통 방어 상성 불리
+    elemDisadvantageFallback: 0.8,   // 관리자 elemChart에 advantageMult만 있을 때 불리 배율
+  },
+
+  // 사냥터 카드 3장 (generateBattleOffers)
+  offers: {
+    zoneRanges: {
+      beginner:     { min:1,  max:10 },
+      intermediate: { min:11, max:20 },
+      advanced:     { min:21, max:30 },
+    },
+    rarityWeights: [
+      { common:1.0, rare:0.2, legend:0.0 }, // 슬롯 0 [P−1, P]
+      { common:1.0, rare:1.4, legend:0.0 }, // 슬롯 1 [P, P+1]
+      { common:1.0, rare:1.6, legend:2.0 }, // 슬롯 2 [P+1, P+2]
+    ],
+    unseenWeight: 1.5,                                                          // 도감에 없는 몬스터 우대
+    recent: { justNow: 3, justNowWeight: 0.3, lately: 9, latelyWeight: 0.6 },   // 최근 제시 이름이 끝에서 몇 번째인지
+    recentKeep: 4,                                                              // recentBattleOffers 이전 4회 + 이번 1회
+    maxGhosts: 2,
+    thirdSlot: { returnChance: 0.2, maxLevelAbovePlayer: 3 },   // 3번 카드: 20% 확률로 놓친 희귀/전설 복귀, Lv+3까지
+  },
+};
+
+// ─── 장비 표 만들기 (B-2b) ─────────────────────────────────
+// 등급 i(0~9) 장비의 레벨 = BALANCE.equipment.tierLevels[i]. 키 순서는 옛 표와 같게(id·name·lv·stats·cond·price·icon·element).
+function _equipTiers(rows) {
+  return rows.map((r, i) => {
+    const item = { id: r.id, name: r.name, lv: BALANCE.equipment.tierLevels[i], stats: r.stats, cond: r.cond, price: r.price, icon: r.icon };
+    if (r.element !== undefined) item.element = r.element;
+    return item;
+  });
+}
+// 계열 복사: 같은 등급 원본 줄의 레벨·능력치·가격을 쓰고 id·name·cond·icon 은 줄마다 따로 (B-1 §4.3)
+//   opt.element — 몸통 속성 · opt.mirror(stats) — 스태프처럼 능력치를 바꿔 쓸 때
+function _equipCopy(source, opt, rows) {
+  return rows.map((r, i) => {
+    const src = source[i];
+    const item = { id: r.id, name: r.name, lv: src.lv, stats: opt.mirror ? opt.mirror(src.stats) : { ...src.stats }, cond: r.cond, price: src.price, icon: r.icon };
+    if (opt.element !== undefined) item.element = opt.element;
+    return item;
+  });
+}
+const _EQUIP_BODY_FIRE = _equipTiers([
+  {id:'e_b1', name:'천 옷 (불)',          stats:{def:5},              cond:{},                      price:45,   icon:'👕', element:'fire'},
+  {id:'e_b2', name:'가죽 갑옷 (불)',      stats:{def:9},              cond:{health:2,life:1},       price:65,  icon:'🥋', element:'fire'},
+  {id:'e_b3', name:'견습 로브 (불)',      stats:{mag:6, def:4},       cond:{health:4,life:2},       price:95,  icon:'🧥', element:'fire'},
+  {id:'e_b4', name:'철 갑옷 (불)',        stats:{def:14},             cond:{health:6,life:4},       price:140,  icon:'🛡️', element:'fire'},
+  {id:'e_b5', name:'연구 로브 (불)',      stats:{mag:11, def:6},      cond:{health:8,life:6},       price:200,  icon:'🔬', element:'fire'},
+  {id:'e_b6', name:'기사 갑옷 (불)',      stats:{def:20},             cond:{health:10,life:8},      price:280,  icon:'⚔️', element:'fire'},
+  {id:'e_b7', name:'대마법 로브 (불)',    stats:{mag:18, def:8},      cond:{health:13,life:10},     price:380,  icon:'✨', element:'fire'},
+  {id:'e_b8', name:'황금 갑옷 (불)',      stats:{def:27},             cond:{health:16,life:13},     price:490,  icon:'💛', element:'fire'},
+  {id:'e_b9', name:'전설 갑옷 (불)',      stats:{def:34},             cond:{health:19,life:15},     price:625, icon:'🌟', element:'fire'},
+  {id:'e_b10',name:'왕의 갑옷 (불)',      stats:{def:40},             cond:{health:21,life:17},     price:775, icon:'👑', element:'fire'},
+]);
+const _EQUIP_SWORD = _equipTiers([
+  {id:'e_w1', name:'나무검',     stats:{atk:8,  mag:5},  cond:{},                 price:45,   icon:'🗡️'},
+  {id:'e_w2', name:'철검',       stats:{atk:12, mag:8},  cond:{health:2,life:1},  price:70,  icon:'⚔️'},
+  {id:'e_w3', name:'마법검',     stats:{atk:16, mag:11}, cond:{health:4,life:2},  price:100,  icon:'🔷'},
+  {id:'e_w4', name:'강철검',     stats:{atk:22, mag:15}, cond:{health:6,life:4},  price:150,  icon:'🔱'},
+  {id:'e_w5', name:'기사검',     stats:{atk:28, mag:19}, cond:{health:8,life:6},  price:210,  icon:'🏹'},
+  {id:'e_w6', name:'용사검',     stats:{atk:35, mag:23}, cond:{health:10,life:8}, price:300,  icon:'⚔️'},
+  {id:'e_w7', name:'용기사검',   stats:{atk:43, mag:29}, cond:{health:13,life:10},price:400,  icon:'🌟'},
+  {id:'e_w8', name:'황금검',     stats:{atk:52, mag:35}, cond:{health:16,life:13},price:525, icon:'✨'},
+  {id:'e_w9', name:'전설검',     stats:{atk:62, mag:41}, cond:{health:19,life:15},price:675, icon:'💎'},
+  {id:'e_w10',name:'영웅의 검',  stats:{atk:72, mag:48}, cond:{health:21,life:17},price:850, icon:'🌈'},
+]);
+
+
 const GAME_DATA = {
 
   // ─── EXP 레벨 테이블 (밸런스 조정: 초반 빠르게, 후반 완만하게) ───
@@ -66,103 +206,93 @@ const GAME_DATA = {
   // ★ cond = 구매 조건 (slot 규칙 반영), 기존 보유 장비엔 cond 미적용
   // 머리=가치+생활, 불몸통=건강+생활, 물몸통=학습+생활, 풀몸통=예술+생활
   // 검=건강+생활, 지팡이=학습+예술, 장갑=가치+건강, 신발=예술+건강
+  // ★ B-2b: 등급 i 의 레벨 = BALANCE.equipment.tierLevels[i] (_equipTiers) ·
+  //   물·풀 몸통 = 불 몸통 복사, 스태프 = 검 거울 (_equipCopy) — 능력치·가격은 원본 줄 하나만 고치면 따라온다
   equipment: {
-    head: [
-      {id:'e_h1', name:'천 모자',        lv:1,  stats:{def:3},              cond:{},                      price:35,   icon:'🎩'},
-      {id:'e_h2', name:'가죽 모자',      lv:5,  stats:{def:5, spd:1},       cond:{value:2,life:1},        price:50,  icon:'🪖'},
-      {id:'e_h3', name:'견습 마법 모자', lv:7,  stats:{mag:4, def:3},       cond:{value:4,life:2},        price:75,  icon:'🧙'},
-      {id:'e_h4', name:'기사 투구',      lv:10, stats:{def:10, spd:2},      cond:{value:6,life:4},        price:110,  icon:'⛑️'},
-      {id:'e_h5', name:'학자의 모자',    lv:13, stats:{mag:8, def:4},       cond:{value:8,life:6},        price:160,  icon:'🎓'},
-      {id:'e_h6', name:'수호 투구',      lv:16, stats:{def:15, spd:3},      cond:{value:10,life:8},       price:225,  icon:'🛡️'},
-      {id:'e_h7', name:'대마법 모자',    lv:20, stats:{mag:13, def:5},      cond:{value:13,life:10},      price:310,  icon:'🔮'},
-      {id:'e_h8', name:'황금 투구',      lv:24, stats:{def:21, spd:4},      cond:{value:16,life:13},      price:410,  icon:'👑'},
-      {id:'e_h9', name:'전설 투구',      lv:28, stats:{def:26, spd:5},      cond:{value:19,life:15},      price:525, icon:'💎'},
-      {id:'e_h10',name:'왕관',           lv:30, stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      price:650, icon:'👑'},
-    ],
+    head: _equipTiers([
+      {id:'e_h1', name:'천 모자',        stats:{def:3},              cond:{},                      price:35,   icon:'🎩'},
+      {id:'e_h2', name:'가죽 모자',      stats:{def:5, spd:1},       cond:{value:2,life:1},        price:50,  icon:'🪖'},
+      {id:'e_h3', name:'견습 마법 모자', stats:{mag:4, def:3},       cond:{value:4,life:2},        price:75,  icon:'🧙'},
+      {id:'e_h4', name:'기사 투구',      stats:{def:10, spd:2},      cond:{value:6,life:4},        price:110,  icon:'⛑️'},
+      {id:'e_h5', name:'학자의 모자',    stats:{mag:8, def:4},       cond:{value:8,life:6},        price:160,  icon:'🎓'},
+      {id:'e_h6', name:'수호 투구',      stats:{def:15, spd:3},      cond:{value:10,life:8},       price:225,  icon:'🛡️'},
+      {id:'e_h7', name:'대마법 모자',    stats:{mag:13, def:5},      cond:{value:13,life:10},      price:310,  icon:'🔮'},
+      {id:'e_h8', name:'황금 투구',      stats:{def:21, spd:4},      cond:{value:16,life:13},      price:410,  icon:'👑'},
+      {id:'e_h9', name:'전설 투구',      stats:{def:26, spd:5},      cond:{value:19,life:15},      price:525, icon:'💎'},
+      {id:'e_h10',name:'왕관',           stats:{def:30,mag:8,spd:6}, cond:{value:21,life:17},      price:650, icon:'👑'},
+    ]),
     body: [
-      // ★ e_b1~e_b10 = 불(fire) — 기존 ID 완전 유지, 조건=건강+생활
-      {id:'e_b1', name:'천 옷 (불)',          lv:1,  stats:{def:5},              cond:{},                      price:45,   icon:'👕', element:'fire'},
-      {id:'e_b2', name:'가죽 갑옷 (불)',      lv:5,  stats:{def:9},              cond:{health:2,life:1},       price:65,  icon:'🥋', element:'fire'},
-      {id:'e_b3', name:'견습 로브 (불)',      lv:7,  stats:{mag:6, def:4},       cond:{health:4,life:2},       price:95,  icon:'🧥', element:'fire'},
-      {id:'e_b4', name:'철 갑옷 (불)',        lv:10, stats:{def:14},             cond:{health:6,life:4},       price:140,  icon:'🛡️', element:'fire'},
-      {id:'e_b5', name:'연구 로브 (불)',      lv:13, stats:{mag:11, def:6},      cond:{health:8,life:6},       price:200,  icon:'🔬', element:'fire'},
-      {id:'e_b6', name:'기사 갑옷 (불)',      lv:16, stats:{def:20},             cond:{health:10,life:8},      price:280,  icon:'⚔️', element:'fire'},
-      {id:'e_b7', name:'대마법 로브 (불)',    lv:20, stats:{mag:18, def:8},      cond:{health:13,life:10},     price:380,  icon:'✨', element:'fire'},
-      {id:'e_b8', name:'황금 갑옷 (불)',      lv:24, stats:{def:27},             cond:{health:16,life:13},     price:490,  icon:'💛', element:'fire'},
-      {id:'e_b9', name:'전설 갑옷 (불)',      lv:28, stats:{def:34},             cond:{health:19,life:15},     price:625, icon:'🌟', element:'fire'},
-      {id:'e_b10',name:'왕의 갑옷 (불)',      lv:30, stats:{def:40},             cond:{health:21,life:17},     price:775, icon:'👑', element:'fire'},
-      // ★ e_b11~e_b20 = 물(water) — 신규, 조건=학습+생활
-      {id:'e_b11',name:'물의 천 옷',          lv:1,  stats:{def:5},              cond:{},                      price:45,   icon:'🩵', element:'water'},
-      {id:'e_b12',name:'물의 가죽 갑옷',      lv:5,  stats:{def:9},              cond:{study:2,life:1},        price:65,  icon:'💧', element:'water'},
-      {id:'e_b13',name:'물의 견습 로브',      lv:7,  stats:{mag:6, def:4},       cond:{study:4,life:2},        price:95,  icon:'🌊', element:'water'},
-      {id:'e_b14',name:'물의 철 갑옷',        lv:10, stats:{def:14},             cond:{study:6,life:4},        price:140,  icon:'🐚', element:'water'},
-      {id:'e_b15',name:'물의 연구 로브',      lv:13, stats:{mag:11, def:6},      cond:{study:8,life:6},        price:200,  icon:'🔵', element:'water'},
-      {id:'e_b16',name:'물의 기사 갑옷',      lv:16, stats:{def:20},             cond:{study:10,life:8},       price:280,  icon:'🌀', element:'water'},
-      {id:'e_b17',name:'물의 대마법 로브',    lv:20, stats:{mag:18, def:8},      cond:{study:13,life:10},      price:380,  icon:'🫧', element:'water'},
-      {id:'e_b18',name:'물의 황금 갑옷',      lv:24, stats:{def:27},             cond:{study:16,life:13},      price:490,  icon:'🔷', element:'water'},
-      {id:'e_b19',name:'물의 전설 갑옷',      lv:28, stats:{def:34},             cond:{study:19,life:15},      price:625, icon:'❄️', element:'water'},
-      {id:'e_b20',name:'물의 왕의 갑옷',      lv:30, stats:{def:40},             cond:{study:21,life:17},      price:775, icon:'🌊', element:'water'},
-      // ★ e_b21~e_b30 = 풀(grass) — 신규, 조건=예술+생활
-      {id:'e_b21',name:'풀의 천 옷',          lv:1,  stats:{def:5},              cond:{},                      price:45,   icon:'🌿', element:'grass'},
-      {id:'e_b22',name:'풀의 가죽 갑옷',      lv:5,  stats:{def:9},              cond:{art:2,life:1},          price:65,  icon:'🍃', element:'grass'},
-      {id:'e_b23',name:'풀의 견습 로브',      lv:7,  stats:{mag:6, def:4},       cond:{art:4,life:2},          price:95,  icon:'🌱', element:'grass'},
-      {id:'e_b24',name:'풀의 철 갑옷',        lv:10, stats:{def:14},             cond:{art:6,life:4},          price:140,  icon:'🍀', element:'grass'},
-      {id:'e_b25',name:'풀의 연구 로브',      lv:13, stats:{mag:11, def:6},      cond:{art:8,life:6},          price:200,  icon:'🌾', element:'grass'},
-      {id:'e_b26',name:'풀의 기사 갑옷',      lv:16, stats:{def:20},             cond:{art:10,life:8},         price:280,  icon:'🌲', element:'grass'},
-      {id:'e_b27',name:'풀의 대마법 로브',    lv:20, stats:{mag:18, def:8},      cond:{art:13,life:10},        price:380,  icon:'🌳', element:'grass'},
-      {id:'e_b28',name:'풀의 황금 갑옷',      lv:24, stats:{def:27},             cond:{art:16,life:13},        price:490,  icon:'🍁', element:'grass'},
-      {id:'e_b29',name:'풀의 전설 갑옷',      lv:28, stats:{def:34},             cond:{art:19,life:15},        price:625, icon:'🌺', element:'grass'},
-      {id:'e_b30',name:'풀의 왕의 갑옷',      lv:30, stats:{def:40},             cond:{art:21,life:17},        price:775, icon:'🌸', element:'grass'},
+      // ★ e_b1~e_b10 = 불(fire) — 기존 ID 완전 유지, 조건=건강+생활 (능력치·가격 원본: _EQUIP_BODY_FIRE)
+      ..._EQUIP_BODY_FIRE,
+      // ★ e_b11~e_b20 = 물(water) — 신규, 조건=학습+생활 · 레벨·능력치·가격은 같은 등급 불 몸통
+      ..._equipCopy(_EQUIP_BODY_FIRE, { element:'water' }, [
+        {id:'e_b11',name:'물의 천 옷',          cond:{},                      icon:'🩵'},
+        {id:'e_b12',name:'물의 가죽 갑옷',      cond:{study:2,life:1},        icon:'💧'},
+        {id:'e_b13',name:'물의 견습 로브',      cond:{study:4,life:2},        icon:'🌊'},
+        {id:'e_b14',name:'물의 철 갑옷',        cond:{study:6,life:4},        icon:'🐚'},
+        {id:'e_b15',name:'물의 연구 로브',      cond:{study:8,life:6},        icon:'🔵'},
+        {id:'e_b16',name:'물의 기사 갑옷',      cond:{study:10,life:8},       icon:'🌀'},
+        {id:'e_b17',name:'물의 대마법 로브',    cond:{study:13,life:10},      icon:'🫧'},
+        {id:'e_b18',name:'물의 황금 갑옷',      cond:{study:16,life:13},      icon:'🔷'},
+        {id:'e_b19',name:'물의 전설 갑옷',      cond:{study:19,life:15},      icon:'❄️'},
+        {id:'e_b20',name:'물의 왕의 갑옷',      cond:{study:21,life:17},      icon:'🌊'},
+      ]),
+      // ★ e_b21~e_b30 = 풀(grass) — 신규, 조건=예술+생활 · 레벨·능력치·가격은 같은 등급 불 몸통
+      ..._equipCopy(_EQUIP_BODY_FIRE, { element:'grass' }, [
+        {id:'e_b21',name:'풀의 천 옷',          cond:{},                      icon:'🌿'},
+        {id:'e_b22',name:'풀의 가죽 갑옷',      cond:{art:2,life:1},          icon:'🍃'},
+        {id:'e_b23',name:'풀의 견습 로브',      cond:{art:4,life:2},          icon:'🌱'},
+        {id:'e_b24',name:'풀의 철 갑옷',        cond:{art:6,life:4},          icon:'🍀'},
+        {id:'e_b25',name:'풀의 연구 로브',      cond:{art:8,life:6},          icon:'🌾'},
+        {id:'e_b26',name:'풀의 기사 갑옷',      cond:{art:10,life:8},         icon:'🌲'},
+        {id:'e_b27',name:'풀의 대마법 로브',    cond:{art:13,life:10},        icon:'🌳'},
+        {id:'e_b28',name:'풀의 황금 갑옷',      cond:{art:16,life:13},        icon:'🍁'},
+        {id:'e_b29',name:'풀의 전설 갑옷',      cond:{art:19,life:15},        icon:'🌺'},
+        {id:'e_b30',name:'풀의 왕의 갑옷',      cond:{art:21,life:17},        icon:'🌸'},
+      ]),
     ],
     weapon: [
       // 검 계열(홀수-짝수 섞임): 건강+생활 / 지팡이 계열: 학습+예술
-      // ── 검 계열 10개 (ATK:MAG ≈ 3:2) ────────────────────
-      {id:'e_w1', name:'나무검',     lv:1,  stats:{atk:8,  mag:5},  cond:{},                 price:45,   icon:'🗡️'},
-      {id:'e_w2', name:'철검',       lv:5,  stats:{atk:12, mag:8},  cond:{health:2,life:1},  price:70,  icon:'⚔️'},
-      {id:'e_w3', name:'마법검',     lv:7,  stats:{atk:16, mag:11}, cond:{health:4,life:2},  price:100,  icon:'🔷'},
-      {id:'e_w4', name:'강철검',     lv:10, stats:{atk:22, mag:15}, cond:{health:6,life:4},  price:150,  icon:'🔱'},
-      {id:'e_w5', name:'기사검',     lv:13, stats:{atk:28, mag:19}, cond:{health:8,life:6},  price:210,  icon:'🏹'},
-      {id:'e_w6', name:'용사검',     lv:16, stats:{atk:35, mag:23}, cond:{health:10,life:8}, price:300,  icon:'⚔️'},
-      {id:'e_w7', name:'용기사검',   lv:20, stats:{atk:43, mag:29}, cond:{health:13,life:10},price:400,  icon:'🌟'},
-      {id:'e_w8', name:'황금검',     lv:24, stats:{atk:52, mag:35}, cond:{health:16,life:13},price:525, icon:'✨'},
-      {id:'e_w9', name:'전설검',     lv:28, stats:{atk:62, mag:41}, cond:{health:19,life:15},price:675, icon:'💎'},
-      {id:'e_w10',name:'영웅의 검',  lv:30, stats:{atk:72, mag:48}, cond:{health:21,life:17},price:850, icon:'🌈'},
-      // ── 스태프 계열 10개 (MAG:ATK ≈ 3:2) — 완전 대칭 ──────
-      {id:'e_ws1', name:'나무 스태프',    lv:1,  stats:{mag:8,  atk:5},  cond:{},                  price:45,   icon:'🪄'},
-      {id:'e_ws2', name:'철 스태프',      lv:5,  stats:{mag:12, atk:8},  cond:{study:2,art:1},     price:70,  icon:'🔮'},
-      {id:'e_ws3', name:'수정 스태프',    lv:7,  stats:{mag:16, atk:11}, cond:{study:4,art:2},     price:100,  icon:'💜'},
-      {id:'e_ws4', name:'강철 스태프',    lv:10, stats:{mag:22, atk:15}, cond:{study:6,art:4},     price:150,  icon:'🌀'},
-      {id:'e_ws5', name:'현자의 스태프',  lv:13, stats:{mag:28, atk:19}, cond:{study:8,art:6},     price:210,  icon:'⭐'},
-      {id:'e_ws6', name:'마법사의 지팡이',lv:16, stats:{mag:35, atk:23}, cond:{study:10,art:8},    price:300,  icon:'🔯'},
-      {id:'e_ws7', name:'고대 스태프',    lv:20, stats:{mag:43, atk:29}, cond:{study:13,art:10},   price:400,  icon:'🌙'},
-      {id:'e_ws8', name:'황금 스태프',    lv:24, stats:{mag:52, atk:35}, cond:{study:16,art:13},   price:525, icon:'⚡'},
-      {id:'e_ws9', name:'전설 스태프',    lv:28, stats:{mag:62, atk:41}, cond:{study:19,art:15},   price:675, icon:'🌠'},
-      {id:'e_ws10',name:'영웅의 스태프',  lv:30, stats:{mag:72, atk:48}, cond:{study:21,art:17},   price:850, icon:'🔯'},
+      // ── 검 계열 10개 (ATK:MAG ≈ 3:2) — 원본: _EQUIP_SWORD ──
+      ..._EQUIP_SWORD,
+      // ── 스태프 계열 10개 (MAG:ATK ≈ 3:2) — 완전 대칭: 같은 등급 검의 ATK↔MAG, 레벨·가격 같음 ──
+      ..._equipCopy(_EQUIP_SWORD, { mirror: st => ({ mag: st.atk, atk: st.mag }) }, [
+        {id:'e_ws1', name:'나무 스태프',    cond:{},                  icon:'🪄'},
+        {id:'e_ws2', name:'철 스태프',      cond:{study:2,art:1},     icon:'🔮'},
+        {id:'e_ws3', name:'수정 스태프',    cond:{study:4,art:2},     icon:'💜'},
+        {id:'e_ws4', name:'강철 스태프',    cond:{study:6,art:4},     icon:'🌀'},
+        {id:'e_ws5', name:'현자의 스태프',  cond:{study:8,art:6},     icon:'⭐'},
+        {id:'e_ws6', name:'마법사의 지팡이',cond:{study:10,art:8},    icon:'🔯'},
+        {id:'e_ws7', name:'고대 스태프',    cond:{study:13,art:10},   icon:'🌙'},
+        {id:'e_ws8', name:'황금 스태프',    cond:{study:16,art:13},   icon:'⚡'},
+        {id:'e_ws9', name:'전설 스태프',    cond:{study:19,art:15},   icon:'🌠'},
+        {id:'e_ws10',name:'영웅의 스태프',  cond:{study:21,art:17},   icon:'🔯'},
+      ]),
     ],
-    glove: [
-      {id:'e_g1', name:'천 장갑',         lv:1,  stats:{atk:2, spd:2},      cond:{},                      price:25,   icon:'🧤'},
-      {id:'e_g2', name:'가죽 장갑',       lv:5,  stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     price:35,   icon:'🥊'},
-      {id:'e_g3', name:'마법 장갑',       lv:7,  stats:{mag:4, spd:3},      cond:{value:4,health:2},      price:50,  icon:'✋'},
-      {id:'e_g4', name:'철 장갑',         lv:10, stats:{atk:5, spd:4},      cond:{value:6,health:4},      price:70,  icon:'⚙️'},
-      {id:'e_g5', name:'연구 장갑',       lv:13, stats:{mag:7, spd:5},      cond:{value:8,health:6},      price:100,  icon:'🔬'},
-      {id:'e_g6', name:'기사 장갑',       lv:16, stats:{atk:8, spd:6},      cond:{value:10,health:8},     price:140,  icon:'🏆'},
-      {id:'e_g7', name:'마도 장갑',       lv:20, stats:{mag:10, spd:8},     cond:{value:13,health:10},    price:190,  icon:'💫'},
-      {id:'e_g8', name:'황금 장갑',       lv:24, stats:{atk:11, spd:9},     cond:{value:16,health:13},    price:250,  icon:'💛'},
-      {id:'e_g9', name:'전설 장갑',       lv:28, stats:{atk:13, spd:11},    cond:{value:19,health:15},    price:320,  icon:'💎'},
-      {id:'e_g10',name:'영웅 장갑',       lv:30, stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  price:400,  icon:'🌟'},
-    ],
-    shoe: [
-      {id:'e_s1', name:'천 신발',         lv:1,  stats:{spd:4, def:1},      cond:{},                      price:30,   icon:'👟'},
-      {id:'e_s2', name:'가죽 신발',       lv:5,  stats:{spd:6, def:2},      cond:{art:2,health:1},        price:42,   icon:'👠'},
-      {id:'e_s3', name:'마법 신발',       lv:7,  stats:{spd:6, mag:2},      cond:{art:4,health:2},        price:60,  icon:'✨'},
-      {id:'e_s4', name:'철 부츠',         lv:10, stats:{spd:8, def:3},      cond:{art:6,health:4},        price:85,  icon:'🥾'},
-      {id:'e_s5', name:'연구 부츠',       lv:13, stats:{spd:9, mag:3},      cond:{art:8,health:6},        price:120,  icon:'🔬'},
-      {id:'e_s6', name:'기사 부츠',       lv:16, stats:{spd:11, def:4},     cond:{art:10,health:8},       price:170,  icon:'⚔️'},
-      {id:'e_s7', name:'마도 부츠',       lv:20, stats:{spd:13, mag:4},     cond:{art:13,health:10},      price:235,  icon:'💫'},
-      {id:'e_s8', name:'황금 부츠',       lv:24, stats:{spd:15, def:5},     cond:{art:16,health:13},      price:310,  icon:'💛'},
-      {id:'e_s9', name:'전설 부츠',       lv:28, stats:{spd:18, def:6},     cond:{art:19,health:15},      price:395,  icon:'💎'},
-      {id:'e_s10',name:'영웅 부츠',       lv:30, stats:{spd:20, def:8},     cond:{art:21,health:17},      price:490,  icon:'🌈'},
-    ],
+    glove: _equipTiers([
+      {id:'e_g1', name:'천 장갑',         stats:{atk:2, spd:2},      cond:{},                      price:25,   icon:'🧤'},
+      {id:'e_g2', name:'가죽 장갑',       stats:{atk:3, spd:2, mag:2},cond:{value:2,health:1},     price:35,   icon:'🥊'},
+      {id:'e_g3', name:'마법 장갑',       stats:{mag:4, spd:3},      cond:{value:4,health:2},      price:50,  icon:'✋'},
+      {id:'e_g4', name:'철 장갑',         stats:{atk:5, spd:4},      cond:{value:6,health:4},      price:70,  icon:'⚙️'},
+      {id:'e_g5', name:'연구 장갑',       stats:{mag:7, spd:5},      cond:{value:8,health:6},      price:100,  icon:'🔬'},
+      {id:'e_g6', name:'기사 장갑',       stats:{atk:8, spd:6},      cond:{value:10,health:8},     price:140,  icon:'🏆'},
+      {id:'e_g7', name:'마도 장갑',       stats:{mag:10, spd:8},     cond:{value:13,health:10},    price:190,  icon:'💫'},
+      {id:'e_g8', name:'황금 장갑',       stats:{atk:11, spd:9},     cond:{value:16,health:13},    price:250,  icon:'💛'},
+      {id:'e_g9', name:'전설 장갑',       stats:{atk:13, spd:11},    cond:{value:19,health:15},    price:320,  icon:'💎'},
+      {id:'e_g10',name:'영웅 장갑',       stats:{atk:16,spd:12,mag:4},cond:{value:21,health:17},  price:400,  icon:'🌟'},
+    ]),
+    shoe: _equipTiers([
+      {id:'e_s1', name:'천 신발',         stats:{spd:4, def:1},      cond:{},                      price:30,   icon:'👟'},
+      {id:'e_s2', name:'가죽 신발',       stats:{spd:6, def:2},      cond:{art:2,health:1},        price:42,   icon:'👠'},
+      {id:'e_s3', name:'마법 신발',       stats:{spd:6, mag:2},      cond:{art:4,health:2},        price:60,  icon:'✨'},
+      {id:'e_s4', name:'철 부츠',         stats:{spd:8, def:3},      cond:{art:6,health:4},        price:85,  icon:'🥾'},
+      {id:'e_s5', name:'연구 부츠',       stats:{spd:9, mag:3},      cond:{art:8,health:6},        price:120,  icon:'🔬'},
+      {id:'e_s6', name:'기사 부츠',       stats:{spd:11, def:4},     cond:{art:10,health:8},       price:170,  icon:'⚔️'},
+      {id:'e_s7', name:'마도 부츠',       stats:{spd:13, mag:4},     cond:{art:13,health:10},      price:235,  icon:'💫'},
+      {id:'e_s8', name:'황금 부츠',       stats:{spd:15, def:5},     cond:{art:16,health:13},      price:310,  icon:'💛'},
+      {id:'e_s9', name:'전설 부츠',       stats:{spd:18, def:6},     cond:{art:19,health:15},      price:395,  icon:'💎'},
+      {id:'e_s10',name:'영웅 부츠',       stats:{spd:20, def:8},     cond:{art:21,health:17},      price:490,  icon:'🌈'},
+    ]),
   },
   // ─── 씨앗 (성장 시간 대폭 단축: 수업 시간 기준) ──────────
   // 수업 중 2~3번 접속 기준: 감자는 쉬는시간에 심으면 점심에 수확 가능
@@ -467,98 +597,6 @@ const GAME_DATA = {
 // ═══════════════════════════════════════════════════════
 //  스킬 데이터 (stage 1 상수 — 4단계 가격 적용)
 // ═══════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════
-//  BALANCE — 전투·사냥터 계수의 **코드 기본값** 한 곳 (B-2, 공식 설명: docs/rpg_balance_model.md)
-//  ★ 여기 값은 원본이다. 런타임 표(SKILL_MULTIPLIERS·ELEMENT_CHART·BATTLE_CONSTS)는 이것을 복사해 만들고,
-//    관리자 설정(applyBattleSettings)은 그 런타임 표만 덮는다. BALANCE 자체를 코드에서 바꾸지 말 것.
-//  ★ 운영 값(몬스터 HP×1.5 · ATK×1.6 · 하루 5회)은 관리자 설정이지 여기 기본값이 아니다.
-//  ★ 값을 바꾸면 아이가 보는 전투가 바뀐다 — scripts/balance/gate.mjs 로 전후 표를 먼저 볼 것.
-//    구조만 옮길 때는 scripts/balance/identity.mjs 가 "출력 100% 동일"을 확인한다.
-// ═══════════════════════════════════════════════════════
-const BALANCE = {
-  // 플레이어 HP = hpBase + 레벨 × hpPerLevel (ATK/MAG/DEF/SPD는 장비 합산)
-  player: { hpBase: 80, hpPerLevel: 12 },
-
-  // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
-  // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
-  skill: {
-    maxLevel: 7,
-    normal:  { 1:1.10, 2:1.18, 3:1.27, 4:1.36, 5:1.46, 6:1.56, 7:1.65 },
-    element: { 0:0.00, 1:1.00, 2:1.10, 3:1.20, 4:1.30, 5:1.40, 6:1.50, 7:1.60 },
-  },
-
-  // 속성 상성 (공격) — water > fire > grass > water
-  element: { advantage: 1.4, disadvantage: 0.8, same: 1.0 },
-
-  // 피해 공통: 공격 × defScale / (defScale + 방어), 최소 minDamage
-  damage: { defScale: 100, minDamage: 1 },
-
-  // 플레이어 → 몬스터
-  playerAttack: {
-    hit:  { base: 0.93, perSpd: 0.01, min: 0.85, max: 0.97 },   // 명중 = base − (몬스터SPD − 내SPD) × perSpd
-    crit: { rate: 0.10, mult: 1.5 },
-    levelGap: { perLevel: 0.08, floor: 0.45 },                  // 몬스터가 높을 때만: max(floor, 1 − 차 × perLevel)
-  },
-
-  // 몬스터 → 플레이어
-  monsterAttack: {
-    hit:  { base: 0.93, perSpd: 0.01, min: 0.88, max: 0.97 },   // 명중 = base − (내SPD − 몬스터SPD) × perSpd
-    crit: { rate: 0.06, mult: 1.4 },
-  },
-
-  // 몬스터 데이터에 hp/atk가 없을 때 · SPD 같을 때 플레이어 선공 확률
-  monster: { hpFallback: 10, atkFallback: 5, firstTurnTie: 0.5 },
-
-  // 몬스터 역할 기믹 (performPlayerTurn · performMonsterTurn)
-  role: {
-    tank:   { hpRatio: 0.6, damageTaken: 0.6, counterBuff: 1.15 },  // HP 60% 이하 첫 피격 40% 경감 → 다음 공격 ×1.15
-    fast:   { hpRatio: 0.7, extraHitMult: 0.6 },                    // HP 70% 이하 첫 도달 → 다음 몬스터 턴 추가타(급소 없음) ×0.6
-    dealer: { maxStacks: 3, perStack: 0.10 },                       // 몬스터 턴마다 +10%, 최대 3
-    normal: { onMonsterTurn: 2, buff: 1.6 },                        // monsterTurnCount===2 에 준비 → 다음 공격 ×1.6
-  },
-
-  // 전투 스킬 (skill2)
-  skill2: {
-    healRatio: 0.30,
-    prepMult: 2.3,
-    rush: { turns: 2, multMin: 1.15, multSpread: 0.20, damageTaken: 1.15 },
-    guardMult: 0.5,
-    counter: { chance: 0.5, reflectMult: 1.5 },
-    reckless: { chance: 0.5, mult: 2.2 },
-  },
-
-  // 관리자 설정이 덮을 수 있는 값의 기본 (BATTLE_CONSTS 초기값 · 설정이 없을 때 되돌아갈 값)
-  settingsDefaults: {
-    ghostNormalMult: 0.55,     // ★ 7단계 조정: 0.35→0.55 (노말 원툴 방지는 유지하되 "불가능" 수준은 아니게)
-    dailyBattleLimit: 3,
-    infiniteBattleLimit: 1,
-    monsterHpMult: 1.0,
-    monsterAtkMult: 1.0,
-    defAdvMult: 0.85,          // 몸통 방어 상성 유리 (받는 피해 배율)
-    defDisMult: 1.15,          // 몸통 방어 상성 불리
-    elemDisadvantageFallback: 0.8,   // 관리자 elemChart에 advantageMult만 있을 때 불리 배율
-  },
-
-  // 사냥터 카드 3장 (generateBattleOffers)
-  offers: {
-    zoneRanges: {
-      beginner:     { min:1,  max:10 },
-      intermediate: { min:11, max:20 },
-      advanced:     { min:21, max:30 },
-    },
-    rarityWeights: [
-      { common:1.0, rare:0.2, legend:0.0 }, // 슬롯 0 [P−1, P]
-      { common:1.0, rare:1.4, legend:0.0 }, // 슬롯 1 [P, P+1]
-      { common:1.0, rare:1.6, legend:2.0 }, // 슬롯 2 [P+1, P+2]
-    ],
-    unseenWeight: 1.5,                                                          // 도감에 없는 몬스터 우대
-    recent: { justNow: 3, justNowWeight: 0.3, lately: 9, latelyWeight: 0.6 },   // 최근 제시 이름이 끝에서 몇 번째인지
-    recentKeep: 4,                                                              // recentBattleOffers 이전 4회 + 이번 1회
-    maxGhosts: 2,
-    thirdSlot: { returnChance: 0.2, maxLevelAbovePlayer: 3 },   // 3번 카드: 20% 확률로 놓친 희귀/전설 복귀, Lv+3까지
-  },
-};
 
 const DEFAULT_SKILL_LEVELS = { normal:1, fire:0, water:0, grass:0 };
 
