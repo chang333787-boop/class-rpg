@@ -1349,7 +1349,7 @@ function buildMainHTML() {
     </div>`);
   if (isFriday && settings.bossActive)
     alerts.push(`<div class="boss-banner" onclick="openBoss()" style="margin-bottom:.6rem">
-      <div style="font-size:2rem">${settings.bossIcon||'🧌'}</div>
+      <div style="font-size:2rem">${escHtml(settings.bossIcon||'🧌')}</div>
       <div style="flex:1"><div style="font-weight:900;color:var(--red)">${escHtml(settings.bossName||'금요일 보스')} 출현!</div>
       <div style="font-size:.76rem;color:var(--txt2)">보상: 💰${settings.bossGold||150}G + 특별 씨앗</div></div>
       <button class="bb-btn">도전!</button>
@@ -1514,7 +1514,7 @@ function buildMainHTML() {
           <div class="mission-check ${done?'done':pending?'wait':''}">
             ${done?'✓':pending?'⏳':''}
           </div>
-          <span style="font-size:1rem;flex-shrink:0">${q.icon||'📋'}</span>
+          <span style="font-size:1rem;flex-shrink:0">${escHtml(q.icon||'📋')}</span>
           <div style="flex:1;min-width:0">
             <div class="mission-name">${escHtml(q.name)}</div>
             <div style="font-size:.68rem;color:var(--txt3)">${typeLabel}${q.dueDate?` · 마감 ${q.dueDate}`:''}</div>
@@ -2657,7 +2657,7 @@ function renderBattleNew() {
     <div class="ba-stage">
       <!-- 플레이어 -->
       <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#7ec8e3">${player.name}</div>
+        <div class="ba-fighter-name" style="color:#7ec8e3">${escHtml(player.name)}</div>
         <div class="ba-fighter-icon" style="width:80px;height:100px;margin:0 auto" id="ba-char-emoji">${charSVG(player)}</div>
         <div style="width:100%">
           <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-char-hp" style="width:${playerHpPct}%"></div></div>
@@ -2916,7 +2916,7 @@ function renderBattle(phase) {
         <div class="ba-emoji" id="ba-char-emoji" style="font-size:0;width:70px;height:90px;margin:0 auto">
           ${charSVG(s)}
         </div>
-        <div style="font-size:.75rem;font-weight:700">${s.name}</div>
+        <div style="font-size:.75rem;font-weight:700">${escHtml(s.name)}</div>
         <div class="ba-hp-wrap">
           <div class="ba-hp-bar-bg"><div class="ba-hp-bar-fill ba-char-hp" id="ba-char-hp" style="width:${charHpPct}%"></div></div>
           <div class="ba-hp-txt">HP ${charHpPct}%</div>
@@ -2962,7 +2962,7 @@ function doFight() {
   }
 
   const rounds = win ? [
-    {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${s.name} 공격!</span>`},
+    {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${escHtml(s.name)} 공격!</span>`},
     {delay:1000, monShake:true,  log:`<span class="good">💥 타격! 몬스터 체력 감소!</span>`,  monHp:65},
     {delay:2200, monAtk:true,    log:`<span class="bad">😤 ${escHtml(mon.name)} 반격!</span>`},
     {delay:3200, charFx:true,    log:`<span class="info">🛡️ 막았다!</span>`},
@@ -2972,7 +2972,7 @@ function doFight() {
     {delay:7600, monShake:true,  log:`<span class="good">💥 ${escHtml(mon.name)} 쓰러졌다!</span>`, monHp:0},
     {delay:9000, end:true, win:true},
   ] : [
-    {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${s.name} 공격!</span>`},
+    {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${escHtml(s.name)} 공격!</span>`},
     {delay:1000, miss:true,      log:`<span style="color:#888">💨 빗나감!</span>`},
     {delay:2200, monAtk:true,    log:`<span class="bad">😈 ${escHtml(mon.name)} 반격!</span>`},
     {delay:3200, charShake:true, log:`<span class="bad">💔 피해! 체력 감소...</span>`,     charHp:65},
@@ -4109,8 +4109,8 @@ function openBoss() {
   openModal('m-boss');
   document.getElementById('boss-arena').innerHTML = `
     <div style="text-align:center;padding:1rem">
-      <div style="font-size:5rem;animation:floatY 3s ease-in-out infinite">${settings.bossIcon||'🧌'}</div>
-      <div style="font-size:1.2rem;font-weight:700;color:var(--red);margin:.5rem 0">${settings.bossName}</div>
+      <div style="font-size:5rem;animation:floatY 3s ease-in-out infinite">${escHtml(settings.bossIcon||'🧌')}</div>
+      <div style="font-size:1.2rem;font-weight:700;color:var(--red);margin:.5rem 0">${escHtml(settings.bossName)}</div>
       <div style="font-size:.82rem;color:var(--txt2);margin-bottom:1.2rem">전체 학생이 힘을 합쳐 물리쳐요!</div>
       <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.2rem">
         <span class="rb-tag">💰 ${settings.bossGold}G</span>
@@ -8833,7 +8833,7 @@ function renderQuestBoard() {
     return `<div style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':pending?'rgba(255,215,0,.25)':'rgba(255,255,255,.08)'};
       border-radius:12px;padding:.9rem 1rem;margin-bottom:.6rem;${done?'opacity:.6':''}">
       <div style="display:flex;align-items:flex-start;gap:.7rem">
-        <div style="font-size:1.6rem;flex-shrink:0">${q.icon||'📋'}</div>
+        <div style="font-size:1.6rem;flex-shrink:0">${escHtml(q.icon||'📋')}</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${escHtml(q.name)}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
@@ -9574,9 +9574,9 @@ function buildRankingHTML(students) {
       <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;
         background:rgba(255,255,255,.05);border-radius:10px;flex:1;min-width:0">
         <span style="font-size:1.3rem;flex-shrink:0">${medals[i]}</span>
-        <span style="font-size:1rem;flex-shrink:0">${s.avatar||''}</span>
+        <span style="font-size:1rem;flex-shrink:0">${escHtml(s.avatar||'')}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
+          <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.name)}</div>
           <div style="font-size:.73rem;color:var(--gold);font-weight:700">${cat.fmt(s,cat.key(s))}</div>
         </div>
       </div>`).join('');
