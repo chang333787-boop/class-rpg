@@ -1225,6 +1225,42 @@ const DB = {
     }))).catch(e => this._onSaveError(e));
   },
 
+  // [ART-KEY-FIX-1] artworks 서버 판(raw) → "작품 id = 키" 로 맞추는 **바뀔 키만** 담은 update 객체(순수 함수, 쓰기 없음).
+  //   · 옛 숫자 키 작품은 id 키로 옮기고, 그 id 키에 쓰여 있던 유령 조각(hidden·likes)은 합친다
+  //   · 같은 작품이 id 키에 이미 있으면 숫자 키만 지운다 · keep(a) 가 false 면 지운다(그 작품의 유령 조각도)
+  //   · 이미 제 모양인 키(그 순간 올라온 새 작품)는 건드리지 않는다
+  //   숫자 키 하나만 지우면 배열에 null 구멍이 생겨 `a.id` 를 읽는 화면이 깨지므로, 지울 때도 이걸로 모양을 같이 맞춘다.
+  _artworkKeyFix(raw, keep) {
+    raw = raw || {};
+    const keys = Object.keys(raw);
+    const upd = {};
+    const mergedGhost = new Set();
+    let moved = 0, removed = 0;
+    const hasRealAt = k => !!(raw[k] && raw[k].id === k);
+    for (const k of keys) {
+      const a = raw[k];
+      if (!a || !a.id) continue;                               // id 없는 것은 아래에서
+      if (a.id === k) {                                        // 이미 제 모양
+        if (!keep(a)) { upd[k] = null; removed++; }
+        continue;
+      }
+      upd[k] = null;                                           // 키가 id 가 아님(옛 숫자 키 등)
+      if (!keep(a)) { removed++; continue; }
+      if (hasRealAt(a.id) || (upd[a.id] && upd[a.id].id)) { removed++; continue; }   // 같은 작품이 이미 id 키에 → 중복
+      const piece = raw[a.id] && !raw[a.id].id ? raw[a.id] : {};                    // 유령 조각
+      const rec = { ...a, ...piece, likes: { ...(a.likes || {}), ...(piece.likes || {}) } };
+      if (!Object.keys(rec.likes).length) delete rec.likes;
+      upd[a.id] = rec; mergedGhost.add(a.id); moved++;
+    }
+    for (const k of keys) {                                    // id 없는 레코드: 옮긴 작품에 합쳐진 조각이 아니면 버린다
+      const a = raw[k];
+      if (a && a.id) continue;
+      if (mergedGhost.has(k)) continue;
+      upd[k] = null; removed++;
+    }
+    return { upd, moved, removed };
+  },
+
   // [ARTFREE-1] 작품 내리기 — 갤러리에서만 감춘다(지우지 않는다). hidden 한 칸만 쓴다.
   hideArtwork(id, hidden) {
     const db = this.load();
@@ -1237,12 +1273,15 @@ const DB = {
 
   deleteArtwork(id) {
     const db = this.load();
-    db.artworks = (db.artworks||[]).filter(a => a.id !== id);
+    db.artworks = (db.artworks||[]).filter(a => a && a.id !== id);
     this._cache = db;
-    this._fbRef.child('artworks/' + id).remove();
-    const artworksObj = {};
-    db.artworks.forEach(a => { artworksObj[a.id] = a; });
-    this._fbRef.child('artworks').set(artworksObj);
+    // [ART-KEY-FIX-1] 캐시 판 통째 set 대신 서버 판에서 바뀔 키만 — 그 순간 올라온 작품을 지우지 않고,
+    //   숫자 키 판이면 모양도 같이 맞춰 null 구멍을 안 남긴다
+    const node = this._fbRef.child('artworks');
+    return node.once('value').then(snap => {
+      const { upd } = this._artworkKeyFix(snap.val(), a => a.id !== id);
+      if (Object.keys(upd).length) return node.update(upd);
+    }).catch(e => this._onSaveError(e));
   },
 
   // ── 추억 사진 ────────────────────────────────────────
