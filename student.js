@@ -2288,6 +2288,7 @@ function buySkillBook(bookId) {
   const result = buySkillBookLogic(CUR, bookId);
   if (!result.ok) { toast(`🔒 ${result.reason}`); return; }
   DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'skill', book.price);   // [GOLD-SPEND-2] 저장 뒤
   renderShop();
   renderHUD();
   toast(`✅ ${book.name} 구매! ${typeLabel} Lv.${book.targetLevel} 습득!`);
@@ -2313,7 +2314,9 @@ function buyEquip(itemId) {
   const oldId = (CUR.equipmentIds||{})[slot];
   if (oldId && oldId !== itemId) returnEquipToInv(oldId);
   Utils.equipItem(CUR, item);
-  DB.saveStudent(CUR); renderAll(); renderShop();
+  DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'equip', item.price);   // [GOLD-SPEND-2] 저장 뒤
+  renderAll(); renderShop();
   checkAchievements();
   toast(`✅ ${item.name} 구매 및 장착!`);
 }
@@ -2331,7 +2334,9 @@ function buySeed(id) {
   CUR.inventory = CUR.inventory || [];
   const ex = CUR.inventory.find(i => i.id === id);
   if (ex) ex.qty++; else CUR.inventory.push({id, qty:1});
-  DB.saveStudent(CUR); renderShop(); renderHUD();
+  DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'seed', seed.price);   // [GOLD-SPEND-2] 저장 뒤 · 일반·돌연변이 씨앗 모두
+  renderShop(); renderHUD();
   toast(`✅ ${seed.name} 구매!`);
 }
 
@@ -2342,7 +2347,9 @@ function buyDeco(id) {
   CUR.inventory = CUR.inventory || [];
   const ex = CUR.inventory.find(i => i.id === id);
   if (ex) ex.qty++; else CUR.inventory.push({id, qty:1});
-  DB.saveStudent(CUR); renderShop(); renderHUD();
+  DB.saveStudent(CUR);
+  DB.logSpend(CUR.id, 'deco', deco.price);   // [GOLD-SPEND-2] 저장 뒤 · 장식·가구·러그
+  renderShop(); renderHUD();
   toast(`✅ ${deco.name} 구매!`);
 }
 
