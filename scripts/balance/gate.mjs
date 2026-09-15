@@ -8,7 +8,10 @@
 //    node scripts/balance/gate.mjs                                   코드 기본 계수
 //    node scripts/balance/gate.mjs --settings scripts/balance/settings/prod-20260915.json   운영 계수
 //    node scripts/balance/gate.mjs --gamedata <옛 gamedata.js 경로>   옛 커밋과 비교
+//    node scripts/balance/gate.mjs --proposal scripts/balance/proposals/<안>.json  B-4 계수 세트(메모리에서만 적용)
 //    옵션: --n 400(칸당 판 수) · --seed 20260915 · --max 20(최대 레벨) · --strict
+//    proposal JSON = { name, settings(관리자 설정 — --settings 위에 덮음), balance(BALANCE 덮기),
+//                      patches([원문, 바꿀 글] — 코드에 없는 구조 제안), growth({atk:[기본, 레벨당]} — 코드에 없는 구조 제안) }
 //
 //  판정 (G1~G5, 목표는 "제안" — 운영 값 변경은 사용자 결정)
 //    G1 같은 Lv 풀장비 65~80%        G2 같은 Lv 무기만 45~60%        G3 같은 Lv 맨몸 25~40%
@@ -28,13 +31,15 @@ const N = Number(arg('n', 400));
 const SEED = Number(arg('seed', 20260915));
 const MAX = Number(arg('max', 20));
 const settingsPath = arg('settings', null);
-const settings = settingsPath ? JSON.parse(fs.readFileSync(path.resolve(settingsPath), 'utf8')) : {};
+const proposalPath = arg('proposal', null);
+const proposal = proposalPath ? JSON.parse(fs.readFileSync(path.resolve(proposalPath), 'utf8')) : {};
+const settings = { ...(settingsPath ? JSON.parse(fs.readFileSync(path.resolve(settingsPath), 'utf8')) : {}), ...(proposal.settings || {}) };
 const gamedata = arg('gamedata', path.join(ROOT, 'gamedata.js'));
 const OFFSETS = [-1, 0, 1, 2, 3];
 const TARGET = { 풀장비: [0.65, 0.80], 무기만: [0.45, 0.60], 맨몸: [0.25, 0.40] };
 const CLIFF = 0.15, PLUS3 = [0.30, 0.45];
 
-const W = loadWorld({ gamedata, settings, seed: SEED });
+const W = loadWorld({ gamedata, settings, balance: proposal.balance || null, patches: proposal.patches || null, seed: SEED });
 const bc = W.BATTLE_CONSTS;
 const pct = r => (r == null ? '—' : `${Math.round(r.win * 100)}%`);
 const out = [];
@@ -42,7 +47,7 @@ const P = s => out.push(s);
 
 P(`# 밸런스 게이트 — ${new Date().toISOString().slice(0, 10)}`);
 P(`계수: 몬스터 HP×${bc.monsterHpMult} · 공격력×${bc.monsterAtkMult} · 하루 전투 ${bc.dailyBattleLimit}회 · 유령 노말×${bc.ghostNormalMult}` +
-  ` · 출처 ${settingsPath ? path.basename(settingsPath) : '코드 기본값'} · gamedata ${gamedata.startsWith(ROOT) ? path.relative(ROOT, gamedata) : path.basename(gamedata) + ' (저장소 밖)'} · 칸당 ${N}판 · 씨앗 ${SEED}`);
+  ` · 출처 ${settingsPath ? path.basename(settingsPath) : '코드 기본값'}${proposalPath ? ` + 제안 ${proposal.name || path.basename(proposalPath)}` : ''} · gamedata ${gamedata.startsWith(ROOT) ? path.relative(ROOT, gamedata) : path.basename(gamedata) + ' (저장소 밖)'} · 칸당 ${N}판 · 씨앗 ${SEED}`);
 
 // ── 1. 승률 표 ─────────────────────────────────────────────────
 const table = {};   // table[gear][lv][offset] = {win,turns}
@@ -52,7 +57,7 @@ for (const gear of GEAR) {
   P('| Lv | ATK/DEF/HP | 노말 | Lv−1 | **같은 Lv** | Lv+1 | Lv+2 | Lv+3 |');
   P('|---|---|---|---|---|---|---|---|');
   for (let lv = 1; lv <= MAX; lv++) {
-    const st = makeStudent(W, lv, gear);
+    const st = makeStudent(W, lv, gear, proposal.growth || null);
     const hp = W.getPlayerBattleStats(st).hp;
     table[gear][lv] = {};
     for (const o of OFFSETS) table[gear][lv][o] = winRate(W, st, lv + o, N);

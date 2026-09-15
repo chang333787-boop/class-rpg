@@ -1,0 +1,10 @@
+{
+  "name": "S2 S1 + 피해 흔들림 ±25% (구조 — 코드 필요)",
+  "settings": { "monsterHpMult": 2.0, "monsterAtkMult": 2.0 },
+  "patches": [
+    ["const dmg = Math.max(BALANCE.damage.minDamage, Math.round(stat * skillMult * defFactor * elemMult * traitMult * levelMult * critMult));",
+     "const dmg = Math.max(BALANCE.damage.minDamage, Math.round(stat * skillMult * defFactor * elemMult * traitMult * levelMult * critMult * (1 + (Math.random() * 2 - 1) * 0.25)));"],
+    ["const dmg = Math.max(BALANCE.damage.minDamage, Math.round((monster.atk || BALANCE.monster.atkFallback) * defFactor * armorMult * critMult));",
+     "const dmg = Math.max(BALANCE.damage.minDamage, Math.round((monster.atk || BALANCE.monster.atkFallback) * defFactor * armorMult * critMult * (1 + (Math.random() * 2 - 1) * 0.25)));"]
+  ]
+}
