@@ -709,6 +709,23 @@ cur = 'admin 기본값 초기화 범위(RESET-SCOPE-1)';
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'admin 승급 직업은 꿈 기준(PROMO-JOB-DREAM-1)';
+try {
+  const ADMIN = read('admin.js');
+  const gd = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  gd.globalThis = gd; vm.createContext(gd); vm.runInContext(read('gamedata.js') + ';globalThis.__U = Utils;', gd);
+  const stu = { id: 's1', name: '가', job: '대학생', dream: '의사', level: 19, exp: 0, gold: 0, totalGold: 0, promotedLevels: [] };
+  const req = { id: 'r1', studentId: 's1', level: 20 };
+  const sb = { Utils: gd.__U, notify() {}, renderAll() {},
+    DB: { getPromotionRequests: () => [req], getStudent: () => stu, saveQuestLog() {}, saveStudent() {}, removePromotionRequest() {} } };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(sliceFn(ADMIN, 'approvePromotion') + "\napprovePromotion('r1');", sb);
+  test('Lv20 승급: job "대학생"·꿈 "의사" → "의사 지망생"(예전 "대학생 지망생")', () => eq(stu.job, '의사 지망생'));
+} catch (e) {
+  test('승급 직업 계산을 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
