@@ -22,11 +22,10 @@ const FILES = ['gamedata.js', 'admin.js', 'student.js', 'kiosk.js'];
 const BASELINE = {
   'gamedata.js': {
     settings:          { n: 1, why: '교사만(saveSettings) — 학생 아침 자동등록은 #279 부터 settings/autoDailyLastDate 한 칸' },
-    artworks:          { n: 1, why: '교사 삭제 — id 키 객체로 씀(artworksObj)' },
     customProblems:    { n: 2, why: '교사만' },
     memories:          { n: 3, why: '여러 기기(학생 올리기↔교사 승인) — 판정 대기, 보고_20260915/판정_추억사진_저장방식_rf.md' },
     memoryAlbums:      { n: 2, why: '교사만' },
-    promotionRequests: { n: 3, why: '여러 기기 — PROMO-PER-ID-1(#271) 머지 뒤 1(교사 고아 정리, id 키 객체)' },
+    promotionRequests: { n: 1, why: '교사 고아 정리 savePromotionRequests — id 키 객체(#271). 학생 신청·승인은 한 건씩' },
     recorderSongs:     { n: 2, why: '교사만(리코더 제거 판정 대기)' },
   },
   'admin.js': {
@@ -35,7 +34,6 @@ const BASELINE = {
     customMonsters:       { n: 4, why: '교사만' },
     customQuestTemplates: { n: 3, why: '교사만' },
     hiddenQuestTemplates: { n: 2, why: '교사만' },
-    artworks:             { n: 2, why: '교사만 — id 키 객체' },
     promotionRequests:    { n: 1, why: '교사 dedupeAll' },
   },
   'student.js': {},
