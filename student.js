@@ -3821,64 +3821,57 @@ function renderMonsterStep() {
       const kCount = mons.filter(m => killed.includes(m.id)).length;
       const pct    = mons.length ? Math.round(kCount/mons.length*100) : 0;
       const preview = mons.slice(0,3).map(m =>
-        `<div style="text-align:center">
-          <div style="font-size:1.5rem">${iconImg(m, 'monsters', '1.5rem')}</div>
-          <div style="font-size:.52rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
+        `<div class="zn-mon">
+          <div class="zn-mon-ico">${iconImg(m, 'monsters', '1.5rem')}</div>
+          <div class="zn-mon-lv">Lv${m.level||m.recLv}</div>
         </div>`).join('');
 
       return `<div class="zone-card ${locked?'zone-locked':''}"
         onclick="${locked?`toast('Lv.${z.minLv} 이상 필요해요!')`:`selectZoneCard('${z.id}')`}"
-        style="background:${z.bg};border:2px solid ${locked?'rgba(255,255,255,.08)':z.border};
-          border-radius:18px;padding:1.2rem;cursor:${locked?'not-allowed':'pointer'};
-          opacity:${locked?.4:1};transition:transform .18s,box-shadow .18s;
-          position:relative;overflow:hidden;display:flex;flex-direction:column;gap:.7rem">
+        style="--zbg:${z.bg};--zb:${z.border};--zc:${z.color}">
         ${!locked?'<div class="zone-shine"></div>':''}
-        <div style="display:flex;align-items:center;gap:.6rem">
-          <span style="font-size:1.8rem">${z.icon}</span>
-          <div style="flex:1">
-            <div style="font-size:.95rem;font-weight:800;color:${locked?'var(--txt3)':z.color}">${z.name}</div>
-            <div style="font-size:.65rem;color:var(--txt3)">${z.sub}</div>
+        <div class="zn-head">
+          <span class="zn-ico">${z.icon}</span>
+          <div class="zn-title">
+            <div class="zn-name">${z.name}</div>
+            <div class="zn-sub">${z.sub}</div>
           </div>
-          ${locked?`<span style="font-size:.65rem;color:var(--red);background:rgba(231,76,60,.15);
-            border-radius:6px;padding:.2rem .45rem;white-space:nowrap">🔒 Lv.${z.minLv}</span>`:''}
+          ${locked?`<span class="zn-lock">🔒 Lv.${z.minLv}</span>`:''}
         </div>
-        <div style="font-size:.68rem;color:var(--txt3)">${z.desc}</div>
-        <div style="display:flex;gap:.4rem;align-items:center">
+        <div class="zn-desc">${z.desc}</div>
+        <div class="zn-prev">
           ${preview}
-          <div style="font-size:.6rem;color:var(--txt3);margin-left:auto">외 ${Math.max(0,mons.length-3)}마리</div>
+          <div class="zn-more">외 ${Math.max(0,mons.length-3)}마리</div>
         </div>
-        <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:.6rem;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.68rem;color:${locked?'var(--txt3)':z.color}">💰 ${zoneGoldRangeText(mons, z.reward)}</span>
-          <span style="font-size:.62rem;color:var(--txt3)">${kCount}/${mons.length} 처치</span>
+        <div class="zn-foot">
+          <span class="zn-reward">💰 ${zoneGoldRangeText(mons, z.reward)}</span>
+          <span class="zn-kill">${kCount}/${mons.length} 처치</span>
         </div>
-        <div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px">
-          <div style="height:100%;width:${pct}%;background:${z.color};border-radius:2px"></div>
+        <div class="zn-bar">
+          <div class="zn-bar-fill" style="width:${pct}%"></div>
         </div>
-        ${!locked&&canFight?`<div style="text-align:center;background:${z.color};color:#111;
-          font-size:.75rem;font-weight:800;border-radius:10px;padding:.35rem">입장 →</div>`:''}
+        ${!locked&&canFight?`<div class="zn-enter">입장 →</div>`:''}
       </div>`;
     }).join('');
 
     body.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">
+      <div class="zn-top">
         <div>
-          <div style="font-size:.92rem;font-weight:700">구역을 선택하세요</div>
-          <div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">선택 후 돌아올 수 없어요</div>
+          <div class="zn-top-title">구역을 선택하세요</div>
+          <div class="zn-top-sub">선택 후 돌아올 수 없어요</div>
         </div>
         ${canFight
-          ? `<div style="text-align:right">
-               <div style="font-size:1.2rem;font-weight:800;color:var(--gold)">${attemptsLeft}
-                 <span style="font-size:.65rem;font-weight:400;color:var(--txt3)">/${limit}회</span>
+          ? `<div class="zn-left">
+               <div class="zn-left-n">${attemptsLeft}
+                 <span class="zn-left-of">/${limit}회</span>
                </div>
-               <div style="font-size:.6rem;color:var(--txt3)">오늘 남은 전투</div>
+               <div class="zn-left-lbl">오늘 남은 전투</div>
              </div>`
-          : `<div style="font-size:.75rem;color:var(--txt3)">오늘 완료 ✅</div>`}
+          : `<div class="zn-done">오늘 완료 ✅</div>`}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem">${zoneCards}</div>
-      <div style="text-align:center;margin-top:.9rem">
-        <button onclick="MONSTER_STEP='dex';MONSTER_DEX_ZONE='beginner';renderMonsterStep()"
-          style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;
-            color:var(--txt3);font-size:.73rem;padding:.4rem 1.2rem;cursor:pointer;font-family:inherit">
+      <div class="zn-grid">${zoneCards}</div>
+      <div class="zn-dex-wrap">
+        <button onclick="MONSTER_STEP='dex';MONSTER_DEX_ZONE='beginner';renderMonsterStep()" class="zn-dex">
           📖 몬스터 도감 보기
         </button>
       </div>`;
