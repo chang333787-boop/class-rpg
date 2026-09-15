@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>우리반 마을 · 시뮬 45차 — 저장층 sync + palette·sid 결함</title>
+<title>우리반 마을 · 시뮬 53차 — 어제 소식</title>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:#0f1116;
@@ -60,6 +60,15 @@
   #goals{position:fixed;left:12px;top:62px;z-index:7;background:#16241af2;border:1px solid #2d5d3c;border-left:4px solid #5fc27e;border-radius:10px;
     padding:10px 14px;font:13px/1.6 'Malgun Gothic',sans-serif;color:#e8f5ea;max-width:min(80vw,340px);box-shadow:0 8px 24px #0009;display:none}
   #goals.show{display:block}
+  #guide{position:fixed;inset:0;z-index:20;background:#0f111699;display:none;align-items:center;justify-content:center;padding:20px}
+  #guide.show{display:flex}
+  #guide .card{background:#1a1d26;border:1px solid #3a4050;border-radius:16px;padding:22px 24px;width:min(92vw,420px);box-shadow:0 12px 40px #000b;font:16px/1.6 'Malgun Gothic',sans-serif;color:#e8e6e0;text-align:center}
+  #guide .pic{font-size:56px;line-height:1.2;margin-bottom:8px}
+  #guide .txt{min-height:78px}#guide .txt b{color:#e8b04b}
+  #guide .dots{margin:8px 0 12px;color:#556}#guide .dots b{color:#e8b04b}
+  #guide .btns{display:flex;gap:10px;justify-content:center}
+  #guide button{background:#222630;border:1px solid #3a4050;color:#e8e6e0;border-radius:10px;padding:10px 18px;font-size:16px;cursor:pointer;min-height:44px;min-width:110px}
+  #guide button.main{background:#e8b04b;color:#1a1d26;border-color:#e8b04b;font-weight:800}
   #fileBtn{flex:0 0 auto;pointer-events:auto;background:#222630dd;border:1px solid #3a4050;color:#e8e6e0;border-radius:9px;min-width:44px;min-height:44px;padding:0;font-size:18px;cursor:pointer}
   #filebox{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:8;background:#1a1d26f5;border:1px solid #3a4050;border-radius:12px;padding:12px 16px;
     font:13px/1.6 'Malgun Gothic',sans-serif;color:#e8e6e0;min-width:260px;max-width:min(90vw,380px);box-shadow:0 8px 24px #0009;display:none}
@@ -196,6 +205,7 @@
 
 <canvas id="mini" width="160" height="120"></canvas>
 <div id="goals"></div>
+<div id="guide"><div class="card"><div class="pic" id="guidePic"></div><div class="txt" id="guideTxt"></div><div class="dots" id="guideDots"></div><div class="btns"><button id="guideSkip">건너뛰기</button><button id="guideNext" class="main">다음</button></div></div></div>
 <div id="filebox"><div class="t">📦 마을 파일 <button id="fileClose">✕</button></div>
   <button id="exportBtn">⬇️ 내 마을 파일로 저장</button>
   <button id="importBtn">⬆️ 파일에서 마을 가져오기</button><input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -268,6 +278,8 @@ const ROOFS = [0xf2889e, 0x79cfd4, 0xf6c667, 0xa89ae0, 0xef9a7a, 0x8fbdf0, 0x8ad
 /* 주소 끝 #w=128,fill=25,people=30 → 판 크기·채움 비율·사람 수를 정해 **재기 위한** 모드.
    실제 판 크기는 설계 문서(시뮬레이션_설계_20260914.md)에서 정한다. */
 const QS = new URLSearchParams(location.search); const DEV = QS.get('dev') === '1';   // ?dev=1 일 때만 #fresh·파괴성 훅(G5 첫 PR 훅)
+const VISIT_SID = (QS.get('visit') || '').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || null;   // 친구 마을 구경(읽기만)
+const VISIT_SRC = DEV ? QS.get('visitsrc') : null;   // 시험용: 원격 대신 이 주소에서 { meta, plots } 를 받는다
 const HP = {};
 location.hash.slice(1).split(',').forEach(kv => { const [k, v] = kv.split('='); if (v !== undefined) HP[k] = isNaN(+v) ? v : +v; });
 const OFF = new Set(String(HP.off || '').split('+').filter(Boolean));   // 재기용: #off=faces+folks+… (쉼표는 해시 구분자라 + 로)
@@ -695,7 +707,7 @@ const amenOf = root => amen.has(root) ? amen.get(root) : (amen.set(root, amenity
 const growMul = root => { const a = amenOf(root); return a <= 0 ? 1.15 : 1 - 0.3 * Math.min(a, AMEN_MAX) / AMEN_MAX; };   // 6 → ×0.7 · 0 → ×1.15
 const amenText = root => { const a = amenOf(root); return a >= 3 ? ' · 나무가 많아 좋아요' : a <= 0 ? ' · 거리가 좀 삭막해요' : ''; };
 /* 해금 — 인구 문턱과 열리는 물건 */
-const UNLOCKS = [ { pop:10, kinds:['fountain','pavilion'] }, { pop:30, kinds:['clock','windmill','dream'] }, { pop:80, kinds:['green','sbridge','library'] }, { pop:200, kinds:['school','station','museum'] } ];
+const UNLOCKS = [ { pop:10, kinds:['fountain','pavilion'] }, { pop:30, kinds:['clock','windmill','dream'] }, { pop:50, kinds:['library'] }, { pop:80, kinds:['green','sbridge','station'] }, { pop:120, kinds:['school'] }, { pop:160, kinds:['museum'] } ];   // 47차: 특별 4종은 한 개씩(광장 뒤 곡선)
 const LOCK_POP = {}; UNLOCKS.forEach(u => u.kinds.forEach(k => LOCK_POP[k] = u.pop));
 const unlocked = new Set();
 function lockedWhy(kind) { const need = LOCK_POP[kind]; if (!need || unlocked.has(kind)) return true; return '인구 ' + need + '명이면 열려요'; }
@@ -1621,7 +1633,7 @@ function act(clientX, clientY) {
     if (who) { FOLLOW.f = who; FOLLOW.until = performance.now() + 6000; toast(folkCard(who), true); return; }   // 카드 + 6초 따라가기(F20)
     const rec = c.inside ? cells[idx(c.x, c.y)] : null;
     if (rec && rec.k === 'sign') { writeSign(rec); return; }
-    if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘', true); return; }
+    if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘' + (topSign() ? ' · 가장 많이 읽힌 표지판 「' + topSign().t + '」 ' + topSign().reads + '번' : '') + (topLike() ? ' · 손님이 좋아한 곳: ' + topLike().nm : ''), true); return; }
     if (rec && rec.k === 'dream') {                   // 꿈나무: 꿈을 적거나 본다
       if (VISIT.on) { toast('🌟 ' + (DREAM.text || '(아직 꿈을 안 적었어요)'), true); return; }
       if (!DREAM.text) { const t = prompt('꿈나무에 네 꿈을 적어 봐 (한 줄)', ''); if (t != null && t.trim()) { DREAM.text = t.trim().slice(0, 40); markDirty(); toast('🌟 꿈나무에 적었어요: ' + DREAM.text, true); } }
@@ -1913,6 +1925,7 @@ function simDay()  { return Math.floor(SIM.t / DAY_MS) + 1; }
 let savedDay = 1;
 function simHour() { return (DAY_START_H + (SIM.t % DAY_MS) / DAY_MS * 24) % 24; }
 function setSpeed(n) {
+  if (VISIT.remote && n !== 0) { toast('구경 중엔 시간이 멈춰 있어요', true); return; }
   if (n === 0) SIM.paused = true; else { SIM.paused = false; SIM.speed = n; }
   document.querySelectorAll('#spd button').forEach(b => b.classList.toggle('on', +b.dataset.s === (SIM.paused ? 0 : SIM.speed)));
   toast(n === 0 ? '멈췄어요' : n + '배속', true);
@@ -1927,7 +1940,7 @@ function drawClock() {
   if (d === clockShownDay && h === clockShownH) return;
   clockShownDay = d; clockShownH = h;
   document.getElementById('clockDay').textContent = ['🌸','☀️','🍂','❄️'][seasonIdx()] + ' ' + d + '일째';
-  if (d !== savedDay) { histPush(savedDay); savedDay = d; markDirty(); }   // 하루 넘어가면 어제 점 하나 + 시계 저장(F35)
+  if (d !== savedDay) { histPush(savedDay); dayNote(savedDay); savedDay = d; markDirty(); }   // 하루 넘어가면 어제 점 하나 + 어제 소식 + 시계 저장(F35·53차)
   document.getElementById('clockTime').textContent = (h < 12 ? (h < 6 ? '새벽 ' : '아침 ') : (h < 18 ? '낮 ' : '밤 ')) + (h % 12 || 12) + '시';
 }
 /* 낮·밤 — 빛의 세기와 하늘색만. 해 각도는 F7 에서. */
@@ -2065,6 +2078,14 @@ function roadBFS(from, who, radius) {
 }
 
 /* 목적지를 하나 고른다 — 무엇이든 옆에 있는 길 칸을 좋아한다(집·광장·우물 앞) */
+/* 시간대별로 끌리는 필요(F26): 아침 물 · 낮 장보기 · 오후 놀이 · 저녁 쉼 */
+function hourPref(h) { return h >= 6 && h < 9 ? '물' : h >= 11 && h < 14 ? '장보기' : h >= 14 && h < 18 ? '놀이' : h >= 18 && h < 20 ? '쉼' : null; }
+function needBeside(i) {
+  const x = cX(i), y = cY(i);
+  for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && K[c.k].need) return K[c.k].need; }
+  return null;
+}
+const destLog = { 전체: 0, 후보: 0, 고름: 0 };   // 시간대 끌림이 있는 시각에 고른 목적지 중 몇 번을 그 필요로 갔나
 function pickDestination(f, who) {
   const here = f.path ? f.path[f.path.length - 1] : f.base;
   if (here < 0 || !isRoad(here)) { f.state = 'mill'; f.until = 0; return; }
@@ -2092,7 +2113,10 @@ function pickDestination(f, who) {
   let festPool = null;
   if (EV.fest && EV.festRoot >= 0) festPool = nice.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && c.root === EV.festRoot; }); });
-  const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
+  const pref = hourPref(simHour()), timely = pref ? errand.filter(i => needBeside(i) === pref) : [];   // 시간대별(F26)
+  const useTimely = !!(timely.length && !(festPool && festPool.length) && Math.random() < 0.85);
+  if (pref) { destLog.후보 += timely.length ? 1 : 0; destLog.고름 += useTimely ? 1 : 0; destLog.전체++; }
+  const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : useTimely ? timely : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
   let goal = pool[(Math.random() * pool.length) | 0];
   if (f.visitor) { const g = visitorGoal(f, reach); if (g >= 0) goal = g; }
 
@@ -2374,8 +2398,14 @@ const GOALS = [
   { id: 'pop30',  t: '인구 30명',           ok: () => population() >= 30 },
   { id: 'plaza',  t: '광장 만들기',         ok: () => countKind('plaza') >= 1 },
   { id: 'lv3',    t: '3층 집 하나',         ok: () => { let f = false; hinfo.forEach(h => { if (h.lv >= 3) f = true; }); return f; } },
+  { id: 'library1', t: '도서관 세우기',       ok: () => countKind('library') >= 1 },
   { id: 'fest',   t: '광장 축제 열기',      ok: () => EV.festSeen },
   { id: 'pop80',  t: '인구 80명',           ok: () => population() >= 80 },
+  { id: 'station1', t: '기차역 세우기 — 손님이 와요', ok: () => countKind('station') >= 1 },
+  { id: 'pop120', t: '인구 120명',          ok: () => population() >= 120 },
+  { id: 'school1',  t: '학교 세우기',        ok: () => countKind('school') >= 1 },
+  { id: 'pop160', t: '인구 160명',          ok: () => population() >= 160 },
+  { id: 'museum1',  t: '박물관 세우기',      ok: () => countKind('museum') >= 1 },
   { id: 'pop200', t: '인구 200명',          ok: () => population() >= 200 },
 ];
 const goalsDone = new Set();
@@ -2477,6 +2507,17 @@ function histPoint(d) {
   let homes = 0, happy = 0; res.forEach((v, root) => { if (v > 0 && cells[root]) { homes++; if (faceOfHome(root) === 0) happy++; } });
   return { d, 인구: population(), 만족: homes ? Math.round(happy / homes * 100) : 0, 일자리: jobStats.일자리 ? Math.round(jobStats.찬자리 / jobStats.일자리 * 100) : 0 };
 }
+/* 어제 소식(53차): 손님·읽힘·이웃이 있었던 날만 한 줄 */
+const dayBook = { 손님: 0, 읽힘: 0, 이웃: 0, 마지막: '' };
+function dayNote(d) {
+  if (VISIT.on) return;                                   /* 구경 중엔 남의 마을 소식이라 안 보인다. 시연 판(#adv 등)에선 보인다 */
+  const v = visitStats.온손님 - dayBook.손님, r = visitStats.읽음 - dayBook.읽힘, n = (typeof neighborStats !== 'undefined' ? neighborStats.옴 : 0) - dayBook.이웃;
+  dayBook.손님 = visitStats.온손님; dayBook.읽힘 = visitStats.읽음; dayBook.이웃 = typeof neighborStats !== 'undefined' ? neighborStats.옴 : 0;
+  if (v + r + n <= 0) return;
+  const parts = []; if (v) parts.push('손님 ' + v + '명'); if (n) parts.push('이웃 ' + n + '명'); if (r) parts.push('표지판 ' + r + '번 읽힘');
+  dayBook.마지막 = '📰 어제: ' + parts.join(' · '); toast(dayBook.마지막, true);
+}
+window.__dayNote = () => ({ ...dayBook });
 function histPush(d) {
   if (VISIT.on || savingOff) return;
   if (HIST.length && HIST[HIST.length - 1].d >= d) return;   // 같은 날 두 번 없음
@@ -2643,7 +2684,7 @@ function rhythmTick(f, i, now) {
    ══════════════════════════════════════════════════════════════ */
 const fileStats = { 내보냄: 0, 가져옴: 0, 거절: 0 };
 function exportText() { return JSON.stringify(serialize()); }
-function reopenUrl() { const q = new URLSearchParams(location.search); q.set('r', String(Date.now())); return location.pathname + '?' + q.toString(); }   // sid·dev 를 잃지 않는다(결함 B)
+function reopenUrl() { const q = new URLSearchParams(location.search); q.delete('visit'); q.delete('visitsrc'); q.set('r', String(Date.now())); return location.pathname + '?' + q.toString(); }   // sid·dev 를 잃지 않는다(결함 B)
 function exportFile() {
   const txt = exportText(), d = new Date(), stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); a.download = '우리반마을_' + SID + '_' + stamp + '.json';
@@ -2737,6 +2778,44 @@ function visitFriend(fr) {
   toast('🏘️ ' + fr.nm + '의 마을이에요 — 구경만 할 수 있어요', true);
   return n;
 }
+/* ── ?visit=<sid>: 원격(REST GET, 읽기만) → 읽기 전용 구경 (46차) ── */
+const REMOTE_DB = 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app';
+const rArr = v => Array.isArray(v) ? v.filter(x => x != null) : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : [];
+const rObj = v => { const o = {}; if (Array.isArray(v)) v.forEach((x, i) => { if (x != null) o[i] = x; }); else if (v && typeof v === 'object') for (const k in v) if (v[k] != null) o[k.replace(/^c/, '')] = v[k]; return o; };
+function remoteToVillage(r) {                                   // sync.js 의 toVillage 와 같은 규칙
+  const m = r && r.meta; if (!m || typeof m !== 'object') return null;
+  return { v: m.v || 2, w: m.w || W, h: m.h || H, palette: rArr(m.palette), plotStr: Object.assign({}, (r.plots && typeof r.plots === 'object' && !Array.isArray(r.plots)) ? r.plots : {}),
+           clock: m.clock || { t: 0, speed: 1 }, houses: rObj(m.houses), unlocked: rArr(m.unlocked), goals: rArr(m.goals), festSeen: !!m.festSeen, dream: m.dream || '',
+           plots: rArr(m.plotsOpen), plotsEarned: m.plotsEarned || 0, signs: rObj(m.signs), hist: rArr(m.hist) };
+}
+function visitBar(text, showBack) {
+  const bar = document.getElementById('visitBar'); bar.classList.add('show');
+  bar.querySelector('#visitName').textContent = text; bar.childNodes[0].textContent = '🏘️ ';
+  document.getElementById('likeBtn').style.display = 'none'; document.getElementById('backBtn').style.display = showBack ? '' : 'none';
+}
+function applyVisit(d, who) {
+  clearTimeout(saveTimer); savingOff = true; VISIT.on = true; VISIT.remote = true; VISIT.who = { id: who, nm: who };
+  setMode(null, null); overlayClear(); clearBoard();
+  const r = loadSaved(JSON.stringify(d));
+  SIM.paused = true; document.querySelectorAll('#spd button').forEach(b => { b.classList.toggle('on', +b.dataset.s === 0); b.disabled = true; });
+  folksDirty = true; updateCount(); document.getElementById('fitBtn').onclick();
+  visitBar(who + '의 마을 · 구경만 할 수 있어요(시간 멈춤)', true);
+  VISIT.msg = r.ok ? '구경 중' : '저장본을 읽지 못했어요: ' + r.why; return r;
+}
+async function visitRemoteStart(sid) {
+  visitBar(sid + '의 마을을 불러오는 중…', false);
+  let data = null, err = '';
+  try {
+    const url = VISIT_SRC || (REMOTE_DB + '/classRPG_villages/' + encodeURIComponent(sid) + '.json');
+    const res = await fetch(url, { method: 'GET' }); if (!res.ok) err = 'HTTP ' + res.status; else data = await res.json();
+  } catch (e) { err = String(e); }
+  const d = data && data.meta ? remoteToVillage(data) : null;
+  if (!d || !d.plotStr) { VISIT.on = true; VISIT.remote = true; VISIT.msg = '아직 마을이 없어요' + (err ? ' (' + err + ')' : ''); visitBar(sid + ' — 아직 마을이 없어요', true); toast('아직 마을이 없어요 — 친구가 먼저 지어야 해요', true); return false; }
+  applyVisit(d, sid); return true;
+}
+if (VISIT_SID) setTimeout(() => visitRemoteStart(VISIT_SID), 0);
+window.__visitLoad = (obj) => applyVisit(obj.meta ? remoteToVillage(obj) : obj, 'test');
+window.__visitState = () => ({ 구경: VISIT.on, 원격: !!VISIT.remote, 멈춤: SIM.paused, 안내: VISIT.msg || '', 저장꺼짐: savingOff });
 document.getElementById('classBtn').onclick = () => { if (VISIT.on) return; renderFriends(); document.getElementById('friends').classList.toggle('show'); };
 document.getElementById('friendsClose').onclick = () => document.getElementById('friends').classList.remove('show');
 document.getElementById('likeBtn').onclick = () => { if (!VISIT.on) return; const l = likes(); const id = VISIT.who.id; if (l[id]) delete l[id]; else l[id] = 1;
@@ -2871,7 +2950,22 @@ let visitTimer = 0; const visitStats = { 온손님: 0, 간손님: 0, 오늘: 0, 
 /* 글이 있는 표지판·꿈나무인가 */
 const readable = c => (c.k === 'sign' && !!(signs.get(c.root) || {}).t) || (c.k === 'dream' && !!DREAM.text);
 function stationRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'station') r = i; }); return r; }
+const NEIGHBOR_POP = 30, NEIGHBOR_EVERY = 2400, NEIGHBOR_STAY = 60000;   // 인구 30 부터, 4분마다 1명, 60초 구경
+let neighborTimer = 0; const neighborStats = { 옴: 0, 감: 0 };
+function neighborTick(now) {
+  if (++neighborTimer < NEIGHBOR_EVERY) return; neighborTimer = 0;
+  if (VISIT.on || population() < NEIGHBOR_POP || folks.some(f => f.neighbor) || folks.length >= FOLK_CAP) return;
+  let start = -1; cells.forEach((rec, i) => { if (start < 0 && rec && rec.root === i && rec.k === 'house') start = roadBeside(rec); });   // 어느 집 앞 길에서 먼 끝을 찾는다
+  if (start < 0) return;
+  const { reach } = roadBFS(start, undefined, 60); if (reach.length < 8) return;
+  const b = reach[reach.length - 1];                                              // 길 먼 끝 = 마을 입구
+  folks.push({ home: b, ct: (Math.random() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
+    x: wx(cX(b)), z: wz(cY(b)), px: wx(cX(b)), pz: wz(cY(b)), dir: 0, pdir: 0, path: [b], step: 0, seg: 0, state: 'idle', mx: 0, mz: 0, mt: 0 });
+  folkPool.forEach(m => m.count = folks.length); neighborStats.옴++;
+  toast('🚶 이웃 마을 아이가 구경 왔어요', true);
+}
 function visitTick(now) {
+  neighborTick(now);
   if (++visitTimer < VISIT_EVERY) return; visitTimer = 0;
   const sr = stationRoot(); if (sr < 0) return;
   const b = roadBeside(cells[sr]); if (b < 0) return;
@@ -2898,9 +2992,14 @@ function visitorGoal(f, reach) {
   }
   const sights = reach.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && SIGHTS.has(c.k); }); });
-  return sights.length ? sights[(Math.random() * sights.length) | 0] : -1;
+  if (!sights.length) return -1;
+  const g = sights[(Math.random() * sights.length) | 0]; const b = buildingBeside(g); if (b && SIGHTS.has(b.k)) visitLikes[b.k] = (visitLikes[b.k] || 0) + 1;   // 손님이 좋아한 곳(50차)
+  return g;
 }
-function visitorLeave(f, i) { folks.splice(i, 1); releaseAll(i); claimed.clear(); claimed2.clear(); folkPool.forEach(m => m.count = folks.length); visitStats.간손님++; }
+const visitLikes = {};
+function topSign() { let best = null; signs.forEach((v, root) => { if (v.t && (v.reads || 0) > 0 && (!best || v.reads > best.reads)) best = { t: v.t, reads: v.reads }; }); return best; }
+function topLike() { let k = null, n = 0; for (const key in visitLikes) if (visitLikes[key] > n) { n = visitLikes[key]; k = key; } return k ? { nm: K[k].nm, n } : null; }
+function visitorLeave(f, i) { if (f.neighbor) neighborStats.감++; folks.splice(i, 1); releaseAll(i); claimed.clear(); claimed2.clear(); folkPool.forEach(m => m.count = folks.length); visitStats.간손님++; }
 
 /* ══════════════════════════════════════════════════════════════
    표지판 글(F26). signs: root → { t, at }. 팻말 Sprite 는 최근 20개만.
@@ -2934,6 +3033,7 @@ function refreshSignSprites() {
 }
 function writeSign(rec) {
   if (VISIT.on) { const v = signs.get(rec.root); toast(v && v.t ? '🪧 ' + v.t : '🪧 (빈 표지판)', true); return; }
+  { const v = signs.get(rec.root); if (v && v.t && (v.reads || 0) > 0) toast('🪧 「' + v.t + '」 손님 ' + v.reads + '명이 읽었어요', true); }
   const cur = signs.get(rec.root);
   const t = prompt('표지판에 뭐라고 쓸까? (한 줄)', cur ? cur.t : '');
   if (t == null) return; const tt = t.trim().slice(0, 20);
@@ -2951,7 +3051,7 @@ function syncFolks() {
   /* 없어진 집의 사람은 뺀다 */
   for (let i = folks.length - 1; i >= 0; i--) {
     const rec = cells[folks[i].home];
-    if (folks[i].visitor) { if (!rec || rec.k !== 'station') { folks.splice(i, 1); claimed.clear(); claimed2.clear(); } continue; }
+    if (folks[i].visitor) { if (!folks[i].neighbor && (!rec || rec.k !== 'station')) { folks.splice(i, 1); claimed.clear(); claimed2.clear(); } continue; }   // 이웃 구경꾼은 역이 없어도 남는다(52차)
     if (!rec || rec.k !== 'house' || rec.root !== folks[i].home) { if (folks[i].arriving) movers = Math.max(0, movers - 1); if (folks[i].inside) leave(folks[i], '쫓겨남'); folks.splice(i, 1); claimed.clear(); claimed2.clear(); }
   }
   /* 없어진 집의 주민 기록도 지운다 */
@@ -3030,11 +3130,14 @@ function tickFolks(dt, now) {
         if (f.arriving) { arrive(f, i); continue; }  // 집 앞에 닿았다 — 들어가 산다
         if (f.visitor && now >= f.leaveAt && from === f.base) { visitorLeave(f, i); continue; }   // 손님이 역에 닿았다 — 떠난다(F30)
         if (f.visitor && f.readTarget != null && touchesRoot(from, f.readTarget) && !f.read.has(f.readTarget)) {   // 표지판 앞 — 2초 읽는다(F37)
-          f.read.add(f.readTarget); f.readTarget = null; visitStats.읽음++; f.faceShow = 5; f.faceUntil = now + 2000;
+          f.read.add(f.readTarget); visitStats.읽음++; f.faceShow = 5; f.faceUntil = now + 2000;
+          { const sv = signs.get(f.readTarget); if (sv) { sv.reads = (sv.reads || 0) + 1; markDirty(); } else if (cells[f.readTarget] && cells[f.readTarget].k === 'dream') DREAM.reads = (DREAM.reads || 0) + 1; }   // 표지판 인기(50차)
+          f.readTarget = null;
           f.state = 'idle'; f.until = now + 2000; f.walking = false; f.path = [from]; f.step = 0; releaseAll(i); claim(from, i); continue; }
         if (f.goal === 'home' && from === f.base) { enterPlace(f, i, f.home, from, 1e15); rhythmStats.귀가++; continue; }      // 밤: 집에(F24)
-        if (f.goal === 'work' && f.job != null && cells[f.job] && touchesRoot(from, f.job)) { enterPlace(f, i, f.job, from, 1e15); jobStats.출근++; continue; }   // 일터에 닿았다(F27)
+        if (f.goal === 'work' && f.job != null && cells[f.job] && touchesRoot(from, f.job)) { enterPlace(f, i, f.job, from, 1e15); jobStats.출근++; { const bb = cells[f.job]; if (bb) { f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; } } continue; }   // 일터에 닿았다(F27)
         if (f.goal === 'school') { const sr = schoolNow(); if (sr >= 0 && buildingBeside(from) && buildingBeside(from).root === sr) { enterPlace(f, i, sr, from, 1e15); rhythmStats.등교++; continue; } }
+        if (!f.visitor) { const bb = buildingBeside(from); if (bb && (K[bb.k].need || K[bb.k].jobs)) { f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; } }   // 닿기만 해도 센다 — 좋아하는 곳(F20, 51차)
         if (tryEnter(f, i, from)) continue;          // 볼 일 보러 들어간다(F10)
         f.state = 'idle'; f.until = now + 400 + Math.random() * 900;   // 길 위에 서 있는 동안 그 칸을 막으므로 짧게
         f.walking = false; f.path = [from]; f.step = 0; releaseAll(i); claim(from, i); continue; }
@@ -3243,7 +3346,7 @@ function plotStrings() {
 function serialize() {
   const { pal, ps, changed } = plotStrings();
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
-  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at]; });
+  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   lastSave = { 구역수: Object.keys(ps).length, 바뀐구역: changed, 크기: 0, 형식: 'v2' };
   return { v: SAVE_V, w: W, h: H, palette: pal, plotStr: ps, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: [...unlocked], goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
@@ -3257,7 +3360,7 @@ function serializeV1() {
   });
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
   const unlockedList = [...unlocked];
-  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at]; });
+  const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
 
@@ -3314,9 +3417,9 @@ window.addEventListener('pagehide', () => flushSave('pagehide'));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave('hidden'); });
 
 /* 저장본 읽기 — 깨져 있어도 절대 던지지 않는다. 못 읽으면 빈 판으로 시작한다. */
-function loadSaved() {
-  let raw = null;
-  try { raw = localStorage.getItem(SAVE_KEY); if (!raw && SID === 'guest') raw = localStorage.getItem('rpg.village.demo'); }   // 옛 demo 저장본은 guest 로 이어받는다
+function loadSaved(rawOverride) {
+  let raw = rawOverride || null;
+  try { if (!raw) raw = localStorage.getItem(SAVE_KEY); if (!raw && SID === 'guest') raw = localStorage.getItem('rpg.village.demo'); }   // 옛 demo 저장본은 guest 로 이어받는다
   catch (e) { return { ok:false, why:'저장소를 읽을 수 없음' }; }
   if (!raw) return { ok:false, why:'저장본 없음' };
 
@@ -3358,12 +3461,12 @@ function loadSaved() {
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
   if (Array.isArray(d.hist)) HIST = d.hist.filter(p => p && typeof p.d === 'number').slice(-HIST_MAX);   // 마을 흐름(F35)
   if (typeof d.dream === 'string') DREAM.text = d.dream.slice(0, 40);
-  if (d.signs && typeof d.signs === 'object') { for (const r in d.signs) { const v = d.signs[r]; const rec = cells[+r]; if (rec && rec.k === 'sign' && rec.root === +r && Array.isArray(v) && v[0]) signs.set(+r, { t: String(v[0]).slice(0, 20), at: +v[1] || 0 }); } setTimeout(refreshSignSprites, 0); }
+  if (d.signs && typeof d.signs === 'object') { for (const r in d.signs) { const v = d.signs[r]; const rec = cells[+r]; if (rec && rec.k === 'sign' && rec.root === +r && Array.isArray(v) && v[0]) signs.set(+r, { t: String(v[0]).slice(0, 20), at: +v[1] || 0, reads: +v[2] || 0 }); } setTimeout(refreshSignSprites, 0); }
   /* 구역: 저장본에 있으면 그대로. 없으면(옛 저장본) 물건이 있는 구역을 연다 — 말없이 잠그지 않는다 */
   if (Array.isArray(d.plots)) d.plots.forEach(k => { const [px, py] = String(k).split(',').map(Number); openPlot(px, py, true); });
   cells.forEach((rec, i) => { if (rec && rec.root === i) { const [px, py] = plotOf(cX(i), cY(i)).split(',').map(Number); openPlot(px, py, true); } });
   if (!plots.size) openPlot((NPX / 2) | 0, (NPY / 2) | 0, true);
-  if (isV1) { try { localStorage.setItem(SAVE_KEY + '.backup', raw); } catch (e) {} lastSave.형식 = 'v1→v2'; setTimeout(() => { if (!savingOff) { saveDirty = true; saveNow(); } }, 0); }   // 옛 형식은 원문을 옆에 두고 v2 로 다시 쓴다(말없이 버리지 않기)
+  if (isV1 && !VISIT.on) { try { localStorage.setItem(SAVE_KEY + '.backup', raw); } catch (e) {} lastSave.형식 = 'v1→v2'; setTimeout(() => { if (!savingOff) { saveDirty = true; saveNow(); } }, 0); }   // 옛 형식은 원문을 옆에 두고 v2 로 다시 쓴다(말없이 버리지 않기)
   plotsEarned = typeof d.plotsEarned === 'number' ? d.plotsEarned : Math.max(0, plots.size - 1);
   if (!hasHouses) cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house') res.set(i, 1); });   // else 로 두면 뒤에 끼어드는 if 에 붙어 버린다(17차에서 잡음)
   cells.forEach((rec, i) => { if (rec && rec.root === i && LOCK_POP[rec.k]) unlocked.add(rec.k); });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
@@ -3457,6 +3560,8 @@ else if (hash.indexOf('adv') >= 0) {
     roads.forEach(rec => removeAt(cX(rec.root), cY(rec.root)));
   }
   if (hash.indexOf('house') >= 0) setMode('house', null);
+} else if (VISIT_SID) {
+  savingOff = true; startInfo = '친구 마을 구경(읽기만): ' + VISIT_SID;
 } else {
   if (window.VillageSync) { try { await VillageSync.boot({ sid: SID }); } catch (e) { console.warn('VillageSync.boot', e); } }   // 원격 판을 저장본 자리에 먼저(G5 ④)
   const r = loadSaved();
@@ -3470,7 +3575,7 @@ else if (hash.indexOf('adv') >= 0) {
     for (let x = sx0; x < sx0 + 12; x++) placeAt('road', x, sy0);   // 첫 구역 한가운데 12칸
     startInfo = r.ok ? '저장본이 비어 있어 기본 판' : ('기본 판 — ' + r.why);
     markDirty();                          // 기본 판도 바로 저장해 둔다
-    setTimeout(() => goalsPeek(20000), 1500);   // 첫 세 걸음(F14 목표판)을 20초 펼쳐 둔다
+    setTimeout(() => { if (!guideStart()) goalsPeek(20000); }, 1500);   // 첫 열기 안내 3장 → 닫히면 목표판 20초(F25)
   }
 }
 if (!STORAGE_OK) { startInfo += ' · 이 창은 저장을 못 받음(미리보기 등)'; setTimeout(noteNoStorage, 400); }
@@ -3625,10 +3730,39 @@ window.__wishes = () => ({ ...wishStats, 지금: folks.filter(f => f.wish).map(f
 window.__setSign = (x, y, t) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'sign') return false; signs.set(rec.root, { t: String(t).slice(0, 20), at: SIM.t }); refreshSignSprites(); markDirty(); return true; };
 window.__setDream = (t) => { DREAM.text = String(t || '').slice(0, 40); return DREAM.text; };
 window.__stationAt = () => { const r = stationRoot(); return r < 0 ? null : [cX(r), cY(r)]; };
+window.__neighbors = () => ({ ...neighborStats, 지금: folks.filter(f => f.neighbor).length, 문턱: NEIGHBOR_POP });
 window.__visitors = () => ({ ...visitStats, 지금: folks.filter(f => f.visitor).length, 읽는중: folks.filter(f => f.visitor && f.faceShow === 5 && SIM.t <= f.faceUntil).length, 읽으러: folks.filter(f => f.visitor && f.readTarget != null).length });
 window.__followFolk = (k) => { const f = folks[k]; if (!f) return null; FOLLOW.f = f; FOLLOW.until = performance.now() + 6000; return folkCard(f); };
 window.__follow = () => ({ 따라가는중: !!FOLLOW.f, 목표: [+camTarget.x.toFixed(1), +camTarget.z.toFixed(1)], 사람: FOLLOW.f ? [+FOLLOW.f.x.toFixed(1), +FOLLOW.f.z.toFixed(1)] : null });
+window.__favAll = () => folks.filter(f => !f.visitor && !f.arriving).map(f => [folkName(f), favPlace(f), f.visits || {}]);
 window.__fav = (k) => folks[k] ? { 이름: folkName(folks[k]), 곳: favPlace(folks[k]), 방문: folks[k].visits || {} } : null;
+/* ── 첫 열기 3장 안내(48차) ── */
+const GUIDE = { on: false, i: 0, seen: false, shown: 0 };
+const GUIDE_KEY = () => 'rpg.guide.' + SID;
+const GUIDE_CARDS = [
+  { pic: '⬜➡️⬜⬜', txt: '아래에서 <b>길</b>을 고르고 칸을 누르면 놓여요.<br>칸 위를 <b>끌면 연달아</b> 놓여요.' },
+  { pic: '🏠🛣️🏠', txt: '<b>집은 길 옆</b>에 놓아요.<br>길이 <b>6칸</b> 이어지면 첫 주민이 걸어와요.' },
+  { pic: '🎯 ▶▶', txt: '🎯 을 누르면 <b>지금 목표</b>가 보여요.<br>기다리기 지루하면 <b>2× 4×</b> 를 눌러요.' } ];
+function guideSeen() { try { return localStorage.getItem(GUIDE_KEY()) === '1'; } catch (e) { return false; } }
+function guideRender() { const c = GUIDE_CARDS[GUIDE.i]; document.getElementById('guidePic').textContent = c.pic; document.getElementById('guideTxt').innerHTML = c.txt;
+  document.getElementById('guideDots').innerHTML = GUIDE_CARDS.map((_, k) => k === GUIDE.i ? '<b>●</b>' : '○').join(' ');
+  document.getElementById('guideNext').textContent = GUIDE.i === GUIDE_CARDS.length - 1 ? '시작!' : '다음'; }
+function guideStart(force) {
+  if (!force && (guideSeen() || VISIT.on || savingOff)) return false;      // 옛 저장본·구경·시연 판엔 안 뜸
+  GUIDE.on = true; GUIDE.i = 0; GUIDE.shown++; document.getElementById('guide').classList.add('show'); guideRender(); return true;
+}
+function guideEnd(how) {
+  GUIDE.on = false; document.getElementById('guide').classList.remove('show');
+  try { localStorage.setItem(GUIDE_KEY(), '1'); } catch (e) {} GUIDE.seen = true;
+  goalsPeek(20000);                                                        // 안내 뒤 목표판(F25)
+}
+document.getElementById('guideNext').onclick = () => { if (GUIDE.i < GUIDE_CARDS.length - 1) { GUIDE.i++; guideRender(); } else guideEnd('끝'); };
+document.getElementById('guideSkip').onclick = () => guideEnd('건너뜀');
+if (DEV && QS.get('guide') === '1') setTimeout(() => guideStart(true), 1600);
+window.__guide = () => ({ 보임: GUIDE.on, 장: GUIDE.i + 1, 본적: guideSeen(), 뜬횟수: GUIDE.shown });
+window.__destLog = (reset) => { const o = { ...destLog, 끌림: hourPref(simHour()), 시: +simHour().toFixed(1) }; if (reset) { destLog.전체 = destLog.후보 = destLog.고름 = 0; } return o; };
+window.__destMix = () => { const m = { 물: 0, 장보기: 0, 놀이: 0, 쉼: 0, 배움: 0, 기타: 0, 시: +simHour().toFixed(1), 끌림: hourPref(simHour()) }; folks.forEach(f => { if (f.state !== 'walk' || !f.path || f.visitor || f.goal) return; const n = needBeside(f.path[f.path.length - 1]); m[n && m[n] != null ? n : '기타']++; }); return m; };
+window.__signStats = () => ({ 표지판: [...signs.values()].map(v => [v.t, v.reads || 0]), 으뜸: topSign(), 좋아한곳: topLike(), 집계: { ...visitLikes } });
 window.__houseText = (x, y) => { const rec = cells[idx(x, y)]; return rec && rec.k === 'house' ? satText(rec) : '집 없음'; };
 window.__placeText = (x, y) => { const rec = cells[idx(x, y)]; return rec ? K[rec.k].nm + ' · ' + jobText(rec) : '없음'; };
 window.__rhythm = () => { let home = 0, sch = 0, out = 0; folks.forEach(f => { if (f.state === 'inside' && f.inside.root === f.home) home++; else if (f.state === 'inside' && cells[f.inside.root] && cells[f.inside.root].k === 'school') sch++; else if (!f.arriving) out++; }); return { 시: +simHour().toFixed(1), 집안: home, 학교안: sch, 밖: out, ...rhythmStats }; };
