@@ -1027,6 +1027,18 @@ const DB = {
     this._fbRef.child('artworks/' + normalized.id).set(normalized).catch(e => this._onSaveError(e));
   },
 
+  // [ART-RAW-KEY-1] 작품이 실제로 저장된 키들. 운영 artworks 는 옛 배열(숫자 키 0,1,2…)이라
+  //   `artworks/<작품id>/…` 에 쓰면 진짜 작품은 그대로이고 유령 조각만 생겼다(내리기가 학생 화면에 안 먹음).
+  //   서버 판에서 value.id 가 같은 키를 모두 찾는다(숫자 키·id 키 둘 다 있으면 둘 다). 없으면 id 키.
+  //   root 구독이 이미 받아 둔 판이라 once 는 SDK 캐시에서 바로 온다(추가 다운로드 없음).
+  _artworkKeys(id) {
+    return this._fbRef.child('artworks').once('value').then(snap => {
+      const raw = snap.val() || {};
+      const keys = Object.keys(raw).filter(k => raw[k] && raw[k].id === id);
+      return keys.length ? keys : [id];
+    }, () => [id]);
+  },
+
   updateArtwork(id, patch) {
     const db = this.load();
     const idx = (db.artworks||[]).findIndex(a => a.id === id);
@@ -1034,7 +1046,8 @@ const DB = {
     db.artworks[idx] = { ...db.artworks[idx], ...patch };
     this._cache = db;
     this._saving = true;
-    return this._fbRef.child('artworks/' + id).set(db.artworks[idx]).catch(e => this._onSaveError(e)).finally(() => {
+    const rec = db.artworks[idx];
+    return this._artworkKeys(id).then(keys => Promise.all(keys.map(k => this._fbRef.child('artworks/' + k).set(rec)))).catch(e => this._onSaveError(e)).finally(() => {
       setTimeout(() => { this._saving = false; }, 300);
     });
   },
@@ -1189,8 +1202,10 @@ const DB = {
     a.likes = a.likes || {};
     if (on) a.likes[studentId] = true; else delete a.likes[studentId];
     this._cache = db;
-    const ref = this._fbRef.child('artworks/' + artId + '/likes/' + studentId);
-    return (on ? ref.set(true) : ref.remove()).catch(e => this._onSaveError(e));
+    return this._artworkKeys(artId).then(keys => Promise.all(keys.map(k => {   // [ART-RAW-KEY-1]
+      const ref = this._fbRef.child('artworks/' + k + '/likes/' + studentId);
+      return on ? ref.set(true) : ref.remove();
+    }))).catch(e => this._onSaveError(e));
   },
 
   // [ARTFREE-1] 작품 내리기 — 갤러리에서만 감춘다(지우지 않는다). hidden 한 칸만 쓴다.
@@ -1198,7 +1213,8 @@ const DB = {
     const db = this.load();
     const a = (db.artworks || []).find(x => x.id === id);
     if (a) { a.hidden = !!hidden; this._cache = db; }
-    return this._fbRef.child('artworks/' + id + '/hidden').set(!!hidden)
+    return this._artworkKeys(id)   // [ART-RAW-KEY-1] 숫자 키 판이어도 진짜 작품(들)에 쓴다
+      .then(keys => Promise.all(keys.map(k => this._fbRef.child('artworks/' + k + '/hidden').set(!!hidden))))
       .catch(e => this._onSaveError(e));
   },
 
