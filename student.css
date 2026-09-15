@@ -840,6 +840,22 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @media (max-width:600px){
   .zn-grid{grid-template-columns:minmax(0,1fr);gap:var(--sp-1,8px);}
 }
+/* [D3-ZONE-CLASS-1 · 2단계] 디자인 시스템 토큰 — 가장 작던 몬스터 레벨 8.3px·마릿수 9.6px·처치 9.9px 등을 12~14px로,
+   모서리·간격 토큰. (1단계 커밋은 모양 100% 동일 — 픽셀 차이 0) */
+.zone-card{border-radius:var(--r-lg);gap:var(--sp-1);padding:var(--sp-2);}
+.zn-name{font-size:var(--fs-md);}
+.zn-sub,.zn-lock,.zn-mon-lv,.zn-more,.zn-kill,.zn-left-of,.zn-left-lbl{font-size:var(--fs-xs);}
+.zn-desc,.zn-reward,.zn-top-sub{font-size:var(--fs-sm);}
+.zn-sub,.zn-desc,.zn-mon-lv,.zn-more,.zn-kill,.zn-top-sub,.zn-left-of,.zn-left-lbl,.zn-dex{color:var(--txt2);}
+.zone-locked .zn-name,.zone-locked .zn-reward{color:var(--txt3);}
+.zn-head{flex-wrap:wrap;row-gap:var(--sp-h);}
+.zn-lock{white-space:nowrap;flex-shrink:0;}
+.zn-name{white-space:nowrap;}
+.zn-desc{word-break:keep-all;}
+.zn-foot{padding-top:var(--sp-1);flex-wrap:wrap;gap:2px var(--sp-1);}
+.zn-enter{font-size:var(--fs-sm);border-radius:var(--r-sm);padding:var(--sp-1);}
+.zn-top-title{font-size:var(--fs-md);}
+.zn-dex{font-size:var(--fs-sm);border-radius:var(--r-sm);min-height:40px;padding:0 var(--sp-3);}
 
 /* 몬스터 선택 카드 눌림 */
 .mon-select-card:not(.mon-select-dim){
