@@ -411,7 +411,7 @@ const GAME_DATA = {
     {id:'d_y17',name:'정자',          icon:'⛩️', size:{w:2,h:2}, priceAdj:+40, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y18',name:'돌 벤치',       icon:'🪑', size:{w:2,h:1}, priceAdj:-10, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y19',name:'큰 나무 B',     icon:'🌳', size:{w:2,h:2}, priceAdj:-80, cat:'yard', rarity:'epic',   reqLv:1},
-    {id:'d_y20',name:'조형 분수',     icon:'⛲', size:{w:3,h:3}, priceAdj:+50, cat:'yard', rarity:'epic',   reqLv:1},
+    {id:'d_y20',name:'조형 분수',     icon:'⛲', size:{w:3,h:3}, priceAdj:-115, cat:'yard', rarity:'legend', reqLv:1},
     {id:'d_y21',name:'장미 아치',     icon:'🌹', size:{w:1,h:3}, priceAdj:+20, cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 농촌 테마 ───────────────────────────────────────────
@@ -455,7 +455,7 @@ const GAME_DATA = {
     {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', priceAdj:-5,       cat:'yard', rarity:'common', reqLv:1},
     {id:'d_y46',name:'작은 침엽수',   icon:'🌲', size:{w:2,h:2}, priceAdj:+50, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, priceAdj:+60, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, priceAdj:+120, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, priceAdj:-70, cat:'yard', rarity:'epic', reqLv:1},
 
     // ── 목재 울타리 4종 ─────────────────────────────────────
     {id:'d_y49',name:'울타리 가로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
