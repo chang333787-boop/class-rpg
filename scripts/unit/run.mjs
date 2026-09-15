@@ -673,6 +673,42 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'admin 기본값 초기화 범위(RESET-SCOPE-1)';
+{
+  const ADMIN = read('admin.js');
+  const run = (fn, db, extra = {}) => {
+    const writes = [];
+    const sb = {
+      confirm: () => true, notify() {}, renderMonsters() {}, location: { reload() {} }, setTimeout() {}, ...extra,
+      DB: { load: () => db, _cache: null, _fbRef: { child: (p) => ({
+        set: (v) => writes.push(['set', p, JSON.parse(JSON.stringify(v))]),
+        update: (v) => writes.push(['update', p, JSON.parse(JSON.stringify(v))]),
+        remove: () => writes.push(['remove', p]),
+      }) } },
+    };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(sliceFn(ADMIN, fn) + `\n${fn}();`, sb);
+    return writes;
+  };
+  {
+    const db = { customMonsters: { m3: { id: 'm3', gold: 99, _custom: true, _new: false }, cm_1: { id: 'cm_1', name: '새몹', _custom: true, _new: true } } };
+    const w = run('resetCustomMonsters', db);
+    test('몬스터 초기화 → 기본 몬스터 조정만 null · 새로 만든 몬스터 남음 · 통째 set 없음', () => {
+      eq(w, [['update', 'customMonsters', { m3: null }]]);
+      eq(Object.keys(db.customMonsters), ['cm_1']);
+    });
+  }
+  {
+    const db = { settings: { className: '반', todayLinks: [{ t: 1 }], shopOverrides: { seeds: { s1: {} }, equipment: { e1: {} } } } };
+    const w = run('resetShopOverrides', db, { CUR_SHOP_TAB: 'equip' });
+    test('상점 장비 탭 초기화 → settings/shopOverrides/equipment 만 remove · settings 통째 set 없음', () => {
+      eq(w, [['remove', 'settings/shopOverrides/equipment']]);
+      eq(Object.keys(db.settings.shopOverrides), ['seeds']);
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);

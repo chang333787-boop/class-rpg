@@ -29,9 +29,9 @@ const BASELINE = {
     recorderSongs:     { n: 2, why: '교사만(리코더 제거 판정 대기)' },
   },
   'admin.js': {
-    settings:             { n: 6, why: '교사만' },
+    settings:             { n: 5, why: '교사만' },
     boardQuests:          { n: 6, why: '교사만 — 학생 아침 자동등록은 transaction' },
-    customMonsters:       { n: 4, why: '교사만' },
+    customMonsters:       { n: 3, why: '교사만' },
     customQuestTemplates: { n: 3, why: '교사만' },
     hiddenQuestTemplates: { n: 2, why: '교사만' },
     promotionRequests:    { n: 1, why: '교사 dedupeAll' },
