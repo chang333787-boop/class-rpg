@@ -24,6 +24,39 @@
 2. 장비 80종 중 **독립으로 정의된 것은 50종**이다. 몸통 물·풀 20종은 불과 똑같고, 스태프 10종은 검의 ATK↔MAG 거울이다.
 3. 몬스터 골드는 곡선 적합도가 R² 0.35~0.84로 **손으로 하나씩 정한 값**이다. 능력치(R² 0.99)와 성격이 다르다.
 
+## 0-1. 코드 속 자리 — `BALANCE` 키 지도 (B-2 이후, 2026-09-15)
+
+B-2(#263·#269·#283·#311·#318·#329)로 아래 절들의 숫자가 `gamedata.js` 맨 위 **`const BALANCE`** 한 곳에 모였다. 표의 손값은 **곡선 + 줄마다 보정(`adjust`·`priceAdj`)** 으로 바뀌었고 **출력은 한 글자도 안 바뀌었다**(`scripts/balance/identity.mjs` 24줄 ✅ 매번).
+
+| 이 문서 절 | 코드 자리 | 바꾸는 곳 |
+|---|---|---|
+| §1.1 플레이어 HP | `BALANCE.player.hpBase · hpPerLevel` | 코드 |
+| §1.2 몬스터 난이도 배율 · 하루 전투 · 유령 노말 · 몸통 상성 | `BALANCE.settingsDefaults.*` → 런타임 `BATTLE_CONSTS` | **관리자 설정**이 덮음(`customBattleSettings`) |
+| §1.3 선공 동률 | `BALANCE.monster.firstTurnTie` | 코드 |
+| §1.4 피해·명중·급소·레벨차 | `BALANCE.damage` · `BALANCE.playerAttack.{hit,crit,levelGap}` | 코드 |
+| §1.5 몬스터 피해·명중·급소 | `BALANCE.monsterAttack.{hit,crit}` | 코드 |
+| §1.6 공격 상성 | `BALANCE.element` → 런타임 `ELEMENT_CHART` | 관리자 `elemChart` 가 덮음 |
+| §1.7 스킬 계수 | `BALANCE.skill.{normal,element,maxLevel}` → 런타임 `SKILL_MULTIPLIERS` | 관리자 `normalMults`·`elementMults` |
+| §1.8 역할 기믹 | `BALANCE.role.{tank,fast,dealer,normal}` | 코드 |
+| §1.9 전투 스킬 | `BALANCE.skill2.*` | 코드 |
+| §1.12 사냥터 카드 | `BALANCE.offers.*` (= `ZONE_RANGES`·`RARITY_WEIGHTS`) | 코드 |
+| §4.1 몬스터 능력치 | `BALANCE.monsterStats.{base,baseAdjust,shapes}` + 줄 `_mon(shape, …, 보정)` | 코드(곡선·배수) |
+| §4.2 몬스터 골드 | `BALANCE.monsterGold.{base,rarity}` + 줄 `{ gold: ±n }` | 코드 |
+| §4.3 장비 레벨·가격 | `BALANCE.equipment.{tierLevels,price}` + 줄 `priceAdj` · 복사 `_equipCopy` | 코드 · 관리자 `equipment` 패치가 개별 덮음 |
+| §3.4 돌연변이 씨앗 | `BALANCE.mutantSeed` (#329) — 일반 씨앗에서 계산 | 코드 |
+| §3.5 냉기·자연 스킬북 | `_bookCopy` (#329) — 화염 복사 | 코드 · 관리자 `skillBooks` |
+
+**아직 손값으로 남은 것:** 일반 씨앗 5 · 노말·화염 스킬북 14 · 장식 68 · 경험치표 31칸.
+
+### 값을 바꾸고 싶을 때 순서
+1. **구조만 옮길 때**(값 그대로): 수정 → `node scripts/balance/identity.mjs` 24줄 ✅ 이어야 PR.
+2. **값을 바꿀 때**(아이가 보는 변화): `scripts/balance/proposals/<안>.json` 에 `settings`(관리자 설정)·`balance`(BALANCE 덮기)를 적고
+   `node scripts/balance/gate.mjs --settings scripts/balance/settings/prod-20260915.json --proposal <안>.json` 으로 전후 표 → 결정 카드 → **사용자 결정** → 코드/설정 반영.
+3. 보정 줄(`adjust`·`priceAdj`)을 0으로 하면 "곡선 그대로"가 된다 — 몬스터 골드 G1/G2(#307)·사냥터 경계 Z1(#322)이 이 방식의 결정이다.
+
+### 이 문서 이후 결정 카드
+B-4 난이도 S0/S1b/S1(#293) · 속성 격차 E4(#304) · 물리 장비 공백 A/B/C · 신발 art 3안(#300) · 골드 G0/G1/G2(#307) · 사냥터 경계 Z0/Z1(#322).
+
 ---
 
 ## 1. 전투
