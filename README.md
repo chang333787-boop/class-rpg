@@ -56,6 +56,11 @@ watercolor/                                    수채화·데생 앱
 scripts/verify-safety.mjs                      저장 안전 정적 검증 스크립트 (Node 기본 모듈만)
 scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test (캐시버스터는 html에서 읽어 교차검증)
 scripts/unit/run.mjs                           student.js 순수 함수 단위 테스트(함수 본문만 떼어 vm 실행)
+scripts/unit/buster-check.mjs [base] [head]    캐시버스터 누락 검사(머지 뒤 값 기준, git 읽기만)
+scripts/unit/whole-set-check.mjs               모음 통째 set 이 기준선보다 늘면 FAIL(동시 쓰기 유실 막기)
+scripts/unit/gold-sync-sim.mjs · gold-loss-real-sdk/  골드 유실 재현(수정 뒤 --expect-fixed 로 0 확인)
+scripts/unit/promo-sync-sim.mjs · settings-field-sim.mjs  승급 신청·설정 동시 쓰기 시뮬
+scripts/village-backup.mjs · village-restore.mjs      마을 백업(읽기만)·한 학생 되살리기
 scripts/village-sync/                          sync.js 가짜 RTDB 대조 시험
 docs/                                          리팩토링 안전 규칙 / 인수인계 / 에셋 명세 문서
 CNAME                                          GitHub Pages 커스텀 도메인 (funclassrpg.kr)
@@ -161,7 +166,7 @@ node scripts/verify-safety.mjs
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
 - 현재 기대 결과: **`PASS 18 · REVIEW 1 · FAIL 0`** (exit code 0)
-- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 29 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 49 · FAIL 0`** (2026-09-15 기준 · 29번째 = CACHE-SORT-GUARD-1)
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 29 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 66 · FAIL 0`** (2026-09-15 오후 기준 · smoke 29번째 = CACHE-SORT-GUARD-1)
 - 남은 `REVIEW 1`건 = 루트 쓰기 후보(`gamedata.js` 1 + `admin.js` 4). 전부 위의 **의도된 게이팅 경로**다.
   0으로 강제하지 않는다 — 강제하면 새로 추가되는 진짜 루트 쓰기를 못 잡는 사각이 생긴다. **안전 알림으로 유지**한다.
 
@@ -211,7 +216,8 @@ HTML 인라인 `<script>`/`<style>` 잔여 등.
 ## 현재 안정화 상태
 
 - 리팩토링 1차 마감 commit: `7c3350e` (2026-07)
-- 2026-09-15 main 기준: `verify-safety` 18/1/0 · `smoke-test` 29/0/0 · `unit/run` 49/0
+- 2026-09-15 오후 main 기준: `verify-safety` 18/1/0 · `smoke-test` 29/0/0 · `unit/run` 66/0 · `whole-set-check` 16/0 · `buster-check` FAIL 0
+- 알려진 미해결: `gold-sync-sim` 은 지금 코드에서 🔴 REPRO(골드 유실 재현). 수정 PR(#288) 뒤 `--expect-fixed` 로 0 확인
 - 열린 게이트: Firebase 규칙 게시 → #214(마을 45차 서버 저장) 머지. 규칙 전에는 마을이 기기(localStorage)에만 저장된다
 - JS/CSS 외부화 완료, HTML 인라인 `<script>`/`<style>` 잔여 **0건**
 - `DB.save(`/`this.save(` 0건, 루트 저장 위험 정리됨

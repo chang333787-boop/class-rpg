@@ -1339,7 +1339,7 @@ function buildMainHTML() {
   if (isFriday && settings.bossActive)
     alerts.push(`<div class="boss-banner" onclick="openBoss()" style="margin-bottom:.6rem">
       <div style="font-size:2rem">${settings.bossIcon||'🧌'}</div>
-      <div style="flex:1"><div style="font-weight:900;color:var(--red)">${settings.bossName||'금요일 보스'} 출현!</div>
+      <div style="flex:1"><div style="font-weight:900;color:var(--red)">${escHtml(settings.bossName||'금요일 보스')} 출현!</div>
       <div style="font-size:.76rem;color:var(--txt2)">보상: 💰${settings.bossGold||150}G + 특별 씨앗</div></div>
       <button class="bb-btn">도전!</button>
     </div>`);
@@ -1505,7 +1505,7 @@ function buildMainHTML() {
           </div>
           <span style="font-size:1rem;flex-shrink:0">${q.icon||'📋'}</span>
           <div style="flex:1;min-width:0">
-            <div class="mission-name">${q.name}</div>
+            <div class="mission-name">${escHtml(q.name)}</div>
             <div style="font-size:.68rem;color:var(--txt3)">${typeLabel}${q.dueDate?` · 마감 ${q.dueDate}`:''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;flex-shrink:0">
@@ -1607,9 +1607,9 @@ function buildMainHTML() {
             📅 이번 주 목표 · 이번 주 다짐을 기억해봐요
           </div>
           <div style="display:flex;gap:1rem;flex-wrap:wrap">
-            <span style="font-size:.8rem;color:var(--txt1)">💪 <b>${goal.focusArea||''}</b></span>
-            <span style="font-size:.8rem;color:var(--txt1)">🎯 <b>${goal.goalText||''}</b></span>
-            <span style="font-size:.8rem;color:var(--txt1)">🌟 <b>${goal.mindset||''}</b></span>
+            <span style="font-size:.8rem;color:var(--txt1)">💪 <b>${escHtml(goal.focusArea||'')}</b></span>
+            <span style="font-size:.8rem;color:var(--txt1)">🎯 <b>${escHtml(goal.goalText||'')}</b></span>
+            <span style="font-size:.8rem;color:var(--txt1)">🌟 <b>${escHtml(goal.mindset||'')}</b></span>
           </div>
         </div>`;
     })()}
@@ -2411,7 +2411,7 @@ function renderMonsters() {
       onclick="${canChallenge?`startBattle('${m.id}')`:''}"
       style="${isKilled||isLocked?'cursor:default':''}">
       <div class="mc-icon">${iconImg(m, 'monsters', '1.6rem')}</div>
-      <div class="mc-name">${m.name}</div>
+      <div class="mc-name">${escHtml(m.name)}</div>
       <div class="mc-lv">Lv.${m.level||m.recLv}</div>
       <div class="mc-gold">💰 ${m.gold}G</div>
       ${isKilled?'<span class="mc-tag tag-done">처치완료</span>'
@@ -2626,7 +2626,7 @@ function renderBattleNew() {
       </div>
       <!-- 몬스터 -->
       <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#FF8A80">${mon.name}</div>
+        <div class="ba-fighter-name" style="color:#FF8A80">${escHtml(mon.name)}</div>
         <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
         <div style="width:100%">
           <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-mon-hp" style="width:${monsterHpPct}%"></div></div>
@@ -2857,11 +2857,11 @@ function renderBattle(phase) {
 
   let logHtml = '';
   if (phase === 'ready') {
-    logHtml = `<span class="info">${mon.icon} ${mon.name}이(가) 나타났다!</span><br>도전 버튼을 눌러 전투를 시작하세요.`;
+    logHtml = `<span class="info">${escHtml(mon.icon)} ${escHtml(mon.name)}이(가) 나타났다!</span><br>도전 버튼을 눌러 전투를 시작하세요.`;
   } else if (phase === 'win') {
-    logHtml = `<span class="good">⚡ 공격 성공!</span><br><span class="good">💥 ${mon.name}을(를) 물리쳤다!</span><br><span class="good">💰 +${mon.gold}G 획득!</span>`;
+    logHtml = `<span class="good">⚡ 공격 성공!</span><br><span class="good">💥 ${escHtml(mon.name)}을(를) 물리쳤다!</span><br><span class="good">💰 +${mon.gold}G 획득!</span>`;
   } else {
-    logHtml = `<span class="bad">💔 ${mon.name}의 반격!</span><br><span class="bad">패배했습니다...</span>`;
+    logHtml = `<span class="bad">💔 ${escHtml(mon.name)}의 반격!</span><br><span class="bad">패배했습니다...</span>`;
   }
 
   document.getElementById('battle-arena').innerHTML = `
@@ -2879,7 +2879,7 @@ function renderBattle(phase) {
       <div class="ba-vs-icon">⚡</div>
       <div class="ba-side">
         <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
-        <div style="font-size:.75rem;font-weight:700">${mon.name}</div>
+        <div style="font-size:.75rem;font-weight:700">${escHtml(mon.name)}</div>
         <div class="ba-hp-wrap">
           <div class="ba-hp-bar-bg"><div class="ba-hp-bar-fill ba-mon-hp" id="ba-mon-hp" style="width:${monHpPct}%"></div></div>
           <div class="ba-hp-txt">HP ${monHpPct}%</div>
@@ -2918,17 +2918,17 @@ function doFight() {
   const rounds = win ? [
     {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${s.name} 공격!</span>`},
     {delay:1000, monShake:true,  log:`<span class="good">💥 타격! 몬스터 체력 감소!</span>`,  monHp:65},
-    {delay:2200, monAtk:true,    log:`<span class="bad">😤 ${mon.name} 반격!</span>`},
+    {delay:2200, monAtk:true,    log:`<span class="bad">😤 ${escHtml(mon.name)} 반격!</span>`},
     {delay:3200, charFx:true,    log:`<span class="info">🛡️ 막았다!</span>`},
     {delay:4400, charMove:true,  log:`<span class="info">⚔️ 연속 공격!</span>`},
     {delay:5400, monShake:true,  log:`<span class="good">💥 치명타!</span>`,               monHp:30},
     {delay:6600, charMove:true,  log:`<span class="info">⚔️ 마지막 일격!</span>`},
-    {delay:7600, monShake:true,  log:`<span class="good">💥 ${mon.name} 쓰러졌다!</span>`, monHp:0},
+    {delay:7600, monShake:true,  log:`<span class="good">💥 ${escHtml(mon.name)} 쓰러졌다!</span>`, monHp:0},
     {delay:9000, end:true, win:true},
   ] : [
     {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${s.name} 공격!</span>`},
     {delay:1000, miss:true,      log:`<span style="color:#888">💨 빗나감!</span>`},
-    {delay:2200, monAtk:true,    log:`<span class="bad">😈 ${mon.name} 반격!</span>`},
+    {delay:2200, monAtk:true,    log:`<span class="bad">😈 ${escHtml(mon.name)} 반격!</span>`},
     {delay:3200, charShake:true, log:`<span class="bad">💔 피해! 체력 감소...</span>`,     charHp:65},
     {delay:4400, charMove:true,  log:`<span class="info">⚔️ 다시 공격!</span>`},
     {delay:5400, miss:true,      log:`<span style="color:#888">💨 또 빗나감!</span>`},
@@ -3877,7 +3877,7 @@ function renderMonsterStep() {
           border-radius:6px;padding:.12rem .35rem">${badgeTxt}</div>`:''}
         <div style="font-size:.58rem;color:var(--txt3);margin-bottom:.3rem">${slotLabels[i]||''}</div>
         <div style="font-size:2.3rem;margin-bottom:.3rem">${iconImg(mon, 'monsters', '2.3rem')}</div>
-        <div style="font-size:.85rem;font-weight:800;color:${isKilled?'var(--txt3)':isSpecial?'#fff':'var(--txt1)'};margin-bottom:.2rem">${mon.name}</div>
+        <div style="font-size:.85rem;font-weight:800;color:${isKilled?'var(--txt3)':isSpecial?'#fff':'var(--txt1)'};margin-bottom:.2rem">${escHtml(mon.name)}</div>
         <div style="font-size:.63rem;color:var(--txt3)">Lv.${mon.level||mon.recLv} ${elemE}${mon.trait==='ghost'?' 👻':''}</div>
         <div style="font-size:.67rem;color:var(--gold);margin:.2rem 0">💰${mon.gold}G</div>
         <div style="margin-top:.5rem">
@@ -3911,7 +3911,7 @@ function renderMonsterStep() {
               opacity:${isK?.65:1}">
               <span style="font-size:.85rem">${iconImg(m, 'monsters', '.85rem')}</span>
               <div>
-                <div style="font-size:.63rem;font-weight:600;color:${isK?'var(--txt3)':'var(--txt2)'}">${m.name}</div>
+                <div style="font-size:.63rem;font-weight:600;color:${isK?'var(--txt3)':'var(--txt2)'}">${escHtml(m.name)}</div>
                 <div style="font-size:.56rem;color:var(--txt3)">Lv${m.level||m.recLv}${isK?' ✓':''}</div>
               </div>
             </div>`;
@@ -3989,7 +3989,7 @@ function renderMonsterStep() {
           border-radius:12px;padding:.65rem .4rem;text-align:center${glowSpec}">
           ${isSpecial?`<div style="font-size:.52rem;color:#FFD700;font-weight:700;margin-bottom:.1rem">✨전설</div>`:''}
           <div style="font-size:1.5rem;margin-bottom:.15rem">${iconImg(m, 'monsters', '1.5rem')}</div>
-          <div style="font-size:.7rem;font-weight:700;color:var(--txt1)">${m.name}</div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--txt1)">${escHtml(m.name)}</div>
           <div style="font-size:.58rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
           <div style="font-size:.55rem;color:var(--emerald);background:rgba(46,204,113,.15);
             border-radius:5px;padding:.1rem .3rem;margin-top:.25rem">✓ 처치완료</div>
@@ -3998,7 +3998,7 @@ function renderMonsterStep() {
         return `<div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.12);
           border-radius:12px;padding:.65rem .4rem;text-align:center;opacity:.8">
           <div style="font-size:1.5rem;margin-bottom:.15rem;filter:grayscale(.4)">${iconImg(m, 'monsters', '1.5rem')}</div>
-          <div style="font-size:.7rem;font-weight:700;color:var(--txt2)">${m.name}</div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--txt2)">${escHtml(m.name)}</div>
           <div style="font-size:.58rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
           <div style="font-size:.55rem;color:var(--txt3);background:rgba(255,255,255,.07);
             border-radius:5px;padding:.1rem .3rem;margin-top:.25rem">미처치</div>
@@ -4338,7 +4338,7 @@ function renderHouse() {
     return `<div style="margin-bottom:.5rem">
       <div style="font-size:.68rem;color:${z.color};font-weight:600;margin-bottom:.25rem">${z.label}</div>
       <div style="display:flex;flex-wrap:wrap;gap:.25rem">
-        ${killed.map(m => `<span class="dex-chip">${m.icon} ${m.name}</span>`).join('')}
+        ${killed.map(m => `<span class="dex-chip">${escHtml(m.icon)} ${escHtml(m.name)}</span>`).join('')}
       </div>
     </div>`;
   }).join('');
@@ -8779,7 +8779,7 @@ function renderQuestBoard() {
       <div style="display:flex;align-items:flex-start;gap:.7rem">
         <div style="font-size:1.6rem;flex-shrink:0">${q.icon||'📋'}</div>
         <div style="flex:1">
-          <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${q.name}</div>
+          <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${escHtml(q.name)}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
             ${q.type==='daily'?'📅 일일':q.type==='weekly'?'📆 주간':q.type==='special'?'⭐ 과제':'🎉 특별'} 퀘스트
             ${q.dueDate?` · 마감 ${q.dueDate}`:''}
@@ -9010,7 +9010,7 @@ function renderBookRecords() {
           border-radius:20px;padding:.1rem .5rem;flex-shrink:0">
           ${isPending?'확인중':'✓ 완료'}</span>
         <span style="font-weight:700;font-size:.88rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          ${r.bookTitle||r.title||''}</span>
+          ${escHtml(r.bookTitle||r.title||'')}</span>
         ${cat?`<span style="font-size:.65rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:10px;padding:.1rem .45rem;flex-shrink:0">${cat}</span>`:''}
         ${r.rating?`<span style="font-size:.75rem;flex-shrink:0">${starStr(r.rating)}</span>`:''}
         <span style="font-size:.66rem;color:var(--txt3);flex-shrink:0">${r.bookDate||r.date||''}</span>
@@ -9023,7 +9023,7 @@ function renderBookRecords() {
       </div>
       ${r.teacherComment?`<div style="margin-top:.45rem;font-size:.72rem;color:var(--emerald);
         background:rgba(46,204,113,.08);border-radius:8px;padding:.3rem .5rem">
-        💬 선생님: ${r.teacherComment}</div>`:''}
+        💬 선생님: ${escHtml(r.teacherComment)}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -9092,7 +9092,7 @@ function renderQuestModal() {
   document.getElementById('quest-list').innerHTML = (claimBtn||'') + (all.length > 0
     ? all.map(q => `<div class="quest-row">
         <div class="qr-icon">${q.icon}</div>
-        <div class="qr-body"><div class="qr-name">${q.name}</div><div class="qr-desc">${q.date||''}</div></div>
+        <div class="qr-body"><div class="qr-name">${escHtml(q.name)}</div><div class="qr-desc">${q.date||''}</div></div>
         <div class="qr-right">
           ${statusLabel[q.status]||statusLabel.done}
           <span class="qr-rewards">${q.exp>0?`+${q.exp}EXP · `:''}${q.gold>0?`+${q.gold}G`:q.status==='self'?'보상 대기':''}</span>
@@ -9700,11 +9700,11 @@ function buildMondayReadOnly(g) {
       <div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
         border-radius:12px;padding:.9rem;margin-bottom:.7rem">
         <div style="font-size:.72rem;color:var(--sky);font-weight:700;margin-bottom:.6rem">✅ 이번 주 다짐 완료</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🏖️ 주말: ${g.weekendText||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">😊 기분: ${g.weekendMood||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">💪 노력할 것: ${g.focusArea||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🎯 목표: ${g.goalText||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2)">🌟 마음가짐: ${g.mindset||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🏖️ 주말: ${escHtml(g.weekendText||'')}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">😊 기분: ${escHtml(g.weekendMood||'')}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">💪 노력할 것: ${escHtml(g.focusArea||'')}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🎯 목표: ${escHtml(g.goalText||'')}</div>
+        <div style="font-size:.82rem;color:var(--txt2)">🌟 마음가짐: ${escHtml(g.mindset||'')}</div>
       </div>
       <div style="font-size:.75rem;color:var(--txt3);text-align:center">이미 작성했어요! 금요일에 다시 만나요 😊</div>
     </div>`;
@@ -9739,9 +9739,9 @@ function buildFridayForm(goal) {
   const existing = DB.getWeeklyReflection(CUR.id, wk);
   if (existing) return buildFridayReadOnly(goal, existing);
 
-  const focusQ   = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${goal.focusArea}'</strong>를 얼마나 노력했나요?` : '이번 주 얼마나 노력했나요?';
-  const goalQ    = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${goal.goalText}'</strong>를 어떻게 해냈나요?` : '이번 주 목표를 어떻게 해냈나요?';
-  const mindsetQ = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${goal.mindset||"마음가짐"}'</strong>으로 지내려고 얼마나 노력했나요?` : '이번 주 마음가짐을 얼마나 지켰나요?';
+  const focusQ   = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${escHtml(goal.focusArea)}'</strong>를 얼마나 노력했나요?` : '이번 주 얼마나 노력했나요?';
+  const goalQ    = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${escHtml(goal.goalText)}'</strong>를 어떻게 해냈나요?` : '이번 주 목표를 어떻게 해냈나요?';
+  const mindsetQ = goal ? `이번 주 나는 <strong style="color:var(--sky)">'${escHtml(goal.mindset||"마음가짐")}'</strong>으로 지내려고 얼마나 노력했나요?` : '이번 주 마음가짐을 얼마나 지켰나요?';
 
   return `
     <div style="padding:.8rem 1rem;display:flex;flex-direction:column;gap:1.1rem">
@@ -9749,11 +9749,11 @@ function buildFridayForm(goal) {
       <div style="background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);
         border-radius:12px;padding:.8rem;font-size:.8rem">
         <div style="font-size:.72rem;color:var(--gold);font-weight:700;margin-bottom:.5rem">📅 이번 주 월요일 다짐</div>
-        <div style="color:var(--txt2);margin-bottom:.2rem">🏖️ 주말에 한 일: <b>${goal.weekendText||''}</b></div>
-        <div style="color:var(--txt2);margin-bottom:.2rem">😊 주말 기분: <b>${goal.weekendMood||''}</b></div>
-        <div style="color:var(--txt2);margin-bottom:.2rem">💪 노력할 것: <b>${goal.focusArea||''}</b></div>
-        <div style="color:var(--txt2);margin-bottom:.2rem">🎯 목표: <b>${goal.goalText||''}</b></div>
-        <div style="color:var(--txt2)">🌟 마음가짐: <b>${goal.mindset||''}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">🏖️ 주말에 한 일: <b>${escHtml(goal.weekendText||'')}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">😊 주말 기분: <b>${escHtml(goal.weekendMood||'')}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">💪 노력할 것: <b>${escHtml(goal.focusArea||'')}</b></div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">🎯 목표: <b>${escHtml(goal.goalText||'')}</b></div>
+        <div style="color:var(--txt2)">🌟 마음가짐: <b>${escHtml(goal.mindset||'')}</b></div>
       </div>` : ''}
       <!-- Q1 -->
       <div>
@@ -9791,17 +9791,17 @@ function buildFridayReadOnly(goal, ref) {
       ${goal ? `<div style="background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);
         border-radius:12px;padding:.8rem;margin-bottom:.7rem;font-size:.8rem">
         <div style="font-size:.72rem;color:var(--gold);font-weight:700;margin-bottom:.5rem">📅 이번 주 다짐</div>
-        <div style="color:var(--txt2);margin-bottom:.2rem">💪 ${goal.focusArea}</div>
-        <div style="color:var(--txt2)">🎯 ${goal.goalText}</div>
+        <div style="color:var(--txt2);margin-bottom:.2rem">💪 ${escHtml(goal.focusArea)}</div>
+        <div style="color:var(--txt2)">🎯 ${escHtml(goal.goalText)}</div>
       </div>` : ''}
       <div style="background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.2);
         border-radius:12px;padding:.9rem;margin-bottom:.7rem">
         <div style="font-size:.72rem;color:var(--emerald);font-weight:700;margin-bottom:.6rem">✅ 이번 주 돌아보기 완료</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">📊 노력: ${ref.focusReflection||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🎯 목표: ${ref.goalReflection||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">📊 노력: ${escHtml(ref.focusReflection||'')}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🎯 목표: ${escHtml(ref.goalReflection||'')}</div>
         <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">🌟 마음가짐: ${ref.mindsetReflection||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">⭐ 잘한 것: ${ref.bestMoment||''}</div>
-        <div style="font-size:.82rem;color:var(--txt2)">➡️ 다음 주: ${ref.nextWeekGoal||''}</div>
+        <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">⭐ 잘한 것: ${escHtml(ref.bestMoment||'')}</div>
+        <div style="font-size:.82rem;color:var(--txt2)">➡️ 다음 주: ${escHtml(ref.nextWeekGoal||'')}</div>
       </div>
     </div>`;
 }
@@ -9903,19 +9903,19 @@ function buildWeekCard(wk, goal, ref, expanded) {
         ${goal?`<div style="font-size:.78rem;color:var(--txt2);margin-bottom:.5rem;padding:.6rem;
           background:rgba(255,215,0,.05);border-radius:8px;border:1px solid rgba(255,215,0,.1)">
           <div style="font-size:.68rem;color:var(--gold);font-weight:700;margin-bottom:.35rem">📅 월요일 다짐</div>
-          <div style="margin-bottom:.2rem">🏖️ ${goal.weekendText||''} <span style="color:var(--txt3)">(${goal.weekendMood||''})</span></div>
-          <div style="margin-bottom:.2rem">💪 노력할 것: <b>${goal.focusArea||''}</b></div>
-          <div style="margin-bottom:.2rem">🎯 목표: <b>${goal.goalText||''}</b></div>
-          <div>🌟 마음가짐: <b>${goal.mindset||''}</b></div>
+          <div style="margin-bottom:.2rem">🏖️ ${escHtml(goal.weekendText||'')} <span style="color:var(--txt3)">(${escHtml(goal.weekendMood||'')})</span></div>
+          <div style="margin-bottom:.2rem">💪 노력할 것: <b>${escHtml(goal.focusArea||'')}</b></div>
+          <div style="margin-bottom:.2rem">🎯 목표: <b>${escHtml(goal.goalText||'')}</b></div>
+          <div>🌟 마음가짐: <b>${escHtml(goal.mindset||'')}</b></div>
         </div>`:'<div style="font-size:.75rem;color:var(--txt3);padding:.3rem 0">월요일 다짐 없음</div>'}
         ${ref?`<div style="font-size:.78rem;color:var(--txt2);padding:.6rem;
           background:rgba(46,204,113,.05);border-radius:8px;border:1px solid rgba(46,204,113,.1)">
           <div style="font-size:.68rem;color:var(--emerald);font-weight:700;margin-bottom:.35rem">📅 금요일 돌아보기</div>
-          <div style="margin-bottom:.2rem">📊 노력: ${ref.focusReflection||''}</div>
-          <div style="margin-bottom:.2rem">🎯 목표: ${ref.goalReflection||''}</div>
+          <div style="margin-bottom:.2rem">📊 노력: ${escHtml(ref.focusReflection||'')}</div>
+          <div style="margin-bottom:.2rem">🎯 목표: ${escHtml(ref.goalReflection||'')}</div>
           <div style="margin-bottom:.2rem">🌟 마음가짐: ${ref.mindsetReflection||''}</div>
-          <div style="margin-bottom:.2rem">⭐ 잘한 것: ${ref.bestMoment||''}</div>
-          <div>➡️ 다음 주: ${ref.nextWeekGoal||''}</div>
+          <div style="margin-bottom:.2rem">⭐ 잘한 것: ${escHtml(ref.bestMoment||'')}</div>
+          <div>➡️ 다음 주: ${escHtml(ref.nextWeekGoal||'')}</div>
         </div>`:'<div style="font-size:.75rem;color:var(--txt3);padding:.3rem 0">금요일 돌아보기 없음</div>'}
       </div>
     </div>`;

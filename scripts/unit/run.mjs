@@ -392,6 +392,59 @@ cur = 'admin 학생 상세 비번 가림(DET-PW-MASK-1)';
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'admin 작품 키 정리·중복 정리 확인(DEDUPE-ART-1·DEDUPE-CONFIRM-1)';
+try {
+  //  운영 artworks 는 옛 배열(숫자 키). 내리기·좋아요는 artworks/<id>/… 에만 써서 진짜 작품이 안 내려갔다.
+  //  정리는 통째 set 이 아니라 **바뀔 키만** update 하고, id 키에 쓰인 조각(hidden·likes)은 합쳐야 한다.
+  const ADMIN = read('admin.js');
+  const sliceAsync = (name) => {
+    const m = new RegExp('^async function ' + name + '[ \\t]*[(]', 'm').exec(ADMIN);
+    if (!m) throw new Error('함수 없음: ' + name);
+    let i = ADMIN.indexOf('{', m.index), dep = 0;
+    for (; i < ADMIN.length; i++) { if (ADMIN[i] === '{') dep++; else if (ADMIN[i] === '}' && --dep === 0) return ADMIN.slice(m.index, i + 1); }
+    throw new Error('중괄호: ' + name);
+  };
+  const runNorm = async (raw, keepSrc) => {
+    const writes = [];
+    const node = { once: async () => ({ val: () => JSON.parse(JSON.stringify(raw)) }), update: async (u) => { writes.push(u); }, set: async () => { writes.push('SET'); } };
+    const sb = { DB: { _fbRef: { child: (p) => { if (p !== 'artworks') throw new Error('다른 경로: ' + p); return node; } } } };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(sliceAsync('normalizeArtworkKeys') + '\nglobalThis.__n = normalizeArtworkKeys;', sb);
+    const r = await sb.__n(vm.runInContext(keepSrc, sb));
+    return { r, writes };
+  };
+  const A = (id, sid, extra = {}) => ({ id, studentId: sid, title: 't' + id, ...extra });
+  const cases = [];
+  cases.push(['옛 숫자 키 2개 → id 키로 옮기고 숫자 키는 null', await runNorm({ 0: A('a1', 's1'), 1: A('a2', 's2') }, '() => true'),
+    ({ r, writes }) => { eq(writes.length, 1, 'update 1번'); eq(writes[0], { 0: null, 1: null, a1: A('a1', 's1'), a2: A('a2', 's2') }); eq(r, { moved: 2, removed: 0 }); }]);
+  cases.push(['숫자 키 판에서 내리기로 생긴 유령 {hidden} 은 진짜 작품에 합쳐진다', await runNorm({ 0: A('a1', 's1'), a1: { hidden: true, likes: { s9: true } } }, '() => true'),
+    ({ writes }) => { eq(writes[0], { 0: null, a1: { ...A('a1', 's1'), hidden: true, likes: { s9: true } } }); }]);
+  cases.push(['이미 id 키인 작품(그 순간 올라온 새 작품)은 건드리지 않는다', await runNorm({ 0: A('a1', 's1'), new1: A('new1', 's2') }, '() => true'),
+    ({ writes }) => { if ('new1' in writes[0]) throw new Error('새 작품을 건드림: ' + JSON.stringify(writes[0])); }]);
+  cases.push(['같은 작품이 숫자 키·id 키 둘 다 → 숫자 키만 지움', await runNorm({ 0: A('a1', 's1'), a1: A('a1', 's1') }, '() => true'),
+    ({ r, writes }) => { eq(writes[0], { 0: null }); eq(r, { moved: 0, removed: 1 }); }]);
+  cases.push(['고아 정리: keep 가 false 인 작품만 지움', await runNorm({ a1: A('a1', 's1'), a2: A('a2', 'gone'), 0: A('a3', 'gone') }, "a => a.studentId !== 'gone'"),
+    ({ r, writes }) => { eq(writes[0], { a2: null, 0: null }); eq(r.removed, 2); }]);
+  cases.push(['고칠 것이 없으면 쓰지 않는다 · 통째 set 은 절대 안 씀', await runNorm({ a1: A('a1', 's1') }, '() => true'),
+    ({ writes }) => { eq(writes, []); }]);
+  for (const [name, res, check] of cases) test(name, () => check(res));
+
+  // 확인창에서 취소하면 아무것도 안 쓴다
+  const wrote = [];
+  const sb = {
+    confirm: () => false, notify() {}, renderAll() {},
+    DB: { load: () => { wrote.push('load'); return {}; }, getStudents: () => [], saveStudent: () => wrote.push('saveStudent'), _promoObj: (x) => x,
+          _fbRef: { child: () => ({ set: () => wrote.push('set'), update: () => wrote.push('update'), once: async () => ({ val: () => ({}) }) }) } },
+  };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(sliceAsync('dedupeAll') + '\nglobalThis.__d = dedupeAll;', sb);
+  await sb.__d();
+  test('dedupeAll: 확인창 취소 → 쓰기 0', () => eq(wrote, []));
+} catch (e) {
+  test('작품 키 정리 함수·확인창이 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
