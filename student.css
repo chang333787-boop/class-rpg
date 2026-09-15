@@ -541,6 +541,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .shop-gold-bar{font-size:.82rem;color:var(--gold);margin-bottom:.7rem;
   background:rgba(217,164,65,.07);border:1px solid rgba(217,164,65,.2);border-radius:8px;padding:.4rem .7rem;}
 .item-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;}
+/* [D3-SHOP375-1] 3칸 고정이라 375 폭에서 장비 카드(이름·능력치·가격 가로 한 줄)가 칸마다 182px를 요구해
+   합 555px가 310px 모달 밖으로 넘치고 글자가 한 글자씩 세로로 쌓였다.
+   768 폭 무기 탭도 같은 이유로 8장이 넘쳤다.
+   장비 줄 카드(.shop-row-card)가 든 그리드: 260px 이상씩 자동 칸 (375→1칸 · 768→2칸 · 1366→3칸 그대로).
+   마스터리북 탭은 칸마다 '종류 묶음(가로 줄 목록)'이 들어가(.item-card 아님) 375에서 100px 칸에 세로 글자 → 좁은 폭 1칸.
+   씨앗·장식 탭(작은 .item-card 타일)은 3칸 그대로.
+   1fr 칸은 최소 폭이 '내용 전체'라 min-width:0 을 같이 준다([UI375-2]와 같은 이유). */
+.item-grid:has(> .shop-row-card){grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));}
+.item-grid > *{min-width:0;}
+@media(max-width:700px){
+  .item-grid:not(:has(> .item-card)){grid-template-columns:minmax(0,1fr);}
+}
 .item-card{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);
   border-radius:10px;padding:.5rem .65rem;cursor:pointer;transition:all .2s;}
 .item-card:hover{border-color:rgba(217,164,65,.38);background:rgba(217,164,65,.05);}
