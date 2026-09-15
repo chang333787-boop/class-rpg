@@ -799,13 +799,63 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 }
 .zone-card:not(.zone-locked):hover{transform:translateY(-6px) scale(1.02);box-shadow:0 12px 40px rgba(0,0,0,.5);}
 .zone-card:not(.zone-locked):active{transform:translateY(2px) scale(.97);box-shadow:0 2px 8px rgba(0,0,0,.3);}
-/* [D3-ZONE375-1] 사냥터 구역 카드 375 폭 — 3칸 고정(student.js 인라인 grid)이라 카드가 94px, 내용은 141px.
-   구역 이름이 '초/급/사/냥/터' 세로로 쌓이고 몬스터 미리보기·보상 줄이 잘렸다.
-   좁은 폭에서만 1칸으로. 부모에 class가 없어 `:has(> .zone-card)`로 잡는다(크롬북 크롬 105+).
-   카드 여백(인라인 1.2rem)은 1칸이면 충분히 넓어 그대로 둔다. */
+/* [D3-ZONE-CLASS-1] 사냥터 구역 고르기 — renderMonsterStep(zone 단계) 인라인 style → class (값은 옮기기 전과 같음).
+   구역마다 다른 값(배경 그라데·테두리·글자색)은 카드에 CSS 변수 --zbg·--zb·--zc 로만 넘기고, 잠김 모양은 .zone-locked 로.
+   진행 막대 폭(%)만 인라인. #274의 `div:has(> .zone-card)` !important는 .zn-grid 로 바꿔 삭제. */
+.zone-card,.zone-card:not(.zone-locked){transition:transform .18s,box-shadow .18s;}
+.zone-card{background:var(--zbg);border:2px solid var(--zb);border-radius:18px;padding:1.2rem;cursor:pointer;opacity:1;
+  position:relative;overflow:hidden;display:flex;flex-direction:column;gap:.7rem;}
+.zone-card.zone-locked{border-color:rgba(255,255,255,.08);cursor:not-allowed;opacity:.4;}
+.zn-head{display:flex;align-items:center;gap:.6rem;}
+.zn-ico{font-size:1.8rem;}
+.zn-title{flex:1;}
+.zn-name{font-size:.95rem;font-weight:800;color:var(--zc);}
+.zone-locked .zn-name{color:var(--txt3);}
+.zn-sub{font-size:.65rem;color:var(--txt3);}
+.zn-lock{font-size:.65rem;color:var(--red);background:rgba(231,76,60,.15);border-radius:6px;padding:.2rem .45rem;white-space:nowrap;}
+.zn-desc{font-size:.68rem;color:var(--txt3);}
+.zn-prev{display:flex;gap:.4rem;align-items:center;}
+.zn-mon{text-align:center;}
+.zn-mon-ico{font-size:1.5rem;}
+.zn-mon-lv{font-size:.52rem;color:var(--txt3);}
+.zn-more{font-size:.6rem;color:var(--txt3);margin-left:auto;}
+.zn-foot{border-top:1px solid rgba(255,255,255,.07);padding-top:.6rem;display:flex;justify-content:space-between;align-items:center;}
+.zn-reward{font-size:.68rem;color:var(--zc);}
+.zone-locked .zn-reward{color:var(--txt3);}
+.zn-kill{font-size:.62rem;color:var(--txt3);}
+.zn-bar{height:4px;background:rgba(255,255,255,.07);border-radius:2px;}
+.zn-bar-fill{height:100%;background:var(--zc);border-radius:2px;}
+.zn-enter{text-align:center;background:var(--zc);color:#111;font-size:.75rem;font-weight:800;border-radius:10px;padding:.35rem;}
+.zn-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;}
+.zn-top-title{font-size:.92rem;font-weight:700;}
+.zn-top-sub{font-size:.68rem;color:var(--txt3);margin-top:.1rem;}
+.zn-left{text-align:right;}
+.zn-left-n{font-size:1.2rem;font-weight:800;color:var(--gold);}
+.zn-left-of{font-size:.65rem;font-weight:400;color:var(--txt3);}
+.zn-left-lbl{font-size:.6rem;color:var(--txt3);}
+.zn-done{font-size:.75rem;color:var(--txt3);}
+.zn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;}
+.zn-dex-wrap{text-align:center;margin-top:.9rem;}
+.zn-dex{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--txt3);font-size:.73rem;padding:.4rem 1.2rem;cursor:pointer;font-family:inherit;}
 @media (max-width:600px){
-  div:has(> .zone-card){grid-template-columns:minmax(0,1fr)!important;gap:var(--sp-1,8px)!important;}
+  .zn-grid{grid-template-columns:minmax(0,1fr);gap:var(--sp-1,8px);}
 }
+/* [D3-ZONE-CLASS-1 · 2단계] 디자인 시스템 토큰 — 가장 작던 몬스터 레벨 8.3px·마릿수 9.6px·처치 9.9px 등을 12~14px로,
+   모서리·간격 토큰. (1단계 커밋은 모양 100% 동일 — 픽셀 차이 0) */
+.zone-card{border-radius:var(--r-lg);gap:var(--sp-1);padding:var(--sp-2);}
+.zn-name{font-size:var(--fs-md);}
+.zn-sub,.zn-lock,.zn-mon-lv,.zn-more,.zn-kill,.zn-left-of,.zn-left-lbl{font-size:var(--fs-xs);}
+.zn-desc,.zn-reward,.zn-top-sub{font-size:var(--fs-sm);}
+.zn-sub,.zn-desc,.zn-mon-lv,.zn-more,.zn-kill,.zn-top-sub,.zn-left-of,.zn-left-lbl,.zn-dex{color:var(--txt2);}
+.zone-locked .zn-name,.zone-locked .zn-reward{color:var(--txt3);}
+.zn-head{flex-wrap:wrap;row-gap:var(--sp-h);}
+.zn-lock{white-space:nowrap;flex-shrink:0;}
+.zn-name{white-space:nowrap;}
+.zn-desc{word-break:keep-all;}
+.zn-foot{padding-top:var(--sp-1);flex-wrap:wrap;gap:2px var(--sp-1);}
+.zn-enter{font-size:var(--fs-sm);border-radius:var(--r-sm);padding:var(--sp-1);}
+.zn-top-title{font-size:var(--fs-md);}
+.zn-dex{font-size:var(--fs-sm);border-radius:var(--r-sm);min-height:40px;padding:0 var(--sp-3);}
 
 /* 몬스터 선택 카드 눌림 */
 .mon-select-card:not(.mon-select-dim){
