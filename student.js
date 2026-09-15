@@ -3428,6 +3428,16 @@ const IB_CONFIG = {
   advanced:     { baseGold:32, prob:{ common:79, rare:18, legend:3  } },
 };
 
+// [ZONE-GOLD-TEXT-1] 사냥터 카드의 "💰 보상" 범위는 그 구역 몬스터의 실제 골드(mon.gold — 이긴 뒤 그대로 지급)에서 만든다.
+//   예전엔 "10 ~ 50G" 같은 글자를 적어 둬서 몬스터 표가 바뀌면 어긋났다(09-15: 실제 18~60 · 35~110 · 70~220G).
+//   몬스터가 없거나 골드가 숫자가 아니면 적어 둔 글자(fallback)를 쓴다.
+function zoneGoldRangeText(mons, fallback) {
+  const golds = (mons || []).map(m => Number(m && m.gold)).filter(Number.isFinite);
+  if (!golds.length) return fallback;
+  const lo = Math.min(...golds), hi = Math.max(...golds);
+  return lo === hi ? `${lo}G` : `${lo} ~ ${hi}G`;
+}
+
 // 무한배틀 하루 제한 횟수 가져오기
 function _ibDailyLimit() {
   const bs = (typeof BATTLE_CONSTS !== 'undefined' && BATTLE_CONSTS.infiniteBattleLimit !== undefined)
@@ -3459,9 +3469,9 @@ function renderInfiniteBattleZoneSelect() {
 
   const lv = CUR.level || 1;
   const zones = [
-    { id:'beginner',     icon:'🌿', name:'초급 사냥터', color:'#6fd49d', border:'rgba(111,212,157,.35)', bg:'rgba(111,212,157,.07)', gold:'10G / 마리', minLv:1  },
-    { id:'intermediate', icon:'🔥', name:'중급 사냥터', color:'#FF8A80', border:'rgba(255,138,128,.35)', bg:'rgba(255,138,128,.07)', gold:'18G / 마리', minLv:1  },
-    { id:'advanced',     icon:'⚡', name:'고급 사냥터', color:'#7ec8e3', border:'rgba(126,200,227,.35)', bg:'rgba(126,200,227,.07)', gold:'32G / 마리', minLv:21 },
+    { id:'beginner',     icon:'🌿', name:'초급 사냥터', color:'#6fd49d', border:'rgba(111,212,157,.35)', bg:'rgba(111,212,157,.07)', gold:IB_CONFIG.beginner.baseGold + 'G / 마리', minLv:1  },
+    { id:'intermediate', icon:'🔥', name:'중급 사냥터', color:'#FF8A80', border:'rgba(255,138,128,.35)', bg:'rgba(255,138,128,.07)', gold:IB_CONFIG.intermediate.baseGold + 'G / 마리', minLv:1  },
+    { id:'advanced',     icon:'⚡', name:'고급 사냥터', color:'#7ec8e3', border:'rgba(126,200,227,.35)', bg:'rgba(126,200,227,.07)', gold:IB_CONFIG.advanced.baseGold + 'G / 마리', minLv:21 },
   ];
 
   body.innerHTML = `
@@ -3792,7 +3802,7 @@ function renderMonsterStep() {
           <div style="font-size:.6rem;color:var(--txt3);margin-left:auto">외 ${Math.max(0,mons.length-3)}마리</div>
         </div>
         <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:.6rem;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.68rem;color:${locked?'var(--txt3)':z.color}">💰 ${z.reward}</span>
+          <span style="font-size:.68rem;color:${locked?'var(--txt3)':z.color}">💰 ${zoneGoldRangeText(mons, z.reward)}</span>
           <span style="font-size:.62rem;color:var(--txt3)">${kCount}/${mons.length} 처치</span>
         </div>
         <div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px">
