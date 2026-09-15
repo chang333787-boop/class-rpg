@@ -803,13 +803,16 @@ const DB = {
   //  학생 기기는 큰데 남의 것은 안 쓰는 노드를 root 구독에서 빼고(COLD), 로그인 뒤 내 것만 키 범위로 받는다(MINE).
   //  교사(admin)·키오스크는 지금처럼 root 통째. 이 판에서는 캐시가 **부분**이므로 root 통째 저장을 막는다(G1).
   //  quests 는 _normalizeArrays 가 questLogs 에서 늘 다시 만들어 서버 값을 안 쓴다(옛 롤백이 남긴 사본).
-  STUDENT_COLD: ['quests', 'quizRecords', 'emotionLogs', 'emotionReflections', 'backups'],
+  //  goldDaily 는 학생 화면이 읽지 않고 logGold 가 한 칸 increment 로 쓰기만 한다. 학생 기기가 이 경로를 **들으면**
+  //  logGold 의 update() 가 동기 value 이벤트를 띄워 onDataChange 가 CUR 을 옛 캐시로 바꾸고 다음 saveStudent 가
+  //  골드 빠진 학생을 저장했다(골드 유실 M1). 안 들으면 이벤트가 안 뜬다 — [STUDENT-GOLDDAILY-COLD-1] 실제 SDK 로 확인.
+  STUDENT_COLD: ['quests', 'quizRecords', 'emotionLogs', 'emotionReflections', 'backups', 'goldDaily'],
   STUDENT_MINE: ['emotionLogs', 'emotionReflections'],   // 키가 `<sid>_…` 로 시작 → orderByKey 범위, 색인 불필요
   //  지금 운영에 없어도(null) 학생 화면이 읽는 노드 — 나중에 생기면 바로 받도록 미리 구독(null 구독은 비용 0)
   STUDENT_KNOWN: ['settings', 'students', 'questLogs', 'boardQuests', 'artworks', 'memories', 'memoryAlbums',
     'promotionRequests', 'pwResetRequests', 'weeklyGoals', 'weeklyReflections', 'customProblems', 'customWords',
     'teacherWordSets', 'recorderLogs', 'recorderSongs', 'problemRecords', 'studentNotes', 'emotionPromptStats',
-    'emotionAlerts', 'goldDaily', 'customMonsters', 'customQuestTemplates', 'hiddenQuestTemplates'],
+    'emotionAlerts', 'customMonsters', 'customQuestTemplates', 'hiddenQuestTemplates'],
 
   // G1: 부분 캐시로 root 통째 저장하면 빠진 노드가 운영에서 지워진다
   _rootSet(data) {
