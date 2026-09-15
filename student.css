@@ -1016,8 +1016,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
   padding-bottom:80px;
-  /* 바텀탭(65px) 영역 침범 방지 */
-  max-height:calc(100svh - 52px - 65px);
+  /* 바텀탭 영역 침범 방지 — [D3-TABH-1] 52px·65px 고정값은 #242 뒤 실제(HUD 60·탭 79)와 어긋나 있었다.
+     변수로 바꿔 HUD·탭 크기를 고칠 때 한 곳만 맞추면 되게 한다(값은 :root [D3-TABH-1]). */
+  max-height:calc(100svh - var(--hud-h,52px) - var(--tabs-h,65px));
   pointer-events:auto;
 }
 
@@ -1137,6 +1138,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   /* [D3-RADIUS-1] 모서리 4단. 파일 전체의 border-radius Npx 60곳을 이 넷으로 바꿨다(22종 → 4단 + 작은 막대용 2~6px·50%):
      8~10px → --r-sm(버튼·작은 칸) · 12~16px → --r(카드) · 18~26px → --r-lg(모달·큰 카드) · 50/99/999px → --r-pill(칩·알약 버튼). */
   --r-sm:8px;--r-lg:20px;--r-pill:999px;
+  /* [D3-TABH-1] 모바일 HUD·바텀탭 실제 높이(하네스 실측 390×844·375×667: HUD 60 · 탭 79 = 윗여백 6.4 + 탭칸 66.2 + 아래여백 6.4).
+     탭 아래여백은 max(.4rem, 아이폰 홈 표시줄) 이라 같은 식으로 더한다. HUD·탭 글자·여백을 바꾸면 이 두 값만 다시 잰다. */
+  --hud-h:60px;
+  --tabs-h:calc(72.6px + max(.4rem, env(safe-area-inset-bottom, 0px)));
 }
 /* 학교망에서 구글 폰트가 막히면 지금은 브라우저 기본 sans-serif로 떨어진다 → 한글 고딕을 명시 */
 html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif;}
