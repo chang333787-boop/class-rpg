@@ -161,7 +161,7 @@ node scripts/verify-safety.mjs
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
 - 현재 기대 결과: **`PASS 18 · REVIEW 1 · FAIL 0`** (exit code 0)
-- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 28 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 49 · FAIL 0`** (2026-09-15 기준)
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 29 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 49 · FAIL 0`** (2026-09-15 기준 · 29번째 = CACHE-SORT-GUARD-1)
 - 남은 `REVIEW 1`건 = 루트 쓰기 후보(`gamedata.js` 1 + `admin.js` 4). 전부 위의 **의도된 게이팅 경로**다.
   0으로 강제하지 않는다 — 강제하면 새로 추가되는 진짜 루트 쓰기를 못 잡는 사각이 생긴다. **안전 알림으로 유지**한다.
 
@@ -211,7 +211,7 @@ HTML 인라인 `<script>`/`<style>` 잔여 등.
 ## 현재 안정화 상태
 
 - 리팩토링 1차 마감 commit: `7c3350e` (2026-07)
-- 2026-09-15 main 기준: `verify-safety` 18/1/0 · `smoke-test` 28/0/0 · `unit/run` 49/0
+- 2026-09-15 main 기준: `verify-safety` 18/1/0 · `smoke-test` 29/0/0 · `unit/run` 49/0
 - 열린 게이트: Firebase 규칙 게시 → #214(마을 45차 서버 저장) 머지. 규칙 전에는 마을이 기기(localStorage)에만 저장된다
 - JS/CSS 외부화 완료, HTML 인라인 `<script>`/`<style>` 잔여 **0건**
 - `DB.save(`/`this.save(` 0건, 루트 저장 위험 정리됨
