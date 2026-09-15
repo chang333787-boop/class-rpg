@@ -9,6 +9,7 @@
 //   angle    { deg, label? }                  각. label:'?'면 각도 숫자 숨김
 //   polygon  { n, shape?, angles?, regular?, diag?, sides? }  n각형. shape 'right'|'iso'|'equi'(삼각형). angles:[50,70,'?'] 꼭짓점 각 표기
 //                                             regular:true 정n각형(사각형도 정사각형) · diag:true(모든 대각선)|[[0,2]] · sides:['5 cm',null,'?'] 변 옆 글자
+//                                             삼각형: apex:40(이등변 꼭지각대로) · degs:[30,40,110](세 각대로 모양) · angles에 ''면 그 꼭짓점 글자 없음
 //   rect     { w, h, unit? }                  치수 표시된 직사각형
 //   clock    { h, m }                         아날로그 시계
 //   fraction { n, k, shape? }                 전체 n칸 중 k칸 색칠. 'circle'|'bar'
@@ -66,13 +67,39 @@ const Figures = (() => {
       const n = Math.max(3, Math.min(8, toNum(f.n, 3)));
       let pts;
       if (n === 3 && f.shape === 'right') pts = [[40, 110], [200, 110], [40, 20]];
+      else if (n === 3 && f.shape === 'iso' && toNum(f.apex, 0) > 0) {
+        // [FIG-TRIANGLE-1] 꼭지각 크기대로 그린다(꼭짓점 순서: 왼쪽 아래 → 오른쪽 아래 → 꼭대기)
+        const t = Math.tan(Math.min(170, toNum(f.apex)) * Math.PI / 360); let h = 90, hb = h * t;
+        if (hb > 85) { hb = 85; h = hb / t; }
+        pts = [[120 - hb, 110], [120 + hb, 110], [120, 110 - h]];
+      }
       else if (n === 3 && f.shape === 'iso') pts = [[40, 110], [200, 110], [120, 20]];
+      else if (n === 3 && Array.isArray(f.degs) && f.degs.length === 3) {
+        // [FIG-TRIANGLE-1] 세 각대로 모양을 만든다 — 밑변 양 끝 각 = degs[0], degs[1]
+        const A = toNum(f.degs[0], 60) * Math.PI / 180, B = toNum(f.degs[1], 60) * Math.PI / 180, C = Math.PI - A - B;
+        const b = Math.sin(B) / Math.sin(C);          // 밑변 길이 1일 때 왼쪽 변 길이
+        const raw = [[0, 0], [1, 0], [b * Math.cos(A), -b * Math.sin(A)]];
+        const xs = raw.map(q => q[0]), ys = raw.map(q => q[1]);
+        const w = Math.max(...xs) - Math.min(...xs), hh = Math.max(...ys) - Math.min(...ys);
+        const k = Math.min(190 / w, 90 / (hh || 1));
+        const ox = 120 - (Math.max(...xs) + Math.min(...xs)) / 2 * k;
+        pts = raw.map(([x, y]) => [ox + x * k, 110 + y * k]);
+      }
       else if (n === 4 && !f.angles && !f.regular) pts = [[50, 105], [190, 105], [190, 25], [50, 25]];
       else pts = regular(n, 120, 68, 52, f.regular && n % 2 === 0 ? -Math.PI / 2 + Math.PI / n : -Math.PI / 2);   // regular 짝수각형은 밑변이 눕게
       const angs = Array.isArray(f.angles) ? f.angles : [];
+      const exact = toNum(f.apex, 0) > 0 || Array.isArray(f.degs);   // [FIG-TRIANGLE-1] 모양이 바뀌면 글자 방향도 무게중심 기준
+      const CX = exact ? pts.reduce((a, q) => a + q[0], 0) / n : 120, CY = exact ? pts.reduce((a, q) => a + q[1], 0) / n : 68;
       const labels = angs.slice(0, n).map((a, i) => {
-        const [x, y] = pts[i]; const dx = 120 - x, dy = 68 - y, len = Math.hypot(dx, dy) || 1;
-        return txt(x + dx / len * 24, y + dy / len * 24 + 5, (a === '?' || a == null) ? '?' : a + '°', 13);
+        if (a === '') return '';
+        const [x, y] = pts[i]; const dx = CX - x, dy = CY - y, len = Math.hypot(dx, dy) || 1;
+        let d = 24;
+        if (exact) {   // 뾰족한 각은 글자를 안쪽으로 더 넣어야 변과 안 겹친다
+          const u = pts[(i + 1) % n], v = pts[(i + n - 1) % n];
+          const th = Math.acos(Math.max(-1, Math.min(1, ((u[0] - x) * (v[0] - x) + (u[1] - y) * (v[1] - y)) / (Math.hypot(u[0] - x, u[1] - y) * Math.hypot(v[0] - x, v[1] - y)))));
+          d = Math.min(len * .8, Math.max(24, 13 / Math.sin(th / 2)));
+        }
+        return txt(x + dx / len * d, y + dy / len * d + 5, (a === '?' || a == null) ? '?' : a + '°', 13);
       }).join('');
       const marks = (angs.length === 0 && f.shape === 'right') ? `<path d="M40 96 L54 96 L54 110" stroke-width="1.6"/>` : '';
       // [FIG-POLYGON-1] 대각선·변 글자 — 옵션이 없으면 지금까지와 똑같은 그림
@@ -85,8 +112,9 @@ const Figures = (() => {
       const sideLabs = (Array.isArray(f.sides) ? f.sides : []).slice(0, n).map((s, i) => {
         if (s == null) return '';
         const p = pts[i], q = pts[(i + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
-        const dx = mx - 120, dy = my - 68, len = Math.hypot(dx, dy) || 1;
-        return txt(mx + dx / len * 16, my + dy / len * 16 + 5, s, 12);
+        const dx = mx - CX, dy = my - CY, len = Math.hypot(dx, dy) || 1;
+        const anchor = dx / len > .45 ? 'start' : dx / len < -.45 ? 'end' : 'middle';   // 옆 변 글자는 변에서 바깥쪽으로 붙인다
+        return txt(mx + dx / len * 10, my + dy / len * 12 + 5, s, 12).replace('text-anchor="middle"', `text-anchor="${anchor}"`);
       }).join('');
       if (!diags && !sideLabs) return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
       return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${diags}${marks}${labels}${sideLabs}`);
