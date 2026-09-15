@@ -1,12 +1,13 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 :root {
-  --bg: #0d1b2a;
-  --bg2: #162032;
-  --bg3: #1e2d42;
-  --border: rgba(255,255,255,.1);
-  --txt: #e8edf2;
-  --txt2: #8fa3b8;
-  --gold: #FFD700;
+  /* [TONE-1] 학생 화면(student.css)과 같은 결 */
+  --bg: #15110D;
+  --bg2: #241E16;
+  --bg3: #3A2E20;
+  --border: rgba(217,164,65,.18);
+  --txt: #EFE7D9;
+  --txt2: #BCAB92;
+  --gold: #D9A441;
   --emerald: #2ECC71;
   --red: #E74C3C;
   --sky: #5DADE2;
@@ -117,7 +118,7 @@ html, body {
 /* ── 토스트 ── */
 #toast {
   position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);
-  background:#1e2d42;border:1px solid var(--gold);color:var(--gold);
+  background:#3A2E20;border:1px solid var(--gold);color:var(--gold);
   padding:.7rem 1.5rem;border-radius:20px;font-size:.9rem;font-weight:700;
   z-index:9999;display:none;pointer-events:none;
 }
