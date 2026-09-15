@@ -1099,21 +1099,20 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 /* [D3-RANK-CLASS-1] 우리반 랭킹 — buildRankingHTML 인라인 style 9곳을 class로 옮겼다(값은 옮기기 전과 같음).
    #272의 375 대응(칸 안 세로 쌓기)도 #rank-modal-body 구조 선택자·!important 대신 이 class로. */
-.rk-group{margin-bottom:.9rem;}
-.rk-label{font-size:.7rem;color:var(--txt3);font-weight:700;margin-bottom:.35rem;padding-left:.1rem;}
-.rk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;}
-.rk-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;background:rgba(255,255,255,.05);border-radius:10px;flex:1;min-width:0;}
-.rk-medal{font-size:1.3rem;flex-shrink:0;}
-.rk-ava{font-size:1rem;flex-shrink:0;}
+/* [D3-RANK-CLASS-1 · 2단계] 디자인 시스템 토큰: 분류 제목 11.2→14px·--txt2, 이름 13.1→14px, 값 11.7→14px·--gold-t,
+   간격 8px 단위, 칸 모서리 --r-sm, 칸 배경 카드색. (1단계 커밋은 모양 100% 동일 — 픽셀 차이 0) */
+.rk-group{margin-bottom:var(--sp-2);}
+.rk-label{font-size:var(--fs-sm);color:var(--txt2);font-weight:700;margin-bottom:var(--sp-1);padding-left:2px;}
+.rk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-1);}
+.rk-item{display:flex;align-items:center;gap:var(--sp-1);padding:var(--sp-1) 12px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);flex:1;min-width:0;}
+.rk-medal{font-size:1.5rem;line-height:1;flex-shrink:0;}
+.rk-ava{font-size:1.125rem;line-height:1;flex-shrink:0;}
 .rk-body{flex:1;min-width:0;}
-.rk-name{font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rk-val{font-size:.73rem;color:var(--gold);font-weight:700;}
+.rk-name{font-weight:700;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rk-val{font-size:var(--fs-sm);color:var(--gold-t);font-weight:700;white-space:nowrap;}
 @media (max-width:600px){
   .rk-item{flex-direction:column;align-items:center;text-align:center;gap:2px;padding:var(--sp-1) var(--sp-h);}
   .rk-body{flex:none;width:100%;}
-  .rk-name{font-size:.8125rem;}
-  .rk-val{font-size:.875rem;white-space:nowrap;}
-  .rk-label{font-size:var(--fs-sm);color:var(--txt2);}
 }
 .ach-icon{font-size:1.8rem;width:40px;text-align:center;flex-shrink:0;}
 .ach-body{flex:1;}
