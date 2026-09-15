@@ -2219,20 +2219,13 @@ function approveArtwork(studentId, rewardId) {
 }
 
 
-function deleteOrphanArtworks() {
+async function deleteOrphanArtworks() {
   if (!confirm('삭제된 학생의 작품을 모두 정리할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
-  const db = DB.load();
-  const students = DB.getStudents();
-  const validIds = new Set(students.map(s => s.id));
-  const before = (db.artworks||[]).length;
-  db.artworks = (db.artworks||[]).filter(a => validIds.has(a.studentId));
-  DB._cache = db;
-  // 배열/객체 모두 대응: 전체 artworks를 id 키 기반으로 재저장
-  const artworksObj = {};
-  db.artworks.forEach(a => { artworksObj[a.id] = a; });
-  DB._fbRef.child('artworks').set(artworksObj);
+  const validIds = new Set(DB.getStudents().map(s => s.id));
+  // [DEDUPE-ART-1] 통째 set 대신 지울 키만 — 그 순간 올라온 작품을 지우지 않는다
+  const r = await normalizeArtworkKeys(a => validIds.has(a.studentId));
   renderArtworkAdmin();
-  notify(`🗑️ 고아 작품 ${before - db.artworks.length}개 정리 완료`);
+  notify(`🗑️ 고아 작품 ${r.removed}개 정리 완료`);
 }
 
 function openEditArtworkModal(artworkId) {
@@ -3568,7 +3561,9 @@ function renderWeeklyAdminPage() {
 }
 
 
-function dedupeAll() {
+async function dedupeAll() {
+  // [DEDUPE-CONFIRM-1] 한 번 누르면 승급 신청·학생 책 목록·작품 세 곳을 바로 쓴다 — 되돌리기 없음
+  if (!confirm('중복 데이터를 정리할까요?\n\n· 같은 학생·같은 레벨 승급 신청 중복\n· 학생별 같은 제목 책 중복\n· 작품 저장 모양(옛 번호 키 → 작품 id 키)\n\n되돌릴 수 없습니다.')) return;
   // 승급 중복 제거
   const db = DB.load();
   const seen = new Set();
@@ -3592,20 +3587,47 @@ function dedupeAll() {
   DB._cache = db;
   DB._fbRef.child('promotionRequests').set(DB._promoObj(db.promotionRequests));   // [PROMO-PER-ID-1] 배열로 쓰면 숫자 키로 돌아감
 
-  // artworks id 키 기반 정리 (배열/키 혼재 해소 + 중복 id 제거)
-  const seenArtIds = new Set();
-  db.artworks = (db.artworks||[]).filter(a => {
-    if (!a || !a.id) return false;
-    if (seenArtIds.has(a.id)) return false;
-    seenArtIds.add(a.id); return true;
-  });
-  const artworksObj = {};
-  db.artworks.forEach(a => { artworksObj[a.id] = a; });
-  DB._cache = db;
-  DB._fbRef.child('artworks').set(artworksObj);
+  // artworks id 키 기반 정리 (배열/키 혼재 해소 + 중복 id 제거) — 나쁜 키만 고친다
+  const r = await normalizeArtworkKeys(() => true);
 
-  notify('✅ 중복 데이터 정리 완료!');
+  notify(`✅ 중복 데이터 정리 완료! (작품 옮김 ${r.moved} · 지움 ${r.removed})`);
   renderAll();
+}
+
+// [DEDUPE-ART-1] artworks 를 "작품 id = 키" 모양으로 맞춘다. **바뀌어야 할 키만** update 한다.
+//   예전엔 교사 캐시 판으로 artworks 를 통째 set 해서, 그 순간 학생이 올린 작품을 지울 수 있었다.
+//   옛 배열(숫자 키) 작품은 id 키로 옮기고, 그 id 키에 이미 쓰인 조각(내리기 hidden·좋아요 likes)은 합친다
+//   — 숫자 키 판에서 hideArtwork 가 `artworks/<id>/hidden` 에만 써서 진짜 작품은 안 내려가던 것도 이걸로 풀린다.
+//   keep(a) 가 false 인 작품은 지운다(고아 정리용).
+async function normalizeArtworkKeys(keep) {
+  const node = DB._fbRef.child('artworks');
+  const raw = (await node.once('value')).val() || {};
+  const keys = Object.keys(raw);
+  const upd = {};
+  let moved = 0, removed = 0;
+  const hasRealAt = k => !!(raw[k] && raw[k].id === k);
+  for (const k of keys) {
+    const a = raw[k];
+    if (a && a.id === k) {                                   // 이미 제 모양
+      if (!keep(a)) { upd[k] = null; removed++; }
+      continue;
+    }
+    if (a && a.id) {                                         // 키가 id 가 아님(옛 숫자 키 등)
+      upd[k] = null;
+      if (!keep(a)) { removed++; continue; }
+      if (hasRealAt(a.id) || (upd[a.id] && upd[a.id].id)) { removed++; continue; }   // 같은 작품이 이미 id 키에 있음 → 중복
+      const piece = raw[a.id] && !raw[a.id].id ? raw[a.id] : {};                    // 유령 조각(hidden·likes)
+      upd[a.id] = { ...a, ...piece, likes: { ...(a.likes || {}), ...(piece.likes || {}) } };
+      if (!Object.keys(upd[a.id].likes).length) delete upd[a.id].likes;
+      moved++;
+      continue;
+    }
+    // id 없는 레코드: 다른 작품의 유령 조각이면 위에서 합쳐졌다. 아니면 버린다
+    if (keys.some(j => raw[j] && raw[j].id === k && j !== k)) continue;
+    upd[k] = null; removed++;
+  }
+  if (Object.keys(upd).length) await node.update(upd);
+  return { moved, removed };
 }
 
 // [ARTFREE-1] 작품 내리기 — 지우지 않고 갤러리에서만 감춘다(부적절한 사진을 즉시 뺄 수단).
