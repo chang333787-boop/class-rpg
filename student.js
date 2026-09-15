@@ -10994,6 +10994,9 @@ function renderStudyUnitPick(subjectKey) {
 function setStudyCat(subjectKey, cat) { STUDY_CAT = cat; renderStudyUnitPick(subjectKey); }
 
 function startStudySession(subjectKey, unitId, onlyDue) {
+  // [MASTERY-DUE-1] 복습 카드의 숫자는 모드와 상관없이 센다 → 복습 세션도 모드를 풀고 연다.
+  //   전에는 다른 과목에서 고른 모드(받아쓰기 등)가 남아 "수학 6개"를 눌러도 0문제가 됐다.
+  if (onlyDue) STUDY_CAT = null;
   const active = CurriculumUtils.activeUnitIds();
   let pool = unitId
     ? CurriculumUtils.problemsByUnit(unitId)       // 단원 하나만 골라 풀기
