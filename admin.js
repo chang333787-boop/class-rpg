@@ -304,11 +304,10 @@ function renderDashboard() {
   if (startGuideEl) {
     const isDefaultClass = students.some(s => /^학생[1-6]$/.test(String(s.name || '').trim()));
     startGuideEl.innerHTML = isDefaultClass ? `
-      <div style="background:rgba(74,144,226,.07);border:1px solid rgba(74,144,226,.28);
-        border-radius:var(--r);padding:.9rem 1.2rem;margin-bottom:1rem;line-height:1.7">
-        <div style="font-weight:700;font-size:.9rem;color:var(--accent);margin-bottom:.3rem">🚀 처음이신가요?</div>
-        <div style="font-size:.8rem;color:var(--txt2);margin-bottom:.5rem">지금 보이는 학생1~6은 예시예요.</div>
-        <div style="font-size:.8rem;color:var(--txt2)">
+      <div class="dash-guide">
+        <div class="dash-guide-title">🚀 처음이신가요?</div>
+        <div class="dash-guide-text dash-guide-lead">지금 보이는 학생1~6은 예시예요.</div>
+        <div class="dash-guide-text">
           ① 학생 목록에서 이름과 비밀번호를 우리 반 학생에 맞게 바꿔주세요.<br>
           ② 퀘스트 관리 탭에서 퀘스트를 등록하고 자동 일일퀘스트를 켜보세요.<br>
           ③ 설정에서 관리자 비밀번호를 우리 반만 아는 값으로 바꿔주세요.
@@ -467,7 +466,7 @@ function renderDashboard() {
         <div style="flex:1;min-width:0">
           <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${escHtml(s.name)}</div>
           <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4A90E2,#5BA8F5);border-radius:2px"></div>
+            <div class="dash-lv-fill" style="width:${pct}%"></div>
           </div>
         </div>
         <div style="font-size:.78rem;color:var(--accent);font-weight:700;white-space:nowrap">Lv.${s.level}</div>
