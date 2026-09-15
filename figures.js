@@ -7,7 +7,8 @@
 //
 //  kind 목록 (curriculum_review.js 작성자와 약속한 규격):
 //   angle    { deg, label? }                  각. label:'?'면 각도 숫자 숨김
-//   polygon  { n, shape?, angles? }           n각형. shape 'right'|'iso'|'equi'(삼각형). angles:[50,70,'?'] 꼭짓점 각 표기
+//   polygon  { n, shape?, angles?, regular?, diag?, sides? }  n각형. shape 'right'|'iso'|'equi'(삼각형). angles:[50,70,'?'] 꼭짓점 각 표기
+//                                             regular:true 정n각형(사각형도 정사각형) · diag:true(모든 대각선)|[[0,2]] · sides:['5 cm',null,'?'] 변 옆 글자
 //   rect     { w, h, unit? }                  치수 표시된 직사각형
 //   clock    { h, m }                         아날로그 시계
 //   fraction { n, k, shape? }                 전체 n칸 중 k칸 색칠. 'circle'|'bar'
@@ -66,15 +67,29 @@ const Figures = (() => {
       let pts;
       if (n === 3 && f.shape === 'right') pts = [[40, 110], [200, 110], [40, 20]];
       else if (n === 3 && f.shape === 'iso') pts = [[40, 110], [200, 110], [120, 20]];
-      else if (n === 4 && !f.angles) pts = [[50, 105], [190, 105], [190, 25], [50, 25]];
-      else pts = regular(n, 120, 68, 52);
+      else if (n === 4 && !f.angles && !f.regular) pts = [[50, 105], [190, 105], [190, 25], [50, 25]];
+      else pts = regular(n, 120, 68, 52, f.regular && n % 2 === 0 ? -Math.PI / 2 + Math.PI / n : -Math.PI / 2);   // regular 짝수각형은 밑변이 눕게
       const angs = Array.isArray(f.angles) ? f.angles : [];
       const labels = angs.slice(0, n).map((a, i) => {
         const [x, y] = pts[i]; const dx = 120 - x, dy = 68 - y, len = Math.hypot(dx, dy) || 1;
         return txt(x + dx / len * 24, y + dy / len * 24 + 5, (a === '?' || a == null) ? '?' : a + '°', 13);
       }).join('');
       const marks = (angs.length === 0 && f.shape === 'right') ? `<path d="M40 96 L54 96 L54 110" stroke-width="1.6"/>` : '';
-      return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
+      // [FIG-POLYGON-1] 대각선·변 글자 — 옵션이 없으면 지금까지와 똑같은 그림
+      let diags = '';
+      if (f.diag) {
+        const pairs = Array.isArray(f.diag) ? f.diag.slice() : [];
+        if (f.diag === true) for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (!(i === 0 && j === n - 1)) pairs.push([i, j]);
+        diags = pairs.filter(([i, j]) => pts[i] && pts[j]).map(([i, j]) => `<line x1="${pts[i][0].toFixed(1)}" y1="${pts[i][1].toFixed(1)}" x2="${pts[j][0].toFixed(1)}" y2="${pts[j][1].toFixed(1)}" stroke="${ACC}" stroke-width="2.4"/>`).join('');
+      }
+      const sideLabs = (Array.isArray(f.sides) ? f.sides : []).slice(0, n).map((s, i) => {
+        if (s == null) return '';
+        const p = pts[i], q = pts[(i + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+        const dx = mx - 120, dy = my - 68, len = Math.hypot(dx, dy) || 1;
+        return txt(mx + dx / len * 16, my + dy / len * 16 + 5, s, 12);
+      }).join('');
+      if (!diags && !sideLabs) return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
+      return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${diags}${marks}${labels}${sideLabs}`);
     },
     rect(f) {
       const w = Math.max(1, toNum(f.w, 4)), h = Math.max(1, toNum(f.h, 3)), unit = f.unit || 'cm';
