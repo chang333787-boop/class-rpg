@@ -78,7 +78,7 @@ window.onload = async () => {
     });
   } catch(e) {
     console.error('Firebase 연결 실패:', e);
-    alert('서버 연결에 실패했습니다. 인터넷 연결을 확인해주세요.');
+    alert('연결이 안 됐어요. 인터넷이 켜져 있는지 확인해 주세요.');
   }
   loading.style.display = 'none';
   buildLoginGrid();
@@ -429,7 +429,7 @@ async function syncEnglishRewards(force) {
   DB.saveStudent(CUR);
   renderAll();
   const exp = adds.reduce((n, r) => n + r.exp, 0), gold = adds.reduce((n, r) => n + r.gold, 0);
-  toast(`🔤 영어 복습 보상 ${adds.length}개 신청됐어요 (+${exp}EXP +${gold}G) · 선생님 승인 후 지급됩니다`);
+  toast(`🔤 영어 복습 보상 ${adds.length}개 신청됐어요 (+${exp}EXP +${gold}G) · 선생님이 확인하면 받아요`);
 }
 
 function enterGame() {
@@ -454,7 +454,7 @@ function enterGame() {
     CUR.battleInProgress = null;
     DB.saveStudent(CUR);
     // 게임 화면 진입 후 안내 (renderAll 이후에 보여야 잘 보임)
-    setTimeout(() => toast(`⚠️ [${monName}] 전투 도중 종료되어 패배 처리됐어요.\n이미 사용한 전투 기회는 복구되지 않아요.`), 500);
+    setTimeout(() => toast(`⚠️ [${monName}] 전투 중에 꺼져서 진 걸로 쳤어요.\n이미 쓴 전투 기회는 돌아오지 않아요.`), 500);
   }
 
   document.getElementById('s-game').classList.add('active');
@@ -1071,7 +1071,7 @@ function renderMain() {
     document.getElementById('main-area').innerHTML = `
       <div style="padding:2rem;text-align:center;color:var(--txt2)">
         <div style="font-size:2rem;margin-bottom:.5rem">⚠️</div>
-        <div style="font-size:.85rem">화면 로딩 중 오류가 발생했어요</div>
+        <div style="font-size:.85rem">화면을 여는 중에 문제가 생겼어요</div>
         <div style="font-size:.72rem;color:var(--txt3);margin-top:.3rem">${e.message}</div>
         <button onclick="renderAll()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;
           background:var(--gold);color:#1a1a1a;border:none;font-weight:700;cursor:pointer">다시 시도</button>
@@ -1459,7 +1459,7 @@ function buildMainHTML() {
   if (!todayBook)
     todos.push({type:'hint', icon:'📚', badge:null,
       title:'오늘 독서 기록 없음',
-      sub:'읽은 책을 기록하면 독서 스탯이 올라요',
+      sub:'읽은 책을 기록하면 독서 능력치가 올라요',
       action:"openModal('m-house');renderHouse()", btnLabel:null});
 
   const hasSeed = (s.inventory||[]).some(i=>GAME_DATA.seeds.find(sd=>sd.id===i.id));
@@ -1520,7 +1520,7 @@ function buildMainHTML() {
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;flex-shrink:0">
             <span class="mission-reward">+${q.exp}EXP</span>
             ${done?`<span style="font-size:.65rem;color:var(--emerald);font-weight:700">완료!</span>`
-              :pending?`<span style="font-size:.65rem;color:var(--gold)">확인중...</span>`
+              :pending?`<span style="font-size:.65rem;color:var(--gold)">확인 중…</span>`
               :`<span style="font-size:.65rem;color:var(--txt3)">탭하면 신청</span>`}
           </div>
         </div>`;
@@ -1993,8 +1993,8 @@ function renderShop() {
 
       // 상태 배지
       let badge = '';
-      if (isEquip) badge = `<span style="color:var(--emerald);font-size:.62rem"> 장착중</span>`;
-      else if (inInv) badge = `<span style="color:var(--sky);font-size:.62rem"> 보유중</span>`;
+      if (isEquip) badge = `<span style="color:var(--emerald);font-size:.62rem"> 장착 중</span>`;
+      else if (inInv) badge = `<span style="color:var(--sky);font-size:.62rem"> 가진 것</span>`;
 
       // 구매 불가 사유 표시
       let reasonHtml = '';
@@ -2049,8 +2049,8 @@ function renderShop() {
           const inInv   = (CUR.inventory||[]).some(i => i.id === item.id);
           const owned   = isEquip || inInv;
           let badge = '';
-          if (isEquip) badge = `<span style="color:var(--emerald);font-size:.62rem"> 장착중</span>`;
-          else if (inInv) badge = `<span style="color:var(--sky);font-size:.62rem"> 보유중</span>`;
+          if (isEquip) badge = `<span style="color:var(--emerald);font-size:.62rem"> 장착 중</span>`;
+          else if (inInv) badge = `<span style="color:var(--sky);font-size:.62rem"> 가진 것</span>`;
           let reasonHtml = '';
           if (!owned && !check.ok) reasonHtml = `<div style="font-size:.62rem;color:var(--red);margin-top:.15rem">🔒 ${check.reason}</div>`;
           const clickFn = owned ? `equipFromShop('${item.id}')` : `buyEquip('${item.id}')`;
@@ -2882,7 +2882,7 @@ function renderBattle(phase) {
   } else if (phase === 'win') {
     logHtml = `<span class="good">⚡ 공격 성공!</span><br><span class="good">💥 ${escHtml(mon.name)}을(를) 물리쳤다!</span><br><span class="good">💰 +${mon.gold}G 획득!</span>`;
   } else {
-    logHtml = `<span class="bad">💔 ${escHtml(mon.name)}의 반격!</span><br><span class="bad">패배했습니다...</span>`;
+    logHtml = `<span class="bad">💔 ${escHtml(mon.name)}의 반격!</span><br><span class="bad">이번엔 졌어요…</span>`;
   }
 
   document.getElementById('battle-arena').innerHTML = `
@@ -3041,17 +3041,17 @@ function requestCloseBattle() {
   }
   // 무한배틀 진행 중 포기
   if (BATTLE_STATE?.isInfinite) {
-    if (confirm('무한배틀을 포기하시겠습니까?\n지금까지의 기록은 저장됩니다.')) {
+    if (confirm('무한배틀을 그만할까요?\n지금까지 기록은 남아요.')) {
       _endInfiniteBattleSession(true);
     }
     return;
   }
   // 일반 전투 진행 중: 포기 확인
-  if (confirm('지금 전투를 포기하면 패배 처리되며,\n이미 사용한 기회는 복구되지 않습니다.\n\n전투를 포기하시겠습니까?')) {
+  if (confirm('지금 그만두면 진 걸로 쳐요.\n쓴 기회는 돌아오지 않아요.\n\n그만할까요?')) {
     CUR.battleInProgress = null;
     DB.saveStudent(CUR);
     closeBattle();
-    toast('💀 전투를 포기했습니다. 기회는 이미 소모되었습니다.');
+    toast('💀 전투를 그만뒀어요. 기회 1번을 썼어요.');
   }
 }
 
@@ -3499,8 +3499,8 @@ function renderInfiniteBattleZoneSelect() {
     <div style="padding:.6rem 0 .4rem">
       <div style="font-size:.8rem;color:var(--txt2);line-height:1.7;margin-bottom:.9rem;
         background:rgba(255,255,255,.04);border-radius:10px;padding:.6rem .8rem">
-        선택한 사냥터에서 <b style="color:var(--gold)">죽을 때까지 연속 전투</b>합니다.<br>
-        몬스터를 처치할 때마다 <b style="color:#6fd49d">최대 체력의 20%</b>를 회복합니다.<br>
+        선택한 사냥터에서 <b style="color:var(--gold)">쓰러질 때까지 계속 싸워요</b>.<br>
+        몬스터를 처치할 때마다 <b style="color:#6fd49d">최대 체력의 20%</b>를 되찾아요.<br>
         <span style="color:var(--txt3);font-size:.72rem">경험치 없음 · 소량 골드 지급 · 하루 ${limit}회</span>
       </div>
       ${used
@@ -3623,7 +3623,7 @@ function _ibNextMonster() {
   document.getElementById('battle-title').textContent =
     `♾️ 무한배틀 — ${IB.kills + 1}번째`;
   document.getElementById('battle-sub').textContent =
-    `${IB.zone === 'beginner' ? '초급' : IB.zone === 'intermediate' ? '중급' : '고급'} · 처치 ${IB.kills}마리 · 누적 ${IB.gold}G`;
+    `${IB.zone === 'beginner' ? '초급' : IB.zone === 'intermediate' ? '중급' : '고급'} · 처치 ${IB.kills}마리 · 모은 골드 ${IB.gold}G`;
 
   const rarityBanner = mon._ibRarity === 'legend'
     ? `<div style="text-align:center;color:#FFD700;font-weight:800;font-size:.82rem;margin-bottom:.3rem">
@@ -4162,7 +4162,7 @@ function farmCellClick(slot) {
         CUR.farmHarvests = (CUR.farmHarvests||0) + 1;
         DB.saveStudent(CUR);
         checkAchievements();
-        if (success) toast(`🎉 ${sd.cropIcon} 돌연변이 재배 성공! +${earned}G 획득!`);
+        if (success) toast(`🎉 ${sd.cropIcon} 돌연변이 재배 성공! +${earned}G 받았어요!`);
         else         toast(`💀 ${sd.cropIcon} 돌연변이 재배 실패... 수확 보상 없음`);
         renderFarmModal(); renderHUD(); renderMain(); renderMobile();
         if (_ifMode) _drawDeco(); // 마당 농장 즉시 갱신
@@ -4204,7 +4204,7 @@ function farmCellClick(slot) {
     if (sd.isMutant) { plotData.isMutant = true; plotData.successRate = sd.successRate; }
     CUR.farm = [...(CUR.farm||[]), plotData];
     DB.saveStudent(CUR);
-    if (sd.isMutant) toast(`⚡ ${sd.name} 심었어요! 성공 확률 ${Math.round(sd.successRate*100)}% · ${sd.growHours}시간 후 판정`);
+    if (sd.isMutant) toast(`⚡ ${sd.name} 심었어요! 성공 확률 ${Math.round(sd.successRate*100)}% · ${sd.growHours}시간 뒤에 결과가 나와요`);
     else toast(`🌱 ${sd.name} 심었어요! ${sd.growHours}시간 후 수확`);
     renderFarmModal(); renderMain(); renderMobile();
     if (_ifMode) _drawDeco(); // 마당 농장 즉시 갱신
@@ -4543,7 +4543,7 @@ function ifSyncScene() {
   const il = document.getElementById('if-inv-label');
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
   if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
-  if (il) il.textContent = isYard ? '🎒 보유 장식품 (마당)' : '🎒 보유 장식품 (집 안)';
+  if (il) il.textContent = isYard ? '🎒 내 장식품 (마당)' : '🎒 내 장식품 (집 안)';
 }
 
 function ifSyncModeBtn() {
@@ -7388,7 +7388,7 @@ function _decoPlace(area,row,col){
   const sz=d.size||{w:1,h:1};
   const used=placed.filter(p=>p.id===SEL_DECO).length;
   const inv=(CUR.inventory||[]).find(i=>i.id===SEL_DECO);
-  if(!inv||inv.qty-used<=0){ toast('보유 수량이 부족해요!'); return; }
+  if(!inv||inv.qty-used<=0){ toast('가진 개수가 모자라요!'); return; }
   if(!canPlaceDeco(row,col,sz.w,sz.h,area,null)){ toast('여기엔 배치할 수 없어요!'); return; }
   CUR.houseDecorations=[...placed,{id:SEL_DECO,area,row,col}];
   DB.saveStudent(CUR); _drawDeco(); renderDecoInv();
@@ -7405,11 +7405,11 @@ function toggleDecoScene(){
   const iLabel = document.getElementById('deco-inv-label');
   if(sBtn)   sBtn.textContent  = isYard?'🏠 집 안으로 →':'🌿 마당으로 ←';
   if(sName)  sName.textContent = isYard?'🌿 마당':'🏠 집 안';
-  if(iLabel) iLabel.textContent= isYard?'🎒 보유 장식품':'🎒 보유 장식품 (집 안)';
+  if(iLabel) iLabel.textContent= isYard?'🎒 내 장식품':'🎒 내 장식품 (집 안)';
   _dCv=null; _dCtx=null;
   renderHouseDeco();
   if(_ifMode) ifSyncScene();
-  toast(isYard?'🌿 마당이에요! 집은 우상단 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
+  toast(isYard?'🌿 마당이에요! 집은 오른쪽 위 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
 
 function renderDecoInv(){
@@ -7417,7 +7417,7 @@ function renderDecoInv(){
   const inv=(CUR.inventory||[]).filter(i=>GAME_DATA.decorations.find(d=>d.id===i.id));
   const el=document.getElementById('house-deco-inv');
   if(!inv.length){
-    el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">보유한 장식품이 없어요. 상점에서 구매하세요! 🏪</div>`;
+    el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">가진 장식품이 없어요. 상점에서 사 보세요! 🏪</div>`;
     if(_ifMode) ifSyncInv();
     return;
   }
@@ -7503,8 +7503,8 @@ async function submitArtwork() {
   // 중복 차단: 같은 제목으로 이미 대기중이거나 전시중인 작품
   const dupPending = (CUR.pendingRewards||[]).some(r => r.type==='artwork' && (r.artTitle||'').trim() === title.trim());
   const dupArtwork = DB.getArtworks(CUR.id).some(a => (a.title||a.artTitle||'').trim() === title.trim());
-  if (dupPending) { toast(`🎨 "${title}"은 이미 승인 대기중이에요!`); return; }
-  if (dupArtwork) { toast(`🎨 "${title}"은 이미 전시중인 작품이에요!`); return; }
+  if (dupPending) { toast(`🎨 "${title}"은 이미 선생님 확인을 기다리고 있어요!`); return; }
+  if (dupArtwork) { toast(`🎨 "${title}"은 이미 전시 중인 작품이에요!`); return; }
 
   // 업로드 UI 표시
   document.getElementById('aw-upload-progress').style.display = '';
@@ -7515,7 +7515,7 @@ async function submitArtwork() {
     // 이미지 리사이징
     const blob = await resizeImage(fileInput.files[0]);
     document.getElementById('aw-progress-bar').style.width = '30%';
-    document.getElementById('aw-progress-text').textContent = '업로드 중...';
+    document.getElementById('aw-progress-text').textContent = '올리는 중이에요…';
 
     // Firebase Storage 업로드
     const storage  = firebase.storage();
@@ -7659,7 +7659,7 @@ async function submitMemories() {
   const monthKey = Utils.todayStr().slice(0,7);
 
   for (const file of [..._memFiles]) {
-    progTxt.textContent = `업로드 중 ${done+1}/${total}...`;
+    progTxt.textContent = `올리는 중 ${done+1}/${total}…`;
     progBar.style.width = `${Math.round(done/total*80)+5}%`;
     try {
       const [imgBlob, thumbBlob] = await Promise.all([
@@ -7760,7 +7760,7 @@ function renderMyMemories() {
             ${escHtml(m.title||'')}
           </div>
           ${myPending?`<div style="position:absolute;top:4px;right:4px;font-size:.55rem;
-            background:rgba(255,180,0,.85);color:#1a1a1a;padding:.1rem .3rem;border-radius:4px;font-weight:700">확인중</div>`:''}
+            background:rgba(255,180,0,.85);color:#1a1a1a;padding:.1rem .3rem;border-radius:4px;font-weight:700">확인 중</div>`:''}
           ${m.studentId===CUR.id?`<button onclick="event.stopPropagation();editMemTitle('${m.id}')"
             style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);border:none;
               color:#fff;font-size:.65rem;padding:.1rem .35rem;border-radius:4px;cursor:pointer">✏️</button>`:''}
@@ -7918,7 +7918,7 @@ function renderArtworks() {
       <div style="padding:.75rem .9rem">
         <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap">
           <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
-            background:rgba(255,215,0,.18);color:var(--gold);border:1px solid rgba(255,215,0,.3)">⏳ 확인중</span>
+            background:rgba(255,215,0,.18);color:var(--gold);border:1px solid rgba(255,215,0,.3)">⏳ 확인 중</span>
           ${a.subject?`<span style="font-size:.65rem;padding:.18rem .5rem;border-radius:20px;
             background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${escHtml(a.subject)}</span>`:''}
         </div>
@@ -7948,7 +7948,7 @@ function renderArtworks() {
       <div style="padding:.75rem .9rem">
         <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap">
           <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
-            background:rgba(46,204,113,.15);color:var(--emerald);border:1px solid rgba(46,204,113,.25)">✓ 전시중</span>
+            background:rgba(46,204,113,.15);color:var(--emerald);border:1px solid rgba(46,204,113,.25)">✓ 전시 중</span>
           ${a.subject?`<span style="font-size:.65rem;padding:.18rem .5rem;border-radius:20px;
             background:rgba(255,255,255,.07);color:var(--txt3);border:1px solid rgba(255,255,255,.1)">${escHtml(a.subject)}</span>`:''}
         </div>
@@ -8465,7 +8465,7 @@ let _emoEditDate = null; // 수정 모드일 때 날짜
 
 function submitEmotion(reason) {
   if (!_emoSelectedKey || !_emoSelectedLevel) {
-    toast('감정과 강도를 선택해주세요!'); return;
+    toast('마음과 그 크기를 골라 주세요!'); return;
   }
   const saveDate = _emoEditDate || Utils.todayStr();
   DB_EMOTION.save(CUR.id, saveDate, _emoCurrentPeriod, _emoSelectedKey, _emoSelectedLevel,
@@ -8503,7 +8503,7 @@ function renderInv() {
     const typeNames  = { normal:'기본', fire:'화염', water:'냉기', grass:'자연' };
 
     html += `<div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">⚔️ 전투 장착 스킬</div>`;
-    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">슬롯 2~3을 눌러 속성 스킬을 장착하세요. 전투에서 장착된 스킬만 버튼으로 표시됩니다.</div>`;
+    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">2~3번 칸을 눌러 불·물·풀 스킬을 끼워요. 끼운 스킬만 전투 버튼으로 나와요.</div>`;
     html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:1rem">`;
 
     const slotConfigs = [
@@ -8536,7 +8536,7 @@ function renderInv() {
 
     // ── 스킬 현황 카드 ──────────────────────────────────────
     html += `<div style="font-size:.78rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">📖 보유 스킬 현황</div>`;
-    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">마스터리북을 구매하면 레벨이 오릅니다. 상점 → 📚 마스터리북 탭</div>`;
+    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">마스터리북을 사면 레벨이 올라요. 상점 → 📚 마스터리북 탭</div>`;
     html += typeInfo.map(({ type, label, color, maxLv }) => {
       const lv   = sl[type] ?? 0;
       const pct  = Math.round(lv / maxLv * 100);
@@ -8554,7 +8554,7 @@ function renderInv() {
         border-radius:12px;padding:.7rem;margin-bottom:.45rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
           <span style="font-weight:700;font-size:.85rem;color:${color}">${label}
-            ${isEquipped ? '<span style="font-size:.62rem;background:'+color+';color:#111;border-radius:4px;padding:.05rem .3rem;margin-left:.3rem">장착중</span>' : ''}
+            ${isEquipped ? '<span style="font-size:.62rem;background:'+color+';color:#111;border-radius:4px;padding:.05rem .3rem;margin-left:.3rem">장착 중</span>' : ''}
           </span>
           <span style="font-size:.72rem;font-weight:700;color:${lv>0?color:'var(--txt3)'}">
             ${lv === 0 ? '미습득' : `Lv.${lv} / ${maxLv}`}
@@ -8582,7 +8582,7 @@ function renderInv() {
     ];
 
     html += `<div style="font-size:.8rem;font-weight:700;color:var(--txt1);margin:.8rem 0 .4rem">🎮 전투 스킬 장착 (3칸)</div>`;
-    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">슬롯을 눌러 전투 스킬을 선택하세요. 각 스킬은 전투당 1회 사용 가능합니다.</div>`;
+    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">칸을 눌러 전투 스킬을 골라요. 스킬은 전투 한 번에 한 번씩 쓸 수 있어요.</div>`;
     html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:.8rem">`;
     [0,1,2].forEach(i => {
       const sid  = eq2[i] || null;
@@ -8755,7 +8755,7 @@ function equipFromInv(itemId) {
   if (!item) return;
   const slot  = GAME_DATA.SLOT_MAP[itemId];
   const oldId = CUR.equipmentIds?.[slot];
-  if (oldId === itemId) { toast('이미 장착중이에요!'); return; }
+  if (oldId === itemId) { toast('이미 끼고 있어요!'); return; }
   if (!Utils.condMet(CUR, item.cond)) { toast('🔒 착용 조건 미충족\n' + Utils.condText(item.cond)); return; }
   // 기존 장비 인벤 반환
   if (oldId) returnEquipToInv(oldId);
@@ -9039,7 +9039,7 @@ function renderBookRecords() {
           background:${isPending?'rgba(255,215,0,.12)':'rgba(46,204,113,.12)'};
           color:${isPending?'var(--gold)':'var(--emerald)'};
           border-radius:20px;padding:.1rem .5rem;flex-shrink:0">
-          ${isPending?'확인중':'✓ 완료'}</span>
+          ${isPending?'확인 중':'✓ 완료'}</span>
         <span style="font-weight:700;font-size:.88rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           ${escHtml(r.bookTitle||r.title||'')}</span>
         ${cat?`<span style="font-size:.65rem;background:rgba(93,173,226,.12);color:var(--sky);border-radius:10px;padding:.1rem .45rem;flex-shrink:0">${cat}</span>`:''}
@@ -9117,7 +9117,7 @@ function renderQuestModal() {
   const claimBtn = ''; // 보상 자동 지급으로 받기 버튼 제거
   const statusLabel = {
     claim: `<span class="qr-status approved">🎁 받기 가능</span>`,
-    self:  `<span class="qr-status waiting">📨 신청중</span>`,
+    self:  `<span class="qr-status waiting">📨 신청 중</span>`,
     done:  `<span class="qr-status approved">✅ 완료</span>`,
   };
   document.getElementById('quest-list').innerHTML = (claimBtn||'') + (all.length > 0
@@ -9516,9 +9516,9 @@ window.addEventListener('resize', applyScale);
 
 function triggerLevelUp(newLv) {
   const fx = document.getElementById('lup-fx');
-  document.getElementById('lup-sub').textContent = `Lv.${newLv}이 되었습니다!`;
+  document.getElementById('lup-sub').textContent = `Lv.${newLv}이 됐어요!`;
   const isPromo = Utils.isPromotionLevel(newLv);
-  document.getElementById('lup-promo').textContent = isPromo ? '🎊 승급 가능 레벨 도달! HUD에서 승급 신청을 해보세요!' : '';
+  document.getElementById('lup-promo').textContent = isPromo ? '🎊 승급할 수 있어요! 화면 위 ⬆ 승급 가능을 눌러 보세요!' : '';
   fx.classList.add('show');
   const pw = document.getElementById('lup-particles');
   pw.innerHTML = '';
@@ -9845,7 +9845,7 @@ function submitFridayReflection() {
   const nextWeekGoal      = getChipVal('wk-next');
   if (!focusReflection)   { toast('노력 정도를 선택해주세요!'); return; }
   if (!goalReflection)    { toast('목표 달성을 선택해주세요!'); return; }
-  if (!mindsetReflection) { toast('마음가짐 성찰을 선택해주세요!'); return; }
+  if (!mindsetReflection) { toast('마음가짐을 얼마나 지켰는지 골라 주세요!'); return; }
   if (!bestMoment)        { toast('잘한 점을 선택해주세요!'); return; }
   if (!nextWeekGoal)      { toast('다음 주 목표를 선택해주세요!'); return; }
 
@@ -10116,7 +10116,7 @@ function renderHouseAchievements() {
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
       <div style="font-size:.82rem;color:var(--txt2)">달성 <span style="color:var(--gold);font-weight:700">${doneList.length}</span> / ${ACHIEVEMENTS.length}</div>
-      <div style="font-size:.72rem;color:var(--txt3)">경험치·골드·칭호 획득!</div>
+      <div style="font-size:.72rem;color:var(--txt3)">경험치·골드·칭호를 받았어요!</div>
     </div>
     <div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin-bottom:1rem;overflow:hidden">
       <div style="height:100%;width:${Math.round(doneList.length/ACHIEVEMENTS.length*100)}%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;transition:width .6s ease"></div>
@@ -10162,7 +10162,7 @@ function openPwReset() {
   if (!selId) { alert('먼저 이름을 선택해주세요!'); return; }
   const s = DB.getStudent(selId);
   if (!s) return;
-  if (confirm(`선생님께 비밀번호 초기화를 요청할까요?\n(선생님이 확인 후 새 비밀번호를 알려드려요)`)) {
+  if (confirm(`선생님께 비밀번호를 새로 받을까요?\n(선생님이 확인 후 새 비밀번호를 알려드려요)`)) {
     DB.addPwResetRequest({ id: Utils.uid(), studentId: s.id, name: s.name, date: Utils.todayStr() });
     alert('요청이 전달됐어요! 선생님께 말씀드리세요 🙋');
   }
@@ -11196,7 +11196,7 @@ function renderStudyQuestion() {
     <div style="text-align:center;margin-bottom:1.4rem;background:rgba(255,255,255,.05);border-radius:12px;padding:1.1rem">
       <div style="font-size:1.6rem">🔇</div>
       <div style="font-weight:700;margin:.4rem 0">이 기기에서는 ${pLang.startsWith('ko') ? '한국어' : '영어'} 소리가 나오지 않아요</div>
-      <div style="font-size:.92rem;color:var(--txt3);margin-bottom:.8rem">선생님께 알려 주세요. 이 문제는 건너뛰어도 됩니다.</div>
+      <div style="font-size:.92rem;color:var(--txt3);margin-bottom:.8rem">선생님께 알려 주세요. 이 문제는 건너뛰어도 돼요.</div>
       <button onclick="nextStudyQuestion()" style="border:1px solid rgba(255,255,255,.2);background:none;color:var(--txt2);
         border-radius:10px;padding:.55rem 1.1rem;cursor:pointer;font-family:inherit">이 문제 건너뛰기</button>
     </div>` : `
