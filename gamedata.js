@@ -468,13 +468,104 @@ const GAME_DATA = {
 //  스킬 데이터 (stage 1 상수 — 4단계 가격 적용)
 // ═══════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════
+//  BALANCE — 전투·사냥터 계수의 **코드 기본값** 한 곳 (B-2, 공식 설명: docs/rpg_balance_model.md)
+//  ★ 여기 값은 원본이다. 런타임 표(SKILL_MULTIPLIERS·ELEMENT_CHART·BATTLE_CONSTS)는 이것을 복사해 만들고,
+//    관리자 설정(applyBattleSettings)은 그 런타임 표만 덮는다. BALANCE 자체를 코드에서 바꾸지 말 것.
+//  ★ 운영 값(몬스터 HP×1.5 · ATK×1.6 · 하루 5회)은 관리자 설정이지 여기 기본값이 아니다.
+//  ★ 값을 바꾸면 아이가 보는 전투가 바뀐다 — scripts/balance/gate.mjs 로 전후 표를 먼저 볼 것.
+//    구조만 옮길 때는 scripts/balance/identity.mjs 가 "출력 100% 동일"을 확인한다.
+// ═══════════════════════════════════════════════════════
+const BALANCE = {
+  // 플레이어 HP = hpBase + 레벨 × hpPerLevel (ATK/MAG/DEF/SPD는 장비 합산)
+  player: { hpBase: 80, hpPerLevel: 12 },
+
+  // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
+  // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
+  skill: {
+    maxLevel: 7,
+    normal:  { 1:1.10, 2:1.18, 3:1.27, 4:1.36, 5:1.46, 6:1.56, 7:1.65 },
+    element: { 0:0.00, 1:1.00, 2:1.10, 3:1.20, 4:1.30, 5:1.40, 6:1.50, 7:1.60 },
+  },
+
+  // 속성 상성 (공격) — water > fire > grass > water
+  element: { advantage: 1.4, disadvantage: 0.8, same: 1.0 },
+
+  // 피해 공통: 공격 × defScale / (defScale + 방어), 최소 minDamage
+  damage: { defScale: 100, minDamage: 1 },
+
+  // 플레이어 → 몬스터
+  playerAttack: {
+    hit:  { base: 0.93, perSpd: 0.01, min: 0.85, max: 0.97 },   // 명중 = base − (몬스터SPD − 내SPD) × perSpd
+    crit: { rate: 0.10, mult: 1.5 },
+    levelGap: { perLevel: 0.08, floor: 0.45 },                  // 몬스터가 높을 때만: max(floor, 1 − 차 × perLevel)
+  },
+
+  // 몬스터 → 플레이어
+  monsterAttack: {
+    hit:  { base: 0.93, perSpd: 0.01, min: 0.88, max: 0.97 },   // 명중 = base − (내SPD − 몬스터SPD) × perSpd
+    crit: { rate: 0.06, mult: 1.4 },
+  },
+
+  // 몬스터 데이터에 hp/atk가 없을 때 · SPD 같을 때 플레이어 선공 확률
+  monster: { hpFallback: 10, atkFallback: 5, firstTurnTie: 0.5 },
+
+  // 몬스터 역할 기믹 (performPlayerTurn · performMonsterTurn)
+  role: {
+    tank:   { hpRatio: 0.6, damageTaken: 0.6, counterBuff: 1.15 },  // HP 60% 이하 첫 피격 40% 경감 → 다음 공격 ×1.15
+    fast:   { hpRatio: 0.7, extraHitMult: 0.6 },                    // HP 70% 이하 첫 도달 → 다음 몬스터 턴 추가타(급소 없음) ×0.6
+    dealer: { maxStacks: 3, perStack: 0.10 },                       // 몬스터 턴마다 +10%, 최대 3
+    normal: { onMonsterTurn: 2, buff: 1.6 },                        // monsterTurnCount===2 에 준비 → 다음 공격 ×1.6
+  },
+
+  // 전투 스킬 (skill2)
+  skill2: {
+    healRatio: 0.30,
+    prepMult: 2.3,
+    rush: { turns: 2, multMin: 1.15, multSpread: 0.20, damageTaken: 1.15 },
+    guardMult: 0.5,
+    counter: { chance: 0.5, reflectMult: 1.5 },
+    reckless: { chance: 0.5, mult: 2.2 },
+  },
+
+  // 관리자 설정이 덮을 수 있는 값의 기본 (BATTLE_CONSTS 초기값 · 설정이 없을 때 되돌아갈 값)
+  settingsDefaults: {
+    ghostNormalMult: 0.55,     // ★ 7단계 조정: 0.35→0.55 (노말 원툴 방지는 유지하되 "불가능" 수준은 아니게)
+    dailyBattleLimit: 3,
+    infiniteBattleLimit: 1,
+    monsterHpMult: 1.0,
+    monsterAtkMult: 1.0,
+    defAdvMult: 0.85,          // 몸통 방어 상성 유리 (받는 피해 배율)
+    defDisMult: 1.15,          // 몸통 방어 상성 불리
+    elemDisadvantageFallback: 0.8,   // 관리자 elemChart에 advantageMult만 있을 때 불리 배율
+  },
+
+  // 사냥터 카드 3장 (generateBattleOffers)
+  offers: {
+    zoneRanges: {
+      beginner:     { min:1,  max:10 },
+      intermediate: { min:11, max:20 },
+      advanced:     { min:21, max:30 },
+    },
+    rarityWeights: [
+      { common:1.0, rare:0.2, legend:0.0 }, // 슬롯 0 [P−1, P]
+      { common:1.0, rare:1.4, legend:0.0 }, // 슬롯 1 [P, P+1]
+      { common:1.0, rare:1.6, legend:2.0 }, // 슬롯 2 [P+1, P+2]
+    ],
+    unseenWeight: 1.5,                                                          // 도감에 없는 몬스터 우대
+    recent: { justNow: 3, justNowWeight: 0.3, lately: 9, latelyWeight: 0.6 },   // 최근 제시 이름이 끝에서 몇 번째인지
+    recentKeep: 4,                                                              // recentBattleOffers 이전 4회 + 이번 1회
+    maxGhosts: 2,
+    thirdSlot: { returnChance: 0.2, maxLevelAbovePlayer: 3 },   // 3번 카드: 20% 확률로 놓친 희귀/전설 복귀, Lv+3까지
+  },
+};
+
 const DEFAULT_SKILL_LEVELS = { normal:1, fire:0, water:0, grass:0 };
 
+// 런타임 스킬 계수 표 — BALANCE.skill 복사본 (관리자 normalMults/elementMults가 이 표를 덮는다)
 const SKILL_MULTIPLIERS = {
-  // ★ 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
-  // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
-  normal:  { 1:1.10, 2:1.18, 3:1.27, 4:1.36, 5:1.46, 6:1.56, 7:1.65 },
-  element: { 0:0.00, 1:1.00, 2:1.10, 3:1.20, 4:1.30, 5:1.40, 6:1.50, 7:1.60 },
+  normal:  { ...BALANCE.skill.normal },
+  element: { ...BALANCE.skill.element },
 };
 
 // ★ 4단계 가격 반영 + reqPlayerLevel / targetLevel 추가
@@ -1725,7 +1816,7 @@ function applyBattleSettings(db) {
           }
           if (ELEMENT_CHART[atk] && ELEMENT_CHART[atk][target] !== undefined
               && ELEMENT_CHART[atk][target] < 1.0) {
-            ELEMENT_CHART[atk][target] = bs.elemChart.disadvantageMult || 0.8;
+            ELEMENT_CHART[atk][target] = bs.elemChart.disadvantageMult || BALANCE.settingsDefaults.elemDisadvantageFallback;
           }
         });
       });
@@ -1744,11 +1835,11 @@ function applyBattleSettings(db) {
     BATTLE_CONSTS.infiniteBattleLimit = bs.infiniteBattleLimit;
   }
   // 4-c. 몬스터 HP/공격력 배율 (난이도 조절)
-  BATTLE_CONSTS.monsterHpMult  = (bs.monsterHpMult  !== undefined) ? bs.monsterHpMult  : 1.0;
-  BATTLE_CONSTS.monsterAtkMult = (bs.monsterAtkMult !== undefined) ? bs.monsterAtkMult : 1.0;
+  BATTLE_CONSTS.monsterHpMult  = (bs.monsterHpMult  !== undefined) ? bs.monsterHpMult  : BALANCE.settingsDefaults.monsterHpMult;
+  BATTLE_CONSTS.monsterAtkMult = (bs.monsterAtkMult !== undefined) ? bs.monsterAtkMult : BALANCE.settingsDefaults.monsterAtkMult;
   // 4-d. 몸통 방어 상성 배율 (관리자 defChart — 저장만 되고 안 읽히던 값, 밸런스 감사 B2)
-  BATTLE_CONSTS.defAdvMult = (bs.defChart && bs.defChart.advantageMult    !== undefined) ? bs.defChart.advantageMult    : 0.85;
-  BATTLE_CONSTS.defDisMult = (bs.defChart && bs.defChart.disadvantageMult !== undefined) ? bs.defChart.disadvantageMult : 1.15;
+  BATTLE_CONSTS.defAdvMult = (bs.defChart && bs.defChart.advantageMult    !== undefined) ? bs.defChart.advantageMult    : BALANCE.settingsDefaults.defAdvMult;
+  BATTLE_CONSTS.defDisMult = (bs.defChart && bs.defChart.disadvantageMult !== undefined) ? bs.defChart.disadvantageMult : BALANCE.settingsDefaults.defDisMult;
   // 5. 장비 오버라이드 ─────────────────────────────────────────
   // ★ 핵심: 매 호출마다 원본 복원 후 패치 적용 (누적 방지)
   _backupEquipOrigins(); // 최초 1회만 실행됨
@@ -1792,15 +1883,15 @@ function applyBattleSettings(db) {
   });
 }
 
-// 전투 관련 런타임 상수 (applyBattleSettings에서 패치 가능)
+// 전투 관련 런타임 상수 (applyBattleSettings에서 패치 가능) — 초기값은 BALANCE.settingsDefaults
 const BATTLE_CONSTS = {
-  ghostNormalMult: 0.55,    // 유령형 노말 배율 (기본값)
-  dailyBattleLimit: 3,      // 하루 전투 횟수 (기본값)
-  infiniteBattleLimit: 1,   // 무한배틀 하루 횟수 (기본값)
-  monsterHpMult:  1.0,      // 몬스터 HP 배율 (난이도 조절)
-  monsterAtkMult: 1.0,      // 몬스터 공격력 배율 (난이도 조절)
-  defAdvMult: 0.85,         // 몸통 방어 상성 유리 (받는 피해 배율)
-  defDisMult: 1.15,         // 몸통 방어 상성 불리
+  ghostNormalMult:     BALANCE.settingsDefaults.ghostNormalMult,     // 유령형 노말 배율
+  dailyBattleLimit:    BALANCE.settingsDefaults.dailyBattleLimit,    // 하루 전투 횟수
+  infiniteBattleLimit: BALANCE.settingsDefaults.infiniteBattleLimit, // 무한배틀 하루 횟수
+  monsterHpMult:       BALANCE.settingsDefaults.monsterHpMult,       // 몬스터 HP 배율 (난이도 조절)
+  monsterAtkMult:      BALANCE.settingsDefaults.monsterAtkMult,      // 몬스터 공격력 배율 (난이도 조절)
+  defAdvMult:          BALANCE.settingsDefaults.defAdvMult,          // 몸통 방어 상성 유리 (받는 피해 배율)
+  defDisMult:          BALANCE.settingsDefaults.defDisMult,          // 몸통 방어 상성 불리
 };
 
 // ══════════════════════════════════════════════════
@@ -2093,10 +2184,10 @@ function normalizeBattleDaily(student) {
 }
 
 // ── 플레이어 전투 스탯 계산 ──
-// HP = 80 + level*12, ATK/MAG/DEF/SPD = 장비 합산
+// HP = BALANCE.player.hpBase + level × hpPerLevel (80 + level*12), ATK/MAG/DEF/SPD = 장비 합산
 function getPlayerBattleStats(student) {
   const c = student.combat || {};
-  const hp  = 80 + (student.level || 1) * 12;
+  const hp  = BALANCE.player.hpBase + (student.level || 1) * BALANCE.player.hpPerLevel;
   const atk = c.atk || 0;
   const mag = c.mag || 0;
   const def = c.def || 0;
@@ -2115,10 +2206,11 @@ function getPlayerBattleStats(student) {
 
 // ── 속성 상성 (공격) ──
 // water > fire > grass > water / normal = 1.0
+// 런타임 표 — BALANCE.element 로 만든다 (관리자 elemChart가 이 표를 덮는다)
 const ELEMENT_CHART = {
-  water: { fire: 1.4, grass: 0.8, water: 1.0 },
-  fire:  { grass: 1.4, water: 0.8, fire: 1.0 },
-  grass: { water: 1.4, fire: 0.8, grass: 1.0 },
+  water: { fire: BALANCE.element.advantage, grass: BALANCE.element.disadvantage, water: BALANCE.element.same },
+  fire:  { grass: BALANCE.element.advantage, water: BALANCE.element.disadvantage, fire: BALANCE.element.same },
+  grass: { water: BALANCE.element.advantage, fire: BALANCE.element.disadvantage, grass: BALANCE.element.same },
 };
 function getElementMultiplier(attackType, targetElement) {
   if (!attackType || attackType === 'normal' || !targetElement) return 1.0;
@@ -2134,17 +2226,17 @@ function getDefenseElementMultiplier(monsterElement, armorElement) {
   const rel = adv[monsterElement];
   // ★ 1.4/0.8 정확 비교 금지 — 관리자가 공격 상성 값을 바꾸면 방어 상성이 통째로 사라졌음 (밸런스 감사 B2)
   const bc = (typeof BATTLE_CONSTS !== 'undefined') ? BATTLE_CONSTS : {};
-  if (rel > 1.0) return (bc.defAdvMult !== undefined) ? bc.defAdvMult : 0.85; // 유리
-  if (rel < 1.0) return (bc.defDisMult !== undefined) ? bc.defDisMult : 1.15; // 불리
+  if (rel > 1.0) return (bc.defAdvMult !== undefined) ? bc.defAdvMult : BALANCE.settingsDefaults.defAdvMult; // 유리
+  if (rel < 1.0) return (bc.defDisMult !== undefined) ? bc.defDisMult : BALANCE.settingsDefaults.defDisMult; // 불리
   return 1.0;
 }
 
 // ── 특수형 처리 (ghost: normal 55%) ──
-// ★ 7단계 조정: 0.35→0.55 (노말 원툴 방지는 유지하되 "불가능" 수준은 아니게)
+// ★ 기본값은 BALANCE.settingsDefaults.ghostNormalMult (7단계 0.35→0.55 이력은 그쪽 주석)
 // ★ 8단계: BATTLE_CONSTS.ghostNormalMult 참조 → 관리자에서 조정 가능
 function getTraitMultiplier(monster, attackType) {
   if (monster.trait === 'ghost' && attackType === 'normal') {
-    return (typeof BATTLE_CONSTS !== 'undefined') ? BATTLE_CONSTS.ghostNormalMult : 0.55;
+    return (typeof BATTLE_CONSTS !== 'undefined') ? BATTLE_CONSTS.ghostNormalMult : BALANCE.settingsDefaults.ghostNormalMult;
   }
   return 1.0;
 }
@@ -2156,48 +2248,50 @@ function calculatePlayerDamage(playerStats, monster, attackType, skillLevels) {
   const skillTable = attackType === 'normal'
     ? SKILL_MULTIPLIERS.normal
     : SKILL_MULTIPLIERS.element;
-  const skillMult = skillTable[Math.min(lvl, 7)] || 1.0;
+  const skillMult = skillTable[Math.min(lvl, BALANCE.skill.maxLevel)] || 1.0;
   const stat = (attackType === 'normal') ? playerStats.atk : playerStats.mag;
-  const defFactor = 100 / (100 + (monster.def || 0));
+  const PA = BALANCE.playerAttack, DS = BALANCE.damage.defScale;
+  const defFactor = DS / (DS + (monster.def || 0));
   const elemMult  = getElementMultiplier(attackType, monster.element);
   const traitMult = getTraitMultiplier(monster, attackType);
   // 레벨차 보정
   const playerLevel  = playerStats.level || 1;
   const monsterLevel = monster.level || monster.recLv || 1;
   const gap       = monsterLevel - playerLevel;
-  const levelMult = gap > 0 ? Math.max(0.45, 1 - gap * 0.08) : 1.0;
+  const levelMult = gap > 0 ? Math.max(PA.levelGap.floor, 1 - gap * PA.levelGap.perLevel) : 1.0;
 
   // ★ 빗나감 판정 (기본 93%, SPD 차이로 ±3% 보정, 85~97% 범위)
   const spdDiff   = (monster.spd || 0) - (playerStats.spd || 0);
-  const hitRate   = Math.min(0.97, Math.max(0.85, 0.93 - spdDiff * 0.01));
+  const hitRate   = Math.min(PA.hit.max, Math.max(PA.hit.min, PA.hit.base - spdDiff * PA.hit.perSpd));
   const miss      = Math.random() > hitRate;
   if (miss) return { dmg: 0, miss: true, crit: false };
 
   // ★ 급소 판정 (기본 10%, 급소 시 1.5배)
-  const critRate  = 0.10;
+  const critRate  = PA.crit.rate;
   const crit      = Math.random() < critRate;
-  const critMult  = crit ? 1.5 : 1.0;
+  const critMult  = crit ? PA.crit.mult : 1.0;
 
-  const dmg = Math.max(1, Math.round(stat * skillMult * defFactor * elemMult * traitMult * levelMult * critMult));
+  const dmg = Math.max(BALANCE.damage.minDamage, Math.round(stat * skillMult * defFactor * elemMult * traitMult * levelMult * critMult));
   return { dmg, miss: false, crit };
 }
 
 // ── 몬스터 → 플레이어 데미지 ──
 function calculateMonsterDamage(playerStats, monster) {
-  const defFactor  = 100 / (100 + (playerStats.def || 0));
+  const MA = BALANCE.monsterAttack, DS = BALANCE.damage.defScale;
+  const defFactor  = DS / (DS + (playerStats.def || 0));
   const armorMult  = getDefenseElementMultiplier(monster.element, playerStats.armorElement);
 
   // ★ 몬스터 빗나감: 기본 명중 93%, 플레이어 SPD 높을수록 최대 2% 추가 회피, 범위 88~97%
   const spdDiff = (playerStats.spd || 0) - (monster.spd || 0);
-  const hitRate = Math.min(0.97, Math.max(0.88, 0.93 - spdDiff * 0.01));
+  const hitRate = Math.min(MA.hit.max, Math.max(MA.hit.min, MA.hit.base - spdDiff * MA.hit.perSpd));
   const miss    = Math.random() > hitRate;
   if (miss) return { dmg: 0, miss: true, crit: false };
 
   // ★ 몬스터 급소: 기본 6% (플레이어 10%보다 낮게), 급소 시 1.4배
-  const crit    = Math.random() < 0.06;
-  const critMult = crit ? 1.4 : 1.0;
+  const crit    = Math.random() < MA.crit.rate;
+  const critMult = crit ? MA.crit.mult : 1.0;
 
-  const dmg = Math.max(1, Math.round((monster.atk || 5) * defFactor * armorMult * critMult));
+  const dmg = Math.max(BALANCE.damage.minDamage, Math.round((monster.atk || BALANCE.monster.atkFallback) * defFactor * armorMult * critMult));
   return { dmg, miss: false, crit };
 }
 
@@ -2205,7 +2299,7 @@ function calculateMonsterDamage(playerStats, monster) {
 function decideFirstTurn(playerSpd, monsterSpd) {
   if (playerSpd > monsterSpd) return 'player';
   if (monsterSpd > playerSpd) return 'monster';
-  return Math.random() < 0.5 ? 'player' : 'monster';
+  return Math.random() < BALANCE.monster.firstTurnTie ? 'player' : 'monster';
 }
 
 // ── 전투 시작: state 객체 반환 ──
@@ -2218,8 +2312,8 @@ function startBattleEngine(student, monster) {
   const atkMult = (typeof BATTLE_CONSTS !== 'undefined') ? (BATTLE_CONSTS.monsterAtkMult || 1.0) : 1.0;
   const scaledMonster = {
     ...monster,
-    hp:  Math.round((monster.hp  || 10) * hpMult),
-    atk: Math.round((monster.atk || 5)  * atkMult),
+    hp:  Math.round((monster.hp  || BALANCE.monster.hpFallback) * hpMult),
+    atk: Math.round((monster.atk || BALANCE.monster.atkFallback)  * atkMult),
   };
 
   return {
@@ -2265,12 +2359,12 @@ function performPlayerTurn(state, attackType) {
   let skill2Mult = 1.0;
   let skill2Label = '';
   if (state.prepActive) {
-    skill2Mult  = 2.3;
+    skill2Mult  = BALANCE.skill2.prepMult;
     skill2Label = ' <span style="color:#FFD700;font-size:.78rem">준비한 일격이 터졌다!</span>';
     state.prepActive = false;
   }
   if (state.rushTurns > 0) {
-    const rushMult = 1.15 + Math.random() * 0.20; // 115~135%
+    const rushMult = BALANCE.skill2.rush.multMin + Math.random() * BALANCE.skill2.rush.multSpread; // 115~135%
     skill2Mult = Math.max(skill2Mult, rushMult); // prep와 중첩 시 높은 쪽
     skill2Label += ` <span style="color:#f39c12;font-size:.78rem">거세게 몰아친다!</span>`;
     state.rushTurns--;
@@ -2296,11 +2390,11 @@ function performPlayerTurn(state, attackType) {
   // ── role 특성: tank — HP 60% 이하 피격 시 40% 경감 (전투 1회) ──
   const mon = state.monster;
   if (mon.role === 'tank' && mon.trait !== 'ghost' && !state.tankTriggered &&
-      state.monsterHp / state.monsterHpMax <= 0.6) {
+      state.monsterHp / state.monsterHpMax <= BALANCE.role.tank.hpRatio) {
     state.tankTriggered = true;
-    dmg = Math.max(1, Math.round(dmg * 0.6));
+    dmg = Math.max(1, Math.round(dmg * BALANCE.role.tank.damageTaken));
     state.log.push(`<span style="color:#e74c3c;font-size:.78rem">🛡️ ${mon.name}이(가) 단단히 버텨냈다! 반격 태세를 갖춘다!</span>`);
-    state.roleBuff = { mult: 1.15, label: '반격 강화!' };
+    state.roleBuff = { mult: BALANCE.role.tank.counterBuff, label: '반격 강화!' };
   }
 
   state.monsterHp = Math.max(0, state.monsterHp - dmg);
@@ -2308,7 +2402,7 @@ function performPlayerTurn(state, attackType) {
   // ── role 특성: fast(속공) — HP 70% 이하 첫 도달 시 다음 몬스터 턴에 추가타 예약 ──
   const monF = state.monster;
   if (monF.role === 'fast' && monF.trait !== 'ghost' && !state.fastTriggered && !state.fastPending &&
-      state.monsterTurnCount > 0 && state.monsterHp / state.monsterHpMax <= 0.7) {
+      state.monsterTurnCount > 0 && state.monsterHp / state.monsterHpMax <= BALANCE.role.fast.hpRatio) {
     state.fastPending = true;
   }
 
@@ -2344,14 +2438,14 @@ function performMonsterTurn(state) {
   const isGhostMon = mon.trait === 'ghost';
 
   // ── role 특성: dealer(전투 가속) — 매 몬스터 턴마다 스택 증가 ──
-  if (!isGhostMon && role === 'dealer' && state.dealerStacks < 3) {
+  if (!isGhostMon && role === 'dealer' && state.dealerStacks < BALANCE.role.dealer.maxStacks) {
     state.dealerStacks++;
     const stackLabels = ['점점 공격이 거세진다!','공격 기세가 오른다!','최고조의 공격 태세!'];
     state.log.push(`<span style="color:#e74c3c;font-size:.78rem">⬆ ${stackLabels[state.dealerStacks-1]}</span>`);
   }
 
   // ── 몬스터 공격 계산 ──────────────────────────────────────────
-  const dealerMult = (!isGhostMon && role === 'dealer') ? (1 + state.dealerStacks * 0.10) : 1.0;
+  const dealerMult = (!isGhostMon && role === 'dealer') ? (1 + state.dealerStacks * BALANCE.role.dealer.perStack) : 1.0;
   // ★ roleBuff를 normal role 세팅 이전에 읽어서 소모
   // → 준비 턴(monsterTurnCount===2)엔 ×1.0으로 정상 공격, 다음 턴에 ×1.6 적용
   const roleBuff = state.roleBuff;
@@ -2359,9 +2453,9 @@ function performMonsterTurn(state) {
   const roleAttackMult = (roleBuff ? roleBuff.mult : 1.0) * dealerMult;
 
   // ── role 특성: normal(강공) — 2번째 몬스터 턴 시 준비 문구 + 다음 턴에 ×1.6 ──
-  if (!isGhostMon && role === 'normal' && !state.roleUsed && state.monsterTurnCount === 2) {
+  if (!isGhostMon && role === 'normal' && !state.roleUsed && state.monsterTurnCount === BALANCE.role.normal.onMonsterTurn) {
     state.log.push(`<span style="color:#e74c3c;font-size:.78rem">⚡ ${mon.name}이(가) 강한 일격을 준비한다!</span>`);
-    state.roleBuff = { mult: 1.6, label: '강공!' }; // ★ 다음 턴에 소모됨
+    state.roleBuff = { mult: BALANCE.role.normal.buff, label: '강공!' }; // ★ 다음 턴에 소모됨
     state.roleUsed = true;
     // 이번 턴은 roleAttackMult = 1.0으로 정상 공격 진행
   }
@@ -2370,14 +2464,14 @@ function performMonsterTurn(state) {
   const armorMult = getDefenseElementMultiplier(mon.element, state.playerStats.armorElement);
 
   // ── skill2: 방어 (guardActive) — 이번 피해 50% 감소 ──────────
-  const guardMult = state.guardActive ? 0.5 : 1.0;
+  const guardMult = state.guardActive ? BALANCE.skill2.guardMult : 1.0;
   if (state.guardActive) {
     state.log.push(`<span style="color:#4fc3f7;font-size:.78rem">🛡️ 피해를 줄였다!</span>`);
     state.guardActive = false;
   }
 
   // ── skill2: 몰아치기 피해증가 (rushTurns > 0일 때 받는 피해 15% 증가) ──
-  const rushDmgMult = (state.rushTurns > 0) ? 1.15 : 1.0;
+  const rushDmgMult = (state.rushTurns > 0) ? BALANCE.skill2.rush.damageTaken : 1.0;
 
   // 빗나감
   if (result.miss) {
@@ -2396,9 +2490,9 @@ function performMonsterTurn(state) {
   // ── skill2: 최후의 반격 판정 ───────────────────────────────
   if (state.counterReady) {
     state.counterReady = false;
-    const counterSuccess = Math.random() < 0.5;
+    const counterSuccess = Math.random() < BALANCE.skill2.counter.chance;
     if (counterSuccess) {
-      const reflectDmg = Math.max(1, Math.round(finalDmg * 1.5));
+      const reflectDmg = Math.max(1, Math.round(finalDmg * BALANCE.skill2.counter.reflectMult));
       state.monsterHp = Math.max(0, state.monsterHp - reflectDmg);
       state.log.push(`<span class="good">⚡ 반격 성공! 몬스터에게 -${reflectDmg} 반사!</span>`);
     } else {
@@ -2435,10 +2529,10 @@ function performMonsterTurn(state) {
       if (!fastHit.miss) {
         // 급소 배율 제거: fastHit.dmg에서 crit이 baked-in된 경우 역산 필요
         // → 간단하게 기본 피해(crit 없이) 직접 계산
-        const defFactor  = 100 / (100 + (state.playerStats.def || 0));
+        const defFactor  = BALANCE.damage.defScale / (BALANCE.damage.defScale + (state.playerStats.def || 0));
         const armorMult2 = getDefenseElementMultiplier(mon.element, state.playerStats.armorElement);
-        const baseDmg    = Math.max(1, Math.round((mon.atk || 5) * defFactor * armorMult2));
-        const fastDmg    = Math.max(1, Math.round(baseDmg * 0.6 * guardMult * rushDmgMult));
+        const baseDmg    = Math.max(1, Math.round((mon.atk || BALANCE.monster.atkFallback) * defFactor * armorMult2));
+        const fastDmg    = Math.max(1, Math.round(baseDmg * BALANCE.role.fast.extraHitMult * guardMult * rushDmgMult));
         state.playerHp   = Math.max(0, state.playerHp - fastDmg);
         state.log.push(`<span class="bad">💨 추가타! -${fastDmg}</span>`);
       } else {
@@ -2465,7 +2559,7 @@ function performSkill2(state, skill2Id) {
 
   switch (skill2Id) {
     case 'heal': {
-      const healAmt = Math.floor(state.playerHpMax * 0.30);
+      const healAmt = Math.floor(state.playerHpMax * BALANCE.skill2.healRatio);
       state.playerHp = Math.min(state.playerHpMax, state.playerHp + healAmt);
       state.log.push(`<span class="good">💊 응급치료! +${healAmt}HP</span>`);
       state.turn = 'monster';
@@ -2502,7 +2596,7 @@ function performSkill2(state, skill2Id) {
       break;
     }
     case 'rush': {
-      state.rushTurns = 2;
+      state.rushTurns = BALANCE.skill2.rush.turns;
       state.log.push(`<span style="color:#f39c12">🔥 몰아치기 시작!</span>`);
       state.turn = 'monster';
       state.monsterTurnCount++;
@@ -2516,11 +2610,11 @@ function performSkill2(state, skill2Id) {
 function performRecklessAttack(state, attackType) {
   if (!state.recklessReady) return state;
   state.recklessReady = false;
-  if (Math.random() < 0.5) {
-    // 성공: 2.2배 적용
+  if (Math.random() < BALANCE.skill2.reckless.chance) {
+    // 성공: BALANCE.skill2.reckless.mult (2.2배) 적용
     const result = calculatePlayerDamage(state.playerStats, state.monster, attackType, state.skillLevels);
     if (!result.miss) {
-      const dmg = Math.max(1, Math.round(result.dmg * 2.2));
+      const dmg = Math.max(1, Math.round(result.dmg * BALANCE.skill2.reckless.mult));
       state.monsterHp = Math.max(0, state.monsterHp - dmg);
       const elemMult = attackType !== 'normal' ? getElementMultiplier(attackType, state.monster.element) : 1.0;
       const isGhost  = state.monster.trait === 'ghost' && attackType === 'normal';
@@ -2599,12 +2693,8 @@ function finalizeBattle(student, monster, win) {
 //  전투 시스템 3단계 — 사냥터 3마리 제시 로직
 // ═══════════════════════════════════════════════════════
 
-// 사냥터 구간 정의
-const ZONE_RANGES = {
-  beginner:     { min:1,  max:10 },
-  intermediate: { min:11, max:20 },
-  advanced:     { min:21, max:30 },
-};
+// 사냥터 구간 정의 — BALANCE.offers.zoneRanges
+const ZONE_RANGES = BALANCE.offers.zoneRanges;
 
 // 슬롯별 레벨 범위 계산 (사냥터 min/max 내로 클램프)
 function getSlotLevelRange(playerLevel, slotIndex, zoneMin, zoneMax) {
@@ -2614,19 +2704,15 @@ function getSlotLevelRange(playerLevel, slotIndex, zoneMin, zoneMax) {
   return { lo, hi };
 }
 
-// 희귀도 가중치 (슬롯별)
-const RARITY_WEIGHTS = [
-  { common:1.0, rare:0.2, legend:0.0 }, // 슬롯 0
-  { common:1.0, rare:1.4, legend:0.0 }, // 슬롯 1
-  { common:1.0, rare:1.6, legend:2.0 }, // 슬롯 2
-];
+// 희귀도 가중치 (슬롯별) — BALANCE.offers.rarityWeights
+const RARITY_WEIGHTS = BALANCE.offers.rarityWeights;
 function getRarityWeight(monster, slotIndex) {
   return (RARITY_WEIGHTS[slotIndex] || RARITY_WEIGHTS[0])[monster.rarity] ?? 1.0;
 }
 
 // 미획득 몬스터 우대 (monsterLog는 id 배열 기준 — _migrate에서 통일)
 function getDiscoveryWeight(player, monster) {
-  return (player.monsterLog || []).includes(monster.id) ? 1.0 : 1.5;
+  return (player.monsterLog || []).includes(monster.id) ? 1.0 : BALANCE.offers.unseenWeight;
 }
 
 // 최근 등장 억제 (recentBattleOffers는 최근 5회 제시 이름 평탄화 배열)
@@ -2638,8 +2724,9 @@ function getRecentWeight(player, monster) {
   if (idx < 0) return 1.0;
   // 직전(최신 3개 안) 등장 여부 확인
   const distFromEnd = flat.length - 1 - idx;
-  if (distFromEnd < 3)  return 0.3; // 직전 출현
-  if (distFromEnd < 9)  return 0.6; // 최근 3회 내 (3마리×3회)
+  const R = BALANCE.offers.recent;
+  if (distFromEnd < R.justNow) return R.justNowWeight; // 직전 출현
+  if (distFromEnd < R.lately)  return R.latelyWeight;  // 최근 3회 내 (3마리×3회)
   return 1.0;
 }
 
@@ -2649,7 +2736,7 @@ function canPickMonster(candidate, pickedMonsters) {
   if (pickedMonsters.some(p => p.id === candidate.id)) return false;
   // 유령형 최대 2마리
   const ghostCount = pickedMonsters.filter(p => p.trait === 'ghost').length;
-  if (candidate.trait === 'ghost' && ghostCount >= 2) return false;
+  if (candidate.trait === 'ghost' && ghostCount >= BALANCE.offers.maxGhosts) return false;
   return true;
 }
 
@@ -2669,7 +2756,7 @@ function weightedPick(candidates) {
 function getThirdSlotCandidates(player, zoneMonsters, currentRange) {
   const inRange = zoneMonsters.filter(m => m.level >= currentRange.lo && m.level <= currentRange.hi);
   // ★ 레벨 상한: 플레이어 레벨 +3까지만 (저레벨이 고레벨 만나는 문제 방지)
-  const maxLevel = (player.level || 1) + 3;
+  const maxLevel = (player.level || 1) + BALANCE.offers.thirdSlot.maxLevelAbovePlayer;
   // 복귀 후보: 같은 사냥터 안, 미획득, rare/legend, 레벨 상한 이하
   const missed = zoneMonsters.filter(m =>
     (m.rarity === 'rare' || m.rarity === 'legend') &&
@@ -2678,7 +2765,7 @@ function getThirdSlotCandidates(player, zoneMonsters, currentRange) {
     (m.level || 1) <= maxLevel   // ★ 레벨 상한 적용
   );
   // 20% 확률로 복귀 후보 사용 (없으면 현재 범위)
-  if (missed.length > 0 && Math.random() < 0.2) return missed;
+  if (missed.length > 0 && Math.random() < BALANCE.offers.thirdSlot.returnChance) return missed;
   return inRange.length > 0 ? inRange : zoneMonsters.filter(m => (m.level||1) <= maxLevel);
 }
 
@@ -2733,7 +2820,7 @@ function generateBattleOffers(player, zone) {
   // recentBattleOffers 업데이트 (최근 5회 배열of배열 유지)
   if (picked.length > 0) {
     const names = picked.map(m => m.name);
-    const prev  = (player.recentBattleOffers || []).slice(-4); // 이전 4회 유지
+    const prev  = (player.recentBattleOffers || []).slice(-BALANCE.offers.recentKeep); // 이전 4회 유지
     player.recentBattleOffers = [...prev, names];              // 5번째 추가
   }
 

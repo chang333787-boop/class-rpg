@@ -871,6 +871,21 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .seed-chip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
   border-radius:20px;padding:.2rem .6rem;font-size:.75rem;cursor:pointer;transition:all .2s;}
 .seed-chip:hover,.seed-chip.sel{border-color:var(--gold);color:var(--gold);}
+/* [D3-FARM-1] 농장 — 디자인 시스템 v1(#242). CSS만.
+   · 빈 밭 칸이 초록 8% 네모 + 작은 '+'라 밭처럼 안 보였다 → 흙색 칸(갈색 한 벌 안), 자라는 칸만 초록 테두리.
+   · 칸 사이 3px(인라인) → 6px: 크롬북 손가락으로 옆 칸을 잘못 누르지 않게. #farm-grid-wrap 자식 한 곳만 !important.
+   · 씨앗 칩 12px·높이 26px → 14px·40px, 밭 정보 11px·--txt3 → 14px·--txt2(인라인이라 id 선택자 !important). */
+#farm-grid-wrap > div{gap:6px!important;}
+.fm-cell{background:linear-gradient(180deg,#3A2A1B,#2C1F14);border:1px solid rgba(160,112,64,.35);border-radius:var(--r-sm);}
+.fm-cell.empty{color:rgba(239,231,217,.35);font-size:1.5rem;font-weight:300;}
+.fm-cell.empty:hover{border-color:var(--border-strong);color:var(--gold-t);}
+.fm-cell.growing{border-color:rgba(46,204,113,.45);}
+.fm-prog{height:4px;}
+.seed-chip{display:inline-flex;align-items:center;gap:var(--sp-h);min-height:40px;padding:0 var(--sp-2);
+  font-size:var(--fs-sm);background:var(--bg2);border-color:var(--line);border-radius:var(--r-pill);}
+.seed-chip.sel{background:rgba(217,164,65,.16);font-weight:700;}
+#farm-info{font-size:var(--fs-sm)!important;color:var(--txt2)!important;margin-top:var(--sp-1)!important;}
+#farm-seed-select > span{font-size:var(--fs-sm)!important;}
 
 /* 집 */
 .house-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:1rem;}
@@ -878,6 +893,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .hs-label{font-size:.7rem;color:var(--txt3);margin-bottom:.4rem;}
 .hs-value{font-size:1.4rem;font-weight:900;}
 .hs-sub{font-size:.7rem;color:var(--txt2);margin-top:.15rem;}
+/* [D3-HOUSE-1] 집 기록 카드 — 카드 3종(디자인 시스템 v1)의 '숫자 카드'로. 라벨·설명 11px → 14px. */
+.house-grid{gap:var(--sp-2);}
+.house-stat{background:var(--bg2);border-color:var(--border);border-radius:var(--r);padding:var(--sp-2);}
+.hs-label{font-size:var(--fs-sm);color:var(--txt2);margin-bottom:var(--sp-h);}
+.hs-value{font-size:var(--fs-2xl);line-height:1.15;}
+.hs-sub{font-size:var(--fs-sm);margin-top:var(--sp-h);}
+.book-item{background:var(--bg2);font-size:var(--fs-sm);padding:var(--sp-1) var(--sp-2);}
 .book-list{display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem;max-height:160px;overflow-y:auto;}
 .book-item{background:rgba(255,255,255,.04);border-radius:8px;padding:.45rem .7rem;font-size:.78rem;
   display:flex;align-items:center;gap:.5rem;}
