@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 우리반 성장 RPG — 순수 함수 단위 테스트 (read-only, 앱 코드 수정 없음)
 //
-//  · scripts/smoke-test.mjs(구조·HTTP)와 별개. smoke 기준선(28)은 건드리지 않는다.
+//  · scripts/smoke-test.mjs(구조·HTTP)와 별개. smoke 기준선(29)은 건드리지 않는다.
 //  · student.js 는 최상위에서 document 를 만지므로 통째로 로드하지 않고,
 //    함수 이름으로 **본문만 잘라내어** vm 샌드박스에서 돌린다(아래 sliceFn).
 //    함수가 이름을 바꾸거나 사라지면 여기서 FAIL 이 난다 — 그게 의도다.
@@ -339,6 +339,35 @@ cur = 'buster-check';
     const head = { ...base, 'kiosk.html': base['kiosk.html'] + '<script src="./kiosk.js"></script>' };
     eq(lv(check({ changed: new Set(), baseHtml: base, headHtml: head }), 'REVIEW').length, 1);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = 'admin 비번 초기화 알림(PW-NOTIFY-1)';
+{
+  //  교사 PC 는 TV 로 미러링된다. 초기화 알림(notify)에 새 비밀번호 값이 찍히면 반 아이들이 본다.
+  const ADMIN = read('admin.js');
+  const run = (fnName, call) => {
+    const said = [];
+    const stu = { id: 's1', name: '학생1', pw: 'old' };
+    const sb = {
+      notify: (m) => said.push(String(m)), prompt: () => 'zq7Secret',
+      document: { getElementById: (id) => (id.startsWith('newpw-') ? { value: ' zq7Secret ' } : null) },
+      DB: { getStudent: () => stu, saveStudent() {}, removePwResetRequest() {} },
+      renderAll() {}, renderPwResetList() {}, updatePwResetBadge() {},
+    };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(sliceFn(ADMIN, fnName) + `\n${call};`, sb);
+    return { said, stu };
+  };
+  for (const [fn, call] of [['approvePwResetDash', "approvePwResetDash('r1','s1',{})"], ['resetStudentPw', "resetStudentPw('r1','s1')"]]) {
+    test(`${fn}: 비번은 바뀌고 알림엔 값이 없다`, () => {
+      const { said, stu } = run(fn, call);
+      eq(stu.pw, 'zq7Secret', '저장된 비번');
+      if (!said.length) throw new Error('알림이 없음');
+      const leak = said.filter(m => m.includes('zq7Secret'));
+      if (leak.length) throw new Error('알림에 새 비번 값: ' + JSON.stringify(leak));
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

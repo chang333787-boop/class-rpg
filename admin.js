@@ -311,7 +311,7 @@ function renderDashboard() {
         <div style="font-size:.8rem;color:var(--txt2)">
           ① 학생 목록에서 이름과 비밀번호를 우리 반 학생에 맞게 바꿔주세요.<br>
           ② 퀘스트 관리 탭에서 퀘스트를 등록하고 자동 일일퀘스트를 켜보세요.<br>
-          ③ 설정에서 관리자 비밀번호 teacher1234를 바꿔주세요.
+          ③ 설정에서 관리자 비밀번호를 우리 반만 아는 값으로 바꿔주세요.
         </div>
       </div>` : '';
   }
@@ -1003,7 +1003,8 @@ function approvePwResetDash(reqId, studentId, btn) {
   DB.saveStudent(s);
   DB.removePwResetRequest(reqId);
   renderAll();
-  notify(`✅ ${s.name} 비밀번호 → "${newPw}" 초기화 완료!`);
+  // [PW-NOTIFY-1] 교사 화면은 TV 로 미러링된다 — 알림에 새 비밀번호 값을 띄우지 않는다
+  notify(`✅ ${s.name} 비밀번호 초기화 완료 · 학생 상세에서 확인`);
 }
 
 function rejectPwResetDash(reqId, btn) {
@@ -1607,6 +1608,13 @@ function approvePromotion(reqId) {
   const req = DB.getPromotionRequests().find(r => r.id === reqId);
   if (!req) return;
   const s = DB.getStudent(req.studentId);
+  // [PROMO-PER-ID-1] 이미 승급한 레벨의 신청(되살아난 신청 등)은 보상 없이 목록에서만 치운다
+  if (s && (s.promotedLevels || []).map(Number).includes(Number(req.level))) {
+    DB.removePromotionRequest(reqId);
+    renderAll();
+    notify(`${s.name} Lv.${req.level} 은 이미 승급했어요 — 신청만 정리했습니다`);
+    return;
+  }
   // 직업명 자동 변경 (장래희망 기반)
   const newJob = Utils.getJobTitle(s.job || s.dream || '', req.level);
   const oldJob = s.job || '';
@@ -3569,7 +3577,7 @@ function dedupeAll() {
   });
   db.promotionRequests = db.promotionRequests;
   DB._cache = db;
-  DB._fbRef.child('promotionRequests').set(db.promotionRequests);
+  DB._fbRef.child('promotionRequests').set(DB._promoObj(db.promotionRequests));   // [PROMO-PER-ID-1] 배열로 쓰면 숫자 키로 돌아감
 
   // artworks id 키 기반 정리 (배열/키 혼재 해소 + 중복 id 제거)
   const seenArtIds = new Set();
@@ -3646,7 +3654,8 @@ function resetStudentPw(reqId, studentId) {
   DB.removePwResetRequest(reqId);
   renderPwResetList();
   updatePwResetBadge();
-  notify(`✅ ${s.name} 비밀번호 초기화 완료! 새 비밀번호: ${newPw}`);
+  // [PW-NOTIFY-1] 교사 화면은 TV 로 미러링된다 — 알림에 새 비밀번호 값을 띄우지 않는다
+  notify(`✅ ${s.name} 비밀번호 초기화 완료 · 학생 상세에서 확인`);
 }
 
 function dismissPwReset(reqId) {
@@ -5668,7 +5677,13 @@ async function confirmRollback() {
   //   기존엔 정규화 캐시를 통째로 root에 set 해서 ① 파생 배열 quests(약 450KB)가 실제로
   //   저장되고 ② 백업에 없던 노드까지 캐시 값으로 덮어써졌다. 개별 set으로 바꿔 부작용 제거.
   const nodes = BACKUP_NODES.filter(k => backup[k] !== undefined && backup[k] !== null);
-  for (const k of nodes) await DB._fbRef.child(k).set(backup[k]);
+  for (const k of nodes) {
+    // [PROMO-PER-ID-1] 백업은 캐시(배열)라 그대로 쓰면 숫자 키 — 승급 신청만 id 키로 되돌린다
+    const v = k === 'promotionRequests'
+      ? DB._promoObj(Array.isArray(backup[k]) ? backup[k] : Object.values(backup[k]))
+      : backup[k];
+    await DB._fbRef.child(k).set(v);
+  }
   notify(`✅ ${selected} 데이터로 롤백 완료 (${nodes.length}개 항목) — 새로고침됩니다`);
   setTimeout(() => location.reload(), 1500);
 }

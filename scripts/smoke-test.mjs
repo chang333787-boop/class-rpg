@@ -260,6 +260,45 @@ for (const f of HTML_FILES) {
   }
 }
 
+// ── [CACHE-SORT-GUARD-1] DB 캐시 배열을 화면 코드에서 제자리로 바꾸지 않는다 ──────
+//  DB.getStudents() · getAlbums() · getMemories('all') 등은 **캐시 배열 그 자체**를 돌려준다.
+//  화면 코드가 그 배열에 sort/reverse/splice… 를 하면
+//   · 캐시 순서가 뒤섞여 다른 화면 순서가 저절로 바뀐다(#228 학생 순서 — "쪽지 보내니 순서가 바뀜")
+//   · 배열을 통째로 set 하는 저장이 뒤섞인 순서를 운영 DB 에 쓴다(#239 추억·앨범)
+//  에러는 안 난다. 복사 뒤 정렬([...arr].sort)로 써야 한다. 정적 검사라 완벽하진 않다:
+//  ① 게터에 바로 붙은 체인  ② 같은 함수 안에서 게터로 받은 변수(40줄 안)  두 모양만 본다.
+//  kiosk 의 DB_DATA 는 스냅샷마다 새로 만드는 읽기 전용 사본이라 보지 않는다.
+{
+  const GETTERS = ['getStudents', 'getQuests', 'getPromotionRequests', 'getAllWeeklyGoals', 'getAllWeeklyReflections',
+    'getAllRecorderLogs', 'getCustomProblems', 'getAlbums', 'getPwResetRequests', 'getMemories', 'getProblemRecords'];
+  const MUT = 'sort|reverse|splice|push|pop|shift|unshift|fill|copyWithin';
+  const g = GETTERS.join('|');
+  const hits = [];
+  for (const f of ['admin.js', 'student.js', 'kiosk.js']) {
+    let src; try { src = read(f); } catch (e) { continue; }
+    const lines = src.split('\n');
+    // ① DB.getX(...).sort(  /  DB.load().x.sort(
+    for (const m of src.matchAll(new RegExp(`DB\\.(?:(?:${g})\\([^)]*\\)|load\\(\\)\\.\\w+)\\s*\\.(?:${MUT})\\(`, 'g')))
+      hits.push(`${f}:${src.slice(0, m.index).split('\n').length}`);
+    // ② const x = DB.getX(...); … x.sort(  — 감싸는 함수 안에서 본다(받는 줄과 정렬 줄이 멀 수 있다: #228 은 55줄)
+    for (const m of src.matchAll(new RegExp(`\\b([A-Za-z_$][\\w$]*)\\.(?:${MUT})\\(`, 'g'))) {
+      const v = m[1], ln = src.slice(0, m.index).split('\n').length;
+      const fnStart = Math.max(src.lastIndexOf('\nfunction ', m.index), src.lastIndexOf('\nasync function ', m.index), 0);
+      const before = src.slice(fnStart, m.index);
+      const esc = v.replace(/[$]/g, '\\$');
+      const assign = new RegExp(`\\b(?:const|let|var)\\s+${esc}\\s*=\\s*DB\\.(?:(?:${g})\\([^)]*\\)|load\\(\\)\\.\\w+)\\s*;`);
+      const m2 = before.match(assign);
+      if (!m2) continue;
+      // 사이에 **무조건** 다른 배열로 바꿔 넣었으면 안전. `if (…) x = x.filter(…)` 같은 조건부는 안 걸릴 때 캐시 그대로라 위험으로 본다
+      const after = before.slice(before.lastIndexOf(m2[0]) + m2[0].length).split('\n');
+      const safeReassign = after.some(l => new RegExp(`(^|[^.\\w$])${esc}\\s*=(?!=)`).test(l) && !/^\s*(\}\s*)?(if\b|else\b)/.test(l));
+      if (!safeReassign) hits.push(`${f}:${ln}`);
+    }
+  }
+  if (hits.length === 0) add('PASS', 'DB 캐시 배열 제자리 변경 없음 (sort·reverse·splice… — #228·#239 재발 방지)');
+  else add('FAIL', `DB 캐시 배열을 제자리로 바꾸는 곳 ${hits.length}개: ${[...new Set(hits)].join(', ')} — [...arr].sort 처럼 복사 뒤에`);
+}
+
 // ── 결과 출력 (verify-safety와 동일 형식) ──
 const order = { PASS: 0, REVIEW: 1, FAIL: 2 };
 const icon = { PASS: '✅ PASS  ', REVIEW: '🟡 REVIEW', FAIL: '❌ FAIL  ' };
