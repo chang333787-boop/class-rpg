@@ -427,7 +427,7 @@ function renderKioskMemory() {
       ? `<div style="text-align:center;padding:3rem;color:var(--txt3)">아직 추억 사진이 없어요 📸</div>`
       : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem">
           ${filtered.map((m,i) => `
-            <div onclick="openKioskMemLightbox(${i},${JSON.stringify(_kioskMemView).replace(/"/g,"'")})"
+            <div onclick="openKioskMemLightbox(${i})"
               style="cursor:pointer;border-radius:12px;overflow:hidden;
                 background:rgba(255,255,255,.05);aspect-ratio:1;position:relative;transition:transform .2s"
               onmouseenter="this.style.transform='scale(1.03)'"
@@ -531,9 +531,9 @@ function renderEmotionBoard() {
             </td>
             <td style="padding:.4rem;border:1px solid var(--border);text-align:center">
               ${am
-                ? `<div style="font-size:1.4rem">${am.emotionIcon}</div>
-                   <div style="font-size:.68rem;color:var(--txt2)">${am.emotionLabel}</div>
-                   <div style="font-size:.6rem;color:var(--txt3)">${am.levelLabel}</div>
+                ? `<div style="font-size:1.4rem">${escHtml(am.emotionIcon)}</div>
+                   <div style="font-size:.68rem;color:var(--txt2)">${escHtml(am.emotionLabel)}</div>
+                   <div style="font-size:.6rem;color:var(--txt3)">${escHtml(am.levelLabel)}</div>
                    <button onclick="openKioskEmotion('${s.id}','am')"
                      style="font-size:.6rem;background:none;border:1px solid rgba(255,255,255,.15);
                      color:var(--txt3);border-radius:6px;padding:.1rem .4rem;cursor:pointer;margin-top:.2rem">수정</button>`
@@ -544,9 +544,9 @@ function renderEmotionBoard() {
             </td>
             <td style="padding:.4rem;border:1px solid var(--border);text-align:center">
               ${pm
-                ? `<div style="font-size:1.4rem">${pm.emotionIcon}</div>
-                   <div style="font-size:.68rem;color:var(--txt2)">${pm.emotionLabel}</div>
-                   <div style="font-size:.6rem;color:var(--txt3)">${pm.levelLabel}</div>
+                ? `<div style="font-size:1.4rem">${escHtml(pm.emotionIcon)}</div>
+                   <div style="font-size:.68rem;color:var(--txt2)">${escHtml(pm.emotionLabel)}</div>
+                   <div style="font-size:.6rem;color:var(--txt3)">${escHtml(pm.levelLabel)}</div>
                    <button onclick="openKioskEmotion('${s.id}','pm')"
                      style="font-size:.6rem;background:none;border:1px solid rgba(255,255,255,.15);
                      color:var(--txt3);border-radius:6px;padding:.1rem .4rem;cursor:pointer;margin-top:.2rem">수정</button>`
@@ -586,7 +586,7 @@ function openKioskEmotion(studentId, period) {
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;
       padding:1.2rem;width:90%;max-width:460px;max-height:90vh;overflow-y:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
-        <div style="font-weight:700">${s?.avatar} ${s?.name} · ${label}</div>
+        <div style="font-weight:700">${escHtml(s?.avatar)} ${escHtml(s?.name)} · ${label}</div>
         <button onclick="document.getElementById('kiosk-emo-popup').style.display='none'"
           style="background:none;border:none;color:var(--txt2);font-size:1.2rem;cursor:pointer">✕</button>
       </div>
