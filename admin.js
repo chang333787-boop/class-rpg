@@ -480,7 +480,7 @@ function renderDashboard() {
         const s = DB.getStudent(q.studentId);
         return `<div style="display:flex;align-items:center;gap:.6rem;padding:.45rem 1rem;
           border-bottom:1px solid rgba(255,255,255,.03)">
-          <span style="font-size:.95rem">${q.icon||'📋'}</span>
+          <span style="font-size:.95rem">${escHtml(q.icon||'📋')}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
               ${escHtml(s?.name||'?')} · ${escHtml(q.name)}</div>
@@ -1272,7 +1272,7 @@ function renderApproveGrid() {
   boardQuests.forEach(q => {
     html += `<tr>
       <td style="padding:.4rem .8rem;font-size:.78rem;font-weight:600;border:1px solid var(--border2);position:sticky;left:0;background:var(--bg2);z-index:4">
-        ${q.icon||'📋'} ${escHtml(q.name)}
+        ${escHtml(q.icon||'📋')} ${escHtml(q.name)}
         <div style="font-size:.65rem;color:var(--gold);font-weight:400">+${q.exp}EXP +${q.gold}G</div>
       </td>`;
     students.forEach(s => {
@@ -3877,7 +3877,7 @@ function renderAbilityQuests() {
       background:${d.color};border-radius:8px;border:0.5px solid ${d.border}">
       <input type="checkbox" id="aq-chk-${i}" data-name="${escHtml(t.name)}" data-diff="${t.diff}" data-stat="${t.stat||type}"
         style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
-      <label for="aq-chk-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
+      <label for="aq-chk-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${escHtml(t.name)}</label>
       <span class="text-muted-xs">${d.label}</span>
       <span style="font-size:.68rem;color:var(--gold)">+${d.exp}EXP</span>
       <button onclick="${t.custom ? `removeCustomTemplate('${type}','${escJsAttr(t.name)}');renderAbilityQuests()` : `hideDefaultTemplate('${type}','${escJsAttr(t.name)}')`}"
@@ -4265,7 +4265,7 @@ function renderBoardQuestList() {
     return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);
       border-radius:14px;padding:1rem 1.2rem;margin-bottom:.8rem">
       <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem">
-        <span style="font-size:1.8rem">${q.icon||'📋'}</span>
+        <span style="font-size:1.8rem">${escHtml(q.icon||'📋')}</span>
         <div class="flex-1">
           <div style="font-weight:700;font-size:.95rem">${escHtml(q.name)}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-top:.15rem">
@@ -4436,7 +4436,7 @@ function renderInactiveQuests() {
   el.innerHTML = inactive.map(q => `
     <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem 1.2rem;
       border-bottom:1px solid rgba(255,255,255,.04);opacity:.6">
-      <span style="font-size:1.2rem">${q.icon||'📋'}</span>
+      <span style="font-size:1.2rem">${escHtml(q.icon||'📋')}</span>
       <div class="flex-1">
         <div style="font-size:.85rem;font-weight:600">${escHtml(q.name)}</div>
         <div class="text-muted-tiny">${typeNames[q.type]||q.type} · +${q.exp}EXP · +${q.gold}G</div>
@@ -5377,7 +5377,7 @@ function renderEmotionAlerts() {
     <div style="padding:.8rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05);
       background:${a.read?'':'rgba(93,173,226,.04)'}">
       <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.4rem">
-        <span style="font-size:1.1rem">${a.studentAvatar||'?'}</span>
+        <span style="font-size:1.1rem">${escHtml(a.studentAvatar||'?')}</span>
         <span style="font-weight:700">${escHtml(a.studentName||'?')}</span>
         <span style="font-size:.72rem;background:rgba(93,173,226,.12);color:var(--sky);
           border-radius:8px;padding:.1rem .4rem">${typeLabel[a.responseType]||a.responseType}</span>

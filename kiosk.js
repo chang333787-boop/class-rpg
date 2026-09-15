@@ -229,7 +229,7 @@ function renderTable() {
         questList.forEach(q => {
           totalHtml += `<tr><td class="quest-name">
             <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-              ${q.icon||'📋'} ${escHtml(q.name)}
+              ${escHtml(q.icon||'📋')} ${escHtml(q.name)}
               ${statBadge(q.stat, q.statVal)}
             </div>
             <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
@@ -292,7 +292,7 @@ function renderTable() {
       totalHtml += `<tr>
         <td class="quest-name">
           <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-            ${q.icon||'📋'} ${escHtml(q.name)}
+            ${escHtml(q.icon||'📋')} ${escHtml(q.name)}
             ${statBadge(q.stat, q.statVal)}
           </div>
           <div class="quest-reward">+${q.exp}EXP · +${q.gold}G</div>
