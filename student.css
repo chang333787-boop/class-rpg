@@ -1144,6 +1144,29 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .login-head{font-family:inherit;font-weight:800;color:var(--gold-t);}
 .stu-btn{font-size:var(--fs-md);min-height:48px;}
 .login-admin-link a{font-size:var(--fs-sm);color:var(--txt3);}
+/* [D3-TITLE-1] 타이틀·로그인 입력·캐릭터 선택 — 아이가 가장 먼저 보는 세 화면.
+   · 제목의 가는 명조(Gowun Batang)는 어두운 바탕·TV 미러링에서 획이 뭉개지고, 구글 폰트가 막히면 기본 명조로 떨어져
+     나머지 고딕 화면과 따로 논다 → 본문과 같은 고딕 굵게.
+   · 부제 자간 .25em(글자 사이가 벌어져 한 단어로 안 읽힘) → .04em, 14.4 → 16px.
+   · 떠 있는 아이콘 칸·캐릭터 칸: 반투명 흰 4% → 카드 색(--bg2), 모서리 토큰.
+   · 시작 버튼 높이 56px, 비밀번호 칸 48px·16px. */
+.title-logo{font-family:inherit;font-weight:900;letter-spacing:-.01em;}
+.title-sub{font-size:var(--fs-md);letter-spacing:.04em;color:var(--txt2);}
+.floater{background:var(--bg2);border-color:var(--border);border-radius:var(--r-lg);}
+.btn-gold{min-height:56px;font-size:var(--fs-lg);}
+.login-input{background:var(--bg0);border-color:var(--line);font-size:var(--fs-md);min-height:48px;}
+.login-err{font-size:var(--fs-sm);}
+.charsel-title{font-family:inherit;font-weight:800;font-size:var(--fs-2xl);color:var(--gold-t);}
+.charsel-sub{font-size:var(--fs-md);color:var(--txt2);}
+.char-opt{background:var(--bg2);border-color:var(--line);border-radius:var(--r-lg);}
+.char-opt:hover{border-color:var(--border-strong);}
+.char-opt.sel{background:rgba(217,164,65,.14);border-color:var(--gold);}
+.char-opt-name{font-size:var(--fs-sm);color:var(--txt2);}
+.char-opt.sel .char-opt-name{color:var(--gold-t);font-weight:700;}
+/* 375 폭에서 캐릭터 4칸이 3+1로 접혀 마지막 한 칸만 덩그러니 → 좁은 폭은 2×2 */
+@media (max-width:600px){
+  .char-options{display:grid;grid-template-columns:repeat(2,110px);justify-content:center;gap:var(--sp-2);}
+}
 
 /* HUD */
 .hud{background:var(--bg1);border-bottom:1px solid var(--border);padding:var(--sp-1) var(--sp-2);gap:var(--sp-2);}
