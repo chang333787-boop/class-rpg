@@ -23,7 +23,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorld, makeStudent, winRate, GEAR, ROOT } from './lib.mjs';
+import { loadWorld, makeStudent, winRate, GEAR, GEAR_REF, ROOT } from './lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const flag = k => process.argv.includes('--' + k);
@@ -51,9 +51,9 @@ P(`계수: 몬스터 HP×${bc.monsterHpMult} · 공격력×${bc.monsterAtkMult} 
 
 // ── 1. 승률 표 ─────────────────────────────────────────────────
 const table = {};   // table[gear][lv][offset] = {win,turns}
-for (const gear of GEAR) {
+for (const gear of [...GEAR, ...GEAR_REF]) {
   table[gear] = {};
-  P(`\n## 승률 — ${gear}`);
+  P(`\n## 승률 — ${gear}${GEAR_REF.includes(gear) ? ' (참고 · 판정 밖 — 칸마다 최근 등급·스태프·속성 스킬, 몬스터마다 가장 센 공격)' : ''}`);
   P('| Lv | ATK/DEF/HP | 노말 | Lv−1 | **같은 Lv** | Lv+1 | Lv+2 | Lv+3 |');
   P('|---|---|---|---|---|---|---|---|');
   for (let lv = 1; lv <= MAX; lv++) {
@@ -62,7 +62,7 @@ for (const gear of GEAR) {
     table[gear][lv] = {};
     for (const o of OFFSETS) table[gear][lv][o] = winRate(W, st, lv + o, N);
     const row = OFFSETS.map(o => (o === 0 ? `**${pct(table[gear][lv][o])}**` : pct(table[gear][lv][o])));
-    P(`| ${lv} | ${st.combat.atk}/${st.combat.def}/${hp} | ${st.skillLevels.normal} | ${row.join(' | ')} |`);
+    P(`| ${lv} | ${st.combat.atk}/${st.combat.def}/${hp}${GEAR_REF.includes(gear) ? ` (MAG ${st.combat.mag})` : ''} | ${st.skillLevels.normal} | ${row.join(' | ')} |`);
   }
 }
 P('\n`—` = 그 레벨이 같은 사냥터(1~10·11~20·21~30) 밖이라 카드로 제시되지 않음.');
@@ -76,7 +76,7 @@ const cardAvg = (gear, offs) => {
   for (let lv = 1; lv <= MAX; lv++) for (const o of offs) { const r = table[gear][lv][o]; if (r) vals.push(r.win); }
   return vals.length ? `${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 100)}%` : '—';
 };
-for (const gear of GEAR) P(`| ${gear} | ${cardAvg(gear, [-1, 0])} | ${cardAvg(gear, [0, 1])} | ${cardAvg(gear, [1, 2])} |`);
+for (const gear of [...GEAR, ...GEAR_REF]) P(`| ${gear} | ${cardAvg(gear, [-1, 0])} | ${cardAvg(gear, [0, 1])} | ${cardAvg(gear, [1, 2])} |`);
 
 // ── 3. 골드 흐름 ───────────────────────────────────────────────
 //  전투: 하루 전투 횟수 × 같은 Lv 승률(풀장비) × 그 레벨 몬스터 평균 골드

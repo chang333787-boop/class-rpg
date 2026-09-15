@@ -700,8 +700,15 @@ const DB = {
     this._fbRef = firebase.database().ref(this.KEY);
     this._fbAdminRef = firebase.database().ref(this.ADMIN_KEY);
 
-    // 초기 데이터 로드
-    const snap = await this._fbRef.once('value');
+    // 초기 데이터 로드 — [INIT-SINGLE-LOAD-1] once('value') 대신 on('value') 의 첫 스냅샷.
+    //   once 가 끝나면 SDK 가 그 구독을 내리고 캐시를 버려, 곧이어 건 on 이 root 를 **통째로 한 번 더** 받았다
+    //   (에뮬레이터 + SDK 9.23 실측 2배). 첫 리스너를 붙여 둔 채 아래 실시간 리스너를 걸면 SDK 캐시에서 바로 받는다.
+    let firstLoadResolve = null;
+    const firstLoad = (s) => { if (firstLoadResolve) { firstLoadResolve(s); firstLoadResolve = null; } };
+    const snap = await new Promise((resolve, reject) => {
+      firstLoadResolve = resolve;
+      this._fbRef.on('value', firstLoad, reject);
+    });
     let data = snap.val();
 
     if (!data) {
@@ -709,6 +716,9 @@ const DB = {
       await this._fbRef.set(data);
     }
     this._cache = this._migrate(this._normalizeArrays(data));
+
+    // 첫 리스너는 아래 실시간 리스너를 건 **뒤**에 뗀다 — 먼저 떼면 구독이 끊겨 root 를 다시 통째로 받는다
+    setTimeout(() => this._fbRef.off('value', firstLoad), 0);
 
     // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
     this._fbRef.on('value', (snap) => {
