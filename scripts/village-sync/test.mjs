@@ -121,7 +121,7 @@ await test('P2 keepalive 는 전부 아니면 안 보냄(palette 가 바뀐 채 
   d.save(V2(big, { palette: ['road'] })); await d.sync.boot();
   const big2 = {}; for (const k in big) big2[k] = S('AF', 1280);
   d.save(V2(big2, { palette: ['bush', 'road'] }));
-  assert.equal(d.sync.onPageHide(), 'too-big'); assert.equal(w.rtdb.log.filter(l => l.keepalive).length, 0);
+  assert.equal(d.sync.onPageHide(), 'too-big'); assert.equal(w.rtdb.log.filter(l => l.keepalive && l.path === ROOT).length, 0);   // 데이터 경로만(닫힐 때 session 비우기는 따로 나감)
 });
 await test('P3 houses 숫자 키 → 원격은 c 키 · 촘촘해서 배열로 돌아와도 되살림 · 마을 모양은 숫자 키', async () => {
   const w = world(); const d = device(w);
@@ -177,6 +177,22 @@ await test('S6 session 지워지면 주인은 조용히 다시', async () => {
   const w = world(); const A = device(w); await A.sync.boot();
   w.rtdb.set(ROOT + '/session', null); await w.clock.settle(); await w.clock.settle();
   assert.equal(w.rtdb.get(ROOT + '/session/dev'), A.sync.state.dev);
+});
+
+await test('S7 닫힐 때 session 을 비움 → 곧바로 다른 기기에서 열어도 묻지 않음', async () => {
+  const w = world(); const A = device(w); A.save(V2({ '4_4': 'AE' })); await A.sync.boot(); A.sync.attach();
+  A.sync.onPageHide(); await w.clock.settle(); A.sync.close();
+  assert.equal(w.rtdb.get(ROOT + '/session/at'), 0); assert.equal(w.rtdb.get(ROOT + '/session/dev'), A.sync.state.dev);
+  const B = device(w); const r = await B.sync.boot();
+  assert.equal(B.asked, 0); assert.equal(r.mode, 'owner');
+});
+await test('S8 주인을 잃은 기기가 닫혀도 새 주인 session 은 그대로', async () => {
+  const w = world(); const A = device(w); await A.sync.boot(); A.sync.attach();
+  await w.clock.advance(10000);
+  const B = device(w, { askAnswer: true }); await B.sync.boot(); await w.clock.settle();
+  const atB = w.rtdb.get(ROOT + '/session/at');
+  assert.equal(A.sync.onPageHide(), 'skip'); await w.clock.settle();
+  assert.equal(w.rtdb.get(ROOT + '/session/dev'), B.sync.state.dev); assert.equal(w.rtdb.get(ROOT + '/session/at'), atB);
 });
 
 /* ───────── 묶어 보내기 ───────── */
