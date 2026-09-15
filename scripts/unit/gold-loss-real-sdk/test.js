@@ -42,6 +42,7 @@
 
     // 준비 저장들이 끝나고 _saving 이 풀릴 때까지 기다린다
     setTimeout(() => {
+      out('dbMode', DB._snaps ? 'student(노드별 구독)' : 'root');   // ?profile= 이 실제로 먹었는지
       out('savingBefore', DB._saving);
       out('totalGoldBefore', CUR.totalGold || 0);
       let changes = 0; const prev = DB._onChangeCb; DB._onChangeCb = function () { changes++; return prev && prev.apply(this, arguments); };
