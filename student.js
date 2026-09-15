@@ -14,6 +14,18 @@ function escHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ══ 링크 주소 검사 (Q3-URL-1) — 교사가 적은 주소를 href 에 넣기 전에 ══
+//  http/https 만 연다. javascript:·data: 같은 다른 스킴은 빈 문자열(링크를 그리지 않음).
+//  스킴이 없으면(naver.com) https:// 를 붙인다 — 교사 화면 오늘의 링크와 같은 규칙.
+//  브라우저가 주소 속 탭·줄바꿈을 무시하므로(java<탭>script:) 제어 문자를 먼저 지운다.
+function safeUrl(u) {
+  const s = String(u == null ? '' : u).replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.\-]*:/i.test(s)) return '';
+  return 'https://' + s.replace(/^\/+/, '');
+}
+
 // monsterLog 항목(id) → 표시용 이름 (매핑 실패 시 원본 그대로 — 옛 커스텀 이름 등)
 function monsterNameById(id) {
   const mon = getActiveMonsters().find(m => m.id === id);
@@ -1105,7 +1117,7 @@ function renderNoteList() {
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
         <span style="font-size:1.05rem">${n.kind === 'account' ? '🔑' : '📝'}</span>
         <b style="font-size:.9rem;flex:1">${escHtml(n.site || '쪽지')}</b>
-        ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener"
+        ${safeUrl(n.url) ? `<a href="${escHtml(safeUrl(n.url))}" target="_blank" rel="noopener"
           class="btn-gold" style="display:inline-block;padding:.25rem .6rem;font-size:.72rem;
           font-weight:700;text-decoration:none;border-radius:50px;box-shadow:none;animation:none">🔗 사이트 열기</a>` : ''}
       </div>
@@ -1523,7 +1535,7 @@ function buildMainHTML() {
          링크가 8개면 278px를 먹어 크롬북(1366×610)에서 학습·퀘스트가 전부 화면 밖으로
          밀려났다. 헤더만 남기고 접어 둔다. 개수는 헤더에 표시. -->
     ${(()=>{
-      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>l.url&&l.title);
+      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>safeUrl(l.url)&&l.title);
       if (!todayLinks.length) return '';
       return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
         border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
@@ -1536,10 +1548,10 @@ function buildMainHTML() {
         </button>
         <div id="today-links" style="display:none;margin-top:.4rem">
         ${todayLinks.map(l=>`
-          <a href="${l.url}" target="_blank" rel="noopener"
+          <a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener"
             style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
               text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
-            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${l.title}</span>
+            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${escHtml(l.title)}</span>
             <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
           </a>`).join('')}
         </div>
