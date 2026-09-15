@@ -4,7 +4,7 @@
 //  흐름: 로그인 → 1.5초 한가 → 케이스 실행 → SDK 로컬 값 비교.
 //   battle  : 실제 _finishBattle() 승리 10G → totalGold +10 이어야(NO_LOSS)
 //   buySeed : 실제 buySeed(첫 씨앗) → 골드 차감 + 씨앗 1 이어야(OK). 로그를 저장 전에 쓰는 코드면 FREE_ITEM
-//  사용: node scripts/unit/gold-loss-real-sdk/run.mjs [battle|buySeed]   → 케이스별 판정 출력(인자 없으면 둘 다)
+//  사용: node scripts/unit/gold-loss-real-sdk/run.mjs [battle|buySeed|farm|infinite]   → 케이스별 판정 출력(인자 없으면 전부)
 //        node scripts/unit/gold-loss-real-sdk/run.mjs --expect-fixed      → 기대와 다른 케이스가 있으면 exit 1
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { execFile } from 'node:child_process'; import { promisify } from 'node:util'; import { fileURLToPath } from 'node:url';
@@ -32,7 +32,7 @@ const srv = http.createServer((req, res) => {
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 
 // 케이스마다 새 브라우저 한 번. 기대값: battle=NO_LOSS · buySeed=OK
-const CASES = { battle: 'NO_LOSS', buySeed: 'OK' };
+const CASES = { battle: 'NO_LOSS', buySeed: 'OK', farm: 'NO_LOSS', infinite: 'NO_LOSS' };
 const only = process.argv.slice(2).find(a => !a.startsWith('--'));
 let bad = 0;
 for (const [name, want] of Object.entries(CASES)) {
@@ -46,7 +46,7 @@ for (const [name, want] of Object.entries(CASES)) {
   if (!ok) bad++;
   console.log(`== ${name} (기대 ${want})`);
   console.log(text);
-  console.log(ok ? `✅ ${name}: ${verdict}` : `🔴 ${name}: ${verdict} — ${verdict === 'LOSS' ? '승리 골드가 totalGold 에 안 들어감(goldDaily 는 남음)' : verdict === 'FREE_ITEM' ? '구매했는데 골드가 안 빠짐' : '판정 불가/깨짐'}`);
+  console.log(ok ? `✅ ${name}: ${verdict}` : `🔴 ${name}: ${verdict} — ${verdict === 'LOSS' ? '얻은 골드가 totalGold 에 안 들어감(goldDaily 는 남음)' : verdict === 'FREE_ITEM' ? '구매했는데 골드가 안 빠짐' : '판정 불가/깨짐'}`);
   console.log('');
 }
 srv.close();
