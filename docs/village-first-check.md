@@ -71,7 +71,7 @@ node scripts/village-backup.mjs --out "C:/Users/USER/OneDrive - 정림초등학�
 
 ## 5. 다른 기기에서 같은 마을 (선생님)
 1. 크롬북(또는 같은 PC **시크릿 창** — 기기 저장소가 따로라 다른 기기 흉내가 됩니다)에서 시험 계정 로그인 → 🏘️
-2. 방금 닫았으면(90초 안) **"다른 기기에서 마을이 열려 있어요. 여기서 계속할까요?"** 가 뜰 수 있음 → **확인**
+2. 교사 PC 에서 ✕ 로 닫았으면 **물음 없이** 바로 열림(닫을 때 `session/at` 을 0 으로 비움). 창을 닫지 않았거나 닫기 신호가 막혔으면 **"다른 기기에서 마을이 열려 있어요. 여기서 계속할까요?"** → **확인** (보고에 "닫기 신호 미도착" 적기)
 
 | 합격 | 불합격이면 |
 |---|---|
@@ -84,7 +84,7 @@ node scripts/village-backup.mjs --out "C:/Users/USER/OneDrive - 정림초등학�
 3. **보스**: `curl -s "$DB/classRPG_villages/$SID/meta/palette.json"` → `road` 뒤에 새 종류가 **붙어** 있음(순서가 바뀌지 않음)
 
 ## 7. 끝내기 (보스)
-- 교사 화면 🏘️ 우리 마을: 시험 계정 **있음 · 닫힘**(90초 뒤)
+- 교사 화면 🏘️ 우리 마을: 시험 계정 **있음 · 닫힘**(✕ 로 닫았으면 바로, 아니면 90초 뒤)
 - 백업 한 번 더: `node scripts/village-backup.mjs --out …` → 시험 계정이 목록에 보임
 - 시험 계정 마을은 **그대로 둡니다**(지우기는 데이터 삭제 — 필요하면 사용자 판단)
 - 결과를 표로 보고: 0~6 각 칸 합격/불합격 + 불합격이면 무엇이 보였는지
@@ -103,7 +103,7 @@ node scripts/village-backup.mjs --out "C:/Users/USER/OneDrive - 정림초등학�
 
 ### 5-3. 마을이 이상하게 됐다(물건이 섞임·사라짐)
 - **학생 기기 저장소에 사본이 남습니다**(`rpg.village.<sid>.sync-backup`).
-- 원격은 1번 백업으로: `docs/village-restore.md` 절차(마을 닫고 90초 뒤, 보여 주기만 → `--apply --yes-production`).
+- 원격은 1번 백업으로: `docs/village-restore.md` 절차(마을 ✕ 로 닫은 뒤 — 닫기 신호가 막혔으면 90초 뒤, 보여 주기만 → `--apply --yes-production`).
 
 ---
 
