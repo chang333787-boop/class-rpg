@@ -1061,11 +1061,13 @@ function renderMobile() {
   const s = CUR;
   renderCharCard('mob-char-svg-wrap','mob-char-cname','mob-char-job','mob-char-combat','mob-equip-grid','mob-ability-bars', s);
   document.getElementById('mob-main-tab').innerHTML = buildMainHTML();
+  _restoreHomeOpen(document.getElementById('mob-main-tab'));   // [HOME-KEEP-OPEN-1]
 }
 
 function renderMain() {
   try {
     document.getElementById('main-area').innerHTML = buildMainHTML();
+    _restoreHomeOpen(document.getElementById('main-area'));    // [HOME-KEEP-OPEN-1]
   } catch(e) {
     console.error('renderMain 오류:', e);
     document.getElementById('main-area').innerHTML = `
@@ -1825,6 +1827,7 @@ function toggleRestTodo() {
   if (btn) btn.textContent = open
     ? `▲ 할 일 접기`
     : `▼ 할 일 더보기 (${wrap.querySelectorAll('.todo-card').length}개)`;
+  if (open) _homeOpen.set('rest-todo-wrap', '__rest-todo'); else _homeOpen.delete('rest-todo-wrap');   // [HOME-KEEP-OPEN-1]
 }
 
 function toggleSection(sectionId, arrowId) {
@@ -1834,6 +1837,28 @@ function toggleSection(sectionId, arrowId) {
   const open = sec.style.display === 'none';
   sec.style.display = open ? '' : 'none';
   if (arrow) arrow.textContent = open ? '▲' : '▼';
+  if (open) _homeOpen.set(sectionId, arrowId); else _homeOpen.delete(sectionId);   // [HOME-KEEP-OPEN-1]
+}
+
+// [HOME-KEEP-OPEN-1] 홈 펼침 상태를 다시 그리기 뒤에도 유지한다.
+//   onDataChange → renderMain·renderMobile 이 홈을 innerHTML 로 통째로 다시 그려 펼친 섹션이 기본(접힘)으로 돌아갔다.
+//   교실에선 누군가 저장할 때마다(몇 초) 다시 그려져 "오늘의 링크 ▼ 가 펼쳐지지 않는다"처럼 보였다(에뮬레이터: 다른 학생 저장 첫 번에 접힘).
+//   홈 섹션은 모두 기본 접힘이라 **펼친 것만** 기억한다. sectionId → arrowId (할 일 더보기는 '__rest-todo').
+const _homeOpen = new Map();
+function _restoreHomeOpen(box) {
+  if (!box) return;
+  for (const [sid, aid] of _homeOpen) {
+    const sec = box.querySelector('[id="' + sid + '"]');
+    if (!sec) continue;
+    sec.style.display = '';
+    if (aid === '__rest-todo') {
+      const btn = box.querySelector('[id="rest-todo-btn"]');
+      if (btn) btn.textContent = `▲ 할 일 접기`;
+    } else if (aid) {
+      const arrow = box.querySelector('[id="' + aid + '"]');
+      if (arrow) arrow.textContent = '▲';
+    }
+  }
 }
 
 function toggleSideSection(sectionId, arrowId) {
