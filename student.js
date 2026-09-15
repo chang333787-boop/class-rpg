@@ -2022,10 +2022,9 @@ function renderShop() {
       else if (inInv) badge = `<span style="color:var(--sky);font-size:.62rem"> 가진 것</span>`;
 
       // 구매 불가 사유 표시
-      let reasonHtml = '';
-      if (!owned && !check.ok) {
-        reasonHtml = `<div style="font-size:.62rem;color:var(--red);margin-top:.15rem">🔒 ${check.reason}</div>`;
-      }
+      // [SHOP-LOCK-HINT-1] 잠금 줄 + 여는 법 + 1 모자람 표시
+      const lock = owned ? { html: '', near: false } : shopLockInfo(CUR, item, check);
+      const reasonHtml = lock.html;
 
       // element 뱃지 (body만)
       const elemBadge = item.element
@@ -2038,7 +2037,7 @@ function renderShop() {
       const clickFn = owned ? `equipFromShop('${item.id}')` : `buyEquip('${item.id}')`;
 
       return `<div class="item-card ${!check.ok&&!owned?'cant-afford':''} shop-row-card"
-        onclick="${clickFn}" style="${!check.ok&&!owned?'opacity:.6':''}">
+        onclick="${clickFn}" style="${!check.ok&&!owned?(lock.near?'opacity:.9;border-color:rgba(126,224,160,.7);box-shadow:inset 0 0 0 1px rgba(126,224,160,.25)':'opacity:.6'):''}">
         <div style="display:flex;align-items:center;gap:.6rem;width:100%">
           <div style="flex-shrink:0">${iconImg(item, 'equipment', '3rem')}</div>
           <div style="flex:1;min-width:0">
@@ -2076,11 +2075,11 @@ function renderShop() {
           let badge = '';
           if (isEquip) badge = `<span style="color:var(--emerald);font-size:.62rem"> 장착 중</span>`;
           else if (inInv) badge = `<span style="color:var(--sky);font-size:.62rem"> 가진 것</span>`;
-          let reasonHtml = '';
-          if (!owned && !check.ok) reasonHtml = `<div style="font-size:.62rem;color:var(--red);margin-top:.15rem">🔒 ${check.reason}</div>`;
+          const lock = owned ? { html: '', near: false } : shopLockInfo(CUR, item, check);   // [SHOP-LOCK-HINT-1]
+          const reasonHtml = lock.html;
           const clickFn = owned ? `equipFromShop('${item.id}')` : `buyEquip('${item.id}')`;
           return `<div class="item-card ${!check.ok&&!owned?'cant-afford':''} shop-row-card"
-            onclick="${clickFn}" style="${!check.ok&&!owned?'opacity:.6':''}">
+            onclick="${clickFn}" style="${!check.ok&&!owned?(lock.near?'opacity:.9;border-color:rgba(126,224,160,.7);box-shadow:inset 0 0 0 1px rgba(126,224,160,.25)':'opacity:.6'):''}">
             <div style="display:flex;align-items:center;gap:.6rem;width:100%">
               <div style="flex-shrink:0">${iconImg(item, 'equipment', '3rem')}</div>
               <div style="flex:1;min-width:0">
@@ -3489,6 +3488,51 @@ function zoneGoldRangeText(mons, fallback) {
   if (!golds.length) return fallback;
   const lo = Math.min(...golds), hi = Math.max(...golds);
   return lo === hi ? `${lo}G` : `${lo} ~ ${hi}G`;
+}
+
+// ══ 상점 장비 잠금 줄 (SHOP-LOCK-HINT-1) ══════════════════════════════
+//  디자인 A-2(클로드코드\rpg_게임디자인_A\A2_신발_예술조건_20260915.md) 시안 그대로 — 값·구매 규칙은 안 바꾸고 보여 주는 말만.
+//   · 능력치 조건마다 "필요 (지금 n)", 이미 채운 조건은 ✅ — 하나 채우고 또 막히는 실망을 막는다
+//   · 여는 법 한 줄(능력치별) — 레벨도 모자라고 조건이 둘 이상 모자라면(아주 멀면) 생략
+//   · 골드·레벨은 괜찮고 조건 하나가 딱 1 모자라면 초록 테두리 + "퀘스트 하나면 열려요!"
+//  구매 판정(canBuyEquipment)은 그대로 쓰고, 이 함수는 표시만 만든다.
+const SHOP_STAT_HOW = {
+  art:    { ic: '🎨', how: '그림·만들기·악기 퀘스트로 예술이 올라요' },
+  health: { ic: '💪', how: '운동 퀘스트로 건강이 올라요' },
+  study:  { ic: '📚', how: '공부 퀘스트로 학습이 올라요' },
+  value:  { ic: '💝', how: '선행 퀘스트로 가치가 올라요' },
+  life:   { ic: '🏠', how: '생활 퀘스트로 생활이 올라요' },
+  read:   { ic: '📖', how: '책을 읽고 기록하면 독서가 올라요' },
+};
+function shopLockInfo(student, item, check) {
+  if (!check || check.ok) return { html: '', near: false };
+  const st = (student && student.stats) || {};
+  const names = (GAME_DATA && GAME_DATA.statNames) || {};
+  const goldShort  = (student.gold || 0) < item.price;
+  const levelShort = (student.level || 1) < (item.lv || 1);
+  const conds = Object.entries(item.cond || {}).filter(([, v]) => v && v > 0)
+    .map(([k, v]) => ({ k, need: v, have: st[k] || 0, name: names[k] || k }));
+  const unmet = conds.filter(c => c.have < c.need);
+  // 능력치 조건이 다 찼으면(골드·레벨·보유 때문에 막힘) 예전 문구 그대로
+  if (!unmet.length) return { html: `<div style="font-size:.62rem;color:var(--red);margin-top:.15rem">🔒 ${escHtml(check.reason)}</div>`, near: false };
+  const parts = [];
+  if (goldShort)  parts.push(escHtml(`골드 부족 (${item.price}G 필요)`));
+  if (levelShort) parts.push(escHtml(`Lv.${item.lv} 이상 필요`));
+  for (const c of conds) {
+    parts.push(c.have >= c.need
+      ? `<span style="color:var(--emerald)">✅ ${escHtml(c.name)} ${c.need}</span>`
+      : `${escHtml(c.name)} ${c.need} 필요 <span style="color:var(--txt3)">(지금 ${c.have})</span>`);
+  }
+  const near = !goldShort && !levelShort && unmet.length === 1 && unmet[0].need - unmet[0].have === 1;
+  const first = unmet[0], how = SHOP_STAT_HOW[first.k];
+  let howLine = '';
+  if (near) howLine = `${how ? how.ic : '⭐'} 퀘스트 하나면 열려요!`;
+  else if (how && !(levelShort && unmet.length >= 2)) howLine = `${how.ic} ${how.how}`;
+  return {
+    html: `<div style="font-size:.62rem;color:var(--red);margin-top:.15rem">🔒 ${parts.join(' · ')}</div>`
+        + (howLine ? `<div style="font-size:.62rem;color:var(--emerald);margin-top:.1rem">${howLine}</div>` : ''),
+    near,
+  };
 }
 
 // 무한배틀 하루 제한 횟수 가져오기
