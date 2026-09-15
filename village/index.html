@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>우리반 마을 · 시뮬 53차 — 어제 소식</title>
+<title>우리반 마을 · 시뮬 59차 — 길가 장식 3 · 계절 장식 2</title>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:#0f1116;
@@ -321,6 +321,18 @@ const K = {
     { g:'cone',c:0x8ed455, s:[.13,.42,.13], p:[1.1,.31,.8] },
     { g:'cone',c:0x8ed455, s:[.15,.50,.15], p:[.2,.35,-1.1] },
     { g:'cone',c:0x8ed455, s:[.14,.46,.14], p:[-.4,.33,1.0] } ] },
+  crosswalk:{ nm:'횡단보도', ic:'🚸', grp:'바닥', w:1, h:2, g:2, road:true, cap:200, parts:[
+    { g:'box', c:0x3a3a40, s:[CS,.16,CS*2],   p:[0,.08,0] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,-2.6] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,-.9] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,.9] },
+    { g:'box', c:0xf2f2f2, s:[CS*.8,.03,.5],  p:[0,.17,2.6] } ] },
+  treerow:{ nm:'가로수 열', ic:'🌳', grp:'바닥', w:1, h:3, g:3, road:true, cap:200, parts:[
+    { g:'box', c:P.pave,   s:[CS,.16,CS*3],   p:[0,.08,0] },
+    { g:'box', c:P.stoneD, s:[.6,.3,CS*3],    p:[-1.5,.15,0] },
+    { g:'cyl', c:0xc9a071, s:[.16,1.2,.16],   p:[-1.5,.8,-4] }, { g:'sph', c:P.leaf, s:[.8,.75,.8], p:[-1.5,1.9,-4] },
+    { g:'cyl', c:0xc9a071, s:[.16,1.2,.16],   p:[-1.5,.8,0] },  { g:'sph', c:P.leaf, s:[.8,.75,.8], p:[-1.5,1.9,0] },
+    { g:'cyl', c:0xc9a071, s:[.16,1.2,.16],   p:[-1.5,.8,4] },  { g:'sph', c:P.leaf, s:[.8,.75,.8], p:[-1.5,1.9,4] } ] },
   gravel:{ nm:'자갈길', ic:'⬛', grp:'바닥', w:1, h:1, g:2, cap:700, parts:[
     { g:'box', c:P.gravel, s:[CS*.94,.14,CS*.94], p:[0,.07,0] },
     { g:'sph', c:P.stoneD, s:[.30,.16,.30], p:[-.9,.16,-.7] },
@@ -346,6 +358,27 @@ const K = {
   rock:  { nm:'바위', ic:'🪨', grp:'낮은 것', w:1, h:1, g:12, cap:150, parts:[
     { g:'sph', c:P.stone,  s:[.92,.70,.86], p:[.1,.50,0] },
     { g:'sph', c:P.stoneD, s:[.46,.34,.44], p:[-.85,.26,.35] } ] },
+  trashcan:{ nm:'쓰레기통', ic:'🗑️', grp:'낮은 것', w:1, h:1, g:0, cap:150, parts:[
+    { g:'cyl', c:0x3f8f4a, s:[.5,1.1,.5],  p:[0,.55,0] },
+    { g:'cyl', c:0x2f6e38, s:[.56,.14,.56], p:[0,1.17,0] } ] },
+  mailbox: { nm:'우체통', ic:'📪', grp:'낮은 것', w:1, h:1, g:0, cap:150, parts:[
+    { g:'cyl', c:P.metalD, s:[.08,1.1,.08], p:[0,.55,0] },
+    { g:'box', c:P.red,    s:[.7,.8,.5],    p:[0,1.5,0] },
+    { g:'box', c:0xf2f2f2, s:[.5,.12,.06],  p:[0,1.5,.26] } ] },
+  minibench:{ nm:'짧은 의자', ic:'🪑', grp:'낮은 것', need:'쉼', w:1, h:1, g:0, cap:150, parts:[
+    { g:'box', c:P.wood,   s:[1.8,.14,.6],  p:[0,.9,0] },
+    { g:'box', c:P.wood,   s:[1.8,.6,.12],  p:[0,1.5,-.28] },
+    { g:'box', c:P.metalD, s:[.12,.9,.5],   p:[-.75,.45,0] },
+    { g:'box', c:P.metalD, s:[.12,.9,.5],   p:[.75,.45,0] } ] },
+  leafpile:{ nm:'낙엽 더미', ic:'🍂', grp:'낮은 것', w:1, h:1, g:0, cap:120, season:2, parts:[
+    { g:'sph', c:0xe08a3a, s:[1.2,.6,1.1],  p:[0,.3,0] },
+    { g:'sph', c:0xc9702a, s:[.8,.45,.8],   p:[.4,.55,.2] },
+    { g:'cyl', c:P.wood,   s:[.06,1.8,.06], p:[-.7,.9,-.4], rz:.5 } ] },
+  snowman: { nm:'눈사람', ic:'⛄', grp:'낮은 것', w:1, h:1, g:0, cap:120, season:3, parts:[
+    { g:'sph', c:0xf4f7fa, s:[1.1,1.0,1.1], p:[0,.9,0] },
+    { g:'sph', c:0xf4f7fa, s:[.8,.75,.8],   p:[0,2.2,0] },
+    { g:'sph', c:0xf4f7fa, s:[.6,.55,.6],   p:[0,3.1,0] },
+    { g:'cone',c:0xf08a3a, s:[.12,.5,.12],  p:[0,3.1,.5], rx:Math.PI/2 } ] },
   stump: { nm:'그루터기', ic:'🪵', grp:'낮은 것', w:1, h:1, g:14, cap:120, parts:[
     { g:'cyl', c:P.woodD, s:[.62,.56,.62], p:[0,.28,0] },
     { g:'cyl', c:P.woodL, s:[.56,.06,.56], p:[0,.58,0] },
@@ -387,6 +420,14 @@ const K = {
     { g:'cyl', c:P.stoneD, s:[.30,.12,.30], p:[0,.07,0] },
     { g:'cone',c:P.red,    s:[.62,.90,.10], p:[.42,3.55,0], rz:-Math.PI/2 },
     { g:'sph', c:P.glow,   s:[.13,.13,.13], p:[0,4.06,0], emis:0.8 } ] },
+  fruit: { nm:'과일나무', ic:'🍎', grp:'키 큰 것', w:1, h:1, g:28, cap:100, parts:[
+    { g:'cyl', c:0xb8895f, s:[.28,1.5,.28],  p:[0,.75,0] },
+    { g:'sph', c:P.leaf,   s:[1.35,1.2,1.35],p:[0,2.3,0] },
+    { g:'sph', c:P.leafL,  s:[.95,.85,.95],  p:[.5,2.95,-.3] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[.7,2.1,.9] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[-.8,2.4,.7] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[.2,1.9,1.2] },
+    { g:'sph', c:P.red,    s:[.16,.16,.16],  p:[-.4,2.9,1.0] } ] },
   bigtree:{ nm:'큰나무', ic:'🌲', grp:'키 큰 것', w:1, h:1, g:30, cap:100, parts:[
     { g:'cyl', c:0xb8895f, s:[.52,2.6,.52],  p:[0,1.3,0] },
     { g:'sph', c:P.leaf,   s:[2.15,2.0,2.15],p:[0,3.9,0] },
@@ -681,7 +722,7 @@ const HOUSE_LV = [null, houseParts(1), houseParts(2), houseParts(3)];
 const HOUSE_CAPS = [0, 2, 4, 6];
 const GROW_TICKS = 1800;                          // 하루 내내 😊 면 한 층
 /* ── 주변 가치(F33): 집 둘레 4칸의 꾸미기 무게. 놓을 때·치울 때만 센다 ── */
-const DECO = { tree:1, bigtree:1.5, flower:1, lawn:.5, bush:.6, pot:.5, lamp:.5, bench:1, fence:.3, wall:.2, stump:.3, logs:.2, rock:.3, flag:.3, post:.2, gravel:.2, laundry:.3, bridge:.3, statue:1, sbridge:.5, pond:1, fountain:1 };
+const DECO = { tree:1, fruit:1.2, bigtree:1.5, trashcan:.5, mailbox:.5, minibench:.5, leafpile:.5, snowman:.5, flower:1, lawn:.5, bush:.6, pot:.5, lamp:.5, bench:1, fence:.3, wall:.2, stump:.3, logs:.2, rock:.3, flag:.3, post:.2, gravel:.2, laundry:.3, bridge:.3, statue:1, sbridge:.5, pond:1, fountain:1 };
 const AMEN_R = 4, AMEN_MAX = 6;
 const amen = new Map();                                // 집 root → 점수
 function amenityOf(root) {
@@ -982,7 +1023,7 @@ function seasonTick() {
     const first = seasonNow < 0;
     seasonNow = si;
     chunks.forEach(ch => { if (ch.built) dirtyChunks.add(chunkKey(ch.cx, ch.cz)); });   // 잎 색을 다시 합친다(보이는 것부터)
-    forestSeason();
+    forestSeason(); if (!first) buildTray();   /* 계절 장식 트레이 갱신(59차) */
     if (!first) toast(['🌸 봄이 왔어요', '☀️ 여름이에요', '🍂 가을이에요', '❄️ 겨울이에요'][si], true);
   }
   /* 바닥·하늘은 하루에 걸쳐 부드럽게 */
@@ -1168,6 +1209,89 @@ for (const g in GEO) {
   const geo = GEO[g];
   BASE[g] = { pos: geo.attributes.position.array, nrm: geo.attributes.normal.array, idx: geo.index.array, nv: geo.attributes.position.count };
 }
+
+/* ══════════════════════════════════════════════════════════════
+   glb 모델(54차) — 디자인 2의 저폴리 모델(assets/models)을 '부위 하나'로 쓴다.
+   · 최소 파서: GLB(JSON+BIN) → 노드 TRS 적용한 정점·법선·인덱스 + 정점마다 재료 번호. 블렌더 기본 내보내기(정점 float32·인덱스 u16/u32·stride 없음)만.
+   · 모델은 base64 로 안에 넣는다(file:// 는 fetch 가 막힌다). 서버용 판은 base64 를 비우고 ./assets/models/ 에서 fetch.
+   · 없으면(#glb=none · fetch 실패) 프리미티브 그대로. #glb=house+tree+person+shop 으로 종류별 켜기(측정용).
+   ══════════════════════════════════════════════════════════════ */
+const MODEL_URL = './assets/models/';
+const MODEL_B64 = { /* 서버용: 모델은 ./assets/models/*.glb 를 상대 경로로 받는다(54차) */ };
+const GLB_KIND = { house: 'house', tree: 'tree_round', bigtree: 'tree_pine', fruit: 'tree_fruit', shop: 'shop', school: 'school', library: 'library', station: 'station', museum: 'museum', crosswalk: 'crosswalk', treerow: 'treerow', trashcan: 'trashcan', mailbox: 'mailbox', minibench: 'minibench', leafpile: 'leafpile', snowman: 'snowman', well: 'well', fountain: 'fountain', lamp: 'lamp', pond: 'pond', pavilion: 'pavilion', play: 'playground', bench: 'bench' };
+const GLB_PROP = new Set(['well', 'fountain', 'lamp', 'pond', 'pavilion', 'play', 'bench']);
+const GLB_SPECIAL = new Set(['school', 'library', 'station', 'museum']);
+const GLB_STREET = new Set(['crosswalk', 'treerow']);
+const GLB_DECO = new Set(['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman']);   // 길가·계절 장식은 'deco'(59차)   // 길 조각 둘은 'street' 로(58차)   // 특별 4종은 'special' 로 켜고 끈다(57차)   // 물건 7종은 'props' 하나로 켜고 끈다(55차)   // 종류 → 모델(집 2·3층은 partsOf 에서)
+const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_round', 'tree_pine', 'tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'], person: ['person'], shop: ['shop'], props: ['well', 'fountain', 'lamp', 'pond', 'pavilion', 'playground', 'bench'], special: ['school', 'library', 'station', 'museum'], visitor: ['visitor'], street: ['crosswalk', 'treerow'], deco: ['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman'] };
+const GLB_ON = new Set(HP.glb == null ? ['house', 'tree', 'person', 'shop', 'props', 'special', 'visitor', 'street', 'deco'] : String(HP.glb).split('+').filter(x => x && x !== 'none'));
+if (OFF.has('glb')) GLB_ON.clear();
+const GLB = {};                                       // 모델 이름 → { pos, nrm, idx, nv, vcol, vkind, tri }
+const VKIND = { roof: 1, leaf: 2, leaf2: 3, window: 4, sign: 5, lamp: 6 };   // 정점 종류: 지붕 색 돌리기 · 잎 계절색 · 창 밤불 · 빛나는 것
+function parseGLB(buf) {
+  const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('glb 아님');
+  const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
+  const bo = 20 + jl, bl = dv.getUint32(bo, true), bin = buf.slice(bo + 8, bo + 8 + bl);
+  const CT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array }, NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+  const acc = i => { const a = json.accessors[i], bv = json.bufferViews[a.bufferView]; return new CT[a.componentType](bin, (bv.byteOffset || 0) + (a.byteOffset || 0), a.count * NC[a.type]); };
+  const mats = (json.materials || []).map(m => { const c = (m.pbrMetallicRoughness && m.pbrMetallicRoughness.baseColorFactor) || [1, 1, 1, 1]; return { name: m.name || '', color: [c[0], c[1], c[2]] }; });
+  const pos = [], nrm = [], idx = [], vmat = [];
+  const N3 = new THREE.Matrix3(), tv = new THREE.Vector3(), tp = new THREE.Vector3(), tq = new THREE.Quaternion(), ts = new THREE.Vector3();
+  function node(ni, parent) {
+    const n = json.nodes[ni], m = new THREE.Matrix4();
+    if (n.matrix) m.fromArray(n.matrix); else m.compose(tp.fromArray(n.translation || [0, 0, 0]), tq.fromArray(n.rotation || [0, 0, 0, 1]), ts.fromArray(n.scale || [1, 1, 1]));
+    m.premultiply(parent);
+    if (n.mesh != null) json.meshes[n.mesh].primitives.forEach(p => {
+      if (p.mode != null && p.mode !== 4) return;
+      const Pa = acc(p.attributes.POSITION), Na = p.attributes.NORMAL != null ? acc(p.attributes.NORMAL) : null, Ia = p.indices != null ? acc(p.indices) : null, off = pos.length / 3, nv = Pa.length / 3;
+      N3.getNormalMatrix(m);
+      for (let v = 0; v < nv; v++) {
+        tv.set(Pa[v * 3], Pa[v * 3 + 1], Pa[v * 3 + 2]).applyMatrix4(m); pos.push(tv.x, tv.y, tv.z);
+        if (Na) tv.set(Na[v * 3], Na[v * 3 + 1], Na[v * 3 + 2]).applyMatrix3(N3).normalize(); else tv.set(0, 1, 0);
+        nrm.push(tv.x, tv.y, tv.z); vmat.push(p.material == null ? 0 : p.material);
+      }
+      if (Ia) for (let t = 0; t < Ia.length; t++) idx.push(Ia[t] + off); else for (let t = 0; t < nv; t++) idx.push(t + off);
+    });
+    (n.children || []).forEach(c => node(c, m));
+  }
+  const sc = json.scenes ? json.scenes[json.scene || 0] : { nodes: json.nodes.map((_, i) => i) };
+  sc.nodes.forEach(ni => node(ni, new THREE.Matrix4()));
+  const nv = pos.length / 3, vcol = new Float32Array(nv * 3), vkind = new Uint8Array(nv);
+  for (let v = 0; v < nv; v++) { const mt = mats[vmat[v]] || { name: '', color: [1, 1, 1] }; vcol[v * 3] = mt.color[0]; vcol[v * 3 + 1] = mt.color[1]; vcol[v * 3 + 2] = mt.color[2]; vkind[v] = VKIND[mt.name] || 0; }
+  return { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv, vcol, vkind, vmat: Uint8Array.from(vmat), mats, tri: idx.length / 3 };
+}
+function b64buf(t) { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
+function glbRegister(name, buf) { const g = parseGLB(buf); GLB[name] = g; BASE['glb:' + name] = g; }
+const FRUIT_MODELS = ['tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'];
+const GLB_PARTS = {};
+function glbParts(kind, name) {                     // 켜져 있고 모델이 있으면 '부위 하나', 아니면 null(프리미티브)
+  if (!GLB_ON.has(kind) || !GLB[name]) return null;
+  return GLB_PARTS[name] || (GLB_PARTS[name] = [{ g: 'glb:' + name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
+}
+/* 모델 한 재료만 떼어 BufferGeometry 로(사람: 재료별 InstancedMesh) */
+function glbSubGeo(g, matName) {
+  const mi = g.mats.findIndex(m => m.name === matName); if (mi < 0) return null;
+  const map = new Int32Array(g.nv).fill(-1), pos = [], nrm = [], idx = [];
+  for (let t = 0; t < g.idx.length; t += 3) {
+    if (g.vmat[g.idx[t]] !== mi) continue;
+    for (let k = 0; k < 3; k++) { const v = g.idx[t + k]; if (map[v] < 0) { map[v] = pos.length / 3; pos.push(g.pos[v * 3], g.pos[v * 3 + 1], g.pos[v * 3 + 2]); nrm.push(g.nrm[v * 3], g.nrm[v * 3 + 1], g.nrm[v * 3 + 2]); } idx.push(map[v]); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setIndex(idx); geo.computeBoundingSphere();
+  return geo;
+}
+const glbStats = { 안에서: 0, 받아서: 0, 실패: 0 };
+let glbLateApply = null;                              // 서버용 판: 모델이 늦게 오면 청크·사람 다시(아래 folkPoolBuild 뒤에 채움)
+(function glbLoad() {
+  const want = new Set(); GLB_ON.forEach(k => (GLB_NEED[k] || []).forEach(n => want.add(n)));
+  const late = [];
+  want.forEach(n => {
+    if (MODEL_B64[n]) { try { glbRegister(n, b64buf(MODEL_B64[n])); glbStats.안에서++; } catch (e) { glbStats.실패++; console.warn('모델 못 읽음', n, e); } }
+    else late.push(fetch(MODEL_URL + n + '.glb').then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(buf => { glbRegister(n, buf); glbStats.받아서++; }).catch(e => { glbStats.실패++; console.warn('모델 없음 → 프리미티브', n, e); }));
+  });
+  if (late.length) Promise.all(late).then(() => { if (glbLateApply) glbLateApply(); });
+})();
+window.__glb = () => ({ 켠것: [...GLB_ON], 모델: Object.keys(GLB), 사람부위: PERSON_PARTS.length, 손님부위: VISITOR_PARTS.length, 삼각: Object.fromEntries(Object.entries(GLB).map(([k, g]) => [k, g.tri])), ...glbStats });
 const _m = new THREE.Matrix4(), _n3 = new THREE.Matrix3(), _v = new THREE.Vector3(), _col = new THREE.Color();
 const _p = new THREE.Vector3(), _sc = new THREE.Vector3();
 const qLocal = new THREE.Quaternion(), qWorld = new THREE.Quaternion();
@@ -1193,7 +1317,11 @@ function partMatrix(kind, x, y, rot, pt, out) {
   return out.compose(_p, qWorld, _sc);
 }
 function bucketOf(pt) { return pt.op ? 'glass' : 'lit'; }
-function partsOf(rec) { return rec.k === 'house' ? HOUSE_LV[houseLv(rec.root)] : K[rec.k].parts; }
+function partsOf(rec) {
+  if (rec.k === 'house') { const lv = houseLv(rec.root); return glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house') || HOUSE_LV[lv]; }
+  if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
+  const mn = GLB_KIND[rec.k]; return (mn && glbParts(rec.k === 'bigtree' ? 'tree' : GLB_PROP.has(rec.k) ? 'props' : GLB_SPECIAL.has(rec.k) ? 'special' : GLB_STREET.has(rec.k) ? 'street' : GLB_DECO.has(rec.k) ? 'deco' : rec.k, mn)) || K[rec.k].parts;
+}
 
 function buildChunk(cx, cz) {
   const key = chunkKey(cx, cz);
@@ -1214,11 +1342,14 @@ function buildChunk(cx, cz) {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
       partMatrix(rec.k, x, y, rec.rot, pt, _m); _n3.getNormalMatrix(_m);
-      _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
+      const vc = base.vcol, vk = base.vkind;
+      if (!vc) _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
       for (let v = 0; v < base.nv; v++) {
         _v.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(_m); b.pos.push(_v.x, _v.y, _v.z);
         _v.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(_n3).normalize(); b.nrm.push(_v.x, _v.y, _v.z);
-        b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : 0); b.night.push(lit && pt.c === P.glass ? 1 : 0);
+        let kind = 0;
+        if (vc) { kind = vk[v]; if (kind === 1) _col.setHex(roofC); else if (kind === 2 || kind === 3) _col.setHex(seasonColor(kind === 2 ? P.leaf : P.leafL)); else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
+        b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? 1 : 0);
       }
       for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off);
     });
@@ -1826,7 +1957,7 @@ function buildTray() {
     tabs.appendChild(b);
   });
 
-  ORDER.filter(k => K[k].grp === curGroup).forEach(kind => {
+  ORDER.filter(k => K[k].grp === curGroup && (K[k].season == null || K[k].season === seasonIdx())).forEach(kind => {   /* 계절 장식(59차): 가을·겨울에만 트레이에 */
     const k = K[kind];
     const el = document.createElement('div');
     const lw = lockedWhy(kind);
@@ -1885,7 +2016,7 @@ const SKIN = { 1:0xFFCC80, 2:0xFDDCB5, 3:0xC68642, 4:0x8D5524 };
 const HAIR = { 1:0x3E1F00, 2:0x6A1B9A, 3:0x0D2B6B, 4:0x1B5E20 };
 const TOPC = { 1:0x3E2723, 2:0x7B1FA2, 3:0x1565C0, 4:0x2E7D32 };
 
-const PERSON_PARTS = [
+const PERSON_PARTS_PRIM = [
   { g:'cyl',  c:'top',   s:[.55,1.15,.42], p:[0,.90,0] },
   { g:'cyl',  c:0x3b4252,s:[.50,.75,.38],  p:[0,.28,0] },
   { g:'cyl',  c:'skin',  s:[.15,.85,.15],  p:[-.62,.95,0] },
@@ -2011,14 +2142,34 @@ function blockedFor(cell, who) {
    놓기 한 번마다 맞추면 죽 끌어 놓을 때 같은 일을 열여섯 번 한다. */
 let folksDirty = true;
 
-const folkPool = PERSON_PARTS.map(pt => {
-  const im = new THREE.InstancedMesh(GEO[pt.g],
-    new THREE.MeshLambertMaterial({ color:0xffffff, flatShading:true }), FOLK_CAP);
-  im.castShadow = true; im.receiveShadow = true;
-  im.count = 0; im.frustumCulled = false;
-  scene.add(im);
-  return im;
-});
+let PERSON_PARTS = PERSON_PARTS_PRIM, folkPool = [];
+function personGlbParts() {                          // glb 사람(54차): 재료별 부위, 첫 부위(셔츠)가 클릭 판정용
+  const g = GLB.person; if (!g || !GLB_ON.has('person')) return null;
+  const spec = [['shirt', 'top'], ['pants', 0x3b4252], ['skin', 'skin'], ['hair', 'hair'], ['shoe', 0x2a1b10]], out = [];
+  for (const [mat, c] of spec) { const geo = glbSubGeo(g, mat); if (geo) out.push({ g: 'glb', geo, c, s: [1.3, 1.3, 1.3], p: [0, 0, 0] })   /* 1.85 → 2.4: 문(2.0)보다 조금 큰 치비, 44px 화면에서도 보이게 */; }
+  return out.length ? out : null;
+}
+let VISITOR_PARTS = [];
+function visitorGlbParts() {                         // 손님(관광객) glb(57차): 셔츠·바지·모자·배낭·카메라는 모델 색, 피부·머리는 4벌
+  const g = GLB.visitor; if (!g || !GLB_ON.has('visitor')) return [];
+  const out = []; const hexOf = n => { const m = g.mats.find(x => x.name === n); return m ? _col.setRGB(m.color[0], m.color[1], m.color[2]).getHex() : 0x888888; };
+  for (const mat of ['shirt', 'pants', 'skin', 'hair', 'shoe', 'hat', 'bag', 'cam']) { const geo = glbSubGeo(g, mat); if (geo) out.push({ g: 'glb', geo, c: mat === 'skin' ? 'skin' : mat === 'hair' ? 'hair' : hexOf(mat), s: [1.3, 1.3, 1.3], p: [0, 0, 0] }); }
+  return out;
+}
+function folkPoolBuild(parts) {
+  folkPool.forEach(m => { scene.remove(m); m.dispose(); });
+  PERSON_PARTS = parts; VISITOR_PARTS = visitorGlbParts();
+  folkPool = parts.concat(VISITOR_PARTS).map(pt => {
+    const im = new THREE.InstancedMesh(pt.geo || GEO[pt.g],
+      new THREE.MeshLambertMaterial({ color:0xffffff, flatShading:true }), FOLK_CAP);
+    im.castShadow = true; im.receiveShadow = true;
+    im.count = folks.length; im.frustumCulled = false;
+    scene.add(im);
+    return im;
+  });
+}
+folkPoolBuild(personGlbParts() || PERSON_PARTS_PRIM);
+glbLateApply = () => { chunks.forEach((ch, key) => { if (ch.built) dirtyChunks.add(key); }); const pp = personGlbParts(); if (pp) folkPoolBuild(pp); };
 
 const isRoad = i => { const c = cells[i]; return !!(c && K[c.k].road); };
 
@@ -2079,7 +2230,7 @@ function roadBFS(from, who, radius) {
 
 /* 목적지를 하나 고른다 — 무엇이든 옆에 있는 길 칸을 좋아한다(집·광장·우물 앞) */
 /* 시간대별로 끌리는 필요(F26): 아침 물 · 낮 장보기 · 오후 놀이 · 저녁 쉼 */
-function hourPref(h) { return h >= 6 && h < 9 ? '물' : h >= 11 && h < 14 ? '장보기' : h >= 14 && h < 18 ? '놀이' : h >= 18 && h < 20 ? '쉼' : null; }
+function hourPref(h) { return h >= 6 && h < 9 ? '물' : h >= 14 && h < 17 ? '놀이' : h >= 17 && h < 19 ? '장보기' : h >= 19 && h < 21 ? '쉼' : null; }   // 장보기는 퇴근 뒤 17~19(54차·보스 14:50)
 function needBeside(i) {
   const x = cX(i), y = cY(i);
   for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && K[c.k].need) return K[c.k].need; }
@@ -2494,7 +2645,7 @@ function pickFolk(clientX, clientY) {
   if (!folks.length || mapMode) return null;
   folkNdc.set((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
   folkRay.setFromCamera(folkNdc, camera);
-  const hits = folkRay.intersectObject(folkPool[0], false);
+  const hits = folkRay.intersectObjects(VISITOR_PARTS.length ? [folkPool[0], folkPool[PERSON_PARTS.length]] : [folkPool[0]], false);
   if (!hits.length || hits[0].instanceId == null) return null;
   return folks[hits[0].instanceId] || null;
 }
@@ -3248,8 +3399,10 @@ const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
 function drawFolks(now) {
   if (!folks.length || OFF.has('folks')) return;
   const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS);   // 이전 틱 → 이번 틱 사이 어디쯤인가
-  PERSON_PARTS.forEach((pt, pi) => {
-    const im = folkPool[pi];
+  const hasV = VISITOR_PARTS.length > 0;                        // 손님 모델이 있으면 역 손님은 손님 부위로만 그린다(57차)
+  const tourist = f => !!f.visitor && !f.neighbor;
+  const draw = (parts, base, mine) => parts.forEach((pt, pi) => {
+    const im = folkPool[base + pi];
     folks.forEach((f, i) => {
       const bob = f.walking ? Math.abs(Math.sin(now / 150 + i)) * 0.09 : 0;
       const th = f.dir, co = Math.cos(th), si = Math.sin(th);
@@ -3257,7 +3410,7 @@ function drawFolks(now) {
       const pz = -pt.p[0] * si + pt.p[2] * co;
       const fx = f.px == null ? f.x : f.px + (f.x - f.px) * a;
       const fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a;
-      if (f.state === 'inside' || (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60))) { folkDummy.position.set(0, -50, 0); folkDummy.scale.set(0, 0, 0); folkDummy.updateMatrix(); im.setMatrixAt(i, folkDummy.matrix); return; }
+      if (!mine(f) || f.state === 'inside' || (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60))) { folkDummy.position.set(0, -50, 0); folkDummy.scale.set(0, 0, 0); folkDummy.updateMatrix(); im.setMatrixAt(i, folkDummy.matrix); return; }
       folkDummy.position.set(fx + px, pt.p[1] + bob, fz + pz);
       folkDummy.rotation.set(0, th, 0);
       folkDummy.scale.set(pt.s[0], pt.s[1], pt.s[2]);
@@ -3271,6 +3424,8 @@ function drawFolks(now) {
     im.instanceMatrix.needsUpdate = true;
     if (im.instanceColor) im.instanceColor.needsUpdate = true;
   });
+  draw(PERSON_PARTS, 0, f => !(hasV && tourist(f)));
+  if (hasV) draw(VISITOR_PARTS, PERSON_PARTS.length, tourist);
 }
 
 /* ══════════════════════════════════════════════════════════════
