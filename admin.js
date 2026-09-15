@@ -522,6 +522,16 @@ function renderStudentTable() {
 // ══════════════════════════════════════════════════
 //  STUDENT DETAIL MODAL
 // ══════════════════════════════════════════════════
+// [DET-PW-MASK-1] 교사 화면은 TV 로 미러링된다 — 학생 상세의 비밀번호는 ●●●● 로 가리고 [보기] 로만 잠깐 보인다
+function toggleDetPw() {
+  const inp = document.getElementById('det-pw');
+  const btn = document.getElementById('det-pw-toggle');
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (btn) btn.textContent = show ? '가리기' : '보기';
+}
+
 function openStudentDetail(id) {
   const s = DB.getStudent(id);
   document.getElementById('modal-student-title').textContent = `${s.avatar} ${s.name} 상세`;
@@ -540,7 +550,10 @@ function openStudentDetail(id) {
             ${GAME_DATA.titles.map(t=>`<option ${s.title===t?'selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-group"><label class="form-label">비밀번호</label>
-          <input class="form-input" id="det-pw" value="${s.pw||'1234'}"></div>
+          <div style="display:flex;gap:.4rem">
+            <input class="form-input flex-1" type="password" autocomplete="new-password" id="det-pw" value="${escHtml(s.pw||'1234')}">
+            <button type="button" class="btn-sm outline" id="det-pw-toggle" onclick="toggleDetPw()">보기</button>
+          </div></div>
         <div class="form-group"><label class="form-label">레벨</label>
           <input class="form-input" type="number" id="det-lv" value="${s.level}"></div>
         <div class="form-group"><label class="form-label">골드</label>
