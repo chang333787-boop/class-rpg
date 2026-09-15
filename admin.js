@@ -4683,7 +4683,10 @@ function saveBattleSettings() {
   [0,1,2,3,4,5,6,7].forEach(lv => {
     elementMults[lv] = parseFloat(document.getElementById(`bs-el-${lv}`)?.value) || SKILL_MULTIPLIERS.element[lv];
   });
+  // [BATTLE-SET-1] 장비·스킬북 조정값(equipment·skillBooks)은 다른 화면이 같은 노드 아래 저장한다.
+  //   통째로 새 객체를 만들면 set 이 그것들을 운영에서 지웠다 → 기존 값을 먼저 펼친다.
   db.settings.customBattleSettings = {
+    ...(db.settings.customBattleSettings || {}),
     dailyBattleLimit:    parseInt(document.getElementById('bs-daily-limit').value) || 3,
     infiniteBattleLimit: parseInt(document.getElementById('bs-infinite-limit').value) ?? 1,
     ghostNormalMult:  parseFloat(document.getElementById('bs-ghost-mult').value) || 0.55,
@@ -5743,7 +5746,8 @@ function loadSettings() {
   document.getElementById('set-base-gold').value    = s.baseGold||30;
   document.getElementById('set-monster-rate').value = s.monsterWinRate||80;
   const limitEl = document.getElementById('set-monster-limit');
-  if (limitEl) limitEl.value = s.monsterDailyLimit||2;
+  // [BATTLE-SET-1] 이 칸은 예전에 settings.monsterDailyLimit(읽는 곳 0)에 썼다. 실제 전투가 읽는 키로 통일.
+  if (limitEl) limitEl.value = (s.customBattleSettings || {}).dailyBattleLimit ?? 3;
   const startEl = document.getElementById('set-access-start');
   const endEl   = document.getElementById('set-access-end');
   if (startEl) startEl.value = s.accessStart||'08:30';
@@ -5817,7 +5821,7 @@ function saveSettings() {
     baseExp:          parseInt(document.getElementById('set-base-exp').value)||30,
     baseGold:         parseInt(document.getElementById('set-base-gold').value)||30,
     monsterWinRate:   parseInt(document.getElementById('set-monster-rate').value)||80,
-    monsterDailyLimit: limitEl ? (parseInt(limitEl.value)||2) : 2,
+    ...(limitEl ? { customBattleSettings: { ...(prev.customBattleSettings || {}), dailyBattleLimit: parseInt(limitEl.value) || 3 } } : {}),   // [BATTLE-SET-1]
     accessStart: document.getElementById('set-access-start')?.value || '08:30',
     accessEnd:   document.getElementById('set-access-end')?.value   || '16:00',
   });
