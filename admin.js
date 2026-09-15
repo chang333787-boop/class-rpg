@@ -52,13 +52,13 @@ async function adminLogin() {
     populateSelectStudents();
     autoBackupOnLogin(); // 오늘 백업 없으면 자동 저장
   } else {
-    document.getElementById('admin-login-err').textContent = '비밀번호가 틀렸습니다!';
+    document.getElementById('admin-login-err').textContent = '❌ 비밀번호가 틀렸어요';
   }
 }
 
 function changeAdminPw() {
   const newPw = document.getElementById('set-admin-pw').value.trim();
-  if (!newPw || newPw.length < 4) { notify('비밀번호는 4자 이상이어야 합니다', 'error'); return; }
+  if (!newPw || newPw.length < 4) { notify('비밀번호는 4자 이상이어야 해요', 'error'); return; }
   DB.setAdminPw(newPw);
   document.getElementById('set-admin-pw').value = '';
   notify('🔑 관리자 비밀번호 변경 완료!');
@@ -273,7 +273,7 @@ async function renderVillagesPage() {
   const n = rows.filter(r => r.has).length;
   const orphan = Object.keys(list).filter(id => !seen.has(id));
   sum.textContent = `${students.length}명 중 ${n}명 저장됨`;
-  note.innerHTML = (n === 0 ? '아직 온라인에 저장된 마을이 없어요. 마을 저장 규칙을 게시하고 마을 새 판이 올라간 뒤부터 쌓입니다.<br>' : '')
+  note.innerHTML = (n === 0 ? '아직 온라인에 저장된 마을이 없어요. 서버 저장이 켜진 뒤부터 쌓여요.<br>' : '')
     + (orphan.length ? `학생 목록에 없는 마을 ${orphan.length}개: ${orphan.map(escHtml).join(', ')}<br>` : '')
     + '마을 구경 링크는 마을 쪽에서 구경 모드(?visit=)를 지원한 뒤 붙입니다.';
 }
@@ -903,7 +903,7 @@ function openAddStudent() {
       <div class="modal-title">👤 학생 추가 (한 번에 최대 6명)</div>
       <button class="modal-close" onclick="this.closest('.overlay').remove()">✕</button>
     </div>
-    <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">이름을 입력하면 해당 줄이 활성화돼요. 비어있는 줄은 건너뜁니다.</div>
+    <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">이름을 입력하면 해당 줄이 활성화돼요. 비어 있는 줄은 건너뛰어요.</div>
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse">
       <thead><tr class="text-muted-sm">
@@ -1186,13 +1186,13 @@ function quickApprove() {
       s.pendingRewards = [...(s.pendingRewards||[]), {...reward}];
       DB.saveStudent(s);
     });
-    notify(`✅ 전체 학생에게 "${name}" 보상 대기를 만들었습니다. 승인하면 지급됩니다.`);
+    notify(`✅ 전체 학생에게 "${name}" 보상 대기를 만들었어요. 승인하면 지급돼요.`);
   } else {
     const s = DB.getStudent(studentId);
     if (!s) { notify('학생을 찾을 수 없어요', 'error'); return; }
     s.pendingRewards = [...(s.pendingRewards||[]), reward];
     DB.saveStudent(s);
-    notify(`✅ ${s.name}에게 "${name}" 보상 대기를 만들었습니다. 승인하면 지급됩니다.`);
+    notify(`✅ ${s.name}에게 "${name}" 보상 대기를 만들었어요. 승인하면 지급돼요.`);
   }
   renderAll();
 }
@@ -1223,7 +1223,7 @@ function fillPreset(type) {
   document.querySelectorAll('[onclick^="fillPreset"]').forEach(b => b.classList.remove('success'));
   event?.target?.classList.add('success');
   const hint = document.getElementById('last-preset-hint');
-  if (hint) hint.textContent = `"${p.name}" 프리셋 선택됨`;
+  if (hint) hint.textContent = `"${p.name}" 보상 칸 채움`;
 }
 
 // ── 필터 ──
@@ -1537,7 +1537,7 @@ function renderPromotionList() {
             <div class="ac-left">
               <div class="ac-student" style="color:var(--red)">알 수 없는 학생</div>
               <div class="ac-quest">studentId: ${req.studentId} · Lv.${req.level} · ${req.date||''}</div>
-              <div class="ac-rewards"><span class="ac-tag" style="background:rgba(231,76,60,.15);color:var(--red)">⚠️ 고아 요청 — 학생이 삭제됐거나 ID가 다릅니다</span></div>
+              <div class="ac-rewards"><span class="ac-tag" style="background:rgba(231,76,60,.15);color:var(--red)">⚠️ 주인 없는 신청 — 학생 목록에 없는 학생의 신청이에요</span></div>
             </div>
             <div class="ac-right">
               <button class="btn-sm danger" onclick="rejectPromotion('${req.id}')">🗑️ 삭제</button>
@@ -1595,7 +1595,7 @@ function renderPromotionList() {
           <div style="height:100%;background:linear-gradient(90deg,var(--sky),var(--purple));border-radius:3px;width:${expPct}%"></div>
         </div>
         <span class="text-muted-tiny">${s.exp||0} EXP</span>
-        ${isPending?'<span style="font-size:.68rem;background:rgba(155,89,182,.2);color:var(--purple);border-radius:20px;padding:.1rem .45rem;font-weight:700">신청중</span>':''}
+        ${isPending?'<span style="font-size:.68rem;background:rgba(155,89,182,.2);color:var(--purple);border-radius:20px;padding:.1rem .45rem;font-weight:700">신청 중</span>':''}
       </div>`;
     }).join('');
   } catch(e) {
@@ -1610,7 +1610,7 @@ function cleanupOrphanPromoRequests() {
   const validIds = new Set(DB.getStudents().map(s=>s.id));
   const valid = DB.getPromotionRequests().filter(r=>validIds.has(r.studentId));
   DB.savePromotionRequests(valid);
-  notify('🧹 고아 승급 요청 정리 완료');
+  notify('🧹 주인 없는 승급 신청 정리 완료');
   renderPromotionList();
   updatePromoBadge();
 }
@@ -2224,7 +2224,7 @@ async function deleteOrphanArtworks() {
   // [DEDUPE-ART-1] 통째 set 대신 지울 키만 — 그 순간 올라온 작품을 지우지 않는다
   const r = await normalizeArtworkKeys(a => validIds.has(a.studentId));
   renderArtworkAdmin();
-  notify(`🗑️ 고아 작품 ${r.removed}개 정리 완료`);
+  notify(`🗑️ 주인 없는 작품 ${r.removed}개 정리 완료`);
 }
 
 function openEditArtworkModal(artworkId) {
@@ -3109,7 +3109,7 @@ function assignMemAlbum(memId, albumId) {
 
 function approveMemory(id) {
   DB.saveMemory({ id, approvalStatus:'approved', approvedAt: Date.now() });
-  notify('✅ 승인 완료! 키오스크에 공개됩니다');
+  notify('✅ 승인 완료! 키오스크에 공개돼요');
   renderMemoriesPage();
 }
 function rejectMemory(id) {
@@ -3621,7 +3621,7 @@ function deleteArtwork(id) {
   if (!confirm('이 작품을 삭제할까요?')) return;
   DB.deleteArtwork(id);
   renderArtworkAdmin();
-  notify('작품을 삭제했습니다');
+  notify('작품을 삭제했어요');
 }
 
 // ══════════════════════════════════════════════════
@@ -3673,7 +3673,7 @@ function dismissPwReset(reqId) {
   DB.removePwResetRequest(reqId);
   renderPwResetList();
   updatePwResetBadge();
-  notify('요청을 무시했습니다');
+  notify('요청을 무시했어요');
 }
 
 // ── 퀘스트 템플릿 시스템 ──
@@ -4022,7 +4022,7 @@ function postCheckedQuests(type) {
       : 0;
     // 이미 같은 이름의 활성 퀘스트가 있으면 중복 방지
     if (db.boardQuests.find(q => q.name===t.name && q.active!==false)) {
-      notify(`"${t.name}" 은 이미 게시중이에요`, 'error');
+      notify(`"${t.name}"은 이미 게시 중이에요`, 'error');
       return;
     }
     db.boardQuests.push({
@@ -4069,7 +4069,7 @@ function saveAutoDaily() {
   //   기존엔 '오늘 이미 처리됨'으로 막혀 교사가 저장해도 종일 반영되지 않았다.
   DB.saveSettings({ ...prev, autoDailyQuests: items, autoDailyLastDate: '' });
   if (items.length === 0) {
-    notify('⏹️ 자동 등록을 껐어요. 이제 매일 아침 자동 게시가 되지 않습니다.');
+    notify('⏹️ 자동 등록을 껐어요. 이제 매일 아침 자동 게시되지 않아요.');
     renderAutoDailyStatus();
     return;
   }
@@ -4228,7 +4228,7 @@ function renderBoardQuestList() {
   if (!container) return;
 
   if (boardQuests.length === 0) {
-    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">게시중인 퀘스트가 없어요</div>';
+    container.innerHTML = '<div style="padding:1.5rem;text-align:center;font-size:.83rem;color:var(--txt3)">게시 중인 퀘스트가 없어요</div>';
     return;
   }
 
@@ -4255,7 +4255,7 @@ function renderBoardQuestList() {
         <span style="font-size:.83rem;font-weight:600;flex:1">${escHtml(s.name)}</span>
         ${done
           ? `<span style="font-size:.72rem;color:var(--emerald);font-weight:700">✅ 완료</span>`
-          : `${pending?`<span style="font-size:.68rem;color:var(--gold);font-weight:700;margin-right:.35rem">⏳ 신청중</span>`:''}
+          : `${pending?`<span style="font-size:.68rem;color:var(--gold);font-weight:700;margin-right:.35rem">⏳ 신청 중</span>`:''}
              <button class="btn-sm success" style="font-size:.7rem;padding:.25rem .6rem"
               onclick="completeQuestForStudent('${q.id}','${s.id}')">✔ 완료</button>`
         }
@@ -4361,7 +4361,7 @@ function closeBoardQuest(questId) {
   DB._cache = db;
   DB._fbRef.child('boardQuests').set(db.boardQuests);
   renderAll();
-  notify('퀘스트를 내렸습니다');
+  notify('퀘스트를 내렸어요');
 }
 
 // 퀘스트 삭제/닫기 시 학생 pendingRewards 정리
@@ -4407,7 +4407,7 @@ function deleteBoardQuest(questId) {
   DB._cache = db;
   DB._fbRef.child('boardQuests').set(db.boardQuests);
   renderAll();
-  notify('🗑️ 퀘스트가 삭제되었습니다', 'error');
+  notify('🗑️ 퀘스트를 삭제했어요', 'error');
 }
 
 function toggleInactiveQuests() {
@@ -4563,7 +4563,7 @@ function updateBattleSettingsSummary() {
   const nm    = bs.normalMults || SKILL_MULTIPLIERS.normal;
   const dr    = DB.getSettings().dexRewards || {};
   const nmStr = [1,2,3,4,5,6,7].map(lv => nm[lv]??SKILL_MULTIPLIERS.normal[lv]).join(' / ');
-  const modified = Object.keys(bs).length > 0 ? '⚠️ 커스텀 적용 중' : '✅ 기본값';
+  const modified = Object.keys(bs).length > 0 ? '⚠️ 바꾼 값 적용 중' : '✅ 기본값';
   el.innerHTML = `
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">⚔️ 하루전투: <strong>${limit}회</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">👻 유령배율: <strong>${ghost}</strong></span>
@@ -4650,7 +4650,7 @@ function renderMonsters() {
         <div style="font-size:1.5rem;width:32px;text-align:center">${iconImg(m, 'monsters', '1.5rem')}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.85rem">${escHtml(m.name)}
-            ${isCustom?'<span style="font-size:.62rem;color:var(--gold);margin-left:.3rem">✏️커스텀</span>':''}
+            ${isCustom?'<span style="font-size:.62rem;color:var(--gold);margin-left:.3rem">✏️ 바꾼 값</span>':''}
             ${m.trait==='ghost'?'<span style="font-size:.62rem;color:#ccc;margin-left:.2rem">👻</span>':''}
           </div>
           <div class="text-muted-tiny">
@@ -4737,7 +4737,7 @@ function saveBattleSettings() {
   DB._cache = db;
   DB._fbRef.child('settings/customBattleSettings').set(db.settings.customBattleSettings);
   applyBattleSettings(db);
-  notify('✅ 전투 설정 저장 완료! 학생 화면에 즉시 반영됩니다.');
+  notify('✅ 전투 설정 저장 완료! 학생 화면에 바로 반영돼요.');
 }
 
 // [BATTLE-RESET-KEEP-1] "기본값으로 초기화"는 **전투 배율만** 되돌린다.
@@ -5257,7 +5257,7 @@ function saveShopOverrides() {
   DB._cache = db;
   DB._fbRef.child('settings').set(db.settings);
   applyShopOverrides(db); // 즉시 반영
-  notify('✅ 상점 설정 저장! 학생 화면에도 즉시 반영됩니다');
+  notify('✅ 상점 설정 저장! 학생 화면에도 바로 반영돼요');
 }
 
 function resetShopOverrides() {
@@ -5271,7 +5271,7 @@ function resetShopOverrides() {
   DB._cache = db;
   DB._fbRef.child('settings').set(db.settings);
   // GAME_DATA를 기본값으로 재로드 (페이지 새로고침 필요)
-  notify('↩️ 기본값으로 초기화됐어요. 새로고침 후 반영됩니다');
+  notify('↩️ 기본값으로 초기화됐어요. 새로고침하면 반영돼요');
   setTimeout(() => location.reload(), 1500);
 }
 
@@ -5694,7 +5694,7 @@ async function confirmRollback() {
   }
   const pw = document.getElementById('rollback-pw-input').value;
   const adminPw = await DB.getAdminPw();
-  if (pw !== adminPw) { notify('비밀번호가 틀렸습니다', 'error'); return; }
+  if (pw !== adminPw) { notify('❌ 비밀번호가 틀렸어요', 'error'); return; }
 
   // 백업 데이터 불러와서 복원 (새 위치 → 없으면 옛 위치)
   const backup = await readBackup(selected);
@@ -5711,7 +5711,7 @@ async function confirmRollback() {
       : backup[k];
     await DB._fbRef.child(k).set(v);
   }
-  notify(`✅ ${selected} 데이터로 롤백 완료 (${nodes.length}개 항목) — 새로고침됩니다`);
+  notify(`✅ ${selected} 데이터로 롤백 완료 (${nodes.length}개 항목) — 곧 새로고침돼요`);
   setTimeout(() => location.reload(), 1500);
 }
 
@@ -5764,7 +5764,7 @@ async function cleanupDerivedNodes() {
   const kb  = Math.round(JSON.stringify(v).length / 1024);
 
   if (!confirm(
-    `중복 저장된 'quests' 데이터 ${cnt}건(약 ${kb}KB)을 지울까요?\n\n` +
+    `중복 저장된 옛 퀘스트 목록 ${cnt}건(약 ${kb}KB)을 지울까요?\n\n` +
     `· 이 데이터는 활동 기록(questLogs)에서 매번 자동으로 다시 만들어집니다\n` +
     `· 지워도 기록·통계·완료 판정에 영향이 없습니다\n` +
     `· 접속할 때마다 오가던 데이터가 그만큼 줄어듭니다`)) return;
@@ -5881,7 +5881,7 @@ function confirmReset() {
   const pw = prompt('교사 비밀번호를 입력하세요:');
   if (pw === null) return; // 취소
   DB.getAdminPw().then(adminPw => {
-    if (pw !== adminPw) { notify('❌ 비밀번호가 틀렸습니다', 'error'); return; }
+    if (pw !== adminPw) { notify('❌ 비밀번호가 틀렸어요', 'error'); return; }
     DB._fbRef.remove().then(() => { notify('✅ 초기화 완료'); setTimeout(() => location.reload(), 800); });
   });
 }
@@ -5941,7 +5941,7 @@ function saveStudyRewardCfg() {
     bonusExp: num('sr-bexp', 20), bonusGold: num('sr-bgold', 10),
   };
   DB.saveSettings({ ...DB.getSettings(), studyReward: cfg });
-  notify(cfg.enabled ? `오늘의 공부 보상 저장 (${cfg.mode === 'approve' ? '승인 후' : '바로'} +${cfg.exp}EXP +${cfg.gold}G)` : '오늘의 공부 보상을 껐습니다');
+  notify(cfg.enabled ? `오늘의 공부 보상 저장 (${cfg.mode === 'approve' ? '승인 후' : '바로'} +${cfg.exp}EXP +${cfg.gold}G)` : '오늘의 공부 보상을 껐어요');
   renderStudyScopePage();
 }
 
@@ -6088,7 +6088,7 @@ function setSubjectStudyUnits(subjectKey, on) {
   sub.units.forEach(u => { if (on) set.add(u.id); else set.delete(u.id); });
   _saveActiveUnits([...set]);
   renderStudyScopePage();
-  notify(on ? `${sub.label} 단원을 모두 켰습니다` : `${sub.label} 단원을 해제했습니다`);
+  notify(on ? `${sub.label} 단원을 모두 켰어요` : `${sub.label} 단원을 모두 껐어요`);
 }
 
 function setAllStudyUnits(on) {
@@ -6101,5 +6101,5 @@ function setAllStudyUnits(on) {
   const all = CurriculumUtils.subjects().flatMap(s => s.units.map(u => u.id));
   _saveActiveUnits(all);
   renderStudyScopePage();
-  notify('전체 단원을 켰습니다');
+  notify('전체 단원을 켰어요');
 }
