@@ -366,8 +366,8 @@ function renderDashboard() {
         onmouseout="this.style.background=''">
         <div style="font-size:1.15rem;width:32px;text-align:center;padding-top:.1rem">${item.student.avatar}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:.84rem;font-weight:700">${item.student.name}
-            <span style="font-weight:400;color:var(--txt2)">· ${item.label}</span>
+          <div style="font-size:.84rem;font-weight:700">${escHtml(item.student.name)}
+            <span style="font-weight:400;color:var(--txt2)">· ${escHtml(item.label)}</span>
             ${item.type==='book'?`<span style="font-size:.68rem;background:rgba(93,173,226,.12);color:var(--sky);
               border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">📚 독서</span>`:''}
           ${item.type==='artwork'?`<span style="font-size:.68rem;background:rgba(155,89,182,.12);color:var(--purple);
@@ -484,7 +484,7 @@ function renderDashboard() {
           <span style="font-size:.95rem">${q.icon||'📋'}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-              ${s?.name||'?'} · ${q.name}</div>
+              ${escHtml(s?.name||'?')} · ${escHtml(q.name)}</div>
             <div class="text-muted-xs">${q.date||''}</div>
           </div>
           <span class="tag ${q.approved?'approved':'pending'}">${q.approved?'승인':'대기'}</span>
@@ -522,6 +522,16 @@ function renderStudentTable() {
 // ══════════════════════════════════════════════════
 //  STUDENT DETAIL MODAL
 // ══════════════════════════════════════════════════
+// [DET-PW-MASK-1] 교사 화면은 TV 로 미러링된다 — 학생 상세의 비밀번호는 ●●●● 로 가리고 [보기] 로만 잠깐 보인다
+function toggleDetPw() {
+  const inp = document.getElementById('det-pw');
+  const btn = document.getElementById('det-pw-toggle');
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (btn) btn.textContent = show ? '가리기' : '보기';
+}
+
 function openStudentDetail(id) {
   const s = DB.getStudent(id);
   document.getElementById('modal-student-title').textContent = `${s.avatar} ${s.name} 상세`;
@@ -540,7 +550,10 @@ function openStudentDetail(id) {
             ${GAME_DATA.titles.map(t=>`<option ${s.title===t?'selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-group"><label class="form-label">비밀번호</label>
-          <input class="form-input" id="det-pw" value="${s.pw||'1234'}"></div>
+          <div style="display:flex;gap:.4rem">
+            <input class="form-input flex-1" type="password" autocomplete="new-password" id="det-pw" value="${escHtml(s.pw||'1234')}">
+            <button type="button" class="btn-sm outline" id="det-pw-toggle" onclick="toggleDetPw()">보기</button>
+          </div></div>
         <div class="form-group"><label class="form-label">레벨</label>
           <input class="form-input" type="number" id="det-lv" value="${s.level}"></div>
         <div class="form-group"><label class="form-label">골드</label>
@@ -1378,7 +1391,7 @@ function renderApproveList() {
     <div class="approve-card" style="${isExpired?'border-left:3px solid rgba(255,100,100,.4)':''}">
       <div style="font-size:1.5rem">${item.icon||'📋'}</div>
       <div class="ac-left">
-        <div class="ac-student">${item.student.avatar} ${item.student.name}
+        <div class="ac-student">${item.student.avatar} ${escHtml(item.student.name)}
           <span style="font-size:.65rem;color:${isExpired?'var(--red)':'var(--txt3)'};margin-left:.3rem">
             ${item.date||''}${isExpired?' (기간 만료)':''}
           </span>
@@ -1386,7 +1399,7 @@ function renderApproveList() {
           ${item.type==='artwork'?`<span style="font-size:.68rem;background:rgba(155,89,182,.12);color:var(--purple);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">🎨 작품</span>`:''}
           ${qStatus.badge?`<span style="font-size:.68rem;background:rgba(255,215,0,.12);color:var(--gold);border-radius:8px;padding:.05rem .4rem;margin-left:.3rem">${qStatus.badge}</span>`:''}
         </div>
-        <div class="ac-quest">${item.label}</div>
+        <div class="ac-quest">${escHtml(item.label)}</div>
         ${item.bookReview?`<div style="font-size:.72rem;color:var(--txt2);margin-top:.3rem;padding:.3rem .5rem;background:rgba(255,255,255,.04);border-radius:8px;border-left:2px solid rgba(93,173,226,.3);line-height:1.5">${escHtml(item.bookReview.length>80?item.bookReview.slice(0,80)+'...':item.bookReview)}</div>`:''}
         <div class="ac-rewards">
           <span class="ac-tag">+${item.exp}EXP</span>
@@ -2062,7 +2075,7 @@ function renderActivityPage() {
         const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)';
         return `<tr style="background:${rowBg};border-bottom:1px solid rgba(255,255,255,.04)">
           <td style="padding:.45rem .8rem;white-space:nowrap;color:var(--txt2)">${log.date||''}</td>
-          <td style="padding:.45rem .8rem;white-space:nowrap">${s ? s.avatar+' '+s.name : log.studentId}</td>
+          <td style="padding:.45rem .8rem;white-space:nowrap">${s ? s.avatar+' '+escHtml(s.name) : escHtml(log.studentId)}</td>
           <td style="padding:.45rem .8rem">
             <span style="font-size:.72rem;padding:.15rem .45rem;border-radius:8px;
               background:rgba(255,255,255,.06);color:${color};font-weight:700;white-space:nowrap">
@@ -2070,7 +2083,7 @@ function renderActivityPage() {
             </span>
           </td>
           <td style="padding:.45rem .8rem;max-width:240px">
-            <div style="font-weight:600">${log.name||''}</div>
+            <div style="font-weight:600">${escHtml(log.name||'')}</div>
             ${bq ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${label} · 게시일 ${bq.date||''}</div>` : ''}
           </td>
           <td style="padding:.45rem .8rem;text-align:center;color:var(--emerald);font-weight:700">+${log.exp||0}</td>
@@ -3535,20 +3548,20 @@ function renderWeeklyAdminPage() {
       <div style="background:rgba(93,173,226,.06);border-left:3px solid rgba(93,173,226,.3);
         border-radius:0 8px 8px 0;padding:.5rem .75rem;margin-bottom:.4rem">
         <div style="font-size:.65rem;color:var(--sky);font-weight:700;margin-bottom:.3rem">📅 월요일 다짐</div>
-        ${goal.weekendText?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">🗓 주말: ${goal.weekendText}</div>`:''}
+        ${goal.weekendText?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">🗓 주말: ${escHtml(goal.weekendText)}</div>`:''}
         ${goal.weekendMood!=null?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">기분: ${moodEmoji[goal.weekendMood]||''}</div>`:''}
-        ${goal.focusArea?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">🎯 노력영역: ${goal.focusArea}</div>`:''}
-        ${goal.goalText?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">📌 목표: ${goal.goalText}</div>`:''}
-        ${goal.mindset?`<div style="font-size:.75rem;color:var(--txt2)">💭 마음가짐: ${goal.mindset}</div>`:''}
+        ${goal.focusArea?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">🎯 노력영역: ${escHtml(goal.focusArea)}</div>`:''}
+        ${goal.goalText?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">📌 목표: ${escHtml(goal.goalText)}</div>`:''}
+        ${goal.mindset?`<div style="font-size:.75rem;color:var(--txt2)">💭 마음가짐: ${escHtml(goal.mindset)}</div>`:''}
       </div>`:''}
       ${refl?`
       <div style="background:rgba(46,204,113,.06);border-left:3px solid rgba(46,204,113,.3);
         border-radius:0 8px 8px 0;padding:.5rem .75rem">
         <div style="font-size:.65rem;color:var(--emerald);font-weight:700;margin-bottom:.3rem">📅 금요일 돌아보기</div>
-        ${refl.focusReflection?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">노력: ${refl.focusReflection}</div>`:''}
-        ${refl.goalReflection?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">목표: ${refl.goalReflection}</div>`:''}
-        ${refl.bestMoment?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">✨ 잘한 점: ${refl.bestMoment}</div>`:''}
-        ${refl.nextWeekGoal?`<div style="font-size:.75rem;color:var(--txt2)">다음 주 목표: ${refl.nextWeekGoal}</div>`:''}
+        ${refl.focusReflection?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">노력: ${escHtml(refl.focusReflection)}</div>`:''}
+        ${refl.goalReflection?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">목표: ${escHtml(refl.goalReflection)}</div>`:''}
+        ${refl.bestMoment?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.2rem">✨ 잘한 점: ${escHtml(refl.bestMoment)}</div>`:''}
+        ${refl.nextWeekGoal?`<div style="font-size:.75rem;color:var(--txt2)">다음 주 목표: ${escHtml(refl.nextWeekGoal)}</div>`:''}
       </div>`:''}
     </div>`;
   }).join('');
@@ -3630,7 +3643,7 @@ function renderPwResetList() {
       border-radius:12px;margin-bottom:.6rem">
       <div style="font-size:1.5rem">🔑</div>
       <div class="flex-1">
-        <div style="font-weight:700;font-size:.9rem">${r.name}</div>
+        <div style="font-weight:700;font-size:.9rem">${escHtml(r.name)}</div>
         <div class="text-muted-sm">${r.date} 요청</div>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center">
@@ -3864,12 +3877,12 @@ function renderAbilityQuests() {
     const d = DIFF_INFO[t.diff] || DIFF_INFO.easy;
     return `<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;
       background:${d.color};border-radius:8px;border:0.5px solid ${d.border}">
-      <input type="checkbox" id="aq-chk-${i}" data-name="${t.name}" data-diff="${t.diff}" data-stat="${t.stat||type}"
+      <input type="checkbox" id="aq-chk-${i}" data-name="${escHtml(t.name)}" data-diff="${t.diff}" data-stat="${t.stat||type}"
         style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
       <label for="aq-chk-${i}" style="flex:1;cursor:pointer;font-size:.86rem">${t.name}</label>
       <span class="text-muted-xs">${d.label}</span>
       <span style="font-size:.68rem;color:var(--gold)">+${d.exp}EXP</span>
-      <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderAbilityQuests()` : `hideDefaultTemplate('${type}','${t.name}')`}"
+      <button onclick="${t.custom ? `removeCustomTemplate('${type}','${escJsAttr(t.name)}');renderAbilityQuests()` : `hideDefaultTemplate('${type}','${escJsAttr(t.name)}')`}"
         style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
         title="${t.custom ? '삭제' : '숨기기'}">✕</button>
     </div>`;
@@ -3946,7 +3959,7 @@ function renderQuestTemplates(type) {
     <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;
       background:rgba(255,255,255,.03);border-radius:8px;border:0.5px solid rgba(255,255,255,.07)">
       <input type="checkbox" id="qt-chk-${type}-${i}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--emerald)">
-      <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.84rem">${t.name}</label>
+      <label for="qt-chk-${type}-${i}" style="flex:1;cursor:pointer;font-size:.84rem">${escHtml(t.name)}</label>
       <select id="qt-stat-${type}-${i}" style="font-size:.7rem;padding:.15rem .25rem;border-radius:6px;
         background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt);width:72px">
         ${statOpts}
@@ -3954,7 +3967,7 @@ function renderQuestTemplates(type) {
       <input type="number" id="qt-statval-${type}-${i}" value="1" min="0.1" max="10" step="0.1"
         style="width:44px;font-size:.7rem;padding:.15rem .25rem;border-radius:6px;text-align:center;
           background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--txt)">
-      <button onclick="${t.custom ? `removeCustomTemplate('${type}','${t.name}');renderQuestTemplates('${type}')` : `hideDefaultTemplate('${type}','${t.name}')`}"
+      <button onclick="${t.custom ? `removeCustomTemplate('${type}','${escJsAttr(t.name)}');renderQuestTemplates('${type}')` : `hideDefaultTemplate('${type}','${escJsAttr(t.name)}')`}"
         style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.8rem;padding:.1rem .3rem"
         title="${t.custom ? '삭제' : '목록에서 숨기기'}">✕</button>
     </div>`).join('');
@@ -5351,18 +5364,18 @@ function renderEmotionAlerts() {
       background:${a.read?'':'rgba(93,173,226,.04)'}">
       <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.4rem">
         <span style="font-size:1.1rem">${a.studentAvatar||'?'}</span>
-        <span style="font-weight:700">${a.studentName||'?'}</span>
+        <span style="font-weight:700">${escHtml(a.studentName||'?')}</span>
         <span style="font-size:.72rem;background:rgba(93,173,226,.12);color:var(--sky);
           border-radius:8px;padding:.1rem .4rem">${typeLabel[a.responseType]||a.responseType}</span>
         <span style="font-size:.7rem;color:var(--txt3);margin-left:auto">${a.promptDate||''}</span>
       </div>
       <div style="font-size:.8rem;color:var(--txt2);margin-bottom:.3rem">
         과거 감정: ${a.promptEmotionLabel||''}
-        ${a.promptReason&&a.promptReason!=='없음'?` · "${a.promptReason}"`:''}
+        ${a.promptReason&&a.promptReason!=='없음'?` · "${escHtml(a.promptReason)}"`:''}
       </div>
       ${a.responseText?`<div style="font-size:.78rem;color:var(--txt2);padding:.4rem .6rem;
         background:rgba(255,255,255,.04);border-radius:8px;margin-bottom:.3rem">
-        💬 ${a.responseText}</div>`:''}
+        💬 ${escHtml(a.responseText)}</div>`:''}
       <button onclick="markEmotionAlertRead('${a.id}')"
         style="font-size:.7rem;background:none;border:1px solid rgba(255,255,255,.15);
           color:var(--txt3);border-radius:6px;padding:.2rem .5rem;cursor:pointer">
@@ -5455,7 +5468,7 @@ function renderEmotionPage() {
     const s = students.find(x => x.id === sid);
     return `<div style="padding:.8rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="font-size:.88rem;font-weight:700;margin-bottom:.5rem">
-        ${s?.avatar||'?'} ${s?.name||'?'}
+        ${s?.avatar||'?'} ${escHtml(s?.name||'?')}
       </div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap">
         ${recs.sort((a,b)=>a.period.localeCompare(b.period)).map(r => `

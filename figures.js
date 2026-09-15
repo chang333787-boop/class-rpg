@@ -7,7 +7,9 @@
 //
 //  kind 목록 (curriculum_review.js 작성자와 약속한 규격):
 //   angle    { deg, label? }                  각. label:'?'면 각도 숫자 숨김
-//   polygon  { n, shape?, angles? }           n각형. shape 'right'|'iso'|'equi'(삼각형). angles:[50,70,'?'] 꼭짓점 각 표기
+//   polygon  { n, shape?, angles?, regular?, diag?, sides? }  n각형. shape 'right'|'iso'|'equi'(삼각형). angles:[50,70,'?'] 꼭짓점 각 표기
+//                                             regular:true 정n각형(사각형도 정사각형) · diag:true(모든 대각선)|[[0,2]] · sides:['5 cm',null,'?'] 변 옆 글자
+//                                             삼각형: apex:40(이등변 꼭지각대로) · degs:[30,40,110](세 각대로 모양) · angles에 ''면 그 꼭짓점 글자 없음
 //   rect     { w, h, unit? }                  치수 표시된 직사각형
 //   clock    { h, m }                         아날로그 시계
 //   fraction { n, k, shape? }                 전체 n칸 중 k칸 색칠. 'circle'|'bar'
@@ -17,6 +19,13 @@
 //   shapes   { items:[...] }                  도형 나열. circle|triangle|square|rect|star|heart
 //   move     { shape, op }                    평면도형 이동 전/후. shape L|F|P|arrow, op flip-h|flip-v|rot90|rot180|'?'
 //   ruler    { len, unit? }                   자 위의 막대
+//   line     { labels, values, unit?, min?, max?, step? }  꺾은선그래프. min>0이면 세로축 아래에 물결선
+//   quad     { type, deg?, angles? }           사각형. type trapezoid|parallelogram|rhombus|rectangle|square
+//                                             deg=왼쪽 아래 각(평행사변형·마름모), angles:[70,'?',null,null] 꼭짓점 각 표기
+//                                             (꼭짓점 순서: 왼쪽 아래 → 오른쪽 아래 → 오른쪽 위 → 왼쪽 위)
+//   hundred  { parts, cross?, wholes?, unit? }  소수 모눈(10×10=1). parts 색칠 칸 수, cross 빗금, wholes 다 칠한 모눈 장수
+//   bar      { labels, values, unit?, step?, q? }  막대그래프(세로). q:[i]면 그 항목은 막대 없이 ?
+//   lines    { type, label? }                 두 직선. type perp(수직)|parallel(평행)|distance(평행선 사이 수선, label 길이)
 // ══════════════════════════════════════════════════
 
 const Figures = (() => {
@@ -59,16 +68,57 @@ const Figures = (() => {
       const n = Math.max(3, Math.min(8, toNum(f.n, 3)));
       let pts;
       if (n === 3 && f.shape === 'right') pts = [[40, 110], [200, 110], [40, 20]];
+      else if (n === 3 && f.shape === 'iso' && toNum(f.apex, 0) > 0) {
+        // [FIG-TRIANGLE-1] 꼭지각 크기대로 그린다(꼭짓점 순서: 왼쪽 아래 → 오른쪽 아래 → 꼭대기)
+        const t = Math.tan(Math.min(170, toNum(f.apex)) * Math.PI / 360); let h = 90, hb = h * t;
+        if (hb > 85) { hb = 85; h = hb / t; }
+        pts = [[120 - hb, 110], [120 + hb, 110], [120, 110 - h]];
+      }
       else if (n === 3 && f.shape === 'iso') pts = [[40, 110], [200, 110], [120, 20]];
-      else if (n === 4 && !f.angles) pts = [[50, 105], [190, 105], [190, 25], [50, 25]];
-      else pts = regular(n, 120, 68, 52);
+      else if (n === 3 && Array.isArray(f.degs) && f.degs.length === 3) {
+        // [FIG-TRIANGLE-1] 세 각대로 모양을 만든다 — 밑변 양 끝 각 = degs[0], degs[1]
+        const A = toNum(f.degs[0], 60) * Math.PI / 180, B = toNum(f.degs[1], 60) * Math.PI / 180, C = Math.PI - A - B;
+        const b = Math.sin(B) / Math.sin(C);          // 밑변 길이 1일 때 왼쪽 변 길이
+        const raw = [[0, 0], [1, 0], [b * Math.cos(A), -b * Math.sin(A)]];
+        const xs = raw.map(q => q[0]), ys = raw.map(q => q[1]);
+        const w = Math.max(...xs) - Math.min(...xs), hh = Math.max(...ys) - Math.min(...ys);
+        const k = Math.min(190 / w, 90 / (hh || 1));
+        const ox = 120 - (Math.max(...xs) + Math.min(...xs)) / 2 * k;
+        pts = raw.map(([x, y]) => [ox + x * k, 110 + y * k]);
+      }
+      else if (n === 4 && !f.angles && !f.regular) pts = [[50, 105], [190, 105], [190, 25], [50, 25]];
+      else pts = regular(n, 120, 68, 52, f.regular && n % 2 === 0 ? -Math.PI / 2 + Math.PI / n : -Math.PI / 2);   // regular 짝수각형은 밑변이 눕게
       const angs = Array.isArray(f.angles) ? f.angles : [];
+      const exact = toNum(f.apex, 0) > 0 || Array.isArray(f.degs);   // [FIG-TRIANGLE-1] 모양이 바뀌면 글자 방향도 무게중심 기준
+      const CX = exact ? pts.reduce((a, q) => a + q[0], 0) / n : 120, CY = exact ? pts.reduce((a, q) => a + q[1], 0) / n : 68;
       const labels = angs.slice(0, n).map((a, i) => {
-        const [x, y] = pts[i]; const dx = 120 - x, dy = 68 - y, len = Math.hypot(dx, dy) || 1;
-        return txt(x + dx / len * 24, y + dy / len * 24 + 5, (a === '?' || a == null) ? '?' : a + '°', 13);
+        if (a === '') return '';
+        const [x, y] = pts[i]; const dx = CX - x, dy = CY - y, len = Math.hypot(dx, dy) || 1;
+        let d = 24;
+        if (exact) {   // 뾰족한 각은 글자를 안쪽으로 더 넣어야 변과 안 겹친다
+          const u = pts[(i + 1) % n], v = pts[(i + n - 1) % n];
+          const th = Math.acos(Math.max(-1, Math.min(1, ((u[0] - x) * (v[0] - x) + (u[1] - y) * (v[1] - y)) / (Math.hypot(u[0] - x, u[1] - y) * Math.hypot(v[0] - x, v[1] - y)))));
+          d = Math.min(len * .8, Math.max(24, 13 / Math.sin(th / 2)));
+        }
+        return txt(x + dx / len * d, y + dy / len * d + 5, (a === '?' || a == null) ? '?' : a + '°', 13);
       }).join('');
       const marks = (angs.length === 0 && f.shape === 'right') ? `<path d="M40 96 L54 96 L54 110" stroke-width="1.6"/>` : '';
-      return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
+      // [FIG-POLYGON-1] 대각선·변 글자 — 옵션이 없으면 지금까지와 똑같은 그림
+      let diags = '';
+      if (f.diag) {
+        const pairs = Array.isArray(f.diag) ? f.diag.slice() : [];
+        if (f.diag === true) for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (!(i === 0 && j === n - 1)) pairs.push([i, j]);
+        diags = pairs.filter(([i, j]) => pts[i] && pts[j]).map(([i, j]) => `<line x1="${pts[i][0].toFixed(1)}" y1="${pts[i][1].toFixed(1)}" x2="${pts[j][0].toFixed(1)}" y2="${pts[j][1].toFixed(1)}" stroke="${ACC}" stroke-width="2.4"/>`).join('');
+      }
+      const sideLabs = (Array.isArray(f.sides) ? f.sides : []).slice(0, n).map((s, i) => {
+        if (s == null) return '';
+        const p = pts[i], q = pts[(i + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+        const dx = mx - CX, dy = my - CY, len = Math.hypot(dx, dy) || 1;
+        const anchor = dx / len > .45 ? 'start' : dx / len < -.45 ? 'end' : 'middle';   // 옆 변 글자는 변에서 바깥쪽으로 붙인다
+        return txt(mx + dx / len * 10, my + dy / len * 12 + 5, s, 12).replace('text-anchor="middle"', `text-anchor="${anchor}"`);
+      }).join('');
+      if (!diags && !sideLabs) return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
+      return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${diags}${marks}${labels}${sideLabs}`);
     },
     rect(f) {
       const w = Math.max(1, toNum(f.w, 4)), h = Math.max(1, toNum(f.h, 3)), unit = f.unit || 'cm';
@@ -180,6 +230,156 @@ const Figures = (() => {
       }
       out += `<rect x="${x0}" y="34" width="${len * px}" height="18" fill="${ACC}"/>${txt(x0 + len * px / 2, 25, `? ${unit}`, 13)}`;
       return wrap(out);
+    },
+    // [FIG-LINE-QUAD-1] 꺾은선그래프 — 점을 찍고 선분으로 잇는다. 값은 문항 글에도 있으니 점 옆에 숫자는 쓰지 않는다(그래프를 읽게).
+    line(f) {
+      const vals = (Array.isArray(f.values) ? f.values : []).map(v => toNum(v, NaN)).slice(0, 8);
+      const labs = (Array.isArray(f.labels) ? f.labels : []).slice(0, vals.length);
+      if (vals.length < 2 || vals.some(v => !Number.isFinite(v))) return '';
+      const hi = Math.max(...vals);
+      const min = toNum(f.min, 0);
+      const step = toNum(f.step, 0) > 0 ? toNum(f.step) : (() => { const r = (hi - min) / 5; const p = Math.pow(10, Math.floor(Math.log10(r || 1))); return [1, 2, 5, 10].map(k => k * p).find(k => k >= r) || p * 10; })();
+      const max = toNum(f.max, 0) > min ? toNum(f.max) : min + Math.ceil((hi - min) / step - 1e-9) * step;
+      if (max <= min) return '';
+      const dec = (String(step).split('.')[1] || '').length;
+      const Wd = 260, Hd = 160, x0 = 46, x1 = 246, yT = 22, yB = 126;
+      const yM = min > 0 ? yB - 16 : yB;   // 0부터 시작하지 않으면 0과 최솟값 사이를 물결선으로 줄인다
+      const py = v => yM - (v - min) / (max - min) * (yM - yT);
+      const gx = (x1 - x0) / vals.length, px = i => x0 + gx * (i + .5);
+      let out = '';
+      const n = Math.round((max - min) / step);
+      for (let k = 0; k <= n; k++) {
+        const v = min + k * step, y = py(v);
+        out += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke-width="${k === 0 && !(min > 0) ? 2 : .8}" stroke-opacity="${k === 0 && !(min > 0) ? 1 : .35}"/>`;
+        if (n <= 10 || k % 2 === 0) out += `<text x="${x0 - 6}" y="${(y + 4).toFixed(1)}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">${esc(v.toFixed(dec))}</text>`;
+      }
+      out += `<line x1="${x0}" y1="${yT - 6}" x2="${x0}" y2="${yB}"/>`;
+      if (min > 0) out += `<line x1="${x0}" y1="${yB}" x2="${x1}" y2="${yB}"/><text x="${x0 - 6}" y="${yB + 4}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">0</text>`
+        + `<path d="M${x0 - 5} ${yB - 5} l5 -3 l-5 -3 l5 -3" stroke-width="1.8"/>`;   // 물결선(0과 최솟값 사이)
+      if (f.unit) out += `<text x="${x0 - 6}" y="${yT - 10}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">(${esc(f.unit)})</text>`;
+      out += `<polyline points="${vals.map((v, i) => px(i).toFixed(1) + ',' + py(v).toFixed(1)).join(' ')}" stroke="${ACC}" stroke-width="3"/>`;
+      out += vals.map((v, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="4" fill="currentColor" stroke="none"/>`).join('');
+      out += labs.map((s, i) => `<text x="${px(i).toFixed(1)}" y="${yB + 18}" font-size="10.5" fill="currentColor" stroke="none" text-anchor="middle" font-family="inherit">${esc(s)}</text>`).join('');
+      return wrap(out, Wd, Hd);
+    },
+    // [FIG-HUNDRED-1] 소수 모눈 — 10×10 모눈 한 장 = 1. parts:[30,50] 앞에서부터 색 두 가지로 칠함, cross:40 칠한 칸 끝에서 40칸 빗금(뺄셈)
+    //   wholes:2면 다 칠한 모눈 2장을 앞에 둔다(1.45 = 모눈 1장 + 45칸). unit:'0.1'이면 세로 10줄(0.1 칸)만 긋는다.
+    hundred(f) {
+      const parts = (Array.isArray(f.parts) ? f.parts : []).map(v => Math.max(0, Math.min(100, toNum(v, 0))));
+      const wholes = Math.max(0, Math.min(2, toNum(f.wholes, 0)));
+      const tenths = f.unit === '0.1';
+      const total = parts.reduce((a, v) => a + v, 0);
+      if (total > 100) return '';
+      const cross = Math.max(0, Math.min(total, toNum(f.cross, 0)));
+      const sheets = wholes + 1, gap = 12, size = Math.min(100, (236 - gap * (sheets - 1)) / sheets), c = size / 10;
+      const y0 = (130 - size) / 2;
+      const fills = [ACC, ACC2];
+      let out = '';
+      for (let s = 0; s < sheets; s++) {
+        const x0 = (240 - (size * sheets + gap * (sheets - 1))) / 2 + s * (size + gap);
+        if (s < wholes) out += `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" fill="${ACC}" stroke="none"/>`;
+        else {
+          let idx = 0;
+          parts.forEach((v, pi) => { for (let j = 0; j < v; j++, idx++) {
+            const col = Math.floor(idx / 10), row = idx % 10;   // 세로줄(0.1)부터 채운다
+            out += `<rect x="${(x0 + col * c).toFixed(1)}" y="${(y0 + row * c).toFixed(1)}" width="${c.toFixed(1)}" height="${c.toFixed(1)}" fill="${fills[pi % 2]}" stroke="none"/>`;
+          } });
+          for (let j = total - cross; j < total; j++) {
+            const col = Math.floor(j / 10), row = j % 10, x = x0 + col * c, y = y0 + row * c;
+            out += `<path d="M${(x + 1).toFixed(1)} ${(y + c - 1).toFixed(1)} L${(x + c - 1).toFixed(1)} ${(y + 1).toFixed(1)}" stroke-width="1.6"/>`;
+          }
+        }
+        for (let i = 0; i <= 10; i++) {
+          const w = i % 10 === 0 ? 2 : .8;
+          out += `<line x1="${(x0 + i * c).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${(x0 + i * c).toFixed(1)}" y2="${(y0 + size).toFixed(1)}" stroke-width="${w}"/>`;
+          if (!tenths || i % 10 === 0) out += `<line x1="${x0.toFixed(1)}" y1="${(y0 + i * c).toFixed(1)}" x2="${(x0 + size).toFixed(1)}" y2="${(y0 + i * c).toFixed(1)}" stroke-width="${w}"/>`;
+        }
+      }
+      return wrap(out);
+    },
+    // [FIG-BAR-1] 막대그래프 — 세로 막대. q:[칸 번호]인 항목은 막대 없이 '?'(문항이 그 값을 묻을 때)
+    bar(f) {
+      const labs = (Array.isArray(f.labels) ? f.labels : []).slice(0, 6);
+      const qs = new Set(Array.isArray(f.q) ? f.q : []);
+      const vals = labs.map((_, i) => qs.has(i) ? NaN : toNum((f.values || [])[i], NaN));
+      const known = vals.filter(Number.isFinite);
+      if (labs.length < 2 || !known.length || known.length + qs.size !== labs.length) return '';
+      const hi = Math.max(...known);
+      const step = toNum(f.step, 0) > 0 ? toNum(f.step) : (() => { const r = hi / 5; const p = Math.pow(10, Math.floor(Math.log10(r || 1))); return [1, 2, 5, 10].map(k => k * p).find(k => k >= r) || p * 10; })();
+      const max = Math.max(step, Math.ceil(hi / step - 1e-9) * step);
+      const Wd = 260, Hd = 160, x0 = 46, x1 = 246, yT = 22, yB = 126;
+      const py = v => yB - v / max * (yB - yT);
+      const gx = (x1 - x0) / labs.length, bw = Math.min(30, gx * .55), px = i => x0 + gx * (i + .5);
+      let out = '';
+      const n = Math.round(max / step);
+      for (let k = 0; k <= n; k++) {
+        const y = py(k * step);
+        out += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke-width="${k === 0 ? 2 : .8}" stroke-opacity="${k === 0 ? 1 : .35}"/>`;
+        out += `<text x="${x0 - 6}" y="${(y + 4).toFixed(1)}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">${esc(k * step)}</text>`;
+      }
+      out += `<line x1="${x0}" y1="${yT - 6}" x2="${x0}" y2="${yB}"/>`;
+      if (f.unit) out += `<text x="${x0 - 6}" y="${yT - 10}" font-size="10" fill="currentColor" stroke="none" text-anchor="end" font-family="inherit">(${esc(f.unit)})</text>`;
+      out += labs.map((s, i) => {
+        const x = px(i);
+        const body = Number.isFinite(vals[i])
+          ? `<rect x="${(x - bw / 2).toFixed(1)}" y="${py(vals[i]).toFixed(1)}" width="${bw.toFixed(1)}" height="${(yB - py(vals[i])).toFixed(1)}" fill="${ACC2}"/>`
+          : txt(x, yB - 14, '?', 16);
+        return body + `<text x="${x.toFixed(1)}" y="${yB + 18}" font-size="10.5" fill="currentColor" stroke="none" text-anchor="middle" font-family="inherit">${esc(s)}</text>`;
+      }).join('');
+      return wrap(out, Wd, Hd);
+    },
+    // [FIG-LINE-QUAD-1] 사각형 — 평행한 변은 화살표(>, >>), 길이가 같은 변은 눈금, 직각은 ㄱ 표시
+    quad(f) {
+      const type = f.type || 'parallelogram';
+      const cy0 = 108;
+      let pts;
+      if (type === 'trapezoid') pts = [[40, cy0], [200, cy0], [160, 30], [80, 30]];
+      else if (type === 'rectangle') pts = [[45, cy0], [195, cy0], [195, 32], [45, 32]];
+      else if (type === 'square') pts = [[82, cy0], [158, cy0], [158, 32], [82, 32]];
+      else {
+        const rh = type === 'rhombus';
+        const deg = Math.max(30, Math.min(150, toNum(f.deg, rh ? 60 : 65)));
+        const a = deg * Math.PI / 180, b = rh ? 88 : 120, s = rh ? 88 : 80;
+        const dx = s * Math.cos(a), dy = s * Math.sin(a), sc = Math.min(1, 76 / dy);
+        const B = b * sc, DX = dx * sc, DY = dy * sc;
+        const left = (240 - (B + Math.abs(DX))) / 2 + (DX < 0 ? -DX : 0);
+        pts = [[left, cy0], [left + B, cy0], [left + B + DX, cy0 - DY], [left + DX, cy0 - DY]];
+      }
+      const cx = pts.reduce((s, p) => s + p[0], 0) / 4, cy = pts.reduce((s, p) => s + p[1], 0) / 4;
+      const mid = (i) => { const p = pts[i], q = pts[(i + 1) % 4]; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.atan2(q[1] - p[1], q[0] - p[0])]; };
+      const chevron = (i, k) => { const [mx, my, t0] = mid(i), t = i >= 2 ? t0 + Math.PI : t0; let d = '';
+        for (let j = 0; j < k; j++) { const o = (j - (k - 1) / 2) * 7, x = mx + o * Math.cos(t), y = my + o * Math.sin(t);
+          d += `M${(x - 5 * Math.cos(t) - 4 * Math.sin(t)).toFixed(1)} ${(y - 5 * Math.sin(t) + 4 * Math.cos(t)).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x - 5 * Math.cos(t) + 4 * Math.sin(t)).toFixed(1)} ${(y - 5 * Math.sin(t) - 4 * Math.cos(t)).toFixed(1)} `; }
+        return `<path d="${d}" stroke="${ACC}" stroke-width="2.4"/>`; };
+      const tick = (i) => { const [mx, my, t] = mid(i); const nx = -Math.sin(t) * 6, ny = Math.cos(t) * 6;
+        return `<line x1="${(mx - nx).toFixed(1)}" y1="${(my - ny).toFixed(1)}" x2="${(mx + nx).toFixed(1)}" y2="${(my + ny).toFixed(1)}" stroke-width="2"/>`; };
+      const right = (i) => { const p = pts[i], a = pts[(i + 1) % 4], b = pts[(i + 3) % 4];
+        const u = [(a[0] - p[0]), (a[1] - p[1])], v = [(b[0] - p[0]), (b[1] - p[1])], lu = Math.hypot(...u), lv = Math.hypot(...v), k = 12;
+        const q1 = [p[0] + u[0] / lu * k, p[1] + u[1] / lu * k], q2 = [p[0] + v[0] / lv * k, p[1] + v[1] / lv * k];
+        return `<path d="M${q1[0].toFixed(1)} ${q1[1].toFixed(1)} L${(q1[0] + q2[0] - p[0]).toFixed(1)} ${(q1[1] + q2[1] - p[1]).toFixed(1)} L${q2[0].toFixed(1)} ${q2[1].toFixed(1)}" stroke-width="1.6"/>`; };
+      let marks = '';
+      if (type === 'trapezoid') marks = chevron(0, 1) + chevron(2, 1);
+      else if (type === 'parallelogram') marks = chevron(0, 1) + chevron(2, 1) + chevron(1, 2) + chevron(3, 2);
+      else if (type === 'rhombus') marks = [0, 1, 2, 3].map(tick).join('');   // 마름모는 네 변이 같다는 눈금만(화살표까지 겹치면 복잡)
+      else if (type === 'rectangle') marks = [0, 1, 2, 3].map(right).join('');
+      else if (type === 'square') marks = [0, 1, 2, 3].map(right).join('') + [0, 1, 2, 3].map(tick).join('');
+      const angs = Array.isArray(f.angles) ? f.angles : [];
+      const labels = angs.slice(0, 4).map((a, i) => {
+        if (a == null) return '';
+        const [x, y] = pts[i]; const dx = cx - x, dy = cy - y, len = Math.hypot(dx, dy) || 1;
+        return txt(x + dx / len * 26, y + dy / len * 26 + 5, a === '?' ? '?' : a + '°', 13);
+      }).join('');
+      return wrap(`<path d="${path(pts)}" fill="${ACC2}"/>${marks}${labels}`);
+    },
+    // [FIG-LINE-QUAD-1] 두 직선 — 수직·평행·평행선 사이의 거리
+    lines(f) {
+      if (f.type === 'perp') return wrap(`<line x1="30" y1="96" x2="210" y2="96"/><line x1="120" y1="14" x2="120" y2="120"/>
+        <path d="M120 82 L134 82 L134 96" stroke-width="1.8"/>`);
+      const par = `<line x1="20" y1="34" x2="220" y2="34"/><line x1="20" y1="100" x2="220" y2="100"/>`;
+      if (f.type === 'parallel') return wrap(par);
+      if (f.type === 'distance') return wrap(`${par}<line x1="120" y1="34" x2="120" y2="100" stroke="${ACC}" stroke-width="3"/>
+        <path d="M120 86 L134 86 L134 100" stroke-width="1.6"/>${txt(160, 72, f.label != null ? f.label : '?', 14)}`);
+      return '';
     },
   };
 

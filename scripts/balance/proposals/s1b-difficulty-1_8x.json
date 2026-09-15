@@ -1,0 +1,1 @@
+{ "name": "S1b 난이도 계수만 (HP×1.8 · ATK×1.8)", "settings": { "monsterHpMult": 1.8, "monsterAtkMult": 1.8 } }

@@ -8,7 +8,10 @@
 //    node scripts/balance/gate.mjs                                   코드 기본 계수
 //    node scripts/balance/gate.mjs --settings scripts/balance/settings/prod-20260915.json   운영 계수
 //    node scripts/balance/gate.mjs --gamedata <옛 gamedata.js 경로>   옛 커밋과 비교
+//    node scripts/balance/gate.mjs --proposal scripts/balance/proposals/<안>.json  B-4 계수 세트(메모리에서만 적용)
 //    옵션: --n 400(칸당 판 수) · --seed 20260915 · --max 20(최대 레벨) · --strict
+//    proposal JSON = { name, settings(관리자 설정 — --settings 위에 덮음), balance(BALANCE 덮기),
+//                      patches([원문, 바꿀 글] — 코드에 없는 구조 제안), growth({atk:[기본, 레벨당]} — 코드에 없는 구조 제안) }
 //
 //  판정 (G1~G5, 목표는 "제안" — 운영 값 변경은 사용자 결정)
 //    G1 같은 Lv 풀장비 65~80%        G2 같은 Lv 무기만 45~60%        G3 같은 Lv 맨몸 25~40%
@@ -20,7 +23,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorld, makeStudent, winRate, GEAR, ROOT } from './lib.mjs';
+import { loadWorld, makeStudent, winRate, GEAR, GEAR_REF, ROOT } from './lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const flag = k => process.argv.includes('--' + k);
@@ -28,13 +31,15 @@ const N = Number(arg('n', 400));
 const SEED = Number(arg('seed', 20260915));
 const MAX = Number(arg('max', 20));
 const settingsPath = arg('settings', null);
-const settings = settingsPath ? JSON.parse(fs.readFileSync(path.resolve(settingsPath), 'utf8')) : {};
+const proposalPath = arg('proposal', null);
+const proposal = proposalPath ? JSON.parse(fs.readFileSync(path.resolve(proposalPath), 'utf8')) : {};
+const settings = { ...(settingsPath ? JSON.parse(fs.readFileSync(path.resolve(settingsPath), 'utf8')) : {}), ...(proposal.settings || {}) };
 const gamedata = arg('gamedata', path.join(ROOT, 'gamedata.js'));
 const OFFSETS = [-1, 0, 1, 2, 3];
 const TARGET = { 풀장비: [0.65, 0.80], 무기만: [0.45, 0.60], 맨몸: [0.25, 0.40] };
 const CLIFF = 0.15, PLUS3 = [0.30, 0.45];
 
-const W = loadWorld({ gamedata, settings, seed: SEED });
+const W = loadWorld({ gamedata, settings, balance: proposal.balance || null, patches: proposal.patches || null, seed: SEED });
 const bc = W.BATTLE_CONSTS;
 const pct = r => (r == null ? '—' : `${Math.round(r.win * 100)}%`);
 const out = [];
@@ -42,22 +47,22 @@ const P = s => out.push(s);
 
 P(`# 밸런스 게이트 — ${new Date().toISOString().slice(0, 10)}`);
 P(`계수: 몬스터 HP×${bc.monsterHpMult} · 공격력×${bc.monsterAtkMult} · 하루 전투 ${bc.dailyBattleLimit}회 · 유령 노말×${bc.ghostNormalMult}` +
-  ` · 출처 ${settingsPath ? path.basename(settingsPath) : '코드 기본값'} · gamedata ${gamedata.startsWith(ROOT) ? path.relative(ROOT, gamedata) : path.basename(gamedata) + ' (저장소 밖)'} · 칸당 ${N}판 · 씨앗 ${SEED}`);
+  ` · 출처 ${settingsPath ? path.basename(settingsPath) : '코드 기본값'}${proposalPath ? ` + 제안 ${proposal.name || path.basename(proposalPath)}` : ''} · gamedata ${gamedata.startsWith(ROOT) ? path.relative(ROOT, gamedata) : path.basename(gamedata) + ' (저장소 밖)'} · 칸당 ${N}판 · 씨앗 ${SEED}`);
 
 // ── 1. 승률 표 ─────────────────────────────────────────────────
 const table = {};   // table[gear][lv][offset] = {win,turns}
-for (const gear of GEAR) {
+for (const gear of [...GEAR, ...GEAR_REF]) {
   table[gear] = {};
-  P(`\n## 승률 — ${gear}`);
+  P(`\n## 승률 — ${gear}${GEAR_REF.includes(gear) ? ' (참고 · 판정 밖 — 칸마다 최근 등급·스태프·속성 스킬, 몬스터마다 가장 센 공격)' : ''}`);
   P('| Lv | ATK/DEF/HP | 노말 | Lv−1 | **같은 Lv** | Lv+1 | Lv+2 | Lv+3 |');
   P('|---|---|---|---|---|---|---|---|');
   for (let lv = 1; lv <= MAX; lv++) {
-    const st = makeStudent(W, lv, gear);
+    const st = makeStudent(W, lv, gear, proposal.growth || null);
     const hp = W.getPlayerBattleStats(st).hp;
     table[gear][lv] = {};
     for (const o of OFFSETS) table[gear][lv][o] = winRate(W, st, lv + o, N);
     const row = OFFSETS.map(o => (o === 0 ? `**${pct(table[gear][lv][o])}**` : pct(table[gear][lv][o])));
-    P(`| ${lv} | ${st.combat.atk}/${st.combat.def}/${hp} | ${st.skillLevels.normal} | ${row.join(' | ')} |`);
+    P(`| ${lv} | ${st.combat.atk}/${st.combat.def}/${hp}${GEAR_REF.includes(gear) ? ` (MAG ${st.combat.mag})` : ''} | ${st.skillLevels.normal} | ${row.join(' | ')} |`);
   }
 }
 P('\n`—` = 그 레벨이 같은 사냥터(1~10·11~20·21~30) 밖이라 카드로 제시되지 않음.');
@@ -71,7 +76,7 @@ const cardAvg = (gear, offs) => {
   for (let lv = 1; lv <= MAX; lv++) for (const o of offs) { const r = table[gear][lv][o]; if (r) vals.push(r.win); }
   return vals.length ? `${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 100)}%` : '—';
 };
-for (const gear of GEAR) P(`| ${gear} | ${cardAvg(gear, [-1, 0])} | ${cardAvg(gear, [0, 1])} | ${cardAvg(gear, [1, 2])} |`);
+for (const gear of [...GEAR, ...GEAR_REF]) P(`| ${gear} | ${cardAvg(gear, [-1, 0])} | ${cardAvg(gear, [0, 1])} | ${cardAvg(gear, [1, 2])} |`);
 
 // ── 3. 골드 흐름 ───────────────────────────────────────────────
 //  전투: 하루 전투 횟수 × 같은 Lv 승률(풀장비) × 그 레벨 몬스터 평균 골드
