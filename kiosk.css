@@ -123,7 +123,7 @@ html, body {
 #header{height:auto;min-height:56px;flex-wrap:wrap;row-gap:.4rem;padding:.4rem 1rem;}
 #header .title{font-size:1.25rem;white-space:nowrap;}
 #header .date{font-size:.875rem;white-space:nowrap;}
-#class-name{white-space:nowrap;font-size:.875rem!important;}
+#class-name{white-space:nowrap;font-size:1rem;color:var(--txt2);}
 .qtab{font-size:1rem;min-height:40px;padding:0 1.1rem;white-space:nowrap;display:inline-flex;align-items:center;gap:.3rem;}
 #kiosk-table th{font-size:.9375rem;padding:.6rem .5rem;}
 #kiosk-table th.quest-th{font-size:.9375rem;}
@@ -131,6 +131,23 @@ html, body {
 #kiosk-table td.quest-name .quest-reward{font-size:.8125rem;}
 .cell-btn{border-color:rgba(239,231,217,.28);font-size:.8125rem;}
 #empty-msg{font-size:1rem;}
+/* [D3-KIOSK-2] TV 3m 거리 — 글자 16px 이상 기준(1920×1080 실측, 16px 미만 38곳).
+   kiosk.js·kiosk.html 인라인 글자 크기를 class로 옮겼다(색·배경처럼 값이 바뀌는 것만 인라인에 남김 — 탭 활성색은 switchKioskTab이 바꿈).
+   학생 이름 11.5→16 · 탭 13.1→16 · 섹션 줄 11.5→16 · 마감일 10.6→14(보조) · 보상 13→14 · 날짜·반 이름 14→16 · 할 일 머리 15→16 */
+.kiosk-tab{font-size:1rem;padding:0 1.1rem;min-height:40px;border-radius:999px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap;}
+#kiosk-table th.k-stu-th{font-size:1rem;}
+.k-stu-ava{font-size:1.5rem;line-height:1.1;}
+.k-stu-name{font-size:1rem;margin-top:2px;}
+#kiosk-table th.quest-th{font-size:1rem;}
+#kiosk-table td.k-grp{padding:.35rem .8rem;font-size:1rem;font-weight:700;color:#fff;}
+#kiosk-table td.k-grp-etc{background:rgba(255,255,255,.05);color:var(--txt2);}
+.k-due{font-size:.875rem;color:var(--txt2);margin-top:.15rem;white-space:nowrap;}
+/* 글자가 커져 할 일 칸(180px)에서 마감일이 '오늘까/지'로 접혔다 → 칸 최소 폭 230px */
+#kiosk-table th.quest-th,#kiosk-table td.quest-name{min-width:230px;width:230px;}
+.k-due-urgent{display:inline-flex;align-items:center;gap:.25rem;margin-top:.2rem;font-weight:700;border-radius:6px;padding:.05rem .4rem;}
+#kiosk-table td.quest-name .quest-reward{font-size:.875rem;}
+#header .date{font-size:1rem;}
+.k-sec{font-size:1.125rem;font-weight:900;color:var(--gold);padding:.55rem .9rem;margin-top:.6rem;border-radius:0 8px 8px 0;}
 @media(max-width:600px){
   #header .date{margin-left:0;}
 }
