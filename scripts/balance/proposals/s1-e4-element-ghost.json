@@ -1,0 +1,1 @@
+{ "name": "S1+E4 몬스터 ×2.0 · 유리 상성 1.2 · 유령 노말 0.8 (관리자 설정만)", "settings": { "monsterHpMult": 2.0, "monsterAtkMult": 2.0, "elemChart": { "advantageMult": 1.2, "disadvantageMult": 0.8 }, "ghostNormalMult": 0.8 } }
