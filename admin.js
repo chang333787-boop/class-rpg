@@ -4866,7 +4866,8 @@ function saveEquipItem(itemId, slot) {
 }
 
 function resetEquipSettings() {
-  if (!confirm('장비 수치를 기본값으로 초기화할까요?')) return;
+  // [RESET-SCOPE-1] 지우는 범위를 확인창에 적는다(장비 조정만 — 전투 배율·횟수·스킬북·상점 가격은 그대로)
+  if (!confirm('장비 수치 조정을 모두 기본값으로 되돌릴까요?\n\n전투 배율·하루 전투 횟수·스킬북·상점 가격은 그대로 둡니다.')) return;
   const db = DB.load();
   db.settings = db.settings || {};
   db.settings.customBattleSettings = db.settings.customBattleSettings || {};
@@ -4930,7 +4931,8 @@ function saveSkillBook(bookId) {
 }
 
 function resetSkillBookSettings() {
-  if (!confirm('스킬북 설정을 기본값으로 초기화할까요?')) return;
+  // [RESET-SCOPE-1] 지우는 범위를 확인창에 적는다(스킬북 조정만)
+  if (!confirm('스킬북 조정을 모두 기본값으로 되돌릴까요?\n\n전투 배율·하루 전투 횟수·장비 수치는 그대로 둡니다.')) return;
   const db = DB.load();
   db.settings = db.settings || {};
   db.settings.customBattleSettings = db.settings.customBattleSettings || {};
@@ -5082,14 +5084,21 @@ function deleteCustomMonster() {
   notify('몬스터 삭제 완료');
 }
 
+// [RESET-SCOPE-1] 기본 몬스터의 수치 조정만 되돌린다. 선생님이 **새로 만든 몬스터(_new)** 는 남긴다.
+//   예전엔 customMonsters 를 통째 {} 로 set 해서 새로 만든 몬스터까지 지웠다. 이제 지울 id 만 update(null).
 function resetCustomMonsters() {
-  if (!confirm('모든 몬스터 수치를 기본값으로 되돌릴까요?\n(새로 추가한 몬스터도 삭제됩니다)')) return;
   const db = DB.load();
-  db.customMonsters = {};
+  const customs = db.customMonsters || {};
+  const edits = Object.keys(customs).filter(id => customs[id] && !customs[id]._new);
+  const added = Object.keys(customs).length - edits.length;
+  if (!edits.length) { notify('되돌릴 기본 몬스터 조정이 없어요'); return; }
+  if (!confirm(`기본 몬스터 ${edits.length}마리의 수치 조정을 되돌릴까요?\n\n새로 만든 몬스터 ${added}마리는 그대로 둡니다.`)) return;
+  edits.forEach(id => { delete customs[id]; });
+  db.customMonsters = customs;
   DB._cache = db;
-  DB._fbRef.child('customMonsters').set({});
+  DB._fbRef.child('customMonsters').update(Object.fromEntries(edits.map(id => [id, null])));
   renderMonsters();
-  notify('🔄 몬스터 기본값으로 초기화');
+  notify(`🔄 기본 몬스터 ${edits.length}마리 되돌림 · 새로 만든 몬스터는 그대로`);
 }
 
 function closeMonsterModal() {
@@ -5261,15 +5270,18 @@ function saveShopOverrides() {
 }
 
 function resetShopOverrides() {
-  if (!confirm('이 탭의 상점 설정을 기본값으로 초기화할까요?')) return;
+  // [RESET-SCOPE-1] 이 탭 한 칸만 지운다. 예전엔 settings **전체**를 교사 캐시 판으로 set 해서
+  //   그사이 바뀐 다른 설정(아침 자동등록 날짜·오늘의 링크 등)을 되돌릴 수 있었다.
+  const node = { seed: 'seeds', equip: 'equipment', deco: 'decorations' }[CUR_SHOP_TAB];
+  if (!node) return;
+  const label = { seed: '씨앗', equip: '장비', deco: '장식' }[CUR_SHOP_TAB];
+  if (!confirm(`상점 ${label} 탭의 가격·수치 조정을 기본값으로 되돌릴까요?\n\n다른 탭과 다른 설정은 그대로 둡니다.`)) return;
   const db = DB.load();
   db.settings = db.settings || {};
   db.settings.shopOverrides = db.settings.shopOverrides || {};
-  if (CUR_SHOP_TAB === 'seed')  delete db.settings.shopOverrides.seeds;
-  if (CUR_SHOP_TAB === 'equip') delete db.settings.shopOverrides.equipment;
-  if (CUR_SHOP_TAB === 'deco')  delete db.settings.shopOverrides.decorations;
+  delete db.settings.shopOverrides[node];
   DB._cache = db;
-  DB._fbRef.child('settings').set(db.settings);
+  DB._fbRef.child('settings/shopOverrides/' + node).remove();
   // GAME_DATA를 기본값으로 재로드 (페이지 새로고침 필요)
   notify('↩️ 기본값으로 초기화됐어요. 새로고침하면 반영돼요');
   setTimeout(() => location.reload(), 1500);
