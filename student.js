@@ -1505,7 +1505,7 @@ function buildMainHTML() {
           </div>
           <span style="font-size:1rem;flex-shrink:0">${q.icon||'📋'}</span>
           <div style="flex:1;min-width:0">
-            <div class="mission-name">${q.name}</div>
+            <div class="mission-name">${escHtml(q.name)}</div>
             <div style="font-size:.68rem;color:var(--txt3)">${typeLabel}${q.dueDate?` · 마감 ${q.dueDate}`:''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;flex-shrink:0">
@@ -2411,7 +2411,7 @@ function renderMonsters() {
       onclick="${canChallenge?`startBattle('${m.id}')`:''}"
       style="${isKilled||isLocked?'cursor:default':''}">
       <div class="mc-icon">${iconImg(m, 'monsters', '1.6rem')}</div>
-      <div class="mc-name">${m.name}</div>
+      <div class="mc-name">${escHtml(m.name)}</div>
       <div class="mc-lv">Lv.${m.level||m.recLv}</div>
       <div class="mc-gold">💰 ${m.gold}G</div>
       ${isKilled?'<span class="mc-tag tag-done">처치완료</span>'
@@ -2626,7 +2626,7 @@ function renderBattleNew() {
       </div>
       <!-- 몬스터 -->
       <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#FF8A80">${mon.name}</div>
+        <div class="ba-fighter-name" style="color:#FF8A80">${escHtml(mon.name)}</div>
         <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
         <div style="width:100%">
           <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-mon-hp" style="width:${monsterHpPct}%"></div></div>
@@ -2857,11 +2857,11 @@ function renderBattle(phase) {
 
   let logHtml = '';
   if (phase === 'ready') {
-    logHtml = `<span class="info">${mon.icon} ${mon.name}이(가) 나타났다!</span><br>도전 버튼을 눌러 전투를 시작하세요.`;
+    logHtml = `<span class="info">${escHtml(mon.icon)} ${escHtml(mon.name)}이(가) 나타났다!</span><br>도전 버튼을 눌러 전투를 시작하세요.`;
   } else if (phase === 'win') {
-    logHtml = `<span class="good">⚡ 공격 성공!</span><br><span class="good">💥 ${mon.name}을(를) 물리쳤다!</span><br><span class="good">💰 +${mon.gold}G 획득!</span>`;
+    logHtml = `<span class="good">⚡ 공격 성공!</span><br><span class="good">💥 ${escHtml(mon.name)}을(를) 물리쳤다!</span><br><span class="good">💰 +${mon.gold}G 획득!</span>`;
   } else {
-    logHtml = `<span class="bad">💔 ${mon.name}의 반격!</span><br><span class="bad">패배했습니다...</span>`;
+    logHtml = `<span class="bad">💔 ${escHtml(mon.name)}의 반격!</span><br><span class="bad">패배했습니다...</span>`;
   }
 
   document.getElementById('battle-arena').innerHTML = `
@@ -2879,7 +2879,7 @@ function renderBattle(phase) {
       <div class="ba-vs-icon">⚡</div>
       <div class="ba-side">
         <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
-        <div style="font-size:.75rem;font-weight:700">${mon.name}</div>
+        <div style="font-size:.75rem;font-weight:700">${escHtml(mon.name)}</div>
         <div class="ba-hp-wrap">
           <div class="ba-hp-bar-bg"><div class="ba-hp-bar-fill ba-mon-hp" id="ba-mon-hp" style="width:${monHpPct}%"></div></div>
           <div class="ba-hp-txt">HP ${monHpPct}%</div>
@@ -2918,17 +2918,17 @@ function doFight() {
   const rounds = win ? [
     {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${s.name} 공격!</span>`},
     {delay:1000, monShake:true,  log:`<span class="good">💥 타격! 몬스터 체력 감소!</span>`,  monHp:65},
-    {delay:2200, monAtk:true,    log:`<span class="bad">😤 ${mon.name} 반격!</span>`},
+    {delay:2200, monAtk:true,    log:`<span class="bad">😤 ${escHtml(mon.name)} 반격!</span>`},
     {delay:3200, charFx:true,    log:`<span class="info">🛡️ 막았다!</span>`},
     {delay:4400, charMove:true,  log:`<span class="info">⚔️ 연속 공격!</span>`},
     {delay:5400, monShake:true,  log:`<span class="good">💥 치명타!</span>`,               monHp:30},
     {delay:6600, charMove:true,  log:`<span class="info">⚔️ 마지막 일격!</span>`},
-    {delay:7600, monShake:true,  log:`<span class="good">💥 ${mon.name} 쓰러졌다!</span>`, monHp:0},
+    {delay:7600, monShake:true,  log:`<span class="good">💥 ${escHtml(mon.name)} 쓰러졌다!</span>`, monHp:0},
     {delay:9000, end:true, win:true},
   ] : [
     {delay:0,    charMove:true,  log:`<span class="info">⚔️ ${s.name} 공격!</span>`},
     {delay:1000, miss:true,      log:`<span style="color:#888">💨 빗나감!</span>`},
-    {delay:2200, monAtk:true,    log:`<span class="bad">😈 ${mon.name} 반격!</span>`},
+    {delay:2200, monAtk:true,    log:`<span class="bad">😈 ${escHtml(mon.name)} 반격!</span>`},
     {delay:3200, charShake:true, log:`<span class="bad">💔 피해! 체력 감소...</span>`,     charHp:65},
     {delay:4400, charMove:true,  log:`<span class="info">⚔️ 다시 공격!</span>`},
     {delay:5400, miss:true,      log:`<span style="color:#888">💨 또 빗나감!</span>`},
@@ -3877,7 +3877,7 @@ function renderMonsterStep() {
           border-radius:6px;padding:.12rem .35rem">${badgeTxt}</div>`:''}
         <div style="font-size:.58rem;color:var(--txt3);margin-bottom:.3rem">${slotLabels[i]||''}</div>
         <div style="font-size:2.3rem;margin-bottom:.3rem">${iconImg(mon, 'monsters', '2.3rem')}</div>
-        <div style="font-size:.85rem;font-weight:800;color:${isKilled?'var(--txt3)':isSpecial?'#fff':'var(--txt1)'};margin-bottom:.2rem">${mon.name}</div>
+        <div style="font-size:.85rem;font-weight:800;color:${isKilled?'var(--txt3)':isSpecial?'#fff':'var(--txt1)'};margin-bottom:.2rem">${escHtml(mon.name)}</div>
         <div style="font-size:.63rem;color:var(--txt3)">Lv.${mon.level||mon.recLv} ${elemE}${mon.trait==='ghost'?' 👻':''}</div>
         <div style="font-size:.67rem;color:var(--gold);margin:.2rem 0">💰${mon.gold}G</div>
         <div style="margin-top:.5rem">
@@ -3911,7 +3911,7 @@ function renderMonsterStep() {
               opacity:${isK?.65:1}">
               <span style="font-size:.85rem">${iconImg(m, 'monsters', '.85rem')}</span>
               <div>
-                <div style="font-size:.63rem;font-weight:600;color:${isK?'var(--txt3)':'var(--txt2)'}">${m.name}</div>
+                <div style="font-size:.63rem;font-weight:600;color:${isK?'var(--txt3)':'var(--txt2)'}">${escHtml(m.name)}</div>
                 <div style="font-size:.56rem;color:var(--txt3)">Lv${m.level||m.recLv}${isK?' ✓':''}</div>
               </div>
             </div>`;
@@ -3989,7 +3989,7 @@ function renderMonsterStep() {
           border-radius:12px;padding:.65rem .4rem;text-align:center${glowSpec}">
           ${isSpecial?`<div style="font-size:.52rem;color:#FFD700;font-weight:700;margin-bottom:.1rem">✨전설</div>`:''}
           <div style="font-size:1.5rem;margin-bottom:.15rem">${iconImg(m, 'monsters', '1.5rem')}</div>
-          <div style="font-size:.7rem;font-weight:700;color:var(--txt1)">${m.name}</div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--txt1)">${escHtml(m.name)}</div>
           <div style="font-size:.58rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
           <div style="font-size:.55rem;color:var(--emerald);background:rgba(46,204,113,.15);
             border-radius:5px;padding:.1rem .3rem;margin-top:.25rem">✓ 처치완료</div>
@@ -3998,7 +3998,7 @@ function renderMonsterStep() {
         return `<div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.12);
           border-radius:12px;padding:.65rem .4rem;text-align:center;opacity:.8">
           <div style="font-size:1.5rem;margin-bottom:.15rem;filter:grayscale(.4)">${iconImg(m, 'monsters', '1.5rem')}</div>
-          <div style="font-size:.7rem;font-weight:700;color:var(--txt2)">${m.name}</div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--txt2)">${escHtml(m.name)}</div>
           <div style="font-size:.58rem;color:var(--txt3)">Lv${m.level||m.recLv}</div>
           <div style="font-size:.55rem;color:var(--txt3);background:rgba(255,255,255,.07);
             border-radius:5px;padding:.1rem .3rem;margin-top:.25rem">미처치</div>
@@ -4338,7 +4338,7 @@ function renderHouse() {
     return `<div style="margin-bottom:.5rem">
       <div style="font-size:.68rem;color:${z.color};font-weight:600;margin-bottom:.25rem">${z.label}</div>
       <div style="display:flex;flex-wrap:wrap;gap:.25rem">
-        ${killed.map(m => `<span class="dex-chip">${m.icon} ${m.name}</span>`).join('')}
+        ${killed.map(m => `<span class="dex-chip">${escHtml(m.icon)} ${escHtml(m.name)}</span>`).join('')}
       </div>
     </div>`;
   }).join('');
@@ -8779,7 +8779,7 @@ function renderQuestBoard() {
       <div style="display:flex;align-items:flex-start;gap:.7rem">
         <div style="font-size:1.6rem;flex-shrink:0">${q.icon||'📋'}</div>
         <div style="flex:1">
-          <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${q.name}</div>
+          <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${escHtml(q.name)}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
             ${q.type==='daily'?'📅 일일':q.type==='weekly'?'📆 주간':q.type==='special'?'⭐ 과제':'🎉 특별'} 퀘스트
             ${q.dueDate?` · 마감 ${q.dueDate}`:''}
@@ -9092,7 +9092,7 @@ function renderQuestModal() {
   document.getElementById('quest-list').innerHTML = (claimBtn||'') + (all.length > 0
     ? all.map(q => `<div class="quest-row">
         <div class="qr-icon">${q.icon}</div>
-        <div class="qr-body"><div class="qr-name">${q.name}</div><div class="qr-desc">${q.date||''}</div></div>
+        <div class="qr-body"><div class="qr-name">${escHtml(q.name)}</div><div class="qr-desc">${q.date||''}</div></div>
         <div class="qr-right">
           ${statusLabel[q.status]||statusLabel.done}
           <span class="qr-rewards">${q.exp>0?`+${q.exp}EXP · `:''}${q.gold>0?`+${q.gold}G`:q.status==='self'?'보상 대기':''}</span>
