@@ -461,6 +461,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @media (prefers-reduced-motion: reduce){
   #study-body *{animation:none !important;transition:none !important}
 }
+/* [D3-STUDY-1] 375 폭: 모달 안 여백 27px + 과목 카드 여백 19px + 아이콘 35px + 간격 16px + 화살표를 빼면
+   설명 글자 칸이 150px 남짓이라 '단어·표현·듣기·말하기…'가 4줄로 접혔다. 여백을 8px 단위로 줄여 글자 칸을 넓힌다.
+   과목 카드의 여백·간격은 student.js 템플릿 인라인이라 이 한 곳만 !important(클래스 선택자, 속성 선택자 아님). */
+@media (max-width:600px){
+  #m-study .modal{padding:var(--sp-2,16px);border-radius:var(--r-lg,20px);}
+  #study-body .st-subject-card{padding:var(--sp-2,16px)!important;gap:12px!important;}
+  #study-body .st-subject-card > span:first-child{font-size:1.75rem!important;}
+}
 /* 세로로 긴 화면(태블릿 세로)에서는 빈 공간이 과하게 남지 않게 */
 @media (orientation:portrait){
   #m-study .modal{min-height:min(76vh,780px);}
