@@ -35,7 +35,7 @@ const CHECKS = [
   { name: 'save-order',   file: 'scripts/unit/save-order-check.mjs', args: ['--baseline', SAVE_BASELINE],     pick: /요약:[^\n]*/ },
 ];
 // 폴더에 있는 다른 자기검사 시뮬들(각자 exit 코드로 판정)
-for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim']) {
+for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'student-known-check']) {
   CHECKS.push({ name: f, file: `scripts/unit/${f}.mjs`, args: [], pick: /(최종 결과:[^\n]*|PASS[^\n]*|FAIL[^\n]*)$/m, optional: true });
 }
 if (GOLD) {
