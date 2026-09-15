@@ -38,3 +38,11 @@ git log 검색으로는 안 잡히는 작업만 여기 적는다. (전체 목록
 - [2026-09-10-cachebuster-single-source.md](2026-09-10-cachebuster-single-source.md) — 캐시버스터를 html 단일 출처로(#205).
   **smoke 기준선이 34 → 28로 바뀐 곳**이라, 옛 문서의 "34"를 보고 헷갈리면 여기를 본다.
   이후 캐시버스터는 html만 고치고, `gamedata.js`류는 student·admin·kiosk 세 곳을 같이 올린다.
+
+- [2026-09-14-village-g5.md](2026-09-14-village-g5.md) — 우리 마을을 RPG에 붙인 PR 6건(#209~#213·#217) 색인.
+  **마을 원본은 저장소 밖**이고 `sync.js`만 저장소가 원본이라는 것, `village/** -text`를 지우면 해시가 틀어지는 것,
+  마을 파일엔 캐시버스터가 없다는 것이 여기 있다. #209는 커밋 제목에 "마을"이 없어 `--grep`으로 안 잡힌다.
+
+- [2026-09-15-rf-village-ops.md](2026-09-15-rf-village-ops.md) — 마을 백업·되살리기·첫 확인 절차 근거 + **학생 순서가 바뀌던 원인**(#228) + 학생 이중화 데이터 대조.
+  되살릴 때 `savedAt` 을 지금으로 바꾸는 이유(옛 시각이면 기기가 복원을 덮음), **옛 숫자 키에 6월 보상 대기가 남아 있던 것**,
+  에뮬레이터 함정(firebase-tools 는 Java 21 · jar 는 17 로 직접 · 없는 경로 200 null · EventSource patch 조각)이 여기 있다.

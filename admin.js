@@ -26,6 +26,16 @@ function escJsAttr(s) {
   return escHtml(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
+// 링크·오디오 주소 검사 (Q3-URL-2) — student.js safeUrl 과 같은 규칙. http/https 만, 다른 스킴은 빈 문자열.
+//  브라우저가 주소 속 탭·줄바꿈을 무시하므로 제어 문자(코드 0~31, 127)를 먼저 지운다.
+function safeUrl(u) {
+  const s = [...String(u == null ? '' : u)].filter(ch => ch.charCodeAt(0) > 31 && ch.charCodeAt(0) !== 127).join('').trim();
+  if (!s) return '';
+  if (/^https?:[/][/]/i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return '';
+  return 'https://' + s.replace(/^[/]+/, '');
+}
+
 // ══════════════════════════════════════════════════
 //  ADMIN LOGIN
 // ══════════════════════════════════════════════════
@@ -132,9 +142,9 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts'];
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages'];
 const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
-  rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황',
+  rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황', villages:'🏘️ 우리 마을',
   memories:'📸 추억 관리',
   recorder:'🎵 리코더 관리',
   weekly:'📅 주간 다짐', study:'📚 학습 범위',
@@ -207,6 +217,65 @@ function nav(page, el) {
   }
   if (page === 'emotion')        renderEmotionPage();
   if (page === 'emotionalerts')  renderEmotionAlerts();
+  if (page === 'villages')       renderVillagesPage();
+}
+
+// ══════════════════════════════════════════════════
+//  [VILLAGE-ADMIN-1] 우리 마을 — 읽기만
+// ══════════════════════════════════════════════════
+//  classRPG_villages(루트 밖, village/sync.js 가 쓰는 자리)를 **REST GET 으로만** 읽는다. 쓰기 0.
+//  · SDK once('value') 로 통째로 받지 않는다 — 구역 문자열까지 받으면 학생당 최대 약 135KB.
+//    대신 ① 목록은 ?shallow=true ② 학생마다 meta(수 KB) · plots?shallow=true(키만) · session 만.
+//  · 구경 링크는 아직 두지 않는다. 마을(index.html)이 ?visit= 를 받지 않는다(44·45차 확인).
+//    ?sid=<학생> 링크도 두지 않는다 — 교사 기기가 session 주인이 되어 학생 쪽이 구경 모드로 밀려난다.
+const VILLAGE_STALE_MS = 90000;   // village/sync.js 의 staleMs 와 같다 — 이 안에 박동이 있으면 "열려 있음"
+async function renderVillagesPage() {
+  const tbody = document.getElementById('villages-table');
+  const sum = document.getElementById('villages-summary');
+  const note = document.getElementById('villages-note');
+  if (!tbody) return;
+  const students = [];
+  const seen = new Set();
+  (DB.getStudents() || []).forEach(s => { if (s && s.id && !seen.has(s.id)) { seen.add(s.id); students.push(s); } });
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--txt3)">불러오는 중…</td></tr>`;
+  sum.textContent = ''; note.textContent = '';
+
+  const base = FIREBASE_CONFIG.databaseURL + '/classRPG_villages';
+  const getJSON = async path => { const r = await fetch(base + path); if (!r.ok) throw new Error(r.status); return r.json(); };
+  let list;
+  try { list = await getJSON('.json?shallow=true') || {}; }
+  catch (e) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--red)">마을 목록을 읽지 못했어요 (${escHtml(String(e.message || e))})</td></tr>`; return; }
+
+  const rows = await Promise.all(students.map(async s => {
+    if (!list[s.id]) return { s, has: false };
+    const enc = encodeURIComponent(s.id);
+    try {
+      const [meta, plots, session] = await Promise.all([
+        getJSON('/' + enc + '/meta.json'), getJSON('/' + enc + '/plots.json?shallow=true'), getJSON('/' + enc + '/session.json')]);
+      const houses = meta && meta.houses && typeof meta.houses === 'object' ? Object.values(meta.houses) : [];
+      return { s, has: true, plots: plots ? Object.keys(plots).length : 0, houses: houses.length,
+               people: houses.reduce((n, h) => n + (Array.isArray(h) ? (h[0] | 0) : 0), 0),
+               savedAt: meta && typeof meta.savedAt === 'number' ? meta.savedAt : null,
+               open: !!(session && typeof session.at === 'number' && Date.now() - session.at < VILLAGE_STALE_MS) };
+    } catch (e) { return { s, has: true, error: String(e.message || e) }; }
+  }));
+
+  const fmt = ms => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const muted = t => `<span style="color:var(--txt3)">${t}</span>`;
+  tbody.innerHTML = rows.map(r => {
+    const name = escHtml(r.s.name || r.s.id);
+    if (!r.has) return `<tr><td>${name}</td><td>${muted('아직 없음')}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+    if (r.error) return `<tr><td>${name}</td><td>있음</td><td colspan="5" style="color:var(--red)">읽기 실패 (${escHtml(r.error)})</td></tr>`;
+    return `<tr><td>${name}</td><td>있음</td><td>${r.plots}</td><td>${r.houses}</td><td>${r.people}</td>`
+         + `<td>${r.savedAt ? fmt(r.savedAt) : muted('-')}</td><td>${r.open ? '🟢 열려 있음' : muted('닫힘')}</td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--txt3)">학생이 없어요</td></tr>`;
+
+  const n = rows.filter(r => r.has).length;
+  const orphan = Object.keys(list).filter(id => !seen.has(id));
+  sum.textContent = `${students.length}명 중 ${n}명 저장됨`;
+  note.innerHTML = (n === 0 ? '아직 온라인에 저장된 마을이 없어요. 마을 저장 규칙을 게시하고 마을 새 판이 올라간 뒤부터 쌓입니다.<br>' : '')
+    + (orphan.length ? `학생 목록에 없는 마을 ${orphan.length}개: ${orphan.map(escHtml).join(', ')}<br>` : '')
+    + '마을 구경 링크는 마을 쪽에서 구경 모드(?visit=)를 지원한 뒤 붙입니다.';
 }
 
 // ══════════════════════════════════════════════════
@@ -371,7 +440,7 @@ function renderDashboard() {
         border-bottom:1px solid rgba(255,255,255,.04)">
         <div style="font-size:1.1rem">${s.avatar}</div>
         <div class="flex-1">
-          <div style="font-size:.84rem;font-weight:700">${s.name}</div>
+          <div style="font-size:.84rem;font-weight:700">${escHtml(s.name)}</div>
           <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">${r.date||''} 요청</div>
         </div>
         <div style="display:flex;gap:.4rem;flex-shrink:0">
@@ -396,7 +465,7 @@ function renderDashboard() {
       return `<div style="display:flex;align-items:center;gap:.8rem;padding:.5rem 1rem;">
         <div style="font-size:1.1rem;width:28px;text-align:center">${s.avatar}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${s.name}</div>
+          <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem">${escHtml(s.name)}</div>
           <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
             <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4A90E2,#5BA8F5);border-radius:2px"></div>
           </div>
@@ -432,7 +501,7 @@ function renderStudentTable() {
   document.getElementById('student-table').innerHTML = students.map(s => `
     <tr>
       <td><div class="td-avatar">${s.avatar}</div></td>
-      <td><div class="td-name">${s.name}</div></td>
+      <td><div class="td-name">${escHtml(s.name)}</div></td>
       <td><div class="td-level">Lv.${s.level}</div></td>
       <td>
         <div style="display:flex;align-items:center;gap:.5rem">
@@ -463,7 +532,7 @@ function openStudentDetail(id) {
       <div class="ms-label">기본 정보</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">이름</label>
-          <input class="form-input" id="det-name" value="${s.name}"></div>
+          <input class="form-input" id="det-name" value="${escHtml(s.name)}"></div>
         <div class="form-group"><label class="form-label">직업(장래희망)</label>
           <input class="form-input" id="det-job" value="${s.job||''}"></div>
         <div class="form-group"><label class="form-label">칭호</label>
@@ -1183,7 +1252,7 @@ function renderApproveGrid() {
       <th style="padding:.5rem .8rem;text-align:left;font-size:.78rem;border:1px solid var(--border2);min-width:160px;position:sticky;left:0;background:var(--bg3);z-index:5">퀘스트</th>
       ${students.map(s=>`<th style="padding:.4rem .3rem;text-align:center;font-size:.72rem;border:1px solid var(--border2);min-width:64px">
         <div style="font-size:1rem">${s.avatar}</div>
-        <div>${s.name}</div>
+        <div>${escHtml(s.name)}</div>
       </th>`).join('')}
     </tr></thead><tbody>`;
 
@@ -1465,7 +1534,7 @@ function renderPromotionList() {
         return `<div class="approve-card">
           <div style="font-size:2rem">⬆️</div>
           <div class="ac-left">
-            <div class="ac-student">${s.avatar} ${s.name}</div>
+            <div class="ac-student">${s.avatar} ${escHtml(s.name)}</div>
             <div class="ac-quest">Lv.${req.level} 승급 신청 · ${req.date||''}</div>
             <div class="ac-rewards">
               <span class="ac-tag">현재 Lv.${s.level||1}</span>
@@ -1492,7 +1561,10 @@ function renderPromotionList() {
     const statusEl = document.getElementById('promo-student-status');
     if (!statusEl) return;
     if (students.length === 0) { statusEl.innerHTML = ''; return; }
-    statusEl.innerHTML = students.sort((a,b)=>(b.level||0)-(a.level||0)).map(s => {
+    // [STUDENT-ORDER-1] 복사해서 정렬한다. students 는 DB.getStudents() 가 돌려준 **캐시 배열 그 자체**라
+    //   제자리 sort 하면 캐시 순서가 레벨순으로 바뀌고, 학생 목록 등 다른 화면이 그 순서를 따른다.
+    //   다음 쓰기(쪽지 등)가 루트 on('value') 를 깨우면 재정규화로 id순으로 돌아가 "순서가 바뀌었다"로 보였다.
+    statusEl.innerHTML = [...students].sort((a,b)=>(b.level||0)-(a.level||0)).map(s => {
       const isPending = requests.some(r=>r.studentId===s.id);
       const expTable  = typeof GAME_DATA !== 'undefined' ? GAME_DATA.expTable : [];
       const curIdx = Math.min((s.level||1)-1, expTable.length-1);
@@ -1503,7 +1575,7 @@ function renderPromotionList() {
       return `<div style="display:flex;align-items:center;gap:.7rem;padding:.5rem 1.2rem;
         border-bottom:1px solid rgba(255,255,255,.05)">
         <span>${s.avatar||'🙂'}</span>
-        <span style="font-weight:700;font-size:.88rem;min-width:60px">${s.name}</span>
+        <span style="font-weight:700;font-size:.88rem;min-width:60px">${escHtml(s.name)}</span>
         <span style="font-size:.78rem;font-weight:700;color:var(--sky)">Lv.${s.level||1}</span>
         <span class="text-muted-sm">${s.job||'학생'}</span>
         <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;max-width:120px">
@@ -1603,7 +1675,7 @@ function buildRankingHTML(students) {
         <span style="font-size:1.3rem;flex-shrink:0">${medals[i]}</span>
         <span style="font-size:1.1rem;flex-shrink:0">${s.avatar||''}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
+          <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.name)}</div>
           <div style="font-size:.75rem;color:var(--gold);font-weight:700">${cat.fmt(s,val)}</div>
         </div>
       </div>`;
@@ -1719,7 +1791,7 @@ function renderStatsPage() {
       background:rgba(255,255,255,.04);border-radius:12px;margin-bottom:1rem">
       <span style="font-size:2rem">${s.avatar}</span>
       <div>
-        <div style="font-weight:700">${s.name} <span style="font-size:.76rem;color:var(--txt3)">Lv.${s.level}</span></div>
+        <div style="font-weight:700">${escHtml(s.name)} <span style="font-size:.76rem;color:var(--txt3)">Lv.${s.level}</span></div>
         <div style="font-size:.75rem;color:var(--txt2);margin-top:.15rem">
           📚${s.stats?.read||0} ✏️${s.stats?.study||0} 🎨${s.stats?.art||0} 💎${s.stats?.value||0} 💪${s.stats?.health||0} 🏠${s.stats?.life||0}
         </div>
@@ -1882,7 +1954,7 @@ function renderDqSummary() {
           return `<div class="dq-stu" style="border-bottom:1px solid rgba(255,255,255,.04);padding:.4rem .8rem">
             <div style="display:flex;align-items:center;gap:.5rem">
               <span>${s.avatar}</span>
-              <span style="font-size:.82rem;font-weight:700;flex:1">${s.name}</span>
+              <span style="font-size:.82rem;font-weight:700;flex:1">${escHtml(s.name)}</span>
               <span style="font-size:.7rem;color:var(--txt3)">미완료 ${undone}일 · ${pct}%</span>
               <span style="font-size:.73rem;font-weight:700;color:${color};min-width:48px;text-align:right">${totalDone}/${totalAvail}일</span>
               <button class="btn-sm outline" style="font-size:.66rem;padding:.1rem .4rem;white-space:nowrap"
@@ -2317,7 +2389,7 @@ function renderArtworkAdmin() {
       <div class="aw-detail" style="display:none;padding:0 1.2rem .8rem">
         ${arts.map(a=>`
           <div style="display:flex;align-items:flex-start;gap:.8rem;padding:.6rem 0;border-top:1px solid rgba(255,255,255,.04)">
-            ${a.artUrl?`<img src="${a.artUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
+            ${a.artUrl?`<img src="${escHtml(a.artUrl)}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer"
               onclick="adminOpenArtLb(event)">`:``}
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:.85rem">${escHtml(a.title || '제목 없는 그림')}
@@ -2686,7 +2758,7 @@ function createAlbum() {
 function renderAlbumList() {
   const el = document.getElementById('album-list');
   if (!el) return;
-  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const albums = [...DB.getAlbums()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // [CACHE-SORT-1] 복사 뒤 정렬
   el.innerHTML = albums.length === 0
     ? `<div style="font-size:.78rem;color:var(--txt3)">앨범 없음 — 위에서 추가하세요</div>`
     : albums.map(a => {
@@ -2860,10 +2932,12 @@ function renderMemoriesPage() {
   if (statusF !== 'all')       mems = mems.filter(m=>m.approvalStatus===statusF);
   if (typeF === 'admin')        mems = mems.filter(m=>m.uploadedBy==='admin');
   if (typeF === 'student')      mems = mems.filter(m=>m.uploadedBy!=='admin');
-  mems.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  // [CACHE-SORT-1] 필터가 모두 '전체'면 mems 는 DB.getMemories('all') 이 돌려준 **캐시 배열 그 자체**다.
+  //   제자리 정렬하면 캐시가 뒤섞이고, saveMemory/saveAlbum 이 배열을 통째로 set 해 **재배치된 순서가 운영 DB 에 저장**된다(#228 과 같은 종류).
+  mems = [...mems].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
   // 앨범 목록 (셀렉트 옵션용)
-  const albums = DB.getAlbums().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const albums = [...DB.getAlbums()].sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // [CACHE-SORT-1] 복사 뒤 정렬
 
   if (mems.length === 0) {
     el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--txt3)">추억 사진이 없어요</div>`;
@@ -2877,9 +2951,9 @@ function renderMemoriesPage() {
     <div style="display:flex;align-items:center;gap:.8rem;padding:.65rem 1.2rem;
       border-bottom:1px solid rgba(255,255,255,.05)">
       <!-- 썸네일 (클릭→다운로드) -->
-      <a href="${m.imageUrl||m.thumbUrl}" download target="_blank" title="클릭하면 원본 다운로드"
+      <a href="${escHtml(safeUrl(m.imageUrl||m.thumbUrl))}" download target="_blank" title="클릭하면 원본 다운로드"
         style="flex-shrink:0;display:block;position:relative">
-        <img src="${m.thumbUrl||m.imageUrl}"
+        <img src="${escHtml(m.thumbUrl||m.imageUrl)}"
           style="width:60px;height:60px;border-radius:8px;object-fit:cover;display:block">
         <div style="position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:8px;
           display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s"
@@ -2946,7 +3020,7 @@ function renderBulkRenameList() {
   const wrap = document.getElementById('bulk-rename-list');
   if (!wrap) return;
   const filter = document.getElementById('bulk-rename-filter')?.value || 'kakao';
-  const mems = DB.getMemories('all').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const mems = [...DB.getMemories('all')].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));   // [CACHE-SORT-1] 복사 뒤 정렬
 
   const candidates = mems.filter(m => {
     const t = (m.title || '').toLowerCase();
@@ -2968,7 +3042,7 @@ function renderBulkRenameList() {
       <input type="checkbox" class="bulk-chk" data-id="${m.id}" checked
         onchange="updateBulkCount()"
         style="width:15px;height:15px;flex-shrink:0;accent-color:var(--gold)">
-      <img src="${m.thumbUrl||m.imageUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0">
+      <img src="${escHtml(m.thumbUrl||m.imageUrl)}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0">
       <div style="flex:1;min-width:0">
         <div style="font-size:.75rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
           color:${(m.title||'').toLowerCase().startsWith('kakao')?'var(--red)':'var(--txt1)'}">
@@ -3131,9 +3205,9 @@ function renderRecorderPage() {
       <div onclick="toggleRecLog('${r.id}')"
         style="display:flex;align-items:center;gap:.6rem;padding:.65rem 1.2rem;cursor:pointer">
         <span style="font-size:.95rem">${s?.avatar||'👤'}</span>
-        <span style="font-weight:700;font-size:.88rem">${s?.name||r.studentId}</span>
+        <span style="font-weight:700;font-size:.88rem">${escHtml(s?.name||r.studentId)}</span>
         <span style="font-size:.72rem;background:rgba(255,215,0,.1);color:var(--gold);
-          border-radius:8px;padding:.1rem .4rem">🎵 ${r.songTitle||song?.title||'(곡 없음)'}</span>
+          border-radius:8px;padding:.1rem .4rem">🎵 ${escHtml(r.songTitle||song?.title||'(곡 없음)')}</span>
         <span class="text-muted-tiny">${r.date||''}</span>
         <span style="font-size:.78rem;letter-spacing:.08em;color:var(--sky);margin-left:.2rem"
           title="연습 횟수">${dots(r.practiceCount)}</span>
@@ -3149,9 +3223,9 @@ function renderRecorderPage() {
         ${r.recordingUrl ? `
         <div style="margin-bottom:.7rem">
           <div style="font-size:.68rem;color:var(--emerald);font-weight:700;margin-bottom:.3rem">🎙️ 녹음 파일</div>
-          ${r.recordingName ? `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.25rem">${r.recordingName}</div>` : ''}
-          <audio controls src="${r.recordingUrl}" style="width:100%;height:36px" preload="none"></audio>
-          <a href="${r.recordingUrl}" target="_blank" rel="noopener"
+          ${r.recordingName ? `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.25rem">${escHtml(r.recordingName)}</div>` : ''}
+          <audio controls src="${escHtml(safeUrl(r.recordingUrl))}" style="width:100%;height:36px" preload="none"></audio>
+          <a href="${escHtml(safeUrl(r.recordingUrl))}" target="_blank" rel="noopener"
             style="font-size:.68rem;color:var(--sky);display:inline-block;margin-top:.25rem;text-decoration:none">
             ↗ 새 창에서 열기</a>
         </div>` : ''}
@@ -3161,11 +3235,11 @@ function renderRecorderPage() {
           ${r.reflection    ? `<div><b style="color:var(--txt3);font-size:.68rem">느낀 점</b><br>${escHtml(r.reflection)}</div>`       : ''}
           ${r.bestToday     ? `<div><b style="color:var(--txt3);font-size:.68rem">잘된 점</b><br>${escHtml(r.bestToday)}</div>`         : ''}
           ${r.difficultPart ? `<div><b style="color:var(--txt3);font-size:.68rem">어려운 부분</b><br>${escHtml(r.difficultPart)}</div>` : ''}
-          ${r.selfRating    ? `<div><b style="color:var(--txt3);font-size:.68rem">자기평가</b><br>${'⭐'.repeat(r.selfRating)}</div>` : ''}
+          ${r.selfRating    ? `<div><b style="color:var(--txt3);font-size:.68rem">자기평가</b><br>${'⭐'.repeat(Math.max(0, Math.min(5, r.selfRating|0)))}</div>` : ''}
         </div>` : ''}
         <!-- 교사 코멘트 -->
         <div style="display:flex;gap:.4rem;align-items:center">
-          <input id="${rid}-comment" type="text" value="${r.teacherComment||''}"
+          <input id="${rid}-comment" type="text" value="${escHtml(r.teacherComment||'')}"
             placeholder="교사 코멘트 입력..."
             style="flex:1;padding:.3rem .6rem;border-radius:8px;font-size:.75rem;font-family:inherit;
               border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--txt1)">
@@ -3394,7 +3468,7 @@ function renderWeeklyAdminPage() {
       <div style="display:flex;flex-wrap:wrap;gap:.3rem">
         ${monDone.length===0?'<span class="text-muted-base">없음</span>':
           monDone.map(s=>`<span style="font-size:.75rem;background:rgba(93,173,226,.12);
-            color:var(--sky);border-radius:20px;padding:.15rem .55rem">${s.avatar} ${s.name}</span>`).join('')}
+            color:var(--sky);border-radius:20px;padding:.15rem .55rem">${s.avatar} ${escHtml(s.name)}</span>`).join('')}
       </div>`;
   }
 
@@ -3407,7 +3481,7 @@ function renderWeeklyAdminPage() {
       incEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.6rem 1.2rem">
         ${noDone.map(s=>`<span style="font-size:.78rem;background:rgba(231,76,60,.1);
           color:var(--red);border-radius:20px;padding:.2rem .6rem;border:1px solid rgba(231,76,60,.2)">
-          ${s.avatar} ${s.name}</span>`).join('')}
+          ${s.avatar} ${escHtml(s.name)}</span>`).join('')}
       </div>`;
     }
   }
@@ -3443,7 +3517,7 @@ function renderWeeklyAdminPage() {
     <div style="border-bottom:1px solid rgba(255,255,255,.05);padding:.8rem 1.2rem">
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
         <span>${s.avatar}</span>
-        <span style="font-weight:700;font-size:.88rem">${s.name}</span>
+        <span style="font-weight:700;font-size:.88rem">${escHtml(s.name)}</span>
         <span style="font-size:.72rem;color:var(--txt3);background:rgba(255,255,255,.06);
           border-radius:20px;padding:.1rem .45rem">${wk} 주</span>
         ${goal?'<span style="font-size:.68rem;color:var(--sky);background:rgba(93,173,226,.1);border-radius:20px;padding:.1rem .45rem">📅 월 작성</span>':''}
@@ -4158,7 +4232,7 @@ function renderBoardQuestList() {
         border-radius:8px;background:${done?'rgba(46,204,113,.08)':'rgba(255,255,255,.03)'};
         border:1px solid ${done?'rgba(46,204,113,.2)':'rgba(255,255,255,.06)'};margin-bottom:.3rem">
         <span style="font-size:1rem">${s.avatar}</span>
-        <span style="font-size:.83rem;font-weight:600;flex:1">${s.name}</span>
+        <span style="font-size:.83rem;font-weight:600;flex:1">${escHtml(s.name)}</span>
         ${done
           ? `<span style="font-size:.72rem;color:var(--emerald);font-weight:700">✅ 완료</span>`
           : `${pending?`<span style="font-size:.68rem;color:var(--gold);font-weight:700;margin-right:.35rem">⏳ 신청중</span>`:''}
@@ -4389,7 +4463,7 @@ function populateRewardStudents() {
   const sel = document.getElementById('rw-student');
   const students = DB.getStudents();
   // ★ 버그 수정: innerHTML 초기화 후 재구성 (중복 방지)
-  sel.innerHTML = students.map(s => `<option value="${s.id}">${s.avatar} ${s.name}</option>`).join('');
+  sel.innerHTML = students.map(s => `<option value="${s.id}">${s.avatar} ${escHtml(s.name)}</option>`).join('');
   loadRewardStudent();
 }
 
@@ -4527,7 +4601,7 @@ function renderMonsters() {
   const killTbl = document.getElementById('monster-kill-table');
   if (killTbl) killTbl.innerHTML = students.map(s => `
     <tr>
-      <td>${s.avatar} <strong>${s.name}</strong></td>
+      <td>${s.avatar} <strong>${escHtml(s.name)}</strong></td>
       <td style="color:var(--red);font-weight:700">${(s.monsterLog||[]).length} / ${allMonsters.length}</td>
       <td style="font-size:.72rem;color:var(--txt2)">${(s.monsterLog||[]).map(e=>{const mm=allMonsters.find(m=>m.id===e);return mm?mm.name:e;}).join(', ')||'-'}</td>
     </tr>`).join('');

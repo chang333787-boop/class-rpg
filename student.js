@@ -14,6 +14,18 @@ function escHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ══ 링크 주소 검사 (Q3-URL-1) — 교사가 적은 주소를 href 에 넣기 전에 ══
+//  http/https 만 연다. javascript:·data: 같은 다른 스킴은 빈 문자열(링크를 그리지 않음).
+//  스킴이 없으면(naver.com) https:// 를 붙인다 — 교사 화면 오늘의 링크와 같은 규칙.
+//  브라우저가 주소 속 탭·줄바꿈을 무시하므로(java<탭>script:) 제어 문자를 먼저 지운다.
+function safeUrl(u) {
+  const s = String(u == null ? '' : u).replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.\-]*:/i.test(s)) return '';
+  return 'https://' + s.replace(/^\/+/, '');
+}
+
 // monsterLog 항목(id) → 표시용 이름 (매핑 실패 시 원본 그대로 — 옛 커스텀 이름 등)
 function monsterNameById(id) {
   const mon = getActiveMonsters().find(m => m.id === id);
@@ -1105,7 +1117,7 @@ function renderNoteList() {
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
         <span style="font-size:1.05rem">${n.kind === 'account' ? '🔑' : '📝'}</span>
         <b style="font-size:.9rem;flex:1">${escHtml(n.site || '쪽지')}</b>
-        ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener"
+        ${safeUrl(n.url) ? `<a href="${escHtml(safeUrl(n.url))}" target="_blank" rel="noopener"
           class="btn-gold" style="display:inline-block;padding:.25rem .6rem;font-size:.72rem;
           font-weight:700;text-decoration:none;border-radius:50px;box-shadow:none;animation:none">🔗 사이트 열기</a>` : ''}
       </div>
@@ -1523,7 +1535,7 @@ function buildMainHTML() {
          링크가 8개면 278px를 먹어 크롬북(1366×610)에서 학습·퀘스트가 전부 화면 밖으로
          밀려났다. 헤더만 남기고 접어 둔다. 개수는 헤더에 표시. -->
     ${(()=>{
-      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>l.url&&l.title);
+      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>safeUrl(l.url)&&l.title);
       if (!todayLinks.length) return '';
       return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
         border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
@@ -1536,10 +1548,10 @@ function buildMainHTML() {
         </button>
         <div id="today-links" style="display:none;margin-top:.4rem">
         ${todayLinks.map(l=>`
-          <a href="${l.url}" target="_blank" rel="noopener"
+          <a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener"
             style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
               text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
-            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${l.title}</span>
+            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${escHtml(l.title)}</span>
             <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
           </a>`).join('')}
         </div>
@@ -1750,7 +1762,7 @@ function buildMainHTML() {
           <div class="tc-label">👥 친구 방문</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
           ${allStudents.map(f=>`<div class="friend-row" onclick="visitFriend('${f.id}')">
-            <span>${f.avatar} ${f.name}</span>
+            <span>${f.avatar} ${escHtml(f.name)}</span>
             <span style="font-size:.7rem;color:var(--txt3)">Lv.${f.level} →</span>
           </div>`).join('')}
           </div>
@@ -7850,7 +7862,7 @@ function renderArtworks() {
   const pendingHtml = pending.map(a => `
     <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(255,215,0,.2);
       border-radius:14px;overflow:hidden;margin-bottom:.8rem">
-      ${a.artUrl?`<img src="${a.artUrl}" style="width:100%;max-height:200px;object-fit:cover;display:block">`:''}
+      ${a.artUrl?`<img src="${escHtml(a.artUrl)}" style="width:100%;max-height:200px;object-fit:cover;display:block">`:''}
       <div style="padding:.75rem .9rem">
         <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;flex-wrap:wrap">
           <span style="font-size:.65rem;font-weight:800;padding:.18rem .55rem;border-radius:20px;
@@ -7873,7 +7885,7 @@ function renderArtworks() {
     <div style="background:rgba(255,255,255,.04);border:1.5px solid rgba(46,204,113,.15);
       border-radius:14px;overflow:hidden;margin-bottom:.8rem">
       ${url?`<div style="position:relative;cursor:pointer" onclick="openLightbox(window._artLbImgs,${lbIdx})">
-        <img src="${url}" style="width:100%;max-height:220px;object-fit:cover;display:block"
+        <img src="${escHtml(url)}" style="width:100%;max-height:220px;object-fit:cover;display:block"
           onerror="this.parentElement.style.display='none'">
         <div style="position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .2s"
           onmouseover="this.style.background='rgba(0,0,0,.15)'" onmouseout="this.style.background='rgba(0,0,0,0)'">
@@ -9257,7 +9269,7 @@ function visitFriend(id) {
   el.id = modalId+'-overlay';
   el.innerHTML = `<div class="modal" style="max-width:460px">
     <div class="modal-hd">
-      <div class="modal-title">${f.avatar} ${f.name}의 집</div>
+      <div class="modal-title">${f.avatar} ${escHtml(f.name)}의 집</div>
       <button class="modal-close" onclick="this.closest('.overlay').remove()">✕</button>
     </div>
     <!-- 프로필 -->
@@ -9265,8 +9277,8 @@ function visitFriend(id) {
       background:rgba(255,255,255,.04);border-radius:12px;margin-bottom:.8rem">
       <div style="font-size:2.8rem">${f.avatar}</div>
       <div>
-        <div style="font-weight:700">${f.name}
-          ${f.title?`<span style="font-size:.72rem;color:var(--gold);margin-left:.3rem">[${f.title}]</span>`:''}
+        <div style="font-weight:700">${escHtml(f.name)}
+          ${f.title?`<span style="font-size:.72rem;color:var(--gold);margin-left:.3rem">[${escHtml(f.title)}]</span>`:''}
         </div>
         <div style="font-size:.76rem;color:var(--txt2);margin-top:.2rem">
           Lv.${f.level} · 📚${f.bookCount||0}권 · ⚔️${(f.monsterLog||[]).length}마리
@@ -9309,7 +9321,7 @@ function visitFriend(id) {
             ${artworks.map((a,i)=>a.artUrl?`
               <div style="border-radius:10px;overflow:hidden;cursor:pointer"
                 onclick="openLightbox(window._friendArtLbImgs,${friendArtLb.findIndex(x=>x.url===a.artUrl)})">
-                <img src="${a.artUrl}" style="width:100%;aspect-ratio:1;object-fit:cover">
+                <img src="${escHtml(a.artUrl)}" style="width:100%;aspect-ratio:1;object-fit:cover">
                 <div style="padding:.3rem .4rem;font-size:.72rem;font-weight:600;background:rgba(255,255,255,.04)">${escHtml(a.title||'')}</div>
               </div>`:''
             ).join('')}
@@ -10458,9 +10470,11 @@ const MASTERY_GAP = [0, 1, 2, 4, 7, 14];   // 별 0~5일 때 며칠 뒤에 다�
 let _masteryCache = null, _masteryOwner = null;
 function invalidateMastery() { _masteryCache = null; _masteryOwner = null; }
 function addDaysStr(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
+  // [MASTERY-TZ-1] 날짜만 다루므로 UTC 로만 센다. 전에는 로컬 자정을 만들고 toISOString(UTC)으로 찍어
+  //   KST(UTC+9)에서 항상 하루가 빠졌다 — 오늘 맞힌 문항이 오늘 바로 '복습'으로 떴다.
+  const d = new Date(dateStr + 'T00:00:00Z');
   if (isNaN(d)) return dateStr;
-  d.setDate(d.getDate() + n);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 function masteryMap(studentId) {

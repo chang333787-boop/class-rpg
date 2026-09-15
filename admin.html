@@ -11,10 +11,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="./gamedata.js?v=20260915bla"></script>
 <script src="./curriculum.js?v=20260909e"></script>
-<link rel="stylesheet" href="./admin.css?v=20260910b">
+<link rel="stylesheet" href="./admin.css?v=20260915d2a">
 </head>
 <body>
-<div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:#0E1621;
+<div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:var(--bg);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
   <div style="font-size:3rem">🏫</div>
   <div style="font-size:1rem;font-weight:700;color:#FFD700">교사 관리자</div>
@@ -25,9 +25,9 @@
 </div>
 
 <!-- ════ 관리자 로그인 ════ -->
-<div id="admin-login-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
+<div id="admin-login-screen" style="position:fixed;inset:0;z-index:999999;background:var(--bg);
   display:flex;align-items:center;justify-content:center">
-  <div style="background:#1A2535;border:1px solid rgba(74,144,226,.3);border-radius:16px;
+  <div style="background:var(--bg2);border:1px solid rgba(217,164,65,.3);border-radius:16px;
     padding:2.4rem;width:min(360px,92vw);box-shadow:0 30px 60px rgba(0,0,0,.5)">
     <div style="text-align:center;margin-bottom:1.8rem">
       <div style="font-size:2.5rem;margin-bottom:.5rem">🏫</div>
@@ -73,6 +73,7 @@
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
     <div class="nav-item" onclick="nav('stats',this)"><span class="nav-icon">📊</span> 활동능력치 관리</div>
     <div class="nav-item" onclick="nav('artwork',this)"><span class="nav-icon">🖼️</span> 작품 관리</div>
+    <div class="nav-item" onclick="nav('villages',this)"><span class="nav-icon">🏘️</span> 우리 마을</div>
     <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon">📚</span> 독서 현황</div>
     <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon">📸</span> 추억 관리</div>
     <div class="nav-item" onclick="nav('weekly',this)"><span class="nav-icon">📅</span> 주간 다짐</div>
@@ -1063,6 +1064,29 @@
       </div>
     </div>
 
+    <!-- ── VILLAGES ── [VILLAGE-ADMIN-1] 읽기만. classRPG_villages GET 만 한다(쓰기 0). -->
+    <div class="page" id="p-villages">
+      <div class="section-header">
+        <div><div class="sh-title">🏘️ 우리 마을</div>
+          <div class="sh-sub">학생마다 마을이 온라인에 저장됐는지 봅니다. 이 화면은 읽기만 합니다</div></div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-sm outline" onclick="renderVillagesPage()">🔄 새로고침</button>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="tc-header"><div class="tc-title">학생별 마을</div><div id="villages-summary" style="font-size:.8rem;color:var(--txt3)"></div></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>이름</th><th>마을</th><th>구역</th><th>집</th><th>주민</th><th>마지막 저장</th><th>지금</th>
+            </tr></thead>
+            <tbody id="villages-table"></tbody>
+          </table>
+        </div>
+        <div id="villages-note" style="padding:.7rem 1.2rem;font-size:.78rem;color:var(--txt3);line-height:1.6"></div>
+      </div>
+    </div>
+
     <!-- ── MEMORIES ── -->
     <div class="page" id="p-memories">
       <div class="section-header">
@@ -1564,6 +1588,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20260910k"></script>
+<script src="./admin.js?v=20260915q3f"></script>
 </body>
 </html>

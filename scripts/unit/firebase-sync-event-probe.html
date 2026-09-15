@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>PROBE</title>
+<!-- GOLD-LOSS-SIM-1 근거: 실제 Firebase compat SDK 9.23.0 이 on('value') 콜백을 update()/set() 안에서 **동기로** 부르는지 확인.
+     존재하지 않는 가짜 프로젝트 + goOffline() 이라 서버 통신 0. 브라우저로 열면 결과가 화면에 찍힌다.
+     2026-09-15 학교 PC 엣지 결과: SYNC_UPDATE_EVENT=true · SYNC_SET_EVENT=true -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<pre id="out"></pre>
+<script>
+(async () => {
+  const log = [];
+  try {
+    // 존재하지 않는 가짜 프로젝트 + 바로 오프라인 → 서버와 통신 없음
+    firebase.initializeApp({ apiKey: 'x', projectId: 'q1-probe-none', databaseURL: 'https://q1-probe-none-default-rtdb.firebaseio.com' });
+    const db = firebase.database(); db.goOffline();
+    const root = db.ref('classRPG_v3');
+    let calls = 0;
+    root.on('value', s => { calls++; log.push('value#' + calls + ' gold=' + JSON.stringify(s.child('students/s1/gold').val()) + ' daily=' + JSON.stringify(s.child('goldDaily/s1_d/battle').val())); });
+    await new Promise(r => setTimeout(r, 50));
+    root.set({ students: { s1: { id: 's1', gold: 100 } }, settings: { a: 1 } });   // 노드 전체를 로컬에 완성
+    await new Promise(r => setTimeout(r, 50));
+    log.push('after root set + 50ms: calls=' + calls);
+    const before = calls;
+    root.child('goldDaily/s1_d').update({ s: 's1', battle: firebase.database.ServerValue.increment(7) });
+    log.push('SYNC_UPDATE_EVENT=' + (calls > before) + ' (update 직후 같은 줄에서 콜백 수 ' + before + '→' + calls + ')');
+    const b2 = calls;
+    root.child('students/s1').set({ id: 's1', gold: 107 });
+    log.push('SYNC_SET_EVENT=' + (calls > b2));
+  } catch (e) { log.push('ERR ' + e.message); }
+  document.getElementById('out').textContent = log.join('\n');
+  document.title = 'DONE';
+})();
+</script>
