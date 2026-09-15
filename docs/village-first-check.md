@@ -21,7 +21,7 @@ SID=s1774671589091
 | #214 가 main 에 들어갔다 | `gh pr view 214 --json state -q .state` | `MERGED` |
 | Pages 가 그 커밋으로 배포됐다 | `gh api repos/chang333787-boop/class-rpg/pages/builds/latest -q '.status+" "+.commit[0:7]'` | `built <main 끝 커밋>` |
 | 배포된 마을이 59차 서버용이다 | `curl -s https://funclassrpg.kr/village/index.html \| sha256sum` | `fc6d9160…` 로 시작 |
-| 배포된 sync.js 가 저장소 원본이다 | `curl -s https://funclassrpg.kr/village/sync.js \| sha256sum` | `5fa8fe44…` 로 시작 |
+| 배포된 sync.js 가 저장소 원본이다 | `curl -s https://funclassrpg.kr/village/sync.js \| sha256sum` | `3259e716…` 로 시작 |
 | 시작 전 비어 있다 | `curl -s "$DB/classRPG_villages/$SID.json"` | `null` (이미 있으면 적어 두고 진행) |
 
 ## 1. 백업 먼저 (보스)
