@@ -2530,6 +2530,46 @@ function startBattle(monId) {
 }
 
 // ── 새 턴제 전투 화면 렌더 ──
+// ══ 전투 끝 화면 문구 (BATTLE-RESULT-1) ═══════════════════════════════
+//  디자인 A-4(클로드코드\rpg_게임디자인_A\A4_S1E4_첫주시나리오_졌을때_20260915.md · A4_패배화면_시안.html) 구현.
+//  이미 있는 값(몬스터·내 HP, 레벨, 장착 칸, 몸통 속성, 남은 횟수)으로 **말만** 만든다 — 저장·판정·보상 무변경.
+//   졌을 때: 제목(몬스터 HP 절반 넘게 깎음 → 😮 아깝다! / 아니면 😵 아직은 세다)
+//            왜 한 줄(하나만, 보스 판정 순서: 레벨 차 → 빈 장비 칸 → 몸통 속성 불리, 없으면 운)
+//            남은 기회 줄(연속 2패부터 🟢 권유) · 단추: 내 레벨쯤 고르기 / 장비 보러 가기(빈 칸 있을 때만)
+//   이겼을 때: 내 HP 30% 미만이면 ⚡ 아슬아슬했어요!
+//  연패 수는 이 기기 메모리에서만 센다(같은 전투를 여러 번 그려도 한 번만, 저장 안 함).
+const BATTLE_SLOTS = [['head', '모자'], ['body', '몸통'], ['weapon', '무기'], ['glove', '장갑'], ['shoe', '신발']];
+const _battleCounted = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
+let _battleLoseStreak = 0;
+function battleResultInfo(st, student) {
+  if (!st || !st.finished) return null;
+  if (_battleCounted && !_battleCounted.has(st)) {
+    _battleCounted.add(st);
+    _battleLoseStreak = st.win ? 0 : _battleLoseStreak + 1;
+  }
+  const mon = st.monster || {};
+  if (st.win) return { win: true, close: st.playerHpMax > 0 && st.playerHp / st.playerHpMax < 0.3 };
+  const dealt = st.monsterHpMax > 0 ? 1 - Math.max(0, st.monsterHp) / st.monsterHpMax : 0;
+  const nearly = dealt > 0.5;
+  const myLv = (student && student.level) || 1;
+  const monLv = mon.level || mon.recLv || 1;
+  const eq = (student && student.equipmentIds) || {};
+  const empty = BATTLE_SLOTS.filter(([k]) => !eq[k]).map(([, n]) => n);
+  const E = { fire: '🔥', water: '💧', grass: '🌿' };
+  const armor = st.playerStats && st.playerStats.armorElement;
+  const defMult = (typeof getDefenseElementMultiplier === 'function') ? getDefenseElementMultiplier(mon.element, armor) : 1;
+  let why;
+  if (monLv > myLv) why = `Lv.${monLv} 는 나보다 ${monLv - myLv} 높아요`;
+  else if (empty.length) why = `장비 칸이 비어 있어요(${empty.join('·')})`;
+  else if (defMult > 1 && E[mon.element] && E[armor]) why = `속성이 불리했어요(${E[mon.element]}→${E[armor]})`;
+  else why = '이번엔 운이 없었어요 — 한 번 더!';
+  const left = (typeof Utils !== 'undefined' && Utils.monsterAttemptsLeft) ? Utils.monsterAttemptsLeft(student) : null;
+  const cons = _battleLoseStreak >= 2
+    ? '오늘은 🟢 카드로 골드를 모아 볼까요?'
+    : (left == null ? '기회 1번을 썼어요' : `기회 1번을 썼어요 — 오늘 ${left}번 남았어요`);
+  return { win: false, nearly, title: nearly ? '😮 아깝다!' : '😵 아직은 세다', monName: mon.name || '몬스터', why, cons, showShop: empty.length > 0, streak: _battleLoseStreak };
+}
+
 function renderBattleNew() {
   const s     = BATTLE_STATE;
   const mon   = s.monster;
@@ -2638,12 +2678,24 @@ function renderBattleNew() {
   let resultHtml = '';
   if (s.finished) {
     if (s.win) {
+      const ri = s.isInfinite ? null : battleResultInfo(s, CUR);   // [BATTLE-RESULT-1]
       resultHtml = `<div class="ba-result-box ba-result-win">
         <div style="font-size:1.6rem;font-weight:900;color:var(--gold);margin-bottom:.3rem">🏆 승리!</div>
         <div style="font-size:.85rem;color:var(--gold)">+${mon.gold}G 획득</div>
+        ${ri && ri.close ? '<div style="font-size:.82rem;color:#ffe08a;margin-top:.35rem">⚡ 아슬아슬했어요!</div>' : ''}
       </div>`;
     } else {
-      resultHtml = `<div class="ba-result-box ba-result-lose">
+      const ri = s.isInfinite ? null : battleResultInfo(s, CUR);   // [BATTLE-RESULT-1]
+      resultHtml = ri ? `<div class="ba-result-box ba-result-lose">
+        <div style="font-size:1.6rem;font-weight:900;color:#FF8A80;margin-bottom:.2rem">${ri.title}</div>
+        ${ri.nearly ? `<div style="font-size:.75rem;color:var(--txt3)">${escHtml(ri.monName)} HP 를 절반 넘게 깎았어요</div>` : ''}
+        <div style="font-size:.85rem;color:#ffe08a;margin-top:.45rem">${escHtml(ri.why)}</div>
+        <div style="font-size:.78rem;color:var(--txt2);margin-top:.3rem">${escHtml(ri.cons)}</div>
+        <div style="display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap">
+          <button class="btn-sm" style="flex:1;min-width:8rem;background:rgba(95,211,138,.14);color:#9ff0b9;border:1px solid rgba(95,211,138,.55)" onclick="closeBattle()">🟢 내 레벨쯤 고르기</button>
+          ${ri.showShop ? `<button class="btn-sm" style="flex:1;min-width:8rem;background:rgba(255,215,0,.12);color:#ffe680;border:1px solid rgba(255,215,0,.5)" onclick="closeBattle();openModal('m-shop');renderShop()">🛒 장비 보러 가기</button>` : ''}
+        </div>
+      </div>` : `<div class="ba-result-box ba-result-lose">
         <div style="font-size:1.6rem;font-weight:900;color:#FF8A80;margin-bottom:.3rem">💀 패배...</div>
         <div style="font-size:.78rem;color:var(--txt3)">전투 기회 1회 소모</div>
       </div>`;
