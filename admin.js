@@ -5587,6 +5587,12 @@ const BACKUP_NODES = [
   'emotionAlerts', 'emotionPromptStats', 'weeklyGoals', 'weeklyReflections',
   'recorderLogs', 'recorderSongs', 'quizRecords', 'customWords', 'teacherWordSets',
   'studentNotes',   // [NOTES-1] 교사가 학생에게 준 쪽지 — 잃으면 안 되는 데이터
+  // [BACKUP-3N] 날짜별 롤백으로 되살릴 수 없던 세 노드(09-15 기타 2 발견). 운영 실측 크기(GET):
+  //   problemRecords 214KB(176건) · goldDaily 0.2KB · customProblems 없음 → 백업 1회 1,387KB → 약 1,601KB(+15%).
+  //   롤백은 아래 노드별 set 이라 셋 다 그대로 되돌아간다. 마을(classRPG_villages)은 여전히 밖(scripts/village-backup.mjs).
+  'problemRecords',  // 학습 풀이 기록 — 별(숙달도)·복습 날짜의 근거. 키 객체 그대로
+  'goldDaily',       // 골드 하루 기록(경로별 수입)
+  'customProblems',  // 교사가 만든 문제
 ];
 
 async function saveBackup(auto) {
