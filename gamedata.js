@@ -1094,14 +1094,26 @@ const DB = {
     this._cache = db;
     this._fbRef.child('boardQuests').transaction(cur => applyDaily(cur));
 
-    // 오늘 날짜 기록
-    this.saveSettings({ ...settings, autoDailyLastDate: today });
+    // 오늘 날짜 기록 — [DAILY-DATE-FIELD-1] 이 한 칸만 쓴다.
+    //   예전엔 saveSettings 로 settings 통째 set 이라, 학생 기기가 아침에 이걸 부르는 순간(왕복 시간 안)
+    //   교사가 바꾼 설정(보스 켜기 등)을 옛 캐시 값으로 되돌렸다.
+    settings.autoDailyLastDate = today;
+    this._fbRef.child('settings/autoDailyLastDate').set(today).catch(e => this._onSaveError(e));
   },
 
-  getPromotionRequests()     { return this.load().promotionRequests || []; },
+  getPromotionRequests()     { return (this.load().promotionRequests || []).filter(Boolean); },   // 빈 칸(null)이 끼면 r.id 읽다 깨짐
+  // [PROMO-PER-ID-1] 승급 신청은 id 키 한 건씩 쓴다.
+  //   예전엔 기기 캐시의 배열을 통째로 set 해서, 두 학생이 거의 동시에 신청하면 한 명이 사라지고
+  //   교사 승인 직후 옛 캐시 기기가 신청하면 승인한 신청이 되살아났다(다시 승인하면 보상 중복).
+  //   읽기는 _normalizeArrays 의 toArr(Object.values) 그대로. 모음 전체를 쓸 때도 반드시 _promoObj 로.
+  _promoObj(arr) {
+    const o = {};
+    (arr || []).forEach(r => { if (r && r.id) o[r.id] = r; });
+    return o;
+  },
   savePromotionRequests(arr) {
     const db = this.load(); db.promotionRequests = arr; this._cache = db;
-    this._fbRef.child('promotionRequests').set(arr);
+    this._fbRef.child('promotionRequests').set(this._promoObj(arr));
   },
   addPromotionRequest(r) {
     const db = this.load();
@@ -1111,22 +1123,32 @@ const DB = {
     if (exists) return false;
     db.promotionRequests.push(r);
     this._cache = db;
-    this._saving = true;
-    // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
-    this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
-    });
+    // 한 건만 쓰므로 다른 기기의 신청·승인을 덮지 않는다 → _saving 창도 필요 없음
+    this._fbRef.child('promotionRequests/' + r.id).set(r).catch(e => this._onSaveError(e));
     return true;
   },
   removePromotionRequest(id) {
     const db = this.load();
-    db.promotionRequests = (db.promotionRequests || []).filter(r => r.id !== id);
+    db.promotionRequests = (db.promotionRequests || []).filter(r => r && r.id !== id);
     this._cache = db;
-    this._saving = true;
-    // promotionRequests 노드만 배열 부분 저장 (root 전체 set 방지)
-    this._fbRef.child('promotionRequests').set(db.promotionRequests).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
-    });
+    const node = this._fbRef.child('promotionRequests');
+    node.child(id).remove().catch(e => this._onSaveError(e));
+    // 안전띠: 옛 판 기기·옛 백업이 배열(숫자 키)로 써 둔 게 있으면 이 기회에 id 키로 옮긴다.
+    //   숫자 키만 지우면 배열에 구멍(null)이 생겨 r.id 읽는 화면이 깨지므로, 지운 신청 말고는 id 키로 다시 넣는다.
+    node.once('value').then(snap => {
+      const v = snap.val();
+      if (!v || typeof v !== 'object') return;
+      const upd = {};
+      // 이 기기가 그사이 지운 신청은 되살리지 않도록 지금 캐시에 남아 있는 것만 옮긴다
+      const keep = new Set((this.load().promotionRequests || []).map(r => r && r.id));
+      Object.keys(v).forEach(k => {
+        const r = v[k];
+        if (!/^\d+$/.test(k)) return;
+        upd[k] = null;
+        if (r && r.id && r.id !== id && keep.has(r.id)) upd[r.id] = r;
+      });
+      if (Object.keys(upd).length) return node.update(upd);
+    }).catch(e => this._onSaveError(e));
   },
 
   async getAdminPw() {
