@@ -664,6 +664,24 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .ba-log{font-size:.79rem;line-height:1.75;color:var(--txt2);}
 .ba-log .good{color:#6fd49d;font-weight:700;}.ba-log .bad{color:#FF8A80;font-weight:700;}.ba-log .info{color:#7ec8e3;}
 
+/* [D3-BATTLE-1] 전투 모달 — 디자인 시스템 v1(#242)에 맞춤. CSS만.
+   · 남색·보라 그라데(#0e1a2e/#1a0e2e) → 갈색 한 벌. 전투 긴장감은 가운데를 붉은 갈색으로 남긴다.
+   · 전투 기록 제목(9px·금색 40%)·능력치 줄(9.6px·--txt3)·HP 숫자(11px)가 TV 미러링에서 안 읽혀 12~15px로.
+   · 전투 기록 상자 높이(72~130px)는 그대로 — 글자가 커져도 스크롤로 본다. */
+.battle-modal{background:linear-gradient(160deg,var(--bg1) 0%,#2A1812 50%,var(--bg1) 100%);border-color:var(--border-strong);}
+.bat-header{background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,transparent 100%);border-bottom-color:var(--border);}
+.bat-header-deco{color:rgba(217,164,65,.7);}
+.bat-title{font-size:var(--fs-xl);}
+.bat-sub{font-size:var(--fs-sm);color:var(--txt2);}
+.ba-stage{background:rgba(0,0,0,.18);border:1px solid var(--line);}
+.ba-fighter-name{font-size:var(--fs-md);}
+.ba-hp-txt{font-size:var(--fs-sm);color:var(--txt);}
+.ba-stats-txt{font-size:var(--fs-xs);color:var(--txt3);}
+.ba-vs-label{color:var(--txt3);}
+.ba-log-wrap{background:rgba(0,0,0,.35);border-color:var(--line);padding:var(--sp-1) var(--sp-2);}
+.ba-log-title{font-size:var(--fs-xs);color:var(--gold);letter-spacing:.05em;}
+.ba-log{font-size:.9375rem;line-height:1.65;}
+
 /* 스킬2 이펙트 */
 @keyframes skill-ki {
   0%   { box-shadow:0 0 0 0 rgba(217,164,65,0); transform:scale(1); }
