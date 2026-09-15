@@ -43,6 +43,10 @@ const BALANCE = {
   //   ★ 보정을 0으로 하면 아이가 보는 골드가 바뀐다 — docs/rpg_balance_gold_curve_20260915.md (G1 전부 0 · G2 이상치 11종만 0) 는 사용자 결정.
   monsterGold: { base: { a: 10.5, b: 2.4 }, rarity: { common: 1, rare: 1.15, legend: 1.75 } },
 
+  // 돌연변이 씨앗 (B-2f) — 같은 등급 일반 씨앗의 성장시간·판매가·레벨을 쓰고, 가격 = round(일반 × priceMult) + 줄의 priceAdj,
+  //   성공률 = floor((successBase − successPerTier × 등급) × 100) / 100. 성공 시 판매가 ×2 는 student.js 수확 코드.
+  mutantSeed: { priceMult: 1.6, successBase: 0.55, successPerTier: 0.025 },
+
   // 스킬 계수 — 7단계 밸런스 조정: 노말 계수 +10% (1.00→1.10 base)
   // 이유: 시뮬레이션에서 초급 비유령 몬스터도 6-7라운드로 체감이 느림
   skill: {
@@ -356,13 +360,8 @@ const GAME_DATA = {
   // ── 돌연변이 씨앗 (일반 씨앗과 별도 관리) ───────────────────────────
   // 수확 시 성공/실패 판정: 성공=baseSellPrice*2, 실패=0G
   // isMutant:true 로 일반 씨앗과 구분
-  mutantSeeds: [
-    {id:'i_m_potato_seed',    name:'⚡ 번개 감자', icon:'⚡🥔', price:20,  growHours:20, baseSellPrice:40,  successRate:0.55, crop:'m_potato',     cropIcon:'⚡🥔', reqLv:1,  desc:'특별 씨앗 입문', isMutant:true},
-    {id:'i_m_carrot_seed',    name:'✨ 황금 당근', icon:'✨🥕', price:32,  growHours:24, baseSellPrice:75,  successRate:0.52, crop:'m_carrot',     cropIcon:'✨🥕', reqLv:3,  desc:'행운의 씨앗',   isMutant:true},
-    {id:'i_m_corn_seed',      name:'🌈 무지개 옥수수',icon:'🌈🌽', price:47,  growHours:36, baseSellPrice:125, successRate:0.50, crop:'m_corn',       cropIcon:'🌈🌽', reqLv:5,  desc:'신비한 씨앗', isMutant:true},
-    {id:'i_m_tomato_seed',    name:'🔥 불꽃 토마토',icon:'🔥🍅', price:65, growHours:48, baseSellPrice:180, successRate:0.47, crop:'m_tomato',     cropIcon:'🔥🍅', reqLv:8,  desc:'희귀 씨앗', isMutant:true},
-    {id:'i_m_strawberry_seed',name:'🌟 별빛 딸기',  icon:'🌟🍓', price:97, growHours:72, baseSellPrice:290, successRate:0.45, crop:'m_strawberry', cropIcon:'🌟🍓', reqLv:12, desc:'전설의 씨앗',   isMutant:true},
-  ],
+  // ★ B-2f: 값은 GAME_DATA 정의 바로 뒤 _mutantSeeds() 가 일반 씨앗 + BALANCE.mutantSeed 로 채운다(키 순서 옛 표와 같음)
+  mutantSeeds: [],
 
   // ─── 장식물 ────────────────────────────────────────────
   decorations: [
@@ -643,6 +642,20 @@ const GAME_DATA = {
   getSlotForItem(id) { return this.SLOT_MAP[id] || null; },
 };
 
+// 돌연변이 씨앗 (B-2f) — i 번째 줄 = i 번째 일반 씨앗의 돌연변이
+GAME_DATA.mutantSeeds = [
+    { id:'i_m_potato_seed', name:'⚡ 번개 감자', icon:'⚡🥔', priceAdj:+1, crop:'m_potato', cropIcon:'⚡🥔', desc:'특별 씨앗 입문' },
+    { id:'i_m_carrot_seed', name:'✨ 황금 당근', icon:'✨🥕', crop:'m_carrot', cropIcon:'✨🥕', desc:'행운의 씨앗' },
+    { id:'i_m_corn_seed', name:'🌈 무지개 옥수수', icon:'🌈🌽', priceAdj:-1, crop:'m_corn', cropIcon:'🌈🌽', desc:'신비한 씨앗' },
+    { id:'i_m_tomato_seed', name:'🔥 불꽃 토마토', icon:'🔥🍅', priceAdj:+1, crop:'m_tomato', cropIcon:'🔥🍅', desc:'희귀 씨앗' },
+    { id:'i_m_strawberry_seed', name:'🌟 별빛 딸기', icon:'🌟🍓', priceAdj:+1, crop:'m_strawberry', cropIcon:'🌟🍓', desc:'전설의 씨앗' },
+].map((r, t) => {
+  const s = GAME_DATA.seeds[t], c = BALANCE.mutantSeed;
+  return { id: r.id, name: r.name, icon: r.icon, price: Math.round(s.price * c.priceMult) + (r.priceAdj || 0), growHours: s.growHours,
+    baseSellPrice: s.sellPrice, successRate: Math.floor((c.successBase - c.successPerTier * t) * 100 + 1e-9) / 100,
+    crop: r.crop, cropIcon: r.cropIcon, reqLv: s.reqLv, desc: r.desc, isMutant: true };
+});
+
 // ═══════════════════════════════════════════════════════
 //  스킬 데이터 (stage 1 상수 — 4단계 가격 적용)
 // ═══════════════════════════════════════════════════════
@@ -673,23 +686,31 @@ const SKILL_BOOKS = [
   {id:'sb_f5',name:'화염 마스터리북 5권',type:'fire',  level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📕',desc:'화염 공격력 +40%'},
   {id:'sb_f6',name:'화염 마스터리북 6권',type:'fire',  level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📕',desc:'화염 공격력 +50%'},
   {id:'sb_f7',name:'화염 마스터리북 7권',type:'fire',  level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📕',desc:'화염 공격력 +60%'},
-  // water 1~7 (90/140/210/290/400/540/720)
-  {id:'sb_w1',name:'냉기 마스터리북 1권',type:'water', level:1,targetLevel:1, reqPlayerLevel:2,  price:45,  icon:'📗',desc:'냉기 공격 해금'},
-  {id:'sb_w2',name:'냉기 마스터리북 2권',type:'water', level:2,targetLevel:2, reqPlayerLevel:5,  price:70, icon:'📗',desc:'냉기 공격력 +10%'},
-  {id:'sb_w3',name:'냉기 마스터리북 3권',type:'water', level:3,targetLevel:3, reqPlayerLevel:8,  price:105, icon:'📗',desc:'냉기 공격력 +20%'},
-  {id:'sb_w4',name:'냉기 마스터리북 4권',type:'water', level:4,targetLevel:4, reqPlayerLevel:12, price:145, icon:'📗',desc:'냉기 공격력 +30%'},
-  {id:'sb_w5',name:'냉기 마스터리북 5권',type:'water', level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📗',desc:'냉기 공격력 +40%'},
-  {id:'sb_w6',name:'냉기 마스터리북 6권',type:'water', level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📗',desc:'냉기 공격력 +50%'},
-  {id:'sb_w7',name:'냉기 마스터리북 7권',type:'water', level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📗',desc:'냉기 공격력 +60%'},
-  // grass 1~7 (90/140/210/290/400/540/720)
-  {id:'sb_g1',name:'자연 마스터리북 1권',type:'grass', level:1,targetLevel:1, reqPlayerLevel:2,  price:45,  icon:'📒',desc:'자연 공격 해금'},
-  {id:'sb_g2',name:'자연 마스터리북 2권',type:'grass', level:2,targetLevel:2, reqPlayerLevel:5,  price:70, icon:'📒',desc:'자연 공격력 +10%'},
-  {id:'sb_g3',name:'자연 마스터리북 3권',type:'grass', level:3,targetLevel:3, reqPlayerLevel:8,  price:105, icon:'📒',desc:'자연 공격력 +20%'},
-  {id:'sb_g4',name:'자연 마스터리북 4권',type:'grass', level:4,targetLevel:4, reqPlayerLevel:12, price:145, icon:'📒',desc:'자연 공격력 +30%'},
-  {id:'sb_g5',name:'자연 마스터리북 5권',type:'grass', level:5,targetLevel:5, reqPlayerLevel:16, price:200, icon:'📒',desc:'자연 공격력 +40%'},
-  {id:'sb_g6',name:'자연 마스터리북 6권',type:'grass', level:6,targetLevel:6, reqPlayerLevel:20, price:270, icon:'📒',desc:'자연 공격력 +50%'},
-  {id:'sb_g7',name:'자연 마스터리북 7권',type:'grass', level:7,targetLevel:7, reqPlayerLevel:24, price:360, icon:'📒',desc:'자연 공격력 +60%'},
 ];
+// ★ B-2f: 냉기·자연 마스터리북 = 같은 권의 화염 마스터리북 복사(권·목표 레벨·필요 레벨·가격), 이름·아이콘·설명만 따로
+function _bookCopy(type, rows) {
+  const fire = SKILL_BOOKS.filter(b => b.type === 'fire');
+  return rows.map((r, i) => ({ id: r.id, name: r.name, type, level: fire[i].level, targetLevel: fire[i].targetLevel,
+    reqPlayerLevel: fire[i].reqPlayerLevel, price: fire[i].price, icon: r.icon, desc: r.desc }));
+}
+SKILL_BOOKS.push(..._bookCopy('water', [
+  { id:'sb_w1', name:'냉기 마스터리북 1권', icon:'📗', desc:'냉기 공격 해금' },
+  { id:'sb_w2', name:'냉기 마스터리북 2권', icon:'📗', desc:'냉기 공격력 +10%' },
+  { id:'sb_w3', name:'냉기 마스터리북 3권', icon:'📗', desc:'냉기 공격력 +20%' },
+  { id:'sb_w4', name:'냉기 마스터리북 4권', icon:'📗', desc:'냉기 공격력 +30%' },
+  { id:'sb_w5', name:'냉기 마스터리북 5권', icon:'📗', desc:'냉기 공격력 +40%' },
+  { id:'sb_w6', name:'냉기 마스터리북 6권', icon:'📗', desc:'냉기 공격력 +50%' },
+  { id:'sb_w7', name:'냉기 마스터리북 7권', icon:'📗', desc:'냉기 공격력 +60%' },
+]));
+SKILL_BOOKS.push(..._bookCopy('grass', [
+  { id:'sb_g1', name:'자연 마스터리북 1권', icon:'📒', desc:'자연 공격 해금' },
+  { id:'sb_g2', name:'자연 마스터리북 2권', icon:'📒', desc:'자연 공격력 +10%' },
+  { id:'sb_g3', name:'자연 마스터리북 3권', icon:'📒', desc:'자연 공격력 +20%' },
+  { id:'sb_g4', name:'자연 마스터리북 4권', icon:'📒', desc:'자연 공격력 +30%' },
+  { id:'sb_g5', name:'자연 마스터리북 5권', icon:'📒', desc:'자연 공격력 +40%' },
+  { id:'sb_g6', name:'자연 마스터리북 6권', icon:'📒', desc:'자연 공격력 +50%' },
+  { id:'sb_g7', name:'자연 마스터리북 7권', icon:'📒', desc:'자연 공격력 +60%' },
+]));
 
 // ─── Firebase 설정 ────────────────────────────────────
 const FIREBASE_CONFIG = {
