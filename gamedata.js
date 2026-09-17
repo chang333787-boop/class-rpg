@@ -679,6 +679,28 @@ GAME_DATA.decorations = GAME_DATA.decorations.map(d => {
   return out;
 });
 
+// ═══════════════════════════════════════════════════════
+//  🎁 꾸미기 무료 기간 (사용자 지시 2026-09-17 · 3일)
+//  기간만 보고 값을 0으로 바꿔 주는 것이고, 원래 가격(price)은 그대로 둔다 →
+//  기간이 지나면 저절로 원래 가격으로 돌아온다(되돌리는 패치가 필요 없다).
+//  from 0시 ~ until 0시 전까지(기기 시각 기준). 2026-09-17·18·19 사흘.
+// ═══════════════════════════════════════════════════════
+GAME_DATA.decoFree = { from: '2026-09-17', until: '2026-09-20', label: '9월 19일' };
+
+GAME_DATA.decoFreeNow = function (now) {
+  const f = GAME_DATA.decoFree;
+  if (!f || !f.from || !f.until) return false;
+  const d = now || new Date();
+  const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return ymd >= f.from && ymd < f.until;
+};
+
+// 지금 실제로 받을 값 — 무료 기간이면 0. 장식 구매는 반드시 이걸 쓴다(price 를 직접 빼지 말 것).
+GAME_DATA.decoCost = function (deco) {
+  if (!deco) return 0;
+  return GAME_DATA.decoFreeNow() ? 0 : (deco.price || 0);
+};
+
 GAME_DATA.mutantSeeds = [
     { id:'i_m_potato_seed', name:'⚡ 번개 감자', icon:'⚡🥔', priceAdj:+1, crop:'m_potato', cropIcon:'⚡🥔', desc:'특별 씨앗 입문' },
     { id:'i_m_carrot_seed', name:'✨ 황금 당근', icon:'✨🥕', crop:'m_carrot', cropIcon:'✨🥕', desc:'행운의 씨앗' },

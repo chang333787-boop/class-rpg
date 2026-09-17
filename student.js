@@ -2224,6 +2224,7 @@ function renderShop() {
       normalCards.join('') + divider + mutantCards.join('');
     return; // 아래 items.join() 건너뜀
   } else {
+    const decoFree = !!(GAME_DATA.decoFreeNow && GAME_DATA.decoFreeNow());   // [DECO-FREE-1]
     items = GAME_DATA.decorations.filter(d => d.price > 0).map(d => {
       const lv = CUR.level || 1;
       const locked = lv < (d.reqLv||1);
@@ -2236,11 +2237,16 @@ function renderShop() {
         <div class="ic-icon">${d.icon}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
         <div class="ic-name">${rl} ${d.name}</div>
         <div class="ic-stats">${catBadge}${locked?` <span style="color:var(--txt3);font-size:.6rem">Lv${d.reqLv}+</span>`:''}</div>
-        <div class="ic-price">💰 ${d.price}G</div>
+        <div class="ic-price">${decoFree ? `<span style="color:#7ec850;font-weight:800">🎁 무료</span> <span style="text-decoration:line-through;color:var(--txt3);font-size:.6rem">${d.price}G</span>` : `💰 ${d.price}G`}</div>
       </div>`;
     });
   }
-  document.getElementById('shop-items').innerHTML = items.join('');
+  const _decoBanner = (SHOP_TAB === 'deco' && GAME_DATA.decoFreeNow && GAME_DATA.decoFreeNow())
+    ? `<div style="grid-column:1/-1;background:rgba(126,200,80,.12);border:1.5px solid rgba(126,200,80,.45);
+        border-radius:10px;padding:.5rem .7rem;font-size:.72rem;color:#9fe07a;font-weight:700;word-break:keep-all">
+        🎁 지금은 꾸미기가 무료! ${escHtml(GAME_DATA.decoFree.label || '')} 까지 골드 없이 가질 수 있어요</div>`
+    : '';
+  document.getElementById('shop-items').innerHTML = _decoBanner + items.join('');
 }
 
 function shopTab(tab, el) {
@@ -2341,15 +2347,17 @@ function buySeed(id) {
 
 function buyDeco(id) {
   const deco = GAME_DATA.decorations.find(d => d.id === id);
-  if (!deco || CUR.gold < deco.price) { toast('💸 골드 부족!'); return; }
-  CUR.gold -= deco.price;
+  if (!deco) return;
+  const cost = GAME_DATA.decoCost ? GAME_DATA.decoCost(deco) : deco.price;   // [DECO-FREE-1] 🎁 무료 기간이면 0
+  if (CUR.gold < cost) { toast('💸 골드 부족!'); return; }
+  CUR.gold -= cost;
   CUR.inventory = CUR.inventory || [];
   const ex = CUR.inventory.find(i => i.id === id);
   if (ex) ex.qty++; else CUR.inventory.push({id, qty:1});
   DB.saveStudent(CUR);
-  DB.logSpend(CUR.id, 'deco', deco.price);   // [GOLD-SPEND-2] 저장 뒤 · 장식·가구·러그
+  if (cost > 0) DB.logSpend(CUR.id, 'deco', cost);   // [GOLD-SPEND-2] 저장 뒤 · 장식·가구·러그 / [DECO-FREE-1] 무료면 지출 기록 없음
   renderShop(); renderHUD();
-  toast(`✅ ${deco.name} 구매!`);
+  toast(cost === 0 ? `🎁 ${deco.name} 무료로 받았어요!` : `✅ ${deco.name} 구매!`);
 }
 
 // ══ 몬스터 ══
