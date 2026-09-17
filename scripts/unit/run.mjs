@@ -772,7 +772,7 @@ try {
     ] },
   };
   sb.globalThis = sb; vm.createContext(sb);
-  const names = ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked', '_groundKind', '_groundAt',
+  const names = ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_groundKind', '_groundAt',
     '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
     '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
   let src = '';
@@ -999,11 +999,11 @@ try {
     }
     src += S.slice(at, end + 1) + '\n';
   }
-  for (const n of ['_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
+  for (const n of ['_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
                    '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
-  src += ';globalThis.__R = { _groundKind, _animGroundOk, _animWhyNot, _animSyncLayer, _animAt, _animPoke, _animLayers, _animStopLayer };';
+  src += ';globalThis.__R = { _penAt, _isPenDeco, _groundKind, _animGroundOk, _animWhyNot, _animSyncLayer, _animAt, _animPoke, _animLayers, _animStopLayer };';
   vm.runInContext(src, sb);
   const R = sb.__R;
 
@@ -1072,6 +1072,101 @@ try {
   test('🐶 강아지는 누른 쪽으로 한 칸 다가온다', () => eq(dog.cur.col, before + 1));
 } catch (e) {
   test('동물 규칙 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 동물 우리(DECO-ANIM-3)';
+try {
+  const S = read('student.js');
+  const mkEl = (tag) => {
+    const el = { tag, className: '', style: {}, children: [], parentNode: null, offsetWidth: 0, textContent: '',
+      classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+      appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
+      removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
+      querySelector(sel) { const want = sel.charAt(0) === '.' ? sel.slice(1) : sel;
+        const walk = (n) => { for (const c of n.children) { if (c.tag === want || c.className === want) return c; const r = walk(c); if (r) return r; } return null; };
+        return walk(el); } };
+    return el;
+  };
+  const host = mkEl('div'); host.id = 'if-topview';
+  const timers = new Map(); let tid = 1;
+  // 닭장 3×3(우리) + 벤치 2×1(보통 장식)
+  const DECOS = [
+    { id: 'd_y55', name: '닭 한 마리' },
+    { id: 'pen_hen', name: '닭장', size: { w: 3, h: 3 }, pen: true },
+    { id: 'd_y5', name: '벤치', size: { w: 2, h: 1 } },
+  ];
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+    document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
+    window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
+    getComputedStyle: () => ({ position: 'static' }),
+    setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; }, clearTimeout: (id) => timers.delete(id),
+    encodeURIComponent,
+    DY: { rows: 28, cols: 50 }, _isHC: () => false, _isFarmCell: () => false,
+    getDecoSize: (id) => { const d = DECOS.filter(x => x.id === id)[0]; return (d && d.size) || { w: 1, h: 1 }; },
+    GAME_DATA: { decorations: DECOS } };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked']) {
+    let at = S.indexOf('const ' + n);
+    if (at < 0) at = S.indexOf('let ' + n);
+    let depth = 0, end = -1;
+    const open = '{[(', close = '}])';
+    for (let i = at; i < S.length; i++) {
+      const ch = S.charAt(i);
+      if (open.indexOf(ch) >= 0) depth++;
+      else if (close.indexOf(ch) >= 0) depth--;
+      else if (ch === ';' && depth === 0) { end = i; break; }
+    }
+    src += S.slice(at, end + 1) + '\n';
+  }
+  for (const n of ['_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
+                   '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+    src += sliceFn(S, n) + '\n';
+  src += ';globalThis.__P = { _isPenDeco, _penAt, _animSyncLayer, _animLayers, _animStopLayer, _animFreeMaker };';
+  vm.runInContext(src, sb);
+  const P = sb.__P;
+
+  test('장식 표의 pen:true 를 우리로 알아본다(보통 장식은 아니다)', () => {
+    eq([P._isPenDeco('pen_hen'), P._isPenDeco('d_y5'), P._isPenDeco('없는것')], [true, false, false]);
+  });
+
+  // 닭장 3×3 을 (10,10)~(12,12) 에 놓고 그 안에 닭 한 마리
+  const stu = { yardFloor: {}, houseDecorations: [
+    { id: 'pen_hen', area: 'yard', row: 10, col: 10 },
+    { id: 'd_y55',   area: 'yard', row: 11, col: 11 },
+    { id: 'd_y5',    area: 'yard', row: 11, col: 14 },   // 우리 밖 벤치
+  ] };
+  test('우리 사각형을 찾는다(안은 찾고 밖은 못 찾는다)', () => {
+    eq(P._penAt(stu, 11, 11), { r0: 10, c0: 10, r1: 12, c1: 12 });
+    eq(P._penAt(stu, 9, 10), null);
+  });
+  test('동물은 우리 칸을 지날 수 있고, 보통 장식 칸은 못 지난다', () => {
+    const free = P._animFreeMaker(stu, 28, 50);
+    eq([free(10, 10, 1, 1, 'd_y55', false), free(11, 14, 1, 1, 'd_y55', false)], [true, false]);
+  });
+
+  P._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560, 0, 0);
+  const hen = [...P._animLayers.get('if-topview').items.values()][0];
+  test('우리 안에 놓인 닭은 그 우리를 기억한다', () => eq(hen.pen, { r0: 10, c0: 10, r1: 12, c1: 12 }));
+  let out = null;
+  for (let i = 0; i < 200 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const p = hen.cur;
+    if (p.row < 10 || p.row > 12 || p.col < 10 || p.col > 12) { out = JSON.stringify(p); break; }
+  }
+  test('200걸음 동안 닭이 우리 밖으로 안 나간다', () => { if (out) throw new Error('우리 밖: ' + out); });
+
+  // 우리 밖 동물은 예전처럼 반지름으로 다닌다
+  P._animStopLayer('if-topview');
+  const stu2 = { yardFloor: {}, houseDecorations: [{ id: 'd_y55', area: 'yard', row: 3, col: 3 }] };
+  P._animSyncLayer('if-topview', stu2, 'yard', 20, 1000, 560, 0, 0);
+  const free2 = [...P._animLayers.get('if-topview').items.values()][0];
+  test('우리 밖 동물은 우리가 없다(반지름 규칙 그대로)', () => eq(free2.pen, null));
+} catch (e) {
+  test('우리 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════

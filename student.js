@@ -7029,6 +7029,26 @@ const ANIM_DECO = {
   d_y57: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양' },
 };
 
+// [DECO-ANIM-3] 우리(pen) — 장식 표에 pen:true 인 장식(닭장·목장·연못 우리 등).
+//  · 동물은 우리 칸을 지날 수 있다(다른 장식은 못 지난다).
+//  · 우리 안에 놓인 동물은 반지름 대신 **그 우리 안**에서만 돌아다닌다 → 마당이 어지럽지 않다.
+function _isPenDeco(id) {
+  const d = GAME_DATA.decorations.find(x => x.id === id);
+  return !!(d && d.pen);
+}
+//  (r,c) 를 품은 우리의 사각형을 준다. 없으면 null.
+function _penAt(student, r, c) {
+  const list = (student && student.houseDecorations) || [];
+  for (const p of list) {
+    if (p.area !== 'yard' || !_isPenDeco(p.id)) continue;
+    const sz = getDecoSize(p.id);
+    if (r >= p.row && r < p.row + sz.h && c >= p.col && c < p.col + sz.w) {
+      return { r0: p.row, c0: p.col, r1: p.row + sz.h - 1, c1: p.col + sz.w - 1 };
+    }
+  }
+  return null;
+}
+
 // [DECO-ANIM-2] 바닥 묶음 — 아이가 🖌️ 바닥으로 칠한 타일을 셋으로 본다
 const GROUND_HARD = ['stone', 'brick', 'gravel', 'gravel_yard', 'wood', 'deck', 'stone_floor'];
 function _groundKind(type) {
@@ -7081,6 +7101,7 @@ function _animFreeMaker(student, rows, cols) {
   const taken = new Set();
   (student.houseDecorations || []).forEach(p => {
     if (p.area !== 'yard' || ANIM_DECO[p.id]) return;
+    if (_isPenDeco(p.id)) return;   // [DECO-ANIM-3] 우리 안은 동물이 지날 수 있다
     const sz = getDecoSize(p.id);
     for (let dr = 0; dr < sz.h; dr++) for (let dc = 0; dc < sz.w; dc++) taken.add((p.row + dr) + '_' + (p.col + dc));
   });
@@ -7155,10 +7176,14 @@ function _animStep(st) {
   // [DECO-ANIM-2] 좌우로 걷고, 20~35초에 한 번만 줄을 바꾼다(위·아래 한 칸 '톡')
   const now = Date.now();
   const wantHop = !st.swim && now - (st.lastHop || 0) > (20000 + Math.random() * 15000);
-  const free = (r, c) => st.isFree(r, c, st.w, st.h, st.id, st.swim);
-  let next = _animNextCell(st.home, st.cur, st.cfg.radius, free, Math.random, wantHop);
+  const free = (r, c) => {
+    if (st.pen && (r < st.pen.r0 || r > st.pen.r1 - (st.h - 1) || c < st.pen.c0 || c > st.pen.c1 - (st.w - 1))) return false;
+    return st.isFree(r, c, st.w, st.h, st.id, st.swim);
+  };
+  const radius = st.pen ? 99 : st.cfg.radius;   // 우리 안에서는 우리 벽이 한계다
+  let next = _animNextCell(st.home, st.cur, radius, free, Math.random, wantHop);
   let hopped = wantHop && (next.row !== st.cur.row);
-  if (wantHop && !hopped) next = _animNextCell(st.home, st.cur, st.cfg.radius, free, Math.random, false);
+  if (wantHop && !hopped) next = _animNextCell(st.home, st.cur, radius, free, Math.random, false);
   if (hopped) st.lastHop = now;
 
   if (next.row !== st.cur.row || next.col !== st.cur.col) {
@@ -7207,7 +7232,8 @@ function _animPoke(st, fromCol) {
   if (st.cfg.come && fromCol !== undefined) {
     const dir = fromCol > st.cur.col ? 1 : (fromCol < st.cur.col ? -1 : 0);
     const to = { row: st.cur.row, col: st.cur.col + dir };
-    if (dir && st.isFree(to.row, to.col, st.w, st.h, st.id, st.swim)) {
+    const penOk = !st.pen || (to.col >= st.pen.c0 && to.col <= st.pen.c1 - (st.w - 1));
+    if (dir && penOk && st.isFree(to.row, to.col, st.w, st.h, st.id, st.swim)) {
       const imgEl = st.el.querySelector('img');
       if (imgEl) imgEl.style.transform = 'scaleX(' + dir + ')';
       st.cur = to;
@@ -7279,6 +7305,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     // [DECO-ANIM-2] 물에 놓인 오리는 물에서만 다닌다(놓인 자리 바닥으로 판정)
     st.swim = !!(st.cfg.water && _groundAt(student, p.row, p.col) === 'water');
     st.el.classList.toggle('swim', st.swim);
+    st.pen = _penAt(student, p.row, p.col);   // [DECO-ANIM-3] 우리 안이면 그 안에서만
     st.el.style.width = (sz.w * C) + 'px';
     st.el.style.height = (sz.h * C) + 'px';
     st.el.style.transitionDuration = '0ms';
