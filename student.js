@@ -2229,7 +2229,7 @@ function renderShop() {
     //  아이가 새 것을 못 찾고 지나치는 것을 막는다(장식이 84종이라 눈에 안 띈다).
     const _today = (() => { const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
-    items = GAME_DATA.decorations.filter(d => d.price > 0).map(d => {
+    items = GAME_DATA.decorations.filter(d => d.price > 0 && !d.hidden).map(d => {   // [DECO-FENCE-1] hidden 은 상점에서만 감춘다(인벤토리는 그대로)
       const lv = CUR.level || 1;
       const locked = lv < (d.reqLv||1);
       const rl = {common:'⚪',rare:'🔵',epic:'🟣',legend:'🟡'}[d.rarity||'common']||'';
@@ -7033,6 +7033,63 @@ const ANIM_DECO = {
   d_y57: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양' },
 };
 
+// [DECO-FENCE-1] 울타리 자동 이음 — 아이가 가로·세로·코너를 고르지 않는다.
+//  장식 표에 autoFence:true 인 장식(🚧 울타리) 하나만 상점에 두고,
+//  놓으면 이웃 울타리를 보고 네 그림 중 맞는 것으로 그린다(바닥 타일이 이미 그렇게 이어진다).
+//  옛 4종(d_y49~52)은 표에 그대로 남는다 — 이미 산 아이가 인벤토리에서 놓을 수 있다.
+const FENCE_IDS = ['d_y49', 'd_y50', 'd_y51', 'd_y52'];
+const FENCE_ART = { h: 'd_y49', v: 'd_y50', cornerL: 'd_y51', cornerR: 'd_y52' };
+
+function _isFenceCell(student, r, c) {
+  const list = (student && student.houseDecorations) || [];
+  for (const p of list) {
+    if (p.area !== 'yard' || p.row !== r || p.col !== c) continue;
+    if (FENCE_IDS.indexOf(p.id) >= 0) return true;
+    const d = GAME_DATA.decorations.find(x => x.id === p.id);
+    if (d && d.autoFence) return true;
+  }
+  return false;
+}
+
+//  이웃을 보고 어느 그림으로 그릴지 — 순수 함수(단위 시험용)
+//   좌우만 있으면 가로 · 위아래만 있으면 세로 · 둘 다면 코너(가로 이웃이 왼쪽이면 왼쪽 코너)
+//   아무 이웃도 없으면 가로(혼자 있는 울타리는 가로가 자연스럽다)
+function _fencePick(hasL, hasR, hasU, hasD) {
+  const horiz = hasL || hasR, vert = hasU || hasD;
+  if (horiz && vert) return hasL ? FENCE_ART.cornerL : FENCE_ART.cornerR;
+  if (vert) return FENCE_ART.v;
+  return FENCE_ART.h;
+}
+
+function _fenceArtFor(student, r, c) {
+  return _fencePick(_isFenceCell(student, r, c - 1), _isFenceCell(student, r, c + 1),
+                    _isFenceCell(student, r - 1, c), _isFenceCell(student, r + 1, c));
+}
+
+// [DECO-FEED-1] 먹이통 — 놓으면 가까운 동물이 모인다(장식 표의 feeder:true).
+//  · 먹이통 칸을 기준으로 정해진 거리 안에 있는 동물만.
+//  · 우리 안 동물은 그 우리 안에 있는 먹이통에만 모인다.
+//  · 저장하지 않는다. 먹이·수입 같은 값은 없다(그건 밸런스 결정이다).
+const FEED_RANGE = 7;
+function _feedersOf(student) {
+  return ((student && student.houseDecorations) || []).filter(p => {
+    if (p.area !== 'yard') return false;
+    const d = GAME_DATA.decorations.find(x => x.id === p.id);
+    return !!(d && d.feeder);
+  });
+}
+//  이 동물이 갈 먹이통 — 없으면 null
+function _feederFor(student, st, feeders) {
+  let best = null, bestDist = 1e9;
+  for (const f of feeders) {
+    if (st.pen && (f.row < st.pen.r0 || f.row > st.pen.r1 || f.col < st.pen.c0 || f.col > st.pen.c1)) continue;
+    const dist = Math.abs(f.row - st.home.row) + Math.abs(f.col - st.home.col);
+    if (dist > (st.pen ? 99 : FEED_RANGE)) continue;
+    if (dist < bestDist) { bestDist = dist; best = f; }
+  }
+  return best;
+}
+
 // [DECO-ANIM-3] 우리(pen) — 장식 표에 pen:true 인 장식(닭장·목장·연못 우리 등).
 //  · 동물은 우리 칸을 지날 수 있다(다른 장식은 못 지난다).
 //  · 우리 안에 놓인 동물은 반지름 대신 **그 우리 안**에서만 돌아다닌다 → 마당이 어지럽지 않다.
@@ -7177,7 +7234,13 @@ function _animResumeAll() {
 
 function _animSchedule(st) {
   const w = st.cfg.wait;
-  const wait = w[0] + Math.random() * (w[1] - w[0]);
+  let wait = w[0] + Math.random() * (w[1] - w[0]);
+  // [DECO-FEED-1] 먹이통 옆이면 더 오래 머문다(먹는 것처럼) · 가는 길이면 빨리 걷는다
+  const fd = st.feeder;
+  if (fd) {
+    const near = Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1;
+    wait = near ? wait * 2 : Math.min(wait, 1800);
+  }
   st.timer = setTimeout(() => _animStep(st), wait);
 }
 
@@ -7186,15 +7249,35 @@ function _animStep(st) {
   if (!st.el || !st.el.parentNode) return;
   // [DECO-ANIM-2] 좌우로 걷고, 20~35초에 한 번만 줄을 바꾼다(위·아래 한 칸 '톡')
   const now = Date.now();
-  const wantHop = !st.swim && now - (st.lastHop || 0) > (20000 + Math.random() * 15000);
+  // [DECO-FEED-1] 먹이통이 있고 아직 그 옆이 아니면 그쪽으로 간다(줄도 더 자주 바꿔 붙는다)
+  const fd = st.feeder;
+  const atFeeder = fd && Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1;
+  const heading = !!(fd && !atFeeder);
+  const hopGap = heading ? 4000 : (20000 + Math.random() * 15000);
+  const wantHop = !st.swim && (heading ? (st.cur.row !== fd.row) : true) && now - (st.lastHop || 0) > hopGap;
   const free = (r, c) => {
     if (st.pen && (r < st.pen.r0 || r > st.pen.r1 - (st.h - 1) || c < st.pen.c0 || c > st.pen.c1 - (st.w - 1))) return false;
     return st.isFree(r, c, st.w, st.h, st.id, st.swim, !!(st.pen && st.pen.water));
   };
-  const radius = st.pen ? 99 : st.cfg.radius;   // 우리 안에서는 우리 벽이 한계다
-  let next = _animNextCell(st.home, st.cur, radius, free, Math.random, wantHop);
-  let hopped = wantHop && (next.row !== st.cur.row);
-  if (wantHop && !hopped) next = _animNextCell(st.home, st.cur, radius, free, Math.random, false);
+  const radius = st.pen ? 99 : (heading ? Math.max(st.cfg.radius, FEED_RANGE) : st.cfg.radius);
+  //  먹이통으로 갈 때는 그 방향 한 칸을 먼저 본다(없으면 평소처럼 아무 쪽)
+  let next = null;
+  if (heading) {
+    if (wantHop && st.cur.row !== fd.row) {
+      const rr = st.cur.row + (fd.row > st.cur.row ? 1 : -1);
+      if (free(rr, st.cur.col)) next = { row: rr, col: st.cur.col };
+    }
+    if (!next && st.cur.col !== fd.col) {
+      const cc = st.cur.col + (fd.col > st.cur.col ? 1 : -1);
+      if (free(st.cur.row, cc)) next = { row: st.cur.row, col: cc };
+    }
+  }
+  let hopped = !!(next && next.row !== st.cur.row);
+  if (!next) {
+    next = _animNextCell(st.home, st.cur, radius, free, Math.random, wantHop);
+    hopped = wantHop && (next.row !== st.cur.row);
+    if (wantHop && !hopped) next = _animNextCell(st.home, st.cur, radius, free, Math.random, false);
+  }
   if (hopped) st.lastHop = now;
 
   if (next.row !== st.cur.row || next.col !== st.cur.col) {
@@ -7285,6 +7368,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
   rec.world.style.transform = 'translate(' + (-(panX || 0)) + 'px,' + (-(panY || 0)) + 'px)';
 
   const isFree = _animFreeMaker(student, rows, cols);
+  const feeders = _feedersOf(student);   // [DECO-FEED-1]
   const keep = new Set();
 
   list.forEach(p => {
@@ -7315,6 +7399,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     st.isFree = isFree;
     // [DECO-ANIM-2] 물에 놓인 오리는 물에서만 다닌다(놓인 자리 바닥으로 판정)
     st.pen = _penAt(student, p.row, p.col);   // [DECO-ANIM-3] 우리 안이면 그 안에서만
+    st.feeder = _feederFor(student, st, feeders);   // [DECO-FEED-1] 갈 먹이통(없으면 null)
     //  헤엄: 바닥을 물로 칠한 자리이거나, 물 있는 우리(연못 우리) 안이면
     st.swim = !!(st.cfg.water && (_groundAt(student, p.row, p.col) === 'water' || (st.pen && st.pen.water)));
     st.el.classList.toggle('swim', st.swim);
@@ -7699,10 +7784,11 @@ function _drawYard() {
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
     if(ANIM_DECO[p.id]) return;   // [DECO-ANIM-1] 움직이는 동물은 캔버스 위 층에서 그린다
+    const drawId = d.autoFence ? _fenceArtFor(CUR, p.row, p.col) : p.id;   // [DECO-FENCE-1]
     const sz=d.size||{w:1,h:1};
     const px=p.col*C, py=p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
-    if(_drawDecoSVG(p.id, px, py, bw, bh)) return;   // SVG 있으면 그걸로 끝
+    if(_drawDecoSVG(drawId, px, py, bw, bh)) return;   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;

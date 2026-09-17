@@ -772,12 +772,12 @@ try {
     ] },
   };
   sb.globalThis = sb; vm.createContext(sb);
-  const names = ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_groundKind', '_groundAt',
+  const names = ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt',
     '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
     '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
   let src = '';
   for (const n of names) {
-    if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
+    if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === 'FEED_RANGE' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
       const m = re.exec(S); if (!m) throw new Error(`없음: ${n}`); src += m[0] + '\n';
     } else src += sliceFn(S, n) + '\n';
@@ -985,7 +985,7 @@ try {
     ] } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = '';
-  for (const n of ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked']) {
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
     if (at < 0) throw new Error('선언 없음: ' + n);
@@ -999,7 +999,7 @@ try {
     }
     src += S.slice(at, end + 1) + '\n';
   }
-  for (const n of ['_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
+  for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
                    '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
@@ -1108,7 +1108,7 @@ try {
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = '';
-  for (const n of ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked']) {
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
     let depth = 0, end = -1;
@@ -1121,7 +1121,7 @@ try {
     }
     src += S.slice(at, end + 1) + '\n';
   }
-  for (const n of ['_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
+  for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
                    '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
@@ -1186,6 +1186,111 @@ try {
   test('우리 밖 동물은 우리가 없다(반지름 규칙 그대로)', () => eq(free2.pen, null));
 } catch (e) {
   test('우리 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 울타리 자동 이음·먹이통(DECO-FENCE-1·DECO-FEED-1)';
+try {
+  const S = read('student.js');
+  const mkEl = (tag) => {
+    const el = { tag, className: '', style: {}, children: [], parentNode: null, offsetWidth: 0, textContent: '',
+      classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+      appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
+      removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
+      querySelector(sel) { const want = sel.charAt(0) === '.' ? sel.slice(1) : sel;
+        const walk = (n) => { for (const c of n.children) { if (c.tag === want || c.className === want) return c; const r = walk(c); if (r) return r; } return null; };
+        return walk(el); } };
+    return el;
+  };
+  const host = mkEl('div'); host.id = 'if-topview';
+  const timers = new Map(); let tid = 1;
+  const DECOS = [
+    { id: 'd_y49', name: '울타리 가로형' }, { id: 'd_y50', name: '울타리 세로형' },
+    { id: 'd_y51', name: '울타리 왼쪽 코너' }, { id: 'd_y52', name: '울타리 오른쪽 코너' },
+    { id: 'd_y70', name: '울타리', autoFence: true },
+    { id: 'd_y69', name: '먹이통', feeder: true },
+    { id: 'd_y55', name: '닭 한 마리' },
+  ];
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+    document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
+    window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
+    getComputedStyle: () => ({ position: 'static' }),
+    setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; }, clearTimeout: (id) => timers.delete(id),
+    encodeURIComponent,
+    DY: { rows: 28, cols: 50 }, _isHC: () => false, _isFarmCell: () => false,
+    getDecoSize: () => ({ w: 1, h: 1 }),
+    GAME_DATA: { decorations: DECOS } };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FENCE_IDS', 'FENCE_ART', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
+    let at = S.indexOf('const ' + n);
+    if (at < 0) at = S.indexOf('let ' + n);
+    if (at < 0) throw new Error('선언 없음: ' + n);
+    let depth = 0, end = -1;
+    const open = '{[(', close = '}])';
+    for (let i = at; i < S.length; i++) {
+      const ch = S.charAt(i);
+      if (open.indexOf(ch) >= 0) depth++;
+      else if (close.indexOf(ch) >= 0) depth--;
+      else if (ch === ';' && depth === 0) { end = i; break; }
+    }
+    src += S.slice(at, end + 1) + '\n';
+  }
+  for (const n of ['_isFenceCell', '_fencePick', '_fenceArtFor', '_feedersOf', '_feederFor',
+                   '_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
+                   '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+    src += sliceFn(S, n) + '\n';
+  src += ';globalThis.__F = { _fencePick, _fenceArtFor, _feedersOf, _animSyncLayer, _animLayers, _animStopLayer };';
+  vm.runInContext(src, sb);
+  const F = sb.__F;
+
+  // ① 울타리 그림 고르기 — 아이는 가로·세로·코너를 고르지 않는다
+  test('혼자 있는 울타리는 가로', () => eq(F._fencePick(false, false, false, false), 'd_y49'));
+  test('좌우로 이어지면 가로', () => eq(F._fencePick(true, true, false, false), 'd_y49'));
+  test('위아래로 이어지면 세로', () => eq(F._fencePick(false, false, true, true), 'd_y50'));
+  test('왼쪽 + 위 → 왼쪽 코너', () => eq(F._fencePick(true, false, true, false), 'd_y51'));
+  test('오른쪽 + 아래 → 오른쪽 코너', () => eq(F._fencePick(false, true, false, true), 'd_y52'));
+
+  // ② 실제로 놓인 울타리를 보고 고른다(옛 4종도 이웃으로 센다)
+  const fstu = { yardFloor: {}, houseDecorations: [
+    { id: 'd_y70', area: 'yard', row: 5, col: 5 },
+    { id: 'd_y70', area: 'yard', row: 5, col: 6 },
+    { id: 'd_y49', area: 'yard', row: 5, col: 7 },   // 옛 가로형도 이웃이다
+    { id: 'd_y70', area: 'yard', row: 6, col: 5 },
+  ] };
+  test('줄로 이어진 가운데는 가로', () => eq(F._fenceArtFor(fstu, 5, 6), 'd_y49'));
+  test('아래로도 이어진 왼쪽 끝은 코너', () => eq(F._fenceArtFor(fstu, 5, 5), 'd_y52'));
+  test('세로로만 이어진 아래 칸은 세로', () => eq(F._fenceArtFor(fstu, 6, 5), 'd_y50'));
+
+  // ③ 먹이통 — 닭이 모인다
+  const stu = { yardFloor: {}, houseDecorations: [
+    { id: 'd_y69', area: 'yard', row: 10, col: 10 },
+    { id: 'd_y55', area: 'yard', row: 12, col: 14 },
+  ] };
+  test('먹이통을 찾는다', () => eq(F._feedersOf(stu).length, 1));
+  F._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560, 0, 0);
+  const hen = [...F._animLayers.get('if-topview').items.values()][0];
+  test('닭이 갈 먹이통을 물고 있다', () => { if (!hen.feeder) throw new Error('먹이통 없음'); });
+  let best = 99;
+  for (let i = 0; i < 300 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    best = Math.min(best, Math.abs(hen.cur.row - 10) + Math.abs(hen.cur.col - 10));
+  }
+  test('300걸음 안에 먹이통 옆(1칸)까지 온다', () => { if (best > 1) throw new Error('가장 가까워진 거리 ' + best); });
+
+  // ④ 너무 먼 동물은 안 온다
+  F._animStopLayer('if-topview');
+  const far = { yardFloor: {}, houseDecorations: [
+    { id: 'd_y69', area: 'yard', row: 2, col: 2 },
+    { id: 'd_y55', area: 'yard', row: 20, col: 30 },
+  ] };
+  F._animSyncLayer('if-topview', far, 'yard', 20, 1000, 560, 0, 0);
+  const far1 = [...F._animLayers.get('if-topview').items.values()][0];
+  test('먹이통이 멀면(7칸 넘음) 그 동물은 안 간다', () => eq(far1.feeder, null));
+} catch (e) {
+  test('울타리·먹이통 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════
