@@ -61,6 +61,9 @@ window.onload = async () => {
       applyShopOverrides();
       applyBattleSettings();
       if (typeof CUR !== 'undefined' && CUR) {
+        // [DECO-SAVE-1] CUR 을 통째 교체하기 **직전에** 묶여 있던 꾸미기 변경을 보낸다.
+        //  (보내고 나서 교체하므로 순서는 지금과 같다 — 서버 값이 이긴다)
+        if (typeof decoFlush === 'function') decoFlush('스냅샷');
         const fresh = DB.getStudent(CUR.id);
         if (fresh) CUR = fresh;
 
@@ -4625,6 +4628,7 @@ function _decoLandHint() {
 }
 
 function closeInteriorFullscreen() {
+  decoFlush('전체화면 닫기');   // [DECO-SAVE-1]
   _animStopAll();   // [DECO-ANIM-1] 타이머 남기지 않기
   _ifMode = false;
   DY = {...DY_NORMAL};
@@ -8045,6 +8049,34 @@ function _decoClick(e) {
   }
 }
 
+// ══ 꾸미기 저장 묶기 (DECO-SAVE-1) ══════════════════════════
+//  꾸미기 조작 한 번 = 학생 문서 **통째** 저장이었다(실측: 바닥 20칸 = 20번, 한 번에 평균 26KB → 약 520KB).
+//  '무엇을 저장하는지'는 한 글자도 바꾸지 않는다. **'언제' 저장하는지만** 0.4초로 묶는다.
+//  대상은 꾸미기 쓰기 3곳뿐(_paintFloor · _decoPlace 놓기/치우기). 골드·상점·전투·농장은 손대지 않는다.
+//  잃는 것 0: 아래 자리에서 **즉시 저장(flush)** 한다 —
+//   씬 바꿈 · 전체화면 닫기 · 내 집 창 닫기·다른 탭 · 앱 가려짐 · 페이지 닫힘 ·
+//   **다른 곳에서 CUR 이 갈릴 때(스냅샷 직전)**.
+const DECO_SAVE_MS = 400;
+let _decoSaveTimer = null;
+
+function decoDirty() {
+  if (_decoSaveTimer) clearTimeout(_decoSaveTimer);
+  _decoSaveTimer = setTimeout(() => { _decoSaveTimer = null; DB.saveStudent(CUR); }, DECO_SAVE_MS);
+}
+
+//  대기 중이던 것을 지금 보낸다. 대기 중이 아니면 아무 일도 안 한다(쓰기가 늘지 않는다).
+function decoFlush(why) {
+  if (!_decoSaveTimer) return false;
+  clearTimeout(_decoSaveTimer); _decoSaveTimer = null;
+  try { DB.saveStudent(CUR); } catch (e) { console.error('꾸미기 저장 실패(' + why + ')', e); }
+  return true;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (document.hidden) decoFlush('가려짐'); });
+  addEventListener('pagehide', () => decoFlush('페이지 닫힘'));
+}
+
 function _paintFloor(r, c) {
   CUR.yardFloor = CUR.yardFloor||{};
   const key = r+'_'+c;
@@ -8053,7 +8085,7 @@ function _paintFloor(r, c) {
   } else {
     CUR.yardFloor[key] = CUR_FLOOR_TILE;
   }
-  DB.saveStudent(CUR);
+  decoDirty();   // [DECO-SAVE-1] 0.4초 묶기 — 끌어서 칠할 때 칸마다 통째 저장되지 않게
   _drawDeco();
 }
 
@@ -8069,7 +8101,7 @@ function _decoPlace(area,row,col){
   if(existing){
     const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
     CUR.houseDecorations=placed.filter(p=>!(p.area===area&&p.row===existing.row&&p.col===existing.col));
-    DB.saveStudent(CUR); _drawDeco();
+    decoDirty(); _drawDeco();   // [DECO-SAVE-1]
     toast(`${d?d.icon:'🌸'} 제거됨`); return;
   }
   if(!SEL_DECO){ toast('먼저 아래 장식품을 선택해주세요!'); return; }
@@ -8086,11 +8118,12 @@ function _decoPlace(area,row,col){
     toast(_animWhyNot(SEL_DECO)); return;
   }
   CUR.houseDecorations=[...placed,{id:SEL_DECO,area,row,col}];
-  DB.saveStudent(CUR); _drawDeco(); renderDecoInv();
+  decoDirty(); _drawDeco(); renderDecoInv();   // [DECO-SAVE-1]
   toast(`✅ ${d.icon} ${d.name} 배치!`);
 }
 
 function toggleDecoScene(){
+  decoFlush('씬 바꿈');   // [DECO-SAVE-1]
   DECO_SCENE=DECO_SCENE==='yard'?'indoor':'yard';
   SEL_DECO=null;
   _dZoom=1; _dPanX=0; _dPanY=0;   // [DECO-ZOOM-1]
