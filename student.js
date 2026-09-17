@@ -4565,13 +4565,19 @@ function canPlaceDeco(r, c, w, h, area, excludeId) {
 let SEL_DECO = null;
 let DECO_SCENE = 'yard'; // 'yard' | 'indoor'
 let _dCv = null, _dCtx = null, _dC = 28, _dW = 0, _dH = 0;
+// [DECO-ZOOM-1] 꾸미기 확대/축소·화면 이동 — 판은 격자 좌표 그대로 그리고, 보이는 창만 옮긴다.
+//  _dZoom 1 = 지금까지 보던 크기. 칸 크기 C = 기준칸 × _dZoom.
+//  _dPanX/_dPanY = 보이는 창의 왼쪽 위가 판의 어디인지(판 픽셀). 저장하지 않는다(화면 상태).
+const DECO_ZOOM_MIN = 0.5, DECO_ZOOM_MAX = 3, DECO_ZOOM_STEP = 1.25;
+const DY_BASE = { cols: 50, rows: 28 };   // 집·농장 자리를 재는 기준 판(넓혀도 자리가 안 움직이게)
+let _dZoom = 1, _dPanX = 0, _dPanY = 0;
 let _ifMode = false; // 전체화면 인테리어 모드 여부
 
 // ── 그리드 상수 ──
 // 전체화면 모드: 셀 24px 기준으로 화면 크기에서 역산
 // 일반 모드(포트폴리오 내): 기존 cols/rows 유지
 const DY_NORMAL  = {cols:20, rows:14};  // 마당 일반 모드
-const DY_FULL    = {cols:50, rows:28};  // 마당 전체화면 모드
+const DY_FULL    = {cols:80, rows:44};  // 마당 전체화면 모드 — [DECO-LAND-1] 50×28 → 80×44(2.2배). 좌표는 그대로라 있는 마당은 안 움직인다
 const DI_NORMAL  = {cols:12, rows:8};   // 집 안 일반 모드
 const DI_FULL    = {cols:50, rows:28};  // 집 안 전체화면 모드
 const DH = {cols:6, rows:3};            // 집 건물 차지 영역 (우상단)
@@ -4580,11 +4586,14 @@ const DH = {cols:6, rows:3};            // 집 건물 차지 영역 (우상단)
 let DY = {...DY_NORMAL};
 let DI = {...DI_NORMAL};
 
-function _isHC(r,c){ return r < DH.rows && c >= (DY.cols - DH.cols); }
+// [DECO-ZOOM-1] 집은 기준 판(50칸) 오른쪽 위에 고정한다 — 마당을 넓혀도 집·문이 제자리.
+function _houseCol0(){ return Math.min(DY.cols, DY_BASE.cols) - DH.cols; }
+function _isHC(r,c){ const c0=_houseCol0(); return r < DH.rows && c >= c0 && c < c0 + DH.cols; }
 
 // ── 전체화면 인테리어 모드 ──────────────────────────────
 function openInteriorFullscreen() {
   _ifMode = true;
+  _dZoom = 1; _dPanX = 0; _dPanY = 0;   // [DECO-ZOOM-1]
   DY = {...DY_FULL};
   DI = {...DI_FULL};
   const fs = document.getElementById('interior-fullscreen');
@@ -4597,8 +4606,18 @@ function openInteriorFullscreen() {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       renderHouseDeco();
+      _decoLandHint();
     });
   });
+}
+
+// [DECO-LAND-1] 마당이 넓어진 것을 한 번만 알려 준다(기기에만 기록 — DB 쓰기 0)
+function _decoLandHint() {
+  try {
+    if (localStorage.getItem('rpg.deco.landHint') === '1') return;
+    localStorage.setItem('rpg.deco.landHint', '1');
+  } catch (e) { return; }
+  toast('🌿 마당이 넓어졌어요! 두 손가락으로 모으거나 "전체"를 누르면 넓게 보여요');
 }
 
 function closeInteriorFullscreen() {
@@ -6817,6 +6836,7 @@ function _initDeco() {
     }, { passive: false });
     // 마우스(PC)용
     _dCv.addEventListener('click', _decoClick);
+    _decoAttachGestures(_dCv);   // [DECO-ZOOM-1] 핀치·두 손가락 이동·빈손 끌기·휠
   }
   // 전체화면 모드면 window 크기 직접 사용, 아니면 컨테이너 너비
   let W, maxH;
@@ -6831,9 +6851,13 @@ function _initDeco() {
   }
   const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
   const rows = DECO_SCENE === 'yard' ? DY.rows : DI.rows;
-  const C = Math.floor(W / cols);
-  const H = Math.min(C * rows, maxH);
+  // [DECO-ZOOM-1] 기준 칸은 '기준 판'(50칸) 기준이라 판을 넓혀도 처음 보이는 크기가 그대로다.
+  const baseCols = Math.min(cols, DECO_SCENE === 'yard' ? DY_BASE.cols : DI.cols);
+  const baseC = Math.floor(W / baseCols);
+  const C = Math.max(4, Math.round(baseC * _dZoom));
+  const H = Math.min(Math.max(C * rows, 120), maxH);
   _dW = W; _dH = H; _dC = C;
+  _decoClampPan();
   _dCv.width  = W * 2;
   _dCv.height = H * 2;
   _dCv.style.width  = W + 'px';
@@ -6843,6 +6867,144 @@ function _initDeco() {
 }
 
 let _drawDecoRaf = null;
+
+// ══ 꾸미기 확대/축소·화면 이동 (DECO-ZOOM-1) ══════════════════
+//  · 판(격자)은 지금 코드가 쓰는 좌표 그대로 그린다. 캔버스 변환으로 보이는 창만 옮긴다.
+//  · 보이는 칸만 그린다(컬링) → 판을 넓혀도 한 번 그리는 비용이 늘지 않는다.
+//  · 줌·이동은 화면 상태다. DB 에 쓰지 않는다.
+function _decoBoardPx() {
+  const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
+  const rows = DECO_SCENE === 'yard' ? DY.rows : DI.rows;
+  return { w: cols * _dC, h: rows * _dC };
+}
+
+function _decoClampPan() {
+  const b = _decoBoardPx();
+  const maxX = Math.max(0, b.w - _dW), maxY = Math.max(0, b.h - _dH);
+  _dPanX = Math.min(Math.max(0, _dPanX), maxX);
+  _dPanY = Math.min(Math.max(0, _dPanY), maxY);
+}
+
+// 보이는 칸 범위 — 그리는 쪽에서 이 범위만 돈다
+function _decoVisible(rows, cols) {
+  const r0 = Math.max(0, Math.floor(_dPanY / _dC) - 1);
+  const c0 = Math.max(0, Math.floor(_dPanX / _dC) - 1);
+  const r1 = Math.min(rows, Math.ceil((_dPanY + _dH) / _dC) + 1);
+  const c1 = Math.min(cols, Math.ceil((_dPanX + _dW) / _dC) + 1);
+  return { r0, c0, r1, c1 };
+}
+
+//  화면의 한 점(창 기준 px)을 고정한 채 줌을 바꾼다 — 핀치 중심·＋－ 단추 모두 이걸 쓴다
+function _decoSetZoom(z, fx, fy) {
+  const prev = _dZoom;
+  const next = Math.min(DECO_ZOOM_MAX, Math.max(DECO_ZOOM_MIN, z));
+  if (Math.abs(next - prev) < 0.001) return;
+  const ax = (fx === undefined ? _dW / 2 : fx), ay = (fy === undefined ? _dH / 2 : fy);
+  const boardX = (_dPanX + ax) / prev, boardY = (_dPanY + ay) / prev;   // 줌 1 기준 판 좌표
+  _dZoom = next;
+  _dCv = null; _dCtx = null;          // 칸 크기가 바뀌니 캔버스를 다시 잡는다
+  _initDeco();
+  _dPanX = boardX * _dZoom - ax; _dPanY = boardY * _dZoom - ay;
+  _decoClampPan();
+  _drawDeco();
+}
+
+function decoZoomIn()  { _decoSetZoom(_dZoom * DECO_ZOOM_STEP); }
+function decoZoomOut() { _decoSetZoom(_dZoom / DECO_ZOOM_STEP); }
+
+// 판 전체가 보이게 (마당이 넓어져 길을 잃었을 때)
+function decoZoomFit() {
+  const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
+  const baseCols = Math.min(cols, DECO_SCENE === 'yard' ? DY_BASE.cols : DI.cols);
+  const z = Math.max(DECO_ZOOM_MIN, Math.min(DECO_ZOOM_MAX, baseCols / cols));
+  _dPanX = 0; _dPanY = 0;
+  _decoSetZoom(z, 0, 0);
+  if (Math.abs(_dZoom - z) < 0.001) { _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); }
+}
+
+function decoPanBy(dx, dy) {
+  const bx = _dPanX, by = _dPanY;
+  _dPanX += dx; _dPanY += dy;
+  _decoClampPan();
+  if (_dPanX !== bx || _dPanY !== by) _drawDeco();
+}
+
+// 손짓 — 두 손가락 벌리기/모으기 = 확대/축소(손가락 사이 중심 기준) · 두 손가락 끌기 = 화면 이동
+//  빈손(고른 카드 없고 바닥 모드 아님) 한 손가락 끌기 = 화면 이동 · 휠 = 확대/축소(PC)
+//  카드를 고른 채 한 손가락은 지금처럼 '놓기'다(탭).
+let _dSuppressClick = false;
+function _decoAttachGestures(cv) {
+  const pts = new Map();
+  let pinch = null, drag = null;
+
+  const mid = () => {
+    const a = [...pts.values()];
+    return { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2,
+             d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) };
+  };
+  const local = (e) => {
+    const rect = cv.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (_dW / rect.width), y: (e.clientY - rect.top) * (_dH / rect.height) };
+  };
+
+  cv.addEventListener('pointerdown', e => {
+    pts.set(e.pointerId, local(e));
+    if (pts.size === 2) {
+      drag = null;
+      const m = mid();
+      pinch = { d0: m.d, z0: _dZoom, fx: m.x, fy: m.y, mx: m.x, my: m.y };
+      _dSuppressClick = true;
+    } else if (pts.size === 1 && !SEL_DECO && DECO_MODE !== 'floor') {
+      const l = local(e);
+      drag = { x: l.x, y: l.y, moved: 0 };
+    }
+  });
+
+  cv.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, local(e));
+    if (pinch && pts.size >= 2) {
+      const m = mid();
+      if (pinch.d0 > 8) _decoSetZoom(pinch.z0 * (m.d / pinch.d0), pinch.fx, pinch.fy);
+      decoPanBy(pinch.mx - m.x, pinch.my - m.y);
+      pinch.mx = m.x; pinch.my = m.y;
+      return;
+    }
+    if (drag) {
+      const l = local(e);
+      const dx = l.x - drag.x, dy = l.y - drag.y;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      if (drag.moved > 6) _dSuppressClick = true;
+      decoPanBy(-dx, -dy);
+      drag.x = l.x; drag.y = l.y;
+    }
+  });
+
+  const end = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (!pts.size) { drag = null; setTimeout(() => { _dSuppressClick = false; }, 0); }
+  };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+  cv.addEventListener('lostpointercapture', end);
+
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const l = local(e);
+    _decoSetZoom(_dZoom * (e.deltaY < 0 ? DECO_ZOOM_STEP : 1 / DECO_ZOOM_STEP), l.x, l.y);
+  }, { passive: false });
+}
+
+// 창 기준 px → 판 px (클릭·핀치 공용)
+function _decoBoardPoint(clientX, clientY) {
+  const rect = _dCv.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) * (_dW / rect.width) + _dPanX,
+    y: (clientY - rect.top) * (_dH / rect.height) + _dPanY,
+  };
+}
+
 
 // ══ 꾸미기 동물 움직임 (DECO-ANIM-1) ══════════════════════
 //  캔버스 위에 투명한 층을 얹고, 마당 동물만 그 층의 <img> 로 놓는다.
@@ -6950,7 +7112,7 @@ function _animStep(st) {
 
 //  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.
 //  이미 있는 동물은 그 자리를 지킨다(다시 그려도 처음부터 걷지 않게).
-function _animSyncLayer(hostId, student, scene, C, W, H) {
+function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
   const host = document.getElementById(hostId);
   if (!host || !student) { _animStopLayer(hostId); return; }
   if (scene !== 'yard') { _animStopLayer(hostId); return; }
@@ -6963,7 +7125,10 @@ function _animSyncLayer(hostId, student, scene, C, W, H) {
   if (!rec) {
     const layer = document.createElement('div');
     layer.className = 'deco-anim-layer';
-    rec = { layer, items: new Map() };
+    const world = document.createElement('div');   // [DECO-ZOOM-1] 이 겹만 옮기면 동물이 판과 같이 움직인다
+    world.className = 'deco-anim-world';
+    layer.appendChild(world);
+    rec = { layer, world, items: new Map() };
     _animLayers.set(hostId, rec);
   }
   if (rec.layer.parentNode !== host) {
@@ -6972,6 +7137,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H) {
   }
   rec.layer.style.width = W + 'px';
   rec.layer.style.height = H + 'px';
+  rec.world.style.transform = 'translate(' + (-(panX || 0)) + 'px,' + (-(panY || 0)) + 'px)';
 
   const isFree = _animFreeMaker(student, rows, cols);
   const keep = new Set();
@@ -6993,7 +7159,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H) {
       img.src = './assets/deco/' + encodeURIComponent(p.id) + '.svg';
       bob.appendChild(img);
       el.appendChild(bob);
-      rec.layer.appendChild(el);
+      rec.world.appendChild(el);
       st = { el, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null };
       rec.items.set(key, st);
     }
@@ -7162,23 +7328,27 @@ function _drawDeco() {
   _drawDecoRaf = requestAnimationFrame(() => {
     _drawDecoRaf = null;
     if (!_dCtx) return;
+    // [DECO-ZOOM-1] 보이는 창만 옮긴다 — 그리는 코드는 판 좌표를 그대로 쓴다
+    _dCtx.setTransform(2, 0, 0, 2, 0, 0);
     _dCtx.clearRect(0, 0, _dW, _dH);
+    _dCtx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
     if (DECO_SCENE === 'yard') _drawYard();
     else _drawIndoor();
     // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
-    _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH);
+    _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
   });
 }
 
 function _drawYard() {
   const C = _dC, W = _dW, H = _dH;
-  const hx = (DY.cols - DH.cols) * C, hh = DH.rows * C, hw = DH.cols * C;
+  const hx = _houseCol0() * C, hh = DH.rows * C, hw = DH.cols * C;
 
   // 셀별 바닥 타일
   // [FLOOR-SVG-1] 이웃 타입 조회 — 격자 밖·집 영역은 null(경계 없음)
   const _yardTypeAt = (rr, cc) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
     ? null : ((CUR.yardFloor||{})[rr+'_'+cc] || 'grass');
-  for(let r=0;r<DY.rows;r++) for(let c=0;c<DY.cols;c++){
+  const _vis = _decoVisible(DY.rows, DY.cols);   // [DECO-ZOOM-1] 보이는 칸만
+  for(let r=_vis.r0;r<_vis.r1;r++) for(let c=_vis.c0;c<_vis.c1;c++){
     if(_isHC(r,c)) continue;
     const tkey = r+'_'+c;
     const ttype = (CUR.yardFloor||{})[tkey]||'grass';
@@ -7354,8 +7524,9 @@ function _drawYard() {
     const sd = GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
     if(sd?.cat==='yard') {
       const ssz = sd.size||{w:1,h:1};
-      // 빈 칸마다 footprint 프리뷰 표시
-      for(let r=0;r<DY.rows;r++) for(let c=0;c<DY.cols;c++){
+      // 빈 칸마다 footprint 프리뷰 표시 — [DECO-ZOOM-1] 보이는 칸만(1,400칸 계산을 줄인다)
+      const _pv = _decoVisible(DY.rows, DY.cols);
+      for(let r=_pv.r0;r<_pv.r1;r++) for(let c=_pv.c0;c<_pv.c1;c++){
         if(_isHC(r,c)) continue;
         if(canPlaceDeco(r,c,ssz.w,ssz.h,'yard',null)){
           // 배치 가능한 footprint 영역 강조
@@ -7422,11 +7593,11 @@ function _drawYard() {
 // ── 마당 농장 존 렌더 + 판정 헬퍼 ──────────────────────────
 function _getFarmZone() {
   const {cols:fc, rows:fr} = getFarmLayout(CUR.level || 1);
-  // DY.rows/cols 대신 실제 캔버스에 보이는 칸 수 기준
-  const visibleCols = Math.floor(_dW / _dC);
-  const visibleRows = Math.floor(_dH / _dC);
-  const startCol = visibleCols - fc - 1;
-  const startRow = visibleRows - fr - 1;
+  // [DECO-ZOOM-1] 예전에는 '보이는 칸 수'(_dW/_dC)로 재서 창 크기·확대에 따라 농장이 움직였다
+  //  (기기마다 자리가 달라지고, 확대하면 밭이 따라다녔다). 기준 판에 고정한다.
+  const bc = Math.min(DY.cols, DY_BASE.cols), br = Math.min(DY.rows, DY_BASE.rows);
+  const startCol = bc - fc - 1;
+  const startRow = br - fr - 1;
   return { startCol, startRow, cols: fc, rows: fr };
 }
 
@@ -7589,9 +7760,9 @@ function _drawIndoor() {
 
 function _decoClick(e) {
   if(!_dCv||!_dCtx) return;
-  const rect=_dCv.getBoundingClientRect();
-  const mx=(e.clientX-rect.left)*(_dW/rect.width);
-  const my=(e.clientY-rect.top)*(_dH/rect.height);
+  if(_dSuppressClick) return;   // [DECO-ZOOM-1] 화면을 끈 직후·핀치 직후의 클릭은 놓기가 아니다
+  const _bp=_decoBoardPoint(e.clientX, e.clientY);   // [DECO-ZOOM-1] 이동·확대 반영
+  const mx=_bp.x, my=_bp.y;
   const C=_dC;
 
   // 문 클릭 체크
@@ -7658,6 +7829,7 @@ function _decoPlace(area,row,col){
 function toggleDecoScene(){
   DECO_SCENE=DECO_SCENE==='yard'?'indoor':'yard';
   SEL_DECO=null;
+  _dZoom=1; _dPanX=0; _dPanY=0;   // [DECO-ZOOM-1]
   const isYard=DECO_SCENE==='yard';
   // 일반 모드 UI
   const sBtn = document.getElementById('deco-scene-btn');
@@ -9498,7 +9670,7 @@ function _renderFriendCanvas() {
   if (_ffScene === 'yard') _drawYard();
   else _drawIndoor();
   // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다
-  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H);
+  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _dPanX, _dPanY);
 
   // 복원
   CUR        = prevCUR;

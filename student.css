@@ -1353,6 +1353,7 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
    캔버스 위 투명한 층. 걷기는 transform 전환, 제자리 꼬물은 무한 키프레임(둘 다 GPU).
    움직임 줄이기 설정이면 걷지 않고(코드에서 타이머를 안 걸고) 꼬물만 느리게. */
 .deco-anim-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:2}
+.deco-anim-world{position:absolute;left:0;top:0;width:100%;height:100%}
 .deco-anim{position:absolute;left:0;top:0;transition:transform 1s linear;will-change:transform}
 .deco-anim .bob{position:absolute;left:0;bottom:0;width:100%;animation:decoBob 1.6s ease-in-out infinite}
 .deco-anim .bob img{display:block;width:100%;height:auto}

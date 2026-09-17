@@ -805,9 +805,11 @@ try {
   ] };
   A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
   const layer = host.children.find(c => c.className === 'deco-anim-layer');
+  const world = layer && layer.children.find(c => c.className === 'deco-anim-world');
   test('마당에 동물 층이 생기고 동물 수만큼 요소가 생긴다(장식·집 안은 제외)', () => {
     if (!layer) throw new Error('층 없음');
-    eq(layer.children.length, 2);
+    if (!world) throw new Error('세계 겹 없음');
+    eq(world.children.length, 2);
   });
   test('동물마다 걸음 타이머가 하나씩 예약된다', () => eq(timers.size, 2));
   test('층은 캔버스 위에 절대 위치 · 손가락을 통과시킨다(CSS 클래스)', () => eq(layer.className, 'deco-anim-layer'));
@@ -834,15 +836,113 @@ try {
 
   // ⑤ 같은 자리 다시 맞추면 같은 요소를 지킨다(처음부터 걷지 않게)
   A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
-  const l2 = host.children.find(c => c.className === 'deco-anim-layer');
+  const l2w = host.children.find(c => c.className === 'deco-anim-layer').children.find(c => c.className === 'deco-anim-world');
   const first = [...A._animLayers.get('if-topview').items.values()][0];
   first.cur = { row: first.home.row + 2, col: first.home.col };
   A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
   const again = [...A._animLayers.get('if-topview').items.values()][0];
   test('다시 그려도 동물이 지금 자리를 지킨다', () => eq(again.cur, { row: first.home.row + 2, col: first.home.col }));
-  test('다시 그려도 요소를 새로 만들지 않는다', () => eq(l2.children.length, 2));
+  test('다시 그려도 요소를 새로 만들지 않는다', () => eq(l2w.children.length, 2));
 } catch (e) {
   test('동물 움직임 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 확대·이동(DECO-ZOOM-1)';
+try {
+  const S = read('student.js');
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  // 상태 선언
+  for (const d of ['let _dCv', 'const DECO_ZOOM_MIN', 'const DY_BASE', 'let _dZoom',
+                   'const DY_NORMAL', 'const DY_FULL', 'const DI_NORMAL', 'const DI_FULL', 'const DH ', 'let DY ', 'let DI ']) {
+    const at = S.indexOf(d);
+    if (at < 0) throw new Error('선언 없음: ' + d);
+    const nl = S.indexOf('\n', at);
+    src += S.slice(at, nl) + '\n';
+  }
+  src += "let DECO_SCENE='yard';\n";
+  for (const n of ['_decoBoardPx', '_decoClampPan', '_decoVisible', '_decoSetZoom', '_houseCol0', '_isHC', '_getFarmZone', '_isFarmCell'])
+    src += sliceFn(S, n) + '\n';
+  // _decoSetZoom 이 부르는 것들은 흉내만 (칸 크기 = 기준칸 20 × 줌)
+  src += `
+    let drawCount = 0;
+    function _initDeco(){ _dC = Math.max(4, Math.round(20 * _dZoom)); _dW = 1000; _dH = 560; _decoClampPan(); }
+    function _drawDeco(){ drawCount++; }
+    function getFarmLayout(){ return { cols: 4, rows: 3 }; }
+    let CUR = { level: 5 };
+    globalThis.__Z = { get zoom(){return _dZoom;}, get panX(){return _dPanX;}, get panY(){return _dPanY;}, get C(){return _dC;},
+      get draws(){return drawCount;}, setDY(v){ DY = v; }, setState(z,x,y){ _dZoom=z; _initDeco(); _dPanX=x; _dPanY=y; _decoClampPan(); },
+      _decoVisible, _decoSetZoom, _decoClampPan, _houseCol0, _isHC, _getFarmZone, DY_BASE, DY_FULL, DY_NORMAL };
+  `;
+  vm.runInContext(src, sb);
+  const Z = sb.__Z;
+
+  Z.setDY({ ...Z.DY_FULL });
+
+  test('마당이 80×44 로 넓어졌다(전체화면 판)', () => eq(Z.DY_FULL, { cols: 80, rows: 44 }));
+
+  // ① 보이는 칸만 도는지
+  Z.setState(1, 0, 0);
+  {
+    const v = Z._decoVisible(44, 80);
+    test('줌 1·왼쪽 위: 보이는 칸 범위가 판 전체보다 좁다(컬링)', () => {
+      if (!(v.c1 - v.c0 < 80)) throw new Error('열 범위가 안 좁혀졌다: ' + JSON.stringify(v));
+      if (!(v.r1 - v.r0 <= 44)) throw new Error('줄 범위 이상: ' + JSON.stringify(v));
+      if (v.r0 !== 0 || v.c0 !== 0) throw new Error('왼쪽 위인데 시작이 0이 아니다');
+    });
+  }
+  // ② 오른쪽 끝으로 밀어도 범위가 판을 안 넘는다
+  Z.setState(1, 99999, 99999);
+  {
+    const v = Z._decoVisible(44, 80);
+    test('끝까지 밀어도 보이는 범위가 판을 넘지 않는다', () => { eq([v.r1, v.c1], [44, 80]); });
+    test('끝까지 밀면 이동값이 판 크기에 맞게 잘린다', () => {
+      const maxX = 80 * Z.C - 1000, maxY = 44 * Z.C - 560;
+      eq([Z.panX, Z.panY], [maxX, maxY]);
+    });
+  }
+  // ③ 판이 창보다 작으면 이동 0
+  Z.setDY({ cols: 20, rows: 10 });
+  Z.setState(1, 500, 500);
+  test('판이 창보다 작으면 화면이 안 움직인다(이동 0)', () => eq([Z.panX, Z.panY], [0, 0]));
+  Z.setDY({ ...Z.DY_FULL });
+
+  // ④ 확대: 손가락 아래 점이 제자리
+  Z.setState(1, 400, 200);
+  {
+    const fx = 300, fy = 150;
+    const beforeBoard = { x: (400 + fx) / 1, y: (200 + fy) / 1 };   // 줌 1 기준 판 좌표
+    Z._decoSetZoom(2, fx, fy);
+    const afterBoard = { x: (Z.panX + fx) / Z.zoom, y: (Z.panY + fy) / Z.zoom };
+    test('두 손가락으로 벌려도 손가락 아래 자리가 그대로다(오차 1 이하)', () => {
+      if (Math.abs(afterBoard.x - beforeBoard.x) > 1 || Math.abs(afterBoard.y - beforeBoard.y) > 1)
+        throw new Error('기준점이 밀렸다: ' + JSON.stringify(afterBoard) + ' vs ' + JSON.stringify(beforeBoard));
+    });
+    test('확대하면 칸이 커진다', () => { if (!(Z.C > 20)) throw new Error('칸 크기 ' + Z.C); });
+  }
+  // ⑤ 상한·하한
+  Z._decoSetZoom(99);
+  test('확대 상한 3 을 넘지 않는다', () => eq(Z.zoom, 3));
+  Z._decoSetZoom(0.01);
+  test('축소 하한 0.5 아래로 안 간다', () => eq(Z.zoom, 0.5));
+
+  // ⑥ 집·농장 자리가 확대·창 크기와 무관하게 고정
+  test('집은 기준 판(50칸) 오른쪽 위에 고정 — 마당을 넓혀도 44열', () => eq(Z._houseCol0(), 44));
+  test('집 영역은 44~49열·0~2줄만(그 오른쪽 새 땅은 쓸 수 있다)', () => {
+    eq([Z._isHC(0, 44), Z._isHC(0, 49), Z._isHC(0, 50), Z._isHC(3, 44)], [true, true, false, false]);
+  });
+  {
+    const a = Z._getFarmZone();
+    Z._decoSetZoom(2);
+    const b = Z._getFarmZone();
+    test('농장 자리가 확대해도 안 움직인다(예전에는 창 크기·확대에 따라 움직였다)', () => eq(a, b));
+    test('농장은 기준 판 오른쪽 아래(45,24 부근)', () => eq([a.startCol, a.startRow], [50 - 4 - 1, 28 - 3 - 1]));
+  }
+} catch (e) {
+  test('확대·이동 계산을 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════
