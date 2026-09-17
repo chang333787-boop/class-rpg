@@ -8195,7 +8195,7 @@ function openWorksheetScan() {
       <span style="color:#fff;font-weight:700;flex:1">📄 학습지 스캔</span>
       <button onclick="closeWorksheetScan()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:.35rem .8rem;font-family:inherit;cursor:pointer">✕ 닫기</button>
     </div>
-    <iframe src="scan/index.html?v=20260915stq" title="학습지 스캔" allow="camera" style="flex:1;border:0;width:100%;background:#f8f6f1"></iframe>`;
+    <iframe src="scan/index.html?v=20260917sta" title="학습지 스캔" allow="camera" style="flex:1;border:0;width:100%;background:#f8f6f1"></iframe>`;
   document.body.appendChild(el);
 }
 function closeWorksheetScan() { const el = document.getElementById('scan-overlay'); if (el) el.remove(); }
