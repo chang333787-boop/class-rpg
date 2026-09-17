@@ -473,9 +473,9 @@ const GAME_DATA = {
     // ── 3차 확장: 걷는 동물 (DECO-ANIM-1) — 낱마리라 마당을 돌아다닐 수 있다
     {id:'d_y53',name:'강아지',        icon:'🐶', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y54',name:'고양이',        icon:'🐱', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
-    {id:'d_y55',name:'닭 한 마리',    icon:'🐔', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
-    {id:'d_y56',name:'오리 한 마리',  icon:'🦆', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
-    {id:'d_y57',name:'양 한 마리',    icon:'🐑', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y55',name:'닭 1마리',    icon:'🐔', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y56',name:'오리 1마리',  icon:'🦆', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y57',name:'양 1마리',    icon:'🐑', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
 
     // ── 4차 확장: 넓어진 마당용 큰 장식 (DECO-LAND-1 뒤) — pen 은 동물이 안에서만 돌아다니는 우리
     {id:'d_y58',name:'닭장',          icon:'🐔', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true, newUntil:'2026-09-27'},
