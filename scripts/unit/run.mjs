@@ -734,6 +734,11 @@ try {
   const made = [];
   const mkEl = (tag) => {
     const el = { tag, className: '', style: {}, children: [], parentNode: null, dataset: {},
+      offsetWidth: 0, textContent: '',
+      classList: { toggle(c, on) { el._cls = el._cls || new Set(); if (on) el._cls.add(c); else el._cls.delete(c); },
+                   add(c) { el._cls = el._cls || new Set(); el._cls.add(c); },
+                   remove(c) { el._cls = el._cls || new Set(); el._cls.delete(c); },
+                   contains(c) { return !!(el._cls && el._cls.has(c)); } },
       appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
       removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
       querySelector(sel) { const want = sel.replace(/^\./, ''); const hit = (n) => n.tag === want || n.className === want;
@@ -745,11 +750,12 @@ try {
   const timers = new Map(); let tid = 1;
   const sb = {
     console: { log() {}, warn() {}, error() {} },
-    Math, JSON, Object, Array, Number, String, Boolean, Set, Map, document: {
+    Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date, document: {
       hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null),
       createElement: mkEl, addEventListener() {},
     },
     window: { matchMedia: () => ({ matches: false }) },
+    Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
     getComputedStyle: () => ({ position: 'static' }),
     setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; },
     clearTimeout: (id) => { timers.delete(id); },
@@ -766,16 +772,18 @@ try {
     ] },
   };
   sb.globalThis = sb; vm.createContext(sb);
-  const names = ['ANIM_DECO', '_animLayers', '_animHooked', '_animReduced', '_animFreeMaker', '_animNextCell',
-    '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animSyncLayer'];
+  const names = ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_groundKind', '_groundAt',
+    '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
+    '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
   let src = '';
   for (const n of names) {
-    if (n === 'ANIM_DECO' || n === '_animLayers' || n === '_animHooked') {
+    if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
       const m = re.exec(S); if (!m) throw new Error(`없음: ${n}`); src += m[0] + '\n';
     } else src += sliceFn(S, n) + '\n';
   }
-  vm.runInContext(src + ';globalThis.__A = { _animSyncLayer, _animNextCell, _animStopLayer, _animLayers };', sb);
+  src += ';globalThis.__A = { _animSyncLayer, _animNextCell, _animStopLayer, _animLayers, _groundKind, _animGroundOk, _animWhyNot, _animAt, _animPoke, _animFreeMaker, Date };';
+  vm.runInContext(src, sb);
   const A = sb.__A;
 
   // ① 순수 함수: 반지름·금지 구역을 벗어나지 않는다
@@ -805,9 +813,11 @@ try {
   ] };
   A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
   const layer = host.children.find(c => c.className === 'deco-anim-layer');
+  const world = layer && layer.children.find(c => c.className === 'deco-anim-world');
   test('마당에 동물 층이 생기고 동물 수만큼 요소가 생긴다(장식·집 안은 제외)', () => {
     if (!layer) throw new Error('층 없음');
-    eq(layer.children.length, 2);
+    if (!world) throw new Error('세계 겹 없음');
+    eq(world.children.length, 2);
   });
   test('동물마다 걸음 타이머가 하나씩 예약된다', () => eq(timers.size, 2));
   test('층은 캔버스 위에 절대 위치 · 손가락을 통과시킨다(CSS 클래스)', () => eq(layer.className, 'deco-anim-layer'));
@@ -834,15 +844,348 @@ try {
 
   // ⑤ 같은 자리 다시 맞추면 같은 요소를 지킨다(처음부터 걷지 않게)
   A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
-  const l2 = host.children.find(c => c.className === 'deco-anim-layer');
+  const l2w = host.children.find(c => c.className === 'deco-anim-layer').children.find(c => c.className === 'deco-anim-world');
   const first = [...A._animLayers.get('if-topview').items.values()][0];
   first.cur = { row: first.home.row + 2, col: first.home.col };
   A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
   const again = [...A._animLayers.get('if-topview').items.values()][0];
   test('다시 그려도 동물이 지금 자리를 지킨다', () => eq(again.cur, { row: first.home.row + 2, col: first.home.col }));
-  test('다시 그려도 요소를 새로 만들지 않는다', () => eq(l2.children.length, 2));
+  test('다시 그려도 요소를 새로 만들지 않는다', () => eq(l2w.children.length, 2));
 } catch (e) {
   test('동물 움직임 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 확대·이동(DECO-ZOOM-1)';
+try {
+  const S = read('student.js');
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  // 상태 선언
+  for (const d of ['let _dCv', 'const DECO_ZOOM_MIN', 'const DY_BASE', 'let _dZoom',
+                   'const DY_NORMAL', 'const DY_FULL', 'const DI_NORMAL', 'const DI_FULL', 'const DH ', 'let DY ', 'let DI ']) {
+    const at = S.indexOf(d);
+    if (at < 0) throw new Error('선언 없음: ' + d);
+    const nl = S.indexOf('\n', at);
+    src += S.slice(at, nl) + '\n';
+  }
+  src += "let DECO_SCENE='yard';\n";
+  for (const n of ['_decoBoardPx', '_decoClampPan', '_decoVisible', '_decoSetZoom', '_houseCol0', '_isHC', '_getFarmZone', '_isFarmCell'])
+    src += sliceFn(S, n) + '\n';
+  // _decoSetZoom 이 부르는 것들은 흉내만 (칸 크기 = 기준칸 20 × 줌)
+  src += `
+    let drawCount = 0;
+    function _initDeco(){ _dC = Math.max(4, Math.round(20 * _dZoom)); _dW = 1000; _dH = 560; _decoClampPan(); }
+    function _drawDeco(){ drawCount++; }
+    function getFarmLayout(){ return { cols: 4, rows: 3 }; }
+    let CUR = { level: 5 };
+    globalThis.__Z = { get zoom(){return _dZoom;}, get panX(){return _dPanX;}, get panY(){return _dPanY;}, get C(){return _dC;},
+      get draws(){return drawCount;}, setDY(v){ DY = v; }, setState(z,x,y){ _dZoom=z; _initDeco(); _dPanX=x; _dPanY=y; _decoClampPan(); },
+      _decoVisible, _decoSetZoom, _decoClampPan, _houseCol0, _isHC, _getFarmZone, DY_BASE, DY_FULL, DY_NORMAL };
+  `;
+  vm.runInContext(src, sb);
+  const Z = sb.__Z;
+
+  Z.setDY({ ...Z.DY_FULL });
+
+  test('마당이 80×44 로 넓어졌다(전체화면 판)', () => eq(Z.DY_FULL, { cols: 80, rows: 44 }));
+
+  // ① 보이는 칸만 도는지
+  Z.setState(1, 0, 0);
+  {
+    const v = Z._decoVisible(44, 80);
+    test('줌 1·왼쪽 위: 보이는 칸 범위가 판 전체보다 좁다(컬링)', () => {
+      if (!(v.c1 - v.c0 < 80)) throw new Error('열 범위가 안 좁혀졌다: ' + JSON.stringify(v));
+      if (!(v.r1 - v.r0 <= 44)) throw new Error('줄 범위 이상: ' + JSON.stringify(v));
+      if (v.r0 !== 0 || v.c0 !== 0) throw new Error('왼쪽 위인데 시작이 0이 아니다');
+    });
+  }
+  // ② 오른쪽 끝으로 밀어도 범위가 판을 안 넘는다
+  Z.setState(1, 99999, 99999);
+  {
+    const v = Z._decoVisible(44, 80);
+    test('끝까지 밀어도 보이는 범위가 판을 넘지 않는다', () => { eq([v.r1, v.c1], [44, 80]); });
+    test('끝까지 밀면 이동값이 판 크기에 맞게 잘린다', () => {
+      const maxX = 80 * Z.C - 1000, maxY = 44 * Z.C - 560;
+      eq([Z.panX, Z.panY], [maxX, maxY]);
+    });
+  }
+  // ③ 판이 창보다 작으면 이동 0
+  Z.setDY({ cols: 20, rows: 10 });
+  Z.setState(1, 500, 500);
+  test('판이 창보다 작으면 화면이 안 움직인다(이동 0)', () => eq([Z.panX, Z.panY], [0, 0]));
+  Z.setDY({ ...Z.DY_FULL });
+
+  // ④ 확대: 손가락 아래 점이 제자리
+  Z.setState(1, 400, 200);
+  {
+    const fx = 300, fy = 150;
+    const beforeBoard = { x: (400 + fx) / 1, y: (200 + fy) / 1 };   // 줌 1 기준 판 좌표
+    Z._decoSetZoom(2, fx, fy);
+    const afterBoard = { x: (Z.panX + fx) / Z.zoom, y: (Z.panY + fy) / Z.zoom };
+    test('두 손가락으로 벌려도 손가락 아래 자리가 그대로다(오차 1 이하)', () => {
+      if (Math.abs(afterBoard.x - beforeBoard.x) > 1 || Math.abs(afterBoard.y - beforeBoard.y) > 1)
+        throw new Error('기준점이 밀렸다: ' + JSON.stringify(afterBoard) + ' vs ' + JSON.stringify(beforeBoard));
+    });
+    test('확대하면 칸이 커진다', () => { if (!(Z.C > 20)) throw new Error('칸 크기 ' + Z.C); });
+  }
+  // ⑤ 상한·하한
+  Z._decoSetZoom(99);
+  test('확대 상한 3 을 넘지 않는다', () => eq(Z.zoom, 3));
+  Z._decoSetZoom(0.01);
+  test('축소 하한 0.5 아래로 안 간다', () => eq(Z.zoom, 0.5));
+
+  // ⑥ 집·농장 자리가 확대·창 크기와 무관하게 고정
+  test('집은 기준 판(50칸) 오른쪽 위에 고정 — 마당을 넓혀도 44열', () => eq(Z._houseCol0(), 44));
+  test('집 영역은 44~49열·0~2줄만(그 오른쪽 새 땅은 쓸 수 있다)', () => {
+    eq([Z._isHC(0, 44), Z._isHC(0, 49), Z._isHC(0, 50), Z._isHC(3, 44)], [true, true, false, false]);
+  });
+  {
+    const a = Z._getFarmZone();
+    Z._decoSetZoom(2);
+    const b = Z._getFarmZone();
+    test('농장 자리가 확대해도 안 움직인다(예전에는 창 크기·확대에 따라 움직였다)', () => eq(a, b));
+    test('농장은 기준 판 오른쪽 아래(45,24 부근)', () => eq([a.startCol, a.startRow], [50 - 4 - 1, 28 - 3 - 1]));
+  }
+} catch (e) {
+  test('확대·이동 계산을 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 동물 규칙·상호작용(DECO-ANIM-2)';
+try {
+  const S = read('student.js');
+  const mkEl = (tag) => {
+    const el = { tag, className: '', style: {}, children: [], parentNode: null, offsetWidth: 0, textContent: '',
+      classList: { toggle(c, on) { el._cls = el._cls || new Set(); if (on) el._cls.add(c); else el._cls.delete(c); },
+                   add(c) { el._cls = el._cls || new Set(); el._cls.add(c); }, remove(c) { el._cls = el._cls || new Set(); el._cls.delete(c); },
+                   contains(c) { return !!(el._cls && el._cls.has(c)); } },
+      appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
+      removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
+      querySelector(sel) { const want = sel.charAt(0) === '.' ? sel.slice(1) : sel;
+        const walk = (n) => { for (const c of n.children) { if (c.tag === want || c.className === want) return c; const r = walk(c); if (r) return r; } return null; };
+        return walk(el); } };
+    return el;
+  };
+  const host = mkEl('div'); host.id = 'if-topview';
+  const timers = new Map(); let tid = 1;
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+    document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
+    window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
+    getComputedStyle: () => ({ position: 'static' }),
+    setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; }, clearTimeout: (id) => timers.delete(id),
+    encodeURIComponent,
+    DY: { rows: 28, cols: 50 }, _isHC: () => false, _isFarmCell: () => false,
+    getDecoSize: () => ({ w: 1, h: 1 }),
+    GAME_DATA: { decorations: [
+      { id: 'd_y56', name: '오리 한 마리' }, { id: 'd_y57', name: '양 한 마리' }, { id: 'd_y53', name: '강아지' },
+    ] } };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked']) {
+    let at = S.indexOf('const ' + n);
+    if (at < 0) at = S.indexOf('let ' + n);
+    if (at < 0) throw new Error('선언 없음: ' + n);
+    let depth = 0, end = -1;
+    const open = '{[(', close = '}])';
+    for (let i = at; i < S.length; i++) {
+      const ch = S.charAt(i);
+      if (open.indexOf(ch) >= 0) depth++;
+      else if (close.indexOf(ch) >= 0) depth--;
+      else if (ch === ';' && depth === 0) { end = i; break; }
+    }
+    src += S.slice(at, end + 1) + '\n';
+  }
+  for (const n of ['_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
+                   '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+    src += sliceFn(S, n) + '\n';
+  src += ';globalThis.__R = { _penAt, _isPenDeco, _groundKind, _animGroundOk, _animWhyNot, _animSyncLayer, _animAt, _animPoke, _animLayers, _animStopLayer };';
+  vm.runInContext(src, sb);
+  const R = sb.__R;
+
+  // ① 바닥 묶음
+  test('바닥 묶음: water=물 · stone/brick/deck=단단한 길 · grass/dirt=풀·흙', () => {
+    eq([R._groundKind('water'), R._groundKind('stone'), R._groundKind('brick'), R._groundKind('deck'),
+        R._groundKind('grass'), R._groundKind('dirt'), R._groundKind('flower')],
+       ['water', 'hard', 'hard', 'hard', 'soft', 'soft', 'soft']);
+  });
+
+  // ② 동물별 놓을 수 있는 곳
+  const stu = { yardFloor: { '5_5': 'water', '5_6': 'water', '7_7': 'stone' }, houseDecorations: [] };
+  test('🦆 오리는 물에 놓을 수 있다', () => eq(R._animGroundOk('d_y56', stu, 5, 5, 1, 1), true));
+  test('🐑 양은 물에 못 놓는다', () => eq(R._animGroundOk('d_y57', stu, 5, 5, 1, 1), false));
+  test('🐑 양은 풀밭에 놓을 수 있다', () => eq(R._animGroundOk('d_y57', stu, 1, 1, 1, 1), true));
+  test('🐶 강아지는 길(단단한 바닥)에 놓을 수 있다', () => eq(R._animGroundOk('d_y53', stu, 7, 7, 1, 1), true));
+  test('🐶 강아지는 물에 못 놓는다', () => eq(R._animGroundOk('d_y53', stu, 5, 5, 1, 1), false));
+  test('🐔 닭은 길에 못 놓는다(풀·흙만)', () => eq(R._animGroundOk('d_y55', stu, 7, 7, 1, 1), false));
+  test('안 되는 이유를 아이 말로 알려 준다', () => {
+    if (R._animWhyNot('d_y57').indexOf('풀밭') < 0) throw new Error(R._animWhyNot('d_y57'));
+    if (R._animWhyNot('d_y53').indexOf('물') < 0) throw new Error(R._animWhyNot('d_y53'));
+  });
+
+  // ③ 물에 놓인 오리는 물 밖으로 안 나가고 줄도 안 바꾼다
+  const water = {};
+  for (let c = 4; c <= 8; c++) water['5_' + c] = 'water';
+  const stu2 = { yardFloor: water, houseDecorations: [{ id: 'd_y56', area: 'yard', row: 5, col: 6 }] };
+  R._animSyncLayer('if-topview', stu2, 'yard', 20, 1000, 560, 0, 0);
+  const duck = [...R._animLayers.get('if-topview').items.values()][0];
+  test('물에 놓인 오리는 헤엄 상태가 된다', () => eq(duck.swim, true));
+  let out = null;
+  for (let i = 0; i < 60 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const g = (stu2.yardFloor[duck.cur.row + '_' + duck.cur.col] || 'grass');
+    if (g !== 'water') { out = JSON.stringify(duck.cur); break; }
+  }
+  test('60걸음 동안 오리가 물 밖으로 안 나간다', () => { if (out) throw new Error('물 밖: ' + out); });
+  test('오리는 줄(row)을 안 바꾼다 — 좌우만 걷는다', () => eq(duck.cur.row, 5));
+
+  // ④ 땅 동물은 물에 안 들어간다
+  R._animStopLayer('if-topview');
+  const stu3 = { yardFloor: water, houseDecorations: [{ id: 'd_y57', area: 'yard', row: 5, col: 2 }] };
+  R._animSyncLayer('if-topview', stu3, 'yard', 20, 1000, 560, 0, 0);
+  const sheep = [...R._animLayers.get('if-topview').items.values()][0];
+  let wet = null;
+  for (let i = 0; i < 60 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    if ((stu3.yardFloor[sheep.cur.row + '_' + sheep.cur.col] || 'grass') === 'water') { wet = JSON.stringify(sheep.cur); break; }
+  }
+  test('양은 60걸음 동안 물에 안 들어간다', () => { if (wet) throw new Error('물에 들어갔다: ' + wet); });
+
+  // ⑤ 누르면 반응 · 강아지는 다가온다
+  R._animStopLayer('if-topview');
+  const stu4 = { yardFloor: {}, houseDecorations: [{ id: 'd_y53', area: 'yard', row: 3, col: 3 }] };
+  R._animSyncLayer('if-topview', stu4, 'yard', 20, 1000, 560, 0, 0);
+  const dog = R._animAt('if-topview', 3, 3);
+  test('누른 칸의 동물을 찾는다', () => { if (!dog) throw new Error('못 찾음'); });
+  test('빈 칸을 누르면 동물이 없다(놓기로 넘어간다)', () => eq(R._animAt('if-topview', 10, 10), null));
+  const before = dog.cur.col;
+  R._animPoke(dog, 8);
+  test('누르면 말풍선이 뜬다', () => {
+    const say = dog.el.children.filter(c => c.className === 'deco-anim-say')[0];
+    if (!say) throw new Error('말풍선 없음');
+    eq(say.textContent, '왈!');
+  });
+  test('🐶 강아지는 누른 쪽으로 한 칸 다가온다', () => eq(dog.cur.col, before + 1));
+} catch (e) {
+  test('동물 규칙 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 동물 우리(DECO-ANIM-3)';
+try {
+  const S = read('student.js');
+  const mkEl = (tag) => {
+    const el = { tag, className: '', style: {}, children: [], parentNode: null, offsetWidth: 0, textContent: '',
+      classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+      appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
+      removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
+      querySelector(sel) { const want = sel.charAt(0) === '.' ? sel.slice(1) : sel;
+        const walk = (n) => { for (const c of n.children) { if (c.tag === want || c.className === want) return c; const r = walk(c); if (r) return r; } return null; };
+        return walk(el); } };
+    return el;
+  };
+  const host = mkEl('div'); host.id = 'if-topview';
+  const timers = new Map(); let tid = 1;
+  // 닭장 3×3(우리) + 벤치 2×1(보통 장식)
+  const DECOS = [
+    { id: 'd_y55', name: '닭 한 마리' },
+    { id: 'pen_hen', name: '닭장', size: { w: 3, h: 3 }, pen: true },
+    { id: 'd_y5', name: '벤치', size: { w: 2, h: 1 } },
+  ];
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+    document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
+    window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
+    getComputedStyle: () => ({ position: 'static' }),
+    setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; }, clearTimeout: (id) => timers.delete(id),
+    encodeURIComponent,
+    DY: { rows: 28, cols: 50 }, _isHC: () => false, _isFarmCell: () => false,
+    getDecoSize: (id) => { const d = DECOS.filter(x => x.id === id)[0]; return (d && d.size) || { w: 1, h: 1 }; },
+    GAME_DATA: { decorations: DECOS } };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked']) {
+    let at = S.indexOf('const ' + n);
+    if (at < 0) at = S.indexOf('let ' + n);
+    let depth = 0, end = -1;
+    const open = '{[(', close = '}])';
+    for (let i = at; i < S.length; i++) {
+      const ch = S.charAt(i);
+      if (open.indexOf(ch) >= 0) depth++;
+      else if (close.indexOf(ch) >= 0) depth--;
+      else if (ch === ';' && depth === 0) { end = i; break; }
+    }
+    src += S.slice(at, end + 1) + '\n';
+  }
+  for (const n of ['_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
+                   '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+    src += sliceFn(S, n) + '\n';
+  src += ';globalThis.__P = { _isPenDeco, _penAt, _animSyncLayer, _animLayers, _animStopLayer, _animFreeMaker };';
+  vm.runInContext(src, sb);
+  const P = sb.__P;
+
+  test('장식 표의 pen:true 를 우리로 알아본다(보통 장식은 아니다)', () => {
+    eq([P._isPenDeco('pen_hen'), P._isPenDeco('d_y5'), P._isPenDeco('없는것')], [true, false, false]);
+  });
+
+  // 닭장 3×3 을 (10,10)~(12,12) 에 놓고 그 안에 닭 한 마리
+  const stu = { yardFloor: {}, houseDecorations: [
+    { id: 'pen_hen', area: 'yard', row: 10, col: 10 },
+    { id: 'd_y55',   area: 'yard', row: 11, col: 11 },
+    { id: 'd_y5',    area: 'yard', row: 11, col: 14 },   // 우리 밖 벤치
+  ] };
+  test('우리 사각형을 찾는다(안은 찾고 밖은 못 찾는다)', () => {
+    eq(P._penAt(stu, 11, 11), { r0: 11, c0: 11, r1: 11, c1: 11, water: false });   // 울타리 줄 뺀 안쪽
+    eq(P._penAt(stu, 9, 10), null);
+  });
+  test('동물은 우리 칸을 지날 수 있고, 보통 장식 칸은 못 지난다', () => {
+    const free = P._animFreeMaker(stu, 28, 50);
+    eq([free(10, 10, 1, 1, 'd_y55', false), free(11, 14, 1, 1, 'd_y55', false)], [true, false]);
+  });
+
+  P._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560, 0, 0);
+  const hen = [...P._animLayers.get('if-topview').items.values()][0];
+  test('우리 안에 놓인 닭은 울타리 줄을 뺀 안쪽만 기억한다', () => eq(hen.pen, { r0: 11, c0: 11, r1: 11, c1: 11, water: false }));
+  let out = null;
+  for (let i = 0; i < 200 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const p = hen.cur;
+    if (p.row !== 11 || p.col !== 11) { out = JSON.stringify(p); break; }
+  }
+  test('200걸음 동안 닭이 울타리 줄을 밟지 않는다(3×3 은 안쪽 1칸)', () => { if (out) throw new Error('울타리 줄: ' + out); });
+
+  // 연못 우리(penWater) 안의 오리는 바닥이 잔디여도 헤엄한다
+  P._animStopLayer('if-topview');
+  DECOS.push({ id: 'pen_pond', name: '연못 우리', size: { w: 4, h: 3 }, pen: true, penWater: true });
+  DECOS.push({ id: 'd_y56', name: '오리 한 마리' });
+  const stuP = { yardFloor: {}, houseDecorations: [
+    { id: 'pen_pond', area: 'yard', row: 5, col: 5 },
+    { id: 'd_y56',    area: 'yard', row: 6, col: 6 },
+  ] };
+  P._animSyncLayer('if-topview', stuP, 'yard', 20, 1000, 560, 0, 0);
+  const duckPen = [...P._animLayers.get('if-topview').items.values()][0];
+  test('연못 우리 안의 오리는 바닥이 잔디여도 헤엄한다', () => eq(duckPen.swim, true));
+  let outP = null;
+  for (let i = 0; i < 120 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const p = duckPen.cur;
+    if (p.row < 6 || p.row > 6 || p.col < 6 || p.col > 7) { outP = JSON.stringify(p); break; }
+  }
+  test('120걸음 동안 오리가 연못 우리 안쪽(울타리 줄 뺀 곳)에만 있는다', () => { if (outP) throw new Error('밖: ' + outP); });
+
+  // 우리 밖 동물은 예전처럼 반지름으로 다닌다
+  P._animStopLayer('if-topview');
+  const stu2 = { yardFloor: {}, houseDecorations: [{ id: 'd_y55', area: 'yard', row: 3, col: 3 }] };
+  P._animSyncLayer('if-topview', stu2, 'yard', 20, 1000, 560, 0, 0);
+  const free2 = [...P._animLayers.get('if-topview').items.values()][0];
+  test('우리 밖 동물은 우리가 없다(반지름 규칙 그대로)', () => eq(free2.pen, null));
+} catch (e) {
+  test('우리 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════
