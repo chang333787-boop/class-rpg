@@ -7020,7 +7020,24 @@ const ANIM_DECO = {
   d_y32: { radius: 3, wait: [4000, 8000] },    // 오리 가족
   d_y39: { radius: 3, wait: [3500, 7000] },    // 닭 3마리
   d_y40: { radius: 2, wait: [6000, 11000] },   // 양
+  d_y53: { radius: 4, wait: [2500, 5500] },    // 강아지 — 제일 활발하게
+  d_y54: { radius: 4, wait: [3000, 7000] },    // 고양이 — 느긋하게 멀리
+  d_y55: { radius: 3, wait: [3500, 7000] },    // 닭 한 마리
+  d_y56: { radius: 3, wait: [4000, 8000] },    // 오리 한 마리
+  d_y57: { radius: 2, wait: [6000, 11000] },   // 양 한 마리
 };
+
+// 걸음 두 번째 장(<id>_b.svg) — 있으면 걷는 동안 그 장을 쓴다. 없으면 한 장으로 그냥 걷는다(404 안전).
+const _animFrameB = {};
+function _animProbeFrameB(id) {
+  if (id in _animFrameB) return _animFrameB[id];
+  _animFrameB[id] = false;
+  const img = new Image();
+  img.onload = () => { _animFrameB[id] = (img.naturalWidth > 0); };
+  img.onerror = () => { _animFrameB[id] = false; };
+  img.src = './assets/deco/' + encodeURIComponent(id) + '_b.svg';
+  return false;
+}
 
 const _animLayers = new Map();   // hostId → { layer, items: Map(key → state) }
 let _animHooked = false;
@@ -7069,7 +7086,8 @@ function _animNextCell(home, cur, radius, isFree, rnd) {
 function _animStopLayer(hostId) {
   const rec = _animLayers.get(hostId);
   if (!rec) return;
-  rec.items.forEach(st => { if (st.timer) clearTimeout(st.timer); st.timer = null; });
+  rec.items.forEach(st => { if (st.timer) clearTimeout(st.timer); st.timer = null;
+    if (st.frameTimer) { clearTimeout(st.frameTimer); st.frameTimer = null; } });
   if (rec.layer && rec.layer.parentNode) rec.layer.parentNode.removeChild(rec.layer);
   _animLayers.delete(hostId);
 }
@@ -7102,6 +7120,13 @@ function _animStep(st) {
       if (img) img.style.transform = 'scaleX(' + face + ')';
     }
     const dur = 900 + Math.random() * 700;
+    // 걸음 그림 두 장이 있으면 걷는 동안만 바꿔 준다
+    const imgEl = st.el.querySelector('img');
+    if (imgEl && _animFrameB[st.id]) {
+      imgEl.src = './assets/deco/' + encodeURIComponent(st.id) + '_b.svg';
+      if (st.frameTimer) clearTimeout(st.frameTimer);
+      st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; }, dur);
+    }
     st.el.style.transitionDuration = dur + 'ms';
     st.cur = next;
     st.el.style.transform = 'translate(' + (next.col * st.C) + 'px,' + (next.row * st.C) + 'px)';
@@ -7156,11 +7181,13 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
       bob.className = 'bob';
       const img = document.createElement('img');
       img.alt = d.name || '';
-      img.src = './assets/deco/' + encodeURIComponent(p.id) + '.svg';
+      const srcA = './assets/deco/' + encodeURIComponent(p.id) + '.svg';
+      img.src = srcA;
       bob.appendChild(img);
       el.appendChild(bob);
       rec.world.appendChild(el);
-      st = { el, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null };
+      _animProbeFrameB(p.id);
+      st = { el, id: p.id, srcA, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null, frameTimer: null };
       rec.items.set(key, st);
     }
     st.cfg = ANIM_DECO[p.id];
@@ -7178,6 +7205,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     if (keep.has(k)) return;
     const st = rec.items.get(k);
     if (st.timer) clearTimeout(st.timer);
+    if (st.frameTimer) clearTimeout(st.frameTimer);
     if (st.el && st.el.parentNode) st.el.parentNode.removeChild(st.el);
     rec.items.delete(k);
   });
