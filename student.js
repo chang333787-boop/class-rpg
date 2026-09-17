@@ -7016,16 +7016,45 @@ function _decoBoardPoint(clientX, clientY) {
 //  · 친구 방 구경(ff-topview)도 같은 층을 쓴다.
 //  한계(1판): 층이 캔버스 위라 키 큰 장식 뒤로 가도 앞에 보인다 → 반지름을 좁게 둔다.
 
+//  ground: 갈 수 있는 바닥 묶음 · water:true = 물에 놓으면 물 안에서만(헤엄)
+//  say: 누르면 뜨는 말 · hop: 줄 바꾸기(위·아래 한 칸 톡) 간격 ms
 const ANIM_DECO = {
-  d_y32: { radius: 3, wait: [4000, 8000] },    // 오리 가족
-  d_y39: { radius: 3, wait: [3500, 7000] },    // 닭 3마리
-  d_y40: { radius: 2, wait: [6000, 11000] },   // 양
-  d_y53: { radius: 4, wait: [2500, 5500] },    // 강아지 — 제일 활발하게
-  d_y54: { radius: 4, wait: [3000, 7000] },    // 고양이 — 느긋하게 멀리
-  d_y55: { radius: 3, wait: [3500, 7000] },    // 닭 한 마리
-  d_y56: { radius: 3, wait: [4000, 8000] },    // 오리 한 마리
-  d_y57: { radius: 2, wait: [6000, 11000] },   // 양 한 마리
+  d_y32: { radius: 3, wait: [4000, 8000],  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
+  d_y39: { radius: 3, wait: [3500, 7000],  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
+  d_y40: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양' },
+  d_y53: { radius: 4, wait: [2500, 5500],  ground: ['soft', 'hard'], come: true,    say: '왈!',     name: '강아지' },
+  d_y54: { radius: 4, wait: [3000, 7000],  ground: ['soft', 'hard'],                say: '야옹',    name: '고양이' },
+  d_y55: { radius: 3, wait: [3500, 7000],  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
+  d_y56: { radius: 3, wait: [4000, 8000],  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
+  d_y57: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양' },
 };
+
+// [DECO-ANIM-2] 바닥 묶음 — 아이가 🖌️ 바닥으로 칠한 타일을 셋으로 본다
+const GROUND_HARD = ['stone', 'brick', 'gravel', 'gravel_yard', 'wood', 'deck', 'stone_floor'];
+function _groundKind(type) {
+  if (type === 'water') return 'water';
+  return GROUND_HARD.indexOf(type) >= 0 ? 'hard' : 'soft';   // 그 외는 풀·흙
+}
+function _groundAt(student, r, c) {
+  return _groundKind(((student && student.yardFloor) || {})[r + '_' + c] || 'grass');
+}
+//  이 동물을 (r,c) 에 놓을 수 있나 — 바닥만 본다(겹침은 canPlaceDeco 가 본다)
+function _animGroundOk(id, student, r, c, w, h) {
+  const cfg = ANIM_DECO[id];
+  if (!cfg) return true;
+  for (let dr = 0; dr < (h || 1); dr++) for (let dc = 0; dc < (w || 1); dc++) {
+    if (cfg.ground.indexOf(_groundAt(student, r + dr, c + dc)) < 0) return false;
+  }
+  return true;
+}
+//  왜 안 되는지 아이 말로
+function _animWhyNot(id) {
+  const cfg = ANIM_DECO[id];
+  if (!cfg) return '여기엔 놓을 수 없어요';
+  if (cfg.water) return '🦆 ' + cfg.name + '는 물이나 풀밭에 놓아 주세요';
+  if (cfg.ground.indexOf('hard') >= 0) return '🐶 ' + cfg.name + '는 물에는 못 들어가요';
+  return '🐑 ' + cfg.name + '은 풀밭이나 흙에 놓아 주세요';
+}
 
 // 걸음 두 번째 장(<id>_b.svg) — 있으면 걷는 동안 그 장을 쓴다. 없으면 한 장으로 그냥 걷는다(404 안전).
 const _animFrameB = {};
@@ -7055,13 +7084,21 @@ function _animFreeMaker(student, rows, cols) {
     const sz = getDecoSize(p.id);
     for (let dr = 0; dr < sz.h; dr++) for (let dc = 0; dc < sz.w; dc++) taken.add((p.row + dr) + '_' + (p.col + dc));
   });
-  return function (r, c, w, h) {
+  //  id 를 주면 그 동물이 갈 수 있는 바닥까지 본다(DECO-ANIM-2).
+  //  swim = 물에 놓인 동물이면 물에서만 다닌다.
+  return function (r, c, w, h, id, swim) {
     if (r < 0 || c < 0 || r + h > rows || c + w > cols) return false;
     for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) {
       const tr = r + dr, tc = c + dc;
       if (_isHC(tr, tc)) return false;
       if (_isFarmCell(tr, tc)) return false;
       if (taken.has(tr + '_' + tc)) return false;
+      if (id) {
+        const g = _groundAt(student, tr, tc);
+        if (swim) { if (g !== 'water') return false; }               // 헤엄 중이면 물만
+        else if (g === 'water') return false;                        // 땅 동물은 물에 안 들어간다
+        else if (ANIM_DECO[id].ground.indexOf(g) < 0) return false;  // 동물마다 다니는 바닥
+      }
     }
     return true;
   };
@@ -7070,9 +7107,12 @@ function _animFreeMaker(student, rows, cols) {
 // 다음 칸 하나 고르기 — 순수 함수(단위 시험용)
 //  home 놓은 자리 · cur 지금 자리 · radius 집에서 몇 칸까지 · isFree(r,c) · rnd() 0~1
 //  이웃 네 칸 중 갈 수 있는 곳을 고른다. 갈 곳이 없으면 지금 자리 그대로.
-function _animNextCell(home, cur, radius, isFree, rnd) {
+//  [DECO-ANIM-2] 걷기는 좌우만(그림이 옆모습이라 그게 정직하다).
+//  vertical=true 로 부르면 줄 바꾸기(위·아래 한 칸) 후보만 본다 — 드물게 '톡' 뛰는 용도.
+function _animNextCell(home, cur, radius, isFree, rnd, vertical) {
   const cand = [];
-  for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+  const dirs = vertical ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1]];
+  for (const [dr, dc] of dirs) {
     const r = cur.row + dr, c = cur.col + dc;
     if (Math.abs(r - home.row) > radius || Math.abs(c - home.col) > radius) continue;
     if (!isFree(r, c)) continue;
@@ -7112,17 +7152,23 @@ function _animSchedule(st) {
 function _animStep(st) {
   st.timer = null;
   if (!st.el || !st.el.parentNode) return;
-  const next = _animNextCell(st.home, st.cur, st.cfg.radius, (r, c) => st.isFree(r, c, st.w, st.h), Math.random);
+  // [DECO-ANIM-2] 좌우로 걷고, 20~35초에 한 번만 줄을 바꾼다(위·아래 한 칸 '톡')
+  const now = Date.now();
+  const wantHop = !st.swim && now - (st.lastHop || 0) > (20000 + Math.random() * 15000);
+  const free = (r, c) => st.isFree(r, c, st.w, st.h, st.id, st.swim);
+  let next = _animNextCell(st.home, st.cur, st.cfg.radius, free, Math.random, wantHop);
+  let hopped = wantHop && (next.row !== st.cur.row);
+  if (wantHop && !hopped) next = _animNextCell(st.home, st.cur, st.cfg.radius, free, Math.random, false);
+  if (hopped) st.lastHop = now;
+
   if (next.row !== st.cur.row || next.col !== st.cur.col) {
-    if (next.col !== st.cur.col) {
-      const face = next.col > st.cur.col ? 1 : -1;
-      const img = st.el.querySelector('img');
-      if (img) img.style.transform = 'scaleX(' + face + ')';
-    }
-    const dur = 900 + Math.random() * 700;
-    // 걸음 그림 두 장이 있으면 걷는 동안만 바꿔 준다
     const imgEl = st.el.querySelector('img');
-    if (imgEl && _animFrameB[st.id]) {
+    if (next.col !== st.cur.col && imgEl) {
+      imgEl.style.transform = 'scaleX(' + (next.col > st.cur.col ? 1 : -1) + ')';
+    }
+    const dur = hopped ? 300 : (900 + Math.random() * 700);
+    // 걸음 그림 두 장이 있으면 걷는 동안만 바꿔 준다(헤엄은 발이 안 보이니 안 바꾼다)
+    if (imgEl && _animFrameB[st.id] && !st.swim && !hopped) {
       imgEl.src = './assets/deco/' + encodeURIComponent(st.id) + '_b.svg';
       if (st.frameTimer) clearTimeout(st.frameTimer);
       st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; }, dur);
@@ -7133,6 +7179,43 @@ function _animStep(st) {
     st.el.style.zIndex = String(next.row);
   }
   _animSchedule(st);
+}
+
+// [DECO-ANIM-2] 동물을 누르면 — 말풍선 + 폴짝. 강아지는 누른 쪽으로 한 칸 다가온다.
+//  손가락이 어느 동물을 눌렀는지는 '판의 칸'으로 찾는다(층은 손가락을 통과시킨다).
+function _animAt(hostId, r, c) {
+  const rec = _animLayers.get(hostId);
+  if (!rec) return null;
+  for (const st of rec.items.values()) {
+    if (r >= st.cur.row && r < st.cur.row + st.h && c >= st.cur.col && c < st.cur.col + st.w) return st;
+  }
+  return null;
+}
+
+function _animPoke(st, fromCol) {
+  if (!st || !st.el) return false;
+  // 말풍선
+  const say = document.createElement('div');
+  say.className = 'deco-anim-say';
+  say.textContent = st.cfg.say || '…';
+  st.el.appendChild(say);
+  setTimeout(() => { if (say.parentNode) say.parentNode.removeChild(say); }, 1200);
+  // 폴짝
+  const bob = st.el.querySelector('.bob');
+  if (bob) { bob.classList.remove('hop'); void bob.offsetWidth; bob.classList.add('hop'); }
+  // 강아지는 부르면 온다 — 누른 쪽으로 한 칸
+  if (st.cfg.come && fromCol !== undefined) {
+    const dir = fromCol > st.cur.col ? 1 : (fromCol < st.cur.col ? -1 : 0);
+    const to = { row: st.cur.row, col: st.cur.col + dir };
+    if (dir && st.isFree(to.row, to.col, st.w, st.h, st.id, st.swim)) {
+      const imgEl = st.el.querySelector('img');
+      if (imgEl) imgEl.style.transform = 'scaleX(' + dir + ')';
+      st.cur = to;
+      st.el.style.transitionDuration = '500ms';
+      st.el.style.transform = 'translate(' + (to.col * st.C) + 'px,' + (to.row * st.C) + 'px)';
+    }
+  }
+  return true;
 }
 
 //  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.
@@ -7193,6 +7276,9 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     st.cfg = ANIM_DECO[p.id];
     st.w = sz.w; st.h = sz.h; st.C = C;
     st.isFree = isFree;
+    // [DECO-ANIM-2] 물에 놓인 오리는 물에서만 다닌다(놓인 자리 바닥으로 판정)
+    st.swim = !!(st.cfg.water && _groundAt(student, p.row, p.col) === 'water');
+    st.el.classList.toggle('swim', st.swim);
     st.el.style.width = (sz.w * C) + 'px';
     st.el.style.height = (sz.h * C) + 'px';
     st.el.style.transitionDuration = '0ms';
@@ -7556,7 +7642,8 @@ function _drawYard() {
       const _pv = _decoVisible(DY.rows, DY.cols);
       for(let r=_pv.r0;r<_pv.r1;r++) for(let c=_pv.c0;c<_pv.c1;c++){
         if(_isHC(r,c)) continue;
-        if(canPlaceDeco(r,c,ssz.w,ssz.h,'yard',null)){
+        if(canPlaceDeco(r,c,ssz.w,ssz.h,'yard',null)
+           && (!ANIM_DECO[SEL_DECO] || _animGroundOk(SEL_DECO, CUR, r, c, ssz.w, ssz.h))){
           // 배치 가능한 footprint 영역 강조
           _dCtx.fillStyle='rgba(255,255,255,.1)';
           _dCtx.fillRect(c*C+1,r*C+1,ssz.w*C-2,ssz.h*C-2);
@@ -7804,6 +7891,11 @@ function _decoClick(e) {
     // 농장 존 클릭 차단 (수확은 농장 탭에서만)
     if(_isFarmCell(r,c)){ toast('🌾 수확은 농장 탭에서 해주세요!'); return; }
     if(DECO_MODE==='floor') { _paintFloor(r,c); return; }
+    // [DECO-ANIM-2] 카드를 안 고른 상태에서 동물을 누르면 반응(놓기가 먼저다)
+    if(!SEL_DECO){
+      const pet=_animAt(_ifActiveContainer||'house-topview', r, c);
+      if(pet && _animPoke(pet, c)) return;
+    }
     _decoPlace('yard',r,c);
   } else {
     const {_offX:ox,_offY:oy}=_dCv;
@@ -7849,6 +7941,10 @@ function _decoPlace(area,row,col){
   const inv=(CUR.inventory||[]).find(i=>i.id===SEL_DECO);
   if(!inv||inv.qty-used<=0){ toast('가진 개수가 모자라요!'); return; }
   if(!canPlaceDeco(row,col,sz.w,sz.h,area,null)){ toast('여기엔 배치할 수 없어요!'); return; }
+  // [DECO-ANIM-2] 동물은 바닥을 가린다 — 왜 안 되는지 아이 말로 알려 준다
+  if(area==='yard' && ANIM_DECO[SEL_DECO] && !_animGroundOk(SEL_DECO, CUR, row, col, sz.w, sz.h)){
+    toast(_animWhyNot(SEL_DECO)); return;
+  }
   CUR.houseDecorations=[...placed,{id:SEL_DECO,area,row,col}];
   DB.saveStudent(CUR); _drawDeco(); renderDecoInv();
   toast(`✅ ${d.icon} ${d.name} 배치!`);

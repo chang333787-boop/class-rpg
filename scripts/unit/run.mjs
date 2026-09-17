@@ -734,6 +734,11 @@ try {
   const made = [];
   const mkEl = (tag) => {
     const el = { tag, className: '', style: {}, children: [], parentNode: null, dataset: {},
+      offsetWidth: 0, textContent: '',
+      classList: { toggle(c, on) { el._cls = el._cls || new Set(); if (on) el._cls.add(c); else el._cls.delete(c); },
+                   add(c) { el._cls = el._cls || new Set(); el._cls.add(c); },
+                   remove(c) { el._cls = el._cls || new Set(); el._cls.delete(c); },
+                   contains(c) { return !!(el._cls && el._cls.has(c)); } },
       appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
       removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
       querySelector(sel) { const want = sel.replace(/^\./, ''); const hit = (n) => n.tag === want || n.className === want;
@@ -745,7 +750,7 @@ try {
   const timers = new Map(); let tid = 1;
   const sb = {
     console: { log() {}, warn() {}, error() {} },
-    Math, JSON, Object, Array, Number, String, Boolean, Set, Map, document: {
+    Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date, document: {
       hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null),
       createElement: mkEl, addEventListener() {},
     },
@@ -767,16 +772,18 @@ try {
     ] },
   };
   sb.globalThis = sb; vm.createContext(sb);
-  const names = ['ANIM_DECO', '_animFrameB', '_animLayers', '_animHooked', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
-    '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animSyncLayer'];
+  const names = ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked', '_groundKind', '_groundAt',
+    '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
+    '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
   let src = '';
   for (const n of names) {
-    if (n === 'ANIM_DECO' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
+    if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
       const m = re.exec(S); if (!m) throw new Error(`없음: ${n}`); src += m[0] + '\n';
     } else src += sliceFn(S, n) + '\n';
   }
-  vm.runInContext(src + ';globalThis.__A = { _animSyncLayer, _animNextCell, _animStopLayer, _animLayers };', sb);
+  src += ';globalThis.__A = { _animSyncLayer, _animNextCell, _animStopLayer, _animLayers, _groundKind, _animGroundOk, _animWhyNot, _animAt, _animPoke, _animFreeMaker, Date };';
+  vm.runInContext(src, sb);
   const A = sb.__A;
 
   // ① 순수 함수: 반지름·금지 구역을 벗어나지 않는다
@@ -944,6 +951,127 @@ try {
   }
 } catch (e) {
   test('확대·이동 계산을 돌릴 수 있다', () => { throw e; });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 동물 규칙·상호작용(DECO-ANIM-2)';
+try {
+  const S = read('student.js');
+  const mkEl = (tag) => {
+    const el = { tag, className: '', style: {}, children: [], parentNode: null, offsetWidth: 0, textContent: '',
+      classList: { toggle(c, on) { el._cls = el._cls || new Set(); if (on) el._cls.add(c); else el._cls.delete(c); },
+                   add(c) { el._cls = el._cls || new Set(); el._cls.add(c); }, remove(c) { el._cls = el._cls || new Set(); el._cls.delete(c); },
+                   contains(c) { return !!(el._cls && el._cls.has(c)); } },
+      appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
+      removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
+      querySelector(sel) { const want = sel.charAt(0) === '.' ? sel.slice(1) : sel;
+        const walk = (n) => { for (const c of n.children) { if (c.tag === want || c.className === want) return c; const r = walk(c); if (r) return r; } return null; };
+        return walk(el); } };
+    return el;
+  };
+  const host = mkEl('div'); host.id = 'if-topview';
+  const timers = new Map(); let tid = 1;
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+    document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
+    window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
+    getComputedStyle: () => ({ position: 'static' }),
+    setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; }, clearTimeout: (id) => timers.delete(id),
+    encodeURIComponent,
+    DY: { rows: 28, cols: 50 }, _isHC: () => false, _isFarmCell: () => false,
+    getDecoSize: () => ({ w: 1, h: 1 }),
+    GAME_DATA: { decorations: [
+      { id: 'd_y56', name: '오리 한 마리' }, { id: 'd_y57', name: '양 한 마리' }, { id: 'd_y53', name: '강아지' },
+    ] } };
+  sb.globalThis = sb; vm.createContext(sb);
+  let src = '';
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', '_animFrameB', '_animLayers', '_animHooked']) {
+    let at = S.indexOf('const ' + n);
+    if (at < 0) at = S.indexOf('let ' + n);
+    if (at < 0) throw new Error('선언 없음: ' + n);
+    let depth = 0, end = -1;
+    const open = '{[(', close = '}])';
+    for (let i = at; i < S.length; i++) {
+      const ch = S.charAt(i);
+      if (open.indexOf(ch) >= 0) depth++;
+      else if (close.indexOf(ch) >= 0) depth--;
+      else if (ch === ';' && depth === 0) { end = i; break; }
+    }
+    src += S.slice(at, end + 1) + '\n';
+  }
+  for (const n of ['_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
+                   '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+    src += sliceFn(S, n) + '\n';
+  src += ';globalThis.__R = { _groundKind, _animGroundOk, _animWhyNot, _animSyncLayer, _animAt, _animPoke, _animLayers, _animStopLayer };';
+  vm.runInContext(src, sb);
+  const R = sb.__R;
+
+  // ① 바닥 묶음
+  test('바닥 묶음: water=물 · stone/brick/deck=단단한 길 · grass/dirt=풀·흙', () => {
+    eq([R._groundKind('water'), R._groundKind('stone'), R._groundKind('brick'), R._groundKind('deck'),
+        R._groundKind('grass'), R._groundKind('dirt'), R._groundKind('flower')],
+       ['water', 'hard', 'hard', 'hard', 'soft', 'soft', 'soft']);
+  });
+
+  // ② 동물별 놓을 수 있는 곳
+  const stu = { yardFloor: { '5_5': 'water', '5_6': 'water', '7_7': 'stone' }, houseDecorations: [] };
+  test('🦆 오리는 물에 놓을 수 있다', () => eq(R._animGroundOk('d_y56', stu, 5, 5, 1, 1), true));
+  test('🐑 양은 물에 못 놓는다', () => eq(R._animGroundOk('d_y57', stu, 5, 5, 1, 1), false));
+  test('🐑 양은 풀밭에 놓을 수 있다', () => eq(R._animGroundOk('d_y57', stu, 1, 1, 1, 1), true));
+  test('🐶 강아지는 길(단단한 바닥)에 놓을 수 있다', () => eq(R._animGroundOk('d_y53', stu, 7, 7, 1, 1), true));
+  test('🐶 강아지는 물에 못 놓는다', () => eq(R._animGroundOk('d_y53', stu, 5, 5, 1, 1), false));
+  test('🐔 닭은 길에 못 놓는다(풀·흙만)', () => eq(R._animGroundOk('d_y55', stu, 7, 7, 1, 1), false));
+  test('안 되는 이유를 아이 말로 알려 준다', () => {
+    if (R._animWhyNot('d_y57').indexOf('풀밭') < 0) throw new Error(R._animWhyNot('d_y57'));
+    if (R._animWhyNot('d_y53').indexOf('물') < 0) throw new Error(R._animWhyNot('d_y53'));
+  });
+
+  // ③ 물에 놓인 오리는 물 밖으로 안 나가고 줄도 안 바꾼다
+  const water = {};
+  for (let c = 4; c <= 8; c++) water['5_' + c] = 'water';
+  const stu2 = { yardFloor: water, houseDecorations: [{ id: 'd_y56', area: 'yard', row: 5, col: 6 }] };
+  R._animSyncLayer('if-topview', stu2, 'yard', 20, 1000, 560, 0, 0);
+  const duck = [...R._animLayers.get('if-topview').items.values()][0];
+  test('물에 놓인 오리는 헤엄 상태가 된다', () => eq(duck.swim, true));
+  let out = null;
+  for (let i = 0; i < 60 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const g = (stu2.yardFloor[duck.cur.row + '_' + duck.cur.col] || 'grass');
+    if (g !== 'water') { out = JSON.stringify(duck.cur); break; }
+  }
+  test('60걸음 동안 오리가 물 밖으로 안 나간다', () => { if (out) throw new Error('물 밖: ' + out); });
+  test('오리는 줄(row)을 안 바꾼다 — 좌우만 걷는다', () => eq(duck.cur.row, 5));
+
+  // ④ 땅 동물은 물에 안 들어간다
+  R._animStopLayer('if-topview');
+  const stu3 = { yardFloor: water, houseDecorations: [{ id: 'd_y57', area: 'yard', row: 5, col: 2 }] };
+  R._animSyncLayer('if-topview', stu3, 'yard', 20, 1000, 560, 0, 0);
+  const sheep = [...R._animLayers.get('if-topview').items.values()][0];
+  let wet = null;
+  for (let i = 0; i < 60 && timers.size; i++) {
+    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    if ((stu3.yardFloor[sheep.cur.row + '_' + sheep.cur.col] || 'grass') === 'water') { wet = JSON.stringify(sheep.cur); break; }
+  }
+  test('양은 60걸음 동안 물에 안 들어간다', () => { if (wet) throw new Error('물에 들어갔다: ' + wet); });
+
+  // ⑤ 누르면 반응 · 강아지는 다가온다
+  R._animStopLayer('if-topview');
+  const stu4 = { yardFloor: {}, houseDecorations: [{ id: 'd_y53', area: 'yard', row: 3, col: 3 }] };
+  R._animSyncLayer('if-topview', stu4, 'yard', 20, 1000, 560, 0, 0);
+  const dog = R._animAt('if-topview', 3, 3);
+  test('누른 칸의 동물을 찾는다', () => { if (!dog) throw new Error('못 찾음'); });
+  test('빈 칸을 누르면 동물이 없다(놓기로 넘어간다)', () => eq(R._animAt('if-topview', 10, 10), null));
+  const before = dog.cur.col;
+  R._animPoke(dog, 8);
+  test('누르면 말풍선이 뜬다', () => {
+    const say = dog.el.children.filter(c => c.className === 'deco-anim-say')[0];
+    if (!say) throw new Error('말풍선 없음');
+    eq(say.textContent, '왈!');
+  });
+  test('🐶 강아지는 누른 쪽으로 한 칸 다가온다', () => eq(dog.cur.col, before + 1));
+} catch (e) {
+  test('동물 규칙 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════

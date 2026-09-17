@@ -1362,3 +1362,16 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
   .deco-anim{transition:none}
   .deco-anim .bob{animation-duration:3.2s}
 }
+
+/* [DECO-ANIM-2] 누르면 말풍선 + 폴짝 · 물에 놓인 오리는 몸이 조금 잠긴다 */
+.deco-anim-say{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);
+  background:rgba(20,24,32,.92);color:#fff;border:1px solid rgba(255,255,255,.25);
+  border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;
+  pointer-events:none;animation:decoSay 1.2s ease-out forwards}
+@keyframes decoSay{0%{opacity:0;transform:translateX(-50%) translateY(6px)}
+  15%{opacity:1;transform:translateX(-50%) translateY(0)}
+  80%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-6px)}}
+.deco-anim .bob.hop{animation:decoHop .45s ease-out}
+@keyframes decoHop{0%,100%{transform:translateY(0)}35%{transform:translateY(-9px)}}
+.deco-anim.swim .bob{bottom:-4px;animation-duration:2.4s}
+@media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
