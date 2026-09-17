@@ -7037,8 +7037,17 @@ const ANIM_DECO = {
 //  장식 표에 autoFence:true 인 장식(🚧 울타리) 하나만 상점에 두고,
 //  놓으면 이웃 울타리를 보고 네 그림 중 맞는 것으로 그린다(바닥 타일이 이미 그렇게 이어진다).
 //  옛 4종(d_y49~52)은 표에 그대로 남는다 — 이미 산 아이가 인벤토리에서 놓을 수 있다.
-const FENCE_IDS = ['d_y49', 'd_y50', 'd_y51', 'd_y52'];
-const FENCE_ART = { h: 'd_y49', v: 'd_y50', cornerL: 'd_y51', cornerR: 'd_y52' };
+//  그림 id — 방향은 **그림에서 난간이 실제로 뻗는 쪽**으로 잰 값이다(디자인 2 실측).
+//   d_y49 ─(왼+오른) · d_y50 │(위+아래) · d_y51 └(위+오른) · d_y52 ┘(위+왼)
+//   d_y71 ┌(아래+오른) · d_y72 ┐(아래+왼) — 아래로 꺾이는 두 장은 그림이 생기면 쓰고,
+//   없으면 세로(│)로 대신한다(줄은 이어져 보이고 모퉁이만 각이 안 진다).
+const FENCE_IDS = ['d_y49', 'd_y50', 'd_y51', 'd_y52', 'd_y70', 'd_y71', 'd_y72'];
+const FENCE_ART = { h: 'd_y49', v: 'd_y50', ur: 'd_y51', ul: 'd_y52', dr: 'd_y71', dl: 'd_y72' };
+
+//  그 그림이 장식 표에 있나 — 없으면 대신 쓸 것을 준다
+function _fenceArtOr(id, fallback) {
+  return GAME_DATA.decorations.some(x => x.id === id) ? id : fallback;
+}
 
 function _isFenceCell(student, r, c) {
   const list = (student && student.houseDecorations) || [];
@@ -7052,12 +7061,18 @@ function _isFenceCell(student, r, c) {
 }
 
 //  이웃을 보고 어느 그림으로 그릴지 — 순수 함수(단위 시험용)
-//   좌우만 있으면 가로 · 위아래만 있으면 세로 · 둘 다면 코너(가로 이웃이 왼쪽이면 왼쪽 코너)
-//   아무 이웃도 없으면 가로(혼자 있는 울타리는 가로가 자연스럽다)
+//   ① 좌우로 지나가면 가로 ─ (세 갈래·네 갈래도 가로로 읽는 게 낫다)
+//   ② 위아래로 지나가면 세로 │
+//   ③ 한 번 꺾이면 그 모퉁이 그림 └ ┘ ┌ ┐
+//   ④ 이웃이 하나면 그 방향(좌·우 → 가로 · 위·아래 → 세로) · 없으면 가로
 function _fencePick(hasL, hasR, hasU, hasD) {
-  const horiz = hasL || hasR, vert = hasU || hasD;
-  if (horiz && vert) return hasL ? FENCE_ART.cornerL : FENCE_ART.cornerR;
-  if (vert) return FENCE_ART.v;
+  if (hasL && hasR) return FENCE_ART.h;
+  if (hasU && hasD) return FENCE_ART.v;
+  if (hasU && hasR) return FENCE_ART.ur;
+  if (hasU && hasL) return FENCE_ART.ul;
+  if (hasD && hasR) return _fenceArtOr(FENCE_ART.dr, FENCE_ART.v);
+  if (hasD && hasL) return _fenceArtOr(FENCE_ART.dl, FENCE_ART.v);
+  if (hasU || hasD) return FENCE_ART.v;
   return FENCE_ART.h;
 }
 
