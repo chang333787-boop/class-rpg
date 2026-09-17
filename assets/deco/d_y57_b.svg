@@ -2,7 +2,7 @@
 <!-- d_y57 양 1마리 1×1 · 걸음 B · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
 <path d="M20,182 L62,174 L92,186 L48,192 Z" fill="#000" opacity=".16"/><ellipse cx="50" cy="184" rx="32" ry="7" fill="#000" opacity=".26"/>
-<g transform="translate(50,186) scale(0.96) translate(-50,-186)"><path class="i" d="M25.0,163 h8 l3.8,18 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="33" cy="185" rx="6.0" ry="3" fill="#3d3833"/><path class="i" d="M55.0,163 h8 l-2.2,18 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="57" cy="185" rx="6.0" ry="3" fill="#3d3833"/>
+<g transform="translate(50,186) scale(1.02) translate(-50,-186)"><path class="i" d="M25.0,163 h8 l3.8,18 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="33" cy="185" rx="6.0" ry="3" fill="#3d3833"/><path class="i" d="M55.0,163 h8 l-2.2,18 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="57" cy="185" rx="6.0" ry="3" fill="#3d3833"/>
 <g class="o" fill="#f2eee6"><circle cx="30" cy="149" r="15"/><circle cx="48" cy="142" r="17"/><circle cx="66" cy="148" r="15"/><circle cx="38" cy="161" r="14"/><circle cx="58" cy="161" r="14"/></g>
 <g fill="#f2eee6"><circle cx="30" cy="149" r="13"/><circle cx="48" cy="142" r="15"/><circle cx="66" cy="148" r="13"/><circle cx="38" cy="161" r="12"/><circle cx="58" cy="161" r="12"/></g>
 <g fill="#dcd6ca"><circle cx="38" cy="161" r="6.3"/><circle cx="58" cy="161" r="6.3"/></g>
