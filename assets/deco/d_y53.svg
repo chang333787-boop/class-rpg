@@ -4,7 +4,6 @@
 <path d="M20,182 L62,174 L92,186 L48,192 Z" fill="#000" opacity=".16"/><ellipse cx="50" cy="184" rx="32" ry="7" fill="#000" opacity=".26"/>
 <path d="M28,153 q-17,-5 -15,-20 q2,-11 11,-8 q7,3 4,10" fill="none" stroke="#2b2118" stroke-width="11" stroke-linecap="round"/>
 <path d="M28,153 q-17,-5 -15,-20 q2,-11 11,-8 q7,3 4,10" fill="none" stroke="#e8a04a" stroke-width="7.5" stroke-linecap="round"/>
-<path d="M24,150 q-12,-6 -11,-17" fill="none" stroke="#c9702e" stroke-width="2" stroke-linecap="round" opacity=".6"/>
 <path class="i" d="M22.5,163 h9 l-2.1,18 q0,4 -4,4 h-8 q-4,0 -4,-4z" fill="#c9702e"/><ellipse class="i" cx="25" cy="185" rx="6.8" ry="3" fill="#a5561e"/><path class="i" d="M54.5,163 h9 l3.9,18 q0,4 -4,4 h-8 q-4,0 -4,-4z" fill="#c9702e"/><ellipse class="i" cx="63" cy="185" rx="6.8" ry="3" fill="#a5561e"/>
 <path class="o" d="M24,158 q-4,-20 12,-24 q16,-5 34,1 q10,3 10,14 q0,13 -12,15 q-22,3 -36,1 q-7,-1 -8,-7z" fill="#e8a04a"/>
 <path d="M32,138 q18,-5 34,1 q8,3 8,10 q-20,-7 -42,-3z" fill="#c9702e" opacity=".55"/>

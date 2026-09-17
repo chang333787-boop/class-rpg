@@ -6,7 +6,7 @@
 <path d="M28,156 q-16,-1 -17,-16 q-1,-13 8,-13 q6,1 4,7" fill="none" stroke="#5c5650" stroke-width="6.5" stroke-linecap="round"/>
 <path d="M19,127 q5,0 4,6" fill="none" stroke="#f4efe4" stroke-width="4.5" stroke-linecap="round"/>
 <path d="M24,152 q-11,-3 -12,-13" fill="none" stroke="#3d3833" stroke-width="2" stroke-linecap="round" opacity=".7"/>
-<path class="i" d="M25.0,164 h8 l-2.2,17 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="27" cy="185" rx="6.0" ry="3" fill="#5c5650"/><path class="i" d="M57.0,164 h8 l3.8,17 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="65" cy="185" rx="6.0" ry="3" fill="#5c5650"/>
+<path class="i" d="M25.0,164 h8 l-2.2,17 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="27" cy="185" rx="6.0" ry="3" fill="#dcd6ca"/><path class="i" d="M57.0,164 h8 l3.8,17 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="65" cy="185" rx="6.0" ry="3" fill="#dcd6ca"/>
 <path class="o" d="M26,157 q-3,-19 12,-23 q17,-5 34,1 q9,3 9,13 q0,12 -11,14 q-22,3 -36,1 q-7,-1 -8,-6z" fill="#5c5650"/>
 <path d="M34,137 q17,-5 34,1 q8,3 8,10 q-20,-7 -42,-3z" fill="#3d3833" opacity=".55"/>
 <path d="M32,158 q18,5 40,0 q-2,7 -12,8 q-20,2 -28,-8z" fill="#f4efe4"/>
