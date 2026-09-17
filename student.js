@@ -2225,6 +2225,10 @@ function renderShop() {
     return; // 아래 items.join() 건너뜀
   } else {
     const decoFree = !!(GAME_DATA.decoFreeNow && GAME_DATA.decoFreeNow());   // [DECO-FREE-1]
+    // [DECO-NEW-1] 새로 들어온 장식에 🆕 — 장식 표의 newUntil(YYYY-MM-DD) 까지만 붙는다.
+    //  아이가 새 것을 못 찾고 지나치는 것을 막는다(장식이 84종이라 눈에 안 띈다).
+    const _today = (() => { const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
     items = GAME_DATA.decorations.filter(d => d.price > 0).map(d => {
       const lv = CUR.level || 1;
       const locked = lv < (d.reqLv||1);
@@ -2235,7 +2239,7 @@ function renderShop() {
       const lockMsg = locked ? `toast('Lv${d.reqLv} 이상이 되어야 구매할 수 있어요!')` : `buyDeco('${d.id}')`;
       return `<div class="item-card" onclick="${lockMsg}" style="opacity:${locked?.55:1}">
         <div class="ic-icon">${d.icon}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
-        <div class="ic-name">${rl} ${d.name}</div>
+        <div class="ic-name">${(d.newUntil && _today <= d.newUntil) ? '<span style="color:#7ec850;font-weight:800">🆕</span> ' : ''}${rl} ${d.name}</div>
         <div class="ic-stats">${catBadge}${locked?` <span style="color:var(--txt3);font-size:.6rem">Lv${d.reqLv}+</span>`:''}</div>
         <div class="ic-price">${decoFree ? `<span style="color:#7ec850;font-weight:800">🎁 무료</span> <span style="text-decoration:line-through;color:var(--txt3);font-size:.6rem">${d.price}G</span>` : `💰 ${d.price}G`}</div>
       </div>`;
