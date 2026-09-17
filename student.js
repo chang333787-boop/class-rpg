@@ -7043,7 +7043,8 @@ function _penAt(student, r, c) {
     if (p.area !== 'yard' || !_isPenDeco(p.id)) continue;
     const sz = getDecoSize(p.id);
     if (r >= p.row && r < p.row + sz.h && c >= p.col && c < p.col + sz.w) {
-      return { r0: p.row, c0: p.col, r1: p.row + sz.h - 1, c1: p.col + sz.w - 1 };
+      const d = GAME_DATA.decorations.find(x => x.id === p.id);
+      return { r0: p.row, c0: p.col, r1: p.row + sz.h - 1, c1: p.col + sz.w - 1, water: !!(d && d.penWater) };
     }
   }
   return null;
@@ -7107,7 +7108,7 @@ function _animFreeMaker(student, rows, cols) {
   });
   //  id 를 주면 그 동물이 갈 수 있는 바닥까지 본다(DECO-ANIM-2).
   //  swim = 물에 놓인 동물이면 물에서만 다닌다.
-  return function (r, c, w, h, id, swim) {
+  return function (r, c, w, h, id, swim, penWater) {
     if (r < 0 || c < 0 || r + h > rows || c + w > cols) return false;
     for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) {
       const tr = r + dr, tc = c + dc;
@@ -7116,7 +7117,8 @@ function _animFreeMaker(student, rows, cols) {
       if (taken.has(tr + '_' + tc)) return false;
       if (id) {
         const g = _groundAt(student, tr, tc);
-        if (swim) { if (g !== 'water') return false; }               // 헤엄 중이면 물만
+        if (penWater) { /* 물 있는 우리 안은 그 자체가 물이다 */ }
+        else if (swim) { if (g !== 'water') return false; }          // 헤엄 중이면 물만
         else if (g === 'water') return false;                        // 땅 동물은 물에 안 들어간다
         else if (ANIM_DECO[id].ground.indexOf(g) < 0) return false;  // 동물마다 다니는 바닥
       }
@@ -7178,7 +7180,7 @@ function _animStep(st) {
   const wantHop = !st.swim && now - (st.lastHop || 0) > (20000 + Math.random() * 15000);
   const free = (r, c) => {
     if (st.pen && (r < st.pen.r0 || r > st.pen.r1 - (st.h - 1) || c < st.pen.c0 || c > st.pen.c1 - (st.w - 1))) return false;
-    return st.isFree(r, c, st.w, st.h, st.id, st.swim);
+    return st.isFree(r, c, st.w, st.h, st.id, st.swim, !!(st.pen && st.pen.water));
   };
   const radius = st.pen ? 99 : st.cfg.radius;   // 우리 안에서는 우리 벽이 한계다
   let next = _animNextCell(st.home, st.cur, radius, free, Math.random, wantHop);
@@ -7303,9 +7305,10 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     st.w = sz.w; st.h = sz.h; st.C = C;
     st.isFree = isFree;
     // [DECO-ANIM-2] 물에 놓인 오리는 물에서만 다닌다(놓인 자리 바닥으로 판정)
-    st.swim = !!(st.cfg.water && _groundAt(student, p.row, p.col) === 'water');
-    st.el.classList.toggle('swim', st.swim);
     st.pen = _penAt(student, p.row, p.col);   // [DECO-ANIM-3] 우리 안이면 그 안에서만
+    //  헤엄: 바닥을 물로 칠한 자리이거나, 물 있는 우리(연못 우리) 안이면
+    st.swim = !!(st.cfg.water && (_groundAt(student, p.row, p.col) === 'water' || (st.pen && st.pen.water)));
+    st.el.classList.toggle('swim', st.swim);
     st.el.style.width = (sz.w * C) + 'px';
     st.el.style.height = (sz.h * C) + 'px';
     st.el.style.transitionDuration = '0ms';
