@@ -1348,3 +1348,16 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
      실제로 커지는 곳은 태블릿 이상 터치 화면이다. */
   .hud-mini-btn{min-height:44px;}
 }
+
+/* ══ 꾸미기 동물 움직임 (DECO-ANIM-1) ══════════════════════
+   캔버스 위 투명한 층. 걷기는 transform 전환, 제자리 꼬물은 무한 키프레임(둘 다 GPU).
+   움직임 줄이기 설정이면 걷지 않고(코드에서 타이머를 안 걸고) 꼬물만 느리게. */
+.deco-anim-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:2}
+.deco-anim{position:absolute;left:0;top:0;transition:transform 1s linear;will-change:transform}
+.deco-anim .bob{position:absolute;left:0;bottom:0;width:100%;animation:decoBob 1.6s ease-in-out infinite}
+.deco-anim .bob img{display:block;width:100%;height:auto}
+@keyframes decoBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion: reduce){
+  .deco-anim{transition:none}
+  .deco-anim .bob{animation-duration:3.2s}
+}

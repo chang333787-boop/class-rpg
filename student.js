@@ -4602,6 +4602,7 @@ function openInteriorFullscreen() {
 }
 
 function closeInteriorFullscreen() {
+  _animStopAll();   // [DECO-ANIM-1] 타이머 남기지 않기
   _ifMode = false;
   DY = {...DY_NORMAL};
   DI = {...DI_NORMAL};
@@ -6842,6 +6843,185 @@ function _initDeco() {
 }
 
 let _drawDecoRaf = null;
+
+// ══ 꾸미기 동물 움직임 (DECO-ANIM-1) ══════════════════════
+//  캔버스 위에 투명한 층을 얹고, 마당 동물만 그 층의 <img> 로 놓는다.
+//  · 움직임은 CSS 전환(transition)이 한다 — 코드는 몇 초에 한 번 "다음 칸"만 정하고 손을 뗀다.
+//    → requestAnimationFrame 루프 없음 · 캔버스 다시 그리기 없음.
+//  · 돌아다니는 위치는 **화면에만** 있다. DB 쓰기 0 (꾸미기는 조작 한 번마다 학생 문서를
+//    통째로 저장하는 구조라, 위치를 저장하면 저장이 쉬지 않는다).
+//  · 캔버스는 이 동물들을 그리지 않는다(_drawYard 에서 건너뜀) — 두 마리로 보이지 않게.
+//  · 친구 방 구경(ff-topview)도 같은 층을 쓴다.
+//  한계(1판): 층이 캔버스 위라 키 큰 장식 뒤로 가도 앞에 보인다 → 반지름을 좁게 둔다.
+
+const ANIM_DECO = {
+  d_y32: { radius: 3, wait: [4000, 8000] },    // 오리 가족
+  d_y39: { radius: 3, wait: [3500, 7000] },    // 닭 3마리
+  d_y40: { radius: 2, wait: [6000, 11000] },   // 양
+};
+
+const _animLayers = new Map();   // hostId → { layer, items: Map(key → state) }
+let _animHooked = false;
+
+function _animReduced() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  catch (e) { return false; }
+}
+
+// 그 칸에 설 수 있나 — 판 안 · 집 영역 아님 · 농장 칸 아님 · 다른 장식 없음(동물끼리는 지나갈 수 있다)
+function _animFreeMaker(student, rows, cols) {
+  const taken = new Set();
+  (student.houseDecorations || []).forEach(p => {
+    if (p.area !== 'yard' || ANIM_DECO[p.id]) return;
+    const sz = getDecoSize(p.id);
+    for (let dr = 0; dr < sz.h; dr++) for (let dc = 0; dc < sz.w; dc++) taken.add((p.row + dr) + '_' + (p.col + dc));
+  });
+  return function (r, c, w, h) {
+    if (r < 0 || c < 0 || r + h > rows || c + w > cols) return false;
+    for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) {
+      const tr = r + dr, tc = c + dc;
+      if (_isHC(tr, tc)) return false;
+      if (_isFarmCell(tr, tc)) return false;
+      if (taken.has(tr + '_' + tc)) return false;
+    }
+    return true;
+  };
+}
+
+// 다음 칸 하나 고르기 — 순수 함수(단위 시험용)
+//  home 놓은 자리 · cur 지금 자리 · radius 집에서 몇 칸까지 · isFree(r,c) · rnd() 0~1
+//  이웃 네 칸 중 갈 수 있는 곳을 고른다. 갈 곳이 없으면 지금 자리 그대로.
+function _animNextCell(home, cur, radius, isFree, rnd) {
+  const cand = [];
+  for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const r = cur.row + dr, c = cur.col + dc;
+    if (Math.abs(r - home.row) > radius || Math.abs(c - home.col) > radius) continue;
+    if (!isFree(r, c)) continue;
+    cand.push({ row: r, col: c });
+  }
+  if (!cand.length) return { row: cur.row, col: cur.col };
+  const i = Math.floor((rnd ? rnd() : Math.random()) * cand.length) % cand.length;
+  return cand[i];
+}
+
+function _animStopLayer(hostId) {
+  const rec = _animLayers.get(hostId);
+  if (!rec) return;
+  rec.items.forEach(st => { if (st.timer) clearTimeout(st.timer); st.timer = null; });
+  if (rec.layer && rec.layer.parentNode) rec.layer.parentNode.removeChild(rec.layer);
+  _animLayers.delete(hostId);
+}
+
+function _animStopAll() { [..._animLayers.keys()].forEach(_animStopLayer); }
+
+function _animPauseAll() {
+  _animLayers.forEach(rec => rec.items.forEach(st => { if (st.timer) clearTimeout(st.timer); st.timer = null; }));
+}
+
+function _animResumeAll() {
+  if (_animReduced()) return;
+  _animLayers.forEach(rec => rec.items.forEach(st => { if (!st.timer) _animSchedule(st); }));
+}
+
+function _animSchedule(st) {
+  const w = st.cfg.wait;
+  const wait = w[0] + Math.random() * (w[1] - w[0]);
+  st.timer = setTimeout(() => _animStep(st), wait);
+}
+
+function _animStep(st) {
+  st.timer = null;
+  if (!st.el || !st.el.parentNode) return;
+  const next = _animNextCell(st.home, st.cur, st.cfg.radius, (r, c) => st.isFree(r, c, st.w, st.h), Math.random);
+  if (next.row !== st.cur.row || next.col !== st.cur.col) {
+    if (next.col !== st.cur.col) {
+      const face = next.col > st.cur.col ? 1 : -1;
+      const img = st.el.querySelector('img');
+      if (img) img.style.transform = 'scaleX(' + face + ')';
+    }
+    const dur = 900 + Math.random() * 700;
+    st.el.style.transitionDuration = dur + 'ms';
+    st.cur = next;
+    st.el.style.transform = 'translate(' + (next.col * st.C) + 'px,' + (next.row * st.C) + 'px)';
+    st.el.style.zIndex = String(next.row);
+  }
+  _animSchedule(st);
+}
+
+//  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.
+//  이미 있는 동물은 그 자리를 지킨다(다시 그려도 처음부터 걷지 않게).
+function _animSyncLayer(hostId, student, scene, C, W, H) {
+  const host = document.getElementById(hostId);
+  if (!host || !student) { _animStopLayer(hostId); return; }
+  if (scene !== 'yard') { _animStopLayer(hostId); return; }
+
+  const rows = DY.rows, cols = DY.cols;
+  const list = (student.houseDecorations || []).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);
+  if (!list.length) { _animStopLayer(hostId); return; }
+
+  let rec = _animLayers.get(hostId);
+  if (!rec) {
+    const layer = document.createElement('div');
+    layer.className = 'deco-anim-layer';
+    rec = { layer, items: new Map() };
+    _animLayers.set(hostId, rec);
+  }
+  if (rec.layer.parentNode !== host) {
+    try { if (getComputedStyle(host).position === 'static') host.style.position = 'relative'; } catch (e) {}
+    host.appendChild(rec.layer);
+  }
+  rec.layer.style.width = W + 'px';
+  rec.layer.style.height = H + 'px';
+
+  const isFree = _animFreeMaker(student, rows, cols);
+  const keep = new Set();
+
+  list.forEach(p => {
+    const d = GAME_DATA.decorations.find(x => x.id === p.id);
+    if (!d) return;
+    const sz = d.size || { w: 1, h: 1 };
+    const key = p.id + '@' + p.row + '_' + p.col;
+    keep.add(key);
+    let st = rec.items.get(key);
+    if (!st) {
+      const el = document.createElement('div');
+      el.className = 'deco-anim';
+      const bob = document.createElement('div');
+      bob.className = 'bob';
+      const img = document.createElement('img');
+      img.alt = d.name || '';
+      img.src = './assets/deco/' + encodeURIComponent(p.id) + '.svg';
+      bob.appendChild(img);
+      el.appendChild(bob);
+      rec.layer.appendChild(el);
+      st = { el, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null };
+      rec.items.set(key, st);
+    }
+    st.cfg = ANIM_DECO[p.id];
+    st.w = sz.w; st.h = sz.h; st.C = C;
+    st.isFree = isFree;
+    st.el.style.width = (sz.w * C) + 'px';
+    st.el.style.height = (sz.h * C) + 'px';
+    st.el.style.transitionDuration = '0ms';
+    st.el.style.transform = 'translate(' + (st.cur.col * C) + 'px,' + (st.cur.row * C) + 'px)';
+    st.el.style.zIndex = String(st.cur.row);
+    if (!st.timer && !_animReduced() && !document.hidden) _animSchedule(st);
+  });
+
+  [...rec.items.keys()].forEach(k => {
+    if (keep.has(k)) return;
+    const st = rec.items.get(k);
+    if (st.timer) clearTimeout(st.timer);
+    if (st.el && st.el.parentNode) st.el.parentNode.removeChild(st.el);
+    rec.items.delete(k);
+  });
+
+  if (!_animHooked) {
+    _animHooked = true;
+    document.addEventListener('visibilitychange', () => { if (document.hidden) _animPauseAll(); else _animResumeAll(); });
+  }
+}
+
 // ══ 장식 SVG 파이프라인 (DECO-SVG-1) ══════════════════════
 //  assets/deco/<id>.svg 가 있으면 그 그림을 쓰고, 없으면 기존 _DFN 캔버스 그림을 그대로 쓴다.
 //  · SVG는 "발밑 기준"으로 놓는다 — footprint 폭에 맞추고, 아래 끝을 footprint 바닥에 붙이고,
@@ -6985,6 +7165,8 @@ function _drawDeco() {
     _dCtx.clearRect(0, 0, _dW, _dH);
     if (DECO_SCENE === 'yard') _drawYard();
     else _drawIndoor();
+    // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
+    _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH);
   });
 }
 
@@ -7191,6 +7373,7 @@ function _drawYard() {
   _decoSorted((CUR.houseDecorations||[]).filter(p=>p.area==='yard')).forEach(p=>{
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
+    if(ANIM_DECO[p.id]) return;   // [DECO-ANIM-1] 움직이는 동물은 캔버스 위 층에서 그린다
     const sz=d.size||{w:1,h:1};
     const px=p.col*C, py=p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
@@ -9258,6 +9441,7 @@ function openFriendFullscreen(friendId) {
 }
 
 function closeFriendFullscreen() {
+  _animStopLayer('ff-topview');   // [DECO-ANIM-1]
   document.getElementById('friend-fullscreen').style.display = 'none';
   _ffFriend = null;
 }
@@ -9313,6 +9497,8 @@ function _renderFriendCanvas() {
   _dCtx.clearRect(0, 0, W, H);
   if (_ffScene === 'yard') _drawYard();
   else _drawIndoor();
+  // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다
+  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H);
 
   // 복원
   CUR        = prevCUR;

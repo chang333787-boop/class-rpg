@@ -725,6 +725,126 @@ try {
   test('승급 직업 계산을 돌릴 수 있다', () => { throw e; });
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+cur = '꾸미기 동물 움직임(DECO-ANIM-1)';
+try {
+  const S = read('student.js');
+  // 가짜 DOM — 만든 요소·타이머를 셀 수 있게. DB·firebase 는 아예 없다(쓰면 오류가 난다).
+  const made = [];
+  const mkEl = (tag) => {
+    const el = { tag, className: '', style: {}, children: [], parentNode: null, dataset: {},
+      appendChild(c) { c.parentNode = el; el.children.push(c); return c; },
+      removeChild(c) { el.children = el.children.filter(x => x !== c); c.parentNode = null; return c; },
+      querySelector(sel) { const want = sel.replace(/^\./, ''); const hit = (n) => n.tag === want || n.className === want;
+        const walk = (n) => { for (const c of n.children) { if (hit(c)) return c; const r = walk(c); if (r) return r; } return null; };
+        return walk(el); } };
+    made.push(el); return el;
+  };
+  const host = mkEl('div'); host.id = 'if-topview';
+  const timers = new Map(); let tid = 1;
+  const sb = {
+    console: { log() {}, warn() {}, error() {} },
+    Math, JSON, Object, Array, Number, String, Boolean, Set, Map, document: {
+      hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null),
+      createElement: mkEl, addEventListener() {},
+    },
+    window: { matchMedia: () => ({ matches: false }) },
+    getComputedStyle: () => ({ position: 'static' }),
+    setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; },
+    clearTimeout: (id) => { timers.delete(id); },
+    encodeURIComponent,
+    // 판 크기·금지 구역
+    DY: { rows: 28, cols: 50 },
+    _isHC: (r, c) => r < 3 && c >= 44,                 // 집 영역(오른쪽 위)
+    _isFarmCell: (r, c) => r >= 20 && r < 24 && c >= 0 && c < 6,   // 농장 존
+    getDecoSize: (id) => (id === 'd_y5' ? { w: 2, h: 1 } : { w: 1, h: 1 }),
+    GAME_DATA: { decorations: [
+      { id: 'd_y39', name: '닭 3마리', size: { w: 2, h: 1 } },
+      { id: 'd_y40', name: '양', size: { w: 2, h: 1 } },
+      { id: 'd_y5',  name: '정원 벤치', size: { w: 2, h: 1 } },
+    ] },
+  };
+  sb.globalThis = sb; vm.createContext(sb);
+  const names = ['ANIM_DECO', '_animLayers', '_animHooked', '_animReduced', '_animFreeMaker', '_animNextCell',
+    '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animSyncLayer'];
+  let src = '';
+  for (const n of names) {
+    if (n === 'ANIM_DECO' || n === '_animLayers' || n === '_animHooked') {
+      const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
+      const m = re.exec(S); if (!m) throw new Error(`없음: ${n}`); src += m[0] + '\n';
+    } else src += sliceFn(S, n) + '\n';
+  }
+  vm.runInContext(src + ';globalThis.__A = { _animSyncLayer, _animNextCell, _animStopLayer, _animLayers };', sb);
+  const A = sb.__A;
+
+  // ① 순수 함수: 반지름·금지 구역을 벗어나지 않는다
+  test('_animNextCell: 갈 곳이 없으면 제자리', () => {
+    eq(A._animNextCell({ row: 5, col: 5 }, { row: 5, col: 5 }, 3, () => false, () => 0), { row: 5, col: 5 });
+  });
+  test('_animNextCell: 반지름 밖으로 안 나간다', () => {
+    const home = { row: 5, col: 5 }, cur = { row: 5, col: 8 };   // 이미 오른쪽 끝(반지름 3)
+    const seen = new Set();
+    for (let i = 0; i < 20; i++) { const n = A._animNextCell(home, cur, 3, () => true, () => i / 20); seen.add(n.col); }
+    if ([...seen].some(c => Math.abs(c - 5) > 3)) throw new Error('반지름 밖: ' + [...seen].join(','));
+  });
+  test('_animNextCell: 못 가는 칸은 고르지 않는다', () => {
+    const isFree = (r, c) => !(r === 5 && c === 6);
+    for (let i = 0; i < 20; i++) {
+      const n = A._animNextCell({ row: 5, col: 5 }, { row: 5, col: 5 }, 3, isFree, () => i / 20);
+      if (n.row === 5 && n.col === 6) throw new Error('막힌 칸을 골랐다');
+    }
+  });
+
+  // ② 층 만들기 — 동물 수만큼 요소, 타이머 예약
+  const stu = { houseDecorations: [
+    { id: 'd_y39', area: 'yard', row: 6, col: 6 },
+    { id: 'd_y40', area: 'yard', row: 10, col: 10 },
+    { id: 'd_y5',  area: 'yard', row: 6, col: 8 },     // 장식(움직이지 않음)
+    { id: 'd_y39', area: 'indoor', row: 1, col: 1 },   // 집 안은 대상 아님
+  ] };
+  A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
+  const layer = host.children.find(c => c.className === 'deco-anim-layer');
+  test('마당에 동물 층이 생기고 동물 수만큼 요소가 생긴다(장식·집 안은 제외)', () => {
+    if (!layer) throw new Error('층 없음');
+    eq(layer.children.length, 2);
+  });
+  test('동물마다 걸음 타이머가 하나씩 예약된다', () => eq(timers.size, 2));
+  test('층은 캔버스 위에 절대 위치 · 손가락을 통과시킨다(CSS 클래스)', () => eq(layer.className, 'deco-anim-layer'));
+
+  // ③ 걸음 — 100번 걸어도 금지 구역·반지름을 안 벗어난다
+  const st = [...A._animLayers.get('if-topview').items.values()][0];
+  const homeRow = st.home.row, homeCol = st.home.col;
+  let bad = null;
+  for (let i = 0; i < 100 && timers.size; i++) {
+    const [id, t] = [...timers.entries()][0]; timers.delete(id); t.fn();
+    const p = st.cur;
+    if (Math.abs(p.row - homeRow) > st.cfg.radius || Math.abs(p.col - homeCol) > st.cfg.radius) { bad = '반지름 밖 ' + JSON.stringify(p); break; }
+    if (sb._isHC(p.row, p.col) || sb._isFarmCell(p.row, p.col)) { bad = '금지 구역 ' + JSON.stringify(p); break; }
+    if (p.row === 6 && (p.col === 8 || p.col === 9)) { bad = '장식 위 ' + JSON.stringify(p); break; }
+    if (p.row + st.h > sb.DY.rows || p.col + st.w > sb.DY.cols || p.row < 0 || p.col < 0) { bad = '판 밖 ' + JSON.stringify(p); break; }
+  }
+  test('100걸음 동안 반지름·집·농장·다른 장식·판 밖으로 나가지 않는다', () => { if (bad) throw new Error(bad); });
+  test('걸을 때마다 다음 걸음이 다시 예약된다(멈추지 않는다)', () => { if (!timers.size) throw new Error('타이머가 끊겼다'); });
+
+  // ④ 집 안으로 바꾸면 층이 사라지고 타이머가 남지 않는다
+  A._animSyncLayer('if-topview', stu, 'indoor', 20, 1000, 560);
+  test('집 안으로 바꾸면 층이 사라진다', () => eq(host.children.filter(c => c.className === 'deco-anim-layer').length, 0));
+  test('층이 사라지면 타이머도 0개(앱 전환·닫기 때 새지 않는다)', () => eq(timers.size, 0));
+
+  // ⑤ 같은 자리 다시 맞추면 같은 요소를 지킨다(처음부터 걷지 않게)
+  A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
+  const l2 = host.children.find(c => c.className === 'deco-anim-layer');
+  const first = [...A._animLayers.get('if-topview').items.values()][0];
+  first.cur = { row: first.home.row + 2, col: first.home.col };
+  A._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560);
+  const again = [...A._animLayers.get('if-topview').items.values()][0];
+  test('다시 그려도 동물이 지금 자리를 지킨다', () => eq(again.cur, { row: first.home.row + 2, col: first.home.col }));
+  test('다시 그려도 요소를 새로 만들지 않는다', () => eq(l2.children.length, 2));
+} catch (e) {
+  test('동물 움직임 코드를 돌릴 수 있다', () => { throw e; });
+}
+
 // ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
