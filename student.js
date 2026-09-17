@@ -7044,7 +7044,12 @@ function _penAt(student, r, c) {
     const sz = getDecoSize(p.id);
     if (r >= p.row && r < p.row + sz.h && c >= p.col && c < p.col + sz.w) {
       const d = GAME_DATA.decorations.find(x => x.id === p.id);
-      return { r0: p.row, c0: p.col, r1: p.row + sz.h - 1, c1: p.col + sz.w - 1, water: !!(d && d.penWater) };
+      //  울타리 줄(footprint 가장자리)에는 서지 않는다 — 동물 층이 캔버스 위라
+      //  울타리 칸에 서면 '우리 안'이 아니라 '울타리 위'로 보인다.
+      //  안쪽이 한 칸도 안 남는 작은 우리는 어쩔 수 없이 footprint 전체를 쓴다.
+      let r0 = p.row + 1, c0 = p.col + 1, r1 = p.row + sz.h - 2, c1 = p.col + sz.w - 2;
+      if (r1 < r0 || c1 < c0) { r0 = p.row; c0 = p.col; r1 = p.row + sz.h - 1; c1 = p.col + sz.w - 1; }
+      return { r0, c0, r1, c1, water: !!(d && d.penWater) };
     }
   }
   return null;

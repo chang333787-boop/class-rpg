@@ -1140,7 +1140,7 @@ try {
     { id: 'd_y5',    area: 'yard', row: 11, col: 14 },   // 우리 밖 벤치
   ] };
   test('우리 사각형을 찾는다(안은 찾고 밖은 못 찾는다)', () => {
-    eq(P._penAt(stu, 11, 11), { r0: 10, c0: 10, r1: 12, c1: 12, water: false });
+    eq(P._penAt(stu, 11, 11), { r0: 11, c0: 11, r1: 11, c1: 11, water: false });   // 울타리 줄 뺀 안쪽
     eq(P._penAt(stu, 9, 10), null);
   });
   test('동물은 우리 칸을 지날 수 있고, 보통 장식 칸은 못 지난다', () => {
@@ -1150,14 +1150,14 @@ try {
 
   P._animSyncLayer('if-topview', stu, 'yard', 20, 1000, 560, 0, 0);
   const hen = [...P._animLayers.get('if-topview').items.values()][0];
-  test('우리 안에 놓인 닭은 그 우리를 기억한다', () => eq(hen.pen, { r0: 10, c0: 10, r1: 12, c1: 12, water: false }));
+  test('우리 안에 놓인 닭은 울타리 줄을 뺀 안쪽만 기억한다', () => eq(hen.pen, { r0: 11, c0: 11, r1: 11, c1: 11, water: false }));
   let out = null;
   for (let i = 0; i < 200 && timers.size; i++) {
     const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
     const p = hen.cur;
-    if (p.row < 10 || p.row > 12 || p.col < 10 || p.col > 12) { out = JSON.stringify(p); break; }
+    if (p.row !== 11 || p.col !== 11) { out = JSON.stringify(p); break; }
   }
-  test('200걸음 동안 닭이 우리 밖으로 안 나간다', () => { if (out) throw new Error('우리 밖: ' + out); });
+  test('200걸음 동안 닭이 울타리 줄을 밟지 않는다(3×3 은 안쪽 1칸)', () => { if (out) throw new Error('울타리 줄: ' + out); });
 
   // 연못 우리(penWater) 안의 오리는 바닥이 잔디여도 헤엄한다
   P._animStopLayer('if-topview');
@@ -1174,9 +1174,9 @@ try {
   for (let i = 0; i < 120 && timers.size; i++) {
     const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
     const p = duckPen.cur;
-    if (p.row < 5 || p.row > 7 || p.col < 5 || p.col > 8) { outP = JSON.stringify(p); break; }
+    if (p.row < 6 || p.row > 6 || p.col < 6 || p.col > 7) { outP = JSON.stringify(p); break; }
   }
-  test('120걸음 동안 오리가 연못 우리 밖으로 안 나간다', () => { if (outP) throw new Error('밖: ' + outP); });
+  test('120걸음 동안 오리가 연못 우리 안쪽(울타리 줄 뺀 곳)에만 있는다', () => { if (outP) throw new Error('밖: ' + outP); });
 
   // 우리 밖 동물은 예전처럼 반지름으로 다닌다
   P._animStopLayer('if-topview');
