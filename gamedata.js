@@ -458,11 +458,14 @@ const GAME_DATA = {
     {id:'d_y47',name:'둥근 나무 B형', icon:'🌳', size:{w:2,h:2}, priceAdj:+60, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, priceAdj:+120, cat:'yard', rarity:'common', reqLv:1},
 
+    // ── 목재 울타리 — 한 종만 상점에 둔다(놓으면 이웃을 보고 네 모양 중 맞는 것으로 그려진다, DECO-FENCE-1)
+    //    옛 4종은 hidden:true 로 상점에서만 감춘다 — 아이가 이미 산 것은 가방에서 그대로 놓인다
+    {id:'d_y70',name:'울타리',        icon:'🚧', priceAdj:-60, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
     // ── 목재 울타리 4종 ─────────────────────────────────────
-    {id:'d_y49',name:'울타리 가로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y50',name:'울타리 세로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y51',name:'울타리 왼쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
+    {id:'d_y49',name:'울타리 가로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, hidden:true},
+    {id:'d_y50',name:'울타리 세로형',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, hidden:true},
+    {id:'d_y51',name:'울타리 왼쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, hidden:true},
+    {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, hidden:true},
 
     // ── 3차 확장: 걷는 동물 (DECO-ANIM-1) — 낱마리라 마당을 돌아다닐 수 있다
     {id:'d_y53',name:'강아지',        icon:'🐶', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
