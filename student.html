@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260917bsb">
+<link rel="stylesheet" href="./student.css?v=20260917bsc">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -734,6 +734,20 @@
     </button>
   </div>
 
+  <!-- [DECO-ZOOM-1] 확대/축소 — 두 손가락으로도 되고, 이 단추로도 된다(44px 이상) -->
+  <div id="if-zoom-col" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:8px;z-index:9001">
+    <button onclick="decoZoomIn()" title="크게" aria-label="크게"
+      style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
+        background:rgba(20,24,32,.88);color:#fff;font-size:20px;font-weight:800;cursor:pointer;font-family:inherit">＋</button>
+    <button onclick="decoZoomOut()" title="작게" aria-label="작게"
+      style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
+        background:rgba(20,24,32,.88);color:#fff;font-size:20px;font-weight:800;cursor:pointer;font-family:inherit">－</button>
+    <button onclick="decoZoomFit()" title="전체 보기" aria-label="전체 보기"
+      style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
+        background:rgba(20,24,32,.88);color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">전체</button>
+  </div>
+
   <!-- 바닥 타일 선택줄 (바닥 모드일 때만) -->
   <div id="if-floor-row" style="display:none;padding:.4rem 1rem;gap:.4rem;flex-wrap:wrap;
     background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
@@ -901,7 +915,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260917bsb"></script>
+<script src="./student.js?v=20260917bsc"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
