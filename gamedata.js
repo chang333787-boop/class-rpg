@@ -488,7 +488,7 @@ const GAME_DATA = {
     {id:'d_y65',name:'자갈길',   icon:'🪨', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y66',name:'큰 헛간',       icon:'🏚️', size:{w:4,h:3}, priceAdj:-150, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y67',name:'온실',          icon:'🪴', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
-    {id:'d_y68',name:'캠프파이어 광장', icon:'🔥', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y68',name:'캠프파이어', icon:'🔥', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
 
     // ── 쓰는 방식 1차 — 놓으면 동물이 모이는 물건 (모이는 규칙은 움직임 코드)
     {id:'d_y69',name:'먹이통',        icon:'🥣', priceAdj:0, cat:'yard', rarity:'common', reqLv:1, newUntil:'2026-09-27'},
