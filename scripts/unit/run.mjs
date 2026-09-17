@@ -1256,6 +1256,14 @@ try {
   test('아래 꺾임은 그림이 없으면 세로로 대신한다', () => {
     eq([F._fencePick(false, true, false, true), F._fencePick(true, false, false, true)], ['d_y50', 'd_y50']);
   });
+  //  그림이 생긴 뒤(#398): 아래 꺾임도 제 그림을 쓴다 — 표에 넣고 다시 물어본다
+  test('아래 꺾임 그림이 표에 있으면 ┌ ┐ 를 쓴다(#398)', () => {
+    DECOS.push({ id: 'd_y71', name: '울타리 모퉁이 ┌', hidden: true }, { id: 'd_y72', name: '울타리 모퉁이 ┐', hidden: true });
+    try {
+      eq([F._fencePick(false, true, false, true), F._fencePick(true, false, false, true)], ['d_y71', 'd_y72']);
+      eq([F._fencePick(false, true, true, false), F._fencePick(true, false, true, false)], ['d_y51', 'd_y52']);
+    } finally { DECOS.length = DECOS.length - 2; }
+  });
   test('세 갈래·네 갈래는 가로로 읽는다(줄이 끊겨 보이지 않게)', () => {
     eq([F._fencePick(true, true, true, false), F._fencePick(true, true, true, true)], ['d_y49', 'd_y49']);
   });
