@@ -1,0 +1,6 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<!-- ui_erase_area — 구역 지우기(점선 네모 = 끌어 고른 구역, 금색 = 쓸어내는 지우개) · 어두운 판용 · 24/32/44px 확인 -->
+<rect x="7" y="7" width="34" height="34" rx="4" stroke="#BCAB92" stroke-width="4" stroke-dasharray="9 6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M13,30 L26,17 l11,11 L24,41 z" fill="#D9A441" stroke="#D9A441" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M22,39 h15" stroke="#EFE7D9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

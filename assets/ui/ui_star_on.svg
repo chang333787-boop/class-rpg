@@ -1,0 +1,4 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<!-- ui_star_on — 즐겨찾기 켜짐(찬 별) · 어두운 판용 · 24/32/44px 확인 -->
+<path d="M24,6 l5.4,11.6 l12.6,1.7 l-9.2,8.8 l2.3,12.6 L24,34.6 L12.9,40.7 l2.3,-12.6 l-9.2,-8.8 l12.6,-1.7z" fill="#D9A441" stroke="#D9A441" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
