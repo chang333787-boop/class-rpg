@@ -1,0 +1,5 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<!-- ui_undo — 되돌리기(굽은 화살표가 왼쪽으로 돈다, 화살촉만 금색) · 어두운 판용 · 24/32/44px 확인 -->
+<path d="M11,17 h16 a11,11 0 1 1 0,22 h-9" stroke="#EFE7D9" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M18,9 L9,17 L18,25" stroke="#D9A441" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

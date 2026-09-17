@@ -1,0 +1,6 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<!-- ui_pick — 스포이드(집어서 같은 것을 손에), 집는 머리만 금색 · 어두운 판용 · 24/32/44px 확인 -->
+<path d="M28,9 a7,7 0 0 1 10,10 L34,23 l-10,-10z" fill="#D9A441" stroke="#D9A441" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M30,23 L15,38 l-6,2 l2,-6 L26,19z" stroke="#EFE7D9" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M22,21 l5,5" stroke="#EFE7D9" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
