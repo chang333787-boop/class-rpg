@@ -491,7 +491,7 @@ const GAME_DATA = {
     {id:'d_y68',name:'캠프파이어', icon:'🔥', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
 
     // ── 쓰는 방식 1차 — 놓으면 동물이 모이는 물건 (모이는 규칙은 움직임 코드)
-    {id:'d_y69',name:'먹이통',        icon:'🥣', priceAdj:0, cat:'yard', rarity:'common', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y69',name:'먹이통',        icon:'🥣', priceAdj:0, cat:'yard', rarity:'common', reqLv:1, feeder:true, newUntil:'2026-09-27'},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', priceAdj:-5,  cat:'indoor', rarity:'common', reqLv:1},
