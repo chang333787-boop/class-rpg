@@ -1,0 +1,43 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+<!-- d_y66 큰 헛간 4×3 · footprint y100~400 · 문이 열려 안 짚이 보인다 + 건초 수레·사료 자루 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<path d="M70,378 L330,352 L392,386 L190,400 Z" fill="#000" opacity=".2"/>
+<ellipse cx="200" cy="380" rx="176" ry="18" fill="#000" opacity=".26"/>
+<path class="i" d="M18,352 h364 v26 h-364z" fill="#8c8578"/>
+<path d="M24,358 h352" fill="none" stroke="#b3ada0" stroke-width="3.4" stroke-linecap="round"/>
+<path class="o" d="M28,206 h344 v146 h-344z" fill="#b5392b"/>
+<g stroke="#8f2a1e" stroke-width="2.4" opacity=".85"><path d="M28,230 h344"/><path d="M28,258 h344"/><path d="M28,286 h344"/><path d="M28,314 h344"/><path d="M28,342 h344"/></g>
+<path d="M28,206 h344 v18 h-344z" fill="#000" opacity=".16"/>
+<g class="i" fill="#efe6d4"><rect x="20" y="200" width="360" height="10"/><rect x="22" y="206" width="10" height="146"/><rect x="368" y="206" width="10" height="146"/></g>
+<path class="o" d="M6,208 L46,128 L200,86 L354,128 L394,208 Z" fill="#4e5459"/>
+<path d="M200,86 L354,128 L394,208 L300,208 q10,-64 -100,-122z" fill="#000" opacity=".17"/>
+<path d="M46,128 L200,86 L354,128" fill="none" stroke="#b3ada0" stroke-width="3.4" stroke-linecap="round" opacity=".6"/>
+<g stroke="#2b2118" stroke-width="2" opacity=".45"><path d="M30,208 L60,116"/><path d="M76,208 L96,124"/><path d="M122,208 L132,132"/><path d="M168,208 L168,124"/><path d="M214,208 L204,116"/><path d="M260,208 L240,108"/><path d="M306,208 L276,100"/><path d="M352,208 L312,92"/></g>
+<rect class="i" x="14" y="200" width="372" height="12" rx="3" fill="#efe6d4"/>
+<path class="o" d="M172,138 h56 v46 h-56z" fill="#a5743c"/>
+<path d="M200,138 v46" fill="none" stroke="#7a5230" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M200,120 v18" fill="none" stroke="#6d6860" stroke-width="4" stroke-linecap="round"/>
+<circle class="i" cx="200" cy="116" r="8" fill="#b3ada0"/>
+<path class="i" d="M132,240 h136 v112 h-136z" fill="#2b2118"/>
+<path d="M140,248 h120 v104 h-120z" fill="#3a2c20"/>
+<path d="M150,320 h44 q6,0 6,6 v26 h-50z" fill="#d9b24a"/>
+<path d="M206,332 h40 v20 h-40z" fill="#e8c26a"/>
+<path d="M152,330 h40 M210,340 h32" fill="none" stroke="#b8901a" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
+<path class="o" d="M132,240 l-34,10 v92 l34,10z" fill="#efe6d4"/>
+
+<path d="M129,250 l-26,8 M129,342 l-26,-8" fill="none" stroke="#b5392b" stroke-width="3.4" stroke-linecap="round"/>
+<path class="o" d="M268,240 l34,10 v92 l-34,10z" fill="#efe6d4"/>
+
+<path d="M271,250 l26,8 M271,342 l26,-8" fill="none" stroke="#b5392b" stroke-width="3.4" stroke-linecap="round"/>
+<ellipse cx="76" cy="372" rx="50" ry="10" fill="#000" opacity=".24"/>
+<path class="o" d="M34,330 h80 v28 h-80z" fill="#a5743c"/>
+<path d="M40,318 q34,-12 68,0 v12 h-68z" fill="#e8c26a"/>
+<path d="M44,324 h58" fill="none" stroke="#b8901a" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>
+<circle class="o" cx="52" cy="364" r="14" fill="#7a5230"/><circle cx="52" cy="364" r="5" fill="#b58a56"/>
+<circle class="o" cx="98" cy="364" r="14" fill="#7a5230"/><circle cx="98" cy="364" r="5" fill="#b58a56"/>
+<ellipse cx="316" cy="374" rx="22.0" ry="6" fill="#000" opacity=".2"/>
+<g transform="translate(316,372) scale(1.0)"><path class="i" d="M-18,-44 q18,-6 36,0 v40 q-18,6 -36,0z" fill="#efe6d4"/><path d="M-12,-28 h24" fill="none" stroke="#b8901a" stroke-width="2.6" stroke-linecap="round"/><path class="i" d="M-18,-44 q18,8 36,0 q-6,-8 -18,-8 q-12,0 -18,8z" fill="#e8c26a"/></g>
+<ellipse cx="348" cy="374" rx="18.04" ry="6" fill="#000" opacity=".2"/>
+<g transform="translate(348,372) scale(0.82)"><path class="i" d="M-18,-44 q18,-6 36,0 v40 q-18,6 -36,0z" fill="#efe6d4"/><path d="M-12,-28 h24" fill="none" stroke="#b8901a" stroke-width="2.6" stroke-linecap="round"/><path class="i" d="M-18,-44 q18,8 36,0 q-6,-8 -18,-8 q-12,0 -18,8z" fill="#e8c26a"/></g>
+<g transform="translate(16,392) scale(0.65)"><g fill="#4f7a2e" class="i"><path d="M-10,0 l-4,-16 l8,3 l0,13z M-3,0 l0,-24 l6,5 l-2,19z M5,0 l3,-19 l5,7 l-4,12z"/></g><g fill="#86ad50"><path d="M-8,-2 l-1,-9 l2,1z M0,-3 l0,-15 l2,2z"/></g></g><g transform="translate(386,386) scale(0.6)"><g fill="#4f7a2e" class="i"><path d="M-10,0 l-4,-16 l8,3 l0,13z M-3,0 l0,-24 l6,5 l-2,19z M5,0 l3,-19 l5,7 l-4,12z"/></g><g fill="#86ad50"><path d="M-8,-2 l-1,-9 l2,1z M0,-3 l0,-15 l2,2z"/></g></g><g transform="translate(240,396) scale(0.55)"><g fill="#4f7a2e" class="i"><path d="M-10,0 l-4,-16 l8,3 l0,13z M-3,0 l0,-24 l6,5 l-2,19z M5,0 l3,-19 l5,7 l-4,12z"/></g><g fill="#86ad50"><path d="M-8,-2 l-1,-9 l2,1z M0,-3 l0,-15 l2,2z"/></g></g>
+</svg>
