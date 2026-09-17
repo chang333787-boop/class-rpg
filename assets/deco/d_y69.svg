@@ -1,19 +1,24 @@
 <svg width="100" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">
-<!-- d_y69 먹이통 1×1 · footprint y100~200 · 낮게(키 26) 그려 동물이 통 앞에 서도 안 가린다 -->
+<!-- d_y69 먹이통 1×1 · footprint y100~200 · 낮게(키 26·낟알 포함 42) 그려 동물이 앞에 서도 안 가린다 · 낟알을 수북이 쌓아 정원석·건초더미와 갈라짐 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
 <ellipse cx="50" cy="186" rx="34" ry="7" fill="#000" opacity=".26"/>
-<path class="o" d="M18,164 h64 l-6,20 q-1,4 -6,4 h-40 q-5,0 -6,-4z" fill="#a5743c"/>
-<path d="M50,164 h32 l-6,20 q-1,4 -6,4 h-20 q10,-12 0,-24z" fill="#7a5230" opacity=".4"/>
-<path d="M24,176 h52" fill="none" stroke="#7a5230" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
-<ellipse class="o" cx="50" cy="164" rx="32" ry="8" fill="#b58a56"/>
-<ellipse cx="50" cy="165" rx="25" ry="5" fill="#5a4636"/>
-<ellipse class="i" cx="50" cy="164" rx="24" ry="5" fill="#e8c26a"/>
-<g fill="#d9b24a"><ellipse cx="57" cy="161" rx="2" ry="1.4"/><ellipse cx="37" cy="164" rx="2" ry="1.4"/><ellipse cx="43" cy="166" rx="2" ry="1.4"/><ellipse cx="62" cy="165" rx="2" ry="1.4"/><ellipse cx="47" cy="165" rx="2" ry="1.4"/><ellipse cx="53" cy="165" rx="2" ry="1.4"/><ellipse cx="43" cy="164" rx="2" ry="1.4"/><ellipse cx="48" cy="163" rx="2" ry="1.4"/><ellipse cx="46" cy="163" rx="2" ry="1.4"/></g>
-<path d="M36,163 q6,-3 12,0 M56,164 q5,-2 9,0" fill="none" stroke="#b8901a" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>
-<ellipse cx="26" cy="186" rx="2.4" ry="1.6" fill="#e8c26a" stroke="#2b2118" stroke-width=".9"/>
-<ellipse cx="34" cy="190" rx="2.4" ry="1.6" fill="#e8c26a" stroke="#2b2118" stroke-width=".9"/>
-<ellipse cx="70" cy="187" rx="2.4" ry="1.6" fill="#e8c26a" stroke="#2b2118" stroke-width=".9"/>
-<ellipse cx="78" cy="190" rx="2.4" ry="1.6" fill="#e8c26a" stroke="#2b2118" stroke-width=".9"/>
-<ellipse cx="60" cy="192" rx="2.4" ry="1.6" fill="#e8c26a" stroke="#2b2118" stroke-width=".9"/>
+<path class="o" d="M18,164 h64 l-6,20 q-1,4 -6,4 h-40 q-5,0 -6,-4z" fill="#b58a56"/>
+<path d="M50,164 h32 l-6,20 q-1,4 -6,4 h-20 q10,-12 0,-24z" fill="#a5743c" opacity=".45"/>
+<path d="M24,176 h52" fill="none" stroke="#a5743c" stroke-width="2.2" stroke-linecap="round" opacity=".8"/>
+<ellipse class="o" cx="50" cy="164" rx="32" ry="8" fill="#d9b07a"/>
+<ellipse cx="50" cy="165" rx="25" ry="5" fill="#8a6a45"/>
+<path class="o" d="M22,163 q12,-12 28,-12 q16,0 28,12 q-28,8 -56,0z" fill="#e8c545"/>
+<path d="M50,151 q16,0 28,12 q-14,4 -28,4 q12,-8 0,-16z" fill="#c9a227" opacity=".55"/>
+<path d="M30,160 q20,-7 40,0 M36,155 q14,-5 28,0" fill="none" stroke="#b8901a" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+<path d="M38,155 q12,-4 24,0" fill="none" stroke="#f2c25a" stroke-width="2.6" stroke-linecap="round" opacity=".9"/>
+<g fill="#f2c25a"><ellipse cx="57" cy="156" rx="2.2" ry="1.5"/><ellipse cx="37" cy="160" rx="2.2" ry="1.5"/><ellipse cx="43" cy="163" rx="2.2" ry="1.5"/><ellipse cx="62" cy="163" rx="2.2" ry="1.5"/><ellipse cx="47" cy="162" rx="2.2" ry="1.5"/><ellipse cx="53" cy="162" rx="2.2" ry="1.5"/><ellipse cx="43" cy="160" rx="2.2" ry="1.5"/></g>
+<ellipse cx="50" cy="164" rx="33" ry="8.5" fill="none" stroke="#2b2118" stroke-width="3"/>
+<ellipse cx="50" cy="164" rx="33" ry="8.5" fill="none" stroke="#d9b07a" stroke-width="1.6" stroke-dasharray="0 6 60 999"/>
+<path d="M17,164 q0,6 5,10 M83,164 q0,6 -5,10" fill="none" stroke="#2b2118" stroke-width="2.5" stroke-linecap="round"/>
+<ellipse cx="26" cy="186" rx="2.6" ry="1.8" fill="#e8c545" stroke="#2b2118" stroke-width="1"/>
+<ellipse cx="34" cy="190" rx="2.6" ry="1.8" fill="#e8c545" stroke="#2b2118" stroke-width="1"/>
+<ellipse cx="70" cy="187" rx="2.6" ry="1.8" fill="#e8c545" stroke="#2b2118" stroke-width="1"/>
+<ellipse cx="78" cy="190" rx="2.6" ry="1.8" fill="#e8c545" stroke="#2b2118" stroke-width="1"/>
+<ellipse cx="60" cy="192" rx="2.6" ry="1.8" fill="#e8c545" stroke="#2b2118" stroke-width="1"/>
 <g transform="translate(12,192) scale(0.45)"><g fill="#4f7a2e" class="i"><path d="M-10,0 l-4,-16 l8,3 l0,13z M-3,0 l0,-24 l6,5 l-2,19z M5,0 l3,-19 l5,7 l-4,12z"/></g><g fill="#86ad50"><path d="M-8,-2 l-1,-9 l2,1z M0,-3 l0,-15 l2,2z"/></g></g><g transform="translate(88,190) scale(0.42)"><g fill="#4f7a2e" class="i"><path d="M-10,0 l-4,-16 l8,3 l0,13z M-3,0 l0,-24 l6,5 l-2,19z M5,0 l3,-19 l5,7 l-4,12z"/></g><g fill="#86ad50"><path d="M-8,-2 l-1,-9 l2,1z M0,-3 l0,-15 l2,2z"/></g></g>
 </svg>
