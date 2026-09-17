@@ -750,6 +750,7 @@ try {
       createElement: mkEl, addEventListener() {},
     },
     window: { matchMedia: () => ({ matches: false }) },
+    Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
     getComputedStyle: () => ({ position: 'static' }),
     setTimeout: (fn, ms) => { const id = tid++; timers.set(id, { fn, ms }); return id; },
     clearTimeout: (id) => { timers.delete(id); },
@@ -766,11 +767,11 @@ try {
     ] },
   };
   sb.globalThis = sb; vm.createContext(sb);
-  const names = ['ANIM_DECO', '_animLayers', '_animHooked', '_animReduced', '_animFreeMaker', '_animNextCell',
+  const names = ['ANIM_DECO', '_animFrameB', '_animLayers', '_animHooked', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
     '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animSyncLayer'];
   let src = '';
   for (const n of names) {
-    if (n === 'ANIM_DECO' || n === '_animLayers' || n === '_animHooked') {
+    if (n === 'ANIM_DECO' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
       const m = re.exec(S); if (!m) throw new Error(`없음: ${n}`); src += m[0] + '\n';
     } else src += sliceFn(S, n) + '\n';
