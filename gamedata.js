@@ -461,6 +461,9 @@ const GAME_DATA = {
     // ── 목재 울타리 — 한 종만 상점에 둔다(놓으면 이웃을 보고 네 모양 중 맞는 것으로 그려진다, DECO-FENCE-1)
     //    옛 4종은 hidden:true 로 상점에서만 감춘다 — 아이가 이미 산 것은 가방에서 그대로 놓인다
     {id:'d_y70',name:'울타리',        icon:'🚧', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, autoFence:true, newUntil:'2026-09-27'},
+    // 아래로 꺾이는 모퉁이 두 장 — **그림 전용**(값 0·hidden 이라 상점에 안 뜬다). 자동 이음이 id 로 찾아 쓴다
+    {id:'d_y71',name:'울타리 모퉁이 ┌', icon:'🚧', priceAdj:-20, cat:'yard', rarity:'common', reqLv:1, hidden:true},
+    {id:'d_y72',name:'울타리 모퉁이 ┐', icon:'🚧', priceAdj:-20, cat:'yard', rarity:'common', reqLv:1, hidden:true},
     // ── 목재 울타리 4종 ─────────────────────────────────────
     {id:'d_y49',name:'가로 울타리',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, hidden:true},
     {id:'d_y50',name:'세로 울타리',  icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1, hidden:true},
