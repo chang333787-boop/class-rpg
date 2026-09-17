@@ -1237,7 +1237,7 @@ try {
     }
     src += S.slice(at, end + 1) + '\n';
   }
-  for (const n of ['_isFenceCell', '_fencePick', '_fenceArtFor', '_feedersOf', '_feederFor',
+  for (const n of ['_isFenceCell', '_fenceArtOr', '_fencePick', '_fenceArtFor', '_feedersOf', '_feederFor',
                    '_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
                    '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
@@ -1247,11 +1247,21 @@ try {
   const F = sb.__F;
 
   // ① 울타리 그림 고르기 — 아이는 가로·세로·코너를 고르지 않는다
-  test('혼자 있는 울타리는 가로', () => eq(F._fencePick(false, false, false, false), 'd_y49'));
-  test('좌우로 이어지면 가로', () => eq(F._fencePick(true, true, false, false), 'd_y49'));
-  test('위아래로 이어지면 세로', () => eq(F._fencePick(false, false, true, true), 'd_y50'));
-  test('왼쪽 + 위 → 왼쪽 코너', () => eq(F._fencePick(true, false, true, false), 'd_y51'));
-  test('오른쪽 + 아래 → 오른쪽 코너', () => eq(F._fencePick(false, true, false, true), 'd_y52'));
+  //  방향은 그림에서 난간이 실제로 뻗는 쪽(디자인 2 실측): d_y51 = └(위+오른) · d_y52 = ┘(위+왼)
+  test('혼자 있는 울타리는 가로 ─', () => eq(F._fencePick(false, false, false, false), 'd_y49'));
+  test('좌우로 지나가면 가로 ─', () => eq(F._fencePick(true, true, false, false), 'd_y49'));
+  test('위아래로 지나가면 세로 │', () => eq(F._fencePick(false, false, true, true), 'd_y50'));
+  test('위+오른 → └ (d_y51)', () => eq(F._fencePick(false, true, true, false), 'd_y51'));
+  test('위+왼 → ┘ (d_y52)', () => eq(F._fencePick(true, false, true, false), 'd_y52'));
+  test('아래 꺾임은 그림이 없으면 세로로 대신한다', () => {
+    eq([F._fencePick(false, true, false, true), F._fencePick(true, false, false, true)], ['d_y50', 'd_y50']);
+  });
+  test('세 갈래·네 갈래는 가로로 읽는다(줄이 끊겨 보이지 않게)', () => {
+    eq([F._fencePick(true, true, true, false), F._fencePick(true, true, true, true)], ['d_y49', 'd_y49']);
+  });
+  test('이웃이 위 하나면 세로 · 왼 하나면 가로', () => {
+    eq([F._fencePick(false, false, true, false), F._fencePick(true, false, false, false)], ['d_y50', 'd_y49']);
+  });
 
   // ② 실제로 놓인 울타리를 보고 고른다(옛 4종도 이웃으로 센다)
   const fstu = { yardFloor: {}, houseDecorations: [
@@ -1261,7 +1271,7 @@ try {
     { id: 'd_y70', area: 'yard', row: 6, col: 5 },
   ] };
   test('줄로 이어진 가운데는 가로', () => eq(F._fenceArtFor(fstu, 5, 6), 'd_y49'));
-  test('아래로도 이어진 왼쪽 끝은 코너', () => eq(F._fenceArtFor(fstu, 5, 5), 'd_y52'));
+  test('아래로도 이어진 왼쪽 끝은 아래 꺾임 → 그림 없으니 세로', () => eq(F._fenceArtFor(fstu, 5, 5), 'd_y50'));
   test('세로로만 이어진 아래 칸은 세로', () => eq(F._fenceArtFor(fstu, 6, 5), 'd_y50'));
 
   // ③ 먹이통 — 닭이 모인다
