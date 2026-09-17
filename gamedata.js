@@ -465,8 +465,8 @@ const GAME_DATA = {
     {id:'d_y52',name:'울타리 오른쪽 코너', icon:'🪵', priceAdj:-10, cat:'yard', rarity:'common', reqLv:1},
 
     // ── 3차 확장: 걷는 동물 (DECO-ANIM-1) — 낱마리라 마당을 돌아다닐 수 있다
-    {id:'d_y53',name:'강아지',        icon:'🐶', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y54',name:'고양이',        icon:'🐱', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y53',name:'강아지',        icon:'🐶', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y54',name:'고양이',        icon:'🐱', priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', priceAdj:-5,  cat:'indoor', rarity:'common', reqLv:1},
