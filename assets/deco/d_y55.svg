@@ -1,0 +1,20 @@
+<svg width="100" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">
+<!-- d_y55 닭 1마리 1×1 · 걸음 A · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<path d="M20,182 L62,174 L92,186 L48,192 Z" fill="#000" opacity=".16"/><ellipse cx="50" cy="184" rx="32" ry="7" fill="#000" opacity=".26"/>
+<g transform="translate(50,186) scale(0.72) translate(-50,-186)"><path d="M44,166 l-1.8,11.0 l-1.2,9.0" fill="none" stroke="#2b2118" stroke-width="4.6" stroke-linecap="round"/><path d="M44,166 l-1.8,11.0 l-1.2,9.0" fill="none" stroke="#e8892c" stroke-width="2.8" stroke-linecap="round"/><path d="M41,186 l-4,2 M41,186 l4,1.5 M41,186 l1,3" fill="none" stroke="#e8892c" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M58,166 l1.8,11.0 l1.2,9.0" fill="none" stroke="#2b2118" stroke-width="4.6" stroke-linecap="round"/><path d="M58,166 l1.8,11.0 l1.2,9.0" fill="none" stroke="#e8892c" stroke-width="2.8" stroke-linecap="round"/><path d="M61,186 l-4,2 M61,186 l4,1.5 M61,186 l1,3" fill="none" stroke="#e8892c" stroke-width="2.2" stroke-linecap="round"/>
+<path class="i" d="M28,150 q-15,-13 -8,-28 q7,12 13,19z" fill="#e2dccd"/>
+<path class="i" d="M26,155 q-18,-7 -17,-24 q10,8 18,15z" fill="#f4efe4"/>
+<path class="o" d="M26,150 q4,22 30,20 q18,-2 20,-18 q-2,-20 -24,-21 q-26,-1 -26,19z" fill="#f4efe4"/>
+<path d="M52,131 q22,1 24,21 q0,10 -8,15 q6,-22 -16,-36z" fill="#e2dccd" opacity=".6"/>
+<path d="M36,146 q16,-4 28,3 M40,158 q14,4 26,-2" fill="none" stroke="#cfc8b6" stroke-width="2" stroke-linecap="round"/>
+<circle class="o" cx="72" cy="126" r="12" fill="#f4efe4"/>
+<path d="M74,116 q11,2 11,12 q0,7 -5,10 q4,-13 -6,-22z" fill="#e2dccd" opacity=".55"/>
+<path class="i" d="M61,115 l3,-10 l5,8 l5,-10 l5,10 l4,-6 l2,9z" fill="#c9302c"/>
+<path class="i" d="M84,125 l10,3 l-10,4z" fill="#e8892c"/>
+<path class="i" d="M79,133 q4,1 3,6 q-4,1 -5,-4z" fill="#c9302c"/>
+<circle cx="76" cy="123" r="2.2" fill="#2b2118"/>
+<circle cx="76.8" cy="122.2" r="0.8" fill="#fff"/></g>
+<g fill="#4f7a2e"><path d="M8,188 l2,-9 l3,9z M14,188 l2,-12 l3,12z M88,184 l2,-8 l3,8z"/></g><g fill="#86ad50"><path d="M11,188 l1.5,-6 l1.5,6z"/></g>
+</svg>
