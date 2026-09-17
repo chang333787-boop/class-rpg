@@ -478,7 +478,7 @@ const GAME_DATA = {
     {id:'d_y57',name:'양 한 마리',    icon:'🐑', priceAdj:-30, cat:'yard', rarity:'rare',   reqLv:1, newUntil:'2026-09-27'},
 
     // ── 4차 확장: 넓어진 마당용 큰 장식 (DECO-LAND-1 뒤) — pen 은 동물이 안에서만 돌아다니는 우리
-    {id:'d_y58',name:'닭장',          icon:'🐔', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true},
+    {id:'d_y58',name:'닭장',          icon:'🐔', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true},
     {id:'d_y59',name:'큰 연못',       icon:'🦆', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true, penWater:true},
     {id:'d_y60',name:'양 목장',       icon:'🐑', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true},
     {id:'d_y61',name:'꽃길 조각',     icon:'🌸', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1},
