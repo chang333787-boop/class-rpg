@@ -1,0 +1,25 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- d_y32_swim 오리 가족 2×1 · 헤엄(물 위 전용 — 다리·풀·그림자·발자국 없음, 몸 아래 물결 띠) · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
+<g id="duckling"><ellipse cy="-1" rx="12" ry="4" fill="#000" opacity=".25"/><path class="i" d="M-12,-8 q12,10 24,0 q-2,-10 -12,-10 q-10,0 -12,10z" fill="#f2cf4a"/><path d="M-12,-8 q3,-3 3,-7 l-5,-2z" fill="#d9b23a"/><circle class="i" cx="10" cy="-16" r="6.5" fill="#f2cf4a"/><path class="i" d="M16,-16 l7,2 l-7,2.5z" fill="#e8892c"/><circle cx="12" cy="-17.5" r="1.4" fill="#2b2118"/><path d="M-4,-2 v3 M2,-2 v3" stroke="#e8892c" stroke-width="2"/><path d="M-2,-12 q4,-2 8,0" stroke="#d9b23a" stroke-width="1.2" fill="none"/></g>
+<g id="duckling_swim"><path class="i" d="M-12,-8 q12,10 24,0 q-2,-10 -12,-10 q-10,0 -12,10z" fill="#f2cf4a"/><path d="M-12,-8 q3,-3 3,-7 l-5,-2z" fill="#d9b23a"/><circle class="i" cx="10" cy="-16" r="6.5" fill="#f2cf4a"/><path class="i" d="M16,-16 l7,2 l-7,2.5z" fill="#e8892c"/><circle cx="12" cy="-17.5" r="1.4" fill="#2b2118"/><path d="M-2,-12 q4,-2 8,0" stroke="#d9b23a" stroke-width="1.2" fill="none"/><path d="M-15,-5 q3.75,-4 7.5,0 q3.75,4 7.5,0 q3.75,-4 7.5,0 q3.75,4 7.5,0 q4,4.8 -4,8 q-11,3.6 -22,0 q-4,-3.2 -4,-8 z" fill="#3f88bf" opacity=".9"/><path d="M-15,-5 q3.75,-4 7.5,0 q3.75,4 7.5,0 q3.75,-4 7.5,0 q3.75,4 7.5,0" fill="none" stroke="#2f74a8" stroke-width="2.2" stroke-linecap="round"/><path d="M-15,-5 q3.75,-4 7.5,0 q3.75,4 7.5,0 q3.75,-4 7.5,0 q3.75,4 7.5,0" fill="none" stroke="#5aa3d6" stroke-width="1.4" stroke-linecap="round" transform="translate(0,2.2)"/><path d="M-10,0 q3,-3 6,0" fill="none" stroke="#dff2fa" stroke-width="1.8" stroke-linecap="round"/><path d="M4,1 q3,-3 6,0" fill="none" stroke="#dff2fa" stroke-width="1.8" stroke-linecap="round"/></g>
+</defs>
+<!-- 어미 오리 -->
+<g transform="translate(136,180) scale(1.22)">
+  <path class="o" d="M-30,-16 q10,16 44,12 q14,-2 16,-14 q-6,-14 -26,-16 q-26,-2 -34,18z" fill="#f4efe4"/>
+  <path d="M-30,-16 q6,-6 6,-14 l-10,-4 q-4,10 4,18z" fill="#e2dccd" stroke="#2b2118" stroke-width="1.8"/>
+  <path d="M-16,-14 q14,-4 26,2" stroke="#d8d1c0" stroke-width="2" fill="none"/>
+  <path d="M-12,-10 q10,6 26,2" stroke="#cfc8b6" stroke-width="1.5" fill="none"/>
+  <path class="i" d="M-2,-26 q6,-10 18,-6" fill="none" stroke-width="2"/>
+  <circle class="o" cx="26" cy="-34" r="12" fill="#f4efe4"/>
+  <path class="i" d="M36,-34 l14,3 l-14,5z" fill="#e8892c"/>
+  <circle cx="30" cy="-37" r="2.2" fill="#2b2118"/><circle cx="31" cy="-38" r=".8" fill="#fff"/>
+  <path d="M22,-42 q6,-4 10,0" stroke="#e2dccd" stroke-width="1.6" fill="none"/>
+  <path d="M-38,-12 q9,-4 18,0 q9,4 18,0 q9,-4 18,0 q9,4 18,0 q4,8.4 -4,14 q-32,6.3 -64,0 q-4,-5.6 -4,-14 z" fill="#3f88bf" opacity=".9"/><path d="M-38,-12 q9,-4 18,0 q9,4 18,0 q9,-4 18,0 q9,4 18,0" fill="none" stroke="#2f74a8" stroke-width="2.2" stroke-linecap="round"/><path d="M-38,-12 q9,-4 18,0 q9,4 18,0 q9,-4 18,0 q9,4 18,0" fill="none" stroke="#5aa3d6" stroke-width="1.4" stroke-linecap="round" transform="translate(0,2.2)"/><path d="M-30,-2 q5,-3 10,0" fill="none" stroke="#dff2fa" stroke-width="1.8" stroke-linecap="round"/><path d="M4,0 q6,-3 12,0" fill="none" stroke="#dff2fa" stroke-width="1.8" stroke-linecap="round"/>
+</g>
+<!-- 새끼 2 -->
+<use href="#duckling_swim" transform="translate(78,188) scale(1.2)"/>
+<use href="#duckling_swim" transform="translate(38,194) scale(1.1)"/>
+<!-- 뒤로 번지는 물결 -->
+<path d="M8,186 q7,-3 14,0 M100,190 q6,-3 12,0 M176,182 q6,-3 12,0" fill="none" stroke="#dff2fa" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
