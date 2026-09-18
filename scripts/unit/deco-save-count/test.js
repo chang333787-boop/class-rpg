@@ -72,6 +72,43 @@
     const s2 = await server();
     out('스냅샷뒤_내칸', !!(s2.yardFloor && s2.yardFloor['22_45']));
     out('학생문서B', JSON.stringify(s2).length);
+
+    //  ④ 되돌리기(DECO-UNDO-1) — 판에 있을 때만
+    if (typeof decoUndo === 'function') {
+      closeInteriorFullscreen(); await sleep(300); openInteriorFullscreen(); await sleep(700);
+      out('다시열면_단계', _decoUndo.length);
+      const gold0 = CUR.gold;
+      const n0 = (CUR.houseDecorations || []).length;
+      SEL_DECO = 'd_y1';
+      for (let i = 0; i < 3; i++) _decoPlace('yard', 34, 10 + i);
+      out('놓기3_뒤', (CUR.houseDecorations || []).length - n0);
+      saves = 0;
+      decoUndo(); decoUndo(); decoUndo();
+      await sleep(900);
+      out('되돌리기3_뒤', (CUR.houseDecorations || []).length - n0);
+      out('되돌리기3_쓰기', saves);
+      //  치우기 되돌리기
+      _decoPlace('yard', 35, 10); SEL_DECO = null;
+      const before = (CUR.houseDecorations || []).length;
+      _decoPlace('yard', 35, 10);                 // 치우기
+      out('치운뒤', (CUR.houseDecorations || []).length - before);
+      decoUndo();
+      out('치우기되돌림', (CUR.houseDecorations || []).length - before);
+      //  바닥 되돌리기
+      const key = '36_10'; const prevT = (CUR.yardFloor || {})[key];
+      CUR_FLOOR_TILE = 'stone'; _paintFloor(36, 10);
+      out('칠한뒤', CUR.yardFloor[key]);
+      decoUndo();
+      out('바닥되돌림_같나', (CUR.yardFloor || {})[key] === prevT);
+      //  20단계 상한
+      for (let i = 0; i < 25; i++) _paintFloor(37, i);
+      out('25번뒤_단계', _decoUndo.length);
+      out('골드그대로', CUR.gold === gold0);
+      //  씬 바꾸면 0
+      toggleDecoScene(); await sleep(300);
+      out('씬바꾼뒤_단계', _decoUndo.length);
+      toggleDecoScene(); await sleep(300);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }

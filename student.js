@@ -4601,6 +4601,7 @@ function _isHC(r,c){ const c0=_houseCol0(); return r < DH.rows && c >= c0 && c <
 function openInteriorFullscreen() {
   _ifMode = true;
   _dZoom = 1; _dPanX = 0; _dPanY = 0;   // [DECO-ZOOM-1]
+  _decoUndoClear();   // [DECO-UNDO-1] 다시 열면 0단계
   DY = {...DY_FULL};
   DI = {...DI_FULL};
   const fs = document.getElementById('interior-fullscreen');
@@ -8077,9 +8078,94 @@ if (typeof document !== 'undefined') {
   addEventListener('pagehide', () => decoFlush('페이지 닫힘'));
 }
 
-function _paintFloor(r, c) {
+// ══ 꾸미기 되돌리기 ↩ 20단계 (DECO-UNDO-1) ═══════════════════
+//  마을(3D) 규칙 그대로: 20단계 · **맨 위만** 되돌린다(기록 중간을 고치지 않는다) ·
+//  **다시 열면 0단계**(기억에만 — 저장하지 않는다, 저장 형식 변경 0) · 끌어서 죽 놓은 것은 한 단계.
+//  골드는 건드리지 않는다 — 장식은 환불이 없고, 가진 개수는 '놓인 수'로 세므로 되돌리면 저절로 맞는다.
+//  되돌린 것도 꾸미기 묶음 저장(DECO-SAVE-1)을 탄다 → 되돌리기 때문에 쓰기가 늘지 않는다.
+const DECO_UNDO_MAX = 20;
+let _decoUndo = [];
+
+function _decoUndoPush(rec) {
+  _decoUndo.push(rec);
+  if (_decoUndo.length > DECO_UNDO_MAX) _decoUndo.shift();
+  _decoUndoSync();
+}
+function _decoUndoClear() { _decoUndo = []; _decoUndoSync(); }
+
+//  끌어서 죽 놓은 것을 한 단계로(K2 가 쓴다). 빈 목록은 쌓지 않는다.
+function decoUndoStroke(list) { if (list && list.length) _decoUndoPush({ t: 'stroke', list }); }
+
+function _decoUndoSync() {
+  const b = document.getElementById('if-undo-btn');
+  if (!b) return;
+  const n = _decoUndo.length;
+  b.disabled = !n;
+  b.style.opacity = n ? '1' : '.35';
+  b.title = n ? '되돌리기 (' + n + ')' : '되돌릴 것이 없어요';
+}
+
+//  한 줄을 거꾸로 — 성공하면 true
+function _decoUndoOne(rec) {
+  if (rec.t === 'place') {
+    const list = CUR.houseDecorations || [];
+    const i = list.findIndex(p => p.id === rec.p.id && p.area === rec.p.area && p.row === rec.p.row && p.col === rec.p.col);
+    if (i < 0) return false;
+    CUR.houseDecorations = list.slice(0, i).concat(list.slice(i + 1));
+    return true;
+  }
+  if (rec.t === 'remove') {
+    const d = GAME_DATA.decorations.find(x => x.id === rec.p.id);
+    if (!d) return false;
+    const sz = d.size || { w: 1, h: 1 };
+    const placed = CUR.houseDecorations || [];
+    const used = placed.filter(p => p.id === rec.p.id).length;
+    const inv = (CUR.inventory || []).find(x => x.id === rec.p.id);
+    if (!inv || inv.qty - used <= 0) return false;
+    if (!canPlaceDeco(rec.p.row, rec.p.col, sz.w, sz.h, rec.p.area, null)) return false;
+    CUR.houseDecorations = [...placed, { id: rec.p.id, area: rec.p.area, row: rec.p.row, col: rec.p.col }];
+    return true;
+  }
+  if (rec.t === 'floor') {
+    CUR.yardFloor = CUR.yardFloor || {};
+    if (rec.prev === undefined) delete CUR.yardFloor[rec.key]; else CUR.yardFloor[rec.key] = rec.prev;
+    return true;
+  }
+  if (rec.t === 'stroke') {
+    let ok = false;
+    for (let i = rec.list.length - 1; i >= 0; i--) ok = _decoUndoOne(rec.list[i]) || ok;
+    return ok;
+  }
+  return false;
+}
+
+function decoUndo() {
+  const rec = _decoUndo.pop();
+  if (!rec) { toast('되돌릴 것이 없어요'); _decoUndoSync(); return; }
+  const ok = _decoUndoOne(rec);
+  _decoUndoSync();
+  if (!ok) { toast(rec.t === 'remove' ? '그 자리가 이미 찼어요' : '되돌릴 수 없었어요'); return; }
+  decoDirty(); _drawDeco(); renderDecoInv();
+  toast('↩ 되돌렸어요');
+}
+
+if (typeof document !== 'undefined') {
+  //  PC: Ctrl+Z (꾸미기 전체화면이 열려 있을 때만)
+  document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || (e.key !== 'z' && e.key !== 'Z')) return;
+    const fs = document.getElementById('interior-fullscreen');
+    if (!fs || fs.style.display === 'none') return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    e.preventDefault(); decoUndo();
+  });
+}
+
+function _paintFloor(r, c, stroke) {
   CUR.yardFloor = CUR.yardFloor||{};
   const key = r+'_'+c;
+  const undoRec = { t: 'floor', key, prev: CUR.yardFloor[key] };   // [DECO-UNDO-1]
+  if (stroke) stroke.push(undoRec); else _decoUndoPush(undoRec);
   if(CUR.yardFloor[key] === CUR_FLOOR_TILE) {
     delete CUR.yardFloor[key]; // 같은 타일이면 기본(잔디)으로
   } else {
@@ -8101,6 +8187,7 @@ function _decoPlace(area,row,col){
   if(existing){
     const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
     CUR.houseDecorations=placed.filter(p=>!(p.area===area&&p.row===existing.row&&p.col===existing.col));
+    _decoUndoPush({ t: 'remove', p: { id: existing.id, area: existing.area, row: existing.row, col: existing.col } });   // [DECO-UNDO-1]
     decoDirty(); _drawDeco();   // [DECO-SAVE-1]
     toast(`${d?d.icon:'🌸'} 제거됨`); return;
   }
@@ -8118,12 +8205,14 @@ function _decoPlace(area,row,col){
     toast(_animWhyNot(SEL_DECO)); return;
   }
   CUR.houseDecorations=[...placed,{id:SEL_DECO,area,row,col}];
+  _decoUndoPush({ t: 'place', p: { id: SEL_DECO, area, row, col } });   // [DECO-UNDO-1]
   decoDirty(); _drawDeco(); renderDecoInv();   // [DECO-SAVE-1]
   toast(`✅ ${d.icon} ${d.name} 배치!`);
 }
 
 function toggleDecoScene(){
   decoFlush('씬 바꿈');   // [DECO-SAVE-1]
+  _decoUndoClear();   // [DECO-UNDO-1] 안 보이는 씬의 것을 되돌리지 않게
   DECO_SCENE=DECO_SCENE==='yard'?'indoor':'yard';
   SEL_DECO=null;
   _dZoom=1; _dPanX=0; _dPanY=0;   // [DECO-ZOOM-1]
