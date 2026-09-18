@@ -6944,7 +6944,7 @@ function decoPanBy(dx, dy) {
 let _dSuppressClick = false;
 function _decoAttachGestures(cv) {
   const pts = new Map();
-  let pinch = null, drag = null;
+  let pinch = null, drag = null, paint = null;   // paint = [DECO-DRAG-1] 끌어서 칠하기·놓기
 
   const mid = () => {
     const a = [...pts.values()];
@@ -6960,12 +6960,17 @@ function _decoAttachGestures(cv) {
     pts.set(e.pointerId, local(e));
     if (pts.size === 2) {
       drag = null;
+      if (paint) { _decoStrokeEnd(paint); paint = null; }   // 두 손가락이 되면 칠하기는 거기서 끝
       const m = mid();
       pinch = { d0: m.d, z0: _dZoom, fx: m.x, fy: m.y, mx: m.x, my: m.y };
       _dSuppressClick = true;
     } else if (pts.size === 1 && !SEL_DECO && DECO_MODE !== 'floor') {
       const l = local(e);
       drag = { x: l.x, y: l.y, moved: 0 };
+    } else if (pts.size === 1) {
+      //  [DECO-DRAG-1] 카드를 골랐거나 바닥 모드 — 끌면 칠하기·놓기
+      const cell = _decoCellAt(e.clientX, e.clientY);
+      if (cell) paint = { start: cell, last: cell, active: false, stroke: [], mode: null, placed: 0, outOfStock: false };
     }
   });
 
@@ -6977,6 +6982,18 @@ function _decoAttachGestures(cv) {
       if (pinch.d0 > 8) _decoSetZoom(pinch.z0 * (m.d / pinch.d0), pinch.fx, pinch.fy);
       decoPanBy(pinch.mx - m.x, pinch.my - m.y);
       pinch.mx = m.x; pinch.my = m.y;
+      return;
+    }
+    if (paint && pts.size === 1) {
+      const cell = _decoCellAt(e.clientX, e.clientY);
+      if (!cell || cell.area !== paint.last.area || (cell.r === paint.last.r && cell.c === paint.last.c)) return;
+      if (!paint.active) _decoStrokeBegin(paint);
+      for (const k of _decoLineCells(paint.last.r, paint.last.c, cell.r, cell.c)) {
+        if (cell.area === 'yard' && (_isHC(k.r, k.c) || _isFarmCell(k.r, k.c))) continue;
+        _decoStrokeApply({ area: cell.area, r: k.r, c: k.c }, paint);
+      }
+      paint.last = cell;
+      _drawDeco();
       return;
     }
     if (drag) {
@@ -6992,7 +7009,10 @@ function _decoAttachGestures(cv) {
   const end = e => {
     pts.delete(e.pointerId);
     if (pts.size < 2) pinch = null;
-    if (!pts.size) { drag = null; setTimeout(() => { _dSuppressClick = false; }, 0); }
+    if (!pts.size) {
+      if (paint) { _decoStrokeEnd(paint); paint = null; }
+      drag = null; setTimeout(() => { _dSuppressClick = false; }, 0);
+    }
   };
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
@@ -7003,6 +7023,105 @@ function _decoAttachGestures(cv) {
     const l = local(e);
     _decoSetZoom(_dZoom * (e.deltaY < 0 ? DECO_ZOOM_STEP : 1 / DECO_ZOOM_STEP), l.x, l.y);
   }, { passive: false });
+}
+
+// ══ 꾸미기 끌어서 연달아 놓기·칠하기 (DECO-DRAG-1) ══════════════
+//  카드를 고른 채(또는 🖌️ 바닥 모드) **한 손가락으로 끌면** 지나간 칸마다 놓이고 칠해진다.
+//  · 한 번 끈 것은 **되돌리기 한 단계**(decoUndoStroke) · 저장은 묶음(DECO-SAVE-1)이라 칸마다 저장 안 됨.
+//  · 바닥: 시작 칸이 그 타일이 되면 '칠하기', 지워지면 '지우기'로 한 번 정해 그대로 간다(깜빡이지 않게).
+//  · 장식: **놓기만** 한다(끌다가 치우는 일은 없다 — 망가뜨리지 않게). 못 놓는 칸은 조용히 건너뛴다.
+//  · 빠르게 끌어도 칸이 비지 않게 앞 칸과 이 칸 사이를 곧은 줄로 채운다.
+//  · 빈손 한 손가락 끌기는 지금처럼 화면 이동, 두 손가락은 확대·이동.
+let _decoLastTap = null;   // 방금 누른 칸(터치는 누르는 순간 이미 놓인다 — 끌기 첫 칸이 두 번 되지 않게)
+
+function _decoCellAt(clientX, clientY) {
+  if (!_dCv) return null;
+  const bp = _decoBoardPoint(clientX, clientY), C = _dC;
+  if (DECO_SCENE === 'yard') {
+    const c = Math.floor(bp.x / C), r = Math.floor(bp.y / C);
+    if (c < 0 || c >= DY.cols || r < 0 || r >= DY.rows) return null;
+    if (_isHC(r, c) || _isFarmCell(r, c)) return null;
+    return { area: 'yard', r, c };
+  }
+  const ox = _dCv._offX || 0, oy = _dCv._offY || 0;
+  const c = Math.floor((bp.x - ox) / C), r = Math.floor((bp.y - oy) / C);
+  if (c < 0 || c >= DI.cols || r < 0 || r >= DI.rows) return null;
+  return { area: 'indoor', r, c };
+}
+
+//  앞 칸 → 이 칸 사이 곧은 줄(Bresenham). 앞 칸은 빼고 이 칸은 넣는다 — 순수 함수(시험용)
+function _decoLineCells(r0, c0, r1, c1) {
+  const out = [];
+  const dr = Math.abs(r1 - r0), dc = Math.abs(c1 - c0);
+  const sr = r0 < r1 ? 1 : -1, sc = c0 < c1 ? 1 : -1;
+  let err = dc - dr, r = r0, c = c0;
+  while (!(r === r1 && c === c1)) {
+    const e2 = 2 * err;
+    if (e2 > -dr) { err -= dr; c += sc; }
+    if (e2 < dc) { err += dc; r += sr; }
+    out.push({ r, c });
+  }
+  return out;
+}
+
+//  한 칸 칠하기·놓기(끌기용 — 알림 없음). 바뀐 게 있으면 true
+function _decoStrokeApply(cell, st) {
+  if (DECO_MODE === 'floor') {
+    if (cell.area !== 'yard') return false;
+    CUR.yardFloor = CUR.yardFloor || {};
+    const key = cell.r + '_' + cell.c, cur = CUR.yardFloor[key];
+    if (st.mode === 'erase') {
+      if (cur === undefined) return false;
+      st.stroke.push({ t: 'floor', key, prev: cur }); delete CUR.yardFloor[key];
+    } else {
+      if (cur === CUR_FLOOR_TILE) return false;
+      st.stroke.push({ t: 'floor', key, prev: cur }); CUR.yardFloor[key] = CUR_FLOOR_TILE;
+    }
+    decoDirty();
+    return true;
+  }
+  if (!SEL_DECO) return false;
+  const d = GAME_DATA.decorations.find(x => x.id === SEL_DECO);
+  if (!d || d.cat !== cell.area) return false;
+  const sz = d.size || { w: 1, h: 1 };
+  const placed = CUR.houseDecorations || [];
+  const inv = (CUR.inventory || []).find(i => i.id === SEL_DECO);
+  if (!inv || inv.qty - placed.filter(p => p.id === SEL_DECO).length <= 0) { st.outOfStock = true; return false; }
+  if (!canPlaceDeco(cell.r, cell.c, sz.w, sz.h, cell.area, null)) return false;
+  if (cell.area === 'yard' && typeof ANIM_DECO !== 'undefined' && ANIM_DECO[SEL_DECO]
+      && !_animGroundOk(SEL_DECO, CUR, cell.r, cell.c, sz.w, sz.h)) return false;
+  CUR.houseDecorations = [...placed, { id: SEL_DECO, area: cell.area, row: cell.r, col: cell.c }];
+  st.stroke.push({ t: 'place', p: { id: SEL_DECO, area: cell.area, row: cell.r, col: cell.c } });
+  st.placed++;
+  decoDirty();
+  return true;
+}
+
+function _decoStrokeBegin(st) {
+  const s0 = st.start;
+  //  터치는 누르는 순간 첫 칸이 이미 처리됐다 → 그 되돌리기 한 줄을 이 끌기로 합친다
+  const tapped = _decoLastTap && _decoLastTap.area === s0.area && _decoLastTap.r === s0.r && _decoLastTap.c === s0.c
+    && Date.now() - _decoLastTap.t < 1500;
+  const startKey = s0.r + '_' + s0.c;
+  if (tapped) {
+    if (_decoUndo.length) { st.stroke.push(_decoUndo.pop()); _decoUndoSync(); }
+    if (DECO_MODE === 'floor') st.mode = ((CUR.yardFloor || {})[startKey] === CUR_FLOOR_TILE) ? 'set' : 'erase';
+  } else {
+    if (DECO_MODE === 'floor') st.mode = ((CUR.yardFloor || {})[startKey] === CUR_FLOOR_TILE) ? 'erase' : 'set';
+    _decoStrokeApply(s0, st);
+  }
+  st.active = true;
+  _dSuppressClick = true;
+}
+
+function _decoStrokeEnd(st) {
+  if (!st || !st.active) return;
+  decoUndoStroke(st.stroke);
+  _drawDeco(); renderDecoInv();
+  if (DECO_MODE !== 'floor') {
+    if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
+    else if (st.outOfStock) toast('가진 개수가 모자라요!');
+  }
 }
 
 // 창 기준 px → 판 px (클릭·핀치 공용)
@@ -8035,6 +8154,7 @@ function _decoClick(e) {
     if(_isHC(r,c)){ toast('집 영역에는 배치할 수 없어요!'); return; }
     // 농장 존 클릭 차단 (수확은 농장 탭에서만)
     if(_isFarmCell(r,c)){ toast('🌾 수확은 농장 탭에서 해주세요!'); return; }
+    _decoLastTap = { area: 'yard', r, c, t: Date.now() };   // [DECO-DRAG-1]
     if(DECO_MODE==='floor') { _paintFloor(r,c); return; }
     // [DECO-ANIM-2] 카드를 안 고른 상태에서 동물을 누르면 반응(놓기가 먼저다)
     if(!SEL_DECO){
@@ -8046,6 +8166,7 @@ function _decoClick(e) {
     const {_offX:ox,_offY:oy}=_dCv;
     const c=Math.floor((mx-ox)/C), r=Math.floor((my-oy)/C);
     if(c<0||c>=DI.cols||r<0||r>=DI.rows) return;
+    _decoLastTap = { area: 'indoor', r, c, t: Date.now() };   // [DECO-DRAG-1]
     _decoPlace('indoor',r,c);
   }
 }

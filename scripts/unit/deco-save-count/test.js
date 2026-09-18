@@ -109,6 +109,87 @@
       out('씬바꾼뒤_단계', _decoUndo.length);
       toggleDecoScene(); await sleep(300);
     }
+
+    //  ⑤ 끌어서 연달아 놓기·칠하기(DECO-DRAG-1) — 판에 있을 때만
+    if (typeof _decoStrokeApply === 'function') {
+      closeInteriorFullscreen(); await sleep(300); openInteriorFullscreen(); await sleep(1200);
+      if (!_dCv) { renderHouseDeco(); await sleep(300); }
+      out('캔버스있나', !!_dCv);
+      const pt = (r, c) => {
+        const cv = _dCv;
+        const rect = cv.getBoundingClientRect();
+        const bx = c * _dC + _dC / 2 - _dPanX, by = r * _dC + _dC / 2 - _dPanY;
+        return { clientX: rect.left + bx * rect.width / _dW, clientY: rect.top + by * rect.height / _dH };
+      };
+      const fire = (type, r, c, id) => _dCv.dispatchEvent(new PointerEvent(type, Object.assign({ pointerId: id || 1, pointerType: 'mouse', bubbles: true }, pt(r, c))));
+      const clickAt = (r, c) => _dCv.dispatchEvent(new MouseEvent('click', Object.assign({ bubbles: true }, pt(r, c))));
+
+      //  바닥: 한 줄 10칸 끌기
+      setDecoMode('floor'); CUR_FLOOR_TILE = 'brick'; await sleep(200);
+      const u0 = _decoUndo.length;
+      saves = 0;
+      fire('pointerdown', 5, 2);
+      for (let c = 3; c <= 11; c++) fire('pointermove', 5, c);
+      fire('pointerup', 5, 11); clickAt(5, 11);   // 마우스는 뗄 때 click 이 온다 — 끌기 뒤라 무시돼야 한다
+      await sleep(900);
+      let painted = 0; for (let c = 2; c <= 11; c++) if ((CUR.yardFloor || {})['5_' + c] === 'brick') painted++;
+      out('끌어칠하기_10칸', painted);
+      out('끌어칠하기_쓰기', saves);
+      out('끌어칠하기_되돌리기단계', _decoUndo.length - u0);
+      decoUndo();
+      let left = 0; for (let c = 2; c <= 11; c++) if ((CUR.yardFloor || {})['5_' + c] === 'brick') left++;
+      out('끌어칠하기_되돌린뒤', left);
+
+      //  빠르게 끌기: 한 번에 8칸 뛰어도 사이가 채워지나
+      fire('pointerdown', 7, 2); fire('pointermove', 7, 10); fire('pointerup', 7, 10);
+      await sleep(100);
+      let gap = 0; for (let c = 2; c <= 10; c++) if ((CUR.yardFloor || {})['7_' + c] !== 'brick') gap++;
+      out('빠른끌기_빈칸', gap);
+      decoUndo();
+
+      //  장식: 6칸 끌어 놓기
+      setDecoMode('deco'); SEL_DECO = 'd_y1'; await sleep(200);
+      const n0 = (CUR.houseDecorations || []).length, u1 = _decoUndo.length;
+      fire('pointerdown', 12, 2);
+      for (let c = 3; c <= 7; c++) fire('pointermove', 12, c);
+      fire('pointerup', 12, 7); clickAt(12, 7);
+      await sleep(200);
+      out('끌어놓기_6개', (CUR.houseDecorations || []).length - n0);
+      out('끌어놓기_되돌리기단계', _decoUndo.length - u1);
+      decoUndo();
+      out('끌어놓기_되돌린뒤', (CUR.houseDecorations || []).length - n0);
+
+      //  빈손 끌기는 여전히 화면 이동(놓인 것 0)
+      SEL_DECO = null; await sleep(100);
+      const n1 = (CUR.houseDecorations || []).length;
+      fire('pointerdown', 14, 2); for (let c = 3; c <= 9; c++) fire('pointermove', 14, c); fire('pointerup', 14, 9); clickAt(14, 9);
+      await sleep(200);
+      out('빈손끌기_놓인것', (CUR.houseDecorations || []).length - n1);
+
+      //  한 번 누르기(끌지 않음)는 예전처럼 하나
+      SEL_DECO = 'd_y1';
+      const n2 = (CUR.houseDecorations || []).length;
+      fire('pointerdown', 16, 4); fire('pointerup', 16, 4); clickAt(16, 4);
+      await sleep(200);
+      out('한번누르기_놓인것', (CUR.houseDecorations || []).length - n2);
+
+      //  터치 흉내: 터치는 누르는 순간(touchstart) 첫 칸이 이미 처리된다 → 끌기가 첫 칸을 두 번 하지 않고,
+      //  되돌리기도 한 단계로 합쳐져야 한다.
+      setDecoMode('floor'); CUR_FLOOR_TILE = 'sand'; await sleep(200);
+      const u2 = _decoUndo.length;
+      clickAt(9, 2);                         // touchstart 가 부르는 것과 같은 _decoClick
+      fire('pointerdown', 9, 2, 7);
+      for (let c = 3; c <= 6; c++) fire('pointermove', 9, c, 7);
+      fire('pointerup', 9, 6, 7);
+      await sleep(100);
+      let sand = 0; for (let c = 2; c <= 6; c++) if ((CUR.yardFloor || {})['9_' + c] === 'sand') sand++;
+      out('터치끌기_5칸', sand);
+      out('터치끌기_되돌리기단계', _decoUndo.length - u2);
+      decoUndo();
+      let sandLeft = 0; for (let c = 2; c <= 6; c++) if ((CUR.yardFloor || {})['9_' + c] === 'sand') sandLeft++;
+      out('터치끌기_되돌린뒤', sandLeft);
+      setDecoMode('deco');
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
