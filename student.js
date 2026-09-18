@@ -7296,7 +7296,7 @@ function _decoBoardPoint(clientX, clientY) {
 const ANIM_DECO = {
   d_y32: { radius: 3, wait: [4000, 8000],  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
   d_y39: { radius: 3, wait: [3500, 7000],  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
-  d_y40: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양' },
+  d_y40: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양', artLeft: true },   // 그림이 왼쪽을 본다
   d_y53: { radius: 4, wait: [2500, 5500],  ground: ['soft', 'hard'], come: true,    say: '왈!',     name: '강아지' },
   d_y54: { radius: 4, wait: [3000, 7000],  ground: ['soft', 'hard'],                say: '야옹',    name: '고양이' },
   d_y55: { radius: 3, wait: [3500, 7000],  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
@@ -7431,6 +7431,17 @@ function _animWhyNot(id) {
 
 // 걸음 두 번째 장(<id>_b.svg) — 있으면 걷는 동안 그 장을 쓴다. 없으면 한 장으로 그냥 걷는다(404 안전).
 const _animFrameB = {};
+// [DECO-EAT-1] 먹는 장(<id>_eat.svg) — 먹이통 옆에 닿으면 고개 숙인 장으로 바꾼다(헤엄 중엔 안 씀)
+const _animFrameEat = {};
+function _animProbeEat(id) {
+  if (id in _animFrameEat) return _animFrameEat[id];
+  _animFrameEat[id] = false;
+  const img = new Image();
+  img.onload = () => { _animFrameEat[id] = (img.naturalWidth > 0); };
+  img.onerror = () => { _animFrameEat[id] = false; };
+  img.src = './assets/deco/' + encodeURIComponent(id) + '_eat.svg';
+  return false;
+}
 function _animProbeFrameB(id) {
   if (id in _animFrameB) return _animFrameB[id];
   _animFrameB[id] = false;
@@ -7569,21 +7580,40 @@ function _animStep(st) {
   if (next.row !== st.cur.row || next.col !== st.cur.col) {
     const imgEl = st.el.querySelector('img');
     if (next.col !== st.cur.col && imgEl) {
-      imgEl.style.transform = 'scaleX(' + (next.col > st.cur.col ? 1 : -1) + ')';
+      const dir = next.col > st.cur.col ? 1 : -1;
+      imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';   // [DECO-EAT-1] 왼쪽을 보는 그림은 반대로
     }
     const dur = hopped ? 300 : (900 + Math.random() * 700);
     // 걸음 그림 두 장이 있으면 걷는 동안만 바꿔 준다(헤엄은 발이 안 보이니 안 바꾼다)
     if (imgEl && _animFrameB[st.id] && !st.swim && !hopped) {
       imgEl.src = './assets/deco/' + encodeURIComponent(st.id) + '_b.svg';
       if (st.frameTimer) clearTimeout(st.frameTimer);
-      st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; }, dur);
+      st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; st.eating = false; _animEatSync(st); }, dur);
     }
     st.el.style.transitionDuration = dur + 'ms';
     st.cur = next;
     st.el.style.transform = 'translate(' + (next.col * st.C) + 'px,' + (next.row * st.C) + 'px)';
     st.el.style.zIndex = String(next.row);
   }
+  _animEatSync(st);   // [DECO-EAT-1]
   _animSchedule(st);
+}
+
+function _animEatSync(st) {
+  const imgEl = st.el && st.el.querySelector('img'); if (!imgEl) return;
+  const fd = st.feeder;
+  const near = !!(fd && Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1);
+  const eat = near && !st.swim && _animFrameEat[st.id];
+  const want = eat ? './assets/deco/' + encodeURIComponent(st.id) + '_eat.svg' : st.srcA;
+  if (st.eating === eat) return;
+  //  걸음 장(_b)이 도는 중이면 그 타이머가 끝날 때 다시 부른다
+  if (st.frameTimer) return;
+  imgEl.src = want; st.eating = eat;
+  //  먹을 때는 먹이통 쪽을 본다
+  if (eat && fd.col !== st.cur.col) {
+    const dir = fd.col > st.cur.col ? 1 : -1;
+    imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';
+  }
 }
 
 // [DECO-ANIM-2] 동물을 누르면 — 말풍선 + 폴짝. 강아지는 누른 쪽으로 한 칸 다가온다.
@@ -7615,7 +7645,7 @@ function _animPoke(st, fromCol) {
     const penOk = !st.pen || (to.col >= st.pen.c0 && to.col <= st.pen.c1 - (st.w - 1));
     if (dir && penOk && st.isFree(to.row, to.col, st.w, st.h, st.id, st.swim)) {
       const imgEl = st.el.querySelector('img');
-      if (imgEl) imgEl.style.transform = 'scaleX(' + dir + ')';
+      if (imgEl) imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';
       st.cur = to;
       st.el.style.transitionDuration = '500ms';
       st.el.style.transform = 'translate(' + (to.col * st.C) + 'px,' + (to.row * st.C) + 'px)';
@@ -7677,6 +7707,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
       el.appendChild(bob);
       rec.world.appendChild(el);
       _animProbeFrameB(p.id);
+      _animProbeEat(p.id);   // [DECO-EAT-1]
       st = { el, id: p.id, srcA, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null, frameTimer: null };
       rec.items.set(key, st);
     }

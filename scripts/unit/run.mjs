@@ -777,12 +777,12 @@ try {
     ] },
   };
   sb.globalThis = sb; vm.createContext(sb);
-  const names = ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt',
-    '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
+  const names = ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt',
+    '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animProbeEat', '_animEatSync', '_animReduced', '_animFreeMaker', '_animNextCell',
     '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
   let src = SPACE_PRELUDE(S);
   for (const n of names) {
-    if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === 'FEED_RANGE' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
+    if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === 'FEED_RANGE' || n === '_animFrameB' || n === '_animFrameEat' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
       const m = re.exec(S); if (!m) throw new Error(`없음: ${n}`); src += m[0] + '\n';
     } else src += sliceFn(S, n) + '\n';
@@ -990,7 +990,7 @@ try {
     ] } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
-  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
     if (at < 0) throw new Error('선언 없음: ' + n);
@@ -1006,7 +1006,7 @@ try {
   }
   for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
                    '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
-                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+                   '_animProbeFrameB', '_animProbeEat', '_animEatSync', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
   src += ';globalThis.__R = { _penAt, _isPenDeco, _groundKind, _animGroundOk, _animWhyNot, _animSyncLayer, _animAt, _animPoke, _animLayers, _animStopLayer };';
   vm.runInContext(src, sb);
@@ -1113,7 +1113,7 @@ try {
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
-  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
     let depth = 0, end = -1;
@@ -1128,7 +1128,7 @@ try {
   }
   for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
                    '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
-                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+                   '_animProbeFrameB', '_animProbeEat', '_animEatSync', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
   src += ';globalThis.__P = { _isPenDeco, _penAt, _animSyncLayer, _animLayers, _animStopLayer, _animFreeMaker };';
   vm.runInContext(src, sb);
@@ -1228,7 +1228,7 @@ try {
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
-  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FENCE_IDS', 'FENCE_ART', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
+  for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FENCE_IDS', 'FENCE_ART', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
     if (at < 0) throw new Error('선언 없음: ' + n);
@@ -1245,7 +1245,7 @@ try {
   for (const n of ['_isFenceCell', '_fenceArtOr', '_fencePick', '_fenceArtFor', '_feedersOf', '_feederFor',
                    '_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
                    '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
-                   '_animProbeFrameB', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
+                   '_animProbeFrameB', '_animProbeEat', '_animEatSync', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
   src += ';globalThis.__F = { _fencePick, _fenceArtFor, _feedersOf, _animSyncLayer, _animLayers, _animStopLayer };';
   vm.runInContext(src, sb);

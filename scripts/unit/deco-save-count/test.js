@@ -314,6 +314,34 @@
       out('서버_공간2장식', (sv.houseDecorations ? Object.values(sv.houseDecorations) : []).filter(p => p && p.sp === 2).length);
       out('서버_공간3바닥', !!(sv.yardFloors && sv.yardFloors[3]));
     }
+
+    //  ⑨ 먹는 장(DECO-EAT-1) — 먹이통(d_y69, 9/20 머지)은 시험에서만 표에 넣는다
+    if (typeof _animEatSync === 'function') {
+      if (!GAME_DATA.decorations.find(d => d.id === 'd_y69'))
+        GAME_DATA.decorations.push({ id: 'd_y69', name: '먹이통', icon: '🥣', cat: 'yard', rarity: 'common', price: 20, feeder: true });
+      decoSpaceSet(3); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.houseDecorations.push({ id: 'd_y69', area: 'yard', row: 20, col: 20, sp: 3 });
+      CUR.houseDecorations.push({ id: 'd_y55', area: 'yard', row: 20, col: 21, sp: 3 });   // 닭 한 마리 — 먹이통 바로 옆
+      CUR.houseDecorations.push({ id: 'd_y40', area: 'yard', row: 24, col: 24, sp: 3 });   // 양 — 멀리
+      _animStopAll();
+      const host = _ifActiveContainer || 'house-topview';
+      //  (헤드리스는 RAF 가 안 돌 때가 있다 — 그리기 끝에 부르는 층 맞추기를 직접 부른다)
+      _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
+      await sleep(1500);   // 먹는 장 그림이 불러와질 시간
+      _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
+      await sleep(100);
+      const rec = _animLayers.get(_ifActiveContainer || 'house-topview');
+      const hen = rec && [...rec.items.values()].find(x => x.id === 'd_y55');
+      if (hen) { _animEatSync(hen); }
+      const img = hen && hen.el.querySelector('img');
+      out('먹이통옆_닭_먹는장', !!(img && /d_y55_eat\.svg/.test(img.src)));
+      out('먹는장_파일있음', !!_animFrameEat['d_y55']);
+      const sheep = rec && [...rec.items.values()].find(x => x.id === 'd_y40');
+      out('양_그림왼쪽표시', !!(sheep && sheep.cfg.artLeft));
+      decoSpaceSet(1); await sleep(200);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
