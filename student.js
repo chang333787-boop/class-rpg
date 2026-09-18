@@ -7484,6 +7484,21 @@ function _animWhyNot(id) {
 const _animFrameB = {};
 // [DECO-EAT-1] 먹는 장(<id>_eat.svg) — 먹이통 옆에 닿으면 고개 숙인 장으로 바꾼다(헤엄 중엔 안 씀)
 const _animFrameEat = {};
+// [DECO-SWIM-1] 헤엄 장(<id>_swim.svg) — 물 위 오리가 다리 두 개로 걷고 발밑에 풀이 따라오던 것(플레이 시험)
+const _animFrameSwim = {};
+function _animProbeSwim(id) {
+  if (id in _animFrameSwim) return _animFrameSwim[id];
+  _animFrameSwim[id] = false;
+  const img = new Image();
+  img.onload = () => {
+    _animFrameSwim[id] = (img.naturalWidth > 0);
+    //  그림 확인이 늦게 끝나도 이미 물 위에 있는 오리를 바로 헤엄 장으로(타이머를 따로 걸지 않는다)
+    if (_animFrameSwim[id]) _animLayers.forEach(rec => rec.items.forEach(st => { if (st.id === id) _animEatSync(st); }));
+  };
+  img.onerror = () => { _animFrameSwim[id] = false; };
+  img.src = './assets/deco/' + encodeURIComponent(id) + '_swim.svg';
+  return false;
+}
 function _animProbeEat(id) {
   if (id in _animFrameEat) return _animFrameEat[id];
   _animFrameEat[id] = false;
@@ -7640,7 +7655,7 @@ function _animStep(st) {
     if (imgEl && _animFrameB[st.id] && !st.swim && !hopped) {
       imgEl.src = './assets/deco/' + encodeURIComponent(st.id) + '_b.svg';
       if (st.frameTimer) clearTimeout(st.frameTimer);
-      st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; st.eating = false; _animEatSync(st); }, dur);
+      st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; st.eating = null; _animEatSync(st); }, dur);
     }
     st.el.style.transitionDuration = dur + 'ms';
     st.cur = next;
@@ -7656,11 +7671,14 @@ function _animEatSync(st) {
   const fd = st.feeder;
   const near = !!(fd && Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1);
   const eat = near && !st.swim && _animFrameEat[st.id];
-  const want = eat ? './assets/deco/' + encodeURIComponent(st.id) + '_eat.svg' : st.srcA;
-  if (st.eating === eat) return;
+  const swim = !!(st.swim && _animFrameSwim[st.id]);   // [DECO-SWIM-1]
+  const want = eat ? './assets/deco/' + encodeURIComponent(st.id) + '_eat.svg'
+             : swim ? './assets/deco/' + encodeURIComponent(st.id) + '_swim.svg' : st.srcA;
+  const mode = eat ? 'eat' : swim ? 'swim' : 'rest';
+  if (st.eating === mode) return;
   //  걸음 장(_b)이 도는 중이면 그 타이머가 끝날 때 다시 부른다
   if (st.frameTimer) return;
-  imgEl.src = want; st.eating = eat;
+  imgEl.src = want; st.eating = mode;
   //  먹을 때는 먹이통 쪽을 본다
   if (eat && fd.col !== st.cur.col) {
     const dir = fd.col > st.cur.col ? 1 : -1;
@@ -7763,6 +7781,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
       rec.world.appendChild(el);
       _animProbeFrameB(p.id);
       _animProbeEat(p.id);   // [DECO-EAT-1]
+      _animProbeSwim(p.id);  // [DECO-SWIM-1]
       st = { el, id: p.id, srcA, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null, frameTimer: null };
       rec.items.set(key, st);
     }
@@ -7771,6 +7790,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     st.isFree = isFree;
     // [DECO-ANIM-2] 물에 놓인 오리는 물에서만 다닌다(놓인 자리 바닥으로 판정)
     st.pen = _penAt(student, p.row, p.col);   // [DECO-ANIM-3] 우리 안이면 그 안에서만
+    if (_animFrameSwim[p.id] || _animFrameEat[p.id]) _animEatSync(st);   // [DECO-SWIM-1] 이미 확인된 그림이면 바로
     st.feeder = _feederFor(student, st, feeders);   // [DECO-FEED-1] 갈 먹이통(없으면 null)
     //  헤엄: 바닥을 물로 칠한 자리이거나, 물 있는 우리(연못 우리) 안이면
     st.swim = !!(st.cfg.water && (_groundAt(student, p.row, p.col) === 'water' || (st.pen && st.pen.water)));
@@ -8220,6 +8240,7 @@ function _isFarmCell(r, c) {
 }
 
 function _drawYardFarm(C) {
+  if (DECO_SPACE !== 1) return;   // [DECO-PT-3] 밭은 공간 1 에만(그림도) — 공간 2·3 에서 장식을 가리던 것
   const farm = CUR.farm || [];
   const {startCol, startRow, cols, rows} = _getFarmZone();
   const ctx = _dCtx;
@@ -8533,6 +8554,14 @@ function _paintFloor(r, c, stroke) {
 }
 
 //  [DECO-PT-2] 한 칸에 둘이 겹치면(우리 안 동물) 누른 것은 위의 것 — 동물 > 작은 것 > 우리
+//  [DECO-PT-3] 다 썼을 때 어느 공간에 몇 개 놓였는지 — "어 왜 모자라지?"
+function _decoWhereUsed(id) {
+  const by = {};
+  (CUR.houseDecorations || []).forEach(p => { if (p.id === id) { const k = _decoSpaceOf(p); by[k] = (by[k] || 0) + 1; } });
+  const parts = Object.keys(by).sort().map(k => '공간 ' + k + '에 ' + by[k] + '개');
+  return parts.length ? '다 썼어요 — ' + parts.join(', ') + ' 놓여 있어요' : '가진 개수가 모자라요!';
+}
+
 function _decoTopAt(area, row, col) {
   const hits = _decoList(CUR).filter(p => {
     if (p.area !== area) return false;
@@ -8578,7 +8607,7 @@ function _decoPlace(area,row,col){
   const sz=d.size||{w:1,h:1};
   const used=placed.filter(p=>p.id===SEL_DECO).length;
   const inv=(CUR.inventory||[]).find(i=>i.id===SEL_DECO);
-  if(!inv||inv.qty-used<=0){ toast('가진 개수가 모자라요!'); return; }
+  if(!inv||inv.qty-used<=0){ toast(_decoWhereUsed(SEL_DECO)); return; }   // [DECO-PT-3]
   if(!canPlaceDeco(row,col,sz.w,sz.h,area,null)){ toast('여기엔 배치할 수 없어요!'); return; }
   const why=_decoRuleWhy(SEL_DECO,area,row,col,sz.w,sz.h); if(why){ toast(why); return; }   // [DECO-PT-2]
   // [DECO-ANIM-2] 동물은 바닥을 가린다 — 왜 안 되는지 아이 말로 알려 준다
