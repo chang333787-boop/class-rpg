@@ -749,6 +749,11 @@
     <button onclick="decoZoomFit()" title="전체 보기" aria-label="전체 보기"
       style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
         background:rgba(20,24,32,.88);color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">전체</button>
+    <!-- [DECO-UNDO-1] 되돌리기 — 기둥 맨 아래(엄지 자리). 아이콘은 디자인2 assets/ui/ui_undo.svg -->
+    <button id="if-undo-btn" onclick="decoUndo()" title="되돌릴 것이 없어요" aria-label="되돌리기" disabled
+      style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(217,164,65,.55);opacity:.35;
+        background:rgba(20,24,32,.88);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin-top:6px">
+      <img src="./assets/ui/ui_undo.svg" alt="" width="26" height="26" style="pointer-events:none"></button>
   </div>
 
   <!-- 바닥 타일 선택줄 (바닥 모드일 때만) -->
@@ -918,7 +923,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260918bsa"></script>
+<script src="./student.js?v=20260918bsb"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
