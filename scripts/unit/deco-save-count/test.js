@@ -268,6 +268,52 @@
       await sleep(100);
       out('짧게누르면_치움', (CUR.houseDecorations || []).length === nBefore - 1);
     }
+
+    //  ⑧ 꾸미기 공간 1~3 (DECO-SPACE-1)
+    if (typeof decoSpaceSet === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
+      const pid = GAME_DATA.decorations.filter(d => d.price > 0 && !d.hidden && d.cat === 'yard' && !(d.size && (d.size.w > 1 || d.size.h > 1))
+        && !(typeof ANIM_DECO !== 'undefined' && ANIM_DECO[d.id]) && !(CUR.houseDecorations || []).some(p => p.id === d.id))[0].id;
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== pid).concat([{ id: pid, qty: 2 }]);
+      decoSpaceSet(1); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const s1count0 = _decoList(CUR).length;
+      SEL_DECO = pid; _decoPlace('yard', 30, 30);                 // 공간 1 에 하나
+      out('공간1_놓임', _decoList(CUR).length - s1count0);
+      decoSpaceSet(2); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      out('공간2_처음_비었나', _decoList(CUR).length === 0);
+      SEL_DECO = pid; _decoPlace('yard', 30, 30);                 // 공간 2 같은 자리에 하나(가진 2개 중 남은 1)
+      out('공간2_같은자리_놓임', _decoList(CUR).length);
+      SEL_DECO = pid; _decoPlace('yard', 31, 30);                 // 3번째 — 가진 개수 2개 다 씀 → 안 놓여야
+      out('공간2_세번째_막힘', _decoList(CUR).length === 1);
+      const sp2 = (CUR.houseDecorations || []).find(p => p.id === pid && p.sp === 2);
+      out('공간2_sp필드', sp2 ? sp2.sp : null);
+      //  공간 2 에서 치우면 공간 1 같은 자리 것은 그대로
+      SEL_DECO = null; _decoPlace('yard', 30, 30);
+      out('공간2_치운뒤', _decoList(CUR).length);
+      decoSpaceSet(1); await sleep(200);
+      out('공간1_그대로', _decoList(CUR).some(p => p.id === pid && p.row === 30 && p.col === 30));
+      //  바닥은 공간마다 따로
+      setDecoMode('floor'); CUR_FLOOR_TILE = 'brick'; _paintFloor(32, 30);
+      decoSpaceSet(3); await sleep(200);
+      out('공간3_바닥_따로', (_yardFloorGet(CUR)['32_30'] || 'grass') === 'grass');
+      _paintFloor(33, 30);
+      out('공간3_바닥필드', !!(CUR.yardFloors && CUR.yardFloors[3] && CUR.yardFloors[3]['33_30']));
+      decoSpaceSet(1); await sleep(200);
+      out('공간1_바닥', _yardFloorGet(CUR)['32_30']);
+      out('공간1_옛필드그대로', !!(CUR.yardFloor && CUR.yardFloor['32_30']) && !(CUR.yardFloor['33_30']));
+      setDecoMode('deco');
+      //  공간을 바꾸면 되돌리기 0
+      out('공간바꾼뒤_되돌리기', _decoUndo.length);
+      //  공간 1 옛 장식에는 sp 가 안 붙는다(형식 그대로)
+      out('공간1_sp없음', (CUR.houseDecorations || []).filter(p => !p.sp).length > 0);
+      decoSpaceSet(2); await sleep(200); SEL_DECO = pid; _decoPlace('yard', 34, 30); decoSpaceSet(1);   // 공간 2 에 다시 하나 두고 저장
+      await sleep(900);
+      const sv = await server();
+      out('서버_공간2장식', (sv.houseDecorations ? Object.values(sv.houseDecorations) : []).filter(p => p && p.sp === 2).length);
+      out('서버_공간3바닥', !!(sv.yardFloors && sv.yardFloors[3]));
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
