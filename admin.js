@@ -2147,7 +2147,7 @@ function renderRank() {
 //  ARTWORK 관리 (학생이 올린 작품 승인/반려)
 // ══════════════════════════════════════════════════
 // [ARTFREE-1] 수업 작품과 자유 작품을 갈라 본다. '전체'가 기본.
-let ART_KIND_FILTER = 'all';   // 'all' | 'lesson' | 'free'
+let ART_KIND_FILTER = 'all';   // 'all' | 'lesson' | 'free' | 'worksheet'(SCAN-LINK-1)
 function setArtKindFilter(k) {
   ART_KIND_FILTER = k;
   renderArtworkPending(); renderArtworkAdmin();
@@ -2155,7 +2155,7 @@ function setArtKindFilter(k) {
 const artKindOf = x => (x && x.kind) || 'lesson';   // 예전 데이터는 kind가 없다 → 수업 작품으로 본다
 function artKindChips() {
   return `<div style="display:flex;gap:.35rem;padding:.6rem 1.2rem">
-    ${[['all', '전체'], ['lesson', '🎨 수업'], ['free', '✏️ 자유']].map(k => `
+    ${[['all', '전체'], ['lesson', '🎨 수업'], ['free', '✏️ 자유'], ['worksheet', '📄 학습지']].map(k => `
       <button class="btn-sm ${ART_KIND_FILTER === k[0] ? '' : 'outline'}" style="font-size:.72rem"
         onclick="setArtKindFilter('${k[0]}')">${k[1]}</button>`).join('')}
   </div>`;
@@ -2184,6 +2184,8 @@ function renderArtworkPending() {
         <span style="font-weight:700">${escHtml(item.student.name || '')}</span>
         ${artKindOf(item) === 'free'
           ? '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(93,173,226,.16);color:var(--sky)">자유</span>'
+          : artKindOf(item) === 'worksheet'
+          ? '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(200,150,46,.16);color:var(--gold)">📄 학습지</span>'
           : '<span style="font-size:.66rem;padding:.1rem .4rem;border-radius:99px;background:rgba(46,204,113,.16);color:var(--emerald)">수업</span>'}
         <span style="font-size:.78rem;color:var(--txt3)">· ${escHtml(item.artTitle || '제목 없는 그림')}</span>
         <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">${item.date||''}</span>
