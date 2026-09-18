@@ -1,0 +1,45 @@
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<!-- d_y62_thumb 강아지 마당 — 썸네일 전용(개집 + 강아지) · 개집은 d_y62 그림 그대로 줄임 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}.O{stroke:#2b2118;stroke-width:5;stroke-linejoin:round;stroke-linecap:round}.I{stroke:#2b2118;stroke-width:3.6;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<path class="i" d="M8,40 h84 q5,0 5,5 v46 q0,5 -5,5 h-84 q-5,0 -5,-5 v-46 q0,-5 5,-5z" fill="#5a8a3a"/>
+<path d="M14,56 q30,-6 54,2 q16,4 24,0 q2,18 -6,30 q-30,6 -58,0 q-14,-6 -14,-32z" fill="#66963a" opacity=".5"/>
+<g fill="#3e6224" opacity=".55"><path d="M16,88 l2,-7 l3,7z M84,62 l2,-7 l3,7z M52,92 l2,-7 l3,7z"/></g>
+<g transform="translate(-19,-49) scale(0.52)"><ellipse cx="102" cy="197" rx="54" ry="10" fill="#000" opacity=".26"/>
+<path class="O" d="M56,144 h84 v50 h-84z" fill="#a5743c"/>
+<path d="M56,144 h84 v10 h-84z" fill="#000" opacity=".14"/>
+<path d="M80,144 v50 M114,144 v50" fill="none" stroke="#7a5230" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
+<path class="O" d="M44,146 L98,102 L152,146 Z" fill="#b5392b"/>
+<path d="M60,134 L94,108" fill="none" stroke="#efe6d4" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+<path d="M102,106 L98,102 L152,146 Z" fill="#8f2a1e" opacity=".45"/>
+<rect class="I" x="42" y="142" width="112" height="8" rx="2" fill="#efe6d4"/>
+<path class="I" d="M82,174 a16,20 0 0 1 32,0 v20 h-32z" fill="#2b2118"/>
+<path d="M86,179 a12,15 0 0 1 24,0 v15 h-24z" fill="#4a3a2a"/>
+<ellipse class="I" cx="98" cy="132" rx="13" ry="9" fill="#efe6d4"/>
+<path d="M92,132 h12" fill="none" stroke="#7a5230" stroke-width="2" stroke-linecap="round"/></g>
+<svg x="38" y="42" width="62" height="52" viewBox="5 118 93 77">
+
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<path d="M20,182 L62,174 L92,186 L48,192 Z" fill="#000" opacity=".16"/><ellipse cx="50" cy="184" rx="32" ry="7" fill="#000" opacity=".26"/>
+<path d="M28,153 q-17,-5 -15,-20 q2,-11 11,-8 q7,3 4,10" fill="none" stroke="#2b2118" stroke-width="11" stroke-linecap="round"/>
+<path d="M28,153 q-17,-5 -15,-20 q2,-11 11,-8 q7,3 4,10" fill="none" stroke="#e8a04a" stroke-width="7.5" stroke-linecap="round"/>
+<path class="i" d="M22.5,163 h9 l-2.1,18 q0,4 -4,4 h-8 q-4,0 -4,-4z" fill="#c9702e"/><ellipse class="i" cx="25" cy="185" rx="6.8" ry="3" fill="#a5561e"/><path class="i" d="M54.5,163 h9 l3.9,18 q0,4 -4,4 h-8 q-4,0 -4,-4z" fill="#c9702e"/><ellipse class="i" cx="63" cy="185" rx="6.8" ry="3" fill="#a5561e"/>
+<path class="o" d="M24,158 q-4,-20 12,-24 q16,-5 34,1 q10,3 10,14 q0,13 -12,15 q-22,3 -36,1 q-7,-1 -8,-7z" fill="#e8a04a"/>
+<path d="M32,138 q18,-5 34,1 q8,3 8,10 q-20,-7 -42,-3z" fill="#c9702e" opacity=".55"/>
+<path d="M30,158 q18,5 40,0 q-2,7 -12,8 q-20,2 -28,-8z" fill="#f4efe4"/>
+<path class="i" d="M28.5,164 h9 l3.9,18 q0,4 -4,4 h-8 q-4,0 -4,-4z" fill="#e8a04a"/><ellipse class="i" cx="37" cy="186" rx="6.8" ry="3" fill="#f4efe4"/><path class="i" d="M60.5,164 h9 l-2.1,18 q0,4 -4,4 h-8 q-4,0 -4,-4z" fill="#e8a04a"/><ellipse class="i" cx="63" cy="186" rx="6.8" ry="3" fill="#f4efe4"/>
+<path class="o" d="M62,150 q2,-14 14,-16 q14,-2 17,9 q2,11 -8,14 q-14,3 -23,-7z" fill="#e8a04a"/>
+<path d="M76,135 q13,-1 15,9 q1,7 -5,10 q4,-11 -10,-19z" fill="#c9702e" opacity=".5"/>
+<path class="i" d="M84,151 q8,-1 8,3 q1,4 -5,5 q-6,1 -7,-2.5 q0,-4.5 4,-5.5z" fill="#f4efe4"/>
+<circle cx="92" cy="150.5" r="2.3" fill="#2b2118"/>
+<path d="M87,156 q3,1.5 4,-.5" fill="none" stroke="#a5561e" stroke-width="1.3" stroke-linecap="round"/>
+<path d="M80,149 q6,-2 11,1" fill="none" stroke="#c9702e" stroke-width="1.2" stroke-linecap="round" opacity=".6"/>
+<path class="i" d="M70,136 q-3,-13 4,-15 q7,3 7,14z" fill="#a5561e"/>
+<path d="M73,132 q0,-8 2,-10 q3,3 3,10z" fill="#c9702e"/>
+<path class="i" d="M84,134 q1,-12 7,-12 q4,4 1,14z" fill="#a5561e"/>
+<circle cx="80" cy="143" r="2.4" fill="#2b2118"/>
+<circle cx="80.8" cy="142.2" r="0.9" fill="#fff"/>
+<path class="i" d="M64,152 q8,7 17,4 l1,5 q-12,3 -20,-5z" fill="#c9302c"/>
+<circle class="i" cx="72" cy="160" r="2.6" fill="#f3d55b"/>
+<g fill="#4f7a2e"><path d="M8,188 l2,-9 l3,9z M14,188 l2,-12 l3,12z M88,184 l2,-8 l3,8z"/></g><g fill="#86ad50"><path d="M11,188 l1.5,-6 l1.5,6z"/></g>
+</svg>
+</svg>
