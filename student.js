@@ -7117,6 +7117,7 @@ function _decoStrokeBegin(st) {
 function _decoStrokeEnd(st) {
   if (!st || !st.active) return;
   decoUndoStroke(st.stroke);
+  if (st.placed && SEL_DECO) _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
   _drawDeco(); renderDecoInv();
   if (DECO_MODE !== 'floor') {
     if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
@@ -8327,6 +8328,7 @@ function _decoPlace(area,row,col){
   }
   CUR.houseDecorations=[...placed,{id:SEL_DECO,area,row,col}];
   _decoUndoPush({ t: 'place', p: { id: SEL_DECO, area, row, col } });   // [DECO-UNDO-1]
+  _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
   decoDirty(); _drawDeco(); renderDecoInv();   // [DECO-SAVE-1]
   toast(`✅ ${d.icon} ${d.name} 배치!`);
 }
@@ -8351,35 +8353,114 @@ function toggleDecoScene(){
   toast(isYard?'🌿 마당이에요! 집은 오른쪽 위 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
 
+// ══ 장식 찾기 (DECO-FIND-1) — 이 장소만 · 이름 검색 · 최근 놓은 것 · 서랍 펼치기 ══
+//  거르기만 한다 — 값·가진 개수·놓기 규칙은 손대지 않는다. 기억은 기기에만(localStorage, DB 쓰기 0).
+const _decoFind = { sceneOnly: true, q: '' };
+const DECO_RECENT_KEY = 'rpg.deco.recent', DECO_RECENT_MAX = 8;
+
+function _decoRecentGet() {
+  try { const a = JSON.parse(localStorage.getItem(DECO_RECENT_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function _decoRecentAdd(id) {
+  try {
+    const a = _decoRecentGet().filter(x => x !== id);
+    a.unshift(id);
+    localStorage.setItem(DECO_RECENT_KEY, JSON.stringify(a.slice(0, DECO_RECENT_MAX)));
+  } catch (e) {}
+}
+
+//  이 장식이 지금 목록에 보여야 하나 — 순수 함수(시험용)
+function _decoFindMatch(d, scene, f) {
+  if (!d) return false;
+  if (f.sceneOnly && d.cat !== scene) return false;
+  const q = (f.q || '').trim();
+  if (q && String(d.name || '').indexOf(q) < 0) return false;
+  return true;
+}
+
+function decoFindSet(key, val) {
+  if (key === 'sceneOnly') _decoFind.sceneOnly = !_decoFind.sceneOnly;
+  else _decoFind[key] = val;
+  const chip = document.getElementById('if-deco-scene-only');
+  if (chip) { chip.classList.toggle('is-on', _decoFind.sceneOnly); chip.setAttribute('aria-pressed', String(_decoFind.sceneOnly)); }
+  const clr = document.getElementById('if-deco-search-clear');
+  if (clr) clr.hidden = !(_decoFind.q || '').length;
+  renderDecoInv();
+}
+
+function decoDrawerToggle() {
+  const dr = document.getElementById('if-deco-drawer'); if (!dr) return;
+  const open = !dr.classList.contains('is-open');
+  dr.classList.toggle('is-open', open);
+  const b = document.getElementById('if-deco-expand');
+  if (b) { b.textContent = open ? '⌄' : '⌃'; b.setAttribute('aria-label', open ? '서랍 접기' : '서랍 펼치기'); }
+}
+
+function _decoCardHtml(i, d, avail, placedScene) {
+  const RL = {common:'⚪',rare:'🔵',epic:'🟣',legend:'🟡'};
+  const isSel = SEL_DECO === i.id, isMatch = d.cat === placedScene, rl = RL[d.rarity||'common'] || '';
+  return `<div class="deco-card${isSel?' is-sel':''}" data-deco-id="${i.id}" data-cat="${d.cat}" onclick="selectDeco('${i.id}')" style="
+      background:${isSel?'rgba(255,215,0,.18)':'rgba(255,255,255,.05)'};
+      border:2px solid ${isSel?'var(--gold)':isMatch?'rgba(255,255,255,.15)':'rgba(255,255,255,.06)'};
+      border-radius:10px;padding:.35rem .45rem;cursor:${avail>0?'pointer':'default'};flex-shrink:0;
+      text-align:center;opacity:${avail>0?isMatch?1:.45:.25};min-width:64px;max-width:92px;transition:all .2s;
+      transform:${isSel?'scale(1.06)':'scale(1)'}">
+      <div style="font-size:1.35rem;line-height:1.2">${d.icon}</div>
+      <div class="dc-name" style="color:var(--txt2);margin-top:.1rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all">${rl} ${escHtml(d.name)}</div>
+      <div class="dc-qty">${d.cat==='yard'?'🌿':'🏠'} ×${avail}</div>
+    </div>`;
+}
+
 function renderDecoInv(){
   const placed=CUR.houseDecorations||[];
   const inv=(CUR.inventory||[]).filter(i=>GAME_DATA.decorations.find(d=>d.id===i.id));
   const el=document.getElementById('house-deco-inv');
+  _decoRenderQuick(inv, placed);   // [DECO-FIND-1] 최근 놓은 것 줄
   if(!inv.length){
     el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">가진 장식품이 없어요. 상점에서 사 보세요! 🏪</div>`;
     if(_ifMode) ifSyncInv();
     return;
   }
-  const RL={common:'⚪',rare:'🔵',epic:'🟣',legend:'🟡'};
-  el.innerHTML=inv.map(i=>{
-    const d=GAME_DATA.decorations.find(x=>x.id===i.id); if(!d) return '';
-    const used=placed.filter(p=>p.id===i.id).length;
-    const avail=i.qty-used;
-    const isSel=SEL_DECO===i.id;
-    const isMatch=d.cat===DECO_SCENE;
-    const rl=RL[d.rarity||'common']||'';
-    return `<div onclick="selectDeco('${i.id}')" style="
-      background:${isSel?'rgba(255,215,0,.18)':'rgba(255,255,255,.05)'};
-      border:2px solid ${isSel?'var(--gold)':isMatch?'rgba(255,255,255,.15)':'rgba(255,255,255,.06)'};
-      border-radius:10px;padding:.45rem .6rem;cursor:${avail>0?'pointer':'default'};
-      text-align:center;opacity:${avail>0?isMatch?1:.45:.25};min-width:58px;transition:all .2s;
-      transform:${isSel?'scale(1.06)':'scale(1)'}">
-      <div style="font-size:1.4rem">${d.icon}</div>
-      <div style="font-size:.6rem;color:var(--txt2);margin-top:.1rem;line-height:1.2">${rl} ${d.name}</div>
-      <div style="font-size:.58rem;margin-top:.08rem">${d.cat==='yard'?'🌿':'🏠'} ×${avail}</div>
-    </div>`;
+  //  [DECO-FIND-1] 이 장소만 · 이름 검색으로 거른다(값·개수·놓기 규칙은 그대로)
+  let hidden = 0;
+  const shown = inv.filter(i => {
+    const d = GAME_DATA.decorations.find(x => x.id === i.id);
+    const ok = _decoFindMatch(d, DECO_SCENE, _decoFind);
+    if (!ok) hidden++;
+    return ok;
+  });
+  el.innerHTML = shown.map(i => {
+    const d = GAME_DATA.decorations.find(x => x.id === i.id); if (!d) return '';
+    const avail = i.qty - placed.filter(p => p.id === i.id).length;
+    return _decoCardHtml(i, d, avail, DECO_SCENE);
   }).join('');
+  const empty = document.getElementById('if-deco-empty');
+  if (empty) {
+    if (!shown.length) {
+      empty.hidden = false;
+      empty.textContent = (_decoFind.q || '').trim()
+        ? '"' + _decoFind.q.trim() + '" 이름인 장식이 없어요'
+        : (DECO_SCENE === 'yard' ? '마당에 놓을 장식이 없어요' : '집 안에 놓을 장식이 없어요') + ' — "이 장소만"을 끄면 다 보여요';
+    } else empty.hidden = true;
+  }
   if(_ifMode) ifSyncInv();
+}
+
+//  최근 놓은 것 줄 — 지금 장소에 놓을 수 있고 아직 남은 것만. 비면 줄을 감춘다.
+function _decoRenderQuick(inv, placed) {
+  const q = document.getElementById('if-deco-quick'); if (!q) return;
+  const byId = {}; inv.forEach(i => { byId[i.id] = i; });
+  const cards = [];
+  for (const id of _decoRecentGet()) {
+    const i = byId[id]; const d = GAME_DATA.decorations.find(x => x.id === id);
+    if (!i || !d || d.cat !== DECO_SCENE) continue;
+    const avail = i.qty - placed.filter(p => p.id === id).length;
+    if (avail <= 0) continue;
+    cards.push(_decoCardHtml(i, d, avail, DECO_SCENE));
+  }
+  q.hidden = !cards.length;
+  q.innerHTML = cards.length ? '<span class="deco-quick-label">🕘 최근</span>' + cards.join('') : '';
 }
 
 function selectDeco(id){

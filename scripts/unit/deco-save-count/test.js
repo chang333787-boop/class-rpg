@@ -190,6 +190,47 @@
       out('터치끌기_되돌린뒤', sandLeft);
       setDecoMode('deco');
     }
+
+    //  ⑥ 장식 찾기(DECO-FIND-1) — 판에 있을 때만
+    if (typeof _decoFindMatch === 'function') {
+      //  장식 79종을 전부 1개씩 가진 아이로
+      const all = GAME_DATA.decorations.filter(d => d.price > 0 && !d.hidden);
+      CUR.inventory = all.map(d => ({ id: d.id, qty: 2 }));
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(400); }
+      _decoFind.sceneOnly = true; _decoFind.q = '';
+      renderDecoInv(); await sleep(100);
+      const cnt = () => document.querySelectorAll('#if-deco-inv .deco-card').length;
+      out('집안_이장소만', cnt());
+      decoFindSet('sceneOnly'); await sleep(50);
+      out('집안_다보기', cnt());
+      decoFindSet('sceneOnly'); await sleep(50);
+      toggleDecoScene(); await sleep(400);
+      out('마당_이장소만', cnt());
+      decoFindSet('q', '울타리'); await sleep(50);
+      out('검색_울타리', cnt());
+      decoFindSet('q', '없는이름'); await sleep(50);
+      const emp = document.getElementById('if-deco-empty');
+      out('없는이름_빈칸글', emp && !emp.hidden ? emp.textContent : '(안 보임)');
+      decoFindSet('q', ''); await sleep(50);
+      //  최근 놓은 것
+      SEL_DECO = all.find(d => d.cat === 'yard' && !(d.size && (d.size.w > 1 || d.size.h > 1)) && !(CUR.houseDecorations || []).some(p => p.id === d.id) && !(typeof ANIM_DECO !== 'undefined' && ANIM_DECO[d.id])).id;
+      const before = (CUR.houseDecorations || []).length;
+      _decoPlace('yard', 25, 4); await sleep(100);
+      out('최근용_놓였나', (CUR.houseDecorations || []).length - before);
+      out('최근_저장값', localStorage.getItem('rpg.deco.recent'));
+      const quick = document.getElementById('if-deco-quick');
+      out('최근줄_보임', !!(quick && !quick.hidden));
+      out('최근줄_카드', quick ? quick.querySelectorAll('.deco-card').length : 0);
+      //  서랍 펼치기
+      const body = document.getElementById('if-deco-body');
+      const h0 = body.getBoundingClientRect().height;
+      decoDrawerToggle(); await sleep(100);
+      const h1 = body.getBoundingClientRect().height;
+      out('서랍_접힘높이', Math.round(h0));
+      out('서랍_펼침높이', Math.round(h1));
+      decoDrawerToggle();
+      out('DB쓰기_찾기동안', 'localStorage만');
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }

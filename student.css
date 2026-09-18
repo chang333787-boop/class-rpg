@@ -1375,3 +1375,30 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 @keyframes decoHop{0%,100%{transform:translateY(0)}35%{transform:translateY(-9px)}}
 .deco-anim.swim .bob{bottom:-4px;animation-duration:2.4s}
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
+
+/* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════
+   디자인3 실측: 폰 375 에서 서랍에 79종 중 4개만 보였다(줄 높이 120px·1.5줄).
+   집 안에서는 마당 전용 62종이 흐리게 그대로 나열돼 17종을 찾으려 62개를 지나쳤다. */
+.deco-drawer-head{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:nowrap}
+.deco-drawer-label{font-size:12px;color:var(--txt3);white-space:nowrap;word-break:keep-all}
+.deco-search-wrap{flex:1;min-width:0;position:relative;display:flex}
+#if-deco-search{flex:1;min-width:0;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);color:var(--txt);padding:0 36px 0 10px;font-size:14px;font-family:inherit}
+#if-deco-search-clear{position:absolute;right:2px;top:2px;width:36px;height:36px;border:0;background:transparent;
+  color:var(--txt2);font-size:16px;cursor:pointer}
+.deco-chip{flex-shrink:0;min-width:44px;height:40px;padding:0 10px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;border:1.5px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);color:var(--txt2);white-space:nowrap;word-break:keep-all}
+.deco-chip.is-on{border-color:var(--gold);background:rgba(217,164,65,.16);color:var(--gold)}
+.deco-quick{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:4px;
+  border-bottom:1px dashed rgba(255,255,255,.1)}
+.deco-quick-label{flex-shrink:0;align-self:center;font-size:12px;color:var(--txt3);white-space:nowrap}
+.deco-drawer-body{max-height:152px;overflow-y:auto}
+.deco-drawer.is-open .deco-drawer-body{max-height:48vh}
+.deco-empty{font-size:13px;color:var(--txt3);padding:10px 4px;word-break:keep-all}
+/* 카드 글자 12px (디자인 시스템 최소) */
+#if-deco-inv .deco-card .dc-name,#if-deco-quick .deco-card .dc-name{font-size:12px!important}
+#if-deco-inv .deco-card .dc-qty,#if-deco-quick .deco-card .dc-qty{font-size:12px!important}
+@media (max-width:420px){
+  .deco-drawer-label{display:none}
+}
