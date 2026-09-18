@@ -4549,8 +4549,63 @@ function getDecoSize(decoId) {
 }
 
 // 멀티셀 장식 충돌 체크
+// ══ 꾸미기 공간 1~3 (DECO-SPACE-1) ═══════════════════════════════
+//  선생님: "지금 꾸미기를 공간 1 이라 하고 공간 3 까지 줘도 돼. 공간 1 에서 쓴 것은 소모된 상태로
+//  다른 공간에서 쓰는 거지." → 장식은 한 목록(houseDecorations)에 두고 **공간 번호(sp)만 붙인다.**
+//  · 공간 1 은 지금 그대로(sp 없음 = 1) → **있는 꾸미기는 한 글자도 안 바뀐다.**
+//  · 가진 개수는 **모든 공간을 합쳐** 센다(공간 1 에 놓은 것은 다른 공간에서 못 쓴다).
+//  · 바닥은 공간 1 = yardFloor(그대로), 공간 2·3 = yardFloors["2"|"3"] (새 필드, 있을 때만).
+//  · 농장은 공간 1 에만 있다(작물은 하나다). 친구가 구경 오면 공간 1 을 본다.
+//  저장 형식은 **추가만**(sp · yardFloors) — 옛 판이 새 저장본을 읽어도 공간 1 은 그대로 열린다.
+const DECO_SPACES = 3;
+let DECO_SPACE = 1;
+function _decoSpaceOf(p) { return (p && p.sp) || 1; }
+function _decoList(student) {
+  return ((student && student.houseDecorations) || []).filter(p => _decoSpaceOf(p) === DECO_SPACE);
+}
+function _decoNew(id, area, row, col) {
+  const o = { id, area, row, col };
+  if (DECO_SPACE !== 1) o.sp = DECO_SPACE;
+  return o;
+}
+//  읽기용(없으면 빈 것 — 필드를 만들지 않는다)
+function _yardFloorGet(student) {
+  if (!student) return {};
+  if (DECO_SPACE === 1) return student.yardFloor || {};
+  return (student.yardFloors && student.yardFloors[DECO_SPACE]) || {};
+}
+//  쓰기용(없으면 만든다)
+function _yardFloorMap(student) {
+  if (DECO_SPACE === 1) { student.yardFloor = student.yardFloor || {}; return student.yardFloor; }
+  student.yardFloors = student.yardFloors || {};
+  student.yardFloors[DECO_SPACE] = student.yardFloors[DECO_SPACE] || {};
+  return student.yardFloors[DECO_SPACE];
+}
+
+function decoSpaceSet(n) {
+  n = Math.max(1, Math.min(DECO_SPACES, n | 0));
+  if (n === DECO_SPACE) return;
+  decoFlush('공간 바꿈');
+  _decoUndoClear();
+  _decoViewSave();
+  DECO_SPACE = n;
+  try { localStorage.setItem('rpg.deco.space', String(n)); } catch (e) {}
+  _decoSpaceSync();
+  _animStopAll();
+  _dCv = null; _dCtx = null;
+  renderHouseDeco();
+  const used = _decoList(CUR).length;
+  toast('🏡 공간 ' + n + (used ? '' : ' — 비어 있어요. 새로 꾸며 보세요!'));
+}
+function _decoSpaceSync() {
+  for (let i = 1; i <= DECO_SPACES; i++) {
+    const b = document.getElementById('if-space-' + i);
+    if (b) { b.classList.toggle('is-on', i === DECO_SPACE); b.setAttribute('aria-pressed', String(i === DECO_SPACE)); }
+  }
+}
+
 function canPlaceDeco(r, c, w, h, area, excludeId) {
-  const placed = (CUR.houseDecorations||[]).filter(p=>p.area===area && p.id!==excludeId);
+  const placed = _decoList(CUR).filter(p=>p.area===area && p.id!==excludeId);   // [DECO-SPACE-1] 이 공간만
   for (let dr=0; dr<h; dr++) for (let dc=0; dc<w; dc++) {
     const tr=r+dr, tc=c+dc;
     if (area==='yard') {
@@ -4601,6 +4656,8 @@ function _isHC(r,c){ const c0=_houseCol0(); return r < DH.rows && c >= c0 && c <
 function openInteriorFullscreen() {
   _ifMode = true;
   _dZoom = 1; _dPanX = 0; _dPanY = 0;   // [DECO-ZOOM-1]
+  try { const sp = +localStorage.getItem('rpg.deco.space'); if (sp >= 1 && sp <= DECO_SPACES) DECO_SPACE = sp; } catch (e) {}   // [DECO-SPACE-1]
+  setTimeout(_decoSpaceSync, 0);
   _decoUndoClear();   // [DECO-UNDO-1] 다시 열면 0단계
   DY = {...DY_FULL};
   DI = {...DI_FULL};
@@ -6846,7 +6903,7 @@ function _initDeco() {
       //  [DECO-PICK-1] 카드 없이 놓인 장식을 누르면 '치우기'인데, 길게 누르면 스포이드다 →
       //  그 경우만 손을 뗄 때(짧았을 때) 치운다. 나머지는 지금처럼 누르는 순간 처리.
       const cell = _decoCellAt(t.clientX, t.clientY);
-      const onDeco = !SEL_DECO && DECO_MODE !== 'floor' && cell && (CUR.houseDecorations || []).some(p => {
+      const onDeco = !SEL_DECO && DECO_MODE !== 'floor' && cell && _decoList(CUR).some(p => {
         if (p.area !== cell.area) return false; const sz = getDecoSize(p.id);
         return cell.r >= p.row && cell.r < p.row + sz.h && cell.c >= p.col && cell.c < p.col + sz.w;
       });
@@ -7132,14 +7189,14 @@ function _decoLineCells(r0, c0, r1, c1) {
 function _decoStrokeApply(cell, st) {
   if (DECO_MODE === 'floor') {
     if (cell.area !== 'yard') return false;
-    CUR.yardFloor = CUR.yardFloor || {};
-    const key = cell.r + '_' + cell.c, cur = CUR.yardFloor[key];
+    const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
+    const key = cell.r + '_' + cell.c, cur = fm[key];
     if (st.mode === 'erase') {
       if (cur === undefined) return false;
-      st.stroke.push({ t: 'floor', key, prev: cur }); delete CUR.yardFloor[key];
+      st.stroke.push({ t: 'floor', key, prev: cur }); delete fm[key];
     } else {
       if (cur === CUR_FLOOR_TILE) return false;
-      st.stroke.push({ t: 'floor', key, prev: cur }); CUR.yardFloor[key] = CUR_FLOOR_TILE;
+      st.stroke.push({ t: 'floor', key, prev: cur }); fm[key] = CUR_FLOOR_TILE;
     }
     decoDirty();
     return true;
@@ -7154,8 +7211,9 @@ function _decoStrokeApply(cell, st) {
   if (!canPlaceDeco(cell.r, cell.c, sz.w, sz.h, cell.area, null)) return false;
   if (cell.area === 'yard' && typeof ANIM_DECO !== 'undefined' && ANIM_DECO[SEL_DECO]
       && !_animGroundOk(SEL_DECO, CUR, cell.r, cell.c, sz.w, sz.h)) return false;
-  CUR.houseDecorations = [...placed, { id: SEL_DECO, area: cell.area, row: cell.r, col: cell.c }];
-  st.stroke.push({ t: 'place', p: { id: SEL_DECO, area: cell.area, row: cell.r, col: cell.c } });
+  const np = _decoNew(SEL_DECO, cell.area, cell.r, cell.c);   // [DECO-SPACE-1]
+  CUR.houseDecorations = [...placed, np];
+  st.stroke.push({ t: 'place', p: Object.assign({}, np) });
   st.placed++;
   decoDirty();
   return true;
@@ -7169,9 +7227,9 @@ function _decoStrokeBegin(st) {
   const startKey = s0.r + '_' + s0.c;
   if (tapped) {
     if (_decoUndo.length) { st.stroke.push(_decoUndo.pop()); _decoUndoSync(); }
-    if (DECO_MODE === 'floor') st.mode = ((CUR.yardFloor || {})[startKey] === CUR_FLOOR_TILE) ? 'set' : 'erase';
+    if (DECO_MODE === 'floor') st.mode = (_yardFloorGet(CUR)[startKey] === CUR_FLOOR_TILE) ? 'set' : 'erase';
   } else {
-    if (DECO_MODE === 'floor') st.mode = ((CUR.yardFloor || {})[startKey] === CUR_FLOOR_TILE) ? 'erase' : 'set';
+    if (DECO_MODE === 'floor') st.mode = (_yardFloorGet(CUR)[startKey] === CUR_FLOOR_TILE) ? 'erase' : 'set';
     _decoStrokeApply(s0, st);
   }
   st.active = true;
@@ -7185,7 +7243,7 @@ const DECO_PICK_MS = 600;
 function _decoPickAt(cell) {
   if (!cell) return false;
   const list = CUR.houseDecorations || [];
-  const hit = list.find(p => {
+  const hit = _decoList(CUR).find(p => {   // [DECO-SPACE-1] 누른 것은 이 공간에서
     if (p.area !== cell.area) return false;
     const sz = getDecoSize(p.id);
     return cell.r >= p.row && cell.r < p.row + sz.h && cell.c >= p.col && cell.c < p.col + sz.w;
@@ -7263,7 +7321,7 @@ function _fenceArtOr(id, fallback) {
 }
 
 function _isFenceCell(student, r, c) {
-  const list = (student && student.houseDecorations) || [];
+  const list = _decoList(student);   // [DECO-SPACE-1]
   for (const p of list) {
     if (p.area !== 'yard' || p.row !== r || p.col !== c) continue;
     if (FENCE_IDS.indexOf(p.id) >= 0) return true;
@@ -7300,7 +7358,7 @@ function _fenceArtFor(student, r, c) {
 //  · 저장하지 않는다. 먹이·수입 같은 값은 없다(그건 밸런스 결정이다).
 const FEED_RANGE = 7;
 function _feedersOf(student) {
-  return ((student && student.houseDecorations) || []).filter(p => {
+  return _decoList(student).filter(p => {   // [DECO-SPACE-1]
     if (p.area !== 'yard') return false;
     const d = GAME_DATA.decorations.find(x => x.id === p.id);
     return !!(d && d.feeder);
@@ -7327,7 +7385,7 @@ function _isPenDeco(id) {
 }
 //  (r,c) 를 품은 우리의 사각형을 준다. 없으면 null.
 function _penAt(student, r, c) {
-  const list = (student && student.houseDecorations) || [];
+  const list = _decoList(student);   // [DECO-SPACE-1]
   for (const p of list) {
     if (p.area !== 'yard' || !_isPenDeco(p.id)) continue;
     const sz = getDecoSize(p.id);
@@ -7351,7 +7409,7 @@ function _groundKind(type) {
   return GROUND_HARD.indexOf(type) >= 0 ? 'hard' : 'soft';   // 그 외는 풀·흙
 }
 function _groundAt(student, r, c) {
-  return _groundKind(((student && student.yardFloor) || {})[r + '_' + c] || 'grass');
+  return _groundKind(_yardFloorGet(student)[r + '_' + c] || 'grass');   // [DECO-SPACE-1]
 }
 //  이 동물을 (r,c) 에 놓을 수 있나 — 바닥만 본다(겹침은 canPlaceDeco 가 본다)
 function _animGroundOk(id, student, r, c, w, h) {
@@ -7394,7 +7452,7 @@ function _animReduced() {
 // 그 칸에 설 수 있나 — 판 안 · 집 영역 아님 · 농장 칸 아님 · 다른 장식 없음(동물끼리는 지나갈 수 있다)
 function _animFreeMaker(student, rows, cols) {
   const taken = new Set();
-  (student.houseDecorations || []).forEach(p => {
+  _decoList(student).forEach(p => {   // [DECO-SPACE-1]
     if (p.area !== 'yard' || ANIM_DECO[p.id]) return;
     if (_isPenDeco(p.id)) return;   // [DECO-ANIM-3] 우리 안은 동물이 지날 수 있다
     const sz = getDecoSize(p.id);
@@ -7574,7 +7632,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
   if (scene !== 'yard') { _animStopLayer(hostId); return; }
 
   const rows = DY.rows, cols = DY.cols;
-  const list = (student.houseDecorations || []).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);
+  const list = _decoList(student).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);   // [DECO-SPACE-1]
   if (!list.length) { _animStopLayer(hostId); return; }
 
   let rec = _animLayers.get(hostId);
@@ -7812,12 +7870,12 @@ function _drawYard() {
   // 셀별 바닥 타일
   // [FLOOR-SVG-1] 이웃 타입 조회 — 격자 밖·집 영역은 null(경계 없음)
   const _yardTypeAt = (rr, cc) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
-    ? null : ((CUR.yardFloor||{})[rr+'_'+cc] || 'grass');
+    ? null : (_yardFloorGet(CUR)[rr+'_'+cc] || 'grass');   // [DECO-SPACE-1]
   const _vis = _decoVisible(DY.rows, DY.cols);   // [DECO-ZOOM-1] 보이는 칸만
   for(let r=_vis.r0;r<_vis.r1;r++) for(let c=_vis.c0;c<_vis.c1;c++){
     if(_isHC(r,c)) continue;
     const tkey = r+'_'+c;
-    const ttype = (CUR.yardFloor||{})[tkey]||'grass';
+    const ttype = _yardFloorGet(CUR)[tkey]||'grass';
     const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
     if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
     _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;
@@ -8008,7 +8066,7 @@ function _drawYard() {
 
   // 배치된 마당 장식 - footprint 전체를 채우는 bounding box 렌더
   // [DECO-SVG-1] 뒤(윗줄)부터 그린다 — SVG가 위로 넘칠 수 있어 앞줄이 가리게 해야 한다
-  _decoSorted((CUR.houseDecorations||[]).filter(p=>p.area==='yard')).forEach(p=>{
+  _decoSorted(_decoList(CUR).filter(p=>p.area==='yard')).forEach(p=>{   // [DECO-SPACE-1]
     const fn=_DFN[p.id], d=GAME_DATA.decorations.find(x=>x.id===p.id);
     if(!d) return;
     if(ANIM_DECO[p.id]) return;   // [DECO-ANIM-1] 움직이는 동물은 캔버스 위 층에서 그린다
@@ -8070,6 +8128,7 @@ function _getFarmZone() {
 }
 
 function _isFarmCell(r, c) {
+  if (DECO_SPACE !== 1) return false;   // [DECO-SPACE-1] 농장은 공간 1 에만
   const {startCol, startRow, cols, rows} = _getFarmZone();
   return r >= startRow && r < startRow + rows && c >= startCol && c < startCol + cols;
 }
@@ -8182,7 +8241,7 @@ function _drawIndoor() {
       _dCtx.drawImage(oc, px+2, py+2, bw-4, bh-4);
     }
   };
-  const _indoorPlaced = (CUR.houseDecorations||[]).filter(p=>p.area==='indoor');
+  const _indoorPlaced = _decoList(CUR).filter(p=>p.area==='indoor');   // [DECO-SPACE-1]
   // [FLOOR-SVG-1] 바닥 레이어(러그) — 격자·가구보다 먼저
   _decoSorted(_indoorPlaced.filter(_isFloorLayerDeco)).forEach(_drawIndoorItem);
 
@@ -8206,7 +8265,7 @@ function _drawIndoor() {
   if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='indoor'){
     _dCtx.fillStyle='rgba(255,220,100,.09)';
     for(let r=0;r<DI.rows;r++) for(let c=0;c<DI.cols;c++){
-      if(!(CUR.houseDecorations||[]).find(p=>p.area==='indoor'&&p.row===r&&p.col===c))
+      if(!_decoList(CUR).find(p=>p.area==='indoor'&&p.row===r&&p.col===c))
         _dCtx.fillRect(offX+c*C+1,offY+r*C+1,C-2,C-2);
     }
   }
@@ -8319,7 +8378,8 @@ function _decoUndoSync() {
 function _decoUndoOne(rec) {
   if (rec.t === 'place') {
     const list = CUR.houseDecorations || [];
-    const i = list.findIndex(p => p.id === rec.p.id && p.area === rec.p.area && p.row === rec.p.row && p.col === rec.p.col);
+    const i = list.findIndex(p => p.id === rec.p.id && p.area === rec.p.area && p.row === rec.p.row && p.col === rec.p.col
+      && _decoSpaceOf(p) === _decoSpaceOf(rec.p));   // [DECO-SPACE-1]
     if (i < 0) return false;
     CUR.houseDecorations = list.slice(0, i).concat(list.slice(i + 1));
     return true;
@@ -8333,12 +8393,12 @@ function _decoUndoOne(rec) {
     const inv = (CUR.inventory || []).find(x => x.id === rec.p.id);
     if (!inv || inv.qty - used <= 0) return false;
     if (!canPlaceDeco(rec.p.row, rec.p.col, sz.w, sz.h, rec.p.area, null)) return false;
-    CUR.houseDecorations = [...placed, { id: rec.p.id, area: rec.p.area, row: rec.p.row, col: rec.p.col }];
+    CUR.houseDecorations = [...placed, Object.assign({}, rec.p)];   // [DECO-SPACE-1] 공간 번호째 되살린다
     return true;
   }
   if (rec.t === 'floor') {
-    CUR.yardFloor = CUR.yardFloor || {};
-    if (rec.prev === undefined) delete CUR.yardFloor[rec.key]; else CUR.yardFloor[rec.key] = rec.prev;
+    const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
+    if (rec.prev === undefined) delete fm[rec.key]; else fm[rec.key] = rec.prev;
     return true;
   }
   if (rec.t === 'stroke') {
@@ -8372,14 +8432,14 @@ if (typeof document !== 'undefined') {
 }
 
 function _paintFloor(r, c, stroke) {
-  CUR.yardFloor = CUR.yardFloor||{};
+  const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
   const key = r+'_'+c;
-  const undoRec = { t: 'floor', key, prev: CUR.yardFloor[key] };   // [DECO-UNDO-1]
+  const undoRec = { t: 'floor', key, prev: fm[key] };   // [DECO-UNDO-1]
   if (stroke) stroke.push(undoRec); else _decoUndoPush(undoRec);
-  if(CUR.yardFloor[key] === CUR_FLOOR_TILE) {
-    delete CUR.yardFloor[key]; // 같은 타일이면 기본(잔디)으로
+  if(fm[key] === CUR_FLOOR_TILE) {
+    delete fm[key]; // 같은 타일이면 기본(잔디)으로
   } else {
-    CUR.yardFloor[key] = CUR_FLOOR_TILE;
+    fm[key] = CUR_FLOOR_TILE;
   }
   decoDirty();   // [DECO-SAVE-1] 0.4초 묶기 — 끌어서 칠할 때 칸마다 통째 저장되지 않게
   _drawDeco();
@@ -8388,16 +8448,16 @@ function _paintFloor(r, c, stroke) {
 function _decoPlace(area,row,col){
   const placed=CUR.houseDecorations||[];
 
-  // 클릭한 칸에 있는 장식 찾기 (멀티셀 고려)
-  const existing=placed.find(p=>{
+  // 클릭한 칸에 있는 장식 찾기 (멀티셀 고려) — [DECO-SPACE-1] 이 공간 것만
+  const existing=_decoList(CUR).find(p=>{
     if(p.area!==area) return false;
     const sz=getDecoSize(p.id);
     return row>=p.row&&row<p.row+sz.h&&col>=p.col&&col<p.col+sz.w;
   });
   if(existing){
     const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
-    CUR.houseDecorations=placed.filter(p=>!(p.area===area&&p.row===existing.row&&p.col===existing.col));
-    _decoUndoPush({ t: 'remove', p: { id: existing.id, area: existing.area, row: existing.row, col: existing.col } });   // [DECO-UNDO-1]
+    CUR.houseDecorations=placed.filter(p=>p!==existing);   // [DECO-SPACE-1] 그 한 개만(다른 공간 같은 자리 것은 그대로)
+    _decoUndoPush({ t: 'remove', p: Object.assign({}, existing) });   // [DECO-UNDO-1]
     decoDirty(); _drawDeco();   // [DECO-SAVE-1]
     toast(`${d?d.icon:'🌸'} 제거됨`); return;
   }
@@ -8414,8 +8474,9 @@ function _decoPlace(area,row,col){
   if(area==='yard' && ANIM_DECO[SEL_DECO] && !_animGroundOk(SEL_DECO, CUR, row, col, sz.w, sz.h)){
     toast(_animWhyNot(SEL_DECO)); return;
   }
-  CUR.houseDecorations=[...placed,{id:SEL_DECO,area,row,col}];
-  _decoUndoPush({ t: 'place', p: { id: SEL_DECO, area, row, col } });   // [DECO-UNDO-1]
+  const np=_decoNew(SEL_DECO,area,row,col);   // [DECO-SPACE-1]
+  CUR.houseDecorations=[...placed,np];
+  _decoUndoPush({ t: 'place', p: Object.assign({}, np) });   // [DECO-UNDO-1]
   _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
   decoDirty(); _drawDeco(); renderDecoInv();   // [DECO-SAVE-1]
   toast(`✅ ${d.icon} ${d.name} 배치!`);
@@ -10343,6 +10404,7 @@ function _renderFriendCanvas() {
 
   const prevCUR   = CUR;
   const prevScene = DECO_SCENE;
+  const prevSpace = DECO_SPACE; DECO_SPACE = 1;   // [DECO-SPACE-1] 친구 구경은 공간 1
   const prevCv    = _dCv;
   const prevCtx   = _dCtx;
   const prevW     = _dW;
@@ -10383,6 +10445,7 @@ function _renderFriendCanvas() {
   _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _dPanX, _dPanY);
 
   // 복원
+  DECO_SPACE = prevSpace;   // [DECO-SPACE-1]
   CUR        = prevCUR;
   DECO_SCENE = prevScene;
   _dCv       = prevCv;

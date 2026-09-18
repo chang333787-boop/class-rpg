@@ -32,6 +32,11 @@ const eq = (a, b, note = '') => {
 // ── 소스에서 함수/상수 하나를 이름으로 잘라낸다 ──────────────────
 //  "function NAME(" 이 줄 머리에 있는 곳부터 중괄호 짝이 맞는 곳까지.
 //  문자열·정규식·주석 안의 중괄호를 완벽히 세지는 않지만, 대상 함수들은 그런 경우가 없다.
+//  [DECO-SPACE-1] 꾸미기 함수들은 '지금 공간'의 장식·바닥만 본다 — 시험 샌드박스에 공간 도우미를 먼저 넣는다(공간 1)
+const NL = String.fromCharCode(10);
+const SPACE_PRELUDE = (S) => 'let DECO_SPACE = 1;' + NL + ['_decoSpaceOf', '_decoList', '_yardFloorGet', '_yardFloorMap']
+  .map(n => sliceFn(S, n)).join(NL) + NL;
+
 function sliceFn(src, name) {
   const re = new RegExp(`^function ${name}\\s*\\(`, 'm');
   const m = re.exec(src);
@@ -775,7 +780,7 @@ try {
   const names = ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt',
     '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animReduced', '_animFreeMaker', '_animNextCell',
     '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
-  let src = '';
+  let src = SPACE_PRELUDE(S);
   for (const n of names) {
     if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === 'FEED_RANGE' || n === '_animFrameB' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
@@ -862,7 +867,7 @@ try {
   const S = read('student.js');
   const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map };
   sb.globalThis = sb; vm.createContext(sb);
-  let src = '';
+  let src = SPACE_PRELUDE(S);
   // 상태 선언
   for (const d of ['let _dCv', 'const DECO_ZOOM_MIN', 'const DY_BASE', 'let _dZoom',
                    'const DY_NORMAL', 'const DY_FULL', 'const DI_NORMAL', 'const DI_FULL', 'const DH ', 'let DY ', 'let DI ']) {
@@ -984,7 +989,7 @@ try {
       { id: 'd_y56', name: '오리 한 마리' }, { id: 'd_y57', name: '양 한 마리' }, { id: 'd_y53', name: '강아지' },
     ] } };
   sb.globalThis = sb; vm.createContext(sb);
-  let src = '';
+  let src = SPACE_PRELUDE(S);
   for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
@@ -1107,7 +1112,7 @@ try {
     getDecoSize: (id) => { const d = DECOS.filter(x => x.id === id)[0]; return (d && d.size) || { w: 1, h: 1 }; },
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
-  let src = '';
+  let src = SPACE_PRELUDE(S);
   for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
@@ -1222,7 +1227,7 @@ try {
     getDecoSize: () => ({ w: 1, h: 1 }),
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
-  let src = '';
+  let src = SPACE_PRELUDE(S);
   for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FENCE_IDS', 'FENCE_ART', 'FEED_RANGE', '_animFrameB', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);

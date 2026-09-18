@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260918bsd">
+<link rel="stylesheet" href="./student.css?v=20260918bsf">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -718,6 +718,12 @@
       ← 내 기록으로
     </button>
     <span id="if-scene-name" style="font-size:.9rem;font-weight:700;color:var(--gold)">🌿 마당</span>
+    <!-- [DECO-SPACE-1] 꾸미기 공간 1~3 — 가진 장식은 세 공간이 나눠 쓴다 -->
+    <div class="deco-spaces" role="group" aria-label="꾸미기 공간">
+      <button id="if-space-1" class="deco-space is-on" onclick="decoSpaceSet(1)" aria-pressed="true">🏡1</button>
+      <button id="if-space-2" class="deco-space" onclick="decoSpaceSet(2)" aria-pressed="false">2</button>
+      <button id="if-space-3" class="deco-space" onclick="decoSpaceSet(3)" aria-pressed="false">3</button>
+    </div>
     <div style="flex:1"></div>
     <!-- 모드 버튼 -->
     <button id="if-mode-deco" onclick="setDecoMode('deco',this);ifSyncModeBtn()"
@@ -937,7 +943,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260918bse"></script>
+<script src="./student.js?v=20260918bsf"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
