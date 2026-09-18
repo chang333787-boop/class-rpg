@@ -342,6 +342,56 @@
       out('양_그림왼쪽표시', !!(sheep && sheep.cfg.artLeft));
       decoSpaceSet(1); await sleep(200);
     }
+
+    //  ⑩ 플레이 시험 고침(DECO-PT-1·2) — 공간 2 빈 판에서
+    if (typeof _decoTopAt === 'function') {
+      decoSpaceSet(2); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 2);
+      setDecoMode('deco');
+      //  우리(시험에서만 표에 넣는다 — 9/20 머지)
+      if (!GAME_DATA.decorations.find(d => d.id === 'pen_t'))
+        GAME_DATA.decorations.push({ id: 'pen_t', name: '시험 우리', icon: '🚧', cat: 'yard', rarity: 'epic', price: 210, size: { w: 4, h: 3 }, pen: true });
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'pen_t' && i.id !== 'd_y55' && i.id !== 'd_y7')
+        .concat([{ id: 'pen_t', qty: 1 }, { id: 'd_y55', qty: 3 }, { id: 'd_y7', qty: 3 }]);
+      SEL_DECO = 'pen_t'; _decoPlace('yard', 10, 10);
+      SEL_DECO = 'd_y55'; _decoPlace('yard', 11, 11);            // 우리 안에 닭
+      const inPen = _decoList(CUR);
+      out('우리안_닭_놓임', inPen.some(p => p.id === 'd_y55'));
+      out('우리_안지워짐', inPen.some(p => p.id === 'pen_t'));
+      //  카드를 든 채 이미 놓인 것을 누르면 치우지 않는다
+      SEL_DECO = 'd_y7'; _decoPlace('yard', 11, 11);             // 닭 칸을 해바라기 카드로 누름
+      out('카드든채_안치움', _decoList(CUR).some(p => p.id === 'd_y55'));
+      //  🧽 치우기: 겹친 칸은 위의 것(동물)부터
+      setDecoMode('erase'); SEL_DECO = null;
+      _decoPlace('yard', 11, 11);
+      const after1 = _decoList(CUR);
+      out('치우기_동물먼저', !after1.some(p => p.id === 'd_y55') && after1.some(p => p.id === 'pen_t'));
+      _decoPlace('yard', 11, 11);
+      out('치우기_그다음_우리', !_decoList(CUR).some(p => p.id === 'pen_t'));
+      setDecoMode('deco');
+      //  물 위에 나무 안 됨 · 갈대는 됨
+      CUR_FLOOR_TILE = 'water'; setDecoMode('floor'); _paintFloor(20, 20); _paintFloor(20, 21); setDecoMode('deco');
+      CUR.inventory = CUR.inventory.concat([{ id: 'd_y29', qty: 2 }]);
+      const n0 = _decoList(CUR).length;
+      SEL_DECO = 'd_y7'; _decoPlace('yard', 20, 20);
+      out('물위_해바라기_막힘', _decoList(CUR).length === n0);
+      SEL_DECO = 'd_y29'; _decoPlace('yard', 20, 21);
+      out('물위_갈대_됨', _decoList(CUR).length === n0 + 1);
+      //  집 안 확대해도 왼쪽 끝까지 간다
+      toggleDecoScene(); await sleep(300);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      _decoSetZoom(3); await sleep(50);
+      decoPanBy(-99999, 0);
+      _drawIndoor();
+      out('집안확대_왼쪽여백', _dCv._offX);
+      out('집안확대_왼쪽끝이동', _dPanX);
+      decoPanBy(99999, 0); _drawIndoor();
+      const boardW = DI.cols * _dC;
+      out('집안확대_오른끝까지', Math.round(_dPanX + _dW) >= Math.round(_dCv._offX + boardW) - 1);
+      toggleDecoScene(); await sleep(300);
+      decoSpaceSet(1); await sleep(200);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
