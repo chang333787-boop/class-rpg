@@ -4614,6 +4614,7 @@ function openInteriorFullscreen() {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       renderHouseDeco();
+      _decoViewRestore();   // [DECO-VIEW-1] 지난번 보던 자리로
       _decoLandHint();
     });
   });
@@ -4630,6 +4631,7 @@ function _decoLandHint() {
 
 function closeInteriorFullscreen() {
   decoFlush('전체화면 닫기');   // [DECO-SAVE-1]
+  _decoViewSave();   // [DECO-VIEW-1]
   _animStopAll();   // [DECO-ANIM-1] 타이머 남기지 않기
   _ifMode = false;
   DY = {...DY_NORMAL};
@@ -6841,7 +6843,21 @@ function _initDeco() {
     _dCv.addEventListener('touchstart', e => {
       e.preventDefault();
       const t = e.changedTouches[0];
+      //  [DECO-PICK-1] 카드 없이 놓인 장식을 누르면 '치우기'인데, 길게 누르면 스포이드다 →
+      //  그 경우만 손을 뗄 때(짧았을 때) 치운다. 나머지는 지금처럼 누르는 순간 처리.
+      const cell = _decoCellAt(t.clientX, t.clientY);
+      const onDeco = !SEL_DECO && DECO_MODE !== 'floor' && cell && (CUR.houseDecorations || []).some(p => {
+        if (p.area !== cell.area) return false; const sz = getDecoSize(p.id);
+        return cell.r >= p.row && cell.r < p.row + sz.h && cell.c >= p.col && cell.c < p.col + sz.w;
+      });
+      if (onDeco) { _dCv._pendingTap = { clientX: t.clientX, clientY: t.clientY, t0: Date.now() }; return; }
       _decoClick({ clientX: t.clientX, clientY: t.clientY, target: e.target });
+    }, { passive: false });
+    _dCv.addEventListener('touchend', e => {
+      const pt = _dCv && _dCv._pendingTap; if (!pt) return;
+      _dCv._pendingTap = null;
+      if (Date.now() - pt.t0 >= DECO_PICK_MS) return;   // 길게였다 — 스포이드가 이미 처리
+      _decoClick({ clientX: pt.clientX, clientY: pt.clientY, target: e.target });
     }, { passive: false });
     // 마우스(PC)용
     _dCv.addEventListener('click', _decoClick);
@@ -6918,6 +6934,36 @@ function _decoSetZoom(z, fx, fy) {
   _drawDeco();
 }
 
+// [DECO-VIEW-1] 마지막 보던 자리·배율 기억 — 기기에만(localStorage), DB 쓰기 0.
+//  판 픽셀은 창 크기·배율에 따라 달라지므로 '보던 한가운데 칸'과 배율로 기억한다(폰↔태블릿에서도 같은 곳).
+const DECO_VIEW_KEY = 'rpg.deco.view';
+function _decoViewSave() {
+  if (!_dCv || DECO_SCENE !== 'yard' || !_dC) return;
+  try {
+    localStorage.setItem(DECO_VIEW_KEY, JSON.stringify({
+      z: Math.round(_dZoom * 1000) / 1000,
+      cx: Math.round(((_dPanX + _dW / 2) / _dC) * 10) / 10,
+      cy: Math.round(((_dPanY + _dH / 2) / _dC) * 10) / 10,
+    }));
+  } catch (e) {}
+}
+function _decoViewRestore() {
+  if (DECO_SCENE !== 'yard') return false;
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem(DECO_VIEW_KEY) || 'null'); } catch (e) { return false; }
+  if (!v || !(v.z > 0) || !isFinite(v.cx) || !isFinite(v.cy)) return false;
+  _dZoom = Math.min(DECO_ZOOM_MAX, Math.max(DECO_ZOOM_MIN, v.z));
+  _dCv = null; _dCtx = null;
+  _initDeco();
+  _dPanX = v.cx * _dC - _dW / 2; _dPanY = v.cy * _dC - _dH / 2;
+  _decoClampPan();
+  _drawDeco();
+  return true;
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (document.hidden) _decoViewSave(); });
+}
+
 function decoZoomIn()  { _decoSetZoom(_dZoom * DECO_ZOOM_STEP); }
 function decoZoomOut() { _decoSetZoom(_dZoom / DECO_ZOOM_STEP); }
 
@@ -6956,8 +7002,24 @@ function _decoAttachGestures(cv) {
     return { x: (e.clientX - rect.left) * (_dW / rect.width), y: (e.clientY - rect.top) * (_dH / rect.height) };
   };
 
+  let pickTimer = null, pickAt = null;   // [DECO-PICK-1]
+  const pickCancel = () => { if (pickTimer) { clearTimeout(pickTimer); pickTimer = null; } };
   cv.addEventListener('pointerdown', e => {
     pts.set(e.pointerId, local(e));
+    pickCancel();
+    if (pts.size === 1) {
+      const cell = _decoCellAt(e.clientX, e.clientY);
+      pickAt = { cell, x: e.clientX, y: e.clientY };
+      pickTimer = setTimeout(() => {
+        pickTimer = null;
+        if (paint && paint.active) return;
+        if (_decoPickAt(pickAt && pickAt.cell)) {
+          _dSuppressClick = true;            // 뗄 때 오는 클릭은 놓기가 아니다
+          if (paint) paint = null;            // 이 누름은 칠하기가 아니었다
+          drag = null;
+        }
+      }, DECO_PICK_MS);
+    }
     if (pts.size === 2) {
       drag = null;
       if (paint) { _decoStrokeEnd(paint); paint = null; }   // 두 손가락이 되면 칠하기는 거기서 끝
@@ -6977,6 +7039,7 @@ function _decoAttachGestures(cv) {
   cv.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, local(e));
+    if (pickTimer && pickAt && Math.abs(e.clientX - pickAt.x) + Math.abs(e.clientY - pickAt.y) > 8) pickCancel();
     if (pinch && pts.size >= 2) {
       const m = mid();
       if (pinch.d0 > 8) _decoSetZoom(pinch.z0 * (m.d / pinch.d0), pinch.fx, pinch.fy);
@@ -7008,6 +7071,7 @@ function _decoAttachGestures(cv) {
 
   const end = e => {
     pts.delete(e.pointerId);
+    pickCancel();
     if (pts.size < 2) pinch = null;
     if (!pts.size) {
       if (paint) { _decoStrokeEnd(paint); paint = null; }
@@ -7112,6 +7176,30 @@ function _decoStrokeBegin(st) {
   }
   st.active = true;
   _dSuppressClick = true;
+}
+
+// [DECO-PICK-1] 스포이드 — 판에 놓인 장식을 **길게 누르면(0.6초)** 그 장식 카드가 손에 잡힌다.
+//  같은 것을 또 놓고 싶을 때 서랍에서 다시 찾지 않는다. 가진 게 남았을 때만 잡힌다.
+//  동물을 누르면 반응하는 것(짧게)과 겹치지 않는다 — 길게일 때만. 끌기가 시작되면 취소.
+const DECO_PICK_MS = 600;
+function _decoPickAt(cell) {
+  if (!cell) return false;
+  const list = CUR.houseDecorations || [];
+  const hit = list.find(p => {
+    if (p.area !== cell.area) return false;
+    const sz = getDecoSize(p.id);
+    return cell.r >= p.row && cell.r < p.row + sz.h && cell.c >= p.col && cell.c < p.col + sz.w;
+  });
+  if (!hit) return false;
+  const d = GAME_DATA.decorations.find(x => x.id === hit.id);
+  const inv = (CUR.inventory || []).find(i => i.id === hit.id);
+  const left = inv ? inv.qty - list.filter(p => p.id === hit.id).length : 0;
+  if (DECO_MODE === 'floor') setDecoMode('deco');
+  if (left <= 0) { toast((d ? d.icon + ' ' : '') + '이건 다 놓았어요 — 상점에서 더 살 수 있어요'); return true; }
+  SEL_DECO = hit.id;
+  _drawDeco(); renderDecoInv();
+  toast('💧 ' + (d ? d.icon + ' ' + d.name : '') + ' 잡았어요 — 놓을 칸을 누르세요');
+  return true;
 }
 
 function _decoStrokeEnd(st) {

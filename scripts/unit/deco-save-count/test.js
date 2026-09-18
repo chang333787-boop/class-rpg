@@ -231,6 +231,43 @@
       decoDrawerToggle();
       out('DB쓰기_찾기동안', 'localStorage만');
     }
+
+    //  ⑦ 마지막 보던 자리 기억(DECO-VIEW-1) · 스포이드(DECO-PICK-1)
+    if (typeof _decoViewSave === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
+      _decoSetZoom(2); decoPanBy(300, 200); await sleep(100);
+      const cx0 = Math.round((_dPanX + _dW / 2) / _dC), z0 = _dZoom;
+      closeInteriorFullscreen(); await sleep(300);
+      openInteriorFullscreen(); await sleep(1200);
+      //  (헤드리스에서는 여는 쪽 두 번 RAF 가 안 돌 때가 있다 — 실제 브라우저가 하는 순서를 그대로 부른다)
+      if (!_dCv) { renderHouseDeco(); _decoViewRestore(); await sleep(200); }
+      const cx1 = Math.round((_dPanX + _dW / 2) / _dC);
+      out('다시열면_배율같나', Math.abs(_dZoom - z0) < 0.01);
+      out('다시열면_가운데칸차이', Math.abs(cx1 - cx0));
+
+      //  스포이드: 카드 없이 놓인 장식을 0.75초 누르고 떼면 그 장식이 손에 잡히고 치워지지 않는다
+      const all2 = GAME_DATA.decorations.filter(d => d.price > 0 && !d.hidden && d.cat === 'yard' && !(d.size && (d.size.w > 1 || d.size.h > 1)) && !(typeof ANIM_DECO !== 'undefined' && ANIM_DECO[d.id]));
+      const pickId = all2.find(d => !(CUR.houseDecorations || []).some(p => p.id === d.id)).id;
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== pickId).concat([{ id: pickId, qty: 3 }]);
+      SEL_DECO = pickId; _decoPlace('yard', 26, 8); SEL_DECO = null; renderDecoInv(); await sleep(100);
+      const nBefore = (CUR.houseDecorations || []).length;
+      const pt2 = (r, c) => { const rect = _dCv.getBoundingClientRect(); return { clientX: rect.left + (c * _dC + _dC / 2 - _dPanX) * rect.width / _dW, clientY: rect.top + (r * _dC + _dC / 2 - _dPanY) * rect.height / _dH }; };
+      _dCv.dispatchEvent(new PointerEvent('pointerdown', Object.assign({ pointerId: 9, pointerType: 'mouse', bubbles: true }, pt2(26, 8))));
+      await sleep(750);
+      _dCv.dispatchEvent(new PointerEvent('pointerup', Object.assign({ pointerId: 9, pointerType: 'mouse', bubbles: true }, pt2(26, 8))));
+      _dCv.dispatchEvent(new MouseEvent('click', Object.assign({ bubbles: true }, pt2(26, 8))));
+      await sleep(100);
+      out('스포이드_잡은것', SEL_DECO === pickId);
+      out('스포이드_안치워짐', (CUR.houseDecorations || []).length === nBefore);
+      //  짧게 누르면 예전처럼 치우기
+      SEL_DECO = null; renderDecoInv();
+      _dCv.dispatchEvent(new PointerEvent('pointerdown', Object.assign({ pointerId: 10, pointerType: 'mouse', bubbles: true }, pt2(26, 8))));
+      await sleep(100);
+      _dCv.dispatchEvent(new PointerEvent('pointerup', Object.assign({ pointerId: 10, pointerType: 'mouse', bubbles: true }, pt2(26, 8))));
+      _dCv.dispatchEvent(new MouseEvent('click', Object.assign({ bubbles: true }, pt2(26, 8))));
+      await sleep(100);
+      out('짧게누르면_치움', (CUR.houseDecorations || []).length === nBefore - 1);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
