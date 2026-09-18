@@ -4528,6 +4528,7 @@ function setDecoMode(mode, btn) {
     btn.style.borderColor = mode==='deco'?'rgba(255,215,0,.4)':'rgba(93,173,226,.4)';
   }
   document.body.classList.toggle('deco-floor-mode', mode === 'floor');   // [DECO-PT-2] 바닥 모드면 장식 서랍 접기
+  setTimeout(() => { try { _decoPillarSync(); } catch (e) {} }, 0);
   document.body.classList.toggle('deco-erase-mode', mode === 'erase');
   if (mode === 'erase') { SEL_DECO = null; if (typeof renderDecoInv === 'function') renderDecoInv(); }
   const floorRow = document.getElementById('floor-tile-row');
@@ -8680,22 +8681,62 @@ function decoFindSet(key, val) {
   renderDecoInv();
 }
 
+// [DECO-THUMB-2] 오른쪽 확대 단추 기둥이 서랍을 펼치면 서랍 위로 겹쳤다 → 늘 서랍 바로 위에 붙인다
+function _decoPillarSync() {
+  const col = document.getElementById('if-zoom-col'); if (!col) return;
+  const dr = document.getElementById('if-deco-drawer');
+  const drH = (dr && dr.offsetParent !== null) ? dr.offsetHeight : 0;
+  col.style.top = 'auto'; col.style.transform = 'none';
+  col.style.bottom = (drH + 12) + 'px';
+}
+if (typeof window !== 'undefined') addEventListener('resize', () => { try { _decoPillarSync(); } catch (e) {} });
+
 function decoDrawerToggle() {
   const dr = document.getElementById('if-deco-drawer'); if (!dr) return;
   const open = !dr.classList.contains('is-open');
   dr.classList.toggle('is-open', open);
   const b = document.getElementById('if-deco-expand');
   if (b) { b.textContent = open ? '⌄' : '⌃'; b.setAttribute('aria-label', open ? '서랍 접기' : '서랍 펼치기'); }
+  _decoPillarSync();
 }
 
 // [DECO-THUMB-1] 카드에 실제 그림 — 이모지로는 뭔지 모른다("울타리 샀는데 공사 표지판이야?")
 //  울타리처럼 자동 이음인 것은 가로 그림으로 보여 준다. 그림이 없으면 이모지로 돌아간다.
+//  [DECO-THUMB-2] 그림 파일은 위쪽이 비어 있다(1×1 은 위 절반) → 통째로 맞추면 실제 그림이 15~20px.
+//  디자인 2 가 잰 '그린 부분 상자'(assets/deco/bbox.json, [x,y,w,h,vbW,vbH])로 그 부분만 크게 보인다.
+//  표가 아직 없거나 그 장식이 표에 없으면 예전처럼 통째로.
+let _decoBBox = null;
+if (typeof fetch === 'function') {
+  fetch('./assets/deco/bbox.json').then(r => r.ok ? r.json() : null).then(j => {
+    if (!j) return;
+    _decoBBox = j;
+    try { if (typeof renderDecoInv === 'function' && CUR) renderDecoInv(); } catch (e) {}
+    try { if (typeof SHOP_TAB !== 'undefined' && SHOP_TAB === 'deco' && typeof renderShop === 'function' && CUR) renderShop(); } catch (e) {}
+  }).catch(() => {});
+}
+
 function _decoThumb(d, px) {
   const id = d.autoFence ? 'd_y49' : d.id;
   const emo = escHtml(d.icon || '🌸');
-  return `<img class="deco-thumb" src="./assets/deco/${encodeURIComponent(id)}.svg" alt="" loading="lazy"`
-    + ` style="height:${px}px;width:auto;max-width:${Math.round(px * 1.6)}px;object-fit:contain;display:block;margin:0 auto"`
-    + ` onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${emo}',style:'font-size:${Math.round(px * 0.8)}px'}))">`;
+  const src = './assets/deco/' + encodeURIComponent(id) + '.svg';
+  const onerr = ` onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${emo}',style:'font-size:${Math.round(px * 0.8)}px'}))"`;
+  //  썸네일 전용 그림(bbox.json 의 thumbArt 목록에 있으면 <id>_thumb.svg 를 통째로)
+  if (_decoBBox && Array.isArray(_decoBBox.thumbArt) && _decoBBox.thumbArt.indexOf(id) >= 0) {
+    return `<img class="deco-thumb" src="./assets/deco/${encodeURIComponent(id)}_thumb.svg" alt="" loading="lazy"`
+      + ` style="height:${px}px;width:auto;max-width:${Math.round(px * 1.6)}px;object-fit:contain;display:block;margin:0 auto"${onerr}>`;
+  }
+  const bb = _decoBBox && _decoBBox[id];
+  if (Array.isArray(bb) && bb[2] > 0 && bb[3] > 0) {
+    const [x, y, w, h, vw, vh] = bb;
+    const maxW = Math.round(px * 1.6);
+    const sc = Math.min(px / h, maxW / w);
+    const bw = Math.round(w * sc), bh = Math.round(h * sc);
+    return `<span class="deco-thumb-box" style="display:block;width:${bw}px;height:${bh}px;overflow:hidden;margin:0 auto;position:relative">`
+      + `<img class="deco-thumb" src="${src}" alt="" loading="lazy"${onerr}`
+      + ` style="position:absolute;left:${-Math.round(x * sc)}px;top:${-Math.round(y * sc)}px;width:${Math.round(vw * sc)}px;height:${Math.round(vh * sc)}px;max-width:none"></span>`;
+  }
+  return `<img class="deco-thumb" src="${src}" alt="" loading="lazy"`
+    + ` style="height:${px}px;width:auto;max-width:${Math.round(px * 1.6)}px;object-fit:contain;display:block;margin:0 auto"${onerr}>`;
 }
 
 function _decoCardHtml(i, d, avail, placedScene) {
@@ -8746,6 +8787,7 @@ function renderDecoInv(){
     } else empty.hidden = true;
   }
   if(_ifMode) ifSyncInv();
+  _decoPillarSync();   // [DECO-THUMB-2] 서랍 키가 바뀌면 기둥도
 }
 
 //  최근 놓은 것 줄 — 지금 장소에 놓을 수 있고 아직 남은 것만. 비면 줄을 감춘다.
