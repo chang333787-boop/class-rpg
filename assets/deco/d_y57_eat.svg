@@ -1,0 +1,20 @@
+<svg width="100" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">
+<!-- d_y57 양 1마리 1×1 · 먹는 장(풀 뜯기) · footprint y100~200 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<path d="M20,182 L62,174 L92,186 L48,192 Z" fill="#000" opacity=".16"/><ellipse cx="50" cy="184" rx="32" ry="7" fill="#000" opacity=".26"/>
+<g transform="translate(50,186) scale(1.02) translate(-50,-186)"><path class="i" d="M25.0,162 h8 l-2.2,19 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="27" cy="185" rx="6.0" ry="3" fill="#3d3833"/><path class="i" d="M55.0,162 h8 l3.8,19 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="63" cy="185" rx="6.0" ry="3" fill="#3d3833"/>
+<g class="o" fill="#f2eee6"><circle cx="30" cy="148" r="15"/><circle cx="48" cy="141" r="17"/><circle cx="66" cy="147" r="15"/><circle cx="38" cy="160" r="14"/><circle cx="58" cy="160" r="14"/></g>
+<g fill="#f2eee6"><circle cx="30" cy="148" r="13"/><circle cx="48" cy="141" r="15"/><circle cx="66" cy="147" r="13"/><circle cx="38" cy="160" r="12"/><circle cx="58" cy="160" r="12"/></g>
+<g fill="#dcd6ca"><circle cx="38" cy="160" r="6.3"/><circle cx="58" cy="160" r="6.3"/></g>
+<g fill="#fff"><circle cx="27" cy="143" r="4"/><circle cx="45" cy="136" r="4"/></g>
+<path class="i" d="M31.0,163 h8 l3.8,19 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="39" cy="186" rx="6.0" ry="3" fill="#5c5650"/><path class="i" d="M61.0,163 h8 l-2.2,19 q0,4 -4,4 h-7 q-4,0 -4,-4z" fill="#3d3833"/><ellipse class="i" cx="63" cy="186" rx="6.0" ry="3" fill="#5c5650"/>
+<g transform="translate(6,13) rotate(30 72 150)"><path class="o" d="M72,146 q16,-2 18,10 q1,12 -9,14 q-12,1 -15,-8 q-1,-12 6,-16z" fill="#3d3833"/>
+<path d="M80,147 q10,1 10,10 q0,8 -6,10 q4,-12 -4,-20z" fill="#5c5650" opacity=".5"/>
+<path class="i" d="M74,144 q-8,-6 -14,-2 q6,6 12,6z" fill="#3d3833"/>
+<path class="i" d="M62,147 q0,-8 8,-8 q2,5 -1,9z" fill="#f2eee6"/>
+<circle cx="84" cy="152" r="2.2" fill="#fff"/>
+<circle cx="84.4" cy="152.4" r="1" fill="#2b2118"/>
+<path d="M87,163 q3,2 4,0" fill="none" stroke="#5c5650" stroke-width="1.5" stroke-linecap="round"/></g>
+<circle class="i" cx="22" cy="150" r="5.5" fill="#f2eee6"/></g>
+<g fill="#4f7a2e"><path d="M8,188 l2,-9 l3,9z M14,188 l2,-12 l3,12z M88,184 l2,-8 l3,8z"/></g><g fill="#86ad50"><path d="M11,188 l1.5,-6 l1.5,6z"/></g>
+</svg>
