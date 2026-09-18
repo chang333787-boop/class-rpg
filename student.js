@@ -2241,7 +2241,7 @@ function renderShop() {
         : `<span style="color:#C8A87A;font-size:.62rem">🏠 집 안</span>`;
       const lockMsg = locked ? `toast('Lv${d.reqLv} 이상이 되어야 구매할 수 있어요!')` : `buyDeco('${d.id}')`;
       return `<div class="item-card" onclick="${lockMsg}" style="opacity:${locked?.55:1}">
-        <div class="ic-icon">${d.icon}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
+        <div class="ic-icon" style="display:flex;align-items:flex-end;justify-content:center;gap:2px;min-height:44px">${_decoThumb(d, 42)}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
         <div class="ic-name">${(d.newUntil && _today <= d.newUntil) ? '<span style="color:#7ec850;font-weight:800">🆕</span> ' : ''}${rl} ${d.name}</div>
         <div class="ic-stats">${catBadge}${locked?` <span style="color:var(--txt3);font-size:.6rem">Lv${d.reqLv}+</span>`:''}</div>
         <div class="ic-price">${decoFree ? `<span style="color:#7ec850;font-weight:800">🎁 무료</span> <span style="text-decoration:line-through;color:var(--txt3);font-size:.6rem">${d.price}G</span>` : `💰 ${d.price}G`}</div>
@@ -8659,6 +8659,16 @@ function decoDrawerToggle() {
   if (b) { b.textContent = open ? '⌄' : '⌃'; b.setAttribute('aria-label', open ? '서랍 접기' : '서랍 펼치기'); }
 }
 
+// [DECO-THUMB-1] 카드에 실제 그림 — 이모지로는 뭔지 모른다("울타리 샀는데 공사 표지판이야?")
+//  울타리처럼 자동 이음인 것은 가로 그림으로 보여 준다. 그림이 없으면 이모지로 돌아간다.
+function _decoThumb(d, px) {
+  const id = d.autoFence ? 'd_y49' : d.id;
+  const emo = escHtml(d.icon || '🌸');
+  return `<img class="deco-thumb" src="./assets/deco/${encodeURIComponent(id)}.svg" alt="" loading="lazy"`
+    + ` style="height:${px}px;width:auto;max-width:${Math.round(px * 1.6)}px;object-fit:contain;display:block;margin:0 auto"`
+    + ` onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${emo}',style:'font-size:${Math.round(px * 0.8)}px'}))">`;
+}
+
 function _decoCardHtml(i, d, avail, placedScene) {
   const RL = {common:'⚪',rare:'🔵',epic:'🟣',legend:'🟡'};
   const isSel = SEL_DECO === i.id, isMatch = d.cat === placedScene, rl = RL[d.rarity||'common'] || '';
@@ -8668,7 +8678,7 @@ function _decoCardHtml(i, d, avail, placedScene) {
       border-radius:10px;padding:.35rem .45rem;cursor:${avail>0?'pointer':'default'};flex-shrink:0;
       text-align:center;opacity:${avail>0?isMatch?1:.45:.25};min-width:64px;max-width:92px;transition:all .2s;
       transform:${isSel?'scale(1.06)':'scale(1)'}">
-      <div style="font-size:1.35rem;line-height:1.2">${d.icon}</div>
+      <div style="height:36px;display:flex;align-items:flex-end;justify-content:center">${_decoThumb(d, 34)}</div>
       <div class="dc-name" style="color:var(--txt2);margin-top:.1rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all">${rl} ${escHtml(d.name)}</div>
       <div class="dc-qty">${d.cat==='yard'?'🌿':'🏠'} ×${avail}</div>
     </div>`;
