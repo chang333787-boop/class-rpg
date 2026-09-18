@@ -392,6 +392,33 @@
       toggleDecoScene(); await sleep(300);
       decoSpaceSet(1); await sleep(200);
     }
+
+    //  ⑪ 헤엄 장·밭은 공간 1 만·다 썼을 때 어느 공간(DECO-SWIM-1·DECO-PT-3)
+    if (typeof _animProbeSwim === 'function') {
+      decoSpaceSet(3); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      setDecoMode('floor'); CUR_FLOOR_TILE = 'water';
+      for (let c = 4; c <= 8; c++) _paintFloor(30, c);
+      setDecoMode('deco');
+      CUR.houseDecorations.push({ id: 'd_y56', area: 'yard', row: 30, col: 6, sp: 3 });   // 물 위 오리 한 마리
+      _animStopAll();
+      const host = _ifActiveContainer || 'house-topview';
+      _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
+      await sleep(1500);
+      _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
+      await sleep(100);
+      const rec = _animLayers.get(host);
+      const duck = rec && [...rec.items.values()].find(x => x.id === 'd_y56');
+      const img = duck && duck.el.querySelector('img');
+      out('물위오리_헤엄장', !!(img && /d_y56_swim\.svg/.test(img.src)));
+      //  밭 칸은 공간 3 에서 놓을 수 있다(그림도 안 나온다)
+      out('공간3_밭칸_놓임가능', !_isFarmCell(24, 45));
+      //  다 썼을 때 어느 공간에 있는지
+      const msg = _decoWhereUsed('d_y56');
+      out('다썼을때_공간안내', /공간 3에 1개/.test(msg));
+      decoSpaceSet(1); await sleep(200);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
