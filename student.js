@@ -2352,10 +2352,17 @@ function buySeed(id) {
   toast(`✅ ${seed.name} 구매!`);
 }
 
+let _buyDecoArm = null;   // [DECO-PT-1] 한 번 누름 = 확인, 3초 안에 같은 카드를 한 번 더 = 산다
 function buyDeco(id) {
   const deco = GAME_DATA.decorations.find(d => d.id === id);
   if (!deco) return;
   const cost = GAME_DATA.decoCost ? GAME_DATA.decoCost(deco) : deco.price;   // [DECO-FREE-1] 🎁 무료 기간이면 0
+  if (cost > 0 && !(_buyDecoArm && _buyDecoArm.id === id && Date.now() - _buyDecoArm.t < 3000)) {
+    _buyDecoArm = { id, t: Date.now() };
+    toast(`${deco.icon} ${deco.name} 💰${cost}G — 한 번 더 누르면 사요`);
+    return;
+  }
+  _buyDecoArm = null;
   if (CUR.gold < cost) { toast('💸 골드 부족!'); return; }
   CUR.gold -= cost;
   CUR.inventory = CUR.inventory || [];
@@ -4520,6 +4527,9 @@ function setDecoMode(mode, btn) {
     btn.style.color = mode==='deco'?'var(--gold)':'var(--sky)';
     btn.style.borderColor = mode==='deco'?'rgba(255,215,0,.4)':'rgba(93,173,226,.4)';
   }
+  document.body.classList.toggle('deco-floor-mode', mode === 'floor');   // [DECO-PT-2] 바닥 모드면 장식 서랍 접기
+  document.body.classList.toggle('deco-erase-mode', mode === 'erase');
+  if (mode === 'erase') { SEL_DECO = null; if (typeof renderDecoInv === 'function') renderDecoInv(); }
   const floorRow = document.getElementById('floor-tile-row');
   const hint = document.getElementById('deco-mode-hint');
   if (floorRow) floorRow.style.display = mode==='floor' ? 'flex' : 'none';
@@ -4604,7 +4614,30 @@ function _decoSpaceSync() {
   }
 }
 
-function canPlaceDeco(r, c, w, h, area, excludeId) {
+// [DECO-PT-2] 말이 되게 — 물 위에는 물에 사는 것·물가 것만, 벽에 거는 것은 벽(맨 윗줄)에만
+//  (디자인2 플레이 시험: "연못 한가운데 나무가 자라!" · "그림 액자가 방바닥 한가운데 있어")
+const DECO_WATER_OK = { d_y29: 1, d_y30: 1 };   // 갈대 묶음 · 징검돌 (+ 물을 좋아하는 동물은 동물 규칙이 본다)
+const DECO_WALL = { d_i3: 1, d_i4: 1 };         // 시계 · 그림 액자
+function _decoRuleWhy(id, area, r, c, w, h) {
+  if (!id) return '';
+  if (area === 'yard' && !(typeof ANIM_DECO !== 'undefined' && ANIM_DECO[id]) && !DECO_WATER_OK[id]) {
+    const fl = _yardFloorGet(CUR);
+    for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++)
+      if (fl[(r + dr) + '_' + (c + dc)] === 'water') return '🌊 물 위에는 놓을 수 없어요 — 물가 풀밭에 놓아 보세요';
+  }
+  if (area === 'indoor' && DECO_WALL[id] && r !== 0) return '🖼️ 벽에 거는 거예요 — 맨 윗줄(벽 앞)에 놓아 주세요';
+  return '';
+}
+
+//  [DECO-PT-2] 우리(pen)와 동물은 서로 겹쳐도 된다 — 우리 안에 동물을 넣고, 동물이 있는 자리에 우리를 두른다
+function _decoOverlapOk(placingId, other) {
+  if (!placingId || !other) return false;
+  const isAnim = id => typeof ANIM_DECO !== 'undefined' && !!ANIM_DECO[id];
+  return (isAnim(placingId) && _isPenDeco(other.id)) || (_isPenDeco(placingId) && isAnim(other.id));
+}
+
+function canPlaceDeco(r, c, w, h, area, excludeId, placingId) {
+  if (placingId === undefined) placingId = SEL_DECO;   // [DECO-PT-2] 무엇을 놓는지(우리·동물 겹침 판단용)
   const placed = _decoList(CUR).filter(p=>p.area===area && p.id!==excludeId);   // [DECO-SPACE-1] 이 공간만
   for (let dr=0; dr<h; dr++) for (let dc=0; dc<w; dc++) {
     const tr=r+dr, tc=c+dc;
@@ -4618,7 +4651,10 @@ function canPlaceDeco(r, c, w, h, area, excludeId) {
     // 다른 장식과 겹침 체크
     for (const p of placed) {
       const ps = getDecoSize(p.id);
-      if (tr>=p.row && tr<p.row+ps.h && tc>=p.col && tc<p.col+ps.w) return false;
+      if (tr>=p.row && tr<p.row+ps.h && tc>=p.col && tc<p.col+ps.w) {
+        if (_decoOverlapOk(placingId, p)) continue;   // [DECO-PT-2] 우리 안 동물
+        return false;
+      }
     }
   }
   return true;
@@ -4671,7 +4707,7 @@ function openInteriorFullscreen() {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       renderHouseDeco();
-      _decoViewRestore();   // [DECO-VIEW-1] 지난번 보던 자리로
+      if (!_decoViewRestore()) _decoPhoneStart();   // [DECO-VIEW-1] 지난번 보던 자리로 · [DECO-PT-1] 처음이면 폰은 크게
       _decoLandHint();
     });
   });
@@ -4715,10 +4751,10 @@ function ifSyncModeBtn() {
   const isFloor = DECO_MODE === 'floor';
   const fr = document.getElementById('if-floor-row');
   if (fr) fr.style.display = isFloor ? 'flex' : 'none';
-  ['if-mode-deco','if-mode-floor'].forEach(id => {
+  ['if-mode-deco','if-mode-floor','if-mode-erase'].forEach(id => {   // [DECO-PT-2] 🧽 치우기
     const btn = document.getElementById(id);
     if (!btn) return;
-    const active = (id === 'if-mode-deco' && !isFloor) || (id === 'if-mode-floor' && isFloor);
+    const active = id === 'if-mode-' + DECO_MODE;
     btn.style.background = active ? 'rgba(255,215,0,.12)' : 'rgba(255,255,255,.06)';
     btn.style.color = active ? 'var(--gold)' : 'var(--txt2)';
     btn.style.borderColor = active ? 'rgba(255,215,0,.4)' : 'rgba(255,255,255,.12)';
@@ -6925,8 +6961,9 @@ function _initDeco() {
   if (_ifMode) {
     // 상단바(~50px) + 바닥타일줄(~48px, 바닥모드일 때) + 하단인벤(~120px) 제외
     const topH = DECO_MODE === 'floor' ? 98 : 50;
-    W    = window.innerWidth;
-    maxH = window.innerHeight - topH - 120;
+    //  [DECO-PT-1] 서랍(머리줄·최근 줄)이 커지면 어림값(−120)이 틀려 판이 서랍 밑으로 들어갔다 → 실제 남는 자리로
+    W    = el.clientWidth  || window.innerWidth;
+    maxH = el.clientHeight || (window.innerHeight - topH - 120);
   } else {
     W    = el.offsetWidth || 340;
     maxH = 600;
@@ -6937,7 +6974,7 @@ function _initDeco() {
   const baseCols = Math.min(cols, DECO_SCENE === 'yard' ? DY_BASE.cols : DI.cols);
   const baseC = Math.floor(W / baseCols);
   const C = Math.max(4, Math.round(baseC * _dZoom));
-  const H = Math.min(Math.max(C * rows, 120), maxH);
+  const H = _ifMode ? Math.max(120, maxH) : Math.min(Math.max(C * rows, 120), maxH);   // [DECO-PT-1]
   _dW = W; _dH = H; _dC = C;
   _decoClampPan();
   _dCv.width  = W * 2;
@@ -6957,6 +6994,8 @@ let _drawDecoRaf = null;
 function _decoBoardPx() {
   const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
   const rows = DECO_SCENE === 'yard' ? DY.rows : DI.rows;
+  //  [DECO-PT-1] 집 안은 위에 벽 한 줄(약 0.9칸)이 더 있다
+  if (DECO_SCENE !== 'yard') return { w: cols * _dC, h: rows * _dC + Math.ceil(_dC * 0.9) + _dC };
   return { w: cols * _dC, h: rows * _dC };
 }
 
@@ -7019,6 +7058,16 @@ function _decoViewRestore() {
 }
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => { if (document.hidden) _decoViewSave(); });
+}
+
+// [DECO-PT-1] 폰(좁은 화면)에서 처음 열면 칸이 7px 라 꽃 하나를 못 누른다 → 칸 약 16px 로 집 앞에서 연다
+function _decoPhoneStart() {
+  if (DECO_SCENE !== 'yard' || !_dC || _dW > 600) return;
+  const z = Math.min(DECO_ZOOM_MAX, 16 / Math.max(1, _dC / _dZoom));
+  _decoSetZoom(z, 0, 0);
+  //  집(기준 판 오른쪽 위) 앞이 보이게
+  _dPanX = (_houseCol0() - 4) * _dC; _dPanY = 0;
+  _decoClampPan(); _drawDeco();
 }
 
 function decoZoomIn()  { _decoSetZoom(_dZoom * DECO_ZOOM_STEP); }
@@ -7209,6 +7258,7 @@ function _decoStrokeApply(cell, st) {
   const inv = (CUR.inventory || []).find(i => i.id === SEL_DECO);
   if (!inv || inv.qty - placed.filter(p => p.id === SEL_DECO).length <= 0) { st.outOfStock = true; return false; }
   if (!canPlaceDeco(cell.r, cell.c, sz.w, sz.h, cell.area, null)) return false;
+  if (_decoRuleWhy(SEL_DECO, cell.area, cell.r, cell.c, sz.w, sz.h)) return false;   // [DECO-PT-2]
   if (cell.area === 'yard' && typeof ANIM_DECO !== 'undefined' && ANIM_DECO[SEL_DECO]
       && !_animGroundOk(SEL_DECO, CUR, cell.r, cell.c, sz.w, sz.h)) return false;
   const np = _decoNew(SEL_DECO, cell.area, cell.r, cell.c);   // [DECO-SPACE-1]
@@ -7266,7 +7316,8 @@ function _decoStrokeEnd(st) {
   if (st.placed && SEL_DECO) _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
   _drawDeco(); renderDecoInv();
   if (DECO_MODE !== 'floor') {
-    if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
+    if (st.placed && st.outOfStock) toast('✅ ' + st.placed + '개 놓았어요 — 이제 다 썼어요(상점에서 더 살 수 있어요)');   // [DECO-PT-1]
+    else if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
     else if (st.outOfStock) toast('가진 개수가 모자라요!');
   }
 }
@@ -7584,6 +7635,7 @@ function _animStep(st) {
       imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';   // [DECO-EAT-1] 왼쪽을 보는 그림은 반대로
     }
     const dur = hopped ? 300 : (900 + Math.random() * 700);
+    st.from = { row: st.cur.row, col: st.cur.col }; st.fromAt = Date.now();   // [DECO-PT-1] 걷는 동안 떠난 칸도 누를 수 있게
     // 걸음 그림 두 장이 있으면 걷는 동안만 바꿔 준다(헤엄은 발이 안 보이니 안 바꾼다)
     if (imgEl && _animFrameB[st.id] && !st.swim && !hopped) {
       imgEl.src = './assets/deco/' + encodeURIComponent(st.id) + '_b.svg';
@@ -7621,8 +7673,11 @@ function _animEatSync(st) {
 function _animAt(hostId, r, c) {
   const rec = _animLayers.get(hostId);
   if (!rec) return null;
+  //  [DECO-PT-1] 그림은 발 칸 위로 솟는다 → 발 칸 위 한 줄까지 · 걷는 1초 남짓은 떠난 칸도 맞는다
+  const hitAt = (row, col, st) => r >= row - 1 && r < row + st.h && c >= col && c < col + st.w;
   for (const st of rec.items.values()) {
-    if (r >= st.cur.row && r < st.cur.row + st.h && c >= st.cur.col && c < st.cur.col + st.w) return st;
+    if (hitAt(st.cur.row, st.cur.col, st)) return st;
+    if (st.from && Date.now() - st.fromAt < 1700 && hitAt(st.from.row, st.from.col, st)) return st;
   }
   return null;
 }
@@ -8229,11 +8284,12 @@ function _drawYardFarm(C) {
 
 function _drawIndoor() {
   const C = _dC, W = _dW, H = _dH;
-  const offX = Math.floor((W - DI.cols*C)/2);
+  // [DECO-PT-1] 확대하면 (W−판)/2 가 음수가 되어 왼쪽 칸에 못 가고 오른쪽이 까맸다 → 음수면 0, 나머지는 화면 밀기가
+  const offX = Math.max(0, Math.floor((W - DI.cols*C)/2));
   const offY = Math.max(Math.floor(C*.9), Math.floor((H - DI.rows*C)/2));
 
-  // 벽
-  _dCtx.fillStyle='#8B6520'; _dCtx.fillRect(0,0,W,H);
+  // 벽 — [DECO-PT-1] 확대해 밀어도 벽이 끊기지 않게 판 전체 크기로 칠한다
+  _dCtx.fillStyle='#8B6520'; _dCtx.fillRect(0,0,Math.max(W,offX*2+DI.cols*C),Math.max(H,offY+DI.rows*C+C));
   // 바닥
   _dCtx.fillStyle='#C4955A'; _dCtx.fillRect(offX,offY,DI.cols*C,DI.rows*C);
   for(let r=0;r<DI.rows;r++){_dCtx.fillStyle=r%2?'rgba(255,255,255,.03)':'rgba(0,0,0,.05)';_dCtx.fillRect(offX,offY+r*C,DI.cols*C,C);}
@@ -8332,11 +8388,11 @@ function _decoClick(e) {
     if(c<0||c>=DY.cols||r<0||r>=DY.rows) return;
     if(_isHC(r,c)){ toast('집 영역에는 배치할 수 없어요!'); return; }
     // 농장 존 클릭 차단 (수확은 농장 탭에서만)
-    if(_isFarmCell(r,c)){ toast('🌾 수확은 농장 탭에서 해주세요!'); return; }
+    if(_isFarmCell(r,c)){ toast('🌾 여기는 밭이에요 — 밭에는 장식을 놓을 수 없어요'); return; }   // [DECO-PT-1]
     _decoLastTap = { area: 'yard', r, c, t: Date.now() };   // [DECO-DRAG-1]
     if(DECO_MODE==='floor') { _paintFloor(r,c); return; }
     // [DECO-ANIM-2] 카드를 안 고른 상태에서 동물을 누르면 반응(놓기가 먼저다)
-    if(!SEL_DECO){
+    if(!SEL_DECO && DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
       const pet=_animAt(_ifActiveContainer||'house-topview', r, c);
       if(pet && _animPoke(pet, c)) return;
     }
@@ -8423,7 +8479,7 @@ function _decoUndoOne(rec) {
     const used = placed.filter(p => p.id === rec.p.id).length;
     const inv = (CUR.inventory || []).find(x => x.id === rec.p.id);
     if (!inv || inv.qty - used <= 0) return false;
-    if (!canPlaceDeco(rec.p.row, rec.p.col, sz.w, sz.h, rec.p.area, null)) return false;
+    if (!canPlaceDeco(rec.p.row, rec.p.col, sz.w, sz.h, rec.p.area, null, rec.p.id)) return false;   // [DECO-PT-2]
     CUR.houseDecorations = [...placed, Object.assign({}, rec.p)];   // [DECO-SPACE-1] 공간 번호째 되살린다
     return true;
   }
@@ -8476,16 +8532,39 @@ function _paintFloor(r, c, stroke) {
   _drawDeco();
 }
 
+//  [DECO-PT-2] 한 칸에 둘이 겹치면(우리 안 동물) 누른 것은 위의 것 — 동물 > 작은 것 > 우리
+function _decoTopAt(area, row, col) {
+  const hits = _decoList(CUR).filter(p => {
+    if (p.area !== area) return false;
+    const sz = getDecoSize(p.id);
+    return row >= p.row && row < p.row + sz.h && col >= p.col && col < p.col + sz.w;
+  });
+  const rank = p => (typeof ANIM_DECO !== 'undefined' && ANIM_DECO[p.id]) ? 0 : _isPenDeco(p.id) ? 2 : 1;
+  hits.sort((a, b) => rank(a) - rank(b));
+  return hits[0] || null;
+}
+
 function _decoPlace(area,row,col){
   const placed=CUR.houseDecorations||[];
+  if(DECO_MODE==='erase'){   // [DECO-PT-2] 🧽 치우기 — 누른 칸의 위의 것 하나를 치운다(카드는 안 씀)
+    const ex=_decoTopAt(area,row,col);
+    if(!ex){ toast('여기엔 치울 게 없어요'); return; }
+    const d=GAME_DATA.decorations.find(x=>x.id===ex.id);
+    CUR.houseDecorations=placed.filter(p=>p!==ex);
+    _decoUndoPush({ t: 'remove', p: Object.assign({}, ex) });
+    decoDirty(); _drawDeco(); renderDecoInv();
+    toast(`🧽 ${d?d.icon:''} 치웠어요 (↩ 로 되돌릴 수 있어요)`); return;
+  }
 
-  // 클릭한 칸에 있는 장식 찾기 (멀티셀 고려) — [DECO-SPACE-1] 이 공간 것만
-  const existing=_decoList(CUR).find(p=>{
-    if(p.area!==area) return false;
-    const sz=getDecoSize(p.id);
-    return row>=p.row&&row<p.row+sz.h&&col>=p.col&&col<p.col+sz.w;
-  });
-  if(existing){
+  // 클릭한 칸에 있는 장식 찾기 (멀티셀 고려) — [DECO-SPACE-1] 이 공간 것만 · [DECO-PT-2] 겹치면 위의 것
+  const existing=_decoTopAt(area,row,col);
+  //  [DECO-PT-2] 카드를 든 채 누르면 치우지 않는다("꽃 놓으려는데 나무가 사라졌어") — 치우기는 빈손·🧽 치우기 모드에서만
+  if(existing && SEL_DECO && DECO_MODE!=='erase'){
+    if(!canPlaceDeco(row,col,(getDecoSize(SEL_DECO)).w,(getDecoSize(SEL_DECO)).h,area,null)){
+      const ed=GAME_DATA.decorations.find(x=>x.id===existing.id);
+      toast(`여기엔 이미 ${ed?ed.icon+' '+ed.name:'장식'}이(가) 있어요 — 치우려면 🧽 치우기`); return;
+    }
+  } else if(existing){
     const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
     CUR.houseDecorations=placed.filter(p=>p!==existing);   // [DECO-SPACE-1] 그 한 개만(다른 공간 같은 자리 것은 그대로)
     _decoUndoPush({ t: 'remove', p: Object.assign({}, existing) });   // [DECO-UNDO-1]
@@ -8501,6 +8580,7 @@ function _decoPlace(area,row,col){
   const inv=(CUR.inventory||[]).find(i=>i.id===SEL_DECO);
   if(!inv||inv.qty-used<=0){ toast('가진 개수가 모자라요!'); return; }
   if(!canPlaceDeco(row,col,sz.w,sz.h,area,null)){ toast('여기엔 배치할 수 없어요!'); return; }
+  const why=_decoRuleWhy(SEL_DECO,area,row,col,sz.w,sz.h); if(why){ toast(why); return; }   // [DECO-PT-2]
   // [DECO-ANIM-2] 동물은 바닥을 가린다 — 왜 안 되는지 아이 말로 알려 준다
   if(area==='yard' && ANIM_DECO[SEL_DECO] && !_animGroundOk(SEL_DECO, CUR, row, col, sz.w, sz.h)){
     toast(_animWhyNot(SEL_DECO)); return;
@@ -8516,6 +8596,7 @@ function _decoPlace(area,row,col){
 function toggleDecoScene(){
   decoFlush('씬 바꿈');   // [DECO-SAVE-1]
   _decoUndoClear();   // [DECO-UNDO-1] 안 보이는 씬의 것을 되돌리지 않게
+  if (DECO_SCENE === 'yard') _decoViewSave();   // [DECO-PT-1] 마당에서 보던 자리를 기억해 두고
   DECO_SCENE=DECO_SCENE==='yard'?'indoor':'yard';
   SEL_DECO=null;
   _dZoom=1; _dPanX=0; _dPanY=0;   // [DECO-ZOOM-1]
@@ -8529,6 +8610,7 @@ function toggleDecoScene(){
   if(iLabel) iLabel.textContent= isYard?'🎒 내 장식품':'🎒 내 장식품 (집 안)';
   _dCv=null; _dCtx=null;
   renderHouseDeco();
+  if (DECO_SCENE === 'yard') _decoViewRestore();   // [DECO-PT-1] 마당으로 돌아오면 그 자리로
   if(_ifMode) ifSyncScene();
   toast(isYard?'🌿 마당이에요! 집은 오른쪽 위 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
@@ -8644,12 +8726,13 @@ function _decoRenderQuick(inv, placed) {
 }
 
 function selectDeco(id){
+  if (DECO_MODE === 'erase') { setDecoMode('deco'); ifSyncModeBtn(); }   // [DECO-PT-2]
   SEL_DECO=(SEL_DECO===id)?null:id;
   _drawDeco(); renderDecoInv();
   if(SEL_DECO){
     const d=GAME_DATA.decorations.find(x=>x.id===id);
     if(d&&d.cat!==DECO_SCENE) toast(`${d.icon} 이 장식은 ${d.cat==='yard'?'🌿 마당':'🏠 집 안'} 전용이에요!`);
-    else toast(`${d?.icon} 선택됨 — 원하는 칸에 클릭!`);
+    else toast(`${d?.icon} 골랐어요 — 놓을 칸을 누르세요`);   // [DECO-PT-1] 폰·태블릿은 '클릭'이 아니다
   }
 }
 // ══ 작품 전시 (Storage 업로드) ══

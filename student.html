@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260918bsf">
+<link rel="stylesheet" href="./student.css?v=20260918bsh">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -708,8 +708,8 @@
 <div id="interior-fullscreen" style="display:none;position:fixed;inset:0;z-index:9000;
   background:#0E1621;flex-direction:column;overflow:hidden">
 
-  <!-- 상단 바 -->
-  <div style="display:flex;align-items:center;gap:.7rem;padding:.55rem 1rem;
+  <!-- 상단 바 — [DECO-PT-1] 폰에서 한 글자씩 세로로 접히지 않게(if-topbar) -->
+  <div class="if-topbar" style="display:flex;align-items:center;gap:.7rem;padding:.55rem 1rem;
     background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,215,0,.15);flex-shrink:0">
     <button onclick="closeInteriorFullscreen()"
       style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
@@ -734,6 +734,11 @@
       style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
         cursor:pointer;border:1.5px solid rgba(255,255,255,.12);
         background:rgba(255,255,255,.06);color:var(--txt2)">🖌️ 바닥</button>
+    <!-- [DECO-PT-2] 🧽 치우기 — 누른 것을 치운다(동물·우리 안 동물 포함). 전엔 동물을 치울 방법이 없었다 -->
+    <button id="if-mode-erase" onclick="setDecoMode('erase',this);ifSyncModeBtn()"
+      style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
+        cursor:pointer;border:1.5px solid rgba(255,255,255,.12);
+        background:rgba(255,255,255,.06);color:var(--txt2)">🧽 치우기</button>
     <!-- 씬 전환 -->
     <button id="if-scene-btn" onclick="toggleDecoScene();ifSyncScene()"
       style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;
@@ -820,7 +825,7 @@
       <div class="deco-drawer-head">
         <span id="if-inv-label" class="deco-drawer-label">🎒 내 장식품</span>
         <div class="deco-search-wrap">
-          <input id="if-deco-search" type="search" placeholder="🔍 이름으로 찾기" autocomplete="off"
+          <input id="if-deco-search" type="text" enterkeyhint="search" placeholder="🔍 이름으로 찾기" autocomplete="off"
             oninput="decoFindSet('q', this.value)" aria-label="장식 이름으로 찾기">
           <button id="if-deco-search-clear" onclick="decoFindSet('q','');document.getElementById('if-deco-search').value=''"
             aria-label="지우기" hidden>✕</button>
@@ -943,7 +948,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260918bsg"></script>
+<script src="./student.js?v=20260918bsh"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

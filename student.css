@@ -1409,3 +1409,27 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
   font-size:13px;font-weight:800;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--txt2)}
 .deco-space.is-on{border-color:var(--gold);background:rgba(217,164,65,.18);color:var(--gold)}
 @media (max-width:420px){ .deco-space{min-width:36px;padding:0 6px} }
+
+/* ══ 꾸미기 플레이 시험 고침 1차 (DECO-PT-1) ══ */
+/* #2 폰 윗줄: 한 글자씩 세로로 접히던 것 → 한 줄 유지, 넘치면 옆으로 민다 */
+.if-topbar{flex-wrap:nowrap!important;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.if-topbar::-webkit-scrollbar{display:none}
+.if-topbar > *{flex-shrink:0;white-space:nowrap}
+@media (max-width:480px){
+  .if-topbar{gap:.4rem!important;padding:.4rem .5rem!important}
+  .if-topbar button{font-size:.74rem!important;padding:.3rem .55rem!important}
+  #if-scene-name{display:none}
+}
+/* #20 끌 때 글자가 파랗게 선택되지 않게 */
+#interior-fullscreen{-webkit-user-select:none;user-select:none}
+#interior-fullscreen input{-webkit-user-select:text;user-select:text}
+/* #15 바닥 모드에서는 장식 서랍을 접는다(마당이 넓게) */
+body.deco-floor-mode #if-deco-drawer{display:none}
+/* 폰: 최근 줄 카드를 작게 — 서랍이 마당을 덜 먹게 */
+@media (max-width:480px){
+  #if-deco-quick .deco-card{min-width:52px!important;padding:.2rem .3rem!important}
+  #if-deco-quick .deco-card .dc-name{display:none}
+  .deco-drawer-body{max-height:128px}
+}
+/* #14 카드 이름: 한 줄 자르기 대신 두 줄까지 */
+#if-deco-inv .deco-card .dc-name{white-space:normal!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.5em}
