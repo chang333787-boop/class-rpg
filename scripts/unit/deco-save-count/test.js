@@ -419,6 +419,33 @@
       out('다썼을때_공간안내', /공간 3에 1개/.test(msg));
       decoSpaceSet(1); await sleep(200);
     }
+
+    //  ⑫ 보이는 단추가 정말 눌리나(DECO-PT-4) — 마을에서 ⋯ 가 72차부터 터치로 안 눌렸던 함정.
+    //    .click() 은 겹침·pointer-events 를 건너뛰므로 '눌린다'의 증거가 아니다 → 한가운데 elementFromPoint.
+    {
+      const tapBad = () => {
+        const root = document.getElementById('interior-fullscreen');
+        const bad = [];
+        root.querySelectorAll('button, input').forEach(b => {
+          const r = b.getBoundingClientRect(), cs = getComputedStyle(b);
+          if (!(r.width > 0 && r.height > 0) || cs.visibility === 'hidden' || cs.display === 'none') return;
+          if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) return;
+          const x = Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), y = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2));
+          const top = document.elementFromPoint(x, y);
+          if (!(top === b || b.contains(top))) bad.push(b.id || b.textContent.trim().slice(0, 8));
+        });
+        return bad;
+      };
+      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(900);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const r1 = tapBad(); decoDrawerToggle(); await sleep(200);
+      const r2 = tapBad(); decoDrawerToggle(); await sleep(100);
+      setDecoMode('floor'); ifSyncModeBtn(); await sleep(200);
+      const r3 = tapBad(); setDecoMode('deco'); ifSyncModeBtn();
+      out('안눌리는단추_접힘', r1.join(',') || '없음');
+      out('안눌리는단추_펼침', r2.join(',') || '없음');
+      out('안눌리는단추_바닥모드', r3.join(',') || '없음');
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }

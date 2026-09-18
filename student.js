@@ -4700,6 +4700,7 @@ function openInteriorFullscreen() {
   DI = {...DI_FULL};
   const fs = document.getElementById('interior-fullscreen');
   fs.style.display = 'flex';
+  setTimeout(() => { try { _decoPillarSync(); } catch (e) {} }, 0);   // [DECO-PT-4] 보이게 된 뒤 기둥 자리
   _dCv = null; _dCtx = null;
   _ifActiveContainer = 'if-topview';
   ifSyncScene();
@@ -4766,6 +4767,7 @@ function ifSyncInv() {
   const el = document.getElementById('if-deco-inv');
   const srcEl = document.getElementById('house-deco-inv');
   if (el && srcEl) el.innerHTML = srcEl.innerHTML;
+  try { _decoPillarSync(); } catch (e) {}   // [DECO-PT-4]
   // 클릭 이벤트는 SEL_DECO 변수 공유로 동작
 }
 
@@ -8683,11 +8685,15 @@ function decoFindSet(key, val) {
 
 // [DECO-THUMB-2] 오른쪽 확대 단추 기둥이 서랍을 펼치면 서랍 위로 겹쳤다 → 늘 서랍 바로 위에 붙인다
 function _decoPillarSync() {
-  const col = document.getElementById('if-zoom-col'); if (!col) return;
+  //  [DECO-PT-4] 기둥 위치는 CSS 변수 하나(--deco-drawer-h)로. 서랍이 아직 안 보일 때(높이 0) 재면
+  //  기둥이 서랍 머리줄(⌃ 펼치기)을 덮었다 → 보일 때만 값을 바꾸고, 안 보이면 이전 값(기본 220px)을 둔다.
+  const fs = document.getElementById('interior-fullscreen');
   const dr = document.getElementById('if-deco-drawer');
-  const drH = (dr && dr.offsetParent !== null) ? dr.offsetHeight : 0;
-  col.style.top = 'auto'; col.style.transform = 'none';
-  col.style.bottom = (drH + 12) + 'px';
+  if (!fs || !dr) return;
+  const shown = fs.style.display !== 'none' && dr.offsetParent !== null;
+  const h = shown ? dr.offsetHeight : 0;
+  if (h > 0) fs.style.setProperty('--deco-drawer-h', h + 'px');
+  else if (fs.style.display !== 'none' && dr.offsetParent === null) fs.style.setProperty('--deco-drawer-h', '0px');   // 바닥 모드(서랍 숨김)
 }
 if (typeof window !== 'undefined') addEventListener('resize', () => { try { _decoPillarSync(); } catch (e) {} });
 

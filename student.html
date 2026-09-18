@@ -749,7 +749,7 @@
   </div>
 
   <!-- [DECO-ZOOM-1] 확대/축소 — 두 손가락으로도 되고, 이 단추로도 된다(44px 이상) -->
-  <div id="if-zoom-col" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  <div id="if-zoom-col" style="position:absolute;right:10px;bottom:calc(var(--deco-drawer-h, 220px) + 12px);
     display:flex;flex-direction:column;gap:8px;z-index:9001">
     <button onclick="decoZoomIn()" title="크게" aria-label="크게"
       style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
@@ -948,7 +948,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260918bsk"></script>
+<script src="./student.js?v=20260918bsl"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
