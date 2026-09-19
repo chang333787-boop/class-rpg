@@ -5051,7 +5051,11 @@ function _decoSpaceSync() {
 // [DECO-PT-2] 말이 되게 — 물 위에는 물에 사는 것·물가 것만, 벽에 거는 것은 벽(맨 윗줄)에만
 //  (디자인2 플레이 시험: "연못 한가운데 나무가 자라!" · "그림 액자가 방바닥 한가운데 있어")
 const DECO_WATER_OK = { d_y29: 1, d_y30: 1 };   // 갈대 묶음 · 징검돌 (+ 물을 좋아하는 동물은 동물 규칙이 본다)
-const DECO_WALL = { d_i3: 1, d_i4: 1 };         // 시계 · 그림 액자
+//  [INDOOR-WALL-1] 벽걸이 — 괘종시계(d_i3)는 서 있는 시계라 뺐다(그림에 바닥 그림자 · docs/indoor_look_rules_20260920.md §4, 보스 승인).
+//  벽걸이는 저장은 **0번 줄 그대로**, 그림만 한 칸 위 벽 띠에 그린다(`DECO_WALL_ART` 의 벽걸이 판 · 없으면 몸통을 띠에).
+const DECO_WALL = { d_i4: 1 };                   // 그림 액자
+const DECO_WALL_ART = { d_i4: 'd_i4_wall' };     // 벽 띠에 그릴 그림(assets/deco/<이름>.svg — 못·끈·벽 그림자까지 그린 판)
+function _isWallDeco(id) { return !!DECO_WALL[id]; }
 function _decoRuleWhy(id, area, r, c, w, h) {
   if (!id) return '';
   if (area === 'yard' && !(typeof ANIM_DECO !== 'undefined' && ANIM_DECO[id]) && !DECO_WATER_OK[id]) {
@@ -5059,7 +5063,7 @@ function _decoRuleWhy(id, area, r, c, w, h) {
     for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++)
       if (fl[(r + dr) + '_' + (c + dc)] === 'water') return '🌊 물 위에는 놓을 수 없어요 — 물가 풀밭에 놓아 보세요';
   }
-  if (area === 'indoor' && DECO_WALL[id] && r !== 0) return '🖼️ 벽에 거는 거예요 — 맨 윗줄(벽 앞)에 놓아 주세요';
+  if (area === 'indoor' && DECO_WALL[id] && r !== 0) return '🖼️ 벽에 거는 거예요 — 위쪽 벽(맨 윗줄)을 눌러 걸어 주세요';
   return '';
 }
 
@@ -5068,6 +5072,8 @@ function _decoOverlapOk(placingId, other) {
   if (!placingId || !other) return false;
   const isAnim = id => typeof ANIM_DECO !== 'undefined' && !!ANIM_DECO[id];
   if (other.area === 'indoor' && _isRugDeco(placingId) !== _isRugDeco(other.id)) return true;   // [INDOOR-RUG-1] 깔개 ↔ 가구
+  //  [INDOOR-WALL-1] 벽에 건 것 ↔ 그 앞 바닥의 가구 — 액자는 벽 띠에 걸려 있어 0번 줄 바닥 칸을 차지하지 않는다
+  if (other.area === 'indoor' && other.row === 0 && _isWallDeco(placingId) !== _isWallDeco(other.id)) return true;
   return (isAnim(placingId) && _isPenDeco(other.id)) || (_isPenDeco(placingId) && isAnim(other.id));
 }
 // [INDOOR-RUG-1] 깔개(러그) = 장식 표의 layer:'floor' — 그릴 때 먼저 그려지던 바로 그 표시다(_isFloorLayerDeco 와 같은 잣대 · id 목록을 따로 두지 않는다).
@@ -7717,6 +7723,7 @@ function _decoCellAt(clientX, clientY) {
   }
   const ox = _dCv._offX || 0, oy = _dCv._offY || 0;
   const c = Math.floor((bp.x - ox) / C), r = Math.floor((bp.y - oy) / C);
+  if (r === -1 && c >= 0 && c < DI.cols) return { area: 'indoor', r: 0, c, band: true };   // [INDOOR-WALL-1] 벽 띠 = 0번 줄의 벽
   if (c < 0 || c >= DI.cols || r < 0 || r >= DI.rows) return null;
   return { area: 'indoor', r, c };
 }
@@ -7795,7 +7802,8 @@ const DECO_PICK_MS = 600;
 function _decoPickAt(cell) {
   if (!cell) return false;
   const list = CUR.houseDecorations || [];
-  const hit = _decoTopAt(cell.area, cell.r, cell.c, true);   // [DECO-SPACE-1] 이 공간에서 · [DECO-ANIM-HIT-1] 동물은 보이는 자리로
+  let hit = _decoTopAt(cell.area, cell.r, cell.c, true, cell.band);   // [DECO-SPACE-1] 이 공간에서 · [DECO-ANIM-HIT-1] 동물은 보이는 자리로 · [INDOOR-WALL-1] 벽 띠
+  if (hit && !cell.band && _decoOnWallFloor(hit, cell.area)) hit = null;   // 액자 아래 빈 바닥
   if (!hit) return false;
   const d = GAME_DATA.decorations.find(x => x.id === hit.id);
   const inv = (CUR.inventory || []).find(i => i.id === hit.id);
@@ -8634,7 +8642,9 @@ function _drawIndoorFloorSVG(offX, offY, C, W) {
   const bb = _floorImg('wall_baseboard');
   if (bb) for (let x = x0; x < W; x += C) _dCtx.drawImage(bb, x, offY - C, C, C);
   const win = _floorImg('wall_window');
-  if (win) [1, 5, 9].forEach(cc => { if (cc < DI.cols) _dCtx.drawImage(win, offX + cc*C, offY - C, C, C); });
+  //  [INDOOR-WALL-1] 액자를 건 칸의 고정 창은 그리지 않는다(창 위에 액자가 겹쳐 보이지 않게)
+  const hungCols = new Set(); _decoList(CUR).forEach(p => { if (p.area === 'indoor' && p.row === 0 && _isWallDeco(p.id)) for (let k = 0; k < getDecoSize(p.id).w; k++) hungCols.add(p.col + k); });
+  if (win) [1, 5, 9].forEach(cc => { if (cc < DI.cols && !hungCols.has(cc)) _dCtx.drawImage(win, offX + cc*C, offY - C, C, C); });
   return true;
 }
 function _isFloorLayerDeco(p) {
@@ -9066,7 +9076,12 @@ function _drawIndoor() {
   for(let r=0;r<=DI.rows;r++){_dCtx.beginPath();_dCtx.moveTo(offX,offY+r*C);_dCtx.lineTo(offX+DI.cols*C,offY+r*C);_dCtx.stroke();}
 
   // 선택 하이라이트
-  if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='indoor'){
+  if(SEL_DECO && _isWallDeco(SEL_DECO)){   // [INDOOR-WALL-1] 벽걸이 카드 — 벽 띠의 빈 칸만 밝게
+    _dCtx.fillStyle='rgba(255,216,102,.3)'; _dCtx.strokeStyle='rgba(255,216,102,.9)'; _dCtx.lineWidth=Math.max(1,C*.05);
+    for(let c=0;c<DI.cols;c++) if(!_decoList(CUR).some(p=>p.area==='indoor'&&p.row===0&&_isWallDeco(p.id)&&c>=p.col&&c<p.col+getDecoSize(p.id).w)){
+      _dCtx.fillRect(offX+c*C+2,offY-C+2,C-4,C-4); _dCtx.strokeRect(offX+c*C+2,offY-C+2,C-4,C-4);
+    }
+  } else if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='indoor'){
     _dCtx.fillStyle='rgba(255,220,100,.09)';
     for(let r=0;r<DI.rows;r++) for(let c=0;c<DI.cols;c++){
       if(!_decoList(CUR).find(p=>p.area==='indoor'&&p.row===r&&p.col===c))
@@ -9074,8 +9089,16 @@ function _drawIndoor() {
     }
   }
 
+  // [INDOOR-WALL-1] 벽걸이 — 0번 줄에 놓인 것은 한 칸 위 벽 띠에(벽걸이 판이 있으면 그것, 없으면 몸통을 띠에). 가구보다 먼저 = 가구가 그 앞에 선다
+  const _onWall = p => p.row === 0 && _isWallDeco(p.id);
+  _indoorPlaced.filter(_onWall).forEach(p => {
+    const sz = getDecoSize(p.id), px = offX + p.col * C, py = offY - C;
+    const art = DECO_WALL_ART[p.id] && _decoImg(DECO_WALL_ART[p.id]);
+    if (art) _dCtx.drawImage(art, px, py, sz.w * C, C);
+    else _drawDecoSVG(p.id, px, py, sz.w * C, C);
+  });
   // 배치된 가구 (바닥 레이어 제외 — 러그는 위에서 먼저 그렸다)
-  _decoSorted(_indoorPlaced.filter(p=>!_isFloorLayerDeco(p))).forEach(_drawIndoorItem);
+  _decoSorted(_indoorPlaced.filter(p=>!_isFloorLayerDeco(p) && !_onWall(p))).forEach(_drawIndoorItem);
 
   // 나가기 문
   const dx=offX+DI.cols*C/2-C*.35, dy=offY+DI.rows*C-C*.75;
@@ -9119,6 +9142,17 @@ function _decoClick(e) {
     const c=Math.floor((mx-ox)/C), r=Math.floor((my-oy)/C);
     //  [INDOOR-LOOK-1] 🖌️ 벽지·바닥 — 방(판) 어디를 눌러도, 벽 띠를 눌러도 그 방이 바뀐다
     if(DECO_MODE==='floor'){ if(c>=0&&c<DI.cols&&my>=0&&r<DI.rows) _inLookApply(); return; }
+    //  [INDOOR-WALL-1] 벽 띠를 누르면 — 벽걸이 카드를 들었으면 거기(0번 줄)에 건다 · 빈손·🧽 이면 거기 걸린 것을 치운다
+    if(r===-1 && c>=0 && c<DI.cols){
+      if(SEL_DECO && DECO_MODE!=='erase'){
+        if(_isWallDeco(SEL_DECO)) _decoPlace('indoor',0,c);
+        else toast('🖼️ 벽에는 액자 같은 벽걸이만 걸 수 있어요');
+        return;
+      }
+      const hung=_decoTopAt('indoor',0,c,false,true);
+      if(hung) _decoRemoveOne(hung);
+      return;
+    }
     if(c<0||c>=DI.cols||r<0||r>=DI.rows) return;
     _decoLastTap = { area: 'indoor', r, c, t: Date.now() };   // [DECO-DRAG-1]
     _decoPlace('indoor',r,c);
@@ -9293,7 +9327,7 @@ function _decoAnimPlacedAt(area, r, c) {
   return _decoList(CUR).find(p => p.area === 'yard' && p.id === st.id && p.row === st.home.row && p.col === st.home.col) || null;
 }
 
-function _decoTopAt(area, row, col, seen) {
+function _decoTopAt(area, row, col, seen, band) {
   if (seen) { const pet = _decoAnimPlacedAt(area, row, col); if (pet) return pet; }   // [DECO-ANIM-HIT-1] 보이는 동물 먼저
   const hits = _decoList(CUR).filter(p => {
     if (p.area !== area) return false;
@@ -9301,7 +9335,9 @@ function _decoTopAt(area, row, col, seen) {
     const sz = getDecoSize(p.id);
     return row >= p.row && row < p.row + sz.h && col >= p.col && col < p.col + sz.w;
   });
-  const rank = p => (typeof ANIM_DECO !== 'undefined' && ANIM_DECO[p.id]) ? 0 : (_isPenDeco(p.id) || _isRugDeco(p.id)) ? 2 : 1;   // [INDOOR-RUG-1] 깔개는 맨 아래
+  const rank = p => (area === 'indoor' && _isWallDeco(p.id)) ? (band ? -1 : 3)   // [INDOOR-WALL-1] 벽 띠를 눌렀으면 벽걸이 · 바닥 칸이면 그 앞 가구 먼저
+    : (typeof ANIM_DECO !== 'undefined' && ANIM_DECO[p.id]) ? 0 : (_isPenDeco(p.id) || _isRugDeco(p.id)) ? 2 : 1;   // [INDOOR-RUG-1] 깔개는 맨 아래
+  if (band) return hits.filter(p => _isWallDeco(p.id)).sort((a, b) => rank(a) - rank(b))[0] || null;   // 벽 띠에는 벽걸이만 걸려 있다
   hits.sort((a, b) => rank(a) - rank(b));
   return hits[0] || null;
 }
@@ -9322,7 +9358,8 @@ function _decoRemoveOne(ex) {
 function _decoRightClickAt(clientX, clientY) {
   const cell = _decoCellAt(clientX, clientY);
   if (!cell) return false;
-  const ex = _decoTopAt(cell.area, cell.r, cell.c, true);
+  let ex = _decoTopAt(cell.area, cell.r, cell.c, true, cell.band);   // [INDOOR-WALL-1]
+  if (ex && !cell.band && _decoOnWallFloor(ex, cell.area)) ex = null;   // 액자 아래 빈 바닥
   if (ex) { _decoRemoveOne(ex); return true; }
   if (DECO_MODE === 'floor' && cell.area === 'yard') {          // 바닥 모드면 칠한 바닥 한 칸을 걷어 낸다(↩ 됨)
     const fm = _yardFloorGet(CUR), key = cell.r + '_' + cell.c;
@@ -9337,16 +9374,20 @@ function _decoRightClickAt(clientX, clientY) {
   return false;
 }
 
+//  [INDOOR-WALL-1] 0번 줄 바닥 칸을 눌렀는데 맨 위 것이 벽에 건 것뿐 = 그림은 한 칸 위 벽 띠에 있다(바닥은 비어 보인다)
+function _decoOnWallFloor(p, area) { return area === 'indoor' && p && p.row === 0 && _isWallDeco(p.id); }
 function _decoPlace(area,row,col){
   const placed=CUR.houseDecorations||[];
   if(DECO_MODE==='erase'){   // [DECO-PT-2] 🧽 치우기 — 누른 칸의 위의 것 하나를 치운다(카드는 안 씀)
-    const ex=_decoTopAt(area,row,col,true);   // [DECO-ANIM-HIT-1] 동물은 보이는 자리로
+    let ex=_decoTopAt(area,row,col,true);   // [DECO-ANIM-HIT-1] 동물은 보이는 자리로
+    if(ex && _decoOnWallFloor(ex, area)) ex=null;   // [INDOOR-WALL-1] 액자는 벽에 걸려 있다 — 그 아래 빈 바닥을 누른 것이다
     if(!ex){ toast('여기엔 치울 게 없어요'); return; }
     _decoRemoveOne(ex); return;
   }
 
   // 클릭한 칸에 있는 장식 찾기 (멀티셀 고려) — [DECO-SPACE-1] 이 공간 것만 · [DECO-PT-2] 겹치면 위의 것
-  const existing=_decoTopAt(area,row,col);
+  let existing=_decoTopAt(area,row,col);
+  if(existing && !SEL_DECO && _decoOnWallFloor(existing, area)) existing=null;   // [INDOOR-WALL-1] 빈손으로 액자 아래 빈 바닥 — 액자를 치우지 않는다
   //  [DECO-PT-2] 카드를 든 채 누르면 치우지 않는다("꽃 놓으려는데 나무가 사라졌어") — 치우기는 빈손·🧽 치우기 모드에서만
   if(existing && SEL_DECO && DECO_MODE!=='erase'){
     if(!canPlaceDeco(row,col,(getDecoSize(SEL_DECO)).w,(getDecoSize(SEL_DECO)).h,area,null)){
@@ -9859,7 +9900,8 @@ function _decoFlashPlaced(id) {
     const st = _decoAnimState(p);   // 동물은 지금 있는 자리(그 그림)를 반짝
     if (st && st.el) { st.el.classList.remove('deco-flash'); void st.el.offsetWidth; st.el.classList.add('deco-flash'); setTimeout(() => st.el.classList.remove('deco-flash'), 1800); return; }
     const sz = getDecoSize(p.id);
-    const x = rect.left + (ox + p.col * _dC - _dPanX) * sx, y = rect.top + (oy + p.row * _dC - _dPanY) * sy, w = sz.w * _dC * sx, h = sz.h * _dC * sy;
+    const rowY = (p.area === 'indoor' && p.row === 0 && _isWallDeco(p.id)) ? -1 : p.row;   // [INDOOR-WALL-1] 액자는 벽 띠를 반짝
+    const x = rect.left + (ox + p.col * _dC - _dPanX) * sx, y = rect.top + (oy + rowY * _dC - _dPanY) * sy, w = sz.w * _dC * sx, h = sz.h * _dC * sy;
     if (x + w < hr.left || x > hr.right || y + h < hr.top || y > hr.bottom) return;   // 화면 밖이면 글만
     const r = document.createElement('div'); r.className = 'deco-flash-ring';
     r.style.cssText = `left:${Math.round(x)}px;top:${Math.round(y)}px;width:${Math.round(w)}px;height:${Math.round(h)}px`;

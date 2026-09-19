@@ -879,10 +879,12 @@
       setDecoMode('deco'); ifSyncModeBtn(); await sleep(200);                 // (main 과 나란히 잴 때 판 크기가 같게 — 이 PR 에서는 이미 장식 모드다)
       decoZoomFit(); await sleep(100);
 
-      //  옛 집 안(겹침 없음): 벽걸이 둘 · 크기 다른 가구 · 러그 둘 — 놓는 길을 거치지 않고 저장본처럼 바로 넣는다(main 에서도 같은 줄이 나오게)
+      //  옛 집 안(겹침 없음): 윗줄 둘 · 크기 다른 가구 · 러그 둘 — 놓는 길을 거치지 않고 저장본처럼 바로 넣는다(main 에서도 같은 줄이 나오게)
+      //  [INDOOR-WALL-1] 0번 줄 액자(d_i4)는 이 PR 부터 **일부러** 한 칸 위 벽 띠로 올라가 그려진다(indoor_look_rules §4) →
+      //   그 하나는 ⑳ 에서 따로 재고, 여기는 '그 밖은 한 픽셀도 안 바뀐다'를 지키게 윗줄 둘째를 마법 거울(d_i13)로 둔다.
       CUR.inventory = GAME_DATA.decorations.filter(d => d.cat === 'indoor').map(d => ({ id: d.id, qty: 3 }));
       CUR.houseDecorations = [
-        { id: 'd_i3', area: 'indoor', row: 0, col: 2 }, { id: 'd_i4', area: 'indoor', row: 0, col: 4 },
+        { id: 'd_i3', area: 'indoor', row: 0, col: 2 }, { id: 'd_i13', area: 'indoor', row: 0, col: 4 },
         { id: 'd_i16', area: 'indoor', row: 2, col: 1 }, { id: 'd_i15', area: 'indoor', row: 5, col: 8 },
         { id: 'd_i8', area: 'indoor', row: 5, col: 1 }, { id: 'd_i9', area: 'indoor', row: 2, col: 6 },
         { id: 'd_i6', area: 'indoor', row: 1, col: 10 }, { id: 'd_i1', area: 'indoor', row: 4, col: 5 },
@@ -1136,6 +1138,46 @@
       if (keep !== undefined) CUR.indoor = keep; else delete CUR.indoor;
       setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear();
       toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
+    }
+    //  ⑳ 벽걸이를 벽 띠에(INDOOR-WALL-1) — 공간 3 에서
+    if (typeof _isWallDeco === 'function') {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.inventory = (CUR.inventory || []).filter(i => !/^d_i(3|4|8)$/.test(i.id)).concat([{ id: 'd_i3', qty: 2 }, { id: 'd_i4', qty: 2 }, { id: 'd_i8', qty: 2 }]);
+      setDecoMode('deco'); _decoUndoClear(); decoZoomFit(); await sleep(100);
+      const list = () => _decoList(CUR).filter(p => p.area === 'indoor').map(p => p.id + '@' + p.row + ',' + p.col).sort().join(' ');
+      const k = () => document.querySelector('#if-topview canvas').getBoundingClientRect();
+      const tap = (r, c) => { _dSuppressClick = false; const b = k(); _decoClick({ clientX: b.left + _dCv._offX + (c + .5) * _dC - _dPanX, clientY: b.top + _dCv._offY + (r + .5) * _dC - _dPanY }); };
+      out('벽걸이_괘종시계는_가구', !_isWallDeco('d_i3') && _isWallDeco('d_i4'));
+      SEL_DECO = 'd_i3'; tap(5, 3);
+      out('벽걸이_괘종시계_아무줄에나', /d_i3@5,3/.test(list()));
+      SEL_DECO = 'd_i4'; tap(-1, 6);                                       // 벽 띠를 눌러 건다 → 저장은 0번 줄
+      out('벽걸이_벽띠눌러_걸림_저장0줄', /d_i4@0,6/.test(list()));
+      SEL_DECO = 'd_i4'; tap(4, 9);
+      out('벽걸이_바닥에는_안걸림', !/d_i4@4,9/.test(list()));
+      SEL_DECO = 'd_i8'; tap(0, 5);                                        // 소파(3×1)가 액자 아래 바닥(0줄 5~7칸)에
+      out('벽걸이_아래바닥에_가구', /d_i8@0,5/.test(list()));
+      //  그리기: 액자는 벽 띠에 벽걸이 판으로 · 가구는 제 칸에 · 액자 칸의 고정 창은 생략
+      const drawn = []; const oI = _decoImg, oS = _drawDecoSVG;
+      _drawDecoSVG = (id, px, py, bw, bh) => { drawn.push(id + ':' + Math.round((py - _dCv._offY) / _dC)); return oS(id, px, py, bw, bh); };
+      _decoImg = id => { if (/_wall$/.test(id)) drawn.push(id); return oI(id); };
+      try { _dCtx.setTransform(2, 0, 0, 2, 0, 0); _drawIndoor(); } finally { _decoImg = oI; _drawDecoSVG = oS; }
+      out('벽걸이_벽띠에_벽걸이판', drawn.indexOf('d_i4_wall') >= 0 && !drawn.some(x => /^d_i4:/.test(x)) && drawn.some(x => /^d_i8:/.test(x)));
+      //  빈손: 0줄 6칸 바닥 = 소파(맨 위) → 소파 치움 · 다시 = 액자 아래 빈 바닥 → 안 치움 · 벽 띠 6칸 = 액자 치움
+      SEL_DECO = null; tap(0, 6); const a1 = list();
+      tap(0, 6); const a2 = list();
+      tap(-1, 6); const a3 = list();
+      out('벽걸이_바닥누르면_가구먼저', !/d_i8/.test(a1) && /d_i4@0,6/.test(a1));
+      out('벽걸이_액자아래빈바닥_안치움', a2 === a1);
+      out('벽걸이_벽띠누르면_액자치움', !/d_i4/.test(a3));
+      decoUndo(); out('벽걸이_↩되살림', /d_i4@0,6/.test(list()));
+      //  스포이드 · 오른쪽 클릭도 벽 띠 = 액자 · 바닥 칸 = 액자 아님
+      out('벽걸이_벽띠_칸찾기', (() => { const b = k(), c = _decoCellAt(b.left + _dCv._offX + 6.5 * _dC - _dPanX, b.top + _dCv._offY - .5 * _dC - _dPanY); return !!c && c.band && c.r === 0 && c.c === 6; })());
+      out('벽걸이_골드불변', typeof CUR.gold === 'number');
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _decoUndoClear(); SEL_DECO = null; toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
     }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
