@@ -4931,17 +4931,29 @@ window.__umbrella = () => ({ 켜짐: window.VRULES.umbrella.on, 비: EV.rain, �
 const LIT = { shops: new Map(), day: -1, key: '', scanAt: -1e9, tick: -1, dirty: true, lastCells: new Set(), pieces: 0, stats: { 가게: 0, 단계1: 0, 단계2: 0, 두리번: 0, 통앞멈춤: 0, 놓자마자줄어듦: 0 } };
 const litCanNear = rec => { const R = window.VRULES.litter, b = roadBeside(rec); if (b < 0) return false; const { reach } = roadBFS(b, undefined, R.radius);
   for (const c of reach) { const x = cX(c), y = cY(c); for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && r.k === 'trashcan') return c; } } return false; };   // 통 옆 길 칸(멈춰 설 자리) 또는 false
-function litCells(rec) { const R = window.VRULES.litter, out = []; footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot).forEach(([x, y]) => { for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = idx(nx, ny); if (isRoad(c) && !out.includes(c)) out.push(c); } }); return out.slice(0, R.cellsMax); }
+/* 카메라에서 보이는 쪽 — 카메라는 목표에서 (cos camAz, sin camAz) 쪽에 있다(격자 x·y = 세계 x·z). 그쪽 길 칸이 건물 '앞'(화면 아래쪽)이라 가려지지 않는다 */
+const litFace = () => { const a = typeof camAz === 'number' ? camAz : Math.PI / 4; return [Math.cos(a), Math.sin(a)]; };
+const litFaceKey = () => Math.round((typeof camAz === 'number' ? camAz : Math.PI / 4) / (Math.PI / 4));   // 45° 단위 — 아이가 판을 돌리면 다시 고른다
+function litCells(rec) { const R = window.VRULES.litter, fp = footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot), [fx, fz] = litFace(), mine = new Set(fp.map(([x, y]) => idx(x, y)));
+  const ccx = fp.reduce((s, p) => s + p[0], 0) / fp.length, ccy = fp.reduce((s, p) => s + p[1], 0) / fp.length, ring = new Map();
+  fp.forEach(([x, y]) => { for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = idx(nx, ny); if (isRoad(c) && !ring.has(c)) ring.set(c, 1); } });   // 가게에 닿은 길 칸
+  [...ring.keys()].forEach(c => { for (const [dx, dy] of D4) { const nx = cX(c) + dx, ny = cY(c) + dy; if (!inb(nx, ny)) continue; const n = idx(nx, ny); if (isRoad(n) && !ring.has(n) && !mine.has(n)) ring.set(n, 2); } });   // 그 옆 한 칸(제안서 '가게 앞 두세 칸')
+  const hidden = c => { for (let t = 0.5; t <= 2; t += 0.5) { const hx = Math.round(cX(c) + fx * t), hy = Math.round(cY(c) + fz * t); if (inb(hx, hy) && mine.has(idx(hx, hy))) return 1; } return 0; };   // 카메라와 그 칸 사이에 이 건물 — 가린다
+  const face = c => (cX(c) - ccx) * fx + (cY(c) - ccy) * fz;           // 클수록 카메라 쪽(앞)
+  const all = [...ring].map(([c, r], k) => ({ c, r, k, h: hidden(c), f: face(c) }));
+  if (all.every(o => o.h)) return all.filter(o => o.r === 1).sort((a, b) => b.f - a.f || a.k - b.k).map(o => o.c).slice(0, R.cellsMax);   // 다 가려지면 지금처럼(닿은 칸)
+  return all.sort((a, b) => a.h - b.h || a.r - b.r || b.f - a.f || a.k - b.k).map(o => o.c).slice(0, R.cellsMax); }   // 안 가려진 칸 → 닿은 칸 → 앞쪽
 function litScan(now) {                                                 // 가게 목록 — 하루 한 번 · 놓은 것이 바뀌면(2초에 한 번까지)
-  const R = window.VRULES.litter, day = Math.floor(SIM.t / DAY_MS), key = placedTotal + ':' + day;
+  const R = window.VRULES.litter, day = Math.floor(SIM.t / DAY_MS), key = placedTotal + ':' + day + ':' + litFaceKey();
   if (LIT.key === key || SIM.ticks - LIT.scanAt < 20) return; LIT.scanAt = SIM.ticks; LIT.key = key;
   const alive = new Set();
   cells.forEach((rec, i) => { if (!rec || rec.root !== i || !R.kinds.includes(rec.k)) return; alive.add(i);
     let s = LIT.shops.get(i); if (!s) LIT.shops.set(i, s = { today: 0, yday: 0, stage: 0, asked: -1, n: 0, flash: 0 });
-    s.cells = litCells(rec); const can = litCanNear(rec), had = s.can; s.can = can;
+    { const nc = litCells(rec); if (s.stage && String(nc) !== String(s.cells)) LIT.dirty = true; s.cells = nc; } const can = litCanNear(rec), had = s.can; s.can = can;   // 판을 돌려 앞 칸이 바뀌면 청크를 다시
     if (can !== false && had === false && s.stage > 0) { s.stage--; s.flash = now + R.flashMs; LIT.stats.놓자마자줄어듦++; LIT.dirty = true; }   // 놓는 순간 — 한 단계 줄고 ✓
   });
-  LIT.shops.forEach((s, r) => { if (!alive.has(r) && !s.fest) { LIT.shops.delete(r); LIT.dirty = true; } });   // s.fest = [ACT-FESTLIT] 축제 다음 날 광장(그 블록이 맡는다)
+  LIT.shops.forEach((s, r) => { if (!alive.has(r) && !s.fest) { LIT.shops.delete(r); LIT.dirty = true; } });
+  LIT.shops.forEach((s, r) => { if (s.fest && cells[r] && typeof festLitCells === 'function') { const nc = festLitCells(cells[r]); if (String(nc) !== String(s.cells)) { s.cells = nc; LIT.dirty = true; } } });   // 축제 광장도 같은 규칙   // s.fest = [ACT-FESTLIT] 축제 다음 날 광장(그 블록이 맡는다)
   LIT.stats.가게 = LIT.shops.size;
 }
 function litMorning() {                                                 // 아침 6시 — 어제 손님으로 단계를 한 칸씩
@@ -5046,8 +5058,8 @@ window.__litter = () => ({ 켜짐: window.VRULES.litter.on, ...LIT.stats, 가게
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).festLitter = { on: true, lo: 3, hi: 10, cellsMax: 4, tidyAt: [8, 10.5], tryH: 1.5, clearH: 14, seekR: 14 };
 const FESTLIT = { tick: -1, festDay: -1, root: -1, seen: new Set(), lastDay: -1, stats: { 축제: 0, 모인사람: 0, 단계: 0, 치우러감: 0, 치움: 0, 저절로: 0 } };
-function festLitCells(rec) { const R = window.VRULES.festLitter, fp = footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot), n = fp.length, pick = [0, n - 1, (n / 2) | 0, (n / 3) | 0, n - 1 - ((n / 3) | 0)];
-  return [...new Set(pick)].slice(0, R.cellsMax).map(k => idx(fp[k][0], fp[k][1])); }   // 광장 발자국의 모퉁이·가운데 몇 칸
+function festLitCells(rec) { const R = window.VRULES.festLitter, fp = footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot), [fx, fz] = litFace();
+  return fp.map(([x, y], k) => [x * fx + y * fz, k, idx(x, y)]).sort((a, b) => b[0] - a[0] || a[1] - b[1]).slice(0, R.cellsMax).map(a => a[2]); }   // 광장 발자국 중 카메라 쪽(앞) 칸부터 — 가운데 조형물·가로등에 가리지 않게
 function festTidySend(s, root, now) {                                   // 광장 가까이 쉬던 주민 하나를 광장 앞 길 칸으로
   const R = window.VRULES.festLitter, rec = cells[root]; if (!rec || pathBudget <= 1) return false;
   const b = roadBeside(rec); if (b < 0) return false;
