@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260920mcm">
+<link rel="stylesheet" href="./student.css?v=20260920mcr">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -773,53 +773,6 @@
       <img src="./assets/ui/ui_undo.svg" alt="" width="26" height="26" style="pointer-events:none"></button>
   </div>
 
-  <!-- 바닥 타일 선택줄 (바닥 모드일 때만) -->
-  <div id="if-floor-row" style="display:none;padding:.4rem 1rem;gap:.4rem;flex-wrap:wrap;
-    background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
-    <button class="floor-tile-btn active" onclick="setCurFloor('grass',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(74,140,42,.5);
-        background:rgba(74,140,42,.2);color:#a8e06a;cursor:pointer;font-family:inherit">🌿 잔디</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('dirt',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🟫 흙</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('dark_earth',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">⬛ 어두운 흙</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('stone',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪨 돌</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('stone_floor',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪟 돌바닥</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('sand',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🏜️ 모래</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('gravel',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🔘 자갈</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('brick',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🧱 벽돌</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('wood',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 나무</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('water',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🔵 물</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('flower',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🌸 꽃밭</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('deck',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🪵 데크</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('dry_earth',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">🟡 마른 흙</button>
-    <button class="floor-tile-btn" onclick="setCurFloor('gravel_yard',this)"
-      style="padding:.2rem .6rem;border-radius:10px;font-size:.75rem;border:1.5px solid rgba(255,255,255,.1);
-        background:rgba(255,255,255,.06);color:var(--txt2);cursor:pointer;font-family:inherit">⬜ 자갈마당</button>
-  </div>
-
   <!-- 본문: 캔버스 + 장식 인벤토리 -->
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
     <!-- 캔버스 (전체 폭 사용) -->
@@ -852,6 +805,17 @@
         <div id="if-deco-inv" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
         <div id="if-deco-shop"></div>
         <div id="if-deco-empty" class="deco-empty" hidden></div>
+      </div>
+    </div>
+    <!-- [DECO-FLOOR-PICK-1] 바닥 고르기 — 🖌️ 바닥 모드에서 접힌 서랍 자리에 연다(위쪽 글자 단추 줄은 없앴다).
+         견본 판 + 가족 칩 · 색 · 테두리(정원) / 기본 14바닥(기본 칩). 안의 단추는 _floorPickRender 가 만든다. -->
+    <div id="if-floor-picker" class="fpk" hidden>
+      <div class="fpk-side"></div>
+      <div class="fpk-main">
+        <div class="fpk-row" data-row="fams"><div class="fpk-scroll" data-row="fams" role="group" aria-label="바닥 가족"></div></div>
+        <div class="fpk-row" data-row="cols" hidden><span class="fpk-lab">색</span><div class="fpk-scroll" data-row="cols" role="group" aria-label="색"></div></div>
+        <div class="fpk-row" data-row="rims" hidden><span class="fpk-lab">테두리 · <b>저절로</b></span><div class="fpk-scroll" data-row="rims" role="group" aria-label="테두리"></div></div>
+        <div class="fpk-row" data-row="basics" hidden><span class="fpk-lab">바닥</span><div class="fpk-scroll fpk-wrap" data-row="basics" role="group" aria-label="기본 바닥"></div></div>
       </div>
     </div>
   </div>
@@ -962,7 +926,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260920mcq"></script>
+<script src="./student.js?v=20260920mcr"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

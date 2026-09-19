@@ -1492,6 +1492,66 @@ try {
   test('정원 바닥 색 코드를 돌릴 수 있다', () => { throw e; });
 }
 
+//  [DECO-FLOOR-PICK-1] 바닥 고르기 — 저장값은 `_floorJoin` 한 곳. 지우개 판정이 글자 그대로 비교하므로 한 조합 = 한 글자여야 한다.
+cur = '꾸미기 바닥 고르기(DECO-FLOOR-PICK-1)';
+try {
+  const S = read('student.js');
+  const own = {};   // 가진 장식 id → 수(잠긴 색 문턱)
+  const DECOS = [{ id: 'd_y1', k: 'plant' }, { id: 'd_y21', k: 'plant' }, { id: 'd_y43', k: 'plant' }, { id: 'd_y42', k: 'plant' }, { id: 'd_y41', k: 'plant' }, { id: 'd_y7', k: 'plant' },
+    ...Array.from({ length: 10 }, (_, i) => ({ id: 'p' + i, k: 'plant' })), ...['d_y10', 'd_y20', 'd_y31', 'd_y59'].map(id => ({ id, k: 'water' })),
+    { id: 'd_y6', k: 'prop' }, { id: 'd_y14', k: 'prop' }, ...Array.from({ length: 6 }, (_, i) => ({ id: 'a' + i, k: 'animal' })), ...Array.from({ length: 5 }, (_, i) => ({ id: 't' + i, k: 'tree' })),
+    { id: 'hid', k: 'plant', hidden: true }];
+  const sb = { GAME_DATA: { decorations: DECOS.map(d => ({ id: d.id, cat: 'yard', hidden: !!d.hidden, _k: d.k })) },
+    _decoQtyOf: id => own[id] || 0, _decoShopKind: d => d._k };
+  sb.globalThis = sb; vm.createContext(sb);
+  const at = S.indexOf('const _FLOOR_COLORS = {'), end = S.indexOf(NL + '};', at);
+  const eAt = S.indexOf('const _FLOOR_EDGE_COLOR = '), eEnd = S.indexOf(NL + '});', eAt);
+  const fAt = S.indexOf('const FLOOR_TILES = {'), fEnd = S.indexOf(NL + '};', fAt);
+  const arr = n => { const i = S.indexOf('const ' + n + ' = ['), j = S.indexOf(']];', i); if (i < 0 || j < 0) throw new Error(n + ' 표를 못 찾음'); return S.slice(i, j + 3) + NL; };
+  vm.runInContext(SPACE_PRELUDE(S) + S.slice(at, end + 3) + NL + sliceConst(S, '_FLOOR_RIMS') + S.slice(eAt, eEnd + 4) + NL + S.slice(fAt, fEnd + 3) + NL
+    + arr('_FLOOR_BASIC') + arr('_FLOOR_FAMS') + ['_floorJoin', '_floorHas', '_floorKindCount', '_floorLockWhy'].map(n => sliceFn(S, n)).join(NL) + NL
+    + ';globalThis.__R = { _floorParse, _floorJoin, _floorLockWhy, _FLOOR_COLORS, _FLOOR_RIMS, _FLOOR_EDGE_COLOR, _FLOOR_BASIC, _FLOOR_FAMS, FLOOR_TILES };', sb);
+  const R = sb.__R, J = R._floorJoin, P = R._floorParse;
+  const combos = [];
+  R._FLOOR_FAMS.forEach(([n]) => [''].concat(R._FLOOR_COLORS[n]).forEach(c => [''].concat(R._FLOOR_RIMS).forEach(m => combos.push([n, c, m]))));
+  test('가족 칩 7개 = 정원 바닥 7종(순서: 튤립 · 세로 튤립 · 수국 · 라벤더 · 해바라기 · 데이지 · 들꽃)', () =>
+    eq(R._FLOOR_FAMS.map(f => f[0]), ['tulipbed', 'tulipcol', 'hydrangea', 'lavender', 'sunflowerbed', 'daisyfield', 'wildflower']));
+  test('기본 14바닥 = 옛 단추 순서 그대로 · 옛 바닥 표와 같은 14종', () => {
+    eq(R._FLOOR_BASIC.map(b => b[0]), ['grass', 'dirt', 'dark_earth', 'stone', 'stone_floor', 'sand', 'gravel', 'brick', 'wood', 'water', 'flower', 'deck', 'dry_earth', 'gravel_yard']);
+    eq(R._FLOOR_BASIC.map(b => b[0]).sort(), Object.keys(R.FLOOR_TILES).slice(0, 14).sort());
+  });
+  test('기본 색은 그림의 기본이라 색 표에 없다(저장값에 #기본색 이 생길 길이 없다)', () => R._FLOOR_FAMS.forEach(([n, , d]) => eq(R._FLOOR_COLORS[n].indexOf(d), -1, n + '#' + d)));
+  test('만든 값을 해석하면 고른 그대로 · 다시 만들면 같은 글자(왕복)', () => combos.forEach(([n, c, m]) => {
+    const v = J(n, c, m), p = P(v), m2 = R._FLOOR_EDGE_COLOR[n] ? m : '';
+    eq([p.name, p.color, p.rim], [n, c, m2], v); eq(J(p.name, p.color, p.rim), v, v);
+  }));
+  test('한 조합 = 한 글자(겹침 없음) · 기본색이면 # 없음 · 자연이면 + 없음', () => {
+    const vs = combos.filter(([n, , m]) => R._FLOOR_EDGE_COLOR[n] || !m).map(x => J(...x));
+    eq(new Set(vs).size, vs.length);
+    eq([J('tulipbed', '', ''), J('tulipbed', 'red', 'picket'), J('tulipcol', 'yellow', ''), J('hydrangea', '', 'stone'), J('hydrangea', 'pink', ''), J('lavender', '', 'brick'), J('daisyfield', '', ''), J('wildflower', 'rainbow', '')],
+       ['tulipbed', 'tulipbed#red+picket', 'tulipcol#yellow', 'hydrangea+stone', 'hydrangea#pink', 'lavender+brick', 'daisyfield', 'wildflower#rainbow']);   // 규칙 문서 §4 표 그대로
+  });
+  test('붙을 수 없는 것은 떨어진다 — 기본색 이름 · 모르는 색 · 들꽃의 마감 · 옛 바닥의 색·마감 · 이상한 이름', () =>
+    eq([J('tulipbed', 'pink', ''), J('hydrangea', 'blue', ''), J('tulipbed', 'nosuch', 'nosuch'), J('wildflower', 'snow', 'picket'), J('brick', 'red', 'stone'), J('', '', ''), J('Tulip#x', '', ''), J('constructor', 'red', 'picket')],
+       ['tulipbed', 'hydrangea', 'tulipbed', 'wildflower#snow', 'brick', 'grass', 'grass', 'constructor']));
+  const shut = n => [''].concat(R._FLOOR_COLORS[n]).filter(c => R._floorLockWhy(n, c));
+  test('아무것도 없으면: 튤립은 분홍·노랑만 · 수국은 파랑만 · 들꽃은 기본만 · 라벤더·해바라기·데이지는 전부 열림', () => {
+    eq(shut('tulipbed'), ['red', 'white', 'violet', 'orange', 'candy', 'sherbet', 'night']); eq(shut('tulipcol'), shut('tulipbed'));
+    eq(shut('hydrangea'), ['violet', 'pink', 'white', 'duo', 'moon']); eq(shut('wildflower'), ['rainbow', 'snow']);
+    ['lavender', 'sunflowerbed', 'daisyfield'].forEach(n => eq(shut(n), [], n));
+  });
+  test('문턱: 장미 하나 → 빨강 · 꽃·풀 8가지 → 사탕 · 물 2가지 → 수국 세 색 · 가로등 → 달빛 · 숨은 장식은 안 센다', () => {
+    own.d_y43 = 1; eq(shut('tulipbed').indexOf('red'), -1);
+    ['d_y1', 'd_y21', 'd_y42', 'd_y41', 'd_y7', 'p0'].forEach(id => { own[id] = 1; }); eq(shut('tulipbed'), ['candy', 'sherbet', 'night']);
+    own.p1 = 1; eq(shut('tulipbed'), ['sherbet', 'night']);   // 8가지
+    own.d_y10 = 1; own.d_y20 = 1; eq(shut('hydrangea'), ['duo', 'moon']); own.d_y6 = 1; eq(shut('hydrangea'), ['duo']);
+    for (let i = 2; i < 10; i++) own['p' + i] = 1; eq(shut('tulipbed'), []);   // 전부 = 숨은 것 빼고 16가지
+    eq(/지금 \d+가지/.test(R._floorLockWhy('wildflower', 'rainbow')), true);
+  });
+} catch (e) {
+  test('바닥 고르기 코드를 돌릴 수 있다', () => { throw e; });
+}
+
 // ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
