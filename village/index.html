@@ -3451,6 +3451,11 @@ function trayTrim() {
     let show = !lockedNow || (LOCK_GOAL[k] ? openIds.has(LOCK_GOAL[k]) : LOCK_POP[k] <= nextPop);
     if (lockedNow && show) { lockedShown[q.grp0] = (lockedShown[q.grp0] || 0) + 1; if (lockedShown[q.grp0] > R.maxLockedPerTab) show = false; }
     q.grp = show ? q.grp0 : '(아직)'; });
+  /* [MAC-GOAL-3] 꽃 탭만은 '다음 보상' 하나를 늘 보인다 — 새 마을에서는 첫 목표 셋에 보상이 없고 꽃의 가장 가까운 인구 문턱이 30 이라, 꽃 탭에 잠긴 카드가 하나도 안 떠서 '더 있다'는 걸 몰랐다(디자인 담당 09-20) */
+  { const tab = K.flower && K.flower.grp0; if (tab && !lockedShown[tab]) { const inTab = k => K[k] && K[k].grp0 === tab && !unlocked.has(k);
+      let next = null; GOALS.some(g => { if (goalsDone.has(g.id)) return false; const ks = (GOAL_REWARDS[g.id] || []).filter(inTab); if (ks.length) { next = ks[0]; return true; } return false; });   // 목표 순서로 가장 먼저 올 보상
+      if (!next) next = Object.keys(LOCK_POP).filter(inTab).sort((x, y) => LOCK_POP[x] - LOCK_POP[y])[0] || null;
+      if (next) K[next].grp = tab; } }
   setTimeout(() => { const now = performance.now(); document.querySelectorAll('#trayIn .card').forEach(el => { const u = GU.fresh.get(el.dataset.kind); if (u && u > now) { el.style.boxShadow = '0 0 0 3px #5fc27e, 0 0 18px #5fc27e'; const pr = el.querySelector('.pr'); if (pr) pr.textContent = 'NEW · ' + pr.textContent; } }); }, 0);
 }
 /* ── [MAC-GOAL-2] 목표판 줄 끝에 보상 그림 + 목표가 바뀌는 순간 트레이 다시 그리기 (창조자의 눈 3회 ①② · 계획표 §5-0) ── */
