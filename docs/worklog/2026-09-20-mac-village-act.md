@@ -149,3 +149,48 @@ ACT-PATH ✔ → 광장·정자 ✔(#527) → 돌아서는 사람 ✔(#505) → 
 ## ⑮ 다음
 - 축제 다음 날 광장(쓰레기 둘째 PR · 보스 답 ④) — #559 머지 뒤 새 브랜치(같은 청크 합치기를 쓴다).
 - 월요일 학교 세션: 1부 ④·2부 ⑨ 그대로 + **정원 하나를 만들어 저녁에 누가 오는지 · 문을 눌러 까닭이 읽히는지** 아이 반응을 적어 달라.
+
+---
+
+# 4부 (09-20 밤 늦게) — 축제 뒤 · 비 · 밤 · 새벽 · 돌아서는 이웃 · 반딧불
+
+## ⑯ PR (전부 base `feat/village-45` · 보스 순서대로)
+| PR | 무엇 | 상태 | 스위치 · 훅 |
+|---|---|---|---|
+| [#559](https://github.com/chang333787-boop/class-rpg/pull/559) ACT-LITTER 후속 | 조각을 길 청크 기하에(draw +0) · 1단계 문턱 6 → 5 | 머지됨 | `VRULES.litter` |
+| [#568](https://github.com/chang333787-boop/class-rpg/pull/568) ACT-FESTLIT | 축제 다음 날 광장 조각 · 이웃이 치운다(아무도 탓 안 함) · 2단계 문턱 12 → 10 | 머지됨 | `VRULES.festLitter` |
+| [#572](https://github.com/chang333787-boop/class-rpg/pull/572) ACT-RAIN | 비 오면 가까운 정자·처마 밑에 모여 선다 · 밤·비 그침이면 풀어 준다 | 머지됨 | `VRULES.rainShelter` · `__rainShelter()` |
+| [#577](https://github.com/chang333787-boop/class-rpg/pull/577) ACT-LITTER | 조각 칸을 카메라에서 보이는 쪽(건물 앞 길)부터 | 머지됨 | 〃 |
+| [#582](https://github.com/chang333787-boop/class-rpg/pull/582) ACT-NIGHTCART | 밤 어귀에 내일 올 이웃의 짐수레 + 등불(모양은 디자인 `CART_PARTS`) | 머지됨 | `VRULES.nightCart` · `__nightCart()` |
+| [#585](https://github.com/chang333787-boop/class-rpg/pull/585) ACT-WELLCHAT | 아침 우물가 — 모인 이웃이 마주 보고 돌아가며 👋(보스: 👋 그대로) | 머지됨 | `VRULES.wellChat` |
+| [#586](https://github.com/chang333787-boop/class-rpg/pull/586) ACT-GATEHINT | 아무도 안 오는 정원 문 위에만 가끔 ? | 머지됨 | `VRULES.gateHint` |
+| [#591](https://github.com/chang333787-boop/class-rpg/pull/591) ACT-LITTER ⓑ | 보이는 길이 없는 가게 — 조각을 건물 옆으로 비껴 가장자리에 | 머지됨 | `litter.edgePack/edgeShift` |
+| [#597](https://github.com/chang333787-boop/class-rpg/pull/597) ACT-PUDDLE | 비 온 다음 날 6~12시 길 가장자리 웅덩이 8칸(모양은 디자인 #590) · 아이가 밟으면 세 번 통통 | 머지됨 | `VRULES.puddle` · `__puddle()` |
+| [#599](https://github.com/chang333787-boop/class-rpg/pull/599) ACT-DAWN | 00:30~4:45 사는 집 창을 끔 → 먼저 일어난 집이 먼저 켜고 6시에 먼저 나옴 | 머지됨 | `VRULES.dawn` · `__dawn()` |
+| [#603](https://github.com/chang333787-boop/class-rpg/pull/603) ACT-LEAVE (+ACT-DAWN 고침) | 나가는 이웃 풍선은 동시 셋까지 · 곁 주민 하나가 멈춰 돌아봄 · 먼저 켜는 집은 날짜+집 번호로(카메라 ✗) | 머지됨 | `VRULES.leaveLook` · `__leave()` |
+| [#605](https://github.com/chang333787-boop/class-rpg/pull/605) ACT-FIREFLY | 꽃밭 무리·연못 곁 반딧불 서너 마리 · 밤·맑은 날만 · draw 밤 +1 | 열림 | `VRULES.firefly` · `__firefly()` |
+| (이 PR) | worklog 4부 | 열림 | 문서 |
+
+## ⑰ 고친 줄 지도(더함) — 월요일 3-way
+| 표식 | 고리 |
+|---|---|
+| `[ACT-LEAVE]` | `tickFolks` 맨 첫 고리(ACT-LOOK **바로 위**) · ACT-LOOK `keepBubble` 줄 조건에 `leaveKeep(f)` |
+| `[ACT-FESTLIT]` · `[ACT-DAWN]` · `[ACT-NIGHTCART]` | `tickFolks` ACT-LITTER 고리 아래 차례로 세 줄(틱마다 한 번 도는 것들) |
+| `[ACT-PUDDLE]` | 위 세 줄 **바로 아래** · `buildChunk` 수레 고리 아래 · `actKidDraw` 의 아이 높이 줄(통통 중이면 세 번 높게) — **기존 줄 수정** |
+| `[ACT-DAWN]` | `buildChunk` 의 `const lit = …` 줄 끝에 `&& dawnLit(i)` — **기존 줄 수정** · 집 안 사람 나오기 `if (home ? !isNightHour(h) …` **바로 위** 한 줄 |
+| `[ACT-RAIN]` | `tickFolks` 걷기 앞 고리 · 루프 `actRainDraw()` · ACT-UMB 안 한 줄(처마 밑에선 우산을 접는다) |
+| `[ACT-GATEHINT]` · `[ACT-WELLCHAT]` | 루프 그리기 줄 |
+| `[ACT-FIREFLY]` | 루프 `actNightCartDraw()` **바로 아래** |
+- `buildChunk` 안 남의 함수 고리는 이제 넷이다: 쓰레기(`for (const name in MAT)` 앞) · 수레 · 웅덩이 · `lit` 줄의 `dawnLit`. 학교 판과 합칠 때 이 넷의 자리를 먼저 본다.
+- 그리기 순서(루프): … UMB → RAIN → GATEHINT → (drawClock) → GREET → WELLCHAT → LITTER → NIGHTCART → **FIREFLY**.
+
+## ⑱ 찾은 것(더함)
+16. **아이는 아침에 거의 학교로 간다** — 웅덩이 '들르기'만으론 한 아침에 0~3번. 가던 길 그대로 밟는 칸에서 뛰게 하자 보였다. 집 앞 문 칸은 6시에 식구가 몰려 나와 웅덩이를 가린다 → 빼고 한두 칸 떨어진 가장자리.
+17. **연기는 카메라와 무관해야 한다**(보스 원칙) — 같은 마을이 어디를 보느냐에 따라 사람 움직임이 달라지면 시험을 못 한다. 새벽 첫 불을 '카메라 가까운 집'으로 골랐다가 날짜+집 번호로 고쳤다. 보이게 하는 건 **흩어 놓기**로(8채에 하나꼴 · 마을 곳곳).
+18. **곱셈 해시 `(i * 2654435761) >>> 0` 의 아래 비트는 고르지 않다** — `% 8` 로 고르면 집 번호 끝자리에 묶여 48채에 2채. 나눌 땐 `>>> 16` 한 위 비트로.
+19. **작은 빛은 반지름 단위부터** — 반딧불 떠다니는 반지름을 월드 값(1.3)으로 두니 한 칸(4)의 1/3 이라 셋이 한 점. 칸 단위(`* CS`)로.
+20. 헤드리스 그림의 밤은 실제보다 밝다 — 창 불빛 차이는 확대(zoom 55)로 보일 것.
+
+## ⑲ 다음
+- 보스 결정 대기(반딧불 #605 머지 뒤 새 순서).
+- 월요일 학교 세션: 1부 ④·2부 ⑨·3부 ⑮ 그대로 + **비 온 다음 날 아침 아이가 웅덩이에서 뛰는 걸 보는지 · 새벽 첫 불을 알아채는지** 적어 달라.
