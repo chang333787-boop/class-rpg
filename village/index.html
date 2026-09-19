@@ -5432,7 +5432,7 @@ function syncFolks() {
 const lookStats = { 둘러봄: 0 };
 function actLookTick(f, i, now) {
   const R = window.VRULES.lookAround; if (!R.on || !f.away || !(f.leaving || f.comeback)) return false;
-  if (R.keepBubble) f.away.until = SIM.t + 1500;                        // 풍선을 끄지 않는다 — 사람이 사라지면(마을 밖 · 집 안) 같이 사라진다
+  if (R.keepBubble && (!f.leaving || leaveKeep(f))) f.away.until = SIM.t + 1500;                        // 풍선을 끄지 않는다 — 사람이 사라지면(마을 밖 · 집 안) 같이 사라진다
   if (!f.leaving) return false;
   if (!f.look) { const rec = cells[f.home], c = rec ? centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot) : null;
     f.look = { t0: now, dir0: c ? Math.atan2(c.x - f.x, c.z - f.z) : f.dir }; lookStats.둘러봄++; }
@@ -5441,6 +5441,41 @@ function actLookTick(f, i, now) {
   return true;
 }
 window.__look = () => ({ 켜짐: window.VRULES.lookAround.on, ...lookStats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-LEAVE] '왔다가 그냥 간다'가 길 위에서 보이게 (주민 연기 · 09-20 · 보스 승인 — 인구 정체 조사 docs/village_pop_stall_20260920.md 의 '6초짜리 연기').
+   ⓐ 돌아서 나가는 이웃은 빠진 것 풍선을 띄운 채 마을을 나갈 때까지 간다(ACT-LOOK keepBubble) — 풍선이 화면을 덮지 않게 **동시에 maxBubbles 명까지만**
+      (먼저 돌아선 사람부터 · 넘친 사람은 원래대로 6초 뒤 풍선을 접는다).
+   ⓑ 그 길에서 마주친(nearR 칸 안) 주민 **한 명**이 멈춰 그 사람을 돌아본다(lookMs · 몸 방향은 ACT-GREET 처럼 atan2 로, 지나가는 동안 따라 돈다).
+      나가는 이웃 한 사람에 한 명 · 주민은 **집마다 하루 한 번**. 카메라와 무관(보스: 같은 마을은 늘 같게 움직인다).
+   판정·확률·저장·길찾기 0 · draw call +0. 스위치·수치 VRULES.leaveLook + 고리 둘(tickFolks 한 줄 · ACT-LOOK keepBubble 줄에 leaveKeep).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).leaveLook = { on: true, maxBubbles: 3, nearR: 2, lookMs: 2200 };
+const LEAVE = { tick: -1, keep: [], day: -1, homes: new Set(), stats: { 풍선지님: 0, 풍선접음: 0, 돌아봄: 0 } };
+function leaveKeep(f) {                                                 // 이 사람의 풍선을 마을 밖까지 들고 가나
+  const R = window.VRULES.leaveLook; if (!R.on) return true;
+  if (LEAVE.keep.includes(f)) return true;
+  if (!f.leaveCounted) { f.leaveCounted = true; if (LEAVE.keep.length < R.maxBubbles) { LEAVE.keep.push(f); LEAVE.stats.풍선지님++; return true; } LEAVE.stats.풍선접음++; }
+  return false;
+}
+function actLeaveTick(f, i, now) {
+  const R = window.VRULES.leaveLook;
+  if (LEAVE.tick !== SIM.ticks) { LEAVE.tick = SIM.ticks;               // 틱마다 한 번 — 나간 사람을 빼고, 마주친 주민을 고른다
+    const day = Math.floor(SIM.t / DAY_MS); if (day !== LEAVE.day) { LEAVE.day = day; LEAVE.homes.clear(); }
+    LEAVE.keep = LEAVE.keep.filter(g => g.leaving && folks.includes(g));
+    if (R.on) folks.forEach(g => { if (!g.leaving || g.leaveSeen || g.state !== 'walk' || (g.look && now - g.look.t0 < window.VRULES.lookAround.lookMs)) return;   // 둘러보기가 끝나 걸어 나가는 사람만
+      let best = null, bd = R.nearR * CS + 0.01;
+      folks.forEach(h => { if (h === g || h.visitor || h.arriving || h.leaving || h.comeback || h.leaveLook || h.greet || h.puddle || h.litAsk || h.litCan || h.gap || h.garden || h.look) return;
+        if ((h.state !== 'walk' && h.state !== 'idle') || LEAVE.homes.has(h.home)) return;
+        const d = Math.max(Math.abs(h.x - g.x), Math.abs(h.z - g.z)); if (d < bd) { bd = d; best = h; } });
+      if (best) { g.leaveSeen = true; LEAVE.homes.add(best.home); best.leaveLook = { who: g, until: now + R.lookMs }; LEAVE.stats.돌아봄++; } });
+  }
+  const L = f.leaveLook; if (!L) return false;
+  if (!R.on || now >= L.until || f.goal === 'home' && isNightHour(simHour())) { f.leaveLook = null; return false; }
+  f.walking = false; if (folks.includes(L.who)) f.dir = Math.atan2(L.who.x - f.x, L.who.z - f.z);   // 멈춰 서서 그 사람 쪽으로 — 지나가는 동안 따라 돈다
+  return true;
+}
+window.__leave = () => ({ 켜짐: window.VRULES.leaveLook.on, 지금풍선: LEAVE.keep.length, 지금나감: folks.filter(f => f.leaving).length, 지금돌아봄: folks.filter(f => f.leaveLook).length, ...LEAVE.stats });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-GAP] 끊긴 길 앞의 멈칫 — 길 끝과 길 끝 사이가 한두 칸 비었을 때 (주민 연기 · 09-20 · 창조자의 눈 2회).
@@ -5753,6 +5788,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
     if (actGardenTick(f, i, now, dt)) continue;   // [ACT-GARDEN] 저녁에 정원 문으로 들어가 한 바퀴 · 의자에 앉았다 나온다
     const rec = cells[f.home];
