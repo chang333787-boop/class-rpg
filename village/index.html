@@ -5157,6 +5157,31 @@ window.PUDDLE_PARTS = seed => {
       { g:'box', c:0xffffff, s:[rr * .7, .01, .07], p:[x - rr * .15, Y + .02, z - rr * .25 * sq], ry:.5, e:.4 }); }
   return out;
 };
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-WAITHOUSE-1] '이웃을 기다리는 집' 모습 — 보스 결정 ⓓ(채도 25%↓ + 어두운 창 + 문 앞 팻말). 표·함수만 — 훅이 없으면 아무 일도 안 한다.
+   까닭(docs/village_pop_stall_20260920.md): 새 이웃이 돌아선 빈집이 사는 집과 똑같이 생겨서 '왜 마을이 안 자라나'가 안 보였다.
+   · 역할 나눔: 기본 거리의 갈림 = 어두운 창 + 약간 옅은 색(밤에 빈집 창이 꺼져 있는 것과 이어진다) · 가까이의 까닭 = 팻말 위 작은 3D(빠진 것 첫째 하나).
+   · 폐가처럼 보이지 않게 — 채도는 25% 만(45% 는 빛바래 보였다). 이웃이 들어오면 청크를 다시 합칠 때 한 번에 제 색으로 돌아온다.
+   · 접점(프로그램 담당 — 돌아섬 블록):
+       ① 청크 build 에서 집 정점색을 정한 뒤, 돌아선 빈집(awayLacks 있음)이면  window.WAITHOUSE.col(_col, kind, pt)   (kind = 모델 정점 종류, 모델이 아니면 -1 · pt = 그 부위 — 팻말(keep)은 건너뛴다)
+       ② partsOf(house) 뒤에 같은 집이면  .concat(window.WAITHOUSE.props(awayLacks(rec)[0]))   — 부위는 집 발자국 가운데 원점 · +z = 문(집과 같이 돈다)
+       ③ 돌아선 집이 생기거나 풀리면 그 집 청크를 dirtyChunks 에
+   · 팻말 자리: 문 앞, 길 쪽(+z 3.3) · 문 오른쪽(+x 1.45) — 집 벽에 가리지 않게(쓰레기 조각 때의 함정). 삼각형 약 40~60.
+   ══════════════════════════════════════════════════════════════ */
+window.WAITHOUSE = (() => {
+  const PI = Math.PI, WIN = new THREE.Color(0x3d4a5c), G = new THREE.Color(), SX = 1.45, SZ = 3.3, TOP = 1.78;
+  const ICON = {                                                                           // 빠진 것 — 판 위에 선 작은 3D(가까이에서 읽힌다)
+    물:    [ { g:'sph', c:0x5aa9e6, s:[.26,.3,.26], p:[0,0,0] }, { g:'cone', c:0x5aa9e6, s:[.19,.3,.19], p:[0,.3,0], ry:PI / 4 } ],
+    장보기: [ { g:'box', c:P.red, s:[.56,.1,.34], p:[0,.2,0], rx:.3 }, { g:'box', c:0xf7efdc, s:[.46,.34,.3], p:[0,0,-.02] } ],
+    놀이:  [ { g:'box', c:0xf6c23e, s:[.12,.08,.62], p:[0,.05,0], rx:.7 }, { g:'box', c:P.red, s:[.08,.5,.08], p:[0,.1,-.25] } ],
+    쉼:    [ { g:'box', c:P.woodL, s:[.56,.08,.22], p:[0,0,0] }, { g:'box', c:P.woodL, s:[.56,.22,.06], p:[0,.14,-.1] }, { g:'box', c:P.metalD, s:[.06,.2,.2], p:[-.22,-.12,0] }, { g:'box', c:P.metalD, s:[.06,.2,.2], p:[.22,-.12,0] } ] };
+  const stake = [ { g:'box', c:P.woodD, s:[.12,1.2,.12], p:[SX,.6,SZ] }, { g:'box', c:P.woodL, s:[.9,.62,.08], p:[SX,1.2,SZ + .02] } ];
+  const cache = {};
+  return {
+    col(c, kind, pt) { if (pt && pt.keep) return c; if (kind === 4) { c.copy(WIN); return c; } const l = (c.r + c.g + c.b) / 3; return c.lerp(G.setRGB(l, l, l), .25); },   // 창은 어둡게 · 나머지(벽·지붕·문)는 채도 25%↓
+    props(miss) { const k = ICON[miss] ? miss : '물'; return cache[k] || (cache[k] = stake.concat(ICON[k].map(pt => ({ ...pt, p:[pt.p[0] + SX, pt.p[1] + TOP, pt.p[2] + SZ + .02] }))).map(pt => ({ ...pt, keep: true }))); },   // keep = 팻말은 제 색 그대로(col 이 건너뛴다)
+    icons: Object.keys(ICON) };
+})();
 /* buildChunk 고리 — 이 청크의 길 칸에 조각을 'lit' 묶음 기하로 더한다(청크를 다시 합칠 때만 돈다) */
 const litM = new THREE.Matrix4(), litN = new THREE.Matrix3(), litV = new THREE.Vector3(), litQ = new THREE.Quaternion(), litS = new THREE.Vector3(), litP = new THREE.Vector3(), litY = new THREE.Vector3(0, 1, 0), litC = new THREE.Color();
 function actLitterChunk(x0, z0, bucket) {
