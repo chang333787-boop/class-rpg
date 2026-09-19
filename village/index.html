@@ -4431,6 +4431,71 @@ function actLookTick(f, i, now) {
 window.__look = () => ({ 켜짐: window.VRULES.lookAround.on, ...lookStats });
 
 /* ══════════════════════════════════════════════════════════════
+   [ACT-GAP] 끊긴 길 앞의 멈칫 — 길 끝과 길 끝 사이가 한두 칸 비었을 때 (주민 연기 · 09-20 · 창조자의 눈 2회).
+   아이가 길을 잇다 한두 칸을 빠뜨리면, 걷는 사람은 먼 길로 돌아간다 — 그런데 화면에선 아무 일도 없다.
+   후: 하루에 두 번쯤, 그 끊긴 끝 가까이 쉬던 주민 하나가 **끝까지 걸어가 멈칫 서서 건너편을 바라본다**(고개를 좌우로). 풍선·글자 없음.
+   끊긴 곳 찾기(길 끝 칸 중 바로 건너편 1~2칸이 비고 그 너머가 길인 곳)는 하루 한 번, 놓은 것이 바뀌었을 때만 다시 한다. 판정·확률·저장 0.
+   '닳은 풀'(그 빈칸이 흙길로)은 디자인 담당 몫 — 이 블록은 몸짓까지만. 규칙 모듈 꼴: 스위치·수치 VRULES.gapLook + tickFolks 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).gapLook = { on: true, maxGap: 2, perDay: 2, fromH: 8, toH: 18, everyH: 3, seekR: 14, lookMs: 2600, maxGaps: 12 };
+const GAP = { key: '', list: [], tick: -1, scanAt: -1e9, stats: { 끊긴곳: 0, 보냄: 0, 멈칫: 0, 그만둠: 0 } };
+const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+function gapScan() {                                                    // 하루 한 번 · 놓은 것이 바뀌었을 때만(열린 구역 안만 훑는다)
+  const R = window.VRULES.gapLook, day = Math.floor(SIM.t / DAY_MS), key = placedTotal + ':' + day;
+  if (GAP.key === key || SIM.ticks - GAP.scanAt < 20) return;          // 같으면 안 훑는다 · 길을 죽 끌어 놓는 동안엔 2초에 한 번만
+  GAP.scanAt = SIM.ticks;
+  const keep = new Map(GAP.list.map(g => [g.cell, g])); GAP.key = key; GAP.list = [];
+  plots.forEach(pk => { const [px, py] = pk.split(',').map(Number), x0 = px * PLOT, y0 = py * PLOT;
+    for (let y = y0; y < y0 + PLOT && GAP.list.length < R.maxGaps; y++) for (let x = x0; x < x0 + PLOT && GAP.list.length < R.maxGaps; x++) {
+      const c = idx(x, y); if (!isRoad(c)) continue;
+      let nb = -1, cnt = 0; for (let k = 0; k < 4; k++) { const nx = x + D4[k][0], ny = y + D4[k][1]; if (inb(nx, ny) && isRoad(idx(nx, ny))) { cnt++; nb = k; } }
+      if (cnt !== 1) continue;                                          // 길 끝(이웃 길이 하나)
+      const dx = -D4[nb][0], dy = -D4[nb][1];                           // 길이 뻗어 오던 쪽의 반대 = 끊긴 쪽
+      for (let g = 1; g <= R.maxGap; g++) { const ex = x + dx * g, ey = y + dy * g; if (!inb(ex, ey) || cells[idx(ex, ey)]) break;   // 비어 있어야(물건이 있으면 끊긴 게 아니라 막힌 것)
+        const fx = x + dx * (g + 1), fy = y + dy * (g + 1); if (inb(fx, fy) && isRoad(idx(fx, fy))) { const old = keep.get(c);
+          GAP.list.push({ cell: c, dir: Math.atan2(dx, dy), gap: g, sent: old ? old.sent : 0, day: old ? old.day : -1, next: old ? old.next : 0 }); break; } }
+    } });
+  GAP.stats.끊긴곳 = GAP.list.length;
+}
+function gapPathTo(f, i, goal) {                                        // 남을 피해서 → 안 되면 막힌 칸까지 넣어
+  if (pathTo(f, i, goal)) return true;
+  const here = f.path ? f.path[f.path.length - 1] : f.base; if (here < 0) return false;
+  const { prev } = roadBFS(here); if (bfsSeen[goal] !== bfsGen) return false;
+  const path = []; let k = goal; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here);
+  f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; return true;
+}
+function gapSend(now) {                                                 // 때가 된 끊긴 곳 하나에 가까이 쉬던 주민 한 명을 보낸다
+  const R = window.VRULES.gapLook, h = simHour(), day = Math.floor(SIM.t / DAY_MS);
+  if (h < R.fromH || h >= R.toH || pathBudget <= 0) return;
+  const g = GAP.list.find(x => (x.day !== day || x.sent < R.perDay) && now >= x.next); if (!g) return;
+  if (g.day !== day) { g.day = day; g.sent = 0; }
+  g.next = now + R.everyH / 24 * DAY_MS;                                // 한 번 보내고 나면 몇 시간 쉰다(보낼 사람이 없어도)
+  pathBudget--; const { reach } = roadBFS(g.cell, undefined, R.seekR); const near = new Set(reach);
+  let best = null, bi = -1, bd = 1e9;
+  folks.forEach((f, i) => { if (f.visitor || f.arriving || f.state !== 'idle' || f.goal || f.gap || f.greet || f.carry || !f.path) return;
+    const at = f.path[f.path.length - 1]; if (!near.has(at) || at === g.cell) return; const d = Math.abs(cX(at) - cX(g.cell)) + Math.abs(cY(at) - cY(g.cell)); if (d < bd) { bd = d; best = f; bi = i; } });
+  if (!best || pathBudget <= 0) return;
+  pathBudget--; if (!gapPathTo(best, bi, g.cell)) return;
+  best.gap = { cell: g.cell, dir: g.dir, phase: 'go' }; g.sent++; GAP.stats.보냄++;
+}
+/* tickFolks 고리 — 쉬는 사람 처리 바로 앞. true 면 그 사람의 이번 틱은 여기서 끝 */
+function actGapTick(f, i, now) {
+  const R = window.VRULES.gapLook; if (!R.on) { f.gap = null; return false; }
+  if (GAP.tick !== SIM.ticks) { GAP.tick = SIM.ticks; gapScan(); gapSend(now); }   // 틱마다 한 번(이 고리에 처음 닿은 사람에서)
+  const g = f.gap; if (!g) return false;
+  if (f.goal || f.state === 'inside' || f.state === 'mill') { f.gap = null; GAP.stats.그만둠++; return false; }   // 출근·귀가 등이 먼저다
+  if (g.phase === 'look') { if (now >= g.until) { f.gap = null; f.until = now; return false; } f.walking = false; f.dir = g.dir + Math.sin((now - g.t0) / R.lookMs * Math.PI * 3) * 0.28; return true; }   // 건너편을 보며 고개를 좌우로
+  const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;
+  if (at === g.cell && (f.state === 'idle' || (f.state === 'walk' && f.path[f.step + 1] == null))) {   // 끝에 닿았다 — 멈칫, 건너편을 본다
+    f.state = 'idle'; f.walking = false; f.path = [at]; f.step = 0; f.seg = 0; f.until = now + R.lookMs; releaseAll(i); claim(at, i);
+    g.phase = 'look'; g.t0 = now; g.until = now + R.lookMs; f.dir = g.dir; GAP.stats.멈칫++; return true;
+  }
+  if (f.state === 'idle' && now >= f.until) { f.gap = null; GAP.stats.그만둠++; }   // 막혀서 멈췄다 — 그만 둔다(다음 기회에)
+  return false;
+}
+window.__gap = () => ({ 켜짐: window.VRULES.gapLook.on, ...GAP.stats, 곳: GAP.list.map(g => [cX(g.cell), cY(g.cell), g.gap]), 지금가는중: folks.filter(f => f.gap && f.gap.phase === 'go').length, 지금멈칫: folks.filter(f => f.gap && f.gap.phase === 'look').length });
+
+/* ══════════════════════════════════════════════════════════════
    [ACT-DOOR] 밤에 이미 자기 집 문 앞에 서 있는 사람은 곧장 들어간다 (주민 연기 · 09-20).
    구멍: 밤 귀가 규칙(rhythmTick)은 pathTo 로 '집 앞 칸까지 걸을 길'을 잡고, 걸음이 끝나는 순간에만 집에 들인다.
          그런데 이미 그 칸에 서 있으면 pathTo 가 here === goal 로 끝나 걷는 상태가 안 되고, rhythmTick 은 true 를 돌려줘
@@ -4530,6 +4595,7 @@ function tickFolks(dt, now) {
       continue;
     }
 
+    if (actGapTick(f, i, now)) continue;   // [ACT-GAP] 끊긴 길 끝에서 멈칫 — 건너편을 바라본다
     if (actGreetTick(f, i, now)) continue;   // [ACT-GREET] 이사 온 다음 날 아침, 옆집 사람 하나가 새 집 앞에 들러 👋
     if (f.state === 'idle') {
       f.walking = false;
