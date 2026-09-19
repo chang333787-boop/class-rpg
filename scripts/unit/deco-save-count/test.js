@@ -619,6 +619,95 @@
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
     }
 
+    //  ⑯ 마당 안 상점(DECO-SHOP-1) — 사는 길은 본편 상점의 buyDeco() 하나다. 여기서는 **골드**를 본다:
+    //    사기 전후 골드·가진 수 · 저장 1번 · 골드 부족/도감 선물/숨김/레벨 잠금/다른 장소 것은 안 사짐 · 200G↑ 는 한 번 더 · 무료 기간이면 0G ·
+    //    ↩ 로는 골드가 안 움직인다(환불 없음) · 막 눌러도(300번) 골드는 늘지 않고, 쓴 골드 = 늘어난 장식 값의 합.
+    if (typeof decoShopBuy === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(500); }
+      const keep = { gold: CUR.gold, inv: JSON.parse(JSON.stringify(CUR.inventory || [])), placed: CUR.houseDecorations, free: GAME_DATA.decoFree, lv: CUR.level };
+      const D = id => GAME_DATA.decorations.find(d => d.id === id), qty = id => ((CUR.inventory || []).find(i => i.id === id) || { qty: 0 }).qty;
+      const shopList = GAME_DATA.decorations.filter(d => d.price > 0 && !d.hidden);           // 본편 상점이 그리는 목록 그대로
+      const cheap = shopList.find(d => d.cat === 'yard' && d.price < 200 && !(d.size && (d.size.w > 1 || d.size.h > 1)) && !(typeof ANIM_DECO !== 'undefined' && ANIM_DECO[d.id]));
+      const dear = shopList.find(d => d.cat === 'yard' && d.price >= 200), indoor = shopList.find(d => d.cat === 'indoor');
+      GAME_DATA.decoFree = null; CUR.houseDecorations = []; CUR.inventory = []; CUR.gold = 1000; SEL_DECO = null; _decoUndoClear();
+      out('상점_열기전_카드0', document.querySelectorAll('#if-deco-shop .deco-scard').length === 0);
+      decoTab('shop'); await sleep(50);
+      out('상점_카드수_본편상점과같음', document.querySelectorAll('#if-deco-shop .deco-scard').length === shopList.filter(d => d.cat === 'yard').length);
+      { const dr = document.getElementById('if-deco-drawer').getBoundingClientRect(), tv = document.getElementById('if-topview').getBoundingClientRect();
+        out('상점_서랍자리', { 창: innerWidth + 'x' + innerHeight, 판위: Math.round(tv.top), 서랍위: Math.round(dr.top), 서랍키: Math.round(dr.height), 마당비율: Math.round((dr.top - tv.top) / innerHeight * 100) + '%' }); }
+      //  ① 싼 것 — 한 번에. 꾸미기 묶음 저장이 대기 중이어도 저장은 1번(그 대기분은 구매 저장에 실려 간다)
+      CUR.yardFloor = CUR.yardFloor || {}; CUR.yardFloor['23_46'] = 'stone'; decoDirty();
+      saves = 0; sets = 0;
+      decoShopPick(cheap.id); decoShopBuy(); await sleep(900);
+      out('상점_사기_골드·가진수', { 골드: CUR.gold, 가진수: qty(cheap.id), 값: cheap.price, 맞나: CUR.gold === 1000 - cheap.price && qty(cheap.id) === 1 });
+      out('상점_사기_저장1번', { saveStudent: saves, sdkSet: sets, 맞나: saves === 1 && sets === 1 });
+      const sv = await server();
+      out('상점_사기_서버에도', sv.gold === CUR.gold && (sv.inventory || []).some(i => i.id === cheap.id && i.qty === 1) && !!(sv.yardFloor && sv.yardFloor['23_46']));
+      out('상점_산직후_내것탭·골라짐·맨앞·손끝', DECO_TAB === 'own' && SEL_DECO === cheap.id && (document.querySelector('#if-deco-inv .deco-card') || { dataset: {} }).dataset.decoId === cheap.id && !!document.getElementById('deco-hand-ghost'));
+      out('상점_골드배지', document.getElementById('if-deco-gold').textContent === '💰 ' + CUR.gold + 'G');
+      //  본편 상점에서 같은 것을 살 때와 같은 값이 빠지나(한 번 누름 = 확인, 또 누름 = 산다)
+      { const g = CUR.gold; buyDeco(cheap.id); const armOnly = CUR.gold === g; buyDeco(cheap.id); out('상점_본편과_같은값', armOnly && g - CUR.gold === cheap.price && qty(cheap.id) === 2); }
+      //  놓으면 손끝 그림이 사라지고, ↩ 는 놓기만 무른다(골드 그대로). 놓기 전 ↩ 도 골드를 안 돌려준다 — 환불 없음
+      { const g = CUR.gold; _decoPlace('yard', 27, 12); await sleep(50);
+        const placedOk = _decoList(CUR).some(p => p.id === cheap.id) && !document.getElementById('deco-hand-ghost');
+        decoUndo(); await sleep(50); decoUndo(); decoUndo(); await sleep(50);
+        out('상점_놓으면_손끝그림끝', placedOk);
+        out('상점_되돌리기_골드·가진수_그대로', CUR.gold === g && qty(cheap.id) === 2 && !_decoList(CUR).some(p => p.id === cheap.id)); }
+      //  ② 안 사지는 것들 — 골드·가진 수·저장 전부 0
+      const noBuy = async (label, id, prep, undo) => { decoTab('shop'); if (prep) prep(); _decoShopRender(); decoShopPick(null); decoShopPick(id);
+        const g = CUR.gold, q = qty(id), hasBtn = !!document.querySelector('#if-deco-buybar .db-buy'); saves = 0;
+        decoShopBuy(); _decoShop.armedAt = 1; decoShopBuy(); await sleep(20);
+        out(label, { 단추: hasBtn, 맞나: CUR.gold === g && qty(id) === q && saves === 0 && !hasBtn }); if (undo) undo(); };
+      await noBuy('상점_골드부족_안사짐', cheap.id, () => { CUR.gold = cheap.price - 1; }, () => { CUR.gold = 1000; });
+      await noBuy('상점_도감선물_안사짐(카드숨김)', 'd_y90');
+      await noBuy('상점_도감선물_안사짐(카드보임)', 'd_y90', () => { DECO_SHOP_GIFTS = true; }, () => { DECO_SHOP_GIFTS = false; });
+      await noBuy('상점_숨긴것_안사짐', 'd_y71');
+      await noBuy('상점_업적보상_안사짐', 'deco_trophy');
+      await noBuy('상점_레벨잠금_안사짐', dear.id, () => { dear.reqLv = 99; }, () => { dear.reqLv = 1; });
+      await noBuy('상점_다른장소것_안사짐', indoor.id);
+      //  고른 뒤에 골드가 줄었으면(막대에 단추가 남아 있어도) 안 사진다
+      { decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(cheap.id); const q = qty(cheap.id); CUR.gold = 3; decoShopBuy(); out('상점_고른뒤_골드줄면_안사짐', CUR.gold === 3 && qty(cheap.id) === q); CUR.gold = 1000; }
+      //  ③ 200G 이상 — 한 번 더. 두 번 두드림(0.35초 안)은 한 번으로 친다
+      { decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(dear.id); const g = CUR.gold;
+        decoShopBuy(); const a = CUR.gold === g && /한 번 더/.test(document.querySelector('#if-deco-buybar .db-buy').textContent);
+        decoShopBuy(); const b = CUR.gold === g;
+        await sleep(450); decoShopBuy();
+        out('상점_200G이상_한번더', { 값: dear.price, 첫누름_안사짐: a, 두번두드림_안사짐: b, 맞나: a && b && CUR.gold === g - dear.price && qty(dear.id) === 1 }); }
+      //  ④ 무료 기간 — 0G · 한 번에 · 지출 없음
+      { GAME_DATA.decoFree = { from: '2000-01-01', until: '2999-01-01', label: '시험' }; decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(dear.id);
+        const g = CUR.gold, q = qty(dear.id), txt = document.getElementById('if-deco-buybar').textContent; decoShopBuy();
+        out('상점_무료기간_0G', CUR.gold === g && qty(dear.id) === q + 1 && /무료/.test(txt)); GAME_DATA.decoFree = null; }
+      //  ⑤ 산 직후 다른 곳 변경(스냅샷)이 와서 CUR 이 갈려도 구매는 그대로
+      { decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(cheap.id); const g = CUR.gold, q = qty(cheap.id); decoShopBuy();
+        R.db.ref('classRPG_v3/settings/lastPing').set(Date.now()); await sleep(700);
+        out('상점_스냅샷뒤_구매그대로', CUR.gold === g - cheap.price && qty(cheap.id) === q + 1); }
+      //  ⑥ 막 누르기 300번 — 어떤 순서로도 골드는 늘지 않고, 쓴 골드 = 늘어난 장식 값의 합(무료 기간이 섞여도)
+      { CUR.gold = 3000; CUR.inventory = []; CUR.houseDecorations = []; _decoUndoClear();
+        let seed = 12345; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+        const ids = GAME_DATA.decorations.map(d => d.id); let up = 0, spent = 0, gained = 0;
+        for (let i = 0; i < 300; i++) {
+          const g = CUR.gold, tot = (CUR.inventory || []).reduce((a, x) => a + x.qty, 0), free = !!GAME_DATA.decoFreeNow(), k = rnd(12);
+          if (k < 3) { decoTab('shop'); decoShopPick(ids[rnd(ids.length)]); }
+          else if (k < 7) decoShopBuy();
+          else if (k === 7) _decoShop.armedAt = 1;
+          else if (k === 8) decoUndo();
+          else if (k === 9) { if (SEL_DECO) _decoPlace('yard', 8 + rnd(30), 1 + rnd(40)); }
+          else if (k === 10) decoTab(rnd(2) ? 'own' : 'shop');
+          else GAME_DATA.decoFree = rnd(4) ? null : { from: '2000-01-01', until: '2999-01-01' };
+          if (CUR.gold > g) up++;
+          const tot2 = (CUR.inventory || []).reduce((a, x) => a + x.qty, 0);
+          if (tot2 > tot) { const id = SEL_DECO; gained += free ? 0 : D(id).price; }
+          spent += g - CUR.gold;
+        }
+        GAME_DATA.decoFree = null;
+        out('상점_막누르기300번', { 골드늘어난횟수: up, 쓴골드: spent, 산것값합: gained, 산개수: (CUR.inventory || []).reduce((a, x) => a + x.qty, 0), 맞나: up === 0 && spent === gained && spent > 0 }); }
+      document.querySelectorAll('.toast-msg').forEach(t => t.remove());
+      decoTab('own'); SEL_DECO = null; _decoUndoClear();
+      CUR.gold = keep.gold; CUR.inventory = keep.inv; CUR.houseDecorations = keep.placed; GAME_DATA.decoFree = keep.free; CUR.level = keep.lv;
+      delete CUR.yardFloor['23_46'];
+      DB.saveStudent(CUR); renderHouseDeco(); await sleep(300);
+    }
+
     //  ⑮ 바닥 저장값 해석(DECO-FLOOR-PARSE-1) — 옛 값만 있는 마당은 **한 픽셀도** 달라지면 안 된다.
     //    옛 바닥 14종을 이웃이 골고루 섞이게 깔고(연못 = 물가 조각 전부 · 잔디 번짐) 캔버스 전체의 지문(SHA-256)을 찍는다.
     //    지문은 기기(래스터)마다 다르다 → 값 자체는 맞다/틀리다가 아니다. **전/후 비교는 `REPO=<main 을 푼 폴더>` 로 같은 기기에서 나란히**

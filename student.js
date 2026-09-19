@@ -4757,10 +4757,8 @@ function ifSyncScene() {
   const isYard = DECO_SCENE === 'yard';
   const sn = document.getElementById('if-scene-name');
   const sb = document.getElementById('if-scene-btn');
-  const il = document.getElementById('if-inv-label');
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
   if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
-  if (il) il.textContent = isYard ? '🎒 내 장식품 (마당)' : '🎒 내 장식품 (집 안)';
   // [INDOOR-RUG-1] 집 안에는 아직 고를 바닥이 없다 — 눌러도 끌어도 아무 일 없던 🖌️ 바닥 단추는 집 안에서 감춘다
   //  (벽지·바닥 고르기(IN-2)가 들어오면 이 자리에 '방 꾸미기'로 돌아온다). 바닥 모드인 채 집 안에 들어오면 장식 모드로.
   const fb = document.getElementById('if-mode-floor');
@@ -8572,6 +8570,12 @@ function decoFlush(why) {
   return true;
 }
 
+//  [DECO-SHOP-1] 방금 **다른 통째 저장**(마당 안 상점의 구매)이 나갔다 — 대기 중이던 꾸미기 변경은 그 저장에 이미 실려 갔다.
+//  대기만 푼다(쓰기 0). 구매 때문에 쓰기가 한 번 더 나가지 않게 — 구매 1번 = 저장 1번(본편 상점과 같다).
+function decoSaveAbsorbed() {
+  if (_decoSaveTimer) { clearTimeout(_decoSaveTimer); _decoSaveTimer = null; }
+}
+
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => { if (document.hidden) decoFlush('가려짐'); });
   addEventListener('pagehide', () => decoFlush('페이지 닫힘'));
@@ -8849,6 +8853,11 @@ function _decoFindMatch(d, scene, f) {
 }
 
 function decoFindSet(key, val) {
+  if (key === 'q' && DECO_TAB === 'shop') {   // [DECO-SHOP-1] 찾기 글은 탭마다 따로
+    _decoShop.q = val;
+    const c = document.getElementById('if-deco-search-clear'); if (c) c.hidden = !(val || '').length;
+    _decoShopRender(); return;
+  }
   if (key === 'sceneOnly') _decoFind.sceneOnly = !_decoFind.sceneOnly;
   else _decoFind[key] = val;
   const chip = document.getElementById('if-deco-scene-only');
@@ -8957,9 +8966,10 @@ function renderDecoInv(){
   const placed=CUR.houseDecorations||[];
   const inv=(CUR.inventory||[]).filter(i=>GAME_DATA.decorations.find(d=>d.id===i.id));
   const el=document.getElementById('house-deco-inv');
+  _decoShopSync();   // [DECO-SHOP-1] 골드 배지 · 손끝 그림 끝내기 · 씬이 바뀌었으면 상점 목록도
   _decoRenderQuick(inv, placed);   // [DECO-FIND-1] 최근 놓은 것 줄
   if(!inv.length){
-    el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">가진 장식품이 없어요. 상점에서 사 보세요! 🏪</div>`;
+    el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">가진 장식품이 없어요. 위의 🛒 상점에서 사 보세요!</div>`;
     if(_ifMode) ifSyncInv();
     return;
   }
@@ -8971,6 +8981,9 @@ function renderDecoInv(){
     if (!ok) hidden++;
     return ok;
   });
+  //  [DECO-SHOP-1] 방금 산 것은 골라져 있는 동안 맨 앞에(서랍 끝에 붙으면 크롬북 한 줄 서랍에서 안 보인다)
+  if (_decoShop.front && SEL_DECO === _decoShop.front) shown.sort((a, b) => (b.id === SEL_DECO) - (a.id === SEL_DECO));
+  else _decoShop.front = null;
   el.innerHTML = shown.map(i => {
     const d = GAME_DATA.decorations.find(x => x.id === i.id); if (!d) return '';
     const avail = i.qty - placed.filter(p => p.id === i.id).length;
@@ -9015,6 +9028,202 @@ function selectDeco(id){
     else toast(`${d?.icon} 골랐어요 — 놓을 칸을 누르세요 · 화면 옮기기는 두 손가락 또는 ✋`);   // [DECO-PAN-1]   // [DECO-PT-1] 폰·태블릿은 '클릭'이 아니다
   }
 }
+// ══ 마당 안 상점 (DECO-SHOP-1) — 서랍에 [🎒 내 것 | 🛒 상점] ═══════════════
+//  화면 규칙: docs/deco_shop_home_screens_20260920.md ①. 꾸미는 화면을 떠나지 않고 산다.
+//  🔴 **사는 길은 새로 만들지 않았다** — 값(`decoCost`·무료 기간)·골드 차감·인벤토리 +1·저장·지출 기록은 전부 본편 상점의
+//     `buyDeco()` 가 한다. 여기는 ①무엇을 보여 줄지 ②살 수 있는지(본편 상점 카드와 같은 조건)만 본다.
+//     본편 상점은 '살 수 없는 것'을 **카드를 안 그려서** 막는다(`price>0 && !hidden` · 레벨 잠금은 카드의 onclick).
+//     `buyDeco()` 자체에는 그 검사가 없다 → `_decoShopState()` 가 'ok' 가 아니면 절대 부르지 않는다.
+//  ↩ 되돌리기에 '사기'는 **넣지 않았다**(환불 없음 — DECO-UNDO-1 의 '골드는 건드리지 않는다' 그대로). 까닭은 PR 본문.
+//  상점 카드는 🛒 를 처음 누를 때 만든다(꾸미기를 여는 값 0).
+let DECO_TAB = 'own';
+const DECO_SHOP_TWICE = 200;      // 이 값 이상은 '한 번 더 눌러 사기'
+//  도감 선물 카드(값 0 · gift 필드)는 **도감 코드가 붙은 뒤에** 켠다 — 지금 보여 주면 받을 길이 없는 약속이 된다.
+let DECO_SHOP_GIFTS = false;
+const _decoShop = { kind: 'all', q: '', sel: null, armedAt: 0, front: null, scene: '', scroll: { own: 0, shop: 0 } };
+//  분류 칩 — 표에 kind 가 있으면 그 값, 아직 없는 옛 장식은 놓는 방식 전수표(docs/deco_place_table.md)의 kind.
+//  길·울타리는 소품 칩에(화면 규칙). 표에 kind 가 다 들어오면 이 목록은 지운다.
+const DECO_SHOP_KINDS = [['all', '전체'], ['tree', '🌳 나무'], ['plant', '🌷 꽃·풀'], ['animal', '🐾 동물'], ['building', '🏠 건물'],
+  ['water', '💧 물'], ['prop', '🪑 소품'], ['furniture', '🛋️ 가구'], ['decor', '🖼️ 장식']];
+const _DECO_KIND_OLD = {
+  tree: 'd_y9 d_y12 d_y19 d_y46 d_y47 d_y48 d_y64',
+  plant: 'd_y1 d_y2 d_y3 d_y7 d_y15 d_y16 d_y21 d_y25 d_y29 d_y35 d_y36 d_y41 d_y42 d_y43 d_y44 d_y45',
+  animal: 'd_y32 d_y39 d_y40 d_y53 d_y54 d_y55 d_y56 d_y57 d_y58 d_y60 d_y62 d_y69',
+  building: 'd_y11 d_y17 d_y27 d_y28 d_y33 d_y34 d_y63 d_y66 d_y67 d_y68',
+  water: 'd_y10 d_y20 d_y31 d_y59',
+  furniture: 'd_i5 d_i6 d_i7 d_i8 d_i9 d_i10 d_i11 d_i12 d_i14',
+};
+let _decoKindMap = null;
+function _decoShopKind(d) {
+  if (!_decoKindMap) { _decoKindMap = {}; for (const k in _DECO_KIND_OLD) _DECO_KIND_OLD[k].split(' ').forEach(id => { _decoKindMap[id] = k; }); }
+  const k = d.kind || _decoKindMap[d.id];
+  if (d.cat === 'indoor') return k === 'furniture' ? 'furniture' : 'decor';
+  return ['tree', 'plant', 'animal', 'building', 'water'].indexOf(k) >= 0 ? k : 'prop';
+}
+
+const _decoCostOf = d => GAME_DATA.decoCost ? GAME_DATA.decoCost(d) : d.price;
+const _decoQtyOf = id => { const i = (CUR.inventory || []).find(x => x.id === id); return i ? i.qty : 0; };
+const _decoShopName = d => String(d.name || '').replace(/\s*\((선물|업적)\)\s*$/, '');
+
+//  살 수 있나 — 본편 상점 카드와 같은 조건. 'none' = 여기 상점에 없는 것(숨김·업적 보상·지금 장소에 못 놓는 것).
+function _decoShopState(d) {
+  if (!d || d.hidden || d.cat !== DECO_SCENE) return 'none';
+  if (!(d.price > 0)) return (d.gift && DECO_SHOP_GIFTS) ? 'gift' : 'none';
+  if ((CUR.level || 1) < (d.reqLv || 1)) return 'lock';
+  return CUR.gold >= _decoCostOf(d) ? 'ok' : 'short';
+}
+
+function _decoGoldSync() {
+  const b = document.getElementById('if-deco-gold'); if (!b || !CUR) return;
+  //  꾸미는 중에 골드가 바뀌는 길(교사 지급 → 스냅샷 → renderHUD)을 따라간다 — HUD 숫자가 바뀌면 배지도(renderHUD 는 안 고친다)
+  const hud = document.getElementById('hud-gold');
+  if (hud && !_decoGoldSync._mo && typeof MutationObserver === 'function') {
+    _decoGoldSync._mo = new MutationObserver(() => { if (_ifMode) _decoGoldSync(); });
+    _decoGoldSync._mo.observe(hud, { childList: true, characterData: true, subtree: true });
+  }
+  const txt = '💰 ' + (CUR.gold || 0) + 'G';
+  if (b.textContent === txt) return;
+  b.textContent = txt;
+  if (DECO_TAB === 'shop') _decoShopRender();   // 골드가 바뀌면 '골드 부족' 카드도 바뀐다
+}
+function _decoShopSync() {   // renderDecoInv 가 부른다
+  _decoGoldSync(); _decoGhostCheck();
+  if (DECO_TAB === 'shop' && _decoShop.scene !== DECO_SCENE) _decoShopRender();
+}
+
+function decoTab(tab) {
+  tab = tab === 'shop' ? 'shop' : 'own';
+  const body = document.getElementById('if-deco-body'), dr = document.getElementById('if-deco-drawer');
+  if (body) _decoShop.scroll[DECO_TAB] = body.scrollTop;   // 스크롤은 탭마다 기억
+  DECO_TAB = tab;
+  if (dr) dr.classList.toggle('is-shop', tab === 'shop');
+  ['own', 'shop'].forEach(t => { const b = document.getElementById('if-deco-tab-' + t);
+    if (b) { b.classList.toggle('is-on', t === tab); b.setAttribute('aria-selected', String(t === tab)); } });
+  const q = tab === 'shop' ? _decoShop.q : _decoFind.q, inp = document.getElementById('if-deco-search'), clr = document.getElementById('if-deco-search-clear');
+  if (inp) { inp.value = q || ''; inp.placeholder = tab === 'shop' ? '🔍 상점에서 찾기' : '🔍 이름으로 찾기'; }
+  if (clr) clr.hidden = !(q || '').length;
+  if (tab === 'shop') _decoShopRender(); else _decoShopBarSync();
+  if (body) body.scrollTop = _decoShop.scroll[tab] || 0;
+  _decoPillarSync(); _decoFit();
+}
+
+function decoShopKind(k) { _decoShop.kind = k; _decoShopRender(); }
+
+function _decoShopRender() {
+  const el = document.getElementById('if-deco-shop'), chips = document.getElementById('if-deco-kinds');
+  if (!el || !CUR) return;
+  _decoShop.scene = DECO_SCENE;
+  const list = GAME_DATA.decorations.filter(d => _decoShopState(d) !== 'none');
+  const has = {}; list.forEach(d => { has[_decoShopKind(d)] = 1; });
+  if (_decoShop.kind !== 'all' && !has[_decoShop.kind]) _decoShop.kind = 'all';   // 마당↔집 안을 오가면 그 분류가 없을 수 있다
+  if (chips) chips.innerHTML = DECO_SHOP_KINDS.filter(k => k[0] === 'all' || has[k[0]]).map(k =>
+    `<button class="deco-chip${_decoShop.kind === k[0] ? ' is-on' : ''}" aria-pressed="${_decoShop.kind === k[0]}" onclick="decoShopKind('${k[0]}')">${k[1]}</button>`).join('');
+  const q = (_decoShop.q || '').trim(), free = !!(GAME_DATA.decoFreeNow && GAME_DATA.decoFreeNow());
+  const d0 = new Date(), today = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
+  const shown = list.filter(d => (_decoShop.kind === 'all' || _decoShopKind(d) === _decoShop.kind) && (!q || String(d.name || '').indexOf(q) >= 0));
+  if (_decoShop.sel && !shown.some(d => d.id === _decoShop.sel)) _decoShop.sel = null;
+  el.innerHTML = shown.length ? shown.map(d => {
+    const st = _decoShopState(d), own = _decoQtyOf(d.id);
+    const price = st === 'gift' ? '🎁 도감 선물' : st === 'lock' ? `🔒 Lv${d.reqLv}+` : free ? `🎁 무료 <s>${d.price}G</s>` : `💰 ${_decoCostOf(d)}G`;
+    return `<div class="deco-scard is-${st}${free && st === 'ok' ? ' is-free' : ''}${_decoShop.sel === d.id ? ' is-sel' : ''}" data-shop-id="${d.id}" onclick="decoShopPick('${d.id}')">`
+      + `<div class="ds-art">${_decoThumb(d, 34)}</div><div class="dc-name">${escHtml(_decoShopName(d))}</div><div class="ds-price">${price}</div>`
+      + (own > 0 ? `<span class="ds-own">×${own}</span>` : '') + ((d.newUntil && today <= d.newUntil) ? '<span class="ds-new">NEW</span>' : '') + '</div>';
+  }).join('') : `<div class="deco-empty">${q ? '"' + escHtml(q) + '" 이름인 장식이 상점에 없어요' : '여기에 놓을 장식이 상점에 없어요'}</div>`;
+  _decoShopBarSync();
+}
+
+//  카드를 누른다 = 고르기(다시 누르면 풀림). 사는 것은 막대의 단추가 한다.
+function decoShopPick(id) {
+  _decoShop.sel = (!id || _decoShop.sel === id) ? null : id;
+  _decoShop.armedAt = 0;
+  document.querySelectorAll('#if-deco-shop .deco-scard').forEach(c => c.classList.toggle('is-sel', c.dataset.shopId === _decoShop.sel));
+  _decoShopBarSync();
+}
+
+function _decoShopBarSync() {
+  const bar = document.getElementById('if-deco-buybar'); if (!bar) return;
+  const d = DECO_TAB === 'shop' && _decoShop.sel ? GAME_DATA.decorations.find(x => x.id === _decoShop.sel) : null;
+  const st = d ? _decoShopState(d) : 'none', was = !bar.hidden;
+  if (st === 'none') { bar.hidden = true; bar.innerHTML = ''; }
+  else {
+    const cost = _decoCostOf(d), nm = escHtml((d.icon || '') + ' ' + _decoShopName(d)), twice = st === 'ok' && cost >= DECO_SHOP_TWICE;
+    let msg, btn = '';
+    if (st === 'gift') {
+      const g = d.gift || {}, what = { topiary: '다듬은 나무', plant: '꽃·풀', tree: '나무', animal: '동물' }[g.need] || '장식';
+      msg = `🎁 ${escHtml(_decoShopName(d))}${_josa(_decoShopName(d), '은', '는')} 도감을 채우면 받아요 — ${what} ${g.count || ''}가지`;
+    } else if (st === 'lock') msg = `🔒 ${nm} — Lv${d.reqLv} 이상이 되면 살 수 있어요`;
+    else if (st === 'short') msg = `${nm} <b>${cost}G</b> — 골드가 ${cost - CUR.gold}G 모자라요`;
+    else {
+      msg = cost === 0 ? `${nm} <b>🎁 무료</b> <s>${d.price}G</s>` : `${nm} <b>💰 ${cost}G</b>`;
+      btn = `<button class="db-buy" onclick="decoShopBuy()">${twice && _decoShop.armedAt ? '한 번 더 눌러 사기' : '사서 놓기 ▶'}</button>`;
+    }
+    bar.className = 'deco-buybar is-' + st + (twice ? ' is-twice' : '');
+    bar.innerHTML = `<span class="db-msg">${msg}</span>${btn}<button class="db-x" onclick="decoShopPick(null)" aria-label="고르기 풀기">✕</button>`;
+    bar.hidden = false;
+  }
+  if (was !== !bar.hidden) { _decoPillarSync(); _decoFit(); }   // 좁은 폭에서는 막대가 한 줄을 더 쓴다
+}
+
+function _josa(word, a, b) {   // 받침 있으면 a, 없으면 b
+  const c = String(word || '').trim().slice(-1).charCodeAt(0);
+  return (c >= 0xAC00 && c <= 0xD7A3) ? ((c - 0xAC00) % 28 ? a : b) : b;
+}
+
+function decoShopBuy() {
+  const d = _decoShop.sel && GAME_DATA.decorations.find(x => x.id === _decoShop.sel);
+  if (!d || DECO_TAB !== 'shop' || _decoShopState(d) !== 'ok') { _decoShopBarSync(); return; }
+  const cost = _decoCostOf(d), now = Date.now();
+  if (cost >= DECO_SHOP_TWICE) {   // 비싼 것은 한 번 더 — 첫 누름은 단추 글만 바꾼다. 두 번 두드림(0.35초 안)은 한 번으로 친다
+    if (!_decoShop.armedAt) { _decoShop.armedAt = now; _decoShopBarSync(); return; }
+    if (now - _decoShop.armedAt < 350) return;
+  }
+  const qty0 = _decoQtyOf(d.id), olds = new Set(document.querySelectorAll('.toast-msg'));
+  //  본편 상점의 buyDeco() 를 그대로 부른다. 그 함수의 '한 번 더 누르면 사요'(3초) 걸음은 사기 막대가 이미 받았으므로 통과시킨다.
+  _buyDecoArm = { id: d.id, t: now };
+  try { buyDeco(d.id); } finally { _buyDecoArm = null; }
+  document.querySelectorAll('.toast-msg').forEach(t => { if (!olds.has(t)) t.remove(); });   // 본편 알림 대신 아래 한 줄(겹치면 글자가 뭉개진다)
+  if (_decoQtyOf(d.id) !== qty0 + 1) { toast('💸 골드가 모자라요'); _decoGoldSync(); _decoShopRender(); return; }
+  decoSaveAbsorbed();   // buyDeco 가 통째 저장을 했다 — 대기 중이던 꾸미기 묶음은 거기에 실려 갔다
+  //  산 직후 = 내 것 탭 · 그 카드가 맨 앞에 골라진 채 · 손끝에 그림
+  _decoShop.sel = null; _decoShop.armedAt = 0; _decoShop.front = d.id; _decoShop.scroll.own = 0;
+  _decoFind.q = '';
+  if (DECO_MODE !== 'deco') { setDecoMode('deco'); ifSyncModeBtn(); }
+  SEL_DECO = d.id;
+  decoTab('own');
+  _drawDeco(); renderDecoInv(); _decoHandSync();
+  _decoGhostStart(d);
+  toast(`${d.icon || ''} ${_decoShopName(d)}${_josa(_decoShopName(d), '을', '를')} ${cost === 0 ? '무료로 받았어요' : '샀어요'} — 놓을 곳을 눌러요`);
+}
+
+//  산 직후 손끝 그림 — 마우스는 따라다니고, 터치는 마당 가운데에서 기다리다가 손가락을 따라간다. 하나 놓거나 손을 비우면 끝.
+let _decoGhost = null;
+function _decoGhostMove(e) {
+  if (!_decoGhost) return;
+  _decoGhost.el.style.transform = `translate(${Math.round(e.clientX - 28)}px, ${Math.round(e.clientY - 64)}px)`;
+}
+function _decoGhostStart(d) {
+  _decoGhostEnd();
+  const fs = document.getElementById('interior-fullscreen'), host = document.getElementById('if-topview');
+  if (!fs || !host || !_ifMode) return;
+  const el = document.createElement('div'); el.id = 'deco-hand-ghost'; el.innerHTML = _decoThumb(d, 56);
+  fs.appendChild(el);
+  _decoGhost = { id: d.id, n0: (CUR.houseDecorations || []).filter(p => p.id === d.id).length, el, host };
+  const r = host.getBoundingClientRect();
+  _decoGhostMove({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 + 36 });
+  host.addEventListener('pointermove', _decoGhostMove, { passive: true });
+  host.addEventListener('pointerdown', _decoGhostMove, { passive: true });
+}
+function _decoGhostEnd() {
+  if (!_decoGhost) return;
+  _decoGhost.host.removeEventListener('pointermove', _decoGhostMove);
+  _decoGhost.host.removeEventListener('pointerdown', _decoGhostMove);
+  _decoGhost.el.remove(); _decoGhost = null;
+}
+function _decoGhostCheck() {
+  const g = _decoGhost; if (!g) return;
+  if (!_ifMode || SEL_DECO !== g.id || (CUR.houseDecorations || []).filter(p => p.id === g.id).length > g.n0) _decoGhostEnd();
+}
+
 // ══ 작품 전시 (Storage 업로드) ══
 
 // [SCAN-LINK-1] 학습지 스캔 — scan/index.html을 전체화면 iframe으로 열고, 결과 JPEG(≤500KB)를 postMessage로 받는다.
