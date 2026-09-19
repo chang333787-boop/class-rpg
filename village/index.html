@@ -2776,6 +2776,44 @@ function doorRotCands(kind, x, y) { const out = [], vx = camera.position.x - cam
   const modeD0 = setMode; setMode = function (kind) { if (kind !== sel) DOORROT.manual = false; return modeD0.apply(this, arguments); }; }
 window.__doorRot = () => ({ 켜짐: window.VRULES.doorRot.on, 직접돌림: DOORROT.manual, 지금방향: selRot, 고른것: sel, 문있음: sel ? doorRotKind(sel) : null, ...DOORROT.stats });
 
+/* ── [MAC-JOBSHOMES] 일자리를 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ③-0 · '시뮬 단위는 집, 걷는 사람은 표본') ──
+   jobsTick·joblessHome·joblessRatio 가 전부 걷는 사람(최대 120명)만 셌다 → 516명 마을도 일 찾는 어른이 60명 남짓이라 가게 15채면 다 찼고,
+   '일자리 모자람'이 영영 생기지 않았다. 이제:
+   · **수요** = 집마다 어른 몫(식구의 절반 · 식구가 있으면 최소 1) · **공급** = 일터(K.jobs)의 자리 합 — 수치(일터당 2~4)는 그대로.
+   · **배정**도 집 단위: 집 앞 길에서 닿는 일터 가운데 빈 자리 있는 가장 가까운 곳부터 어른 몫을 채운다(한 일터가 모자라면 다음 곳에 나눠). 틱마다 판의 1/90 조각씩.
+   · 걷는 사람의 f.job 은 그 집 배정에서 빌려 쓴다(출근 연기는 그대로) · jobCount(일터 → 붙은 어른 수)·jobText 모양 그대로(연기가 읽는다).
+   · jobStats(일자리·찬자리·일없는어른)·'일할 곳이 없어요'(joblessHome) 도 집 기준. 일터 목록은 놓기·치우기 때만 다시 센다(원래 jobsTick 의 판 훑기 없앰).
+   스위치 VRULES.jobsHomes — 끄면 옛 셈(표본). 원래 줄 수정 0 — jobsTick·joblessHome·placeAt·removeAt 감싸기 + simTick 고리 한 줄. */
+(window.VRULES = window.VRULES || {}).jobsHomes = { on: false, every: 90 };   // ⚠ 기본 꺼짐 — 켜면 아이가 지은 pop167 판의 '일할 곳이 없어요' 집이 4 → 56채(성장이 멈춤). 보스 결정 뒤 켠다
+var JOBH = { wp: new Map(), wpDirty: true, asg: new Map(), used: new Map(), lack: new Map(), cur: 0, need: 0, stats: { 한바퀴: 0, 배정: 0, 풀림: 0 } };
+const jobsAdultsOf = root => { const n = res.get(root) || 0; return n > 0 ? Math.max(1, Math.round(n / 2)) : 0; };   // 식구의 절반(어른 몫)
+function jobsWpIndex() { if (!JOBH.wpDirty) return JOBH.wp; const m = new Map(); cells.forEach((rec, i) => { if (rec && rec.root === i && K[rec.k].jobs) m.set(i, K[rec.k].jobs); }); JOBH.wp = m; JOBH.wpDirty = false;
+  JOBH.asg.forEach((a, h) => a.forEach((n, w) => { if (!m.has(w)) { a.delete(w); JOBH.used.set(w, 0); } })); return m; }
+function jobsRelease(h) { const a = JOBH.asg.get(h); if (!a) return; a.forEach((n, w) => JOBH.used.set(w, Math.max(0, (JOBH.used.get(w) || 0) - n))); JOBH.asg.delete(h); JOBH.lack.delete(h); JOBH.stats.풀림++; }
+function jobsHouseStep(rec) { const h = rec.root, need = jobsAdultsOf(h), wp = jobsWpIndex(); let a = JOBH.asg.get(h);
+  if (a) a.forEach((n, w) => { if (!wp.has(w)) { a.delete(w); } });
+  let have = 0; if (a) a.forEach(n => have += n);
+  if (have > need && a) { for (const [w, n] of [...a].reverse()) { if (have <= need) break; const d = Math.min(n, have - need); a.set(w, n - d); if (n - d <= 0) a.delete(w); JOBH.used.set(w, Math.max(0, (JOBH.used.get(w) || 0) - d)); have -= d; } }
+  if (have < need) { const b = roadBeside(rec); if (b >= 0) { const { reach } = roadBFS(b); const seen = new Set();
+      for (const i of reach) { if (have >= need) break; const x = cX(i), y = cY(i);
+        for (let k = 0; k < 4 && have < need; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (!c || !wp.has(c.root) || seen.has(c.root)) continue; seen.add(c.root);
+          const free = wp.get(c.root) - (JOBH.used.get(c.root) || 0); if (free <= 0) continue; const d = Math.min(free, need - have); if (!a) { a = new Map(); JOBH.asg.set(h, a); }
+          a.set(c.root, (a.get(c.root) || 0) + d); JOBH.used.set(c.root, (JOBH.used.get(c.root) || 0) + d); have += d; JOBH.stats.배정 += d; } } } }
+  if (need - have > 0) JOBH.lack.set(h, need - have); else JOBH.lack.delete(h); }
+function jobsHomesStep() { const R = window.VRULES.jobsHomes; if (!R.on || OFF.has('jobs')) return; const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, JOBH.cur + step);
+  for (let i = JOBH.cur; i < end; i++) { const rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') jobsHouseStep(rec); else if (JOBH.asg.has(i) || JOBH.lack.has(i)) jobsRelease(i); }
+  JOBH.cur = end >= N ? 0 : end; if (end >= N) JOBH.stats.한바퀴++; }
+{ const jt0 = jobsTick; jobsTick = function () { if (!window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴) return jt0.apply(this, arguments);
+    const wp = jobsWpIndex(); jobCount.clear(); let total = 0, filled = 0, lack = 0; wp.forEach((n, w) => { total += n; const u = Math.min(n, JOBH.used.get(w) || 0); jobCount.set(w, u); filled += u; }); JOBH.lack.forEach(v => lack += v);
+    folks.forEach(f => { if (!isAdult(f)) return; const a = JOBH.asg.get(f.home); if (!a || !a.size) { f.job = null; return; } const list = [...a.keys()]; const w = list[(f.slot || 0) % list.length]; if (f.job !== w) f.job = w; });
+    jobStats.일자리 = total; jobStats.찬자리 = filled; jobStats.일없는어른 = lack; };
+  const jh0 = joblessHome; joblessHome = function (root) { if (!window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴) return jh0.apply(this, arguments);
+    if (population() < JOB_POP) return false; const need = jobsAdultsOf(root); if (!need) return false; const a = JOBH.asg.get(root); let have = 0; if (a) a.forEach(n => have += n); return have === 0; };
+  const pJ0 = placeAt; placeAt = function (kind) { if (K[kind] && K[kind].jobs) JOBH.wpDirty = true; return pJ0.apply(this, arguments); };
+  const rJ0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && K[c.k].jobs) JOBH.wpDirty = true; if (c && c.k === 'house') jobsRelease(c.root); return rJ0.apply(this, arguments); }; }
+window.__jobsHomes = () => { let need = 0, houses = 0, jl = 0; cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const n = jobsAdultsOf(i); if (!n) return; houses++; need += n; if (joblessHome(i)) jl++; });
+  let lack = 0; JOBH.lack.forEach(v => lack += v); return { 켜짐: window.VRULES.jobsHomes.on, 사는집: houses, 어른몫: need, 일자리: jobStats.일자리, 찬자리: jobStats.찬자리, 일없는어른: lack, 일없는집: jl, 모자란집: JOBH.lack.size, ...JOBH.stats }; };
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
@@ -3724,6 +3762,7 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 10) === 0) goalTraySync();   // [MAC-GOAL-2] 목표가 목표판에 오르는 순간 트레이도
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
+  jobsHomesStep();   // [MAC-JOBSHOMES] 일자리 배정을 집 단위로 — 틱마다 판의 1/90 조각
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   if ((SIM.ticks % 30) === 13) growTick('tick');   // [MAC-GROW] 심은 것이 한 단계 자랐나(3초마다 · 자라는 것만 훑는다)
