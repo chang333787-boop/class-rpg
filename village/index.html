@@ -3624,6 +3624,43 @@ function pathToBuilding(f, i, root) {
   const path = []; let k = goal; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here);
   f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; return true;
 }
+/* ══════════════════════════════════════════════════════════════
+   [ACT-NIGHT] 밤 귀갓길은 서로 비켜 지나간다 — 둘째 밤부터 주민 절반이 새벽까지 밖에 있던 것 (주민 연기 · 09-20 · 창조자의 눈 3회 🟢1 · #500 의 'C').
+   원인: 밤 귀가 길찾기(pathTo)는 '남이 잡은 칸을 피한 길'만 찾는다. 밤 8시엔 온 마을이 한꺼번에 집으로 가니 좁은 길(한 칸 한 명)이 서로 막혀 길이 안 잡히고,
+         그러면 낮처럼 아무 데나 가는 쪽으로 떨어진다(새벽 4시에 "놀이터에 놀러 가요"). '막힌 칸까지 넣어 집으로'만 하면 마주 선 둘이 안 비켜 더 나빠진다(#500 에서 해 보고 버림).
+   고침: **밤에 집으로 가는 걸음만** 칸을 잡지 않는다 — 서로 지나친다(큰길은 이미 한 칸에 둘이다). 길은 막힌 칸까지 넣어 한 번에 잡고(pathBudget 안), 그 걸음은 이 블록이 옮긴다.
+         낮의 걸음·칸 잡기·붐빔 규칙은 그대로다. 판정·확률·저장 0. 기존 줄 수정 0 — tickFolks 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).nightHome = { on: true };
+const nightHomeStats = { 밤길잡음: 0, 밤길없음: 0, 걸어서귀가: 0 };
+function actNightHome(f, i, now, dt) {
+  const R = window.VRULES.nightHome;
+  if (!R.on || f.visitor || f.arriving || f.base < 0 || (f.state !== 'idle' && f.state !== 'walk') || !isNightHour(simHour())) { if (f.nh) f.nh = false; return false; }
+  if (!f.nh) {                                                          // 아직 밤길을 안 잡았다
+    if (f.state === 'idle' && now < f.until) return false;              // 잠깐 선 사람은 그 쉼을 마저
+    const mid = f.state === 'walk' && f.path && f.path[f.step + 1] != null;   // 걷는 중이면 지금 걸음은 마저 걷고 그 다음 칸에서부터
+    const from = mid ? f.path[f.step + 1] : (f.path ? f.path[Math.min(f.step, f.path.length - 1)] : f.base);
+    if (from === f.base && !mid) return false;                          // 이미 문 앞 — [ACT-DOOR] 가 들인다
+    if (pathBudget <= 0) return f.state === 'idle';                     // 예산이 없다 — 선 사람은 다음 틱에(그사이 딴 데로 새지 않게), 걷는 사람은 그대로
+    pathBudget--;
+    const { prev } = roadBFS(from);                                     // 막힌 칸까지 넣어서 — 어차피 지나쳐 간다
+    if (bfsSeen[f.base] !== bfsGen) { nightHomeStats.밤길없음++; return false; }   // 길이 끊겼다 — 원래 규칙대로
+    const path = []; let k = f.base; while (k !== from && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(from);
+    if (mid) { path.unshift(f.path[f.step]); } else { f.seg = 0; }
+    f.path = path; f.step = 0; f.state = 'walk'; f.goal = 'home'; f.nh = true; f.blockedAt = 0; releaseAll(i); nightHomeStats.밤길잡음++;
+  }
+  /* 밤길 걸음 — 칸을 잡지 않는다 */
+  const a = f.path[f.step], b = f.path[f.step + 1];
+  if (b == null) { if (a === f.base) { enterPlace(f, i, f.home, a, 1e15); rhythmStats.귀가++; nightHomeStats.걸어서귀가++; } else { f.state = 'idle'; f.until = now; f.path = [a]; f.step = 0; } f.nh = false; return true; }
+  if (!isRoad(b)) { f.nh = false; f.state = 'idle'; f.until = now; f.path = [a]; f.step = 0; f.seg = 0; return true; }   // 걷는 도중에 길이 뜯겼다 — 다시 정한다
+  const ax = wx(cX(a)), az = wz(cY(a)), bx = wx(cX(b)), bz = wz(cY(b)), len = Math.hypot(bx - ax, bz - az) || 1;
+  f.seg += (WALK_SPEED * (EV.rain ? 1.3 : 1) * dt) / len;
+  if (f.seg >= 1) { f.seg = 0; f.step++; f.x = bx; f.z = bz; } else { f.x = ax + (bx - ax) * f.seg; f.z = az + (bz - az) * f.seg; }
+  f.dir = Math.atan2(bx - ax, bz - az); f.walking = true;
+  return true;
+}
+window.__nightHome = () => ({ 켜짐: window.VRULES.nightHome.on, ...nightHomeStats, 지금밤길: folks.filter(f => f.nh).length });
+
 const SCHOOL_MAX = 12;
 function schoolRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'school') r = i; }); return r; }
 let schoolCache = { at: -1, root: -1 };
@@ -4163,6 +4200,7 @@ function tickFolks(dt, now) {
       if (home ? !isNightHour(h) : work ? !isWorkHour(h) : school ? !isSchoolHour(h) : now >= f.inside.until) { leave(f, '나옴'); f.goal = null; }
       continue;
     }
+    if (actNightHome(f, i, now, dt)) continue;   // [ACT-NIGHT] 밤 귀갓길은 칸을 잡지 않고 걷는다(서로 지나친다)
     if (actDoorStep(f, i)) continue;   // [ACT-DOOR] 밤에 이미 문 앞이면 곧장 집에 든다(아래 rhythmTick 은 '걸어서 닿은' 사람만 들인다)
     if (actPathBefore(f, i)) continue;   // [ACT-PATH] 걸음을 적어 둔다 · 이미 일터·학교 앞이면 그 자리에서 들어간다
     if (!f.visitor && rhythmTick(f, i, now) && f.state !== 'walk') continue;
