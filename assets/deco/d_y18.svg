@@ -1,7 +1,7 @@
 <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
 <!-- d_y18 돌 벤치 2×1 · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
-<path d="M40,182 L150,170 L198,190 L112,198 Z" fill="#000" opacity=".2"/>
+<path d="M40,182 L148.6,170 L196,190 L111.1,198 Z" fill="#000" opacity=".2"/>
 <ellipse cx="100" cy="184" rx="82" ry="12" fill="#000" opacity=".28"/>
 <!-- 받침돌 2개 -->
 <g class="o" fill="#8c8578"><path d="M34,150 l4,-10 h30 l4,10 v30 h-38z"/><path d="M128,150 l4,-10 h30 l4,10 v30 h-38z"/></g>

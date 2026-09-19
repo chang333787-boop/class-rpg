@@ -5,7 +5,7 @@
 <radialGradient id="glow"><stop offset="0" stop-color="#b98ae6" stop-opacity=".22"/><stop offset="1" stop-color="#b98ae6" stop-opacity="0"/></radialGradient>
 </defs>
 <circle cx="50" cy="160" r="70" fill="url(#glow)"/>
-<path d="M22,282 L78,270 L98,290 L44,298 Z" fill="#000" opacity=".2"/>
+<path d="M22,282 L76.5,270 L96,290 L43.4,298 Z" fill="#000" opacity=".2"/>
 <ellipse cx="50" cy="286" rx="40" ry="9" fill="#000" opacity=".28"/>
 <!-- 받침 -->
 <path class="o" d="M20,270 q30,-8 60,0 v14 q-30,8 -60,0z" fill="#b8892e"/>

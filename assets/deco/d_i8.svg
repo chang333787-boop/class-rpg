@@ -1,7 +1,7 @@
 <svg width="300" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
 <!-- d_i8 소파 3×1 · 3인용, 쿠션·담요 · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
-<path d="M50,184 L250,170 L298,192 L150,198 Z" fill="#000" opacity=".2"/>
+<path d="M50,184 L248.4,170 L296,192 L149.2,198 Z" fill="#000" opacity=".2"/>
 <ellipse cx="150" cy="184" rx="134" ry="13" fill="#000" opacity=".28"/>
 <!-- 등받이 -->
 <path class="o" d="M30,96 q0,-10 10,-10 h220 q10,0 10,10 v58 h-240z" fill="#8a4a3a"/>

@@ -3,7 +3,7 @@
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
 <g id="bk"><rect width="13" height="34" rx="1.5" stroke="#2b2118" stroke-width="1.8"/><path d="M3,7 h7" stroke="#2b2118" stroke-width="1.4" opacity=".5"/></g>
 </defs>
-<path d="M20,282 L84,272 L98,290 L40,298 Z" fill="#000" opacity=".2"/>
+<path d="M20,282 L82.4,272 L96,290 L39.5,298 Z" fill="#000" opacity=".2"/>
 <ellipse cx="50" cy="286" rx="44" ry="9" fill="#000" opacity=".28"/>
 <!-- 몸체 -->
 <path class="o" d="M8,60 h84 v226 h-84z" fill="#7a5230"/>
