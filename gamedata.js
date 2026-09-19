@@ -486,6 +486,9 @@ const GAME_DATA = {
     {id:'d_y63',name:'놀이터',        icon:'🛝', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y64',name:'과수원',        icon:'🍎', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y65',name:'자갈길',   icon:'🪨', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y66',name:'큰 헛간',       icon:'🏚️', size:{w:4,h:3}, priceAdj:-150, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y67',name:'온실',          icon:'🪴', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y68',name:'캠프파이어', icon:'🔥', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', priceAdj:-5,  cat:'indoor', rarity:'common', reqLv:1},
