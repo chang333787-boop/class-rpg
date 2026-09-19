@@ -96,7 +96,7 @@ function setRules(w, spec) {
 async function child(spec) {
   const { loadVillage } = await import('./load.mjs');
   const saveText = spec.save ? fs.readFileSync(path.resolve(ROOT, spec.save), 'utf8') : null;
-  const { w } = await loadVillage({ root: ROOT, saveText, seed: spec.seed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
+  const { w } = await loadVillage({ root: ROOT, html: spec.html || null, saveText, seed: spec.seed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
   const stage = typeof w.__stage === 'function' ? w.__stage() : null;
   if (spec.stage && (!stage || stage.오류 || stage.id !== spec.stage)) throw new Error('판을 못 얹음: ' + (stage ? stage.오류 || stage.id : '__stage 없음'));
   setRules(w, spec.rules);
@@ -118,7 +118,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i].replace(/^--/, ''), v = argv[i + 1];
     if (k === 'vs') { o.vs.push(v); i++; } else if (k === 'json') { o.json = v; i++; } else if (k === 'child') { o.child = v; i++; }
-    else if (k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name') { o[k] = v; i++; }
+    else if (k === 'html' || k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name') { o[k] = v; i++; }
     else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs') { o[k] = +v; i++; }
     else if (k === 'help' || k === 'h') o.help = true;
     else if (k === 'voice') o.voice = true;
@@ -129,7 +129,7 @@ function parseArgs(argv) {
 const seedList = s => { const out = []; String(s).split(',').forEach(p => { const [a, b] = p.split('-').map(Number); for (let x = a; x <= (b || a); x++) out.push(x); }); return out; };
 
 function variants(o) {
-  const base = { name: o.name || (o.stage ? '판 ' + o.stage : '기본'), stage: o.stage || null, save: o.save || null, rules: o.rules || '', do: o.do || '' };
+  const base = { name: o.name || (o.stage ? '판 ' + o.stage : '기본'), html: o.html || null, stage: o.stage || null, save: o.save || null, rules: o.rules || '', do: o.do || '' };
   const list = [base];
   o.vs.forEach(s => {   // '이름: do=…; rules=…; save=…' — do 안의 여러 수는 '|' 로 잇는다
     const c = s.indexOf(':'); if (c < 0) throw new Error("--vs 는 '이름: do=… ; rules=…' 꼴");
@@ -140,7 +140,8 @@ function variants(o) {
       else if (k === 'rules') v.rules = [base.rules, val].filter(Boolean).join(',');
       else if (k === 'save') v.save = val;
       else if (k === 'stage') v.stage = val || null;
-      else throw new Error('--vs 칸은 do · rules · save · stage: ' + k);
+      else if (k === 'html') v.html = val || null;
+      else throw new Error('--vs 칸은 do · rules · save · stage · html: ' + k);
     });
     list.push(v);
   });
@@ -223,6 +224,7 @@ function report(o, vars, res) {
 }
 
 const HELP = `마을 시뮬 도구 — scripts/village-sim/README.md 참고
+  --html <파일>          다른 index.html 로(전/후 비교 — --vs '옛: html=/tmp/old.html')
   --stage <id>           판 파일 village/stages/<id>.json 으로 연다(시작 땅·규칙·목표)
   --save <저장본 json>   (없으면 빈 땅)          --days N (2)   --seeds 1-5 (1-3)
   --rules 'a.b=v,…'      VRULES 덮기             --do 'put shop @jobs 1; del x y'
