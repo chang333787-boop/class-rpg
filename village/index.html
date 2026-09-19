@@ -4766,6 +4766,48 @@ function widenShiftPlan(x, y, rot) {
 window.__widenFront = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; const b = roadBeside(rec); if (b < 0) return '문 앞 길 없음';
   let last = ''; for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) { const r = window.__put('avenue', cX(b) + ox, cY(b) + oy, 0); if (r === true) return true; last = r; } return last; };
 window.__widen2 = () => ({ 켜짐: window.VRULES.widenShift.on, ...WIDEN2.stats });
+/* ── [MAC-WIDEN3] 바꿔 깔기는 두 번 눌러서 · ↩ 는 물러난 집도 제자리로 (보스 09-20 — 아이 집을 움직이는 일이라 main 승격 전 필수) ──
+   ① **두 번 누름**: 큰길이 곁 집을 물려야 할 때 첫 누름엔 깔지 않는다 — 물러날 집에 주황 점선 테두리 + "🏠 이 집이 한 칸 물러나요 — 한 번 더 누르면 큰길을 깔아요".
+      같은 자리를 한 번 더 누르면 깐다(마우스). 터치(자리 잡기 — MAC-SEAT)는 톡으로 자리를 잡는 순간 테두리가 서고 ✓ 가 확정이다.
+      다른 곳을 누르거나 · 자리를 옮기거나 · 모드를 바꾸면 풀린다. 그냥 올려 둔 그림자(아직 안 누름)엔 같은 말이 빨간 글로 뜬다.
+   ② **↩ 되돌리기**: 그 큰길을 거두면(WIDEN 이 길을 되살림) 물러났던 집도 원래 자리로 돌아온다(식구·층 그대로 · 그 사이 원래 자리가 찼으면 그대로 두고 말한다).
+   원래 줄 수정 0 — canPlace·paintAt·seatAt·setMode·removeAt·placeAt 감싸기. 스위치는 widenShift 그대로. */
+const WIDEN3 = { armed: null, shifts: new Map(), force: false, stats: { 표시: 0, 확정: 0, 풀림: 0, 제자리: 0, 제자리못함: 0 } };
+const widenKey = (x, y, rot, p) => x + ',' + y + ',' + (rot || 0) + ',' + p.house.root;
+const widenCage = (() => { const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineDashedMaterial({ color: 0xf29a2e, dashSize: 0.9, gapSize: 0.6, depthTest: false, transparent: true }));
+  m.computeLineDistances(); m.visible = false; m.renderOrder = 7; m.frustumCulled = false; scene.add(m); return m; })();
+function widenArm(x, y, rot, p) { const h = p.house, d = dims('house', h.rot), c = centerOf('house', cX(h.root), cY(h.root), h.rot), hgt = 4 + houseLv(h.root) * 2.4;
+  WIDEN3.armed = widenKey(x, y, rot, p); widenCage.position.set(c.x, hgt / 2, c.z); widenCage.scale.set(d.w * CS + .6, hgt, d.h * CS + .6); widenCage.visible = true; WIDEN3.stats.표시++;
+  toast('🏠 이 집이 한 칸 물러나요 — ' + (SEAT.on ? '✓ 를 누르면' : '한 번 더 누르면') + ' 큰길을 깔아요', true); }
+function widenDisarm() { if (!WIDEN3.armed) return; WIDEN3.armed = null; widenCage.visible = false; WIDEN3.stats.풀림++; }
+{ const cA0 = canPlace; canPlace = function (kind, x, y, rot, opts) { const r = cA0.apply(this, arguments);
+    if (r !== true || kind !== 'avenue' || !window.VRULES.widenShift.on || (opts && opts.복원) || WIDEN3.force || WIDEN.undoing) return r;
+    const p = widenShiftPlan(x, y, rot); if (!p || WIDEN3.armed === widenKey(x, y, rot, p)) return r;
+    return '🏠 이 집이 한 칸 물러나요 — 두 번 눌러 큰길을 깔아요'; };
+  const pA0 = paintAt; paintAt = function (c) {
+    if (painting && painting.k === 'avenue' && c && c.inside && window.VRULES.widenShift.on) { const p = widenShiftPlan(c.x, c.y, painting.rot), key = p ? widenKey(c.x, c.y, painting.rot, p) : null, first = !painting.list.length && painting.last == null;
+      if (first && WIDEN3.armed && WIDEN3.armed !== key) widenDisarm();   // 새로 누른 곳이 다르면 풀린다(누른 채 조금 움직인 것은 그대로)
+      if (p && WIDEN3.armed !== key) { if (first && !SEAT.on) widenArm(c.x, c.y, painting.rot, p); painting.last = c.x + ',' + c.y; return; }   // 첫 누름 — 표시만(끌며 지나가다 선 것은 표시도 안 한다)
+      if (p) { const r = pA0.apply(this, arguments); if (painting.list.length) { WIDEN3.stats.확정++; widenDisarm(); } return r; } }
+    return pA0.apply(this, arguments); };
+  const sA0 = seatAt; seatAt = function (x, y) { const r = sA0.apply(this, arguments);
+    if (sel === 'avenue' && window.VRULES.widenShift.on) { const p = widenShiftPlan(x, y, selRot), key = p ? widenKey(x, y, selRot, p) : null; if (WIDEN3.armed !== key) { widenDisarm(); if (p) { widenArm(x, y, selRot, p); seatShow(); } } }
+    else widenDisarm(); return r; };
+  const mA0 = setMode; setMode = function () { widenDisarm(); return mA0.apply(this, arguments); };
+  /* ② 되돌리기 — 물림을 적어 두었다가(큰길 root → 집의 원래 자리) 그 큰길을 ↩ 로 거두면 집을 제자리로 */
+  const plA0 = placeAt; placeAt = function (kind, x, y, rot) { const p = kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy ? widenShiftPlan(x, y, rot) : null;
+    const from = p ? { x: cX(p.house.root), y: cY(p.house.root), rot: p.house.rot, to: p.to } : null; const r = plA0.apply(this, arguments);
+    if (from) WIDEN3.shifts.set(idx(x, y), from); return r; };
+  const rmA0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, back = root >= 0 ? WIDEN3.shifts.get(root) : null, undoing = WIDEN.undoing;
+    const r = rmA0.apply(this, arguments);
+    if (r && back) { WIDEN3.shifts.delete(root); if (undoing) { const h = cells[idx(back.to[0], back.to[1])];
+        if (h && h.k === 'house' && h.root === idx(back.to[0], back.to[1])) { const ok = (() => { const keep = footprint('house', back.to[0], back.to[1], h.rot).map(([px, py]) => idx(px, py)); keep.forEach(i => { cells[i] = null; });
+            let v; try { v = canPlace('house', back.x, back.y, back.rot); } finally { keep.forEach(i => { cells[i] = h; }); } return v === true; })();
+          if (ok) { KEEP.lastPush = -1e9; rmA0.call(this, back.to[0], back.to[1]); placeAt('house', back.x, back.y, back.rot); WIDEN3.stats.제자리++; setTimeout(() => toast('↩ 큰길을 거두고 집도 제자리로 돌려놨어요', true), 0); }
+          else { WIDEN3.stats.제자리못함++; setTimeout(() => toast('↩ 큰길은 거뒀어요 — 집이 있던 자리가 그새 찼어요', true), 0); } } } }
+    return r; }; }
+{ const wf0 = window.__widenFront; window.__widenFront = (x, y) => { WIDEN3.force = true; try { return wf0(x, y); } finally { WIDEN3.force = false; } }; }   // 시험 훅은 확인 없이(도구 · 두 번 누름은 사람 손의 일)
+window.__widen3 = () => ({ 기다림: WIDEN3.armed, 물림기록: WIDEN3.shifts.size, ...WIDEN3.stats });
 /* ── [MAC-CROWDHOMES] 붐빔을 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ② · 창조자의 눈 6회 🟢2 '큰 마을일수록 길이 한산해진다') ──
    붐빔(F12)은 걷는 사람(최대 120명 표본)이 앞사람 뒤에 선 비율이었다 → 마을이 넓을수록 120명이 흩어져 붐빔이 사라졌다(516명 판에서 붐비는 길 칸 70 → 3).
    붐빔 → 큰길 사다리가 300명 뒤에 끊겼다. 이제 **교통량**으로 센다:
