@@ -285,7 +285,7 @@ __pop()
 캡처 단계 리스너(원래 처리기보다 먼저 받음): MAC-TOUCH(두 손가락) · MAC-KEEP-2(pointerup) · MAC-RCLICK(마우스 오른쪽) · MAC-HOLD(#539 길게 누르기 — 열림). 학교 판이 `pointerdown/move/up` 처리기를 고쳤다면 **`down`·`moved`·`painting`·`carrying` 네 변수의 뜻이 그대로인지** 볼 것(이 넷을 밖에서 만진다).
 
 ## ㉘ 새 id · 새 저장 키 (주말 동안 · 마을 프로그램 담당 몫)
-- **종류 id**: `fence1` · `wall1` · `fence1_gate` · `wall1_gate`(#493). 디자인 담당 몫(꽃밭·다듬은 나무·이음 식구 등)은 디자인 worklog 참고 — 전체는 `?dev=1` 에서 `__snapshot().palette` 를 59차와 견주면 나온다.
+- **종류 id**: `fence1` · `wall1` · `fence1_gate` · `wall1_gate`(#493). 디자인 담당 몫(꽃밭·다듬은 나무·이음 식구 등)은 디자인 worklog 참고 — 전체는 `?dev=1` 에서 `__palette()` 를 59차와 견주면 나온다.
 - **저장 키(마을 v2 안)**: 새 키 **없음.** 돌아오는 목표는 `goals` 에 `r1`·`r2`… id 로 들어간다(#528). 칭호를 넣게 되면 선택 키 `title` 하나(#541 제안 — 아직 아님).
 - **localStorage 곁 키**(마을 저장본 아님 · 없어도 됨): `rpg.village.awaySeen.<sid>`(#457) · `rpg.village.tip.rclick`(#536) · `rpg.village.tip.hold`(#539).
 - **규칙 스위치**(`window.VRULES.*` — 끄면 그 규칙만 빠진다): 내 것 `whyBubble`·`breath`·`turnAway`·`placeOn`·`keep`·`goalUnlock`·`dayMoveIn`·`spotHint`·`placeSay`·`fresh`·`crowdSkipNight`·`recurGoals`·`variantCards`·`rightClick`(+`holdMenu` #539). 나머지(`beside`·`doorStep`·`greet`·`kid(s)`·`lampWalk`·`lookAround`·`nightHome`·`pathKeep`·`plazaRing`·`umbrella`·`words`·`gapLook`)는 주민 연기·디자인 담당.
