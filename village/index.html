@@ -2908,9 +2908,13 @@ window.__rclick = () => ({ 켜짐: window.VRULES.rightClick.on, 확인대기중:
       → 있는 장치(MAC-SPOT 의 노란 자리 밝히기)를 그 순간에 켠다. 큰 건물이 열릴 때만 켜지던 것 — 집은 빠져 있었다. 6초에 한 번까지.
    원래 줄 수정 0 — pushUndo·updateGhost 감싸기 + pointerup 리스너. */
 (window.VRULES = window.VRULES || {}).first5 = { on: true, spotGapMs: 6000 };
-const F5 = { pushes: 0, p0: 0, painted: 0, mute: null, spotAt: 0, told: false, stats: { 말풍선접음: 0, 자리밝힘: 0 } };
+const F5 = { pushes: 0, p0: 0, painted: 0, mute: null, spotAt: 0, told: false, stats: { 말풍선접음: 0, 누르는중접음: 0, 자리밝힘: 0 } };
 { const push0 = pushUndo; pushUndo = function () { F5.pushes++; return push0.apply(this, arguments); };
   const ghost0 = updateGhost; updateGhost = function () { const r = ghost0.apply(this, arguments);
+    /* [MAC-FIRST5-2] (창조자의 눈 5회 🔴1) 손가락이 **눌린 채** 1px 만 흔들려도 pointermove → updateGhost 가 방금 놓은 칸을 다시 보고 빨간 "여기엔 이미 ○○가 있어요"를 띄웠다
+       (① 은 손을 뗀 뒤에만 걷었다 — 진짜 손가락은 늘 흔들리므로 터치에선 놓을 때마다 보였다). 이번 누름(획)으로 놓은 것 위에서는 그 말과 붉은 상자를 띄우지 않는다. */
+    if (window.VRULES.first5.on && painting && painting.list.length && hover && hover.inside) { const rec = cells[idx(hover.x, hover.y)];
+      if (rec && painting.list.some(it => idx(it.x, it.y) === rec.root)) { const el = document.getElementById('why'); if (el && el.className === 'show' && /^여기엔 이미/.test(el.textContent)) { el.className = ''; F5.stats.누르는중접음++; } ghost.fill.visible = ghost.edge.visible = false; } }
     if (F5.mute && window.VRULES.first5.on) { const el = document.getElementById('why'), key = hover ? hover.x + ',' + hover.y : null;
       if (key !== F5.mute) F5.mute = null; else if (el && el.className === 'show' && /^여기엔 이미/.test(el.textContent)) el.className = ''; }
     return r; }; }
