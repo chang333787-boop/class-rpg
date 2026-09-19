@@ -255,6 +255,30 @@ await test('B9 마을 이름(meta.name) — 12자까지 올리고 다른 기기�
   assert.equal(d2.local().name, '우리 반 꿈나무 마을이');
 });
 
+await test('H1 가려질 때(hidden) — 마지막 몇 초도 keepalive 로 올리고, 세션은 놓지 않는다(돌아오면 그대로 주인)', async () => {
+  const w = world(); const d = device(w); d.save(V2({ '4_4': 'AE' })); await d.sync.boot(); d.sync.attach(); await w.clock.settle();
+  const atBefore = w.rtdb.get(ROOT + '/session/at');
+  d.save(V2({ '4_4': 'AF' }));                                             // 2초가 지나기 전에 앱을 바꿈 — OS 가 탭을 죽이면 pagehide 는 안 온다
+  assert.equal(d.sync.onHidden(), 'sent'); await w.clock.settle();
+  assert.equal(w.rtdb.get(ROOT + '/plots/4_4'), 'AF');                      // 다른 기기가 받을 수 있다
+  assert.equal(w.rtdb.get(ROOT + '/session/at'), atBefore);                // 세션 그대로(at=0 으로 놓지 않음)
+  assert.equal(d.sync.state.owner, true);
+  const n = w.rtdb.log.filter(l => l.keepalive && l.path === ROOT).length;
+  assert.equal(d.sync.onHidden(), 'same'); assert.equal(d.sync.onPageHide(), 'same'); await w.clock.settle();   // 같은 내용은 다시 안 보냄
+  assert.equal(w.rtdb.log.filter(l => l.keepalive && l.path === ROOT).length, n);
+  assert.equal(w.rtdb.get(ROOT + '/session/at'), 0);                       // 닫힐 때는 전처럼 세션을 놓는다
+  d.sync.close();
+  const B = device(w); await B.sync.boot(); assert.equal(B.local().plotStr['4_4'], 'AF');   // 다른 기기에서 열면 그 몇 초분까지 있다
+});
+await test('H2 가려질 때 — guest·주인 아님은 네트워크 0', async () => {
+  const w = world(); const g = device(w, { sid: 'guest' }); await g.sync.boot(); g.sync.attach(); g.storage.setItem('rpg.village.guest', JSON.stringify(V2({ '4_4': 'AE' })));
+  assert.equal(g.sync.onHidden(), 'skip'); assert.equal(w.rtdb.log.length, 0);
+  const A = device(w); await A.sync.boot(); A.sync.attach(); await w.clock.advance(10000);
+  const B = device(w, { askAnswer: true }); await B.sync.boot(); await w.clock.settle(); const from = w.rtdb.log.length;
+  A.save(V2({ '4_4': 'ZZ' })); assert.equal(A.sync.onHidden(), 'skip'); await w.clock.settle();
+  assert.equal(w.rtdb.log.slice(from).filter(l => l.keepalive).length, 0);
+});
+
 const pass = results.filter(r => r[0] === 'PASS').length, fail = results.length - pass;
 for (const r of results) console.log((r[0] === 'PASS' ? '✅' : '❌') + ' ' + r[1] + (r[2] ? '  ← ' + r[2] : ''));
 console.log(`\n요약: PASS ${pass} · FAIL ${fail}`);
