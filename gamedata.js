@@ -492,6 +492,17 @@ const GAME_DATA = {
 
     // ── 쓰는 방식 1차 — 놓으면 동물이 모이는 물건 (모이는 규칙은 움직임 코드)
     {id:'d_y69',name:'먹이통',        icon:'🥣', priceAdj:0, cat:'yard', rarity:'common', reqLv:1, feeder:true, newUntil:'2026-09-27'},
+
+    // ── 다듬은 나무(토피어리) 7모양 — 1×1, 위로 솟음. kind/group 은 서랍 묶음(아직 코드가 안 읽음 → 무시됨)
+    //    colors: 같은 그림 파일 안의 잎색(주소 뒤 #lime·#autumn). 색 고르기 코드가 붙기 전엔 기본 초록으로만 보인다
+    //    곰·오리는 살 수 없는 도감 선물(price:0 → 상점에 안 뜸). gift 는 받는 조건 — 도감 코드가 붙기 전엔 아무도 못 받는다
+    {id:'d_y85',name:'공 나무',   icon:'🌳', priceAdj:0,   cat:'yard', rarity:'rare', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], newUntil:'2026-09-27'},
+    {id:'d_y86',name:'원뿔 나무', icon:'🌲', priceAdj:0,   cat:'yard', rarity:'rare', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], newUntil:'2026-09-27'},
+    {id:'d_y87',name:'원통 나무', icon:'🌳', priceAdj:0,   cat:'yard', rarity:'rare', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], newUntil:'2026-09-27'},
+    {id:'d_y88',name:'나선 나무', icon:'🌳', priceAdj:0,   cat:'yard', rarity:'rare', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], newUntil:'2026-09-27'},
+    {id:'d_y89',name:'토끼 나무', icon:'🐰', priceAdj:+30, cat:'yard', rarity:'rare', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], newUntil:'2026-09-27'},
+    {id:'d_y90',name:'곰 나무 (선물)',  icon:'🐻', price:0, cat:'yard', rarity:'epic', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], gift:{need:'topiary', count:5}},
+    {id:'d_y91',name:'오리 나무 (선물)', icon:'🦆', price:0, cat:'yard', rarity:'epic', reqLv:1, kind:'plant', group:'topiary', colors:['lime','autumn'], gift:{need:'plant', count:12}},
     // ── 집 안 (indoor) ──
     // ⚪ 일반 Lv1+
     {id:'d_i1', name:'화분',          icon:'🪴', priceAdj:-5,  cat:'indoor', rarity:'common', reqLv:1},
