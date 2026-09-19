@@ -1367,10 +1367,13 @@ try {
   const at = S.indexOf('const _FLOOR_COLORS = {'), end = S.indexOf(NL + '};', at);
   if (at < 0 || end < 0) throw new Error('_FLOOR_COLORS 표를 못 찾음');
   const vAt = S.indexOf('const _FLOOR_VARIANTS = {'), vEnd = S.indexOf('};', vAt);
+  const eAt = S.indexOf('const _FLOOR_EDGE_COLOR = '), eEnd = S.indexOf(NL + '});', eAt);
+  if (eAt < 0 || eEnd < 0) throw new Error('_FLOOR_EDGE_COLOR 표를 못 찾음');
   vm.runInContext('const _FLOOR_IMG = {};' + NL + S.slice(vAt, vEnd + 2) + NL + S.slice(at, end + 3) + NL
+    + sliceConst(S, '_FLOOR_BED_COLORS') + sliceConst(S, '_FLOOR_RIMS') + S.slice(eAt, eEnd + 4) + NL
     + ['_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
     + 'const _SVG_BMP = new Map();' + NL
-    + ';globalThis.__R = { _FLOOR_IMG, _FLOOR_VARIANTS, _FLOOR_COLORS, _floorImg, _drawFloorSVG };', sb);
+    + ';globalThis.__R = { _FLOOR_IMG, _FLOOR_VARIANTS, _FLOOR_COLORS, _FLOOR_BED_COLORS, _FLOOR_RIMS, _FLOOR_EDGE_COLOR, _floorImg, _floorIsGrass, _drawFloorSVG };', sb);
   const R = sb.__R, DIR = path.join(ROOT, 'assets', 'floor');
   const GARDEN = Object.keys(R._FLOOR_COLORS);
   test('정원 바닥 7종', () => eq(GARDEN.slice().sort(), ['daisyfield', 'hydrangea', 'lavender', 'sunflowerbed', 'tulipbed', 'tulipcol', 'wildflower']));
@@ -1415,6 +1418,76 @@ try {
     eq([first('tulipbed', 'red'), first('tulipbed', 'yellow'), first('tulipbed', ''), first('tulipbed', 'nosuchcolor')].map(k => k.replace(/_[ab]/, '')),
        ['tile_tulipbed#red', 'tile_tulipbed#yellow', 'tile_tulipbed', 'tile_tulipbed']);
   });
+  // ── [DECO-FLOOR-EDGE-1] 꽃밭 가장자리 · 마감 · 들꽃 잔디 = 풀 ──
+  cur = '꾸미기 꽃밭 가장자리(DECO-FLOOR-EDGE-1)';
+  const BEDS = Object.keys(R._FLOOR_EDGE_COLOR);
+  const PIECES = ['n', 'e', 's', 'w', 'n2', 'e2', 's2', 'w2', 'in_ne', 'in_nw', 'in_se', 'in_sw', 'out_ne', 'out_nw', 'out_se', 'out_sw'];
+  test('꽃밭 무리 = 정원 7종에서 들꽃 잔디를 뺀 6종', () => eq(BEDS.slice().sort(), GARDEN.filter(t => t !== 'wildflower').sort()));
+  test('들꽃 잔디는 풀 · 꽃밭 무리는 풀이 아니다', () => { eq(R._floorIsGrass('wildflower'), true); eq(R._floorIsGrass('grass'), true); eq(R._floorIsGrass('flower'), true); BEDS.forEach(t => eq(R._floorIsGrass(t), false, t)); eq(R._floorIsGrass('stone'), false); });
+  test('가장자리·마감 조각 16개씩이 파일로 있다(bed · rim_picket · rim_stone · rim_brick)', () =>
+    ['bed'].concat(R._FLOOR_RIMS.map(m => 'rim_' + m)).forEach(pre => PIECES.forEach(k => eq(fs.existsSync(path.join(DIR, pre + '_' + k + '.svg')), true, pre + '_' + k))));
+  test('꽃잎 색 표 = bed_*.svg 안의 `#색:target`(16조각 전부) · 마감 그림에는 색이 없다', () => {
+    PIECES.forEach(k => { const svg = fs.readFileSync(path.join(DIR, 'bed_' + k + '.svg'), 'utf8');
+      eq([...new Set([...svg.matchAll(/#([a-z0-9_]+):target/g)].map(m => m[1]))].sort(), R._FLOOR_BED_COLORS.slice().sort(), 'bed_' + k); });
+    R._FLOOR_RIMS.forEach(m => PIECES.forEach(k => eq(/:target/.test(fs.readFileSync(path.join(DIR, 'rim_' + m + '_' + k + '.svg'), 'utf8')), false, 'rim_' + m + '_' + k)));
+  });
+  test('짝 표의 값은 전부 꽃잎 색 · 열쇠는 그 종류의 바탕 색(또는 기본색 \'\') · 종류마다 기본색 짝이 있다', () => BEDS.forEach(t => {
+    eq(typeof R._FLOOR_EDGE_COLOR[t][''], 'string', t + ' 기본색 짝');
+    Object.keys(R._FLOOR_EDGE_COLOR[t]).forEach(c => { eq(c === '' || R._FLOOR_COLORS[t].indexOf(c) >= 0, true, t + '#' + c); eq(R._FLOOR_BED_COLORS.indexOf(R._FLOOR_EDGE_COLOR[t][c]) >= 0, true, t + '#' + c + ' → ' + R._FLOOR_EDGE_COLOR[t][c]); });
+  }));
+  //  그린 조각 이름을 순서대로 모은다(그림은 전부 '왔다'고 친다 — 기억 표를 미리 채우는 대신 Image 가 오면 ok 로)
+  const piecesOf = (type, color, rim, grid) => {   // grid: '-1,0' → 이웃 이름(없으면 잔디)
+    const T = (rr, cc, wantRim) => { const v = (rr === 2 && cc === 3) ? type + (rim ? '+' + rim : '') : ((grid || {})[(rr - 2) + ',' + (cc - 3)] || 'grass'); return v.split('+')[wantRim ? 1 : 0] || ''; };
+    for (let pass = 0; pass < 4; pass++) {   // 바탕이 와야 조각을 부르고, 조각이 와야 그린다 — 새로 부른 그림이 없을 때까지
+      const n0 = Object.keys(R._FLOOR_IMG).length;
+      Object.keys(R._FLOOR_IMG).forEach(k => { R._FLOOR_IMG[k].ok = true; R._FLOOR_IMG[k].img.tag = k; });
+      draws.length = 0; R._drawFloorSVG(type, 2, 3, 0, 0, 20, T, color, rim);
+      if (pass && Object.keys(R._FLOOR_IMG).length === n0) break;
+    }
+    return draws.map(i => i.tag).slice(1);   // 맨 앞은 바탕
+  };
+  const all8 = v => ({ '-1,-1': v, '-1,0': v, '-1,1': v, '0,-1': v, '0,1': v, '1,-1': v, '1,0': v, '1,1': v });
+  test('잔디에 홀로 선 꽃밭 = 변 4 + 안 모서리 4, 순서도 물가와 같다 · 잔디 번짐은 안 얹는다', () =>
+    eq(piecesOf('tulipbed', '', ''), ['bed_n2', 'bed_e2', 'bed_s2', 'bed_w2', 'bed_in_ne', 'bed_in_nw', 'bed_in_se', 'bed_in_sw']));
+  test('꽃밭에 둘러싸이면 조각 0 — 종류·색이 달라도(줄무늬 화단은 한 밭)', () => { eq(piecesOf('tulipbed', 'red', '', all8('tulipbed')), []); eq(piecesOf('tulipbed', 'red', '', all8('lavender')), []); });
+  test('변은 꽃밭인데 대각선만 바깥 = 바깥 모서리 조각', () => eq(piecesOf('tulipbed', '', '', Object.assign(all8('tulipbed'), { '-1,1': 'grass', '1,-1': 'wildflower' })), ['bed_out_ne', 'bed_out_sw']));
+  test('들꽃 잔디·돌·물 옆은 바깥', () => ['wildflower', 'stone', 'water'].forEach(v => eq(piecesOf('hydrangea', '', '', Object.assign(all8('hydrangea'), { '0,1': v })), ['bed_e2#blue'], v)));
+  test('짝 표는 빠짐없다 — 꽃밭 6종의 바탕 색 전부에 짝이 있다(디자인 표 #636)', () => BEDS.forEach(t => R._FLOOR_COLORS[t].forEach(c => eq(typeof R._FLOOR_EDGE_COLOR[t][c], 'string', t + '#' + c))));
+  const e1 = (t, c) => piecesOf(t, c, '', Object.assign(all8(t), { '0,1': 'grass' }))[0];
+  test('꽃잎 색 = 짝 표 그대로 · 눈으로 고른 짝(candy→red · duo→violet · moon→yellow · lemon→yellow · night→violet · sherbet→pink) · pink 는 주소에 안 붙인다', () => {
+    eq([e1('tulipbed', 'red'), e1('tulipbed', ''), e1('tulipbed', 'candy'), e1('tulipbed', 'sherbet'), e1('tulipcol', 'night'), e1('tulipcol', 'yellow'),
+        e1('hydrangea', ''), e1('hydrangea', 'pink'), e1('hydrangea', 'duo'), e1('hydrangea', 'moon'),
+        e1('sunflowerbed', ''), e1('sunflowerbed', 'lemon'), e1('lavender', ''), e1('lavender', 'white'), e1('daisyfield', ''), e1('daisyfield', 'pink')],
+       ['bed_e2#red', 'bed_e2', 'bed_e2#red', 'bed_e2', 'bed_e2#violet', 'bed_e2#yellow',
+        'bed_e2#blue', 'bed_e2', 'bed_e2#violet', 'bed_e2#yellow',
+        'bed_e2#yellow', 'bed_e2#yellow', 'bed_e2#violet', 'bed_e2#white', 'bed_e2#white', 'bed_e2']);
+  });
+  test('짝 표에 없는 새 바탕 색 → 그 바닥의 기본 짝(\'\' 줄) · 물려받은 이름(constructor)도 기본 짝', () => {
+    R._FLOOR_COLORS.hydrangea.push('zzz', 'constructor');
+    try { eq([e1('hydrangea', 'zzz'), e1('hydrangea', 'constructor')], ['bed_e2#blue', 'bed_e2#blue']); }
+    finally { R._FLOOR_COLORS.hydrangea.splice(-2, 2); }
+  });
+  test('마감이 있으면 rim_<마감>_* · 색 없음 · 없는 마감은 그냥 가장자리', () => {
+    eq(piecesOf('tulipbed', 'red', 'picket', Object.assign(all8('tulipbed#red+picket'.replace('#red', '')), { '1,0': 'grass' })), ['rim_picket_s2']);
+    eq(piecesOf('lavender', '', 'brick'), ['n2', 'e2', 's2', 'w2', 'in_ne', 'in_nw', 'in_se', 'in_sw'].map(k => 'rim_brick_' + k));
+    eq(piecesOf('tulipbed', 'red', 'nosuchrim', Object.assign(all8('tulipbed'), { '1,0': 'grass' })), ['bed_s2#red']);
+  });
+  test('마감 있는 칸은 같은 마감의 꽃밭만 안쪽 — 울타리는 빙 둘러 닫힌다 · 마감 없는 칸은 꽃밭이면 다 안쪽', () => {
+    const RING = ['n2', 'e2', 's2', 'w2', 'in_ne', 'in_nw', 'in_se', 'in_sw'];
+    eq(piecesOf('sunflowerbed', '', 'picket', all8('hydrangea')), RING.map(k => 'rim_picket_' + k));          // 마감 없는 밭에 둘러싸여도 말뚝은 사방
+    eq(piecesOf('sunflowerbed', '', 'picket', all8('hydrangea+brick')), RING.map(k => 'rim_picket_' + k));    // 다른 마감도 바깥
+    eq(piecesOf('sunflowerbed', '', 'picket', all8('lavender+picket')), []);                                  // 같은 마감이면 종류가 달라도 한 밭
+    eq(piecesOf('hydrangea', '', '', all8('sunflowerbed+picket')), []);                                       // 마감 없는 칸: 옆 밭 울타리까지 꽃이 닿는다
+    eq(piecesOf('sunflowerbed', '', 'picket', Object.assign(all8('sunflowerbed+picket'), { '-1,1': 'hydrangea' })), ['rim_picket_out_ne']);
+  });
+  test('들꽃 잔디 칸에는 아무 조각도 없다 · 돌 칸은 들꽃 잔디 쪽으로 잔디가 번진다 · 꽃밭 쪽으로는 안 번진다', () => {
+    eq(piecesOf('wildflower', 'snow', ''), []);
+    eq(piecesOf('stone', '', '', Object.assign(all8('stone'), { '0,1': 'wildflower' })), ['fringe_grass_e2']);
+    eq(piecesOf('stone', '', '', Object.assign(all8('stone'), { '0,1': 'tulipbed' })), []);
+  });
+  test('물 칸은 전과 같다 — 물가 8 다음에 잔디 번짐 8', () => eq(piecesOf('water', '', ''),
+    ['n', 'e', 's', 'w', 'in_ne', 'in_nw', 'in_se', 'in_sw'].map(k => 'shore_' + k).concat(['n2', 'e2', 's2', 'w2', 'in_ne', 'in_nw', 'in_se', 'in_sw'].map(k => 'fringe_grass_' + k))));
+  test("물려받은 이름('constructor')은 꽃밭이 아니다", () => eq(R._FLOOR_EDGE_COLOR.constructor, undefined));
 } catch (e) {
   test('정원 바닥 색 코드를 돌릴 수 있다', () => { throw e; });
 }
