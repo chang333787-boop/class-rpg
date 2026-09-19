@@ -2452,6 +2452,65 @@ function whyPlace(x, y, w, h, vw, ceil, up, down) {
     return r; }; }
 window.__whyup = () => { const el = document.getElementById('why'), q = el.getBoundingClientRect(); return { 켜짐: window.VRULES.whyAbove.on, 포인터: WHYUP.type, 보임: el.className === 'show', 말: el.textContent, 자리: [Math.round(q.left), Math.round(q.top), Math.round(q.right), Math.round(q.bottom)], ...WHYUP.stats }; };
 
+/* ── [MAC-GHOST] 놓기 미리보기를 '그 물건의 모양'으로 + 문 앞 표시 (사용자 09-20: "돌리기 해도 건물별로 미리보기가 안 보이는데 이걸 어떻게 알아?") ──
+   미리보기는 초록 상자뿐이었다 — 건물 모양도 문이 어느 쪽인지도 안 보이고, 2×2 처럼 발자국이 정사각인 건물은 돌려도 화면이 전혀 안 바뀌었다.
+   · 고른 종류·방향(·계절)이 **바뀔 때만** partsOf 로 부위를 한 번 합쳐 메시 하나를 만든다(카드 그림 DESIGN-CARDTHUMB 와 같은 식). 프레임마다 다시 만들지 않는다.
+   · 놓을 수 있으면 초록빛, 못 놓으면 붉은빛(원래 상자의 색을 그대로 읽는다). 발자국 테두리 상자(선)는 그대로 둔다 — 몇 칸을 차지하는지는 그쪽이 말한다.
+   · **문 앞 표시**: 문이 있는 건물은 문 앞 줄에 화살표. 그 줄에 길이 있으면 밝은 노랑("문이 길을 보고 있어요"), 없으면 흐린 회색.
+     규칙은 그대로다 — 길은 발자국 **어느 옆**에 닿아도 놓인다(canPlace). 표시는 '문이 어느 쪽인가'를 보일 뿐 놓기를 막지 않는다. 주민은 문 앞(doorFront)에서 드나든다.
+   · 이음류(울타리·담)·꽃밭은 상자 그대로(이웃에 따라 모양이 달라 미리 합칠 수 없다). 치우기·옮기기의 '가리키는 상자'도 그대로.
+   · 모양 묶음은 테두리 상자(ghost.edge)의 **자식**이다 → 상자가 꺼지는 모든 곳(스무 군데쯤)에서 같이 꺼진다. 고리를 더 걸 필요가 없다.
+   draw call: 놓는 동안만 +1(모양 +1 · 문 표시 +1 · 채운 상자 −1). 원래 줄 수정 0 — updateGhost 감싸기. */
+(window.VRULES = window.VRULES || {}).ghostShape = { on: true, opacity: 0.78 };
+const GHOSTS = { key: '', geo: null, door: false, stats: { 만든횟수: 0, 만든ms: 0 } };
+const ghostGroup = new THREE.Group(); ghost.edge.add(ghostGroup);
+const ghostBody = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.78 })); ghostBody.renderOrder = 5; ghostBody.frustumCulled = false; ghostGroup.add(ghostBody);
+const ghostDoor = (() => { const sh = new THREE.Shape(); sh.moveTo(-1.35, 0); sh.lineTo(1.35, 0); sh.lineTo(0, 2.3); sh.closePath();     // 바깥을 가리키는 세모(+z 쪽이 문 앞)
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0xffd84d, transparent: true, opacity: 0.95, depthTest: false, side: THREE.DoubleSide })); m.rotation.x = Math.PI / 2; m.renderOrder = 7; m.frustumCulled = false; ghostGroup.add(m); return m; })();
+function ghostHasDoor(kind, parts) { const k = K[kind]; return !!(k && (k.needRoad || kind === 'house' || (parts || []).some(pt => pt.c === P.doorW))); }
+/* 부위를 한 번 합친다 — 기준 칸 (2,2)에 rot 방향으로 놓인 것처럼 만들고, 발자국 한가운데가 원점이 되게 옮긴다 */
+function ghostBuild(kind, rot) {
+  const t0 = performance.now(), rec = { k: kind, root: idx(2, 2), rot }; let parts; try { parts = partsOf(rec); } catch (e) { parts = K[kind].parts; } if (!parts || !parts.length) return null;
+  const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color(), ctr = centerOf(kind, 2, 2, rot), roofC = ROOFS[(kind.length * 3) % ROOFS.length];
+  parts.forEach(pt => { const base = BASE[pt.g]; if (!base) return; const off = pos.length / 3; partMatrix(kind, 2 + (pt.tx || 0), 2, rot, pt, m); n3.getNormalMatrix(m); const vc = base.vcol, vk = base.vkind;
+    if (!vc) c.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
+    for (let i = 0; i < base.nv; i++) { v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x - ctr.x, v.y, v.z - ctr.z);
+      v.set(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z);
+      if (vc) { const kd = vk[i]; if (kd === 1) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
+      col.push(c.r, c.g, c.b); }
+    for (let i = 0; i < base.idx.length; i++) idxs.push(base.idx[i] + off); });
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(idxs);
+  GHOSTS.stats.만든횟수++; GHOSTS.stats.만든ms = +(GHOSTS.stats.만든ms + performance.now() - t0).toFixed(1);
+  return { geo, door: ghostHasDoor(kind, parts), key0: parts[0].g + ':' + parts.length };
+}
+/* 순수 함수 — 문 앞 줄의 칸들: 발자국 (x,y,w,h) 에서 rot 방향(0:+y · 1:+x · 2:−y · 3:−x — doorFront 와 같은 쪽)으로 한 칸 나간 줄 */
+function ghostFrontCells(x, y, w, h, rot) { const out = []; if (rot === 0) for (let i = 0; i < w; i++) out.push([x + i, y + h]); else if (rot === 2) for (let i = 0; i < w; i++) out.push([x + i, y - 1]); else if (rot === 1) for (let j = 0; j < h; j++) out.push([x + w, y + j]); else for (let j = 0; j < h; j++) out.push([x - 1, y + j]); return out; }
+{ const ghostU0 = updateGhost; updateGhost = function () { const r = ghostU0.apply(this, arguments);
+    const R = window.VRULES.ghostShape, kind = carrying ? carrying.k : sel, rot = carrying ? carrying.rot : selRot;
+    const use = R.on && ghost.edge.visible && kind && K[kind] && hover && !JOIN_KINDS[kind] && !FLOWER_KINDS[kind] && (carrying || (!eraser && !mover)) && !painting;   // 죽 놓는 중엔 전처럼 상자만(방금 놓인 진짜 건물 위에 붉은 모양이 겹친다)
+    if (!use) { ghostGroup.visible = false; return r; }
+    const probe = (() => { try { const p = partsOf({ k: kind, root: idx(2, 2), rot }); return p && p.length ? p[0].g + ':' + p.length : ''; } catch (e) { return ''; } })();   // 모델이 늦게 와 부위가 바뀌면 다시 만든다
+    const key = kind + ':' + rot + ':' + (seasonNow < 0 ? 1 : seasonNow) + ':' + probe;
+    if (key !== GHOSTS.key) { const b = ghostBuild(kind, rot); GHOSTS.key = key; if (GHOSTS.geo) GHOSTS.geo.dispose(); GHOSTS.geo = b ? b.geo : null; GHOSTS.door = !!(b && b.door); if (b) ghostBody.geometry = b.geo; }
+    if (!GHOSTS.geo) { ghostGroup.visible = false; return r; }
+    const s = ghost.edge.scale, ok = ghost.fill.material.color.getHex() === 0x5fc27e; ghost.fill.visible = false; ghostGroup.visible = true;
+    ghostGroup.scale.set(1 / s.x, 1 / s.y, 1 / s.z); ghostGroup.position.set(0, -ghost.edge.position.y / s.y, 0);             // 부모(테두리 상자)의 크기·높이를 되돌려 땅 위 제 크기로
+    ghostBody.material.color.setHex(ok ? 0xd8ffe0 : 0xff9a8f); ghostBody.material.opacity = R.opacity;
+    ghostDoor.visible = GHOSTS.door; if (GHOSTS.door) { const d = dims(kind, rot), front = ghostFrontCells(hover.x, hover.y, d.w, d.h, rot), onRoad = front.some(([x, y]) => inb(x, y) && isRoad(idx(x, y)));
+      const th = rot * Math.PI / 2, dist = (rot % 2 === 0 ? d.h : d.w) * CS / 2 + CS * 0.2; ghostDoor.position.set(Math.sin(th) * dist, 0.22, Math.cos(th) * dist); ghostDoor.rotation.z = -th;
+      ghostDoor.material.color.setHex(onRoad ? 0xffd84d : 0x9aa0ad); ghostDoor.material.opacity = onRoad ? 0.95 : 0.55; GHOSTS.onRoad = onRoad; }
+    return r; }; }
+/* 터치에는 '가리키기'가 없다 — 손가락을 대는 순간 놓인다. 그래서 놓기 전에 방향을 볼 길이 돌리기 단추뿐인데, 단추엔 '90°' 글자만 있었다.
+   돌리면(단추·R 키) 포인터가 판 위에 없을 때 **화면 가운데 칸에 그 방향의 모양을 1.8초** 보여 준다. 포인터가 판 위에 있으면(마우스) 전처럼 그 자리에서 바로 돈다. */
+{ const rot0 = rotate; rotate = function () { const r = rot0.apply(this, arguments); const R = window.VRULES.ghostShape;
+    if (R.on && sel && !carrying && !(hover && ghost.edge.visible)) { const top = document.getElementById('top'), tabs = document.getElementById('trayTabs');
+      const y0 = top ? top.getBoundingClientRect().bottom : 60, y1 = tabs ? tabs.getBoundingClientRect().top : innerHeight; updateGhost(innerWidth / 2, (y0 + y1) / 2); document.getElementById('why').className = '';
+      clearTimeout(GHOSTS.peekT); GHOSTS.peek = true; GHOSTS.peekT = setTimeout(() => { if (GHOSTS.peek && !down) { ghost.fill.visible = ghost.edge.visible = false; } GHOSTS.peek = false; }, 1800); }
+    return r; }; }
+canvas.addEventListener('pointerdown', () => { GHOSTS.peek = false; }, true);   // 판을 누르면 '잠깐 보기'는 끝(그 뒤는 원래 규칙)
+window.__ghost = () => ({ 켜짐: window.VRULES.ghostShape.on, 보임: ghostGroup.visible && ghost.edge.visible, 열쇠: GHOSTS.key, 문표시: ghostDoor.visible && GHOSTS.door, 문이길을봄: !!GHOSTS.onRoad, 삼각형: GHOSTS.geo && GHOSTS.geo.index ? GHOSTS.geo.index.count / 3 : 0, ...GHOSTS.stats });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
