@@ -2885,6 +2885,33 @@ const WORKF = { got: 0, last: 1, stats: { 첫자리: 0, 채우기미룸: 0 } };
 function workRoadWhy(rec) { const R = window.VRULES.workRoad; if (!R || !R.on || !K[rec.k].jobs || roadBeside(rec) >= 0) return ''; WORKF.stats.길없음말 = (WORKF.stats.길없음말 || 0) + 1; return ' — 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요'; }
 window.__workFirst = () => ({ 길필요: window.VRULES.workRoad.on && window.VRULES.workRoad.kinds.filter(k => K[k] && K[k].needRoad), 먼저: !!window.VRULES.jobsHomes.first, 지난바퀴첫자리: WORKF.last, ...WORKF.stats });
 
+/* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
+   가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
+   이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
+   · 불러오는 동안·첫 바퀴·구경 중에는 안 뜬다(MAC-SAY 의 sayLive 와 같은 때만). 한꺼번에 많아도 16개까지.
+   · 그림: 🪣✓ 와 같은 동그라미 + 초록 ✓ · InstancedMesh 하나(표시가 없으면 개수 0 = draw call 0).
+   판정 0 · 저장 0. 원래 줄 수정 0 — jobsHouseStep·sayDraw 감싸기. 스위치 VRULES.jobCheck. */
+(window.VRULES = window.VRULES || {}).jobCheck = { on: true, showMs: 4500, max: 16 };
+const JOBCHK = { marks: [], stats: { 표시: 0 } };
+const jobChkMesh = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#e9f8ec'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '34px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('💼', 30, 37);
+  g.fillStyle = '#2e9d57'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText('✓', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 16); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; })();
+{ const hsC0 = jobsHouseStep; jobsHouseStep = function (rec) { const h = rec.root, R = window.VRULES.jobCheck, a0 = JOBH.asg.get(h);
+    const watch = R.on && JOBH.stats.한바퀴 > 0 && JOBH.lack.has(h) && !(a0 && a0.size) && population() >= JOB_POP && sayLive();
+    const r = hsC0.apply(this, arguments);
+    if (watch) { const a = JOBH.asg.get(h); if (a && a.size) { const c = centerOf('house', cX(h), cY(h), rec.rot); JOBCHK.marks.push({ x: c.x, z: c.z, until: performance.now() + R.showMs });
+      if (JOBCHK.marks.length > R.max) JOBCHK.marks.shift(); JOBCHK.stats.표시++; } }
+    return r; }; }
+function jobChkDraw() { if (!JOBCHK.marks.length && !jobChkMesh.count) return; const now = performance.now(), R = window.VRULES.jobCheck; JOBCHK.marks = JOBCHK.marks.filter(m => m.until > now); let n = 0;
+  JOBCHK.marks.forEach(m => { const age = 1 - (m.until - now) / R.showMs; sayDummy.position.set(m.x, 8.5 + Math.min(1, age * 4) * 1.2, m.z); sayDummy.quaternion.copy(camera.quaternion);
+    const sc = 1 + 0.25 * Math.sin(Math.min(1, age * 3) * Math.PI); sayDummy.scale.set(sc, sc, 1); sayDummy.updateMatrix(); jobChkMesh.setMatrixAt(n++, sayDummy.matrix); });
+  jobChkMesh.count = n; if (n) jobChkMesh.instanceMatrix.needsUpdate = true; }
+{ const sdC0 = sayDraw; sayDraw = function () { const r = sdC0.apply(this, arguments); jobChkDraw(); return r; }; }
+window.__jobCheck = () => ({ 켜짐: window.VRULES.jobCheck.on, 떠있는표시: JOBCHK.marks.length, ...JOBCHK.stats });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;

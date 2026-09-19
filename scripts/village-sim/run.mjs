@@ -17,6 +17,9 @@ const DAY = 1800;   // 틱 · 하루 3분 ÷ 100ms
 
 /* 낮을수록 좋은 지표 — 나머지는 높을수록 좋다 */
 const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:)/.test(k);
+/* 집 말은 필요 이름이 아니라 이 글로 나온다(index.html NEED_TXT) — '배울 곳이 멀어요' → 배움 */
+const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' }, NEED_OF = Object.fromEntries(Object.entries(NEED_TXT).map(([k, v]) => [v, k]));
+const missOf = txt => { const mm = txt.match(/^[^ ]+ (.+?)이 멀어요/); return mm ? mm[1].split('·').map(t => NEED_OF[t] || t) : []; };
 
 /* ─────────────── 한 판(자식 프로세스) ─────────────── */
 function measure(w) {
@@ -33,8 +36,7 @@ function measure(w) {
     if (txt.startsWith('😊')) m.웃는집++; else if (txt.startsWith('😟')) m.찡그린집++;
     if (txt.includes('길이 붐벼요')) m.붐빔집++;
     if (txt.includes('일할 곳이 없어요')) m.일먼집++;
-    const miss = txt.match(/^[^ ]+ (.+?)이 멀어요/);
-    if (miss) miss[1].split('·').forEach(k => { need['없음:' + k] = (need['없음:' + k] || 0) + 1; });
+    missOf(txt).forEach(k => { need['없음:' + k] = (need['없음:' + k] || 0) + 1; });
   });
   m['일닿음%'] = m.사는집 ? Math.round((1 - m.일먼집 / m.사는집) * 1000) / 10 : 100;
   if (typeof w.__stage === 'function') { const st = w.__stage(); if (st.id) { m.판목표 = st.목표.filter(g => g[1]).length; m.판목표수 = st.목표.length; } }
@@ -44,7 +46,7 @@ function measure(w) {
 function housesWith(w, what) {   // @jobs · @crowd · @need:물
   const need = what.startsWith('need:') ? what.slice(5) : null;
   const hit = what === 'jobs' ? t => t.includes('일할 곳이 없어요') : what === 'crowd' ? t => t.includes('길이 붐벼요')
-    : need ? t => { const mm = t.match(/^[^ ]+ (.+?)이 멀어요/); return !!mm && mm[1].split('·').includes(need); } : null;
+    : need ? t => missOf(t).includes(need) : null;
   if (!hit) throw new Error('모르는 자리 @' + what + ' (jobs · crowd · need:<필요>)');
   const out = []; w.__snapshot().물건.forEach(t => { const mm = t.match(/^house@(\d+),(\d+)/); if (mm && hit(w.__houseText(+mm[1], +mm[2]))) out.push([+mm[1], +mm[2]]); });
   return out;
