@@ -5493,7 +5493,7 @@ function syncFolks() {
 const lookStats = { 둘러봄: 0 };
 function actLookTick(f, i, now) {
   const R = window.VRULES.lookAround; if (!R.on || !f.away || !(f.leaving || f.comeback)) return false;
-  if (R.keepBubble) f.away.until = SIM.t + 1500;                        // 풍선을 끄지 않는다 — 사람이 사라지면(마을 밖 · 집 안) 같이 사라진다
+  if (R.keepBubble && (!f.leaving || leaveKeep(f))) f.away.until = SIM.t + 1500;                        // 풍선을 끄지 않는다 — 사람이 사라지면(마을 밖 · 집 안) 같이 사라진다
   if (!f.leaving) return false;
   if (!f.look) { const rec = cells[f.home], c = rec ? centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot) : null;
     f.look = { t0: now, dir0: c ? Math.atan2(c.x - f.x, c.z - f.z) : f.dir }; lookStats.둘러봄++; }
@@ -5502,6 +5502,41 @@ function actLookTick(f, i, now) {
   return true;
 }
 window.__look = () => ({ 켜짐: window.VRULES.lookAround.on, ...lookStats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-LEAVE] '왔다가 그냥 간다'가 길 위에서 보이게 (주민 연기 · 09-20 · 보스 승인 — 인구 정체 조사 docs/village_pop_stall_20260920.md 의 '6초짜리 연기').
+   ⓐ 돌아서 나가는 이웃은 빠진 것 풍선을 띄운 채 마을을 나갈 때까지 간다(ACT-LOOK keepBubble) — 풍선이 화면을 덮지 않게 **동시에 maxBubbles 명까지만**
+      (먼저 돌아선 사람부터 · 넘친 사람은 원래대로 6초 뒤 풍선을 접는다).
+   ⓑ 그 길에서 마주친(nearR 칸 안) 주민 **한 명**이 멈춰 그 사람을 돌아본다(lookMs · 몸 방향은 ACT-GREET 처럼 atan2 로, 지나가는 동안 따라 돈다).
+      나가는 이웃 한 사람에 한 명 · 주민은 **집마다 하루 한 번**. 카메라와 무관(보스: 같은 마을은 늘 같게 움직인다).
+   판정·확률·저장·길찾기 0 · draw call +0. 스위치·수치 VRULES.leaveLook + 고리 둘(tickFolks 한 줄 · ACT-LOOK keepBubble 줄에 leaveKeep).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).leaveLook = { on: true, maxBubbles: 3, nearR: 2, lookMs: 2200 };
+const LEAVE = { tick: -1, keep: [], day: -1, homes: new Set(), stats: { 풍선지님: 0, 풍선접음: 0, 돌아봄: 0 } };
+function leaveKeep(f) {                                                 // 이 사람의 풍선을 마을 밖까지 들고 가나
+  const R = window.VRULES.leaveLook; if (!R.on) return true;
+  if (LEAVE.keep.includes(f)) return true;
+  if (!f.leaveCounted) { f.leaveCounted = true; if (LEAVE.keep.length < R.maxBubbles) { LEAVE.keep.push(f); LEAVE.stats.풍선지님++; return true; } LEAVE.stats.풍선접음++; }
+  return false;
+}
+function actLeaveTick(f, i, now) {
+  const R = window.VRULES.leaveLook;
+  if (LEAVE.tick !== SIM.ticks) { LEAVE.tick = SIM.ticks;               // 틱마다 한 번 — 나간 사람을 빼고, 마주친 주민을 고른다
+    const day = Math.floor(SIM.t / DAY_MS); if (day !== LEAVE.day) { LEAVE.day = day; LEAVE.homes.clear(); }
+    LEAVE.keep = LEAVE.keep.filter(g => g.leaving && folks.includes(g));
+    if (R.on) folks.forEach(g => { if (!g.leaving || g.leaveSeen || g.state !== 'walk' || (g.look && now - g.look.t0 < window.VRULES.lookAround.lookMs)) return;   // 둘러보기가 끝나 걸어 나가는 사람만
+      let best = null, bd = R.nearR * CS + 0.01;
+      folks.forEach(h => { if (h === g || h.visitor || h.arriving || h.leaving || h.comeback || h.leaveLook || h.greet || h.puddle || h.litAsk || h.litCan || h.gap || h.garden || h.look) return;
+        if ((h.state !== 'walk' && h.state !== 'idle') || LEAVE.homes.has(h.home)) return;
+        const d = Math.max(Math.abs(h.x - g.x), Math.abs(h.z - g.z)); if (d < bd) { bd = d; best = h; } });
+      if (best) { g.leaveSeen = true; LEAVE.homes.add(best.home); best.leaveLook = { who: g, until: now + R.lookMs }; LEAVE.stats.돌아봄++; } });
+  }
+  const L = f.leaveLook; if (!L) return false;
+  if (!R.on || now >= L.until || f.goal === 'home' && isNightHour(simHour())) { f.leaveLook = null; return false; }
+  f.walking = false; if (folks.includes(L.who)) f.dir = Math.atan2(L.who.x - f.x, L.who.z - f.z);   // 멈춰 서서 그 사람 쪽으로 — 지나가는 동안 따라 돈다
+  return true;
+}
+window.__leave = () => ({ 켜짐: window.VRULES.leaveLook.on, 지금풍선: LEAVE.keep.length, 지금나감: folks.filter(f => f.leaving).length, 지금돌아봄: folks.filter(f => f.leaveLook).length, ...LEAVE.stats });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-GAP] 끊긴 길 앞의 멈칫 — 길 끝과 길 끝 사이가 한두 칸 비었을 때 (주민 연기 · 09-20 · 창조자의 눈 2회).
@@ -5814,6 +5849,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
     if (actGardenTick(f, i, now, dt)) continue;   // [ACT-GARDEN] 저녁에 정원 문으로 들어가 한 바퀴 · 의자에 앉았다 나온다
     const rec = cells[f.home];
@@ -6521,17 +6557,18 @@ window.__puddle = () => ({ 켜짐: window.VRULES.puddle.on, 지금: PUDDLE.on, �
    [ACT-DAWN] 새벽 첫 불 (주민 연기 · 09-20 · 보스 순서 ②).
    한밤(sleepFrom 시부터 sleepStep 간격 네 무리)에 집집이 창 불을 끈다 → 새벽 earlyH 시에 **맨 먼저 일어나는 집 한두 채**만 창이 켜진다
    → wakeFrom 시부터 다른 집들이 차례로 켠다 → 6시에 먼저 일어난 집 식구가 맨 먼저 나오고 다른 집은 outLag 시간 뒤에.
-   먼저 일어나는 집: 그날 새벽(1~4.5시) 사람 사는 집 가운데 **카메라가 보는 곳에서 가까운 집**부터 칸 번호로 섞어 한두 채(사람 사는 집 20채 넘으면 둘) — 아이가 보는 쪽에서 밤이 끝나게.
+   먼저 일어나는 집: **날짜와 집 번호로만** 정한다(카메라와 무관 — 같은 마을은 어디를 보든 같게) — 사람 사는 집 every 채에 하나꼴(적어도 한 채)이 마을 곳곳에서
+   earlyH 부터 earlyStep 간격 earlySteps 무리로 흩어서 켠다(4:45 · 5:00 · 5:15) — 아이가 어디를 보고 있든 화면 안에 한 집쯤은 걸린다.
    창 빛은 사람 사는 집 창과 같은 aNight(buildChunk 의 lit 한 줄에 dawnLit) — 15분마다 바뀐 집의 청크만 다시 합친다(draw call +0).
    판정·확률·저장 0. 스위치·수치 VRULES.dawn + 고리 셋(buildChunk lit · tickFolks 한 줄 · 집 안 사람 나오기 한 줄).
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).dawn = { on: true, sleepFrom: 23, sleepStep: 0.5, earlyH: 4.6, wakeFrom: 5.5, wakeStep: 0.25, outLag: [0.25, 0.4, 0.55], nearR: 40 };
+(window.VRULES = window.VRULES || {}).dawn = { on: true, sleepFrom: 23, sleepStep: 0.5, earlyH: 4.75, earlyStep: 0.25, earlySteps: 3, every: 8, wakeFrom: 5.5, wakeStep: 0.25, outLag: [0.25, 0.4, 0.55] };
 var DAWN = null;                                                        // var — buildChunk 가 이 블록보다 먼저 불려도 TDZ 없이 '다 켜짐'
 const dawnHash = i => ((i * 2654435761) >>> 0);
 function dawnLit(root) { return !(DAWN && window.VRULES.dawn && window.VRULES.dawn.on && DAWN.asleep.has(root)); }
 function dawnAsleep(root, h) {                                          // 이 집은 지금 자나(시각만으로 — 저장 0)
   const R = window.VRULES.dawn, hh = h < 12 ? h + 24 : h, s = R.sleepFrom + (dawnHash(root) % 4) * R.sleepStep;
-  const w = DAWN.early.has(root) ? R.earlyH : R.wakeFrom + (dawnHash(root + 7) % 3) * R.wakeStep;
+  const w = DAWN.early.has(root) ? R.earlyH + ((dawnHash(root + 11) >>> 16) % R.earlySteps) * R.earlyStep : R.wakeFrom + (dawnHash(root + 7) % 3) * R.wakeStep;
   return hh >= s && hh < w + 24;
 }
 function actDawnTick() {
@@ -6540,10 +6577,10 @@ function actDawnTick() {
   const R = window.VRULES.dawn, h = simHour(), key = R.on ? Math.floor(h * 4) : -2;
   if (key === DAWN.key) return; DAWN.key = key;
   if (R.on && h >= 1 && h < R.earlyH && DAWN.day !== simDay()) {        // 오늘 새벽 먼저 일어날 집 — 한 번
-    DAWN.day = simDay(); const cx = camTarget.x / CS + (W - 1) / 2, cz = camTarget.z / CS + (H - 1) / 2, list = [];
-    res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') list.push([root, Math.hypot(cX(root) - cx, cY(root) - cz)]); });
-    const near = list.filter(a => a[1] <= R.nearR), pool = (near.length ? near : list).sort((a, b) => (dawnHash(a[0] + DAWN.day) % 1000) - (dawnHash(b[0] + DAWN.day) % 1000));
-    DAWN.early = new Set(pool.slice(0, list.length > 20 ? 2 : 1).map(a => a[0])); DAWN.stats.먼저켠집 += DAWN.early.size;
+    DAWN.day = simDay(); const list = [], pick = r => dawnHash(r * 31 + DAWN.day * 977);   // 날짜 + 집 번호만
+    res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') list.push(root); });
+    const early = list.filter(r => (pick(r) >>> 16) % R.every === 0); if (!early.length && list.length) early.push(list.reduce((a, b) => pick(a) >>> 16 <= pick(b) >>> 16 ? a : b));   // 곱셈 해시는 아래 비트가 고르지 않다 — 위 비트로   // 적어도 한 채
+    DAWN.early = new Set(early); DAWN.stats.먼저켠집 += DAWN.early.size;
   }
   const now = new Set(); if (R.on) res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house' && dawnAsleep(root, h)) now.add(root); });
   DAWN.asleep.forEach(r => { if (!now.has(r) && cells[r]) { dirtyChunks.add(chunkOfCell(r)); DAWN.stats.창바꿈++; } });
