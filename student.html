@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260918bsh">
+<link rel="stylesheet" href="./student.css?v=20260920mcc">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -749,8 +749,10 @@
   </div>
 
   <!-- [DECO-ZOOM-1] 확대/축소 — 두 손가락으로도 되고, 이 단추로도 된다(44px 이상) -->
+  <!-- [DECO-SHORT-1] 판 자리보다 길면 왼쪽으로 한 줄 더 접는다(wrap-reverse) — 크롬북 610 높이에서 ＋ 가 윗줄 '집 안으로' 단추를 덮었다 -->
   <div id="if-zoom-col" style="position:absolute;right:10px;bottom:calc(var(--deco-drawer-h, 220px) + 12px);
-    display:flex;flex-direction:column;gap:8px;z-index:9001">
+    display:flex;flex-direction:column;flex-wrap:wrap-reverse;align-content:flex-start;gap:8px;z-index:9001;
+    max-height:max(46px, calc(100% - var(--deco-drawer-h, 220px) - var(--deco-host-top, 60px) - 20px))">
     <button onclick="decoZoomIn()" title="크게" aria-label="크게"
       style="width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
         background:rgba(20,24,32,.88);color:#fff;font-size:20px;font-weight:800;cursor:pointer;font-family:inherit">＋</button>
@@ -952,7 +954,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260920mcb"></script>
+<script src="./student.js?v=20260920mcc"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

@@ -1431,5 +1431,19 @@ body.deco-floor-mode #if-deco-drawer{display:none}
   #if-deco-quick .deco-card .dc-name{display:none}
   .deco-drawer-body{max-height:128px}
 }
+/* ══ 키 작은 화면 (DECO-SHORT-1) — 크롬북 실뷰포트 1366×610 ══
+   서랍(머리줄 46 + 최근 줄 87 + 두 줄 152)이 310px 을 먹어 마당이 240px(화면의 39%)만 보였다.
+   접힌 서랍은 한 줄만(더 보려면 ⌃ 펼치기), 최근 줄은 폰처럼 이름 없이 작게. 펼친 서랍도 마당을 남긴다.
+   (폰 세로 375×667 은 그대로 — min-width 로 뺀다) */
+@media (max-height:700px) and (min-width:700px){
+  .deco-drawer-body{max-height:84px}
+  .deco-drawer.is-open .deco-drawer-body{max-height:40vh}
+  #if-deco-quick .deco-card{min-width:52px!important;padding:.2rem .3rem!important}
+  #if-deco-quick .deco-card .dc-name{display:none}
+}
+/* 폰을 가로로 돌렸을 때(375 높이) — 최근 줄까지 두면 마당이 5px 였다 */
+@media (max-height:450px){
+  #if-deco-quick{display:none!important}
+}
 /* #14 카드 이름: 한 줄 자르기 대신 두 줄까지 */
 #if-deco-inv .deco-card .dc-name{white-space:normal!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.5em}
