@@ -6595,6 +6595,52 @@ function actDawnHold(f, h) {
 }
 window.__dawn = () => DAWN ? { 켜짐: window.VRULES.dawn.on, 시: +simHour().toFixed(2), 잠든집: DAWN.asleep.size, 먼저: [...DAWN.early].map(r => [cX(r), cY(r), dawnAsleep(r, simHour()) ? '잠' : '깸']), ...DAWN.stats } : null;
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-FIREFLY] 반딧불 — 꽃밭·연못을 가꾼 마을에 돌아오는 밤의 선물 (주민 연기 · 09-20 · 보스 순서 ③ · 모양도 이 블록).
+   꽃밭(flower + 색 꽃밭 FLOWER_KINDS)은 붙어 있는 칸끼리(8방향) 한 무리 — 무리마다 서너 마리(small 칸 미만이면 셋, 넘으면 넷), 연못은 하나에 셋.
+   꽃밭·연못이 없는 마을엔 안 나온다. 밤(NIGHT ≥ from)에만 · 비 오는 밤엔 없다 · 지도 보기엔 없다. 모두 합쳐 max 마리까지(칸 번호 순 — 늘 같은 무리).
+   모양: 작은 상자 하나 + 둘레의 옅은 빛 상자(같은 묶음 · 더하기 섞기라 어두운 색 = 옅은 빛 · 톤매핑 없음 · 밤이 짙을수록 밝게) — 무리 가운데 둘레를 천천히 떠다니고(높이 0.8~1.8) 저마다 다른 박자로 깜빡인다.
+   묶음 하나(InstancedMesh) — 밤에만 보여 draw call 낮 +0 · 밤 +1. 무리 찾기는 놓은 것이 바뀔 때만(2초에 한 번까지). 판정·확률·저장 0 · 시간은 화면 시계(시뮬과 무관).
+   스위치·수치 VRULES.firefly + 루프 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).firefly = { on: true, from: 0.55, max: 40, small: 4, flowerN: [3, 4], pondN: 3, size: 0.35, halo: 3.2, color: 0xdcff72, haloColor: 0x2c3a0c, speed: 0.00035 };
+const FLY = { key: '', scanAt: -1e9, list: [], mesh: null, stats: { 무리: 0, 연못: 0, 마리: 0 } };
+const flyIsFlower = k => k === 'flower' || (typeof FLOWER_KINDS === 'object' && !!FLOWER_KINDS[k]);
+function fireflyScan() {                                                // 놓은 것이 바뀌었을 때만 — 열린 구역만 훑는다
+  const R = window.VRULES.firefly, key = placedTotal + ':' + plots.size;
+  if (FLY.key === key || SIM.ticks - FLY.scanAt < 20) return; FLY.scanAt = SIM.ticks; FLY.key = key;
+  const flowers = new Set(), ponds = [];
+  plots.forEach(pk => { const [px, py] = pk.split(',').map(Number);
+    for (let y = py * PLOT; y < Math.min(H, py * PLOT + PLOT); y++) for (let x = px * PLOT; x < Math.min(W, px * PLOT + PLOT); x++) { const i = idx(x, y), r = cells[i]; if (!r || r.root !== i) continue;
+      if (flyIsFlower(r.k)) flowers.add(i); else if (r.k === 'pond') ponds.push(i); } });
+  const groups = [], seen = new Set();
+  [...flowers].sort((a, b) => a - b).forEach(s => { if (seen.has(s)) return; const g = [s]; seen.add(s);
+    for (let q = 0; q < g.length; q++) { const x = cX(g[q]), y = cY(g[q]); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!inb(x + dx, y + dy)) continue; const j = idx(x + dx, y + dy); if (flowers.has(j) && !seen.has(j)) { seen.add(j); g.push(j); } } }
+    groups.push({ x: g.reduce((a, c) => a + wx(cX(c)), 0) / g.length, z: g.reduce((a, c) => a + wz(cY(c)), 0) / g.length, n: g.length < R.small ? R.flowerN[0] : R.flowerN[1], spread: Math.min(2.2, 0.6 + Math.sqrt(g.length) * 0.4) * CS, seed: s }); });
+  ponds.sort((a, b) => a - b).forEach(p => { const r = cells[p], c = centerOf(r.k, cX(p), cY(p), r.rot); groups.push({ x: c.x, z: c.z, n: R.pondN, spread: 1.3 * CS, seed: p, pond: true }); });
+  FLY.list = []; groups.forEach(g => { for (let k = 0; k < g.n && FLY.list.length < R.max; k++) { const h = ((g.seed * 2654435761 + k * 40503) >>> 0);
+    FLY.list.push({ x: g.x, z: g.z, r: g.spread, a: (h >>> 8) % 628 / 100, b: (h >>> 4) % 97 / 10, w: 0.7 + (h >>> 12) % 60 / 100, blink: 2600 + (h >>> 16) % 2400 }); } });
+  FLY.stats.무리 = groups.filter(g => !g.pond).length; FLY.stats.연못 = ponds.length; FLY.stats.마리 = FLY.list.length;
+}
+const flyDummy = new THREE.Object3D(), flyC = new THREE.Color();
+function actFireflyDraw(t) {
+  const R = window.VRULES.firefly;
+  if (!FLY.mesh) { FLY.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }), R.max * 2);
+    FLY.mesh.frustumCulled = false; FLY.mesh.count = 0; FLY.mesh.visible = false; scene.add(FLY.mesh); }
+  const n = NIGHT.value, on = R.on && !EV.rain && !mapMode && n >= R.from;
+  if (R.on) fireflyScan();
+  if (!on || !FLY.list.length) { FLY.mesh.visible = false; return; }
+  FLY.mesh.visible = true; FLY.mesh.material.opacity = Math.min(1, (n - R.from) / (1 - R.from) * 1.6);
+  let k = 0; FLY.list.forEach(f => { if (k >= R.max * 2) return;
+    const s = t * R.speed * f.w, ang = f.a + s, rr = f.r * (0.7 + 0.3 * Math.sin(s * 1.7 + f.b));
+    const blink = 0.35 + 0.65 * Math.max(0, Math.sin((t % f.blink) / f.blink * Math.PI * 2 + f.b));   // 저마다 다른 박자로 켜졌다 흐려졌다
+    flyDummy.position.set(f.x + Math.cos(ang) * rr, 1.3 + Math.sin(s * 2.3 + f.a) * 0.5, f.z + Math.sin(ang) * rr * 0.8);
+    flyDummy.rotation.set(0, 0, 0); flyDummy.scale.setScalar(R.size * blink); flyDummy.updateMatrix(); FLY.mesh.setMatrixAt(k, flyDummy.matrix); FLY.mesh.setColorAt(k++, flyC.setHex(R.color));
+    flyDummy.scale.setScalar(R.size * R.halo * blink); flyDummy.updateMatrix(); FLY.mesh.setMatrixAt(k, flyDummy.matrix); FLY.mesh.setColorAt(k++, flyC.setHex(R.haloColor)); });   // 둘레 빛
+  FLY.mesh.count = k; FLY.mesh.instanceMatrix.needsUpdate = true; if (FLY.mesh.instanceColor) FLY.mesh.instanceColor.needsUpdate = true;
+}
+window.__firefly = () => ({ 켜짐: window.VRULES.firefly.on, 보임: !!(FLY.mesh && FLY.mesh.visible), 비: EV.rain, 밤: +NIGHT.value.toFixed(2), ...FLY.stats });
+
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
 function drawFolks(now) {
@@ -8004,6 +8050,7 @@ function loop() {
   actWellChatDraw(SIM.t + SIM.acc);   // [ACT-WELLCHAT] 아침 우물가에 모인 이웃 — 마주 보고 돌아가며 👋
   actLitterDraw(SIM.t + SIM.acc);   // [ACT-LITTER] 가게 앞 조각 · 🗑️? · 🗑️✓
   actNightCartDraw();   // [ACT-NIGHTCART] 끌려가는 수레
+  actFireflyDraw(performance.now());   // [ACT-FIREFLY] 밤, 꽃밭·연못 곁에 반딧불 서너 마리
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
   followTick(); placeCamera();
