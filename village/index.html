@@ -729,15 +729,23 @@ const K = {
      b 꽃 둔덕(수국) — 겹친 잎 둔덕 위에 큰 꽃 덩이 6~7
      c 들꽃 — 잎 바탕에 같은 색 꽃 무리 두세 덩이
    규칙 필드(need·w·h·g)는 원래 꽃밭과 같게 두었다. cap 만 300(원래 꽃밭 700) — 프로그램 담당이 예산 보고 고칠 것.
-   새 id 5개: flower_hb · flower_tr · flower_ty · flower_wd · flower_wv (palette 는 뒤에 붙는다. 옛 판은 모르는 id 를 건너뛴다)
+   새 id: flower_hb · flower_tr · flower_ty · flower_wd · flower_wv (FLOWER-4) + flower_hy · flower_to · flower_hw · flower_sf · flower_lv · flower_t2 · flower_rb · flower_nt (FLOWER-5) (palette 는 뒤에 붙는다. 옛 판은 모르는 id 를 건너뛴다)
    ══════════════════════════════════════════════════════════════ */
-const FLOWER_KINDS = {
-  flower:    { st:'b', main:0xf0719a, side:0xf7f3ea },                                   // 꽃밭(원래 id) = 분홍 꽃 둔덕
-  flower_hb: { st:'b', main:0x7fa6f0, side:0xb79af0, nm:'파란 꽃밭',   ic:'💠' },
-  flower_tr: { st:'a', main:0xe8534a, side:0xf7f3ea, nm:'튤립밭',      ic:'🌷' },
-  flower_ty: { st:'a', main:0xf6c23e, side:0xef8f4f, nm:'노란 튤립밭', ic:'🌻' },
-  flower_wd: { st:'c', main:0xf7f3ea, side:0xf6c23e, nm:'들꽃밭',      ic:'🌼' },
-  flower_wv: { st:'c', main:0xa583e6, side:0xf0719a, nm:'보라 들꽃밭', ic:'🌺' } };
+const FLOWER_KINDS = {                                 // pop: 그 인구에서 열린다(없으면 처음부터). [DESIGN-FLOWER-5] 뒤로 갈수록 눈에 띄게 특별하다
+  flower:    { st:'b', main:0xf0719a, side:0xf7f3ea },                                   // 꽃밭(원래 id) = 분홍 꽃 둔덕 — 처음부터
+  flower_tr: { st:'a', main:0xe8534a, side:0xf7f3ea, nm:'튤립밭',      ic:'🌷' },          // 처음부터
+  flower_wd: { st:'c', main:0xf7f3ea, side:0xf6c23e, nm:'들꽃밭',      ic:'🌼' },          // 처음부터
+  flower_hy: { st:'b', main:0xf6c23e, side:0xf7f3ea, nm:'노란 꽃밭',   ic:'🌼', pop:10 },
+  flower_ty: { st:'a', main:0xf6c23e, side:0xef8f4f, nm:'노란 튤립밭', ic:'🌻', pop:10 },
+  flower_hb: { st:'b', main:0x7fa6f0, side:0xb79af0, nm:'파란 꽃밭',   ic:'💠', pop:30 },
+  flower_wv: { st:'c', main:0xa583e6, side:0xf0719a, nm:'보라 들꽃밭', ic:'🌺', pop:30 },
+  flower_to: { st:'a', main:0xf08a3c, side:0xf6c23e, nm:'주황 튤립밭', ic:'🌷', pop:30 },
+  flower_hw: { st:'b', main:0xf7f3ea, side:0xbfe6f7, nm:'흰 꽃밭',     ic:'🤍', pop:50 },
+  flower_sf: { st:'d', main:0xf6c23e, side:0x7a5230, nm:'해바라기밭',  ic:'🌻', pop:50 },
+  flower_lv: { st:'e', main:0x9a7fe0, side:0xb9a4ee, nm:'라벤더밭',    ic:'🪻', pop:80 },
+  flower_t2: { st:'a', main:0xe8534a, side:0xf6c23e, nm:'알록달록 튤립밭', ic:'🎪', pop:80, mix:true },          // 꽃마다 두 색이 번갈아
+  flower_rb: { st:'c', main:0xe8534a, side:0xf6c23e, nm:'무지개 들꽃밭', ic:'🌈', pop:120, rainbow:true },        // 무리마다 색이 다르다
+  flower_nt: { st:'b', main:0xfff1b8, side:0xbfe6f7, nm:'달빛 꽃밭',   ic:'🌙', pop:160, glow:true } };           // 밤에 은은히 빛난다(vkind 5)
 Object.keys(FLOWER_KINDS).forEach(id => { const f = FLOWER_KINDS[id]; if (K[id]) return;
   K[id] = { nm: f.nm, ic: f.ic, grp: K.flower.grp, need: K.flower.need, w: 1, h: 1, g: K.flower.g, cap: 300, parts: K.flower.parts }; });   // parts 는 예비(#fb=0 · 모형이 없을 때)
 const countFlowers = () => Object.keys(FLOWER_KINDS).reduce((n, id) => n + countKind(id), 0);
@@ -824,6 +832,11 @@ const amenText = root => { const a = amenOf(root); return a >= 3 ? ' · 나무�
 /* 해금 — 인구 문턱과 열리는 물건 */
 const UNLOCKS = [ { pop:10, kinds:['fountain','pavilion'] }, { pop:30, kinds:['clock','windmill','dream'] }, { pop:50, kinds:['library'] }, { pop:80, kinds:['green','sbridge','station'] }, { pop:120, kinds:['school'] }, { pop:160, kinds:['museum'] } ];   // 47차: 특별 4종은 한 개씩(광장 뒤 곡선)
 const LOCK_POP = {}; UNLOCKS.forEach(u => u.kinds.forEach(k => LOCK_POP[k] = u.pop));
+/* [DESIGN-FLOWER-5] 꽃밭 해금(선생님 09-20: "목표에 따라 해금되는 꽃이 있으면 동기부여가 된다"). 처음엔 세 종만, 나머지는 인구 문턱(= 목표 '인구 N명')에서 열린다.
+   새 장치 0 — 위 UNLOCKS 에 줄을 더할 뿐이라 🔒 카드·'인구 N명이면 열려요'·열릴 때 알림·'이미 놓인 건 열린 것'이 그대로 먹는다.
+   프로그램 담당이 '목표 → 열리는 것' 표를 만들면 FLOWER_KINDS 의 pop 을 그 표로 옮기면 된다. */
+(function flowerUnlocks() { const by = {}; Object.keys(FLOWER_KINDS).forEach(id => { const p = FLOWER_KINDS[id].pop; if (p) (by[p] = by[p] || []).push(id); });
+  Object.keys(by).forEach(p => { UNLOCKS.push({ pop: +p, kinds: by[p] }); by[p].forEach(id => { LOCK_POP[id] = +p; }); }); })();
 const unlocked = new Set();
 function lockedWhy(kind) { const need = LOCK_POP[kind]; if (!need || unlocked.has(kind)) return true; return '인구 ' + need + '명이면 열려요'; }
 function checkUnlocks() {
@@ -1328,7 +1341,8 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
   const lin = h => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
   const LEAF = lin(P.leaf);
   Object.keys(FLOWER_KINDS).forEach((kid, si) => {
-    const style = FLOWER_KINDS[kid].st, MAIN = lin(FLOWER_KINDS[kid].main), SIDE = lin(FLOWER_KINDS[kid].side), set = FLOWER_SETS[kid] = [];
+    const FK = FLOWER_KINDS[kid], style = FK.st, MAIN = lin(FK.main), SIDE = lin(FK.side), set = FLOWER_SETS[kid] = [], PK = FK.glow ? 5 : 0;   // glow: 꽃을 '빛나는 것'(vkind 5)으로 — 밤에 은은히
+    const RAINBOW = [0xe8534a, 0xf6a03c, 0xf6c23e, 0x7fa6f0, 0xa583e6].map(lin);
     for (let vi = 0; vi < FLOWER_VARS; vi++) {
       let s = (0x9e3779b1 ^ Math.imul(vi + 1 + si * 16, 0x85ebca6b)) | 0;
       const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -1357,13 +1371,14 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
       shape([[-HALF, TOP, -HALF], [HALF, TOP, -HALF], [HALF, TOP, HALF], [-HALF, TOP, HALF], [-HALF, 0, -HALF], [HALF, 0, -HALF], [HALF, 0, HALF], [-HALF, 0, HALF]],
             [[0, 1, 2], [0, 2, 3], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]], LEAF, 7);
       const jit = a => (rnd() * 2 - 1) * a;
+      const stalk = (cx, cz, y0, r, h) => { const q = ringAt(cx, y0, cz, r, r, 4, rnd() * TAU); shape([...q, [cx, y0 + h, cz]], [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]], LEAF, 2); };
       if (style === 'a') {
         /* 가지런한 줄화단 — 잎 이랑 3줄(칸을 가로질러 옆 칸과 이어짐) 위에 같은 색 꽃 덩이가 줄 맞춰. 줄 간격 4/3 · 꽃 간격 1 이라 깔면 밭 전체가 한 줄무늬 */
         for (let r = 0; r < 3; r++) {
           const z = -HALF + (r + .5) * (CS / 3);
           shape([[-HALF, TOP, z - .52], [HALF, TOP, z - .52], [HALF, TOP, z + .52], [-HALF, TOP, z + .52], [-HALF, TOP + .38, z - .2], [HALF, TOP + .38, z - .2], [HALF, TOP + .38, z + .2], [-HALF, TOP + .38, z + .2]],
                 [[0, 1, 5], [0, 5, 4], [2, 3, 7], [2, 7, 6], [4, 5, 6], [4, 6, 7]], LEAF, 7);
-          for (let i = 0; i < 4; i++) { const big = .50 + rnd() * .07; dome(-1.5 + i + jit(.05), z + jit(.04), TOP + .30, big * 1.08, big * .86, .50 + rnd() * .12, 6, (r === 1) ? SIDE : MAIN, 0); }
+          for (let i = 0; i < 4; i++) { const big = .50 + rnd() * .07; dome(-1.5 + i + jit(.05), z + jit(.04), TOP + .30, big * 1.08, big * .86, .50 + rnd() * .12, 6, FK.mix ? ((i + r) % 2 ? SIDE : MAIN) : (r === 1) ? SIDE : MAIN, PK); }
         }
       } else if (style === 'b') {
         /* 큰 꽃 몇 송이 + 넉넉한 잎 둔덕 — 둔덕 3개가 겹치고, 그 어깨에 큰 꽃 덩이 6~7(주색 무리 + 곁색 한두 송이). 둔덕은 칸 경계를 조금 넘는다 */
@@ -1372,14 +1387,25 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
         const heads = 6 + (vi & 1);
         for (let i = 0; i < heads; i++) {
           const [mx, mz, mr] = m[i % 3], a = rnd() * TAU, d = mr * (.15 + rnd() * .5), big = i < 2 ? .74 : i < 5 ? .56 : .42;
-          dome(mx + Math.cos(a) * d, mz + Math.sin(a) * d, TOP + .46 + rnd() * .22, big, big * (.9 + rnd() * .15), big * .78, 6, i >= heads - 2 && i % 2 ? SIDE : MAIN, 0);
+          dome(mx + Math.cos(a) * d, mz + Math.sin(a) * d, TOP + .46 + rnd() * .22, big, big * (.9 + rnd() * .15), big * .78, 6, i >= heads - 2 && i % 2 ? SIDE : MAIN, PK);
         }
+      } else if (style === 'd') {
+        /* 해바라기 — 키 큰 밭. 낮은 잎 둔덕 2 + 사람 키쯤 되는 줄기 5 위에 넓적한 노란 꽃판(가운데 갈색). 꽃판이 커서 점으로 안 보인다 */
+        dome(-.8 + jit(.3), .5 + jit(.3), TOP - .04, 1.6, 1.4, .55, 6, LEAF, 7); dome(.9 + jit(.3), -.6 + jit(.3), TOP - .04, 1.4, 1.5, .5, 6, LEAF, 2);
+        const sp = []; for (let t = 0; sp.length < 5 && t < 200; t++) { const x = jit(1.45), z = jit(1.45); if (sp.every(p => Math.hypot(p[0] - x, p[1] - z) > 1.25)) sp.push([x, z]); }
+        sp.forEach(([x, z]) => { const h = 1.35 + rnd() * .5, r = .62 + rnd() * .12; stalk(x, z, TOP, .16, h); dome(x, z, TOP + h - .08, r, r, .16, 6, MAIN, PK); dome(x, z, TOP + h + .02, r * .45, r * .45, .14, 5, SIDE, PK); });
+      } else if (style === 'e') {
+        /* 라벤더 — 보랏빛 물결. 잎 이랑 3줄 위에 굵은 꽃대 4개씩(가늘게 많이 세우면 다시 점박이가 된다). 한 칸 = 한 파장이라 옆 칸과 물결이 이어진다 */
+        for (let r = 0; r < 3; r++) { const z0 = -HALF + (r + .5) * (CS / 3);
+          shape([[-HALF, TOP, z0 - .5], [HALF, TOP, z0 - .5], [HALF, TOP, z0 + .5], [-HALF, TOP, z0 + .5], [-HALF, TOP + .34, z0], [HALF, TOP + .34, z0]], [[0, 1, 5], [0, 5, 4], [2, 3, 4], [2, 4, 5]], LEAF, 7);
+          for (let i = 0; i < 4; i++) { const x = -1.5 + i + jit(.08), z = z0 + Math.sin((x / CS) * TAU) * .22, big = .46 + rnd() * .08; dome(x, z, TOP + .22, big, big * .8, .66 + rnd() * .22, 5, (i + r) % 3 ? MAIN : SIDE, PK); } }
       } else {
         /* 잎 바탕에 색 무리 두세 덩이 — 낮은 둔덕 2개 + 같은 색 꽃이 다닥다닥 붙은 무리(주색 큰 무리 · 곁색 작은 무리 · 가끔 셋째) */
         dome(-.7 + jit(.5), .6 + jit(.5), TOP - .04, 1.7, 1.5, .5, 6, LEAF, 7); dome(.9 + jit(.4), -.8 + jit(.4), TOP - .04, 1.35, 1.5, .42, 6, LEAF, 2);
         const patches = [[jit(.7), jit(.7), 5, MAIN], [0, 0, 3, SIDE]];   // 무리는 크게·수는 적게(작아지면 부스러기가 된다 — 보스·선생님 09-20)
         patches.forEach((p, k) => { if (k) { const a = rnd() * TAU; p[0] = patches[0][0] + Math.cos(a) * (1.9 + rnd() * .4); p[1] = patches[0][1] + Math.sin(a) * (1.9 + rnd() * .4); p[0] = Math.max(-1.6, Math.min(1.6, p[0])); p[1] = Math.max(-1.6, Math.min(1.6, p[1])); } });
-        patches.forEach(([px, pz, n, c]) => { for (let i = 0; i < n; i++) { const a = i ? (i / (n - 1)) * TAU + rnd() * .6 : 0, d = i ? .82 + rnd() * .12 : 0, big = i ? .52 + rnd() * .10 : .70; dome(px + Math.cos(a) * d, pz + Math.sin(a) * d, TOP + .30 + rnd() * .12 + (i ? 0 : .16), big, big, big * .8, 6, c, 0); } });
+        if (FK.rainbow) { patches.push([0, 0, 3, MAIN]); patches.forEach((p, k) => { p[3] = RAINBOW[(vi + k * 2) % RAINBOW.length]; }); const a3 = rnd() * TAU; patches[2][0] = Math.max(-1.5, Math.min(1.5, patches[0][0] - Math.cos(a3) * 1.9)); patches[2][1] = Math.max(-1.5, Math.min(1.5, patches[0][1] - Math.sin(a3) * 1.9)); }
+        patches.forEach(([px, pz, n, c]) => { for (let i = 0; i < n; i++) { const a = i ? (i / (n - 1)) * TAU + rnd() * .6 : 0, d = i ? .82 + rnd() * .12 : 0, big = i ? .52 + rnd() * .10 : .70; dome(px + Math.cos(a) * d, pz + Math.sin(a) * d, TOP + .30 + rnd() * .12 + (i ? 0 : .16), big, big, big * .8, 6, c, PK); } });
       }
       const name = 'fb:' + kid + ':' + vi;
       BASE[name] = { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv: pos.length / 3, vcol: new Float32Array(col), vkind: Uint8Array.from(kind), tri: idx.length / 3 };
