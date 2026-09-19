@@ -8010,22 +8010,30 @@ window.__verify = function () {
    ③ 못 놓는 이유·'여기엔 지울 게 없어요' 말풍선은 포인터가 멈춘 지 4초면 사라진다(움직이면 다시 뜬다). 마우스를 그 자리에 두고 구경하면 게임 시간으로 몇 시간이고 남아 있었다.
    ④ __verify 는 '아직 다시 안 그린 묶음(dirtyChunks)'을 어긋남으로 세지 않는다 — 창이 가려져 rAF 가 0프레임이면 glb 가 늦게 와 dirty 표시만 되고 안 그려져 '어긋난것 108~149'로 나왔다
       (회귀로 오인하기 쉽다). 그 묶음은 건너뛰고 '기다리는묶음'·'창가려짐'을 따로 돌려준다. */
-(window.VRULES = window.VRULES || {}).calm = { on: true, whyMs: 4000, stuckN: 30, stuckMs: 5000 };
-const CALM = { errs: [], seen: new Map(), whyT: 0, bar: false, stats: { 삼킨오류: 0, 덮개: 0, 캡처실패: 0, 말풍선걷음: 0 } };
+/* [MAC-CALM-2] (보스 09-20) 첫 프레임에서 터지는 되풀이 오류는 여전히 빨간 덮개였다 — flushChunks→buildChunk 가 첫 프레임에 던지면 booted 가 영영 안 서서
+   __LOADMS 가 없고, ① 은 '__LOADMS 없음 = 뜨기 전 = 덮개'로 보냈기 때문이다(?dev=1 이 아닌데도 프레임마다 덮개). 이제 덮개는 **?dev=1 과 스위치 끔에서만.**
+   · 뜨기 전 오류: 삼키고, preMs 뒤에도 마을이 안 떴으면 작은 띠 "마을을 여는 데 문제가 생겼어요 — 다시 열기"(로딩 화면 위에).
+   · 되풀이 오류(5초에 30번): 작은 띠 "마을에 잠깐 문제가 생겼어요 — 다시 열면 저장해 둔 데서 이어져요".
+   · 띠가 뜨는 순간 **자동 저장을 멈춘다**(savingOff) — 깨진 상태·덜 열린 빈 마을이 아이의 저장본을 덮지 않게. 마지막으로 잘 저장된 것에서 다시 열린다.
+   이 모듈이 아예 못 도는 오류(문법 오류·첫 줄들의 예외)는 이 블록에 닿기 전이라 원래 덮개 그대로다 — 그건 배포 전에 잡을 몫. */
+(window.VRULES = window.VRULES || {}).calm = { on: true, whyMs: 4000, stuckN: 30, stuckMs: 5000, preMs: 4000 };
+const CALM = { errs: [], seen: new Map(), whyT: 0, preT: 0, bar: false, stats: { 삼킨오류: 0, 덮개: 0, 캡처실패: 0, 말풍선걷음: 0, 뜨기전: 0, 저장멈춤: 0 } };
 { const err0 = window.onerror;
   window.onerror = function (m, src, l, c, e) {
     const R = window.VRULES.calm;
-    if (!R.on || DEV || window.__LOADMS == null) { CALM.stats.덮개++; return err0 ? err0.apply(this, arguments) : false; }
+    if (!R.on || DEV) { CALM.stats.덮개++; return err0 ? err0.apply(this, arguments) : false; }
+    if (window.__LOADMS == null) { CALM.stats.뜨기전++; if (!CALM.preT) CALM.preT = setTimeout(() => { if (window.__LOADMS == null && !CALM.bar) calmBar('open'); }, R.preMs); }   // [MAC-CALM-2]
     const key = String(m) + '@' + l + ':' + c, now = performance.now(); CALM.stats.삼킨오류++;
     if (CALM.errs.length < 20) CALM.errs.push({ 말: String(m), 줄: l, 때: Math.round(now), 더미: e && e.stack ? String(e.stack).split('\n').slice(0, 4).join(' | ') : '' });
     let s = CALM.seen.get(key); if (!s || now - s.t0 > R.stuckMs) { s = { t0: now, n: 0 }; CALM.seen.set(key, s); } s.n++;
-    if (s.n > R.stuckN && !CALM.bar) calmBar();
+    if (s.n > R.stuckN && !CALM.bar) calmBar(window.__LOADMS == null ? 'open' : 'stuck');
     return false;                                                                // 콘솔에는 그대로 찍힌다
   }; }
-function calmBar() {                                                             // 같은 오류가 되풀이된다 = 그림이 멈췄을 수 있다 → 부드럽게 알리고 다시 열 길을 준다(억지 저장은 안 한다 — 자동 저장은 돌고 있었다)
+function calmBar(kind) {                                                             // 같은 오류가 되풀이된다 = 그림이 멈췄을 수 있다 → 부드럽게 알리고 다시 열 길을 준다(억지 저장은 안 한다 — 자동 저장은 돌고 있었다)
   CALM.bar = true; const d = document.createElement('div'); d.id = 'calmBar';
-  d.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:29;background:#1c202af2;border:2px solid #e8b04b;border-radius:14px;padding:10px 14px;color:#e8e6e0;font:800 14px "Malgun Gothic",sans-serif;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px #000a';
-  d.innerHTML = '<span>앗, 마을이 잠깐 멈춘 것 같아요</span>'; const b = document.createElement('button'); b.textContent = '다시 열기';
+  try { clearTimeout(saveTimer); if (!savingOff) { savingOff = true; CALM.stats.저장멈춤++; } } catch (err) { /* 저장 쪽이 아직 안 섰으면(뜨기 전) 멈출 것도 없다 */ }   // [MAC-CALM-2] 깨진 상태를 저장하지 않는다
+  d.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99;max-width:calc(100vw - 24px);box-sizing:border-box;background:#1c202af2;border:2px solid #e8b04b;border-radius:14px;padding:10px 14px;color:#e8e6e0;font:800 14px "Malgun Gothic",sans-serif;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px #000a';
+  d.innerHTML = '<span>' + (kind === 'open' ? '마을을 여는 데 문제가 생겼어요' : '앗, 마을에 잠깐 문제가 생겼어요 — 다시 열면 저장해 둔 데서 이어져요') + '</span>'; const b = document.createElement('button'); b.textContent = '다시 열기';
   b.style.cssText = 'min-height:44px;min-width:96px;border-radius:10px;border:0;background:#e8b04b;color:#1a1d26;font:800 14px "Malgun Gothic",sans-serif;cursor:pointer'; b.onclick = () => location.reload(); d.appendChild(b); document.body.appendChild(d);
 }
 { const cap0 = canvas.setPointerCapture.bind(canvas);
@@ -8039,7 +8047,7 @@ function calmBar() {                                                            
     const keys = [...dirtyChunks], hid = []; keys.forEach(k => { const ch = chunks.get(k); if (ch && ch.built) { ch.built = false; hid.push(ch); } }); dirtyChunks.clear();   // 기다리는 묶음은 이번 검사에서 뺀다
     let r; try { r = verify0.apply(this, arguments); } finally { hid.forEach(ch => { ch.built = true; }); keys.forEach(k => dirtyChunks.add(k)); }
     return { ...r, 기다리는묶음: keys.length, 창가려짐: document.hidden }; }; }
-window.__errors = () => ({ ...CALM.stats, 멈춤알림: CALM.bar, 목록: CALM.errs.slice() });
+window.__errors = () => ({ ...CALM.stats, 멈춤알림: CALM.bar, 저장꺼짐: savingOff, 목록: CALM.errs.slice() });
 function applyOff() {
   if (!OFF.size) return;
   if (OFF.has('folks')) folkPool.forEach(m => m.visible = false);
