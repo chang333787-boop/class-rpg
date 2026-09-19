@@ -2564,6 +2564,7 @@ function buildTray() {
       if (sel === kind) { setMode(null, null); return; }
       setMode(kind, null);
       if (k.needRoad) toast(josa(k.nm, '은', '는') + ' 길에 붙여 놓아요 — 사람이 드나들거든요', true);
+      if (k.needRoad && k.w * k.h >= 4 && kind !== 'house') spotShow(kind, true);   // [MAC-SPOT] 놓을 자리가 0곳이면 말해 준다
       if (k.wide) toast('큰길은 두 명이 나란히 지나가요 — 붐비는 골목을 넓힐 때', true);
     };
     box.appendChild(el);
@@ -2644,6 +2645,7 @@ function simTick() {
   if (++moveTimer >= MOVEIN_EVERY * (population() >= JOB_POP && joblessRatio() > 0.5 ? 2 : 1)) { moveTimer = 0; /* 어른 절반이 일이 없으면 이사가 느리다(F27) */ if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
   satTick(); crowdTick(); eventTick(); visitTick(SIM.t); if ((SIM.ticks % 50) === 0) needsTick(); if ((SIM.ticks % 30) === 0 && !OFF.has('jobs')) jobsTick(); wishTick();
   if ((SIM.ticks % 10) === 0) { goalTick(); plotTick(); }
+  if ((SIM.ticks % 10) === 0) spotTick();   // [MAC-SPOT] 큰 건물이 열렸나
   dayMoveBoost();   // [MAC-DAY] 낮에는 이사 시도를 두 배로(하루 합을 맞춘다)
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 10) === 0) goalTraySync();   // [MAC-GOAL-2] 목표가 목표판에 오르는 순간 트레이도
@@ -2961,6 +2963,56 @@ function newsSeedText(names, flowerNames) { return names.length && names.every(n
     NEWS.q.push({ msg, ok }); if (NEWS.q.length > 6) NEWS.q.shift(); NEWS.stats.줄섬++;   /* 줄은 여섯까지 — 오래 기다린 소식은 버린다 */ if (!NEWS.timer) NEWS.timer = setTimeout(pump, Math.max(0, NEWS.busyUntil - now));
   }; }
 window.__news = () => ({ ...NEWS.stats, 줄: NEWS.q.map(i => i.msg), 낮이사: moveInDaytime(), 시: +simHour().toFixed(1) });
+
+/* ══════════════════════════════════════════════════════════════
+   [MAC-SPOT] 큰 건물이 열리는 순간, 놓을 수 있는 자리를 판 위에 한 번 밝혀 준다 (창조자의 눈 3회 ④)
+   인구 123 에 학교가 열렸는데 길가를 전부 집으로 채워 둬서 놓을 자리가 **마을 전체에 0곳**이었다 — 아이는 왜 안 놓이는지 모른다.
+   · 길에 붙어야 하고 네 칸 이상인 것(가게·놀이터·정자·학교·도서관·기차역·박물관)이 열리면: 놓을 수 있는 자리를 노랗게 8초 밝힌다(가까운 순 12곳).
+   · 한 곳도 없으면: "놓을 자리가 없어요 — 길 끝 빈 땅에 길을 이어 보세요". 그 카드를 고를 때도 같은 검사를 한다(자리가 0곳일 때만 말한다).
+   · 자리 찾기는 순수 함수 spotsFor(열린 구역의 칸을 한 번 훑는다 — 열릴 때·카드를 고를 때만, 매 프레임 0).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).spotHint = { on: true, showMs: 8000, max: 12 };
+const SPOT = { seen: null, until: 0, stats: { 밝힘: 0, 자리없음: 0 } };
+/* 순수 함수 — w×h 발자국을 놓을 수 있는 왼쪽 위 칸들. free(x,y): 빈 칸이고 내 땅인가 · road(x,y): 길인가 */
+function spotsFor(w, h, x0, y0, x1, y1, free, road) {
+  const out = [];
+  for (let y = y0; y + h - 1 <= y1; y++) for (let x = x0; x + w - 1 <= x1; x++) {
+    let ok = true, touch = false;
+    for (let dy = 0; dy < h && ok; dy++) for (let dx = 0; dx < w && ok; dx++) { const px = x + dx, py = y + dy; if (!free(px, py)) { ok = false; break; }
+      if (!touch && (road(px + 1, py) || road(px - 1, py) || road(px, py + 1) || road(px, py - 1))) touch = true; }
+    if (ok && touch) out.push([x, y]);
+  }
+  return out;
+}
+const spotMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffd84d, transparent: true, opacity: .6, depthWrite: false }), 16);   // 풀밭이 초록이라 노랑으로(초록은 안 보였다)
+spotMesh.rotation.x = 0; spotMesh.count = 0; spotMesh.frustumCulled = false; spotMesh.renderOrder = 3; scene.add(spotMesh);
+function spotFind(kind) {
+  const k = K[kind]; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+  plots.forEach(key => { const [px, py] = key.split(',').map(Number); x0 = Math.min(x0, px * PLOT); y0 = Math.min(y0, py * PLOT); x1 = Math.max(x1, px * PLOT + PLOT - 1); y1 = Math.max(y1, py * PLOT + PLOT - 1); });
+  if (x1 < 0) return [];
+  const free = (x, y) => inb(x, y) && !cells[idx(x, y)] && plotOpen(x, y), road = (x, y) => inb(x, y) && isRoad(idx(x, y));
+  return spotsFor(k.w, k.h, x0, y0, Math.min(W - 1, x1), Math.min(H - 1, y1), free, road);
+}
+function spotShow(kind, quietIfAny) {
+  const R = window.VRULES.spotHint; if (!R.on || VISIT.on) return;
+  const k = K[kind], all = spotFind(kind);
+  if (!all.length) { SPOT.stats.자리없음++; toast(josa(k.nm, '을', '를') + ' 놓을 자리가 없어요 — 길 끝 빈 땅에 길을 이어 보세요(길 옆 ' + k.w + '×' + k.h + '칸)'); spotMesh.count = 0; return; }
+  if (quietIfAny) return;
+  const cx = (camTarget.x / CS) + (W - 1) / 2, cy = (camTarget.z / CS) + (H - 1) / 2;
+  all.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
+  const picked = []; all.forEach(p => { if (picked.length < R.max && !picked.some(q => Math.abs(q[0] - p[0]) < k.w + 1 && Math.abs(q[1] - p[1]) < k.h + 1)) picked.push(p); });   // 겹치는 자리는 하나만
+  const d = new THREE.Object3D(); d.rotation.x = -Math.PI / 2;
+  picked.forEach(([x, y], n) => { d.position.set((wx(x) + wx(x + k.w - 1)) / 2, .16, (wz(y) + wz(y + k.h - 1)) / 2); d.scale.set(k.w * CS * .92, k.h * CS * .92, 1); d.updateMatrix(); spotMesh.setMatrixAt(n, d.matrix); });
+  spotMesh.count = picked.length; spotMesh.instanceMatrix.needsUpdate = true; SPOT.until = performance.now() + R.showMs; SPOT.stats.밝힘++;
+}
+function spotTick() {                                                          // 1초마다 — 새로 열린 큰 건물이 있나
+  if (SPOT.until && performance.now() > SPOT.until) { SPOT.until = 0; spotMesh.count = 0; }
+  if (SPOT.seen == null) { SPOT.seen = new Set(unlocked); return; }              // 첫 바퀴(옛 마을을 연 직후)는 조용히
+  const fresh = []; unlocked.forEach(kind => { if (!SPOT.seen.has(kind)) { SPOT.seen.add(kind); fresh.push(kind); } });
+  const big = fresh.filter(kind => K[kind] && K[kind].needRoad && K[kind].w * K[kind].h >= 4); if (big.length) spotShow(big[big.length - 1], false);
+}
+function spotDraw() { if (spotMesh.count) spotMesh.material.opacity = .46 + .22 * Math.sin(performance.now() / 260); }
+window.__spots = kind => ({ 자리: spotFind(kind).length, 밝힌것: spotMesh.count, ...SPOT.stats });
 
 /* 빈 집 하나 골라 주민 하나를 길 먼 끝에서 출발시킨다 */
 function tryMoveIn() {
@@ -5385,6 +5437,7 @@ function loop() {
   if (guard <= 0) SIM.acc = 0;
   whyBubbleTick(SIM.t + SIM.acc);   // [MAC-WHY] 앞 프레임에 뜬 표정에 이유가 있으면 그 자리를 대신한다(표정은 한 프레임만 비친다 — drawFaces 를 두 번 돌리지 않으려고)
   awayDraw(SIM.t + SIM.acc);   // [MAC-AWAY]
+  spotDraw();   // [MAC-SPOT]
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   drawClock(); applyDaylight();
