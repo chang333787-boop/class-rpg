@@ -1,0 +1,4 @@
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<!-- glow 불빛 원 — 해 질 녘·밤에 등불(가로등·석등·집 등불·캠프파이어) 위에 얹는 빛(globalCompositeOperation lighter 권장). 크기·밝기는 코드가. 색: 주소 뒤 #warm(기본) #fire #moon -->
+<style>.a{stop-color:var(--a,#ffe7a0)}.b{stop-color:var(--b,#f2a93b)}#fire:target~g{--a:#ffc27a;--b:#e8612c}#moon:target~g{--a:#e6efff;--b:#7fa3e8}</style><g id="fire"/><g id="moon"/><g><defs><radialGradient id="r"><stop offset="0" class="a" stop-opacity=".9"/><stop offset=".12" class="a" stop-opacity=".62"/><stop offset=".3" class="b" stop-opacity=".32"/><stop offset=".55" class="b" stop-opacity=".12"/><stop offset=".78" class="b" stop-opacity=".035"/><stop offset="1" class="b" stop-opacity="0"/></radialGradient></defs><circle cx="50" cy="50" r="50" fill="url(#r)"/></g>
+</svg>
