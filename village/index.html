@@ -1256,7 +1256,11 @@ const SEASONS = [
 const seasonIdx = () => Math.floor((simDay() - 1) / SEASON_DAYS) % 4;
 let seasonNow = -1;
 const LEAF_KEYS = new Set([P.leaf, P.leafL]);
-function seasonColor(hex) { const S = SEASONS[seasonNow < 0 ? 1 : seasonNow]; return hex === P.leaf ? S.leaf : hex === P.leafL ? S.leafL : hex; }
+/* [DESIGN-LAWN-1] 잔디밭 칸(바탕 7cb944 · 풀잎 8ed455)도 계절을 따른다 — 여름 땅(64a341)에 대한 비율을 그 계절 땅에 곱한다(여름은 그대로, 가을은 누런 풀, 겨울은 눈 덮인 칸) */
+const LAWN_HEX = [0x7cb944, 0x8ed455], _lawnC = {};
+function lawnSeason(hex, S) { const k = hex + ':' + S.ground; if (_lawnC[k] != null) return _lawnC[k]; const g0 = 0x64a341, ch = (h, sh) => (h >> sh) & 255;
+  let out = 0; [16, 8, 0].forEach(sh => { out |= Math.min(255, Math.round(ch(S.ground, sh) * ch(hex, sh) / ch(g0, sh))) << sh; }); return _lawnC[k] = out; }
+function seasonColor(hex) { const S = SEASONS[seasonNow < 0 ? 1 : seasonNow]; return hex === P.leaf ? S.leaf : hex === P.leafL ? S.leafL : LAWN_HEX.includes(hex) ? lawnSeason(hex, S) : hex; }
 const _gc = new THREE.Color(), _tc = new THREE.Color();
 function seasonTick() {
   const si = seasonIdx();
@@ -2730,7 +2734,9 @@ const TAB_ICON = (() => {
     '자연':  svg('<path d="M10.2 13h3.6l.6 9h-4.8z" fill="#9a6f48" ' + o + '/><path d="M12 1.5c3.2 0 5 2.2 5 4.2 2.6.4 4.4 2.5 4.4 5 0 3-2.5 5-5.4 5H8c-2.9 0-5.4-2-5.4-5 0-2.5 1.8-4.6 4.4-5 0-2 1.8-4.2 5-4.2z" fill="#6fb54a" ' + o + '/><circle cx="9" cy="7.6" r="2.4" fill="#86c95e"/><circle cx="14.6" cy="10.4" r="1.9" fill="#86c95e"/>'),   // 나무 — 뭉게 잎 + 굵은 줄기
     '꽃':    svg('<path d="M12 13v9" stroke="#6fb54a" stroke-width="2.2" stroke-linecap="round"/><path d="M12 19c-3 0-5-2-5-4 2.6 0 4.4 1.4 5 4z" fill="#6fb54a" ' + o + '/>'
                + [0, 72, 144, 216, 288].map(a => '<ellipse cx="12" cy="4.6" rx="2.9" ry="3.9" fill="#f0719a" ' + o + ' transform="rotate(' + a + ' 12 9)"/>').join('') + '<circle cx="12" cy="9" r="2.6" fill="#f6c23e" ' + o + '/>'),
-    '꾸밈':  svg([3, 9.5, 16].map(x => '<path d="M' + x + ' 8l2.5-3 2.5 3v13h-5z" fill="#ffffff" ' + o + '/>').join('') + '<path d="M2 10.5h20v2.4H2zM2 16h20v2.4H2z" fill="#f1eee6" ' + o + '/>'),
+    '두르기': svg([3, 9.5, 16].map(x => '<path d="M' + x + ' 8l2.5-3 2.5 3v13h-5z" fill="#ffffff" ' + o + '/>').join('') + '<path d="M2 10.5h20v2.4H2zM2 16h20v2.4H2z" fill="#f1eee6" ' + o + '/>'),   // [DESIGN-TABICON-2] 흰 말뚝 울타리 — 울타리가 두르기로 옮겨 가서 그림도 따라간다
+    '꾸밈':  svg('<path d="M9 20.2h6v2.3H9z" fill="#6e7883" ' + o + '/><path d="M12 20V10.5" stroke="#0f1117" stroke-width="3.4" stroke-linecap="round"/><path d="M12 20V10.5" stroke="#6e7883" stroke-width="1.6"/>'
+               + '<path d="M8.4 5.2h7.2l-1.1 5.6H9.5z" fill="#ffd66b" ' + o + '/><path d="M7.2 5.4 12 1.6l4.8 3.8z" fill="#6e7883" ' + o + '/><path d="M18.2 6.8l2.2-.9M18.4 9.6l2.2.7M5.8 6.8l-2.2-.9M5.6 9.6l-2.2.7" stroke="#ffd66b" stroke-width="1.4" stroke-linecap="round"/>'),   // 가로등 — 꾸밈 탭에 남은 것(가로등·표지판·우편함…)의 얼굴
     '시설':  svg('<path d="M3 9 12 3l9 6z" fill="#d8d3c8" ' + o + '/><path d="M3 20h18v2.5H3z" fill="#9c968b" ' + o + '/><path d="M5 10h2.6v10H5zM10.7 10h2.6v10h-2.6zM16.4 10H19v10h-2.6z" fill="#efeee8" ' + o + '/><circle cx="12" cy="6.6" r="1.2" fill="#e8b04b"/>') };
 })();
 (function tabIcons() {
