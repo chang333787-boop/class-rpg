@@ -470,6 +470,22 @@
       _decoUndoClear(); decoSpaceSet(1); await sleep(200);
     }
 
+    //  ⑩-4 닫은 뒤에는 동물이 걷지 않는다(DECO-ANIM-HIDDEN-1) — 안 보이는 작은 판에 층·타이머가 생기던 것
+    if (typeof _animSyncLayer === 'function') {
+      const timers = () => { let n = 0; _animLayers.forEach(rec => rec.items.forEach(st => { if (st.timer) n++; })); return n; };
+      const keep = CUR.houseDecorations;
+      CUR.houseDecorations = (keep || []).filter(p => p.id !== 'd_y53' && p.id !== 'd_y55').concat([{ id: 'd_y53', area: 'yard', row: 20, col: 6 }, { id: 'd_y55', area: 'yard', row: 21, col: 9 }]);
+      _drawDeco(); await sleep(200);
+      out('열려있을때_동물층', _animLayers.size + '층·타이머 ' + timers());
+      out('열려있을때_동물_걷는다', _animLayers.size === 1 && timers() === 2);
+      closeInteriorFullscreen(); await sleep(300);
+      out('닫은뒤_동물층_0', _animLayers.size === 0 && timers() === 0 && !document.querySelector('.deco-anim'));
+      openInteriorFullscreen(); await sleep(400);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      out('다시열면_동물_돌아옴', _animLayers.size === 1 && timers() === 2);
+      CUR.houseDecorations = keep; _drawDeco(); await sleep(100);
+    }
+
     //  ⑪ 헤엄 장·밭은 공간 1 만·다 썼을 때 어느 공간(DECO-SWIM-1·DECO-PT-3)
     if (typeof _animProbeSwim === 'function') {
       decoSpaceSet(3); await sleep(200);
