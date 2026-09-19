@@ -288,7 +288,9 @@ const P = {
   stoneL:0xd8d3c8, sand:0xe9cfa4, tile:0x79cfd4
 };
 /* 지붕은 집마다 다르게 — 같은 색이 스무 채 서 있으면 그때부터 인공적으로 보인다 */
-const ROOFS = [0xf2889e, 0x79cfd4, 0xf6c667, 0xa89ae0, 0xef9a7a, 0x8fbdf0, 0x8ad39b];
+const ROOFS = [0xd9634f, 0xe98f7a, 0xe8b75a, 0xb9785a, 0xd97a9a, 0xc98a4a, 0xa8667e];   // [DESIGN-LOOK-1] 집 지붕은 따뜻한 계열만(적갈·살구·겨자·밤·장미·호박·자두). 전: 파랑·청록·보라·초록이 섞여 다른 건물 색과 겹쳤다
+/* [DESIGN-LOOK-1] 특별 건물 지붕은 종류마다 한 색 — 칸 자리 돌림(ROOFS)을 쓰지 않는다. 차가운 색이라 따뜻한 집 지붕과 갈린다 */
+const ROOF_FIX = { school: 0x4fb3bf, library: 0x3f6db3, station: 0x5d6b78, museum: 0x9aa3ad };
 
 /* ── 판 ── */
 /* 주소 끝 #w=128,fill=25,people=30 → 판 크기·채움 비율·사람 수를 정해 **재기 위한** 모드.
@@ -636,21 +638,26 @@ const K = {
     { g:'cyl', c:P.metalD, s:[.05,2.0,.05],  p:[1.0,2.78,2.4] },
     { g:'box', c:P.red,    s:[1.15,.18,.72], p:[1.0,1.72,2.4] } ] },
   shop: { jobs:4, nm:'가게', ic:'🏪', grp:'건물', need:'장보기', w:2, h:2, g:120, adv:true, needRoad:true, cap:40,
+    /* [DESIGN-LOOK-1] 가게 = 평지붕 + 앞으로 솟은 빨강 간판벽 + 빨강·흰 줄무늬 차양 + 매대 하나 (09-20 · 보스 채택 시안 R).
+       전: shop.glb(크림 상자 + 갈색 평지붕 + 앞 벽의 작은 차양) — 기본 확대에서 '납작한 집'으로 읽혔다. 카메라가 35° 내려다보니 윤곽(솟은 간판벽)과 줄무늬를 크게.
+       뾰족 박공은 집만 쓴다(원칙). 글자·돈 간판 없음. 상자 16개 = 192△ = 옛 shop.glb 와 같다 · 청크에 합쳐 draw call +0 */
     parts:[
-    { g:'box', c:P.woodD,  s:[6.4,.3,5.6],  p:[0,.15,0] },
-    { g:'box', c:P.cloth,  s:[6.2,3.2,5.4], p:[0,1.7,0] },
-    { g:'box', c:'roof',   s:[6.6,.5,5.8],  p:[0,3.5,0] },
-    { g:'box', c:P.woodD,  s:[5.0,1.1,.26], p:[0,4.25,2.0] },
-    { g:'box', c:P.glow,   s:[4.4,.55,.14], p:[0,4.25,2.16], emis:.5 },
-    { g:'box', c:P.glass,  s:[3.4,1.7,.2],  p:[-.9,1.8,2.72] },
-    { g:'box', c:P.woodD,  s:[3.6,.18,.24], p:[-.9,.85,2.74] },
-    { g:'box', c:P.doorW,  s:[1.4,2.2,.2],  p:[2.0,1.1,2.72] },
-    { g:'box', c:P.red,    s:[6.2,.16,1.9], p:[0,2.86,3.5], rx:-.34 },
-    { g:'box', c:P.cloth,  s:[1.3,.18,1.9], p:[-2.1,2.88,3.5], rx:-.34 },
-    { g:'box', c:P.cloth,  s:[1.3,.18,1.9], p:[0,2.88,3.5],    rx:-.34 },
-    { g:'box', c:P.cloth,  s:[1.3,.18,1.9], p:[2.1,2.88,3.5],  rx:-.34 },
-    { g:'cyl', c:P.woodD,  s:[.11,3.2,.11], p:[-2.95,1.6,4.32] },
-    { g:'cyl', c:P.woodD,  s:[.11,3.2,.11], p:[2.95,1.6,4.32] } ] },
+    { g:'box', c:P.stoneD, s:[6.6,.3,6.0],   p:[0,.15,-.4] },
+    { g:'box', c:0xf6ecd8, s:[6.0,3.4,4.6],  p:[0,1.85,-.8] },            // 벽
+    { g:'box', c:0xd8ccb2, s:[6.3,.35,4.9],  p:[0,3.72,-.8] },            // 평지붕
+    { g:'box', c:P.glass,  s:[3.8,1.9,.12],  p:[-.8,1.75,1.52] },         // 큰 진열창
+    { g:'box', c:P.woodD,  s:[4.0,.2,.2],    p:[-.8,.75,1.56] },
+    { g:'box', c:P.doorW,  s:[1.1,2.1,.14],  p:[2.1,1.15,1.52] },
+    { g:'box', c:P.red,    s:[6.4,1.5,.3],   p:[0,4.6,1.3] },             // 솟은 간판벽(윤곽)
+    { g:'box', c:0xfbf6ec, s:[6.44,.3,.34],  p:[0,5.2,1.3] },
+    { g:'box', c:P.red,    s:[3.0,.7,.3],    p:[0,5.7,1.3] },
+    { g:'box', c:P.red,    s:[1.26,.14,2.2], p:[-2.48,3.0,2.45], rx:.42 }, // 줄무늬 차양 다섯 폭
+    { g:'box', c:0xfbf6ec, s:[1.26,.14,2.2], p:[-1.24,3.0,2.45], rx:.42 },
+    { g:'box', c:P.red,    s:[1.26,.14,2.2], p:[0,3.0,2.45],     rx:.42 },
+    { g:'box', c:0xfbf6ec, s:[1.26,.14,2.2], p:[1.24,3.0,2.45],  rx:.42 },
+    { g:'box', c:P.red,    s:[1.26,.14,2.2], p:[2.48,3.0,2.45],  rx:.42 },
+    { g:'box', c:P.woodD,  s:[1.1,.7,.9],    p:[-2.2,.55,3.3] },          // 매대
+    { g:'box', c:0xf5c542, s:[.95,.22,.75],  p:[-2.2,1.0,3.3] } ] },
   clock: { nm:'시계탑', ic:'🕰️', grp:'키 큰 것', w:1, h:1, g:130, adv:true, cap:40,
     parts:[
     { g:'box', c:P.stoneD, s:[2.7,.5,2.7],  p:[0,.25,0] },
@@ -1820,12 +1827,12 @@ window.__joinGeo = () => Object.fromEntries(Object.keys(BASE).filter(k => k.inde
    ══════════════════════════════════════════════════════════════ */
 const MODEL_URL = './assets/models/';
 const MODEL_B64 = { /* 서버용: 모델은 ./assets/models/*.glb 를 상대 경로로 받는다(54차) */ };
-const GLB_KIND = { house: 'house', tree: 'tree_round', bigtree: 'tree_pine', fruit: 'tree_fruit', shop: 'shop', school: 'school', library: 'library', station: 'station', museum: 'museum', crosswalk: 'crosswalk', treerow: 'treerow', trashcan: 'trashcan', mailbox: 'mailbox', minibench: 'minibench', leafpile: 'leafpile', snowman: 'snowman', well: 'well', fountain: 'fountain', lamp: 'lamp', pond: 'pond', pavilion: 'pavilion', play: 'playground', bench: 'bench' };
+const GLB_KIND = { house: 'house', tree: 'tree_round', bigtree: 'tree_pine', fruit: 'tree_fruit', school: 'school', library: 'library', station: 'station', museum: 'museum', crosswalk: 'crosswalk', treerow: 'treerow', trashcan: 'trashcan', mailbox: 'mailbox', minibench: 'minibench', leafpile: 'leafpile', snowman: 'snowman', well: 'well', fountain: 'fountain', lamp: 'lamp', pond: 'pond', pavilion: 'pavilion', play: 'playground', bench: 'bench' };
 const GLB_PROP = new Set(['well', 'fountain', 'lamp', 'pond', 'pavilion', 'play', 'bench']);
 const GLB_SPECIAL = new Set(['school', 'library', 'station', 'museum']);
 const GLB_STREET = new Set(['crosswalk', 'treerow']);
 const GLB_DECO = new Set(['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman']);   // 길가·계절 장식은 'deco'(59차)   // 길 조각 둘은 'street' 로(58차)   // 특별 4종은 'special' 로 켜고 끈다(57차)   // 물건 7종은 'props' 하나로 켜고 끈다(55차)   // 종류 → 모델(집 2·3층은 partsOf 에서)
-const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_round', 'tree_pine', 'tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'], person: ['person'], shop: ['shop'], props: ['well', 'fountain', 'lamp', 'pond', 'pavilion', 'playground', 'bench'], special: ['school', 'library', 'station', 'museum'], visitor: ['visitor'], street: ['crosswalk', 'treerow'], deco: ['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman'] };
+const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_round', 'tree_pine', 'tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'], person: ['person'], props: ['well', 'fountain', 'lamp', 'pond', 'pavilion', 'playground', 'bench'], special: ['school', 'library', 'station', 'museum'], visitor: ['visitor'], street: ['crosswalk', 'treerow'], deco: ['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman'] };
 const GLB_ON = new Set(HP.glb == null ? ['house', 'tree', 'person', 'shop', 'props', 'special', 'visitor', 'street', 'deco'] : String(HP.glb).split('+').filter(x => x && x !== 'none'));
 if (OFF.has('glb')) GLB_ON.clear();
 const GLB = {};                                       // 모델 이름 → { pos, nrm, idx, nv, vcol, vkind, tri }
@@ -1947,7 +1954,7 @@ function buildChunk(cx, cz) {
   for (let y = z0; y < Math.min(H, z0 + CHUNK); y++) for (let x = x0; x < Math.min(W, x0 + CHUNK); x++) {
     const i = idx(x, y), rec = cells[i];
     if (!rec || rec.root !== i) continue;
-    const k = K[rec.k], roofC = ROOFS[(x * 5 + y * 3) % ROOFS.length];
+    const k = K[rec.k], roofC = ROOF_FIX[rec.k] || ROOFS[(x * 5 + y * 3) % ROOFS.length];
     const parts = partsOf(rec);
     const item = { root: i, k: rec.k, rot: rec.rot, bucket: bucketOf(parts[0]), off: 0 };
     const lit = rec.k === 'house' && (res.get(i) || 0) > 0 && dawnLit(i);   // 사람이 사는 집만 창에 불이 켜진다 · [ACT-DAWN] 잠든 집은 끈다
@@ -2616,7 +2623,7 @@ function ghostHasDoor(kind, parts) { const k = K[kind]; return !!(k && (k.needRo
 /* 부위를 한 번 합친다 — 기준 칸 (2,2)에 rot 방향으로 놓인 것처럼 만들고, 발자국 한가운데가 원점이 되게 옮긴다 */
 function ghostBuild(kind, rot) {
   const t0 = performance.now(), rec = { k: kind, root: idx(2, 2), rot }; let parts; try { parts = partsOf(rec); } catch (e) { parts = K[kind].parts; } if (!parts || !parts.length) return null;
-  const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color(), ctr = centerOf(kind, 2, 2, rot), roofC = ROOFS[(kind.length * 3) % ROOFS.length];
+  const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color(), ctr = centerOf(kind, 2, 2, rot), roofC = ROOF_FIX[kind] || ROOFS[(kind.length * 3) % ROOFS.length];
   parts.forEach(pt => { const base = BASE[pt.g]; if (!base) return; const off = pos.length / 3; partMatrix(kind, 2 + (pt.tx || 0), 2, rot, pt, m); n3.getNormalMatrix(m); const vc = base.vcol, vk = base.vkind;
     if (!vc) c.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
     for (let i = 0; i < base.nv; i++) { v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x - ctr.x, v.y, v.z - ctr.z);
@@ -3526,7 +3533,7 @@ function thumbOf(kind) {
   const t0 = performance.now();
   try {
     const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color();
-    const roofC = ROOFS[(kind.length * 3) % ROOFS.length];
+    const roofC = ROOF_FIX[kind] || ROOFS[(kind.length * 3) % ROOFS.length];
     parts.forEach(pt => {
       const base = BASE[pt.g]; if (!base) return;
       const off = pos.length / 3; partMatrix(kind, x0 + (pt.tx || 0), y0, 0, pt, m); n3.getNormalMatrix(m);
