@@ -3633,6 +3633,25 @@ function syncFolks() {
   if (el) el.textContent = '👥 ' + population() + '명';
 }
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-DOOR] 밤에 이미 자기 집 문 앞에 서 있는 사람은 곧장 들어간다 (주민 연기 · 09-20).
+   구멍: 밤 귀가 규칙(rhythmTick)은 pathTo 로 '집 앞 칸까지 걸을 길'을 잡고, 걸음이 끝나는 순간에만 집에 들인다.
+         그런데 이미 그 칸에 서 있으면 pathTo 가 here === goal 로 끝나 걷는 상태가 안 되고, rhythmTick 은 true 를 돌려줘
+         그 사람은 아침 6시까지 문 앞에 '잠깐 쉬어요'로 서 있었다 — 밤에 이사 온 사람 · 밤에 마을을 연 순간의 모든 주민 · 20시에 마침 문 앞에 멈춰 있던 사람.
+   고침: 판정·확률 없음. 밤 + 서 있음 + 선 칸이 집 앞 칸이면 그 자리에서 집에 든다(걸어서 도착한 사람과 같은 enterPlace · 같은 '귀가' 셈).
+         창의 불은 arrive() 가 주민 수를 올릴 때 이미 켜진다 — 이제 그 창 아래 서 있는 사람이 없다.
+   규칙 모듈 꼴: 스위치 VRULES.doorStep + 함수 하나 + tickFolks 고리 한 줄. 저장 0 · 길찾기 0(BFS 를 부르지 않는다).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).doorStep = { on: true };
+const doorStepStats = { 문앞에서들어감: 0 };
+function actDoorStep(f, i) {
+  if (!window.VRULES.doorStep.on || f.visitor || f.arriving || f.state !== 'idle' || f.base < 0 || !isNightHour(simHour())) return false;
+  if ((f.path ? f.path[f.path.length - 1] : f.base) !== f.base) return false;      // 집 앞 칸에 서 있을 때만 — 다른 데 서 있으면 원래 규칙대로 걸어온다
+  f.goal = 'home'; enterPlace(f, i, f.home, f.base, 1e15); rhythmStats.귀가++; doorStepStats.문앞에서들어감++;
+  return true;
+}
+window.__doorStep = () => ({ 켜짐: window.VRULES.doorStep.on, ...doorStepStats });
+
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
     const rec = cells[f.home];
@@ -3647,6 +3666,7 @@ function tickFolks(dt, now) {
       if (home ? !isNightHour(h) : work ? !isWorkHour(h) : school ? !isSchoolHour(h) : now >= f.inside.until) { leave(f, '나옴'); f.goal = null; }
       continue;
     }
+    if (actDoorStep(f, i)) continue;   // [ACT-DOOR] 밤에 이미 문 앞이면 곧장 집에 든다(아래 rhythmTick 은 '걸어서 닿은' 사람만 들인다)
     if (!f.visitor && rhythmTick(f, i, now) && f.state !== 'walk') continue;
     if (f.state === 'mill' || (f.state !== 'walk' && f.base < 0)) {
       /* 길이 없다 — 집 앞을 오간다. 갇히지도, 허공을 걷지도 않는다. */
