@@ -4370,6 +4370,50 @@ function actLampTick(f, i, now, dt) {
 }
 window.__lampWalk = () => ({ 켜짐: window.VRULES.lampWalk.on, ...LAMPW.stats, 지금종종걸음: folks.filter(f => f.lamp && !f.lamp.lit).length, 지금멈춤: folks.filter(f => f.lamp && SIM.t < f.lamp.until).length });
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-UMB] 우산은 든 사람 손에 — 사람 키 두 배 반 높이에 떠서 따로 놀던 것 (주민 연기 · 09-20 · 창조자의 눈 2회).
+   전: 우산 갓이 땅에서 4.3(사람 모델 키의 두 배 가까이)에 떠 있고, 손잡이가 없고, 걸음을 따라 흔들리지 않았다. 작은 사람(아이) 위에도 어른 높이. 곁에 선 사람(#492)·광장 가장자리 구경꾼에게는 우산이 없거나 엉뚱한 자리에.
+   후: 갓은 **그 사람 머리 바로 위**(모델에서 잰 키 + gap), 손에서 갓까지 **손잡이 막대**, 걸음 흔들림을 같이 탄다, 아이는 아이 높이. 곁에 선 사람·앉은 사람도 우산을 쓴다.
+   원래 drawUmbrellas 는 그대로 두고 바로 뒤에서 같은 묶음(umbrella)을 다시 채운다 — 판정·저장 0. 손잡이 묶음 하나(비 올 때만 · draw call +1).
+   규칙 모듈 꼴: 스위치·수치 VRULES.umbrella + 루프 고리 한 줄. 모양(갓 모양·손잡이 굵기)은 거친 임시 — 디자인 담당에게.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).umbrella = { on: true, gap: 0.35, r: 1.15, h: 0.5, hand: [0.42, 0.1], handY: 0.55, tilt: 0.12 };
+const UMB = { top: 0, parts: null, stats: { 사람키: 0 } };
+const umbStick = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 5), new THREE.MeshLambertMaterial({ color: 0x4a3b2a, flatShading: true }), FOLK_CAP);
+umbStick.count = 0; umbStick.frustumCulled = false; umbStick.castShadow = false; scene.add(umbStick);
+function umbPersonTop() {                                               // 사람 모델의 꼭대기 높이 — 모델이 바뀌면(glb 늦게 옴) 다시 잰다
+  if (UMB.parts === PERSON_PARTS) return UMB.top;
+  let top = 0; PERSON_PARTS.forEach(pt => { const g = pt.geo || GEO[pt.g]; if (!g) return; if (!g.boundingBox) g.computeBoundingBox(); top = Math.max(top, g.boundingBox.max.y * pt.s[1] + pt.p[1]); });
+  UMB.parts = PERSON_PARTS; UMB.top = top || 2.4; UMB.stats.사람키 = +UMB.top.toFixed(2); return UMB.top;
+}
+const umbQ = new THREE.Quaternion(), umbE = new THREE.Euler();
+function actUmbrellaDraw(now) {
+  const R = window.VRULES.umbrella; if (!R.on) return;
+  if (!EV.rain || mapMode || OFF.has('umb')) { umbStick.count = 0; return; }
+  const top = umbPersonTop(), a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), KR = window.VRULES.kid;
+  let n = 0;
+  folks.forEach((f, i) => {
+    let fx, fz, drop = 0, dir = f.dir;
+    if (f.state === 'inside') { if (!f.beside) return; fx = f.beside.x; fz = f.beside.z; drop = f.beside.drop || 0; dir = f.beside.dir; }   // 곁에 선 사람·앉은 사람도 밖이다
+    else if (f.festSpot && f.state === 'idle') { fx = f.festSpot.x; fz = f.festSpot.z; dir = f.festSpot.dir; }
+    else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
+    if (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60)) return;
+    const small = typeof isSmall === 'function' && isSmall(f), k = small && KR ? KR.scale : 1;
+    const walk = f.walking && f.state !== 'inside', bob = walk ? (small && KR ? Math.abs(Math.sin(now / 95 + i)) * KR.hop : Math.abs(Math.sin(now / 150 + i)) * 0.09) : 0;
+    const co = Math.cos(dir), si = Math.sin(dir), hx = R.hand[0] * k, hz = R.hand[1] * k;
+    const sx = fx + hx * co + hz * si, sz = fz - hx * si + hz * co;       // 오른손 자리(발밑 기준으로 줄인 몸에 맞춘다)
+    const y0 = (top * R.handY - drop) * k + bob, y1 = (top + R.gap - drop) * k + bob;
+    folkDummy.position.set(sx, (y0 + y1) / 2, sz); folkDummy.rotation.set(0, 0, 0); folkDummy.scale.set(1, y1 - y0, 1); folkDummy.updateMatrix(); umbStick.setMatrixAt(n, folkDummy.matrix);
+    umbE.set(walk ? -R.tilt : 0, dir, 0, 'YXZ'); umbQ.setFromEuler(umbE);                   // 걸을 땐 갓이 앞으로 살짝 기운다
+    folkDummy.position.set((fx + sx) / 2, y1 + R.h * k / 2, (fz + sz) / 2); folkDummy.quaternion.copy(umbQ); folkDummy.scale.set(R.r * k, R.h * k, R.r * k); folkDummy.updateMatrix();
+    umbrella.setMatrixAt(n, folkDummy.matrix); umbrella.setColorAt(n, folkCol.setHex(UMB_COL[i % 4])); n++;
+  });
+  folkDummy.quaternion.identity();
+  umbrella.count = n; umbStick.count = n;
+  if (n) { umbrella.instanceMatrix.needsUpdate = true; if (umbrella.instanceColor) umbrella.instanceColor.needsUpdate = true; umbStick.instanceMatrix.needsUpdate = true; }
+}
+window.__umbrella = () => ({ 켜짐: window.VRULES.umbrella.on, 비: EV.rain, 우산: umbrella.count, 손잡이: umbStick.count, ...UMB.stats, 갓높이: +((UMB.top || 0) + window.VRULES.umbrella.gap).toFixed(2), 옛갓높이: 4.3 });
+
 function syncFolks() {
   const seen = new Set(), homes = [];
   cells.forEach(rec => {
@@ -6023,6 +6067,7 @@ function loop() {
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
+  actUmbrellaDraw(SIM.t + SIM.acc);   // [ACT-UMB] 우산은 든 사람 머리 위에 · 손잡이 · 아이 높이 · 곁에 선 사람도
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
