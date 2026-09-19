@@ -93,3 +93,19 @@
 - 보스가 정한 그다음 순서(09-20 낮): **① 물 칸 그리기 순서 한 줄**(`_drawFloorSVG`: 지금 바탕→`fringe_grass_*`→`shore_*` 를 **바탕→`shore_*`→`fringe_grass_*`** 로 — 그림 PR #503 과 같은 날 머지) → ② 정원 바닥 연결(본보기 마당 #517 의 연결 규칙 · 한 파일 `#색` → 비트맵 캐시 키에 색) → ③ 마당 안 상점 → ④ 홈에서 마을과 나란히 + 이름 '마당 꾸미기'.
 - 규칙 다시: student.js PR 은 **한 번에 하나** · 머지된 브랜치에 이어 커밋 금지(늘 `origin/main` 에서 새 브랜치) · `git reset --soft origin/main` 금지(그사이 main 이 움직이면 남의 새 파일이 '삭제'로 잡힌다 — 한 번 당했다. 커밋을 합칠 땐 `git reset --soft HEAD~N`).
 - 도구: 실제 터치·실제 마우스 CDP 스크립트는 세션 임시 폴더에만 있다(터치 흉내를 켜면 `Input.dispatchMouseEvent` 가 안 먹는다 — 마우스 시험은 끄고). 성능 재기(§5-7)를 할 때 `scripts/unit/deco-perf/` 로 옮겨 남길 것.
+
+## 9. 09-20 저녁 갱신 — 열린 PR 둘 · 다음 일을 시작할 자리
+
+- 머지됨(추가): #549 오른쪽 클릭 치우기 · #550 worklog.
+- **열린 PR**: **#561 DECO-WATER-ORDER-1**(student.js — 물 칸은 물가 먼저·잔디 번짐 나중 · **#503 과 같은 날 머지**) · **#557 DECO-PERF-METER-1**(scripts 만 — 성능 재기 + main 기준선).
+- 성능 잣대: `node scripts/unit/deco-perf/run.mjs --runs 3`(전/후는 `REPO=<푼 폴더>` 로 **ABAB**). main 기준선(1366×610·CPU 4배): 로그인 665ms · 홈 ~800ms · 꾸미기 첫 그림 ~600ms · 홈까지 112건 2.7MB · 꾸미기 열 때 81건(그림 75건 낱개) · 무거운 마당 끌기 한 프레임 100ms(체크무늬 칠 = 최악) · 장식 1개 ≈ 46.5B. PR 본문에 이 숫자로 전/후를 적는다.
+- 🐞 재면서 찾은 것(아직 안 고침 · 한두 줄): **전체화면을 닫은 뒤에도 동물 걷기 타이머가 돈다.** `closeInteriorFullscreen()` 이 안 보이는 작은 판(`house-topview`)을 다시 그리고 `_drawDeco → _animSyncLayer` 가 거기에 동물 층을 새로 만든다. 고침 안: `_animSyncLayer` 에서 `host.offsetParent === null`(안 보임)이면 `_animStopLayer(hostId)` 하고 돌아가기. 확인은 deco-perf 의 `20번열닫_걷기타이머`(지금 4 → 전체화면이 열려 있을 때 2, 닫혀 있을 때 0 이어야).
+
+### 다음 일 = 정원 바닥 연결 (규칙 원문: `docs/deco_showcase_yard_20260920.md` §1·§4) — 짚을 곳
+1. **저장값 해석 한 곳**: `_floorParse(v) → { name, color, rim }`(`'tulipbed#red+picket'` · 옛 값은 `{name:v}`). 지금 바닥 값을 읽는 곳 = `_drawYard` 의 `_floorCells`·`_yardTypeAt` · `_drawFloorSVG` · `_groundAt`(동물 바닥 묶음 — 꽃밭은 `soft` 로) · `_decoRuleWhy`(물 판정은 `=== 'water'` 라 그대로) · `_paintFloor`/`_decoStrokeApply`(같은 값이면 지우기 — **색·마감까지 같을 때만**).
+2. **그림 이름·변형**: `_FLOOR_VARIANTS` 에 tulipbed 2 · tulipcol 2 · hydrangea 3 · wildflower 4 · sunflowerbed 2 · lavender 2 · daisyfield 3. 파일은 `tile_<이름>_<변형>.svg#<색>` — `_floorImg(name)` 의 캐시 키와 **`_floorBmp` 키(`'f:'+name`)에 색을 넣어야** 한다(같은 파일·다른 색 = 다른 비트맵). `<img src="…svg#red">` 의 `#색` 은 SVG 안 `:target` 방식이라 **이미지마다 따로 로드**된다(색 수만큼 Image 객체).
+3. **가장자리**: 물가 블록을 그대로 본뜬 `bed_*`(마감 없을 때, `#색`)/`rim_<마감>_*`(색 없음). '꽃밭 무리'끼리 맞닿은 변은 안 그린다 · `wildflower` 는 풀(`_floorIsGrass` 에 추가). 순서 = 바탕 → 가장자리/마감 → 물가 → 풀 번짐(#561 이 뒤 둘을 이미 맞췄다).
+4. **옛 캐시 JS 가 새 값을 만나면**: `FLOOR_TILES[값]` 이 없어 잔디 색으로 그린다(깨지지 않음) · 통째 저장이라 값은 보존된다. 단 옛 JS 에서 그 칸을 같은 도구로 칠하면 덮어쓴다 — 받아들일 만함.
+5. **바닥 고르기 화면**: 지금도 폰에서 4줄(146px). 종류가 20 을 넘으니 디자인 담당 시안('흙·돌 / 풀·꽃 / 물' 묶음 + 꽃은 종류 1칸 + 색 점 + 마감)대로 **한 줄 가로 밀기**로 다시 짜야 한다. `student.html` 의 `#if-floor-row` 단추 14개가 인라인이라, 목록을 JS 표(`FLOOR_PICKER`)에서 그리게 바꾸는 '정리' 커밋이 먼저다.
+6. 성능: 가장자리 조각이 늘면 칸당 drawImage 가 더 는다 → deco-perf 의 끌기 한 프레임을 전/후로. 나빠지면 '칸 묶음 굽기'(이웃 서명별 한 장)를 같이.
+- 그 뒤 순서(보스): 마당 안 상점(`buyDeco()` 재사용·구매 즉시 저장·`teacherEdit` 전후) → 홈에서 마을과 나란히 + 이름 '마당 꾸미기' → 지우기 남은 두 조각(§8) → 놓는 방식 1단계 → 농장 1단계 → 서랍 탭·뒤집기·움직임 층.
