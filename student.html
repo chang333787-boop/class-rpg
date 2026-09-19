@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260920mcc">
+<link rel="stylesheet" href="./student.css?v=20260920mcm">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -829,7 +829,11 @@
     <div id="if-deco-drawer" class="deco-drawer" style="flex-shrink:0;background:rgba(0,0,0,.35);border-top:1px solid rgba(255,255,255,.08);
       padding:.4rem .7rem .5rem">
       <div class="deco-drawer-head">
-        <span id="if-inv-label" class="deco-drawer-label">🎒 내 장식품</span>
+        <!-- [DECO-SHOP-1] 마당 안 상점 — 서랍에 탭 하나 더. 상점 카드는 🛒 를 처음 누를 때 만든다 -->
+        <div class="deco-tabs" role="tablist" aria-label="내 것과 상점">
+          <button id="if-deco-tab-own" class="deco-tab is-on" role="tab" aria-selected="true" onclick="decoTab('own')">🎒 내 것</button>
+          <button id="if-deco-tab-shop" class="deco-tab" role="tab" aria-selected="false" onclick="decoTab('shop')">🛒 상점</button>
+        </div>
         <div class="deco-search-wrap">
           <input id="if-deco-search" type="text" enterkeyhint="search" placeholder="🔍 이름으로 찾기" autocomplete="off"
             oninput="decoFindSet('q', this.value)" aria-label="장식 이름으로 찾기">
@@ -838,11 +842,15 @@
         </div>
         <button id="if-deco-scene-only" class="deco-chip is-on" onclick="decoFindSet('sceneOnly')"
           aria-pressed="true">이 장소만</button>
+        <span id="if-deco-gold" class="deco-gold" aria-label="가진 골드">💰 0G</span>
+        <div id="if-deco-buybar" class="deco-buybar" hidden></div>
         <button id="if-deco-expand" class="deco-chip" onclick="decoDrawerToggle()" aria-label="서랍 펼치기">⌃</button>
       </div>
+      <div id="if-deco-kinds" class="deco-kinds" role="group" aria-label="상점 분류"></div>
       <div id="if-deco-quick" class="deco-quick" hidden></div>
       <div id="if-deco-body" class="deco-drawer-body">
         <div id="if-deco-inv" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
+        <div id="if-deco-shop"></div>
         <div id="if-deco-empty" class="deco-empty" hidden></div>
       </div>
     </div>
@@ -954,7 +962,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260920mcl"></script>
+<script src="./student.js?v=20260920mcm"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

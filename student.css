@@ -1380,7 +1380,6 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
    디자인3 실측: 폰 375 에서 서랍에 79종 중 4개만 보였다(줄 높이 120px·1.5줄).
    집 안에서는 마당 전용 62종이 흐리게 그대로 나열돼 17종을 찾으려 62개를 지나쳤다. */
 .deco-drawer-head{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:nowrap}
-.deco-drawer-label{font-size:12px;color:var(--txt3);white-space:nowrap;word-break:keep-all}
 .deco-search-wrap{flex:1;min-width:0;position:relative;display:flex}
 #if-deco-search{flex:1;min-width:0;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.18);
   background:rgba(255,255,255,.06);color:var(--txt);padding:0 36px 0 10px;font-size:14px;font-family:inherit}
@@ -1399,9 +1398,6 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 /* 카드 글자 12px (디자인 시스템 최소) */
 #if-deco-inv .deco-card .dc-name,#if-deco-quick .deco-card .dc-name{font-size:12px!important}
 #if-deco-inv .deco-card .dc-qty,#if-deco-quick .deco-card .dc-qty{font-size:12px!important}
-@media (max-width:420px){
-  .deco-drawer-label{display:none}
-}
 
 /* ══ 꾸미기 공간 1~3 (DECO-SPACE-1) ══ */
 .deco-spaces{display:flex;gap:4px;margin-left:6px}
@@ -1447,3 +1443,73 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 }
 /* #14 카드 이름: 한 줄 자르기 대신 두 줄까지 */
 #if-deco-inv .deco-card .dc-name{white-space:normal!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.5em}
+
+/* ══ 마당 안 상점 (DECO-SHOP-1) — 서랍에 탭 하나 더. 규칙: docs/deco_shop_home_screens_20260920.md ①
+   누르는 것은 전부 44px(탭·칩·사기 단추·✕·찾기). 상점 탭일 때는 서랍에 .is-shop 이 붙는다. */
+.deco-drawer-head .deco-chip,#if-deco-search{height:44px}
+#if-deco-search-clear{width:44px;height:44px;right:0;top:0}
+.deco-tabs{display:flex;flex-shrink:0;border-radius:12px;overflow:hidden;border:1.5px solid rgba(255,255,255,.18)}
+.deco-tab{height:44px;min-width:74px;padding:0 12px;border:0;background:rgba(255,255,255,.06);color:var(--txt2);
+  font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;word-break:keep-all}
+.deco-tab.is-on{background:#d9a441;color:#231c12}
+.deco-gold{flex-shrink:0;display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:20px;white-space:nowrap;
+  background:rgba(255,255,255,.05);border:1px solid rgba(217,164,65,.4);color:#d9a441;font-size:14px;font-weight:800}
+.deco-kinds,#if-deco-shop{display:none}
+.deco-drawer.is-shop .deco-kinds{display:flex;gap:6px;overflow-x:auto;margin-bottom:6px;scrollbar-width:none}
+.deco-kinds::-webkit-scrollbar{display:none}
+.deco-kinds .deco-chip{height:44px}
+.deco-drawer.is-shop #if-deco-shop{display:flex;flex-wrap:wrap;gap:10px .35rem}   /* 줄 사이 10px — 아랫줄의 NEW 알약이 한 줄 서랍 밑으로 비치지 않게 */
+.deco-drawer.is-shop #if-deco-inv,.deco-drawer.is-shop #if-deco-quick,
+.deco-drawer.is-shop #if-deco-empty,.deco-drawer.is-shop #if-deco-scene-only{display:none!important}
+/* 상점 카드 — 크기·모양은 가진 장식 카드와 같다. 죽은 카드는 없다(골드 부족·선물도 눌러서 구경) */
+.deco-scard{position:relative;flex-shrink:0;min-width:64px;max-width:92px;padding:.35rem .45rem;border-radius:10px;text-align:center;
+  cursor:pointer;background:rgba(255,255,255,.05);border:2px dashed rgba(255,255,255,.22);transition:transform .2s}
+.deco-scard .ds-art{height:36px;display:flex;align-items:flex-end;justify-content:center}
+.deco-scard .dc-name{font-size:12px;color:var(--txt2);margin-top:.1rem;line-height:1.2;word-break:keep-all;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.5em}
+.deco-scard .ds-price{font-size:12px;font-weight:800;color:#d9a441;white-space:nowrap}
+.deco-scard .ds-price s{color:var(--txt3);font-weight:400}
+.deco-scard.is-short .ds-art,.deco-scard.is-lock .ds-art{opacity:.5}
+.deco-scard.is-short .ds-price{color:#e57c6e}
+.deco-scard.is-lock .ds-price{color:var(--txt3)}
+.deco-scard.is-gift .ds-art{filter:grayscale(1) brightness(.7);opacity:.75}
+.deco-scard.is-gift .ds-price,.deco-scard.is-free .ds-price{color:#8fd18a}
+.deco-scard.is-sel{border:2px solid #d9a441;background:rgba(217,164,65,.16);transform:scale(1.06)}
+.deco-scard .ds-own{position:absolute;right:-3px;top:-4px;padding:0 5px;border-radius:8px;font-size:11px;font-weight:800;
+  background:rgba(0,0,0,.55);color:var(--txt2);line-height:16px}
+.deco-scard .ds-new{position:absolute;left:-4px;top:-4px;padding:0 5px;border-radius:8px;font-size:10px;font-weight:800;
+  background:#3fbf6a;color:#0d2414;line-height:15px}
+#if-deco-shop .deco-empty{flex:1}
+#if-deco-shop{padding:4px 4px 2px}   /* NEW 알약·골라진 카드의 1.06배가 잘리지 않게 */
+/* 접힌 서랍의 키 — 카드(87)가 줄 단위로 딱 보이게: 두 줄 192 · 키 작은 화면(크롬북) 한 줄 92 · 폰은 가진 장식 줄과 같게. 펼친 서랍(⌃)은 그대로 */
+.deco-drawer.is-shop:not(.is-open) .deco-drawer-body{max-height:192px}
+@media (max-width:480px){ .deco-drawer.is-shop:not(.is-open) .deco-drawer-body{max-height:128px} }
+@media (max-height:700px) and (min-width:700px){ .deco-drawer.is-shop:not(.is-open) .deco-drawer-body{max-height:92px} }
+/* 최근 줄이 비었을 때(hidden) 도 display:flex 가 이겨 점선 한 줄(11px)이 남아 있었다 */
+.deco-quick[hidden]{display:none}
+/* 사기 막대 — 머리 오른쪽(좁은 폭은 머리 아래 한 줄) */
+.deco-buybar{display:flex;align-items:center;gap:6px;min-width:0;flex:0 1 auto;height:44px;padding:0 4px 0 12px;border-radius:12px;
+  border:1.5px solid rgba(217,164,65,.6);background:rgba(20,24,32,.6);color:var(--txt);font-size:13px;font-weight:700}
+.deco-buybar[hidden]{display:none}
+.deco-buybar .db-msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.deco-buybar .db-msg b{color:#d9a441}
+.deco-buybar .db-msg s{color:var(--txt3);font-weight:400}
+.deco-buybar.is-short,.deco-buybar.is-twice,.deco-buybar.is-lock{border-color:rgba(232,150,58,.7)}
+.deco-buybar.is-gift{border-color:rgba(143,209,138,.6)}
+.deco-buybar button{flex-shrink:0;height:44px;border:0;border-radius:10px;font-family:inherit;font-weight:800;cursor:pointer;white-space:nowrap}
+.deco-buybar .db-buy{padding:0 14px;font-size:14px;background:#3fbf6a;color:#0d2414;margin:-1.5px 0}
+.deco-buybar.is-twice .db-buy{background:#e8963a;color:#2a1704}
+.deco-buybar .db-x{width:44px;background:transparent;color:var(--txt2);font-size:16px}
+@media (max-width:900px){
+  .deco-drawer-head{flex-wrap:wrap}
+  .deco-buybar{order:10;flex:1 1 100%}
+  .deco-buybar .db-msg{flex:1}
+}
+@media (max-width:700px){   /* 폰: 첫 줄 = 탭·골드·⌃ / 둘째 줄 = 찾기·이 장소만 */
+  .deco-gold{margin-left:auto}
+  .deco-search-wrap{order:5;flex:1 1 60%}
+  #if-deco-scene-only{order:6}
+}
+/* 산 직후 손끝 그림 — 놓기 전까지만. 누르는 것을 가로막지 않는다 */
+#deco-hand-ghost{position:fixed;left:0;top:0;z-index:9000;pointer-events:none;opacity:.6;will-change:transform;
+  filter:drop-shadow(0 3px 4px rgba(0,0,0,.5))}
