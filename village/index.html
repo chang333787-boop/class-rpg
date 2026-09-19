@@ -2382,6 +2382,7 @@ function act(clientX, clientY) {
     if (who) { FOLLOW.f = who; FOLLOW.until = performance.now() + 6000; toast(folkCard(who), true); return; }   // 카드 + 6초 따라가기(F20)
     const rec = c.inside ? cells[idx(c.x, c.y)] : null;
     if (rec && rec.k === 'sign') { writeSign(rec); return; }
+    if (rec && actGateSay(rec)) return;   // [ACT-GATESAY] 정원 문 — 왜 아무도 안 오나 한 줄
     if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘' + (topSign() ? ' · 가장 많이 읽힌 표지판 「' + topSign().t + '」 ' + topSign().reads + '번' : '') + (topLike() ? ' · 손님이 좋아한 곳: ' + topLike().nm : ''), true); return; }
     if (rec && rec.k === 'dream') {                   // 꿈나무: 꿈을 적거나 본다
       if (VISIT.on) { toast('🌟 ' + (DREAM.text || '(아직 꿈을 안 적었어요)'), true); return; }
@@ -5141,6 +5142,45 @@ function gardenSend(now) {                                              // 그�
 }
 function actGardenText(f) { return f.garden && f.state === 'garden' ? '정원을 한 바퀴 돌아요' : null; }
 window.__garden = () => ({ 켜짐: window.VRULES.gardenVisit.on, ...GARDEN.stats, 곳: GARDEN.list.map(g => ({ 문: [cX(g.gate), cY(g.gate)], 칸: g.region.length, 자갈: g.gravel.length, 의자: !!g.seat, 오늘: g.n })), 지금안에: folks.filter(f => f.garden).length });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-GATESAY] 정원 문을 누르면 '왜 아무도 안 오나' 한 줄 (주민 연기 · 09-20 · 보스 제안 — #546 의 아이 눈높이).
+   아이가 울타리·문·자갈길로 정원을 만들었는데 아무도 안 오면, 까닭(문이 길에 안 닿음 · 울타리가 열림 · 너무 넓음)을 알 길이 없었다.
+   판정은 [ACT-GARDEN] 의 정원 찾기와 같은 규칙을 이 문 하나에 대고 다시 한다(누를 때만 · 저장 0). 열린 곳이 있으면 그 칸을 잠깐 반짝 보여 준다.
+   act() 고리 한 줄(표지판 줄 바로 아래). 규칙 모듈 꼴: VRULES.gateSay.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).gateSay = { on: true, bigCap: 600 };
+function gateDiagnose(gi) {
+  const R = window.VRULES.gardenVisit, x = cX(gi), y = cY(gi); let road = -1, inn = -1, blocked = false;
+  for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || !isRoad(idx(nx, ny))) continue; road = idx(nx, ny);
+    const ox = x - dx, oy = y - dy; if (inb(ox, oy) && gardenWalkable(idx(ox, oy))) { inn = idx(ox, oy); break; } blocked = true; }
+  if (road < 0) return { why: 'noroad' };
+  if (inn < 0) return { why: blocked ? 'blocked' : 'noroad' };
+  const region = [inn], mark = new Set([inn]); let leak = -1;
+  for (let q = 0; q < region.length && leak < 0; q++) { const c = region[q], cx = cX(c), cy = cY(c);
+    for (const [dx, dy] of D4) { const nx = cx + dx, ny = cy + dy; if (!inb(nx, ny) || !plotOpen(nx, ny)) { leak = c; break; } const n = idx(nx, ny); if (mark.has(n) || !gardenWalkable(n)) continue;
+      mark.add(n); region.push(n); if (region.length > window.VRULES.gateSay.bigCap) { leak = n; break; } } }
+  if (leak >= 0) {                                                      // 열린 곳 — 울타리 줄 사이의 빈칸(양옆이 울타리)을 문에서 가까운 것부터 찾아 보여 준다
+    const fence = (xx, yy) => { if (!inb(xx, yy)) return false; const r = cells[idx(xx, yy)]; return !!(r && K[r.k].join && !K[r.k].gate); };
+    let hole = -1, hd = 1e9;
+    region.forEach(c => { const cx = cX(c), cy = cY(c), d = Math.abs(cx - x) + Math.abs(cy - y); if (d > 16 || d >= hd) return;
+      if ((fence(cx - 1, cy) && fence(cx + 1, cy)) || (fence(cx, cy - 1) && fence(cx, cy + 1))) { hd = d; hole = c; } });
+    return { why: 'open', hole };
+  }
+  if (region.length > R.maxCells) return { why: 'big', n: region.length };
+  return { why: 'ok', n: region.length };
+}
+function actGateSay(rec) {
+  if (!window.VRULES.gateSay.on || !rec || !K[rec.k].gate || !window.VRULES.gardenVisit) return false;
+  const d = gateDiagnose(rec.root), g = GARDEN.list.find(x => x.gate === rec.root);
+  if (d.why === 'noroad') toast('🚪 문 앞에 길이 없어서 이웃이 못 들어와요 — 문이 길에 닿게 놓아 주세요');
+  else if (d.why === 'blocked') toast('🚪 문 안쪽이 막혀 있어요 — 문 안쪽 칸을 비우거나 자갈길·잔디를 깔아 주세요');
+  else if (d.why === 'open') { toast('🚪 울타리가 한 군데 열려 있어요 — 빙 둘러 닫혀야 정원이 돼요'); if (d.hole >= 0) sparkle.push({ x: wx(cX(d.hole)), z: wz(cY(d.hole)), until: SIM.t + 2500 }); }
+  else if (d.why === 'big') toast('🚪 울타리 안이 너무 넓어요(' + d.n + '칸) — ' + window.VRULES.gardenVisit.maxCells + '칸 안으로 둘러 주세요');
+  else toast('🌷 정원이에요 · 저녁마다 이웃이 들러요' + (g ? ' · 오늘 ' + g.n + '번' : '') + (g && g.gravel.length ? ' · 자갈길 ' + g.gravel.length + '칸' : ' · 자갈길을 깔면 한 바퀴 돌아요') + (g && g.seat ? ' · 의자에 앉았다 가요' : ' · 의자를 두면 앉았다 가요'), true);
+  return true;
+}
+window.__gateSay = (x, y) => { const r = cells[idx(x, y)]; return r && K[r.k].gate ? gateDiagnose(r.root) : '문 아님'; };
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-DOOR] 밤에 이미 자기 집 문 앞에 서 있는 사람은 곧장 들어간다 (주민 연기 · 09-20).
