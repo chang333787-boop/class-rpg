@@ -61,7 +61,7 @@ node scripts/village-sim/run.mjs --save village/_t/pop167.json --days 2 --seeds 
 |---|---|---|---|
 | 규칙 | `window.VRULES` (스위치 77개 · 파일 곳곳에서 한 줄씩 정의) | 1047~6661 | 판을 **맨 먼저** 읽어 두고, module 끝(부팅 직전)에 `Object.assign` 으로 덮는다 — 한 곳 |
 | 건물 | `K` (322~) · `UNLOCKS` (967) · 트레이 | 322, 967 | 트레이·놓기에서 `쓸것` 밖을 거르고, `UNLOCKS` 를 판 값으로 바꾼다 |
-| 땅 | `W,H` (hash `w=`) · `openPlot` · `PLOT_PER` | 290, 1388~1449 | 시작 구역과 저장본을 판에서 받는다 |
+| 땅 | `W,H` (hash `w=`) · `openPlot` · `PLOT_PER` | 304, 1388~1449 | 시작 구역과 저장본을 판에서 받는다 |
 | 필요 | `NEEDS_BASE` · `LEARN_POP` | 4459 | 판 값 |
 | 목표 | `GOALS` — **목표마다 `ok: () => …` 함수** | 4773~4900 | **여기가 제일 큰 일.** 판 파일은 함수를 못 담는다 → `셈` 세 가지(kind/pop/hook)로 표현한다. 지금 목표도 이 꼴로 옮길 수 있는지 먼저 센다. 못 옮기는 것은 `hook` 이름으로 남긴다 |
 | 저장 | `SAVE_KEY = 'rpg.village.' + SID` | 7935 | 판마다 키를 따로 쓴다(`rpg.village.<sid>.<stage>`). **기본 판은 지금 키 그대로** — 아이들 저장본과 운영 DB는 안 건드린다 |
