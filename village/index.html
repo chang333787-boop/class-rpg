@@ -8134,7 +8134,7 @@ function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된
     if (STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(kind)) { STAGE.stats.막음++; return '이 판에서는 쓰지 않아요'; }
     return cp0.apply(this, arguments); }; }
 { const gt0 = goalTick; goalTick = function () { const r = gt0.apply(this, arguments);
-    if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (STAGE.def.되돌아보기) toast('🎉 ' + STAGE.def.되돌아보기, true); }
+    if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (typeof stageCardEnd === 'function' && window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardEnd('목표'); else if (STAGE.def.되돌아보기) toast('🎉 ' + STAGE.def.되돌아보기, true); }   // [MAC-STAGECARD] 끝 카드
     return r; }; }
 if (STAGE.id) {
   window.VillageSync = null;   // 판은 원격 동기를 쓰지 않는다(저장은 이 기기에만 · 키도 따로)
@@ -9333,8 +9333,92 @@ resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
 if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
 Object.keys(JOIN_KINDS).forEach(id => { DECO[id] = DECO.fence; MAP_COL[id] = JOIN_KINDS[id].fam === 'hedge' ? MAP_COL.bush : JOIN_KINDS[id].fam === 'curb' ? '#c8a08a' : '#efeee8'; });   // [DESIGN-JOIN-1] 주변 가치·미니맵 색(둘 다 나중에 쓰이는 표라 여기서 채워도 된다)
+/* ══════════════════════════════════════════════════════════════
+   [MAC-STAGECARD] 판 카드 — 시작과 끝을 한 틀로 (보스 09-20 · 사회시뮬 흡수 C11 · 수업 판(?stage · 교과 칸 있음)일 때만 · town(자유 놀이)·기본 판은 안 뜸)
+   · 시작: 판 이름·교과(작게) · 🔎 탐구 질문 한 줄 · 🎯 목표 · **첫날 한 장**(찍어 둔다) · [시작] — 그 판을 처음 열 때 한 번.
+   · 끝(판 목표를 다 이룸 · 또는 교사가 주소 끝에 #끝 을 붙여 열 때 · window.__stageEnd()): 같은 틀에 **첫날 ↔ 오늘** 두 장 나란히
+     + 되돌아보기 질문 한 줄 + 관찰 한 줄(새로 생긴 것을 그림으로 — 🏪🏪🏪 · 숫자는 작게) · [닫기].
+     교과 칸: '3~4학년 (2) 지역의 변화'(첫날↔오늘) · '4-2 지역 문제 해결'(되돌아보기).
+   · 사진: 어제의 한 장(ACT-SNAP)의 따로 둔 카메라(snapCam)를 다시 쓴다 — 본 그리기 바로 앞에서 캔버스 구석에만 그려 떠 내고 본 그리기가 덮는다(아이 화면 그대로).
+     첫날과 오늘을 **같은 틀**(가운데·폭·방향을 첫날에 적어 둠)로 찍어야 나란히 볼 수 있다. 가운데 = 첫날 물건들의 가운데, 폭 = 물건이 퍼진 넓이.
+   · 저장: localStorage 'rpg.stagecard.<sid>.<id>'(사진 두 장 · 첫날 물건 수) — 저장본·sync 0 · 모자라면 사진 없이.
+   · 크롬북 1366×610 · 단추 44px · 첫 안내(guide)가 떠 있으면 닫힌 뒤에.
+   원래 줄 수정 2 — [MAC-STAGE] 의 끝 토스트 줄·시작 토스트 줄(카드가 켜져 있으면 카드로). 그 밖엔 actSnapShoot 감싸기 + 이 블록.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).stageCard = { on: true, size: [480, 270], pad: 0.8, maxIcons: 10, roadIcons: 3 };
+const SCARD_IC = { road: '🛣️', avenue: '🛣️', gravel: '🛣️', crosswalk: '🚸' };   // 카드에 늘어놓을 그림 — 길 가족의 ⬜ 는 흰 막대로 보여서
+const SCARD = { rec: null, shoot: null, el: null, stats: { 시작: 0, 끝: 0, 찍음: 0, 사진없음: 0 } };
+const scardKey = () => 'rpg.stagecard.' + SID + '.' + STAGE.id;
+function scardLoad() { if (SCARD.rec) return SCARD.rec; try { SCARD.rec = JSON.parse(localStorage.getItem(scardKey()) || 'null'); } catch (e) {} return SCARD.rec || (SCARD.rec = {}); }
+function scardSave() { try { localStorage.setItem(scardKey(), JSON.stringify(SCARD.rec)); } catch (e) { SCARD.stats.사진없음++; try { const r = { ...SCARD.rec }; if (r.first) r.first = { ...r.first, url: null }; if (r.today) r.today = { ...r.today, url: null }; localStorage.setItem(scardKey(), JSON.stringify(r)); } catch (e2) {} } }
+/* 지금 판의 물건 수(종류별 · 칸이 아니라 물건 하나로) */
+function scardCounts() { const n = {}; cells.forEach((rec, i) => { if (rec && rec.root === i) n[rec.k] = (n[rec.k] || 0) + 1; }); return n; }
+/* 첫날 틀 — 물건들의 가운데와 퍼진 넓이 · 지금 카메라 방향 */
+function scardFrame() { const xs = [], ys = []; cells.forEach((rec, i) => { if (!rec || rec.root !== i) return; const k = K[rec.k]; if (!k || !(k.road || rec.k === 'house' || k.need || k.jobs || k.special)) return; xs.push(cX(i)); ys.push(cY(i)); });   // 집·길·시설만(울타리·나무는 빼고)
+  let x0 = W / 2, x1 = W / 2, y0 = H / 2, y1 = H / 2;
+  if (xs.length) { xs.sort((a, b) => a - b); ys.sort((a, b) => a - b); const q = (a, p) => a[Math.min(a.length - 1, Math.max(0, Math.round(p * (a.length - 1))))]; x0 = q(xs, 0.03); x1 = q(xs, 0.97); y0 = q(ys, 0.03); y1 = q(ys, 0.97); }   // 멀리 떨어진 몇 개는 틀에서 뺀다
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, span = Math.max(12, x1 - x0 + 2, y1 - y0 + 2), off = camera.position.clone().sub(camTarget);
+  return { x: wx(cx - 0.5), z: wz(cy - 0.5), hw: span * CS / 2 * window.VRULES.stageCard.pad, q: camera.quaternion.toArray(), off: off.toArray() }; }
+/* 본 그리기 바로 앞(actSnapShoot 고리) — 따로 둔 카메라(snapCam)로 구석에 그려 떠 낸다 */
+function scardShootNow() { const S = SCARD.shoot; if (!S) return; SCARD.shoot = null; const R = window.VRULES.stageCard, F = S.frame;
+  const dpr = renderer.getPixelRatio(), Wp = R.size[0], Hp = R.size[1], cw = Wp / dpr, chh = Hp / dpr;
+  snapCam.quaternion.fromArray(F.q); snapCam.position.set(F.x, 0, F.z).add(new THREE.Vector3().fromArray(F.off));
+  const hw = F.hw, hh = hw * Hp / Wp; snapCam.left = -hw; snapCam.right = hw; snapCam.top = hh; snapCam.bottom = -hh; snapCam.near = camera.near; snapCam.far = camera.far * 3; snapCam.updateProjectionMatrix(); snapCam.updateMatrixWorld();
+  renderer.getViewport(snapVp); renderer.getScissor(snapSc); const scT = renderer.getScissorTest(), au = renderer.shadowMap.autoUpdate, gv = gridLines.visible;
+  const rv = rain.visible; rain.visible = false;   // 빗방울은 사진에서만 뺀다(첫날·오늘을 나란히 보는 사진)
+  renderer.shadowMap.autoUpdate = false; gridLines.visible = false; renderer.setViewport(0, 0, cw, chh); renderer.setScissor(0, 0, cw, chh); renderer.setScissorTest(true);
+  renderer.render(scene, snapCam); rain.visible = rv;
+  const cv = document.createElement('canvas'); cv.width = Wp; cv.height = Hp; const el = renderer.domElement; try { cv.getContext('2d').drawImage(el, 0, el.height - Hp, Wp, Hp, 0, 0, Wp, Hp); } catch (e) {}
+  renderer.setScissorTest(scT); renderer.setScissor(snapSc); renderer.setViewport(snapVp); renderer.shadowMap.autoUpdate = au; gridLines.visible = gv;
+  SCARD.stats.찍음++; const idle = window.requestIdleCallback || (fn => setTimeout(fn, 60));
+  idle(() => { let url = null; try { url = cv.toDataURL('image/jpeg', 0.75); } catch (e) { SCARD.stats.사진없음++; } S.done(url); }); }
+{ const ss0 = actSnapShoot; actSnapShoot = function () { const r = ss0.apply(this, arguments); if (SCARD.shoot && !mapMode) scardShootNow(); return r; }; }
+/* 카드 그리기 — 한 틀 */
+function scardCss() { if (document.getElementById('stageCardCss')) return; const st = document.createElement('style'); st.id = 'stageCardCss';
+  st.textContent = '#stageCard{position:fixed;inset:0;z-index:22;background:#0f111699;display:flex;align-items:center;justify-content:center;padding:12px}'
+    + '#stageCard .card{background:#1a1d26;border:1px solid #3a4050;border-radius:16px;padding:14px 18px;max-width:min(94vw,720px);max-height:calc(100vh - 24px);overflow:auto;box-shadow:0 12px 40px #000b;font:15px/1.5 "Malgun Gothic",sans-serif;color:#e8e6e0;text-align:center}'
+    + '#stageCard .top{font-size:12px;color:#a8adba;margin-bottom:4px}#stageCard .q{font-size:18px;font-weight:800;color:#ffe9b8;margin:4px 0 8px}'
+    + '#stageCard .goal{font-size:14px;color:#e8b04b;margin:2px 0}#stageCard .pics{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:8px 0}'
+    + '#stageCard figure{margin:0}#stageCard figure img,#stageCard figure .ph{width:min(42vw,320px);aspect-ratio:16/9;border:3px solid #fff;border-radius:6px;background:#222 center/cover;display:block;object-fit:cover}'
+    + '#stageCard figure .ph{display:flex;align-items:center;justify-content:center;font-size:40px;color:#556}#stageCard figcaption{font-size:13px;color:#ffe9b8;font-weight:800;margin-top:3px}'
+    + '#stageCard .see{font-size:16px;margin:6px 0;letter-spacing:1px}#stageCard .see small{font-size:12px;color:#a8adba;letter-spacing:0}#stageCard .cur{font-size:11px;color:#7d8394;margin-top:6px}'
+    + '#stageCard button{background:#e8b04b;color:#1a1d26;border:none;border-radius:10px;min-height:44px;min-width:120px;padding:0 18px;font-size:16px;font-weight:800;cursor:pointer;margin-top:8px}';
+  document.head.appendChild(st); }
+const scardEsc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function scardPic(url, cap) { return '<figure>' + (url ? '<img alt="" src="' + url + '">' : '<div class="ph">📷</div>') + '<figcaption>' + scardEsc(cap) + '</figcaption></figure>'; }
+/* 관찰 한 줄 — 새로 생긴 것을 그림으로(종류별 아이콘을 늘어놓는다 · 많으면 작은 +n) */
+function scardSee(c0, c1) { const R = window.VRULES.stageCard, rows = []; Object.keys(c1).forEach(k => { const d = (c1[k] || 0) - (c0[k] || 0); if (d > 0 && K[k] && K[k].ic) rows.push([k, d]); });
+  rows.sort((a, b) => b[1] - a[1]); if (!rows.length) return '처음 그대로예요';
+  return rows.slice(0, 6).map(([k, d]) => { const road = !!K[k].road, cap = road ? R.roadIcons : R.maxIcons, ic = SCARD_IC[k] || K[k].ic; return ic.repeat(Math.min(d, cap)) + (d > cap ? '<small>+' + (d - cap) + (road ? '칸' : '') + '</small>' : ''); }).join('  '); }
+function scardShow(html, btn, onClose) { scardCss(); scardClose(); const el = document.createElement('div'); el.id = 'stageCard'; el.innerHTML = '<div class="card">' + html + '<div><button type="button">' + btn + '</button></div></div>';
+  el.querySelector('button').onclick = () => { scardClose(); if (onClose) onClose(); }; document.body.appendChild(el); SCARD.el = el; }
+function scardClose() { if (SCARD.el) { SCARD.el.remove(); SCARD.el = null; } }
+function scardTop(extra) { const d = STAGE.def; return '<div class="top">' + scardEsc(d.이름) + (extra ? ' · ' + scardEsc(extra) : '') + '</div>'; }
+function stageCardStart() { const d = STAGE.def, rec = scardLoad(); SCARD.stats.시작++;
+  const goals = STAGE.goals.map(g => '<div class="goal">🎯 ' + scardEsc(g.t) + '</div>').join('');
+  const draw = url => scardShow(scardTop() + '<div class="q">🔎 ' + scardEsc(d.질문 || '') + '</div>' + goals + '<div class="pics">' + scardPic(url, '첫날') + '</div>'
+      + (d.교과 ? '<div class="cur">' + scardEsc(d.교과) + '</div>' : ''), '시작', () => { rec.started = Date.now(); scardSave(); });
+  if (rec.first && rec.first.url) { draw(rec.first.url); return; }
+  draw(null); rec.first = { t: Date.now(), day: simDay(), counts: scardCounts(), pop: population(), frame: scardFrame(), url: null };
+  SCARD.shoot = { frame: rec.first.frame, done: url => { rec.first.url = url; scardSave(); const img = SCARD.el && SCARD.el.querySelector('figure .ph'); if (img && url) img.outerHTML = '<img alt="" src="' + url + '">'; } }; }
+function stageCardEnd(why) { if (!STAGE.def || STAGE.def.교과 == null) return; const d = STAGE.def, rec = scardLoad(); if (why === '목표' && rec.ended) return; SCARD.stats.끝++;   // 한 번 닫은 끝 카드는 목표로는 다시 안 뜬다(교사의 #끝 은 언제나)
+  if (!rec.first) rec.first = { t: Date.now(), day: simDay(), counts: scardCounts(), pop: population(), frame: scardFrame(), url: null };   // 시작 카드 전에 끝(교사가 닫음) — 첫날 사진은 없다
+  const now = scardCounts(), see = scardSee(rec.first.counts || {}, now), pop0 = rec.first.pop || 0, pop1 = population();
+  const html = url => scardTop(why === '목표' ? '🎉 목표를 이뤘어요' : '판을 마쳐요') + '<div class="pics">' + scardPic(rec.first.url, '첫날') + scardPic(url, '오늘') + '</div>'
+    + '<div class="cur">3~4학년 (2) 지역의 변화</div>'
+    + '<div class="see">' + see + ' <small>👥 ' + pop0 + ' → ' + pop1 + '</small></div>'
+    + (d.되돌아보기 ? '<div class="q">💭 ' + scardEsc(d.되돌아보기) + '</div><div class="cur">4-2 지역 문제 해결</div>' : '');
+  scardShow(html(null), '닫기', () => { rec.ended = Date.now(); scardSave(); });
+  SCARD.shoot = { frame: rec.first.frame, done: url => { rec.today = { t: Date.now(), day: simDay(), url }; scardSave(); if (SCARD.el) { const figs = SCARD.el.querySelectorAll('figure'); if (figs[1] && url) figs[1].outerHTML = scardPic(url, '오늘'); } } }; }
+/* 부팅 — 판일 때만. 처음 여는 판이면 시작 카드 · #끝 이면 끝 카드. 첫 안내가 떠 있으면 닫힌 뒤에 */
+/* 자유 놀이 판(교과 없음 · town)엔 카드가 없다 */
+function stageCardBoot() { if (!STAGE.def || VISIT_SID || STAGE.def.교과 == null) return; const endAsk = /(^|,)(끝|end)(,|$)/.test(decodeURIComponent(location.hash.slice(1)));
+  const go = () => { if (GUIDE.on) { setTimeout(go, 800); return; } if (endAsk) stageCardEnd('교사'); else if (!scardLoad().started) stageCardStart(); };
+  setTimeout(go, 600); }
+window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
+window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
-if (STAGE.def) { if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
+if (STAGE.def) { if (window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardBoot(); else if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
 </script>
 </body>
 </html>
