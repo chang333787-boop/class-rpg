@@ -4822,7 +4822,7 @@ window.__umbrella = () => ({ 켜짐: window.VRULES.umbrella.on, 비: EV.rain, �
      · 통이 가까운 가게 — 나온 손님 몇 명(canEvery 명에 한 명)이 통 앞까지 걸어가 pauseMs 멈췄다 간다(버리는 몸짓 · 기쁜 쪽).
    규칙 모듈 꼴: 스위치·수치 VRULES.litter + 고리 세 줄(tickFolks · 루프 · buildChunk). 가게 드나듦은 기존 줄을 안 고치고 f.inside 가 바뀌는 것으로 센다.
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).litter = { on: true, kinds: ['shop'], radius: 4, lo: 5, hi: 12, pieces: [0, 3, 7], cellsMax: 3,   /* pieces = 칸마다(모양 규칙 §6: 1단계 두세 개 · 2단계 예닐곱 개 + 봉지 더미) */ askMs: 2400, pauseMs: 800, canEvery: 3, flashMs: 3000 };
+(window.VRULES = window.VRULES || {}).litter = { on: true, kinds: ['shop'], radius: 4, lo: 5, hi: 10, pieces: [0, 3, 7], cellsMax: 3,   /* pieces = 칸마다(모양 규칙 §6: 1단계 두세 개 · 2단계 예닐곱 개 + 봉지 더미) */ askMs: 2400, pauseMs: 800, canEvery: 3, flashMs: 3000 };
 const LIT = { shops: new Map(), day: -1, key: '', scanAt: -1e9, tick: -1, dirty: true, lastCells: new Set(), pieces: 0, stats: { 가게: 0, 단계1: 0, 단계2: 0, 두리번: 0, 통앞멈춤: 0, 놓자마자줄어듦: 0 } };
 const litCanNear = rec => { const R = window.VRULES.litter, b = roadBeside(rec); if (b < 0) return false; const { reach } = roadBFS(b, undefined, R.radius);
   for (const c of reach) { const x = cX(c), y = cY(c); for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && r.k === 'trashcan') return c; } } return false; };   // 통 옆 길 칸(멈춰 설 자리) 또는 false
@@ -4836,12 +4836,12 @@ function litScan(now) {                                                 // 가�
     s.cells = litCells(rec); const can = litCanNear(rec), had = s.can; s.can = can;
     if (can !== false && had === false && s.stage > 0) { s.stage--; s.flash = now + R.flashMs; LIT.stats.놓자마자줄어듦++; LIT.dirty = true; }   // 놓는 순간 — 한 단계 줄고 ✓
   });
-  LIT.shops.forEach((s, r) => { if (!alive.has(r)) { LIT.shops.delete(r); LIT.dirty = true; } });
+  LIT.shops.forEach((s, r) => { if (!alive.has(r) && !s.fest) { LIT.shops.delete(r); LIT.dirty = true; } });   // s.fest = [ACT-FESTLIT] 축제 다음 날 광장(그 블록이 맡는다)
   LIT.stats.가게 = LIT.shops.size;
 }
 function litMorning() {                                                 // 아침 6시 — 어제 손님으로 단계를 한 칸씩
   const R = window.VRULES.litter; let s1 = 0, s2 = 0;
-  LIT.shops.forEach(s => { s.yday = s.today; s.today = 0;
+  LIT.shops.forEach(s => { if (s.fest) return; s.yday = s.today; s.today = 0;
     const want = s.can !== false ? 0 : s.yday >= R.hi ? 2 : s.yday >= R.lo ? 1 : 0;
     s.stage += Math.sign(want - s.stage); if (s.stage === 1) s1++; if (s.stage === 2) s2++; });
   LIT.stats.단계1 = s1; LIT.stats.단계2 = s2; LIT.dirty = true;
@@ -4920,6 +4920,60 @@ function actLitterDraw(now) {
   litBubble.forEach((b, k) => { b.count = cnt[k]; if (cnt[k]) b.instanceMatrix.needsUpdate = true; });
 }
 window.__litter = () => ({ 켜짐: window.VRULES.litter.on, ...LIT.stats, 가게별: [...LIT.shops].map(([r, s]) => ({ 곳: [cX(r), cY(r)], 오늘: s.today, 어제: s.yday, 단계: s.stage, 통: s.can !== false })), 조각칸: LIT.lastCells.size, 조각: [...LIT.lastCells].reduce((n, c) => { let k = 0; LIT.shops.forEach(s => { const ci = (s.cells || []).indexOf(c); if (ci >= 0 && s.stage) k = litPieces(c, ci, s.stage).length; }); return n + k; }, 0) });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-FESTLIT] 축제 다음 날 광장 — 아무도 탓하지 않는 쓰레기, 그날 안에 저절로 (주민 연기 · 09-20 · 보스 승인 ④ · 창조자의 눈 1회 🟢5 의 상상).
+   축제 날(광장이 있고 7일째마다) 광장에 모인 사람을 센다(광장에 든 사람 + 가장자리 구경꾼 · 서로 다른 사람). 다음 날 아침 그 수로
+     ≥ lo → 1단계 · ≥ hi → 2단계 조각이 광장 칸 몇 곳에 생긴다([ACT-LITTER] 의 표·그림을 그대로 — 길 청크 기하에 합침 · draw call +0).
+   · 탓하지 않는다: 🗑️? 두리번 없음 · 쓰레기통 판정 없음(통이 있어도 잔치 뒤엔 남는다).
+   · 치운다: tidyAt 시각마다 광장 가까이 쉬던 주민 하나가 광장 앞까지 걸어가 잠깐 멈춘다 → 한 단계 줄고, 다 치우면 광장 위에 ✨.
+     아무도 못 오면 clearH 에 저절로 0. 판정(만족·이사·목표)에 0 · 확률 0 · 저장 0.
+   규칙 모듈 꼴: 스위치·수치 VRULES.festLitter + tickFolks 고리 한 줄. [ACT-LITTER] 안에 두 줄(찾기·아침 규칙이 이 항목을 건너뛴다).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).festLitter = { on: true, lo: 3, hi: 10, cellsMax: 4, tidyAt: [8, 10.5], tryH: 1.5, clearH: 14, seekR: 14 };
+const FESTLIT = { tick: -1, festDay: -1, root: -1, seen: new Set(), lastDay: -1, stats: { 축제: 0, 모인사람: 0, 단계: 0, 치우러감: 0, 치움: 0, 저절로: 0 } };
+function festLitCells(rec) { const R = window.VRULES.festLitter, fp = footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot), n = fp.length, pick = [0, n - 1, (n / 2) | 0, (n / 3) | 0, n - 1 - ((n / 3) | 0)];
+  return [...new Set(pick)].slice(0, R.cellsMax).map(k => idx(fp[k][0], fp[k][1])); }   // 광장 발자국의 모퉁이·가운데 몇 칸
+function festTidySend(s, root, now) {                                   // 광장 가까이 쉬던 주민 하나를 광장 앞 길 칸으로
+  const R = window.VRULES.festLitter, rec = cells[root]; if (!rec || pathBudget <= 1) return false;
+  const b = roadBeside(rec); if (b < 0) return false;
+  pathBudget--; const near = new Set(roadBFS(b, undefined, R.seekR).reach);
+  let best = null, bi = -1, bd = 1e9;
+  folks.forEach((f, i) => { if (f.visitor || f.arriving || f.state !== 'idle' || f.goal || f.litCan || f.litAsk || f.garden || f.greet || f.gap || f.carry || !f.path) return;
+    const at = f.path[f.path.length - 1]; if (!near.has(at)) return; const d = Math.abs(cX(at) - cX(b)) + Math.abs(cY(at) - cY(b)); if (d < bd) { bd = d; best = f; bi = i; } });
+  if (!best) return false;
+  pathBudget--; const c = centerOf(rec.k, cX(root), cY(root), rec.rot), here = best.path[best.path.length - 1];
+  if (here !== b && !pathTo(best, bi, b)) return false;
+  best.litCan = { cell: b, dir: Math.atan2(c.x - wx(cX(b)), c.z - wz(cY(b))), until: 0, fest: root }; FESTLIT.stats.치우러감++; return true;
+}
+function festLitClear(s, root, why) { s.stage = Math.max(0, s.stage - 1); LIT.dirty = true; if (why) FESTLIT.stats[why]++;
+  if (!s.stage) { const rec = cells[root]; if (rec) { const c = centerOf(rec.k, cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); } LIT.shops.delete(root); } }
+/* tickFolks 고리 — 틱마다 한 번만 일한다 */
+function actFestLitterTick(now) {
+  if (FESTLIT.tick === SIM.ticks) return; FESTLIT.tick = SIM.ticks;
+  const R = window.VRULES.festLitter; if (!R.on || !window.VRULES.litter || !window.VRULES.litter.on) return;
+  const day = Math.floor(SIM.t / DAY_MS), h = simHour();
+  if (EV.fest && EV.festRoot >= 0) {                                    // 축제 날 — 광장에 모인 서로 다른 사람
+    if (FESTLIT.festDay !== day) { FESTLIT.festDay = day; FESTLIT.root = EV.festRoot; FESTLIT.seen = new Set(); FESTLIT.stats.축제++; }
+    folks.forEach(f => { if (!f.visitor && ((f.state === 'inside' && f.inside.root === EV.festRoot) || f.festSpot)) FESTLIT.seen.add(f); });
+  }
+  if (day !== FESTLIT.lastDay && h >= DAY_START_H) {                    // 새 아침 — 어제가 축제였으면 광장에 조각
+    FESTLIT.lastDay = day;
+    if (FESTLIT.festDay === day - 1 && FESTLIT.root >= 0 && cells[FESTLIT.root] && cells[FESTLIT.root].k === 'plaza') {
+      const n = FESTLIT.seen.size, stage = n >= R.hi ? 2 : n >= R.lo ? 1 : 0; FESTLIT.stats.모인사람 = n; FESTLIT.stats.단계 = stage;
+      if (stage) { LIT.shops.set(FESTLIT.root, { fest: true, stage, cells: festLitCells(cells[FESTLIT.root]), can: false, today: 0, yday: n, asked: day, n: 0, flash: 0, tidy: 0 }); LIT.dirty = true; }
+    }
+  }
+  LIT.shops.forEach((s, root) => { if (!s.fest) return;
+    if (!cells[root] || cells[root].k !== 'plaza') { LIT.shops.delete(root); LIT.dirty = true; return; }
+    if (h >= R.clearH) { while (LIT.shops.has(root)) festLitClear(s, root, '저절로'); return; }
+    if (s.tidy < R.tidyAt.length && h >= R.tidyAt[s.tidy] && !s.going) { if (festTidySend(s, root, now)) { s.going = true; s.tidy++; } else if (h >= R.tidyAt[s.tidy] + R.tryH) s.tidy++; }   // 길찾기 예산·쉬는 사람이 없으면 틱마다 다시(tryH 시간까지)
+  });
+  folks.forEach(f => { const C = f.litCan; if (!C || !C.fest || !C.until || C.done) return; C.done = true;   // 치우러 간 사람이 광장 앞에 멈췄다 — 한 단계
+    const s = LIT.shops.get(C.fest); if (s) { s.going = false; festLitClear(s, C.fest, '치움'); } });
+  LIT.shops.forEach(s => { if (s.fest && s.going) { if (!folks.some(f => f.litCan && f.litCan.fest)) s.going = false; } });   // 가다 그만뒀다 — 다음 시각에
+}
+window.__festLitter = () => ({ 켜짐: window.VRULES.festLitter.on, ...FESTLIT.stats, 지금광장: [...LIT.shops].filter(([r, s]) => s.fest).map(([r, s]) => ({ 곳: [cX(r), cY(r)], 단계: s.stage })), 축제중모인: EV.fest ? FESTLIT.seen.size : null });
 
 function syncFolks() {
   const seen = new Set(), homes = [];
@@ -5266,6 +5320,7 @@ function tickFolks(dt, now) {
     if (!rec) continue;
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
     if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
+    actFestLitterTick(now);   // [ACT-FESTLIT] 축제 다음 날 광장 조각 · 치우러 가기(틱마다 한 번)
     f.base = roadBeside(rec);
     if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
     actPlazaTick(f, i, now);   // [ACT-PLAZA] 축제 날 광장에선 둥글게 · 길목에 선 사람은 가장자리로 한 발
