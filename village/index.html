@@ -3885,6 +3885,7 @@ function actWordsText(f) {
 function whatDoing(f) {
   if (f.leaving && f.away) return f.away.miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 돌아가요';   // [MAC-AWAY]
   if (f.comeback) return '살 만해졌다는 소식에 다시 와요';
+  { const t = actGardenText(f); if (t) return t; }   // [ACT-GARDEN]
   if (f.arriving) return '이사 오는 중이에요';
   { const t = actBesideText(f); if (t) return t; }   // [ACT-BESIDE]
   { const t = actWordsText(f); if (t) return t; }   // [ACT-WORDS] 학교에 배우러 · 도서관에 책 읽으러
@@ -4698,6 +4699,119 @@ function actGapTick(f, i, now) {
 window.__gap = () => ({ 켜짐: window.VRULES.gapLook.on, ...GAP.stats, 곳: GAP.list.map(g => [cX(g.cell), cY(g.cell), g.gap]), 지금가는중: folks.filter(f => f.gap && f.gap.phase === 'go').length, 지금멈칫: folks.filter(f => f.gap && f.gap.phase === 'look').length });
 
 /* ══════════════════════════════════════════════════════════════
+   [ACT-GARDEN] 정원에 주민이 들어온다 — 저녁에 문으로 들어가 자갈길을 한 바퀴 돌고 의자에 잠깐 앉았다 나온다 (주민 연기 · 09-20 · 창조자의 눈 3회 🟢2).
+   아이가 제일 궁금한 게 "내가 만든 정원에 누가 오나"다. 지금은 울타리·문·자갈길·긴의자를 두르고 꾸며도 아무도 안 들어온다(사람은 길 칸만 걷는다).
+   정원 = **길에 닿은 문**(K.gate) + 그 문 안쪽으로 이어진 **닫힌 땅**(빈칸·잔디·자갈길 · maxCells 칸 안에서 끝나야 — 열려 있으면 정원이 아니다). 하루 한 번·놓은 것이 바뀌면 다시 찾는다.
+   · 저녁(fromH~toH) 쉼 시간에, **문 앞 길 칸을 지나던 주민**(걷는 중·목표 없음)이 문으로 들어간다. 그날 아무도 안 지나가면 sendH 에 문에서 길로 seekR 칸 안에 쉬던 주민 하나를 보낸다.
+   · 안에서는 이 블록이 걸음을 옮긴다: 문 → 자갈길 칸들을 가까운 순으로 한 바퀴(자갈이 없으면 가장 먼 칸까지) → 긴의자·짧은 의자가 있으면 곁에 앉아 sitMs → 문 → 길. 밤 8시가 되면 곧장 나온다.
+   · 앉기는 [ACT-BESIDE] 의 앉은 그림을 그대로 쓴다(state 'inside' + f.beside · 정원 셈에는 안 넣는다). 걷는 동안은 state 'garden'(다른 규칙은 이 사람을 건너뛴다).
+   판정·확률·저장 0 · draw call +0. 정원마다 하루 perDay 번. 규칙 모듈 꼴: 스위치·수치 VRULES.gardenVisit + 고리 두 줄(tickFolks · whatDoing).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).gardenVisit = { on: true, fromH: 16.5, toH: 19.5, sendH: 17, perDay: 2, gapH: 0.8, seekR: 12, maxCells: 80, loop: 4, sitMs: 2600, walkK: 0.9 };   // 하루가 3분 — 한 칸 걷기가 시뮬 15분 남짓이라 한 바퀴는 짧게
+const GARDEN = { key: '', list: [], tick: -1, scanAt: -1e9, stats: { 정원: 0, 들어감: 0, 보냄: 0, 앉음: 0, 나옴: 0 } };
+const gardenWalkable = c => { const r = cells[c]; return !r || r.k === 'gravel' || r.k === 'lawn'; };
+function gardenScan() {
+  const R = window.VRULES.gardenVisit, day = Math.floor(SIM.t / DAY_MS), key = placedTotal + ':' + day;
+  if (GARDEN.key === key || SIM.ticks - GARDEN.scanAt < 20) return;
+  GARDEN.scanAt = SIM.ticks; const old = new Map(GARDEN.list.map(g => [g.gate, g])); GARDEN.key = key; GARDEN.list = [];
+  const seen = new Set();
+  cells.forEach((rec, gi) => { if (!rec || rec.root !== gi || !K[rec.k].gate || seen.has(gi)) return; seen.add(gi);
+    const x = cX(gi), y = cY(gi); let road = -1, inn = -1;
+    for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = idx(nx, ny);
+      if (isRoad(c)) { const ox = x - dx, oy = y - dy; if (inb(ox, oy) && gardenWalkable(idx(ox, oy))) { road = c; inn = idx(ox, oy); break; } } }
+    if (road < 0) return;
+    const region = [inn], mark = new Set([inn]); let open = false;
+    for (let q = 0; q < region.length && !open; q++) { const c = region[q], cx = cX(c), cy = cY(c);
+      for (const [dx, dy] of D4) { const nx = cx + dx, ny = cy + dy; if (!inb(nx, ny) || !plotOpen(nx, ny)) { open = true; break; } const n = idx(nx, ny); if (mark.has(n) || !gardenWalkable(n)) continue;
+        mark.add(n); region.push(n); if (region.length > R.maxCells) { open = true; break; } } }
+    if (open) return;                                                   // 울타리로 닫혀 있지 않다 — 정원이 아니다
+    const gravel = region.filter(c => cells[c] && cells[c].k === 'gravel');
+    let seat = null; for (const c of region) { const cx = cX(c), cy = cY(c); for (const [dx, dy] of D4) { const nx = cx + dx, ny = cy + dy; if (!inb(nx, ny)) continue; const b = cells[idx(nx, ny)];
+      if (b && (b.k === 'bench' || b.k === 'minibench')) { seat = { cell: c, root: b.root }; break; } } if (seat) break; }
+    const o = old.get(gi);
+    GARDEN.list.push({ gate: gi, road, inn, region, mark, gravel, seat, day: o ? o.day : -1, n: o ? o.n : 0, next: o ? o.next : 0 });
+  });
+  GARDEN.stats.정원 = GARDEN.list.length;
+}
+function gardenRoute(g) {                                               // 문 안 칸 → 자갈 칸들(가까운 순) → 앉을 자리 → 문 안 칸 : 칸 번호 줄
+  const R = window.VRULES.gardenVisit, bfs = (from, to) => { const prev = new Map([[from, -1]]), q = [from];
+    for (let h = 0; h < q.length; h++) { const c = q[h]; if (c === to) break; const cx = cX(c), cy = cY(c);
+      for (const [dx, dy] of D4) { const n = idx(cx + dx, cy + dy); if (!g.mark.has(n) || prev.has(n)) continue; prev.set(n, c); q.push(n); } }
+    if (!prev.has(to)) return null; const p = []; let k = to; while (k !== from) { p.unshift(k); k = prev.get(k); } return p; };
+  let at = g.inn, stops = [], left = g.gravel.slice();
+  if (!left.length) { let far = g.inn, fd = -1; g.region.forEach(c => { const d = Math.abs(cX(c) - cX(g.inn)) + Math.abs(cY(c) - cY(g.inn)); if (d > fd) { fd = d; far = c; } }); left = [far]; }
+  for (let s = 0; s < R.loop && left.length; s++) { let bi = 0, bd = 1e9; left.forEach((c, k) => { const d = Math.abs(cX(c) - cX(at)) + Math.abs(cY(c) - cY(at)); if (d < bd) { bd = d; bi = k; } }); at = left.splice(bi, 1)[0]; stops.push(at); }
+  if (g.seat) stops.push(g.seat.cell);
+  const seq = [g.inn]; let cur = g.inn;
+  for (const s of stops) { const p = bfs(cur, s); if (p) { seq.push(...p); cur = s; } }
+  const sitAt = g.seat && cur === g.seat.cell ? seq.length - 1 : -1;
+  const back = bfs(cur, g.inn); if (back) seq.push(...back);
+  return { seq, sitAt };
+}
+function gardenEnter(f, i, g, now) {
+  const r = gardenRoute(g), pts = [g.road, g.gate].concat(r.seq, [g.gate, g.road]);
+  releaseAll(i); f.state = 'garden'; f.walking = true;
+  f.garden = { g, pts, k: 0, seg: 0, sitAt: r.sitAt >= 0 ? r.sitAt + 2 : -1, sat: false, until: 0 };
+  g.n++; g.next = now + window.VRULES.gardenVisit.gapH / 24 * DAY_MS; GARDEN.stats.들어감++;
+}
+function gardenLeave(f, i, now) {
+  const G = f.garden, g = G.g; f.garden = null; f.beside = null; f.inside = null;
+  const out = isRoad(g.road) ? g.road : f.base; if (out < 0) { f.state = 'mill'; return; }
+  f.x = wx(cX(out)); f.z = wz(cY(out)); f.px = f.x; f.pz = f.z; f.path = [out]; f.step = 0; f.seg = 0; f.goal = null;
+  f.state = 'idle'; f.until = now + 300; f.walking = false; claim(out, i); GARDEN.stats.나옴++;
+}
+/* tickFolks 고리 — 맨 앞. true 면 그 사람의 이번 틱은 여기서 끝 */
+function actGardenTick(f, i, now, dt) {
+  const R = window.VRULES.gardenVisit;
+  if (GARDEN.tick !== SIM.ticks) { GARDEN.tick = SIM.ticks; if (R.on) { gardenScan(); gardenSend(now); } }
+  const G = f.garden;
+  if (!G) {                                                             // 문 앞 길 칸을 지나던 사람 — 들어갈까
+    if (!R.on || f.visitor || f.arriving || f.goal || f.state !== 'walk' || f.seg !== 0 || !f.path || f.carry || f.greet || f.gap || f.kidHome) return false;
+    const h = simHour(); if (h < R.fromH || h >= R.toH) return false;
+    const at = f.path[f.step], day = Math.floor(SIM.t / DAY_MS);
+    const g = GARDEN.list.find(x => x.road === at && (x.day !== day || x.n < R.perDay) && now >= x.next); if (!g) return false;
+    if (g.day !== day) { g.day = day; g.n = 0; }
+    gardenEnter(f, i, g, now); return true;
+  }
+  if (!R.on) { gardenLeave(f, i, now); return true; }
+  const h = simHour(); if ((h >= 20 || h < 6) && G.k < G.pts.length - 3) { G.k = G.pts.length - 3; G.seg = 0; G.sat = true; }   // 밤 — 곧장 문으로
+  if (f.state === 'inside') {                                           // 앉아 있다
+    if (now < G.until) return true;
+    f.state = 'garden'; f.inside = null; f.beside = null; G.sat = true; G.k++; G.seg = 0; return true;
+  }
+  if (G.k >= G.pts.length - 1) { gardenLeave(f, i, now); return true; }
+  if (G.k === G.sitAt && !G.sat) {                                      // 앉을 자리에 닿았다 — [ACT-BESIDE] 의 앉은 그림으로
+    const b = cells[G.g.seat.root]; if (b && (b.k === 'bench' || b.k === 'minibench')) { const c = centerOf(b.k, cX(b.root), cY(b.root), b.rot), th = b.rot * Math.PI / 2, B = window.VRULES.beside || {};
+      f.state = 'inside'; f.inside = { root: b.root, until: now + R.sitMs, cell: G.g.road, act: 1 }; f.beside = { root: b.root, k: b.k, mode: 'sit', slot: 9, x: c.x + Math.sin(th) * (B.sitFwd || 0.2), z: c.z + Math.cos(th) * (B.sitFwd || 0.2), dir: th, drop: B.sitDrop || 0.42 };
+      G.until = now + R.sitMs; f.walking = false; GARDEN.stats.앉음++; return true; }
+    G.sat = true;
+  }
+  const a = G.pts[G.k], b = G.pts[G.k + 1], ax = wx(cX(a)), az = wz(cY(a)), bx = wx(cX(b)), bz = wz(cY(b)), len = Math.hypot(bx - ax, bz - az) || 1;
+  f.px = f.x; f.pz = f.z;
+  G.seg += (WALK_SPEED * R.walkK * dt) / len; if (G.seg >= 1) { G.seg = 0; G.k++; f.x = bx; f.z = bz; } else { f.x = ax + (bx - ax) * G.seg; f.z = az + (bz - az) * G.seg; }
+  f.dir = Math.atan2(bx - ax, bz - az); f.walking = true;
+  return true;
+}
+function gardenSend(now) {                                              // 그날 아직 아무도 안 온 정원 — sendH 에 가까이 쉬던 사람 하나를 문 앞으로
+  const R = window.VRULES.gardenVisit, h = simHour(), day = Math.floor(SIM.t / DAY_MS);
+  if (h < R.sendH || h >= R.toH - 0.5 || pathBudget <= 1) return;
+  const g = GARDEN.list.find(x => x.sentDay !== day && (x.day !== day || x.n === 0)); if (!g) return;
+  g.sentDay = day; pathBudget--; const near = new Set(roadBFS(g.road, undefined, R.seekR).reach);
+  let best = null, bi = -1, bd = 1e9;
+  folks.forEach((f, i) => { if (f.visitor || f.arriving || f.state !== 'idle' || f.goal || f.garden || f.greet || f.gap || f.carry || f.kidHome || !f.path) return;
+    const at = f.path[f.path.length - 1]; if (!near.has(at)) return; const d = Math.abs(cX(at) - cX(g.road)) + Math.abs(cY(at) - cY(g.road)); if (d < bd) { bd = d; best = f; bi = i; } });
+  if (!best || pathBudget <= 0) return;
+  pathBudget--; const here = best.path[best.path.length - 1];
+  if (here === g.road) { gardenEnter(best, bi, g, now); GARDEN.stats.보냄++; return; }
+  if (pathTo(best, bi, g.road)) { GARDEN.stats.보냄++; return; }       // 걸어서 문 앞을 지나게 되면 위 고리가 들인다
+  const { prev } = roadBFS(here); if (bfsSeen[g.road] !== bfsGen) return;
+  const path = []; let k = g.road; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here);
+  best.path = path; best.step = 0; best.seg = 0; best.state = 'walk'; GARDEN.stats.보냄++;
+}
+function actGardenText(f) { return f.garden && f.state === 'garden' ? '정원을 한 바퀴 돌아요' : null; }
+window.__garden = () => ({ 켜짐: window.VRULES.gardenVisit.on, ...GARDEN.stats, 곳: GARDEN.list.map(g => ({ 문: [cX(g.gate), cY(g.gate)], 칸: g.region.length, 자갈: g.gravel.length, 의자: !!g.seat, 오늘: g.n })), 지금안에: folks.filter(f => f.garden).length });
+
+/* ══════════════════════════════════════════════════════════════
    [ACT-DOOR] 밤에 이미 자기 집 문 앞에 서 있는 사람은 곧장 들어간다 (주민 연기 · 09-20).
    구멍: 밤 귀가 규칙(rhythmTick)은 pathTo 로 '집 앞 칸까지 걸을 길'을 잡고, 걸음이 끝나는 순간에만 집에 들인다.
          그런데 이미 그 칸에 서 있으면 pathTo 가 here === goal 로 끝나 걷는 상태가 안 되고, rhythmTick 은 true 를 돌려줘
@@ -4760,6 +4874,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
+    if (actGardenTick(f, i, now, dt)) continue;   // [ACT-GARDEN] 저녁에 정원 문으로 들어가 한 바퀴 · 의자에 앉았다 나온다
     const rec = cells[f.home];
     if (!rec) continue;
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
