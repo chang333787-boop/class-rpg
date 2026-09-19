@@ -2563,6 +2563,7 @@ function simTick() {
   if (++moveTimer >= MOVEIN_EVERY * (population() >= JOB_POP && joblessRatio() > 0.5 ? 2 : 1)) { moveTimer = 0; /* 어른 절반이 일이 없으면 이사가 느리다(F27) */ if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
   satTick(); crowdTick(); eventTick(); visitTick(SIM.t); if ((SIM.ticks % 50) === 0) needsTick(); if ((SIM.ticks % 30) === 0 && !OFF.has('jobs')) jobsTick(); wishTick();
   if ((SIM.ticks % 10) === 0) { goalTick(); plotTick(); }
+  dayMoveBoost();   // [MAC-DAY] 낮에는 이사 시도를 두 배로(하루 합을 맞춘다)
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
@@ -2849,8 +2850,39 @@ function moveInQuiet() {
   }
   return false;
 }
+/* ══════════════════════════════════════════════════════════════
+   [MAC-DAY] 이사는 낮에 온다 + 큰 소식은 줄을 선다 (창조자의 눈 2회 — 09-20)
+   ① 첫 돌아섬이 새벽 4시·화면 밖이라 아이가 못 봤다. 새 이웃은 **아침 6시~저녁 6시 반**에만 길을 나선다(밤엔 주민도 집에 있다 — 맞이할 사람이 없다).
+      낮에만 오면 하루 이사 수가 1/3 로 준다 → 낮에는 시도를 두 배로(7.5초마다) 해 하루 합을 맞춘다. 속도표는 PR 본문 실측.
+   ② checkUnlocks 가 종류마다 같은 토스트를 되풀이하고(분수·정자 = 두 번), 같은 인구의 꽃 해금이 별도 항목이라 둘째가 첫째를 **같은 순간에 덮었다** —
+      아이는 "분수·정자가 열렸어요"를 못 봤다. 🔓·🎯·🎉 로 시작하는 큰 소식은 앞의 것이 다 보인 뒤에 나오고, 같은 말은 한 번만.
+      꽃밭이 인구로 열릴 때는 숫자 대신 "새 이웃이 ○○ 씨를 가져왔어요".
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).dayMoveIn = { on: true, from: 6, to: 18.5, boostTicks: 75 };
+(window.VRULES).news = { on: true, showMs: 2400, sameMs: 6000 };
+const moveInDaytime = () => { const R = window.VRULES.dayMoveIn; if (!R.on) return true; const h = simHour(); return h >= R.from && h < R.to; };
+function dayMoveBoost() { const R = window.VRULES.dayMoveIn; if (!R.on || (SIM.ticks % R.boostTicks) !== 0 || !moveInDaytime()) return; if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
+const NEWS = { q: [], busyUntil: 0, last: new Map(), timer: 0, stats: { 줄섬: 0, 같은말버림: 0, 씨앗: 0 } };
+/* 순수 함수 — 인구로 꽃밭이 열렸다는 말이면 '씨를 가져왔어요'로. names = 열린 것 이름들, flowerNames = 꽃밭 이름 집합 */
+function newsSeedText(names, flowerNames) { return names.length && names.every(n => flowerNames.has(n)) ? '🌱 새 이웃이 ' + names.join('·') + ' 씨를 가져왔어요!' : null; }
+{ const toast0 = toast;
+  const show = (msg, ok) => { NEWS.busyUntil = performance.now() + window.VRULES.news.showMs; toast0(msg, ok); };
+  const pump = () => { NEWS.timer = 0; const it = NEWS.q.shift(); if (!it) return; show(it.msg, it.ok); if (NEWS.q.length) NEWS.timer = setTimeout(pump, window.VRULES.news.showMs); };
+  toast = (msg, ok) => {
+    const R = window.VRULES.news; msg = String(msg);
+    const big = msg.startsWith('🔓') || msg.startsWith('🎯') || msg.startsWith('🎉');
+    if (!R.on || !big) { if (R.on && ok && performance.now() < NEWS.busyUntil) return; return toast0(msg, ok); }   // 큰 소식이 떠 있는 동안 자잘한 좋은 소식은 접는다. 못 놓는 이유(ok 아님)는 바로 보인다
+    const m = msg.match(/^🔓 (.+) 이 열렸어요! \(인구 \d+명\)$/);
+    if (m && typeof FLOWER_KINDS !== 'undefined') { const fl = new Set(Object.keys(FLOWER_KINDS).map(id => K[id] && K[id].nm)); const t = newsSeedText(m[1].split('·'), fl); if (t) { msg = t; NEWS.stats.씨앗++; } }
+    const now = performance.now(), seen = NEWS.last.get(msg); if (seen && now - seen < R.sameMs) { NEWS.stats.같은말버림++; return; } NEWS.last.set(msg, now);
+    if (now >= NEWS.busyUntil && !NEWS.q.length) return show(msg, ok);
+    NEWS.q.push({ msg, ok }); if (NEWS.q.length > 6) NEWS.q.shift(); NEWS.stats.줄섬++;   /* 줄은 여섯까지 — 오래 기다린 소식은 버린다 */ if (!NEWS.timer) NEWS.timer = setTimeout(pump, Math.max(0, NEWS.busyUntil - now));
+  }; }
+window.__news = () => ({ ...NEWS.stats, 줄: NEWS.q.map(i => i.msg), 낮이사: moveInDaytime(), 시: +simHour().toFixed(1) });
+
 /* 빈 집 하나 골라 주민 하나를 길 먼 끝에서 출발시킨다 */
 function tryMoveIn() {
+  if (!moveInDaytime()) return;   // [MAC-DAY] 새 이웃은 낮에만 길을 나선다
   if (folks.length >= FOLK_CAP) { moveInQuiet(); return; }   // [MAC-POPCAP] 화면의 사람이 꽉 차도 인구는 는다
   if (movers >= MOVEIN_MAX || folks.length >= FOLK_CAP) return;
   const homes = [];
