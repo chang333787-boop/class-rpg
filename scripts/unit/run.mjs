@@ -1559,6 +1559,28 @@ try {
   test('바닥 고르기 코드를 돌릴 수 있다', () => { throw e; });
 }
 
+//  [DECO-FLOOR-RECT-1] ⬛ 네모로 — 시작 칸 ↔ 지금 칸 네모 · 상한(칸 수)을 넘으면 시작 칸 쪽으로 줄인다
+cur = '꾸미기 바닥 네모로(DECO-FLOOR-RECT-1)';
+try {
+  const S = read('student.js');
+  const sb = {}; sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(sliceConst(S, 'DECO_RECT_MAX') + sliceFn(S, '_decoRectFrom') + ';globalThis.__R = { _decoRectFrom, DECO_RECT_MAX };', sb);
+  const F = sb.__R._decoRectFrom, box = o => [o.r0, o.c0, o.r1, o.c1, o.w, o.h, o.capped];
+  test('상한 = 400칸', () => eq(sb.__R.DECO_RECT_MAX, 400));
+  test('어느 쪽으로 끌어도 같은 네모 · 한 칸도 네모', () => {
+    eq(box(F(5, 5, 7, 9, 400)), [5, 5, 7, 9, 5, 3, false]);
+    eq(box(F(7, 9, 5, 5, 400)), [5, 5, 7, 9, 5, 3, false]);
+    eq(box(F(3, 3, 3, 3, 400)), [3, 3, 3, 3, 1, 1, false]);
+  });
+  test('상한을 넘으면 시작 칸에서 줄인다(칸 수 ≤ 상한) · 폭만 넘으면 한 줄', () => {
+    const a = F(0, 0, 99, 99, 400); eq([a.w * a.h <= 400, a.r0, a.c0, a.capped], [true, 0, 0, true]);
+    const b = F(50, 60, 0, 0, 400); eq([b.w * b.h <= 400, b.r1, b.c1, b.capped], [true, 50, 60, true]);   // 시작 칸(오른쪽 아래)은 늘 네모 안
+    eq(box(F(0, 0, 0, 500, 400)), [0, 0, 0, 399, 400, 1, true]);
+  });
+} catch (e) {
+  test('네모로 코드를 돌릴 수 있다', () => { throw e; });
+}
+
 // ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);

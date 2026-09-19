@@ -4529,6 +4529,7 @@ function setDecoMode(mode, btn) {
   }
   document.body.classList.toggle('deco-floor-mode', mode === 'floor');   // [DECO-PT-2] 바닥 모드면 장식 서랍 접기
   _floorPickShow(mode === 'floor');   // [DECO-FLOOR-PICK-1] 접힌 서랍 자리에 바닥 고르기 판
+  if (_decoRectPrev) { _decoRectPrev = null; _decoRectTip(); }   // [DECO-FLOOR-RECT-1]
   setTimeout(() => { try { _decoPillarSync(); } catch (e) {} }, 0);
   document.body.classList.toggle('deco-erase-mode', mode === 'erase');
   if (mode === 'erase') { SEL_DECO = null; if (typeof renderDecoInv === 'function') renderDecoInv(); }
@@ -4662,6 +4663,12 @@ function _pkSwatch(box, w, h, draw, name, caps, locked) {
   const n = document.createElement('div'); n.className = 'pk-name'; n.textContent = name; box.appendChild(n);
   caps.forEach(t => { const c = document.createElement('div'); c.className = 'pk-cap'; c.textContent = t; box.appendChild(c); });
 }
+//  [DECO-FLOOR-RECT-1] 둘 중 하나 고르기(도구 토글) — items = [[값, 글자]…]
+function _pkSeg(items, cur, onTap, label) {
+  const g = document.createElement('div'); g.className = 'pk-seg'; g.setAttribute('role', 'group'); if (label) g.setAttribute('aria-label', label);
+  items.forEach(([v, t]) => { const b = _pkButton('pk-seg-b', t, v === cur, () => onTap(v)); b.dataset.v = v; b.textContent = t; g.appendChild(b); });
+  return g;
+}
 //  말풍선 — anchor 위에 한 줄(두 줄까지). host 는 position:relative 인 판
 function _pkBubble(host, anchor, text) {
   let bb = host.querySelector('.pk-bubble');
@@ -4757,9 +4764,14 @@ function _floorPickRender() {
   const v = peekV || _floorPickValue();
   //  견본 180×112(좁으면 150×96) — 잔디 7×5 가운데 5×3 을 고른 조합으로
   const sw = host.querySelector('.fpk-side'), swW = small ? 150 : 180, swH = small ? 96 : 112;
-  const caps = [_fpk.peek ? '🔒 아직 잠긴 색이에요' : '이렇게 칠해져요'];
+  const caps = [_fpk.peek ? '🔒 아직 잠긴 색이에요' : DECO_FLOOR_TOOL === 'rect' ? '모서리에서 모서리로 끌어요' : '이렇게 칠해져요'];
   if (isBed && !_fpk.peek) caps.push('테두리는 저절로 둘러져요');
   _pkSwatch(sw, swW, swH, _floorBedDraw(v, 5, 3, 1), _floorPickName(v), caps, !!_fpk.peek);
+  //  [DECO-FLOOR-RECT-1] 도구 토글 — 폭 1200 이상은 가족 칩 줄 맨 앞(가는 세로줄로 가름), 미만은 견본 아래
+  const seg = _pkSeg([['drag', '✏️ 끌어서'], ['rect', '⬛ 네모로']], DECO_FLOOR_TOOL, t => decoFloorTool(t), '칠하는 도구');
+  const slot = host.querySelector('.fpk-tool');
+  if (slot) { slot.textContent = ''; slot.hidden = !wide; if (wide) slot.appendChild(seg); }
+  if (!wide || !slot) sw.appendChild(seg);
   const keepX = {};
   host.querySelectorAll('.fpk-scroll').forEach(el => { keepX[el.dataset.row] = el.scrollLeft; });
   const row = (name, items) => {
@@ -7219,11 +7231,17 @@ function _initDeco() {
         return cell.r >= p.row && cell.r < p.row + sz.h && cell.c >= p.col && cell.c < p.col + sz.w;
       });
       if (onDeco) { _dCv._pendingTap = { clientX: t.clientX, clientY: t.clientY, t0: Date.now() }; return; }
+      //  [DECO-FLOOR-RECT-1] ⬛ 네모로: 누르는 순간 칠하지 않고 뗄 때 — 끌었으면(네모) 한 칸이 아니었고, 두 손가락이면 화면이었다.
+      //  (누르는 순간 칠하면 네모마다 첫 칸이 따로 저장되고, 두 손가락 확대에도 한 칸이 칠해졌다)
+      if (DECO_MODE === 'floor' && DECO_FLOOR_TOOL === 'rect' && e.touches.length === 1) {
+        _dCv._pendingTap = { clientX: t.clientX, clientY: t.clientY, t0: Date.now(), rect: true }; return;
+      }
       _decoClick({ clientX: t.clientX, clientY: t.clientY, target: e.target });
     }, { passive: false });
     _dCv.addEventListener('touchend', e => {
       const pt = _dCv && _dCv._pendingTap; if (!pt) return;
       _dCv._pendingTap = null;
+      if (pt.rect) { if (!_dSuppressClick && DECO_MODE === 'floor') _decoClick({ clientX: pt.clientX, clientY: pt.clientY, target: e.target }); return; }
       if (Date.now() - pt.t0 >= DECO_PICK_MS) return;   // 길게였다 — 스포이드가 이미 처리
       _decoClick({ clientX: pt.clientX, clientY: pt.clientY, target: e.target });
     }, { passive: false });
@@ -7433,7 +7451,7 @@ function _decoAttachGestures(cv) {
     }
     if (pts.size === 2) {
       drag = null;
-      if (paint) { _decoStrokeEnd(paint); paint = null; }   // 두 손가락이 되면 칠하기는 거기서 끝
+      if (paint) { if (paint.rect) _decoRectCancel(); else _decoStrokeEnd(paint); paint = null; }   // 두 손가락이 되면 칠하기는 거기서 끝 · [DECO-FLOOR-RECT-1] 네모는 취소(안 칠함)
       const m = mid();
       pinch = { d0: m.d, z0: _dZoom, fx: m.x, fy: m.y, mx: m.x, my: m.y };
       _dSuppressClick = true;
@@ -7444,7 +7462,8 @@ function _decoAttachGestures(cv) {
     } else if (pts.size === 1) {
       //  [DECO-DRAG-1] 카드를 골랐거나 바닥 모드 — 끌면 칠하기·놓기
       const cell = _decoCellAt(e.clientX, e.clientY);
-      if (cell) paint = { start: cell, last: cell, active: false, stroke: [], mode: null, placed: 0, outOfStock: false };
+      if (cell) paint = { start: cell, last: cell, active: false, stroke: [], mode: null, placed: 0, outOfStock: false,
+        rect: DECO_MODE === 'floor' && DECO_FLOOR_TOOL === 'rect' && cell.area === 'yard' };   // [DECO-FLOOR-RECT-1] ⬛ 네모로
     }
   });
 
@@ -7457,6 +7476,12 @@ function _decoAttachGestures(cv) {
       if (pinch.d0 > 8) _decoSetZoom(pinch.z0 * (m.d / pinch.d0), pinch.fx, pinch.fy);
       decoPanBy(pinch.mx - m.x, pinch.my - m.y);
       pinch.mx = m.x; pinch.my = m.y;
+      return;
+    }
+    if (paint && paint.rect && pts.size === 1) {   // [DECO-FLOOR-RECT-1] 시작 칸을 벗어나면 네모 미리보기(집·밭 위로도 늘어난다 — 칠할 때 건너뜀)
+      const k = _decoYardCellClamp(e.clientX, e.clientY);
+      if (!paint.active && k.r === paint.start.r && k.c === paint.start.c) return;
+      _decoRectMove(paint, e.clientX, e.clientY);
       return;
     }
     if (paint && pts.size === 1) {
@@ -7490,7 +7515,7 @@ function _decoAttachGestures(cv) {
     pickCancel();
     if (pts.size < 2) pinch = null;
     if (!pts.size) {
-      if (paint) { _decoStrokeEnd(paint); paint = null; }
+      if (paint) { if (paint.rect) _decoRectCommit(paint); else _decoStrokeEnd(paint); paint = null; }
       drag = null; setTimeout(() => { _dSuppressClick = false; }, 0);
     }
   };
@@ -7627,6 +7652,107 @@ function _decoStrokeEnd(st) {
     else if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
     else if (st.outOfStock) toast('가진 개수가 모자라요!');
   }
+}
+
+// ══ 바닥 '⬛ 네모로' 칠하기 (DECO-FLOOR-RECT-1 · 정원 바닥 연결 ④-2) ══════════════
+//  규칙: docs/deco_floor_picker_20260920.md §5. 한 손가락으로 끌면 시작 칸 ↔ 지금 칸을 모서리로 하는 네모를 미리 보여 주고,
+//  손을 떼면 네모 안 칸을 **한꺼번에** 칠한다(집·밭 칸은 건너뜀) · ↩ 한 번 = 네모 하나 · 확인 창 없음 · **지우지 않는다**(칠하기만).
+//  한 번 누름은 지금처럼 한 칸(끌어서와 같다) · 두 손가락은 확대·이동(네모는 취소 — 아무것도 안 칠한다).
+//  한 번에 칠하는 칸은 DECO_RECT_MAX 까지 — 넘으면 네모가 그 크기에서 멈추고 아래 글에 알린다. 저장은 묶음 저장(decoDirty) 한 번.
+const DECO_RECT_MAX = 400;
+const DECO_TOOL_KEY = 'deco_floor_tool_v1';
+let DECO_FLOOR_TOOL = 'drag';   // 'drag' | 'rect' — 고른 도구는 이 기기에 기억(편의 · 저장값 아님)
+try { if (typeof localStorage !== 'undefined' && localStorage.getItem(DECO_TOOL_KEY) === 'rect') DECO_FLOOR_TOOL = 'rect'; } catch (e) {}
+function decoFloorTool(t) {
+  DECO_FLOOR_TOOL = t === 'rect' ? 'rect' : 'drag';
+  try { localStorage.setItem(DECO_TOOL_KEY, DECO_FLOOR_TOOL); } catch (e) {}
+  if (typeof _floorPickRender === 'function') _floorPickRender();
+}
+let _decoRectPrev = null;   // 끄는 동안의 네모 { r0, c0, r1, c1, sr, sc, capped }
+
+//  시작 칸과 지금 칸 → 네모(상한을 넘으면 시작 칸 쪽으로 줄인다 · 순수 함수)
+function _decoRectFrom(sr, sc, r, c, max) {
+  let h = Math.abs(r - sr) + 1, w = Math.abs(c - sc) + 1, capped = false;
+  if (w * h > max) {
+    capped = true;
+    if (w > max) { w = max; h = 1; }
+    else h = Math.max(1, Math.floor(max / w));
+  }
+  const dr = r >= sr ? 1 : -1, dc = c >= sc ? 1 : -1;
+  const r1 = sr + dr * (h - 1), c1 = sc + dc * (w - 1);
+  return { r0: Math.min(sr, r1), r1: Math.max(sr, r1), c0: Math.min(sc, c1), c1: Math.max(sc, c1), sr, sc, w, h, capped };
+}
+//  창 좌표 → 마당 칸(집·밭 위여도 · 판 밖이면 가장자리 칸으로)
+function _decoYardCellClamp(clientX, clientY) {
+  const bp = _decoBoardPoint(clientX, clientY), C = _dC;
+  return { r: Math.max(0, Math.min(DY.rows - 1, Math.floor(bp.y / C))), c: Math.max(0, Math.min(DY.cols - 1, Math.floor(bp.x / C))) };
+}
+function _decoRectMove(st, clientX, clientY) {
+  const k = _decoYardCellClamp(clientX, clientY);
+  const p = _decoRectPrev;
+  let nx = _decoRectFrom(st.start.r, st.start.c, k.r, k.c, Infinity);
+  //  상한을 넘으면 네모는 **마지막으로 된 크기에서 멈춘다**(처음부터 넘으면 시작 칸 쪽으로 줄인 네모)
+  if (nx.w * nx.h > DECO_RECT_MAX) nx = p ? Object.assign({}, p, { capped: true }) : _decoRectFrom(st.start.r, st.start.c, k.r, k.c, DECO_RECT_MAX);
+  if (p && p.r0 === nx.r0 && p.r1 === nx.r1 && p.c0 === nx.c0 && p.c1 === nx.c1 && p.capped === nx.capped) return;
+  if (!st.active) { st.active = true; _dSuppressClick = true; }   // 이제 네모다 — 뗄 때 오는 '한 번 누름'은 칠하지 않는다
+  _decoRectPrev = nx;
+  _decoRectTip();
+  _drawDeco();
+}
+function _decoRectCancel() { _decoRectPrev = null; _decoRectTip(); _drawDeco(); }
+//  손을 뗌 — 네모 안 칸을 한꺼번에(집·밭 건너뜀 · 이미 그 바닥인 칸은 그대로). 되돌리기 한 단계 · 저장 한 번
+function _decoRectCommit(st) {
+  const p = _decoRectPrev;
+  _decoRectPrev = null; _decoRectTip();
+  if (!p || !st.active) { _drawDeco(); return 0; }
+  const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
+  let n = 0;
+  for (let r = p.r0; r <= p.r1; r++) for (let c = p.c0; c <= p.c1; c++) {
+    if (_isHC(r, c) || _isFarmCell(r, c)) continue;
+    const key = r + '_' + c, cur = fm[key];
+    if (cur === CUR_FLOOR_TILE) continue;
+    st.stroke.push({ t: 'floor', key, prev: cur }); fm[key] = CUR_FLOOR_TILE; n++;
+  }
+  decoUndoStroke(st.stroke);
+  if (st.stroke.length) decoDirty();
+  _drawDeco();
+  return n;
+}
+//  미리보기 — 칠해질 모습을 반투명(.55)으로 + 금색 점선 테 + 시작 모서리 금색 점. 바닥 그리기는 마당과 같은 _drawFloorSVG
+//  (네모 안 = 고른 바닥, 밖 = 지금 마당 → 칠한 뒤 생길 가장자리·물가까지 미리 보인다). _drawDeco 가 판 좌표 변환을 건 뒤 부른다.
+function _drawRectPreview() {
+  const p = _decoRectPrev; if (!p || !_dCtx) return;
+  const C = _dC, fl = _yardFloorGet(CUR), ctx = _dCtx;
+  const inR = (r, c) => r >= p.r0 && r <= p.r1 && c >= p.c0 && c <= p.c1 && !_isHC(r, c) && !_isFarmCell(r, c);
+  const valAt = (r, c) => inR(r, c) ? CUR_FLOOR_TILE : fl[r + '_' + c];
+  const typeAt = (rr, cc, wantRim) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc)) ? null : _floorParse(valAt(rr, cc))[wantRim ? 'rim' : 'name'];
+  ctx.save(); ctx.globalAlpha = 0.55;
+  for (let r = p.r0; r <= p.r1; r++) for (let c = p.c0; c <= p.c1; c++) {
+    if (!inR(r, c)) continue;
+    const fp = _floorParse(CUR_FLOOR_TILE);
+    if (FLOOR_SVG && _drawFloorSVG(fp.name, r, c, c * C, r * C, C, typeAt, fp.color, fp.rim)) continue;
+    const t = FLOOR_TILES[fp.name] || FLOOR_TILES.grass; ctx.fillStyle = t.bg; ctx.fillRect(c * C, r * C, C, C);
+  }
+  ctx.restore();
+  ctx.save();
+  ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffd866';
+  ctx.strokeRect(p.c0 * C + 1.5, p.r0 * C + 1.5, (p.c1 - p.c0 + 1) * C - 3, (p.r1 - p.r0 + 1) * C - 3);
+  ctx.setLineDash([]); ctx.fillStyle = '#ffd866'; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1.5;
+  const x = (p.sc + (p.sc === p.c0 ? 0 : 1)) * C, y = (p.sr + (p.sr === p.r0 ? 0 : 1)) * C;
+  ctx.beginPath(); ctx.arc(x, y, Math.max(4, C * 0.18), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+//  아래 글 — '12×9칸 · 손을 떼면 칠해져요 · 잘못하면 ↩' (상한에 닿으면 알림)
+function _decoRectTip() {
+  const host = document.getElementById('if-topview'); if (!host) return;
+  let el = document.getElementById('if-rect-tip');
+  const p = _decoRectPrev;
+  if (!p) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'if-rect-tip'; el.className = 'deco-rect-tip'; el.setAttribute('role', 'status'); host.appendChild(el); }
+  el.hidden = false;
+  el.textContent = p.capped ? `${p.w}×${p.h}칸 · 한 번에 ${DECO_RECT_MAX}칸까지예요 · 손을 떼면 칠해져요`
+    : `${p.w}×${p.h}칸 · 손을 떼면 칠해져요 · 잘못하면 ↩`;
+  el.classList.toggle('is-capped', !!p.capped);
 }
 
 // 창 기준 px → 판 px (클릭·핀치 공용)
@@ -8359,7 +8485,7 @@ function _drawDeco() {
     _dCtx.setTransform(2, 0, 0, 2, 0, 0);
     _dCtx.clearRect(0, 0, _dW, _dH);
     _dCtx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
-    if (DECO_SCENE === 'yard') _drawYard();
+    if (DECO_SCENE === 'yard') { _drawYard(); if (_decoRectPrev) _drawRectPreview(); }   // [DECO-FLOOR-RECT-1] 끄는 동안의 네모
     else _drawIndoor();
     // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
     _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);

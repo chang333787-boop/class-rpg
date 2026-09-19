@@ -1040,6 +1040,54 @@
       out('바닥고르기_장식모드면_닫힘', pk.hidden && getComputedStyle(document.getElementById('if-deco-drawer')).display !== 'none');
       CUR.inventory = keepInv; CUR_FLOOR_TILE = keepTile; _drawDeco();
     }
+    //  ⑱ ⬛ 네모로(DECO-FLOOR-RECT-1) — 도구 토글 · 끄는 동안 미리보기+아래 글 · 떼면 한꺼번에(집·밭 건너뜀) · ↩ 한 번 = 네모 통째 · 상한 400칸.
+    //    손짓 자체(한 손가락=네모 · 두 손가락=화면)는 진짜 터치(CDP)로 따로 쟀다(PR 본문). 여기서는 같은 함수를 좌표로 부른다.
+    if (typeof _decoRectMove === 'function') {
+      const pk = document.getElementById('if-floor-picker'), keepTile = CUR_FLOOR_TILE, keepTool = DECO_FLOOR_TOOL;
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
+      _decoUndoClear(); setDecoMode('deco'); ifSyncModeBtn(); CUR_FLOOR_TILE = 'hydrangea+stone';
+      document.getElementById('if-mode-floor').click(); await sleep(250); decoZoomFit(); await sleep(150);
+      const segB = v => pk.querySelector('.pk-seg-b[data-v="' + v + '"]');
+      out('네모로_도구토글_있음_처음은_끌어서', !!segB('rect') && !!segB('drag') && (keepTool === 'rect' || segB('drag').classList.contains('is-on')));
+      segB('rect').click(); await sleep(80);
+      let mem = null; try { mem = localStorage.getItem('deco_floor_tool_v1'); } catch (e) {}
+      out('네모로_고르면_캡션·기억', DECO_FLOOR_TOOL === 'rect' && segB('rect').classList.contains('is-on') && /모서리에서 모서리로/.test(pk.textContent) && (mem === 'rect' || mem === null));
+      const cv = document.querySelector('#if-topview canvas'), R0 = cv.getBoundingClientRect();
+      const at = (r, c) => ({ x: R0.left + ((c + 0.5) * _dC - _dPanX) * R0.width / _dW, y: R0.top + ((r + 0.5) * _dC - _dPanY) * R0.height / _dH });
+      //  집 칸을 가로지르는 네모 — 집 칸은 건너뛴다
+      let hr = -1, hc = -1; for (let r = 0; r < DY.rows && hr < 0; r++) for (let c = 0; c < DY.cols; c++) if (_isHC(r, c)) { hr = r; hc = c; break; }
+      const sr = hr + 1, sc = Math.max(0, hc - 2), er = hr + 3, ec = hc + 3;
+      const fm0 = Object.assign({}, _yardFloorGet(CUR));
+      const st = { start: { area: 'yard', r: sr, c: sc }, active: false, stroke: [] };
+      const p1 = at(hr, ec); _decoRectMove(st, p1.x, p1.y); await sleep(60);
+      const tip = document.getElementById('if-rect-tip');
+      out('네모로_끄는동안_미리보기·아래글', !!_decoRectPrev && !!tip && !tip.hidden && /칸 · 손을 떼면 칠해져요/.test(tip.textContent) && JSON.stringify(fm0) === JSON.stringify(_yardFloorGet(CUR)));
+      const p2 = at(er, ec); _decoRectMove(st, p2.x, p2.y);
+      const want = []; for (let r = Math.min(sr, er, hr); r <= Math.max(sr, er, hr); r++) for (let c = Math.min(sc, ec); c <= Math.max(sc, ec); c++) if (!_isHC(r, c) && !_isFarmCell(r, c)) want.push(r + '_' + c);
+      const pv = _decoRectPrev;
+      const n = _decoRectCommit(st); await sleep(60);
+      const fm1 = _yardFloorGet(CUR);
+      const cells = []; for (let r = pv.r0; r <= pv.r1; r++) for (let c = pv.c0; c <= pv.c1; c++) cells.push([r, c]);
+      out('네모로_떼면_한꺼번에_집칸건너뜀', n > 0 && cells.every(([r, c]) => (_isHC(r, c) || _isFarmCell(r, c)) ? fm1[r + '_' + c] === fm0[r + '_' + c] : fm1[r + '_' + c] === 'hydrangea+stone')
+        && cells.some(([r, c]) => _isHC(r, c)) && !_decoRectPrev && tip.hidden);
+      out('네모로_되돌리기_한단계', _decoUndo.length === 1);
+      decoUndo(); await sleep(60);
+      out('네모로_↩한번에_통째로', JSON.stringify(fm0) === JSON.stringify(_yardFloorGet(CUR)) && _decoUndo.length === 0);
+      //  지우지 않는다 — 이미 그 바닥인 칸은 그대로(걷히지 않는다)
+      _yardFloorMap(CUR)[sr + '_' + sc] = 'hydrangea+stone';
+      const st2 = { start: { area: 'yard', r: sr, c: sc }, active: false, stroke: [] }, p3 = at(sr + 1, sc + 1);
+      _decoRectMove(st2, p3.x, p3.y); _decoRectCommit(st2);
+      out('네모로_지우지않음', _yardFloorGet(CUR)[sr + '_' + sc] === 'hydrangea+stone' && st2.stroke.length > 0 && !st2.stroke.some(x => x.key === sr + '_' + sc));
+      decoUndo(); delete _yardFloorMap(CUR)[sr + '_' + sc];
+      //  상한 — 판 끝까지 끌면 400칸에서 멈춘다
+      const st3 = { start: { area: 'yard', r: DY.rows - 1, c: 0 }, active: false, stroke: [] };
+      const q1 = at(DY.rows - 6, 10); _decoRectMove(st3, q1.x, q1.y);
+      const q2 = at(0, DY.cols - 1); _decoRectMove(st3, q2.x, q2.y);
+      const p4 = _decoRectPrev;
+      out('네모로_상한400_멈춤·알림', !!p4 && p4.capped && p4.w * p4.h <= 400 && /400칸까지/.test(tip.textContent));
+      _decoRectCancel(); out('네모로_취소면_안칠함', !_decoRectPrev && tip.hidden && _decoUndo.length === 0);
+      decoFloorTool(keepTool); CUR_FLOOR_TILE = keepTile; setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear(); await sleep(100);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';
