@@ -7924,8 +7924,10 @@ function _drawDecoSVG(id, px, py, bw, bh) {
 //  assets/floor/<name>.svg — 바닥은 100×100 조각을 셀마다 drawImage(c*C, r*C, C, C)로 찍는다.
 //  · base: 바닥 이름 → tile_<이름>[_a~_d][#색]. 변형은 (r,c) 해시로 고정(다시 그려도 안 바뀜). 색은 정원 바닥만(_FLOOR_COLORS).
 //  · 잔디 번짐: 잔디가 아닌 칸의 4방 이웃이 잔디면 fringe_grass_{n,e,s,w}(2종 교차),
-//    두 변이 잔디면 in_<모서리>, 변은 아닌데 대각선만 잔디면 out_<모서리>. (꽃밭은 잔디로 친다)
-//  · 물가: 물 칸의 이웃이 물이 아니면 shore_{n,e,s,w} / in_* / out_*. 잔디 번짐 위에 그린다.
+//    두 변이 잔디면 in_<모서리>, 변은 아닌데 대각선만 잔디면 out_<모서리>. (옛 꽃밭 flower·들꽃 잔디 wildflower 는 잔디로 친다)
+//  · 물가: 물 칸의 이웃이 물이 아니면 shore_{n,e,s,w} / in_* / out_*. 물가 먼저, 잔디 번짐 나중.
+//  · 꽃밭 가장자리: 꽃밭 무리 칸의 이웃이 꽃밭 무리가 아니면 bed_*#꽃잎색(마감이 있으면 rim_<마감>_*). 같은 열두 조각 판정.
+//    순서 = 바탕 → 가장자리/마감 → 물가 → 잔디 번짐.
 //  · base 파일이 없거나 아직 안 왔으면 false → 호출부가 기존 fillRect+텍스처로 그린다(폴백).
 //    오버레이 조각이 없으면 그 조각만 건너뛴다.
 //  · FLOOR_SVG=false 로 두면 전부 기존 방식(단색)으로 돌아간다.
@@ -7977,12 +7979,26 @@ const _FLOOR_COLORS = {
   hydrangea: ['violet', 'pink', 'white', 'duo', 'moon'],
   wildflower: ['rainbow', 'snow'], sunflowerbed: ['orange', 'lemon'], lavender: ['pink', 'white'], daisyfield: ['yellow', 'pink'],
 };
+// [DECO-FLOOR-EDGE-1] 꽃밭 가장자리 — 이 표에 있는 종류가 '꽃밭 무리'다(들꽃 잔디는 풀이라 없다).
+//  값 = 바탕 색 → 가장자리에 떨어진 꽃잎 색(bed_*.svg 의 일곱 색 중 하나). '' = 그 종류의 기본색 짝.
+//  짝은 디자인 담당의 표 그대로(docs/deco_floor_edge_colors_20260920.md · #636). `_FLOOR_COLORS` 에 색이 늘면 여기도 한 줄 —
+//  표에 없는 바탕 색은 그 바닥의 기본 짝('' 줄)으로 그린다.
+const _FLOOR_BED_COLORS = ['pink', 'red', 'yellow', 'white', 'violet', 'orange', 'blue'];
+const _FLOOR_RIMS = ['picket', 'stone', 'brick'];
+const _FLOOR_EDGE_COLOR = Object.assign(Object.create(null), {   // (물려받은 이름 'constructor' 같은 값이 꽃밭으로 읽히지 않게)
+  tulipbed:     { '': 'pink', red: 'red', yellow: 'yellow', white: 'white', violet: 'violet', orange: 'orange', candy: 'red', sherbet: 'pink', night: 'violet' },
+  tulipcol:     { '': 'pink', red: 'red', yellow: 'yellow', white: 'white', violet: 'violet', orange: 'orange', candy: 'red', sherbet: 'pink', night: 'violet' },
+  hydrangea:    { '': 'blue', violet: 'violet', pink: 'pink', white: 'white', duo: 'violet', moon: 'yellow' },
+  lavender:     { '': 'violet', pink: 'pink', white: 'white' },
+  sunflowerbed: { '': 'yellow', orange: 'orange', lemon: 'yellow' },
+  daisyfield:   { '': 'white', yellow: 'yellow', pink: 'pink' },
+});   // wildflower 는 풀밭의 한 종류라 이 표에 없다(가장자리 없음)
 function _floorBaseName(type, r, c) {
   const n = _FLOOR_VARIANTS[type] || 0;
   if (!n) return 'tile_' + type;
   return 'tile_' + type + '_' + 'abcd'[(r*3 + c*7 + (r*c)%5) % n];
 }
-function _floorIsGrass(t) { return t === 'grass' || t === 'flower'; }
+function _floorIsGrass(t) { return t === 'grass' || t === 'flower' || t === 'wildflower'; }   // 들꽃 잔디는 풀밭의 한 종류(가장자리 없음)
 // 셀 하나(base + 가장자리). typeAt(r,c) → 타입 | null(격자 밖·집 영역 = 경계 없음으로 취급)
 // [DECO-PERF-1] SVG 를 캔버스에 그리면 브라우저가 매번 새로 래스터한다(확대한 화면에서 바닥 612칸에 88ms).
 //  한 번 비트맵으로 구워 두고 그걸 붙인다. 크기는 계단(약 19%씩)으로 굽는다 — 두 손가락으로 확대하는 동안
@@ -8003,46 +8019,58 @@ function _svgBmp(key, img, needW, ratio) {
   return b;
 }
 function _floorBmp(name, img, C) { return _svgBmp('f:' + name, img, C * 2, 1); }
-function _drawFloorSVG(type, r, c, px, py, C, typeAt, color) {
+function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
   const bname = _floorBaseName(type, r, c);
   const col = (color && _FLOOR_COLORS[type] && _FLOOR_COLORS[type].indexOf(color) >= 0) ? color : '';   // [DECO-FLOOR-COLOR-1]
   const base = _floorImg(bname, col);
   if (!base) return false;
   _dCtx.drawImage(_floorBmp(col ? bname + '#' + col : bname, base, C), px, py, C, C);   // 같은 파일·다른 색 = 다른 비트맵
   const T = (dr, dc) => { const t = typeAt(r + dr, c + dc); return (t == null) ? type : t; };
-  const put = name => { const img = _floorImg(name); if (img) _dCtx.drawImage(_floorBmp(name, img, C), px, py, C, C); };
+  const put = (name, ec) => { const img = _floorImg(name, ec); if (img) _dCtx.drawImage(_floorBmp(ec ? name + '#' + ec : name, img, C), px, py, C, C); };
+  //  [DECO-FLOOR-EDGE-1] 변 넷 · 안 모서리 넷 · 바깥 모서리 넷 — 물가·꽃밭 가장자리·잔디 번짐이 같은 판정, 같은 순서다.
+  //  n/e/s/w = 그 변의 이웃이 '바깥'인가 · out(dr,dc) = 그 대각선 이웃이 '바깥'인가 · v = 변 조각의 변형('' | '2') · ec = 조각 색
+  const ring = (pre, v, ec, n, e, s, w, out) => {
+    if (n) put(pre + 'n' + v, ec);
+    if (e) put(pre + 'e' + v, ec);
+    if (s) put(pre + 's' + v, ec);
+    if (w) put(pre + 'w' + v, ec);
+    if (n && e) put(pre + 'in_ne', ec);
+    if (n && w) put(pre + 'in_nw', ec);
+    if (s && e) put(pre + 'in_se', ec);
+    if (s && w) put(pre + 'in_sw', ec);
+    if (!n && !e && out(-1, 1))  put(pre + 'out_ne', ec);
+    if (!n && !w && out(-1, -1)) put(pre + 'out_nw', ec);
+    if (!s && !e && out(1, 1))   put(pre + 'out_se', ec);
+    if (!s && !w && out(1, -1))  put(pre + 'out_sw', ec);
+  };
+  const v2 = ((r*5 + c*3) % 2) ? '2' : '';
+  //  꽃밭 무리(들꽃 잔디 빼고 6종): 이웃이 꽃밭 무리가 **아닌** 변에만 가장자리. 마감이 있으면 rim_<마감>_*(색 없음), 없으면 bed_*#꽃잎색.
+  //  · 종류·색이 달라도 꽃밭끼리 맞닿은 변은 안 그린다 — 색을 번갈아 깔면 줄무늬 화단 하나가 된다. 잔디 번짐은 안 그린다.
+  //  · 마감 있는 칸은 **같은 마감의 꽃밭**만 안쪽으로 친다 → 울타리는 늘 빙 둘러 닫힌다(마감 없는 옆 밭은 그 울타리까지 꽃이 닿는다).
+  const EC = _FLOOR_EDGE_COLOR[type];
+  if (EC) {
+    const rimOf = x => (x && _FLOOR_RIMS.indexOf(x) >= 0) ? x : '';
+    const rm = rimOf(rim);
+    const out = (dr, dc) => {
+      const t = typeAt(r + dr, c + dc);
+      if (t == null) return false;                       // 격자 밖·집 = 경계 없음(물가와 같다)
+      if (!_FLOOR_EDGE_COLOR[t]) return true;
+      return !!rm && rimOf(typeAt(r + dr, c + dc, true)) !== rm;
+    };
+    let ec = '';
+    if (!rm) { ec = (col && Object.prototype.hasOwnProperty.call(EC, col)) ? EC[col] : EC['']; if (ec === 'pink') ec = ''; }   // bed_* 의 기본색 = pink(주소에 안 붙인다)
+    ring(rm ? 'rim_' + rm + '_' : 'bed_', v2, ec, out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);
+    return true;
+  }
   //  [DECO-WATER-ORDER-1] 물 칸은 **물가(shore_*)를 먼저, 잔디 번짐(fringe_grass_*)을 나중에** — 풀이 모래 띠 위로 번져
-  //  '풀 둑 + 모래톱 + 잔물결'이 된다(디자인 담당 #503 의 새 물가 그림 전제). 판정은 그대로, 두 블록 순서만 바꿨다.
+  //  '풀 둑 + 모래톱 + 잔물결'이 된다(디자인 담당 #503 의 새 물가 그림 전제).
   if (type === 'water') {
-    const n = T(-1, 0) !== 'water', e = T(0, 1) !== 'water', s = T(1, 0) !== 'water', w = T(0, -1) !== 'water';
-    if (n) put('shore_n');
-    if (e) put('shore_e');
-    if (s) put('shore_s');
-    if (w) put('shore_w');
-    if (n && e) put('shore_in_ne');
-    if (n && w) put('shore_in_nw');
-    if (s && e) put('shore_in_se');
-    if (s && w) put('shore_in_sw');
-    if (!n && !e && T(-1, 1) !== 'water')  put('shore_out_ne');
-    if (!n && !w && T(-1, -1) !== 'water') put('shore_out_nw');
-    if (!s && !e && T(1, 1) !== 'water')   put('shore_out_se');
-    if (!s && !w && T(1, -1) !== 'water')  put('shore_out_sw');
+    const out = (dr, dc) => T(dr, dc) !== 'water';
+    ring('shore_', '', '', out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);
   }
   if (!_floorIsGrass(type)) {
-    const n = _floorIsGrass(T(-1, 0)), e = _floorIsGrass(T(0, 1)), s = _floorIsGrass(T(1, 0)), w = _floorIsGrass(T(0, -1));
-    const v = ((r*5 + c*3) % 2) ? '2' : '';
-    if (n) put('fringe_grass_n' + v);
-    if (e) put('fringe_grass_e' + v);
-    if (s) put('fringe_grass_s' + v);
-    if (w) put('fringe_grass_w' + v);
-    if (n && e) put('fringe_grass_in_ne');
-    if (n && w) put('fringe_grass_in_nw');
-    if (s && e) put('fringe_grass_in_se');
-    if (s && w) put('fringe_grass_in_sw');
-    if (!n && !e && _floorIsGrass(T(-1, 1)))  put('fringe_grass_out_ne');
-    if (!n && !w && _floorIsGrass(T(-1, -1))) put('fringe_grass_out_nw');
-    if (!s && !e && _floorIsGrass(T(1, 1)))   put('fringe_grass_out_se');
-    if (!s && !w && _floorIsGrass(T(1, -1)))  put('fringe_grass_out_sw');
+    const out = (dr, dc) => _floorIsGrass(T(dr, dc));
+    ring('fringe_grass_', v2, '', out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);
   }
   return true;
 }
@@ -8091,8 +8119,8 @@ function _drawYard() {
 
   // 셀별 바닥 타일
   // [FLOOR-SVG-1] 이웃 타입 조회 — 격자 밖·집 영역은 null(경계 없음)
-  const _yardTypeAt = (rr, cc) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
-    ? null : _floorParse(_yardFloorGet(CUR)[rr+'_'+cc]).name;   // [DECO-SPACE-1] · [DECO-FLOOR-PARSE-1] 이웃 판정은 이름으로
+  const _yardTypeAt = (rr, cc, wantRim) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
+    ? null : _floorParse(_yardFloorGet(CUR)[rr+'_'+cc])[wantRim ? 'rim' : 'name'];   // [DECO-SPACE-1] · [DECO-FLOOR-PARSE-1] 이웃 판정은 이름으로
   const _vis = _decoVisible(DY.rows, DY.cols);   // [DECO-ZOOM-1] 보이는 칸만
   const _floorCells = (v) => {
     const fl = _yardFloorGet(CUR);
@@ -8101,7 +8129,7 @@ function _drawYard() {
       const tkey = r+'_'+c;
       const fp = _floorParse(fl[tkey]), ttype = fp.name;   // [DECO-FLOOR-PARSE-1] 옛 값은 이름 그대로
       const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
-      if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt, fp.color)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
+      if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt, fp.color, fp.rim)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
       _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;
       _dCtx.fillRect(c*C, r*C, C, C);
       _drawTileTexture(ttype, c, r, C);

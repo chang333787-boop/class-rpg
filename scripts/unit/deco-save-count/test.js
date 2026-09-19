@@ -744,7 +744,7 @@
       out('옛바닥마당_두번그려_같음', f1 === f2 && f1 !== 'no-canvas');
       out('옛바닥마당_그림지문', f1);
       //  여기까지는 옛 바닥만 깔았다 → 정원 바닥 그림은 한 장도 안 불렸어야 한다(쓴 색만 부른다 · 요청 수 그대로)
-      out('정원바닥_안쓴마당_부른그림0', !Object.keys(_FLOOR_IMG).some(k => /^tile_(tulipbed|tulipcol|hydrangea|wildflower|sunflowerbed|lavender|daisyfield)/.test(k)));
+      out('정원바닥_안쓴마당_부른그림0', !Object.keys(_FLOOR_IMG).some(k => /^(bed_|rim_|tile_(tulipbed|tulipcol|hydrangea|wildflower|sunflowerbed|lavender|daisyfield))/.test(k)));
       if (typeof _floorParse === 'function') {
         out('바닥해석_옛값_이름그대로', OLD.every(t => { const p = _floorParse(t); return p.name === t && !p.color && !p.rim; }));
         const p = _floorParse('tulipbed#red+picket');
@@ -761,10 +761,18 @@
         const vals = []; Object.keys(_FLOOR_COLORS).forEach(n => { vals.push([n, '']); _FLOOR_COLORS[n].forEach(col => vals.push([n, col])); });
         vals.forEach(([n, col]) => _floorImg(_floorBaseName(n, gr, gc), col));                            // 이 칸에 쓸 그림만 부른다
         for (let i = 0; i < 100; i++) { if (Object.keys(_FLOOR_IMG).every(k => _FLOOR_IMG[k].img.complete)) break; await sleep(50); }
-        const cellPrint = async (v) => {
-          CUR.yardFloor = { [gk]: v }; _drawDeco(); await sleep(40);
+        //  한 칸(과 이웃)을 깔고 그 **칸만** 지문을 뜬다. 가장자리 조각은 그릴 때 처음 불리므로, 새 그림을 불렀으면 다 올 때까지 기다렸다가 다시 그린다.
+        //  (`complete` 가 먼저 참이 되고 onload 는 그 뒤에 온다 — '왔다'는 기억 표의 ok 로 본다. 없는 파일은 complete 인데 폭 0)
+        const settled = () => Object.keys(_FLOOR_IMG).every(k => _FLOOR_IMG[k].ok || (_FLOOR_IMG[k].img.complete && !_FLOOR_IMG[k].img.naturalWidth));
+        const cellPrint = async (v, around) => {
+          const fx2 = { [gk]: v }; Object.keys(around || {}).forEach(d => { const [dr, dc] = d.split(',').map(Number); fx2[(gr + dr) + '_' + (gc + dc)] = around[d]; });
+          const ok0 = Object.keys(_FLOOR_IMG).filter(k => _FLOOR_IMG[k].ok).length;   // 그리기 **전에** 센다 — 그리는 40ms 사이에 도착한 그림도 '새로 온 것'
+          CUR.yardFloor = fx2; _drawDeco(); await sleep(40);
+          for (let i = 0; i < 100 && !settled(); i++) await sleep(50);
+          if (Object.keys(_FLOOR_IMG).filter(k => _FLOOR_IMG[k].ok).length !== ok0) { _drawDeco(); await sleep(40); }
           const cv = document.querySelector('#if-topview canvas');
-          const d = cv.getContext('2d').getImageData(Math.round((gc * _dC - _dPanX) * 2), Math.round((gr * _dC - _dPanY) * 2), C2, C2).data;
+          //  칸 크기가 정수가 아니면(하네스 창 = 칸 15.12px) 칸 경계 1px 이 이웃 칸과 섞인다 → 안쪽으로 2px 들여 뜬다(이웃이 달라도 제 칸 그림만 견주게)
+          const d = cv.getContext('2d').getImageData(Math.ceil((gc * _dC - _dPanX) * 2) + 2, Math.ceil((gr * _dC - _dPanY) * 2) + 2, Math.floor(C2) - 4, Math.floor(C2) - 4).data;
           return [...new Uint8Array(await crypto.subtle.digest('SHA-256', d.buffer))].slice(0, 8).join(',');
         };
         const grassPrint = await cellPrint('grass'), seen = {}; let same = [];
@@ -772,11 +780,44 @@
         out('정원바닥_값마다_다른그림', vals.length + '값 중 겹침 ' + same.length + (same.length ? ' (' + same.slice(0, 4).join(' · ') + ')' : ''));
         out('정원바닥_색이_실제로_입혀짐', same.length === 0 && vals.length >= 30);
         const nImg = Object.keys(_FLOOR_IMG).length;
-        const bogus = await cellPrint('tulipbed#nosuchcolor'), rimmed = await cellPrint('tulipbed#red+picket'), oldCol = await cellPrint('stone#red');
+        const bogus = await cellPrint('tulipbed#nosuchcolor'), oldCol = await cellPrint('stone#red');
         out('정원바닥_없는색은_기본색_그림안부름', bogus === (await cellPrint('tulipbed')) && Object.keys(_FLOOR_IMG).length === nImg);
-        out('정원바닥_마감붙어도_같은바탕', rimmed === (await cellPrint('tulipbed#red')));                 // 마감 그림은 가장자리 PR 에서
         out('정원바닥_옛바닥에_색은_무시', oldCol === (await cellPrint('stone')));
         out('정원바닥_부른그림수', Object.keys(_FLOOR_IMG).filter(isGarden).length + '장(이 칸의 변형 × ' + vals.length + '값)');
+        //  ⑰ 꽃밭 가장자리(DECO-FLOOR-EDGE-1) — 꽃밭 무리의 바깥 변에만 bed_*#꽃잎색 / rim_<마감>_* · 들꽃 잔디는 풀.
+        if (typeof _FLOOR_EDGE_COLOR !== 'undefined') {
+          const ring8 = v => ({ '-1,-1': v, '-1,0': v, '-1,1': v, '0,-1': v, '0,1': v, '1,-1': v, '1,0': v, '1,1': v });
+          const keysLike = re => Object.keys(_FLOOR_IMG).filter(k => re.test(k));
+          const alone = await cellPrint('tulipbed'), inside = await cellPrint('tulipbed', ring8('tulipbed'));
+          out('꽃밭가장자리_홀로선칸은_둘러싸인칸과_다르다', alone !== inside);
+          out('꽃밭가장자리_다른꽃밭·다른색·다른마감과_맞닿으면_안그림', inside === (await cellPrint('tulipbed', ring8('lavender+brick'))) && inside === (await cellPrint('tulipbed', ring8('tulipbed#red'))));
+          const eGrass = await cellPrint('tulipbed', Object.assign(ring8('tulipbed'), { '0,1': 'grass' }));
+          out('꽃밭가장자리_바깥변_하나만', eGrass !== inside && eGrass !== alone);
+          out('꽃밭가장자리_들꽃·돌·물_옆도_바깥', eGrass === (await cellPrint('tulipbed', Object.assign(ring8('tulipbed'), { '0,1': 'wildflower' })))
+            && eGrass === (await cellPrint('tulipbed', Object.assign(ring8('tulipbed'), { '0,1': 'stone' }))) && eGrass === (await cellPrint('tulipbed', Object.assign(ring8('tulipbed'), { '0,1': 'water' }))));
+          await cellPrint('tulipbed#red');
+          out('꽃밭가장자리_꽃잎색은_바탕색을_따른다', keysLike(/^bed_.*#red$/).length >= 8 && keysLike(/^bed_.*#red$/).every(k => _FLOOR_IMG[k].ok));   // 변 4 + 안 모서리 4
+          //  짝 표(#636): candy → red(방금 부른 그림) · sherbet → pink(기본 = 주소에 색 없음) — 새 그림을 안 부르고, 짝 색 자체가 주소에 안 붙는다
+          const nb = keysLike(/^bed_/).length; await cellPrint('tulipbed#candy'); await cellPrint('tulipbed#sherbet');
+          out('꽃밭가장자리_짝색은_이미부른그림_다시안부름', keysLike(/^bed_/).length === nb && keysLike(/^bed_.*#(candy|sherbet|pink)$/).length === 0);
+          await cellPrint('hydrangea'); await cellPrint('lavender'); await cellPrint('sunflowerbed'); await cellPrint('daisyfield');
+          out('꽃밭가장자리_기본색짝', ['blue', 'violet', 'yellow', 'white'].every(c2 => keysLike(new RegExp('^bed_.*#' + c2 + '$')).length > 0));
+          const rims = [await cellPrint('tulipbed+picket'), await cellPrint('tulipbed+stone'), await cellPrint('tulipbed+brick')];
+          out('꽃밭가장자리_마감셋_서로다르고_가장자리와도_다르다', new Set(rims.concat([alone])).size === 4);
+          const fenceT = [rims[0] === (await cellPrint('tulipbed+picket', ring8('tulipbed'))), rims[0] === (await cellPrint('tulipbed+picket', ring8('lavender+brick'))),
+            rims[0] !== (await cellPrint('tulipbed+picket', ring8('lavender+picket'))), inside === (await cellPrint('tulipbed', ring8('lavender+picket')))];
+          out('꽃밭가장자리_울타리는_빙_둘러_닫힌다', fenceT.every(Boolean) || fenceT.join(','));
+          out('꽃밭가장자리_마감엔_색없음·없는마감은_그냥가장자리', keysLike(/^rim_.*#/).length === 0 && alone === (await cellPrint('tulipbed+nosuchrim')) && keysLike(/^rim_nosuch/).length === 0);
+          const stGrass = await cellPrint('stone', ring8('grass'));
+          out('들꽃잔디는_풀_돌칸에_잔디가_번진다', stGrass === (await cellPrint('stone', ring8('wildflower#snow'))) && stGrass !== (await cellPrint('stone', ring8('stone'))));
+          out('들꽃잔디는_풀_제칸엔_번짐없음', (await cellPrint('wildflower')) === (await cellPrint('wildflower', ring8('wildflower'))));
+          //  홀로 선 꽃밭 칸 = 바탕 1 + 가장자리 8(변 4 · 안 모서리 4)뿐 — 잔디 번짐(8)을 또 얹지 않는다. 마당 전체를 그리는 drawImage 횟수의 차로 센다.
+          const drawsFor = (fx3) => { CUR.yardFloor = fx3; const o = _dCtx.drawImage; let n = 0; _dCtx.drawImage = function () { n++; return o.apply(this, arguments); }; try { _drawYard(); } finally { _dCtx.drawImage = o; } return n; };
+          const dGrass = drawsFor({}), dBed = drawsFor({ [gk]: 'tulipbed' });
+          out('꽃밭칸_조각수', '홀로 선 칸 = 잔디 칸 +' + (dBed - dGrass));
+          out('꽃밭칸엔_잔디번짐_안얹는다', dBed - dGrass === 8);
+          out('꽃밭가장자리_부른그림수', 'bed ' + keysLike(/^bed_/).length + ' · rim ' + keysLike(/^rim_/).length);
+        }
       }
       CUR.yardFloor = keepFloor; _drawDeco(); await sleep(100);
     }
