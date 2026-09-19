@@ -250,7 +250,7 @@
   };
 </script>
 
-<script src="./sync.js"></script>
+<script src="./sync.js?v=20260920-hidden"></script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
 </script>
@@ -772,7 +772,7 @@ function joinPartsAt(rec) {                            // 이웃(세계 기준) 
   else { const straight = mask === 5 || mask === 10; if (S.always || !straight) S.node.forEach(pt => out.push(turn(pt, rot))); [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) S.arm.forEach(pt => out.push(turn(nv ? { ...pt, g: pt.g + ((vv + d) % nv) } : pt, d + rot))); }); }
   return _joinCache[key] = out; }
 /* 놓거나 치우면 이웃의 모양도 바뀐다 → 이웃 칸이 든 청크도 다시 합친다(청크가 4칸이라 경계를 자주 넘는다). 꽃밭 가장자리 등 '이웃을 보는 모양'이 같이 쓴다 */
-function joinDirtyAround(kind, x, y) { if (K[kind] && ROAD_JOIN_TO.has(kind)) { for (let dy = -1; dy <= 3; dy++) for (let dx = -1; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (inb(xx, yy)) dirtyChunks.add(chunkOfCell(idx(xx, yy))); } return; }   /* [DESIGN-ROAD-1] 길 가족(발자국 최대 3칸) — 둘레 청크를 다시 합친다 */ if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
+function joinDirtyAround(kind, x, y) { if (K[kind] && ROAD_JOIN_TO.has(kind)) { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (inb(xx, yy)) dirtyChunks.add(chunkOfCell(idx(xx, yy))); } return; }   /* [DESIGN-ROAD-1] 길 가족(발자국 최대 3칸) — 둘레 청크를 다시 합친다 · [DESIGN-AVENUE-1] 뿌리가 3칸 뒤에 있는 이웃(큰길 방향·가로수 열)도 */ if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
 /* ══════════════════════════════════════════════════════════════
    [MAC-LINE] 옛 울타리·돌담(2×1)도 이웃을 보고 이어진다 — 디자인 담당의 자동 이음(DESIGN-JOIN-1)을 받아 넓힌다
    사용자 09-20: "울타리라면 대실패고, 네 코너 맞닿는 요소를 만들어야지." 옛 fence·wall 은 곧은 2×1 상자를 R 로 돌려 놓는 방식이라 모퉁이가 어긋나고 틈이 났다.
@@ -1290,8 +1290,11 @@ function lawnPartsAt(rec) {
    ══════════════════════════════════════════════════════════════ */
 const ROAD_FAM = new Set(['road', 'avenue', 'crosswalk', 'treerow', 'gravel']);
 const ROAD_JOIN_TO = new Set(['road', 'avenue', 'crosswalk', 'treerow', 'gravel', 'bridge', 'sbridge', 'plaza']);   // 다리·광장은 '이어지는 상대'로만(제 모양은 그대로)
-window.ROADJOIN = window.ROADJOIN || { on: true, gap: .07 };   // 보스 결정 ⓑ 가는 줄눈 — 칸의 결이 남아 칸을 세며 짓기 좋다(0 = 틈 없이 한 띠)
+window.ROADJOIN = window.ROADJOIN || { on: true, gap: .07, lanes: true };   // lanes: 큰길 차선(보스 결정 ⓐ — false 면 옛 노란 ＋)   // 보스 결정 ⓑ 가는 줄눈 — 칸의 결이 남아 칸을 세며 짓기 좋다(0 = 틈 없이 한 띠)
 const _rm = new THREE.Matrix4();
+/* 큰길의 방향 — 둘레(발자국 바깥 한 칸)에 이어지는 상대가 더 많은 쪽. 큰길끼리는 두 배로 센다(큰길을 이어 놓은 거리가 한 방향으로 읽히게). 외따로면 가로(x) */
+function avenueAlongX(rx, ry) { const at = (x, y) => { if (!inb(x, y)) return 0; const c = cells[idx(x, y)]; return !c || !ROAD_JOIN_TO.has(c.k) ? 0 : c.k === 'avenue' ? 2 : 1; };
+  let ex = 0, ez = 0; for (let d = 0; d < 2; d++) { ex += at(rx - 1, ry + d) + at(rx + 2, ry + d); ez += at(rx + d, ry - 1) + at(rx + d, ry + 2); } return ex >= ez; }
 function roadFamParts(rec) {
   const R = window.ROADJOIN, rx = cX(rec.root), ry = cY(rec.root), rot = rec.rot & 3, fp = footprint(rec.k, rx, ry, rot);
   const fam = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && ROAD_JOIN_TO.has(c.k)); };
@@ -1314,7 +1317,12 @@ function roadFamParts(rec) {
     if (gravel) [[-.9, -.7, .3], [.8, .5, .26], [.2, -1.1, .22], [-.5, 1.0, .24]].forEach(([a, b, r]) => out.push({ g:'sph', c:P.stoneD, s:[r, r * .5, r], p:[cx + a, .21, cz + b], abs:true }));
   });
   const n = fp.length, mx = sx / n, mz = sz / n, alongX = fp.length > 1 && fp[0][1] === fp[1][1];   // 발자국 가운데 · 긴 쪽이 x 인가
-  if (rec.k === 'avenue') out.push({ g:'box', c:0xf4e7a8, s:[CS * 1.6, .02, .16], p:[mx, .21, mz], abs:true }, { g:'box', c:0xf4e7a8, s:[.16, .02, CS * 1.6], p:[mx, .21, mz], abs:true });
+  if (rec.k === 'avenue' && !R.lanes) out.push({ g:'box', c:0xf4e7a8, s:[CS * 1.6, .02, .16], p:[mx, .21, mz], abs:true }, { g:'box', c:0xf4e7a8, s:[.16, .02, CS * 1.6], p:[mx, .21, mz], abs:true });
+  if (rec.k === 'avenue' && R.lanes) {                                  // [DESIGN-AVENUE-1] 차선 — 짙은 차도판(횡단보도와 같은 색) + 흰 점선 가운데 줄 + 양 가장자리 실선. '넓은 길'로 한눈에(1칸 길 여러 줄과 갈리게)
+    const alongX = avenueAlongX(rx, ry), L = CS * 2, Wd = CS * 2 * .72, B = (c, a, h, w, pa, y, pw) => ({ g:'box', c, s: alongX ? [a, h, w] : [w, h, a], p: alongX ? [mx + pa, y, mz + pw] : [mx + pw, y, mz + pa], abs:true });
+    out.push(B(0x8f9097, L, .02, Wd, 0, .205, 0));
+    [-3, -1, 1, 3].forEach(t => out.push(B(0xf6f6f2, .9, .02, .14, t * .95, .215, 0)));
+    [-1, 1].forEach(sd => out.push(B(0xf6f6f2, L, .02, .09, 0, .215, sd * (Wd / 2 - .12)))); }
   if (rec.k === 'crosswalk') {
     out.push({ g:'box', c:0x8f9097, s: alongX ? [CS * 2, .02, CS * .74] : [CS * .74, .02, CS * 2], p:[mx, .205, mz], abs:true });
     [-2.6, -.9, .9, 2.6].forEach(t => out.push({ g:'box', c:0xf6f6f2, s: alongX ? [.5, .02, CS * .6] : [CS * .6, .02, .5], p:[mx + (alongX ? t : 0), .215, mz + (alongX ? 0 : t)], abs:true }));
@@ -1532,7 +1540,7 @@ for (const g in GEO) {
    주소 끝 #fb=0 → 옛 parts(K.flower.parts)로 재 보기
    ══════════════════════════════════════════════════════════════ */
 const FLOWER_VARS = 4;
-const FLOWER_SETS = {};                                // 종류 id → [parts × FLOWER_VARS]
+const FLOWER_SETS = {}, FLOWER_BLOOMS = {};   // FLOWER_BLOOMS: 꽃밭 기하마다 꽃 무리 [첫 꼭짓점, 수, 밑 가운데 x·y·z] ([DESIGN-GROW-1])                                // 종류 id → [parts × FLOWER_VARS]
 (function buildFlowerBeds() {
   if (HP.fb === 0) return;
   const HALF = CS / 2, TOP = .22, TAU = Math.PI * 2;
@@ -1544,7 +1552,7 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
     for (let vi = 0; vi < FLOWER_VARS; vi++) {
       let s = (0x9e3779b1 ^ Math.imul(vi + 1 + si * 16, 0x85ebca6b)) | 0;
       const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-      const pos = [], nrm = [], idx = [], col = [], kind = [];
+      const pos = [], nrm = [], idx = [], col = [], kind = [], blooms = [];
       /* 도형 하나: 면마다 '도형 가운데에서 바깥'을 보게 감는 방향을 맞춘다(한쪽 면만 그리므로) */
       function shape(verts, faces, c, k) {
         const off = pos.length / 3; let mx = 0, my = 0, mz = 0, off2 = 0;
@@ -1573,6 +1581,7 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
         const rot = rnd() * TAU, n = P.n, v = [...ringAt(cx, y0, cz, r * P.b, r * P.b, n, rot), ...ringAt(cx, y0 + h * P.m, cz, r, r, n, rot + TAU / (2 * n)), [cx, y0 + h, cz]], f = [];
         for (let i = 0; i < n; i++) { const j = (i + 1) % n; f.push([i, j, n + i], [j, n + j, n + i], [n + i, n + j, 2 * n]); }
         const lo = dark(c, .70), hi = center || mixc(c, WHITE, P.top);
+        blooms.push([pos.length / 3, v.length, cx, y0, cz]);   // [DESIGN-GROW-1] 꽃 한 송이의 꼭짓점 자리 — 봉오리를 만들 때 이 무리만 줄인다
         shape(v, f, i => i < n ? lo : i < 2 * n ? c : hi, PK);
       }
       /* 잎 깔개 — 위 + 옆 4면(10△), 칸 끝까지 */
@@ -1617,10 +1626,62 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
       }
       const name = 'fb:' + kid + ':' + vi;
       BASE[name] = { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv: pos.length / 3, vcol: new Float32Array(col), vkind: Uint8Array.from(kind), tri: idx.length / 3 };
+      FLOWER_BLOOMS[name] = blooms;
       set.push([{ g: name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
     }
   });
 })();
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-GROW-1] 밤새 자라는 것의 단계 모양 — docs/village_grow_proposal.md. 저장은 프로그램 담당, 그리기 고리·연기는 주민 연기 담당, **모양은 여기**.
+   window.GROW_PARTS(kind, stage, parts) → 그 단계의 부위 목록(다 자란 단계면 null = 원래 부위 그대로).
+   · 나무 tree · 과일나무 fruit · 큰나무 bigtree: 0 새싹 → 1 어린나무 → 2 다 자람. 과일나무는 다 자라야 열매(어린나무까지는 나무와 같은 모양).
+   · 꽃밭 flower · 색 꽃밭: 0 봉오리 → 1 활짝. 봉오리 = 같은 꽃밭 기하에서 **꽃 무리만** 작게 오므리고 초록으로 — 잎·꽃대·가장자리는 그대로.
+   · 부위는 칸 가운데 원점(원래 부위와 같은 자리) — 청크에 합쳐 그리면 draw call +0.
+   ══════════════════════════════════════════════════════════════ */
+window.GROW_LOOK = window.GROW_LOOK || { treeStyle: 'mix', budStyle: 'closed' };   // 보스 결정: ⓒ 섞음 + 오므린 봉오리   // 시안 스위치: treeStyle 'shape'(단계별 모양) | 'scale'(크기만) | 'mix'(새싹 모양 · 어린나무는 제 나무 0.6 + 받침대) · budStyle 'closed'(오므린 봉오리) | 'small'(작게+초록)
+const GROW_TREE = {
+  tree: [
+    [ { g:'cyl', c:0x8a6a48, s:[.8,.14,.8], p:[0,.07,0] }, { g:'cyl', c:P.leafL, s:[.08,1.0,.08], p:[0,.6,0] },                  // 새싹: 흙 둔덕 + 줄기 + 떡잎 둘 + 새잎 — 기본 거리에서 '싹'으로 읽히는 크기(처음엔 흙만 보였다)
+      { g:'sph', c:P.leafL, s:[.48,.09,.28], p:[-.38,1.08,0], rz:.4 }, { g:'sph', c:P.leafL, s:[.48,.09,.28], p:[.38,1.08,0], rz:-.4 }, { g:'sph', c:P.leaf, s:[.2,.3,.2], p:[0,1.2,0] } ],
+    [ { g:'cyl', c:0x8a6a48, s:[.7,.1,.7], p:[0,.05,0] }, { g:'cyl', c:0x9a6f48, s:[.1,1.5,.1], p:[0,.8,0] },                     // 어린나무: 가는 줄기 + 작은 잎 뭉치 셋 + 받침대(끈)
+      { g:'sph', c:P.leaf, s:[.62,.55,.62], p:[0,1.75,0] }, { g:'sph', c:P.leafL, s:[.42,.4,.42], p:[-.35,1.5,.15] }, { g:'sph', c:P.leafL, s:[.38,.36,.38], p:[.3,1.45,-.2] },
+      { g:'box', c:P.woodL, s:[.07,1.3,.07], p:[.32,.65,.12], rz:-.08 }, { g:'box', c:0xe6d3a3, s:[.36,.06,.06], p:[.16,1.0,.06] } ] ],
+  bigtree: [
+    [ { g:'cyl', c:0x8a6a48, s:[.8,.14,.8], p:[0,.07,0] }, { g:'cone', c:P.leaf, s:[.36,.8,.36], p:[0,.62,0] }, { g:'cone', c:P.leafL, s:[.24,.5,.24], p:[0,1.1,0] } ],   // 새싹: 뾰족잎 둘
+    [ { g:'cyl', c:0x8a6a48, s:[.7,.1,.7], p:[0,.05,0] }, { g:'cyl', c:0x9a6f48, s:[.1,.9,.1], p:[0,.5,0] },                                                            // 어린나무: 원뿔 셋을 쌓은 작은 전나무 + 받침대
+      { g:'cone', c:P.leaf, s:[.62,.9,.62], p:[0,1.2,0] }, { g:'cone', c:P.leaf, s:[.5,.8,.5], p:[0,1.65,0] }, { g:'cone', c:P.leafL, s:[.34,.65,.34], p:[0,2.1,0] },
+      { g:'box', c:P.woodL, s:[.07,1.3,.07], p:[.36,.65,.12], rz:-.08 }, { g:'box', c:0xe6d3a3, s:[.4,.06,.06], p:[.18,.95,.06] } ] ] };
+GROW_TREE.fruit = GROW_TREE.tree;
+const GROW_STAKE = [ { g:'cyl', c:0x8a6a48, s:[.8,.12,.8], p:[0,.06,0] }, { g:'box', c:P.woodL, s:[.08,1.5,.08], p:[.5,.75,.2], rz:-.08 }, { g:'box', c:0xe6d3a3, s:[.5,.07,.07], p:[.25,1.05,.1] } ];   // 어린나무 받침대 + 흙 둔덕
+const _budCache = {};
+function budGeo(name) {                                                   // 꽃밭 기하 하나에서 봉오리 기하를 만든다(한 번만)
+  const st = window.GROW_LOOK.budStyle, key = name + ':' + st; if (_budCache[key]) return _budCache[key];
+  const b = BASE[name], groups = FLOWER_BLOOMS[name]; if (!b || !groups) return null;
+  const pos = new Float32Array(b.pos), col = new Float32Array(b.vcol), G = [.30, .52, .20];   // 봉오리 초록(선형 색)
+  groups.forEach(([o, n, cx, cy, cz]) => { const ring = (n - 1) / 2;
+    for (let i = o; i < o + n; i++) { const k = i - o, top = k === n - 1;
+      const sxz = st === 'closed' ? .38 : .5, sy = st === 'closed' ? .72 : .5;
+      pos[i * 3] = cx + (pos[i * 3] - cx) * sxz; pos[i * 3 + 1] = cy - .12 + (pos[i * 3 + 1] - cy) * sy; pos[i * 3 + 2] = cz + (pos[i * 3 + 2] - cz) * sxz;
+      const t = st === 'closed' ? (top ? .15 : k < ring ? .85 : .7) : .45;          // 오므린 봉오리: 밑·배는 초록, 꼭대기만 꽃빛
+      for (let c = 0; c < 3; c++) col[i * 3 + c] = col[i * 3 + c] + (G[c] - col[i * 3 + c]) * t; } });
+  const nn = name.replace(/^fb:/, 'fbb:') + ':' + st;
+  BASE[nn] = { pos, nrm: b.nrm, idx: b.idx, nv: b.nv, vcol: col, vkind: b.vkind, tri: b.tri };
+  return _budCache[key] = nn;
+}
+/* 단계는 저장 쪽 window.GROW(root) → 0 새싹·봉오리 · 1 어린나무 · 2 다 자람(프로그램 담당). 청크를 합칠 때 partsOf 가 여기로 — 지도에 놓인 칸만(카드 그림·놓기 미리보기의 가짜 rec 은 그대로).
+   ACT-GROW(#628)의 크기 곱하기는 GROW_PARTS 가 모양을 주는 종류면 건너뛴다(그쪽 한 줄). */
+window.GROW_PARTS = (kind, stage, parts) => {
+  if (GROW_TREE[kind]) { if (stage >= 2) return null;
+    if (window.GROW_LOOK.treeStyle === 'scale') { const k = stage ? .65 : .35; return (parts || []).map(pt => ({ ...pt, s: pt.s.map(v => v * k), p: [pt.p[0] * k, pt.p[1] * k, pt.p[2] * k] })); }
+    if (window.GROW_LOOK.treeStyle === 'mix' && stage === 1) return ((kind === 'fruit' ? glbParts('tree', 'tree_round') : parts) || K.tree.parts).map(pt => ({ ...pt, s: pt.s.map(v => v * .6), p: [pt.p[0] * .6, pt.p[1] * .6, pt.p[2] * .6] })).concat(GROW_STAKE);   // 섞음: 새싹은 모양 · 어린나무는 제 나무를 0.6 + 받침대(과일나무·전나무가 제 모습을 지킨다)
+    return GROW_TREE[kind][stage]; }
+  if (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]) { if (stage >= 1) return null;
+    return (parts || []).map(pt => { if (!/^fb:/.test(pt.g)) return pt; const g = budGeo(pt.g); return g ? { ...pt, g } : pt; }); }
+  return null;
+};
+{ const po = partsOf; partsOf = function (rec) { const r = po(rec), G = window.GROW;   // [DESIGN-GROW-1] 자라는 중인 나무·꽃밭은 그 단계의 모양으로
+  if (typeof G !== 'function' || cells[rec.root] !== rec || (window.VRULES && window.VRULES.grow && !window.VRULES.grow.on)) return r;
+  const st = G(rec.root); if (st !== 0 && st !== 1) return r; return window.GROW_PARTS(rec.k, st, r) || r; }; }
 function flowerPartsAt(kind, x, y) { const set = FLOWER_SETS[kind]; return set ? set[(x * 7 + y * 13) % set.length] : null; }
 window.__flowerBeds = () => Object.fromEntries(Object.entries(FLOWER_SETS).map(([k, set]) => [k, set.map(p => BASE[p[0].g].tri)]));
 /* ══════════════════════════════════════════════════════════════
@@ -1862,7 +1923,7 @@ function buildChunk(cx, cz) {
     parts.forEach((pt, pi) => {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
-      partMatrix(rec.k, x, y, rec.rot, pt, _m); _n3.getNormalMatrix(_m);
+      partMatrix(rec.k, x, y, rec.rot, pt, _m); if (typeof actGrowMatrix === 'function') actGrowMatrix(rec, x, y, _m); _n3.getNormalMatrix(_m);   // [ACT-GROW] 자라는 중이면 단계 크기
       const vc = base.vcol, vk = base.vkind;
       if (!vc) _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
       if (!vc && wait) window.WAITHOUSE.col(_col, -1, pt);   // [MAC-WAITLOOK] 한 색 부위는 여기서 한 번(정점마다 하면 옅어짐이 쌓인다)
@@ -2660,6 +2721,7 @@ function act(clientX, clientY) {
     const rec = c.inside ? cells[idx(c.x, c.y)] : null;
     if (rec && rec.k === 'sign') { writeSign(rec); return; }
     if (rec && actGateSay(rec)) return;   // [ACT-GATESAY] 정원 문 — 왜 아무도 안 오나 한 줄
+    if (typeof actCartTap === 'function' && actCartTap(c.x, c.y)) return;   // [ACT-CARTTAP] 밤 어귀 수레를 누르면 내일 올 집을 ✨ 로
     if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘' + (topSign() ? ' · 가장 많이 읽힌 표지판 「' + topSign().t + '」 ' + topSign().reads + '번' : '') + (topLike() ? ' · 손님이 좋아한 곳: ' + topLike().nm : ''), true); return; }
     if (rec && rec.k === 'dream') {                   // 꿈나무: 꿈을 적거나 본다
       if (VISIT.on) { toast('🌟 ' + (DREAM.text || '(아직 꿈을 안 적었어요)'), true); return; }
@@ -2908,9 +2970,13 @@ window.__rclick = () => ({ 켜짐: window.VRULES.rightClick.on, 확인대기중:
       → 있는 장치(MAC-SPOT 의 노란 자리 밝히기)를 그 순간에 켠다. 큰 건물이 열릴 때만 켜지던 것 — 집은 빠져 있었다. 6초에 한 번까지.
    원래 줄 수정 0 — pushUndo·updateGhost 감싸기 + pointerup 리스너. */
 (window.VRULES = window.VRULES || {}).first5 = { on: true, spotGapMs: 6000 };
-const F5 = { pushes: 0, p0: 0, painted: 0, mute: null, spotAt: 0, told: false, stats: { 말풍선접음: 0, 자리밝힘: 0 } };
+const F5 = { pushes: 0, p0: 0, painted: 0, mute: null, spotAt: 0, told: false, stats: { 말풍선접음: 0, 누르는중접음: 0, 자리밝힘: 0 } };
 { const push0 = pushUndo; pushUndo = function () { F5.pushes++; return push0.apply(this, arguments); };
   const ghost0 = updateGhost; updateGhost = function () { const r = ghost0.apply(this, arguments);
+    /* [MAC-FIRST5-2] (창조자의 눈 5회 🔴1) 손가락이 **눌린 채** 1px 만 흔들려도 pointermove → updateGhost 가 방금 놓은 칸을 다시 보고 빨간 "여기엔 이미 ○○가 있어요"를 띄웠다
+       (① 은 손을 뗀 뒤에만 걷었다 — 진짜 손가락은 늘 흔들리므로 터치에선 놓을 때마다 보였다). 이번 누름(획)으로 놓은 것 위에서는 그 말과 붉은 상자를 띄우지 않는다. */
+    if (window.VRULES.first5.on && painting && painting.list.length && hover && hover.inside) { const rec = cells[idx(hover.x, hover.y)];
+      if (rec && painting.list.some(it => idx(it.x, it.y) === rec.root)) { const el = document.getElementById('why'); if (el && el.className === 'show' && /^여기엔 이미/.test(el.textContent)) { el.className = ''; F5.stats.누르는중접음++; } ghost.fill.visible = ghost.edge.visible = false; } }
     if (F5.mute && window.VRULES.first5.on) { const el = document.getElementById('why'), key = hover ? hover.x + ',' + hover.y : null;
       if (key !== F5.mute) F5.mute = null; else if (el && el.className === 'show' && /^여기엔 이미/.test(el.textContent)) el.className = ''; }
     return r; }; }
@@ -3063,7 +3129,7 @@ window.__touch2 = () => ({ 손가락: TOUCH2.pts.size, 두손가락중: TOUCH2.o
    · 옮기기 = 원래 옮기기 도구로 바꿔 주고, 한 번 옮기고 나면 하던 일(고르던 카드)로 돌아온다. 들고 있는 상태를 손가락을 뗀 채로 끌고 가지 않는다(그 사이 자동 저장이 돌면 든 물건이 빠진 채 저장된다).
    메뉴가 떠 있을 때 판을 누르면 메뉴만 닫힌다(그 누름으로 물건이 놓이지 않게). 두 손가락을 대면 닫힌다. 원래 줄 수정 0 — 캡처 단계 리스너. 생김새(#hold·#holdRing)는 디자인 담당이 고쳐도 된다. */
 (window.VRULES = window.VRULES || {}).holdMenu = { on: true, ms: 500, ringAfter: 160, slop: 10, tipAfter: 3 };
-const HOLD = { t: 0, tr: 0, id: -1, x: 0, y: 0, root: -1, open: null, back: null, sawCarry: false, tipN: 0, stats: { 열림: 0, 돌림: 0, 못돌림: 0, 치움: 0, 옮기기: 0, 돌아옴: 0, 닫음: 0 } };
+const HOLD = { t: 0, tr: 0, id: -1, x: 0, y: 0, root: -1, open: null, back: null, sawCarry: false, tipN: 0, stats: { 열림: 0, 돌림: 0, 못돌림: 0, 치움: 0, 옮기기: 0, 돌아옴: 0, 닫음: 0, 카드든채: 0 } };
 const holdCage = (() => { const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false }));
   m.visible = false; m.renderOrder = 7; m.frustumCulled = false; scene.add(m); const m2 = m.clone(); m2.scale.setScalar(1.03); m.add(m2); return m; })();
 function holdCageFit(rec) { const d = dims(rec.k, rec.rot), c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot), hgt = rec.k === 'house' ? 4 + houseLv(rec.root) * 2.4 : Math.max(3, Math.min(9, d.w * 2.6));
@@ -3117,6 +3183,7 @@ canvas.addEventListener('pointerdown', e => {
   const R = window.VRULES.holdMenu;
   if (HOLD.open) { holdClose(); HOLD.stats.닫음++; if (TOUCH2.pts.size < 2) e.stopImmediatePropagation(); return; }   // 메뉴가 떠 있을 때 판을 누르면 닫기만(그 누름으로 놓이지 않게)
   holdCancel(); if (!R.on || e.pointerType === 'mouse' || TOUCH2.pts.size > 1 || mover || eraser || carrying || PHOTO.on || VISIT.on) return;
+  if (sel && R.viewOnly !== false) { HOLD.stats.카드든채++; return; }   // [MAC-HOLD-2] (창조자의 눈 5회) 카드를 든 채 겨누느라 0.7초 대고 있던 아이에게 길의 돌리기·옮기기 메뉴가 떴다 — 메뉴는 보기 모드(아무것도 안 고름)에서만. holdMenu.viewOnly = false 면 전처럼
   const c = cellAt(e.clientX, e.clientY), rec = c && c.inside ? cells[idx(c.x, c.y)] : null; if (!rec) return;      // 누르는 순간 물건이 있던 칸만
   HOLD.id = e.pointerId; HOLD.x = e.clientX; HOLD.y = e.clientY; HOLD.root = rec.root;
   HOLD.t = setTimeout(holdFire, R.ms); HOLD.tr = setTimeout(() => holdRing(true, HOLD.x, HOLD.y), R.ringAfter);
@@ -3576,6 +3643,7 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
+  if ((SIM.ticks % 30) === 13) growTick('tick');   // [MAC-GROW] 심은 것이 한 단계 자랐나(3초마다 · 자라는 것만 훑는다)
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
@@ -4050,11 +4118,11 @@ function tryMoveIn() {
 var WAITLOOK = { miss: new Map(), stats: { 센횟수: 0, 다시합친청크: 0, 센ms: 0 } };   // var — buildChunk 가 이 줄보다 먼저 돌 수 있다(그땐 undefined → 기다리는 집 없음)
 /* [MAC-WAITSCAN] 기다리는 집 훑기는 3초에 한 번만 — 칩(MAC-WAITHOMES)과 집 모습(MAC-WAITLOOK)이 같은 awayLacks 훑기(빈집마다 길 BFS)를 따로 했다.
    같은 3초 구간 안에서는 앞서 센 것을 돌려준다. fresh = 아이가 칩을 눌렀을 때·시험 훅(멈춘 동안 우물을 놓고 바로 누를 수 있다). 방문 중엔 빈 표. */
-var WAITSCAN = { at: -1e9, map: new Map(), stats: { 훑음: 0, 다시씀: 0 } };
+var WAITSCAN = { at: -1e9, map: new Map(), lack: new Map(), stats: { 훑음: 0, 다시씀: 0 } };
 function waitScan(fresh) {
   if (!fresh && SIM.ticks >= WAITSCAN.at && SIM.ticks - WAITSCAN.at < 30) { WAITSCAN.stats.다시씀++; return WAITSCAN.map; }
-  const m = new Map(); if (!VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; const miss = awayLacks(rec); if (miss && miss.length) m.set(i, miss[0]); });
-  WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.stats.훑음++; return m;
+  const m = new Map(), lack = new Map(); if (!VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; const miss = awayLacks(rec); if (miss && miss.length) { m.set(i, miss[0]); lack.set(i, miss); } });
+  WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.lack = lack; WAITSCAN.stats.훑음++; return m;
 }
 function waitHouseIs(root) { return !!(WAITLOOK && window.WAITHOUSE) && WAITLOOK.miss.has(root) && (res.get(root) || 0) === 0; }
 function waitLookTick() {
@@ -4077,7 +4145,7 @@ const AWAY = { turned: new Map(), toasted: new Set(), rr: 0, stats: { 돌아섬:
 /* 순수 함수 — 이 집에 빠진 것 목록(살 만하면 null). THREE·DOM 을 안 만진다 */
 function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]); return needs.length - miss.length >= minHave ? null : miss; }
 function awayLacks(rec) { const R = window.VRULES.turnAway; if (!R.on || population() < R.graceBelow) return null; return homeLacks(computeSat(rec).met, AWAY_NEEDS, R.minHave); }   // computeSat 을 그 자리에서 — 빈 집은 satTick 이 안 돌아 캐시가 없다
-function awayWhy(rec) { const miss = awayLacks(rec); return miss ? miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아가요 — 물·가게·놀 곳·쉴 곳 중 두 가지는 가까워야 해요' : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
+function awayWhy(rec) { const miss = awayLacks(rec); return miss ? waitSay(miss, window.VRULES.turnAway.minHave) : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
 const awayLeavers = () => { let n = 0; folks.forEach(f => { if (f.leaving) n++; }); return n; };
 /* tryMoveIn 고리 — 오늘 이미 돌아선 집은 후보에서 뺀다. 돌아가는 사람이 길에 있으면 다음 후보가 불편한 집일 때 그 차례를 쉰다(행렬 막기 — 결과는 같다: 아무도 안 든다) */
 function awayFilter(homes) {
@@ -4157,19 +4225,37 @@ const WAITHOMES = { roots: [], seen: new Set(), stats: { 눌러감: 0 } };
 function waitHomesScan(fresh) { if (VISIT.on) return []; const m = waitScan(fresh); return window.VRULES.waitHomes.on ? [...m.keys()] : []; }   // [MAC-WAITSCAN] 훑기는 waitScan 하나
 /* 순수 함수 — (cx,cy)에서 가까운 순. 방금 본 것(seen)은 뒤로 */
 function waitHomesOrder(roots, cx, cy, seen, w) { return roots.slice().sort((a, b) => (seen.has(a) - seen.has(b)) || (Math.hypot(a % w - cx, ((a / w) | 0) - cy) - Math.hypot(b % w - cx, ((b / w) | 0) - cy))); }
+/* ── [MAC-WAITHOMES-2] (창조자의 눈 5회 🟡) 말은 짧게·귀띔 톤으로 / 고치는 만큼 점이 찬다 / 가장 많이 모인 동네부터 ──
+   · 말: 빨간색(실패와 같은 색)·60자·네 가지+규칙을 한 줄에 → "하나만 더 가까이 있으면 이웃이 와요 — 🛒🛝🪑 중에"(초록 톤). 빈집을 눌렀을 때도 같은 말.
+   · 점: 우물을 놓아 여섯 채의 '물'이 풀려도 배지 숫자(6)는 그대로라 "고쳤는데 안 됐다"로 읽혔다 → 배지 곁에 ●○ (가까이 있는 것 / 더 있어야 하는 것). ○○ → ●○ → 배지가 사라짐.
+   · 순서: 화면에서 가까운 집 차례가 아니라 **가장 많이 모인 동네**부터(한 번의 우물로 여러 채가 풀리는 곳). 누를 때마다 다음 동네 — 20채를 다 돌지 않는다. */
+/* 순수 함수 — 빠진 것(miss)과 있어야 하는 수(minHave)로 한 줄. 넷 가운데 (4 - miss.length) 가지는 이미 가깝다 */
+function waitSay(miss, minHave) { const I = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑' }, need = Math.max(1, (minHave || 2) - (4 - miss.length)); return (need === 1 ? '하나만 더' : '두 가지 더') + ' 가까이 있으면 이웃이 와요 — ' + miss.map(k => I[k] || '').join('') + ' 중에'; }
+/* 순수 함수 — 점: 가까이 있는 것 ● · 더 있어야 하는 것 ○ (minHave 개) */
+function waitDots(missLen, minHave) { const n = minHave || 2, have = Math.max(0, Math.min(n, 4 - missLen)); return '●'.repeat(have) + '○'.repeat(n - have); }
+/* 순수 함수 — 가까이 모인 집끼리 무리로(칸 거리 reach 이내면 같은 동네 · 이어 붙이기). 큰 무리부터. roots = 칸 번호, w = 판 너비 */
+function waitClusters(roots, w, reach) { const left = roots.slice(), out = [];
+  while (left.length) { const g = [left.pop()]; for (let i = 0; i < g.length; i++) { const ax = g[i] % w, ay = (g[i] / w) | 0; for (let j = left.length - 1; j >= 0; j--) { const bx = left[j] % w, by = (left[j] / w) | 0; if (Math.max(Math.abs(ax - bx), Math.abs(ay - by)) <= reach) g.push(left.splice(j, 1)[0]); } } out.push(g.sort((a, b) => a - b)); }
+  return out.sort((a, b) => b.length - a.length || a[0] - b[0]); }
+/* 순수 함수 — 그 동네의 한가운데에 가장 가까운 집 */
+function waitClusterHome(g, w) { let sx = 0, sy = 0; g.forEach(r => { sx += r % w; sy += (r / w) | 0; }); const cx = sx / g.length, cy = sy / g.length; return g.slice().sort((a, b) => Math.hypot(a % w - cx, ((a / w) | 0) - cy) - Math.hypot(b % w - cx, ((b / w) | 0) - cy))[0]; }
+{ const toastW0 = toast; toast = function (msg, ok) { if (!ok && typeof msg === 'string' && /^빈집이에요 · .*이웃이 와요/.test(msg)) ok = true; return toastW0.call(this, msg, ok); }; }   // 귀띔 톤(실패의 빨강 ✗)
 function waitHomesDraw() { let el = document.getElementById('waitHomes');
   if (!el) { el = document.createElement('button'); el.id = 'waitHomes'; el.title = '새 이웃이 돌아서는 집 — 누르면 그 집으로 가요';     // 상단 바는 1366 폭에서 이미 꽉 찼다(안에 넣었더니 오른쪽 끝에서 잘렸다) → 바 아래 오른쪽에 띄운다
     el.style.cssText = 'position:fixed;right:10px;top:68px;z-index:6;display:none;background:#2a2417ee;border:1px solid #e8b04b;border-radius:10px;min-height:44px;padding:0 14px;font:800 13.5px/1 "Malgun Gothic",sans-serif;color:#ffe9b8;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px #0007';
     el.onclick = waitHomesGo; document.body.appendChild(el); const st = document.createElement('style'); st.textContent = 'body.photo #waitHomes{display:none!important}'; document.head.appendChild(st); }
   const n = WAITHOMES.roots.length, top = document.getElementById('top'); el.style.display = n ? '' : 'none';
-  if (n) { el.textContent = '🏠 이웃을 기다리는 집 ' + n; if (top) el.style.top = Math.round(top.getBoundingClientRect().bottom + 6) + 'px'; } }
+  if (n) { const g = waitClusters(WAITHOMES.roots, W, window.VRULES.waitHomes.reach || 8)[0], ml = g.map(r => (WAITSCAN.lack.get(r) || []).length || 4), most = ml.sort((a, b) => ml.filter(v => v === a).length - ml.filter(v => v === b).length).pop();   // 가장 큰 동네에서 가장 흔한 처지
+    el.textContent = '🏠 이웃을 기다리는 집 ' + n + ' ' + waitDots(most, window.VRULES.turnAway.minHave); if (top) el.style.top = Math.round(top.getBoundingClientRect().bottom + 6) + 'px'; } }
 function waitHomesTick() { WAITHOMES.roots = waitHomesScan(true); waitHomesDraw(); }   // 3초 박자의 첫 자리(틱 %30 === 0)가 늘 새로 훑고, 7틱 뒤의 집 모습이 그것을 다시 쓴다
 function waitHomesGo() {
   WAITHOMES.roots = waitHomesScan(true); waitHomesDraw(); if (!WAITHOMES.roots.length) return;
   if (WAITHOMES.roots.every(r => WAITHOMES.seen.has(r))) WAITHOMES.seen.clear();                                    // 한 바퀴 다 봤으면 처음부터
-  const cx = camTarget.x / CS + (W - 1) / 2, cy = camTarget.z / CS + (H - 1) / 2, root = waitHomesOrder(WAITHOMES.roots, cx, cy, WAITHOMES.seen, W)[0], rec = cells[root]; if (!rec) return;
+  const groups = waitClusters(WAITHOMES.roots, W, window.VRULES.waitHomes.reach || 8), g = groups.find(q => !q.some(r => WAITHOMES.seen.has(r))) || groups[0], root = waitClusterHome(g, W), rec = cells[root]; if (!rec) return;   // [MAC-WAITHOMES-2] 가장 많이 모인 동네부터 · 본 동네는 건너뛴다
+  if (groups.every(q => q.some(r => WAITHOMES.seen.has(r)))) WAITHOMES.seen.clear();
   WAITHOMES.seen.add(root); WAITHOMES.stats.눌러감++; const c = centerOf('house', cX(root), cY(root), rec.rot); camTarget.set(c.x, 2, c.z); miniDirty = true;
-  sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); const why = moveInWhy(rec); toast(why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, why === true);   // 그 집을 눌렀을 때와 같은 말
+  sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); const miss = WAITSCAN.lack.get(root), why = moveInWhy(rec);
+  toast(miss ? '🏠 이 동네 ' + g.length + '채 · ' + waitSay(miss, window.VRULES.turnAway.minHave) : why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, true);
 }
 window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan(true).length, 훑기: { ...WAITSCAN.stats }, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
 
@@ -4390,6 +4476,22 @@ function eventTick() {
       sparkle.push({ x: c.x + (Math.random() - .5) * 10, z: c.z + (Math.random() - .5) * 10, until: SIM.t + 2000 }); }
   }
 }
+
+/* ── [MAC-RAINCLEAR] 비 오는 날의 절반쯤은 오후에 갠다 (보스 09-20 · 주민 연기 담당의 '처마 밑에서 다 같이 나옴'(ACT-SHELTER)이 낮에도 보이게) ──
+   비는 마을 하루 내내(6시~다음 날 6시) 왔다 → 그치는 순간이 늘 새벽 6시, 어두울 때뿐이었다.
+   · 비 오는 날마다 날 번호로 정해진다(순수 함수 rainClearAt — 다시 열어도 같은 날은 같은 때 갠다): 절반은 13~16시 사이 어느 정시에 그친다. 나머지는 전처럼 하루 내내.
+   · 그치는 순간 소식 한 줄 "🌤️ 비가 그쳤어요". 그친 뒤 열면 처음부터 맑다(말 없음). 다음 날 아침 웅덩이(ACT-PUDDLE)는 그대로 '어제 비 온 날'이면 생긴다.
+   · 비 오는 날의 수·시작은 그대로(rainDay). 원래 줄 수정 0 — eventTick 감싸기: 그친 뒤에는 원래 줄이 '비가 와요'로 되돌리지 않게 부르기 전에 잠깐 비로 두고, 부른 뒤 걷는다. */
+(window.VRULES = window.VRULES || {}).rainClear = { on: true, from: 13, to: 16 };
+const RAINCLEAR = { stats: { 갬: 0 } };
+/* 순수 함수 — 그 날(d)의 비가 몇 시에 그치나(정시) · 하루 내내면 null. 비 오는 날인지는 따로(rainDay) */
+function rainClearAt(d, from, to) { const h = (Math.imul(d, 2246822519) >>> 0); if ((h >>> 7) % 2) return null; return from + ((h >>> 11) % (to - from + 1)); }
+{ const ev0 = eventTick; eventTick = function () { const R = window.VRULES.rainClear, d = simDay(), at = R.on && rainDay(d) ? rainClearAt(d, R.from, R.to) : null, clear = at != null && simHour() >= at, before = EV.rain;
+    if (clear) EV.rain = true;                                                       // 원래 줄은 rainDay(d) 와 EV.rain 이 다를 때만 움직인다 — 같게 두어 '비가 와요'를 막는다
+    const r = ev0.apply(this, arguments);
+    if (clear) { EV.rain = false; rain.visible = false; if (before) { RAINCLEAR.stats.갬++; toast('🌤️ 비가 그쳤어요', true); } }
+    return r; }; }
+window.__rainClear = () => ({ 켜짐: window.VRULES.rainClear.on, 비: EV.rain, 날: simDay(), 시: +simHour().toFixed(1), 오늘비: rainDay(simDay()), 그치는때: rainDay(simDay()) ? rainClearAt(simDay(), window.VRULES.rainClear.from, window.VRULES.rainClear.to) : null, ...RAINCLEAR.stats });
 
 /* ══════════════════════════════════════════════════════════════
    목표(F14). 순서대로 셋씩. 이루면 알림 한 번. 저장한다.
@@ -4963,6 +5065,62 @@ function exportFile() {
   fileStats.내보냄++; toast('⬇️ 마을을 파일로 저장했어요 — ' + a.download, true); sndFx('goal');
 }
 /* 문자열 하나로 가져온다. 돌려주는 값: true(다시 연다) 또는 거절 이유 */
+/* ── [MAC-GROW] 밤새 자라는 것 — 저장 쪽 (보스 승인 09-20 · 제안서 docs/village_grow_proposal.md · 주민 연기 담당이 그리기·연기) ──
+   저장본에 곁 키 grow: { 칸번호: [심은 시뮬날, 심은 실제날] } (+ growDay: 저장한 실제날) 를 **자라는 동안만** 둔다. 다 자라면 지운다 → 머무는 건 많아야 이틀치(칸당 ≈20바이트).
+   · 단계: 0 새싹 → 1 어린나무(마을 아침이 한 번 지남 — simDay 는 6시에 바뀐다) → 2 다 자람(실제 날짜가 하루 넘음). 실제 다음 날 열었는데 마을 아침이 아직이면 1 부터.
+     키가 없으면 2(다 자람) — 옛 저장본·다른 기기·옛 판이 저장한 것은 전부 다 자란 것(잃는 것 없음). SAVE_V 는 그대로(옛 판은 모르는 키를 무시한다).
+   · 심을 때 적는다: 나무·과일나무·큰나무·꽃밭(색 꽃밭 포함)을 **아이가 놓을 때만**(painting 중 — 톡·끌어 놓기·앉히기 ✓). 불러오기·시험 훅(__put)·되살리기로 놓인 것은 새로 적지 않는다.
+   · 따라간다: 치우면 지우고 잠깐 맡아 둔다 → 되돌리기로 되살리면 그 단계로, 🖐 옮기면 새 자리로, 돌리기(치웠다 다시 놓기)는 그대로. 치우고 **새로 심으면** 새싹부터.
+   · 실제 날짜는 뒤로 안 간다: 기기 시계를 되돌려도 max(오늘, 이번에 본 가장 늦은 날). 판정(필요·목표·꾸미기)은 단계와 무관하다 — 자라는 건 보는 기쁨만.
+   · 연기·디자인 쪽 접점: window.GROW(칸) → 0·1·2(= .stage) · .news() · 단계가 바뀌면 그 칸의 청크를 다시 합치고 'village-grow' 이벤트(detail: { 까닭: 'open'|'tick', 바뀜: [{칸, 전, 후, 종류}] }).
+   · sync.js 에는 싣지 않는다(다른 기기에선 다 자란 것으로 보인다 — 안전한 쪽). 원래 줄 수정 0 — serialize·loadSaved·placeAt·removeAt·pickUp·dropDown·undo 감싸기. */
+(window.VRULES = window.VRULES || {}).growSave = { on: true };   // 그리기·연기 쪽 스위치(VRULES.grow)는 ACT-GROW 몫 — 저장 쪽은 따로
+var GROW_S = { news: [], map: new Map(), gone: new Map(), txn: null, pend: null, seen: new Map(), realHigh: 0, lastDay: null, stats: { 심음: 0, 따라감: 0, 지움: 0, 다자람: 0, 바뀜: 0 } };
+const GROW_KINDS = new Set(['tree', 'fruit', 'bigtree'].concat(Object.keys(FLOWER_KINDS)));
+const growToday = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);   // 이 기기의 날 번호(1970-01-01 부터)
+function growReal() { GROW_S.realHigh = Math.max(GROW_S.realHigh, growToday()); return GROW_S.realHigh; }
+/* 순수 함수 — 단계. e = [심은 시뮬날, 심은 실제날], sd = 지금 시뮬날, rd = 지금 실제날(뒤로 안 간 값). 없으면 2 */
+function growStageOf(e, sd, rd) { if (!e) return 2; const night = sd > e[0], day = rd > e[1]; return night ? (day ? 2 : 1) : (day ? 1 : 0); }
+/* 순수 함수 — 저장본의 grow 를 읽을 때 걸러 낸다: 칸 번호·정수 둘만 · 살아 있는 칸(alive(칸) → 종류)이 자라는 종류일 때만 */
+function growClean(obj, alive, kinds) { const out = new Map(); if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  Object.keys(obj).forEach(k => { const i = +k, e = obj[k]; if (!Number.isInteger(i) || i < 0 || !Array.isArray(e) || e.length !== 2 || !e.every(Number.isInteger)) return; if (!kinds.has(alive(i))) return; out.set(i, [e[0], e[1]]); }); return out; }
+function growTick(why) { const R = window.VRULES.growSave; if (!R.on) return; const sd = simDay(), rd = growReal(), ch = [];
+  GROW_S.map.forEach((e, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !GROW_KINDS.has(rec.k)) { GROW_S.map.delete(root); GROW_S.seen.delete(root); return; }
+    const st = growStageOf(e, sd, rd), was = GROW_S.seen.has(root) ? GROW_S.seen.get(root) : (why === 'open' ? growStageOf(e, sd, Math.max(e[1], GROW_S.lastDay == null ? e[1] : Math.min(GROW_S.lastDay, rd))) : st);   // 처음 열 때는 '마지막으로 저장한 날'과 견준다 — 그 뒤 밤새 자란 것만(같은 날 다시 열면 알리지 않는다)
+    if (st !== was) { ch.push({ 칸: root, 전: was, 후: st, 종류: rec.k }); dirtyChunks.add(chunkOfCell(root)); }
+    if (st >= 2) { GROW_S.map.delete(root); GROW_S.seen.delete(root); GROW_S.stats.다자람++; } else GROW_S.seen.set(root, st); });
+  if (why === 'open') GROW_S.news = ch.filter(c => c.후 > c.전).map(c => c.칸);   // ACT-GROW 가 한 번 읽어 가는 '밤새 자란 칸'
+  if (ch.length) { GROW_S.stats.바뀜 += ch.length; if (why !== 'open') markDirty(); setTimeout(() => window.dispatchEvent(new CustomEvent('village-grow', { detail: { 까닭: why, 바뀜: ch } })), 0); } }
+{ const place0 = placeAt; placeAt = function (kind, x, y) { const r = place0.apply(this, arguments);
+    if (!window.VRULES.growSave.on || !GROW_KINDS.has(kind)) return r; const root = idx(x, y);
+    if (painting && !GROW_S.txn) { GROW_S.map.set(root, [simDay(), growReal()]); GROW_S.seen.set(root, 0); GROW_S.gone.delete(root); GROW_S.stats.심음++; return r; }   // 아이가 새로 심었다
+    let e = null; const g = GROW_S.gone.get(root);
+    if (GROW_S.pend && GROW_S.pend.k === kind) { e = GROW_S.pend.e; GROW_S.pend = null; }                                  // 🖐 옮겨 놓았다
+    else if (g && g.k === kind) e = g.e;                                                                                   // 되살림 · 제자리 · 돌리기
+    else if (GROW_S.txn) { const j = GROW_S.txn.findIndex(t => t.k === kind); if (j >= 0) e = GROW_S.txn.splice(j, 1)[0].e; }   // 되돌리기의 '옮긴 것 제자리로'
+    GROW_S.gone.delete(root); if (e) { GROW_S.map.set(root, e.slice()); GROW_S.seen.delete(root); GROW_S.stats.따라감++; } return r; };
+  const rem0 = removeAt; removeAt = function (x, y) { const rec = inb(x, y) ? cells[idx(x, y)] : null, root = rec ? rec.root : -1, e = root >= 0 ? GROW_S.map.get(root) : null;
+    const r = rem0.apply(this, arguments);
+    if (r && e) { GROW_S.map.delete(root); GROW_S.seen.delete(root); GROW_S.gone.set(root, { k: rec.k, e }); if (GROW_S.txn) GROW_S.txn.push({ k: rec.k, e }); GROW_S.stats.지움++;
+      if (GROW_S.gone.size > 400) GROW_S.gone.delete(GROW_S.gone.keys().next().value); }                                   // 오래된 것부터 버린다(되돌리기 목록보다 넉넉히)
+    return r; };
+  const pick0 = pickUp; pickUp = function () { const r = pick0.apply(this, arguments); if (carrying) { const g = GROW_S.gone.get(idx(carrying.fx, carrying.fy)); if (g && g.k === carrying.k) carrying.growE = g.e; } return r; };
+  const drop0 = dropDown; dropDown = function () { const cur = carrying; if (cur && cur.growE) GROW_S.pend = { k: cur.k, e: cur.growE }; try { return drop0.apply(this, arguments); } finally { GROW_S.pend = null; } };
+  const undo0 = undo; undo = function () { GROW_S.txn = []; try { return undo0.apply(this, arguments); } finally { GROW_S.txn = null; } };
+  const ser0 = serialize; serialize = function () { const d = ser0.apply(this, arguments);
+    if (d && window.VRULES.growSave.on && GROW_S.map.size) { const o = {}; GROW_S.map.forEach((e, root) => { o[root] = e; }); d.grow = o; d.growDay = growReal(); } return d; };   // growDay = 마지막으로 저장한 실제날(다음에 열 때 '밤새 자란 것'을 셀 기준)
+  const load0 = loadSaved; loadSaved = function (rawOverride) { const r = load0.apply(this, arguments);
+    GROW_S.map.clear(); GROW_S.seen.clear(); GROW_S.gone.clear();
+    try { const raw = rawOverride || localStorage.getItem(SAVE_KEY), d = raw ? JSON.parse(raw) : null;
+      GROW_S.map = growClean(d && d.grow, i => { const c = inb(cX(i), cY(i)) ? cells[i] : null; return c && c.root === i ? c.k : null; }, GROW_KINDS);
+      GROW_S.lastDay = d && Number.isInteger(d.growDay) ? d.growDay : null; GROW_S.map.forEach(e => { GROW_S.realHigh = Math.max(GROW_S.realHigh, e[1]); }); } catch (err) { GROW_S.map = new Map(); GROW_S.lastDay = null; }   // 못 읽으면 전부 다 자란 것 — 마을은 열린다
+    growTick('open'); return r; }; }   // 곧바로 — ACT-GROW 가 첫 틱에 news() 를 읽는다(이벤트는 growTick 안에서 한 박자 늦게)
+/* window.GROW — ACT-GROW(#628)는 이것을 **함수로** 부른다: GROW(칸) → 0·1·2(없으면 2). 속성: stage(같은 것) · list() · news()(열었을 때 밤새 자란 칸 — 한 번만 돌려준다) */
+window.GROW = Object.assign((i) => { if (!window.VRULES.growSave.on) return 2; const c = cells[i], root = c ? c.root : i; return growStageOf(GROW_S.map.get(root), simDay(), growReal()); },
+  { list: () => [...GROW_S.map.keys()], news: () => { const L = GROW_S.news; GROW_S.news = []; return L; } });
+window.GROW.stage = window.GROW;
+window.__plantGrow = () => ({ 켜짐: window.VRULES.growSave.on, 자라는중: GROW_S.map.size, 오늘: growReal(), 시뮬날: simDay(), 목록: [...GROW_S.map].slice(0, 12).map(([i, e]) => [cX(i), cY(i), cells[i] && cells[i].k, e, window.GROW.stage(i)]), 맡아둠: GROW_S.gone.size, ...GROW_S.stats });
+
 function importText(txt) {
   let d = null;
   try { d = JSON.parse(txt); } catch (e) { fileStats.거절++; return '마을 파일이 아니에요(읽을 수 없는 내용)'; }
@@ -6051,6 +6209,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
     if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
@@ -6897,6 +7056,82 @@ function actFireflyDraw(t) {
   FLY.mesh.count = k; FLY.mesh.instanceMatrix.needsUpdate = true; if (FLY.mesh.instanceColor) FLY.mesh.instanceColor.needsUpdate = true;
 }
 window.__firefly = () => ({ 켜짐: window.VRULES.firefly.on, 보임: !!(FLY.mesh && FLY.mesh.visible), 비: EV.rain, 밤: +NIGHT.value.toFixed(2), ...FLY.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-CARTTAP] 밤 어귀 수레를 누르면 '내일 아침 → 저 집'을 ✨ 로 (주민 연기 · 09-20 · 보스 승인 ④ — 작게, 화살표는 늘 띄우지 않는다).
+   보기 모드에서 서 있는 수레(ACT-NIGHTCART) 칸이나 그 곁 한 칸을 누르면, 지금 오면 들어갈 집(moveInWhy === true — 판정은 읽기만) 가운데
+   수레에서 가장 가까운 집 위에 ms 동안 ✨(수레 위엔 안 띄운다 — 수레 곁 집이면 둘이 겹쳐 어느 쪽인지 안 읽혔다). 그런 집이 없으면(수레가 곧 거둬질 때) 아무 일도 안 한다.
+   판정·저장 0 · draw call +0(있던 sparkle). 스위치 VRULES.cartTap + act() 고리 한 줄(정원 문 줄 바로 아래).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).cartTap = { on: true, ms: 3000, reach: 1 };
+const CARTTAP = { stats: { 누름: 0, 비춤: 0 } };
+function actCartTap(x, y) {
+  const R = window.VRULES.cartTap; if (!R.on || !CART.shown || CART.cell < 0) return false;
+  const cx = cX(CART.cell), cy = cY(CART.cell), rx = cX(CART.road), ry = cY(CART.road);
+  if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) > R.reach && Math.max(Math.abs(x - rx), Math.abs(y - ry)) > R.reach) return false;
+  CARTTAP.stats.누름++;
+  let best = null, bd = 1e9;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) >= houseCap(i)) return;
+    const d = Math.abs(cX(i) - cx) + Math.abs(cY(i) - cy); if (d >= bd || moveInWhy(rec) !== true) return; bd = d; best = rec; });
+  if (!best) return false;
+  const d = centerOf(best.k, cX(best.root), cY(best.root), best.rot); sparkle.push({ x: d.x, z: d.z, until: SIM.t + R.ms });   // 집 가운데 위(문 앞은 길 위라 수레 옆 집이면 수레 것처럼 보였다)
+  CARTTAP.stats.비춤++; return true;
+}
+window.__cartTap = () => ({ 켜짐: window.VRULES.cartTap.on, 수레: CART.shown ? [cX(CART.cell), cY(CART.cell)] : null, ...CARTTAP.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-GROW] 밤새 자라는 것 — 그림·연기 쪽 (주민 연기 · 09-20 · 보스 승인 · 제안서 docs/village_grow_proposal.md).
+   저장('심은 날' 곁 키 grow)·날짜 셈은 프로그램 담당. 이 블록은 **window.GROW 를 이름으로 읽기만** 한다(CART_PARTS 때처럼 — 없으면 아무 일도 안 함 = 다 자람).
+     · window.GROW(root) → 0 새싹/봉오리 · 1 어린나무 · 2(또는 undefined) 다 자람
+     · (있으면) window.GROW.news() → 이번에 열었을 때 밤새(실제 날짜) 자란 칸 목록 — 한 번만 돌려준다
+   ⓐ 청크를 합칠 때 그 물건의 부위 행렬을 발밑 가운데 기준으로 줄인다 — 나무 treeK[단계] · 꽃밭 flowerK[단계](작은 포기 → 번짐). draw call +0 · 삼각형 그대로.
+   ⓑ 합칠 때 본 '자라는 칸'을 기억해 두고 틱마다 조금씩(everyTicks) 단계를 다시 물어, 바뀌었으면 그 청크를 다시 합치고 ✨(있던 sparkle) +
+      곁(nearR 칸)을 지나던 주민 한 명이 lookMs 동안 멈춰 그 나무 쪽을 본다(하루 perDay 번까지 · 판정·확률 0).
+   ⓒ GROW.news() 가 있으면 처음 한 번 소식 한 줄 + 그 자리 ✨(모달·카메라 이동 없음).
+   판정·저장 0. 스위치·수치 VRULES.grow + 고리 둘(buildChunk 부위 행렬 한 줄 · tickFolks 한 줄).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).grow = { on: true, treeK: [0.35, 0.65, 1], flowerK: [0.5, 0.75, 1], trees: ['tree', 'fruit', 'bigtree'], everyTicks: 10, nearR: 3, lookMs: 2200, perDay: 6 };
+const GROWX = { seen: new Map(), tick: -1, day: -1, looks: 0, news: false, stats: { 자라는칸: 0, 자람: 0, 올려다봄: 0, 소식: 0 } };
+const growM = new THREE.Matrix4(), growS = new THREE.Matrix4(), growT = new THREE.Matrix4();
+const growStage = root => { const G = window.GROW; if (typeof G !== 'function') return 2; const s = G(root); return s === 0 || s === 1 ? s : 2; };
+const growKind = k => (window.VRULES.grow.trees.includes(k) ? 'tree' : (k === 'flower' || (typeof FLOWER_KINDS === 'object' && FLOWER_KINDS[k])) ? 'flower' : null);
+function actGrowMatrix(rec, x, y, m) {                                   // buildChunk — 부위마다(청크를 합칠 때만)
+  const R = window.VRULES.grow; if (!R || !R.on || typeof window.GROW !== 'function') return;   // 이 블록보다 먼저 불려도(모듈 읽는 중) 조용히
+  const kind = growKind(rec.k); if (!kind) return;
+  const st = growStage(rec.root); if (st >= 2) { GROWX.seen.delete(rec.root); return; }
+  GROWX.seen.set(rec.root, st);
+  if (typeof window.GROW_PARTS === 'function' && window.GROW_PARTS(rec.k, st, [])) return;   // [DESIGN-GROW-1] 모양은 디자인 담당의 단계별 부위가 준다 — 크기 곱하기 대신
+  const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot), k = kind === 'tree' ? R.treeK[st] : R.flowerK[st], ky = k;   // 꽃밭도 통째로(높이만 줄이면 봉오리가 안 읽혔다 — 작은 포기가 번져 가는 꼴)
+  growT.makeTranslation(c.x, 0, c.z); growS.makeScale(k, ky, k); growM.makeTranslation(-c.x, 0, -c.z);
+  m.premultiply(growM).premultiply(growS).premultiply(growT);           // 발밑 가운데를 기준으로 줄인다
+}
+function actGrowTick(f, now) {
+  const R = window.VRULES.grow;
+  if (GROWX.tick !== SIM.ticks) { GROWX.tick = SIM.ticks;                // 틱마다 한 번
+    const day = Math.floor(SIM.t / DAY_MS); if (day !== GROWX.day) { GROWX.day = day; GROWX.looks = 0; }
+    if (R.on && !GROWX.news && typeof window.GROW === 'function') { GROWX.news = true;   // 열었을 때 한 번 — 실제 날짜로 밤새 자란 것
+      const L = typeof window.GROW.news === 'function' ? (window.GROW.news() || []) : [];
+      if (L.length) { const trees = L.filter(r => cells[r] && growKind(cells[r].k) === 'tree').length, fl = L.length - trees; GROWX.stats.소식++;
+        L.forEach(r => { const rec = cells[r]; if (!rec) return; const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 6000 }); });
+        toast('🌳 ' + [trees ? '나무 ' + trees + '그루' : '', fl ? '꽃밭 ' + fl + '곳' : ''].filter(Boolean).join('·') + '이 밤새 자랐어요', true); } }
+    if (R.on && GROWX.seen.size && SIM.ticks % R.everyTicks === 0) {
+      GROWX.stats.자라는칸 = GROWX.seen.size;
+      GROWX.seen.forEach((was, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !growKind(rec.k)) { GROWX.seen.delete(root); return; }
+        const st = growStage(root); if (st === was) return;
+        dirtyChunks.add(chunkOfCell(root)); if (st >= 2) GROWX.seen.delete(root); else GROWX.seen.set(root, st);
+        if (st < was) return;                                           // 작아지는 쪽(치우고 다시 심기 등)은 조용히
+        GROWX.stats.자람++; const c = centerOf(rec.k, cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 2500 });
+        if (GROWX.looks >= R.perDay) return;                            // 지나던 주민 한 명이 멈춰 올려다본다
+        let best = null, bd = R.nearR * CS + 0.01;
+        folks.forEach(h => { if (h.visitor || h.arriving || h.leaving || h.growLook || h.leaveLook || h.greet || h.puddle || h.shelter || h.garden || (h.state !== 'walk' && h.state !== 'idle')) return;
+          const d = Math.max(Math.abs(h.x - c.x), Math.abs(h.z - c.z)); if (d < bd) { bd = d; best = h; } });
+        if (best) { best.growLook = { x: c.x, z: c.z, until: now + R.lookMs }; GROWX.looks++; GROWX.stats.올려다봄++; } });
+    } }
+  const L = f.growLook; if (!L) return false;
+  if (!R.on || now >= L.until) { f.growLook = null; return false; }
+  f.walking = false; f.dir = Math.atan2(L.x - f.x, L.z - f.z); return true;
+}
+window.__growPlant = () => ({ 켜짐: window.VRULES.grow.on, GROW있음: typeof window.GROW === 'function', 지금자라는칸: GROWX.seen.size, ...GROWX.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();

@@ -72,6 +72,28 @@ test('문이 있으면 작아도 앉힌다', () => assert.equal(seatKindIs({ w: 
 test('길·큰길(2×2 길)·횡단보도·다리(길 가족)·울타리(이음)·꽃밭은 전처럼 즉시', () => { for (const i of [{ w: 1, h: 1, road: true }, { w: 2, h: 2, road: true }, { w: 1, h: 2, road: true, roadFam: true }, { w: 3, h: 1, roadFam: true }, { w: 1, h: 1, join: true }, { w: 1, h: 1, flower: true }]) assert.equal(seatKindIs(i), false); });
 test('1×1 꾸밈 · 긴의자(2×1)는 즉시', () => { assert.equal(seatKindIs({ w: 1, h: 1 }), false); assert.equal(seatKindIs({ w: 2, h: 1 }), false); assert.equal(seatKindIs(null), false); });
 
+/* ── 이웃을 기다리는 집(MAC-WAITHOMES-2) — waitSay · waitDots · waitClusters ── */
+const waitSay = grab('waitSay'), waitDots = grab('waitDots'), waitClusters = grab('waitClusters');
+test('넷 다 멀면 "두 가지 더" · 셋이 멀면 "하나만 더"', () => { assert.match(waitSay(['물', '장보기', '놀이', '쉼'], 2), /^두 가지 더/); assert.match(waitSay(['물', '놀이', '쉼'], 2), /^하나만 더/); });
+test('말은 짧고, 빠진 것만 그림으로', () => { const t = waitSay(['물', '놀이', '쉼'], 2); assert.ok(t.length <= 40, t.length + '자'); assert.ok(t.includes('🪣🛝🪑')); assert.ok(!t.includes('🛒')); assert.doesNotMatch(t, /멀어서|돌아가요/); });
+test('점: ○○ → ●○ (우물 하나로 차오른다)', () => { assert.equal(waitDots(4, 2), '○○'); assert.equal(waitDots(3, 2), '●○'); assert.equal(waitDots(2, 2), '●●'); });
+test('동네 묶기: 가까운 집끼리 · 큰 동네부터', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([r(10, 10), r(12, 10), r(14, 11), r(80, 80), r(82, 80), r(200, 5)], w, 8); assert.deepEqual(g.map(q => q.length), [3, 2, 1]); });
+test('동네 묶기: 사슬처럼 이어진 거리는 한 동네', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([0, 1, 2, 3, 4].map(i => r(10 + i * 6, 40)), w, 8); assert.equal(g.length, 1); });
+/* ── 밤새 자라는 것(MAC-GROW) — growStage(e, 시뮬날, 실제날) · growClean(저장본, 살아있는칸, 종류) ── */
+const growStage = grab('growStageOf'), growClean = grab('growClean');
+test('기록이 없으면 다 자란 것(2) — 옛 저장본·다른 기기', () => assert.equal(growStage(undefined, 9, 99999), 2));
+test('심은 날 = 새싹(0) · 마을 아침이 지나면 어린나무(1) · 실제 다음 날까지 지나면 다 자람(2)', () => { const e = [3, 20000]; assert.equal(growStage(e, 3, 20000), 0); assert.equal(growStage(e, 4, 20000), 1); assert.equal(growStage(e, 4, 20001), 2); });
+test('실제 다음 날 열었는데 마을 아침은 아직 — 어린나무(1)부터', () => assert.equal(growStage([3, 20000], 3, 20001), 1));
+test('불러올 때 걸러 낸다: 칸 번호·정수 둘만 · 살아 있는 자라는 종류만', () => { const kinds = new Set(['tree', 'flower']), alive = i => ({ 10: 'tree', 11: 'road', 12: 'flower' })[i] || null;
+  const m = growClean({ 10: [1, 2], 11: [1, 2], 12: [1.5, 2], 13: [1, 2], abc: [1, 2], 14: 'x' }, alive, kinds); assert.deepEqual([...m.keys()], [10]); assert.deepEqual(m.get(10), [1, 2]); });
+test('grow 가 없거나 배열·문자열이면 빈 것', () => { for (const v of [undefined, null, [], 'x', 3]) assert.equal(growClean(v, () => 'tree', new Set(['tree'])).size, 0); });
+
+/* ── 비 오는 날의 절반쯤은 오후에 갠다(MAC-RAINCLEAR) — rainClearAt(날, 13, 16) ── */
+const rainClearAt = grab('rainClearAt');
+test('그치는 때는 13~16시 정시 또는 null(하루 내내)', () => { for (let d = 1; d <= 400; d++) { const h = rainClearAt(d, 13, 16); assert.ok(h === null || (Number.isInteger(h) && h >= 13 && h <= 16), d + '일 ' + h); } });
+test('비 오는 날의 40~60% 가 오후에 갠다 · 네 시간대가 다 쓰인다', () => { const rainDay = d => ((d * 2654435761) >>> 0) % 3 === 0; let n = 0, c = 0; const hs = new Set(); for (let d = 1; d <= 600; d++) if (rainDay(d)) { n++; const h = rainClearAt(d, 13, 16); if (h != null) { c++; hs.add(h); } } assert.ok(c / n > 0.4 && c / n < 0.6, (c / n).toFixed(2)); assert.equal(hs.size, 4); });
+test('같은 날은 늘 같은 때(다시 열어도)', () => { for (const d of [7, 22, 31, 100]) assert.equal(rainClearAt(d, 13, 16), rainClearAt(d, 13, 16)); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);
