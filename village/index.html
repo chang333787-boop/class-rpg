@@ -2567,7 +2567,7 @@ function tryMoveIn() {
      · 이미 사는 주민은 떠나지 않는다. 저장 없음(돌아선 집 목록은 판을 연 동안만).
    규칙 모듈 꼴: 스위치 VRULES.turnAway + 순수 함수 homeLacks + 고리 여섯 줄(moveInWhy·tryMoveIn·arrive·simTick·루프·whatDoing).
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 2, bubbleMs: 6000 };
+(window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 1, bubbleMs: 6000 };
 const AWAY_NEEDS = ['물', '장보기', '놀이', '쉼'];
 const AWAY_ICON = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 다시: '🏠' };
 const AWAY_KEYS = Object.keys(AWAY_ICON);
@@ -2578,7 +2578,7 @@ function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]
 function awayLacks(rec) { const R = window.VRULES.turnAway; if (!R.on || population() < R.graceBelow) return null; return homeLacks(computeSat(rec).met, AWAY_NEEDS, R.minHave); }   // computeSat 을 그 자리에서 — 빈 집은 satTick 이 안 돌아 캐시가 없다
 function awayWhy(rec) { const miss = awayLacks(rec); return miss ? miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아가요 — 물·가게·놀 곳·쉴 곳 중 두 가지는 가까워야 해요' : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
 const awayLeavers = () => { let n = 0; folks.forEach(f => { if (f.leaving) n++; }); return n; };
-/* tryMoveIn 고리 — 오늘 이미 돌아선 집은 후보에서 뺀다. 돌아가는 사람이 길에 둘이면 다음 후보가 불편한 집일 때 그 차례를 쉰다(행렬 막기 — 결과는 같다: 아무도 안 든다) */
+/* tryMoveIn 고리 — 오늘 이미 돌아선 집은 후보에서 뺀다. 돌아가는 사람이 길에 있으면 다음 후보가 불편한 집일 때 그 차례를 쉰다(행렬 막기 — 결과는 같다: 아무도 안 든다) */
 function awayFilter(homes) {
   const R = window.VRULES.turnAway; if (!R.on) return false;
   for (let k = homes.length - 1; k >= 0; k--) { const t = AWAY.turned.get(homes[k].root); if (t && SIM.t - t.at < R.retryMs) homes.splice(k, 1); }
