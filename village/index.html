@@ -4445,6 +4445,60 @@ window.__crowdSkip = () => { let n = 0, sum = 0, over = 0; crowd.forEach(v => { 
 function cellOfFolk(f) { const gx = Math.round(f.x / CS + (W - 1) / 2), gy = Math.round(f.z / CS + (H - 1) / 2); return inb(gx, gy) ? idx(gx, gy) : -1; }
 const crowdedHome = root => (crowd.get(root) || 0) > 0.3;
 
+/* ── [MAC-CROWDSAY] '길이 붐벼요' 뒤에 아이의 한 수 · 붐빔 값을 칸마다 읽는 창구 (보스 09-20 · 조사 docs/village_crowd_stall_20260920.md 추천 ①) ──
+   "길이 붐벼요"는 까닭만 말했다 — 그래서 뭘 하라는지가 없었다(도서관 때와 같은 막다른 말). 필요가 다 찼는데 붐빔 하나로 😐 인 집에 한마디를 잇는다:
+   · 그 집이 쓰는 길을 따라 6칸 안에 곧게 난 곳의 **한쪽 두 칸이 비어 있으면** "🛣️ 길 옆이 비었어요 — 큰길로 넓혀 봐요" (재 봄: pop88 에서 그런 자리 10곳을 넓히자 나흘 뒤 붐빔 0.52 → 0.30 · 인구 100 → 128)
+   · 없으면 "🛣️ 길을 한 줄 더 내 봐요 — 사람들이 나눠 걸어요" (pop88 0.52 → 0.41 · pop167 0.62 → 0.50 — 반쯤 듣는다)
+   · 필요가 빠진 집은 그 말이 먼저다(이유 풍선 whyStuck 과 같은 차례) — 붐빔 귀띔은 안 붙인다.
+   · window.CROWD_AT(칸) → 0~1: 집 칸이면 그 집의 붐빔(crowd, 문턱 0.3 = "길이 붐벼요"), 길 칸이면 그 칸에서 막혀 선 사람 수의 이동 평균(약 20초) — 마을 디자인의 '붐비는 길' 그림 신호가 읽는다.
+     crowdTick 을 감싸 막힌 사람(앞사람 뒤에서 기다림 · 한 칸에 둘)의 칸만 세고, 값은 읽을 때 늦춰 빼 준다(판 전체를 훑지 않는다).
+   · 넓히기: 큰길을 한 칸 길 + 빈 칸 위에 놓으면 그 길을 큰길로 바꾼다(아래 WIDEN) — 말한 한 수가 '여기엔 이미 길이 있어요'로 막히지 않게.
+   판정·수치 0 — 원래 줄 수정 0. satText·crowdTick·canPlace·placeAt·removeAt·undo 감싸기. 스위치 VRULES.crowdSay. */
+(window.VRULES = window.VRULES || {}).crowdSay = { on: true, keep: 0.995 };
+const CROWDSAY = { road: new Map(), stats: { 넓혀요: 0, 한줄더: 0 } };
+/* 순수 함수 — 붐비는 집의 말 끝에 붙일 한마디. crowded = 붐빔으로 😐 · full = 필요는 다 참 · widen = 곁 길을 넓힐 자리가 있음 */
+function crowdHint(crowded, full, widen) { if (!crowded || !full) return ''; return widen ? ' · 🛣️ 곁이 빈 길을 큰길로 넓혀 봐요 — 길 위에 큰길을 놓으면 돼요' : ' · 🛣️ 길을 한 줄 더 내 봐요 — 사람들이 나눠 걸어요'; }
+/* 그 집 곁 길 가운데, 곧게 이어진 두 칸의 한쪽 옆 두 칸이 비어 있고 내 땅인 곳이 있나(큰길 2×2 가 들어갈 자리) */
+/* 그 집이 쓰는 길을 따라 reach 칸 안에, 곧게 이어진 두 칸의 한쪽 옆 두 칸이 비어 있고 내 땅인 곳이 있나(큰길 2×2 가 들어갈 자리) — 있으면 그 칸 */
+function crowdWidenAt(rec, reach) { reach = reach || 6; const roadAt = (x, y) => inb(x, y) && cells[idx(x, y)] && cells[idx(x, y)].k === 'road', empty = (x, y) => inb(x, y) && !cells[idx(x, y)] && plotOpen(x, y);
+  const start = []; footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot).forEach(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { if (roadAt(px + dx, py + dy)) start.push(idx(px + dx, py + dy)); }));
+  const seen = new Map(start.map(i => [i, 0])), q = start.slice();
+  while (q.length) { const i = q.shift(), d = seen.get(i), x = cX(i), y = cY(i);
+    for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x2 = x + ax, y2 = y + ay; if (!roadAt(x2, y2)) continue; const sx = ay ? 1 : 0, sy = ax ? 1 : 0;   // 길이 나아가는 쪽에 직각
+      for (const s of [-1, 1]) if (empty(x + sx * s, y + sy * s) && empty(x2 + sx * s, y2 + sy * s)) return true;
+      const j = idx(x2, y2); if (d < reach && !seen.has(j)) { seen.set(j, d + 1); q.push(j); } } }
+  return false; }
+{ const satC0 = satText; satText = function (rec) { const t = satC0.apply(this, arguments); if (!window.VRULES.crowdSay.on || !rec || rec.k !== 'house') return t;
+    const cr = crowdedHome(rec.root), full = /다 있어요/.test(t), h = crowdHint(cr, full, cr && full && crowdWidenAt(rec));   // 넓힐 자리는 필요할 때만 찾는다
+    if (h) CROWDSAY.stats[/넓혀/.test(h) ? '넓혀요' : '한줄더']++; return t + h; };
+  const ct0 = crowdTick; crowdTick = function () { const r = ct0.apply(this, arguments); if (!window.VRULES.crowdSay.on) return r; const a = window.VRULES.crowdSay.keep, T = SIM.ticks, n = new Map();
+    folks.forEach(f => { if (f.arriving || f.state === 'inside' || f.nh) return; if (!(f.crowdK < 1 || (f.state === 'walk' && f.blockedAt > 0))) return; const c = cellOfFolk(f); if (c >= 0) n.set(c, (n.get(c) || 0) + 1); });
+    n.forEach((k, c) => { const e = CROWDSAY.road.get(c); const v = e ? e.v * Math.pow(a, T - e.t) : 0; CROWDSAY.road.set(c, { v: v + (1 - a) * k, t: T }); });
+    return r; }; }
+/* 넓히기 — 큰길(2×2)을 **한 칸 길 + 빈 칸** 위에 놓으면 그 길 칸을 큰길로 바꾼다(길을 치우고 다시 깔 필요 없이). 옆이 집·시설이면 전처럼 못 놓는다.
+   되돌리기로 그 큰길을 치우면 원래 길이 돌아온다(되돌리기 때만 — 치우기 카드로 치우면 큰길만 사라진다). 길 가족의 다른 것(횡단보도·가로수 열·큰길)은 안 바꾼다. */
+const WIDEN = { roads: new Map(), undoing: false, stats: { 넓힘: 0, 되돌림: 0 } };
+/* 순수 함수 — 발자국 칸들의 사정(kinds: 칸마다 null=빈 칸 · 'road' · 그 밖)으로 넓히기가 되나: 한 칸 길이 하나 이상 · 나머지는 빈 칸 */
+function widenOk(kinds) { let r = 0; for (const k of kinds) { if (k === 'road') r++; else if (k !== null) return false; } return r > 0 && r < kinds.length; }
+{ const canW0 = canPlace; canPlace = function (kind, x, y, rot, opts) { const r = canW0.apply(this, arguments);
+    if (kind !== 'avenue' || r === true || !window.VRULES.crowdSay.on || (opts && opts.복원) || typeof r !== 'string' || !/이미 길이/.test(r)) return r;
+    const fp = footprint(kind, x, y, rot || 0); if (!fp.every(([px, py]) => inb(px, py))) return r;
+    const recs = fp.map(([px, py]) => cells[idx(px, py)]); if (!widenOk(recs.map(c => c ? c.k : null))) return r;
+    fp.forEach(([px, py], j) => { if (recs[j]) cells[idx(px, py)] = null; }); let v; try { v = canW0.apply(this, arguments); } finally { fp.forEach(([px, py], j) => { if (recs[j]) cells[idx(px, py)] = recs[j]; }); }
+    return v; };
+  const placeW0 = placeAt; placeAt = function (kind, x, y, rot) { if (kind === 'avenue' && window.VRULES.crowdSay.on) { const fp = footprint(kind, x, y, rot || 0), gone = [];
+      fp.forEach(([px, py]) => { const c = inb(px, py) ? cells[idx(px, py)] : null; if (c && c.k === 'road' && c.root === idx(px, py)) { removeAt(px, py); gone.push(idx(px, py)); } });
+      if (gone.length) { WIDEN.roads.set(idx(x, y), gone); WIDEN.stats.넓힘++; } }
+    return placeW0.apply(this, arguments); };
+  const remW0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, r = remW0.apply(this, arguments);
+    if (r && root >= 0 && WIDEN.roads.has(root)) { const g = WIDEN.roads.get(root); WIDEN.roads.delete(root); if (WIDEN.undoing) { g.forEach(i => { if (!cells[i]) placeAt('road', cX(i), cY(i), 0); }); WIDEN.stats.되돌림++; } }
+    return r; };
+  const undoW0 = undo; undo = function () { WIDEN.undoing = true; try { return undoW0.apply(this, arguments); } finally { WIDEN.undoing = false; } }; }
+window.CROWD_AT = (i) => { const c = cells[i]; if (!c) return 0; if (c.k === 'house') return Math.min(1, crowd.get(c.root) || 0);
+  const e = CROWDSAY.road.get(i); if (!e) return 0; const v = e.v * Math.pow(window.VRULES.crowdSay.keep, SIM.ticks - e.t); if (v < 0.005) { CROWDSAY.road.delete(i); return 0; } return Math.min(1, v); };
+window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { const v = window.CROWD_AT(i); if (v > 0) top.push([cX(i), cY(i), +v.toFixed(2)]); }); top.sort((a, b) => b[2] - a[2]);
+  return { 켜짐: window.VRULES.crowdSay.on, 붐비는길칸: top.filter(t => t[2] > 0.3).length, 센길칸: top.length, 가장붐빔: top.slice(0, 5), ...CROWDSAY.stats, 넓히기: { ...WIDEN.stats } }; };
+
 /* ══════════════════════════════════════════════════════════════
    이벤트(F13). 비 · 축제. 날짜로 정해지므로 저장할 게 없다(같은 날은 같은 날씨).
    ══════════════════════════════════════════════════════════════ */
