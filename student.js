@@ -7328,11 +7328,7 @@ const DECO_PICK_MS = 600;
 function _decoPickAt(cell) {
   if (!cell) return false;
   const list = CUR.houseDecorations || [];
-  const hit = _decoList(CUR).find(p => {   // [DECO-SPACE-1] 누른 것은 이 공간에서
-    if (p.area !== cell.area) return false;
-    const sz = getDecoSize(p.id);
-    return cell.r >= p.row && cell.r < p.row + sz.h && cell.c >= p.col && cell.c < p.col + sz.w;
-  });
+  const hit = _decoTopAt(cell.area, cell.r, cell.c, true);   // [DECO-SPACE-1] 이 공간에서 · [DECO-ANIM-HIT-1] 동물은 보이는 자리로
   if (!hit) return false;
   const d = GAME_DATA.decorations.find(x => x.id === hit.id);
   const inv = (CUR.inventory || []).find(i => i.id === hit.id);
@@ -8623,9 +8619,33 @@ function _decoWhereUsed(id) {
   return parts.length ? '다 썼어요 — ' + parts.join(', ') + ' 놓여 있어요' : '가진 개수가 모자라요!';
 }
 
-function _decoTopAt(area, row, col) {
+// [DECO-ANIM-HIT-1] 동물은 돌아다닌다 — 저장된 자리(놓은 칸)와 **보이는 자리**가 다르다.
+//  누른 것을 찾을 때(치우기·스포이드·빈손 누르기)는 보이는 자리로 찾는다. 전에는 놓은 칸으로만 찾아서
+//  ① 🧽 치우기로 보이는 강아지를 눌러도 "치울 게 없어요" ② 빈 풀밭(강아지가 놓였던 칸)을 누르면 멀리 있는 강아지가 사라졌다.
+//  놓기 막기(canPlaceDeco)는 그대로 놓은 칸 기준이다 — 동물이 돌아올 자리라서.
+function _decoAnimState(p) {
+  if (!p || p.area !== 'yard' || typeof ANIM_DECO === 'undefined' || !ANIM_DECO[p.id]) return null;
+  const rec = _animLayers.get(_ifActiveContainer || 'house-topview');
+  return (rec && rec.items.get(p.id + '@' + p.row + '_' + p.col)) || null;
+}
+//  이 동물이 놓은 칸을 떠나 있나(층이 없으면 — 움직임 끔 등 — 떠난 게 아니다)
+function _decoAnimAway(p) {
+  const st = _decoAnimState(p);
+  return !!st && (st.cur.row !== p.row || st.cur.col !== p.col);
+}
+//  (r,c) 에 **보이는** 동물의 놓인 기록. 없으면 null
+function _decoAnimPlacedAt(area, r, c) {
+  if (area !== 'yard') return null;
+  const st = _animAt(_ifActiveContainer || 'house-topview', r, c);
+  if (!st) return null;
+  return _decoList(CUR).find(p => p.area === 'yard' && p.id === st.id && p.row === st.home.row && p.col === st.home.col) || null;
+}
+
+function _decoTopAt(area, row, col, seen) {
+  if (seen) { const pet = _decoAnimPlacedAt(area, row, col); if (pet) return pet; }   // [DECO-ANIM-HIT-1] 보이는 동물 먼저
   const hits = _decoList(CUR).filter(p => {
     if (p.area !== area) return false;
+    if (seen && _decoAnimAway(p)) return false;   // 떠나 있는 동물의 빈 자리는 누른 게 아니다
     const sz = getDecoSize(p.id);
     return row >= p.row && row < p.row + sz.h && col >= p.col && col < p.col + sz.w;
   });
@@ -8637,7 +8657,7 @@ function _decoTopAt(area, row, col) {
 function _decoPlace(area,row,col){
   const placed=CUR.houseDecorations||[];
   if(DECO_MODE==='erase'){   // [DECO-PT-2] 🧽 치우기 — 누른 칸의 위의 것 하나를 치운다(카드는 안 씀)
-    const ex=_decoTopAt(area,row,col);
+    const ex=_decoTopAt(area,row,col,true);   // [DECO-ANIM-HIT-1] 동물은 보이는 자리로
     if(!ex){ toast('여기엔 치울 게 없어요'); return; }
     const d=GAME_DATA.decorations.find(x=>x.id===ex.id);
     CUR.houseDecorations=placed.filter(p=>p!==ex);
@@ -8652,8 +8672,14 @@ function _decoPlace(area,row,col){
   if(existing && SEL_DECO && DECO_MODE!=='erase'){
     if(!canPlaceDeco(row,col,(getDecoSize(SEL_DECO)).w,(getDecoSize(SEL_DECO)).h,area,null)){
       const ed=GAME_DATA.decorations.find(x=>x.id===existing.id);
+      //  [DECO-ANIM-HIT-1] 동물이 떠나 있으면 "이미 강아지가 있어요"는 눈에 보이는 것과 다르다
+      if(_decoAnimAway(existing)){ toast(`여기는 ${ed?ed.icon+' '+ed.name:'동물'} 자리예요(돌아올 곳) — 옆 칸에 놓아 보세요`); return; }
       toast(`여기엔 이미 ${ed?ed.icon+' '+ed.name:'장식'}이(가) 있어요 — 치우려면 🧽 치우기`); return;
     }
+  } else if(existing && _decoAnimAway(existing)){
+    //  [DECO-ANIM-HIT-1] 빈 풀밭을 눌렀는데 멀리 있는 동물이 사라지던 것 — 여기는 그 동물이 돌아올 자리일 뿐이다
+    const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
+    toast(`여기는 ${d?d.icon+' '+d.name:'동물'} 자리예요 — 치우려면 🧽 치우기를 켜고 그 동물을 누르세요`); return;
   } else if(existing){
     const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
     CUR.houseDecorations=placed.filter(p=>p!==existing);   // [DECO-SPACE-1] 그 한 개만(다른 공간 같은 자리 것은 그대로)
