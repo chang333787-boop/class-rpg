@@ -101,6 +101,15 @@ test('넓힐 자리가 있으면 큰길로 넓히기 · 없으면 길 한 줄 �
 test('넓히기: 한 칸 길 + 빈 칸이면 된다', () => { assert.equal(widenOk(['road', 'road', null, null]), true); assert.equal(widenOk(['road', null, null, null]), true); });
 test('넓히기: 길만(빈 칸 없음) · 빈 칸만 · 집·큰길·횡단보도가 끼면 안 된다', () => { assert.equal(widenOk(['road', 'road', 'road', 'road']), false); assert.equal(widenOk([null, null, null, null]), false); for (const k of ['house', 'avenue', 'crosswalk', 'tree']) assert.equal(widenOk(['road', 'road', k, null]), false); });
 
+/* ── 문이 길을 보게(MAC-DOORROT) — doorRotPick(cands[{rot,score,face}], cur) ── */
+const doorRotPick = grab('doorRotPick');
+test('길을 보는 면이 없으면 지금 방향 그대로', () => assert.equal(doorRotPick([], 3), 3));
+test('하나뿐이면 그쪽 — 지금 방향이 무엇이든', () => { for (const cur of [0, 1, 2, 3]) assert.equal(doorRotPick([{ rot: 2, score: 2, face: -1 }], cur), 2); });
+test('여러 면(모퉁이·양면·3면)이면 지금 방향이 그 가운데 있을 때 그대로 — 한 줄로 이어 놓을 때 흔들리지 않게', () => assert.equal(doorRotPick([{ rot: 0, score: 2, face: 1 }, { rot: 2, score: 2, face: -1 }], 2), 2));
+test('여러 면인데 지금 방향이 없으면: 더 넓은 길(큰길) 먼저 → 같으면 보는 사람 쪽 면', () => {
+  assert.equal(doorRotPick([{ rot: 0, score: 2, face: 1 }, { rot: 1, score: 4, face: 0 }], 3), 1);
+  assert.equal(doorRotPick([{ rot: 3, score: 2, face: -0.7 }, { rot: 0, score: 2, face: 0.7 }], 2), 0); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);

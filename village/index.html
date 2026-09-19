@@ -288,7 +288,9 @@ const P = {
   stoneL:0xd8d3c8, sand:0xe9cfa4, tile:0x79cfd4
 };
 /* 지붕은 집마다 다르게 — 같은 색이 스무 채 서 있으면 그때부터 인공적으로 보인다 */
-const ROOFS = [0xf2889e, 0x79cfd4, 0xf6c667, 0xa89ae0, 0xef9a7a, 0x8fbdf0, 0x8ad39b];
+const ROOFS = [0xd9634f, 0xe98f7a, 0xe8b75a, 0xb9785a, 0xd97a9a, 0xc98a4a, 0xa8667e];   // [DESIGN-LOOK-1] 집 지붕은 따뜻한 계열만(적갈·살구·겨자·밤·장미·호박·자두). 전: 파랑·청록·보라·초록이 섞여 다른 건물 색과 겹쳤다
+/* [DESIGN-LOOK-1] 특별 건물 지붕은 종류마다 한 색 — 칸 자리 돌림(ROOFS)을 쓰지 않는다. 차가운 색이라 따뜻한 집 지붕과 갈린다 */
+const ROOF_FIX = { school: 0x4fb3bf, library: 0x3f6db3, station: 0x5d6b78, museum: 0x9aa3ad };   // glb 재료 roof(1)와 큰 지붕 roof2(8 · 도서관·기차역) 둘 다 이 색. roof2 는 ROOF_FIX 에 있는 종류만 칠하고 나머지는 모델 색 그대로
 
 /* ── 판 ── */
 /* 주소 끝 #w=128,fill=25,people=30 → 판 크기·채움 비율·사람 수를 정해 **재기 위한** 모드.
@@ -636,21 +638,26 @@ const K = {
     { g:'cyl', c:P.metalD, s:[.05,2.0,.05],  p:[1.0,2.78,2.4] },
     { g:'box', c:P.red,    s:[1.15,.18,.72], p:[1.0,1.72,2.4] } ] },
   shop: { jobs:4, nm:'가게', ic:'🏪', grp:'건물', need:'장보기', w:2, h:2, g:120, adv:true, needRoad:true, cap:40,
+    /* [DESIGN-LOOK-1] 가게 = 평지붕 + 앞으로 솟은 빨강 간판벽 + 빨강·흰 줄무늬 차양 + 매대 하나 (09-20 · 보스 채택 시안 R).
+       전: shop.glb(크림 상자 + 갈색 평지붕 + 앞 벽의 작은 차양) — 기본 확대에서 '납작한 집'으로 읽혔다. 카메라가 35° 내려다보니 윤곽(솟은 간판벽)과 줄무늬를 크게.
+       뾰족 박공은 집만 쓴다(원칙). 글자·돈 간판 없음. 상자 16개 = 192△ = 옛 shop.glb 와 같다 · 청크에 합쳐 draw call +0 */
     parts:[
-    { g:'box', c:P.woodD,  s:[6.4,.3,5.6],  p:[0,.15,0] },
-    { g:'box', c:P.cloth,  s:[6.2,3.2,5.4], p:[0,1.7,0] },
-    { g:'box', c:'roof',   s:[6.6,.5,5.8],  p:[0,3.5,0] },
-    { g:'box', c:P.woodD,  s:[5.0,1.1,.26], p:[0,4.25,2.0] },
-    { g:'box', c:P.glow,   s:[4.4,.55,.14], p:[0,4.25,2.16], emis:.5 },
-    { g:'box', c:P.glass,  s:[3.4,1.7,.2],  p:[-.9,1.8,2.72] },
-    { g:'box', c:P.woodD,  s:[3.6,.18,.24], p:[-.9,.85,2.74] },
-    { g:'box', c:P.doorW,  s:[1.4,2.2,.2],  p:[2.0,1.1,2.72] },
-    { g:'box', c:P.red,    s:[6.2,.16,1.9], p:[0,2.86,3.5], rx:-.34 },
-    { g:'box', c:P.cloth,  s:[1.3,.18,1.9], p:[-2.1,2.88,3.5], rx:-.34 },
-    { g:'box', c:P.cloth,  s:[1.3,.18,1.9], p:[0,2.88,3.5],    rx:-.34 },
-    { g:'box', c:P.cloth,  s:[1.3,.18,1.9], p:[2.1,2.88,3.5],  rx:-.34 },
-    { g:'cyl', c:P.woodD,  s:[.11,3.2,.11], p:[-2.95,1.6,4.32] },
-    { g:'cyl', c:P.woodD,  s:[.11,3.2,.11], p:[2.95,1.6,4.32] } ] },
+    { g:'box', c:P.stoneD, s:[6.6,.3,6.0],   p:[0,.15,-.4] },
+    { g:'box', c:0xf6ecd8, s:[6.0,3.4,4.6],  p:[0,1.85,-.8] },            // 벽
+    { g:'box', c:0xd8ccb2, s:[6.3,.35,4.9],  p:[0,3.72,-.8] },            // 평지붕
+    { g:'box', c:P.glass,  s:[3.8,1.9,.12],  p:[-.8,1.75,1.52] },         // 큰 진열창
+    { g:'box', c:P.woodD,  s:[4.0,.2,.2],    p:[-.8,.75,1.56] },
+    { g:'box', c:P.doorW,  s:[1.1,2.1,.14],  p:[2.1,1.15,1.52] },
+    { g:'box', c:P.red,    s:[6.4,1.5,.3],   p:[0,4.6,1.3] },             // 솟은 간판벽(윤곽)
+    { g:'box', c:0xfbf6ec, s:[6.44,.3,.34],  p:[0,5.2,1.3] },
+    { g:'box', c:P.red,    s:[3.0,.7,.3],    p:[0,5.7,1.3] },
+    { g:'box', c:P.red,    s:[1.26,.14,2.2], p:[-2.48,3.0,2.45], rx:.42 }, // 줄무늬 차양 다섯 폭
+    { g:'box', c:0xfbf6ec, s:[1.26,.14,2.2], p:[-1.24,3.0,2.45], rx:.42 },
+    { g:'box', c:P.red,    s:[1.26,.14,2.2], p:[0,3.0,2.45],     rx:.42 },
+    { g:'box', c:0xfbf6ec, s:[1.26,.14,2.2], p:[1.24,3.0,2.45],  rx:.42 },
+    { g:'box', c:P.red,    s:[1.26,.14,2.2], p:[2.48,3.0,2.45],  rx:.42 },
+    { g:'box', c:P.woodD,  s:[1.1,.7,.9],    p:[-2.2,.55,3.3] },          // 매대
+    { g:'box', c:0xf5c542, s:[.95,.22,.75],  p:[-2.2,1.0,3.3] } ] },
   clock: { nm:'시계탑', ic:'🕰️', grp:'키 큰 것', w:1, h:1, g:130, adv:true, cap:40,
     parts:[
     { g:'box', c:P.stoneD, s:[2.7,.5,2.7],  p:[0,.25,0] },
@@ -1528,7 +1535,7 @@ function forestSeason() {
    왜 InstancedMesh 를 버렸나: 종류·부위마다 판 전체를 한 덩어리로 들어 화면 밖도 다 그렸다 —
    128×128 부터 PRD 한도(12ms·30만△)를 못 지켰다(README 33).
    ══════════════════════════════════════════════════════════════ */
-const CHUNK = 4, NCX = Math.ceil(W / CHUNK), NCZ = Math.ceil(H / CHUNK);   // 8→4: 경계 구가 작아야 화면 밖 청크를 덜 그린다
+const CHUNK = 6, NCX = Math.ceil(W / CHUNK), NCZ = Math.ceil(H / CHUNK);   // 8→4: 경계 구가 작아야 화면 밖 청크를 덜 그린다 · [MAC-CHUNK6] 4→6(09-20): 기본 거리 draw call 103→69 · 넓게 볼 때 115→76 · 삼각형 +0~4% · 놓을 때 다시 합치는 시간 같음(pop167 실측)
 const chunks = new Map();                       // key → { cx, cz, meshes:{lit,glow,glass}, items:[], built }
 const dirtyChunks = new Set();
 const chunkGroup = new THREE.Group(); scene.add(chunkGroup);
@@ -1820,16 +1827,16 @@ window.__joinGeo = () => Object.fromEntries(Object.keys(BASE).filter(k => k.inde
    ══════════════════════════════════════════════════════════════ */
 const MODEL_URL = './assets/models/';
 const MODEL_B64 = { /* 서버용: 모델은 ./assets/models/*.glb 를 상대 경로로 받는다(54차) */ };
-const GLB_KIND = { house: 'house', tree: 'tree_round', bigtree: 'tree_pine', fruit: 'tree_fruit', shop: 'shop', school: 'school', library: 'library', station: 'station', museum: 'museum', crosswalk: 'crosswalk', treerow: 'treerow', trashcan: 'trashcan', mailbox: 'mailbox', minibench: 'minibench', leafpile: 'leafpile', snowman: 'snowman', well: 'well', fountain: 'fountain', lamp: 'lamp', pond: 'pond', pavilion: 'pavilion', play: 'playground', bench: 'bench' };
+const GLB_KIND = { house: 'house', tree: 'tree_round', bigtree: 'tree_pine', fruit: 'tree_fruit', school: 'school', library: 'library', station: 'station', museum: 'museum', crosswalk: 'crosswalk', treerow: 'treerow', trashcan: 'trashcan', mailbox: 'mailbox', minibench: 'minibench', leafpile: 'leafpile', snowman: 'snowman', well: 'well', fountain: 'fountain', lamp: 'lamp', pond: 'pond', pavilion: 'pavilion', play: 'playground', bench: 'bench' };
 const GLB_PROP = new Set(['well', 'fountain', 'lamp', 'pond', 'pavilion', 'play', 'bench']);
 const GLB_SPECIAL = new Set(['school', 'library', 'station', 'museum']);
 const GLB_STREET = new Set(['crosswalk', 'treerow']);
 const GLB_DECO = new Set(['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman']);   // 길가·계절 장식은 'deco'(59차)   // 길 조각 둘은 'street' 로(58차)   // 특별 4종은 'special' 로 켜고 끈다(57차)   // 물건 7종은 'props' 하나로 켜고 끈다(55차)   // 종류 → 모델(집 2·3층은 partsOf 에서)
-const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_round', 'tree_pine', 'tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'], person: ['person'], shop: ['shop'], props: ['well', 'fountain', 'lamp', 'pond', 'pavilion', 'playground', 'bench'], special: ['school', 'library', 'station', 'museum'], visitor: ['visitor'], street: ['crosswalk', 'treerow'], deco: ['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman'] };
+const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_round', 'tree_pine', 'tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'], person: ['person'], props: ['well', 'fountain', 'lamp', 'pond', 'pavilion', 'playground', 'bench'], special: ['school', 'library', 'station', 'museum'], visitor: ['visitor'], street: ['crosswalk', 'treerow'], deco: ['trashcan', 'mailbox', 'minibench', 'leafpile', 'snowman'] };
 const GLB_ON = new Set(HP.glb == null ? ['house', 'tree', 'person', 'shop', 'props', 'special', 'visitor', 'street', 'deco'] : String(HP.glb).split('+').filter(x => x && x !== 'none'));
 if (OFF.has('glb')) GLB_ON.clear();
 const GLB = {};                                       // 모델 이름 → { pos, nrm, idx, nv, vcol, vkind, tri }
-const VKIND = { roof: 1, leaf: 2, leaf2: 3, window: 4, sign: 5, lamp: 6 };   // 정점 종류: 지붕 색 돌리기 · 잎 계절색 · 창 밤불 · 빛나는 것
+const VKIND = { roof: 1, leaf: 2, leaf2: 3, window: 4, sign: 5, lamp: 6, roof2: 8 };   // 정점 종류: 지붕 색 돌리기 · 잎 계절색 · 창 밤불 · 빛나는 것
 function parseGLB(buf) {
   const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('glb 아님');
   const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
@@ -1947,7 +1954,7 @@ function buildChunk(cx, cz) {
   for (let y = z0; y < Math.min(H, z0 + CHUNK); y++) for (let x = x0; x < Math.min(W, x0 + CHUNK); x++) {
     const i = idx(x, y), rec = cells[i];
     if (!rec || rec.root !== i) continue;
-    const k = K[rec.k], roofC = ROOFS[(x * 5 + y * 3) % ROOFS.length];
+    const k = K[rec.k], roofC = ROOF_FIX[rec.k] || ROOFS[(x * 5 + y * 3) % ROOFS.length];
     const parts = partsOf(rec);
     const item = { root: i, k: rec.k, rot: rec.rot, bucket: bucketOf(parts[0]), off: 0 };
     const lit = rec.k === 'house' && (res.get(i) || 0) > 0 && dawnLit(i);   // 사람이 사는 집만 창에 불이 켜진다 · [ACT-DAWN] 잠든 집은 끈다
@@ -1963,7 +1970,7 @@ function buildChunk(cx, cz) {
         _v.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(_m); b.pos.push(_v.x, _v.y, _v.z);
         _v.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(_n3).normalize(); b.nrm.push(_v.x, _v.y, _v.z);
         let kind = 0;
-        if (vc) { kind = vk[v]; if (kind === 1) _col.setHex(roofC); else if (kind === 2 || kind === 3 || kind === 7) { _col.setHex(seasonColor(kind === 3 ? P.leafL : P.leaf)); if (kind === 7) _col.multiplyScalar(.72); }   /* 7 = 짙은 잎(꽃밭 바탕 [DESIGN-FLOWER-3]) */ else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
+        if (vc) { kind = vk[v]; if (kind === 1 || (kind === 8 && ROOF_FIX[rec.k])) _col.setHex(roofC); else if (kind === 2 || kind === 3 || kind === 7) { _col.setHex(seasonColor(kind === 3 ? P.leafL : P.leaf)); if (kind === 7) _col.multiplyScalar(.72); }   /* 7 = 짙은 잎(꽃밭 바탕 [DESIGN-FLOWER-3]) */ else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
         if (vc && wait) window.WAITHOUSE.col(_col, kind, pt);   // [MAC-WAITLOOK] 모델 정점은 정점마다 색을 새로 정하므로 여기서
         b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? 1 : 0);
       }
@@ -2616,12 +2623,12 @@ function ghostHasDoor(kind, parts) { const k = K[kind]; return !!(k && (k.needRo
 /* 부위를 한 번 합친다 — 기준 칸 (2,2)에 rot 방향으로 놓인 것처럼 만들고, 발자국 한가운데가 원점이 되게 옮긴다 */
 function ghostBuild(kind, rot) {
   const t0 = performance.now(), rec = { k: kind, root: idx(2, 2), rot }; let parts; try { parts = partsOf(rec); } catch (e) { parts = K[kind].parts; } if (!parts || !parts.length) return null;
-  const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color(), ctr = centerOf(kind, 2, 2, rot), roofC = ROOFS[(kind.length * 3) % ROOFS.length];
+  const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color(), ctr = centerOf(kind, 2, 2, rot), roofC = ROOF_FIX[kind] || ROOFS[(kind.length * 3) % ROOFS.length];
   parts.forEach(pt => { const base = BASE[pt.g]; if (!base) return; const off = pos.length / 3; partMatrix(kind, 2 + (pt.tx || 0), 2, rot, pt, m); n3.getNormalMatrix(m); const vc = base.vcol, vk = base.vkind;
     if (!vc) c.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
     for (let i = 0; i < base.nv; i++) { v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x - ctr.x, v.y, v.z - ctr.z);
       v.set(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z);
-      if (vc) { const kd = vk[i]; if (kd === 1) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
+      if (vc) { const kd = vk[i]; if (kd === 1 || (kd === 8 && ROOF_FIX[kind])) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
       col.push(c.r, c.g, c.b); }
     for (let i = 0; i < base.idx.length; i++) idxs.push(base.idx[i] + off); });
   if (!pos.length) return null;
@@ -2725,6 +2732,186 @@ function libHint(miss, libs, cap, open) {
     if (h) LIBMANY.stats.귀띔++; return t + h; }; }
 window.__libMany = () => ({ 켜짐: window.VRULES.manyLibrary.on, 한도: window.VRULES.manyLibrary.cap, 도서관: countKind('library'), 학교: countKind('school'), ...LIBMANY.stats });
 
+/* ── [MAC-TICKSPLIT] 큰 마을의 튀는 틱 나눠 하기 (보스 10월 ① · 516명 판 CPU 프로파일 — 창조자의 눈 6회 🟡5 '틱 최대 54ms') ──
+   ① 기다리는 집 훑기는 조각으로(위 MAC-WAITSCAN-2) — 가장 컸다(30틱마다 60ms).
+   ② 하루 리듬(출근·등교·귀가)의 길찾기가 8~13시에 한 틱에 몰렸다(사람마다 길 BFS). 리듬이 부르는 길찾기는 **틱당 rhythmBudget 번까지** — 나머지는
+      다음 틱에(출근은 원래 규칙대로 잠깐 뒤 다시). 출발이 한두 틱씩 엇갈릴 뿐 규칙·목적지는 그대로다.
+   ③ 학교·역 찾기(schoolRoot·stationRoot — 판 65,536칸 훑기)는 광장(MAC-PLAZACACHE)과 같이 학교·역을 놓거나 치울 때만 다시 찾는다.
+   원래 줄 수정 0 — rhythmTick·pathTo·pathToBuilding·schoolRoot·stationRoot·placeAt·removeAt 감싸기. 스위치 VRULES.tickSplit. */
+(window.VRULES = window.VRULES || {}).tickSplit = { on: true, rhythmBudget: 8 };
+const TICKSPLIT = { inRhythm: false, tick: -1, n: 0, stats: { 길찾기: 0, 미룸: 0 } };
+{ const rh0 = rhythmTick; rhythmTick = function () { TICKSPLIT.inRhythm = true; try { return rh0.apply(this, arguments); } finally { TICKSPLIT.inRhythm = false; } };
+  const budget = () => { const R = window.VRULES.tickSplit; if (!R.on || !TICKSPLIT.inRhythm) return true; if (TICKSPLIT.tick !== SIM.ticks) { TICKSPLIT.tick = SIM.ticks; TICKSPLIT.n = 0; }
+    if (TICKSPLIT.n >= R.rhythmBudget) { TICKSPLIT.stats.미룸++; return false; } TICKSPLIT.n++; TICKSPLIT.stats.길찾기++; return true; };
+  const pt0 = pathTo; pathTo = function (f) { if (!budget()) return false; return pt0.apply(this, arguments); };
+  const ptb0 = pathToBuilding; pathToBuilding = function (f) { if (!budget()) return false; return ptb0.apply(this, arguments); }; }
+const ROOTC = { school: { root: -1, dirty: true, f0: schoolRoot }, station: { root: -1, dirty: true, f0: stationRoot }, stats: { 훑음: 0, 다시씀: 0 } };
+function rootCached(k) { const e = ROOTC[k], r = e.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === k); if (!e.dirty && ok) { ROOTC.stats.다시씀++; return r; } e.root = e.f0(); e.dirty = false; ROOTC.stats.훑음++; return e.root; }
+schoolRoot = function () { return rootCached('school'); }; stationRoot = function () { return rootCached('station'); };
+{ const pR0 = placeAt; placeAt = function (kind) { if (ROOTC[kind] && ROOTC[kind].f0) ROOTC[kind].dirty = true; return pR0.apply(this, arguments); };
+  const rR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && ROOTC[c.k] && ROOTC[c.k].f0) ROOTC[c.k].dirty = true; return rR0.apply(this, arguments); }; }
+window.__tickSplit = () => ({ 켜짐: window.VRULES.tickSplit.on, 예산: window.VRULES.tickSplit.rhythmBudget, ...TICKSPLIT.stats, 건물찾기: { ...ROOTC.stats }, 기다리는집: { ...WAITSCAN.stats }, 기억: { ...WAITMEMO.stats } });
+/* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
+   규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
+   · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
+   · 길을 보는 방향이 **하나뿐**이면 그쪽으로. **둘 이상**(모퉁이·양면·3면)이면: 지금 방향이 그 가운데 있으면 그대로 → 아니면 더 넓은 길 쪽(점수 큰 쪽)
+     → 같으면 **보는 사람(카메라) 쪽을 향한 면** — 아이가 문을 볼 수 있게(시점을 돌리면 따라 돈다). 길을 보는 방향이 **없으면** 지금 방향 그대로.
+     ('손가락에 가까운 면'은 버렸다: 놓는 칸이 늘 발자국의 왼쪽 위 모서리라 늘 위·왼쪽 면이 가깝게 나온다.)
+   · 아이가 🔄 돌리기를 **직접 누른 뒤에는 그 선택을 따른다**(다른 카드를 고를 때까지 — #607 과 같게). 끌어 놓기 중·들고 옮기는 중·치우기엔 끼어들지 않는다.
+   · 미리보기(#593 모양·문 앞 화살표)·카드 그림(#600)·터치 앉히기(#621)는 selRot 을 읽으므로 저절로 잡힌 방향으로 보인다. 이미 놓인 건물은 바꾸지 않는다.
+   원래 줄 수정 0 — cellAt·rotate·setMode 감싸기. 순수 함수 doorRotPick. 스위치 VRULES.doorRot. */
+(window.VRULES = window.VRULES || {}).doorRot = { on: true };
+const DOORROT = { manual: false, door: new Map(), stats: { 맞춤: 0, 여러면: 0 } };
+/* 순수 함수 — 방향 고르기. cands = [{ rot, score, face }] (score>0 인 것만 — 길을 보는 방향들 · face = 그 면이 카메라를 향한 정도 −1~1), cur = 지금 방향 */
+function doorRotPick(cands, cur) { if (!cands.length) return cur; if (cands.length === 1) return cands[0].rot; if (cands.some(c => c.rot === cur)) return cur;
+  return cands.slice().sort((a, b) => (b.score - a.score) || (b.face - a.face))[0].rot; }
+function doorRotKind(kind) { const k = K[kind]; if (!k || JOIN_KINDS[kind] || FLOWER_KINDS[kind] || k.road || ROADROT.kinds.has(kind)) return false;
+  if (!DOORROT.door.has(kind)) { let parts = null; try { parts = partsOf({ k: kind, root: idx(2, 2), rot: 0 }); } catch (e) { parts = k.parts; } DOORROT.door.set(kind, ghostHasDoor(kind, parts)); }
+  return DOORROT.door.get(kind); }
+function doorRotCands(kind, x, y) { const out = [], vx = camera.position.x - camTarget.x, vz = camera.position.z - camTarget.z, vl = Math.hypot(vx, vz) || 1;
+  for (let r = 0; r < 4; r++) { if (canPlace(kind, x, y, r) !== true) continue; const d = dims(kind, r), fc = ghostFrontCells(x, y, d.w, d.h, r); let score = 0;
+    fc.forEach(([fx, fy]) => { if (!inb(fx, fy)) return; const c = cells[idx(fx, fy)]; if (c && K[c.k].road) score += K[c.k].wide ? 2 : 1; });
+    if (score > 0) out.push({ rot: r, score, face: (Math.sin(r * Math.PI / 2) * vx + Math.cos(r * Math.PI / 2) * vz) / vl }); }   // 문 앞 방향(doorFront 와 같은 식) · 카메라 쪽
+  return out; }
+{ const cellD0 = cellAt; cellAt = function () { const c = cellD0.apply(this, arguments);
+    if (!c || !c.inside || !window.VRULES.doorRot.on || DOORROT.manual || !sel || painting || carrying || eraser || mover || cells[idx(c.x, c.y)] || !doorRotKind(sel)) return c;
+    const cands = doorRotCands(sel, c.x, c.y), r = doorRotPick(cands, selRot);
+    if (cands.length > 1) DOORROT.stats.여러면++;
+    if (r !== selRot) { selRot = r; DOORROT.stats.맞춤++; refreshRotCard(); }
+    return c; };
+  const rotD0 = rotate; rotate = function () { if (sel && doorRotKind(sel)) DOORROT.manual = true; return rotD0.apply(this, arguments); };   // 직접 돌렸다 → 그 선택을 따른다
+  const modeD0 = setMode; setMode = function (kind) { if (kind !== sel) DOORROT.manual = false; return modeD0.apply(this, arguments); }; }
+window.__doorRot = () => ({ 켜짐: window.VRULES.doorRot.on, 직접돌림: DOORROT.manual, 지금방향: selRot, 고른것: sel, 문있음: sel ? doorRotKind(sel) : null, ...DOORROT.stats });
+
+/* ── [MAC-JOBSHOMES] 일자리를 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ③-0 · '시뮬 단위는 집, 걷는 사람은 표본') ──
+   jobsTick·joblessHome·joblessRatio 가 전부 걷는 사람(최대 120명)만 셌다 → 516명 마을도 일 찾는 어른이 60명 남짓이라 가게 15채면 다 찼고,
+   '일자리 모자람'이 영영 생기지 않았다. 이제:
+   · **수요** = 집마다 어른 몫(식구의 절반 · 식구가 있으면 최소 1) · **공급** = 일터(K.jobs)의 자리 합 — 수치(일터당 2~4)는 그대로.
+   · **배정**도 집 단위: 집 앞 길에서 닿는 일터 가운데 빈 자리 있는 가장 가까운 곳부터 어른 몫을 채운다(한 일터가 모자라면 다음 곳에 나눠). 틱마다 판의 1/90 조각씩.
+   · 걷는 사람의 f.job 은 그 집 배정에서 빌려 쓴다(출근 연기는 그대로) · jobCount(일터 → 붙은 어른 수)·jobText 모양 그대로(연기가 읽는다).
+   · jobStats(일자리·찬자리·일없는어른)·'일할 곳이 없어요'(joblessHome) 도 집 기준. 일터 목록은 놓기·치우기 때만 다시 센다(원래 jobsTick 의 판 훑기 없앰).
+   스위치 VRULES.jobsHomes — 끄면 옛 셈(표본). 원래 줄 수정 0 — jobsTick·joblessHome·placeAt·removeAt 감싸기 + simTick 고리 한 줄. */
+(window.VRULES = window.VRULES || {}).jobsHomes = { on: true, every: 90 };   // 보스 결정 09-21: 켠다 — 아이 판에서 일자리가 진짜 모자란 게 '도시를 부르는 문제'다(💼 칩·소식 한 줄·돌아섬 💼 과 함께 · MAC-JOBSON)
+var JOBH = { wp: new Map(), wpDirty: true, asg: new Map(), used: new Map(), lack: new Map(), cur: 0, need: 0, stats: { 한바퀴: 0, 배정: 0, 풀림: 0 } };
+const jobsAdultsOf = root => { const n = res.get(root) || 0; return n > 0 ? Math.max(1, Math.round(n / 2)) : 0; };   // 식구의 절반(어른 몫)
+function jobsWpIndex() { if (!JOBH.wpDirty) return JOBH.wp; const m = new Map(); cells.forEach((rec, i) => { if (rec && rec.root === i && K[rec.k].jobs) m.set(i, K[rec.k].jobs); }); JOBH.wp = m; JOBH.wpDirty = false;
+  JOBH.asg.forEach((a, h) => a.forEach((n, w) => { if (!m.has(w)) { a.delete(w); JOBH.used.set(w, 0); } })); return m; }
+function jobsRelease(h) { const a = JOBH.asg.get(h); if (!a) return; a.forEach((n, w) => JOBH.used.set(w, Math.max(0, (JOBH.used.get(w) || 0) - n))); JOBH.asg.delete(h); JOBH.lack.delete(h); JOBH.stats.풀림++; }
+function jobsHouseStep(rec) { const h = rec.root, need = jobsAdultsOf(h), wp = jobsWpIndex(); let a = JOBH.asg.get(h);
+  if (a) a.forEach((n, w) => { if (!wp.has(w)) { a.delete(w); } });
+  let have = 0; if (a) a.forEach(n => have += n);
+  if (have > need && a) { for (const [w, n] of [...a].reverse()) { if (have <= need) break; const d = Math.min(n, have - need); a.set(w, n - d); if (n - d <= 0) a.delete(w); JOBH.used.set(w, Math.max(0, (JOBH.used.get(w) || 0) - d)); have -= d; } }
+  if (have < need) { const b = roadBeside(rec); if (b >= 0) { const { reach } = roadBFS(b); const seen = new Set();
+      for (const i of reach) { if (have >= need) break; const x = cX(i), y = cY(i);
+        for (let k = 0; k < 4 && have < need; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (!c || !wp.has(c.root) || seen.has(c.root)) continue; seen.add(c.root);
+          const free = wp.get(c.root) - (JOBH.used.get(c.root) || 0); if (free <= 0) continue; const d = Math.min(free, need - have); if (!a) { a = new Map(); JOBH.asg.set(h, a); }
+          a.set(c.root, (a.get(c.root) || 0) + d); JOBH.used.set(c.root, (JOBH.used.get(c.root) || 0) + d); have += d; JOBH.stats.배정 += d; } } } }
+  if (need - have > 0) JOBH.lack.set(h, need - have); else JOBH.lack.delete(h); }
+function jobsHomesStep() { const R = window.VRULES.jobsHomes; if (!R.on || OFF.has('jobs')) return; const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, JOBH.cur + step);
+  for (let i = JOBH.cur; i < end; i++) { const rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') jobsHouseStep(rec); else if (JOBH.asg.has(i) || JOBH.lack.has(i)) jobsRelease(i); }
+  JOBH.cur = end >= N ? 0 : end; if (end >= N) JOBH.stats.한바퀴++; }
+{ const jt0 = jobsTick; jobsTick = function () { if (!window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴) return jt0.apply(this, arguments);
+    const wp = jobsWpIndex(); jobCount.clear(); let total = 0, filled = 0, lack = 0; wp.forEach((n, w) => { total += n; const u = Math.min(n, JOBH.used.get(w) || 0); jobCount.set(w, u); filled += u; }); JOBH.lack.forEach(v => lack += v);
+    folks.forEach(f => { if (!isAdult(f)) return; const a = JOBH.asg.get(f.home); if (!a || !a.size) { f.job = null; return; } const list = [...a.keys()]; const w = list[(f.slot || 0) % list.length]; if (f.job !== w) f.job = w; });
+    jobStats.일자리 = total; jobStats.찬자리 = filled; jobStats.일없는어른 = lack; };
+  const jh0 = joblessHome; joblessHome = function (root) { if (!window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴) return jh0.apply(this, arguments);
+    if (population() < JOB_POP) return false; const need = jobsAdultsOf(root); if (!need) return false; const a = JOBH.asg.get(root); let have = 0; if (a) a.forEach(n => have += n); return have === 0; };
+  const pJ0 = placeAt; placeAt = function (kind) { if (K[kind] && K[kind].jobs) JOBH.wpDirty = true; return pJ0.apply(this, arguments); };
+  const rJ0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && K[c.k].jobs) JOBH.wpDirty = true; if (c && c.k === 'house') jobsRelease(c.root); return rJ0.apply(this, arguments); }; }
+window.__jobsHomes = () => { let need = 0, houses = 0, jl = 0; cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const n = jobsAdultsOf(i); if (!n) return; houses++; need += n; if (joblessHome(i)) jl++; });
+  let lack = 0; JOBH.lack.forEach(v => lack += v); return { 켜짐: window.VRULES.jobsHomes.on, 사는집: houses, 어른몫: need, 일자리: jobStats.일자리, 찬자리: jobStats.찬자리, 일없는어른: lack, 일없는집: jl, 모자란집: JOBH.lack.size, ...JOBH.stats }; };
+
+/* ── [MAC-JOBSON] 집 단위 일자리를 켜며 붙이는 셋 (보스 결정 09-21 · #672) ──
+   ① 💼 칩 '일할 곳이 먼 집 n' — 어른 몫이 있는데 배정이 하나도 안 된 집(= "일할 곳이 없어요"). 누르면 가장 많이 모인 동네로 · "가까이 가게·온실·풍차를 지어 봐요".
+   ② 켜는 날 한 번 소식 한 줄(이 마을에 한 번 — 곁 키 rpg.village.jobsNews.<sid>).
+   ③ 이사 간격 ×2 곱셈(보이지 않는 벌) 대신 **일터가 안 닿는 빈집 앞에서 새 이웃이 돌아선다**(awayLacks 에 '일자리' — 빈 자리 있는 일터가 길로 닿지 않으면).
+      돌아섬의 말: "💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요".
+   · 이미 자란 집의 층은 줄지 않는다 — 성장은 '멈춤'만 있고 되돌림이 없다(satTick: "내려가는 일은 없다"). 켜져도 아이 것은 그대로.
+   · 스위치: VRULES.jobsHomes(집 단위 셈) · VRULES.jobAway(돌아섬 💼) · VRULES.jobsChip(칩·소식). 원래 줄 수정 1 — 이사 간격 줄(스위치가 켜졌을 때만 ×2 를 뺀다). */
+(window.VRULES = window.VRULES || {}).jobAway = { on: true };
+(window.VRULES = window.VRULES || {}).jobsChip = { on: true };
+const JOBSON = { memo: new Map(), roots: [], seen: new Set(), stats: { 돌아섬판정: 0, 눌러감: 0, 소식: 0 } };
+/* 순수 함수 — 돌아섬 말. miss 에 '일자리'가 있으면 그것을 따로 말한다 */
+function waitSayJob(miss, minHave) { const job = miss.includes('일자리'), rest = miss.filter(k => k !== '일자리');
+  const jobT = '💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요';
+  if (!job) return waitSay(rest, minHave); if (!rest.length || 4 - rest.length >= (minHave || 2)) return jobT; return waitSay(rest, minHave) + ' · 💼 일할 곳도 멀어요'; }
+/* 빈 자리 있는 일터가 이 집 앞 길에서 닿나 */
+function jobsReachFree(rec) { const b = roadBeside(rec); if (b < 0) return false; const wp = jobsWpIndex(), { reach } = roadBFS(b);
+  for (const i of reach) { const x = cX(i), y = cY(i); for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && wp.has(c.root) && wp.get(c.root) - (JOBH.used.get(c.root) || 0) > 0) return true; } }
+  return false; }
+{ const al0 = awayLacks; awayLacks = function (rec) { const base = al0.apply(this, arguments);
+    if (!window.VRULES.jobAway.on || !window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴 || OFF.has('jobs') || population() < JOB_POP || !window.VRULES.turnAway.on) return base;
+    if ((res.get(rec.root) || 0) > 0) return base;                                                        // 돌아섬은 빈집 앞 이야기
+    JOBSON.stats.돌아섬판정++; if (jobsReachFree(rec)) return base; return (base || []).concat('일자리'); }; }
+function jobsChipList() { const out = []; if (!window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴 || VISIT.on) return out; JOBH.lack.forEach((v, h) => { const rec = cells[h]; if (rec && rec.root === h && rec.k === 'house' && joblessHome(h)) out.push(h); }); return out; }
+function jobsChipDraw() { let el = document.getElementById('jobsChip'); const R = window.VRULES.jobsChip;
+  if (!el) { el = document.createElement('button'); el.id = 'jobsChip'; el.title = '어른들이 일할 곳이 닿지 않는 집 — 누르면 그 동네로 가요';
+    el.style.cssText = 'position:fixed;right:10px;top:120px;z-index:6;display:none;background:#1f2a24ee;border:1px solid #7fc79a;border-radius:10px;min-height:44px;padding:0 14px;font:800 13.5px/1 "Malgun Gothic",sans-serif;color:#d9f7e3;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px #0007';
+    el.onclick = jobsChipGo; document.body.appendChild(el); const st = document.createElement('style'); st.textContent = 'body.photo #jobsChip{display:none!important}'; document.head.appendChild(st); }
+  const n = R.on ? JOBSON.roots.length : 0; el.style.display = n ? '' : 'none'; if (!n) return; el.textContent = '💼 일할 곳이 먼 집 ' + n;
+  const wh = document.getElementById('waitHomes'), top = document.getElementById('top'); const below = wh && wh.style.display !== 'none' ? wh.getBoundingClientRect().bottom : (top ? top.getBoundingClientRect().bottom : 60); el.style.top = Math.round(below + 6) + 'px'; }
+function jobsChipTick() { JOBSON.roots = jobsChipList(); jobsChipDraw();
+  const R = window.VRULES.jobsChip; if (!R.on || !JOBSON.roots.length || population() < JOB_POP || window.__LOADMS == null) return;
+  const key = 'rpg.village.jobsNews.' + SID; let seen = false; try { seen = !!localStorage.getItem(key); } catch (e) { seen = true; }
+  if (!seen) { try { localStorage.setItem(key, '1'); } catch (e) {} JOBSON.stats.소식++; setTimeout(() => toast('💼 마을이 커져서 어른들 일할 곳이 모자라요 — 가게·온실·풍차를 더 지어 봐요', true), 800); } }
+function jobsChipGo() { JOBSON.roots = jobsChipList(); jobsChipDraw(); if (!JOBSON.roots.length) return;
+  const groups = waitClusters(JOBSON.roots, W, 8), g = groups.find(q => !q.some(r => JOBSON.seen.has(r))) || groups[0]; if (groups.every(q => q.some(r => JOBSON.seen.has(r)))) JOBSON.seen.clear();
+  const root = waitClusterHome(g, W), rec = cells[root]; if (!rec) return; g.forEach(r => JOBSON.seen.add(r)); JOBSON.stats.눌러감++;
+  const c = centerOf('house', cX(root), cY(root), rec.rot); camTarget.set(c.x, 2, c.z); miniDirty = true; sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 });
+  toast('💼 이 동네 ' + g.length + '채 · 어른들 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요', true); }
+window.__jobsOn = () => ({ 셈: window.VRULES.jobsHomes.on, 돌아섬: window.VRULES.jobAway.on, 칩: window.VRULES.jobsChip.on, 칩수: JOBSON.roots.length, 글: (document.getElementById('jobsChip') || {}).textContent || '', ...JOBSON.stats });
+
+/* ── [MAC-WORKFIRST] 일터 둘 고침 (창조자의 눈 7회 🔴1·🔴2 · 보스 09-20) ──
+   ① 풍차·온실도 길에 붙어야 놓인다(VRULES.workRoad) — 가게는 needRoad 였는데 풍차·온실은 아니어서 풀밭에 말없이 놓이고 일꾼이 영영 못 왔다("일자리 0/2").
+      K.windmill·K.green 의 needRoad 를 스위치를 읽는 getter 로 둔다 → 놓기 막음 말("풍차는 길에 붙어야 해요…")·카드 고를 때 한마디·문 방향이 가게와 같아진다.
+      옛 저장본의 풀밭 풍차는 그대로 되살아난다(canPlace 의 복원 길은 needRoad 를 안 본다).
+   ② 새 일터 자리는 **아무도 일 안 하는 집부터**(VRULES.jobsHomes.first — 집 단위 배정의 한 칸이라 따로 스위치를 두지 않는다) — 판정('일할 곳이 없어요' = 배정 0)에 닿는 집이 먼저다.
+      한 명이라도 일하는 집이 식구가 늘어 자리를 더 채우는 일(채우기)은, 지난 한 바퀴에 '첫 자리'를 얻은 집이 있었으면 한 바퀴 쉰다.
+      그 전엔 판을 도는 차례대로 채우기가 자리 2개짜리 풍차를 먼저 가져가 💼 칩이 안 줄 수 있었다.
+   ③ 옛 저장본의 풀밭 풍차·온실을 누르면 "— 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요".
+   원래 줄 수정 1 — 일터를 누를 때의 토스트 줄 끝에 workRoadWhy(rec). 그 밖엔 K 두 항목에 getter · jobsHouseStep·jobsHomesStep 감싸기. */
+(window.VRULES = window.VRULES || {}).workRoad = { on: true, kinds: ['windmill', 'green'] };
+if (!('first' in window.VRULES.jobsHomes)) window.VRULES.jobsHomes.first = true;
+const WORKF = { got: 0, last: 1, stats: { 첫자리: 0, 채우기미룸: 0 } };
+['windmill', 'green'].forEach(k => { if (K[k] && !('needRoad' in K[k])) Object.defineProperty(K[k], 'needRoad', { configurable: true, enumerable: true,
+  get: () => { const R = window.VRULES.workRoad; return !!(R && R.on && R.kinds.includes(k)); } }); });
+{ const hs0 = jobsHouseStep; jobsHouseStep = function (rec) { const first = window.VRULES.jobsHomes.first, a = JOBH.asg.get(rec.root); let have = 0; if (a) a.forEach(n => have += n);
+    if (first && have > 0 && WORKF.last > 0 && have < jobsAdultsOf(rec.root)) { WORKF.stats.채우기미룸++; return; }   // 채우기만 쉰다(넘친 몫 줄이기는 have ≥ need 라 여기 안 걸린다)
+    const r = hs0.apply(this, arguments);
+    if (have === 0) { const b = JOBH.asg.get(rec.root); let h2 = 0; if (b) b.forEach(n => h2 += n); if (h2 > 0) { WORKF.got++; WORKF.stats.첫자리++; } }
+    return r; }; }
+{ const hh0 = jobsHomesStep; jobsHomesStep = function () { const lap = JOBH.stats.한바퀴, r = hh0.apply(this, arguments); if (JOBH.stats.한바퀴 !== lap) { WORKF.last = WORKF.got; WORKF.got = 0; } return r; }; }
+/* 일터를 눌렀을 때 — 길에 안 닿은 일터(옛 저장본의 풀밭 풍차·온실)는 까닭과 한 수를 말한다 */
+function workRoadWhy(rec) { const R = window.VRULES.workRoad; if (!R || !R.on || !K[rec.k].jobs || roadBeside(rec) >= 0) return ''; WORKF.stats.길없음말 = (WORKF.stats.길없음말 || 0) + 1; return ' — 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요'; }
+window.__workFirst = () => ({ 길필요: window.VRULES.workRoad.on && window.VRULES.workRoad.kinds.filter(k => K[k] && K[k].needRoad), 먼저: !!window.VRULES.jobsHomes.first, 지난바퀴첫자리: WORKF.last, ...WORKF.stats });
+
+/* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
+   가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
+   이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
+   · 불러오는 동안·첫 바퀴·구경 중에는 안 뜬다(MAC-SAY 의 sayLive 와 같은 때만). 한꺼번에 많아도 16개까지.
+   · 그림: 🪣✓ 와 같은 동그라미 + 초록 ✓ · InstancedMesh 하나(표시가 없으면 개수 0 = draw call 0).
+   판정 0 · 저장 0. 원래 줄 수정 0 — jobsHouseStep·sayDraw 감싸기. 스위치 VRULES.jobCheck. */
+(window.VRULES = window.VRULES || {}).jobCheck = { on: true, showMs: 4500, max: 16 };
+const JOBCHK = { marks: [], stats: { 표시: 0 } };
+const jobChkMesh = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#e9f8ec'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '34px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('💼', 30, 37);
+  g.fillStyle = '#2e9d57'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText('✓', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 16); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; })();
+{ const hsC0 = jobsHouseStep; jobsHouseStep = function (rec) { const h = rec.root, R = window.VRULES.jobCheck, a0 = JOBH.asg.get(h);
+    const watch = R.on && JOBH.stats.한바퀴 > 0 && JOBH.lack.has(h) && !(a0 && a0.size) && population() >= JOB_POP && sayLive();
+    const r = hsC0.apply(this, arguments);
+    if (watch) { const a = JOBH.asg.get(h); if (a && a.size) { const c = centerOf('house', cX(h), cY(h), rec.rot); JOBCHK.marks.push({ x: c.x, z: c.z, until: performance.now() + R.showMs });
+      if (JOBCHK.marks.length > R.max) JOBCHK.marks.shift(); JOBCHK.stats.표시++; } }
+    return r; }; }
+function jobChkDraw() { if (!JOBCHK.marks.length && !jobChkMesh.count) return; const now = performance.now(), R = window.VRULES.jobCheck; JOBCHK.marks = JOBCHK.marks.filter(m => m.until > now); let n = 0;
+  JOBCHK.marks.forEach(m => { const age = 1 - (m.until - now) / R.showMs; sayDummy.position.set(m.x, 8.5 + Math.min(1, age * 4) * 1.2, m.z); sayDummy.quaternion.copy(camera.quaternion);
+    const sc = 1 + 0.25 * Math.sin(Math.min(1, age * 3) * Math.PI); sayDummy.scale.set(sc, sc, 1); sayDummy.updateMatrix(); jobChkMesh.setMatrixAt(n++, sayDummy.matrix); });
+  jobChkMesh.count = n; if (n) jobChkMesh.instanceMatrix.needsUpdate = true; }
+{ const sdC0 = sayDraw; sayDraw = function () { const r = sdC0.apply(this, arguments); jobChkDraw(); return r; }; }
+window.__jobCheck = () => ({ 켜짐: window.VRULES.jobCheck.on, 떠있는표시: JOBCHK.marks.length, ...JOBCHK.stats });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
@@ -2766,7 +2953,7 @@ function act(clientX, clientY) {
       toast(K[rec.k].nm + ' · ' + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);
       return;
     }
-    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec), true); return; }   // 온실·풍차 같은 일터(F27)
+    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec), true); return; }   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
     if (rec && rec.k === 'house') {                   // 집을 누르면 사정을 말한다
       const n = res.get(rec.root) || 0, why = moveInWhy(rec);
       const names = folks.filter(f => !f.arriving && f.home === rec.root).map(folkName).join('·');
@@ -3475,7 +3662,7 @@ function thumbOf(kind) {
   const t0 = performance.now();
   try {
     const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color();
-    const roofC = ROOFS[(kind.length * 3) % ROOFS.length];
+    const roofC = ROOF_FIX[kind] || ROOFS[(kind.length * 3) % ROOFS.length];
     parts.forEach(pt => {
       const base = BASE[pt.g]; if (!base) return;
       const off = pos.length / 3; partMatrix(kind, x0 + (pt.tx || 0), y0, 0, pt, m); n3.getNormalMatrix(m);
@@ -3484,7 +3671,7 @@ function thumbOf(kind) {
       for (let i = 0; i < base.nv; i++) {
         v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x, v.y, v.z);
         v.set(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z);
-        if (vc) { const kd = vk[i]; if (kd === 1) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) { c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); if (kd === 7) c.multiplyScalar(.72); } else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
+        if (vc) { const kd = vk[i]; if (kd === 1 || (kd === 8 && ROOF_FIX[kind])) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) { c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); if (kd === 7) c.multiplyScalar(.72); } else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
         col.push(c.r, c.g, c.b);
       }
       for (let i = 0; i < base.idx.length; i++) idxs.push(base.idx[i] + off);
@@ -3665,7 +3852,7 @@ const simNow = () => SIM.t;
 function simTick() {
   SIM.t += TICK_MS; SIM.ticks++;
   pathBudget = PATH_BUDGET;                       // 길찾기 예산은 틱마다 새로
-  if (++moveTimer >= MOVEIN_EVERY * (population() >= JOB_POP && joblessRatio() > 0.5 ? 2 : 1)) { moveTimer = 0; /* 어른 절반이 일이 없으면 이사가 느리다(F27) */ if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
+  if (++moveTimer >= MOVEIN_EVERY * (population() >= JOB_POP && joblessRatio() > 0.5 && !(window.VRULES.jobsHomes && window.VRULES.jobsHomes.on && window.VRULES.jobAway && window.VRULES.jobAway.on) ? 2 : 1)) { moveTimer = 0; /* 어른 절반이 일이 없으면 이사가 느리다(F27) */ if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
   satTick(); crowdTick(); eventTick(); visitTick(SIM.t); if ((SIM.ticks % 50) === 0) needsTick(); if ((SIM.ticks % 30) === 0 && !OFF.has('jobs')) jobsTick(); wishTick();
   if ((SIM.ticks % 10) === 0) { goalTick(); plotTick(); }
   if ((SIM.ticks % 10) === 0) spotTick();   // [MAC-SPOT] 큰 건물이 열렸나
@@ -3673,11 +3860,15 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 10) === 0) goalTraySync();   // [MAC-GOAL-2] 목표가 목표판에 오르는 순간 트레이도
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
+  jobsHomesStep();   // [MAC-JOBSHOMES] 일자리 배정을 집 단위로 — 틱마다 판의 1/90 조각
+  if ((SIM.ticks % 30) === 17) jobsChipTick();   // [MAC-JOBSON] 💼 일할 곳이 먼 집 칩(3초마다)
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   if ((SIM.ticks % 30) === 13) growTick('tick');   // [MAC-GROW] 심은 것이 한 단계 자랐나(3초마다 · 자라는 것만 훑는다)
+  waitScanStep();   // [MAC-WAITSCAN-2] 기다리는 집 훑기 — 틱마다 판의 1/30 조각
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
+  crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
@@ -4150,11 +4341,26 @@ function tryMoveIn() {
 var WAITLOOK = { miss: new Map(), stats: { 센횟수: 0, 다시합친청크: 0, 센ms: 0 } };   // var — buildChunk 가 이 줄보다 먼저 돌 수 있다(그땐 undefined → 기다리는 집 없음)
 /* [MAC-WAITSCAN] 기다리는 집 훑기는 3초에 한 번만 — 칩(MAC-WAITHOMES)과 집 모습(MAC-WAITLOOK)이 같은 awayLacks 훑기(빈집마다 길 BFS)를 따로 했다.
    같은 3초 구간 안에서는 앞서 센 것을 돌려준다. fresh = 아이가 칩을 눌렀을 때·시험 훅(멈춘 동안 우물을 놓고 바로 누를 수 있다). 방문 중엔 빈 표. */
-var WAITSCAN = { at: -1e9, map: new Map(), lack: new Map(), stats: { 훑음: 0, 다시씀: 0 } };
+var WAITSCAN = { at: -1e9, map: new Map(), lack: new Map(), cur: 0, accM: new Map(), accL: new Map(), cand: 0, accC: 0, stats: { 훑음: 0, 다시씀: 0, 조각: 0, 한바퀴: 0 } };
+/* [MAC-WAITSCAN-2] (보스 10월 ① · 516명 판 CPU 프로파일) 판 전체를 한 틱에 훑으면 빈집마다 길 BFS 라 30틱마다 60ms 가 튀었다(틱 최대 54~69ms 의 뿌리 · 전체의 40%).
+   이제 **틱마다 판의 1/30 조각**만 본다(waitScanStep — simTick 고리 한 줄) → 30틱에 한 바퀴, 끝나면 표를 통째로 바꿔 끼운다(반쯤 센 표를 내보이지 않는다).
+   fresh(칩을 누를 때·시험 훅)는 지난 바퀴의 빈집 후보가 40채 이하인 작은 마을에서만 그 자리에서 전체를 다시 센다 — 큰 마을은 3초 안의 표를 쓴다. */
+function waitScanFull() { const m = new Map(), lack = new Map(); let c = 0; if (!VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; c++; const miss = awayLacks(rec); if (miss && miss.length) { m.set(i, miss[0]); lack.set(i, miss); } });
+  WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.lack = lack; WAITSCAN.cand = c; WAITSCAN.stats.훑음++; return m; }
+/* 빈집의 '빠진 것'은 판(길·시설)이 바뀔 때만 달라진다 — 판 번호(놓기·치우기마다 +1)와 필요 수·인구 문턱이 같으면 지난 답을 쓴다(길 BFS 를 안 돈다). */
+const WAITMEMO = { ver: 0, m: new Map(), stats: { 다시씀: 0, 셈: 0 } };
+{ const pW0 = placeAt; placeAt = function () { WAITMEMO.ver++; return pW0.apply(this, arguments); }; const rW0 = removeAt; removeAt = function () { WAITMEMO.ver++; return rW0.apply(this, arguments); }; }
+function waitLacksMemo(rec) { const key = WAITMEMO.ver + '|' + NEEDS.length + '|' + (population() < window.VRULES.turnAway.graceBelow ? 0 : 1) + '|' + (window.VRULES.turnAway.on ? 1 : 0) + '|' + (typeof JOBH !== 'undefined' && window.VRULES.jobAway && window.VRULES.jobAway.on ? (JOBH.stats.한바퀴 >> 2) : '-'), e = WAITMEMO.m.get(rec.root);   // 일자리 자리는 배정이 돌며 바뀐다 — 네 바퀴(≈36초)마다 다시
+  if (e && e.key === key) { WAITMEMO.stats.다시씀++; return e.miss; } const miss = awayLacks(rec); WAITMEMO.m.set(rec.root, { key, miss }); WAITMEMO.stats.셈++; if (WAITMEMO.m.size > 4000) WAITMEMO.m.clear(); return miss; }
+function waitScanStep() { if (VISIT.on) { WAITSCAN.map = new Map(); WAITSCAN.lack = new Map(); WAITSCAN.cur = 0; WAITSCAN.accM = new Map(); WAITSCAN.accL = new Map(); WAITSCAN.accC = 0; return; }
+  const N = W * H, step = Math.ceil(N / 30), end = Math.min(N, WAITSCAN.cur + step);
+  for (let i = WAITSCAN.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) continue; WAITSCAN.accC++; const miss = waitLacksMemo(rec); if (miss && miss.length) { WAITSCAN.accM.set(i, miss[0]); WAITSCAN.accL.set(i, miss); } }
+  WAITSCAN.cur = end; WAITSCAN.stats.조각++;
+  if (end >= N) { WAITSCAN.map = WAITSCAN.accM; WAITSCAN.lack = WAITSCAN.accL; WAITSCAN.cand = WAITSCAN.accC; WAITSCAN.at = SIM.ticks; WAITSCAN.accM = new Map(); WAITSCAN.accL = new Map(); WAITSCAN.accC = 0; WAITSCAN.cur = 0; WAITSCAN.stats.한바퀴++; } }
 function waitScan(fresh) {
-  if (!fresh && SIM.ticks >= WAITSCAN.at && SIM.ticks - WAITSCAN.at < 30) { WAITSCAN.stats.다시씀++; return WAITSCAN.map; }
-  const m = new Map(), lack = new Map(); if (!VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; const miss = awayLacks(rec); if (miss && miss.length) { m.set(i, miss[0]); lack.set(i, miss); } });
-  WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.lack = lack; WAITSCAN.stats.훑음++; return m;
+  if (fresh && WAITSCAN.cand <= 40) return waitScanFull();                                  // 작은 마을: 그 자리에서(우물을 놓고 바로 칩을 눌러도 맞게)
+  if (WAITSCAN.at < 0) return waitScanFull();                                               // 처음 한 번(열자마자 칩이 비어 보이지 않게)
+  WAITSCAN.stats.다시씀++; return WAITSCAN.map;
 }
 function waitHouseIs(root) { return !!(WAITLOOK && window.WAITHOUSE) && WAITLOOK.miss.has(root) && (res.get(root) || 0) === 0; }
 function waitLookTick() {
@@ -4165,7 +4371,7 @@ function waitLookTick() {
   WAITLOOK.stats.센횟수++; WAITLOOK.stats.다시합친청크 += keys.size; WAITLOOK.stats.센ms = +(performance.now() - t0).toFixed(2);
 }
 { const parts0 = partsOf; partsOf = function (rec) { const p = parts0.apply(this, arguments);
-    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root)) return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
+    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root) && WAITLOOK.miss.get(rec.root) !== '일자리') return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
 window.__waitLook = () => ({ 켜짐: window.VRULES.waitLook.on, 기다리는집: WAITLOOK.miss.size, 빠진것첫째: [...new Set(WAITLOOK.miss.values())], ...WAITLOOK.stats });
 
 (window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 1, bubbleMs: 6000 };
@@ -4177,7 +4383,7 @@ const AWAY = { turned: new Map(), toasted: new Set(), rr: 0, stats: { 돌아섬:
 /* 순수 함수 — 이 집에 빠진 것 목록(살 만하면 null). THREE·DOM 을 안 만진다 */
 function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]); return needs.length - miss.length >= minHave ? null : miss; }
 function awayLacks(rec) { const R = window.VRULES.turnAway; if (!R.on || population() < R.graceBelow) return null; return homeLacks(computeSat(rec).met, AWAY_NEEDS, R.minHave); }   // computeSat 을 그 자리에서 — 빈 집은 satTick 이 안 돌아 캐시가 없다
-function awayWhy(rec) { const miss = awayLacks(rec); return miss ? waitSay(miss, window.VRULES.turnAway.minHave) : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
+function awayWhy(rec) { const miss = awayLacks(rec); return miss ? waitSayJob(miss, window.VRULES.turnAway.minHave) : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
 const awayLeavers = () => { let n = 0; folks.forEach(f => { if (f.leaving) n++; }); return n; };
 /* tryMoveIn 고리 — 오늘 이미 돌아선 집은 후보에서 뺀다. 돌아가는 사람이 길에 있으면 다음 후보가 불편한 집일 때 그 차례를 쉰다(행렬 막기 — 결과는 같다: 아무도 안 든다) */
 function awayFilter(homes) {
@@ -4254,7 +4460,7 @@ function awayDraw(now) {
    · 3초마다 센다(칸을 한 번 훑는다 · 0.3ms 안팎). 원래 줄 수정 0 — simTick 고리 한 줄. */
 (window.VRULES = window.VRULES || {}).waitHomes = { on: true };
 const WAITHOMES = { roots: [], seen: new Set(), stats: { 눌러감: 0 } };
-function waitHomesScan(fresh) { if (VISIT.on) return []; const m = waitScan(fresh); return window.VRULES.waitHomes.on ? [...m.keys()] : []; }   // [MAC-WAITSCAN] 훑기는 waitScan 하나
+function waitHomesScan(fresh) { if (VISIT.on) return []; const m = waitScan(fresh); return window.VRULES.waitHomes.on ? [...m.keys()].filter(r => cells[r] && cells[r].root === r && cells[r].k === 'house' && !((res.get(r) || 0) > 0)) : []; }   // 조각 훑기 표는 3초까지 묵을 수 있다 — 그 사이 누가 들었거나 치운 집은 뺀다   // [MAC-WAITSCAN] 훑기는 waitScan 하나
 /* 순수 함수 — (cx,cy)에서 가까운 순. 방금 본 것(seen)은 뒤로 */
 function waitHomesOrder(roots, cx, cy, seen, w) { return roots.slice().sort((a, b) => (seen.has(a) - seen.has(b)) || (Math.hypot(a % w - cx, ((a / w) | 0) - cy) - Math.hypot(b % w - cx, ((b / w) | 0) - cy))); }
 /* ── [MAC-WAITHOMES-2] (창조자의 눈 5회 🟡) 말은 짧게·귀띔 톤으로 / 고치는 만큼 점이 찬다 / 가장 많이 모인 동네부터 ──
@@ -4277,9 +4483,9 @@ function waitHomesDraw() { let el = document.getElementById('waitHomes');
     el.style.cssText = 'position:fixed;right:10px;top:68px;z-index:6;display:none;background:#2a2417ee;border:1px solid #e8b04b;border-radius:10px;min-height:44px;padding:0 14px;font:800 13.5px/1 "Malgun Gothic",sans-serif;color:#ffe9b8;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px #0007';
     el.onclick = waitHomesGo; document.body.appendChild(el); const st = document.createElement('style'); st.textContent = 'body.photo #waitHomes{display:none!important}'; document.head.appendChild(st); }
   const n = WAITHOMES.roots.length, top = document.getElementById('top'); el.style.display = n ? '' : 'none';
-  if (n) { const g = waitClusters(WAITHOMES.roots, W, window.VRULES.waitHomes.reach || 8)[0], ml = g.map(r => (WAITSCAN.lack.get(r) || []).length || 4), most = ml.sort((a, b) => ml.filter(v => v === a).length - ml.filter(v => v === b).length).pop();   // 가장 큰 동네에서 가장 흔한 처지
+  if (n) { const g = waitClusters(WAITHOMES.roots, W, window.VRULES.waitHomes.reach || 8)[0], ml = g.map(r => (WAITSCAN.lack.get(r) || []).filter(k => k !== '일자리').length || 4), most = ml.sort((a, b) => ml.filter(v => v === a).length - ml.filter(v => v === b).length).pop();   // 가장 큰 동네에서 가장 흔한 처지
     el.textContent = '🏠 이웃을 기다리는 집 ' + n + ' ' + waitDots(most, window.VRULES.turnAway.minHave); if (top) el.style.top = Math.round(top.getBoundingClientRect().bottom + 6) + 'px'; } }
-function waitHomesTick() { WAITHOMES.roots = waitHomesScan(true); waitHomesDraw(); }   // 3초 박자의 첫 자리(틱 %30 === 0)가 늘 새로 훑고, 7틱 뒤의 집 모습이 그것을 다시 쓴다
+function waitHomesTick() { WAITHOMES.roots = waitHomesScan(false); waitHomesDraw(); }   // 3초 박자의 첫 자리(틱 %30 === 0)가 늘 새로 훑고, 7틱 뒤의 집 모습이 그것을 다시 쓴다
 function waitHomesGo() {
   WAITHOMES.roots = waitHomesScan(true); waitHomesDraw(); if (!WAITHOMES.roots.length) return;
   if (WAITHOMES.roots.every(r => WAITHOMES.seen.has(r))) WAITHOMES.seen.clear();                                    // 한 바퀴 다 봤으면 처음부터
@@ -4289,7 +4495,7 @@ function waitHomesGo() {
   sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); const miss = WAITSCAN.lack.get(root), why = moveInWhy(rec);
   toast(miss ? '🏠 이 동네 ' + g.length + '채 · ' + waitSay(miss, window.VRULES.turnAway.minHave) : why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, true);
 }
-window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan(true).length, 훑기: { ...WAITSCAN.stats }, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
+window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan(true).length, 훑기: { ...WAITSCAN.stats, 기억: { ...WAITMEMO.stats } }, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
 
 window.__away = () => ({ 켜짐: window.VRULES.turnAway.on, ...AWAY.stats, 돌아선집: AWAY.turned.size, 나가는중: awayLeavers(), 이사중: movers, 최근: AWAY.log.slice(-5) });
 
@@ -4530,6 +4736,136 @@ window.CROWD_AT = (i) => { const c = cells[i]; if (!c) return 0; if (c.k === 'ho
   const e = CROWDSAY.road.get(i); if (!e) return 0; const v = e.v * Math.pow(window.VRULES.crowdSay.keep, SIM.ticks - e.t); if (v < 0.005) { CROWDSAY.road.delete(i); return 0; } return Math.min(1, v); };
 window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { const v = window.CROWD_AT(i); if (v > 0) top.push([cX(i), cY(i), +v.toFixed(2)]); }); top.sort((a, b) => b[2] - a[2]);
   return { 켜짐: window.VRULES.crowdSay.on, 붐비는길칸: top.filter(t => t[2] > 0.3).length, 센길칸: top.length, 가장붐빔: top.slice(0, 5), ...CROWDSAY.stats, 넓히기: { ...WIDEN.stats } }; };
+/* ── [MAC-WIDEN2] 이미 지은 골목을 큰길로 — 바꿔 깔기 (창조자의 눈 7회 🔴4 · 보스 09-20 · **규칙 변경 — 월요일 안건**) ──
+   붐빔(#670)은 **그 집 문 앞 길 칸**의 교통량 ÷ 품(한 칸 길 4 · 큰길 8)이다. 그런데 붐비는 집의 문 앞 길에 큰길(2×2)을 놓으면 "여기엔 이미 …" —
+   잰 값: 붐비는 집 pop88 26채 중 24 · pop167 57채 중 53 은 문 앞 칸을 덮는 2×2 자리에 **곁 집 한 채**가 걸린다(넓히기 WIDEN 은 길+빈 칸만 됐다).
+   그 집을 한 칸 물리면 자리가 난다: pop88 26/26 · pop167 52/57. 그래서
+   · 큰길을 길 위에 놓을 때 발자국에 **집 한 채만** 걸리고 나머지가 길·빈 칸이면, 그 집을 큰길에서 먼 쪽으로 **한 칸 물리고**(식구·층은 KEEP 이 그대로 옮긴다) 큰길을 깐다.
+     물린 집은 새 큰길이나 길에 닿아야 하고, 옮길 칸은 비어 있고 열린 땅이어야 한다. 알림: "🏠 집이 한 칸 물러나고 큰길이 깔렸어요".
+   · 물릴 자리도 없으면 한마디: "큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 곁에 길을 한 줄 더 내 봐요".
+   · 붐비는 집(필요는 다 찬 집)의 말: 문 앞 길에 큰길이 들어가면(바로 또는 한 칸 물려서) "🛣️ 문 앞 길을 큰길로 넓혀 봐요 — 문 앞 길 위에 큰길을 놓으면 돼요".
+   · ↩ 되돌리기는 큰길만 거둔다(WIDEN 이 길을 되살림) — 물러난 집은 그 자리에 둔다.
+   스위치 VRULES.widenShift. 원래 줄 수정 0 — canPlace·placeAt·crowdWidenAt·crowdHint 감싸기. */
+(window.VRULES = window.VRULES || {}).widenShift = { on: true };
+const WIDEN2 = { busy: false, stats: { 물림: 0, 자리없음말: 0 } };
+/* 큰길 발자국(x,y,rot)에 집 한 채만 걸리고 나머지가 한 칸 길·빈 칸이면, 그 집을 물릴 곳 { house, to:[x,y], fp } — 없으면 null */
+function widenShiftPlan(x, y, rot) {
+  const fp = footprint('avenue', x, y, rot || 0); if (!fp.every(([px, py]) => inb(px, py) && plotOpen(px, py))) return null;
+  const fpSet = new Set(fp.map(([px, py]) => idx(px, py))); let house = null, road = 0;
+  for (const [px, py] of fp) { const i = idx(px, py), c = cells[i]; if (!c) continue; if (c.k === 'road' && c.root === i) { road++; continue; } if (c.k === 'house' && (!house || house === c)) { house = c; continue; } return null; }
+  if (!house || !road) return null;
+  const hx = cX(house.root), hy = cY(house.root), own = new Set(footprint('house', hx, hy, house.rot).map(([px, py]) => idx(px, py)));
+  const isRoadAt = i => { const c = cells[i]; return !!(c && K[c.k].road); };
+  let best = null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nfp = footprint('house', hx + dx, hy + dy, house.rot);
+    if (!nfp.every(([px, py]) => inb(px, py) && plotOpen(px, py) && !fpSet.has(idx(px, py)) && (!cells[idx(px, py)] || own.has(idx(px, py))))) continue;
+    const touch = nfp.some(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => { const nx = px + ax, ny = py + ay; if (!inb(nx, ny)) return false; const j = idx(nx, ny); return fpSet.has(j) || (!own.has(j) && isRoadAt(j)); }));
+    if (!touch) continue;
+    const far = nfp.reduce((m, [px, py]) => Math.min(m, ...fp.map(([fx, fy]) => Math.abs(px - fx) + Math.abs(py - fy))), 99);   // 큰길에서 먼 쪽이 먼저
+    if (!best || far > best.far) best = { house, to: [hx + dx, hy + dy], fp, far };
+  }
+  return best;
+}
+{ const cS0 = canPlace; canPlace = function (kind, x, y, rot, opts) { const r = cS0.apply(this, arguments);
+    if (kind !== 'avenue' || r === true || !window.VRULES.widenShift.on || (opts && opts.복원) || typeof r !== 'string' || !/이미/.test(r)) return r;   // 자리 겹침일 때만(잠김 등은 그대로)
+    const fp = footprint('avenue', x, y, rot || 0), onRoad = fp.some(([px, py]) => inb(px, py) && cells[idx(px, py)] && cells[idx(px, py)].k === 'road');
+    if (!onRoad) return r;   // 길 위가 아니면 원래 말 그대로
+    const p = widenShiftPlan(x, y, rot);
+    if (p) { const keep = new Map(); footprint('house', cX(p.house.root), cY(p.house.root), p.house.rot).forEach(([px, py]) => keep.set(idx(px, py), cells[idx(px, py)]));
+      p.fp.forEach(([px, py]) => { const i = idx(px, py), c = cells[i]; if (c && c.k === 'road') keep.set(i, c); });
+      keep.forEach((c, i) => { cells[i] = null; }); let v; try { v = cS0.apply(this, arguments); } finally { keep.forEach((c, i) => { cells[i] = c; }); }
+      return v; }
+    WIDEN2.stats.자리없음말++; return '큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 곁에 길을 한 줄 더 내 봐요'; };
+  const pS0 = placeAt; placeAt = function (kind, x, y, rot) {
+    if (kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy) { const p = widenShiftPlan(x, y, rot);
+      if (p) { const h = p.house, n = res.get(h.root) || 0; WIDEN2.busy = true;
+        try { KEEP.lastPush = -1e9; removeAt(cX(h.root), cY(h.root)); pS0.call(this, 'house', p.to[0], p.to[1], h.rot); } finally { WIDEN2.busy = false; }   // 한 채 물림 — '여러 채 한꺼번에'(30ms) 방어에 걸리지 않게
+        WIDEN2.stats.물림++; setTimeout(() => toast('🏠 집이 한 칸 물러나고 큰길이 깔렸어요' + (n ? ' — 식구 ' + n + '명 그대로' : ''), true), 0); } }
+    return pS0.apply(this, arguments); };
+  /* 붐비는 집의 말 — 문 앞 길을 덮는 큰길 자리가 있나(바로 또는 한 칸 물려서) */
+  const cw0 = crowdWidenAt; crowdWidenAt = function (rec) { if (!window.VRULES.widenShift.on) return cw0.apply(this, arguments);
+    const b = roadBeside(rec); if (b < 0) return false; const bx = cX(b), by = cY(b);
+    for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) if (canPlace('avenue', bx + ox, by + oy, 0) === true) return 'front';
+    return cw0.apply(this, arguments); };
+  const ch0 = crowdHint; crowdHint = function (crowded, full, widen) { if (widen === 'front' && crowded && full) return ' · 🛣️ 문 앞 길을 큰길로 넓혀 봐요 — 문 앞 길 위에 큰길을 놓으면 돼요'; return ch0.apply(this, arguments); }; }
+/* 시험 훅 — (x,y) 집의 문 앞 길을 덮는 큰길을 놓아 본다(되면 놓는다) */
+window.__widenFront = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; const b = roadBeside(rec); if (b < 0) return '문 앞 길 없음';
+  let last = ''; for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) { const r = window.__put('avenue', cX(b) + ox, cY(b) + oy, 0); if (r === true) return true; last = r; } return last; };
+window.__widen2 = () => ({ 켜짐: window.VRULES.widenShift.on, ...WIDEN2.stats });
+/* ── [MAC-WIDEN3] 바꿔 깔기는 두 번 눌러서 · ↩ 는 물러난 집도 제자리로 (보스 09-20 — 아이 집을 움직이는 일이라 main 승격 전 필수) ──
+   ① **두 번 누름**: 큰길이 곁 집을 물려야 할 때 첫 누름엔 깔지 않는다 — 물러날 집에 주황 점선 테두리 + "🏠 이 집이 한 칸 물러나요 — 한 번 더 누르면 큰길을 깔아요".
+      같은 자리를 한 번 더 누르면 깐다(마우스). 터치(자리 잡기 — MAC-SEAT)는 톡으로 자리를 잡는 순간 테두리가 서고 ✓ 가 확정이다.
+      다른 곳을 누르거나 · 자리를 옮기거나 · 모드를 바꾸면 풀린다. 그냥 올려 둔 그림자(아직 안 누름)엔 같은 말이 빨간 글로 뜬다.
+   ② **↩ 되돌리기**: 그 큰길을 거두면(WIDEN 이 길을 되살림) 물러났던 집도 원래 자리로 돌아온다(식구·층 그대로 · 그 사이 원래 자리가 찼으면 그대로 두고 말한다).
+   원래 줄 수정 0 — canPlace·paintAt·seatAt·setMode·removeAt·placeAt 감싸기. 스위치는 widenShift 그대로. */
+const WIDEN3 = { armed: null, shifts: new Map(), force: false, stats: { 표시: 0, 확정: 0, 풀림: 0, 제자리: 0, 제자리못함: 0 } };
+const widenKey = (x, y, rot, p) => x + ',' + y + ',' + (rot || 0) + ',' + p.house.root;
+const widenCage = (() => { const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineDashedMaterial({ color: 0xf29a2e, dashSize: 0.9, gapSize: 0.6, depthTest: false, transparent: true }));
+  m.computeLineDistances(); m.visible = false; m.renderOrder = 7; m.frustumCulled = false; scene.add(m); return m; })();
+function widenArm(x, y, rot, p) { const h = p.house, d = dims('house', h.rot), c = centerOf('house', cX(h.root), cY(h.root), h.rot), hgt = 4 + houseLv(h.root) * 2.4;
+  WIDEN3.armed = widenKey(x, y, rot, p); widenCage.position.set(c.x, hgt / 2, c.z); widenCage.scale.set(d.w * CS + .6, hgt, d.h * CS + .6); widenCage.visible = true; WIDEN3.stats.표시++;
+  toast('🏠 이 집이 한 칸 물러나요 — ' + (SEAT.on ? '✓ 를 누르면' : '한 번 더 누르면') + ' 큰길을 깔아요', true); }
+function widenDisarm() { if (!WIDEN3.armed) return; WIDEN3.armed = null; widenCage.visible = false; WIDEN3.stats.풀림++; }
+{ const cA0 = canPlace; canPlace = function (kind, x, y, rot, opts) { const r = cA0.apply(this, arguments);
+    if (r !== true || kind !== 'avenue' || !window.VRULES.widenShift.on || (opts && opts.복원) || WIDEN3.force || WIDEN.undoing) return r;
+    const p = widenShiftPlan(x, y, rot); if (!p || WIDEN3.armed === widenKey(x, y, rot, p)) return r;
+    return '🏠 이 집이 한 칸 물러나요 — 두 번 눌러 큰길을 깔아요'; };
+  const pA0 = paintAt; paintAt = function (c) {
+    if (painting && painting.k === 'avenue' && c && c.inside && window.VRULES.widenShift.on) { const p = widenShiftPlan(c.x, c.y, painting.rot), key = p ? widenKey(c.x, c.y, painting.rot, p) : null, first = !painting.list.length && painting.last == null;
+      if (first && WIDEN3.armed && WIDEN3.armed !== key) widenDisarm();   // 새로 누른 곳이 다르면 풀린다(누른 채 조금 움직인 것은 그대로)
+      if (p && WIDEN3.armed !== key) { if (first && !SEAT.on) widenArm(c.x, c.y, painting.rot, p); painting.last = c.x + ',' + c.y; return; }   // 첫 누름 — 표시만(끌며 지나가다 선 것은 표시도 안 한다)
+      if (p) { const r = pA0.apply(this, arguments); if (painting.list.length) { WIDEN3.stats.확정++; widenDisarm(); } return r; } }
+    return pA0.apply(this, arguments); };
+  const sA0 = seatAt; seatAt = function (x, y) { const r = sA0.apply(this, arguments);
+    if (sel === 'avenue' && window.VRULES.widenShift.on) { const p = widenShiftPlan(x, y, selRot), key = p ? widenKey(x, y, selRot, p) : null; if (WIDEN3.armed !== key) { widenDisarm(); if (p) { widenArm(x, y, selRot, p); seatShow(); } } }
+    else widenDisarm(); return r; };
+  const mA0 = setMode; setMode = function () { widenDisarm(); return mA0.apply(this, arguments); };
+  /* ② 되돌리기 — 물림을 적어 두었다가(큰길 root → 집의 원래 자리) 그 큰길을 ↩ 로 거두면 집을 제자리로 */
+  const plA0 = placeAt; placeAt = function (kind, x, y, rot) { const p = kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy ? widenShiftPlan(x, y, rot) : null;
+    const from = p ? { x: cX(p.house.root), y: cY(p.house.root), rot: p.house.rot, to: p.to } : null; const r = plA0.apply(this, arguments);
+    if (from) WIDEN3.shifts.set(idx(x, y), from); return r; };
+  const rmA0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, back = root >= 0 ? WIDEN3.shifts.get(root) : null, undoing = WIDEN.undoing;
+    const r = rmA0.apply(this, arguments);
+    if (r && back) { WIDEN3.shifts.delete(root); if (undoing) { const h = cells[idx(back.to[0], back.to[1])];
+        if (h && h.k === 'house' && h.root === idx(back.to[0], back.to[1])) { const ok = (() => { const keep = footprint('house', back.to[0], back.to[1], h.rot).map(([px, py]) => idx(px, py)); keep.forEach(i => { cells[i] = null; });
+            let v; try { v = canPlace('house', back.x, back.y, back.rot); } finally { keep.forEach(i => { cells[i] = h; }); } return v === true; })();
+          if (ok) { KEEP.lastPush = -1e9; rmA0.call(this, back.to[0], back.to[1]); placeAt('house', back.x, back.y, back.rot); WIDEN3.stats.제자리++; setTimeout(() => toast('↩ 큰길을 거두고 집도 제자리로 돌려놨어요', true), 0); }
+          else { WIDEN3.stats.제자리못함++; setTimeout(() => toast('↩ 큰길은 거뒀어요 — 집이 있던 자리가 그새 찼어요', true), 0); } } } }
+    return r; }; }
+{ const wf0 = window.__widenFront; window.__widenFront = (x, y) => { WIDEN3.force = true; try { return wf0(x, y); } finally { WIDEN3.force = false; } }; }   // 시험 훅은 확인 없이(도구 · 두 번 누름은 사람 손의 일)
+window.__widen3 = () => ({ 기다림: WIDEN3.armed, 물림기록: WIDEN3.shifts.size, ...WIDEN3.stats });
+/* ── [MAC-CROWDHOMES] 붐빔을 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ② · 창조자의 눈 6회 🟢2 '큰 마을일수록 길이 한산해진다') ──
+   붐빔(F12)은 걷는 사람(최대 120명 표본)이 앞사람 뒤에 선 비율이었다 → 마을이 넓을수록 120명이 흩어져 붐빔이 사라졌다(516명 판에서 붐비는 길 칸 70 → 3).
+   붐빔 → 큰길 사다리가 300명 뒤에 끊겼다. 이제 **교통량**으로 센다:
+   · 집마다(식구 n>0) 필요(물·장보기·놀이·쉼·배움)를 채우는 **가장 가까운 곳까지의 길**을 따라, 그 길 칸마다 n ÷ 필요 수(= 평균 나들이)를 더한다.
+   · 길 칸의 품 = VRULES.crowdHomes.cap(한 칸 길) · 큰길은 두 배. 칸의 붐빔 = 더한 값 ÷ 품. 집의 붐빔 = **그 집 문 앞 길 칸**의 붐빔(mode 'front').
+     ('지나는 길 전체의 평균'(mode 'path')은 시설이 한 길에 몰린 동네에서 넓혀도 안 풀려 버렸다 — 아이가 고칠 수 있는 곳은 제 집 앞 길이다.)
+   · 기존 판정·말·풍선이 읽는 crowd 표에 **0.3 × 붐빔** 을 써 넣는다 → 문턱 0.3("길이 붐벼요") = 품을 넘음. 걷는 사람의 느려짐(crowdK)은 전처럼 표본 그대로.
+   · window.CROWD_AT(칸) 은 같은 값을 읽는다(집 칸 = 그 집 · 길 칸 = 0.3 × 그 칸의 붐빔, 최대 1) — 디자인의 흙빛·연기의 멈칫 접점 그대로.
+   · 틱마다 판의 1/90 조각씩 센다(90틱 = 9초에 한 바퀴 · 한 바퀴가 끝나면 표를 바꿔 끼운다 — 붐빔은 느리게 바뀐다). 식구 있는 집마다 길 BFS 한 번.
+   규칙 판정이 바뀐다 — VRULES.crowdHomes.on = false 면 옛 셈(걷는 표본). 원래 줄 수정 0 — crowdTick 감싸기 + simTick 고리 한 줄. */
+(window.VRULES = window.VRULES || {}).crowdHomes = { on: true, cap: 4, mode: 'front', every: 90 };   // 품 4 · 문 앞 칸: 167명 판에서 옛 셈과 이어지고(48~50 ↔ 57채) 큰 판에서 사라지지 않는다(317명 36 · 529명 69채)
+var CROWDH = { cur: 0, acc: new Map(), paths: new Map(), front: new Map(), load: new Map(), house: new Map(), stats: { 한바퀴: 0, 집: 0 } };
+function crowdHomesStep() { const R = window.VRULES.crowdHomes; if (!R.on) return; const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CROWDH.cur + step), nn = NEEDS.length || 1;
+  for (let i = CROWDH.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i || rec.k !== 'house') continue; const n = res.get(i) || 0; if (n <= 0) continue;
+    const b = roadBeside(rec); if (b < 0) continue; const { prev, reach } = roadBFS(b, undefined, NEED_R_WIDE); const left = new Set(NEEDS), used = [];
+    for (const c of reach) { if (!left.size) break; if (bfsDepth[c] > NEED_R && !isWide(c)) continue; const x = cX(c), y = cY(c);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (!r) continue; const kk = K[r.k];
+        for (const need of [kk.need, kk.need2]) if (need && left.has(need)) { left.delete(need); let p = c; while (p >= 0) { CROWDH.acc.set(p, (CROWDH.acc.get(p) || 0) + n / nn); used.push(p); if (p === b) break; p = prev[p]; } } } }
+    CROWDH.paths.set(i, used.length ? Array.from(new Set(used)) : [b]); CROWDH.front.set(i, b); CROWDH.stats.집++; }
+  CROWDH.cur = end;
+  if (end >= N) { const cap = c => R.cap * (isWide(c) ? 2 : 1), house = new Map(); CROWDH.load = CROWDH.acc; CROWDH.acc = new Map();
+    CROWDH.paths.forEach((cs, root) => { let v = 0; if (R.mode === 'path') { for (const c of cs) v += (CROWDH.load.get(c) || 0) / cap(c); v = cs.length ? v / cs.length : 0; } else { const f = CROWDH.front.get(root); v = f >= 0 ? (CROWDH.load.get(f) || 0) / cap(f) : 0; } house.set(root, v); });   // 지나는 길의 평균(가장 붐빈 한 칸이면 시설 앞 한 칸 때문에 거리 전체가 붐볐다)
+    CROWDH.house = house; CROWDH.paths = new Map(); CROWDH.front = new Map(); CROWDH.cur = 0; CROWDH.stats.한바퀴++; } }
+{ const ctH0 = crowdTick; crowdTick = function () { const r = ctH0.apply(this, arguments); if (!window.VRULES.crowdHomes.on || !CROWDH.stats.한바퀴) return r;
+    crowd.forEach((v, root) => { if (!CROWDH.house.has(root)) crowd.set(root, 0); }); CROWDH.house.forEach((m, root) => crowd.set(root, 0.3 * m)); return r; };
+  const ca0 = window.CROWD_AT; window.CROWD_AT = function (i) { const R = window.VRULES.crowdHomes; const c = cells[i];
+    if (!R.on || !CROWDH.stats.한바퀴 || !c || c.k === 'house' || !K[c.k].road) return ca0 ? ca0.apply(this, arguments) : 0;
+    return Math.min(1, 0.3 * (CROWDH.load.get(i) || 0) / (R.cap * (isWide(i) ? 2 : 1))); }; }
+window.__crowdHomes = () => { let over = 0, hs = 0; const all = []; CROWDH.house.forEach(m => { hs++; all.push(m); if (m > 1) over++; }); all.sort((a, b) => a - b); let cellsOver = 0; CROWDH.load.forEach((v, c) => { if (v / (window.VRULES.crowdHomes.cap * (isWide(c) ? 2 : 1)) > 1) cellsOver++; });
+  return { 켜짐: window.VRULES.crowdHomes.on, 품: window.VRULES.crowdHomes.cap, 센집: hs, 붐비는집: over, 집붐빔_중앙: all.length ? +all[all.length >> 1].toFixed(2) : 0, 집붐빔_최대: all.length ? +all[all.length - 1].toFixed(2) : 0, 붐비는길칸: cellsOver, 센길칸: CROWDH.load.size, ...CROWDH.stats }; };
+
 
 /* ══════════════════════════════════════════════════════════════
    이벤트(F13). 비 · 축제. 날짜로 정해지므로 저장할 게 없다(같은 날은 같은 날씨).
@@ -4537,6 +4873,14 @@ window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { cons
 const EV = { rain: false, fest: false, festRoot: -1, lastToastDay: 0 };
 const rainDay = d => ((d * 2654435761) >>> 0) % 3 === 0;          // 사흘에 하루꼴
 function plazaRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'plaza') r = i; }); return r; }
+/* [MAC-PLAZACACHE] (보스 09-20 · 연기 담당 CPU 프로파일 #656) eventTick 이 틱마다 plazaRoot — 판 65,536칸 훑기 — 를 불러 인구와 무관하게 틱의 약 15% 를 썼다.
+   광장을 **놓거나 치울 때만** 다시 찾는다(placeAt·removeAt 감싸기 — 판을 바꾸는 길은 이 둘뿐). 찾아 둔 칸이 더는 광장이 아니면 그때도 다시. 답은 원래 함수와 같다(가장 앞 칸의 광장). */
+const PLAZAC = { root: -1, dirty: true, stats: { 훑음: 0, 다시씀: 0 } };
+{ const pr0 = plazaRoot; plazaRoot = function () { const r = PLAZAC.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === 'plaza');
+    if (!PLAZAC.dirty && ok) { PLAZAC.stats.다시씀++; return r; } PLAZAC.root = pr0(); PLAZAC.dirty = false; PLAZAC.stats.훑음++; return PLAZAC.root; };
+  const plP0 = placeAt; placeAt = function (kind) { if (kind === 'plaza') PLAZAC.dirty = true; return plP0.apply(this, arguments); };
+  const plR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && c.k === 'plaza') PLAZAC.dirty = true; return plR0.apply(this, arguments); }; }
+window.__plazaCache = () => ({ 광장: PLAZAC.root >= 0 ? [cX(PLAZAC.root), cY(PLAZAC.root)] : null, 원래답: (() => { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'plaza') r = i; }); return r >= 0 ? [cX(r), cY(r)] : null; })(), ...PLAZAC.stats });
 /* 빗줄기 — 카메라 둘레 60 단위에 600점, 매 프레임 아래로 */
 const RAIN_N = 600, rainPos = new Float32Array(RAIN_N * 3);
 for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = (Math.random() - .5) * 120; rainPos[i * 3 + 1] = Math.random() * 40; rainPos[i * 3 + 2] = (Math.random() - .5) * 120; }
@@ -6295,6 +6639,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actWorkTick(f, i, now)) continue;   // [ACT-WORK] 일하는 사람은 문 밖에서 · 풍차 자루는 하루 한 번 가게로
     if (actCrowdTick(f, now)) continue;   // [ACT-CROWD] 붐비는 좁은 길 — 마주 오는 둘이 비켜 서느라 잠깐 멈칫
     if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
@@ -7378,6 +7723,98 @@ function actCrowdTick(f, now) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = whyPool[k].material; if (m.map) m.map.dispose(); m.map = t; m.needsUpdate = true; } }
 window.__crowdLook = () => ({ 켜짐: window.VRULES.crowdLook.on, CROWD_AT있음: typeof window.CROWD_AT === 'function', 지금멈칫: folks.filter(f => f.crowdPause).length, ...CROWDX.stats });
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-WORK] 일하는 사람이 문 밖에서 보이게 — 가게·온실·풍차 (주민 연기 · 09-20 · 보스 · 사용자 "온실·풍차가 일자리였구나 — 더 직관적인 거 없나").
+   까닭: 일이 건물 안에서만 일어나 문 밖에서 안 보였다. 근무시간(isWorkHour · 9~17)에 그 일터에 **들어가 있는 사람**(jobCount 로 붙은 사람이 출근해 든 것)을
+   들어온 길 칸 쪽 **건물 앞 가장자리**에 나란히(slot) 그리고 일하는 몸짓을 한다 — 붙은 사람이 0 이면 아무도 없다(빈 일터가 그림으로 읽힌다).
+     · 가게 = 문 앞 진열 정리(상자를 발 앞에 두고 허리 굽혔다 폈다) · 온실 = 물뿌리개 / 바구니(자리마다 번갈아 · 좌우로 천천히 돌며)
+     · 풍차 = 자루를 어깨에 · 하루 한 번(tripH 시) 풍차 일꾼 한 사람이 자루를 메고 가장 가까운 가게까지 걸어가 내려놓고 돌아온다(가던 목적 'work' 그대로 — 풍차에 닿으면 다시 든다)
+   옷(윗도리)은 일터 색으로만 — 성별·나이 그림 없음. 물건은 물동이 묶음(ACT-BESIDE)을 크기·색만 바꿔 같이 쓴다(draw call +0). 판정·확률·돈 말·저장 0 · 일자리 셈은 jobCount·f.job 을 읽기만.
+   스위치·수치 VRULES.workLook + 고리 둘(tickFolks 한 줄 · 루프 actBesideDraw 바로 아래 한 줄).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).workLook = { on: true, gap: 1.0, inset: -0.9, tripH: 10.5, tripPauseMs: 1800,
+  kinds: { shop: { top: 0x2f8f83, props: ['crate'] }, green: { top: 0x5aa04a, props: ['can', 'basket'] }, windmill: { top: 0xb8894a, props: ['sack'] } } };
+const WORK_PROP = { crate: { s: [1.25, 0.55, 1.25], c: 0xf0c890 }, can: { s: [0.8, 0.95, 0.8], c: 0xc8f0d0 }, basket: { s: [1.15, 0.6, 1.15], c: 0xffe0a0 }, sack: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 } };
+const WORK = { tripDay: new Map(), stats: { 문밖일꾼: 0, 자루출발: 0, 자루나름: 0, 자루못감: 0 } };
+const workKind = root => { const b = cells[root]; return b && b.root === root && window.VRULES.workLook.kinds[b.k] ? b.k : null; };
+function workPlace(f) {                                                 // 들어온 길 칸 쪽 건물 앞 가장자리 · 같은 일터 일꾼끼리 자리 나눔
+  const R = window.VRULES.workLook, root = f.inside.root, b = cells[root], cell = f.inside.cell; if (!b || cell == null) return null;
+  const used = new Set(); folks.forEach(g => { if (g !== f && g.beside && g.beside.work && g.beside.root === root && g.state === 'inside') used.add(g.beside.slot); });
+  let slot = 0; while (used.has(slot)) slot++;
+  // 서는 칸: 기본 시점(π/4)에서 보이는 면(+x · +z)의 바깥 칸이 길이거나 빈 땅이면 거기(카메라를 따르지 않는다 — 늘 같게), 아니면 들어온 길 칸
+  const fp = footprint(b.k, cX(root), cY(root), b.rot), mine = new Set(fp.map(([a, c]) => idx(a, c))), spots = [];
+  for (const [ax, ay] of [[1, 0], [0, 1]]) fp.forEach(([a, c]) => { const nx = a + ax, ny = c + ay; if (!inb(nx, ny) || !plotOpen(nx, ny)) return; const j = idx(nx, ny); if (mine.has(j)) return; const r = cells[j]; if (!r || isRoad(j)) spots.push([nx, ny, -ax, -ay]); });
+  if (!spots.length) { const x = cX(cell), y = cY(cell); for (const [ax, ay] of D4) { const nx = x + ax, ny = y + ay; if (inb(nx, ny) && mine.has(idx(nx, ny))) { spots.push([x, y, ax, ay]); break; } } }
+  if (!spots.length) return null;
+  const [sx, sy, dx, dz] = spots[slot % spots.length], side = (Math.floor(slot / spots.length) % 2 ? 0.8 : 0) * R.gap;   // 칸마다 한 사람 · 넘치면 옆으로
+  const px = wx(sx) + dx * (CS / 2 + R.inset) + dz * side, pz = wz(sy) + dz * (CS / 2 + R.inset) - dx * side;
+  const k = b.k, props = R.kinds[k].props;
+  return { root, k, mode: 'work', work: true, slot, x: px, z: pz, dir: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), dir0: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), drop: 0,   /* 벽을 비스듬히 보고 선다 — 옆모습이 보이게 */ prop: props[slot % props.length], top: R.kinds[k].top };
+}
+/* tickFolks 고리 — 문 밖 자리 잡기 · 풍차 자루 나르기. true 면 이번 틱은 여기서 끝 */
+function actWorkTick(f, i, now) {
+  const R = window.VRULES.workLook, h = simHour();
+  const T = f.workTrip;
+  if (T) {                                                              // 풍차 → 가게 자루 나르기
+    if (!R.on || !isWorkHour(h) || f.goal !== 'work' || f.state === 'inside') { f.workTrip = null; return false; }
+    const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1, end = f.path && f.path[f.step + 1] == null;
+    if (T.phase === 'go' && end && (f.state === 'idle' || f.state === 'walk') && touchesRoot(at, T.shop)) { T.phase = 'drop'; T.until = now + R.tripPauseMs; f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false;
+      const s = cells[T.shop]; if (s) { const c = centerOf(s.k, cX(s.root), cY(s.root), s.rot); f.dir = Math.atan2(c.x - f.x, c.z - f.z); } return true; }
+    if (T.phase === 'drop') { if (now < T.until) { f.walking = false; return true; } T.phase = 'back'; if (!pathToBuilding(f, i, f.job)) { f.workTrip = null; return false; } WORK.stats.자루나름++; return true; }   // 내려놓고 풍차로(닿으면 원래 줄이 다시 들인다)
+    if (T.phase === 'go' && f.state === 'idle' && now >= f.until) {   // 가다 막혀 섰다 — 하루 리듬이 풍차로 되돌리기 전에 가게로 다시 잡는다
+      if (pathBudget <= 0) return true; pathBudget--; if (!pathToBuilding(f, i, T.shop)) { f.workTrip = null; WORK.stats.자루못감++; return false; } return true; }
+    return false;
+  }
+  if (f.state !== 'inside' || !f.inside) { return false; }
+  const k = workKind(f.inside.root);
+  if (!R.on || !k || f.goal !== 'work' || f.inside.root !== f.job || !isWorkHour(h)) { if (f.beside && f.beside.work) f.beside = null; return false; }
+  if (!f.beside || !f.beside.work) { const b = workPlace(f); if (b) { f.beside = b; WORK.stats.문밖일꾼++; } }
+  if (k === 'windmill' && h >= R.tripH && f.beside && f.beside.slot === 0) {   // 하루 한 번 — 가장 가까운 가게로 자루 하나
+    const day = Math.floor(SIM.t / DAY_MS); if (WORK.tripDay.get(f.inside.root) === day) return false; WORK.tripDay.set(f.inside.root, day);
+    if (pathBudget <= 1) return false;
+    const wr = f.inside.root; let shop = -1, bd = 1e9; jobCount.forEach((n, r) => { const b = cells[r]; if (!b || b.k !== 'shop') return; const d = Math.abs(cX(r) - cX(wr)) + Math.abs(cY(r) - cY(wr)); if (d < bd) { bd = d; shop = r; } });
+    if (shop < 0) { WORK.stats.자루못감++; return false; }
+    leave(f, '나옴'); f.beside = null; pathBudget--;
+    if (!pathToBuilding(f, i, shop)) { WORK.stats.자루못감++; return false; }   // 길이 없으면 원래 줄이 풍차로 다시 들인다
+    f.workTrip = { phase: 'go', shop }; f.goal = 'work'; WORK.stats.자루출발++; return true;
+  }
+  return false;
+}
+/* 루프 고리 — actBesideDraw 바로 아래: 몸짓(방향·굽힘) · 일터 색 윗도리 · 물건(물동이 묶음에 이어서) */
+function actWorkDraw(now) {
+  const R = window.VRULES.workLook; if (!R.on || !folks.length || OFF.has('folks')) return;
+  let nb = bucketMesh.count, touched = false;
+  for (let k = 0; k < nb; k++) bucketMesh.setColorAt(k, folkCol.setHex(0xffffff));   // 물동이는 원래 색(물건 색을 쓰면서 생기는 곱하기 색을 흰색으로)
+  const tops = PERSON_PARTS.map((pt, pi) => pt.c === 'top' ? pi : -1).filter(pi => pi >= 0);
+  folks.forEach((f, i) => {
+    const b = f.beside, T = f.workTrip;
+    if (T && f.state !== 'inside' && nb < FOLK_CAP) {                  // 자루를 메고 가는 중(가게에 내려놓을 때까지)
+      if (T.phase === 'back') return;
+      const P = WORK_PROP.sack, a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), fx = f.px == null ? f.x : f.px + (f.x - f.px) * a, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a, co = Math.cos(f.dir), si = Math.sin(f.dir);
+      folkDummy.position.set(fx + 0.35 * co, T.phase === 'drop' ? 0.35 : 1.55 + (f.walking ? Math.abs(Math.sin(now / 150 + i)) * 0.09 : 0), fz - 0.35 * si); folkDummy.rotation.set(0, f.dir, T.phase === 'drop' ? 0 : 0.5); folkDummy.scale.set(P.s[0], P.s[1], P.s[2]); folkDummy.updateMatrix();
+      bucketMesh.setMatrixAt(nb, folkDummy.matrix); bucketMesh.setColorAt(nb++, folkCol.setHex(P.c)); return; }
+    if (f.state !== 'inside' || !b || !b.work) return;
+    if (QUALITY.farFolk && (Math.abs(b.x - camTarget.x) > 60 || Math.abs(b.z - camTarget.z) > 60)) return;
+    const ph = now / 700 + i * 1.7, P = WORK_PROP[b.prop];
+    let dir = b.dir0, drop = 0, py = 0.26, fwd = 0.85, side = 0;
+    if (b.k === 'shop') { const bend = Math.max(0, Math.sin(ph)); drop = bend * 0.18; py = 0.2; fwd = 0.9; }                     // 진열 정리 — 굽혔다 폈다
+    else if (b.k === 'green') { dir = b.dir0 + Math.sin(ph * 0.6) * 0.6; py = b.prop === 'can' ? 0.95 + Math.sin(ph * 2) * 0.05 : 0.7; fwd = 0.55; side = 0.35; }   // 물 주기 · 바구니 — 좌우로 천천히
+    else if (b.k === 'windmill') { py = 1.5 + Math.abs(Math.sin(ph)) * 0.12; fwd = 0.15; side = 0.35; }                           // 자루를 어깨에
+    const co = Math.cos(dir), si = Math.sin(dir), parts = PERSON_PARTS;
+    parts.forEach((pt, pi) => { const im = folkPool[pi]; if (!im || i >= im.count) return;
+      folkDummy.position.set(b.x + pt.p[0] * co + pt.p[2] * si, pt.p[1] - drop * (pt.p[1] > 0.6 ? 1 : 0), b.z - pt.p[0] * si + pt.p[2] * co); folkDummy.rotation.set(0, dir, 0); folkDummy.scale.set(pt.s[0], pt.s[1], pt.s[2]); folkDummy.updateMatrix();
+      im.setMatrixAt(i, folkDummy.matrix); if (tops.includes(pi)) im.setColorAt(i, folkCol.setHex(b.top)); });
+    touched = true;
+    if (P && nb < FOLK_CAP) { folkDummy.position.set(b.x + side * co + fwd * si, py, b.z - side * si + fwd * co); folkDummy.rotation.set(0, dir, 0); folkDummy.scale.set(P.s[0], P.s[1], P.s[2]); folkDummy.updateMatrix();
+      bucketMesh.setMatrixAt(nb, folkDummy.matrix); bucketMesh.setColorAt(nb++, folkCol.setHex(P.c)); }
+  });
+  if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; });
+  bucketMesh.count = nb; if (nb) { bucketMesh.instanceMatrix.needsUpdate = true; if (bucketMesh.instanceColor) bucketMesh.instanceColor.needsUpdate = true; }
+}
+window.__workLook = () => { const h = simHour(); let out = 0, trip = 0; folks.forEach(f => { if (f.state === 'inside' && f.beside && f.beside.work) out++; if (f.workTrip) trip++; });
+  const empty = []; jobCount.forEach((n, r) => { if (workKind(r) && n === 0) empty.push(cells[r].k); });
+  return { 켜짐: window.VRULES.workLook.on, 시: +h.toFixed(1), 지금문밖일꾼: out, 자루나르는중: trip, 빈일터: empty, ...WORK.stats }; };
+
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
 function drawFolks(now) {
@@ -7652,7 +8089,67 @@ window.__kids = () => ({ 켜짐: window.VRULES.kids.on, ...KIDS.stats, 지금밖
    ══════════════════════════════════════════════════════════════ */
 const SAVE_V = 2;                       // v2 = 구역 문자열 + palette (G5 ③). v1(items) 은 읽기만
 const SID = (QS.get('sid') || 'guest').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || 'guest';   // ?sid=<학생id>, 없으면 guest (G5 훅)
-const SAVE_KEY = 'rpg.village.' + SID;
+const SAVE_KEY = 'rpg.village.' + SID + stageKeyPart();   // [MAC-STAGE] 판마다 따로 — ?stage 가 없으면(기본 판) 옛 키 그대로
+/* ══════════════════════════════════════════════════════════════
+   [MAC-STAGE] 판(스테이지) 파일 — 엔진 제안서 ② (docs/village_engine_proposal.md · docs/village_socialsim_absorb.md C1·C2·C4·C10)
+   ?stage=<id> 이면 village/stages/<id>.json 을 읽어 그 판을 얹는다. **없으면 기본 판 = 지금 마을 그대로**(달라지는 것 0).
+   판 칸: id·이름·교과·질문·되돌아보기·현상·변수·시작(저장본 경로 | null)·규칙(VRULES 덮기 — 끄기도 여기)·건물(쓸 것)·목표(셈 꼴).
+   셈: { 셈:'kind', k, n } 그 종류 n개 이상 · { 셈:'pop', n } 인구 n 이상 · { 셈:'hook', 훅, n, 비교:'>='|'<=' } 아래 STAGE_HOOKS.
+   운영 안전: 판이 있으면 저장 키가 따로('rpg.village.<sid>.<id>')이고 원격 동기(sync.js)를 끈다 → 아이 저장본·운영 DB 에 닿지 않는다.
+   규칙 덮기는 module 맨 끝(모든 VRULES 가 정의된 뒤 · 첫 틱 전)에서 한다. 판정/연기 표는 village/stages/rules.json(C10).
+   기존 줄 수정 1(SAVE_KEY 줄 끝에 stageKeyPart()) · canPlace·goalTick 감싸기 · 고리 한 줄(module 끝 stageApplyRules).
+   ══════════════════════════════════════════════════════════════ */
+function stageIdOf(s) { return String(s || '').replace(/[^a-z0-9\-]/g, '').slice(0, 40) || null; }
+function stageKeyPart() { const id = VISIT_SID ? null : stageIdOf(QS.get('stage')); return id ? '.' + id : ''; }
+const STAGE = { id: VISIT_SID ? null : stageIdOf(QS.get('stage')), def: null, err: null, goals: [], saidEnd: false,
+  stats: { 규칙수: 0, 모르는규칙: [], 건물수: 0, 모르는건물: [], 목표수: 0, 시작판: false, 막음: 0 } };
+const STAGE_HOOKS = {
+  /* 사는 집 가운데 일할 곳이 닿는 집의 비율(%) — 일자리 셈이 한 바퀴 돌기 전이나 인구가 JOB_POP 아래면 null(아직 못 잰다) */
+  '일닿음%': () => { if (population() < JOB_POP || (window.VRULES.jobsHomes && window.VRULES.jobsHomes.on && !JOBH.stats.한바퀴)) return null;
+    let lived = 0, far = 0; res.forEach((v, root) => { if (v > 0) { lived++; if (joblessHome(root)) far++; } }); return lived ? 100 * (1 - far / lived) : null; },
+};
+function stageGoalOk(g) {
+  if (g.셈 === 'kind') return countKind(g.k) >= (g.n || 1);
+  if (g.셈 === 'pop') return population() >= (g.n || 1);
+  if (g.셈 === 'hook') { const f = STAGE_HOOKS[g.훅], v = f ? f() : null; if (v == null) return false; return g.비교 === '<=' ? v <= g.n : v >= g.n; }
+  return false;
+}
+function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표판) 전에
+  if (Array.isArray(def.건물) && def.건물.length) {
+    const keep = def.건물.filter(k => K[k]); STAGE.stats.모르는건물 = def.건물.filter(k => !K[k]); STAGE.stats.건물수 = keep.length;
+    const next = ORDER.filter(k => keep.includes(k)); ORDER.splice(0, ORDER.length, ...next);
+  }
+  if (Array.isArray(def.목표)) {
+    STAGE.goals = def.목표.map((g, i) => ({ id: 'stage:' + STAGE.id + ':' + i, t: g.t, ok: () => stageGoalOk(g) }));
+    GOALS.unshift(...STAGE.goals); STAGE.stats.목표수 = STAGE.goals.length;
+  }
+}
+function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
+  const def = STAGE.def; if (!def || !def.규칙) return;
+  Object.keys(def.규칙).forEach(k => { const v = def.규칙[k], cur = window.VRULES[k];
+    if (!cur || typeof v !== 'object') { STAGE.stats.모르는규칙.push(k); return; }
+    Object.assign(cur, v); STAGE.stats.규칙수++; });
+}
+{ const cp0 = canPlace; canPlace = function (kind) {
+    if (STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(kind)) { STAGE.stats.막음++; return '이 판에서는 쓰지 않아요'; }
+    return cp0.apply(this, arguments); }; }
+{ const gt0 = goalTick; goalTick = function () { const r = gt0.apply(this, arguments);
+    if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (typeof stageCardEnd === 'function' && window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardEnd('목표'); else if (STAGE.def.되돌아보기) toast('🎉 ' + STAGE.def.되돌아보기, true); }   // [MAC-STAGECARD] 끝 카드
+    return r; }; }
+if (STAGE.id) {
+  window.VillageSync = null;   // 판은 원격 동기를 쓰지 않는다(저장은 이 기기에만 · 키도 따로)
+  try {
+    const r = await fetch('stages/' + STAGE.id + '.json', { cache: 'no-store' }); if (!r.ok) throw new Error('판 파일이 없어요 (' + r.status + ')');
+    const def = await r.json(); if (def.id !== STAGE.id) throw new Error('판 id 가 파일 이름과 달라요');
+    if (def.시작 && localStorage.getItem(SAVE_KEY) == null && !/(^|,)fresh(,|$)/.test(location.hash.slice(1))) {
+      const b = await fetch(def.시작, { cache: 'no-store' }); if (!b.ok) throw new Error('시작 땅을 못 읽었어요 (' + b.status + ')');
+      localStorage.setItem(SAVE_KEY, await b.text()); STAGE.stats.시작판 = true;
+    }
+    STAGE.def = def; stageApplyEarly(def);
+  } catch (e) { STAGE.err = String(e && e.message || e); console.warn('[MAC-STAGE]', STAGE.err); }
+}
+window.__stage = () => ({ id: STAGE.id, 이름: STAGE.def && STAGE.def.이름, 오류: STAGE.err, 저장키: SAVE_KEY, 원격: !!window.VillageSync,
+  목표: STAGE.goals.map(g => [g.t, goalsDone.has(g.id)]), 일닿음: STAGE_HOOKS['일닿음%'](), ...STAGE.stats });
 let saveBroken = false;                   // 저장이 막혔는가(용량 초과 등)
 let saveWarned = false;
 /* 저장을 아예 못 하는 자리가 있다 — 미리보기 창처럼 출처가 없는 화면이면
@@ -8797,6 +9294,7 @@ function loop() {
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
+  actWorkDraw(SIM.t + SIM.acc);   // [ACT-WORK] 문 밖에서 일하는 몸짓 · 일터 색 옷 · 물뿌리개·바구니·자루·상자(물동이 묶음을 같이 쓴다)
   actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
   actPassDraw();   // [ACT-PASS] 한 칸을 같이 지나는 둘은 오른쪽으로 비켜 그린다(겹쳐 한 몸 ✗)
   actRainDraw();   // [ACT-RAIN] 처마 밑에 선 사람은 지붕 쪽으로 반 걸음
@@ -8835,6 +9333,92 @@ resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
 if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
 Object.keys(JOIN_KINDS).forEach(id => { DECO[id] = DECO.fence; MAP_COL[id] = JOIN_KINDS[id].fam === 'hedge' ? MAP_COL.bush : JOIN_KINDS[id].fam === 'curb' ? '#c8a08a' : '#efeee8'; });   // [DESIGN-JOIN-1] 주변 가치·미니맵 색(둘 다 나중에 쓰이는 표라 여기서 채워도 된다)
+/* ══════════════════════════════════════════════════════════════
+   [MAC-STAGECARD] 판 카드 — 시작과 끝을 한 틀로 (보스 09-20 · 사회시뮬 흡수 C11 · 수업 판(?stage · 교과 칸 있음)일 때만 · town(자유 놀이)·기본 판은 안 뜸)
+   · 시작: 판 이름·교과(작게) · 🔎 탐구 질문 한 줄 · 🎯 목표 · **첫날 한 장**(찍어 둔다) · [시작] — 그 판을 처음 열 때 한 번.
+   · 끝(판 목표를 다 이룸 · 또는 교사가 주소 끝에 #끝 을 붙여 열 때 · window.__stageEnd()): 같은 틀에 **첫날 ↔ 오늘** 두 장 나란히
+     + 되돌아보기 질문 한 줄 + 관찰 한 줄(새로 생긴 것을 그림으로 — 🏪🏪🏪 · 숫자는 작게) · [닫기].
+     교과 칸: '3~4학년 (2) 지역의 변화'(첫날↔오늘) · '4-2 지역 문제 해결'(되돌아보기).
+   · 사진: 어제의 한 장(ACT-SNAP)의 따로 둔 카메라(snapCam)를 다시 쓴다 — 본 그리기 바로 앞에서 캔버스 구석에만 그려 떠 내고 본 그리기가 덮는다(아이 화면 그대로).
+     첫날과 오늘을 **같은 틀**(가운데·폭·방향을 첫날에 적어 둠)로 찍어야 나란히 볼 수 있다. 가운데 = 첫날 물건들의 가운데, 폭 = 물건이 퍼진 넓이.
+   · 저장: localStorage 'rpg.stagecard.<sid>.<id>'(사진 두 장 · 첫날 물건 수) — 저장본·sync 0 · 모자라면 사진 없이.
+   · 크롬북 1366×610 · 단추 44px · 첫 안내(guide)가 떠 있으면 닫힌 뒤에.
+   원래 줄 수정 2 — [MAC-STAGE] 의 끝 토스트 줄·시작 토스트 줄(카드가 켜져 있으면 카드로). 그 밖엔 actSnapShoot 감싸기 + 이 블록.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).stageCard = { on: true, size: [480, 270], pad: 0.8, maxIcons: 10, roadIcons: 3 };
+const SCARD_IC = { road: '🛣️', avenue: '🛣️', gravel: '🛣️', crosswalk: '🚸' };   // 카드에 늘어놓을 그림 — 길 가족의 ⬜ 는 흰 막대로 보여서
+const SCARD = { rec: null, shoot: null, el: null, stats: { 시작: 0, 끝: 0, 찍음: 0, 사진없음: 0 } };
+const scardKey = () => 'rpg.stagecard.' + SID + '.' + STAGE.id;
+function scardLoad() { if (SCARD.rec) return SCARD.rec; try { SCARD.rec = JSON.parse(localStorage.getItem(scardKey()) || 'null'); } catch (e) {} return SCARD.rec || (SCARD.rec = {}); }
+function scardSave() { try { localStorage.setItem(scardKey(), JSON.stringify(SCARD.rec)); } catch (e) { SCARD.stats.사진없음++; try { const r = { ...SCARD.rec }; if (r.first) r.first = { ...r.first, url: null }; if (r.today) r.today = { ...r.today, url: null }; localStorage.setItem(scardKey(), JSON.stringify(r)); } catch (e2) {} } }
+/* 지금 판의 물건 수(종류별 · 칸이 아니라 물건 하나로) */
+function scardCounts() { const n = {}; cells.forEach((rec, i) => { if (rec && rec.root === i) n[rec.k] = (n[rec.k] || 0) + 1; }); return n; }
+/* 첫날 틀 — 물건들의 가운데와 퍼진 넓이 · 지금 카메라 방향 */
+function scardFrame() { const xs = [], ys = []; cells.forEach((rec, i) => { if (!rec || rec.root !== i) return; const k = K[rec.k]; if (!k || !(k.road || rec.k === 'house' || k.need || k.jobs || k.special)) return; xs.push(cX(i)); ys.push(cY(i)); });   // 집·길·시설만(울타리·나무는 빼고)
+  let x0 = W / 2, x1 = W / 2, y0 = H / 2, y1 = H / 2;
+  if (xs.length) { xs.sort((a, b) => a - b); ys.sort((a, b) => a - b); const q = (a, p) => a[Math.min(a.length - 1, Math.max(0, Math.round(p * (a.length - 1))))]; x0 = q(xs, 0.03); x1 = q(xs, 0.97); y0 = q(ys, 0.03); y1 = q(ys, 0.97); }   // 멀리 떨어진 몇 개는 틀에서 뺀다
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, span = Math.max(12, x1 - x0 + 2, y1 - y0 + 2), off = camera.position.clone().sub(camTarget);
+  return { x: wx(cx - 0.5), z: wz(cy - 0.5), hw: span * CS / 2 * window.VRULES.stageCard.pad, q: camera.quaternion.toArray(), off: off.toArray() }; }
+/* 본 그리기 바로 앞(actSnapShoot 고리) — 따로 둔 카메라(snapCam)로 구석에 그려 떠 낸다 */
+function scardShootNow() { const S = SCARD.shoot; if (!S) return; SCARD.shoot = null; const R = window.VRULES.stageCard, F = S.frame;
+  const dpr = renderer.getPixelRatio(), Wp = R.size[0], Hp = R.size[1], cw = Wp / dpr, chh = Hp / dpr;
+  snapCam.quaternion.fromArray(F.q); snapCam.position.set(F.x, 0, F.z).add(new THREE.Vector3().fromArray(F.off));
+  const hw = F.hw, hh = hw * Hp / Wp; snapCam.left = -hw; snapCam.right = hw; snapCam.top = hh; snapCam.bottom = -hh; snapCam.near = camera.near; snapCam.far = camera.far * 3; snapCam.updateProjectionMatrix(); snapCam.updateMatrixWorld();
+  renderer.getViewport(snapVp); renderer.getScissor(snapSc); const scT = renderer.getScissorTest(), au = renderer.shadowMap.autoUpdate, gv = gridLines.visible;
+  const rv = rain.visible; rain.visible = false;   // 빗방울은 사진에서만 뺀다(첫날·오늘을 나란히 보는 사진)
+  renderer.shadowMap.autoUpdate = false; gridLines.visible = false; renderer.setViewport(0, 0, cw, chh); renderer.setScissor(0, 0, cw, chh); renderer.setScissorTest(true);
+  renderer.render(scene, snapCam); rain.visible = rv;
+  const cv = document.createElement('canvas'); cv.width = Wp; cv.height = Hp; const el = renderer.domElement; try { cv.getContext('2d').drawImage(el, 0, el.height - Hp, Wp, Hp, 0, 0, Wp, Hp); } catch (e) {}
+  renderer.setScissorTest(scT); renderer.setScissor(snapSc); renderer.setViewport(snapVp); renderer.shadowMap.autoUpdate = au; gridLines.visible = gv;
+  SCARD.stats.찍음++; const idle = window.requestIdleCallback || (fn => setTimeout(fn, 60));
+  idle(() => { let url = null; try { url = cv.toDataURL('image/jpeg', 0.75); } catch (e) { SCARD.stats.사진없음++; } S.done(url); }); }
+{ const ss0 = actSnapShoot; actSnapShoot = function () { const r = ss0.apply(this, arguments); if (SCARD.shoot && !mapMode) scardShootNow(); return r; }; }
+/* 카드 그리기 — 한 틀 */
+function scardCss() { if (document.getElementById('stageCardCss')) return; const st = document.createElement('style'); st.id = 'stageCardCss';
+  st.textContent = '#stageCard{position:fixed;inset:0;z-index:22;background:#0f111699;display:flex;align-items:center;justify-content:center;padding:12px}'
+    + '#stageCard .card{background:#1a1d26;border:1px solid #3a4050;border-radius:16px;padding:14px 18px;max-width:min(94vw,720px);max-height:calc(100vh - 24px);overflow:auto;box-shadow:0 12px 40px #000b;font:15px/1.5 "Malgun Gothic",sans-serif;color:#e8e6e0;text-align:center}'
+    + '#stageCard .top{font-size:12px;color:#a8adba;margin-bottom:4px}#stageCard .q{font-size:18px;font-weight:800;color:#ffe9b8;margin:4px 0 8px}'
+    + '#stageCard .goal{font-size:14px;color:#e8b04b;margin:2px 0}#stageCard .pics{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:8px 0}'
+    + '#stageCard figure{margin:0}#stageCard figure img,#stageCard figure .ph{width:min(42vw,320px);aspect-ratio:16/9;border:3px solid #fff;border-radius:6px;background:#222 center/cover;display:block;object-fit:cover}'
+    + '#stageCard figure .ph{display:flex;align-items:center;justify-content:center;font-size:40px;color:#556}#stageCard figcaption{font-size:13px;color:#ffe9b8;font-weight:800;margin-top:3px}'
+    + '#stageCard .see{font-size:16px;margin:6px 0;letter-spacing:1px}#stageCard .see small{font-size:12px;color:#a8adba;letter-spacing:0}#stageCard .cur{font-size:11px;color:#7d8394;margin-top:6px}'
+    + '#stageCard button{background:#e8b04b;color:#1a1d26;border:none;border-radius:10px;min-height:44px;min-width:120px;padding:0 18px;font-size:16px;font-weight:800;cursor:pointer;margin-top:8px}';
+  document.head.appendChild(st); }
+const scardEsc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function scardPic(url, cap) { return '<figure>' + (url ? '<img alt="" src="' + url + '">' : '<div class="ph">📷</div>') + '<figcaption>' + scardEsc(cap) + '</figcaption></figure>'; }
+/* 관찰 한 줄 — 새로 생긴 것을 그림으로(종류별 아이콘을 늘어놓는다 · 많으면 작은 +n) */
+function scardSee(c0, c1) { const R = window.VRULES.stageCard, rows = []; Object.keys(c1).forEach(k => { const d = (c1[k] || 0) - (c0[k] || 0); if (d > 0 && K[k] && K[k].ic) rows.push([k, d]); });
+  rows.sort((a, b) => b[1] - a[1]); if (!rows.length) return '처음 그대로예요';
+  return rows.slice(0, 6).map(([k, d]) => { const road = !!K[k].road, cap = road ? R.roadIcons : R.maxIcons, ic = SCARD_IC[k] || K[k].ic; return ic.repeat(Math.min(d, cap)) + (d > cap ? '<small>+' + (d - cap) + (road ? '칸' : '') + '</small>' : ''); }).join('  '); }
+function scardShow(html, btn, onClose) { scardCss(); scardClose(); const el = document.createElement('div'); el.id = 'stageCard'; el.innerHTML = '<div class="card">' + html + '<div><button type="button">' + btn + '</button></div></div>';
+  el.querySelector('button').onclick = () => { scardClose(); if (onClose) onClose(); }; document.body.appendChild(el); SCARD.el = el; }
+function scardClose() { if (SCARD.el) { SCARD.el.remove(); SCARD.el = null; } }
+function scardTop(extra) { const d = STAGE.def; return '<div class="top">' + scardEsc(d.이름) + (extra ? ' · ' + scardEsc(extra) : '') + '</div>'; }
+function stageCardStart() { const d = STAGE.def, rec = scardLoad(); SCARD.stats.시작++;
+  const goals = STAGE.goals.map(g => '<div class="goal">🎯 ' + scardEsc(g.t) + '</div>').join('');
+  const draw = url => scardShow(scardTop() + '<div class="q">🔎 ' + scardEsc(d.질문 || '') + '</div>' + goals + '<div class="pics">' + scardPic(url, '첫날') + '</div>'
+      + (d.교과 ? '<div class="cur">' + scardEsc(d.교과) + '</div>' : ''), '시작', () => { rec.started = Date.now(); scardSave(); });
+  if (rec.first && rec.first.url) { draw(rec.first.url); return; }
+  draw(null); rec.first = { t: Date.now(), day: simDay(), counts: scardCounts(), pop: population(), frame: scardFrame(), url: null };
+  SCARD.shoot = { frame: rec.first.frame, done: url => { rec.first.url = url; scardSave(); const img = SCARD.el && SCARD.el.querySelector('figure .ph'); if (img && url) img.outerHTML = '<img alt="" src="' + url + '">'; } }; }
+function stageCardEnd(why) { if (!STAGE.def || STAGE.def.교과 == null) return; const d = STAGE.def, rec = scardLoad(); if (why === '목표' && rec.ended) return; SCARD.stats.끝++;   // 한 번 닫은 끝 카드는 목표로는 다시 안 뜬다(교사의 #끝 은 언제나)
+  if (!rec.first) rec.first = { t: Date.now(), day: simDay(), counts: scardCounts(), pop: population(), frame: scardFrame(), url: null };   // 시작 카드 전에 끝(교사가 닫음) — 첫날 사진은 없다
+  const now = scardCounts(), see = scardSee(rec.first.counts || {}, now), pop0 = rec.first.pop || 0, pop1 = population();
+  const html = url => scardTop(why === '목표' ? '🎉 목표를 이뤘어요' : '판을 마쳐요') + '<div class="pics">' + scardPic(rec.first.url, '첫날') + scardPic(url, '오늘') + '</div>'
+    + '<div class="cur">3~4학년 (2) 지역의 변화</div>'
+    + '<div class="see">' + see + ' <small>👥 ' + pop0 + ' → ' + pop1 + '</small></div>'
+    + (d.되돌아보기 ? '<div class="q">💭 ' + scardEsc(d.되돌아보기) + '</div><div class="cur">4-2 지역 문제 해결</div>' : '');
+  scardShow(html(null), '닫기', () => { rec.ended = Date.now(); scardSave(); });
+  SCARD.shoot = { frame: rec.first.frame, done: url => { rec.today = { t: Date.now(), day: simDay(), url }; scardSave(); if (SCARD.el) { const figs = SCARD.el.querySelectorAll('figure'); if (figs[1] && url) figs[1].outerHTML = scardPic(url, '오늘'); } } }; }
+/* 부팅 — 판일 때만. 처음 여는 판이면 시작 카드 · #끝 이면 끝 카드. 첫 안내가 떠 있으면 닫힌 뒤에 */
+/* 자유 놀이 판(교과 없음 · town)엔 카드가 없다 */
+function stageCardBoot() { if (!STAGE.def || VISIT_SID || STAGE.def.교과 == null) return; const endAsk = /(^|,)(끝|end)(,|$)/.test(decodeURIComponent(location.hash.slice(1)));
+  const go = () => { if (GUIDE.on) { setTimeout(go, 800); return; } if (endAsk) stageCardEnd('교사'); else if (!scardLoad().started) stageCardStart(); };
+  setTimeout(go, 600); }
+window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
+window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
+stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
+if (STAGE.def) { if (window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardBoot(); else if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
 </script>
 </body>
 </html>
