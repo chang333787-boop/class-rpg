@@ -2725,6 +2725,38 @@ function libHint(miss, libs, cap, open) {
     if (h) LIBMANY.stats.귀띔++; return t + h; }; }
 window.__libMany = () => ({ 켜짐: window.VRULES.manyLibrary.on, 한도: window.VRULES.manyLibrary.cap, 도서관: countKind('library'), 학교: countKind('school'), ...LIBMANY.stats });
 
+/* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
+   규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
+   · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
+   · 길을 보는 방향이 **하나뿐**이면 그쪽으로. **둘 이상**(모퉁이·양면·3면)이면: 지금 방향이 그 가운데 있으면 그대로 → 아니면 더 넓은 길 쪽(점수 큰 쪽)
+     → 같으면 **보는 사람(카메라) 쪽을 향한 면** — 아이가 문을 볼 수 있게(시점을 돌리면 따라 돈다). 길을 보는 방향이 **없으면** 지금 방향 그대로.
+     ('손가락에 가까운 면'은 버렸다: 놓는 칸이 늘 발자국의 왼쪽 위 모서리라 늘 위·왼쪽 면이 가깝게 나온다.)
+   · 아이가 🔄 돌리기를 **직접 누른 뒤에는 그 선택을 따른다**(다른 카드를 고를 때까지 — #607 과 같게). 끌어 놓기 중·들고 옮기는 중·치우기엔 끼어들지 않는다.
+   · 미리보기(#593 모양·문 앞 화살표)·카드 그림(#600)·터치 앉히기(#621)는 selRot 을 읽으므로 저절로 잡힌 방향으로 보인다. 이미 놓인 건물은 바꾸지 않는다.
+   원래 줄 수정 0 — cellAt·rotate·setMode 감싸기. 순수 함수 doorRotPick. 스위치 VRULES.doorRot. */
+(window.VRULES = window.VRULES || {}).doorRot = { on: true };
+const DOORROT = { manual: false, door: new Map(), stats: { 맞춤: 0, 여러면: 0 } };
+/* 순수 함수 — 방향 고르기. cands = [{ rot, score, face }] (score>0 인 것만 — 길을 보는 방향들 · face = 그 면이 카메라를 향한 정도 −1~1), cur = 지금 방향 */
+function doorRotPick(cands, cur) { if (!cands.length) return cur; if (cands.length === 1) return cands[0].rot; if (cands.some(c => c.rot === cur)) return cur;
+  return cands.slice().sort((a, b) => (b.score - a.score) || (b.face - a.face))[0].rot; }
+function doorRotKind(kind) { const k = K[kind]; if (!k || JOIN_KINDS[kind] || FLOWER_KINDS[kind] || k.road || ROADROT.kinds.has(kind)) return false;
+  if (!DOORROT.door.has(kind)) { let parts = null; try { parts = partsOf({ k: kind, root: idx(2, 2), rot: 0 }); } catch (e) { parts = k.parts; } DOORROT.door.set(kind, ghostHasDoor(kind, parts)); }
+  return DOORROT.door.get(kind); }
+function doorRotCands(kind, x, y) { const out = [], vx = camera.position.x - camTarget.x, vz = camera.position.z - camTarget.z, vl = Math.hypot(vx, vz) || 1;
+  for (let r = 0; r < 4; r++) { if (canPlace(kind, x, y, r) !== true) continue; const d = dims(kind, r), fc = ghostFrontCells(x, y, d.w, d.h, r); let score = 0;
+    fc.forEach(([fx, fy]) => { if (!inb(fx, fy)) return; const c = cells[idx(fx, fy)]; if (c && K[c.k].road) score += K[c.k].wide ? 2 : 1; });
+    if (score > 0) out.push({ rot: r, score, face: (Math.sin(r * Math.PI / 2) * vx + Math.cos(r * Math.PI / 2) * vz) / vl }); }   // 문 앞 방향(doorFront 와 같은 식) · 카메라 쪽
+  return out; }
+{ const cellD0 = cellAt; cellAt = function () { const c = cellD0.apply(this, arguments);
+    if (!c || !c.inside || !window.VRULES.doorRot.on || DOORROT.manual || !sel || painting || carrying || eraser || mover || cells[idx(c.x, c.y)] || !doorRotKind(sel)) return c;
+    const cands = doorRotCands(sel, c.x, c.y), r = doorRotPick(cands, selRot);
+    if (cands.length > 1) DOORROT.stats.여러면++;
+    if (r !== selRot) { selRot = r; DOORROT.stats.맞춤++; refreshRotCard(); }
+    return c; };
+  const rotD0 = rotate; rotate = function () { if (sel && doorRotKind(sel)) DOORROT.manual = true; return rotD0.apply(this, arguments); };   // 직접 돌렸다 → 그 선택을 따른다
+  const modeD0 = setMode; setMode = function (kind) { if (kind !== sel) DOORROT.manual = false; return modeD0.apply(this, arguments); }; }
+window.__doorRot = () => ({ 켜짐: window.VRULES.doorRot.on, 직접돌림: DOORROT.manual, 지금방향: selRot, 고른것: sel, 문있음: sel ? doorRotKind(sel) : null, ...DOORROT.stats });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
