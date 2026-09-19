@@ -24,10 +24,12 @@ node scripts/village-sim/run.mjs --save village/stages/boards/pop88.json --vs '�
 node scripts/village-sim/run.mjs --save village/stages/boards/pop88.json --vs 'pop167: save=village/stages/boards/pop167.json'
 
 node scripts/village-sim/test.mjs     # 도구 시험 (약 15초)
+node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README.md)
 ```
 
 | 인자 | 뜻 |
 |---|---|
+| `--stage <id>` | 판 파일 `village/stages/<id>.json` 으로 연다(`?stage=` 와 같은 길 · 시작 땅·규칙·목표). 판 파일만 디스크에서 읽어 주고 다른 주소는 여전히 거절 · 지표에 `판목표`(이룬 판 목표 수) |
 | `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅 |
 | `--days N` · `--seeds 1-5` | 며칠 · 어느 시드(`1,3,7` 도 된다) |
 | `--rules 'a.b=v,…'` | 불러온 뒤 `VRULES` 를 덮는다. 없는 키면 멈춘다 |

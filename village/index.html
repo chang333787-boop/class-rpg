@@ -7939,7 +7939,67 @@ window.__kids = () => ({ 켜짐: window.VRULES.kids.on, ...KIDS.stats, 지금밖
    ══════════════════════════════════════════════════════════════ */
 const SAVE_V = 2;                       // v2 = 구역 문자열 + palette (G5 ③). v1(items) 은 읽기만
 const SID = (QS.get('sid') || 'guest').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || 'guest';   // ?sid=<학생id>, 없으면 guest (G5 훅)
-const SAVE_KEY = 'rpg.village.' + SID;
+const SAVE_KEY = 'rpg.village.' + SID + stageKeyPart();   // [MAC-STAGE] 판마다 따로 — ?stage 가 없으면(기본 판) 옛 키 그대로
+/* ══════════════════════════════════════════════════════════════
+   [MAC-STAGE] 판(스테이지) 파일 — 엔진 제안서 ② (docs/village_engine_proposal.md · docs/village_socialsim_absorb.md C1·C2·C4·C10)
+   ?stage=<id> 이면 village/stages/<id>.json 을 읽어 그 판을 얹는다. **없으면 기본 판 = 지금 마을 그대로**(달라지는 것 0).
+   판 칸: id·이름·교과·질문·되돌아보기·현상·변수·시작(저장본 경로 | null)·규칙(VRULES 덮기 — 끄기도 여기)·건물(쓸 것)·목표(셈 꼴).
+   셈: { 셈:'kind', k, n } 그 종류 n개 이상 · { 셈:'pop', n } 인구 n 이상 · { 셈:'hook', 훅, n, 비교:'>='|'<=' } 아래 STAGE_HOOKS.
+   운영 안전: 판이 있으면 저장 키가 따로('rpg.village.<sid>.<id>')이고 원격 동기(sync.js)를 끈다 → 아이 저장본·운영 DB 에 닿지 않는다.
+   규칙 덮기는 module 맨 끝(모든 VRULES 가 정의된 뒤 · 첫 틱 전)에서 한다. 판정/연기 표는 village/stages/rules.json(C10).
+   기존 줄 수정 1(SAVE_KEY 줄 끝에 stageKeyPart()) · canPlace·goalTick 감싸기 · 고리 한 줄(module 끝 stageApplyRules).
+   ══════════════════════════════════════════════════════════════ */
+function stageIdOf(s) { return String(s || '').replace(/[^a-z0-9\-]/g, '').slice(0, 40) || null; }
+function stageKeyPart() { const id = VISIT_SID ? null : stageIdOf(QS.get('stage')); return id ? '.' + id : ''; }
+const STAGE = { id: VISIT_SID ? null : stageIdOf(QS.get('stage')), def: null, err: null, goals: [], saidEnd: false,
+  stats: { 규칙수: 0, 모르는규칙: [], 건물수: 0, 모르는건물: [], 목표수: 0, 시작판: false, 막음: 0 } };
+const STAGE_HOOKS = {
+  /* 사는 집 가운데 일할 곳이 닿는 집의 비율(%) — 일자리 셈이 한 바퀴 돌기 전이나 인구가 JOB_POP 아래면 null(아직 못 잰다) */
+  '일닿음%': () => { if (population() < JOB_POP || (window.VRULES.jobsHomes && window.VRULES.jobsHomes.on && !JOBH.stats.한바퀴)) return null;
+    let lived = 0, far = 0; res.forEach((v, root) => { if (v > 0) { lived++; if (joblessHome(root)) far++; } }); return lived ? 100 * (1 - far / lived) : null; },
+};
+function stageGoalOk(g) {
+  if (g.셈 === 'kind') return countKind(g.k) >= (g.n || 1);
+  if (g.셈 === 'pop') return population() >= (g.n || 1);
+  if (g.셈 === 'hook') { const f = STAGE_HOOKS[g.훅], v = f ? f() : null; if (v == null) return false; return g.비교 === '<=' ? v <= g.n : v >= g.n; }
+  return false;
+}
+function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표판) 전에
+  if (Array.isArray(def.건물) && def.건물.length) {
+    const keep = def.건물.filter(k => K[k]); STAGE.stats.모르는건물 = def.건물.filter(k => !K[k]); STAGE.stats.건물수 = keep.length;
+    const next = ORDER.filter(k => keep.includes(k)); ORDER.splice(0, ORDER.length, ...next);
+  }
+  if (Array.isArray(def.목표)) {
+    STAGE.goals = def.목표.map((g, i) => ({ id: 'stage:' + STAGE.id + ':' + i, t: g.t, ok: () => stageGoalOk(g) }));
+    GOALS.unshift(...STAGE.goals); STAGE.stats.목표수 = STAGE.goals.length;
+  }
+}
+function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
+  const def = STAGE.def; if (!def || !def.규칙) return;
+  Object.keys(def.규칙).forEach(k => { const v = def.규칙[k], cur = window.VRULES[k];
+    if (!cur || typeof v !== 'object') { STAGE.stats.모르는규칙.push(k); return; }
+    Object.assign(cur, v); STAGE.stats.규칙수++; });
+}
+{ const cp0 = canPlace; canPlace = function (kind) {
+    if (STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(kind)) { STAGE.stats.막음++; return '이 판에서는 쓰지 않아요'; }
+    return cp0.apply(this, arguments); }; }
+{ const gt0 = goalTick; goalTick = function () { const r = gt0.apply(this, arguments);
+    if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (STAGE.def.되돌아보기) toast('🎉 ' + STAGE.def.되돌아보기, true); }
+    return r; }; }
+if (STAGE.id) {
+  window.VillageSync = null;   // 판은 원격 동기를 쓰지 않는다(저장은 이 기기에만 · 키도 따로)
+  try {
+    const r = await fetch('stages/' + STAGE.id + '.json', { cache: 'no-store' }); if (!r.ok) throw new Error('판 파일이 없어요 (' + r.status + ')');
+    const def = await r.json(); if (def.id !== STAGE.id) throw new Error('판 id 가 파일 이름과 달라요');
+    if (def.시작 && localStorage.getItem(SAVE_KEY) == null && !/(^|,)fresh(,|$)/.test(location.hash.slice(1))) {
+      const b = await fetch(def.시작, { cache: 'no-store' }); if (!b.ok) throw new Error('시작 땅을 못 읽었어요 (' + b.status + ')');
+      localStorage.setItem(SAVE_KEY, await b.text()); STAGE.stats.시작판 = true;
+    }
+    STAGE.def = def; stageApplyEarly(def);
+  } catch (e) { STAGE.err = String(e && e.message || e); console.warn('[MAC-STAGE]', STAGE.err); }
+}
+window.__stage = () => ({ id: STAGE.id, 이름: STAGE.def && STAGE.def.이름, 오류: STAGE.err, 저장키: SAVE_KEY, 원격: !!window.VillageSync,
+  목표: STAGE.goals.map(g => [g.t, goalsDone.has(g.id)]), 일닿음: STAGE_HOOKS['일닿음%'](), ...STAGE.stats });
 let saveBroken = false;                   // 저장이 막혔는가(용량 초과 등)
 let saveWarned = false;
 /* 저장을 아예 못 하는 자리가 있다 — 미리보기 창처럼 출처가 없는 화면이면
@@ -9123,6 +9183,8 @@ resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
 if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
 Object.keys(JOIN_KINDS).forEach(id => { DECO[id] = DECO.fence; MAP_COL[id] = JOIN_KINDS[id].fam === 'hedge' ? MAP_COL.bush : JOIN_KINDS[id].fam === 'curb' ? '#c8a08a' : '#efeee8'; });   // [DESIGN-JOIN-1] 주변 가치·미니맵 색(둘 다 나중에 쓰이는 표라 여기서 채워도 된다)
+stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
+if (STAGE.def) { if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
 </script>
 </body>
 </html>

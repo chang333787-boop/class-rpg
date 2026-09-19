@@ -27,17 +27,24 @@ function any() {
   });
 }
 
-function fakeGlobals({ saveText, hash }) {
+function fakeGlobals({ saveText, hash, query, root }) {
   const g = globalThis, def = (k, v) => Object.defineProperty(g, k, { value: v, configurable: true, writable: true });
   const ls = new Map(); if (saveText != null) ls.set('rpg.village.guest', saveText);
   def('localStorage', { getItem: k => ls.has(k) ? ls.get(k) : null, setItem: (k, v) => ls.set(k, String(v)), removeItem: k => ls.delete(k), key: i => [...ls.keys()][i] ?? null, clear: () => ls.clear(), get length() { return ls.size; } });
   def('sessionStorage', g.localStorage);
-  def('location', new URL('http://sim.local/village/index.html?sid=guest&dev=1#' + (hash || '')));
+  def('location', new URL('http://sim.local/village/index.html?sid=guest&dev=1' + (query ? '&' + query : '') + '#' + (hash || '')));
   def('navigator', { userAgent: 'village-sim', maxTouchPoints: 0, language: 'ko', onLine: false });
   def('document', any()); def('window', g); def('self', g);
   // 네트워크를 쓰려 한 주소 — 쓰려 해도 늘 거절한다. 마을 자기 파일(모델 glb 등 같은 출처)은 __simLocal, 그 밖은 __simNet 에 센다
   g.__simNet = 0; g.__simLocal = [];
-  def('fetch', async (u) => { const url = new URL(String(u && u.url || u), g.location.href); if (url.origin === g.location.origin) g.__simLocal.push(url.pathname); else g.__simNet++; throw new Error('village-sim: 네트워크 없음'); });
+  // 단 하나 예외: 판 파일(village/stages/ 밑)은 디스크에서 읽어 준다 — 브라우저의 ?stage= 와 같은 길로 판을 얹게(읽기만)
+  def('fetch', async (u) => { const url = new URL(String(u && u.url || u), g.location.href);
+    if (url.origin === g.location.origin && url.pathname.startsWith('/village/stages/') && !url.pathname.includes('..')) {
+      const f = path.join(root, decodeURIComponent(url.pathname)); g.__simStage = (g.__simStage || []).concat(url.pathname);
+      if (!fs.existsSync(f)) return { ok: false, status: 404, json: async () => null, text: async () => '' };
+      const t = fs.readFileSync(f, 'utf8'); return { ok: true, status: 200, json: async () => JSON.parse(t), text: async () => t };
+    }
+    if (url.origin === g.location.origin) g.__simLocal.push(url.pathname); else g.__simNet++; throw new Error('village-sim: 네트워크 없음'); });
   def('XMLHttpRequest', function () { g.__simNet++; throw new Error('village-sim: 네트워크 없음'); });
   def('WebSocket', function () { g.__simNet++; throw new Error('village-sim: 네트워크 없음'); });
   def('addEventListener', () => {}); def('removeEventListener', () => {}); def('dispatchEvent', () => true);
@@ -51,7 +58,7 @@ function fakeGlobals({ saveText, hash }) {
   return ls;
 }
 
-/* opts: { root, saveText, seed, hash, quiet } → 마을의 window(시험 훅 __*) */
+/* opts: { root, saveText, seed, hash, query, quiet } → 마을의 window(시험 훅 __*) */
 export async function loadVillage(opts) {
   const root = opts.root, html = fs.readFileSync(path.join(root, 'village/index.html'), 'utf8');
   const m = html.match(/<script type="module">([\s\S]*?)<\/script>/);
@@ -61,7 +68,7 @@ export async function loadVillage(opts) {
   if (!m[1].includes(IMP)) throw new Error('three import 줄이 바뀜: ' + IMP);
   const src = m[1].replace(IMP, "import * as THREE0 from '" + three + "'; const THREE = Object.assign({}, THREE0, { WebGLRenderer: globalThis.__FakeRenderer });");
   seedRandom(opts.seed || 1);
-  const ls = fakeGlobals(opts);
+  const ls = fakeGlobals({ ...opts, root });
   const file = path.join(os.tmpdir(), 'village-sim-' + process.pid + '-' + Date.now() + '.mjs');
   fs.writeFileSync(file, src);
   const log = console.log, warn = console.warn;
