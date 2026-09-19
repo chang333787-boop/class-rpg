@@ -2246,6 +2246,47 @@ function setMode(kind, tool) {          // tool: null | 'erase' | 'move'
   refreshRotCard();
 }
 
+/* ── [MAC-ENTRANCE] 마을 어귀 — 마을의 길이 바깥을 향해 끝나는 곳 옆의 빈 칸 (칭호 간판이 설 자리 · 디자인 담당과 약속한 접점) ──
+   간판은 cells 에 안 들어가는 장식이다(저장 0 · 놓기를 안 막는다). 여기서는 '어디가 어귀인가'만 고른다 — 그림은 디자인 담당.
+   · 문(gate) 후보 둘: ⓐ 나가는 길 = 열린 구역 안의 길 칸 가운데 이웃이 열린 구역 밖인 것 ⓑ 막다른 길 끝 = 길 이웃이 하나뿐인 칸(바깥 방향 = 그 이웃의 반대쪽).
+     실제 아이들 마을(창조자의 눈 저장본 둘·새 마을)에는 ⓐ 가 하나도 없었다 — 길을 구역 가장자리까지 긋지 않는다. 그래서 ⓑ 가 보통의 경우다.
+   · 고르는 순서: ⓐ 가 있으면 ⓐ 끼리, 없으면 ⓑ 끼리 — **바깥 방향으로 열린 구역의 끝까지 가장 가까운 것**(마을 안쪽을 향한 막다른 골목은 뒤로 밀린다). 마을(집들의 90% 가 드는 원)에서 8칸 넘게 먼 끝은 그만큼 뒤로 민다.
+   · 자리: ① 길 끝에서 바깥으로 한 칸 나간 줄의 옆 칸 ② 길 끝의 옆 칸 ③ 반경 3 안 가장 가까운 빈 칸. side 는 그 칸이 열린 구역 밖이면 'out'(아이가 못 놓는 땅 — 밀려날 일이 없다), 안이면 'in'.
+   · prev(지난번 자리)를 넘기면 그 칸이 아직 비어 있고 문에서 3칸 안인 동안은 **그대로** 돌려준다 — 아이가 지을 때마다 간판이 뛰어다니지 않게.
+   칸 전체를 한 번 훑는다(1ms 아래) — 프레임마다 부르지 말고 칭호가 바뀔 때·가끔(10초에 한 번쯤)만 부를 것.
+   누르기: window.__titleSign = { cell:{x,y} } 또는 { cells:[…] } 가 있으면, 보기 모드에서 그 칸을 눌렀을 때 window.__titleOpen()(칭호 카드 — MAC-TITLE)을 부른다. 원래 줄 수정 0(act 감싸기). */
+(window.VRULES = window.VRULES || {}).entrance = { on: true, near: 3 };
+const ENTRANCE_D4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+function entranceSpot(prev) {
+  const R = window.VRULES.entrance, isRoad = (x, y) => { const r = inb(x, y) ? cells[idx(x, y)] : null; return !!(r && K[r.k] && K[r.k].road); }, free = (x, y) => inb(x, y) && !cells[idx(x, y)];
+  let hx = 0, hy = 0, hn = 0; const exits = [], ends = [], homes = [];
+  cells.forEach((rec, i) => { if (!rec) return; const x = cX(i), y = cY(i);
+    if (rec.root === i && rec.k === 'house') { hx += x; hy += y; hn++; homes.push(i); }
+    if (!K[rec.k] || !K[rec.k].road || !plotOpen(x, y)) return; let roads = 0, back = null;
+    ENTRANCE_D4.forEach(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (isRoad(nx, ny)) { roads++; back = [dx, dy]; } else if (inb(nx, ny) && !plotOpen(nx, ny)) exits.push({ x, y, ox: dx, oy: dy }); });
+    if (roads === 1) ends.push({ x, y, ox: -back[0], oy: -back[1] }); });
+  if (!exits.length && !ends.length) return null;
+  const cx = hn ? hx / hn : W / 2, cy = hn ? hy / hn : H / 2, d2 = p => (p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy);
+  const toEdge = g => { let n = 0, x = g.x, y = g.y; while (n < W) { x += g.ox; y += g.oy; n++; if (!inb(x, y) || !plotOpen(x, y)) break; } return n; };   // 바깥 방향으로 열린 구역이 끝나기까지 몇 칸
+  /* 마을의 크기 = 집들의 90% 가 드는 반지름. 그보다 8칸 넘게 떨어진 길 끝(외딴 집으로 가는 긴 길)은 그만큼 뒤로 민다 — 간판은 마을 가장자리에서 보여야 한다(pop167 에서 첫 판은 마을에서 40칸 떨어진 외딴 집 앞을 골랐다) */
+  const dists = homes.map(i => Math.sqrt(d2({ x: cX(i), y: cY(i) }))).sort((a, b) => a - b), r90 = dists.length ? dists[Math.floor((dists.length - 1) * 0.9)] : 0;
+  const score = g => toEdge(g) + 2 * Math.max(0, Math.sqrt(d2(g)) - r90 - 8);
+  const gates = (exits.length ? exits : ends).map(g => ({ ...g, sc: score(g) })).sort((a, b) => a.sc - b.sc || d2(a) - d2(b));
+  if (prev && free(prev.x, prev.y) && Math.max(Math.abs(gates[0].x - prev.x), Math.abs(gates[0].y - prev.y)) <= R.near) return { x: prev.x, y: prev.y, side: plotOpen(prev.x, prev.y) ? 'in' : 'out', road: { x: gates[0].x, y: gates[0].y }, kept: true };
+  for (const g of gates) { const px = g.oy, py = g.ox, road = { x: g.x, y: g.y }, ok = (x, y) => free(x, y) && !isRoad(x, y), mk = (x, y) => ({ x, y, side: plotOpen(x, y) ? 'in' : 'out', road });
+    for (const s of [1, -1]) { const x = g.x + g.ox + px * s, y = g.y + g.oy + py * s; if (ok(x, y)) return mk(x, y); }
+    for (const s of [1, -1]) { const x = g.x + px * s, y = g.y + py * s; if (ok(x, y)) return mk(x, y); }
+    let best = null; for (let yy = g.y - R.near; yy <= g.y + R.near; yy++) for (let xx = g.x - R.near; xx <= g.x + R.near; xx++) { if (!ok(xx, yy)) continue; const dd = (xx - g.x) * (xx - g.x) + (yy - g.y) * (yy - g.y); if (!best || dd < best.dd) best = { x: xx, y: yy, dd }; }
+    if (best) return mk(best.x, best.y); }
+  return null;
+}
+window.__entranceSpot = prev => (window.VRULES.entrance.on ? entranceSpot(prev || null) : null);
+{ const act0 = act; act = function (clientX, clientY) {                          // 보기 모드에서 간판이 선 칸을 누르면 칭호 카드
+    const sign = window.__titleSign; if (sign && window.VRULES.entrance.on && !sel && !eraser && !mover && typeof window.__titleOpen === 'function') {
+      const c = cellAt(clientX, clientY), list = sign.cells || (sign.cell ? [sign.cell] : []);
+      if (c && !cells[idx(c.x, c.y)] && list.some(p => p && p.x === c.x && p.y === c.y)) { window.__titleOpen(); return; } }
+    return act0.apply(this, arguments); }; }
+
 /* 돌리기 — 놓기 전에 방향을 바꾼다. 옮기는 중에도 바꿀 수 있다. */
 function rotate() {
   if (!sel && !carrying) { toast('먼저 놓을 물건을 고르세요'); return; }
