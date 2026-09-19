@@ -44,6 +44,28 @@
    }
   ]
  },
+ "d_y20": {
+  "body": "d_y20_body.svg",
+  "layers": [
+   {
+    "files": [
+     "d_y20_w1.svg",
+     "d_y20_w2.svg",
+     "d_y20_w3.svg"
+    ],
+    "kind": "frames",
+    "frameSec": 0.3,
+    "size": [
+     300,
+     400
+    ],
+    "bodyViewBox": [
+     300,
+     400
+    ]
+   }
+  ]
+ },
  "d_y28": {
   "body": "d_y28_body.svg",
   "layers": [
