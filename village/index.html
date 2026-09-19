@@ -3635,6 +3635,7 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
+  if ((SIM.ticks % 30) === 13) growTick('tick');   // [MAC-GROW] 심은 것이 한 단계 자랐나(3초마다 · 자라는 것만 훑는다)
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
@@ -5056,6 +5057,62 @@ function exportFile() {
   fileStats.내보냄++; toast('⬇️ 마을을 파일로 저장했어요 — ' + a.download, true); sndFx('goal');
 }
 /* 문자열 하나로 가져온다. 돌려주는 값: true(다시 연다) 또는 거절 이유 */
+/* ── [MAC-GROW] 밤새 자라는 것 — 저장 쪽 (보스 승인 09-20 · 제안서 docs/village_grow_proposal.md · 주민 연기 담당이 그리기·연기) ──
+   저장본에 곁 키 grow: { 칸번호: [심은 시뮬날, 심은 실제날] } (+ growDay: 저장한 실제날) 를 **자라는 동안만** 둔다. 다 자라면 지운다 → 머무는 건 많아야 이틀치(칸당 ≈20바이트).
+   · 단계: 0 새싹 → 1 어린나무(마을 아침이 한 번 지남 — simDay 는 6시에 바뀐다) → 2 다 자람(실제 날짜가 하루 넘음). 실제 다음 날 열었는데 마을 아침이 아직이면 1 부터.
+     키가 없으면 2(다 자람) — 옛 저장본·다른 기기·옛 판이 저장한 것은 전부 다 자란 것(잃는 것 없음). SAVE_V 는 그대로(옛 판은 모르는 키를 무시한다).
+   · 심을 때 적는다: 나무·과일나무·큰나무·꽃밭(색 꽃밭 포함)을 **아이가 놓을 때만**(painting 중 — 톡·끌어 놓기·앉히기 ✓). 불러오기·시험 훅(__put)·되살리기로 놓인 것은 새로 적지 않는다.
+   · 따라간다: 치우면 지우고 잠깐 맡아 둔다 → 되돌리기로 되살리면 그 단계로, 🖐 옮기면 새 자리로, 돌리기(치웠다 다시 놓기)는 그대로. 치우고 **새로 심으면** 새싹부터.
+   · 실제 날짜는 뒤로 안 간다: 기기 시계를 되돌려도 max(오늘, 이번에 본 가장 늦은 날). 판정(필요·목표·꾸미기)은 단계와 무관하다 — 자라는 건 보는 기쁨만.
+   · 연기·디자인 쪽 접점: window.GROW(칸) → 0·1·2(= .stage) · .news() · 단계가 바뀌면 그 칸의 청크를 다시 합치고 'village-grow' 이벤트(detail: { 까닭: 'open'|'tick', 바뀜: [{칸, 전, 후, 종류}] }).
+   · sync.js 에는 싣지 않는다(다른 기기에선 다 자란 것으로 보인다 — 안전한 쪽). 원래 줄 수정 0 — serialize·loadSaved·placeAt·removeAt·pickUp·dropDown·undo 감싸기. */
+(window.VRULES = window.VRULES || {}).growSave = { on: true };   // 그리기·연기 쪽 스위치(VRULES.grow)는 ACT-GROW 몫 — 저장 쪽은 따로
+var GROW_S = { news: [], map: new Map(), gone: new Map(), txn: null, pend: null, seen: new Map(), realHigh: 0, lastDay: null, stats: { 심음: 0, 따라감: 0, 지움: 0, 다자람: 0, 바뀜: 0 } };
+const GROW_KINDS = new Set(['tree', 'fruit', 'bigtree'].concat(Object.keys(FLOWER_KINDS)));
+const growToday = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);   // 이 기기의 날 번호(1970-01-01 부터)
+function growReal() { GROW_S.realHigh = Math.max(GROW_S.realHigh, growToday()); return GROW_S.realHigh; }
+/* 순수 함수 — 단계. e = [심은 시뮬날, 심은 실제날], sd = 지금 시뮬날, rd = 지금 실제날(뒤로 안 간 값). 없으면 2 */
+function growStageOf(e, sd, rd) { if (!e) return 2; const night = sd > e[0], day = rd > e[1]; return night ? (day ? 2 : 1) : (day ? 1 : 0); }
+/* 순수 함수 — 저장본의 grow 를 읽을 때 걸러 낸다: 칸 번호·정수 둘만 · 살아 있는 칸(alive(칸) → 종류)이 자라는 종류일 때만 */
+function growClean(obj, alive, kinds) { const out = new Map(); if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  Object.keys(obj).forEach(k => { const i = +k, e = obj[k]; if (!Number.isInteger(i) || i < 0 || !Array.isArray(e) || e.length !== 2 || !e.every(Number.isInteger)) return; if (!kinds.has(alive(i))) return; out.set(i, [e[0], e[1]]); }); return out; }
+function growTick(why) { const R = window.VRULES.growSave; if (!R.on) return; const sd = simDay(), rd = growReal(), ch = [];
+  GROW_S.map.forEach((e, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !GROW_KINDS.has(rec.k)) { GROW_S.map.delete(root); GROW_S.seen.delete(root); return; }
+    const st = growStageOf(e, sd, rd), was = GROW_S.seen.has(root) ? GROW_S.seen.get(root) : (why === 'open' ? growStageOf(e, sd, Math.max(e[1], GROW_S.lastDay == null ? e[1] : Math.min(GROW_S.lastDay, rd))) : st);   // 처음 열 때는 '마지막으로 저장한 날'과 견준다 — 그 뒤 밤새 자란 것만(같은 날 다시 열면 알리지 않는다)
+    if (st !== was) { ch.push({ 칸: root, 전: was, 후: st, 종류: rec.k }); dirtyChunks.add(chunkOfCell(root)); }
+    if (st >= 2) { GROW_S.map.delete(root); GROW_S.seen.delete(root); GROW_S.stats.다자람++; } else GROW_S.seen.set(root, st); });
+  if (why === 'open') GROW_S.news = ch.filter(c => c.후 > c.전).map(c => c.칸);   // ACT-GROW 가 한 번 읽어 가는 '밤새 자란 칸'
+  if (ch.length) { GROW_S.stats.바뀜 += ch.length; if (why !== 'open') markDirty(); setTimeout(() => window.dispatchEvent(new CustomEvent('village-grow', { detail: { 까닭: why, 바뀜: ch } })), 0); } }
+{ const place0 = placeAt; placeAt = function (kind, x, y) { const r = place0.apply(this, arguments);
+    if (!window.VRULES.growSave.on || !GROW_KINDS.has(kind)) return r; const root = idx(x, y);
+    if (painting && !GROW_S.txn) { GROW_S.map.set(root, [simDay(), growReal()]); GROW_S.seen.set(root, 0); GROW_S.gone.delete(root); GROW_S.stats.심음++; return r; }   // 아이가 새로 심었다
+    let e = null; const g = GROW_S.gone.get(root);
+    if (GROW_S.pend && GROW_S.pend.k === kind) { e = GROW_S.pend.e; GROW_S.pend = null; }                                  // 🖐 옮겨 놓았다
+    else if (g && g.k === kind) e = g.e;                                                                                   // 되살림 · 제자리 · 돌리기
+    else if (GROW_S.txn) { const j = GROW_S.txn.findIndex(t => t.k === kind); if (j >= 0) e = GROW_S.txn.splice(j, 1)[0].e; }   // 되돌리기의 '옮긴 것 제자리로'
+    GROW_S.gone.delete(root); if (e) { GROW_S.map.set(root, e.slice()); GROW_S.seen.delete(root); GROW_S.stats.따라감++; } return r; };
+  const rem0 = removeAt; removeAt = function (x, y) { const rec = inb(x, y) ? cells[idx(x, y)] : null, root = rec ? rec.root : -1, e = root >= 0 ? GROW_S.map.get(root) : null;
+    const r = rem0.apply(this, arguments);
+    if (r && e) { GROW_S.map.delete(root); GROW_S.seen.delete(root); GROW_S.gone.set(root, { k: rec.k, e }); if (GROW_S.txn) GROW_S.txn.push({ k: rec.k, e }); GROW_S.stats.지움++;
+      if (GROW_S.gone.size > 400) GROW_S.gone.delete(GROW_S.gone.keys().next().value); }                                   // 오래된 것부터 버린다(되돌리기 목록보다 넉넉히)
+    return r; };
+  const pick0 = pickUp; pickUp = function () { const r = pick0.apply(this, arguments); if (carrying) { const g = GROW_S.gone.get(idx(carrying.fx, carrying.fy)); if (g && g.k === carrying.k) carrying.growE = g.e; } return r; };
+  const drop0 = dropDown; dropDown = function () { const cur = carrying; if (cur && cur.growE) GROW_S.pend = { k: cur.k, e: cur.growE }; try { return drop0.apply(this, arguments); } finally { GROW_S.pend = null; } };
+  const undo0 = undo; undo = function () { GROW_S.txn = []; try { return undo0.apply(this, arguments); } finally { GROW_S.txn = null; } };
+  const ser0 = serialize; serialize = function () { const d = ser0.apply(this, arguments);
+    if (d && window.VRULES.growSave.on && GROW_S.map.size) { const o = {}; GROW_S.map.forEach((e, root) => { o[root] = e; }); d.grow = o; d.growDay = growReal(); } return d; };   // growDay = 마지막으로 저장한 실제날(다음에 열 때 '밤새 자란 것'을 셀 기준)
+  const load0 = loadSaved; loadSaved = function (rawOverride) { const r = load0.apply(this, arguments);
+    GROW_S.map.clear(); GROW_S.seen.clear(); GROW_S.gone.clear();
+    try { const raw = rawOverride || localStorage.getItem(SAVE_KEY), d = raw ? JSON.parse(raw) : null;
+      GROW_S.map = growClean(d && d.grow, i => { const c = inb(cX(i), cY(i)) ? cells[i] : null; return c && c.root === i ? c.k : null; }, GROW_KINDS);
+      GROW_S.lastDay = d && Number.isInteger(d.growDay) ? d.growDay : null; GROW_S.map.forEach(e => { GROW_S.realHigh = Math.max(GROW_S.realHigh, e[1]); }); } catch (err) { GROW_S.map = new Map(); GROW_S.lastDay = null; }   // 못 읽으면 전부 다 자란 것 — 마을은 열린다
+    growTick('open'); return r; }; }   // 곧바로 — ACT-GROW 가 첫 틱에 news() 를 읽는다(이벤트는 growTick 안에서 한 박자 늦게)
+/* window.GROW — ACT-GROW(#628)는 이것을 **함수로** 부른다: GROW(칸) → 0·1·2(없으면 2). 속성: stage(같은 것) · list() · news()(열었을 때 밤새 자란 칸 — 한 번만 돌려준다) */
+window.GROW = Object.assign((i) => { if (!window.VRULES.growSave.on) return 2; const c = cells[i], root = c ? c.root : i; return growStageOf(GROW_S.map.get(root), simDay(), growReal()); },
+  { list: () => [...GROW_S.map.keys()], news: () => { const L = GROW_S.news; GROW_S.news = []; return L; } });
+window.GROW.stage = window.GROW;
+window.__plantGrow = () => ({ 켜짐: window.VRULES.growSave.on, 자라는중: GROW_S.map.size, 오늘: growReal(), 시뮬날: simDay(), 목록: [...GROW_S.map].slice(0, 12).map(([i, e]) => [cX(i), cY(i), cells[i] && cells[i].k, e, window.GROW.stage(i)]), 맡아둠: GROW_S.gone.size, ...GROW_S.stats });
+
 function importText(txt) {
   let d = null;
   try { d = JSON.parse(txt); } catch (e) { fileStats.거절++; return '마을 파일이 아니에요(읽을 수 없는 내용)'; }
