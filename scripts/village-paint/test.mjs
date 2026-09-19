@@ -58,6 +58,20 @@ test('횡단보도 · 세로로 난 큰길 끝 — 가로로 누워 큰길의 �
 test('횡단보도 · 이미 맞는 방향(2)이면 안 바꾼다', () => assert.equal(roadRotSpan(true, 2, 147, 138, 145, 138).rot, 2));
 test('정사각(큰길 2×2)은 건드리지 않는다', () => assert.deepEqual(roadRotPlan(2, 2, 3, true, false, false, false), { rot: 3, dx: 0, dy: 0 }));
 
+/* ── 도서관은 동네마다(MAC-LIBRARY) — 집의 말에 붙는 배움 귀띔 libHint(miss, libs, cap, open) ── */
+const libHint = grab('libHint');
+test('배움이 안 빠졌으면 귀띔 없음', () => { assert.equal(libHint(['물', '놀이'], 1, 5, true), ''); assert.equal(libHint([], 0, 5, true), ''); assert.equal(libHint(null, 0, 5, true), ''); });
+test('도서관이 아직 안 열렸으면 언제 열리는지', () => assert.match(libHint(['배움'], 0, 5, false), /인구 50명/));
+test('도서관이 없으면 "지어 봐요" · 있으면 "하나 더"', () => { assert.match(libHint(['배움'], 0, 5, true), /가까이에 도서관을 지어/); assert.match(libHint(['놀이', '배움'], 2, 5, true), /하나 더/); });
+test('한도까지 놓았으면 옮기기를 권한다(더 지으라고 하지 않는다)', () => { const t = libHint(['배움'], 5, 5, true); assert.match(t, /옮겨/); assert.doesNotMatch(t, /하나 더/); });
+
+/* ── 터치로 놓기(MAC-SEAT) — 앉혀서 놓는 종류인가 seatKindIs({ w, h, road, join, flower, roadFam, door }) ── */
+const seatKindIs = grab('seatKindIs');
+test('집(2×2 · 문) · 가게 · 광장(3×3 · 문 없음) · 우물(2×2)은 앉힌다', () => { for (const i of [{ w: 2, h: 2, door: true }, { w: 3, h: 3 }, { w: 2, h: 2 }, { w: 3, h: 2, door: true }]) assert.equal(seatKindIs(i), true); });
+test('문이 있으면 작아도 앉힌다', () => assert.equal(seatKindIs({ w: 1, h: 1, door: true }), true));
+test('길·큰길(2×2 길)·횡단보도·다리(길 가족)·울타리(이음)·꽃밭은 전처럼 즉시', () => { for (const i of [{ w: 1, h: 1, road: true }, { w: 2, h: 2, road: true }, { w: 1, h: 2, road: true, roadFam: true }, { w: 3, h: 1, roadFam: true }, { w: 1, h: 1, join: true }, { w: 1, h: 1, flower: true }]) assert.equal(seatKindIs(i), false); });
+test('1×1 꾸밈 · 긴의자(2×1)는 즉시', () => { assert.equal(seatKindIs({ w: 1, h: 1 }), false); assert.equal(seatKindIs({ w: 2, h: 1 }), false); assert.equal(seatKindIs(null), false); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);

@@ -2556,7 +2556,7 @@ function ghostFrontCells(x, y, w, h, rot) { const out = []; if (rot === 0) for (
 /* 터치에는 '가리키기'가 없다 — 손가락을 대는 순간 놓인다. 그래서 놓기 전에 방향을 볼 길이 돌리기 단추뿐인데, 단추엔 '90°' 글자만 있었다.
    돌리면(단추·R 키) 포인터가 판 위에 없을 때 **화면 가운데 칸에 그 방향의 모양을 1.8초** 보여 준다. 포인터가 판 위에 있으면(마우스) 전처럼 그 자리에서 바로 돈다. */
 { const rot0 = rotate; rotate = function () { const r = rot0.apply(this, arguments); const R = window.VRULES.ghostShape;
-    if (R.on && sel && !carrying && !(hover && ghost.edge.visible)) { const top = document.getElementById('top'), tabs = document.getElementById('trayTabs');
+    if (R.on && sel && !carrying && !(hover && ghost.edge.visible) && !(window.VRULES.seatPlace && window.VRULES.seatPlace.on)) { const top = document.getElementById('top'), tabs = document.getElementById('trayTabs');   // [MAC-SEAT] 앉히기가 켜져 있으면 '가운데 1.8초'는 걷는다 — 앉은 미리보기가 그 일을 한다
       const y0 = top ? top.getBoundingClientRect().bottom : 60, y1 = tabs ? tabs.getBoundingClientRect().top : innerHeight; updateGhost(innerWidth / 2, (y0 + y1) / 2); document.getElementById('why').className = '';
       clearTimeout(GHOSTS.peekT); GHOSTS.peek = true; GHOSTS.peekT = setTimeout(() => { if (GHOSTS.peek && !down) { ghost.fill.visible = ghost.edge.visible = false; } GHOSTS.peek = false; }, 1800); }
     return r; }; }
@@ -2602,6 +2602,35 @@ const roadRotIsRoad = (x, y) => { if (!inb(x, y)) return false; const c = cells[
           p.rot = plan.rot; selRot = plan.rot; ROADROT.stats.획방향++; refreshRotCard(); } } }
     return paintM0.apply(this, arguments); }; }
 window.__roadRot = () => ({ 켜짐: window.VRULES.roadRot.on, 직접돌림: ROADROT.manual, 지금방향: selRot, ...ROADROT.stats });
+
+/* ── [MAC-LIBRARY] 도서관은 동네마다 — '마을에 하나'에서 뺀다 (보스 결정 09-20 · 조사 docs/village_learn_stall_20260920.md) ──
+   이 게임의 약속은 "필요가 보인다 → 아이가 해결책을 놓는다"인데 배움에서만 깨져 있었다: 📚 풍선과 "배울 곳이 멀어요"는 마을 내내 뜨는데,
+   배움을 주는 도서관·학교가 둘 다 '마을에 하나'라 놓을 것이 없었다(가장 좋은 자리에 둘 다 놓아도 집의 37%엔 안 닿았다).
+   · 도서관만 여럿(cap 까지). **학교는 하나 그대로.** 우물·가게·의자와 같은 말투가 된다 — "멀어요 → 이 동네에 하나 더".
+   · 범위(길 14칸)·성장 조건·해금(인구 50)·목표('도서관 세우기' = 한 채)는 그대로. 지울 때 한 번 더 묻는 방어(MAC-KEEP)도 그대로(special 값은 안 바꾼다).
+   · 옛 저장본(도서관 1채)은 그대로 열린다. 스위치를 끄면(VRULES.manyLibrary.on = false) 옛 규칙 — 이미 놓인 둘째·셋째는 남고 새로는 못 놓는다.
+   · 막다른 말 고치기: 학교 둘째 = "…하나만 있어요 — 배울 곳이 먼 동네엔 도서관을 지어 봐요" · 집을 눌렀을 때 배움이 빠졌으면 "📚 가까이에 도서관을" 한마디.
+   원래 줄 수정 0 — canPlace·satText 감싸기(canPlace 안의 special 판정은 그 부름 동안만 도서관을 건너뛴다). */
+(window.VRULES = window.VRULES || {}).manyLibrary = { on: true, cap: 5 };   // 재 본 값: pop88(집 68)·pop167(집 95) 둘 다 도서관 4채면 배움이 집의 90%쯤에 닿는다 → 그 +1
+const LIBMANY = { stats: { 더놓음: 0, 한도말: 0, 귀띔: 0 } };
+/* 순수 함수 — 집의 말(base)에 배움 귀띔을 붙일까. miss = 빠진 필요들, libs = 놓인 도서관 수, open = 도서관이 열렸나 */
+function libHint(miss, libs, cap, open) {
+  if (!miss || miss.indexOf('배움') < 0) return '';
+  if (!open) return ' · 📚 인구 50명이면 도서관이 열려요';
+  return libs >= cap ? ' · 📚 ✋ 로 도서관을 가까이 옮겨 봐요' : libs ? ' · 📚 이 동네에 도서관을 하나 더 지어 봐요' : ' · 📚 가까이에 도서관을 지어 봐요';
+}
+{ const can0 = canPlace; canPlace = function (kind, x, y, rot, opts) {
+    const R = window.VRULES.manyLibrary;
+    if (!R.on || (opts && opts.복원) || (kind !== 'library' && kind !== 'school')) return can0.apply(this, arguments);
+    if (kind === 'school') { const r = can0.apply(this, arguments); return (typeof r === 'string' && r.indexOf('마을에 하나만') >= 0) ? r + ' — 배울 곳이 먼 동네엔 도서관을 지어 봐요' : r; }
+    const k = K.library, sp = k.special; let r; k.special = false; try { r = can0.apply(this, arguments); } finally { k.special = sp; }
+    if (r === true && countKind('library') >= R.cap) { LIBMANY.stats.한도말++; return '도서관은 ' + R.cap + '채까지 지을 수 있어요 — ✋ 로 옮겨 볼 수 있어요'; }
+    return r; };
+  const place0 = placeAt; placeAt = function (kind) { const r = place0.apply(this, arguments); if (kind === 'library' && countKind('library') > 1) LIBMANY.stats.더놓음++; return r; };
+  const sat0 = satText; satText = function (rec) { const t = sat0.apply(this, arguments); if (!window.VRULES.manyLibrary.on || !rec) return t;
+    const st = sat.get(rec.root), miss = st ? NEEDS.filter(n => !st.met[n]) : null, h = libHint(miss, countKind('library'), window.VRULES.manyLibrary.cap, lockedWhy('library') === true);
+    if (h) LIBMANY.stats.귀띔++; return t + h; }; }
+window.__libMany = () => ({ 켜짐: window.VRULES.manyLibrary.on, 한도: window.VRULES.manyLibrary.cap, 도서관: countKind('library'), 학교: countKind('school'), ...LIBMANY.stats });
 
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
@@ -3169,6 +3198,80 @@ function vpadTilt() {
 })();
 window.__viewpad = () => ({ 켜짐: window.VRULES.viewPad.on, 배율: +zoomMul.toFixed(2), camEl: +camEl.toFixed(3), ...VPAD.stats });
 
+/* ── [MAC-SEAT] 터치로 놓기 — 앉히고 · 보고 · 확정 (보스 결정 09-20 · 제안서 docs/village_touch_place_proposal.md 안 A · PR ①) ──
+   터치는 손가락을 대는 순간 놓였다(pointerdown → paintStart) — 실제 모양 미리보기(#593)를 볼 틈이 없고, 문이 어디를 보는지는 놓아 봐야 알았다.
+   · **문 있는 것 + 자리 4칸 이상**(집·가게·우물·도서관·광장…)만: 톡 = 미리보기가 그 칸에 **앉는다** + 곁에 [✕][🔄][✓ 놓기]. 길 가족·울타리·꽃밭·1×1 은 전처럼 대는 순간 놓이고 끌면 죽 놓인다.
+   · 확정 = ✓ **또는 앉은 미리보기를 한 번 더 톡.** 다른 빈 곳을 톡하면 **그리로 옮겨 앉는다**(✕ 를 누를 일이 거의 없게). 앉은 채 끌면 전처럼 판이 움직인다.
+   · ✓ 뒤에도 같은 카드가 들려 있다 — 다음 자리를 톡하면 새 미리보기가 앉는다. 카드를 바꾸거나 ✕·Esc 면 앉은 것만 사라진다.
+   · '놓은 줄 알았는데 안 놓였다' 막기: 앉은 미리보기는 천천히 숨쉬듯 깜빡이고, ✓ 가 가장 크고 밝다. idleMs 동안 아무것도 안 하면 제목이 "✓ 를 눌러 놓아요"로 바뀐다. **저절로 놓지는 않는다.**
+   · 못 놓는 자리면 제목에 까닭, ✓ 는 흐림. 필요 건물은 앉은 채로 닿는 범위(파란 길·노란 집)가 보인다(updateGhost 가 하던 일 그대로).
+   · **터치·펜에서만.** 마우스는 지금 그대로(커서 미리보기가 이미 있다). 스위치 VRULES.seatPlace.on = false 면 전부 옛 흐름(1.8초 가운데 미리보기 포함). 월요일 실기기에서 보고 기본값을 다시 정한다.
+   · 놓는 길은 오늘의 톡과 같은 paintStart → paintEnd 다 — 되돌리기·소리·귀띔(MAC-SAY-2)·목표가 그대로 붙는다.
+   원래 줄 수정 0 — 캡처 단계 리스너 + paintStart·updateGhost·rotate·setMode 감싸기. 터치의 '끌어서 집 줄짓기'는 사라진다(마우스엔 남는다 — 보스 결정). */
+(window.VRULES = window.VRULES || {}).seatPlace = { on: true, mouse: false, idleMs: 5000 };
+const SEAT = { on: false, kind: null, x: 0, y: 0, seq: null, block: false, tick: 0, idleT: 0, idle: false, door: new Map(), stats: { 앉음: 0, 옮겨앉음: 0, 놓음: 0, 다시톡놓음: 0, 그만: 0, 못놓음: 0, 귀띔: 0 } };
+const seatV = new THREE.Vector3();
+/* 순수 함수 — 앉혀서 놓는 종류인가. info = { w, h, road, join, flower, roadFam, door } */
+function seatKindIs(info) { return !!info && !info.road && !info.join && !info.flower && !info.roadFam && (!!info.door || info.w * info.h >= 4); }
+function seatKind(kind) { const k = K[kind]; if (!k) return false; if (!SEAT.door.has(kind)) { let parts = null; try { parts = partsOf({ k: kind, root: idx(2, 2), rot: 0 }); } catch (e) { parts = k.parts; } SEAT.door.set(kind, ghostHasDoor(kind, parts)); }
+  return seatKindIs({ w: k.w, h: k.h, road: !!k.road, join: !!JOIN_KINDS[kind], flower: !!FLOWER_KINDS[kind], roadFam: ROADROT.kinds.has(kind), door: SEAT.door.get(kind) }); }
+const seatLive = e => { const R = window.VRULES.seatPlace; return R.on && (e.pointerType !== 'mouse' || R.mouse) && sel && !eraser && !mover && !carrying && !PHOTO.on && !VISIT.on && !GUIDE.on && seatKind(sel); };
+function seatPoint(wxv, wzv, hgt) { seatV.set(wxv, hgt || 0, wzv).project(camera); return [(seatV.x + 1) / 2 * innerWidth, (1 - seatV.y) / 2 * innerHeight]; }
+const seatCellPoint = () => seatPoint(wx(SEAT.x), wz(SEAT.y), 0);
+function seatCss() { if (document.getElementById('seatCss')) return; const st = document.createElement('style'); st.id = 'seatCss';
+  st.textContent = '#seat{position:fixed;z-index:9;display:none;flex-direction:column;gap:6px;padding:8px 10px;background:#1c202af2;border:2px solid #e8b04b;border-radius:16px;box-shadow:0 8px 24px #000a;color:#e8e6e0;font:13px/1.3 "Malgun Gothic",sans-serif;touch-action:none;user-select:none}'
+    + '#seat .ht{font-weight:800;text-align:center;white-space:nowrap;max-width:min(320px,calc(100vw - 40px));overflow:hidden;text-overflow:ellipsis}#seat .ht.no{color:#ffb4a8}#seat .ht.go{color:#ffe08a}#seat .hb{display:flex;gap:8px;justify-content:center;align-items:stretch}'
+    + '#seat .hbtn{min-width:60px;min-height:60px;padding:6px 8px;border-radius:12px;border:2px solid #3a4050;background:#262b38;color:#e8e6e0;font:800 12px "Malgun Gothic",sans-serif;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}'
+    + '#seat .hbtn span{font-size:22px;line-height:1}#seat .hbtn:active{background:#3a4050}'
+    + '#seat .hbtn.ok{min-width:104px;border-color:#7be495;background:#2f8f4e;color:#fff;font-size:14px;animation:seatPulse 1.6s ease-in-out infinite}#seat .hbtn.ok span{font-size:28px}#seat.idle .hbtn.ok{animation-duration:.8s}'
+    + '#seat .hbtn.ok.off{background:#2b3140;border-color:#3a4050;color:#8a90a0;animation:none}'
+    + '@keyframes seatPulse{0%,100%{box-shadow:0 0 0 0 #7be49588}50%{box-shadow:0 0 0 7px #7be49500}}body.photo #seat{display:none!important}';
+  document.head.appendChild(st); }
+function seatMenu() { seatCss(); let m = document.getElementById('seat');
+  if (!m) { m = document.createElement('div'); m.id = 'seat'; m.innerHTML = '<div class="ht"></div><div class="hb"></div>'; document.body.appendChild(m); ['pointerdown', 'pointerup', 'click'].forEach(t => m.addEventListener(t, e => e.stopPropagation()));
+    const row = m.querySelector('.hb'), btn = (cls, ic, nm, fn) => { const b = document.createElement('button'); b.className = 'hbtn ' + cls; b.innerHTML = '<span>' + ic + '</span>' + nm; b.onclick = ev => { ev.stopPropagation(); fn(); }; row.appendChild(b); };
+    btn('x', '✕', '그만', () => seatOff(true)); btn('r', '🔄', '돌리기', () => rotate()); btn('ok', '✓', '놓기', () => seatConfirm(false)); }
+  return m; }
+function seatDraw() { if (!SEAT.on) return; const m = seatMenu(), k = K[SEAT.kind], v = canPlace(SEAT.kind, SEAT.x, SEAT.y, selRot), ht = m.querySelector('.ht'), ok = m.querySelector('.hbtn.ok');
+  ht.className = 'ht' + (v !== true ? ' no' : SEAT.idle ? ' go' : ''); ht.textContent = v !== true ? v : SEAT.idle ? '✓ 를 눌러 놓아요' : k.ic + ' ' + k.nm + ' — 여기에 놓을까요?';
+  ok.classList.toggle('off', v !== true); m.classList.toggle('idle', SEAT.idle && v === true); m.style.display = 'flex'; seatMenuPlace(); }
+function seatMenuPlace() { const m = document.getElementById('seat'); if (!m || !SEAT.on) return; const c = centerOf(SEAT.kind, SEAT.x, SEAT.y, selRot), d = dims(SEAT.kind, selRot);
+  const [px, py] = seatPoint(c.x, c.z, 0), [, topY] = seatPoint(c.x, c.z, SEAT.kind === 'house' ? 7 : Math.max(4, Math.min(9, d.w * 2.6))), w = m.offsetWidth, h = m.offsetHeight;
+  const top0 = (typeof FIT !== 'undefined' ? FIT.topBottom : 56) + 4, tabs = document.getElementById('trayTabs'), bot = (tabs ? tabs.getBoundingClientRect().top : innerHeight) - 6;
+  let y = topY - h - 14; if (y < top0) y = py + 46; y = Math.max(top0, Math.min(bot - h, y));                                   // 건물 위에 — 위가 좁으면 아래에. 상단 바·트레이 탭은 실제 자리를 잰다(MAC-FIT 과 같은 식)
+  const left = Math.round(Math.max(6, Math.min(innerWidth - w - 6, px - w / 2))) + 'px', tp = Math.round(y) + 'px'; if (m.style.left !== left) m.style.left = left; if (m.style.top !== tp) m.style.top = tp; }
+function seatIdleArm() { clearTimeout(SEAT.idleT); const was = SEAT.idle; SEAT.idle = false; if (was) seatDraw(); SEAT.idleT = setTimeout(() => { if (!SEAT.on) return; SEAT.idle = true; SEAT.stats.귀띔++; seatDraw(); }, window.VRULES.seatPlace.idleMs); }
+function seatShow() { const [sx, sy] = seatCellPoint(); updateGhost(sx, sy); document.getElementById('why').className = ''; seatDraw(); }
+function seatAt(x, y) { const moved = SEAT.on; SEAT.on = true; SEAT.kind = sel; SEAT.x = x; SEAT.y = y; SEAT.stats[moved ? '옮겨앉음' : '앉음']++; if (!moved) sndFx('pop');
+  if (!SEAT.tick) SEAT.tick = setInterval(() => { if (!SEAT.on) return; ghostBody.material.opacity = 0.62 + 0.17 * Math.sin(performance.now() / 380); seatMenuPlace(); }, 100);   // 숨쉬듯 깜빡임 + 시점이 움직여도 단추가 따라오게(앉아 있는 동안만 돈다)
+  seatIdleArm(); seatShow(); }
+function seatOff(byUser) { if (!SEAT.on) return; SEAT.on = false; clearInterval(SEAT.tick); SEAT.tick = 0; clearTimeout(SEAT.idleT); SEAT.idle = false; if (byUser) SEAT.stats.그만++;
+  const m = document.getElementById('seat'); if (m) m.style.display = 'none'; ghost.fill.visible = ghost.edge.visible = false; document.getElementById('why').className = ''; if (typeof overlayClear === 'function' && !ovUntil) overlayClear(); }
+function seatConfirm(byTap) { if (!SEAT.on) return; const x = SEAT.x, y = SEAT.y, v = canPlace(SEAT.kind, x, y, selRot);
+  if (v !== true) { SEAT.stats.못놓음++; seatIdleArm(); seatDraw(); const m = document.getElementById('seat'); if (m && m.animate) m.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], { duration: 220 }); return; }
+  seatOff(false); SEAT.block = false; paintStart({ x, y, inside: true }); paintEnd(); SEAT.stats.놓음++; if (byTap) SEAT.stats.다시톡놓음++; }
+/* 포인터 — 캡처 단계에서 먼저 받아 '대는 순간 놓기'만 막는다(원래 처리기는 그대로 돌아 끌면 판이 움직인다) */
+canvas.addEventListener('pointerdown', e => { if (TOUCH2.pts.size > 1) { if (SEAT.seq) SEAT.seq.multi = true; return; }                          // 둘째 손가락 = 두 손가락 손짓(MAC-TOUCH) — 톡이 아니다. (MAC-TOUCH 가 손 떼기를 먼저 받아 넘기지 않을 수 있어 '앞 손가락이 아직 있나'는 그쪽 표로 본다)
+  if (!seatLive(e)) { SEAT.seq = null; return; } SEAT.seq = { id: e.pointerId, multi: false }; SEAT.block = true; }, true);
+canvas.addEventListener('pointerdown', () => { SEAT.block = false; });                                                                           // 원래 pointerdown(paintStart 를 부르는 곳) 다음에 돈다
+addEventListener('pointerup', e => { const q = SEAT.seq; if (!q || q.id !== e.pointerId) return; SEAT.seq = null; SEAT.block = false;
+  if (q.multi || TOUCH2.on || !down || moved > 6 || painting || carrying || !seatLive(e)) return;                                               // 끌었다(판 이동)·두 손가락·길게 눌러 메뉴가 떴다 → 톡이 아니다
+  down = false;                                                                                                                                  // 원래 pointerup 이 act()(= 바로 놓기)로 가지 않게
+  const c = cellAt(e.clientX, e.clientY); if (!c || !c.inside) return;
+  if (SEAT.on && SEAT.kind === sel && footprint(sel, SEAT.x, SEAT.y, selRot).some(([fx, fy]) => fx === c.x && fy === c.y)) seatConfirm(true); else seatAt(c.x, c.y); }, true);
+addEventListener('pointerup', () => { if (SEAT.on) setTimeout(() => { if (SEAT.on) seatShow(); }, 0); }, true);                                  // MAC-TOUCH 는 손을 떼면 자리 표시를 끈다(터치엔 hover 가 없어서) — 앉은 미리보기는 그 뒤에 다시 켠다
+addEventListener('pointercancel', e => { if (SEAT.seq && SEAT.seq.id === e.pointerId) { SEAT.seq = null; SEAT.block = false; } }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && SEAT.on) seatOff(true); });
+{ const ps0 = paintStart; paintStart = function () { if (SEAT.block) return; return ps0.apply(this, arguments); };
+  const ug0 = updateGhost; updateGhost = function (cx, cy) { if (!SEAT.on) return ug0.apply(this, arguments);                                    // 앉아 있는 동안 미리보기는 손가락이 아니라 앉은 칸을 따른다
+    if (SEAT.kind !== sel || carrying || eraser || mover) { seatOff(false); return ug0.apply(this, arguments); }
+    const [sx, sy] = seatCellPoint(), r = ug0.call(this, sx, sy); document.getElementById('why').className = ''; return r; };
+  const rotS0 = rotate; rotate = function () { const r = rotS0.apply(this, arguments); if (SEAT.on) { seatIdleArm(); seatShow(); } return r; };
+  const modeS0 = setMode; setMode = function () { if (SEAT.on) seatOff(false); return modeS0.apply(this, arguments); }; }
+window.__seat = () => ({ 켜짐: window.VRULES.seatPlace.on, 앉음중: SEAT.on, 종류: SEAT.on ? SEAT.kind : null, 칸: SEAT.on ? [SEAT.x, SEAT.y] : null, 방향: selRot, 귀띔중: SEAT.idle,
+  메뉴: (() => { const m = document.getElementById('seat'); if (!m || m.style.display === 'none') return null; const r = m.getBoundingClientRect(); return { 글: m.querySelector('.ht').textContent, 놓기흐림: m.querySelector('.hbtn.ok').classList.contains('off'), 상자: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] }; })(), ...SEAT.stats });
+window.__seatKinds = () => Object.keys(K).filter(k => seatKind(k));
+
 /* ── [MAC-FIT] 같이 떴을 때 서로 가리지 않게 — 자리를 '재서' 잡는다 (보스 09-20: 하루에 얹힌 화면 요소들의 겹침 점검) ──
    하나씩은 확인했지만 같이 뜬 적이 없었다. 1366×610 · 768×1024 · 1024×768 에서 다섯 상태를 재 보니 넷이 걸렸다 — 전부 **자리를 고정값으로 잡은 것**이 원인:
    ① 목표판·마을 흐름·소식(토스트)은 top:62~64px 고정 → 상단 바가 두 줄(112px)이 되는 태블릿에서 둘째 줄('판 전체 보기'·놓은 것·인구)을 덮었다.
@@ -3637,6 +3740,9 @@ window.__thumbFix = () => ({ 켜짐: window.VRULES.thumbFix.on, 미뤄둔것: TH
 (window.VRULES = window.VRULES || {}).cardRot = { on: true };
 var CARDROT = { cache: new Map(), force: null, sym: new Map(), stats: { 찍음: 0, 바꿈: 0 } };
 { const pm0 = partMatrix; partMatrix = function (kind, x, y, rot, pt, out) { return pm0(kind, x, y, CARDROT && CARDROT.force != null ? CARDROT.force : rot, pt, out); }; }   // 찍는 동안만 방향을 바꾼다(그 밖엔 그대로 통과)
+/* [MAC-CARDROT-2] 길 가족(DESIGN-ROAD-1 #609)은 부위를 **세계 좌표(abs)** 로 내고 방향은 rec.rot 에서 읽는다 — partMatrix 의 방향을 바꿔도 그림이 안 돌았다.
+   그래서 횡단보도 카드는 '돌려도 같은 것'으로 잘못 읽혀 그림이 안 돌고 돌리기 단추가 흐려졌다. 찍는 동안만, 놓이지 않은 rec(카드·미리보기용)의 rot 을 바꿔서 부위를 받는다. */
+{ const partsR0 = partsOf; partsOf = function (rec) { return (CARDROT && CARDROT.force != null && rec && cells[rec.root] !== rec && typeof ROAD_FAM !== 'undefined' && ROAD_FAM.has(rec.k)) ? partsR0.call(this, { ...rec, rot: CARDROT.force }) : partsR0.apply(this, arguments); }; }
 const cardRotView = () => ((Math.round((camAz - Math.PI / 4) / (Math.PI / 2)) % 4) + 4) % 4;           // 시점이 기본에서 몇 번(90°) 돌았나
 function thumbRot(kind, rot) {
   rot = ((rot % 4) + 4) % 4; if (!K[kind]) return null; const base = thumbOf(kind); if (!rot || !base) return base;
@@ -5274,7 +5380,8 @@ function actUmbrellaDraw(now) {
     else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
     if (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60)) return;
     if (f.passOx && f.state !== 'inside') { fx += f.passOx; fz += f.passOz; }   // [ACT-PASS] 비켜 선 사람의 우산도 같이
-    if (f.shelter && f.shelter.at && f.state === 'idle') return;   // [ACT-RAIN] 처마 밑에선 우산을 접는다
+    const RO = f.shelter && typeof rainOffset === 'function' ? rainOffset(f, SIM.t + SIM.acc) : null;   // [ACT-RAIN] 처마 밑 자리(나란히) · 접은 우산 · 다 같이 나올 땐 편다
+    if (RO) { fx += RO.x; fz += RO.z; if (RO.folded) { rainFoldedUmb(f, i, fx, fz, dir, n++, top); return; } }
     const small = typeof isSmall === 'function' && isSmall(f), k = small && KR ? KR.scale : 1;
     const walk = f.walking && f.state !== 'inside', bob = walk ? (small && KR ? Math.abs(Math.sin(now / 95 + i)) * KR.hop : Math.abs(Math.sin(now / 150 + i)) * 0.09) : 0;
     const co = Math.cos(dir), si = Math.sin(dir), hx = R.hand[0] * k, hz = R.hand[1] * k;
@@ -5944,6 +6051,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
     if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
     if (actGardenTick(f, i, now, dt)) continue;   // [ACT-GARDEN] 저녁에 정원 문으로 들어가 한 바퀴 · 의자에 앉았다 나온다
@@ -6432,7 +6540,7 @@ window.__passBy = () => ({ 켜짐: window.VRULES.passBy.on, 지금비켜선사�
    규칙 모듈 꼴: 스위치·수치 VRULES.rainShelter + 고리 두 줄(tickFolks · 루프) + [ACT-UMB] 에 한 줄(처마 밑에선 우산을 접는다).
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).rainShelter = { on: true, kinds: ['pavilion', 'shop', 'station', 'library', 'school', 'museum'], radius: 6, perRoof: 6, under: 1.3, underPav: 2.3, leaveMs: 1500 };
-const RAIN = { tick: -1, count: new Map(), stats: { 비피함: 0, 의자에서일어남: 0, 흩어짐: 0 } };
+const RAIN = { tick: -1, seq: 0, count: new Map(), cellN: new Map(), stats: { 비피함: 0, 의자에서일어남: 0, 흩어짐: 0, 다같이나옴: 0 } };
 function rainRoofBeside(c) { const R = window.VRULES.rainShelter, x = cX(c), y = cY(c);
   for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && R.kinds.includes(r.k)) return { rec: r, dx, dy }; } return null; }
 /* tickFolks 고리 — 쉬는 사람 처리 바로 앞(ACT-GAP 고리 위). true 면 이번 틱은 여기서 끝 */
@@ -6440,9 +6548,10 @@ function actRainTick(f, i, now) {
   const R = window.VRULES.rainShelter;
   if (RAIN.tick !== SIM.ticks) { RAIN.tick = SIM.ticks;                  // 틱마다 한 번 — 처마마다 몇 명 · 비 오면 의자에서 일어나기
     RAIN.count.clear(); folks.forEach(g => { if (g.shelter) RAIN.count.set(g.shelter.root, (RAIN.count.get(g.shelter.root) || 0) + 1); });
+    rainSlots();   // [ACT-SHELTER] 같은 처마 밑 사람끼리 나란히 설 자리 · 칸마다 몇 명
     const wet = R.on && EV.rain && !isNightHour(simHour());
     if (wet) folks.forEach(g => { if (g.state === 'inside' && g.beside && g.beside.mode === 'sit' && !g.garden && !g.visitor) { leave(g, '나옴'); g.goal = null; g.beside = null; g.until = now; RAIN.stats.의자에서일어남++; } });
-    else folks.forEach(g => { if (!g.shelter) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + Math.random() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
+    else folks.forEach(g => { if (!g.shelter || g.shelter.out) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + Math.random() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
   }
   const S = f.shelter;
   if (!R.on || !EV.rain || isNightHour(simHour())) return false;      // 흩어지기는 위(틱마다 한 번)에서
@@ -6450,13 +6559,18 @@ function actRainTick(f, i, now) {
   if (S) {
     if (S.at) { f.walking = false; f.dir = S.dir; f.state = 'idle'; f.until = now + 1000; return true; }   // 처마 밑에 서 있다(비가 그칠 때까지)
     const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;
-    if (at === S.cell && (f.state === 'idle' || (f.state === 'walk' && f.path[f.step + 1] == null))) { f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; S.at = true; f.dir = S.dir; RAIN.stats.비피함++; return true; }
+    if (at === S.cell && (f.state === 'idle' || (f.state === 'walk' && f.path[f.step + 1] == null))) { f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; S.at = true; S.seq = ++RAIN.seq; f.dir = S.dir; RAIN.stats.비피함++; return true; }
     if (f.state === 'idle' && now >= f.until) f.shelter = null;         // 막혀 멈췄다 — 다음에 다시 찾는다
     return false;
   }
   if (f.state !== 'idle' || now < f.until || !f.path || pathBudget <= 1) return false;   // 쉬다가 다음 갈 곳을 고를 때만
   pathBudget--; const here = f.path[f.path.length - 1], { reach } = roadBFS(here, i, R.radius);
   let pick = null; for (const c of reach) { const r = rainRoofBeside(c); if (r && (RAIN.count.get(r.rec.root) || 0) < R.perRoof) { pick = { c, r }; break; } }   // BFS 순서 = 가까운 순
+  if (pick && window.VRULES.shelterLook.on) { const L = window.VRULES.shelterLook, ok = r => r && (RAIN.count.get(r.rec.root) || 0) < R.perRoof;   // [ACT-SHELTER] 모여 서야 '비를 피하는 중'으로 읽힌다
+    const front = c => { const x = cX(c), y = cY(c); for (const [dx, dy] of D4) { if (dx + dy >= 0 || !inb(x + dx, y + dy)) continue; const r = cells[idx(x + dx, y + dy)]; if (r && R.kinds.includes(r.k)) return { rec: r, dx, dy }; } return null; };   // 기본 시점(π/4)에서 지붕이 사람 뒤에 오는 쪽 — 카메라를 따르지 않는다(늘 같게)
+    let best = null; for (const c of reach) { const n = RAIN.cellN.get(c) || 0, r = n < L.perCell ? (front(c) || rainRoofBeside(c)) : null; if (n > 0 && ok(r)) { best = { c, r }; break; } }   // ① 이미 누가 선 처마 밑
+    if (!best) for (const c of reach) { const r = front(c); if (ok(r)) { best = { c, r }; break; } }   // ② 앞에서 보이는 처마 밑
+    if (best) pick = best; }
   if (!pick) return false;                                              // 멀다 — 우산 쓰고 원래대로
   const { c, r } = pick, under = r.rec.k === 'pavilion' ? R.underPav : R.under;
   f.shelter = { root: r.rec.root, cell: c, ox: r.dx * under, oz: r.dy * under, dir: Math.atan2(-r.dx, -r.dy), at: false };   // 지붕 쪽으로 반 걸음 · 얼굴은 밖(비)을 본다
@@ -6470,14 +6584,61 @@ const RAIN_M = new THREE.Matrix4(), RAIN_T = new THREE.Matrix4();
 function actRainDraw() {
   if (!window.VRULES.rainShelter.on || !folks.length || OFF.has('folks')) return;
   let touched = false; const hasV = VISITOR_PARTS.length > 0;
+  const now = SIM.t + SIM.acc;
   folks.forEach((f, i) => { const S = f.shelter; if (!S || !S.at || f.state !== 'idle') return;
-    RAIN_T.makeTranslation(S.ox, 0, S.oz);
+    const O = rainOffset(f, now); RAIN_T.makeTranslation(O.x, 0, O.z);
     const tour = hasV && !!f.visitor && !f.neighbor, n = tour ? VISITOR_PARTS.length : PERSON_PARTS.length, base = tour ? PERSON_PARTS.length : 0;
     for (let pi = 0; pi < n; pi++) { const im = folkPool[base + pi]; if (!im || i >= im.count) continue; im.getMatrixAt(i, RAIN_M); RAIN_M.premultiply(RAIN_T); im.setMatrixAt(i, RAIN_M); }
     touched = true; });
   if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
 }
 window.__rainShelter = () => ({ 켜짐: window.VRULES.rainShelter.on, 비: EV.rain, 지금처마밑: folks.filter(f => f.shelter && f.shelter.at).length, 가는중: folks.filter(f => f.shelter && !f.shelter.at).length, 의자에앉은사람: folks.filter(f => f.state === 'inside' && f.beside && f.beside.mode === 'sit').length, ...RAIN.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-SHELTER] 처마 밑이 '비를 피하는 중'으로 읽히게 (주민 연기 · 09-20 · 창조자의 눈 5회 '처마 밑 11명은 그냥 서 있는 사람과 구별 안 됨' · 보스 ①).
+   전: 같은 처마 밑 사람이 **한 점에 겹쳐** 서고(여섯이 한 몸) 우산은 그냥 사라졌다.
+   후: ⓐ 같은 칸의 처마 밑 사람은 벽을 따라 **나란히**(side 간격 · 먼저 온 순서) 벽을 등지고 길을 내다본다 ⓑ 우산은 **접어서 손에 늘어뜨린다**(있는 우산 갓·손잡이 묶음을
+      가늘고 길게 거꾸로 — draw call +0) ⓒ 비가 그치거나 밤이 되면 처마 밑 사람들이 **다 같이** 한 걸음 나와(outMs) — 아직 비면 우산을 펴고 — 흩어진다.
+   (비는 지금 하루 단위라 낮에 그치는 순간이 없다 — 지금 보이는 '다 같이 나옴'은 저녁 8시. 낮에 비가 그치게 하는 건 날씨 규칙(프로그램 담당) 몫.)
+   판정·확률·저장 0 · draw call +0. 스위치·수치 VRULES.shelterLook + ACT-RAIN·ACT-UMB 의 줄 몇 개 + tickFolks 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).shelterLook = { on: true, perCell: 4, side: 0.85, maxSide: 1.7, outMs: 1600, outStepMs: 600, outStep: 0.6, foldR: 0.24, foldH: 1.15 };
+function rainSlots() {                                                  // 틱마다 한 번 — 처마 밑(같은 칸)에 선 사람을 먼저 온 순서로 나란히
+  const R = window.VRULES.shelterLook, groups = new Map();
+  folks.forEach(g => { const S = g.shelter; if (!S || !S.at) return; const k = S.cell; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(S); });
+  RAIN.cellN = new Map(); folks.forEach(g => { const S = g.shelter; if (S && !S.out) RAIN.cellN.set(S.cell, (RAIN.cellN.get(S.cell) || 0) + 1); });   // 가는 중인 사람도 센다
+  groups.forEach(list => { list.sort((a, b) => (a.seq || 0) - (b.seq || 0)); const n = list.length;
+    const gap = n > 1 ? Math.min(R.side, 2 * R.maxSide / (n - 1)) : 0; list.forEach((S, r) => { S.lat = R.on ? (r - (n - 1) / 2) * gap : 0; }); });   // 많으면 간격을 좁혀 벽 폭 안에
+}
+function rainOffset(f, now) {                                           // 그리기 — 처마 밑 자리(반 걸음 + 나란히) · 나올 땐 한 걸음 밖으로 · 우산을 접었나
+  const S = f.shelter; if (!S || !S.at) return null;
+  const R = window.VRULES.shelterLook, len = Math.hypot(S.ox, S.oz) || 1, ux = S.ox / len, uz = S.oz / len, lat = R.on ? (S.lat || 0) : 0;
+  let under = 1, out = 0;
+  if (S.out) { const p = Math.min(1, Math.max(0, (now - S.out.t0) / R.outStepMs)); under = 1 - p; out = p * R.outStep; }
+  return { x: S.ox * under - ux * out - uz * lat, z: S.oz * under - uz * out + ux * lat, folded: R.on && (!S.out || !EV.rain) };
+}
+/* ACT-UMB 안에서 — 접은 우산: 손에서 아래로 늘어뜨린 가는 갓 + 짧은 손잡이(같은 묶음 두 개) */
+const foldE = new THREE.Euler(), foldQ = new THREE.Quaternion();
+function rainFoldedUmb(f, i, fx, fz, dir, n, top) {
+  const U = window.VRULES.umbrella, R = window.VRULES.shelterLook, KR = window.VRULES.kid, k = (typeof isSmall === 'function' && isSmall(f) && KR) ? KR.scale : 1;
+  const co = Math.cos(dir), si = Math.sin(dir), hx = U.hand[0] * k, hz = U.hand[1] * k, sx = fx + hx * co + hz * si, sz = fz - hx * si + hz * co, hy = top * U.handY * k;
+  folkDummy.position.set(sx, hy + 0.12 * k, sz); folkDummy.rotation.set(0, 0, 0); folkDummy.scale.set(1, 0.24 * k, 1); folkDummy.updateMatrix(); umbStick.setMatrixAt(n, folkDummy.matrix);   // 손에 쥔 손잡이
+  foldE.set(Math.PI - 0.12, dir, 0, 'YXZ'); foldQ.setFromEuler(foldE);   // 거꾸로(끝이 땅 쪽) · 살짝 기댄다
+  folkDummy.position.set(sx, hy - R.foldH * k / 2, sz); folkDummy.quaternion.copy(foldQ); folkDummy.scale.set(R.foldR * k, R.foldH * k, R.foldR * k); folkDummy.updateMatrix();
+  umbrella.setMatrixAt(n, folkDummy.matrix); umbrella.setColorAt(n, folkCol.setHex(UMB_COL[i % 4])); folkDummy.quaternion.identity();
+}
+/* tickFolks 고리(맨 앞) — 비가 그쳤거나 밤: 처마 밑 사람은 다 같이 한 걸음 나와 outMs 동안 서 있다가 흩어진다. true 면 이번 틱은 여기서 끝 */
+const SHELTEROUT = { tick: -1 };
+function actShelterOutTick(f, now) {
+  const R = window.VRULES.shelterLook, RS = window.VRULES.rainShelter;
+  if (SHELTEROUT.tick !== SIM.ticks) { SHELTEROUT.tick = SIM.ticks;    // 틱마다 한 번 — 나올 때가 됐나(다른 고리보다 먼저 — 밤 귀갓길이 먼저 데려가기 전에)
+    const wet = RS.on && EV.rain && !isNightHour(simHour());
+    if (!wet && R.on) { let n = 0; folks.forEach(g => { const S = g.shelter; if (S && S.at && !S.out) { S.out = { t0: now, until: now + R.outMs }; n++; } }); if (n) RAIN.stats.다같이나옴 += n; } }
+  const S = f.shelter; if (!S || !S.out) return false;
+  if (now < S.out.until && f.state !== 'inside') { f.state = 'idle'; f.walking = false; f.dir = S.dir; f.until = S.out.until; return true; }
+  f.shelter = null; f.until = now + ((S.seq || 0) % 4) * 120; RAIN.stats.흩어짐++; return false;   // 거의 같이(조금씩 엇갈려) 흩어진다
+}
+window.__shelterLook = () => ({ 켜짐: window.VRULES.shelterLook.on, 처마밑: folks.filter(f => f.shelter && f.shelter.at && !f.shelter.out).length, 나오는중: folks.filter(f => f.shelter && f.shelter.out).length, 다같이나옴: RAIN.stats.다같이나옴 });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-NIGHTCART] 밤의 빈 45초 — 내일 올 이웃이 마을 어귀에 짐수레를 세우고 등불을 켠 채 기다린다 (주민 연기 · 09-20 · 창조자의 눈 4회 · 보스 ①).
@@ -6694,11 +6855,11 @@ window.__dawn = () => DAWN ? { 켜짐: window.VRULES.dawn.on, 시: +simHour().to
    [ACT-FIREFLY] 반딧불 — 꽃밭·연못을 가꾼 마을에 돌아오는 밤의 선물 (주민 연기 · 09-20 · 보스 순서 ③ · 모양도 이 블록).
    꽃밭(flower + 색 꽃밭 FLOWER_KINDS)은 붙어 있는 칸끼리(8방향) 한 무리 — 무리마다 서너 마리(small 칸 미만이면 셋, 넘으면 넷), 연못은 하나에 셋.
    꽃밭·연못이 없는 마을엔 안 나온다. 밤(NIGHT ≥ from)에만 · 비 오는 밤엔 없다 · 지도 보기엔 없다. 모두 합쳐 max 마리까지(칸 번호 순 — 늘 같은 무리).
-   모양: 작은 상자 하나 + 둘레의 옅은 빛 상자(같은 묶음 · 더하기 섞기라 어두운 색 = 옅은 빛 · 톤매핑 없음 · 밤이 짙을수록 밝게) — 무리 가운데 둘레를 천천히 떠다니고(높이 0.8~1.8) 저마다 다른 박자로 깜빡인다.
+   모양: 작은 구슬 하나 + 둘레의 옅은 빛 구슬(창조자의 눈 5회 뒤: 상자 → 구슬 · 기본 거리에서 보이게 키우고 당기면 줄임)(같은 묶음 · 더하기 섞기라 어두운 색 = 옅은 빛 · 톤매핑 없음 · 밤이 짙을수록 밝게) — 무리 가운데 둘레를 천천히 떠다니고(높이 0.8~1.8) 저마다 다른 박자로 깜빡인다.
    묶음 하나(InstancedMesh) — 밤에만 보여 draw call 낮 +0 · 밤 +1. 무리 찾기는 놓은 것이 바뀔 때만(2초에 한 번까지). 판정·확률·저장 0 · 시간은 화면 시계(시뮬과 무관).
    스위치·수치 VRULES.firefly + 루프 고리 한 줄.
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).firefly = { on: true, from: 0.55, max: 40, small: 4, flowerN: [3, 4], pondN: 3, size: 0.35, halo: 3.2, color: 0xdcff72, haloColor: 0x2c3a0c, speed: 0.00035 };
+(window.VRULES = window.VRULES || {}).firefly = { on: true, from: 0.55, max: 40, small: 4, flowerN: [3, 4], pondN: 3, size: 1.3, halo: 2.4, color: 0xeeff88, haloColor: 0x4e6a1a, speed: 0.00035, near: 10, nearMin: 0.4, blinkLo: 0.12 };   // [창조자의 눈 5회] 기본 거리(배율 10)에서 보이게 — 가까이 당기면 줄인다
 const FLY = { key: '', scanAt: -1e9, list: [], mesh: null, stats: { 무리: 0, 연못: 0, 마리: 0 } };
 const flyIsFlower = k => k === 'flower' || (typeof FLOWER_KINDS === 'object' && !!FLOWER_KINDS[k]);
 function fireflyScan() {                                                // 놓은 것이 바뀌었을 때만 — 열린 구역만 훑는다
@@ -6720,15 +6881,16 @@ function fireflyScan() {                                                // 놓�
 const flyDummy = new THREE.Object3D(), flyC = new THREE.Color();
 function actFireflyDraw(t) {
   const R = window.VRULES.firefly;
-  if (!FLY.mesh) { FLY.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }), R.max * 2);
+  if (!FLY.mesh) { FLY.mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }), R.max * 2);
     FLY.mesh.frustumCulled = false; FLY.mesh.count = 0; FLY.mesh.visible = false; scene.add(FLY.mesh); }
   const n = NIGHT.value, on = R.on && !EV.rain && !mapMode && n >= R.from;
   if (R.on) fireflyScan();
   if (!on || !FLY.list.length) { FLY.mesh.visible = false; return; }
   FLY.mesh.visible = true; FLY.mesh.material.opacity = Math.min(1, (n - R.from) / (1 - R.from) * 1.6);
+  const zk = Math.min(1, Math.max(R.nearMin, R.near / Math.max(0.1, zoomMul)));   // 기본 거리에서 1 · 당기면 작게(화면에서 비슷한 크기)
   let k = 0; FLY.list.forEach(f => { if (k >= R.max * 2) return;
     const s = t * R.speed * f.w, ang = f.a + s, rr = f.r * (0.7 + 0.3 * Math.sin(s * 1.7 + f.b));
-    const blink = 0.35 + 0.65 * Math.max(0, Math.sin((t % f.blink) / f.blink * Math.PI * 2 + f.b));   // 저마다 다른 박자로 켜졌다 흐려졌다
+    const sw = Math.max(0, Math.sin((t % f.blink) / f.blink * Math.PI * 2 + f.b)), blink = (R.blinkLo + (1 - R.blinkLo) * sw * sw) * zk;   // 저마다 다른 박자로 반짝 켜졌다 흐려졌다(대비 크게) · 거리 맞춤
     flyDummy.position.set(f.x + Math.cos(ang) * rr, 1.3 + Math.sin(s * 2.3 + f.a) * 0.5, f.z + Math.sin(ang) * rr * 0.8);
     flyDummy.rotation.set(0, 0, 0); flyDummy.scale.setScalar(R.size * blink); flyDummy.updateMatrix(); FLY.mesh.setMatrixAt(k, flyDummy.matrix); FLY.mesh.setColorAt(k++, flyC.setHex(R.color));
     flyDummy.scale.setScalar(R.size * R.halo * blink); flyDummy.updateMatrix(); FLY.mesh.setMatrixAt(k, flyDummy.matrix); FLY.mesh.setColorAt(k++, flyC.setHex(R.haloColor)); });   // 둘레 빛
@@ -8010,22 +8172,30 @@ window.__verify = function () {
    ③ 못 놓는 이유·'여기엔 지울 게 없어요' 말풍선은 포인터가 멈춘 지 4초면 사라진다(움직이면 다시 뜬다). 마우스를 그 자리에 두고 구경하면 게임 시간으로 몇 시간이고 남아 있었다.
    ④ __verify 는 '아직 다시 안 그린 묶음(dirtyChunks)'을 어긋남으로 세지 않는다 — 창이 가려져 rAF 가 0프레임이면 glb 가 늦게 와 dirty 표시만 되고 안 그려져 '어긋난것 108~149'로 나왔다
       (회귀로 오인하기 쉽다). 그 묶음은 건너뛰고 '기다리는묶음'·'창가려짐'을 따로 돌려준다. */
-(window.VRULES = window.VRULES || {}).calm = { on: true, whyMs: 4000, stuckN: 30, stuckMs: 5000 };
-const CALM = { errs: [], seen: new Map(), whyT: 0, bar: false, stats: { 삼킨오류: 0, 덮개: 0, 캡처실패: 0, 말풍선걷음: 0 } };
+/* [MAC-CALM-2] (보스 09-20) 첫 프레임에서 터지는 되풀이 오류는 여전히 빨간 덮개였다 — flushChunks→buildChunk 가 첫 프레임에 던지면 booted 가 영영 안 서서
+   __LOADMS 가 없고, ① 은 '__LOADMS 없음 = 뜨기 전 = 덮개'로 보냈기 때문이다(?dev=1 이 아닌데도 프레임마다 덮개). 이제 덮개는 **?dev=1 과 스위치 끔에서만.**
+   · 뜨기 전 오류: 삼키고, preMs 뒤에도 마을이 안 떴으면 작은 띠 "마을을 여는 데 문제가 생겼어요 — 다시 열기"(로딩 화면 위에).
+   · 되풀이 오류(5초에 30번): 작은 띠 "마을에 잠깐 문제가 생겼어요 — 다시 열면 저장해 둔 데서 이어져요".
+   · 띠가 뜨는 순간 **자동 저장을 멈춘다**(savingOff) — 깨진 상태·덜 열린 빈 마을이 아이의 저장본을 덮지 않게. 마지막으로 잘 저장된 것에서 다시 열린다.
+   이 모듈이 아예 못 도는 오류(문법 오류·첫 줄들의 예외)는 이 블록에 닿기 전이라 원래 덮개 그대로다 — 그건 배포 전에 잡을 몫. */
+(window.VRULES = window.VRULES || {}).calm = { on: true, whyMs: 4000, stuckN: 30, stuckMs: 5000, preMs: 4000 };
+const CALM = { errs: [], seen: new Map(), whyT: 0, preT: 0, bar: false, stats: { 삼킨오류: 0, 덮개: 0, 캡처실패: 0, 말풍선걷음: 0, 뜨기전: 0, 저장멈춤: 0 } };
 { const err0 = window.onerror;
   window.onerror = function (m, src, l, c, e) {
     const R = window.VRULES.calm;
-    if (!R.on || DEV || window.__LOADMS == null) { CALM.stats.덮개++; return err0 ? err0.apply(this, arguments) : false; }
+    if (!R.on || DEV) { CALM.stats.덮개++; return err0 ? err0.apply(this, arguments) : false; }
+    if (window.__LOADMS == null) { CALM.stats.뜨기전++; if (!CALM.preT) CALM.preT = setTimeout(() => { if (window.__LOADMS == null && !CALM.bar) calmBar('open'); }, R.preMs); }   // [MAC-CALM-2]
     const key = String(m) + '@' + l + ':' + c, now = performance.now(); CALM.stats.삼킨오류++;
     if (CALM.errs.length < 20) CALM.errs.push({ 말: String(m), 줄: l, 때: Math.round(now), 더미: e && e.stack ? String(e.stack).split('\n').slice(0, 4).join(' | ') : '' });
     let s = CALM.seen.get(key); if (!s || now - s.t0 > R.stuckMs) { s = { t0: now, n: 0 }; CALM.seen.set(key, s); } s.n++;
-    if (s.n > R.stuckN && !CALM.bar) calmBar();
+    if (s.n > R.stuckN && !CALM.bar) calmBar(window.__LOADMS == null ? 'open' : 'stuck');
     return false;                                                                // 콘솔에는 그대로 찍힌다
   }; }
-function calmBar() {                                                             // 같은 오류가 되풀이된다 = 그림이 멈췄을 수 있다 → 부드럽게 알리고 다시 열 길을 준다(억지 저장은 안 한다 — 자동 저장은 돌고 있었다)
+function calmBar(kind) {                                                             // 같은 오류가 되풀이된다 = 그림이 멈췄을 수 있다 → 부드럽게 알리고 다시 열 길을 준다(억지 저장은 안 한다 — 자동 저장은 돌고 있었다)
   CALM.bar = true; const d = document.createElement('div'); d.id = 'calmBar';
-  d.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:29;background:#1c202af2;border:2px solid #e8b04b;border-radius:14px;padding:10px 14px;color:#e8e6e0;font:800 14px "Malgun Gothic",sans-serif;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px #000a';
-  d.innerHTML = '<span>앗, 마을이 잠깐 멈춘 것 같아요</span>'; const b = document.createElement('button'); b.textContent = '다시 열기';
+  try { clearTimeout(saveTimer); if (!savingOff) { savingOff = true; CALM.stats.저장멈춤++; } } catch (err) { /* 저장 쪽이 아직 안 섰으면(뜨기 전) 멈출 것도 없다 */ }   // [MAC-CALM-2] 깨진 상태를 저장하지 않는다
+  d.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99;max-width:calc(100vw - 24px);box-sizing:border-box;background:#1c202af2;border:2px solid #e8b04b;border-radius:14px;padding:10px 14px;color:#e8e6e0;font:800 14px "Malgun Gothic",sans-serif;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px #000a';
+  d.innerHTML = '<span>' + (kind === 'open' ? '마을을 여는 데 문제가 생겼어요' : '앗, 마을에 잠깐 문제가 생겼어요 — 다시 열면 저장해 둔 데서 이어져요') + '</span>'; const b = document.createElement('button'); b.textContent = '다시 열기';
   b.style.cssText = 'min-height:44px;min-width:96px;border-radius:10px;border:0;background:#e8b04b;color:#1a1d26;font:800 14px "Malgun Gothic",sans-serif;cursor:pointer'; b.onclick = () => location.reload(); d.appendChild(b); document.body.appendChild(d);
 }
 { const cap0 = canvas.setPointerCapture.bind(canvas);
@@ -8039,7 +8209,7 @@ function calmBar() {                                                            
     const keys = [...dirtyChunks], hid = []; keys.forEach(k => { const ch = chunks.get(k); if (ch && ch.built) { ch.built = false; hid.push(ch); } }); dirtyChunks.clear();   // 기다리는 묶음은 이번 검사에서 뺀다
     let r; try { r = verify0.apply(this, arguments); } finally { hid.forEach(ch => { ch.built = true; }); keys.forEach(k => dirtyChunks.add(k)); }
     return { ...r, 기다리는묶음: keys.length, 창가려짐: document.hidden }; }; }
-window.__errors = () => ({ ...CALM.stats, 멈춤알림: CALM.bar, 목록: CALM.errs.slice() });
+window.__errors = () => ({ ...CALM.stats, 멈춤알림: CALM.bar, 저장꺼짐: savingOff, 목록: CALM.errs.slice() });
 function applyOff() {
   if (!OFF.size) return;
   if (OFF.has('folks')) folkPool.forEach(m => m.visible = false);
