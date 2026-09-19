@@ -8762,6 +8762,9 @@ function _decoPillarSync() {
   const fs = document.getElementById('interior-fullscreen');
   const dr = document.getElementById('if-deco-drawer');
   if (!fs || !dr) return;
+  //  [DECO-SHORT-1] 판 자리의 위 끝(윗줄 + 바닥 줄) — 기둥이 그 위로 못 올라가게(CSS max-height 가 쓴다)
+  const host = document.getElementById('if-topview');
+  if (host && fs.style.display !== 'none' && host.offsetTop > 0) fs.style.setProperty('--deco-host-top', host.offsetTop + 'px');
   const shown = fs.style.display !== 'none' && dr.offsetParent !== null;
   const h = shown ? dr.offsetHeight : 0;
   if (h > 0) fs.style.setProperty('--deco-drawer-h', h + 'px');

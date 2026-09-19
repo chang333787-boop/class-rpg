@@ -446,9 +446,14 @@
           const r = b.getBoundingClientRect(), cs = getComputedStyle(b);
           if (!(r.width > 0 && r.height > 0) || cs.visibility === 'hidden' || cs.display === 'none') return;
           if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) return;
-          const x = Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), y = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2));
-          const top = document.elementFromPoint(x, y);
-          if (!(top === b || b.contains(top))) bad.push(b.id || b.textContent.trim().slice(0, 8));
+          //  [DECO-SHORT-1] 한가운데만 보면 '반쯤 덮인 단추'를 놓친다(크롬북 610 높이: ＋ 가 '집 안으로' 오른쪽 1/3 을 덮었다) → 다섯 점
+          const hit = [[.5, .5], [.2, .5], [.8, .5], [.5, .25], [.5, .75]].every(([fx, fy]) => {
+            const x = r.left + r.width * fx, y = r.top + r.height * fy;
+            if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return true;   // 화면 밖(옆으로 미는 윗줄)은 덮인 게 아니다
+            const top = document.elementFromPoint(x, y);
+            return top === b || b.contains(top);
+          });
+          if (!hit) bad.push(b.id || b.textContent.trim().slice(0, 8));
         });
         return bad;
       };
