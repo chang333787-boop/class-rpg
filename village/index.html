@@ -290,7 +290,7 @@ const P = {
 /* 지붕은 집마다 다르게 — 같은 색이 스무 채 서 있으면 그때부터 인공적으로 보인다 */
 const ROOFS = [0xd9634f, 0xe98f7a, 0xe8b75a, 0xb9785a, 0xd97a9a, 0xc98a4a, 0xa8667e];   // [DESIGN-LOOK-1] 집 지붕은 따뜻한 계열만(적갈·살구·겨자·밤·장미·호박·자두). 전: 파랑·청록·보라·초록이 섞여 다른 건물 색과 겹쳤다
 /* [DESIGN-LOOK-1] 특별 건물 지붕은 종류마다 한 색 — 칸 자리 돌림(ROOFS)을 쓰지 않는다. 차가운 색이라 따뜻한 집 지붕과 갈린다 */
-const ROOF_FIX = { school: 0x4fb3bf, library: 0x3f6db3, station: 0x5d6b78, museum: 0x9aa3ad };
+const ROOF_FIX = { school: 0x4fb3bf, library: 0x3f6db3, station: 0x5d6b78, museum: 0x9aa3ad };   // glb 재료 roof(1)와 큰 지붕 roof2(8 · 도서관·기차역) 둘 다 이 색. roof2 는 ROOF_FIX 에 있는 종류만 칠하고 나머지는 모델 색 그대로
 
 /* ── 판 ── */
 /* 주소 끝 #w=128,fill=25,people=30 → 판 크기·채움 비율·사람 수를 정해 **재기 위한** 모드.
@@ -1836,7 +1836,7 @@ const GLB_NEED = { house: ['house', 'house_lv2', 'house_lv3'], tree: ['tree_roun
 const GLB_ON = new Set(HP.glb == null ? ['house', 'tree', 'person', 'shop', 'props', 'special', 'visitor', 'street', 'deco'] : String(HP.glb).split('+').filter(x => x && x !== 'none'));
 if (OFF.has('glb')) GLB_ON.clear();
 const GLB = {};                                       // 모델 이름 → { pos, nrm, idx, nv, vcol, vkind, tri }
-const VKIND = { roof: 1, leaf: 2, leaf2: 3, window: 4, sign: 5, lamp: 6 };   // 정점 종류: 지붕 색 돌리기 · 잎 계절색 · 창 밤불 · 빛나는 것
+const VKIND = { roof: 1, leaf: 2, leaf2: 3, window: 4, sign: 5, lamp: 6, roof2: 8 };   // 정점 종류: 지붕 색 돌리기 · 잎 계절색 · 창 밤불 · 빛나는 것
 function parseGLB(buf) {
   const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('glb 아님');
   const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
@@ -1970,7 +1970,7 @@ function buildChunk(cx, cz) {
         _v.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(_m); b.pos.push(_v.x, _v.y, _v.z);
         _v.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(_n3).normalize(); b.nrm.push(_v.x, _v.y, _v.z);
         let kind = 0;
-        if (vc) { kind = vk[v]; if (kind === 1) _col.setHex(roofC); else if (kind === 2 || kind === 3 || kind === 7) { _col.setHex(seasonColor(kind === 3 ? P.leafL : P.leaf)); if (kind === 7) _col.multiplyScalar(.72); }   /* 7 = 짙은 잎(꽃밭 바탕 [DESIGN-FLOWER-3]) */ else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
+        if (vc) { kind = vk[v]; if (kind === 1 || (kind === 8 && ROOF_FIX[rec.k])) _col.setHex(roofC); else if (kind === 2 || kind === 3 || kind === 7) { _col.setHex(seasonColor(kind === 3 ? P.leafL : P.leaf)); if (kind === 7) _col.multiplyScalar(.72); }   /* 7 = 짙은 잎(꽃밭 바탕 [DESIGN-FLOWER-3]) */ else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
         if (vc && wait) window.WAITHOUSE.col(_col, kind, pt);   // [MAC-WAITLOOK] 모델 정점은 정점마다 색을 새로 정하므로 여기서
         b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? 1 : 0);
       }
@@ -2628,7 +2628,7 @@ function ghostBuild(kind, rot) {
     if (!vc) c.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
     for (let i = 0; i < base.nv; i++) { v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x - ctr.x, v.y, v.z - ctr.z);
       v.set(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z);
-      if (vc) { const kd = vk[i]; if (kd === 1) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
+      if (vc) { const kd = vk[i]; if (kd === 1 || (kd === 8 && ROOF_FIX[kind])) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
       col.push(c.r, c.g, c.b); }
     for (let i = 0; i < base.idx.length; i++) idxs.push(base.idx[i] + off); });
   if (!pos.length) return null;
@@ -3542,7 +3542,7 @@ function thumbOf(kind) {
       for (let i = 0; i < base.nv; i++) {
         v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x, v.y, v.z);
         v.set(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z);
-        if (vc) { const kd = vk[i]; if (kd === 1) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) { c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); if (kd === 7) c.multiplyScalar(.72); } else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
+        if (vc) { const kd = vk[i]; if (kd === 1 || (kd === 8 && ROOF_FIX[kind])) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) { c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); if (kd === 7) c.multiplyScalar(.72); } else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
         col.push(c.r, c.g, c.b);
       }
       for (let i = 0; i < base.idx.length; i++) idxs.push(base.idx[i] + off);
