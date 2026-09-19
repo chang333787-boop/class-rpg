@@ -43,5 +43,53 @@
     ]
    }
   ]
+ },
+ "d_y28": {
+  "body": "d_y28_body.svg",
+  "layers": [
+   {
+    "file": "d_y28_mv.svg",
+    "kind": "turn",
+    "note": "좌우 뒤집기(scaleX 1→-1→1)로 도는 것처럼. 그림 아래 가운데를 pivotInBody 에 맞춘다",
+    "periodSec": 5,
+    "size": [
+     80,
+     80
+    ],
+    "anchor": "bottom-center",
+    "pivotInBody": [
+     150,
+     124
+    ],
+    "bodyViewBox": [
+     300,
+     400
+    ]
+   }
+  ]
+ },
+ "d_y33": {
+  "body": "d_y33_body.svg",
+  "layers": [
+   {
+    "file": "d_y33_mv.svg",
+    "kind": "rise",
+    "note": "위로 20 떠오르며 옅어졌다가 처음으로(translateY + opacity)",
+    "periodSec": 4,
+    "size": [
+     60,
+     90
+    ],
+    "anchor": "bottom-center",
+    "pivotInBody": [
+     142,
+     108
+    ],
+    "bodyViewBox": [
+     200,
+     300
+    ]
+   }
+  ]
  }
 }
