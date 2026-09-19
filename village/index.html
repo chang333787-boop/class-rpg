@@ -3029,6 +3029,7 @@ function whatDoing(f) {
   if (f.leaving && f.away) return f.away.miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 돌아가요';   // [MAC-AWAY]
   if (f.comeback) return '살 만해졌다는 소식에 다시 와요';
   if (f.arriving) return '이사 오는 중이에요';
+  { const t = actBesideText(f); if (t) return t; }   // [ACT-BESIDE]
   if (f.state === 'inside') { const b = cells[f.inside.root]; return (b ? K[b.k].nm : '건물') + (f.goal === 'work' ? '에서 일해요' : ' 안에 있어요'); }
   if (f.state === 'mill') return '길이 없어서 집 앞을 서성여요';
   if (f.state === 'idle') return '잠깐 쉬어요';
@@ -3638,6 +3639,7 @@ function tickFolks(dt, now) {
     const rec = cells[f.home];
     if (!rec) continue;
     f.base = roadBeside(rec);
+    if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
 
     if (f.state === 'inside') {
       const b = cells[f.inside.root];
@@ -3881,6 +3883,127 @@ function drawFolks(now) {
   draw(PERSON_PARTS, 0, f => !(hasV && tourist(f)));
   if (hasV) draw(VISITOR_PARTS, PERSON_PARTS.length, tourist);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-BESIDE] 지붕 없는 곳에서는 사라지지 않는다 + 물동이 (주민 연기 · 09-20 · 창조자의 눈 발견 2·6).
+   전: 우물·긴의자·꽃밭·분수·연못·놀이터·광장에 닿으면 사람이 '안으로' 사라졌다가 나타났다("우물 안에 있어요").
+   후: 그런 곳에서는 곁에 서/앉아 있는다. 우물에서 나올 땐 물동이를 들고 집까지 걸어가 문 앞에 내려놓는다.
+       규칙을 하나도 안 보탰는데 '물이 먼 집'은 "물동이 들고 오래 걷는 사람"으로 저절로 보인다.
+   판정은 하나도 안 건드린다: 상태는 그대로 'inside'(정원 3명·머무는 시간·좋아하는 곳 셈·만족·붐빔 전부 옛 그대로), **그리는 자리만** 준다.
+   drawFolks 가 숨긴 사람을 바로 뒤에 같은 묶음(folkPool)에 다시 그린다 → 사람 draw call +0, 물동이 묶음 하나 +1.
+   규칙 모듈 꼴: 스위치·수치 VRULES.beside + 고리 세 줄(tickFolks · 루프 · whatDoing). 저장 0 · 확률 0. 모양(물동이·앉은 몸)은 거친 임시 — 다듬기는 디자인 담당.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).beside = { on: true,
+  kinds: { well: 'stand', fountain: 'stand', pond: 'stand', play: 'stand', dream: 'stand', flower: 'stand', plaza: 'on', bench: 'sit', minibench: 'sit' },   // 꽃밭 가족(FLOWER_KINDS)은 flower 를 따른다 · 여기 없는 곳(가게·정자·학교…)은 옛 그대로 안으로
+  inset: { well: 1.3, fountain: 0.6, pond: -0.5, play: 0.8, dream: -0.3, flower: -0.6 },   // 길 가장자리에서 그 물건 쪽으로 몇 들어가 서나(세계 단위 · 한 칸 4). 음수 = 길 쪽에 남는다(꽃·물은 밟지 않는다)
+  gap: 1.15, seats: { bench: [-0.9, 0.9, -2.6], minibench: [0] }, sitDrop: 0.42, sitFwd: 0.2,
+  say: { well: '우물가에서 물을 길어요', sit: '에 앉아 쉬어요', on: '에 나와 있어요', stand: ' 곁에 있어요', carry: '물동이를 들고 집에 가요', rest: '물동이를 문 앞에 내려놓아요' },
+  bucket: { on: true, from: ['well'], restMs: 1500, tries: 6, hand: [0.72, 0.62, 0.1] } };
+const besideStats = { 곁에섬: 0, 앉음: 0, 물동이: 0, 물동이도착: 0, 물동이들고밤귀가: 0, 물동이들고출근: 0, 물동이길없음: 0, 물동이최장칸: 0 };
+const besideMode = k => { const R = window.VRULES.beside; return R.kinds[k] || (FLOWER_KINDS[k] ? R.kinds.flower : null); };
+/* 들어간 첫 틱에 한 번 — 설 자리·볼 쪽을 정한다(그 뒤로는 그리기만) */
+function besidePlace(f) {
+  const R = window.VRULES.beside, root = f.inside.root, b = cells[root], cell = f.inside.cell; if (!b || cell == null) return;
+  let mode = besideMode(b.k); if (!mode) return;
+  const used = new Set(); folks.forEach(g => { if (g !== f && g.beside && g.beside.root === root && g.state === 'inside') used.add(g.beside.slot); });
+  let slot = 0; while (used.has(slot)) slot++;
+  const c = centerOf(b.k, cX(root), cY(root), b.rot);
+  if (mode === 'sit' && slot < (R.seats[b.k] || [0]).length) {
+    const th = b.rot * Math.PI / 2, off = R.seats[b.k][slot];
+    f.beside = { root, k: b.k, mode, slot, x: c.x + Math.cos(th) * off + Math.sin(th) * R.sitFwd, z: c.z - Math.sin(th) * off + Math.cos(th) * R.sitFwd, dir: th, drop: R.sitDrop };
+    besideStats.앉음++; return;
+  }
+  if (mode === 'sit') mode = 'stand';                                  // 자리가 다 찼으면 곁에 선다
+  let dx = 0, dz = 0; const x = cX(cell), y = cY(cell);
+  for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + ax, ny = y + ay; if (inb(nx, ny) && cells[idx(nx, ny)] && cells[idx(nx, ny)].root === root) { dx = ax; dz = ay; break; } }
+  if (!dx && !dz) return;
+  const side = [0, -1, 1, -2, 2][slot % 5] * R.gap, inn = mode === 'on' ? CS * 0.5 + [0.4, 1.5, 0.9][slot % 3] : (R.inset[b.k] != null ? R.inset[b.k] : R.inset[FLOWER_KINDS[b.k] ? 'flower' : b.k] || 0);
+  const px = wx(x) + dx * (CS / 2 + inn) + dz * side, pz = wz(y) + dz * (CS / 2 + inn) - dx * side;
+  f.beside = { root, k: b.k, mode, slot, x: px, z: pz, dir: mode === 'on' ? Math.atan2(c.x - px, c.z - pz) : Math.atan2(dx, dz), drop: 0 };
+  besideStats.곁에섬++;
+}
+/* 집 앞 칸까지 — 먼저 남을 피해서, 안 되면 막힌 칸까지 넣어 다시(pathToBuilding 과 같은 방식 · 그땐 앞사람 뒤에서 기다린다). 외길 마을에서 먼 집일수록 '남을 피한 길'은 거의 없다 */
+function pathHomeAnyway(f, i) {
+  if (pathTo(f, i, f.base)) return true;
+  const here = f.path ? f.path[f.path.length - 1] : f.base; if (here < 0) return false;
+  const { prev } = roadBFS(here); if (bfsSeen[f.base] !== bfsGen) return false;
+  const path = []; let k = f.base; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here);
+  f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; return true;
+}
+/* tickFolks 고리 — true 면 그 사람의 이번 틱은 여기서 끝 */
+function actBesideTick(f, i, now) {
+  const R = window.VRULES.beside;
+  if (f.state === 'inside') { if (f.inside.act === undefined) { f.inside.act = 1; f.beside = null; if (f.carry) { besideStats[f.inside.root === f.home ? '물동이들고밤귀가' : '물동이들고출근']++; f.carry = null; } if (R.on) besidePlace(f); } return false; }
+  if (f.beside) {                                                      // 방금 나왔다 — 우물이었으면 물동이를 든다(출근·등교할 시간이면 그냥 간다)
+    const from = f.beside; f.beside = null; const h = simHour();
+    const busy = (!OFF.has('jobs') && f.job != null && isWorkHour(h)) || (schoolNow() >= 0 && (f.ct === 1 || f.ct === 2) && isSchoolHour(h));
+    if (R.on && R.bucket.on && !f.visitor && !busy && f.base >= 0 && f.state === 'idle' && R.bucket.from.includes(from.k)) { f.carry = { phase: 'go', tries: 0, cells: 0 }; besideStats.물동이++; }
+  }
+  const c = f.carry; if (!c) return false;
+  if (!R.on || f.visitor || f.base < 0 || f.state === 'mill') { f.carry = null; return false; }
+  if (f.goal === 'work' || f.goal === 'school') return false;            // 들고 가다 출근 시간이 됐다 — 그대로 들고 가 일터에 들어가며 내려놓는다(길 한가운데서 사라지지 않게)
+  if (c.phase === 'rest') { if (now >= c.until) f.carry = null; return false; }
+  if (f.state === 'idle' && now >= f.until) {                           // 집으로 길을 잡는다(막혀서 멈춘 뒤에도 여기로) — 길찾기 예산을 같이 쓴다
+    if (pathBudget <= 0) return true;
+    pathBudget--;
+    if (!pathHomeAnyway(f, i)) { if (++c.tries >= R.bucket.tries) { f.carry = null; besideStats.물동이길없음++; } else f.until = now + 600; return !!f.carry; }
+    c.cells = Math.max(c.cells, f.path.length - 1); besideStats.물동이최장칸 = Math.max(besideStats.물동이최장칸, c.cells);
+    if (f.path.length > 1) return false;                                // 걷기 시작 — 나머지는 원래 걷기 코드가
+  }
+  if (f.path && f.path[f.step + 1] == null && f.path[f.step] === f.base && (f.state === 'walk' || f.path.length === 1)) {   // 집 앞에 닿았다
+    if (f.goal === 'home') return false;                                // 밤이면 원래 규칙이 집에 들인다(들어가는 순간 물동이는 위에서 사라진다)
+    const rec = cells[f.home], cc = rec ? centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot) : null;
+    if (cc) f.dir = Math.atan2(cc.x - f.x, cc.z - f.z);
+    f.state = 'idle'; f.until = now + R.bucket.restMs; f.walking = false; f.path = [f.base]; f.step = 0; f.seg = 0; releaseAll(i); claim(f.base, i);
+    c.phase = 'rest'; c.until = now + R.bucket.restMs; besideStats.물동이도착++;
+    return true;
+  }
+  return false;
+}
+/* 물동이 — 나무통 + 물 윗면을 한 기하로(정점 색) → draw call 하나. 시작할 때 한 번만 만든다 */
+const bucketMesh = (() => {
+  const parts = [[new THREE.CylinderGeometry(0.34, 0.27, 0.48, 8), 0x8a5a33, 0], [new THREE.CylinderGeometry(0.29, 0.29, 0.05, 8), 0x6ec6f0, 0.24]];
+  const pos = [], nor = [], col = [], cc = new THREE.Color();
+  parts.forEach(([g0, hex, y]) => { const g = g0.toNonIndexed(), P0 = g.attributes.position, N0 = g.attributes.normal; cc.setHex(hex);
+    for (let v = 0; v < P0.count; v++) { pos.push(P0.getX(v), P0.getY(v) + y, P0.getZ(v)); nor.push(N0.getX(v), N0.getY(v), N0.getZ(v)); col.push(cc.r, cc.g, cc.b); } g.dispose(); g0.dispose(); });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const im = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), FOLK_CAP);
+  im.count = 0; im.frustumCulled = false; im.castShadow = false; scene.add(im); return im;
+})();
+/* 루프 고리 — drawFolks 바로 뒤. 곁에 있는 사람을 같은 묶음에 다시 그리고, 물동이를 손 옆에 단다 */
+function actBesideDraw(now) {
+  if (!folks.length || OFF.has('folks')) { bucketMesh.count = 0; return; }
+  const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), hasV = VISITOR_PARTS.length > 0, R = window.VRULES.beside;
+  let nb = 0, touched = false;
+  folks.forEach((f, i) => {
+    if (f.state === 'inside') {
+      const b = f.beside; if (!b || !R.on) return;
+      if (QUALITY.farFolk && (Math.abs(b.x - camTarget.x) > 60 || Math.abs(b.z - camTarget.z) > 60)) return;
+      const tour = hasV && !!f.visitor && !f.neighbor, parts = tour ? VISITOR_PARTS : PERSON_PARTS, base = tour ? PERSON_PARTS.length : 0, co = Math.cos(b.dir), si = Math.sin(b.dir);
+      parts.forEach((pt, pi) => { const im = folkPool[base + pi];
+        folkDummy.position.set(b.x + pt.p[0] * co + pt.p[2] * si, pt.p[1] - b.drop, b.z - pt.p[0] * si + pt.p[2] * co); folkDummy.rotation.set(0, b.dir, 0); folkDummy.scale.set(pt.s[0], pt.s[1], pt.s[2]); folkDummy.updateMatrix();
+        im.setMatrixAt(i, folkDummy.matrix);
+        im.setColorAt(i, folkCol.setHex(pt.c === 'skin' ? SKIN[f.ct] : pt.c === 'hair' ? HAIR[f.ct] : pt.c === 'top' ? TOPC[f.ct] : pt.c)); });
+      touched = true; return;
+    }
+    if (!f.carry) return;
+    const fx = f.px == null ? f.x : f.px + (f.x - f.px) * a, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a, H = R.bucket.hand, co = Math.cos(f.dir), si = Math.sin(f.dir);
+    const rest = f.carry.phase === 'rest', hx = rest ? 0.2 : H[0], hz = rest ? 0.75 : H[2];
+    folkDummy.position.set(fx + hx * co + hz * si, rest ? 0.26 : H[1] + (f.walking ? Math.abs(Math.sin(now / 150 + i)) * 0.09 : 0), fz - hx * si + hz * co); folkDummy.rotation.set(0, f.dir, 0); folkDummy.scale.set(1, 1, 1); folkDummy.updateMatrix();
+    bucketMesh.setMatrixAt(nb++, folkDummy.matrix);
+  });
+  if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; });
+  bucketMesh.count = nb; if (nb) bucketMesh.instanceMatrix.needsUpdate = true;
+}
+/* whatDoing 고리 — "우물 안에 있어요" 대신 */
+function actBesideText(f) {
+  const S = window.VRULES.beside.say;
+  if (f.state === 'inside' && f.beside) { const b = cells[f.inside.root], nm = b ? K[b.k].nm : ''; return f.beside.k === 'well' ? S.well : nm + S[f.beside.mode]; }
+  if (f.carry && f.state !== 'inside') return f.carry.phase === 'rest' ? S.rest : S.carry;
+  return null;
+}
+window.__beside = () => { let st = 0, sit = 0, car = 0; folks.forEach(f => { if (f.state === 'inside' && f.beside) { if (f.beside.mode === 'sit') sit++; else st++; } else if (f.carry) car++; }); return { 켜짐: window.VRULES.beside.on, 지금곁에: st, 지금앉음: sit, 지금물동이: car, 누적: { ...besideStats } }; };
 
 /* ══════════════════════════════════════════════════════════════
    저장 — 지금은 이 컴퓨터(localStorage)에만 넣는다.
@@ -4693,6 +4816,7 @@ function loop() {
   whyBubbleTick(SIM.t + SIM.acc);   // [MAC-WHY] 앞 프레임에 뜬 표정에 이유가 있으면 그 자리를 대신한다(표정은 한 프레임만 비친다 — drawFaces 를 두 번 돌리지 않으려고)
   awayDraw(SIM.t + SIM.acc);   // [MAC-AWAY]
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
+  actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   drawClock(); applyDaylight();
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
