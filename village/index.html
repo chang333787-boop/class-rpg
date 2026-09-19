@@ -4432,6 +4432,7 @@ function tickFolks(dt, now) {
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
     f.base = roadBeside(rec);
     if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
+    actPlazaTick(f, i, now);   // [ACT-PLAZA] 축제 날 광장에선 둥글게 · 길목에 선 사람은 가장자리로 한 발
 
     if (f.state === 'inside') {
       const b = cells[f.inside.root];
@@ -4762,6 +4763,57 @@ function actGreetDraw(now) {
   greetPool.count = n; if (n) greetPool.instanceMatrix.needsUpdate = true;
 }
 window.__greet = () => ({ 켜짐: window.VRULES.greet.on, ...GREET.stats, 지금가는중: folks.filter(f => f.greet && f.greet.phase !== 'wave').length, 지금인사중: folks.filter(f => f.greet && f.greet.phase === 'wave').length, 최근: GREET.log.slice(-5) });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-PLAZA] 광장·정자에 모여 선다 — 축제 날엔 광장 가운데를 보고 둥글게 (주민 연기 · 09-20 · 창조자의 눈 2회).
+   전: 축제 날 8명이 광장에 갔는데 셋만 광장에 들고(정원 ENTER_MAX 3 — 판정이라 안 건드린다) 나머지는 길 가장자리에 1초 남짓 서다 흩어졌다. 정자는 '안으로' 사라졌다.
+   후: ① 정자 — 지붕 아래 서 있는다([ACT-BESIDE] 의 'on' 방식에 정자를 더한다). ② 축제 날 광장 — 광장에 든 사람은 가운데를 보고 둥글게 선다.
+       ③ 축제 날 광장에 닿았지만 자리가 없어 길 끝에 선 사람은 **광장 가장자리로 한 발 들어가** 가운데를 보고 잠깐(festStay) 구경한다 — 판정상은 여전히 그 길 칸에 선 사람(칸을 잡은 채 · 정원 셈에 안 들어감), 그리는 자리만 광장 위.
+   판정·확률·저장 0. 모양 추가 0 · draw call +0(사람 묶음에 다시 그린다). 손님(기차·이웃 마을)은 옛 그대로.
+   규칙 모듈 꼴: 스위치·수치 VRULES.plazaRing + 고리 두 줄(tickFolks · 루프).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).plazaRing = { on: true, pavilion: true, ring: true, watch: true, radius: [3.0, 4.4], festStay: 3000 };
+const PLAZA = { slot: new Map(), day: -1, stats: { 둥글게섬: 0, 가장자리구경: 0 } };
+function ringSpot(root, key) {
+  const R = window.VRULES.plazaRing, rec = cells[root]; if (!rec) return null;
+  const d = simDay(); if (d !== PLAZA.day) { PLAZA.slot.clear(); PLAZA.day = d; }
+  const n = PLAZA.slot.get(root) || 0; PLAZA.slot.set(root, n + 1);
+  const c = centerOf(rec.k, cX(root), cY(root), rec.rot), ang = n * 2.39996 + (key % 7) * 0.05, rad = R.radius[n % R.radius.length];   // 황금각으로 돌려 가며 — 겹치지 않고 둘레가 고르게 찬다
+  const x = c.x + Math.sin(ang) * rad, z = c.z + Math.cos(ang) * rad;
+  return { x, z, dir: Math.atan2(c.x - x, c.z - z) };
+}
+/* tickFolks 고리 — [ACT-BESIDE] 고리 바로 뒤 */
+function actPlazaTick(f, i, now) {
+  const R = window.VRULES.plazaRing; if (!R.on || f.visitor || f.arriving) { f.festSpot = null; return; }
+  if (R.pavilion && !PLAZA.pv) { const B = window.VRULES.beside; if (B && B.kinds) { if (!B.kinds.pavilion) B.kinds.pavilion = 'on'; PLAZA.pv = true; } }   // ① 정자도 지붕 아래 선다 — [ACT-BESIDE] 표가 이 블록보다 아래에서 만들어지므로 첫 틱에
+  const fr = EV.fest ? EV.festRoot : -1;
+  if (f.state === 'inside') {                                           // ② 축제 날 광장에 든 사람 — 둥글게, 가운데를 보고
+    if (R.ring && fr >= 0 && f.inside.root === fr && f.beside && !f.beside.ring) { const s = ringSpot(fr, i); if (s) { f.beside.x = s.x; f.beside.z = s.z; f.beside.dir = s.dir; f.beside.ring = true; PLAZA.stats.둥글게섬++; } }
+    f.festSpot = null; return;
+  }
+  if (f.state !== 'idle') { f.festSpot = null; return; }
+  if (f.festSpot || !R.watch || fr < 0 || !f.path) return;
+  const at = f.path[f.path.length - 1];                                 // ③ 광장 길목에 선 사람 — 가장자리로 한 발 들어가 구경
+  if (!touchesRoot(at, fr) || now >= f.until) return;
+  const s = ringSpot(fr, i); if (!s) return;
+  f.festSpot = s; f.until = Math.max(f.until, now + R.festStay); f.dir = s.dir; PLAZA.stats.가장자리구경++;
+}
+/* 루프 고리 — [ACT-BESIDE] 그리기 바로 앞. 구경하는 사람을 광장 위 자리에 다시 그린다(같은 묶음) */
+function actPlazaDraw() {
+  if (!window.VRULES.plazaRing.on || !folks.length || OFF.has('folks')) return;
+  let touched = false;
+  folks.forEach((f, i) => {
+    const s = f.festSpot; if (!s || f.state !== 'idle') return;
+    if (QUALITY.farFolk && (Math.abs(s.x - camTarget.x) > 60 || Math.abs(s.z - camTarget.z) > 60)) return;
+    const co = Math.cos(s.dir), si = Math.sin(s.dir);
+    PERSON_PARTS.forEach((pt, pi) => { const im = folkPool[pi];
+      folkDummy.position.set(s.x + pt.p[0] * co + pt.p[2] * si, pt.p[1], s.z - pt.p[0] * si + pt.p[2] * co); folkDummy.rotation.set(0, s.dir, 0); folkDummy.scale.set(pt.s[0], pt.s[1], pt.s[2]); folkDummy.updateMatrix();
+      im.setMatrixAt(i, folkDummy.matrix); });
+    touched = true;
+  });
+  if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
+}
+window.__plaza = () => ({ 켜짐: window.VRULES.plazaRing.on, 축제: EV.fest, 지금광장위: folks.filter(f => (f.festSpot && f.state === 'idle') || (f.beside && f.state === 'inside' && cells[f.inside.root] && (cells[f.inside.root].k === 'plaza' || cells[f.inside.root].k === 'pavilion'))).length, ...PLAZA.stats });
 
 /* 우산(F13) — 사람마다 하나. 비 올 때만 count 를 올린다 */
 const umbrella = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 8), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), FOLK_CAP);
@@ -5794,6 +5846,7 @@ function loop() {
   keepArmDraw();   // [MAC-KEEP-2] 치우기 확인의 빨간 테두리
   sayDraw();   // [MAC-SAY]
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
+  actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
