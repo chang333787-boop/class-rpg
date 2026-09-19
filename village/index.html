@@ -2725,6 +2725,25 @@ function libHint(miss, libs, cap, open) {
     if (h) LIBMANY.stats.귀띔++; return t + h; }; }
 window.__libMany = () => ({ 켜짐: window.VRULES.manyLibrary.on, 한도: window.VRULES.manyLibrary.cap, 도서관: countKind('library'), 학교: countKind('school'), ...LIBMANY.stats });
 
+/* ── [MAC-TICKSPLIT] 큰 마을의 튀는 틱 나눠 하기 (보스 10월 ① · 516명 판 CPU 프로파일 — 창조자의 눈 6회 🟡5 '틱 최대 54ms') ──
+   ① 기다리는 집 훑기는 조각으로(위 MAC-WAITSCAN-2) — 가장 컸다(30틱마다 60ms).
+   ② 하루 리듬(출근·등교·귀가)의 길찾기가 8~13시에 한 틱에 몰렸다(사람마다 길 BFS). 리듬이 부르는 길찾기는 **틱당 rhythmBudget 번까지** — 나머지는
+      다음 틱에(출근은 원래 규칙대로 잠깐 뒤 다시). 출발이 한두 틱씩 엇갈릴 뿐 규칙·목적지는 그대로다.
+   ③ 학교·역 찾기(schoolRoot·stationRoot — 판 65,536칸 훑기)는 광장(MAC-PLAZACACHE)과 같이 학교·역을 놓거나 치울 때만 다시 찾는다.
+   원래 줄 수정 0 — rhythmTick·pathTo·pathToBuilding·schoolRoot·stationRoot·placeAt·removeAt 감싸기. 스위치 VRULES.tickSplit. */
+(window.VRULES = window.VRULES || {}).tickSplit = { on: true, rhythmBudget: 8 };
+const TICKSPLIT = { inRhythm: false, tick: -1, n: 0, stats: { 길찾기: 0, 미룸: 0 } };
+{ const rh0 = rhythmTick; rhythmTick = function () { TICKSPLIT.inRhythm = true; try { return rh0.apply(this, arguments); } finally { TICKSPLIT.inRhythm = false; } };
+  const budget = () => { const R = window.VRULES.tickSplit; if (!R.on || !TICKSPLIT.inRhythm) return true; if (TICKSPLIT.tick !== SIM.ticks) { TICKSPLIT.tick = SIM.ticks; TICKSPLIT.n = 0; }
+    if (TICKSPLIT.n >= R.rhythmBudget) { TICKSPLIT.stats.미룸++; return false; } TICKSPLIT.n++; TICKSPLIT.stats.길찾기++; return true; };
+  const pt0 = pathTo; pathTo = function (f) { if (!budget()) return false; return pt0.apply(this, arguments); };
+  const ptb0 = pathToBuilding; pathToBuilding = function (f) { if (!budget()) return false; return ptb0.apply(this, arguments); }; }
+const ROOTC = { school: { root: -1, dirty: true, f0: schoolRoot }, station: { root: -1, dirty: true, f0: stationRoot }, stats: { 훑음: 0, 다시씀: 0 } };
+function rootCached(k) { const e = ROOTC[k], r = e.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === k); if (!e.dirty && ok) { ROOTC.stats.다시씀++; return r; } e.root = e.f0(); e.dirty = false; ROOTC.stats.훑음++; return e.root; }
+schoolRoot = function () { return rootCached('school'); }; stationRoot = function () { return rootCached('station'); };
+{ const pR0 = placeAt; placeAt = function (kind) { if (ROOTC[kind] && ROOTC[kind].f0) ROOTC[kind].dirty = true; return pR0.apply(this, arguments); };
+  const rR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && ROOTC[c.k] && ROOTC[c.k].f0) ROOTC[c.k].dirty = true; return rR0.apply(this, arguments); }; }
+window.__tickSplit = () => ({ 켜짐: window.VRULES.tickSplit.on, 예산: window.VRULES.tickSplit.rhythmBudget, ...TICKSPLIT.stats, 건물찾기: { ...ROOTC.stats }, 기다리는집: { ...WAITSCAN.stats }, 기억: { ...WAITMEMO.stats } });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
    · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
@@ -3708,6 +3727,7 @@ function simTick() {
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   if ((SIM.ticks % 30) === 13) growTick('tick');   // [MAC-GROW] 심은 것이 한 단계 자랐나(3초마다 · 자라는 것만 훑는다)
+  waitScanStep();   // [MAC-WAITSCAN-2] 기다리는 집 훑기 — 틱마다 판의 1/30 조각
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
@@ -4182,11 +4202,26 @@ function tryMoveIn() {
 var WAITLOOK = { miss: new Map(), stats: { 센횟수: 0, 다시합친청크: 0, 센ms: 0 } };   // var — buildChunk 가 이 줄보다 먼저 돌 수 있다(그땐 undefined → 기다리는 집 없음)
 /* [MAC-WAITSCAN] 기다리는 집 훑기는 3초에 한 번만 — 칩(MAC-WAITHOMES)과 집 모습(MAC-WAITLOOK)이 같은 awayLacks 훑기(빈집마다 길 BFS)를 따로 했다.
    같은 3초 구간 안에서는 앞서 센 것을 돌려준다. fresh = 아이가 칩을 눌렀을 때·시험 훅(멈춘 동안 우물을 놓고 바로 누를 수 있다). 방문 중엔 빈 표. */
-var WAITSCAN = { at: -1e9, map: new Map(), lack: new Map(), stats: { 훑음: 0, 다시씀: 0 } };
+var WAITSCAN = { at: -1e9, map: new Map(), lack: new Map(), cur: 0, accM: new Map(), accL: new Map(), cand: 0, accC: 0, stats: { 훑음: 0, 다시씀: 0, 조각: 0, 한바퀴: 0 } };
+/* [MAC-WAITSCAN-2] (보스 10월 ① · 516명 판 CPU 프로파일) 판 전체를 한 틱에 훑으면 빈집마다 길 BFS 라 30틱마다 60ms 가 튀었다(틱 최대 54~69ms 의 뿌리 · 전체의 40%).
+   이제 **틱마다 판의 1/30 조각**만 본다(waitScanStep — simTick 고리 한 줄) → 30틱에 한 바퀴, 끝나면 표를 통째로 바꿔 끼운다(반쯤 센 표를 내보이지 않는다).
+   fresh(칩을 누를 때·시험 훅)는 지난 바퀴의 빈집 후보가 40채 이하인 작은 마을에서만 그 자리에서 전체를 다시 센다 — 큰 마을은 3초 안의 표를 쓴다. */
+function waitScanFull() { const m = new Map(), lack = new Map(); let c = 0; if (!VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; c++; const miss = awayLacks(rec); if (miss && miss.length) { m.set(i, miss[0]); lack.set(i, miss); } });
+  WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.lack = lack; WAITSCAN.cand = c; WAITSCAN.stats.훑음++; return m; }
+/* 빈집의 '빠진 것'은 판(길·시설)이 바뀔 때만 달라진다 — 판 번호(놓기·치우기마다 +1)와 필요 수·인구 문턱이 같으면 지난 답을 쓴다(길 BFS 를 안 돈다). */
+const WAITMEMO = { ver: 0, m: new Map(), stats: { 다시씀: 0, 셈: 0 } };
+{ const pW0 = placeAt; placeAt = function () { WAITMEMO.ver++; return pW0.apply(this, arguments); }; const rW0 = removeAt; removeAt = function () { WAITMEMO.ver++; return rW0.apply(this, arguments); }; }
+function waitLacksMemo(rec) { const key = WAITMEMO.ver + '|' + NEEDS.length + '|' + (population() < window.VRULES.turnAway.graceBelow ? 0 : 1) + '|' + (window.VRULES.turnAway.on ? 1 : 0), e = WAITMEMO.m.get(rec.root);
+  if (e && e.key === key) { WAITMEMO.stats.다시씀++; return e.miss; } const miss = awayLacks(rec); WAITMEMO.m.set(rec.root, { key, miss }); WAITMEMO.stats.셈++; if (WAITMEMO.m.size > 4000) WAITMEMO.m.clear(); return miss; }
+function waitScanStep() { if (VISIT.on) { WAITSCAN.map = new Map(); WAITSCAN.lack = new Map(); WAITSCAN.cur = 0; WAITSCAN.accM = new Map(); WAITSCAN.accL = new Map(); WAITSCAN.accC = 0; return; }
+  const N = W * H, step = Math.ceil(N / 30), end = Math.min(N, WAITSCAN.cur + step);
+  for (let i = WAITSCAN.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) continue; WAITSCAN.accC++; const miss = waitLacksMemo(rec); if (miss && miss.length) { WAITSCAN.accM.set(i, miss[0]); WAITSCAN.accL.set(i, miss); } }
+  WAITSCAN.cur = end; WAITSCAN.stats.조각++;
+  if (end >= N) { WAITSCAN.map = WAITSCAN.accM; WAITSCAN.lack = WAITSCAN.accL; WAITSCAN.cand = WAITSCAN.accC; WAITSCAN.at = SIM.ticks; WAITSCAN.accM = new Map(); WAITSCAN.accL = new Map(); WAITSCAN.accC = 0; WAITSCAN.cur = 0; WAITSCAN.stats.한바퀴++; } }
 function waitScan(fresh) {
-  if (!fresh && SIM.ticks >= WAITSCAN.at && SIM.ticks - WAITSCAN.at < 30) { WAITSCAN.stats.다시씀++; return WAITSCAN.map; }
-  const m = new Map(), lack = new Map(); if (!VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; const miss = awayLacks(rec); if (miss && miss.length) { m.set(i, miss[0]); lack.set(i, miss); } });
-  WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.lack = lack; WAITSCAN.stats.훑음++; return m;
+  if (fresh && WAITSCAN.cand <= 40) return waitScanFull();                                  // 작은 마을: 그 자리에서(우물을 놓고 바로 칩을 눌러도 맞게)
+  if (WAITSCAN.at < 0) return waitScanFull();                                               // 처음 한 번(열자마자 칩이 비어 보이지 않게)
+  WAITSCAN.stats.다시씀++; return WAITSCAN.map;
 }
 function waitHouseIs(root) { return !!(WAITLOOK && window.WAITHOUSE) && WAITLOOK.miss.has(root) && (res.get(root) || 0) === 0; }
 function waitLookTick() {
@@ -4286,7 +4321,7 @@ function awayDraw(now) {
    · 3초마다 센다(칸을 한 번 훑는다 · 0.3ms 안팎). 원래 줄 수정 0 — simTick 고리 한 줄. */
 (window.VRULES = window.VRULES || {}).waitHomes = { on: true };
 const WAITHOMES = { roots: [], seen: new Set(), stats: { 눌러감: 0 } };
-function waitHomesScan(fresh) { if (VISIT.on) return []; const m = waitScan(fresh); return window.VRULES.waitHomes.on ? [...m.keys()] : []; }   // [MAC-WAITSCAN] 훑기는 waitScan 하나
+function waitHomesScan(fresh) { if (VISIT.on) return []; const m = waitScan(fresh); return window.VRULES.waitHomes.on ? [...m.keys()].filter(r => cells[r] && cells[r].root === r && cells[r].k === 'house' && !((res.get(r) || 0) > 0)) : []; }   // 조각 훑기 표는 3초까지 묵을 수 있다 — 그 사이 누가 들었거나 치운 집은 뺀다   // [MAC-WAITSCAN] 훑기는 waitScan 하나
 /* 순수 함수 — (cx,cy)에서 가까운 순. 방금 본 것(seen)은 뒤로 */
 function waitHomesOrder(roots, cx, cy, seen, w) { return roots.slice().sort((a, b) => (seen.has(a) - seen.has(b)) || (Math.hypot(a % w - cx, ((a / w) | 0) - cy) - Math.hypot(b % w - cx, ((b / w) | 0) - cy))); }
 /* ── [MAC-WAITHOMES-2] (창조자의 눈 5회 🟡) 말은 짧게·귀띔 톤으로 / 고치는 만큼 점이 찬다 / 가장 많이 모인 동네부터 ──
@@ -4311,7 +4346,7 @@ function waitHomesDraw() { let el = document.getElementById('waitHomes');
   const n = WAITHOMES.roots.length, top = document.getElementById('top'); el.style.display = n ? '' : 'none';
   if (n) { const g = waitClusters(WAITHOMES.roots, W, window.VRULES.waitHomes.reach || 8)[0], ml = g.map(r => (WAITSCAN.lack.get(r) || []).length || 4), most = ml.sort((a, b) => ml.filter(v => v === a).length - ml.filter(v => v === b).length).pop();   // 가장 큰 동네에서 가장 흔한 처지
     el.textContent = '🏠 이웃을 기다리는 집 ' + n + ' ' + waitDots(most, window.VRULES.turnAway.minHave); if (top) el.style.top = Math.round(top.getBoundingClientRect().bottom + 6) + 'px'; } }
-function waitHomesTick() { WAITHOMES.roots = waitHomesScan(true); waitHomesDraw(); }   // 3초 박자의 첫 자리(틱 %30 === 0)가 늘 새로 훑고, 7틱 뒤의 집 모습이 그것을 다시 쓴다
+function waitHomesTick() { WAITHOMES.roots = waitHomesScan(false); waitHomesDraw(); }   // 3초 박자의 첫 자리(틱 %30 === 0)가 늘 새로 훑고, 7틱 뒤의 집 모습이 그것을 다시 쓴다
 function waitHomesGo() {
   WAITHOMES.roots = waitHomesScan(true); waitHomesDraw(); if (!WAITHOMES.roots.length) return;
   if (WAITHOMES.roots.every(r => WAITHOMES.seen.has(r))) WAITHOMES.seen.clear();                                    // 한 바퀴 다 봤으면 처음부터
@@ -4321,7 +4356,7 @@ function waitHomesGo() {
   sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); const miss = WAITSCAN.lack.get(root), why = moveInWhy(rec);
   toast(miss ? '🏠 이 동네 ' + g.length + '채 · ' + waitSay(miss, window.VRULES.turnAway.minHave) : why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, true);
 }
-window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan(true).length, 훑기: { ...WAITSCAN.stats }, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
+window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan(true).length, 훑기: { ...WAITSCAN.stats, 기억: { ...WAITMEMO.stats } }, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
 
 window.__away = () => ({ 켜짐: window.VRULES.turnAway.on, ...AWAY.stats, 돌아선집: AWAY.turned.size, 나가는중: awayLeavers(), 이사중: movers, 최근: AWAY.log.slice(-5) });
 
