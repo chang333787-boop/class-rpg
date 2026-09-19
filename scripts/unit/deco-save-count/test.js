@@ -504,6 +504,18 @@
       out('안눌리는단추_바닥모드', r3.join(',') || '없음');
     }
 
+    //  ⑫-2 구경 중에 그림이 도착하면 구경 판도 다시 그리나(DECO-FRIEND-ART-1) — 한꺼번에 여러 장이 와도 한 번
+    if (typeof _ffRedrawSoon === 'function') {
+      let n = 0; const orig = _renderFriendCanvas, fr0 = _ffFriend;
+      _renderFriendCanvas = () => { n++; };
+      _ffFriend = null; _ffRedrawSoon(); await sleep(100);
+      out('구경아닐때_다시안그림', n === 0);
+      _ffFriend = { id: 'x' }; _ffRedrawSoon(); _ffRedrawSoon(); _ffRedrawSoon();
+      await sleep(300);
+      out('구경중_그림오면_한번다시그림', n === 1);
+      _renderFriendCanvas = orig; _ffFriend = fr0;
+    } else out('구경중_그림오면_한번다시그림', false);
+
     //  ⑬ 두 손가락 확대가 끝까지 되나(DECO-PINCH-1) — 확대 걸음마다 캔버스를 새로 만들면
     //    손가락이 잡고 있던 캔버스가 사라져 첫 걸음(약 7%)에서 끊겼다(실제 터치로 3배 벌려도 1→1.07배).
     //    실제 브라우저처럼 **그 순간 화면에 있는 캔버스**에 이벤트를 보낸다(옛 캔버스를 쥐고 보내면 못 잡는다).
