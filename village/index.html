@@ -151,6 +151,7 @@
   .card.on{border-color:#e8b04b;background:#2a2417;box-shadow:0 0 0 3px #e8b04b33}
   .card.lock{opacity:.55}.card.lock .pr{color:#a8adba;font-family:'Malgun Gothic',sans-serif}
   .card .ic{font-size:22px;line-height:1.25;display:block}
+  .card .ic img.thumb{width:40px;height:40px;display:block;margin:-4px auto -3px}.card.lock .ic img.thumb{filter:saturate(.45)}   /* [DESIGN-CARDTHUMB-1] 잠긴 카드는 빛바랜 색 — 실루엣은 꽃밭끼리 다 같아 보여서 안 씀 */
   .card .nm{font-size:12px;font-weight:800;margin-top:1px}
   .card .sz{font-size:10px;color:#8a90a0;font-family:Consolas,monospace}
   .card.tool{min-width:64px}
@@ -2594,6 +2595,92 @@ const TAB_ICON = (() => {
     b.innerHTML = ic + '<span>' + label.replace(/[<&]/g, '') + '</span>';
   });
   new MutationObserver(dress).observe(tabs, { childList: true }); dress();
+})();
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-CARDTHUMB-1] 물건 카드 그림 = 그 물건을 **한 번 그려 만든 작은 그림** — 그림 파일 0.
+   창조자의 눈 3회: 목표 보상으로 연 🌼 노란 꽃밭이 옆 🌼 들꽃밭과 그림이 같아 "이미 있던 거랑 똑같네"로 김이 샜다
+   (🌻 노란 튤립 = 🌻 해바라기 · 🌷 튤립 = 🌷 주황 튤립 · 🚪 나무 문 = 🚪 아치문도). 그림문자는 기기마다 그림도 다르다.
+   → 게임 렌더러로 96칸 화면 밖 버퍼에 그 물건 하나를 게임과 같은 각도·빛으로 그려 캐시한다(종류 × 계절 × 모델이 왔나).
+     꽃밭은 색이 다르면 카드가 저절로 달라지고, 두르기는 그 식구의 혼자 선 모양이 나온다.
+   · 카드가 그려질 때마다(관찰자) 그림문자 자리(.ic)만 그림으로 바꾼다 — buildTray·카드 코드 무변경. 못 그리면 그림문자 그대로.
+   · 잠긴 카드는 같은 그림을 빛바랜 색으로(CSS 한 줄) — 까만 실루엣은 꽃밭끼리 모양이 같아 전부 똑같아 보였다.
+   · 한 장 그리는 데 드는 시간은 __thumbStats() 로 잰다(처음 여는 탭에서만, 그 뒤는 캐시).
+   ══════════════════════════════════════════════════════════════ */
+const THUMB = { cache: new Map(), made: 0, ms: 0, failed: 0, rt: null, scene: null, cam: null, R: 96 };
+function thumbOf(kind) {
+  const k = K[kind]; if (!k) return null;
+  const x0 = 2, y0 = 2, rec = { k: kind, root: idx(x0, y0), rot: 0 };
+  let parts; try { parts = JOIN_KINDS[kind] ? thumbJoin(kind) : partsOf(rec); } catch (e) { parts = k.parts; }
+  if (!parts || !parts.length) return null;
+  const key = kind + ':' + (seasonNow < 0 ? 1 : seasonNow) + ':' + parts[0].g + ':' + parts.length;
+  if (THUMB.cache.has(key)) return THUMB.cache.get(key);
+  const t0 = performance.now();
+  try {
+    const pos = [], nrm = [], col = [], idxs = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color();
+    const roofC = ROOFS[(kind.length * 3) % ROOFS.length];
+    parts.forEach(pt => {
+      const base = BASE[pt.g]; if (!base) return;
+      const off = pos.length / 3; partMatrix(kind, x0 + (pt.tx || 0), y0, 0, pt, m); n3.getNormalMatrix(m);
+      const vc = base.vcol, vk = base.vkind;
+      if (!vc) c.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
+      for (let i = 0; i < base.nv; i++) {
+        v.set(base.pos[i * 3], base.pos[i * 3 + 1], base.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x, v.y, v.z);
+        v.set(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z);
+        if (vc) { const kd = vk[i]; if (kd === 1) c.setHex(roofC); else if (kd === 2 || kd === 3 || kd === 7) { c.setHex(seasonColor(kd === 3 ? P.leafL : P.leaf)); if (kd === 7) c.multiplyScalar(.72); } else c.setRGB(vc[i * 3], vc[i * 3 + 1], vc[i * 3 + 2]); }
+        col.push(c.r, c.g, c.b);
+      }
+      for (let i = 0; i < base.idx.length; i++) idxs.push(base.idx[i] + off);
+    });
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry(), nv = pos.length / 3;
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute('aEmis', new THREE.Float32BufferAttribute(new Float32Array(nv), 1)); geo.setAttribute('aNight', new THREE.Float32BufferAttribute(new Float32Array(nv), 1));
+    geo.setIndex(idxs); geo.computeBoundingSphere();
+    if (!THUMB.scene) {
+      THUMB.scene = new THREE.Scene();
+      const s = new THREE.DirectionalLight(0xfff6e4, 1.9); s.position.set(-80, 108, 56); THUMB.scene.add(s, s.target, new THREE.HemisphereLight(0xdff2ff, 0x8fc457, 0.90), new THREE.AmbientLight(0xffffff, 0.30));
+      THUMB.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
+      THUMB.rt = new THREE.WebGLRenderTarget(THUMB.R, THUMB.R, { samples: 4 }); THUMB.rt.texture.colorSpace = THREE.SRGBColorSpace;
+    }
+    const mesh = new THREE.Mesh(geo, MAT.lit); THUMB.scene.add(mesh);
+    const bs = geo.boundingSphere, az = Math.PI * 0.25, el = Math.atan(1 / Math.SQRT2);
+    THUMB.cam.position.set(bs.center.x + Math.cos(el) * Math.sin(az) * 200, bs.center.y + Math.sin(el) * 200, bs.center.z + Math.cos(el) * Math.cos(az) * 200); THUMB.cam.lookAt(bs.center); THUMB.cam.updateMatrixWorld();
+    let x0v = 1e9, x1v = -1e9, y0v = 1e9, y1v = -1e9; const inv = THUMB.cam.matrixWorldInverse;   // 화면에 비친 크기에 꼭 맞춘다(길고 낮은 울타리가 구 크기로 맞추면 가는 선이 된다)
+    for (let i = 0; i < nv; i++) { v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).applyMatrix4(inv); if (v.x < x0v) x0v = v.x; if (v.x > x1v) x1v = v.x; if (v.y < y0v) y0v = v.y; if (v.y > y1v) y1v = v.y; }
+    const cx = (x0v + x1v) / 2, cy = (y0v + y1v) / 2, r = Math.max(x1v - x0v, y1v - y0v) * 0.54;
+    THUMB.cam.left = cx - r; THUMB.cam.right = cx + r; THUMB.cam.top = cy + r; THUMB.cam.bottom = cy - r; THUMB.cam.updateProjectionMatrix();
+    const oldT = renderer.getRenderTarget(), oldC = renderer.getClearColor(new THREE.Color()), oldA = renderer.getClearAlpha(), oldN = NIGHT.value;
+    NIGHT.value = 0; renderer.setRenderTarget(THUMB.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(THUMB.scene, THUMB.cam);
+    const px = new Uint8Array(THUMB.R * THUMB.R * 4); renderer.readRenderTargetPixels(THUMB.rt, 0, 0, THUMB.R, THUMB.R, px);
+    renderer.setRenderTarget(oldT); renderer.setClearColor(oldC, oldA); NIGHT.value = oldN;
+    THUMB.scene.remove(mesh); geo.dispose();
+    const cv = document.createElement('canvas'); cv.width = cv.height = THUMB.R; const g2 = cv.getContext('2d'), im = g2.createImageData(THUMB.R, THUMB.R);
+    for (let y = 0; y < THUMB.R; y++) im.data.set(px.subarray((THUMB.R - 1 - y) * THUMB.R * 4, (THUMB.R - y) * THUMB.R * 4), y * THUMB.R * 4);   // 위아래 뒤집기
+    g2.putImageData(im, 0, 0);
+    const url = cv.toDataURL('image/png');
+    THUMB.cache.set(key, url); THUMB.made++; THUMB.ms += performance.now() - t0;
+    return url;
+  } catch (e) { THUMB.failed++; return null; }
+}
+/* 두르기 카드: 혼자 선 기둥·상자는 그것으로 안 보인다 → 마디 + 동서 팔 한 조각(문은 양옆에 같은 식구 마디 + 문 쪽 팔). 세계 칸을 읽지 않는다(tx = 옆 칸) */
+function thumbJoin(kind) {
+  const j = JOIN_KINDS[kind], S = JOIN_SHAPES[j.fam], nv = S.vars || 0, cols = j.cols;
+  const paint = pt => (cols && typeof pt.c === 'string' && pt.c[0] === 'c' && pt.c.length === 2) ? { ...pt, c: cols[+pt.c[1] - 1] } : pt;
+  const turn = (pt, q, tx) => { let px = pt.p[0], pz = pt.p[2]; for (let i = 0; i < q; i++) { const t = px; px = -pz; pz = t; } return paint({ ...pt, p:[px, pt.p[1], pz], ry: (pt.ry || 0) - q * Math.PI / 2, tx }); };
+  const arm = (d, tx) => S.arm.map(pt => turn(nv ? { ...pt, g: pt.g + (d % nv) } : pt, d, tx));
+  const node = tx => S.node.map(pt => turn(pt, 0, tx));
+  if (j.gate) return [...JOIN_GATES[j.fam].map(pt => turn(pt, 0, 0)), ...node(-1), ...arm(1, -1), ...node(1), ...arm(3, 1)];
+  return [...node(0), ...arm(1, 0), ...arm(3, 0)];
+}
+window.__thumbStats = () => ({ 그린장수: THUMB.made, 합ms: +THUMB.ms.toFixed(1), 한장ms: THUMB.made ? +(THUMB.ms / THUMB.made).toFixed(2) : 0, 실패: THUMB.failed, 캐시: THUMB.cache.size });
+(function cardThumbs() {
+  const box = document.getElementById('trayIn'); if (!box || !window.MutationObserver) return;
+  const dress = () => box.querySelectorAll('.card[data-kind]').forEach(el => {
+    const ic = el.querySelector('.ic'); if (!ic || ic.querySelector('img')) return;
+    const url = thumbOf(el.dataset.kind); if (!url) return;
+    ic.innerHTML = '<img class="thumb" src="' + url + '" alt="">';
+  });
+  new MutationObserver(dress).observe(box, { childList: true }); dress();
 })();
 function buildTray() {
   const tabs = document.getElementById('trayTabs');
