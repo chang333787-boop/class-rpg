@@ -5784,6 +5784,28 @@ function actGreetDraw(now) {
   greetPool.count = n; if (n) greetPool.instanceMatrix.needsUpdate = true;
 }
 window.__greet = () => ({ 켜짐: window.VRULES.greet.on, ...GREET.stats, 지금가는중: folks.filter(f => f.greet && f.greet.phase !== 'wave').length, 지금인사중: folks.filter(f => f.greet && f.greet.phase === 'wave').length, 최근: GREET.log.slice(-5) });
+/* ══════════════════════════════════════════════════════════════
+   [ACT-WELLCHAT] 아침 우물가는 이웃이 만나는 곳 (주민 연기 · 09-20 · 창조자의 눈 4회 — 아침 7시가 하루 중 좋은 풍선이 가장 적다 1.1 · 보스 ②).
+   물 뜨는 시간(from~to)에 한 우물가(분수·연못 포함)에 둘 이상 서 있으면 서로 가운데를 보고 서고, everyMs 마다 한 사람씩 돌아가며 👋(새 이웃 인사와 같은 그림 · 같은 묶음).
+   그리기만 한다(곁에 선 자리·몸 방향·풍선) — 판정·저장·확률 0 · draw call +0(👋 묶음에 더해 그린다). 루프 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).wellChat = { on: true, from: 6, to: 9, everyMs: 3500, waveMs: 1600, kinds: ['well', 'fountain', 'pond'] };
+const WELLCHAT = { next: new Map(), turn: new Map(), who: new Map(), groups: new Map(), stats: { 인사: 0, 모인때: 0 } };
+function actWellChatDraw(now) {
+  const R = window.VRULES.wellChat; if (!R.on || mapMode || OFF.has('faces')) return;
+  const h = simHour(); if (h < R.from || h >= R.to) return;
+  const G = WELLCHAT.groups; G.forEach(l => l.length = 0);
+  folks.forEach(f => { const b = f.beside; if (f.state !== 'inside' || !b || b.mode === 'sit' || !R.kinds.includes(b.k)) return; let l = G.get(b.root); if (!l) G.set(b.root, l = []); l.push(f); });
+  G.forEach((l, root) => { if (l.length < 2) { WELLCHAT.who.delete(root); return; }
+    let cx = 0, cz = 0; l.forEach(f => { cx += f.beside.x; cz += f.beside.z; }); cx /= l.length; cz /= l.length;
+    l.forEach(f => { const dx = cx - f.beside.x, dz = cz - f.beside.z; if (dx * dx + dz * dz > 0.09) f.beside.dir = Math.atan2(dx, dz); });   // 서로 가운데를 보고
+    if (now >= (WELLCHAT.next.get(root) || 0)) { const t = (WELLCHAT.turn.get(root) || 0) % l.length; WELLCHAT.turn.set(root, t + 1); WELLCHAT.who.set(root, { f: l[t], until: now + R.waveMs }); WELLCHAT.next.set(root, now + R.everyMs); WELLCHAT.stats.인사++; if (!t) WELLCHAT.stats.모인때++; }
+    const w = WELLCHAT.who.get(root); if (!w || now > w.until || !l.includes(w.f) || greetPool.count >= 8) return;
+    faceDummy.position.set(w.f.beside.x, 4.8 + Math.sin(now / 180) * 0.16, w.f.beside.z); faceDummy.quaternion.copy(camera.quaternion);
+    const s = 1.45 + Math.sin(now / 180) * 0.12; faceDummy.scale.set(s, s, 1); faceDummy.updateMatrix(); greetPool.setMatrixAt(greetPool.count, faceDummy.matrix); greetPool.count++; greetPool.instanceMatrix.needsUpdate = true;
+  });
+}
+window.__wellChat = () => { let n = 0; WELLCHAT.groups.forEach(l => { if (l.length >= 2) n++; }); return { 켜짐: window.VRULES.wellChat.on, 지금모인우물: n, ...WELLCHAT.stats }; };
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-PLAZA] 광장·정자에 모여 선다 — 축제 날엔 광장 가운데를 보고 둥글게 (주민 연기 · 09-20 · 창조자의 눈 2회).
@@ -7330,6 +7352,7 @@ function loop() {
   actUmbrellaDraw(SIM.t + SIM.acc);   // [ACT-UMB] 우산은 든 사람 머리 위에 · 손잡이 · 아이 높이 · 곁에 선 사람도
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
+  actWellChatDraw(SIM.t + SIM.acc);   // [ACT-WELLCHAT] 아침 우물가에 모인 이웃 — 마주 보고 돌아가며 👋
   actLitterDraw(SIM.t + SIM.acc);   // [ACT-LITTER] 가게 앞 조각 · 🗑️? · 🗑️✓
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
