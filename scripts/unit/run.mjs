@@ -1500,7 +1500,7 @@ try {
   const DECOS = [{ id: 'd_y1', k: 'plant' }, { id: 'd_y21', k: 'plant' }, { id: 'd_y43', k: 'plant' }, { id: 'd_y42', k: 'plant' }, { id: 'd_y41', k: 'plant' }, { id: 'd_y7', k: 'plant' },
     ...Array.from({ length: 10 }, (_, i) => ({ id: 'p' + i, k: 'plant' })), ...['d_y10', 'd_y20', 'd_y31', 'd_y59'].map(id => ({ id, k: 'water' })),
     { id: 'd_y6', k: 'prop' }, { id: 'd_y14', k: 'prop' }, ...Array.from({ length: 6 }, (_, i) => ({ id: 'a' + i, k: 'animal' })), ...Array.from({ length: 5 }, (_, i) => ({ id: 't' + i, k: 'tree' })),
-    { id: 'hid', k: 'plant', hidden: true }];
+    { id: 'hid', k: 'plant', hidden: true }, { id: 'w_h1', k: 'water', hidden: true }, { id: 'w_h2', k: 'water', hidden: true }];
   const sb = { GAME_DATA: { decorations: DECOS.map(d => ({ id: d.id, cat: 'yard', hidden: !!d.hidden, _k: d.k })) },
     _decoQtyOf: id => own[id] || 0, _decoShopKind: d => d._k };
   sb.globalThis = sb; vm.createContext(sb);
@@ -1547,6 +1547,13 @@ try {
     own.d_y10 = 1; own.d_y20 = 1; eq(shut('hydrangea'), ['duo', 'moon']); own.d_y6 = 1; eq(shut('hydrangea'), ['duo']);
     for (let i = 2; i < 10; i++) own['p' + i] = 1; eq(shut('tulipbed'), []);   // 전부 = 숨은 것 빼고 16가지
     eq(/지금 \d+가지/.test(R._floorLockWhy('wildflower', 'rainbow')), true);
+  });
+  test('[DECO-RETIRE-2] 상점에서 뺀 연못만 가진 아이 → 수국 물 색은 열린 그대로 · \'전부\'는 상점에 있는 것만 본다', () => {
+    Object.keys(own).forEach(k => delete own[k]);
+    eq(shut('hydrangea'), ['violet', 'pink', 'white', 'duo', 'moon']);
+    own.w_h1 = 1; own.w_h2 = 1; eq(shut('hydrangea'), ['duo', 'moon']);                     // 숨긴 둘도 '가진 것'
+    ['d_y10', 'd_y20', 'd_y31', 'd_y59'].forEach(id => { own[id] = 1; }); eq(shut('hydrangea'), ['moon']);   // 상점에 있는 물 넷 전부
+    delete own.d_y59; eq(/1\/4|3\/4/.test(R._floorLockWhy('hydrangea', 'duo')), true);
   });
 } catch (e) {
   test('바닥 고르기 코드를 돌릴 수 있다', () => { throw e; });
