@@ -6374,6 +6374,28 @@ function titleTick() {                                                          
 window.__titleOpen = () => { if (window.VRULES.titles.on && window.__LOADMS != null) titleCard(true); };   // 간판을 눌렀을 때 부르는 곳(위쪽 마을 이름을 누른 것과 같다)
 window.__titleNow = () => ({ id: TITLE.id, 말: titleText(TITLE.id), 전: TITLE.was, 별: typeof recurStars === 'function' ? recurStars() : 0 });   // 간판(디자인 담당)이 읽는 곳
 window.__titles = () => { const c = titleCounts(); return { 고른것: TITLE.id, 전: TITLE.was, 첫카드봄: TITLE.offered, 후보: titleCandidates(c, TITLES, TITLE.live, window.VRULES.titles.keep), 값: Object.fromEntries(TITLES.map(t => [t.id, +(t.need(c) || 0).toFixed(2)])), 센것: { ...c, bookKinds: c.bookKinds.join() }, ...TITLE.stats }; };
+/* ── [MAC-TITLE-3] 칭호가 거울이 되게 — 카드가 열린 동안 시간은 선다 · 고르는 순간 까닭이 된 것들이 반짝인다 (창조자의 눈 4회 🟡B3) ──
+   ① 카드가 떠 있는 동안에도 시간이 흘러 그 저녁의 일(정원 방문·광장)을 놓쳤다 → 카드가 열려 있는 동안 시계를 세운다(첫 안내 MAC-GUIDE 와 같은 식:
+      아이가 이미 멈춰 둔 판이면 손대지 않고, 멈춤 단추 표시도 안 건드린다). 카드가 어떤 길로 닫히든(고름·나중에·바깥 누름) 다시 흐른다.
+   ② 고른 뒤에도 마을은 같아 보였다 → 고르는 순간 **그 까닭이 된 것들 위에 ✨**(뛰노는 마을이면 놀 곳들, 꽃피는 마을이면 꽃밭들). 있던 ✨ 묶음(sparkle)을 쓴다 — draw call 0.
+      많으면 고르게 열네 곳만. 시뮬의 어떤 값도 바꾸지 않는다. */
+const TITLE_MIRROR = { max: 14, ms: 3500 };
+function titleReasonCells(id) {                                                  // 그 칭호의 까닭이 된 것들의 root
+  const set = TITLE_SETS[id] ? new Set(TITLE_SETS[id]) : null, out = [];
+  if (id === 'home') { res.forEach((v, root) => { const st = sat.get(root); if (v > 0 && st && st.n >= NEEDS.length) out.push(root); }); return out; }
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i) return; const k = rec.k;
+    if (id === 'flower' ? (k === 'pot' || !!FLOWER_KINDS[k]) : id === 'guest' ? (k === 'station' || (k === 'sign' && signs.get(i) && signs.get(i).t)) : !!(set && set.has(k))) out.push(i); });
+  return out;
+}
+/* 순수 함수 — n 개 가운데 고르게 max 개의 자리 번호 */
+function titleSpread(n, max) { if (n <= max) return Array.from({ length: n }, (_, i) => i); const out = []; for (let i = 0; i < max; i++) out.push(Math.floor(i * n / max)); return out; }
+{ const set0 = titleSet; titleSet = function (id) { const prev = TITLE.id, r = set0.apply(this, arguments);
+    if (id && id !== prev) { const roots = titleReasonCells(id); titleSpread(roots.length, TITLE_MIRROR.max).forEach(n => { const root = roots[n], rec = cells[root]; if (!rec) return; const c = centerOf(rec.k, cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: SIM.t + TITLE_MIRROR.ms }); }); TITLE.stats.반짝 = roots.length; }
+    return r; };
+  const cardM0 = titleCard; titleCard = function () { const r = cardM0.apply(this, arguments);
+    if (document.getElementById('titleCard') && !TITLE.held && !SIM.paused) { TITLE.held = true; SIM.paused = true; }   // 카드가 실제로 떴을 때만
+    return r; };
+  if (window.MutationObserver) new MutationObserver(() => { if (TITLE.held && !document.getElementById('titleCard')) { TITLE.held = false; SIM.paused = false; } }).observe(document.body, { childList: true }); }
 /* ══════════════════════════════════════════════════════════════
    [DESIGN-TITLESIGN-1] 칭호 간판 — 마을 어귀에 저절로 서는 지붕 팻말(보스 결정 ⓑ). 새 물건 아님: cells 에 안 들고 저장 0.
    · 자리: 프로그램 담당의 __entranceSpot(prev)(#566). 칭호가 없으면(id null) 간판도 없다. 친구 마을 구경 중엔 내린다.
