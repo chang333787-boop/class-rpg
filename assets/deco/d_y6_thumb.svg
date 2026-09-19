@@ -1,0 +1,15 @@
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<!-- d_y6_thumb 가로등 — 썸네일 전용. 본 그림은 기둥이 가늘고 어두워(6폭 #3d3833) 어두운 카드 위에서 불빛만 남았다 → 등 머리를 크게, 기둥은 짧고 굵게 + 밝은 결(#77706a, 본 그림 받침 색) -->
+<defs><style>.o{stroke:#2b2118;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<circle cx="50" cy="42" r="38" fill="#f2c25a" opacity=".28"/>
+<path class="o" d="M31,97 v-8 h38 v8z" fill="#5c5650"/>
+<path class="o" d="M37,89 v-7 h26 v7z" fill="#77706a"/>
+<rect class="o" x="44" y="54" width="12" height="28" fill="#3d3833"/>
+<path d="M47.5,58 v20" stroke="#77706a" stroke-width="2.4" stroke-linecap="round"/>
+<path class="o" d="M31,54 l4,-33 h30 l4,33z" fill="#f2c25a"/>
+<path d="M50,54 v-33 M36,38 h28" stroke="#3d3833" stroke-width="2" opacity=".6"/>
+<circle cx="50" cy="38" r="8" fill="#fff4c2"/>
+<path class="o" d="M27,21 l23,-14 l23,14z" fill="#3d3833"/>
+<path d="M34,18 l16,-9.5" stroke="#77706a" stroke-width="2.4" stroke-linecap="round"/>
+<rect x="47.5" y="1.5" width="5" height="7" rx="1" fill="#3d3833" stroke="#2b2118" stroke-width="1.6"/>
+</svg>
