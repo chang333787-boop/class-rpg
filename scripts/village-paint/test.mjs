@@ -94,6 +94,13 @@ test('그치는 때는 13~16시 정시 또는 null(하루 내내)', () => { for 
 test('비 오는 날의 40~60% 가 오후에 갠다 · 네 시간대가 다 쓰인다', () => { const rainDay = d => ((d * 2654435761) >>> 0) % 3 === 0; let n = 0, c = 0; const hs = new Set(); for (let d = 1; d <= 600; d++) if (rainDay(d)) { n++; const h = rainClearAt(d, 13, 16); if (h != null) { c++; hs.add(h); } } assert.ok(c / n > 0.4 && c / n < 0.6, (c / n).toFixed(2)); assert.equal(hs.size, 4); });
 test('같은 날은 늘 같은 때(다시 열어도)', () => { for (const d of [7, 22, 31, 100]) assert.equal(rainClearAt(d, 13, 16), rainClearAt(d, 13, 16)); });
 
+/* ── '길이 붐벼요' 뒤의 한 수(MAC-CROWDSAY) — crowdHint · 넓히기 widenOk ── */
+const crowdHint = grab('crowdHint'), widenOk = grab('widenOk');
+test('붐비지 않거나 필요가 빠진 집엔 안 붙인다(필요가 먼저)', () => { assert.equal(crowdHint(false, true, true), ''); assert.equal(crowdHint(true, false, true), ''); });
+test('넓힐 자리가 있으면 큰길로 넓히기 · 없으면 길 한 줄 더 — 둘 다 아이의 한 수로 끝난다', () => { assert.match(crowdHint(true, true, true), /큰길로 넓혀 봐요/); assert.match(crowdHint(true, true, false), /길을 한 줄 더/); });
+test('넓히기: 한 칸 길 + 빈 칸이면 된다', () => { assert.equal(widenOk(['road', 'road', null, null]), true); assert.equal(widenOk(['road', null, null, null]), true); });
+test('넓히기: 길만(빈 칸 없음) · 빈 칸만 · 집·큰길·횡단보도가 끼면 안 된다', () => { assert.equal(widenOk(['road', 'road', 'road', 'road']), false); assert.equal(widenOk([null, null, null, null]), false); for (const k of ['house', 'avenue', 'crosswalk', 'tree']) assert.equal(widenOk(['road', 'road', k, null]), false); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);
