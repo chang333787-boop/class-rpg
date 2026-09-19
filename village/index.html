@@ -6308,10 +6308,28 @@ function titleCard(byChild) {
     link(TITLE.id ? '그대로 둘래요 ›' : '나중에 고를래요 ›', () => wrap.remove()); };
   draw(); wrap.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === wrap) wrap.remove(); }); document.body.appendChild(wrap);
 }
+/* [MAC-TITLE-2] 첫 칭호 제안은 화면을 가리지 않는다 (보스 09-20 — 주민 연기 담당이 시험 중 겪음: 하루가 바뀔 때 카드가 저절로 떠 화면 가운데를 가렸다)
+   · 저절로 뜨던 모달을 없앴다. 대신 소식 한 줄 "💡 우리 마을에 어울리는 이름이 생겼어요 — 눌러 봐요" — 그 줄을 누르거나 위쪽 마을 이름을 누르면 카드가 열린다.
+   · 하루에 한 번까지, 아이가 카드를 한 번 열어 볼 때까지. 놓기·끌기·옮기기·치우기 중, 길게 누르기 메뉴, 첫 안내, 구경, 사진 모드에는 안 뜬다(titleBusy).
+   · 위쪽 마을 이름에 노란 테를 둘러 '여기를 누르면 된다'를 보인다 — 카드를 열면 걷힌다.
+   · 자동 시험(창조자의 눈·주민 연기)은 이제 카드에 막히지 않는다 — 아무것도 저절로 열리지 않는다. */
+const TITLE_NUDGE = '💡 우리 마을에 어울리는 이름이 생겼어요 — 눌러 봐요';
+function titleNudge() {
+  if (TITLE.nudgeDay === simDay() || titleBusy() || mover || eraser) return;
+  toast(TITLE_NUDGE, true); const el = document.getElementById('toast'); if (!el || el.textContent !== TITLE_NUDGE) return;   // 큰 소식이 떠 있어 접혔다(#498) → 다음 틱(30초 뒤)에 다시
+  TITLE.nudgeDay = simDay(); TITLE.stats.알림++; el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer';
+  const ttl = document.querySelector('#top .ttl'); if (ttl) ttl.style.boxShadow = '0 0 0 2px #e8b04b, 0 0 14px #e8b04b88';
+}
+if (window.MutationObserver) new MutationObserver(() => { const el = document.getElementById('toast'); if (el.style.pointerEvents && (el.textContent !== TITLE_NUDGE || !el.classList.contains('show'))) { el.style.pointerEvents = ''; el.style.cursor = ''; } })
+  .observe(document.getElementById('toast'), { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });   // 소식 줄은 평소엔 눌리지 않는다(아래 판을 가리지 않게) — 이 한 줄이 '보이는' 동안만 눌린다
+document.getElementById('toast').addEventListener('click', () => { const el = document.getElementById('toast'); if (el.textContent === TITLE_NUDGE) { el.style.pointerEvents = ''; el.classList.remove('show'); titleCard(true); } });
+{ const card0 = titleCard; titleCard = function (byChild) { const r = card0.apply(this, arguments);      // 아이가 카드를 한 번 열어 봤으면 제안은 끝 — 테도 걷는다
+    if (document.getElementById('titleCard')) { if (!TITLE.offered) { TITLE.offered = true; try { localStorage.setItem(TITLE_SIDE() + '.offered', '1'); } catch (err) { /* 없어도 된다 */ } } const ttl = document.querySelector('#top .ttl'); if (ttl) ttl.style.boxShadow = ''; }
+    return r; }; }
 function titleTick() {                                                           // 30초에 한 번 — 첫 카드 · 새 후보 알림
   const R = window.VRULES.titles; if (!R.on || window.__LOADMS == null || titleBusy() || population() < R.minPop) return;
   const { ids } = titleScan();
-  if (!TITLE.offered && !TITLE.id) { if (ids.length < 2) return; TITLE.offered = true; try { localStorage.setItem(TITLE_SIDE() + '.offered', '1'); } catch (err) { /* 없어도 된다 */ } titleCard(false); return; }
+  if (!TITLE.offered && !TITLE.id) { if (ids.length >= 2) titleNudge(); return; }   // [MAC-TITLE-2] 첫 제안은 모달이 아니라 소식 한 줄 — 카드는 아이가 눌러서 연다
   const fresh = ids.filter(id => !TITLE.told.has(id) && id !== TITLE.id); ids.forEach(id => TITLE.told.add(id));
   if (fresh.length && TITLE.toldDay !== simDay()) { TITLE.toldDay = simDay(); TITLE.stats.알림++; toast('💡 이제 ' + titleText(fresh[0]) + '이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요', true); }
 }
