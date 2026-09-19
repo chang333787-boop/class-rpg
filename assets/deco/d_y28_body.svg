@@ -33,8 +33,8 @@
 <path d="M104,184 v72 M120,184 v72 M136,184 v72 M164,184 v72 M180,184 v72 M196,184 v72" stroke="#5a3218" stroke-width="1.6" opacity=".8"/>
 <circle cx="142" cy="222" r="3" fill="#3d3833"/><circle cx="158" cy="222" r="3" fill="#3d3833"/>
 <!-- 옆 창 2 -->
-<g><rect class="i" x="40" y="182" width="34" height="28" fill="#6d8ea3"/><path d="M40,182 h34 v28 h-34z" fill="none" stroke="#efe6d4" stroke-width="4"/><path d="M57,182 v28 M40,196 h34" stroke="#efe6d4" stroke-width="2.5"/><path d="M44,186 l8,0 l-8,8z" fill="#fff" opacity=".45"/></g>
-<g><rect class="i" x="226" y="182" width="34" height="28" fill="#6d8ea3"/><path d="M226,182 h34 v28 h-34z" fill="none" stroke="#efe6d4" stroke-width="4"/><path d="M243,182 v28 M226,196 h34" stroke="#efe6d4" stroke-width="2.5"/><path d="M230,186 l8,0 l-8,8z" fill="#fff" opacity=".45"/></g>
+<g id="win"><rect class="i" x="40" y="182" width="34" height="28" fill="#6d8ea3"/><path d="M40,182 h34 v28 h-34z" fill="none" stroke="#efe6d4" stroke-width="4"/><path d="M57,182 v28 M40,196 h34" stroke="#efe6d4" stroke-width="2.5"/><path d="M44,186 l8,0 l-8,8z" fill="#fff" opacity=".45"/></g>
+<use href="#win" x="186"/>
 <!-- 문 옆 랜턴 -->
 <path d="M214,190 h10" stroke="#3d3833" stroke-width="3"/><path class="i" d="M220,190 l-5,4 v12 h10 v-12z" fill="#f2c25a"/><circle cx="220" cy="200" r="3" fill="#fff4c2"/>
 <!-- 풍향계 -->
