@@ -6335,6 +6335,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actWorkTick(f, i, now)) continue;   // [ACT-WORK] 일하는 사람은 문 밖에서 · 풍차 자루는 하루 한 번 가게로
     if (actCrowdTick(f, now)) continue;   // [ACT-CROWD] 붐비는 좁은 길 — 마주 오는 둘이 비켜 서느라 잠깐 멈칫
     if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
@@ -7417,6 +7418,98 @@ function actCrowdTick(f, now) {
   g.fillStyle = '#d9482f'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 50, 16);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = whyPool[k].material; if (m.map) m.map.dispose(); m.map = t; m.needsUpdate = true; } }
 window.__crowdLook = () => ({ 켜짐: window.VRULES.crowdLook.on, CROWD_AT있음: typeof window.CROWD_AT === 'function', 지금멈칫: folks.filter(f => f.crowdPause).length, ...CROWDX.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-WORK] 일하는 사람이 문 밖에서 보이게 — 가게·온실·풍차 (주민 연기 · 09-20 · 보스 · 사용자 "온실·풍차가 일자리였구나 — 더 직관적인 거 없나").
+   까닭: 일이 건물 안에서만 일어나 문 밖에서 안 보였다. 근무시간(isWorkHour · 9~17)에 그 일터에 **들어가 있는 사람**(jobCount 로 붙은 사람이 출근해 든 것)을
+   들어온 길 칸 쪽 **건물 앞 가장자리**에 나란히(slot) 그리고 일하는 몸짓을 한다 — 붙은 사람이 0 이면 아무도 없다(빈 일터가 그림으로 읽힌다).
+     · 가게 = 문 앞 진열 정리(상자를 발 앞에 두고 허리 굽혔다 폈다) · 온실 = 물뿌리개 / 바구니(자리마다 번갈아 · 좌우로 천천히 돌며)
+     · 풍차 = 자루를 어깨에 · 하루 한 번(tripH 시) 풍차 일꾼 한 사람이 자루를 메고 가장 가까운 가게까지 걸어가 내려놓고 돌아온다(가던 목적 'work' 그대로 — 풍차에 닿으면 다시 든다)
+   옷(윗도리)은 일터 색으로만 — 성별·나이 그림 없음. 물건은 물동이 묶음(ACT-BESIDE)을 크기·색만 바꿔 같이 쓴다(draw call +0). 판정·확률·돈 말·저장 0 · 일자리 셈은 jobCount·f.job 을 읽기만.
+   스위치·수치 VRULES.workLook + 고리 둘(tickFolks 한 줄 · 루프 actBesideDraw 바로 아래 한 줄).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).workLook = { on: true, gap: 1.0, inset: -0.9, tripH: 10.5, tripPauseMs: 1800,
+  kinds: { shop: { top: 0x2f8f83, props: ['crate'] }, green: { top: 0x5aa04a, props: ['can', 'basket'] }, windmill: { top: 0xb8894a, props: ['sack'] } } };
+const WORK_PROP = { crate: { s: [1.25, 0.55, 1.25], c: 0xf0c890 }, can: { s: [0.8, 0.95, 0.8], c: 0xc8f0d0 }, basket: { s: [1.15, 0.6, 1.15], c: 0xffe0a0 }, sack: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 } };
+const WORK = { tripDay: new Map(), stats: { 문밖일꾼: 0, 자루출발: 0, 자루나름: 0, 자루못감: 0 } };
+const workKind = root => { const b = cells[root]; return b && b.root === root && window.VRULES.workLook.kinds[b.k] ? b.k : null; };
+function workPlace(f) {                                                 // 들어온 길 칸 쪽 건물 앞 가장자리 · 같은 일터 일꾼끼리 자리 나눔
+  const R = window.VRULES.workLook, root = f.inside.root, b = cells[root], cell = f.inside.cell; if (!b || cell == null) return null;
+  const used = new Set(); folks.forEach(g => { if (g !== f && g.beside && g.beside.work && g.beside.root === root && g.state === 'inside') used.add(g.beside.slot); });
+  let slot = 0; while (used.has(slot)) slot++;
+  // 서는 칸: 기본 시점(π/4)에서 보이는 면(+x · +z)의 바깥 칸이 길이거나 빈 땅이면 거기(카메라를 따르지 않는다 — 늘 같게), 아니면 들어온 길 칸
+  const fp = footprint(b.k, cX(root), cY(root), b.rot), mine = new Set(fp.map(([a, c]) => idx(a, c))), spots = [];
+  for (const [ax, ay] of [[1, 0], [0, 1]]) fp.forEach(([a, c]) => { const nx = a + ax, ny = c + ay; if (!inb(nx, ny) || !plotOpen(nx, ny)) return; const j = idx(nx, ny); if (mine.has(j)) return; const r = cells[j]; if (!r || isRoad(j)) spots.push([nx, ny, -ax, -ay]); });
+  if (!spots.length) { const x = cX(cell), y = cY(cell); for (const [ax, ay] of D4) { const nx = x + ax, ny = y + ay; if (inb(nx, ny) && mine.has(idx(nx, ny))) { spots.push([x, y, ax, ay]); break; } } }
+  if (!spots.length) return null;
+  const [sx, sy, dx, dz] = spots[slot % spots.length], side = (Math.floor(slot / spots.length) % 2 ? 0.8 : 0) * R.gap;   // 칸마다 한 사람 · 넘치면 옆으로
+  const px = wx(sx) + dx * (CS / 2 + R.inset) + dz * side, pz = wz(sy) + dz * (CS / 2 + R.inset) - dx * side;
+  const k = b.k, props = R.kinds[k].props;
+  return { root, k, mode: 'work', work: true, slot, x: px, z: pz, dir: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), dir0: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), drop: 0,   /* 벽을 비스듬히 보고 선다 — 옆모습이 보이게 */ prop: props[slot % props.length], top: R.kinds[k].top };
+}
+/* tickFolks 고리 — 문 밖 자리 잡기 · 풍차 자루 나르기. true 면 이번 틱은 여기서 끝 */
+function actWorkTick(f, i, now) {
+  const R = window.VRULES.workLook, h = simHour();
+  const T = f.workTrip;
+  if (T) {                                                              // 풍차 → 가게 자루 나르기
+    if (!R.on || !isWorkHour(h) || f.goal !== 'work' || f.state === 'inside') { f.workTrip = null; return false; }
+    const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1, end = f.path && f.path[f.step + 1] == null;
+    if (T.phase === 'go' && end && (f.state === 'idle' || f.state === 'walk') && touchesRoot(at, T.shop)) { T.phase = 'drop'; T.until = now + R.tripPauseMs; f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false;
+      const s = cells[T.shop]; if (s) { const c = centerOf(s.k, cX(s.root), cY(s.root), s.rot); f.dir = Math.atan2(c.x - f.x, c.z - f.z); } return true; }
+    if (T.phase === 'drop') { if (now < T.until) { f.walking = false; return true; } T.phase = 'back'; if (!pathToBuilding(f, i, f.job)) { f.workTrip = null; return false; } WORK.stats.자루나름++; return true; }   // 내려놓고 풍차로(닿으면 원래 줄이 다시 들인다)
+    if (T.phase === 'go' && f.state === 'idle' && now >= f.until) {   // 가다 막혀 섰다 — 하루 리듬이 풍차로 되돌리기 전에 가게로 다시 잡는다
+      if (pathBudget <= 0) return true; pathBudget--; if (!pathToBuilding(f, i, T.shop)) { f.workTrip = null; WORK.stats.자루못감++; return false; } return true; }
+    return false;
+  }
+  if (f.state !== 'inside' || !f.inside) { return false; }
+  const k = workKind(f.inside.root);
+  if (!R.on || !k || f.goal !== 'work' || f.inside.root !== f.job || !isWorkHour(h)) { if (f.beside && f.beside.work) f.beside = null; return false; }
+  if (!f.beside || !f.beside.work) { const b = workPlace(f); if (b) { f.beside = b; WORK.stats.문밖일꾼++; } }
+  if (k === 'windmill' && h >= R.tripH && f.beside && f.beside.slot === 0) {   // 하루 한 번 — 가장 가까운 가게로 자루 하나
+    const day = Math.floor(SIM.t / DAY_MS); if (WORK.tripDay.get(f.inside.root) === day) return false; WORK.tripDay.set(f.inside.root, day);
+    if (pathBudget <= 1) return false;
+    const wr = f.inside.root; let shop = -1, bd = 1e9; jobCount.forEach((n, r) => { const b = cells[r]; if (!b || b.k !== 'shop') return; const d = Math.abs(cX(r) - cX(wr)) + Math.abs(cY(r) - cY(wr)); if (d < bd) { bd = d; shop = r; } });
+    if (shop < 0) { WORK.stats.자루못감++; return false; }
+    leave(f, '나옴'); f.beside = null; pathBudget--;
+    if (!pathToBuilding(f, i, shop)) { WORK.stats.자루못감++; return false; }   // 길이 없으면 원래 줄이 풍차로 다시 들인다
+    f.workTrip = { phase: 'go', shop }; f.goal = 'work'; WORK.stats.자루출발++; return true;
+  }
+  return false;
+}
+/* 루프 고리 — actBesideDraw 바로 아래: 몸짓(방향·굽힘) · 일터 색 윗도리 · 물건(물동이 묶음에 이어서) */
+function actWorkDraw(now) {
+  const R = window.VRULES.workLook; if (!R.on || !folks.length || OFF.has('folks')) return;
+  let nb = bucketMesh.count, touched = false;
+  for (let k = 0; k < nb; k++) bucketMesh.setColorAt(k, folkCol.setHex(0xffffff));   // 물동이는 원래 색(물건 색을 쓰면서 생기는 곱하기 색을 흰색으로)
+  const tops = PERSON_PARTS.map((pt, pi) => pt.c === 'top' ? pi : -1).filter(pi => pi >= 0);
+  folks.forEach((f, i) => {
+    const b = f.beside, T = f.workTrip;
+    if (T && f.state !== 'inside' && nb < FOLK_CAP) {                  // 자루를 메고 가는 중(가게에 내려놓을 때까지)
+      if (T.phase === 'back') return;
+      const P = WORK_PROP.sack, a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), fx = f.px == null ? f.x : f.px + (f.x - f.px) * a, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a, co = Math.cos(f.dir), si = Math.sin(f.dir);
+      folkDummy.position.set(fx + 0.35 * co, T.phase === 'drop' ? 0.35 : 1.55 + (f.walking ? Math.abs(Math.sin(now / 150 + i)) * 0.09 : 0), fz - 0.35 * si); folkDummy.rotation.set(0, f.dir, T.phase === 'drop' ? 0 : 0.5); folkDummy.scale.set(P.s[0], P.s[1], P.s[2]); folkDummy.updateMatrix();
+      bucketMesh.setMatrixAt(nb, folkDummy.matrix); bucketMesh.setColorAt(nb++, folkCol.setHex(P.c)); return; }
+    if (f.state !== 'inside' || !b || !b.work) return;
+    if (QUALITY.farFolk && (Math.abs(b.x - camTarget.x) > 60 || Math.abs(b.z - camTarget.z) > 60)) return;
+    const ph = now / 700 + i * 1.7, P = WORK_PROP[b.prop];
+    let dir = b.dir0, drop = 0, py = 0.26, fwd = 0.85, side = 0;
+    if (b.k === 'shop') { const bend = Math.max(0, Math.sin(ph)); drop = bend * 0.18; py = 0.2; fwd = 0.9; }                     // 진열 정리 — 굽혔다 폈다
+    else if (b.k === 'green') { dir = b.dir0 + Math.sin(ph * 0.6) * 0.6; py = b.prop === 'can' ? 0.95 + Math.sin(ph * 2) * 0.05 : 0.7; fwd = 0.55; side = 0.35; }   // 물 주기 · 바구니 — 좌우로 천천히
+    else if (b.k === 'windmill') { py = 1.5 + Math.abs(Math.sin(ph)) * 0.12; fwd = 0.15; side = 0.35; }                           // 자루를 어깨에
+    const co = Math.cos(dir), si = Math.sin(dir), parts = PERSON_PARTS;
+    parts.forEach((pt, pi) => { const im = folkPool[pi]; if (!im || i >= im.count) return;
+      folkDummy.position.set(b.x + pt.p[0] * co + pt.p[2] * si, pt.p[1] - drop * (pt.p[1] > 0.6 ? 1 : 0), b.z - pt.p[0] * si + pt.p[2] * co); folkDummy.rotation.set(0, dir, 0); folkDummy.scale.set(pt.s[0], pt.s[1], pt.s[2]); folkDummy.updateMatrix();
+      im.setMatrixAt(i, folkDummy.matrix); if (tops.includes(pi)) im.setColorAt(i, folkCol.setHex(b.top)); });
+    touched = true;
+    if (P && nb < FOLK_CAP) { folkDummy.position.set(b.x + side * co + fwd * si, py, b.z - side * si + fwd * co); folkDummy.rotation.set(0, dir, 0); folkDummy.scale.set(P.s[0], P.s[1], P.s[2]); folkDummy.updateMatrix();
+      bucketMesh.setMatrixAt(nb, folkDummy.matrix); bucketMesh.setColorAt(nb++, folkCol.setHex(P.c)); }
+  });
+  if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; });
+  bucketMesh.count = nb; if (nb) { bucketMesh.instanceMatrix.needsUpdate = true; if (bucketMesh.instanceColor) bucketMesh.instanceColor.needsUpdate = true; }
+}
+window.__workLook = () => { const h = simHour(); let out = 0, trip = 0; folks.forEach(f => { if (f.state === 'inside' && f.beside && f.beside.work) out++; if (f.workTrip) trip++; });
+  const empty = []; jobCount.forEach((n, r) => { if (workKind(r) && n === 0) empty.push(cells[r].k); });
+  return { 켜짐: window.VRULES.workLook.on, 시: +h.toFixed(1), 지금문밖일꾼: out, 자루나르는중: trip, 빈일터: empty, ...WORK.stats }; };
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
@@ -8837,6 +8930,7 @@ function loop() {
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
+  actWorkDraw(SIM.t + SIM.acc);   // [ACT-WORK] 문 밖에서 일하는 몸짓 · 일터 색 옷 · 물뿌리개·바구니·자루·상자(물동이 묶음을 같이 쓴다)
   actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
   actPassDraw();   // [ACT-PASS] 한 칸을 같이 지나는 둘은 오른쪽으로 비켜 그린다(겹쳐 한 몸 ✗)
   actRainDraw();   // [ACT-RAIN] 처마 밑에 선 사람은 지붕 쪽으로 반 걸음
