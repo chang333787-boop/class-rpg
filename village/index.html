@@ -2861,6 +2861,30 @@ function jobsChipGo() { JOBSON.roots = jobsChipList(); jobsChipDraw(); if (!JOBS
   toast('💼 이 동네 ' + g.length + '채 · 어른들 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요', true); }
 window.__jobsOn = () => ({ 셈: window.VRULES.jobsHomes.on, 돌아섬: window.VRULES.jobAway.on, 칩: window.VRULES.jobsChip.on, 칩수: JOBSON.roots.length, 글: (document.getElementById('jobsChip') || {}).textContent || '', ...JOBSON.stats });
 
+/* ── [MAC-WORKFIRST] 일터 둘 고침 (창조자의 눈 7회 🔴1·🔴2 · 보스 09-20) ──
+   ① 풍차·온실도 길에 붙어야 놓인다(VRULES.workRoad) — 가게는 needRoad 였는데 풍차·온실은 아니어서 풀밭에 말없이 놓이고 일꾼이 영영 못 왔다("일자리 0/2").
+      K.windmill·K.green 의 needRoad 를 스위치를 읽는 getter 로 둔다 → 놓기 막음 말("풍차는 길에 붙어야 해요…")·카드 고를 때 한마디·문 방향이 가게와 같아진다.
+      옛 저장본의 풀밭 풍차는 그대로 되살아난다(canPlace 의 복원 길은 needRoad 를 안 본다).
+   ② 새 일터 자리는 **아무도 일 안 하는 집부터**(VRULES.jobsHomes.first — 집 단위 배정의 한 칸이라 따로 스위치를 두지 않는다) — 판정('일할 곳이 없어요' = 배정 0)에 닿는 집이 먼저다.
+      한 명이라도 일하는 집이 식구가 늘어 자리를 더 채우는 일(채우기)은, 지난 한 바퀴에 '첫 자리'를 얻은 집이 있었으면 한 바퀴 쉰다.
+      그 전엔 판을 도는 차례대로 채우기가 자리 2개짜리 풍차를 먼저 가져가 💼 칩이 안 줄 수 있었다.
+   ③ 옛 저장본의 풀밭 풍차·온실을 누르면 "— 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요".
+   원래 줄 수정 1 — 일터를 누를 때의 토스트 줄 끝에 workRoadWhy(rec). 그 밖엔 K 두 항목에 getter · jobsHouseStep·jobsHomesStep 감싸기. */
+(window.VRULES = window.VRULES || {}).workRoad = { on: true, kinds: ['windmill', 'green'] };
+if (!('first' in window.VRULES.jobsHomes)) window.VRULES.jobsHomes.first = true;
+const WORKF = { got: 0, last: 1, stats: { 첫자리: 0, 채우기미룸: 0 } };
+['windmill', 'green'].forEach(k => { if (K[k] && !('needRoad' in K[k])) Object.defineProperty(K[k], 'needRoad', { configurable: true, enumerable: true,
+  get: () => { const R = window.VRULES.workRoad; return !!(R && R.on && R.kinds.includes(k)); } }); });
+{ const hs0 = jobsHouseStep; jobsHouseStep = function (rec) { const first = window.VRULES.jobsHomes.first, a = JOBH.asg.get(rec.root); let have = 0; if (a) a.forEach(n => have += n);
+    if (first && have > 0 && WORKF.last > 0 && have < jobsAdultsOf(rec.root)) { WORKF.stats.채우기미룸++; return; }   // 채우기만 쉰다(넘친 몫 줄이기는 have ≥ need 라 여기 안 걸린다)
+    const r = hs0.apply(this, arguments);
+    if (have === 0) { const b = JOBH.asg.get(rec.root); let h2 = 0; if (b) b.forEach(n => h2 += n); if (h2 > 0) { WORKF.got++; WORKF.stats.첫자리++; } }
+    return r; }; }
+{ const hh0 = jobsHomesStep; jobsHomesStep = function () { const lap = JOBH.stats.한바퀴, r = hh0.apply(this, arguments); if (JOBH.stats.한바퀴 !== lap) { WORKF.last = WORKF.got; WORKF.got = 0; } return r; }; }
+/* 일터를 눌렀을 때 — 길에 안 닿은 일터(옛 저장본의 풀밭 풍차·온실)는 까닭과 한 수를 말한다 */
+function workRoadWhy(rec) { const R = window.VRULES.workRoad; if (!R || !R.on || !K[rec.k].jobs || roadBeside(rec) >= 0) return ''; WORKF.stats.길없음말 = (WORKF.stats.길없음말 || 0) + 1; return ' — 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요'; }
+window.__workFirst = () => ({ 길필요: window.VRULES.workRoad.on && window.VRULES.workRoad.kinds.filter(k => K[k] && K[k].needRoad), 먼저: !!window.VRULES.jobsHomes.first, 지난바퀴첫자리: WORKF.last, ...WORKF.stats });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
@@ -2902,7 +2926,7 @@ function act(clientX, clientY) {
       toast(K[rec.k].nm + ' · ' + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);
       return;
     }
-    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec), true); return; }   // 온실·풍차 같은 일터(F27)
+    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec), true); return; }   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
     if (rec && rec.k === 'house') {                   // 집을 누르면 사정을 말한다
       const n = res.get(rec.root) || 0, why = moveInWhy(rec);
       const names = folks.filter(f => !f.arriving && f.home === rec.root).map(folkName).join('·');
