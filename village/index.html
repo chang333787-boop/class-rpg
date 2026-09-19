@@ -7231,14 +7231,14 @@ window.__growPlant = () => ({ 켜짐: window.VRULES.grow.on, GROW있음: typeof 
    저장: localStorage 'rpg.snap.<SID>'(앨범과 같은 곳) — 저장본·sync 0 · 모자라면 조용히 건너뜀. 친구 마을(구경)에선 안 찍고 안 보인다.
    스위치·수치 VRULES.snap + 고리 셋(tickFolks 한 줄 · 루프 한 줄(본 그리기 앞) · dayNote·albumShow 감싸기).
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).snap = { on: true, every: 3, festMin: 6, viewCells: 9, sizes: [480, 360, 240], maxMs: 5, busyMs: 12, keepMs: 3000, cardMs: 9000, far: 55 };
+(window.VRULES = window.VRULES || {}).snap = { on: true, rain: true, rainShelter: 3, rainPlaza: 4, every: 3, festMin: 6, viewCells: 9, sizes: [480, 360, 240], maxMs: 5, busyMs: 12, keepMs: 3000, cardMs: 9000, far: 55 };
 const SNAP_LABEL = ['', '마을의 즐거운 순간', '새 이웃에게 👋 인사한 순간', '🎉 불편이 풀려 기뻐한 순간', '새 이웃이 이사 온 순간', '🎉 축제 한가운데'];
 const SNAP = { tick: -1, day: -1, rank: 0, log: [], pending: null, arr: new Map(), today: null, yday: null, loaded: false, sizeStep: 0, cost: 0, card: null,
   stats: { 후보: [0, 0, 0, 0, 0, 0], 찍음: [0, 0, 0, 0, 0, 0], 바꿔찍음: 0, 미룸: 0, 건너뜀: 0, 굽기실패: 0 } };
 const snapKey = () => 'rpg.snap.' + SID;
 function snapLoad() { if (SNAP.loaded) return; SNAP.loaded = true; try { const o = JSON.parse(localStorage.getItem(snapKey()) || 'null'); if (o) { SNAP.today = o.today || null; SNAP.yday = o.yday || null; } } catch (e) {} }
 function snapSave() { try { localStorage.setItem(snapKey(), JSON.stringify({ today: SNAP.today, yday: SNAP.yday })); } catch (e) { SNAP.stats.굽기실패++; } }   // 모자라면 조용히
-function snapWant(rank, x, z, now, label) { SNAP.stats.후보[rank]++; if (rank <= SNAP.rank) return; SNAP.rank = rank; SNAP.pending = { rank, x, z, at: now, day: SNAP.day, label: label || SNAP_LABEL[rank] }; }
+function snapWant(rank, x, z, now, label) { SNAP.stats.후보[rank | 0]++; if (rank <= SNAP.rank) return; SNAP.rank = rank; SNAP.pending = { rank, x, z, at: now, day: SNAP.day, label: label || SNAP_LABEL[rank | 0] }; }   // rank 1.5 = 비 오는 날의 한 장(평범한 날 칸보다 조금 위)
 function actSnapTick(now) {
   if (SNAP.tick === SIM.ticks) return; SNAP.tick = SIM.ticks;
   const R = window.VRULES.snap; if (!R.on || VISIT.on) return;
@@ -7248,6 +7248,7 @@ function actSnapTick(now) {
   if (SIM.ticks % R.every) return;
   // 4 새 이웃이 든 순간 — 지난번에 오던 사람이 사라졌고 그 집 식구가 늘었다
   SNAP.arr.forEach((v, f) => { if (folks.includes(f)) return; SNAP.arr.delete(f); const rec = cells[v.home]; if (rec && (res.get(v.home) || 0) > v.n) { const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); snapWant(4, c.x, c.z, now); } });
+  if (EV.rain && SNAP.rank < 1.5 && window.VRULES.snap.rain) snapRain(now);   // 비 오는 날의 한 장 — 처마 밑 무리 · 광장의 우산들(평범한 날 칸 맨 앞)
   let fest = 0;
   folks.forEach(f => {
     if (f.arriving && !f.leaving && !f.visitor && f.home >= 0 && !SNAP.arr.has(f)) SNAP.arr.set(f, { home: f.home, n: res.get(f.home) || 0 });
@@ -7261,6 +7262,15 @@ function actSnapTick(now) {
   if (SNAP.rank < 1) folks.forEach(f => { if (SNAP.rank >= 1 || f.state !== 'inside' || !f.beside || !isSmall(f)) return; const b = cells[f.inside.root]; if (b && b.k === 'play') snapWant(1, f.beside.x, f.beside.z, now, '아이들이 놀이터에서 논 순간'); });   // 평범한 날의 한 장 — 놀이터의 아이
   if (SNAP.rank < 1 && typeof WELLCHAT === 'object') WELLCHAT.who.forEach(w => { if (SNAP.rank < 1 && w && w.f && SIM.t <= w.until) snapWant(1, w.f.x, w.f.z, now, '아침 우물가에서 이웃끼리 👋'); });   // 아침 우물가
   if (EV.fest && EV.festRoot >= 0 && fest >= R.festMin && cells[EV.festRoot]) { const r = cells[EV.festRoot], c = centerOf(r.k, cX(r.root), cY(r.root), r.rot); snapWant(5, c.x, c.z, now); }
+}
+function snapRain(now) {                                               // [ACT-SNAP 비] 처마 밑에 모인 이웃(한 칸에 셋 이상) · 비 오는 광장에 우산 넷 이상
+  const R = window.VRULES.snap, at = new Map();
+  folks.forEach(f => { const S = f.shelter; if (S && S.at && !S.out) { const l = at.get(S.cell); if (l) l.push(f); else at.set(S.cell, [f]); } });
+  for (const l of at.values()) if (l.length >= R.rainShelter) { const x = l.reduce((a, f) => a + f.x, 0) / l.length, z = l.reduce((a, f) => a + f.z, 0) / l.length; snapWant(1.5, x, z, now, '비 오는 날 처마 밑에 모인 이웃'); return; }
+  if (SNAP.plazaDay !== SNAP.day) { SNAP.plazaDay = SNAP.day; SNAP.plaza = plazaRoot(); }   // 광장 찾기는 판 전체를 훑으니 하루 한 번
+  const pr = SNAP.plaza; if (pr == null || pr < 0 || !cells[pr] || cells[pr].k !== 'plaza') return;
+  const r = cells[pr], c = centerOf(r.k, cX(r.root), cY(r.root), r.rot), rr = 3 * CS;
+  const n = folks.filter(f => f.state !== 'inside' && !f.shelter && Math.abs(f.x - c.x) < rr && Math.abs(f.z - c.z) < rr).length; if (n >= R.rainPlaza) snapWant(1.5, c.x, c.z, now, '비 오는 광장의 우산들');
 }
 /* 루프 고리 — 본 그리기(renderer.render) 바로 앞 */
 const snapCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2000), snapVp = new THREE.Vector4(), snapSc = new THREE.Vector4();
@@ -7283,7 +7293,7 @@ function actSnapShoot() {
   try { cv.getContext('2d').drawImage(el, 0, el.height - H, W, H, 0, 0, W, H); } catch (e) {}
   renderer.setScissorTest(scT); renderer.setScissor(snapSc); renderer.setViewport(snapVp); renderer.shadowMap.autoUpdate = au; gridLines.visible = gv; hid.forEach(im => { im.visible = true; });   // 아래 본 그리기가 화면 전체를 다시 그린다
   const ms = performance.now() - t0; SNAP.cost = ms; if (ms > R.maxMs && SNAP.sizeStep < R.sizes.length - 1) SNAP.sizeStep++;
-  SNAP.stats.찍음[P.rank]++; if (SNAP.today && SNAP.today.day === P.day) SNAP.stats.바꿔찍음++;
+  SNAP.stats.찍음[P.rank | 0]++; if (SNAP.today && SNAP.today.day === P.day) SNAP.stats.바꿔찍음++;
   const idle = window.requestIdleCallback || (fn => setTimeout(fn, 60));
   idle(() => { let url = null; try { url = cv.toDataURL('image/jpeg', 0.72); } catch (e) { SNAP.stats.굽기실패++; return; }
     if (SNAP.today && SNAP.today.day === P.day && SNAP.today.rank > P.rank) return;   // 그사이 더 높은 게 찍혔다
