@@ -10715,6 +10715,10 @@ function _renderFriendCanvas() {
   const prevC     = _dC;
   const prevIfMode = _ifMode;
   const prevCont  = _ifActiveContainer;
+  //  [DECO-FRIEND-PAN-1] 구경 판은 옮기지 않은 채 한 장으로 그린다 — 내 마당에서 옮겨 본 값(_dPanX/Y)이 새면
+  //  보이는 칸 고르기(_decoVisible)가 친구 마당 왼쪽·위를 안 그리고(까맣게 빔), 동물 층도 그만큼 밀려 사라졌다.
+  const prevPanX = _dPanX, prevPanY = _dPanY, prevZoom = _dZoom;
+  _dPanX = 0; _dPanY = 0; _dZoom = 1;
 
   // 전체화면 그리드 크기 임시 적용
   DY = {...DY_FULL};
@@ -10745,9 +10749,10 @@ function _renderFriendCanvas() {
   if (_ffScene === 'yard') _drawYard();
   else _drawIndoor();
   // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다
-  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _dPanX, _dPanY);
+  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, 0, 0);
 
   // 복원
+  _dPanX = prevPanX; _dPanY = prevPanY; _dZoom = prevZoom;   // [DECO-FRIEND-PAN-1]
   DECO_SPACE = prevSpace;   // [DECO-SPACE-1]
   CUR        = prevCUR;
   DECO_SCENE = prevScene;
@@ -10784,6 +10789,9 @@ function visitFriend(id) {
     const prevW         = _dW;
     const prevH         = _dH;
     const prevC         = _dC;
+    //  [DECO-FRIEND-PAN-1] 내 화면 상태(옮긴 자리·배율·공간 번호)가 친구 그림에 새지 않게
+    const prevPanX = _dPanX, prevPanY = _dPanY, prevZoom = _dZoom, prevSpace = DECO_SPACE;
+    _dPanX = 0; _dPanY = 0; _dZoom = 1; DECO_SPACE = 1;   // 친구 구경은 공간 1
 
     CUR = f;
     DECO_SCENE = area;
@@ -10816,6 +10824,7 @@ function visitFriend(id) {
     else _drawIndoor();
 
     // 전역 상태 복원
+    _dPanX = prevPanX; _dPanY = prevPanY; _dZoom = prevZoom; DECO_SPACE = prevSpace;   // [DECO-FRIEND-PAN-1]
     CUR       = prevCUR;
     DECO_SCENE = prevScene;
     _dCv      = prevCv;

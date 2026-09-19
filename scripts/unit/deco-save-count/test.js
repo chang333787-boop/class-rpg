@@ -525,6 +525,28 @@
       out('핀치중_캔버스그대로', live() === cv0);
       decoZoomFit(); await sleep(100);
     }
+
+    //  ⑭ 친구 마당 구경에 내 화면 상태가 새지 않나(DECO-FRIEND-PAN-1) — 내 마당을 옮겨 본 뒤 구경 가면
+    //    친구 마당 왼쪽·위가 안 그려지고(까맣게 빔) 동물이 그만큼 밀려 사라졌다.
+    if (typeof _renderFriendCanvas === 'function') {
+      _decoSetZoom(2); decoPanBy(600, 200); await sleep(100);
+      closeInteriorFullscreen(); await sleep(200);
+      openFriendFullscreen({ id: 's_fr', name: '친구', avatar: '🧒', level: 1, inventory: [],
+        houseDecorations: [{ id: 'd_y53', area: 'yard', row: 9, col: 6 }], yardFloor: {} });
+      await sleep(500);
+      _dPanX = 600; _dPanY = 200; _dZoom = 2;      // 내 마당에서 옮겨 본 값이 남아 있는 상태
+      const pan0 = [_dZoom, _dPanX, _dPanY];
+      _renderFriendCanvas(); await sleep(100);   // (헤드리스 가상 시간에서는 여는 쪽 rAF 가 아직일 수 있다)
+      const fcv = document.querySelector('#ff-topview canvas');
+      const px = fcv ? fcv.getContext('2d').getImageData(12, 12, 1, 1).data[3] : -1;
+      out('구경_왼쪽위_그려짐', px > 0);
+      const rec = _animLayers.get('ff-topview');
+      out('구경_동물층_안밀림', !!rec && rec.world.style.transform === 'translate(0px, 0px)');
+      out('구경뒤_내자리_그대로', pan0[0] === _dZoom && pan0[1] === _dPanX && pan0[2] === _dPanY);
+      closeFriendFullscreen(); await sleep(100);
+      openInteriorFullscreen(); await sleep(500);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
