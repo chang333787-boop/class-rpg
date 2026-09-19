@@ -88,6 +88,12 @@ test('불러올 때 걸러 낸다: 칸 번호·정수 둘만 · 살아 있는 �
   const m = growClean({ 10: [1, 2], 11: [1, 2], 12: [1.5, 2], 13: [1, 2], abc: [1, 2], 14: 'x' }, alive, kinds); assert.deepEqual([...m.keys()], [10]); assert.deepEqual(m.get(10), [1, 2]); });
 test('grow 가 없거나 배열·문자열이면 빈 것', () => { for (const v of [undefined, null, [], 'x', 3]) assert.equal(growClean(v, () => 'tree', new Set(['tree'])).size, 0); });
 
+/* ── 비 오는 날의 절반쯤은 오후에 갠다(MAC-RAINCLEAR) — rainClearAt(날, 13, 16) ── */
+const rainClearAt = grab('rainClearAt');
+test('그치는 때는 13~16시 정시 또는 null(하루 내내)', () => { for (let d = 1; d <= 400; d++) { const h = rainClearAt(d, 13, 16); assert.ok(h === null || (Number.isInteger(h) && h >= 13 && h <= 16), d + '일 ' + h); } });
+test('비 오는 날의 40~60% 가 오후에 갠다 · 네 시간대가 다 쓰인다', () => { const rainDay = d => ((d * 2654435761) >>> 0) % 3 === 0; let n = 0, c = 0; const hs = new Set(); for (let d = 1; d <= 600; d++) if (rainDay(d)) { n++; const h = rainClearAt(d, 13, 16); if (h != null) { c++; hs.add(h); } } assert.ok(c / n > 0.4 && c / n < 0.6, (c / n).toFixed(2)); assert.equal(hs.size, 4); });
+test('같은 날은 늘 같은 때(다시 열어도)', () => { for (const d of [7, 22, 31, 100]) assert.equal(rainClearAt(d, 13, 16), rainClearAt(d, 13, 16)); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);
