@@ -4756,8 +4756,10 @@ function _floorPickPeekEnd(redraw) {
   if (redraw) _floorPickRender();
 }
 function _floorPickRender() {
+  if (DECO_SCENE !== 'yard') return _inLookRender();   // [INDOOR-LOOK-1] 집 안이면 같은 판에 벽지·바닥
   const host = document.getElementById('if-floor-picker');
   if (!host || host.hidden) return;
+  const colLab = host.querySelector('.fpk-row[data-row="cols"] .fpk-lab'); if (colLab) colLab.textContent = '색';   // 집 안의 '톤'을 되돌린다
   const wide = innerWidth >= 1200, small = innerWidth < 900;
   const fam = _fpk.fam, isBed = !!_FLOOR_EDGE_COLOR[fam], famRow = _FLOOR_FAMS.find(f => f[0] === fam);
   const peekV = _fpk.peek ? _floorJoin(fam, _fpk.peek.col, _fpk.rim[fam] || '') : '';
@@ -4811,14 +4813,177 @@ function _floorPickSoon(rebuild) {
 function _floorPickShow(on) {
   const host = document.getElementById('if-floor-picker'); if (!host) return;
   if (!on) { _floorPickPeekEnd(false); host.hidden = true; return; }
-  _floorPickRead(CUR_FLOOR_TILE);
   host.hidden = false;
+  if (DECO_SCENE !== 'yard') { _inLookShow(); return; }   // [INDOOR-LOOK-1]
+  _floorPickRead(CUR_FLOOR_TILE);
   _floorPickRender();
 }
 if (typeof window !== 'undefined') {
   addEventListener('resize', () => { if (DECO_MODE === 'floor') _floorPickSoon(true); });   // 폭 1200·900 에서 칩·견본 크기가 바뀐다
   //  말풍선은 다른 곳을 누르면 닫힌다(고른 것은 그대로). 판 안 단추는 제 click 에서 닫는다(여기서 다시 그리면 그 click 이 사라진다)
   addEventListener('pointerdown', e => { if (_fpk.peek && !(e.target.closest && e.target.closest('#if-floor-picker'))) _floorPickPeekEnd(true); }, true);
+}
+
+// ══ 집 안 벽지·바닥 고르기 (INDOOR-LOOK-1 · IN-2) ══════════════
+//  규칙 원본: docs/indoor_look_rules_20260920.md §3 · 저장: docs/indoor_rooms_proposal_20260920.md (나)
+//  · 저장은 새 필드 하나 — `indoor["<공간>"].look = "바닥,벽지"`, 각 값은 마당 바닥과 같은 `이름#색`(기본색이면 `#` 없음).
+//    배열이 아니라 객체 맵이라 `_normalizeArrays` 를 안 탄다 · 옛 JS 는 모르는 필드를 `...s` 로 싣고 통째 저장에 그대로 내보낸다.
+//  · **고르지 않은 집 안은 지금 그림 그대로**(`tile_indoor_wood` + `wall_floral` — 파일 이름까지 같다 = 한 픽셀도 안 바뀐다).
+//    보통 마루·꽃무늬를 다시 고르면 저장값에서 그 칸을 비운다(둘 다 기본이면 필드째 지운다) — '고르기 전'과 같은 글자가 되게.
+//  · 표에 없는 이름·색은 조용히 기본으로(마당 `_floorParse` 와 같은 태도).
+//  · 방이 없는 지금은 판 어디를 눌러도 큰 방 하나가 바뀐다(방 만들기 IN-3 은 아직).
+const INDOOR_WALLS = [['plain', '민무늬', []], ['stripe', '줄무늬', []], ['floral', '꽃무늬', []],
+  ['star', '별무늬', ['sky', 'night', 'pink']], ['gingham', '체크', ['blue', 'green', 'yellow']],
+  ['wood', '나무 판벽', ['light', 'dark', 'white']], ['tile', '타일 벽', ['mint', 'sky', 'pink']], ['brick', '벽돌 벽', ['white', 'gray']]];
+const INDOOR_FLOORS = [['plank', '마루', ['light', 'dark']], ['tile', '타일', ['white', 'sky', 'terra']],
+  ['check', '체크 타일', ['mint', 'pink', 'blue']], ['carpet', '카펫', ['blue', 'pink', 'green']]];
+//  색 이름 — '' 는 그 그림 파일의 기본색(파일마다 다르다)
+const _IN_COLOR_KO = { sky: '하늘', night: '밤', pink: '분홍', blue: '파랑', green: '초록', yellow: '노랑', light: '밝은', dark: '짙은',
+  white: '흰', mint: '민트', gray: '회색', terra: '벽돌빛' };
+const _IN_BASE_KO = { wall: { star: '크림', gingham: '다홍', wood: '나무', tile: '아이보리', brick: '붉은' },
+  floor: { plank: '보통', tile: '베이지', check: '밤색', carpet: '베이지' } };
+const _inTable = kind => kind === 'wall' ? INDOOR_WALLS : INDOOR_FLOORS;
+//  한 쪽 값 'star#sky' → { name, color } · 못 읽으면 null(= 기본)
+function _inPartParse(kind, v) {
+  const m = /^([a-z]+)(?:#([a-z]+))?$/.exec(String(v || ''));
+  if (!m) return null;
+  const row = _inTable(kind).find(x => x[0] === m[1]);
+  if (!row) return null;
+  return { name: row[0], color: (m[2] && row[2].indexOf(m[2]) >= 0) ? m[2] : '' };
+}
+//  기본(보통 마루·꽃무늬)이면 '' — 저장값에서 그 칸을 비운다
+function _inPartJoin(kind, p) {
+  if (!p || (kind === 'floor' ? p.name === 'plank' : p.name === 'floral') && !p.color) return '';
+  return p.name + (p.color ? '#' + p.color : '');
+}
+function _inLookParse(v) {
+  const a = String(v || '').split(',');
+  return { floor: _inPartParse('floor', a[0]), wall: _inPartParse('wall', a[1]) };
+}
+function _inLookJoin(floor, wall) {
+  const f = _inPartJoin('floor', floor), w = _inPartJoin('wall', wall);
+  return (f || w) ? f + ',' + w : '';
+}
+//  그 공간의 look 글자(없으면 '') — 읽기만, 필드를 만들지 않는다
+function _inLookGet(student, sp) {
+  const m = student && student.indoor, e = m && m[sp || DECO_SPACE];
+  return (e && typeof e.look === 'string') ? e.look : '';
+}
+//  쓰기 — '' 면 지우고, 빈 것이 남으면 필드째 지운다(Firebase 는 빈 객체를 어차피 지운다)
+function _inLookSet(student, v, sp) {
+  sp = sp || DECO_SPACE;
+  if (v) {
+    student.indoor = (student.indoor && typeof student.indoor === 'object') ? student.indoor : {};
+    const e = (student.indoor[sp] && typeof student.indoor[sp] === 'object') ? student.indoor[sp] : (student.indoor[sp] = {});
+    e.look = v;
+    return;
+  }
+  const m = student.indoor, e = m && m[sp];
+  if (!e || typeof e !== 'object') return;
+  delete e.look;
+  if (!Object.keys(e).length) delete m[sp];
+  if (!Object.keys(m).some(k => m[k] != null)) delete student.indoor;
+}
+//  그릴 그림 파일 — 고르지 않았으면 지금 그림(옛 파일 이름 그대로)
+function _inLookArt(kind, p) {
+  if (kind === 'floor') return (p && !(p.name === 'plank' && !p.color)) ? ['tile_in_' + p.name, p.color] : ['tile_indoor_wood', ''];
+  return (p && !(p.name === 'floral' && !p.color)) ? ['wall_' + p.name, p.color] : ['wall_floral', ''];
+}
+function _inPartName(kind, p) {
+  const row = _inTable(kind).find(x => x[0] === (p ? p.name : (kind === 'floor' ? 'plank' : 'floral')));
+  if (!row) return '';
+  if (!row[2].length) return row[1];
+  const c = p && p.color ? _IN_COLOR_KO[p.color] : (_IN_BASE_KO[kind][row[0]] || '');
+  return (c ? c + ' ' : '') + row[1];
+}
+
+// ── 고르기 판 — 마당 바닥 고르기와 같은 판(#if-floor-picker)·같은 조각(_pk*) ──
+//  붓 = 탭마다 고른 것(미리 보기). 판(방)을 누르면 지금 탭 쪽만 그 방에 바뀐다.
+const _inPk = { tab: 'wall', wall: null, floor: null };
+//  작은 방 그림: 위 한 줄 벽 띠(벽지 + 걸레받이) · 아래 floorRows 줄 바닥 · 벽에 액자(있으면)
+function _inRoomDraw(wall, floor, floorRows, frame) {
+  return (ctx, W, H) => {
+    const rows = 1 + floorRows, C = H / rows, cols = Math.ceil(W / C);
+    const [fa, fc] = _inLookArt('floor', floor), [wa, wc] = _inLookArt('wall', wall);
+    const fi = _floorImg(fa, fc), wi = _floorImg(wa, wc), bb = _floorImg('wall_baseboard');
+    ctx.fillStyle = '#C4955A'; ctx.fillRect(0, C, W, H - C);
+    ctx.fillStyle = '#8B6520'; ctx.fillRect(0, 0, W, C);
+    for (let c = 0; c < cols; c++) {
+      if (wi) ctx.drawImage(wi, c * C, 0, C, C);
+      if (bb) ctx.drawImage(bb, c * C, 0, C, C);
+      if (fi) for (let r = 1; r < rows; r++) ctx.drawImage(fi, c * C, r * C, C, C);
+    }
+    const fr = frame && _decoImg('d_i4_wall');
+    if (fr) ctx.drawImage(fr, Math.floor(cols / 2) * C, 0, C, C);
+  };
+}
+//  칩·동그라미 그림: 그 벽지(걸레받이까지) 또는 그 바닥을 rows 줄로 채운다
+function _inTileDraw(kind, part, rows) {
+  return (ctx, W, H) => {
+    const C = H / rows, cols = Math.ceil(W / C), [a, c] = _inLookArt(kind, part);
+    const im = _floorImg(a, c), bb = kind === 'wall' ? _floorImg('wall_baseboard') : null;
+    ctx.fillStyle = kind === 'wall' ? '#8B6520' : '#C4955A'; ctx.fillRect(0, 0, W, H);
+    for (let r = 0; r < rows; r++) for (let x = 0; x < cols; x++) {
+      if (im) ctx.drawImage(im, x * C, r * C, C, C);
+      if (bb) ctx.drawImage(bb, x * C, r * C, C, C);
+    }
+  };
+}
+function _inLookShow() {
+  const cur = _inLookParse(_inLookGet(CUR));
+  _inPk.wall = cur.wall; _inPk.floor = cur.floor;   // 거꾸로 읽기 — 지금 방의 것을 고른 상태로
+  _inLookRender();
+}
+function _inLookRender() {
+  const host = document.getElementById('if-floor-picker');
+  if (!host || host.hidden) return;
+  const wide = innerWidth >= 1200, small = innerWidth < 900, kind = _inPk.tab;
+  const saved = _inLookParse(_inLookGet(CUR));
+  const wall = kind === 'wall' ? _inPk.wall : saved.wall, floor = kind === 'floor' ? _inPk.floor : saved.floor;
+  //  견본 — 고른 쪽은 붓, 다른 쪽은 지금 방의 것
+  const sw = host.querySelector('.fpk-side');
+  _pkSwatch(sw, small ? 150 : 180, small ? 96 : 112, _inRoomDraw(wall, floor, 3, true), _inPartName(kind, _inPk[kind]), ['방을 누르면 이렇게 바뀌어요']);
+  const seg = _pkSeg([['wall', '🧱 벽지'], ['floor', '🟫 바닥']], kind, t => { _inPk.tab = t; _inLookRender(); }, '무엇을 고를까');
+  const slot = host.querySelector('.fpk-tool');
+  if (slot) { slot.textContent = ''; slot.hidden = !wide; if (wide) slot.appendChild(seg); }
+  if (!wide || !slot) sw.appendChild(seg);
+  const row = (name, items, lab) => {
+    const r = host.querySelector('.fpk-row[data-row="' + name + '"]'); if (!r) return;
+    r.hidden = !items; if (!items) return;
+    const l = r.querySelector('.fpk-lab'); if (l && lab) l.textContent = lab;
+    const sc = r.querySelector('.fpk-scroll'); sc.textContent = ''; items.forEach(el => sc.appendChild(el));
+  };
+  row('rims', null); row('basics', null);
+  const pick = _inPk[kind], pickName = pick ? pick.name : (kind === 'floor' ? 'plank' : 'floral');
+  const cw = wide ? 52 : 54, ch = wide ? 34 : 40;
+  //  1줄: 종류 칩 — 벽지 = 벽 띠 조각 + 걸레받이 · 바닥 = 바닥 두 줄
+  row('fams', _inTable(kind).map(([id, lab]) => _pkChip(lab, cw, ch,
+    _inTileDraw(kind, { name: id, color: '' }, kind === 'wall' ? 1 : 2),
+    pickName === id, () => { _inPk[kind] = { name: id, color: (_inPk[kind] && _inPk[kind].name === id) ? _inPk[kind].color : '' }; _inLookRender(); })));
+  //  2줄: 색(마루는 '톤') — 동그라미 44px + 아래 이름 10px(벽지 색은 그림만으로 헷갈린다) · 색이 없는 종류는 줄을 감춘다
+  const tRow = _inTable(kind).find(x => x[0] === pickName), cols = tRow ? tRow[2] : [];
+  if (!cols.length) { row('cols', null); return; }
+  const order = pickName === 'plank' ? ['light', '', 'dark'] : [''].concat(cols);
+  row('cols', order.map(c => {
+    const part = { name: pickName, color: c }, name = _inPartName(kind, part);
+    const w = document.createElement('div'); w.className = 'pk-dotn';
+    const dot = _pkDot(name, 40, _inTileDraw(kind, part, 1), (pick ? pick.color : '') === c, false, () => { _inPk[kind] = part; _inLookRender(); });
+    dot.dataset.col = c;
+    const t = document.createElement('span'); t.textContent = (c ? _IN_COLOR_KO[c] : (_IN_BASE_KO[kind][pickName] || '기본'));
+    w.appendChild(dot); w.appendChild(t);
+    return w;
+  }), pickName === 'plank' ? '톤' : '색');
+}
+//  판을 누르면 — 지금 탭 쪽만 그 방에(방이 없으면 큰 방). 같으면 아무 일 없음 · ↩ 한 단계
+function _inLookApply() {
+  const kind = _inPk.tab, prev = _inLookGet(CUR), saved = _inLookParse(prev);
+  const next = kind === 'wall' ? _inLookJoin(saved.floor, _inPk.wall) : _inLookJoin(_inPk.floor, saved.wall);
+  if (next === prev) { toast(kind === 'wall' ? '🧱 이미 이 벽지예요' : '🟫 이미 이 바닥이에요'); return false; }
+  _inLookSet(CUR, next);
+  _decoUndoPush({ t: 'look', sp: DECO_SPACE, prev, next });
+  decoDirty(); _drawDeco(); _inLookRender();
+  toast((kind === 'wall' ? '🧱 벽지가' : '🟫 바닥이') + ' 바뀌었어요 — ' + _inPartName(kind, _inPk[kind]) + ' (↩ 되돌리기)');
+  return true;
 }
 
 // 장식 크기 가져오기 (없으면 1x1)
@@ -5027,11 +5192,10 @@ function ifSyncScene() {
   const sb = document.getElementById('if-scene-btn');
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
   if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
-  // [INDOOR-RUG-1] 집 안에는 아직 고를 바닥이 없다 — 눌러도 끌어도 아무 일 없던 🖌️ 바닥 단추는 집 안에서 감춘다
-  //  (벽지·바닥 고르기(IN-2)가 들어오면 이 자리에 '방 꾸미기'로 돌아온다). 바닥 모드인 채 집 안에 들어오면 장식 모드로.
+  // [INDOOR-LOOK-1] 집 안에서는 같은 자리가 '🖌️ 벽지·바닥'(#631 이 감춰 두었던 단추가 돌아온다). 바닥 모드인 채 장면을 바꾸면 판도 그 장면 것으로.
   const fb = document.getElementById('if-mode-floor');
-  if (fb) fb.style.display = isYard ? '' : 'none';
-  if (!isYard && DECO_MODE === 'floor') { setDecoMode('deco'); ifSyncModeBtn(); }
+  if (fb) { fb.style.display = ''; fb.textContent = isYard ? '🖌️ 바닥' : '🖌️ 벽지·바닥'; }
+  if (DECO_MODE === 'floor') _floorPickShow(true);
 }
 
 function ifSyncModeBtn() {
@@ -7233,7 +7397,8 @@ function _initDeco() {
       if (onDeco) { _dCv._pendingTap = { clientX: t.clientX, clientY: t.clientY, t0: Date.now() }; return; }
       //  [DECO-FLOOR-RECT-1] ⬛ 네모로: 누르는 순간 칠하지 않고 뗄 때 — 끌었으면(네모) 한 칸이 아니었고, 두 손가락이면 화면이었다.
       //  (누르는 순간 칠하면 네모마다 첫 칸이 따로 저장되고, 두 손가락 확대에도 한 칸이 칠해졌다)
-      if (DECO_MODE === 'floor' && DECO_FLOOR_TOOL === 'rect' && e.touches.length === 1) {
+      //  [INDOOR-LOOK-1] 집 안 벽지·바닥도 뗄 때 — 한 손가락 끌기는 화면 이동이다
+      if (DECO_MODE === 'floor' && (DECO_FLOOR_TOOL === 'rect' || DECO_SCENE !== 'yard') && e.touches.length === 1) {
         _dCv._pendingTap = { clientX: t.clientX, clientY: t.clientY, t0: Date.now(), rect: true }; return;
       }
       _decoClick({ clientX: t.clientX, clientY: t.clientY, target: e.target });
@@ -7455,7 +7620,8 @@ function _decoAttachGestures(cv) {
       const m = mid();
       pinch = { d0: m.d, z0: _dZoom, fx: m.x, fy: m.y, mx: m.x, my: m.y };
       _dSuppressClick = true;
-    } else if (pts.size === 1 && (!SEL_DECO && DECO_MODE !== 'floor' || e.pointerType === 'mouse' && e.button !== 0)) {
+    } else if (pts.size === 1 && (!SEL_DECO && DECO_MODE !== 'floor' || e.pointerType === 'mouse' && e.button !== 0
+        || DECO_MODE === 'floor' && DECO_SCENE !== 'yard')) {   // [INDOOR-LOOK-1] 집 안 벽지·바닥: 칠할 칸이 없다 → 한 손가락 끌기 = 화면 이동
       //  [DECO-PAN-1] 마우스 오른쪽·가운데 버튼 끌기는 카드를 골랐어도 언제나 화면 이동
       const l = local(e);
       drag = { x: l.x, y: l.y, moved: 0 };
@@ -8280,7 +8446,7 @@ function _decoImg(id) {
   const img = new Image();
   const rec = { img, ok: false };
   _DECO_IMG[id] = rec;
-  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); } };   // [DECO-FRIEND-ART-1]
+  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); _floorPickSoon(); } };   // [DECO-FRIEND-ART-1] · [INDOOR-LOOK-1] 견본 액자
   img.onerror = () => { rec.ok = false; };
   img.src = './assets/deco/' + encodeURIComponent(id) + '.svg';
   return null;
@@ -8455,9 +8621,12 @@ function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
 }
 // 집 안 벽 띠(벽지+걸레받이+창)와 마루. 그려졌으면 true(호출부가 구식 창문을 생략).
 function _drawIndoorFloorSVG(offX, offY, C, W) {
-  const wood = _floorImg('tile_indoor_wood');
+  //  [INDOOR-LOOK-1] 고른 벽지·바닥 — 고르지 않았으면 지금 그림(파일 이름까지 같다). 친구 구경은 CUR 이 친구라 친구 것이 나온다.
+  const look = _inLookParse(_inLookGet(CUR));
+  const [fa, fc] = _inLookArt('floor', look.floor), [wa, wc] = _inLookArt('wall', look.wall);
+  const wood = _floorImg(fa, fc);
   if (wood) for (let r = 0; r < DI.rows; r++) for (let c = 0; c < DI.cols; c++) _dCtx.drawImage(wood, offX + c*C, offY + r*C, C, C);
-  const wall = _floorImg('wall_floral');
+  const wall = _floorImg(wa, wc);
   if (!wall) return false;
   // 벽 타일의 아래 끝을 바닥 윗선(offY)에 맞추고 위로 채운다. 맨 윗줄은 잘려도 된다.
   const x0 = offX - Math.ceil(offX / C) * C;
@@ -8948,6 +9117,8 @@ function _decoClick(e) {
   } else {
     const {_offX:ox,_offY:oy}=_dCv;
     const c=Math.floor((mx-ox)/C), r=Math.floor((my-oy)/C);
+    //  [INDOOR-LOOK-1] 🖌️ 벽지·바닥 — 방(판) 어디를 눌러도, 벽 띠를 눌러도 그 방이 바뀐다
+    if(DECO_MODE==='floor'){ if(c>=0&&c<DI.cols&&my>=0&&r<DI.rows) _inLookApply(); return; }
     if(c<0||c>=DI.cols||r<0||r>=DI.rows) return;
     _decoLastTap = { area: 'indoor', r, c, t: Date.now() };   // [DECO-DRAG-1]
     _decoPlace('indoor',r,c);
@@ -9040,6 +9211,11 @@ function _decoUndoOne(rec) {
   if (rec.t === 'floor') {
     const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
     if (rec.prev === undefined) delete fm[rec.key]; else fm[rec.key] = rec.prev;
+    return true;
+  }
+  if (rec.t === 'look') {   // [INDOOR-LOOK-1] 집 안 벽지·바닥 — 그 공간의 글자를 앞 것으로
+    _inLookSet(CUR, rec.prev, rec.sp);
+    if (DECO_MODE === 'floor' && DECO_SCENE !== 'yard') _inLookRender();
     return true;
   }
   if (rec.t === 'stroke') {
@@ -9279,7 +9455,9 @@ function decoFindSet(key, val) {
 //  아이는 이 기준을 모른다(카드는 놓은 뒤에도 계속 잡혀 있다) → 막혀 있을 때만 ✋ 단추를 보여 준다.
 function _decoHandSync() {
   const b = typeof document !== 'undefined' && document.getElementById('if-hand-btn');
-  if (b) b.style.display = (SEL_DECO || DECO_MODE === 'floor') ? 'flex' : 'none';
+  //  [INDOOR-LOOK-1] 집 안 벽지·바닥에서는 한 손가락 끌기가 이미 화면 이동이라 ✋ 가 필요 없다
+  const blocked = DECO_MODE === 'floor' ? DECO_SCENE === 'yard' : !!SEL_DECO;
+  if (b) b.style.display = blocked ? 'flex' : 'none';
 }
 function decoHand() {
   if (DECO_MODE === 'floor') { setDecoMode('deco'); if (typeof ifSyncModeBtn === 'function') ifSyncModeBtn(); }

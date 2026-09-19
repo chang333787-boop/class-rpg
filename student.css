@@ -1576,6 +1576,9 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 }
 /* 폰 가로(키 작음) — 판이 마당을 다 덮지 않게 */
 @media (max-height:480px){ .fpk{max-height:52vh;overflow-y:auto} }
+/* [INDOOR-LOOK-1] 집 안 벽지·바닥 — 색 동그라미 아래 이름 10px(벽지 색은 그림만으로 헷갈린다) */
+.pk-dotn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px}
+.pk-dotn>span{font-size:10px;line-height:12px;color:#c9cdd6;white-space:nowrap}
 /* ══ 바닥 '⬛ 네모로' (DECO-FLOOR-RECT-1) — 도구 토글 · 끄는 동안 아래 글 ══ */
 .fpk-tool{flex:0 0 auto;display:flex;align-items:center;padding-right:10px;margin-right:2px;border-right:1px solid rgba(255,255,255,.12)}
 .fpk-tool[hidden]{display:none}

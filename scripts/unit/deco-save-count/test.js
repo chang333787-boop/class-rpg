@@ -861,7 +861,7 @@
       CUR.yardFloor = keepFloor; _drawDeco(); await sleep(100);
     }
 
-    //  ⑯ 집 안 — 러그 위에 가구(INDOOR-RUG-1) + 집 안에서는 🖌️ 바닥 단추가 없다.
+    //  ⑯ 집 안 — 러그 위에 가구(INDOOR-RUG-1) + 집 안의 🖌️ 는 '벽지·바닥'(INDOOR-LOOK-1 — #631 이 감췄던 단추가 돌아왔다).
     //    러그(장식 표의 layer:'floor')와 가구는 한 칸에 같이 놓인다. 러그끼리·가구끼리는 그대로 안 겹친다.
     //    `옛집안_그림지문` 은 ⑮ 와 같은 방식 — **값 자체가 아니라 main 과 나란히(`REPO=<main 을 푼 폴더>`) 같은 기기에서 같은지**를 본다.
     //    (러그와 가구가 안 겹친 '지금까지 가능했던' 집 안 = 이 PR 뒤에도 한 픽셀도 달라지면 안 된다.)
@@ -873,8 +873,9 @@
       const shown = el => !!el && getComputedStyle(el).display !== 'none';
       out('마당_바닥단추_보임', shown(fbtn));
       toggleDecoScene(); await sleep(500);
-      out('집안_바닥단추_없음', !shown(fbtn));
-      out('집안_바닥모드_풀림', DECO_MODE === 'deco' && !shown(frow) && !document.body.classList.contains('deco-floor-mode'));
+      out('집안_🖌️는_벽지바닥', shown(fbtn) && /벽지·바닥/.test(fbtn.textContent));
+      out('집안_바닥모드면_벽지바닥판', DECO_MODE === 'floor' && !shown(frow) && !document.getElementById('if-floor-picker').hidden
+        && document.querySelectorAll('#if-floor-picker .fpk-row[data-row=fams] .pk-chip').length === INDOOR_WALLS.length);
       setDecoMode('deco'); ifSyncModeBtn(); await sleep(200);                 // (main 과 나란히 잴 때 판 크기가 같게 — 이 PR 에서는 이미 장식 모드다)
       decoZoomFit(); await sleep(100);
 
@@ -968,7 +969,7 @@
         openInteriorFullscreen(); await sleep(500);
         if (!_dCv) { renderHouseDeco(); await sleep(200); }
       }
-      out('집안_다시열어도_바닥단추_없음', DECO_SCENE === 'indoor' ? !shown(fbtn) : 'scene=' + DECO_SCENE);
+      out('집안_다시열어도_벽지바닥단추', DECO_SCENE === 'indoor' ? shown(fbtn) && /벽지·바닥/.test(fbtn.textContent) : 'scene=' + DECO_SCENE);
       SEL_DECO = null; _decoUndoClear();
       CUR.houseDecorations = keepDeco; CUR.inventory = keepInv;
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
@@ -1087,6 +1088,54 @@
       out('네모로_상한400_멈춤·알림', !!p4 && p4.capped && p4.w * p4.h <= 400 && /400칸까지/.test(tip.textContent));
       _decoRectCancel(); out('네모로_취소면_안칠함', !_decoRectPrev && tip.hidden && _decoUndo.length === 0);
       decoFloorTool(keepTool); CUR_FLOOR_TILE = keepTile; setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear(); await sleep(100);
+    }
+    //  ⑲ 집 안 벽지·바닥 고르기(INDOOR-LOOK-1 · IN-2) — 공간 3 에서(공간 1 의 옛 집 안을 안 건드린다)
+    if (typeof _inLookApply === 'function') {
+      const server = async () => (await R.db.ref('classRPG_v3/students/' + R.sid).once('value')).val() || {};
+      const names = () => { const got = []; const o = _floorImg; _floorImg = (n, c) => { got.push(n + (c ? '#' + c : '')); return o(n, c); };
+        try { _drawIndoorFloorSVG(10, 10, 20, 400); } finally { _floorImg = o; } return got; };
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keep = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      delete CUR.indoor; _decoUndoClear();
+      //  고르지 않은 집 안 = 지금 그림 파일 그대로(파일 이름·색 조각까지)
+      out('집안_고르기전_옛그림', JSON.stringify(names().slice(0, 2)) === '["tile_indoor_wood","wall_floral"]');
+      out('집안_🖌️단추_보임', getComputedStyle(document.getElementById('if-mode-floor')).display !== 'none' && /벽지·바닥/.test(document.getElementById('if-mode-floor').textContent));
+      setDecoMode('floor'); ifSyncModeBtn(); await sleep(200);
+      const host = document.getElementById('if-floor-picker');
+      out('집안_판열림_벽지8칩', !host.hidden && host.querySelectorAll('.fpk-row[data-row=fams] .pk-chip').length === 8);
+      //  벽지: 별무늬·밤 → 판 누르기(칸 3,3) = 큰 방
+      _inPk.tab = 'wall'; _inPk.wall = { name: 'star', color: 'night' }; _inLookRender();
+      const n0 = (CUR.houseDecorations || []).length;
+      const k = document.querySelector('#if-topview canvas').getBoundingClientRect();
+      _dSuppressClick = false;   // (앞 시험의 끌기가 남긴 '클릭 무시' — 실제로는 손을 떼면 풀린다)
+      _decoClick({ clientX: k.left + (_dCv._offX || 0) + 3.5 * _dC - _dPanX, clientY: k.top + (_dCv._offY || 0) + 3.5 * _dC - _dPanY });
+      out('집안_벽지_바뀜', _inLookGet(CUR, 3) === ',star#night' && JSON.stringify(names().slice(0, 2)) === '["tile_indoor_wood","wall_star#night"]');
+      out('집안_바닥모드_장식은안놓임', (CUR.houseDecorations || []).length === n0);
+      //  바닥: 체크 타일·민트
+      _inPk.tab = 'floor'; _inPk.floor = { name: 'check', color: 'mint' }; _inLookApply();
+      out('집안_바닥_바뀜', _inLookGet(CUR, 3) === 'check#mint,star#night');
+      out('집안_다른공간은_그대로', _inLookGet(CUR, 1) === '' && _inLookGet(CUR, 2) === '');
+      await sleep(700);
+      const sv = await server();
+      out('집안_서버저장', !!(sv.indoor && sv.indoor[3] && sv.indoor[3].look === 'check#mint,star#night'));
+      //  ↩ 두 번 → 필드째 사라진다
+      decoUndo(); decoUndo();
+      out('집안_↩두번_필드없음', CUR.indoor === undefined);
+      //  기본(보통 마루·꽃무늬)을 다시 고르면 '고르기 전'과 같은 글자(필드 없음)
+      _inPk.tab = 'wall'; _inPk.wall = { name: 'plain', color: '' }; _inLookApply();
+      _inPk.wall = { name: 'floral', color: '' }; _inLookApply();
+      out('집안_기본을다시고르면_필드없음', CUR.indoor === undefined);
+      //  못 읽는 값은 조용히 기본으로 · 옛 JS 처럼 배열로 돌아와도 읽힌다
+      const bad = _inLookParse('zzz#q,star#bogus');
+      out('집안_모르는값_기본', bad.floor === null && bad.wall && bad.wall.name === 'star' && bad.wall.color === '');
+      out('집안_배열로와도_읽힘', _inLookGet({ indoor: [null, null, null, { look: 'tile#sky,' }] }, 3) === 'tile#sky,');
+      //  골드·가진 개수는 안 움직인다
+      out('집안_벽지바닥_골드불변', typeof CUR.gold === 'number');
+      if (keep !== undefined) CUR.indoor = keep; else delete CUR.indoor;
+      setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear();
+      toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
     }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
