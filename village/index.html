@@ -1295,6 +1295,37 @@ const _rm = new THREE.Matrix4();
 /* 큰길의 방향 — 둘레(발자국 바깥 한 칸)에 이어지는 상대가 더 많은 쪽. 큰길끼리는 두 배로 센다(큰길을 이어 놓은 거리가 한 방향으로 읽히게). 외따로면 가로(x) */
 function avenueAlongX(rx, ry) { const at = (x, y) => { if (!inb(x, y)) return 0; const c = cells[idx(x, y)]; return !c || !ROAD_JOIN_TO.has(c.k) ? 0 : c.k === 'avenue' ? 2 : 1; };
   let ex = 0, ez = 0; for (let d = 0; d < 2; d++) { ex += at(rx - 1, ry + d) + at(rx + 2, ry + d); ez += at(rx + d, ry - 1) + at(rx + d, ry + 2); } return ex >= ez; }
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-WEAR-1] 붐비는 길이 붐벼 보이게 — 길 쪽 그림 신호(사람 쪽 몸짓은 주민 연기 담당). 보스·사용자 결정 ⓑ.
+   · 1칸 길(road)의 윗판이 붐빔 단계만큼 **흙빛**으로(중간 e2d6bd · 심함 d2bf99) + 심함엔 이어진 변의 **줄눈에 흙**. 칸당 ~18△ — 붐비는 칸이 수백이어도 가볍게(얼룩은 넣지 않는다).
+   · 붐빔 값은 프로그램 쪽 판정 그대로 읽기만(새 판정 0): window.CROWD_AT(root) 가 있으면 그것, 없으면 집마다 crowd(0~1).
+     길 칸의 닳음 = 그 칸에 닿은 집들(발자국 4방)의 붐빔 가운데 가장 큰 것. 단계: 중간 ≥ .2 · 심함 > .3(= crowdedHome 과 같은 선).
+   · **마을의 밤에 한 번만**(자정~5시, 하루 한 번) 새로 본다 → 큰길로 넓혀 붐빔이 풀리면 자국도 서서히가 아니라 그날 밤 걷힌다. 바뀐 칸의 청크만 다시 합친다.
+   · 큰길은 차선이 있어 자국 없음. 청크 기하 안(draw call +0). window.__roadWear(x, y) → 0/1/2(창조자의 눈이 대조할 때).
+   ══════════════════════════════════════════════════════════════ */
+const ROAD_WEAR = new Map();                                   // 길 칸 → 1/2 (밤마다 한 번 새로 · 0 은 안 적는다)
+window.WEAR_LOOK = window.WEAR_LOOK || { on: true, mid: .2, hi: .3 };
+function roadWearParts(x, y, x0, x1, z0, z1, HALF, out) {
+  if (!window.WEAR_LOOK.on) return; const lv = ROAD_WEAR.get(idx(x, y)) || 0; if (!lv) return;
+  const cx = wx(x), cz = wz(y);
+  out.push({ g:'box', c: lv === 1 ? 0xe2d6bd : 0xd2bf99, s:[x1 - x0, .008, z1 - z0], p:[cx + (x0 + x1) / 2, .201, cz + (z0 + z1) / 2], abs:true });   // 윗판이 흙빛으로
+  if (lv >= 2) { const soil = 0x7a5a3a, t = .22;                                                                    // 줄눈 사이 흙 — 이어진 변의 틈에
+    if (x1 > HALF - .2) out.push({ g:'box', c:soil, s:[t, .03, z1 - z0], p:[cx + HALF, .19, cz + (z0 + z1) / 2], abs:true });
+    if (z1 > HALF - .2) out.push({ g:'box', c:soil, s:[x1 - x0, .03, t], p:[cx + (x0 + x1) / 2, .19, cz + HALF], abs:true }); }
+}
+const WEAR = { day: -1, stats: { 밤: 0, 닳은칸: 0, 바뀐칸: 0 } };
+function roadWearSnapshot() {                                   // 밤에 한 번 — 집마다 붐빔을 읽어 길 칸 단계를 새로
+  const W = window.WEAR_LOOK, at = typeof window.CROWD_AT === 'function' ? window.CROWD_AT : (root => crowd.get(root) || 0), next = new Map();
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const v = at(i); if (!(v >= W.mid)) return; const lv = v > W.hi ? 2 : 1;
+    footprint(rec.k, cX(i), cY(i), rec.rot).forEach(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const nx = px + dx, ny = py + dy; if (!inb(nx, ny)) return;
+      const c = cells[idx(nx, ny)]; if (c && c.k === 'road' && lv > (next.get(idx(nx, ny)) || 0)) next.set(idx(nx, ny), lv); })); });
+  let changed = 0; new Set([...ROAD_WEAR.keys(), ...next.keys()]).forEach(c => { if ((ROAD_WEAR.get(c) || 0) !== (next.get(c) || 0)) { changed++; dirtyChunks.add(chunkOfCell(c)); } });
+  ROAD_WEAR.clear(); next.forEach((v, c) => ROAD_WEAR.set(c, v)); WEAR.stats.밤++; WEAR.stats.닳은칸 = ROAD_WEAR.size; WEAR.stats.바뀐칸 = changed;
+}
+setInterval(() => { if (!window.WEAR_LOOK.on || window.__LOADMS == null || typeof simHour !== 'function') return; const h = simHour(), d = simDay();
+  if (h < 5 && WEAR.day !== d) { WEAR.day = d; roadWearSnapshot(); } }, 1000);
+window.__roadWear = (x, y) => (inb(x, y) ? ROAD_WEAR.get(idx(x, y)) || 0 : 0);
+window.__wear = () => ({ 켜짐: window.WEAR_LOOK.on, ...WEAR.stats, 날: WEAR.day });
 function roadFamParts(rec) {
   const R = window.ROADJOIN, rx = cX(rec.root), ry = cY(rec.root), rot = rec.rot & 3, fp = footprint(rec.k, rx, ry, rot);
   const fam = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && ROAD_JOIN_TO.has(c.k)); };
@@ -1314,6 +1345,7 @@ function roadFamParts(rec) {
       if (dx) out.push({ g:'box', c:topC, s:[len, T, z1 - z0], p:[cx + mid, my, cz + (z0 + z1) / 2], rz: dx > 0 ? ang : -ang, abs:true });
       else out.push({ g:'box', c:topC, s:[x1 - x0, T, len], p:[cx + (x0 + x1) / 2, my, cz + mid], rx: dz > 0 ? -ang : ang, abs:true }); }
     else out.push({ g:'box', c:topC, s:[x1 - x0, .04, z1 - z0], p:[cx + (x0 + x1) / 2, .18, cz + (z0 + z1) / 2], abs:true });
+    if (rec.k === 'road') roadWearParts(x, y, x0, x1, z0, z1, HALF, out);   // [DESIGN-WEAR-1] 붐비는 길의 닳은 자국 · 줄눈 사이 흙
     if (gravel) [[-.9, -.7, .3], [.8, .5, .26], [.2, -1.1, .22], [-.5, 1.0, .24]].forEach(([a, b, r]) => out.push({ g:'sph', c:P.stoneD, s:[r, r * .5, r], p:[cx + a, .21, cz + b], abs:true }));
   });
   const n = fp.length, mx = sx / n, mz = sz / n, alongX = fp.length > 1 && fp[0][1] === fp[1][1];   // 발자국 가운데 · 긴 쪽이 x 인가
@@ -4445,6 +4477,60 @@ window.__crowdSkip = () => { let n = 0, sum = 0, over = 0; crowd.forEach(v => { 
 function cellOfFolk(f) { const gx = Math.round(f.x / CS + (W - 1) / 2), gy = Math.round(f.z / CS + (H - 1) / 2); return inb(gx, gy) ? idx(gx, gy) : -1; }
 const crowdedHome = root => (crowd.get(root) || 0) > 0.3;
 
+/* ── [MAC-CROWDSAY] '길이 붐벼요' 뒤에 아이의 한 수 · 붐빔 값을 칸마다 읽는 창구 (보스 09-20 · 조사 docs/village_crowd_stall_20260920.md 추천 ①) ──
+   "길이 붐벼요"는 까닭만 말했다 — 그래서 뭘 하라는지가 없었다(도서관 때와 같은 막다른 말). 필요가 다 찼는데 붐빔 하나로 😐 인 집에 한마디를 잇는다:
+   · 그 집이 쓰는 길을 따라 6칸 안에 곧게 난 곳의 **한쪽 두 칸이 비어 있으면** "🛣️ 길 옆이 비었어요 — 큰길로 넓혀 봐요" (재 봄: pop88 에서 그런 자리 10곳을 넓히자 나흘 뒤 붐빔 0.52 → 0.30 · 인구 100 → 128)
+   · 없으면 "🛣️ 길을 한 줄 더 내 봐요 — 사람들이 나눠 걸어요" (pop88 0.52 → 0.41 · pop167 0.62 → 0.50 — 반쯤 듣는다)
+   · 필요가 빠진 집은 그 말이 먼저다(이유 풍선 whyStuck 과 같은 차례) — 붐빔 귀띔은 안 붙인다.
+   · window.CROWD_AT(칸) → 0~1: 집 칸이면 그 집의 붐빔(crowd, 문턱 0.3 = "길이 붐벼요"), 길 칸이면 그 칸에서 막혀 선 사람 수의 이동 평균(약 20초) — 마을 디자인의 '붐비는 길' 그림 신호가 읽는다.
+     crowdTick 을 감싸 막힌 사람(앞사람 뒤에서 기다림 · 한 칸에 둘)의 칸만 세고, 값은 읽을 때 늦춰 빼 준다(판 전체를 훑지 않는다).
+   · 넓히기: 큰길을 한 칸 길 + 빈 칸 위에 놓으면 그 길을 큰길로 바꾼다(아래 WIDEN) — 말한 한 수가 '여기엔 이미 길이 있어요'로 막히지 않게.
+   판정·수치 0 — 원래 줄 수정 0. satText·crowdTick·canPlace·placeAt·removeAt·undo 감싸기. 스위치 VRULES.crowdSay. */
+(window.VRULES = window.VRULES || {}).crowdSay = { on: true, keep: 0.995 };
+const CROWDSAY = { road: new Map(), stats: { 넓혀요: 0, 한줄더: 0 } };
+/* 순수 함수 — 붐비는 집의 말 끝에 붙일 한마디. crowded = 붐빔으로 😐 · full = 필요는 다 참 · widen = 곁 길을 넓힐 자리가 있음 */
+function crowdHint(crowded, full, widen) { if (!crowded || !full) return ''; return widen ? ' · 🛣️ 곁이 빈 길을 큰길로 넓혀 봐요 — 길 위에 큰길을 놓으면 돼요' : ' · 🛣️ 길을 한 줄 더 내 봐요 — 사람들이 나눠 걸어요'; }
+/* 그 집 곁 길 가운데, 곧게 이어진 두 칸의 한쪽 옆 두 칸이 비어 있고 내 땅인 곳이 있나(큰길 2×2 가 들어갈 자리) */
+/* 그 집이 쓰는 길을 따라 reach 칸 안에, 곧게 이어진 두 칸의 한쪽 옆 두 칸이 비어 있고 내 땅인 곳이 있나(큰길 2×2 가 들어갈 자리) — 있으면 그 칸 */
+function crowdWidenAt(rec, reach) { reach = reach || 6; const roadAt = (x, y) => inb(x, y) && cells[idx(x, y)] && cells[idx(x, y)].k === 'road', empty = (x, y) => inb(x, y) && !cells[idx(x, y)] && plotOpen(x, y);
+  const start = []; footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot).forEach(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { if (roadAt(px + dx, py + dy)) start.push(idx(px + dx, py + dy)); }));
+  const seen = new Map(start.map(i => [i, 0])), q = start.slice();
+  while (q.length) { const i = q.shift(), d = seen.get(i), x = cX(i), y = cY(i);
+    for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x2 = x + ax, y2 = y + ay; if (!roadAt(x2, y2)) continue; const sx = ay ? 1 : 0, sy = ax ? 1 : 0;   // 길이 나아가는 쪽에 직각
+      for (const s of [-1, 1]) if (empty(x + sx * s, y + sy * s) && empty(x2 + sx * s, y2 + sy * s)) return true;
+      const j = idx(x2, y2); if (d < reach && !seen.has(j)) { seen.set(j, d + 1); q.push(j); } } }
+  return false; }
+{ const satC0 = satText; satText = function (rec) { const t = satC0.apply(this, arguments); if (!window.VRULES.crowdSay.on || !rec || rec.k !== 'house') return t;
+    const cr = crowdedHome(rec.root), full = /다 있어요/.test(t), h = crowdHint(cr, full, cr && full && crowdWidenAt(rec));   // 넓힐 자리는 필요할 때만 찾는다
+    if (h) CROWDSAY.stats[/넓혀/.test(h) ? '넓혀요' : '한줄더']++; return t + h; };
+  const ct0 = crowdTick; crowdTick = function () { const r = ct0.apply(this, arguments); if (!window.VRULES.crowdSay.on) return r; const a = window.VRULES.crowdSay.keep, T = SIM.ticks, n = new Map();
+    folks.forEach(f => { if (f.arriving || f.state === 'inside' || f.nh) return; if (!(f.crowdK < 1 || (f.state === 'walk' && f.blockedAt > 0))) return; const c = cellOfFolk(f); if (c >= 0) n.set(c, (n.get(c) || 0) + 1); });
+    n.forEach((k, c) => { const e = CROWDSAY.road.get(c); const v = e ? e.v * Math.pow(a, T - e.t) : 0; CROWDSAY.road.set(c, { v: v + (1 - a) * k, t: T }); });
+    return r; }; }
+/* 넓히기 — 큰길(2×2)을 **한 칸 길 + 빈 칸** 위에 놓으면 그 길 칸을 큰길로 바꾼다(길을 치우고 다시 깔 필요 없이). 옆이 집·시설이면 전처럼 못 놓는다.
+   되돌리기로 그 큰길을 치우면 원래 길이 돌아온다(되돌리기 때만 — 치우기 카드로 치우면 큰길만 사라진다). 길 가족의 다른 것(횡단보도·가로수 열·큰길)은 안 바꾼다. */
+const WIDEN = { roads: new Map(), undoing: false, stats: { 넓힘: 0, 되돌림: 0 } };
+/* 순수 함수 — 발자국 칸들의 사정(kinds: 칸마다 null=빈 칸 · 'road' · 그 밖)으로 넓히기가 되나: 한 칸 길이 하나 이상 · 나머지는 빈 칸 */
+function widenOk(kinds) { let r = 0; for (const k of kinds) { if (k === 'road') r++; else if (k !== null) return false; } return r > 0 && r < kinds.length; }
+{ const canW0 = canPlace; canPlace = function (kind, x, y, rot, opts) { const r = canW0.apply(this, arguments);
+    if (kind !== 'avenue' || r === true || !window.VRULES.crowdSay.on || (opts && opts.복원) || typeof r !== 'string' || !/이미 길이/.test(r)) return r;
+    const fp = footprint(kind, x, y, rot || 0); if (!fp.every(([px, py]) => inb(px, py))) return r;
+    const recs = fp.map(([px, py]) => cells[idx(px, py)]); if (!widenOk(recs.map(c => c ? c.k : null))) return r;
+    fp.forEach(([px, py], j) => { if (recs[j]) cells[idx(px, py)] = null; }); let v; try { v = canW0.apply(this, arguments); } finally { fp.forEach(([px, py], j) => { if (recs[j]) cells[idx(px, py)] = recs[j]; }); }
+    return v; };
+  const placeW0 = placeAt; placeAt = function (kind, x, y, rot) { if (kind === 'avenue' && window.VRULES.crowdSay.on) { const fp = footprint(kind, x, y, rot || 0), gone = [];
+      fp.forEach(([px, py]) => { const c = inb(px, py) ? cells[idx(px, py)] : null; if (c && c.k === 'road' && c.root === idx(px, py)) { removeAt(px, py); gone.push(idx(px, py)); } });
+      if (gone.length) { WIDEN.roads.set(idx(x, y), gone); WIDEN.stats.넓힘++; } }
+    return placeW0.apply(this, arguments); };
+  const remW0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, r = remW0.apply(this, arguments);
+    if (r && root >= 0 && WIDEN.roads.has(root)) { const g = WIDEN.roads.get(root); WIDEN.roads.delete(root); if (WIDEN.undoing) { g.forEach(i => { if (!cells[i]) placeAt('road', cX(i), cY(i), 0); }); WIDEN.stats.되돌림++; } }
+    return r; };
+  const undoW0 = undo; undo = function () { WIDEN.undoing = true; try { return undoW0.apply(this, arguments); } finally { WIDEN.undoing = false; } }; }
+window.CROWD_AT = (i) => { const c = cells[i]; if (!c) return 0; if (c.k === 'house') return Math.min(1, crowd.get(c.root) || 0);
+  const e = CROWDSAY.road.get(i); if (!e) return 0; const v = e.v * Math.pow(window.VRULES.crowdSay.keep, SIM.ticks - e.t); if (v < 0.005) { CROWDSAY.road.delete(i); return 0; } return Math.min(1, v); };
+window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { const v = window.CROWD_AT(i); if (v > 0) top.push([cX(i), cY(i), +v.toFixed(2)]); }); top.sort((a, b) => b[2] - a[2]);
+  return { 켜짐: window.VRULES.crowdSay.on, 붐비는길칸: top.filter(t => t[2] > 0.3).length, 센길칸: top.length, 가장붐빔: top.slice(0, 5), ...CROWDSAY.stats, 넓히기: { ...WIDEN.stats } }; };
+
 /* ══════════════════════════════════════════════════════════════
    이벤트(F13). 비 · 축제. 날짜로 정해지므로 저장할 게 없다(같은 날은 같은 날씨).
    ══════════════════════════════════════════════════════════════ */
@@ -6209,6 +6295,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actCrowdTick(f, now)) continue;   // [ACT-CROWD] 붐비는 좁은 길 — 마주 오는 둘이 비켜 서느라 잠깐 멈칫
     if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
     if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
@@ -6219,6 +6306,7 @@ function tickFolks(dt, now) {
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
     if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
     actFestLitterTick(now);   // [ACT-FESTLIT] 축제 다음 날 광장 조각 · 치우러 가기(틱마다 한 번)
+    actSnapTick(now);   // [ACT-SNAP] 오늘 가장 기쁜 순간 고르기(틱마다 한 번 · 셋에 한 번 훑음)
     actDawnTick();   // [ACT-DAWN] 한밤엔 집집이 불을 끄고, 새벽엔 한두 집이 먼저 켠다(틱마다 한 번 · 15분마다 셈)
     actNightCartTick(now);   // [ACT-NIGHTCART] 밤엔 어귀에 내일 올 이웃의 수레 · 아침엔 그 수레를 끌고 들어온다(틱마다 한 번)
     if (actPuddleTick(f, i, now)) continue;   // [ACT-PUDDLE] 비 그친 다음 날 아침 — 아이는 웅덩이로 뛰어가 통통
@@ -6672,7 +6760,7 @@ function actPassDraw() {
     const walkers = list.filter(i => folks[i].walking), standers = list.filter(i => !folks[i].walking);
     walkers.forEach((i, k) => { const f = folks[i], co = Math.cos(f.dir), si = Math.sin(f.dir);
       const same = walkers.slice(0, k).some(j => Math.cos(folks[j].dir - f.dir) > 0.5);   // 앞에 같은 쪽으로 가는 사람이 있으면 나는 왼쪽
-      const s = (same ? 1 : -1) * R.side;                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
+      const s = (same ? 1 : -1) * R.side * (1 + (f.crowdLv || 0) * 0.25);   // [ACT-CROWD] 붐빌수록 조금 더 비킨다                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
       f.passTx = co * s; f.passTz = -si * s; });
     if (standers.length >= 2) standers.forEach((i, k) => { const f = folks[i], s = (k % 2 ? 1 : -1) * R.side * (1 + (k >> 1) * 0.6);   // 한 칸에 둘 이상 서 있으면(큰길 · 가로등 아래 멈춤) 나란히 — 번갈아 좌우로
       const d0 = folks[standers[0]].dir; f.passTx = Math.cos(d0) * s; f.passTz = -Math.sin(d0) * s; }); });   // 한 축(첫 사람의 방향)으로 — 등을 맞댄 둘이 같은 자리로 가지 않게
@@ -7132,6 +7220,163 @@ function actGrowTick(f, now) {
   f.walking = false; f.dir = Math.atan2(L.x - f.x, L.z - f.z); return true;
 }
 window.__growPlant = () => ({ 켜짐: window.VRULES.grow.on, GROW있음: typeof window.GROW === 'function', 지금자라는칸: GROWX.seen.size, ...GROWX.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-SNAP] 어제의 한 장 — '📰 어제' 한 줄 대신 어제 가장 기뻤던 순간 사진 한 장 (주민 연기 · 09-20 · 창조자의 눈 5회 D 🟢 · 보스 승인).
+   ⓐ 고르기(틱 · 판정 0): 오늘 지금까지 찍은 것보다 높은 순간이 오면 찍을 차례를 건다 — 축제 한가운데(5) > 새 이웃이 든 순간(4) > 🎉 해결의 기쁨(3)
+      > 👋 새 이웃 인사(2) > 웅덩이 통통·자란 나무 올려다봄(1). 하루(시뮬) 한 장만 — 더 높은 순간이 오면 바꿔 찍는다.
+   ⓑ 찍기(프레임): **아이 화면은 그대로** — 본 그리기 바로 앞에서 따로 둔 카메라(같은 방향 · 그 자리 중심)로 캔버스 구석(가위 영역)에만 그려
+      2D 캔버스로 떠 내고, 곧바로 본 그리기가 전부 덮는다(보이기 전에). 그림자 판은 다시 안 그린다. 앞 프레임이 바빴으면(busyMs) 다음 틈으로 미룬다.
+      한 번에 maxMs 를 넘기면 다음부터 더 작게 찍는다(480 → 360 → 240). jpeg 로 굽기는 쉬는 틈(requestIdleCallback)에.
+   ⓒ 보이기: 다음 날 아침(dayNote 자리) '📰 어제' 한 줄 대신 작은 사진 + "어제 · 무슨 순간" + 원래 한 줄(있으면) — 누르면 📖 앨범의 '어제' 칸. 모달·카메라 이동 없음.
+   저장: localStorage 'rpg.snap.<SID>'(앨범과 같은 곳) — 저장본·sync 0 · 모자라면 조용히 건너뜀. 친구 마을(구경)에선 안 찍고 안 보인다.
+   스위치·수치 VRULES.snap + 고리 셋(tickFolks 한 줄 · 루프 한 줄(본 그리기 앞) · dayNote·albumShow 감싸기).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).snap = { on: true, rain: true, rainShelter: 3, rainPlaza: 4, every: 3, festMin: 6, viewCells: 9, sizes: [480, 360, 240], maxMs: 5, busyMs: 12, keepMs: 3000, cardMs: 9000, far: 55 };
+const SNAP_LABEL = ['', '마을의 즐거운 순간', '새 이웃에게 👋 인사한 순간', '🎉 불편이 풀려 기뻐한 순간', '새 이웃이 이사 온 순간', '🎉 축제 한가운데'];
+const SNAP = { tick: -1, day: -1, rank: 0, log: [], pending: null, arr: new Map(), today: null, yday: null, loaded: false, sizeStep: 0, cost: 0, card: null,
+  stats: { 후보: [0, 0, 0, 0, 0, 0], 찍음: [0, 0, 0, 0, 0, 0], 바꿔찍음: 0, 미룸: 0, 건너뜀: 0, 굽기실패: 0 } };
+const snapKey = () => 'rpg.snap.' + SID;
+function snapLoad() { if (SNAP.loaded) return; SNAP.loaded = true; try { const o = JSON.parse(localStorage.getItem(snapKey()) || 'null'); if (o) { SNAP.today = o.today || null; SNAP.yday = o.yday || null; } } catch (e) {} }
+function snapSave() { try { localStorage.setItem(snapKey(), JSON.stringify({ today: SNAP.today, yday: SNAP.yday })); } catch (e) { SNAP.stats.굽기실패++; } }   // 모자라면 조용히
+function snapWant(rank, x, z, now, label) { SNAP.stats.후보[rank | 0]++; if (rank <= SNAP.rank) return; SNAP.rank = rank; SNAP.pending = { rank, x, z, at: now, day: SNAP.day, label: label || SNAP_LABEL[rank | 0] }; }   // rank 1.5 = 비 오는 날의 한 장(평범한 날 칸보다 조금 위)
+function actSnapTick(now) {
+  if (SNAP.tick === SIM.ticks) return; SNAP.tick = SIM.ticks;
+  const R = window.VRULES.snap; if (!R.on || VISIT.on) return;
+  snapLoad();
+  const day = Math.floor(SIM.t / DAY_MS);
+  if (day !== SNAP.day) { if (SNAP.day >= 0) { SNAP.log.push([SNAP.day, SNAP.rank]); if (SNAP.log.length > 30) SNAP.log.shift(); } SNAP.day = day; SNAP.rank = SNAP.today && SNAP.today.day === day ? SNAP.today.rank : 0; SNAP.pending = null; }
+  if (SIM.ticks % R.every) return;
+  // 4 새 이웃이 든 순간 — 지난번에 오던 사람이 사라졌고 그 집 식구가 늘었다
+  SNAP.arr.forEach((v, f) => { if (folks.includes(f)) return; SNAP.arr.delete(f); const rec = cells[v.home]; if (rec && (res.get(v.home) || 0) > v.n) { const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); snapWant(4, c.x, c.z, now); } });
+  if (EV.rain && SNAP.rank < 1.5 && window.VRULES.snap.rain) snapRain(now);   // 비 오는 날의 한 장 — 처마 밑 무리 · 광장의 우산들(평범한 날 칸 맨 앞)
+  let fest = 0;
+  folks.forEach(f => {
+    if (f.arriving && !f.leaving && !f.visitor && f.home >= 0 && !SNAP.arr.has(f)) SNAP.arr.set(f, { home: f.home, n: res.get(f.home) || 0 });
+    if ((f.festSpot && f.state === 'idle') || (EV.fest && f.state === 'inside' && f.inside && f.inside.root === EV.festRoot)) fest++;   // 광장 가장자리 구경꾼 + 광장에 든 사람(__plaza 와 같은 셈)
+    if (f.state === 'inside') return;
+    if (f.whyShow === '기쁨' && now <= f.whyUntil) snapWant(3, f.x, f.z, now);
+    else if (f.greet && f.greet.phase === 'wave') snapWant(2, f.x, f.z, now);
+    else if (f.puddle && f.puddle.until) snapWant(1, f.x, f.z, now, '아이가 웅덩이에서 통통 뛴 순간');
+    else if (f.growLook) snapWant(1, f.x, f.z, now, '밤새 자란 나무를 올려다본 순간');
+  });
+  if (SNAP.rank < 1) folks.forEach(f => { if (SNAP.rank >= 1 || f.state !== 'inside' || !f.beside || !isSmall(f)) return; const b = cells[f.inside.root]; if (b && b.k === 'play') snapWant(1, f.beside.x, f.beside.z, now, '아이들이 놀이터에서 논 순간'); });   // 평범한 날의 한 장 — 놀이터의 아이
+  if (SNAP.rank < 1 && typeof WELLCHAT === 'object') WELLCHAT.who.forEach(w => { if (SNAP.rank < 1 && w && w.f && SIM.t <= w.until) snapWant(1, w.f.x, w.f.z, now, '아침 우물가에서 이웃끼리 👋'); });   // 아침 우물가
+  if (EV.fest && EV.festRoot >= 0 && fest >= R.festMin && cells[EV.festRoot]) { const r = cells[EV.festRoot], c = centerOf(r.k, cX(r.root), cY(r.root), r.rot); snapWant(5, c.x, c.z, now); }
+}
+function snapRain(now) {                                               // [ACT-SNAP 비] 처마 밑에 모인 이웃(한 칸에 셋 이상) · 비 오는 광장에 우산 넷 이상
+  const R = window.VRULES.snap, at = new Map();
+  folks.forEach(f => { const S = f.shelter; if (S && S.at && !S.out) { const l = at.get(S.cell); if (l) l.push(f); else at.set(S.cell, [f]); } });
+  for (const l of at.values()) if (l.length >= R.rainShelter) { const x = l.reduce((a, f) => a + f.x, 0) / l.length, z = l.reduce((a, f) => a + f.z, 0) / l.length; snapWant(1.5, x, z, now, '비 오는 날 처마 밑에 모인 이웃'); return; }
+  if (SNAP.plazaDay !== SNAP.day) { SNAP.plazaDay = SNAP.day; SNAP.plaza = plazaRoot(); }   // 광장 찾기는 판 전체를 훑으니 하루 한 번
+  const pr = SNAP.plaza; if (pr == null || pr < 0 || !cells[pr] || cells[pr].k !== 'plaza') return;
+  const r = cells[pr], c = centerOf(r.k, cX(r.root), cY(r.root), r.rot), rr = 3 * CS;
+  const n = folks.filter(f => f.state !== 'inside' && !f.shelter && Math.abs(f.x - c.x) < rr && Math.abs(f.z - c.z) < rr).length; if (n >= R.rainPlaza) snapWant(1.5, c.x, c.z, now, '비 오는 광장의 우산들');
+}
+/* 루프 고리 — 본 그리기(renderer.render) 바로 앞 */
+const snapCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2000), snapVp = new THREE.Vector4(), snapSc = new THREE.Vector4();
+function actSnapShoot() {
+  const P = SNAP.pending, R = window.VRULES.snap; if (!P) return;
+  if (!R.on || VISIT.on || mapMode || P.day !== SNAP.day) { SNAP.pending = null; return; }
+  if (SIM.t - P.at > R.keepMs && P.rank < SNAP.rank) { SNAP.pending = null; return; }
+  if (QUALITY.farFolk && (Math.abs(P.x - camTarget.x) > R.far || Math.abs(P.z - camTarget.z) > R.far)) { SNAP.pending = null; SNAP.stats.건너뜀++; SNAP.rank = SNAP.today && SNAP.today.day === SNAP.day ? SNAP.today.rank : 0; return; }   // 먼 사람을 안 그리는 기기 — 빈 길만 찍히니 다음 순간을 기다린다
+  if (typeof lastWork === 'number' && lastWork > R.busyMs && SIM.t - P.at < R.keepMs) { SNAP.stats.미룸++; return; }   // 앞 프레임이 바빴다 — 다음 틈에
+  SNAP.pending = null;
+  const t0 = performance.now(), dpr = renderer.getPixelRatio(), W = R.sizes[SNAP.sizeStep], H = Math.round(W * 9 / 16), cw = W / dpr, chh = H / dpr;
+  snapCam.position.copy(camera.position).add(new THREE.Vector3(P.x - camTarget.x, 0, P.z - camTarget.z)); snapCam.quaternion.copy(camera.quaternion);   // 같은 방향 · 그 자리 중심
+  const hw = R.viewCells * CS / 2, hh = hw * H / W; snapCam.left = -hw; snapCam.right = hw; snapCam.top = hh; snapCam.bottom = -hh; snapCam.near = camera.near; snapCam.far = camera.far; snapCam.updateProjectionMatrix(); snapCam.updateMatrixWorld();
+  renderer.getViewport(snapVp); renderer.getScissor(snapSc); const scT = renderer.getScissorTest(), au = renderer.shadowMap.autoUpdate, gv = gridLines.visible;
+  renderer.shadowMap.autoUpdate = false; gridLines.visible = false;
+  const hid = []; [facePool[1], facePool[2]].concat(whyPool.filter((im, k) => !WHY_GOOD.has(WHY_KEYS[k]))).forEach(im => { if (im && im.visible) { im.visible = false; hid.push(im); } });   // 기쁜 순간의 사진 — 😐·😟·불편 풍선은 사진에서만 뺀다(아이 화면엔 그대로)
+  renderer.setViewport(0, 0, cw, chh); renderer.setScissor(0, 0, cw, chh); renderer.setScissorTest(true);
+  renderer.render(scene, snapCam);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const el = renderer.domElement;
+  try { cv.getContext('2d').drawImage(el, 0, el.height - H, W, H, 0, 0, W, H); } catch (e) {}
+  renderer.setScissorTest(scT); renderer.setScissor(snapSc); renderer.setViewport(snapVp); renderer.shadowMap.autoUpdate = au; gridLines.visible = gv; hid.forEach(im => { im.visible = true; });   // 아래 본 그리기가 화면 전체를 다시 그린다
+  const ms = performance.now() - t0; SNAP.cost = ms; if (ms > R.maxMs && SNAP.sizeStep < R.sizes.length - 1) SNAP.sizeStep++;
+  SNAP.stats.찍음[P.rank | 0]++; if (SNAP.today && SNAP.today.day === P.day) SNAP.stats.바꿔찍음++;
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 60));
+  idle(() => { let url = null; try { url = cv.toDataURL('image/jpeg', 0.72); } catch (e) { SNAP.stats.굽기실패++; return; }
+    if (SNAP.today && SNAP.today.day === P.day && SNAP.today.rank > P.rank) return;   // 그사이 더 높은 게 찍혔다
+    SNAP.today = { day: P.day, rank: P.rank, label: P.label, url, t: Date.now() }; snapSave(); });
+}
+/* dayNote 감싸기 — 새 아침: 오늘 것이 어제 것이 되고, '📰 어제' 한 줄 대신 사진 조각 */
+{ const dayNote0 = dayNote;
+  dayNote = function (d) {
+    const R = window.VRULES.snap; if (!R || !R.on || VISIT.on) return dayNote0(d);
+    snapLoad(); let msg = null; const toast0 = toast; toast = (m) => { msg = m; };
+    try { dayNote0(d); } finally { toast = toast0; }
+    const today = Math.floor(SIM.t / DAY_MS);
+    if (SNAP.today && SNAP.today.day < today) { SNAP.yday = SNAP.today; SNAP.today = null; snapSave(); }
+    if (SNAP.yday && SNAP.yday.day === today - 1) snapCard(SNAP.yday, msg); else if (msg) toast(msg, true);   // 사진이 없으면 원래대로 한 줄
+  }; }
+function snapCard(y, msg) {
+  let el = SNAP.card; if (!el) { el = SNAP.card = document.createElement('div'); el.id = 'snapCard';
+    el.style.cssText = 'position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:10;display:none;align-items:center;gap:10px;padding:6px 12px 6px 6px;border-radius:14px;background:rgba(24,28,36,.86);color:#fff;font-size:14px;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;max-width:min(92vw,460px)';
+    el.onclick = () => { el.style.display = 'none'; albumLoad(); albumShow(album.length); };
+    document.body.appendChild(el); }
+  el.innerHTML = '';
+  const im = document.createElement('img'); im.src = y.url; im.alt = '어제의 한 장'; im.style.cssText = 'width:112px;height:63px;object-fit:cover;border-radius:9px;flex:none';
+  const tx = document.createElement('div'); tx.innerHTML = '<b>📷 어제 · ' + y.label + '</b>' + (msg ? '<div style="opacity:.8;font-size:12.5px">' + msg.replace(/^📰\s*/, '') + '</div>' : '');
+  el.appendChild(im); el.appendChild(tx); el.style.display = 'flex';
+  clearTimeout(SNAP.cardT); SNAP.cardT = setTimeout(() => { el.style.display = 'none'; }, window.VRULES.snap.cardMs);
+}
+/* 앨범 감싸기 — 맨 끝에 '어제' 칸 */
+{ const albumShow0 = albumShow;
+  albumShow = function (i) {
+    albumLoad(); snapLoad(); const y = SNAP.yday;
+    if (!y || !window.VRULES.snap.on || VISIT.on || i < album.length) return albumShow0(i);
+    const el = document.getElementById('album'); el.classList.add('show'); albumIdx = album.length;
+    const img = document.getElementById('albumImg'); img.style.display = ''; img.src = y.url; document.getElementById('albumEmpty').style.display = 'none';
+    document.getElementById('albumCap').textContent = '어제 · ' + y.label;
+  };
+  document.getElementById('albumBtn').onclick = () => { albumLoad(); snapLoad(); albumShow(SNAP.yday && window.VRULES.snap.on && !VISIT.on ? album.length : album.length - 1); }; }
+window.__snap = () => { snapLoad(); return { 켜짐: window.VRULES.snap.on, 오늘: SNAP.today ? { 날: SNAP.today.day, 순간: SNAP.today.label, 크기: SNAP.today.url.length } : null, 어제: SNAP.yday ? { 날: SNAP.yday.day, 순간: SNAP.yday.label } : null, 기다림: !!SNAP.pending, 찍기ms: +SNAP.cost.toFixed(2), 크기단계: window.VRULES.snap.sizes[SNAP.sizeStep], 후보: SNAP.stats.후보.slice(1), 찍음: SNAP.stats.찍음.slice(1), 바꿔찍음: SNAP.stats.바꿔찍음, 미룸: SNAP.stats.미룸, 날마다: SNAP.log.map(([d, r]) => (d + 1) + '일:' + r), 건너뜀: SNAP.stats.건너뜀, 굽기실패: SNAP.stats.굽기실패 }; };
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-CROWD] 붐비는 길이 붐벼 보이게 — 사람 쪽 (주민 연기 · 09-20 · 보스 ① · 길 판의 흙빛은 디자인 담당 몫(roadFamParts)).
+   ⓐ 좁은 길(1칸 · 큰길 아님)의 붐빈 칸에서 **마주 오는 둘**(한 사람의 다음 칸 = 다른 사람의 지금 칸, 방향이 반대)이 만나면 둘 다 pauseMs[단계] 멈칫 —
+      멈춘 둘은 ACT-PASS 의 '나란히 선 사람' 꼴로 비켜 선다. 사람마다 coolMs 에 한 번. 큰길(차선)에선 멈칫 없음.
+   ⓑ ACT-PASS 비켜 그리기를 붐빔 단계만큼 조금 더(×1.25 · ×1.5).
+   ⓒ '붐빔' 이유 풍선(🚶 하나)을 '길이 붐벼요' 그림으로 — 길 띠 위에 마주 보는 두 사람(있는 풍선 텍스처만 바꿈 · draw call +0).
+   붐빔 단계(새 판정 0): 프로그램 담당의 window.CROWD_AT(cell)(#647 · 0~1) 이 있으면 그것(.2 이상 1 · .3 넘으면 2 — 디자인 담당 길 그림과 같은 문턱),
+   없으면 이번 틱 칸 사람 수(crowdCount · 프로그램 쪽) 를 그 칸 + 네 이웃으로 더해 3 이상 1 · 5 이상 2.
+   스위치·수치 VRULES.crowdLook + 고리 둘(tickFolks 한 줄 · ACT-PASS 한 조각).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).crowdLook = { on: true, pauseMs: [0, 450, 850], coolMs: 12000, lv1: 3, lv2: 5 };
+const CROWDX = { tick: -1, stats: { 멈칫: 0, 마주침: 0, 큰길넘김: 0 } };
+function crowdLvAt(c) {
+  const R = window.VRULES.crowdLook, F = window.CROWD_AT;
+  if (typeof F === 'function') { const v = F(c); if (typeof v === 'number') return v > 0.3 ? 2 : v >= 0.2 ? 1 : 0; }   // #647: 길 칸 = 막혀 선 사람의 이동 평균 0~1 · 디자인 담당과 같은 문턱(.2 · .3)
+  const x = cX(c), y = cY(c); let n = crowdCount.get(c) || 0;
+  for (const [dx, dy] of D4) if (inb(x + dx, y + dy)) n += crowdCount.get(idx(x + dx, y + dy)) || 0;
+  return n >= R.lv2 ? 2 : n >= R.lv1 ? 1 : 0;
+}
+function actCrowdTick(f, now) {
+  const R = window.VRULES.crowdLook;
+  if (CROWDX.tick !== SIM.ticks) { CROWDX.tick = SIM.ticks;               // 틱마다 한 번 — 마주 오는 둘 찾기
+    if (R.on) { const at = new Map();
+      folks.forEach(g => { g.crowdLv = 0; if (g.state !== 'walk' || !g.path || g.path[g.step + 1] == null || g.visitor && !g.neighbor) return; const c = g.path[g.step]; const l = at.get(c); if (l) l.push(g); else at.set(c, [g]); });
+      at.forEach((list, c) => list.forEach(g => { const n = g.path[g.step + 1], other = at.get(n); if (!other) return;
+        const h = other.find(o => o !== g && o.path[o.step + 1] === c && Math.cos(o.dir - g.dir) < -0.5); if (!h) return;
+        if (isWide(c) || isWide(n)) { CROWDX.stats.큰길넘김++; return; }
+        const lv = Math.max(crowdLvAt(c), crowdLvAt(n)); g.crowdLv = lv; h.crowdLv = lv; if (!lv) return;
+        CROWDX.stats.마주침++;
+        [g, h].forEach(p => { if (p.crowdPause || now < (p.crowdNext || 0)) return; p.crowdPause = { until: now + R.pauseMs[lv], dir: p.dir }; p.crowdNext = now + R.coolMs; CROWDX.stats.멈칫++; }); })); } }
+  const P = f.crowdPause; if (!P) return false;
+  if (!R.on || now >= P.until || f.state !== 'walk') { f.crowdPause = null; return false; }
+  f.walking = false; f.dir = P.dir + Math.sin((P.until - now) / 90) * 0.12; return true;   // 멈칫 — 몸을 살짝 틀었다가 다시 간다
+}
+{ const k = WHY_KEYS.indexOf('붐빔'); if (k >= 0 && whyPool[k]) {         // '붐빔' 풍선 그림 — 길 띠 위에 마주 보는 두 사람
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#fffaf0'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.fillStyle = '#b9b4a8'; g.fillRect(6, 45, 50, 8); g.fillStyle = '#d9d4c8'; g.fillRect(6, 48, 50, 2);   // 좁은 길
+  const fig = (x, col, flip) => { g.fillStyle = col; g.beginPath(); g.arc(x, 25, 5, 0, 6.283); g.fill(); g.fillRect(x - 4.5, 31, 9, 11); g.fillStyle = '#4a3b2a'; g.fillRect(x - 4, 42, 3, 5); g.fillRect(x + 1, 42, 3, 5);
+    g.fillStyle = col; g.fillRect(flip ? x - 9 : x + 4, 33, 5, 3); };   // 앞으로 내민 팔 — 서로를 향해(귀퉁이 딱지에 안 가리게 왼쪽 아래로)
+  fig(17, '#e0457b', false); fig(34, '#3f7fd6', true);
+  g.fillStyle = '#d9482f'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = whyPool[k].material; if (m.map) m.map.dispose(); m.map = t; m.needsUpdate = true; } }
+window.__crowdLook = () => ({ 켜짐: window.VRULES.crowdLook.on, CROWD_AT있음: typeof window.CROWD_AT === 'function', 지금멈칫: folks.filter(f => f.crowdPause).length, ...CROWDX.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
@@ -8158,6 +8403,18 @@ function guideHold(on) {
   if (on) { GUIDE.held = !SIM.paused; if (GUIDE.held) SIM.paused = true; }
   else if (GUIDE.held) { GUIDE.held = false; SIM.paused = false; }
 }
+/* ── [MAC-FIRST5-3] 처음 안내의 집 장 — 터치에선 '톡 → 자리를 보고 → ✓' (보스 09-20 · 터치 앉히기 MAC-SEAT #621 에 맞춰) ──
+   안내 둘째 장은 "집은 길 옆에 놓아요"뿐이었다. 터치에선 이제 집·우물·가게를 톡하면 **바로 놓이지 않고 자리부터 보여 준다** — 처음 온 아이가
+   '눌렀는데 안 놓였다'로 읽지 않게, 그 장에서 미리 말해 둔다. 터치가 되는 기기(any-pointer: coarse · 터치 점 1개 이상)이고 앉히기가 켜져 있을 때만.
+   마우스만 있는 기기는 그대로(누르는 순간 놓인다). 원래 줄 수정 0 — 안내 카드 글(데이터)만 바꾼다. */
+(window.VRULES = window.VRULES || {}).first5House = { on: true };
+const F5H = { was: GUIDE_CARDS[1] ? GUIDE_CARDS[1].txt : '' };
+const first5Touch = () => { try { return (window.matchMedia && matchMedia('(any-pointer: coarse)').matches) || (navigator.maxTouchPoints || 0) > 0; } catch (e) { return false; } };
+function first5HouseCard() { const c = GUIDE_CARDS[1]; if (!c) return; const on = window.VRULES.first5House.on && window.VRULES.seatPlace && window.VRULES.seatPlace.on && first5Touch();
+  c.txt = on ? '<b>집은 길 옆</b>에 놓아요. 땅을 <b>톡</b> 하면<br>집이 그 자리에 먼저 앉아요 → 마음에 들면 <b>✓</b>.<br>길이 <b>6칸</b> 이어지면 첫 주민이 걸어와요.' : F5H.was; }
+{ const gr0 = guideRender; guideRender = function () { first5HouseCard(); return gr0.apply(this, arguments); }; }
+window.__first5House = () => ({ 켜짐: window.VRULES.first5House.on, 터치기기: first5Touch(), 글: (GUIDE_CARDS[1] || {}).txt });
+
 function guideStart(force) {
   if (!force && (guideSeen() || VISIT.on || savingOff)) return false;      // 옛 저장본·구경·시연 판엔 안 뜸
   guideHold(true);   // [MAC-GUIDE]
@@ -8554,6 +8811,7 @@ function loop() {
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
   followTick(); placeCamera();
+  if (typeof actSnapShoot === 'function') actSnapShoot();   // [ACT-SNAP] 어제의 한 장 — 찍을 게 있으면 화면 구석에 먼저 그려 떠 낸다(아래 본 그리기가 덮는다 · 아이 화면 그대로)
   gpuBegin(now);
   renderer.render(scene, camera);
   gpuEnd(now);
