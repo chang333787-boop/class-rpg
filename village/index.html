@@ -3983,6 +3983,47 @@ function actDoorStep(f, i) {
 }
 window.__doorStep = () => ({ 켜짐: window.VRULES.doorStep.on, ...doorStepStats });
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-PATH] 하루 리듬이 길을 다시 잡을 때의 구멍 둘 (주민 연기 · 09-20 · 보스 승인). 둘 다 rhythmTick → pathTo/pathToBuilding 의 같은 열 줄에서 나온다.
+   B. 걷다가 순간이동 — 두 함수는 '지금 경로의 끝 칸'에서 길을 잡고 step 을 0 으로 되돌린다. 걷는 도중(20시 귀가·9시 출근·8시 등교)에 불리면
+      사람이 옛 경로의 끝으로 튄다(사람 24 · 사흘에 37번 · 2~11칸). → 지금 걸음은 마저 걷고, 그 다음 칸에서 같은 목적지로 길을 새로 잡아 잇는다(길찾기 +1 — 사람마다 하루 서너 번).
+   D. 일터·학교 앞에 서 있기 — 이미 그 건물에 닿은 칸에 서 있으면 pathToBuilding 이 goal === here 로 끝나 걷는 상태가 안 되고 들어가기 고리에 안 닿는다(ACT-DOOR 와 같은 구멍의 낮 판).
+      사흘에 493 사람·틱을 일터 앞에 서 있었다. → 그 자리에서 들어간다(걸어서 닿은 사람과 같은 enterPlace · 같은 셈).
+   (안 넣은 것 C. 밤에 '남을 피한 길'이 없으면 헤매는 것 — 막힌 칸까지 넣어 집으로 보내는 두 가지를 해 봤으나 외길에서 마주 선 사람끼리 안 비켜 귀가가 71 → 27 · 59 로 줄었다.
+    헤맴과 '딴 건물에 들어가기'가 외길의 숨통이다. 고치려면 좁은 길에서 비켜 가는 규칙(칸 잡기)이 먼저 — 프로그램 담당 구역. worklog 참고.)
+   판정·확률·저장 0. pathTo·pathToBuilding·rhythmTick 은 한 글자도 안 고쳤다 — tickFolks 의 rhythmTick 줄 위·아래 고리 두 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).pathKeep = { on: true, join: true, atDoor: true };
+const pathKeepStats = { 새로이음: 0, 가던길이음: 0, 일터앞에서들어감: 0, 학교앞에서들어감: 0 };
+const AP = { path: null, step: 0, seg: 0, walk: false };               // rhythmTick 직전의 걸음(사람마다 새로 만들지 않는다)
+function actPathBefore(f, i) {
+  const R = window.VRULES.pathKeep;
+  AP.path = f.path; AP.step = f.step; AP.seg = f.seg; AP.walk = f.state === 'walk' && !!f.path && f.path[f.step + 1] != null;
+  if (!R.on || !R.atDoor || f.visitor || f.arriving || f.state !== 'idle' || !f.path || !f.goal) return false;
+  const here = f.path[f.path.length - 1], h = simHour();
+  if (f.goal === 'work' && !OFF.has('jobs') && f.job != null && isWorkHour(h) && cells[f.job] && cells[f.job].root === f.job && touchesRoot(here, f.job)) {
+    enterPlace(f, i, f.job, here, 1e15); jobStats.출근++; pathKeepStats.일터앞에서들어감++;
+    { const bb = cells[f.job]; f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; }
+    return true;
+  }
+  if (f.goal === 'school' && isSchoolHour(h)) { const sr = schoolNow(); if (sr >= 0 && (inside.get(sr) || 0) < SCHOOL_MAX && touchesRoot(here, sr)) { enterPlace(f, i, sr, here, 1e15); rhythmStats.등교++; pathKeepStats.학교앞에서들어감++; return true; } }
+  return false;
+}
+/* 걷는 도중에 경로가 바뀌었다: 새 경로는 옛 경로의 '끝'에서 시작한다(거기로 튄다). 지금 걸음(old[s] → old[s+1])은 마저 걷고, **그 다음 칸에서** 같은 목적지로 길을 새로 잡아 잇는다.
+   (옛 길 끝까지 갔다가 돌아오게 이어 붙이는 쪽도 해 봤다 — 길이 길고 그사이 낡아서 외길이 더 막혔다: 귀가 77 → 61.)  새로 못 잡으면(거기선 남에게 막혔다) 그때만 '가던 길 + 새 길'. */
+function actPathAfter(f, i) {
+  const R = window.VRULES.pathKeep;
+  if (!R.on || !R.join || !AP.walk || f.state !== 'walk' || f.path === AP.path || !f.path || !f.path.length) return;
+  const old = AP.path, s = AP.step, far = f.path;
+  if (far[0] !== old[old.length - 1]) return;
+  f.path = [old[s], old[s + 1]]; pathBudget--;                         // 길찾기 한 번 더 — 사람마다 하루 서너 번(귀가·출근·등교 때)뿐이지만 그 틱의 예산에서 뺀다
+  const ok = f.goal === 'home' ? pathTo(f, i, f.base) : f.goal === 'work' ? pathToBuilding(f, i, f.job) : f.goal === 'school' ? pathToBuilding(f, i, schoolNow()) : false;
+  if (ok && f.path[0] === old[s + 1]) { f.path = [old[s]].concat(f.path); pathKeepStats.새로이음++; }
+  else { const joined = [old[s]]; for (let k = s + 1; k < old.length; k++) { joined.push(old[k]); const j = far.indexOf(old[k]); if (j >= 0) { for (let m = j + 1; m < far.length; m++) joined.push(far[m]); break; } } f.path = joined; pathKeepStats.가던길이음++; }
+  f.step = 0; f.seg = AP.seg; f.state = 'walk';
+}
+window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats });
+
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
     const rec = cells[f.home];
@@ -3999,7 +4040,9 @@ function tickFolks(dt, now) {
       continue;
     }
     if (actDoorStep(f, i)) continue;   // [ACT-DOOR] 밤에 이미 문 앞이면 곧장 집에 든다(아래 rhythmTick 은 '걸어서 닿은' 사람만 들인다)
+    if (actPathBefore(f, i)) continue;   // [ACT-PATH] 걸음을 적어 둔다 · 이미 일터·학교 앞이면 그 자리에서 들어간다
     if (!f.visitor && rhythmTick(f, i, now) && f.state !== 'walk') continue;
+    actPathAfter(f, i);   // [ACT-PATH] 걷다가 경로가 바뀌었으면 지금 걸음을 마저 걷고 거기서부터 잇는다(순간이동 ✗)
     if (f.state === 'mill' || (f.state !== 'walk' && f.base < 0)) {
       /* 길이 없다 — 집 앞을 오간다. 갇히지도, 허공을 걷지도 않는다. */
       f.state = 'mill';
