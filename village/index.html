@@ -4500,6 +4500,7 @@ function tickFolks(dt, now) {
     if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
     actPlazaTick(f, i, now);   // [ACT-PLAZA] 축제 날 광장에선 둥글게 · 길목에 선 사람은 가장자리로 한 발
 
+    if (actKidsTick(f, i, now, dt)) continue;   // [ACT-KIDS] 2층 이상 집의 아이 — 오후엔 놀 곳으로 뛰어가고 저녁엔 먼저 집에
     if (f.state === 'inside') {
       const b = cells[f.inside.root];
       const home = f.inside.root === f.home, work = f.inside.root === f.job && f.goal === 'work', school = !work && b && b.k === 'school';
@@ -5080,6 +5081,7 @@ function actKidDraw(now) {
     if (!isSmall(f)) return;
     let fx, fz;
     if (f.state === 'inside') { if (!f.beside) return; fx = f.beside.x; fz = f.beside.z; }            // 안에 든 아이는 안 그려진다(곁에 선 아이만)
+    else if (f.festSpot && f.state === 'idle') { fx = f.festSpot.x; fz = f.festSpot.z; }               // [ACT-KIDS] 광장 가장자리에서 구경하는 아이([ACT-PLAZA])
     else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
     const hop = f.walking && f.state !== 'inside' ? Math.abs(Math.sin(now / 95 + i)) * R.hop : 0;     // 아이는 통통 튄다(어른 bob 보다 빠르고 높게)
     kidA.makeTranslation(fx, hop, fz); kidB.makeScale(R.scale, R.scale, R.scale); kidA.multiply(kidB); kidB.makeTranslation(-fx, 0, -fz); kidA.multiply(kidB);
@@ -5090,6 +5092,74 @@ function actKidDraw(now) {
   if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
 }
 window.__kid = () => ({ 켜짐: window.VRULES.kid.on, 지금작은사람: folks.filter(isSmall).length, 이웃아이: folks.filter(f => f.neighbor).length, ...kidStats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-KIDS] 아이 — 2층 이상 집 = 아이가 있는 세대 (주민 연기 · 09-20 · 창조자의 눈 발견 4 · 일감 5).
+   전: 주민이 전부 같은 키다. 놀이터에 어른만 간다. 집이 2층으로 자라면 계획표는 "식구가 는다"고 부르는데 늘어난 식구가 안 보인다.
+   집 단위로 본다: 날마다 아침 한 번, 2층 이상인 집마다 그 집 표본 한 명을 **아이**로 정한다(f.kid → [ACT-KID] isSmall 이 작게 그린다).
+     · 누가 아이인가: 그 집 식구 중 일자리가 없는 사람, 뒤에 온 사람부터. 일자리 판정(isAdult·jobTick)은 안 건드린다 — 일이 있는 사람은 아이가 되지 않는다.
+     · 오후(14~17시) — 쉬던 아이는 가까운 놀 곳(놀이터 먼저)으로 **뛰어간다**(걸음 runK 배). 가서는 [ACT-BESIDE] 대로 놀이터 곁에 선다.
+     · 저녁(homeAt~20시) — 아이는 어른보다 **먼저 집에** 뛰어 들어간다(긴의자·놀이터에 있던 아이도 일어난다 · 원래 규칙은 20시). 하루가 3분이라 한 시간이 6칸 남짓 — 두 시간 앞서 부른다.
+   판정·확률·저장 0. 모양은 [ACT-KID] 그대로(같은 모델 ⅔). 길찾기는 pathBudget 안에서(놀 곳 찾기 반경 playR).
+   규칙 모듈 꼴: 스위치·수치 VRULES.kids + tickFolks 고리 한 줄. (학교·횡단보도의 '이유'는 다음 단계 — 지금은 아이가 보이는 데까지.)
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).kids = { on: true, minLv: 2, playFrom: 14, playTo: 17, homeAt: 18, playR: 24, runK: 1.35 };
+const KIDS = { day: -1, stats: { 아이있는집: 0, 아이: 0, 놀곳으로: 0, 먼저귀가: 0, 불러들임: 0, 일이생겨내려놓음: 0 } };
+function kidsPlan() {
+  const R = window.VRULES.kids; folks.forEach(f => { f.kid = false; });
+  if (!R.on) return;
+  const by = new Map(); folks.forEach(f => { if (!f.visitor && !f.arriving && f.home >= 0) { const a = by.get(f.home); if (a) a.push(f); else by.set(f.home, [f]); } });
+  let homes = 0, n = 0;
+  by.forEach((list, root) => { const rec = cells[root]; if (!rec || rec.k !== 'house' || houseLv(root) < R.minLv) return; homes++;
+    let pick = null; list.forEach(f => { if (f.job == null && (!pick || (f.slot || 0) > (pick.slot || 0))) pick = f; });
+    if (pick) { pick.kid = true; n++; } });
+  KIDS.stats.아이있는집 = homes; KIDS.stats.아이 = n;
+}
+function kidPathTo(f, i, goal) {                                        // 남을 피해서 → 안 되면 막힌 칸까지 넣어(그땐 앞사람 뒤에서 기다린다)
+  if (pathTo(f, i, goal)) return true;
+  const here = f.path ? f.path[f.path.length - 1] : f.base; if (here < 0) return false;
+  const { prev } = roadBFS(here); if (bfsSeen[goal] !== bfsGen) return false;
+  const path = []; let k = goal; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here);
+  f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; return true;
+}
+/* tickFolks 고리 — 안에 든 사람 처리 바로 앞. true 면 그 사람의 이번 틱은 여기서 끝 */
+function actKidsTick(f, i, now, dt) {
+  const day = Math.floor(SIM.t / DAY_MS); if (day !== KIDS.day && simHour() >= DAY_START_H) { kidsPlan(); KIDS.day = day; }
+  const R = window.VRULES.kids; if (!R.on || !f.kid) return false;
+  if (f.job != null) { f.kid = false; KIDS.stats.일이생겨내려놓음++; return false; }   // 그사이 일자리가 생겼다 — 아이는 이제 어른 몫
+  const h = simHour(), early = h >= R.homeAt && h < 20;
+  if (f.state === 'inside') {
+    if (!early) return false;
+    if (f.inside.root === f.home) return true;                          // 저녁에 먼저 든 아이는 20시 전이라도 집에 머문다(원래 규칙은 20시 전엔 내보낸다)
+    leave(f, '나옴'); f.goal = null; f.until = now; KIDS.stats.불러들임++; return true;   // 긴의자·놀이터에 있던 아이도 저녁엔 일어나 집으로(다음 틱에 길을 잡는다)
+  }
+  if (early) {
+    const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : f.base;
+    const ended = f.state === 'idle' || (f.state === 'walk' && f.path && f.path[f.step + 1] == null);
+    if (ended && at === f.base && f.base >= 0) { enterPlace(f, i, f.home, f.base, 1e15); f.kidHome = false; KIDS.stats.먼저귀가++; return true; }
+    if (f.kidHome) {                                                    // 집으로 뛰어가는 중
+      if (f.state === 'walk' && f.path && f.path[f.path.length - 1] === f.base) { if (f.path[f.step + 1] != null && !f.blockedAt) f.seg += (WALK_SPEED * (R.runK - 1) * dt) / CS; return false; }
+      if (f.state === 'idle') { if (now < f.until || pathBudget <= 0) return true; pathBudget--; if (!kidPathTo(f, i, f.base)) f.until = now + 800; return true; }   // 막혀서 멈췄다(원래 걷기 규칙) — 딴 데로 새지 않고 다시 집 길을
+      return false;
+    }
+    if (f.state === 'idle' && now >= f.until && f.base >= 0) { if (pathBudget <= 0) return true; pathBudget--; if (kidPathTo(f, i, f.base)) { f.kidHome = true; f.kidRun = true; } else f.until = now + 800; return true; }
+    return false;
+  }
+  f.kidHome = false;
+  if (h >= R.playFrom && h < R.playTo && f.state === 'idle' && now >= f.until && !f.goal && f.path) {   // 오후 — 놀 곳으로 뛰어간다
+    if (pathBudget <= 0) return true;
+    pathBudget--;
+    const here = f.path[f.path.length - 1], { reach } = roadBFS(here, i, R.playR);
+    let best = -1, bestPlay = false;
+    for (const c of reach) { if (c === here) continue; const b = buildingBeside(c); if (!b || K[b.k].need !== '놀이' && K[b.k].need2 !== '놀이') continue;
+      const isPlay = b.k === 'play'; if (best < 0 || (isPlay && !bestPlay)) { best = c; bestPlay = isPlay; if (isPlay) break; } }   // BFS 순서 = 가까운 순 — 놀이터가 있으면 그게 먼저
+    if (best >= 0 && kidPathTo(f, i, best)) { f.kidRun = true; KIDS.stats.놀곳으로++; return true; }
+    return false;
+  }
+  if (f.kidRun) { if (f.state === 'walk' && f.path && f.path[f.step + 1] != null && !f.blockedAt) f.seg += (WALK_SPEED * (R.runK - 1) * dt) / CS; else if (f.state !== 'walk') f.kidRun = false; }
+  return false;
+}
+window.__kids = () => ({ 켜짐: window.VRULES.kids.on, ...KIDS.stats, 지금밖에: folks.filter(f => f.kid && f.state !== 'inside').length, 지금뛰는중: folks.filter(f => f.kid && f.kidRun && f.state === 'walk').length });
 
 /* ══════════════════════════════════════════════════════════════
    저장 — 지금은 이 컴퓨터(localStorage)에만 넣는다.
