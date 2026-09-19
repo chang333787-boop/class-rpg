@@ -2512,6 +2512,46 @@ function ghostFrontCells(x, y, w, h, rot) { const out = []; if (rot === 0) for (
 canvas.addEventListener('pointerdown', () => { GHOSTS.peek = false; }, true);   // 판을 누르면 '잠깐 보기'는 끝(그 뒤는 원래 규칙)
 window.__ghost = () => ({ 켜짐: window.VRULES.ghostShape.on, 보임: ghostGroup.visible && ghost.edge.visible, 열쇠: GHOSTS.key, 문표시: ghostDoor.visible && GHOSTS.door, 문이길을봄: !!GHOSTS.onRoad, 삼각형: GHOSTS.geo && GHOSTS.geo.index ? GHOSTS.geo.index.count / 3 : 0, ...GHOSTS.stats });
 
+/* ── [MAC-ROADROT] 여러 칸짜리 길 가족은 이웃 길의 축에 맞춰 저절로 방향을 잡는다 (사용자 09-20: "길들을 연속으로 이었을 때 끊기는 애들이 많다") ──
+   횡단보도(1×2)·가로수 열(1×3)·나무다리(2×1)·돌다리(3×1)는 기본 방향이 제각각이라, 아이가 돌리지 않고 길 끝에 이어 놓으면 옆으로 삐져나왔다.
+   · 누른 빈 칸의 네 이웃을 본다 — 길이 **한 축으로만** 있으면(왼·오른쪽만 / 위·아래만) 긴 쪽을 그 축에 맞춘다. 모퉁이·갈래·이웃 길 없음처럼 애매하면 지금 방향 그대로.
+   · 길이 오른쪽(아래)에만 있으면 조각이 길을 덮지 않게 **길에서 멀어지는 쪽으로** 놓는다(누른 칸이 조각의 길 쪽 끝이 된다).
+   · 아이가 돌리기를 **직접 누른 뒤에는 그 선택을 따른다**(다른 카드를 고를 때까지). 끌어서 죽 놓을 때는 획이 나아가는 쪽이 축이다.
+   · 판 위 미리보기(MAC-GHOST)·카드 그림(MAC-CARDROT)은 selRot 을 읽으므로 저절로 그 방향으로 보인다.
+   큰길(2×2)을 한 칸 길 끝에 이을 때는 가운데를 맞출 수 없다(두 칸 폭 대 한 칸) — 어느 쪽으로 붙는지는 미리보기가 보여 준다. 그대로 뒀다.
+   원래 줄 수정 0 — cellAt·rotate·setMode·paintAt 감싸기. 순수 함수 roadRotPlan. */
+(window.VRULES = window.VRULES || {}).roadRot = { on: true };
+const ROADROT = { kinds: new Set(['crosswalk', 'treerow', 'bridge', 'sbridge']), manual: false, stats: { 맞춤: 0, 옮겨놓음: 0, 획방향: 0 } };
+/* 순수 함수 — (w,h) 물건을 cur 방향으로 들고, 누른 칸의 이웃 길이 L·R·U·D 에 있을 때: 어느 방향으로, 뿌리 칸을 얼마나 옮겨 놓을까 */
+function roadRotPlan(w, h, cur, L, R, U, D) {
+  const ax = (L || R) && !(U || D), ay = (U || D) && !(L || R); if (w === h || (!ax && !ay)) return { rot: cur, dx: 0, dy: 0 };
+  const long = Math.max(w, h), odd = ax ? (w < h) : (w > h), rot = ((cur & 1) === (odd ? 1 : 0)) ? cur : (odd ? 1 : 0);
+  return { rot, dx: ax && R && !L ? -(long - 1) : 0, dy: ay && D && !U ? -(long - 1) : 0 };
+}
+/* 순수 함수 — 횡단보도(1×2)를 큰길 끝에 놓을 때: 큰길의 두 칸 폭을 가로지르게. ax = 큰길이 가로로 나 있다. (avx,avy) = 그 큰길 조각의 뿌리 칸 */
+function roadRotSpan(ax, cur, cx, cy, avx, avy) { const par = ax ? 0 : 1; return { rot: (cur & 1) === par ? cur : par, dx: ax ? 0 : avx - cx, dy: ax ? avy - cy : 0 }; }
+const roadRotIsRoad = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && (K[c.k].road || ROADROT.kinds.has(c.k))); };
+{ const cell0 = cellAt; cellAt = function () { const c = cell0.apply(this, arguments);
+    if (!c || !c.inside || !window.VRULES.roadRot.on || ROADROT.manual || !sel || !ROADROT.kinds.has(sel) || painting || carrying || eraser || mover || cells[idx(c.x, c.y)]) return c;
+    const k = K[sel], L = roadRotIsRoad(c.x - 1, c.y), R = roadRotIsRoad(c.x + 1, c.y), U = roadRotIsRoad(c.x, c.y - 1), D = roadRotIsRoad(c.x, c.y + 1);
+    let p = roadRotPlan(k.w, k.h, selRot, L, R, U, D);
+    if (sel === 'crosswalk' && (L || R || U || D)) {                       // 큰길(두 칸 폭) 끝에서는 길을 '가로질러' 두 칸을 다 덮는다
+      const ax = (L || R) && !(U || D), ay = (U || D) && !(L || R), av = [ax && L && [-1, 0], ax && R && [1, 0], ay && U && [0, -1], ay && D && [0, 1]].filter(Boolean).map(o => cells[idx(c.x + o[0], c.y + o[1])]).find(r => r.k === 'avenue');
+      if (av) p = roadRotSpan(ax, selRot, c.x, c.y, cX(av.root), cY(av.root));
+    }
+    if (p.rot !== selRot) { selRot = p.rot; ROADROT.stats.맞춤++; refreshRotCard(); }
+    if ((p.dx || p.dy) && inb(c.x + p.dx, c.y + p.dy)) { ROADROT.stats.옮겨놓음++; return { x: c.x + p.dx, y: c.y + p.dy, inside: true }; }
+    return c; };
+  const rotM0 = rotate; rotate = function () { if (sel && ROADROT.kinds.has(sel)) ROADROT.manual = true; return rotM0.apply(this, arguments); };            // 직접 돌렸다 → 그 선택을 따른다
+  const modeM0 = setMode; setMode = function (kind) { if (kind !== sel) ROADROT.manual = false; return modeM0.apply(this, arguments); };
+  const paintM0 = paintAt; paintAt = function (c) { const p = painting;                                                                     // 끌어서 죽 놓기 — 획이 나아가는 쪽이 축
+    if (p && c && c.inside && window.VRULES.roadRot.on && !ROADROT.manual && ROADROT.kinds.has(p.k) && p.last && p.list.length <= 1) { const [lx, ly] = p.last.split(',').map(Number), mx = Math.abs(c.x - lx), my = Math.abs(c.y - ly);
+      if (mx !== my) { const k = K[p.k], plan = roadRotPlan(k.w, k.h, p.rot, mx > my, mx > my, my > mx, my > mx); if (plan.rot !== p.rot) { const f = p.list[0];                                  // 첫 조각은 방향을 알기 전에(누르는 순간) 놓였다 → 같은 자리에 새 방향으로 다시 놓는다(안 들어가면 그대로 둔다)
+          if (f) { removeAt(f.x, f.y); placeAt(p.k, f.x, f.y, canPlace(p.k, f.x, f.y, plan.rot) === true ? plan.rot : p.rot); }
+          p.rot = plan.rot; selRot = plan.rot; ROADROT.stats.획방향++; refreshRotCard(); } } }
+    return paintM0.apply(this, arguments); }; }
+window.__roadRot = () => ({ 켜짐: window.VRULES.roadRot.on, 직접돌림: ROADROT.manual, 지금방향: selRot, ...ROADROT.stats });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
