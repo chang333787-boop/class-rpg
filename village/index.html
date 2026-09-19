@@ -782,16 +782,18 @@ function joinDirtyAround(kind, x, y) { if (!K[kind] || !(K[kind].join || (typeof
    · joinDirtyAround 는 root 칸의 이웃만 더럽힌다 → 2×1 은 둘째 칸의 이웃도(joinDirtyWide).
    모양(아래 표의 상자들)은 기존 울타리·돌담 생김새를 옮긴 기본값 — 디자인 담당이 바꿔도 된다.
    ══════════════════════════════════════════════════════════════ */
-JOIN_SHAPES.wood = { always: true,
-  arm:  [ { g:'box', c:P.woodD, s:[.13,.16,CS/2], p:[0,1.00,-CS/4] }, { g:'box', c:P.woodD, s:[.13,.16,CS/2], p:[0,.52,-CS/4] } ],
-  node: [ { g:'box', c:P.wood, s:[.24,1.25,.24], p:[0,.625,0] } ],
-  lone: [ { g:'box', c:P.wood, s:[.24,1.25,.24], p:[-1.6,.625,0] }, { g:'box', c:P.wood, s:[.24,1.25,.24], p:[1.6,.625,0] }, { g:'box', c:P.woodD, s:[3.4,.16,.13], p:[0,1.00,0] }, { g:'box', c:P.woodD, s:[3.4,.16,.13], p:[0,.52,0] } ] };
-JOIN_SHAPES.stone = {
-  arm:  [ { g:'box', c:P.stone, s:[.80,.80,CS/2], p:[0,.40,-CS/4] }, { g:'box', c:P.stoneD, s:[.94,.16,CS/2], p:[0,.86,-CS/4] } ],
-  node: [ { g:'box', c:P.stone, s:[.96,.84,.96], p:[0,.42,0] }, { g:'box', c:P.stoneD, s:[1.08,.16,1.08], p:[0,.91,0] } ],
-  lone: [ { g:'box', c:P.stone, s:[3.4,.80,.80], p:[0,.40,0] }, { g:'box', c:P.stoneD, s:[3.5,.16,.94], p:[0,.86,0] } ] };
-JOIN_GATES.wood  = [ { g:'box', c:P.wood, s:[.30,1.75,.30], p:[-1.7,.875,0] }, { g:'box', c:P.wood, s:[.30,1.75,.30], p:[1.7,.875,0] }, { g:'box', c:P.woodD, s:[3.9,.18,.22], p:[0,1.80,0] } ];   // 두 기둥 + 가로 들보
-JOIN_GATES.stone = [ { g:'box', c:P.stone, s:[.90,1.35,.90], p:[-1.55,.675,0] }, { g:'box', c:P.stone, s:[.90,1.35,.90], p:[1.55,.675,0] }, { g:'box', c:P.stoneD, s:[1.04,.18,1.04], p:[-1.55,1.44,0] }, { g:'box', c:P.stoneD, s:[1.04,.18,1.04], p:[1.55,1.44,0] } ];
+JOIN_SHAPES.wood = { always: true,   // [DESIGN-WOOD-STONE-1] 갈색 울타리 — 흰 말뚝 울타리와 같은 식구 비례: 기둥 .22·1.12 + 작은 꼭지 · 가로대 두 줄(.40 · .84) · 칸마다 기둥
+  arm:  [ { g:'box', c:P.woodD, s:[.10,.15,CS/2], p:[0,.84,-CS/4] }, { g:'box', c:P.woodD, s:[.10,.15,CS/2], p:[0,.40,-CS/4] } ],
+  node: [ { g:'box', c:P.wood, s:[.22,1.12,.22], p:[0,.56,0] }, { g:'cone', c:P.woodD, s:[.22,.16,.22], p:[0,1.20,0], ry:Math.PI / 4 } ],
+  lone: [ { g:'box', c:P.wood, s:[.22,1.12,.22], p:[-1.5,.56,0] }, { g:'box', c:P.wood, s:[.22,1.12,.22], p:[1.5,.56,0] }, { g:'box', c:P.woodD, s:[3.0,.15,.10], p:[0,.84,0] }, { g:'box', c:P.woodD, s:[3.0,.15,.10], p:[0,.40,0] } ] };
+JOIN_SHAPES.stone = {   // 돌담 — 크기·밝기가 다른 돌 세 덩이가 엇갈려 쌓이고, 위에 조금 넓은 갓돌. 몸통은 0.62(전 0.80)로 가늘게, 마디는 한 단 높은 기둥돌
+  arm:  [ { g:'box', c:0xd6d0c2, s:[.62,.40,.80], p:[0,.20,-.42] }, { g:'box', c:0xa9a193, s:[.60,.40,1.14], p:[0,.20,-1.43] },
+          { g:'box', c:0xb7af9f, s:[.60,.36,1.06], p:[0,.58,-.55] }, { g:'box', c:0xd0cabb, s:[.62,.36,.90], p:[0,.58,-1.55] },
+          { g:'box', c:P.stoneD, s:[.78,.12,CS/2], p:[0,.82,-CS/4] } ],
+  node: [ { g:'box', c:0xc9c3b6, s:[.86,.98,.86], p:[0,.49,0] }, { g:'box', c:P.stoneD, s:[1.0,.14,1.0], p:[0,1.05,0] } ],
+  lone: [ { g:'box', c:0xc9c3b6, s:[.86,.98,.86], p:[0,.49,0] }, { g:'box', c:P.stoneD, s:[1.0,.14,1.0], p:[0,1.05,0] } ] };
+JOIN_GATES.wood  = [ { g:'box', c:P.wood, s:[.28,1.40,.28], p:[-1.6,.70,0] }, { g:'box', c:P.wood, s:[.28,1.40,.28], p:[1.6,.70,0] }, { g:'cone', c:P.woodD, s:[.28,.18,.28], p:[-1.6,1.49,0], ry:Math.PI / 4 }, { g:'cone', c:P.woodD, s:[.28,.18,.28], p:[1.6,1.49,0], ry:Math.PI / 4 }, { g:'box', c:P.woodL, s:[1.5,.86,.08], p:[-.86,.56,-.44], ry:.62 }, { g:'box', c:P.woodD, s:[1.56,.15,.14], p:[-.86,.92,-.44], ry:.62 }, { g:'box', c:P.woodD, s:[1.56,.15,.14], p:[-.86,.22,-.44], ry:.62 }, { g:'box', c:P.woodD, s:[1.5,.13,.13], p:[-.86,.57,-.44], ry:.62, rz:.42 } ];   // [DESIGN-WOOD-STONE-1] 문기둥 둘 + 꼭지 + 안쪽으로 반쯤 열린 문짝(밝은 판 한 장 · 짙은 가로대 둘 · Z 버팀대) — 멀리서도 '문'으로 읽히게
+JOIN_GATES.stone = [ { g:'box', c:0xc9c3b6, s:[.86,1.3,.86], p:[-1.57,.65,0] }, { g:'box', c:0xc9c3b6, s:[.86,1.3,.86], p:[1.57,.65,0] }, { g:'box', c:P.stoneD, s:[1.0,.14,1.0], p:[-1.57,1.37,0] }, { g:'box', c:P.stoneD, s:[1.0,.14,1.0], p:[1.57,1.37,0] }, { g:'sph', c:P.stoneD, s:[.26,.22,.26], p:[-1.57,1.5,0] }, { g:'sph', c:P.stoneD, s:[.26,.22,.26], p:[1.57,1.5,0] } ];   // 문기둥 둘 + 갓돌 + 둥근 꼭지
 (function lineKinds() {
   const add = { fence1: { fam:'wood', nm:'울타리', ic:'🚧', cap:300 }, fence1_gate: { fam:'wood', nm:'울타리 문', ic:'🚪', cap:60, gate:true },
                 wall1:  { fam:'stone', nm:'돌담', ic:'🧱', cap:300 }, wall1_gate:  { fam:'stone', nm:'돌담 문', ic:'🚪', cap:60, gate:true } };
