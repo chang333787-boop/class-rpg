@@ -5377,6 +5377,38 @@ function actGateSay(rec) {
   return true;
 }
 window.__gateSay = (x, y) => { const r = cells[idx(x, y)]; return r && K[r.k].gate ? gateDiagnose(r.root) : '문 아님'; };
+/* ══════════════════════════════════════════════════════════════
+   [ACT-GATEHINT] 아무도 안 오는 정원의 문 위에만 가끔 작은 ? (주민 연기 · 09-20 · 창조자의 눈 4회 · 보스 ③).
+   [ACT-GATESAY] 의 판정(gateDiagnose)을 그대로 — 'ok'(잘 되는 정원)가 아닌 문 위에만, 문마다 엇갈려 everyMs 에 한 번 showMs 동안 작은 ? 풍선.
+   누르면 까닭 한 줄(#556)이 나오니 '?' 는 "여기 눌러 봐"의 손짓이다. 울타리 줄에 든 문만(이웃에 울타리가 둘 이상 — 길가 장식 문은 빼고).
+   판정 결과는 놓은 것이 바뀔 때만 다시 센다(2초에 한 번까지) · 판정·저장 0 · 풍선 묶음 하나(떠 있을 때만 draw call +1).
+   규칙 모듈 꼴: 스위치·수치 VRULES.gateHint + 루프 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).gateHint = { on: true, everyMs: 20000, showMs: 2500, scale: 1.1, y: 3.4 };
+const GATEHINT = { key: -1, at: -1e9, list: [], stats: { 문: 0, 물음표문: 0 } };
+const gateHintPool = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#fffaf0'; g.beginPath(); g.arc(32, 32, 26, 0, 6.283); g.fill(); g.fillStyle = '#6b7a90'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 32, 35);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 16); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; })();
+function gateHintScan() {
+  if (GATEHINT.key === placedTotal || SIM.ticks - GATEHINT.at < 20) return; GATEHINT.key = placedTotal; GATEHINT.at = SIM.ticks;
+  GATEHINT.list = []; let n = 0;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || !K[rec.k].gate) return; n++;
+    const x = cX(i), y = cY(i), fences = D4.filter(([dx, dy]) => { if (!inb(x + dx, y + dy)) return false; const r = cells[idx(x + dx, y + dy)]; return !!(r && K[r.k].join && !K[r.k].gate); }).length;
+    if (fences < 2) return;                                             // 울타리 줄에 든 문만
+    const d = gateDiagnose(i); if (d.why !== 'ok') GATEHINT.list.push({ i, why: d.why, phase: (i * 7919) % 1000 / 1000 }); });
+  GATEHINT.stats.문 = n; GATEHINT.stats.물음표문 = GATEHINT.list.length;
+}
+function actGateHintDraw(now) {
+  const R = window.VRULES.gateHint; if (!R.on || mapMode || OFF.has('faces') || !window.VRULES.gateSay || !window.VRULES.gateSay.on) { gateHintPool.count = 0; return; }
+  gateHintScan(); let n = 0;
+  for (const g of GATEHINT.list) { if (n >= 16) break; const t = ((now / R.everyMs) + g.phase) % 1; if (t * R.everyMs > R.showMs) continue;
+    const a = t * R.everyMs / R.showMs, pop = Math.sin(Math.min(1, a * 4) * Math.PI / 2) * (a > 0.8 ? (1 - a) * 5 : 1);   // 톡 튀어나왔다 사라진다
+    faceDummy.position.set(wx(cX(g.i)), R.y + Math.sin(now / 220) * 0.1, wz(cY(g.i))); faceDummy.quaternion.copy(camera.quaternion); faceDummy.scale.set(R.scale * pop, R.scale * pop, 1); faceDummy.updateMatrix();
+    gateHintPool.setMatrixAt(n++, faceDummy.matrix); }
+  gateHintPool.count = n; if (n) gateHintPool.instanceMatrix.needsUpdate = true;
+}
+window.__gateHint = () => ({ 켜짐: window.VRULES.gateHint.on, ...GATEHINT.stats, 문들: GATEHINT.list.map(g => [cX(g.i), cY(g.i), g.why]), 지금뜬것: gateHintPool.count });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-DOOR] 밤에 이미 자기 집 문 앞에 서 있는 사람은 곧장 들어간다 (주민 연기 · 09-20).
@@ -7327,6 +7359,7 @@ function loop() {
   actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
   actPassDraw();   // [ACT-PASS] 한 칸을 같이 지나는 둘은 오른쪽으로 비켜 그린다(겹쳐 한 몸 ✗)
   actRainDraw();   // [ACT-RAIN] 처마 밑에 선 사람은 지붕 쪽으로 반 걸음
+  actGateHintDraw(SIM.t + SIM.acc);   // [ACT-GATEHINT] 아무도 안 오는 정원 문 위에 가끔 ?
   actUmbrellaDraw(SIM.t + SIM.acc);   // [ACT-UMB] 우산은 든 사람 머리 위에 · 손잡이 · 아이 높이 · 곁에 선 사람도
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
