@@ -1532,7 +1532,7 @@ for (const g in GEO) {
    주소 끝 #fb=0 → 옛 parts(K.flower.parts)로 재 보기
    ══════════════════════════════════════════════════════════════ */
 const FLOWER_VARS = 4;
-const FLOWER_SETS = {};                                // 종류 id → [parts × FLOWER_VARS]
+const FLOWER_SETS = {}, FLOWER_BLOOMS = {};   // FLOWER_BLOOMS: 꽃밭 기하마다 꽃 무리 [첫 꼭짓점, 수, 밑 가운데 x·y·z] ([DESIGN-GROW-1])                                // 종류 id → [parts × FLOWER_VARS]
 (function buildFlowerBeds() {
   if (HP.fb === 0) return;
   const HALF = CS / 2, TOP = .22, TAU = Math.PI * 2;
@@ -1544,7 +1544,7 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
     for (let vi = 0; vi < FLOWER_VARS; vi++) {
       let s = (0x9e3779b1 ^ Math.imul(vi + 1 + si * 16, 0x85ebca6b)) | 0;
       const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-      const pos = [], nrm = [], idx = [], col = [], kind = [];
+      const pos = [], nrm = [], idx = [], col = [], kind = [], blooms = [];
       /* 도형 하나: 면마다 '도형 가운데에서 바깥'을 보게 감는 방향을 맞춘다(한쪽 면만 그리므로) */
       function shape(verts, faces, c, k) {
         const off = pos.length / 3; let mx = 0, my = 0, mz = 0, off2 = 0;
@@ -1573,6 +1573,7 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
         const rot = rnd() * TAU, n = P.n, v = [...ringAt(cx, y0, cz, r * P.b, r * P.b, n, rot), ...ringAt(cx, y0 + h * P.m, cz, r, r, n, rot + TAU / (2 * n)), [cx, y0 + h, cz]], f = [];
         for (let i = 0; i < n; i++) { const j = (i + 1) % n; f.push([i, j, n + i], [j, n + j, n + i], [n + i, n + j, 2 * n]); }
         const lo = dark(c, .70), hi = center || mixc(c, WHITE, P.top);
+        blooms.push([pos.length / 3, v.length, cx, y0, cz]);   // [DESIGN-GROW-1] 꽃 한 송이의 꼭짓점 자리 — 봉오리를 만들 때 이 무리만 줄인다
         shape(v, f, i => i < n ? lo : i < 2 * n ? c : hi, PK);
       }
       /* 잎 깔개 — 위 + 옆 4면(10△), 칸 끝까지 */
@@ -1617,10 +1618,62 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
       }
       const name = 'fb:' + kid + ':' + vi;
       BASE[name] = { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv: pos.length / 3, vcol: new Float32Array(col), vkind: Uint8Array.from(kind), tri: idx.length / 3 };
+      FLOWER_BLOOMS[name] = blooms;
       set.push([{ g: name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
     }
   });
 })();
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-GROW-1] 밤새 자라는 것의 단계 모양 — docs/village_grow_proposal.md. 저장은 프로그램 담당, 그리기 고리·연기는 주민 연기 담당, **모양은 여기**.
+   window.GROW_PARTS(kind, stage, parts) → 그 단계의 부위 목록(다 자란 단계면 null = 원래 부위 그대로).
+   · 나무 tree · 과일나무 fruit · 큰나무 bigtree: 0 새싹 → 1 어린나무 → 2 다 자람. 과일나무는 다 자라야 열매(어린나무까지는 나무와 같은 모양).
+   · 꽃밭 flower · 색 꽃밭: 0 봉오리 → 1 활짝. 봉오리 = 같은 꽃밭 기하에서 **꽃 무리만** 작게 오므리고 초록으로 — 잎·꽃대·가장자리는 그대로.
+   · 부위는 칸 가운데 원점(원래 부위와 같은 자리) — 청크에 합쳐 그리면 draw call +0.
+   ══════════════════════════════════════════════════════════════ */
+window.GROW_LOOK = window.GROW_LOOK || { treeStyle: 'mix', budStyle: 'closed' };   // 보스 결정: ⓒ 섞음 + 오므린 봉오리   // 시안 스위치: treeStyle 'shape'(단계별 모양) | 'scale'(크기만) | 'mix'(새싹 모양 · 어린나무는 제 나무 0.6 + 받침대) · budStyle 'closed'(오므린 봉오리) | 'small'(작게+초록)
+const GROW_TREE = {
+  tree: [
+    [ { g:'cyl', c:0x8a6a48, s:[.8,.14,.8], p:[0,.07,0] }, { g:'cyl', c:P.leafL, s:[.08,1.0,.08], p:[0,.6,0] },                  // 새싹: 흙 둔덕 + 줄기 + 떡잎 둘 + 새잎 — 기본 거리에서 '싹'으로 읽히는 크기(처음엔 흙만 보였다)
+      { g:'sph', c:P.leafL, s:[.48,.09,.28], p:[-.38,1.08,0], rz:.4 }, { g:'sph', c:P.leafL, s:[.48,.09,.28], p:[.38,1.08,0], rz:-.4 }, { g:'sph', c:P.leaf, s:[.2,.3,.2], p:[0,1.2,0] } ],
+    [ { g:'cyl', c:0x8a6a48, s:[.7,.1,.7], p:[0,.05,0] }, { g:'cyl', c:0x9a6f48, s:[.1,1.5,.1], p:[0,.8,0] },                     // 어린나무: 가는 줄기 + 작은 잎 뭉치 셋 + 받침대(끈)
+      { g:'sph', c:P.leaf, s:[.62,.55,.62], p:[0,1.75,0] }, { g:'sph', c:P.leafL, s:[.42,.4,.42], p:[-.35,1.5,.15] }, { g:'sph', c:P.leafL, s:[.38,.36,.38], p:[.3,1.45,-.2] },
+      { g:'box', c:P.woodL, s:[.07,1.3,.07], p:[.32,.65,.12], rz:-.08 }, { g:'box', c:0xe6d3a3, s:[.36,.06,.06], p:[.16,1.0,.06] } ] ],
+  bigtree: [
+    [ { g:'cyl', c:0x8a6a48, s:[.8,.14,.8], p:[0,.07,0] }, { g:'cone', c:P.leaf, s:[.36,.8,.36], p:[0,.62,0] }, { g:'cone', c:P.leafL, s:[.24,.5,.24], p:[0,1.1,0] } ],   // 새싹: 뾰족잎 둘
+    [ { g:'cyl', c:0x8a6a48, s:[.7,.1,.7], p:[0,.05,0] }, { g:'cyl', c:0x9a6f48, s:[.1,.9,.1], p:[0,.5,0] },                                                            // 어린나무: 원뿔 셋을 쌓은 작은 전나무 + 받침대
+      { g:'cone', c:P.leaf, s:[.62,.9,.62], p:[0,1.2,0] }, { g:'cone', c:P.leaf, s:[.5,.8,.5], p:[0,1.65,0] }, { g:'cone', c:P.leafL, s:[.34,.65,.34], p:[0,2.1,0] },
+      { g:'box', c:P.woodL, s:[.07,1.3,.07], p:[.36,.65,.12], rz:-.08 }, { g:'box', c:0xe6d3a3, s:[.4,.06,.06], p:[.18,.95,.06] } ] ] };
+GROW_TREE.fruit = GROW_TREE.tree;
+const GROW_STAKE = [ { g:'cyl', c:0x8a6a48, s:[.8,.12,.8], p:[0,.06,0] }, { g:'box', c:P.woodL, s:[.08,1.5,.08], p:[.5,.75,.2], rz:-.08 }, { g:'box', c:0xe6d3a3, s:[.5,.07,.07], p:[.25,1.05,.1] } ];   // 어린나무 받침대 + 흙 둔덕
+const _budCache = {};
+function budGeo(name) {                                                   // 꽃밭 기하 하나에서 봉오리 기하를 만든다(한 번만)
+  const st = window.GROW_LOOK.budStyle, key = name + ':' + st; if (_budCache[key]) return _budCache[key];
+  const b = BASE[name], groups = FLOWER_BLOOMS[name]; if (!b || !groups) return null;
+  const pos = new Float32Array(b.pos), col = new Float32Array(b.vcol), G = [.30, .52, .20];   // 봉오리 초록(선형 색)
+  groups.forEach(([o, n, cx, cy, cz]) => { const ring = (n - 1) / 2;
+    for (let i = o; i < o + n; i++) { const k = i - o, top = k === n - 1;
+      const sxz = st === 'closed' ? .38 : .5, sy = st === 'closed' ? .72 : .5;
+      pos[i * 3] = cx + (pos[i * 3] - cx) * sxz; pos[i * 3 + 1] = cy - .12 + (pos[i * 3 + 1] - cy) * sy; pos[i * 3 + 2] = cz + (pos[i * 3 + 2] - cz) * sxz;
+      const t = st === 'closed' ? (top ? .15 : k < ring ? .85 : .7) : .45;          // 오므린 봉오리: 밑·배는 초록, 꼭대기만 꽃빛
+      for (let c = 0; c < 3; c++) col[i * 3 + c] = col[i * 3 + c] + (G[c] - col[i * 3 + c]) * t; } });
+  const nn = name.replace(/^fb:/, 'fbb:') + ':' + st;
+  BASE[nn] = { pos, nrm: b.nrm, idx: b.idx, nv: b.nv, vcol: col, vkind: b.vkind, tri: b.tri };
+  return _budCache[key] = nn;
+}
+/* 단계는 저장 쪽 window.GROW(root) → 0 새싹·봉오리 · 1 어린나무 · 2 다 자람(프로그램 담당). 청크를 합칠 때 partsOf 가 여기로 — 지도에 놓인 칸만(카드 그림·놓기 미리보기의 가짜 rec 은 그대로).
+   ACT-GROW(#628)의 크기 곱하기는 GROW_PARTS 가 모양을 주는 종류면 건너뛴다(그쪽 한 줄). */
+window.GROW_PARTS = (kind, stage, parts) => {
+  if (GROW_TREE[kind]) { if (stage >= 2) return null;
+    if (window.GROW_LOOK.treeStyle === 'scale') { const k = stage ? .65 : .35; return (parts || []).map(pt => ({ ...pt, s: pt.s.map(v => v * k), p: [pt.p[0] * k, pt.p[1] * k, pt.p[2] * k] })); }
+    if (window.GROW_LOOK.treeStyle === 'mix' && stage === 1) return ((kind === 'fruit' ? glbParts('tree', 'tree_round') : parts) || K.tree.parts).map(pt => ({ ...pt, s: pt.s.map(v => v * .6), p: [pt.p[0] * .6, pt.p[1] * .6, pt.p[2] * .6] })).concat(GROW_STAKE);   // 섞음: 새싹은 모양 · 어린나무는 제 나무를 0.6 + 받침대(과일나무·전나무가 제 모습을 지킨다)
+    return GROW_TREE[kind][stage]; }
+  if (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]) { if (stage >= 1) return null;
+    return (parts || []).map(pt => { if (!/^fb:/.test(pt.g)) return pt; const g = budGeo(pt.g); return g ? { ...pt, g } : pt; }); }
+  return null;
+};
+{ const po = partsOf; partsOf = function (rec) { const r = po(rec), G = window.GROW;   // [DESIGN-GROW-1] 자라는 중인 나무·꽃밭은 그 단계의 모양으로
+  if (typeof G !== 'function' || cells[rec.root] !== rec || (window.VRULES && window.VRULES.grow && !window.VRULES.grow.on)) return r;
+  const st = G(rec.root); if (st !== 0 && st !== 1) return r; return window.GROW_PARTS(rec.k, st, r) || r; }; }
 function flowerPartsAt(kind, x, y) { const set = FLOWER_SETS[kind]; return set ? set[(x * 7 + y * 13) % set.length] : null; }
 window.__flowerBeds = () => Object.fromEntries(Object.entries(FLOWER_SETS).map(([k, set]) => [k, set.map(p => BASE[p[0].g].tri)]));
 /* ══════════════════════════════════════════════════════════════
@@ -6982,6 +7035,7 @@ function actGrowMatrix(rec, x, y, m) {                                   // buil
   const kind = growKind(rec.k); if (!kind) return;
   const st = growStage(rec.root); if (st >= 2) { GROWX.seen.delete(rec.root); return; }
   GROWX.seen.set(rec.root, st);
+  if (typeof window.GROW_PARTS === 'function' && window.GROW_PARTS(rec.k, st, [])) return;   // [DESIGN-GROW-1] 모양은 디자인 담당의 단계별 부위가 준다 — 크기 곱하기 대신
   const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot), k = kind === 'tree' ? R.treeK[st] : R.flowerK[st], ky = k;   // 꽃밭도 통째로(높이만 줄이면 봉오리가 안 읽혔다 — 작은 포기가 번져 가는 꼴)
   growT.makeTranslation(c.x, 0, c.z); growS.makeScale(k, ky, k); growM.makeTranslation(-c.x, 0, -c.z);
   m.premultiply(growM).premultiply(growS).premultiply(growT);           // 발밑 가운데를 기준으로 줄인다
