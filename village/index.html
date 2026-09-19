@@ -1844,6 +1844,60 @@ function updateViewMode() {
   if (mapMode && mapDirty && performance.now() - mapLastDraw > 500) drawMap();
 }
 
+/* ══════════════════════════════════════════════════════════════
+   [MAC-KEEP] 지우기 방어장치 — 아이들 마을을 지킨다 (사용자 09-20: "비싼 걸 막 지우면 안 되니 방어장치가 있어야 한다. 길 같은 건 상관없지만.")
+   전에는 removeAt 에 방어가 0 — 6명 사는 3층 집, 마을에 하나뿐인 학교가 치우기 모드에서 한 번 누르면 사라졌고,
+   ↩ 되돌리기는 **건물만** 되살렸다(식구·층은 사라진 채). 🖐 옮기기도 같았다(3층 6명 집을 옮기면 1층 빈집).
+   ① 무게 3단 keepOf(rec): 0 가벼운 것(땅·길·1×1) 바로 / 1 보통 — 바로 치우고 ↩ 를 5초 밝힌다 / 2 무거운 것(사람이 사는 집·2층↑·special·adv·2×2↑) — **한 번 더 눌러야** 치워진다(3초 안).
+      K[k].keep 이 있으면 그 값이 먼저다(표로 조절).
+   ② 치운 집의 식구·층은 1분 동안 맡아 둔다(KEEP.stash) — 그 안에 집이 다시 놓이면(↩ 되돌리기 · 🖐 옮기기 · 새로 짓기) 그 집으로 돌아온다. 저장 없음.
+      집 단위 기록이다(계획표 맨 위 원칙). 1분이 지나면 식구는 떠난 것이다 — 인구는 집을 치운 순간 이미 줄어 있다.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).keep = { on: true, confirmMs: 3000, stashMs: 60000, undoGlowMs: 5000 };
+const KEEP = { armed: null, stash: [], stats: { 막음: 0, 확인뒤치움: 0, 맡김: 0, 돌아옴: 0 } };
+/* 순수 함수 — 이 물건의 무게. info = { kind, w, h, place, special, adv, keep, people, lv } */
+function keepLevel(info) {
+  if (info.keep != null) return info.keep;
+  if (info.kind === 'house') return (info.people > 0 || info.lv > 1) ? 2 : 1;          // 빈 1층 집은 보통
+  if (info.special || info.adv || info.w * info.h >= 4) return 2;
+  if (info.place !== 'object' || info.w * info.h === 1) return 0;
+  return 1;
+}
+const keepOf = rec => { const k = K[rec.k]; return keepLevel({ kind: rec.k, w: k.w, h: k.h, place: typeof placeOf === 'function' ? placeOf(rec.k) : 'object', special: !!k.special, adv: !!k.adv, keep: k.keep,
+  people: rec.k === 'house' ? (res.get(rec.root) || 0) : 0, lv: rec.k === 'house' ? houseLv(rec.root) : 1 }); };
+/* 치우기 모드에서 누를 때(act 고리) — true 면 이번 누름은 치우지 않는다 */
+function keepGuard(rec) {
+  const R = window.VRULES.keep; if (!R.on) return false;
+  const lv = keepOf(rec), now = performance.now();
+  if (lv < 2) { if (lv === 1) keepGlowUndo(); return false; }
+  if (KEEP.armed && KEEP.armed.root === rec.root && now - KEEP.armed.at <= R.confirmMs) { KEEP.armed = null; KEEP.stats.확인뒤치움++; keepGlowUndo(); return false; }
+  KEEP.armed = { root: rec.root, at: now }; KEEP.stats.막음++;
+  const n = rec.k === 'house' ? (res.get(rec.root) || 0) : 0, fl = rec.k === 'house' ? houseLv(rec.root) : 1;
+  toast('✋ ' + K[rec.k].nm + (fl > 1 ? ' ' + fl + '층' : '') + (n ? ' · ' + n + '명이 살고 있어요' : '') + ' — 정말 치우려면 한 번 더 눌러요');
+  const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: SIM.t + SIM.acc + 1500 });
+  return true;
+}
+function keepGlowUndo() { setTimeout(() => { const el = document.getElementById('cUndo'); if (!el) return; el.style.boxShadow = '0 0 0 3px #e8b04b'; clearTimeout(KEEP.glowT); KEEP.glowT = setTimeout(() => { const e2 = document.getElementById('cUndo'); if (e2) e2.style.boxShadow = ''; }, window.VRULES.keep.undoGlowMs); }, 0); }
+/* removeAt 고리 — 식구·층을 맡아 둔다 */
+function keepStash(rec) {
+  if (rec.k !== 'house') return;
+  const n = res.get(rec.root) || 0, h = hinfo.get(rec.root), lv = h ? h.lv : 1;
+  hinfo.delete(rec.root);                                                   // 전에는 안 지워져, 같은 자리에 새로 지은 집이 옛 층을 물려받았다
+  if (!window.VRULES.keep.on || (n === 0 && lv <= 1)) return;
+  const t0 = performance.now(); if (t0 - (KEEP.lastPush || -1e9) < 30) { KEEP.stash.length = 0; KEEP.lastPush = t0; return; }   // 한꺼번에 여러 채(판 비우기·파일 가져오기)는 맡지 않는다
+  KEEP.lastPush = t0;
+  KEEP.stash.push({ n, lv, until: performance.now() + window.VRULES.keep.stashMs }); if (KEEP.stash.length > 6) KEEP.stash.shift(); KEEP.stats.맡김++;
+  if (!carrying && !VISIT.on) setTimeout(() => { if (KEEP.stash.length) toast('🧳 식구 ' + n + '명이 마을 어귀에서 1분 기다려요 — ↩ 되돌리거나 집을 다시 놓으면 돌아와요', true); }, 0);
+}
+/* placeAt 고리 — 집이 다시 놓이면 맡아 둔 식구·층이 돌아온다(되돌리기·옮기기·새로 짓기 모두) */
+function keepRestore(kind, root) {
+  if (kind !== 'house' || !KEEP.stash.length) return;
+  const now = performance.now(); KEEP.stash = KEEP.stash.filter(t => t.until > now); const t = KEEP.stash.pop(); if (!t) return;
+  hinfo.set(root, { lv: t.lv, hs: -1 }); res.set(root, Math.min(HOUSE_CAPS[t.lv], t.n)); folksDirty = true; dirtyChunks.add(chunkOfCell(root)); KEEP.stats.돌아옴++;
+  if (t.n) setTimeout(() => toast('🏠 식구 ' + t.n + '명이 돌아왔어요' + (t.lv > 1 ? ' (' + t.lv + '층 그대로)' : ''), true), 0);
+}
+window.__keep = (x, y) => { const rec = x == null ? null : cells[idx(x, y)]; return { 무게: rec ? keepOf(rec) : null, 맡아둔것: KEEP.stash.map(t => [t.n, t.lv]), ...KEEP.stats }; };
+
 function placeAt(kind, x, y, rot) {
   rot = rot || 0;
   const rec = { k: kind, root: idx(x, y), rot: rot };
@@ -1853,6 +1907,7 @@ function placeAt(kind, x, y, rot) {
   joinDirtyAround(kind, x, y);                          // [DESIGN-JOIN-1] 이웃의 모양도 바뀐다
   if (kind === 'house' || K[kind].road) folksDirty = true;   // 사람이 생기거나 길이 열렸다
   amenityChanged(kind, x, y, rot);                      // 주변 가치(F33)
+  keepRestore(kind, rec.root);   // [MAC-KEEP] 맡아 둔 식구·층이 돌아온다
   return true;
 }
 function removeAt(x, y) {
@@ -1860,6 +1915,7 @@ function removeAt(x, y) {
   const rec = cells[idx(x, y)];
   if (!rec) return false;
   const kind = rec.k;
+  keepStash(rec);   // [MAC-KEEP] 집이면 식구·층을 1분 맡아 둔다
   footprint(kind, cX(rec.root), cY(rec.root), rec.rot).forEach(([px, py]) => {
     if (inb(px, py) && cells[idx(px, py)] === rec) cells[idx(px, py)] = null;
   });
@@ -2088,6 +2144,7 @@ function act(clientX, clientY) {
     if (!c.inside) { toast('판 밖이에요'); return; }
     const rec = cells[idx(c.x, c.y)];
     if (!rec) { toast('여기엔 지울 게 없어요'); return; }
+    if (keepGuard(rec)) return;   // [MAC-KEEP] 무거운 것은 한 번 더 눌러야 치워진다
     const nm = K[rec.k].nm, rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root);
     removeAt(c.x, c.y);
     pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr });
