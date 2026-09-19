@@ -741,6 +741,22 @@ const FLOWER_KINDS = {
 Object.keys(FLOWER_KINDS).forEach(id => { const f = FLOWER_KINDS[id]; if (K[id]) return;
   K[id] = { nm: f.nm, ic: f.ic, grp: K.flower.grp, need: K.flower.need, w: 1, h: 1, g: K.flower.g, cap: 300, parts: K.flower.parts }; });   // parts 는 예비(#fb=0 · 모형이 없을 때)
 const countFlowers = () => Object.keys(FLOWER_KINDS).reduce((n, id) => n + countKind(id), 0);
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-TOPIARY-1] 다듬은 나무 5 · 낮은 산울타리 — 정원 가족(docs/village_garden_family.md ⓓⓔ). 새 모델 0, 부위 2~3개.
+   키는 모양 규칙의 '문·처마' 단 4.2~4.6(사람 1.7 의 2.5배 — 집 5.9 보다 낮고 가로등 5.4 보다 낮다). 잎은 P.leaf·P.leafL 이라 계절색을 탄다.
+   산울타리는 칸 끝까지 가는 잎 상자(허리 높이 1.0) — 이어 놓으면 한 줄, R 로 가로/세로. ㄱ 자 모퉁이·문은 '테두리' 단계에서.
+   규칙 필드는 나무(tree)·덤불(bush)을 따랐다: 1×1 · need 없음 · cap 100/400. 새 id 6: topi_cone · topi_ball · topi_two · topi_cyl · topi_box · hedge
+   ══════════════════════════════════════════════════════════════ */
+const TOPIARY = {
+  topi_cone: { nm:'원뿔 나무',   ic:'🔺', parts:[ { g:'cyl', c:P.woodD, s:[.22,.8,.22], p:[0,.4,0] },  { g:'cone8', c:P.leaf, s:[1.35,3.8,1.35], p:[0,2.7,0] } ] },
+  topi_ball: { nm:'공 나무',     ic:'🟢', parts:[ { g:'cyl', c:P.woodD, s:[.2,2.0,.2],  p:[0,1.0,0] }, { g:'sph', c:P.leaf, s:[1.4,1.35,1.4], p:[0,3.1,0] } ] },
+  topi_two:  { nm:'2단 공 나무', ic:'🎄', parts:[ { g:'cyl', c:P.woodD, s:[.2,3.3,.2],  p:[0,1.65,0] }, { g:'sph', c:P.leaf, s:[1.3,1.0,1.3], p:[0,1.9,0] }, { g:'sph', c:P.leafL, s:[.9,.8,.9], p:[0,3.7,0] } ] },
+  topi_cyl:  { nm:'원통 나무',   ic:'🥫', parts:[ { g:'cyl', c:P.woodD, s:[.22,.6,.22], p:[0,.3,0] },  { g:'cyl', c:P.leaf, s:[1.1,3.0,1.1], p:[0,2.1,0] }, { g:'cone8', c:P.leafL, s:[1.1,.6,1.1], p:[0,3.9,0] } ] },
+  topi_box:  { nm:'네모 나무',   ic:'🟩', parts:[ { g:'cyl', c:P.woodD, s:[.22,1.4,.22], p:[0,.7,0] }, { g:'box', c:P.leaf, s:[2.2,2.0,2.2], p:[0,2.4,0] }, { g:'box', c:P.leafL, s:[1.4,.9,1.4], p:[0,3.85,0] } ] } };
+Object.keys(TOPIARY).forEach(id => { if (!K[id]) K[id] = { nm: TOPIARY[id].nm, ic: TOPIARY[id].ic, grp: K.tree.grp, w: 1, h: 1, g: K.tree.g, cap: 100, parts: TOPIARY[id].parts }; });
+if (!K.hedge) K.hedge = { nm:'낮은 산울타리', ic:'🌿', grp: K.bush.grp, w: 1, h: 1, g: K.bush.g, cap: 400, parts:[
+  { g:'box', c:P.leaf,  s:[CS,1.0,1.3],  p:[0,.5,0] },
+  { g:'box', c:P.leafL, s:[CS,.12,1.05], p:[0,1.05,0] } ] };
 const GROUPS = ['바닥', '낮은 것', '키 큰 것', '긴 것', '건물', '특별'];
 const ORDER = Object.keys(K);
 /* [MAC-TABS] 물건 묶음을 '모양'(바닥·낮은 것·키 큰 것·긴 것)에서 **쓰임새**로 바꾼다(사용자 09-20).
@@ -772,6 +788,10 @@ const USE_TABS = [
   const first = ORDER.indexOf('flower'); ids.slice(1).forEach(id => { const i = ORDER.indexOf(id); if (i >= 0) ORDER.splice(i, 1); });
   ORDER.splice(ORDER.indexOf('flower') + 1, 0, ...ids.slice(1));   // 탭 안 순서 = 표 순서
 })();
+/* [DESIGN-TOPIARY-1] 다듬은 나무·산울타리는 꽃밭과 한 식구(정원) — '🌷 꽃' 탭의 꽃밭들 뒤에 선다 */
+(function gardenTab() { const ids = Object.keys(TOPIARY).concat('hedge'), tab = K.flower.grp;
+  ids.forEach(id => { K[id].grp = tab; const i = ORDER.indexOf(id); if (i >= 0) ORDER.splice(i, 1); });
+  let last = -1; ORDER.forEach((k, i) => { if (K[k].grp === tab) last = i; }); ORDER.splice(last + 1, 0, ...ids); })();
 
 /* ── 집 층수(F6). 1층은 K.house.parts 그대로. 2·3층은 벽을 올리고 창을 한 줄씩 더 낸다. 지붕은 같은 색 규칙. */
 function houseParts(lv) {
@@ -797,6 +817,7 @@ const GROW_TICKS = 1800;                          // 하루 내내 😊 면 한 
 /* ── 주변 가치(F33): 집 둘레 4칸의 꾸미기 무게. 놓을 때·치울 때만 센다 ── */
 const DECO = { tree:1, fruit:1.2, bigtree:1.5, trashcan:.5, mailbox:.5, minibench:.5, leafpile:.5, snowman:.5, flower:1, lawn:.5, bush:.6, pot:.5, lamp:.5, bench:1, fence:.3, wall:.2, stump:.3, logs:.2, rock:.3, flag:.3, post:.2, gravel:.2, laundry:.3, bridge:.3, statue:1, sbridge:.5, pond:1, fountain:1 };
 Object.keys(FLOWER_KINDS).forEach(id => { DECO[id] = DECO.flower; });   // [DESIGN-FLOWER-4]
+Object.keys(TOPIARY).forEach(id => { DECO[id] = DECO.tree; }); DECO.hedge = DECO.bush;   // [DESIGN-TOPIARY-1]
 const AMEN_R = 4, AMEN_MAX = 6;
 const amen = new Map();                                // 집 root → 점수
 function amenityOf(root) {
@@ -1627,6 +1648,7 @@ const MAP_COL = { road:'#d9d6cf', gravel:'#b9b2a6', lawn:'#a3d86d', flower:'#f58
   plaza:'#efeee8', house:'#f2889e', shop:'#f2889e', green:'#bfe6f7', pavilion:'#79cfd4', play:'#e9cfa4', tree:'#4f9a3a', bigtree:'#3f8a2e', bush:'#5fae44',
   school:'#f4f2ea', library:'#e0574a', station:'#8d98a3', museum:'#d8d3c8', dream:'#ffd166' };
 Object.keys(FLOWER_KINDS).forEach(id => { MAP_COL[id] = '#' + FLOWER_KINDS[id].main.toString(16).padStart(6, '0'); });   // [DESIGN-FLOWER-4]
+Object.keys(TOPIARY).forEach(id => { MAP_COL[id] = MAP_COL.tree; }); MAP_COL.hedge = MAP_COL.bush;   // [DESIGN-TOPIARY-1]
 function drawMap() {
   const g = mapCanvas.getContext('2d');
   g.fillStyle = '#97cc5e'; g.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
