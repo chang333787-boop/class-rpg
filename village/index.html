@@ -2236,6 +2236,12 @@ function refreshRotCard() {
   el.classList.toggle('off', !sel && !carrying);
 }
 
+/* [MAC-LOCKDIM] 카드를 하나 고르면 잠긴 카드의 흐림이 풀리던 것 — setMode 가 모든 카드의 class 를 'card…' 로 다시 써서 buildTray 가 붙인 .lock 이 지워졌다
+   (잠긴 카드가 열린 것처럼 보여 눌러 보고서야 🔒 인 줄 안다). 고른 뒤에 다시 매긴다 — 원래 줄 수정 0 */
+{ const mode0 = setMode; setMode = function () { const r = mode0.apply(this, arguments);
+    document.querySelectorAll('#trayIn .card[data-kind]').forEach(el => { if (K[el.dataset.kind] && lockedWhy(el.dataset.kind) !== true) el.classList.add('lock'); });
+    return r; }; }
+
 let toastT = 0;
 function toast(msg, ok) {
   const t = document.getElementById('toast');
