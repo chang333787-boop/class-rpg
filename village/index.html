@@ -1960,6 +1960,25 @@ mini.addEventListener('click', e => {
   camTarget.set(wx(x), 2, wz(y)); miniDirty = true;
   toast('거기로 갔어요', true);
 });
+/* ── [MAC-MINIFADE] 놓거나 끄는 손가락이 미니맵 가까이 오면 미니맵이 옅어진다 (창조자의 눈 4회 🟡A5) ──
+   길을 오른쪽 아래로 이어 가다 보면 길 끝이 미니맵 뒤로 들어가 안 보였다(1024×768). 미니맵을 접거나 옮기지 않고 — 가장 싼 길 — 그 순간만 비쳐 보이게 한다.
+   · 죽 놓는 중·들고 옮기는 중·끌어 치우는 중에, 포인터가 미니맵에서 48px 안이면 미니맵이 옅어지고(0.18) 눌리지 않는다. 손을 떼면 0.4초 뒤 돌아온다.
+   · 미니맵을 '누르려고' 다가가는 것과 헷갈리지 않는다 — 아무것도 안 하는 손가락(보기 모드·끌지 않음)에는 반응하지 않는다.
+   프레임마다 하는 일 없음(포인터가 움직일 때 비교 몇 번). 원래 줄 수정 0. */
+(window.VRULES = window.VRULES || {}).miniFade = { on: true, near: 48, alpha: 0.18, backMs: 400 };
+const MINIFADE = { on: false, rect: null, t: 0, stats: { 옅어짐: 0 } };
+function miniFadeSet(on) { if (MINIFADE.on === on) return; MINIFADE.on = on; clearTimeout(MINIFADE.t);
+  mini.style.transition = 'opacity .15s'; mini.style.opacity = on ? String(window.VRULES.miniFade.alpha) : ''; mini.style.pointerEvents = on ? 'none' : ''; if (on) MINIFADE.stats.옅어짐++; }
+canvas.addEventListener('pointerdown', () => { const r = mini.getBoundingClientRect(); MINIFADE.rect = r.width ? r : null; }, true);
+addEventListener('pointermove', e => {
+  const R = window.VRULES.miniFade, r = MINIFADE.rect; if (!R.on || !r) return;
+  const busy = !!painting || !!carrying || (typeof SWEEP !== 'undefined' && SWEEP.on); if (!busy) { if (MINIFADE.on) miniFadeSet(false); return; }
+  const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right), dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+  miniFadeSet(Math.hypot(dx, dy) <= R.near);
+}, true);
+['pointerup', 'pointercancel'].forEach(t => addEventListener(t, () => { if (MINIFADE.on) { clearTimeout(MINIFADE.t); MINIFADE.t = setTimeout(() => miniFadeSet(false), window.VRULES.miniFade.backMs); } }, true));
+window.__miniFade = () => ({ 켜짐: window.VRULES.miniFade.on, 옅은중: MINIFADE.on, 투명도: mini.style.opacity || '1', ...MINIFADE.stats });
+
 function miniTick() {
   if (W < 128 || OFF.has('mini')) return;
   const on = !mapMode; if (mini.classList.contains('on') !== on) mini.classList.toggle('on', on);
