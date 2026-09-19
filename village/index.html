@@ -3381,6 +3381,7 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
+  if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
@@ -3881,6 +3882,34 @@ function awayDraw(now) {
   });
   awayPool.forEach((im, k) => { im.count = cnt[k]; if (cnt[k]) im.instanceMatrix.needsUpdate = true; });
 }
+/* ── [MAC-WAITHOMES] '🏠 이웃을 기다리는 집 n' — 위쪽 👥 곁 (인구 정체 조사 docs/village_pop_stall_20260920.md 후보 2 · 보스 승인) ──
+   인구가 안 느는 까닭은 눌러 보기 전엔 어디에도 없었다 — 위쪽엔 👥 100명뿐, 새 이웃이 돌아서는 빈집 20채는 숫자로도 모습으로도 안 보였다.
+   · 세는 것: **비어 있고, 지금 그대로면 새 이웃이 돌아설 집**(awayLacks — 돌아섬 규칙 그대로). 그냥 아직 아무도 안 온 빈집은 세지 않는다(곧 온다).
+   · 자리는 상단 바 **아래 오른쪽**(바의 실제 아래 끝을 재서). 0 이면 안 보인다. 말은 아이 말로 — '빈집 n'이 아니라 '이웃을 기다리는 집 n'(빈집이 실패처럼 읽히지 않게).
+   · 누르면 화면 가운데에서 **가장 가까운** 그런 집으로 화면을 옮기고, 그 집을 눌렀을 때와 같은 말을 한다. 그 집 위에 ✨ 3초(있던 묶음 — draw call 0). 다시 누르면 그다음 가까운 집.
+   · 3초마다 센다(칸을 한 번 훑는다 · 0.3ms 안팎). 원래 줄 수정 0 — simTick 고리 한 줄. */
+(window.VRULES = window.VRULES || {}).waitHomes = { on: true };
+const WAITHOMES = { roots: [], seen: new Set(), stats: { 눌러감: 0 } };
+function waitHomesScan() { const out = []; if (!window.VRULES.waitHomes.on || VISIT.on) return out;
+  cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house' && (res.get(i) || 0) === 0 && awayLacks(rec)) out.push(i); }); return out; }
+/* 순수 함수 — (cx,cy)에서 가까운 순. 방금 본 것(seen)은 뒤로 */
+function waitHomesOrder(roots, cx, cy, seen, w) { return roots.slice().sort((a, b) => (seen.has(a) - seen.has(b)) || (Math.hypot(a % w - cx, ((a / w) | 0) - cy) - Math.hypot(b % w - cx, ((b / w) | 0) - cy))); }
+function waitHomesDraw() { let el = document.getElementById('waitHomes');
+  if (!el) { el = document.createElement('button'); el.id = 'waitHomes'; el.title = '새 이웃이 돌아서는 집 — 누르면 그 집으로 가요';     // 상단 바는 1366 폭에서 이미 꽉 찼다(안에 넣었더니 오른쪽 끝에서 잘렸다) → 바 아래 오른쪽에 띄운다
+    el.style.cssText = 'position:fixed;right:10px;top:68px;z-index:6;display:none;background:#2a2417ee;border:1px solid #e8b04b;border-radius:10px;min-height:44px;padding:0 14px;font:800 13.5px/1 "Malgun Gothic",sans-serif;color:#ffe9b8;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px #0007';
+    el.onclick = waitHomesGo; document.body.appendChild(el); const st = document.createElement('style'); st.textContent = 'body.photo #waitHomes{display:none!important}'; document.head.appendChild(st); }
+  const n = WAITHOMES.roots.length, top = document.getElementById('top'); el.style.display = n ? '' : 'none';
+  if (n) { el.textContent = '🏠 이웃을 기다리는 집 ' + n; if (top) el.style.top = Math.round(top.getBoundingClientRect().bottom + 6) + 'px'; } }
+function waitHomesTick() { WAITHOMES.roots = waitHomesScan(); waitHomesDraw(); }
+function waitHomesGo() {
+  WAITHOMES.roots = waitHomesScan(); waitHomesDraw(); if (!WAITHOMES.roots.length) return;
+  if (WAITHOMES.roots.every(r => WAITHOMES.seen.has(r))) WAITHOMES.seen.clear();                                    // 한 바퀴 다 봤으면 처음부터
+  const cx = camTarget.x / CS + (W - 1) / 2, cy = camTarget.z / CS + (H - 1) / 2, root = waitHomesOrder(WAITHOMES.roots, cx, cy, WAITHOMES.seen, W)[0], rec = cells[root]; if (!rec) return;
+  WAITHOMES.seen.add(root); WAITHOMES.stats.눌러감++; const c = centerOf('house', cX(root), cY(root), rec.rot); camTarget.set(c.x, 2, c.z); miniDirty = true;
+  sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); const why = moveInWhy(rec); toast(why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, why === true);   // 그 집을 눌렀을 때와 같은 말
+}
+window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan().length, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
+
 window.__away = () => ({ 켜짐: window.VRULES.turnAway.on, ...AWAY.stats, 돌아선집: AWAY.turned.size, 나가는중: awayLeavers(), 이사중: movers, 최근: AWAY.log.slice(-5) });
 
 function arrive(f, i) {
