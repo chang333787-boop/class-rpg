@@ -111,3 +111,41 @@ ACT-PATH ✔ → 광장·정자 ✔(#527) → 돌아서는 사람 ✔(#505) → 
 - 두 PR 이 **같은 줄 바로 아래**에 고리를 넣으면 git 이 충돌로 본다(#521 과 #525 가 `if (!rec) continue;` 아래에서 부딪쳤다). 새 고리는 다른 PR 이 안 쓰는 이웃 줄에 — 올리기 전에 열린 PR 들을 로컬에서 한꺼번에 합쳐 본다(`git merge` 여러 번 → `node --check`).
 - 새 블록이 다른 블록의 `VRULES.*` 표를 읽거나 고칠 때, 그 표가 **파일에서 더 아래**에 있으면 모듈이 읽히는 순간엔 아직 없다(#527 의 정자 등록) — 첫 틱에 한 번 하게.
 - `typeof isSmall === 'function'` 처럼 다른 블록의 `const` 함수를 부르는 건 **그리기·틱 안에서만**(모듈 읽는 도중엔 TDZ).
+
+---
+
+# 3부 (09-20 밤) — 말 · 겹침 · 정원 · 쓰레기
+
+## ⑫ PR (전부 base `feat/village-45`)
+| PR | 무엇 | 상태 | 스위치 · 훅 |
+|---|---|---|---|
+| [#530](https://github.com/chang333787-boop/class-rpg/pull/530) ACT-UMB | 우산은 든 사람 머리 위(4.3 → 2.56) · 손잡이 · 아이 높이 | 머지됨 | `VRULES.umbrella` · `__umbrella()` |
+| [#532](https://github.com/chang333787-boop/class-rpg/pull/532) ACT-GAP | 끊긴 길 끝에서 멈칫, 건너편을 본다 | 머지됨 | `VRULES.gapLook` · `__gap()` |
+| [#537](https://github.com/chang333787-boop/class-rpg/pull/537) ACT-WORDS | 학교에 배우러 · 도서관에 책 읽으러 · 박물관 구경 | 머지됨 | `VRULES.words` |
+| [#540](https://github.com/chang333787-boop/class-rpg/pull/540) ACT-PASS | 한 칸을 같이 지나는 둘은 어깨를 스치듯 비켜 그린다(pop88 겹친 쌍 밤 629→182) | 머지됨 | `VRULES.passBy` · `__passBy()` |
+| [#546](https://github.com/chang333787-boop/class-rpg/pull/546) ACT-GARDEN | 정원(길에 닿은 문 + 닫힌 땅)에 저녁마다 이웃이 들어와 자갈길 한 바퀴 · 의자에 앉았다 나온다 | 머지됨 | `VRULES.gardenVisit` · `__garden()` |
+| [#554](https://github.com/chang333787-boop/class-rpg/pull/554) ACT-LITTER | 가게 앞 쓰레기 — 가게 단위·하루 한 번 · 두리번 🗑️? · 통을 놓는 순간 🗑️✓ + 한 단계 | 머지됨 | `VRULES.litter` · `__litter()` |
+| [#556](https://github.com/chang333787-boop/class-rpg/pull/556) ACT-GATESAY | 정원 문을 누르면 '왜 아무도 안 오나' 한 줄(열린 칸 반짝) | 머지됨 | `VRULES.gateSay` · `__gateSay(x,y)` |
+| [#559](https://github.com/chang333787-boop/class-rpg/pull/559) ACT-LITTER 후속 | 조각을 길 청크 기하에(draw call +0) · 1단계 문턱 6 → 5 | 열림 | 〃 |
+| (이 PR) | worklog 3부 | 열림 | 문서 |
+
+## ⑬ 고친 줄 지도(더함)
+| 표식 | 새 블록 위치 | 고리 |
+|---|---|---|
+| `[ACT-WORDS]` | `function whatDoing(f) {` 바로 위 | `whatDoing` 안 ACT-BESIDE 고리 **바로 아래** |
+| `[ACT-PASS]` | `/* 사람 그리기 — …` 주석 바로 위 | 루프 `actKidDraw(…)` **바로 아래** · `[ACT-UMB]` 안에 한 줄(비켜 선 사람의 우산) |
+| `[ACT-GARDEN]` | `[ACT-DOOR]` 배너 바로 위(ACT-GAP 아래) | `tickFolks` 의 ACT-LOOK 고리 **바로 아래** · `whatDoing` 의 `if (f.arriving) …` **바로 위** |
+| `[ACT-GATESAY]` | `[ACT-DOOR]` 배너 바로 위(ACT-GARDEN 아래) | `act()` 의 `if (rec && rec.k === 'sign') …` **바로 아래** |
+| `[ACT-LITTER]` | `function syncFolks() {` 바로 위(ACT-UMB 아래) | `tickFolks` 의 ACT-LAMP 고리 **바로 아래** · 루프 `actGreetDraw(…)` **바로 아래** · (#559) `buildChunk` 의 `for (const name in MAT) {` **바로 위** |
+- **`buildChunk` 에 남의 함수 안 고리가 처음 생긴다(#559).** 청크 기하 합치기는 디자인·프로그램 담당이 자주 만지는 곳 — 3-way 때 이 한 줄의 자리(메시 만들기 루프 바로 앞)만 지키면 된다.
+- 그리기 순서(루프): PLAZA → BESIDE → KID → **PASS** → UMB → (drawClock) → GREET → **LITTER**.
+
+## ⑭ 찾은 것(더함)
+12. **밤 겹침은 밤만의 일이 아니었다** — 큰길(한 칸 둘)·가로등 아래 멈춤·줄 선 사람. 낮에 겹친 쌍이 밤의 네 배(2,440). #540 이 같이 풀었다.
+13. **한 바퀴는 짧아야** — 하루가 3분이라 한 칸 걷기가 시뮬 15분 남짓. 정원 한 바퀴(자갈 여섯 · 느린 걸음)가 3시간을 넘어 8시 전에 의자까지 못 갔다 → 자갈 넷 · 16:30 부터.
+14. **큰 마을은 손님이 흩어진다** — pop167(184명)은 가게 하나 하루 손님 1~5, pop88(100명)은 4~11. 절대 문턱 하나로 두 판을 맞추면 5 가 '절반쯤'. 2단계(12)는 어느 판에서도 안 나온다.
+15. 판 전체(65,536칸)를 훑는 것이 둘 생겼다(정원 찾기 · 가게 찾기) — 하루 한 번 · 놓을 때 2초에 한 번. 문·가게 목록을 따로 들면 없앨 수 있다(급하지 않음).
+
+## ⑮ 다음
+- 축제 다음 날 광장(쓰레기 둘째 PR · 보스 답 ④) — #559 머지 뒤 새 브랜치(같은 청크 합치기를 쓴다).
+- 월요일 학교 세션: 1부 ④·2부 ⑨ 그대로 + **정원 하나를 만들어 저녁에 누가 오는지 · 문을 눌러 까닭이 읽히는지** 아이 반응을 적어 달라.
