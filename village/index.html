@@ -4983,7 +4983,6 @@ function actLitterTick(f, i, now) {
   return false;
 }
 /* 그림 — 조각은 길 청크 기하에 합친다(draw call +0 · 모양 규칙 §6 '길 기하에 합침') · 🗑️? · 🗑️✓ 풍선은 보일 때만 */
-const LIT_COL = () => [0xfbfaf6, P.woodD, P.metalD, 0xfbfaf6, P.woodD];   // 모양 규칙 §6 — 새 색 없이 cloth(흰)·woodD·metal: 흰 종이 · 갈색 종이봉투 · 캔 · 봉지 · 갈색 조각
 const litBubble = ['🗑️?', '🗑️✓'].map((ch, k) => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   g.fillStyle = k ? '#e6f7ea' : '#fffaf0'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
   g.font = '34px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🗑️', 28, 36);
@@ -4991,11 +4990,21 @@ const litBubble = ['🗑️?', '🗑️✓'].map((ch, k) => { const c = document
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 12); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; });
 /* 한 칸의 조각들(칸 좌표로 고른 벌 — 저장 0) */
+/* [DESIGN-LITTER-1] 기본 거리에서 '어, 지저분하네'로 — 보스 결정 ⓑ + ⓑ'. 흰 종이 조각(두께 0.22)은 밝은 길 위에서 대비가 없어 가까이에서만 보였다.
+   · 부스러기(칸마다 R.pieces[1]개 — 둘째 칸부터 하나 적게): 두툼한 흰 종이 · 갈색 봉투 · 빨간 캔 · 노랑/파랑 포장지(가까이에서의 결).
+   · 멀리서 읽히는 것은 짙은 봉투뿐 → 1단계: 칸마다 **작은 짙은 봉투 하나 + 매듭**. 2단계: **봉투 셋 + 매듭 셋의 더미**(1단계 봉투보다 확실히 크게 — 두 단계가 한눈에 갈린다).
+   · 가게 앞(ACT-LITTER)과 축제 다음 날 광장(ACT-FESTLIT)이 같은 LIT.shops → 이 함수를 쓴다. 길 청크 기하 그대로(draw call +0). 바닥 얼룩(시안 ⓒ)은 뺐다. */
+const LIT_BAG = [0x3d4543, 0x4f5a55];
 function litPieces(c, ci, stage) {
-  const per = window.VRULES.litter.pieces[stage] || 0, cnt = per ? Math.max(1, per - (ci === 0 ? 0 : 1)) : 0, out = [], LC = LIT_COL(); let h = (c * 2654435761) >>> 0;
+  if (!stage) return [];
+  const per = window.VRULES.litter.pieces[1] || 0, cnt = per ? Math.max(1, per - (ci === 0 ? 0 : 1)) : 0, out = [], cx = wx(cX(c)), cz = wz(cY(c));
+  const COLS = [0xfbfaf6, P.woodD, P.red, 0xf6c23e, 0x5aa9e6]; let h = (c * 2654435761) >>> 0;
   for (let k = 0; k < cnt; k++) { h = (h * 1103515245 + 12345) >>> 0; const r1 = (h & 1023) / 1023, r2 = ((h >> 10) & 1023) / 1023, r3 = ((h >> 20) & 255) / 255;
-    const bag = stage === 2 && k === 0, can = !bag && r3 > 0.7, sx = bag ? 1.3 : can ? 0.4 : 0.85, sy = bag ? 0.8 : can ? 0.6 : 0.22, sz = bag ? 1.1 : can ? 0.4 : 0.65;
-    out.push({ x: wx(cX(c)) + (r1 - 0.5) * 2.8, y: 0.2 + sy / 2, z: wz(cY(c)) + (r2 - 0.5) * 2.8, ry: r3 * 6.28, sx, sy, sz, col: bag ? LC[3] : can ? LC[2] : LC[r2 > 0.45 ? 1 : 0] }); }
+    const kind = k % 5, can = kind === 2, sx = can ? .55 : 1.15, sy = can ? .8 : .42, sz = can ? .55 : .9;
+    out.push({ x: cx + (r1 - .5) * 2.6, y: .2 + sy / 2, z: cz + (r2 - .5) * 2.6, ry: r3 * 6.28, sx, sy, sz, col: COLS[kind] }); }
+  const bag = (dx, dz, sx, sy, sz, col, ry) => { out.push({ x: cx + dx, y: .2 + sy / 2, z: cz + dz, ry, sx, sy, sz, col }); out.push({ x: cx + dx, y: .2 + sy + .09, z: cz + dz, ry: ry + .6, sx: sx * .26, sy: .18, sz: sz * .26, col }); };
+  if (stage === 1) bag(.7, -.5, .9, .8, .8, LIT_BAG[0], .7);
+  else [[-.55, 0, 1.25, 1.1, 1.1, 0], [.6, .15, 1.15, 1.0, 1.05, 1], [0, -.7, 1.1, .95, 1.0, 0]].forEach(([dx, dz, sx, sy, sz, ci2], i) => bag(dx, dz, sx, sy, sz, LIT_BAG[ci2], i * 1.1));
   return out;
 }
 /* buildChunk 고리 — 이 청크의 길 칸에 조각을 'lit' 묶음 기하로 더한다(청크를 다시 합칠 때만 돈다) */
