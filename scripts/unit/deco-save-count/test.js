@@ -446,6 +446,28 @@
       out('안눌리는단추_펼침', r2.join(',') || '없음');
       out('안눌리는단추_바닥모드', r3.join(',') || '없음');
     }
+
+    //  ⑬ 두 손가락 확대가 끝까지 되나(DECO-PINCH-1) — 확대 걸음마다 캔버스를 새로 만들면
+    //    손가락이 잡고 있던 캔버스가 사라져 첫 걸음(약 7%)에서 끊겼다(실제 터치로 3배 벌려도 1→1.07배).
+    //    실제 브라우저처럼 **그 순간 화면에 있는 캔버스**에 이벤트를 보낸다(옛 캔버스를 쥐고 보내면 못 잡는다).
+    {
+      decoZoomFit(); await sleep(100); _decoSetZoom(1); await sleep(100);
+      //  (id 로 찾지 않는다 — 내 집 창 안의 작은 판도 같은 id 라 그쪽이 먼저 잡힌다)
+      const live = () => document.querySelector('#if-topview canvas');
+      const cv0 = live(), k = cv0.getBoundingClientRect();
+      const cx = k.left + k.width / 2, cy = k.top + Math.min(k.height, innerHeight - k.top) / 2;
+      const fire = (type, id, x) => live().dispatchEvent(new PointerEvent(type,
+        { pointerId: id, pointerType: 'touch', bubbles: true, cancelable: true, clientX: x, clientY: cy }));
+      const z0 = _dZoom;
+      fire('pointerdown', 21, cx - 50); fire('pointerdown', 22, cx + 50);
+      for (let i = 1; i <= 10; i++) { fire('pointermove', 21, cx - 50 - i * 10); fire('pointermove', 22, cx + 50 + i * 10); await sleep(16); }
+      fire('pointerup', 21, cx - 150); fire('pointerup', 22, cx + 150);
+      await sleep(100);
+      out('핀치_3배벌림_배율', Math.round(_dZoom / z0 * 100) / 100);
+      out('핀치_끝까지_커짐', _dZoom / z0 > 2.5);
+      out('핀치중_캔버스그대로', live() === cv0);
+      decoZoomFit(); await sleep(100);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }

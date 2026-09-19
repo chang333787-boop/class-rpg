@@ -6980,12 +6980,13 @@ function _initDeco() {
   const H = _ifMode ? Math.max(120, maxH) : Math.min(Math.max(C * rows, 120), maxH);   // [DECO-PT-1]
   _dW = W; _dH = H; _dC = C;
   _decoClampPan();
-  _dCv.width  = W * 2;
-  _dCv.height = H * 2;
+  //  [DECO-PINCH-1] 크기가 같으면 버퍼를 다시 잡지 않는다(확대 중에는 칸 크기만 바뀐다 — 매 걸음 지우고 새로 잡지 않게)
+  if (_dCv.width !== W * 2)  _dCv.width  = W * 2;
+  if (_dCv.height !== H * 2) _dCv.height = H * 2;
   _dCv.style.width  = W + 'px';
   _dCv.style.height = H + 'px';
   _dCtx = _dCv.getContext('2d');
-  _dCtx.scale(2, 2);
+  _dCtx.setTransform(2, 0, 0, 2, 0, 0);   // scale(2,2) 와 같은 값 — 버퍼를 안 바꾼 때 거듭 곱해지지 않게
 }
 
 let _drawDecoRaf = null;
@@ -7026,7 +7027,8 @@ function _decoSetZoom(z, fx, fy) {
   const ax = (fx === undefined ? _dW / 2 : fx), ay = (fy === undefined ? _dH / 2 : fy);
   const boardX = (_dPanX + ax) / prev, boardY = (_dPanY + ay) / prev;   // 줌 1 기준 판 좌표
   _dZoom = next;
-  _dCv = null; _dCtx = null;          // 칸 크기가 바뀌니 캔버스를 다시 잡는다
+  //  [DECO-PINCH-1] 캔버스를 새로 만들지 않는다 — 새로 만들면 손가락이 잡고 있던 캔버스가 사라져
+  //  두 손가락 확대가 첫 걸음(약 7%)에서 끊겼다(실제 터치로 3배 벌려도 1→1.07배). 칸 크기만 다시 잰다.
   _initDeco();
   _dPanX = boardX * _dZoom - ax; _dPanY = boardY * _dZoom - ay;
   _decoClampPan();
