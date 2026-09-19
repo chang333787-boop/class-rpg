@@ -3107,6 +3107,7 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 10) === 0) goalTraySync();   // [MAC-GOAL-2] 목표가 목표판에 오르는 순간 트레이도
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
+  if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
@@ -6040,6 +6041,111 @@ function plotStrings() {
   plotStrCache.set('__pal', JSON.stringify(pal)); dirtyPlots.clear();
   return { pal, ps, changed };
 }
+/* ── [MAC-TITLE] 마을 칭호 — 거울이지 메뉴가 아니다 (docs/village_title_proposal.md v2 가 정본) ──
+   마을이 실제로 그런 마을일 때만 후보가 떠오르고 아이가 고른다. 칭호는 아무것도 열지 않는다(등급·점수·순위 없음).
+   · **판이 없다**: 전체 칭호 목록·잠긴 칸·"n개 중 m개"를 아이 화면 어디에도 두지 않는다 — 보이는 것은 지금 떠오른 후보뿐.
+   · **숨은 점수가 없다**: 까닭 문장에 절대 숫자를 안 쓴다(자기 마을 안의 비교로). 후보가 셋보다 많으면 '센 순서'로 자르지 않고 돌아가며 셋.
+   · 문턱은 집 수(H)에 견준 비 — 도배해도 집이 늘면 도로 내려간다. 한 번 뜬 후보는 문턱의 90% 아래로 내려가야 사라진다(깜빡임 막기). 고른 칭호는 그와 무관하게 남는다.
+   · 첫 카드는 인구 20 + 후보 둘 이상일 때 한 번. 그 뒤엔 위쪽 마을 이름을 누르면 언제나. 새 후보가 생기면 하루에 한 번 알려만 준다.
+   · 마을끼리의 관계는 놓인 것에서 나오고 고른 칭호에서 나오지 않는다 — 이 블록은 시뮬의 어떤 값도 바꾸지 않는다.
+   저장: 마을 v2 의 선택 키 title·titleWas(없으면 키를 안 둔다). sync.js 는 아직 title 을 안 나르므로(월요일 규칙 확인 뒤) 이 기기의 곁 키에도 적어 둔다 — 서버에서 내려받은 판에 title 이 없어도 잃지 않게.
+   칸 훑기는 30초에 한 번 + 카드를 열 때뿐. 원래 줄 수정 0(serialize·loadSaved 감싸기 + simTick 고리 한 줄). */
+(window.VRULES = window.VRULES || {}).titles = { on: true, minPop: 20, show: 3, keep: 0.9 };
+const TITLE_SETS = { market: ['shop', 'green', 'windmill'], forest: ['tree', 'bigtree', 'fruit', 'bush', 'topi_cone', 'topi_ball', 'topi_two', 'topi_cyl', 'topi_box'], play: ['play', 'plaza', 'pavilion', 'fountain'], book: ['library', 'school', 'museum'],
+  water: ['pond', 'fountain', 'bridge', 'sbridge'], rest: ['bench', 'minibench'], road: ['road', 'avenue', 'gravel', 'crosswalk', 'treerow'] };
+/* 표 — need(c) 는 '문턱에 견준 값'(1 이상이면 그런 마을). why(c) 는 아이가 듣는 까닭(숫자 없음) */
+const TITLES = [
+  { id: 'flower', ic: '🌷', nm: '꽃피는 마을',        need: c => c.flower / (c.H / 5),                     why: c => c.flower >= c.H ? '집보다 꽃밭이 더 많아요' : '집 다섯 채에 꽃밭이 하나꼴이에요' },
+  { id: 'forest', ic: '🌳', nm: '숲속 마을',          need: c => c.forest / (c.H / 3),                     why: c => c.forest >= c.H ? '집보다 나무가 더 많아요' : '집 세 채에 나무가 한 그루꼴이에요' },
+  { id: 'market', ic: '🛒', nm: '북적이는 장터 마을', need: c => Math.min(c.market / 4, c.market / (c.H / 10)), why: () => '가게와 일터가 여럿 모여 있어요' },
+  { id: 'play',   ic: '🛝', nm: '뛰노는 마을',        need: c => c.play / 4,                               why: () => '놀 곳이 여럿 모여 있어요' },
+  { id: 'book',   ic: '📚', nm: '책 읽는 마을',       need: c => c.bookKinds.length / 2,                   why: c => c.bookKinds.slice(0, 2).map(k => K[k].nm).join('도 ') + '도 있어요' },
+  { id: 'water',  ic: '💧', nm: '물가 마을',          need: c => c.water / 3,                              why: () => '연못과 분수, 다리가 어우러져요' },
+  { id: 'rest',   ic: '🪑', nm: '쉬어 가는 마을',     need: c => Math.min(c.rest / 6, c.rest / (c.H / 10)), why: () => '골목마다 쉴 의자가 있어요' },
+  { id: 'road',   ic: '🛣️', nm: '길이 시원한 마을',   need: c => c.road / (c.H * 2.25),                    why: () => '집보다 길이 훨씬 길어요' },
+  { id: 'guest',  ic: '🚂', nm: '손님 맞는 마을',     need: c => c.station ? c.signs / 3 : 0,              why: () => '기차역이 있고 손님이 읽을 표지판이 여럿이에요' },
+  { id: 'home',   ic: '🏡', nm: '오순도순 마을',      need: c => c.lived >= 5 ? (c.happy / c.lived) / 0.8 : 0, why: () => '이웃이 거의 다 웃고 있어요' },
+];
+const TITLE_BY = {}; TITLES.forEach(t => { TITLE_BY[t.id] = t; });
+const TITLE = { id: null, was: null, live: new Set(), told: new Set(), offered: false, turn: 0, toldDay: 0, stats: { 셈: 0, 카드: 0, 고름: 0, 알림: 0 } };
+const TITLE_SIDE = () => 'rpg.village.title.' + SID;
+/* 놓인 것을 한 번 훑어 센다 — 길은 칸 수(큰길 한 장 = 네 칸), 나머지는 물건 수 */
+function titleCounts() {
+  TITLE.stats.셈++; const c = { H: 0, flower: 0, forest: 0, market: 0, play: 0, water: 0, rest: 0, road: 0, station: 0, signs: 0, lived: 0, happy: 0, bookKinds: [] };
+  const inSet = {}; Object.keys(TITLE_SETS).forEach(g => TITLE_SETS[g].forEach(k => { (inSet[k] = inSet[k] || []).push(g); }));
+  cells.forEach((rec, i) => { if (!rec) return; const gs = inSet[rec.k];
+    if (gs && gs.includes('road')) c.road++; if (rec.root !== i) return;
+    if (rec.k === 'house') c.H++; else if (rec.k === 'station') c.station++; else if (rec.k === 'pot' || FLOWER_KINDS[rec.k]) c.flower++;
+    if (gs) gs.forEach(g => { if (g === 'book') { if (!c.bookKinds.includes(rec.k)) c.bookKinds.push(rec.k); } else if (g !== 'road') c[g]++; }); });
+  signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root && v && v.t) c.signs++; });
+  res.forEach((v, root) => { if (v <= 0) return; c.lived++; const st = sat.get(root); if (st && st.n >= NEEDS.length) c.happy++; });
+  return c;
+}
+/* 순수 함수 — 후보 id 들(표 순서). live = 앞서 떠 있던 후보(90% 아래로 내려가야 빠진다). 세기·비·등수는 돌려주지 않는다 */
+function titleCandidates(c, table, live, keep) { if (!c.H) return []; return table.filter(t => { const v = t.need(c); return v >= 1 || (live.has(t.id) && v >= keep); }).map(t => t.id); }
+/* 순수 함수 — 후보가 show 보다 많으면 연 횟수(turn)만큼 밀어 돌아가며 show 개 */
+function titleWindow(ids, show, turn) { if (ids.length <= show) return ids.slice(); const out = []; for (let i = 0; i < show; i++) out.push(ids[(turn * show + i) % ids.length]); return out; }
+const titleText = id => TITLE_BY[id] ? TITLE_BY[id].ic + ' ' + TITLE_BY[id].nm : '';
+function titleScan() { const c = titleCounts(), ids = titleCandidates(c, TITLES, TITLE.live, window.VRULES.titles.keep); TITLE.live = new Set(ids); return { c, ids }; }
+function titleDraw() {                                                           // 위쪽 제목 자리 — 칭호를 골랐으면 그 말
+  const el = document.querySelector('#top .ttl'); if (!el) return; if (el.dataset.t0 == null) el.dataset.t0 = el.innerHTML;
+  if (TITLE.id && TITLE_BY[TITLE.id]) el.textContent = titleText(TITLE.id); else el.innerHTML = el.dataset.t0;
+  el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.style.padding = '12px 4px'; el.title = '우리 마을은 어떤 마을일까?';
+}
+function titleSet(id) {
+  const prev = TITLE.id; if (id === prev) return; if (prev) TITLE.was = prev; TITLE.id = id; TITLE.stats.고름++;
+  try { if (id) localStorage.setItem(TITLE_SIDE(), JSON.stringify({ id, was: TITLE.was })); else localStorage.removeItem(TITLE_SIDE()); } catch (err) { /* 곁 키는 없어도 된다 */ }
+  titleDraw(); markDirty();
+  toast(id ? '우리 마을은 이제 ' + titleText(id) + (prev ? ' · 전에는 ' + titleText(prev) + '이었어요' : '이에요') : '칭호 없이 지내요 — 마을 이름을 누르면 언제든 다시 고를 수 있어요', true);
+}
+function titleBusy() { return VISIT.on || PHOTO.on || GUIDE.on || down || painting || carrying || (typeof HOLD !== 'undefined' && HOLD.open) || document.getElementById('titleCard'); }
+function titleCard(byChild) {
+  if (VISIT.on) { toast('친구 마을이에요 — 구경만 할 수 있어요'); return; }
+  const old = document.getElementById('titleCard'); if (old) old.remove();
+  const { c, ids } = titleScan();
+  if (!ids.length) { if (byChild) toast(TITLE.id ? '지금은 ' + titleText(TITLE.id) + '이에요 — 마을이 달라지면 다른 이름이 떠올라요' : '아직 어떤 마을인지 또렷하지 않아요 — 마을이 자라면 이름이 떠올라요', true); return; }
+  ids.forEach(id => TITLE.told.add(id)); TITLE.stats.카드++;
+  const wrap = document.createElement('div'); wrap.id = 'titleCard';
+  const draw = () => { const shown = titleWindow(ids, window.VRULES.titles.show, TITLE.turn);
+    wrap.innerHTML = '<div class="tc"><div class="tq">우리 마을은 어떤 마을일까?</div>' + (TITLE.id ? '<div class="tn">지금은 ' + titleText(TITLE.id) + (TITLE.was ? ' · 전에는 ' + titleText(TITLE.was) + '이었어요' : '') + '</div>' : '')
+      + '<div class="tr"></div><div class="tf"></div></div>';
+    const row = wrap.querySelector('.tr'), foot = wrap.querySelector('.tf');
+    shown.forEach(id => { const t = TITLE_BY[id], b = document.createElement('button'); b.className = 'tb' + (id === TITLE.id ? ' on' : ''); b.innerHTML = '<span class="ti">' + t.ic + '</span><b>' + t.nm + '</b><i>' + t.why(c) + '</i>'; b.onclick = () => { titleSet(id); wrap.remove(); }; row.appendChild(b); });
+    const link = (txt, fn) => { const a = document.createElement('button'); a.className = 'tl'; a.textContent = txt; a.onclick = fn; foot.appendChild(a); };
+    if (ids.length > shown.length) link('다른 것도 볼래요 ›', () => { TITLE.turn++; draw(); });
+    if (TITLE.id) link('칭호 없이 둘래요', () => { titleSet(null); wrap.remove(); });
+    link(TITLE.id ? '그대로 둘래요 ›' : '나중에 고를래요 ›', () => wrap.remove()); };
+  draw(); wrap.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === wrap) wrap.remove(); }); document.body.appendChild(wrap);
+}
+function titleTick() {                                                           // 30초에 한 번 — 첫 카드 · 새 후보 알림
+  const R = window.VRULES.titles; if (!R.on || window.__LOADMS == null || titleBusy() || population() < R.minPop) return;
+  const { ids } = titleScan();
+  if (!TITLE.offered && !TITLE.id) { if (ids.length < 2) return; TITLE.offered = true; try { localStorage.setItem(TITLE_SIDE() + '.offered', '1'); } catch (err) { /* 없어도 된다 */ } titleCard(false); return; }
+  const fresh = ids.filter(id => !TITLE.told.has(id) && id !== TITLE.id); ids.forEach(id => TITLE.told.add(id));
+  if (fresh.length && TITLE.toldDay !== simDay()) { TITLE.toldDay = simDay(); TITLE.stats.알림++; toast('💡 이제 ' + titleText(fresh[0]) + '이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요', true); }
+}
+{ const ser0 = serialize; serialize = function () { const d = ser0.apply(this, arguments); if (d && TITLE.id) { d.title = TITLE.id; if (TITLE.was) d.titleWas = TITLE.was; } return d; };
+  const load0 = loadSaved; loadSaved = function (rawOverride) { const r = load0.apply(this, arguments);
+    try { let d = null; try { const raw = rawOverride || localStorage.getItem(SAVE_KEY); d = raw ? JSON.parse(raw) : null; } catch (e1) { d = null; }
+      if (!d) { try { localStorage.removeItem(TITLE_SIDE()); localStorage.removeItem(TITLE_SIDE() + '.offered'); } catch (e0) { /* 없어도 된다 */ } }   // 저장본이 없다 = 새 마을 → 옛 마을의 칭호를 물려받지 않는다
+      let side = null; try { side = JSON.parse(localStorage.getItem(TITLE_SIDE()) || 'null'); TITLE.offered = !!localStorage.getItem(TITLE_SIDE() + '.offered'); } catch (e2) { side = null; }
+      const id = d && typeof d.title === 'string' ? d.title : side && side.id, was = d && typeof d.titleWas === 'string' ? d.titleWas : side && side.was;   // 서버에서 내려받은 판엔 아직 title 이 없다 → 이 기기의 곁 키로 잇는다
+      TITLE.id = TITLE_BY[id] ? id : null; TITLE.was = TITLE_BY[was] ? was : null; if (TITLE.id) TITLE.offered = true; } catch (err) { /* 칭호를 못 읽어도 마을은 열린다 */ }
+    setTimeout(titleDraw, 0); return r; }; }
+{ const st = document.createElement('style'); st.textContent =
+    '#titleCard{position:fixed;inset:0;z-index:20;background:#0b0d12b8;display:flex;align-items:center;justify-content:center;padding:16px}'
+  + '#titleCard .tc{background:#1a1d26;border:2px solid #e8b04b;border-radius:18px;padding:18px 18px 12px;width:min(94vw,720px);box-sizing:border-box;color:#e8e6e0;font:15px/1.5 "Malgun Gothic",sans-serif;text-align:center;box-shadow:0 14px 44px #000c}'
+  + '#titleCard .tq{font-size:19px;font-weight:800}#titleCard .tn{font-size:13px;color:#a8adba;margin-top:2px}'
+  + '#titleCard .tr{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0 8px}'
+  + '#titleCard .tb{flex:1 1 170px;max-width:220px;min-height:118px;border-radius:14px;border:2px solid #3a4050;background:#222630;color:#e8e6e0;cursor:pointer;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font:inherit}'
+  + '#titleCard .tb .ti{font-size:34px;line-height:1.1}#titleCard .tb b{font-size:15px}#titleCard .tb i{font-style:normal;font-size:12.5px;color:#c9cdd8}#titleCard .tb.on{border-color:#e8b04b;background:#2a2417}#titleCard .tb:active{background:#3a4050}'
+  + '#titleCard .tf{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}#titleCard .tl{min-height:44px;padding:0 12px;border:0;background:none;color:#a8adba;font:700 13.5px "Malgun Gothic",sans-serif;cursor:pointer}'
+  + 'body.photo #titleCard{display:none!important}';
+  document.head.appendChild(st); }
+{ const el = document.querySelector('#top .ttl'); if (el) el.addEventListener('click', () => { if (window.VRULES.titles.on && window.__LOADMS != null) titleCard(true); }); }
+window.__titleNow = () => ({ id: TITLE.id, 말: titleText(TITLE.id), 전: TITLE.was, 별: typeof recurStars === 'function' ? recurStars() : 0 });   // 간판(디자인 담당)이 읽는 곳
+window.__titles = () => { const c = titleCounts(); return { 고른것: TITLE.id, 전: TITLE.was, 첫카드봄: TITLE.offered, 후보: titleCandidates(c, TITLES, TITLE.live, window.VRULES.titles.keep), 값: Object.fromEntries(TITLES.map(t => [t.id, +(t.need(c) || 0).toFixed(2)])), 센것: { ...c, bookKinds: c.bookKinds.join() }, ...TITLE.stats }; };
+
 function serialize() {
   const { pal, ps, changed } = plotStrings();
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h && h.hs >= 0 ? h.hs : -1]; });
