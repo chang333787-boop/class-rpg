@@ -772,7 +772,7 @@ function joinPartsAt(rec) {                            // 이웃(세계 기준) 
   else { const straight = mask === 5 || mask === 10; if (S.always || !straight) S.node.forEach(pt => out.push(turn(pt, rot))); [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) S.arm.forEach(pt => out.push(turn(nv ? { ...pt, g: pt.g + ((vv + d) % nv) } : pt, d + rot))); }); }
   return _joinCache[key] = out; }
 /* 놓거나 치우면 이웃의 모양도 바뀐다 → 이웃 칸이 든 청크도 다시 합친다(청크가 4칸이라 경계를 자주 넘는다). 꽃밭 가장자리 등 '이웃을 보는 모양'이 같이 쓴다 */
-function joinDirtyAround(kind, x, y) { if (K[kind] && ROAD_JOIN_TO.has(kind)) { for (let dy = -1; dy <= 3; dy++) for (let dx = -1; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (inb(xx, yy)) dirtyChunks.add(chunkOfCell(idx(xx, yy))); } return; }   /* [DESIGN-ROAD-1] 길 가족(발자국 최대 3칸) — 둘레 청크를 다시 합친다 */ if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
+function joinDirtyAround(kind, x, y) { if (K[kind] && ROAD_JOIN_TO.has(kind)) { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (inb(xx, yy)) dirtyChunks.add(chunkOfCell(idx(xx, yy))); } return; }   /* [DESIGN-ROAD-1] 길 가족(발자국 최대 3칸) — 둘레 청크를 다시 합친다 · [DESIGN-AVENUE-1] 뿌리가 3칸 뒤에 있는 이웃(큰길 방향·가로수 열)도 */ if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
 /* ══════════════════════════════════════════════════════════════
    [MAC-LINE] 옛 울타리·돌담(2×1)도 이웃을 보고 이어진다 — 디자인 담당의 자동 이음(DESIGN-JOIN-1)을 받아 넓힌다
    사용자 09-20: "울타리라면 대실패고, 네 코너 맞닿는 요소를 만들어야지." 옛 fence·wall 은 곧은 2×1 상자를 R 로 돌려 놓는 방식이라 모퉁이가 어긋나고 틈이 났다.
@@ -1290,8 +1290,11 @@ function lawnPartsAt(rec) {
    ══════════════════════════════════════════════════════════════ */
 const ROAD_FAM = new Set(['road', 'avenue', 'crosswalk', 'treerow', 'gravel']);
 const ROAD_JOIN_TO = new Set(['road', 'avenue', 'crosswalk', 'treerow', 'gravel', 'bridge', 'sbridge', 'plaza']);   // 다리·광장은 '이어지는 상대'로만(제 모양은 그대로)
-window.ROADJOIN = window.ROADJOIN || { on: true, gap: .07 };   // 보스 결정 ⓑ 가는 줄눈 — 칸의 결이 남아 칸을 세며 짓기 좋다(0 = 틈 없이 한 띠)
+window.ROADJOIN = window.ROADJOIN || { on: true, gap: .07, lanes: true };   // lanes: 큰길 차선(보스 결정 ⓐ — false 면 옛 노란 ＋)   // 보스 결정 ⓑ 가는 줄눈 — 칸의 결이 남아 칸을 세며 짓기 좋다(0 = 틈 없이 한 띠)
 const _rm = new THREE.Matrix4();
+/* 큰길의 방향 — 둘레(발자국 바깥 한 칸)에 이어지는 상대가 더 많은 쪽. 큰길끼리는 두 배로 센다(큰길을 이어 놓은 거리가 한 방향으로 읽히게). 외따로면 가로(x) */
+function avenueAlongX(rx, ry) { const at = (x, y) => { if (!inb(x, y)) return 0; const c = cells[idx(x, y)]; return !c || !ROAD_JOIN_TO.has(c.k) ? 0 : c.k === 'avenue' ? 2 : 1; };
+  let ex = 0, ez = 0; for (let d = 0; d < 2; d++) { ex += at(rx - 1, ry + d) + at(rx + 2, ry + d); ez += at(rx + d, ry - 1) + at(rx + d, ry + 2); } return ex >= ez; }
 function roadFamParts(rec) {
   const R = window.ROADJOIN, rx = cX(rec.root), ry = cY(rec.root), rot = rec.rot & 3, fp = footprint(rec.k, rx, ry, rot);
   const fam = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && ROAD_JOIN_TO.has(c.k)); };
@@ -1314,7 +1317,12 @@ function roadFamParts(rec) {
     if (gravel) [[-.9, -.7, .3], [.8, .5, .26], [.2, -1.1, .22], [-.5, 1.0, .24]].forEach(([a, b, r]) => out.push({ g:'sph', c:P.stoneD, s:[r, r * .5, r], p:[cx + a, .21, cz + b], abs:true }));
   });
   const n = fp.length, mx = sx / n, mz = sz / n, alongX = fp.length > 1 && fp[0][1] === fp[1][1];   // 발자국 가운데 · 긴 쪽이 x 인가
-  if (rec.k === 'avenue') out.push({ g:'box', c:0xf4e7a8, s:[CS * 1.6, .02, .16], p:[mx, .21, mz], abs:true }, { g:'box', c:0xf4e7a8, s:[.16, .02, CS * 1.6], p:[mx, .21, mz], abs:true });
+  if (rec.k === 'avenue' && !R.lanes) out.push({ g:'box', c:0xf4e7a8, s:[CS * 1.6, .02, .16], p:[mx, .21, mz], abs:true }, { g:'box', c:0xf4e7a8, s:[.16, .02, CS * 1.6], p:[mx, .21, mz], abs:true });
+  if (rec.k === 'avenue' && R.lanes) {                                  // [DESIGN-AVENUE-1] 차선 — 짙은 차도판(횡단보도와 같은 색) + 흰 점선 가운데 줄 + 양 가장자리 실선. '넓은 길'로 한눈에(1칸 길 여러 줄과 갈리게)
+    const alongX = avenueAlongX(rx, ry), L = CS * 2, Wd = CS * 2 * .72, B = (c, a, h, w, pa, y, pw) => ({ g:'box', c, s: alongX ? [a, h, w] : [w, h, a], p: alongX ? [mx + pa, y, mz + pw] : [mx + pw, y, mz + pa], abs:true });
+    out.push(B(0x8f9097, L, .02, Wd, 0, .205, 0));
+    [-3, -1, 1, 3].forEach(t => out.push(B(0xf6f6f2, .9, .02, .14, t * .95, .215, 0)));
+    [-1, 1].forEach(sd => out.push(B(0xf6f6f2, L, .02, .09, 0, .215, sd * (Wd / 2 - .12)))); }
   if (rec.k === 'crosswalk') {
     out.push({ g:'box', c:0x8f9097, s: alongX ? [CS * 2, .02, CS * .74] : [CS * .74, .02, CS * 2], p:[mx, .205, mz], abs:true });
     [-2.6, -.9, .9, 2.6].forEach(t => out.push({ g:'box', c:0xf6f6f2, s: alongX ? [.5, .02, CS * .6] : [CS * .6, .02, .5], p:[mx + (alongX ? t : 0), .215, mz + (alongX ? 0 : t)], abs:true }));
