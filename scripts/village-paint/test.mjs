@@ -80,6 +80,12 @@ test('점: ○○ → ●○ (우물 하나로 차오른다)', () => { assert.eq
 test('동네 묶기: 가까운 집끼리 · 큰 동네부터', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([r(10, 10), r(12, 10), r(14, 11), r(80, 80), r(82, 80), r(200, 5)], w, 8); assert.deepEqual(g.map(q => q.length), [3, 2, 1]); });
 test('동네 묶기: 사슬처럼 이어진 거리는 한 동네', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([0, 1, 2, 3, 4].map(i => r(10 + i * 6, 40)), w, 8); assert.equal(g.length, 1); });
 
+/* ── 비 오는 날의 절반쯤은 오후에 갠다(MAC-RAINCLEAR) — rainClearAt(날, 13, 16) ── */
+const rainClearAt = grab('rainClearAt');
+test('그치는 때는 13~16시 정시 또는 null(하루 내내)', () => { for (let d = 1; d <= 400; d++) { const h = rainClearAt(d, 13, 16); assert.ok(h === null || (Number.isInteger(h) && h >= 13 && h <= 16), d + '일 ' + h); } });
+test('비 오는 날의 40~60% 가 오후에 갠다 · 네 시간대가 다 쓰인다', () => { const rainDay = d => ((d * 2654435761) >>> 0) % 3 === 0; let n = 0, c = 0; const hs = new Set(); for (let d = 1; d <= 600; d++) if (rainDay(d)) { n++; const h = rainClearAt(d, 13, 16); if (h != null) { c++; hs.add(h); } } assert.ok(c / n > 0.4 && c / n < 0.6, (c / n).toFixed(2)); assert.equal(hs.size, 4); });
+test('같은 날은 늘 같은 때(다시 열어도)', () => { for (const d of [7, 22, 31, 100]) assert.equal(rainClearAt(d, 13, 16), rainClearAt(d, 13, 16)); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);
