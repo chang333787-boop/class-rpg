@@ -1,9 +1,6 @@
 <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<!-- d_y62_thumb 강아지 마당 — 썸네일 전용(개집 + 강아지) · 개집은 d_y62 그림 그대로 줄임 -->
+<!-- d_y62_thumb 강아지 마당 — 썸네일 전용(개집 + 강아지) · 개집은 d_y62 그림 그대로 줄임 · 2026-09-20 축척 감사: 잔디 판 없앰(그림자만) -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}.O{stroke:#2b2118;stroke-width:5;stroke-linejoin:round;stroke-linecap:round}.I{stroke:#2b2118;stroke-width:3.6;stroke-linejoin:round;stroke-linecap:round}</style></defs>
-<path class="i" d="M8,40 h84 q5,0 5,5 v46 q0,5 -5,5 h-84 q-5,0 -5,-5 v-46 q0,-5 5,-5z" fill="#5a8a3a"/>
-<path d="M14,56 q30,-6 54,2 q16,4 24,0 q2,18 -6,30 q-30,6 -58,0 q-14,-6 -14,-32z" fill="#66963a" opacity=".5"/>
-<g fill="#3e6224" opacity=".55"><path d="M16,88 l2,-7 l3,7z M84,62 l2,-7 l3,7z M52,92 l2,-7 l3,7z"/></g>
 <g transform="translate(-19,-49) scale(0.52)"><ellipse cx="102" cy="197" rx="54" ry="10" fill="#000" opacity=".26"/>
 <path class="O" d="M56,144 h84 v50 h-84z" fill="#a5743c"/>
 <path d="M56,144 h84 v10 h-84z" fill="#000" opacity=".14"/>
