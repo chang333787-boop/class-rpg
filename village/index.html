@@ -4484,6 +4484,7 @@ function tickFolks(dt, now) {
       continue;
     }
 
+    if (f.state === 'walk') actKidTick(f, dt);   // [ACT-KID] 아이 걸음은 조금 빠르다
     if (f.state === 'walk') {
       const from = f.path[f.step], to = f.path[f.step + 1];
       if (to == null) {
@@ -4943,6 +4944,43 @@ function actBesideText(f) {
   return null;
 }
 window.__beside = () => { let st = 0, sit = 0, car = 0; folks.forEach(f => { if (f.state === 'inside' && f.beside) { if (f.beside.mode === 'sit') sit++; else st++; } else if (f.carry) car++; }); return { 켜짐: window.VRULES.beside.on, 지금곁에: st, 지금앉음: sit, 지금물동이: car, 누적: { ...besideStats } }; };
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-KID] 작은 사람 — 이웃 마을 아이 구경꾼을 아이 키로 (주민 연기 · 09-20 · 창조자의 눈 2회 · 아이를 들이는 가장 작은 첫걸음).
+   전: "🚶 이웃 마을 아이가 구경 왔어요" 알림은 뜨는데 화면엔 어른 크기다.
+   후: 같은 사람 모델을 발밑 기준으로 scale(⅔ 안팎 · 모양 규칙 키 사다리의 '허리' 단)만큼 줄여 그린다. 걸음은 조금 빠르고 통통 튄다.
+   그리기만 바꾼다: drawFolks·actBesideDraw 가 쓴 행렬을 그 뒤에 발밑 기준으로 줄인다 → 같은 묶음 · draw call +0 · 모델·기하 추가 0. 누르기(광선)도 줄인 몸에 맞는다.
+   걸음 빠르기는 걸음 진행(f.seg)에 조금 얹는다(걷기 코드 수정 0). 판정·저장 0.
+   누가 작은가는 isSmall() 한 곳 — 지금은 이웃 마을 구경꾼(f.neighbor)만. 다음 단계(2층 이상 집 = 아이 있는 세대)가 여기에 조건을 더한다.
+   규칙 모듈 꼴: 스위치·수치 VRULES.kid + 고리 두 줄(tickFolks · 루프).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).kid = { on: true, scale: 0.68, neighbor: true, walkK: 1.25, hop: 0.12 };
+const kidStats = { 그린틱: 0 };
+const isSmall = f => { const R = window.VRULES.kid; return R.on && ((R.neighbor && !!f.neighbor) || !!f.kid); };
+/* tickFolks 고리 — 아이 걸음은 조금 빠르다(막혀 서 있을 땐 안 얹는다) */
+function actKidTick(f, dt) {
+  if (!isSmall(f) || f.state !== 'walk' || !f.path || f.path[f.step + 1] == null || f.blockedAt) return;
+  f.seg += (WALK_SPEED * (window.VRULES.kid.walkK - 1) * dt) / CS;
+}
+/* 루프 고리 — drawFolks·actBesideDraw 뒤. 작은 사람의 부위 행렬을 발밑 기준으로 줄인다 */
+const kidM = new THREE.Matrix4(), kidA = new THREE.Matrix4(), kidB = new THREE.Matrix4();
+function actKidDraw(now) {
+  const R = window.VRULES.kid; if (!R.on || !folks.length || OFF.has('folks')) return;
+  const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), hasV = VISITOR_PARTS.length > 0; let touched = false;
+  folks.forEach((f, i) => {
+    if (!isSmall(f)) return;
+    let fx, fz;
+    if (f.state === 'inside') { if (!f.beside) return; fx = f.beside.x; fz = f.beside.z; }            // 안에 든 아이는 안 그려진다(곁에 선 아이만)
+    else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
+    const hop = f.walking && f.state !== 'inside' ? Math.abs(Math.sin(now / 95 + i)) * R.hop : 0;     // 아이는 통통 튄다(어른 bob 보다 빠르고 높게)
+    kidA.makeTranslation(fx, hop, fz); kidB.makeScale(R.scale, R.scale, R.scale); kidA.multiply(kidB); kidB.makeTranslation(-fx, 0, -fz); kidA.multiply(kidB);
+    const tour = hasV && !!f.visitor && !f.neighbor, n = tour ? VISITOR_PARTS.length : PERSON_PARTS.length, base = tour ? PERSON_PARTS.length : 0;
+    for (let pi = 0; pi < n; pi++) { const im = folkPool[base + pi]; if (!im || i >= im.count) continue; im.getMatrixAt(i, kidM); kidM.premultiply(kidA); im.setMatrixAt(i, kidM); }
+    touched = true; kidStats.그린틱++;
+  });
+  if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
+}
+window.__kid = () => ({ 켜짐: window.VRULES.kid.on, 지금작은사람: folks.filter(isSmall).length, 이웃아이: folks.filter(f => f.neighbor).length, ...kidStats });
 
 /* ══════════════════════════════════════════════════════════════
    저장 — 지금은 이 컴퓨터(localStorage)에만 넣는다.
@@ -5804,6 +5842,7 @@ function loop() {
   sayDraw();   // [MAC-SAY]
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
+  actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
