@@ -4634,7 +4634,20 @@ function _decoRuleWhy(id, area, r, c, w, h) {
 function _decoOverlapOk(placingId, other) {
   if (!placingId || !other) return false;
   const isAnim = id => typeof ANIM_DECO !== 'undefined' && !!ANIM_DECO[id];
+  if (other.area === 'indoor' && _isRugDeco(placingId) !== _isRugDeco(other.id)) return true;   // [INDOOR-RUG-1] 깔개 ↔ 가구
   return (isAnim(placingId) && _isPenDeco(other.id)) || (_isPenDeco(placingId) && isAnim(other.id));
+}
+// [INDOOR-RUG-1] 깔개(러그) = 장식 표의 layer:'floor' — 그릴 때 먼저 그려지던 바로 그 표시다(_isFloorLayerDeco 와 같은 잣대 · id 목록을 따로 두지 않는다).
+//  깔개와 가구는 한 칸에 같이 놓인다(깔개 위에 소파 · 소파 밑에 깔개). **깔개끼리·가구끼리는 지금처럼 안 겹친다.**
+//  저장 형식 변경 0 — 같은 칸에 기록이 둘 생길 뿐이고, 옛 JS 도 러그를 먼저 그리니 같은 그림이 나온다.
+function _isRugDeco(id) { return !!id && _isFloorLayerDeco({ id }); }
+//  이 자리(r,c,w,h)에 placingId 를 못 놓게 막는 놓인 것 하나(없으면 null) — "여기엔 이미 ○○" 의 ○○ 를 바르게 말하려고
+function _decoBlockerAt(r, c, w, h, area, placingId) {
+  return _decoList(CUR).find(p => {
+    if (p.area !== area || _decoOverlapOk(placingId, p)) return false;
+    const ps = getDecoSize(p.id);
+    return r < p.row + ps.h && r + h > p.row && c < p.col + ps.w && c + w > p.col;
+  }) || null;
 }
 
 function canPlaceDeco(r, c, w, h, area, excludeId, placingId) {
@@ -4746,6 +4759,11 @@ function ifSyncScene() {
   const sb = document.getElementById('if-scene-btn');
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
   if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
+  // [INDOOR-RUG-1] 집 안에는 아직 고를 바닥이 없다 — 눌러도 끌어도 아무 일 없던 🖌️ 바닥 단추는 집 안에서 감춘다
+  //  (벽지·바닥 고르기(IN-2)가 들어오면 이 자리에 '방 꾸미기'로 돌아온다). 바닥 모드인 채 집 안에 들어오면 장식 모드로.
+  const fb = document.getElementById('if-mode-floor');
+  if (fb) fb.style.display = isYard ? '' : 'none';
+  if (!isYard && DECO_MODE === 'floor') { setDecoMode('deco'); ifSyncModeBtn(); }
 }
 
 function ifSyncModeBtn() {
@@ -8700,7 +8718,7 @@ function _decoTopAt(area, row, col, seen) {
     const sz = getDecoSize(p.id);
     return row >= p.row && row < p.row + sz.h && col >= p.col && col < p.col + sz.w;
   });
-  const rank = p => (typeof ANIM_DECO !== 'undefined' && ANIM_DECO[p.id]) ? 0 : _isPenDeco(p.id) ? 2 : 1;
+  const rank = p => (typeof ANIM_DECO !== 'undefined' && ANIM_DECO[p.id]) ? 0 : (_isPenDeco(p.id) || _isRugDeco(p.id)) ? 2 : 1;   // [INDOOR-RUG-1] 깔개는 맨 아래
   hits.sort((a, b) => rank(a) - rank(b));
   return hits[0] || null;
 }
@@ -8749,7 +8767,9 @@ function _decoPlace(area,row,col){
   //  [DECO-PT-2] 카드를 든 채 누르면 치우지 않는다("꽃 놓으려는데 나무가 사라졌어") — 치우기는 빈손·🧽 치우기 모드에서만
   if(existing && SEL_DECO && DECO_MODE!=='erase'){
     if(!canPlaceDeco(row,col,(getDecoSize(SEL_DECO)).w,(getDecoSize(SEL_DECO)).h,area,null)){
-      const ed=GAME_DATA.decorations.find(x=>x.id===existing.id);
+      //  [INDOOR-RUG-1] 누른 칸 맨 위 것이 아니라 **정말 막는 것**의 이름을 말한다(러그 위 소파를 누르고 러그를 놓으려 할 때 막는 건 밑의 러그다)
+      const blk=(area==='indoor' && _decoBlockerAt(row,col,(getDecoSize(SEL_DECO)).w,(getDecoSize(SEL_DECO)).h,area,SEL_DECO)) || existing;
+      const ed=GAME_DATA.decorations.find(x=>x.id===blk.id);
       //  [DECO-ANIM-HIT-1] 동물이 떠나 있으면 "이미 강아지가 있어요"는 눈에 보이는 것과 다르다
       if(_decoAnimAway(existing)){ toast(`여기는 ${ed?ed.icon+' '+ed.name:'동물'} 자리예요(돌아올 곳) — 옆 칸에 놓아 보세요`); return; }
       toast(`여기엔 이미 ${ed?ed.icon+' '+ed.name:'장식'}이(가) 있어요 — 치우려면 🧽 치우기`); return;
