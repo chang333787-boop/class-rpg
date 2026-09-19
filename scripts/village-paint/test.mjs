@@ -72,6 +72,14 @@ test('문이 있으면 작아도 앉힌다', () => assert.equal(seatKindIs({ w: 
 test('길·큰길(2×2 길)·횡단보도·다리(길 가족)·울타리(이음)·꽃밭은 전처럼 즉시', () => { for (const i of [{ w: 1, h: 1, road: true }, { w: 2, h: 2, road: true }, { w: 1, h: 2, road: true, roadFam: true }, { w: 3, h: 1, roadFam: true }, { w: 1, h: 1, join: true }, { w: 1, h: 1, flower: true }]) assert.equal(seatKindIs(i), false); });
 test('1×1 꾸밈 · 긴의자(2×1)는 즉시', () => { assert.equal(seatKindIs({ w: 1, h: 1 }), false); assert.equal(seatKindIs({ w: 2, h: 1 }), false); assert.equal(seatKindIs(null), false); });
 
+/* ── 이웃을 기다리는 집(MAC-WAITHOMES-2) — waitSay · waitDots · waitClusters ── */
+const waitSay = grab('waitSay'), waitDots = grab('waitDots'), waitClusters = grab('waitClusters');
+test('넷 다 멀면 "두 가지 더" · 셋이 멀면 "하나만 더"', () => { assert.match(waitSay(['물', '장보기', '놀이', '쉼'], 2), /^두 가지 더/); assert.match(waitSay(['물', '놀이', '쉼'], 2), /^하나만 더/); });
+test('말은 짧고, 빠진 것만 그림으로', () => { const t = waitSay(['물', '놀이', '쉼'], 2); assert.ok(t.length <= 40, t.length + '자'); assert.ok(t.includes('🪣🛝🪑')); assert.ok(!t.includes('🛒')); assert.doesNotMatch(t, /멀어서|돌아가요/); });
+test('점: ○○ → ●○ (우물 하나로 차오른다)', () => { assert.equal(waitDots(4, 2), '○○'); assert.equal(waitDots(3, 2), '●○'); assert.equal(waitDots(2, 2), '●●'); });
+test('동네 묶기: 가까운 집끼리 · 큰 동네부터', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([r(10, 10), r(12, 10), r(14, 11), r(80, 80), r(82, 80), r(200, 5)], w, 8); assert.deepEqual(g.map(q => q.length), [3, 2, 1]); });
+test('동네 묶기: 사슬처럼 이어진 거리는 한 동네', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([0, 1, 2, 3, 4].map(i => r(10 + i * 6, 40)), w, 8); assert.equal(g.length, 1); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);
