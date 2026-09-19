@@ -2883,6 +2883,43 @@ function vpadTilt() {
 })();
 window.__viewpad = () => ({ 켜짐: window.VRULES.viewPad.on, 배율: +zoomMul.toFixed(2), camEl: +camEl.toFixed(3), ...VPAD.stats });
 
+/* ── [MAC-FIT] 같이 떴을 때 서로 가리지 않게 — 자리를 '재서' 잡는다 (보스 09-20: 하루에 얹힌 화면 요소들의 겹침 점검) ──
+   하나씩은 확인했지만 같이 뜬 적이 없었다. 1366×610 · 768×1024 · 1024×768 에서 다섯 상태를 재 보니 넷이 걸렸다 — 전부 **자리를 고정값으로 잡은 것**이 원인:
+   ① 목표판·마을 흐름·소식(토스트)은 top:62~64px 고정 → 상단 바가 두 줄(112px)이 되는 태블릿에서 둘째 줄('판 전체 보기'·놓은 것·인구)을 덮었다.
+   ② 미니맵은 bottom:150px 고정 → 트레이가 두 줄이 되면(태블릿, 꽃 탭) 카드 밑에 깔려 안 보였고, 1024 폭에서는 탭 줄과 겹쳤다.
+   ③ 길게 누르기 메뉴는 상단 바를 56px 로 쳤다 → 두 줄 상단 바의 둘째 줄에 걸쳤다.
+   ④ 못 놓는 이유(마우스)는 포인터 오른쪽에만 떠서 화면 오른쪽 끝에서 잘렸다(터치는 #553 이 이미 맞춘다). 마우스가 판을 벗어나 단추 위로 가도 말풍선이 남아 그 단추를 덮었다.
+   ⑤ 좁은 화면(768)에서 가운데 뜨는 소식이 왼쪽의 목표판과 겹쳤다 → 목표판이 떠 있고 가로로 겹치면 소식은 목표판 아래에.
+   고침: 상단 바의 실제 아래 끝·트레이 탭의 실제 위 끝을 재서 맞춘다. 상단 바·트레이의 크기가 바뀔 때만 돈다(ResizeObserver) — 프레임마다 하는 일 없음. 원래 줄 수정 0. */
+(window.VRULES = window.VRULES || {}).fit = { on: true };
+const FIT = { n: 0, topBottom: 62 };
+function fitPlace() {
+  if (!window.VRULES.fit.on) return; FIT.n++;
+  const g = id => document.getElementById(id), top = g('top'), mini = g('mini'); if (!top) return;
+  const tb = Math.round(top.getBoundingClientRect().bottom); FIT.topBottom = tb;
+  ['goals', 'hist'].forEach(id => { const e = g(id); if (e) e.style.top = Math.max(62, tb + 2) + 'px'; });
+  fitToast();
+  if (mini) { mini.style.bottom = ''; const m = mini.getBoundingClientRect(), hit = e => { const r = e.getBoundingClientRect(); return r.width > 0 && !(m.right <= r.left || m.left >= r.right || m.bottom <= r.top || m.top >= r.bottom); };
+    if (m.width > 0 && [...document.querySelectorAll('#trayTabs .gtab, #trayIn .card')].some(hit)) { const tabs = g('trayTabs'), tt = tabs ? tabs.getBoundingClientRect().top : innerHeight; mini.style.bottom = Math.round(innerHeight - tt + 8) + 'px'; } }
+  if (typeof VPAD !== 'undefined' && VPAD.place) VPAD.place();                  // ＋－◢ 는 미니맵 위에 선다 — 미니맵이 움직였으면 같이
+}
+function fitToast() {                                                            // 소식의 자리 — 상단 바 아래, 목표판·마을 흐름과 가로로 겹치면 그 아래
+  const t = document.getElementById('toast'); if (!t || !window.VRULES.fit.on) return; let top = Math.max(64, FIT.topBottom + 4); t.style.top = top + 'px';
+  const tr = t.getBoundingClientRect(); ['goals', 'hist'].forEach(id => { const e = document.getElementById(id); if (!e || !e.classList.contains('show')) return; const r = e.getBoundingClientRect(); if (r.width > 0 && tr.left < r.right && tr.right > r.left) top = Math.max(top, Math.round(r.bottom) + 6); });
+  t.style.top = top + 'px';
+}
+addEventListener('resize', fitPlace);
+['goalBtn', 'goals', 'histBtn', 'hist'].forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener('click', () => setTimeout(fitToast, 0)); });   // 목표판·마을 흐름을 여닫을 때도(줄 서 있던 소식은 toast 감싸기를 안 거친다)
+canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && window.VRULES.fit.on) document.getElementById('why').className = ''; });   // 마우스가 판을 벗어나면 이유 말풍선을 걷는다
+if (window.ResizeObserver) { const ro = new ResizeObserver(fitPlace); ['top', 'tray'].forEach(id => { const e = document.getElementById(id); if (e) ro.observe(e); }); }
+setTimeout(fitPlace, 0);
+{ const toastF0 = toast; toast = function () { const r = toastF0.apply(this, arguments); fitToast(); return r; };
+  const open0 = holdOpen; holdOpen = function (rec, x, y) { const r = open0.apply(this, arguments);      // 길게 누르기 메뉴: 상단 바의 실제 아래 끝을 본다
+    const m = document.getElementById('hold'); if (m && window.VRULES.fit.on) { const q = m.getBoundingClientRect(); if (q.top < FIT.topBottom + 4) m.style.top = Math.min(innerHeight - q.height - 6, y + 46) + 'px'; } return r; };
+  const ghost0 = updateGhost; updateGhost = function () { const r = ghost0.apply(this, arguments);         // 못 놓는 이유(마우스): 오른쪽 끝에서 잘리면 포인터 왼쪽으로
+    const el = document.getElementById('why'); if (el && window.VRULES.fit.on && el.className === 'show' && !el.style.transform) { const q = el.getBoundingClientRect(); if (q.right > innerWidth - 6) el.style.left = Math.max(6, (parseFloat(el.style.left) || 0) - q.width - 28) + 'px'; } return r; }; }
+window.__fit = () => ({ 켜짐: window.VRULES.fit.on, 돈횟수: FIT.n, 상단바아래끝: FIT.topBottom, 미니맵bottom: (document.getElementById('mini') || { style: {} }).style.bottom || '(CSS 그대로)' });
+
 document.getElementById('rotBtn').onclick = () => rotateView(1);
 document.getElementById('fitBtn').onclick = () => {
   const whole = zoomMul <= 1.02;
