@@ -7297,7 +7297,7 @@ window.__snap = () => { snapLoad(); return { 켜짐: window.VRULES.snap.on, 오�
       멈춘 둘은 ACT-PASS 의 '나란히 선 사람' 꼴로 비켜 선다. 사람마다 coolMs 에 한 번. 큰길(차선)에선 멈칫 없음.
    ⓑ ACT-PASS 비켜 그리기를 붐빔 단계만큼 조금 더(×1.25 · ×1.5).
    ⓒ '붐빔' 이유 풍선(🚶 하나)을 '길이 붐벼요' 그림으로 — 길 띠 위에 마주 보는 두 사람(있는 풍선 텍스처만 바꿈 · draw call +0).
-   붐빔 단계(새 판정 0): 프로그램 담당의 window.CROWD_AT(cell) 가 있으면 그것(수 0~1 → .2 이상 1 · .3 넘으면 2 / 정수 0·1·2 그대로),
+   붐빔 단계(새 판정 0): 프로그램 담당의 window.CROWD_AT(cell)(#647 · 0~1) 이 있으면 그것(.2 이상 1 · .3 넘으면 2 — 디자인 담당 길 그림과 같은 문턱),
    없으면 이번 틱 칸 사람 수(crowdCount · 프로그램 쪽) 를 그 칸 + 네 이웃으로 더해 3 이상 1 · 5 이상 2.
    스위치·수치 VRULES.crowdLook + 고리 둘(tickFolks 한 줄 · ACT-PASS 한 조각).
    ══════════════════════════════════════════════════════════════ */
@@ -7305,7 +7305,7 @@ window.__snap = () => { snapLoad(); return { 켜짐: window.VRULES.snap.on, 오�
 const CROWDX = { tick: -1, stats: { 멈칫: 0, 마주침: 0, 큰길넘김: 0 } };
 function crowdLvAt(c) {
   const R = window.VRULES.crowdLook, F = window.CROWD_AT;
-  if (typeof F === 'function') { const v = F(c); if (typeof v === 'number') return Number.isInteger(v) && v >= 0 && v <= 2 ? v : v > 0.3 ? 2 : v >= 0.2 ? 1 : 0; }
+  if (typeof F === 'function') { const v = F(c); if (typeof v === 'number') return v > 0.3 ? 2 : v >= 0.2 ? 1 : 0; }   // #647: 길 칸 = 막혀 선 사람의 이동 평균 0~1 · 디자인 담당과 같은 문턱(.2 · .3)
   const x = cX(c), y = cY(c); let n = crowdCount.get(c) || 0;
   for (const [dx, dy] of D4) if (inb(x + dx, y + dy)) n += crowdCount.get(idx(x + dx, y + dy)) || 0;
   return n >= R.lv2 ? 2 : n >= R.lv1 ? 1 : 0;
