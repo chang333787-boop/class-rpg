@@ -781,7 +781,7 @@ function resetStudentStats(id) {
   s.pendingRewards = []; s.titles = [];
   s.title = ''; s.achievements = [];
   s.equipmentIds = {}; s.inventory = [];
-  s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {};   // [DECO-SPACE-1] 공간 2·3 바닥도
+  s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {}; s.indoor = {};   // [DECO-SPACE-1] 공간 2·3 바닥도 · [IN-2] 집 안 벽지·바닥
   s.lastAttendDate = '';
   DB.saveStudent(s);
   closeModal();
@@ -800,7 +800,7 @@ function resetAllStudents() {
     s.pendingRewards = []; s.titles = [];
     s.title = ''; s.achievements = [];
     s.equipmentIds = {}; s.inventory = [];
-    s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {};   // [DECO-SPACE-1] 공간 2·3 바닥도
+    s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {}; s.indoor = {};   // [DECO-SPACE-1] 공간 2·3 바닥도 · [IN-2] 집 안 벽지·바닥
     s.lastAttendDate = '';
     DB.saveStudent(s);
   });
