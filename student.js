@@ -7135,7 +7135,8 @@ function _decoAttachGestures(cv) {
       const m = mid();
       pinch = { d0: m.d, z0: _dZoom, fx: m.x, fy: m.y, mx: m.x, my: m.y };
       _dSuppressClick = true;
-    } else if (pts.size === 1 && !SEL_DECO && DECO_MODE !== 'floor') {
+    } else if (pts.size === 1 && (!SEL_DECO && DECO_MODE !== 'floor' || e.pointerType === 'mouse' && e.button !== 0)) {
+      //  [DECO-PAN-1] 마우스 오른쪽·가운데 버튼 끌기는 카드를 골랐어도 언제나 화면 이동
       const l = local(e);
       drag = { x: l.x, y: l.y, moved: 0 };
     } else if (pts.size === 1) {
@@ -7191,6 +7192,7 @@ function _decoAttachGestures(cv) {
   cv.addEventListener('pointercancel', end);
   cv.addEventListener('lostpointercapture', end);
 
+  cv.addEventListener('contextmenu', e => e.preventDefault());   // [DECO-PAN-1] 오른쪽 끌기에 메뉴가 뜨지 않게
   cv.addEventListener('wheel', e => {
     e.preventDefault();
     const l = local(e);
@@ -7861,7 +7863,8 @@ function _drawDecoSVG(id, px, py, bw, bh) {
   if (!nw || !nh) return false;
   const w = bw;                    // 땅에 닿는 폭 = footprint 폭
   const h = w * (nh / nw);         // 비율 유지 — 늘이지 않는다
-  _dCtx.drawImage(img, px, py + bh - h, w, h);   // 아래 끝을 footprint 바닥에 맞춤
+  const src = _svgBmp('d:' + id, img, w * 2, nh / nw);   // [DECO-PERF-1] 구운 비트맵
+  _dCtx.drawImage(src, px, py + bh - h, w, h);   // 아래 끝을 footprint 바닥에 맞춤
   return true;
 }
 
@@ -7895,12 +7898,32 @@ function _floorBaseName(type, r, c) {
 }
 function _floorIsGrass(t) { return t === 'grass' || t === 'flower'; }
 // 셀 하나(base + 가장자리). typeAt(r,c) → 타입 | null(격자 밖·집 영역 = 경계 없음으로 취급)
+// [DECO-PERF-1] SVG 를 캔버스에 그리면 브라우저가 매번 새로 래스터한다(확대한 화면에서 바닥 612칸에 88ms).
+//  한 번 비트맵으로 구워 두고 그걸 붙인다. 크기는 계단(약 19%씩)으로 굽는다 — 두 손가락으로 확대하는 동안
+//  칸 크기가 조금씩 바뀌어도 같은 비트맵을 다시 쓴다(항상 필요한 크기 이상으로 구워 흐려지지 않는다).
+const _SVG_BMP = new Map();
+function _bmpStep(px) { return Math.max(4, Math.ceil(Math.pow(2, Math.ceil(Math.log2(Math.max(1, px)) * 4) / 4))); }
+function _svgBmp(key, img, needW, ratio) {
+  if (typeof document === 'undefined') return img;
+  const w = _bmpStep(needW), h = Math.max(1, Math.round(w * ratio));
+  const k = key + '|' + w;
+  let b = _SVG_BMP.get(k);
+  if (!b) {
+    if (_SVG_BMP.size > 1500) _SVG_BMP.clear();   // 메모리 상한(대략 수십 MB 아래)
+    b = document.createElement('canvas'); b.width = w; b.height = h;
+    b.getContext('2d').drawImage(img, 0, 0, w, h);
+    _SVG_BMP.set(k, b);
+  }
+  return b;
+}
+function _floorBmp(name, img, C) { return _svgBmp('f:' + name, img, C * 2, 1); }
 function _drawFloorSVG(type, r, c, px, py, C, typeAt) {
-  const base = _floorImg(_floorBaseName(type, r, c));
+  const bname = _floorBaseName(type, r, c);
+  const base = _floorImg(bname);
   if (!base) return false;
-  _dCtx.drawImage(base, px, py, C, C);
+  _dCtx.drawImage(_floorBmp(bname, base, C), px, py, C, C);
   const T = (dr, dc) => { const t = typeAt(r + dr, c + dc); return (t == null) ? type : t; };
-  const put = name => { const img = _floorImg(name); if (img) _dCtx.drawImage(img, px, py, C, C); };
+  const put = name => { const img = _floorImg(name); if (img) _dCtx.drawImage(_floorBmp(name, img, C), px, py, C, C); };
   if (!_floorIsGrass(type)) {
     const n = _floorIsGrass(T(-1, 0)), e = _floorIsGrass(T(0, 1)), s = _floorIsGrass(T(1, 0)), w = _floorIsGrass(T(0, -1));
     const v = ((r*5 + c*3) % 2) ? '2' : '';
@@ -7956,6 +7979,7 @@ function _isFloorLayerDeco(p) {
 // ══ /FLOOR-SVG-1 ══════════════════════════════════════════
 
 function _drawDeco() {
+  try { _decoHandSync(); } catch (e) {}   // [DECO-PAN-1]
   if (!_dCtx) return;
   if (_drawDecoRaf) return; // 이미 RAF 예약됨 — 중복 방지
   _drawDecoRaf = requestAnimationFrame(() => {
@@ -7981,16 +8005,20 @@ function _drawYard() {
   const _yardTypeAt = (rr, cc) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
     ? null : (_yardFloorGet(CUR)[rr+'_'+cc] || 'grass');   // [DECO-SPACE-1]
   const _vis = _decoVisible(DY.rows, DY.cols);   // [DECO-ZOOM-1] 보이는 칸만
-  for(let r=_vis.r0;r<_vis.r1;r++) for(let c=_vis.c0;c<_vis.c1;c++){
-    if(_isHC(r,c)) continue;
-    const tkey = r+'_'+c;
-    const ttype = _yardFloorGet(CUR)[tkey]||'grass';
-    const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
-    if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
-    _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;
-    _dCtx.fillRect(c*C, r*C, C, C);
-    _drawTileTexture(ttype, c, r, C);
-  }
+  const _floorCells = (v) => {
+    const fl = _yardFloorGet(CUR);
+    for(let r=v.r0;r<v.r1;r++) for(let c=v.c0;c<v.c1;c++){
+      if(_isHC(r,c)) continue;
+      const tkey = r+'_'+c;
+      const ttype = fl[tkey]||'grass';
+      const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
+      if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
+      _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;
+      _dCtx.fillRect(c*C, r*C, C, C);
+      _drawTileTexture(ttype, c, r, C);
+    }
+  };
+  _floorCells(_vis);
   // 나무 타일은 가로줄 추가 (무늬) — texture 함수로 통합했으므로 기존 loop 삭제
 
   // ══════════════════════════════════════════════════════
@@ -8684,6 +8712,20 @@ function decoFindSet(key, val) {
 }
 
 // [DECO-THUMB-2] 오른쪽 확대 단추 기둥이 서랍을 펼치면 서랍 위로 겹쳤다 → 늘 서랍 바로 위에 붙인다
+// [DECO-PAN-1] 한 손가락 끌기가 화면 이동이 되는 건 '카드를 안 골랐고 바닥 모드가 아닐 때'뿐이다.
+//  아이는 이 기준을 모른다(카드는 놓은 뒤에도 계속 잡혀 있다) → 막혀 있을 때만 ✋ 단추를 보여 준다.
+function _decoHandSync() {
+  const b = typeof document !== 'undefined' && document.getElementById('if-hand-btn');
+  if (b) b.style.display = (SEL_DECO || DECO_MODE === 'floor') ? 'flex' : 'none';
+}
+function decoHand() {
+  if (DECO_MODE === 'floor') { setDecoMode('deco'); if (typeof ifSyncModeBtn === 'function') ifSyncModeBtn(); }
+  SEL_DECO = null;
+  if (typeof renderDecoInv === 'function') renderDecoInv();
+  _drawDeco();
+  toast('✋ 손을 비웠어요 — 이제 한 손가락으로 끌면 화면이 움직여요');
+}
+
 function _decoPillarSync() {
   //  [DECO-PT-4] 기둥 위치는 CSS 변수 하나(--deco-drawer-h)로. 서랍이 아직 안 보일 때(높이 0) 재면
   //  기둥이 서랍 머리줄(⌃ 펼치기)을 덮었다 → 보일 때만 값을 바꾸고, 안 보이면 이전 값(기본 220px)을 둔다.
@@ -8819,7 +8861,7 @@ function selectDeco(id){
   if(SEL_DECO){
     const d=GAME_DATA.decorations.find(x=>x.id===id);
     if(d&&d.cat!==DECO_SCENE) toast(`${d.icon} 이 장식은 ${d.cat==='yard'?'🌿 마당':'🏠 집 안'} 전용이에요!`);
-    else toast(`${d?.icon} 골랐어요 — 놓을 칸을 누르세요`);   // [DECO-PT-1] 폰·태블릿은 '클릭'이 아니다
+    else toast(`${d?.icon} 골랐어요 — 놓을 칸을 누르세요 · 화면 옮기기는 두 손가락 또는 ✋`);   // [DECO-PAN-1]   // [DECO-PT-1] 폰·태블릿은 '클릭'이 아니다
   }
 }
 // ══ 작품 전시 (Storage 업로드) ══
