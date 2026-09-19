@@ -393,6 +393,42 @@
       decoSpaceSet(1); await sleep(200);
     }
 
+    //  ⑩-2 돌아다니는 동물은 '보이는 자리'로 누른다(DECO-ANIM-HIT-1) — 공간 3 빈 판에서
+    //    전에는 놓은 칸으로만 찾아서 🧽 치우기로 보이는 강아지를 눌러도 "치울 게 없어요",
+    //    빈 풀밭(강아지가 놓였던 칸)을 빈손으로 누르면 멀리 있는 강아지가 사라졌다.
+    if (typeof _decoTopAt === 'function') {
+      decoSpaceSet(3); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_y53').concat([{ id: 'd_y53', qty: 1 }]);
+      setDecoMode('deco'); SEL_DECO = 'd_y53'; _decoPlace('yard', 30, 10); SEL_DECO = null;
+      const host = _ifActiveContainer || 'house-topview';
+      const walkTo = (col) => {   // 걸어간 것과 같은 상태(타이머를 기다리지 않는다)
+        _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
+        const rec = _animLayers.get(host), st = rec && [...rec.items.values()].find(x => x.id === 'd_y53');
+        if (!st) return;   // (고치기 전 판에서는 위에서 강아지가 이미 사라진다 — 뒤 시험이 계속 돌게)
+        if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+        st.cur = { row: 30, col }; st.from = null;
+      };
+      const dogs = () => _decoList(CUR).filter(p => p.id === 'd_y53').length;
+      walkTo(13);
+      _decoPlace('yard', 30, 10);                       // 빈손으로 빈 풀밭(놓았던 칸)
+      out('동물떠난자리_빈손_안사라짐', dogs() === 1);
+      SEL_DECO = 'd_y53'; _decoPickAt({ area: 'yard', r: 30, c: 10 }); // (가진 1개를 다 놓아 잡히진 않는다 — 떠난 자리는 아예 안 맞아야 한다)
+      SEL_DECO = null;
+      out('동물_스포이드_보이는자리', _decoTopAt('yard', 30, 13, true) && _decoTopAt('yard', 30, 13, true).id === 'd_y53' && !_decoTopAt('yard', 30, 10, true));
+      setDecoMode('erase');
+      _decoPlace('yard', 30, 10);                       // 🧽 빈 풀밭
+      out('치우기_떠난자리_안치움', dogs() === 1);
+      walkTo(13);
+      _decoPlace('yard', 30, 13);                       // 🧽 보이는 강아지
+      out('치우기_보이는동물_치움', dogs() === 0);
+      decoUndo(); out('치운동물_되돌림', dogs() === 1);
+      setDecoMode('deco');
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      decoSpaceSet(1); await sleep(200);
+    }
+
     //  ⑪ 헤엄 장·밭은 공간 1 만·다 썼을 때 어느 공간(DECO-SWIM-1·DECO-PT-3)
     if (typeof _animProbeSwim === 'function') {
       decoSpaceSet(3); await sleep(200);
