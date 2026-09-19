@@ -2301,8 +2301,27 @@ function moveInWhy(rec) {
   if (reach.length < MOVEIN_MIN_ROAD) return '길이 너무 짧아요 · ' + MOVEIN_MIN_ROAD + '칸은 이어져야 이사 와요';
   return true;
 }
+/* [MAC-POPCAP] 보이는 사람은 FOLK_CAP(120)에서 멈추지만(프레임 예산) 인구는 계속 늘어야 한다.
+   전에는 tryMoveIn 이 상한에서 그냥 돌아가 인구가 119 에서 영영 멈췄다 — 인구 120·160·200 목표와 학교(120)·박물관(160) 해금에 닿을 수 없었다.
+   화면이 꽉 찼으면 걸어오는 모습 없이 빈 집 하나에 바로 든다. 저장 형식은 그대로다(houses 의 주민 수만 는다). */
+function moveInQuiet() {
+  const homes = [];
+  cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house' && (res.get(i) || 0) < houseCap(i)) homes.push(rec); });
+  for (let t = 0; t < homes.length; t++) {
+    const rec = homes[(moveRR++) % homes.length];
+    if (moveInWhy(rec) !== true) continue;
+    res.set(rec.root, (res.get(rec.root) || 0) + 1); sndFx('pop');
+    dirtyChunks.add(chunkOfCell(rec.root));            // 창에 불이 켜진다(F7)
+    folksDirty = true; markDirty();                     // syncFolks 가 👥 숫자를 고친다(사람은 상한이라 안 는다)
+    if (simNow() - lastMoveToast > 30000) { lastMoveToast = simNow(); toast('누가 이사 왔어요! 👥 ' + population() + '명', true); }
+    checkUnlocks();
+    return true;
+  }
+  return false;
+}
 /* 빈 집 하나 골라 주민 하나를 길 먼 끝에서 출발시킨다 */
 function tryMoveIn() {
+  if (folks.length >= FOLK_CAP) { moveInQuiet(); return; }   // [MAC-POPCAP] 화면의 사람이 꽉 차도 인구는 는다
   if (movers >= MOVEIN_MAX || folks.length >= FOLK_CAP) return;
   const homes = [];
   cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house' && (res.get(i) || 0) < houseCap(i)) homes.push(rec); });
