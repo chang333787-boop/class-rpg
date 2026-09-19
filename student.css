@@ -1576,3 +1576,15 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 }
 /* 폰 가로(키 작음) — 판이 마당을 다 덮지 않게 */
 @media (max-height:480px){ .fpk{max-height:52vh;overflow-y:auto} }
+/* ══ 바닥 '⬛ 네모로' (DECO-FLOOR-RECT-1) — 도구 토글 · 끄는 동안 아래 글 ══ */
+.fpk-tool{flex:0 0 auto;display:flex;align-items:center;padding-right:10px;margin-right:2px;border-right:1px solid rgba(255,255,255,.12)}
+.fpk-tool[hidden]{display:none}
+.pk-seg{display:inline-flex;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04)}
+.fpk-side .pk-seg{margin-top:6px;width:100%}
+.pk-seg-b{flex:1 1 auto;height:44px;padding:0 12px;border:0;background:none;color:#aeb4c0;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.pk-seg-b.is-on{background:rgba(93,173,226,.25);color:#cfe8f7;font-weight:700}
+.deco-rect-tip{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:9002;pointer-events:none;
+  background:rgba(20,24,32,.9);color:#ffd866;border:1px solid rgba(255,216,102,.45);border-radius:12px;padding:8px 14px;font-size:14px;font-weight:700;white-space:nowrap}
+.deco-rect-tip[hidden]{display:none}
+.deco-rect-tip.is-capped{color:#ffb86b;border-color:rgba(255,184,107,.6)}
+@media (max-height:480px){ .fpk-side .pk-cap{display:none} }   /* 폰 가로: 캡션 줄은 접는다(끄는 동안 아래 글이 대신 말한다) */
