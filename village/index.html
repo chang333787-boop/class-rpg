@@ -3934,12 +3934,20 @@ function guideSeen() { try { return localStorage.getItem(GUIDE_KEY()) === '1'; }
 function guideRender() { const c = GUIDE_CARDS[GUIDE.i]; document.getElementById('guidePic').textContent = c.pic; document.getElementById('guideTxt').innerHTML = c.txt;
   document.getElementById('guideDots').innerHTML = GUIDE_CARDS.map((_, k) => k === GUIDE.i ? '<b>●</b>' : '○').join(' ');
   document.getElementById('guideNext').textContent = GUIDE.i === GUIDE_CARDS.length - 1 ? '시작!' : '다음'; }
+/* [MAC-GUIDE] 첫 안내 3장을 읽는 동안 시계를 세운다. 하루가 3분이라, 천천히 읽는 아이는 안내를 닫았을 때 이미 저녁·밤이었다
+   (실측: 안내 2장째에서 '밤 10시'). 멈춤 단추 표시는 안 건드린다 — 아이가 누른 멈춤이 아니다. 아이가 이미 멈춰 둔 판이면 손대지 않는다. */
+function guideHold(on) {
+  if (on) { GUIDE.held = !SIM.paused; if (GUIDE.held) SIM.paused = true; }
+  else if (GUIDE.held) { GUIDE.held = false; SIM.paused = false; }
+}
 function guideStart(force) {
   if (!force && (guideSeen() || VISIT.on || savingOff)) return false;      // 옛 저장본·구경·시연 판엔 안 뜸
+  guideHold(true);   // [MAC-GUIDE]
   GUIDE.on = true; GUIDE.i = 0; GUIDE.shown++; document.getElementById('guide').classList.add('show'); guideRender(); return true;
 }
 function guideEnd(how) {
   GUIDE.on = false; document.getElementById('guide').classList.remove('show');
+  guideHold(false);   // [MAC-GUIDE]
   try { localStorage.setItem(GUIDE_KEY(), '1'); } catch (e) {} GUIDE.seen = true;
   goalsPeek(20000);                                                        // 안내 뒤 목표판(F25)
 }
