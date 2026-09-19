@@ -481,11 +481,11 @@ const GAME_DATA = {
     {id:'d_y58',name:'닭장',          icon:'🐔', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true, newUntil:'2026-09-27'},
     {id:'d_y59',name:'큰 연못',       icon:'🦆', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true, penWater:true, newUntil:'2026-09-27'},
     {id:'d_y60',name:'양 목장',       icon:'🐑', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true, newUntil:'2026-09-27'},
-    {id:'d_y61',name:'꽃길',     icon:'🌸', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y61',name:'꽃길',     icon:'🌸', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, hidden:true, newUntil:'2026-09-27'},   // [DECO-RETIRE-1] 🖌 바닥(꽃밭·자갈)으로 같은 것을 칠할 수 있어 상점에서만 뺀다 — 가진 것·놓은 것은 그대로
     {id:'d_y62',name:'강아지 마당',   icon:'🐶', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true, newUntil:'2026-09-27'},
     {id:'d_y63',name:'놀이터',        icon:'🛝', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y64',name:'과수원',        icon:'🍎', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
-    {id:'d_y65',name:'자갈길',   icon:'🪨', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y65',name:'자갈길',   icon:'🪨', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, hidden:true, newUntil:'2026-09-27'},   // [DECO-RETIRE-1] 🖌 바닥(꽃밭·자갈)으로 같은 것을 칠할 수 있어 상점에서만 뺀다 — 가진 것·놓은 것은 그대로
     {id:'d_y66',name:'큰 헛간',       icon:'🏚️', size:{w:4,h:3}, priceAdj:-150, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y67',name:'온실',          icon:'🪴', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y68',name:'캠프파이어', icon:'🔥', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
