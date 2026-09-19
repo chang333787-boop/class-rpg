@@ -6189,6 +6189,96 @@ function titleTick() {                                                          
 window.__titleOpen = () => { if (window.VRULES.titles.on && window.__LOADMS != null) titleCard(true); };   // 간판을 눌렀을 때 부르는 곳(위쪽 마을 이름을 누른 것과 같다)
 window.__titleNow = () => ({ id: TITLE.id, 말: titleText(TITLE.id), 전: TITLE.was, 별: typeof recurStars === 'function' ? recurStars() : 0 });   // 간판(디자인 담당)이 읽는 곳
 window.__titles = () => { const c = titleCounts(); return { 고른것: TITLE.id, 전: TITLE.was, 첫카드봄: TITLE.offered, 후보: titleCandidates(c, TITLES, TITLE.live, window.VRULES.titles.keep), 값: Object.fromEntries(TITLES.map(t => [t.id, +(t.need(c) || 0).toFixed(2)])), 센것: { ...c, bookKinds: c.bookKinds.join() }, ...TITLE.stats }; };
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-TITLESIGN-1] 칭호 간판 — 마을 어귀에 저절로 서는 지붕 팻말(보스 결정 ⓑ). 새 물건 아님: cells 에 안 들고 저장 0.
+   · 자리: 프로그램 담당의 __entranceSpot(prev)(#566). 칭호가 없으면(id null) 간판도 없다. 친구 마을 구경 중엔 내린다.
+   · 그림: 판 한 장(캔버스) = 둥근 원 안의 칭호 그림(우리 SVG 열 개 — 탭 아이콘과 같은 선·색) + 칭호 말.
+   · ⭐ 마을 별(줄지 않음)로 꾸밈이 는다: 1 지붕 위 깃발 · 3 금테 · 6 양옆 꽃상자 · 10 등불 둘(밤에 환하다).
+   · 그리기 1회: 틀과 판을 **메시 하나·재질 하나**로(draw call 예산 턱밑 #564). 틀 꼭짓점은 캔버스의 흰 칸을, 판 꼭짓점은 그림 칸을 본다.
+     빛은 청크와 같은 withEmis(aEmis) — 판은 은은히(0.5), 등불은 1.
+   · 키: 판 윗변 ≈ 집 1층 처마, 깃발은 지붕 위로 분명히(기본 거리에서 읽히게).
+   ══════════════════════════════════════════════════════════════ */
+const TITLE_ICON = (() => {
+  const o = 'stroke="#0f1117" stroke-width="1.3" stroke-linejoin="round"';
+  return {
+    flower: '<path d="M12 13v9" stroke="#6fb54a" stroke-width="2.2" stroke-linecap="round"/><path d="M12 19c-3 0-5-2-5-4 2.6 0 4.4 1.4 5 4z" fill="#6fb54a" ' + o + '/>'
+          + [0, 72, 144, 216, 288].map(a => '<ellipse cx="12" cy="4.6" rx="2.9" ry="3.9" fill="#f0719a" ' + o + ' transform="rotate(' + a + ' 12 9)"/>').join('') + '<circle cx="12" cy="9" r="2.6" fill="#f6c23e" ' + o + '/>',
+    forest: '<path d="M7 1.5 2.6 11h8.8z" fill="#4f9a3c" ' + o + '/><path d="M7 6 2 16.5h10z" fill="#4f9a3c" ' + o + '/><path d="M6 16.5h2V22H6z" fill="#9a6f48" ' + o + '/><circle cx="16.6" cy="10" r="5" fill="#6fb54a" ' + o + '/><path d="M15.6 14.6h2V22h-2z" fill="#9a6f48" ' + o + '/><circle cx="15" cy="8.4" r="1.6" fill="#86c95e"/>',
+    market: '<path d="M3 11h18v10H3z" fill="#f7efdc" ' + o + '/><path d="M2 4.5h20l-1 6.5H3z" fill="#e0574a" ' + o + '/><path d="M6.3 4.8 5.6 11M10.2 4.8v6.2M13.8 4.8v6.2M17.7 4.8l.7 6.2" stroke="#fff" stroke-width="1.7"/><path d="M9 14.5h6V21H9z" fill="#9a6f48" ' + o + '/>',
+    play:   '<path d="M2.5 21.5h19" stroke="#6e7883" stroke-width="2" stroke-linecap="round"/><path d="M5 21V8h3v13" fill="#e08075" ' + o + '/><path d="M8 8.5c4 1 7 6 12 11.5l-2 1.3C13.5 16 11 12.6 8 11.6z" fill="#f6c23e" ' + o + '/><path d="M4 8l2.5-5L9 8z" fill="#5aa9e6" ' + o + '/>',
+    book:   '<path d="M12 6C9 4 5.5 4 2.5 5v14c3-1 6.5-1 9.5 1z" fill="#f4f2ea" ' + o + '/><path d="M12 6c3-2 6.5-2 9.5-1v14c-3-1-6.5-1-9.5 1z" fill="#f4f2ea" ' + o + '/><path d="M12 6v14" stroke="#0f1117" stroke-width="1.3"/><path d="M5 9h4.5M5 12h4.5M5 15h3M14.5 9H19M14.5 12H19M14.5 15h3" stroke="#5aa9e6" stroke-width="1.4" stroke-linecap="round"/>',
+    water:  '<path d="M12 1.8c3.6 4.6 6 7.7 6 10.7a6 6 0 0 1-12 0c0-3 2.4-6.1 6-10.7z" fill="#7fd0e8" ' + o + '/><circle cx="9.6" cy="11.8" r="1.4" fill="#fff"/><path d="M1.8 20.4c2.5-2 4.6-2 7.1 0s4.6 2 7.1 0 4.4-2 6.2 0" fill="none" stroke="#3b8fc9" stroke-width="2.1" stroke-linecap="round"/>',
+    rest:   '<path d="M5 15v6M19 15v6" stroke="#6e7883" stroke-width="2.6" stroke-linecap="round"/><path d="M3 3.5h18v4.2H3zM3 8.6h18v3.4H3z" fill="#d2ab7f" ' + o + '/><path d="M1.5 12.8h21v3.8h-21z" fill="#b98a5e" ' + o + '/>',
+    road:   '<path d="M9 2h6l6 20H3z" fill="#d9d6cf" ' + o + '/><path d="M12 4v3M12 10v4M12 17v4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>',
+    guest:  '<path d="M2.5 8h11.5v10H2.5z" fill="#e0574a" ' + o + '/><path d="M14 11h6.5v7H14z" fill="#5aa9e6" ' + o + '/><path d="M4.6 3.6h3.2V8H4.6z" fill="#6e7883" ' + o + '/><path d="M5 10.2h4.2v3.2H5z" fill="#f4f2ea" ' + o + '/><circle cx="6.8" cy="19.4" r="2.2" fill="#3a3f47" ' + o + '/><circle cx="16.6" cy="19.4" r="2.2" fill="#3a3f47" ' + o + '/><path d="M1.5 22.3h21" stroke="#6e7883" stroke-width="1.6" stroke-linecap="round"/>',
+    home:   '<path d="M4 11h16v10H4z" fill="#f7efdc" ' + o + '/><path d="M2 12 12 3l10 9z" fill="#e08075" ' + o + '/><path d="M12 19.6s-3.7-2.3-3.7-4.7a1.9 1.9 0 0 1 3.7-.9 1.9 1.9 0 0 1 3.7.9c0 2.4-3.7 4.7-3.7 4.7z" fill="#f0719a" ' + o + '/>' };
+})();
+const TSIGN = { mesh: null, key: '', spot: null, busy: false, K: 1.25, ROOF: 0xc8705a, stats: { 지음: 0, 내림: 0 } };
+function tsignParts(stars) {                             // 칸 가운데 기준(단위: 칸 한 변 4). 앞(+z)이 판
+  const GOLD = 0xe8b04b, W = 2.95, FY = 2.25;
+  const box = (c, s, p, x) => Object.assign({ g:'box', c, s, p }, x || {});
+  const parts = [ box(P.woodD, [.22,3.2,.22], [-1.35,1.6,0]), box(P.woodD, [.22,3.2,.22], [1.35,1.6,0]),
+    box(P.woodL, [W,1.55,.16], [0,FY,0]), box(P.woodD, [3.1,.12,.3], [0,1.42,0]),
+    box('roof', [1.9,.14,.9], [-.78,3.32,0], { rz:.42 }), box('roof', [1.9,.14,.9], [.78,3.32,0], { rz:-.42 }), box(P.woodD, [.22,.2,.94], [0,3.66,0]) ];
+  if (stars >= 1) parts.push({ g:'cyl', c:P.metalD, s:[.05,1.7,.05], p:[0,4.5,0] }, box(0xe0574a, [.86,.26,.03], [.46,5.18,0]), box(0xf6c23e, [.86,.26,.03], [.46,4.92,0]), { g:'sph', c:GOLD, s:[.09,.09,.09], p:[0,5.38,0] });
+  if (stars >= 3) parts.push(box(GOLD, [3.05,.1,.2], [0,3.06,0]), box(GOLD, [3.05,.1,.2], [0,1.48,0]), box(GOLD, [.1,1.6,.2], [-1.52,FY,0]), box(GOLD, [.1,1.6,.2], [1.52,FY,0]));
+  if (stars >= 6) [-.8, .8].forEach(x => parts.push(box(P.woodD, [.9,.34,.5], [x,.17,.62]), { g:'sph', c:0x6fb54a, s:[.42,.26,.24], p:[x,.42,.62] },
+    { g:'sph', c:0xf0719a, s:[.14,.14,.14], p:[x-.22,.55,.72] }, { g:'sph', c:0xf6c23e, s:[.14,.14,.14], p:[x+.05,.58,.74] }, { g:'sph', c:0xffffff, s:[.13,.13,.13], p:[x+.26,.54,.7] }));
+  if (stars >= 10) [-1.72, 1.72].forEach(x => parts.push(box(P.metalD, [.07,.34,.07], [x,2.95,.18]), box(P.metalD, [.44,.06,.44], [x,2.4,.18]), box(P.glow, [.4,.48,.4], [x,2.66,.18], { e:1 }), { g:'cone', c:P.metalD, s:[.36,.26,.36], p:[x,3.02,.18], ry:Math.PI / 4 }));
+  const k = TSIGN.K; return { parts: parts.map(pt => ({ ...pt, s: pt.s.map(v => v * k), p: pt.p.map(v => v * k) })), face: { w: 2.7 * k, h: 1.35 * k, y: FY * k, z: .08 * k + .012 } };
+}
+function tsignCanvas(id) {                               // 512×256: 위 232줄 = 판, 왼쪽 아래 흰 칸 = 틀이 보는 곳
+  return new Promise(res => {
+    const t = TITLE_BY[id], cv = document.createElement('canvas'); cv.width = 512; cv.height = 256; const g = cv.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 236, 40, 20);
+    g.fillStyle = '#f3e3c0'; g.fillRect(0, 0, 512, 232); g.strokeStyle = '#b98a5e'; g.lineWidth = 10; g.strokeRect(5, 5, 502, 222);
+    const text = () => {
+      const F = '"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif', maxW = 262, words = t.nm.split(' ');
+      let lines = [t.nm], size = 58; g.font = '800 ' + size + 'px ' + F;
+      if (g.measureText(t.nm).width > maxW && words.length > 1) { let best = null; for (let i = 1; i < words.length; i++) { const a = words.slice(0, i).join(' '), b = words.slice(i).join(' '), w = Math.max(g.measureText(a).width, g.measureText(b).width); if (!best || w < best.w) best = { w, l: [a, b] }; } lines = best.l; }
+      while (size > 26 && Math.max(...lines.map(l => g.measureText(l).width)) > maxW) { size -= 2; g.font = '800 ' + size + 'px ' + F; }
+      g.fillStyle = '#4a3422'; g.textBaseline = 'middle'; const lh = size * 1.12, y0 = 116 - (lines.length - 1) * lh / 2;
+      lines.forEach((l, i) => g.fillText(l, 226, y0 + i * lh));
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; res(tex);
+    };
+    g.fillStyle = '#fff8e8'; g.beginPath(); g.arc(114, 116, 96, 0, Math.PI * 2); g.fill(); g.lineWidth = 6; g.strokeStyle = '#b98a5e'; g.stroke();
+    const im = new Image(); im.onload = () => { g.drawImage(im, 40, 42, 148, 148); text(); }; im.onerror = text;
+    im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' + (TITLE_ICON[id] || '') + '</svg>');
+  });
+}
+async function tsignBuild(id, stars, x, y) {
+  const tex = await tsignCanvas(id), { parts, face } = tsignParts(stars);
+  const pos = [], nrm = [], col = [], uv = [], em = [], ix = [], m = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color();
+  const WU = 20 / 512, WV = 10 / 256;                    // 흰 칸 한가운데
+  parts.forEach(pt => { const b = BASE[pt.g]; if (!b) return; const off = pos.length / 3; partMatrix('sign', x, y, 0, pt, m); n3.getNormalMatrix(m); c.setHex(pt.c === 'roof' ? TSIGN.ROOF : pt.c);
+    for (let i = 0; i < b.nv; i++) { v.set(b.pos[i * 3], b.pos[i * 3 + 1], b.pos[i * 3 + 2]).applyMatrix4(m); pos.push(v.x, v.y, v.z); v.set(b.nrm[i * 3], b.nrm[i * 3 + 1], b.nrm[i * 3 + 2]).applyMatrix3(n3).normalize(); nrm.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b); uv.push(WU, WV); em.push(pt.e ? 1 : 0); }
+    for (let i = 0; i < b.idx.length; i++) ix.push(b.idx[i] + off); });
+  const cc = centerOf('sign', x, y, 0), off = pos.length / 3, fx = face.w / 2, fy = face.h / 2, V0 = 1 - 232 / 256;
+  [[-fx, -fy, 0, V0], [fx, -fy, 1, V0], [fx, fy, 1, 1], [-fx, fy, 0, 1]].forEach(([dx, dy, u, vv]) => { pos.push(cc.x + dx, face.y + dy, cc.z + face.z); nrm.push(0, 0, 1); col.push(1, 1, 1); uv.push(u, vv); em.push(.5); });
+  ix.push(off, off + 1, off + 2, off, off + 2, off + 3);
+  const geo = new THREE.BufferGeometry(), nv = pos.length / 3;
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('aEmis', new THREE.Float32BufferAttribute(em, 1)); geo.setAttribute('aNight', new THREE.Float32BufferAttribute(new Float32Array(nv), 1));
+  geo.setIndex(ix); geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, withEmis(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, map: tex })));
+  mesh.castShadow = false; mesh.receiveShadow = true; return mesh;   // 그림자를 드리우면 그림자 패스에 그리기 +1 — 예산 턱밑(#564)이라 끈다
+}
+function tsignDrop() { if (!TSIGN.mesh) return; scene.remove(TSIGN.mesh); TSIGN.mesh.geometry.dispose(); if (TSIGN.mesh.material.map) TSIGN.mesh.material.map.dispose(); TSIGN.mesh.material.dispose(); TSIGN.mesh = null; TSIGN.key = ''; window.__titleSign = null; TSIGN.stats.내림++; }
+async function tsignSync() {
+  if (TSIGN.busy) return; const now = window.__titleNow ? window.__titleNow() : null;
+  if (!now || !now.id || !TITLE_BY[now.id] || VISIT.on || !window.__entranceSpot) { tsignDrop(); TSIGN.spot = null; return; }
+  const spot = window.__entranceSpot(TSIGN.spot); if (!spot) { tsignDrop(); return; } TSIGN.spot = { x: spot.x, y: spot.y };
+  const st = now.별 >= 10 ? 10 : now.별 >= 6 ? 6 : now.별 >= 3 ? 3 : now.별 >= 1 ? 1 : 0, key = now.id + ':' + st + ':' + spot.x + ',' + spot.y;
+  if (key === TSIGN.key) return;
+  TSIGN.busy = true;
+  try { const mesh = await tsignBuild(now.id, st, spot.x, spot.y); tsignDrop(); TSIGN.mesh = mesh; TSIGN.key = key; scene.add(mesh); window.__titleSign = { mesh, cell: { x: spot.x, y: spot.y } }; TSIGN.stats.지음++; }
+  finally { TSIGN.busy = false; }
+}
+addEventListener('village-title', () => { tsignSync(); });
+setInterval(() => { if (window.__LOADMS != null) tsignSync(); }, 10000);   // 별·어귀 자리·구경 오감 — 칸 훑기 0.5ms 라 10초에 한 번
+window.__tsign = () => ({ 있음: !!TSIGN.mesh, 열쇠: TSIGN.key, 자리: TSIGN.spot, 삼각형: TSIGN.mesh ? TSIGN.mesh.geometry.index.count / 3 : 0, ...TSIGN.stats });
+window.__tsignSync = tsignSync;
+{ const t0 = setInterval(() => { if (window.__LOADMS != null) { clearInterval(t0); tsignSync(); } }, 500); }   // 저장본을 다 읽으면 한 번
 
 function serialize() {
   const { pal, ps, changed } = plotStrings();
