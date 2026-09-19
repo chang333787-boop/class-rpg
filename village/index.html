@@ -6295,6 +6295,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actCrowdTick(f, now)) continue;   // [ACT-CROWD] 붐비는 좁은 길 — 마주 오는 둘이 비켜 서느라 잠깐 멈칫
     if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
     if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
@@ -6759,7 +6760,7 @@ function actPassDraw() {
     const walkers = list.filter(i => folks[i].walking), standers = list.filter(i => !folks[i].walking);
     walkers.forEach((i, k) => { const f = folks[i], co = Math.cos(f.dir), si = Math.sin(f.dir);
       const same = walkers.slice(0, k).some(j => Math.cos(folks[j].dir - f.dir) > 0.5);   // 앞에 같은 쪽으로 가는 사람이 있으면 나는 왼쪽
-      const s = (same ? 1 : -1) * R.side;                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
+      const s = (same ? 1 : -1) * R.side * (1 + (f.crowdLv || 0) * 0.25);   // [ACT-CROWD] 붐빌수록 조금 더 비킨다                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
       f.passTx = co * s; f.passTz = -si * s; });
     if (standers.length >= 2) standers.forEach((i, k) => { const f = folks[i], s = (k % 2 ? 1 : -1) * R.side * (1 + (k >> 1) * 0.6);   // 한 칸에 둘 이상 서 있으면(큰길 · 가로등 아래 멈춤) 나란히 — 번갈아 좌우로
       const d0 = folks[standers[0]].dir; f.passTx = Math.cos(d0) * s; f.passTz = -Math.sin(d0) * s; }); });   // 한 축(첫 사람의 방향)으로 — 등을 맞댄 둘이 같은 자리로 가지 않게
@@ -7321,6 +7322,51 @@ function snapCard(y, msg) {
   };
   document.getElementById('albumBtn').onclick = () => { albumLoad(); snapLoad(); albumShow(SNAP.yday && window.VRULES.snap.on && !VISIT.on ? album.length : album.length - 1); }; }
 window.__snap = () => { snapLoad(); return { 켜짐: window.VRULES.snap.on, 오늘: SNAP.today ? { 날: SNAP.today.day, 순간: SNAP.today.label, 크기: SNAP.today.url.length } : null, 어제: SNAP.yday ? { 날: SNAP.yday.day, 순간: SNAP.yday.label } : null, 기다림: !!SNAP.pending, 찍기ms: +SNAP.cost.toFixed(2), 크기단계: window.VRULES.snap.sizes[SNAP.sizeStep], 후보: SNAP.stats.후보.slice(1), 찍음: SNAP.stats.찍음.slice(1), 바꿔찍음: SNAP.stats.바꿔찍음, 미룸: SNAP.stats.미룸, 날마다: SNAP.log.map(([d, r]) => (d + 1) + '일:' + r), 건너뜀: SNAP.stats.건너뜀, 굽기실패: SNAP.stats.굽기실패 }; };
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-CROWD] 붐비는 길이 붐벼 보이게 — 사람 쪽 (주민 연기 · 09-20 · 보스 ① · 길 판의 흙빛은 디자인 담당 몫(roadFamParts)).
+   ⓐ 좁은 길(1칸 · 큰길 아님)의 붐빈 칸에서 **마주 오는 둘**(한 사람의 다음 칸 = 다른 사람의 지금 칸, 방향이 반대)이 만나면 둘 다 pauseMs[단계] 멈칫 —
+      멈춘 둘은 ACT-PASS 의 '나란히 선 사람' 꼴로 비켜 선다. 사람마다 coolMs 에 한 번. 큰길(차선)에선 멈칫 없음.
+   ⓑ ACT-PASS 비켜 그리기를 붐빔 단계만큼 조금 더(×1.25 · ×1.5).
+   ⓒ '붐빔' 이유 풍선(🚶 하나)을 '길이 붐벼요' 그림으로 — 길 띠 위에 마주 보는 두 사람(있는 풍선 텍스처만 바꿈 · draw call +0).
+   붐빔 단계(새 판정 0): 프로그램 담당의 window.CROWD_AT(cell)(#647 · 0~1) 이 있으면 그것(.2 이상 1 · .3 넘으면 2 — 디자인 담당 길 그림과 같은 문턱),
+   없으면 이번 틱 칸 사람 수(crowdCount · 프로그램 쪽) 를 그 칸 + 네 이웃으로 더해 3 이상 1 · 5 이상 2.
+   스위치·수치 VRULES.crowdLook + 고리 둘(tickFolks 한 줄 · ACT-PASS 한 조각).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).crowdLook = { on: true, pauseMs: [0, 450, 850], coolMs: 12000, lv1: 3, lv2: 5 };
+const CROWDX = { tick: -1, stats: { 멈칫: 0, 마주침: 0, 큰길넘김: 0 } };
+function crowdLvAt(c) {
+  const R = window.VRULES.crowdLook, F = window.CROWD_AT;
+  if (typeof F === 'function') { const v = F(c); if (typeof v === 'number') return v > 0.3 ? 2 : v >= 0.2 ? 1 : 0; }   // #647: 길 칸 = 막혀 선 사람의 이동 평균 0~1 · 디자인 담당과 같은 문턱(.2 · .3)
+  const x = cX(c), y = cY(c); let n = crowdCount.get(c) || 0;
+  for (const [dx, dy] of D4) if (inb(x + dx, y + dy)) n += crowdCount.get(idx(x + dx, y + dy)) || 0;
+  return n >= R.lv2 ? 2 : n >= R.lv1 ? 1 : 0;
+}
+function actCrowdTick(f, now) {
+  const R = window.VRULES.crowdLook;
+  if (CROWDX.tick !== SIM.ticks) { CROWDX.tick = SIM.ticks;               // 틱마다 한 번 — 마주 오는 둘 찾기
+    if (R.on) { const at = new Map();
+      folks.forEach(g => { g.crowdLv = 0; if (g.state !== 'walk' || !g.path || g.path[g.step + 1] == null || g.visitor && !g.neighbor) return; const c = g.path[g.step]; const l = at.get(c); if (l) l.push(g); else at.set(c, [g]); });
+      at.forEach((list, c) => list.forEach(g => { const n = g.path[g.step + 1], other = at.get(n); if (!other) return;
+        const h = other.find(o => o !== g && o.path[o.step + 1] === c && Math.cos(o.dir - g.dir) < -0.5); if (!h) return;
+        if (isWide(c) || isWide(n)) { CROWDX.stats.큰길넘김++; return; }
+        const lv = Math.max(crowdLvAt(c), crowdLvAt(n)); g.crowdLv = lv; h.crowdLv = lv; if (!lv) return;
+        CROWDX.stats.마주침++;
+        [g, h].forEach(p => { if (p.crowdPause || now < (p.crowdNext || 0)) return; p.crowdPause = { until: now + R.pauseMs[lv], dir: p.dir }; p.crowdNext = now + R.coolMs; CROWDX.stats.멈칫++; }); })); } }
+  const P = f.crowdPause; if (!P) return false;
+  if (!R.on || now >= P.until || f.state !== 'walk') { f.crowdPause = null; return false; }
+  f.walking = false; f.dir = P.dir + Math.sin((P.until - now) / 90) * 0.12; return true;   // 멈칫 — 몸을 살짝 틀었다가 다시 간다
+}
+{ const k = WHY_KEYS.indexOf('붐빔'); if (k >= 0 && whyPool[k]) {         // '붐빔' 풍선 그림 — 길 띠 위에 마주 보는 두 사람
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#fffaf0'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.fillStyle = '#b9b4a8'; g.fillRect(6, 45, 50, 8); g.fillStyle = '#d9d4c8'; g.fillRect(6, 48, 50, 2);   // 좁은 길
+  const fig = (x, col, flip) => { g.fillStyle = col; g.beginPath(); g.arc(x, 25, 5, 0, 6.283); g.fill(); g.fillRect(x - 4.5, 31, 9, 11); g.fillStyle = '#4a3b2a'; g.fillRect(x - 4, 42, 3, 5); g.fillRect(x + 1, 42, 3, 5);
+    g.fillStyle = col; g.fillRect(flip ? x - 9 : x + 4, 33, 5, 3); };   // 앞으로 내민 팔 — 서로를 향해(귀퉁이 딱지에 안 가리게 왼쪽 아래로)
+  fig(17, '#e0457b', false); fig(34, '#3f7fd6', true);
+  g.fillStyle = '#d9482f'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = whyPool[k].material; if (m.map) m.map.dispose(); m.map = t; m.needsUpdate = true; } }
+window.__crowdLook = () => ({ 켜짐: window.VRULES.crowdLook.on, CROWD_AT있음: typeof window.CROWD_AT === 'function', 지금멈칫: folks.filter(f => f.crowdPause).length, ...CROWDX.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
