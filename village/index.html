@@ -1295,6 +1295,37 @@ const _rm = new THREE.Matrix4();
 /* 큰길의 방향 — 둘레(발자국 바깥 한 칸)에 이어지는 상대가 더 많은 쪽. 큰길끼리는 두 배로 센다(큰길을 이어 놓은 거리가 한 방향으로 읽히게). 외따로면 가로(x) */
 function avenueAlongX(rx, ry) { const at = (x, y) => { if (!inb(x, y)) return 0; const c = cells[idx(x, y)]; return !c || !ROAD_JOIN_TO.has(c.k) ? 0 : c.k === 'avenue' ? 2 : 1; };
   let ex = 0, ez = 0; for (let d = 0; d < 2; d++) { ex += at(rx - 1, ry + d) + at(rx + 2, ry + d); ez += at(rx + d, ry - 1) + at(rx + d, ry + 2); } return ex >= ez; }
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-WEAR-1] 붐비는 길이 붐벼 보이게 — 길 쪽 그림 신호(사람 쪽 몸짓은 주민 연기 담당). 보스·사용자 결정 ⓑ.
+   · 1칸 길(road)의 윗판이 붐빔 단계만큼 **흙빛**으로(중간 e2d6bd · 심함 d2bf99) + 심함엔 이어진 변의 **줄눈에 흙**. 칸당 ~18△ — 붐비는 칸이 수백이어도 가볍게(얼룩은 넣지 않는다).
+   · 붐빔 값은 프로그램 쪽 판정 그대로 읽기만(새 판정 0): window.CROWD_AT(root) 가 있으면 그것, 없으면 집마다 crowd(0~1).
+     길 칸의 닳음 = 그 칸에 닿은 집들(발자국 4방)의 붐빔 가운데 가장 큰 것. 단계: 중간 ≥ .2 · 심함 > .3(= crowdedHome 과 같은 선).
+   · **마을의 밤에 한 번만**(자정~5시, 하루 한 번) 새로 본다 → 큰길로 넓혀 붐빔이 풀리면 자국도 서서히가 아니라 그날 밤 걷힌다. 바뀐 칸의 청크만 다시 합친다.
+   · 큰길은 차선이 있어 자국 없음. 청크 기하 안(draw call +0). window.__roadWear(x, y) → 0/1/2(창조자의 눈이 대조할 때).
+   ══════════════════════════════════════════════════════════════ */
+const ROAD_WEAR = new Map();                                   // 길 칸 → 1/2 (밤마다 한 번 새로 · 0 은 안 적는다)
+window.WEAR_LOOK = window.WEAR_LOOK || { on: true, mid: .2, hi: .3 };
+function roadWearParts(x, y, x0, x1, z0, z1, HALF, out) {
+  if (!window.WEAR_LOOK.on) return; const lv = ROAD_WEAR.get(idx(x, y)) || 0; if (!lv) return;
+  const cx = wx(x), cz = wz(y);
+  out.push({ g:'box', c: lv === 1 ? 0xe2d6bd : 0xd2bf99, s:[x1 - x0, .008, z1 - z0], p:[cx + (x0 + x1) / 2, .201, cz + (z0 + z1) / 2], abs:true });   // 윗판이 흙빛으로
+  if (lv >= 2) { const soil = 0x7a5a3a, t = .22;                                                                    // 줄눈 사이 흙 — 이어진 변의 틈에
+    if (x1 > HALF - .2) out.push({ g:'box', c:soil, s:[t, .03, z1 - z0], p:[cx + HALF, .19, cz + (z0 + z1) / 2], abs:true });
+    if (z1 > HALF - .2) out.push({ g:'box', c:soil, s:[x1 - x0, .03, t], p:[cx + (x0 + x1) / 2, .19, cz + HALF], abs:true }); }
+}
+const WEAR = { day: -1, stats: { 밤: 0, 닳은칸: 0, 바뀐칸: 0 } };
+function roadWearSnapshot() {                                   // 밤에 한 번 — 집마다 붐빔을 읽어 길 칸 단계를 새로
+  const W = window.WEAR_LOOK, at = typeof window.CROWD_AT === 'function' ? window.CROWD_AT : (root => crowd.get(root) || 0), next = new Map();
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const v = at(i); if (!(v >= W.mid)) return; const lv = v > W.hi ? 2 : 1;
+    footprint(rec.k, cX(i), cY(i), rec.rot).forEach(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const nx = px + dx, ny = py + dy; if (!inb(nx, ny)) return;
+      const c = cells[idx(nx, ny)]; if (c && c.k === 'road' && lv > (next.get(idx(nx, ny)) || 0)) next.set(idx(nx, ny), lv); })); });
+  let changed = 0; new Set([...ROAD_WEAR.keys(), ...next.keys()]).forEach(c => { if ((ROAD_WEAR.get(c) || 0) !== (next.get(c) || 0)) { changed++; dirtyChunks.add(chunkOfCell(c)); } });
+  ROAD_WEAR.clear(); next.forEach((v, c) => ROAD_WEAR.set(c, v)); WEAR.stats.밤++; WEAR.stats.닳은칸 = ROAD_WEAR.size; WEAR.stats.바뀐칸 = changed;
+}
+setInterval(() => { if (!window.WEAR_LOOK.on || window.__LOADMS == null || typeof simHour !== 'function') return; const h = simHour(), d = simDay();
+  if (h < 5 && WEAR.day !== d) { WEAR.day = d; roadWearSnapshot(); } }, 1000);
+window.__roadWear = (x, y) => (inb(x, y) ? ROAD_WEAR.get(idx(x, y)) || 0 : 0);
+window.__wear = () => ({ 켜짐: window.WEAR_LOOK.on, ...WEAR.stats, 날: WEAR.day });
 function roadFamParts(rec) {
   const R = window.ROADJOIN, rx = cX(rec.root), ry = cY(rec.root), rot = rec.rot & 3, fp = footprint(rec.k, rx, ry, rot);
   const fam = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && ROAD_JOIN_TO.has(c.k)); };
@@ -1314,6 +1345,7 @@ function roadFamParts(rec) {
       if (dx) out.push({ g:'box', c:topC, s:[len, T, z1 - z0], p:[cx + mid, my, cz + (z0 + z1) / 2], rz: dx > 0 ? ang : -ang, abs:true });
       else out.push({ g:'box', c:topC, s:[x1 - x0, T, len], p:[cx + (x0 + x1) / 2, my, cz + mid], rx: dz > 0 ? -ang : ang, abs:true }); }
     else out.push({ g:'box', c:topC, s:[x1 - x0, .04, z1 - z0], p:[cx + (x0 + x1) / 2, .18, cz + (z0 + z1) / 2], abs:true });
+    if (rec.k === 'road') roadWearParts(x, y, x0, x1, z0, z1, HALF, out);   // [DESIGN-WEAR-1] 붐비는 길의 닳은 자국 · 줄눈 사이 흙
     if (gravel) [[-.9, -.7, .3], [.8, .5, .26], [.2, -1.1, .22], [-.5, 1.0, .24]].forEach(([a, b, r]) => out.push({ g:'sph', c:P.stoneD, s:[r, r * .5, r], p:[cx + a, .21, cz + b], abs:true }));
   });
   const n = fp.length, mx = sx / n, mz = sz / n, alongX = fp.length > 1 && fp[0][1] === fp[1][1];   // 발자국 가운데 · 긴 쪽이 x 인가
