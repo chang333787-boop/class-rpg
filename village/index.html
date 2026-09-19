@@ -860,6 +860,31 @@ function footprint(kind, x, y, rot) {
    저장본은 만들 때 이미 규칙을 통과한 것이고, 되살리는 순서 때문에
    (길보다 집이 먼저 들어오면) 멀쩡한 집이 거절돼 사라지기 때문이다.
    자리 규칙(판 밖·겹침)은 복원에서도 반드시 본다. */
+/* ══════════════════════════════════════════════════════════════
+   [MAC-ON] 놓는 방식 1단계 — '올라설 수 있는 바닥'(on) 검사 자리 (설계안: docs/placement_classes_design_20260919.md §3 · 저장 변화 0)
+   기물마다 놓는 법(place)과 올라설 수 있는 바닥(on)을 **표의 필드**로 둔다 — 코드 속 id 예외 목록을 늘리지 않으려고.
+   지금 마을은 한 칸 한 물건(단층)이라 바닥은 늘 '풀'이다. 그래서 오늘은 아무것도 막지 않는다 — **구조만 깐다.**
+   v3(층) 가 오면 groundAt 이 땅·길 층을 읽게 되고, 그때 이 표가 그대로 일한다.
+     PLACE_OF[kind] : 'ground' 땅 · 'path' 길 · 'object' 물건(기본) · 'roadside' 길가 물건 · 'edge' 테두리
+     PLACE_ON[kind] : 올라설 수 있는 바닥 목록. 없으면 **전부 허용**(디자인 담당의 47종 전수표가 오기 전 기본값)
+     ON_WHY[kind]   : 못 놓을 때 아이에게 할 말. 없으면 일반 문구
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).placeOn = { on: true };
+const GROUNDS = ['풀', '흙', '자갈', '꽃밭', '포장', '길', '물'];          // 바닥 종류(설계안 §3 표의 열)
+const PLACE_OF = { road: 'path', avenue: 'path', crosswalk: 'path', treerow: 'path', bridge: 'path', sbridge: 'path',
+                   lawn: 'ground', gravel: 'ground', flower: 'ground', plaza: 'ground', pond: 'ground' };   // 나머지는 'object'. roadside·edge 는 v3 뒤(설계안 §5 의 3·4단계)
+const PLACE_ON = {};                                                       // 예: tree: ['풀','흙','자갈','꽃밭'] — 전수표가 오면 여기만 채운다
+const ON_WHY = {};                                                         // 예: tree: '나무는 흙이 있어야 자라요'
+const placeOf = kind => PLACE_OF[kind] || 'object';
+function groundAt(x, y) { return '풀'; }                                   // 단층인 동안은 빈 칸 = 풀. v3 에서 땅·길 층을 읽는다
+/* 순수 함수 — 이 바닥들 위에 이 기물을 놓아도 되나. 되면 null, 안 되면 아이에게 할 말 */
+function onWhy(kind, grounds, table, whys) {
+  const ok = table[kind]; if (!ok) return null;
+  const bad = grounds.find(g => !ok.includes(g)); if (bad == null) return null;
+  return whys[kind] || (josa(K[kind].nm, '은', '는') + ' ' + bad + ' 위에는 못 놓아요');
+}
+window.__placeRules = () => ({ 켜짐: window.VRULES.placeOn.on, 놓는법: Object.fromEntries(ORDER.map(k => [k, placeOf(k)])), on표: PLACE_ON, 바닥: GROUNDS });
+
 function canPlace(kind, x, y, rot, opts) {
   if (VISIT.on && !(opts && opts.복원)) return '친구 마을이에요 — 구경만 할 수 있어요';   // F28
   const k = K[kind];
@@ -872,6 +897,7 @@ function canPlace(kind, x, y, rot, opts) {
 
   for (const [px, py] of fp)
     if (cells[idx(px, py)]) return '여기엔 이미 ' + josa(K[cells[idx(px, py)].k].nm, '이', '가') + ' 있어요';
+  if (PLACE_ON[kind] && window.VRULES.placeOn.on && !(opts && opts.복원)) { const ow = onWhy(kind, fp.map(([px, py]) => groundAt(px, py)), PLACE_ON, ON_WHY); if (ow) return ow; }   // [MAC-ON] 복원은 건너뛴다 — 옛 마을을 말없이 버리지 않는다
   if (!(opts && opts.복원)) for (const [px, py] of fp)
     if (!plotOpen(px, py)) return '아직 내 땅이 아니에요 · 인구 ' + ((Math.floor(population() / PLOT_PER) + 1) * PLOT_PER) + '명이면 옆 땅이 열려요';
 
