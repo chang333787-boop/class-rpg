@@ -168,3 +168,31 @@ __pop()
 3. 길에 붙는 물건 자동 정렬(벤치·가로등·쓰레기통) · 살아 있는 장식(시계탑이 실제 시각) — 모양은 디자인과 나눠서.
 4. 목표 순서 3곳(계획표 §5-3) — **표를 먼저 고치고** 코드.
 5. 칸 가장자리 울타리·네모로 끌어 두르기 — **설계 메모만**(저장 형식 v2 를 건드린다).
+
+---
+
+# 3부 (09-20 밤) — 보스 새 순서: 자동 이음 → 지우기 방어 → 목표와 해금 → (마우스 덤)
+
+## ⑬ 3부 PR (전부 base `feat/village-45` · 기존 줄 수정 0)
+| PR | 무엇 | 추가 위치(머지 전 base 기준) |
+|---|---|---|
+| [#479](https://github.com/chang333787-boop/class-rpg/pull/479) MAC-BREATH | 풍선의 호흡 — 불만 ≤3·집마다 쉼·좋은 풍선은 집 단위 박자·해결의 기쁨 🎉. 내 MAC-WHY 블록의 `whyBubbleTick` 을 고쳐 씀 | `[MAC-WHY]` 블록 안 |
+| [#480](https://github.com/chang333787-boop/class-rpg/pull/480) | v3 제안 덧붙임 — 색마다 kind id + 화면은 `variantOf` 로 카드 묶기 | 문서 |
+| [#485](https://github.com/chang333787-boop/class-rpg/pull/485) MAC-LINE | 울타리·돌담 **자동 이음**(마디+팔, 이웃 방향 비트) + 문(빈손으로 누름, rot=1) + 이웃 청크 다시 합치기 `lineTouch`(꽃밭 가장자리도 같은 자리) | `const AMEN_R …` **아래** 블록 + 고리 8줄(`partsOf`·`partMatrix`·`placeAt`·`removeAt`·`setMode`·`rotate`·`act`) |
+| [#488](https://github.com/chang333787-boop/class-rpg/pull/488) MAC-KEEP | **지우기 방어장치** — 무게 3단(사는 집·2×2↑·special·adv 는 한 번 더) + 치운 집의 식구·층을 1분 맡아 되돌리기·옮기기·새로 짓기에서 되살림 | `function placeAt` **위** 블록 + 고리 3줄(`placeAt`·`removeAt`·`act` 치우기 가지) |
+| [#490](https://github.com/chang333787-boop/class-rpg/pull/490) MAC-GOAL | **목표가 꽃을 연다**(`GOAL_REWARDS`) + 목표 27개 + 트레이는 '열린 것 + 다음 단계'만 | `goalBtn.onclick` 줄 **위** 블록 + 고리 2줄(`buildTray`·`simTick`) · `lockedWhy` 는 감싸서 다시 묶음 |
+
+⚠ #485·#488 은 둘 다 `placeAt`·`removeAt` 에 고리를 건다(서로 다른 줄 아래라 자동 병합될 것 — 머지 뒤 `grep -n "MAC-LINE\|MAC-KEEP" village/index.html` 로 둘 다 살아 있는지 확인).
+
+## ⑭ 새 종류 id 예약 (둘 중 먼저 하는 쪽이 적는다)
+- **`fence1`(울타리 1×1) · `wall1`(돌담 1×1)** — #485 에서 사용. palette 뒤에 붙는다. 옛 `fence`·`wall`(2×1)은 K 에 남기고 트레이에서만 뺐다. 가족 이름 `line:'fence'|'wall'`, 곧 올 산울타리는 `line:'hedge'` + `LINE_SHAPES.hedge`.
+- 다음에 쓸 예정: `litter`(바닥의 쓰레기 표시 — 쓰레기통 문제가 들어올 때).
+
+## ⑮ 코드로 확인한 '몰랐던 것' (3부)
+- **옮기기(🖐)가 집의 식구·층을 지우고 있었다** — `pickUp` 이 `removeAt` 을 부르고 다음 프레임 `syncFolks` 가 주민 기록을 지운다. 되돌리기(↩)도 건물만 되살렸다. → #488.
+- `hinfo`(층)는 어디서도 안 지워져, 같은 자리에 새로 지은 집이 **옛 층을 물려받았다.** → #488 에서 같이.
+- 울타리는 주민 걷기와 무관하다(주민은 길 칸만 걷고, 길과 울타리는 한 칸에 같이 못 있다) → 문은 생김새일 뿐.
+- 좋은 풍선 '84개'는 시험 훅의 키 이름 충돌이었다(#479 본문에 기록).
+
+## ⑯ 다음
+입력 2탄(마우스 오른쪽 **클릭** = 치우기 · 터치 길게 누르기 메뉴 · 끌어서 연달아 치우기(무게 2 건너뜀) · 확대 단추) → 돌아오는 목표(27개 뒤) → 색 카드 묶기(`variantOf`, 디자인 id 목록이 오면).
