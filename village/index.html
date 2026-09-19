@@ -3730,6 +3730,7 @@ function simTick() {
   waitScanStep();   // [MAC-WAITSCAN-2] 기다리는 집 훑기 — 틱마다 판의 1/30 조각
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
+  crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
@@ -4597,6 +4598,37 @@ window.CROWD_AT = (i) => { const c = cells[i]; if (!c) return 0; if (c.k === 'ho
   const e = CROWDSAY.road.get(i); if (!e) return 0; const v = e.v * Math.pow(window.VRULES.crowdSay.keep, SIM.ticks - e.t); if (v < 0.005) { CROWDSAY.road.delete(i); return 0; } return Math.min(1, v); };
 window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { const v = window.CROWD_AT(i); if (v > 0) top.push([cX(i), cY(i), +v.toFixed(2)]); }); top.sort((a, b) => b[2] - a[2]);
   return { 켜짐: window.VRULES.crowdSay.on, 붐비는길칸: top.filter(t => t[2] > 0.3).length, 센길칸: top.length, 가장붐빔: top.slice(0, 5), ...CROWDSAY.stats, 넓히기: { ...WIDEN.stats } }; };
+/* ── [MAC-CROWDHOMES] 붐빔을 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ② · 창조자의 눈 6회 🟢2 '큰 마을일수록 길이 한산해진다') ──
+   붐빔(F12)은 걷는 사람(최대 120명 표본)이 앞사람 뒤에 선 비율이었다 → 마을이 넓을수록 120명이 흩어져 붐빔이 사라졌다(516명 판에서 붐비는 길 칸 70 → 3).
+   붐빔 → 큰길 사다리가 300명 뒤에 끊겼다. 이제 **교통량**으로 센다:
+   · 집마다(식구 n>0) 필요(물·장보기·놀이·쉼·배움)를 채우는 **가장 가까운 곳까지의 길**을 따라, 그 길 칸마다 n ÷ 필요 수(= 평균 나들이)를 더한다.
+   · 길 칸의 품 = VRULES.crowdHomes.cap(한 칸 길) · 큰길은 두 배. 칸의 붐빔 = 더한 값 ÷ 품. 집의 붐빔 = **그 집 문 앞 길 칸**의 붐빔(mode 'front').
+     ('지나는 길 전체의 평균'(mode 'path')은 시설이 한 길에 몰린 동네에서 넓혀도 안 풀려 버렸다 — 아이가 고칠 수 있는 곳은 제 집 앞 길이다.)
+   · 기존 판정·말·풍선이 읽는 crowd 표에 **0.3 × 붐빔** 을 써 넣는다 → 문턱 0.3("길이 붐벼요") = 품을 넘음. 걷는 사람의 느려짐(crowdK)은 전처럼 표본 그대로.
+   · window.CROWD_AT(칸) 은 같은 값을 읽는다(집 칸 = 그 집 · 길 칸 = 0.3 × 그 칸의 붐빔, 최대 1) — 디자인의 흙빛·연기의 멈칫 접점 그대로.
+   · 틱마다 판의 1/90 조각씩 센다(90틱 = 9초에 한 바퀴 · 한 바퀴가 끝나면 표를 바꿔 끼운다 — 붐빔은 느리게 바뀐다). 식구 있는 집마다 길 BFS 한 번.
+   규칙 판정이 바뀐다 — VRULES.crowdHomes.on = false 면 옛 셈(걷는 표본). 원래 줄 수정 0 — crowdTick 감싸기 + simTick 고리 한 줄. */
+(window.VRULES = window.VRULES || {}).crowdHomes = { on: true, cap: 4, mode: 'front', every: 90 };   // 품 4 · 문 앞 칸: 167명 판에서 옛 셈과 이어지고(48~50 ↔ 57채) 큰 판에서 사라지지 않는다(317명 36 · 529명 69채)
+var CROWDH = { cur: 0, acc: new Map(), paths: new Map(), front: new Map(), load: new Map(), house: new Map(), stats: { 한바퀴: 0, 집: 0 } };
+function crowdHomesStep() { const R = window.VRULES.crowdHomes; if (!R.on) return; const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CROWDH.cur + step), nn = NEEDS.length || 1;
+  for (let i = CROWDH.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i || rec.k !== 'house') continue; const n = res.get(i) || 0; if (n <= 0) continue;
+    const b = roadBeside(rec); if (b < 0) continue; const { prev, reach } = roadBFS(b, undefined, NEED_R_WIDE); const left = new Set(NEEDS), used = [];
+    for (const c of reach) { if (!left.size) break; if (bfsDepth[c] > NEED_R && !isWide(c)) continue; const x = cX(c), y = cY(c);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (!r) continue; const kk = K[r.k];
+        for (const need of [kk.need, kk.need2]) if (need && left.has(need)) { left.delete(need); let p = c; while (p >= 0) { CROWDH.acc.set(p, (CROWDH.acc.get(p) || 0) + n / nn); used.push(p); if (p === b) break; p = prev[p]; } } } }
+    CROWDH.paths.set(i, used.length ? Array.from(new Set(used)) : [b]); CROWDH.front.set(i, b); CROWDH.stats.집++; }
+  CROWDH.cur = end;
+  if (end >= N) { const cap = c => R.cap * (isWide(c) ? 2 : 1), house = new Map(); CROWDH.load = CROWDH.acc; CROWDH.acc = new Map();
+    CROWDH.paths.forEach((cs, root) => { let v = 0; if (R.mode === 'path') { for (const c of cs) v += (CROWDH.load.get(c) || 0) / cap(c); v = cs.length ? v / cs.length : 0; } else { const f = CROWDH.front.get(root); v = f >= 0 ? (CROWDH.load.get(f) || 0) / cap(f) : 0; } house.set(root, v); });   // 지나는 길의 평균(가장 붐빈 한 칸이면 시설 앞 한 칸 때문에 거리 전체가 붐볐다)
+    CROWDH.house = house; CROWDH.paths = new Map(); CROWDH.front = new Map(); CROWDH.cur = 0; CROWDH.stats.한바퀴++; } }
+{ const ctH0 = crowdTick; crowdTick = function () { const r = ctH0.apply(this, arguments); if (!window.VRULES.crowdHomes.on || !CROWDH.stats.한바퀴) return r;
+    crowd.forEach((v, root) => { if (!CROWDH.house.has(root)) crowd.set(root, 0); }); CROWDH.house.forEach((m, root) => crowd.set(root, 0.3 * m)); return r; };
+  const ca0 = window.CROWD_AT; window.CROWD_AT = function (i) { const R = window.VRULES.crowdHomes; const c = cells[i];
+    if (!R.on || !CROWDH.stats.한바퀴 || !c || c.k === 'house' || !K[c.k].road) return ca0 ? ca0.apply(this, arguments) : 0;
+    return Math.min(1, 0.3 * (CROWDH.load.get(i) || 0) / (R.cap * (isWide(i) ? 2 : 1))); }; }
+window.__crowdHomes = () => { let over = 0, hs = 0; const all = []; CROWDH.house.forEach(m => { hs++; all.push(m); if (m > 1) over++; }); all.sort((a, b) => a - b); let cellsOver = 0; CROWDH.load.forEach((v, c) => { if (v / (window.VRULES.crowdHomes.cap * (isWide(c) ? 2 : 1)) > 1) cellsOver++; });
+  return { 켜짐: window.VRULES.crowdHomes.on, 품: window.VRULES.crowdHomes.cap, 센집: hs, 붐비는집: over, 집붐빔_중앙: all.length ? +all[all.length >> 1].toFixed(2) : 0, 집붐빔_최대: all.length ? +all[all.length - 1].toFixed(2) : 0, 붐비는길칸: cellsOver, 센길칸: CROWDH.load.size, ...CROWDH.stats }; };
+
 
 /* ══════════════════════════════════════════════════════════════
    이벤트(F13). 비 · 축제. 날짜로 정해지므로 저장할 게 없다(같은 날은 같은 날씨).
