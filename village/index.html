@@ -4731,6 +4731,102 @@ function actUmbrellaDraw(now) {
 }
 window.__umbrella = () => ({ 켜짐: window.VRULES.umbrella.on, 비: EV.rain, 우산: umbrella.count, 손잡이: umbStick.count, ...UMB.stats, 갓높이: +((UMB.top || 0) + window.VRULES.umbrella.gap).toFixed(2), 옛갓높이: 4.3 });
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-LITTER] 가게 앞 쓰레기 — 몰리는 가게 앞 두세 칸에만, 통을 놓으면 그 자리에서 한 단계 (주민 연기 · 09-20 · 보스 승인 · 제안서 docs/village_act_litter_proposal.md).
+   판정은 **가게(건물) 단위 · 하루 한 번(아침 6시)**: 어제 그 가게에 든 손님 수(일하러 든 사람 빼고) × 가게 앞 길에서 길로 radius 칸 안에 쓰레기통이 있나.
+     통이 없고 어제 손님 ≥ lo → 1단계 · ≥ hi → 2단계(하루에 한 단계씩만 오르내린다). 통이 있으면 0.  **만족·이사·집 모습 판정에는 아무것도 안 보탠다.** 확률 0 · 저장 0.
+   보이는 것(그림만으로 원인이 이어지게):
+     · 조각 — 그 가게에 닿은 길 칸 두세 칸에만(칸 좌표로 고른 벌 · 칸마다 1단계 2~3조각, 2단계 6~7조각 + 봉지). InstancedMesh 하나(draw call +1). 거친 임시 모양 → 디자인 담당(모양 규칙 §6).
+     · '어디에 버리지?' — 조각이 있는 가게에서 나온 손님 하나가 손에 든 걸 들고 두리번 + 🗑️? 풍선(가게마다 하루 한 번 · 불평이 아니다).
+     · 통을 반경 안에 **놓는 순간** — 그 가게 위에 🗑️✓ 한 번 + 조각이 그 자리에서 한 단계 준다(나머지는 다음 날 아침).
+     · 통이 가까운 가게 — 나온 손님 몇 명(canEvery 명에 한 명)이 통 앞까지 걸어가 pauseMs 멈췄다 간다(버리는 몸짓 · 기쁜 쪽).
+   규칙 모듈 꼴: 스위치·수치 VRULES.litter + 고리 두 줄(tickFolks · 루프). 가게 드나듦은 기존 줄을 안 고치고 f.inside 가 바뀌는 것으로 센다.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).litter = { on: true, kinds: ['shop'], radius: 4, lo: 6, hi: 12, pieces: [0, 3, 7], cellsMax: 3,   /* pieces = 칸마다(모양 규칙 §6: 1단계 두세 개 · 2단계 예닐곱 개 + 봉지 더미) */ askMs: 2400, pauseMs: 800, canEvery: 3, flashMs: 3000 };
+const LIT = { shops: new Map(), day: -1, key: '', scanAt: -1e9, tick: -1, dirty: true, stats: { 가게: 0, 단계1: 0, 단계2: 0, 두리번: 0, 통앞멈춤: 0, 놓자마자줄어듦: 0 } };
+const litCanNear = rec => { const R = window.VRULES.litter, b = roadBeside(rec); if (b < 0) return false; const { reach } = roadBFS(b, undefined, R.radius);
+  for (const c of reach) { const x = cX(c), y = cY(c); for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && r.k === 'trashcan') return c; } } return false; };   // 통 옆 길 칸(멈춰 설 자리) 또는 false
+function litCells(rec) { const R = window.VRULES.litter, out = []; footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot).forEach(([x, y]) => { for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = idx(nx, ny); if (isRoad(c) && !out.includes(c)) out.push(c); } }); return out.slice(0, R.cellsMax); }
+function litScan(now) {                                                 // 가게 목록 — 하루 한 번 · 놓은 것이 바뀌면(2초에 한 번까지)
+  const R = window.VRULES.litter, day = Math.floor(SIM.t / DAY_MS), key = placedTotal + ':' + day;
+  if (LIT.key === key || SIM.ticks - LIT.scanAt < 20) return; LIT.scanAt = SIM.ticks; LIT.key = key;
+  const alive = new Set();
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || !R.kinds.includes(rec.k)) return; alive.add(i);
+    let s = LIT.shops.get(i); if (!s) LIT.shops.set(i, s = { today: 0, yday: 0, stage: 0, asked: -1, n: 0, flash: 0 });
+    s.cells = litCells(rec); const can = litCanNear(rec), had = s.can; s.can = can;
+    if (can !== false && had === false && s.stage > 0) { s.stage--; s.flash = now + R.flashMs; LIT.stats.놓자마자줄어듦++; LIT.dirty = true; }   // 놓는 순간 — 한 단계 줄고 ✓
+  });
+  LIT.shops.forEach((s, r) => { if (!alive.has(r)) { LIT.shops.delete(r); LIT.dirty = true; } });
+  LIT.stats.가게 = LIT.shops.size;
+}
+function litMorning() {                                                 // 아침 6시 — 어제 손님으로 단계를 한 칸씩
+  const R = window.VRULES.litter; let s1 = 0, s2 = 0;
+  LIT.shops.forEach(s => { s.yday = s.today; s.today = 0;
+    const want = s.can !== false ? 0 : s.yday >= R.hi ? 2 : s.yday >= R.lo ? 1 : 0;
+    s.stage += Math.sign(want - s.stage); if (s.stage === 1) s1++; if (s.stage === 2) s2++; });
+  LIT.stats.단계1 = s1; LIT.stats.단계2 = s2; LIT.dirty = true;
+}
+const LIT_ASK = { t0: 0 };
+/* tickFolks 고리 — f.base 를 정하기 바로 앞. true 면 그 사람의 이번 틱은 여기서 끝 */
+function actLitterTick(f, i, now) {
+  const R = window.VRULES.litter;
+  if (LIT.tick !== SIM.ticks) { LIT.tick = SIM.ticks; if (R.on) { litScan(now); const day = Math.floor(SIM.t / DAY_MS); if (day !== LIT.day && simHour() >= DAY_START_H) { if (LIT.day >= 0) litMorning(); LIT.day = day; } } }
+  if (!R.on || f.visitor || f.arriving) { f.litAsk = null; f.litCan = null; return false; }
+  if (f.state === 'inside') {                                           // 가게에 들었다 — 하루 손님 셈(일하러 든 사람 빼고)
+    const s = LIT.shops.get(f.inside.root);
+    if (s && f.litIn !== f.inside && f.goal !== 'work' && f.inside.root !== f.job) { s.today++; f.litShop = f.inside.root; }
+    f.litIn = f.inside; return false;
+  }
+  if (f.litShop != null) {                                              // 방금 가게에서 나왔다
+    const s = LIT.shops.get(f.litShop); f.litShop = null; const day = Math.floor(SIM.t / DAY_MS);
+    if (s && s.stage > 0 && s.asked !== day && f.state === 'idle' && !f.goal) {   // 어디에 버리지? — 가게마다 하루 한 번
+      s.asked = day; f.litAsk = { t0: now, until: now + R.askMs, dir0: f.dir }; LIT.stats.두리번++; }
+    else if (s && s.can !== false && f.state === 'idle' && !f.goal && (s.n++ % R.canEvery) === 0 && pathBudget > 0) {   // 통 앞까지 가서 멈췄다 간다
+      pathBudget--; if (pathTo(f, i, s.can)) { const c = s.can, x = cX(c), y = cY(c); let tc = -1; for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && cells[idx(nx, ny)] && cells[idx(nx, ny)].k === 'trashcan') { tc = idx(nx, ny); break; } }
+        f.litCan = { cell: c, dir: tc >= 0 ? Math.atan2(wx(cX(tc)) - wx(x), wz(cY(tc)) - wz(y)) : f.dir, until: 0 }; } }
+  }
+  const A = f.litAsk;
+  if (A) { if (now >= A.until || f.goal) { f.litAsk = null; return false; } f.walking = false; f.dir = A.dir0 + Math.sin((now - A.t0) / 300) * 0.7; return true; }   // 손에 든 걸 들고 두리번
+  const C = f.litCan;
+  if (C) {
+    if (f.goal) { f.litCan = null; return false; }
+    if (C.until) { if (now >= C.until) { f.litCan = null; return false; } f.walking = false; f.dir = C.dir; return true; }
+    const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;
+    if (at === C.cell && (f.state === 'idle' || (f.state === 'walk' && f.path[f.step + 1] == null))) { f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; f.until = now + R.pauseMs; C.until = now + R.pauseMs; f.dir = C.dir; LIT.stats.통앞멈춤++; return true; }
+    if (f.state === 'idle' && now >= f.until) f.litCan = null;          // 막혀 멈췄다 — 그만
+  }
+  return false;
+}
+/* 그림 — 조각(묶음 하나) · 🗑️? · 🗑️✓ 풍선(보일 때만) */
+const litMesh = (() => { const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), 600); im.count = 0; im.frustumCulled = false; im.receiveShadow = true; scene.add(im); return im; })();
+const LIT_COL = () => [0xfbfaf6, P.woodD, P.metalD, 0xfbfaf6, P.woodD];   // 모양 규칙 §6 — 새 색 없이 cloth(흰)·woodD·metal: 흰 종이 · 갈색 종이봉투 · 캔 · 봉지 · 갈색 조각
+const litBubble = ['🗑️?', '🗑️✓'].map((ch, k) => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = k ? '#e6f7ea' : '#fffaf0'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '34px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🗑️', 28, 36);
+  g.fillStyle = k ? '#2e9d57' : '#6b7a90'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText(k ? '✓' : '?', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 12); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; });
+function actLitterDraw(now) {
+  const R = window.VRULES.litter; if (!R.on || mapMode) { litMesh.count = 0; litBubble.forEach(b => b.count = 0); return; }
+  if (LIT.dirty) {                                                      // 단계가 바뀔 때만 행렬을 다시
+    LIT.dirty = false; let n = 0;
+    LIT.shops.forEach(s => { const per = R.pieces[s.stage] || 0; if (!per) return;
+      (s.cells || []).forEach((c, ci) => { const cnt = Math.max(1, per - (ci === 0 ? 0 : 1)); let h = (c * 2654435761) >>> 0;
+        for (let k = 0; k < cnt && n < 600; k++) { h = (h * 1103515245 + 12345) >>> 0; const r1 = (h & 1023) / 1023, r2 = ((h >> 10) & 1023) / 1023, r3 = ((h >> 20) & 255) / 255;
+          const bag = s.stage === 2 && k === 0, can = !bag && r3 > 0.7, sx = bag ? 1.3 : can ? 0.4 : 0.85, sy = bag ? 0.8 : can ? 0.6 : 0.22, sz = bag ? 1.1 : can ? 0.4 : 0.65;
+          folkDummy.position.set(wx(cX(c)) + (r1 - 0.5) * 2.8, 0.2 + sy / 2, wz(cY(c)) + (r2 - 0.5) * 2.8); folkDummy.rotation.set(0, r3 * 6.28, 0); folkDummy.scale.set(sx, sy, sz); folkDummy.updateMatrix();
+          litMesh.setMatrixAt(n, folkDummy.matrix); const LC = LIT_COL(); litMesh.setColorAt(n, folkCol.setHex(bag ? LC[3] : can ? LC[2] : LC[r2 > 0.45 ? 1 : 0])); n++; } }); });
+    folkDummy.rotation.set(0, 0, 0); litMesh.count = n; litMesh.instanceMatrix.needsUpdate = true; if (litMesh.instanceColor) litMesh.instanceColor.needsUpdate = true;
+  }
+  const cnt = [0, 0], put = (k, x, y, z) => { if (cnt[k] >= 12) return; faceDummy.position.set(x, y + Math.sin(now / 250) * 0.12, z); faceDummy.quaternion.copy(camera.quaternion); faceDummy.scale.set(1.45, 1.45, 1); faceDummy.updateMatrix(); litBubble[k].setMatrixAt(cnt[k]++, faceDummy.matrix); };
+  if (!OFF.has('faces')) {
+    folks.forEach(f => { if (f.litAsk && f.state !== 'inside') put(0, f.x, 4.8, f.z); });
+    LIT.shops.forEach((s, r) => { if (now < s.flash && cells[r]) { const rec = cells[r], c = centerOf(rec.k, cX(r), cY(r), rec.rot); put(1, c.x, 7.2, c.z); } });
+  }
+  litBubble.forEach((b, k) => { b.count = cnt[k]; if (cnt[k]) b.instanceMatrix.needsUpdate = true; });
+}
+window.__litter = () => ({ 켜짐: window.VRULES.litter.on, ...LIT.stats, 가게별: [...LIT.shops].map(([r, s]) => ({ 곳: [cX(r), cY(r)], 오늘: s.today, 어제: s.yday, 단계: s.stage, 통: s.can !== false })), 조각: litMesh.count });
+
 function syncFolks() {
   const seen = new Set(), homes = [];
   cells.forEach(rec => {
@@ -5036,6 +5132,7 @@ function tickFolks(dt, now) {
     const rec = cells[f.home];
     if (!rec) continue;
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
+    if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
     f.base = roadBeside(rec);
     if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
     actPlazaTick(f, i, now);   // [ACT-PLAZA] 축제 날 광장에선 둥글게 · 길목에 선 사람은 가장자리로 한 발
@@ -6607,6 +6704,7 @@ function loop() {
   actUmbrellaDraw(SIM.t + SIM.acc);   // [ACT-UMB] 우산은 든 사람 머리 위에 · 손잡이 · 아이 높이 · 곁에 선 사람도
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
+  actLitterDraw(SIM.t + SIM.acc);   // [ACT-LITTER] 가게 앞 조각 · 🗑️? · 🗑️✓
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
   followTick(); placeCamera();
