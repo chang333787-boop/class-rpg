@@ -4490,6 +4490,7 @@ function actUmbrellaDraw(now) {
     else if (f.festSpot && f.state === 'idle') { fx = f.festSpot.x; fz = f.festSpot.z; dir = f.festSpot.dir; }
     else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
     if (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60)) return;
+    if (f.passOx && f.state !== 'inside') { fx += f.passOx; fz += f.passOz; }   // [ACT-PASS] 비켜 선 사람의 우산도 같이
     const small = typeof isSmall === 'function' && isSmall(f), k = small && KR ? KR.scale : 1;
     const walk = f.walking && f.state !== 'inside', bob = walk ? (small && KR ? Math.abs(Math.sin(now / 95 + i)) * KR.hop : Math.abs(Math.sin(now / 150 + i)) * 0.09) : 0;
     const co = Math.cos(dir), si = Math.sin(dir), hx = R.hand[0] * k, hz = R.hand[1] * k;
@@ -5101,6 +5102,45 @@ function drawUmbrellas() {
   });
   umbrella.count = n; if (n) { umbrella.instanceMatrix.needsUpdate = true; if (umbrella.instanceColor) umbrella.instanceColor.needsUpdate = true; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-PASS] 같은 칸을 지나는 둘은 어깨를 스치듯 — 한 몸으로 겹쳐 보이지 않게 (주민 연기 · 09-20 · 보스 지시, #518 의 남은 흠).
+   #518 뒤로 밤 귀갓길은 칸을 잡지 않아 좁은 길에서 두 사람이 한 칸을 같이 지난다 → 한 몸으로 겹쳐 보였다(큰길은 원래 한 칸에 둘).
+   후: 한 칸에 둘 이상 서 있거나 걸으면, 걷는 사람을 **자기 걷는 방향의 오른쪽**으로 side 만큼 비켜 그린다(마주 오는 둘은 서로 반대쪽으로 → 어깨를 스친다).
+       같은 방향으로 가는 둘이면 뒤 사람은 왼쪽으로. 한 칸에 둘 이상 **서 있으면**(큰길은 한 칸에 둘 · 가로등 아래 멈춤) 번갈아 좌우로 나란히. 혼자 선 사람 곁을 지나는 사람만 비킨다. 비켜 서기·돌아오기는 부드럽게(ease).
+   **그리기만** 옮긴다: drawFolks·[ACT-KID] 가 쓴 행렬에 옆 걸음만 더한다(같은 묶음 · draw call +0). 우산([ACT-UMB])도 같은 만큼 따라간다(그 블록에 한 줄).
+   판정·칸 잡기·붐빔·저장 0. 규칙 모듈 꼴: 스위치·수치 VRULES.passBy + 루프 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).passBy = { on: true, side: 0.85, ease: 0.18 };
+const PASS = { cells: new Map(), m: new THREE.Matrix4(), t: new THREE.Matrix4(), stats: { 비켜그린틱: 0 } };
+function actPassDraw() {
+  const R = window.VRULES.passBy; if (!R.on || !folks.length || OFF.has('folks')) return;
+  const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), C = PASS.cells; C.clear();
+  folks.forEach((f, i) => { if (f.state === 'inside' || f.festSpot || f.state === 'mill') return;
+    const x = f.px == null ? f.x : f.px + (f.x - f.px) * a, z = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a, c = Math.round(x / CS + (W - 1) / 2) * 1000 + Math.round(z / CS + (H - 1) / 2);   // 칸 = cellOfFolk 과 같은 셈(칸 가운데에서 갈리지 않게)
+    const l = C.get(c); if (l) l.push(i); else C.set(c, [i]); });
+  folks.forEach(f => { f.passTx = 0; f.passTz = 0; });
+  C.forEach(list => { if (list.length < 2) return;
+    const walkers = list.filter(i => folks[i].walking), standers = list.filter(i => !folks[i].walking);
+    walkers.forEach((i, k) => { const f = folks[i], co = Math.cos(f.dir), si = Math.sin(f.dir);
+      const same = walkers.slice(0, k).some(j => Math.cos(folks[j].dir - f.dir) > 0.5);   // 앞에 같은 쪽으로 가는 사람이 있으면 나는 왼쪽
+      const s = (same ? 1 : -1) * R.side;                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
+      f.passTx = co * s; f.passTz = -si * s; });
+    if (standers.length >= 2) standers.forEach((i, k) => { const f = folks[i], s = (k % 2 ? 1 : -1) * R.side * (1 + (k >> 1) * 0.6);   // 한 칸에 둘 이상 서 있으면(큰길 · 가로등 아래 멈춤) 나란히 — 번갈아 좌우로
+      const d0 = folks[standers[0]].dir; f.passTx = Math.cos(d0) * s; f.passTz = -Math.sin(d0) * s; }); });   // 한 축(첫 사람의 방향)으로 — 등을 맞댄 둘이 같은 자리로 가지 않게
+  let touched = false; const hasV = VISITOR_PARTS.length > 0;
+  folks.forEach((f, i) => {
+    const e = R.ease; f.passOx = (f.passOx || 0) + (f.passTx - (f.passOx || 0)) * e; f.passOz = (f.passOz || 0) + (f.passTz - (f.passOz || 0)) * e;
+    if (Math.abs(f.passOx) < 0.01 && Math.abs(f.passOz) < 0.01) { f.passOx = 0; f.passOz = 0; return; }
+    if (f.state === 'inside' || f.festSpot) return;
+    PASS.t.makeTranslation(f.passOx, 0, f.passOz);
+    const tour = hasV && !!f.visitor && !f.neighbor, n = tour ? VISITOR_PARTS.length : PERSON_PARTS.length, base = tour ? PERSON_PARTS.length : 0;
+    for (let pi = 0; pi < n; pi++) { const im = folkPool[base + pi]; if (!im || i >= im.count) continue; im.getMatrixAt(i, PASS.m); PASS.m.premultiply(PASS.t); im.setMatrixAt(i, PASS.m); }
+    touched = true; PASS.stats.비켜그린틱++;
+  });
+  if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
+}
+window.__passBy = () => ({ 켜짐: window.VRULES.passBy.on, 지금비켜선사람: folks.filter(f => Math.abs(f.passOx || 0) + Math.abs(f.passOz || 0) > 0.3).length, ...PASS.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
@@ -6225,6 +6265,7 @@ function loop() {
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
+  actPassDraw();   // [ACT-PASS] 한 칸을 같이 지나는 둘은 오른쪽으로 비켜 그린다(겹쳐 한 몸 ✗)
   actUmbrellaDraw(SIM.t + SIM.acc);   // [ACT-UMB] 우산은 든 사람 머리 위에 · 손잡이 · 아이 높이 · 곁에 선 사람도
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
