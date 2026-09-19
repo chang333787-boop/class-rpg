@@ -8158,6 +8158,18 @@ function guideHold(on) {
   if (on) { GUIDE.held = !SIM.paused; if (GUIDE.held) SIM.paused = true; }
   else if (GUIDE.held) { GUIDE.held = false; SIM.paused = false; }
 }
+/* ── [MAC-FIRST5-3] 처음 안내의 집 장 — 터치에선 '톡 → 자리를 보고 → ✓' (보스 09-20 · 터치 앉히기 MAC-SEAT #621 에 맞춰) ──
+   안내 둘째 장은 "집은 길 옆에 놓아요"뿐이었다. 터치에선 이제 집·우물·가게를 톡하면 **바로 놓이지 않고 자리부터 보여 준다** — 처음 온 아이가
+   '눌렀는데 안 놓였다'로 읽지 않게, 그 장에서 미리 말해 둔다. 터치가 되는 기기(any-pointer: coarse · 터치 점 1개 이상)이고 앉히기가 켜져 있을 때만.
+   마우스만 있는 기기는 그대로(누르는 순간 놓인다). 원래 줄 수정 0 — 안내 카드 글(데이터)만 바꾼다. */
+(window.VRULES = window.VRULES || {}).first5House = { on: true };
+const F5H = { was: GUIDE_CARDS[1] ? GUIDE_CARDS[1].txt : '' };
+const first5Touch = () => { try { return (window.matchMedia && matchMedia('(any-pointer: coarse)').matches) || (navigator.maxTouchPoints || 0) > 0; } catch (e) { return false; } };
+function first5HouseCard() { const c = GUIDE_CARDS[1]; if (!c) return; const on = window.VRULES.first5House.on && window.VRULES.seatPlace && window.VRULES.seatPlace.on && first5Touch();
+  c.txt = on ? '<b>집은 길 옆</b>에 놓아요. 땅을 <b>톡</b> 하면<br>집이 그 자리에 먼저 앉아요 → 마음에 들면 <b>✓</b>.<br>길이 <b>6칸</b> 이어지면 첫 주민이 걸어와요.' : F5H.was; }
+{ const gr0 = guideRender; guideRender = function () { first5HouseCard(); return gr0.apply(this, arguments); }; }
+window.__first5House = () => ({ 켜짐: window.VRULES.first5House.on, 터치기기: first5Touch(), 글: (GUIDE_CARDS[1] || {}).txt });
+
 function guideStart(force) {
   if (!force && (guideSeen() || VISIT.on || savingOff)) return false;      // 옛 저장본·구경·시연 판엔 안 뜸
   guideHold(true);   // [MAC-GUIDE]
