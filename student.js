@@ -7771,6 +7771,9 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
   const host = document.getElementById(hostId);
   if (!host || !student) { _animStopLayer(hostId); return; }
   if (scene !== 'yard') { _animStopLayer(hostId); return; }
+  //  [DECO-ANIM-HIDDEN-1] 판이 **안 보이면** 층을 만들지 않는다 — 전체화면을 닫으면 closeInteriorFullscreen 이 내 집 창 안의
+  //  작은 판(안 보임)을 다시 그리는데, 거기에 동물 층이 새로 생겨 아이가 홈·학습·전투에 가 있는 내내 걷기 타이머가 돌았다.
+  if (typeof host.getClientRects === 'function' && !host.getClientRects().length) { _animStopLayer(hostId); return; }
 
   const rows = DY.rows, cols = DY.cols;
   const list = _decoList(student).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);   // [DECO-SPACE-1]
