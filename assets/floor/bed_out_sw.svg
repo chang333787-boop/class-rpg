@@ -1,0 +1,3 @@
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<!-- 꽃밭 가장자리 모퉁이(오목) out_sw — 두 변은 꽃밭인데 대각선만 풀밭일 때 -->
+<style>.p{fill:var(--p,#f48fb6)}.pd{fill:var(--pd,#d9699a)}#red:target~g{--p:#ec6a66;--pd:#cc4a4c}#yellow:target~g{--p:#f7d45c;--pd:#e0b13a}#white:target~g{--p:#fdfbff;--pd:#dcd6e6}#violet:target~g{--p:#b494ee;--pd:#9070d4}#orange:target~g{--p:#f7a055;--pd:#dd7f36}#blue:target~g{--p:#8f93f0;--pd:#6d70d2}#pink:target~g{--p:#f48fb6;--pd:#d9699a}</style><g id="red"/><g id="yellow"/><g id="white"/><g id="violet"/><g id="orange"/><g id="blue"/><g id="pink"/><g transform="rotate(270 50 50)"><path d="M0,0H11Q10,7 7,8Q6,10 0,11z" fill="#6b9440"/><ellipse cx="9" cy="9" rx="5.6" ry="3.8" fill="#3f7a30"/></g></svg>
