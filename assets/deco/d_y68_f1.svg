@@ -1,0 +1,8 @@
+<svg width="300" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+<!-- d_y68_f1 캠프파이어 불꽃 1/2 — 움직임 층. 몸통 d_y68_body.svg 와 같은 viewBox 에 그대로 겹친다. 본 그림의 불꽃 그대로 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs><path class="o" d="M150,246 q-26,-16 -18,-44 q4,10 12,12 q-6,-24 10,-40 q-2,18 12,26 q10,6 10,22 q0,20 -26,24z" fill="#c0392b"/>
+<path d="M150,240 q-16,-12 -10,-30 q4,8 10,8 q-2,-14 8,-24 q0,14 8,20 q6,6 4,16 q-2,12 -20,10z" fill="#e8892c"/>
+<path d="M150,234 q-9,-8 -5,-18 q3,6 6,6 q0,-8 5,-14 q0,10 5,14 q3,4 1,10 q-2,6 -12,2z" fill="#f2c25a"/>
+<path d="M150,226 q-5,-5 -2,-11 q2,4 4,4 q0,-5 3,-8 q0,7 3,9 q1,3 0,6 q-2,4 -8,0z" fill="#e8c545"/>
+<g fill="#e8c545"><circle cx="128" cy="190" r="3" opacity=".9"/><circle cx="176" cy="176" r="2.4" opacity=".75"/><circle cx="160" cy="150" r="2" opacity=".6"/><circle cx="138" cy="162" r="2.2" opacity=".7"/></g>
+</svg>

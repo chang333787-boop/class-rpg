@@ -91,5 +91,131 @@
     ]
    }
   ]
+ },
+ "d_y68": {
+  "body": "d_y68_body.svg",
+  "layers": [
+   {
+    "files": [
+     "d_y68_f1.svg",
+     "d_y68_f2.svg"
+    ],
+    "kind": "frames",
+    "frameSec": 0.22,
+    "size": [
+     300,
+     400
+    ],
+    "bodyViewBox": [
+     300,
+     400
+    ]
+   },
+   {
+    "file": "glow.svg#fire",
+    "kind": "glow",
+    "night": true,
+    "size": [
+     170,
+     170
+    ],
+    "anchor": "center",
+    "pivotInBody": [
+     150,
+     222
+    ],
+    "bodyViewBox": [
+     300,
+     400
+    ]
+   }
+  ]
+ },
+ "_ambient": {
+  "_": "장식 하나가 아니라 마당 전체에 쓰는 움직임 조각. 코드가 조건을 보고 얹는다.",
+  "glow": {
+   "file": "glow.svg",
+   "colors": [
+    "warm",
+    "fire",
+    "moon"
+   ],
+   "when": "저녁·밤(색 막이 깔릴 때)",
+   "on": {
+    "d_y6": [
+     50,
+     70,
+     "warm",
+     120
+    ],
+    "d_y14": [
+     50,
+     62,
+     "warm",
+     110
+    ],
+    "d_y28": [
+     220,
+     305,
+     "warm",
+     60
+    ],
+    "d_y33": [
+     132,
+     238,
+     "warm",
+     60
+    ],
+    "d_y34": [
+     134,
+     236,
+     "warm",
+     60
+    ],
+    "d_y68": [
+     150,
+     222,
+     "fire",
+     170
+    ]
+   },
+   "_on": "id: [몸통 viewBox 안 x, y, 색, 지름]"
+  },
+  "petal": {
+   "file": "petal.svg",
+   "colors": [
+    "pink",
+    "maple",
+    "white"
+   ],
+   "on": {
+    "d_y12": "pink",
+    "d_y19": "maple",
+    "d_y48": "white",
+    "d_y64": "white"
+   },
+   "count": 6,
+   "fallSec": [
+    4,
+    7
+   ]
+  },
+  "butterfly": {
+   "files": [
+    "butterfly_a.svg",
+    "butterfly_b.svg"
+   ],
+   "frameSec": 0.14,
+   "colors": [
+    "white",
+    "yellow",
+    "blue"
+   ],
+   "when": "꽃밭 바닥(tulipbed·hydrangea·wildflower)이 물 바닥에서 3칸 안이거나, 이어진 꽃밭이 9칸 이상",
+   "count": [
+    1,
+    3
+   ]
+  }
  }
 }
