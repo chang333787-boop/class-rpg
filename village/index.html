@@ -1828,6 +1828,7 @@ function buildChunk(cx, cz) {
     ch.items.push(item);
   }
   if (typeof actLitterChunk === 'function' && window.VRULES && window.VRULES.litter) actLitterChunk(x0, z0, bucket);   // [ACT-LITTER] 가게 앞 조각을 이 청크 기하에(draw call +0)
+  if (typeof actCartChunk === 'function' && window.VRULES && window.VRULES.nightCart) actCartChunk(x0, z0, bucket);   // [ACT-NIGHTCART] 어귀에 선 수레(draw call +0)
   for (const name in MAT) {
     const old = ch.meshes[name];
     if (old) { chunkGroup.remove(old); old.geometry.dispose(); ch.meshes[name] = null; }
@@ -5435,6 +5436,7 @@ function tickFolks(dt, now) {
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
     if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
     actFestLitterTick(now);   // [ACT-FESTLIT] 축제 다음 날 광장 조각 · 치우러 가기(틱마다 한 번)
+    actNightCartTick(now);   // [ACT-NIGHTCART] 밤엔 어귀에 내일 올 이웃의 수레 · 아침엔 그 수레를 끌고 들어온다(틱마다 한 번)
     f.base = roadBeside(rec);
     if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
     actPlazaTick(f, i, now);   // [ACT-PLAZA] 축제 날 광장에선 둥글게 · 길목에 선 사람은 가장자리로 한 발
@@ -5935,6 +5937,95 @@ function actRainDraw() {
   if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
 }
 window.__rainShelter = () => ({ 켜짐: window.VRULES.rainShelter.on, 비: EV.rain, 지금처마밑: folks.filter(f => f.shelter && f.shelter.at).length, 가는중: folks.filter(f => f.shelter && !f.shelter.at).length, 의자에앉은사람: folks.filter(f => f.state === 'inside' && f.beside && f.beside.mode === 'sit').length, ...RAIN.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-NIGHTCART] 밤의 빈 45초 — 내일 올 이웃이 마을 어귀에 짐수레를 세우고 등불을 켠 채 기다린다 (주민 연기 · 09-20 · 창조자의 눈 4회 · 보스 ①).
+   '이사는 낮에'(#498)는 그대로. 밤(dayMoveIn.to ~ from)에 한 시간마다 "빈 방이 있고 지금 오면 들어갈 집(moveInWhy — 읽기만)"이 있으면
+   어귀(#566 __entranceSpot)에 수레를 세운다 → 아이 눈엔 "내일 누가 오는구나", 밤이 기다림이 된다. 그런 집이 없어지면 수레도 없다.
+   아침에 그날 첫 이사 오는 사람이 나오면 **그 사람은 수레 옆 길 칸에서 출발**해 수레를 끌고 집까지 간다(목적지·이사 판정은 그대로 — 출발 칸만).
+   집에 닿으면(또는 돌아서 나가면) 수레는 ✨ 와 함께 사라진다. 판정 0 · 저장 0.
+   그림: 서 있는 수레는 길 청크 'lit' 묶음 기하에 합친다(draw call +0 · 등불 e:1 = 가로등과 같은 밤 발광). 끌려가는 동안만 InstancedMesh 하나(+1).
+   모양: 디자인 담당 [DESIGN-CART-1] 의 window.CART_PARTS(1×1 칸 · 칸 가운데 원점 · 앞 = +z 손잡이 · e:1 등불)를 읽고, 없으면 아래 임시 상자.
+   규칙 모듈 꼴: 스위치 VRULES.nightCart + 고리 셋(tickFolks · 루프 · buildChunk — 쓰레기 청크 고리 바로 아래).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).nightCart = { on: true, pullBack: 1.7, giveUpH: 3, reachR: 120 };
+const CART_TMP = [                                                      // 임시 상자 — 디자인 담당이 다듬는다
+  { g: 'box', c: 0x9a6f48, s: [1.5, 0.22, 2.2], p: [0, 0.9, 0] },
+  { g: 'box', c: 0x7a5535, s: [0.1, 0.35, 2.2], p: [-0.75, 1.15, 0] }, { g: 'box', c: 0x7a5535, s: [0.1, 0.35, 2.2], p: [0.75, 1.15, 0] },
+  { g: 'cyl', c: 0x5a3e28, s: [0.55, 0.14, 0.55], p: [-0.85, 0.55, -0.2], rz: Math.PI / 2 }, { g: 'cyl', c: 0x5a3e28, s: [0.55, 0.14, 0.55], p: [0.85, 0.55, -0.2], rz: Math.PI / 2 },
+  { g: 'box', c: 0x7a5535, s: [0.08, 0.08, 1.4], p: [-0.55, 0.95, 1.7] }, { g: 'box', c: 0x7a5535, s: [0.08, 0.08, 1.4], p: [0.55, 0.95, 1.7] },
+  { g: 'box', c: 0xd9c9a3, s: [0.8, 0.7, 0.8], p: [-0.25, 1.36, -0.4] }, { g: 'box', c: 0xb08560, s: [0.6, 0.55, 0.6], p: [0.35, 1.3, 0.45] },
+  { g: 'box', c: 0x3a3a3a, s: [0.07, 1.3, 0.07], p: [0.7, 1.65, 0.95] }, { g: 'box', c: 0xffd27a, s: [0.28, 0.34, 0.28], p: [0.7, 2.35, 0.95], e: 1 } ];
+const cartParts = () => (Array.isArray(window.CART_PARTS) && window.CART_PARTS.length ? window.CART_PARTS : CART_TMP);
+const CART = { spot: null, cell: -1, road: -1, yaw: 0, shown: false, hour: -99, mover: null, moverHome: -1, since: 0, pop0: -1, stats: { 밤에세움: 0, 거둠: 0, 끌고감: 0, 도착: 0, 못끌고감: 0, 조용히들어감: 0 } };
+const cartM = new THREE.Matrix4(), cartP = new THREE.Matrix4(), cartN = new THREE.Matrix3(), cartV = new THREE.Vector3(), cartE = new THREE.Euler(), cartQ = new THREE.Quaternion(), cartS = new THREE.Vector3(), cartT = new THREE.Vector3(), cartC = new THREE.Color();
+function cartPartMatrix(pt, out) { cartE.set(pt.rx || 0, pt.ry || 0, pt.rz || 0); cartQ.setFromEuler(cartE); return out.compose(cartT.set(pt.p[0], pt.p[1], pt.p[2]), cartQ, cartS.set(pt.s[0], pt.s[1], pt.s[2])); }
+function cartWantsTomorrow() {                                          // 빈 방이 있고 지금 오면 들어갈 집이 하나라도 — 이사 판정 그대로(읽기만)
+  let ok = false; cells.forEach((rec, i) => { if (ok || !rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) >= houseCap(i)) return; if (moveInWhy(rec) === true) ok = true; }); return ok; }
+function cartSet(show) {
+  if (CART.cell >= 0) dirtyChunks.add(chunkOfCell(CART.cell));
+  if (!show) { CART.shown = false; return; }
+  const sp = window.__entranceSpot ? window.__entranceSpot(CART.spot) : null; if (!sp || !sp.road) { CART.shown = false; return; }
+  CART.spot = { x: sp.x, y: sp.y }; CART.cell = idx(sp.x, sp.y); CART.road = idx(sp.road.x, sp.road.y); CART.yaw = Math.atan2(sp.road.x - sp.x, sp.road.y - sp.y);   // 손잡이(+z)가 마을 쪽 길을 향하게
+  CART.shown = true; dirtyChunks.add(chunkOfCell(CART.cell));
+}
+/* tickFolks 고리 — 틱마다 한 번 */
+function actNightCartTick(now) {
+  if (CART.tick === SIM.ticks) return; CART.tick = SIM.ticks;
+  const R = window.VRULES.nightCart, D = window.VRULES.dayMoveIn;
+  if (!R.on || !D || !D.on) { if (CART.shown) { cartSet(false); } CART.mover = null; return; }
+  const h = simHour(), night = h >= D.to || h < D.from, hr = Math.floor(h);
+  if (night && hr !== CART.hour) { CART.hour = hr; const want = cartWantsTomorrow();   // 한 시간마다 다시 본다
+    if (want && !CART.shown) { cartSet(true); if (CART.shown) CART.stats.밤에세움++; } else if (!want && CART.shown) { cartSet(false); CART.stats.거둠++; } }
+  if (night) CART.pop0 = population();
+  if (!night && CART.shown && !CART.mover && population() > CART.pop0 && CART.pop0 >= 0) {   // 걸어오지 않고 든 이사(사람이 화면에 꽉 찬 큰 마을 — moveInQuiet) — 수레도 ✨ 와 함께 마을로
+    sparkle.push({ x: wx(cX(CART.cell)), z: wz(cY(CART.cell)), until: SIM.t + 2500 }); cartSet(false); CART.stats.조용히들어감++; }
+  if (!night && CART.shown && !CART.mover) {                            // 아침 — 그날 첫 이사 오는 사람이 수레 옆에서 출발한다
+    const f = folks.find(g => g.arriving && !g.leaving && !g.comeback && !g.visitor && g.step <= 1 && !g.cartSeen);
+    if (f) { f.cartSeen = true; const { prev, reach } = roadBFS(CART.road, undefined, R.reachR);   // 아침에 한 번뿐이라 넓게
+      if (reach.includes(f.base)) { const path = []; let k = f.base; while (k >= 0 && k !== CART.road) { path.unshift(k); k = prev[k]; } path.unshift(CART.road);
+        f.path = path; f.step = 0; f.seg = 0; f.x = f.px = wx(cX(CART.road)); f.z = f.pz = wz(cY(CART.road)); f.dir = Math.atan2(wx(cX(path[1] ?? CART.road)) - f.x, wz(cY(path[1] ?? CART.road)) - f.z);
+        CART.mover = f; CART.moverHome = f.home; CART.stats.끌고감++; cartSet(false); CART.shown = false; }
+      else { CART.stats.못끌고감++; } }
+    else if (h >= D.from + R.giveUpH) { cartSet(false); CART.stats.거둠++; }   // 아무도 안 왔다 — 조용히 거둔다
+  }
+  if (CART.mover && !folks.includes(CART.mover)) {                      // 집에 들었다(또는 돌아서 나갔다) — 수레는 ✨ 와 함께
+    const rec = cells[CART.moverHome]; if (rec) { const c = doorFront(rec); sparkle.push({ x: c.x, z: c.z, until: SIM.t + 2500 }); } CART.mover = null; CART.stats.도착++; }
+}
+/* buildChunk 고리 — 서 있는 수레를 이 청크의 'lit' 묶음 기하에(등불 e:1 = 밤 발광) */
+function actCartChunk(x0, z0, bucket) {
+  if (!window.VRULES.nightCart.on || !CART.shown || CART.cell < 0 || mapMode) return;
+  const x = cX(CART.cell), y = cY(CART.cell); if (x < x0 || x >= x0 + CHUNK || y < z0 || y >= z0 + CHUNK) return;
+  cartM.makeRotationY(CART.yaw).setPosition(wx(x), 0.2, wz(y));
+  cartParts().forEach(pt => { const base = BASE[pt.g]; if (!base) return; cartP.multiplyMatrices(cartM, cartPartMatrix(pt, cartP)); cartN.getNormalMatrix(cartP); cartC.setHex(pt.c);
+    const b = bucket('lit'), off = b.pos.length / 3;
+    for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); b.pos.push(cartV.x, cartV.y, cartV.z);
+      cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); b.nrm.push(cartV.x, cartV.y, cartV.z); b.col.push(cartC.r, cartC.g, cartC.b); b.emis.push(pt.e ? 1.6 : 0); b.night.push(0); }
+    for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off); });
+}
+/* 끌려가는 수레 — 같은 표를 한 기하로 굽는다(모양 표가 바뀌면 다시) · 걷는 동안만 count 1 */
+let cartMesh = null, cartMeshParts = null;
+function cartMeshFor() {
+  const parts = cartParts(); if (cartMesh && cartMeshParts === parts) return cartMesh;
+  if (cartMesh) { scene.remove(cartMesh); cartMesh.geometry.dispose(); }
+  const pos = [], nrm = [], col = [], ix = [];
+  parts.forEach(pt => { const base = BASE[pt.g]; if (!base) return; cartPartMatrix(pt, cartP); cartN.getNormalMatrix(cartP); cartC.setHex(pt.c); const off = pos.length / 3;
+    for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); pos.push(cartV.x, cartV.y, cartV.z);
+      cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); nrm.push(cartV.x, cartV.y, cartV.z); col.push(cartC.r, cartC.g, cartC.b); }
+    for (let t = 0; t < base.idx.length; t++) ix.push(base.idx[t] + off); });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(ix);
+  cartMesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 1); cartMesh.count = 0; cartMesh.frustumCulled = false; cartMesh.castShadow = true; scene.add(cartMesh); cartMeshParts = parts;
+  return cartMesh;
+}
+/* 루프 고리 */
+function actNightCartDraw() {
+  const f = CART.mover; if (!f) { if (cartMesh) cartMesh.count = 0; return; }
+  const m = cartMeshFor(), a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), R = window.VRULES.nightCart;
+  const fx = f.px == null ? f.x : f.px + (f.x - f.px) * a, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a;
+  folkDummy.position.set(fx - Math.sin(f.dir) * R.pullBack, 0.2, fz - Math.cos(f.dir) * R.pullBack); folkDummy.rotation.set(0, f.dir, 0); folkDummy.scale.set(1, 1, 1); folkDummy.updateMatrix();
+  m.setMatrixAt(0, folkDummy.matrix); m.count = 1; m.instanceMatrix.needsUpdate = true;
+}
+window.__nightCart = () => ({ 켜짐: window.VRULES.nightCart.on, 서있음: CART.shown, 자리: CART.spot, 끄는중: !!CART.mover, 모양: Array.isArray(window.CART_PARTS) ? '디자인' : '임시상자', ...CART.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
@@ -7301,6 +7392,7 @@ function loop() {
   drawClock(); applyDaylight();
   actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
   actLitterDraw(SIM.t + SIM.acc);   // [ACT-LITTER] 가게 앞 조각 · 🗑️? · 🗑️✓
+  actNightCartDraw();   // [ACT-NIGHTCART] 끌려가는 수레
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
   followTick(); placeCamera();
