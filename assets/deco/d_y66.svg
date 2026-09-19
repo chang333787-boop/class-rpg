@@ -1,41 +1,62 @@
 <svg width="400" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
-<!-- d_y66 큰 헛간 4×3 · footprint y100~400 · 문이 열려 안 짚이 보인다 + 건초 수레·사료 자루 -->
-<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
-<path d="M70,378 L330,352 L392,386 L190,400 Z" fill="#000" opacity=".2"/>
-<ellipse cx="200" cy="380" rx="176" ry="18" fill="#000" opacity=".26"/>
-<path class="i" d="M18,352 h364 v26 h-364z" fill="#8c8578"/>
-<path d="M24,358 h352" fill="none" stroke="#b3ada0" stroke-width="3.4" stroke-linecap="round"/>
-<path class="o" d="M28,206 h344 v146 h-344z" fill="#b5392b"/>
-<g stroke="#8f2a1e" stroke-width="2.4" opacity=".85"><path d="M28,230 h344"/><path d="M28,258 h344"/><path d="M28,286 h344"/><path d="M28,314 h344"/><path d="M28,342 h344"/></g>
-<path d="M28,206 h344 v18 h-344z" fill="#000" opacity=".16"/>
-<g class="i" fill="#efe6d4"><rect x="20" y="200" width="360" height="10"/><rect x="22" y="206" width="10" height="146"/><rect x="368" y="206" width="10" height="146"/></g>
-<path class="o" d="M6,208 L46,128 L200,86 L354,128 L394,208 Z" fill="#4e5459"/>
-<path d="M200,86 L354,128 L394,208 L300,208 q10,-64 -100,-122z" fill="#000" opacity=".17"/>
-<path d="M46,128 L200,86 L354,128" fill="none" stroke="#b3ada0" stroke-width="3.4" stroke-linecap="round" opacity=".6"/>
-<g stroke="#2b2118" stroke-width="2" opacity=".45"><path d="M30,208 L60,116"/><path d="M76,208 L96,124"/><path d="M122,208 L132,132"/><path d="M168,208 L168,124"/><path d="M214,208 L204,116"/><path d="M260,208 L240,108"/><path d="M306,208 L276,100"/><path d="M352,208 L312,92"/></g>
-<rect class="i" x="14" y="200" width="372" height="12" rx="3" fill="#efe6d4"/>
-<path class="o" d="M172,138 h56 v46 h-56z" fill="#a5743c"/>
-<path d="M200,138 v46" fill="none" stroke="#7a5230" stroke-width="2.6" stroke-linecap="round"/>
-<path d="M200,120 v18" fill="none" stroke="#6d6860" stroke-width="4" stroke-linecap="round"/>
-<circle class="i" cx="200" cy="116" r="8" fill="#b3ada0"/>
-<path class="i" d="M132,240 h136 v112 h-136z" fill="#2b2118"/>
-<path d="M140,248 h120 v104 h-120z" fill="#3a2c20"/>
-<path d="M150,320 h44 q6,0 6,6 v26 h-50z" fill="#d9b24a"/>
-<path d="M206,332 h40 v20 h-40z" fill="#e8c26a"/>
-<path d="M152,330 h40 M210,340 h32" fill="none" stroke="#b8901a" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
-<path class="o" d="M132,240 l-34,10 v92 l34,10z" fill="#efe6d4"/>
-
-<path d="M129,250 l-26,8 M129,342 l-26,-8" fill="none" stroke="#b5392b" stroke-width="3.4" stroke-linecap="round"/>
-<path class="o" d="M268,240 l34,10 v92 l-34,10z" fill="#efe6d4"/>
-
-<path d="M271,250 l26,8 M271,342 l26,-8" fill="none" stroke="#b5392b" stroke-width="3.4" stroke-linecap="round"/>
-<ellipse cx="76" cy="372" rx="50" ry="10" fill="#000" opacity=".24"/>
+<!-- d_y66 큰 헛간 4×3 · footprint y100~400 · 2026-09-20 축척 감사 3묶음: 헛간(d_y28)과 같은 결로 다시 — 회색 갬브럴 지붕 · 붉은 판벽 + 흰 트림 · 다락 문과 도르래 · 환기탑 풍향계. 큰 헛간만의 것: 큰 문이 열려 안에 건초 · 오른쪽 덧댄 창고 · 건초 수레 · 사료 자루. 문 높이 1.2칸(사람 1.33칸이 드나든다) -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
+<path d="M70,380 L330,352 L396,388 L200,398 Z" fill="#000" opacity=".2"/>
+<ellipse cx="200" cy="380" rx="182" ry="17" fill="#000" opacity=".28"/>
+<!-- 오른쪽 덧댄 창고(낮은 지붕) -->
+<path class="o" d="M326,262 h60 v104 h-60z" fill="#a8342a"/>
+<g stroke="#8f2a1e" stroke-width="2" opacity=".85"><path d="M326,284 h60 M326,306 h60 M326,328 h60 M326,350 h60"/></g>
+<path class="o" d="M318,266 L330,236 L396,262 L392,274 Z" fill="#4e5459"/>
+<path d="M330,236 L396,262 L386,262 L328,242z" fill="#5f666c"/>
+<rect class="i" x="344" y="300" width="26" height="22" fill="#6d8ea3"/><path d="M344,300 h26 v22 h-26z M357,300 v22" fill="none" stroke="#efe6d4" stroke-width="3"/>
+<!-- 기단 -->
+<path class="i" d="M22,362 h310 v18 h-310z" fill="#8c8578"/>
+<path d="M26,366 h302" stroke="#b3ada0" stroke-width="3"/>
+<!-- 벽 -->
+<path class="o" d="M32,198 h290 v164 h-290z" fill="#b5392b"/>
+<g stroke="#8f2a1e" stroke-width="2" opacity=".85"><path d="M32,220 h290 M32,242 h290 M32,264 h290 M32,286 h290 M32,308 h290 M32,330 h290 M32,352 h290"/></g>
+<path d="M32,198 h290 v14 h-290z" fill="#000" opacity=".16"/>
+<g class="i" fill="#efe6d4"><rect x="26" y="194" width="302" height="8"/><rect x="26" y="198" width="8" height="164"/><rect x="320" y="198" width="8" height="164"/></g>
+<!-- 지붕(갬브럴 — 헛간 d_y28 과 같은 결) -->
+<path class="o" d="M14,200 L50,136 L177,98 L304,136 L340,200 Z" fill="#4e5459"/>
+<path d="M50,136 L177,98 L304,136 L177,106 Z" fill="#5f666c"/>
+<g stroke="#3a3f44" stroke-width="1.8" opacity=".8"><path d="M28,176 L150,138 M38,158 L158,122 M204,138 L326,176 M196,122 L316,158 M20,190 L140,152 M214,152 L334,190 M60,130 L160,104 M194,104 L294,130"/></g>
+<path d="M14,200 L50,136 L177,98 L304,136 L340,200" fill="none" stroke="#2b2118" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M22,200 h310 v6 h-310z" fill="#000" opacity=".25"/>
+<!-- 다락 문(열림) + 도르래 -->
+<path d="M177,112 v10" stroke="#3d3833" stroke-width="3"/><path d="M162,112 h30" stroke="#6d3f24" stroke-width="5" stroke-linecap="round"/>
+<path d="M186,114 v22" stroke="#3d3833" stroke-width="1.6"/><circle cx="186" cy="114" r="3.5" fill="#8c8578" stroke="#2b2118" stroke-width="1.4"/>
+<path class="i" d="M153,134 h48 v40 h-48z" fill="#3b2a1c"/>
+<path d="M153,134 h48 v40 h-48z" fill="none" stroke="#efe6d4" stroke-width="4"/>
+<path d="M160,174 q8,-12 18,-6 q10,-8 18,2 v4z" fill="#d9b24a" stroke="#2b2118" stroke-width="1.4"/>
+<path d="M166,170 l8,-4 M178,170 l8,-3 M188,170 l6,-3" stroke="#b8901a" stroke-width="1.4"/>
+<!-- 큰 문 — 열려서 안에 건초가 보인다 -->
+<path class="o" d="M116,240 h122 v122 h-122z" fill="#2e2016"/>
+<path d="M120,244 h114 v20 h-114z" fill="#000" opacity=".25"/>
+<g class="i"><path d="M124,362 v-34 h40 v34z" fill="#d9b24a"/><path d="M168,362 v-34 h40 v34z" fill="#e8c26a"/><path d="M146,328 v-30 h40 v30z" fill="#d9b24a"/><path d="M212,362 v-22 h20 v22z" fill="#c9a23e"/></g>
+<g stroke="#b8901a" stroke-width="1.6" opacity=".9"><path d="M128,338 h32 M128,350 h32 M172,338 h32 M172,350 h32 M150,308 h32 M150,318 h32"/></g>
+<path d="M116,240 h122 v122 h-122z" fill="none" stroke="#efe6d4" stroke-width="6"/>
+<!-- 열린 문짝 둘(바깥으로 비스듬히) -->
+<path class="o" d="M116,240 L80,250 L80,364 L116,362 Z" fill="#6d3f24"/>
+<path d="M116,240 L80,250 L80,364 L116,362 Z M116,240 L80,364 M80,250 L116,362" fill="none" stroke="#efe6d4" stroke-width="4" stroke-linejoin="round"/>
+<path class="o" d="M238,240 L274,250 L274,364 L238,362 Z" fill="#6d3f24"/>
+<path d="M238,240 L274,250 L274,364 L238,362 Z M238,240 L274,364 M274,250 L238,362" fill="none" stroke="#efe6d4" stroke-width="4" stroke-linejoin="round"/>
+<!-- 창 둘 -->
+<g id="w6"><rect class="i" x="44" y="212" width="30" height="26" fill="#6d8ea3"/><path d="M44,212 h30 v26 h-30z" fill="none" stroke="#efe6d4" stroke-width="4"/><path d="M59,212 v26 M44,225 h30" stroke="#efe6d4" stroke-width="2.5"/><path d="M48,216 l7,0 l-7,7z" fill="#fff" opacity=".45"/></g>
+<use href="#w6" x="238"/>
+<!-- 문 위 랜턴 -->
+<path d="M177,226 v6" stroke="#3d3833" stroke-width="3"/><path class="i" d="M177,232 l-5,4 v11 h10 v-11z" fill="#f2c25a"/><circle cx="177" cy="241" r="3" fill="#fff4c2"/>
+<!-- 용마루 환기탑 + 풍향계 -->
+<path class="o" d="M163,104v-24h28v24z" fill="#b5392b"/><path d="M168,86h18M168,94h18" stroke="#8f2a1e" stroke-width="2.5"/>
+<path class="o" d="M156,82l21,-20l21,20z" fill="#4e5459"/><path d="M177,62l21,20h-10z" fill="#3f4549"/>
+<path d="M177,62v-26" stroke="#3d3833" stroke-width="3" stroke-linecap="round"/><path d="M163,48h28" stroke="#3d3833" stroke-width="2.5" stroke-linecap="round"/>
+<path class="i" d="M170,40 q6,-10 14,-4 l6,-4 l-2,8 q-6,6 -16,4z" fill="#d9a53a"/><g transform="translate(76,372) scale(1.1) translate(-76,-372)"><ellipse cx="76" cy="372" rx="50" ry="10" fill="#000" opacity=".24"/>
 <path class="o" d="M34,330 h80 v28 h-80z" fill="#a5743c"/>
 <path d="M40,318 q34,-12 68,0 v12 h-68z" fill="#e8c26a"/>
 <path d="M44,324 h58" fill="none" stroke="#b8901a" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>
 <circle class="o" cx="52" cy="364" r="14" fill="#7a5230"/><circle cx="52" cy="364" r="5" fill="#b58a56"/>
 <circle class="o" cx="98" cy="364" r="14" fill="#7a5230"/><circle cx="98" cy="364" r="5" fill="#b58a56"/>
-<ellipse cx="316" cy="374" rx="22.0" ry="6" fill="#000" opacity=".2"/>
+</g><ellipse cx="316" cy="374" rx="22.0" ry="6" fill="#000" opacity=".2"/>
 <g transform="translate(316,372) scale(1.0)"><path class="i" d="M-18,-44 q18,-6 36,0 v40 q-18,6 -36,0z" fill="#efe6d4"/><path d="M-12,-28 h24" fill="none" stroke="#b8901a" stroke-width="2.6" stroke-linecap="round"/><path class="i" d="M-18,-44 q18,8 36,0 q-6,-8 -18,-8 q-12,0 -18,8z" fill="#e8c26a"/></g>
 <ellipse cx="348" cy="374" rx="18.04" ry="6" fill="#000" opacity=".2"/>
 <g transform="translate(348,372) scale(0.82)"><path class="i" d="M-18,-44 q18,-6 36,0 v40 q-18,6 -36,0z" fill="#efe6d4"/><path d="M-12,-28 h24" fill="none" stroke="#b8901a" stroke-width="2.6" stroke-linecap="round"/><path class="i" d="M-18,-44 q18,8 36,0 q-6,-8 -18,-8 q-12,0 -18,8z" fill="#e8c26a"/></g>
