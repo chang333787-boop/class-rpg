@@ -87,7 +87,7 @@
     const st = {
       owner: false, viewOnly: false, dev: devId(), book: null, offset: 0,
       lastRaw: null, lastChange: 0, pendingSince: 0,
-      pollT: 0, beatT: 0, unwatch: null, sending: false, closed: false, attached: false,
+      pollT: 0, beatT: 0, unwatch: null, sending: false, closed: false, attached: false, hiddenRaw: null,
       stats: { patches: 0, puts: 0, gets: 0, keepalive: 0, failed: 0 }
     };
 
@@ -257,13 +257,24 @@
       st.lastRaw = readRaw();
       st.pollT = setT(poll, o.pollMs);
       if (root.addEventListener) root.addEventListener('pagehide', onPageHide);   // 마을의 pagehide(로컬 저장) 뒤에 붙는다
+      const doc = root.document;                                                   // [SYNC-HIDDEN-1] 가려질 때도 — 마을의 visibilitychange(로컬 저장) 뒤에 붙는다
+      if (doc && doc.addEventListener) doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'hidden') onHidden(); });
     }
 
     /* ── 닫힐 때 — 전부 아니면 하나도 안 보냄 ── */
     function onPageHide() {
       if (GUEST || !st.owner) return 'skip';
-      const r = pushOnHide();
+      const r = readRaw() === st.hiddenRaw ? 'same' : pushOnHide();   // 방금 가려질 때 같은 내용을 보냈으면 데이터는 다시 안 보낸다(세션은 놓는다)
       releaseSession();
+      return r;
+    }
+    // [SYNC-HIDDEN-1] 가려질 때(앱 바꾸기·홈 버튼·탭 전환) — 태블릿·크롬북은 그 뒤 OS 가 탭을 죽이면 pagehide 가 안 온다.
+    //   그러면 마지막 quietMs(2초)분이 다른 기기로 안 갔다(같은 기기에선 다음 열기에 올라감). 데이터만 keepalive 로 보내고
+    //   **세션은 놓지 않는다** — 다시 보이면 이 기기가 그대로 주인이고 poll 이 이어 간다. 같은 내용이면 다시 안 보낸다.
+    function onHidden() {
+      if (GUEST || !st.owner || st.closed) return 'skip';
+      const raw = readRaw(); if (raw === st.hiddenRaw) return 'same';
+      const r = pushOnHide(); if (r === 'sent' || r === 'clean') st.hiddenRaw = raw; st.stats.hidden = (st.stats.hidden || 0) + 1;
       return r;
     }
     function pushOnHide() {
@@ -313,7 +324,7 @@
       root.document.body.appendChild(el); setT(() => el.remove(), 6000);
     }
 
-    return { boot, attach, flush, poll, onPageHide, close, decide, diff, state: st, _claim: claim };
+    return { boot, attach, flush, poll, onPageHide, onHidden, close, decide, diff, state: st, _claim: claim };
   }
 
   /* 마을에서 쓰는 모양: VillageSync.boot({sid}) → 한 개만 만든다 */
