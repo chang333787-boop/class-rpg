@@ -772,7 +772,7 @@ function joinPartsAt(rec) {                            // 이웃(세계 기준) 
   else { const straight = mask === 5 || mask === 10; if (S.always || !straight) S.node.forEach(pt => out.push(turn(pt, rot))); [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) S.arm.forEach(pt => out.push(turn(nv ? { ...pt, g: pt.g + ((vv + d) % nv) } : pt, d + rot))); }); }
   return _joinCache[key] = out; }
 /* 놓거나 치우면 이웃의 모양도 바뀐다 → 이웃 칸이 든 청크도 다시 합친다(청크가 4칸이라 경계를 자주 넘는다). 꽃밭 가장자리 등 '이웃을 보는 모양'이 같이 쓴다 */
-function joinDirtyAround(kind, x, y) { if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
+function joinDirtyAround(kind, x, y) { if (K[kind] && ROAD_JOIN_TO.has(kind)) { for (let dy = -1; dy <= 3; dy++) for (let dx = -1; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (inb(xx, yy)) dirtyChunks.add(chunkOfCell(idx(xx, yy))); } return; }   /* [DESIGN-ROAD-1] 길 가족(발자국 최대 3칸) — 둘레 청크를 다시 합친다 */ if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
 /* ══════════════════════════════════════════════════════════════
    [MAC-LINE] 옛 울타리·돌담(2×1)도 이웃을 보고 이어진다 — 디자인 담당의 자동 이음(DESIGN-JOIN-1)을 받아 넓힌다
    사용자 09-20: "울타리라면 대실패고, 네 코너 맞닿는 요소를 만들어야지." 옛 fence·wall 은 곧은 2×1 상자를 R 로 돌려 놓는 방식이라 모퉁이가 어긋나고 틈이 났다.
@@ -1277,6 +1277,46 @@ function lawnPartsAt(rec) {
   const out = [{ g:'box', c: (x & 1) ? 0x74ae3f : 0x84c04b, s:[CS, .12, CS], p:[0, .06, 0] }], w = .26;
   [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) out.push(turn({ g:'box', c:0x6ea83c, s:[CS, .13, w], p:[0, .065, -CS / 2 + w / 2] }, d + rot)); });
   return _lawnParts[key] = out.concat(K.lawn.parts.slice(1)); }
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-ROAD-1] 길 가족을 한 식구로 — 사용자 09-20 "연속으로 이었을 때 끊기는 애들이 많은데?"
+   길·큰길·횡단보도·가로수 열·자갈길이 나란히 놓이면 같은 폭·같은 높이·같은 가장자리로 한 줄이 된다.
+   · 모든 칸: 칸을 꽉 채운 바탕 판(높이 .16) + 윗판(.04). 윗판은 이웃이 길 가족(또는 다리)인 변으로는 **칸 끝까지**, 아닌 변은 안으로 들인다(연석).
+     → 곧은 길은 끊김 없는 띠, 굽은 길·세 갈래·네 갈래는 모서리까지 이어진다. 윗판은 상자 하나라 삼각형은 전과 같다(칸당 24).
+   · ROADJOIN.gap: 이어진 변에 남길 줄눈 — 0.07(보스 결정 ⓑ). 0 이면 틈 없는 한 띠(시안 ⓐ). 광장·다리는 이어지는 상대로만.
+   · 남은 것(다음 과제 후보): 다리 진입부 — 다리 판(.30~.47)이 길 윗판(.20)보다 높아 계단처럼 보인다.
+   · 횡단보도 = 같은 판 + 가운데 회색 판 위의 흰 줄무늬(길이 방향으로 넷). 가로수 열 = 같은 판 + 한쪽 연석 위의 나무 셋(작은 돌 화분). 자갈길 = 같은 판을 자갈빛으로 + 자갈 몇 알.
+   · 여러 칸짜리(큰길 2×2 · 횡단보도 1×2 · 가로수 열 1×3)는 칸마다 따로 — 세계 좌표 부위(abs)로 낸다.
+   · 비용: 이웃 4방만 본다. 놓거나 치우면 둘레(발자국 최대 3칸) 청크를 다시 합친다.
+   ══════════════════════════════════════════════════════════════ */
+const ROAD_FAM = new Set(['road', 'avenue', 'crosswalk', 'treerow', 'gravel']);
+const ROAD_JOIN_TO = new Set(['road', 'avenue', 'crosswalk', 'treerow', 'gravel', 'bridge', 'sbridge', 'plaza']);   // 다리·광장은 '이어지는 상대'로만(제 모양은 그대로)
+window.ROADJOIN = window.ROADJOIN || { on: true, gap: .07 };   // 보스 결정 ⓑ 가는 줄눈 — 칸의 결이 남아 칸을 세며 짓기 좋다(0 = 틈 없이 한 띠)
+const _rm = new THREE.Matrix4();
+function roadFamParts(rec) {
+  const R = window.ROADJOIN, rx = cX(rec.root), ry = cY(rec.root), rot = rec.rot & 3, fp = footprint(rec.k, rx, ry, rot);
+  const fam = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && ROAD_JOIN_TO.has(c.k)); };
+  const pz = (x, y) => { if (!inb(x, y)) return 0; const c = cells[idx(x, y)]; return c && c.k === 'plaza' ? .2 : 0; };   // 광장 판은 칸에서 0.2 들여 있다 → 그 변은 0.2 더 뻗어 틈을 덮는다
+  const HALF = CS / 2, IN = CS * .37, G = R.gap || 0, gravel = rec.k === 'gravel', out = [];
+  const baseC = gravel ? P.gravel : P.pave, topC = gravel ? 0xcac2b2 : P.paveIn;
+  let sx = 0, sz = 0;
+  fp.forEach(([x, y]) => {
+    const cx = wx(x), cz = wz(y); sx += cx; sz += cz;
+    const ew = pz(x - 1, y), ee = pz(x + 1, y), en = pz(x, y - 1), es = pz(x, y + 1);
+    const x0 = fam(x - 1, y) ? -HALF + (ew ? -ew : G) : -IN, x1 = fam(x + 1, y) ? HALF + (ee ? ee : -G) : IN, z0 = fam(x, y - 1) ? -HALF + (en ? -en : G) : -IN, z1 = fam(x, y + 1) ? HALF + (es ? es : -G) : IN;
+    out.push({ g:'box', c:baseC, s:[CS + ew + ee, .16, CS + en + es], p:[cx + (ee - ew) / 2, .08, cz + (es - en) / 2], abs:true }, { g:'box', c:topC, s:[x1 - x0, .04, z1 - z0], p:[cx + (x0 + x1) / 2, .18, cz + (z0 + z1) / 2], abs:true });
+    if (gravel) [[-.9, -.7, .3], [.8, .5, .26], [.2, -1.1, .22], [-.5, 1.0, .24]].forEach(([a, b, r]) => out.push({ g:'sph', c:P.stoneD, s:[r, r * .5, r], p:[cx + a, .21, cz + b], abs:true }));
+  });
+  const n = fp.length, mx = sx / n, mz = sz / n, alongX = fp.length > 1 && fp[0][1] === fp[1][1];   // 발자국 가운데 · 긴 쪽이 x 인가
+  if (rec.k === 'avenue') out.push({ g:'box', c:0xf4e7a8, s:[CS * 1.6, .02, .16], p:[mx, .21, mz], abs:true }, { g:'box', c:0xf4e7a8, s:[.16, .02, CS * 1.6], p:[mx, .21, mz], abs:true });
+  if (rec.k === 'crosswalk') {
+    out.push({ g:'box', c:0x8f9097, s: alongX ? [CS * 2, .02, CS * .74] : [CS * .74, .02, CS * 2], p:[mx, .205, mz], abs:true });
+    [-2.6, -.9, .9, 2.6].forEach(t => out.push({ g:'box', c:0xf6f6f2, s: alongX ? [.5, .02, CS * .6] : [CS * .6, .02, .5], p:[mx + (alongX ? t : 0), .215, mz + (alongX ? 0 : t)], abs:true }));
+  }
+  if (rec.k === 'treerow') K.treerow.parts.forEach(pt => { if (pt.g !== 'cyl' && pt.g !== 'sph') return;           // 나무 셋(원래 부위)을 연석 쪽으로 — 세계 자리만 옮겨 온다
+    const q = { ...pt, p:[-1.62, pt.p[1], pt.p[2]] }; partMatrix(rec.k, rx, ry, rot, q, _rm); const e = _rm.elements;
+    out.push({ ...pt, s: pt.s.map(v => v * 1.35), p:[e[12], pt.p[1] * 1.32, e[14]], abs:true, ry:0 }); if (pt.g === 'cyl') out.push({ g:'box', c:P.stoneD, s:[.66, .26, .66], p:[e[12], .23, e[14]], abs:true }); });   // 나무는 원래보다 1.35배(연석 위 작은 나무가 약해 보였다)
+  return out;
+}
 function lawnSeason(hex, S) { const k = hex + ':' + S.ground; if (_lawnC[k] != null) return _lawnC[k]; const g0 = 0x64a341, ch = (h, sh) => (h >> sh) & 255;
   let out = 0; [16, 8, 0].forEach(sh => { out |= Math.min(255, Math.round(ch(S.ground, sh) * ch(hex, sh) / ch(g0, sh))) << sh; }); return _lawnC[k] = out; }
 function seasonColor(hex) { const S = SEASONS[seasonNow < 0 ? 1 : seasonNow]; return hex === P.leaf ? S.leaf : hex === P.leafL ? S.leafL : LAWN_HEX.includes(hex) ? lawnSeason(hex, S) : hex; }
@@ -1789,6 +1829,7 @@ function partsOf(rec) {
   if (K[rec.k].join && K[rec.k].w * K[rec.k].h > 1) return joinPartsWide(rec);   // [MAC-LINE] 옛 2×1 울타리·돌담 — 칸마다 따로
   if (K[rec.k].join) return joinPartsAt(rec);   // [DESIGN-JOIN-1] 이웃을 보고 모양이 정해지는 것(산울타리·문)
   if (rec.k === 'lawn') return lawnPartsAt(rec);   // [DESIGN-LAWN-2] 깎은 줄 + 바깥 테
+  if (ROAD_FAM.has(rec.k) && window.ROADJOIN.on) return roadFamParts(rec);   // [DESIGN-ROAD-1] 길 가족 — 이웃을 보고 한 줄로
   if (FLOWER_KINDS[rec.k]) { const x = cX(rec.root), y = cY(rec.root), fp = flowerPartsAt(rec.k, x, y); if (fp) { const ed = flowerEdgeParts(x, y, rec.rot); return ed ? fp.concat(ed) : fp; } }   // [DESIGN-FLOWER-3·4·EDGE-1] 꽃밭 종류 × 칸 좌표로 벌 + 바깥 변 가장자리
   if (rec.k === 'house') { const lv = houseLv(rec.root), g = glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house'); return g ? (lv === 3 ? (HOUSE3_GLB || (HOUSE3_GLB = g.concat(HOUSE3_ADD))) : g) : HOUSE_LV[lv]; }
   if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
@@ -1809,7 +1850,7 @@ function buildChunk(cx, cz) {
     const k = K[rec.k], roofC = ROOFS[(x * 5 + y * 3) % ROOFS.length];
     const parts = partsOf(rec);
     const item = { root: i, k: rec.k, rot: rec.rot, bucket: bucketOf(parts[0]), off: 0 };
-    const lit = rec.k === 'house' && (res.get(i) || 0) > 0 && dawnLit(i);   // 사람이 사는 집만 창에 불이 켜진다 · [ACT-DAWN] 잠든 집은 끈다
+    const lit = rec.k === 'house' && (res.get(i) || 0) > 0;   // 사람이 사는 집만 창에 불이 켜진다
     parts.forEach((pt, pi) => {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
@@ -5760,7 +5801,6 @@ function tickFolks(dt, now) {
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
     if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
     actFestLitterTick(now);   // [ACT-FESTLIT] 축제 다음 날 광장 조각 · 치우러 가기(틱마다 한 번)
-    actDawnTick();   // [ACT-DAWN] 한밤엔 집집이 불을 끄고, 새벽엔 한두 집이 먼저 켠다(틱마다 한 번 · 15분마다 셈)
     actNightCartTick(now);   // [ACT-NIGHTCART] 밤엔 어귀에 내일 올 이웃의 수레 · 아침엔 그 수레를 끌고 들어온다(틱마다 한 번)
     if (actPuddleTick(f, i, now)) continue;   // [ACT-PUDDLE] 비 그친 다음 날 아침 — 아이는 웅덩이로 뛰어가 통통
     f.base = roadBeside(rec);
@@ -5773,7 +5813,6 @@ function tickFolks(dt, now) {
       const home = f.inside.root === f.home, work = f.inside.root === f.job && f.goal === 'work', school = !work && b && b.k === 'school';
       if (!b || b.root !== f.inside.root || (!K[b.k].need && !home && !school && !work)) { leave(f, '쫓겨남'); continue; }   // 건물이 없어졌다 — 문 앞으로
       const h = simHour();
-      if (home && actDawnHold(f, h)) continue;   // [ACT-DAWN] 아침 6시엔 먼저 일어난 집 식구가 맨 먼저 나온다 — 다른 집은 조금 뒤
       if (home ? !isNightHour(h) : work ? !isWorkHour(h) : school ? !isSchoolHour(h) : now >= f.inside.until) { leave(f, '나옴'); f.goal = null; }
       continue;
     }
@@ -6455,47 +6494,6 @@ function actPuddleChunk(x0, z0, bucket) {
       for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off); }); });
 }
 window.__puddle = () => ({ 켜짐: window.VRULES.puddle.on, 지금: PUDDLE.on, 칸: PUDDLE.cells.map(c => [cX(c), cY(c)]), 모양: typeof window.PUDDLE_PARTS === 'function' ? '디자인' : '임시원판', 지금통통: folks.filter(f => f.puddle && f.puddle.until).length, ...PUDDLE.stats });
-
-/* ══════════════════════════════════════════════════════════════
-   [ACT-DAWN] 새벽 첫 불 (주민 연기 · 09-20 · 보스 순서 ②).
-   한밤(sleepFrom 시부터 sleepStep 간격 네 무리)에 집집이 창 불을 끈다 → 새벽 earlyH 시에 **맨 먼저 일어나는 집 한두 채**만 창이 켜진다
-   → wakeFrom 시부터 다른 집들이 차례로 켠다 → 6시에 먼저 일어난 집 식구가 맨 먼저 나오고 다른 집은 outLag 시간 뒤에.
-   먼저 일어나는 집: 그날 새벽(1~4.5시) 사람 사는 집 가운데 **카메라가 보는 곳에서 가까운 집**부터 칸 번호로 섞어 한두 채(사람 사는 집 20채 넘으면 둘) — 아이가 보는 쪽에서 밤이 끝나게.
-   창 빛은 사람 사는 집 창과 같은 aNight(buildChunk 의 lit 한 줄에 dawnLit) — 15분마다 바뀐 집의 청크만 다시 합친다(draw call +0).
-   판정·확률·저장 0. 스위치·수치 VRULES.dawn + 고리 셋(buildChunk lit · tickFolks 한 줄 · 집 안 사람 나오기 한 줄).
-   ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).dawn = { on: true, sleepFrom: 23, sleepStep: 0.5, earlyH: 4.6, wakeFrom: 5.5, wakeStep: 0.25, outLag: [0.25, 0.4, 0.55], nearR: 40 };
-var DAWN = null;                                                        // var — buildChunk 가 이 블록보다 먼저 불려도 TDZ 없이 '다 켜짐'
-const dawnHash = i => ((i * 2654435761) >>> 0);
-function dawnLit(root) { return !(DAWN && window.VRULES.dawn && window.VRULES.dawn.on && DAWN.asleep.has(root)); }
-function dawnAsleep(root, h) {                                          // 이 집은 지금 자나(시각만으로 — 저장 0)
-  const R = window.VRULES.dawn, hh = h < 12 ? h + 24 : h, s = R.sleepFrom + (dawnHash(root) % 4) * R.sleepStep;
-  const w = DAWN.early.has(root) ? R.earlyH : R.wakeFrom + (dawnHash(root + 7) % 3) * R.wakeStep;
-  return hh >= s && hh < w + 24;
-}
-function actDawnTick() {
-  if (!DAWN) DAWN = { tick: -1, key: -1, day: -1, early: new Set(), asleep: new Set(), stats: { 잠든집최대: 0, 먼저켠집: 0, 먼저나옴: 0, 창바꿈: 0 } };
-  if (DAWN.tick === SIM.ticks) return; DAWN.tick = SIM.ticks;
-  const R = window.VRULES.dawn, h = simHour(), key = R.on ? Math.floor(h * 4) : -2;
-  if (key === DAWN.key) return; DAWN.key = key;
-  if (R.on && h >= 1 && h < R.earlyH && DAWN.day !== simDay()) {        // 오늘 새벽 먼저 일어날 집 — 한 번
-    DAWN.day = simDay(); const cx = camTarget.x / CS + (W - 1) / 2, cz = camTarget.z / CS + (H - 1) / 2, list = [];
-    res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') list.push([root, Math.hypot(cX(root) - cx, cY(root) - cz)]); });
-    const near = list.filter(a => a[1] <= R.nearR), pool = (near.length ? near : list).sort((a, b) => (dawnHash(a[0] + DAWN.day) % 1000) - (dawnHash(b[0] + DAWN.day) % 1000));
-    DAWN.early = new Set(pool.slice(0, list.length > 20 ? 2 : 1).map(a => a[0])); DAWN.stats.먼저켠집 += DAWN.early.size;
-  }
-  const now = new Set(); if (R.on) res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house' && dawnAsleep(root, h)) now.add(root); });
-  DAWN.asleep.forEach(r => { if (!now.has(r) && cells[r]) { dirtyChunks.add(chunkOfCell(r)); DAWN.stats.창바꿈++; } });
-  now.forEach(r => { if (!DAWN.asleep.has(r)) { dirtyChunks.add(chunkOfCell(r)); DAWN.stats.창바꿈++; } });
-  DAWN.asleep = now; DAWN.stats.잠든집최대 = Math.max(DAWN.stats.잠든집최대, now.size);
-}
-/* 집 안 사람 나오기 고리 — 6시가 넘어도 먼저 일어난 집이 아니면 outLag 만큼 더 머문다. true 면 이번 틱은 그대로 집 안 */
-function actDawnHold(f, h) {
-  const R = window.VRULES.dawn; if (!R.on || !DAWN || h < 6 || h >= 6 + R.outLag[R.outLag.length - 1]) return false;
-  if (DAWN.early.has(f.home)) { if (f.dawnOut !== DAWN.day) { f.dawnOut = DAWN.day; DAWN.stats.먼저나옴++; } return false; }
-  return h < 6 + R.outLag[dawnHash(f.home + 3) % R.outLag.length];
-}
-window.__dawn = () => DAWN ? { 켜짐: window.VRULES.dawn.on, 시: +simHour().toFixed(2), 잠든집: DAWN.asleep.size, 먼저: [...DAWN.early].map(r => [cX(r), cY(r), dawnAsleep(r, simHour()) ? '잠' : '깸']), ...DAWN.stats } : null;
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
