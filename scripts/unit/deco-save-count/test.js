@@ -724,6 +724,9 @@
       }
       const pr = vis.r0 + 2, pc = vis.c0 + 4;                                                 // 연못 5×6(귀 하나 빠짐 · 가운데 섬) = 물가 변·안 모서리·바깥 모서리 전부
       for (let r = pr; r < pr + 5; r++) for (let c = pc; c < pc + 6; c++) if (free(r, c) && !(r === pr && c === pc) && !(r === pr + 2 && c === pc + 3)) fx[r + '_' + c] = 'water';
+      //  (앞 검사에서 🖌️ 바닥 모드를 열었으면 고르기 판이 칩 그림으로 정원 그림을 이미 불렀다 — 그건 빼고, 이 마당을 그리며 **새로** 부른 것만 본다)
+      const GARDEN_RE = /^(bed_|rim_|tile_(tulipbed|tulipcol|hydrangea|wildflower|sunflowerbed|lavender|daisyfield))/;
+      const gardenBefore = new Set(Object.keys(_FLOOR_IMG).filter(k => GARDEN_RE.test(k)));
       CUR.yardFloor = fx;
       const print = async () => {
         _drawDeco(); await sleep(150);
@@ -744,7 +747,7 @@
       out('옛바닥마당_두번그려_같음', f1 === f2 && f1 !== 'no-canvas');
       out('옛바닥마당_그림지문', f1);
       //  여기까지는 옛 바닥만 깔았다 → 정원 바닥 그림은 한 장도 안 불렸어야 한다(쓴 색만 부른다 · 요청 수 그대로)
-      out('정원바닥_안쓴마당_부른그림0', !Object.keys(_FLOOR_IMG).some(k => /^(bed_|rim_|tile_(tulipbed|tulipcol|hydrangea|wildflower|sunflowerbed|lavender|daisyfield))/.test(k)));
+      out('정원바닥_안쓴마당_부른그림0', !Object.keys(_FLOOR_IMG).some(k => GARDEN_RE.test(k) && !gardenBefore.has(k)));
       if (typeof _floorParse === 'function') {
         out('바닥해석_옛값_이름그대로', OLD.every(t => { const p = _floorParse(t); return p.name === t && !p.color && !p.rim; }));
         const p = _floorParse('tulipbed#red+picket');
@@ -934,6 +937,72 @@
       CUR.houseDecorations = keepDeco; CUR.inventory = keepInv;
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
       out('마당으로_돌아오면_바닥단추_보임', shown(fbtn));
+    }
+    //  ⑰ 바닥 고르기(DECO-FLOOR-PICK-1) — 🖌️ 바닥 모드에서 접힌 서랍 자리에 판(규칙 docs/deco_floor_picker_20260920.md).
+    //    누르면 붓(CUR_FLOOR_TILE)이 §4 표 글자 그대로 · 잠긴 색은 칠하지 않는다 · 칠하면 그 글자가 저장값 · 다시 열면 붓을 거꾸로 읽는다.
+    if (document.getElementById('if-floor-picker')) {
+      const keepInv = CUR.inventory, keepTile = CUR_FLOOR_TILE;
+      const pk = document.getElementById('if-floor-picker'), q = sel => [...pk.querySelectorAll(sel)];
+      const fams = () => q('.fpk-row[data-row="fams"] .pk-chip'), onTxt = sel => { const b = pk.querySelector(sel + '.is-on'); return b ? b.textContent : ''; };
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
+      setDecoMode('deco'); ifSyncModeBtn(); CUR_FLOOR_TILE = 'grass';
+      document.getElementById('if-mode-floor').click(); await sleep(300);
+      out('바닥고르기_판열림_위줄없음_서랍접힘', !pk.hidden && !document.getElementById('if-floor-row') && getComputedStyle(document.getElementById('if-deco-drawer')).display === 'none');
+      out('바닥고르기_가족칩', fams().map(b => b.textContent).join('·'));
+      out('바닥고르기_기본14_잔디고름', q('.pk-tile').length === 14 && q('.pk-tile.is-on').length === 1 && q('.pk-tile')[0].classList.contains('is-on') && onTxt('.pk-chip') === '기본');
+      q('.pk-tile')[7].click(); await sleep(100);
+      out('바닥고르기_기본_벽돌', CUR_FLOOR_TILE === 'brick' && /벽돌/.test(pk.querySelector('.pk-name').textContent));
+      //  가진 것 없음 → 튤립의 빨강은 잠김
+      CUR.inventory = [];
+      fams()[1].click(); await sleep(100);
+      out('바닥고르기_튤립_기본색은_글자없음', CUR_FLOOR_TILE === 'tulipbed');
+      out('바닥고르기_색순서_기본먼저_잠김뒤로', q('.pk-dot').map(b => (b.dataset.col || '기본') + (b.classList.contains('is-locked') ? '🔒' : '')).join(' '));
+      pk.querySelector('.pk-dot[data-col="red"]').click(); await sleep(150);
+      const bub = pk.querySelector('.pk-bubble');
+      out('바닥고르기_잠긴색_안칠함_말풍선_견본잠김', CUR_FLOOR_TILE === 'tulipbed' && !!bub && !bub.hidden && /장미/.test(bub.textContent) && !!pk.querySelector('.pk-sw-lk') && /잠긴/.test(pk.textContent));
+      await sleep(2700);
+      out('바닥고르기_말풍선_저절로닫힘_고른것그대로', bub.hidden && !pk.querySelector('.pk-sw-lk') && CUR_FLOOR_TILE === 'tulipbed' && pk.querySelector('.pk-dot.is-on').dataset.col === '');
+      //  가진 것 있음 → 빨강 · 흰 말뚝
+      CUR.inventory = GAME_DATA.decorations.filter(d => d.cat === 'yard').map(d => ({ id: d.id, qty: 1 }));
+      fams()[1].click(); await sleep(100);
+      pk.querySelector('.pk-dot[data-col="red"]').click(); await sleep(100);
+      const swPrint = async () => { await sleep(700); const cv = pk.querySelector('.pk-sw canvas'); const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+        return [...new Uint8Array(await crypto.subtle.digest('SHA-256', d.buffer))].slice(0, 6).join(','); };
+      const swRed = await swPrint();
+      q('.pk-rim')[3].click();
+      const swPicket = await swPrint();
+      out('바닥고르기_빨강튤립_흰말뚝', CUR_FLOOR_TILE === 'tulipbed#red+picket' && pk.querySelector('.pk-name').textContent === '빨강 튤립 · 흰 말뚝' && onTxt('.pk-rim') === '흰 말뚝');
+      out('바닥고르기_견본이_고른대로_바뀜', swRed !== swPicket);
+      //  견본 = 마당과 같은 그리기 — 가장자리/마감 조각을 실제로 불렀다
+      out('바닥고르기_견본에_마감조각', Object.keys(_FLOOR_IMG).some(k => /^rim_picket_/.test(k) && _FLOOR_IMG[k].ok) && Object.keys(_FLOOR_IMG).some(k => /^bed_.*#red$/.test(k)));
+      fams()[3].click(); await sleep(80);
+      out('바닥고르기_수국_처음은_기본색_자연', CUR_FLOOR_TILE === 'hydrangea' && q('.pk-rim').length === 4 && onTxt('.pk-rim') === '자연');
+      fams()[7].click(); await sleep(80);
+      out('바닥고르기_들꽃_테두리줄없음', CUR_FLOOR_TILE === 'wildflower' && pk.querySelector('.fpk-row[data-row="rims"]').hidden && q('.pk-cap').length === 1);
+      fams()[1].click(); await sleep(80);
+      out('바닥고르기_가족마다_마지막것기억', CUR_FLOOR_TILE === 'tulipbed#red+picket');
+      //  누를 곳 44px 이상(보이는 것만 — 옆으로 넘긴 줄 끝은 폭을 잰다)
+      const tooSmall = () => q('button').filter(b => { const r = b.getBoundingClientRect(); return b.offsetParent !== null && (r.width < 44 || r.height < 44); }).map(b => b.getAttribute('aria-label'));
+      fams()[0].click(); await sleep(60); const small = tooSmall(); fams()[1].click(); await sleep(60); small.push(...tooSmall());   // 기본 줄 · 정원 세 줄 둘 다
+      out('바닥고르기_44px미만', small.length ? small.join(',') : '없음');
+      //  칠하기 — 붓 글자가 그대로 저장값 · 같은 칸을 다시 누르면 걷힌다(지우개 판정은 글자 그대로)
+      const key = '30_30', had = _yardFloorGet(CUR)[key];
+      if (!had) {
+        _paintFloor(30, 30); const got = _yardFloorGet(CUR)[key];
+        _paintFloor(30, 30);
+        out('바닥고르기_칠하면_그글자_다시누르면_걷힘', got === 'tulipbed#red+picket' && !_yardFloorGet(CUR)[key]);
+      }
+      //  거꾸로 읽기 — 붓이 'hydrangea#pink+stone' 인 채 바닥 모드를 다시 열면 칩·색·테두리가 그 자리에
+      setDecoMode('deco'); ifSyncModeBtn(); CUR_FLOOR_TILE = 'hydrangea#pink+stone';
+      document.getElementById('if-mode-floor').click(); await sleep(250);
+      out('바닥고르기_거꾸로읽기', onTxt('.fpk-row[data-row="fams"] .pk-chip') === '수국' && pk.querySelector('.pk-dot.is-on').dataset.col === 'pink' && onTxt('.pk-rim') === '돌' && CUR_FLOOR_TILE === 'hydrangea#pink+stone');
+      //  자리 — 서랍 자리 · 마당이 절반 넘게 · 기둥이 판 위
+      const tv = document.getElementById('if-topview').getBoundingClientRect(), pr = pk.getBoundingClientRect(), zc = document.getElementById('if-zoom-col').getBoundingClientRect();
+      out('바닥고르기_자리', { 창: innerWidth + 'x' + innerHeight, 판위: Math.round(tv.top), 고르기위: Math.round(pr.top), 고르기키: Math.round(pr.height), 마당비율: Math.round((pr.top - tv.top) / innerHeight * 100) + '%' });
+      out('바닥고르기_기둥이_판위', zc.bottom <= pr.top + 1);
+      setDecoMode('deco'); ifSyncModeBtn(); await sleep(150);
+      out('바닥고르기_장식모드면_닫힘', pk.hidden && getComputedStyle(document.getElementById('if-deco-drawer')).display !== 'none');
+      CUR.inventory = keepInv; CUR_FLOOR_TILE = keepTile; _drawDeco();
     }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });

@@ -4528,6 +4528,7 @@ function setDecoMode(mode, btn) {
     btn.style.borderColor = mode==='deco'?'rgba(255,215,0,.4)':'rgba(93,173,226,.4)';
   }
   document.body.classList.toggle('deco-floor-mode', mode === 'floor');   // [DECO-PT-2] 바닥 모드면 장식 서랍 접기
+  _floorPickShow(mode === 'floor');   // [DECO-FLOOR-PICK-1] 접힌 서랍 자리에 바닥 고르기 판
   setTimeout(() => { try { _decoPillarSync(); } catch (e) {} }, 0);
   document.body.classList.toggle('deco-erase-mode', mode === 'erase');
   if (mode === 'erase') { SEL_DECO = null; if (typeof renderDecoInv === 'function') renderDecoInv(); }
@@ -4551,6 +4552,259 @@ function setCurFloor(type, btn) {
     btn.style.color = fc.color||'var(--gold)';
     btn.style.borderColor = fc.border||'rgba(255,255,255,.3)';
   }
+}
+
+// ══ 바닥 고르기 화면 (DECO-FLOOR-PICK-1 · 정원 바닥 연결 ④-1) ══════════════
+//  규칙 원본: docs/deco_floor_picker_20260920.md — (다) 견본 판 + 가족 칩 · 색 · 테두리 세 줄. 칠하기는 지금의 '끌어서' 그대로(④-2 에서 '네모로').
+//  · 저장값은 `_floorJoin` 한 곳에서만 만든다 — 늘 `이름#색+마감` 순서 · 기본색이면 `#` 없이 · 자연(마감 없음)이면 `+` 없이.
+//    지우개 판정 네 곳이 저장값을 **글자 그대로** 비교하므로(같은 바닥을 다시 칠하면 걷힌다) 한 조합 = 한 글자여야 한다.
+//  · 견본·칩·동그라미 그림은 마당과 같은 `_drawFloorSVG` 로 그린다(가장자리·마감까지 칠해질 모습 그대로).
+//  · 판·칩·동그라미·말풍선 모양은 `_pk*` 로 떼어 두었다 — 집 안 벽지·바닥 고르기(IN-2)가 그림 그리는 함수만 바꿔 같은 말투로 쓰게.
+function _floorJoin(name, color, rim) {
+  name = String(name || '');
+  if (!/^[a-z][a-z0-9_]*$/.test(name)) return 'grass';
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const cols = own(_FLOOR_COLORS, name) ? _FLOOR_COLORS[name] : null;
+  const col = (color && cols && cols.indexOf(color) >= 0) ? color : '';                       // 기본색·모르는 색 → 글자 없음
+  const rm = (rim && _FLOOR_EDGE_COLOR[name] && _FLOOR_RIMS.indexOf(rim) >= 0) ? rim : '';    // 꽃밭 무리만 마감(들꽃·옛 바닥은 없음)
+  return name + (col ? '#' + col : '') + (rm ? '+' + rm : '');
+}
+//  기본 14바닥 — 지금 단추 순서·글자 그대로(보스 ⓓ: 쓰던 바닥이 사라져 보이면 안 된다)
+const _FLOOR_BASIC = [['grass', '🌿 잔디'], ['dirt', '🟫 흙'], ['dark_earth', '⬛ 어두운 흙'], ['stone', '🪨 돌'], ['stone_floor', '🪟 돌바닥'],
+  ['sand', '🏜️ 모래'], ['gravel', '🔘 자갈'], ['brick', '🧱 벽돌'], ['wood', '🪵 나무'], ['water', '🔵 물'], ['flower', '🌸 꽃밭'],
+  ['deck', '🪵 데크'], ['dry_earth', '🟡 마른 흙'], ['gravel_yard', '⬜ 자갈마당']];
+//  가족 칩 — 순서 고정 · [이름, 칩 글자, 기본 색(그림 파일의 기본 · 저장값에는 안 붙는다)]
+const _FLOOR_FAMS = [['tulipbed', '튤립', 'pink'], ['tulipcol', '세로 튤립', 'pink'], ['hydrangea', '수국', 'blue'], ['lavender', '라벤더', 'violet'],
+  ['sunflowerbed', '해바라기', 'yellow'], ['daisyfield', '데이지', 'white'], ['wildflower', '들꽃', '']];
+const _FLOOR_COLOR_KO = { pink: '분홍', red: '빨강', yellow: '노랑', white: '흰', violet: '보라', orange: '주황', blue: '파랑',
+  candy: '사탕', sherbet: '복숭아', night: '검보라', duo: '두 빛', moon: '달빛', lemon: '레몬', rainbow: '무지개', snow: '눈꽃' };
+const _FLOOR_RIM_ORDER = [['', '자연'], ['brick', '벽돌'], ['stone', '돌'], ['picket', '흰 말뚝']];
+
+//  잠긴 색 — docs/deco_garden_family_20260920.md '열린 색 / 잠긴 색' 표. 열렸으면 '' · 잠겼으면 아이 말 두 줄.
+//  ⚠️ 문턱은 원래 '가진 적 있음'(도감)인데 도감 기록이 아직 없다 → 지금은 **지금 가진 것**(인벤토리)으로 본다.
+//     팔면 그 색이 다시 잠기지만, 이미 칠한 칸은 그대로 남는다(저장값은 안 건드린다). 도감 코드가 붙으면 `_floorHas` 만 바꾼다.
+//  라벤더·해바라기·데이지는 표에 문턱이 없어 전부 열림.
+function _floorHas(id) { return _decoQtyOf(id) > 0; }
+function _floorKindCount(kind) {
+  const all = GAME_DATA.decorations.filter(d => d.cat === 'yard' && !d.hidden && _decoShopKind(d) === kind);
+  return { have: all.filter(d => _floorHas(d.id)).length, all: all.length };
+}
+function _floorLockWhy(name, color) {
+  const fam = name === 'tulipcol' ? 'tulipbed' : name;
+  const any = ids => ids.some(_floorHas);
+  const need = (kind, n, what, icon) => { const k = _floorKindCount(kind), goal = n || k.all;
+    return k.have >= goal ? '' : `${icon} ${what} 장식을 ${n ? n + '가지' : '전부'} 모으면 열려요!\n지금 ${k.have}가지 · 🛒 상점에서 찾아볼 수 있어요`; };
+  const one = (ids, what) => any(ids) ? '' : `${what} 장식을 가져 보면 열려요!\n🛒 상점에서 찾아볼 수 있어요`;
+  if (fam === 'tulipbed') {
+    if (color === 'red') return one(['d_y1', 'd_y21', 'd_y43'], '🌹 장미');
+    if (color === 'white') return one(['d_y42'], '🌼 데이지');
+    if (color === 'violet') return one(['d_y41'], '💜 라벤더');
+    if (color === 'orange') return one(['d_y7'], '🌻 해바라기');
+    if (color === 'candy') return need('plant', 8, '꽃·풀', '🌷');
+    if (color === 'sherbet') return need('plant', 12, '꽃·풀', '🌷');
+    if (color === 'night') return need('plant', 0, '꽃·풀', '🌷');
+  }
+  if (fam === 'hydrangea') {
+    if (color === 'violet' || color === 'pink' || color === 'white') return need('water', 2, '물', '💧');
+    if (color === 'duo') return need('water', 0, '물', '💧');
+    if (color === 'moon') return any(['d_y6', 'd_y14']) ? '' : '🏮 가로등이나 석등을 가져 보면 열려요!\n밤에 피는 꽃이에요';
+  }
+  if (fam === 'wildflower') {
+    if (color === 'rainbow') return need('animal', 6, '동물', '🐾');
+    if (color === 'snow') return need('tree', 5, '나무', '🌳');
+  }
+  return '';
+}
+
+// ── 고르기 화면 공용 조각(마당·집 안) ── draw(ctx, w, h) 는 CSS 픽셀 좌표로 그린다(2배 판에 알아서 맞춘다)
+function _pkCanvas(w, h, draw) {
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(w * 2); cv.height = Math.round(h * 2);
+  cv.style.width = w + 'px'; cv.style.height = h + 'px'; cv.setAttribute('aria-hidden', 'true');
+  cv._pkDraw = draw; cv._pkW = w; cv._pkH = h; _pkPaint(cv);
+  return cv;
+}
+function _pkPaint(cv) {
+  const ctx = cv.getContext('2d'); if (!ctx) return;
+  ctx.setTransform(2, 0, 0, 2, 0, 0); ctx.clearRect(0, 0, cv._pkW, cv._pkH);
+  try { cv._pkDraw(ctx, cv._pkW, cv._pkH); } catch (e) {}
+}
+function _pkButton(cls, label, on, onTap, extra) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = cls + (on ? ' is-on' : ''); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (label) b.setAttribute('aria-label', label);
+  b.addEventListener('click', e => { e.stopPropagation(); onTap(b); });
+  if (extra) extra(b);
+  return b;
+}
+//  칩 = 그림 + 짧은 이름 · 동그라미 = 그림만(잠기면 🔒) · 네모 = 그림만
+function _pkChip(name, w, h, draw, on, onTap, cls) {
+  return _pkButton('pk-chip' + (cls ? ' ' + cls : ''), name, on, onTap, b => { b.appendChild(_pkCanvas(w, h, draw)); const s = document.createElement('span'); s.textContent = name; b.appendChild(s); });
+}
+function _pkDot(label, size, draw, on, locked, onTap) {
+  return _pkButton('pk-dot' + (locked ? ' is-locked' : ''), label + (locked ? ' (잠김)' : ''), on, onTap, b => {
+    b.appendChild(_pkCanvas(size, size, draw));
+    if (locked) { const l = document.createElement('span'); l.className = 'pk-lk'; l.textContent = '🔒'; b.appendChild(l); }
+  });
+}
+function _pkTile(label, size, draw, on, onTap) {
+  return _pkButton('pk-tile', label, on, onTap, b => b.appendChild(_pkCanvas(size, size, draw)));
+}
+//  견본 판 — 그림 + 이름 줄 + 캡션(줄마다) · locked 면 어둡게 + 가운데 🔒
+function _pkSwatch(box, w, h, draw, name, caps, locked) {
+  box.textContent = '';
+  const f = document.createElement('div'); f.className = 'pk-sw';
+  f.appendChild(_pkCanvas(w, h, (ctx, W, H) => { draw(ctx, W, H); if (locked) { ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, W, H); } }));
+  if (locked) { const l = document.createElement('span'); l.className = 'pk-sw-lk'; l.textContent = '🔒'; f.appendChild(l); }
+  box.appendChild(f);
+  const n = document.createElement('div'); n.className = 'pk-name'; n.textContent = name; box.appendChild(n);
+  caps.forEach(t => { const c = document.createElement('div'); c.className = 'pk-cap'; c.textContent = t; box.appendChild(c); });
+}
+//  말풍선 — anchor 위에 한 줄(두 줄까지). host 는 position:relative 인 판
+function _pkBubble(host, anchor, text) {
+  let bb = host.querySelector('.pk-bubble');
+  if (!bb) { bb = document.createElement('div'); bb.className = 'pk-bubble'; bb.setAttribute('role', 'status'); host.appendChild(bb); }
+  if (!anchor || !text) { bb.hidden = true; return; }
+  bb.textContent = text; bb.hidden = false;
+  const hr = host.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+  const bw = bb.offsetWidth, x = Math.max(6, Math.min(hr.width - bw - 6, ar.left - hr.left + ar.width / 2 - bw / 2));
+  bb.style.left = x + 'px'; bb.style.top = (ar.top - hr.top - bb.offsetHeight - 10) + 'px';
+  bb.style.setProperty('--pk-tail', (ar.left - hr.left + ar.width / 2 - x) + 'px');
+}
+
+// ── 마당 바닥 그림: 작은 판을 마당과 같은 그리기로 ──
+//  cellAt(r,c) → 저장값. 판 밖은 '경계 없음'(마당의 격자 밖과 같다) — 둘레를 보이려면 판 안에 잔디 테를 둔다.
+function _floorBoard(ctx, cols, rows, C, ox, oy, cellAt) {
+  const keep = _dCtx;
+  _dCtx = ctx;
+  try {
+    ctx.save(); ctx.translate(ox, oy);
+    const typeAt = (rr, cc, wantRim) => (rr < 0 || cc < 0 || rr >= rows || cc >= cols) ? null : _floorParse(cellAt(rr, cc))[wantRim ? 'rim' : 'name'];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const p = _floorParse(cellAt(r, c));
+      if (FLOOR_SVG && _drawFloorSVG(p.name, r, c, c * C, r * C, C, typeAt, p.color, p.rim)) continue;
+      const t = FLOOR_TILES[p.name] || FLOOR_TILES.grass;     // 그림이 아직 안 왔으면 단색(오면 다시 그린다)
+      ctx.fillStyle = t.bg; ctx.fillRect(c * C, r * C, C, C);
+    }
+    ctx.restore();
+  } finally { _dCtx = keep; }
+}
+//  값 v 를 잔디 가운데 (bw×bh) 로 깐 판 — 테 두께 m 칸. 캔버스 W×H 에 가로로 맞추고 세로는 가운데 자른다.
+const _floorBedDraw = (v, bw, bh, m) => (ctx, W, H) => {
+  const cols = bw + 2, rows = bh + 2, C = W / (bw + 2 * m);
+  _floorBoard(ctx, cols, rows, C, -(1 - m) * C, (H - (bh + 2 * m) * C) / 2 - (1 - m) * C,
+    (r, c) => (r >= 1 && r <= bh && c >= 1 && c <= bw) ? v : 'grass');
+};
+const _floorCellDraw = v => (ctx, W) => _floorBoard(ctx, 1, 1, W, 0, 0, () => v);
+//  테두리 단추 그림 = 꽃밭 모퉁이를 확대해 자른 것(그 마감이 둘러진 모습)
+const _floorCornerDraw = v => (ctx, W) => { const C = W / 1.45; _floorBoard(ctx, 3, 3, C, -0.55 * C, -0.55 * C, (r, c) => (r >= 1 && c >= 1) ? v : 'grass'); };
+
+// ── 상태 · 그리기 ──
+const _fpk = { fam: 'basic', basic: 'grass', col: {}, rim: {}, peek: null, peekT: 0, soon: 0 };
+function _floorPickRead(v) {   // 거꾸로 읽기 — 지금 붓(CUR_FLOOR_TILE)을 칩·색·테두리로
+  const p = _floorParse(v || 'grass');
+  if (_FLOOR_FAMS.some(f => f[0] === p.name)) { _fpk.fam = p.name; _fpk.col[p.name] = p.color; _fpk.rim[p.name] = p.rim; }
+  else { _fpk.fam = 'basic'; _fpk.basic = _FLOOR_BASIC.some(b => b[0] === p.name) ? p.name : 'grass'; }
+}
+function _floorPickValue() { return _fpk.fam === 'basic' ? _fpk.basic : _floorJoin(_fpk.fam, _fpk.col[_fpk.fam] || '', _fpk.rim[_fpk.fam] || ''); }
+function _floorPickName(v) {
+  const p = _floorParse(v), b = _FLOOR_BASIC.find(x => x[0] === p.name);
+  if (b) return b[1];
+  const f = _FLOOR_FAMS.find(x => x[0] === p.name); if (!f) return p.name;
+  const col = _FLOOR_COLOR_KO[p.color || f[2]] || '';
+  const rim = p.rim ? ' · ' + (_FLOOR_RIM_ORDER.find(x => x[0] === p.rim) || ['', p.rim])[1] : '';
+  return (col ? col + ' ' : '') + f[1] + rim;
+}
+function _floorPickTap(patch, anchor) {
+  _floorPickPeekEnd(false);
+  if (patch.fam !== undefined) {
+    _fpk.fam = patch.fam;
+    if (patch.fam !== 'basic' && _floorLockWhy(patch.fam, _fpk.col[patch.fam] || '')) _fpk.col[patch.fam] = '';   // 마지막 색이 그 새 잠겼으면 기본색
+  }
+  if (patch.basic !== undefined) _fpk.basic = patch.basic;
+  if (patch.rim !== undefined) _fpk.rim[_fpk.fam] = patch.rim;
+  if (patch.col !== undefined) {
+    const why = _floorLockWhy(_fpk.fam, patch.col);
+    if (why) {   // 잠긴 색 — 칠하지 않는다. 견본만 그 색으로 어둡게 + 말풍선. 고른 것은 누르기 전 그대로
+      _fpk.peek = { col: patch.col, why };
+      _floorPickRender();
+      const host = document.getElementById('if-floor-picker');
+      const dot = host && host.querySelector('.pk-dot[data-col="' + patch.col + '"]');
+      if (host) _pkBubble(host, dot, why);
+      _fpk.peekT = setTimeout(() => _floorPickPeekEnd(true), 2500);
+      return;
+    }
+    _fpk.col[_fpk.fam] = patch.col;
+  }
+  CUR_FLOOR_TILE = _floorPickValue();
+  _floorPickRender();
+}
+function _floorPickPeekEnd(redraw) {
+  if (_fpk.peekT) { clearTimeout(_fpk.peekT); _fpk.peekT = 0; }
+  if (!_fpk.peek) return;
+  _fpk.peek = null;
+  const host = document.getElementById('if-floor-picker'); if (host) _pkBubble(host, null, '');
+  if (redraw) _floorPickRender();
+}
+function _floorPickRender() {
+  const host = document.getElementById('if-floor-picker');
+  if (!host || host.hidden) return;
+  const wide = innerWidth >= 1200, small = innerWidth < 900;
+  const fam = _fpk.fam, isBed = !!_FLOOR_EDGE_COLOR[fam], famRow = _FLOOR_FAMS.find(f => f[0] === fam);
+  const peekV = _fpk.peek ? _floorJoin(fam, _fpk.peek.col, _fpk.rim[fam] || '') : '';
+  const v = peekV || _floorPickValue();
+  //  견본 180×112(좁으면 150×96) — 잔디 7×5 가운데 5×3 을 고른 조합으로
+  const sw = host.querySelector('.fpk-side'), swW = small ? 150 : 180, swH = small ? 96 : 112;
+  const caps = [_fpk.peek ? '🔒 아직 잠긴 색이에요' : '이렇게 칠해져요'];
+  if (isBed && !_fpk.peek) caps.push('테두리는 저절로 둘러져요');
+  _pkSwatch(sw, swW, swH, _floorBedDraw(v, 5, 3, 1), _floorPickName(v), caps, !!_fpk.peek);
+  const keepX = {};
+  host.querySelectorAll('.fpk-scroll').forEach(el => { keepX[el.dataset.row] = el.scrollLeft; });
+  const row = (name, items) => {
+    const r = host.querySelector('.fpk-row[data-row="' + name + '"]'); if (!r) return;
+    r.hidden = !items; if (!items) return;
+    const sc = r.querySelector('.fpk-scroll'); sc.textContent = ''; items.forEach(el => sc.appendChild(el));
+    if (keepX[name]) sc.scrollLeft = keepX[name];
+  };
+  //  1줄: 가족 칩(그림 = 3×2 꽃밭 + 자연 가장자리 · 기본 칩은 벽돌)
+  const cw = wide ? 52 : 54, ch = wide ? 34 : 40;
+  row('fams', [['basic', '기본', 'brick']].concat(_FLOOR_FAMS.map(f => [f[0], f[1], f[0]])).map(([id, name, pic]) =>
+    _pkChip(name, cw, ch, _floorBedDraw(pic, 3, 2, 0.35), fam === id, () => _floorPickTap({ fam: id }))));
+  if (fam === 'basic') {
+    row('cols', null); row('rims', null);
+    row('basics', _FLOOR_BASIC.map(([id, lab]) => _pkTile(lab, 40, _floorCellDraw(id), _fpk.basic === id, () => _floorPickTap({ basic: id }))));
+  } else {
+    row('basics', null);
+    //  2줄: 색 — 기본 색 먼저 · 열린 색 · 잠긴 색은 뒤로
+    const cur = _fpk.col[fam] || '', all = [''].concat(_FLOOR_COLORS[fam] || []);
+    const open = all.filter(c => !_floorLockWhy(fam, c)), shut = all.filter(c => _floorLockWhy(fam, c));
+    row('cols', open.concat(shut).map(c => {
+      const shutC = shut.indexOf(c) >= 0, name = (_FLOOR_COLOR_KO[c || (famRow && famRow[2])] || '기본') + ' ' + (famRow ? famRow[1] : '');
+      const b = _pkDot(name, 40, _floorCellDraw(_floorJoin(fam, c, '')), cur === c, shutC, () => _floorPickTap({ col: c }));
+      b.dataset.col = c; return b;
+    }));
+    //  3줄: 테두리(꽃밭 무리만 — 들꽃은 없다)
+    row('rims', isBed ? _FLOOR_RIM_ORDER.map(([id, lab]) => _pkChip(lab, 40, 40, _floorCornerDraw(_floorJoin(fam, cur, id)),
+      (_fpk.rim[fam] || '') === id, () => _floorPickTap({ rim: id }), 'pk-rim')) : null);
+  }
+}
+//  그림이 늦게 오면 판만 다시 칠한다(단추는 그대로 — 누르는 도중에 단추가 바뀌면 눌림이 사라진다). 몰려와도 한 번.
+function _floorPickSoon(rebuild) {
+  const host = document.getElementById('if-floor-picker');
+  if (!host || host.hidden || _fpk.soon) return;
+  _fpk.soon = setTimeout(() => { _fpk.soon = 0; if (rebuild) _floorPickRender(); else host.querySelectorAll('canvas').forEach(_pkPaint); }, 80);
+}
+function _floorPickShow(on) {
+  const host = document.getElementById('if-floor-picker'); if (!host) return;
+  if (!on) { _floorPickPeekEnd(false); host.hidden = true; return; }
+  _floorPickRead(CUR_FLOOR_TILE);
+  host.hidden = false;
+  _floorPickRender();
+}
+if (typeof window !== 'undefined') {
+  addEventListener('resize', () => { if (DECO_MODE === 'floor') _floorPickSoon(true); });   // 폭 1200·900 에서 칩·견본 크기가 바뀐다
+  //  말풍선은 다른 곳을 누르면 닫힌다(고른 것은 그대로). 판 안 단추는 제 click 에서 닫는다(여기서 다시 그리면 그 click 이 사라진다)
+  addEventListener('pointerdown', e => { if (_fpk.peek && !(e.target.closest && e.target.closest('#if-floor-picker'))) _floorPickPeekEnd(true); }, true);
 }
 
 // 장식 크기 가져오기 (없으면 1x1)
@@ -4767,9 +5021,6 @@ function ifSyncScene() {
 }
 
 function ifSyncModeBtn() {
-  const isFloor = DECO_MODE === 'floor';
-  const fr = document.getElementById('if-floor-row');
-  if (fr) fr.style.display = isFloor ? 'flex' : 'none';
   ['if-mode-deco','if-mode-floor','if-mode-erase'].forEach(id => {   // [DECO-PT-2] 🧽 치우기
     const btn = document.getElementById(id);
     if (!btn) return;
@@ -7942,7 +8193,7 @@ function _floorImg(name, color) {
   const img = new Image();
   const rec = { img, ok: false };
   _FLOOR_IMG[key] = rec;
-  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); } };   // [DECO-FRIEND-ART-1]
+  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); _floorPickSoon(); } };   // [DECO-FRIEND-ART-1] · [DECO-FLOOR-PICK-1] 고르기 판 그림도
   img.onerror = () => { rec.ok = false; };
   img.src = './assets/floor/' + encodeURIComponent(name) + '.svg' + (color ? '#' + color : '');
   return null;
@@ -8914,7 +9165,8 @@ function _decoPillarSync() {
   //  [DECO-PT-4] 기둥 위치는 CSS 변수 하나(--deco-drawer-h)로. 서랍이 아직 안 보일 때(높이 0) 재면
   //  기둥이 서랍 머리줄(⌃ 펼치기)을 덮었다 → 보일 때만 값을 바꾸고, 안 보이면 이전 값(기본 220px)을 둔다.
   const fs = document.getElementById('interior-fullscreen');
-  const dr = document.getElementById('if-deco-drawer');
+  const pk = document.getElementById('if-floor-picker');   // [DECO-FLOOR-PICK-1] 바닥 모드면 서랍 자리 = 바닥 고르기 판
+  const dr = (pk && !pk.hidden && DECO_MODE === 'floor') ? pk : document.getElementById('if-deco-drawer');
   if (!fs || !dr) return;
   //  [DECO-SHORT-1] 판 자리의 위 끝(윗줄 + 바닥 줄) — 기둥이 그 위로 못 올라가게(CSS max-height 가 쓴다)
   const host = document.getElementById('if-topview');
