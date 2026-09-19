@@ -4709,6 +4709,63 @@ window.CROWD_AT = (i) => { const c = cells[i]; if (!c) return 0; if (c.k === 'ho
   const e = CROWDSAY.road.get(i); if (!e) return 0; const v = e.v * Math.pow(window.VRULES.crowdSay.keep, SIM.ticks - e.t); if (v < 0.005) { CROWDSAY.road.delete(i); return 0; } return Math.min(1, v); };
 window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { const v = window.CROWD_AT(i); if (v > 0) top.push([cX(i), cY(i), +v.toFixed(2)]); }); top.sort((a, b) => b[2] - a[2]);
   return { 켜짐: window.VRULES.crowdSay.on, 붐비는길칸: top.filter(t => t[2] > 0.3).length, 센길칸: top.length, 가장붐빔: top.slice(0, 5), ...CROWDSAY.stats, 넓히기: { ...WIDEN.stats } }; };
+/* ── [MAC-WIDEN2] 이미 지은 골목을 큰길로 — 바꿔 깔기 (창조자의 눈 7회 🔴4 · 보스 09-20 · **규칙 변경 — 월요일 안건**) ──
+   붐빔(#670)은 **그 집 문 앞 길 칸**의 교통량 ÷ 품(한 칸 길 4 · 큰길 8)이다. 그런데 붐비는 집의 문 앞 길에 큰길(2×2)을 놓으면 "여기엔 이미 …" —
+   잰 값: 붐비는 집 pop88 26채 중 24 · pop167 57채 중 53 은 문 앞 칸을 덮는 2×2 자리에 **곁 집 한 채**가 걸린다(넓히기 WIDEN 은 길+빈 칸만 됐다).
+   그 집을 한 칸 물리면 자리가 난다: pop88 26/26 · pop167 52/57. 그래서
+   · 큰길을 길 위에 놓을 때 발자국에 **집 한 채만** 걸리고 나머지가 길·빈 칸이면, 그 집을 큰길에서 먼 쪽으로 **한 칸 물리고**(식구·층은 KEEP 이 그대로 옮긴다) 큰길을 깐다.
+     물린 집은 새 큰길이나 길에 닿아야 하고, 옮길 칸은 비어 있고 열린 땅이어야 한다. 알림: "🏠 집이 한 칸 물러나고 큰길이 깔렸어요".
+   · 물릴 자리도 없으면 한마디: "큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 곁에 길을 한 줄 더 내 봐요".
+   · 붐비는 집(필요는 다 찬 집)의 말: 문 앞 길에 큰길이 들어가면(바로 또는 한 칸 물려서) "🛣️ 문 앞 길을 큰길로 넓혀 봐요 — 문 앞 길 위에 큰길을 놓으면 돼요".
+   · ↩ 되돌리기는 큰길만 거둔다(WIDEN 이 길을 되살림) — 물러난 집은 그 자리에 둔다.
+   스위치 VRULES.widenShift. 원래 줄 수정 0 — canPlace·placeAt·crowdWidenAt·crowdHint 감싸기. */
+(window.VRULES = window.VRULES || {}).widenShift = { on: true };
+const WIDEN2 = { busy: false, stats: { 물림: 0, 자리없음말: 0 } };
+/* 큰길 발자국(x,y,rot)에 집 한 채만 걸리고 나머지가 한 칸 길·빈 칸이면, 그 집을 물릴 곳 { house, to:[x,y], fp } — 없으면 null */
+function widenShiftPlan(x, y, rot) {
+  const fp = footprint('avenue', x, y, rot || 0); if (!fp.every(([px, py]) => inb(px, py) && plotOpen(px, py))) return null;
+  const fpSet = new Set(fp.map(([px, py]) => idx(px, py))); let house = null, road = 0;
+  for (const [px, py] of fp) { const i = idx(px, py), c = cells[i]; if (!c) continue; if (c.k === 'road' && c.root === i) { road++; continue; } if (c.k === 'house' && (!house || house === c)) { house = c; continue; } return null; }
+  if (!house || !road) return null;
+  const hx = cX(house.root), hy = cY(house.root), own = new Set(footprint('house', hx, hy, house.rot).map(([px, py]) => idx(px, py)));
+  const isRoadAt = i => { const c = cells[i]; return !!(c && K[c.k].road); };
+  let best = null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nfp = footprint('house', hx + dx, hy + dy, house.rot);
+    if (!nfp.every(([px, py]) => inb(px, py) && plotOpen(px, py) && !fpSet.has(idx(px, py)) && (!cells[idx(px, py)] || own.has(idx(px, py))))) continue;
+    const touch = nfp.some(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => { const nx = px + ax, ny = py + ay; if (!inb(nx, ny)) return false; const j = idx(nx, ny); return fpSet.has(j) || (!own.has(j) && isRoadAt(j)); }));
+    if (!touch) continue;
+    const far = nfp.reduce((m, [px, py]) => Math.min(m, ...fp.map(([fx, fy]) => Math.abs(px - fx) + Math.abs(py - fy))), 99);   // 큰길에서 먼 쪽이 먼저
+    if (!best || far > best.far) best = { house, to: [hx + dx, hy + dy], fp, far };
+  }
+  return best;
+}
+{ const cS0 = canPlace; canPlace = function (kind, x, y, rot, opts) { const r = cS0.apply(this, arguments);
+    if (kind !== 'avenue' || r === true || !window.VRULES.widenShift.on || (opts && opts.복원) || typeof r !== 'string' || !/이미/.test(r)) return r;   // 자리 겹침일 때만(잠김 등은 그대로)
+    const fp = footprint('avenue', x, y, rot || 0), onRoad = fp.some(([px, py]) => inb(px, py) && cells[idx(px, py)] && cells[idx(px, py)].k === 'road');
+    if (!onRoad) return r;   // 길 위가 아니면 원래 말 그대로
+    const p = widenShiftPlan(x, y, rot);
+    if (p) { const keep = new Map(); footprint('house', cX(p.house.root), cY(p.house.root), p.house.rot).forEach(([px, py]) => keep.set(idx(px, py), cells[idx(px, py)]));
+      p.fp.forEach(([px, py]) => { const i = idx(px, py), c = cells[i]; if (c && c.k === 'road') keep.set(i, c); });
+      keep.forEach((c, i) => { cells[i] = null; }); let v; try { v = cS0.apply(this, arguments); } finally { keep.forEach((c, i) => { cells[i] = c; }); }
+      return v; }
+    WIDEN2.stats.자리없음말++; return '큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 곁에 길을 한 줄 더 내 봐요'; };
+  const pS0 = placeAt; placeAt = function (kind, x, y, rot) {
+    if (kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy) { const p = widenShiftPlan(x, y, rot);
+      if (p) { const h = p.house, n = res.get(h.root) || 0; WIDEN2.busy = true;
+        try { KEEP.lastPush = -1e9; removeAt(cX(h.root), cY(h.root)); pS0.call(this, 'house', p.to[0], p.to[1], h.rot); } finally { WIDEN2.busy = false; }   // 한 채 물림 — '여러 채 한꺼번에'(30ms) 방어에 걸리지 않게
+        WIDEN2.stats.물림++; setTimeout(() => toast('🏠 집이 한 칸 물러나고 큰길이 깔렸어요' + (n ? ' — 식구 ' + n + '명 그대로' : ''), true), 0); } }
+    return pS0.apply(this, arguments); };
+  /* 붐비는 집의 말 — 문 앞 길을 덮는 큰길 자리가 있나(바로 또는 한 칸 물려서) */
+  const cw0 = crowdWidenAt; crowdWidenAt = function (rec) { if (!window.VRULES.widenShift.on) return cw0.apply(this, arguments);
+    const b = roadBeside(rec); if (b < 0) return false; const bx = cX(b), by = cY(b);
+    for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) if (canPlace('avenue', bx + ox, by + oy, 0) === true) return 'front';
+    return cw0.apply(this, arguments); };
+  const ch0 = crowdHint; crowdHint = function (crowded, full, widen) { if (widen === 'front' && crowded && full) return ' · 🛣️ 문 앞 길을 큰길로 넓혀 봐요 — 문 앞 길 위에 큰길을 놓으면 돼요'; return ch0.apply(this, arguments); }; }
+/* 시험 훅 — (x,y) 집의 문 앞 길을 덮는 큰길을 놓아 본다(되면 놓는다) */
+window.__widenFront = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; const b = roadBeside(rec); if (b < 0) return '문 앞 길 없음';
+  let last = ''; for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) { const r = window.__put('avenue', cX(b) + ox, cY(b) + oy, 0); if (r === true) return true; last = r; } return last; };
+window.__widen2 = () => ({ 켜짐: window.VRULES.widenShift.on, ...WIDEN2.stats });
 /* ── [MAC-CROWDHOMES] 붐빔을 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ② · 창조자의 눈 6회 🟢2 '큰 마을일수록 길이 한산해진다') ──
    붐빔(F12)은 걷는 사람(최대 120명 표본)이 앞사람 뒤에 선 비율이었다 → 마을이 넓을수록 120명이 흩어져 붐빔이 사라졌다(516명 판에서 붐비는 길 칸 70 → 3).
    붐빔 → 큰길 사다리가 300명 뒤에 끊겼다. 이제 **교통량**으로 센다:

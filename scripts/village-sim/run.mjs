@@ -50,10 +50,16 @@ function housesWith(w, what) {   // @jobs · @crowd · @need:물
   return out;
 }
 
-/* 한 수: 'put shop 136 145 0' · 'put shop @jobs 3' · 'put shop @at:160,171 5' · 'road 172 170 150 170'(곧은 길 긋기) · 'del 136 145' */
+/* 한 수: 'put shop 136 145 0' · 'put shop @jobs 3' · 'put shop @at:160,171 5' · 'road 172 170 150 170'(곧은 길 긋기) · 'widen @crowd 5'(문 앞 길을 큰길로) · 'del 136 145' */
 function doMove(w, cmd) {
   const a = cmd.trim().split(/\s+/);
   if (a[0] === 'del') { w.__del(+a[1], +a[2]); return { 한수: cmd, 됨: 1 }; }
+  if (a[0] === 'widen') {   // 'widen @crowd 5' — 붐비는 집 n채의 문 앞 길을 큰길로(index.html __widenFront · 바꿔 깔기)
+    if (typeof w.__widenFront !== 'function') throw new Error('이 판에는 __widenFront 가 없음');
+    const hs = housesWith(w, (a[1] || '@crowd').slice(1)), n = +(a[2] || 99), why = {}; let ok = 0, tried = 0;
+    for (const [x, y] of hs) { if (tried >= n) break; tried++; const r = w.__widenFront(x, y); if (r === true) ok++; else why[r] = (why[r] || 0) + 1; }
+    return { 한수: cmd, 됨: ok, 까닭: Object.keys(why).length ? Object.entries(why).map(([k, v]) => v + '× ' + String(k).slice(0, 30)).join(' · ') : undefined };
+  }
   if (a[0] === 'road') {   // 가로나 세로 곧은 줄만 — 이미 길인 칸은 건너뛴다
     const [x1, y1, x2, y2] = a.slice(1, 5).map(Number); if (x1 !== x2 && y1 !== y2) throw new Error('road 는 가로·세로 곧은 줄만: ' + cmd);
     const dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) + 1; let ok = 0; const bad = [];
