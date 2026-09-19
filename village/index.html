@@ -2535,6 +2535,58 @@ function returnCarried(why) {
 canvas.addEventListener('pointercancel', () => { paintEnd(); returnCarried(); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());   // 오른쪽 단추 끌기용
 addEventListener('blur', () => { paintEnd(); returnCarried(); });
+/* ── [MAC-SWEEP] 끌어서 연달아 치우기 — 치우기 모드에서 '물건 위에서' 끌기 시작하면 지나간 자리의 것이 죽 치워진다 ──
+   꽃밭 열 칸을 치우려면 열 번을 눌러야 했다(놓을 땐 끌어서 죽 놓는데 치울 땐 하나씩이었다).
+   · 시작 자리가 가른다: **물건 위**에서 끌면 죽 치우기 · **빈 땅**에서 끌면 전처럼 판 이동(놓기 모드의 '판 위에서 끌면 죽 놓기'와 같은 식).
+   · 무거운 것(MAC-KEEP 무게 2 — 식구 있는 집·큰 건물)은 **건너뛴다**. 끝나고 몇 개를 남겼는지 말한다. 그것들은 전처럼 한 번 누르고 한 번 더.
+   · 한 번의 끌기 = 되돌리기 한 번(↩ 가 전부 되살린다 — 길이 먼저 놓여야 하는 집이 있어 세 번까지 돌려 본다).
+   · 손가락이 빨리 지나가 칸을 건너뛰어도 사이 칸을 이어서 본다.
+   원래 줄 수정 0 — 캡처 단계 리스너 + undo 감싸기. */
+(window.VRULES = window.VRULES || {}).sweepErase = { on: true, slop: 6 };
+const SWEEP = { id: -1, on: false, sx: 0, sy: 0, moved: 0, lx: 0, ly: 0, last: null, list: [], skipped: new Set(), stats: { 끌기: 0, 치움: 0, 건너뜀: 0, 되살림: 0 } };
+/* 순수 함수 — 두 칸 사이를 잇는 칸들(끝 칸 포함, 첫 칸 제외) */
+function sweepLine(x0, y0, x1, y1) { const out = [], n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let i = 1; i <= n; i++) out.push({ x: Math.round(x0 + (x1 - x0) * i / n), y: Math.round(y0 + (y1 - y0) * i / n) }); return out; }
+function sweepCell(x, y) {
+  if (x < 0 || y < 0 || x >= W || y >= H) return; const rec = cells[idx(x, y)]; if (!rec) return;
+  if (window.VRULES.keep && window.VRULES.keep.on && keepOf(rec) >= 2) { SWEEP.skipped.add(rec.root); return; }          // 무거운 것은 건너뛴다
+  const it = { k: rec.k, x: cX(rec.root), y: cY(rec.root), rot: rec.rot }; removeAt(it.x, it.y); SWEEP.list.push(it);
+}
+function sweepTo(clientX, clientY) {
+  const c = cellAt(clientX, clientY); if (!c || !c.inside) { SWEEP.last = null; return; }
+  if (SWEEP.last && SWEEP.last.x === c.x && SWEEP.last.y === c.y) return;
+  (SWEEP.last ? sweepLine(SWEEP.last.x, SWEEP.last.y, c.x, c.y) : [c]).forEach(p => sweepCell(p.x, p.y)); SWEEP.last = { x: c.x, y: c.y };
+}
+function sweepEnd() {
+  const was = SWEEP.on, n = SWEEP.list.length, sk = SWEEP.skipped.size; SWEEP.id = -1; SWEEP.on = false; if (!was) return;
+  down = false; canvas.classList.remove('drag'); SWEEP.stats.끌기++; SWEEP.stats.치움 += n; SWEEP.stats.건너뜀 += sk;
+  if (n) { pushUndo({ t: 'sweep', list: SWEEP.list.slice() }); updateCount(); markDirty(); keepGlowUndo(); }
+  if (n || sk) toast((n ? n + '개 치웠어요' : '') + (n && sk ? ' · ' : '') + (sk ? '✋ 무거운 것 ' + sk + '개는 남겼어요 — 하나씩 눌러요' : ' · ↩ 로 되살려요'), n > 0);   // 아이가 한눈에 읽을 길이로
+  SWEEP.list = []; SWEEP.skipped = new Set(); SWEEP.last = null;
+}
+canvas.addEventListener('pointerdown', e => {
+  if (SWEEP.on) { sweepEnd(); return; }                                          // 끄는 중에 다른 손가락이 닿았다 → 여기까지만
+  SWEEP.id = -1; if (!window.VRULES.sweepErase.on || !eraser || VISIT.on || PHOTO.on || e.button > 0 || (typeof TOUCH2 !== 'undefined' && TOUCH2.pts.size > 1)) return;
+  const c = cellAt(e.clientX, e.clientY), rec = c && c.inside ? cells[idx(c.x, c.y)] : null; if (!rec) return;   // 빈 땅에서 시작하면 판 이동
+  SWEEP.id = e.pointerId; SWEEP.sx = SWEEP.lx = e.clientX; SWEEP.sy = SWEEP.ly = e.clientY; SWEEP.moved = 0;
+}, true);
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerId !== SWEEP.id) return;
+  if (!eraser || (typeof TOUCH2 !== 'undefined' && TOUCH2.lock)) { sweepEnd(); return; }
+  SWEEP.moved += Math.abs(e.clientX - SWEEP.lx) + Math.abs(e.clientY - SWEEP.ly); SWEEP.lx = e.clientX; SWEEP.ly = e.clientY;   // 원래 처리기와 같은 셈(같은 순간에 문턱을 넘는다 → 판이 1px 도 안 밀린다)
+  if (!SWEEP.on) { if (SWEEP.moved <= window.VRULES.sweepErase.slop) return; SWEEP.on = true; SWEEP.last = null; keepDisarm(); sweepTo(SWEEP.sx, SWEEP.sy); }
+  e.stopImmediatePropagation(); lastMouse.x = e.clientX; lastMouse.y = e.clientY; sweepTo(e.clientX, e.clientY); updateGhost(e.clientX, e.clientY);
+}, true);
+addEventListener('pointerup', e => { if (e.pointerId !== SWEEP.id) return; if (SWEEP.on) { e.stopImmediatePropagation(); sweepEnd(); updateGhost(e.clientX, e.clientY); } else SWEEP.id = -1; }, true);
+addEventListener('pointercancel', e => { if (e.pointerId === SWEEP.id) sweepEnd(); }, true);
+addEventListener('blur', () => sweepEnd());
+{ const undo0 = undo; undo = function () {                                       // 'sweep' 한 칸 = 그 끌기로 치운 것을 전부 되살린다
+    const top = undoStack[undoStack.length - 1]; if (!top || top.t !== 'sweep' || VISIT.on) return undo0.apply(this, arguments);
+    undoStack.pop(); refreshUndo(); let left = top.list.slice(), back = 0;
+    for (let pass = 0; pass < 3 && left.length; pass++) left = left.filter(it => { if (canPlace(it.k, it.x, it.y, it.rot) !== true) return true; placeAt(it.k, it.x, it.y, it.rot); back++; return false; });   // 길에 붙어야 하는 것은 길이 되살아난 다음 바퀴에
+    SWEEP.stats.되살림 += back; updateCount(); markDirty();
+    toast(back + '개 되살렸어요' + (left.length ? ' · ' + left.length + '개는 자리가 차서 못 되살렸어요' : ''), true); }; }
+window.__sweep = () => ({ 켜짐: window.VRULES.sweepErase.on, 끄는중: SWEEP.on, ...SWEEP.stats });
+
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   userZoomed = true;
