@@ -2480,8 +2480,8 @@ function paintEnd() {
   const p = painting; painting = null;
   if (!p.list.length) return;
   if (p.list.length === 1) pushUndo({ t:'place', k:p.k, x:p.list[0].x, y:p.list[0].y, rot:p.rot });
-  if (p.list.length) sndFx('place');
   else                     pushUndo({ t:'stroke', k:p.k, rot:p.rot, list:p.list });
+  sndFx('place');   // [MAC-UNDO] 이 줄이 위의 if/else 사이에 끼어 있어서 else 가 효과음의 if 에 붙었다 → 끌어서 여러 칸 놓은 것은 되돌리기에 안 쌓였고, ↩ 는 그 '전에 한 일'을 되돌렸다
   updateCount(); markDirty();
   if (p.list.length > 1) toast(josa(K[p.k].nm, '을', '를') + ' ' + p.list.length + '개 놓았어요', true);
 }
