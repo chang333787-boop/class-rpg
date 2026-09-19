@@ -4048,6 +4048,27 @@ function syncFolks() {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   [ACT-LOOK] 돌아서는 사람의 연기 — 집 앞에서 둘러보고, 풍선을 마을 밖까지 들고 간다 (주민 연기 · 09-20 · 창조자의 눈 2회).
+   전: 살기 불편한 집 앞에 닿은 새 이웃은 닿은 그 틱에 돌아서 걸어 나가고, 빠진 것 풍선은 6초 뒤 꺼졌다 — 첫 돌아섬이 새벽·화면 밖이면 아이는 아무것도 못 본다.
+   후: 집 앞에서 집을 바라보고 3초 동안 좌우를 둘러본 뒤 돌아선다. 풍선은 마을을 나갈 때까지 떠 있다(다시 오는 사람의 ♥ 풍선은 집에 들 때까지).
+   판정은 안 건드린다 — 돌아설지는 [MAC-AWAY] awayGate 가 이미 정했고(f.leaving), 여기서는 그 뒤의 몸짓만. 저장 0 · 확률 0 · 길찾기 0 · draw call +0(있던 풍선 묶음).
+   규칙 모듈 꼴: 스위치·수치 VRULES.lookAround + tickFolks 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).lookAround = { on: true, lookMs: 3000, swing: 0.95, swingMs: 1500, keepBubble: true };
+const lookStats = { 둘러봄: 0 };
+function actLookTick(f, i, now) {
+  const R = window.VRULES.lookAround; if (!R.on || !f.away || !(f.leaving || f.comeback)) return false;
+  if (R.keepBubble) f.away.until = SIM.t + 1500;                        // 풍선을 끄지 않는다 — 사람이 사라지면(마을 밖 · 집 안) 같이 사라진다
+  if (!f.leaving) return false;
+  if (!f.look) { const rec = cells[f.home], c = rec ? centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot) : null;
+    f.look = { t0: now, dir0: c ? Math.atan2(c.x - f.x, c.z - f.z) : f.dir }; lookStats.둘러봄++; }
+  const e = now - f.look.t0; if (e >= R.lookMs) return false;
+  f.walking = false; f.dir = f.look.dir0 + Math.sin(e / R.swingMs * 6.283) * R.swing;   // 집을 보고 왼쪽·오른쪽·왼쪽·오른쪽
+  return true;
+}
+window.__look = () => ({ 켜짐: window.VRULES.lookAround.on, ...lookStats });
+
+/* ══════════════════════════════════════════════════════════════
    [ACT-DOOR] 밤에 이미 자기 집 문 앞에 서 있는 사람은 곧장 들어간다 (주민 연기 · 09-20).
    구멍: 밤 귀가 규칙(rhythmTick)은 pathTo 로 '집 앞 칸까지 걸을 길'을 잡고, 걸음이 끝나는 순간에만 집에 들인다.
          그런데 이미 그 칸에 서 있으면 pathTo 가 here === goal 로 끝나 걷는 상태가 안 되고, rhythmTick 은 true 를 돌려줘
@@ -4109,6 +4130,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
     const rec = cells[f.home];
     if (!rec) continue;
     f.base = roadBeside(rec);
