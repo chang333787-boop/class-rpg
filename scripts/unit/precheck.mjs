@@ -4,9 +4,11 @@
 //  PR 마다 따로 돌리던 검사를 한 명령으로 묶는다. 각 검사는 **따로 프로세스**로 돌려 서로 영향이 없고,
 //  기준선 숫자는 각 스크립트가 원래 쓰는 것을 그대로 쓴다(이 파일은 판정을 바꾸지 않고 모으기만 한다).
 //
-//  사용: node scripts/unit/precheck.mjs [--base origin/main] [--gold] [--save-order-baseline N] [--balance-strict]
+//  사용: node scripts/unit/precheck.mjs [--base origin/main] [--gold] [--deco|--no-deco] [--save-order-baseline N] [--balance-strict]
 //    --base    buster-check 비교 기준(기본 origin/main). 현재 체크아웃(HEAD)을 검사한다.
 //    --gold    느린 골드 검사도 돌린다: gold-sync-sim · gold-loss-real-sdk(엣지 필요). 저장 경로를 건드린 PR이면 켤 것.
+//    --deco    꾸미기 하네스(헤드리스 크롬/엣지, 약 1분)를 무조건 돌린다. 안 줘도 **base 대비 꾸미기 파일**
+//              (student.js·student.css·student.html·scripts/unit/deco-save-count/)을 고친 PR 이면 저절로 돈다. --no-deco 로 끈다.
 //    --save-order-baseline N   save-order-check 기준선(기본 11 = 2026-09-15 main). 새 자리가 늘면 FAIL.
 //
 //  판정: 하나라도 FAIL(exit≠0)이면 exit 1. 골드 검사는 **수정 전 main 에서 LOSS 가 정상**이라
@@ -47,6 +49,20 @@ for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'stud
 const BALANCE_STRICT = argv.includes('--balance-strict');
 CHECKS.push({ name: 'balance-identity', file: 'scripts/balance/identity.mjs', args: BALANCE_STRICT ? ['--quick'] : ['--quick', '--review'], pick: /요약:[^\n]*/, optional: true, balanceReview: !BALANCE_STRICT });
 CHECKS.push({ name: 'balance-gate', file: 'scripts/balance/gate.mjs', args: ['--quick', '--settings', 'scripts/balance/settings/prod-20260915.json'], pick: /요약:[^\n]*/, optional: true });
+// [DECO-HARNESS-PRECHECK-1] 꾸미기 하네스 — 실제 student.html 을 없는 프로젝트+오프라인으로 띄워 100줄쯤을 잰다(운영 통신 0).
+//   느려서(약 1분) 꾸미기 파일을 고친 PR 에서만 저절로 돈다. 판정은 deco-save-count/check.mjs(틀린 줄 0 = PASS · 흔들림 = REVIEW).
+{
+  const DECO_PATHS = /^(student\.(js|css|html)|scripts\/unit\/deco-save-count\/)/;
+  let touched = false;
+  try {
+    const d = spawnSync('git', ['diff', '--name-only', `${BASE}...HEAD`], { cwd: ROOT, encoding: 'utf8' }).stdout || '';
+    const w = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).stdout || '';   // 아직 커밋 안 한 것도
+    touched = d.split('\n').concat(w.split('\n').map(l => l.slice(3))).some(f => DECO_PATHS.test(f.trim()));
+  } catch (e) {}
+  const on = !argv.includes('--no-deco') && (argv.includes('--deco') || touched);
+  if (on) CHECKS.push({ name: 'deco-harness', file: 'scripts/unit/deco-save-count/check.mjs', args: [], pick: /요약:[^\n]*/, optional: true, decoReview: true, timeout: 600000 });
+  else CHECKS.push({ name: 'deco-harness', file: 'scripts/unit/deco-save-count/check.mjs', skip: argv.includes('--no-deco') ? '--no-deco' : '꾸미기 파일 변경 없음(--deco 로 강제)' });
+}
 if (GOLD) {
   CHECKS.push({ name: 'gold-sync-sim', file: 'scripts/unit/gold-sync-sim.mjs', args: GOLD_STRICT ? ['--expect-fixed'] : [], pick: /무작위[^\n]*/, gold: true, timeout: 900000 });
   CHECKS.push({ name: 'gold-real-sdk', file: 'scripts/unit/gold-loss-real-sdk/run.mjs', args: GOLD_STRICT ? ['--expect-fixed'] : [], pick: /최종 결과:[^\n]*/, gold: true, timeout: 900000 });
@@ -57,6 +73,7 @@ console.log(`사전 검사 · HEAD ${head} · base ${BASE}${GOLD ? ` · 골드 $
 
 const rows = [];
 for (const c of CHECKS) {
+  if (c.skip) { rows.push({ ...c, status: 'SKIP', line: c.skip }); continue; }
   if (!exists(c.file)) { rows.push({ ...c, status: c.optional ? 'SKIP' : 'FAIL', line: '파일 없음' }); continue; }
   const t0 = Date.now();
   const r = spawnSync(process.execPath, [c.file, ...c.args], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64e6, timeout: c.timeout || 300000 });
@@ -68,6 +85,8 @@ for (const c of CHECKS) {
   if (c.gold && !GOLD_STRICT) status = /LOSS|REPRO|유실 난 판 [1-9]/.test(outText) ? 'REVIEW' : 'PASS';
   if (c.name === 'save-order' && status === 'PASS' && /저장보다 앞선 다른 경로 쓰기 [1-9]/.test(outText)) status = 'REVIEW';
   if (c.balanceReview && status === 'PASS' && /요약: REVIEW/.test(outText)) status = 'REVIEW';
+  if (c.decoReview && status === 'PASS' && /요약: REVIEW/.test(outText)) status = 'REVIEW';
+  if (c.decoReview && status === 'PASS' && /요약: SKIP/.test(outText)) status = 'SKIP';
   rows.push({ ...c, status, line, sec: ((Date.now() - t0) / 1000).toFixed(1) });
 }
 

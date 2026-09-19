@@ -10,6 +10,12 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { execFile } from 'node:child_process'; import { promisify } from 'node:util'; import { fileURLToPath } from 'node:url';
 const run = promisify(execFile);
+import os from 'node:os';
+//  [DECO-HARNESS-PRECHECK-1] 브라우저: BROWSER 환경변수 > 맥 크롬 > 윈도 엣지(맥북에서도 돌게) · 프로필 폴더는 실행마다 새로(동시 실행 SingletonLock 충돌 방지)
+const BROWSER = process.env.BROWSER || (process.platform === 'darwin'
+  ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  : 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
+const PROFILE_ROOT = fs.mkdtempSync(path.join(process.env.TEMP || process.env.TMPDIR || os.tmpdir(), 'qa_q1_deco_'));
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.Q1_REPO || path.resolve(HERE, '..', '..', '..');   // Q1_REPO=<다른 체크아웃> 이면 그 앱 코드로
 const EXPECT_FIXED = process.argv.includes('--expect-fixed');
@@ -40,8 +46,8 @@ const PROFILES = PROF === 'both' ? ['root', 'student'] : [PROF];
 let bad = 0;
 for (const profile of PROFILES) for (const name of CASES) {
   if (only && only !== name) continue;
-  const { stdout } = await run('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${process.env.TEMP}/qa_q1_deco_${profile}_${name}`, '--virtual-time-budget=30000', '--dump-dom',
+  const { stdout } = await run(BROWSER,
+    ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${path.join(PROFILE_ROOT, profile + '_' + name)}`, '--virtual-time-budget=30000', '--dump-dom',
      `http://127.0.0.1:${srv.address().port}/student.html?case=${name}&profile=${profile}`], { maxBuffer: 1e8, timeout: 180000 });
   const text = (stdout.match(/<pre id="q1-out">([\s\S]*?)<\/pre>/) || [, '{}'])[1].replace(/&quot;/g, '"');
   let o = {}; try { o = JSON.parse(text); } catch { o = { err: 'no output', raw: text.slice(0, 120) }; }
@@ -50,6 +56,7 @@ for (const profile of PROFILES) for (const name of CASES) {
   console.log(`${ok ? '✅' : '🔴'} [${profile}] ${name.padEnd(11)} ${o.VERDICT || o.err || '?'} · 놓임 ${o.serverDecos ?? '-'}/밭 ${o.serverFloor ?? '-'} · saveStudent ${o.saveStudentCalls ?? '-'} · SDK 쓰기 ${o.sdkWrites ?? '-'}${o.goldBefore !== undefined ? ` · 골드 ${o.goldBefore}→${o.goldAfter}` : ''}${o.enterErr ? ' · enterErr ' + o.enterErr : ''}`);
 }
 srv.close();
+try { fs.rmSync(PROFILE_ROOT, { recursive: true, force: true }); } catch (e) {}
 console.log('');
 console.log(bad ? `최종 결과: 🔴 ${bad}건 기대와 다름` : '최종 결과: ✅ 전부 기대대로');
 if (EXPECT_FIXED && bad) process.exit(1);

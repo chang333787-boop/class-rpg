@@ -3,6 +3,11 @@
 (function () {
   const R = window.__RF, out = (k, v) => R.log.push(k + '=' + JSON.stringify(v));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  //  헤드리스 가상 시간에서는 rAF 가 한참 늦게 돈다. openInteriorFullscreen() 은 rAF 두 번 뒤에 판을 그리고
+  //  _decoViewRestore(캔버스를 새로 잡음)를 부르는데, 그게 **다음 시험 도중**에 끼어들어 가끔 false 가 났다
+  //  (⑬ 핀치 도중 캔버스가 바뀜 · ⑭ 비교 사이에 배율이 바뀜). 연 뒤에는 그 rAF 가 실제로 돌 때까지 기다린다.
+  const rafSettle = (ms) => new Promise(r => { let fin = false; const go = () => { if (!fin) { fin = true; r(); } };
+    requestAnimationFrame(() => requestAnimationFrame(go)); setTimeout(go, ms || 4000); });
   const t0 = Date.now();
   (async () => {
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
@@ -461,7 +466,7 @@
     {
       const host = () => document.getElementById('if-topview');
       const fit = () => ({ 맞나: _dW === host().clientWidth && _dH === Math.max(120, host().clientHeight), 캔버스: _dH, 자리: host().clientHeight });
-      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(900);
+      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(900); await rafSettle();
       if (!_dCv) { renderHouseDeco(); await sleep(200); }   // 헤드리스 가상 시간에서는 여는 쪽 rAF 가 아직일 수 있다(⑫ 와 같은 처리)
       out('판맞춤_열었을때', fit());
       setDecoMode('floor'); ifSyncModeBtn(); await sleep(300);
@@ -493,7 +498,7 @@
         });
         return bad;
       };
-      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(900);
+      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(900); await rafSettle();
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
       const r1 = tapBad(); decoDrawerToggle(); await sleep(200);
       const r2 = tapBad(); decoDrawerToggle(); await sleep(100);
@@ -548,18 +553,21 @@
       await sleep(500);
       _dPanX = 600; _dPanY = 200; _dZoom = 2;      // 내 마당에서 옮겨 본 값이 남아 있는 상태
       const pan0 = [_dZoom, _dPanX, _dPanY];
-      _renderFriendCanvas(); await sleep(100);   // (헤드리스 가상 시간에서는 여는 쪽 rAF 가 아직일 수 있다)
+      _renderFriendCanvas();                     // (헤드리스 가상 시간에서는 여는 쪽 rAF 가 아직일 수 있다)
+      const same = pan0[0] === _dZoom && pan0[1] === _dPanX && pan0[2] === _dPanY;   // 그린 직후 바로 잰다(사이에 다른 것이 끼어들지 않게)
+      await sleep(100);
       const fcv = document.querySelector('#ff-topview canvas');
       const px = fcv ? fcv.getContext('2d').getImageData(12, 12, 1, 1).data[3] : -1;
       out('구경_왼쪽위_그려짐', px > 0);
       const rec = _animLayers.get('ff-topview');
       out('구경_동물층_안밀림', !!rec && rec.world.style.transform === 'translate(0px, 0px)');
-      out('구경뒤_내자리_그대로', pan0[0] === _dZoom && pan0[1] === _dPanX && pan0[2] === _dPanY);
+      out('구경뒤_내자리_그대로', same);
       closeFriendFullscreen(); await sleep(100);
       openInteriorFullscreen(); await sleep(500);
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
     }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
-  function done() { const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE'; }
+  function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';
+    try { fetch('/__done', { method: 'POST', body: pre.textContent, keepalive: true }); } catch (e) {} }
 })();
