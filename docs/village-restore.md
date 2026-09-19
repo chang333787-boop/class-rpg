@@ -9,7 +9,7 @@
 
 저장소 폴더에서:
 ```bash
-node scripts/village-backup.mjs --out "C:/Users/USER/OneDrive - 정림초등학교/바탕 화면/클로드코드/tmp"
+node scripts/village-backup.mjs --out "<백업을 둘 폴더>"
 ```
 - 운영 `classRPG_villages` 를 **GET 1번** 받아 `village_backup_<YYYYMMDD_HHMM>.json` 로 씁니다.
 - 끝에 **학생 수 · 구역 수 · 크기 · SHA-256** 과 학생별 마지막 저장을 보여 줍니다. `되읽기 확인: 받은 것과 같음 ✅` 이 나와야 정상입니다.

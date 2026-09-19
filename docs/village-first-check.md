@@ -26,7 +26,7 @@ SID=s1774671589091
 
 ## 1. 백업 먼저 (보스)
 ```bash
-node scripts/village-backup.mjs --out "C:/Users/USER/OneDrive - 정림초등학교/바탕 화면/클로드코드/tmp"
+node scripts/village-backup.mjs --out "<백업을 둘 폴더>"
 ```
 합격: `되읽기 확인: 받은 것과 같음 ✅`. 파일 이름을 적어 둡니다.
 
