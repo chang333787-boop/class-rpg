@@ -902,6 +902,13 @@ const USE_TABS = [
   let last = -1; ORDER.forEach((k, i) => { if (K[k].grp === tab) last = i; }); ORDER.splice(last + 1, 0, ...ids); })();
 
 /* ── 집 층수(F6). 1층은 K.house.parts 그대로. 2·3층은 벽을 올리고 창을 한 줄씩 더 낸다. 지붕은 같은 색 규칙. */
+/* [DESIGN-HOUSE3-1] 3층 집은 앞쪽 지붕에 지붕창 하나 — 멀리서도 2층 집과 갈리게(새 모델 0, 상자 부위만 · 3층 모델 기준 자리).
+   사용자가 시안(ⓐ 2층 발코니 · ⓑ 지붕창 · ⓐ+ⓑ) 중 ⓑ. ⓐ 로 바꾸려면 HOUSE3_ADD = HOUSE3_BALC, ⓐ+ⓑ 는 HOUSE3_BALC.concat(HOUSE3_DORM). */
+const HOUSE3_DORM = [ { g:'box', c:0xf3ead6, s:[1.5,1.25,1.5], p:[0,8.35,1.55] }, { g:'box', c:0x7fa9cf, s:[.7,.7,.06], p:[0,8.35,2.31] }, { g:'box', c:0xf6f1e6, s:[.9,.1,.1], p:[0,7.95,2.33] },
+                      { g:'box', c:'roof', s:[1.8,.14,1.8], p:[0,9.0,1.55] }, { g:'cone', c:'roof', s:[1.35,.95,1.35], p:[0,9.45,1.55], ry:Math.PI/4 } ];
+const HOUSE3_BALC = [ { g:'box', c:P.woodD, s:[2.8,.18,1.0], p:[0,3.02,2.75] }, { g:'box', c:0xf6f1e6, s:[2.8,.1,.1], p:[0,3.72,3.2] }, { g:'box', c:0xf6f1e6, s:[.1,.1,1.0], p:[-1.35,3.72,2.75] }, { g:'box', c:0xf6f1e6, s:[.1,.1,1.0], p:[1.35,3.72,2.75] },
+                      ...[-1.35, -.81, -.27, .27, .81, 1.35].map(x => ({ g:'box', c:0xf6f1e6, s:[.09,.62,.09], p:[x,3.4,3.2] })), { g:'box', c:P.woodD, s:[.14,.5,.14], p:[-1.2,2.8,3.1] }, { g:'box', c:P.woodD, s:[.14,.5,.14], p:[1.2,2.8,3.1] } ];
+const HOUSE3_ADD = HOUSE3_DORM; let HOUSE3_GLB = null;
 function houseParts(lv) {
   const h = lv === 3 ? 7.8 : lv === 2 ? 5.6 : 3.4;
   const parts = [
@@ -1770,7 +1777,7 @@ function partsOf(rec) {
   if (K[rec.k].join && K[rec.k].w * K[rec.k].h > 1) return joinPartsWide(rec);   // [MAC-LINE] 옛 2×1 울타리·돌담 — 칸마다 따로
   if (K[rec.k].join) return joinPartsAt(rec);   // [DESIGN-JOIN-1] 이웃을 보고 모양이 정해지는 것(산울타리·문)
   if (FLOWER_KINDS[rec.k]) { const x = cX(rec.root), y = cY(rec.root), fp = flowerPartsAt(rec.k, x, y); if (fp) { const ed = flowerEdgeParts(x, y, rec.rot); return ed ? fp.concat(ed) : fp; } }   // [DESIGN-FLOWER-3·4·EDGE-1] 꽃밭 종류 × 칸 좌표로 벌 + 바깥 변 가장자리
-  if (rec.k === 'house') { const lv = houseLv(rec.root); return glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house') || HOUSE_LV[lv]; }
+  if (rec.k === 'house') { const lv = houseLv(rec.root), g = glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house'); return g ? (lv === 3 ? (HOUSE3_GLB || (HOUSE3_GLB = g.concat(HOUSE3_ADD))) : g) : HOUSE_LV[lv]; }
   if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
   const mn = GLB_KIND[rec.k]; return (mn && glbParts(rec.k === 'bigtree' ? 'tree' : GLB_PROP.has(rec.k) ? 'props' : GLB_SPECIAL.has(rec.k) ? 'special' : GLB_STREET.has(rec.k) ? 'street' : GLB_DECO.has(rec.k) ? 'deco' : rec.k, mn)) || K[rec.k].parts;
 }
