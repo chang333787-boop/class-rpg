@@ -6095,7 +6095,7 @@ function titleDraw() {                                                          
 function titleSet(id) {
   const prev = TITLE.id; if (id === prev) return; if (prev) TITLE.was = prev; TITLE.id = id; TITLE.stats.고름++;
   try { if (id) localStorage.setItem(TITLE_SIDE(), JSON.stringify({ id, was: TITLE.was })); else localStorage.removeItem(TITLE_SIDE()); } catch (err) { /* 곁 키는 없어도 된다 */ }
-  titleDraw(); markDirty();
+  titleDraw(); markDirty(); window.dispatchEvent(new CustomEvent('village-title', { detail: window.__titleNow() }));   // 간판(디자인 담당)이 듣는다 — 물어보러 돌지 않아도 되게
   toast(id ? '우리 마을은 이제 ' + titleText(id) + (prev ? ' · 전에는 ' + titleText(prev) + '이었어요' : '이에요') : '칭호 없이 지내요 — 마을 이름을 누르면 언제든 다시 고를 수 있어요', true);
 }
 function titleBusy() { return VISIT.on || PHOTO.on || GUIDE.on || down || painting || carrying || (typeof HOLD !== 'undefined' && HOLD.open) || document.getElementById('titleCard'); }
@@ -6124,6 +6124,8 @@ function titleTick() {                                                          
   const fresh = ids.filter(id => !TITLE.told.has(id) && id !== TITLE.id); ids.forEach(id => TITLE.told.add(id));
   if (fresh.length && TITLE.toldDay !== simDay()) { TITLE.toldDay = simDay(); TITLE.stats.알림++; toast('💡 이제 ' + titleText(fresh[0]) + '이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요', true); }
 }
+{ const imp0 = importText; importText = function () { const r = imp0.apply(this, arguments);      // 파일에서 가져온 마을은 다른 마을이다 — 이 기기의 곁 키(앞 마을의 칭호)를 물려주지 않는다. 파일에 title 이 있으면 그것이 산다
+    if (r === true) { try { localStorage.removeItem(TITLE_SIDE()); localStorage.removeItem(TITLE_SIDE() + '.offered'); } catch (err) { /* 없어도 된다 */ } } return r; }; }
 { const ser0 = serialize; serialize = function () { const d = ser0.apply(this, arguments); if (d && TITLE.id) { d.title = TITLE.id; if (TITLE.was) d.titleWas = TITLE.was; } return d; };
   const load0 = loadSaved; loadSaved = function (rawOverride) { const r = load0.apply(this, arguments);
     try { let d = null; try { const raw = rawOverride || localStorage.getItem(SAVE_KEY); d = raw ? JSON.parse(raw) : null; } catch (e1) { d = null; }
@@ -6131,7 +6133,7 @@ function titleTick() {                                                          
       let side = null; try { side = JSON.parse(localStorage.getItem(TITLE_SIDE()) || 'null'); TITLE.offered = !!localStorage.getItem(TITLE_SIDE() + '.offered'); } catch (e2) { side = null; }
       const id = d && typeof d.title === 'string' ? d.title : side && side.id, was = d && typeof d.titleWas === 'string' ? d.titleWas : side && side.was;   // 서버에서 내려받은 판엔 아직 title 이 없다 → 이 기기의 곁 키로 잇는다
       TITLE.id = TITLE_BY[id] ? id : null; TITLE.was = TITLE_BY[was] ? was : null; if (TITLE.id) TITLE.offered = true; } catch (err) { /* 칭호를 못 읽어도 마을은 열린다 */ }
-    setTimeout(titleDraw, 0); return r; }; }
+    setTimeout(() => { titleDraw(); window.dispatchEvent(new CustomEvent('village-title', { detail: window.__titleNow() })); }, 0); return r; }; }
 { const st = document.createElement('style'); st.textContent =
     '#titleCard{position:fixed;inset:0;z-index:20;background:#0b0d12b8;display:flex;align-items:center;justify-content:center;padding:16px}'
   + '#titleCard .tc{background:#1a1d26;border:2px solid #e8b04b;border-radius:18px;padding:18px 18px 12px;width:min(94vw,720px);box-sizing:border-box;color:#e8e6e0;font:15px/1.5 "Malgun Gothic",sans-serif;text-align:center;box-shadow:0 14px 44px #000c}'
@@ -6143,6 +6145,7 @@ function titleTick() {                                                          
   + 'body.photo #titleCard{display:none!important}';
   document.head.appendChild(st); }
 { const el = document.querySelector('#top .ttl'); if (el) el.addEventListener('click', () => { if (window.VRULES.titles.on && window.__LOADMS != null) titleCard(true); }); }
+window.__titleOpen = () => { if (window.VRULES.titles.on && window.__LOADMS != null) titleCard(true); };   // 간판을 눌렀을 때 부르는 곳(위쪽 마을 이름을 누른 것과 같다)
 window.__titleNow = () => ({ id: TITLE.id, 말: titleText(TITLE.id), 전: TITLE.was, 별: typeof recurStars === 'function' ? recurStars() : 0 });   // 간판(디자인 담당)이 읽는 곳
 window.__titles = () => { const c = titleCounts(); return { 고른것: TITLE.id, 전: TITLE.was, 첫카드봄: TITLE.offered, 후보: titleCandidates(c, TITLES, TITLE.live, window.VRULES.titles.keep), 값: Object.fromEntries(TITLES.map(t => [t.id, +(t.need(c) || 0).toFixed(2)])), 센것: { ...c, bookKinds: c.bookKinds.join() }, ...TITLE.stats }; };
 
