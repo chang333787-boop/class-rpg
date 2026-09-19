@@ -7875,7 +7875,7 @@ function _decoImg(id) {
   const img = new Image();
   const rec = { img, ok: false };
   _DECO_IMG[id] = rec;
-  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) _drawDeco(); };
+  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); } };   // [DECO-FRIEND-ART-1]
   img.onerror = () => { rec.ok = false; };
   img.src = './assets/deco/' + encodeURIComponent(id) + '.svg';
   return null;
@@ -7911,7 +7911,7 @@ function _floorImg(name) {
   const img = new Image();
   const rec = { img, ok: false };
   _FLOOR_IMG[name] = rec;
-  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) _drawDeco(); };
+  img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); } };   // [DECO-FRIEND-ART-1]
   img.onerror = () => { rec.ok = false; };
   img.src = './assets/floor/' + encodeURIComponent(name) + '.svg';
   return null;
@@ -10684,6 +10684,15 @@ function openFriendFullscreen(friendId) {
     `Lv.${friend.level} · ${friend.job||'학생'} · 📚 ${friend.bookCount||0}권`;
   document.getElementById('ff-scene-btn').textContent = '🏠 집 안 보기 →';
   requestAnimationFrame(() => requestAnimationFrame(() => _renderFriendCanvas()));
+}
+
+// [DECO-FRIEND-ART-1] 그림(SVG)이 늦게 도착하면 _drawDeco() 는 **내** 캔버스만 다시 그린다 → 처음 가 보는 친구 마당은
+//  옛 캔버스 그림(_DFN)·단색 물로 그려진 채 그대로였다(내가 이미 본 장식만 새 그림). 구경 중이면 구경 판도 다시 그린다.
+//  한꺼번에 여러 장이 와도 0.05초에 한 번.
+let _ffRedrawTimer = null;
+function _ffRedrawSoon() {
+  if (!_ffFriend || _ffRedrawTimer) return;
+  _ffRedrawTimer = setTimeout(() => { _ffRedrawTimer = null; if (_ffFriend) _renderFriendCanvas(); }, 50);
 }
 
 function closeFriendFullscreen() {
