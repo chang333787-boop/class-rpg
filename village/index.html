@@ -4537,6 +4537,14 @@ window.__crowdSay = () => { let top = []; CROWDSAY.road.forEach((e, i) => { cons
 const EV = { rain: false, fest: false, festRoot: -1, lastToastDay: 0 };
 const rainDay = d => ((d * 2654435761) >>> 0) % 3 === 0;          // 사흘에 하루꼴
 function plazaRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'plaza') r = i; }); return r; }
+/* [MAC-PLAZACACHE] (보스 09-20 · 연기 담당 CPU 프로파일 #656) eventTick 이 틱마다 plazaRoot — 판 65,536칸 훑기 — 를 불러 인구와 무관하게 틱의 약 15% 를 썼다.
+   광장을 **놓거나 치울 때만** 다시 찾는다(placeAt·removeAt 감싸기 — 판을 바꾸는 길은 이 둘뿐). 찾아 둔 칸이 더는 광장이 아니면 그때도 다시. 답은 원래 함수와 같다(가장 앞 칸의 광장). */
+const PLAZAC = { root: -1, dirty: true, stats: { 훑음: 0, 다시씀: 0 } };
+{ const pr0 = plazaRoot; plazaRoot = function () { const r = PLAZAC.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === 'plaza');
+    if (!PLAZAC.dirty && ok) { PLAZAC.stats.다시씀++; return r; } PLAZAC.root = pr0(); PLAZAC.dirty = false; PLAZAC.stats.훑음++; return PLAZAC.root; };
+  const plP0 = placeAt; placeAt = function (kind) { if (kind === 'plaza') PLAZAC.dirty = true; return plP0.apply(this, arguments); };
+  const plR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && c.k === 'plaza') PLAZAC.dirty = true; return plR0.apply(this, arguments); }; }
+window.__plazaCache = () => ({ 광장: PLAZAC.root >= 0 ? [cX(PLAZAC.root), cY(PLAZAC.root)] : null, 원래답: (() => { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'plaza') r = i; }); return r >= 0 ? [cX(r), cY(r)] : null; })(), ...PLAZAC.stats });
 /* 빗줄기 — 카메라 둘레 60 단위에 600점, 매 프레임 아래로 */
 const RAIN_N = 600, rainPos = new Float32Array(RAIN_N * 3);
 for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = (Math.random() - .5) * 120; rainPos[i * 3 + 1] = Math.random() * 40; rainPos[i * 3 + 2] = (Math.random() - .5) * 120; }
