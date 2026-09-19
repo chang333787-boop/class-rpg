@@ -1949,6 +1949,63 @@ canvas.addEventListener('wheel', e => {
   zoomMul = Math.max(0.85, Math.min(20, zoomMul * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
   resize(); updateGhost(e.clientX, e.clientY);
 }, { passive:false });
+/* ══════════════════════════════════════════════════════════════
+   [MAC-TOUCH] 두 손가락 = 언제나 판 이동·확대·비틀어 시점 돌리기 (태블릿이 기본 — 사용자 09-20)
+   전에는 ① 확대가 휠뿐이라 터치에서는 확대할 길이 없었고 ② 물건을 고른 채 두 손가락을 대면
+   첫 손가락 자리에 물건이 놓였고 ③ 두 포인터가 lx·ly 를 번갈아 덮어써 판이 튀었다.
+   터치 포인터만 본다(pointerType). 캡처 단계에서 먼저 받아, 두 손가락인 동안은 아래 한 손가락 처리에 넘기지 않는다.
+   마우스·펜은 전과 같다. 기존 줄 수정 0.
+   ══════════════════════════════════════════════════════════════ */
+const TOUCH2 = { pts: new Map(), on: false, lock: false, d0: 0, a0: 0, cx: 0, cy: 0, twist: 0, stats: { 시작: 0, 되돌린놓기: 0 } };
+const TWIST_DEAD = 0.18;                                  // 라디안. 이만큼 비틀어야 시점이 돌기 시작한다(확대하다 실수로 도는 것 막기)
+function touch2Begin() {
+  const [a, b] = [...TOUCH2.pts.values()];
+  TOUCH2.on = true; TOUCH2.lock = true; TOUCH2.twist = 0; TOUCH2.stats.시작++;
+  TOUCH2.d0 = Math.hypot(b.x - a.x, b.y - a.y) || 1; TOUCH2.a0 = Math.atan2(b.y - a.y, b.x - a.x);
+  TOUCH2.cx = (a.x + b.x) / 2; TOUCH2.cy = (a.y + b.y) / 2;
+  /* 첫 손가락이 이미 시작한 일을 없던 일로 — 놓던 것은 걷고, 들던 것은 제자리에 */
+  if (painting) { const p = painting; painting = null; p.list.forEach(it => removeAt(it.x, it.y)); if (p.list.length) { TOUCH2.stats.되돌린놓기 += p.list.length; updateCount(); markDirty(); } }
+  if (carrying) { const c = carrying; carrying = null; placeAt(c.k, c.fx, c.fy, c.rot); updateCount(); markDirty(); }
+  down = false; moved = 99; canvas.classList.remove('drag');
+  ghost.fill.visible = ghost.edge.visible = false; document.getElementById('why').className = '';
+}
+function touch2Move() {
+  const [a, b] = [...TOUCH2.pts.values()];
+  const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, d = Math.hypot(b.x - a.x, b.y - a.y) || 1, ang = Math.atan2(b.y - a.y, b.x - a.x);
+  panBy(cx - TOUCH2.cx, cy - TOUCH2.cy);                                    // 두 손가락 가운데가 움직인 만큼 판이 따라온다
+  const r = d / TOUCH2.d0, z0 = zoomMul;
+  zoomMul = Math.max(0.85, Math.min(20, zoomMul * r));                      // 휠과 같은 범위
+  if (zoomMul !== z0) { userZoomed = true; resize(); const k = zoomMul / z0; panBy((cx - innerWidth / 2) * (1 - k), (cy - innerHeight / 2) * (1 - k)); }   // 손가락 사이 그 자리가 그대로 있게
+  let da = ang - TOUCH2.a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+  TOUCH2.twist += da;
+  if (Math.abs(TOUCH2.twist) > TWIST_DEAD) camAz -= da;                     // 비틀기 — 문턱을 넘은 뒤부터
+  TOUCH2.cx = cx; TOUCH2.cy = cy; TOUCH2.d0 = d; TOUCH2.a0 = ang;
+}
+canvas.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' || PHOTO.on) return;
+  TOUCH2.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (TOUCH2.pts.size === 2) touch2Begin();
+  if (TOUCH2.lock) e.stopImmediatePropagation();                            // 둘째 손가락부터는 한 손가락 처리에 안 넘긴다
+}, true);
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'touch' || !TOUCH2.pts.has(e.pointerId)) return;
+  const p = TOUCH2.pts.get(e.pointerId); p.x = e.clientX; p.y = e.clientY;
+  if (TOUCH2.on && TOUCH2.pts.size >= 2) touch2Move();
+  if (TOUCH2.lock) e.stopImmediatePropagation();
+}, true);
+function touch2Up(e) {
+  if (e.pointerType !== 'touch' || !TOUCH2.pts.has(e.pointerId)) return;
+  TOUCH2.pts.delete(e.pointerId);
+  const wasLock = TOUCH2.lock;
+  if (TOUCH2.pts.size < 2) TOUCH2.on = false;
+  if (TOUCH2.pts.size === 0) TOUCH2.lock = false;                           // 손가락을 다 떼야 다시 한 손가락 조작 — 남은 손가락이 놓거나 튀지 않게
+  if (wasLock) { e.stopImmediatePropagation(); down = false; }
+  else if (e.type === 'pointerup') setTimeout(() => { if (!TOUCH2.pts.size) { ghost.fill.visible = ghost.edge.visible = false; } }, 0);   // 터치엔 hover 가 없다 — 손을 떼면 자리 표시도 걷는다
+}
+addEventListener('pointerup', touch2Up, true);
+addEventListener('pointercancel', touch2Up, true);
+window.__touch2 = () => ({ 손가락: TOUCH2.pts.size, 두손가락중: TOUCH2.on, 잠금: TOUCH2.lock, ...TOUCH2.stats, 배율: +zoomMul.toFixed(2), camAz: +camAz.toFixed(3) });
+
 addEventListener('keydown', e => {
   if (e.key === 'Escape' && PHOTO.on) { if (document.getElementById('shot').classList.contains('show')) document.getElementById('shot').classList.remove('show'); else photoMode(false); return; }
   if (e.key === 'Escape') {
