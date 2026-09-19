@@ -373,3 +373,63 @@ __pop()
 3. 집 200채 판의 틱 실측(사람은 120 에서 멈추지만 집은 계속 는다).
 4. 보류 그대로: 필요 건물 정원 · 저장 v3 · 정지 시 렌더 멈춤 · three.min 교체.
 
+
+---
+
+# 9부 — 창조자의 눈 4회 뒤 · 인구 정체 · 사용자 직접 지적 셋 (#570 ~ #610)
+
+## ㊴ 9부 PR (전부 base `feat/village-45`)
+| PR | 무엇 | 상태 |
+|---|---|---|
+| #570 MAC-FIT | 세 화면(1366×610 · 768×1024 · 1024×768) × 다섯 상태 겹침 점검 — 원인은 전부 **고정값 자리**(목표판·소식 top 62/64px · 미니맵 bottom 150px · 길게 메뉴의 56px) → 상단 바·탭의 **실제 위치를 재서** 잡음 | 머지됨 |
+| #573 MAC-FIRST5 | 처음 5분을 CDP 터치로 걸어 봄 — 놓자마자 뜨던 빨간 "여기엔 이미 …" 걷기 + 길에서 먼 땅을 누르면 놓을 자리를 노랗게 | 머지됨 |
+| #574 MAC-UNDO | **기존 줄 수정**(아래 ㊵) — 끌어서 여러 칸 놓은 뒤 ↩ 가 '그 전에 한 일'을 되돌리던 버그. **main 운영 44차에도 있다** | 머지됨 |
+| #578 MAC-TITLE-2 · #581 MAC-TITLE-3 | 칭호 첫 제안을 모달 대신 누를 수 있는 소식 한 줄로 · 카드가 열린 동안 시간 멈춤 + 고르는 순간 까닭이 된 것들 위 ✨ | 머지됨 |
+| #580 MAC-STROKE | 빨리 그어도 길이 안 끊김 — `paintLine4`(4방향 계단)로 사이 칸 메움 · 1×1 만 · 자동 시험 `scripts/village-paint/test.mjs` 신설 | 머지됨 |
+| #583 MAC-PLOTLOOK · #584 MAC-MINIFADE | 노란 땅이 화면 밖이면 미니맵 깜빡임·범위 확장·한마디(카메라는 안 옮김) · 놓기/끌기 중 손가락이 미니맵 48px 안이면 옅어짐 | 머지됨 |
+| #589 | **인구 정체 조사** `docs/village_pop_stall_20260920.md` — 인구 100 = 사는 집 48채가 꽉 찬 값 · 빈집 20 = 시설 없는 새 거리의 돌아선 집 · 우물 하나 +20명 | 머지됨 |
+| #592 MAC-THUMBFIX | glb 가 첫 그림보다 늦게 오면 대역 그림이 영영 남던 카드 → 다시 찍기 | 머지됨 |
+| #593 MAC-GHOST | **사용자 지적 ①** "돌려도 미리보기가 안 보인다" → 미리보기를 실제 모양으로 + 문 앞 화살표. 터치는 대는 순간 놓이므로 🔄 를 누르면 화면 가운데 1.8초 | 머지됨 |
+| #595 MAC-SAY-2 · #596 MAC-WAITHOMES · #598 MAC-WAITLOOK | 인구 정체 후보 1·2·3 — 집 놓는 순간 귀띔(빠진 것 하나) · '🏠 이웃을 기다리는 집 n' 칩(누르면 그 집으로) · 디자인 #594 `WAITHOUSE` 표에 접점 셋 | 머지됨 |
+| #600 MAC-CARDROT | **사용자 지적 ②** "돌리면 저게 바뀌면 안 돼?" → 고른 카드 그림·돌리기 단추가 같이 돈다 | 머지됨 |
+| #607 MAC-ROADROT | **사용자 지적 ③** "길들을 이었을 때 끊기는 애들이 많다"의 방향 쪽 — 횡단보도·가로수 열·다리가 이웃 길 축으로 저절로. 횡단보도는 큰길 끝에서만 축과 직각(두 차선). 끌어 놓기는 획 방향, 첫 조각도 다시 놓음 | 머지됨 |
+| #608 | 터치 놓기 흐름 제안서 `docs/village_touch_place_proposal.md` — 안 A(앉히고·보고·확정) + 걱정 여섯 + 반대 안 B·C. **보스가 고를 것 셋이 남아 있다** | 머지됨(문서) |
+| [#610](https://github.com/chang333787-boop/class-rpg/pull/610) | '배움' 조사 `docs/village_learn_stall_20260920.md` — 도서관·학교는 `special`(하나씩)이라 **아이에게 한 수가 없다.** 가장 좋은 자리여도 집의 37%엔 안 닿음. #589 의 틀린 문장 정정 | 열림 |
+
+## ㊵ 기존 줄을 고친 것 (9부 — 월요일 3-way 병합 때 손으로 볼 곳)
+| 어디 | PR | 무엇 |
+|---|---|---|
+| `paintEnd` | #574 | `if (…length === 1) pushUndo(place) … else pushUndo(stroke)` **사이에 끼어 있던 `sndFx('place')` 줄을 if/else 아래로.** 학교 판이 `paintEnd` 를 만졌다면 효과음 줄 위치만 맞추면 된다 |
+| `buildChunk` | #598 | 고리 세 줄(`const wait = …` / `if (!vc && wait) WAITHOUSE.col(…)` / `if (vc && wait) …`) — 집 부품의 색을 정하는 자리 |
+| `simTick` | #598 | `waitLookTick()` 고리 한 줄(`seasonTick` 앞) |
+
+## ㊶ 월요일 표(㉗·㉜·㊱) 보충 — 9부에서 더 감싼 것
+| 함수 | 감싼 PR | 덧붙인 일 | 겹치면 볼 것 |
+|---|---|---|---|
+| `updateGhost` | #573 · #593 (+앞의 #548·#553·#570) | 방금 놓은 칸의 '이미 있어요' 걷기 · 미리보기 모양 묶음(`ghost.edge` 의 자식) | 다섯 겹이다. 학교 판이 `updateGhost` 의 **인자·`hover` 쓰임**을 바꿨다면 전부 같이 볼 것 |
+| `paintAt` | #580 · #607 | 사이 칸 메우기(1×1) · 길 가족의 획 방향(첫 조각 다시 놓기) | #607 이 바깥, #580 이 안쪽. `painting = { k, rot, list, last }` 꼴에 기댄다 |
+| `cellAt` | #607 | 길 가족을 고른 채 **빈 칸**을 가리키면 `selRot` 을 맞추고 뿌리 칸을 옮겨 돌려준다 | **시험 훅 `__cellScreen` 이 `cellAt` 을 쓴다** — 길 가족을 고른 채 부르면 방향이 바뀐다 |
+| `rotate` · `setMode` | #593 · #600 · #607 | 가운데 미리보기·카드 그림 회전 · '직접 돌림' 기억/풀기 | `setMode` 는 이제 여섯 겹쯤 — 인자 `(kind, tool)` 가 바뀌면 전부 |
+| `partsOf` | #598 | 돌아선 집이면 `WAITHOUSE.props(miss)` 를 덧붙인다(`cells[rec.root] === rec` 일 때만) | 그림 도구가 `partsOf` 를 놓이지 않은 rec 로 부르는 길(미리보기·카드)엔 안 붙게 했다 |
+| `partMatrix` · `thumbOf` · `thumbSet` · `refreshRotCard` · `rotateView` · `holdDraw` · `holdRotate` | #592 · #600 | 카드 그림을 지금 방향·지금 시점으로 다시 찍기 | `thumbOf` 캐시를 잠깐 비웠다 되돌린다 — 캐시 열쇠 꼴이 바뀌면 볼 것 |
+| `titleCard` · `toast` · `chooseShow` · `chooseClear` · `miniRange` · `drawMini` · `glbLateApply` · `placeAt` · `pushUndo` | #578~#595 | 소식 한 줄 · 노란 땅 · 미니맵 · 늦게 온 glb · 놓는 순간 귀띔 | — |
+
+새 `VRULES` 스위치(9부): `fit` `first5` `strokeFill` `plotLook` `miniFade` `thumbFix` `ghostShape` `placeSayAway` `waitHomes` `waitLook` `cardRot` `roadRot`. 전부 `on:false` 면 그 장치만 꺼진다.
+새 localStorage 곁 키: 없음(9부). 앞의 `rpg.village.tip.rclick` · `rpg.village.tip.hold` · `rpg.village.title.<sid>`(+`.offered`) 그대로. `rpg.village.awaySeen.<sid>` 는 연기 담당 것.
+새 저장 키: 없음. 새 시험 훅: `__fit __first5 __strokeFill __plotLook __miniFade __thumbFix __ghost __sayAway __waitHomes __waitLook __cardRot __roadRot`.
+새 자동 시험: `node scripts/village-paint/test.mjs`(**PASS 165** — `paintLine4` · `sweepLine` · `roadRotPlan` · `roadRotSpan`).
+
+## ㊷ 시험에서 밟은 것 (9부)
+- **해 보지 않은 '한 수'를 문서에 쓰지 말 것**: #589 에 "도서관을 반대편에 하나 더"라고 썼는데 도서관은 `special`(하나)이라 놓을 수 없었다. #610 에서 정정. 조사 문서의 '아이의 한 수'는 **전부 실제로 놓아 본 것만.**
+- **내 변경이 '우연히 되던 것'을 깨는지**: 횡단보도(1×2)는 기본 방향이 마침 가로 큰길을 가로지르는 꼴이었다. 길 축에 눕히는 규칙만 넣었으면 그 경우가 나빠졌다 → 큰길 끝만 따로.
+- **끌어 놓기의 첫 조각은 방향을 알기 전에 놓인다**(`pointerdown` 에서). 획 방향으로 맞추려면 첫 조각을 다시 놓아야 한다.
+- 1366×610 에서 화면 y > 400 은 트레이가 가린다 — 시험 좌표는 `elementFromPoint(...).id === 'cv'` 로 확인. `__view(mul)` 은 **클수록 가깝다**(처음 14).
+- 큰 소식 중엔 ok 토스트가 접힌다 · 끌어 놓기는 (#574 전엔) undo 에 안 쌓였다 — '놓았는지'는 토스트·undo 말고 `painting.list`/판으로 볼 것.
+- 같은 anchor 에 열린 PR 둘이 끼워 넣으면 충돌 → 열린 PR 의 anchor 를 피해 블록 자리를 고른다(#584 · #598 · #607).
+- `gh` 가 잠깐 401 을 낼 때가 있다(로그인은 멀쩡) — 다시 부르면 된다. 보스는 **시험한 SHA 와 맞을 때만 머지**하니 PR 뒤에 커밋을 더하면 새 SHA 를 알릴 것.
+
+## ㊸ 다음
+1. **보스 답을 기다리는 것**: 터치 놓기 흐름(#608 — A/B/C · 집을 넣나 · 확정 손짓) · '배움'(#610 — 지금은 막다른 말 고치기 ⑤, 월요일 안건 ① 도서관 여럿).
+2. 월요일 안건에 더할 것: ① '배움' 천장(규칙 결정) ② #574 의 버그가 **main 운영 판에도 있다** ③ 횡단보도 glb 가 두 칸 자리의 가운데 한 칸만 차지(모양 — 디자인).
+3. 뒤처리: #596 과 #598 이 같은 `awayLacks` 훑기를 3초에 두 번 한다 → 하나로 합치기(작은 PR).
+4. 그대로: 칭호 PR ② `sync.js meta.title`(월요일 규칙 확인 뒤) · draw call 예산 턱밑 · 집 200채 틱 · 크롬북·태블릿 실기 전부.
