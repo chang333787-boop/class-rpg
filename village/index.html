@@ -1288,10 +1288,15 @@ function parseGLB(buf) {
 function b64buf(t) { const b = atob(t), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
 function glbRegister(name, buf) { const g = parseGLB(buf); GLB[name] = g; BASE['glb:' + name] = g; }
 const FRUIT_MODELS = ['tree_fruit', 'tree_fruit_orange', 'tree_fruit_lemon', 'tree_fruit_blossom'];
+/* [DESIGN-SCALE-1] 모델 크기 비례 — 모델 파일은 그대로 두고 놓을 때 배율만 준다(새 glb 0 · 삼각형 수 그대로).
+   잰 값(꼭대기 높이): 사람 1.7 · 1층 집 5.9 · 가로등 5.4 인데 나무 4.1 · '큰나무' 4.2 · 과일나무 3.9 — 나무가 처마보다 낮고 '큰나무'가 가장 작았다.
+   기준: 나무 > 1층 집, 큰나무 ≈ 2층 집(8.1), 과일나무는 집보다 조금 낮게. 폭은 한 칸(4)을 크게 넘지 않게(큰나무 4.4). */
+const GLB_SCALE = { tree_round: 1.6, tree_pine: 1.9, tree_fruit: 1.35, tree_fruit_orange: 1.35, tree_fruit_lemon: 1.35, tree_fruit_blossom: 1.35, treerow: 1.4 };
 const GLB_PARTS = {};
 function glbParts(kind, name) {                     // 켜져 있고 모델이 있으면 '부위 하나', 아니면 null(프리미티브)
   if (!GLB_ON.has(kind) || !GLB[name]) return null;
-  return GLB_PARTS[name] || (GLB_PARTS[name] = [{ g: 'glb:' + name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
+  const k = GLB_SCALE[name] || 1;                  // [DESIGN-SCALE-1]
+  return GLB_PARTS[name] || (GLB_PARTS[name] = [{ g: 'glb:' + name, c: 'model', s: [k, k, k], p: [0, 0, 0] }]);
 }
 /* 모델 한 재료만 떼어 BufferGeometry 로(사람: 재료별 InstancedMesh) */
 function glbSubGeo(g, matName) {
