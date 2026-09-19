@@ -1,0 +1,47 @@
+{
+ "_": "움직임 층 안내 — 코드가 이 표를 읽어 본 그림 대신 body 를 캔버스에 그리고, 층 그림을 DOM 에 얹는다. 표에 없거나 파일이 없으면 지금처럼 본 그림만.",
+ "d_y11": {
+  "body": "d_y11_body.svg",
+  "layers": [
+   {
+    "file": "d_y11_mv.svg",
+    "kind": "rotate",
+    "periodSec": 8,
+    "size": [
+     220,
+     220
+    ],
+    "pivotInBody": [
+     100,
+     124
+    ],
+    "bodyViewBox": [
+     200,
+     300
+    ]
+   }
+  ]
+ },
+ "d_y10": {
+  "body": "d_y10_body.svg",
+  "layers": [
+   {
+    "files": [
+     "d_y10_w1.svg",
+     "d_y10_w2.svg",
+     "d_y10_w3.svg"
+    ],
+    "kind": "frames",
+    "frameSec": 0.3,
+    "size": [
+     200,
+     300
+    ],
+    "bodyViewBox": [
+     200,
+     300
+    ]
+   }
+  ]
+ }
+}
