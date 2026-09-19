@@ -5306,7 +5306,8 @@ function actUmbrellaDraw(now) {
     else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
     if (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60)) return;
     if (f.passOx && f.state !== 'inside') { fx += f.passOx; fz += f.passOz; }   // [ACT-PASS] 비켜 선 사람의 우산도 같이
-    if (f.shelter && f.shelter.at && f.state === 'idle') return;   // [ACT-RAIN] 처마 밑에선 우산을 접는다
+    const RO = f.shelter && typeof rainOffset === 'function' ? rainOffset(f, SIM.t + SIM.acc) : null;   // [ACT-RAIN] 처마 밑 자리(나란히) · 접은 우산 · 다 같이 나올 땐 편다
+    if (RO) { fx += RO.x; fz += RO.z; if (RO.folded) { rainFoldedUmb(f, i, fx, fz, dir, n++, top); return; } }
     const small = typeof isSmall === 'function' && isSmall(f), k = small && KR ? KR.scale : 1;
     const walk = f.walking && f.state !== 'inside', bob = walk ? (small && KR ? Math.abs(Math.sin(now / 95 + i)) * KR.hop : Math.abs(Math.sin(now / 150 + i)) * 0.09) : 0;
     const co = Math.cos(dir), si = Math.sin(dir), hx = R.hand[0] * k, hz = R.hand[1] * k;
@@ -5976,6 +5977,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
     if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
     if (actGardenTick(f, i, now, dt)) continue;   // [ACT-GARDEN] 저녁에 정원 문으로 들어가 한 바퀴 · 의자에 앉았다 나온다
@@ -6464,7 +6466,7 @@ window.__passBy = () => ({ 켜짐: window.VRULES.passBy.on, 지금비켜선사�
    규칙 모듈 꼴: 스위치·수치 VRULES.rainShelter + 고리 두 줄(tickFolks · 루프) + [ACT-UMB] 에 한 줄(처마 밑에선 우산을 접는다).
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).rainShelter = { on: true, kinds: ['pavilion', 'shop', 'station', 'library', 'school', 'museum'], radius: 6, perRoof: 6, under: 1.3, underPav: 2.3, leaveMs: 1500 };
-const RAIN = { tick: -1, count: new Map(), stats: { 비피함: 0, 의자에서일어남: 0, 흩어짐: 0 } };
+const RAIN = { tick: -1, seq: 0, count: new Map(), cellN: new Map(), stats: { 비피함: 0, 의자에서일어남: 0, 흩어짐: 0, 다같이나옴: 0 } };
 function rainRoofBeside(c) { const R = window.VRULES.rainShelter, x = cX(c), y = cY(c);
   for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && R.kinds.includes(r.k)) return { rec: r, dx, dy }; } return null; }
 /* tickFolks 고리 — 쉬는 사람 처리 바로 앞(ACT-GAP 고리 위). true 면 이번 틱은 여기서 끝 */
@@ -6472,9 +6474,10 @@ function actRainTick(f, i, now) {
   const R = window.VRULES.rainShelter;
   if (RAIN.tick !== SIM.ticks) { RAIN.tick = SIM.ticks;                  // 틱마다 한 번 — 처마마다 몇 명 · 비 오면 의자에서 일어나기
     RAIN.count.clear(); folks.forEach(g => { if (g.shelter) RAIN.count.set(g.shelter.root, (RAIN.count.get(g.shelter.root) || 0) + 1); });
+    rainSlots();   // [ACT-SHELTER] 같은 처마 밑 사람끼리 나란히 설 자리 · 칸마다 몇 명
     const wet = R.on && EV.rain && !isNightHour(simHour());
     if (wet) folks.forEach(g => { if (g.state === 'inside' && g.beside && g.beside.mode === 'sit' && !g.garden && !g.visitor) { leave(g, '나옴'); g.goal = null; g.beside = null; g.until = now; RAIN.stats.의자에서일어남++; } });
-    else folks.forEach(g => { if (!g.shelter) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + Math.random() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
+    else folks.forEach(g => { if (!g.shelter || g.shelter.out) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + Math.random() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
   }
   const S = f.shelter;
   if (!R.on || !EV.rain || isNightHour(simHour())) return false;      // 흩어지기는 위(틱마다 한 번)에서
@@ -6482,13 +6485,18 @@ function actRainTick(f, i, now) {
   if (S) {
     if (S.at) { f.walking = false; f.dir = S.dir; f.state = 'idle'; f.until = now + 1000; return true; }   // 처마 밑에 서 있다(비가 그칠 때까지)
     const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;
-    if (at === S.cell && (f.state === 'idle' || (f.state === 'walk' && f.path[f.step + 1] == null))) { f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; S.at = true; f.dir = S.dir; RAIN.stats.비피함++; return true; }
+    if (at === S.cell && (f.state === 'idle' || (f.state === 'walk' && f.path[f.step + 1] == null))) { f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; S.at = true; S.seq = ++RAIN.seq; f.dir = S.dir; RAIN.stats.비피함++; return true; }
     if (f.state === 'idle' && now >= f.until) f.shelter = null;         // 막혀 멈췄다 — 다음에 다시 찾는다
     return false;
   }
   if (f.state !== 'idle' || now < f.until || !f.path || pathBudget <= 1) return false;   // 쉬다가 다음 갈 곳을 고를 때만
   pathBudget--; const here = f.path[f.path.length - 1], { reach } = roadBFS(here, i, R.radius);
   let pick = null; for (const c of reach) { const r = rainRoofBeside(c); if (r && (RAIN.count.get(r.rec.root) || 0) < R.perRoof) { pick = { c, r }; break; } }   // BFS 순서 = 가까운 순
+  if (pick && window.VRULES.shelterLook.on) { const L = window.VRULES.shelterLook, ok = r => r && (RAIN.count.get(r.rec.root) || 0) < R.perRoof;   // [ACT-SHELTER] 모여 서야 '비를 피하는 중'으로 읽힌다
+    const front = c => { const x = cX(c), y = cY(c); for (const [dx, dy] of D4) { if (dx + dy >= 0 || !inb(x + dx, y + dy)) continue; const r = cells[idx(x + dx, y + dy)]; if (r && R.kinds.includes(r.k)) return { rec: r, dx, dy }; } return null; };   // 기본 시점(π/4)에서 지붕이 사람 뒤에 오는 쪽 — 카메라를 따르지 않는다(늘 같게)
+    let best = null; for (const c of reach) { const n = RAIN.cellN.get(c) || 0, r = n < L.perCell ? (front(c) || rainRoofBeside(c)) : null; if (n > 0 && ok(r)) { best = { c, r }; break; } }   // ① 이미 누가 선 처마 밑
+    if (!best) for (const c of reach) { const r = front(c); if (ok(r)) { best = { c, r }; break; } }   // ② 앞에서 보이는 처마 밑
+    if (best) pick = best; }
   if (!pick) return false;                                              // 멀다 — 우산 쓰고 원래대로
   const { c, r } = pick, under = r.rec.k === 'pavilion' ? R.underPav : R.under;
   f.shelter = { root: r.rec.root, cell: c, ox: r.dx * under, oz: r.dy * under, dir: Math.atan2(-r.dx, -r.dy), at: false };   // 지붕 쪽으로 반 걸음 · 얼굴은 밖(비)을 본다
@@ -6502,14 +6510,61 @@ const RAIN_M = new THREE.Matrix4(), RAIN_T = new THREE.Matrix4();
 function actRainDraw() {
   if (!window.VRULES.rainShelter.on || !folks.length || OFF.has('folks')) return;
   let touched = false; const hasV = VISITOR_PARTS.length > 0;
+  const now = SIM.t + SIM.acc;
   folks.forEach((f, i) => { const S = f.shelter; if (!S || !S.at || f.state !== 'idle') return;
-    RAIN_T.makeTranslation(S.ox, 0, S.oz);
+    const O = rainOffset(f, now); RAIN_T.makeTranslation(O.x, 0, O.z);
     const tour = hasV && !!f.visitor && !f.neighbor, n = tour ? VISITOR_PARTS.length : PERSON_PARTS.length, base = tour ? PERSON_PARTS.length : 0;
     for (let pi = 0; pi < n; pi++) { const im = folkPool[base + pi]; if (!im || i >= im.count) continue; im.getMatrixAt(i, RAIN_M); RAIN_M.premultiply(RAIN_T); im.setMatrixAt(i, RAIN_M); }
     touched = true; });
   if (touched) folkPool.forEach(im => { im.instanceMatrix.needsUpdate = true; });
 }
 window.__rainShelter = () => ({ 켜짐: window.VRULES.rainShelter.on, 비: EV.rain, 지금처마밑: folks.filter(f => f.shelter && f.shelter.at).length, 가는중: folks.filter(f => f.shelter && !f.shelter.at).length, 의자에앉은사람: folks.filter(f => f.state === 'inside' && f.beside && f.beside.mode === 'sit').length, ...RAIN.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-SHELTER] 처마 밑이 '비를 피하는 중'으로 읽히게 (주민 연기 · 09-20 · 창조자의 눈 5회 '처마 밑 11명은 그냥 서 있는 사람과 구별 안 됨' · 보스 ①).
+   전: 같은 처마 밑 사람이 **한 점에 겹쳐** 서고(여섯이 한 몸) 우산은 그냥 사라졌다.
+   후: ⓐ 같은 칸의 처마 밑 사람은 벽을 따라 **나란히**(side 간격 · 먼저 온 순서) 벽을 등지고 길을 내다본다 ⓑ 우산은 **접어서 손에 늘어뜨린다**(있는 우산 갓·손잡이 묶음을
+      가늘고 길게 거꾸로 — draw call +0) ⓒ 비가 그치거나 밤이 되면 처마 밑 사람들이 **다 같이** 한 걸음 나와(outMs) — 아직 비면 우산을 펴고 — 흩어진다.
+   (비는 지금 하루 단위라 낮에 그치는 순간이 없다 — 지금 보이는 '다 같이 나옴'은 저녁 8시. 낮에 비가 그치게 하는 건 날씨 규칙(프로그램 담당) 몫.)
+   판정·확률·저장 0 · draw call +0. 스위치·수치 VRULES.shelterLook + ACT-RAIN·ACT-UMB 의 줄 몇 개 + tickFolks 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).shelterLook = { on: true, perCell: 4, side: 0.85, maxSide: 1.7, outMs: 1600, outStepMs: 600, outStep: 0.6, foldR: 0.24, foldH: 1.15 };
+function rainSlots() {                                                  // 틱마다 한 번 — 처마 밑(같은 칸)에 선 사람을 먼저 온 순서로 나란히
+  const R = window.VRULES.shelterLook, groups = new Map();
+  folks.forEach(g => { const S = g.shelter; if (!S || !S.at) return; const k = S.cell; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(S); });
+  RAIN.cellN = new Map(); folks.forEach(g => { const S = g.shelter; if (S && !S.out) RAIN.cellN.set(S.cell, (RAIN.cellN.get(S.cell) || 0) + 1); });   // 가는 중인 사람도 센다
+  groups.forEach(list => { list.sort((a, b) => (a.seq || 0) - (b.seq || 0)); const n = list.length;
+    const gap = n > 1 ? Math.min(R.side, 2 * R.maxSide / (n - 1)) : 0; list.forEach((S, r) => { S.lat = R.on ? (r - (n - 1) / 2) * gap : 0; }); });   // 많으면 간격을 좁혀 벽 폭 안에
+}
+function rainOffset(f, now) {                                           // 그리기 — 처마 밑 자리(반 걸음 + 나란히) · 나올 땐 한 걸음 밖으로 · 우산을 접었나
+  const S = f.shelter; if (!S || !S.at) return null;
+  const R = window.VRULES.shelterLook, len = Math.hypot(S.ox, S.oz) || 1, ux = S.ox / len, uz = S.oz / len, lat = R.on ? (S.lat || 0) : 0;
+  let under = 1, out = 0;
+  if (S.out) { const p = Math.min(1, Math.max(0, (now - S.out.t0) / R.outStepMs)); under = 1 - p; out = p * R.outStep; }
+  return { x: S.ox * under - ux * out - uz * lat, z: S.oz * under - uz * out + ux * lat, folded: R.on && (!S.out || !EV.rain) };
+}
+/* ACT-UMB 안에서 — 접은 우산: 손에서 아래로 늘어뜨린 가는 갓 + 짧은 손잡이(같은 묶음 두 개) */
+const foldE = new THREE.Euler(), foldQ = new THREE.Quaternion();
+function rainFoldedUmb(f, i, fx, fz, dir, n, top) {
+  const U = window.VRULES.umbrella, R = window.VRULES.shelterLook, KR = window.VRULES.kid, k = (typeof isSmall === 'function' && isSmall(f) && KR) ? KR.scale : 1;
+  const co = Math.cos(dir), si = Math.sin(dir), hx = U.hand[0] * k, hz = U.hand[1] * k, sx = fx + hx * co + hz * si, sz = fz - hx * si + hz * co, hy = top * U.handY * k;
+  folkDummy.position.set(sx, hy + 0.12 * k, sz); folkDummy.rotation.set(0, 0, 0); folkDummy.scale.set(1, 0.24 * k, 1); folkDummy.updateMatrix(); umbStick.setMatrixAt(n, folkDummy.matrix);   // 손에 쥔 손잡이
+  foldE.set(Math.PI - 0.12, dir, 0, 'YXZ'); foldQ.setFromEuler(foldE);   // 거꾸로(끝이 땅 쪽) · 살짝 기댄다
+  folkDummy.position.set(sx, hy - R.foldH * k / 2, sz); folkDummy.quaternion.copy(foldQ); folkDummy.scale.set(R.foldR * k, R.foldH * k, R.foldR * k); folkDummy.updateMatrix();
+  umbrella.setMatrixAt(n, folkDummy.matrix); umbrella.setColorAt(n, folkCol.setHex(UMB_COL[i % 4])); folkDummy.quaternion.identity();
+}
+/* tickFolks 고리(맨 앞) — 비가 그쳤거나 밤: 처마 밑 사람은 다 같이 한 걸음 나와 outMs 동안 서 있다가 흩어진다. true 면 이번 틱은 여기서 끝 */
+const SHELTEROUT = { tick: -1 };
+function actShelterOutTick(f, now) {
+  const R = window.VRULES.shelterLook, RS = window.VRULES.rainShelter;
+  if (SHELTEROUT.tick !== SIM.ticks) { SHELTEROUT.tick = SIM.ticks;    // 틱마다 한 번 — 나올 때가 됐나(다른 고리보다 먼저 — 밤 귀갓길이 먼저 데려가기 전에)
+    const wet = RS.on && EV.rain && !isNightHour(simHour());
+    if (!wet && R.on) { let n = 0; folks.forEach(g => { const S = g.shelter; if (S && S.at && !S.out) { S.out = { t0: now, until: now + R.outMs }; n++; } }); if (n) RAIN.stats.다같이나옴 += n; } }
+  const S = f.shelter; if (!S || !S.out) return false;
+  if (now < S.out.until && f.state !== 'inside') { f.state = 'idle'; f.walking = false; f.dir = S.dir; f.until = S.out.until; return true; }
+  f.shelter = null; f.until = now + ((S.seq || 0) % 4) * 120; RAIN.stats.흩어짐++; return false;   // 거의 같이(조금씩 엇갈려) 흩어진다
+}
+window.__shelterLook = () => ({ 켜짐: window.VRULES.shelterLook.on, 처마밑: folks.filter(f => f.shelter && f.shelter.at && !f.shelter.out).length, 나오는중: folks.filter(f => f.shelter && f.shelter.out).length, 다같이나옴: RAIN.stats.다같이나옴 });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-NIGHTCART] 밤의 빈 45초 — 내일 올 이웃이 마을 어귀에 짐수레를 세우고 등불을 켠 채 기다린다 (주민 연기 · 09-20 · 창조자의 눈 4회 · 보스 ①).
