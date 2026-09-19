@@ -80,7 +80,7 @@ test('점: ○○ → ●○ (우물 하나로 차오른다)', () => { assert.eq
 test('동네 묶기: 가까운 집끼리 · 큰 동네부터', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([r(10, 10), r(12, 10), r(14, 11), r(80, 80), r(82, 80), r(200, 5)], w, 8); assert.deepEqual(g.map(q => q.length), [3, 2, 1]); });
 test('동네 묶기: 사슬처럼 이어진 거리는 한 동네', () => { const w = 256, r = (x, y) => y * w + x; const g = waitClusters([0, 1, 2, 3, 4].map(i => r(10 + i * 6, 40)), w, 8); assert.equal(g.length, 1); });
 /* ── 밤새 자라는 것(MAC-GROW) — growStage(e, 시뮬날, 실제날) · growClean(저장본, 살아있는칸, 종류) ── */
-const growStage = grab('growStage'), growClean = grab('growClean');
+const growStage = grab('growStageOf'), growClean = grab('growClean');
 test('기록이 없으면 다 자란 것(2) — 옛 저장본·다른 기기', () => assert.equal(growStage(undefined, 9, 99999), 2));
 test('심은 날 = 새싹(0) · 마을 아침이 지나면 어린나무(1) · 실제 다음 날까지 지나면 다 자람(2)', () => { const e = [3, 20000]; assert.equal(growStage(e, 3, 20000), 0); assert.equal(growStage(e, 4, 20000), 1); assert.equal(growStage(e, 4, 20001), 2); });
 test('실제 다음 날 열었는데 마을 아침은 아직 — 어린나무(1)부터', () => assert.equal(growStage([3, 20000], 3, 20001), 1));
