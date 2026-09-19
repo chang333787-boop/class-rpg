@@ -37,6 +37,7 @@ function measure(w) {
     if (miss) miss[1].split('·').forEach(k => { need['없음:' + k] = (need['없음:' + k] || 0) + 1; });
   });
   m['일닿음%'] = m.사는집 ? Math.round((1 - m.일먼집 / m.사는집) * 1000) / 10 : 100;
+  if (typeof w.__stage === 'function') { const st = w.__stage(); if (st.id) { m.판목표 = st.목표.filter(g => g[1]).length; m.판목표수 = st.목표.length; } }
   return Object.assign(m, need);
 }
 
@@ -80,7 +81,9 @@ function setRules(w, spec) {
 async function child(spec) {
   const { loadVillage } = await import('./load.mjs');
   const saveText = spec.save ? fs.readFileSync(path.resolve(ROOT, spec.save), 'utf8') : null;
-  const { w } = await loadVillage({ root: ROOT, saveText, seed: spec.seed, hash: spec.hash });
+  const { w } = await loadVillage({ root: ROOT, saveText, seed: spec.seed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
+  const stage = typeof w.__stage === 'function' ? w.__stage() : null;
+  if (spec.stage && (!stage || stage.오류 || stage.id !== spec.stage)) throw new Error('판을 못 얹음: ' + (stage ? stage.오류 || stage.id : '__stage 없음'));
   setRules(w, spec.rules);
   const ticks = [], samples = []; let tick = 0;
   const run = n => { const r = w.__tickBench(n); ticks.push(r.틱최대ms); tick += n; };
@@ -90,7 +93,7 @@ async function child(spec) {
   const moves = (spec.do || '').split(';').map(s => s.trim()).filter(Boolean).map(c => doMove(w, c));
   const t0 = tick;
   while (tick - t0 < spec.days * DAY) { run(Math.min(spec.every, t0 + spec.days * DAY - tick)); sample(); }
-  return { name: spec.name, seed: spec.seed, moves, t0, samples, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 자기파일: [...new Set(globalThis.__simLocal || [])] };
+  return { name: spec.name, seed: spec.seed, moves, t0, samples, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
 }
 
 /* ─────────────── 묶어 돌리기(부모) ─────────────── */
@@ -99,7 +102,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i].replace(/^--/, ''), v = argv[i + 1];
     if (k === 'vs') { o.vs.push(v); i++; } else if (k === 'json') { o.json = v; i++; } else if (k === 'child') { o.child = v; i++; }
-    else if (k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name') { o[k] = v; i++; }
+    else if (k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name') { o[k] = v; i++; }
     else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs') { o[k] = +v; i++; }
     else if (k === 'help' || k === 'h') o.help = true;
     else throw new Error('모르는 인자: ' + argv[i]);
@@ -109,7 +112,7 @@ function parseArgs(argv) {
 const seedList = s => { const out = []; String(s).split(',').forEach(p => { const [a, b] = p.split('-').map(Number); for (let x = a; x <= (b || a); x++) out.push(x); }); return out; };
 
 function variants(o) {
-  const base = { name: o.name || '기본', save: o.save || null, rules: o.rules || '', do: o.do || '' };
+  const base = { name: o.name || (o.stage ? '판 ' + o.stage : '기본'), stage: o.stage || null, save: o.save || null, rules: o.rules || '', do: o.do || '' };
   const list = [base];
   o.vs.forEach(s => {   // '이름: do=…; rules=…; save=…' — do 안의 여러 수는 '|' 로 잇는다
     const c = s.indexOf(':'); if (c < 0) throw new Error("--vs 는 '이름: do=… ; rules=…' 꼴");
@@ -119,7 +122,8 @@ function variants(o) {
       if (k === 'do') v.do = [base.do, val.split('|').join(';')].filter(Boolean).join(';');
       else if (k === 'rules') v.rules = [base.rules, val].filter(Boolean).join(',');
       else if (k === 'save') v.save = val;
-      else throw new Error('--vs 칸은 do · rules · save: ' + k);
+      else if (k === 'stage') v.stage = val || null;
+      else throw new Error('--vs 칸은 do · rules · save · stage: ' + k);
     });
     list.push(v);
   });
@@ -150,8 +154,8 @@ const sgn = x => (x > 0 ? '+' : '') + x;
 
 function report(o, vars, res) {
   const L = [], seeds = seedList(o.seeds), show = o.show.split(',');
-  L.push(`판 ${o.save || '(빈 땅)'} · ${o.days}일 · 시드 ${seeds.join(',')} · 처음 ${o.warm}틱 돌린 뒤 한 수 · 값은 평균 (최소–최대)`);
-  vars.forEach(v => { const extra = [v.save !== vars[0].save && 'save=' + v.save, v.rules && 'rules=' + v.rules, v.do && 'do=' + v.do].filter(Boolean); if (extra.length) L.push(`- **${v.name}**: ${extra.join(' · ')}`); });
+  L.push(`판 ${o.stage ? '?stage=' + o.stage : o.save || '(빈 땅)'} · ${o.days}일 · 시드 ${seeds.join(',')} · 처음 ${o.warm}틱 돌린 뒤 한 수 · 값은 평균 (최소–최대)`);
+  vars.forEach(v => { const extra = [v.stage !== vars[0].stage && 'stage=' + (v.stage || '(없음)'), v.save !== vars[0].save && 'save=' + v.save, v.rules && 'rules=' + v.rules, v.do && 'do=' + v.do].filter(Boolean); if (extra.length) L.push(`- **${v.name}**: ${extra.join(' · ')}`); });
   const mv = res.filter(r => r.moves.length); if (mv.length) { const r = mv[0]; L.push(`- 한 수 결과(시드 ${r.seed} · ${r.name}): ` + r.moves.map(x => `${x.한수} → ${x.됨}개` + (x.자리 ? ' ' + JSON.stringify(x.자리.map(a => a.slice(0, 2))) : '') + (x.까닭 ? ' (' + x.까닭 + ')' : '')).join(' · ')); }
   L.push('');
   const days = Array.from({ length: o.days + 1 }, (_, d) => d);
@@ -182,7 +186,7 @@ function report(o, vars, res) {
       });
       const ok = delays.filter(x => x != null), better = diffs.filter(x => x >= o.by).length;
       const med = ok.length ? ok.slice().sort((p, q) => p - q)[ok.length >> 1] : null;
-      const other = v.save !== vars[0].save;
+      const other = v.save !== vars[0].save || v.stage !== vars[0].stage;
       L.push(`| ${v.name} | ${k} | ${stat(diffs).replace(/^(-?[\d.]+)/, m => sgn(+m))} | ${better}/${diffs.length} | ${other ? '— (다른 판)' : med == null ? '안 풀림' : '중앙 ' + med + (ok.length > 1 ? ' (' + Math.min(...ok) + '–' + Math.max(...ok) + ')' : '')} | ${ok.length}/${delays.length} |`);
     }));
   }
@@ -191,6 +195,7 @@ function report(o, vars, res) {
 }
 
 const HELP = `마을 시뮬 도구 — scripts/village-sim/README.md 참고
+  --stage <id>           판 파일 village/stages/<id>.json 으로 연다(시작 땅·규칙·목표)
   --save <저장본 json>   (없으면 빈 땅)          --days N (2)   --seeds 1-5 (1-3)
   --rules 'a.b=v,…'      VRULES 덮기             --do 'put shop @jobs 1; del x y'
   --vs '이름: do=…; rules=…; save=…'  (여러 번) — 같은 시드로 나란히 돌려 비교
