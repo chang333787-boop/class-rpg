@@ -2246,6 +2246,7 @@ function simTick() {
   if (++moveTimer >= MOVEIN_EVERY * (population() >= JOB_POP && joblessRatio() > 0.5 ? 2 : 1)) { moveTimer = 0; /* 어른 절반이 일이 없으면 이사가 느리다(F27) */ if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
   satTick(); crowdTick(); eventTick(); visitTick(SIM.t); if ((SIM.ticks % 50) === 0) needsTick(); if ((SIM.ticks % 30) === 0 && !OFF.has('jobs')) jobsTick(); wishTick();
   if ((SIM.ticks % 10) === 0) { goalTick(); plotTick(); }
+  if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
@@ -2505,6 +2506,7 @@ const population = () => { let n = 0; res.forEach(v => n += v); return n; };
 /* 이 집이 주민을 받을 수 있나 — true 아니면 이유 */
 function moveInWhy(rec) {
   if ((res.get(rec.root) || 0) >= houseCap(rec.root)) return '이 집은 꽉 찼어요';
+  { const aw = awayWhy(rec); if (aw) return aw; }   // [MAC-AWAY] 집을 눌렀을 때의 이유 · 조용한 이사(moveInQuiet)도 같은 판정
   const b = roadBeside(rec);
   if (b < 0) return '집 앞에 길이 없어요';
   const { reach } = roadBFS(b, undefined, 60);
@@ -2536,6 +2538,7 @@ function tryMoveIn() {
   const homes = [];
   cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house' && (res.get(i) || 0) < houseCap(i)) homes.push(rec); });
   if (!homes.length) return;
+  if (awayFilter(homes)) return;   // [MAC-AWAY] 오늘 돌아선 집은 후보에서 뺀다
   for (let t = 0; t < homes.length; t++) {
     const rec = homes[(moveRR++) % homes.length];
     if (folks.some(f => f.arriving && f.home === rec.root)) continue;     // 이미 오는 중
@@ -2553,7 +2556,99 @@ function tryMoveIn() {
     return;
   }
 }
+/* ══════════════════════════════════════════════════════════════
+   [MAC-AWAY] 살기 불편한 집 앞에서는 돌아간다 — 만족이 이사로 돌아오게 (docs/village_progression_plan.md §5-1 이 정본)
+   전에는 이사 조건이 빈 방·집 앞 길·길 6칸뿐이라 우물 하나 없이 1층 집만 뿌려도 정상 플레이와 같은 속도로 인구 200 에 갔다.
+   규칙(아이가 셀 수 있게 · 확률 없음 · 보이지 않는 곱셈 없음):
+     · 인구 10명부터. 집 앞에 **도착한 순간** 물·장보기·놀이·쉼 네 가지 중 **두 가지**가 가까이(필요 판정과 같은 사거리) 있으면 언제나 들어가고, 없으면 언제나 돌아간다.
+     · '배움'은 판정에 안 넣는다(인구 80 이 되는 순간 이사가 뚝 끊기는 절벽을 막는다). 붐빔·일자리·꾸밈도 안 본다.
+     · 돌아선 사람은 그 차례에 다른 집으로 안 간다 — 빠진 것 그림을 머리에 띄우고 걸어 나간다. 돌아선 집엔 하루에 한 번만 다시 와 본다.
+     · 고쳐 주면 2초 안에 알아채고 가까이(길로 12칸)에서 곧바로 다시 온다 — "놓았더니 들어왔다"가 한 장면에.
+     · 이미 사는 주민은 떠나지 않는다. 저장 없음(돌아선 집 목록은 판을 연 동안만).
+   규칙 모듈 꼴: 스위치 VRULES.turnAway + 순수 함수 homeLacks + 고리 여섯 줄(moveInWhy·tryMoveIn·arrive·simTick·루프·whatDoing).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 2, bubbleMs: 6000 };
+const AWAY_NEEDS = ['물', '장보기', '놀이', '쉼'];
+const AWAY_ICON = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 다시: '🏠' };
+const AWAY_KEYS = Object.keys(AWAY_ICON);
+const AWAY_SEEN_KEY = () => 'rpg.village.awaySeen.' + SID;      // 첫 돌아섬 안내를 봤나(기기마다 · 저장본 밖)
+const AWAY = { turned: new Map(), toasted: new Set(), rr: 0, stats: { 돌아섬: 0, 건너뜀: 0, 다시옴: 0, 첫안내: 0 }, log: [] };
+/* 순수 함수 — 이 집에 빠진 것 목록(살 만하면 null). THREE·DOM 을 안 만진다 */
+function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]); return needs.length - miss.length >= minHave ? null : miss; }
+function awayLacks(rec) { const R = window.VRULES.turnAway; if (!R.on || population() < R.graceBelow) return null; return homeLacks(computeSat(rec).met, AWAY_NEEDS, R.minHave); }   // computeSat 을 그 자리에서 — 빈 집은 satTick 이 안 돌아 캐시가 없다
+function awayWhy(rec) { const miss = awayLacks(rec); return miss ? miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아가요 — 물·가게·놀 곳·쉴 곳 중 두 가지는 가까워야 해요' : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
+const awayLeavers = () => { let n = 0; folks.forEach(f => { if (f.leaving) n++; }); return n; };
+/* tryMoveIn 고리 — 오늘 이미 돌아선 집은 후보에서 뺀다. 돌아가는 사람이 길에 둘이면 다음 후보가 불편한 집일 때 그 차례를 쉰다(행렬 막기 — 결과는 같다: 아무도 안 든다) */
+function awayFilter(homes) {
+  const R = window.VRULES.turnAway; if (!R.on) return false;
+  for (let k = homes.length - 1; k >= 0; k--) { const t = AWAY.turned.get(homes[k].root); if (t && SIM.t - t.at < R.retryMs) homes.splice(k, 1); }
+  if (!homes.length) return true;
+  if (awayLeavers() >= R.maxLeavers && awayLacks(homes[moveRR % homes.length])) { moveRR++; AWAY.stats.건너뜀++; return true; }
+  return false;
+}
+/* arrive 고리 — 집 앞에 닿은 순간의 판정. true 면 이사는 없던 일 */
+function awayGate(f, i) {
+  if (f.leaving) { if (!f.slotFreed) movers = Math.max(0, movers - 1); folks.splice(i, 1); releaseAll(i); claimed.clear(); claimed2.clear(); folksDirty = true; return true; }   // 마을 밖으로 나갔다
+  const rec = cells[f.home]; if (f.comeback || !rec || rec.k !== 'house') return false;
+  const miss = awayLacks(rec); if (!miss) { AWAY.turned.delete(f.home); return false; }
+  const R = window.VRULES.turnAway, here = f.path[Math.min(f.step, f.path.length - 1)];
+  AWAY.turned.set(f.home, { at: SIM.t, miss }); if (AWAY.turned.size > 40) AWAY.turned.delete(AWAY.turned.keys().next().value);
+  AWAY.stats.돌아섬++; AWAY.log.push({ t: SIM.t, 집: f.home, 빠진것: miss.join('·') }); if (AWAY.log.length > 30) AWAY.log.shift();
+  const { prev, reach } = roadBFS(here, undefined, 60), far = reach[reach.length - 1];
+  const path = []; let k = far; while (k >= 0 && k !== here) { path.unshift(k); k = prev[k]; } path.unshift(here);
+  f.leaving = true; f.away = { key: miss[AWAY.stats.돌아섬 % miss.length], miss, until: SIM.t + R.bubbleMs };
+  f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; f.blockedAt = 0; f.stuckN = 0;
+  movers = Math.max(0, movers - 1); f.slotFreed = true;                     // 돌아가는 길은 이사 자리를 안 차지한다(왕복이라 처리량이 반으로 주는 것 막기)
+  let first = false; try { if (!localStorage.getItem(AWAY_SEEN_KEY())) { localStorage.setItem(AWAY_SEEN_KEY(), '1'); first = true; } } catch (e) {}
+  if (first) { AWAY.stats.첫안내++; toast('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
+  else { const key = miss.join(); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); toast('🚶 ' + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
+  if (path.length < 2) return awayGate(f, i);                                // 나갈 길이 없다 — 그 자리에서 사라진다
+  return true;
+}
+/* simTick 고리(2초마다) — 돌아섰던 집이 살 만해졌나. 그러면 가까이에서 곧바로 다시 온다 */
+function awayTick() {
+  const R = window.VRULES.turnAway; if (!AWAY.turned.size) return; if (!R.on) { AWAY.turned.clear(); return; }
+  const roots = [...AWAY.turned.keys()];
+  for (let n = 0; n < Math.min(6, roots.length); n++) {                     // 한 번에 여섯 채까지만 다시 센다(예산)
+    const root = roots[(AWAY.rr++) % roots.length], rec = cells[root];
+    if (!rec || rec.k !== 'house' || rec.root !== root || (res.get(root) || 0) >= houseCap(root)) { AWAY.turned.delete(root); continue; }
+    if (awayLacks(rec)) continue;
+    if (movers >= MOVEIN_MAX || folks.length >= FOLK_CAP || folks.some(f => f.arriving && f.home === root)) { AWAY.turned.get(root).at = -1e15; continue; }   // 살 만해졌다 — 자리가 나면 온다(후보에서 빼지 않게만)
+    const b = roadBeside(rec); if (b < 0) continue;
+    const { prev, reach } = roadBFS(b, undefined, R.comebackDepth); if (reach.length < 2) continue;
+    const spawn = reach[reach.length - 1], path = []; let k = spawn; while (k >= 0 && k !== b) { path.push(k); k = prev[k]; } path.push(b);
+    folks.push({ home: root, ct: (folks.length % 4) + 1, arriving: true, comeback: true, away: { key: '다시', miss: [], until: SIM.t + R.bubbleMs },
+      x: wx(cX(spawn)), z: wz(cY(spawn)), px: wx(cX(spawn)), pz: wz(cY(spawn)), dir: 0, pdir: 0, path, step: 0, seg: 0, state: 'walk', until: 0, base: b, mx: 0, mz: 0, mt: 0 });
+    movers++; folkPool.forEach(m => m.count = folks.length); AWAY.turned.delete(root); AWAY.stats.다시옴++;
+  }
+}
+/* 루프 고리 — 돌아가는 사람·다시 오는 사람 머리 위 그림 */
+const awayPool = AWAY_KEYS.map(key => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), back = key === '다시';
+  g.fillStyle = back ? '#e6f7ea' : '#fffaf0'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '38px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(AWAY_ICON[key], 30, 37);
+  g.fillStyle = back ? '#2e9d57' : '#d9482f'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill();
+  g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText(back ? '♥' : '✕', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 8);
+  im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im;
+});
+function awayDraw(now) {
+  const cnt = AWAY_KEYS.map(() => 0);
+  if (!OFF.has('faces')) folks.forEach(f => {
+    if (!f.away || now > f.away.until) return;
+    const k = AWAY_KEYS.indexOf(f.away.key); if (k < 0 || cnt[k] >= 8) return;
+    const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS);
+    const fx = f.px == null ? f.x : f.px + (f.x - f.px) * a, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a;
+    faceDummy.position.set(fx, 4.8 + Math.sin(now / 250) * 0.12, fz); faceDummy.quaternion.copy(camera.quaternion); faceDummy.scale.set(1.45, 1.45, 1); faceDummy.updateMatrix();
+    awayPool[k].setMatrixAt(cnt[k]++, faceDummy.matrix);
+  });
+  awayPool.forEach((im, k) => { im.count = cnt[k]; if (cnt[k]) im.instanceMatrix.needsUpdate = true; });
+}
+window.__away = () => ({ 켜짐: window.VRULES.turnAway.on, ...AWAY.stats, 돌아선집: AWAY.turned.size, 나가는중: awayLeavers(), 이사중: movers, 최근: AWAY.log.slice(-5) });
+
 function arrive(f, i) {
+  if (awayGate(f, i)) return;   // [MAC-AWAY] 살기 불편한 집이면 들어가지 않고 돌아간다
   res.set(f.home, (res.get(f.home) || 0) + 1); sndFx('pop');
   dirtyChunks.add(chunkOfCell(f.home));            // 창에 불이 켜진다(F7)
   movers = Math.max(0, movers - 1);
@@ -2856,6 +2951,8 @@ function followTick() {
 }
 function folkCard(f) { return (f.wish ? wishText(f) + ' — ' : '🙂 ') + (f.arriving ? '새 이웃' : folkName(f)) + ' · ' + whatDoing(f) + (f.visitor || f.arriving ? '' : ' · 좋아하는 곳: ' + favPlace(f)); }
 function whatDoing(f) {
+  if (f.leaving && f.away) return f.away.miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 돌아가요';   // [MAC-AWAY]
+  if (f.comeback) return '살 만해졌다는 소식에 다시 와요';
   if (f.arriving) return '이사 오는 중이에요';
   if (f.state === 'inside') { const b = cells[f.inside.root]; return (b ? K[b.k].nm : '건물') + (f.goal === 'work' ? '에서 일해요' : ' 안에 있어요'); }
   if (f.state === 'mill') return '길이 없어서 집 앞을 서성여요';
@@ -4519,6 +4616,7 @@ function loop() {
   while (SIM.acc >= TICK_MS && guard-- > 0) { if (!OFF.has('sim')) simTick(); SIM.acc -= TICK_MS; }
   if (guard <= 0) SIM.acc = 0;
   whyBubbleTick(SIM.t + SIM.acc);   // [MAC-WHY] 앞 프레임에 뜬 표정에 이유가 있으면 그 자리를 대신한다(표정은 한 프레임만 비친다 — drawFaces 를 두 번 돌리지 않으려고)
+  awayDraw(SIM.t + SIM.acc);   // [MAC-AWAY]
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   drawClock(); applyDaylight();
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
