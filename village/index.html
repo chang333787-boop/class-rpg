@@ -2612,6 +2612,32 @@ addEventListener('pointerup', e => {
 });
 window.__rclick = () => ({ 켜짐: window.VRULES.rightClick.on, 확인대기중: KEEP.armed ? KEEP.armed.root === RC.armRoot : false, ...RC.stats });
 
+/* ── [MAC-FIRST5] 처음 5분 — 빈 땅에서 길→집→첫 이웃→첫 목표까지 터치만으로 해 보고 걸린 두 곳 (보스 09-20 · 새 안내 장치는 만들지 않는다) ──
+   ① **놓자마자 빨간 말풍선**: 길·집·우물·가게를 놓는 데 성공한 바로 그 순간 "여기엔 이미 집이 있어요"가 떴다 — 손을 뗀 자리에 방금 놓은 것이 있어서다.
+      아이에겐 '놓았더니 혼났다'로 읽힌다(처음 5분 동안 놓을 때마다 떴다). → 방금 놓은 그 칸에서는 '이미 있어요'를 말하지 않는다. 다른 칸으로 가면 전과 같다.
+   ② **어디에 놓을 수 있는지 모른다**: 집·가게를 길에서 먼 땅에 누르면 "길에 붙어야 해요"라는 말은 나오지만 '그래서 어디?'가 없다.
+      → 있는 장치(MAC-SPOT 의 노란 자리 밝히기)를 그 순간에 켠다. 큰 건물이 열릴 때만 켜지던 것 — 집은 빠져 있었다. 6초에 한 번까지.
+   원래 줄 수정 0 — pushUndo·updateGhost 감싸기 + pointerup 리스너. */
+(window.VRULES = window.VRULES || {}).first5 = { on: true, spotGapMs: 6000 };
+const F5 = { pushes: 0, p0: 0, painted: 0, mute: null, spotAt: 0, told: false, stats: { 말풍선접음: 0, 자리밝힘: 0 } };
+{ const push0 = pushUndo; pushUndo = function () { F5.pushes++; return push0.apply(this, arguments); };
+  const ghost0 = updateGhost; updateGhost = function () { const r = ghost0.apply(this, arguments);
+    if (F5.mute && window.VRULES.first5.on) { const el = document.getElementById('why'), key = hover ? hover.x + ',' + hover.y : null;
+      if (key !== F5.mute) F5.mute = null; else if (el && el.className === 'show' && /^여기엔 이미/.test(el.textContent)) el.className = ''; }
+    return r; }; }
+canvas.addEventListener('pointerdown', () => { F5.p0 = F5.pushes; F5.painted = 0; }, true);
+addEventListener('pointerup', () => { F5.painted = painting ? painting.list.length : 0; }, true);   // 원래 pointerup 이 painting 을 비우기 전에 — 이번 누름으로 몇 개 놓였나(되돌리기 목록은 끌어 놓기를 안 쌓는 때가 있어 그것만 믿지 않는다)
+addEventListener('pointerup', e => {                                             // 원래 pointerup(놓기·act) 다음에 돈다
+  const R = window.VRULES.first5; if (!R.on || e.target !== canvas || VISIT.on || PHOTO.on) return;
+  const c = cellAt(e.clientX, e.clientY);
+  if (F5.pushes > F5.p0 || F5.painted > 0) { if (c) { F5.mute = c.x + ',' + c.y; const el = document.getElementById('why'); if (el.className === 'show' && /^여기엔 이미/.test(el.textContent)) { el.className = ''; F5.stats.말풍선접음++; } } return; }   // ① 방금 놓았다
+  if (!sel || !K[sel] || !K[sel].needRoad || moved > 6 || !c || !c.inside) return;
+  const v = canPlace(sel, c.x, c.y, selRot); if (typeof v !== 'string' || !/길에 붙어야/.test(v)) return;                 // ② 길에서 먼 땅을 눌렀다
+  const now = performance.now(); if (now - F5.spotAt < R.spotGapMs) return; F5.spotAt = now; F5.stats.자리밝힘++;
+  spotShow(sel, false); if (!F5.told && spotMesh.count > 0) { toast('💡 노란 자리에 놓을 수 있어요 — 길 바로 옆이에요', true); F5.told = /노란 자리/.test((document.getElementById('toast') || {}).textContent || ''); }   // 큰 소식이 떠 있으면 이 말은 접힌다(#498) — 그땐 다음 기회에 다시
+});
+window.__first5 = () => ({ 켜짐: window.VRULES.first5.on, 접는칸: F5.mute, 노란자리: spotMesh.count, ...F5.stats });
+
 /* 들고 있는 동안 손을 떼는 신호를 놓치면(창을 벗어남, 알트탭, 터치 취소)
    물건이 판에서도 화면에서도 사라진다. 반드시 제자리로 돌려놓는다. */
 function returnCarried(why) {
