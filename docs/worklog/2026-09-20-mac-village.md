@@ -196,3 +196,29 @@ __pop()
 
 ## ⑯ 다음
 입력 2탄(마우스 오른쪽 **클릭** = 치우기 · 터치 길게 누르기 메뉴 · 끌어서 연달아 치우기(무게 2 건너뜀) · 확대 단추) → 돌아오는 목표(27개 뒤) → 색 카드 묶기(`variantOf`, 디자인 id 목록이 오면).
+
+---
+
+# 4부 (09-20 밤~) — 한 장치로 합치기 · 창조자의 눈 2·3회
+
+## ⑰ 4부 PR (전부 base `feat/village-45` · 기존 줄 수정 0)
+| PR | 무엇 | 상태 |
+|---|---|---|
+| #485 | 자동 이음(내 장치 `K.line`) | **닫음** — #493 으로 대체 |
+| [#493](https://github.com/chang333787-boop/class-rpg/pull/493) MAC-LINE v2 | 디자인 담당 장치(#477 `JOIN_*`)를 남기고 넓힘: 나무·돌 식구 + 옛 2×1 을 칸마다 판정(`joinPartsWide`·`pt.abs`) + `joinDirtyWide` + '🪵 두르기' 탭 | 머지됨 |
+| [#498](https://github.com/chang333787-boop/class-rpg/pull/498) MAC-DAY | 이사는 낮에(6~18.5시, 낮엔 시도 두 배 — 28·131·290 vs 전 31·121·290) + 큰 소식은 줄을 선다(`toast` 감싸기) + "씨를 가져왔어요" | 머지됨 |
+| [#507](https://github.com/chang333787-boop/class-rpg/pull/507) MAC-GOAL-2 | 목표판 줄 끝에 보상 그림 + 목표가 오르는 순간 트레이 다시 그림 + 잠긴 카드 글 짧게 | 열림 |
+| [#508](https://github.com/chang333787-boop/class-rpg/pull/508) MAC-KEEP-2 | 지우기 확인을 3초 시계 대신 빨간 테두리(다른 곳을 누르거나 모드를 바꿀 때까지) + 줄 선 소식이 ✋ 말을 덮던 것 | 열림 |
+| [#510](https://github.com/chang333787-boop/class-rpg/pull/510) MAC-SPOT | 큰 건물이 열리는 순간 놓을 자리를 노랗게 밝힘 · 0곳이면 말해 줌 | 열림 |
+| (이 PR) | v3 제안서에 캐시 절(운영 헤더 실측) · 계획표에 정원 '보류 — 관찰 뒤' · 이 worklog 4부 | 열림 |
+
+## ⑱ 새 종류 id (⑭ 를 고쳐 씀)
+`fence1` · `wall1` · **`fence1_gate` · `wall1_gate`**(#493 — 문은 디자인 담당 방식: 따로 놓는 물건). #485 의 'rot=1 = 문'은 **없던 일**이다(머지된 적 없음). 식구 이름: `wood`·`stone`(내) · `picket`·`curb`·`hedge`(디자인).
+
+## ⑲ 감싸서 다시 묶은 함수들 (원래 줄은 그대로 — 월요일 병합 때 학교 판이 이 함수들을 고쳤어도 충돌은 안 난다. 다만 **동작이 겹치는지**는 봐야 한다)
+`lockedWhy`(#490·#507) · `toast`(#498·#508) · `renderGoals`(#507). 찾기: `grep -n "lockedWhy0\|toast0\|renderGoals0" village/index.html`.
+
+## ⑳ 시험에서 밟은 것 (4부)
+- 누른 자리가 **트레이에 가려져** 있으면 `__cellScreen` 이 돌려준 좌표를 눌러도 판에 안 닿는다 → `document.elementFromPoint(x,y).id === 'cv'` 를 같이 본다.
+- 로컬 `python3 -m http.server` 는 Cache-Control 을 안 줘서 **브라우저가 옛 index.html 을 쓴다** → Playwright 는 CDP `Network.setCacheDisabled` + 주소에 `&nc=<시각>`.
+- 시험 훅의 **키 이름 충돌**(`...stats` 가 같은 이름의 현재 값을 덮음) — 누적값과 현재값의 이름을 다르게.
