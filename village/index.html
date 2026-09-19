@@ -2270,6 +2270,8 @@ function pickDestination(f, who) {
   const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : useTimely ? timely : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
   let goal = pool[(Math.random() * pool.length) | 0];
   if (f.visitor) { const g = visitorGoal(f, reach); if (g >= 0) goal = g; }
+  /* [MAC-PATH] 손님이 돌아갈 때 visitorGoal 은 f.base 를 돌려주는데, 그 칸이 '남이 잡은 칸을 피한 탐색' 밖이면 prev 에 옛 탐색 찌꺼기가 남아 이웃하지 않은 칸을 잇는 경로가 나왔다(막다른 길 끝에서 이사 오는 사람과 영구 교착 → 이사가 끊김). 막힌 칸까지 넣어 다시 찾고, 그래도 없으면 잠깐 쉰다. */
+  if (bfsSeen[goal] !== bfsGen) { ({ prev, reach } = roadBFS(here)); if (bfsSeen[goal] !== bfsGen) { f.state = 'idle'; f.until = simNow() + 900; return; } }
 
   const path = [];
   let k = goal;
@@ -3323,6 +3325,7 @@ function tickFolks(dt, now) {
         f.walking = false;                      // 서서 기다린다
         if (!f.blockedAt) f.blockedAt = now;
         if (now - f.blockedAt > WAIT_LIMIT) {    // 너무 오래 막혔다 — 맞바꾸기 교착일 수 있다
+          if (f.arriving && (f.stuckN = (f.stuckN || 0) + 1) >= 6) { arrive(f, i); continue; }   // [MAC-PATH] 이사 오는 사람이 여섯 번(약 9초) 막히면 그냥 들어가 산다 — movers 가 3 에 묶여 이사가 영영 끊기지 않게
           f.blockedAt = 0;
           releaseAll(i); claim(from, i);
           f.path = [from]; f.step = 0; f.seg = 0;
