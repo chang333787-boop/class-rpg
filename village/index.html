@@ -2019,7 +2019,48 @@ function keepRestore(kind, root) {
 }
 window.__keep = (x, y) => { const rec = x == null ? null : cells[idx(x, y)]; return { 무게: rec ? keepOf(rec) : null, 맡아둔것: KEEP.stash.map(t => [t.n, t.lv]), ...KEEP.stats }; };
 
+/* ══════════════════════════════════════════════════════════════
+   [MAC-SAY] 놓는 순간의 반응 둘 (창조자의 눈 2회)
+   ① 길에 안 닿은 긴의자·우물이 **말없이** 놓였다 — 집·가게는 "길에 붙어야 해요"라 말해 주는데, 필요를 채우는 물건은 길 옆이 아니면 아무도 못 쓰는데도 조용했다.
+      막지는 않는다(꾸밈으로 놓고 싶을 수도 있다). 종류마다 한 번만 말한다: "긴의자는 길 옆에 있어야 주민이 와서 쉬어요 — 길에 붙여 보세요".
+   ② 필요 하나가 새로 채워진 **빈 집** 위에 그 그림 + ✓ 가 한 번 뜬다("하나 됐다, 하나 더") — 빈 집엔 기뻐해 줄 주민이 없어서 부분 수리가 눈에 안 보였다.
+      놓기 **전**에 둘레 빈 집의 필요를 세어 두고(placeAt 첫 줄), 놓은 **뒤**에 다시 세어 새로 채워진 집에만(끝 줄). 집 단위 판정 · 저장 없음.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).placeSay = { on: true, box: 22, maxHomes: 16, showMs: 4500 };
+const SAY = { before: null, told: new Set(), marks: [], stats: { 길에서먼안내: 0, 빈집표시: 0 } };
+const SAY_ICON = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 배움: '📚' }, SAY_KEYS = Object.keys(SAY_ICON);
+const sayLive = () => window.VRULES.placeSay.on && window.__LOADMS != null && !VISIT.on && !savingOff;   // __LOADMS = 첫 프레임이 그려진 뒤(let booted 는 이 줄보다 아래라 저장본을 되살리는 동안엔 못 읽는다)          // 저장본을 되살리는 동안·구경·시연 판에서는 조용히
+function sayNearRoad(kind, x, y, rot) { return footprint(kind, x, y, rot).some(([px, py]) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => inb(px + dx, py + dy) && isRoad(idx(px + dx, py + dy)))); }
+function sayEmptyHomes(x, y) { const R = window.VRULES.placeSay, out = []; for (let yy = Math.max(0, y - R.box); yy <= Math.min(H - 1, y + R.box) && out.length < R.maxHomes; yy++) for (let xx = Math.max(0, x - R.box); xx <= Math.min(W - 1, x + R.box) && out.length < R.maxHomes; xx++) {
+    const i = idx(xx, yy), rec = cells[i]; if (rec && rec.root === i && rec.k === 'house' && (res.get(i) || 0) === 0) out.push(rec); } return out; }
+function sayBefore(kind, x, y) {                                               // placeAt 첫 줄 — 놓기 전, 둘레 빈 집의 필요
+  SAY.before = null; if (!sayLive() || !K[kind] || !(K[kind].need || K[kind].need2)) return;
+  SAY.before = new Map(sayEmptyHomes(x, y).map(rec => [rec.root, { ...computeSat(rec).met }]));
+}
+function sayAfter(kind, x, y, rot) {                                           // placeAt 끝 줄
+  if (!sayLive() || !K[kind]) return; const k = K[kind], R = window.VRULES.placeSay;
+  if ((k.need || k.need2) && !k.needRoad && !sayNearRoad(kind, x, y, rot) && !SAY.told.has(kind)) { SAY.told.add(kind); SAY.stats.길에서먼안내++;
+    setTimeout(() => toast(josa(k.nm, '은', '는') + ' 길 옆에 있어야 주민이 와서 ' + ({ 물: '물을 떠요', 장보기: '장을 봐요', 놀이: '놀아요', 쉼: '쉬어요', 배움: '배워요' })[k.need] + ' — 길에 붙여 보세요'), 0); }
+  if (!SAY.before) return; const was = SAY.before; SAY.before = null;
+  was.forEach((met0, root) => { const rec = cells[root]; if (!rec || rec.k !== 'house') return; const met1 = computeSat(rec).met;
+    const got = SAY_KEYS.filter(n => !met0[n] && met1[n]); if (!got.length) return;
+    const c = centerOf('house', cX(root), cY(root), rec.rot); SAY.marks.push({ x: c.x, z: c.z, key: got[0], until: performance.now() + R.showMs }); SAY.stats.빈집표시++; });
+  if (SAY.marks.length > 16) SAY.marks.splice(0, SAY.marks.length - 16);
+}
+const sayPool = SAY_KEYS.map(key => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#e9f8ec'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '36px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(SAY_ICON[key], 30, 37);
+  g.fillStyle = '#2e9d57'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText('✓', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 16); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; });
+const sayDummy = new THREE.Object3D();
+function sayDraw() { if (!SAY.marks.length && !sayPool.some(im => im.count)) return; const now = performance.now(), cnt = SAY_KEYS.map(() => 0); SAY.marks = SAY.marks.filter(m => m.until > now);
+  SAY.marks.forEach(m => { const k = SAY_KEYS.indexOf(m.key), age = 1 - (m.until - now) / window.VRULES.placeSay.showMs; sayDummy.position.set(m.x, 8.5 + Math.min(1, age * 4) * 1.2, m.z); sayDummy.quaternion.copy(camera.quaternion); const sc = 1 + 0.25 * Math.sin(Math.min(1, age * 3) * Math.PI); sayDummy.scale.set(sc, sc, 1); sayDummy.updateMatrix(); sayPool[k].setMatrixAt(cnt[k]++, sayDummy.matrix); });
+  sayPool.forEach((im, k) => { im.count = cnt[k]; if (cnt[k]) im.instanceMatrix.needsUpdate = true; }); }
+window.__say = () => ({ ...SAY.stats, 떠있는표시: SAY.marks.length, 말한종류: [...SAY.told] });
+
 function placeAt(kind, x, y, rot) {
+  sayBefore(kind, x, y);   // [MAC-SAY] 놓기 전 — 둘레 빈 집의 필요를 세어 둔다
   rot = rot || 0;
   const rec = { k: kind, root: idx(x, y), rot: rot };
   footprint(kind, x, y, rot).forEach(([px, py]) => { cells[idx(px, py)] = rec; });
@@ -2030,6 +2071,7 @@ function placeAt(kind, x, y, rot) {
   if (kind === 'house' || K[kind].road) folksDirty = true;   // 사람이 생기거나 길이 열렸다
   amenityChanged(kind, x, y, rot);                      // 주변 가치(F33)
   keepRestore(kind, rec.root);   // [MAC-KEEP] 맡아 둔 식구·층이 돌아온다
+  sayAfter(kind, x, y, rot);   // [MAC-SAY] 길에서 먼 필요 건물 안내 · 빈 집의 ✓
   return true;
 }
 function removeAt(x, y) {
@@ -5533,6 +5575,7 @@ function loop() {
   awayDraw(SIM.t + SIM.acc);   // [MAC-AWAY]
   spotDraw();   // [MAC-SPOT]
   keepArmDraw();   // [MAC-KEEP-2] 치우기 확인의 빨간 테두리
+  sayDraw();   // [MAC-SAY]
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   drawClock(); applyDaylight();
