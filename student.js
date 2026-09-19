@@ -7906,7 +7906,7 @@ function _drawDecoSVG(id, px, py, bw, bh) {
 
 // ══ 바닥 SVG 파이프라인 (FLOOR-SVG-1) ══════════════════════
 //  assets/floor/<name>.svg — 바닥은 100×100 조각을 셀마다 drawImage(c*C, r*C, C, C)로 찍는다.
-//  · base: FLOOR_TILES 키 → tile_<키>[_a~_d]. 변형은 (r,c) 해시로 고정(다시 그려도 안 바뀜).
+//  · base: 바닥 이름 → tile_<이름>[_a~_d][#색]. 변형은 (r,c) 해시로 고정(다시 그려도 안 바뀜). 색은 정원 바닥만(_FLOOR_COLORS).
 //  · 잔디 번짐: 잔디가 아닌 칸의 4방 이웃이 잔디면 fringe_grass_{n,e,s,w}(2종 교차),
 //    두 변이 잔디면 in_<모서리>, 변은 아닌데 대각선만 잔디면 out_<모서리>. (꽃밭은 잔디로 친다)
 //  · 물가: 물 칸의 이웃이 물이 아니면 shore_{n,e,s,w} / in_* / out_*. 잔디 번짐 위에 그린다.
@@ -7914,16 +7914,19 @@ function _drawDecoSVG(id, px, py, bw, bh) {
 //    오버레이 조각이 없으면 그 조각만 건너뛴다.
 //  · FLOOR_SVG=false 로 두면 전부 기존 방식(단색)으로 돌아간다.
 const FLOOR_SVG = true;
-const _FLOOR_IMG = {};   // name → {img, ok}  (없는 파일은 한 번만 시도)
-function _floorImg(name) {
-  const hit = _FLOOR_IMG[name];
+const _FLOOR_IMG = {};   // name[#색] → {img, ok}  (없는 파일은 한 번만 시도)
+// [DECO-FLOOR-COLOR-1] 색은 한 파일 안의 `:target` 규칙이다 — 주소 끝에 `#색`. 같은 파일이라도 색마다 Image 가 따로라서
+//  **그 색이 마당에 실제로 있을 때만** 부른다(미리 부르지 않는다 — 정원 바닥을 안 쓴 마당은 요청이 하나도 안 는다).
+function _floorImg(name, color) {
+  const key = color ? name + '#' + color : name;
+  const hit = _FLOOR_IMG[key];
   if (hit) return hit.ok ? hit.img : null;
   const img = new Image();
   const rec = { img, ok: false };
-  _FLOOR_IMG[name] = rec;
+  _FLOOR_IMG[key] = rec;
   img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); } };   // [DECO-FRIEND-ART-1]
   img.onerror = () => { rec.ok = false; };
-  img.src = './assets/floor/' + encodeURIComponent(name) + '.svg';
+  img.src = './assets/floor/' + encodeURIComponent(name) + '.svg' + (color ? '#' + color : '');
   return null;
 }
 // [DECO-FLOOR-PARSE-1] 바닥 저장값 해석은 여기 한 곳 — '이름#색+마감'(예 'tulipbed#red+picket' · 'hydrangea+stone'). 옛 값('stone')은 이름뿐이다.
@@ -7948,7 +7951,16 @@ function _floorParse(v) {
   M.set(v, p);
   return p;
 }
-const _FLOOR_VARIANTS = { grass:4, dirt:4, stone:2, flower:2, dry_earth:2, sand:2, water:2 };
+const _FLOOR_VARIANTS = { grass:4, dirt:4, stone:2, flower:2, dry_earth:2, sand:2, water:2,
+  tulipbed:2, tulipcol:2, hydrangea:3, wildflower:4, sunflowerbed:2, lavender:2, daisyfield:3 };   // [DECO-FLOOR-COLOR-1] 정원 바닥 7종
+// [DECO-FLOOR-COLOR-1] 종류별로 그림 파일에 **실제로 있는** 색(기본색은 색 없음 = 'tulipbed'). 표에 없는 색은 기본색으로 그린다 —
+//  저장본에 엉뚱한 색이 아무리 많아도 Image·비트맵이 이 표만큼만 생긴다. 표와 그림 파일이 맞는지는 단위 검사가 본다.
+const _FLOOR_COLORS = {
+  tulipbed: ['red', 'yellow', 'white', 'violet', 'orange', 'candy', 'sherbet', 'night'],
+  tulipcol: ['red', 'yellow', 'white', 'violet', 'orange', 'candy', 'sherbet', 'night'],
+  hydrangea: ['violet', 'pink', 'white', 'duo', 'moon'],
+  wildflower: ['rainbow', 'snow'], sunflowerbed: ['orange', 'lemon'], lavender: ['pink', 'white'], daisyfield: ['yellow', 'pink'],
+};
 function _floorBaseName(type, r, c) {
   const n = _FLOOR_VARIANTS[type] || 0;
   if (!n) return 'tile_' + type;
@@ -7975,11 +7987,12 @@ function _svgBmp(key, img, needW, ratio) {
   return b;
 }
 function _floorBmp(name, img, C) { return _svgBmp('f:' + name, img, C * 2, 1); }
-function _drawFloorSVG(type, r, c, px, py, C, typeAt) {
+function _drawFloorSVG(type, r, c, px, py, C, typeAt, color) {
   const bname = _floorBaseName(type, r, c);
-  const base = _floorImg(bname);
+  const col = (color && _FLOOR_COLORS[type] && _FLOOR_COLORS[type].indexOf(color) >= 0) ? color : '';   // [DECO-FLOOR-COLOR-1]
+  const base = _floorImg(bname, col);
   if (!base) return false;
-  _dCtx.drawImage(_floorBmp(bname, base, C), px, py, C, C);
+  _dCtx.drawImage(_floorBmp(col ? bname + '#' + col : bname, base, C), px, py, C, C);   // 같은 파일·다른 색 = 다른 비트맵
   const T = (dr, dc) => { const t = typeAt(r + dr, c + dc); return (t == null) ? type : t; };
   const put = name => { const img = _floorImg(name); if (img) _dCtx.drawImage(_floorBmp(name, img, C), px, py, C, C); };
   //  [DECO-WATER-ORDER-1] 물 칸은 **물가(shore_*)를 먼저, 잔디 번짐(fringe_grass_*)을 나중에** — 풀이 모래 띠 위로 번져
@@ -8070,9 +8083,9 @@ function _drawYard() {
     for(let r=v.r0;r<v.r1;r++) for(let c=v.c0;c<v.c1;c++){
       if(_isHC(r,c)) continue;
       const tkey = r+'_'+c;
-      const ttype = _floorParse(fl[tkey]).name;   // [DECO-FLOOR-PARSE-1] 옛 값은 이름 그대로
+      const fp = _floorParse(fl[tkey]), ttype = fp.name;   // [DECO-FLOOR-PARSE-1] 옛 값은 이름 그대로
       const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
-      if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
+      if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt, fp.color)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
       _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;
       _dCtx.fillRect(c*C, r*C, C, C);
       _drawTileTexture(ttype, c, r, C);

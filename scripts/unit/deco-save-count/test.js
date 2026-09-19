@@ -627,7 +627,7 @@
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(500); }
       if (typeof decoSpaceSet === 'function') { decoSpaceSet(1); await sleep(200); }
       decoZoomFit(); await sleep(100);
-      const OLD = Object.keys(FLOOR_TILES), keepFloor = CUR.yardFloor, fx = {};
+      const OLD = Object.keys(FLOOR_TILES).slice(0, 14), keepFloor = CUR.yardFloor, fx = {};   // 옛 14종(표 앞 14줄 — 뒤에 무엇이 더 들어와도 이 지문은 안 바뀐다)
       const vis = _decoVisible(DY.rows, DY.cols), free = (r, c) => !_isHC(r, c) && !(typeof _isFarmCell === 'function' && _isFarmCell(r, c));
       for (let r = vis.r0; r < vis.r1; r++) for (let c = vis.c0; c < vis.c1; c++) {          // 보이는 칸 전부에 — 다섯 칸에 한 칸쯤은 맨 잔디로 둔다
         const k = (r * 7 + c * 13 + (r * c) % 3) % (OLD.length + 3);
@@ -654,6 +654,8 @@
       out('옛바닥마당_바닥그림_다옴', OLD.every(t => Object.keys(_FLOOR_IMG).some(k => k.indexOf('tile_' + t) === 0 && _FLOOR_IMG[k].ok)));
       out('옛바닥마당_두번그려_같음', f1 === f2 && f1 !== 'no-canvas');
       out('옛바닥마당_그림지문', f1);
+      //  여기까지는 옛 바닥만 깔았다 → 정원 바닥 그림은 한 장도 안 불렸어야 한다(쓴 색만 부른다 · 요청 수 그대로)
+      out('정원바닥_안쓴마당_부른그림0', !Object.keys(_FLOOR_IMG).some(k => /^tile_(tulipbed|tulipcol|hydrangea|wildflower|sunflowerbed|lavender|daisyfield)/.test(k)));
       if (typeof _floorParse === 'function') {
         out('바닥해석_옛값_이름그대로', OLD.every(t => { const p = _floorParse(t); return p.name === t && !p.color && !p.rim; }));
         const p = _floorParse('tulipbed#red+picket');
@@ -662,6 +664,30 @@
         CUR.yardFloor = Object.assign({}, fx, { '7_2': 'tulipbed#red+picket', '7_3': 'lavender+brick' });
         let threw = ''; try { _drawYard(); } catch (e) { threw = String(e).slice(0, 80); }
         out('바닥해석_새값있어도_그려짐', threw === '' && _groundAt(CUR, 7, 2) === 'soft');
+      }
+      //  ⑯ 정원 바닥 색(DECO-FLOOR-COLOR-1) — 한 파일·여러 색(`…svg#색`). 색마다 Image·비트맵이 따로라서 **쓴 색만** 불러야 한다.
+      if (typeof _FLOOR_COLORS !== 'undefined') {
+        const isGarden = k => Object.keys(_FLOOR_COLORS).some(n => k.indexOf('tile_' + n + '_') === 0);
+        const gr = vis.r0 + 3, gc = vis.c0 + 3, gk = gr + '_' + gc, C2 = _dC * 2;
+        const vals = []; Object.keys(_FLOOR_COLORS).forEach(n => { vals.push([n, '']); _FLOOR_COLORS[n].forEach(col => vals.push([n, col])); });
+        vals.forEach(([n, col]) => _floorImg(_floorBaseName(n, gr, gc), col));                            // 이 칸에 쓸 그림만 부른다
+        for (let i = 0; i < 100; i++) { if (Object.keys(_FLOOR_IMG).every(k => _FLOOR_IMG[k].img.complete)) break; await sleep(50); }
+        const cellPrint = async (v) => {
+          CUR.yardFloor = { [gk]: v }; _drawDeco(); await sleep(40);
+          const cv = document.querySelector('#if-topview canvas');
+          const d = cv.getContext('2d').getImageData(Math.round((gc * _dC - _dPanX) * 2), Math.round((gr * _dC - _dPanY) * 2), C2, C2).data;
+          return [...new Uint8Array(await crypto.subtle.digest('SHA-256', d.buffer))].slice(0, 8).join(',');
+        };
+        const grassPrint = await cellPrint('grass'), seen = {}; let same = [];
+        for (const [n, col] of vals) { const v = col ? n + '#' + col : n, pr = await cellPrint(v); if (seen[pr] || pr === grassPrint) same.push(v + '=' + (seen[pr] || 'grass')); seen[pr] = v; }
+        out('정원바닥_값마다_다른그림', vals.length + '값 중 겹침 ' + same.length + (same.length ? ' (' + same.slice(0, 4).join(' · ') + ')' : ''));
+        out('정원바닥_색이_실제로_입혀짐', same.length === 0 && vals.length >= 30);
+        const nImg = Object.keys(_FLOOR_IMG).length;
+        const bogus = await cellPrint('tulipbed#nosuchcolor'), rimmed = await cellPrint('tulipbed#red+picket'), oldCol = await cellPrint('stone#red');
+        out('정원바닥_없는색은_기본색_그림안부름', bogus === (await cellPrint('tulipbed')) && Object.keys(_FLOOR_IMG).length === nImg);
+        out('정원바닥_마감붙어도_같은바탕', rimmed === (await cellPrint('tulipbed#red')));                 // 마감 그림은 가장자리 PR 에서
+        out('정원바닥_옛바닥에_색은_무시', oldCol === (await cellPrint('stone')));
+        out('정원바닥_부른그림수', Object.keys(_FLOOR_IMG).filter(isGarden).length + '장(이 칸의 변형 × ' + vals.length + '값)');
       }
       CUR.yardFloor = keepFloor; _drawDeco(); await sleep(100);
     }

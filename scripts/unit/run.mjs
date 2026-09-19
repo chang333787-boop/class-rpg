@@ -1328,7 +1328,7 @@ try {
   vm.runInContext(SPACE_PRELUDE(S) + S.slice(at, end + 3) + NL + sliceConst(S, 'GROUND_HARD') + sliceFn(S, '_groundKind') + NL + sliceFn(S, '_groundAt') + NL
     + ';globalThis.__R = { _floorParse, _groundAt, FLOOR_TILES };', sb);
   const P = sb.__R._floorParse, plain = (v) => { const o = P(v); return { name: o.name, color: o.color, rim: o.rim }; };
-  const OLD = Object.keys(sb.__R.FLOOR_TILES);
+  const OLD = Object.keys(sb.__R.FLOOR_TILES).slice(0, 14);
   test('옛 바닥 14종이 표에 있다(이 검사가 빈 표를 보고 통과하지 않게)', () => eq(OLD.length >= 14, true));
   test('옛 값은 이름 그대로 · 색·마감 없음', () => OLD.forEach(k => eq(plain(k), { name: k, color: '', rim: '' }, k)));
   test("'#'·'+' 가 없는 낯선 값도 이름 그대로(전과 같은 길 — 그림이 없으면 잔디색)", () => eq(plain('Some-Old Value'), { name: 'Some-Old Value', color: '', rim: '' }));
@@ -1353,6 +1353,70 @@ try {
   });
 } catch (e) {
   test('바닥 저장값 해석 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  [DECO-FLOOR-COLOR-1] 정원 바닥 — 변형 표·색 표가 그림 파일과 맞는가 · 색이 그림 주소와 기억 키에 들어가는가 · 쓴 색만 부르는가
+cur = '꾸미기 정원 바닥 색(DECO-FLOOR-COLOR-1)';
+try {
+  const S = read('student.js');
+  const srcs = [], draws = [];
+  const sb = { Image: function () { const o = { naturalWidth: 100, naturalHeight: 100 }; Object.defineProperty(o, 'src', { set(v) { srcs.push(v); } }); return o; },
+    encodeURIComponent, _drawDeco() {}, _ffRedrawSoon() {}, _dCtx: { drawImage(img) { draws.push(img); } } };
+  sb.globalThis = sb; vm.createContext(sb);
+  const at = S.indexOf('const _FLOOR_COLORS = {'), end = S.indexOf(NL + '};', at);
+  if (at < 0 || end < 0) throw new Error('_FLOOR_COLORS 표를 못 찾음');
+  const vAt = S.indexOf('const _FLOOR_VARIANTS = {'), vEnd = S.indexOf('};', vAt);
+  vm.runInContext('const _FLOOR_IMG = {};' + NL + S.slice(vAt, vEnd + 2) + NL + S.slice(at, end + 3) + NL
+    + ['_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
+    + 'const _SVG_BMP = new Map();' + NL
+    + ';globalThis.__R = { _FLOOR_IMG, _FLOOR_VARIANTS, _FLOOR_COLORS, _floorImg, _drawFloorSVG };', sb);
+  const R = sb.__R, DIR = path.join(ROOT, 'assets', 'floor');
+  const GARDEN = Object.keys(R._FLOOR_COLORS);
+  test('정원 바닥 7종', () => eq(GARDEN.slice().sort(), ['daisyfield', 'hydrangea', 'lavender', 'sunflowerbed', 'tulipbed', 'tulipcol', 'wildflower']));
+  test('변형 표의 개수 = 실제 그림 파일 수(옛 바닥 포함 전부)', () => Object.keys(R._FLOOR_VARIANTS).forEach(t => {
+    const n = 'abcd'.split('').filter(v => fs.existsSync(path.join(DIR, 'tile_' + t + '_' + v + '.svg'))).length;
+    eq(R._FLOOR_VARIANTS[t], n, t);
+  }));
+  test('색 표 = 그림 파일 안의 `#색:target` (변형마다 전부 · 빠짐도 남음도 없이)', () => GARDEN.forEach(t => {
+    for (let i = 0; i < R._FLOOR_VARIANTS[t]; i++) {
+      const svg = fs.readFileSync(path.join(DIR, 'tile_' + t + '_' + 'abcd'[i] + '.svg'), 'utf8');
+      const inFile = [...new Set([...svg.matchAll(/#([a-z0-9_]+):target/g)].map(m => m[1]))].sort();
+      eq(R._FLOOR_COLORS[t].slice().sort(), inFile, 'tile_' + t + '_' + 'abcd'[i]);
+    }
+  }));
+  test('색 이름은 저장값 해석이 받는 글자만([a-z0-9_])', () => GARDEN.forEach(t => R._FLOOR_COLORS[t].forEach(c => eq(/^[a-z0-9_]+$/.test(c), true, t + '#' + c))));
+  const T = () => 'grass';   // 이웃은 전부 잔디
+  test('색 없는 값은 전과 같은 주소·같은 기억 키', () => {
+    srcs.length = 0; R._drawFloorSVG('stone', 2, 3, 0, 0, 20, T);
+    eq(srcs.length, 1); eq(/^\.\/assets\/floor\/tile_stone_[ab]\.svg$/.test(srcs[0]), true, srcs[0]);
+    eq(Object.keys(R._FLOOR_IMG).filter(k => k.indexOf('#') >= 0).length, 0);
+  });
+  test('색 있는 정원 바닥은 주소 끝에 #색 · 기억 키도 색까지', () => {
+    srcs.length = 0; R._drawFloorSVG('tulipbed', 2, 3, 0, 0, 20, T, 'red');
+    eq(/^\.\/assets\/floor\/tile_tulipbed_[ab]\.svg#red$/.test(srcs[0]), true, srcs[0]);
+    eq(Object.keys(R._FLOOR_IMG).filter(k => /^tile_tulipbed_[ab]#red$/.test(k)).length, 1);
+  });
+  test('같은 파일·다른 색은 따로 부른다 · 같은 색은 다시 안 부른다', () => {
+    srcs.length = 0;
+    R._drawFloorSVG('tulipbed', 2, 3, 0, 0, 20, T, 'yellow'); R._drawFloorSVG('tulipbed', 2, 3, 0, 0, 20, T, 'yellow'); R._drawFloorSVG('tulipbed', 2, 3, 0, 0, 20, T, '');
+    eq(srcs.map(u => u.split('/').pop().replace(/_[ab]\./, '_x.')), ['tile_tulipbed_x.svg#yellow', 'tile_tulipbed_x.svg']);
+  });
+  test('표에 없는 색·옛 바닥에 붙은 색은 기본색으로(그림을 새로 안 부른다)', () => {
+    srcs.length = 0;
+    R._drawFloorSVG('tulipbed', 2, 3, 0, 0, 20, T, 'nosuchcolor'); R._drawFloorSVG('tulipbed', 2, 3, 0, 0, 20, T, 'pink'); R._drawFloorSVG('stone', 2, 3, 0, 0, 20, T, 'red');
+    eq(srcs, []);
+  });
+  test('쓴 색만 부른다 — 여기까지 부른 정원 바닥 그림은 셋(빨강·노랑·기본)', () =>
+    eq(Object.keys(R._FLOOR_IMG).filter(k => /^tile_tulipbed/.test(k)).length, 3));
+  test('그림이 오면 색마다 제 그림을 그린다', () => {
+    Object.keys(R._FLOOR_IMG).forEach(k => { R._FLOOR_IMG[k].ok = true; R._FLOOR_IMG[k].img.tag = k; });
+    const first = (type, col) => { draws.length = 0; R._drawFloorSVG(type, 2, 3, 0, 0, 20, () => type, col); return draws[0] && draws[0].tag; };
+    eq([first('tulipbed', 'red'), first('tulipbed', 'yellow'), first('tulipbed', ''), first('tulipbed', 'nosuchcolor')].map(k => k.replace(/_[ab]/, '')),
+       ['tile_tulipbed#red', 'tile_tulipbed#yellow', 'tile_tulipbed', 'tile_tulipbed']);
+  });
+} catch (e) {
+  test('정원 바닥 색 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════
