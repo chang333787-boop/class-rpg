@@ -4585,15 +4585,17 @@ const _FLOOR_RIM_ORDER = [['', '자연'], ['brick', '벽돌'], ['stone', '돌'],
 //     팔면 그 색이 다시 잠기지만, 이미 칠한 칸은 그대로 남는다(저장값은 안 건드린다). 도감 코드가 붙으면 `_floorHas` 만 바꾼다.
 //  라벤더·해바라기·데이지는 표에 문턱이 없어 전부 열림.
 function _floorHas(id) { return _decoQtyOf(id) > 0; }
+//  [DECO-RETIRE-2] '가진 것'은 상점에서 뺀(hidden) 것도 센다 — 장식을 상점에서 빼도 그걸 가진 아이의 색이 다시 잠기지 않게.
+//  '전부'는 **지금 상점에 있는 것 전부**(뺀 것은 더 살 수 없으니 목표에서 뺀다).
 function _floorKindCount(kind) {
-  const all = GAME_DATA.decorations.filter(d => d.cat === 'yard' && !d.hidden && _decoShopKind(d) === kind);
-  return { have: all.filter(d => _floorHas(d.id)).length, all: all.length };
+  const yard = GAME_DATA.decorations.filter(d => d.cat === 'yard' && _decoShopKind(d) === kind), shop = yard.filter(d => !d.hidden);
+  return { have: yard.filter(d => _floorHas(d.id)).length, all: shop.length, allHave: shop.filter(d => _floorHas(d.id)).length };
 }
 function _floorLockWhy(name, color) {
   const fam = name === 'tulipcol' ? 'tulipbed' : name;
   const any = ids => ids.some(_floorHas);
-  const need = (kind, n, what, icon) => { const k = _floorKindCount(kind), goal = n || k.all;
-    return k.have >= goal ? '' : `${icon} ${what} 장식을 ${n ? n + '가지' : '전부'} 모으면 열려요!\n지금 ${k.have}가지 · 🛒 상점에서 찾아볼 수 있어요`; };
+  const need = (kind, n, what, icon) => { const k = _floorKindCount(kind), ok = n ? k.have >= n : k.allHave >= k.all;
+    return ok ? '' : `${icon} ${what} 장식을 ${n ? n + '가지' : '전부'} 모으면 열려요!\n지금 ${n ? k.have + '가지' : k.allHave + '/' + k.all} · 🛒 상점에서 찾아볼 수 있어요`; };
   const one = (ids, what) => any(ids) ? '' : `${what} 장식을 가져 보면 열려요!\n🛒 상점에서 찾아볼 수 있어요`;
   if (fam === 'tulipbed') {
     if (color === 'red') return one(['d_y1', 'd_y21', 'd_y43'], '🌹 장미');

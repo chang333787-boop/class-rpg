@@ -408,7 +408,7 @@ const GAME_DATA = {
 
     // ── 공원/정원 테마 ─────────────────────────────────────
     {id:'d_y15',name:'낮은 관목',     icon:'🌿', priceAdj:-3,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y16',name:'큰 화단',       icon:'🌺', size:{w:2,h:2}, priceAdj:0, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y16',name:'큰 화단',       icon:'🌺', size:{w:2,h:2}, priceAdj:0, cat:'yard', rarity:'rare',   reqLv:1, hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 정원 바닥 + 벽돌 마감
     {id:'d_y17',name:'정자',          icon:'⛩️', size:{w:2,h:2}, priceAdj:+40, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y18',name:'돌 벤치',       icon:'🪑', size:{w:2,h:1}, priceAdj:-10, cat:'yard', rarity:'rare',   reqLv:1},
     {id:'d_y19',name:'큰 나무 B',     icon:'🌳', size:{w:2,h:2}, priceAdj:-80, cat:'yard', rarity:'epic',   reqLv:1},
@@ -427,7 +427,7 @@ const GAME_DATA = {
     // ── 연못/물가 테마 ──────────────────────────────────────
     {id:'d_y29',name:'갈대 묶음',     icon:'🌿', priceAdj:0,  cat:'yard',   rarity:'common', reqLv:1},
     {id:'d_y30',name:'징검돌',        icon:'🪨', priceAdj:-5,  cat:'yard',   rarity:'common', reqLv:1},
-    {id:'d_y31',name:'작은 연못',     icon:'🪷', size:{w:3,h:3}, priceAdj:+10, cat:'yard', rarity:'epic',   reqLv:1},
+    {id:'d_y31',name:'작은 연못',     icon:'🪷', size:{w:3,h:3}, priceAdj:+10, cat:'yard', rarity:'epic',   reqLv:1, hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 🖌 물 바닥(+물가)
     {id:'d_y32',name:'오리 가족',     icon:'🦆', size:{w:2,h:1}, priceAdj:-5, cat:'yard', rarity:'rare',   reqLv:1},
 
     // ── 건물 테마 ───────────────────────────────────────────
@@ -437,10 +437,10 @@ const GAME_DATA = {
     {id:'d_y34',name:'작은 창고',     icon:'🏚️', size:{w:2,h:2}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1},
 
     // ── 2차 확장: 농촌 심화 ─────────────────────────────────
-    {id:'d_y35',name:'밀밭 B형',      icon:'🌾', size:{w:2,h:2}, priceAdj:-5,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y35',name:'밀밭 B형',      icon:'🌾', size:{w:2,h:2}, priceAdj:-5,  cat:'yard', rarity:'rare',   reqLv:1, hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 밀밭 d_y25
     {id:'d_y36',name:'보리밭',        icon:'🌾', size:{w:2,h:2}, priceAdj:-5,  cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y37',name:'장작더미 2',  icon:'🪵', priceAdj:+15,       cat:'yard', rarity:'common', reqLv:1},
-    {id:'d_y38',name:'큰 바위 2',   icon:'🪨', size:{w:2,h:1}, priceAdj:-10,  cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y37',name:'장작더미 2',  icon:'🪵', priceAdj:+15,       cat:'yard', rarity:'common', reqLv:1, hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 장작더미 d_y23
+    {id:'d_y38',name:'큰 바위 2',   icon:'🪨', size:{w:2,h:1}, priceAdj:-10,  cat:'yard', rarity:'rare',   reqLv:1, hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 큰 바위 d_y26
 
     // ── 2차 확장: 정적 동물 ─────────────────────────────────
     {id:'d_y39',name:'닭 3마리',      icon:'🐔', size:{w:2,h:1}, priceAdj:0,  cat:'yard', rarity:'rare',   reqLv:1},
@@ -455,7 +455,7 @@ const GAME_DATA = {
     // ── 2차 확장: 식생/나무 ─────────────────────────────────
     {id:'d_y45',name:'키 큰 풀숲',    icon:'🌿', priceAdj:-5,       cat:'yard', rarity:'common', reqLv:1},
     {id:'d_y46',name:'침엽수',   icon:'🌲', size:{w:2,h:2}, priceAdj:+50, cat:'yard', rarity:'rare',   reqLv:1},
-    {id:'d_y47',name:'둥근 나무 2', icon:'🌳', size:{w:2,h:2}, priceAdj:+60, cat:'yard', rarity:'rare',   reqLv:1},
+    {id:'d_y47',name:'둥근 나무 2', icon:'🌳', size:{w:2,h:2}, priceAdj:+60, cat:'yard', rarity:'rare',   reqLv:1, hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 작은 나무 d_y9
     {id:'d_y48',name:'과수나무',      icon:'🍎', size:{w:2,h:2}, priceAdj:+120, cat:'yard', rarity:'common', reqLv:1},
 
     // ── 목재 울타리 — 한 종만 상점에 둔다(놓으면 이웃을 보고 네 모양 중 맞는 것으로 그려진다, DECO-FENCE-1)
@@ -479,14 +479,14 @@ const GAME_DATA = {
 
     // ── 4차 확장: 넓어진 마당용 큰 장식 (DECO-LAND-1 뒤) — pen 은 동물이 안에서만 돌아다니는 우리
     {id:'d_y58',name:'닭장',          icon:'🐔', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true, newUntil:'2026-09-27'},
-    {id:'d_y59',name:'큰 연못',       icon:'🦆', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true, penWater:true, newUntil:'2026-09-27'},
+    {id:'d_y59',name:'큰 연못',       icon:'🦆', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true, penWater:true, newUntil:'2026-09-27', hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 🖌 물 바닥(+물가)
     {id:'d_y60',name:'양 목장',       icon:'🐑', size:{w:5,h:4}, priceAdj:0, cat:'yard', rarity:'legend', reqLv:1, pen:true, newUntil:'2026-09-27'},
     {id:'d_y61',name:'꽃길',     icon:'🌸', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, hidden:true, newUntil:'2026-09-27'},   // [DECO-RETIRE-1] 🖌 바닥(꽃밭·자갈)으로 같은 것을 칠할 수 있어 상점에서만 뺀다 — 가진 것·놓은 것은 그대로
     {id:'d_y62',name:'강아지 마당',   icon:'🐶', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, pen:true, newUntil:'2026-09-27'},
     {id:'d_y63',name:'놀이터',        icon:'🛝', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
-    {id:'d_y64',name:'과수원',        icon:'🍎', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y64',name:'과수원',        icon:'🍎', size:{w:4,h:4}, priceAdj:-75, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27', hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 과수나무 d_y48 넷
     {id:'d_y65',name:'자갈길',   icon:'🪨', size:{w:3,h:1}, priceAdj:0, cat:'yard', rarity:'common', reqLv:1, hidden:true, newUntil:'2026-09-27'},   // [DECO-RETIRE-1] 🖌 바닥(꽃밭·자갈)으로 같은 것을 칠할 수 있어 상점에서만 뺀다 — 가진 것·놓은 것은 그대로
-    {id:'d_y66',name:'큰 헛간',       icon:'🏚️', size:{w:4,h:3}, priceAdj:-150, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27'},
+    {id:'d_y66',name:'큰 헛간',       icon:'🏚️', size:{w:4,h:3}, priceAdj:-150, cat:'yard', rarity:'legend', reqLv:1, newUntil:'2026-09-27', hidden:true},   // [DECO-RETIRE-2] 상점에서만 뺀다(가진 것·놓은 것은 그대로) — 대신 헛간 d_y28
     {id:'d_y67',name:'온실',          icon:'🪴', size:{w:4,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
     {id:'d_y68',name:'캠프파이어', icon:'🔥', size:{w:3,h:3}, priceAdj:0, cat:'yard', rarity:'epic',   reqLv:1, newUntil:'2026-09-27'},
 
@@ -519,7 +519,7 @@ const GAME_DATA = {
     {id:'d_i10',name:'침대',          icon:'🛏️', size:{w:2,h:2}, priceAdj:-23, cat:'indoor', rarity:'epic',   reqLv:1},
     {id:'d_i11',name:'수족관',        icon:'🐠', size:{w:3,h:1}, priceAdj:+15, cat:'indoor', rarity:'epic',   reqLv:1},
     // 🟡 전설 Lv20+
-    {id:'d_i12',name:'황금 책장',     icon:'📖', size:{w:2,h:2}, priceAdj:-75, cat:'indoor', rarity:'legend', reqLv:1},
+    {id:'d_i12',name:'금빛 책장',     icon:'📖', size:{w:2,h:2}, priceAdj:-75, cat:'indoor', rarity:'legend', reqLv:1},
     {id:'d_i13',name:'마법 거울',     icon:'🪞', size:{w:1,h:2}, priceAdj:0, cat:'indoor', rarity:'legend', reqLv:1},
     {id:'d_i14',name:'왕의 의자',     icon:'👑', size:{w:1,h:2}, priceAdj:+75, cat:'indoor', rarity:'legend', reqLv:1},
     // ── 러그 (layer:'floor' = 가구·캐릭터 뒤 바닥 레이어에 그림, FLOOR-SVG-1) ──
