@@ -5008,7 +5008,7 @@ window.__umbrella = () => ({ 켜짐: window.VRULES.umbrella.on, 비: EV.rain, �
      · 통이 가까운 가게 — 나온 손님 몇 명(canEvery 명에 한 명)이 통 앞까지 걸어가 pauseMs 멈췄다 간다(버리는 몸짓 · 기쁜 쪽).
    규칙 모듈 꼴: 스위치·수치 VRULES.litter + 고리 세 줄(tickFolks · 루프 · buildChunk). 가게 드나듦은 기존 줄을 안 고치고 f.inside 가 바뀌는 것으로 센다.
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).litter = { on: true, kinds: ['shop'], radius: 4, lo: 5, hi: 10, pieces: [0, 3, 7], cellsMax: 3,   /* pieces = 칸마다(모양 규칙 §6: 1단계 두세 개 · 2단계 예닐곱 개 + 봉지 더미) */ askMs: 2400, pauseMs: 800, canEvery: 3, flashMs: 3000 };
+(window.VRULES = window.VRULES || {}).litter = { on: true, kinds: ['shop'], radius: 4, lo: 5, hi: 10, edgePack: 0.35, edgeShift: 1.35, pieces: [0, 3, 7], cellsMax: 3,   /* pieces = 칸마다(모양 규칙 §6: 1단계 두세 개 · 2단계 예닐곱 개 + 봉지 더미) */ askMs: 2400, pauseMs: 800, canEvery: 3, flashMs: 3000 };
 const LIT = { shops: new Map(), day: -1, key: '', scanAt: -1e9, tick: -1, dirty: true, lastCells: new Set(), pieces: 0, stats: { 가게: 0, 단계1: 0, 단계2: 0, 두리번: 0, 통앞멈춤: 0, 놓자마자줄어듦: 0 } };
 const litCanNear = rec => { const R = window.VRULES.litter, b = roadBeside(rec); if (b < 0) return false; const { reach } = roadBFS(b, undefined, R.radius);
   for (const c of reach) { const x = cX(c), y = cY(c); for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && r.k === 'trashcan') return c; } } return false; };   // 통 옆 길 칸(멈춰 설 자리) 또는 false
@@ -5022,7 +5022,7 @@ function litCells(rec) { const R = window.VRULES.litter, fp = footprint(rec.k, c
   const hidden = c => { for (let t = 0.5; t <= 2; t += 0.5) { const hx = Math.round(cX(c) + fx * t), hy = Math.round(cY(c) + fz * t); if (inb(hx, hy) && mine.has(idx(hx, hy))) return 1; } return 0; };   // 카메라와 그 칸 사이에 이 건물 — 가린다
   const face = c => (cX(c) - ccx) * fx + (cY(c) - ccy) * fz;           // 클수록 카메라 쪽(앞)
   const all = [...ring].map(([c, r], k) => ({ c, r, k, h: hidden(c), f: face(c) }));
-  if (all.every(o => o.h)) return all.filter(o => o.r === 1).sort((a, b) => b.f - a.f || a.k - b.k).map(o => o.c).slice(0, R.cellsMax);   // 다 가려지면 지금처럼(닿은 칸)
+  if (all.every(o => o.h)) { const r = all.filter(o => o.r === 1).sort((a, b) => b.f - a.f || a.k - b.k).map(o => o.c).slice(0, R.cellsMax); if (r.length) { const c = r[0]; let dx = cX(c) - ccx, dy = cY(c) - ccy; const d = dx * fx + dy * fz; dx -= d * fx; dy -= d * fz; const L = Math.hypot(dx, dy); r.edge = L > 0.05 ? [dx / L, dy / L] : [fz, -fx]; } return r; }   // 다 가려지면 지금처럼(닿은 칸) — 그 칸 안에서 조각을 '건물 옆으로 비껴 보이는' 가장자리로(actLitterChunk · 보스 ⓑ): 건물→칸 방향에서 카메라 쪽 성분을 뺀 쪽
   return all.sort((a, b) => a.h - b.h || a.r - b.r || b.f - a.f || a.k - b.k).map(o => o.c).slice(0, R.cellsMax); }   // 안 가려진 칸 → 닿은 칸 → 앞쪽
 function litScan(now) {                                                 // 가게 목록 — 하루 한 번 · 놓은 것이 바뀌면(2초에 한 번까지)
   const R = window.VRULES.litter, day = Math.floor(SIM.t / DAY_MS), key = placedTotal + ':' + day + ':' + litFaceKey();
@@ -5129,6 +5129,7 @@ function actLitterChunk(x0, z0, bucket) {
   const base = BASE.box; let n = 0;
   LIT.shops.forEach(s => { if (!s.stage) return; (s.cells || []).forEach((c, ci) => { const x = cX(c), y = cY(c); if (x < x0 || x >= x0 + CHUNK || y < z0 || y >= z0 + CHUNK) return;
     litPieces(c, ci, s.stage).forEach(p => { const b = bucket('lit'), off = b.pos.length / 3;
+      if (s.cells.edge) { const [ux, uz] = s.cells.edge, ox = wx(cX(c)), oz = wz(cY(c)); p.x = ox + (p.x - ox) * R.edgePack + ux * R.edgeShift; p.z = oz + (p.z - oz) * R.edgePack + uz * R.edgeShift; }   // [ACT-LITTER ⓑ] 보이는 길이 없는 가게 — 조각을 모아 건물 옆으로 비껴 보이는 칸 가장자리로(모양은 그대로)
       litM.compose(litP.set(p.x, p.y, p.z), litQ.setFromAxisAngle(litY, p.ry), litS.set(p.sx, p.sy, p.sz)); litN.getNormalMatrix(litM); litC.setHex(p.col);
       for (let v = 0; v < base.nv; v++) { litV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(litM); b.pos.push(litV.x, litV.y, litV.z);
         litV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(litN).normalize(); b.nrm.push(litV.x, litV.y, litV.z); b.col.push(litC.r, litC.g, litC.b); b.emis.push(0); b.night.push(0); }
