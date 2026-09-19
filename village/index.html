@@ -1528,7 +1528,7 @@ function forestSeason() {
    왜 InstancedMesh 를 버렸나: 종류·부위마다 판 전체를 한 덩어리로 들어 화면 밖도 다 그렸다 —
    128×128 부터 PRD 한도(12ms·30만△)를 못 지켰다(README 33).
    ══════════════════════════════════════════════════════════════ */
-const CHUNK = 4, NCX = Math.ceil(W / CHUNK), NCZ = Math.ceil(H / CHUNK);   // 8→4: 경계 구가 작아야 화면 밖 청크를 덜 그린다
+const CHUNK = 6, NCX = Math.ceil(W / CHUNK), NCZ = Math.ceil(H / CHUNK);   // 8→4: 경계 구가 작아야 화면 밖 청크를 덜 그린다 · [MAC-CHUNK6] 4→6(09-20): 기본 거리 draw call 103→69 · 넓게 볼 때 115→76 · 삼각형 +0~4% · 놓을 때 다시 합치는 시간 같음(pop167 실측)
 const chunks = new Map();                       // key → { cx, cz, meshes:{lit,glow,glass}, items:[], built }
 const dirtyChunks = new Set();
 const chunkGroup = new THREE.Group(); scene.add(chunkGroup);
