@@ -5945,7 +5945,7 @@ window.__rainShelter = () => ({ 켜짐: window.VRULES.rainShelter.on, 비: EV.ra
    아침에 그날 첫 이사 오는 사람이 나오면 **그 사람은 수레 옆 길 칸에서 출발**해 수레를 끌고 집까지 간다(목적지·이사 판정은 그대로 — 출발 칸만).
    집에 닿으면(또는 돌아서 나가면) 수레는 ✨ 와 함께 사라진다. 판정 0 · 저장 0.
    그림: 서 있는 수레는 길 청크 'lit' 묶음 기하에 합친다(draw call +0 · 등불 e:1 = 가로등과 같은 밤 발광). 끌려가는 동안만 InstancedMesh 하나(+1).
-   모양: 디자인 담당 [DESIGN-CART-1] 의 window.CART_PARTS(1×1 칸 · 칸 가운데 원점 · 앞 = +z 손잡이 · e = aEmis 0~1)를 읽고, 없으면 아래 임시 상자.
+   모양: 디자인 담당 [DESIGN-CART-1] 의 window.CART_PARTS(1×1 칸 · 칸 가운데 원점 · 앞 = +z 손잡이 · e = aEmis 0~1 · n:1 = 밤에만 따뜻한 빛)를 읽고, 없으면 아래 임시 상자.
          window.CART_GLOW(발밑 불빛 웅덩이)는 **밤에 서 있을 때만** 같은 묶음에 넣고, 끌려가는 수레에는 안 넣는다.
    규칙 모듈 꼴: 스위치 VRULES.nightCart + 고리 셋(tickFolks · 루프 · buildChunk — 쓰레기 청크 고리 바로 아래).
    ══════════════════════════════════════════════════════════════ */
@@ -5956,7 +5956,7 @@ const CART_TMP = [                                                      // 임�
   { g: 'cyl', c: 0x5a3e28, s: [0.55, 0.14, 0.55], p: [-0.85, 0.55, -0.2], rz: Math.PI / 2 }, { g: 'cyl', c: 0x5a3e28, s: [0.55, 0.14, 0.55], p: [0.85, 0.55, -0.2], rz: Math.PI / 2 },
   { g: 'box', c: 0x7a5535, s: [0.08, 0.08, 1.4], p: [-0.55, 0.95, 1.7] }, { g: 'box', c: 0x7a5535, s: [0.08, 0.08, 1.4], p: [0.55, 0.95, 1.7] },
   { g: 'box', c: 0xd9c9a3, s: [0.8, 0.7, 0.8], p: [-0.25, 1.36, -0.4] }, { g: 'box', c: 0xb08560, s: [0.6, 0.55, 0.6], p: [0.35, 1.3, 0.45] },
-  { g: 'box', c: 0x3a3a3a, s: [0.07, 1.3, 0.07], p: [0.7, 1.65, 0.95] }, { g: 'box', c: 0xffd27a, s: [0.28, 0.34, 0.28], p: [0.7, 2.35, 0.95], e: 1 } ];   // 발밑 불빛(window.CART_GLOW)은 디자인 담당 표에만
+  { g: 'box', c: 0x3a3a3a, s: [0.07, 1.3, 0.07], p: [0.7, 1.65, 0.95] }, { g: 'box', c: 0xffd27a, s: [0.28, 0.34, 0.28], p: [0.7, 2.35, 0.95], n: 1 } ];   // 발밑 불빛(window.CART_GLOW)은 디자인 담당 표에만
 const cartParts = () => (Array.isArray(window.CART_PARTS) && window.CART_PARTS.length ? window.CART_PARTS : CART_TMP);
 const cartGlow = () => (Array.isArray(window.CART_GLOW) ? window.CART_GLOW : []);   // 디자인 담당: 발밑 불빛 웅덩이 — 밤에 서 있을 때만(끌려갈 땐 빼다)
 const CART = { spot: null, cell: -1, road: -1, yaw: 0, shown: false, hour: -99, mover: null, moverHome: -1, since: 0, pop0: -1, stats: { 밤에세움: 0, 거둠: 0, 끌고감: 0, 도착: 0, 못끌고감: 0, 조용히들어감: 0 } };
@@ -6002,7 +6002,7 @@ function actCartChunk(x0, z0, bucket) {
   cartParts().concat(cartGlow()).forEach(pt => { const base = BASE[pt.g]; if (!base) return; cartP.multiplyMatrices(cartM, cartPartMatrix(pt, cartP)); cartN.getNormalMatrix(cartP); cartC.setHex(pt.c);
     const b = bucket('lit'), off = b.pos.length / 3;
     for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); b.pos.push(cartV.x, cartV.y, cartV.z);
-      cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); b.nrm.push(cartV.x, cartV.y, cartV.z); b.col.push(cartC.r, cartC.g, cartC.b); b.emis.push(pt.e || 0); b.night.push(0); }   // e = aEmis 값 그대로(0~1)
+      cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); b.nrm.push(cartV.x, cartV.y, cartV.z); b.col.push(cartC.r, cartC.g, cartC.b); b.emis.push(pt.e || 0); b.night.push(pt.n || 0); }   // e = aEmis 값 그대로(0~1 · 낮에도 빛남) · n = 사람 사는 집 창과 같은 밤빛(낮 0) — 등불·발밑 불빛은 n
     for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off); });
 }
 /* 끌려가는 수레 — 같은 표를 한 기하로 굽는다(모양 표가 바뀌면 다시) · 걷는 동안만 count 1 */
