@@ -3535,6 +3535,43 @@ function thumbRedo(why) {
   const dress0 = thumbDress; thumbDress = function (el) { if (window.VRULES.thumbFix.on && document.hidden) { THUMBFIX.hiddenTry = true; THUMBFIX.stats.안보여서미룸++; return; } return dress0.apply(this, arguments); }; }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && THUMBFIX.hiddenTry) setTimeout(() => thumbRedo('visible'), 200); });
 window.__thumbFix = () => ({ 켜짐: window.VRULES.thumbFix.on, 미뤄둔것: THUMBFIX.hiddenTry, ...THUMBFIX.stats });
+/* ── [MAC-CARDROT] 돌리면 고른 카드의 그림과 돌리기 단추도 같이 돈다 (사용자 09-20: "돌리면 저게 바뀌면 안 돼?") ──
+   돌리기를 눌러도 카드 그림은 그대로였고 단추엔 '0°/90°' 글자만 바뀌었다 — 아이는 도(°)를 읽지 않는다.
+   · 카드 그림 찍기(DESIGN-CARDTHUMB)를 방향별로 찍어 따로 캐시한다(thumbRot). thumbOf 는 rot 0 만 찍으므로, 찍는 동안만 partMatrix 의 방향을 바꿔 준다(원래 캐시는 그대로 돌려놓는다).
+   · **고른 카드만** 지금 방향으로 — 다른 카드는 0 그대로, 고름을 풀면 0 으로. 돌리기 단추에는 🔄 대신 그 물건의 돈 모습, 글자 '90°' 대신 🔄.
+   · 판 위 미리보기(MAC-GHOST)와 **같은 방향**이어야 한다 — 시점을 돌려 놓았으면(↻ · 끌어 돌리기) 그만큼 빼서 찍는다(90° 단위로 어림).
+   · 돌려도 안 달라지는 것(rot 0 과 rot 1 의 그림이 같다 — 나무·우물 같은 대칭)과 이음류·꽃밭은 안 바꾼다: 돌리기 단추는 흐려진다.
+   · 길게 누르기 메뉴의 🔄 에도 그 물건의 지금 모습. 찍는 값: 한 장 7ms 안팎 · 고른 종류의 방향마다 한 번. 원래 줄 수정 0 — 감싸기. */
+(window.VRULES = window.VRULES || {}).cardRot = { on: true };
+var CARDROT = { cache: new Map(), force: null, sym: new Map(), stats: { 찍음: 0, 바꿈: 0 } };
+{ const pm0 = partMatrix; partMatrix = function (kind, x, y, rot, pt, out) { return pm0(kind, x, y, CARDROT && CARDROT.force != null ? CARDROT.force : rot, pt, out); }; }   // 찍는 동안만 방향을 바꾼다(그 밖엔 그대로 통과)
+const cardRotView = () => ((Math.round((camAz - Math.PI / 4) / (Math.PI / 2)) % 4) + 4) % 4;           // 시점이 기본에서 몇 번(90°) 돌았나
+function thumbRot(kind, rot) {
+  rot = ((rot % 4) + 4) % 4; if (!K[kind]) return null; const base = thumbOf(kind); if (!rot || !base) return base;
+  const season = seasonNow < 0 ? 1 : seasonNow, ck = kind + ':' + rot + ':' + season + ':' + base.length; if (CARDROT.cache.has(ck)) return CARDROT.cache.get(ck);
+  const lk = kind + ':' + season, key0 = THUMB.last && THUMB.last.get(lk), keep = key0 != null ? THUMB.cache.get(key0) : undefined; if (key0 != null) THUMB.cache.delete(key0);
+  let url = null; CARDROT.force = rot; try { url = thumbOf(kind); } finally { CARDROT.force = null; if (key0 != null && keep !== undefined) { THUMB.cache.set(key0, keep); THUMB.last.set(lk, key0); } }
+  if (url) { CARDROT.cache.set(ck, url); CARDROT.stats.찍음++; } return url || base;
+}
+/* 돌려서 달라지는 물건인가 — 이음류·꽃밭은 아니다 · 나머지는 rot 0 과 rot 1 의 그림을 견줘 본다(한 번만) */
+function cardRotTurns(kind) { if (!kind || !K[kind] || JOIN_KINDS[kind] || FLOWER_KINDS[kind]) return false; if (CARDROT.sym.has(kind)) return CARDROT.sym.get(kind);
+  const a = thumbOf(kind), b = a && thumbRot(kind, 1), turns = !!(a && b && a !== b); if (a) CARDROT.sym.set(kind, turns); return turns; }
+function cardRotSync() {
+  const R = window.VRULES.cardRot; if (!R.on || document.hidden) return; const want = sel && cardRotTurns(sel) ? ((selRot - cardRotView()) % 4 + 4) % 4 : 0;
+  document.querySelectorAll('#trayIn .card[data-kind]').forEach(el => { const ic = el.querySelector('.ic'), img = ic && ic.querySelector('img.thumb'); if (!img) return; const kind = el.dataset.kind, r = kind === sel ? want : 0;
+    if ((+ic.dataset.trot || 0) === r) return; const url = thumbRot(kind, r); if (url) { img.src = url; ic.dataset.trot = r; CARDROT.stats.바꿈++; } });
+  const rc = document.getElementById('cRot'); if (!rc) return; const ic = rc.querySelector('.ic'), sz = rc.querySelector('.sz'), kind = carrying ? carrying.k : sel, rot = carrying ? carrying.rot : selRot;
+  if (kind && cardRotTurns(kind)) { const url = thumbRot(kind, ((rot - cardRotView()) % 4 + 4) % 4); if (url && ic) { ic.innerHTML = '<img class="thumb" src="' + url + '" alt="">'; if (sz) sz.textContent = '🔄'; } rc.classList.remove('off'); }
+  else { if (ic && ic.querySelector('img')) ic.textContent = '🔄'; if (kind && rc) rc.classList.add('off'); }                                       // 돌려도 안 달라지는 것 → 흐림
+}
+{ const ref0 = refreshRotCard; refreshRotCard = function () { const r = ref0.apply(this, arguments); cardRotSync(); return r; };      // 돌리기·고르기·풀기·집어 들기가 다 이 함수를 지난다
+  const set0 = thumbSet; thumbSet = function (el, kind, url) { const r = set0.apply(this, arguments); const ic = el.querySelector('.ic'); if (ic) delete ic.dataset.trot; if (kind === sel && selRot) cardRotSync(); return r; };   // 늦게 찍힌 rot 0 그림이 고른 카드를 덮으면 다시 맞춘다
+  const view0 = rotateView; rotateView = function () { const r = view0.apply(this, arguments); cardRotSync(); return r; };
+  const hd0 = holdDraw; holdDraw = function () { const r = hd0.apply(this, arguments); const o = HOLD.open, rec = o && cells[o.root], b = document.querySelector('#hold .hbtn span');
+    if (window.VRULES.cardRot.on && rec && b && cardRotTurns(rec.k)) { const url = thumbRot(rec.k, ((rec.rot - cardRotView()) % 4 + 4) % 4); if (url) b.innerHTML = '<img src="' + url + '" alt="" style="width:34px;height:34px;display:block;margin:-6px auto -4px">'; } return r; };
+  const hr0 = holdRotate; holdRotate = function () { const r = hr0.apply(this, arguments); if (HOLD.open) holdDraw(); return r; }; }
+addEventListener('pointerup', () => { if (CARDROT.viewQ !== cardRotView()) { CARDROT.viewQ = cardRotView(); cardRotSync(); } });   // 끌어서 시점을 돌린 뒤
+window.__cardRot = () => ({ 켜짐: window.VRULES.cardRot.on, 고른것: sel, 방향: selRot, 시점돈횟수: cardRotView(), 고른카드그림방향: (() => { const el = sel && document.querySelector('#trayIn .card[data-kind="' + sel + '"] .ic'); return el ? +el.dataset.trot || 0 : null; })(), 돌리기단추그림: !!(document.querySelector('#cRot .ic img')), 돌리기단추흐림: !!(document.getElementById('cRot') && document.getElementById('cRot').classList.contains('off')), 캐시: CARDROT.cache.size, ...CARDROT.stats });
 
 
 const isRoad = i => { const c = cells[i]; return !!(c && K[c.k].road); };
