@@ -7498,7 +7498,7 @@ function _groundKind(type) {
   return GROUND_HARD.indexOf(type) >= 0 ? 'hard' : 'soft';   // 그 외는 풀·흙
 }
 function _groundAt(student, r, c) {
-  return _groundKind(_yardFloorGet(student)[r + '_' + c] || 'grass');   // [DECO-SPACE-1]
+  return _groundKind(_floorParse(_yardFloorGet(student)[r + '_' + c]).name);   // [DECO-SPACE-1] · 색·마감이 붙은 꽃밭도 이름으로 본다
 }
 //  이 동물을 (r,c) 에 놓을 수 있나 — 바닥만 본다(겹침은 canPlaceDeco 가 본다)
 function _animGroundOk(id, student, r, c, w, h) {
@@ -7926,6 +7926,28 @@ function _floorImg(name) {
   img.src = './assets/floor/' + encodeURIComponent(name) + '.svg';
   return null;
 }
+// [DECO-FLOOR-PARSE-1] 바닥 저장값 해석은 여기 한 곳 — '이름#색+마감'(예 'tulipbed#red+picket' · 'hydrangea+stone'). 옛 값('stone')은 이름뿐이다.
+//  · '#'·'+' 가 없는 값은 **이름 그대로**(옛 마당은 한 픽셀도 안 바뀐다) · 빈 값·글자가 아닌 값·못 읽는 새 형식은 잔디.
+//  · 색·마감은 그림 주소와 캐시 키에 들어갈 값이라 [a-z0-9_] 만 받는다.
+//  · 칸마다·이웃마다 불리므로 결과를 값별로 기억한다(얼린 객체 — 받은 쪽이 고치지 않는다).
+//  · 지우개 판정('같은 값이면 걷어 낸다')은 저장값 글자 그대로 비교한다 = 색·마감까지 같을 때만.
+function _floorParse(v) {
+  const M = _floorParse._m || (_floorParse._m = new Map());
+  let p = M.get(v);
+  if (p) return p;
+  let name = 'grass', color = '', rim = '';
+  if (v && typeof v === 'string') {
+    if (v.indexOf('#') < 0 && v.indexOf('+') < 0) name = v;
+    else {
+      const m = /^([a-z][a-z0-9_]*)(?:#([a-z0-9_]+))?(?:\+([a-z0-9_]+))?$/.exec(v);
+      if (m) { name = m[1]; color = m[2] || ''; rim = m[3] || ''; }
+    }
+  }
+  p = Object.freeze({ name, color, rim });
+  if (M.size > 300) M.clear();
+  M.set(v, p);
+  return p;
+}
 const _FLOOR_VARIANTS = { grass:4, dirt:4, stone:2, flower:2, dry_earth:2, sand:2, water:2 };
 function _floorBaseName(type, r, c) {
   const n = _FLOOR_VARIANTS[type] || 0;
@@ -8041,14 +8063,14 @@ function _drawYard() {
   // 셀별 바닥 타일
   // [FLOOR-SVG-1] 이웃 타입 조회 — 격자 밖·집 영역은 null(경계 없음)
   const _yardTypeAt = (rr, cc) => (rr < 0 || cc < 0 || rr >= DY.rows || cc >= DY.cols || _isHC(rr, cc))
-    ? null : (_yardFloorGet(CUR)[rr+'_'+cc] || 'grass');   // [DECO-SPACE-1]
+    ? null : _floorParse(_yardFloorGet(CUR)[rr+'_'+cc]).name;   // [DECO-SPACE-1] · [DECO-FLOOR-PARSE-1] 이웃 판정은 이름으로
   const _vis = _decoVisible(DY.rows, DY.cols);   // [DECO-ZOOM-1] 보이는 칸만
   const _floorCells = (v) => {
     const fl = _yardFloorGet(CUR);
     for(let r=v.r0;r<v.r1;r++) for(let c=v.c0;c<v.c1;c++){
       if(_isHC(r,c)) continue;
       const tkey = r+'_'+c;
-      const ttype = fl[tkey]||'grass';
+      const ttype = _floorParse(fl[tkey]).name;   // [DECO-FLOOR-PARSE-1] 옛 값은 이름 그대로
       const tile = FLOOR_TILES[ttype]||FLOOR_TILES.grass;
       if (FLOOR_SVG && _drawFloorSVG(ttype, r, c, c*C, r*C, C, _yardTypeAt)) continue;   // [FLOOR-SVG-1] SVG 있으면 그걸로 끝
       _dCtx.fillStyle = (r+c)%2===0 ? tile.bg : tile.alt;

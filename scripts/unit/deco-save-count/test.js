@@ -618,6 +618,53 @@
       openInteriorFullscreen(); await sleep(500);
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
     }
+
+    //  ⑮ 바닥 저장값 해석(DECO-FLOOR-PARSE-1) — 옛 값만 있는 마당은 **한 픽셀도** 달라지면 안 된다.
+    //    옛 바닥 14종을 이웃이 골고루 섞이게 깔고(연못 = 물가 조각 전부 · 잔디 번짐) 캔버스 전체의 지문(SHA-256)을 찍는다.
+    //    지문은 기기(래스터)마다 다르다 → 값 자체는 맞다/틀리다가 아니다. **전/후 비교는 `REPO=<main 을 푼 폴더>` 로 같은 기기에서 나란히**
+    //    (이 줄이 main 과 같으면 옛 마당 그림 불변). 바닥 그리기를 고치는 PR 은 이 지문의 전/후를 PR 에 적는다.
+    {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(500); }
+      if (typeof decoSpaceSet === 'function') { decoSpaceSet(1); await sleep(200); }
+      decoZoomFit(); await sleep(100);
+      const OLD = Object.keys(FLOOR_TILES), keepFloor = CUR.yardFloor, fx = {};
+      const vis = _decoVisible(DY.rows, DY.cols), free = (r, c) => !_isHC(r, c) && !(typeof _isFarmCell === 'function' && _isFarmCell(r, c));
+      for (let r = vis.r0; r < vis.r1; r++) for (let c = vis.c0; c < vis.c1; c++) {          // 보이는 칸 전부에 — 다섯 칸에 한 칸쯤은 맨 잔디로 둔다
+        const k = (r * 7 + c * 13 + (r * c) % 3) % (OLD.length + 3);
+        if (free(r, c) && k < OLD.length) fx[r + '_' + c] = OLD[k];
+      }
+      const pr = vis.r0 + 2, pc = vis.c0 + 4;                                                 // 연못 5×6(귀 하나 빠짐 · 가운데 섬) = 물가 변·안 모서리·바깥 모서리 전부
+      for (let r = pr; r < pr + 5; r++) for (let c = pc; c < pc + 6; c++) if (free(r, c) && !(r === pr && c === pc) && !(r === pr + 2 && c === pc + 3)) fx[r + '_' + c] = 'water';
+      CUR.yardFloor = fx;
+      const print = async () => {
+        _drawDeco(); await sleep(150);
+        const cv = document.querySelector('#if-topview canvas'); if (!cv) return 'no-canvas';
+        const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+        const h = await crypto.subtle.digest('SHA-256', d.buffer);
+        return cv.width + 'x' + cv.height + ':' + [...new Uint8Array(h)].slice(0, 10).map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+      await print();                                                      // 첫 그리기 = 그림을 부른다
+      for (let i = 0; i < 100; i++) {                                     // 부른 바닥 그림이 다 올 때까지(없는 파일은 complete 로 끝난다)
+        if (Object.keys(_FLOOR_IMG).every(k => _FLOOR_IMG[k].img.complete)) break; await sleep(50);
+      }
+      await sleep(300);
+      const f1 = await print(), f2 = await print();
+      out('옛바닥마당_칠한칸_종류', Object.keys(fx).length + '칸·' + new Set(Object.values(fx)).size + '종');
+      out('옛바닥마당_14종_다씀', new Set(Object.values(fx)).size === OLD.length);
+      out('옛바닥마당_바닥그림_다옴', OLD.every(t => Object.keys(_FLOOR_IMG).some(k => k.indexOf('tile_' + t) === 0 && _FLOOR_IMG[k].ok)));
+      out('옛바닥마당_두번그려_같음', f1 === f2 && f1 !== 'no-canvas');
+      out('옛바닥마당_그림지문', f1);
+      if (typeof _floorParse === 'function') {
+        out('바닥해석_옛값_이름그대로', OLD.every(t => { const p = _floorParse(t); return p.name === t && !p.color && !p.rim; }));
+        const p = _floorParse('tulipbed#red+picket');
+        out('바닥해석_새형식', p.name === 'tulipbed' && p.color === 'red' && p.rim === 'picket');
+        //  아직 그림을 안 잇는 새 값(②~③ 전)이 저장본에 있어도 깨지지 않는다 — 오류 없이 그려지고 동물 바닥은 풀·흙
+        CUR.yardFloor = Object.assign({}, fx, { '7_2': 'tulipbed#red+picket', '7_3': 'lavender+brick' });
+        let threw = ''; try { _drawYard(); } catch (e) { threw = String(e).slice(0, 80); }
+        out('바닥해석_새값있어도_그려짐', threw === '' && _groundAt(CUR, 7, 2) === 'soft');
+      }
+      CUR.yardFloor = keepFloor; _drawDeco(); await sleep(100);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';

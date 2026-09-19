@@ -34,7 +34,7 @@ const eq = (a, b, note = '') => {
 //  문자열·정규식·주석 안의 중괄호를 완벽히 세지는 않지만, 대상 함수들은 그런 경우가 없다.
 //  [DECO-SPACE-1] 꾸미기 함수들은 '지금 공간'의 장식·바닥만 본다 — 시험 샌드박스에 공간 도우미를 먼저 넣는다(공간 1)
 const NL = String.fromCharCode(10);
-const SPACE_PRELUDE = (S) => 'let DECO_SPACE = 1;' + NL + ['_decoSpaceOf', '_decoList', '_yardFloorGet', '_yardFloorMap']
+const SPACE_PRELUDE = (S) => 'let DECO_SPACE = 1;' + NL + ['_decoSpaceOf', '_decoList', '_yardFloorGet', '_yardFloorMap', '_floorParse']
   .map(n => sliceFn(S, n)).join(NL) + NL;
 
 function sliceFn(src, name) {
@@ -1314,6 +1314,45 @@ try {
   test('먹이통이 멀면(7칸 넘음) 그 동물은 안 간다', () => eq(far1.feeder, null));
 } catch (e) {
   test('울타리·먹이통 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  [DECO-FLOOR-PARSE-1] 바닥 저장값 해석 — '이름#색+마감'. 옛 값은 이름 그대로여야 옛 마당이 안 바뀐다.
+cur = '꾸미기 바닥 저장값 해석(DECO-FLOOR-PARSE-1)';
+try {
+  const S = read('student.js');
+  const sb = {}; sb.globalThis = sb; vm.createContext(sb);
+  //  FLOOR_TILES 표(옛 바닥 14종)를 소스에서 그대로 잘라 온다 — 표에 있는 이름은 전부 '이름 그대로'여야 한다
+  const at = S.indexOf('const FLOOR_TILES = {'), end = S.indexOf(NL + '};', at);
+  if (at < 0 || end < 0) throw new Error('FLOOR_TILES 표를 못 찾음');
+  vm.runInContext(SPACE_PRELUDE(S) + S.slice(at, end + 3) + NL + sliceConst(S, 'GROUND_HARD') + sliceFn(S, '_groundKind') + NL + sliceFn(S, '_groundAt') + NL
+    + ';globalThis.__R = { _floorParse, _groundAt, FLOOR_TILES };', sb);
+  const P = sb.__R._floorParse, plain = (v) => { const o = P(v); return { name: o.name, color: o.color, rim: o.rim }; };
+  const OLD = Object.keys(sb.__R.FLOOR_TILES);
+  test('옛 바닥 14종이 표에 있다(이 검사가 빈 표를 보고 통과하지 않게)', () => eq(OLD.length >= 14, true));
+  test('옛 값은 이름 그대로 · 색·마감 없음', () => OLD.forEach(k => eq(plain(k), { name: k, color: '', rim: '' }, k)));
+  test("'#'·'+' 가 없는 낯선 값도 이름 그대로(전과 같은 길 — 그림이 없으면 잔디색)", () => eq(plain('Some-Old Value'), { name: 'Some-Old Value', color: '', rim: '' }));
+  test('빈 값·없는 값·글자가 아닌 값 = 잔디', () => [undefined, null, '', 0, false, 5, {}, []].forEach(v => eq(plain(v), { name: 'grass', color: '', rim: '' }, String(v))));
+  test('이름#색+마감', () => eq(plain('tulipbed#red+picket'), { name: 'tulipbed', color: 'red', rim: 'picket' }));
+  test('이름+마감(색 없음)', () => eq(plain('hydrangea+stone'), { name: 'hydrangea', color: '', rim: 'stone' }));
+  test('이름#색(마감 없음)', () => eq(plain('tulipcol#yellow'), { name: 'tulipcol', color: 'yellow', rim: '' }));
+  test('못 읽는 새 형식은 잔디(순서 뒤집힘 · 빈 조각 · 주소에 못 쓰는 글자)', () =>
+    ['tulipbed+picket#red', 'tulipbed#', 'tulipbed+', '#red', '+brick', 'tulipbed#red+', 'tulipbed#re d', 'tulipbed#../x', 'tulipbed#red#blue', 'a+b+c', 'Tulip#red']
+      .forEach(v => eq(plain(v), { name: 'grass', color: '', rim: '' }, v)));
+  test('같은 값은 같은 객체(기억) · 얼어 있다', () => {
+    eq(P('lavender+brick') === P('lavender+brick'), true); eq(Object.isFrozen(P('stone')), true); eq(P(undefined) === P(undefined), true);
+  });
+  test('기억은 끝없이 자라지 않는다(서로 다른 값 1000개 뒤에도 300 남짓)', () => {
+    for (let i = 0; i < 1000; i++) P('x' + i);
+    eq(P._m.size <= 301, true); eq(plain('stone'), { name: 'stone', color: '', rim: '' });
+  });
+  test('동물 바닥 묶음은 이름으로 본다 — 마감 붙은 꽃밭 = 풀·흙, 물·돌은 전과 같다', () => {
+    const stu = { yardFloor: { '1_1': 'lavender+brick', '1_2': 'tulipbed#red+picket', '2_2': 'water', '3_3': 'stone' } };
+    eq([sb.__R._groundAt(stu, 1, 1), sb.__R._groundAt(stu, 1, 2), sb.__R._groundAt(stu, 2, 2), sb.__R._groundAt(stu, 3, 3), sb.__R._groundAt(stu, 9, 9)],
+       ['soft', 'soft', 'water', 'hard', 'soft']);
+  });
+} catch (e) {
+  test('바닥 저장값 해석 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════
