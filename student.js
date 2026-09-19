@@ -7094,12 +7094,14 @@ if (typeof document !== 'undefined') {
 }
 
 // [DECO-PT-1] 폰(좁은 화면)에서 처음 열면 칸이 7px 라 꽃 하나를 못 누른다 → 칸 약 16px 로 집 앞에서 연다
+//  [DECO-PHONE-INDOOR-1] 집 안도 같다 — 폰 375 에서 50칸 방이 칸 7px 로 열려 가구 하나·나가기 문(7px)을 못 눌렀다.
+//  집 안은 왼쪽 위(벽·창문)부터 연다.
 function _decoPhoneStart() {
-  if (DECO_SCENE !== 'yard' || !_dC || _dW > 600) return;
+  if (!_dC || _dW > 600) return;
   const z = Math.min(DECO_ZOOM_MAX, 16 / Math.max(1, _dC / _dZoom));
   _decoSetZoom(z, 0, 0);
-  //  집(기준 판 오른쪽 위) 앞이 보이게
-  _dPanX = (_houseCol0() - 4) * _dC; _dPanY = 0;
+  if (DECO_SCENE === 'yard') { _dPanX = (_houseCol0() - 4) * _dC; _dPanY = 0; }   // 집(기준 판 오른쪽 위) 앞이 보이게
+  else { _dPanX = 0; _dPanY = 0; }
   _decoClampPan(); _drawDeco();
 }
 
@@ -8727,6 +8729,7 @@ function toggleDecoScene(){
   _dCv=null; _dCtx=null;
   renderHouseDeco();
   if (DECO_SCENE === 'yard') _decoViewRestore();   // [DECO-PT-1] 마당으로 돌아오면 그 자리로
+  else if (_ifMode) _decoPhoneStart();             // [DECO-PHONE-INDOOR-1] 폰이면 집 안도 크게 연다(넓은 화면은 아무 일 없음)
   if(_ifMode) ifSyncScene();
   toast(isYard?'🌿 마당이에요! 집은 오른쪽 위 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
