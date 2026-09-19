@@ -785,7 +785,7 @@ const FLOWER_KINDS = {                                 // pop: 그 인구에서 
   flower_tr: { st:'a', main:0xe8534a, side:0xf7f3ea, nm:'튤립밭',      ic:'🌷' },          // 처음부터
   flower_wd: { st:'c', main:0xf7f3ea, side:0xf6c23e, nm:'들꽃밭',      ic:'🌼' },          // 처음부터
   flower_hy: { st:'b', main:0xf6c23e, side:0xf7f3ea, nm:'노란 꽃밭',   ic:'🌼', pop:10 },
-  flower_ty: { st:'a', main:0xf6c23e, side:0xef8f4f, nm:'노란 튤립밭', ic:'🌻', pop:10 },
+  flower_ty: { st:'a', main:0xf6c23e, side:0xef8f4f, nm:'노란 튤립밭', ic:'🌷', pop:10 },   // 🌻 는 해바라기밭 — 같은 그림이 둘이면 못 가른다
   flower_hb: { st:'b', main:0x7fa6f0, side:0xb79af0, nm:'파란 꽃밭',   ic:'💠', pop:30 },
   flower_wv: { st:'c', main:0xa583e6, side:0xf0719a, nm:'보라 들꽃밭', ic:'🌺', pop:30 },
   flower_to: { st:'a', main:0xf08a3c, side:0xf6c23e, nm:'주황 튤립밭', ic:'🌷', pop:30 },
@@ -3168,7 +3168,9 @@ function renderGoals() {
    · 목표 순서 3곳 + 새 목표 4개(문제형 둘 포함)는 GOALS 배열을 여기서 고쳐 쓴다(원래 줄은 그대로).
    · 트레이에는 '열린 것 + 바로 다음 단계'만 보인다(꽃 탭이 세 줄이 되던 것).
    ══════════════════════════════════════════════════════════════ */
-const GOAL_REWARDS = { deco5: ['flower_hy'], happy: ['flower_ty'], lv2: ['flower_wv'], jobs1: ['flower_to'], lv3: ['flower_lv'], happy5: ['flower_hw'], fest: ['flower_rb'], green1: ['flower_sf'] };
+const GOAL_REWARDS = { deco5: ['flower_hy'], happy: ['flower_ty'], lv2: ['flower_wv'], plaza: ['topi_cyl', 'topi_box'], jobs1: ['flower_to'], lv3: ['topi_two'], happy5: ['flower_hw'], pop50: ['flower_sf'], fest: ['flower_t2'], green1: ['flower_lv'], pop80: ['flower_rb'] };
+/* ↑ [DESIGN-REWARD-1] 디자인 담당이 고친 표(09-20) — 뒤로 갈수록 특별하게 + 목표와 뜻이 맞게: 광장 → 광장을 꾸밀 다듬은 나무 · 3층 집 → 키 큰 2단 공 나무 ·
+   축제 → 알록달록 튤립 · 삭막한 집 없애기 → 향기로운 라벤더 · 인구 80 → 무지개 들꽃. 흰 꽃밭(평범한 색)은 해바라기(새 모양)보다 앞으로. 다듬은 나무는 원뿔·공만 처음부터 */
 const GOAL_NEW = [   // [앞에 올 목표 id, 새 목표] — 그 목표 '뒤'에 끼운다
   ['plaza',  { id: 'jobs1',  t: '어른들 일할 곳 만들기',            ok: () => population() >= JOB_POP && jobStats.일자리 > 0 && jobStats.일없는어른 === 0 }],
   ['lv3',    { id: 'happy5', t: '😊 집 다섯 채',                   ok: () => { let n = 0; res.forEach((v, root) => { const st = sat.get(root); if (v > 0 && st && st.n >= NEEDS.length) n++; }); return n >= 5; } }],
