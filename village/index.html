@@ -2473,6 +2473,56 @@ addEventListener('pointerup', e => {
   down = false;
   canvas.classList.remove('drag');
 });
+/* ── [MAC-RCLICK] 마우스 덤 — 오른쪽 단추로 '눌렀다 떼면' 그 자리의 것을 치운다(무엇을 고르고 있든) ──
+   꽃밭을 죽 놓다가 하나를 잘못 놓으면 치우기 카드 → 누르기 → 다시 꽃밭 카드, 세 번을 오가야 했다. 마우스를 쓰는 아이에겐 오른쪽 단추가 남아 있다.
+   · 오른쪽 단추로 '끌면' 전처럼 시점이 돈다(그대로). 6px 안에서 떼면 치우기.
+   · 치우는 길은 치우기 모드와 같은 act() 하나 — 지우기 방어(MAC-KEEP: 식구 있는 집·큰 건물은 빨간 테두리 뒤 한 번 더)·되돌리기·말이 그대로 붙는다.
+   · 덤으로 고쳐진 것: 물건을 고른 채 오른쪽 단추를 누르면 그 물건이 '놓였다'(pointerdown 이 단추를 안 가렸다).
+   터치·펜은 건드리지 않는다(pointerType === 'mouse' 만). 원래 줄 수정 0 — 캡처 단계에서 먼저 받아 원래 처리기로 안 넘긴다. */
+(window.VRULES = window.VRULES || {}).rightClick = { on: true, slop: 6, tipAfter: 3 };
+const RC = { on: false, id: -1, lx: 0, ly: 0, moved: 0, armRoot: -1, armSig: '', tipN: 0, stats: { 치움: 0, 확인대기: 0, 돌림: 0, 빈곳: 0 } };
+const rcSig = () => String(sel) + '|' + eraser + '|' + mover;
+function rcErase(x, y) {
+  if (PHOTO.on || painting || carrying) return;
+  const c = cellAt(x, y), rec = c && c.inside ? cells[idx(c.x, c.y)] : null;
+  if (!rec) { RC.stats.빈곳++; return; }                                        // 빈 땅·판 밖은 조용히(치우기 모드의 '지울 게 없어요'는 모드를 고른 사람에게 하는 말)
+  const e0 = eraser; eraser = true;
+  try { act(x, y); } finally { eraser = e0; }
+  if (KEEP.armed) { RC.armRoot = KEEP.armed.root; RC.armSig = rcSig(); RC.stats.확인대기++; } else { RC.armRoot = -1; if (!cells[idx(c.x, c.y)]) RC.stats.치움++; }
+}
+canvas.addEventListener('pointerdown', e => {
+  if (!window.VRULES.rightClick.on || e.pointerType !== 'mouse' || e.button !== 2) return;
+  e.stopImmediatePropagation();                                                // 원래 처리기는 단추를 안 가려서 고른 물건을 놓거나(놓기) 집어 든다(옮기기)
+  if (down || painting || carrying) return;                                     // 왼쪽 단추로 무언가 하는 중이면 끼어들지 않는다
+  RC.on = true; RC.id = e.pointerId; RC.lx = e.clientX; RC.ly = e.clientY; RC.moved = 0; canvas.setPointerCapture(e.pointerId);
+}, true);
+canvas.addEventListener('pointermove', e => {
+  if (!RC.on || e.pointerId !== RC.id) return;
+  e.stopImmediatePropagation(); lastMouse.x = e.clientX; lastMouse.y = e.clientY;
+  const dx = e.clientX - RC.lx, dy = e.clientY - RC.ly; RC.moved += Math.abs(dx) + Math.abs(dy); RC.lx = e.clientX; RC.ly = e.clientY;
+  if (RC.moved > window.VRULES.rightClick.slop) { canvas.classList.add('drag'); camAz -= dx * 0.008; camEl = Math.max(0.30, Math.min(1.35, camEl + dy * 0.005)); }   // 원래 오른쪽 끌기와 같은 식
+  updateGhost(e.clientX, e.clientY);
+}, true);
+addEventListener('pointerup', e => {
+  if (!RC.on || e.pointerId !== RC.id) return;
+  e.stopImmediatePropagation(); RC.on = false; canvas.classList.remove('drag');
+  if (RC.moved <= window.VRULES.rightClick.slop) rcErase(e.clientX, e.clientY); else RC.stats.돌림++;
+}, true);
+canvas.addEventListener('pointercancel', e => { if (e.pointerId === RC.id) { RC.on = false; canvas.classList.remove('drag'); } }, true);
+/* 빨간 테두리(확인 대기)는 '치우기 모드를 벗어나면' 풀리게 돼 있다 — 오른쪽 단추는 모드 밖에서 치우므로, 오른쪽 단추로 세운 테두리는 모드가 '바뀔 때'만 풀리게 한다 */
+{ const draw0 = keepArmDraw; keepArmDraw = function () {
+    if (!KEEP.armed || KEEP.armed.root !== RC.armRoot || eraser) return draw0();
+    if (rcSig() !== RC.armSig) { RC.armRoot = -1; return draw0(); }             // 다른 카드를 골랐다 → 원래대로 풀린다
+    eraser = true; try { draw0(); } finally { eraser = false; } }; }
+/* 한 번만 알려 준다 — 마우스로 치우기 모드에서 세 번 치운 아이에게(이 브라우저에 한 번) */
+addEventListener('pointerup', e => {
+  const R = window.VRULES.rightClick; if (!R.on || RC.tipN < 0 || e.pointerType !== 'mouse' || e.button !== 0 || !eraser || e.target !== canvas) return;
+  if (++RC.tipN < R.tipAfter) return; RC.tipN = -1;
+  try { if (localStorage.getItem('rpg.village.tip.rclick')) return; localStorage.setItem('rpg.village.tip.rclick', '1'); } catch (err) { /* 저장을 못 하는 곳이면 이번 화면에서 한 번 */ }
+  setTimeout(() => toast('💡 마우스 오른쪽 단추로 눌러도 치워져요 — 카드를 안 바꿔도 돼요', true), 1200);
+});
+window.__rclick = () => ({ 켜짐: window.VRULES.rightClick.on, 확인대기중: KEEP.armed ? KEEP.armed.root === RC.armRoot : false, ...RC.stats });
+
 /* 들고 있는 동안 손을 떼는 신호를 놓치면(창을 벗어남, 알트탭, 터치 취소)
    물건이 판에서도 화면에서도 사라진다. 반드시 제자리로 돌려놓는다. */
 function returnCarried(why) {
