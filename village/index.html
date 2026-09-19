@@ -2814,6 +2814,7 @@ function simTick() {
   dayMoveBoost();   // [MAC-DAY] 낮에는 이사 시도를 두 배로(하루 합을 맞춘다)
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 10) === 0) goalTraySync();   // [MAC-GOAL-2] 목표가 목표판에 오르는 순간 트레이도
+  if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
@@ -3630,6 +3631,42 @@ function goalRewardKinds(goalId, rewards, lockPop) {
     open.forEach((g, n) => { const kinds = goalRewardKinds(g.id, GOAL_REWARDS, LOCK_POP).filter(k => K[k] && !unlocked.has(k)).slice(0, 3); if (!kinds.length || !rows[n]) return;
       const sp = document.createElement('span'); sp.textContent = ' → ' + kinds.map(k => K[k].ic).join(''); sp.title = kinds.map(k => K[k].nm).join('·'); sp.style.cssText = 'margin-left:4px;white-space:nowrap'; rows[n].appendChild(sp); }); };
   const lockedWhy1 = lockedWhy; lockedWhy = kind => { const w = lockedWhy1(kind); return (GU.short && typeof w === 'string' && LOCK_POP[kind]) ? '인구 ' + LOCK_POP[kind] + '명' : w; }; }   // 카드에는 짧게 — 놓으려 할 때는 원래 긴 말
+/* ── [MAC-RECUR] 돌아오는 목표 — 목표판의 빈 줄에 끝없이 온다 (계획표 §5-0-2 가 정본) ──
+   끝 무렵 목표판은 '인구 160명'·'인구 200명' 같은 기다리는 줄만 남고, 다 깨면 '다 이뤘어요' 한 줄뿐이었다. 본래 목표가 둘 이하로 남으면 돌아온 목표가 한 번에 하나 뜨고, 이루면 ⭐ 마을 별이 늘고 다음 것이 온다.
+   GOALS 배열 끝에 보통 목표로 붙인다 → 검사·토스트·저장·목표판은 있던 장치 그대로. 이룬 것은 goals 에 r1·r2… id 로 저장된다(새 저장 필드 없음 · 옛 판은 모르는 id 를 그냥 둔다).
+   '시작한 순간의 값'은 저장하지 않는다 — 다시 열면 지금 값에서 새로 시작한다(별은 그대로). */
+(window.VRULES = window.VRULES || {}).recurGoals = { on: true };
+const RECUR = { cur: null, last: -1, fest: false, stats: { 만든것: 0 } };
+const recurCountKinds = set => { let n = 0; cells.forEach((rec, i) => { if (rec && rec.root === i && set.has(rec.k)) n++; }); return n; };   // 칸을 한 번만 훑는다(countKind 를 종류마다 부르면 1초마다 열네 번 훑는다)
+const RECUR_TREES = new Set(['tree', 'bigtree', 'fruit']);
+const recurHappyHomes = () => { let n = 0; res.forEach((v, root) => { const st = sat.get(root); if (v > 0 && st && st.n >= NEEDS.length) n++; }); return n; };
+/* 순수 함수 — 축제 목표를 낼 만한가: 광장이 있고 인구 20(축제 조건) 이상이고 축제가 하루·이틀 뒤일 때만. 축제는 7일마다라 아무 날에나 내면 길게는 21분을 한 줄이 막는다 · 축제 당일에 내면 거저 이뤄진다 */
+const recurFestSoon = (day, hasPlaza, pop) => { const to = (7 - day % 7) % 7; return hasPlaza && pop >= 20 && to >= 1 && to <= 2; };
+const RECUR_TABLE = [   // [말, 지금 값을 재는 함수, 더할 양, 건너뛸 조건]
+  { t: '새 이웃 5명 더',                 now: () => population(), add: 5 },
+  { t: '꽃밭 8칸 더 — 이번 계절 꽃으로', now: () => recurCountKinds(new Set(Object.keys(FLOWER_KINDS))), add: 8 },
+  { t: '😊 집 3채 더',                  now: recurHappyHomes, add: 3 },
+  { t: '다가오는 광장 축제 맞이하기',    now: () => (RECUR.fest ? 1 : 0), add: 1, skip: () => !recurFestSoon(simDay(), plazaRoot() >= 0, population()), fest: true },
+  { t: '나무 10그루 더',                 now: () => recurCountKinds(RECUR_TREES), add: 10 },
+];
+const recurStars = () => { let n = 0; goalsDone.forEach(id => { if (/^r\d+$/.test(id)) n++; }); return n; };
+/* 순수 함수 — 별이 n 개일 때 다음에 올 표의 자리. 건너뛸 것과 방금 한 것(avoid)은 넘긴다 — 축제를 건너뛴 다음 차례에 '나무'가 두 번 잇달아 오던 것 */
+function recurPick(stars, skips, avoid) { for (let k = 0; k < skips.length; k++) { const at = (stars + k) % skips.length; if (!skips[at] && at !== avoid) return at; } return -1; }
+function recurTick() {                                                         // 1초마다
+  if (!window.VRULES.recurGoals.on || VISIT.on) return;
+  if (EV.fest && RECUR.cur && RECUR.cur.fest) RECUR.fest = true;                // 시작한 뒤에 맞은 축제만 친다
+  if (RECUR.cur && !goalsDone.has(RECUR.cur.id)) return;                        // 하던 것이 있다
+  if (GOALS.filter(g => !/^r\d+$/.test(g.id) && !goalsDone.has(g.id)).length >= 3) return;   // 목표판은 세 줄 — 본래 목표가 셋 남아 있으면 자리가 없다(둘 이하로 줄면 빈 줄에 온다)
+  const stars = recurStars(), at = recurPick(stars, RECUR_TABLE.map(r => !!(r.skip && r.skip())), RECUR.last); if (at < 0) return;
+  const row = RECUR_TABLE[at], justDone = !!RECUR.cur; RECUR.fest = false; const base = row.now(), id = 'r' + (stars + 1);
+  RECUR.cur = { id, fest: !!row.fest }; RECUR.last = at;
+  GOALS.push({ id, t: row.t + ' · ⭐ ' + (stars + 1) + '번째 별', ok: () => row.now() >= base + row.add }); RECUR.stats.만든것++;
+  if (justDone) goalsPeek(5000); else if (goalsShown) renderGoals();   // 방금 하나를 이뤘으면 다음 것을 잠깐 보여 준다(마을을 막 열었을 땐 조용히)
+}
+{ const render0 = renderGoals; renderGoals = function () { render0.apply(this, arguments); const n = recurStars(); if (!n) return;   // 목표판 맨 아래 — 모은 별
+    const el = document.getElementById('goals'), d = document.createElement('div'); d.className = 'g'; d.style.cssText = 'margin-top:2px;color:#ffd84d'; d.textContent = '⭐ 마을 별 ' + n + '개'; el.appendChild(d); }; }
+window.__recur = () => ({ 켜짐: window.VRULES.recurGoals.on, 별: recurStars(), 지금: RECUR.cur && GOALS.find(g => g.id === RECUR.cur.id) ? GOALS.find(g => g.id === RECUR.cur.id).t : null, ...RECUR.stats });
+
 function goalTraySync() {                                                      // 1초마다 — 목표판의 세 목표나 '다음 인구 단계'가 바뀌었으면 트레이를 다시 그린다
   const pop = population(), next = Math.min(...Object.keys(LOCK_POP).filter(k => !unlocked.has(k)).map(k => LOCK_POP[k]).filter(p => p > pop).concat([Infinity]));
   const sig = openGoals().map(g => g.id).join() + '|' + next; if (sig === GU.sig) return; const first = GU.sig == null; GU.sig = sig; if (!first) { buildTray(); if (goalsShown) renderGoals(); }
