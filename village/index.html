@@ -2646,6 +2646,7 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) { goalTick(); plotTick(); }
   dayMoveBoost();   // [MAC-DAY] 낮에는 이사 시도를 두 배로(하루 합을 맞춘다)
   if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
+  if ((SIM.ticks % 10) === 0) goalTraySync();   // [MAC-GOAL-2] 목표가 목표판에 오르는 순간 트레이도
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
@@ -3385,6 +3386,24 @@ function trayTrim() {
     q.grp = show ? q.grp0 : '(아직)'; });
   setTimeout(() => { const now = performance.now(); document.querySelectorAll('#trayIn .card').forEach(el => { const u = GU.fresh.get(el.dataset.kind); if (u && u > now) { el.style.boxShadow = '0 0 0 3px #5fc27e, 0 0 18px #5fc27e'; const pr = el.querySelector('.pr'); if (pr) pr.textContent = 'NEW · ' + pr.textContent; } }); }, 0);
 }
+/* ── [MAC-GOAL-2] 목표판 줄 끝에 보상 그림 + 목표가 바뀌는 순간 트레이 다시 그리기 (창조자의 눈 3회 ①② · 계획표 §5-0) ── */
+/* 순수 함수 — 이 목표를 이루면 열리는 종류들. 목표 보상이 먼저, 인구 목표(popN)는 그 인구에서 열리는 것 */
+function goalRewardKinds(goalId, rewards, lockPop) {
+  if (rewards[goalId]) return rewards[goalId].slice();
+  const m = /^pop(\d+)$/.exec(goalId); if (!m) return [];
+  return Object.keys(lockPop).filter(k => lockPop[k] === +m[1]);
+}
+{ const renderGoals0 = renderGoals;
+  renderGoals = () => { renderGoals0(); if (!window.VRULES.goalUnlock.on) return;
+    const rows = document.querySelectorAll('#goals .g:not(.done)'), open = openGoals();
+    open.forEach((g, n) => { const kinds = goalRewardKinds(g.id, GOAL_REWARDS, LOCK_POP).filter(k => K[k] && !unlocked.has(k)).slice(0, 3); if (!kinds.length || !rows[n]) return;
+      const sp = document.createElement('span'); sp.textContent = ' → ' + kinds.map(k => K[k].ic).join(''); sp.title = kinds.map(k => K[k].nm).join('·'); sp.style.cssText = 'margin-left:4px;white-space:nowrap'; rows[n].appendChild(sp); }); };
+  const lockedWhy1 = lockedWhy; lockedWhy = kind => { const w = lockedWhy1(kind); return (GU.short && typeof w === 'string' && LOCK_POP[kind]) ? '인구 ' + LOCK_POP[kind] + '명' : w; }; }   // 카드에는 짧게 — 놓으려 할 때는 원래 긴 말
+function goalTraySync() {                                                      // 1초마다 — 목표판의 세 목표나 '다음 인구 단계'가 바뀌었으면 트레이를 다시 그린다
+  const pop = population(), next = Math.min(...Object.keys(LOCK_POP).filter(k => !unlocked.has(k)).map(k => LOCK_POP[k]).filter(p => p > pop).concat([Infinity]));
+  const sig = openGoals().map(g => g.id).join() + '|' + next; if (sig === GU.sig) return; const first = GU.sig == null; GU.sig = sig; if (!first) { buildTray(); if (goalsShown) renderGoals(); }
+}
+
 (window.VRULES = window.VRULES || {}).goalUnlock = { on: true, maxLockedPerTab: 2 };
 window.__goals2 = () => ({ 순서: GOALS.map(g => g.id), 보상: { ...LOCK_GOAL }, 열린보상: Object.keys(LOCK_GOAL).filter(k => unlocked.has(k)), 보이는잠김: ORDER.filter(k => !unlocked.has(k) && (LOCK_POP[k] || LOCK_GOAL[k]) && K[k].grp !== '(아직)') });
 buildTray();
