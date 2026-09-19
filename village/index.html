@@ -2660,6 +2660,7 @@ function act(clientX, clientY) {
     const rec = c.inside ? cells[idx(c.x, c.y)] : null;
     if (rec && rec.k === 'sign') { writeSign(rec); return; }
     if (rec && actGateSay(rec)) return;   // [ACT-GATESAY] 정원 문 — 왜 아무도 안 오나 한 줄
+    if (typeof actCartTap === 'function' && actCartTap(c.x, c.y)) return;   // [ACT-CARTTAP] 밤 어귀 수레를 누르면 내일 올 집을 ✨ 로
     if (rec && rec.k === 'station') { toast('🚂 기차역 · 오늘 손님 ' + visitStats.오늘 + '명 · 지금 마을에 ' + folks.filter(f => f.visitor).length + '명 · 표지판 ' + visitStats.읽음 + '번 읽힘' + (topSign() ? ' · 가장 많이 읽힌 표지판 「' + topSign().t + '」 ' + topSign().reads + '번' : '') + (topLike() ? ' · 손님이 좋아한 곳: ' + topLike().nm : ''), true); return; }
     if (rec && rec.k === 'dream') {                   // 꿈나무: 꿈을 적거나 본다
       if (VISIT.on) { toast('🌟 ' + (DREAM.text || '(아직 꿈을 안 적었어요)'), true); return; }
@@ -6897,6 +6898,28 @@ function actFireflyDraw(t) {
   FLY.mesh.count = k; FLY.mesh.instanceMatrix.needsUpdate = true; if (FLY.mesh.instanceColor) FLY.mesh.instanceColor.needsUpdate = true;
 }
 window.__firefly = () => ({ 켜짐: window.VRULES.firefly.on, 보임: !!(FLY.mesh && FLY.mesh.visible), 비: EV.rain, 밤: +NIGHT.value.toFixed(2), ...FLY.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-CARTTAP] 밤 어귀 수레를 누르면 '내일 아침 → 저 집'을 ✨ 로 (주민 연기 · 09-20 · 보스 승인 ④ — 작게, 화살표는 늘 띄우지 않는다).
+   보기 모드에서 서 있는 수레(ACT-NIGHTCART) 칸이나 그 곁 한 칸을 누르면, 지금 오면 들어갈 집(moveInWhy === true — 판정은 읽기만) 가운데
+   수레에서 가장 가까운 집 위에 ms 동안 ✨(수레 위엔 안 띄운다 — 수레 곁 집이면 둘이 겹쳐 어느 쪽인지 안 읽혔다). 그런 집이 없으면(수레가 곧 거둬질 때) 아무 일도 안 한다.
+   판정·저장 0 · draw call +0(있던 sparkle). 스위치 VRULES.cartTap + act() 고리 한 줄(정원 문 줄 바로 아래).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).cartTap = { on: true, ms: 3000, reach: 1 };
+const CARTTAP = { stats: { 누름: 0, 비춤: 0 } };
+function actCartTap(x, y) {
+  const R = window.VRULES.cartTap; if (!R.on || !CART.shown || CART.cell < 0) return false;
+  const cx = cX(CART.cell), cy = cY(CART.cell), rx = cX(CART.road), ry = cY(CART.road);
+  if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) > R.reach && Math.max(Math.abs(x - rx), Math.abs(y - ry)) > R.reach) return false;
+  CARTTAP.stats.누름++;
+  let best = null, bd = 1e9;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) >= houseCap(i)) return;
+    const d = Math.abs(cX(i) - cx) + Math.abs(cY(i) - cy); if (d >= bd || moveInWhy(rec) !== true) return; bd = d; best = rec; });
+  if (!best) return false;
+  const d = centerOf(best.k, cX(best.root), cY(best.root), best.rot); sparkle.push({ x: d.x, z: d.z, until: SIM.t + R.ms });   // 집 가운데 위(문 앞은 길 위라 수레 옆 집이면 수레 것처럼 보였다)
+  CARTTAP.stats.비춤++; return true;
+}
+window.__cartTap = () => ({ 켜짐: window.VRULES.cartTap.on, 수레: CART.shown ? [cX(CART.cell), cY(CART.cell)] : null, ...CARTTAP.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
