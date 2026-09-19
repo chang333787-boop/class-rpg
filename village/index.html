@@ -1809,7 +1809,7 @@ function buildChunk(cx, cz) {
     const k = K[rec.k], roofC = ROOFS[(x * 5 + y * 3) % ROOFS.length];
     const parts = partsOf(rec);
     const item = { root: i, k: rec.k, rot: rec.rot, bucket: bucketOf(parts[0]), off: 0 };
-    const lit = rec.k === 'house' && (res.get(i) || 0) > 0;   // 사람이 사는 집만 창에 불이 켜진다
+    const lit = rec.k === 'house' && (res.get(i) || 0) > 0 && dawnLit(i);   // 사람이 사는 집만 창에 불이 켜진다 · [ACT-DAWN] 잠든 집은 끈다
     parts.forEach((pt, pi) => {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
@@ -5760,6 +5760,7 @@ function tickFolks(dt, now) {
     if (actLampTick(f, i, now, dt)) continue;   // [ACT-LAMP] 밤 귀가 — 가로등 없는 집 식구는 종종걸음, 있는 집 식구는 가로등 아래서 한 번 멈춘다
     if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
     actFestLitterTick(now);   // [ACT-FESTLIT] 축제 다음 날 광장 조각 · 치우러 가기(틱마다 한 번)
+    actDawnTick();   // [ACT-DAWN] 한밤엔 집집이 불을 끄고, 새벽엔 한두 집이 먼저 켠다(틱마다 한 번 · 15분마다 셈)
     actNightCartTick(now);   // [ACT-NIGHTCART] 밤엔 어귀에 내일 올 이웃의 수레 · 아침엔 그 수레를 끌고 들어온다(틱마다 한 번)
     if (actPuddleTick(f, i, now)) continue;   // [ACT-PUDDLE] 비 그친 다음 날 아침 — 아이는 웅덩이로 뛰어가 통통
     f.base = roadBeside(rec);
@@ -5772,6 +5773,7 @@ function tickFolks(dt, now) {
       const home = f.inside.root === f.home, work = f.inside.root === f.job && f.goal === 'work', school = !work && b && b.k === 'school';
       if (!b || b.root !== f.inside.root || (!K[b.k].need && !home && !school && !work)) { leave(f, '쫓겨남'); continue; }   // 건물이 없어졌다 — 문 앞으로
       const h = simHour();
+      if (home && actDawnHold(f, h)) continue;   // [ACT-DAWN] 아침 6시엔 먼저 일어난 집 식구가 맨 먼저 나온다 — 다른 집은 조금 뒤
       if (home ? !isNightHour(h) : work ? !isWorkHour(h) : school ? !isSchoolHour(h) : now >= f.inside.until) { leave(f, '나옴'); f.goal = null; }
       continue;
     }
@@ -6453,6 +6455,47 @@ function actPuddleChunk(x0, z0, bucket) {
       for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off); }); });
 }
 window.__puddle = () => ({ 켜짐: window.VRULES.puddle.on, 지금: PUDDLE.on, 칸: PUDDLE.cells.map(c => [cX(c), cY(c)]), 모양: typeof window.PUDDLE_PARTS === 'function' ? '디자인' : '임시원판', 지금통통: folks.filter(f => f.puddle && f.puddle.until).length, ...PUDDLE.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-DAWN] 새벽 첫 불 (주민 연기 · 09-20 · 보스 순서 ②).
+   한밤(sleepFrom 시부터 sleepStep 간격 네 무리)에 집집이 창 불을 끈다 → 새벽 earlyH 시에 **맨 먼저 일어나는 집 한두 채**만 창이 켜진다
+   → wakeFrom 시부터 다른 집들이 차례로 켠다 → 6시에 먼저 일어난 집 식구가 맨 먼저 나오고 다른 집은 outLag 시간 뒤에.
+   먼저 일어나는 집: 그날 새벽(1~4.5시) 사람 사는 집 가운데 **카메라가 보는 곳에서 가까운 집**부터 칸 번호로 섞어 한두 채(사람 사는 집 20채 넘으면 둘) — 아이가 보는 쪽에서 밤이 끝나게.
+   창 빛은 사람 사는 집 창과 같은 aNight(buildChunk 의 lit 한 줄에 dawnLit) — 15분마다 바뀐 집의 청크만 다시 합친다(draw call +0).
+   판정·확률·저장 0. 스위치·수치 VRULES.dawn + 고리 셋(buildChunk lit · tickFolks 한 줄 · 집 안 사람 나오기 한 줄).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).dawn = { on: true, sleepFrom: 23, sleepStep: 0.5, earlyH: 4.6, wakeFrom: 5.5, wakeStep: 0.25, outLag: [0.25, 0.4, 0.55], nearR: 40 };
+var DAWN = null;                                                        // var — buildChunk 가 이 블록보다 먼저 불려도 TDZ 없이 '다 켜짐'
+const dawnHash = i => ((i * 2654435761) >>> 0);
+function dawnLit(root) { return !(DAWN && window.VRULES.dawn && window.VRULES.dawn.on && DAWN.asleep.has(root)); }
+function dawnAsleep(root, h) {                                          // 이 집은 지금 자나(시각만으로 — 저장 0)
+  const R = window.VRULES.dawn, hh = h < 12 ? h + 24 : h, s = R.sleepFrom + (dawnHash(root) % 4) * R.sleepStep;
+  const w = DAWN.early.has(root) ? R.earlyH : R.wakeFrom + (dawnHash(root + 7) % 3) * R.wakeStep;
+  return hh >= s && hh < w + 24;
+}
+function actDawnTick() {
+  if (!DAWN) DAWN = { tick: -1, key: -1, day: -1, early: new Set(), asleep: new Set(), stats: { 잠든집최대: 0, 먼저켠집: 0, 먼저나옴: 0, 창바꿈: 0 } };
+  if (DAWN.tick === SIM.ticks) return; DAWN.tick = SIM.ticks;
+  const R = window.VRULES.dawn, h = simHour(), key = R.on ? Math.floor(h * 4) : -2;
+  if (key === DAWN.key) return; DAWN.key = key;
+  if (R.on && h >= 1 && h < R.earlyH && DAWN.day !== simDay()) {        // 오늘 새벽 먼저 일어날 집 — 한 번
+    DAWN.day = simDay(); const cx = camTarget.x / CS + (W - 1) / 2, cz = camTarget.z / CS + (H - 1) / 2, list = [];
+    res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') list.push([root, Math.hypot(cX(root) - cx, cY(root) - cz)]); });
+    const near = list.filter(a => a[1] <= R.nearR), pool = (near.length ? near : list).sort((a, b) => (dawnHash(a[0] + DAWN.day) % 1000) - (dawnHash(b[0] + DAWN.day) % 1000));
+    DAWN.early = new Set(pool.slice(0, list.length > 20 ? 2 : 1).map(a => a[0])); DAWN.stats.먼저켠집 += DAWN.early.size;
+  }
+  const now = new Set(); if (R.on) res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house' && dawnAsleep(root, h)) now.add(root); });
+  DAWN.asleep.forEach(r => { if (!now.has(r) && cells[r]) { dirtyChunks.add(chunkOfCell(r)); DAWN.stats.창바꿈++; } });
+  now.forEach(r => { if (!DAWN.asleep.has(r)) { dirtyChunks.add(chunkOfCell(r)); DAWN.stats.창바꿈++; } });
+  DAWN.asleep = now; DAWN.stats.잠든집최대 = Math.max(DAWN.stats.잠든집최대, now.size);
+}
+/* 집 안 사람 나오기 고리 — 6시가 넘어도 먼저 일어난 집이 아니면 outLag 만큼 더 머문다. true 면 이번 틱은 그대로 집 안 */
+function actDawnHold(f, h) {
+  const R = window.VRULES.dawn; if (!R.on || !DAWN || h < 6 || h >= 6 + R.outLag[R.outLag.length - 1]) return false;
+  if (DAWN.early.has(f.home)) { if (f.dawnOut !== DAWN.day) { f.dawnOut = DAWN.day; DAWN.stats.먼저나옴++; } return false; }
+  return h < 6 + R.outLag[dawnHash(f.home + 3) % R.outLag.length];
+}
+window.__dawn = () => DAWN ? { 켜짐: window.VRULES.dawn.on, 시: +simHour().toFixed(2), 잠든집: DAWN.asleep.size, 먼저: [...DAWN.early].map(r => [cX(r), cY(r), dawnAsleep(r, simHour()) ? '잠' : '깸']), ...DAWN.stats } : null;
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
