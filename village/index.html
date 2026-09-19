@@ -6496,17 +6496,18 @@ window.__puddle = () => ({ 켜짐: window.VRULES.puddle.on, 지금: PUDDLE.on, �
    [ACT-DAWN] 새벽 첫 불 (주민 연기 · 09-20 · 보스 순서 ②).
    한밤(sleepFrom 시부터 sleepStep 간격 네 무리)에 집집이 창 불을 끈다 → 새벽 earlyH 시에 **맨 먼저 일어나는 집 한두 채**만 창이 켜진다
    → wakeFrom 시부터 다른 집들이 차례로 켠다 → 6시에 먼저 일어난 집 식구가 맨 먼저 나오고 다른 집은 outLag 시간 뒤에.
-   먼저 일어나는 집: 그날 새벽(1~4.5시) 사람 사는 집 가운데 **카메라가 보는 곳에서 가까운 집**부터 칸 번호로 섞어 한두 채(사람 사는 집 20채 넘으면 둘) — 아이가 보는 쪽에서 밤이 끝나게.
+   먼저 일어나는 집: **날짜와 집 번호로만** 정한다(카메라와 무관 — 같은 마을은 어디를 보든 같게) — 사람 사는 집 every 채에 하나꼴(적어도 한 채)이 마을 곳곳에서
+   earlyH 부터 earlyStep 간격 earlySteps 무리로 흩어서 켠다(4:45 · 5:00 · 5:15) — 아이가 어디를 보고 있든 화면 안에 한 집쯤은 걸린다.
    창 빛은 사람 사는 집 창과 같은 aNight(buildChunk 의 lit 한 줄에 dawnLit) — 15분마다 바뀐 집의 청크만 다시 합친다(draw call +0).
    판정·확률·저장 0. 스위치·수치 VRULES.dawn + 고리 셋(buildChunk lit · tickFolks 한 줄 · 집 안 사람 나오기 한 줄).
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).dawn = { on: true, sleepFrom: 23, sleepStep: 0.5, earlyH: 4.6, wakeFrom: 5.5, wakeStep: 0.25, outLag: [0.25, 0.4, 0.55], nearR: 40 };
+(window.VRULES = window.VRULES || {}).dawn = { on: true, sleepFrom: 23, sleepStep: 0.5, earlyH: 4.75, earlyStep: 0.25, earlySteps: 3, every: 8, wakeFrom: 5.5, wakeStep: 0.25, outLag: [0.25, 0.4, 0.55] };
 var DAWN = null;                                                        // var — buildChunk 가 이 블록보다 먼저 불려도 TDZ 없이 '다 켜짐'
 const dawnHash = i => ((i * 2654435761) >>> 0);
 function dawnLit(root) { return !(DAWN && window.VRULES.dawn && window.VRULES.dawn.on && DAWN.asleep.has(root)); }
 function dawnAsleep(root, h) {                                          // 이 집은 지금 자나(시각만으로 — 저장 0)
   const R = window.VRULES.dawn, hh = h < 12 ? h + 24 : h, s = R.sleepFrom + (dawnHash(root) % 4) * R.sleepStep;
-  const w = DAWN.early.has(root) ? R.earlyH : R.wakeFrom + (dawnHash(root + 7) % 3) * R.wakeStep;
+  const w = DAWN.early.has(root) ? R.earlyH + ((dawnHash(root + 11) >>> 16) % R.earlySteps) * R.earlyStep : R.wakeFrom + (dawnHash(root + 7) % 3) * R.wakeStep;
   return hh >= s && hh < w + 24;
 }
 function actDawnTick() {
@@ -6515,10 +6516,10 @@ function actDawnTick() {
   const R = window.VRULES.dawn, h = simHour(), key = R.on ? Math.floor(h * 4) : -2;
   if (key === DAWN.key) return; DAWN.key = key;
   if (R.on && h >= 1 && h < R.earlyH && DAWN.day !== simDay()) {        // 오늘 새벽 먼저 일어날 집 — 한 번
-    DAWN.day = simDay(); const cx = camTarget.x / CS + (W - 1) / 2, cz = camTarget.z / CS + (H - 1) / 2, list = [];
-    res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') list.push([root, Math.hypot(cX(root) - cx, cY(root) - cz)]); });
-    const near = list.filter(a => a[1] <= R.nearR), pool = (near.length ? near : list).sort((a, b) => (dawnHash(a[0] + DAWN.day) % 1000) - (dawnHash(b[0] + DAWN.day) % 1000));
-    DAWN.early = new Set(pool.slice(0, list.length > 20 ? 2 : 1).map(a => a[0])); DAWN.stats.먼저켠집 += DAWN.early.size;
+    DAWN.day = simDay(); const list = [], pick = r => dawnHash(r * 31 + DAWN.day * 977);   // 날짜 + 집 번호만
+    res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') list.push(root); });
+    const early = list.filter(r => (pick(r) >>> 16) % R.every === 0); if (!early.length && list.length) early.push(list.reduce((a, b) => pick(a) >>> 16 <= pick(b) >>> 16 ? a : b));   // 곱셈 해시는 아래 비트가 고르지 않다 — 위 비트로   // 적어도 한 채
+    DAWN.early = new Set(early); DAWN.stats.먼저켠집 += DAWN.early.size;
   }
   const now = new Set(); if (R.on) res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house' && dawnAsleep(root, h)) now.add(root); });
   DAWN.asleep.forEach(r => { if (!now.has(r) && cells[r]) { dirtyChunks.add(chunkOfCell(r)); DAWN.stats.창바꿈++; } });
