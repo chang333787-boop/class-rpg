@@ -4415,6 +4415,22 @@ function eventTick() {
   }
 }
 
+/* ── [MAC-RAINCLEAR] 비 오는 날의 절반쯤은 오후에 갠다 (보스 09-20 · 주민 연기 담당의 '처마 밑에서 다 같이 나옴'(ACT-SHELTER)이 낮에도 보이게) ──
+   비는 마을 하루 내내(6시~다음 날 6시) 왔다 → 그치는 순간이 늘 새벽 6시, 어두울 때뿐이었다.
+   · 비 오는 날마다 날 번호로 정해진다(순수 함수 rainClearAt — 다시 열어도 같은 날은 같은 때 갠다): 절반은 13~16시 사이 어느 정시에 그친다. 나머지는 전처럼 하루 내내.
+   · 그치는 순간 소식 한 줄 "🌤️ 비가 그쳤어요". 그친 뒤 열면 처음부터 맑다(말 없음). 다음 날 아침 웅덩이(ACT-PUDDLE)는 그대로 '어제 비 온 날'이면 생긴다.
+   · 비 오는 날의 수·시작은 그대로(rainDay). 원래 줄 수정 0 — eventTick 감싸기: 그친 뒤에는 원래 줄이 '비가 와요'로 되돌리지 않게 부르기 전에 잠깐 비로 두고, 부른 뒤 걷는다. */
+(window.VRULES = window.VRULES || {}).rainClear = { on: true, from: 13, to: 16 };
+const RAINCLEAR = { stats: { 갬: 0 } };
+/* 순수 함수 — 그 날(d)의 비가 몇 시에 그치나(정시) · 하루 내내면 null. 비 오는 날인지는 따로(rainDay) */
+function rainClearAt(d, from, to) { const h = (Math.imul(d, 2246822519) >>> 0); if ((h >>> 7) % 2) return null; return from + ((h >>> 11) % (to - from + 1)); }
+{ const ev0 = eventTick; eventTick = function () { const R = window.VRULES.rainClear, d = simDay(), at = R.on && rainDay(d) ? rainClearAt(d, R.from, R.to) : null, clear = at != null && simHour() >= at, before = EV.rain;
+    if (clear) EV.rain = true;                                                       // 원래 줄은 rainDay(d) 와 EV.rain 이 다를 때만 움직인다 — 같게 두어 '비가 와요'를 막는다
+    const r = ev0.apply(this, arguments);
+    if (clear) { EV.rain = false; rain.visible = false; if (before) { RAINCLEAR.stats.갬++; toast('🌤️ 비가 그쳤어요', true); } }
+    return r; }; }
+window.__rainClear = () => ({ 켜짐: window.VRULES.rainClear.on, 비: EV.rain, 날: simDay(), 시: +simHour().toFixed(1), 오늘비: rainDay(simDay()), 그치는때: rainDay(simDay()) ? rainClearAt(simDay(), window.VRULES.rainClear.from, window.VRULES.rainClear.to) : null, ...RAINCLEAR.stats });
+
 /* ══════════════════════════════════════════════════════════════
    목표(F14). 순서대로 셋씩. 이루면 알림 한 번. 저장한다.
    ══════════════════════════════════════════════════════════════ */
