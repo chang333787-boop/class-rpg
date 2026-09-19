@@ -3642,6 +3642,87 @@ buildTray();
 document.getElementById('goalBtn').onclick = () => { goalsAutoUntil = 0; goalsShown = !goalsShown; document.getElementById('goals').classList.toggle('show', goalsShown); if (goalsShown) renderGoals(); };
 document.getElementById('goals').onclick = () => { goalsAutoUntil = 0; goalsShown = false; document.getElementById('goals').classList.remove('show'); };
 
+/* ── [MAC-VARIANT] 색 카드 묶기 — 색만 다른 꽃밭은 카드 한 장, 고르면 그 위에 색 단추 줄 (docs/village_save_v3_proposal.md 덧붙임 3 의 variantOf·tint) ──
+   꽃 탭은 카드가 14장(+다듬은 나무 5)이라 두 줄로 넘쳤고, '노란 꽃밭·노란 튤립밭·주황 튤립밭…'은 색만 다른 같은 물건이다.
+   · 규칙 필드 둘: K[id].variantOf = 가족의 머리 id · K[id].tint = 그 색. 저장·palette·kind id 는 그대로(색마다 id 하나 — v3 제안과 같은 방향). 세는 것(꽃밭 수·필요·목표)은 원래도 id 를 다 더한다.
+   · 화면만 접는다: buildTray 가 끝난 뒤 가족의 카드들을 머리 카드 한 장으로 모은다(variantFold). 특별한 꽃(알록달록·무지개·달빛·해바라기·라벤더)은 제 카드 그대로 — 뒤로 갈수록 눈에 띄게 특별해야 한다(DESIGN-FLOWER-5).
+   · 터치 기준: 카드 안의 작은 점은 '색이 더 있다'는 표시일 뿐 누르는 곳이 아니다. 누르는 색 단추는 카드를 고르면 그 위에 뜨는 줄(44px)이다.
+   · 잠긴 색은 접지 않는다 — trayTrim(MAC-GOAL)이 보여 주는 잠긴 카드는 '다음에 열릴 것'을 알리는 자리다(처음엔 접었더니 새 마을의 꽃 탭에서 🔒 노란 꽃밭 카드가 빈 점 하나로 줄어 '더 있다'는 걸 알 수 없었다). 열리는 순간 가족 카드로 들어오고 8초 동안 초록 테가 둘린다.
+   생김새(.vdots·#vpop)는 디자인 담당이 마음껏 고쳐도 된다 — 여기엔 동작에 필요한 만큼만. */
+(window.VRULES = window.VRULES || {}).variantCards = { on: true };
+const VARIANT_OF = { flower_hy: 'flower', flower_hb: 'flower', flower_hw: 'flower', flower_ty: 'flower_tr', flower_to: 'flower_tr', flower_wv: 'flower_wd' };
+Object.keys(VARIANT_OF).forEach(k => { if (K[k] && K[VARIANT_OF[k]]) K[k].variantOf = VARIANT_OF[k]; });
+Object.keys(FLOWER_KINDS).forEach(k => { if (K[k]) K[k].tint = '#' + FLOWER_KINDS[k].main.toString(16).padStart(6, '0'); });
+const VAR = { pick: {}, fams: new Map(), seen: null, fresh: new Map(), stats: { 접은카드: 0, 색바꿈: 0 } };             // pick: 가족마다 마지막에 고른 색(이 화면 동안만) · fams: 머리 → { card, kinds[] }(지금 탭)
+/* 순수 함수 — 가족의 식구를 트레이 순서대로: [머리, ...variantOf 가 머리인 것] */
+function variantFamily(head, order, kinds) { return [head].concat(order.filter(k => kinds[k] && kinds[k].variantOf === head)); }
+const variantHead = k => (K[k] && K[k].variantOf) || k;
+const variantFamOf = k => { const fam = k ? VAR.fams.get(variantHead(k)) : null; return fam && fam.kinds.includes(k) ? fam : null; };   // 잠긴 색(접히지 않은 제 카드)을 고른 때는 가족이 아니다
+/* 순수 함수 — 가족 카드가 보여 줄 색: 지금 고른 물건 > 방금 열린 것 > 마지막에 고른 색 > 머리. 잠긴 것은 안 된다.
+   (고른 물건이 먼저다 — 흰 꽃밭을 놓는 중에 파랑이 열렸다고 카드가 파랑으로 바뀌면 카드와 놓이는 것이 어긋난다) */
+function variantChoose(kinds, isOpen, fresh, selNow, picked) { const ok = k => k && kinds.includes(k) && isOpen(k); return [selNow, fresh, picked].find(ok) || kinds[0]; }
+/* 방금 열린 색 — 접기 전엔 잠긴 카드가 풀리는 게 보였는데 접으면 빈 점 하나가 차는 것뿐이라 눈에 안 띈다. 8초 동안 카드·색 단추에 초록 테를 두른다.
+   저장본을 다 읽기 전(__LOADMS 없음)엔 전부 잠겨 보이니 그때는 세지 않는다 */
+function variantFreshScan(now) {
+  if (window.__LOADMS == null) return; const all = Object.keys(VARIANT_OF).concat(Object.values(VARIANT_OF)).filter(k => lockedWhy(k) === true);
+  if (!VAR.seen) { VAR.seen = new Set(all); return; }
+  all.forEach(k => { if (!VAR.seen.has(k)) { VAR.seen.add(k); VAR.fresh.set(k, now + 8000); } });
+}
+const variantIsFresh = (k, now) => { const u = Math.max(VAR.fresh.get(k) || 0, GU.fresh.get(k) || 0); return u > now; };
+function variantApply(card, kind) {                                              // 카드를 제자리에서 그 색으로 — 그림은 디자인 담당의 __thumbDress 가 따라 그린다
+  const k = K[kind]; card.dataset.kind = kind; const nm = card.querySelector('.nm'); if (nm) nm.textContent = k.nm;
+  const ic = card.querySelector('.ic'); if (ic && ic.dataset.tk !== kind) { ic.textContent = k.ic; delete ic.dataset.tk; }
+  card.querySelectorAll('.vdots i').forEach(d => { d.style.outline = d.dataset.k === kind ? '2px solid #fff' : 'none'; });
+  if (window.__thumbDress) window.__thumbDress(card);
+}
+function variantFold() {
+  VAR.fams.clear(); const R = window.VRULES.variantCards; if (!R.on) { variantPop(); return; }
+  const box = document.getElementById('trayIn'), byKind = {}; box.querySelectorAll('.card[data-kind]').forEach(el => { byKind[el.dataset.kind] = el; });
+  const now = performance.now(); variantFreshScan(now);
+  Object.keys(byKind).forEach(head => { if (K[head].variantOf) return;
+    const kinds = variantFamily(head, ORDER, K).filter(k => byKind[k] && lockedWhy(k) === true); if (kinds.length < 2 || kinds[0] !== head) return;
+    const card = byKind[head]; kinds.slice(1).forEach(k => { byKind[k].remove(); VAR.stats.접은카드++; });
+    const dots = document.createElement('div'); dots.className = 'vdots';
+    dots.innerHTML = kinds.map(k => '<i data-k="' + k + '" style="background:' + K[k].tint + ';border-color:' + K[k].tint + '"></i>').join('');
+    card.appendChild(dots); card.dataset.fam = '1'; VAR.fams.set(head, { card, kinds });   // data-fam: 크기 줄(1×1) 자리에 점을 둔다 — 카드 키가 그대로라 줄 높이가 안 는다
+    const fresh = kinds.find(k => variantIsFresh(k, now)); if (fresh) { card.style.boxShadow = '0 0 0 3px #5fc27e, 0 0 18px #5fc27e'; setTimeout(() => { if (card.isConnected) card.style.boxShadow = ''; }, 8000); }
+    variantApply(card, variantChoose(kinds, k => lockedWhy(k) === true, fresh, sel, VAR.pick[head]));
+    card.classList.toggle('on', card.dataset.kind === sel);                       // 트레이를 다시 지으면 머리 카드는 '고른 것'이 아니라고 지어진다(sel 은 가족의 다른 색)
+    card.onclick = () => { const k = card.dataset.kind; setMode(sel === k ? null : k, null); };
+  });
+  variantPop();
+}
+/* 색 단추 줄 — 고른 물건이 가족에 들면 그 카드 위에 뜬다 */
+function variantPop() {
+  let pop = document.getElementById('vpop'); const fam = variantFamOf(sel);
+  if (!fam || !fam.card.isConnected) { if (pop) pop.style.display = 'none'; return; }
+  if (!pop) { pop = document.createElement('div'); pop.id = 'vpop'; document.body.appendChild(pop); }
+  pop.innerHTML = ''; fam.kinds.forEach(k => { const b = document.createElement('button');
+    b.className = 'vbtn' + (k === sel ? ' on' : '') + (variantIsFresh(k, performance.now()) ? ' fresh' : ''); b.title = K[k].nm; b.style.background = K[k].tint; b.dataset.k = k;
+    b.onclick = ev => { ev.stopPropagation();
+      VAR.pick[variantHead(k)] = k; VAR.stats.색바꿈++; variantApply(fam.card, k); setMode(k, null); };
+    pop.appendChild(b); });
+  pop.style.display = 'flex'; variantPopPlace();
+}
+function variantPopPlace() {
+  const pop = document.getElementById('vpop'); if (!pop || pop.style.display === 'none') return; const fam = variantFamOf(sel); if (!fam) return;
+  const r = fam.card.getBoundingClientRect(), w = pop.offsetWidth;
+  pop.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px'; pop.style.bottom = (innerHeight - r.top + 8) + 'px';
+}
+{ const st = document.createElement('style'); st.textContent =
+    '.card[data-fam] .sz{display:none}.card .vdots{display:flex;gap:3px;justify-content:center;margin:3px 0 2px;pointer-events:none}.card .vdots i{width:8px;height:8px;border-radius:50%;border:1.5px solid;box-sizing:border-box;display:block}'
+  + '#vpop{position:fixed;z-index:7;display:none;gap:8px;padding:7px 9px;background:#1c202aee;border:2px solid #e8b04b;border-radius:14px;box-shadow:0 6px 18px #0008}'
+  + '#vpop .vbtn{width:44px;height:44px;border-radius:50%;border:3px solid #0006;cursor:pointer;font-size:16px;line-height:1;padding:0}#vpop .vbtn.on{border-color:#fff;box-shadow:0 0 0 3px #e8b04b}#vpop .vbtn.fresh{box-shadow:0 0 0 3px #5fc27e,0 0 14px #5fc27e}'
+  + 'body.photo #vpop{display:none!important}';
+  document.head.appendChild(st); }
+{ const build0 = buildTray; buildTray = function () { build0.apply(this, arguments); variantFold(); };            // 트레이를 다 지은 뒤에 접는다(원래 줄 수정 0)
+  const mode0 = setMode; setMode = function (kind, tool) { const r = mode0.apply(this, arguments);                 // 스포이트·되돌리기로 가족의 다른 색이 골라져도 카드가 따라온다
+    const fam = variantFamOf(sel); if (fam && fam.card.dataset.kind !== sel) { variantApply(fam.card, sel); fam.card.classList.add('on'); }
+    variantPop(); return r; }; }
+document.getElementById('trayIn').addEventListener('scroll', variantPopPlace, { passive: true }); addEventListener('resize', variantPopPlace);
+variantFold();
+window.__variants = () => ({ 켜짐: window.VRULES.variantCards.on, 가족: [...VAR.fams].map(([h, f]) => h + ':' + f.kinds.join('/')), 고른색: { ...VAR.pick }, 카드수: document.querySelectorAll('#trayIn .card[data-kind]').length, 단추줄: (document.getElementById('vpop') || { style: {} }).style.display === 'flex', ...VAR.stats });
+
 /* ══════════════════════════════════════════════════════════════
    사진 모드(F16)
    ══════════════════════════════════════════════════════════════ */
