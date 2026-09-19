@@ -1247,8 +1247,9 @@ ground.visible = false;   // 판(1024) 밑에 완전히 가려져 있던 원(r15
    ══════════════════════════════════════════════════════════════ */
 const SEASON_DAYS = 28;
 const SEASONS = [
-  { nm:'봄',   leaf:0x8cd46a, leafL:0xa8e37f, grass:0x9fd464, ground:0x8cc457, sky:0x9fdbf0 },
-  { nm:'여름', leaf:0x5fa83f, leafL:0x76bd50, grass:0x97cc5e, ground:0x86b953, sky:0x8fd0f2 },
+  /* [DESIGN-SEASON-1] 봄·여름이 거의 같아(잔디 9fd464 ↔ 97cc5e) 계절이 바뀐 걸 몰랐다 — 봄은 밝고 노란빛 새싹 초록 · 여름은 짙고 푸른 초록 + 더 파란 하늘 */
+  { nm:'봄',   leaf:0x9edc6e, leafL:0xc2ec98, grass:0xb3dc74, ground:0x9fcd61, sky:0xaee3f6 },
+  { nm:'여름', leaf:0x3f8f32, leafL:0x5aa843, grass:0x74b84a, ground:0x64a341, sky:0x72c2f0 },
   { nm:'가을', leaf:0xe08a3a, leafL:0xf0a84a, grass:0xc9b45a, ground:0xb5a24f, sky:0xa9d3e8 },
   { nm:'겨울', leaf:0xbfcbd6, leafL:0xd8e2ea, grass:0xe6ecf0, ground:0xd6dde4, sky:0xc8d8e6 } ];
 const seasonIdx = () => Math.floor((simDay() - 1) / SEASON_DAYS) % 4;
