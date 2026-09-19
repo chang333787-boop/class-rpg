@@ -5122,6 +5122,20 @@ function litPieces(c, ci, stage) {
     { g:'cone', c:P.metalD, s:[.52,.3,.52], p:[LX + .5,3.7,LZ], ry:PI / 4 }, { g:'box', c:P.metalD, s:[.66,.06,.66], p:[LX + .5,2.82,LZ] } ];
   window.CART_GLOW = [ { g:'cyl', c:0x8a7a55, s:[2.5,.02,2.5], p:[.2,.24,.5], n:1 } ];                                                          // 발밑 불빛 웅덩이 — 수레를 둘러(어느 쪽으로 돌아서도 보이게)
 })();
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-PUDDLE-1] 비 그친 뒤 웅덩이 모양 — 보스 결정 ⓑ '둥근 웅덩이 둘 + 옅은 테 + 반짝임'. 모양 함수만(쓰레기 litPieces 와 같은 나눔).
+   · window.PUDDLE_PARTS(seed) → 길 한 칸의 부위 목록 { g, c, s, p, ry?, e? } — 칸 가운데 원점 · 길 윗면(0.19) 바로 위. 같은 seed 면 같은 모양(칸 번호를 넘기면 된다).
+   · 어느 칸에 언제 생기고 사라지는지 · 청크 'lit' 묶음에 합치기(draw call +0)는 주민 연기 담당 몫.
+   · 색: 물 62ade0(하늘 반사 한 톤) · 테 a8a499(젖은 길 한 톤) · 흰 반짝임 한 줄(e 0.4 — 낮에 살짝). 처음 색(8fcaea)은 밝은 길 위에서 거의 안 보였다.
+   · 팔각(cone8) 원판 — 칸당 약 120△. 젖은 길 둘레(시안 ⓒ)는 물과 길의 대비를 줄여 뺐다.
+   ══════════════════════════════════════════════════════════════ */
+window.PUDDLE_PARTS = seed => {
+  let h = (seed >>> 0) || 1; const r = () => ((h = (h * 1103515245 + 12345) >>> 0) & 1023) / 1023, out = [], Y = .205;
+  for (let i = 0; i < 2; i++) { const x = (r() - .5) * 1.4, z = (r() - .5) * 1.4, rr = .8 + r() * .45, sq = .7 + r() * .3, a = r() * 3.14;
+    out.push({ g:'cone8', c:0xa8a499, s:[rr + .14, .012, (rr + .14) * sq], p:[x, Y, z], ry:a }, { g:'cone8', c:0x62ade0, s:[rr, .02, rr * sq], p:[x, Y + .006, z], ry:a },
+      { g:'box', c:0xffffff, s:[rr * .7, .01, .07], p:[x - rr * .15, Y + .02, z - rr * .25 * sq], ry:.5, e:.4 }); }
+  return out;
+};
 /* buildChunk 고리 — 이 청크의 길 칸에 조각을 'lit' 묶음 기하로 더한다(청크를 다시 합칠 때만 돈다) */
 const litM = new THREE.Matrix4(), litN = new THREE.Matrix3(), litV = new THREE.Vector3(), litQ = new THREE.Quaternion(), litS = new THREE.Vector3(), litP = new THREE.Vector3(), litY = new THREE.Vector3(0, 1, 0), litC = new THREE.Color();
 function actLitterChunk(x0, z0, bucket) {
