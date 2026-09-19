@@ -1179,6 +1179,61 @@
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       _decoUndoClear(); SEL_DECO = null; toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
     }
+    //  ㉑ 네모로 방 만들기(INDOOR-ROOMS-1 · IN-3) — 공간 3 에서
+    if (typeof _inRoomAdd === 'function') {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keep = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      delete CUR.indoor; _decoUndoClear();
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const rs = () => (CUR.indoor && CUR.indoor[3] && CUR.indoor[3].rooms) || null;
+      out('방_없으면_큰방그대로', _inRooms(CUR).length === 0 && !CUR.indoor);
+      setDecoMode('floor'); ifSyncModeBtn(); _inPk.tab = 'room'; _inPk.tool = ''; _inLookRender(); await sleep(100);
+      out('방_탭_크기칩셋', [...document.querySelectorAll('#if-floor-picker .fpk-row[data-row=fams] .pk-chip')].filter(e => /작은 방|보통 방|큰 방/.test(e.textContent)).length === 3);
+      out('방_네모끌기_모드', _inRoomDragMode() && getComputedStyle(document.getElementById('if-hand-btn')).display !== 'none');
+      _inRoomAdd(_inRoomFrom(3, 3, 9, 12));
+      out('방_만들기_저장', JSON.stringify(rs()) === '{"a":"3,3,10,7,,"}');
+      out('방_겹치면_막힘', !_inRoomAdd(_inRoomFrom(8, 8, 12, 15)) && Object.keys(rs()).length === 1);
+      out('방_작으면_막힘', !!_inRoomWhy(_inRooms(CUR), { r: 20, c: 30, w: 3, h: 2 }) && !!_inRoomWhy(_inRooms(CUR), { r: 10, c: 20, w: 21, h: 4 }));
+      _inPk.tool = 's0'; _inTap(3, 13);                                    // 작은 방 6×4 를 오른쪽에 붙인다
+      out('방_크기칩_붙임', rs() && rs().b === '3,13,6,4,,');
+      out('방_붙이면_문', JSON.stringify(_inRoomDoors(_inRooms(CUR))) === '[{"col":13,"r0":4,"r1":6}]');
+      _inPk.tool = ''; _inPk.tab = 'wall'; _inPk.wall = { name: 'star', color: 'sky' }; _inTap(5, 15);
+      out('방_벽지는_그방만', rs().b === '3,13,6,4,,star#sky' && rs().a === '3,3,10,7,,');
+      _inTap(2, 16);                                                        // 벽 띠를 눌러도 그 방
+      out('방_벽띠눌러도_그방', rs().b === '3,13,6,4,,star#sky');
+      const t0 = [...document.querySelectorAll('.toast-msg')].length; _inTap(20, 40);
+      out('방_빈터누르면_안내', /방 밖은 빈 터/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent) && rs().a === '3,3,10,7,,');
+      _inPk.tab = 'floor'; _inPk.floor = { name: 'carpet', color: 'pink' }; _inTap(6, 6);
+      out('방_바닥도_그방만', rs().a === '3,3,10,7,carpet#pink,');
+      //  벽걸이: 방 윗줄(3줄)에 걸리고 벽 띠(2줄)에 그려진다 · 방 밖 가운데 줄엔 안 걸린다
+      setDecoMode('deco'); ifSyncModeBtn();
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_i4').concat([{ id: 'd_i4', qty: 3 }]);
+      out('방_윗줄은_벽줄', _inIsWallRow(3, 15) && !_inIsWallRow(4, 15) && !_inIsWallRow(20, 40));
+      SEL_DECO = 'd_i4'; _decoPlace('indoor', 3, 15); _decoPlace('indoor', 20, 40); SEL_DECO = null;
+      out('방_윗벽에_액자', _decoList(CUR).some(p => p.id === 'd_i4' && p.row === 3 && p.col === 15) && !_decoList(CUR).some(p => p.id === 'd_i4' && p.row === 20));
+      //  방을 없애도 가구는 그대로 · ↩ 로 되살아난다
+      const nDeco = _decoList(CUR).length;
+      setDecoMode('floor'); ifSyncModeBtn(); _inPk.tab = 'room'; _inPk.tool = 'erase'; _inTap(5, 5);
+      out('방_없애도_가구그대로', !rs().a && _decoList(CUR).length === nDeco);
+      decoUndo(); out('방_↩되살림', rs().a === '3,3,10,7,carpet#pink,');
+      //  못 읽는 값·판 밖·겹침은 읽을 때 버린다(그리기가 안 깨진다)
+      const bad = _inRooms({ indoor: { 3: { rooms: { a: '1,1,5,4,,', b: '2,2,5,4,,', c: 'x,y', d: '25,45,10,10,,', e: '10,20,6,4,zzz,star#bogus' } } } }, 3);
+      out('방_못읽는값_버림', bad.map(r => r.id).join('') === 'ae' && bad[1].floor === null && bad[1].wall.color === '');
+      //  그리기: 방이 있으면 빈 터(도면) 위에 방 · 나가기 문은 가장 아래 방 아래 벽
+      _drawDeco(); await sleep(120);
+      out('방_나가기문_아래방', Math.abs(_dCv._doorY - (_dCv._offY + (3 + 7) * _dC - _dC * .75)) < 1);
+      //  전체 = 방 둘레
+      out('방_전체는_방둘레', _inFitRooms() && _dZoom > 1);
+      //  모든 방을 없애면 필드째 사라지고 큰 방으로
+      _inRoomsCommit([], ''); out('방_다없애면_큰방', !CUR.indoor);
+      out('방_골드불변', typeof CUR.gold === 'number');
+      if (keep !== undefined) CUR.indoor = keep; else delete CUR.indoor;
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _inPk.tab = 'wall'; _inPk.tool = ''; setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear();
+      toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';
