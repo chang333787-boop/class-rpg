@@ -2912,6 +2912,86 @@ function jobChkDraw() { if (!JOBCHK.marks.length && !jobChkMesh.count) return; c
 { const sdC0 = sayDraw; sayDraw = function () { const r = sdC0.apply(this, arguments); jobChkDraw(); return r; }; }
 window.__jobCheck = () => ({ 켜짐: window.VRULES.jobCheck.on, 떠있는표시: JOBCHK.marks.length, ...JOBCHK.stats });
 
+/* ── [MAC-VOICE] 목소리 모으기 P0 — 동네별 바람표 (docs/village_politics_layer.md ① · 보스 09-20 · 경제·정치 층이 함께 쓰는 조각) ──
+   동네 = 32칸 구역(plotOf). 동네마다 '무엇을 원하는 집이 몇 채'인가를 센다 — 집 단위 · **읽기만**(sat·computeSat·crowdedHome·joblessHome 을 읽고 순서·판정은 안 바꾼다).
+   · 사는 집: 빠진 필요(물·장보기·놀이·쉼·배움) + 🚶 덜 붐비는 길(crowdedHome) + 💼 일할 곳(joblessHome).
+   · 빈 집: 빠진 필요만(식구가 없으니 일할 곳·붐빔은 없다 — 이사 오려던 이웃이 보는 것과 같은 computeSat).
+   · 화면: 상단 바의 📣 단추(🎯·📈 곁 · #695 뒤 보스: 왼쪽 위 칩이 두 줄로 접힌 바의 '판 전체 보기'를 덮었다) → 화면 가운데 동네의 카드 "📣 ○○ 동네 — 🪣 물 뜰 곳을 원해요 🏠🏠🏠 3채 …". ◀ ▶ 로 다른 동네(카메라도 그리로).
+     줄 차례는 **사다리 순으로 고정**(물 → 장보기 → 놀이 → 쉼 → 배움 → 일할 곳 → 길) — 채 수로 세우면 순위가 된다. %·점수·순위·교과 낱말 없음.
+   · 동네 이름: 그 구역의 눈에 띄는 건물(학교·역·도서관·광장 … 가게·우물)로 "학교 동네" · 없으면 "집 동네" · 같은 이름이면 뒤에 2·3.
+   · 셈은 칩을 누를 때·카드가 열려 있는 동안 3초마다만(틱 비용 0). 시험·도구 훅 window.__voice().
+   판정 0 · 저장 0 · 스위치 VRULES.voice(보기). 원래 줄 수정 0 — jobsChipTick 감싸기(칩 보이기·카드 새로 고침) + 이 블록. 결정 칸·법은 아직 아니다. */
+(window.VRULES = window.VRULES || {}).voice = { on: true, minPop: 10, per: 5 };
+/* 순수 함수 — 집 n채를 그림으로: 🏘️ 하나 = per 채 · 나머지는 🏠 (그림 길이가 채 수를 따라간다 · 28 → 🏘️×5 🏠×3) */
+function voiceHouses(n, per) { per = per || 5; return '🏘️'.repeat(Math.floor(n / per)) + '🏠'.repeat(n % per); }
+const VOICE_KEYS = ['물', '장보기', '놀이', '쉼', '배움', '일자리', '붐빔'];   // 사다리 순(고정)
+const VOICE_TXT = { 물: '🪣 물 뜰 곳', 장보기: '🛒 장 볼 곳', 놀이: '🛝 놀 곳', 쉼: '🪑 쉴 곳', 배움: '📚 배울 곳', 일자리: '💼 일할 곳', 붐빔: '🚶 덜 붐비는 길' };
+const VOICE_MARK = ['school', 'station', 'museum', 'plaza', 'fountain', 'pavilion', 'pond', 'library', 'windmill', 'green', 'play', 'shop', 'well'];   // 이름이 될 건물(앞이 먼저 · 하나뿐이거나 큰 자리를 앞에 — 도서관·가게처럼 여럿 짓는 것을 놓아도 이름이 덜 바뀌게)
+const VOICE = { open: false, cur: null, list: [], stats: { 셈: 0, 열림: 0, 넘김: 0 } };
+/* 바람표 — [{ key:'4,4', 이름, 집, 사는집, 바람:{물:n,…}, x, y }] (집이 있는 동네만 · key 순) */
+function voiceTable() { VOICE.stats.셈++; const by = new Map(), marks = new Map();
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i) return; const x = cX(i), y = cY(i), key = plotOf(x, y);
+    const mi = VOICE_MARK.indexOf(rec.k); if (mi >= 0) { const m = marks.get(key); if (m == null || mi < m) marks.set(key, mi); }
+    if (rec.k !== 'house') return;
+    let e = by.get(key); if (!e) { e = { key, 집: 0, 사는집: 0, 바람: {} }; VOICE_KEYS.forEach(k => { e.바람[k] = 0; }); by.set(key, e); }
+    e.집++; const n = res.get(i) || 0, st = (n > 0 && sat.get(i)) || computeSat(rec), miss = NEEDS.filter(k => !st.met[k]);
+    if (n > 0) { e.사는집++; if (crowdedHome(i)) miss.push('붐빔'); if (joblessHome(i)) miss.push('일자리'); }
+    miss.forEach(k => { if (k in e.바람) e.바람[k]++; }); });
+  const out = [...by.values()].sort((a, b) => { const [ax, ay] = a.key.split(',').map(Number), [bx, by2] = b.key.split(',').map(Number); return ay - by2 || ax - bx; });
+  const seen = new Map(); out.forEach(e => { const mi = marks.get(e.key), base = (mi != null ? K[VOICE_MARK[mi]].nm : '집') + ' 동네', c = (seen.get(base) || 0) + 1; seen.set(base, c); e.이름 = c > 1 ? base + ' ' + c : base;
+    const [px, py] = e.key.split(',').map(Number); e.x = px * PLOT + PLOT / 2; e.y = py * PLOT + PLOT / 2; });
+  return out; }
+window.__voice = () => voiceTable().map(e => ({ 동네: e.key, 이름: e.이름, 집: e.집, 사는집: e.사는집, 바람: { ...e.바람 } }));
+/* 화면 */
+function voiceCss() { if (document.getElementById('voiceCss')) return; const st = document.createElement('style'); st.id = 'voiceCss';
+  st.textContent = '#voiceChip{flex:0 0 auto;pointer-events:auto;display:none;background:#222630dd;border:1px solid #e8b04b;color:#e8e6e0;border-radius:9px;min-width:44px;min-height:44px;padding:0;font-size:18px;cursor:pointer}'   /* 상단 바 안의 단추 — 🎯·📈 와 같은 꼴(바가 두 줄로 접혀도 같이 흐른다 · 판 전체 보기와 안 겹친다) */
+    + '#voiceCard{position:fixed;left:10px;top:112px;z-index:8;width:min(92vw,340px);max-height:calc(100vh - 250px);overflow:auto;background:#1a1d26;border:1px solid #3a4050;border-radius:14px;padding:10px 12px;box-shadow:0 8px 28px #000a;font:14px/1.45 "Malgun Gothic",sans-serif;color:#e8e6e0}'
+    + '#voiceCard .hd{display:flex;align-items:center;gap:6px;font-weight:800;color:#ffe9b8;margin-bottom:6px}#voiceCard .hd .nm{flex:1;text-align:center}'
+    + '#voiceCard button{background:#333846;color:#e8e6e0;border:none;border-radius:10px;min-width:44px;min-height:44px;font-size:16px;font-weight:800;cursor:pointer}'
+    + '#voiceCard .row{display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px solid #2a2f3b}#voiceCard .w{flex:0 0 auto;min-width:118px}#voiceCard .h{flex:1;letter-spacing:-1px}#voiceCard .n{flex:0 0 auto;color:#a8adba;font-size:12.5px}'
+    + '#voiceCard .ok{color:#9fd8a8;padding:6px 0;text-align:center}#voiceCard .sub{font-size:12px;color:#a8adba;text-align:center;margin:-2px 0 4px}body.photo #voiceChip,body.photo #voiceCard{display:none!important}';
+  document.head.appendChild(st); }
+function voiceChipDraw() { const R = window.VRULES.voice; let el = document.getElementById('voiceChip');
+  if (!el) { voiceCss(); el = document.createElement('button'); el.id = 'voiceChip'; el.type = 'button'; el.textContent = '📣'; el.title = '동네 바람 — 동네마다 집들이 무엇을 원하는지(누르면 화면 가운데 동네)'; el.setAttribute('aria-label', '동네 바람'); el.onclick = () => VOICE.open ? voiceClose() : voiceOpen();
+    const after = document.getElementById('histBtn') || document.getElementById('goalBtn'); if (after && after.parentNode) after.after(el); else document.body.appendChild(el); }
+  el.style.display = R.on && !VISIT.on && population() >= R.minPop ? 'inline-block' : 'none';   /* CSS 기본이 none 이라 '' 가 아니라 block */ if (el.style.display === 'none' && VOICE.open) voiceClose(); }
+function voiceHere(list) { const cx = Math.round(camTarget.x / CS + (W - 1) / 2), cy = Math.round(camTarget.z / CS + (H - 1) / 2), key = plotOf(Math.max(0, Math.min(W - 1, cx)), Math.max(0, Math.min(H - 1, cy)));
+  if (list.some(e => e.key === key)) return key; let best = null, bd = 1e9; list.forEach(e => { const d = Math.hypot(e.x - cx, e.y - cy); if (d < bd) { bd = d; best = e.key; } }); return best; }
+function voiceOpen() { VOICE.open = true; VOICE.stats.열림++; VOICE.list = voiceTable(); VOICE.cur = voiceHere(VOICE.list); voiceDraw(); }
+function voiceClose() { VOICE.open = false; const c = document.getElementById('voiceCard'); if (c) c.remove(); }
+function voiceStep(d) { const L = VOICE.list; if (!L.length) return; let i = L.findIndex(e => e.key === VOICE.cur); i = (i + d + L.length) % L.length; VOICE.cur = L[i].key; VOICE.stats.넘김++;
+  camTarget.set(wx(L[i].x), 2, wz(L[i].y)); miniDirty = true; voiceDraw(); }
+function voiceDraw() { const R = window.VRULES.voice; let c = document.getElementById('voiceCard'); if (!VOICE.open) return;
+  if (!c) { voiceCss(); c = document.createElement('div'); c.id = 'voiceCard'; document.body.appendChild(c); }
+  c.style.top = ((typeof FIT !== 'undefined' ? FIT.topBottom : 56) + 6) + 'px'; c.style.maxHeight = 'calc(100vh - ' + ((typeof FIT !== 'undefined' ? FIT.topBottom : 56) + 170) + 'px)';   // 상단 바의 실제 아래 끝 밑(MAC-FIT) · 목표판(z 7)보다 위
+  const e = VOICE.list.find(v => v.key === VOICE.cur);
+  if (!e) { c.innerHTML = '<div class="hd"><span class="nm">📣 아직 집이 없어요</span><button type="button" data-a="x">✕</button></div>'; }
+  else { const rows = VOICE_KEYS.filter(k => e.바람[k] > 0).map(k => { const n = e.바람[k]; return '<div class="row"><span class="w">' + VOICE_TXT[k] + '을 원해요</span><span class="h">' + voiceHouses(n, R.per) + '</span><span class="n">' + n + '채</span></div>'; }).join('');
+    c.innerHTML = '<div class="hd"><button type="button" data-a="p" aria-label="앞 동네">◀</button><span class="nm">📣 ' + e.이름 + '</span><button type="button" data-a="n" aria-label="다음 동네">▶</button><button type="button" data-a="x" aria-label="닫기">✕</button></div>'
+      + '<div class="sub">사는 집 ' + e.사는집 + ' · 빈 집 ' + (e.집 - e.사는집) + ' · 🏘️ = ' + R.per + '채</div>'
+      + (rows || '<div class="ok">😊 이 동네는 다 있어요</div>'); }
+  c.querySelectorAll('button').forEach(b => { b.onclick = () => { const a = b.dataset.a; if (a === 'x') voiceClose(); else voiceStep(a === 'n' ? 1 : -1); }; }); }
+{ const jct0 = jobsChipTick; jobsChipTick = function () { const r = jct0.apply(this, arguments); voiceChipDraw(); if (VOICE.open) { VOICE.list = voiceTable(); voiceDraw(); } return r; }; }   // 3초마다(SIM.ticks % 30 === 17) — 칩 보이기 · 열린 카드 새로
+window.__voiceUi = () => ({ 켜짐: window.VRULES.voice.on, 열림: VOICE.open, 지금: VOICE.cur, ...VOICE.stats });
+
+/* ── [MAC-SIMOUT] 시뮬이 그림·말을 부르는 곳을 한 줄로 (엔진 제안서 ③ · ④ sim.js 이동의 앞 단계 · 보스 09-20) ──
+   시뮬 핵심(이사·돌아섬·필요·성장·사건·목표·바람 — simTick 에서 불리는 곳)이 화면을 직접 부르던 네 가지를 한 문으로 모은다:
+     toast → simSay · sndFx → simSound · dirtyChunks.add → simDirty · sparkle.push → simSparkle   (모두 simEmit(종류, …) 를 거친다)
+   · 기본 처리기는 **부르는 순간의** toast·sndFx·dirtyChunks·sparkle 을 그대로 부른다 → 다른 블록의 toast 감싸기(소식 줄 세우기·어제 한 장의 받아 두기)도 전과 같이 탄다.
+     인자는 부르기 전에 계산된다(전과 같은 차례 — sparkle 자리의 Math.random 도 같은 순서로 소비).
+   · 동작 변화 0 — 증거: scripts/village-sim/run.mjs --html(옛 index.html)과 새 것을 같은 시드로 돌려 표본이 한 글자도 안 다르다(PR 본문).
+   · ④ 에서 sim.js 로 옮길 때 이 네 이름만 넘겨주면 된다(simOut(종류, fn) 으로 처리기를 바꾼다 · 시뮬 도구는 세기만).
+   · 이번엔 시뮬 핵심 구간의 23줄(25곳 — 말 12 · 소리 6 · 청크 4 · 반짝 3)만. 연기(ACT-*)·놓기·치우기·판 카드 쪽 부름은 그대로 — 지도는 PR 본문.
+   원래 줄 수정 23 — 이름만 바꿨다(인자·차례 그대로). 새 VRULES 없음. */
+function simEmit(type, a, b) { const H = simEmit.h || (simEmit.h = { say: (m, ok) => toast(m, ok), sound: n => sndFx(n), dirty: c => dirtyChunks.add(c), sparkle: o => sparkle.push(o) });
+  const n = simEmit.n || (simEmit.n = { say: 0, sound: 0, dirty: 0, sparkle: 0 }); if (type in n) n[type]++; const f = H[type]; return f ? f(a, b) : undefined; }
+function simSay(m, ok) { return simEmit('say', m, ok); }
+function simSound(name) { return simEmit('sound', name); }
+function simDirty(chunk) { return simEmit('dirty', chunk); }
+function simSparkle(o) { return simEmit('sparkle', o); }
+function simOut(type, fn) { simEmit('_'); simEmit.h[type] = fn; }   // 처리기 바꾸기(④ · 시험용) — simEmit('_') 는 처리기 표를 만들어 두려고 한 번 부른다
+window.__simOut = () => ({ ...(simEmit.n || {}) });
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
@@ -4205,10 +4285,10 @@ function moveInQuiet() {
   for (let t = 0; t < homes.length; t++) {
     const rec = homes[(moveRR++) % homes.length];
     if (moveInWhy(rec) !== true) continue;
-    res.set(rec.root, (res.get(rec.root) || 0) + 1); sndFx('pop');
-    dirtyChunks.add(chunkOfCell(rec.root));            // 창에 불이 켜진다(F7)
+    res.set(rec.root, (res.get(rec.root) || 0) + 1); simSound('pop');
+    simDirty(chunkOfCell(rec.root));            // 창에 불이 켜진다(F7)
     folksDirty = true; markDirty();                     // syncFolks 가 👥 숫자를 고친다(사람은 상한이라 안 는다)
-    if (simNow() - lastMoveToast > 30000) { lastMoveToast = simNow(); toast('누가 이사 왔어요! 👥 ' + population() + '명', true); }
+    if (simNow() - lastMoveToast > 30000) { lastMoveToast = simNow(); simSay('누가 이사 왔어요! 👥 ' + population() + '명', true); }
     checkUnlocks();
     return true;
   }
@@ -4367,7 +4447,7 @@ function waitLookTick() {
   const t0 = performance.now(), next = new Map();
   if (window.VRULES.waitLook.on && window.WAITHOUSE && !VISIT.on) waitScan().forEach((m, root) => next.set(root, m));   // [MAC-WAITSCAN] 칩이 7틱 전에 센 것을 다시 쓴다
   const touched = new Set(); next.forEach((m, root) => { if (WAITLOOK.miss.get(root) !== m) touched.add(root); }); WAITLOOK.miss.forEach((m, root) => { if (!next.has(root)) touched.add(root); });
-  WAITLOOK.miss = next; const keys = new Set(); touched.forEach(root => keys.add(chunkOfCell(root))); keys.forEach(k => dirtyChunks.add(k));
+  WAITLOOK.miss = next; const keys = new Set(); touched.forEach(root => keys.add(chunkOfCell(root))); keys.forEach(k => simDirty(k));
   WAITLOOK.stats.센횟수++; WAITLOOK.stats.다시합친청크 += keys.size; WAITLOOK.stats.센ms = +(performance.now() - t0).toFixed(2);
 }
 { const parts0 = partsOf; partsOf = function (rec) { const p = parts0.apply(this, arguments);
@@ -4407,8 +4487,8 @@ function awayGate(f, i) {
   f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; f.blockedAt = 0; f.stuckN = 0;
   movers = Math.max(0, movers - 1); f.slotFreed = true;                     // 돌아가는 길은 이사 자리를 안 차지한다(왕복이라 처리량이 반으로 주는 것 막기)
   let first = false; try { if (!localStorage.getItem(AWAY_SEEN_KEY())) { localStorage.setItem(AWAY_SEEN_KEY(), '1'); first = true; } } catch (e) {}
-  if (first) { AWAY.stats.첫안내++; toast('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
-  else { const key = miss.join(); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); toast('🚶 ' + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
+  if (first) { AWAY.stats.첫안내++; simSay('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
+  else { const key = miss.join(); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
   if (path.length < 2) return awayGate(f, i);                                // 나갈 길이 없다 — 그 자리에서 사라진다
   return true;
 }
@@ -4501,12 +4581,12 @@ window.__away = () => ({ 켜짐: window.VRULES.turnAway.on, ...AWAY.stats, 돌�
 
 function arrive(f, i) {
   if (awayGate(f, i)) return;   // [MAC-AWAY] 살기 불편한 집이면 들어가지 않고 돌아간다
-  res.set(f.home, (res.get(f.home) || 0) + 1); sndFx('pop');
-  dirtyChunks.add(chunkOfCell(f.home));            // 창에 불이 켜진다(F7)
+  res.set(f.home, (res.get(f.home) || 0) + 1); simSound('pop');
+  simDirty(chunkOfCell(f.home));            // 창에 불이 켜진다(F7)
   movers = Math.max(0, movers - 1);
   folks.splice(i, 1); releaseAll(i); claimed.clear(); claimed2.clear();
   folksDirty = true; markDirty();
-  if (simNow() - lastMoveToast > 30000) { lastMoveToast = simNow(); toast('누가 이사 왔어요! 👥 ' + population() + '명', true); }
+  if (simNow() - lastMoveToast > 30000) { lastMoveToast = simNow(); simSay('누가 이사 왔어요! 👥 ' + population() + '명', true); }
   checkUnlocks();
 }
 
@@ -4517,9 +4597,11 @@ function arrive(f, i) {
 const NEEDS_BASE = ['물', '장보기', '놀이', '쉼'], LEARN_POP = 80;
 let NEEDS = NEEDS_BASE.slice();
 const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' };
+/* [MAC-JOBSON-2] 돌아섬 까닭의 '일자리'(#676)도 말로 — 없어서 "…쉴 곳·이 멀어서 새 이웃이 돌아갔어요"(빈 칸)·주민 카드 "…·이 멀어서 돌아가요"가 됐다. 키를 훑는 곳은 없다(값만 읽음) · 원래 줄 수정 0 */
+NEED_TXT.일자리 = '일할 곳';
 let learnOn = false;
 function needsTick() {                            // 인구 80 을 넘으면 '배움'이 생긴다(한 번 생기면 안 없어진다)
-  if (!learnOn && population() >= LEARN_POP) { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); toast('📚 마을이 커졌어요 — 이제 배울 곳도 바라요(도서관·학교)', true); }
+  if (!learnOn && population() >= LEARN_POP) { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); simSay('📚 마을이 커졌어요 — 이제 배울 곳도 바라요(도서관·학교)', true); }
 }
 const NEED_R = 14, NEED_R_WIDE = 20;               // 길로 14칸 안 · 큰길에 붙은 건물은 20칸(F22)
 const sat = new Map();
@@ -4558,11 +4640,11 @@ function satTick() {
   else h.hs = -1;
 }
 function growHouse(rec, h) {
-  h.lv++; h.hs = SIM.t; sndFx('grow');
-  dirtyChunks.add(chunkOfCell(rec.root)); mapDirty = true; markDirty();
+  h.lv++; h.hs = SIM.t; simSound('grow');
+  simDirty(chunkOfCell(rec.root)); mapDirty = true; markDirty();
   const c = centerOf('house', cX(rec.root), cY(rec.root), rec.rot);
-  sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 });
-  toast('🏠 집이 ' + h.lv + '층이 됐어요!', true);
+  simSparkle({ x: c.x, z: c.z, until: SIM.t + 3000 });
+  simSay('🏠 집이 ' + h.lv + '층이 됐어요!', true);
 }
 function satText(rec) {
   const st = sat.get(rec.root) || computeSat(rec);
@@ -4897,13 +4979,13 @@ function rainTick(dtMs) {
 function eventTick() {
   const d = simDay();
   const rainNow = rainDay(d);
-  if (rainNow !== EV.rain) { EV.rain = rainNow; rain.visible = rainNow && !mapMode; if (rainNow) toast('☔ 비가 와요 — 다들 빨리 걸어요', true); }
+  if (rainNow !== EV.rain) { EV.rain = rainNow; rain.visible = rainNow && !mapMode; if (rainNow) simSay('☔ 비가 와요 — 다들 빨리 걸어요', true); }
   const pr = plazaRoot();
   const festNow = pr >= 0 && population() >= 20 && d % 7 === 0;
-  if (festNow !== EV.fest) { EV.fest = festNow; EV.festRoot = festNow ? pr : -1; if (festNow) { EV.festSeen = true; toast('🎉 광장 축제 날이에요! 다들 광장으로', true); } }
+  if (festNow !== EV.fest) { EV.fest = festNow; EV.festRoot = festNow ? pr : -1; if (festNow) { EV.festSeen = true; simSay('🎉 광장 축제 날이에요! 다들 광장으로', true); } }
   if (EV.fest && EV.festRoot >= 0 && (SIM.ticks % 20) === 0) {
     const rec = cells[EV.festRoot]; if (rec && rec.k === 'plaza') { const c = centerOf('plaza', cX(rec.root), cY(rec.root), rec.rot);
-      sparkle.push({ x: c.x + (Math.random() - .5) * 10, z: c.z + (Math.random() - .5) * 10, until: SIM.t + 2000 }); }
+      simSparkle({ x: c.x + (Math.random() - .5) * 10, z: c.z + (Math.random() - .5) * 10, until: SIM.t + 2000 }); }
   }
 }
 
@@ -4919,7 +5001,7 @@ function rainClearAt(d, from, to) { const h = (Math.imul(d, 2246822519) >>> 0); 
 { const ev0 = eventTick; eventTick = function () { const R = window.VRULES.rainClear, d = simDay(), at = R.on && rainDay(d) ? rainClearAt(d, R.from, R.to) : null, clear = at != null && simHour() >= at, before = EV.rain;
     if (clear) EV.rain = true;                                                       // 원래 줄은 rainDay(d) 와 EV.rain 이 다를 때만 움직인다 — 같게 두어 '비가 와요'를 막는다
     const r = ev0.apply(this, arguments);
-    if (clear) { EV.rain = false; rain.visible = false; if (before) { RAINCLEAR.stats.갬++; toast('🌤️ 비가 그쳤어요', true); } }
+    if (clear) { EV.rain = false; rain.visible = false; if (before) { RAINCLEAR.stats.갬++; simSay('🌤️ 비가 그쳤어요', true); } }
     return r; }; }
 window.__rainClear = () => ({ 켜짐: window.VRULES.rainClear.on, 비: EV.rain, 날: simDay(), 시: +simHour().toFixed(1), 오늘비: rainDay(simDay()), 그치는때: rainDay(simDay()) ? rainClearAt(simDay(), window.VRULES.rainClear.from, window.VRULES.rainClear.to) : null, ...RAINCLEAR.stats });
 
@@ -4960,8 +5042,8 @@ let goalsAutoUntil = 0;
 function goalsPeek(ms) { goalsShown = true; document.getElementById('goals').classList.add('show'); renderGoals(); goalsAutoUntil = performance.now() + ms; }
 function goalTick() {
   let changed = false;
-  openGoals().forEach(g => { if (g.ok()) { goalsDone.add(g.id); changed = true; toast('🎯 목표 달성! ' + g.t, true); } });
-  if (changed) { markDirty(); renderGoals(); sndFx('goal'); if (goalsDone.size < 3) goalsPeek(6000); }   // 첫 세 목표까지만 다음 목표를 잠깐 보여 준다 — 셋 끝나면 사라진다(F25)
+  openGoals().forEach(g => { if (g.ok()) { goalsDone.add(g.id); changed = true; simSay('🎯 목표 달성! ' + g.t, true); } });
+  if (changed) { markDirty(); renderGoals(); simSound('goal'); if (goalsDone.size < 3) goalsPeek(6000); }   // 첫 세 목표까지만 다음 목표를 잠깐 보여 준다 — 셋 끝나면 사라진다(F25)
   if (goalsAutoUntil && performance.now() > goalsAutoUntil) { goalsAutoUntil = 0; goalsShown = false; document.getElementById('goals').classList.remove('show'); }
 }
 function renderGoals() {
@@ -5006,7 +5088,7 @@ function goalUnlockTick() {
   Object.keys(LOCK_GOAL).forEach(k => { if (unlocked.has(k)) return; if (goalsDone.has(LOCK_GOAL[k]) || (GU.first && countKind(k) > 0)) { unlocked.add(k); opened.push(k); } });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
   const quiet = GU.first; GU.first = false; if (!opened.length) return;
   markDirty();
-  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); toast('🔓 목표 보상! ' + opened.map(k => K[k].nm).join('·') + '이 열렸어요', true); sndFx('goal'); }
+  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); simSay('🔓 목표 보상! ' + opened.map(k => K[k].nm).join('·') + '이 열렸어요', true); simSound('goal'); }
   buildTray();
 }
 /* buildTray 고리 — 잠긴 것은 '바로 다음 단계'만 보인다: 인구 문턱이 가장 가까운 것 + 지금 목표판에 뜬 목표의 보상 */
@@ -5329,8 +5411,8 @@ function wishTick() {
     if (st && st.at >= f.wish.at && st.met[f.wish.need]) {                           // 바람 뒤에 잰 만족에서 채워졌다
       const h = hinfo.get(f.home) || { lv: 1, hs: -1 }; hinfo.set(f.home, h);
       if (h.hs >= 0) h.hs -= GROW_TICKS * TICK_MS / 2; else h.hs = now - GROW_TICKS * TICK_MS / 2;   // 성장 반나절 당김(한 번)
-      const c = centerOf('house', cX(f.home), cY(f.home), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 3000 });
-      toast('✨ ' + folkName(f) + '의 바람을 들어줬어요 — ' + NEED_TXT[f.wish.need] + '이 생겼어요', true); sndFx('goal');
+      const c = centerOf('house', cX(f.home), cY(f.home), rec.rot); simSparkle({ x: c.x, z: c.z, until: now + 3000 });
+      simSay('✨ ' + folkName(f) + '의 바람을 들어줬어요 — ' + NEED_TXT[f.wish.need] + '이 생겼어요', true); simSound('goal');
       wishStats.들어줌++; f.wish = null; return;
     }
     if (now - f.wish.at > WISH_LIFE) { f.wish = null; wishStats.사라짐++; }                 // 무시해도 벌 없음

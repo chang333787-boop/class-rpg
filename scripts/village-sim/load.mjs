@@ -58,9 +58,9 @@ function fakeGlobals({ saveText, hash, query, root }) {
   return ls;
 }
 
-/* opts: { root, saveText, seed, hash, query, quiet } → 마을의 window(시험 훅 __*) */
+/* opts: { root, html, saveText, seed, hash, query, quiet } → 마을의 window(시험 훅 __*) */
 export async function loadVillage(opts) {
-  const root = opts.root, html = fs.readFileSync(path.join(root, 'village/index.html'), 'utf8');
+  const root = opts.root, html = fs.readFileSync(opts.html ? path.resolve(root, opts.html) : path.join(root, 'village/index.html'), 'utf8');   // opts.html: 다른 index.html(전/후 비교용 · vendor·stages 는 root 것)
   const m = html.match(/<script type="module">([\s\S]*?)<\/script>/);
   if (!m) throw new Error('module 스크립트를 못 찾음');
   const three = pathToFileURL(path.join(root, 'village/vendor/three.module.js')).href;
