@@ -2074,6 +2074,15 @@ function drawClock() {
   if (d !== savedDay) { histPush(savedDay); dayNote(savedDay); savedDay = d; markDirty(); }   // 하루 넘어가면 어제 점 하나 + 어제 소식 + 시계 저장(F35·53차)
   document.getElementById('clockTime').textContent = (h < 12 ? (h < 6 ? '새벽 ' : '아침 ') : (h < 18 ? '낮 ' : '밤 ')) + (h % 12 || 12) + '시';
 }
+/* [MAC-NIGHT] 밤 밝기 바닥 — 달빛. 하루 3분 중 밤(20~5시)이 68초 + 어스름 30초인데, 그동안 사람과 집이 거의 검게 보였다
+   (밤 값: 해 0.22 · 하늘빛 0.35 · 둘레빛 0.14 · 노출 0.85). 밤 느낌(푸른 하늘·창 불빛)은 두고 읽을 수 있을 만큼만 올린다.
+   applyDaylight 끝에서 부른다. 낮(NIGHT.value = 0)에는 아무것도 안 바꾼다. */
+const NIGHT_LIFT = { sun: 0.20, hemi: 0.20, amb: 0.11, exp: 0.06 };   // 밤 풀밭 밝기 RGB(36,71,20) → (62,107,37). 더 올리면 낮처럼 보여 창 불빛이 죽는다
+function nightLift() {
+  const n = NIGHT.value; if (n <= 0) return;
+  sun.intensity += NIGHT_LIFT.sun * n; hemi.intensity += NIGHT_LIFT.hemi * n; amb.intensity += NIGHT_LIFT.amb * n;
+  renderer.toneMappingExposure += NIGHT_LIFT.exp * n;
+}
 /* 낮·밤 — 빛의 세기와 하늘색만. 해 각도는 F7 에서. */
 const SKY_DAY = new THREE.Color(0x9fdbf0), SKY_NIGHT = new THREE.Color(0x1c2340), skyCol = new THREE.Color();
 const SKY_DAWN = new THREE.Color(0xf2b27a), SUN_DAY = new THREE.Color(0xfff6e4), SUN_DAWN = new THREE.Color(0xffb070), SUN_NIGHT = new THREE.Color(0x7f8fc8), sunCol = new THREE.Color();
@@ -2100,6 +2109,7 @@ function applyDaylight() {
   scene.background = skyCol; scene.fog.color.copy(skyCol);
   renderer.toneMappingExposure = 0.85 + 0.23 * day;
   NIGHT.value = 1 - day;
+  nightLift();   // [MAC-NIGHT]
 }
 const folks = [];                 // {home, ct, x, z, dir, path, step, seg, state, until, base}
 
