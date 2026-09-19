@@ -1810,17 +1810,20 @@ function buildChunk(cx, cz) {
     const parts = partsOf(rec);
     const item = { root: i, k: rec.k, rot: rec.rot, bucket: bucketOf(parts[0]), off: 0 };
     const lit = rec.k === 'house' && (res.get(i) || 0) > 0 && dawnLit(i);   // 사람이 사는 집만 창에 불이 켜진다 · [ACT-DAWN] 잠든 집은 끈다
+    const wait = rec.k === 'house' && waitHouseIs(i);           // [MAC-WAITLOOK] 이웃을 기다리는 집 — 디자인 담당의 WAITHOUSE 표로 색을 옅게·창을 어둡게
     parts.forEach((pt, pi) => {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
       partMatrix(rec.k, x, y, rec.rot, pt, _m); _n3.getNormalMatrix(_m);
       const vc = base.vcol, vk = base.vkind;
       if (!vc) _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
+      if (!vc && wait) window.WAITHOUSE.col(_col, -1, pt);   // [MAC-WAITLOOK] 한 색 부위는 여기서 한 번(정점마다 하면 옅어짐이 쌓인다)
       for (let v = 0; v < base.nv; v++) {
         _v.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(_m); b.pos.push(_v.x, _v.y, _v.z);
         _v.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(_n3).normalize(); b.nrm.push(_v.x, _v.y, _v.z);
         let kind = 0;
         if (vc) { kind = vk[v]; if (kind === 1) _col.setHex(roofC); else if (kind === 2 || kind === 3 || kind === 7) { _col.setHex(seasonColor(kind === 3 ? P.leafL : P.leaf)); if (kind === 7) _col.multiplyScalar(.72); }   /* 7 = 짙은 잎(꽃밭 바탕 [DESIGN-FLOWER-3]) */ else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
+        if (vc && wait) window.WAITHOUSE.col(_col, kind, pt);   // [MAC-WAITLOOK] 모델 정점은 정점마다 색을 새로 정하므로 여기서
         b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? 1 : 0);
       }
       for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off);
@@ -3383,6 +3386,7 @@ function simTick() {
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
+  if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
@@ -3805,6 +3809,26 @@ function tryMoveIn() {
      · 이미 사는 주민은 떠나지 않는다. 저장 없음(돌아선 집 목록은 판을 연 동안만).
    규칙 모듈 꼴: 스위치 VRULES.turnAway + 순수 함수 homeLacks + 고리 여섯 줄(moveInWhy·tryMoveIn·arrive·simTick·루프·whatDoing).
    ══════════════════════════════════════════════════════════════ */
+/* ── [MAC-WAITLOOK] '이웃을 기다리는 집'의 모습 — 디자인 담당의 표(DESIGN-WAITHOUSE-1)에 프로그램 쪽 접점 셋을 단다 (인구 정체 조사 후보 3 · 보스 결정 ⓓ) ──
+   ① buildChunk: 그 집이면 정점색을 WAITHOUSE.col 로(창은 어둡게 · 나머지 채도 25%↓) — 고리 세 줄  ② partsOf: 그 집이면 문 앞 팻말(빠진 것 첫째의 작은 3D)을 더한다 — 감싸기
+   ③ 3초마다 '비어 있고 지금 그대로면 새 이웃이 돌아설 집'(awayLacks — 돌아섬 규칙 그대로)을 세어, **달라진 집의 청크만** 다시 합친다.
+   · 판정을 청크를 합칠 때마다 하지 않고 3초에 한 번 적어 둔다(awayLacks 는 길을 따라 재는 셈이라 싸지 않다). 이웃이 들어오는 순간은 기다리지 않는다 — arrive 가 그 청크를 다시 합치고,
+     그때 res > 0 이면 곧바로 제 색이다(보스 조건: 한 번에 제 색으로).
+   · 카드 그림·놓기 미리보기처럼 **가짜 rec** 으로 부르는 partsOf 에는 팻말을 안 붙인다(cells[root] 가 그 rec 일 때만). 구경 중에는 안 한다. */
+(window.VRULES = window.VRULES || {}).waitLook = { on: true };
+var WAITLOOK = { miss: new Map(), stats: { 센횟수: 0, 다시합친청크: 0, 센ms: 0 } };   // var — buildChunk 가 이 줄보다 먼저 돌 수 있다(그땐 undefined → 기다리는 집 없음)
+function waitHouseIs(root) { return !!(WAITLOOK && window.WAITHOUSE) && WAITLOOK.miss.has(root) && (res.get(root) || 0) === 0; }
+function waitLookTick() {
+  const t0 = performance.now(), next = new Map();
+  if (window.VRULES.waitLook.on && window.WAITHOUSE && !VISIT.on) cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house' || (res.get(i) || 0) > 0) return; const miss = awayLacks(rec); if (miss && miss.length) next.set(i, miss[0]); });
+  const touched = new Set(); next.forEach((m, root) => { if (WAITLOOK.miss.get(root) !== m) touched.add(root); }); WAITLOOK.miss.forEach((m, root) => { if (!next.has(root)) touched.add(root); });
+  WAITLOOK.miss = next; const keys = new Set(); touched.forEach(root => keys.add(chunkOfCell(root))); keys.forEach(k => dirtyChunks.add(k));
+  WAITLOOK.stats.센횟수++; WAITLOOK.stats.다시합친청크 += keys.size; WAITLOOK.stats.센ms = +(performance.now() - t0).toFixed(2);
+}
+{ const parts0 = partsOf; partsOf = function (rec) { const p = parts0.apply(this, arguments);
+    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root)) return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
+window.__waitLook = () => ({ 켜짐: window.VRULES.waitLook.on, 기다리는집: WAITLOOK.miss.size, 빠진것첫째: [...new Set(WAITLOOK.miss.values())], ...WAITLOOK.stats });
+
 (window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 1, bubbleMs: 6000 };
 const AWAY_NEEDS = ['물', '장보기', '놀이', '쉼'];
 const AWAY_ICON = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 다시: '🏠' };
