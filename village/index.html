@@ -5019,6 +5019,28 @@ function litPieces(c, ci, stage) {
   else [[-.55, 0, 1.25, 1.1, 1.1, 0], [.6, .15, 1.15, 1.0, 1.05, 1], [0, -.7, 1.1, .95, 1.0, 0]].forEach(([dx, dz, sx, sy, sz, ci2], i) => bag(dx, dz, sx, sy, sz, LIT_BAG[ci2], i * 1.1));
   return out;
 }
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-CART-1] 밤 어귀의 짐수레 모양 — 보스 결정 ⓑ '천 덮고 끈 묶은 짐'. 주민 연기 담당(ACT-NIGHTCART #582)이 이름으로 읽는다.
+   · window.CART_PARTS = 수레 + 짐 + 등불 기둥 · 1×1 칸 · 칸 가운데 원점 · +z = 손잡이(끄는 사람은 +z 앞) · −x 반 칸은 비워 둔다.
+   · window.CART_GLOW  = 발밑 불빛 웅덩이 — 밤에 서 있을 때만 넣는다(끌려갈 땐 뺀다). 기본·멀리 거리에서 '따뜻한 점'으로 읽히는 것은 이쪽이다(밤의 주인공).
+   · 빛은 n:1 → aNight(withEmis 의 두 번째 항 — 사람 사는 집 창문과 같은 따뜻한 빛). **낮엔 0**, 밤에만 켜진다(e/aEmis 는 낮에도 0.25 라 안 씀).
+     웅덩이 바탕색은 흙빛이라 아침에 잠깐 남아도 빛나지 않는다.
+   · 기둥은 앞쪽 모서리(+x·+z). 수레는 어귀 길 쪽으로 돌아 서므로 불빛은 한쪽이 아니라 수레를 둘러 깐다. 부위 꼴 { g, c, s, p, rx?, ry?, rz?, e?, n? }.
+   ══════════════════════════════════════════════════════════════ */
+(() => {
+  const PI = Math.PI, TARP = 0x6f8fa8, ROPE = 0xe6d3a3, LX = .85, LZ = 1.05;
+  const wheel = x => [ { g:'cyl', c:P.woodD, s:[.62,.14,.62], p:[x,.62,-.2], rz:PI / 2 }, { g:'cyl', c:P.metalD, s:[.16,.2,.16], p:[x,.62,-.2], rz:PI / 2 } ];
+  window.CART_PARTS = [
+    { g:'box', c:P.wood,  s:[1.9,.14,2.3], p:[0,.95,-.2] }, { g:'box', c:P.woodD, s:[.1,.36,2.3], p:[-.95,1.18,-.2] }, { g:'box', c:P.woodD, s:[.1,.36,2.3], p:[.95,1.18,-.2] }, { g:'box', c:P.woodD, s:[1.9,.36,.1], p:[0,1.18,-1.35] },
+    { g:'box', c:P.woodD, s:[.12,.12,1.6], p:[-.7,.95,1.6], rx:-.18 }, { g:'box', c:P.woodD, s:[.12,.12,1.6], p:[.7,.95,1.6], rx:-.18 }, { g:'box', c:P.woodD, s:[1.5,.1,.1], p:[0,.82,2.35] },
+    { g:'box', c:P.metalD, s:[1.5,.08,.08], p:[0,.62,-.2] }, ...wheel(-1.05), ...wheel(1.05),
+    { g:'box', c:TARP, s:[1.8,.9,2.0], p:[0,1.5,-.25] }, { g:'box', c:TARP, s:[1.5,.3,1.8], p:[0,2.05,-.25] },                                   // 천 덮은 짐
+    { g:'box', c:ROPE, s:[1.86,.06,.08], p:[0,1.98,-.8] }, { g:'box', c:ROPE, s:[1.86,.06,.08], p:[0,1.98,.3] }, { g:'box', c:ROPE, s:[.08,.06,2.06], p:[0,2.22,-.25] },
+    { g:'box', c:P.woodD, s:[.12,2.9,.12], p:[LX,2.4,LZ] }, { g:'box', c:P.woodD, s:[.62,.09,.09], p:[LX + .26,3.8,LZ] },                          // 앞 모서리 기둥 + 팔
+    { g:'box', c:P.metalD, s:[.05,.24,.05], p:[LX + .5,3.64,LZ] }, { g:'box', c:0xffb347, s:[.62,.72,.62], p:[LX + .5,3.2,LZ], n:1 },             // 등불(밤에만 빛)
+    { g:'cone', c:P.metalD, s:[.52,.3,.52], p:[LX + .5,3.7,LZ], ry:PI / 4 }, { g:'box', c:P.metalD, s:[.66,.06,.66], p:[LX + .5,2.82,LZ] } ];
+  window.CART_GLOW = [ { g:'cyl', c:0x8a7a55, s:[2.5,.02,2.5], p:[.2,.24,.5], n:1 } ];                                                          // 발밑 불빛 웅덩이 — 수레를 둘러(어느 쪽으로 돌아서도 보이게)
+})();
 /* buildChunk 고리 — 이 청크의 길 칸에 조각을 'lit' 묶음 기하로 더한다(청크를 다시 합칠 때만 돈다) */
 const litM = new THREE.Matrix4(), litN = new THREE.Matrix3(), litV = new THREE.Vector3(), litQ = new THREE.Quaternion(), litS = new THREE.Vector3(), litP = new THREE.Vector3(), litY = new THREE.Vector3(0, 1, 0), litC = new THREE.Color();
 function actLitterChunk(x0, z0, bucket) {
