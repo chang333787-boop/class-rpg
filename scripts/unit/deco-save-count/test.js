@@ -434,6 +434,42 @@
       decoSpaceSet(1); await sleep(200);
     }
 
+    //  ⑩-3 마우스 오른쪽 클릭 = 치우기 · 어떤 치우기에서도 골드는 안 움직인다(DECO-RCLICK-1) — 공간 3 빈 판에서
+    if (typeof _decoRightClickAt === 'function') {
+      decoSpaceSet(3); await sleep(200);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_y7').concat([{ id: 'd_y7', qty: 5 }]);
+      const live = () => document.querySelector('#if-topview canvas');
+      const at = (r, c) => { const k = live().getBoundingClientRect(); return { clientX: k.left + (c + .5) * _dC - _dPanX, clientY: k.top + (r + .5) * _dC - _dPanY }; };
+      const mouse = (type, btn, p) => live().dispatchEvent(new PointerEvent(type, Object.assign({ pointerId: 31, pointerType: 'mouse', button: btn, buttons: type === 'pointerup' ? 0 : (btn === 2 ? 2 : 1), bubbles: true, cancelable: true }, p)));
+      decoZoomFit(); await sleep(100);
+      const vis = _decoVisible(DY.rows, DY.cols), R = vis.r0 + 3, C0 = vis.c0 + 3;
+      const gold0 = CUR.gold, sun = () => _decoList(CUR).filter(p => p.id === 'd_y7').length;
+      setDecoMode('deco'); SEL_DECO = 'd_y7'; _decoPlace('yard', R, C0); _decoPlace('yard', R, C0 + 2); _decoPlace('yard', R, C0 + 4);
+      out('오른쪽클릭_준비_놓임', sun() === 3);
+      //  카드를 든 채 오른쪽 클릭 — 그 자리 것 하나만 치운다(놓기는 0)
+      mouse('pointerdown', 2, at(R, C0)); mouse('pointerup', 2, at(R, C0)); await sleep(50);
+      out('오른쪽클릭_치움', sun() === 2);
+      //  오른쪽으로 끌면(화면 이동) 안 치운다
+      const a = at(R, C0 + 2), b = { clientX: a.clientX + 40, clientY: a.clientY + 25 };
+      mouse('pointerdown', 2, a); mouse('pointermove', 2, b); mouse('pointerup', 2, b); await sleep(50);
+      out('오른쪽끌기_안치움', sun() === 2);
+      decoZoomFit(); await sleep(50);
+      //  빈 칸 오른쪽 클릭 — 아무것도 안 바뀐다
+      mouse('pointerdown', 2, at(R + 2, C0)); mouse('pointerup', 2, at(R + 2, C0)); await sleep(50);
+      out('오른쪽클릭_빈칸_그대로', sun() === 2);
+      //  되돌리기 → 돌아온다 · 🧽 치우기 · 빈손 누르기까지 다 해도 골드 그대로
+      decoUndo(); out('오른쪽클릭_되돌림', sun() === 3);
+      setDecoMode('erase'); SEL_DECO = null; _decoPlace('yard', R, C0 + 2);
+      setDecoMode('deco'); _decoPlace('yard', R, C0 + 4);
+      out('치우기셋_뒤_남은것', sun());
+      out('어떤치우기에도_골드불변', CUR.gold === gold0);
+      out('치운것_가방으로', (CUR.inventory.find(i => i.id === 'd_y7') || {}).qty - (CUR.houseDecorations || []).filter(p => p.id === 'd_y7').length === 4);
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _decoUndoClear(); decoSpaceSet(1); await sleep(200);
+    }
+
     //  ⑪ 헤엄 장·밭은 공간 1 만·다 썼을 때 어느 공간(DECO-SWIM-1·DECO-PT-3)
     if (typeof _animProbeSwim === 'function') {
       decoSpaceSet(3); await sleep(200);

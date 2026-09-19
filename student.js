@@ -4708,6 +4708,7 @@ function openInteriorFullscreen() {
   // 레이아웃 완료 후 렌더
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      if (!_ifMode) return;   // [DECO-RCLICK-1·정리] 그사이 닫혔으면(탭이 가려져 rAF 가 멈춘 사이 등) 닫힌 판을 전체화면 값으로 다시 그리지 않는다
       renderHouseDeco();
       if (!_decoViewRestore()) _decoPhoneStart();   // [DECO-VIEW-1] 지난번 보던 자리로 · [DECO-PT-1] 처음이면 폰은 크게
       _decoLandHint();
@@ -7212,6 +7213,10 @@ function _decoAttachGestures(cv) {
   });
 
   const end = e => {
+    //  [DECO-RCLICK-1] 마우스 오른쪽 버튼을 **안 끌고**(4px 미만) 떼면 치우기 — 끌었으면 화면 이동이었다
+    if (e.type === 'pointerup' && e.pointerType === 'mouse' && e.button === 2 && drag && drag.moved < 4 && pts.has(e.pointerId)) {
+      _decoRightClickAt(e.clientX, e.clientY);
+    }
     pts.delete(e.pointerId);
     pickCancel();
     if (pts.size < 2) pinch = null;
@@ -8656,16 +8661,43 @@ function _decoTopAt(area, row, col, seen) {
   return hits[0] || null;
 }
 
+// [DECO-RCLICK-1] 놓인 것 하나 치우기 — 빈손 누르기·🧽 치우기·마우스 오른쪽 클릭이 다 이 한 곳을 쓴다.
+//  치운 것은 **가방으로 돌아간다**(가진 개수는 '놓인 수'로 세니 저절로 +1 · 골드는 어떤 치우기에서도 안 움직인다).
+//  전 알림("제거됨")은 아이에게 '없어졌다'로 읽혔다 → 잃지 않았다는 것과 되돌리는 길을 말해 준다. 확인 창은 안 띄운다.
+function _decoRemoveOne(ex) {
+  const d = GAME_DATA.decorations.find(x => x.id === ex.id);
+  CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p !== ex);
+  _decoUndoPush({ t: 'remove', p: Object.assign({}, ex) });   // [DECO-UNDO-1]
+  decoDirty(); _drawDeco(); renderDecoInv();                   // [DECO-SAVE-1]
+  toast(`🎒 ${d ? d.icon + ' ' + d.name : '장식'} — 가방으로 돌아갔어요 (↩ 되돌리기)`);
+}
+
+//  마우스 오른쪽 **클릭**(안 끌고 뗌) = 그 자리 위의 것 하나 치우기. 오른쪽 **끌기**는 지금처럼 화면 이동(DECO-PAN-1).
+//  터치에는 오른쪽 클릭이 없다 — 터치는 🧽 치우기·빈손 누르기 그대로(pointerType 으로 그때그때 가린다, 설정 없음).
+function _decoRightClickAt(clientX, clientY) {
+  const cell = _decoCellAt(clientX, clientY);
+  if (!cell) return false;
+  const ex = _decoTopAt(cell.area, cell.r, cell.c, true);
+  if (ex) { _decoRemoveOne(ex); return true; }
+  if (DECO_MODE === 'floor' && cell.area === 'yard') {          // 바닥 모드면 칠한 바닥 한 칸을 걷어 낸다(↩ 됨)
+    const fm = _yardFloorGet(CUR), key = cell.r + '_' + cell.c;
+    if (fm[key] !== undefined) {
+      _decoUndoPush({ t: 'floor', key, prev: fm[key] });
+      delete _yardFloorMap(CUR)[key];
+      decoDirty(); _drawDeco();
+      return true;
+    }
+  }
+  toast('여기엔 치울 게 없어요');
+  return false;
+}
+
 function _decoPlace(area,row,col){
   const placed=CUR.houseDecorations||[];
   if(DECO_MODE==='erase'){   // [DECO-PT-2] 🧽 치우기 — 누른 칸의 위의 것 하나를 치운다(카드는 안 씀)
     const ex=_decoTopAt(area,row,col,true);   // [DECO-ANIM-HIT-1] 동물은 보이는 자리로
     if(!ex){ toast('여기엔 치울 게 없어요'); return; }
-    const d=GAME_DATA.decorations.find(x=>x.id===ex.id);
-    CUR.houseDecorations=placed.filter(p=>p!==ex);
-    _decoUndoPush({ t: 'remove', p: Object.assign({}, ex) });
-    decoDirty(); _drawDeco(); renderDecoInv();
-    toast(`🧽 ${d?d.icon:''} 치웠어요 (↩ 로 되돌릴 수 있어요)`); return;
+    _decoRemoveOne(ex); return;
   }
 
   // 클릭한 칸에 있는 장식 찾기 (멀티셀 고려) — [DECO-SPACE-1] 이 공간 것만 · [DECO-PT-2] 겹치면 위의 것
@@ -8683,11 +8715,7 @@ function _decoPlace(area,row,col){
     const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
     toast(`여기는 ${d?d.icon+' '+d.name:'동물'} 자리예요 — 치우려면 🧽 치우기를 켜고 그 동물을 누르세요`); return;
   } else if(existing){
-    const d=GAME_DATA.decorations.find(x=>x.id===existing.id);
-    CUR.houseDecorations=placed.filter(p=>p!==existing);   // [DECO-SPACE-1] 그 한 개만(다른 공간 같은 자리 것은 그대로)
-    _decoUndoPush({ t: 'remove', p: Object.assign({}, existing) });   // [DECO-UNDO-1]
-    decoDirty(); _drawDeco();   // [DECO-SAVE-1]
-    toast(`${d?d.icon:'🌸'} 제거됨`); return;
+    _decoRemoveOne(existing); return;   // [DECO-SPACE-1] 그 한 개만(다른 공간 같은 자리 것은 그대로)
   }
   if(!SEL_DECO){ toast('먼저 아래 장식품을 선택해주세요!'); return; }
   const d=GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
