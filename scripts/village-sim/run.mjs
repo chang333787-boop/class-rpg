@@ -50,17 +50,24 @@ function housesWith(w, what) {   // @jobs · @crowd · @need:물
   return out;
 }
 
-/* 한 수: 'put shop 136 145 0' · 'put shop @jobs 3' · 'del 136 145' */
+/* 한 수: 'put shop 136 145 0' · 'put shop @jobs 3' · 'put shop @at:160,171 5' · 'road 172 170 150 170'(곧은 길 긋기) · 'del 136 145' */
 function doMove(w, cmd) {
   const a = cmd.trim().split(/\s+/);
   if (a[0] === 'del') { w.__del(+a[1], +a[2]); return { 한수: cmd, 됨: 1 }; }
+  if (a[0] === 'road') {   // 가로나 세로 곧은 줄만 — 이미 길인 칸은 건너뛴다
+    const [x1, y1, x2, y2] = a.slice(1, 5).map(Number); if (x1 !== x2 && y1 !== y2) throw new Error('road 는 가로·세로 곧은 줄만: ' + cmd);
+    const dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) + 1; let ok = 0; const bad = [];
+    for (let i = 0; i < n; i++) { const x = x1 + dx * i, y = y1 + dy * i, r = w.__put('road', x, y, 0); if (r === true) ok++; else if (!/길/.test(String(r))) bad.push(x + ',' + y + ' ' + r); }
+    return { 한수: cmd, 됨: ok, 까닭: bad.length ? bad.slice(0, 3).join(' · ') : undefined };
+  }
   if (a[0] !== 'put') throw new Error('모르는 한 수: ' + cmd);
   const kind = a[1];
   try { w.__put(kind, -1, -1, 0); } catch { throw new Error('모르는 건물: ' + kind); }   // 판 밖 칸 — 놓이지 않고 종류만 확인
   if (!a[2].startsWith('@')) { const r = w.__put(kind, +a[2], +a[3], +(a[4] || 0)); return { 한수: cmd, 됨: r === true ? 1 : 0, 까닭: r === true ? undefined : r }; }
-  const n = +(a[3] || 1), hs = housesWith(w, a[2].slice(1));
-  if (!hs.length) return { 한수: cmd, 됨: 0, 까닭: '그런 집이 없음' };
-  let cx = 0, cy = 0; hs.forEach(([x, y]) => { cx += x; cy += y; }); cx = Math.round(cx / hs.length); cy = Math.round(cy / hs.length);
+  const n = +(a[3] || 1); let cx = 0, cy = 0;
+  if (a[2].startsWith('@at:')) { [cx, cy] = a[2].slice(4).split(',').map(Number); }
+  else { const hs = housesWith(w, a[2].slice(1)); if (!hs.length) return { 한수: cmd, 됨: 0, 까닭: '그런 집이 없음' };
+    hs.forEach(([x, y]) => { cx += x; cy += y; }); cx = Math.round(cx / hs.length); cy = Math.round(cy / hs.length); }
   const cand = []; for (let y = cy - 60; y <= cy + 60; y++) for (let x = cx - 60; x <= cx + 60; x++) if (x >= 0 && y >= 0 && x < 256 && y < 256) cand.push([Math.hypot(x - cx, y - cy), x, y]);
   cand.sort((p, q) => p[0] - q[0]);
   const at = [];
