@@ -4196,6 +4196,7 @@ function tickFolks(dt, now) {
       continue;
     }
 
+    if (actGreetTick(f, i, now)) continue;   // [ACT-GREET] 이사 온 다음 날 아침, 옆집 사람 하나가 새 집 앞에 들러 👋
     if (f.state === 'idle') {
       f.walking = false;
       if (now >= f.until) {
@@ -4415,6 +4416,86 @@ window.__breath = () => { const now = SIM.t + SIM.acc; let good = 0, bad = 0, jo
   let faces = 0; folks.forEach(f => { if (f.faceShow >= 1 && f.faceShow <= 2 && now <= f.faceUntil) faces++; });
   return { 좋은: good, 불만: bad, 기쁨: joy, 표정불만: faces, 집: BREATH.home.size, 빠진집: [...BREATH.home.values()].filter(h => h.reason).length, ...whyStats }; };
 window.__why2 = () => { const c = {}; folks.forEach(f => { if (f.whyShow && SIM.t + SIM.acc <= f.whyUntil) c[f.whyShow] = (c[f.whyShow] || 0) + 1; }); return { 켜짐: window.VRULES.whyBubble.on, 지금뜬것: c, ...whyStats }; };
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-GREET] 새 이웃에게 인사 — 이사 온 다음 날 아침 한 번, 옆집 사람 하나가 새 집 앞에 멈춰 👋 (주민 연기 · 09-20 · 창조자의 눈 발견 3).
+   전: "누가 이사 왔어요!"는 아이한테만 가고 마을 사람들은 모른다 — 옛 주민과 새 주민이 그냥 스쳐 지나간다.
+   집 단위로 본다: 아침 6시에 '어제 아침보다 식구가 는 집'을 한 번 세고(하루 한 번 · 집 목록만), 그 집 앞 길에서 길로 radius 칸 안의 **사람 사는 옆집** 하나를 찾아
+   그 집 표본 한 명에게 "저 집 앞에 들렀다 가"를 맡긴다. 옆집이 없으면 아무도 안 온다(외딴 집 — 다음 단계의 씨앗). 판정·확률·저장 0. 기쁜 쪽 장면이라 아이가 놓을 건 없다.
+   규칙 모듈 꼴: 스위치·수치 VRULES.greet + 고리 두 줄(tickFolks · 루프). 길찾기는 pathBudget 안에서, 아침마다 많아야 perMorning×2 번.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).greet = { on: true, radius: 8, perMorning: 3, untilHour: 11, waveMs: 2500, tries: 5 };
+const GREET = { day: -1, snap: new Map(), stats: { 새집: 0, 옆집없음: 0, 맡김: 0, 인사함: 0, 그만둠: 0 }, log: [] };
+/* 하루 한 번(아침 6시 뒤 첫 틱) — 어제보다 식구가 는 집 → 옆집 → 그 집 표본 한 명 */
+function greetPlan() {
+  const R = window.VRULES.greet, first = GREET.day < 0, fresh = [];
+  if (!first) res.forEach((n, root) => { const rec = cells[root]; if (rec && rec.k === 'house' && rec.root === root && n > (GREET.snap.get(root) || 0)) fresh.push(root); });
+  GREET.snap = new Map(res);
+  if (!R.on) return;
+  const busy = new Set();
+  for (const root of fresh.slice(0, R.perMorning)) {
+    GREET.stats.새집++;
+    const b = roadBeside(cells[root]); if (b < 0) continue;
+    const { reach } = roadBFS(b, undefined, R.radius);
+    let nb = -1;
+    for (const c of reach) { const x = cX(c), y = cY(c);
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const h = cells[idx(nx, ny)];
+        if (h && h.k === 'house' && h.root !== root && (res.get(h.root) || 0) > 0 && !fresh.includes(h.root) && !busy.has(h.root)) { nb = h.root; break; } }
+      if (nb >= 0) break; }
+    if (nb < 0) { GREET.stats.옆집없음++; continue; }
+    const who = folks.find(f => f.home === nb && !f.visitor && !f.arriving && !f.greet && !f.wish);
+    if (!who) continue;
+    busy.add(nb); who.greet = { root, cell: b, phase: 'go', tries: 0 }; GREET.stats.맡김++;
+    GREET.log.push({ 일: GREET.day + 1, 새집: root, 옆집: nb }); if (GREET.log.length > 20) GREET.log.shift();
+  }
+}
+/* tickFolks 고리 — true 면 그 사람의 이번 틱은 여기서 끝 */
+function actGreetTick(f, i, now) {
+  const day = Math.floor(SIM.t / DAY_MS); if (day !== GREET.day) { greetPlan(); GREET.day = day; }
+  const g = f.greet; if (!g) return false;
+  const R = window.VRULES.greet, rec = cells[g.root];
+  if (!R.on || f.goal || f.state === 'mill' || f.base < 0 || !rec || rec.k !== 'house' || simHour() >= R.untilHour || simHour() < DAY_START_H || roadBeside(rec) !== g.cell) { f.greet = null; GREET.stats.그만둠++; return false; }   // 출근·등교·밤이 먼저다 · 집이 없어졌다 · 아침이 지났다
+  if (g.phase === 'wave') { if (now >= g.until) { f.greet = null; return false; } f.walking = false; f.dir = g.dir0 + Math.sin((now - g.t0) / 260) * 0.22; return true; }   // 서서 손을 흔든다(몸을 살짝 흔든다)
+  const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : f.base;
+  const near = at >= 0 && (at === g.cell || touchesRoot(at, g.root) || Math.abs(cX(at) - cX(g.cell)) + Math.abs(cY(at) - cY(g.cell)) === 1);   // 그 집 앞 칸 · 그 집에 닿은 칸 · 바로 옆 칸 — 아침엔 그 집 식구가 문 앞 칸에 서 있기 일쑤다(그러면 마주 보고 인사하게 된다)
+  if (near && (f.state === 'idle' || (f.state === 'walk' && (f.path[f.step + 1] == null || (f.seg === 0 && f.blockedAt > 0))))) {   // 새 집 앞에 닿았다(마지막 한 칸이 막혀 서 있는 것도 닿은 것)
+    const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot);
+    f.state = 'idle'; f.until = now + R.waveMs; f.walking = false; f.path = [at]; f.step = 0; f.seg = 0; f.blockedAt = 0; releaseAll(i); claim(at, i);
+    g.phase = 'wave'; g.t0 = now; g.until = now + R.waveMs; g.dir0 = Math.atan2(c.x - f.x, c.z - f.z); f.dir = g.dir0; GREET.stats.인사함++;
+    sparkle.push({ x: c.x, z: c.z, until: now + R.waveMs });            // 새 집 위 ✨ — 있던 묶음을 쓴다
+    return true;
+  }
+  if (f.state === 'idle' && now >= f.until) {
+    if (pathBudget <= 0) return true;
+    pathBudget--;
+    const here = f.path ? f.path[f.path.length - 1] : f.base;
+    let ok = here === g.cell || pathTo(f, i, g.cell);
+    if (!ok) { const { prev } = roadBFS(here); if (bfsSeen[g.cell] === bfsGen) { const path = []; let k = g.cell; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here); f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; ok = true; } }
+    if (!ok) { if (++g.tries >= R.tries) { f.greet = null; GREET.stats.그만둠++; return false; } f.until = now + 700; return true; }
+    if (here !== g.cell) return false;                                  // 걷기 시작 — 나머지는 원래 걷기 코드가
+    if (!f.path) f.path = [here];
+  }
+  return false;
+}
+/* 루프 고리 — 👋 풍선(묶음 하나 · 흔드는 동안만 그려진다) */
+const greetPool = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#eaf6ff'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '42px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('👋', 32, 36);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 8);
+  im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im;
+})();
+function actGreetDraw(now) {
+  let n = 0;
+  if (!OFF.has('faces') && !mapMode) folks.forEach(f => {
+    if (!f.greet || f.greet.phase !== 'wave' || n >= 8) return;
+    faceDummy.position.set(f.x, 4.8 + Math.sin(now / 180) * 0.16, f.z); faceDummy.quaternion.copy(camera.quaternion);
+    const s = 1.45 + Math.sin(now / 180) * 0.12; faceDummy.scale.set(s, s, 1); faceDummy.updateMatrix(); greetPool.setMatrixAt(n++, faceDummy.matrix);
+  });
+  greetPool.count = n; if (n) greetPool.instanceMatrix.needsUpdate = true;
+}
+window.__greet = () => ({ 켜짐: window.VRULES.greet.on, ...GREET.stats, 지금가는중: folks.filter(f => f.greet && f.greet.phase !== 'wave').length, 지금인사중: folks.filter(f => f.greet && f.greet.phase === 'wave').length, 최근: GREET.log.slice(-5) });
 
 /* 우산(F13) — 사람마다 하나. 비 올 때만 count 를 올린다 */
 const umbrella = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 8), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), FOLK_CAP);
@@ -5402,6 +5483,7 @@ function loop() {
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   drawClock(); applyDaylight();
+  actGreetDraw(SIM.t + SIM.acc);   // [ACT-GREET] 👋
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
   followTick(); placeCamera();
