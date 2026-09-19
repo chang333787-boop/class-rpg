@@ -283,7 +283,7 @@ B-2(출력 동일 리팩토링)는 **이 다섯 가지를 그대로 재현해야
 (`x_*`는 PR #218. `goldDaily/<studentId>_<date>`에 `ServerValue.increment`로 쌓인다.)
 
 ### 3.3 ⚠️ 기록과 원본이 어긋나는 정황 (2026-09-15)
-`goldDaily`와 학생 레코드 `totalGold`가 두 학생에서 맞지 않는다(강지원 −5,220G · 양인우 −73G). 동기화 계층 문제로 보이며 판정 요청 중이다. **그 전까지 경제 수치의 원본은 `totalGold`다.**
+`goldDaily`와 학생 레코드 `totalGold`가 두 학생에서 맞지 않는다(학생 B −5,220G · 학생 F −73G). 동기화 계층 문제로 보이며 판정 요청 중이다. **그 전까지 경제 수치의 원본은 `totalGold`다.**
 
 ### 3.4 씨앗 — `GAME_DATA.seeds` · `mutantSeeds`
 
