@@ -722,6 +722,25 @@ const K = {
     { g:'sph',  c:0xffe9a8, s:[.9,.85,.9],   p:[-.6,3.5,.35], emis:.35 },
     { g:'sph',  c:P.glow,   s:[.3,.3,.3],    p:[0,4.6,0], emis:.9 } ] }
 };
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-FLOWER-4] 꽃밭은 한 종류가 아니다 (선생님 09-20: "롤러코스터 타이쿤처럼 여러 종류여도 돼").
+   모양 셋(st) × 색(main 주색 · side 곁색). 기하는 아래 buildFlowerBeds 가 이 표를 읽어 만든다 — 꽃밭을 더 늘릴 땐 **여기 한 줄**.
+     a 줄화단(튤립) — 잎 이랑 3줄에 같은 색 꽃이 줄 맞춰. 돌려 놓으면(R) 줄 방향이 바뀐다
+     b 꽃 둔덕(수국) — 겹친 잎 둔덕 위에 큰 꽃 덩이 6~7
+     c 들꽃 — 잎 바탕에 같은 색 꽃 무리 두세 덩이
+   규칙 필드(need·w·h·g)는 원래 꽃밭과 같게 두었다. cap 만 300(원래 꽃밭 700) — 프로그램 담당이 예산 보고 고칠 것.
+   새 id 5개: flower_hb · flower_tr · flower_ty · flower_wd · flower_wv (palette 는 뒤에 붙는다. 옛 판은 모르는 id 를 건너뛴다)
+   ══════════════════════════════════════════════════════════════ */
+const FLOWER_KINDS = {
+  flower:    { st:'b', main:0xf0719a, side:0xf7f3ea },                                   // 꽃밭(원래 id) = 분홍 꽃 둔덕
+  flower_hb: { st:'b', main:0x7fa6f0, side:0xb79af0, nm:'파란 꽃밭',   ic:'💠' },
+  flower_tr: { st:'a', main:0xe8534a, side:0xf7f3ea, nm:'튤립밭',      ic:'🌷' },
+  flower_ty: { st:'a', main:0xf6c23e, side:0xef8f4f, nm:'노란 튤립밭', ic:'🌻' },
+  flower_wd: { st:'c', main:0xf7f3ea, side:0xf6c23e, nm:'들꽃밭',      ic:'🌼' },
+  flower_wv: { st:'c', main:0xa583e6, side:0xf0719a, nm:'보라 들꽃밭', ic:'🌺' } };
+Object.keys(FLOWER_KINDS).forEach(id => { const f = FLOWER_KINDS[id]; if (K[id]) return;
+  K[id] = { nm: f.nm, ic: f.ic, grp: K.flower.grp, need: K.flower.need, w: 1, h: 1, g: K.flower.g, cap: 300, parts: K.flower.parts }; });   // parts 는 예비(#fb=0 · 모형이 없을 때)
+const countFlowers = () => Object.keys(FLOWER_KINDS).reduce((n, id) => n + countKind(id), 0);
 const GROUPS = ['바닥', '낮은 것', '키 큰 것', '긴 것', '건물', '특별'];
 const ORDER = Object.keys(K);
 /* [MAC-TABS] 물건 묶음을 '모양'(바닥·낮은 것·키 큰 것·긴 것)에서 **쓰임새**로 바꾼다(사용자 09-20).
@@ -744,6 +763,14 @@ const USE_TABS = [
   GROUPS.length = 0; USE_TABS.forEach(([tab]) => GROUPS.push(tab));
   if (K.mailbox && K.post && K.mailbox.nm === K.post.nm) K.mailbox.nm = '우편함';   // 📪·📮 둘 다 '우체통'이었다 — 같은 탭에 나란히 서니 이름을 가른다(집 앞 📪 = 우편함)
   ORDER.sort((a, b) => rank[a] - rank[b]);
+})();
+/* [DESIGN-FLOWER-4] 꽃밭이 여섯 종이라 '🌳 자연'(11종)에 넣으면 카드가 두 줄이 된다 → 자연 바로 옆에 '🌷 꽃' 탭. 위 USE_TABS 블록은 그대로 두고 여기서 덮어쓴다 */
+(function flowerTab() {
+  const TAB = '🌷 꽃', ids = Object.keys(FLOWER_KINDS), at = GROUPS.findIndex(g => g.indexOf('자연') >= 0);
+  ids.forEach(id => { K[id].grp = TAB; });
+  GROUPS.splice(at < 0 ? GROUPS.length : at + 1, 0, TAB);
+  const first = ORDER.indexOf('flower'); ids.slice(1).forEach(id => { const i = ORDER.indexOf(id); if (i >= 0) ORDER.splice(i, 1); });
+  ORDER.splice(ORDER.indexOf('flower') + 1, 0, ...ids.slice(1));   // 탭 안 순서 = 표 순서
 })();
 
 /* ── 집 층수(F6). 1층은 K.house.parts 그대로. 2·3층은 벽을 올리고 창을 한 줄씩 더 낸다. 지붕은 같은 색 규칙. */
@@ -769,6 +796,7 @@ const HOUSE_CAPS = [0, 2, 4, 6];
 const GROW_TICKS = 1800;                          // 하루 내내 😊 면 한 층
 /* ── 주변 가치(F33): 집 둘레 4칸의 꾸미기 무게. 놓을 때·치울 때만 센다 ── */
 const DECO = { tree:1, fruit:1.2, bigtree:1.5, trashcan:.5, mailbox:.5, minibench:.5, leafpile:.5, snowman:.5, flower:1, lawn:.5, bush:.6, pot:.5, lamp:.5, bench:1, fence:.3, wall:.2, stump:.3, logs:.2, rock:.3, flag:.3, post:.2, gravel:.2, laundry:.3, bridge:.3, statue:1, sbridge:.5, pond:1, fountain:1 };
+Object.keys(FLOWER_KINDS).forEach(id => { DECO[id] = DECO.flower; });   // [DESIGN-FLOWER-4]
 const AMEN_R = 4, AMEN_MAX = 6;
 const amen = new Map();                                // 집 root → 점수
 function amenityOf(root) {
@@ -1263,19 +1291,18 @@ for (const g in GEO) {
      · 색을 모은다 — 한 밭 = 주색 하나 + 곁색 하나, 같은 색끼리 무리
      · 잎이 절반 — 꽃 사이로 짙은 잎이 보이는 쉼. 잎은 vkind 7(계절 잎색 × .72)이라 계절을 그대로 탄다
      · 고르게 반복 금지 — 크기 대·중·소, 벌마다 무리의 자리가 다르다(칸 좌표로 고름. 저장에는 아무것도 안 남는다)
-   시안 셋(선생님이 고른다): a 가지런한 줄화단(튤립) · b 큰 꽃 몇 송이 + 넉넉한 잎 둔덕(수국) · c 잎 바탕에 색 무리 두세 덩이(들꽃)
-   주소 끝: #fb=a|b|c 한 시안으로 · #fb=abc 비교판(x 여섯 칸마다 a·b·c, y 8 부터는 노랑 밭) · #fb=0 옛 parts(K.flower.parts)
+   모양 셋(a 줄화단 · b 꽃 둔덕 · c 들꽃)과 색은 위 FLOWER_KINDS 표가 정한다 — 셋 다 쓴다(꽃밭은 한 종류가 아니다, [DESIGN-FLOWER-4]).
+   주소 끝 #fb=0 → 옛 parts(K.flower.parts)로 재 보기
    ══════════════════════════════════════════════════════════════ */
-const FLOWER_STYLES = ['a', 'b', 'c'], FLOWER_DEFAULT = 'b', FLOWER_VARS = 4;
-const FLOWER_PALS = [ { main: 0xf0719a, side: 0xf7f3ea }, { main: 0xf6c23e, side: 0xef8f4f } ];   // 분홍 밭(+흰) · 노랑 밭(+주황). 색 변형은 여기 줄만 는다
-const FLOWER_SETS = {};                                // 'b0' → [parts × FLOWER_VARS]
+const FLOWER_VARS = 4;
+const FLOWER_SETS = {};                                // 종류 id → [parts × FLOWER_VARS]
 (function buildFlowerBeds() {
   if (HP.fb === 0) return;
   const HALF = CS / 2, TOP = .22, TAU = Math.PI * 2;
   const lin = h => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
   const LEAF = lin(P.leaf);
-  FLOWER_STYLES.forEach((style, si) => FLOWER_PALS.forEach((pal, pi) => {
-    const MAIN = lin(pal.main), SIDE = lin(pal.side), set = FLOWER_SETS[style + pi] = [];
+  Object.keys(FLOWER_KINDS).forEach((kid, si) => {
+    const style = FLOWER_KINDS[kid].st, MAIN = lin(FLOWER_KINDS[kid].main), SIDE = lin(FLOWER_KINDS[kid].side), set = FLOWER_SETS[kid] = [];
     for (let vi = 0; vi < FLOWER_VARS; vi++) {
       let s = (0x9e3779b1 ^ Math.imul(vi + 1 + si * 16, 0x85ebca6b)) | 0;
       const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -1328,18 +1355,13 @@ const FLOWER_SETS = {};                                // 'b0' → [parts × FLO
         patches.forEach((p, k) => { if (k) { const a = rnd() * TAU; p[0] = patches[0][0] + Math.cos(a) * (1.9 + rnd() * .4); p[1] = patches[0][1] + Math.sin(a) * (1.9 + rnd() * .4); p[0] = Math.max(-1.6, Math.min(1.6, p[0])); p[1] = Math.max(-1.6, Math.min(1.6, p[1])); } });
         patches.forEach(([px, pz, n, c]) => { for (let i = 0; i < n; i++) { const a = i ? (i / (n - 1)) * TAU + rnd() * .6 : 0, d = i ? .62 + rnd() * .14 : 0, big = i ? .40 + rnd() * .10 : .56; dome(px + Math.cos(a) * d, pz + Math.sin(a) * d, TOP + .30 + rnd() * .12 + (i ? 0 : .16), big, big, big * .8, 6, c, 0); } });
       }
-      const name = 'fb:' + style + pi + ':' + vi;
+      const name = 'fb:' + kid + ':' + vi;
       BASE[name] = { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv: pos.length / 3, vcol: new Float32Array(col), vkind: Uint8Array.from(kind), tri: idx.length / 3 };
       set.push([{ g: name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
     }
-  }));
+  });
 })();
-function flowerPartsAt(x, y) {
-  const demo = HP.fb === 'abc';
-  const style = demo ? FLOWER_STYLES[Math.max(0, Math.min(2, ((x - 3) / 6) | 0))] : FLOWER_STYLES.includes(HP.fb) ? HP.fb : FLOWER_DEFAULT;
-  const set = FLOWER_SETS[style + (demo && y >= 8 ? 1 : 0)];
-  return set ? set[(x * 7 + y * 13) % set.length] : null;
-}
+function flowerPartsAt(kind, x, y) { const set = FLOWER_SETS[kind]; return set ? set[(x * 7 + y * 13) % set.length] : null; }
 window.__flowerBeds = () => Object.fromEntries(Object.entries(FLOWER_SETS).map(([k, set]) => [k, set.map(p => BASE[p[0].g].tri)]));
 
 
@@ -1456,7 +1478,7 @@ function partMatrix(kind, x, y, rot, pt, out) {
 }
 function bucketOf(pt) { return pt.op ? 'glass' : 'lit'; }
 function partsOf(rec) {
-  if (rec.k === 'flower') { const fp = flowerPartsAt(cX(rec.root), cY(rec.root)); if (fp) return fp; }   // [DESIGN-FLOWER-3] 칸 좌표로 벌을 고른다
+  if (FLOWER_KINDS[rec.k]) { const fp = flowerPartsAt(rec.k, cX(rec.root), cY(rec.root)); if (fp) return fp; }   // [DESIGN-FLOWER-3·4] 꽃밭 종류 × 칸 좌표로 벌을 고른다
   if (rec.k === 'house') { const lv = houseLv(rec.root); return glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house') || HOUSE_LV[lv]; }
   if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
   const mn = GLB_KIND[rec.k]; return (mn && glbParts(rec.k === 'bigtree' ? 'tree' : GLB_PROP.has(rec.k) ? 'props' : GLB_SPECIAL.has(rec.k) ? 'special' : GLB_STREET.has(rec.k) ? 'street' : GLB_DECO.has(rec.k) ? 'deco' : rec.k, mn)) || K[rec.k].parts;
@@ -1578,6 +1600,7 @@ let mapDirty = true, mapMode = false, mapLastDraw = 0;
 const MAP_COL = { road:'#d9d6cf', gravel:'#b9b2a6', lawn:'#a3d86d', flower:'#f58fae', pond:'#7fd0e8', fountain:'#7fd0e8', well:'#9c968b',
   plaza:'#efeee8', house:'#f2889e', shop:'#f2889e', green:'#bfe6f7', pavilion:'#79cfd4', play:'#e9cfa4', tree:'#4f9a3a', bigtree:'#3f8a2e', bush:'#5fae44',
   school:'#f4f2ea', library:'#e0574a', station:'#8d98a3', museum:'#d8d3c8', dream:'#ffd166' };
+Object.keys(FLOWER_KINDS).forEach(id => { MAP_COL[id] = '#' + FLOWER_KINDS[id].main.toString(16).padStart(6, '0'); });   // [DESIGN-FLOWER-4]
 function drawMap() {
   const g = mapCanvas.getContext('2d');
   g.fillStyle = '#97cc5e'; g.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
@@ -2770,7 +2793,7 @@ const GOALS = [
   { id: 'well',   t: '우물 하나 놓기',      ok: () => countKind('well') >= 1 },
   { id: 'shop',   t: '가게 하나 열기',      ok: () => countKind('shop') >= 1 },
   { id: 'pop10',  t: '인구 10명',           ok: () => population() >= 10 },
-  { id: 'deco5',  t: '긴의자·꽃밭 5개 놓기',  ok: () => countKind('bench') + countKind('flower') >= 5 },
+  { id: 'deco5',  t: '긴의자·꽃밭 5개 놓기',  ok: () => countKind('bench') + countFlowers() >= 5 },
   { id: 'happy',  t: '😊 집 하나 만들기',   ok: () => { let f = false; res.forEach((v, root) => { const st = sat.get(root); if (v > 0 && st && st.n >= NEEDS.length) f = true; }); return f; } },
   { id: 'play',   t: '놀이터 놓기',         ok: () => countKind('play') >= 1 },
   { id: 'lv2',    t: '2층 집 하나',         ok: () => { let f = false; hinfo.forEach(h => { if (h.lv >= 2) f = true; }); return f; } },
