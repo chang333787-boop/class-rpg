@@ -7957,6 +7957,23 @@ function _drawFloorSVG(type, r, c, px, py, C, typeAt) {
   _dCtx.drawImage(_floorBmp(bname, base, C), px, py, C, C);
   const T = (dr, dc) => { const t = typeAt(r + dr, c + dc); return (t == null) ? type : t; };
   const put = name => { const img = _floorImg(name); if (img) _dCtx.drawImage(_floorBmp(name, img, C), px, py, C, C); };
+  //  [DECO-WATER-ORDER-1] 물 칸은 **물가(shore_*)를 먼저, 잔디 번짐(fringe_grass_*)을 나중에** — 풀이 모래 띠 위로 번져
+  //  '풀 둑 + 모래톱 + 잔물결'이 된다(디자인 담당 #503 의 새 물가 그림 전제). 판정은 그대로, 두 블록 순서만 바꿨다.
+  if (type === 'water') {
+    const n = T(-1, 0) !== 'water', e = T(0, 1) !== 'water', s = T(1, 0) !== 'water', w = T(0, -1) !== 'water';
+    if (n) put('shore_n');
+    if (e) put('shore_e');
+    if (s) put('shore_s');
+    if (w) put('shore_w');
+    if (n && e) put('shore_in_ne');
+    if (n && w) put('shore_in_nw');
+    if (s && e) put('shore_in_se');
+    if (s && w) put('shore_in_sw');
+    if (!n && !e && T(-1, 1) !== 'water')  put('shore_out_ne');
+    if (!n && !w && T(-1, -1) !== 'water') put('shore_out_nw');
+    if (!s && !e && T(1, 1) !== 'water')   put('shore_out_se');
+    if (!s && !w && T(1, -1) !== 'water')  put('shore_out_sw');
+  }
   if (!_floorIsGrass(type)) {
     const n = _floorIsGrass(T(-1, 0)), e = _floorIsGrass(T(0, 1)), s = _floorIsGrass(T(1, 0)), w = _floorIsGrass(T(0, -1));
     const v = ((r*5 + c*3) % 2) ? '2' : '';
@@ -7972,21 +7989,6 @@ function _drawFloorSVG(type, r, c, px, py, C, typeAt) {
     if (!n && !w && _floorIsGrass(T(-1, -1))) put('fringe_grass_out_nw');
     if (!s && !e && _floorIsGrass(T(1, 1)))   put('fringe_grass_out_se');
     if (!s && !w && _floorIsGrass(T(1, -1)))  put('fringe_grass_out_sw');
-  }
-  if (type === 'water') {
-    const n = T(-1, 0) !== 'water', e = T(0, 1) !== 'water', s = T(1, 0) !== 'water', w = T(0, -1) !== 'water';
-    if (n) put('shore_n');
-    if (e) put('shore_e');
-    if (s) put('shore_s');
-    if (w) put('shore_w');
-    if (n && e) put('shore_in_ne');
-    if (n && w) put('shore_in_nw');
-    if (s && e) put('shore_in_se');
-    if (s && w) put('shore_in_sw');
-    if (!n && !e && T(-1, 1) !== 'water')  put('shore_out_ne');
-    if (!n && !w && T(-1, -1) !== 'water') put('shore_out_nw');
-    if (!s && !e && T(1, 1) !== 'water')   put('shore_out_se');
-    if (!s && !w && T(1, -1) !== 'water')  put('shore_out_sw');
   }
   return true;
 }
