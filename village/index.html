@@ -4577,6 +4577,8 @@ function arrive(f, i) {
 const NEEDS_BASE = ['물', '장보기', '놀이', '쉼'], LEARN_POP = 80;
 let NEEDS = NEEDS_BASE.slice();
 const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' };
+/* [MAC-JOBSON-2] 돌아섬 까닭의 '일자리'(#676)도 말로 — 없어서 "…쉴 곳·이 멀어서 새 이웃이 돌아갔어요"(빈 칸)·주민 카드 "…·이 멀어서 돌아가요"가 됐다. 키를 훑는 곳은 없다(값만 읽음) · 원래 줄 수정 0 */
+NEED_TXT.일자리 = '일할 곳';
 let learnOn = false;
 function needsTick() {                            // 인구 80 을 넘으면 '배움'이 생긴다(한 번 생기면 안 없어진다)
   if (!learnOn && population() >= LEARN_POP) { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); toast('📚 마을이 커졌어요 — 이제 배울 곳도 바라요(도서관·학교)', true); }
