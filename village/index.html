@@ -4862,6 +4862,48 @@ function serializeV1() {
   return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
 
+/* ══════════════════════════════════════════════════════════════
+   [MAC-FRESH] 옛 판이 아이의 마을을 덮지 않게 — 스스로 새 판인지 확인한다 (보스 승인 09-20 · docs/village_save_v3_proposal.md 덧붙임 2)
+   마을 html 에는 캐시버스터가 없다. 운영은 max-age=600 + ETag 라 실제 위험은 ① 배포 직후 10분 ② **열어 둔 채로 있는 화면**이다.
+   손으로 올릴 값은 0 — 자기 자신(index.html)을 HEAD 로 물어 Last-Modified·ETag 를 본다. 물음이 실패하면(오프라인·헤더 없음) 장치는 조용히 꺼지고 평소대로 돈다(막지 않는다).
+   A 시작할 때: 서버의 Last-Modified 가 지금 돌고 있는 문서(document.lastModified)보다 새것이면 옛 캐시다 → 한 번만 다시 연다(r= 로 캐시를 건너뛴다).
+   B 열어 둔 화면: 5분마다·화면으로 돌아올 때 다시 물어, 처음 기억한 꼬리표와 다르면 새 판이 나온 것 → **지금 것을 저장하고**(옛 형식은 새 판이 읽는다 — v1→v2 가 그랬다) 한 줄 알린 뒤 다시 연다.
+   C 가장 중요한 것: 저장소에 **이 판이 모르는 더 새 형식**이 들어 있으면 절대 덮어쓰지 않는다. 전에는 loadSaved 가 '모르는 저장본 버전'이라며 .broken 에 치우고
+     기본 판으로 시작해 곧바로 저장했다 = 아이 마을이 기본 판으로 덮였다(서버 저장이 켜지면 서버까지). 이제는 저장을 끄고, 알리고, 새 판을 받으러 다시 연다.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).fresh = { on: true, everyMs: 5 * 60 * 1000, slackMs: 2000, retryGapMs: 60000 };
+const FRESH = { tag: null, checkedAt: 0, reloading: false, off: null, stats: { 물음: 0, 실패: 0, 옛캐시로다시엶: 0, 새판으로다시엶: 0, 같은크기넘김: 0, 덮어쓰기막음: 0 } };
+/* 순수 함수들 */
+const freshIsStale = (docLmMs, serverLmMs, slackMs) => isFinite(docLmMs) && isFinite(serverLmMs) && serverLmMs - docLmMs > slackMs;
+const freshSavedV = raw => { const m = /^\s*\{\s*"v"\s*:\s*(\d+)/.exec(raw || ''); return m ? +m[1] : null; };       // 저장본 맨 앞의 "v":N 만 본다(전체를 풀지 않는다)
+async function freshAsk() {                                                    // { tag, lm } 또는 null
+  try { FRESH.stats.물음++; const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' }); if (!r.ok) throw 0;
+    const et = r.headers.get('etag'), lm = r.headers.get('last-modified'); if (!et && !lm) { FRESH.off = '서버가 꼬리표(ETag·Last-Modified)를 안 준다'; return null; }
+    return { tag: (et || '') + '|' + (lm || ''), lm: lm ? Date.parse(lm) : NaN, len: r.headers.get('content-length') || '' }; }
+  catch (e) { FRESH.stats.실패++; return null; }
+}
+function freshReopen(why, msg) {
+  if (FRESH.reloading) return; const last = +(QS.get('r') || 0); if (Date.now() - last < window.VRULES.fresh.retryGapMs) { FRESH.off = '방금 다시 열었는데도 같다 — 되풀이하지 않는다'; return; }
+  FRESH.reloading = true; FRESH.stats[why]++; toast(msg, true); setTimeout(() => { location.replace(reopenUrl()); }, 2200);
+}
+async function freshCheck(boot) {
+  const R = window.VRULES.fresh; if (!R.on || FRESH.off || FRESH.reloading || VISIT.on) return; FRESH.checkedAt = performance.now();
+  const a = await freshAsk(); if (!a) return;
+  if (boot) { FRESH.tag = a.tag; FRESH.len = a.len; if (freshIsStale(Date.parse(document.lastModified), a.lm, R.slackMs)) freshReopen('옛캐시로다시엶', '🔄 마을이 새로워졌어요 — 다시 열게요'); return; }
+  if (FRESH.tag && a.tag !== FRESH.tag && a.len && a.len === FRESH.len) { FRESH.tag = a.tag; FRESH.stats.같은크기넘김++; return; }   // GitHub Pages 는 저장소의 **어떤 파일**을 배포해도 모든 파일의 시각·ETag 가 바뀐다 — 크기가 같으면 마을은 그대로라 보고 넘긴다(학생 화면만 고친 배포에 마을이 다시 열리지 않게)
+  if (FRESH.tag && a.tag !== FRESH.tag) { try { flushSave('fresh'); } catch (e) {} freshReopen('새판으로다시엶', '🔄 마을이 새로워졌어요 — 저장하고 다시 열게요'); }
+}
+/* C — 더 새 형식의 저장본을 덮어쓰지 않는다. saveNow 를 감싸 다시 묶는다(원래 함수 줄은 그대로) */
+function freshGuardNewer(where) {
+  let raw = null; try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+  const v = freshSavedV(raw); if (v == null || v <= SAVE_V) return false;
+  savingOff = true; FRESH.stats.덮어쓰기막음++; FRESH.newer = { v, where };
+  const el = document.getElementById('saved'); if (el) { el.innerHTML = '<b>새 마을 판이 필요해요</b><br>이 마을은 더 새로운 판에서 저장됐어요. 지우지 않았어요 — 새 판을 받아 다시 열게요.'; el.className = 'env'; }
+  if (navigator.onLine !== false) freshReopen('새판으로다시엶', '🔄 새 마을 판을 받아 다시 열게요 — 마을은 그대로 있어요');
+  return true;
+}
+{ const saveNow0 = saveNow; saveNow = () => { if (window.VRULES.fresh.on && !savingOff && freshGuardNewer('저장 직전')) return; return saveNow0(); }; }
+
 let noStorageShown = false;
 function noteNoStorage() {
   if (noStorageShown) return;
@@ -5078,6 +5120,9 @@ else if (hash.indexOf('adv') >= 0) {
 }
 if (!STORAGE_OK) { startInfo += ' · 이 창은 저장을 못 받음(미리보기 등)'; setTimeout(noteNoStorage, 400); }
 window.__START = startInfo;
+if (window.VRULES.fresh.on && /모르는 저장본 버전/.test(startInfo)) freshGuardNewer('열 때');   // [MAC-FRESH] 더 새 형식의 저장본 — 기본 판으로 덮어쓰지 않는다
+setTimeout(() => freshCheck(true), 1500); setInterval(() => freshCheck(false), window.VRULES.fresh.everyMs); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && performance.now() - FRESH.checkedAt > 60000) freshCheck(false); });   // [MAC-FRESH]
+window.__fresh = () => ({ 켜짐: window.VRULES.fresh.on, 꺼진까닭: FRESH.off, 꼬리표: FRESH.tag, 문서시각: document.lastModified, 더새저장본: FRESH.newer || null, 저장끔: savingOff, ...FRESH.stats }); window.__freshCheck = boot => freshCheck(!!boot);
 syncFolks();
 updateCount();
 
