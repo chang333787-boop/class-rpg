@@ -2763,6 +2763,48 @@ addEventListener('keydown', e => {
   if (e.key === 'r' || e.key === 'R' || e.key === 'ㄱ') rotate();
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); }
 });
+/* ── [MAC-VIEWPAD] 화면 단추로 확대·축소·기울이기 — 오른쪽 가장자리(미니맵 위)에 ＋ · － · 기울기 ──
+   확대는 휠과 두 손가락 벌리기뿐, 기울이기는 Shift·오른쪽 단추 끌기뿐이었다 — 한 손가락으로 하는 아이(그리고 터치패드 없는 터치 화면)는 기울일 길이 아예 없었다.
+   · ＋/－: 화면 가운데를 두고 1.25배씩(휠·두 손가락과 같은 범위 0.85~20). 누르고 있으면 이어진다.
+   · 기울기: 세 자리를 돈다 — 비스듬히(기본 0.62) → 위에서(1.15) → 낮게(0.42). 0.25초에 걸쳐 부드럽게. 끌어서 맞춘 어중간한 각도에서는 가장 가까운 다음 자리로.
+   사진 모드에서는 숨는다. 원래 줄 수정 0. 생김새(#viewPad)는 디자인 담당이 고쳐도 된다 — 여기엔 44px·자리만. */
+(window.VRULES = window.VRULES || {}).viewPad = { on: true, step: 1.25, repeatMs: 160, tilts: [0.62, 1.15, 0.42], tiltMs: 250 };
+const VPAD = { rep: 0, anim: 0, stats: { 확대: 0, 축소: 0, 기울임: 0 } };
+const TILT_SAY = ['비스듬히 봐요', '위에서 내려다봐요', '낮게 봐요 — 집들이 서 보여요'];
+/* 순수 함수 — 지금 각도에서 다음에 갈 자리(가장 가까운 자리의 다음) */
+function vpadNextTilt(el, tilts) { let at = 0; tilts.forEach((t, i) => { if (Math.abs(t - el) < Math.abs(tilts[at] - el)) at = i; }); return (at + 1) % tilts.length; }
+function vpadZoom(dir) {
+  const R = window.VRULES.viewPad, z0 = zoomMul; zoomMul = Math.max(0.85, Math.min(20, zoomMul * (dir > 0 ? R.step : 1 / R.step)));
+  if (zoomMul === z0) return false; userZoomed = true; resize(); VPAD.stats[dir > 0 ? '확대' : '축소']++; return true;
+}
+function vpadTilt() {
+  const R = window.VRULES.viewPad, to = vpadNextTilt(camEl, R.tilts), from = camEl, goal = R.tilts[to], t0 = performance.now(); VPAD.stats.기울임++;
+  cancelAnimationFrame(VPAD.anim); const stepFn = () => { const k = Math.min(1, (performance.now() - t0) / R.tiltMs), e = k * k * (3 - 2 * k); camEl = from + (goal - from) * e; if (k < 1) VPAD.anim = requestAnimationFrame(stepFn); };
+  stepFn(); toast(TILT_SAY[to], true);
+}
+(function vpadBuild() {
+  const st = document.createElement('style'); st.textContent =
+      '#viewPad{position:fixed;right:10px;top:178px;z-index:6;display:flex;flex-direction:column;gap:6px;touch-action:none;user-select:none}#viewPad.row{flex-direction:row}'
+    + '#viewPad button{width:46px;height:46px;border-radius:12px;border:1px solid #3a4050;background:#222630dd;color:#e8e6e0;font:800 22px/1 "Malgun Gothic",sans-serif;cursor:pointer;padding:0}'
+    + '#viewPad button:active{background:#3a4050}#viewPad button.sm{font-size:18px}'
+    + 'body.photo #viewPad{display:none!important}';
+  document.head.appendChild(st);
+  const pad = document.createElement('div'); pad.id = 'viewPad';
+  const mk = (txt, title, cls) => { const b = document.createElement('button'); b.textContent = txt; b.title = title; b.setAttribute('aria-label', title); if (cls) b.className = cls; pad.appendChild(b); return b; };
+  const hold = (b, dir) => { const stop = () => { clearInterval(VPAD.rep); VPAD.rep = 0; };
+    b.addEventListener('pointerdown', e => { e.preventDefault(); stop(); if (!window.VRULES.viewPad.on) return; vpadZoom(dir); VPAD.rep = setInterval(() => { if (!vpadZoom(dir)) stop(); }, window.VRULES.viewPad.repeatMs); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => b.addEventListener(t, stop)); addEventListener('blur', stop); };
+  hold(mk('＋', '크게 보기'), 1); hold(mk('－', '작게 보기'), -1);
+  mk('◢', '기울여 보기 — 비스듬히 · 위에서 · 낮게', 'sm').addEventListener('click', () => { if (window.VRULES.viewPad.on) vpadTilt(); });
+  document.body.appendChild(pad);
+  /* 자리 — 미니맵과 트레이 탭 가운데 더 높은 것 바로 위(트레이는 탭마다 키가 다르다). 세로로 설 자리가 없으면 가로로, 그것도 없으면 숨는다(좁은 폰 세로 — 두 손가락 벌리기는 그대로 된다) */
+  const place = () => { const rc = id => { const e = document.getElementById(id); return e ? e.getBoundingClientRect() : null; }, top = rc('top'), mini = rc('mini'), tabs = rc('trayTabs');
+    const floor = Math.min(mini && mini.height ? mini.top : innerHeight, tabs && tabs.height ? tabs.top : innerHeight) - 10, ceil = (top ? top.bottom : 0) + 6;
+    const col = floor - 150 >= ceil, row = !col && floor - 46 >= ceil; pad.style.display = col || row ? 'flex' : 'none'; pad.classList.toggle('row', row); pad.style.top = (floor - (col ? 150 : 46)) + 'px'; };
+  addEventListener('resize', place); if (window.ResizeObserver) new ResizeObserver(place).observe(document.getElementById('tray')); setTimeout(place, 0); VPAD.place = place;
+})();
+window.__viewpad = () => ({ 켜짐: window.VRULES.viewPad.on, 배율: +zoomMul.toFixed(2), camEl: +camEl.toFixed(3), ...VPAD.stats });
+
 document.getElementById('rotBtn').onclick = () => rotateView(1);
 document.getElementById('fitBtn').onclick = () => {
   const whole = zoomMul <= 1.02;
