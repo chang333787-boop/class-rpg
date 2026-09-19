@@ -1829,6 +1829,7 @@ function buildChunk(cx, cz) {
   }
   if (typeof actLitterChunk === 'function' && window.VRULES && window.VRULES.litter) actLitterChunk(x0, z0, bucket);   // [ACT-LITTER] 가게 앞 조각을 이 청크 기하에(draw call +0)
   if (typeof actCartChunk === 'function' && window.VRULES && window.VRULES.nightCart) actCartChunk(x0, z0, bucket);   // [ACT-NIGHTCART] 어귀에 선 수레(draw call +0)
+  if (typeof actPuddleChunk === 'function' && window.VRULES && window.VRULES.puddle) actPuddleChunk(x0, z0, bucket);   // [ACT-PUDDLE] 웅덩이(draw call +0)
   for (const name in MAT) {
     const old = ch.meshes[name];
     if (old) { chunkGroup.remove(old); old.geometry.dispose(); ch.meshes[name] = null; }
@@ -5760,6 +5761,7 @@ function tickFolks(dt, now) {
     if (actLitterTick(f, i, now)) continue;   // [ACT-LITTER] 가게 손님 셈 · 어디에 버리지? 두리번 · 통 앞 멈춤
     actFestLitterTick(now);   // [ACT-FESTLIT] 축제 다음 날 광장 조각 · 치우러 가기(틱마다 한 번)
     actNightCartTick(now);   // [ACT-NIGHTCART] 밤엔 어귀에 내일 올 이웃의 수레 · 아침엔 그 수레를 끌고 들어온다(틱마다 한 번)
+    if (actPuddleTick(f, i, now)) continue;   // [ACT-PUDDLE] 비 그친 다음 날 아침 — 아이는 웅덩이로 뛰어가 통통
     f.base = roadBeside(rec);
     if (actBesideTick(f, i, now)) continue;   // [ACT-BESIDE] 지붕 없는 곳에선 곁에 선다 · 우물에서 나오면 물동이를 들고 집으로
     actPlazaTick(f, i, now);   // [ACT-PLAZA] 축제 날 광장에선 둥글게 · 길목에 선 사람은 가장자리로 한 발
@@ -6374,6 +6376,84 @@ function actNightCartDraw() {
 }
 window.__nightCart = () => ({ 켜짐: window.VRULES.nightCart.on, 서있음: CART.shown, 자리: CART.spot, 끄는중: !!CART.mover, 모양: Array.isArray(window.CART_PARTS) ? '디자인' : '임시상자', ...CART.stats });
 
+/* ══════════════════════════════════════════════════════════════
+   [ACT-PUDDLE] 비 그친 뒤 웅덩이 + 아이 통통 (주민 연기 · 09-20 · 창조자의 눈 1회 🟡8 · 보스 순서 넷째).
+   비 오는 날(rainDay) 다음 날 아침 from~to 시에 길 칸 몇 곳(maxCells)에 웅덩이가 남았다가 마른다. 칸: **사람이 몰리는 갈림길·집 앞 문 칸은 빼고 길 가장자리 칸**,
+   카메라와 그 칸 사이에 건물·큰 나무가 없는 칸만. 아이 사는 집에서 한두 칸 떨어진 칸을 먼저(문을 나서 걷다 밟는 자리), 나머지는 칸 번호로 고른 벌(저장 0).
+   웅덩이는 칸 가운데를 비우고 카메라에서 먼 쪽 가장자리로 모아 비낀다(edgePack·edgeShift). 아이(작은 사람)가 그 칸에 들어서면 — 학교 가는 길이어도 — 가던 길은 그대로 두고
+   hopMs 동안 hops 번 높게 통통 뛴 뒤 이어 간다(같은 웅덩이는 againH 시간 쉬었다가 또). 볼일 없는 아이는 가까이(passR·쉬다가 seekR) 웅덩이가 있으면 들른다. 비가 계속 오는 날은 없음.
+   모양: 디자인 담당 #590 의 window.PUDDLE_PARTS(seed)(칸 가운데 원점 · y 0.205~0.23)를 읽고, 없으면 아래 임시 원판 둘. 길 청크 'lit' 묶음 기하에(draw call +0).
+   판정·확률·저장 0. 규칙 모듈 꼴: 스위치·수치 VRULES.puddle + 고리 둘(tickFolks · buildChunk — 수레 고리 바로 아래) + actKidDraw 높이 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).puddle = { on: true, from: 6, to: 12, maxCells: 8, pick: 11, seekR: 12, passR: 3, hopMs: 1800, hops: 3, hopH: 0.55, againH: 1.5, edgePack: 0.5, edgeShift: 0.5 };
+const PUDDLE_TMP = seed => { const r = ((seed * 2654435761) >>> 0) / 4294967296; return [
+  { g: 'cyl', c: 0x62ade0, s: [0.95 + r * 0.3, 0.02, 0.7], p: [-0.55, 0.21, 0.35], ry: r * 3 }, { g: 'cyl', c: 0x62ade0, s: [0.6, 0.02, 0.5], p: [0.6, 0.21, -0.45], ry: r * 5 } ]; };
+const puddleParts = seed => (typeof window.PUDDLE_PARTS === 'function' ? window.PUDDLE_PARTS(seed) : PUDDLE_TMP(seed)) || [];
+const PUDDLE_SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const puddleEdge = i => { const x = cX(i), y = cY(i), [fx, fz] = litFace(), open = PUDDLE_SIDES.filter(([dx, dy]) => { const j = idx(x + dx, y + dy); return !(inb(x + dx, y + dy) && isRoad(j)); });   // 길 아닌 쪽(가장자리)
+  if (PUDDLE_SIDES.length - open.length > 2 || !open.length) return null;   // 갈림길(셋·넷)은 사람이 많이 다닌다 — 빼고
+  for (let t = 0.5; t <= 2; t += 0.5) { const hx = Math.round(x + fx * t), hy = Math.round(y + fz * t); if (!inb(hx, hy)) continue; const r = cells[idx(hx, hy)]; if (r && K[r.k] && /^(건물|키 큰 것|특별)$/.test(K[r.k].grp)) return null; }   // 카메라와 그 칸 사이에 높은 것 — 가려서 안 보인다
+  return open.slice().sort((a, b) => (a[0] * fx + a[1] * fz) - (b[0] * fx + b[1] * fz) || 0)[0]; };   // 카메라에서 먼 쪽 가장자리(앞 건물 뒤에 숨지 않게)
+const PUDDLE = { day: -1, on: false, cells: [], side: new Map(), set: new Set(), tick: -1, stats: { 비온다음날: 0, 웅덩이칸: 0, 아이통통: 0 } };
+function puddleStart() {                                                // 비 온 다음 날 아침 — 칸을 고른다(한 번)
+  const R = window.VRULES.puddle, kidBase = []; folks.forEach(f => { if (f.kid && f.base >= 0) kidBase.push(f.base); });
+  const cand = []; cells.forEach((rec, i) => { if (!rec || !K[rec.k] || !K[rec.k].road || rec.k === 'crosswalk' || !plotOpen(cX(i), cY(i))) return; if (((i * 2654435761) >>> 0) % R.pick || !puddleEdge(i)) return;
+    let d = 1e9; kidBase.forEach(b => { const dd = Math.abs(cX(b) - cX(i)) + Math.abs(cY(b) - cY(i)); if (dd < d) d = dd; }); cand.push([i, d]); });
+  cand.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  const doors = new Set(); folks.forEach(f => { if (f.base >= 0) doors.add(f.base); });   // 집 앞 문 칸은 아침에 식구가 몰려 나온다 — 비워 두고 그 곁 가장자리에
+  const near = []; [...new Set(kidBase)].forEach(b => { if (near.length >= (R.maxCells / 2 | 0)) return; for (let r = 1; r <= 2; r++) { const bx = cX(b), by = cY(b), hit = D4.map(([dx, dy]) => [bx + dx * r, by + dy * r]).find(([x, y]) => { if (!inb(x, y)) return false; const c = idx(x, y); return isRoad(c) && cells[c].k !== 'crosswalk' && !doors.has(c) && plotOpen(x, y) && puddleEdge(c) && !near.includes(c); });
+    if (hit) { near.push(idx(hit[0], hit[1])); return; } } });   // 아이 사는 집에서 한두 칸 — 문을 나서 걸어가다 밟는 자리
+  PUDDLE.cells = near.concat(cand.map(a => a[0]).filter(c => !doors.has(c) && !near.includes(c))).slice(0, R.maxCells); PUDDLE.set = new Set(PUDDLE.cells); PUDDLE.side = new Map(PUDDLE.cells.map(c => [c, puddleEdge(c)])); PUDDLE.on = true; PUDDLE.hopped = new Map();
+  PUDDLE.cells.forEach(c => dirtyChunks.add(chunkOfCell(c))); PUDDLE.stats.비온다음날++; PUDDLE.stats.웅덩이칸 = PUDDLE.cells.length;
+}
+function puddleEnd() { PUDDLE.cells.forEach(c => dirtyChunks.add(chunkOfCell(c))); PUDDLE.on = false; PUDDLE.cells = []; PUDDLE.set = new Set(); }
+/* tickFolks 고리 — 틱마다 한 번 웅덩이 켜고 끄기 · 아이마다 찾아가 통통. true 면 이번 틱은 여기서 끝 */
+function actPuddleTick(f, i, now) {
+  const R = window.VRULES.puddle;
+  if (PUDDLE.tick !== SIM.ticks) { PUDDLE.tick = SIM.ticks;
+    const d = simDay(), h = simHour(), want = R.on && !EV.rain && d > 1 && rainDay(d - 1) && h >= R.from && h < R.to;
+    if (want && !PUDDLE.on && PUDDLE.day !== d) { PUDDLE.day = d; puddleStart(); } else if (!want && PUDDLE.on) puddleEnd(); }
+  const P = f.puddle;
+  if (!PUDDLE.on || !R.on) { if (P) f.puddle = null; return false; }
+  const small = typeof isSmall === 'function' && isSmall(f);
+  if (!small || f.visitor || f.state === 'inside' || f.state === 'mill' || f.garden || f.kidHome) { if (P && f.state === 'inside') f.puddle = null; return false; }
+  if (P) {
+    if (P.until) { if (now >= P.until) { f.puddle = null; f.walking = false; return false; } f.walking = false; return true; }   // 제자리 통통 — 높이는 actKidDraw 가 hops 번(걸음 흔들림 말고)
+    if (f.state === 'idle' && now >= f.until) f.puddle = null;
+  }
+  const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1, hop0 = PUDDLE.hopped.get(f), fresh = c => hop0 && hop0.has(c) && SIM.t - hop0.get(c) < R.againH * DAY_MS / 24;   // 같은 웅덩이는 한동안 쉬었다가 또   // 웅덩이 칸에 들어서면(찾아왔든 지나가다 밟았든) 거기서 멈춰 통통 — 가는 길이 남에게 바뀌어도 놓치지 않게
+  if (at >= 0 && PUDDLE.set.has(at) && (f.state === 'idle' || f.state === 'walk') && ((f.puddle && f.puddle.cell === at) || !fresh(at))) {
+    const hop = hop0 || new Map(); hop.set(at, SIM.t); PUDDLE.hopped.set(f, hop);
+    f.puddle = { cell: at, until: now + R.hopMs }; if (f.state === 'idle') f.until = f.puddle.until; PUDDLE.stats.아이통통++; return true; }   // 가던 길은 그대로 — 통통 뛰고 나서 이어 간다(학교 가는 길이어도)
+  if (f.puddle || f.goal) return false;   // 들르러 길을 바꾸는 건 볼일 없는 아이만
+  const passing = f.state === 'walk' && f.path && f.path[f.step + 1] != null && f.pudStep !== f.step;   // 걷다가 칸을 하나 넘을 때마다 — 곁에 웅덩이가 있으면 들른다
+  if (passing) f.pudStep = f.step;
+  if (!(passing || (f.state === 'idle' && now >= f.until)) || !f.path || pathBudget <= 1) return false;
+  const here = passing ? f.path[f.step + 1] : f.path[f.path.length - 1], hop = hop0 || new Map(), lim = passing ? R.passR : R.seekR;
+  let best = -1, bd = 1e9; PUDDLE.cells.forEach(c => { if (fresh(c)) return; const d = Math.abs(cX(c) - cX(here)) + Math.abs(cY(c) - cY(here)); if (d <= lim && d < bd) { bd = d; best = c; } });
+  if (best < 0) return false;
+  hop.set(best, SIM.t); PUDDLE.hopped.set(f, hop); pathBudget--;
+  if (best !== here || passing) { const { prev } = roadBFS(here, i); if (bfsSeen[best] !== bfsGen) return false;   // 가던 칸 하나는 마저 걷고 거기서 웅덩이로(제자리로 튀지 않게)
+    const path = []; let k = best; while (k !== here && k >= 0) { path.unshift(k); k = prev[k]; } path.unshift(here);
+    if (passing) { path.unshift(f.path[f.step]); f.path = path; f.step = 0; } else { f.path = path; f.step = 0; f.seg = 0; } f.state = 'walk'; }
+  f.puddle = { cell: best, until: 0 }; return f.state === 'walk';
+}
+/* buildChunk 고리 — 웅덩이 칸의 부위를 'lit' 묶음 기하에 */
+const pudM = new THREE.Matrix4(), pudP = new THREE.Matrix4(), pudN = new THREE.Matrix3(), pudV = new THREE.Vector3(), pudE = new THREE.Euler(), pudQ = new THREE.Quaternion(), pudS = new THREE.Vector3(), pudT = new THREE.Vector3(), pudC = new THREE.Color();
+function actPuddleChunk(x0, z0, bucket) {
+  if (!window.VRULES.puddle.on || !PUDDLE.on || mapMode) return;
+  PUDDLE.cells.forEach(c => { const x = cX(c), y = cY(c); if (x < x0 || x >= x0 + CHUNK || y < z0 || y >= z0 + CHUNK) return;
+    const sd = PUDDLE.side.get(c) || [0, 0], R = window.VRULES.puddle;   // 길 가장자리 쪽으로 모아 비낀다(가운데 걷는 줄은 비운다)
+    pudM.makeTranslation(wx(x) + sd[0] * R.edgeShift, 0, wz(y) + sd[1] * R.edgeShift);
+    puddleParts(c).forEach(pt => { const base = BASE[pt.g]; if (!base) return; pudE.set(pt.rx || 0, pt.ry || 0, pt.rz || 0); pudQ.setFromEuler(pudE);
+      pudP.compose(pudT.set(pt.p[0] * R.edgePack, pt.p[1], pt.p[2] * R.edgePack), pudQ, pudS.set(pt.s[0], pt.s[1], pt.s[2])).premultiply(pudM); pudN.getNormalMatrix(pudP); pudC.setHex(pt.c);
+      const b = bucket('lit'), off = b.pos.length / 3;
+      for (let v = 0; v < base.nv; v++) { pudV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(pudP); b.pos.push(pudV.x, pudV.y, pudV.z);
+        pudV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(pudN).normalize(); b.nrm.push(pudV.x, pudV.y, pudV.z); b.col.push(pudC.r, pudC.g, pudC.b); b.emis.push(pt.e || 0); b.night.push(0); }
+      for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off); }); });
+}
+window.__puddle = () => ({ 켜짐: window.VRULES.puddle.on, 지금: PUDDLE.on, 칸: PUDDLE.cells.map(c => [cX(c), cY(c)]), 모양: typeof window.PUDDLE_PARTS === 'function' ? '디자인' : '임시원판', 지금통통: folks.filter(f => f.puddle && f.puddle.until).length, ...PUDDLE.stats });
+
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
 function drawFolks(now) {
@@ -6557,7 +6637,8 @@ function actKidDraw(now) {
     if (f.state === 'inside') { if (!f.beside) return; fx = f.beside.x; fz = f.beside.z; }            // 안에 든 아이는 안 그려진다(곁에 선 아이만)
     else if (f.festSpot && f.state === 'idle') { fx = f.festSpot.x; fz = f.festSpot.z; }               // [ACT-KIDS] 광장 가장자리에서 구경하는 아이([ACT-PLAZA])
     else { fx = f.px == null ? f.x : f.px + (f.x - f.px) * a; fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a; }
-    const hop = f.walking && f.state !== 'inside' ? Math.abs(Math.sin(now / 95 + i)) * R.hop : 0;     // 아이는 통통 튄다(어른 bob 보다 빠르고 높게)
+    const PH = f.puddle && f.puddle.until && window.VRULES.puddle, hop = PH ? Math.abs(Math.sin((1 - Math.max(0, f.puddle.until - now) / PH.hopMs) * Math.PI * PH.hops)) * PH.hopH   // [ACT-PUDDLE] 웅덩이에서 두세 번 높게 통통
+      : f.walking && f.state !== 'inside' ? Math.abs(Math.sin(now / 95 + i)) * R.hop : 0;     // 아이는 통통 튄다(어른 bob 보다 빠르고 높게)
     kidA.makeTranslation(fx, hop, fz); kidB.makeScale(R.scale, R.scale, R.scale); kidA.multiply(kidB); kidB.makeTranslation(-fx, 0, -fz); kidA.multiply(kidB);
     const tour = hasV && !!f.visitor && !f.neighbor, n = tour ? VISITOR_PARTS.length : PERSON_PARTS.length, base = tour ? PERSON_PARTS.length : 0;
     for (let pi = 0; pi < n; pi++) { const im = folkPool[base + pi]; if (!im || i >= im.count) continue; im.getMatrixAt(i, kidM); kidM.premultiply(kidA); im.setMatrixAt(i, kidM); }
