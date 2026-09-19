@@ -691,6 +691,120 @@
       }
       CUR.yardFloor = keepFloor; _drawDeco(); await sleep(100);
     }
+
+    //  ⑯ 집 안 — 러그 위에 가구(INDOOR-RUG-1) + 집 안에서는 🖌️ 바닥 단추가 없다.
+    //    러그(장식 표의 layer:'floor')와 가구는 한 칸에 같이 놓인다. 러그끼리·가구끼리는 그대로 안 겹친다.
+    //    `옛집안_그림지문` 은 ⑮ 와 같은 방식 — **값 자체가 아니라 main 과 나란히(`REPO=<main 을 푼 폴더>`) 같은 기기에서 같은지**를 본다.
+    //    (러그와 가구가 안 겹친 '지금까지 가능했던' 집 안 = 이 PR 뒤에도 한 픽셀도 달라지면 안 된다.)
+    {
+      const keepDeco = CUR.houseDecorations, keepInv = CUR.inventory;
+      setDecoMode('floor'); ifSyncModeBtn();                                  // 마당에서 바닥 모드인 채로 집 안에 들어간다
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
+      const fbtn = document.getElementById('if-mode-floor'), frow = document.getElementById('if-floor-row');
+      const shown = el => !!el && getComputedStyle(el).display !== 'none';
+      out('마당_바닥단추_보임', shown(fbtn));
+      toggleDecoScene(); await sleep(500);
+      out('집안_바닥단추_없음', !shown(fbtn));
+      out('집안_바닥모드_풀림', DECO_MODE === 'deco' && !shown(frow) && !document.body.classList.contains('deco-floor-mode'));
+      setDecoMode('deco'); ifSyncModeBtn(); await sleep(200);                 // (main 과 나란히 잴 때 판 크기가 같게 — 이 PR 에서는 이미 장식 모드다)
+      decoZoomFit(); await sleep(100);
+
+      //  옛 집 안(겹침 없음): 벽걸이 둘 · 크기 다른 가구 · 러그 둘 — 놓는 길을 거치지 않고 저장본처럼 바로 넣는다(main 에서도 같은 줄이 나오게)
+      CUR.inventory = GAME_DATA.decorations.filter(d => d.cat === 'indoor').map(d => ({ id: d.id, qty: 3 }));
+      CUR.houseDecorations = [
+        { id: 'd_i3', area: 'indoor', row: 0, col: 2 }, { id: 'd_i4', area: 'indoor', row: 0, col: 4 },
+        { id: 'd_i16', area: 'indoor', row: 2, col: 1 }, { id: 'd_i15', area: 'indoor', row: 5, col: 8 },
+        { id: 'd_i8', area: 'indoor', row: 5, col: 1 }, { id: 'd_i9', area: 'indoor', row: 2, col: 6 },
+        { id: 'd_i6', area: 'indoor', row: 1, col: 10 }, { id: 'd_i1', area: 'indoor', row: 4, col: 5 },
+        { id: 'd_i10', area: 'indoor', row: 8, col: 3 }, { id: 'd_i2', area: 'indoor', row: 8, col: 6 },
+      ];
+      const print = async () => {
+        _drawDeco(); await sleep(150);
+        const cv = document.querySelector('#if-topview canvas'); if (!cv) return 'no-canvas';
+        const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+        const h = await crypto.subtle.digest('SHA-256', d.buffer);
+        return cv.width + 'x' + cv.height + ':' + [...new Uint8Array(h)].slice(0, 10).map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+      await print();
+      for (let i = 0; i < 100; i++) {                                         // 집 안 그림(가구·벽지·마루)이 다 올 때까지
+        const ids = CUR.houseDecorations.map(p => p.id);
+        if (ids.every(id => _DECO_IMG[id] && _DECO_IMG[id].img.complete) && Object.keys(_FLOOR_IMG).every(k => _FLOOR_IMG[k].img.complete)) break;
+        await sleep(50);
+      }
+      await sleep(300);
+      const g1 = await print(), g2 = await print();
+      out('옛집안_가구그림_다옴', CUR.houseDecorations.every(p => _DECO_IMG[p.id] && _DECO_IMG[p.id].ok));
+      out('옛집안_두번그려_같음', g1 === g2 && g1 !== 'no-canvas');
+      out('옛집안_그림지문', g1);
+
+      //  놓기 — 진짜 놓는 길(_decoPlace)로 · at() 은 **지금 공간**에서 센다
+      const at = (id, r, c) => _decoList(CUR).filter(p => p.id === id && p.area === 'indoor' && p.row === r && p.col === c).length;
+      _decoUndoClear();
+      SEL_DECO = 'd_i8'; _decoPlace('indoor', 2, 1);                          // 네모 러그(2,1 · 3×2) 위에 소파(3×1)
+      out('러그위_가구_놓임', at('d_i8', 2, 1) === 1 && at('d_i16', 2, 1) === 1);
+      SEL_DECO = 'd_i1'; _decoPlace('indoor', 2, 2);                          // 소파가 있는 칸에 화분 → 가구끼리는 그대로 안 된다
+      out('가구끼리_그대로_안겹침', at('d_i1', 2, 2) === 0);
+      SEL_DECO = 'd_i15'; _decoPlace('indoor', 3, 3);                         // 네모 러그와 한 칸 겹치는 둥근 러그
+      out('러그끼리_안겹침', at('d_i15', 3, 3) === 0);
+      { const said = [], origToast = toast; toast = function (m) { said.push(String(m)); return origToast.apply(this, arguments); };   // 막힌 까닭 — 누른 칸 맨 위(소파)가 아니라 정말 막는 것(밑의 러그)을 말한다
+        try { _decoPlace('indoor', 2, 2); } finally { toast = origToast; }
+        out('러그끼리_막힌까닭_러그라고말함', at('d_i15', 2, 2) === 0 && said.some(m => m.indexOf('네모 러그') >= 0) && !said.some(m => m.indexOf('소파') >= 0)); }
+      SEL_DECO = 'd_i16'; _decoPlace('indoor', 8, 3);                         // 침대(8,3 · 2×2) 밑에 러그를 깐다
+      out('가구밑에_러그_깔림', at('d_i16', 8, 3) === 1 && at('d_i10', 8, 3) === 1);
+      const topId = (r, c) => { const t = _decoTopAt('indoor', r, c, true); return t && t.id; };
+      out('겹친칸_맨위는_가구', topId(2, 1) === 'd_i8' && topId(8, 3) === 'd_i10' && topId(3, 1) === 'd_i16');
+      //  스포이드(길게 누르기)도 위의 것
+      SEL_DECO = null; _decoPickAt({ area: 'indoor', r: 2, c: 2 });
+      out('스포이드_위의가구', SEL_DECO === 'd_i8');
+      //  그리기 순서 — 내 집 안·친구 구경 둘 다 러그가 먼저
+      const order = fn => { const seq = [], orig = _drawDecoSVG; _drawDecoSVG = function (id) { seq.push(id); return orig.apply(this, arguments); };
+        try { fn(); } finally { _drawDecoSVG = orig; } return seq; };
+      const rugFirst = seq => { const lastRug = Math.max(seq.lastIndexOf('d_i15'), seq.lastIndexOf('d_i16')); const firstFurn = seq.findIndex(id => id !== 'd_i15' && id !== 'd_i16');
+        return seq.length > 0 && lastRug >= 0 && firstFurn > lastRug; };
+      out('그리기_러그먼저', rugFirst(order(() => _drawIndoor())));
+      //  🧽 치우기 — 겹친 칸을 누르면 가구가 먼저, 러그는 남는다 → ↩ 하면 가구가 러그 위로 돌아온다
+      setDecoMode('erase'); _decoPlace('indoor', 2, 1);
+      out('치우기_가구먼저_러그남음', at('d_i8', 2, 1) === 0 && at('d_i16', 2, 1) === 1);
+      setDecoMode('deco'); decoUndo();
+      out('되돌리기_가구_러그위로', at('d_i8', 2, 1) === 1 && at('d_i16', 2, 1) === 1);
+      decoUndo();                                                             // 침대 밑 러그 놓기를 되돌린다 → 침대는 그대로
+      out('되돌리기_밑러그만_빠짐', at('d_i16', 8, 3) === 0 && at('d_i10', 8, 3) === 1);
+      decoUndo();                                                             // 러그 위 소파 놓기를 되돌린다 → 러그는 그대로
+      out('되돌리기_위가구만_빠짐', at('d_i8', 2, 1) === 0 && at('d_i16', 2, 1) === 1);
+      //  끌어서 죽 놓기 — 러그 위를 지나가도 놓인다 · 러그는 러그 위에 안 놓인다
+      if (typeof _decoStrokeApply === 'function') {
+        const st = { stroke: [], placed: 0 };
+        SEL_DECO = 'd_i1'; const okFurn = _decoStrokeApply({ area: 'indoor', r: 3, c: 2 }, st);
+        SEL_DECO = 'd_i15'; const okRug = _decoStrokeApply({ area: 'indoor', r: 2, c: 2 }, st);
+        out('끌어놓기_러그위_가구됨_러그안됨', okFurn === true && okRug === false);
+      }
+      //  공간 2 — 공간 1 의 러그·가구와 부딪히지 않고, 거기서도 같은 규칙
+      if (typeof decoSpaceSet === 'function') {
+        decoSpaceSet(2); await sleep(200);
+        SEL_DECO = 'd_i16'; _decoPlace('indoor', 2, 1); SEL_DECO = 'd_i9'; _decoPlace('indoor', 2, 1);
+        const sp2 = (CUR.houseDecorations || []).filter(p => p.sp === 2 && p.area === 'indoor').map(p => p.id).sort().join();
+        out('공간2_러그위_가구', sp2 === 'd_i16,d_i9');
+        decoSpaceSet(1); await sleep(200);
+        out('공간1_그대로', at('d_i16', 2, 1) === 1 && topId(2, 1) === 'd_i16');
+      }
+      //  친구 구경(공간 1 · 같은 _drawIndoor) — 러그 위에 가구가 있는 친구 집 안도 러그가 먼저 그려진다
+      if (typeof _renderFriendCanvas === 'function') {
+        const fr = { id: 's_fr2', name: '친구', avatar: '🧒', level: 1, inventory: [], yardFloor: {},
+          houseDecorations: [{ id: 'd_i8', area: 'indoor', row: 2, col: 1 }, { id: 'd_i16', area: 'indoor', row: 2, col: 1 }] };
+        closeInteriorFullscreen(); await sleep(200);
+        openFriendFullscreen(fr); await sleep(300);
+        toggleFriendScene(); await sleep(300);
+        out('구경_집안_러그먼저', rugFirst(order(() => _renderFriendCanvas())));
+        closeFriendFullscreen(); await sleep(100);
+        openInteriorFullscreen(); await sleep(500);
+        if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      }
+      out('집안_다시열어도_바닥단추_없음', DECO_SCENE === 'indoor' ? !shown(fbtn) : 'scene=' + DECO_SCENE);
+      SEL_DECO = null; _decoUndoClear();
+      CUR.houseDecorations = keepDeco; CUR.inventory = keepInv;
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
+      out('마당으로_돌아오면_바닥단추_보임', shown(fbtn));
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';
