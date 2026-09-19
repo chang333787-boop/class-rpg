@@ -16,7 +16,7 @@
 <path d="M24,398 H76 L70,196 H30 Z" fill="#8a6a45"/>
 <path d="M29,394 H71 L66,202 H34 Z" fill="#a8845a"/>
 <g fill="#c9a577"><ellipse cx="44" cy="360" rx="3" ry="2"/><ellipse cx="57" cy="300" rx="2.5" ry="1.6"/><ellipse cx="48" cy="240" rx="2.4" ry="1.5"/></g>
-<use href="#arch" transform="translate(0,200)"/>
-<use href="#arch" transform="translate(0,300)"/>
-<use href="#arch" transform="translate(0,400)"/>
+<use href="#arch" transform="translate(50,200) scale(.917) translate(-50,0)"/>
+<use href="#arch" transform="translate(50,300) scale(.917) translate(-50,0)"/>
+<use href="#arch" transform="translate(50,400) scale(.917) translate(-50,0)"/>
 </svg>
