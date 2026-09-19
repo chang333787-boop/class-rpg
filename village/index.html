@@ -2320,6 +2320,28 @@ function updateGhost(clientX, clientY) {
   });
 }
 
+/* ── [MAC-WHYUP] 못 놓는 이유는 손가락 '위'에 — 터치·펜일 때만 ──
+   이유 말풍선(#why)은 포인터의 오른쪽 아래 14px 에 뜬다. 마우스엔 맞지만 손가락으로 누르면 **손가락과 손바닥에 가려** 읽을 수 없었다(오른손이면 더).
+   · 마지막으로 쓴 포인터가 터치·펜이면: 말풍선을 손가락 위 가운데로(손끝에서 56px), 화면 밖으로 나가지 않게 좌우를 맞춘다. 위가 상단 바에 걸리면 손가락 아래 멀찍이(64px).
+   · 마우스면 전과 같다(CSS 의 translate(14px,14px)).
+   원래 줄 수정 0 — updateGhost 를 감싸 자리만 다시 잡는다. 생김새는 그대로. */
+(window.VRULES = window.VRULES || {}).whyAbove = { on: true, up: 56, down: 64 };
+const WHYUP = { type: 'mouse', stats: { 위로: 0, 아래로: 0 } };
+addEventListener('pointerdown', e => { WHYUP.type = e.pointerType || 'mouse'; }, true);
+addEventListener('pointermove', e => { WHYUP.type = e.pointerType || 'mouse'; }, true);
+/* 순수 함수 — 말풍선의 왼쪽 위 자리. (x,y) 손끝 · (w,h) 말풍선 크기 · vw 화면 폭 · ceil 상단 바 아래 끝 */
+function whyPlace(x, y, w, h, vw, ceil, up, down) {
+  const left = Math.max(6, Math.min(vw - w - 6, x - w / 2)), top = y - up - h;
+  return top >= ceil + 4 ? { left, top, above: true } : { left, top: y + down, above: false };
+}
+{ const ghost0 = updateGhost; updateGhost = function (clientX, clientY) { const r = ghost0.apply(this, arguments);
+    const el = document.getElementById('why'), R = window.VRULES.whyAbove; if (!el) return r;
+    if (!R.on || WHYUP.type === 'mouse' || el.className !== 'show') { if (el.style.transform) el.style.transform = ''; return r; }
+    const bar = document.getElementById('top'), p = whyPlace(clientX, clientY, el.offsetWidth, el.offsetHeight, innerWidth, bar ? bar.getBoundingClientRect().bottom : 0, R.up, R.down);
+    el.style.transform = 'none'; el.style.left = p.left + 'px'; el.style.top = p.top + 'px'; WHYUP.stats[p.above ? '위로' : '아래로']++;
+    return r; }; }
+window.__whyup = () => { const el = document.getElementById('why'), q = el.getBoundingClientRect(); return { 켜짐: window.VRULES.whyAbove.on, 포인터: WHYUP.type, 보임: el.className === 'show', 말: el.textContent, 자리: [Math.round(q.left), Math.round(q.top), Math.round(q.right), Math.round(q.bottom)], ...WHYUP.stats }; };
+
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
