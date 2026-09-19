@@ -102,7 +102,7 @@ __pop()
 | [#428](https://github.com/chang333787-boop/class-rpg/pull/428) | 밤 달빛 바닥 | 밤 풀밭 (36,71,20)→(62,107,37) · 낮 불변(평균 차 0.4) |
 | [#429](https://github.com/chang333787-boop/class-rpg/pull/429) | 첫 안내 중 시계 세우기 | 안내 20초 `SIM.t` 1400→1400 · 닫고 3초 4500 · 저장 speed=1 |
 | [#431](https://github.com/chang333787-boop/class-rpg/pull/431) | 글자·터치 표적 + 상단 바 잘림 | 이름 12→14px · 탭 34→44px · 5개 폭에서 잘린 요소 0 · 트레이 +12px |
-| (이 문서의 PR) | worklog + 제안서 | 문서만 |
+| [#436](https://github.com/chang333787-boop/class-rpg/pull/436) | 이 worklog + 제안서 | 문서만 |
 
 ## ⑦ 월요일 학교 세션에게 부탁
 
