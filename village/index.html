@@ -3063,7 +3063,7 @@ window.__touch2 = () => ({ 손가락: TOUCH2.pts.size, 두손가락중: TOUCH2.o
    · 옮기기 = 원래 옮기기 도구로 바꿔 주고, 한 번 옮기고 나면 하던 일(고르던 카드)로 돌아온다. 들고 있는 상태를 손가락을 뗀 채로 끌고 가지 않는다(그 사이 자동 저장이 돌면 든 물건이 빠진 채 저장된다).
    메뉴가 떠 있을 때 판을 누르면 메뉴만 닫힌다(그 누름으로 물건이 놓이지 않게). 두 손가락을 대면 닫힌다. 원래 줄 수정 0 — 캡처 단계 리스너. 생김새(#hold·#holdRing)는 디자인 담당이 고쳐도 된다. */
 (window.VRULES = window.VRULES || {}).holdMenu = { on: true, ms: 500, ringAfter: 160, slop: 10, tipAfter: 3 };
-const HOLD = { t: 0, tr: 0, id: -1, x: 0, y: 0, root: -1, open: null, back: null, sawCarry: false, tipN: 0, stats: { 열림: 0, 돌림: 0, 못돌림: 0, 치움: 0, 옮기기: 0, 돌아옴: 0, 닫음: 0 } };
+const HOLD = { t: 0, tr: 0, id: -1, x: 0, y: 0, root: -1, open: null, back: null, sawCarry: false, tipN: 0, stats: { 열림: 0, 돌림: 0, 못돌림: 0, 치움: 0, 옮기기: 0, 돌아옴: 0, 닫음: 0, 카드든채: 0 } };
 const holdCage = (() => { const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false }));
   m.visible = false; m.renderOrder = 7; m.frustumCulled = false; scene.add(m); const m2 = m.clone(); m2.scale.setScalar(1.03); m.add(m2); return m; })();
 function holdCageFit(rec) { const d = dims(rec.k, rec.rot), c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot), hgt = rec.k === 'house' ? 4 + houseLv(rec.root) * 2.4 : Math.max(3, Math.min(9, d.w * 2.6));
@@ -3117,6 +3117,7 @@ canvas.addEventListener('pointerdown', e => {
   const R = window.VRULES.holdMenu;
   if (HOLD.open) { holdClose(); HOLD.stats.닫음++; if (TOUCH2.pts.size < 2) e.stopImmediatePropagation(); return; }   // 메뉴가 떠 있을 때 판을 누르면 닫기만(그 누름으로 놓이지 않게)
   holdCancel(); if (!R.on || e.pointerType === 'mouse' || TOUCH2.pts.size > 1 || mover || eraser || carrying || PHOTO.on || VISIT.on) return;
+  if (sel && R.viewOnly !== false) { HOLD.stats.카드든채++; return; }   // [MAC-HOLD-2] (창조자의 눈 5회) 카드를 든 채 겨누느라 0.7초 대고 있던 아이에게 길의 돌리기·옮기기 메뉴가 떴다 — 메뉴는 보기 모드(아무것도 안 고름)에서만. holdMenu.viewOnly = false 면 전처럼
   const c = cellAt(e.clientX, e.clientY), rec = c && c.inside ? cells[idx(c.x, c.y)] : null; if (!rec) return;      // 누르는 순간 물건이 있던 칸만
   HOLD.id = e.pointerId; HOLD.x = e.clientX; HOLD.y = e.clientY; HOLD.root = rec.root;
   HOLD.t = setTimeout(holdFire, R.ms); HOLD.tr = setTimeout(() => holdRing(true, HOLD.x, HOLD.y), R.ringAfter);
