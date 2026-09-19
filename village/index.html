@@ -2606,7 +2606,7 @@ const TAB_ICON = (() => {
    · 잠긴 카드는 같은 그림을 빛바랜 색으로(CSS 한 줄) — 까만 실루엣은 꽃밭끼리 모양이 같아 전부 똑같아 보였다.
    · 한 장 그리는 데 드는 시간은 __thumbStats() 로 잰다(처음 여는 탭에서만, 그 뒤는 캐시).
    ══════════════════════════════════════════════════════════════ */
-const THUMB = { cache: new Map(), made: 0, ms: 0, failed: 0, rt: null, scene: null, cam: null, R: 96 };
+const THUMB = { cache: new Map(), made: 0, ms: 0, failed: 0, rt: null, scene: null, cam: null, R: 96, q: [], busy: false, frameMax: 0, frames: 0, BUDGET: 4 };   // [DESIGN-CARDTHUMB-2] q = 그릴 차례를 기다리는 카드
 function thumbOf(kind) {
   const k = K[kind]; if (!k) return null;
   const x0 = 2, y0 = 2, rec = { k: kind, root: idx(x0, y0), rot: 0 };
@@ -2658,7 +2658,7 @@ function thumbOf(kind) {
     for (let y = 0; y < THUMB.R; y++) im.data.set(px.subarray((THUMB.R - 1 - y) * THUMB.R * 4, (THUMB.R - y) * THUMB.R * 4), y * THUMB.R * 4);   // 위아래 뒤집기
     g2.putImageData(im, 0, 0);
     const url = cv.toDataURL('image/png');
-    THUMB.cache.set(key, url); THUMB.made++; THUMB.ms += performance.now() - t0;
+    THUMB.cache.set(key, url); (THUMB.last || (THUMB.last = new Map())).set(kind + ':' + (seasonNow < 0 ? 1 : seasonNow), key); THUMB.made++; THUMB.ms += performance.now() - t0;
     return url;
   } catch (e) { THUMB.failed++; return null; }
 }
@@ -2672,14 +2672,34 @@ function thumbJoin(kind) {
   if (j.gate) return [...JOIN_GATES[j.fam].map(pt => turn(pt, 0, 0)), ...node(-1), ...arm(1, -1), ...node(1), ...arm(3, 1)];
   return [...node(0), ...arm(1, 0), ...arm(3, 0)];
 }
-window.__thumbStats = () => ({ 그린장수: THUMB.made, 합ms: +THUMB.ms.toFixed(1), 한장ms: THUMB.made ? +(THUMB.ms / THUMB.made).toFixed(2) : 0, 실패: THUMB.failed, 캐시: THUMB.cache.size });
+window.__thumbStats = () => ({ 그린장수: THUMB.made, 합ms: +THUMB.ms.toFixed(1), 한장ms: THUMB.made ? +(THUMB.ms / THUMB.made).toFixed(2) : 0, 실패: THUMB.failed, 캐시: THUMB.cache.size, 한프레임최대ms: +THUMB.frameMax.toFixed(1), 프레임수: THUMB.frames, 줄: THUMB.q.length });
+/* [DESIGN-CARDTHUMB-2] 처음 그리는 비용을 여러 프레임에 나눈다 — readRenderTargetPixels 는 GPU 를 기다리는 동기 호출이라 저사양에선 한 탭이 0.5~1초 멈출 수 있다.
+   · 한 프레임에 BUDGET(4ms) 안에서 그릴 수 있는 만큼(적어도 한 장) → 그 전까진 그림문자가 그대로 보이고 차례로 채워진다.
+   · 두 번째부터는 캐시라 곧바로 바뀐다. 한 프레임에 쓴 최대 시간은 __thumbStats().한프레임최대ms.
+   · thumbDress(카드) 를 밖에 내놓는다 — 색 점으로 카드의 data-kind 를 제자리에서 바꾼 뒤 불러 주면 그림도 따라 바뀐다(window.__thumbDress(카드 또는 없음=트레이 전체)). */
+function thumbSet(el, kind, url) { const ic = el.querySelector('.ic'); if (!ic || el.dataset.kind !== kind) return; ic.innerHTML = '<img class="thumb" src="' + url + '" alt="">'; ic.dataset.tk = kind; }
+function thumbPump() {
+  const t0 = performance.now();
+  while (THUMB.q.length) {
+    const el = THUMB.q.shift(), kind = el.dataset.kind; if (!el.isConnected || !kind) continue;
+    const ic = el.querySelector('.ic'); if (!ic || ic.dataset.tk === kind) continue;
+    const url = thumbOf(kind); if (url) thumbSet(el, kind, url); else ic.dataset.tk = kind;   // 못 그리면 그림문자 그대로(다시 줄 서지 않게 표시만)
+    if (performance.now() - t0 >= THUMB.BUDGET) break;
+  }
+  const dt = performance.now() - t0; THUMB.frames++; if (dt > THUMB.frameMax) THUMB.frameMax = dt;
+  if (THUMB.q.length) requestAnimationFrame(thumbPump); else THUMB.busy = false;
+}
+function thumbDress(el) {
+  const kind = el && el.dataset && el.dataset.kind, ic = kind && el.querySelector('.ic'); if (!ic || ic.dataset.tk === kind) return;
+  const hit = THUMB.cache.get(THUMB.last && THUMB.last.get(kind + ':' + (seasonNow < 0 ? 1 : seasonNow)));   // 이미 그린 것은 곧바로
+  if (hit) { thumbSet(el, kind, hit); return; }
+  if (!THUMB.q.includes(el)) THUMB.q.push(el);
+  if (!THUMB.busy) { THUMB.busy = true; requestAnimationFrame(thumbPump); }
+}
+window.__thumbDress = el => { if (el) thumbDress(el); else document.querySelectorAll('#trayIn .card[data-kind]').forEach(thumbDress); };
 (function cardThumbs() {
   const box = document.getElementById('trayIn'); if (!box || !window.MutationObserver) return;
-  const dress = () => box.querySelectorAll('.card[data-kind]').forEach(el => {
-    const ic = el.querySelector('.ic'); if (!ic || ic.querySelector('img')) return;
-    const url = thumbOf(el.dataset.kind); if (!url) return;
-    ic.innerHTML = '<img class="thumb" src="' + url + '" alt="">';
-  });
+  const dress = () => box.querySelectorAll('.card[data-kind]').forEach(thumbDress);
   new MutationObserver(dress).observe(box, { childList: true }); dress();
 })();
 function buildTray() {
