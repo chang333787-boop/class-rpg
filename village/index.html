@@ -724,6 +724,27 @@ const K = {
 };
 const GROUPS = ['바닥', '낮은 것', '키 큰 것', '긴 것', '건물', '특별'];
 const ORDER = Object.keys(K);
+/* [MAC-TABS] 물건 묶음을 '모양'(바닥·낮은 것·키 큰 것·긴 것)에서 **쓰임새**로 바꾼다(사용자 09-20).
+   전에는 벤치가 '긴 것', 짧은 의자가 '낮은 것', 꽃밭이 '바닥'에 있어 아이가 "의자가 어디 있지?"를 못 찾았다.
+   K 의 grp 는 트레이 탭에만 쓰인다 — 저장(palette)은 종류 id 라 영향이 없다. K 의 줄은 그대로 두고 여기서 덮어쓴다.
+   한 줄 안의 순서 = 탭 안 순서(자주 쓰는 것 먼저). 이 표에 없는 새 종류는 아래 규칙으로 알아서 들어간다(사라지지 않는다). */
+const USE_TABS = [
+  ['🛣️ 길',      ['road', 'avenue', 'crosswalk', 'treerow', 'gravel', 'bridge', 'sbridge']],
+  ['🏠 집·가게',  ['house', 'well', 'shop', 'green', 'windmill']],
+  ['🪑 쉼·놀이',  ['bench', 'minibench', 'play', 'pavilion', 'fountain', 'plaza']],
+  ['🌳 자연',     ['tree', 'bigtree', 'fruit', 'flower', 'bush', 'lawn', 'pot', 'pond', 'rock', 'stump', 'logs']],
+  ['🚧 꾸밈',     ['fence', 'wall', 'lamp', 'sign', 'trashcan', 'mailbox', 'post', 'flag', 'laundry', 'leafpile', 'snowman']],
+  ['⭐ 시설',     ['dream', 'statue', 'clock', 'library', 'station', 'school', 'museum']],
+];
+(function applyUseTabs() {
+  const rank = {}; let n = 0;
+  USE_TABS.forEach(([tab, kinds]) => kinds.forEach(k => { if (K[k]) { K[k].grp = tab; rank[k] = n++; } }));
+  ORDER.forEach((k, i) => { if (rank[k] != null) return;                       // 표에 없는 종류: 길 → 길 · 특별 → 시설 · 필요/일자리 → 집·가게 · 그 밖 → 꾸밈
+    const q = K[k]; K[k].grp = USE_TABS[q.road ? 0 : q.special ? 5 : (q.need || q.jobs) ? 1 : 4][0]; rank[k] = 1000 + i; });
+  GROUPS.length = 0; USE_TABS.forEach(([tab]) => GROUPS.push(tab));
+  if (K.mailbox && K.post && K.mailbox.nm === K.post.nm) K.mailbox.nm = '우편함';   // 📪·📮 둘 다 '우체통'이었다 — 같은 탭에 나란히 서니 이름을 가른다(집 앞 📪 = 우편함)
+  ORDER.sort((a, b) => rank[a] - rank[b]);
+})();
 
 /* ── 집 층수(F6). 1층은 K.house.parts 그대로. 2·3층은 벽을 올리고 창을 한 줄씩 더 낸다. 지붕은 같은 색 규칙. */
 function houseParts(lv) {
