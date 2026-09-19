@@ -742,7 +742,7 @@ const JOIN_SHAPES = {
     node: [ { g:'box', c:'c2', s:[.66,.42,.66], p:[0,.21,0] }, { g:'box', c:'c3', s:[.78,.1,.78], p:[0,.47,0] } ],
     lone: [ { g:'box', c:'c2', s:[.66,.42,.66], p:[0,.21,0] }, { g:'box', c:'c3', s:[.78,.1,.78], p:[0,.47,0] } ] },
   hedge: {                                               // ⓒ 다듬은 산울타리 — 폭 0.9 · 윗면이 둥글게 부푼 잎 덩어리(짙은 잎·밝은 잎이 번갈아 겹침) · 높이 1.2(꽃보다 조금 높게)
-    arm:  [ { g:'jn:hedgeArm', c:'model', s:[1,1,1], p:[0,0,0] } ],
+    vars: 3, arm:  [ { g:'jn:hedgeArm', c:'model', s:[1,1,1], p:[0,0,0] } ],   // vars: 팔 기하가 jn:hedgeArm0~2 세 벌
     node: [ { g:'jn:hedgeNode', c:'model', s:[1,1,1], p:[0,0,0] } ], lone: [ { g:'jn:hedgeLone', c:'model', s:[1,1,1], p:[0,0,0] } ] } };
 const JOIN_GATES = {                                     // 문 — 동서로 선 모양 하나(남북이면 돌린다)
   picket: [ { g:'jn:picketGate', c:'model', s:[1,1,1], p:[0,0,0] }, { g:'box', c:P.wood, s:[1.55,.12,.07], p:[-.33,.32,.52], ry:-.7 }, { g:'box', c:P.wood, s:[1.55,.12,.07], p:[-.33,.66,.52], ry:-.7 },
@@ -761,13 +761,13 @@ function joinPartsAt(rec) {                            // 이웃(세계 기준) 
   const k = K[rec.k], x = cX(rec.root), y = cY(rec.root), fam = k.join;
   const has = (xx, yy) => { if (!inb(xx, yy)) return false; const c = cells[idx(xx, yy)]; return !!(c && K[c.k].join === fam); };
   const mask = (has(x, y - 1) ? 1 : 0) | (has(x + 1, y) ? 2 : 0) | (has(x, y + 1) ? 4 : 0) | (has(x - 1, y) ? 8 : 0), rot = rec.rot & 3;
-  const key = rec.k + ':' + mask + ':' + rot; if (_joinCache[key]) return _joinCache[key];
+  const nv = JOIN_SHAPES[fam].vars || 0, vv = nv ? (x * 7 + y * 13) % nv : 0, key = rec.k + ':' + mask + ':' + rot + ':' + vv; if (_joinCache[key]) return _joinCache[key];
   const cols = JOIN_KINDS[rec.k].cols, paint = pt => (cols && typeof pt.c === 'string' && pt.c[0] === 'c' && pt.c.length === 2) ? { ...pt, c: cols[+pt.c[1] - 1] } : pt;
   const turn = (pt, q) => { const n = ((q % 4) + 4) % 4; let px = pt.p[0], pz = pt.p[2]; for (let i = 0; i < n; i++) { const t = px; px = -pz; pz = t; } return paint({ ...pt, p:[px, pt.p[1], pz], ry: (pt.ry || 0) - n * Math.PI / 2 }); };   // 세계에서 시계 방향 90°×n (북→동→남→서)
   const S = JOIN_SHAPES[fam]; let out = [];
   if (k.gate) { const ns = (mask & 5) && !(mask & 10); out = JOIN_GATES[fam].map(pt => turn(pt, (ns ? 1 : 0) + rot)); }   // 남북 이웃만 있으면 남북으로 선다
   else if (!mask) out = S.lone.map(pt => turn(pt, rot));
-  else { const straight = mask === 5 || mask === 10; if (S.always || !straight) S.node.forEach(pt => out.push(turn(pt, rot))); [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) S.arm.forEach(pt => out.push(turn(pt, d + rot))); }); }
+  else { const straight = mask === 5 || mask === 10; if (S.always || !straight) S.node.forEach(pt => out.push(turn(pt, rot))); [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) S.arm.forEach(pt => out.push(turn(nv ? { ...pt, g: pt.g + ((vv + d) % nv) } : pt, d + rot))); }); }
   return _joinCache[key] = out; }
 /* 놓거나 치우면 이웃의 모양도 바뀐다 → 이웃 칸이 든 청크도 다시 합친다(청크가 4칸이라 경계를 자주 넘는다). 꽃밭 가장자리 등 '이웃을 보는 모양'이 같이 쓴다 */
 function joinDirtyAround(kind, x, y) { if (!K[kind] || !K[kind].join) return; [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
@@ -1469,7 +1469,7 @@ window.__flowerBeds = () => Object.fromEntries(Object.entries(FLOWER_SETS).map((
 /* ══ [DESIGN-JOIN-1] 이어지는 것들의 기하 — 말뚝(끝이 뾰족한 살)·잎 덩어리는 상자로 안 나와서 여기서 만든다(꼭짓점 색, 팔 하나 = 기하 하나) ══ */
 (function buildJoinGeo() {
   const TAU = Math.PI * 2, lin = h => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
-  const WHITE = lin(0xffffff), WHITE2 = lin(0xf1eee6), LEAF = lin(P.leaf);
+  const over = (h, m) => lin(h).map(v => v * m), WHITE = over(0xffffff, 1.45), WHITE2 = over(0xf6f2e8, 1.3), LEAF = lin(P.leaf);   // 흰색은 1 보다 크게 — 그늘면이 회색으로 안 떨어지게(조명 곱 뒤에 1 에서 잘린다)
   function mesh(build) {
     const pos = [], nrm = [], idx = [], col = [], kind = [];
     function shape(verts, faces, c, k) {
@@ -1499,7 +1499,10 @@ window.__flowerBeds = () => Object.fromEntries(Object.entries(FLOWER_SETS).map((
   BASE['jn:picketGate'] = mesh(g => { [-.98, .98].forEach(x => { g.box(x, .68, 0, .28, 1.36, .28, WHITE); g.dome(x, 0, 1.36, .24, .24, .22, 4, WHITE2, 0, TAU / 8); });            // 문기둥 둘(조금 높다)
     [-1, 1].forEach(sg => { g.box(sg * 1.54, .32, 0, .92, .13, .09, WHITE2); g.box(sg * 1.54, .70, 0, .92, .13, .09, WHITE2); }); });                                             // 양옆 가로대 토막 — 이웃 울타리와 이어진다
   /* ⓒ 다듬은 산울타리 — 짙은 잎(7)·보통 잎(2) 덩어리가 번갈아 겹친다 */
-  BASE['jn:hedgeArm']   = mesh(g => { g.box(0, .42, -H / 2, .78, .84, H, LEAF, 7); [[-.55, .07, .52, 1.26, 2, .78], [-1.5, -.08, .56, 1.12, 7, .70]].forEach(([z, x, r, h, k, rz], i) => g.dome(x, z, .3, r, rz, h - .3, 6, LEAF, k, i * .7)); });
+  [ [[-.55, .07, .52, 1.26, 2, .78], [-1.5, -.08, .56, 1.12, 7, .70]],
+    [[-.42, -.06, .50, 1.10, 7, .62], [-1.12, .09, .60, 1.34, 2, .74], [-1.74, -.04, .48, 1.08, 7, .50]],
+    [[-.80, .05, .62, 1.30, 7, .95], [-1.62, -.07, .50, 1.14, 2, .60]] ].forEach((lumps, vi) => {   // 팔 세 벌 — 칸·방향마다 다른 벌을 써서 덩어리가 들쭉날쭉
+    BASE['jn:hedgeArm' + vi] = mesh(g => { g.box(0, .42, -H / 2, .78, .84, H, LEAF, 7); lumps.forEach(([z, x, r, h, k, rz], i) => g.dome(x, z, .3, r, rz, h - .3, 6, LEAF, k, i * .7 + vi)); }); });
   BASE['jn:hedgeNode']  = mesh(g => { g.box(0, .42, 0, .78, .84, .78, LEAF, 7); g.dome(0, 0, .3, .72, .72, 1.06, 6, LEAF, 2, .3); });
   BASE['jn:hedgeLone']  = mesh(g => { g.dome(0, 0, .05, .95, .9, 1.2, 6, LEAF, 7, .2); g.dome(.35, .3, .3, .6, .6, 1.0, 6, LEAF, 2, .9); });
   BASE['jn:hedgeGate']  = mesh(g => { [-1.22, 1.22].forEach((x, i) => { g.dome(x, 0, .05, .6, .6, 2.35, 6, LEAF, i ? 7 : 2, .4); g.box(x * 1.36, .34, 0, .7, .68, .62, LEAF, 7); g.dome(x * 1.42, 0, .12, .46, .5, 1.0, 6, LEAF, i ? 2 : 7, .2); });   // 기둥 둘 + 양옆 토막
