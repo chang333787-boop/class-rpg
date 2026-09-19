@@ -2486,6 +2486,32 @@ function paintEnd() {
   if (p.list.length > 1) toast(josa(K[p.k].nm, '을', '를') + ' ' + p.list.length + '개 놓았어요', true);
 }
 
+/* ── [MAC-STROKE] 빨리 그어도 길이 끊기지 않는다 — 끌어 놓을 때 앞 칸과 이번 칸 사이를 이어 놓는다 (창조자의 눈 4회 🔴A1) ──
+   paintAt 은 손가락이 '보고된' 자리의 칸만 놓았다. 손이 빠르면 포인터 이벤트 사이에 칸을 건너뛰어 길이 점선이 됐다(보스 재현: 140px 를 끌었는데 3칸).
+   끊긴 길 → 이웃이 '물이 멀다'며 돌아서는 일이 아이 손놀림 하나로 매번 생겼다.
+   · 앞서 본 칸과 이번 칸 사이를 **변으로 이어진** 칸들(4방향 계단 — 길은 대각선으로만 닿으면 끊긴 길이다)로 메운다. 순수 함수 paintLine4.
+   · 1×1 물건만(길·울타리·꽃밭·잔디…). 2×2 같은 큰 것은 전처럼 손가락이 지난 칸만 — 사이를 메우면 서로 겹쳐 못 놓는 칸투성이가 된다.
+   · 사이 칸이 못 놓는 칸이면(물건이 있음·내 땅 아님) 그 칸만 건너뛴다 — 한 획(↩ 한 번)은 그대로.
+   · 한 번에 24칸 넘게 뛰면 잇지 않는다(포인터가 판 밖으로 나갔다 다른 곳으로 들어온 것 — 긴 줄이 저절로 그어지면 안 된다).
+   끌어 치우기(#544)는 처음부터 sweepLine 으로 사이를 이었다(치우기는 8방향으로 충분). 원래 줄 수정 0 — paintAt 감싸기. */
+(window.VRULES = window.VRULES || {}).strokeFill = { on: true, maxJump: 24 };
+const STROKE = { stats: { 메운칸: 0, 이은획: 0, 뛴것: 0 } };
+/* 순수 함수 — (x0,y0) 다음부터 (x1,y1) 까지, 이웃한 두 칸이 늘 변으로 닿는 칸들(끝 칸 포함, 첫 칸 제외). 대각선 걸음은 가로 먼저 한 칸을 끼운다 */
+function paintLine4(x0, y0, x1, y1) {
+  const out = [], n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); let px = x0, py = y0;
+  for (let i = 1; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+    if (x !== px && y !== py) out.push({ x, y: py }); out.push({ x, y }); px = x; py = y; }
+  return out;
+}
+{ const at0 = paintAt; paintAt = function (c) {
+    const R = window.VRULES.strokeFill, p = painting;
+    if (R.on && p && c && c.inside && p.last && K[p.k] && K[p.k].w * K[p.k].h === 1) { const [lx, ly] = p.last.split(',').map(Number), jump = Math.max(Math.abs(c.x - lx), Math.abs(c.y - ly));
+      if (jump > R.maxJump) STROKE.stats.뛴것++;
+      else if (jump > 1 || (c.x !== lx && c.y !== ly)) { const mid = paintLine4(lx, ly, c.x, c.y); mid.pop(); const n0 = p.list.length;
+        mid.forEach(q => { if (inb(q.x, q.y)) at0({ x: q.x, y: q.y, inside: true }); }); STROKE.stats.메운칸 += p.list.length - n0; STROKE.stats.이은획++; } }
+    return at0.apply(this, arguments); }; }
+window.__strokeFill = () => ({ 켜짐: window.VRULES.strokeFill.on, ...STROKE.stats });   // (__stroke 는 이미 있는 훅이다)
+
 /* ── 옮기기 ── 누르면 집어 들고, 끌어서 옮기고, 떼면 놓는다 ── */
 function pickUp(clientX, clientY) {
   const c = cellAt(clientX, clientY);
