@@ -420,6 +420,22 @@
       decoSpaceSet(1); await sleep(200);
     }
 
+    //  ⑪-2 캔버스가 판 자리에 맞나(DECO-FIT-1) — 처음 열 때(서랍에 카드가 차기 전에 재서 컸다)·
+    //    바닥 모드(서랍이 접히는데 캔버스는 그대로라 아래가 까맣게 비었다)·서랍 펼침(판 아래가 서랍 밑으로).
+    {
+      const host = () => document.getElementById('if-topview');
+      const fit = () => ({ 맞나: _dW === host().clientWidth && _dH === Math.max(120, host().clientHeight), 캔버스: _dH, 자리: host().clientHeight });
+      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(900);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }   // 헤드리스 가상 시간에서는 여는 쪽 rAF 가 아직일 수 있다(⑫ 와 같은 처리)
+      out('판맞춤_열었을때', fit());
+      setDecoMode('floor'); ifSyncModeBtn(); await sleep(300);
+      out('판맞춤_바닥모드', fit());
+      setDecoMode('deco'); ifSyncModeBtn(); await sleep(300);
+      out('판맞춤_장식모드로', fit());
+      decoDrawerToggle(); await sleep(300); out('판맞춤_서랍펼침', fit());
+      decoDrawerToggle(); await sleep(300); out('판맞춤_서랍접음', fit());
+    }
+
     //  ⑫ 보이는 단추가 정말 눌리나(DECO-PT-4) — 마을에서 ⋯ 가 72차부터 터치로 안 눌렸던 함정.
     //    .click() 은 겹침·pointer-events 를 건너뛰므로 '눌린다'의 증거가 아니다 → 한가운데 elementFromPoint.
     {

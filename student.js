@@ -4761,6 +4761,7 @@ function ifSyncModeBtn() {
     btn.style.color = active ? 'var(--gold)' : 'var(--txt2)';
     btn.style.borderColor = active ? 'rgba(255,215,0,.4)' : 'rgba(255,255,255,.12)';
   });
+  _decoFit();   // [DECO-FIT-1] 바닥 줄이 생기고 서랍이 접히면 판 자리가 달라진다
 }
 
 function ifSyncInv() {
@@ -4768,6 +4769,7 @@ function ifSyncInv() {
   const srcEl = document.getElementById('house-deco-inv');
   if (el && srcEl) el.innerHTML = srcEl.innerHTML;
   try { _decoPillarSync(); } catch (e) {}   // [DECO-PT-4]
+  try { _decoFit(); } catch (e) {}          // [DECO-FIT-1] 서랍 키가 바뀌면 판 자리도(처음 열 때·최근 줄이 생길 때)
   // 클릭 이벤트는 SEL_DECO 변수 공유로 동작
 }
 
@@ -6959,6 +6961,7 @@ function _initDeco() {
     _dCv.addEventListener('click', _decoClick);
     _decoAttachGestures(_dCv);   // [DECO-ZOOM-1] 핀치·두 손가락 이동·빈손 끌기·휠
   }
+  _decoFitWatch(el);   // [DECO-FIT-1] 판 자리가 달라지면(서랍·바닥 모드·창 크기) 캔버스도 따라간다
   // 전체화면 모드면 window 크기 직접 사용, 아니면 컨테이너 너비
   let W, maxH;
   if (_ifMode) {
@@ -6990,6 +6993,31 @@ function _initDeco() {
 }
 
 let _drawDecoRaf = null;
+
+// [DECO-FIT-1] 캔버스 크기는 '잡는 순간' 판 자리(#if-topview)로 정해지는데, 그 자리는 그 뒤에도 바뀐다 —
+//  ① 처음 열 때는 서랍에 카드가 차기 전에 재서 캔버스가 컸다(1366×610: 479 vs 보이는 327 →
+//     마당 맨 아래 5줄이 서랍 밑에 들어가 어떻게 해도 안 보였다 · 지난번 자리 기억이 없는 기기에서)
+//  ② 🖌️ 바닥 모드는 서랍을 접는데 캔버스는 그대로라 판 아래가 까맣게 비었다(1366×610: 화면의 30%)
+//  ③ 🕘 최근 줄이 생기거나 ⌃ 서랍을 펼치면 판 아래가 서랍 밑으로 들어갔다 · 창 크기·화면 돌리기도 같다
+//  → 판 자리 크기가 바뀌면 캔버스 크기만 다시 맞춘다(보던 왼쪽 위는 그대로 · 저장·DB 쓰기 0).
+//  자리가 바뀌는 줄 아는 곳(서랍 다시 그림·모드 바꿈·서랍 펼침)에서는 바로 부르고, 창 크기·화면 돌리기는 지켜본다.
+let _decoFitObs = null, _decoFitHost = null;
+function _decoFit() {
+  if (!_ifMode || !_dCv || !_dCv.parentNode) return false;
+  const el = _dCv.parentNode, w = el.clientWidth, h = el.clientHeight;
+  if (!w || !h) return false;   // 안 보이는 동안(전체화면 닫힘)
+  if (w === _dW && Math.max(120, h) === _dH) return false;
+  _initDeco();
+  _drawDeco();
+  return true;
+}
+function _decoFitWatch(el) {
+  if (typeof ResizeObserver === 'undefined' || _decoFitHost === el) return;
+  if (_decoFitObs) _decoFitObs.disconnect();
+  _decoFitHost = el;
+  _decoFitObs = new ResizeObserver(() => { if (_dCv && _dCv.parentNode === el) _decoFit(); });
+  _decoFitObs.observe(el);
+}
 
 // ══ 꾸미기 확대/축소·화면 이동 (DECO-ZOOM-1) ══════════════════
 //  · 판(격자)은 지금 코드가 쓰는 좌표 그대로 그린다. 캔버스 변환으로 보이는 창만 옮긴다.
@@ -8748,6 +8776,7 @@ function decoDrawerToggle() {
   const b = document.getElementById('if-deco-expand');
   if (b) { b.textContent = open ? '⌄' : '⌃'; b.setAttribute('aria-label', open ? '서랍 접기' : '서랍 펼치기'); }
   _decoPillarSync();
+  _decoFit();   // [DECO-FIT-1]
 }
 
 // [DECO-THUMB-1] 카드에 실제 그림 — 이모지로는 뭔지 모른다("울타리 샀는데 공사 표지판이야?")
