@@ -1234,6 +1234,61 @@ for (const g in GEO) {
   const geo = GEO[g];
   BASE[g] = { pos: geo.attributes.position.array, nrm: geo.attributes.normal.array, idx: geo.index.array, nv: geo.attributes.position.count };
 }
+/* ══════════════════════════════════════════════════════════════
+   [DESIGN-FLOWER-2] 풍성한 꽃밭 — 한 칸의 꽃 전체를 **기하 하나**로 만든다(꼭짓점 색).
+   선생님: "꽃밭이 저게 뭐야 — 롤러코스터 타이쿤처럼 풍성하게." 가져온 건 그림이 아니라 원리 둘:
+     ① 풍성함의 밀도 — 한 칸에 꽃 28송이 + 잎 덩어리 12, 높낮이 3단(잎 .6 · 꽃 1.0 · 키 큰 꽃 1.4)
+     ② 이어 붙는 칸 — 잎 깔개가 칸 끝까지(흙 0%), 꽃이 칸 가장자리 .15 앞까지 흩어져 옆 칸과 한 융단
+   칸마다 다르게: 8벌을 씨앗으로 미리 만들어 두고 칸 좌표로 고른다(partsOf). 저장에는 아무것도 안 남는다.
+   무게: 한 칸 306△(상자 꽃머리 13개이던 #433 은 168△, 그 전 59차는 348△). 청크가 꼭짓점 색으로 합치므로
+        꽃밭을 100칸 깔아도 draw call 은 안 는다. 잎은 vkind 2·3 이라 계절색을 그대로 탄다.
+   끄기(재 보기용): 주소 끝 #fb=0 → 옛 parts(K.flower.parts).
+   ══════════════════════════════════════════════════════════════ */
+const FLOWER_PARTS = [];
+(function buildFlowerBeds() {
+  if (HP.fb === 0) return;
+  const HALF = CS / 2, TOP = .28, N = 8;
+  const lin = h => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
+  const PET = [lin(P.petal), lin(P.petal2), lin(P.petal3)], ACC = [lin(P.cloth), lin(0xb48ae0)], HOT = lin(P.red), LEAF = lin(P.leaf);
+  for (let vi = 0; vi < N; vi++) {
+    let s = (0x9e3779b1 ^ Math.imul(vi + 1, 0x85ebca6b)) | 0;
+    const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const pos = [], nrm = [], idx = [], col = [], kind = [];
+    /* 도형 하나: 꼭짓점을 넣고, 면마다 '도형 가운데에서 바깥'을 보게 감는 방향을 맞춘다(한쪽 면만 그리므로) */
+    function shape(verts, faces, c, k) {
+      const off = pos.length / 3; let mx = 0, my = 0, mz = 0;
+      verts.forEach(v => { mx += v[0]; my += v[1]; mz += v[2]; }); mx /= verts.length; my /= verts.length; mz /= verts.length;
+      verts.forEach(v => { pos.push(v[0], v[1], v[2]); const dx = v[0] - mx, dy = v[1] - my + .2, dz = v[2] - mz, l = Math.hypot(dx, dy, dz) || 1; nrm.push(dx / l, dy / l, dz / l); col.push(c[0], c[1], c[2]); kind.push(k); });
+      faces.forEach(f => {
+        const a = verts[f[0]], b = verts[f[1]], d = verts[f[2]];
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], wx_ = d[0] - a[0], wy_ = d[1] - a[1], wz_ = d[2] - a[2];
+        const nx = uy * wz_ - uz * wy_, ny = uz * wx_ - ux * wz_, nz = ux * wy_ - uy * wx_;
+        const ox = (a[0] + b[0] + d[0]) / 3 - mx, oy = (a[1] + b[1] + d[1]) / 3 - my, oz = (a[2] + b[2] + d[2]) / 3 - mz;
+        if (nx * ox + ny * oy + nz * oz >= 0) idx.push(off + f[0], off + f[1], off + f[2]); else idx.push(off + f[0], off + f[2], off + f[1]);
+      });
+    }
+    const ring = (cx, y, cz, r, rot) => [0, 1, 2, 3].map(i => [cx + Math.cos(rot + i * Math.PI / 2) * r, y, cz + Math.sin(rot + i * Math.PI / 2) * r]);
+    const pyramid = (cx, cz, y0, r, h, c, k) => { const q = ring(cx, y0, cz, r, rnd() * 1.57); shape([...q, [cx, y0 + h, cz]], [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]], c, k); };
+    const gem = (cx, cz, yc, r, up, dn, c) => { const q = ring(cx, yc, cz, r, rnd() * 1.57); shape([...q, [cx, yc + up, cz], [cx, yc - dn, cz]], [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], [1, 0, 5], [2, 1, 5], [3, 2, 5], [0, 3, 5]], c, 0); };
+    /* 잎 깔개 — 위 + 옆 4면(밑은 안 보여서 뺀다: 10△). 가운데를 아래로 내려 잡아 옆면이 바깥을 보게 */
+    (function mat() {
+      const v = [[-HALF, TOP, -HALF], [HALF, TOP, -HALF], [HALF, TOP, HALF], [-HALF, TOP, HALF], [-HALF, 0, -HALF], [HALF, 0, -HALF], [HALF, 0, HALF], [-HALF, 0, HALF]];
+      shape(v, [[0, 1, 2], [0, 2, 3], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]], LEAF, 2);
+    })();
+    /* 흩뿌리기 — 서로 너무 붙지 않게(거리 d), 칸 가장자리 .15 앞까지 */
+    const scatter = (n, d, taken) => { const out = []; for (let tries = 0; out.length < n && tries < n * 40; tries++) { const x = (rnd() * 2 - 1) * (HALF - .15), z = (rnd() * 2 - 1) * (HALF - .15); if (out.concat(taken || []).every(p => Math.hypot(p[0] - x, p[1] - z) >= d)) out.push([x, z]); } return out; };
+    const tall = scatter(6, 1.05), mid = scatter(22, .58, tall), clump = scatter(12, .80);
+    clump.forEach(([x, z], i) => pyramid(x, z, TOP - .02, .46 + rnd() * .18, .30 + rnd() * .16, LEAF, i % 2 ? 3 : 2));
+    const main = PET[vi % 3], second = PET[(vi + 1) % 3], acc = ACC[vi % 2];
+    mid.forEach(([x, z]) => { const t = rnd(), c = t < .5 ? main : t < .8 ? second : acc, r = .24 + rnd() * .10; gem(x, z, TOP + .46 + rnd() * .16, r, r * 1.05, r * .75, c); });
+    tall.forEach(([x, z], i) => { const yc = TOP + .92 + rnd() * .18, r = .27 + rnd() * .07; pyramid(x, z, TOP - .02, .09, yc - TOP, LEAF, 2); gem(x, z, yc, r, r * 1.15, r * .8, i % 3 === 0 ? HOT : i % 3 === 1 ? acc : second); });
+    const name = 'fb:' + vi;
+    BASE[name] = { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv: pos.length / 3, vcol: new Float32Array(col), vkind: Uint8Array.from(kind), tri: idx.length / 3 };
+    FLOWER_PARTS.push([{ g: name, c: 'model', s: [1, 1, 1], p: [0, 0, 0] }]);
+  }
+})();
+window.__flowerBeds = () => ({ 벌: FLOWER_PARTS.length, 삼각: FLOWER_PARTS.map(p => BASE[p[0].g].tri), 꼭짓점: FLOWER_PARTS.map(p => BASE[p[0].g].nv) });
+
 
 /* ══════════════════════════════════════════════════════════════
    glb 모델(54차) — 디자인 2의 저폴리 모델(assets/models)을 '부위 하나'로 쓴다.
@@ -1348,6 +1403,7 @@ function partMatrix(kind, x, y, rot, pt, out) {
 }
 function bucketOf(pt) { return pt.op ? 'glass' : 'lit'; }
 function partsOf(rec) {
+  if (rec.k === 'flower' && FLOWER_PARTS.length) return FLOWER_PARTS[(cX(rec.root) * 7 + cY(rec.root) * 13) % FLOWER_PARTS.length];   // [DESIGN-FLOWER-2] 칸 좌표로 8벌 중 하나
   if (rec.k === 'house') { const lv = houseLv(rec.root); return glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house') || HOUSE_LV[lv]; }
   if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
   const mn = GLB_KIND[rec.k]; return (mn && glbParts(rec.k === 'bigtree' ? 'tree' : GLB_PROP.has(rec.k) ? 'props' : GLB_SPECIAL.has(rec.k) ? 'special' : GLB_STREET.has(rec.k) ? 'street' : GLB_DECO.has(rec.k) ? 'deco' : rec.k, mn)) || K[rec.k].parts;
