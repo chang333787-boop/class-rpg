@@ -3867,11 +3867,27 @@ function followTick() {
   camTarget.x += (fx - camTarget.x) * 0.12; camTarget.z += (fz - camTarget.z) * 0.12;
 }
 function folkCard(f) { return (f.wish ? wishText(f) + ' — ' : '🙂 ') + (f.arriving ? '새 이웃' : folkName(f)) + ' · ' + whatDoing(f) + (f.visitor || f.arriving ? '' : ' · 좋아하는 곳: ' + favPlace(f)); }
+/* ══════════════════════════════════════════════════════════════
+   [ACT-WORDS] 가는 곳에 맞는 말 — "학교에 쉬러 가요"가 아니라 "학교에 배우러 가요" (주민 연기 · 09-20 · 보스 지시).
+   whatDoing 은 필요(need)로 말을 고르는데 '배움'이 없어 학교·도서관이 '쉬러 가요'로 떨어졌다. 박물관(need 놀이)은 '놀러 가요'.
+   여기 표에 있는 곳만 말을 바꾼다 — 일하러 가는 사람(f.goal === 'work')은 옛 말 그대로. 판정 0 · 저장 0. whatDoing 고리 한 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).words = { on: true,
+  go:   { school: '에 배우러 가요', library: '에 책 읽으러 가요', museum: '에 구경하러 가요' },
+  stay: { school: '에서 배워요',     library: '에서 책을 읽어요',   museum: '을 구경해요' } };
+function actWordsText(f) {
+  const R = window.VRULES.words; if (!R.on || f.goal === 'work') return null;
+  if (f.state === 'inside') { const b = cells[f.inside.root]; return b && R.stay[b.k] ? K[b.k].nm + R.stay[b.k] : null; }
+  if (f.state === 'walk' && f.path) { const b = buildingBeside(f.path[f.path.length - 1]); return b && R.go[b.k] ? K[b.k].nm + R.go[b.k] : null; }
+  return null;
+}
+
 function whatDoing(f) {
   if (f.leaving && f.away) return f.away.miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 돌아가요';   // [MAC-AWAY]
   if (f.comeback) return '살 만해졌다는 소식에 다시 와요';
   if (f.arriving) return '이사 오는 중이에요';
   { const t = actBesideText(f); if (t) return t; }   // [ACT-BESIDE]
+  { const t = actWordsText(f); if (t) return t; }   // [ACT-WORDS] 학교에 배우러 · 도서관에 책 읽으러
   if (f.state === 'inside') { const b = cells[f.inside.root]; return (b ? K[b.k].nm : '건물') + (f.goal === 'work' ? '에서 일해요' : ' 안에 있어요'); }
   if (f.state === 'mill') return '길이 없어서 집 앞을 서성여요';
   if (f.state === 'idle') return '잠깐 쉬어요';
