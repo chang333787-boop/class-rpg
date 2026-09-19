@@ -108,7 +108,8 @@ async function child(spec) {
   const moves = (spec.do || '').split(';').map(s => s.trim()).filter(Boolean).map(c => doMove(w, c));
   const t0 = tick;
   while (tick - t0 < spec.days * DAY) { run(Math.min(spec.every, t0 + spec.days * DAY - tick)); sample(); }
-  return { name: spec.name, seed: spec.seed, moves, t0, samples, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
+  const voice = spec.voice && typeof w.__voice === 'function' ? w.__voice() : null;   // [MAC-VOICE] 끝 날의 동네별 바람표
+  return { name: spec.name, seed: spec.seed, moves, t0, samples, voice, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
 }
 
 /* ─────────────── 묶어 돌리기(부모) ─────────────── */
@@ -120,6 +121,7 @@ function parseArgs(argv) {
     else if (k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name') { o[k] = v; i++; }
     else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs') { o[k] = +v; i++; }
     else if (k === 'help' || k === 'h') o.help = true;
+    else if (k === 'voice') o.voice = true;
     else throw new Error('모르는 인자: ' + argv[i]);
   }
   return o;
@@ -205,6 +207,17 @@ function report(o, vars, res) {
       L.push(`| ${v.name} | ${k} | ${stat(diffs).replace(/^(-?[\d.]+)/, m => sgn(+m))} | ${better}/${diffs.length} | ${other ? '— (다른 판)' : med == null ? '안 풀림' : '중앙 ' + med + (ok.length > 1 ? ' (' + Math.min(...ok) + '–' + Math.max(...ok) + ')' : '')} | ${ok.length}/${delays.length} |`);
     }));
   }
+  if (o.voice) {   // [MAC-VOICE] 동네별 바람표 — 끝 날 · 시드 평균 · 줄 차례는 사다리 순(고정)
+    const VK = ['물', '장보기', '놀이', '쉼', '배움', '일자리', '붐빔'];
+    vars.forEach(v => { const rs = res.filter(r => r.name === v.name && r.voice); if (!rs.length) return;
+      const keys = [...new Set(rs.flatMap(r => r.voice.map(e => e.동네)))];
+      L.push('', `### 동네 바람표 — ${v.name} (${o.days}일 뒤 · 원하는 집 채 수 · 시드 평균)`, '| 동네 | 집 | 사는 집 | ' + VK.join(' | ') + ' |', '|---|---|---|' + VK.map(() => '---').join('|') + '|');
+      keys.forEach(k => { const es = rs.map(r => r.voice.find(e => e.동네 === k)).filter(Boolean), m = f => r1(es.reduce((a, e) => a + f(e), 0) / es.length);
+        L.push(`| ${es[0].이름} (${k}) | ${m(e => e.집)} | ${m(e => e.사는집)} | ` + VK.map(b => m(e => e.바람[b] || 0)).join(' | ') + ' |'); });
+      const top3 = r => r.voice.flatMap(e => VK.map(b => [e.이름 + '·' + b, e.바람[b] || 0])).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3).map(x => x[0]).sort().join(' / ');
+      const t = rs.map(top3), same = t.filter(x => x === t[0]).length;
+      L.push(`- 가장 많은 셋(동네·바람): ${t[0] || '—'} — 시드 ${same}/${t.length} 에서 같음`); });
+  }
   const tm = res.map(r => r.틱최대ms); L.push('', `틱 최대 ${r1(Math.max(...tm))}ms (node · 가짜 그림 포함 · 브라우저와 다름)`);
   return L.join('\n');
 }
@@ -215,7 +228,7 @@ const HELP = `마을 시뮬 도구 — scripts/village-sim/README.md 참고
   --rules 'a.b=v,…'      VRULES 덮기             --do 'put shop @jobs 1; del x y'
   --vs '이름: do=…; rules=…; save=…'  (여러 번) — 같은 시드로 나란히 돌려 비교
   --show 인구,일먼집,…   --watch 일먼집 (비교 표 지표)   --by 1 (좋아짐 문턱)
-  --every 150 (틱 · 재는 간격)   --warm 300   --hash 'hour=10'   --jobs 동시 프로세스 수   --json 결과.json`;
+  --voice (끝 날 동네별 바람표 · MAC-VOICE)   --every 150 (틱 · 재는 간격)   --warm 300   --hash 'hour=10'   --jobs 동시 프로세스 수   --json 결과.json`;
 
 const o = parseArgs(process.argv.slice(2));
 if (o.child) {
@@ -224,7 +237,7 @@ if (o.child) {
 } else if (o.help) console.log(HELP);
 else {
   const vars = variants(o), seeds = seedList(o.seeds);
-  const specs = []; vars.forEach(v => seeds.forEach(seed => specs.push({ ...v, seed, days: o.days, every: o.every, warm: o.warm, hash: o.hash })));
+  const specs = []; vars.forEach(v => seeds.forEach(seed => specs.push({ ...v, seed, days: o.days, every: o.every, warm: o.warm, hash: o.hash, voice: !!o.voice })));
   const n = o.jobs || Math.max(1, Math.min(os.cpus().length - 1, 6)), t0 = Date.now();
   let res; try { res = await pool(specs, n, runChild); } catch (e) { console.error(e.message); process.exit(1); }
   console.log(report(o, vars, res));
