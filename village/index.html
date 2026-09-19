@@ -772,7 +772,7 @@ function joinPartsAt(rec) {                            // 이웃(세계 기준) 
   else { const straight = mask === 5 || mask === 10; if (S.always || !straight) S.node.forEach(pt => out.push(turn(pt, rot))); [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) S.arm.forEach(pt => out.push(turn(nv ? { ...pt, g: pt.g + ((vv + d) % nv) } : pt, d + rot))); }); }
   return _joinCache[key] = out; }
 /* 놓거나 치우면 이웃의 모양도 바뀐다 → 이웃 칸이 든 청크도 다시 합친다(청크가 4칸이라 경계를 자주 넘는다). 꽃밭 가장자리 등 '이웃을 보는 모양'이 같이 쓴다 */
-function joinDirtyAround(kind, x, y) { if (!K[kind] || !(K[kind].join || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
+function joinDirtyAround(kind, x, y) { if (!K[kind] || !(K[kind].join || kind === 'lawn' || (typeof FLOWER_KINDS !== 'undefined' && FLOWER_KINDS[kind]))) return; [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (inb(xx, yy) && cells[idx(xx, yy)]) dirtyChunks.add(chunkOfCell(idx(xx, yy))); }); }
 /* ══════════════════════════════════════════════════════════════
    [MAC-LINE] 옛 울타리·돌담(2×1)도 이웃을 보고 이어진다 — 디자인 담당의 자동 이음(DESIGN-JOIN-1)을 받아 넓힌다
    사용자 09-20: "울타리라면 대실패고, 네 코너 맞닿는 요소를 만들어야지." 옛 fence·wall 은 곧은 2×1 상자를 R 로 돌려 놓는 방식이라 모퉁이가 어긋나고 틈이 났다.
@@ -1264,7 +1264,19 @@ const seasonIdx = () => Math.floor((simDay() - 1) / SEASON_DAYS) % 4;
 let seasonNow = -1;
 const LEAF_KEYS = new Set([P.leaf, P.leafL]);
 /* [DESIGN-LAWN-1] 잔디밭 칸(바탕 7cb944 · 풀잎 8ed455)도 계절을 따른다 — 여름 땅(64a341)에 대한 비율을 그 계절 땅에 곱한다(여름은 그대로, 가을은 누런 풀, 겨울은 눈 덮인 칸) */
-const LAWN_HEX = [0x7cb944, 0x8ed455], _lawnC = {};
+const LAWN_HEX = [0x7cb944, 0x8ed455, 0x84c04b, 0x74ae3f, 0x6ea83c], _lawnC = {};   // [DESIGN-LAWN-2] 뒤 셋 = 밝은 줄 · 어두운 줄 · 바깥 테
+/* [DESIGN-LAWN-2] 여름 잔디밭이 판 잔디와 거의 같아 '놓았는데 안 보였다' → 색은 그대로 두고 결로 — 보스 결정 ⓐ+ⓑ.
+   ⓐ 깎은 줄: 칸의 x 홀짝으로 밝은 줄/어두운 줄(명도 ±4%) — 이어 놓으면 한 칸 폭 줄무늬. ⓑ 바깥 테: 이웃이 잔디밭이 아닌 쪽에만 가는 테(0.26) — 어두운 줄보다 한 톤만 더.
+   테는 줄보다 약하게(울타리를 두르면 이중선이 되지 않게). 색은 셋 다 LAWN_HEX 라 계절 비율을 같이 따른다. 이웃을 보므로 joinDirtyAround 에 lawn. */
+const _lawnParts = {};
+function lawnPartsAt(rec) {
+  const x = cX(rec.root), y = cY(rec.root), rot = rec.rot & 3, isL = (xx, yy) => { if (!inb(xx, yy)) return false; const c = cells[idx(xx, yy)]; return !!(c && c.k === 'lawn'); };
+  const mask = (isL(x, y - 1) ? 0 : 1) | (isL(x + 1, y) ? 0 : 2) | (isL(x, y + 1) ? 0 : 4) | (isL(x - 1, y) ? 0 : 8), key = (x & 1) + ':' + mask + ':' + rot;
+  if (_lawnParts[key]) return _lawnParts[key];
+  const turn = (pt, q) => { const n = ((q % 4) + 4) % 4; let px = pt.p[0], pz = pt.p[2]; for (let i = 0; i < n; i++) { const t = px; px = -pz; pz = t; } return { ...pt, p:[px, pt.p[1], pz], ry: (pt.ry || 0) - n * Math.PI / 2 }; };
+  const out = [{ g:'box', c: (x & 1) ? 0x74ae3f : 0x84c04b, s:[CS, .12, CS], p:[0, .06, 0] }], w = .26;
+  [0, 1, 2, 3].forEach(d => { if (mask & (1 << d)) out.push(turn({ g:'box', c:0x6ea83c, s:[CS, .13, w], p:[0, .065, -CS / 2 + w / 2] }, d + rot)); });
+  return _lawnParts[key] = out.concat(K.lawn.parts.slice(1)); }
 function lawnSeason(hex, S) { const k = hex + ':' + S.ground; if (_lawnC[k] != null) return _lawnC[k]; const g0 = 0x64a341, ch = (h, sh) => (h >> sh) & 255;
   let out = 0; [16, 8, 0].forEach(sh => { out |= Math.min(255, Math.round(ch(S.ground, sh) * ch(hex, sh) / ch(g0, sh))) << sh; }); return _lawnC[k] = out; }
 function seasonColor(hex) { const S = SEASONS[seasonNow < 0 ? 1 : seasonNow]; return hex === P.leaf ? S.leaf : hex === P.leafL ? S.leafL : LAWN_HEX.includes(hex) ? lawnSeason(hex, S) : hex; }
@@ -1776,6 +1788,7 @@ function bucketOf(pt) { return pt.op ? 'glass' : 'lit'; }
 function partsOf(rec) {
   if (K[rec.k].join && K[rec.k].w * K[rec.k].h > 1) return joinPartsWide(rec);   // [MAC-LINE] 옛 2×1 울타리·돌담 — 칸마다 따로
   if (K[rec.k].join) return joinPartsAt(rec);   // [DESIGN-JOIN-1] 이웃을 보고 모양이 정해지는 것(산울타리·문)
+  if (rec.k === 'lawn') return lawnPartsAt(rec);   // [DESIGN-LAWN-2] 깎은 줄 + 바깥 테
   if (FLOWER_KINDS[rec.k]) { const x = cX(rec.root), y = cY(rec.root), fp = flowerPartsAt(rec.k, x, y); if (fp) { const ed = flowerEdgeParts(x, y, rec.rot); return ed ? fp.concat(ed) : fp; } }   // [DESIGN-FLOWER-3·4·EDGE-1] 꽃밭 종류 × 칸 좌표로 벌 + 바깥 변 가장자리
   if (rec.k === 'house') { const lv = houseLv(rec.root), g = glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house'); return g ? (lv === 3 ? (HOUSE3_GLB || (HOUSE3_GLB = g.concat(HOUSE3_ADD))) : g) : HOUSE_LV[lv]; }
   if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
