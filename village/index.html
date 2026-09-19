@@ -3666,6 +3666,9 @@ window.__thumbFix = () => ({ 켜짐: window.VRULES.thumbFix.on, 미뤄둔것: TH
 (window.VRULES = window.VRULES || {}).cardRot = { on: true };
 var CARDROT = { cache: new Map(), force: null, sym: new Map(), stats: { 찍음: 0, 바꿈: 0 } };
 { const pm0 = partMatrix; partMatrix = function (kind, x, y, rot, pt, out) { return pm0(kind, x, y, CARDROT && CARDROT.force != null ? CARDROT.force : rot, pt, out); }; }   // 찍는 동안만 방향을 바꾼다(그 밖엔 그대로 통과)
+/* [MAC-CARDROT-2] 길 가족(DESIGN-ROAD-1 #609)은 부위를 **세계 좌표(abs)** 로 내고 방향은 rec.rot 에서 읽는다 — partMatrix 의 방향을 바꿔도 그림이 안 돌았다.
+   그래서 횡단보도 카드는 '돌려도 같은 것'으로 잘못 읽혀 그림이 안 돌고 돌리기 단추가 흐려졌다. 찍는 동안만, 놓이지 않은 rec(카드·미리보기용)의 rot 을 바꿔서 부위를 받는다. */
+{ const partsR0 = partsOf; partsOf = function (rec) { return (CARDROT && CARDROT.force != null && rec && cells[rec.root] !== rec && typeof ROAD_FAM !== 'undefined' && ROAD_FAM.has(rec.k)) ? partsR0.call(this, { ...rec, rot: CARDROT.force }) : partsR0.apply(this, arguments); }; }
 const cardRotView = () => ((Math.round((camAz - Math.PI / 4) / (Math.PI / 2)) % 4) + 4) % 4;           // 시점이 기본에서 몇 번(90°) 돌았나
 function thumbRot(kind, rot) {
   rot = ((rot % 4) + 4) % 4; if (!K[kind]) return null; const base = thumbOf(kind); if (!rot || !base) return base;
