@@ -3707,10 +3707,10 @@ function simTick() {
   if ((SIM.ticks % 10) === 0) recurTick();   // [MAC-RECUR] 목표판 빈 줄에 돌아오는 목표
   if ((SIM.ticks % 300) === 0) titleTick();   // [MAC-TITLE] 첫 칭호 카드 · 새 후보 알림(30초에 한 번)
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
-  crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   if ((SIM.ticks % 30) === 13) growTick('tick');   // [MAC-GROW] 심은 것이 한 단계 자랐나(3초마다 · 자라는 것만 훑는다)
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
+  crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
