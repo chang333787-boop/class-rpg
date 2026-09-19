@@ -65,6 +65,13 @@ test('도서관이 아직 안 열렸으면 언제 열리는지', () => assert.ma
 test('도서관이 없으면 "지어 봐요" · 있으면 "하나 더"', () => { assert.match(libHint(['배움'], 0, 5, true), /가까이에 도서관을 지어/); assert.match(libHint(['놀이', '배움'], 2, 5, true), /하나 더/); });
 test('한도까지 놓았으면 옮기기를 권한다(더 지으라고 하지 않는다)', () => { const t = libHint(['배움'], 5, 5, true); assert.match(t, /옮겨/); assert.doesNotMatch(t, /하나 더/); });
 
+/* ── 터치로 놓기(MAC-SEAT) — 앉혀서 놓는 종류인가 seatKindIs({ w, h, road, join, flower, roadFam, door }) ── */
+const seatKindIs = grab('seatKindIs');
+test('집(2×2 · 문) · 가게 · 광장(3×3 · 문 없음) · 우물(2×2)은 앉힌다', () => { for (const i of [{ w: 2, h: 2, door: true }, { w: 3, h: 3 }, { w: 2, h: 2 }, { w: 3, h: 2, door: true }]) assert.equal(seatKindIs(i), true); });
+test('문이 있으면 작아도 앉힌다', () => assert.equal(seatKindIs({ w: 1, h: 1, door: true }), true));
+test('길·큰길(2×2 길)·횡단보도·다리(길 가족)·울타리(이음)·꽃밭은 전처럼 즉시', () => { for (const i of [{ w: 1, h: 1, road: true }, { w: 2, h: 2, road: true }, { w: 1, h: 2, road: true, roadFam: true }, { w: 3, h: 1, roadFam: true }, { w: 1, h: 1, join: true }, { w: 1, h: 1, flower: true }]) assert.equal(seatKindIs(i), false); });
+test('1×1 꾸밈 · 긴의자(2×1)는 즉시', () => { assert.equal(seatKindIs({ w: 1, h: 1 }), false); assert.equal(seatKindIs({ w: 2, h: 1 }), false); assert.equal(seatKindIs(null), false); });
+
 const fail = results.filter(r => r[0] === 'FAIL');
 results.forEach(r => { if (r[0] === 'FAIL') console.log('❌ FAIL  ', r[1], '—', r[2]); });
 console.log('\n요약: PASS ' + (results.length - fail.length) + ' · FAIL ' + fail.length);
