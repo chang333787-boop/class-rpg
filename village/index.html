@@ -1862,7 +1862,7 @@ function buildChunk(cx, cz) {
     parts.forEach((pt, pi) => {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
       if (pi === 0) item.off = off;
-      partMatrix(rec.k, x, y, rec.rot, pt, _m); _n3.getNormalMatrix(_m);
+      partMatrix(rec.k, x, y, rec.rot, pt, _m); if (typeof actGrowMatrix === 'function') actGrowMatrix(rec, x, y, _m); _n3.getNormalMatrix(_m);   // [ACT-GROW] 자라는 중이면 단계 크기
       const vc = base.vcol, vk = base.vkind;
       if (!vc) _col.setHex(pt.c === 'roof' ? roofC : seasonColor(pt.c));
       if (!vc && wait) window.WAITHOUSE.col(_col, -1, pt);   // [MAC-WAITLOOK] 한 색 부위는 여기서 한 번(정점마다 하면 옅어짐이 쌓인다)
@@ -6051,6 +6051,7 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
     if (actLeaveTick(f, i, now)) continue;   // [ACT-LEAVE] 돌아서 나가는 이웃과 마주친 주민 하나가 멈춰 돌아본다 · 풍선은 셋까지
     if (actLookTick(f, i, now)) continue;   // [ACT-LOOK] 돌아서기 전에 집 앞에서 3초 둘러본다 · 풍선은 마을 밖까지
@@ -6897,6 +6898,59 @@ function actFireflyDraw(t) {
   FLY.mesh.count = k; FLY.mesh.instanceMatrix.needsUpdate = true; if (FLY.mesh.instanceColor) FLY.mesh.instanceColor.needsUpdate = true;
 }
 window.__firefly = () => ({ 켜짐: window.VRULES.firefly.on, 보임: !!(FLY.mesh && FLY.mesh.visible), 비: EV.rain, 밤: +NIGHT.value.toFixed(2), ...FLY.stats });
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-GROW] 밤새 자라는 것 — 그림·연기 쪽 (주민 연기 · 09-20 · 보스 승인 · 제안서 docs/village_grow_proposal.md).
+   저장('심은 날' 곁 키 grow)·날짜 셈은 프로그램 담당. 이 블록은 **window.GROW 를 이름으로 읽기만** 한다(CART_PARTS 때처럼 — 없으면 아무 일도 안 함 = 다 자람).
+     · window.GROW(root) → 0 새싹/봉오리 · 1 어린나무 · 2(또는 undefined) 다 자람
+     · (있으면) window.GROW.news() → 이번에 열었을 때 밤새(실제 날짜) 자란 칸 목록 — 한 번만 돌려준다
+   ⓐ 청크를 합칠 때 그 물건의 부위 행렬을 발밑 가운데 기준으로 줄인다 — 나무 treeK[단계] · 꽃밭 flowerK[단계](작은 포기 → 번짐). draw call +0 · 삼각형 그대로.
+   ⓑ 합칠 때 본 '자라는 칸'을 기억해 두고 틱마다 조금씩(everyTicks) 단계를 다시 물어, 바뀌었으면 그 청크를 다시 합치고 ✨(있던 sparkle) +
+      곁(nearR 칸)을 지나던 주민 한 명이 lookMs 동안 멈춰 그 나무 쪽을 본다(하루 perDay 번까지 · 판정·확률 0).
+   ⓒ GROW.news() 가 있으면 처음 한 번 소식 한 줄 + 그 자리 ✨(모달·카메라 이동 없음).
+   판정·저장 0. 스위치·수치 VRULES.grow + 고리 둘(buildChunk 부위 행렬 한 줄 · tickFolks 한 줄).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).grow = { on: true, treeK: [0.35, 0.65, 1], flowerK: [0.5, 0.75, 1], trees: ['tree', 'fruit', 'bigtree'], everyTicks: 10, nearR: 3, lookMs: 2200, perDay: 6 };
+const GROWX = { seen: new Map(), tick: -1, day: -1, looks: 0, news: false, stats: { 자라는칸: 0, 자람: 0, 올려다봄: 0, 소식: 0 } };
+const growM = new THREE.Matrix4(), growS = new THREE.Matrix4(), growT = new THREE.Matrix4();
+const growStage = root => { const G = window.GROW; if (typeof G !== 'function') return 2; const s = G(root); return s === 0 || s === 1 ? s : 2; };
+const growKind = k => (window.VRULES.grow.trees.includes(k) ? 'tree' : (k === 'flower' || (typeof FLOWER_KINDS === 'object' && FLOWER_KINDS[k])) ? 'flower' : null);
+function actGrowMatrix(rec, x, y, m) {                                   // buildChunk — 부위마다(청크를 합칠 때만)
+  const R = window.VRULES.grow; if (!R || !R.on || typeof window.GROW !== 'function') return;   // 이 블록보다 먼저 불려도(모듈 읽는 중) 조용히
+  const kind = growKind(rec.k); if (!kind) return;
+  const st = growStage(rec.root); if (st >= 2) { GROWX.seen.delete(rec.root); return; }
+  GROWX.seen.set(rec.root, st);
+  const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot), k = kind === 'tree' ? R.treeK[st] : R.flowerK[st], ky = k;   // 꽃밭도 통째로(높이만 줄이면 봉오리가 안 읽혔다 — 작은 포기가 번져 가는 꼴)
+  growT.makeTranslation(c.x, 0, c.z); growS.makeScale(k, ky, k); growM.makeTranslation(-c.x, 0, -c.z);
+  m.premultiply(growM).premultiply(growS).premultiply(growT);           // 발밑 가운데를 기준으로 줄인다
+}
+function actGrowTick(f, now) {
+  const R = window.VRULES.grow;
+  if (GROWX.tick !== SIM.ticks) { GROWX.tick = SIM.ticks;                // 틱마다 한 번
+    const day = Math.floor(SIM.t / DAY_MS); if (day !== GROWX.day) { GROWX.day = day; GROWX.looks = 0; }
+    if (R.on && !GROWX.news && typeof window.GROW === 'function') { GROWX.news = true;   // 열었을 때 한 번 — 실제 날짜로 밤새 자란 것
+      const L = typeof window.GROW.news === 'function' ? (window.GROW.news() || []) : [];
+      if (L.length) { const trees = L.filter(r => cells[r] && growKind(cells[r].k) === 'tree').length, fl = L.length - trees; GROWX.stats.소식++;
+        L.forEach(r => { const rec = cells[r]; if (!rec) return; const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 6000 }); });
+        toast('🌳 ' + [trees ? '나무 ' + trees + '그루' : '', fl ? '꽃밭 ' + fl + '곳' : ''].filter(Boolean).join('·') + '이 밤새 자랐어요', true); } }
+    if (R.on && GROWX.seen.size && SIM.ticks % R.everyTicks === 0) {
+      GROWX.stats.자라는칸 = GROWX.seen.size;
+      GROWX.seen.forEach((was, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !growKind(rec.k)) { GROWX.seen.delete(root); return; }
+        const st = growStage(root); if (st === was) return;
+        dirtyChunks.add(chunkOfCell(root)); if (st >= 2) GROWX.seen.delete(root); else GROWX.seen.set(root, st);
+        if (st < was) return;                                           // 작아지는 쪽(치우고 다시 심기 등)은 조용히
+        GROWX.stats.자람++; const c = centerOf(rec.k, cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 2500 });
+        if (GROWX.looks >= R.perDay) return;                            // 지나던 주민 한 명이 멈춰 올려다본다
+        let best = null, bd = R.nearR * CS + 0.01;
+        folks.forEach(h => { if (h.visitor || h.arriving || h.leaving || h.growLook || h.leaveLook || h.greet || h.puddle || h.shelter || h.garden || (h.state !== 'walk' && h.state !== 'idle')) return;
+          const d = Math.max(Math.abs(h.x - c.x), Math.abs(h.z - c.z)); if (d < bd) { bd = d; best = h; } });
+        if (best) { best.growLook = { x: c.x, z: c.z, until: now + R.lookMs }; GROWX.looks++; GROWX.stats.올려다봄++; } });
+    } }
+  const L = f.growLook; if (!L) return false;
+  if (!R.on || now >= L.until) { f.growLook = null; return false; }
+  f.walking = false; f.dir = Math.atan2(L.x - f.x, L.z - f.z); return true;
+}
+window.__growPlant = () => ({ 켜짐: window.VRULES.grow.on, GROW있음: typeof window.GROW === 'function', 지금자라는칸: GROWX.seen.size, ...GROWX.stats });
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
