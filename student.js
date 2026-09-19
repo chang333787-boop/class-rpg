@@ -9230,15 +9230,16 @@ function _decoThumb(d, px) {
 function _decoCardHtml(i, d, avail, placedScene) {
   const RL = {common:'⚪',rare:'🔵',epic:'🟣',legend:'🟡'};
   const isSel = SEL_DECO === i.id, isMatch = d.cat === placedScene, rl = RL[d.rarity||'common'] || '';
-  return `<div class="deco-card${isSel?' is-sel':''}" data-deco-id="${i.id}" data-cat="${d.cat}" onclick="selectDeco('${i.id}')" style="
+  const where = avail <= 0 ? _decoPlacedWhere(i.id) : '';   // [DECO-SHOP-BAG-1] 다 놓았으면 어디에 몇 개
+  return `<div class="deco-card${isSel?' is-sel':''}${where?' is-placed-out':''}" data-deco-id="${i.id}" data-cat="${d.cat}" onclick="selectDeco('${i.id}')" style="
       background:${isSel?'rgba(255,215,0,.18)':'rgba(255,255,255,.05)'};
       border:2px solid ${isSel?'var(--gold)':isMatch?'rgba(255,255,255,.15)':'rgba(255,255,255,.06)'};
-      border-radius:10px;padding:.35rem .45rem;cursor:${avail>0?'pointer':'default'};flex-shrink:0;
-      text-align:center;opacity:${avail>0?isMatch?1:.45:.25};min-width:64px;max-width:92px;transition:all .2s;
+      border-radius:10px;padding:.35rem .45rem;cursor:${avail>0||where?'pointer':'default'};flex-shrink:0;
+      text-align:center;opacity:${avail>0?isMatch?1:.45:where?.6:.25};min-width:64px;max-width:92px;transition:all .2s;
       transform:${isSel?'scale(1.06)':'scale(1)'}">
       <div style="height:36px;display:flex;align-items:flex-end;justify-content:center">${_decoThumb(d, 34)}</div>
       <div class="dc-name" style="color:var(--txt2);margin-top:.1rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all">${rl} ${escHtml(d.name)}</div>
-      <div class="dc-qty">${d.cat==='yard'?'🌿':'🏠'} ×${avail}</div>
+      <div class="dc-qty"${where?` title="${escHtml(where)}개 놓여 있어요"`:''}>${d.cat==='yard'?'🌿':'🏠'} ${where?`<span class="dc-where">${escHtml(where)}</span>`:'×'+avail}</div>
     </div>`;
 }
 
@@ -9299,6 +9300,11 @@ function _decoRenderQuick(inv, placed) {
 }
 
 function selectDeco(id){
+  //  [DECO-SHOP-BAG-1] 다 놓아서 ×0 인 카드 = 고르지 않고 놓인 그것을 보여 준다('산 게 없어졌다'로 보이지 않게)
+  if (SEL_DECO !== id) {
+    const iv = (CUR.inventory || []).find(x => x.id === id), n = (CUR.houseDecorations || []).filter(p => p.id === id).length;
+    if (iv && n > 0 && iv.qty - n <= 0) { _decoFlashPlaced(id); return; }
+  }
   if (DECO_MODE === 'erase') { setDecoMode('deco'); ifSyncModeBtn(); }   // [DECO-PT-2]
   SEL_DECO=(SEL_DECO===id)?null:id;
   _drawDeco(); renderDecoInv();
@@ -9415,7 +9421,7 @@ function _decoShopRender() {
 //  카드를 누른다 = 고르기(다시 누르면 풀림). 사는 것은 막대의 단추가 한다.
 function decoShopPick(id) {
   _decoShop.sel = (!id || _decoShop.sel === id) ? null : id;
-  _decoShop.armedAt = 0;
+  _decoShop.armedAt = 0; _decoShop.armedMode = null; _decoShop.lastBuyAt = 0;
   document.querySelectorAll('#if-deco-shop .deco-scard').forEach(c => c.classList.toggle('is-sel', c.dataset.shopId === _decoShop.sel));
   _decoShopBarSync();
 }
@@ -9435,7 +9441,11 @@ function _decoShopBarSync() {
     else if (st === 'short') msg = `${nm} <b>${cost}G</b> — 골드가 ${cost - CUR.gold}G 모자라요`;
     else {
       msg = cost === 0 ? `${nm} <b>🎁 무료</b> <s>${d.price}G</s>` : `${nm} <b>💰 ${cost}G</b>`;
-      btn = `<button class="db-buy" onclick="decoShopBuy()">${twice && _decoShop.armedAt ? '한 번 더 눌러 사기' : '사서 놓기 ▶'}</button>`;
+      //  [DECO-SHOP-BAG-1] 단추 둘 — 🎒 가방에 넣기(사고 끝) · 사서 놓기(손끝에). 사는 길은 둘 다 decoShopBuy → buyDeco() 하나.
+      //  200G↑ '한 번 더'는 누른 그 단추가 받는다(다른 단추를 누르면 그 단추로 다시 '한 번 더')
+      const armed = twice && _decoShop.armedAt ? (_decoShop.armedMode || 'place') : '';
+      btn = `<button class="db-buy db-bag${armed === 'bag' ? ' is-armed' : ''}" onclick="decoShopBuy('bag')">${armed === 'bag' ? '🎒 한 번 더 눌러 사기' : '🎒 가방에 넣기'}</button>`
+        + `<button class="db-buy db-place${armed === 'place' ? ' is-armed' : ''}" onclick="decoShopBuy('place')">${armed === 'place' ? '한 번 더 눌러 사기' : '사서 놓기 ▶'}</button>`;
     }
     bar.className = 'deco-buybar is-' + st + (twice ? ' is-twice' : '');
     bar.innerHTML = `<span class="db-msg">${msg}</span>${btn}<button class="db-x" onclick="decoShopPick(null)" aria-label="고르기 풀기">✕</button>`;
@@ -9449,12 +9459,17 @@ function _josa(word, a, b) {   // 받침 있으면 a, 없으면 b
   return (c >= 0xAC00 && c <= 0xD7A3) ? ((c - 0xAC00) % 28 ? a : b) : b;
 }
 
-function decoShopBuy() {
+function decoShopBuy(mode) {
+  mode = mode === 'bag' ? 'bag' : 'place';
   const d = _decoShop.sel && GAME_DATA.decorations.find(x => x.id === _decoShop.sel);
   if (!d || DECO_TAB !== 'shop' || _decoShopState(d) !== 'ok') { _decoShopBarSync(); return; }
   const cost = _decoCostOf(d), now = Date.now();
+  //  [DECO-SHOP-BAG-1] 가방에 넣으면 카드가 골라진 채 남는다 → 두 번 두드림(0.6초 안)이 두 개를 사지 않게. 카드를 다시 고르면 풀린다
+  if (now - (_decoShop.lastBuyAt || 0) < 600) return;
   if (cost >= DECO_SHOP_TWICE) {   // 비싼 것은 한 번 더 — 첫 누름은 단추 글만 바꾼다. 두 번 두드림(0.35초 안)은 한 번으로 친다
-    if (!_decoShop.armedAt) { _decoShop.armedAt = now; _decoShopBarSync(); return; }
+    if (!_decoShop.armedAt || (_decoShop.armedMode && _decoShop.armedMode !== mode)) {
+      _decoShop.armedAt = now; _decoShop.armedMode = mode; _decoShopBarSync(); return;
+    }
     if (now - _decoShop.armedAt < 350) return;
   }
   const qty0 = _decoQtyOf(d.id), olds = new Set(document.querySelectorAll('.toast-msg'));
@@ -9464,8 +9479,14 @@ function decoShopBuy() {
   document.querySelectorAll('.toast-msg').forEach(t => { if (!olds.has(t)) t.remove(); });   // 본편 알림 대신 아래 한 줄(겹치면 글자가 뭉개진다)
   if (_decoQtyOf(d.id) !== qty0 + 1) { toast('💸 골드가 모자라요'); _decoGoldSync(); _decoShopRender(); return; }
   decoSaveAbsorbed();   // buyDeco 가 통째 저장을 했다 — 대기 중이던 꾸미기 묶음은 거기에 실려 갔다
+  _decoShop.armedAt = 0; _decoShop.armedMode = null; _decoShop.lastBuyAt = now;
+  if (mode === 'bag') {   // [DECO-SHOP-BAG-1] 가방에 넣기 = 사고 끝. 상점 그대로 · 아무것도 손에 안 든다
+    renderDecoInv(); _decoShopRender();
+    toast(`🎒 ${_decoShopName(d)}${_josa(_decoShopName(d), '을', '를')} 가방에 넣었어요`);
+    return;
+  }
   //  산 직후 = 내 것 탭 · 그 카드가 맨 앞에 골라진 채 · 손끝에 그림
-  _decoShop.sel = null; _decoShop.armedAt = 0; _decoShop.front = d.id; _decoShop.scroll.own = 0;
+  _decoShop.sel = null; _decoShop.front = d.id; _decoShop.scroll.own = 0;
   _decoFind.q = '';
   if (DECO_MODE !== 'deco') { setDecoMode('deco'); ifSyncModeBtn(); }
   SEL_DECO = d.id;
@@ -9485,9 +9506,13 @@ function _decoGhostStart(d) {
   _decoGhostEnd();
   const fs = document.getElementById('interior-fullscreen'), host = document.getElementById('if-topview');
   if (!fs || !host || !_ifMode) return;
-  const el = document.createElement('div'); el.id = 'deco-hand-ghost'; el.innerHTML = _decoThumb(d, 56);
+  const el = document.createElement('div'); el.id = 'deco-hand-ghost'; el.innerHTML = _decoThumb(d, 56) + '<div class="dg-cap">놓을 곳을 눌러요</div>';
   fs.appendChild(el);
-  _decoGhost = { id: d.id, n0: (CUR.houseDecorations || []).filter(p => p.id === d.id).length, el, host };
+  //  [DECO-SHOP-BAG-1] 토스트만으로는 '지금 누르면 놓인다'를 모른다 → 그림 곁 글 + 누를 수 있는 [✕ 그만](가방에 남김)
+  const tip = document.createElement('div'); tip.id = 'deco-hand-tip';
+  tip.innerHTML = `<span>${escHtml((d.icon || '') + ' ' + _decoShopName(d))} — 놓을 곳을 눌러요</span><button onclick="decoGhostStop()">✕ 그만</button>`;
+  fs.appendChild(tip);
+  _decoGhost = { id: d.id, n0: (CUR.houseDecorations || []).filter(p => p.id === d.id).length, el, tip, host };
   const r = host.getBoundingClientRect();
   _decoGhostMove({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 + 36 });
   host.addEventListener('pointermove', _decoGhostMove, { passive: true });
@@ -9497,7 +9522,43 @@ function _decoGhostEnd() {
   if (!_decoGhost) return;
   _decoGhost.host.removeEventListener('pointermove', _decoGhostMove);
   _decoGhost.host.removeEventListener('pointerdown', _decoGhostMove);
-  _decoGhost.el.remove(); _decoGhost = null;
+  _decoGhost.el.remove(); if (_decoGhost.tip) _decoGhost.tip.remove(); _decoGhost = null;
+}
+//  ✕ 그만 = 고른 것만 푼다. 산 것은 가방에 그대로(되돌리기·골드와 무관)
+function decoGhostStop() {
+  const id = _decoGhost && _decoGhost.id, d = id && GAME_DATA.decorations.find(x => x.id === id);
+  _decoGhostEnd();
+  if (SEL_DECO === id) SEL_DECO = null;
+  _drawDeco(); renderDecoInv(); _decoHandSync();
+  if (d) toast(`🎒 ${_decoShopName(d)}${_josa(_decoShopName(d), '은', '는')} 가방에 있어요`);
+}
+
+//  [DECO-SHOP-BAG-1] 다 놓아서 ×0 인 카드 — '없어진 게 아니라 놓여 있다'. 공간별 놓인 수 글 · 누르면 놓인 그것을 잠깐 반짝
+function _decoPlacedWhere(id) {
+  const d = GAME_DATA.decorations.find(x => x.id === id), by = {};
+  (CUR.houseDecorations || []).forEach(p => { if (p.id === id) { const k = _decoSpaceOf(p); by[k] = (by[k] || 0) + 1; } });
+  const ks = Object.keys(by).sort(); if (!ks.length) return '';
+  const place = d && d.cat === 'indoor' ? '집 안' : '마당';
+  return (ks.length === 1 && ks[0] === '1') ? `${place}에 ${by[1]}` : ks.map(k => `공간${k}에 ${by[k]}`).join(' · ');
+}
+function _decoFlashPlaced(id) {
+  const d = GAME_DATA.decorations.find(x => x.id === id);
+  const here = _decoList(CUR).filter(p => p.id === id && p.area === DECO_SCENE);
+  toast(`${(d && d.icon) || ''} ${_decoPlacedWhere(id)}개 놓여 있어요${here.length ? ' — 반짝이는 곳' : ''}`);
+  if (!_dCv || !here.length) return;
+  const rect = _dCv.getBoundingClientRect(), host = document.getElementById('if-topview');
+  const hr = host ? host.getBoundingClientRect() : rect, sx = rect.width / _dW, sy = rect.height / _dH;
+  const ox = DECO_SCENE === 'yard' ? 0 : (_dCv._offX || 0), oy = DECO_SCENE === 'yard' ? 0 : (_dCv._offY || 0);
+  here.forEach(p => {
+    const st = _decoAnimState(p);   // 동물은 지금 있는 자리(그 그림)를 반짝
+    if (st && st.el) { st.el.classList.remove('deco-flash'); void st.el.offsetWidth; st.el.classList.add('deco-flash'); setTimeout(() => st.el.classList.remove('deco-flash'), 1800); return; }
+    const sz = getDecoSize(p.id);
+    const x = rect.left + (ox + p.col * _dC - _dPanX) * sx, y = rect.top + (oy + p.row * _dC - _dPanY) * sy, w = sz.w * _dC * sx, h = sz.h * _dC * sy;
+    if (x + w < hr.left || x > hr.right || y + h < hr.top || y > hr.bottom) return;   // 화면 밖이면 글만
+    const r = document.createElement('div'); r.className = 'deco-flash-ring';
+    r.style.cssText = `left:${Math.round(x)}px;top:${Math.round(y)}px;width:${Math.round(w)}px;height:${Math.round(h)}px`;
+    document.body.appendChild(r); setTimeout(() => r.remove(), 1800);
+  });
 }
 function _decoGhostCheck() {
   const g = _decoGhost; if (!g) return;

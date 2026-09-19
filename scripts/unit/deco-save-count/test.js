@@ -669,7 +669,7 @@
       { decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(cheap.id); const q = qty(cheap.id); CUR.gold = 3; decoShopBuy(); out('상점_고른뒤_골드줄면_안사짐', CUR.gold === 3 && qty(cheap.id) === q); CUR.gold = 1000; }
       //  ③ 200G 이상 — 한 번 더. 두 번 두드림(0.35초 안)은 한 번으로 친다
       { decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(dear.id); const g = CUR.gold;
-        decoShopBuy(); const a = CUR.gold === g && /한 번 더/.test(document.querySelector('#if-deco-buybar .db-buy').textContent);
+        decoShopBuy(); const a = CUR.gold === g && /한 번 더/.test(document.querySelector('#if-deco-buybar .db-place').textContent);
         decoShopBuy(); const b = CUR.gold === g;
         await sleep(450); decoShopBuy();
         out('상점_200G이상_한번더', { 값: dear.price, 첫누름_안사짐: a, 두번두드림_안사짐: b, 맞나: a && b && CUR.gold === g - dear.price && qty(dear.id) === 1 }); }
@@ -681,22 +681,58 @@
       { decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(cheap.id); const g = CUR.gold, q = qty(cheap.id); decoShopBuy();
         R.db.ref('classRPG_v3/settings/lastPing').set(Date.now()); await sleep(700);
         out('상점_스냅샷뒤_구매그대로', CUR.gold === g - cheap.price && qty(cheap.id) === q + 1); }
+      //  ⑥-가 🎒 가방에 넣기(DECO-SHOP-BAG-1) — 사는 길은 같은 buyDeco(). 가진 수 +1 · 놓인 수 그대로 · 아무것도 안 골라짐 · 상점 그대로
+      { CUR.gold = 1000; SEL_DECO = null; decoTab('shop'); _decoShopRender(); decoShopPick(null); decoShopPick(cheap.id);
+        const g = CUR.gold, q = qty(cheap.id), n = (CUR.houseDecorations || []).filter(p => p.id === cheap.id).length, twoBtn = document.querySelectorAll('#if-deco-buybar .db-buy').length;
+        saves = 0; decoShopBuy('bag'); await sleep(300);
+        out('상점_가방에넣기', { 단추수: twoBtn, 골드차: g - CUR.gold, 값: cheap.price, 저장: saves,
+          맞나: twoBtn === 2 && g - CUR.gold === cheap.price && qty(cheap.id) === q + 1 && (CUR.houseDecorations || []).filter(p => p.id === cheap.id).length === n
+            && SEL_DECO === null && DECO_TAB === 'shop' && !document.getElementById('deco-hand-ghost') && saves === 1 });
+        const g2 = CUR.gold; decoShopBuy('bag'); decoShopBuy('place');
+        out('상점_가방_두번두드림_한개', CUR.gold === g2 && qty(cheap.id) === q + 1); }
+      //  200G↑ 는 가방에 넣기도 한 번 더 · 빠지는 골드는 '사서 놓기'와 같다 · 단추를 바꿔 누르면 다시 한 번 더
+      { decoShopPick(null); decoShopPick(dear.id); const g = CUR.gold, q = qty(dear.id);
+        decoShopBuy('bag'); const a = CUR.gold === g && /한 번 더/.test(document.querySelector('#if-deco-buybar .db-bag').textContent);
+        await sleep(450); decoShopBuy('place'); const b = CUR.gold === g && /한 번 더/.test(document.querySelector('#if-deco-buybar .db-place').textContent);
+        await sleep(450); decoShopBuy('place'); await sleep(100);
+        const placeCost = g - CUR.gold; decoTab('shop'); decoShopPick(null); decoShopPick(dear.id); const g3 = CUR.gold;
+        decoShopBuy('bag'); await sleep(450); decoShopBuy('bag'); await sleep(100);
+        out('상점_200G이상_가방도_한번더', { 첫누름_안사짐: a, 단추바꾸면_다시: b, 놓기값: placeCost, 가방값: g3 - CUR.gold,
+          맞나: a && b && placeCost === dear.price && g3 - CUR.gold === dear.price && qty(dear.id) === q + 2 }); }
+      //  ✕ 그만 — 사서 놓기 뒤 손끝 그림 곁 [✕ 그만] = 고른 것만 풀고 가방에 남김(골드·가진 수 그대로)
+      { decoTab('shop'); decoShopPick(null); decoShopPick(cheap.id); decoShopBuy('place'); await sleep(100);
+        const tipOk = !!document.querySelector('#deco-hand-tip button') && /놓을 곳/.test((document.getElementById('deco-hand-ghost') || {}).textContent || '');
+        const g = CUR.gold, q = qty(cheap.id), n = (CUR.houseDecorations || []).filter(p => p.id === cheap.id).length;
+        document.querySelector('#deco-hand-tip button').click(); await sleep(50);
+        out('상점_그만_가방에남음', { 안내: tipOk, 맞나: tipOk && SEL_DECO === null && !document.getElementById('deco-hand-ghost') && !document.getElementById('deco-hand-tip')
+          && CUR.gold === g && qty(cheap.id) === q && (CUR.houseDecorations || []).filter(p => p.id === cheap.id).length === n }); }
+      //  다 놓아서 ×0 인 카드 — "마당에 1" · 누르면 고르지 않고 놓인 그것이 반짝
+      { const keepInv = CUR.inventory, keepPl = CUR.houseDecorations;
+        CUR.inventory = [{ id: cheap.id, qty: 1 }]; const tvr = document.getElementById('if-topview').getBoundingClientRect(), cc = _decoCellAt(tvr.left + tvr.width / 2, tvr.top + tvr.height / 2) || { r: 27, c: 12 };   // 화면에 보이는 칸
+        CUR.houseDecorations = [_decoNew(cheap.id, 'yard', cc.r, cc.c)]; SEL_DECO = null; _decoFind.q = '';
+        decoTab('own'); renderDecoInv(); await sleep(50);
+        const card = document.querySelector('#if-deco-inv .deco-card[data-deco-id="' + cheap.id + '"]');
+        const where = card && card.querySelector('.dc-where') ? card.querySelector('.dc-where').textContent : '';
+        card && card.click(); await sleep(50);
+        out('상점_다놓은카드_어디에·반짝', { 글: where, 골라짐: SEL_DECO, 반짝: document.querySelectorAll('.deco-flash-ring').length, 판: !!_dCv, 맞나: where === '마당에 1' && SEL_DECO === null && !!document.querySelector('.deco-flash-ring') });
+        document.querySelectorAll('.deco-flash-ring').forEach(r => r.remove());
+        CUR.inventory = keepInv; CUR.houseDecorations = keepPl; renderDecoInv(); }
       //  ⑥ 막 누르기 300번 — 어떤 순서로도 골드는 늘지 않고, 쓴 골드 = 늘어난 장식 값의 합(무료 기간이 섞여도)
       { CUR.gold = 3000; CUR.inventory = []; CUR.houseDecorations = []; _decoUndoClear();
         let seed = 12345; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
         const ids = GAME_DATA.decorations.map(d => d.id); let up = 0, spent = 0, gained = 0;
         for (let i = 0; i < 300; i++) {
-          const g = CUR.gold, tot = (CUR.inventory || []).reduce((a, x) => a + x.qty, 0), free = !!GAME_DATA.decoFreeNow(), k = rnd(12);
+          const g = CUR.gold, before = {}; (CUR.inventory || []).forEach(x => { before[x.id] = x.qty; }); const tot = (CUR.inventory || []).reduce((a, x) => a + x.qty, 0), free = !!GAME_DATA.decoFreeNow(), k = rnd(12);
           if (k < 3) { decoTab('shop'); decoShopPick(ids[rnd(ids.length)]); }
-          else if (k < 7) decoShopBuy();
+          else if (k < 7) decoShopBuy(rnd(2) ? 'bag' : 'place');
           else if (k === 7) _decoShop.armedAt = 1;
-          else if (k === 8) decoUndo();
+          else if (k === 8) { if (rnd(2)) decoUndo(); else decoGhostStop(); }
           else if (k === 9) { if (SEL_DECO) _decoPlace('yard', 8 + rnd(30), 1 + rnd(40)); }
           else if (k === 10) decoTab(rnd(2) ? 'own' : 'shop');
           else GAME_DATA.decoFree = rnd(4) ? null : { from: '2000-01-01', until: '2999-01-01' };
           if (CUR.gold > g) up++;
           const tot2 = (CUR.inventory || []).reduce((a, x) => a + x.qty, 0);
-          if (tot2 > tot) { const id = SEL_DECO; gained += free ? 0 : D(id).price; }
+          if (tot2 > tot) (CUR.inventory || []).forEach(x => { const dq = x.qty - (before[x.id] || 0); if (dq > 0) gained += free ? 0 : dq * D(x.id).price; });   // 가방에 넣기는 SEL 이 없다 — 가진 수 차이로
           spent += g - CUR.gold;
         }
         GAME_DATA.decoFree = null;
