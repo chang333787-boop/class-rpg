@@ -1351,9 +1351,9 @@ const FLOWER_SETS = {};                                // 종류 id → [parts �
       } else {
         /* 잎 바탕에 색 무리 두세 덩이 — 낮은 둔덕 2개 + 같은 색 꽃이 다닥다닥 붙은 무리(주색 큰 무리 · 곁색 작은 무리 · 가끔 셋째) */
         dome(-.7 + jit(.5), .6 + jit(.5), TOP - .04, 1.7, 1.5, .5, 6, LEAF, 7); dome(.9 + jit(.4), -.8 + jit(.4), TOP - .04, 1.35, 1.5, .42, 6, LEAF, 2);
-        const patches = [[jit(.8), jit(.8), 7, MAIN], [0, 0, 4, SIDE]]; if (vi % 2) patches.push([0, 0, 4, MAIN]);
+        const patches = [[jit(.7), jit(.7), 5, MAIN], [0, 0, 3, SIDE]];   // 무리는 크게·수는 적게(작아지면 부스러기가 된다 — 보스·선생님 09-20)
         patches.forEach((p, k) => { if (k) { const a = rnd() * TAU; p[0] = patches[0][0] + Math.cos(a) * (1.9 + rnd() * .4); p[1] = patches[0][1] + Math.sin(a) * (1.9 + rnd() * .4); p[0] = Math.max(-1.6, Math.min(1.6, p[0])); p[1] = Math.max(-1.6, Math.min(1.6, p[1])); } });
-        patches.forEach(([px, pz, n, c]) => { for (let i = 0; i < n; i++) { const a = i ? (i / (n - 1)) * TAU + rnd() * .6 : 0, d = i ? .62 + rnd() * .14 : 0, big = i ? .40 + rnd() * .10 : .56; dome(px + Math.cos(a) * d, pz + Math.sin(a) * d, TOP + .30 + rnd() * .12 + (i ? 0 : .16), big, big, big * .8, 6, c, 0); } });
+        patches.forEach(([px, pz, n, c]) => { for (let i = 0; i < n; i++) { const a = i ? (i / (n - 1)) * TAU + rnd() * .6 : 0, d = i ? .82 + rnd() * .12 : 0, big = i ? .52 + rnd() * .10 : .70; dome(px + Math.cos(a) * d, pz + Math.sin(a) * d, TOP + .30 + rnd() * .12 + (i ? 0 : .16), big, big, big * .8, 6, c, 0); } });
       }
       const name = 'fb:' + kid + ':' + vi;
       BASE[name] = { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx, nv: pos.length / 3, vcol: new Float32Array(col), vkind: Uint8Array.from(kind), tri: idx.length / 3 };
