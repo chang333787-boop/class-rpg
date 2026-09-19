@@ -2238,6 +2238,7 @@ function buildTray() {
   const tabs = document.getElementById('trayTabs');
   const box = document.getElementById('trayIn');
   tabs.innerHTML = ''; box.innerHTML = '';
+  trayTrim();   // [MAC-GOAL] 잠긴 것은 바로 다음 단계만 보인다
 
   GROUPS.forEach(gname => {
     const b = document.createElement('button');
@@ -2340,6 +2341,7 @@ function simTick() {
   if (++moveTimer >= MOVEIN_EVERY * (population() >= JOB_POP && joblessRatio() > 0.5 ? 2 : 1)) { moveTimer = 0; /* 어른 절반이 일이 없으면 이사가 느리다(F27) */ if (folksDirty) { syncFolks(); folksDirty = false; } tryMoveIn(); }
   satTick(); crowdTick(); eventTick(); visitTick(SIM.t); if ((SIM.ticks % 50) === 0) needsTick(); if ((SIM.ticks % 30) === 0 && !OFF.has('jobs')) jobsTick(); wishTick();
   if ((SIM.ticks % 10) === 0) { goalTick(); plotTick(); }
+  if ((SIM.ticks % 10) === 0) goalUnlockTick();   // [MAC-GOAL] 이룬 목표의 보상을 연다
   if ((SIM.ticks % 20) === 0) awayTick();   // [MAC-AWAY] 돌아섰던 집이 살 만해졌나(2초마다)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
@@ -2995,6 +2997,61 @@ function renderGoals() {
   el.innerHTML = '<div class="t">🎯 지금 목표</div>' + (open.length ? open.map(g => '<div class="g">□ ' + g.t + '</div>').join('') : '<div class="g">다 이뤘어요! 마을을 마음껏 꾸며요</div>')
     + (goalsDone.size ? '<div class="g done" style="margin-top:4px">이룬 것 ' + goalsDone.size + '개</div>' : '');
 }
+/* ══════════════════════════════════════════════════════════════
+   [MAC-GOAL] 목표가 무언가를 연다 (docs/village_progression_plan.md §5-0 이 정본 — 표를 먼저 고친다)
+   사용자 09-20: "동기부여가 되려면 목표에 따라 해금되는 꽃 이런 것도 있으면 좋겠다. 해금 요소는 지금 있는 것처럼 계속 진행해라."
+   · 인구 해금은 그대로. 그 위에 GOAL_REWARDS(목표 id → 열리는 종류)를 얹는다. 열린 종류는 이미 저장되는 `unlocked` 에 들어간다 — 새 저장 필드 없음.
+   · 목표 순서 3곳 + 새 목표 4개(문제형 둘 포함)는 GOALS 배열을 여기서 고쳐 쓴다(원래 줄은 그대로).
+   · 트레이에는 '열린 것 + 바로 다음 단계'만 보인다(꽃 탭이 세 줄이 되던 것).
+   ══════════════════════════════════════════════════════════════ */
+const GOAL_REWARDS = { deco5: ['flower_hy'], happy: ['flower_ty'], lv2: ['flower_wv'], jobs1: ['flower_to'], lv3: ['flower_lv'], happy5: ['flower_hw'], fest: ['flower_rb'], green1: ['flower_sf'] };
+const GOAL_NEW = [   // [앞에 올 목표 id, 새 목표] — 그 목표 '뒤'에 끼운다
+  ['plaza',  { id: 'jobs1',  t: '어른들 일할 곳 만들기',            ok: () => population() >= JOB_POP && jobStats.일자리 > 0 && jobStats.일없는어른 === 0 }],
+  ['lv3',    { id: 'happy5', t: '😊 집 다섯 채',                   ok: () => { let n = 0; res.forEach((v, root) => { const st = sat.get(root); if (v > 0 && st && st.n >= NEEDS.length) n++; }); return n >= 5; } }],
+  ['happy5', { id: 'pop50',  t: '인구 50명',                       ok: () => population() >= 50 }],
+  ['fest',   { id: 'green1', t: '삭막한 집 없애기 — 집 가까이 나무·꽃', ok: () => { let homes = 0, bare = 0; res.forEach((v, root) => { if (v > 0) { homes++; if (amenOf(root) <= 0) bare++; } }); return homes >= 10 && bare === 0; } }],
+];
+const LOCK_GOAL = {};                                                          // 종류 → 그것을 여는 목표 id
+const GU = { first: true, fresh: new Map() };                                  // fresh: 방금 열린 종류 → 빛나는 끝 시각
+const goalById = id => GOALS.find(g => g.id === id);
+function goalLockWhy(kind) { const gid = LOCK_GOAL[kind]; if (!gid || unlocked.has(kind)) return null; if (GU.short) return '🎯 목표 보상';   /* 카드에는 짧게(긴 글은 카드를 넓혀 한 줄을 넘긴다) — 놓으려 할 때는 아래 긴 말 */ const g = goalById(gid); return "🎯 '" + (g ? g.t : gid) + "' 목표를 이루면 열려요"; }
+(function goalSetup() {
+  const at = id => GOALS.findIndex(g => g.id === id), move = (id, afterId) => { const g = GOALS.splice(at(id), 1)[0]; GOALS.splice(at(afterId) + 1, 0, g); };
+  const r6 = goalById('road6'); if (r6) { r6.t = '길을 6칸 더 잇기'; r6.ok = () => countKind('road') >= 18; }            // 기본 판이 길 12칸이라 열자마자 달성되던 것
+  if (at('play') > at('happy')) move('play', 'deco5');                          // 😊 집에는 놀 곳이 먼저 있어야 한다
+  const av = goalById('avenue3'); if (av) { av.t = '붐비는 길을 큰길로 — 큰길 3장'; move('avenue3', 'pop30'); }         // 붐비기도 전에 시키던 것
+  GOAL_NEW.forEach(([after, g]) => { if (at(g.id) < 0 && at(after) >= 0) GOALS.splice(at(after) + 1, 0, g); });
+  Object.keys(GOAL_REWARDS).forEach(gid => GOAL_REWARDS[gid].forEach(k => { if (!K[k] || !goalById(gid)) return; LOCK_GOAL[k] = gid; delete LOCK_POP[k]; UNLOCKS.forEach(u => { u.kinds = u.kinds.filter(x => x !== k); }); }));
+})();
+{ const lockedWhy0 = lockedWhy; lockedWhy = kind => goalLockWhy(kind) || lockedWhy0(kind); }   // 인구 잠금 앞에 목표 잠금을 본다(원래 함수 줄은 그대로 둔다)
+/* 1초마다 — 이룬 목표의 보상을 연다. 첫 바퀴(옛 마을을 연 직후)는 조용히 */
+function goalUnlockTick() {
+  if (!window.VRULES.goalUnlock.on) return;
+  const opened = [];
+  Object.keys(LOCK_GOAL).forEach(k => { if (unlocked.has(k)) return; if (goalsDone.has(LOCK_GOAL[k]) || (GU.first && countKind(k) > 0)) { unlocked.add(k); opened.push(k); } });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
+  const quiet = GU.first; GU.first = false; if (!opened.length) return;
+  markDirty();
+  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); toast('🔓 목표 보상! ' + opened.map(k => K[k].nm).join('·') + '이 열렸어요', true); sndFx('goal'); }
+  buildTray();
+}
+/* buildTray 고리 — 잠긴 것은 '바로 다음 단계'만 보인다: 인구 문턱이 가장 가까운 것 + 지금 목표판에 뜬 목표의 보상 */
+function trayTrim() {
+  const R = window.VRULES && window.VRULES.goalUnlock; if (!R || !R.on) return;
+  GU.short = true; setTimeout(() => { GU.short = false; }, 0);                   // buildTray 가 카드를 만드는 동안만 짧은 말
+  const pop = population(), nextPop = Math.min(...Object.keys(LOCK_POP).filter(k => !unlocked.has(k)).map(k => LOCK_POP[k]).filter(p => p > pop).concat([Infinity]));
+  const openIds = new Set(openGoals().map(g => g.id));
+  const lockedShown = {};                                                       // 탭마다 잠긴 카드는 둘까지 — 목표 보상 먼저, 그다음 가까운 인구 단계
+  ORDER.slice().sort((x, y) => (LOCK_GOAL[x] ? 0 : 1) - (LOCK_GOAL[y] ? 0 : 1)).forEach(k => { const q = K[k]; if (q.grp0 == null) q.grp0 = q.grp;
+    const lockedNow = !unlocked.has(k) && (LOCK_POP[k] || LOCK_GOAL[k]);
+    let show = !lockedNow || (LOCK_GOAL[k] ? openIds.has(LOCK_GOAL[k]) : LOCK_POP[k] <= nextPop);
+    if (lockedNow && show) { lockedShown[q.grp0] = (lockedShown[q.grp0] || 0) + 1; if (lockedShown[q.grp0] > R.maxLockedPerTab) show = false; }
+    q.grp = show ? q.grp0 : '(아직)'; });
+  setTimeout(() => { const now = performance.now(); document.querySelectorAll('#trayIn .card').forEach(el => { const u = GU.fresh.get(el.dataset.kind); if (u && u > now) { el.style.boxShadow = '0 0 0 3px #5fc27e, 0 0 18px #5fc27e'; const pr = el.querySelector('.pr'); if (pr) pr.textContent = 'NEW · ' + pr.textContent; } }); }, 0);
+}
+(window.VRULES = window.VRULES || {}).goalUnlock = { on: true, maxLockedPerTab: 2 };
+window.__goals2 = () => ({ 순서: GOALS.map(g => g.id), 보상: { ...LOCK_GOAL }, 열린보상: Object.keys(LOCK_GOAL).filter(k => unlocked.has(k)), 보이는잠김: ORDER.filter(k => !unlocked.has(k) && (LOCK_POP[k] || LOCK_GOAL[k]) && K[k].grp !== '(아직)') });
+buildTray();
+
 document.getElementById('goalBtn').onclick = () => { goalsAutoUntil = 0; goalsShown = !goalsShown; document.getElementById('goals').classList.toggle('show', goalsShown); if (goalsShown) renderGoals(); };
 document.getElementById('goals').onclick = () => { goalsAutoUntil = 0; goalsShown = false; document.getElementById('goals').classList.remove('show'); };
 
