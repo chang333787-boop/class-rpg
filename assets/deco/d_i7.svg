@@ -1,7 +1,7 @@
 <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
 <!-- d_i7 TV 2×1 · 나무 장식장 위 브라운관 TV · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
-<path d="M40,184 L160,172 L198,192 L110,198 Z" fill="#000" opacity=".2"/>
+<path d="M40,184 L158.5,172 L196,192 L109.1,198 Z" fill="#000" opacity=".2"/>
 <ellipse cx="100" cy="184" rx="84" ry="12" fill="#000" opacity=".28"/>
 <!-- 장식장 -->
 <path class="o" d="M16,138 h168 v44 h-168z" fill="#8a5f38"/>

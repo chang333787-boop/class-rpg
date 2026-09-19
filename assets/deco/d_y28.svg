@@ -1,7 +1,7 @@
 <svg width="300" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
 <!-- d_y28 헛간 3×2 · footprint y100~300 · 지붕이 위 여유칸으로 솟음 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style></defs>
-<path d="M60,282 L250,262 L300,290 L150,300 Z" fill="#000" opacity=".2"/>
+<path d="M60,282 L246.8,262 L296,290 L148.5,300 Z" fill="#000" opacity=".2"/>
 <ellipse cx="150" cy="284" rx="140" ry="16" fill="#000" opacity=".28"/>
 <!-- 기단 -->
 <path class="i" d="M14,262 h272 v20 h-272z" fill="#8c8578"/><path d="M18,266 h264" stroke="#b3ada0" stroke-width="3"/>
