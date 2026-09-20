@@ -10640,10 +10640,12 @@ function pmapUpdate(now) {
   const d3 = new THREE.Object3D(), c = new THREE.Color();
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1), x = x0 + (x1 - x0) * t;
-    d3.position.set(x, 0.9, 0); d3.rotation.set(0, 0, 0); d3.scale.set(Math.abs(x1 - x0) / n * 0.62, 1, 1);
+    const 짚음 = PMAP.강조 && now < PMAP.강조 ? 1 + 0.9 * (0.5 + 0.5 * Math.sin(now / 130)) : 1;
+    d3.position.set(x, 0.9 * 짚음, 0); d3.rotation.set(0, 0, 0); d3.scale.set(Math.abs(x1 - x0) / n * 0.62, 짚음, 짚음);
     d3.updateMatrix(); im.setMatrixAt(i, d3.matrix);
     const 지남 = 상태 === 'cut' && i >= 끊긴칸;
-    const 밝기 = 지남 ? 0.18 : 0.42 + 0.58 * Math.max(0, 1 - Math.abs(i - 머리) / 2.2);
+    const 짚기 = PMAP.강조 && now < PMAP.강조 ? 1 : 0;
+    const 밝기 = 지남 ? 0.18 : Math.min(1, (짚기 ? 0.8 : 0.42) + 0.58 * Math.max(0, 1 - Math.abs(i - 머리) / 2.2));
     c.setHex(지남 ? 0x3a3f4a : 0xe8c15a).multiplyScalar(지남 ? 1 : 밝기);
     im.setColorAt(i, c);
   }
@@ -10684,13 +10686,15 @@ function pmapCard(s) {
 }
 function pmapCss() {
   if (document.getElementById('pmapCss')) return; const st = document.createElement('style'); st.id = 'pmapCss';
-  st.textContent = '#pmapBar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:21;display:flex;gap:8px}'
-    + '#pmapBar button{background:#232833;color:#e9edf5;border:1px solid #39404f;border-radius:10px;min-height:40px;padding:0 16px;font-size:15px;font-weight:800;cursor:pointer}'
+  st.textContent = '#pmapBar{position:fixed;left:12px;top:58px;z-index:21;display:flex;flex-direction:column;align-items:stretch;gap:6px}'
+    + '#pmapBar button{background:#232833e8;color:#e9edf5;border:1px solid #39404f;border-radius:10px;min-height:40px;padding:0 14px;font-size:15px;font-weight:800;cursor:pointer;text-align:left}'
     + '#pmapBar button.on{background:#e8b04b;color:#1a1d26;border-color:#e8b04b}'
     + '#pmapCard{position:fixed;left:0;right:0;top:60px;z-index:21;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:nowrap;pointer-events:none;font-size:14px}'
     + '#pmapCard .pm-b{flex:0 0 auto;background:#1b1f28f2;border:1px solid #39404f;border-radius:12px;padding:10px 14px;color:#e9edf5;min-width:160px;text-align:center;line-height:1.5}'
     + '#pmapCard .pm-b b{display:block;color:#ffe9b8;margin-bottom:4px}'
     + '#pmapCard .pm-l{flex:0 0 auto;background:#1b1f28f2;border:1px solid #4a4230;border-radius:999px;padding:8px 14px;color:#ffd98a;font-weight:800;white-space:nowrap}'
+    + '#pmapExtra{display:flex;flex-direction:column;gap:6px;margin-top:8px}'
+    + '#pmapExtra button{background:#2b3140e8;color:#e9edf5;border:1px solid #4a5364;border-radius:10px;min-height:38px;padding:0 14px;font-size:14px;font-weight:700;cursor:pointer;text-align:left}'
     + 'body.pmap #tray,body.pmap #mini,body.pmap #zoomBar,body.pmap .zoom{display:none}'
     + 'body.pmap #cv{pointer-events:none}';
   document.head.appendChild(st);
@@ -10702,19 +10706,41 @@ function pmapBar() {
   칸.forEach(([id, t]) => { const b = document.createElement('button'); b.type = 'button'; b.dataset.k = id; b.textContent = t;
     b.onclick = () => pmapShow(id); bar.appendChild(b); });
   document.body.appendChild(bar); PMAP.el = bar;
+  const 덧 = document.createElement('div'); 덧.id = 'pmapExtra'; bar.appendChild(덧); PMAP.덧 = 덧;
   const card = document.createElement('div'); card.id = 'pmapCard'; card.style.display = 'none'; document.body.appendChild(card); PMAP.카드 = card;
   pmapShow('map');
+}
+/* 그 동네에 딸린 단추 — 설계 3절. 마을 A(만드는 곳) = 생산 멈춤/다시 · 마을 B(쓰는 곳) = 공급 경로 보기 */
+function pmapExtra(which) {
+  const box = PMAP.덧; if (!box) return; box.innerHTML = '';
+  if (which === 'map' || !STAGE.def.동네) return;
+  const i = +which.slice(1) || 0, d = PMAP.덩이[i] || null, n = STAGE.def.동네[i]; if (!n) return;
+  const 셈 = d ? d.셈 : pmapCount(n);
+  const 만들까 = [...셈.keys()].some(k => flowMake({ k })), 받을까 = [...셈.keys()].some(k => flowTake({ k }));
+  const 단추 = (t, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = fn; box.appendChild(b); return b; };
+  if (만들까) 단추(PMAP.멈춤 ? '▶ 생산 다시' : '⏸ 생산 멈춤', () => { pmapPause(!PMAP.멈춤); pmapExtra(which); });
+  if (받을까) 단추('🔗 공급 경로 보기', () => { PMAP.강조 = performance.now() + 4000; pmapShow('map'); });
+}
+/* 시험용 — 밭이 새로 만들지 않게 간격을 아주 길게 둔다(쌓인 것은 그대로 가게로 간다 = '생산만' 멈춤).
+   셈을 고치지 않고 판 값만 잠깐 바꾼다 · 이미 잡혀 있던 다음 수확 한 번은 날 수 있다(시험용이라 그대로 둔다) */
+function pmapPause(on) {
+  const mk = window.VRULES.flow.만드는곳 || {};
+  if (on) { PMAP.옛간격 = {}; Object.keys(mk).forEach(k => { PMAP.옛간격[k] = mk[k].간격틱; mk[k].간격틱 = 1e9; }); }
+  else if (PMAP.옛간격) Object.keys(PMAP.옛간격).forEach(k => { if (mk[k]) mk[k].간격틱 = PMAP.옛간격[k]; });
+  PMAP.멈춤 = !!on; PMAP.stats.멈춤횟수 = (PMAP.stats.멈춤횟수 || 0) + (on ? 1 : 0);
 }
 function pmapShow(which) {
   if (!pmapLive()) return false;
   const 모형 = which === 'map';
   if (모형 && !PMAP.scene) { pmapBuild(); PMAP.stats.켠횟수++; }
   PMAP.켜짐 = 모형;
-  if (PMAP.el) [...PMAP.el.children].forEach(b => b.classList.toggle('on', b.dataset.k === which));
+  if (PMAP.el) [...PMAP.el.children].forEach(b => { if (b.dataset && b.dataset.k) b.classList.toggle('on', b.dataset.k === which); });
+  pmapExtra(which);
   if (PMAP.카드) PMAP.카드.style.display = 모형 ? 'flex' : 'none';
   document.body.classList.toggle('pmap', 모형);
   if (!모형) { const i = +which.slice(1) || 0, n = STAGE.def.동네[i];
-    if (n) { camTarget.x = wx(n.가운데[0]); camTarget.z = wz(n.가운데[1]); } }
+    if (n) { camTarget.x = wx(n.가운데[0]); camTarget.z = wz(n.가운데[1]);
+      } }   /* 줌은 그대로 둔다 — 배율을 맞춰 봤더니 빈 풀밭만 크게 나왔다(아이가 + − 로 보는 쪽이 낫다) */
   return true;
 }
 /* loop 의 그리기 자리 — 모형 화면이면 여기서 그리고 마을은 건너뛴다 */
@@ -10734,7 +10760,7 @@ function protoMapDraw() {
 window.__protoMap = (which) => {
   if (which === '다시') { PMAP.scene = null; PMAP.geo.clear(); PMAP.덩이 = []; which = 'map'; }   /* 모형 안을 바꿔 보며 견주려고 — 시안 비교용 */
   if (which) pmapShow(which);
-  return { 켜짐: PMAP.켜짐, 쓸수있나: pmapLive(), 모형: window.VRULES.protoMap.모형,
+  return { 켜짐: PMAP.켜짐, 쓸수있나: pmapLive(), 모형: window.VRULES.protoMap.모형, 생산멈춤: !!PMAP.멈춤, 짚는중: !!(PMAP.강조 && performance.now() < PMAP.강조),
     덩이: PMAP.덩이.map(d => ({ 이름: d.def.이름, 셈: [...d.셈], 자루: d.자루.visible })), ...PMAP.stats }; };
 setTimeout(pmapBar, 900);   /* [MAC-PROTOMAP] 판에 "동네" 칸이 있을 때만 단추가 생긴다 */
 function loop() {
