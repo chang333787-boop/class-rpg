@@ -11253,6 +11253,228 @@ window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
 if (STAGE.def) { if (window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardBoot(); else if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
+
+/* ══════════════════════════════════════════════════════════════
+   [MAC-VOTE] 결정 — 두 동네가 공공시설 하나의 자리를 정한다 (정치 프로토타입 · 정본 docs/village_proto_spec.md 3절)
+   설계 정본: docs/village_proto_vote_design.md (#763 승인) · 판 파일: village/stages/proto-vote.json
+   답할 질문: **같은 결정이 사람마다 다른 결과를 낳는 것을 기존 세계에서 비교해 보일 수 있는가.**
+
+   · **새 판정을 하나도 만들지 않는다.** 접근성은 이미 있는 필요·거리 판정(computeSat — 집의 문 앞 길에서
+     길을 따라 NEED_R=14칸 안에 그 필요 건물이 있나)을 **읽기만** 한다. 이 판이 바꾸는 판정 규칙 0개.
+   · **미리 보기는 세계를 바꾸지 않는다.** '저 자리에 우물이 있다고 치고' 같은 규칙을 돌릴 뿐,
+     cells·sat·res·저장본에 **쓰기가 한 줄도 없다**(voteReach 는 읽기와 BFS 뿐). 지문(voteFinger)으로 확인한다.
+   · **미리 본 것과 적용한 것이 같아야 한다.** 후보지 둘은 길이 아닌 빈 땅이라 우물을 놓아도 길 그래프가
+     안 바뀐다 → 집에서 나가는 BFS 결과가 그대로다 → 새로 보이는 것은 '닿은 길 칸 옆에 우물이 있다' 하나뿐.
+     적용 뒤 패널은 **미리 보기 셈이 아니라 실제 판정(computeSat)** 을 읽어 적는다 — 어긋나면 화면에서 바로 보이게.
+   · **승패로 처리하지 않는다**(정본 3절): 정답 후보지 없음 · 총점 판정 없음 · 가까워진 집과 **남는 불편**을
+     늘 함께 적는다 · 두 안의 가까워지는 집 수가 4 로 같아 **숫자로는 고를 수 없다**.
+   · **투표·채팅·대표 선출·AI 발언은 만들지 않는다** — 토의는 교실에서 한다.
+   · 말은 기존 통로(toast)만 쓴다 — 미리 보기 1줄 · 적용 1줄, 새 말자리 0(아래 voteApply 주석: simSay 는 대기줄에 막혔다).
+   · 적용은 canPlace 를 거치지 않고 placeAt 을 곧바로 부른다: 판의 `건물` 목록에 well 이 없어서
+     (아이가 제3의 자리에 놓는 길을 안 연다) canPlace 가 막는다. 대신 **판 파일에 적힌 두 자리에만** 놓고
+     놓기 전에 그 칸이 비었는지 스스로 본다. placeAt·removeAt 을 **감싸지 않는다**(다른 담당의 MAC-FLOWGONE 과 겹치지 않게).
+   · 되돌리기는 **판 저장본을 지우고 새로 여는 것** 하나뿐이다 — 우물만 치우면 그 사이 자란 집·늘어난 식구가
+     남아 '앞 실행의 흔적 0'(정본 완료 시험)을 보장할 수 없다.
+   · 판 파일에 `결정` 칸이 없으면 **아무것도 안 만든다** — 본편과 다른 판은 한 줄도 안 달라진다.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).vote = { on: true };
+const VOTE = { 미리: null, 적용: null, 접힘: false, el: null, 몸: null, stats: { 미리본횟수: 0, 적용횟수: 0, 되돌린횟수: 0, 막힌적용: 0 } };
+/* 이 판에 결정 칸이 제대로 있나 — 없으면 이 블록은 통째로 잠잔다 */
+function voteDef() {
+  const R = window.VRULES.vote; if (!R || !R.on) return null;
+  const d = STAGE.def && STAGE.def.결정;
+  if (!d || !d.on || !K[d.시설] || !Array.isArray(d.동네) || d.동네.length < 2 || !Array.isArray(d.후보) || d.후보.length !== 2) return null;
+  return d;
+}
+const voteHomes = d => d.동네.flatMap(t => t.집.map(([x, y], i) => ({ 이름: t.이름 + ' ' + (i + 1), 동네: t.이름, x, y })));
+
+/* ── 미리 보기 셈 — computeSat 과 **같은 규칙**을 '가정한 건물'에 돌린다. 쓰기 0 ──
+   computeSat: 집에 닿는 문 앞 길 전부에서 한 번에 BFS(반경 NEED_R_WIDE) → 깊이 NEED_R 이하(또는 큰길)인
+   길 칸 옆에 그 필요 건물이 있으면 채워짐. 여기서는 '그 자리에 발자국이 있다고 치고' 같은 것을 본다. */
+function voteReach(home, kind, fx, fy, rot) {
+  const rec = cells[idx(home.x, home.y)]; if (!rec) return false;
+  const fp = footprint(kind, fx, fy, rot || 0), mark = new Set();
+  fp.forEach(([px, py]) => { if (inb(px, py)) mark.add(idx(px, py)); });
+  if (!mark.size) return false;
+  const b = roadsBeside(rec); if (!b.length) return false;               // 문 앞 길이 없으면 아무 데도 못 간다
+  const { reach } = roadBFS(b, undefined, NEED_R_WIDE);
+  for (const i of reach) {
+    if (bfsDepth[i] > NEED_R && !isWide(i)) continue;                    // 14칸 넘게 먼 곳은 큰길에 붙은 것만(F22) — 기존 규칙 그대로
+    const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) {
+      const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (inb(nx, ny) && mark.has(idx(nx, ny))) return true;
+    }
+  }
+  return false;
+}
+/* 한 안을 미리 본 결과 — 세계는 안 바뀐다 */
+function votePreviewCalc(id) {
+  const d = voteDef(); if (!d) return null;
+  const c = d.후보.find(q => q.id === id); if (!c) return null;
+  const out = { 안: id, 이름: c.이름, 자리: c.자리.slice(), 동네: [], 가까워짐: [], 남는불편: [], 집별: {}, 세계바뀜: false };
+  d.동네.forEach(t => {
+    let near = 0;
+    t.집.forEach(([x, y], i) => {
+      const nm = t.이름 + ' ' + (i + 1), ok = voteReach({ x, y }, d.시설, c.자리[0], c.자리[1], c.rot || 0);
+      out.집별[nm] = ok; if (ok) { near++; out.가까워짐.push(nm); } else out.남는불편.push(nm);
+    });
+    out.동네.push({ 이름: t.이름, 집: t.집.length, 가까워짐: near, 남는불편: t.집.length - near });
+  });
+  return out;
+}
+/* 적용한 **뒤**에는 미리 보기 셈이 아니라 실제 판정(computeSat)을 읽는다 — 어긋나면 화면에서 바로 보이게 */
+function voteRealCalc() {
+  const d = voteDef(); if (!d) return null;
+  const out = { 안: VOTE.적용, 실제: true, 동네: [], 가까워짐: [], 남는불편: [], 집별: {} };
+  d.동네.forEach(t => {
+    let near = 0;
+    t.집.forEach(([x, y], i) => {
+      const nm = t.이름 + ' ' + (i + 1), rec = cells[idx(x, y)];
+      const ok = !!(rec && computeSat(rec).met[d.필요]);   /* 캐시(sat)를 읽으면 적용 전에 재 둔 옛 값이 나온다 — 실화면에서 윗마을 1 이 적용 뒤에도 '멂'으로 나왔다.
+         그래서 __sat 훅과 같이 **그 자리에서 다시 센다**(satTick 이 어차피 하는 일 · 판정을 바꾸지 않는다). */
+      out.집별[nm] = ok; if (ok) { near++; out.가까워짐.push(nm); } else out.남는불편.push(nm);
+    });
+    out.동네.push({ 이름: t.이름, 집: t.집.length, 가까워짐: near, 남는불편: t.집.length - near });
+  });
+  return out;
+}
+/* 지문 — 배치·집(층·식구)·인구. 미리 보기가 세계를 안 바꿨다는 것을 이걸로 잰다(시계는 안 넣는다 · 시간은 흘러야 한다) */
+function voteFinger() {
+  let s = '?';
+  try { const j = JSON.parse(window.__exportText()); s = JSON.stringify(j.plotStr || {}) + '|' + JSON.stringify(j.houses || {}) + '|' + population(); } catch (e) { s = 'ERR'; }
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return s.length + ':' + (h >>> 0).toString(36);
+}
+
+/* ── 칠하기는 **안 한다** (보스 판단 ① · 실화면에서 재 보고 내린 결론) ──
+   설계에서는 이미 있는 겹판(ovRoad·ovHome)을 읽어 쓰려 했다. 실화면에서 재 보니 **그 겹판은 놓기 모드 밖에서는 안 보인다**
+   — 내 칠하기만 아니라 **기존 __overlay('well',140,121,0) 도 같이 안 보였다**(길칸 29 · 집 4 를 잡고도 화면엔 없음).
+   보이게 하려면 공유된 그리기 쪽을 건드려야 하는데 지금 같은 파일을 네이 만진다. 프로토의 값은 '비교가 되는가'지
+   '예쁘게 칠하는가'가 아니다(보스). 그래서 **겹판을 아예 안 건드린다** — 이 블록은 ov* 를 한 번도 안 부른다.
+   읽을 것은 패널 글에 다 있다 — 어느 집이 가까워지고 어느 집에 불편이 남는지를 이름으로 적는다. */
+
+/* ── 세 가지 조작 ── */
+function votePreview(id) {
+  const d = voteDef(); if (!d) return '결정 판이 아니에요';
+  if (VOTE.적용) return '이미 적용했어요 — [다시 살펴보기] 를 누르면 처음으로 돌아가요';
+  const res = votePreviewCalc(id); if (!res) return '그런 안이 없어요';
+  VOTE.미리 = id; VOTE.stats.미리본횟수++;
+  toast('👀 ' + id + '안 미리 보기예요 — 아직 바뀌지 않았어요', true);
+  voteDraw(); return res;
+}
+function voteApply(id) {
+  const d = voteDef(); if (!d) return '결정 판이 아니에요';
+  if (VOTE.적용) return '이미 적용했어요';
+  const c = d.후보.find(q => q.id === (id || VOTE.미리)); if (!c) return '어느 안인지 먼저 골라요';
+  const fp = footprint(d.시설, c.자리[0], c.자리[1], c.rot || 0);
+  if (fp.some(([px, py]) => !inb(px, py) || cells[idx(px, py)])) {   // 아이가 그 자리에 무언가 지었다 — 조용히 덮지 않는다
+    VOTE.stats.막힌적용++; toast('그 자리에 이미 무언가 있어요 — 치우거나 [다시 살펴보기] 를 눌러요', false); return '자리가 안 비었어요'; }
+  placeAt(d.시설, c.자리[0], c.자리[1], c.rot || 0); updateCount(); markDirty();
+  VOTE.적용 = c.id; VOTE.미리 = null; VOTE.stats.적용횟수++;
+  toast('🪣 결정을 적용했어요 — ' + d.이름 + '이 ' + c.이름 + '에 놓였어요', true);   /* simSay 가 아니라 toast 인 까닭(실화면에서 재 보고 바꿨다):
+     simSay 는 마을이 스스로 하는 말이라 **말 대기줄**을 탄다 — 미리 보기 말이 아직 떠 있으면 적용 말이 뒤에서 기다리다가
+     실화면에서 **한 번도 안 보였다**. 아이가 누른 것에 대한 대답은 곧바로 떠야 한다. 둘 다 기존 말 통로이고 새 말자리는 0. */
+  voteDraw(); return voteRealCalc();
+}
+function voteReset(quiet) {
+  const d = voteDef(); if (!d) return '결정 판이 아니에요';
+  if (!quiet && typeof confirm === 'function' && !confirm('처음 상태로 되돌릴까요?\n이번에 한 것은 남지 않아요.')) return false;
+  VOTE.stats.되돌린횟수++;
+  try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) { console.warn('[MAC-VOTE] 되돌리기', e); }
+  location.replace(location.href);   // 판 파일의 `시작` 저장본이 다시 깔린다 → 앞 실행의 흔적 0
+  return true;
+}
+
+/* ── 패널 — 이 판에서만 뜬다. 본편 화면에는 단추를 만들지 않는다(진입은 주소로만) ── */
+function voteCss() {
+  if (document.getElementById('voteCss')) return;
+  const s = document.createElement('style'); s.id = 'voteCss';
+  s.textContent = '#votePanel{position:fixed;left:12px;bottom:104px;z-index:7;width:min(86vw,320px);max-height:calc(100vh - 210px);overflow:auto;'
+    + 'background:#161d28f2;border:1px solid #32506b;border-left:4px solid #5aa9e0;border-radius:10px;padding:10px 12px;'
+    + "font:12.5px/1.55 'Malgun Gothic',sans-serif;color:#e8eef5;box-shadow:0 8px 24px #0009;pointer-events:auto}"
+    + '#votePanel h4{margin:0 0 6px;font-size:13.5px;color:#bfe0f7;display:flex;align-items:center;gap:6px}'
+    + '#votePanel h4 button{margin-left:auto;background:#222630;border:1px solid #3a4050;color:#cfd6e0;border-radius:8px;min-height:26px;padding:0 9px;font-size:11.5px;cursor:pointer}'
+    + '#votePanel .who{display:flex;gap:8px;font-size:11.5px;color:#a8bccd;margin-bottom:6px}'
+    + '#votePanel .op{background:#1b2430;border:1px solid #2c3b4c;border-radius:8px;padding:7px 9px;margin:5px 0;font-size:11.5px;color:#d7e3ee}'
+    + '#votePanel .op b{color:#ffd9a8}'
+    + '#votePanel .btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}'
+    + '#votePanel button.b{flex:1 1 auto;background:#222630;border:1px solid #3a4050;color:#e8e6e0;border-radius:9px;min-height:40px;padding:0 10px;font-size:12.5px;font-weight:700;cursor:pointer}'
+    + '#votePanel button.b.on{border-color:#5aa9e0;color:#bfe0f7}'
+    + '#votePanel button.b.go{background:#20323f;border-color:#5aa9e0;color:#bfe0f7}'
+    + '#votePanel button.b:disabled{opacity:.45;cursor:default}'
+    + '#votePanel .res{background:#12202b;border:1px solid #2c4356;border-radius:8px;padding:8px 9px;margin-top:6px}'
+    + '#votePanel .res .ln{display:flex;gap:6px;margin:2px 0}'
+    + '#votePanel .near{color:#9ee0b4}#votePanel .far{color:#ffb4ab}'
+    + '#votePanel .chips{color:#cfd6e0;font-size:11px}'
+    + '#votePanel .q{margin-top:8px;border-top:1px solid #2c3b4c;padding-top:7px;font-size:11.5px;color:#a8bccd}'
+    + '#votePanel .q div{margin:2px 0}'
+    + '#votePanel.fold .body{display:none}';
+  document.head.appendChild(s);
+}
+const voteEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function voteBuild() {
+  const d = voteDef(); if (!d || VOTE.el) return;
+  voteCss();
+  const el = document.createElement('div'); el.id = 'votePanel'; document.body.appendChild(el); VOTE.el = el;
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const a = b.dataset.vote;
+    if (a === 'fold') { VOTE.접힘 = !VOTE.접힘; voteDraw(); }
+    else if (a === 'pre') votePreview(b.dataset.id);
+    else if (a === 'apply') voteApply(b.dataset.id);
+    else if (a === 'reset') voteReset();
+  });
+  ['pointerdown', 'pointerup', 'wheel', 'touchstart'].forEach(t => el.addEventListener(t, e => e.stopPropagation()));   // 패널을 만져도 마을이 안 돌아간다
+  voteDraw();
+}
+function voteDraw() {
+  const d = voteDef(), el = VOTE.el; if (!d || !el) return;
+  const res = VOTE.적용 ? voteRealCalc() : (VOTE.미리 ? votePreviewCalc(VOTE.미리) : null);
+  const who = d.동네.map(t => '🏡 ' + voteEsc(t.이름) + ' ' + t.집.length + '집').join(' · ');
+  const ops = d.동네.map(t => '<div class="op"><b>' + voteEsc(t.이름) + '</b> — ' + voteEsc(t.의견 || '') + '</div>').join('');
+  const btn = d.후보.map(c => '<button class="b' + (VOTE.미리 === c.id ? ' on' : '') + '" data-vote="pre" data-id="' + voteEsc(c.id) + '"'
+    + (VOTE.적용 ? ' disabled' : '') + '>' + voteEsc(c.id) + '안 미리 보기<br><span style="font-weight:400;font-size:11px">' + voteEsc(c.이름) + '</span></button>').join('');
+  let box = '';
+  if (res) {
+    const 안이름 = (d.후보.find(c => c.id === res.안) || {}).이름 || '';
+    box = '<div class="res"><div style="color:#bfe0f7;font-weight:700;margin-bottom:4px">'
+      + (res.실제 ? '✅ 적용한 결과' : '👀 미리 보기') + ' — ' + voteEsc(res.안) + '안 · ' + voteEsc(안이름)
+      + (res.실제 ? '' : ' <span style="color:#a8bccd;font-weight:400">(아직 안 바뀌었어요)</span>') + '</div>'
+      + res.동네.map(t => '<div class="ln"><span style="width:62px;flex:0 0 auto">' + voteEsc(t.이름) + '</span>'
+        + '<span class="near">가까워짐 ' + t.가까워짐 + '</span><span class="far">남는 불편 ' + t.남는불편 + '</span></div>').join('')
+      + '<div class="ln chips"><span class="near">가까워짐</span> ' + (res.가까워짐.map(voteEsc).join(' · ') || '없음') + '</div>'
+      + '<div class="ln chips"><span class="far">남는 불편</span> ' + (res.남는불편.map(voteEsc).join(' · ') || '없음') + '</div></div>';
+  }
+  const 고른안 = VOTE.적용 || VOTE.미리;
+  const go = '<div class="btns">'
+    + '<button class="b go" data-vote="apply" data-id="' + voteEsc(고른안 || '') + '"' + (VOTE.적용 || !VOTE.미리 ? ' disabled' : '') + '>이 안으로 결정 적용</button>'
+    + '<button class="b" data-vote="reset">다시 살펴보기</button></div>';
+  const qs = (d.되돌아보기3 || []).map((q, i) => '<div>' + '①②③'[i] + ' ' + voteEsc(q) + '</div>').join('');
+  el.className = VOTE.접힘 ? 'fold' : '';
+  el.innerHTML = '<h4>🗳️ ' + voteEsc(d.이름) + '을 어디에 놓을까요'
+    + '<button data-vote="fold">' + (VOTE.접힘 ? '펼치기' : '접기') + '</button></h4>'
+    + '<div class="body"><div class="who">' + who + '</div>' + ops
+    + '<div class="btns">' + btn + '</div>' + box + go
+    + (qs ? '<div class="q"><b style="color:#cfd6e0">💭 되돌아보기</b>' + qs + '</div>' : '') + '</div>';
+}
+
+/* 확인용 훅 — 이름은 전부 vote/VOTE 계열(다른 담당의 flow·stage 와 안 겹친다) */
+window.__vote = () => { const d = voteDef();
+  return { 켜짐: !!d, 판: STAGE.id || null, 시설: d ? d.이름 : null, 필요: d ? d.필요 : null,
+    동네: d ? d.동네.map(t => ({ 이름: t.이름, 집: t.집.length, 식구: t.집.reduce((n, [x, y]) => { const r = cells[idx(x, y)]; return n + (r ? (res.get(r.root) || 0) : 0); }, 0) })) : [],
+    후보: d ? d.후보.map(c => ({ id: c.id, 이름: c.이름, 자리: c.자리 })) : [],
+    미리보기: VOTE.미리, 적용: VOTE.적용, 지문: voteFinger(), 패널: !!VOTE.el, ...VOTE.stats }; };
+window.__votePreview = id => votePreviewCalc(id) || '그런 안이 없어요';
+window.__voteApply = id => voteApply(id);
+window.__voteReset = quiet => voteReset(quiet);
+window.__voteReal = () => voteRealCalc() || '결정 판이 아니에요';
+/* 담당끼리 쓰는 계약(FLOW(root) 와 같은 꼴) — 그 집 하나가 지금 가까운가 */
+window.VOTE = root => { const d = voteDef(); if (!d) return null; const rec = cells[root];
+  if (!rec || rec.k !== 'house' || rec.root !== root) return null;
+  return computeSat(rec).met[d.필요] ? '가까움' : '멂'; };   /* 캐시 아니라 그 자리에서 — 위와 같은 어긋남을 막는다 */
+if (voteDef()) setTimeout(voteBuild, 700);   // 판에 `결정` 칸이 있을 때만 패널이 생긴다
 </script>
 </body>
 </html>
