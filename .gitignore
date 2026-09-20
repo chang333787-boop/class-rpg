@@ -15,3 +15,6 @@ tmp/
 
 # 시뮬 도구가 잠깐 뜨는 module (scripts/village-sim · 끝나면 지워진다)
 village/_simrun-*.mjs
+
+# 성능 재기용 임시 사본(끝나면 지움)
+village/_perf_*.html
