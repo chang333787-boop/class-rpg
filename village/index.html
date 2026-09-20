@@ -11379,10 +11379,14 @@ function voteApply(id) {
      simSay 는 마을이 스스로 하는 말이라 **말 대기줄**을 탄다 — 미리 보기 말이 아직 떠 있으면 적용 말이 뒤에서 기다리다가
      실화면에서 **한 번도 안 보였다**. 아이가 누른 것에 대한 대답은 곧바로 떠야 한다. 둘 다 기존 말 통로이고 새 말자리는 0. */
   /* [ⓑ12] 적용 뒤 지도 소식에 **기쁜 쪽만** 뜨는 것을 막는다(관찰자 15회 ⓑ12 · 1대 0).
-     기존 세계가 '기뻐해요'를 말하는 그 자리(simSay)에 **남는 불편도 한 번** 넣는다 — 새 말자리 0 · 딱 한 번.
-     패널을 접어도 소식에는 둘이 함께 남는다. 정본 3절 '승패로 처리하지 않는다'의 마지막 칸. */
+     기존 세계가 '기뻐해요'를 말하는 그 자리에 **남는 불편도 한 번** 넣는다 — 새 말자리 0 · 딱 한 번.
+     패널을 접어도 소식에는 둘이 함께 남는다. 정본 3절 '승패로 처리하지 않는다'의 마지막 칸.
+     **simSay 가 아니라 sayOnce 인 까닭(보스가 실화면에서 두 번 돌려 보고 바꿨다):** simSay 는 '되풀이되는 소식' 줄(한 칸)에
+     들어가서, 곧이어 세계가 '🎉 ○○네가 기뻐해요'를 말하면 **새것이 앞엣것을 대신한다**(MAC-TOASTQ 덧 2). 실제로 한 번은
+     🙍 가 뜨고 한 번은 🎉 만 떴다 — 바로 이 판이 고치려던 '1 대 0'이 운에 따라 되살아난다. 이 소식은 그 판에서 다시 오지
+     않으므로 **한 번뿐인 소식 줄**(버리지 않고 쌓아 두는 쪽)에 넣는다. sayOnce 는 simSay 를 그대로 부르는 기존 감쌈이다. */
   const 실 = voteRealCalc(), 아직 = 실 ? 실.동네.filter(t => t.남는불편 > 0) : [];
-  if (아직.length) simSay('🙍 ' + 아직.map(t => t.이름 + ' ' + t.남는불편 + '집').join(' · ') + '은 아직 ' + NEED_TXT[d.필요] + '이 멀어요', false);
+  if (아직.length) sayOnce('🙍 ' + 아직.map(t => t.이름 + ' ' + t.남는불편 + '집').join(' · ') + '은 아직 ' + NEED_TXT[d.필요] + '이 멀어요', false);
   voteDraw(); return 실;
 }
 function voteReset(quiet) {
@@ -11512,7 +11516,7 @@ window.VOTE = root => { const d = voteDef(); if (!d) return null; const rec = ce
    그래서 트레이 안이 비는 것을 **보기만 하고**(MutationObserver · 읽기 0 수정) 그때 한 번 같은 말을 띄운다.
    트레이를 만드는 buildTray 는 다른 담당도 만지는 곳이라 **한 줄도 안 건드린다**. 말은 기존 toast · 판마다 딱 한 번. */
 function voteTrayWatch() {
-  const box = document.getElementById('trayIn'); if (!box || !voteDef()) return;
+  const box = document.getElementById('trayIn'); if (!box || !voteDef() || !window.MutationObserver) return;   /* 3D 없이 돌리는 시뮬 도구에는 MutationObserver 가 없다 — 옆 4627 줄과 같은 가드 */
   /* '비었다'의 뜻: 칸이 0개가 아니라 **놓을 것이 하나도 없다**. 빈 탭에도 연장(돌리기·옮기기·치우기·되돌리기)은 늘 남아 있어서
      children.length 로 보면 영영 안 걸린다 — 실화면에서 자연·시설 탭을 열어 보고 알았다(칸 5개가 전부 .tool). */
   const 본다 = () => { if (VOTE.트레이말 || !VOTE.el) return;
