@@ -1951,7 +1951,10 @@ function partsOf(rec) {
   if (rec.k === 'lawn') return lawnPartsAt(rec);   // [DESIGN-LAWN-2] 깎은 줄 + 바깥 테
   if (ROAD_FAM.has(rec.k) && window.ROADJOIN.on) return roadFamParts(rec);   // [DESIGN-ROAD-1] 길 가족 — 이웃을 보고 한 줄로
   if (FLOWER_KINDS[rec.k]) { const x = cX(rec.root), y = cY(rec.root), fp = flowerPartsAt(rec.k, x, y); if (fp) { const ed = flowerEdgeParts(x, y, rec.rot); return ed ? fp.concat(ed) : fp; } }   // [DESIGN-FLOWER-3·4·EDGE-1] 꽃밭 종류 × 칸 좌표로 벌 + 바깥 변 가장자리
-  if (rec.k === 'house') { const lv = houseLv(rec.root), g = glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house'); return g ? (lv === 3 ? (HOUSE3_GLB || (HOUSE3_GLB = g.concat(HOUSE3_ADD))) : g) : HOUSE_LV[lv]; }
+  if (rec.k === 'house') {
+    const hh = (hinfo.get(rec.root) || {}).세대 | 0;                                     /* [MAC-HOUSEHOLD] 여러 세대가 사는 집 = 아파트 모양(판 파일이 준 조각을 그대로 쓴다 · 새 에셋 0) */
+    if (hh > 1) { const ak = homeKindName(hh); if (ak) return K[ak].parts; }
+    const lv = houseLv(rec.root), g = glbParts('house', lv === 3 ? 'house_lv3' : lv === 2 ? 'house_lv2' : 'house'); return g ? (lv === 3 ? (HOUSE3_GLB || (HOUSE3_GLB = g.concat(HOUSE3_ADD))) : g) : HOUSE_LV[lv]; }
   if (rec.k === 'fruit') { const x = cX(rec.root), y = cY(rec.root); return glbParts('tree', FRUIT_MODELS[(x * 5 + y * 3) % FRUIT_MODELS.length]) || K.fruit.parts; }   /* 과일나무 변형 4종을 칸 자리로 돌려 쓴다(56차) */
   const mn = GLB_KIND[rec.k]; return (mn && glbParts(rec.k === 'bigtree' ? 'tree' : GLB_PROP.has(rec.k) ? 'props' : GLB_SPECIAL.has(rec.k) ? 'special' : GLB_STREET.has(rec.k) ? 'street' : GLB_DECO.has(rec.k) ? 'deco' : rec.k, mn)) || K[rec.k].parts;
 }
@@ -2256,14 +2259,14 @@ function keepStash(rec) {
   if (!window.VRULES.keep.on || (n === 0 && lv <= 1)) return;
   const t0 = performance.now(); if (t0 - (KEEP.lastPush || -1e9) < 30) { KEEP.stash.length = 0; KEEP.lastPush = t0; return; }   // 한꺼번에 여러 채(판 비우기·파일 가져오기)는 맡지 않는다
   KEEP.lastPush = t0;
-  KEEP.stash.push({ n, lv, until: performance.now() + window.VRULES.keep.stashMs }); if (KEEP.stash.length > 6) KEEP.stash.shift(); KEEP.stats.맡김++;
+  KEEP.stash.push({ n, lv, 세대: (hinfo.get(rec.root) || {}).세대 | 0, until: performance.now() + window.VRULES.keep.stashMs });   /* [MAC-HOUSEHOLD] 세대도 함께 맡는다 — 옮겨도 아파트는 아파트다 */ if (KEEP.stash.length > 6) KEEP.stash.shift(); KEEP.stats.맡김++;
   if (!carrying && !VISIT.on) setTimeout(() => { if (KEEP.stash.length) toast('🧳 식구 ' + n + '명이 마을 어귀에서 1분 기다려요 — ↩ 되돌리거나 집을 다시 놓으면 돌아와요', true); }, 0);
 }
 /* placeAt 고리 — 집이 다시 놓이면 맡아 둔 식구·층이 돌아온다(되돌리기·옮기기·새로 짓기 모두) */
 function keepRestore(kind, root) {
   if (kind !== 'house' || !KEEP.stash.length) return;
   const now = performance.now(); KEEP.stash = KEEP.stash.filter(t => t.until > now); const t = KEEP.stash.pop(); if (!t) return;
-  hinfo.set(root, { lv: t.lv, hs: -1 }); res.set(root, Math.min(HOUSE_CAPS[t.lv], t.n)); folksDirty = true; dirtyChunks.add(chunkOfCell(root)); KEEP.stats.돌아옴++;
+  hinfo.set(root, t.세대 > 1 ? { lv: 1, hs: -1, 세대: t.세대 } : { lv: t.lv, hs: -1 }); res.set(root, Math.min(houseCap(root), t.n)); folksDirty = true; dirtyChunks.add(chunkOfCell(root)); KEEP.stats.돌아옴++;
   if (t.n) setTimeout(() => toast('🏠 식구 ' + t.n + '명이 돌아왔어요' + (t.lv > 1 ? ' (' + t.lv + '층 그대로)' : ''), true), 0);
 }
 window.__keep = (x, y) => { const rec = x == null ? null : cells[idx(x, y)]; return { 무게: rec ? keepOf(rec) : null, 맡아둔것: KEEP.stash.map(t => [t.n, t.lv]), ...KEEP.stats }; };
@@ -2430,6 +2433,7 @@ function undo() {
   } else if (e.t === 'remove') {              // 치운 걸 되돌린다 → 다시 놓는다
     if (canPlace(e.k, e.x, e.y, e.rot) !== true) { toast('그 자리가 이미 찼어요'); return; }
     placeAt(e.k, e.x, e.y, e.rot);
+    homeUndo(e);   /* [MAC-HOUSEHOLD] 되살린 것이 아파트였으면 세대도 되살린다 — 치운 것은 `house` 라 카드 이름이 남아 있지 않다 */
     toast(josa(K[e.k].nm, '을', '를') + ' 되살렸어요', true);
   } else if (e.t === 'move') {                // 옮긴 걸 되돌린다 → 제자리로
     removeAt(e.x, e.y);
@@ -2755,6 +2759,22 @@ plazaRoot = hookable('plazaRoot', plazaRoot);
 canPlace = hookable('canPlace', canPlace);
 undo = hookable('undo', undo);
 placeAt = hookable('placeAt', placeAt);
+/* [MAC-HOUSEHOLD] 트레이 카드는 제 이름(`apart`)으로 서고 — 잠금·썸네일·변형이 다 `data-kind` 를 열쇠로 쓰니 그대로 둔다 —
+   **놓이는 순간 `house` 로 바꿔** 넣고 곁 값 `세대` 만 붙인다. 그래서 놓인 뒤에는 집 한 종류뿐이다.
+   ⚠ 발자국이 집과 다르면 바꾸지 않는다 — `centerOf('house', …)`·`footprint('house', …)` 가 **2×2 를 가정**하는 자리가
+   스물일곱 군데라, 크기가 다른 것을 집으로 바꾸면 **오류 없이 반 칸씩 어긋난다**(갈래 조사 #799 0절). */
+const homeKindOf = kind => { const k = K[kind], h = K.house; const n = k && k.세대 | 0;
+  return n > 1 && h && k.w === h.w && k.h === h.h ? n : 0; };
+/* 세대 수 → 그 수를 준 카드 이름(모양을 빌리러 간다). 종류 표는 판을 열 때 한 번 정해지므로 한 번만 찾아 둔다 */
+const HOME_KIND = new Map();
+function homeKindName(n) { if (HOME_KIND.has(n)) return HOME_KIND.get(n);
+  let found = null; for (const k in K) if (homeKindOf(k) === n) { found = k; break; }
+  HOME_KIND.set(n, found); return found; }
+{ hookAdd('placeAt', function (next, args) { const [kind, x, y, rot] = args, n = homeKindOf(kind);
+    if (!n) return next(args);
+    const r = next(['house', x, y, rot]); const root = idx(x, y);
+    const info = hinfo.get(root) || { lv: 1, hs: -1 }; info.세대 = n; info.lv = 1; hinfo.set(root, info);   /* 아파트는 층이 안 오른다 */
+    dirtyChunks.add(chunkOfCell(root)); return r; }); }
 removeAt = hookable('removeAt', removeAt);
 window.__hooks = () => Object.fromEntries(Object.entries(HOOKS).map(([k, v]) => [k, v.length]));
 
@@ -3237,7 +3257,7 @@ function flowTick() {
     res.forEach((n, root) => { if (n <= 0) return; const h = FLOW.집.get(root);
       if (h && h.날 === 오늘) return;
       const rec = cells[root]; if (!rec) return;
-      const 몫 = Math.max(1, R.세대몫 | 0 || 1); let 받음 = false;
+      const 몫 = Math.max(1, R.세대몫 | 0 || 1) * houseHold(root); let 받음 = false;   /* [MAC-HOUSEHOLD] 한 칸에 여러 세대가 살면 그만큼 쓴다 — 여기가 새 관계의 본체다 */
       for (const s of flowStoresFrom(rec)) { const st = flowStore(s.root);
         if (st.양 >= 몫) { st.양 -= 몫; 받음 = true; break; } }
       FLOW.집.set(root, { 날: 오늘, 받음 }); 받음 ? FLOW.stats.씀++ : FLOW.stats.못씀++; }); } }
@@ -3806,9 +3826,9 @@ function act(clientX, clientY) {
     const rec = cells[idx(c.x, c.y)];
     if (!rec) { toast('여기엔 지울 게 없어요'); return; }
     if (keepGuard(rec)) return;   // [MAC-KEEP] 무거운 것은 한 번 더 눌러야 치워진다
-    const nm = K[rec.k].nm, rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root);
+    const nm = K[rec.k].nm, rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root), rh = (hinfo.get(rec.root) || {}).세대 | 0;   /* [MAC-HOUSEHOLD] 세대는 치우기 **전에** 적는다 — removeAt 이 hinfo 를 지운다 */
     removeAt(c.x, c.y);
-    pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr });
+    pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr, 세대: rh });
     updateCount(); markDirty(); updateGhost(clientX, clientY);
     toast(josa(nm, '을', '를') + ' 치웠어요', true);
     if (typeof pmapLive === 'function' && pmapLive()) setMode(null, null);   /* [MAC-PROTOMAP] 프로토 판은 한 번 치우면 모드를 끈다(창조자 13회 ⓑ4) */
@@ -5105,7 +5125,33 @@ function pickDestination(f, who) {
 /* 집 상태(F6): hinfo root → { lv, hs }  (주민 수는 res 에 그대로). hs = 😊 가 시작된 틱, -1 이면 아님 */
 const hinfo = new Map();
 const houseLv = root => (hinfo.get(root) || {}).lv || 1;
-const houseCap = root => HOUSE_CAPS[houseLv(root)];
+/* ── [MAC-HOUSEHOLD] 한 칸이 여러 **세대**로 세어진다 (도시 요소 사전 #793 이 찾은 단 하나의 새 관계 · 설계 #797 · 갈래 조사 #799 ⓑ) ──
+   **아파트는 새 종류가 아니다.** 트레이에서는 제 이름(`apart`)으로 고르지만, 놓이는 순간 **그냥 집**이 되고
+   곁 값 `세대` 만 붙는다. 그래서 `k === 'house'` 갈래 96군데와 `'house'` 가 인자로 박힌 27군데가 **하나도 안 흔들린다**.
+     · **한 세대 = 2명 = 어른 1 = 몫 1**(보스 승인). `세대: 4` 인 아파트는 **8명**이 산다.
+     · 자리 수만 갈린다 — 세대가 있으면 `세대 × 2`, 없으면 지금 그대로 `HOUSE_CAPS[층]`. **HOUSE_CAPS 는 안 건드린다**
+       (그 표는 보통 집의 층 2·4·6 이고 **아파트는 층이 안 오른다** — 보스 결정 2 · 그래서 '넷이 여섯이면 1.5명'이 생기지 않는다).
+     · 일자리(`round(식구/2)`)와 붐빔(`res.get`)은 **이미 식구 수로 돈다** — 여기서 또 곱하면 두 번 센다(설계 ①).
+   판 파일이 `건물정의` 에 `세대: 4` 를 적는다 — `jobs`·`cap` 과 같은 **건물 값**이라 판정 규칙 수가 안 는다. */
+const HOME_PER = 2;                               // 한 세대의 식구 수(= HOUSE_CAPS[1])
+const houseHold = root => Math.max(1, (hinfo.get(root) || {}).세대 | 0 || 1);   // 이 집에 몇 세대가 사나(보통 집은 1)
+const houseCap = root => { const hh = (hinfo.get(root) || {}).세대 | 0; return hh > 1 ? hh * HOME_PER : HOUSE_CAPS[houseLv(root)]; };
+/* 저장할 때 — 세대가 붙은 집 가운데 `res` 에 없어 빠진 것을 채운다(빈 아파트).
+   **보통 집은 한 채도 더하지 않는다** — 그래야 보통 집 마을의 저장본이 예전과 한 글자도 안 달라진다(통과 기준 ①). */
+/* 되돌리기로 되살아난 집에 세대를 도로 붙인다. 치운 자리의 기록이라 **그 자리에 다시 놓을 때만** 쓴다 */
+function homeUndo(e) {
+  if (!e || !(e.세대 > 1)) return;
+  const root = idx(e.x, e.y), rec = cells[root]; if (!rec || rec.k !== 'house' || rec.root !== root) return;
+  const info = hinfo.get(root) || { lv: 1, hs: -1 }; info.세대 = e.세대 | 0; info.lv = 1; hinfo.set(root, info);
+  dirtyChunks.add(chunkOfCell(root)); folksDirty = true;
+}
+function homeExtra(houses) {
+  hinfo.forEach((h, root) => {
+    if (!h || !(h.세대 > 1) || houses[root] != null) return;
+    const rec = cells[root]; if (!rec || rec.k !== 'house' || rec.root !== root) return;   // 치운 자리의 찌꺼기는 담지 않는다
+    houses[root] = [res.get(root) | 0, h.lv || 1, growSave(h), h.세대 | 0];
+  });
+}
 let sparkle = [];                                 // ✨ 표시 [{x,z,until}]
 const MOVEIN_EVERY = 150, MOVEIN_MAX = 3, MOVEIN_MIN_ROAD = 6;   // 틱(15초) · 동시 이사 · 길 최소 길이(칸)
 const res = new Map();                            // 집 root → 주민 수
@@ -5481,6 +5527,7 @@ function satTick() {
   const st = computeSat(rec);
   /* 성장: 넷 다 채워진 채 하루가 가면 한 층. 내려가는 일은 없다 — 😐 가 되면 시계만 멈춘다 */
   const h = hinfo.get(rec.root) || { lv: 1, hs: -1 }; hinfo.set(rec.root, h);
+  if (h.세대 > 1) return;                                              /* [MAC-HOUSEHOLD] 아파트는 층이 안 오른다(보스 결정 2) — 층은 '잘 만든 동네'에 주는 상이고, 아파트의 높이는 아이가 고른 밀도다 */
   if (st.n >= NEEDS.length && !crowdedHome(rec.root) && !joblessHome(rec.root)) { if (h.hs < 0) h.hs = growResume(h); else if (SIM.t - h.hs >= GROW_TICKS * TICK_MS * growMulAt(rec.root) && h.lv < 3) { growHouse(rec, h); } }   // 꾸미기가 많으면 빨리(F33) · 멈췄던 만큼 이어서([MAC-GROWPAUSE])
   else h.hs = growPause(h);   // [MAC-GROWPAUSE] 처음부터 다시가 아니라 멈춤
 }
@@ -5492,11 +5539,12 @@ function growHouse(rec, h) {
   simSay('🏠 집이 ' + h.lv + '층이 됐어요!', true);
 }
 function satText(rec) {
+  const 세대 = houseHold(rec.root), 세대말 = 세대 > 1 ? 세대 + '세대 · ' : '';   /* [MAC-HOUSEHOLD] 여러 세대가 사는 집은 카드가 먼저 말한다 — 곱셈을 숨기지 않는다 */
   const st = sat.get(rec.root) || computeSat(rec);
   const miss = NEEDS.filter(k => !st.met[k]);
   const busy = (crowdedHome(rec.root) ? ' · 길이 붐벼요' : '') + (joblessHome(rec.root) ? ' · ' + jobWhyShort(rec) : '');   /* [MAC-JOBWHY] 까닭 넷에서 */
-  if (!miss.length) return (busy ? '😐 다 있어요' : '😊 다 있어요') + busy + amenText(rec.root);   // busy 에는 붐빔·일자리 사정이 든다. 꾸미기 한 줄은 뒤에(F33)
-  return (faceOfHome(rec.root) === 1 ? '😐 ' : '😟 ') + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어요' + busy + amenText(rec.root);
+  if (!miss.length) return (busy ? '😐 ' : '😊 ') + 세대말 + '다 있어요' + busy + amenText(rec.root);   // busy 에는 붐빔·일자리 사정이 든다. 꾸미기 한 줄은 뒤에(F33)
+  return (faceOfHome(rec.root) === 1 ? '😐 ' : '😟 ') + 세대말 + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어요' + busy + amenText(rec.root);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9728,6 +9776,7 @@ function stageKinds(def) {
       cap: Math.max(1, Math.min(600, t.cap | 0 || 60)), parts,
       ...(NEED_TXT && t.need && NEED_TXT[t.need] ? { need: t.need } : {}),
       ...(t.jobs ? { jobs: Math.max(1, Math.min(9, t.jobs | 0)) } : {}),
+      ...(t['세대'] > 1 ? { '세대': Math.max(2, Math.min(24, t['세대'] | 0)) } : {}),   /* [MAC-HOUSEHOLD] 한 칸에 몇 세대가 사나 — 놓이면 집이 된다(jobs·cap 과 같은 건물 값이라 판정 규칙 수가 안 는다) */
       ...(t.needRoad ? { needRoad: true } : {}) };
     if (ORDER.indexOf(k) < 0) ORDER.push(k);                                 // 트레이에 뜨게(해금 표에 없으니 처음부터 열려 있다)
     VSKIN.stats.더한것.push(k);
@@ -10123,7 +10172,9 @@ window.__tsignSync = tsignSync;
 
 function serialize() {
   const { pal, ps, changed } = plotStrings();
-  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h ? growSave(h) : -1]; });   /* [MAC-FLOW] 흐름은 아래 flow 칸으로 */
+  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); const hh = h && h.세대 | 0;
+    if (v || (h && h.lv > 1) || hh > 1) houses[root] = hh > 1 ? [v, h.lv, growSave(h), hh] : [v, h ? h.lv : 1, h ? growSave(h) : -1]; });   /* [MAC-FLOW] 흐름은 flow 칸으로 · [MAC-HOUSEHOLD] 네 번째 칸 = 세대(옛 코드는 모르고 한 세대로 읽는다) */
+  homeExtra(houses);   /* [MAC-HOUSEHOLD] **`res` 는 집의 목록이 아니라 사는 사람의 목록이다** — 아직 아무도 안 들어온 아파트는 위 forEach 를 한 번도 안 지나간다. 비어 있어도 아파트는 아파트라 따로 담는다 */
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   lastSave = { 구역수: Object.keys(ps).length, 바뀐구역: changed, 크기: 0, 형식: 'v2' };
   return { v: SAVE_V, w: W, h: H, palette: pal, plotStr: ps, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, flow: flowSave(), houses, unlocked: [...unlocked], goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
@@ -10136,7 +10187,9 @@ function serializeV1() {
     seen.add(rec);
     items.push({ id: rec.k, x: cX(rec.root), y: cY(rec.root), rot: rec.rot });
   });
-  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h ? growSave(h) : -1]; });   /* [MAC-FLOW] 흐름은 아래 flow 칸으로 */
+  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); const hh = h && h.세대 | 0;
+    if (v || (h && h.lv > 1) || hh > 1) houses[root] = hh > 1 ? [v, h.lv, growSave(h), hh] : [v, h ? h.lv : 1, h ? growSave(h) : -1]; });   /* [MAC-FLOW] 흐름은 flow 칸으로 · [MAC-HOUSEHOLD] 네 번째 칸 = 세대(옛 코드는 모르고 한 세대로 읽는다) */
+  homeExtra(houses);   /* [MAC-HOUSEHOLD] **`res` 는 집의 목록이 아니라 사는 사람의 목록이다** — 아직 아무도 안 들어온 아파트는 위 forEach 를 한 번도 안 지나간다. 비어 있어도 아파트는 아파트라 따로 담는다 */
   const unlockedList = [...unlocked];
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, flow: flowSave(), houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
@@ -10276,7 +10329,8 @@ function loadSaved(rawOverride) {
   const hasHouses = !!(d.houses && typeof d.houses === 'object');
   if (hasHouses) { for (const r in d.houses) { const rec = cells[+r]; if (!(rec && rec.k === 'house' && rec.root === +r)) continue;
       const v = d.houses[r]; const n = Array.isArray(v) ? v[0] | 0 : v | 0, lv = Array.isArray(v) ? Math.min(3, Math.max(1, v[1] | 0)) : 1, hs = Array.isArray(v) ? (v[2] == null ? -1 : v[2]) : -1;
-      hinfo.set(+r, { lv, hs }); res.set(+r, Math.min(HOUSE_CAPS[lv], n)); if (lv > 1) dirtyChunks.add(chunkOfCell(+r)); } }
+      const hh = Array.isArray(v) && v[3] > 1 ? Math.min(99, v[3] | 0) : 0;   /* [MAC-HOUSEHOLD] 네 번째 칸 · 없으면 한 세대(옛 저장본) */
+      hinfo.set(+r, hh > 1 ? { lv: 1, hs, 세대: hh } : { lv, hs }); res.set(+r, Math.min(houseCap(+r), n)); if (lv > 1 || hh > 1) dirtyChunks.add(chunkOfCell(+r)); } }
   if (d.flow) flowLoad(d.flow);   /* [MAC-FLOW] 저장된 흐름(밭·가게 양 · 운반 중 · 세대 오늘 몫) */
   if (Array.isArray(d.unlocked)) d.unlocked.forEach(k => { if (K[k]) unlocked.add(k); });
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
@@ -10681,7 +10735,7 @@ window.__try   = (kind, x, y, rot) => canPlace(kind, x, y, rot || 0);
 window.__chunks = () => { let built = 0, tri = 0; chunks.forEach(ch => { if (ch.built) built++; for (const n in ch.meshes) { const m = ch.meshes[n]; if (m) tri += m.geometry.index.count / 3; } });
   return { 청크수: NCX * NCZ, 만든청크: built, 청크삼각형: tri, 더러움: dirtyChunks.size, 지도모드: mapMode, 만든누계: chunkStats.built, 내린누계: chunkStats.dropped, 유지반지름: +keepRadius().toFixed(1) }; };
 window.__act = (kind, x, y, rot) => { const why = canPlace(kind, x, y, rot || 0); if (why !== true) return why; placeAt(kind, x, y, rot || 0); pushUndo({ t:'place', k:kind, x, y, rot: rot || 0 }); updateCount(); markDirty(); return true; };
-window.__erase = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return false; const rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root); if (!removeAt(rx, ry)) return false; pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr }); updateCount(); markDirty(); return true; };
+window.__erase = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return false; const rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root), rh = (hinfo.get(rec.root) || {}).세대 | 0; if (!removeAt(rx, ry)) return false; pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr, 세대: rh }); updateCount(); markDirty(); return true; };
 window.__snapshot = () => {
   const items = [], seen = new Set(); cells.forEach(rec => { if (!rec || seen.has(rec)) return; seen.add(rec); items.push(rec.k + '@' + cX(rec.root) + ',' + cY(rec.root) + '/' + rec.rot); }); items.sort();
   const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); houses[root] = [v, h ? h.lv : 1]; });
