@@ -3198,11 +3198,13 @@ function flowLoad(f) { FLOW.밭.clear(); FLOW.가게.clear(); FLOW.집.clear(); 
   for (const r in (f.집 || {})) { const v = f.집[r]; if (Array.isArray(v)) FLOW.집.set(+r, { 날: v[0] | 0, 받음: !!v[1] }); }
   (Array.isArray(f.짐) ? f.짐 : []).forEach(j => { if (Array.isArray(j) && j.length === 4)
     FLOW.짐.push({ 밭: j[0] | 0, 가게: j[1] | 0, 양: Math.max(1, j[2] | 0), 남은: Math.max(1, j[3] | 0), 처음: Math.max(1, j[3] | 0) }); }); }
-window.__flow = () => ({ 켜짐: flowOn(), 물건: window.VRULES.flow.물건, 짐: FLOW.짐.length,
-  밭: [...FLOW.밭].map(([root, v]) => ({ 자리: [cX(root), cY(root)], 양: v.양, 상태: flowFieldState(root) })).filter(o => o.상태),
-  가게: [...FLOW.가게].map(([root, v]) => ({ 자리: [cX(root), cY(root)], 양: v.양, 상태: flowStoreState(root) })).filter(o => o.상태),
+window.__flow = () => { const 밭 = [], 가게 = [];   /* 판에 있는 것 전부를 훑는다(양이 0 이면 기억에 없을 수 있다) */
+  if (flowOn()) cells.forEach((rec, i) => { if (!rec || rec.root !== i) return;
+    if (flowMake(rec)) 밭.push({ 자리: [cX(i), cY(i)], 양: flowField(i).양, 상태: flowFieldState(i) });
+    else if (flowTake(rec)) 가게.push({ 자리: [cX(i), cY(i)], 양: flowStore(i).양, 상태: flowStoreState(i) }); });
+  return ({ 켜짐: flowOn(), 물건: window.VRULES.flow.물건, 짐: FLOW.짐.length, 밭, 가게,
   세대: { 받음: [...FLOW.집.values()].filter(h => h.받음).length, 못받음: [...FLOW.집.values()].filter(h => !h.받음).length },
-  ...FLOW.stats });
+  ...FLOW.stats }); };
 window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '없음';
   const fs = flowFieldState(rec.root), ss = flowStoreState(rec.root), hs = flowHomeState(rec.root);
   const s = fs || ss || hs; if (!s) return '흐름과 무관';
