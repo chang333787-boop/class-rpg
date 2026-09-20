@@ -3336,7 +3336,7 @@ function flowCutCost(rec, budget) {
     while (now.length) { const i = now.pop(), x = cX(i), y = cY(i);
       for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
         if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
-        if (c && flowTake(c)) return { 칸: lv, 가게: c.root };
+        if (c && flowTake(c)) return { 칸: lv, 가게: c.root, 비용: cost };   /* 비용 맵 = 어느 칸에 길을 놓아야 하나([MAC-PROTOMAP] 이 짚는다) */
         if (cost.has(j)) continue;
         if (c) { if (K[c.k] && K[c.k].road) { cost.set(j, lv); now.push(j); } continue; }
         if (lv + 1 > budget || canPlace('road', nx, ny, 0) !== true) continue; cost.set(j, lv + 1); next.push(j); } }
@@ -3601,6 +3601,7 @@ function act(clientX, clientY) {
     pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr });
     updateCount(); markDirty(); updateGhost(clientX, clientY);
     toast(josa(nm, '을', '를') + ' 치웠어요', true);
+    if (typeof pmapLive === 'function' && pmapLive()) setMode(null, null);   /* [MAC-PROTOMAP] 프로토 판은 한 번 치우면 모드를 끈다(창조자 13회 ⓑ4) */
     return;
   }
   if (!sel && CHOOSE.pending > 0 && c.inside && !plotOpen(c.x, c.y)) {
@@ -3623,7 +3624,7 @@ function act(clientX, clientY) {
     }
     if (rec && K[rec.k].need) {                       // 필요 건물을 누르면 닿는 범위를 보여 준다
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
-      toast(K[rec.k].nm + ' · ' + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);
+      toast(K[rec.k].nm + flowCardText(rec.root) + ' · ' + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
       return;
     }
     if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec) + flowCardText(rec.root), true); return; }   /* [MAC-FLOWLOOK] 흐름 한 줄(숫자는 누를 때만) */   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
@@ -10672,7 +10673,9 @@ function pmapHomes(d) {
 function pmapCard(s) {
   if (!PMAP.카드 || !s) return;
   const f = s.f, 물건 = window.VRULES.flow.물건 || '물건';
-  const 말 = s.상태 === 'none' ? '❌ 오는 밭이 없어요' : s.상태 === 'cut' ? '✂️ 길이 끊겼어요' : s.상태 === 'moving' ? '🚚 오는 중 · ' + s.짐 + '개' : '⏳ 기다리는 중';
+  const 가득 = (f.밭 || []).some(o => o.상태 === 'full');
+  const 말 = s.상태 === 'none' ? '❌ 오는 밭이 없어요' : s.상태 === 'cut' ? '✂️ 길이 끊겼어요' : s.상태 === 'moving' ? '🚚 오는 중 · ' + s.짐 + '개'
+    : PMAP.멈춤 ? '⏸ 생산을 멈췄어요' : 가득 ? '📦 가게가 가득 · 밭도 가득' : '⏳ 기다리는 중';   /* 멈춤과 가득이 같은 칩이었다(창조자 13회 ⓑ2) */
   const 덩이글 = PMAP.덩이.map((d, i) => {
     const 밭들 = (f.밭 || []).filter(o => pmapIn(d, o.자리[0], o.자리[1])), 가게들 = (f.가게 || []).filter(o => pmapIn(d, o.자리[0], o.자리[1]));
     const [집, 받음] = pmapHomes(d), 줄 = [];
@@ -10705,6 +10708,9 @@ function pmapBar() {
   const 칸 = [['map', '🗺️ 고장 전체']].concat(STAGE.def.동네.map((n, i) => ['v' + i, (n.이름 || ('마을 ' + (i + 1)))]));
   칸.forEach(([id, t]) => { const b = document.createElement('button'); b.type = 'button'; b.dataset.k = id; b.textContent = t;
     b.onclick = () => pmapShow(id); bar.appendChild(b); });
+  if (STAGE.def.질문) { const q = document.createElement('button'); q.type = 'button'; q.textContent = '📋 할 일 다시 보기';   /* 카드를 닫으면 과제를 볼 곳이 없었다(창조자 13회 ⓑ3) */
+    q.onclick = () => { if (typeof stageCardStart === 'function') stageCardStart(); else toast('🔎 ' + STAGE.def.질문, true); };
+    bar.appendChild(q); }
   document.body.appendChild(bar); PMAP.el = bar;
   const 덧 = document.createElement('div'); 덧.id = 'pmapExtra'; bar.appendChild(덧); PMAP.덧 = 덧;
   const card = document.createElement('div'); card.id = 'pmapCard'; card.style.display = 'none'; document.body.appendChild(card); PMAP.카드 = card;
@@ -10719,7 +10725,44 @@ function pmapExtra(which) {
   const 만들까 = [...셈.keys()].some(k => flowMake({ k })), 받을까 = [...셈.keys()].some(k => flowTake({ k }));
   const 단추 = (t, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = fn; box.appendChild(b); return b; };
   if (만들까) 단추(PMAP.멈춤 ? '▶ 생산 다시' : '⏸ 생산 멈춤', () => { pmapPause(!PMAP.멈춤); pmapExtra(which); });
-  if (받을까) 단추('🔗 공급 경로 보기', () => { PMAP.강조 = performance.now() + 4000; pmapShow('map'); });
+  if (받을까) 단추('🔗 공급 경로 보기', () => pmapRoute());
+}
+/* 끊겼을 때 **이어야 할 바로 그 칸** — 밭 문 앞에서 가게 문 앞까지 0-1 BFS(길 0 · 빈 칸 1)로 가장 싼 길을 찾아 되짚는다.
+   flowCutCost 는 '몇 칸'만 세므로(비용 맵의 싼 칸을 모으면 엉뚱한 쪽이 반짝였다) 여기서 경로를 따로 되짚는다. */
+function pmapCutSpots() {
+  let 밭 = null;
+  cells.forEach((rec, i) => { if (밭 || !rec || rec.root !== i || !flowMake(rec)) return; if (flowFieldState(i) === 'cut') 밭 = rec; });
+  if (!밭) return null;
+  const 시작 = roadsBeside(밭); if (!시작.length) return null;
+  const 비용 = new Map(), 앞 = new Map(); let 이번 = [], 다음 = [];
+  시작.forEach(i => { 비용.set(i, 0); 이번.push(i); 앞.set(i, -1); });
+  let 닿음 = -1;
+  for (let lv = 0; lv <= 10 && 닿음 < 0; lv++) {
+    while (이번.length && 닿음 < 0) { const i = 이번.pop(), x = cX(i), y = cY(i);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
+        if (c && flowTake(c)) { 앞.set(j, i); 닿음 = j; break; }
+        if (비용.has(j)) continue;
+        if (c) { if (K[c.k] && K[c.k].road) { 비용.set(j, lv); 앞.set(j, i); 이번.push(j); } continue; }
+        if (canPlace('road', nx, ny, 0) !== true) continue;
+        비용.set(j, lv + 1); 앞.set(j, i); 다음.push(j); } }
+    이번 = 다음; 다음 = []; if (!이번.length) break; }
+  if (닿음 < 0) return null;
+  const 자리 = []; let 여기 = 앞.get(닿음);
+  while (여기 != null && 여기 >= 0 && 자리.length < 12) { if (!cells[여기]) 자리.push(여기); 여기 = 앞.get(여기); }
+  return { 칸: Math.max(1, 자리.length), 자리: 자리.reverse(), 밭 };
+}
+/* [🔗 공급 경로 보기] — 이어져 있으면 고장 화면에서 선을 짚고, 끊겨 있으면 그 길 칸을 마을 화면에서 반짝인다 */
+function pmapRoute() {
+  const cut = pmapCutSpots();
+  if (!cut) { PMAP.강조 = performance.now() + 4000; pmapShow('map'); return 'line'; }
+  const i = STAGE.def.동네.findIndex(n => pmapIn({ def: n }, cX(cut.밭.root), cY(cut.밭.root)));
+  pmapShow('v' + Math.max(0, i));
+  cut.자리.forEach(j => sparkle.push({ x: wx(cX(j)) + CS / 2, z: wz(cY(j)) + CS / 2, until: SIM.t + 6000 }));
+  camTarget.x = wx(cX(cut.자리[0] != null ? cut.자리[0] : cut.밭.root)); camTarget.z = wz(cY(cut.자리[0] != null ? cut.자리[0] : cut.밭.root));
+  toast('✂️ 여기예요 — 반짝이는 칸에 길 ' + cut.칸 + '칸만 이으면 가게에 닿아요', true);
+  PMAP.stats.짚음 = (PMAP.stats.짚음 || 0) + 1;
+  return 'cut';
 }
 /* 시험용 — 밭이 새로 만들지 않게 간격을 아주 길게 둔다(쌓인 것은 그대로 가게로 간다 = '생산만' 멈춤).
    셈을 고치지 않고 판 값만 잠깐 바꾼다 · 이미 잡혀 있던 다음 수확 한 번은 날 수 있다(시험용이라 그대로 둔다) */
