@@ -3307,12 +3307,17 @@ function flowLookDraw() {
   const cnt = {}, put = (key, x, z, y) => { const im = flowLookMesh(key); const i = cnt[key] || 0; if (i >= 64) return;
     flowLookDummy.position.set(x, y, z); flowLookDummy.quaternion.copy(camera.quaternion);
     flowLookDummy.scale.set(1, 1, 1); flowLookDummy.updateMatrix(); im.setMatrixAt(i, flowLookDummy.matrix); cnt[key] = i + 1; };
-  /* 밭 — 쌓인 더미(양이 많으면 조금 높이) · 길이 끊겼으면 ⚠ 를 함께 */
-  FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
-    const st = flowFieldState(root); if (!st) return;
-    const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
-    if (v.양 > 0) put(st === 'full' ? '가득' : '더미', c.x, c.z, R.높이 + Math.min(2, v.양 * 0.25));
-    if (st === 'cut') put('끊김', c.x, c.z, R.높이 + 2.4); });
+  /* 밭 — [MAC-FLOWSHAPE] 로 옮겼다(이랑·곡식·모서리 자루). 길이 끊긴 것만 ⚠ 를 남긴다 —
+     시안도 '먼 거리에 한 가지를 넣어야 한다면'에서 끊김을 꼽았고, 아이가 멀리서 찾아야 하는 것이 그것이다 */
+  if (!(window.VRULES.flowShape && window.VRULES.flowShape.on))
+    FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
+      const st = flowFieldState(root); if (!st) return;
+      const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+      if (v.양 > 0) put(st === 'full' ? '가득' : '더미', c.x, c.z, R.높이 + Math.min(2, v.양 * 0.25));
+      if (st === 'cut') put('끊김', c.x, c.z, R.높이 + 2.4); });
+  else FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
+      if (flowFieldState(root) !== 'cut') return; const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+      put('끊김', c.x, c.z, R.높이 + 2.4); });
   /* 가게 — 물건이 있으면 진열대, 없으면 빈 선반 */
   FLOW.가게.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowTake(rec)) return;
     const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
@@ -3359,6 +3364,60 @@ function flowCardText(root) {
 window.__flowLook = () => ({ 켜짐: !!(window.VRULES.flowLook && window.VRULES.flowLook.on) && flowOn(),
   그린것: Object.keys(FLOWMESH).reduce((o, k) => (o[k] = FLOWMESH[k].count, o), {}),
   메시수: Object.keys(FLOWMESH).length });
+/* ── [MAC-FLOWSHAPE] 흐름이 **건물 모습**으로 — 밭 (디자인 시안 2026-09-20 · 보고_20260919/마을_흐름_상태시안) ──
+   시안의 한 줄: **아이가 볼 곳은 '밭의 길 쪽 모서리' 한 군데다.**
+     자루가 없고 이랑이 비었다 → **밭이 모자라다** · 자루가 산더미다 → **길이 끊겼다**.
+   그래서 밭 하나로 네 상태를 다 말한다(바탕은 같고 **이랑 위에 무엇이 있나**와 **모서리에 자루가 몇인가**만 다르다):
+     growing(양 0) 빈 밭 — 이랑만 · ready/moving 생산 중 — 이랑마다 곡식 줄 + 이삭 ·
+     양이 쌓이면 **길 쪽 모서리(−z)에 자루** · 많이 쌓이면 **두 켜**로(= 안 나가고 있다) · cut 이면 자루를 쌓고 **어둡게**.
+   새 에셋 0 — 기존 조각(box·cyl·sph)과 기존 색만. **이삭 머리는 sph 말고 box**(시안: 밭 하나 1,484△ → 약 400△).
+   자루 색은 시안 채택안(밀빛 0xf0dcac + 진한 끈 0xa98d55) — ACT-WORK 의 크림색은 밭 흙 위에서 눈덩이로 뭉친다.
+   **거리 위계**(시안 0절): 12px 아래는 마커 층이라 3D 조각이 아예 안 그려진다 → 이 그림은 저절로 사라진다(따로 막을 것 없음).
+   상태가 바뀐 밭의 청크만 다시 합친다. 끄면(VRULES.flowShape.on = false) 판 파일이 준 밭 모습 그대로.
+   원래 줄 수정 0 — partsOf 감싸기 하나. */
+(window.VRULES = window.VRULES || {}).flowShape = { on: true };
+const FSHAPE = { 본: new Map(), stats: { 그린밭: 0, 다시합침: 0 } };
+const FS_C = { 흙: 0x8a6b3f, 곡식: 0xb8a34e, 곡식D: 0x9d8b3e, 자루: 0xf0dcac, 끈: 0xa98d55 };
+const fsDim = (() => { const a = new THREE.Color(), b = new THREE.Color();
+  return (hex, k) => { a.setHex(hex); const l = (a.r + a.g + a.b) / 3; a.lerp(b.setRGB(l, l, l), k); return a.getHex(); }; })();
+/* 자루 하나 — 시안 채택 색 · cyl + sph + box */
+const fsSack = (x, y, z, s, ry) => [
+  { g: 'cyl', c: FS_C.자루, s: [.52 * s, .72 * s, .52 * s], p: [x, y + .36 * s, z], ry: ry || 0 },
+  { g: 'sph', c: FS_C.자루, s: [.40 * s, .30 * s, .40 * s], p: [x, y + .80 * s, z] },
+  { g: 'box', c: FS_C.끈,  s: [.56 * s, .17 * s, .56 * s], p: [x, y + .68 * s, z], ry: ry || 0 } ];
+/* 밭 한 칸(2×2)의 상태 모습 — 판 파일이 준 바탕 위에 얹는다 */
+function fsFieldParts(root, base) {
+  const R = window.VRULES.flowShape; if (!R || !R.on || !flowOn()) return base;
+  const st = flowFieldState(root); if (!st) return base;
+  const 양 = flowField(root).양, 끊김 = st === 'cut';
+  const out = base.slice();
+  if (양 > 0 || st === 'moving' || st === 'ready' || st === 'full' || 끊김) {
+    /* 이랑마다 곡식 줄 + 이삭(box) — 시안의 '생산 중' */
+    [-2.4, -1.2, 0, 1.2, 2.4].forEach(z => {
+      out.push({ g: 'box', c: 끊김 ? fsDim(FS_C.곡식, .3) : FS_C.곡식, s: [6.0, .52, .44], p: [0, .46, z] });
+      [-2.2, -1.1, 0, 1.1, 2.2].forEach(x =>
+        out.push({ g: 'box', c: 끊김 ? fsDim(FS_C.곡식, .3) : FS_C.곡식, s: [.22, .32, .16], p: [x, .82, z], ry: .4 })); });
+  }
+  /* 길 쪽 모서리(−z)에 자루 — 양이 쌓일수록, 넘치면 두 켜 */
+  const 자루수 = Math.min(7, 양), 위켜 = Math.max(0, 양 - 5);
+  const 아래 = [[.4, -3.2], [1.5, -3.3], [2.6, -3.2], [3.3, -2.8], [1.0, -2.4], [2.2, -2.4], [3.1, -2.1]];
+  for (let i = 0; i < 자루수; i++) out.push(...fsSack(아래[i][0], .20, 아래[i][1], 1.6, i * .5));
+  const 위 = [[1.0, -3.0], [2.1, -2.9], [2.8, -2.5]];
+  for (let i = 0; i < Math.min(3, 위켜); i++) out.push(...fsSack(위[i][0], 1.50, 위[i][1], 1.45, i * .9));
+  FSHAPE.stats.그린밭++;
+  return out; }
+{ const po = partsOf; partsOf = function (rec) { const base = po.apply(this, arguments);
+    if (rec && flowOn() && flowMake(rec) && cells[rec.root] === rec) return fsFieldParts(rec.root, base);
+    return base; }; }
+/* 상태가 바뀐 밭의 청크만 다시 합친다 */
+function fsTick() { const R = window.VRULES.flowShape; if (!R || !R.on || !flowOn()) return;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || !flowMake(rec)) return;
+    const 이제 = flowFieldState(i) + ':' + flowField(i).양;
+    if (FSHAPE.본.get(i) === 이제) return;
+    FSHAPE.본.set(i, 이제); dirtyChunks.add(chunkOfCell(i)); FSHAPE.stats.다시합침++; }); }
+window.__flowShape = (x, y) => { const R = { 켜짐: !!(window.VRULES.flowShape && window.VRULES.flowShape.on) && flowOn(), ...FSHAPE.stats };
+  if (x == null) return R; const rec = cells[idx(x, y)]; if (!rec || !flowMake(rec)) return { ...R, 밭: '없음' };
+  return { ...R, 상태: flowFieldState(rec.root), 양: flowField(rec.root).양, 조각수: partsOf(rec).length }; };
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
@@ -4546,7 +4605,7 @@ function simTick() {
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   flowTick();   // [MAC-FLOW] 흐름 — 만들기·보내기·나아가기·쓰기(판 파일 '흐름' 칸이 있을 때만)
-  if ((SIM.ticks % (window.VRULES.flowLook.every || 30)) === 3) flowLookDraw();   // [MAC-FLOWLOOK] 상자·빈 선반·짐·⚠
+  if ((SIM.ticks % (window.VRULES.flowLook.every || 30)) === 3) { fsTick(); flowLookDraw(); }   // [MAC-FLOWSHAPE] 밭 모습 · [MAC-FLOWLOOK] 남은 아이콘
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
