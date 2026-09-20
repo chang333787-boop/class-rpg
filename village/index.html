@@ -3322,8 +3322,11 @@ function flowLookDraw() {
   if (!fsOn()) FLOW.가게.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowTake(rec)) return;
     const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
     put(v.양 > 0 ? '있음' : '빈', c.x, c.z, R.높이); });
-  /* 운반 중인 짐 — 밭과 가게 사이를 남은 시간만큼 (임시 표현: 곧은 선) */
-  FLOW.짐.forEach(j => { const a = cells[j.밭], b = cells[j.가게]; if (!a || !b) return;
+  /* 운반 중인 짐 — 밭과 가게 사이를 남은 시간만큼 (임시 표현: 곧은 선).
+     [MAC-FLOWSHAPE] 가 켜져 있으면 **걷는다** — 운반 중의 주인공은 [ACT-FLOW] 의 **지고 가는 사람**이다(시안 2절).
+     🎒 는 길을 따라가지 않고 밭에서 가게로 **곧게 가로질렀다** — 집과 밭 위를 지나가는 그림이라,
+     같은 화면에서 사람은 길로 돌아가는데 짐은 질러가는 어긋남이 생긴다. 끄면 그대로 돌아온다. */
+  if (!fsOn()) FLOW.짐.forEach(j => { const a = cells[j.밭], b = cells[j.가게]; if (!a || !b) return;
     const ca = centerOf(a.k, cX(j.밭), cY(j.밭), a.rot), cb = centerOf(b.k, cX(j.가게), cY(j.가게), b.rot);
     const 전체 = Math.max(1, j.처음 || j.남은 || 1), t = Math.max(0, Math.min(1, 1 - j.남은 / 전체));
     put('짐', ca.x + (cb.x - ca.x) * t, ca.z + (cb.z - ca.z) * t, R.높이 - 1.6); });
