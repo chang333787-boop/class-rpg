@@ -8,17 +8,17 @@ const results = [];
 const add = (kind, name, why) => results.push([kind, name, why || '']);
 const FIELDS = ['id', '이름', '교과', '질문', '되돌아보기', '현상', '변수', '시작', '규칙', '건물', '목표'];
 const SEMS = { kind: g => typeof g.k === 'string' && g.n > 0, pop: g => g.n > 0, hook: g => typeof g.훅 === 'string' && typeof g.n === 'number' && ['>=', '<='].includes(g.비교) };
-const HOOKS = ['일닿음%'];   // index.html STAGE_HOOKS 와 같게
+const HOOKS = ['일닿음%', '다있음%'];   // index.html STAGE_HOOKS 와 같게
 
 /* 마을을 한 번 실어 VRULES 기본값·건물 종류를 읽는다(시뮬 · 네트워크 0) */
 const probe = path.join(os.tmpdir(), 'village-stages-probe-' + process.pid + '.mjs');
 fs.writeFileSync(probe, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1 });
-process.stdout.write('@@' + JSON.stringify({ vrules: w.VRULES }) + '\\n'); process.exit(0);`);
+process.stdout.write('@@' + JSON.stringify({ vrules: w.VRULES, 끄기이름: (w.__stageOff ? w.__stageOff().쓸수있는이름 : null) }) + '\\n'); process.exit(0);`);
 const pr = spawnSync(process.execPath, [probe], { encoding: 'utf8' }); fs.rmSync(probe, { force: true });
 const line = (pr.stdout || '').split('\n').find(l => l.startsWith('@@'));
 if (!line) { console.log('FAIL 마을을 못 실음 —', (pr.stderr || '').trim().split('\n').slice(-2).join(' ')); process.exit(1); }
-const { vrules } = JSON.parse(line.slice(2));
+const { vrules, 끄기이름 } = JSON.parse(line.slice(2));
 
 /* 건물 종류 확인: 판 밖 칸에 놓아 보면 모르는 종류는 오류가 난다(load.mjs 의 run.mjs 와 같은 꾀) */
 function kindsOk(list) {
@@ -36,6 +36,19 @@ const missing = Object.keys(vrules).filter(k => !rulesMap[k]), extra = Object.ke
 if (missing.length) add('FAIL', 'rules.json 분류', '분류 안 된 VRULES: ' + missing.join(' ')); else add('PASS', `rules.json 분류 (VRULES ${Object.keys(vrules).length}개 전부)`);
 if (extra.length) add('REVIEW', 'rules.json', 'VRULES 에 없는 키: ' + extra.join(' '));
 const judge = Object.keys(rulesMap).filter(k => rulesMap[k] === '판정');
+/* [MAC-STAGEOFF] 묶음 표는 rules.json 한 곳에만 둔다 — index.html 의 SOFF_ALL 과 같은지, 든 규칙이 판정인지 */
+const 묶음 = JSON.parse(fs.readFileSync(path.join(DIR, 'rules.json'), 'utf8')).묶음 || {};
+const 묶음이름 = Object.keys(묶음);
+if (!끄기이름) add('FAIL', '끄기 묶음', 'index.html 에 __stageOff 가 없다(MAC-STAGEOFF 가 안 실렸다)');
+else {
+  const 빠짐 = 끄기이름.filter(k => !묶음이름.includes(k)), 남음 = 묶음이름.filter(k => !끄기이름.includes(k));
+  (빠짐.length || 남음.length)
+    ? add('FAIL', '끄기 묶음 이름', 'rules.json 과 index.html 이 다르다 — 코드에만: ' + (빠짐.join(' ') || '없음') + ' · 표에만: ' + (남음.join(' ') || '없음'))
+    : add('PASS', `끄기 묶음 이름 ${묶음이름.length}개가 코드와 같음 (${묶음이름.join('·')})`);
+  const 안판정 = 묶음이름.flatMap(g => 묶음[g].filter(k => rulesMap[k] !== '판정').map(k => g + ':' + k));
+  안판정.length ? add('FAIL', '끄기 묶음 속', '판정이 아닌 규칙: ' + 안판정.join(' ')) : add('PASS', '끄기 묶음 속이 모두 판정 규칙');
+}
+let 끈판 = 0;
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
 
 const files = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && f !== 'rules.json').sort();
@@ -50,9 +63,18 @@ for (const f of files) {
   unk.length ? add('FAIL', P('규칙'), 'VRULES 에 없음: ' + unk.join(' ')) : add('PASS', P(`규칙 ${rk.length}개 모두 VRULES 에 있음`));
   const changed = rk.filter(k => rulesMap[k] === '판정' && vrules[k] && Object.keys(def.규칙[k]).some(x => JSON.stringify(def.규칙[k][x]) !== JSON.stringify(vrules[k][x])));
   changed.length <= 3 ? add('PASS', P(`기본과 다른 판정 규칙 ${changed.length}개 (≤3)` + (changed.length ? ': ' + changed.join(' ') : ''))) : add('FAIL', P('판정 규칙 차이'), `${changed.length}개 > 3: ${changed.join(' ')}`);
-  const live = judge.filter(k => vrules[k] && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
+  /* [MAC-STAGEOFF] 판이 끄는 묶음 — 모르는 이름은 조용히 지나가면 안 된다(아무것도 안 꺼진 채 PASS 한다) */
+  let 끈것 = new Set();
+  if (def.끄기 != null) {
+    if (!Array.isArray(def.끄기)) add('FAIL', P('끄기'), '배열이어야 한다');
+    else { const 모름 = def.끄기.filter(g => !묶음이름.includes(String(g)));
+      if (모름.length) add('FAIL', P('끄기'), '모르는 묶음 이름: ' + 모름.map(x => JSON.stringify(x)).join(' ') + ' — 쓸 수 있는 것: ' + 묶음이름.join('·'));
+      else { def.끄기.forEach(g => (묶음[g] || []).forEach(k => 끈것.add(k)));
+        add('PASS', P(`끄기 ${def.끄기.length}묶음 (${def.끄기.join('·')}) → 판정 ${끈것.size}개를 끔`)); 끈판++; } }
+  }
+  const live = judge.filter(k => !끈것.has(k) && vrules[k] && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
   if (def.교과 == null) add('PASS', P(`켜진 판정 규칙 ${live.length}개 — 자유 놀이 판(교과 없음)이라 ≤6 면제`));   // 보스 09-20: ≤6 은 수업 판에만
-  else add(live.length <= 6 ? 'PASS' : 'FAIL', P(`켜진 판정 규칙 ${live.length}개`) + (live.length > 6 ? '' : ' (≤6 · 수업 판)'), live.length > 6 ? '수업 판은 6 까지 — ' + live.join(' ') : '');
+  else add(live.length <= 6 ? 'PASS' : 'FAIL', P(`켜진 판정 규칙 ${live.length}개`) + (끈것.size ? ` — 끄기 뒤 (끄기 전 ${live.length + 끈것.size})` : '') + (live.length > 6 ? '' : ' (≤6 · 수업 판)'), live.length > 6 ? '수업 판은 6 까지 — ' + live.join(' ') : '');
   if (def.변수 != null && !rk.includes(def.변수)) add('REVIEW', P('변수'), `'${def.변수}' 가 규칙 칸에 없음`);
   if (def.모습 != null) { const S = def.모습, 철 = ['봄', '여름', '가을', '겨울'];   /* [MAC-SKIN] */
     const 나쁨 = [];
@@ -82,6 +104,10 @@ for (const f of files) {
     빠짐.length ? add('FAIL', P('건물정의'), '판을 열었는데 안 생긴 종류: ' + 빠짐.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종이 판에서 실제로 생김`)); }
   ok ? add('PASS', P(`시뮬로 얹어 하루 돎 · 인구 ${res.samples[0].m.인구}→${res.samples[res.samples.length - 1].m.인구} · 네트워크 0`)) : add('FAIL', P('시뮬로 얹기'), JSON.stringify({ 네트워크: res.네트워크, 판: res.판 }));
 }
+
+/* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
+끈판 ? add('PASS', `판정을 끈 판 ${끈판}개 (정본 2번 — 끄기를 실제로 쓴 판이 있다)`)
+     : add('FAIL', '끄기를 쓴 판', '판정 규칙을 끈 판이 하나도 없다 — 상한(≤6)이 꽉 찬 채로도 PASS 하게 된다');
 
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
 const c = k => results.filter(r => r[0] === k).length;
