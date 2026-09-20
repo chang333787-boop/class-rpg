@@ -4457,6 +4457,34 @@ window.__cardRot = () => ({ 켜짐: window.VRULES.cardRot.on, 고른것: sel, �
 const isRoad = i => { const c = cells[i]; return !!(c && K[c.k].road); };
 
 /* 집 발자국에 붙어 있는 길 칸 하나 (없으면 -1) */
+/* ── [MAC-DOORS] 필요는 **집에 닿는 모든 문 앞 길**에서 함께 센다 (창조자의 눈 9회 🔴1 · 보스 카드 A) ──
+   필요(물·장보기·놀이·쉼·배움)는 그 집의 '문 앞 길 칸' **하나**에서 길을 따라 14칸을 세어 채웠다. 그 한 칸은 roadBeside 가
+   발자국을 돌며 **처음 만난 길**이라, 집 뒤에 길을 한 줄 깔면 문 앞 칸이 그 새 길로 바뀌었다.
+   그래서 화면이 권한 "🛣️ 길을 한 줄 더 내 봐요"를 아이가 따랐더니 — 시설까지 빙 돌아가게 되어 **네 집이 한꺼번에 나빠졌다**
+   (재현: docs/creator_notes/boards/young4.json · 집 바로 위 줄에 길 24칸 → 네 집 모두 😊 → 😟 '물·장 볼·놀·쉴 곳이 멀어요').
+   아이 눈에는 '시키는 대로 했더니 마을이 망가졌다'로 보이고, 되돌리는 법도 화면에 없었다.
+   집 식구는 **어느 문 앞으로든 나갈 수 있다.** 그래서 닿는 길 칸을 **모두 시작점으로** 한 번에 세어(멀티 소스) 가장 가까운 거리를 쓴다.
+   · 비용은 BFS 한 번과 거의 같다(시작점만 여럿 · 같은 반경). 길을 더 깔아서 나빠지는 일이 **원리상 사라진다**.
+   · 큰길 20칸 예외(F22)·범위 14칸·시설 종류는 그대로. 붐빔의 '문 앞 칸'(crowdHomes.mode 'front')은 이 PR 에서 안 건드린다.
+   끄면(VRULES.doorsAll.on = false) 예전처럼 첫 칸 하나만 본다. 원래 줄 수정 3(roadBFS 시작 줄 · computeSat 두 줄). */
+(window.VRULES = window.VRULES || {}).doorsAll = { on: true };
+const DOORS = { stats: { 여러문: 0, 한문: 0, 최대문: 0 } };
+/* 이 집에 닿는 길 칸 전부(중복 없이) — 끄면 첫 칸 하나만 */
+function roadsBeside(rec) {
+  const R = window.VRULES.doorsAll;
+  if (!R || !R.on) { const b = roadBeside(rec); return b >= 0 ? [b] : []; }
+  const fp = footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot), out = [], seen = new Set();
+  for (const [px, py] of fp)
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = px + dx, ny = py + dy; if (!inb(nx, ny)) continue;
+      const i = idx(nx, ny); if (seen.has(i) || !isRoad(i)) continue; seen.add(i); out.push(i);
+    }
+  if (out.length > 1) DOORS.stats.여러문++; else if (out.length === 1) DOORS.stats.한문++;
+  if (out.length > DOORS.stats.최대문) DOORS.stats.최대문 = out.length;
+  return out; }
+window.__doors = (x, y) => { const R = { 켜짐: !!window.VRULES.doorsAll.on, ...DOORS.stats };
+  if (x == null) return R; const rec = cells[idx(x, y)]; if (!rec) return { ...R, 집: '없음' };
+  return { ...R, 문앞칸: roadsBeside(rec).map(i => [cX(i), cY(i)]) }; };
 function roadBeside(rec) {
   const fp = footprint(rec.k, cX(rec.root), cY(rec.root), rec.rot);
   for (const [px, py] of fp)
@@ -4489,7 +4517,8 @@ function roadBFS(from, who, radius) {
   const gen = ++bfsGen, R = radius == null ? PATH_RADIUS : radius;
   const prev = bfsPrev, q = bfsQ;
   let qh = 0, qt = 0;
-  q[qt++] = from; bfsSeen[from] = gen; bfsDepth[from] = 0; prev[from] = -1;
+  if (Array.isArray(from)) { for (const s of from) { if (s < 0 || bfsSeen[s] === gen) continue; q[qt++] = s; bfsSeen[s] = gen; bfsDepth[s] = 0; prev[s] = -1; } }   /* [MAC-DOORS] 문 앞이 여럿이면 다 함께 */
+  else { q[qt++] = from; bfsSeen[from] = gen; bfsDepth[from] = 0; prev[from] = -1; }
   const reach = [];
   let cut = false;
   while (qh < qt) {
@@ -4921,8 +4950,8 @@ const faceOf = n => n >= NEEDS.length ? 0 : n >= Math.ceil(NEEDS.length / 2) ? 1
 const faceOfHome = root => Math.min(2, faceOf((sat.get(root) || { n: 0 }).n) + (crowdedHome(root) ? 1 : 0) + (joblessHome(root) ? 1 : 0));   // 붐비면·일자리 없으면 한 단계 아래(F12·F27)
 function computeSat(rec) {
   const met = { 물: false, 장보기: false, 놀이: false, 쉼: false, 배움: false };
-  const b = roadBeside(rec);
-  if (b >= 0) {
+  const b = roadsBeside(rec);   /* [MAC-DOORS] 닿는 문 앞 길을 모두 — 한 번의 멀티 소스 BFS */
+  if (b.length) {
     const { reach } = roadBFS(b, undefined, NEED_R_WIDE);
     for (const i of reach) {
       if (bfsDepth[i] > NEED_R && !isWide(i)) continue;   // 14칸 넘게 먼 곳은 큰길에 붙은 건물만 센다(F22)
