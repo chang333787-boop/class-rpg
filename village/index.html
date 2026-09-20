@@ -5325,7 +5325,7 @@ function awayGate(f, i) {
   f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; f.blockedAt = 0; f.stuckN = 0;
   movers = Math.max(0, movers - 1); f.slotFreed = true;                     // 돌아가는 길은 이사 자리를 안 차지한다(왕복이라 처리량이 반으로 주는 것 막기)
   let first = false; try { if (!localStorage.getItem(AWAY_SEEN_KEY())) { localStorage.setItem(AWAY_SEEN_KEY(), '1'); first = true; } } catch (e) {}
-  if (first) { AWAY.stats.첫안내++; simSay('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
+  if (first) { AWAY.stats.첫안내++; sayOnce('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
   else { const key = miss.join(); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
   if (path.length < 2) return awayGate(f, i);                                // 나갈 길이 없다 — 그 자리에서 사라진다
   return true;
@@ -5439,7 +5439,7 @@ const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 �
 NEED_TXT.일자리 = '일할 곳';
 let learnOn = false;
 function needsTick() {                            // 인구 80 을 넘으면 '배움'이 생긴다(한 번 생기면 안 없어진다)
-  if (!learnOn && population() >= LEARN_POP) { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); simSay('📚 마을이 커졌어요 — 이제 배울 곳도 바라요(도서관·학교)', true); }
+  if (!learnOn && population() >= LEARN_POP) { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); sayOnce('📚 마을이 커졌어요 — 이제 배울 곳도 바라요(도서관·학교)', true); }
 }
 const NEED_R = 14, NEED_R_WIDE = 20;               // 길로 14칸 안 · 큰길에 붙은 건물은 20칸(F22)
 const sat = new Map();
@@ -6103,7 +6103,7 @@ let goalsAutoUntil = 0;
 function goalsPeek(ms) { goalsShown = true; document.getElementById('goals').classList.add('show'); renderGoals(); goalsAutoUntil = performance.now() + ms; }
 function goalTick() {
   let changed = false;
-  openGoals().forEach(g => { if (g.ok()) { goalsDone.add(g.id); changed = true; simSay('🎯 목표 달성! ' + g.t, true); } });
+  openGoals().forEach(g => { if (g.ok()) { goalsDone.add(g.id); changed = true; sayOnce('🎯 목표 달성! ' + g.t, true); } });   /* [MAC-TOASTQ] 그 마을에서 다시 오지 않는 소식 — sayOnce 로 대기줄에 서서 앞엣것을 안 지운다(창조자 19회 ⓐ2: 경고를 칭찬이 덮었다) */
   if (changed) { markDirty(); renderGoals(); simSound('goal'); if (goalsDone.size < 3) goalsPeek(6000); }   // 첫 세 목표까지만 다음 목표를 잠깐 보여 준다 — 셋 끝나면 사라진다(F25)
   if (goalsAutoUntil && performance.now() > goalsAutoUntil) { goalsAutoUntil = 0; goalsShown = false; document.getElementById('goals').classList.remove('show'); }
 }
@@ -6149,7 +6149,7 @@ function goalUnlockTick() {
   Object.keys(LOCK_GOAL).forEach(k => { if (unlocked.has(k)) return; if (goalsDone.has(LOCK_GOAL[k]) || (GU.first && countKind(k) > 0)) { unlocked.add(k); opened.push(k); } });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
   const quiet = GU.first; GU.first = false; if (!opened.length) return;
   markDirty();
-  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); simSay('🔓 목표 보상! ' + opened.map(k => K[k].nm).join('·') + '이 열렸어요', true); simSound('goal'); }
+  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); sayOnce('🔓 목표 보상! ' + opened.map(k => K[k].nm).join('·') + '이 열렸어요', true); simSound('goal'); }
   buildTray();
 }
 /* buildTray 고리 — 잠긴 것은 '바로 다음 단계'만 보인다: 인구 문턱이 가장 가까운 것 + 지금 목표판에 뜬 목표의 보상 */
@@ -9583,8 +9583,18 @@ const STAGE_HOOKS = {
   '일닿음%': () => { if (population() < JOB_POP || (window.VRULES.jobsHomes && window.VRULES.jobsHomes.on && !JOBH.stats.한바퀴)) return null;
     let lived = 0, far = 0; res.forEach((v, root) => { if (v > 0) { lived++; if (joblessHome(root)) far++; } }); return lived ? 100 * (1 - far / lived) : null; },
 };
+/* [MAC-STAGEOFF] 목표가 **쓸 수 있는 것만** 세게 한다(판 파일 목표에 "쓸수있는": true).
+   창조자 19회 ⓐ2: "어디에 있어야 쓸 수 있을까" 판인데 길에서 떨어진 우물 하나로 '목표 달성!'이 떴다 —
+   아무도 못 쓰는 것을 세면 판이 제 주제를 배반한다. 놓는 것은 막지 않는다(틀려 보고 고치는 것이 배움이다).
+   '쓸 수 있다'는 이미 있는 판정 그대로 — 길 옆인가(sayNearRoad). 새 판정 0. */
+function stageCountUsable(kind) { let n = 0;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== kind) return;
+    if (K[kind] && K[kind].needRoad) { n++; return; }                      /* 길에 붙어야만 놓이는 것은 언제나 쓸 수 있다 */
+    if (sayNearRoad(kind, cX(i), cY(i), rec.rot)) n++; });
+  return n; }
+window.__usable = kind => ({ 종류: kind, 다: countKind(kind), 쓸수있는: stageCountUsable(kind) });
 function stageGoalOk(g) {
-  if (g.셈 === 'kind') return countKind(g.k) >= (g.n || 1);
+  if (g.셈 === 'kind') return (g.쓸수있는 ? stageCountUsable(g.k) : countKind(g.k)) >= (g.n || 1);
   if (g.셈 === 'pop') return population() >= (g.n || 1);
   if (g.셈 === 'hook') { const f = STAGE_HOOKS[g.훅], v = f ? f() : null; if (v == null) return false; return g.비교 === '<=' ? v <= g.n : v >= g.n; }
   return false;
