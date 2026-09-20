@@ -3205,6 +3205,17 @@ window.__flow = () => { const 밭 = [], 가게 = [];   /* 판에 있는 것 전�
   return ({ 켜짐: flowOn(), 물건: window.VRULES.flow.물건, 짐: FLOW.짐.length, 밭, 가게,
   세대: { 받음: [...FLOW.집.values()].filter(h => h.받음).length, 못받음: [...FLOW.집.values()].filter(h => !h.받음).length },
   ...FLOW.stats }); };
+/* ── 계약 겉면: window.FLOW(root) ────────────────────────────────────────────
+   연기·디자인이 **한 함수만** 읽고 장면을 고르게 한다(보스 확정 이름 · 09-21).
+     밭   'growing' | 'ready' | 'full' | 'waiting' | 'moving' | 'cut'
+     가게 'stocked' | 'empty'
+     집   'got' | 'missed'
+     그 밖(흐름 칸이 없는 판 · 흐름과 무관한 것 · 없는 자리) → null
+   안의 이름(FLOW 라는 내부 표)과 헷갈리지 않게, 밖으로 나가는 것은 **이 함수 하나뿐**이다.
+   root 는 그 물건의 대표 칸 번호다(집·건물의 rec.root). 좌표로 묻고 싶으면 window.__flowAt(x, y). */
+window.FLOW = (root) => { if (!flowOn()) return null;
+  const rec = (root | 0) === root ? cells[root] : null; if (!rec || rec.root !== root) return null;
+  return flowFieldState(root) || flowStoreState(root) || flowHomeState(root) || null; };
 window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '없음';
   const fs = flowFieldState(rec.root), ss = flowStoreState(rec.root), hs = flowHomeState(rec.root);
   const s = fs || ss || hs; if (!s) return '흐름과 무관';
