@@ -2177,7 +2177,7 @@ window.__miniClick = (fx, fy) => { const b = miniBox; const x = b.x0 + fx * (b.x
 
 function updateViewMode() {
   const px = cellPixels(zoomMul);
-  const want = px < 12;                         // 한 칸이 12px 보다 작으면 지도
+  const want = px < mapThreshold(mapMode);      // 한 칸이 이만큼보다 작으면 지도 — 큰 판에서는 조금 더 일찍([MAC-MAPWIDE])
   if (want !== mapMode) {
     mapMode = want;
     chunkGroup.visible = !mapMode; mapPlane.visible = mapMode;
@@ -3032,6 +3032,17 @@ function simDirty(chunk) { return simEmit('dirty', chunk); }
 function simSparkle(o) { return simEmit('sparkle', o); }
 function simOut(type, fn) { simEmit('_'); simEmit.h[type] = fn; }   // 처리기 바꾸기(④ · 시험용) — simEmit('_') 는 처리기 표를 만들어 두려고 한 번 부른다
 window.__simOut = () => ({ ...(simEmit.n || {}) });
+
+/* ── [MAC-MAPWIDE] 아주 큰 판만 지도로 조금 더 일찍 (보스 09-20 · docs/village_perf_try_20260920.md ①′) ──
+   3D 로 가장 넓게 보는 순간(한 칸 12~20px)이 제일 무겁다 — 516명 판에서 그리기 호출 452 · 삼각형 446k · 프레임 10.6ms(CPU 6배).
+   문턱을 모두 올리면 작은 마을은 얻는 것 없이 3D 그림만 잃는다(실측: pop88·pop167 은 그 구간이 63~90 호출로 이미 가볍다).
+   그래서 **놓인 물건 수**가 bigItems 를 넘는 판에서만 문턱을 big 으로 올린다 — 아이가 만든 것(물건 수)으로만 정하고, 인구·시각처럼 흔들리는 값은 안 쓴다.
+   깜빡임 방지: **큰 판에서만** — 지도에서 나올 때는 문턱 + hys 를 넘어야 한다(경계에서 왔다 갔다 하지 않게). 작은 판에 넣으면 경계 배율에서 예전과 달라져서 안 넣는다(실측).
+   실학급 판(물건 285~390)은 **아무 변화가 없다**. 끄면(on:false) 예전 그대로. 원래 줄 수정 1(updateViewMode 의 문턱 줄). */
+(window.VRULES = window.VRULES || {}).mapWide = { on: true, base: 12, big: 16, bigItems: 8000, hys: 2 };
+function mapThreshold(inMap) { const R = window.VRULES.mapWide; if (!R || !R.on) return 12;
+  const big = placedTotal > R.bigItems; return big ? (inMap ? R.big + R.hys : R.big) : R.base; }   // 작은 판은 예전 그대로(문턱 12 · 깜빡임 방지도 없음 — 넣으면 경계 배율에서 예전과 달라진다)
+window.__mapWide = () => ({ 켜짐: window.VRULES.mapWide.on, 물건: placedTotal, 문턱: mapThreshold(false), 지도에서나올때: mapThreshold(true), 지도중: mapMode });
 
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
