@@ -970,6 +970,18 @@ function amenityChanged(kind, x, y, rot) {
 const amenOf = root => amen.has(root) ? amen.get(root) : (amen.set(root, amenityOf(root)), amen.get(root));
 const growMul = root => { const a = amenOf(root); return a <= 0 ? 1.15 : 1 - 0.3 * Math.min(a, AMEN_MAX) / AMEN_MAX; };   // 6 → ×0.7 · 0 → ×1.15
 const amenText = root => { const a = amenOf(root); return a >= 3 ? ' · 나무가 많아 좋아요' : a <= 0 ? ' · 거리가 좀 삭막해요' : ''; };
+/* ── [MAC-NOGROWMUL] 꾸밈은 자라는 **속도**를 바꾸지 않는다 (사용자 승인 규칙 변경 1 · 보스 카드) ──
+   집 둘레의 나무·꽃 점수(amenOf)가 성장에 ×1.15 ~ ×0.7 배율로 붙어 있었다(growMul). 화면이 하는 말은
+   ' · 나무가 많아 좋아요' / ' · 거리가 좀 삭막해요'뿐 — **빨리 자란다는 말은 어디에도 없다.**
+   아이 눈에 안 보이는 데다, 같은 수를 둔 두 마을이 왜 다른 속도로 자라는지 설명할 수 없게 만든다.
+   말·목표(green1 '삭막한 집 없애기')·주민 연기(좋아요·콧노래)는 **그대로 둔다** — 속도 배율만 뺀다.
+   ⚠ 끄는 것이 기본이고 스위치(on)는 **복구용**이다 — 수업 판이 '교육적 선택'으로 켤 값이 아니다.
+      판 파일이 true 로 켜면 아이에게 안 보이는 배율이 조용히 돌아온다. 원래 줄 수정 2(satTick · __amen 훅). */
+(window.VRULES = window.VRULES || {}).growMul = { on: false };
+const GMUL = { stats: { 배율쓴집: 0, 배율뺀집: 0 } };
+function growMulOn() { const R = window.VRULES.growMul; return !!(R && R.on); }
+function growMulAt(root) { if (!growMulOn()) { GMUL.stats.배율뺀집++; return 1; } GMUL.stats.배율쓴집++; return growMul(root); }
+window.__growMul = () => ({ 켜짐: growMulOn(), ...GMUL.stats });
 /* 해금 — 인구 문턱과 열리는 물건 */
 const UNLOCKS = [ { pop:10, kinds:['fountain','pavilion'] }, { pop:30, kinds:['clock','windmill','dream'] }, { pop:50, kinds:['library'] }, { pop:80, kinds:['green','sbridge','station'] }, { pop:120, kinds:['school'] }, { pop:160, kinds:['museum'] } ];   // 47차: 특별 4종은 한 개씩(광장 뒤 곡선)
 const LOCK_POP = {}; UNLOCKS.forEach(u => u.kinds.forEach(k => LOCK_POP[k] = u.pop));
@@ -4730,7 +4742,7 @@ function satTick() {
   const st = computeSat(rec);
   /* 성장: 넷 다 채워진 채 하루가 가면 한 층. 내려가는 일은 없다 — 😐 가 되면 시계만 멈춘다 */
   const h = hinfo.get(rec.root) || { lv: 1, hs: -1 }; hinfo.set(rec.root, h);
-  if (st.n >= NEEDS.length && !crowdedHome(rec.root) && !joblessHome(rec.root)) { if (h.hs < 0) h.hs = growResume(h); else if (SIM.t - h.hs >= GROW_TICKS * TICK_MS * growMul(rec.root) && h.lv < 3) { growHouse(rec, h); } }   // 꾸미기가 많으면 빨리(F33) · 멈췄던 만큼 이어서([MAC-GROWPAUSE])
+  if (st.n >= NEEDS.length && !crowdedHome(rec.root) && !joblessHome(rec.root)) { if (h.hs < 0) h.hs = growResume(h); else if (SIM.t - h.hs >= GROW_TICKS * TICK_MS * growMulAt(rec.root) && h.lv < 3) { growHouse(rec, h); } }   // 꾸미기가 많으면 빨리(F33) · 멈췄던 만큼 이어서([MAC-GROWPAUSE])
   else h.hs = growPause(h);   // [MAC-GROWPAUSE] 처음부터 다시가 아니라 멈춤
 }
 function growHouse(rec, h) {
@@ -9059,7 +9071,7 @@ window.__visitNow = () => { visitTimer = VISIT_EVERY; visitTick(SIM.t); return w
 window.__setHour = (h) => { SIM.t = Math.floor(SIM.t / DAY_MS) * DAY_MS + (((h - DAY_START_H) + 24) % 24) / 24 * DAY_MS; return window.__sim(); };
 window.__jobs = () => ({ ...jobStats, 일터: [...jobCount.entries()].map(([r, n]) => [K[cells[r].k].nm, n, K[cells[r].k].jobs]), 일없는비율: +joblessRatio().toFixed(2), 시: +simHour().toFixed(1), 일터안: folks.filter(f => f.state === 'inside' && f.goal === 'work').length, 표시중: facePool[4].count });
 window.__workers = () => folks.filter(isAdult).map(f => ({ 집: cY(f.home) * 1000 + cX(f.home), 일터: f.job == null ? null : cY(f.job) * 1000 + cX(f.job), 목표: f.goal || null, 상태: f.state, 안: f.inside ? f.inside.root : null }));
-window.__amen = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; return { 점수: amenOf(rec.root), 배율: +growMul(rec.root).toFixed(2), 층: houseLv(rec.root), 주민: res.get(rec.root) || 0 }; };
+window.__amen = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; return { 점수: amenOf(rec.root), 배율: growMulOn() ? +growMul(rec.root).toFixed(2) : 1, 옛배율: +growMul(rec.root).toFixed(2), 층: houseLv(rec.root), 주민: res.get(rec.root) || 0 }; };
 window.__wishes = () => ({ ...wishStats, 지금: folks.filter(f => f.wish).map(f => ({ 이름: folkName(f), 집: [cX(f.home), cY(f.home)], 바람: f.wish.need, 글: wishText(f) })) });
 window.__setSign = (x, y, t) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'sign') return false; signs.set(rec.root, { t: String(t).slice(0, 20), at: SIM.t }); refreshSignSprites(); markDirty(); return true; };
 window.__setDream = (t) => { DREAM.text = String(t || '').slice(0, 40); return DREAM.text; };
