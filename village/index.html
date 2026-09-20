@@ -5131,9 +5131,16 @@ const CROWDSAY = { road: new Map(), stats: { 넓혀요: 0, 한줄더: 0 } };
    그래서 권유를 따르든 말든 **길을 깔자마자** 한마디 한다: 새로 깐 길에서 길을 따라가 **시설(필요·일자리를 주는 건물)에 하나도 못 닿으면**
    "이 길은 아직 본길과 안 이어졌어요". 끌어서 여러 칸을 놓는 동안은 조용하고, 손을 뗀 뒤(waitMs) 한 번만 본다.
    같은 말을 되풀이하지 않게 again(20초) 안에는 다시 안 한다. 판정은 한 자도 안 바꾼다(분류 '보기').
+
+   덧(창조자의 눈 11회 🔴 · 보스 09-21) — **첫 마을에서 역효과가 났다.** 이어짐을 '시설에 닿나'로 보았는데 **새 마을엔 시설이 0** 이라,
+   첫 목표('길 6칸 잇기')대로 시작 길에 한 칸만 붙여도 "안 이어졌어요"가 떴다 — 그것도 **첫 안내 창 위에**. 아이가 보는 두 번째 문장이 꾸중이 됐다.
+   그래서 판정을 **'내가 깔기 전부터 있던 길에 붙었나'** 로 바꿨다(놓기 전에 곁을 본다 — 이번 묶음에서 깐 칸은 빼고).
+   여기에 둘을 더한다: **첫 안내가 떠 있는 동안**(GUIDE.on)과 **시설이 하나도 없는 마을**에서는 말하지 않는다.
+   그리고 **끊겼다고 말한 적이 있는데 이번에 붙었으면 알려 준다**(B5): "🛣️ 이어졌어요 — 이제 사람들이 지나가요".
+   고친 줄 모르고 지나가는 일이 없게 — 말한 적이 없으면 축하도 하지 않는다(조용한 마을을 시끄럽게 만들지 않는다).
    끄면(VRULES.roadJoin.on = false) 예전처럼 조용하다. 원래 줄 수정 1(권하는 말에 '끝은 본길과 이어 줘요' 한마디). */
-(window.VRULES = window.VRULES || {}).roadJoin = { on: true, waitMs: 1200, again: 20000 };
-const RJOIN = { pend: [], t: 0, last: -1e9, stats: { 봄: 0, 말함: 0, 이어짐: 0 } };
+(window.VRULES = window.VRULES || {}).roadJoin = { on: true, waitMs: 1200, again: 20000, 이음말: true };
+const RJOIN = { pend: [], set: new Set(), joined: false, warned: false, t: 0, last: -1e9, stats: { 봄: 0, 말함: 0, 이어짐: 0, 이음말: 0, 조용: 0 } };
 /* 이 길에서 길을 따라 시설에 닿나 — 닿으면 본길에 이어진 것이다 */
 function roadJoinReaches(from) {
   const { reach } = roadBFS(from, undefined, 9999);
@@ -5142,20 +5149,36 @@ function roadJoinReaches(from) {
       if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)], q = c && K[c.k];
       if (q && (q.need || q.need2 || q.jobs)) return true; } }
   return false; }
+/* 아직 시설이 하나도 없는 마을(첫 수)에는 '본길'이라는 것이 없다 — 이을 데가 없는데 잇지 않았다고 말하면 안 된다 */
+function roadJoinHasPlace() { for (let i = 0; i < cells.length; i++) { const c = cells[i]; if (!c || c.root !== i) continue;
+    const q = K[c.k]; if (q && (q.need || q.need2 || q.jobs)) return true; } return false; }
 function roadJoinCheck() {
   const R = window.VRULES.roadJoin; if (!R || !R.on) return;
-  const put = RJOIN.pend.slice(); RJOIN.pend.length = 0;
+  const put = RJOIN.pend.slice(), joined = RJOIN.joined;
+  RJOIN.pend.length = 0; RJOIN.set.clear(); RJOIN.joined = false;
   const from = put.find(i => cells[i] && K[cells[i].k] && K[cells[i].k].road); if (from == null) return;
   RJOIN.stats.봄++;
-  if (roadJoinReaches(from)) { RJOIN.stats.이어짐++; return; }
+  /* ① 이번에 깐 길이 **깔기 전부터 있던 길**에 하나라도 붙었으면 이어진 것이다(창조자의 눈 11회 — '시설에 닿나'로 보면
+       시설이 0 인 새 마을의 첫 수가 늘 걸린다). ② 끊겼다고 말한 적이 있는데 이번에 붙었으면 **이어졌다고 알려 준다**(B5). */
+  if (joined) { RJOIN.stats.이어짐++;
+    if (RJOIN.warned && R.이음말 !== false) { RJOIN.warned = false; RJOIN.stats.이음말++;
+      toast('🛣️ 이어졌어요 — 이제 사람들이 지나가요', true); }
+    return; }
+  if (GUIDE.on) { RJOIN.stats.조용++; return; }                 /* 첫 안내가 떠 있는 동안은 아이의 두 번째 문장이 꾸중이 되면 안 된다 */
+  if (!roadJoinHasPlace()) { RJOIN.stats.조용++; return; }      /* 시설이 0 이면 '본길'이 없다 */
   const now = performance.now(); if (now - RJOIN.last < (R.again || 20000)) return;
-  RJOIN.last = now; RJOIN.stats.말함++;
+  RJOIN.last = now; RJOIN.stats.말함++; RJOIN.warned = true;
   toast('🛣️ 이 길은 아직 본길과 안 이어졌어요 — 끝을 이어 줘야 사람들이 지나가요', true); }
-{ hookAdd('placeAt', function (next, args) { const r = next(args); const R = window.VRULES.roadJoin;
-    if (R && R.on && K[args[0]] && K[args[0]].road && window.__LOADMS != null && !VISIT.on) {
-      RJOIN.pend.push(idx(args[1], args[2])); clearTimeout(RJOIN.t); RJOIN.t = setTimeout(roadJoinCheck, R.waitMs || 1200); }
+{ hookAdd('placeAt', function (next, args) { const R = window.VRULES.roadJoin;
+    const 볼까 = R && R.on && K[args[0]] && K[args[0]].road && window.__LOADMS != null && !VISIT.on;
+    if (볼까) { const x = args[1], y = args[2];                 /* **놓기 전에** 본다 — 곁에 '이번에 깐 것이 아닌' 길이 있으면 이어진 것 */
+      for (let k = 0; k < 4 && !RJOIN.joined; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (isRoad(j) && !RJOIN.set.has(j)) RJOIN.joined = true; } }
+    const r = next(args);
+    if (볼까) { const i = idx(args[1], args[2]); RJOIN.set.add(i); RJOIN.pend.push(i);
+      clearTimeout(RJOIN.t); RJOIN.t = setTimeout(roadJoinCheck, R.waitMs || 1200); }
     return r; }); }
-window.__roadJoin = (x, y) => { const R = { 켜짐: !!window.VRULES.roadJoin.on, ...RJOIN.stats };
+window.__roadJoin = (x, y) => { const R = { 켜짐: !!window.VRULES.roadJoin.on, 끊겼다고말함: RJOIN.warned, 시설있음: roadJoinHasPlace(), ...RJOIN.stats };
   if (x == null) return R; const i = idx(x, y), c = cells[i];
   if (!c || !K[c.k] || !K[c.k].road) return { ...R, 길: '없음' };
   return { ...R, 시설에닿음: roadJoinReaches(i) }; };
@@ -5324,9 +5347,15 @@ window.__widen3 = () => ({ 기다림: WIDEN3.armed, 물림기록: WIDEN3.shifts.
      (제 식구는 내보낼 수 없다). 그래서 집의 붐빔 = (문 앞 칸의 값 − **그 집이 제 문 앞에 얹은 몫**) ÷ 품.
      실측(하루): 붐비는 집 young4 3 → 0 · pop88 24 → 11 · pop167 57 → 38. 큰 판의 진짜 붐빔(남의 몫 5.3)은 그대로 남는다.
      끄면(crowdHomes.self = false) 옛 셈. 새 스위치를 만들지 않고 이 칸에 둔 까닭: 켜진 판정 규칙이 이미 여섯(판 검사 상한)이다.
+
+   덧 2 [품 4 → 3] (창조자의 눈 11회 표 · 보스 승인 09-21 · **규칙 수치 변경**):
+     자기 몫을 뺀 뒤(위) 이번엔 **놓친 경고**가 드러났다 — 진짜 막히는 길의 3분의 2가 조용했다(pop88 33채 중 24채).
+     품(한 칸 길이 견디는 나들이 수)을 **4에서 3으로** 낮춘다. 창조자 표: 놓친 경고 pop88 26→16 · pop167 21→12 ·
+     **첫 마을(집 4채·16명)은 품 3 에서도 조용**(거짓 경고가 안 되살아난다). 품 2 는 얻는 것이 작고 #732 로 고친 자리가 되살아나 탈락.
+     되돌리려면 crowdHomes.cap = 4. 큰길은 그 두 배(6)다.
      남은 것: mode 'front' 는 **한 칸만** 보아 과장한다(집 바깥쪽에 길을 한 줄 깔면 문 앞이 한산한 새 길로 바뀌어 0 이 된다) — 이번엔 안 건드린다.
    규칙 판정이 바뀐다 — VRULES.crowdHomes.on = false 면 옛 셈(걷는 표본). 원래 줄 수정 0 — crowdTick 감싸기 + simTick 고리 한 줄. */
-(window.VRULES = window.VRULES || {}).crowdHomes = { on: true, cap: 4, mode: 'front', every: 90, self: true };   // self: 제 식구 몫은 빼고 센다(아래 덧)   // 품 4 · 문 앞 칸: 167명 판에서 옛 셈과 이어지고(48~50 ↔ 57채) 큰 판에서 사라지지 않는다(317명 36 · 529명 69채)
+(window.VRULES = window.VRULES || {}).crowdHomes = { on: true, cap: 3, mode: 'front', every: 90, self: true };   // self: 제 식구 몫은 빼고 센다(아래 덧) · cap 3: 품(창조자의 눈 11회 · 보스 승인 — 아래 덧 2)   // 품 4 · 문 앞 칸: 167명 판에서 옛 셈과 이어지고(48~50 ↔ 57채) 큰 판에서 사라지지 않는다(317명 36 · 529명 69채)
 var CROWDH = { self: new Map(), selfLoad: new Map(), cur: 0, acc: new Map(), paths: new Map(), front: new Map(), load: new Map(), house: new Map(), stats: { 한바퀴: 0, 집: 0 } };
 function crowdHomesStep() { const R = window.VRULES.crowdHomes; if (!R.on) return; const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CROWDH.cur + step), nn = NEEDS.length || 1;
   for (let i = CROWDH.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i || rec.k !== 'house') continue; const n = res.get(i) || 0; if (n <= 0) continue;
