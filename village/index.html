@@ -10145,8 +10145,15 @@ function first5HouseCard() { const c = GUIDE_CARDS[1]; if (!c) return; const on 
 { const gr0 = guideRender; guideRender = function () { first5HouseCard(); return gr0.apply(this, arguments); }; }
 window.__first5House = () => ({ 켜짐: window.VRULES.first5House.on, 터치기기: first5Touch(), 글: (GUIDE_CARDS[1] || {}).txt });
 
+/* [MAC-STAGEGUIDE] 판이 첫 안내 3장을 끈다(판 파일 "첫안내": false).
+   까닭: 안내는 "길을 고르고 칸을 누르면 놓여요"로 **마을 만드는 법**을 가르친다. 프로토타입 판은 아이가 마을을 만들지 않고
+   이미 돌아가는 마을을 **따라가는** 시험이라, 그 안내가 과제와 다른 말을 한다(설계 docs/village_proto_flow_design.md 6-다 · 첫 30초 실측).
+   칸이 없으면 켜진 채 그대로 — 수업 판과 기본 마을은 한 픽셀도 안 달라진다. */
+const stageNoGuide = () => !!(STAGE.def && STAGE.def.첫안내 === false);
+/* 그 대신 판 카드로 과제를 말한다 — 자유 놀이 판(교과 없음)은 원래 카드가 없지만, 프로토타입은 "무엇을 하는 판인지"를 말할 자리가 그 카드뿐이다 */
+const stageWantCard = () => !!(STAGE.def && STAGE.def.카드 === true);
 function guideStart(force) {
-  if (!force && (guideSeen() || VISIT.on || savingOff)) return false;      // 옛 저장본·구경·시연 판엔 안 뜸
+  if (!force && (guideSeen() || VISIT.on || savingOff || stageNoGuide())) return false;      // 옛 저장본·구경·시연 판·판이 끈 곳엔 안 뜸
   guideHold(true);   // [MAC-GUIDE]
   GUIDE.on = true; GUIDE.i = 0; GUIDE.shown++; document.getElementById('guide').classList.add('show'); guideRender(); return true;
 }
@@ -10646,7 +10653,7 @@ function stageCardEnd(why) { if (!STAGE.def || STAGE.def.교과 == null) return;
   SCARD.shoot = { frame: rec.first.frame, done: url => { rec.today = { t: Date.now(), day: simDay(), url }; scardSave(); if (SCARD.el) { const figs = SCARD.el.querySelectorAll('figure'); if (figs[1] && url) figs[1].outerHTML = scardPic(url, '오늘'); } } }; }
 /* 부팅 — 판일 때만. 처음 여는 판이면 시작 카드 · #끝 이면 끝 카드. 첫 안내가 떠 있으면 닫힌 뒤에 */
 /* 자유 놀이 판(교과 없음 · town)엔 카드가 없다 */
-function stageCardBoot() { if (!STAGE.def || VISIT_SID || STAGE.def.교과 == null) return; const endAsk = /(^|,)(끝|end)(,|$)/.test(decodeURIComponent(location.hash.slice(1)));
+function stageCardBoot() { if (!STAGE.def || VISIT_SID || (STAGE.def.교과 == null && !stageWantCard())) return;   /* [MAC-STAGEGUIDE] 교과가 없어도 판이 "카드": true 면 시작 카드를 띄운다 */ const endAsk = /(^|,)(끝|end)(,|$)/.test(decodeURIComponent(location.hash.slice(1)));
   const go = () => { if (GUIDE.on) { setTimeout(go, 800); return; } if (endAsk) stageCardEnd('교사'); else if (!scardLoad().started) stageCardStart(); };
   setTimeout(go, 600); }
 window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
