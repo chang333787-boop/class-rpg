@@ -7441,7 +7441,9 @@ window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
+    if (actJobWhyTick(f, i, now)) continue;   // [ACT-JOBWHY] 일자리가 없는 까닭을 생활 장면으로 · 첫 출근
     if (actWorkTick(f, i, now)) continue;   // [ACT-WORK] 일하는 사람은 문 밖에서 · 풍차 자루는 하루 한 번 가게로
+    if (actFlowTick(f, i, now)) continue;   // [ACT-FLOW] 흐름을 사람으로 — 지고 간다 · 받아 들고 나온다(없으면 빈손)
     if (actCrowdTick(f, now)) continue;   // [ACT-CROWD] 붐비는 좁은 길 — 마주 오는 둘이 비켜 서느라 잠깐 멈칫
     if (actGrowTick(f, now)) continue;   // [ACT-GROW] 밤새 자란 나무·꽃밭 — 지나던 주민이 멈춰 올려다본다
     if (actShelterOutTick(f, now)) continue;   // [ACT-SHELTER] 비가 그치거나 밤이 되면 처마 밑 사람들이 다 같이 한 걸음 나온다
@@ -8571,7 +8573,7 @@ function actWorkTick(f, i, now) {
   const k = workKind(f.inside.root);
   if (!R.on || !k || f.goal !== 'work' || f.inside.root !== f.job || !isWorkHour(h)) { if (f.beside && f.beside.work) f.beside = null; return false; }
   if (!f.beside || !f.beside.work) { const b = workPlace(f); if (b) { f.beside = b; WORK.stats.문밖일꾼++; } }
-  if (k === 'windmill' && h >= R.tripH && f.beside && f.beside.slot === 0) {   // 하루 한 번 — 가장 가까운 가게로 자루 하나
+  if (k === 'windmill' && !(window.VRULES.flowAct && window.VRULES.flowAct.on && typeof window.FLOW === 'function' && window.FLOW(f.inside.root)) && h >= R.tripH && f.beside && f.beside.slot === 0) {   // 하루 한 번 — 가장 가까운 가게로 자루 하나(흐름이 도는 판에서는 [ACT-FLOW] 가 이어받는다)
     const day = Math.floor(SIM.t / DAY_MS); if (WORK.tripDay.get(f.inside.root) === day) return false; WORK.tripDay.set(f.inside.root, day);
     if (pathBudget <= 1) return false;
     const wr = f.inside.root; let shop = -1, bd = 1e9; jobCount.forEach((n, r) => { const b = cells[r]; if (!b || b.k !== 'shop') return; const d = Math.abs(cX(r) - cX(wr)) + Math.abs(cY(r) - cY(wr)); if (d < bd) { bd = d; shop = r; } });
@@ -8616,6 +8618,312 @@ function actWorkDraw(now) {
 window.__workLook = () => { const h = simHour(); let out = 0, trip = 0; folks.forEach(f => { if (f.state === 'inside' && f.beside && f.beside.work) out++; if (f.workTrip) trip++; });
   const empty = []; jobCount.forEach((n, r) => { if (workKind(r) && n === 0) empty.push(cells[r].k); });
   return { 켜짐: window.VRULES.workLook.on, 시: +h.toFixed(1), 지금문밖일꾼: out, 자루나르는중: trip, 빈일터: empty, ...WORK.stats }; };
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-JOBWHY] 일자리가 없는 까닭이 저마다 다르게 보이게 (주민 연기 · 09-20 · 보스 작업 카드 · 사용자 승인).
+   **까닭은 내가 정하지 않는다** — 프로그램 담당의 `window.JOB_WHY(집 root) → 'none'|'cut'|'far'|'full'`(MAC-JOBWHY · 보스 확정 계약)을 하루 한 번 읽고,
+   그 답에 맞는 생활 장면만 보인다(💼 칩 이름 · 집 카드 말 · 돌아섬 말과 늘 같은 까닭을 말하게 된다). 내가 따로 찾는 것은 **걸어갈 칸**뿐이다.
+     ⓐ none 없음  — 가까이 지을 수도 이을 수도 없다                  → 아침 7:30 집 앞에서 두리번(고개 좌우)
+     ⓑ cut  끊김  — 길 몇 칸만 이으면 닿는다                          → 10:30 길이 끝나는 칸까지 걸어가 멈칫, 그쪽을 보고 되돌아선다
+     ⓒ far  멂    — 길은 이어졌지만 배정 반경 밖이다                  → 9:24 그쪽으로 갈 수 있는 데까지 한참 걸어갔다가 되돌아온다(길이 끊긴 곳이 아니다)
+     ⓓ full 자리참 — 닿는 일터가 있는데 자리가 다 찼다                → 10:00 그 일터 앞까지 갔다가 들어가지 못하고 돌아 나온다
+   (일자리가 **있는** 사람의 먼 출근길은 까닭과 별개다 — 출근 경로가 farSteps 칸을 넘으면 아침 earlyH 에 먼저 집을 나선다.)
+   해결된 뒤: **첫 출근** — 일자리가 처음 생긴 사람은 일터 문 앞에서 joyMs 멈췄다가 ✨ 하나(있던 묶음)와 함께 들어간다(💼✓ 와 겹치지 않게 도착 뒤로 비껴 둔다).
+   판정·확률·저장 0 · 옷은 ACT-WORK 의 일터 색 그대로 · draw call +0(몸짓과 있던 ✨ 뿐) · 길찾기는 pathBudget 안에서 하루 사람마다 한 번.
+   스위치·수치 VRULES.jobLook + tickFolks 고리 한 줄. JOB_WHY 가 없거나 꺼져 있으면 장면도 통째로 쉰다(읽는 함수 하나 jobWhyRead 만 그쪽을 본다).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).jobLook = { on: true, atH: { none: 7.5, full: 10, far: 9.4, cut: 10.5 }, spreadH: 0.5, farSteps: 14, earlyH: 8.4, pauseMs: 1500, lookMs: 2600, swing: 0.8, joyMs: 1200 };
+const JOBWHY = { stats: { 없음: 0, 끊김: 0, 멀어서: 0, 자리참: 0, 첫출근: 0, 문앞돌아섬: 0, 길끝멈칫: 0, 멀리갔다돌아섬: 0, 두리번: 0, 먼출근먼저나섬: 0 } };
+function jobWhyRead(f, i) {                                             // 하루 한 번 — 까닭은 프로그램(window.JOB_WHY)에서 읽고, 걸어갈 곳만 내가 찾는다
+  if (f.base < 0 || f.home < 0 || typeof window.JOB_WHY !== 'function') return null;
+  const why = window.JOB_WHY(f.home); if (!why) return null;            /* 판정은 MAC-JOBWHY 하나에서 — 💼 칩·집 카드·돌아섬 말과 같은 답을 장면도 쓴다 */
+  if (why === 'none') return { why: 'none' };
+  if (pathBudget <= 1) return null;
+  pathBudget--;
+  const { reach } = roadBFS(f.base);
+  if (why === 'full') {                                                 // 자리 참 — 길로 닿는 가장 가까운 일터 문 앞까지
+    let near = -1, nd = 1e9;
+    for (const c of reach) { const x = cX(c), y = cY(c);
+      for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (!r || !K[r.k].jobs) continue;
+        const d = Math.abs(cX(r.root) - cX(f.base)) + Math.abs(cY(r.root) - cY(f.base)); if (d < nd) { nd = d; near = r.root; } } }
+    return near >= 0 ? { why: 'full', target: near } : null;
+  }
+  const info = window.JOB_WHY.info ? window.JOB_WHY.info(f.home) : null;   // 끊김·멂 — 그 일터 쪽으로 갈 수 있는 데까지 갔다가 되돌아선다
+  let goal = info && info['일터'] != null && cells[info['일터']] ? info['일터'] : -1, gd = 1e9;
+  if (goal < 0) jobCount.forEach((n, r) => { if (!cells[r]) return; const d = Math.abs(cX(r) - cX(f.base)) + Math.abs(cY(r) - cY(f.base)); if (d < gd) { gd = d; goal = r; } });
+  if (goal < 0) return null;
+  let end = -1, ed = 1e9;
+  for (const c of reach) { const d = Math.abs(cX(c) - cX(goal)) + Math.abs(cY(c) - cY(goal)); if (d < ed) { ed = d; end = c; } }
+  return end >= 0 ? { why, target: goal, end } : null;
+}
+function actJobWhyTick(f, i, now) {
+  const R = window.VRULES.jobLook; if (!R.on || f.visitor || f.arriving || f.leaving) return false;
+  const h = simHour(), day = Math.floor(SIM.t / DAY_MS);
+  if (f.jobLast === undefined) f.jobLast = f.job;                      // 첫 출근 — 일자리가 없다가 생긴 사람
+  if (f.job != null && f.jobLast == null) { f.jobLast = f.job; f.jobNew = true; f.jobWhy = null; }
+  else if (f.job !== f.jobLast) f.jobLast = f.job;
+  if (f.job != null) {
+    if (f.jobNew && f.goal === 'work' && (f.state === 'walk' || f.state === 'idle') && f.path && f.path[f.step + 1] == null && touchesRoot(f.path[f.step], f.job)) {
+      if (!f.jobJoy) { f.jobJoy = now + R.joyMs; f.state = 'idle'; f.path = [f.path[f.step]]; f.step = 0; f.seg = 0; f.walking = false;
+        const b = cells[f.job]; if (b) { const c = centerOf(b.k, cX(b.root), cY(b.root), b.rot); f.dir = Math.atan2(c.x - f.x, c.z - f.z); } return true; }
+      if (now < f.jobJoy) { f.walking = false; return true; }
+      const b = cells[f.job]; if (b) { const c = doorFront(b); sparkle.push({ x: c.x, z: c.z, until: now + 2200 }); }
+      f.jobJoy = null; f.jobNew = false; JOBWHY.stats.첫출근++; return false;
+    }
+    if (f.goal === 'work' && f.state === 'walk' && f.step === 0 && f.path && f.path.length > 1) f.farJob = f.path.length >= R.farSteps;   // 출근길 길이를 읽어 둔다
+    if (f.farJob && !f.goal && h >= R.earlyH && h < 9 && f.jobEarly !== day && (f.state === 'idle' || f.state === 'inside')) {   // 멂 — 남보다 먼저 일터로 나선다(9시를 기다리지 않는다)
+      f.jobEarly = day; if (pathBudget <= 1) return false; pathBudget--;
+      if (f.state === 'inside') { if (f.inside.root !== f.home) return false; leave(f, '나옴'); }
+      f.goal = 'work'; if (!pathToBuilding(f, i, f.job)) { f.goal = null; return false; } JOBWHY.stats.먼출근먼저나섬++; return true;
+    }
+    if (f.jobWhy) f.jobWhy = null;
+    return false;
+  }
+  if (!isAdult(f) || f.base < 0) return false;
+  const S = f.jobScene;
+  if (S) {                                                              // 장면 진행 중
+    if (!isWorkHour(h) && S.why !== 'none' || f.goal) { f.jobScene = null; return false; }
+    const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1, end = !f.path || f.path[f.step + 1] == null;
+    if (S.phase === 'look') { if (now >= S.until) { f.jobScene = null; return false; } f.walking = false; f.dir = S.dir0 + Math.sin((S.until - now) / R.lookMs * 6.283) * R.swing; return true; }
+    if (S.phase === 'go') {
+      if (end && (f.state === 'idle' || f.state === 'walk') && (S.why === 'full' ? touchesRoot(at, S.target) : at === S.end)) {
+        S.phase = 'look'; S.until = now + (S.why === 'full' ? R.pauseMs : R.lookMs); f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; f.until = S.until;
+        const b = cells[S.target]; if (b) { const c = centerOf(b.k, cX(b.root), cY(b.root), b.rot); S.dir0 = Math.atan2(c.x - f.x, c.z - f.z); f.dir = S.dir0; }
+        JOBWHY.stats[S.why === 'full' ? '문앞돌아섬' : S.why === 'far' ? '멀리갔다돌아섬' : '길끝멈칫']++; return true;
+      }
+      if (f.state === 'idle' && now >= f.until) { if (pathBudget <= 1) return true; pathBudget--;
+        const ok = S.why === 'full' ? pathToBuilding(f, i, S.target) : pathTo(f, i, S.end); if (!ok) { f.jobScene = null; return false; } }
+      return false;
+    }
+    return false;
+  }
+  if (f.jobWhyDay !== day && h >= 6.5 && h < 7.4) { const w = jobWhyRead(f, i); if (w) { f.jobWhyDay = day; f.jobWhy = w; JOBWHY.stats[w.why === 'none' ? '없음' : w.why === 'cut' ? '끊김' : w.why === 'far' ? '멀어서' : '자리참']++; } return false; }
+  const W = f.jobWhy; if (!W || f.jobSceneDay === day || f.goal || f.state === 'inside' || f.state === 'mill') return false;
+  const at0 = R.atH[W.why] + ((f.home * 2654435761 >>> 16) % 100) / 100 * R.spreadH;
+  if (h < at0 || h > at0 + 1.5) return false;
+  if (W.why === 'none') { f.jobSceneDay = day; f.jobScene = { why: 'none', phase: 'look', until: now + R.lookMs, dir0: f.dir }; JOBWHY.stats.두리번++; return true; }
+  if (f.state !== 'idle' || now < f.until || pathBudget <= 1) return false;
+  pathBudget--;
+  const ok = W.why === 'full' ? pathToBuilding(f, i, W.target) : (W.end != null && pathTo(f, i, W.end));
+  if (!ok) return false;   /* 남에게 막혔다 — 하루 칸을 쓰지 않고 이따 다시(창가에 선 사람이 비키면) */
+  f.jobSceneDay = day;
+  f.jobScene = { why: W.why, phase: 'go', target: W.target, end: W.end };
+  return true;
+}
+window.__jobWhy = () => { const n = { none: 0, cut: 0, far: 0, full: 0 }; let 먼출근 = 0; folks.forEach(f => { if (f.job != null) { if (f.farJob) 먼출근++; return; } if (!isAdult(f)) return; const w = f.jobWhy; if (w) n[w.why]++; });
+  return { 켜짐: window.VRULES.jobLook.on, 시: +simHour().toFixed(1), 까닭: n, 먼출근: 먼출근, 지금장면: folks.filter(f => f.jobScene).length, ...JOBWHY.stats }; };
+
+/* ══════════════════════════════════════════════════════════════
+   [ACT-FLOW] 흐름을 사람으로 — 지고 가는 사람 · 받아 드는 사람 · 빈손으로 나오는 사람 (주민 연기 · 09-20 · 보스 '흐름' 카드).
+   흐름의 **셈**은 [MAC-FLOW] 가 다 한다(생산·운반·소비·저장). 이 블록은 그 결과를 **사람의 몸짓으로만** 보인다.
+   상태는 보스가 확정한 계약 하나에서만 읽는다 — `window.FLOW(칸 root)`:
+     밭 growing | ready | full | waiting | moving | cut · 가게 stocked | empty · 집 got | missed · 그 밖 null
+   내가 따로 하는 것은 **걸어갈 칸 찾기**뿐이다([ACT-JOBWHY] 가 JOB_WHY 를 쓰는 것과 같은 꼴).
+   **판정에 한 줄도 끼어들지 않는다**: 물건이 가게에 닿는 때·세대가 받는 때는 MAC-FLOW 가 정한다. 내 사람이 늦게 걸어도 셈은 그대로다.
+   **소비를 정하는 것은 세대의 상태다**(정본 원칙) — 걷는 사람이 하나 들고 나온다고 재고가 줄지 않는다. 이 사람은 결과를 보여 주는 표본이다.
+     · 운반 — 밭이 `moving` 이면 그 밭 일꾼 하나가 물건을 **지고** 이어진 길로 가까운 가게까지 걸어가 내려놓는다(✨ 한 번). 밭마다 한 사람씩.
+     · 끊김 — 밭이 `cut` 이면 하루 한 번, **갈 수 있는 길 끝까지 지고 갔다가 멈칫하고, 지고 온 것을 그대로 지고 되돌아온다.**
+     · 구매 — 가게에서 나오는 주민은 그 가게가 `stocked` 면 **받아 든 것을 손에 들고**, `empty` 면 **빈손으로** 문 앞에서 한 번 돌아보고 간다.
+   **돌아섬 둘을 몸짓과 자리로 가른다**: 재고 없음 = 가게에 **들어갔다 나온다**(손이 비어 있다) ↔ 일터 자리 참([ACT-JOBWHY] `full`) = **문 앞에서 아예 안 들어가고** 건물을 올려다보다 돌아선다.
+   흐름 칸이 없는 판(기본 마을)에서는 `window.FLOW` 가 늘 null 이라 **이 블록은 통째로 조용하다.**
+   확률 0 · 저장 0 · 새 InstancedMesh 0(물동이 묶음 bucketMesh 에 얹는다 · draw call +0).
+   원래 줄 수정 1 — [ACT-WORK] 의 풍차 자루 나르기는 이 블록이 이어받는다(흐름이 도는 판에서는 그 줄이 쉰다).
+   스위치·수치 VRULES.flowAct + 고리 둘(tickFolks 한 줄 · 루프 actWorkDraw 바로 아래 한 줄).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).flowAct = { on: true, nearCells: 14, retryMs: 1400,
+  loadMs: 1400, dropMs: 1600, endMs: 1200, swing: 0.75, buyMs: 1000, shrugMs: 900, holdMs: 90000, cutH: 10.5, endH: 17, lastH: 23.5, stallMs: 24000 };
+const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
+const FACT = { 맡은밭: new Set(), cutDay: new Map(), 밭: [], gen: -1, 잰틱: -1e9,
+  stats: { 지고나섬: 0, 내려놓음: 0, 못가고돌아옴: 0, 받아감: 0, 빈손: 0, 다시나옴: 0, 막힘: 0, 중단: { 밤: 0, 들어감: 0, 길없음: 0, 막힘: 0 } } };
+/* 상태는 오직 여기서 읽는다(장면은 답만 쓴다). 프로그램 계약이 없는 판에서는 전부 null → 장면도 통째로 쉰다 */
+const flowActState = root => (window.VRULES.flowAct.on && typeof window.FLOW === 'function' && root != null) ? window.FLOW(root) : null;
+const FACT_FIELD = { growing: 1, ready: 1, full: 1, waiting: 1, moving: 1, cut: 1 };
+const factField = root => { const s = flowActState(root); return FACT_FIELD[s] ? s : null; };          // 밭인가(그 밭의 상태)
+const factStore = root => { const s = flowActState(root); return s === 'stocked' || s === 'empty' ? s : null; };   // 가게인가
+const factProp = root => { const b = cells[root]; return b && b.k === 'windmill' ? 'flour' : 'crop'; };
+/* 밭 목록 — **하루 한 번**(또는 놓은 것이 바뀔 때) 판을 훑는다. 틱마다 판 전체를 훑지 않는다(규모 문서 #656 에서 짚은 것) */
+function factFields() {
+  if (typeof window.FLOW !== 'function') return FACT.밭.length ? (FACT.밭 = []) : FACT.밭;
+  if (FACT.gen !== placedTotal || SIM.ticks - FACT.잰틱 > 1800) { FACT.gen = placedTotal; FACT.잰틱 = SIM.ticks; FACT.밭 = [];
+    cells.forEach((rec, i) => { if (rec && rec.root === i && FACT_FIELD[window.FLOW(i)]) FACT.밭.push(i); }); }
+  return FACT.밭;
+}
+/* 밭에서 **길로** 가장 가까운 가게 — 칸 거리로 고르면 길이 돌아가 하루 안에 못 닿는다(실측: 10칸 거리가 길로는 29칸).
+   roadBFS 는 가까운 칸부터 돌려주므로 먼저 만나는 가게가 길로 가장 가까운 가게다(MAC-FLOW 의 flowStoresFrom 과 같은 차례). */
+function factShop(src) {
+  const rec = cells[src]; if (!rec) return -1;
+  const b = roadBeside(rec);
+  if (b >= 0 && pathBudget > 1) { pathBudget--;
+    const { reach } = roadBFS(b);
+    for (const c of reach) { const x = cX(c), y = cY(c);
+      for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (r && factStore(r.root)) return r.root; } } }
+  let best = -1, bd = 1e9; cells.forEach((r, i) => { if (!r || r.root !== i || !factStore(i)) return;
+    const d = Math.abs(cX(i) - cX(src)) + Math.abs(cY(i) - cY(src)); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function factEnd(from, goal) {                                          // 그쪽으로 갈 수 있는 끝 칸(길이 끊긴 자리) — 지금 선 칸에서 본다
+  if (from < 0 || goal < 0 || pathBudget < 1) return -1; pathBudget--;
+  const { reach } = roadBFS(from); let end = -1, ed = 1e9;
+  for (const c of reach) { const d = Math.abs(cX(c) - cX(goal)) + Math.abs(cY(c) - cY(goal)); if (d < ed) { ed = d; end = c; } }
+  return end;
+}
+/* tickFolks 고리 — 지고 가는 한 사람 · 가게에서 나오는 사람. true 면 이번 틱은 여기서 끝 */
+function actFlowTick(f, i, now) {
+  const R = window.VRULES.flowAct; if (!R.on || f.visitor || f.arriving || f.leaving) return false;
+  const h = simHour();
+  const T = f.flowTrip;
+  if (T) {                                                              // ── 지고 가는 중
+    const 늦음 = (T.held ? (h >= R.lastH || h < 4) : (h >= R.endH || h < 5));   /* 이미 **지고 있으면** 끝까지 가게 둔다 — 마을을 가로지르는 데 걸어서 서너 시간이 걸린다(실측). 빈손으로 밭에 가던 길이면 밤에 접는다 */
+    if (늦음) { FACT.맡은밭.delete(T.src); FACT.stats.중단.밤++; f.flowTrip = null; return false; }
+    if (f.state === 'inside') {                                         /* 길 끝에서 '볼 일 보러 들어가기'(F10)에 딸려 들어갔다 — 지고 있던 것은 두고 올 수 없다 */
+      if (!T.held || !f.inside) { FACT.맡은밭.delete(T.src); FACT.stats.중단.들어감++; f.flowTrip = null; return false; }
+      const 안 = f.inside.root; leave(f, '나옴'); f.beside = null;
+      if (안 === T.shop) { T.phase = 'drop'; T.until = now + R.dropMs; f.walking = false;   /* 가게 안까지 들어갔으면 거기가 도착이다 */
+        const s2 = cells[T.shop]; if (s2) { const c = centerOf(s2.k, cX(s2.root), cY(s2.root), s2.rot); f.dir = Math.atan2(c.x - f.x, c.z - f.z); } return true; }
+      FACT.stats.다시나옴++; return true;                                /* 딴 건물이면 도로 나와 마저 나른다 */
+    }
+    f.goal = 'work';                                                    /* 나르는 동안은 이 블록이 갈 곳을 쥔다(하루 리듬이 도중에 딴 데로 돌리지 않게) */
+    const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;   /* 도착은 '길 끝'이 아니라 **닿는 칸** 으로 본다 — 길이 돌아가거나 마지막 한 칸에서 남에게 막혀도 그 자리에서 내려놓는다(실측: 가게 대각선 칸에서 맴돌았다) */
+    /* 길에 못 나아간 채 오래 서 있으면 **그 자리에서 접는다** — 지고 있으면 지고 온 것을 그대로 지고 돌아간다.
+       좁은 길에서 마주 선 사람에게 막히면 길을 새로 잡아도 첫 칸을 못 밟는 일이 있다(실측: 두 줄 길에서도 한 칸에 두 시간 넘게 멈춰 섰다).
+       아이 눈에는 '길이 막혀서 못 갔다'로 읽혀야지, 자루를 진 채 굳어 있으면 안 된다. */
+    if (T.mark !== at) { T.mark = at; T.markAt = now; }
+    else if (now - (T.markAt || now) > R.stallMs && T.phase !== 'drop' && T.phase !== 'look') {
+      if (T.held && T.phase !== 'back') { T.phase = 'look'; T.until = now + R.endMs; T.dir0 = f.dir; f.state = 'idle'; f.walking = false; f.until = T.until; FACT.stats.막힘++; return true; }
+      FACT.맡은밭.delete(T.src); FACT.stats.중단.막힘++; f.flowTrip = null; return false; }
+    if (T.phase === 'look') {                                           // 길 끝 — 멈칫하고 그쪽을 본다
+      if (now < T.until) { f.walking = false; f.dir = T.dir0 + Math.sin((T.until - now) / R.endMs * 6.283) * R.swing; return true; }
+      T.phase = 'back'; if (pathBudget < 1 || !pathToBuilding(f, i, T.src)) { FACT.맡은밭.delete(T.src); f.flowTrip = null; return false; }
+      pathBudget--; FACT.stats.못가고돌아옴++; return true; }
+    if (T.phase === 'back') {                                           // 지고 온 것을 그대로 지고 밭으로 — 흐름이 끊긴 것이 눈에 남는다
+      if (f.state === 'idle') { if (now < f.until || now < (T.retry || 0) || pathBudget < 1) return true;
+        T.retry = now + R.retryMs; pathBudget--; if (!pathToBuilding(f, i, T.src)) { FACT.맡은밭.delete(T.src); f.flowTrip = null; return false; } }
+      return false; }
+    if (T.phase === 'load') {                                           // 밭까지 가서 싣는다
+      if (now < (T.until || 0)) { f.walking = false; return true; }
+      if (T.until) {                                                    // 싣고 났다 — 이제 가게로
+        if (pathBudget < 1) { f.walking = false; return true; }         /* 길찾기 예산(틱당 4)이 없으면 기다린다 — '길이 없다'와 헷갈리면 안 된다 */
+        const here = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;
+        if (!T.needEnd) { pathBudget--;
+          if (pathToBuilding(f, i, T.shop)) { T.phase = 'go'; T.held = true; T.until = 0; FACT.stats.지고나섬++; return true; }
+          T.needEnd = true; f.walking = false; return true; }           /* 가게까지 길이 없다 — 끊긴 끝 칸 찾기는 다음 틱에(한 틱에 길찾기 넷뿐) */
+        let end = factEnd(here, T.shop);
+        if (end < 0) { f.walking = false; return true; }
+        if (!(end === here || pathTo(f, i, end))) end = here;            /* 그 끝까지도 남에게 막혔다 — 선 자리를 끝으로 삼는다(장면은 같다) */
+        T.phase = 'go'; T.held = true; T.until = 0; T.cut = true; T.end = end; T.needEnd = false; FACT.stats.지고나섬++; return true; }
+      if ((f.state === 'idle' || f.state === 'walk') && touchesRoot(at, T.src)) {
+        T.until = now + R.loadMs; f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; f.until = T.until;
+        const b = cells[T.src]; if (b) { const c = centerOf(b.k, cX(b.root), cY(b.root), b.rot); f.dir = Math.atan2(c.x - f.x, c.z - f.z); } return true; }
+      if (f.state === 'idle') { if (now < f.until || now < (T.retry || 0) || pathBudget < 1) return true;   /* 섰을 때는 내가 붙잡는다 — 문 앞 들어가기·하루 리듬이 밭으로 다시 들이지 않게 */
+        T.retry = now + R.retryMs; pathBudget--;                         /* 막히자마자 길을 새로 잡으면 마주 선 둘이 서로 떠밀며 제자리걸음을 한다 — 잠깐 기다렸다 잡는다 */
+        if (!pathToBuilding(f, i, T.src)) { FACT.맡은밭.delete(T.src); f.flowTrip = null; return false; } }
+      return false;
+    }
+    if (T.phase === 'drop') { if (now < T.until) { f.walking = false; return true; }
+      const s = cells[T.shop]; if (s) { const c = doorFront(s); sparkle.push({ x: c.x, z: c.z, until: now + 2400 }); }
+      FACT.맡은밭.delete(T.src); FACT.stats.내려놓음++; f.flowTrip = null; return false; }   /* 내려놓으면 거기서 끝 — 빈손 귀갓길은 하루 리듬이 맡는다 */
+    if (T.phase === 'go' && (f.state === 'idle' || f.state === 'walk')) {
+      const 닿음 = T.cut ? at === T.end : touchesRoot(at, T.shop);
+      if (닿음) { T.phase = T.cut ? 'look' : 'drop'; T.until = now + (T.cut ? R.endMs : R.dropMs);
+        f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; f.until = T.until;
+        const s = cells[T.shop]; if (s) { const c = centerOf(s.k, cX(s.root), cY(s.root), s.rot); T.dir0 = Math.atan2(c.x - f.x, c.z - f.z); f.dir = T.dir0; }
+        return true; } }
+    if (T.phase === 'go' && f.state === 'idle') {                       // 남에게 막혀 섰다 — 문 앞 들어가기·하루 리듬이 일터로 되돌리기 전에 다시 잡는다
+      if (now < f.until || now < (T.retry || 0) || pathBudget < 1) return true;
+      T.retry = now + R.retryMs; pathBudget--;
+      const ok = T.cut ? pathTo(f, i, T.end) : pathToBuilding(f, i, T.shop);
+      if (!ok) { FACT.맡은밭.delete(T.src); FACT.stats.중단.길없음++; f.flowTrip = null; return false; } return true; }
+    return false;
+  }
+  const B = f.flowBuy;
+  if (B) {                                                              // ── 가게에서 나온 사람 — 받아 들었나 빈손인가
+    if (f.state === 'inside') { f.flowBuy = null; return false; }
+    if (now < B.until) { f.walking = false; f.state = 'idle'; f.until = B.until;
+      f.dir = B.got ? B.dir0 : B.dir0 + Math.sin((B.until - now) / R.shrugMs * 6.283) * R.swing; return true; }
+    if (B.got) { f.flowHold = { until: now + R.holdMs, prop: 'bag' }; FACT.stats.받아감++; } else FACT.stats.빈손++;
+    f.flowBuy = null; return false;
+  }
+  if (f.flowHold && (f.state === 'inside' || now >= f.flowHold.until)) f.flowHold = null;
+  if (f.state === 'inside' && f.inside && factStore(f.inside.root)) { f.flowIn = f.inside.root; return false; }
+  /* ── 지고 나서기 — 밭 곁에서 일하던 어른 하나가 물건을 싣고 나선다.
+     밭 자체가 일터면(온실·풍차) 그 안에 있던 일꾼이 그대로 지고 나온다.
+     밭이 일자리 없는 칸이면(판 파일의 '밭') **곁 일터(헛간 등)에서 일하던 사람**이 나와 밭에 들렀다 간다 —
+     지나가던 사람만 기다리면 아무도 안 나른다(실측: 운반 중인 동안 밭 14칸 안의 걷는 어른 평균 0명).
+     물건을 받는 가게의 일꾼은 부르지 않는다(가게는 지키는 사람이 있어야 한다). */
+  if (isAdult(f) && !f.flowHold && isWorkHour(h) && pathBudget >= 2) {
+    const 안칸 = f.state === 'inside' && f.inside ? f.inside.root : -1;
+    const 안일터 = 안칸 >= 0 && f.job === 안칸 && !factStore(안칸);
+    const 밖 = f.state === 'idle' || f.state === 'walk';
+    const 내칸 = 밖 ? cellOfFolk(f) : 안칸;
+    const 가깝나 = r => 내칸 >= 0 && Math.abs(cX(내칸) - cX(r)) + Math.abs(cY(내칸) - cY(r)) <= R.nearCells;
+    let src = -1, 끊김 = false;
+    if (안일터 || 밖) for (const r of factFields()) {
+      if (FACT.맡은밭.has(r) || FACT.cutDay.get(r) === simDay()) continue;   /* 밭마다 하루 한 번 — 걸어서 몇 시간이라 하루에 여러 번은 못 낸다 */
+      const s2 = factField(r); if (!s2) continue;
+      /* 'moving' 은 물건이 지금 가는 중 · 'ready'·'waiting' 은 거둔 것이 있고 갈 곳도 있다(곧 간다) — 이 셋일 때만 사람이 진다.
+         'growing'(아직 없음) · 'full'(가져갈 곳이 없음) 에는 지고 나서지 않는다 — 그 둘은 프로그램의 더미·⚠ 가 말한다. */
+      const 오늘끊김 = s2 === 'cut' && h >= R.cutH;
+      if (!오늘끊김 && s2 !== 'moving' && s2 !== 'ready' && s2 !== 'waiting') continue;
+      if (안칸 !== r && !가깝나(r)) continue;
+      src = r; 끊김 = 오늘끊김; break;
+    }
+    if (src >= 0) {
+      const shop = factShop(src);
+      if (shop < 0) return false;
+      /* 밭에서 거둔 것은 곁 일터(헛간·온실·풍차)에 모였다가 나간다 — **일터 안에 있던 사람은 이미 지고 나온다.**
+         밭까지 걸어갔다 오게 하면 그 다리에만 서너 시간이 들어 하루가 다 갔다(실측: 그렇게 하면 열 번 중 아홉이 밤에 접혔다). */
+      const prop = factProp(src), 지고나옴 = 안칸 >= 0;
+      if (안칸 >= 0) { leave(f, '나옴'); f.beside = null; }
+      pathBudget--;
+      const 목표 = 지고나옴 ? shop : src;
+      if (pathToBuilding(f, i, 목표)) {
+        FACT.맡은밭.add(src); FACT.cutDay.set(src, simDay()); f.goal = 'work';
+        f.flowTrip = 지고나옴 ? { phase: 'go', src, shop, cut: false, prop, held: true } : { phase: 'load', src, shop, cut: false, prop, held: false, until: 0 };
+        if (지고나옴) FACT.stats.지고나섬++; return true; }
+      if (!지고나옴) return false;                                       /* 밭에도 못 가면 오늘은 못 싣는다(이따 다시) */
+      const here = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1; let end = factEnd(here, shop);
+      if (end < 0) return false;
+      if (!(end === here || pathTo(f, i, end))) end = here;
+      FACT.맡은밭.add(src); FACT.cutDay.set(src, simDay()); f.goal = 'work';
+      f.flowTrip = { phase: 'go', src, shop, cut: true, end, prop, held: true }; FACT.stats.지고나섬++; return true;
+    }
+  }
+  if (f.flowIn != null) {                                               // 가게에서 막 나왔다
+    const shop = f.flowIn; f.flowIn = null;
+    const st = factStore(shop); if (!st) return false;
+    const got = st === 'stocked';                                       /* 걷는 사람이 하나 집었다고 재고를 깎지 않는다 — 소비를 정하는 것은 세대의 상태다(정본 원칙) */
+    const s = cells[shop], c = s ? centerOf(s.k, cX(s.root), cY(s.root), s.rot) : null;
+    f.flowBuy = { shop, got, until: now + R.buyMs + (got ? 0 : R.shrugMs), dir0: c ? Math.atan2(c.x - f.x, c.z - f.z) : f.dir };
+    f.dir = f.flowBuy.dir0; f.walking = false; f.state = 'idle'; f.until = f.flowBuy.until; return true;
+  }
+  return false;
+}
+/* 루프 고리 — actWorkDraw 바로 아래. 지고 가는 것 · 받아 든 것(물동이 묶음에 이어 붙인다 · draw call +0) */
+function actFlowDraw(now) {
+  const R = window.VRULES.flowAct; if (!R.on || !folks.length || OFF.has('folks')) return;
+  let nb = bucketMesh.count; const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS);
+  folks.forEach((f, i) => {
+    const T = f.flowTrip, H = f.flowHold; if ((!T || !T.held) && !H) return;
+    if (f.state === 'inside' || nb >= FOLK_CAP) return;
+    const P = FACT_PROP[T ? T.prop : H.prop]; if (!P) return;
+    const fx = f.px == null ? f.x : f.px + (f.x - f.px) * a, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a;
+    const co = Math.cos(f.dir), si = Math.sin(f.dir), bob = f.walking ? Math.abs(Math.sin(now / 150 + i)) * 0.09 : 0;
+    if (QUALITY.farFolk && (Math.abs(fx - camTarget.x) > 60 || Math.abs(fz - camTarget.z) > 60)) return;
+    const 어깨 = !!T, sx = 어깨 ? 0.35 : 0.42, sz = 어깨 ? -0.35 : 0.5, sy = 어깨 ? 1.55 : 0.82;
+    folkDummy.position.set(fx + sx * co + sz * si, sy + bob, fz - sx * si + sz * co);
+    folkDummy.rotation.set(0, f.dir, 어깨 ? 0.5 : 0); folkDummy.scale.set(P.s[0], P.s[1], P.s[2]); folkDummy.updateMatrix();
+    bucketMesh.setMatrixAt(nb, folkDummy.matrix); bucketMesh.setColorAt(nb++, folkCol.setHex(P.c));
+  });
+  bucketMesh.count = nb; if (nb) { bucketMesh.instanceMatrix.needsUpdate = true; if (bucketMesh.instanceColor) bucketMesh.instanceColor.needsUpdate = true; }
+}
+window.__flowAct = () => {
+  const 밭 = [], 가게 = [];
+  if (typeof window.FLOW === 'function') cells.forEach((rec, i) => { if (!rec || rec.root !== i) return;
+    const fs = factField(i); if (fs) { 밭.push([cX(i), cY(i), fs]); return; }
+    const ss = factStore(i); if (ss) 가게.push([cX(i), cY(i), ss]); });
+  let 지고감 = 0, 들고감 = 0; folks.forEach(f => { if (f.flowTrip && f.flowTrip.held) 지고감++; if (f.flowHold) 들고감++; });
+  return { 켜짐: window.VRULES.flowAct.on, 계약: typeof window.FLOW === 'function', 흐름도는판: 밭.length > 0 || 가게.length > 0,
+    시: +simHour().toFixed(1), 밭, 가게, 지고감, 들고감, 맡은밭: FACT.맡은밭.size, ...FACT.stats }; };
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
@@ -10160,6 +10468,7 @@ function loop() {
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
   actWorkDraw(SIM.t + SIM.acc);   // [ACT-WORK] 문 밖에서 일하는 몸짓 · 일터 색 옷 · 물뿌리개·바구니·자루·상자(물동이 묶음을 같이 쓴다)
+  actFlowDraw(SIM.t + SIM.acc);   // [ACT-FLOW] 지고 가는 것 · 가게에서 받아 든 것(같은 물동이 묶음에 이어 붙인다)
   actKidDraw(SIM.t + SIM.acc);   // [ACT-KID] 작은 사람은 발밑 기준으로 줄여 그린다(같은 묶음)
   actPassDraw();   // [ACT-PASS] 한 칸을 같이 지나는 둘은 오른쪽으로 비켜 그린다(겹쳐 한 몸 ✗)
   actRainDraw();   // [ACT-RAIN] 처마 밑에 선 사람은 지붕 쪽으로 반 걸음
