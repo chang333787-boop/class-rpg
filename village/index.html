@@ -2710,6 +2710,7 @@ window.__roadRot = () => ({ 켜짐: window.VRULES.roadRot.on, 직접돌림: ROAD
      hookAdd('f', function (next, args) { … next(args) … })   — next = 안쪽(먼저 붙은 것 → 맨 안은 원래 함수)
    · hookable(이름, 본체) 가 f 를 한 번 '부르는 문'으로 바꾸고, 목록의 마지막(= 가장 바깥)부터 부른다 → 붙인 차례·안팎이 감싸기 때와 같다.
    · 한 함수의 감싸기는 **전부 한꺼번에** 바꾼다(일부만 바꾸면 남은 옛 감싸기와 안팎 차례가 뒤바뀐다).
+   · 둘째 묶음(#700 뒤 · 4함수 4곳): rhythmTick 1(리듬 길찾기 예산) · pathTo 1 · pathToBuilding 1(길찾기) · plazaRoot 1(광장 캐시).
    · 첫 묶음(11함수 · 15곳): jobsHouseStep 2 · jobsHomesStep 1 · jobsTick 1 · joblessHome 1 · satText 2 · crowdTick 3 · crowdHint 1 · crowdWidenAt 1 · awayLacks 1 · eventTick 1 · goalTick 1.
      각 자리의 몸통은 그대로 — `f0.apply(this, arguments)` → `next(args)` · 매개변수는 `let [..] = args` 로만 바꿨다.
    · 증거: run.mjs --html(옛 index.html)과 같은 시드로 표본 완전 일치(PR 본문) · 실화면 콘솔 0.
@@ -2731,6 +2732,10 @@ crowdWidenAt = hookable('crowdWidenAt', crowdWidenAt);
 awayLacks = hookable('awayLacks', awayLacks);
 eventTick = hookable('eventTick', eventTick);
 goalTick = hookable('goalTick', goalTick);
+rhythmTick = hookable('rhythmTick', rhythmTick);
+pathTo = hookable('pathTo', pathTo);
+pathToBuilding = hookable('pathToBuilding', pathToBuilding);
+plazaRoot = hookable('plazaRoot', plazaRoot);
 window.__hooks = () => Object.fromEntries(Object.entries(HOOKS).map(([k, v]) => [k, v.length]));
 
 /* ── [MAC-LIBRARY] 도서관은 동네마다 — '마을에 하나'에서 뺀다 (보스 결정 09-20 · 조사 docs/village_learn_stall_20260920.md) ──
@@ -2770,11 +2775,11 @@ window.__libMany = () => ({ 켜짐: window.VRULES.manyLibrary.on, 한도: window
    원래 줄 수정 0 — rhythmTick·pathTo·pathToBuilding·schoolRoot·stationRoot·placeAt·removeAt 감싸기. 스위치 VRULES.tickSplit. */
 (window.VRULES = window.VRULES || {}).tickSplit = { on: true, rhythmBudget: 8 };
 const TICKSPLIT = { inRhythm: false, tick: -1, n: 0, stats: { 길찾기: 0, 미룸: 0 } };
-{ const rh0 = rhythmTick; rhythmTick = function () { TICKSPLIT.inRhythm = true; try { return rh0.apply(this, arguments); } finally { TICKSPLIT.inRhythm = false; } };
+{ hookAdd('rhythmTick', function (next, args) { TICKSPLIT.inRhythm = true; try { return next(args); } finally { TICKSPLIT.inRhythm = false; } });
   const budget = () => { const R = window.VRULES.tickSplit; if (!R.on || !TICKSPLIT.inRhythm) return true; if (TICKSPLIT.tick !== SIM.ticks) { TICKSPLIT.tick = SIM.ticks; TICKSPLIT.n = 0; }
     if (TICKSPLIT.n >= R.rhythmBudget) { TICKSPLIT.stats.미룸++; return false; } TICKSPLIT.n++; TICKSPLIT.stats.길찾기++; return true; };
-  const pt0 = pathTo; pathTo = function (f) { if (!budget()) return false; return pt0.apply(this, arguments); };
-  const ptb0 = pathToBuilding; pathToBuilding = function (f) { if (!budget()) return false; return ptb0.apply(this, arguments); }; }
+  hookAdd('pathTo', function (next, args) { let [f] = args; if (!budget()) return false; return next(args); });
+  hookAdd('pathToBuilding', function (next, args) { let [f] = args; if (!budget()) return false; return next(args); }); }
 const ROOTC = { school: { root: -1, dirty: true, f0: schoolRoot }, station: { root: -1, dirty: true, f0: stationRoot }, stats: { 훑음: 0, 다시씀: 0 } };
 function rootCached(k) { const e = ROOTC[k], r = e.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === k); if (!e.dirty && ok) { ROOTC.stats.다시씀++; return r; } e.root = e.f0(); e.dirty = false; ROOTC.stats.훑음++; return e.root; }
 schoolRoot = function () { return rootCached('school'); }; stationRoot = function () { return rootCached('station'); };
@@ -4988,8 +4993,8 @@ function plazaRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec 
 /* [MAC-PLAZACACHE] (보스 09-20 · 연기 담당 CPU 프로파일 #656) eventTick 이 틱마다 plazaRoot — 판 65,536칸 훑기 — 를 불러 인구와 무관하게 틱의 약 15% 를 썼다.
    광장을 **놓거나 치울 때만** 다시 찾는다(placeAt·removeAt 감싸기 — 판을 바꾸는 길은 이 둘뿐). 찾아 둔 칸이 더는 광장이 아니면 그때도 다시. 답은 원래 함수와 같다(가장 앞 칸의 광장). */
 const PLAZAC = { root: -1, dirty: true, stats: { 훑음: 0, 다시씀: 0 } };
-{ const pr0 = plazaRoot; plazaRoot = function () { const r = PLAZAC.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === 'plaza');
-    if (!PLAZAC.dirty && ok) { PLAZAC.stats.다시씀++; return r; } PLAZAC.root = pr0(); PLAZAC.dirty = false; PLAZAC.stats.훑음++; return PLAZAC.root; };
+{ hookAdd('plazaRoot', function (next, args) { const r = PLAZAC.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === 'plaza');
+    if (!PLAZAC.dirty && ok) { PLAZAC.stats.다시씀++; return r; } PLAZAC.root = next([]); PLAZAC.dirty = false; PLAZAC.stats.훑음++; return PLAZAC.root; });
   const plP0 = placeAt; placeAt = function (kind) { if (kind === 'plaza') PLAZAC.dirty = true; return plP0.apply(this, arguments); };
   const plR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && c.k === 'plaza') PLAZAC.dirty = true; return plR0.apply(this, arguments); }; }
 window.__plazaCache = () => ({ 광장: PLAZAC.root >= 0 ? [cX(PLAZAC.root), cY(PLAZAC.root)] : null, 원래답: (() => { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'plaza') r = i; }); return r >= 0 ? [cX(r), cY(r)] : null; })(), ...PLAZAC.stats });
