@@ -8731,7 +8731,7 @@ window.__jobWhy = () => { const n = { none: 0, cut: 0, far: 0, full: 0 }; let �
    스위치·수치 VRULES.flowAct + 고리 둘(tickFolks 한 줄 · 루프 actWorkDraw 바로 아래 한 줄).
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).flowAct = { on: true, nearCells: 14, retryMs: 1400,
-  loadMs: 1400, dropMs: 1600, endMs: 1200, swing: 0.75, buyMs: 1000, shrugMs: 900, holdMs: 90000, cutH: 10.5, endH: 17, lastH: 23.5, stallMs: 24000 };
+  loadMs: 1400, dropMs: 1600, endMs: 1200, swing: 0.75, buyMs: 1000, shrugMs: 900, holdMs: 90000, cutH: 10.5, endH: 17, lastH: 23.5, stallTicks: 240 };   /* 막힘 시계는 **틱(시뮬 시간)** 으로 센다 — 240틱 = 시뮬 3.2시간. 배속을 올려도·일시정지해도·화면을 바꿔도 같은 뜻이다 */
 const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
 const FACT = { 맡은밭: new Set(), cutDay: new Map(), 밭: [], gen: -1, 잰틱: -1e9,
   stats: { 지고나섬: 0, 내려놓음: 0, 못가고돌아옴: 0, 받아감: 0, 빈손: 0, 다시나옴: 0, 막힘: 0, 중단: { 밤: 0, 들어감: 0, 길없음: 0, 막힘: 0 } } };
@@ -8784,12 +8784,15 @@ function actFlowTick(f, i, now) {
     }
     f.goal = 'work';                                                    /* 나르는 동안은 이 블록이 갈 곳을 쥔다(하루 리듬이 도중에 딴 데로 돌리지 않게) */
     const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1;   /* 도착은 '길 끝'이 아니라 **닿는 칸** 으로 본다 — 길이 돌아가거나 마지막 한 칸에서 남에게 막혀도 그 자리에서 내려놓는다(실측: 가게 대각선 칸에서 맴돌았다) */
-    /* 길에 못 나아간 채 오래 서 있으면 **그 자리에서 접는다** — 지고 있으면 지고 온 것을 그대로 지고 돌아간다.
-       좁은 길에서 마주 선 사람에게 막히면 길을 새로 잡아도 첫 칸을 못 밟는 일이 있다(실측: 두 줄 길에서도 한 칸에 두 시간 넘게 멈춰 섰다).
-       아이 눈에는 '길이 막혀서 못 갔다'로 읽혀야지, 자루를 진 채 굳어 있으면 안 된다. */
-    if (T.mark !== at) { T.mark = at; T.markAt = now; }
-    else if (now - (T.markAt || now) > R.stallMs && T.phase !== 'drop' && T.phase !== 'look') {
-      if (T.held && T.phase !== 'back') { T.phase = 'look'; T.until = now + R.endMs; T.dir0 = f.dir; f.state = 'idle'; f.walking = false; f.until = T.until; FACT.stats.막힘++; return true; }
+    /* 길에 못 나아간 채 오래 서 있으면 **그 자리에서 접는다**. 좁은 길에서 마주 선 사람에게 막히면 길을 새로 잡아도
+       첫 칸을 못 밟는 일이 있다(실측: 두 줄 길에서도 한 칸에 시뮬 두 시간 넘게 멈춰 섰다). 자루를 진 채 굳어 있으면 안 된다.
+       세는 것은 **틱(시뮬 시간)** 이다 — `now` 는 `SIM.t` 라 배속·일시정지·화면 전환에 휘둘리지 않는다.
+       접는 모양은 밭이 **정말 못 가는 상태(`cut`)** 일 때만 '지고 되돌아감'이다. 길이 멀쩡한데(내 사람만 막힌 것인데)
+       자루를 지고 되돌아가면, 선반은 차는데 사람은 돌아가는 **앞뒤 안 맞는 그림**이 된다 — 그때는 조용히 내려놓고 하던 일로 돌아간다. */
+    if (T.mark !== at) { T.mark = at; T.markTick = SIM.ticks; }
+    else if (SIM.ticks - (T.markTick || SIM.ticks) > R.stallTicks && T.phase !== 'drop' && T.phase !== 'look') {
+      if (T.held && T.phase !== 'back' && factField(T.src) === 'cut') {   // 정말 끊긴 길 — 지고 온 것을 그대로 지고 되돌아선다
+        T.phase = 'look'; T.until = now + R.endMs; T.dir0 = f.dir; f.state = 'idle'; f.walking = false; f.until = T.until; FACT.stats.막힘++; return true; }
       FACT.맡은밭.delete(T.src); FACT.stats.중단.막힘++; f.flowTrip = null; return false; }
     if (T.phase === 'look') {                                           // 길 끝 — 멈칫하고 그쪽을 본다
       if (now < T.until) { f.walking = false; f.dir = T.dir0 + Math.sin((T.until - now) / R.endMs * 6.283) * R.swing; return true; }
