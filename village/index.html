@@ -3828,14 +3828,16 @@ function act(clientX, clientY) {
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
       const 흐름줄 = flowCardText(rec.root);   /* [MAC-FLOWLOOK] 흐름 글이 있으면 거기서 줄을 바꾼다 — 첫 줄은 물건 이야기, 둘째 줄은 본편 정보(창조자 14회 ⓑ7) */
       toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
+      whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
-    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec) + flowCardText(rec.root), true); return; }   /* [MAC-FLOWLOOK] 흐름 한 줄(숫자는 누를 때만) */   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
-    if (rec && (flowMake(rec) || flowTake(rec))) { toast(K[rec.k].nm + flowCardText(rec.root), true); return; }   /* [MAC-FLOWLOOK] 밭처럼 필요·일자리가 없는 흐름 건물 */
+    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec) + flowCardText(rec.root), true); whereGo(rec); return; }   /* [MAC-FLOWLOOK] 흐름 한 줄(숫자는 누를 때만) */   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
+    if (rec && (flowMake(rec) || flowTake(rec))) { toast(K[rec.k].nm + flowCardText(rec.root), true); whereGo(rec); return; }   /* [MAC-FLOWLOOK] 밭처럼 필요·일자리가 없는 흐름 건물 */
     if (rec && rec.k === 'house') {                   // 집을 누르면 사정을 말한다
       const n = res.get(rec.root) || 0, why = moveInWhy(rec);
       const names = folks.filter(f => !f.arriving && f.home === rec.root).map(folkName).join('·');
       toast(n ? (houseLv(rec.root) + '층 · 🏠 ' + names + ' · ' + satText(rec)) : (why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why), why === true);
+      whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
     toast('아래에서 놓을 물건을 먼저 고르세요'); return;
