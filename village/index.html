@@ -124,7 +124,7 @@
   #toast{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-8px);z-index:9;
     background:#2a1d1d;border:1px solid #6b3630;border-left:4px solid #e0574a;border-radius:10px;
     padding:10px 16px;font-size:13.5px;font-weight:700;box-shadow:0 8px 24px #0009;
-    opacity:0;pointer-events:none;transition:opacity .12s,transform .12s;max-width:min(92vw,440px)}
+    opacity:0;pointer-events:none;transition:opacity .12s,transform .12s;max-width:min(92vw,440px);white-space:pre-line}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   #toast.ok{background:#16241a;border-color:#2d5d3c;border-left-color:#5fc27e}
 
@@ -3624,7 +3624,8 @@ function act(clientX, clientY) {
     }
     if (rec && K[rec.k].need) {                       // 필요 건물을 누르면 닿는 범위를 보여 준다
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
-      toast(K[rec.k].nm + flowCardText(rec.root) + ' · ' + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
+      const 흐름줄 = flowCardText(rec.root);   /* [MAC-FLOWLOOK] 흐름 글이 있으면 거기서 줄을 바꾼다 — 첫 줄은 물건 이야기, 둘째 줄은 본편 정보(창조자 14회 ⓑ7) */
+      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
       return;
     }
     if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec) + flowCardText(rec.root), true); return; }   /* [MAC-FLOWLOOK] 흐름 한 줄(숫자는 누를 때만) */   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
@@ -10711,6 +10712,11 @@ function pmapBar() {
   if (STAGE.def.질문) { const q = document.createElement('button'); q.type = 'button'; q.textContent = '📋 할 일 다시 보기';   /* 카드를 닫으면 과제를 볼 곳이 없었다(창조자 13회 ⓑ3) */
     q.onclick = () => { if (typeof stageCardStart === 'function') stageCardStart(); else toast('🔎 ' + STAGE.def.질문, true); };
     bar.appendChild(q); }
+  if (STAGE.def.시작) { const r = document.createElement('button'); r.type = 'button'; r.textContent = '↺ 처음부터';   /* #fresh 는 '빈 판'이라 시작 저장본이 안 실린다 — 되돌릴 길이 필요했다(창조자 14회 ⓑ6) */
+    r.onclick = () => { if (!confirm('이 판을 처음 상태로 되돌릴까요? 지금까지 바꾼 것은 사라져요.')) return;
+      try { localStorage.removeItem(SAVE_KEY); if (typeof scardKey === 'function') localStorage.removeItem(scardKey()); } catch (e) {}   /* 과제 카드도 다시 뜨게 — '처음부터'니까 */
+      location.replace(location.pathname + location.search); };
+    bar.appendChild(r); }
   document.body.appendChild(bar); PMAP.el = bar;
   const 덧 = document.createElement('div'); 덧.id = 'pmapExtra'; bar.appendChild(덧); PMAP.덧 = 덧;
   const card = document.createElement('div'); card.id = 'pmapCard'; card.style.display = 'none'; document.body.appendChild(card); PMAP.카드 = card;
