@@ -3039,6 +3039,44 @@ window.__jobWhy = (x, y) => { const rec = x == null ? null : cells[idx(x, y)];
   if (!rec || rec.k !== 'house') return '집 없음';
   const r = jobWhyInfo(rec.root); return { 까닭: r ? r.why : null, ...(r || {}), 짧은말: r ? JW_SHORT[r.why] : '', 긴말: r ? jwLong(r.why, r.칸) : '' }; };
 
+/* ── [MAC-REJOB] 길이 끊기거나 일터가 옮겨지면 배정을 다시 본다 (R02 · 보스 카드) ──
+   집 단위 배정(jobsHouseStep)은 '일터가 사라졌나'(wp 에 없나)와 '자리가 모자라나'만 봤다. **닿는지는 다시 안 봤다.**
+   그래서 아이가 길 한 칸을 치워 가게로 가는 길이 끊겨도 배정이 그대로 남았다 — 시뮬 3시간(1,800틱)을 돌려도 그대로였다(실측).
+   어른은 갈 수 없는 일터에 이름만 걸어 두고, 💼 칩도 집 카드도 아무 말을 안 한다. 아이가 한 일이 화면에 안 나타난다.
+   이제 **길이나 일터가 바뀐 뒤 한 바퀴 안에** 집마다 한 번 '지금도 닿나'를 확인하고, 못 가게 된 자리는 푼다.
+   · 다시 보는 때: 길(K[k].road)이나 일터(K[k].jobs)를 놓거나 치울 때 세대(gen)가 오른다 — 꾸밈을 놓을 때는 안 오르고,
+     저장본을 여는 동안도 안 오른다(물건마다 한 번씩 올라 헛일이 된다 — 실측 197번).
+   · 집마다 그 세대에 **한 번만** 본다(길 BFS 한 번). 평소(아무것도 안 놓을 때)는 비용 0.
+   · 푼 자리는 같은 바퀴에서 곧바로 다시 찾는다(jobsHouseStep 의 원래 길) — 닿는 다른 일터가 있으면 그리로 간다.
+   끄면(VRULES.rejob.on = false) 예전처럼 배정이 남는다. 원래 줄 수정 0 — 고리(placeAt·removeAt·jobsHouseStep) 셋만 건다. */
+(window.VRULES = window.VRULES || {}).rejob = { on: true };
+const RJ = { gen: 1, seen: new Map(), stats: { 길바뀜: 0, 다시봄: 0, 푼집: 0, 푼자리: 0 } };
+const rejobKind = k => !!(K[k] && (K[k].road || K[k].jobs));
+function rejobBump(kind) { const R = window.VRULES.rejob; if (!R || !R.on || !rejobKind(kind)) return;
+  if (window.__LOADMS == null) return;   /* 저장본을 여는 동안은 안 센다 — 물건마다 한 번씩 올라 헛일이 된다(실측 197번) */
+  RJ.gen++; RJ.stats.길바뀜++; }
+/* 이 집 앞 길에서 지금 닿는 일터들 */
+function rejobReach(rec) { const b = roadBeside(rec), out = new Set(); if (b < 0) return out;
+  const wp = jobsWpIndex(), { reach } = roadBFS(b);
+  for (const i of reach) { const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && wp.has(c.root)) out.add(c.root); } }
+  return out; }
+/* 못 가게 된 자리를 푼다 — 세대마다 집 하나당 한 번 */
+function rejobCheck(rec) { const R = window.VRULES.rejob; if (!R || !R.on) return;
+  const h = rec.root; if (RJ.seen.get(h) === RJ.gen) return; RJ.seen.set(h, RJ.gen);
+  const a = JOBH.asg.get(h); if (!a || !a.size) return;
+  RJ.stats.다시봄++;
+  const near = rejobReach(rec); let 푼 = 0;
+  for (const [w, n] of [...a]) { if (near.has(w)) continue;
+    a.delete(w); JOBH.used.set(w, Math.max(0, (JOBH.used.get(w) || 0) - n)); 푼 += n; }
+  if (!푼) return;
+  RJ.stats.푼집++; RJ.stats.푼자리 += 푼; if (!a.size) JOBH.asg.delete(h); folksDirty = true; }
+{ hookAdd('placeAt', function (next, args) { const r = next(args); rejobBump(args[0]); return r; }); }
+{ hookAdd('removeAt', function (next, args) { const rec = cells[idx(args[0], args[1])], k = rec && rec.k; const r = next(args); if (k) rejobBump(k); return r; }); }
+{ hookAdd('jobsHouseStep', function (next, args) { rejobCheck(args[0]); return next(args); }); }
+window.__rejob = () => ({ 켜짐: !!window.VRULES.rejob.on, 세대: RJ.gen, 본집: RJ.seen.size, ...RJ.stats });
+
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
