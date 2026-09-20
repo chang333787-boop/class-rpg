@@ -5284,12 +5284,17 @@ function roadJoinReaches(from) {
 /* 아직 시설이 하나도 없는 마을(첫 수)에는 '본길'이라는 것이 없다 — 이을 데가 없는데 잇지 않았다고 말하면 안 된다 */
 function roadJoinHasPlace() { for (let i = 0; i < cells.length; i++) { const c = cells[i]; if (!c || c.root !== i) continue;
     const q = K[c.k]; if (q && (q.need || q.need2 || q.jobs)) return true; } return false; }
+/* 이번에 깐 길에서 **길을 따라가** '깔기 전부터 있던 길 칸'에 닿나 — 곁 네 칸만 보면 안 된다(창조자의 눈 12회 ⓐ:
+   띄엄띄엄 놓으면 **방금 내가 놓은 칸**이 '원래 있던 길'로 세어져 둘째 칸에서 "이어졌어요"가 틀리게 떴다) */
+function roadJoinOld(from, mine) { const { reach } = roadBFS(from, undefined, 9999);
+  for (const i of reach) if (!mine.has(i)) return true; return false; }
 function roadJoinCheck() {
   const R = window.VRULES.roadJoin; if (!R || !R.on) return;
-  const put = RJOIN.pend.slice(), joined = RJOIN.joined;
+  const put = RJOIN.pend.slice(), mine = new Set(RJOIN.set);
   RJOIN.pend.length = 0; RJOIN.set.clear(); RJOIN.joined = false;
   const from = put.find(i => cells[i] && K[cells[i].k] && K[cells[i].k].road); if (from == null) return;
   RJOIN.stats.봄++;
+  const joined = roadJoinOld(from, mine);
   /* ① 이번에 깐 길이 **깔기 전부터 있던 길**에 하나라도 붙었으면 이어진 것이다(창조자의 눈 11회 — '시설에 닿나'로 보면
        시설이 0 인 새 마을의 첫 수가 늘 걸린다). ② 끊겼다고 말한 적이 있는데 이번에 붙었으면 **이어졌다고 알려 준다**(B5). */
   if (joined) { RJOIN.stats.이어짐++;
@@ -5485,6 +5490,9 @@ window.__widen3 = () => ({ 기다림: WIDEN3.armed, 물림기록: WIDEN3.shifts.
      품(한 칸 길이 견디는 나들이 수)을 **4에서 3으로** 낮춘다. 창조자 표: 놓친 경고 pop88 26→16 · pop167 21→12 ·
      **첫 마을(집 4채·16명)은 품 3 에서도 조용**(거짓 경고가 안 되살아난다). 품 2 는 얻는 것이 작고 #732 로 고친 자리가 되살아나 탈락.
      되돌리려면 crowdHomes.cap = 4. 큰길은 그 두 배(6)다.
+     덧 3 [셀 수 없음] (창조자의 눈 12회 ⓑ1): 길이 끊겨 **필요를 하나도 못 채우는 집**은 붐빔을 0(= 안 붐빔)으로 두면 안 된다 —
+       young8 에서 끊긴 새 길이 문 앞이 되자 붐빔 경고가 4 → 0 이 되어 **아이가 좋아진 줄 알았다**. 이제 그런 집은 붐빔 표에서 **빼 둔다**
+       (crowd 에서 지운다 · `__crowdCount()` 로 '셀 수 없음' 수를 읽는다). 그 집은 이미 '멀어요'·'길이 끊겨 일터에 못 가요'로 말하고 있다.
      남은 것: mode 'front' 는 **한 칸만** 보아 과장한다(집 바깥쪽에 길을 한 줄 깔면 문 앞이 한산한 새 길로 바뀌어 0 이 된다) — 이번엔 안 건드린다.
    규칙 판정이 바뀐다 — VRULES.crowdHomes.on = false 면 옛 셈(걷는 표본). 원래 줄 수정 0 — crowdTick 감싸기 + simTick 고리 한 줄. */
 (window.VRULES = window.VRULES || {}).crowdHomes = { on: true, cap: 3, mode: 'front', every: 90, self: true };   // self: 제 식구 몫은 빼고 센다(아래 덧) · cap 3: 품(창조자의 눈 11회 · 보스 승인 — 아래 덧 2)   // 품 4 · 문 앞 칸: 167명 판에서 옛 셈과 이어지고(48~50 ↔ 57채) 큰 판에서 사라지지 않는다(317명 36 · 529명 69채)
@@ -5495,17 +5503,24 @@ function crowdHomesStep() { const R = window.VRULES.crowdHomes; if (!R.on) retur
     for (const c of reach) { if (!left.size) break; if (bfsDepth[c] > NEED_R && !isWide(c)) continue; const x = cX(c), y = cY(c);
       for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (!r) continue; const kk = K[r.k];
         for (const need of [kk.need, kk.need2]) if (need && left.has(need)) { left.delete(need); let p = c; while (p >= 0) { CROWDH.acc.set(p, (CROWDH.acc.get(p) || 0) + n / nn); if (p === b) CROWDH.self.set(i, (CROWDH.self.get(i) || 0) + n / nn);   /* [MAC-CROWDSELF] 제 문 앞에 얹은 제 몫 */ used.push(p); if (p === b) break; p = prev[p]; } } } }
-    CROWDH.paths.set(i, used.length ? Array.from(new Set(used)) : [b]); CROWDH.front.set(i, b); CROWDH.stats.집++; }
+    CROWDH.paths.set(i, used.length ? Array.from(new Set(used)) : null); CROWDH.front.set(i, b); CROWDH.stats.집++; }   /* null = 길이 끊겨 **셀 수 없음**(창조자 12회 ⓑ1) */
   CROWDH.cur = end;
-  if (end >= N) { const cap = c => R.cap * (isWide(c) ? 2 : 1), house = new Map(); CROWDH.load = CROWDH.acc; CROWDH.acc = new Map();
-    CROWDH.paths.forEach((cs, root) => { let v = 0; if (R.mode === 'path') { for (const c of cs) v += (CROWDH.load.get(c) || 0) / cap(c); v = cs.length ? v / cs.length : 0; } else { const f = CROWDH.front.get(root); const mine = R.self === false ? 0 : (CROWDH.selfLoad.get(root) || 0);   /* [MAC-CROWDSELF] 남이 지나는 몫만 */
+  if (end >= N) { const cap = c => R.cap * (isWide(c) ? 2 : 1), house = new Map(); CROWDH.stats.셀수없음 = 0;   /* 한 바퀴마다 다시 센다(지금 몇 채인가) */ CROWDH.load = CROWDH.acc; CROWDH.acc = new Map();
+    CROWDH.paths.forEach((cs, root) => { if (!cs) { CROWDH.stats.셀수없음 = (CROWDH.stats.셀수없음 || 0) + 1; return; }   /* 표에 넣지 않는다 */
+      let v = 0; if (R.mode === 'path') { for (const c of cs) v += (CROWDH.load.get(c) || 0) / cap(c); v = cs.length ? v / cs.length : 0; } else { const f = CROWDH.front.get(root); const mine = R.self === false ? 0 : (CROWDH.selfLoad.get(root) || 0);   /* [MAC-CROWDSELF] 남이 지나는 몫만 */
       v = f >= 0 ? Math.max(0, (CROWDH.load.get(f) || 0) - mine) / cap(f) : 0; } house.set(root, v); });   // 지나는 길의 평균(가장 붐빈 한 칸이면 시설 앞 한 칸 때문에 거리 전체가 붐볐다)
     CROWDH.house = house; CROWDH.paths = new Map(); CROWDH.front = new Map(); CROWDH.selfLoad = CROWDH.self; CROWDH.self = new Map(); CROWDH.cur = 0; CROWDH.stats.한바퀴++; } }
 { hookAdd('crowdTick', function (next, args) { const r = next(args); if (!window.VRULES.crowdHomes.on || !CROWDH.stats.한바퀴) return r;
-    crowd.forEach((v, root) => { if (!CROWDH.house.has(root)) crowd.set(root, 0); }); CROWDH.house.forEach((m, root) => crowd.set(root, 0.3 * m)); return r; });
+    crowd.forEach((v, root) => { if (!CROWDH.house.has(root)) crowd.delete(root); });   /* [MAC-CROWDHOMES] 셀 수 없는 집은 0(안 붐빔)이 아니라 **없음** */
+    CROWDH.house.forEach((m, root) => crowd.set(root, 0.3 * m)); return r; });
   const ca0 = window.CROWD_AT; window.CROWD_AT = function (i) { const R = window.VRULES.crowdHomes; const c = cells[i];
     if (!R.on || !CROWDH.stats.한바퀴 || !c || c.k === 'house' || !K[c.k].road) return ca0 ? ca0.apply(this, arguments) : 0;
     return Math.min(1, 0.3 * (CROWDH.load.get(i) || 0) / (R.cap * (isWide(i) ? 2 : 1))); }; }
+window.__crowdCount = (x, y) => { const rec = x == null ? null : cells[idx(x, y)];
+  const 셀수없음 = CROWDH.stats.셀수없음 || 0;
+  if (x == null) return { 셀수없음, 센집: CROWDH.house.size };
+  if (!rec || rec.k !== 'house') return { 셀수없음, 집: '없음' };
+  return { 셀수없음, 이집: CROWDH.house.has(rec.root) ? '셈' : '셀 수 없음(길이 끊김)' }; };
 window.__crowdSelf = (x, y) => { const R = { 켜짐: window.VRULES.crowdHomes.self !== false, 품: window.VRULES.crowdHomes.cap };
   if (x == null) { let n = 0, s = 0; CROWDH.selfLoad.forEach(v => { n++; s += v; }); return { ...R, 잰집: n, 자기몫평균: n ? +(s / n / (R.품 || 4)).toFixed(2) : 0 }; }
   const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return { ...R, 집: '없음' };
