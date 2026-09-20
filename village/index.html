@@ -2916,6 +2916,78 @@ function jobsChipGo() { JOBSON.roots = jobsChipList(); jobsChipDraw(); if (!JOBS
   toast('이 동네 ' + g.length + '채 · ' + jobWhySay(rec, g), true); }   /* [MAC-JOBWHY] 까닭 넷에서 */
 window.__jobsOn = () => ({ 셈: window.VRULES.jobsHomes.on, 돌아섬: window.VRULES.jobAway.on, 칩: window.VRULES.jobsChip.on, 칩수: JOBSON.roots.length, 글: (document.getElementById('jobsChip') || {}).textContent || '', ...JOBSON.stats });
 
+/* ══════════════════════════════════════════════════════════════
+   [MAC-WHERE] 까닭 + **그 자리로 데려가기** (고장 프로토 최종 보고 ⑥ · 보스 결정 09-21)
+   문제: 마을은 **말은 여럿인데**(일할 곳 까닭 넷 · 빈 선반 까닭 · 붐빔 · 필요) **'그 자리'로 데려가는 것은 드문드문**이다.
+     창조자의 눈 10~12회에서 "말은 맞는데 **어느 길인지 모르겠다**"가 되풀이됐다. 고장 프로토(#762~#774)에서 그 한 쌍을 이어 보니
+     가게 카드의 까닭 → [공급 경로 보기] → **그 칸만 ✨** → 한 수 가 끊기지 않았다(창조자 14회: "끊는 자리를 바꿔도 따라간다").
+   그래서 본편에도 같은 한 쌍을 둔다. **조건 둘**(내가 달고 보스가 받았다):
+     ① **아이가 누른 것에만** 붙인다 — 저절로 뜨는 소식에 붙이면 화면이 아이를 끌고 다닌다.
+     ② 짚는 칸은 **경로를 되짚어 그 칸만** — 후보를 여럿 반짝이면 오히려 헷갈린다(13회에 그렇게 만들었다가 고쳤다).
+   범위는 **흐름 cut · 일자리 cut** 둘뿐(보스 확정 · 한 회 관찰 뒤 넓힌다).
+   · **새 판정 0** — 이미 있는 판정이 'cut' 이라 말한 것만 따라간다. 분류 '보기'.
+   · sparkle 은 **더하기만** 한다(다른 담당도 쓴다). 카메라는 **짚는 칸이 화면 밖일 때만** 옮긴다 — 흐름과 일자리를 **같게**(같은 손짓이면 같은 결과여야 한다 · 보스 지적).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).whereTo = { on: true, budget: 10, keep: 12, ms: 6000 };
+const WHERE = { stats: { 짚음: 0, 칸: 0, 카메라: 0, 없음: 0 } };
+const _whereV = new THREE.Vector3();
+const whereOn = () => !!(window.VRULES.whereTo && window.VRULES.whereTo.on);
+/* 그 칸이 지금 화면에 보이나 — 보이면 카메라를 안 건드린다(아이가 누른 것이 화면에서 사라지지 않게) */
+function whereSeen(i) { try { _whereV.set(wx(cX(i)), 1, wz(cY(i))).project(camera);
+  return Math.abs(_whereV.x) < 0.92 && Math.abs(_whereV.y) < 0.92; } catch (e) { return true; } }
+/* 문 앞 길에서 목표까지 0-1 BFS(이미 있는 길 0 · 빈 칸 1) 뒤 **경로를 되짚어** 아직 빈 칸만 돌려준다 */
+function whereTrace(시작, 닿았나, budget) {
+  if (!시작 || !시작.length) return null;
+  const 비용 = new Map(), 앞 = new Map(); let 이번 = [], 다음 = [];
+  시작.forEach(i => { if (i < 0) return; 비용.set(i, 0); 앞.set(i, -1); 이번.push(i); });
+  let 끝 = -1;
+  for (let lv = 0; lv <= budget && 끝 < 0; lv++) {
+    while (이번.length && 끝 < 0) { const i = 이번.pop(), x = cX(i), y = cY(i);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
+        if (c && 닿았나(c, j)) { 앞.set(j, i); 끝 = j; break; }
+        if (비용.has(j)) continue;
+        if (c) { if (K[c.k] && K[c.k].road) { 비용.set(j, lv); 앞.set(j, i); 이번.push(j); } continue; }
+        if (canPlace('road', nx, ny, 0) !== true) continue;
+        비용.set(j, lv + 1); 앞.set(j, i); 다음.push(j); } }
+    이번 = 다음; 다음 = []; if (!이번.length) break; }
+  if (끝 < 0) return null;
+  const 칸 = []; let 여기 = 앞.get(끝);
+  while (여기 != null && 여기 >= 0 && 칸.length < (window.VRULES.whereTo.keep | 0 || 12)) { if (!cells[여기]) 칸.push(여기); 여기 = 앞.get(여기); }
+  return 칸.reverse();
+}
+/* 이 물건을 누르면 어디를 짚어야 하나 — 'cut' 이라 말한 것만 */
+function whereSpots(rec) {
+  if (!rec || !whereOn()) return null;
+  const R = window.VRULES.whereTo, B = Math.max(2, R.budget | 0 || 10);
+  if (typeof flowMake === 'function' && flowOn()) {
+    if (flowMake(rec) && flowFieldState(rec.root) === 'cut')                      /* 밭: 쌓여 있는데 길이 끊겼다 */
+      return whereTrace(roadsBeside(rec), c => !!flowTake(c), B);
+    if (flowTake(rec) && flowStoreState(rec.root) === 'empty') {                  /* 가게: 빈 선반 — 끊긴 밭 쪽에서 되짚는다 */
+      let 밭 = null;
+      cells.forEach((r2, i) => { if (밭 || !r2 || r2.root !== i || !flowMake(r2)) return; if (flowFieldState(i) === 'cut') 밭 = r2; });
+      if (밭) return whereTrace(roadsBeside(밭), c => c.root === rec.root, B);
+    }
+  }
+  if (rec.k === 'house' && typeof jobWhyInfo === 'function') {                    /* 집: 길만 이으면 일터에 닿는다 */
+    const r = jobWhyInfo(rec.root);
+    if (r && r.why === 'cut' && r.일터 != null) return whereTrace(roadsBeside(rec), c => c.root === r.일터, B);
+  }
+  return null;
+}
+/* 짚는다 — 아이가 누른 자리에서만 부른다(자동 소식에서는 부르지 않는다) */
+function whereGo(rec) {
+  const 칸 = whereSpots(rec);
+  if (!칸 || !칸.length) { if (whereOn()) WHERE.stats.없음++; return 0; }
+  const R = window.VRULES.whereTo;
+  칸.forEach(i => sparkle.push({ x: wx(cX(i)) + CS / 2, z: wz(cY(i)) + CS / 2, until: SIM.t + (R.ms | 0 || 6000) }));
+  if (!whereSeen(칸[0])) { camTarget.x = wx(cX(칸[0])); camTarget.z = wz(cY(칸[0])); miniDirty = true; WHERE.stats.카메라++; }
+  WHERE.stats.짚음++; WHERE.stats.칸 += 칸.length;
+  return 칸.length;
+}
+window.__where = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null;
+  const 칸 = rec ? whereSpots(rec) : null;
+  return { 켜짐: whereOn(), 누른것: rec ? rec.k : null, 짚을칸: 칸 ? 칸.map(i => [cX(i), cY(i)]) : null, 보이나: 칸 && 칸.length ? whereSeen(칸[0]) : null, ...WHERE.stats }; };
 /* ── [MAC-WORKFIRST] 일터 둘 고침 (창조자의 눈 7회 🔴1·🔴2 · 보스 09-20) ──
    ① 풍차·온실도 길에 붙어야 놓인다(VRULES.workRoad) — 가게는 needRoad 였는데 풍차·온실은 아니어서 풀밭에 말없이 놓이고 일꾼이 영영 못 왔다("일자리 0/2").
       K.windmill·K.green 의 needRoad 를 스위치를 읽는 getter 로 둔다 → 놓기 막음 말("풍차는 길에 붙어야 해요…")·카드 고를 때 한마디·문 방향이 가게와 같아진다.
