@@ -9587,14 +9587,30 @@ const STAGE_HOOKS = {
    창조자 19회 ⓐ2: "어디에 있어야 쓸 수 있을까" 판인데 길에서 떨어진 우물 하나로 '목표 달성!'이 떴다 —
    아무도 못 쓰는 것을 세면 판이 제 주제를 배반한다. 놓는 것은 막지 않는다(틀려 보고 고치는 것이 배움이다).
    '쓸 수 있다'는 이미 있는 판정 그대로 — 길 옆인가(sayNearRoad). 새 판정 0. */
-function stageCountUsable(kind) { let n = 0;
-  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== kind) return;
-    if (K[kind] && K[kind].needRoad) { n++; return; }                      /* 길에 붙어야만 놓이는 것은 언제나 쓸 수 있다 */
-    if (sayNearRoad(kind, cX(i), cY(i), rec.rot)) n++; });
+/* '쓸 수 있다' = **닿는 집이 하나라도 있나**. 집 카드가 '멀어요/가까워요'를 말할 때 쓰는 그 잣대(computeSat)의 **역방향**이다 —
+   같은 문 앞 길에서 같은 반경(NEED_R·NEED_R_WIDE·큰길 예외)으로 BFS 한다. 그래서 목표와 집 카드가 **한 잣대**를 쓴다.
+   ⚠ 전에는 sayNearRoad('길 옆인가')를 썼는데, 아이가 **외딴 길 한 칸**을 놓고 그 옆에 우물을 두면 참으로 셌다(보스 실화면).
+      길 옆이어도 그 길이 아무 데도 안 이어졌으면 **한 집도 못 쓴다**. */
+function stageUsableOne(rec) {
+  const b = roadsBeside(rec); if (!b.length) return false;
+  const { reach } = roadBFS(b, undefined, NEED_R_WIDE);
+  for (const i of reach) {
+    if (bfsDepth[i] > NEED_R && !isWide(i)) continue;
+    const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)];
+      if (c && c.k === 'house') return true; } }
+  return false; }
+function stageCountUsable(kind, 멈춤) { let n = 0;
+  cells.forEach((rec, i) => { if (n >= (멈춤 || 1e9) || !rec || rec.root !== i || rec.k !== kind) return;
+    if (stageUsableOne(rec)) n++; });
   return n; }
-window.__usable = kind => ({ 종류: kind, 다: countKind(kind), 쓸수있는: stageCountUsable(kind) });
+window.__usable = kind => { const 다 = [], 못씀 = [];
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== kind) return;
+    다.push([cX(i), cY(i)]); if (!stageUsableOne(rec)) 못씀.push([cX(i), cY(i)]); });
+  return { 종류: kind, 다: 다.length, 쓸수있는: 다.length - 못씀.length, 못쓰는자리: 못씀 }; };
 function stageGoalOk(g) {
-  if (g.셈 === 'kind') return (g.쓸수있는 ? stageCountUsable(g.k) : countKind(g.k)) >= (g.n || 1);
+  if (g.셈 === 'kind') return (g.쓸수있는 ? stageCountUsable(g.k, g.n || 1) : countKind(g.k)) >= (g.n || 1);   /* 필요한 수만 세면 멈춘다 */
   if (g.셈 === 'pop') return population() >= (g.n || 1);
   if (g.셈 === 'hook') { const f = STAGE_HOOKS[g.훅], v = f ? f() : null; if (v == null) return false; return g.비교 === '<=' ? v <= g.n : v >= g.n; }
   return false;
@@ -11164,6 +11180,50 @@ window.__protoMap = (which) => {
   return { 켜짐: PMAP.켜짐, 쓸수있나: pmapLive(), 모형: window.VRULES.protoMap.모형, 생산멈춤: !!PMAP.멈춤, 짚는중: !!(PMAP.강조 && performance.now() < PMAP.강조),
     덩이: PMAP.덩이.map(d => ({ 이름: d.def.이름, 셈: [...d.셈], 자루: d.자루.visible })), ...PMAP.stats }; };
 setTimeout(pmapBar, 900);   /* [MAC-PROTOMAP] 판에 "동네" 칸이 있을 때만 단추가 생긴다 */
+/* ══════════════════════════════════════════════════════════════
+   [MAC-NOUSE] **아무도 못 쓰는 시설 위에 남는 표시** (창조자 19회 ⓐ2 · 보스 ② 셋째)
+   토스트는 지나간다. 아이가 나중에 "왜 아무것도 안 변하지?" 할 때 볼 것이 있어야 한다 —
+   집 카드가 '멀어요'를 계속 들고 있는 것처럼, 못 쓰는 시설도 제 사정을 계속 들고 있게.
+   · 잣대는 목표와 **같은 것**(stageUsableOne = 닿는 집이 하나라도 있나). 새 판정 0.
+   · 보는 종류는 그 판이 목표에 "쓸수있는": true 로 적은 것뿐이다 — 그런 목표가 없는 판·기본 마을은 **한 픽셀도 안 달라진다**.
+   · 1초에 한 번만 다시 센다(목표 셈과 같은 BFS 라 싸다 — 실측 0.24ms/종류).
+   ⚠ 이 고리를 넣으며 본 것: 표시를 **끄기만** 하면 마지막 자리에 얼어붙는다. 그래서 목록을 늘 새로 만든다(비우고 다시 채운다).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).noUse = { on: true, ms: 1000, cap: 24, y: 7.2 };
+const NOUSE = { 자리: [], 잰때: -1e9, mesh: null, stats: { 잼: 0, 지금: 0 } };
+const nouseLive = () => !!(window.VRULES.noUse.on && STAGE.def && Array.isArray(STAGE.def.목표) && STAGE.def.목표.some(g => g.쓸수있는));
+function nouseMesh() {
+  if (NOUSE.mesh) return NOUSE.mesh;
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#3a2a22'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.strokeStyle = '#e8b04b'; g.lineWidth = 4; g.beginPath(); g.arc(32, 32, 28, 0, 6.283); g.stroke();
+  g.font = '34px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('🚫', 32, 34);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.2, 3.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), window.VRULES.noUse.cap);
+  im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); NOUSE.mesh = im; return im;
+}
+function nouseScan(now) {
+  const R = window.VRULES.noUse;
+  if (now - NOUSE.잰때 < (R.ms | 0 || 1000)) return; NOUSE.잰때 = now; NOUSE.stats.잼++;
+  const 종류 = [...new Set(STAGE.def.목표.filter(g => g.쓸수있는 && g.k).map(g => g.k))];
+  const 자리 = [];
+  cells.forEach((rec, i) => { if (자리.length >= (R.cap | 0 || 24) || !rec || rec.root !== i) return;
+    if (!종류.includes(rec.k) || stageUsableOne(rec)) return;
+    const c = centerOf(rec.k, cX(i), cY(i), rec.rot); 자리.push([c.x, c.z]); });
+  NOUSE.자리 = 자리; NOUSE.stats.지금 = 자리.length;
+}
+const _nouseD = new THREE.Object3D();
+function nouseDraw(now) {
+  if (!nouseLive()) { if (NOUSE.mesh && NOUSE.mesh.count) NOUSE.mesh.count = 0; return; }
+  nouseScan(now);
+  const im = nouseMesh(), R = window.VRULES.noUse;
+  const 뜸 = 1 + 0.08 * Math.sin(now / 420);
+  NOUSE.자리.forEach(([x, z], k) => { _nouseD.position.set(x, (R.y || 7.2) * 뜸, z); _nouseD.quaternion.copy(camera.quaternion);
+    _nouseD.updateMatrix(); im.setMatrixAt(k, _nouseD.matrix); });
+  im.count = NOUSE.자리.length; if (im.count) im.instanceMatrix.needsUpdate = true;
+}
+window.__noUse = () => ({ 켜짐: nouseLive(), 자리: NOUSE.자리.map(([x, z]) => [Math.round(x / CS) + 128, Math.round(z / CS) + 128]), ...NOUSE.stats });
 function loop() {
   requestAnimationFrame(loop);
   const now = performance.now();
@@ -11180,6 +11240,7 @@ function loop() {
   spotDraw();   // [MAC-SPOT]
   keepArmDraw();   // [MAC-KEEP-2] 치우기 확인의 빨간 테두리
   sayDraw();   // [MAC-SAY]
+  nouseDraw(now);   // [MAC-NOUSE] 아무도 못 쓰는 시설 위에 🚫 (그런 목표를 둔 판에서만)
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
