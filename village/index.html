@@ -8222,30 +8222,40 @@ window.__workLook = () => { const h = simHour(); let out = 0, trip = 0; folks.fo
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-JOBWHY] 일자리가 없는 까닭이 저마다 다르게 보이게 (주민 연기 · 09-20 · 보스 작업 카드 · 사용자 승인).
-   프로그램 담당이 까닭 넷을 나누는 작업에 들어갔다 — 이 블록은 **판정에 끼어들지 않고**(f.job · jobCount · 길만 읽는다) 그 상태를 생활 장면으로만 보인다.
-   까닭은 하루 한 번(아침) 사람마다 한 번 길을 훑어 스스로 읽는다(jobsTick 과 같은 잣대: 집 앞 길에서 갈 수 있는 곳에 빈 자리가 있으면 이미 일자리가 생겼을 것):
-     ⓐ 없음  — 갈 수 있는 곳에 일터가 하나도 없고 마을에도 없다      → 아침 7:30 집 앞에서 두리번(고개 좌우)
-     ⓑ 끊김  — 마을엔 일터가 있는데 길로는 못 간다                    → 10:30 길이 끝나는 칸까지 걸어가 멈칫, 그쪽을 보고 되돌아선다
-     ⓓ 자리참 — 갈 수 있는 일터가 있는데 자리가 다 찼다               → 10:00 그 일터 앞까지 갔다가 들어가지 못하고 돌아 나온다
-     ⓒ 멂    — 일자리는 있는데 출근길이 farSteps 칸을 넘는다          → 아침 earlyH 에 먼저 집을 나선다(저녁엔 그만큼 늦게 돌아온다)
+   **까닭은 내가 정하지 않는다** — 프로그램 담당의 `window.JOB_WHY(집 root) → 'none'|'cut'|'far'|'full'`(MAC-JOBWHY · 보스 확정 계약)을 하루 한 번 읽고,
+   그 답에 맞는 생활 장면만 보인다(💼 칩 이름 · 집 카드 말 · 돌아섬 말과 늘 같은 까닭을 말하게 된다). 내가 따로 찾는 것은 **걸어갈 칸**뿐이다.
+     ⓐ none 없음  — 가까이 지을 수도 이을 수도 없다                  → 아침 7:30 집 앞에서 두리번(고개 좌우)
+     ⓑ cut  끊김  — 길 몇 칸만 이으면 닿는다                          → 10:30 길이 끝나는 칸까지 걸어가 멈칫, 그쪽을 보고 되돌아선다
+     ⓒ far  멂    — 길은 이어졌지만 배정 반경 밖이다                  → 9:24 그쪽으로 갈 수 있는 데까지 한참 걸어갔다가 되돌아온다(길이 끊긴 곳이 아니다)
+     ⓓ full 자리참 — 닿는 일터가 있는데 자리가 다 찼다                → 10:00 그 일터 앞까지 갔다가 들어가지 못하고 돌아 나온다
+   (일자리가 **있는** 사람의 먼 출근길은 까닭과 별개다 — 출근 경로가 farSteps 칸을 넘으면 아침 earlyH 에 먼저 집을 나선다.)
    해결된 뒤: **첫 출근** — 일자리가 처음 생긴 사람은 일터 문 앞에서 joyMs 멈췄다가 ✨ 하나(있던 묶음)와 함께 들어간다(💼✓ 와 겹치지 않게 도착 뒤로 비껴 둔다).
    판정·확률·저장 0 · 옷은 ACT-WORK 의 일터 색 그대로 · draw call +0(몸짓과 있던 ✨ 뿐) · 길찾기는 pathBudget 안에서 하루 사람마다 한 번.
-   스위치·수치 VRULES.jobLook + tickFolks 고리 한 줄. 프로그램의 까닭 이름이 나오면 `window.JOB_WHY(집)` 을 읽는 쪽으로 바꾼다(그때 이 블록의 읽기만 갈아끼운다).
+   스위치·수치 VRULES.jobLook + tickFolks 고리 한 줄. JOB_WHY 가 없거나 꺼져 있으면 장면도 통째로 쉰다(읽는 함수 하나 jobWhyRead 만 그쪽을 본다).
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).jobLook = { on: true, atH: { none: 7.5, full: 10, cut: 10.5 }, spreadH: 0.5, farSteps: 14, earlyH: 8.4, pauseMs: 1500, lookMs: 2600, swing: 0.8, joyMs: 1200 };
-const JOBWHY = { stats: { 없음: 0, 끊김: 0, 자리참: 0, 멂: 0, 첫출근: 0, 문앞돌아섬: 0, 길끝멈칫: 0, 두리번: 0 } };
-function jobWhyRead(f, i) {                                             // 하루 한 번 — 이 사람의 까닭(읽기만)
-  if (f.base < 0 || pathBudget <= 1) return null;
+(window.VRULES = window.VRULES || {}).jobLook = { on: true, atH: { none: 7.5, full: 10, far: 9.4, cut: 10.5 }, spreadH: 0.5, farSteps: 14, earlyH: 8.4, pauseMs: 1500, lookMs: 2600, swing: 0.8, joyMs: 1200 };
+const JOBWHY = { stats: { 없음: 0, 끊김: 0, 멀어서: 0, 자리참: 0, 첫출근: 0, 문앞돌아섬: 0, 길끝멈칫: 0, 멀리갔다돌아섬: 0, 두리번: 0, 먼출근먼저나섬: 0 } };
+function jobWhyRead(f, i) {                                             // 하루 한 번 — 까닭은 프로그램(window.JOB_WHY)에서 읽고, 걸어갈 곳만 내가 찾는다
+  if (f.base < 0 || f.home < 0 || typeof window.JOB_WHY !== 'function') return null;
+  const why = window.JOB_WHY(f.home); if (!why) return null;            /* 판정은 MAC-JOBWHY 하나에서 — 💼 칩·집 카드·돌아섬 말과 같은 답을 장면도 쓴다 */
+  if (why === 'none') return { why: 'none' };
+  if (pathBudget <= 1) return null;
   pathBudget--;
   const { reach } = roadBFS(f.base);
-  let near = -1, nd = 1e9;
-  for (const c of reach) { const x = cX(c), y = cY(c);
-    for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (!r || !K[r.k].jobs) continue;
-      const d = Math.abs(cX(r.root) - cX(f.base)) + Math.abs(cY(r.root) - cY(f.base)); if (d < nd) { nd = d; near = r.root; } } }
-  if (near >= 0) return { why: 'full', target: near };
-  if (jobCount.size > 0) { let far = -1, fd = 1e9; jobCount.forEach((n, r) => { if (!cells[r]) return; const d = Math.abs(cX(r) - cX(f.base)) + Math.abs(cY(r) - cY(f.base)); if (d < fd) { fd = d; far = r; } });
-    if (far >= 0) { let end = -1, ed = 1e9; for (const c of reach) { const d = Math.abs(cX(c) - cX(far)) + Math.abs(cY(c) - cY(far)); if (d < ed) { ed = d; end = c; } } return { why: 'cut', target: far, end }; } }
-  return { why: 'none' };
+  if (why === 'full') {                                                 // 자리 참 — 길로 닿는 가장 가까운 일터 문 앞까지
+    let near = -1, nd = 1e9;
+    for (const c of reach) { const x = cX(c), y = cY(c);
+      for (const [dx, dy] of D4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const r = cells[idx(nx, ny)]; if (!r || !K[r.k].jobs) continue;
+        const d = Math.abs(cX(r.root) - cX(f.base)) + Math.abs(cY(r.root) - cY(f.base)); if (d < nd) { nd = d; near = r.root; } } }
+    return near >= 0 ? { why: 'full', target: near } : null;
+  }
+  const info = window.JOB_WHY.info ? window.JOB_WHY.info(f.home) : null;   // 끊김·멂 — 그 일터 쪽으로 갈 수 있는 데까지 갔다가 되돌아선다
+  let goal = info && info['일터'] != null && cells[info['일터']] ? info['일터'] : -1, gd = 1e9;
+  if (goal < 0) jobCount.forEach((n, r) => { if (!cells[r]) return; const d = Math.abs(cX(r) - cX(f.base)) + Math.abs(cY(r) - cY(f.base)); if (d < gd) { gd = d; goal = r; } });
+  if (goal < 0) return null;
+  let end = -1, ed = 1e9;
+  for (const c of reach) { const d = Math.abs(cX(c) - cX(goal)) + Math.abs(cY(c) - cY(goal)); if (d < ed) { ed = d; end = c; } }
+  return end >= 0 ? { why, target: goal, end } : null;
 }
 function actJobWhyTick(f, i, now) {
   const R = window.VRULES.jobLook; if (!R.on || f.visitor || f.arriving || f.leaving) return false;
@@ -8265,7 +8275,7 @@ function actJobWhyTick(f, i, now) {
     if (f.farJob && !f.goal && h >= R.earlyH && h < 9 && f.jobEarly !== day && (f.state === 'idle' || f.state === 'inside')) {   // 멂 — 남보다 먼저 일터로 나선다(9시를 기다리지 않는다)
       f.jobEarly = day; if (pathBudget <= 1) return false; pathBudget--;
       if (f.state === 'inside') { if (f.inside.root !== f.home) return false; leave(f, '나옴'); }
-      f.goal = 'work'; if (!pathToBuilding(f, i, f.job)) { f.goal = null; return false; } JOBWHY.stats.멂++; return true;
+      f.goal = 'work'; if (!pathToBuilding(f, i, f.job)) { f.goal = null; return false; } JOBWHY.stats.먼출근먼저나섬++; return true;
     }
     if (f.jobWhy) f.jobWhy = null;
     return false;
@@ -8280,7 +8290,7 @@ function actJobWhyTick(f, i, now) {
       if (end && (f.state === 'idle' || f.state === 'walk') && (S.why === 'full' ? touchesRoot(at, S.target) : at === S.end)) {
         S.phase = 'look'; S.until = now + (S.why === 'full' ? R.pauseMs : R.lookMs); f.state = 'idle'; f.path = [at]; f.step = 0; f.seg = 0; f.walking = false; f.until = S.until;
         const b = cells[S.target]; if (b) { const c = centerOf(b.k, cX(b.root), cY(b.root), b.rot); S.dir0 = Math.atan2(c.x - f.x, c.z - f.z); f.dir = S.dir0; }
-        JOBWHY.stats[S.why === 'full' ? '문앞돌아섬' : '길끝멈칫']++; return true;
+        JOBWHY.stats[S.why === 'full' ? '문앞돌아섬' : S.why === 'far' ? '멀리갔다돌아섬' : '길끝멈칫']++; return true;
       }
       if (f.state === 'idle' && now >= f.until) { if (pathBudget <= 1) return true; pathBudget--;
         const ok = S.why === 'full' ? pathToBuilding(f, i, S.target) : pathTo(f, i, S.end); if (!ok) { f.jobScene = null; return false; } }
@@ -8288,7 +8298,7 @@ function actJobWhyTick(f, i, now) {
     }
     return false;
   }
-  if (f.jobWhyDay !== day && h >= 6.5 && h < 7.4) { const w = jobWhyRead(f, i); if (w) { f.jobWhyDay = day; f.jobWhy = w; JOBWHY.stats[w.why === 'none' ? '없음' : w.why === 'cut' ? '끊김' : '자리참']++; } return false; }
+  if (f.jobWhyDay !== day && h >= 6.5 && h < 7.4) { const w = jobWhyRead(f, i); if (w) { f.jobWhyDay = day; f.jobWhy = w; JOBWHY.stats[w.why === 'none' ? '없음' : w.why === 'cut' ? '끊김' : w.why === 'far' ? '멀어서' : '자리참']++; } return false; }
   const W = f.jobWhy; if (!W || f.jobSceneDay === day || f.goal || f.state === 'inside' || f.state === 'mill') return false;
   const at0 = R.atH[W.why] + ((f.home * 2654435761 >>> 16) % 100) / 100 * R.spreadH;
   if (h < at0 || h > at0 + 1.5) return false;
@@ -8301,8 +8311,8 @@ function actJobWhyTick(f, i, now) {
   f.jobScene = { why: W.why, phase: 'go', target: W.target, end: W.end };
   return true;
 }
-window.__jobWhy = () => { const n = { none: 0, cut: 0, full: 0, far: 0 }; folks.forEach(f => { if (f.job != null) { if (f.farJob) n.far++; return; } if (!isAdult(f)) return; const w = f.jobWhy; if (w) n[w.why]++; });
-  return { 켜짐: window.VRULES.jobLook.on, 시: +simHour().toFixed(1), 까닭: n, 지금장면: folks.filter(f => f.jobScene).length, ...JOBWHY.stats }; };
+window.__jobWhy = () => { const n = { none: 0, cut: 0, far: 0, full: 0 }; let 먼출근 = 0; folks.forEach(f => { if (f.job != null) { if (f.farJob) 먼출근++; return; } if (!isAdult(f)) return; const w = f.jobWhy; if (w) n[w.why]++; });
+  return { 켜짐: window.VRULES.jobLook.on, 시: +simHour().toFixed(1), 까닭: n, 먼출근: 먼출근, 지금장면: folks.filter(f => f.jobScene).length, ...JOBWHY.stats }; };
 
 /* 사람 그리기 — 묶어 그리는 구조는 그대로, 행렬만 매 프레임 갱신 */
 const folkDummy = new THREE.Object3D(), folkCol = new THREE.Color();
