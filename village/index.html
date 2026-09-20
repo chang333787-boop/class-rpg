@@ -3083,6 +3083,131 @@ function rejobCheck(rec) { const R = window.VRULES.rejob; if (!R || !R.on) retur
 { hookAdd('jobsHouseStep', function (next, args) { rejobCheck(args[0]); return next(args); }); }
 window.__rejob = () => ({ 켜짐: !!window.VRULES.rejob.on, 세대: RJ.gen, 본집: RJ.seen.size, ...RJ.stats });
 
+/* ── [MAC-FLOW] 흐름 1단계 — 밭에서 난 것이 길을 따라 가게로 가고 세대가 쓴다 (설계 docs/village_flow_design.md · 보스 범위 확정) ──
+   **생활 판정과 섞지 않는다**: 필요·성장·이사·돌아섬·붐빔·일자리를 한 줄도 안 건드린다. 재고가 비어도 주민은 떠나지 않는다.
+   그래서 판정 규칙 상한에 안 들어간다(rules.json 분류 '물건').
+   상태 이름은 디자인·연기와 함께 쓰는 **계약**이다(보스 확정):
+     밭   growing 자라는 중 · ready 거둘 것이 있어요 · full 가득 찼어요 — 가져갈 곳이 없어요
+     운반 waiting 차례를 기다려요 · moving 가는 중 · cut 길이 끊겨 못 가요
+     가게 stocked 물건이 있어요 · empty 빈 선반이에요
+     세대 got 오늘 몫을 받았어요 · missed 오늘은 못 받았어요
+   판 파일 '흐름' 칸이 없으면 **아무 일도 일어나지 않는다**(기본 마을은 그대로).
+   · 생산: 만드는곳마다 간격틱에 양만큼 제 안에 쌓는다. 담을수까지 — 꽉 차면 **만들지 않는다**(full).
+   · 운반: 밭의 문 앞 길에서 가게의 문 앞 길로 **길이 이어지면**(roadsBeside + 길 BFS · #728·#743 과 같은 길) 가까운 가게부터 보낸다.
+     동시에 운반상한까지 · 걸리는 틱 = 길 거리 × 칸당틱(멀면 늦게 온다 — 그것이 배울 거리다).
+   · 소비: **식구가 있는 집마다** 하루 한 번 세대몫을 닿는 가게 중 가까운 곳에서 뺀다. **걷는 사람 수와 무관하다**(정본 원칙).
+   · 길이 끊기거나 가게가 없어지면 운반 중인 것은 **출발한 밭으로 돌아간다**(안 잃어버린다). 다시 이으면 저절로 간다.
+   · 길·건물이 바뀐 세대에만 이어짐을 다시 본다(#723 rejob 과 같은 꼴) — 평소 비용 0. */
+(window.VRULES = window.VRULES || {}).flow = { on: false, 물건: '곡식', 만드는곳: {}, 받는곳: {},
+  쓰는시각: 12, 세대몫: 1, 운반상한: 4, 칸당틱: 6, every: 90 };
+const FLOW = { 밭: new Map(), 가게: new Map(), 짐: [], 집: new Map(), cur: 0, gen: 1, 길: new Map(),
+  stats: { 만듦: 0, 보냄: 0, 닿음: 0, 되돌림: 0, 씀: 0, 못씀: 0, 가득: 0, 끊김: 0 } };
+const FLOW_TXT = { growing: '자라는 중', ready: '거둘 것이 있어요', full: '가득 찼어요 — 가져갈 곳이 없어요',
+  waiting: '가져갈 차례를 기다려요', moving: '가는 중', cut: '길이 끊겨 못 가요',
+  stocked: '물건이 있어요', empty: '빈 선반이에요', got: '오늘 몫을 받았어요', missed: '오늘은 못 받았어요' };
+const flowOn = () => { const R = window.VRULES.flow; return !!(R && R.on && Object.keys(R.만드는곳 || {}).length); };
+const flowMake = rec => (window.VRULES.flow.만드는곳 || {})[rec && rec.k];
+const flowTake = rec => (window.VRULES.flow.받는곳 || {})[rec && rec.k];
+function flowField(root) { let v = FLOW.밭.get(root); if (!v) { v = { 양: 0, 다음: 0 }; FLOW.밭.set(root, v); } return v; }
+function flowStore(root) { let v = FLOW.가게.get(root); if (!v) { v = { 양: 0 }; FLOW.가게.set(root, v); } return v; }
+/* 이 밭에서 길로 닿는 가게들 — 가까운 것부터. 길·건물이 바뀐 세대에만 다시 본다 */
+function flowStoresFrom(rec) {
+  const memo = FLOW.길.get(rec.root); if (memo && memo.gen === FLOW.gen) return memo.list;
+  const b = roadsBeside(rec), list = [];
+  if (b.length) { const { reach } = roadBFS(b, undefined, 9999);
+    const seen = new Set();
+    for (const i of reach) { const x = cX(i), y = cY(i), d = bfsDepth[i];
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)];
+        if (!c || seen.has(c.root) || !flowTake(c)) continue; seen.add(c.root); list.push({ root: c.root, 거리: d }); } } }
+  list.sort((a, b2) => a.거리 - b2.거리 || a.root - b2.root);   /* 결정적: 거리 → 자리 순 */
+  FLOW.길.set(rec.root, { gen: FLOW.gen, list }); return list; }
+/* 한 틱 */
+function flowTick() {
+  const R = window.VRULES.flow; if (!flowOn()) return;
+  /* ① 운반 중인 것 나아가기 · 길이 끊겼으면 되돌리기 */
+  for (let i = FLOW.짐.length - 1; i >= 0; i--) { const j = FLOW.짐[i];
+    const 밭rec = cells[j.밭], 가게rec = cells[j.가게];
+    const 살았나 = 밭rec && 밭rec.root === j.밭 && 가게rec && 가게rec.root === j.가게 && flowTake(가게rec)
+      && flowStoresFrom(밭rec).some(s => s.root === j.가게);
+    if (!살았나) { FLOW.짐.splice(i, 1);
+      if (밭rec && 밭rec.root === j.밭 && flowMake(밭rec)) { flowField(j.밭).양 += j.양; FLOW.stats.되돌림++; }   /* 밭이 있으면 돌려준다 */
+      continue; }
+    if (--j.남은 <= 0) { FLOW.짐.splice(i, 1); flowStore(j.가게).양 += j.양; FLOW.stats.닿음++; } }
+  /* ② 만들기 · 보내기 — 판을 every 조각으로 나눠 돈다 */
+  const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, FLOW.cur + step);
+  for (let i = FLOW.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i) continue;
+    const mk = flowMake(rec); if (!mk) continue;
+    const f = flowField(i), 담을수 = Math.max(1, mk.담을수 | 0 || 5);
+    if (!f.다음) f.다음 = SIM.ticks + (mk.간격틱 | 0 || 600);
+    if (SIM.ticks >= f.다음) { f.다음 = SIM.ticks + (mk.간격틱 | 0 || 600);
+      if (f.양 < 담을수) { f.양 = Math.min(담을수, f.양 + (mk.양 | 0 || 1)); FLOW.stats.만듦++; } else FLOW.stats.가득++; }
+    if (f.양 <= 0 || FLOW.짐.length >= (R.운반상한 | 0 || 4)) continue;
+    const 가게들 = flowStoresFrom(rec); if (!가게들.length) { FLOW.stats.끊김++; continue; }
+    for (const s of 가게들) { const rec2 = cells[s.root]; const tk = flowTake(rec2); if (!tk) continue;
+      const st = flowStore(s.root), 담을수2 = Math.max(1, tk.담을수 | 0 || 8);
+      if (st.양 + FLOW.짐.filter(j => j.가게 === s.root).reduce((a, j) => a + j.양, 0) >= 담을수2) continue;
+      f.양 -= 1; FLOW.짐.push({ 밭: i, 가게: s.root, 양: 1, 남은: Math.max(1, s.거리 * (R.칸당틱 | 0 || 6)) });
+      FLOW.stats.보냄++; break; } }
+  FLOW.cur = end >= N ? 0 : end;
+  /* ③ 세대가 쓴다 — 하루 한 번, 걷는 사람과 무관 */
+  const 오늘 = simDay(), 시 = simHour();
+  if (시 >= (R.쓰는시각 | 0 || 12) && 시 < (R.쓰는시각 | 0 || 12) + 1) {
+    res.forEach((n, root) => { if (n <= 0) return; const h = FLOW.집.get(root);
+      if (h && h.날 === 오늘) return;
+      const rec = cells[root]; if (!rec) return;
+      const 몫 = Math.max(1, R.세대몫 | 0 || 1); let 받음 = false;
+      for (const s of flowStoresFrom(rec)) { const st = flowStore(s.root);
+        if (st.양 >= 몫) { st.양 -= 몫; 받음 = true; break; } }
+      FLOW.집.set(root, { 날: 오늘, 받음 }); 받음 ? FLOW.stats.씀++ : FLOW.stats.못씀++; }); } }
+/* 상태 — 계약 이름 그대로 */
+function flowFieldState(root) { const rec = cells[root]; if (!rec || !flowMake(rec)) return null;
+  const f = flowField(root), mk = flowMake(rec), 담을수 = Math.max(1, mk.담을수 | 0 || 5);
+  if (FLOW.짐.some(j => j.밭 === root)) return 'moving';
+  if (f.양 <= 0) return 'growing';
+  if (!flowStoresFrom(rec).length) return 'cut';
+  if (f.양 >= 담을수) return 'full';
+  if (FLOW.짐.length >= (window.VRULES.flow.운반상한 | 0 || 4)) return 'waiting';
+  return 'ready'; }
+function flowStoreState(root) { const rec = cells[root]; if (!rec || !flowTake(rec)) return null;
+  return flowStore(root).양 > 0 ? 'stocked' : 'empty'; }
+function flowHomeState(root) { const h = FLOW.집.get(root); if (!h) return null; return h.받음 ? 'got' : 'missed'; }
+/* 빈 선반을 눌렀을 때 — 'empty' 는 원인이 아니라 결과다(설계 4절) */
+function flowWhyEmpty(root) {
+  const 밭들 = []; cells.forEach((rec, i) => { if (!rec || rec.root !== i || !flowMake(rec)) return;
+    if (flowStoresFrom(rec).some(s => s.root === root)) 밭들.push(i); });
+  if (FLOW.짐.some(j => j.가게 === root)) return '곧 와요 — 오는 중이에요';
+  if (!밭들.length) { const 있나 = cells.some((rec, i) => rec && rec.root === i && flowMake(rec));
+    return 있나 ? '밭에 쌓여 있는데 길이 끊겼어요' : '이 가게에 오는 밭이 없어요'; }
+  if (밭들.every(i => flowField(i).양 <= 0)) return '밭이 아직 자라는 중이에요 — 밭을 더 만들어 볼까요?';
+  return '곧 와요 — 오는 중이에요'; }
+{ hookAdd('placeAt', function (next, args) { const r = next(args); if (flowOn()) FLOW.gen++; return r; }); }
+{ hookAdd('removeAt', function (next, args) { const r = next(args); if (flowOn()) FLOW.gen++; return r; }); }
+/* 저장 — 옛 저장본에 이 칸이 없으면 0 에서 시작한다. 옛 코드가 새 저장본을 읽으면 모르는 칸이라 무시한다 */
+function flowSave() { if (!flowOn()) return undefined;
+  const 밭 = {}, 가게 = {}, 집 = {};
+  FLOW.밭.forEach((v, root) => { if (v.양 > 0) 밭[root] = v.양; });
+  FLOW.가게.forEach((v, root) => { if (v.양 > 0) 가게[root] = v.양; });
+  FLOW.집.forEach((v, root) => { 집[root] = [v.날, v.받음 ? 1 : 0]; });
+  return { v: 1, 밭, 가게, 집, 짐: FLOW.짐.map(j => [j.밭, j.가게, j.양, j.남은]) }; }
+function flowLoad(f) { FLOW.밭.clear(); FLOW.가게.clear(); FLOW.집.clear(); FLOW.짐.length = 0; FLOW.길.clear(); FLOW.gen++;
+  if (!f || typeof f !== 'object') return;
+  for (const r in (f.밭 || {})) flowField(+r).양 = Math.max(0, f.밭[r] | 0);
+  for (const r in (f.가게 || {})) flowStore(+r).양 = Math.max(0, f.가게[r] | 0);
+  for (const r in (f.집 || {})) { const v = f.집[r]; if (Array.isArray(v)) FLOW.집.set(+r, { 날: v[0] | 0, 받음: !!v[1] }); }
+  (Array.isArray(f.짐) ? f.짐 : []).forEach(j => { if (Array.isArray(j) && j.length === 4)
+    FLOW.짐.push({ 밭: j[0] | 0, 가게: j[1] | 0, 양: Math.max(1, j[2] | 0), 남은: Math.max(1, j[3] | 0) }); }); }
+window.__flow = () => ({ 켜짐: flowOn(), 물건: window.VRULES.flow.물건, 짐: FLOW.짐.length,
+  밭: [...FLOW.밭].map(([root, v]) => ({ 자리: [cX(root), cY(root)], 양: v.양, 상태: flowFieldState(root) })).filter(o => o.상태),
+  가게: [...FLOW.가게].map(([root, v]) => ({ 자리: [cX(root), cY(root)], 양: v.양, 상태: flowStoreState(root) })).filter(o => o.상태),
+  세대: { 받음: [...FLOW.집.values()].filter(h => h.받음).length, 못받음: [...FLOW.집.values()].filter(h => !h.받음).length },
+  ...FLOW.stats });
+window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '없음';
+  const fs = flowFieldState(rec.root), ss = flowStoreState(rec.root), hs = flowHomeState(rec.root);
+  const s = fs || ss || hs; if (!s) return '흐름과 무관';
+  return { 상태: s, 말: FLOW_TXT[s], 양: fs ? flowField(rec.root).양 : ss ? flowStore(rec.root).양 : null,
+    ...(ss === 'empty' ? { 까닭: flowWhyEmpty(rec.root) } : {}),
+    ...(fs ? { 닿는가게: flowStoresFrom(rec).map(o => [cX(o.root), cY(o.root), o.거리]) } : {}) }; };
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
@@ -4266,6 +4391,7 @@ function simTick() {
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
+  flowTick();   // [MAC-FLOW] 흐름 — 만들기·보내기·나아가기·쓰기(판 파일 '흐름' 칸이 있을 때만)
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
@@ -8721,7 +8847,10 @@ function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표
 }
 
 function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
-  const def = STAGE.def; if (!def || !def.규칙) return;
+  const def = STAGE.def; if (!def) return;
+  if (def.흐름 && typeof def.흐름 === 'object' && window.VRULES.flow) {   /* [MAC-FLOW] 판이 흐름을 켠다(규칙 칸과 따로 — 판정이 아니라 '물건') */
+    Object.assign(window.VRULES.flow, def.흐름); STAGE.stats.흐름 = !!window.VRULES.flow.on; }
+  if (!def.규칙) return;
   Object.keys(def.규칙).forEach(k => { const v = def.규칙[k], cur = window.VRULES[k];
     if (!cur || typeof v !== 'object') { STAGE.stats.모르는규칙.push(k); return; }
     Object.assign(cur, v); STAGE.stats.규칙수++; });
@@ -9043,10 +9172,10 @@ window.__tsignSync = tsignSync;
 
 function serialize() {
   const { pal, ps, changed } = plotStrings();
-  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h ? growSave(h) : -1]; });
+  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h ? growSave(h) : -1]; });   /* [MAC-FLOW] 흐름은 아래 flow 칸으로 */
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
   lastSave = { 구역수: Object.keys(ps).length, 바뀐구역: changed, 크기: 0, 형식: 'v2' };
-  return { v: SAVE_V, w: W, h: H, palette: pal, plotStr: ps, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: [...unlocked], goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
+  return { v: SAVE_V, w: W, h: H, palette: pal, plotStr: ps, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, flow: flowSave(), houses, unlocked: [...unlocked], goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
 /* 옛 형식(v1) — 시험·비교용으로만 남긴다 */
 function serializeV1() {
@@ -9056,10 +9185,10 @@ function serializeV1() {
     seen.add(rec);
     items.push({ id: rec.k, x: cX(rec.root), y: cY(rec.root), rot: rec.rot });
   });
-  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h ? growSave(h) : -1]; });
+  const houses = {}; res.forEach((v, root) => { const h = hinfo.get(root); if (v || (h && h.lv > 1)) houses[root] = [v, h ? h.lv : 1, h ? growSave(h) : -1]; });   /* [MAC-FLOW] 흐름은 아래 flow 칸으로 */
   const unlockedList = [...unlocked];
   const signsObj = {}; signs.forEach((v, root) => { const rec = cells[root]; if (rec && rec.k === 'sign' && rec.root === root) signsObj[root] = [v.t, v.at, v.reads || 0]; });
-  return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
+  return { v: 1, w: W, h: H, items, clock: { t: SIM.t, speed: SIM.paused ? 0 : SIM.speed }, flow: flowSave(), houses, unlocked: unlockedList, goals: [...goalsDone], festSeen: !!EV.festSeen, dream: DREAM.text, plots: [...plots], plotsEarned, signs: signsObj, hist: HIST.slice(-HIST_MAX) };
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9197,6 +9326,7 @@ function loadSaved(rawOverride) {
   if (hasHouses) { for (const r in d.houses) { const rec = cells[+r]; if (!(rec && rec.k === 'house' && rec.root === +r)) continue;
       const v = d.houses[r]; const n = Array.isArray(v) ? v[0] | 0 : v | 0, lv = Array.isArray(v) ? Math.min(3, Math.max(1, v[1] | 0)) : 1, hs = Array.isArray(v) ? (v[2] == null ? -1 : v[2]) : -1;
       hinfo.set(+r, { lv, hs }); res.set(+r, Math.min(HOUSE_CAPS[lv], n)); if (lv > 1) dirtyChunks.add(chunkOfCell(+r)); } }
+  if (d.flow) flowLoad(d.flow);   /* [MAC-FLOW] 저장된 흐름(밭·가게 양 · 운반 중 · 세대 오늘 몫) */
   if (Array.isArray(d.unlocked)) d.unlocked.forEach(k => { if (K[k]) unlocked.add(k); });
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
   if (Array.isArray(d.hist)) HIST = d.hist.filter(p => p && typeof p.d === 'number').slice(-HIST_MAX);   // 마을 흐름(F35)
