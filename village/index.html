@@ -5885,6 +5885,7 @@ window.__crowdDoor = (x, y) => { const R = { 고르기: window.VRULES.crowdHomes
   const 문들 = roadsBeside(rec), b = crowdDoor(rec);
   return { ...R, 문앞칸: 문들.map(i => [cX(i), cY(i), +((CROWDH.load.get(i) || 0) / (window.VRULES.crowdHomes.cap || 3)).toFixed(2)]),
     고른문: b >= 0 ? [cX(b), cY(b)] : null }; };
+crowdHomesStep = hookable('crowdHomesStep', crowdHomesStep);   /* [MAC-STAGEOFF] 판이 붐빔을 끄면 이 셈도 멈춘다 — crowdTick 을 막아도 이쪽이 crowd 를 채운다 */
 function crowdHomesStep() { const R = window.VRULES.crowdHomes; if (!R.on) return; const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CROWDH.cur + step), nn = NEEDS.length || 1;
   for (let i = CROWDH.cur; i < end; i++) { const rec = cells[i]; if (!rec || rec.root !== i || rec.k !== 'house') continue; const n = res.get(i) || 0; if (n <= 0) continue;
     const b = crowdDoor(rec); if (b < 0) continue; const { prev, reach } = roadBFS(b, undefined, NEED_R_WIDE); const left = new Set(NEEDS), used = [];
@@ -9572,6 +9573,12 @@ function stageKeyPart() { const id = VISIT_SID ? null : stageIdOf(QS.get('stage'
 const STAGE = { id: VISIT_SID ? null : stageIdOf(QS.get('stage')), def: null, err: null, goals: [], saidEnd: false,
   stats: { 규칙수: 0, 모르는규칙: [], 건물수: 0, 모르는건물: [], 목표수: 0, 시작판: false, 막음: 0 } };
 const STAGE_HOOKS = {
+  /* [MAC-STAGEOFF] 사는 집 가운데 **필요가 다 찬 집**의 비율(%) — '가까우면 쓸 수 있다'를 목표로 셀 수 있게(3학년 동네 판).
+     판정이 아니라 목표 셈이다 — 이미 있는 computeSat 을 읽기만 한다. 사는 집이 없으면 null(아직 못 잰다). */
+  '다있음%': () => { let lived = 0, ok = 0;
+    res.forEach((v, root) => { if (v <= 0) return; const rec = cells[root]; if (!rec) return; lived++;
+      const st = sat.get(root) || computeSat(rec); if (NEEDS.every(k => st.met[k])) ok++; });
+    return lived ? Math.round(100 * ok / lived) : null; },
   /* 사는 집 가운데 일할 곳이 닿는 집의 비율(%) — 일자리 셈이 한 바퀴 돌기 전이나 인구가 JOB_POP 아래면 null(아직 못 잰다) */
   '일닿음%': () => { if (population() < JOB_POP || (window.VRULES.jobsHomes && window.VRULES.jobsHomes.on && !JOBH.stats.한바퀴)) return null;
     let lived = 0, far = 0; res.forEach((v, root) => { if (v > 0) { lived++; if (joblessHome(root)) far++; } }); return lived ? 100 * (1 - far / lived) : null; },
@@ -9651,10 +9658,44 @@ function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표
   if (VSKIN.stats.더한것.length && typeof buildTray === 'function') { try { buildTray(); VSKIN.stats.트레이 = 'ok'; } catch (e) { VSKIN.stats.트레이 = String(e && e.message || e).slice(0, 60); } }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   [MAC-STAGEOFF] 판이 **판정 묶음을 통째로 끈다** — 수업 판마다 주제 하나만 남기려고 (엔진 정본 2번 · 보스 09-21)
+   왜 기존 스위치로 안 되나(pop88 실측):
+     · `jobsHomes`·`crowdHomes`·`manyLibrary` 의 `on:false` 는 **'옛 셈(걷는 표본)으로 되돌림'**이다 — 껐는데도 말이 계속 뜬다
+       (일자리 셋을 꺼도 일먼집 24→**6**, 붐빔 둘을 꺼도 붐빔집 30→**18.5**). 게다가 판정이 바뀌어 **마을이 달라진다**(인구 +12).
+     · `crowdSkipNight` 는 방향이 반대다 — 끄면 **밤에도 붐빔을 세서 오히려 늘어난다**.
+     · 그 스위치들은 월요일 표가 **복구용**이라고 못박은 것이다(수업 판이 교육적 선택으로 쓸 값이 아니다).
+   그래서 여기서는 **복구용 스위치를 손대지 않고**, 판 파일의 `끄기` 칸으로 **셈과 말을 함께** 멈춘다.
+     `"끄기": ["일자리", "붐빔"]`
+   셈을 멈추면 satText 의 그 줄이 저절로 빠지고 칩·소식도 안 뜬다(성능도 덤). 원래 줄 수정 0 — 고리만 쓴다.
+   ⚠ `turnAway`(새 이웃이 돌아섬)는 **일자리가 아니라 필요 부족** 규칙이라 이 묶음에 안 넣는다 — 필요를 가르치는 판에서는 그게 주제다.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).stageOff = { on: true };
+const SOFF = { 묶음: new Set(), stats: { 일자리막음: 0, 붐빔막음: 0 } };
+const SOFF_ALL = ['일자리', '붐빔'];
+const soffOn = g => window.VRULES.stageOff.on && SOFF.묶음.has(g);
+function stageOffRead(def) {                                   /* 판 로드 때 한 번 — 모르는 이름은 적어 두고 무시한다 */
+  SOFF.묶음.clear(); const L = def && def.끄기; if (!Array.isArray(L)) return;
+  STAGE.stats.모르는끄기 = [];
+  L.forEach(g => { const s = String(g); if (SOFF_ALL.includes(s)) SOFF.묶음.add(s); else STAGE.stats.모르는끄기.push(s); });
+  STAGE.stats.끈묶음 = [...SOFF.묶음];
+}
+{ /* 일자리 — 셈(집 단위·표본 둘 다)과 그 말을 함께 */
+  hookAdd('jobsTick', function (next, args) { if (soffOn('일자리')) { SOFF.stats.일자리막음++; return; } return next(args); });
+  hookAdd('jobsHomesStep', function (next, args) { if (soffOn('일자리')) return; return next(args); });
+  hookAdd('jobsHouseStep', function (next, args) { if (soffOn('일자리')) return; return next(args); });
+  hookAdd('joblessHome', function (next, args) { if (soffOn('일자리')) return false; return next(args); });
+  /* 붐빔 — 걸음을 한 칸도 안 세면 붐빔 값이 0 이라 집 카드·길 색이 저절로 조용해진다([MAC-CROWDNIGHT] 와 같은 꾀) */
+  hookAdd('crowdTick', function (next, args) { if (soffOn('붐빔')) { SOFF.stats.붐빔막음++; return next([]); } return next(args); });
+  hookAdd('crowdHomesStep', function (next, args) { if (!soffOn('붐빔')) return next(args);
+    if (crowd.size) crowd.clear();   /* 셈을 멈추기만 하면 옛 값이 남아 오히려 붐벼 보인다(실측: 최악집 0.35 → 0.96) — 비워야 한다 */
+    return; }); }
+window.__stageOff = () => ({ 켜짐: window.VRULES.stageOff.on, 끈묶음: [...SOFF.묶음], 쓸수있는이름: SOFF_ALL, ...SOFF.stats });
 function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
   const def = STAGE.def; if (!def) return;
   if (def.흐름 && typeof def.흐름 === 'object' && window.VRULES.flow) {   /* [MAC-FLOW] 판이 흐름을 켠다(규칙 칸과 따로 — 판정이 아니라 '물건') */
     Object.assign(window.VRULES.flow, def.흐름); STAGE.stats.흐름 = !!window.VRULES.flow.on; }
+  stageOffRead(def);   /* [MAC-STAGEOFF] 판이 끄는 판정 묶음 */
   if (!def.규칙) return;
   Object.keys(def.규칙).forEach(k => { const v = def.규칙[k], cur = window.VRULES[k];
     if (!cur || typeof v !== 'object') { STAGE.stats.모르는규칙.push(k); return; }
