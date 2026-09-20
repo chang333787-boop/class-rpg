@@ -2712,6 +2712,7 @@ window.__roadRot = () => ({ 켜짐: window.VRULES.roadRot.on, 직접돌림: ROAD
    · 한 함수의 감싸기는 **전부 한꺼번에** 바꾼다(일부만 바꾸면 남은 옛 감싸기와 안팎 차례가 뒤바뀐다).
    · 둘째 묶음(#700 뒤 · 4함수 4곳): rhythmTick 1(리듬 길찾기 예산) · pathTo 1 · pathToBuilding 1(길찾기) · plazaRoot 1(광장 캐시).
    · 셋째 묶음(#701 뒤 · 판 바꾸기 ①): canPlace 5 · undo 3.
+   · 넷째 묶음(#702 뒤 · 판 바꾸기 ②): placeAt 10 · removeAt 7 — 두 곳은 원래 함수를 다른 인자로 부른다(f0.call(this, 'house', …) → next(['house', …])).
    · 첫 묶음(11함수 · 15곳): jobsHouseStep 2 · jobsHomesStep 1 · jobsTick 1 · joblessHome 1 · satText 2 · crowdTick 3 · crowdHint 1 · crowdWidenAt 1 · awayLacks 1 · eventTick 1 · goalTick 1.
      각 자리의 몸통은 그대로 — `f0.apply(this, arguments)` → `next(args)` · 매개변수는 `let [..] = args` 로만 바꿨다.
    · 증거: run.mjs --html(옛 index.html)과 같은 시드로 표본 완전 일치(PR 본문) · 실화면 콘솔 0.
@@ -2739,6 +2740,8 @@ pathToBuilding = hookable('pathToBuilding', pathToBuilding);
 plazaRoot = hookable('plazaRoot', plazaRoot);
 canPlace = hookable('canPlace', canPlace);
 undo = hookable('undo', undo);
+placeAt = hookable('placeAt', placeAt);
+removeAt = hookable('removeAt', removeAt);
 window.__hooks = () => Object.fromEntries(Object.entries(HOOKS).map(([k, v]) => [k, v.length]));
 
 /* ── [MAC-LIBRARY] 도서관은 동네마다 — '마을에 하나'에서 뺀다 (보스 결정 09-20 · 조사 docs/village_learn_stall_20260920.md) ──
@@ -2764,7 +2767,7 @@ function libHint(miss, libs, cap, open) {
     const k = K.library, sp = k.special; let r; k.special = false; try { r = next(args); } finally { k.special = sp; }
     if (r === true && countKind('library') >= R.cap) { LIBMANY.stats.한도말++; return '도서관은 ' + R.cap + '채까지 지을 수 있어요 — ✋ 로 옮겨 볼 수 있어요'; }
     return r; });
-  const place0 = placeAt; placeAt = function (kind) { const r = place0.apply(this, arguments); if (kind === 'library' && countKind('library') > 1) LIBMANY.stats.더놓음++; return r; };
+  hookAdd('placeAt', function (next, args) { let [kind] = args; const r = next(args); if (kind === 'library' && countKind('library') > 1) LIBMANY.stats.더놓음++; return r; });
   hookAdd('satText', function (next, args) { let [rec] = args; const t = next(args); if (!window.VRULES.manyLibrary.on || !rec) return t;
     const st = sat.get(rec.root), miss = st ? NEEDS.filter(n => !st.met[n]) : null, h = libHint(miss, countKind('library'), window.VRULES.manyLibrary.cap, lockedWhy('library') === true);
     if (h) LIBMANY.stats.귀띔++; return t + h; }); }
@@ -2786,8 +2789,8 @@ const TICKSPLIT = { inRhythm: false, tick: -1, n: 0, stats: { 길찾기: 0, 미�
 const ROOTC = { school: { root: -1, dirty: true, f0: schoolRoot }, station: { root: -1, dirty: true, f0: stationRoot }, stats: { 훑음: 0, 다시씀: 0 } };
 function rootCached(k) { const e = ROOTC[k], r = e.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === k); if (!e.dirty && ok) { ROOTC.stats.다시씀++; return r; } e.root = e.f0(); e.dirty = false; ROOTC.stats.훑음++; return e.root; }
 schoolRoot = function () { return rootCached('school'); }; stationRoot = function () { return rootCached('station'); };
-{ const pR0 = placeAt; placeAt = function (kind) { if (ROOTC[kind] && ROOTC[kind].f0) ROOTC[kind].dirty = true; return pR0.apply(this, arguments); };
-  const rR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && ROOTC[c.k] && ROOTC[c.k].f0) ROOTC[c.k].dirty = true; return rR0.apply(this, arguments); }; }
+{ hookAdd('placeAt', function (next, args) { let [kind] = args; if (ROOTC[kind] && ROOTC[kind].f0) ROOTC[kind].dirty = true; return next(args); });
+  hookAdd('removeAt', function (next, args) { let [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && ROOTC[c.k] && ROOTC[c.k].f0) ROOTC[c.k].dirty = true; return next(args); }); }
 window.__tickSplit = () => ({ 켜짐: window.VRULES.tickSplit.on, 예산: window.VRULES.tickSplit.rhythmBudget, ...TICKSPLIT.stats, 건물찾기: { ...ROOTC.stats }, 기다리는집: { ...WAITSCAN.stats }, 기억: { ...WAITMEMO.stats } });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
@@ -2854,8 +2857,8 @@ function jobsHomesStep() { const R = window.VRULES.jobsHomes; if (!R.on || OFF.h
     jobStats.일자리 = total; jobStats.찬자리 = filled; jobStats.일없는어른 = lack; });
   hookAdd('joblessHome', function (next, args) { let [root] = args; if (!window.VRULES.jobsHomes.on || !JOBH.stats.한바퀴) return next(args);
     if (population() < JOB_POP) return false; const need = jobsAdultsOf(root); if (!need) return false; const a = JOBH.asg.get(root); let have = 0; if (a) a.forEach(n => have += n); return have === 0; });
-  const pJ0 = placeAt; placeAt = function (kind) { if (K[kind] && K[kind].jobs) JOBH.wpDirty = true; return pJ0.apply(this, arguments); };
-  const rJ0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && K[c.k].jobs) JOBH.wpDirty = true; if (c && c.k === 'house') jobsRelease(c.root); return rJ0.apply(this, arguments); }; }
+  hookAdd('placeAt', function (next, args) { let [kind] = args; if (K[kind] && K[kind].jobs) JOBH.wpDirty = true; return next(args); });
+  hookAdd('removeAt', function (next, args) { let [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && K[c.k].jobs) JOBH.wpDirty = true; if (c && c.k === 'house') jobsRelease(c.root); return next(args); }); }
 window.__jobsHomes = () => { let need = 0, houses = 0, jl = 0; cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const n = jobsAdultsOf(i); if (!n) return; houses++; need += n; if (joblessHome(i)) jl++; });
   let lack = 0; JOBH.lack.forEach(v => lack += v); return { 켜짐: window.VRULES.jobsHomes.on, 사는집: houses, 어른몫: need, 일자리: jobStats.일자리, 찬자리: jobStats.찬자리, 일없는어른: lack, 일없는집: jl, 모자란집: JOBH.lack.size, ...JOBH.stats }; };
 
@@ -3161,8 +3164,8 @@ const SAYAWAY_FIX = { 물: '우물', 쉼: '긴의자', 놀이: '놀이터', 장�
 function sayAwayPick(miss, near, order) { let best = null, bd = Infinity; order.forEach(n => { if (!miss.includes(n)) return; const d = near[n] == null ? Infinity : near[n]; if (best == null || d < bd) { best = n; bd = d; } }); return best; }
 function sayAwayNear(x, y) { const near = {}; cells.forEach((rec, i) => { if (!rec || rec.root !== i) return; const k = K[rec.k]; if (!k || !(k.need || k.need2)) return; const d = Math.hypot(cX(i) - x, cY(i) - y);
     [k.need, k.need2].forEach(n => { if (n && (near[n] == null || d < near[n])) near[n] = d; }); }); return near; }
-{ const place0 = placeAt; placeAt = function (kind, x, y, rot) { const r = place0.apply(this, arguments);
-    if (kind === 'house' && painting && window.VRULES.placeSayAway.on && sayLive()) SAYAWAY.pending.push(idx(x, y)); return r; }; }
+{ hookAdd('placeAt', function (next, args) { let [kind, x, y, rot] = args; const r = next(args);
+    if (kind === 'house' && painting && window.VRULES.placeSayAway.on && sayLive()) SAYAWAY.pending.push(idx(x, y)); return r; }); }
 addEventListener('pointerup', () => {                                            // 원래 pointerup(획 끝) 다음에 돈다
   const R = window.VRULES.placeSayAway, roots = SAYAWAY.pending.splice(0); if (!roots.length || !R.on) return;
   const tally = {}; roots.forEach(root => { const rec = cells[root]; if (!rec || rec.k !== 'house' || rec.root !== root) return; const miss = awayLacks(rec); if (!miss || !miss.length) return;
@@ -4467,7 +4470,7 @@ function waitScanFull() { const m = new Map(), lack = new Map(); let c = 0; if (
   WAITSCAN.at = SIM.ticks; WAITSCAN.map = m; WAITSCAN.lack = lack; WAITSCAN.cand = c; WAITSCAN.stats.훑음++; return m; }
 /* 빈집의 '빠진 것'은 판(길·시설)이 바뀔 때만 달라진다 — 판 번호(놓기·치우기마다 +1)와 필요 수·인구 문턱이 같으면 지난 답을 쓴다(길 BFS 를 안 돈다). */
 const WAITMEMO = { ver: 0, m: new Map(), stats: { 다시씀: 0, 셈: 0 } };
-{ const pW0 = placeAt; placeAt = function () { WAITMEMO.ver++; return pW0.apply(this, arguments); }; const rW0 = removeAt; removeAt = function () { WAITMEMO.ver++; return rW0.apply(this, arguments); }; }
+{ hookAdd('placeAt', function (next, args) { WAITMEMO.ver++; return next(args); }); hookAdd('removeAt', function (next, args) { WAITMEMO.ver++; return next(args); }); }
 function waitLacksMemo(rec) { const key = WAITMEMO.ver + '|' + NEEDS.length + '|' + (population() < window.VRULES.turnAway.graceBelow ? 0 : 1) + '|' + (window.VRULES.turnAway.on ? 1 : 0) + '|' + (typeof JOBH !== 'undefined' && window.VRULES.jobAway && window.VRULES.jobAway.on ? (JOBH.stats.한바퀴 >> 2) : '-'), e = WAITMEMO.m.get(rec.root);   // 일자리 자리는 배정이 돌며 바뀐다 — 네 바퀴(≈36초)마다 다시
   if (e && e.key === key) { WAITMEMO.stats.다시씀++; return e.miss; } const miss = awayLacks(rec); WAITMEMO.m.set(rec.root, { key, miss }); WAITMEMO.stats.셈++; if (WAITMEMO.m.size > 4000) WAITMEMO.m.clear(); return miss; }
 function waitScanStep() { if (VISIT.on) { WAITSCAN.map = new Map(); WAITSCAN.lack = new Map(); WAITSCAN.cur = 0; WAITSCAN.accM = new Map(); WAITSCAN.accL = new Map(); WAITSCAN.accC = 0; return; }
@@ -4844,13 +4847,13 @@ function widenOk(kinds) { let r = 0; for (const k of kinds) { if (k === 'road') 
     const recs = fp.map(([px, py]) => cells[idx(px, py)]); if (!widenOk(recs.map(c => c ? c.k : null))) return r;
     fp.forEach(([px, py], j) => { if (recs[j]) cells[idx(px, py)] = null; }); let v; try { v = next(args); } finally { fp.forEach(([px, py], j) => { if (recs[j]) cells[idx(px, py)] = recs[j]; }); }
     return v; });
-  const placeW0 = placeAt; placeAt = function (kind, x, y, rot) { if (kind === 'avenue' && window.VRULES.crowdSay.on) { const fp = footprint(kind, x, y, rot || 0), gone = [];
+  hookAdd('placeAt', function (next, args) { let [kind, x, y, rot] = args; if (kind === 'avenue' && window.VRULES.crowdSay.on) { const fp = footprint(kind, x, y, rot || 0), gone = [];
       fp.forEach(([px, py]) => { const c = inb(px, py) ? cells[idx(px, py)] : null; if (c && c.k === 'road' && c.root === idx(px, py)) { removeAt(px, py); gone.push(idx(px, py)); } });
       if (gone.length) { WIDEN.roads.set(idx(x, y), gone); WIDEN.stats.넓힘++; } }
-    return placeW0.apply(this, arguments); };
-  const remW0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, r = remW0.apply(this, arguments);
+    return next(args); });
+  hookAdd('removeAt', function (next, args) { let [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, r = next(args);
     if (r && root >= 0 && WIDEN.roads.has(root)) { const g = WIDEN.roads.get(root); WIDEN.roads.delete(root); if (WIDEN.undoing) { g.forEach(i => { if (!cells[i]) placeAt('road', cX(i), cY(i), 0); }); WIDEN.stats.되돌림++; } }
-    return r; };
+    return r; });
   hookAdd('undo', function (next, args) { WIDEN.undoing = true; try { return next(args); } finally { WIDEN.undoing = false; } }); }
 window.CROWD_AT = (i) => { const c = cells[i]; if (!c) return 0; if (c.k === 'house') return Math.min(1, crowd.get(c.root) || 0);
   const e = CROWDSAY.road.get(i); if (!e) return 0; const v = e.v * Math.pow(window.VRULES.crowdSay.keep, SIM.ticks - e.t); if (v < 0.005) { CROWDSAY.road.delete(i); return 0; } return Math.min(1, v); };
@@ -4897,12 +4900,12 @@ function widenShiftPlan(x, y, rot) {
       keep.forEach((c, i) => { cells[i] = null; }); let v; try { v = next(args); } finally { keep.forEach((c, i) => { cells[i] = c; }); }
       return v; }
     WIDEN2.stats.자리없음말++; return '큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 곁에 길을 한 줄 더 내 봐요'; });
-  const pS0 = placeAt; placeAt = function (kind, x, y, rot) {
+  hookAdd('placeAt', function (next, args) { let [kind, x, y, rot] = args;
     if (kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy) { const p = widenShiftPlan(x, y, rot);
       if (p) { const h = p.house, n = res.get(h.root) || 0; WIDEN2.busy = true;
-        try { KEEP.lastPush = -1e9; removeAt(cX(h.root), cY(h.root)); pS0.call(this, 'house', p.to[0], p.to[1], h.rot); } finally { WIDEN2.busy = false; }   // 한 채 물림 — '여러 채 한꺼번에'(30ms) 방어에 걸리지 않게
+        try { KEEP.lastPush = -1e9; removeAt(cX(h.root), cY(h.root)); next(['house', p.to[0], p.to[1], h.rot]); } finally { WIDEN2.busy = false; }   // 한 채 물림 — '여러 채 한꺼번에'(30ms) 방어에 걸리지 않게
         WIDEN2.stats.물림++; setTimeout(() => toast('🏠 집이 한 칸 물러나고 큰길이 깔렸어요' + (n ? ' — 식구 ' + n + '명 그대로' : ''), true), 0); } }
-    return pS0.apply(this, arguments); };
+    return next(args); });
   /* 붐비는 집의 말 — 문 앞 길을 덮는 큰길 자리가 있나(바로 또는 한 칸 물려서) */
   hookAdd('crowdWidenAt', function (next, args) { let [rec] = args; if (!window.VRULES.widenShift.on) return next(args);
     const b = roadBeside(rec); if (b < 0) return false; const bx = cX(b), by = cY(b);
@@ -4942,17 +4945,17 @@ function widenDisarm() { if (!WIDEN3.armed) return; WIDEN3.armed = null; widenCa
     else widenDisarm(); return r; };
   const mA0 = setMode; setMode = function () { widenDisarm(); return mA0.apply(this, arguments); };
   /* ② 되돌리기 — 물림을 적어 두었다가(큰길 root → 집의 원래 자리) 그 큰길을 ↩ 로 거두면 집을 제자리로 */
-  const plA0 = placeAt; placeAt = function (kind, x, y, rot) { const p = kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy ? widenShiftPlan(x, y, rot) : null;
-    const from = p ? { x: cX(p.house.root), y: cY(p.house.root), rot: p.house.rot, to: p.to } : null; const r = plA0.apply(this, arguments);
-    if (from) WIDEN3.shifts.set(idx(x, y), from); return r; };
-  const rmA0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, back = root >= 0 ? WIDEN3.shifts.get(root) : null, undoing = WIDEN.undoing;
-    const r = rmA0.apply(this, arguments);
+  hookAdd('placeAt', function (next, args) { let [kind, x, y, rot] = args; const p = kind === 'avenue' && window.VRULES.widenShift.on && !WIDEN2.busy ? widenShiftPlan(x, y, rot) : null;
+    const from = p ? { x: cX(p.house.root), y: cY(p.house.root), rot: p.house.rot, to: p.to } : null; const r = next(args);
+    if (from) WIDEN3.shifts.set(idx(x, y), from); return r; });
+  hookAdd('removeAt', function (next, args) { let [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null, root = c && c.k === 'avenue' ? c.root : -1, back = root >= 0 ? WIDEN3.shifts.get(root) : null, undoing = WIDEN.undoing;
+    const r = next(args);
     if (r && back) { WIDEN3.shifts.delete(root); if (undoing) { const h = cells[idx(back.to[0], back.to[1])];
         if (h && h.k === 'house' && h.root === idx(back.to[0], back.to[1])) { const ok = (() => { const keep = footprint('house', back.to[0], back.to[1], h.rot).map(([px, py]) => idx(px, py)); keep.forEach(i => { cells[i] = null; });
             let v; try { v = canPlace('house', back.x, back.y, back.rot); } finally { keep.forEach(i => { cells[i] = h; }); } return v === true; })();
-          if (ok) { KEEP.lastPush = -1e9; rmA0.call(this, back.to[0], back.to[1]); placeAt('house', back.x, back.y, back.rot); WIDEN3.stats.제자리++; setTimeout(() => toast('↩ 큰길을 거두고 집도 제자리로 돌려놨어요', true), 0); }
+          if (ok) { KEEP.lastPush = -1e9; next([back.to[0], back.to[1]]); placeAt('house', back.x, back.y, back.rot); WIDEN3.stats.제자리++; setTimeout(() => toast('↩ 큰길을 거두고 집도 제자리로 돌려놨어요', true), 0); }
           else { WIDEN3.stats.제자리못함++; setTimeout(() => toast('↩ 큰길은 거뒀어요 — 집이 있던 자리가 그새 찼어요', true), 0); } } } }
-    return r; }; }
+    return r; }); }
 { const wf0 = window.__widenFront; window.__widenFront = (x, y) => { WIDEN3.force = true; try { return wf0(x, y); } finally { WIDEN3.force = false; } }; }   // 시험 훅은 확인 없이(도구 · 두 번 누름은 사람 손의 일)
 window.__widen3 = () => ({ 기다림: WIDEN3.armed, 물림기록: WIDEN3.shifts.size, ...WIDEN3.stats });
 /* ── [MAC-CROWDHOMES] 붐빔을 집 단위로 — 걷는 표본이 아니라 식구 수로 (보스 10월 ② · 창조자의 눈 6회 🟢2 '큰 마을일수록 길이 한산해진다') ──
@@ -4998,8 +5001,8 @@ function plazaRoot() { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec 
 const PLAZAC = { root: -1, dirty: true, stats: { 훑음: 0, 다시씀: 0 } };
 { hookAdd('plazaRoot', function (next, args) { const r = PLAZAC.root, ok = r < 0 || (cells[r] && cells[r].root === r && cells[r].k === 'plaza');
     if (!PLAZAC.dirty && ok) { PLAZAC.stats.다시씀++; return r; } PLAZAC.root = next([]); PLAZAC.dirty = false; PLAZAC.stats.훑음++; return PLAZAC.root; });
-  const plP0 = placeAt; placeAt = function (kind) { if (kind === 'plaza') PLAZAC.dirty = true; return plP0.apply(this, arguments); };
-  const plR0 = removeAt; removeAt = function (x, y) { const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && c.k === 'plaza') PLAZAC.dirty = true; return plR0.apply(this, arguments); }; }
+  hookAdd('placeAt', function (next, args) { let [kind] = args; if (kind === 'plaza') PLAZAC.dirty = true; return next(args); });
+  hookAdd('removeAt', function (next, args) { let [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && c.k === 'plaza') PLAZAC.dirty = true; return next(args); }); }
 window.__plazaCache = () => ({ 광장: PLAZAC.root >= 0 ? [cX(PLAZAC.root), cY(PLAZAC.root)] : null, 원래답: (() => { let r = -1; cells.forEach((rec, i) => { if (r < 0 && rec && rec.root === i && rec.k === 'plaza') r = i; }); return r >= 0 ? [cX(r), cY(r)] : null; })(), ...PLAZAC.stats });
 /* 빗줄기 — 카메라 둘레 60 단위에 600점, 매 프레임 아래로 */
 const RAIN_N = 600, rainPos = new Float32Array(RAIN_N * 3);
@@ -5641,19 +5644,19 @@ function growTick(why) { const R = window.VRULES.growSave; if (!R.on) return; co
     if (st >= 2) { GROW_S.map.delete(root); GROW_S.seen.delete(root); GROW_S.stats.다자람++; } else GROW_S.seen.set(root, st); });
   if (why === 'open') GROW_S.news = ch.filter(c => c.후 > c.전).map(c => c.칸);   // ACT-GROW 가 한 번 읽어 가는 '밤새 자란 칸'
   if (ch.length) { GROW_S.stats.바뀜 += ch.length; if (why !== 'open') markDirty(); setTimeout(() => window.dispatchEvent(new CustomEvent('village-grow', { detail: { 까닭: why, 바뀜: ch } })), 0); } }
-{ const place0 = placeAt; placeAt = function (kind, x, y) { const r = place0.apply(this, arguments);
+{ hookAdd('placeAt', function (next, args) { let [kind, x, y] = args; const r = next(args);
     if (!window.VRULES.growSave.on || !GROW_KINDS.has(kind)) return r; const root = idx(x, y);
     if (painting && !GROW_S.txn) { GROW_S.map.set(root, [simDay(), growReal()]); GROW_S.seen.set(root, 0); GROW_S.gone.delete(root); GROW_S.stats.심음++; return r; }   // 아이가 새로 심었다
     let e = null; const g = GROW_S.gone.get(root);
     if (GROW_S.pend && GROW_S.pend.k === kind) { e = GROW_S.pend.e; GROW_S.pend = null; }                                  // 🖐 옮겨 놓았다
     else if (g && g.k === kind) e = g.e;                                                                                   // 되살림 · 제자리 · 돌리기
     else if (GROW_S.txn) { const j = GROW_S.txn.findIndex(t => t.k === kind); if (j >= 0) e = GROW_S.txn.splice(j, 1)[0].e; }   // 되돌리기의 '옮긴 것 제자리로'
-    GROW_S.gone.delete(root); if (e) { GROW_S.map.set(root, e.slice()); GROW_S.seen.delete(root); GROW_S.stats.따라감++; } return r; };
-  const rem0 = removeAt; removeAt = function (x, y) { const rec = inb(x, y) ? cells[idx(x, y)] : null, root = rec ? rec.root : -1, e = root >= 0 ? GROW_S.map.get(root) : null;
-    const r = rem0.apply(this, arguments);
+    GROW_S.gone.delete(root); if (e) { GROW_S.map.set(root, e.slice()); GROW_S.seen.delete(root); GROW_S.stats.따라감++; } return r; });
+  hookAdd('removeAt', function (next, args) { let [x, y] = args; const rec = inb(x, y) ? cells[idx(x, y)] : null, root = rec ? rec.root : -1, e = root >= 0 ? GROW_S.map.get(root) : null;
+    const r = next(args);
     if (r && e) { GROW_S.map.delete(root); GROW_S.seen.delete(root); GROW_S.gone.set(root, { k: rec.k, e }); if (GROW_S.txn) GROW_S.txn.push({ k: rec.k, e }); GROW_S.stats.지움++;
       if (GROW_S.gone.size > 400) GROW_S.gone.delete(GROW_S.gone.keys().next().value); }                                   // 오래된 것부터 버린다(되돌리기 목록보다 넉넉히)
-    return r; };
+    return r; });
   const pick0 = pickUp; pickUp = function () { const r = pick0.apply(this, arguments); if (carrying) { const g = GROW_S.gone.get(idx(carrying.fx, carrying.fy)); if (g && g.k === carrying.k) carrying.growE = g.e; } return r; };
   const drop0 = dropDown; dropDown = function () { const cur = carrying; if (cur && cur.growE) GROW_S.pend = { k: cur.k, e: cur.growE }; try { return drop0.apply(this, arguments); } finally { GROW_S.pend = null; } };
   hookAdd('undo', function (next, args) { GROW_S.txn = []; try { return next(args); } finally { GROW_S.txn = null; } });
