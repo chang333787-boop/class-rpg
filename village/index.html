@@ -1334,6 +1334,7 @@ function roadWearParts(x, y, x0, x1, z0, z1, HALF, out) {
 }
 const WEAR = { day: -1, stats: { 밤: 0, 닳은칸: 0, 바뀐칸: 0 } };
 function roadWearSnapshot() {                                   // 밤에 한 번 — 집마다 붐빔을 읽어 길 칸 단계를 새로
+  if (typeof crowdSegWear === 'function' && crowdSegWear()) return;   // [MAC-CROWDSEG] 켜져 있으면 **토막**을 칠한다 — 집 상태의 그림자가 아니라 길의 상태를
   const W = window.WEAR_LOOK, at = typeof window.CROWD_AT === 'function' ? window.CROWD_AT : (root => crowd.get(root) || 0), next = new Map();
   cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const v = at(i); if (!(v >= W.mid)) return; const lv = v > W.hi ? 2 : 1;
     footprint(rec.k, cX(i), cY(i), rec.rot).forEach(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const nx = px + dx, ny = py + dy; if (!inb(nx, ny)) return;
@@ -5924,6 +5925,88 @@ if (DEV) window.__crowdCells = (min) => { const R = window.VRULES.crowdHomes, lo
   CROWDH.load.forEach((v, c) => { const m = v / (R.cap * (isWide(c) ? 2 : 1)); if (m >= lo) out.push([cX(c), cY(c), +m.toFixed(2)]); });
   out.sort((a, b) => b[2] - a[2] || a[1] - b[1] || a[0] - b[0]);
   return { 품: R.cap, 문턱: lo, 센길칸: CROWDH.load.size, 넘는칸: out.length, 한바퀴: CROWDH.stats.한바퀴, 칸: out }; };
+/* ── [MAC-CROWDSEG] 붐빔을 **'이어진 붐비는 길 한 토막'** 으로 — 집마다가 아니라 토막마다 한 마디 (측정 #777 · 보스 승인 09-21) ──
+   창조자 10회 B1·B4(= backlog #11·#14)를 재 보니 **읽는 곳이 셋인데 서로 다른 수**를 냈다(pop88 · 실화면):
+     집 말 25채 ↔ 엔진의 붐비는 길 칸 93칸 ↔ 화면의 흙빛 43칸.
+   셋째가 진짜 문제였다 — `roadWearSnapshot()` 은 **길 칸 값을 한 번도 안 읽는다.** 집붐빔 ≥ .2 인 집의 발자국 4방 칸을 칠한다.
+   아이가 보는 붉은 길은 길의 상태가 아니라 **집 상태의 그림자**였다(그래서 흙빛으로 묶으면 2칸짜리 섬 17개가 나온다).
+   그래서 **셋이 같은 것을 읽게** 한다 — 길 칸의 붐빔(집 말과 **같은 수** · 문턱도 같은 m>1)을 4방으로 묶어 **토막**을 만들고:
+     · 같은 토막에 닿은 집은 **같은 말**을 한다 → 나란한 두 집이 갈리지 않는다(ⓐ. pop88 에서 간신히 넘은 13채가 13/13 같은 토막 안이다)
+     · 흙빛도 **그 토막**을 칠한다 → 말과 그림이 같은 것을 읽는다(ⓑ. 지금 흙빛 43칸 중 42칸이 토막 안이라 엉뚱한 데가 붉어지지 않는다)
+     · 누르면 **그 토막의 가장 붐비는 칸**을 짚는다 — 짚기는 [MAC-WHERE] 를 그대로 쓴다(같은 손짓이 둘 생기면 반드시 어긋난다 · 보스).
+       그래서 `whereSpots` 에 갈래 하나만 더한다 — `act()` 는 **한 줄도 안 만진다**(그쪽 담당이 붙일 자리다).
+   **새 판정 규칙 0** — 값은 `CROWDH.load`(이미 있는 crowdHomes 의 셈)를 읽기만 한다. 분류 '보기'. 저장 0 · 새 에셋 0 · draw call 0.
+   판이 바뀌거나 crowdHomes 가 한 바퀴를 돌 때만 다시 묶는다(틱마다 판을 훑지 않는다).
+   끄면(VRULES.crowdSeg.on = false) 집마다 말하고 흙빛도 예전 그대로다. 원래 줄 수정 0 — satText 감싸기 · whereSpots 갈래 · roadWearSnapshot 앞머리. */
+/* 덧(중간 크기 판 실측 · 보스가 지목한 구멍) — **최소칸**이 없으면 중간 크기 판에서 거꾸로 간다.
+   집 34채 판에서 재 보니 토막 7개 중 **넷이 1칸짜리**(m 1.07~1.2 · 문턱을 간신히 넘은 칸)라
+   아이가 읽을 것이 2개 → 7개로 **늘었다**(pop88 에서는 24 → 2 로 줄었는데 정반대다).
+   1칸·2칸짜리는 '이어진 길 한 토막'이 아니라 **문턱 언저리의 잡음**이다. 그보다 짧으면 토막으로 치지 않는다. */
+(window.VRULES = window.VRULES || {}).crowdSeg = { on: true, 문턱: 1, 최소칸: 3 };
+const CSEG = { of: new Map(), list: [], 바퀴: -1, stats: { 묶음: 0, 토막: 0, 칸: 0, 말한집: 0, 짚음: 0, 버린조각: 0 } };
+const crowdSegOn = () => !!(window.VRULES.crowdSeg && window.VRULES.crowdSeg.on) && window.VRULES.crowdHomes.on;
+/* 토막 묶기 — 붐비는 길 칸(m > 문턱)을 4방으로 잇는다. crowdHomes 가 한 바퀴 돌 때마다 한 번 */
+function crowdSegBuild() {
+  const R = window.VRULES.crowdSeg, cap = window.VRULES.crowdHomes.cap || 3;
+  CSEG.of = new Map(); CSEG.list = [];
+  if (!crowdSegOn()) return;
+  const hot = new Map();
+  CROWDH.load.forEach((v, c) => { const m = v / (cap * (isWide(c) ? 2 : 1)); if (m > (R.문턱 || 1)) hot.set(c, m); });
+  const 봄 = new Set();
+  for (const i of hot.keys()) { if (봄.has(i)) continue;
+    const q = [i], cs = []; 봄.add(i); let 최대 = 0, 최대칸 = i;
+    while (q.length) { const c = q.pop(); cs.push(c); const m = hot.get(c); if (m > 최대) { 최대 = m; 최대칸 = c; }
+      const x = cX(c), y = cY(c);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (hot.has(j) && !봄.has(j)) { 봄.add(j); q.push(j); } } }
+    if (cs.length < Math.max(1, R.최소칸 | 0 || 1)) { CSEG.stats.버린조각++; continue; }   /* 1칸·2칸은 토막이 아니라 문턱 언저리의 잡음 */
+    const k = CSEG.list.length; cs.forEach(c => CSEG.of.set(c, k)); CSEG.list.push({ 칸: cs, 최대: 최대, 최대칸: 최대칸 }); }
+  CSEG.stats.묶음++; CSEG.stats.토막 = CSEG.list.length; CSEG.stats.칸 = CSEG.of.size; }
+/* 이 집이 닿은 토막 — 발자국 4방 칸 가운데 토막에 든 것(가장 붐비는 토막을 고른다) */
+function crowdSegOfHome(root) {
+  if (!crowdSegOn() || !CSEG.list.length) return -1;
+  const rec = cells[root]; if (!rec || rec.k !== 'house') return -1;
+  let best = -1;
+  footprint(rec.k, cX(root), cY(root), rec.rot).forEach(([px, py]) => {
+    for (let k = 0; k < 4; k++) { const nx = px + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = py + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (!inb(nx, ny)) return; const s = CSEG.of.get(idx(nx, ny));
+      if (s != null && (best < 0 || CSEG.list[s].최대 > CSEG.list[best].최대)) best = s; } });
+  return best; }
+/* 말 — 같은 토막에 닿은 집은 같은 말을 한다. 이미 말하고 있으면 그대로 둔다(글을 두 번 붙이지 않는다) */
+{ hookAdd('satText', function (next, args) { const [rec] = args; const t = next(args);
+    if (!crowdSegOn() || !rec || rec.k !== 'house' || /길이 붐벼요/.test(t)) return t;
+    if (crowdSegOfHome(rec.root) < 0) return t;
+    CSEG.stats.말한집++;
+    return t.replace(/(😊|😐)/, '😐') + ' · 길이 붐벼요'; }); }
+/* 짚기 — [MAC-WHERE] 의 갈래 하나. 토막의 **가장 붐비는 칸** 한 곳만(여럿 반짝이면 헷갈린다 · MAC-WHERE 조건 ②) */
+{ const ws = whereSpots; whereSpots = function (rec) { const r = ws.apply(this, arguments);
+    if (r && r.length) return r;
+    if (!rec || !whereOn() || !crowdSegOn() || rec.k !== 'house') return r;
+    const s = crowdSegOfHome(rec.root); if (s < 0) return r;
+    CSEG.stats.짚음++; return [CSEG.list[s].최대칸]; }; }
+/* 흙빛 — 토막을 그대로 칠한다(집 발자국 곁 칸이 아니라). roadWearSnapshot 앞머리에서 부른다 · 끄면 그 함수가 예전대로 돈다.
+   단계는 토막 안에서 갈린다: 그 칸이 문턱의 두 배를 넘으면 짙게(2), 아니면 옅게(1) — 집 값의 .2/.3 두 선과 같은 뜻(넘었나 · 많이 넘었나). */
+function crowdSegWear() {
+  if (!crowdSegOn() || !window.WEAR_LOOK.on) return false;
+  const cap = window.VRULES.crowdHomes.cap || 3, lo = window.VRULES.crowdSeg.문턱 || 1, next = new Map();
+  CSEG.list.forEach(s => s.칸.forEach(c => { const m = (CROWDH.load.get(c) || 0) / (cap * (isWide(c) ? 2 : 1));
+    next.set(c, m > lo * 2 ? 2 : 1); }));
+  let changed = 0;
+  new Set([...ROAD_WEAR.keys(), ...next.keys()]).forEach(c => { if ((ROAD_WEAR.get(c) || 0) !== (next.get(c) || 0)) { changed++; dirtyChunks.add(chunkOfCell(c)); } });
+  ROAD_WEAR.clear(); next.forEach((v, c) => ROAD_WEAR.set(c, v));
+  WEAR.stats.밤++; WEAR.stats.닳은칸 = ROAD_WEAR.size; WEAR.stats.바뀐칸 = changed; return true; }
+/* 한 바퀴 돌 때마다 다시 묶는다 — 틱마다 판을 훑지 않는다(crowdHomes 가 이미 판을 90조각으로 나눠 돈다) */
+{ hookAdd('crowdTick', function (next, args) { const r = next(args);
+    if (crowdSegOn() && CSEG.바퀴 !== CROWDH.stats.한바퀴) { CSEG.바퀴 = CROWDH.stats.한바퀴; crowdSegBuild(); }
+    else if (!crowdSegOn() && CSEG.list.length) { CSEG.of = new Map(); CSEG.list = []; CSEG.바퀴 = -1; }
+    return r; }); }
+window.__crowdSeg = (x, y) => { const R = { 켜짐: crowdSegOn(), ...CSEG.stats,
+    토막표: CSEG.list.map(s => [s.칸.length, +s.최대.toFixed(2), cX(s.최대칸), cY(s.최대칸)]).sort((a, b) => b[0] - a[0]).slice(0, 10) };
+  if (x == null) return R; const rec = inb(x, y) ? cells[idx(x, y)] : null; if (!rec) return { ...R, 집: '없음' };
+  const s = crowdSegOfHome(rec.root);
+  return { ...R, 이집: rec.k, 토막: s, 토막칸: s >= 0 ? CSEG.list[s].칸.length : 0,
+    가장붐빈칸: s >= 0 ? [cX(CSEG.list[s].최대칸), cY(CSEG.list[s].최대칸), +CSEG.list[s].최대.toFixed(2)] : null,
+    말: rec.k === 'house' ? satText(rec) : null }; };
 
 
 /* ══════════════════════════════════════════════════════════════
