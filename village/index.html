@@ -1394,7 +1394,7 @@ function seasonTick() {
     seasonNow = si;
     chunks.forEach(ch => { if (ch.built) dirtyChunks.add(chunkKey(ch.cx, ch.cz)); });   // 잎 색을 다시 합친다(보이는 것부터)
     forestSeason(); if (!first) buildTray();   /* 계절 장식 트레이 갱신(59차) */
-    if (!first) sayOnce(['🌸 봄이 왔어요', '☀️ 여름이에요', '🍂 가을이에요', '❄️ 겨울이에요'][si], true);
+    if (!first && !VSKIN.계절고정) sayOnce(['🌸 봄이 왔어요', '☀️ 여름이에요', '🍂 가을이에요', '❄️ 겨울이에요'][si], true);   /* [MAC-SKIN] 판이 계절을 고정하면 안 뜬다 */
   }
   /* 바닥·하늘은 하루에 걸쳐 부드럽게 */
   const S = SEASONS[si];
@@ -6019,6 +6019,10 @@ function importText(txt) {
   if (!d || typeof d !== 'object' || typeof d.v !== 'number' || !(Array.isArray(d.items) || (d.plotStr && typeof d.plotStr === 'object' && Array.isArray(d.palette)))) { fileStats.거절++; return '마을 파일이 아니에요(모양이 다름)'; }
   if (d.v > SAVE_V) { fileStats.거절++; return '더 새 판에서 저장한 파일이에요(v' + d.v + ')'; }
   if (!STORAGE_OK) { fileStats.거절++; return '이 창에서는 저장소가 막혀 있어 가져올 수 없어요 — 파일을 바탕화면에서 두 번 눌러 여세요'; }
+  { const pal = Array.isArray(d.palette) ? d.palette.map(String) : (Array.isArray(d.items) ? d.items.map(it => String(it && it.k || '')) : []);
+    const 모름 = [...new Set(pal.filter(k => k && !K[k]))];                                   /* [MAC-SKIN] 판 전용 종류일 수 있다 — 조용히 버리지 않는다 */
+    if (모름.length) { fileStats.모르는종류 = 모름.slice(0, 5);
+      setTimeout(() => sayOnce('⬆️ 이 파일에는 이 마을에 없는 것이 있어요(' + 모름.slice(0, 2).join('·') + (모름.length > 2 ? ' 등 ' + 모름.length + '가지' : '') + ') — 그 칸은 비어서 열려요. 다른 판에서만 쓰는 물건일 수 있어요', true), 1400); } }
   try {
     const cur = localStorage.getItem(SAVE_KEY); if (cur) localStorage.setItem(SAVE_KEY + '.backup', cur);   // 지금 마을은 옆에 치워 둔다
     clearTimeout(saveTimer); savingOff = true;                                                      // 대기 중 저장이 덮지 않게
@@ -8576,7 +8580,61 @@ function stageGoalOk(g) {
   if (g.셈 === 'hook') { const f = STAGE_HOOKS[g.훅], v = f ? f() : null; if (v == null) return false; return g.비교 === '<=' ? v <= g.n : v >= g.n; }
   return false;
 }
+/* ── [MAC-SKIN] 판 파일만으로 다른 컨셉의 마을 — 모습·새 건물 (엔진 5번 '컨셉 스킨' · 보스 범위 확정 09-21) ──
+   조사(docs/village_skin_scan.md)에서 나온 두 칸만 넣는다. 하늘·빛·칭호·해금·바깥 숲은 **이번에 안 넣는다**(판 칸이 늘수록 검사와 설명이 무거워진다).
+     · `모습` : { 계절:"여름"|"봄"|"가을"|"겨울", 풀:"#c8d98a"|"grass", 바닥:"#d9c98a" } — 계절 고정과 색을 **한 칸에 묶는다**
+       (따로 두면 계절이 돌 때 색이 도로 섞인다 — 조사 3-3). 계절을 고정하면 '🌸 봄이 왔어요' 알림도 안 뜬다(그 판에서 계절이 안 도니까).
+     · `건물정의` : { field: { nm,ic,grp,w,h,cap,need,jobs,needRoad, parts:[{g,c,s,p}] } } — 그 판에서만 K 에 더한다.
+       모양(parts)은 원래 순수 데이터다: g = box·cyl·cone·half·sph · c = P 이름("wood") 또는 "#rrggbb" · s·p 의 x·z 는 **칸 단위**(코드가 CS 를 곱한다).
+   **차례가 중요하다**: 건물정의 → 모습 → (그 뒤에) 건물 목록 거르기. 거르기는 `K[k]` 에 있는 것만 남기므로 새 종류를 먼저 더해야 한다(조사 3-5).
+   기존 판·기본 판은 이 칸이 없으면 **한 줄도 안 달라진다**(둘 다 def 를 보고 곧 돌아온다).
+   판 전용 종류가 든 저장본을 **파일로 기본 마을에 가져오면** 모르는 종류가 된다 — 조용히 버리지 않고 한마디 한다(importText). */
+const VSKIN = { 계절고정: null, stats: { 더한것: [], 이미있음: [], 버린것: [], 색: null } };
+/* 판 파일은 쉬운 말로 쓰고, 코드가 **트레이 탭**으로 옮긴다 — K.grp 는 부팅 때 applyUseTabs 가 탭 이름('🏠 집·가게')으로 덮는데
+   그 일은 판 로드보다 **먼저** 끝난다. 그래서 판이 더하는 종류는 여기서 탭 이름을 직접 넣어야 트레이에 카드가 선다(안 그러면 놓을 수가 없다). */
+const VSKIN_TAB = { '길': 0, '바닥': 0, '집': 1, '건물': 1, '가게': 1, '쉼': 2, '놀이': 2, '자연': 3, '키 큰 것': 3, '꾸밈': 4, '낮은 것': 4, '긴 것': 4, '시설': 5, '특별': 5 };
+const VSKIN_G = { box: 1, cyl: 1, cone: 1, half: 1, sph: 1 };
+const SEASON_NO = { 봄: 0, 여름: 1, 가을: 2, 겨울: 3 };
+function skinHex(v) { if (typeof v === 'number') return v;
+  if (typeof v !== 'string' || !v) return null;
+  if (v[0] === '#') { const n = parseInt(v.slice(1), 16); return isFinite(n) ? n : null; }
+  return typeof P[v] === 'number' ? P[v] : null; }
+/* 새 건물 종류를 K 에 더한다 — 건물 목록 거르기보다 먼저 */
+function stageKinds(def) {
+  const D = def && def.건물정의; if (!D || typeof D !== 'object') return;
+  Object.keys(D).forEach(k => {
+    if (!/^[a-z][a-z0-9_]{1,15}$/.test(k)) { VSKIN.stats.버린것.push(k + '(이름)'); return; }
+    if (K[k]) { VSKIN.stats.이미있음.push(k); return; }                       // 있는 종류는 덮지 않는다(그림이 달라지면 저장본이 어긋난다)
+    const t = D[k]; if (!t || !Array.isArray(t.parts) || !t.parts.length) { VSKIN.stats.버린것.push(k + '(parts)'); return; }
+    const parts = [];
+    for (const q of t.parts) {
+      if (!q || !VSKIN_G[q.g] || !Array.isArray(q.s) || q.s.length !== 3 || !Array.isArray(q.p) || q.p.length !== 3) continue;
+      const c = skinHex(q.c); if (c == null) continue;
+      parts.push({ g: q.g, c, s: [q.s[0] * CS, q.s[1], q.s[2] * CS], p: [q.p[0] * CS, q.p[1], q.p[2] * CS] });
+    }
+    if (!parts.length) { VSKIN.stats.버린것.push(k + '(모양)'); return; }
+    const w = Math.max(1, Math.min(4, t.w | 0 || 1)), h = Math.max(1, Math.min(4, t.h | 0 || 1));
+    K[k] = { nm: String(t.nm || k).slice(0, 10), ic: String(t.ic || '🔶').slice(0, 4),
+      grp: USE_TABS[VSKIN_TAB[t.grp] != null ? VSKIN_TAB[t.grp] : ((t.jobs || t.need) ? 1 : 4)][0], w, h, g: Math.max(1, Math.min(400, t.g | 0 || w * h * 8)),
+      cap: Math.max(1, Math.min(600, t.cap | 0 || 60)), parts,
+      ...(NEED_TXT && t.need && NEED_TXT[t.need] ? { need: t.need } : {}),
+      ...(t.jobs ? { jobs: Math.max(1, Math.min(9, t.jobs | 0)) } : {}),
+      ...(t.needRoad ? { needRoad: true } : {}) };
+    if (ORDER.indexOf(k) < 0) ORDER.push(k);                                 // 트레이에 뜨게(해금 표에 없으니 처음부터 열려 있다)
+    VSKIN.stats.더한것.push(k);
+  }); }
+/* 바닥·풀색과 계절 고정 — SEASONS 표를 그 판에서만 갈아 둔다 */
+function stageSkin(def) {
+  const S = def && def.모습; if (!S || typeof S !== 'object') return;
+  const no = SEASON_NO[S.계절];
+  if (no != null) { const base = { ...SEASONS[no] }; SEASONS.forEach(s => Object.assign(s, base)); VSKIN.계절고정 = S.계절; }
+  const g = skinHex(S.풀), gr = skinHex(S.바닥);
+  SEASONS.forEach(s => { if (g != null) s.grass = g; if (gr != null) s.ground = gr; });
+  VSKIN.stats.색 = { 계절: VSKIN.계절고정, 풀: g == null ? null : '#' + g.toString(16), 바닥: gr == null ? null : '#' + gr.toString(16) }; }
+window.__skin = () => ({ 판: STAGE.id || null, 계절고정: VSKIN.계절고정, ...VSKIN.stats, ORDER에: VSKIN.stats.더한것.filter(k => ORDER.indexOf(k) >= 0), 지금탭: typeof curGroup === 'string' ? curGroup : null,
+  새종류: VSKIN.stats.더한것.map(k => ({ 이름: k, 글: K[k].nm, 묶음: K[k].grp, 칸: [K[k].w, K[k].h], 조각: K[k].parts.length })) });
 function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표판) 전에
+  stageKinds(def); stageSkin(def);   /* [MAC-SKIN] 새 종류를 먼저 더하고(거르기가 K 를 본다) 모습을 얹는다 */
   if (Array.isArray(def.건물) && def.건물.length) {
     const keep = def.건물.filter(k => K[k]); STAGE.stats.모르는건물 = def.건물.filter(k => !K[k]); STAGE.stats.건물수 = keep.length;
     const next = ORDER.filter(k => keep.includes(k)); ORDER.splice(0, ORDER.length, ...next);
@@ -8585,7 +8643,12 @@ function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표
     STAGE.goals = def.목표.map((g, i) => ({ id: 'stage:' + STAGE.id + ':' + i, t: g.t, ok: () => stageGoalOk(g) }));
     GOALS.unshift(...STAGE.goals); STAGE.stats.목표수 = STAGE.goals.length;
   }
+  /* [MAC-SKIN] 트레이는 판 로드보다 **먼저** 만들어진다(buildTray 는 4201 줄 · 판 로드는 8659 줄) —
+     새 종류를 더한 판에서만 한 번 다시 그린다. 안 그리면 아이가 그 물건을 고를 수가 없다.
+     새 종류가 없는 판(town·jobs-short 등)은 부르지 않는다 — 전과 한 픽셀도 달라지지 않게. */
+  if (VSKIN.stats.더한것.length && typeof buildTray === 'function') { try { buildTray(); VSKIN.stats.트레이 = 'ok'; } catch (e) { VSKIN.stats.트레이 = String(e && e.message || e).slice(0, 60); } }
 }
+
 function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
   const def = STAGE.def; if (!def || !def.규칙) return;
   Object.keys(def.규칙).forEach(k => { const v = def.규칙[k], cur = window.VRULES[k];

@@ -114,7 +114,7 @@ async function child(spec) {
   const t0 = tick;
   while (tick - t0 < spec.days * DAY) { run(Math.min(spec.every, t0 + spec.days * DAY - tick)); sample(); }
   const voice = spec.voice && typeof w.__voice === 'function' ? w.__voice() : null;   // [MAC-VOICE] 끝 날의 동네별 바람표
-  return { name: spec.name, seed: spec.seed, moves, t0, samples, voice, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
+  return { name: spec.name, seed: spec.seed, moves, t0, samples, voice, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 새종류: (globalThis.__skin ? (globalThis.__skin().더한것 || []) : []), 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
 }
 
 /* ─────────────── 묶어 돌리기(부모) ─────────────── */

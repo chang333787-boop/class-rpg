@@ -54,13 +54,32 @@ for (const f of files) {
   if (def.교과 == null) add('PASS', P(`켜진 판정 규칙 ${live.length}개 — 자유 놀이 판(교과 없음)이라 ≤6 면제`));   // 보스 09-20: ≤6 은 수업 판에만
   else add(live.length <= 6 ? 'PASS' : 'FAIL', P(`켜진 판정 규칙 ${live.length}개`) + (live.length > 6 ? '' : ' (≤6 · 수업 판)'), live.length > 6 ? '수업 판은 6 까지 — ' + live.join(' ') : '');
   if (def.변수 != null && !rk.includes(def.변수)) add('REVIEW', P('변수'), `'${def.변수}' 가 규칙 칸에 없음`);
-  if (def.건물 != null) { const bad = kindsOk(def.건물); bad.length ? add('FAIL', P('건물'), '없는 종류: ' + bad.join(' ')) : add('PASS', P(`건물 ${def.건물.length}종`)); if (!def.건물.includes('road')) add('FAIL', P('건물'), '길(road)이 없음'); }
+  if (def.모습 != null) { const S = def.모습, 철 = ['봄', '여름', '가을', '겨울'];   /* [MAC-SKIN] */
+    const 나쁨 = [];
+    if (S.계절 != null && !철.includes(S.계절)) 나쁨.push('계절');
+    ['풀', '바닥'].forEach(k => { const v = S[k]; if (v != null && !(typeof v === 'string' && (/^#[0-9a-fA-F]{6}$/.test(v) || /^[a-zA-Z]+$/.test(v)))) 나쁨.push(k); });
+    나쁨.length ? add('FAIL', P('모습'), '칸이 틀림: ' + 나쁨.join(' ')) : add('PASS', P('모습 칸(계절·풀·바닥)')); }
+  /* [MAC-SKIN] 판이 스스로 만드는 종류(건물정의)는 기본 판에 없는 게 맞다 — 빼고 검사하고, 정의 자체를 따로 본다 */
+  const 새종류 = def.건물정의 && typeof def.건물정의 === 'object' ? Object.keys(def.건물정의) : [];
+  if (새종류.length) {
+    const G = ['box', 'cyl', 'cone', 'half', 'sph'];
+    const 나쁨 = 새종류.filter(k => { const t = def.건물정의[k];
+      return !/^[a-z][a-z0-9_]{1,15}$/.test(k) || !t || !Array.isArray(t.parts) || !t.parts.length
+        || t.parts.some(q => !q || !G.includes(q.g) || !Array.isArray(q.s) || q.s.length !== 3 || !Array.isArray(q.p) || q.p.length !== 3 || q.c == null); });
+    나쁨.length ? add('FAIL', P('건물정의'), '꼴이 틀림: ' + 나쁨.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종(모양 조각 꼴 OK)`));
+    const 겹침 = 새종류.filter(k => !kindsOk([k]).length);
+    if (겹침.length) add('FAIL', P('건물정의'), '이미 있는 종류를 덮으려 함: ' + 겹침.join(' '));
+  }
+  if (def.건물 != null) { const bad = kindsOk(def.건물.filter(k => !새종류.includes(k))); bad.length ? add('FAIL', P('건물'), '없는 종류: ' + bad.join(' ')) : add('PASS', P(`건물 ${def.건물.length}종`)); if (!def.건물.includes('road')) add('FAIL', P('건물'), '길(road)이 없음'); }
   const gbad = (def.목표 || []).filter(g => !g.t || !SEMS[g.셈] || !SEMS[g.셈](g) || (g.셈 === 'hook' && !HOOKS.includes(g.훅)));
   gbad.length ? add('FAIL', P('목표'), '셈 꼴이 틀림: ' + gbad.map(g => g.t || '?').join(' · ')) : add('PASS', P(`목표 ${(def.목표 || []).length}개 셈 꼴`));
   const r = spawnSync(process.execPath, [path.join(HERE, 'run.mjs'), '--stage', n, '--days', '1', '--seeds', '1', '--json', path.join(os.tmpdir(), 'vs-stage-' + n + '.json')], { cwd: ROOT, encoding: 'utf8' });
   if (r.status !== 0) { add('FAIL', P('시뮬로 얹기'), (r.stderr || r.stdout).trim().split('\n').slice(-1)[0]); continue; }
   const j = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'vs-stage-' + n + '.json'), 'utf8')), res = j.results[0];
   const ok = res.네트워크 === 0 && res.판 && res.판.id === n && !res.판.모르는규칙.length;
+  if (새종류.length) { const 생김 = (res.판 && res.판.새종류 || []).map(String);   /* [MAC-SKIN] 판을 실제로 열었을 때 생겼나 */
+    const 빠짐 = 새종류.filter(k => !생김.includes(k));
+    빠짐.length ? add('FAIL', P('건물정의'), '판을 열었는데 안 생긴 종류: ' + 빠짐.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종이 판에서 실제로 생김`)); }
   ok ? add('PASS', P(`시뮬로 얹어 하루 돎 · 인구 ${res.samples[0].m.인구}→${res.samples[res.samples.length - 1].m.인구} · 네트워크 0`)) : add('FAIL', P('시뮬로 얹기'), JSON.stringify({ 네트워크: res.네트워크, 판: res.판 }));
 }
 
