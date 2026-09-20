@@ -5490,8 +5490,19 @@ window.__hist = () => ({ 점: HIST.slice(), 열림: document.getElementById('his
 window.__histFake = (n) => { for (let i = 0; i < n; i++) histPush((HIST.length ? HIST[HIST.length - 1].d : 0) + 1); return HIST.length; };
 
 /* ══════════════════════════════════════════════════════════════
-   주민 바람(F34). 빠진 필요에서만 나온다. 동시에 둘. 들어주면 ✨ + 성장 반나절 당김. 하루 지나면 조용히 사라진다.
+   주민 바람(F34). 빠진 필요에서만 나온다. 동시에 둘. 들어주면 ✨(성장 당김은 [MAC-WISHNOGROW] 로 껐다). 하루 지나면 조용히 사라진다.
    ══════════════════════════════════════════════════════════════ */
+/* ── [MAC-WISHNOGROW] 바람을 들어줘도 성장 시계는 당기지 않는다 (사용자 승인 규칙 변경 2 · 보스 카드) ──
+   화면은 '✨ …의 바람을 들어줬어요 — 우물이 생겼어요'라고만 말한다. 성장이 **반나절 당겨진다는 말은 어디에도 없다** —
+   아이 눈에 안 보이는 숨은 보너스였고, 같은 수를 둔 두 마을이 왜 다른 속도로 자라는지 설명할 수 없게 만들었다.
+   기쁨은 그대로 둔다: ✨ · '바람을 들어줬어요' 말 · 소리 · 바람 셈(wishStats). **시계만 안 건드린다.**
+   ⚠ 끄는 것이 기본이고 스위치(on)는 **복구용**이다 — 잘못됐을 때 되돌리려고 둔 것이지, 수업 판이 '교육적 선택'으로
+      켤 값이 아니다. 판 파일이 true 로 켜면 아이에게 안 보이는 당김이 조용히 돌아온다. 원래 줄 수정 1(wishTick 의 한 줄). */
+(window.VRULES = window.VRULES || {}).wishGrow = { on: false };
+const WISHG = { stats: { 들어줌: 0, 당김: 0, 안당김: 0 } };
+function wishGrowOn() { const R = window.VRULES.wishGrow; return !!(R && R.on); }
+window.__wishGrow = () => ({ 켜짐: wishGrowOn(), ...WISHG.stats });
+
 const WISH_MAX = 2, WISH_EVERY = 200, WISH_LIFE = DAY_MS;
 const wishStats = { 나옴: 0, 들어줌: 0, 사라짐: 0 };
 const wishText = f => '💬 우리 집 근처에 ' + NEED_TXT[f.wish.need] + '이 있으면 좋겠어요';
@@ -5504,7 +5515,7 @@ function wishTick() {
     if (!rec || rec.root !== f.home) { f.wish = null; return; }
     if (st && st.at >= f.wish.at && st.met[f.wish.need]) {                           // 바람 뒤에 잰 만족에서 채워졌다
       const h = hinfo.get(f.home) || { lv: 1, hs: -1 }; hinfo.set(f.home, h);
-      h.hs = growWish(h, now);   // 성장 반나절 당김(한 번) · 음수 시계의 새 뜻에 맞춰([MAC-GROWPAUSE])
+      WISHG.stats.들어줌++; if (wishGrowOn()) { h.hs = growWish(h, now); WISHG.stats.당김++; } else WISHG.stats.안당김++;   /* [MAC-WISHNOGROW] 숨은 당김은 끈다 · 켜면 옛 반나절 당김([MAC-GROWPAUSE] growWish) */
       const c = centerOf('house', cX(f.home), cY(f.home), rec.rot); simSparkle({ x: c.x, z: c.z, until: now + 3000 });
       simSay('✨ ' + folkName(f) + '의 바람을 들어줬어요 — ' + NEED_TXT[f.wish.need] + '이 생겼어요', true); simSound('goal');
       wishStats.들어줌++; f.wish = null; return;
