@@ -3856,7 +3856,7 @@ function act(clientX, clientY) {
     if (rec && K[rec.k].need) {                       // 필요 건물을 누르면 닿는 범위를 보여 준다
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
       const 흐름줄 = flowCardText(rec.root);   /* [MAC-FLOWLOOK] 흐름 글이 있으면 거기서 줄을 바꾼다 — 첫 줄은 물건 이야기, 둘째 줄은 본편 정보(창조자 14회 ⓑ7) */
-      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (ovInfo.세대 > ovInfo.집 ? ' (' + ovInfo.세대 + '세대)' : '')   /* [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
+      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + ovHomeText(rec.root)   /* [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
       whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
@@ -3988,9 +3988,10 @@ function dropDown(clientX, clientY) {
   if (ok) {
     placeAt(cur.k, c.x, c.y, cur.rot);
     /* 제자리에 그대로 놓은 것은 되돌릴 거리가 아니다 */
-    if (c.x !== cur.fx || c.y !== cur.fy)
+    if (c.x !== cur.fx || c.y !== cur.fy) {
       pushUndo({ t:'move', k:cur.k, x:c.x, y:c.y, fx:cur.fx, fy:cur.fy, rot:cur.rot });
-    toast(josa(K[cur.k].nm, '을', '를') + ' 옮겼어요', true);
+      toast(josa(K[cur.k].nm, '을', '를') + ' 옮겼어요', true);
+    } else toast('제자리에 도로 놓았어요 — 옮기려면 누른 채 끌어 주세요', true);   /* 제자리에 도로 놓고 "옮겼어요"라고 하던 자리(창조자 21회) — 말이 실제와 어긋나면 안 된다. 한 번 누르면 안 듣는 것이 맞으니, 그 한 줄이 곧 조작 안내가 된다 */
   } else {
     placeAt(cur.k, cur.fx, cur.fy, cur.rot);   // 못 놓으면 제자리로 되돌린다
     toast('거기엔 못 놓아요. 제자리로 돌려놨어요');
@@ -5557,10 +5558,18 @@ const ovHome = new THREE.InstancedMesh(new THREE.PlaneGeometry(CS * 2.1, CS * 2.
 [ovRoad, ovHome].forEach(m => { m.count = 0; m.frustumCulled = false; m.renderOrder = 3; scene.add(m); });
 const ovDummy = new THREE.Object3D(); ovDummy.rotation.x = -Math.PI / 2;
 let ovKey = null, ovUntil = 0, ovInfo = { 길칸: 0, 집: 0, 세대: 0 };
+/* [MAC-HOUSEHOLD] 가게마다 **직전에 보여 준 세대 수** — 같은 가게를 다시 누르면 '9세대 → 13세대' 로 보인다.
+   아이가 9와 13을 기억으로 견주지 않게(창조자 21회 ⓑ26 · 15회 ⓑ11 '견줄 것은 한 화면에'와 같은 종류). 새 말자리는 안 만든다 — 있던 한 줄 안에 든다. */
+const OV_WAS = new Map();
+function ovHomeText(root) {
+  if (!(ovInfo.세대 > ovInfo.집)) { OV_WAS.delete(root); return ''; }            // 아파트가 없으면 '채'만으로 충분하다
+  const was = OV_WAS.get(root); OV_WAS.set(root, ovInfo.세대);
+  return was != null && was !== ovInfo.세대 ? ' (' + was + '세대 → ' + ovInfo.세대 + '세대)' : ' (' + ovInfo.세대 + '세대)';
+}
 function overlayClear() { ovRoad.count = 0; ovHome.count = 0; ovKey = null; ovInfo = { 길칸: 0, 집: 0, 세대: 0 }; }
 /* kind 를 (x,y,rot) 에 놓았다 치고 닿는 범위를 칠한다 */
 function overlayFor(kind, x, y, rot) {
-  const key = kind + ':' + x + ':' + y + ':' + rot;
+  const key = kind + ':' + x + ':' + y + ':' + rot + ':' + placedTotal;   /* 놓은 것이 바뀌면 다시 센다 — 아파트를 하나 더 놓고 같은 가게를 눌렀는데 **옛 수가 그대로** 있으면 카드가 거짓말을 한다 */
   if (key === ovKey) return;
   ovKey = key;
   const fake = { k: kind, root: idx(x, y), rot: rot || 0 };
@@ -9207,8 +9216,8 @@ window.__jobWhy = () => { const n = { none: 0, cut: 0, far: 0, full: 0 }; let �
 (window.VRULES = window.VRULES || {}).flowAct = { on: true, nearCells: 14, retryMs: 1400,
   loadMs: 1400, dropMs: 1600, endMs: 1200, swing: 0.75, buyMs: 1000, shrugMs: 900, holdMs: 90000, cutH: 10.5, endH: 17, lastH: 23.5, stallTicks: 240 };   /* 막힘 시계는 **틱(시뮬 시간)** 으로 센다 — 240틱 = 시뮬 3.2시간. 배속을 올려도·일시정지해도·화면을 바꿔도 같은 뜻이다 */
 const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
-const FACT = { 맡은밭: new Set(), cutDay: new Map(), 밭: [], gen: -1, 잰틱: -1e9,
-  stats: { 지고나섬: 0, 내려놓음: 0, 못가고돌아옴: 0, 받아감: 0, 빈손: 0, 다시나옴: 0, 막힘: 0, 중단: { 밤: 0, 들어감: 0, 길없음: 0, 막힘: 0 } } };
+const FACT = { 맡은밭: new Set(), cutDay: new Map(), 밭: [], gen: -1, 잰틱: -1e9, 집날: new Map(),
+  stats: { 지고나섬: 0, 내려놓음: 0, 못가고돌아옴: 0, 받아감: 0, 빈손: 0, 다시나옴: 0, 막힘: 0, 문앞장바구니: 0, 중단: { 밤: 0, 들어감: 0, 길없음: 0, 막힘: 0 } } };
 /* 상태는 오직 여기서 읽는다(장면은 답만 쓴다). 프로그램 계약이 없는 판에서는 전부 null → 장면도 통째로 쉰다 */
 const flowActState = root => (window.VRULES.flowAct.on && typeof window.FLOW === 'function' && root != null) ? window.FLOW(root) : null;
 const FACT_FIELD = { growing: 1, ready: 1, full: 1, waiting: 1, moving: 1, cut: 1 };
@@ -9321,6 +9330,17 @@ function actFlowTick(f, i, now) {
     f.flowBuy = null; return false;
   }
   if (f.flowHold && (f.state === 'inside' || now >= f.flowHold.until)) f.flowHold = null;
+  /* ── 장바구니 여럿 — **여러 세대가 사는 집**(아파트)은 오늘 몫을 받은 날 그 문에서 **세대 수만큼** 사람이 장바구니를 들고 나온다.
+     설계(#797 ③)에서 내가 댄 보증이다: 여섯이 사는 집이 넷을 쓴다는 것을 아이가 **수를 안 읽고 문에서 세어** 본다.
+     세는 것은 프로그램이 한다 — `window.FLOW(집 root)` 가 'got' 인 날만, 하루에 세대 수만큼. 보통 집은 한 줄도 안 달라진다(지금처럼 가게에서 들고 나온다). */
+  if (!f.flowHold && !f.flowTrip && !f.flowBuy && f.state === 'inside' && f.inside && f.inside.root === f.home && !isNightHour(h)) {
+    const hh = houseHold(f.home);
+    if (hh > 1 && flowActState(f.home) === 'got') {
+      const day = simDay(); let c = FACT.집날.get(f.home);
+      if (!c || c.day !== day) { c = { day, n: 0 }; FACT.집날.set(f.home, c); }
+      if (c.n < hh) { c.n++; leave(f, '나옴'); f.flowHold = { until: now + R.holdMs, prop: 'bag' }; FACT.stats.받아감++; FACT.stats.문앞장바구니++; return true; }
+    }
+  }
   if (f.state === 'inside' && f.inside && factStore(f.inside.root)) { f.flowIn = f.inside.root; return false; }
   /* ── 지고 나서기 — 밭 곁에서 일하던 어른 하나가 물건을 싣고 나선다.
      밭 자체가 일터면(온실·풍차) 그 안에 있던 일꾼이 그대로 지고 나온다.
