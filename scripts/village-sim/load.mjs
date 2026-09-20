@@ -2,7 +2,7 @@
 // three 는 진짜(계산만) · 렌더러와 DOM 은 무엇을 불러도 빈 값을 돌려주는 가짜 · Math.random 은 시드.
 // 네트워크 0: fetch 는 늘 거절 · sync.js 는 싣지 않는다(module 만) · sid 는 늘 guest.
 // 한 프로세스에 한 판만 — 모듈 상태가 전역이라 두 판을 한 프로세스에 싣지 않는다(run.mjs 가 판마다 새 프로세스를 띄운다).
-import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 
 function seedRandom(seed) {   // mulberry32
   let a = (seed >>> 0) || 1;
@@ -69,7 +69,8 @@ export async function loadVillage(opts) {
   const src = m[1].replace(IMP, "import * as THREE0 from '" + three + "'; const THREE = Object.assign({}, THREE0, { WebGLRenderer: globalThis.__FakeRenderer });");
   seedRandom(opts.seed || 1);
   const ls = fakeGlobals({ ...opts, root });
-  const file = path.join(os.tmpdir(), 'village-sim-' + process.pid + '-' + Date.now() + '.mjs');
+  // 떼어 낸 module 은 village/ 안에 뜬다 — 임시 폴더에 뜨면 './sim/*.js' 같은 상대 경로가 깨진다(ERR_MODULE_NOT_FOUND · 엔진 ④ 걸음 0)
+  const file = path.join(root, 'village', '_simrun-' + process.pid + '-' + Date.now() + '.mjs');
   fs.writeFileSync(file, src);
   const log = console.log, warn = console.warn;
   if (opts.quiet !== false) { console.log = () => {}; console.warn = () => {}; }
