@@ -5913,6 +5913,15 @@ window.__crowdSelf = (x, y) => { const R = { 켜짐: window.VRULES.crowdHomes.se
   return { ...R, 집붐빔: +all.toFixed(2), 자기몫: +mine.toFixed(2), 합: +(all + mine).toFixed(2) }; };
 window.__crowdHomes = () => { let over = 0, hs = 0; const all = []; CROWDH.house.forEach(m => { hs++; all.push(m); if (m > 1) over++; }); all.sort((a, b) => a - b); let cellsOver = 0; CROWDH.load.forEach((v, c) => { if (v / (window.VRULES.crowdHomes.cap * (isWide(c) ? 2 : 1)) > 1) cellsOver++; });
   return { 켜짐: window.VRULES.crowdHomes.on, 품: window.VRULES.crowdHomes.cap, 센집: hs, 붐비는집: over, 집붐빔_중앙: all.length ? +all[all.length >> 1].toFixed(2) : 0, 집붐빔_최대: all.length ? +all[all.length - 1].toFixed(2) : 0, 붐비는길칸: cellsOver, 센길칸: CROWDH.load.size, ...CROWDH.stats }; };
+/* [MAC-CROWDCELLS] 길 칸마다의 붐빔을 **있는 그대로** 내주는 창구 — `?dev=1` 에서만. **판정 0 · 그림 0 · 저장 0**(읽기만).
+   까닭: `__crowdHomes()` 는 '붐비는길칸 85' 처럼 **개수**만 주어서, 밖에서 '이어진 붐비는 길 한 토막'으로 묶을 수가 없었다
+   (창조자 10회 B1·B4 = backlog #11·#14 의 측정. 흙빛 자국(`__roadWear`)은 길 값이 아니라 **집 값을 이웃 칸에 칠한 것**이라 그것으로 묶으면 2칸짜리 섬만 나온다).
+   칸붐빔 m = 그 칸에 얹힌 값 ÷ 품(큰길은 두 배) — 집 말('길이 붐벼요')이 쓰는 것과 **같은 수**다.
+   다른 점은 집이 **제 식구 몫을 빼고**(MAC-CROWDSELF) 문 앞 **한 칸**만 본다는 것뿐이다. min 을 주면 그 위만(기본 1 = 집 문턱과 같은 선). */
+if (DEV) window.__crowdCells = (min) => { const R = window.VRULES.crowdHomes, lo = min == null ? 1 : +min, out = [];
+  CROWDH.load.forEach((v, c) => { const m = v / (R.cap * (isWide(c) ? 2 : 1)); if (m >= lo) out.push([cX(c), cY(c), +m.toFixed(2)]); });
+  out.sort((a, b) => b[2] - a[2] || a[1] - b[1] || a[0] - b[0]);
+  return { 품: R.cap, 문턱: lo, 센길칸: CROWDH.load.size, 넘는칸: out.length, 한바퀴: CROWDH.stats.한바퀴, 칸: out }; };
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -8436,7 +8445,7 @@ function actPuddleTick(f, i, now) {
   const at = f.path ? f.path[Math.min(f.step, f.path.length - 1)] : -1, hop0 = PUDDLE.hopped.get(f), fresh = c => hop0 && hop0.has(c) && SIM.t - hop0.get(c) < R.againH * DAY_MS / 24;   // 같은 웅덩이는 한동안 쉬었다가 또   // 웅덩이 칸에 들어서면(찾아왔든 지나가다 밟았든) 거기서 멈춰 통통 — 가는 길이 남에게 바뀌어도 놓치지 않게
   if (at >= 0 && PUDDLE.set.has(at) && (f.state === 'idle' || f.state === 'walk') && ((f.puddle && f.puddle.cell === at) || !fresh(at))) {
     const hop = hop0 || new Map(); hop.set(at, SIM.t); PUDDLE.hopped.set(f, hop);
-    f.puddle = { cell: at, until: now + R.hopMs }; if (f.state === 'idle') f.until = f.puddle.until; PUDDLE.stats.아이통통++; return true; }   // 가던 길은 그대로 — 통통 뛰고 나서 이어 간다(학교 가는 길이어도)
+    f.puddle = { cell: at, until: now + R.hopMs }; if (f.state === 'idle') f.until = f.puddle.until; PUDDLE.stats.아이통통++; return true; }   // 가던 길은 그대로 — 통통 뛰고 나서 이어 간다(학교 가는 길이어도)
   if (f.puddle || f.goal) return false;   // 들르러 길을 바꾸는 건 볼일 없는 아이만
   const passing = f.state === 'walk' && f.path && f.path[f.step + 1] != null && f.pudStep !== f.step;   // 걷다가 칸을 하나 넘을 때마다 — 곁에 웅덩이가 있으면 들른다
   if (passing) f.pudStep = f.step;
