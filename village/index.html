@@ -2725,8 +2725,6 @@ function hookable(name, base) { const list = HOOKS[name] || (HOOKS[name] = []);
 function hookAdd(name, fn) { if (!HOOKS[name]) throw new Error('hookAdd: 고리가 없는 함수 ' + name); HOOKS[name].push(fn); return fn; }
 jobsHouseStep = hookable('jobsHouseStep', jobsHouseStep);
 jobsHomesStep = hookable('jobsHomesStep', jobsHomesStep);
-jobsTick = hookable('jobsTick', jobsTick);
-joblessHome = hookable('joblessHome', joblessHome);
 satText = hookable('satText', satText);
 crowdTick = hookable('crowdTick', crowdTick);
 crowdHint = hookable('crowdHint', crowdHint);
@@ -2742,6 +2740,15 @@ canPlace = hookable('canPlace', canPlace);
 undo = hookable('undo', undo);
 placeAt = hookable('placeAt', placeAt);
 removeAt = hookable('removeAt', removeAt);
+/* [엔진 ④ 걸음 1] 시뮬 한 조각을 파일로 — 일자리(docs/village_sim_move_plan.md · 걸음 0·1 만 하고 멈춘다).
+   서로 import 하지 않고 열 때 한 번 건넨다. 늦게 만들어지는 것(folks·roadBFS·population·isAdult)은 getter 로 — 이 줄에서 값을 읽지 않는다.
+   고리(hookAdd('jobsTick', …))는 전과 같은 자리에 그대로 붙는다 — 조각 안에서 hookable 로 만들어 돌려준다. */
+const SIM_JOBS = await import('./sim/jobs.js?v=20260920-step1');
+let { JOB_POP, jobCount, jobStats, jobsTick, joblessHome, joblessRatio, jobText } = SIM_JOBS.init({
+  cells, K, idx, inb, cX, cY, hookable,
+  get folks() { return folks; }, get isAdult() { return isAdult; },
+  roadBFS: (...a) => roadBFS(...a), population: () => population(),
+});
 window.__hooks = () => Object.fromEntries(Object.entries(HOOKS).map(([k, v]) => [k, v.length]));
 
 /* ── [MAC-LIBRARY] 도서관은 동네마다 — '마을에 하나'에서 뺀다 (보스 결정 09-20 · 조사 docs/village_learn_stall_20260920.md) ──
@@ -5476,44 +5483,8 @@ const isNightHour = h => h >= 20 || h < 6;
 const isSchoolHour = h => h >= 8 && h < 14;
 /* ── 일터와 일자리(F27) ── */
 const isWorkHour = h => h >= 9 && h < 17;
-const JOB_POP = 20;   // 43차: 인구 20 부터(10 은 첫 성장을 막았다 — G1 실측)                                   // 이 인구부터 "일할 곳이 없어요"를 따진다(첫 집 몇 채에서 바로 😐 가 되지 않게)
-const jobCount = new Map();                           // 일터 root → 붙은 어른 수
-const jobStats = { 일자리: 0, 찬자리: 0, 일없는어른: 0, 출근: 0 };
-let jobRR = 0;
 const isAdult = f => !f.visitor && !f.arriving && (f.ct === 3 || f.ct === 4);
-function jobsTick() {
-  jobCount.clear(); let total = 0;
-  cells.forEach((rec, i) => { if (rec && rec.root === i && K[rec.k].jobs) { total += K[rec.k].jobs; jobCount.set(i, 0); } });
-  folks.forEach(f => { if (f.job != null && !jobCount.has(f.job)) f.job = null; if (f.job != null) jobCount.set(f.job, jobCount.get(f.job) + 1); });
-  /* 일 없는 어른 둘씩 — 집 앞 길에서 40칸 안 일터 중 빈 자리 있는 곳, 가까운 순 */
-  const idle = folks.filter(f => isAdult(f) && f.job == null && f.base >= 0);
-  for (let t = 0; t < 2 && idle.length; t++) {
-    const f = idle[(jobRR++) % idle.length];
-    const { reach } = roadBFS(f.base);
-    let got = -1;
-    for (const i of reach) {
-      const x = cX(i), y = cY(i);
-      for (let k = 0; k < 4 && got < 0; k++) {
-        const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
-        if (!inb(nx, ny)) continue;
-        const c = cells[idx(nx, ny)]; if (!c || !K[c.k].jobs) continue;
-        if ((jobCount.get(c.root) || 0) < K[c.k].jobs) got = c.root;
-      }
-      if (got >= 0) break;
-    }
-    if (got >= 0) { f.job = got; jobCount.set(got, jobCount.get(got) + 1); idle.splice(idle.indexOf(f), 1); }
-  }
-  let filled = 0; jobCount.forEach(v => filled += v);
-  jobStats.일자리 = total; jobStats.찬자리 = filled; jobStats.일없는어른 = folks.filter(f => isAdult(f) && f.job == null).length;
-}
-/* 이 집 어른이 모두 일자리가 없나(인구 10 부터) */
-function joblessHome(root) {
-  if (population() < JOB_POP) return false;
-  let adults = 0, jobless = 0; folks.forEach(f => { if (f.home === root && isAdult(f)) { adults++; if (f.job == null) jobless++; } });
-  return adults > 0 && jobless === adults;
-}
-const joblessRatio = () => { let a = 0, j = 0; folks.forEach(f => { if (isAdult(f)) { a++; if (f.job == null) j++; } }); return a ? j / a : 0; };
-const jobText = rec => K[rec.k].jobs ? '일자리 ' + (jobCount.get(rec.root) || 0) + '/' + K[rec.k].jobs : '';
+/* [엔진 ④ 걸음 1] 일자리 셈(JOB_POP·jobCount·jobStats·jobsTick·joblessHome·joblessRatio·jobText)은 village/sim/jobs.js 로 옮겼다 — 위 [MAC-HOOKS] 곁에서 import 한다. isAdult 는 걷는 사람 쪽이 널리 써서 여기 남긴다. */
 /* 이 길 칸이 그 건물 발자국에 닿는가 */
 function touchesRoot(cell, root) { const x = cX(cell), y = cY(cell); return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return !!(c && c.root === root); }); }
 /* 건물에 닿는 길 칸 중 갈 수 있는 첫 칸으로 길을 잡는다(문 앞 한 칸만 고집하면 남이 서 있을 때 못 간다) */
