@@ -3380,14 +3380,19 @@ function flowLookDraw() {
   const cnt = {}, put = (key, x, z, y) => { const im = flowLookMesh(key); const i = cnt[key] || 0; if (i >= 64) return;
     flowLookDummy.position.set(x, y, z); flowLookDummy.quaternion.copy(camera.quaternion);
     flowLookDummy.scale.set(1, 1, 1); flowLookDummy.updateMatrix(); im.setMatrixAt(i, flowLookDummy.matrix); cnt[key] = i + 1; };
-  /* 밭 — 쌓인 더미(양이 많으면 조금 높이) · 길이 끊겼으면 ⚠ 를 함께 */
-  FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
-    const st = flowFieldState(root); if (!st) return;
-    const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
-    if (v.양 > 0) put(st === 'full' ? '가득' : '더미', c.x, c.z, R.높이 + Math.min(2, v.양 * 0.25));
-    if (st === 'cut') put('끊김', c.x, c.z, R.높이 + 2.4); });
-  /* 가게 — 물건이 있으면 진열대, 없으면 빈 선반 */
-  FLOW.가게.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowTake(rec)) return;
+  /* 밭 — [MAC-FLOWSHAPE] 로 옮겼다(이랑·곡식·모서리 자루). 길이 끊긴 것만 ⚠ 를 남긴다 —
+     시안도 '먼 거리에 한 가지를 넣어야 한다면'에서 끊김을 꼽았고, 아이가 멀리서 찾아야 하는 것이 그것이다 */
+  if (!fsOn())
+    FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
+      const st = flowFieldState(root); if (!st) return;
+      const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+      if (v.양 > 0) put(st === 'full' ? '가득' : '더미', c.x, c.z, R.높이 + Math.min(2, v.양 * 0.25));
+      if (st === 'cut') put('끊김', c.x, c.z, R.높이 + 2.4); });
+  else FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
+      if (flowFieldState(root) !== 'cut') return; const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+      put('끊김', c.x, c.z, R.높이 + 2.4); });
+  /* 가게 — 물건이 있으면 진열대, 없으면 빈 선반. [MAC-FLOWSHAPE] 가 켜져 있으면 **건물 모습**이 대신 말한다(상자·접힌 차양·팻말) */
+  if (!fsOn()) FLOW.가게.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowTake(rec)) return;
     const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
     put(v.양 > 0 ? '있음' : '빈', c.x, c.z, R.높이); });
   /* 운반 중인 짐 — 밭과 가게 사이를 남은 시간만큼 (임시 표현: 곧은 선) */
@@ -3432,6 +3437,130 @@ function flowCardText(root) {
 window.__flowLook = () => ({ 켜짐: !!(window.VRULES.flowLook && window.VRULES.flowLook.on) && flowOn(),
   그린것: Object.keys(FLOWMESH).reduce((o, k) => (o[k] = FLOWMESH[k].count, o), {}),
   메시수: Object.keys(FLOWMESH).length });
+/* ── [MAC-FLOWSHAPE] 흐름이 **건물 모습**으로 — 밭 · 가게 (디자인 시안 2026-09-20 · 보고_20260919/마을_흐름_상태시안) ──
+   시안의 한 줄: **아이가 볼 곳은 '밭의 길 쪽 모서리' 한 군데다.**
+     자루가 없고 이랑이 비었다 → **밭이 모자라다** · 자루가 산더미다 → **길이 끊겼다**.
+   그래서 밭 하나로 네 상태를 다 말한다(바탕은 같고 **이랑 위에 무엇이 있나**와 **모서리에 자루가 몇인가**만 다르다):
+     growing(양 0) 빈 밭 — 이랑만 · ready/moving 생산 중 — 이랑마다 곡식 줄 + 이삭 ·
+     양이 쌓이면 **길 쪽 모서리(−z)에 자루** · 많이 쌓이면 **두 켜**로(= 안 나가고 있다) · cut 이면 자루를 쌓고 **어둡게**.
+   가게는 시안 3·4절의 채택안을 그대로 쓴다(🧺🫙 아이콘을 대신한다):
+     stocked = **A 매대가 찬다** — 매대에 상자가 쌓이고 양이 넘치면 앞마당으로 나온다(양 = 높이와 넓이).
+     empty   = **B + D** — 기본 거리의 신호는 **접힌 차양**(+ 꺼진 진열창 · 빈 매대), 가까이의 까닭은 **문 앞 팻말**.
+               채도 25%↓ 는 그 둘을 이어 주는 배경 톤(WAITHOUSE 가 집에서 하던 역할 나눔 그대로).
+   **까닭은 새로 판정하지 않는다** — 빈 가게를 눌렀을 때 뜨는 말(flowWhyEmpty)을 그대로 읽어 밭/길 아이콘을 고른다.
+     그림과 말이 어긋날 수 없다(엔진 4번 '같은 원인은 어디서나 같은 말'). 판정 규칙 0개 · 저장 0.
+   새 에셋 0 — 기존 조각(box·cyl·sph)과 기존 색만. **이삭 머리는 sph 말고 box**(시안: 밭 하나 1,484△ → 약 400△).
+   자루 색은 시안 채택안(밀빛 0xf0dcac + 진한 끈 0xa98d55) — ACT-WORK 의 크림색은 밭 흙 위에서 눈덩이로 뭉친다.
+   **거리 위계**(시안 0절): 12px 아래는 마커 층이라 3D 조각이 아예 안 그려진다 → 이 그림은 저절로 사라진다(따로 막을 것 없음).
+   상태가 바뀐 것의 청크만 다시 합친다. 끄면(VRULES.flowShape.on = false) 판 파일이 준 모습 그대로 + 아이콘이 돌아온다.
+   **구경 중에는 통째로 쉰다**(FSHAPE.쉼) — 남의 마을 상태를 내 판정으로 그리지 않는다(시안 7절).
+   원래 줄 수정: partsOf 감싸기 하나 + flowLookDraw 에서 밭·가게 아이콘을 이 블록에 넘기는 갈래 둘. */
+(window.VRULES = window.VRULES || {}).flowShape = { on: true };
+const FSHAPE = { 본: new Map(), 까닭: new Map(), 쉼: false, stats: { 그린밭: 0, 그린가게: 0, 다시합침: 0 } };
+const FS_C = { 흙: 0x8a6b3f, 곡식: 0xb8a34e, 곡식D: 0x9d8b3e, 자루: 0xf0dcac, 끈: 0xa98d55,
+  상자: 0xf0c890, 상자D: 0xd8b070, 창꺼짐: 0x3d4a5c, 매대: 0xf5c542 };
+const fsOn = () => !!(window.VRULES.flowShape && window.VRULES.flowShape.on) && flowOn() && !FSHAPE.쉼;
+const fsDim = (() => { const a = new THREE.Color(), b = new THREE.Color();
+  return (hex, k) => { a.setHex(hex); const l = (a.r + a.g + a.b) / 3; a.lerp(b.setRGB(l, l, l), k); return a.getHex(); }; })();
+/* 자루 하나 — 시안 채택 색 · cyl + sph + box */
+const fsSack = (x, y, z, s, ry) => [
+  { g: 'cyl', c: FS_C.자루, s: [.52 * s, .72 * s, .52 * s], p: [x, y + .36 * s, z], ry: ry || 0 },
+  { g: 'sph', c: FS_C.자루, s: [.40 * s, .30 * s, .40 * s], p: [x, y + .80 * s, z] },
+  { g: 'box', c: FS_C.끈,  s: [.56 * s, .17 * s, .56 * s], p: [x, y + .68 * s, z], ry: ry || 0 } ];
+/* 상자 하나 — ACT-WORK 의 crate 색 그대로 */
+const fsCrate = (x, y, z, w, h, d) => [
+  { g: 'box', c: FS_C.상자,  s: [w, h, d],             p: [x, y + h / 2, z] },
+  { g: 'box', c: FS_C.상자D, s: [w + .04, .09, d + .04], p: [x, y + h - .02, z] } ];
+/* 문 앞 팻말 — WAITHOUSE 의 그것을 자리만 가게 앞으로(m = 크기 배수 · 가게는 집보다 발자국이 넓어 1.9배) */
+const fsStake = (x, z, m) => [
+  { g: 'box', c: P.woodD, s: [.12 * m, 1.2 * m, .12 * m], p: [x, .6 * m, z] },
+  { g: 'box', c: P.woodL, s: [.9 * m, .62 * m, .08 * m],  p: [x, 1.2 * m, z + .02 * m] } ];
+/* 까닭 아이콘 둘 — **같은 문법**(작은 땅 한 조각)이라 아이가 짝으로 읽는다(시안 5절) */
+const FS_ICON = {
+  밭: (x, z, m) => { const Y = 1.51 * m; return [
+    { g: 'box', c: FS_C.흙,    s: [.80 * m, .10 * m, .62 * m], p: [x, Y + .05 * m, z] },
+    ...[-.17, .17].map(o => ({ g: 'box', c: FS_C.곡식D, s: [.72 * m, .07 * m, .13 * m], p: [x, Y + .13 * m, z + o * m] })),
+    { g: 'cyl', c: FS_C.곡식D, s: [.045 * m, .40 * m, .045 * m], p: [x - .22 * m, Y + .32 * m, z - .17 * m] },
+    { g: 'sph', c: FS_C.곡식,  s: [.11 * m, .20 * m, .09 * m],   p: [x - .22 * m, Y + .58 * m, z - .17 * m] } ]; },
+  길: (x, z, m) => { const Y = 1.51 * m; return [
+    { g: 'box', c: P.grassD, s: [.80 * m, .10 * m, .62 * m], p: [x, Y + .05 * m, z] },
+    ...[-.24, .24].map(o => ({ g: 'box', c: P.pave,   s: [.28 * m, .09 * m, .44 * m], p: [x + o * m, Y + .13 * m, z] })),
+    ...[-.24, .24].map(o => ({ g: 'box', c: P.paveIn, s: [.24 * m, .02 * m, .38 * m], p: [x + o * m, Y + .18 * m, z] })) ]; } };
+/* 가게에 쌓인 물건 — 매대부터 차고 넘치면 앞마당으로(시안 A · 숫자는 한 글자도 안 쓴다) */
+function fsStock(양) { const out = [];
+  if (양 >= 1) out.push(...fsCrate(-2.2, 1.12, 3.30, 1.9, .70, 1.25));
+  if (양 >= 3) out.push(...fsCrate(-2.2, 1.82, 3.15, 1.45, .55, 1.0));
+  if (양 >= 2) { const y = 양 >= 3 ? 2.55 : 1.85;
+    out.push({ g: 'sph', c: P.red,    s: [.30, .26, .30], p: [-2.70, y, 3.05] },
+             { g: 'sph', c: P.petal2, s: [.30, .26, .30], p: [-2.15, y, 3.20] },
+             { g: 'sph', c: P.red,    s: [.26, .24, .26], p: [-1.70, y - .03, 3.02] }); }
+  if (양 >= 4) out.push(...fsCrate(0.40, 0, 4.30, 1.75, 1.00, 1.45));
+  if (양 >= 6) out.push(...fsCrate(2.35, 0, 4.60, 1.45, .80, 1.25));
+  if (양 >= 8) out.push(...fsCrate(0.65, 1.00, 4.15, 1.30, .70, 1.05));
+  return out; }
+/* 가게 한 채의 상태 모습 — 부위는 **번호가 아니라 생김새로** 고른다(차양 = 기운 것 · 진열창 = 유리색 · 매대 상판 = 노란 판).
+   접기 자리는 기본 가게(K.shop)의 치수에 맞춰 잰 값이라 **가게에만** 쓴다 — 판 파일이 만든 다른 '받는곳'은 흐림과 팻말만. */
+function fsShopParts(rec, base) {
+  const root = rec.root, st = flowStoreState(root); if (!st) return base;
+  if (st === 'stocked') { FSHAPE.stats.그린가게++; return base.concat(fsStock(flowStore(root).양)); }
+  const 가게냐 = rec.k === 'shop';
+  const out = base.map(pt => {
+    if (가게냐 && pt.rx) return { ...pt, c: fsDim(pt.c, .25), p: [pt.p[0], 3.55, 1.95], rx: 1.42 };   // 차양 다섯 폭을 접어 벽에 붙인다
+    if (가게냐 && pt.c === P.glass) return { ...pt, c: FS_C.창꺼짐 };                                  // 진열창을 끈다
+    if (가게냐 && pt.c === FS_C.매대) return { ...pt, c: fsDim(P.woodD, .25) };                         // 매대가 빈 나무
+    return typeof pt.c === 'number' ? { ...pt, c: fsDim(pt.c, .25) } : pt; });
+  const why = FSHAPE.까닭.get(root);
+  FSHAPE.stats.그린가게++;
+  return why ? out.concat(fsStake(3.2, 3.6, 1.9), FS_ICON[why](3.2, 3.6, 1.9)) : out; }
+/* 밭 한 칸(2×2)의 상태 모습 — 판 파일이 준 바탕 위에 얹는다 */
+function fsFieldParts(root, base) {
+  const st = flowFieldState(root); if (!st) return base;
+  const 양 = flowField(root).양, 끊김 = st === 'cut';
+  const out = base.slice();
+  if (양 > 0 || st === 'moving' || st === 'ready' || st === 'full' || 끊김) {
+    /* 이랑마다 곡식 줄 + 이삭(box) — 시안의 '생산 중' */
+    [-2.4, -1.2, 0, 1.2, 2.4].forEach(z => {
+      out.push({ g: 'box', c: 끊김 ? fsDim(FS_C.곡식, .3) : FS_C.곡식, s: [6.0, .52, .44], p: [0, .46, z] });
+      [-2.2, -1.1, 0, 1.1, 2.2].forEach(x =>
+        out.push({ g: 'box', c: 끊김 ? fsDim(FS_C.곡식, .3) : FS_C.곡식, s: [.22, .32, .16], p: [x, .82, z], ry: .4 })); });
+  }
+  /* 길 쪽 모서리(−z)에 자루 — 양이 쌓일수록, 넘치면 두 켜 */
+  const 자루수 = Math.min(7, 양), 위켜 = Math.max(0, 양 - 5);
+  const 아래 = [[.4, -3.2], [1.5, -3.3], [2.6, -3.2], [3.3, -2.8], [1.0, -2.4], [2.2, -2.4], [3.1, -2.1]];
+  for (let i = 0; i < 자루수; i++) out.push(...fsSack(아래[i][0], .20, 아래[i][1], 1.6, i * .5));
+  const 위 = [[1.0, -3.0], [2.1, -2.9], [2.8, -2.5]];
+  for (let i = 0; i < Math.min(3, 위켜); i++) out.push(...fsSack(위[i][0], 1.50, 위[i][1], 1.45, i * .9));
+  FSHAPE.stats.그린밭++;
+  return out; }
+{ const po = partsOf; partsOf = function (rec) { const base = po.apply(this, arguments);
+    if (!rec || !fsOn() || cells[rec.root] !== rec) return base;
+    if (flowMake(rec)) return fsFieldParts(rec.root, base);
+    if (flowTake(rec)) return fsShopParts(rec, base);
+    return base; }; }
+/* 상태가 바뀐 것의 청크만 다시 합친다. 빈 가게의 **까닭**도 여기서만 읽는다(누를 때 뜨는 말과 같은 함수) */
+function fsWhy(root) { const t = flowWhyEmpty(root) || '';
+  return t.indexOf('길이 끊') >= 0 ? '길' : t.indexOf('밭') >= 0 ? '밭' : null; }   /* '밭에 쌓여 있는데 길이 끊겼어요' 는 길이 먼저 */
+function fsTick() {
+  const R = window.VRULES.flowShape, 쉴까 = !R || !R.on || !flowOn() || VISIT.on;
+  if (쉴까 !== FSHAPE.쉼) { FSHAPE.쉼 = 쉴까;                       // 켜짐이 바뀐 순간 — 그리던 것 전부 다시 합친다
+    FSHAPE.본.forEach((v, i) => { if (cells[i]) dirtyChunks.add(chunkOfCell(i)); });
+    FSHAPE.본.clear(); FSHAPE.까닭.clear(); }
+  if (쉴까) return;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i) return;
+    let 이제 = null;
+    if (flowMake(rec)) 이제 = flowFieldState(i) + ':' + flowField(i).양;
+    else if (flowTake(rec)) { const st = flowStoreState(i);
+      const why = st === 'empty' ? fsWhy(i) : null;
+      why ? FSHAPE.까닭.set(i, why) : FSHAPE.까닭.delete(i);
+      이제 = st + ':' + (st === 'empty' ? (why || '-') : flowStore(i).양); }
+    if (이제 == null || FSHAPE.본.get(i) === 이제) return;
+    FSHAPE.본.set(i, 이제); dirtyChunks.add(chunkOfCell(i)); FSHAPE.stats.다시합침++; }); }
+window.__flowShape = (x, y) => { const R = { 켜짐: fsOn(), 쉼: FSHAPE.쉼, ...FSHAPE.stats };
+  if (x == null) return R; const rec = cells[idx(x, y)]; if (!rec) return { ...R, 물건: '없음' };
+  if (flowMake(rec)) return { ...R, 밭: flowFieldState(rec.root), 양: flowField(rec.root).양, 조각수: partsOf(rec).length };
+  if (flowTake(rec)) return { ...R, 가게: flowStoreState(rec.root), 양: flowStore(rec.root).양,
+    까닭: FSHAPE.까닭.get(rec.root) || null, 조각수: partsOf(rec).length };
+  return { ...R, 물건: '흐름과 무관' }; };
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
@@ -4619,7 +4748,7 @@ function simTick() {
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   flowTick();   // [MAC-FLOW] 흐름 — 만들기·보내기·나아가기·쓰기(판 파일 '흐름' 칸이 있을 때만)
-  if ((SIM.ticks % (window.VRULES.flowLook.every || 30)) === 3) flowLookDraw();   // [MAC-FLOWLOOK] 상자·빈 선반·짐·⚠
+  if ((SIM.ticks % (window.VRULES.flowLook.every || 30)) === 3) { fsTick(); flowLookDraw(); }   // [MAC-FLOWSHAPE] 밭 모습 · [MAC-FLOWLOOK] 남은 아이콘
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
