@@ -994,7 +994,7 @@ const unlocked = new Set();
 function lockedWhy(kind) { const need = LOCK_POP[kind]; if (!need || unlocked.has(kind)) return true; return '인구 ' + need + '명이면 열려요'; }
 function checkUnlocks() {
   const pop = population();
-  UNLOCKS.forEach(u => { if (pop >= u.pop) u.kinds.forEach(k => { if (!unlocked.has(k)) { unlocked.add(k); toast('🔓 ' + u.kinds.map(x => K[x].nm).join('·') + ' 이 열렸어요! (인구 ' + u.pop + '명)', true); buildTray(); } }); });
+  UNLOCKS.forEach(u => { if (pop >= u.pop) u.kinds.forEach(k => { if (!unlocked.has(k)) { unlocked.add(k); simSay('🔓 ' + u.kinds.map(x => K[x].nm).join('·') + ' 이 열렸어요! (인구 ' + u.pop + '명)', true); buildTray(); } }); });
 }
 
 /* ── 재기 위한 채움 계획 ──
@@ -1394,7 +1394,7 @@ function seasonTick() {
     seasonNow = si;
     chunks.forEach(ch => { if (ch.built) dirtyChunks.add(chunkKey(ch.cx, ch.cz)); });   // 잎 색을 다시 합친다(보이는 것부터)
     forestSeason(); if (!first) buildTray();   /* 계절 장식 트레이 갱신(59차) */
-    if (!first) toast(['🌸 봄이 왔어요', '☀️ 여름이에요', '🍂 가을이에요', '❄️ 겨울이에요'][si], true);
+    if (!first) simSay(['🌸 봄이 왔어요', '☀️ 여름이에요', '🍂 가을이에요', '❄️ 겨울이에요'][si], true);
   }
   /* 바닥·하늘은 하루에 걸쳐 부드럽게 */
   const S = SEASONS[si];
@@ -1451,7 +1451,7 @@ function rebuildPlotMeshes_old() {
 function openPlot(px, py, quiet) {
   const key = px + ',' + py; if (plots.has(key) || px < 0 || py < 0 || px >= NPX || py >= NPY) return false;
   plots.add(key); rebuildPlotMeshes();
-  if (!quiet) { markDirty(); toast('🔓 땅이 넓어졌어요! 흙 테두리 안이 내 땅이에요', true); }
+  if (!quiet) { markDirty(); simSay('🔓 땅이 넓어졌어요! 흙 테두리 안이 내 땅이에요', true); }
   return true;
 }
 function openAllPlots() { for (let py = 0; py < NPY; py++) for (let px = 0; px < NPX; px++) plots.add(px + ',' + py); rebuildPlotMeshes(); }
@@ -1485,7 +1485,7 @@ function chooseShow() {
     scene.add(m); CHOOSE.meshes.push(m);
   });
   CHOOSE.since = performance.now();
-  if (CHOOSE.cands.length) toast('🔓 땅을 하나 더 가질 수 있어요! 노란 땅을 눌러 고르세요', true);
+  if (CHOOSE.cands.length) simSay('🔓 땅을 하나 더 가질 수 있어요! 노란 땅을 눌러 고르세요', true);
 }
 function chooseClear() { CHOOSE.meshes.forEach(m => scene.remove(m)); CHOOSE.meshes = []; CHOOSE.cands = []; }
 function choosePlot(px, py) {
@@ -2907,7 +2907,7 @@ function jobsChipDraw() { let el = document.getElementById('jobsChip'); const R 
 function jobsChipTick() { JOBSON.roots = jobsChipList(); jobsChipDraw();
   const R = window.VRULES.jobsChip; if (!R.on || !JOBSON.roots.length || population() < JOB_POP || window.__LOADMS == null) return;
   const key = 'rpg.village.jobsNews.' + SID; let seen = false; try { seen = !!localStorage.getItem(key); } catch (e) { seen = true; }
-  if (!seen) { try { localStorage.setItem(key, '1'); } catch (e) {} JOBSON.stats.소식++; setTimeout(() => toast('💼 마을이 커져서 어른들 일할 곳이 모자라요 — 가게·온실·풍차를 더 지어 봐요', true), 800); } }
+  if (!seen) { try { localStorage.setItem(key, '1'); } catch (e) {} JOBSON.stats.소식++; setTimeout(() => simSay('💼 마을이 커져서 어른들 일할 곳이 모자라요 — 가게·온실·풍차를 더 지어 봐요', true), 800); } }
 function jobsChipGo() { JOBSON.roots = jobsChipList(); jobsChipDraw(); if (!JOBSON.roots.length) return;
   const groups = waitClusters(JOBSON.roots, W, 8), g = groups.find(q => !q.some(r => JOBSON.seen.has(r))) || groups[0]; if (groups.every(q => q.some(r => JOBSON.seen.has(r)))) JOBSON.seen.clear();
   const root = waitClusterHome(g, W), rec = cells[root]; if (!rec) return; g.forEach(r => JOBSON.seen.add(r)); JOBSON.stats.눌러감++;
@@ -3151,7 +3151,18 @@ function simSay(m, ok) { return simEmit('say', m, ok); }
    대기줄은 **한 칸**이다. 그 사이 또 다른 소식이 오면 **새것이 앞엣것을 대신한다**(오래된 소식보다 지금 일이 낫다 · 통계 밀림).
    가르는 잣대는 'SIMOUT 을 거쳤나'다 — 시뮬이 하는 말은 모두 simSay 를 지나고, 아이 손짓 대답은 안 지난다.
    끄면(VRULES.toastQ.on = false) 예전처럼 뒤에 온 말이 바로 덮는다. 규칙 판정과 무관하다(분류 '보기').
-   원래 줄 수정 1(simEmit 의 say 처리기) · 추가 1(toast 를 hookable 로 등록). */
+   원래 줄 수정 1(simEmit 의 say 처리기) · 추가 1(toast 를 hookable 로 등록).
+
+   덧(보스 지시 09-21) — **저절로 뜨는 소식이 toast 를 바로 부르던 14곳을 simSay 로 옮겼다.** 그러지 않으면 위 잣대가
+   그것들을 '아이 손짓 대답'으로 보고 1.4초 자리를 내준다(#721 에서 '🔓 땅을 하나 더…'가 칩을 누른 말을 덮는 것으로 드러났다).
+   옮긴 것: 해금 🔓 · 계절 · 땅 넓어짐 · 땅 하나 더 고르기 · 일자리 모자람 소식 💼 · 돌아섬 귀띔 · 앨범 📖 · 구경 손님 🚶 ·
+     기차 🚂 · 기뻐해요 🎉 · 밤새 자람 🌳 · 하루 넘김 📰 · 판 끝 🎉 · 칭호 알림 💡.
+   **안 옮긴 것과 까닭**:
+     · 아이 손짓의 대답(놓기·치우기·되돌리기·단추·집이나 사람을 누른 카드)은 그대로 — 이 잣대가 지키려는 쪽이다.
+     · 손짓 뒤 늦게 뜨는 안내(💡 팁 · 🧳 식구가 기다려요 · 큰길이 깔렸어요)도 **아이가 방금 한 일의 결과**라 손짓 쪽에 둔다.
+     · dayNote 의 '📰 어제…' 한 줄은 사진 카드가 **toast 를 잠깐 갈아끼워 가로채는** 자리라 건드리지 않았다(그 소식은 7985 줄에서 simSay 로 나간다).
+     · 칭호 귀띔(TITLE_NUDGE)은 띄운 **뒤 말자리 글자를 되읽어** 큰 소식에 덮였는지 보는 코드라 그대로 뒀다 — 옮기면 그 판단이 깨진다.
+     · 새 판본 알림(곧 다시 열어요)은 밀리면 안 되는 안내라 손짓 쪽에 남겼다. */
 (window.VRULES = window.VRULES || {}).toastQ = { on: true, hold: 1400, gap: 900 };
 const TQ = { auto: 0, until: 0, q: null, t: 0, stats: { 손말: 0, 바로: 0, 미룸: 0, 이어봄: 0, 밀림: 0 } };
 function sayAuto(m, ok) { TQ.auto++; try { return toast(m, ok); } finally { TQ.auto--; } }
@@ -3368,7 +3379,7 @@ addEventListener('pointerup', () => {                                           
   const pick = SAYAWAY_ORDER.slice().sort((a, b) => (tally[b] || 0) - (tally[a] || 0))[0]; if (!tally[pick]) return;
   const text = '💡 여긴 ' + NEED_TXT[pick] + '이 멀어요 — ' + josa(SAYAWAY_FIX[pick], '을', '를') + ' 가까이 놓으면 이웃이 와요', now = performance.now();
   if (text === SAYAWAY.last && now - SAYAWAY.lastAt < R.againMs) { SAYAWAY.stats.접음++; return; }
-  SAYAWAY.last = text; SAYAWAY.lastAt = now; SAYAWAY.stats.귀띔++; setTimeout(() => toast(text, true), R.delayMs);
+  SAYAWAY.last = text; SAYAWAY.lastAt = now; SAYAWAY.stats.귀띔++; setTimeout(() => simSay(text, true), R.delayMs);
 });
 window.__sayAway = () => ({ 켜짐: window.VRULES.placeSayAway.on, 마지막말: SAYAWAY.last, ...SAYAWAY.stats });
 
@@ -6106,7 +6117,7 @@ function albumShoot(week) {
   const url = snapSmall();
   album.push({ week, day: simDay(), t: Date.now(), url }); while (album.length > ALBUM_MAX) album.shift();
   try { localStorage.setItem(albumKey(), JSON.stringify(album)); } catch (e) {}
-  toast('📖 ' + week + '주째 사진을 앨범에 넣었어요', true);
+  simSay('📖 ' + week + '주째 사진을 앨범에 넣었어요', true);
 }
 function albumTick() {
   if (VISIT.on) return;                                   // 친구 마을은 내 앨범에 안 찍힌다
@@ -6150,7 +6161,7 @@ function neighborTick(now) {
   folks.push({ home: b, ct: (Math.random() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
     x: wx(cX(b)), z: wz(cY(b)), px: wx(cX(b)), pz: wz(cY(b)), dir: 0, pdir: 0, path: [b], step: 0, seg: 0, state: 'idle', mx: 0, mz: 0, mt: 0 });
   folkPool.forEach(m => m.count = folks.length); neighborStats.옴++;
-  toast('🚶 이웃 마을 아이가 구경 왔어요', true);
+  simSay('🚶 이웃 마을 아이가 구경 왔어요', true);
 }
 function visitTick(now) {
   neighborTick(now);
@@ -6167,7 +6178,7 @@ function visitTick(now) {
     visitStats.온손님++; visitStats.오늘++;
   }
   folkPool.forEach(m => m.count = folks.length);
-  toast('🚂 기차가 왔어요 — 손님 ' + n + '명', true);
+  simSay('🚂 기차가 왔어요 — 손님 ' + n + '명', true);
 }
 /* 손님의 목적지: 구경거리 옆 길 칸. 시간이 다 되면 역으로, 역에 닿으면 사라진다 */
 function visitorGoal(f, reach) {
@@ -7190,7 +7201,7 @@ function breathScan(now) {
       h.joyUntil = now + B.joyMs; whyStats.누적기쁨++;
       const c = centerOf('house', cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 3000 });
       if (now - BREATH.lastJoyToast > B.joyToastGapMs) { BREATH.lastJoyToast = now; const who = folks.find(f => f.home === root && !f.arriving && !f.visitor);
-        toast('🎉 ' + (who ? folkName(who) + '네가' : '주민이') + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
+        simSay('🎉 ' + (who ? folkName(who) + '네가' : '주민이') + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
     }
   }
 }
@@ -7875,7 +7886,7 @@ function actGrowTick(f, now) {
       const L = typeof window.GROW.news === 'function' ? (window.GROW.news() || []) : [];
       if (L.length) { const trees = L.filter(r => cells[r] && growKind(cells[r].k) === 'tree').length, fl = L.length - trees; GROWX.stats.소식++;
         L.forEach(r => { const rec = cells[r]; if (!rec) return; const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 6000 }); });
-        toast('🌳 ' + [trees ? '나무 ' + trees + '그루' : '', fl ? '꽃밭 ' + fl + '곳' : ''].filter(Boolean).join('·') + '이 밤새 자랐어요', true); } }
+        simSay('🌳 ' + [trees ? '나무 ' + trees + '그루' : '', fl ? '꽃밭 ' + fl + '곳' : ''].filter(Boolean).join('·') + '이 밤새 자랐어요', true); } }
     if (R.on && GROWX.seen.size && SIM.ticks % R.everyTicks === 0) {
       GROWX.stats.자라는칸 = GROWX.seen.size;
       GROWX.seen.forEach((was, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !growKind(rec.k)) { GROWX.seen.delete(root); return; }
@@ -7982,7 +7993,7 @@ function actSnapShoot() {
     try { dayNote0(d); } finally { toast = toast0; }
     const today = Math.floor(SIM.t / DAY_MS);
     if (SNAP.today && SNAP.today.day < today) { SNAP.yday = SNAP.today; SNAP.today = null; snapSave(); }
-    if (SNAP.yday && SNAP.yday.day === today - 1) snapCard(SNAP.yday, msg); else if (msg) toast(msg, true);   // 사진이 없으면 원래대로 한 줄
+    if (SNAP.yday && SNAP.yday.day === today - 1) snapCard(SNAP.yday, msg); else if (msg) simSay(msg, true);   // 사진이 없으면 원래대로 한 줄
   }; }
 function snapCard(y, msg) {
   let el = SNAP.card; if (!el) { el = SNAP.card = document.createElement('div'); el.id = 'snapCard';
@@ -8463,7 +8474,7 @@ function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된
     if (STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(kind)) { STAGE.stats.막음++; return '이 판에서는 쓰지 않아요'; }
     return next(args); }); }
 { hookAdd('goalTick', function (next, args) { const r = next(args);
-    if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (typeof stageCardEnd === 'function' && window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardEnd('목표'); else if (STAGE.def.되돌아보기) toast('🎉 ' + STAGE.def.되돌아보기, true); }   // [MAC-STAGECARD] 끝 카드
+    if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (typeof stageCardEnd === 'function' && window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardEnd('목표'); else if (STAGE.def.되돌아보기) simSay('🎉 ' + STAGE.def.되돌아보기, true); }   // [MAC-STAGECARD] 끝 카드
     return r; }); }
 if (STAGE.id) {
   window.VillageSync = null;   // 판은 원격 동기를 쓰지 않는다(저장은 이 기기에만 · 키도 따로)
@@ -8635,7 +8646,7 @@ function titleTick() {                                                          
   const { ids } = titleScan();
   if (!TITLE.offered && !TITLE.id) { if (ids.length >= 2) titleNudge(); return; }   // [MAC-TITLE-2] 첫 제안은 모달이 아니라 소식 한 줄 — 카드는 아이가 눌러서 연다
   const fresh = ids.filter(id => !TITLE.told.has(id) && id !== TITLE.id); ids.forEach(id => TITLE.told.add(id));
-  if (fresh.length && TITLE.toldDay !== simDay()) { TITLE.toldDay = simDay(); TITLE.stats.알림++; toast('💡 이제 ' + titleText(fresh[0]) + '이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요', true); }
+  if (fresh.length && TITLE.toldDay !== simDay()) { TITLE.toldDay = simDay(); TITLE.stats.알림++; simSay('💡 이제 ' + titleText(fresh[0]) + '이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요', true); }
 }
 { const imp0 = importText; importText = function () { const r = imp0.apply(this, arguments);      // 파일에서 가져온 마을은 다른 마을이다 — 이 기기의 곁 키(앞 마을의 칭호)를 물려주지 않는다. 파일에 title 이 있으면 그것이 산다
     if (r === true) { try { localStorage.removeItem(TITLE_SIDE()); localStorage.removeItem(TITLE_SIDE() + '.offered'); } catch (err) { /* 없어도 된다 */ } } return r; }; }
