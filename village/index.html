@@ -9818,7 +9818,9 @@ function stageSkin(def) {
      그대로 두면 아이가 바닷가 판을 열고 몇 분 동안 **초록 들판**을 본다(보스 실측: 연 직후 #a6cd6f · 15초 뒤 #adcd75 — 바란 색은 #ddd0a4).
      테마의 첫인상이 통째로 틀리는 자리다. 여기서 한 번만 lerp 없이 대입하고 판을 다시 칠한다.
      ⚠ 계절이 저절로 도는 판(모습 없는 판)은 이 줄을 안 지난다 — 거기서는 하루에 걸친 번짐이 기능이다. */
-  const S0 = SEASONS[no != null ? no : 0];
+  /* 계절을 고정 안 한 판(풀·바닥만 준 판)은 **지금 계절**을 쓴다 — SEASONS[0](봄) 을 쓰면 하늘이 봄빛으로 한 번 튀었다가
+     제 계절로 되돌아간다. `seasonNow < 0 ? 1 : seasonNow` 는 이 파일이 이미 두 군데에서 쓰는 꼴이다(seasonColor·1538줄). 보스 덧. */
+  const S0 = SEASONS[no != null ? no : (typeof seasonNow === 'number' && seasonNow >= 0 ? seasonNow : 1)];
   plotMat.color.setHex(S0.grass); groundCol.setHex(S0.ground); SKY_DAY.setHex(S0.sky);
   paintBoard(); VSKIN.stats.색세움 = true; }
 window.__skin = () => ({ 판: STAGE.id || null, 계절고정: VSKIN.계절고정, ...VSKIN.stats, ORDER에: VSKIN.stats.더한것.filter(k => ORDER.indexOf(k) >= 0), 지금탭: typeof curGroup === 'string' ? curGroup : null,
