@@ -9813,7 +9813,14 @@ function stageSkin(def) {
   if (no != null) { const base = { ...SEASONS[no] }; SEASONS.forEach(s => Object.assign(s, base)); VSKIN.계절고정 = S.계절; }
   const g = skinHex(S.풀), gr = skinHex(S.바닥);
   SEASONS.forEach(s => { if (g != null) s.grass = g; if (gr != null) s.ground = gr; });
-  VSKIN.stats.색 = { 계절: VSKIN.계절고정, 풀: g == null ? null : '#' + g.toString(16), 바닥: gr == null ? null : '#' + gr.toString(16) }; }
+  VSKIN.stats.색 = { 계절: VSKIN.계절고정, 풀: g == null ? null : '#' + g.toString(16), 바닥: gr == null ? null : '#' + gr.toString(16) };
+  /* [MAC-SKIN] **모습이 있는 판은 색을 곧바로 세운다.** seasonTick 은 바닥·하늘을 하루(3분)에 걸쳐 lerp 하므로,
+     그대로 두면 아이가 바닷가 판을 열고 몇 분 동안 **초록 들판**을 본다(보스 실측: 연 직후 #a6cd6f · 15초 뒤 #adcd75 — 바란 색은 #ddd0a4).
+     테마의 첫인상이 통째로 틀리는 자리다. 여기서 한 번만 lerp 없이 대입하고 판을 다시 칠한다.
+     ⚠ 계절이 저절로 도는 판(모습 없는 판)은 이 줄을 안 지난다 — 거기서는 하루에 걸친 번짐이 기능이다. */
+  const S0 = SEASONS[no != null ? no : 0];
+  plotMat.color.setHex(S0.grass); groundCol.setHex(S0.ground); SKY_DAY.setHex(S0.sky);
+  paintBoard(); VSKIN.stats.색세움 = true; }
 window.__skin = () => ({ 판: STAGE.id || null, 계절고정: VSKIN.계절고정, ...VSKIN.stats, ORDER에: VSKIN.stats.더한것.filter(k => ORDER.indexOf(k) >= 0), 지금탭: typeof curGroup === 'string' ? curGroup : null,
   새종류: VSKIN.stats.더한것.map(k => ({ 이름: k, 글: K[k].nm, 묶음: K[k].grp, 칸: [K[k].w, K[k].h], 조각: K[k].parts.length })) });
 function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표판) 전에
