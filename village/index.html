@@ -3128,10 +3128,9 @@ function flowTick() {
   /* ① 운반 중인 것 나아가기 · 길이 끊겼으면 되돌리기 */
   for (let i = FLOW.짐.length - 1; i >= 0; i--) { const j = FLOW.짐[i];
     const 밭rec = cells[j.밭], 가게rec = cells[j.가게];
-    const 살았나 = 밭rec && 밭rec.root === j.밭 && 가게rec && 가게rec.root === j.가게 && flowTake(가게rec)
-      && flowStoresFrom(밭rec).some(s => s.root === j.가게);
-    if (!살았나) { FLOW.짐.splice(i, 1);
-      if (밭rec && 밭rec.root === j.밭 && flowMake(밭rec)) { flowField(j.밭).양 += j.양; FLOW.stats.되돌림++; }   /* 밭이 있으면 돌려준다 */
+    const 운명 = flowCarryFate(j, 밭rec, 가게rec);   /* [MAC-FLOWGONE] 'go' 가던 길 · 'back' 밭으로 되돌림 · 'drop' 갈 곳도 돌아갈 곳도 없다 */
+    if (운명 !== 'go') { FLOW.짐.splice(i, 1);
+      if (운명 === 'back') { flowField(j.밭).양 += j.양; FLOW.stats.되돌림++; } else flowGoneDrop(j);
       continue; }
     if (--j.남은 <= 0) { FLOW.짐.splice(i, 1); flowStore(j.가게).양 += j.양; FLOW.stats.닿음++; } }
   /* ② 만들기 · 보내기 — 판을 every 조각으로 나눠 돈다 */
@@ -3184,6 +3183,64 @@ function flowWhyEmpty(root) {
   return '곧 와요 — 오는 중이에요'; }
 { hookAdd('placeAt', function (next, args) { const r = next(args); if (flowOn()) FLOW.gen++; return r; }); }
 { hookAdd('removeAt', function (next, args) { const r = next(args); if (flowOn()) FLOW.gen++; return r; }); }
+/* ══════════════════════════════════════════════════════════════
+   [MAC-FLOWGONE] 물건이 설명 없이 사라지거나 생기지 않게 (프로토 정본 2-4 · 설계 docs/village_proto_flow_design.md 1-가)
+   합계 검산(만듦 = 밭 + 운반중 + 가게 + 씀)을 시뮬로 돌렸더니 **한 자리에서만** 어긋났다 — 밭을 치우면 길 위의 것이 말없이 없어졌다.
+   ① 길에 나선 것은 목적지까지 간다 — 밭을 치워도 이미 지고 가던 것은 가게에 닿는다(사람이 지고 길 위에 있으니 연기와도 맞는다).
+      되돌아가는 것은 '길이 끊겼을 때'뿐이다(그때는 밭이 살아 있다 — #759 가 연기 쪽에 정한 잣대와 같다).
+   ② 안에 쌓여 있던 것은 [MAC-KEEP](식구 맡아 두기)과 같은 꼴로 1분 맡아 둔다 — ↩ 되돌리거나 같은 것을 다시 놓으면 돌아오고, 화면이 그렇게 말한다.
+      전에는 FLOW 기억에서 지우지도 않아, 한참 뒤 같은 자리에 새로 놓으면 옛 재고가 말없이 되살아났다(반대쪽 어긋남).
+   ③ 밭도 가게도 없어져 갈 곳이 없으면 그때 한마디 — 조용히 없애지 않는다.
+   분류는 '바로잡음'이다: 셈의 뜻(생산·운반·소비)은 그대로고, 화면 말과 실제를 맞춘다.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).flowGone = { on: true, stashMs: 60000, keep: 6 };
+const FGONE = { stash: [], last: -1e9, stats: { 맡김: 0, 돌아옴: 0, 버림: 0, 계속감: 0, 갈곳없음: 0 } };
+const fgoneOn = () => flowOn() && window.VRULES.flowGone.on;
+const fgoneThing = () => window.VRULES.flow.물건 || '물건';
+const fgoneSay = (msg, ok) => { if (window.__LOADMS == null || VISIT.on || savingOff) return; setTimeout(() => toast(msg, ok), 0); };
+/* 운반 중인 것의 운명 — 'go' 가던 길 그대로 · 'back' 밭으로 되돌림 · 'drop' 갈 곳도 돌아갈 곳도 없다 */
+function flowCarryFate(j, 밭rec, 가게rec) {
+  const 밭있나 = !!(밭rec && 밭rec.root === j.밭 && flowMake(밭rec));
+  const 가게있나 = !!(가게rec && 가게rec.root === j.가게 && flowTake(가게rec));
+  const 이어짐 = () => flowStoresFrom(밭rec).some(s => s.root === j.가게);
+  if (!fgoneOn()) return (밭있나 && 가게있나 && 이어짐()) ? 'go' : (밭있나 ? 'back' : 'drop');   // 스위치를 끄면 옛 판정 그대로
+  if (!가게있나) return 밭있나 ? 'back' : 'drop';
+  if (!밭있나) { if (!j.홀로) { j.홀로 = 1; FGONE.stats.계속감++; } return 'go'; }               // 밭이 없어져도 길 위의 것은 가게까지 간다
+  return 이어짐() ? 'go' : 'back';
+}
+function flowGoneDrop(j) { FGONE.stats.갈곳없음++;
+  if (fgoneOn()) fgoneSay('🧺 나르던 ' + fgoneThing() + ' ' + j.양 + '개는 갈 곳이 없어졌어요'); }
+/* 치울 때 — 기억에서 지우고, 쌓여 있던 것은 1분 맡아 둔다 */
+function flowGoneStash(rec) {
+  if (!rec || !fgoneOn()) return;
+  const 밭 = !!flowMake(rec), 가게 = !밭 && !!flowTake(rec); if (!밭 && !가게) return;
+  const 곳 = 밭 ? FLOW.밭 : FLOW.가게, v = 곳.get(rec.root), 양 = v ? Math.max(0, v.양 | 0) : 0;
+  곳.delete(rec.root);                                           // 남겨 두면 같은 자리에 새로 놓을 때 옛 재고가 말없이 살아난다
+  if (양 <= 0 || carrying || VISIT.on) return;
+  const R = window.VRULES.flowGone, t0 = performance.now();
+  if (t0 - FGONE.last < 30) { FGONE.stash.length = 0; FGONE.last = t0; return; }   // 한꺼번에 여러 채(판 비우기·파일 가져오기)는 맡지 않는다
+  FGONE.last = t0;
+  FGONE.stash.push({ k: rec.k, 양, until: t0 + R.stashMs });
+  while (FGONE.stash.length > (R.keep | 0 || 6)) { FGONE.stash.shift(); FGONE.stats.버림++; }
+  FGONE.stats.맡김++;
+  fgoneSay((밭 ? '🌾' : '🧺') + ' 쌓여 있던 ' + fgoneThing() + ' ' + 양 + '개를 1분 맡아 둬요 — ↩ 되돌리거나 다시 놓으면 돌아와요', true);
+}
+/* 다시 놓을 때 — 같은 종류면 돌아온다(되돌리기·옮기기·새로 놓기 모두 · [MAC-KEEP] 과 같은 꼴) */
+function flowGoneRestore(root) {
+  if (!fgoneOn() || !FGONE.stash.length) return;
+  const rec = cells[root]; if (!rec || rec.root !== root) return;
+  const mk = flowMake(rec), tk = mk ? null : flowTake(rec); if (!mk && !tk) return;
+  const now = performance.now(); FGONE.stash = FGONE.stash.filter(t => t.until > now);
+  const i = FGONE.stash.map(t => t.k).lastIndexOf(rec.k); if (i < 0) return;
+  const t = FGONE.stash.splice(i, 1)[0];
+  const 담을수 = Math.max(1, ((mk || tk).담을수 | 0) || (mk ? 5 : 8)), 양 = Math.min(담을수, t.양);
+  (mk ? flowField(root) : flowStore(root)).양 = 양;
+  FGONE.stats.돌아옴++;
+  fgoneSay((mk ? '🌾' : '🧺') + ' ' + fgoneThing() + ' ' + 양 + '개가 돌아왔어요', true);
+}
+{ hookAdd('placeAt', function (next, args) { const r = next(args); if (flowOn()) flowGoneRestore(idx(args[1], args[2])); return r; });
+  hookAdd('removeAt', function (next, args) { const c = inb(args[0], args[1]) ? cells[idx(args[0], args[1])] : null; if (c) flowGoneStash(c); return next(args); }); }
+window.__flowGone = () => ({ 켜짐: fgoneOn(), 맡아둔것: FGONE.stash.map(t => [t.k, t.양]), ...FGONE.stats });
 /* 저장 — 옛 저장본에 이 칸이 없으면 0 에서 시작한다. 옛 코드가 새 저장본을 읽으면 모르는 칸이라 무시한다 */
 function flowSave() { if (!flowOn()) return undefined;
   const 밭 = {}, 가게 = {}, 집 = {};
