@@ -2886,8 +2886,8 @@ window.__jobsHomes = () => { let need = 0, houses = 0, jl = 0; cells.forEach((re
 (window.VRULES = window.VRULES || {}).jobsChip = { on: true };
 const JOBSON = { memo: new Map(), roots: [], seen: new Set(), stats: { 돌아섬판정: 0, 눌러감: 0, 소식: 0 } };
 /* 순수 함수 — 돌아섬 말. miss 에 '일자리'가 있으면 그것을 따로 말한다 */
-function waitSayJob(miss, minHave) { const job = miss.includes('일자리'), rest = miss.filter(k => k !== '일자리');
-  const jobT = '💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요';
+function waitSayJob(miss, minHave, rec) { const job = miss.includes('일자리'), rest = miss.filter(k => k !== '일자리');
+  const jobT = jobWhySay(rec);   /* [MAC-JOBWHY] 까닭 넷에서 — rec 가 없으면 예전 말 */
   if (!job) return waitSay(rest, minHave); if (!rest.length || 4 - rest.length >= (minHave || 2)) return jobT; return waitSay(rest, minHave) + ' · 💼 일할 곳도 멀어요'; }
 /* 빈 자리 있는 일터가 이 집 앞 길에서 닿나 */
 function jobsReachFree(rec) { const b = roadBeside(rec); if (b < 0) return false; const wp = jobsWpIndex(), { reach } = roadBFS(b);
@@ -2902,7 +2902,7 @@ function jobsChipDraw() { let el = document.getElementById('jobsChip'); const R 
   if (!el) { el = document.createElement('button'); el.id = 'jobsChip'; el.title = '어른들이 일할 곳이 닿지 않는 집 — 누르면 그 동네로 가요';
     el.style.cssText = 'position:fixed;right:10px;top:120px;z-index:6;display:none;background:#1f2a24ee;border:1px solid #7fc79a;border-radius:10px;min-height:44px;padding:0 14px;font:800 13.5px/1 "Malgun Gothic",sans-serif;color:#d9f7e3;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px #0007';
     el.onclick = jobsChipGo; document.body.appendChild(el); const st = document.createElement('style'); st.textContent = 'body.photo #jobsChip{display:none!important}'; document.head.appendChild(st); }
-  const n = R.on ? JOBSON.roots.length : 0; el.style.display = n ? '' : 'none'; if (!n) return; el.textContent = '💼 일할 곳이 먼 집 ' + n;
+  const n = R.on ? JOBSON.roots.length : 0; el.style.display = n ? '' : 'none'; if (!n) return; el.textContent = jobWhyChip(JOBSON.roots, n);   /* [MAC-JOBWHY] 까닭에 맞는 이름 */
   const wh = document.getElementById('waitHomes'), top = document.getElementById('top'); const below = wh && wh.style.display !== 'none' ? wh.getBoundingClientRect().bottom : (top ? top.getBoundingClientRect().bottom : 60); el.style.top = Math.round(below + 6) + 'px'; }
 function jobsChipTick() { JOBSON.roots = jobsChipList(); jobsChipDraw();
   const R = window.VRULES.jobsChip; if (!R.on || !JOBSON.roots.length || population() < JOB_POP || window.__LOADMS == null) return;
@@ -2912,7 +2912,8 @@ function jobsChipGo() { JOBSON.roots = jobsChipList(); jobsChipDraw(); if (!JOBS
   const groups = waitClusters(JOBSON.roots, W, 8), g = groups.find(q => !q.some(r => JOBSON.seen.has(r))) || groups[0]; if (groups.every(q => q.some(r => JOBSON.seen.has(r)))) JOBSON.seen.clear();
   const root = waitClusterHome(g, W), rec = cells[root]; if (!rec) return; g.forEach(r => JOBSON.seen.add(r)); JOBSON.stats.눌러감++;
   const c = centerOf('house', cX(root), cY(root), rec.rot); camTarget.set(c.x, 2, c.z); miniDirty = true; sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 });
-  toast('💼 이 동네 ' + g.length + '채 · 어른들 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요', true); }
+  jobWhyPoint(g);   /* [MAC-JOBWHY] 길만 이으면 닿는 곳이면 그 일터도 함께 반짝인다 — 어디를 이어야 하는지 */
+  toast('이 동네 ' + g.length + '채 · ' + jobWhySay(rec, g), true); }   /* [MAC-JOBWHY] 까닭 넷에서 */
 window.__jobsOn = () => ({ 셈: window.VRULES.jobsHomes.on, 돌아섬: window.VRULES.jobAway.on, 칩: window.VRULES.jobsChip.on, 칩수: JOBSON.roots.length, 글: (document.getElementById('jobsChip') || {}).textContent || '', ...JOBSON.stats });
 
 /* ── [MAC-WORKFIRST] 일터 둘 고침 (창조자의 눈 7회 🔴1·🔴2 · 보스 09-20) ──
@@ -2937,7 +2938,106 @@ const WORKF = { got: 0, last: 1, stats: { 첫자리: 0, 채우기미룸: 0 } };
 { hookAdd('jobsHomesStep', function (next, args) { const lap = JOBH.stats.한바퀴, r = next(args); if (JOBH.stats.한바퀴 !== lap) { WORKF.last = WORKF.got; WORKF.got = 0; } return r; }); }
 /* 일터를 눌렀을 때 — 길에 안 닿은 일터(옛 저장본의 풀밭 풍차·온실)는 까닭과 한 수를 말한다 */
 function workRoadWhy(rec) { const R = window.VRULES.workRoad; if (!R || !R.on || !K[rec.k].jobs || roadBeside(rec) >= 0) return ''; WORKF.stats.길없음말 = (WORKF.stats.길없음말 || 0) + 1; return ' — 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요'; }
+
 window.__workFirst = () => ({ 길필요: window.VRULES.workRoad.on && window.VRULES.workRoad.kinds.filter(k => K[k] && K[k].needRoad), 먼저: !!window.VRULES.jobsHomes.first, 지난바퀴첫자리: WORKF.last, ...WORKF.stats });
+
+/* ── [MAC-JOBWHY] 일할 곳이 없는 까닭 넷 — 한 함수에서 (R01 · 보스·연기 담당 합의 계약 · 창조자의 눈 7·8회) ──
+   같은 상태를 네 곳이 제각기 말해 왔다: 💼 칩 이름('일할 곳이 먼 집')·칩을 누른 동네 말·돌아섬 말·집 카드 말.
+   그런데 이름은 '멀다'인데 실제 판정은 '닿지 않는다'였고, 아이가 할 수 있는 수(길을 잇기 / 일터를 더 짓기)도 갈라지지 않았다.
+   이제 **window.JOB_WHY(집 root) 하나**가 까닭을 넷으로 답하고, 네 곳이 모두 그 답에서 말을 만든다.
+     · 'full' 자리 참   — 닿는 일터가 있는데 자리가 다 찼다            → 일터를 하나 더
+     · 'cut'  길 끊김   — 길만 cut 칸(기본 6) 이내로 이으면 닿는다      → **몇 칸을 이어야 하는지 말에 넣는다**
+     · 'far'  너무 멂   — 길은 이어졌지만 배정 반경(PATH_RADIUS 40칸) 밖이다 → 이 동네에 하나
+     · 'none' 없음      — 닿는 일터가 없고, 이으려 해도 cut 칸을 넘는다  → 가까이 하나 지어 봐요
+   **가르는 잣대(보스 승인)**: 'cut' 은 **잇는 것이 현실적인 거리**일 때만이다. 마을 반대편 일터를 'cut' 으로 부르면 아이가
+   아주 긴 길을 내게 된다 — 그래서 이을 빈칸이 cut 칸을 넘으면 'none'(가까이 하나 지어 봐요) 쪽으로 말한다.
+   'far' 의 문턱은 새로 만든 값이 아니라 **배정이 실제로 쓰는 반경**이다 — 말과 실제가 어긋나지 않게(#716 에서 배운 것).
+   ⚠ cut 칸수(6)는 **복구·실험용** 값이다. 판 파일(stages/*.json)이 바꿀 값이 아니다 — 늘리면 아이에게 긴 길을 내라고 말하게 된다.
+   원래 줄 수정 4 — 돌아섬 말(waitSayJob) · 칩 이름(jobsChipDraw) · 동네 말(jobsChipGo) · 집 카드 말(satText 의 busy 줄). */
+(window.VRULES = window.VRULES || {}).jobWhy = { on: true, cut: 6, wide: 3 };
+const JW = { memo: new Map(), gen: -1, stats: { none: 0, cut: 0, far: 0, full: 0, 잰집: 0, 캐시: 0 } };
+const JW_SHORT = { none: '일할 곳이 없어요', cut: '길이 끊겨 일터에 못 가요', far: '일터가 멀어요', full: '가까운 일터가 꽉 찼어요' };
+const JW_CHIP = { none: '일할 곳 없는 집', cut: '길이 끊긴 집', far: '일터가 먼 집', full: '자리가 찬 집' };
+function jwLong(why, 칸) {
+  if (why === 'cut') return '💼 길 ' + (칸 || 1) + '칸만 이으면 일터에 닿아요';
+  if (why === 'far') return '💼 일터가 멀어요 — 이 동네에 하나 지어 봐요';
+  if (why === 'full') return '💼 가까운 가게가 꽉 찼어요 — 일할 곳을 하나 더';
+  return '💼 일할 곳이 없어요 — 가까이 일터를 하나 지어 봐요'; }
+/* 길에서 닿는 일터 → Map(일터 root → 남은 자리) */
+function jobsNearFree(from, radius) { const wp = jobsWpIndex(), out = new Map(); if (from < 0) return out;
+  const { reach } = roadBFS(from, undefined, radius);
+  for (const i of reach) { const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (!c || !wp.has(c.root) || out.has(c.root)) continue;
+      out.set(c.root, (wp.get(c.root) || 0) - (JOBH.used.get(c.root) || 0)); } }
+  return out; }
+const jwAnyFree = m => { for (const v of m.values()) if (v > 0) return true; return false; };
+/* 빈칸 몇 개를 길로 채우면 빈 자리 일터에 닿나 — 길은 공짜(0) · 빈칸은 1 인 0-1 너비우선. 예산을 넘으면 포기한다 */
+function jobsCutCost(rec, budget) {
+  const wp = jobsWpIndex(), cost = new Map(); let now = [], next = [];
+  const b = roadBeside(rec);
+  if (b >= 0) { cost.set(b, 0); now.push(b); }
+  else { const d = dims(rec.k, rec.rot), x0 = cX(rec.root), y0 = cY(rec.root);          // 길에 안 붙은 집 — 둘레 빈칸부터(한 칸 값)
+    for (let y = y0 - 1; y <= y0 + d.h; y++) for (let x = x0 - 1; x <= x0 + d.w; x++) {
+      if (!inb(x, y) || cells[idx(x, y)]) continue; const i = idx(x, y); if (cost.has(i) || canPlace('road', x, y, 0) !== true) continue; cost.set(i, 1); next.push(i); } }
+  for (let lv = b >= 0 ? 0 : 1; lv <= budget; lv++) {
+    while (now.length) { const i = now.pop(), x = cX(i), y = cY(i);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
+        if (c && wp.has(c.root)) { if ((wp.get(c.root) || 0) - (JOBH.used.get(c.root) || 0) > 0) return { 칸: lv, 일터: c.root }; continue; }
+        if (cost.has(j)) continue;
+        if (c) { if (c.k === 'road') { cost.set(j, lv); now.push(j); } continue; }        // 이미 있는 길은 공짜로 지난다
+        if (lv + 1 > budget || canPlace('road', nx, ny, 0) !== true) continue; cost.set(j, lv + 1); next.push(j); } }
+    now = next; next = []; if (!now.length) break; }
+  return null; }
+function jobWhyCalc(root) {
+  const rec = cells[root]; if (!rec || rec.k !== 'house' || rec.root !== root) return null;
+  const need = jobsAdultsOf(root); if (need <= 0) return null;
+  const a = JOBH.asg.get(root); let have = 0; if (a) a.forEach(n => have += n); if (have >= need) return null;
+  const R = window.VRULES.jobWhy, b = roadBeside(rec);
+  JW.stats.잰집++;
+  const near = jobsNearFree(b, undefined);                                   // 배정과 같은 반경(PATH_RADIUS)
+  if (near.size) { if (jwAnyFree(near)) return null; return { why: 'full' }; }  // 닿는데 자리가 있으면 곧 배정된다 — 말할 것 없음
+  const wide = jobsNearFree(b, PATH_RADIUS * (R.wide || 3));                 // 길은 이어졌지만 배정 반경 밖
+  if (jwAnyFree(wide)) return { why: 'far' };
+  const cut = jobsCutCost(rec, R.cut || 6);
+  if (cut) return { why: 'cut', 칸: cut.칸 || 1, 일터: cut.일터 };
+  return { why: 'none' }; }
+/* 계약: window.JOB_WHY(집 root) → 'none' | 'cut' | 'far' | 'full' | null(해당 없음). 자세히는 JOB_WHY.info(root) */
+function jobWhyInfo(root) { const R = window.VRULES.jobWhy; if (!R || !R.on) return null;
+  const gen = placedTotal * 8 + (JOBH.stats.한바퀴 % 8);
+  if (JW.gen !== gen) { JW.memo.clear(); JW.gen = gen; }
+  if (JW.memo.has(root)) { JW.stats.캐시++; return JW.memo.get(root); }
+  const r = jobWhyCalc(root); JW.memo.set(root, r); if (r) JW.stats[r.why]++; return r; }
+window.JOB_WHY = root => { const r = jobWhyInfo(root); return r ? r.why : null; };
+window.JOB_WHY.info = jobWhyInfo;
+/* 네 곳이 쓰는 말 — 모두 JOB_WHY 하나에서 나온다 */
+function jobWhySay(rec, group) { const OLD = '💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요';
+  const R = window.VRULES.jobWhy; if (!R || !R.on || !rec || rec.k !== 'house') return OLD;
+  let r = jobWhyInfo(rec.root);
+  if (group && group.length > 1) { const w = jobWhyTop(group); if (w) r = { why: w, 칸: jobWhyCut(group, w) }; }   /* 동네는 가장 많은 까닭으로 */
+  return r ? jwLong(r.why, r.칸) : OLD; }
+function jobWhyShort(rec) { const R = window.VRULES.jobWhy; if (!R || !R.on || !rec) return '일할 곳이 없어요';
+  const r = jobWhyInfo(rec.root); return r ? JW_SHORT[r.why] : '일할 곳이 없어요'; }
+function jobWhyCount(roots) { const c = { none: 0, cut: 0, far: 0, full: 0 };
+  roots.forEach(h => { const rec = cells[h]; if (!rec) return; const r = jobWhyInfo(h); if (r) c[r.why]++; }); return c; }
+function jobWhyTop(roots) { const c = jobWhyCount(roots); let top = null, n = 0;
+  ['cut', 'full', 'far', 'none'].forEach(k => { if (c[k] > n) { n = c[k]; top = k; } }); return top; }
+function jobWhyCut(roots, why) { let best = 0;
+  roots.forEach(h => { const r = jobWhyInfo(h); if (r && r.why === why && r.칸) best = best ? Math.min(best, r.칸) : r.칸; }); return best || 1; }
+/* 'cut' 인 집이 있으면 이어 닿을 일터도 함께 반짝인다(칩을 눌렀을 때) — 새 안내 장치를 만들지 않고 있던 ✨ 를 쓴다 */
+function jobWhyPoint(roots) { const R = window.VRULES.jobWhy; if (!R || !R.on) return 0; let n = 0;
+  roots.forEach(h => { if (n >= 3) return; const r = jobWhyInfo(h); if (!r || r.why !== 'cut' || r.일터 == null) return;
+    const w = cells[r.일터]; if (!w) return; const c = centerOf(w.k, cX(r.일터), cY(r.일터), w.rot);
+    sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); n++; });
+  JW.stats.가리킴 = (JW.stats.가리킴 || 0) + n; return n; }
+function jobWhyChip(roots, n) { const top = jobWhyTop(roots), c = jobWhyCount(roots);
+  const only = top && c[top] === n;                                   /* 한 까닭뿐이면 그 이름 · 섞였으면 가장 많은 까닭 이름에 총수 */
+  return '💼 ' + (top ? JW_CHIP[top] : JW_CHIP.none) + ' ' + n + (only || !top ? '' : '↑'); }
+window.__jobWhy = (x, y) => { const rec = x == null ? null : cells[idx(x, y)];
+  if (x == null) return { 켜짐: !!window.VRULES.jobWhy.on, 칸수문턱: window.VRULES.jobWhy.cut, ...JW.stats };
+  if (!rec || rec.k !== 'house') return '집 없음';
+  const r = jobWhyInfo(rec.root); return { 까닭: r ? r.why : null, ...(r || {}), 짧은말: r ? JW_SHORT[r.why] : '', 긴말: r ? jwLong(r.why, r.칸) : '' }; };
 
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
@@ -4599,7 +4699,7 @@ const AWAY = { turned: new Map(), toasted: new Set(), rr: 0, stats: { 돌아섬:
 /* 순수 함수 — 이 집에 빠진 것 목록(살 만하면 null). THREE·DOM 을 안 만진다 */
 function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]); return needs.length - miss.length >= minHave ? null : miss; }
 function awayLacks(rec) { const R = window.VRULES.turnAway; if (!R.on || population() < R.graceBelow) return null; return homeLacks(computeSat(rec).met, AWAY_NEEDS, R.minHave); }   // computeSat 을 그 자리에서 — 빈 집은 satTick 이 안 돌아 캐시가 없다
-function awayWhy(rec) { const miss = awayLacks(rec); return miss ? waitSayJob(miss, window.VRULES.turnAway.minHave) : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
+function awayWhy(rec) { const miss = awayLacks(rec); return miss ? waitSayJob(miss, window.VRULES.turnAway.minHave, rec) : null; }   // 집 모습(낡은 집)도 이 판정을 읽는다
 const awayLeavers = () => { let n = 0; folks.forEach(f => { if (f.leaving) n++; }); return n; };
 /* tryMoveIn 고리 — 오늘 이미 돌아선 집은 후보에서 뺀다. 돌아가는 사람이 길에 있으면 다음 후보가 불편한 집일 때 그 차례를 쉰다(행렬 막기 — 결과는 같다: 아무도 안 든다) */
 function awayFilter(homes) {
@@ -4785,7 +4885,7 @@ function growHouse(rec, h) {
 function satText(rec) {
   const st = sat.get(rec.root) || computeSat(rec);
   const miss = NEEDS.filter(k => !st.met[k]);
-  const busy = (crowdedHome(rec.root) ? ' · 길이 붐벼요' : '') + (joblessHome(rec.root) ? ' · 일할 곳이 없어요' : '');
+  const busy = (crowdedHome(rec.root) ? ' · 길이 붐벼요' : '') + (joblessHome(rec.root) ? ' · ' + jobWhyShort(rec) : '');   /* [MAC-JOBWHY] 까닭 넷에서 */
   if (!miss.length) return (busy ? '😐 다 있어요' : '😊 다 있어요') + busy + amenText(rec.root);   // busy 에는 붐빔·일자리 사정이 든다. 꾸미기 한 줄은 뒤에(F33)
   return (faceOfHome(rec.root) === 1 ? '😐 ' : '😟 ') + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어요' + busy + amenText(rec.root);
 }

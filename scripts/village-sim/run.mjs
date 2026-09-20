@@ -16,7 +16,10 @@ const ROOT = path.resolve(HERE, '../..');
 const DAY = 1800;   // 틱 · 하루 3분 ÷ 100ms
 
 /* 낮을수록 좋은 지표 — 나머지는 높을수록 좋다 */
-const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:)/.test(k);
+const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:|까닭:)/.test(k);
+/* [MAC-JOBWHY] 집 카드가 일자리를 말하는 네 꼴 — 옛 index.html 은 첫 줄 하나뿐이라 그것도 그대로 잡힌다 */
+const JW_TXT = { none: '일할 곳이 없어요', cut: '길이 끊겨 일터에 못 가요', far: '일터가 멀어요', full: '가까운 일터가 꽉 찼어요' };
+const jobWhyOf = t => Object.keys(JW_TXT).find(k => t.includes(JW_TXT[k])) || null;
 /* 집 말은 필요 이름이 아니라 이 글로 나온다(index.html NEED_TXT) — '배울 곳이 멀어요' → 배움 */
 const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' }, NEED_OF = Object.fromEntries(Object.entries(NEED_TXT).map(([k, v]) => [v, k]));
 const missOf = txt => { const mm = txt.match(/^[^ ]+ (.+?)이 멀어요/); return mm ? mm[1].split('·').map(t => NEED_OF[t] || t) : []; };
@@ -35,9 +38,11 @@ function measure(w) {
     m.사는집++;
     if (txt.startsWith('😊')) m.웃는집++; else if (txt.startsWith('😟')) m.찡그린집++;
     if (txt.includes('길이 붐벼요')) m.붐빔집++;
-    if (txt.includes('일할 곳이 없어요')) m.일먼집++;
+    const jw = jobWhyOf(txt);   /* [MAC-JOBWHY] 까닭 넷 — 합(일먼집)은 고치기 전과 같은 자 */
+    if (jw) { m.일먼집++; m['까닭:' + jw] = (m['까닭:' + jw] || 0) + 1; }
     missOf(txt).forEach(k => { need['없음:' + k] = (need['없음:' + k] || 0) + 1; });
   });
+  ['none', 'cut', 'far', 'full'].forEach(k => { if (m['까닭:' + k] == null) m['까닭:' + k] = 0; });
   m['일닿음%'] = m.사는집 ? Math.round((1 - m.일먼집 / m.사는집) * 1000) / 10 : 100;
   if (typeof w.__stage === 'function') { const st = w.__stage(); if (st.id) { m.판목표 = st.목표.filter(g => g[1]).length; m.판목표수 = st.목표.length; } }
   return Object.assign(m, need);
@@ -45,7 +50,7 @@ function measure(w) {
 
 function housesWith(w, what) {   // @jobs · @crowd · @need:물
   const need = what.startsWith('need:') ? what.slice(5) : null;
-  const hit = what === 'jobs' ? t => t.includes('일할 곳이 없어요') : what === 'crowd' ? t => t.includes('길이 붐벼요')
+  const hit = what === 'jobs' ? t => !!jobWhyOf(t) : what === 'crowd' ? t => t.includes('길이 붐벼요')
     : need ? t => missOf(t).includes(need) : null;
   if (!hit) throw new Error('모르는 자리 @' + what + ' (jobs · crowd · need:<필요>)');
   const out = []; w.__snapshot().물건.forEach(t => { const mm = t.match(/^house@(\d+),(\d+)/); if (mm && hit(w.__houseText(+mm[1], +mm[2]))) out.push([+mm[1], +mm[2]]); });
@@ -230,9 +235,14 @@ const HELP = `마을 시뮬 도구 — scripts/village-sim/README.md 참고
   --rules 'a.b=v,…'      VRULES 덮기             --do 'put shop @jobs 1; del x y'
   --vs '이름: do=…; rules=…; save=…'  (여러 번) — 같은 시드로 나란히 돌려 비교
   --show 인구,일먼집,…   --watch 일먼집 (비교 표 지표)   --by 1 (좋아짐 문턱)
+  --show 까닭            일자리 까닭 넷(none·cut·far·full)을 함께 — 합은 일먼집과 같다
   --voice (끝 날 동네별 바람표 · MAC-VOICE)   --every 150 (틱 · 재는 간격)   --warm 300   --hash 'hour=10'   --jobs 동시 프로세스 수   --json 결과.json`;
 
+/* [MAC-JOBWHY] '까닭' 한 마디로 넷을 다 본다: --show 까닭 · --watch 까닭:cut */
+function spreadWhy(s) { return String(s || '').split(',').flatMap(k => k.trim() === '까닭'
+  ? ['까닭:none', '까닭:cut', '까닭:far', '까닭:full'] : [k.trim()]).filter(Boolean).join(','); }
 const o = parseArgs(process.argv.slice(2));
+o.show = spreadWhy(o.show); if (o.watch) o.watch = spreadWhy(o.watch);
 if (o.child) {
   child(JSON.parse(o.child)).then(r => { process.stdout.write('@@RESULT ' + JSON.stringify(r) + '\n'); process.exit(0); },
     e => { process.stdout.write('@@ERROR ' + String(e && e.message || e).split('\n')[0] + '\n'); process.exit(1); });
