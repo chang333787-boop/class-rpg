@@ -3147,7 +3147,8 @@ function flowTick() {
     for (const s of 가게들) { const rec2 = cells[s.root]; const tk = flowTake(rec2); if (!tk) continue;
       const st = flowStore(s.root), 담을수2 = Math.max(1, tk.담을수 | 0 || 8);
       if (st.양 + FLOW.짐.filter(j => j.가게 === s.root).reduce((a, j) => a + j.양, 0) >= 담을수2) continue;
-      f.양 -= 1; FLOW.짐.push({ 밭: i, 가게: s.root, 양: 1, 남은: Math.max(1, s.거리 * (R.칸당틱 | 0 || 6)) });
+      const 걸림 = Math.max(1, s.거리 * (R.칸당틱 | 0 || 6));
+      f.양 -= 1; FLOW.짐.push({ 밭: i, 가게: s.root, 양: 1, 남은: 걸림, 처음: 걸림 });
       FLOW.stats.보냄++; break; } }
   FLOW.cur = end >= N ? 0 : end;
   /* ③ 세대가 쓴다 — 하루 한 번, 걷는 사람과 무관 */
@@ -3196,7 +3197,7 @@ function flowLoad(f) { FLOW.밭.clear(); FLOW.가게.clear(); FLOW.집.clear(); 
   for (const r in (f.가게 || {})) flowStore(+r).양 = Math.max(0, f.가게[r] | 0);
   for (const r in (f.집 || {})) { const v = f.집[r]; if (Array.isArray(v)) FLOW.집.set(+r, { 날: v[0] | 0, 받음: !!v[1] }); }
   (Array.isArray(f.짐) ? f.짐 : []).forEach(j => { if (Array.isArray(j) && j.length === 4)
-    FLOW.짐.push({ 밭: j[0] | 0, 가게: j[1] | 0, 양: Math.max(1, j[2] | 0), 남은: Math.max(1, j[3] | 0) }); }); }
+    FLOW.짐.push({ 밭: j[0] | 0, 가게: j[1] | 0, 양: Math.max(1, j[2] | 0), 남은: Math.max(1, j[3] | 0), 처음: Math.max(1, j[3] | 0) }); }); }
 window.__flow = () => ({ 켜짐: flowOn(), 물건: window.VRULES.flow.물건, 짐: FLOW.짐.length,
   밭: [...FLOW.밭].map(([root, v]) => ({ 자리: [cX(root), cY(root)], 양: v.양, 상태: flowFieldState(root) })).filter(o => o.상태),
   가게: [...FLOW.가게].map(([root, v]) => ({ 자리: [cX(root), cY(root)], 양: v.양, 상태: flowStoreState(root) })).filter(o => o.상태),
@@ -3207,7 +3208,87 @@ window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '�
   const s = fs || ss || hs; if (!s) return '흐름과 무관';
   return { 상태: s, 말: FLOW_TXT[s], 양: fs ? flowField(rec.root).양 : ss ? flowStore(rec.root).양 : null,
     ...(ss === 'empty' ? { 까닭: flowWhyEmpty(rec.root) } : {}),
-    ...(fs ? { 닿는가게: flowStoresFrom(rec).map(o => [cX(o.root), cY(o.root), o.거리]) } : {}) }; };
+    ...(fs ? { 닿는가게: flowStoresFrom(rec).map(o => [cX(o.root), cY(o.root), o.거리]) } : {}),
+    ...(fs === 'cut' ? { 이으면: (() => { const c = flowCutCost(rec, 8); return c ? { 칸: Math.max(1, c.칸), 가게: [cX(c.가게), cY(c.가게)] } : null; })() } : {}),
+    카드: flowCardText(rec.root) }; };
+/* ── [MAC-FLOWLOOK] 흐름이 보이게 — 상자 더미·빈 선반·짐·⚠ (흐름 3단계 · 보스 조건 다섯) ──
+   **그림은 여기 한 곳에서만 그린다.** 상태(MAC-FLOW 의 계약 이름)를 읽어 아이콘을 고를 뿐이라,
+   디자인 임시 표현이 도착하면 이 파일의 아이콘 표 한 줄씩만 갈아끼우면 된다.
+   · 양은 **보이게**(밭에 쌓인 더미 · 가게 진열대 / 빈 선반), 숫자는 **누를 때만**(집 카드·건물 카드).
+   · 원인이 **갈려 보이게**: 밭이 모자라면 밭에 아무 것도 없고 가게만 빈 선반 · 길이 끊기면 **밭에 더미가 쌓이고 ⚠**.
+   · 끊긴 밭을 누르면 **몇 칸만 이으면 닿는지**(일자리 cut 과 같은 꼴 · 창조자 12회 ⓑ2).
+   · 흐름이 꺼진 판(기본 마을)에서는 개수가 0 이라 **그리지 않는다** — draw call 도 안 는다.
+   끄면(VRULES.flowLook.on = false) 아무것도 안 보인다(흐름 셈은 그대로 돈다). 원래 줄 수정 0. */
+(window.VRULES = window.VRULES || {}).flowLook = { on: true, every: 30, 높이: 5.2, 크기: 2.6 };
+const FLOWLOOK_ICON = { 더미: '📦', 가득: '📦', 끊김: '⚠️', 있음: '🧺', 빈: '🫙', 짐: '🎒' };
+const flowIconMesh = (icon, 크기, cap) => { const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); g.font = '46px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(icon, 32, 36);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(크기, 크기),
+    new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), cap);
+  im.count = 0; im.frustumCulled = false; im.renderOrder = 5; scene.add(im); return im; };
+const FLOWMESH = {};
+const flowLookDummy = new THREE.Object3D();
+function flowLookMesh(key) { if (!FLOWMESH[key]) FLOWMESH[key] = flowIconMesh(FLOWLOOK_ICON[key], window.VRULES.flowLook.크기, 64); return FLOWMESH[key]; }
+function flowLookDraw() {
+  const R = window.VRULES.flowLook;
+  if (!R || !R.on || !flowOn() || OFF.has('faces')) { Object.values(FLOWMESH).forEach(im => { im.count = 0; }); return; }
+  const cnt = {}, put = (key, x, z, y) => { const im = flowLookMesh(key); const i = cnt[key] || 0; if (i >= 64) return;
+    flowLookDummy.position.set(x, y, z); flowLookDummy.quaternion.copy(camera.quaternion);
+    flowLookDummy.scale.set(1, 1, 1); flowLookDummy.updateMatrix(); im.setMatrixAt(i, flowLookDummy.matrix); cnt[key] = i + 1; };
+  /* 밭 — 쌓인 더미(양이 많으면 조금 높이) · 길이 끊겼으면 ⚠ 를 함께 */
+  FLOW.밭.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowMake(rec)) return;
+    const st = flowFieldState(root); if (!st) return;
+    const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+    if (v.양 > 0) put(st === 'full' ? '가득' : '더미', c.x, c.z, R.높이 + Math.min(2, v.양 * 0.25));
+    if (st === 'cut') put('끊김', c.x, c.z, R.높이 + 2.4); });
+  /* 가게 — 물건이 있으면 진열대, 없으면 빈 선반 */
+  FLOW.가게.forEach((v, root) => { const rec = cells[root]; if (!rec || rec.root !== root || !flowTake(rec)) return;
+    const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+    put(v.양 > 0 ? '있음' : '빈', c.x, c.z, R.높이); });
+  /* 운반 중인 짐 — 밭과 가게 사이를 남은 시간만큼 (임시 표현: 곧은 선) */
+  FLOW.짐.forEach(j => { const a = cells[j.밭], b = cells[j.가게]; if (!a || !b) return;
+    const ca = centerOf(a.k, cX(j.밭), cY(j.밭), a.rot), cb = centerOf(b.k, cX(j.가게), cY(j.가게), b.rot);
+    const 전체 = Math.max(1, j.처음 || j.남은 || 1), t = Math.max(0, Math.min(1, 1 - j.남은 / 전체));
+    put('짐', ca.x + (cb.x - ca.x) * t, ca.z + (cb.z - ca.z) * t, R.높이 - 1.6); });
+  Object.keys(FLOWMESH).forEach(k => { const im = FLOWMESH[k]; im.count = cnt[k] || 0; if (im.count) im.instanceMatrix.needsUpdate = true; }); }
+/* 끊긴 밭이 몇 칸만 이으면 가게에 닿나 — 일자리 cut(jobsCutCost)과 같은 꼴(ⓑ2) */
+function flowCutCost(rec, budget) {
+  const cost = new Map(); let now = [], next = [];
+  const b = roadsBeside(rec);
+  if (b.length) b.forEach(i => { cost.set(i, 0); now.push(i); });
+  else { const d0 = dims(rec.k, rec.rot), x0 = cX(rec.root), y0 = cY(rec.root);
+    for (let y = y0 - 1; y <= y0 + d0.h; y++) for (let x = x0 - 1; x <= x0 + d0.w; x++) {
+      if (!inb(x, y) || cells[idx(x, y)]) continue; const i = idx(x, y);
+      if (cost.has(i) || canPlace('road', x, y, 0) !== true) continue; cost.set(i, 1); next.push(i); } }
+  for (let lv = b.length ? 0 : 1; lv <= budget; lv++) {
+    while (now.length) { const i = now.pop(), x = cX(i), y = cY(i);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
+        if (c && flowTake(c)) return { 칸: lv, 가게: c.root };
+        if (cost.has(j)) continue;
+        if (c) { if (K[c.k] && K[c.k].road) { cost.set(j, lv); now.push(j); } continue; }
+        if (lv + 1 > budget || canPlace('road', nx, ny, 0) !== true) continue; cost.set(j, lv + 1); next.push(j); } }
+    now = next; next = []; if (!now.length) break; }
+  return null; }
+/* 누를 때 — 숫자와 한 수 */
+function flowCardText(root) {
+  const rec = cells[root]; if (!rec) return '';
+  const mk = flowMake(rec), tk = flowTake(rec), R = window.VRULES.flow;
+  if (mk) { const st = flowFieldState(root), f = flowField(root), 담을수 = Math.max(1, mk.담을수 | 0 || 5);
+    let s = ' · ' + (R.물건 || '물건') + ' ' + f.양 + '/' + 담을수 + ' · ' + FLOW_TXT[st];
+    if (st === 'cut') { const cut = flowCutCost(rec, 8);
+      s += cut ? ' — 길 ' + Math.max(1, cut.칸) + '칸만 이으면 가게에 닿아요' : ' — 가게까지 길을 내 주세요'; }
+    return s; }
+  if (tk) { const st = flowStoreState(root), 담을수 = Math.max(1, tk.담을수 | 0 || 8);
+    let s = ' · ' + (R.물건 || '물건') + ' ' + flowStore(root).양 + '/' + 담을수 + ' · ' + FLOW_TXT[st];
+    if (st === 'empty') s += ' — ' + flowWhyEmpty(root);
+    return s; }
+  return ''; }
+window.__flowLook = () => ({ 켜짐: !!(window.VRULES.flowLook && window.VRULES.flowLook.on) && flowOn(),
+  그린것: Object.keys(FLOWMESH).reduce((o, k) => (o[k] = FLOWMESH[k].count, o), {}),
+  메시수: Object.keys(FLOWMESH).length });
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
@@ -3475,7 +3556,8 @@ function act(clientX, clientY) {
       toast(K[rec.k].nm + ' · ' + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);
       return;
     }
-    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec), true); return; }   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
+    if (rec && K[rec.k].jobs) { toast(K[rec.k].nm + ' · ' + jobText(rec) + workRoadWhy(rec) + flowCardText(rec.root), true); return; }   /* [MAC-FLOWLOOK] 흐름 한 줄(숫자는 누를 때만) */   // 온실·풍차 같은 일터(F27) · [MAC-WORKFIRST] 길에 안 닿으면 한마디
+    if (rec && (flowMake(rec) || flowTake(rec))) { toast(K[rec.k].nm + flowCardText(rec.root), true); return; }   /* [MAC-FLOWLOOK] 밭처럼 필요·일자리가 없는 흐름 건물 */
     if (rec && rec.k === 'house') {                   // 집을 누르면 사정을 말한다
       const n = res.get(rec.root) || 0, why = moveInWhy(rec);
       const names = folks.filter(f => !f.arriving && f.home === rec.root).map(folkName).join('·');
@@ -4392,6 +4474,7 @@ function simTick() {
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
   flowTick();   // [MAC-FLOW] 흐름 — 만들기·보내기·나아가기·쓰기(판 파일 '흐름' 칸이 있을 때만)
+  if ((SIM.ticks % (window.VRULES.flowLook.every || 30)) === 3) flowLookDraw();   // [MAC-FLOWLOOK] 상자·빈 선반·짐·⚠
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
   folks.forEach(f => { f.px = f.x; f.pz = f.z; f.pdir = f.dir; });   // 보간용 이전 자리
   tickFolks(TICK_MS / 1000, SIM.t);
