@@ -5938,8 +5938,12 @@ if (DEV) window.__crowdCells = (min) => { const R = window.VRULES.crowdHomes, lo
    **새 판정 규칙 0** — 값은 `CROWDH.load`(이미 있는 crowdHomes 의 셈)를 읽기만 한다. 분류 '보기'. 저장 0 · 새 에셋 0 · draw call 0.
    판이 바뀌거나 crowdHomes 가 한 바퀴를 돌 때만 다시 묶는다(틱마다 판을 훑지 않는다).
    끄면(VRULES.crowdSeg.on = false) 집마다 말하고 흙빛도 예전 그대로다. 원래 줄 수정 0 — satText 감싸기 · whereSpots 갈래 · roadWearSnapshot 앞머리. */
-(window.VRULES = window.VRULES || {}).crowdSeg = { on: true, 문턱: 1 };
-const CSEG = { of: new Map(), list: [], 바퀴: -1, stats: { 묶음: 0, 토막: 0, 칸: 0, 말한집: 0, 짚음: 0 } };
+/* 덧(중간 크기 판 실측 · 보스가 지목한 구멍) — **최소칸**이 없으면 중간 크기 판에서 거꾸로 간다.
+   집 34채 판에서 재 보니 토막 7개 중 **넷이 1칸짜리**(m 1.07~1.2 · 문턱을 간신히 넘은 칸)라
+   아이가 읽을 것이 2개 → 7개로 **늘었다**(pop88 에서는 24 → 2 로 줄었는데 정반대다).
+   1칸·2칸짜리는 '이어진 길 한 토막'이 아니라 **문턱 언저리의 잡음**이다. 그보다 짧으면 토막으로 치지 않는다. */
+(window.VRULES = window.VRULES || {}).crowdSeg = { on: true, 문턱: 1, 최소칸: 3 };
+const CSEG = { of: new Map(), list: [], 바퀴: -1, stats: { 묶음: 0, 토막: 0, 칸: 0, 말한집: 0, 짚음: 0, 버린조각: 0 } };
 const crowdSegOn = () => !!(window.VRULES.crowdSeg && window.VRULES.crowdSeg.on) && window.VRULES.crowdHomes.on;
 /* 토막 묶기 — 붐비는 길 칸(m > 문턱)을 4방으로 잇는다. crowdHomes 가 한 바퀴 돌 때마다 한 번 */
 function crowdSegBuild() {
@@ -5955,6 +5959,7 @@ function crowdSegBuild() {
       const x = cX(c), y = cY(c);
       for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
         if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (hot.has(j) && !봄.has(j)) { 봄.add(j); q.push(j); } } }
+    if (cs.length < Math.max(1, R.최소칸 | 0 || 1)) { CSEG.stats.버린조각++; continue; }   /* 1칸·2칸은 토막이 아니라 문턱 언저리의 잡음 */
     const k = CSEG.list.length; cs.forEach(c => CSEG.of.set(c, k)); CSEG.list.push({ 칸: cs, 최대: 최대, 최대칸: 최대칸 }); }
   CSEG.stats.묶음++; CSEG.stats.토막 = CSEG.list.length; CSEG.stats.칸 = CSEG.of.size; }
 /* 이 집이 닿은 토막 — 발자국 4방 칸 가운데 토막에 든 것(가장 붐비는 토막을 고른다) */
