@@ -2954,24 +2954,25 @@ function whereTrace(시작, 닿았나, budget) {
   if (끝 < 0) return null;
   const 칸 = []; let 여기 = 앞.get(끝);
   while (여기 != null && 여기 >= 0 && 칸.length < (window.VRULES.whereTo.keep | 0 || 12)) { if (!cells[여기]) 칸.push(여기); 여기 = 앞.get(여기); }
-  return 칸.reverse();
+  return { 자리: 칸.reverse(), 끝 };
 }
 /* 이 물건을 누르면 어디를 짚어야 하나 — 'cut' 이라 말한 것만 */
 function whereSpots(rec) {
   if (!rec || !whereOn()) return null;
   const R = window.VRULES.whereTo, B = Math.max(2, R.budget | 0 || 10);
+  const 자리 = t => (t && t.자리 && t.자리.length) ? t.자리 : null;
   if (typeof flowMake === 'function' && flowOn()) {
     if (flowMake(rec) && flowFieldState(rec.root) === 'cut')                      /* 밭: 쌓여 있는데 길이 끊겼다 */
-      return whereTrace(roadsBeside(rec), c => !!flowTake(c), B);
+      return 자리(whereTrace(roadsBeside(rec), c => !!flowTake(c), B));
     if (flowTake(rec) && flowStoreState(rec.root) === 'empty') {                  /* 가게: 빈 선반 — 끊긴 밭 쪽에서 되짚는다 */
       let 밭 = null;
       cells.forEach((r2, i) => { if (밭 || !r2 || r2.root !== i || !flowMake(r2)) return; if (flowFieldState(i) === 'cut') 밭 = r2; });
-      if (밭) return whereTrace(roadsBeside(밭), c => c.root === rec.root, B);
+      if (밭) return 자리(whereTrace(roadsBeside(밭), c => c.root === rec.root, B));
     }
   }
   if (rec.k === 'house' && typeof jobWhyInfo === 'function') {                    /* 집: 길만 이으면 일터에 닿는다 */
     const r = jobWhyInfo(rec.root);
-    if (r && r.why === 'cut' && r.일터 != null) return whereTrace(roadsBeside(rec), c => c.root === r.일터, B);
+    if (r && r.why === 'cut' && r.일터 != null) return 자리(whereTrace(roadsBeside(rec), c => c.root === r.일터, B));
   }
   return null;
 }
@@ -3052,22 +3053,22 @@ function jobsNearFree(from, radius) { const wp = jobsWpIndex(), out = new Map();
 const jwAnyFree = m => { for (const v of m.values()) if (v > 0) return true; return false; };
 /* 빈칸 몇 개를 길로 채우면 빈 자리 일터에 닿나 — 길은 공짜(0) · 빈칸은 1 인 0-1 너비우선. 예산을 넘으면 포기한다 */
 function jobsCutCost(rec, budget) {
-  const wp = jobsWpIndex(), cost = new Map(); let now = [], next = [];
-  const b = roadsBeside(rec);
-  if (b.length) { b.forEach(i => { cost.set(i, 0); now.push(i); }); }   /* [MAC-DOORS] 문 앞 길 전부에서 잰다 */
-  else { const d = dims(rec.k, rec.rot), x0 = cX(rec.root), y0 = cY(rec.root);          // 길에 안 붙은 집 — 둘레 빈칸부터(한 칸 값)
+  /* [MAC-WHERE] 칸 셈을 '그 자리로 데려가기'와 같은 것으로 맞췄다(보스 결정 09-21).
+     전에는 BFS 레벨을 그대로 칸 수로 썼는데, 실제로 놓아야 하는 빈 칸보다 **한 칸 많게** 나왔다 —
+     실측: "길 3칸만 이으면"이라 말한 판에서 **두 칸만 놓으니 까닭이 사라지고 일 먼 집이 6→2** 가 됐다.
+     이제 whereTrace 로 경로를 되짚어 **정말 놓아야 할 빈 칸**을 세므로, 말과 ✨로 짚는 칸이 같은 수다. */
+  const wp = jobsWpIndex();
+  let 시작 = roadsBeside(rec), 덤 = 0;
+  if (!시작.length) {                                                          // 길에 안 붙은 집 — 둘레 빈칸부터(한 칸 값)
+    const d = dims(rec.k, rec.rot), x0 = cX(rec.root), y0 = cY(rec.root); 시작 = [];
     for (let y = y0 - 1; y <= y0 + d.h; y++) for (let x = x0 - 1; x <= x0 + d.w; x++) {
-      if (!inb(x, y) || cells[idx(x, y)]) continue; const i = idx(x, y); if (cost.has(i) || canPlace('road', x, y, 0) !== true) continue; cost.set(i, 1); next.push(i); } }
-  for (let lv = b >= 0 ? 0 : 1; lv <= budget; lv++) {
-    while (now.length) { const i = now.pop(), x = cX(i), y = cY(i);
-      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
-        if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
-        if (c && wp.has(c.root)) return { 칸: lv, 일터: c.root };   /* [MAC-JOBWHY2] 자리가 찼어도 '길이 끊겼다'는 사실은 같다 */
-        if (cost.has(j)) continue;
-        if (c) { if (c.k === 'road') { cost.set(j, lv); now.push(j); } continue; }        // 이미 있는 길은 공짜로 지난다
-        if (lv + 1 > budget || canPlace('road', nx, ny, 0) !== true) continue; cost.set(j, lv + 1); next.push(j); } }
-    now = next; next = []; if (!now.length) break; }
-  return null; }
+      if (!inb(x, y) || cells[idx(x, y)]) continue; if (canPlace('road', x, y, 0) !== true) continue; 시작.push(idx(x, y)); }
+    덤 = 1;
+  }
+  const t = whereTrace(시작, c => wp.has(c.root), budget);   /* [MAC-JOBWHY2] 자리가 찼어도 '길이 끊겼다'는 사실은 같다 */
+  if (!t || !t.끝 && t.끝 !== 0) return null;
+  const 끝rec = cells[t.끝]; if (!끝rec) return null;
+  return { 칸: Math.max(1, t.자리.length + 덤), 일터: 끝rec.root }; }
 function jobWhyCalc(root) {
   const rec = cells[root]; if (!rec || rec.k !== 'house' || rec.root !== root) return null;
   const need = jobsAdultsOf(root); if (need <= 0) return null;
