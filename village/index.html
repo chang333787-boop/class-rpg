@@ -2953,6 +2953,12 @@ window.__workFirst = () => ({ 길필요: window.VRULES.workRoad.on && window.VRU
    아주 긴 길을 내게 된다 — 그래서 이을 빈칸이 cut 칸을 넘으면 'none'(가까이 하나 지어 봐요) 쪽으로 말한다.
    'far' 의 문턱은 새로 만든 값이 아니라 **배정이 실제로 쓰는 반경**이다 — 말과 실제가 어긋나지 않게(#716 에서 배운 것).
    ⚠ cut 칸수(6)는 **복구·실험용** 값이다. 판 파일(stages/*.json)이 바꿀 값이 아니다 — 늘리면 아이에게 긴 길을 내라고 말하게 된다.
+
+   덧(창조자의 눈 9회 · 보스 카드 B) — **'cut'·'far' 는 자리 여부를 안 본다.** 처음엔 '빈 자리가 있는 일터'에만 길이 닿는지를 쟀다.
+   그래서 **다 자란 마을**(일터가 다 찬 마을)에서 길이 끊기면 'cut' 이 아니라 'none'("일할 곳이 없어요")으로 말했다 —
+   정작 가게는 여덟 칸 옆에 그대로 서 있는데. 아이는 **길이 끊긴 줄 모른 채 일터를 더 짓는다**(9회 관찰).
+   이제 둘 다 **닿느냐만** 본다. 길을 이으면 그다음에 'full'("가까운 가게가 꽉 찼어요 — 일할 곳을 하나 더")로 말이 바뀐다 —
+   아이가 두 걸음으로 배운다: 먼저 길, 그다음 자리.
    원래 줄 수정 4 — 돌아섬 말(waitSayJob) · 칩 이름(jobsChipDraw) · 동네 말(jobsChipGo) · 집 카드 말(satText 의 busy 줄). */
 (window.VRULES = window.VRULES || {}).jobWhy = { on: true, cut: 6, wide: 3 };
 const JW = { memo: new Map(), gen: -1, stats: { none: 0, cut: 0, far: 0, full: 0, 잰집: 0, 캐시: 0 } };
@@ -2984,7 +2990,7 @@ function jobsCutCost(rec, budget) {
     while (now.length) { const i = now.pop(), x = cX(i), y = cY(i);
       for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
         if (!inb(nx, ny)) continue; const j = idx(nx, ny), c = cells[j];
-        if (c && wp.has(c.root)) { if ((wp.get(c.root) || 0) - (JOBH.used.get(c.root) || 0) > 0) return { 칸: lv, 일터: c.root }; continue; }
+        if (c && wp.has(c.root)) return { 칸: lv, 일터: c.root };   /* [MAC-JOBWHY2] 자리가 찼어도 '길이 끊겼다'는 사실은 같다 */
         if (cost.has(j)) continue;
         if (c) { if (c.k === 'road') { cost.set(j, lv); now.push(j); } continue; }        // 이미 있는 길은 공짜로 지난다
         if (lv + 1 > budget || canPlace('road', nx, ny, 0) !== true) continue; cost.set(j, lv + 1); next.push(j); } }
@@ -2999,7 +3005,7 @@ function jobWhyCalc(root) {
   const near = jobsNearFree(b, undefined);                                   // 배정과 같은 반경(PATH_RADIUS)
   if (near.size) { if (jwAnyFree(near)) return null; return { why: 'full' }; }  // 닿는데 자리가 있으면 곧 배정된다 — 말할 것 없음
   const wide = jobsNearFree(b, PATH_RADIUS * (R.wide || 3));                 // 길은 이어졌지만 배정 반경 밖
-  if (jwAnyFree(wide)) return { why: 'far' };
+  if (wide.size) return { why: 'far' };   /* [MAC-JOBWHY2] 자리 여부는 안 본다 — 아래 cut 과 같은 까닭 */
   const cut = jobsCutCost(rec, R.cut || 6);
   if (cut) return { why: 'cut', 칸: cut.칸 || 1, 일터: cut.일터 };
   return { why: 'none' }; }
