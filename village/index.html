@@ -2255,11 +2255,12 @@ function keepGlowUndo() { setTimeout(() => { const el = document.getElementById(
 function keepStash(rec) {
   if (rec.k !== 'house') return;
   const n = res.get(rec.root) || 0, h = hinfo.get(rec.root), lv = h ? h.lv : 1;
+  const hh = (h || {}).세대 | 0;                                            /* [MAC-HOUSEHOLD] 세대는 **지우기 전에** 읽는다 — 아래 delete 뒤에 읽으면 늘 0 이다(그래서 문마다 처방이 따로 필요해 보였다) */
   hinfo.delete(rec.root);                                                   // 전에는 안 지워져, 같은 자리에 새로 지은 집이 옛 층을 물려받았다
-  if (!window.VRULES.keep.on || (n === 0 && lv <= 1)) return;
+  if (!window.VRULES.keep.on || (n === 0 && lv <= 1 && hh <= 1)) return;    /* [MAC-HOUSEHOLD] 빈 아파트도 맡는다 — 식구가 없어도 아파트는 아파트다 */
   const t0 = performance.now(); if (t0 - (KEEP.lastPush || -1e9) < 30) { KEEP.stash.length = 0; KEEP.lastPush = t0; return; }   // 한꺼번에 여러 채(판 비우기·파일 가져오기)는 맡지 않는다
   KEEP.lastPush = t0;
-  KEEP.stash.push({ n, lv, 세대: (hinfo.get(rec.root) || {}).세대 | 0, until: performance.now() + window.VRULES.keep.stashMs });   /* [MAC-HOUSEHOLD] 세대도 함께 맡는다 — 옮겨도 아파트는 아파트다 */ if (KEEP.stash.length > 6) KEEP.stash.shift(); KEEP.stats.맡김++;
+  KEEP.stash.push({ n, lv, 세대: hh, until: performance.now() + window.VRULES.keep.stashMs });   /* [MAC-HOUSEHOLD] 세대도 함께 맡는다 — 치우기·되돌리기·🖐 옮기기·제자리로가 모두 이 한 곳을 지난다 */ if (KEEP.stash.length > 6) KEEP.stash.shift(); KEEP.stats.맡김++;
   if (!carrying && !VISIT.on) setTimeout(() => { if (KEEP.stash.length) toast('🧳 식구 ' + n + '명이 마을 어귀에서 1분 기다려요 — ↩ 되돌리거나 집을 다시 놓으면 돌아와요', true); }, 0);
 }
 /* placeAt 고리 — 집이 다시 놓이면 맡아 둔 식구·층이 돌아온다(되돌리기·옮기기·새로 짓기 모두) */
@@ -3855,7 +3856,7 @@ function act(clientX, clientY) {
     if (rec && K[rec.k].need) {                       // 필요 건물을 누르면 닿는 범위를 보여 준다
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
       const 흐름줄 = flowCardText(rec.root);   /* [MAC-FLOWLOOK] 흐름 글이 있으면 거기서 줄을 바꾼다 — 첫 줄은 물건 이야기, 둘째 줄은 본편 정보(창조자 14회 ⓑ7) */
-      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
+      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (ovInfo.세대 > ovInfo.집 ? ' (' + ovInfo.세대 + '세대)' : '')   /* [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
       whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
@@ -5555,8 +5556,8 @@ const ovRoad = new THREE.InstancedMesh(new THREE.PlaneGeometry(CS * .94, CS * .9
 const ovHome = new THREE.InstancedMesh(new THREE.PlaneGeometry(CS * 2.1, CS * 2.1), new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: .45, depthWrite: false }), 400);
 [ovRoad, ovHome].forEach(m => { m.count = 0; m.frustumCulled = false; m.renderOrder = 3; scene.add(m); });
 const ovDummy = new THREE.Object3D(); ovDummy.rotation.x = -Math.PI / 2;
-let ovKey = null, ovUntil = 0, ovInfo = { 길칸: 0, 집: 0 };
-function overlayClear() { ovRoad.count = 0; ovHome.count = 0; ovKey = null; ovInfo = { 길칸: 0, 집: 0 }; }
+let ovKey = null, ovUntil = 0, ovInfo = { 길칸: 0, 집: 0, 세대: 0 };
+function overlayClear() { ovRoad.count = 0; ovHome.count = 0; ovKey = null; ovInfo = { 길칸: 0, 집: 0, 세대: 0 }; }
 /* kind 를 (x,y,rot) 에 놓았다 치고 닿는 범위를 칠한다 */
 function overlayFor(kind, x, y, rot) {
   const key = kind + ':' + x + ':' + y + ':' + rot;
@@ -5564,7 +5565,7 @@ function overlayFor(kind, x, y, rot) {
   ovKey = key;
   const fake = { k: kind, root: idx(x, y), rot: rot || 0 };
   const b = roadBeside(fake);
-  let nR = 0, nH = 0;
+  let nR = 0, nH = 0, nHH = 0;
   if (b >= 0) {
     const { reach } = roadBFS(b, undefined, NEED_R_WIDE);
     const homes = new Set();
@@ -5579,10 +5580,10 @@ function overlayFor(kind, x, y, rot) {
       }
     }
     homes.forEach(root => { if (nH >= 400) return; const rec = cells[root]; const c = centerOf('house', cX(root), cY(root), rec.rot);
-      ovDummy.position.set(c.x, .14, c.z); ovDummy.updateMatrix(); ovHome.setMatrixAt(nH++, ovDummy.matrix); });
+      ovDummy.position.set(c.x, .14, c.z); ovDummy.updateMatrix(); ovHome.setMatrixAt(nH++, ovDummy.matrix); nHH += houseHold(root); });   /* [MAC-HOUSEHOLD] 채와 세대를 함께 센다 */
   }
   ovRoad.count = nR; ovHome.count = nH; ovRoad.instanceMatrix.needsUpdate = true; ovHome.instanceMatrix.needsUpdate = true;
-  ovInfo = { 길칸: nR, 집: nH };
+  ovInfo = { 길칸: nR, 집: nH, 세대: nHH };
 }
 function overlayTick(now) { if (ovUntil && performance.now() > ovUntil) { ovUntil = 0; overlayClear(); } }
 
@@ -6124,7 +6125,11 @@ window.__rainClear = () => ({ 켜짐: window.VRULES.rainClear.on, 비: EV.rain, 
 /* ══════════════════════════════════════════════════════════════
    목표(F14). 순서대로 셋씩. 이루면 알림 한 번. 저장한다.
    ══════════════════════════════════════════════════════════════ */
-const countKind = k => { let n = 0; cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === k) n++; }); return n; };
+/* [MAC-HOUSEHOLD] 아파트는 놓이는 순간 `house` 가 되므로 `countKind('apart')` 가 늘 0 이었다(목표가 영영 안 찼다).
+   세대가 붙은 카드 이름으로 물으면 **그 세대 수를 가진 집**을 센다 — 목표·한도·판 검사가 다 이 한 함수를 쓴다. */
+const countKind = k => { const hh = typeof homeKindOf === 'function' ? homeKindOf(k) : 0; let n = 0;
+  cells.forEach((rec, i) => { if (!rec || rec.root !== i) return;
+    if (hh ? (rec.k === 'house' && ((hinfo.get(i) || {}).세대 | 0) === hh) : rec.k === k) n++; }); return n; };
 const GOALS = [
   { id: 'road6',  t: '길을 6칸 잇기',       ok: () => countKind('road') >= 6 },
   { id: 'house3', t: '집 3채 짓기',         ok: () => countKind('house') >= 3 },
