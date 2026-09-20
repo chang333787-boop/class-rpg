@@ -16,7 +16,7 @@ const ROOT = path.resolve(HERE, '../..');
 const DAY = 1800;   // 틱 · 하루 3분 ÷ 100ms
 
 /* 낮을수록 좋은 지표 — 나머지는 높을수록 좋다 */
-const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:|까닭:)/.test(k);
+const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:|까닭:|못씀|못받은세대|못받은%)/.test(k);
 /* [MAC-JOBWHY] 집 카드가 일자리를 말하는 네 꼴 — 옛 index.html 은 첫 줄 하나뿐이라 그것도 그대로 잡힌다 */
 const JW_TXT = { none: '일할 곳이 없어요', cut: '길이 끊겨 일터에 못 가요', far: '일터가 멀어요', full: '가까운 일터가 꽉 찼어요' };
 const jobWhyOf = t => Object.keys(JW_TXT).find(k => t.includes(JW_TXT[k])) || null;
@@ -29,6 +29,10 @@ function measure(w) {
   const snap = w.__snapshot(), p = w.__pop(), j = w.__jobs();
   const m = { 인구: p.인구, 사는집: 0, 웃는집: 0, 찡그린집: 0, 붐빔집: 0, 일먼집: 0, '2층이상': p.층[1] + p.층[2], '3층': p.층[2], 찬자리: j.찬자리, 일자리: j.일자리, 목표: w.__goals().이룬것.length };
   try { m.돌아선집 = w.__away().돌아선집; } catch { m.돌아선집 = 0; }
+  /* [MAC-FLOW] 흐름 — 세대가 오늘 몫을 받았나. 흐름이 꺼진 판(대부분)은 0 이라 표에 줄만 생기고 값은 안 움직인다.
+     씀·못씀은 **쌓이는 수**(시작부터 지금까지 세대·일 수)이고, 못받은세대는 **마지막 하루**의 세대 수다 —
+     '상가를 하나 더 놓으면 줄어드나'는 마지막 하루 쪽으로 봐야 보인다(쌓이는 수는 내려가지 않는다). */
+  try { const fl = w.__flow(); if (fl && fl.켜짐) { m.씀 = fl.씀 | 0; m.못씀 = fl.못씀 | 0; m.못받은세대 = (fl.세대 && fl.세대.못받음) | 0; } } catch { /* 옛 index.html 에는 __flow 가 없다 */ }
   const need = {};
   snap.물건.forEach(t => {
     const mm = t.match(/^house@(\d+),(\d+)/); if (!mm) return;
@@ -44,6 +48,9 @@ function measure(w) {
   });
   ['none', 'cut', 'far', 'full'].forEach(k => { if (m['까닭:' + k] == null) m['까닭:' + k] = 0; });
   m['일닿음%'] = m.사는집 ? Math.round((1 - m.일먼집 / m.사는집) * 1000) / 10 : 100;
+  /* 세대 수가 달라지면 '못 받은 세대'의 머릿수만으로는 못 견준다 — 가게를 하나 더 놓으면 돌아서는 집이 줄어 **사는 집이 늘고**,
+     그러면 못 받은 세대도 같이 는다(실측). 비율로 봐야 '고쳤나'가 보인다. 흐름이 꺼진 판에서는 넣지 않는다. */
+  if (m.못받은세대 != null) m['못받은%'] = m.사는집 ? Math.round(m.못받은세대 / m.사는집 * 1000) / 10 : 0;
   if (typeof w.__stage === 'function') { const st = w.__stage(); if (st.id) { m.판목표 = st.목표.filter(g => g[1]).length; m.판목표수 = st.목표.length; } }
   return Object.assign(m, need);
 }
