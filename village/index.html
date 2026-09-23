@@ -9357,7 +9357,7 @@ function actFlowTick(f, i, now) {
      설계(#797 ③)에서 내가 댄 보증이다: 여섯이 사는 집이 넷을 쓴다는 것을 아이가 **수를 안 읽고 문에서 세어** 본다.
      세는 것은 프로그램이 한다 — `window.FLOW(집 root)` 가 'got' 인 날만, 하루에 세대 수만큼. 보통 집은 한 줄도 안 달라진다(지금처럼 가게에서 들고 나온다). */
   if (!f.flowHold && !f.flowTrip && !f.flowBuy && f.state === 'inside' && f.inside && f.inside.root === f.home && !isNightHour(h)) {
-    const hh = houseHold(f.home);
+    const hh = houseLived(f.home);   /* [MAC-LIVED] 받은 몫(사는 세대)만큼만 — 둘이 사는 아파트가 1몫 받고 장바구니 4개가 되지 않게. 사는 세대 1 이면 아래 갈래를 안 타고 보통 집처럼 가게에서 들고 나온다 */
     if (hh > 1 && flowActState(f.home) === 'got') {
       const day = simDay(); let c = FACT.집날.get(f.home);
       if (!c || c.day !== day) { c = { day, n: 0 }; FACT.집날.set(f.home, c); }
