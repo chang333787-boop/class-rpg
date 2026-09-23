@@ -8530,6 +8530,18 @@ window.__breath = () => { const now = SIM.t + SIM.acc; let good = 0, bad = 0, jo
   let faces = 0; folks.forEach(f => { if (f.faceShow >= 1 && f.faceShow <= 2 && now <= f.faceUntil) faces++; });
   return { 좋은: good, 불만: bad, 기쁨: joy, 표정불만: faces, 집: BREATH.home.size, 빠진집: [...BREATH.home.values()].filter(h => h.reason).length, ...whyStats }; };
 window.__why2 = () => { const c = {}; folks.forEach(f => { if (f.whyShow && SIM.t + SIM.acc <= f.whyUntil) c[f.whyShow] = (c[f.whyShow] || 0) + 1; }); return { 켜짐: window.VRULES.whyBubble.on, 지금뜬것: c, ...whyStats }; };
+/* ── [MAC-BUBBLEMIN] 머리 위 풍선은 기본 거리에서도 읽히게 — 화면 지름 최소 px (창조자 25회 ⓑ48 '흰 공' · 보스 09-23) ──
+   풍선 판은 월드 2.2 라 배율 14(1366×610)에서 화면 13~17px — 그 속 그림(🪣·🛒…)은 10px 남짓이라 '그림 없는 흰 공'이었다(+ 세 번에서야 읽힘).
+   · 풍선(얼굴 😊😐😟 · 이유 🪣🛒… · 💼 · ✨)의 화면 지름이 px(28)보다 작으면 **그만큼 키운다**(배율에 따라 매 그림마다 한 번 셈) — 가까이 가면 원래 크기 그대로.
+   · 키운 만큼 **위로 올려** 풍선 아래 끝이 원래 자리에 머문다(머리를 덮지 않게).
+   · 풍선을 놓는 곳(faceDummy)을 거치는 것만 — 건물 위 표시(sayDummy)는 그대로. 원래 줄 수정 0 — faceDummy.updateMatrix · drawFaces 감싸기. 분류 '보기'. */
+(window.VRULES = window.VRULES || {}).bubbleMin = { on: true, px: 28 };
+const BUBBLEMIN = { k: 1 };
+{ const upd0 = faceDummy.updateMatrix; faceDummy.updateMatrix = function () { const k = BUBBLEMIN.k; if (k === 1) return upd0.call(this);
+    const s = this.scale, sx = s.x, sy = s.y, y = this.position.y; s.x = sx * k; s.y = sy * k; this.position.y = y + (k - 1) * 1.1 * sy;
+    const r = upd0.call(this); s.x = sx; s.y = sy; this.position.y = y; return r; };
+  const df0 = drawFaces; drawFaces = function (now) { const R = window.VRULES.bubbleMin; BUBBLEMIN.k = R && R.on ? Math.max(1, R.px * worldPerPixel(zoomMul) / 2.2) : 1; return df0.apply(this, arguments); }; }
+window.__bubbleMin = () => ({ 켜짐: window.VRULES.bubbleMin.on, 최소px: window.VRULES.bubbleMin.px, 키움: +BUBBLEMIN.k.toFixed(2), 원래지름px: +(2.2 / worldPerPixel(zoomMul)).toFixed(1), 지금지름px: +(2.2 * BUBBLEMIN.k / worldPerPixel(zoomMul)).toFixed(1) });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-GREET] 새 이웃에게 인사 — 이사 온 다음 날 아침 한 번, 옆집 사람 하나가 새 집 앞에 멈춰 👋 (주민 연기 · 09-20 · 창조자의 눈 발견 3).
