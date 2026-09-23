@@ -1848,6 +1848,18 @@
       out('구경뒤_내화면값_그대로', [_dPanX, _dPanY, _dZoom, _dC].join(',') === mine);
     }
 
+    //  ㊳ 내 마당 사진(DECO-PHOTO-1 · 묶음 6) — 한 장이 나오고 화면 상태·저장본은 그대로(내려받기는 시험에서 안 누른다)
+    if (typeof decoPhoto === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const st0 = JSON.stringify([_dPanX, _dPanY, _dZoom, _dC, _dW, _dH, SEL_DECO, DECO_MODE]), sv0 = JSON.stringify(CUR.houseDecorations || []);
+      const pc = await decoPhoto({ canvas: true });
+      out('사진_한장', !!pc && pc.width >= 24 * 12 && pc.height > 14 * 12);
+      out('사진뒤_화면값_저장본_그대로', JSON.stringify([_dPanX, _dPanY, _dZoom, _dC, _dW, _dH, SEL_DECO, DECO_MODE]) === st0 && JSON.stringify(CUR.houseDecorations || []) === sv0);
+      toggleDecoScene(); await sleep(300);
+      out('사진_집안에선_안내', (await decoPhoto({ canvas: true })) === null && /마당에서 찍어요/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
+      toggleDecoScene(); await sleep(300);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
