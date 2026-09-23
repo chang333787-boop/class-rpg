@@ -7748,10 +7748,25 @@ function _decoBoardPx() {
 
 function _decoClampPan() {
   const b = _decoBoardPx();
-  const maxX = Math.max(0, b.w - _dW), maxY = Math.max(0, b.h - _dH);
-  _dPanX = Math.min(Math.max(0, _dPanX), maxX);
-  _dPanY = Math.min(Math.max(0, _dPanY), maxY);
+  //  [DECO-VIEW-FIT-1] 집 안에 방이 있으면 판 밖도 도면이다 → 반 화면까지 더 밀 수 있다(판 끝에 붙은 방을 가운데로 — 디자인 D10)
+  const extraX = (DECO_SCENE !== 'yard' && _inRooms(CUR).length) ? _dW / 2 : 0, extraY = extraX ? _dH / 2 : 0;
+  const maxX = Math.max(0, b.w - _dW) + extraX, maxY = Math.max(0, b.h - _dH) + extraY;
+  //  마당 판이 화면보다 작으면(전체 보기) 화면 안에서 움직일 수 있다(판이 화면 밖으로는 안 나간다) — 가운데 두기는 '전체'가 한다
+  const yd = DECO_SCENE === 'yard';
+  const minX = yd && b.w < _dW ? -(_dW - b.w) : -extraX, minY = yd && b.h < _dH ? -(_dH - b.h) : -extraY;
+  _dPanX = Math.min(Math.max(minX, _dPanX), maxX);
+  _dPanY = Math.min(Math.max(minY, _dPanY), maxY);
 }
+// [DECO-VIEW-FIT-1] 판 전체가 한 화면에 들어오는 배율 — '전체'는 폭만 맞춰 1366×610 에서 마당 아래(밭 포함)가 화면 밖이었다(디자인 D17)
+function _decoWholeZoom() {
+  if (!_dW || !_dH) return DECO_ZOOM_MIN;
+  const yard = DECO_SCENE === 'yard', cols = yard ? DY.cols : DI.cols, rows = yard ? DY.rows : DI.rows + 2;   // 집 안은 위 벽 띠 몫
+  const C0 = Math.floor(_dW / Math.min(cols, yard ? DY_BASE.cols : DI.cols));
+  //  칸 크기를 내림으로 정한 뒤 배율로 — _initDeco 가 칸을 반올림해 판이 화면보다 몇 px 넓어지지 않게
+  return Math.max(4, Math.floor(Math.min(_dW / cols, _dH / rows))) / C0;
+}
+//  두 손가락·－ 로 줄일 수 있는 끝 = 원래 끝(0.5)과 '판 전체' 중 작은 쪽(0.25 아래로는 안 간다)
+function _decoZoomMin() { return Math.max(0.25, Math.min(DECO_ZOOM_MIN, _decoWholeZoom())); }
 
 // 보이는 칸 범위 — 그리는 쪽에서 이 범위만 돈다
 function _decoVisible(rows, cols) {
@@ -7765,7 +7780,7 @@ function _decoVisible(rows, cols) {
 //  화면의 한 점(창 기준 px)을 고정한 채 줌을 바꾼다 — 핀치 중심·＋－ 단추 모두 이걸 쓴다
 function _decoSetZoom(z, fx, fy) {
   const prev = _dZoom;
-  const next = Math.min(DECO_ZOOM_MAX, Math.max(DECO_ZOOM_MIN, z));
+  const next = Math.min(DECO_ZOOM_MAX, Math.max(_decoZoomMin(), z));   // [DECO-VIEW-FIT-1]
   if (Math.abs(next - prev) < 0.001) return;
   const ax = (fx === undefined ? _dW / 2 : fx), ay = (fy === undefined ? _dH / 2 : fy);
   const boardX = (_dPanX + ax) / prev, boardY = (_dPanY + ay) / prev;   // 줌 1 기준 판 좌표
@@ -7811,7 +7826,18 @@ if (typeof document !== 'undefined') {
 // [DECO-PT-1] 폰(좁은 화면)에서 처음 열면 칸이 7px 라 꽃 하나를 못 누른다 → 칸 약 16px 로 집 앞에서 연다
 //  [DECO-PHONE-INDOOR-1] 집 안도 같다 — 폰 375 에서 50칸 방이 칸 7px 로 열려 가구 하나·나가기 문(7px)을 못 눌렀다.
 //  집 안은 왼쪽 위(벽·창문)부터 연다.
+// [DECO-VIEW-FIT-1] 처음 열 때 판이 화면 높이보다 짧으면(세로 화면 768×1024: 칸 15 · 아래가 빈 검은 띠) 높이에 맞춰 키우고 집이 보이게 민다(디자인 D13)
+function _decoFillStart() {
+  if (!_dC || DECO_SCENE !== 'yard' || _dW <= 600) return false;
+  const C0 = _dC / _dZoom;
+  if (DY.rows * _dC >= _dH) return false;
+  _decoSetZoom(Math.min(DECO_ZOOM_MAX, _dH / (DY.rows * C0)), 0, 0);
+  _dPanX = Math.max(0, (_houseCol0() + DH.cols + 2) * _dC - _dW); _dPanY = 0;
+  _decoClampPan(); _drawDeco();
+  return true;
+}
 function _decoPhoneStart() {
+  if (_decoFillStart()) return;   // [DECO-VIEW-FIT-1] 넓은 화면인데 판이 짧으면 높이 채우기
   if (!_dC || _dW > 600) return;
   const z = Math.min(DECO_ZOOM_MAX, 16 / Math.max(1, _dC / _dZoom));
   _decoSetZoom(z, 0, 0);
@@ -7826,12 +7852,14 @@ function decoZoomOut() { _decoSetZoom(_dZoom / DECO_ZOOM_STEP); }
 // 판 전체가 보이게 (마당이 넓어져 길을 잃었을 때)
 function decoZoomFit() {
   if (DECO_SCENE !== 'yard' && _inFitRooms()) return;   // [INDOOR-ROOMS-1] 집 안 '전체' = 방들 둘레
-  const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
-  const baseCols = Math.min(cols, DECO_SCENE === 'yard' ? DY_BASE.cols : DI.cols);
-  const z = Math.max(DECO_ZOOM_MIN, Math.min(DECO_ZOOM_MAX, baseCols / cols));
+  //  [DECO-VIEW-FIT-1] 폭·높이 둘 다 맞춘다 — 마당 80×44 가 밭까지 한 화면에(1366×610: 칸 17 → 9 · 아래 줄이 더는 화면 밖이 아니다)
+  const z = Math.max(_decoZoomMin(), Math.min(DECO_ZOOM_MAX, _decoWholeZoom()));
   _dPanX = 0; _dPanY = 0;
   _decoSetZoom(z, 0, 0);
-  if (Math.abs(_dZoom - z) < 0.001) { _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); }
+  //  판이 화면보다 작으면 가운데에(왼쪽·위에 붙고 나머지가 비던 것)
+  const b = _decoBoardPx();
+  _dPanX = b.w < _dW ? -(_dW - b.w) / 2 : 0; _dPanY = b.h < _dH ? -(_dH - b.h) / 2 : 0;
+  _decoClampPan(); _drawDeco();
 }
 
 function decoPanBy(dx, dy) {
@@ -9231,23 +9259,24 @@ function _drawYard() {
     // ── 경계선 ────────────────────────────────────────────
     _dCtx.strokeStyle='#3a2808'; _dCtx.lineWidth=2.5;
     _dCtx.beginPath(); _dCtx.moveTo(hx,0); _dCtx.lineTo(hx,hh); _dCtx.stroke();
-    _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(W,hh); _dCtx.stroke();
+    //  [DECO-VIEW-FIT-1] 집 둘레는 집 폭까지만(마당이 80칸으로 넓어진 뒤 집 오른쪽 잔디를 판 끝까지 가로지르던 줄 — 디자인 ⑯) + 오른쪽 변
+    _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(hx+hw,hh); _dCtx.lineTo(hx+hw,0); _dCtx.stroke();
   }
 
-  // 격자 (집 영역 제외)
+  // 격자 (집 영역 제외) — [DECO-VIEW-FIT-1] 판 크기까지(전엔 캔버스 크기 W·H 까지라 오른쪽·아래로 밀면 격자가 없었다 · 집 오른쪽 칸 위 3줄도)
+  const BW = DY.cols*C, BH = DY.rows*C;
   _dCtx.strokeStyle='rgba(255,255,255,.12)'; _dCtx.lineWidth=.5;
+  _dCtx.beginPath();
   for(let r=0;r<=DY.rows;r++){
-    _dCtx.beginPath();
-    if(r<=DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); }
-    else { _dCtx.moveTo(0,r*C); _dCtx.lineTo(W,r*C); }
-    _dCtx.stroke();
+    if(r<DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); _dCtx.moveTo(hx+hw,r*C); _dCtx.lineTo(BW,r*C); }
+    else { _dCtx.moveTo(0,r*C); _dCtx.lineTo(BW,r*C); }
   }
   for(let c=0;c<=DY.cols;c++){
-    const x=c*C; _dCtx.beginPath();
-    if(x>hx){ _dCtx.moveTo(x,hh); _dCtx.lineTo(x,H); }
-    else { _dCtx.moveTo(x,0); _dCtx.lineTo(x,H); }
-    _dCtx.stroke();
+    const x=c*C;
+    if(x>hx && x<hx+hw){ _dCtx.moveTo(x,hh); _dCtx.lineTo(x,BH); }
+    else { _dCtx.moveTo(x,0); _dCtx.lineTo(x,BH); }
   }
+  _dCtx.stroke();
 
   // 선택 하이라이트 (장식 모드 vs 바닥 모드)
   if(DECO_MODE==='floor'){
