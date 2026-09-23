@@ -10317,6 +10317,21 @@ window.__shopCap = () => { const 가게 = []; cells.forEach((rec, i) => { if (re
 { hookAdd('satText', function (next, args) { const [rec] = args;
     if (rec && rec.k === 'house' && !((res.get(rec.root) || 0) > 0)) { const why = moveInWhy(rec); return '빈집이에요 · ' + (why === true ? '곧 누가 걸어올 거예요' : why); }
     return next(args); }); }
+/* ── [MAC-FLOWSAY] 집 카드도 물건 층을 말한다 — '🛒 가게에 물건이 없어요' (보스 09-23 L5 · 창조자 수업 흐름 초안 #841) ──
+   farm 에서 가게가 비어 네 집 모두 `FLOW = 'missed'` 인데 집 카드는 '😊 다 있어요'였다 — satText 는 **거리만** 보고 흐름을 한 번도 안 읽었다.
+   까닭 층(설계 1-나) ① 멀어요 → ② (자리) → ③ **물건이 안 와요** 가운데 ③이 집 카드에 없었던 것이다(가게의 한계는 물건 — 결정 ①과 같은 방향).
+   · 사는 집이 마지막 장보기 때 **어느 가게에서도 몫을 못 받았으면**(flowHomeState 'missed') — '다 있어요' 자리에 '🛒 가게에 물건이 없어요'(얼굴 😊 → 😐),
+     다른 필요가 멀면 '…이 멀어요' 뒤에 붙인다. **맨 바깥 satText 고리**다(빈 집 카드 뒤) — 붐빔 권유 같은 다른 고리가 '다 있어요'를 보고 붙이는 말을 먼저 다 붙인 뒤에 바꾼다. **① '장 볼 곳이 멀어요'가 걸린 집에는 붙이지 않는다**(한 까닭 층).
+   · 판정(얼굴 셈 faceOfHome · 성장 · 돌아섬)은 한 줄도 안 바뀐다 — **말만**. 흐름이 꺼진 판은 한 줄도 안 돈다. 원래 줄 수정 0. */
+(window.VRULES = window.VRULES || {}).flowSay = { on: true };
+const FSAY = { stats: { 말함: 0 } };
+{ hookAdd('satText', function (next, args) { const [rec] = args; const t = next(args);
+    if (!window.VRULES.flowSay.on || !rec || rec.k !== 'house' || !flowOn() || !((res.get(rec.root) || 0) > 0) || flowHomeState(rec.root) !== 'missed') return t;
+    if (/장 볼 곳/.test(t) || /가게에 물건이 없어요/.test(t)) return t;                     // 층 ①이 먼저 · 두 번 붙이지 않는다
+    FSAY.stats.말함++; const say = '🛒 가게에 물건이 없어요';
+    if (/다 있어요/.test(t)) return t.replace('😊', '😐').replace('다 있어요', say);
+    return /이 멀어요/.test(t) ? t.replace('이 멀어요', '이 멀어요 · ' + say) : t + ' · ' + say; }); }
+window.__flowSay = () => ({ 켜짐: window.VRULES.flowSay.on, ...FSAY.stats });
 function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
   const def = STAGE.def; if (!def) return;
   if (def.흐름 && typeof def.흐름 === 'object' && window.VRULES.flow) {   /* [MAC-FLOW] 판이 흐름을 켠다(규칙 칸과 따로 — 판정이 아니라 '물건') */

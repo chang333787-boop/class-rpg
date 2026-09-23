@@ -1207,6 +1207,21 @@
       out('방_빈터누르면_안내', /방 밖은 빈 터/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent) && rs().a === '3,3,10,7,,');
       _inPk.tab = 'floor'; _inPk.floor = { name: 'carpet', color: 'pink' }; _inTap(6, 6);
       out('방_바닥도_그방만', rs().a === '3,3,10,7,carpet#pink,');
+      //  [DECO-RULE-R3] 가구는 방 벽을 가로지르지 않는다 — 놓기도, 새 방의 벽이 있는 가구를 가르는 것도
+      setDecoMode('deco');
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_i8').concat([{ id: 'd_i8', qty: 3 }]);
+      const sofas = () => _decoList(CUR).filter(p => p.id === 'd_i8').map(p => p.row + ',' + p.col).sort().join(' ');
+      SEL_DECO = 'd_i8'; _decoPlace('indoor', 6, 11);                   // 방 a(3~12칸)의 오른벽을 가로지름(11~13)
+      out('R3_벽가로지르면_안놓임', sofas() === '' && /벽에 걸려요/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
+      _decoPlace('indoor', 6, 9);                                           // 9~11 = 방 안
+      _decoPlace('indoor', 15, 20);                                         // 빈 터
+      out('R3_방안_빈터는_놓임', sofas() === '15,20 6,9');
+      SEL_DECO = null;
+      const cutWhy = _inRoomWhy(_inRooms(CUR), _inRoomFrom(13, 21, 18, 30));
+      out('R3_새방벽이_가구가르면_막힘', /소파.*가르게 돼요/.test(cutWhy));
+      out('R3_가르지않는_새방은_됨', _inRoomWhy(_inRooms(CUR), _inRoomFrom(13, 24, 18, 32)) === '');
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => !(p.sp === 3 && p.id === 'd_i8'));
+      setDecoMode('floor');
       //  벽걸이: 방 윗줄(3줄)에 걸리고 벽 띠(2줄)에 그려진다 · 방 밖 가운데 줄엔 안 걸린다
       setDecoMode('deco'); ifSyncModeBtn();
       CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_i4').concat([{ id: 'd_i4', qty: 3 }]);
