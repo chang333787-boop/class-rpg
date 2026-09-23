@@ -8230,12 +8230,60 @@ const nosnapMoves = f => f.state === 'walk' || f.state === 'idle' || f.state ===
       if (mv) L.set(f, [f.x, f.z, f.state]); else { L.delete(f); O.delete(f); } }
     return r; }; }
 /* 그리기 줄 앞뒤 — 어긋남을 그리는 동안에만 */
-function noSnapOn() { const H = NOSNAP.held; H.length = 0; if (!window.VRULES.noSnap.on) return;
+function noSnapOn() { const H = NOSNAP.held; H.length = 0; if (!window.VRULES.noSnap.on) { if (typeof spaceOn === 'function') spaceOn(H); return; }
   for (const f of folks) { const o = NOSNAP.off.get(f); if (!o || !nosnapMoves(f)) continue; H.push([f, f.x, f.z, f.px, f.pz]);
-    f.x += o[0]; f.z += o[1]; if (f.px != null) f.px += o[0]; if (f.pz != null) f.pz += o[1]; } }
-function noSnapOff() { for (const [f, x, z, px, pz] of NOSNAP.held) { f.x = x; f.z = z; f.px = px; f.pz = pz; } NOSNAP.held.length = 0; }
+    f.x += o[0]; f.z += o[1]; if (f.px != null) f.px += o[0]; if (f.pz != null) f.pz += o[1]; }
+  if (typeof spaceOn === 'function') spaceOn(H); }   /* [ACT-SPACE] 서 있는 사람의 간격도 같은 층에서 */
+function noSnapOff() { for (const [f, x, z, px, pz] of NOSNAP.held) { f.x = x; f.z = z; f.px = px; f.pz = pz; } NOSNAP.held.length = 0; if (typeof spaceOff === 'function') spaceOff(); }
 const nosnapAt = f => { const o = NOSNAP.off.get(f); return o && nosnapMoves(f) ? o : null; };   /* __folkPos 가 읽는다 */
 window.__noSnap = () => ({ 켜짐: window.VRULES.noSnap.on, ...NOSNAP.stats });
+/* ── [ACT-SPACE] 서 있는 사람의 간격 — 줄 세운 인형 · 포개진 사람 (창조자 25회 ⓑ53·ⓑ51 · 보스 09-23) ──
+   ⓑ53 town3 에서 가장 가까운 두 사람 거리가 표본 10/10 **정확히 4.00(한 칸)** — 서 있는 사람이 길 칸 **한가운데**에 서서 길을 따라 구슬 꿰듯 한 줄로 보였다.
+   ⓑ51 붐비는 판에선 거꾸로 포개졌다. 그려진 자리(비킴 passOx 포함)로 재 보니 남는 포갬은 전부 **같은 칸에 '서 있는' 둘**이었다(서 있는 사람 + 막혀 멈춘 걷는 사람) —
+      ACT-PASS 가 둘을 좌우로 벌리려 하는데, 막힌 사람의 '걷는 중' 표시가 틱마다 켜졌다 꺼져 걷는 사람 규칙 ↔ 서 있는 사람 규칙을 오가며 제자리로 돌아왔다(도시+mid36 · 셈 26쌍 → 그림 7쌍).
+   고침(**그림만** · #864 의 그리기 층 noSnapOn/Off 안에서):
+   · 서 있는 사람(길 칸 · 곁 자리·처마·정원·축제 자리 아님)은 **길 가장자리 쪽으로 사람마다 다르게** 비켜 선다 — 길 방향을 이웃 길 칸으로 읽어 옆으로 side, 길 따라 ±along. (옆 1.3 까지 벌렸더니 집 쪽으로 선 사람이 지붕에 가려졌다 — 0.9 까지)
+     한 칸에 둘 이상 서 있으면 ACT-PASS 가 벌리므로 옆 비킴은 쉰다.
+   · 그려진 자리끼리 gap 보다 가까우면 **서로 밀어낸다**(서 있는 사람만 움직인다 · 걷는 사람과 겹치면 서 있는 사람이 다 비킨다).
+   · 가까이(face) 서 있는 둘은 **마주 본다**(몸 방향만 · 그리는 동안만).
+   · 모두 ease 로 스민다(걷기 시작하면 0 으로 돌아간다 — 튀지 않게). 셈·판정·저장 0 · 분류 '연기'.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).folkSpace = { on: true, side: [0.4, 0.9], along: 0.6, ease: 0.12, gap: 0.8, push: 0.6, keep: 0.97, sepMax: 1.6, face: 2.6 };
+const SPACE = { off: new WeakMap(), sep: new WeakMap(), id: new WeakMap(), n: 0, dirs: [], now: { 비켜섬: 0, 밀어냄: 0, 마주봄: 0 } };   /* sep = 밀려난 양(쌓이고 keep 배로 천천히 풀린다) — 그 프레임의 겹침만큼만 밀면 겹침이 조금 남은 채 멈춘다 */
+const spaceStand = f => f.state !== 'inside' && !f.walking && (f.state === 'idle' || f.state === 'walk') && !f.beside && !f.festSpot && !f.shelter && !f.garden && !f.arriving;
+const spaceRand = (f, k) => { let id = SPACE.id.get(f); if (id == null) { id = ++SPACE.n; SPACE.id.set(f, id); } return (((id * 2654435761 + k * 40503) >>> 0) % 10007) / 10007; };
+function spaceOn(held) {   /* 매개변수 이름을 H 로 두면 판 높이 H 를 가린다(칸 계산이 NaN 이 됐다) */
+  const R = window.VRULES.folkSpace, O = SPACE.off, now = SPACE.now; now.비켜섬 = now.밀어냄 = now.마주봄 = 0; SPACE.dirs.length = 0;
+  const on = R.on && !OFF.has('folks'), list = [];
+  for (const f of folks) { if (f.state === 'inside') { O.delete(f); continue; }
+    const st = on && spaceStand(f); let tx = 0, tz = 0;
+    if (st && !(f.passTx || f.passTz)) { const gx = Math.round(f.x / CS + (W - 1) / 2), gy = Math.round(f.z / CS + (H - 1) / 2);
+      if (inb(gx, gy) && isRoad(idx(gx, gy))) { const rx = (inb(gx - 1, gy) && isRoad(idx(gx - 1, gy))) || (inb(gx + 1, gy) && isRoad(idx(gx + 1, gy))),
+          rz = (inb(gx, gy - 1) && isRoad(idx(gx, gy - 1))) || (inb(gx, gy + 1) && isRoad(idx(gx, gy + 1)));
+        const [lx, lz] = rx && !rz ? [0, 1] : rz && !rx ? [1, 0] : [0.707, 0.707], s = (spaceRand(f, 1) < 0.5 ? -1 : 1) * (R.side[0] + (R.side[1] - R.side[0]) * spaceRand(f, 2)), a = (spaceRand(f, 3) - 0.5) * 2 * R.along;
+        tx = lx * s + lz * a; tz = lz * s - lx * a; now.비켜섬++; } }
+    list.push([f, tx, tz, st]); }
+  /* 그려질 자리(지금 층의 자리 + 비킴 + 지금 간격)끼리 — 가까우면 서 있는 사람이 밀려난다 */
+  if (on) for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) { const A = list[a], B = list[c]; if (!A[3] && !B[3]) continue;
+    const oa = O.get(A[0]) || [0, 0], ob = O.get(B[0]) || [0, 0], ax = A[0].x + (A[0].passOx || 0) + oa[0], az = A[0].z + (A[0].passOz || 0) + oa[1], bx = B[0].x + (B[0].passOx || 0) + ob[0], bz = B[0].z + (B[0].passOz || 0) + ob[1];
+    let dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz); if (d >= R.gap) continue;
+    if (d < 1e-3) { const t = spaceRand(A[0], 4) * 6.283; dx = Math.cos(t); dz = Math.sin(t); d = 1; } const need = R.gap - Math.hypot(ax - bx, az - bz), ux = dx / d, uz = dz / d;
+    const wa = A[3] && B[3] ? 0.5 : A[3] ? 1 : 0, wb = 1 - wa, S = SPACE.sep, sa = S.get(A[0]) || [0, 0], sb = S.get(B[0]) || [0, 0], k = need * R.push;
+    if (wa) { sa[0] += ux * k * wa; sa[1] += uz * k * wa; S.set(A[0], sa); } if (wb) { sb[0] -= ux * k * wb; sb[1] -= uz * k * wb; S.set(B[0], sb); } now.밀어냄++; }
+  for (const e of list) { const s = SPACE.sep.get(e[0]); if (!s) continue; if (!e[3]) { SPACE.sep.delete(e[0]); continue; }
+    s[0] *= R.keep; s[1] *= R.keep; const m = Math.hypot(s[0], s[1]); if (m > R.sepMax) { s[0] *= R.sepMax / m; s[1] *= R.sepMax / m; } e[1] += s[0]; e[2] += s[1]; }
+  for (const [f, tx, tz, st] of list) { const o = O.get(f) || [0, 0]; o[0] += (tx - o[0]) * R.ease; o[1] += (tz - o[1]) * R.ease;
+    if (!st && Math.abs(o[0]) + Math.abs(o[1]) < 0.01) { O.delete(f); continue; } O.set(f, o);
+    if (!held.some(h => h[0] === f)) held.push([f, f.x, f.z, f.px, f.pz]);
+    f.x += o[0]; f.z += o[1]; if (f.px != null) f.px += o[0]; if (f.pz != null) f.pz += o[1]; }
+  /* 가까이 서 있는 둘은 마주 본다 — 몸 방향만, 그리는 동안만 */
+  if (on) for (const [f, , , st] of list) { if (!st || f.state !== 'idle') continue; let best = null, bd = R.face;
+    for (const [g, , , sg] of list) { if (g === f || !sg) continue; const d = Math.hypot(g.x - f.x, g.z - f.z); if (d < bd) { bd = d; best = g; } }
+    if (best) { SPACE.dirs.push([f, f.dir]); f.dir = Math.atan2(best.x - f.x, best.z - f.z); now.마주봄++; } } }
+function spaceOff() { for (const [f, d] of SPACE.dirs) f.dir = d; SPACE.dirs.length = 0; }
+const spaceAt = f => SPACE.off.get(f) || null;   /* __folkPos 가 읽는다 */
+window.__folkSpace = () => ({ 켜짐: window.VRULES.folkSpace.on, 지금: { ...SPACE.now } });
+
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
     if (actJobWhyTick(f, i, now)) continue;   // [ACT-JOBWHY] 일자리가 없는 까닭을 생활 장면으로 · 첫 출근
@@ -11328,7 +11376,7 @@ const f30Solid = (rec, x, z) => { const t = K[rec.k]; if (!t || !Array.isArray(t
   return t.parts.some(pt => pt && Array.isArray(pt.p) && Array.isArray(pt.s) && pt.p[1] - pt.s[1] / 2 < 1.5 && pt.p[1] + pt.s[1] / 2 > 0.6
     && Math.abs(lx - pt.p[0]) < pt.s[0] / 2 && Math.abs(lz - pt.p[2]) < pt.s[2] / 2); };
 window.__folkPos = () => folks.map(f => { let id = F30.id.get(f); if (id == null) { id = ++F30.n; F30.id.set(f, id); }
-  const b = f.state === 'inside' && f.beside ? f.beside : null, vis = f.state !== 'inside' || !!b, so = !b && typeof nosnapAt === 'function' ? nosnapAt(f) : null, x = b ? b.x : f.x + (so ? so[0] : 0), z = b ? b.z : f.z + (so ? so[1] : 0);   /* [ACT-NOSNAP] 그려지는 자리 */
+  const b = f.state === 'inside' && f.beside ? f.beside : null, vis = f.state !== 'inside' || !!b, so = !b && typeof nosnapAt === 'function' ? nosnapAt(f) : null, sp = !b && typeof spaceAt === 'function' ? spaceAt(f) : null, x = b ? b.x : f.x + (so ? so[0] : 0) + (sp ? sp[0] : 0) + (f.passOx || 0), z = b ? b.z : f.z + (so ? so[1] : 0) + (sp ? sp[1] : 0) + (f.passOz || 0);   /* [ACT-NOSNAP] [ACT-SPACE] 그려지는 자리(비킴 포함) */
   const gx = Math.round(x / CS + (W - 1) / 2), gy = Math.round(z / CS + (H - 1) / 2), i = inb(gx, gy) ? idx(gx, gy) : -1, rec = i >= 0 ? cells[i] : null, road = i >= 0 && isRoad(i);
   return [id, +x.toFixed(2), +z.toFixed(2), vis ? 1 : 0, f.state, rec ? (road ? 'road' : rec.k) : '', rec && !road && f30Solid(rec, x, z) ? 1 : 0, b ? (b.mode || 'beside') : (f.carry ? 'carry' : '')]; });
 window.__folkStep = (sec) => { if (folksDirty) { syncFolks(); folksDirty = false; } for (let t = 0; t < (sec || 0.1); t += 0.1) simTick(); drawFolks(SIM.t); return window.__folkCheck(); };
