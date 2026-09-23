@@ -11087,6 +11087,7 @@ function loadSaved(rawOverride) {
       const hh = Array.isArray(v) && v[3] > 1 ? Math.min(99, v[3] | 0) : 0;   /* [MAC-HOUSEHOLD] 네 번째 칸 · 없으면 한 세대(옛 저장본) */
       hinfo.set(+r, hh > 1 ? { lv: 1, hs, 세대: hh } : { lv, hs }); res.set(+r, Math.min(houseCap(+r), n)); if (lv > 1 || hh > 1) dirtyChunks.add(chunkOfCell(+r)); } }
   if (d.flow) flowLoad(d.flow);   /* [MAC-FLOW] 저장된 흐름(밭·가게 양 · 운반 중 · 세대 오늘 몫) */
+  if (d.배움 && typeof learnRestore === 'function') learnRestore();   /* [MAC-LEARNSAVE] '배움' 필요가 켜진 마을은 열 때부터 켠다 */
   if (d.배정 && typeof seatLoad === 'function') seatLoad(d.배정);   /* [MAC-SEATSAVE] 누가 어느 일터·학교에 다니나 — 되살리고 곧바로 한 바퀴 */
   if (Array.isArray(d.unlocked)) d.unlocked.forEach(k => { if (K[k]) unlocked.add(k); });
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
@@ -11434,6 +11435,14 @@ window.__stuck = (sec) => { let worst = 0; folks.forEach(f => { if (f.state === 
 window.__overlay = (kind, x, y, rot) => { if (kind) overlayFor(kind, x, y, rot || 0); return { ...ovInfo, 키: ovKey }; };
 window.__sun = () => ({ 시: +simHour().toFixed(2), 방위: +sunDir.az.toFixed(3), 고도: +sunDir.el.toFixed(3), 밤: +NIGHT.value.toFixed(2), 해자리: [ +sun.position.x.toFixed(1), +sun.position.y.toFixed(1), +sun.position.z.toFixed(1) ] });
 window.__needs = () => ({ 필요: NEEDS.slice(), 배움: learnOn, 문턱: LEARN_POP });
+/* ── [MAC-LEARNSAVE] '배움' 필요가 켜진 것을 저장한다 (보스 09-23 · #891 이 본 빈틈) ──
+   '배움'은 인구 80 을 넘으면 켜지고 **한 번 켜지면 안 꺼진다** — 그런데 learnOn 이 저장되지 않아, 다시 열면 첫 needsTick(50틱 = 5초)까지 꺼져 있었다.
+   그동안 학교 '꽉 참'·'배울 곳이 멀어요'가 카드에 안 뜨고, 5초 뒤 '📚 마을이 커졌어요' 소식이 **열 때마다 다시** 떴다.
+   · 저장: 켜져 있으면 새 칸 `배움: 1`(없으면 칸을 안 적는다) · 열 때: 있으면 **조용히** 켠다(소식 없이 — 이미 들은 말이다).
+   · `SAVE_V` 2 그대로 · 옛 코드는 칸을 지나간다(지금처럼 5초 뒤 켜짐) · 옛 저장본(칸 없음)은 지금과 같다(인구로 다시 켜짐 — 다음 저장부터 칸).
+   원격 동기에는 안 넣는다(배정·흐름과 같이 따로). 원래 줄 수정 0 — serialize 감싸기 + loadSaved 한 줄. */
+function learnRestore() { if (learnOn) return; learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); }
+{ const s1 = serialize; serialize = function () { const d = s1.apply(this, arguments); if (learnOn) d.배움 = 1; return d; }; }
 window.__forceLearn = () => { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); return window.__needs(); };
 window.__sat = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; const st = computeSat(rec); return { 채움: st.n, 얼굴: ['😊','😐','😟'][faceOf(st.n)], 빠진것: NEEDS.filter(k => !st.met[k]), 말: satText(rec) }; };
 window.__faces = () => { const c = [0,0,0,0]; folks.forEach(f => { if (f.faceShow != null && f.faceShow >= 0 && SIM.t <= f.faceUntil) c[f.faceShow]++; }); return { '😊': c[0], '😐': c[1], '😟': c[2] }; };   // 이모지 키는 따옴표가 있어야 한다
