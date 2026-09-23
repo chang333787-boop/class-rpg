@@ -11913,6 +11913,22 @@ function loop() {
     document.title = 'READY ' + ms;
   }
 }
+/* ── [MAC-STARTFIT] 첫 배율은 판의 내용물 크기에 맞춘다 (창조자 25회 ⓑ49 '우표 마을' · 보스 09-23) ──
+   빈 판 넷(city·farm·sea·mountain)을 열면 카메라가 멀어, 집 넷과 시설을 지어도 마을이 화면 폭의 약 1/5 이었다(시작 배율은 늘 14).
+   · 놓인 물건의 발자국 네모(가로 w · 세로 h 칸)가 화면 폭의 frac(0.5)쯤 되게 배율을 고른다 — 45° 로 보면 그 네모의 화면 폭 ≈ (w+h)/2 × 한 칸 px.
+   · **다가가기만** 한다: 지금 시작 배율(14)보다 멀어지지 않고, 손으로 갈 수 있는 끝(20)을 넘지 않는다 — 큰 마을(pop88 · 원본)은 그대로 14.
+   · 물건이 없으면 그대로. 손으로 배율을 만진 뒤에는 끼어들지 않는다(resize 의 userZoomed 그대로). '판 전체 보기'에서 돌아올 때도 이 배율로.
+   분류 '보기'. 원래 줄 수정 0 — startZoom 감싸기. */
+(window.VRULES = window.VRULES || {}).startFit = { on: true, frac: 0.5, max: 20 };
+const STARTFIT = { stats: { 맞춤: 0, 그대로: 0 }, last: null };
+{ const sz0 = startZoom; startZoom = function () { const z0 = sz0.apply(this, arguments), R = window.VRULES.startFit; if (!R || !R.on) return z0;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
+    cells.forEach((rec, i) => { if (!rec) return; const x = cX(i), y = cY(i); n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; });
+    if (!n) { STARTFIT.stats.그대로++; return z0; }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, px1 = cellPixels(1), want = R.frac * innerWidth * 2 / ((w + h) * px1);
+    const z = Math.max(z0, Math.min(R.max || 20, want)); STARTFIT.last = { 칸: [w, h], 원래: +z0.toFixed(2), 맞춤: +z.toFixed(2) };
+    STARTFIT.stats[z > z0 + 1e-6 ? '맞춤' : '그대로']++; return z; }; }
+window.__startFit = () => ({ 켜짐: window.VRULES.startFit.on, 배율: +zoomMul.toFixed(2), 손으로: userZoomed, ...STARTFIT.last, ...STARTFIT.stats });
 /* 물건이 있는 곳으로 카메라를 보낸다 — 옛 16×16 저장본은 좌표 그대로(판 귀퉁이) 살아나므로 */
 (function centerOnItems() {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
