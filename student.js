@@ -8895,6 +8895,7 @@ function _animPoke(st, fromCol) {
   heart.className = 'deco-anim-heart';
   heart.textContent = '💗';
   if (over) heart.style.marginBottom = Math.round(over) + 'px';
+  heart.style.marginLeft = -Math.round((say.offsetWidth || 30) / 2 + 22) + 'px';   // [DECO-FRIEND-VIEW-1] 말풍선 왼쪽 밖(한 칸 동물에서 '왈!'을 덮었다)
   st.el.appendChild(heart);
   setTimeout(() => { if (heart.parentNode) heart.parentNode.removeChild(heart); }, 1200);
   //  기쁨 — 그 그림이 있으면 한 번(0.9초) · 없으면 폴짝
@@ -9032,6 +9033,8 @@ function _lifePetAnim(st) {
     const plus = document.createElement('div'), over = _animOverCells(st) * (st.C || 0);
     plus.className = 'deco-anim-plus'; plus.textContent = '+1 💗';
     if (over) plus.style.marginBottom = Math.round(over) + 'px';
+    const say = st.el.querySelector('.deco-anim-say');   // [DECO-FRIEND-VIEW-1] 말풍선 오른쪽 밖
+    plus.style.marginLeft = Math.round((say ? say.offsetWidth : 30) / 2 + 3) + 'px';
     st.el.appendChild(plus);
     setTimeout(() => { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1500);
   }
@@ -13219,12 +13222,67 @@ function requestPromotion() {
 // ── 친구 방문 전체화면 (읽기 전용) ─────────────────────
 let _ffFriend = null;
 let _ffScene  = 'yard';
+// [DECO-FRIEND-VIEW-1] 구경 판의 확대·이동은 구경만의 값(보스 채택 안 · 계획 C9) — 내 마당 값(_dPanX 등)과 섞이지 않는다. 저장 0 · 읽기 전용.
+let _ffView = { zoom: 1, panX: 0, panY: 0 }, _ffRaf = 0;
+function _ffViewReset() { _ffView = { zoom: 1, panX: 0, panY: 0 }; }
+function _ffRender() { if (_ffRaf) return; _ffRaf = requestAnimationFrame(() => { _ffRaf = 0; _renderFriendCanvas(); }); }
+//  (fx,fy) 화면 점을 고정한 채 배율을 바꾼다 — 1(처음 보던 크기) ~ 3배
+function _ffZoomAt(z, fx, fy) {
+  //  옛 칸 크기는 지금 배율로 셈한다(그린 값 v.C 는 한 틀 늦다 — 두 손가락 걸음이 그 사이 여러 번 오면 기준점이 밀렸다)
+  const v = _ffView, C0 = v.C0 || 1, oldC = Math.max(4, Math.round(C0 * v.zoom));
+  v.zoom = Math.min(3, Math.max(1, z));
+  const newC = Math.max(4, Math.round(C0 * v.zoom));
+  if (fx === undefined) { fx = (v.W || 0) / 2; fy = (v.H || 0) / 2; }
+  v.panX = (v.panX + fx) / oldC * newC - fx; v.panY = (v.panY + fy) / oldC * newC - fy;
+  _ffRender();
+}
+function ffZoom(k) { _ffZoomAt(_ffView.zoom * k); }
+function ffZoomReset() { _ffViewReset(); _ffRender(); }
+//  누르면 — 그 칸의 동물이 반응(말풍선 · 💗 · 강아지는 한 칸 온다 — 화면에만)
+function _ffTap(x, y) {
+  const v = _ffView;
+  if (_ffScene !== 'yard' || !v.C) return;
+  const c = Math.floor((x + v.panX) / v.C), r = Math.floor((y + v.panY) / v.C);
+  //  내 마당과 같은 판정(#1021) — 그려진 몸 먼저 · 몸 밖이면 칸
+  const st = _animAtPt('ff-topview', x + v.panX, y + v.panY) || _animAt('ff-topview', r, c);
+  if (st) _animPoke(st, c);
+}
+function _ffAttach(cv) {
+  const pts = new Map(); let pinch = null, drag = null;
+  const local = e => { const k = cv.getBoundingClientRect(); return { x: e.clientX - k.left, y: e.clientY - k.top }; };
+  cv.addEventListener('pointerdown', e => {
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    pts.set(e.pointerId, local(e));
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), z0: _ffView.zoom }; drag = null; }
+    else if (pts.size === 1) { const p = local(e); drag = { x: p.x, y: p.y, px: _ffView.panX, py: _ffView.panY, moved: 0 }; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, local(e));
+    if (pinch && pts.size >= 2) { const [a, b] = [...pts.values()]; if (pinch.d0 > 8) _ffZoomAt(pinch.z0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0, (a.x + b.x) / 2, (a.y + b.y) / 2); }
+    else if (drag) { const p = local(e); drag.moved = Math.max(drag.moved, Math.abs(p.x - drag.x) + Math.abs(p.y - drag.y));
+      if (drag.moved > 6) { _ffView.panX = drag.px - (p.x - drag.x); _ffView.panY = drag.py - (p.y - drag.y); _ffRender(); } }
+  });
+  cv.addEventListener('pointerup', e => {
+    const tap = !!drag && drag.moved <= 6 && !pinch && pts.size === 1, p = local(e);
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (!pts.size) { drag = null; if (tap) _ffTap(p.x, p.y); }
+  });
+  cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); pinch = null; drag = null; });
+  cv.addEventListener('wheel', e => {   // 트랙패드 두 손가락 = 이동 · 모으기(ctrl) = 확대
+    e.preventDefault();
+    if (e.ctrlKey) { const p = local(e); _ffZoomAt(_ffView.zoom * Math.exp(-e.deltaY * .01), p.x, p.y); }
+    else { _ffView.panX += e.deltaX; _ffView.panY += e.deltaY; _ffRender(); }
+  }, { passive: false });
+}
 
 function openFriendFullscreen(friendId) {
   const friend = typeof friendId === 'string' ? DB.getStudent(friendId) : friendId;
   if (!friend) return;
   _ffFriend = friend;
   _ffScene  = 'yard';
+  _ffViewReset();   // [DECO-FRIEND-VIEW-1]
   const fs = document.getElementById('friend-fullscreen');
   fs.style.display = 'flex';
   document.getElementById('ff-title').textContent = friend.avatar + ' ' + friend.name + '의 집';
@@ -13254,6 +13312,7 @@ function toggleFriendScene() {
   const isYard = _ffScene === 'yard';
   document.getElementById('ff-scene-btn').textContent = isYard ? '🏠 집 안 보기 →' : '🌿 마당 보기 ←';
   document.getElementById('ff-topview').innerHTML = '';
+  _ffViewReset();   // [DECO-FRIEND-VIEW-1]
   requestAnimationFrame(() => _renderFriendCanvas());
 }
 
@@ -13272,8 +13331,8 @@ function _renderFriendCanvas() {
   const prevC     = _dC;
   const prevIfMode = _ifMode;
   const prevCont  = _ifActiveContainer;
-  //  [DECO-FRIEND-PAN-1] 구경 판은 옮기지 않은 채 한 장으로 그린다 — 내 마당에서 옮겨 본 값(_dPanX/Y)이 새면
-  //  보이는 칸 고르기(_decoVisible)가 친구 마당 왼쪽·위를 안 그리고(까맣게 빔), 동물 층도 그만큼 밀려 사라졌다.
+  //  [DECO-FRIEND-PAN-1] 내 마당에서 옮겨 본 값(_dPanX/Y)이 새면 보이는 칸 고르기(_decoVisible)가 친구 마당 왼쪽·위를 안 그리고(까맣게 빔),
+  //  동물 층도 그만큼 밀려 사라졌다 → [DECO-FRIEND-VIEW-1] 이제 구경만의 값(_ffView)으로 그린다(아래에서 C 를 정한 뒤)
   const prevPanX = _dPanX, prevPanY = _dPanY, prevZoom = _dZoom;
   _dPanX = 0; _dPanY = 0; _dZoom = 1;
 
@@ -13284,10 +13343,15 @@ function _renderFriendCanvas() {
   DECO_SCENE = _ffScene;
   _ifMode    = true;
 
-  el.innerHTML = '';
-  const cv = document.createElement('canvas');
-  cv.style.cssText = 'display:block;cursor:default;touch-action:none';
-  el.appendChild(cv);
+  //  [DECO-FRIEND-VIEW-1] 캔버스는 다시 쓴다(끌기·확대 중에 매번 새로 만들지 않게) — 장면을 바꾸면 toggleFriendScene 이 비운다
+  let cv = el.querySelector('canvas');
+  if (!cv) {
+    el.innerHTML = '';
+    cv = document.createElement('canvas');
+    cv.style.cssText = 'display:block;cursor:grab;touch-action:none';
+    el.appendChild(cv);
+    _ffAttach(cv);
+  }
 
   const topH = 50;
   const W    = window.innerWidth;
@@ -13295,6 +13359,8 @@ function _renderFriendCanvas() {
   const cols = _ffScene === 'yard' ? DY.cols : DI.cols;
   const rows = _ffScene === 'yard' ? DY.rows : DI.rows;
   let C    = Math.floor(W / cols);
+  const _ffC0 = C;
+  C = Math.max(4, Math.round(_ffC0 * _ffView.zoom));   // [DECO-FRIEND-VIEW-1]
   let H    = Math.min(C * rows, maxH);
   //  [INDOOR-ROOMS-1] 친구 집 안에 방이 있으면 방 둘레에 맞춰 한 장(아래쪽 방이 안 잘리게)
   let fpx = 0, fpy = 0;
@@ -13304,22 +13370,33 @@ function _renderFriendCanvas() {
     fRooms.forEach(rm => { r0 = Math.min(r0, rm.r - 1); c0 = Math.min(c0, rm.c); r1 = Math.max(r1, rm.r + rm.h); c1 = Math.max(c1, rm.c + rm.w); });
     const bw = c1 - c0 + 1, bh = r1 - r0 + 1;
     C = Math.max(4, Math.min(Math.floor(W / bw), Math.floor(maxH / bh)));
+    _ffView.C0 = C; C = Math.max(4, Math.round(C * _ffView.zoom));   // [DECO-FRIEND-VIEW-1]
     H = Math.max(120, Math.min(maxH, bh * C));
     const offX = Math.max(0, Math.floor((W - cols * C) / 2)), offY = Math.max(Math.floor(C * .9), Math.floor((H - rows * C) / 2));
     fpx = offX + c0 * C - Math.max(0, (W - bw * C) / 2); fpy = offY + r0 * C - Math.max(0, (H - bh * C) / 2);
   }
 
+  //  [DECO-FRIEND-VIEW-1] 구경만의 이동 — 판 밖으로는 안 나간다(판이 화면보다 작으면 0)
+  if (!fRooms.length) _ffView.C0 = _ffC0;
+  //  마당 = 판 크기 · 집 안 = 처음 보던 한 장(방 둘레)을 배율만큼 키운 크기
+  const contentW = _ffScene === 'yard' ? cols * C : Math.round(W * _ffView.zoom), contentH = _ffScene === 'yard' ? rows * C : Math.round(H * _ffView.zoom);
+  const maxPX = Math.max(0, contentW - W), maxPY = Math.max(0, contentH - H);
+  _ffView.panX = Math.min(Math.max(0, _ffView.panX), maxPX); _ffView.panY = Math.min(Math.max(0, _ffView.panY), maxPY);
+  _ffView.C = C; _ffView.W = W; _ffView.H = H;
+  _dPanX = _ffView.panX; _dPanY = _ffView.panY; _dZoom = _ffView.zoom;
+
   _dCv  = cv; _dW = W; _dH = H; _dC = C;
-  cv.width  = W * 2; cv.height = H * 2;
+  if (cv.width !== W * 2) cv.width = W * 2;
+  if (cv.height !== H * 2) cv.height = H * 2;
   cv.style.width  = W + 'px'; cv.style.height = H + 'px';
   _dCtx = cv.getContext('2d');
-  _dCtx.scale(2, 2);
+  _dCtx.setTransform(2, 0, 0, 2, 0, 0);
   _dCtx.clearRect(0, 0, W, H);
-  if (fpx || fpy) _dCtx.translate(-fpx, -fpy);   // [INDOOR-ROOMS-1]
+  _dCtx.setTransform(2, 0, 0, 2, -(fpx + _ffView.panX) * 2, -(fpy + _ffView.panY) * 2);   // [INDOOR-ROOMS-1] 방 둘레 + [DECO-FRIEND-VIEW-1] 구경 이동
   if (_ffScene === 'yard') _drawYard();
   else _drawIndoor();
-  // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다
-  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, 0, 0);
+  // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다 — [DECO-FRIEND-VIEW-1] 구경 이동만큼 같이
+  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _ffView.panX, _ffView.panY);
 
   // 복원
   _dPanX = prevPanX; _dPanY = prevPanY; _dZoom = prevZoom;   // [DECO-FRIEND-PAN-1]
