@@ -1763,6 +1763,17 @@
       SEL_DECO = null; CUR.houseDecorations = keep.hd; CUR.yardFloor = keep.yf; CUR.yardFloors = keep.yfs; _decoUndoClear(); _drawDeco(); await sleep(100);
     }
 
+    //  ㉞ 밭 그림(DECO-FARM-ART-1 · 디자인 D12 · #453) — 흙 타일 두 장 · 단계 그림
+    if (typeof _farmImg === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(1); await sleep(100);
+      ['tile_soil_a', 'tile_soil_b', 'stage_sprout', 'stage_grow', 'stage_wither'].forEach(_farmImg);
+      for (let i = 0; i < 20 && !(_farmImg('tile_soil_a') && _farmImg('stage_wither')); i++) await sleep(100);
+      out('밭그림_불러옴', ['tile_soil_a', 'tile_soil_b', 'stage_sprout', 'stage_grow', 'stage_wither'].every(n => !!_farmImg(n)));
+      _drawDeco(); await sleep(60);
+      out('밭그림_밭자리그대로', !!(_dCv._farmZone && _dCv._farmZone.cols > 0));
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
