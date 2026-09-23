@@ -8229,6 +8229,35 @@ function actPathAfter(f, i) {
 }
 window.__pathKeep = () => ({ 켜짐: window.VRULES.pathKeep.on, ...pathKeepStats });
 
+/* ── [ACT-NOSNAP] 한 틱에 튀는 사람을 그림에서 녹인다 (첫 30초 탐지기 #845 · 보스 09-23 '찾아서 고치기') ──
+   탐지기가 '걷다가 한 틱에 2.7~3.8 튐'을 잡았다(pop88 · 시드마다 0~1명 · pop167 저녁 정원 4.0). 원인은 한 부류 —
+   칸 a→b 를 걷다 **칸 중간에서 멈춰 섰다가**(idle · 길 = 떠나던 칸 하나) 몇 틱 뒤 a 에서 새 길을 받으면, 첫 걸음에 a 칸 가운데로 당겨진다.
+   정원도 같다(벤치에서 일어날 때 한 걸음 건너뜀 · 밤 8시에 문 안 칸으로 옮겨 놓음). 새 길을 주는 곳이 스무 군데가 넘는다.
+   처음엔 길(f.path)·진행도(f.seg)를 이어 붙였는데, 그러면 걸음 시간이 달라져 **이사 도착이 밀리고 판정 지표가 움직였다**(pop88 인구 −1).
+   그래서 **셈은 한 줄도 안 바꾸고 그림만** 고친다: 걷거나 서 있거나 정원을 걷는 사람이 한 틱에 jump 넘게 튀면, 그 어긋남(전에 그려진 자리 − 새 셈 자리)을
+   기억해 두고 틱마다 decay 배로(한 틱에 cap 넘게는 안) 녹인다. 그 어긋남은 **그리는 동안에만** 자리에 더했다가(noSnapOn) 곧바로 되돌린다(noSnapOff) — 셈·판정·저장 0.
+   시험 훅 __folkPos 도 그려지는 자리(어긋남 포함)를 준다. 곁 자리(일꾼·앉은 사람)는 제 자리에 그려지므로 뺀다. 분류 '연기'.
+   원래 줄 수정 0 — tickFolks 감싸기 + 그리기 줄 앞뒤 고리 두 줄.
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).noSnap = { on: true, jump: 1.0, max: 16, decay: 0.72, cap: 1.2 };   /* cap = 한 틱에 녹이는 최대(걸음 0.3 + 1.2 < 탐지기 문턱 2) */
+const NOSNAP = { last: new WeakMap(), off: new WeakMap(), held: [], stats: { 녹임: 0 } };   /* last = 지난 틱 끝의 [셈 x, 셈 z, 상태] · off = 지금 그림 어긋남 [x, z] */
+const nosnapMoves = f => f.state === 'walk' || f.state === 'idle' || f.state === 'garden';
+{ const tf = tickFolks; tickFolks = function (dt, now) {
+    const r = tf.apply(this, arguments), R = window.VRULES.noSnap, L = NOSNAP.last, O = NOSNAP.off;
+    for (const f of folks) { const o = O.get(f);
+      if (o) { const m = Math.hypot(o[0], o[1]), k = m > 0 ? Math.max(0, m - Math.min(m * (1 - R.decay), R.cap)) / m : 0; o[0] *= k; o[1] *= k; if (m * k < 0.03) O.delete(f); }
+      const e = L.get(f), mv = nosnapMoves(f);
+      if (R.on && e && mv && e[2] === f.state) { const d = Math.hypot(f.x - e[0], f.z - e[1]);
+        if (d >= R.jump && d <= R.max) { const q = O.get(f) || [0, 0]; q[0] += e[0] - f.x; q[1] += e[1] - f.z; O.set(f, q); NOSNAP.stats.녹임++; } }
+      if (mv) L.set(f, [f.x, f.z, f.state]); else { L.delete(f); O.delete(f); } }
+    return r; }; }
+/* 그리기 줄 앞뒤 — 어긋남을 그리는 동안에만 */
+function noSnapOn() { const H = NOSNAP.held; H.length = 0; if (!window.VRULES.noSnap.on) return;
+  for (const f of folks) { const o = NOSNAP.off.get(f); if (!o || !nosnapMoves(f)) continue; H.push([f, f.x, f.z, f.px, f.pz]);
+    f.x += o[0]; f.z += o[1]; if (f.px != null) f.px += o[0]; if (f.pz != null) f.pz += o[1]; } }
+function noSnapOff() { for (const [f, x, z, px, pz] of NOSNAP.held) { f.x = x; f.z = z; f.px = px; f.pz = pz; } NOSNAP.held.length = 0; }
+const nosnapAt = f => { const o = NOSNAP.off.get(f); return o && nosnapMoves(f) ? o : null; };   /* __folkPos 가 읽는다 */
+window.__noSnap = () => ({ 켜짐: window.VRULES.noSnap.on, ...NOSNAP.stats });
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
     if (actJobWhyTick(f, i, now)) continue;   // [ACT-JOBWHY] 일자리가 없는 까닭을 생활 장면으로 · 첫 출근
@@ -11298,16 +11327,20 @@ window.__folkOverlap = () => {
            잡은칸: claimed.size, 기다리는중: folks.filter(f => f.blockedAt).length };
 };
 /* [ACT-FIRST30] 시험 훅(읽기만) — 첫 30초 연기의 어설픔을 재는 scripts/village-sim/first30.mjs 가 쓴다.
-   사람마다 [이름표, x, z, 보이나, 상태, 선 칸의 종류, 키 큰 것 위인가, 곁 모드]. 자리는 **시뮬 좌표**이고, 건물 안에서 문 밖에 그려지는 사람(곁·일꾼)은 그 곁 자리로 바꿔 준다.
-   이름표는 사람 객체마다 처음 본 때 붙인다(folks 배열 차례는 이사로 바뀔 수 있다). '키 큰 것' = 판 조각 윗면이 1.5 넘는 종류(집·나무·가게 …). 판정·저장 0. */
+   사람마다 [이름표, x, z, 보이나, 상태, 선 칸의 종류, 몸이 부위 안인가, 곁 모드]. 자리는 **시뮬 좌표**이고, 건물 안에서 문 밖에 그려지는 사람(곁·일꾼)은 그 곁 자리로 바꿔 준다.
+   이름표는 사람 객체마다 처음 본 때 붙인다(folks 배열 차례는 이사로 바뀔 수 있다). 판정·저장 0.
+   '몸이 부위 안' = 그 칸 물건의 부위 가운데 **몸 높이(바닥 0.6~1.5)에 걸친 상자** 안에 사람 발 자리가 들었나(칸의 방향대로 돌려서).
+   전에는 '칸 전체가 키 큰 것'으로 쳐서, 2×2 집 칸 안이지만 **벽 밖 1.2 인 문 앞**(doorFront · 벽 z=2.2, 문 앞 3.4)에 선 새 이웃을 '집 안'으로 잘못 셌다(09-23 · pop88 house:idle 12). */
 const F30 = { id: new WeakMap(), n: 0, tall: new Map() };
-const f30Tall = k => { if (F30.tall.has(k)) return F30.tall.get(k); const t = K[k]; let top = 0;
-  (Array.isArray(t && t.parts) ? t.parts : []).forEach(pt => { if (pt && Array.isArray(pt.p) && Array.isArray(pt.s)) top = Math.max(top, pt.p[1] + pt.s[1] / 2); });
-  F30.tall.set(k, top > 1.5); return top > 1.5; };
+const f30Solid = (rec, x, z) => { const t = K[rec.k]; if (!t || !Array.isArray(t.parts)) return false;
+  const c = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot), th = (rec.rot || 0) * Math.PI / 2, co = Math.cos(th), si = Math.sin(th);
+  const dx = x - c.x, dz = z - c.z, lx = dx * co - dz * si, lz = dx * si + dz * co;   /* 칸의 방향을 풀어 부위의 제자리로(doorFront 와 같은 돌림) */
+  return t.parts.some(pt => pt && Array.isArray(pt.p) && Array.isArray(pt.s) && pt.p[1] - pt.s[1] / 2 < 1.5 && pt.p[1] + pt.s[1] / 2 > 0.6
+    && Math.abs(lx - pt.p[0]) < pt.s[0] / 2 && Math.abs(lz - pt.p[2]) < pt.s[2] / 2); };
 window.__folkPos = () => folks.map(f => { let id = F30.id.get(f); if (id == null) { id = ++F30.n; F30.id.set(f, id); }
-  const b = f.state === 'inside' && f.beside ? f.beside : null, vis = f.state !== 'inside' || !!b, x = b ? b.x : f.x, z = b ? b.z : f.z;
+  const b = f.state === 'inside' && f.beside ? f.beside : null, vis = f.state !== 'inside' || !!b, so = !b && typeof nosnapAt === 'function' ? nosnapAt(f) : null, x = b ? b.x : f.x + (so ? so[0] : 0), z = b ? b.z : f.z + (so ? so[1] : 0);   /* [ACT-NOSNAP] 그려지는 자리 */
   const gx = Math.round(x / CS + (W - 1) / 2), gy = Math.round(z / CS + (H - 1) / 2), i = inb(gx, gy) ? idx(gx, gy) : -1, rec = i >= 0 ? cells[i] : null, road = i >= 0 && isRoad(i);
-  return [id, +x.toFixed(2), +z.toFixed(2), vis ? 1 : 0, f.state, rec ? (road ? 'road' : rec.k) : '', rec && !road && f30Tall(rec.k) ? 1 : 0, b ? (b.mode || 'beside') : (f.carry ? 'carry' : '')]; });
+  return [id, +x.toFixed(2), +z.toFixed(2), vis ? 1 : 0, f.state, rec ? (road ? 'road' : rec.k) : '', rec && !road && f30Solid(rec, x, z) ? 1 : 0, b ? (b.mode || 'beside') : (f.carry ? 'carry' : '')]; });
 window.__folkStep = (sec) => { if (folksDirty) { syncFolks(); folksDirty = false; } for (let t = 0; t < (sec || 0.1); t += 0.1) simTick(); drawFolks(SIM.t); return window.__folkCheck(); };
 /* 시간을 앞으로만 흘린다. 호출할 때마다 performance.now() 로 되돌리면
    앞선 호출에서 미래로 잡아둔 '쉬는 시간'이 영영 안 지나간다(실제로 그렇게 헤맸다). */
@@ -11867,6 +11900,7 @@ function loop() {
   keepArmDraw();   // [MAC-KEEP-2] 치우기 확인의 빨간 테두리
   sayDraw();   // [MAC-SAY]
   nouseDraw(now);   // [MAC-NOUSE] 아무도 못 쓰는 시설 위에 🚫 (그런 목표를 둔 판에서만)
+  noSnapOn();   // [ACT-NOSNAP] 한 틱에 튄 사람의 어긋남을 그리는 동안만 더한다
   drawFolks(SIM.t + SIM.acc); drawFaces(SIM.t + SIM.acc); drawUmbrellas(); rainTick(real);
   actPlazaDraw();   // [ACT-PLAZA] 광장 가장자리에서 구경하는 사람
   actBesideDraw(SIM.t + SIM.acc);   // [ACT-BESIDE] drawFolks 가 숨긴 '곁에 있는 사람'을 같은 묶음에 다시 그린다 + 물동이
@@ -11884,6 +11918,7 @@ function loop() {
   actNightCartDraw();   // [ACT-NIGHTCART] 끌려가는 수레
   flowCartDraw();   // [MAC-FLOWCART] 짐 싣고 가는 수레
   actFireflyDraw(performance.now());   // [ACT-FIREFLY] 밤, 꽃밭·연못 곁에 반딧불 서너 마리
+  noSnapOff();   // [ACT-NOSNAP] 셈 자리로 되돌린다
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
   followTick(); placeCamera();

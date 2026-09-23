@@ -1259,6 +1259,50 @@
       _inPk.tab = 'wall'; _inPk.tool = ''; setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear();
       toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
     }
+    //  ㉒ 바닥을 칠할 때도 놓을 때의 규칙(DECO-RULE-R1R2) — 공간 3 마당에서
+    if (typeof _floorPaintBlock === 'function') {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      if (CUR.yardFloors) delete CUR.yardFloors[3];
+      CUR.inventory = (CUR.inventory || []).filter(i => !/^d_y(9|55|56|29)$/.test(i.id)).concat(['d_y9', 'd_y55', 'd_y56', 'd_y29'].map(id => ({ id, qty: 3 })));
+      setDecoMode('deco'); _decoUndoClear(); decoZoomFit(); await sleep(100);
+      SEL_DECO = 'd_y9'; _decoPlace('yard', 10, 10);                      // 작은 나무 2×2 → 10~11줄 · 10~11칸
+      SEL_DECO = 'd_y55'; _decoPlace('yard', 14, 14);                     // 닭(땅)
+      SEL_DECO = 'd_y56'; _decoPlace('yard', 14, 20);                     // 오리(물도 됨)
+      SEL_DECO = 'd_y29'; _decoPlace('yard', 16, 20);                     // 갈대(물가 것)
+      SEL_DECO = null; setDecoMode('floor'); const fl = () => _yardFloorGet(CUR); const u0 = _decoUndo.length;
+      const last = () => [...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent;
+      CUR_FLOOR_TILE = 'water';
+      _paintFloor(10, 10);
+      out('R1_나무칸_물로안칠함', !fl()['10_10'] && /작은 나무.*물로 못 칠해요/.test(last()) && _decoUndo.length === u0);
+      _paintFloor(14, 14);
+      out('R2_닭칸_물로안칠함', !fl()['14_14'] && /닭.*물로 못 칠해요/.test(last()));
+      CUR_FLOOR_TILE = 'stone'; _paintFloor(14, 14);
+      out('R2_닭칸_돌도안칠함', !fl()['14_14'] && /그 바닥으로 못 칠해요/.test(last()));
+      CUR_FLOOR_TILE = 'water'; _paintFloor(14, 20); _paintFloor(16, 20); _paintFloor(12, 10);
+      out('R1R2_오리·갈대·빈칸은_칠함', fl()['14_20'] === 'water' && fl()['16_20'] === 'water' && fl()['12_10'] === 'water');
+      //  끌어서 한 줄(10줄 7~13칸) — 나무 칸 둘만 건너뛰고, 알림은 끝에 한 번
+      const st = { start: { area: 'yard', r: 10, c: 7 }, last: { area: 'yard', r: 10, c: 7 }, active: false, stroke: [], mode: null };
+      _decoStrokeBegin(st); for (let c = 8; c <= 13; c++) _decoStrokeApply({ area: 'yard', r: 10, c }, st); _decoStrokeEnd(st);
+      const row = [7, 8, 9, 10, 11, 12, 13].map(c => fl()['10_' + c] === 'water' ? 1 : 0).join('');
+      out('R1_끌기_나무칸만건너뜀', row === '1110011' && /물로 못 칠해요/.test(last()));
+      decoUndo();
+      out('R1_끌기_↩한번에', [7, 8, 9, 12, 13].every(c => !fl()['10_' + c]));
+      //  네모(9~12줄 · 8~12칸) — 나무 칸 넷은 건너뛴다
+      const cv = document.querySelector('#if-topview canvas').getBoundingClientRect();
+      const at = (r, c) => ({ x: cv.left + (c + .5) * _dC - _dPanX, y: cv.top + (r + .5) * _dC - _dPanY });
+      const keepTool = DECO_FLOOR_TOOL; decoFloorTool('rect');
+      const rst = { start: { area: 'yard', r: 9, c: 8 }, active: false, stroke: [] }, q = at(12, 12);
+      _decoRectMove(rst, q.x, q.y); _decoRectCommit(rst);
+      out('R1_네모_나무칸만건너뜀', !fl()['10_10'] && !fl()['11_11'] && fl()['9_8'] === 'water' && fl()['12_12'] === 'water' && /물로 못 칠해요/.test(last()));
+      decoFloorTool(keepTool);
+      out('R1R2_장식은그대로', _decoList(CUR).filter(p => /^d_y(9|55|56|29)$/.test(p.id)).length === 4);
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      if (CUR.yardFloors) delete CUR.yardFloors[3];
+      CUR_FLOOR_TILE = 'grass'; setDecoMode('deco'); _decoUndoClear(); decoSpaceSet(1); await sleep(150);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';
