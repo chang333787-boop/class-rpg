@@ -3451,7 +3451,7 @@ window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '�
    · 끊긴 밭을 누르면 **몇 칸만 이으면 닿는지**(일자리 cut 과 같은 꼴 · 창조자 12회 ⓑ2).
    · 흐름이 꺼진 판(기본 마을)에서는 개수가 0 이라 **그리지 않는다** — draw call 도 안 는다.
    끄면(VRULES.flowLook.on = false) 아무것도 안 보인다(흐름 셈은 그대로 돈다). 원래 줄 수정 0. */
-(window.VRULES = window.VRULES || {}).flowLook = { on: true, every: 30, 높이: 5.2, 크기: 2.6 };
+(window.VRULES = window.VRULES || {}).flowLook = { on: true, every: 30, 높이: 5.2, 크기: 2.6, 수레: true };   /* 수레 = [MAC-FLOWCART] — false 면 옛 곧은 선 아이콘 */
 const FLOWLOOK_ICON = { 더미: '📦', 가득: '📦', 끊김: '⚠️', 있음: '🧺', 빈: '🫙', 짐: '🎒' };
 const flowIconMesh = (icon, 크기, cap) => { const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d'); g.font = '46px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
@@ -3485,11 +3485,60 @@ function flowLookDraw() {
     const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
     put(v.양 > 0 ? '있음' : '빈', c.x, c.z, R.높이); });
   /* 운반 중인 짐 — 밭과 가게 사이를 남은 시간만큼 (임시 표현: 곧은 선) */
-  FLOW.짐.forEach(j => { const a = cells[j.밭], b = cells[j.가게]; if (!a || !b) return;
+  if (!fcartOn()) FLOW.짐.forEach(j => { const a = cells[j.밭], b = cells[j.가게]; if (!a || !b) return;   /* [MAC-FLOWCART] 수레가 켜져 있으면 떠 가는 아이콘은 안 그린다 */
     const ca = centerOf(a.k, cX(j.밭), cY(j.밭), a.rot), cb = centerOf(b.k, cX(j.가게), cY(j.가게), b.rot);
     const 전체 = Math.max(1, j.처음 || j.남은 || 1), t = Math.max(0, Math.min(1, 1 - j.남은 / 전체));
     put('짐', ca.x + (cb.x - ca.x) * t, ca.z + (cb.z - ca.z) * t, R.높이 - 1.6); });
   Object.keys(FLOWMESH).forEach(k => { const im = FLOWMESH[k]; im.count = cnt[k] || 0; if (im.count) im.instanceMatrix.needsUpdate = true; }); }
+/* ── [MAC-FLOWCART] 운반 중인 짐은 **수레 하나**가 싣고 간다 (보스 ⓑ36 · 창조자 23회 #821) ──
+   전에는 밭과 가게 사이 **곧은 선** 위에 🎒 아이콘이 떠 갔다 — 멀리서는 빨간 공이 혼자 날아가는 것으로 보였다("곡식이 혼자 날아간다").
+   짐은 엔진 시계(남은 틱 / 처음 틱)로 가고 나르는 사람(ACT-FLOW)은 표본이다. 짐을 사람에게 붙이면 사람이 막힐 때 그림이 거짓말을 한다(#754).
+   그래서 **수레는 짐과 같은 시계로, 실제 길 칸을 따라** 간다 — 막히지 않고, 가게에 닿는 그 틱에 선반 수가 오른다(그 틱에 가게 모습도 다시 합친다).
+   모양은 이사 수레(CART_PARTS · 디자인)를 굽되 **등불 기둥은 뺀다**(밤 어귀 이사 수레와 헷갈리지 않게) · 물건마다 한 가지(천 덮은 짐).
+   🎒 아이콘 묶음 대신이라 draw call 은 그대로다. 끄면(VRULES.flowLook.수레 = false) 옛 곧은 선 아이콘. 판정·저장 0. 사람(ACT-FLOW)은 곁들임으로 남는다. */
+const FCART = { 길: new Map(), 방향: new WeakMap(), mesh: null, parts: null, stats: { 그림: 0, 닿는틱에다시합침: 0 } };
+const fcartOn = () => !!(window.VRULES.flowLook && window.VRULES.flowLook.on && window.VRULES.flowLook.수레 !== false) && flowOn() && !VISIT.on;
+/* 밭 문 앞 길에서 가게에 붙은 길 칸까지 — 길 칸만 밟는 너비 우선(흐름의 flowStoresFrom 과 같은 출발점) · 길·건물이 바뀐 세대에만 다시 */
+function fcartPath(j) {
+  const key = j.밭 + ':' + j.가게, m = FCART.길.get(key); if (m && m.gen === FLOW.gen) return m.path;
+  const a = cells[j.밭], path = [];
+  if (a && a.root === j.밭) { const prev = new Map(), q = roadsBeside(a).slice(); q.forEach(i => prev.set(i, -1)); let end = -1;
+    for (let h = 0; h < q.length && end < 0; h++) { const i = q[h], x = cX(i), y = cY(i);
+      for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (!inb(nx, ny)) continue; const n = idx(nx, ny), c = cells[n]; if (!c) continue;
+        if (c.root === j.가게) { end = i; break; }
+        if (!prev.has(n) && K[c.k] && K[c.k].road) { prev.set(n, i); q.push(n); } } }
+    for (let i = end; i >= 0; i = prev.get(i)) path.push(i); path.reverse(); }
+  FCART.길.set(key, { gen: FLOW.gen, path }); return path; }
+function fcartMesh() {
+  const all = cartParts(); if (FCART.mesh && FCART.parts === all) return FCART.mesh;
+  if (FCART.mesh) { scene.remove(FCART.mesh); FCART.mesh.geometry.dispose(); }
+  const parts = all.filter(pt => !pt.n && pt.p[1] + pt.s[1] / 2 <= 2.4);   /* 등불 기둥·팔·등불(높이 2.4 위)은 뺀다 */
+  const pos = [], nrm = [], col = [], ix = [];
+  parts.forEach(pt => { const base = BASE[pt.g]; if (!base) return; cartPartMatrix(pt, cartP); cartN.getNormalMatrix(cartP); cartC.setHex(pt.c); const off = pos.length / 3;
+    for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); pos.push(cartV.x, cartV.y, cartV.z);
+      cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); nrm.push(cartV.x, cartV.y, cartV.z); col.push(cartC.r, cartC.g, cartC.b); }
+    for (let t = 0; t < base.idx.length; t++) ix.push(base.idx[t] + off); });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(ix);
+  FCART.mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 8); FCART.mesh.count = 0; FCART.mesh.frustumCulled = false; FCART.mesh.castShadow = true; scene.add(FCART.mesh); FCART.parts = all;
+  return FCART.mesh; }
+/* 루프 고리 — 틱 사이도 부드럽게(SIM.acc) · 길 칸 가운데를 잇는 꺾은선 위 */
+function flowCartDraw() {
+  if (!fcartOn() || !FLOW.짐.length) { if (FCART.mesh) FCART.mesh.count = 0; FCART.stats.그림 = 0; return; }
+  const m = fcartMesh(), a = SIM.paused ? 0 : Math.min(1, SIM.acc / TICK_MS); let n = 0;
+  for (const j of FLOW.짐) { if (n >= 8) break; const path = fcartPath(j); if (!path.length) continue;
+    const 전체 = Math.max(1, j.처음 || j.남은 || 1), t = Math.max(0, Math.min(1, 1 - (j.남은 - a) / 전체));
+    const s = t * (path.length - 1), i0 = Math.floor(s), i1 = Math.min(path.length - 1, i0 + 1), u = s - i0;
+    const x0 = wx(cX(path[i0])), z0 = wz(cY(path[i0])), x1 = wx(cX(path[i1])), z1 = wz(cY(path[i1]));
+    const dir = i1 !== i0 ? Math.atan2(x1 - x0, z1 - z0) : (FCART.방향.get(j) || 0); FCART.방향.set(j, dir);
+    folkDummy.position.set(x0 + (x1 - x0) * u, 0.2, z0 + (z1 - z0) * u); folkDummy.rotation.set(0, dir, 0); folkDummy.scale.set(1, 1, 1); folkDummy.updateMatrix();
+    m.setMatrixAt(n++, folkDummy.matrix); }
+  m.count = n; if (n) m.instanceMatrix.needsUpdate = true; FCART.stats.그림 = n; }
+/* 닿는 틱에 가게 모습도 — 모습은 30틱마다 다시 합치므로(fsTick) 그대로 두면 수레가 닿고 3초 뒤에야 상자가 오른다 */
+{ const ft = flowTick; flowTick = function () { const n0 = FLOW.stats.닿음, r = ft.apply(this, arguments);
+    if (FLOW.stats.닿음 !== n0 && fcartOn() && fsOn()) { fsTick(); FCART.stats.닿는틱에다시합침++; } return r; }; }
+window.__flowCart = () => ({ 켜짐: fcartOn(), 짐: FLOW.짐.map(j => { const p = fcartPath(j), 전체 = Math.max(1, j.처음 || 1);
+    return { 밭: [cX(j.밭), cY(j.밭)], 가게: [cX(j.가게), cY(j.가게)], 길칸: p.length, 간것: +(1 - j.남은 / 전체).toFixed(2), 남은틱: j.남은 }; }), ...FCART.stats });
 /* 끊긴 밭이 몇 칸만 이으면 가게에 닿나 — 일자리 cut(jobsCutCost)과 같은 꼴(ⓑ2) */
 function flowCutCost(rec, budget) {
   const cost = new Map(); let now = [], next = [];
@@ -11610,6 +11659,7 @@ function loop() {
   actWellChatDraw(SIM.t + SIM.acc);   // [ACT-WELLCHAT] 아침 우물가에 모인 이웃 — 마주 보고 돌아가며 👋
   actLitterDraw(SIM.t + SIM.acc);   // [ACT-LITTER] 가게 앞 조각 · 🗑️? · 🗑️✓
   actNightCartDraw();   // [ACT-NIGHTCART] 끌려가는 수레
+  flowCartDraw();   // [MAC-FLOWCART] 짐 싣고 가는 수레
   actFireflyDraw(performance.now());   // [ACT-FIREFLY] 밤, 꽃밭·연못 곁에 반딧불 서너 마리
   updateViewMode(); flushChunks(); overlayTick(); miniTick();
   if (PHOTO.on) { gridLines.visible = false; ovRoad.count = 0; ovHome.count = 0; }
