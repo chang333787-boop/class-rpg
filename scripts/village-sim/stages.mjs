@@ -55,7 +55,6 @@ const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(
 const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
 const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
-조건부.flowGrow = def => !!(def.흐름 && def.흐름.on);   /* [MAC-FLOWGROW] 흐름이 켜진 판에서만 돈다 */
 
 const files = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && f !== 'rules.json').sort();
 for (const f of files) {
