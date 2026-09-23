@@ -2277,8 +2277,9 @@ const KEEP = { armed: null, stash: [], stats: { 막음: 0, 확인뒤치움: 0, �
 /* 순수 함수 — 이 물건의 무게. info = { kind, w, h, place, special, adv, keep, people, lv } */
 function keepLevel(info) {
   if (info.keep != null) return info.keep;
-  if (info.kind === 'house') return (info.people > 0 || info.lv > 1) ? 2 : 1;          // 빈 1층 집은 보통
-  if (info.special || info.adv || info.w * info.h >= 4) return 2;
+  if (window.VRULES.onePress && window.VRULES.onePress.oneRule) { if (info.kind === 'house') return info.people > 0 ? 2 : 1; if (info.special) return 2; }   /* [MAC-ONEPRESS] 한 줄 기준: 사람이 사는 집 · 한 채뿐인 시설만 묻는다 */
+  else { if (info.kind === 'house') return (info.people > 0 || info.lv > 1) ? 2 : 1;          // 빈 1층 집은 보통
+  if (info.special || info.adv || info.w * info.h >= 4) return 2; }
   if (info.place !== 'object' || info.w * info.h === 1) return 0;
   return 1;
 }
@@ -3961,6 +3962,23 @@ window.__growPause = (x, y) => { const R = { 켜짐: window.VRULES.growPause.on,
   const 진행 = h.hs >= 0 ? SIM.t - h.hs : Math.max(0, -1 - h.hs), 하루 = GROW_TICKS * TICK_MS;
   return { ...R, 층: h.lv, 자라는중: h.hs >= 0, 모인비율: +(진행 / 하루 * 100).toFixed(1), 시계값: h.hs }; };
 
+/* ── [MAC-ONEPRESS] 한 번 누름 = 말 하나 · 확인 규칙 한 줄 · 물건을 누르면 그 물건 (창조자 25회 ⓐ4 · ⓑ52 · ⓑ50 · 보스 09-23) ──
+   ⓐ4 빈 집을 치우기로 한 번 누르자 '집을 치웠어요'와 '여기엔 지울 게 없어요'가 같은 84ms 에 떴다(기본·sea·mountain).
+      재 보니 마우스(Playwright) · 터치 탭(hasTouch) · 앱 안 브라우저 클릭 셋 다 **이벤트 한 벌 · act 한 번 · 말 하나**였다 — 두 번 도는 길을 못 찾았다.
+      그래서 원인과 상관없이 **방금(0.5초 안) 치운 자리를 또 치우려 하면 말하지 않는다** — 치운 뒤 그 자리는 당연히 비어 있다.
+      막을 때마다 부른 곳(스택 첫 줄 셋)을 적어 둔다(`__onePress()`) — 다른 도구에서 다시 나면 원인이 남는다.
+   ⓑ52 무엇을 한 번 더 묻나 — **사람이 사는 집 · 한 채뿐인 시설(special)만.** 나머지(빈 집·놀이터·가게·큰 물건)는 바로 치우고 ↩ 가 5초 빛난다.
+      전에는 '빈 집은 바로, 빈 놀이터는 한 번 더'였다(2×2 이상·adv 도 물었다). 사람이 사는 집의 식구·층은 1분 맡아 둔다(MAC-KEEP 그대로).
+      ⚠ 끌어서 치우기(MAC-SWEEP)도 이 무게를 읽는다 — 놀이터·가게도 이제 끌어서 치워진다(사는 집·특별 시설은 여전히 건너뛴다).
+   ⓑ50 도구 없이 물건(등대·산장·전나무·바위 …)을 누르면 '놓을 물건을 먼저 고르세요'였다(빈 땅과 같은 말 → '안 눌렸다'로 읽혔다).
+      이제 그 물건의 이름과 할 수 있는 일 한 줄. 빈 땅만 예전 말. 원래 줄 수정 4 · 끼운 줄 1. */
+(window.VRULES = window.VRULES || {}).onePress = { on: true, againMs: 500, oneRule: true, thingCard: true };
+const ERASE1 = { at: -1e9, cells: new Set(), stats: { 막음: 0, 부른곳: [] } };
+function erase1Mark(k, x, y, rot) { ERASE1.at = performance.now(); ERASE1.cells = new Set(footprint(k, x, y, rot).map(([fx, fy]) => idx(fx, fy))); }
+function erase1Again(c) { const R = window.VRULES.onePress; if (!R.on || performance.now() - ERASE1.at > R.againMs || !ERASE1.cells.has(idx(c.x, c.y))) return false;
+  ERASE1.stats.막음++; const s = String(new Error().stack || '').split('\n').slice(2, 5).map(l => l.trim()).join(' ← '); ERASE1.stats.부른곳.push(s); if (ERASE1.stats.부른곳.length > 5) ERASE1.stats.부른곳.shift(); return true; }
+function thingSay(rec) { const k = K[rec.k] || {}; return (k.ic ? k.ic + ' ' : '') + (k.nm || rec.k) + ' — 🖐 로 옮기거나 🧽 로 치울 수 있어요 · 더 놓으려면 아래에서 카드를 골라요'; }
+window.__onePress = () => ({ ...window.VRULES.onePress, 막음: ERASE1.stats.막음, 부른곳: ERASE1.stats.부른곳.slice() });
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
@@ -3970,10 +3988,11 @@ function act(clientX, clientY) {
   if (eraser) {
     if (!c.inside) { toast('판 밖이에요'); return; }
     const rec = cells[idx(c.x, c.y)];
-    if (!rec) { toast('여기엔 지울 게 없어요'); return; }
+    if (!rec) { if (!erase1Again(c)) toast('여기엔 지울 게 없어요'); return; }   /* [MAC-ONEPRESS] 방금 치운 자리를 곧바로 또 — 말하지 않는다 */
     if (keepGuard(rec)) return;   // [MAC-KEEP] 무거운 것은 한 번 더 눌러야 치워진다
     const nm = K[rec.k].nm, rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root), rh = (hinfo.get(rec.root) || {}).세대 | 0;   /* [MAC-HOUSEHOLD] 세대는 치우기 **전에** 적는다 — removeAt 이 hinfo 를 지운다 */
     removeAt(c.x, c.y);
+    erase1Mark(rk, rx, ry, rr);   /* [MAC-ONEPRESS] 치운 자리와 때를 적는다 */
     pushUndo({ t:'remove', k:rk, x:rx, y:ry, rot:rr, 세대: rh });
     updateCount(); markDirty(); updateGhost(clientX, clientY);
     toast(josa(nm, '을', '를') + ' 치웠어요', true);
@@ -4014,7 +4033,7 @@ function act(clientX, clientY) {
       whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
-    toast('아래에서 놓을 물건을 먼저 고르세요'); return;
+    toast(rec && window.VRULES.onePress.thingCard ? thingSay(rec) : '아래에서 놓을 물건을 먼저 고르세요'); return;   /* [MAC-ONEPRESS] 물건을 누르면 그 물건의 이름 — 빈 땅만 '먼저 고르세요' */
   }
 
   const why = canPlace(sel, c.x, c.y, selRot);
