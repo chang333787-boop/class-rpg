@@ -8,6 +8,9 @@
   //  (⑬ 핀치 도중 캔버스가 바뀜 · ⑭ 비교 사이에 배율이 바뀜). 연 뒤에는 그 rAF 가 실제로 돌 때까지 기다린다.
   const rafSettle = (ms) => new Promise(r => { let fin = false; const go = () => { if (!fin) { fin = true; r(); } };
     requestAnimationFrame(() => requestAnimationFrame(go)); setTimeout(go, ms || 4000); });
+  //  [DECO-VIEW-FIT-1] 예전 '전체'(마당 0.625 · 집 안 1 · 왼쪽 위) — '전체'가 판 전체 맞춤으로 바뀐 뒤에도 옛 구역(그림 지문·칸 누르기)이
+  //   main 과 같은 배율로 재게. '전체' 자체를 재는 곳(㉖)만 decoZoomFit 을 부른다.
+  const fitOld = () => { const yd = DECO_SCENE === 'yard'; _decoSetZoom(yd ? Math.min(DY_BASE.cols, DY.cols) / DY.cols : 1, 0, 0); _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); };
   const t0 = Date.now();
   (async () => {
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
@@ -443,7 +446,7 @@
       const live = () => document.querySelector('#if-topview canvas');
       const at = (r, c) => { const k = live().getBoundingClientRect(); return { clientX: k.left + (c + .5) * _dC - _dPanX, clientY: k.top + (r + .5) * _dC - _dPanY }; };
       const mouse = (type, btn, p) => live().dispatchEvent(new PointerEvent(type, Object.assign({ pointerId: 31, pointerType: 'mouse', button: btn, buttons: type === 'pointerup' ? 0 : (btn === 2 ? 2 : 1), bubbles: true, cancelable: true }, p)));
-      decoZoomFit(); await sleep(100);
+      fitOld(); await sleep(100);
       const vis = _decoVisible(DY.rows, DY.cols), R = vis.r0 + 3, C0 = vis.c0 + 3;
       const gold0 = CUR.gold, sun = () => _decoList(CUR).filter(p => p.id === 'd_y7').length;
       setDecoMode('deco'); SEL_DECO = 'd_y7'; _decoPlace('yard', R, C0); _decoPlace('yard', R, C0 + 2); _decoPlace('yard', R, C0 + 4);
@@ -455,7 +458,7 @@
       const a = at(R, C0 + 2), b = { clientX: a.clientX + 40, clientY: a.clientY + 25 };
       mouse('pointerdown', 2, a); mouse('pointermove', 2, b); mouse('pointerup', 2, b); await sleep(50);
       out('오른쪽끌기_안치움', sun() === 2);
-      decoZoomFit(); await sleep(50);
+      fitOld(); await sleep(50);
       //  빈 칸 오른쪽 클릭 — 아무것도 안 바뀐다
       mouse('pointerdown', 2, at(R + 2, C0)); mouse('pointerup', 2, at(R + 2, C0)); await sleep(50);
       out('오른쪽클릭_빈칸_그대로', sun() === 2);
@@ -577,7 +580,7 @@
     //    손가락이 잡고 있던 캔버스가 사라져 첫 걸음(약 7%)에서 끊겼다(실제 터치로 3배 벌려도 1→1.07배).
     //    실제 브라우저처럼 **그 순간 화면에 있는 캔버스**에 이벤트를 보낸다(옛 캔버스를 쥐고 보내면 못 잡는다).
     {
-      decoZoomFit(); await sleep(100); _decoSetZoom(1); await sleep(100);
+      fitOld(); await sleep(100); _decoSetZoom(1); await sleep(100);
       //  (id 로 찾지 않는다 — 내 집 창 안의 작은 판도 같은 id 라 그쪽이 먼저 잡힌다)
       const live = () => document.querySelector('#if-topview canvas');
       const cv0 = live(), k = cv0.getBoundingClientRect();
@@ -592,7 +595,7 @@
       out('핀치_3배벌림_배율', Math.round(_dZoom / z0 * 100) / 100);
       out('핀치_끝까지_커짐', _dZoom / z0 > 2.5);
       out('핀치중_캔버스그대로', live() === cv0);
-      decoZoomFit(); await sleep(100);
+      fitOld(); await sleep(100);
     }
 
     //  ⑭ 친구 마당 구경에 내 화면 상태가 새지 않나(DECO-FRIEND-PAN-1) — 내 마당을 옮겨 본 뒤 구경 가면
@@ -751,7 +754,7 @@
     {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(500); }
       if (typeof decoSpaceSet === 'function') { decoSpaceSet(1); await sleep(200); }
-      decoZoomFit(); await sleep(100);
+      fitOld(); await sleep(100);
       const OLD = Object.keys(FLOOR_TILES).slice(0, 14), keepFloor = CUR.yardFloor, fx = {};   // 옛 14종(표 앞 14줄 — 뒤에 무엇이 더 들어와도 이 지문은 안 바뀐다)
       const vis = _decoVisible(DY.rows, DY.cols), free = (r, c) => !_isHC(r, c) && !(typeof _isFarmCell === 'function' && _isFarmCell(r, c));
       for (let r = vis.r0; r < vis.r1; r++) for (let c = vis.c0; c < vis.c1; c++) {          // 보이는 칸 전부에 — 다섯 칸에 한 칸쯤은 맨 잔디로 둔다
@@ -877,7 +880,7 @@
       out('집안_바닥모드면_벽지바닥판', DECO_MODE === 'floor' && !shown(frow) && !document.getElementById('if-floor-picker').hidden
         && document.querySelectorAll('#if-floor-picker .fpk-row[data-row=fams] .pk-chip').length === INDOOR_WALLS.length);
       setDecoMode('deco'); ifSyncModeBtn(); await sleep(200);                 // (main 과 나란히 잴 때 판 크기가 같게 — 이 PR 에서는 이미 장식 모드다)
-      decoZoomFit(); await sleep(100);
+      fitOld(); await sleep(100);
 
       //  옛 집 안(겹침 없음): 윗줄 둘 · 크기 다른 가구 · 러그 둘 — 놓는 길을 거치지 않고 저장본처럼 바로 넣는다(main 에서도 같은 줄이 나오게)
       //  [INDOOR-WALL-1] 0번 줄 액자(d_i4)는 이 PR 부터 **일부러** 한 칸 위 벽 띠로 올라가 그려진다(indoor_look_rules §4) →
@@ -1049,7 +1052,7 @@
       const pk = document.getElementById('if-floor-picker'), keepTile = CUR_FLOOR_TILE, keepTool = DECO_FLOOR_TOOL;
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(400); }
       _decoUndoClear(); setDecoMode('deco'); ifSyncModeBtn(); CUR_FLOOR_TILE = 'hydrangea+stone';
-      document.getElementById('if-mode-floor').click(); await sleep(250); decoZoomFit(); await sleep(150);
+      document.getElementById('if-mode-floor').click(); await sleep(250); fitOld(); await sleep(150);
       const segB = v => pk.querySelector('.pk-seg-b[data-v="' + v + '"]');
       out('네모로_도구토글_있음_처음은_끌어서', !!segB('rect') && !!segB('drag') && (keepTool === 'rect' || segB('drag').classList.contains('is-on')));
       segB('rect').click(); await sleep(80);
@@ -1146,7 +1149,7 @@
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       CUR.inventory = (CUR.inventory || []).filter(i => !/^d_i(3|4|8)$/.test(i.id)).concat([{ id: 'd_i3', qty: 2 }, { id: 'd_i4', qty: 2 }, { id: 'd_i8', qty: 2 }]);
-      setDecoMode('deco'); _decoUndoClear(); decoZoomFit(); await sleep(100);
+      setDecoMode('deco'); _decoUndoClear(); fitOld(); await sleep(100);
       const list = () => _decoList(CUR).filter(p => p.area === 'indoor').map(p => p.id + '@' + p.row + ',' + p.col).sort().join(' ');
       const k = () => document.querySelector('#if-topview canvas').getBoundingClientRect();
       const tap = (r, c) => { _dSuppressClick = false; const b = k(); _decoClick({ clientX: b.left + _dCv._offX + (c + .5) * _dC - _dPanX, clientY: b.top + _dCv._offY + (r + .5) * _dC - _dPanY }); };
@@ -1267,7 +1270,7 @@
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       if (CUR.yardFloors) delete CUR.yardFloors[3];
       CUR.inventory = (CUR.inventory || []).filter(i => !/^d_y(9|55|56|29)$/.test(i.id)).concat(['d_y9', 'd_y55', 'd_y56', 'd_y29'].map(id => ({ id, qty: 3 })));
-      setDecoMode('deco'); _decoUndoClear(); decoZoomFit(); await sleep(100);
+      setDecoMode('deco'); _decoUndoClear(); fitOld(); await sleep(100);
       SEL_DECO = 'd_y9'; _decoPlace('yard', 10, 10);                      // 작은 나무 2×2 → 10~11줄 · 10~11칸
       SEL_DECO = 'd_y55'; _decoPlace('yard', 14, 14);                     // 닭(땅)
       SEL_DECO = 'd_y56'; _decoPlace('yard', 14, 20);                     // 오리(물도 됨)
@@ -1386,6 +1389,24 @@
       out('R5_앞줄엔_놓임', _decoList(CUR).some(p => p.id === 'd_y53' && p.row === 13));
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       _decoUndoClear(); decoSpaceSet(1); await sleep(100);
+    }
+
+    //  ㉖ 화면 맞춤(DECO-VIEW-FIT-1) — '전체'는 폭·높이 둘 다 · 판이 작으면 가운데 · 집 안 방은 판 끝에 붙어도 가운데
+    if (typeof _decoWholeZoom === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      decoZoomFit(); await sleep(100);
+      const bw = DY.cols * _dC, bh = DY.rows * _dC;
+      out('맞춤_전체_판이화면안', bw <= _dW && bh <= _dH + 1);
+      out('맞춤_전체_가운데', Math.abs((-_dPanX) - (_dW - bw) / 2) < 1.5);
+      toggleDecoScene(); await sleep(300); decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keepIn = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      _inRoomsSet(CUR, [{ id: 'a', r: 1, c: 0, w: 10, h: 8, floor: null, wall: null }]); _inFitRooms(); await sleep(100);
+      const mid = _dCv._offX + 5 * _dC - _dPanX;
+      out('맞춤_집안_판끝방도_가운데', Math.abs(mid - _dW / 2) < _dC * 1.5);
+      if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
+      decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
