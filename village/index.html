@@ -3729,6 +3729,42 @@ window.__flowShape = (x, y) => { const R = { 켜짐: fsOn(), 쉼: FSHAPE.쉼, ..
   if (flowTake(rec)) return { ...R, 가게: flowStoreState(rec.root), 양: flowStore(rec.root).양,
     까닭: FSHAPE.까닭.get(rec.root) || null, 조각수: partsOf(rec).length };
   return { ...R, 물건: '흐름과 무관' }; };
+/* ── [ACT-PLACECOUNT] 한 수의 대답 — "💧 물 뜰 곳이 생긴 집 9채" + 그 집들 잠깐 ✨ (수업 흐름 #841 L3 · 보스 09-23) ──
+   몇 채가 풀렸는지 알려면 집을 하나씩 눌러야 했다(14회 · 19회 ⓑ20). 필요를 채우는 것을 놓으면 놓기 **전**과 **뒤**에
+   둘레 집(사는 집·빈 집 모두)의 computeSat 을 견주어 **그 필요가 새로 닿게 된 집**만 센다 — 집 카드의 '가까워요/멀어요'와 같은 잣대.
+   0채여도 말한다("새로 생긴 집은 없어요") — 같은 시설이라도 자리에 따라 닿는 집 수가 다르다는 것이 곧 대답이다. 길에서 먼 것은 MAC-SAY 가 먼저 말하므로 0채 줄은 쉰다.
+   끌어 놓기로 여럿을 잇달아 놓으면 mergeMs 안의 것을 한 줄로 합친다. 반짝임은 있던 sparkle(draw call 0). 판정·저장 0 · 분류 '말'.
+   빈 집의 🪣✓(MAC-SAY)는 그대로 — 그건 '하나 됐다, 하나 더'(빈 집의 부분 수리), 이건 '이 한 수가 몇 채에 닿았나'(한 수의 크기). */
+(window.VRULES = window.VRULES || {}).placeCount = { on: true, box: 24, maxHomes: 160, mergeMs: 500, sparkMs: 3000, sparkMax: 24 };
+const PCOUNT = { pend: null, timer: 0, last: '', stats: { 말함: 0, 영채: 0, 합침: 0, 반짝: 0 } };
+const PCOUNT_ICON = { 물: '💧', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 배움: '📚' };
+const pcountLive = kind => !!(window.VRULES.placeCount.on && sayLive() && K[kind] && (K[kind].need || K[kind].need2));
+function pcountHomes(x, y) { const R = window.VRULES.placeCount, out = [];
+  for (let yy = Math.max(0, y - R.box); yy <= Math.min(H - 1, y + R.box) && out.length < R.maxHomes; yy++)
+    for (let xx = Math.max(0, x - R.box); xx <= Math.min(W - 1, x + R.box) && out.length < R.maxHomes; xx++) {
+      const i = idx(xx, yy), rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') out.push(rec); }
+  return out; }
+function pcountSay() { const P = PCOUNT.pend, R = window.VRULES.placeCount; PCOUNT.pend = null; if (!P) return;
+  const keys = Object.keys(P.got), all = new Set(); keys.forEach(k => P.got[k].forEach(r => all.add(r)));
+  if (!all.size && P.far) return;                                              /* 길에서 먼 것 — MAC-SAY 의 '길 옆에 있어야' 한마디가 이번에 처음 말한다 */
+  const line = keys.map(k => { const n = P.got[k].size; return PCOUNT_ICON[k] + ' ' + NEED_TXT[k] + (n ? '이 생긴 집 ' + n + '채' : '이 새로 생긴 집은 없어요'); }).join(' · ')
+    + (!all.size && P.farHint ? ' — 길 옆에 놓아야 집에서 닿아요' : '');   /* MAC-SAY 는 종류마다 한 번만 말한다 — 두 번째부터는 여기서 */
+  PCOUNT.last = line; PCOUNT.stats.말함++; if (!all.size) PCOUNT.stats.영채++;
+  toast(line, true);
+  [...all].slice(0, R.sparkMax).forEach(root => { const rec = cells[root]; if (!rec) return; const c = centerOf('house', cX(root), cY(root), rec.rot);
+    sparkle.push({ x: c.x, z: c.z, until: SIM.t + R.sparkMs }); PCOUNT.stats.반짝++; }); }
+{ hookAdd('placeAt', function (next, args) { const [kind, x, y, rot] = args;
+    if (!pcountLive(kind)) return next(args);
+    const told0 = SAY.told.has(kind), before = pcountHomes(x, y).map(rec => [rec, { ...computeSat(rec).met }]);
+    const r = next(args);
+    const need = [K[kind].need, K[kind].need2].filter(n => n && PCOUNT_ICON[n]); if (!need.length) return r;
+    if (PCOUNT.pend) PCOUNT.stats.합침++;
+    const P = PCOUNT.pend || (PCOUNT.pend = { got: {}, far: false }); need.forEach(n => { P.got[n] = P.got[n] || new Set(); });
+    before.forEach(([rec, m0]) => { if (cells[rec.root] !== rec) return; const m1 = computeSat(rec).met; need.forEach(n => { if (!m0[n] && m1[n]) P.got[n].add(rec.root); }); });
+    if (!K[kind].needRoad && !sayNearRoad(kind, x, y, rot || 0)) { if (told0) P.farHint = true; else P.far = true; }
+    clearTimeout(PCOUNT.timer); PCOUNT.timer = setTimeout(() => { PCOUNT.timer = 0; pcountSay(); }, window.VRULES.placeCount.mergeMs);
+    return r; }); }
+window.__placeCount = () => ({ 켜짐: window.VRULES.placeCount.on, 마지막: PCOUNT.last, 기다림: !!PCOUNT.pend, ...PCOUNT.stats });
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
