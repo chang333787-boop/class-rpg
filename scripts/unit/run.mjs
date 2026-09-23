@@ -878,7 +878,7 @@ try {
     src += S.slice(at, nl) + '\n';
   }
   src += "let DECO_SCENE='yard';\n";
-  for (const n of ['_decoBoardPx', '_decoClampPan', '_decoVisible', '_decoSetZoom', '_houseCol0', '_isHC', '_getFarmZone', '_isFarmCell'])
+  for (const n of ['_decoBoardPx', '_decoClampPan', '_decoVisible', '_decoWholeZoom', '_decoZoomMin', '_decoSetZoom', '_houseCol0', '_isHC', '_getFarmZone', '_isFarmCell'])
     src += sliceFn(S, n) + '\n';
   // _decoSetZoom 이 부르는 것들은 흉내만 (칸 크기 = 기준칸 20 × 줌)
   src += `

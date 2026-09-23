@@ -7748,10 +7748,25 @@ function _decoBoardPx() {
 
 function _decoClampPan() {
   const b = _decoBoardPx();
-  const maxX = Math.max(0, b.w - _dW), maxY = Math.max(0, b.h - _dH);
-  _dPanX = Math.min(Math.max(0, _dPanX), maxX);
-  _dPanY = Math.min(Math.max(0, _dPanY), maxY);
+  //  [DECO-VIEW-FIT-1] 집 안에 방이 있으면 판 밖도 도면이다 → 반 화면까지 더 밀 수 있다(판 끝에 붙은 방을 가운데로 — 디자인 D10)
+  const extraX = (DECO_SCENE !== 'yard' && _inRooms(CUR).length) ? _dW / 2 : 0, extraY = extraX ? _dH / 2 : 0;
+  const maxX = Math.max(0, b.w - _dW) + extraX, maxY = Math.max(0, b.h - _dH) + extraY;
+  //  마당 판이 화면보다 작으면(전체 보기) 화면 안에서 움직일 수 있다(판이 화면 밖으로는 안 나간다) — 가운데 두기는 '전체'가 한다
+  const yd = DECO_SCENE === 'yard';
+  const minX = yd && b.w < _dW ? -(_dW - b.w) : -extraX, minY = yd && b.h < _dH ? -(_dH - b.h) : -extraY;
+  _dPanX = Math.min(Math.max(minX, _dPanX), maxX);
+  _dPanY = Math.min(Math.max(minY, _dPanY), maxY);
 }
+// [DECO-VIEW-FIT-1] 판 전체가 한 화면에 들어오는 배율 — '전체'는 폭만 맞춰 1366×610 에서 마당 아래(밭 포함)가 화면 밖이었다(디자인 D17)
+function _decoWholeZoom() {
+  if (!_dW || !_dH) return DECO_ZOOM_MIN;
+  const yard = DECO_SCENE === 'yard', cols = yard ? DY.cols : DI.cols, rows = yard ? DY.rows : DI.rows + 2;   // 집 안은 위 벽 띠 몫
+  const C0 = Math.floor(_dW / Math.min(cols, yard ? DY_BASE.cols : DI.cols));
+  //  칸 크기를 내림으로 정한 뒤 배율로 — _initDeco 가 칸을 반올림해 판이 화면보다 몇 px 넓어지지 않게
+  return Math.max(4, Math.floor(Math.min(_dW / cols, _dH / rows))) / C0;
+}
+//  두 손가락·－ 로 줄일 수 있는 끝 = 원래 끝(0.5)과 '판 전체' 중 작은 쪽(0.25 아래로는 안 간다)
+function _decoZoomMin() { return Math.max(0.25, Math.min(DECO_ZOOM_MIN, _decoWholeZoom())); }
 
 // 보이는 칸 범위 — 그리는 쪽에서 이 범위만 돈다
 function _decoVisible(rows, cols) {
@@ -7765,7 +7780,7 @@ function _decoVisible(rows, cols) {
 //  화면의 한 점(창 기준 px)을 고정한 채 줌을 바꾼다 — 핀치 중심·＋－ 단추 모두 이걸 쓴다
 function _decoSetZoom(z, fx, fy) {
   const prev = _dZoom;
-  const next = Math.min(DECO_ZOOM_MAX, Math.max(DECO_ZOOM_MIN, z));
+  const next = Math.min(DECO_ZOOM_MAX, Math.max(_decoZoomMin(), z));   // [DECO-VIEW-FIT-1]
   if (Math.abs(next - prev) < 0.001) return;
   const ax = (fx === undefined ? _dW / 2 : fx), ay = (fy === undefined ? _dH / 2 : fy);
   const boardX = (_dPanX + ax) / prev, boardY = (_dPanY + ay) / prev;   // 줌 1 기준 판 좌표
@@ -7811,7 +7826,18 @@ if (typeof document !== 'undefined') {
 // [DECO-PT-1] 폰(좁은 화면)에서 처음 열면 칸이 7px 라 꽃 하나를 못 누른다 → 칸 약 16px 로 집 앞에서 연다
 //  [DECO-PHONE-INDOOR-1] 집 안도 같다 — 폰 375 에서 50칸 방이 칸 7px 로 열려 가구 하나·나가기 문(7px)을 못 눌렀다.
 //  집 안은 왼쪽 위(벽·창문)부터 연다.
+// [DECO-VIEW-FIT-1] 처음 열 때 판이 화면 높이보다 짧으면(세로 화면 768×1024: 칸 15 · 아래가 빈 검은 띠) 높이에 맞춰 키우고 집이 보이게 민다(디자인 D13)
+function _decoFillStart() {
+  if (!_dC || DECO_SCENE !== 'yard' || _dW <= 600) return false;
+  const C0 = _dC / _dZoom;
+  if (DY.rows * _dC >= _dH) return false;
+  _decoSetZoom(Math.min(DECO_ZOOM_MAX, _dH / (DY.rows * C0)), 0, 0);
+  _dPanX = Math.max(0, (_houseCol0() + DH.cols + 2) * _dC - _dW); _dPanY = 0;
+  _decoClampPan(); _drawDeco();
+  return true;
+}
 function _decoPhoneStart() {
+  if (_decoFillStart()) return;   // [DECO-VIEW-FIT-1] 넓은 화면인데 판이 짧으면 높이 채우기
   if (!_dC || _dW > 600) return;
   const z = Math.min(DECO_ZOOM_MAX, 16 / Math.max(1, _dC / _dZoom));
   _decoSetZoom(z, 0, 0);
@@ -7826,12 +7852,14 @@ function decoZoomOut() { _decoSetZoom(_dZoom / DECO_ZOOM_STEP); }
 // 판 전체가 보이게 (마당이 넓어져 길을 잃었을 때)
 function decoZoomFit() {
   if (DECO_SCENE !== 'yard' && _inFitRooms()) return;   // [INDOOR-ROOMS-1] 집 안 '전체' = 방들 둘레
-  const cols = DECO_SCENE === 'yard' ? DY.cols : DI.cols;
-  const baseCols = Math.min(cols, DECO_SCENE === 'yard' ? DY_BASE.cols : DI.cols);
-  const z = Math.max(DECO_ZOOM_MIN, Math.min(DECO_ZOOM_MAX, baseCols / cols));
+  //  [DECO-VIEW-FIT-1] 폭·높이 둘 다 맞춘다 — 마당 80×44 가 밭까지 한 화면에(1366×610: 칸 17 → 9 · 아래 줄이 더는 화면 밖이 아니다)
+  const z = Math.max(_decoZoomMin(), Math.min(DECO_ZOOM_MAX, _decoWholeZoom()));
   _dPanX = 0; _dPanY = 0;
   _decoSetZoom(z, 0, 0);
-  if (Math.abs(_dZoom - z) < 0.001) { _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); }
+  //  판이 화면보다 작으면 가운데에(왼쪽·위에 붙고 나머지가 비던 것)
+  const b = _decoBoardPx();
+  _dPanX = b.w < _dW ? -(_dW - b.w) / 2 : 0; _dPanY = b.h < _dH ? -(_dH - b.h) / 2 : 0;
+  _decoClampPan(); _drawDeco();
 }
 
 function decoPanBy(dx, dy) {
@@ -9071,6 +9099,31 @@ function _drawDeco() {
   });
 }
 
+// [DECO-HOUSE-ART-1] 마당 '내 집' 한 장 — viewBox 600×400 · 한 칸 = 100 · 발밑 y100~400(= 집 자리 3줄) · 굴뚝 끝만 한 칸 위로.
+//  이름은 오른쪽 앞 푯말(글 가운데 x517·y343 · 폭 x446~588)에, '들어가기'는 문 앞 작은 표로.
+function _drawYardHouseArt(img, hx, hw, C) {
+  const ctx = _dCtx, y0 = -C, h = hw * (img.naturalHeight / img.naturalWidth);
+  //  집 칸은 바닥 그리기가 건너뛴다(옛 그리기는 네모로 덮었다) → 그림 둘레가 비지 않게 잔디를 먼저 깐다
+  const c0 = _houseCol0(), grass = () => 'grass';
+  for (let r = 0; r < DH.rows; r++) for (let c = c0; c < c0 + DH.cols; c++) {
+    if (!(FLOOR_SVG && _drawFloorSVG('grass', r, c, c * C, r * C, C, grass))) { ctx.fillStyle = (r + c) % 2 ? FLOOR_TILES.grass.alt : FLOOR_TILES.grass.bg; ctx.fillRect(c * C, r * C, C, C); }
+  }
+  ctx.drawImage(_svgBmp('d:yard_house', img, hw * 2, img.naturalHeight / img.naturalWidth), hx, y0, hw, h);
+  const u = hw / 600;   // 그림 한 단위 = 캔버스 px
+  const name = CUR && CUR.name ? CUR.name : '내 집';
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#3b2a18';
+  let fs = Math.max(7, 26 * u); ctx.font = `700 ${fs}px sans-serif`;
+  const maxW = 130 * u, tw = ctx.measureText(name).width;
+  if (tw > maxW) { fs = Math.max(6, fs * maxW / tw); ctx.font = `700 ${fs}px sans-serif`; }
+  ctx.fillText(name, hx + 517 * u, y0 + 343 * u);
+  //  문 앞 작은 표
+  const tf = Math.max(7, 20 * u); ctx.font = `700 ${tf}px sans-serif`;
+  const tag = '들어가기', tw2 = ctx.measureText(tag).width + tf;
+  ctx.fillStyle = 'rgba(20,24,32,.72)'; _drr(hx + 300 * u - tw2 / 2, y0 + 360 * u, tw2, tf * 1.5, tf * .5); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(tag, hx + 300 * u, y0 + 360 * u + tf * .78);
+  ctx.restore();
+}
 function _drawYard() {
   const C = _dC, W = _dW, H = _dH;
   const hx = _houseCol0() * C, hh = DH.rows * C, hw = DH.cols * C;
@@ -9099,6 +9152,11 @@ function _drawYard() {
   // ══════════════════════════════════════════════════════
   // 집 건물 (우상단, DH: 6칸×3칸)
   // ══════════════════════════════════════════════════════
+  //  [DECO-HOUSE-ART-1] 그림(assets/deco/yard_house.svg — 디자인 #858)이 오면 그 한 장으로 그린다(판자처럼 보이던 네모+글자 · 디자인 D1).
+  //   그림이 아직 안 왔으면 아래 옛 그리기 그대로.
+  const _houseArt = FLOOR_SVG && _decoImg('yard_house');
+  if (_houseArt) _drawYardHouseArt(_houseArt, hx, hw, C);
+  else {
   {
     const lx=hx, ly=0, lw=hw, lh=hh; // left-x, top-y, width, height
 
@@ -9231,23 +9289,25 @@ function _drawYard() {
     // ── 경계선 ────────────────────────────────────────────
     _dCtx.strokeStyle='#3a2808'; _dCtx.lineWidth=2.5;
     _dCtx.beginPath(); _dCtx.moveTo(hx,0); _dCtx.lineTo(hx,hh); _dCtx.stroke();
-    _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(W,hh); _dCtx.stroke();
+    //  [DECO-VIEW-FIT-1] 집 둘레는 집 폭까지만(마당이 80칸으로 넓어진 뒤 집 오른쪽 잔디를 판 끝까지 가로지르던 줄 — 디자인 ⑯) + 오른쪽 변
+    _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(hx+hw,hh); _dCtx.lineTo(hx+hw,0); _dCtx.stroke();
   }
+  }   // [DECO-HOUSE-ART-1] 옛 그리기 끝
 
-  // 격자 (집 영역 제외)
+  // 격자 (집 영역 제외) — [DECO-VIEW-FIT-1] 판 크기까지(전엔 캔버스 크기 W·H 까지라 오른쪽·아래로 밀면 격자가 없었다 · 집 오른쪽 칸 위 3줄도)
+  const BW = DY.cols*C, BH = DY.rows*C;
   _dCtx.strokeStyle='rgba(255,255,255,.12)'; _dCtx.lineWidth=.5;
+  _dCtx.beginPath();
   for(let r=0;r<=DY.rows;r++){
-    _dCtx.beginPath();
-    if(r<=DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); }
-    else { _dCtx.moveTo(0,r*C); _dCtx.lineTo(W,r*C); }
-    _dCtx.stroke();
+    if(r<DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); _dCtx.moveTo(hx+hw,r*C); _dCtx.lineTo(BW,r*C); }
+    else { _dCtx.moveTo(0,r*C); _dCtx.lineTo(BW,r*C); }
   }
   for(let c=0;c<=DY.cols;c++){
-    const x=c*C; _dCtx.beginPath();
-    if(x>hx){ _dCtx.moveTo(x,hh); _dCtx.lineTo(x,H); }
-    else { _dCtx.moveTo(x,0); _dCtx.lineTo(x,H); }
-    _dCtx.stroke();
+    const x=c*C;
+    if(x>hx && x<hx+hw){ _dCtx.moveTo(x,hh); _dCtx.lineTo(x,BH); }
+    else { _dCtx.moveTo(x,0); _dCtx.lineTo(x,BH); }
   }
+  _dCtx.stroke();
 
   // 선택 하이라이트 (장식 모드 vs 바닥 모드)
   if(DECO_MODE==='floor'){
@@ -9304,7 +9364,9 @@ function _drawYard() {
   });
 
   // 문 클릭 좌표 저장 (새 문 위치 기준)
-  {
+  if (_houseArt) {   // [DECO-HOUSE-ART-1] 그림 속 문 자리(viewBox x268~332 · y248~352, 한 칸 = 100)
+    _dCv._doorX = hx + 2.68 * C; _dCv._doorY = -C + 2.48 * C; _dCv._doorW = 0.64 * C; _dCv._doorH = 1.04 * C;
+  } else {
     const _hw=hw, _hh=hh, _hx=hx;
     const _doorW=C*.88, _doorH=C*1.05;
     const _doorX=_hx+_hw/2-_doorW/2, _doorY=_hh-C*.28-_doorH;
@@ -9956,7 +10018,7 @@ function toggleDecoScene(){
   if (DECO_SCENE === 'yard') _decoViewRestore();   // [DECO-PT-1] 마당으로 돌아오면 그 자리로
   else if (_ifMode) _decoIndoorStart();           // [DECO-PHONE-INDOOR-1] 폰이면 집 안도 크게 · [INDOOR-ROOMS-1] 방이 있으면 방 둘레로
   if(_ifMode) ifSyncScene();
-  toast(isYard?'🌿 마당이에요! 집은 오른쪽 위 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
+  toast(isYard?'🌿 마당이에요! 위쪽 집 문을 누르면 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
 
 // ══ 장식 찾기 (DECO-FIND-1) — 이 장소만 · 이름 검색 · 최근 놓은 것 · 서랍 펼치기 ══

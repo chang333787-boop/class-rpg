@@ -3852,7 +3852,7 @@ function pcountSay() { const P = PCOUNT.pend, R = window.VRULES.placeCount; PCOU
   const line = keys.map(k => { const n = P.got[k].size; return PCOUNT_ICON[k] + ' ' + NEED_TXT[k] + (n ? '이 생긴 집 ' + n + '채' : '이 새로 생긴 집은 없어요'); }).join(' · ')
     + (!all.size && P.farHint ? ' — 길 옆에 놓아야 집에서 닿아요' : '');   /* MAC-SAY 는 종류마다 한 번만 말한다 — 두 번째부터는 여기서 */
   PCOUNT.last = line; PCOUNT.stats.말함++; if (!all.size) PCOUNT.stats.영채++;
-  toast(line, true);
+  if (!fwordPlaceCount(P, all)) toast(line, true);   /* [ACT-FLOATWORD] 놓은 자리 위로 — 화면 밖이거나 끄면 토스트 */
   [...all].slice(0, R.sparkMax).forEach(root => { const rec = cells[root]; if (!rec) return; const c = centerOf('house', cX(root), cY(root), rec.rot);
     sparkle.push({ x: c.x, z: c.z, until: SIM.t + R.sparkMs }); PCOUNT.stats.반짝++; }); }
 { hookAdd('placeAt', function (next, args) { const [kind, x, y, rot] = args;
@@ -3861,12 +3861,63 @@ function pcountSay() { const P = PCOUNT.pend, R = window.VRULES.placeCount; PCOU
     const r = next(args);
     const need = [K[kind].need, K[kind].need2].filter(n => n && PCOUNT_ICON[n]); if (!need.length) return r;
     if (PCOUNT.pend) PCOUNT.stats.합침++;
-    const P = PCOUNT.pend || (PCOUNT.pend = { got: {}, far: false }); need.forEach(n => { P.got[n] = P.got[n] || new Set(); });
+    const P = PCOUNT.pend || (PCOUNT.pend = { got: {}, far: false }); { const rec = cells[idx(x, y)]; if (rec) P.at = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); }   /* [ACT-FLOATWORD] 끌어 놓기면 마지막 것 위 */ need.forEach(n => { P.got[n] = P.got[n] || new Set(); });
     before.forEach(([rec, m0]) => { if (cells[rec.root] !== rec) return; const m1 = computeSat(rec).met; need.forEach(n => { if (!m0[n] && m1[n]) P.got[n].add(rec.root); }); });
     if (!K[kind].needRoad && !sayNearRoad(kind, x, y, rot || 0)) { if (told0) P.farHint = true; else P.far = true; }
     clearTimeout(PCOUNT.timer); PCOUNT.timer = setTimeout(() => { PCOUNT.timer = 0; pcountSay(); }, window.VRULES.placeCount.mergeMs);
     return r; }); }
 window.__placeCount = () => ({ 켜짐: window.VRULES.placeCount.on, 마지막: PCOUNT.last, 기다림: !!PCOUNT.pend, ...PCOUNT.stats });
+/* ── [ACT-FLOATWORD] 한 일의 대답은 한 일의 자리에 — 놓은 물건 위로 떠오르는 글자 (창조자 28회 ⓑ60·61 · ⓒ59 · 보스 09-23) ──
+   ⓑ60 첫 우물의 L3 "💧 물 뜰 곳이 생긴 집 11채"가 #toast 에 한 번도 안 보였다(__placeCount 는 말함 1) — 같은 순간의 "🎯 목표 달성!"이 같은 토스트 칸을 덮었다.
+   그래서 L3 를 토스트에서 빼서 **놓은 물건 위**에 1.9초 떠올랐다 사라지게 한다(✨ 는 그대로). 토스트 칸은 목표·🎉 가 쓴다 — 두 줄이 다른 곳에 떠 부딪치지 않는다.
+   ⓒ59 흐름 판에서 만드는곳(밭·부두·벌목장)을 놓는 순간 대답이 없었다(첫 변화는 판 속 9시간 뒤) → 그 위에 "🌾 곡식이 자라요 · 가게까지 반나절" 한 번.
+      때 = (간격틱 + 가장 가까운 받는곳까지 칸 × 칸당틱) ÷ 75틱(판 속 1시간) — 흐름 셈과 같은 값. 길로 닿는 받는곳이 없으면 그 말을 한다.
+   놓은 자리가 화면 밖이면 전처럼 토스트로. 글자는 DOM 한 장(draw call 0) · 자리는 매 프레임 카메라로 다시 잡는다(판을 끌어도 따라간다).
+   판정·저장 0 · 분류 '말'. 끄면 L3 는 옛 토스트 그대로 · 밭 말은 없음. */
+(window.VRULES = window.VRULES || {}).floatWords = { on: true, ms: 1900, rise: 40, y: 7, max: 4, flow: true, mergeMs: 500 };
+const FWORD = { list: [], v: new THREE.Vector3(), flowT: 0, flowPend: null, stats: { 떠오름: 0, 토스트로: 0, 밭말: 0, 닿는가게없음: 0 } };
+function fwordCss() { if (document.getElementById('fwordCss')) return; const st = document.createElement('style'); st.id = 'fwordCss';
+  st.textContent = '.fword{position:fixed;left:0;top:0;z-index:8;pointer-events:none;text-align:center;white-space:nowrap;color:#fff;font:900 22px/1.15 "Malgun Gothic",sans-serif;'
+    + 'text-shadow:0 0 3px #1a1d26,0 0 3px #1a1d26,0 2px 6px #000c;will-change:transform,opacity}.fword .s{font-size:14px;font-weight:800;color:#ffe9a8}.fword .r+.r{margin-top:4px}'
+    + 'body.photo .fword{display:none!important}';
+  document.head.appendChild(st); }
+const fwordEsc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+/* rows = [[큰 글자, 작은 글자], …] · wxv/wzv 는 세계 자리. 화면 밖이면 false(부른 쪽이 토스트로) */
+function floatWord(rows, wxv, wzv) { const R = window.VRULES.floatWords; if (!R.on || !rows.length) return false;
+  FWORD.v.set(wxv, R.y, wzv).project(camera); const sx = (FWORD.v.x + 1) / 2 * innerWidth, sy = (1 - FWORD.v.y) / 2 * innerHeight;
+  if (FWORD.v.z > 1 || sx < 40 || sx > innerWidth - 40 || sy < 90 || sy > innerHeight - 170) return false;   /* 아래 카드 줄(약 160px)에 가리면 토스트로 */
+  fwordCss(); const el = document.createElement('div'); el.className = 'fword';
+  el.innerHTML = rows.map(r => '<div class="r">' + (r[0] ? '<div>' + fwordEsc(r[0]) + '</div>' : '') + (r[1] ? '<div class="s">' + fwordEsc(r[1]) + '</div>' : '') + '</div>').join('');
+  document.body.appendChild(el); FWORD.list.push({ el, x: wxv, z: wzv, t0: performance.now() });
+  while (FWORD.list.length > R.max) FWORD.list.shift().el.remove();
+  FWORD.stats.떠오름++; fwordDraw(); return true; }
+function fwordDraw() { if (!FWORD.list.length) return; const R = window.VRULES.floatWords, now = performance.now();
+  FWORD.list = FWORD.list.filter(w => { const a = (now - w.t0) / R.ms; if (a >= 1) { w.el.remove(); return false; }
+    FWORD.v.set(w.x, R.y, w.z).project(camera); const sx = (FWORD.v.x + 1) / 2 * innerWidth, sy = (1 - FWORD.v.y) / 2 * innerHeight - R.rise * (1 - Math.pow(1 - a, 2));
+    const op = a < 0.08 ? a / 0.08 : a > 0.72 ? (1 - a) / 0.28 : 1;
+    w.el.style.transform = 'translate(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px) translate(-50%,-100%)'; w.el.style.opacity = op.toFixed(2); return true; }); }
+{ const sdF0 = sayDraw; sayDraw = function () { const r = sdF0.apply(this, arguments); fwordDraw(); return r; }; }
+/* L3 — pcountSay 가 부른다. 떠오르면 true(토스트는 쉰다) */
+function fwordPlaceCount(P, all) { if (!P.at) return false;
+  const rows = Object.keys(P.got).map(k => { const n = P.got[k].size;
+    return n ? [PCOUNT_ICON[k] + ' ' + n + '채', NEED_TXT[k] + '이 생긴 집'] : [PCOUNT_ICON[k] + ' 새로 생긴 집은 없어요', NEED_TXT[k]]; });
+  if (!all.size && P.farHint) rows.push(['', '길 옆에 놓아야 집에서 닿아요']);
+  const ok = floatWord(rows, P.at.x, P.at.z); if (!ok) FWORD.stats.토스트로++; return ok; }
+/* ⓒ59 — 만드는곳을 놓는 순간 */
+function fwordFlowWhen(h) { return h < 5.5 ? Math.max(1, Math.round(h)) + '시간 뒤' : h <= 14 ? '반나절' : '하루쯤'; }
+function fwordFlowSay() { const P = FWORD.flowPend; FWORD.flowPend = null; if (!P) return; const rec = cells[P.root]; if (!rec || rec.root !== P.root || !flowMake(rec)) return;
+  const F = window.VRULES.flow, mk = flowMake(rec), M = F.말, 물건 = F.물건 || '곡식', ic = (K[rec.k] && K[rec.k].ic) || '🌾';
+  const big = ic + ' ' + (M && typeof M.growing === 'string' && M.growing ? M.growing : josa(물건, '이', '가') + ' 자라요');
+  const s = flowStoresFrom(rec)[0], takeNm = (K[Object.keys(F.받는곳 || {}).find(k => K[k]) || ''] || { nm: '가게' }).nm;
+  let small; if (s) small = takeNm + '까지 ' + fwordFlowWhen(((mk.간격틱 | 0 || 600) + s.거리 * (F.칸당틱 | 0 || 6)) / 75);
+  else { small = takeNm + '에 길로 닿지 않아요'; FWORD.stats.닿는가게없음++; }
+  FWORD.stats.밭말++; if (!floatWord([[big, small]], P.x, P.z)) { FWORD.stats.토스트로++; toast(big + ' — ' + small, true); } }
+{ hookAdd('placeAt', function (next, args) { const r = next(args); const [kind, x, y, rot] = args, R = window.VRULES.floatWords;
+    if (R.on && R.flow && flowOn() && flowMake({ k: kind }) && sayLive()) { const rec = cells[idx(x, y)];
+      if (rec && rec.k === kind) { const c = centerOf(kind, cX(rec.root), cY(rec.root), rec.rot); FWORD.flowPend = { root: rec.root, x: c.x, z: c.z };
+        clearTimeout(FWORD.flowT); FWORD.flowT = setTimeout(() => { FWORD.flowT = 0; fwordFlowSay(); }, R.mergeMs); } }
+    return r; }); }
+window.__floatWords = () => ({ 켜짐: window.VRULES.floatWords.on, 떠있음: FWORD.list.map(w => w.el.textContent), ...FWORD.stats });
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
