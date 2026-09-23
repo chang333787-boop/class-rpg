@@ -50,8 +50,9 @@ else {
 }
 let 끈판 = 0;
 /* [MAC-SHOPCAP] ㉮ 조건부 판정 — 그 판에서 한 줄도 안 도는 규칙은 켜진 판정으로 세지 않는다(보스 09-23 · 설계 5-나).
-   수용량(shopCap)은 **정원이 적힌 장보기 건물이 그 판에 있을 때만** 돈다 — 기본 shop 에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대) */
-const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need === '장보기' && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
+   수용량(shopCap)은 **정원이 적힌 필요 시설이 그 판에 있을 때만** 돈다 — 기본 종류에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대).
+   [MAC-FACILCAP] 가게에서 학교로(#857) — '장보기' 에서 '필요가 있는 시설 무엇이든' 으로 넓혔다. */
+const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
 const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
 const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
@@ -111,13 +112,16 @@ for (const f of files) {
 }
 
 /* [MAC-SHOPCAP] ㉮ 반대쪽 자기 시험 — 조건부 셈이 규칙을 **숨기지 않나**. city 를 베껴 끄기를 빼고 상가에 정원을 적으면
-   켜진 판정이 하나 늘어 **한도를 넘어 FAIL** 이어야 한다(정원을 빼면 하나 줄어야 한다). 보스 09-23 '반대쪽 시험을 같이' */
+   켜진 판정이 하나 늘어 **한도를 넘어 FAIL** 이어야 한다(정원을 빼면 하나 줄어야 한다). 보스 09-23 '반대쪽 시험을 같이'
+   [MAC-FACILCAP] 정원 시설이 상가에서 초등학교로 옮겨도 서게 — 있음은 필요 시설 하나에 정원을 적고, 없음은 모든 정원을 뺀다 */
 { const city = JSON.parse(fs.readFileSync(path.join(DIR, 'city.json'), 'utf8')); delete city.끄기;
   const 있음 = JSON.parse(JSON.stringify(city)), 없음 = JSON.parse(JSON.stringify(city));
-  있음.건물정의.store.정원 = 6; delete 없음.건물정의.store.정원;
+  const 쓰는 = k => 있음.건물정의[k].need && (!Array.isArray(있음.건물) || 있음.건물.includes(k)), 이름들 = Object.keys(있음.건물정의 || {});
+  const 시설 = 이름들.find(k => 쓰는(k) && 있음.건물정의[k].정원 > 0) || 이름들.find(쓰는);
+  if (시설) 있음.건물정의[시설].정원 = 있음.건물정의[시설].정원 || 40; Object.values(없음.건물정의 || {}).forEach(d => { delete d.정원; });
   const a = liveOf(있음, new Set()), b = liveOf(없음, new Set());
   (a.includes('shopCap') && !b.includes('shopCap') && a.length === b.length + 1 && a.length > 한도)
-    ? add('PASS', `조건부 판정 자기 시험 — city 에 정원을 적고 끄기를 빼면 켜진 판정 ${a.length}개 > ${한도} → FAIL 로 잡힌다 (정원 없으면 ${b.length}개)`)
+    ? add('PASS', `조건부 판정 자기 시험 — city 에 정원(${시설})을 두고 끄기를 빼면 켜진 판정 ${a.length}개 > ${한도} → FAIL 로 잡힌다 (정원 없으면 ${b.length}개)`)
     : add('FAIL', '조건부 판정 자기 시험', `정원 있음 ${a.length}개(${a.join(' ')}) · 없음 ${b.length}개 — 정원이 적힌 판이 한도 넘김으로 안 잡힌다`); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
