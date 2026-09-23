@@ -1,0 +1,52 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+<!-- yard_house 내 집(마당 우상단 6×3) · footprint y100~400 · 굴뚝 끝만 위로 넘친다. 이름은 코드가 오른쪽 앞 푯말(x446~588 · y318~356, 글 가운데 x517 y343)에 쓴다 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<path d="M90,384 L520,366 L596,392 L240,398 Z" fill="#000" opacity=".18"/>
+<ellipse cx="300" cy="384" rx="270" ry="14" fill="#000" opacity=".26"/>
+<!-- 기단 -->
+<path class="i" d="M44,352 h512 v26 h-512z" fill="#9c968a"/>
+<path d="M48,357 h504" stroke="#b9b3a6" stroke-width="3"/>
+<g stroke="#7c776c" stroke-width="1.6"><path d="M110,360 v18 M190,360 v18 M270,364 v14 M350,360 v18 M430,360 v18 M510,364 v14"/></g>
+<!-- 벽(크림 판벽) -->
+<path class="o" d="M56,206 h488 v146 h-488z" fill="#efd9b0"/>
+<g stroke="#d6bb8c" stroke-width="2"><path d="M58,226 h484 M58,246 h484 M58,266 h484 M58,286 h484 M58,306 h484 M58,326 h484 M58,346 h484"/></g>
+<path d="M56,206 h488 v16 h-488z" fill="#000" opacity=".14"/>
+<g class="i" fill="#8a5f38"><rect x="50" y="204" width="12" height="150"/><rect x="538" y="204" width="12" height="150"/></g>
+<!-- 지붕(3/4 · 테라코타 기와) -->
+<path class="o" d="M26,212 L86,122 L514,122 L574,212 Z" fill="#b8563d"/>
+<path d="M86,122 L514,122 L528,144 L72,144 Z" fill="#cc6a4e"/>
+<g stroke="#8f3d2a" stroke-width="2" opacity=".85"><path d="M60,166 h480 M46,188 h508 M74,144 h452"/></g>
+<g stroke="#8f3d2a" stroke-width="1.6" opacity=".6"><path d="M110,144 v22 M170,144 v22 M230,144 v22 M370,144 v22 M430,144 v22 M490,144 v22 M140,166 v22 M200,166 v22 M400,166 v22 M460,166 v22 M100,188 v22 M500,188 v22"/></g>
+<path d="M26,212 L86,122 L514,122 L574,212" fill="none" stroke="#2b2118" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M34,212 h532 v7 h-532z" fill="#000" opacity=".25"/>
+<!-- 굴뚝 -->
+<path class="o" d="M444,138 v-62 h34 v62z" fill="#a8543c"/>
+<path d="M444,92 h34 M444,108 h34 M444,124 h34" stroke="#7e3a26" stroke-width="2"/>
+<path class="i" d="M438,78 h46 v-10 h-46z" fill="#6d6860"/>
+<!-- 지붕창 -->
+<path class="o" d="M254,196 v-40 l46,-32 l46,32 v40z" fill="#efd9b0"/>
+<path class="o" d="M244,160 l56,-42 l56,42" fill="none"/>
+<path class="i" d="M280,190 v-26 h40 v26z" fill="#8fc6e0"/><path d="M300,164 v26 M280,177 h40" stroke="#efe6d4" stroke-width="3"/><path d="M284,168 l9,0 l-9,9z" fill="#fff" opacity=".5"/>
+<!-- 창 둘 + 꽃상자 -->
+<g id="hw"><rect class="i" x="100" y="236" width="84" height="64" rx="3" fill="#8fc6e0"/><path d="M100,236 h84 v64 h-84z" fill="none" stroke="#f7efe0" stroke-width="5"/><path d="M142,236 v64 M100,268 h84" stroke="#f7efe0" stroke-width="3.5"/><path d="M106,242 l18,0 l-18,18z" fill="#fff" opacity=".5"/>
+<path class="i" d="M94,304 h96 l-6,16 h-84z" fill="#a8743f"/><g stroke="#2b2118" stroke-width="1.4"><circle cx="108" cy="301" r="6" fill="#e0453a"/><circle cx="126" cy="299" r="6" fill="#f2c25a"/><circle cx="144" cy="301" r="6" fill="#e889b0"/><circle cx="162" cy="299" r="6" fill="#e0453a"/><circle cx="178" cy="301" r="6" fill="#f2c25a"/></g></g>
+<use href="#hw" x="316"/>
+<!-- 문 + 차양 + 현관등 -->
+<path class="o" d="M254,236 h92 l10,14 h-112z" fill="#b8563d"/>
+<path class="o" d="M268,352 v-96 q0,-8 8,-8 h48 q8,0 8,8 v96z" fill="#7a4a24"/>
+<path d="M276,262 h48 v36 h-48z M276,306 h48 v38 h-48z" fill="#6a3f1e" stroke="#5a3418" stroke-width="1.6"/>
+<circle cx="318" cy="304" r="4.5" fill="#f2c25a" stroke="#2b2118" stroke-width="1.4"/>
+<path d="M360,262 h8" stroke="#3d3833" stroke-width="3"/><path class="i" d="M366,262 l-5,4 v12 h10 v-12z" fill="#f2c25a"/><circle cx="366" cy="272" r="3" fill="#fff4c2"/>
+<!-- 발판 · 디딤돌 -->
+<path class="i" d="M256,352 h88 l6,12 h-100z" fill="#c9b48e"/>
+<path class="i" d="M270,370 h60 l4,8 h-68z" fill="#b3ada0"/>
+<!-- 우체통 -->
+<path d="M72,344 v36" stroke="#5a3a20" stroke-width="5" stroke-linecap="round"/>
+<path class="i" d="M56,318 h32 v22 h-32z" fill="#c9302c"/><path class="i" d="M56,318 q16,-12 32,0z" fill="#e0453a"/><path d="M90,322 v-10 h8" stroke="#2b2118" stroke-width="2" fill="none"/>
+<!-- 이름 푯말(글은 코드) -->
+<path d="M468,356 v28 M566,356 v28" stroke="#5a3a20" stroke-width="5" stroke-linecap="round"/>
+<path class="o" d="M446,318 h142 v38 h-142z" fill="#c79a62"/>
+<path d="M450,322 h134" stroke="#e0bf8a" stroke-width="2.5"/>
+<!-- 풀포기 -->
+<g fill="#4f7a2e" stroke="#2b2118" stroke-width="1.2"><path d="M38,388 l-3,-14 l6,4 l2,-10 l4,12 l3,-8 l2,16z"/><path d="M226,392 l-2,-12 l5,3 l2,-9 l3,10 l3,-6 l1,14z"/></g>
+</svg>

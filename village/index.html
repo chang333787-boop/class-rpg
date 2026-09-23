@@ -3736,6 +3736,42 @@ window.__flowShape = (x, y) => { const R = { 켜짐: fsOn(), 쉼: FSHAPE.쉼, ..
   if (flowTake(rec)) return { ...R, 가게: flowStoreState(rec.root), 양: flowStore(rec.root).양,
     까닭: FSHAPE.까닭.get(rec.root) || null, 조각수: partsOf(rec).length };
   return { ...R, 물건: '흐름과 무관' }; };
+/* ── [ACT-PLACECOUNT] 한 수의 대답 — "💧 물 뜰 곳이 생긴 집 9채" + 그 집들 잠깐 ✨ (수업 흐름 #841 L3 · 보스 09-23) ──
+   몇 채가 풀렸는지 알려면 집을 하나씩 눌러야 했다(14회 · 19회 ⓑ20). 필요를 채우는 것을 놓으면 놓기 **전**과 **뒤**에
+   둘레 집(사는 집·빈 집 모두)의 computeSat 을 견주어 **그 필요가 새로 닿게 된 집**만 센다 — 집 카드의 '가까워요/멀어요'와 같은 잣대.
+   0채여도 말한다("새로 생긴 집은 없어요") — 같은 시설이라도 자리에 따라 닿는 집 수가 다르다는 것이 곧 대답이다. 길에서 먼 것은 MAC-SAY 가 먼저 말하므로 0채 줄은 쉰다.
+   끌어 놓기로 여럿을 잇달아 놓으면 mergeMs 안의 것을 한 줄로 합친다. 반짝임은 있던 sparkle(draw call 0). 판정·저장 0 · 분류 '말'.
+   빈 집의 🪣✓(MAC-SAY)는 그대로 — 그건 '하나 됐다, 하나 더'(빈 집의 부분 수리), 이건 '이 한 수가 몇 채에 닿았나'(한 수의 크기). */
+(window.VRULES = window.VRULES || {}).placeCount = { on: true, box: 24, maxHomes: 160, mergeMs: 500, sparkMs: 3000, sparkMax: 24 };
+const PCOUNT = { pend: null, timer: 0, last: '', stats: { 말함: 0, 영채: 0, 합침: 0, 반짝: 0 } };
+const PCOUNT_ICON = { 물: '💧', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 배움: '📚' };
+const pcountLive = kind => !!(window.VRULES.placeCount.on && sayLive() && K[kind] && (K[kind].need || K[kind].need2));
+function pcountHomes(x, y) { const R = window.VRULES.placeCount, out = [];
+  for (let yy = Math.max(0, y - R.box); yy <= Math.min(H - 1, y + R.box) && out.length < R.maxHomes; yy++)
+    for (let xx = Math.max(0, x - R.box); xx <= Math.min(W - 1, x + R.box) && out.length < R.maxHomes; xx++) {
+      const i = idx(xx, yy), rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') out.push(rec); }
+  return out; }
+function pcountSay() { const P = PCOUNT.pend, R = window.VRULES.placeCount; PCOUNT.pend = null; if (!P) return;
+  const keys = Object.keys(P.got), all = new Set(); keys.forEach(k => P.got[k].forEach(r => all.add(r)));
+  if (!all.size && P.far) return;                                              /* 길에서 먼 것 — MAC-SAY 의 '길 옆에 있어야' 한마디가 이번에 처음 말한다 */
+  const line = keys.map(k => { const n = P.got[k].size; return PCOUNT_ICON[k] + ' ' + NEED_TXT[k] + (n ? '이 생긴 집 ' + n + '채' : '이 새로 생긴 집은 없어요'); }).join(' · ')
+    + (!all.size && P.farHint ? ' — 길 옆에 놓아야 집에서 닿아요' : '');   /* MAC-SAY 는 종류마다 한 번만 말한다 — 두 번째부터는 여기서 */
+  PCOUNT.last = line; PCOUNT.stats.말함++; if (!all.size) PCOUNT.stats.영채++;
+  toast(line, true);
+  [...all].slice(0, R.sparkMax).forEach(root => { const rec = cells[root]; if (!rec) return; const c = centerOf('house', cX(root), cY(root), rec.rot);
+    sparkle.push({ x: c.x, z: c.z, until: SIM.t + R.sparkMs }); PCOUNT.stats.반짝++; }); }
+{ hookAdd('placeAt', function (next, args) { const [kind, x, y, rot] = args;
+    if (!pcountLive(kind)) return next(args);
+    const told0 = SAY.told.has(kind), before = pcountHomes(x, y).map(rec => [rec, { ...computeSat(rec).met }]);
+    const r = next(args);
+    const need = [K[kind].need, K[kind].need2].filter(n => n && PCOUNT_ICON[n]); if (!need.length) return r;
+    if (PCOUNT.pend) PCOUNT.stats.합침++;
+    const P = PCOUNT.pend || (PCOUNT.pend = { got: {}, far: false }); need.forEach(n => { P.got[n] = P.got[n] || new Set(); });
+    before.forEach(([rec, m0]) => { if (cells[rec.root] !== rec) return; const m1 = computeSat(rec).met; need.forEach(n => { if (!m0[n] && m1[n]) P.got[n].add(rec.root); }); });
+    if (!K[kind].needRoad && !sayNearRoad(kind, x, y, rot || 0)) { if (told0) P.farHint = true; else P.far = true; }
+    clearTimeout(PCOUNT.timer); PCOUNT.timer = setTimeout(() => { PCOUNT.timer = 0; pcountSay(); }, window.VRULES.placeCount.mergeMs);
+    return r; }); }
+window.__placeCount = () => ({ 켜짐: window.VRULES.placeCount.on, 마지막: PCOUNT.last, 기다림: !!PCOUNT.pend, ...PCOUNT.stats });
 /* ── [MAC-JOBCHECK] 💼✓ — 일할 곳이 먼 집이 풀린 순간 그 집 위에 한 번 (창조자의 눈 7회 🟡3 · 우물의 🪣✓(MAC-SAY)와 같은 꼴) ──
    가게를 놓아 네 집이 풀려도 아무 반응이 없었다 — 💼 칩 숫자만 시뮬 1시간(실제 9초) 뒤 조용히 줄었다(배정은 판을 90조각으로 나눠 돈다).
    이제 배정(jobsHouseStep)에서 '일할 곳이 먼 집'(지난 바퀴에 자리 0 · 어른 몫 있음)이 **첫 자리를 얻는 순간** 그 집 위에 💼✓ 가 4.5초 뜬다.
@@ -11941,6 +11977,28 @@ function stageCardBoot() { if (!STAGE.def || VISIT_SID || (STAGE.def.교과 == n
   setTimeout(go, 600); }
 window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
+/* ── [ACT-STAGERESET] [↺ 처음부터] — 수업 판마다 (수업 흐름 #841 L1 · 보스 09-23) ──
+   되돌리는 길이 마을 둘인 판(proto-flow 의 왼쪽 단추 줄)에만 있었다. town3·farm 에서는 Ctrl+Z 를 여러 번 누르거나 주소에 #fresh 를 붙여야 했는데,
+   #fresh 는 '빈 판'이라 준비된 시작 땅이 안 실린다(창조자 14회 ⓑ6). 이제 **수업 판(교과 칸)이거나 시작 저장본이 있는 판**이면 왼쪽 아래(트레이 곁)에 단추 하나.
+   누르면 한 번 묻고 → 이 판의 저장본과 판 카드 기록을 지우고 → 다시 연다(시작 저장본이 있으면 그것이, 없으면 빈 땅이 실린다 — proto-flow 의 단추와 같은 일).
+   모형 화면이 있는 판(pmapLive)은 제 단추 줄에 이미 있어 겹쳐 두지 않는다. 구경 중·기본 판·자유 놀이 판(교과 없음 · 시작 없음)엔 없다. 사진 찍을 때는 숨는다.
+   판정·저장 형식 0 — 지우는 것은 그 판의 저장 키(rpg.village.<sid>.<판>) 하나와 카드 기록 하나뿐이다. 분류 '조작'. */
+(window.VRULES = window.VRULES || {}).stageReset = { on: true };
+const SRESET = { el: null, stats: { 보임: 0, 누름: 0, 되돌림: 0 } };
+const sresetLive = () => !!(window.VRULES.stageReset.on && STAGE.def && !VISIT_SID && (STAGE.def.교과 != null || STAGE.def.시작) && !(typeof pmapLive === 'function' && pmapLive()));
+function stageResetGo() { SRESET.stats.누름++;
+  if (!confirm(STAGE.def.시작 ? '이 판을 처음 상태로 되돌릴까요? 지금까지 바꾼 것은 사라져요.' : '이 판을 처음(빈 땅)으로 되돌릴까요? 지금까지 놓은 것은 사라져요.')) return;
+  SRESET.stats.되돌림++;
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(scardKey()); } catch (e) {}   /* 판 카드도 다시 뜨게 — '처음부터'니까 */
+  location.replace(location.pathname + location.search); }
+function stageResetBoot() { if (SRESET.el || !sresetLive()) return;
+  const st = document.createElement('style'); st.textContent = '#stageReset{position:fixed;left:10px;bottom:14px;z-index:6;background:#232833e8;color:#e9edf5;border:1px solid #39404f;border-radius:10px;min-height:44px;padding:0 14px;font:800 14px/1 "Malgun Gothic",sans-serif;cursor:pointer}'
+    + '@media (max-width:700px){#stageReset{bottom:auto;top:64px}}body.photo #stageReset{display:none!important}';
+  document.head.appendChild(st);
+  const el = document.createElement('button'); el.id = 'stageReset'; el.type = 'button'; el.textContent = '↺ 처음부터'; el.title = '이 판을 처음 상태로 되돌려요';
+  el.onclick = stageResetGo; document.body.appendChild(el); SRESET.el = el; SRESET.stats.보임++; }
+setTimeout(stageResetBoot, 700);   /* 판 규칙(protoMap 등)이 얹힌 뒤 */
+window.__stageReset = () => ({ 켜짐: window.VRULES.stageReset.on, 쓸수있나: sresetLive(), 보임: !!SRESET.el, 시작땅: !!(STAGE.def && STAGE.def.시작), ...SRESET.stats });
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
 if (STAGE.def) { if (window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardBoot(); else if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
 
