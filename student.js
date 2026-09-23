@@ -9657,7 +9657,97 @@ function _drawDeco() {
     // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
     _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
     try { _decoTplSync(); } catch (e) {}   // [DECO-FIRST-YARD-1]
+    try { _decoMotionSync(); } catch (e) {}   // [DECO-MOTION-1]
   });
+}
+
+// [DECO-MOTION-1] 움직임 층 — 원래 움직이는 물건(풍차 날개 · 분수 물줄기 · 헛간 풍향계 · 오두막 연기 · 모닥불)을 산다(계획 C2 · 묶음 5 · docs/deco_living_yard_20260920.md).
+//  assets/deco/motion.json(디자인)이 장식마다 '몸통(body)'과 움직이는 층을 준다 → 캔버스에는 멈춘 몸통을, 층은 판 위 DOM 에 얹어 CSS transform·opacity 로만 돌린다
+//  (캔버스를 다시 그리지 않는다 · 합성기에서 돈다). 같은 장식끼리 박자가 맞지 않게 시작을 어긋나게. 저장 0.
+//  꺼지는 때: 움직임 줄이기 · 판이 안 보일 때(동물 층과 같은 규칙) — 그때는 캔버스가 본 그림(날개까지 그려진 한 장)을 그린다.
+//  아직 안 하는 것: 밤 불빛(glow — 꾸미기에 낮밤이 붙은 뒤) · 바람(흔들기) · 떠다니는 것(_ambient).
+let _DECO_MOTION = null, _decoMotionAsked = false;
+const _decoMvReady = {};   // id → true(층 그림까지 다 옴) | false(없음) | undefined(확인 중)
+function _decoMotionOn() {
+  if (!_ifMode || DECO_SCENE !== 'yard' || _animReduced()) return false;
+  //  내 꾸미기 판에서만 — 친구 구경(ff-topview)도 _drawYard 를 빌려 그리는데 거기엔 층이 없다(날개 없는 풍차가 되지 않게 본 그림으로)
+  if (!_dCv || !_dCv.parentNode || _dCv.parentNode.id !== 'if-topview') return false;
+  if (!_decoMotionAsked) {
+    _decoMotionAsked = true;
+    try { fetch('./assets/deco/motion.json').then(r => r.ok ? r.json() : null).then(j => { if (j) { _DECO_MOTION = j; _drawDeco(); } }).catch(() => {}); } catch (e) {}
+  }
+  return !!_DECO_MOTION;
+}
+//  이 장식을 몸통으로 그릴까 — 층 그림까지 다 왔을 때만(날개 없는 풍차가 잠깐이라도 보이지 않게)
+function _decoMotionBody(id) {
+  if (!_decoMotionOn()) return '';
+  const m = _DECO_MOTION[id];
+  if (!m || !m.body || !Array.isArray(m.layers)) return '';
+  if (_decoMvReady[id] === undefined) {
+    if (_artStart() === 'loading') return '';   // [DECO-BUNDLE-1] 묶음이 오면 다시 그린다
+    _decoMvReady[id] = null;
+    const files = [m.body].concat(...m.layers.filter(L => L.kind !== 'glow').map(L => L.files || [L.file]));
+    let left = files.length, bad = false;
+    files.forEach(f => { const img = new Image(); img.onload = img.onerror = (e) => { if (e.type === 'error' || !img.naturalWidth) bad = true;
+      if (--left === 0) { _decoMvReady[id] = !bad; if (!bad) _drawDeco(); } }; img.src = _artSrc('deco/' + f) || './assets/deco/' + f; });
+  }
+  return _decoMvReady[id] ? m.body.replace(/\.svg$/, '') : '';
+}
+const _decoMv = { layer: null, world: null, items: new Map() };
+function _decoMotionStop() {
+  if (_decoMv.layer && _decoMv.layer.parentNode) _decoMv.layer.parentNode.removeChild(_decoMv.layer);
+  _decoMv.items.clear(); _decoMv.layer = null;
+}
+function _decoMotionSync() {
+  const host = _dCv && _dCv.parentNode;
+  if (!host || !_decoMotionOn() || (typeof host.getClientRects === 'function' && !host.getClientRects().length)) { _decoMotionStop(); return; }
+  if (!_decoMv.layer) {
+    const layer = document.createElement('div'); layer.className = 'deco-mv-layer';
+    const world = document.createElement('div'); world.className = 'deco-anim-world';
+    layer.appendChild(world); _decoMv.layer = layer; _decoMv.world = world;
+  }
+  if (_decoMv.layer.parentNode !== host) host.insertBefore(_decoMv.layer, _dCv.nextSibling);   // 캔버스 바로 위(동물 층 아래 — z-index 1 · 동물 2)
+  const C = _dC, W = _dW, H = _dH;
+  _decoMv.layer.style.width = W + 'px'; _decoMv.layer.style.height = H + 'px';
+  _decoMv.world.style.transform = 'translate(' + (-_dPanX) + 'px,' + (-_dPanY) + 'px)';
+  const keep = new Set();
+  _decoList(CUR).forEach(p => {
+    if (p.area !== 'yard' || !_decoMotionBody(p.id)) return;
+    const z = getDecoSize(p.id), m = _DECO_MOTION[p.id], vb = (m.layers[0] && m.layers[0].bodyViewBox) || [100, 100];
+    const w = z.w * C, u = w / vb[0], h = vb[1] * u, x0 = p.col * C, y0 = (p.row + z.h) * C - h;
+    if (x0 + w < _dPanX - C || x0 > _dPanX + W + C || y0 + h < _dPanY - C || y0 > _dPanY + H + C) return;   // 화면 밖은 안 만든다
+    const key = p.id + '@' + p.row + '_' + p.col; keep.add(key);
+    let it = _decoMv.items.get(key);
+    if (!it) {
+      const box = document.createElement('div'); box.className = 'deco-mv';
+      const phase = Math.random();   // 같은 장식끼리 박자가 어긋나게
+      m.layers.forEach(L => {
+        if (L.kind === 'glow') return;   // 밤 불빛은 낮밤이 붙은 뒤
+        const files = L.files || [L.file], period = L.kind === 'frames' ? files.length * L.frameSec : (L.periodSec || 4);
+        const copies = L.kind === 'rise' ? 2 : 1;
+        for (let k = 0; k < copies; k++) files.forEach((f, i) => {
+          const img = document.createElement('img'); img.alt = ''; img.src = _artSrc('deco/' + f) || './assets/deco/' + f;   // [DECO-BUNDLE-1]
+          img.className = 'deco-mv-' + L.kind + (L.kind === 'frames' ? ' f' + files.length : '');
+          const delay = L.kind === 'frames' ? -(((files.length - i) % files.length) * L.frameSec + phase * period) : -(phase + k / copies) * period;
+          img.style.animationDuration = period + 's'; img.style.animationDelay = delay.toFixed(3) + 's';
+          img._L = L; box.appendChild(img);
+        });
+      });
+      _decoMv.world.appendChild(box);
+      it = { box }; _decoMv.items.set(key, it);
+    }
+    //  자리·크기(배율이 바뀌면 다시) — 층 그림 크기는 몸통 단위(size · pivotInBody)
+    const st = it.box.style;
+    st.left = x0 + 'px'; st.top = y0 + 'px'; st.width = w + 'px'; st.height = h + 'px'; st.zIndex = String(p.row + z.h);
+    [...it.box.children].forEach(img => {
+      const L = img._L, sz = L.size || vb, pv = L.pivotInBody || [vb[0] / 2, vb[1] / 2], s2 = img.style;
+      s2.width = sz[0] * u + 'px'; s2.height = sz[1] * u + 'px';
+      if (L.kind === 'frames') { s2.left = '0px'; s2.top = '0px'; }
+      else if (L.anchor === 'bottom-center') { s2.left = (pv[0] - sz[0] / 2) * u + 'px'; s2.top = (pv[1] - sz[1]) * u + 'px'; }
+      else { s2.left = (pv[0] - sz[0] / 2) * u + 'px'; s2.top = (pv[1] - sz[1] / 2) * u + 'px'; }
+    });
+  });
+  [..._decoMv.items.keys()].forEach(k => { if (!keep.has(k)) { const it = _decoMv.items.get(k); if (it.box.parentNode) it.box.parentNode.removeChild(it.box); _decoMv.items.delete(k); } });
 }
 
 // [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기(디자인 ⑭ · 보스 결정 (A) 보여주기만 — 저장 0)
@@ -10046,7 +10136,8 @@ function _drawYard() {
     const bw=sz.w*C, bh=sz.h*C;
     const _gnd = _decoGroundOn(p, d);   // [DECO-GROUND-1] 잔디 위 물건이면 밑동 그림자 → 그림 → 풀 덮임
     if (_gnd) _decoGroundShadow(px, py, bw, bh, C);
-    if(_drawDecoSVG(drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
+    const mvBody = _decoMotionBody(p.id);   // [DECO-MOTION-1] 움직이는 부분은 DOM 층이 — 캔버스엔 멈춘 몸통
+    if(_drawDecoSVG(mvBody || drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;
