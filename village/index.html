@@ -3199,6 +3199,29 @@ function jwLong(why, 칸) {
    이제 그 틈을 까닭 'soon' 으로 부르고 **"곧 일자리를 찾아요"**. 배정은 한 줄도 안 바뀐다. 계약 window.JOB_WHY 는 'soon' 을 예전처럼 null 로 낸다. */
 JW.stats.soon = 0; JW_SHORT.soon = '곧 일자리를 찾아요'; JW_CHIP.soon = '곧 일자리를 찾는 집';
 { const jwLong0 = jwLong; jwLong = function (why, 칸) { return why === 'soon' ? '💼 곧 일자리를 찾아요 — 닿는 일터에 빈자리가 생겼어요' : jwLong0(why, 칸); }; }
+/* ── [MAC-FLOORJOBS] '층 → 일자리'를 보이게 — 말만 (안 docs/village_floor_jobs_visible.md #888 · 보스 09-23 ㉮+㉯ 승인) ──
+   층이 오르면 식구가 늘고 어른 몫(jobsAdultsOf)이 늘어 일자리가 모자라는데, 카드·칩·성장이 모두 '자리가 **하나도** 없나'(joblessHome)로만 걸러
+   3층 집 '어른 3 · 자리 1'이 '😊 다 있어요'였다(farm 실측: 층이 오른 4~6번 모두 모자람이 늚).
+   · ㉮ 층이 오르는 **그 순간** — `🏠 집이 3층이 됐어요! — 어른이 셋이 돼서 일할 곳이 둘 더 있어야 해요`.
+     셈: 새 층의 방이 다 차면 될 어른 몫 − 지금 앉은 자리 − 길로 닿는 일터의 빈자리. 0 이하면 말하지 않는다(말 수를 늘리지 않게).
+   · ㉯ 집 카드 — 자리가 **일부만** 모자라면 `💼 어른 셋 중 둘은 일할 자리가 없어요`(하나도 없는 집은 지금 말 그대로).
+     ⚠ 글자는 '일할 곳이 없어요'(none 의 말)와 **겹치지 않게** 골랐다 — 카드 글을 세는 도구(run.mjs 일먼집 · 창조자 도구)가 두 까닭을 섞지 않게.
+   · **얼굴·성장·칩은 안 바꾼다**(보스 결정 — 웃는집 지표가 흔들린다 · 되밟기 뒤 판정). 셈 0줄 · 원래 줄 수정 1(층 소식) · satText 고리 하나. */
+(window.VRULES = window.VRULES || {}).floorJobs = { on: true };
+const FJOB = { stats: { 층말: 0, 카드말: 0 } };
+const FJ_NUM = ['영', '하나', '둘', '셋', '넷', '다섯', '여섯', '일곱', '여덟', '아홉', '열'];
+const fjNum = n => FJ_NUM[n] || String(n);
+function floorJobsLive() { return !!(window.VRULES.floorJobs.on && window.VRULES.jobsHomes.on && !soffOn('일자리') && !OFF.has('jobs') && JOBH.stats.한바퀴 && population() >= JOB_POP); }
+function growJobSay(rec, h) { if (!rec || !floorJobsLive()) return ''; const root = rec.root, future = Math.max(1, Math.round(houseCap(root) / 2));
+  const a = JOBH.asg.get(root); let have = 0; if (a) a.forEach(n => have += n);
+  let free = 0; jobsNearFree(roadsBeside(rec)).forEach(v => { free += Math.max(0, v | 0); });
+  const short = future - have - free; if (short <= 0) return '';
+  FJOB.stats.층말++; return ' — 어른이 ' + josa(fjNum(future), '이', '가') + ' 돼서 일할 곳이 ' + fjNum(short) + ' 더 있어야 해요'; }
+{ hookAdd('satText', function (next, args) { const [rec] = args; const t = next(args);
+    if (!rec || rec.k !== 'house' || !floorJobsLive() || joblessHome(rec.root)) return t;                // 하나도 없는 집은 지금 말 그대로
+    const lack = JOBH.lack.get(rec.root) | 0, need = jobsAdultsOf(rec.root); if (lack <= 0 || !need || lack >= need) return t;
+    FJOB.stats.카드말++; return t + ' · 💼 어른 ' + fjNum(need) + ' 중 ' + josa(fjNum(lack), '은', '는') + ' 일할 자리가 없어요'; }); }
+window.__floorJobs = () => ({ 켜짐: window.VRULES.floorJobs.on, ...FJOB.stats });
 /* 길에서 닿는 일터 → Map(일터 root → 남은 자리) */
 function jobsNearFree(from, radius) { const wp = jobsWpIndex(), out = new Map(); if (Array.isArray(from) ? !from.length : from < 0) return out;
   const { reach } = roadBFS(from, undefined, radius);
@@ -5823,7 +5846,7 @@ function growHouse(rec, h) {
   simDirty(chunkOfCell(rec.root)); mapDirty = true; markDirty();
   const c = centerOf('house', cX(rec.root), cY(rec.root), rec.rot);
   simSparkle({ x: c.x, z: c.z, until: SIM.t + 3000 });
-  simSay('🏠 집이 ' + h.lv + '층이 됐어요!', true);
+  simSay('🏠 집이 ' + h.lv + '층이 됐어요!' + growJobSay(rec, h), true);   /* [MAC-FLOORJOBS] 늘어날 어른 몫만큼 일할 곳이 모자라면 한 마디 */
 }
 function satText(rec) {
   const 세대 = houseHold(rec.root), 세대말 = 세대 > 1 ? 세대 + '세대 · ' : '';   /* [MAC-HOUSEHOLD] 여러 세대가 사는 집은 카드가 먼저 말한다 — 곱셈을 숨기지 않는다 */
