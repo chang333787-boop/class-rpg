@@ -9,6 +9,7 @@ const add = (kind, name, why) => results.push([kind, name, why || '']);
 const FIELDS = ['id', '이름', '교과', '질문', '되돌아보기', '현상', '변수', '시작', '규칙', '건물', '목표'];
 const SEMS = { kind: g => typeof g.k === 'string' && g.n > 0, pop: g => g.n > 0, hook: g => typeof g.훅 === 'string' && typeof g.n === 'number' && ['>=', '<='].includes(g.비교) };
 const HOOKS = ['일닿음%', '다있음%'];   // index.html STAGE_HOOKS 와 같게
+const 지형이름 = ['물', '모래'];   // index.html [MAC-TERRAIN] TERR_COL 과 같게(물가는 칠하기 색일 뿐)
 
 /* 마을을 한 번 실어 VRULES 기본값·건물 종류를 읽는다(시뮬 · 네트워크 0) */
 const probe = path.join(os.tmpdir(), 'village-stages-probe-' + process.pid + '.mjs');
@@ -31,6 +32,17 @@ process.stdout.write('@@' + JSON.stringify(bad) + '\\n'); process.exit(0);`);
   const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : list;
 }
 
+/* [MAC-TERRAIN] 지형이 깔린 판을 실제로 열어 — 바닥을 읽고 · 바다엔 길 ✕ · 물가 부두 ○ · 뭍 부두 ✕ · 풀밭 나무 ○ (시뮬 · 네트워크 0) */
+function terrainProbe(n, tries) {
+  const f = path.join(os.tmpdir(), 'village-stages-terrain-' + process.pid + '.mjs');
+  fs.writeFileSync(f, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: 'stage=' + ${JSON.stringify(n)} });
+const out = { t: w.__terrain ? w.__terrain() : null, r: ${JSON.stringify(tries)}.map(([k, x, y]) => { try { return w.__put(k, x, y, 0); } catch (e) { return 'ERR ' + e.message; } }) };
+process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`);
+  const r = spawnSync(process.execPath, [f], { encoding: 'utf8' }); fs.rmSync(f, { force: true });
+  const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : { err: (r.stderr || '').trim().split('\n').slice(-1)[0] };
+}
+
 const rulesMap = JSON.parse(fs.readFileSync(path.join(DIR, 'rules.json'), 'utf8')).규칙;
 const missing = Object.keys(vrules).filter(k => !rulesMap[k]), extra = Object.keys(rulesMap).filter(k => !vrules[k]);
 if (missing.length) add('FAIL', 'rules.json 분류', '분류 안 된 VRULES: ' + missing.join(' ')); else add('PASS', `rules.json 분류 (VRULES ${Object.keys(vrules).length}개 전부)`);
@@ -50,8 +62,9 @@ else {
 }
 let 끈판 = 0;
 /* [MAC-SHOPCAP] ㉮ 조건부 판정 — 그 판에서 한 줄도 안 도는 규칙은 켜진 판정으로 세지 않는다(보스 09-23 · 설계 5-나).
-   수용량(shopCap)은 **정원이 적힌 장보기 건물이 그 판에 있을 때만** 돈다 — 기본 shop 에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대) */
-const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need === '장보기' && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
+   수용량(shopCap)은 **정원이 적힌 필요 시설이 그 판에 있을 때만** 돈다 — 기본 종류에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대).
+   [MAC-FACILCAP] 가게에서 학교로(#857) — '장보기' 에서 '필요가 있는 시설 무엇이든' 으로 넓혔다. */
+const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
 const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
 const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
@@ -86,6 +99,30 @@ for (const f of files) {
     if (S.계절 != null && !철.includes(S.계절)) 나쁨.push('계절');
     ['풀', '바닥'].forEach(k => { const v = S[k]; if (v != null && !(typeof v === 'string' && (/^#[0-9a-fA-F]{6}$/.test(v) || /^[a-zA-Z]+$/.test(v)))) 나쁨.push(k); });
     나쁨.length ? add('FAIL', P('모습'), '칸이 틀림: ' + 나쁨.join(' ')) : add('PASS', P('모습 칸(계절·풀·바닥)')); }
+  if (def.지형 != null) { const L = def.지형 && def.지형.칸;   /* [MAC-TERRAIN] 지형 = 바닥(칸 네모 목록 · 뒤엣것이 덮음) */
+    const 나쁨 = Array.isArray(L) ? L.filter(r => !Array.isArray(r) || r.length !== 5 || r.slice(0, 4).some(v => !Number.isInteger(v) || v < 0 || v > 255) || !지형이름.includes(r[4])) : null;
+    if (!나쁨) add('FAIL', P('지형'), '칸 이 배열이어야 한다');
+    else if (나쁨.length) add('FAIL', P('지형'), '꼴이 틀림(네모 [x0,y0,x1,y1,이름] · 이름 ' + 지형이름.join('·') + '): ' + 나쁨.map(r => JSON.stringify(r)).join(' '));
+    else { const 바닥 = new Map(); L.forEach(([x0, y0, x1, y1, nm]) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) 바닥.set(y * 256 + x, nm); });
+      let 뭍 = 0; for (let y = 128; y < 160; y++) for (let x = 128; x < 160; x++) if (!바닥.has(y * 256 + x) || 바닥.get(y * 256 + x) !== '물') 뭍++;
+      뭍 >= 512 ? add('PASS', P(`지형 ${L.length}네모 · ${바닥.size}칸 · 첫 구역 뭍 ${뭍}/1024`)) : add('FAIL', P('지형'), `첫 구역(128~159)의 뭍이 ${뭍}칸 — 반은 남겨야 마을이 선다`);
+      /* 실제로 열어 규칙을 누른다 — 물가(모래 옆 물) 한 곳 · 바다 한 칸 · 뭍 한 칸을 첫 구역에서 찾는다 */
+      const at = (x, y) => 바닥.get(y * 256 + x) || '풀';
+      let 물가 = null, 바다 = null, 풀 = null;
+      for (let y = 129; y < 158 && !(물가 && 바다 && 풀); y++) for (let x = 129; x < 158; x++) {
+        if (!물가 && at(x, y) === '모래' && at(x, y + 1) === '물' && at(x + 1, y) === '모래' && at(x + 1, y + 1) === '물') 물가 = [x, y];
+        if (!바다 && at(x, y) === '물' && at(x + 1, y) === '물' && at(x, y + 1) === '물' && at(x + 1, y + 1) === '물' && y > 130) 바다 = [x, y];
+        if (!풀 && y < 140 && x > 131 && x < 150 && at(x, y) === '풀') 풀 = [x, y]; }
+      if (!풀) add('REVIEW', P('지형 규칙'), '첫 구역에 풀 칸이 없어 규칙을 못 눌러 봄');
+      else { const tries = [], 뜻 = [];
+        if (바다) { tries.push(['road', ...바다]); 뜻.push(['바다에 길', v => typeof v === 'string' && v.includes('바다')]); }
+        if (물가 && (def.건물 || []).includes('pier')) { tries.push(['pier', ...물가]); 뜻.push(['물가에 부두', v => v === true]);
+          tries.push(['pier', ...풀]); 뜻.push(['뭍에 부두', v => typeof v === 'string' && v.includes('물가')]); }
+        tries.push(['tree', 풀[0], 풀[1] + 4]); 뜻.push(['풀밭에 나무', v => v === true]);
+        const o = terrainProbe(n, tries);
+        if (!o.t || !o.t.켜짐) add('FAIL', P('지형 규칙'), '판을 열었는데 지형이 안 켜짐: ' + JSON.stringify(o));
+        else { const 틀림 = 뜻.map(([m, ok], i) => ok(o.r[i]) ? null : m + ' → ' + JSON.stringify(o.r[i])).filter(Boolean);
+          틀림.length ? add('FAIL', P('지형 규칙'), 틀림.join(' · ')) : add('PASS', P(`지형 규칙 ${뜻.length}가지(${뜻.map(x => x[0]).join(' · ')}) · 엔진 지형 ${o.t.칸}칸`)); } } } }
   /* [MAC-SKIN] 판이 스스로 만드는 종류(건물정의)는 기본 판에 없는 게 맞다 — 빼고 검사하고, 정의 자체를 따로 본다 */
   const 새종류 = def.건물정의 && typeof def.건물정의 === 'object' ? Object.keys(def.건물정의) : [];
   if (새종류.length) {
@@ -111,13 +148,16 @@ for (const f of files) {
 }
 
 /* [MAC-SHOPCAP] ㉮ 반대쪽 자기 시험 — 조건부 셈이 규칙을 **숨기지 않나**. city 를 베껴 끄기를 빼고 상가에 정원을 적으면
-   켜진 판정이 하나 늘어 **한도를 넘어 FAIL** 이어야 한다(정원을 빼면 하나 줄어야 한다). 보스 09-23 '반대쪽 시험을 같이' */
+   켜진 판정이 하나 늘어 **한도를 넘어 FAIL** 이어야 한다(정원을 빼면 하나 줄어야 한다). 보스 09-23 '반대쪽 시험을 같이'
+   [MAC-FACILCAP] 정원 시설이 상가에서 초등학교로 옮겨도 서게 — 있음은 필요 시설 하나에 정원을 적고, 없음은 모든 정원을 뺀다 */
 { const city = JSON.parse(fs.readFileSync(path.join(DIR, 'city.json'), 'utf8')); delete city.끄기;
   const 있음 = JSON.parse(JSON.stringify(city)), 없음 = JSON.parse(JSON.stringify(city));
-  있음.건물정의.store.정원 = 6; delete 없음.건물정의.store.정원;
+  const 쓰는 = k => 있음.건물정의[k].need && (!Array.isArray(있음.건물) || 있음.건물.includes(k)), 이름들 = Object.keys(있음.건물정의 || {});
+  const 시설 = 이름들.find(k => 쓰는(k) && 있음.건물정의[k].정원 > 0) || 이름들.find(쓰는);
+  if (시설) 있음.건물정의[시설].정원 = 있음.건물정의[시설].정원 || 40; Object.values(없음.건물정의 || {}).forEach(d => { delete d.정원; });
   const a = liveOf(있음, new Set()), b = liveOf(없음, new Set());
   (a.includes('shopCap') && !b.includes('shopCap') && a.length === b.length + 1 && a.length > 한도)
-    ? add('PASS', `조건부 판정 자기 시험 — city 에 정원을 적고 끄기를 빼면 켜진 판정 ${a.length}개 > ${한도} → FAIL 로 잡힌다 (정원 없으면 ${b.length}개)`)
+    ? add('PASS', `조건부 판정 자기 시험 — city 에 정원(${시설})을 두고 끄기를 빼면 켜진 판정 ${a.length}개 > ${한도} → FAIL 로 잡힌다 (정원 없으면 ${b.length}개)`)
     : add('FAIL', '조건부 판정 자기 시험', `정원 있음 ${a.length}개(${a.join(' ')}) · 없음 ${b.length}개 — 정원이 적힌 판이 한도 넘김으로 안 잡힌다`); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */

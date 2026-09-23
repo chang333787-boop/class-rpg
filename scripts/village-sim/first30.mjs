@@ -93,7 +93,7 @@ export function first30Report(o, res) {
   row('빈 선반(흐름 판만)', '빈선반', 1);
   L.push('| **③ 연기의 어설픔** (틱마다 · 사람 자리) | ' + hours.map(() => '').join(' | ') + ' |');
   const arow = (label, f) => L.push(`| ${label} | ` + hours.map(h => col(h, rs => rs.some(r => !r.A) ? '못 잰다(__folkPos 없음)' : f(rs))).join(' | ') + ' |');
-  arow('겹쳐 지나감(0.6 안 · 틱당 쌍 평균/최대)', rs => `${r1(avg(rs.map(r => r.A.겹침합 / Math.max(1, r.A.틱))))}/${Math.max(...rs.map(r => r.A.겹침최대))}`);
+  arow('겹쳐 지나감(0.6 안 · 틱당 쌍 평균/최대 · **셈 자리** — 화면에서는 ACT-PASS·ACT-SPACE 가 벌린다 · 기준은 화면판)', rs => `${r1(avg(rs.map(r => r.A.겹침합 / Math.max(1, r.A.틱))))}/${Math.max(...rs.map(r => r.A.겹침최대))}`);
   arow('건물·나무 통과(사람·틱)', rs => { const n = r1(avg(rs.map(r => r.A.통과))), where = {}; rs.forEach(r => Object.entries(r.A.통과곳).forEach(([k, v]) => { where[k] = (where[k] || 0) + v; }));
     const top = Object.entries(where).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + ' ' + v).join(' · '); return n + (top ? ' (' + top + ')' : ''); });
   arow('제자리 떨림(10틱 창)', rs => String(r1(avg(rs.map(r => r.A.떨림)))));

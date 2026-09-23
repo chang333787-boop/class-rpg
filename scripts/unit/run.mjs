@@ -778,9 +778,10 @@ try {
   };
   sb.globalThis = sb; vm.createContext(sb);
   const names = ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animFrameSwim', '_animLayers', '_animHooked', '_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt',
-    '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animProbeEat', '_animProbeSwim', '_animEatSync', '_animReduced', '_animFreeMaker', '_animNextCell',
+    '_animGroundOk', '_animWhyNot', '_animProbeFrameB', '_animProbeEat', '_animProbeSwim', '_animEatSync', '_animReduced', '_decoOverflowCells', '_animFreeMaker', '_animNextCell',
     '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'];
   let src = SPACE_PRELUDE(S);
+  src += 'let _decoBBox = null;' + NL;   // [DECO-RULE-R5] 그림 둘레표(bbox.json)는 안 읽는다 → 솟은 그림 밑 칸 없음
   for (const n of names) {
     if (n === 'ANIM_DECO' || n === 'GROUND_HARD' || n === 'FEED_RANGE' || n === '_animFrameB' || n === '_animFrameEat' || n === '_animFrameSwim' || n === '_animLayers' || n === '_animHooked') {
       const re = new RegExp('^(const|let) ' + n + '[\\s\\S]*?;[ \\t]*(//[^\\n]*)?\\r?\\n', 'm');
@@ -990,6 +991,7 @@ try {
     ] } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
+  src += 'let _decoBBox = null;' + NL;   // [DECO-RULE-R5] 그림 둘레표(bbox.json)는 안 읽는다 → 솟은 그림 밑 칸 없음
   for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animFrameSwim', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
@@ -1004,7 +1006,7 @@ try {
     }
     src += S.slice(at, end + 1) + '\n';
   }
-  for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_animFreeMaker',
+  for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced', '_decoOverflowCells', '_animFreeMaker',
                    '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animProbeEat', '_animProbeSwim', '_animEatSync', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
@@ -1113,6 +1115,7 @@ try {
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
+  src += 'let _decoBBox = null;' + NL;   // [DECO-RULE-R5] 그림 둘레표(bbox.json)는 안 읽는다 → 솟은 그림 밑 칸 없음
   for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animFrameSwim', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
@@ -1127,7 +1130,7 @@ try {
     src += S.slice(at, end + 1) + '\n';
   }
   for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
-                   '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_decoOverflowCells', '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animProbeEat', '_animProbeSwim', '_animEatSync', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
   src += ';globalThis.__P = { _isPenDeco, _penAt, _animSyncLayer, _animLayers, _animStopLayer, _animFreeMaker };';
@@ -1217,7 +1220,9 @@ try {
     { id: 'd_y69', name: '먹이통', feeder: true },
     { id: 'd_y55', name: '닭 한 마리' },
   ];
-  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+  //  시계는 가짜 — 타이머를 하나 돌릴 때마다 그 타이머의 ms 만큼 간다([DECO-WORDS-1] 줄 바꾸기는 '마지막 톡에서 4초 뒤'라 시간이 흘러야 한다)
+  const vclock = { t: 1e12 };
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date: { now: () => vclock.t },
     document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
     window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
     getComputedStyle: () => ({ position: 'static' }),
@@ -1228,6 +1233,7 @@ try {
     GAME_DATA: { decorations: DECOS } };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
+  src += 'let _decoBBox = null;' + NL;   // [DECO-RULE-R5] 그림 둘레표(bbox.json)는 안 읽는다 → 솟은 그림 밑 칸 없음
   for (const n of ['ANIM_DECO', 'GROUND_HARD', 'FENCE_IDS', 'FENCE_ART', 'FEED_RANGE', '_animFrameB', '_animFrameEat', '_animFrameSwim', '_animLayers', '_animHooked']) {
     let at = S.indexOf('const ' + n);
     if (at < 0) at = S.indexOf('let ' + n);
@@ -1244,7 +1250,7 @@ try {
   }
   for (const n of ['_isFenceCell', '_fenceArtOr', '_fencePick', '_fenceArtFor', '_feedersOf', '_feederFor',
                    '_isPenDeco', '_penAt', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animReduced',
-                   '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
+                   '_decoOverflowCells', '_animFreeMaker', '_animNextCell', '_animStopLayer', '_animStopAll', '_animPauseAll', '_animResumeAll',
                    '_animProbeFrameB', '_animProbeEat', '_animProbeSwim', '_animEatSync', '_animSchedule', '_animStep', '_animAt', '_animPoke', '_animSyncLayer'])
     src += sliceFn(S, n) + '\n';
   src += ';globalThis.__F = { _fencePick, _fenceArtFor, _feedersOf, _animSyncLayer, _animLayers, _animStopLayer };';
@@ -1298,7 +1304,7 @@ try {
   test('닭이 갈 먹이통을 물고 있다', () => { if (!hen.feeder) throw new Error('먹이통 없음'); });
   let best = 99;
   for (let i = 0; i < 300 && timers.size; i++) {
-    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const e = [...timers.entries()][0]; timers.delete(e[0]); vclock.t += e[1].ms || 0; e[1].fn();
     best = Math.min(best, Math.abs(hen.cur.row - 10) + Math.abs(hen.cur.col - 10));
   }
   test('300걸음 안에 먹이통 옆(1칸)까지 온다', () => { if (best > 1) throw new Error('가장 가까워진 거리 ' + best); });
