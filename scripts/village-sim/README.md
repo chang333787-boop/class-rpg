@@ -55,3 +55,7 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 - index.html 에 새 브라우저 API 가 들어오면 불러오기에서 `LOAD ERR … index.html N줄 무렵` 으로 멈춘다 → `load.mjs` 의 `fakeGlobals` 에 한 줄 더하면 된다.
 - 틱 ms 는 가짜 그림까지 포함한 node 값이라 브라우저 값과 다르다. 성능은 브라우저에서 잰다.
 - `village/stages/boards/pop88.json`·`pop167.json` 은 창조자의 눈 세션에서 아이 역할로 지은 판이다(실제 학생 자료 아님 · 이름 없음).
+- `village/stages/boards/mid36.json` 은 **실학급 크기 시험 판**이다(집 36채 = 보통 집 33 + 아파트 3 · 사는 집 31 · 인구 74 · 주민 연기 담당이 지음 · 실제 학생 자료 아님).
+  큰 줄 한 줄에 시설을 모아 **붐빔이 실제로 난다**. 아파트 셋 중 **하나는 비어 있다**(저장 왕복 시험용). 밭·헛간이 있어 **흐름은 `--stage farm` 으로** 잰다:
+  `node scripts/village-sim/run.mjs --stage farm --save village/stages/boards/mid36.json --days 3 --seeds 1-5` — `--save` 와 `--stage` 를 함께 주면 저장본이 판 칸에도 들어간다.
+  판 없이 열면 밭·헛간은 모르는 종류로 빠지고(흐름 꺼짐) 붐빔·돌아섬은 그대로 잰다.
