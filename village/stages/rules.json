@@ -105,11 +105,13 @@
   "doorsAll": "바로잡음",
   "growPause": "바로잡음",
   "wishGrow": "바로잡음",
-  "growMul": "바로잡음"
+  "growMul": "바로잡음",
+  "shopCap": "판정"
  },
   "_묶음설명": "판 파일의 `끄기` 칸이 쓰는 이름 → 그 묶음을 끄면 안 도는 판정 규칙들([MAC-STAGEOFF]). 이름은 여기와 index.html 의 SOFF_ALL 한 곳에서만 늘린다(stages.mjs 가 둘이 같은지 검사한다). 끄기는 복구용 스위치(on:false = '옛 셈으로 되돌림')와 다르다 — 셈과 말을 함께 멈춘다.",
   "묶음": {
     "일자리": ["jobsHomes", "jobAway"],
-    "붐빔": ["crowdHomes", "crowdSkipNight"]
+    "붐빔": ["crowdHomes", "crowdSkipNight"],
+    "수용량": ["shopCap"]
   }
 }
