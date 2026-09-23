@@ -12,13 +12,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const MID = 'village/stages/boards/mid36.json';
 const BOARDS = opt('boards', `기본+village/stages/boards/pop167.json,town3,farm+${MID},city+${MID},sea+${MID},mountain+${MID}`).split(',').map(s => s.trim()).filter(Boolean);
-const SEC = +opt('sec', 60), HOUR = opt('hour', '8') === 'none' ? null : +opt('hour', '8'), JSON_OUT = opt('json', null);
+const WARM = +opt('warm', 2), SEC = +opt('sec', 60), HOUR = opt('hour', '8') === 'none' ? null : +opt('hour', '8'), JSON_OUT = opt('json', null);
 const CHROME = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell');
 if (!fs.existsSync(CHROME)) { console.error('헤드리스 크로미움이 없다: ' + CHROME + ' — CHROME=<경로> 로 알려 주거나 npx playwright install chromium-headless-shell'); process.exit(2); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* 기준 — 창조자 25회 3절 · ACT-SPACE(#881) 와 함께 정한 화면판 기준 */
-const PASS = { 포갬쌍: 0.5, 우표: 0.4, 프레임ms: 20 };
+const PASS = { 포갬쌍: 0.5, 오래포갬ms: 1000, 우표: 0.4, 프레임ms: 20, 한칸박자: 0.5 };   /* 포갬 FAIL 은 '오래 포갬'(같은 둘이 1초 넘게 0.6 안) — 평균은 스쳐 지나감이 대부분이라 주의로만(09-23 · mountain 320쌍 중 317쌍이 0.3초 안) */
 
 /* ── 정적 서버 ── */
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
@@ -37,12 +37,12 @@ const evaluate = async (src) => { const r = await send('Runtime.evaluate', { exp
 
 /* 페이지 안에서 도는 잰 것 — 프레임마다(튐) · 0.5초마다(나머지) · 모두 읽기 훅만 */
 const SAMPLER = `
-const SEC = ${SEC}, HOUR = ${HOUR == null ? 'null' : +HOUR};
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const SEC = ${SEC}, HOUR = ${HOUR == null ? 'null' : +HOUR}, WARM = ${WARM};
+const sleep = ms => new Promise(r => setTimeout(r, ms)), PASS_LONG = ${PASS.오래포갬ms};
 for (let k = 0; k < 80 && window.__LOADMS == null; k++) await sleep(250);
 if (window.__LOADMS == null) return { 오류: '부팅 안 됨' };
 [...document.querySelectorAll('button')].filter(x => ['시작', '닫기'].includes(x.textContent.trim()) && x.offsetParent).forEach(b => b.click());
-if (HOUR != null && window.__setHour) window.__setHour(HOUR);
+if (HOUR != null && window.__setHour) { window.__setHour(HOUR); await sleep(WARM * 1000); }   /* 시각을 건너뛴 직후 몇 프레임은 사람이 한꺼번에 나오며 벽 안에 그려진다(09-23 farm · 0.26초 안 · 저절로 나올 땐 0) — 준비 시간 */
 const has = h => typeof window[h] === 'function', e0 = has('__errors') ? window.__errors() : null;
 /* 우표 마을 — 놓인 물건의 화면 폭 ÷ 창 폭 */
 let 우표 = null; try { const cs = (window.__snapshot().물건 || []).map(t => /@(\\d+),(\\d+)/.exec(t)).filter(Boolean).map(m => [+m[1], +m[2]]);
@@ -53,12 +53,17 @@ const said = []; const tEl = document.getElementById('toast'); let lastT = tEl ?
 const obs = new MutationObserver(() => { const t = tEl ? tEl.textContent.trim() : ''; if (t && t !== lastT) { said.push([Math.round(performance.now() - t0), t.slice(0, 60)]); lastT = t; } });
 if (tEl) obs.observe(tEl, { childList: true, subtree: true, characterData: true });
 const t0 = performance.now(), R = { 표본: 0, 포갬표본: 0, 포갬쌍합: 0, 셈포갬표본: 0, 줄세움표본: 0, 벽통과표본: 0, 벽예: [], 갇힘표본: 0, 튐: 0, 튐예: [], 프레임: 0, 사람최대: 0 };
-const prev = new Map(); let nextSample = 0, lastNow = 0; R.긴프레임 = 0; R.긴프레임최대ms = 0;
+const prev = new Map(), ov = new Map(), longOv = new Map(); let nextSample = 0, lastNow = 0; R.긴프레임 = 0; R.긴프레임최대ms = 0; R.스침 = 0; R.박자합 = 0; R.박자표본 = 0;
 await new Promise(done => { const f = () => { const now = performance.now() - t0, dt = now - lastNow; lastNow = now; R.프레임++;
   const P = has('__folkPos') ? window.__folkPos() : [], slow = R.프레임 > 1 && dt > 100;   /* 긴 프레임(멈칫) 뒤의 큰 걸음은 튐이 아니라 멈칫이다 — 따로 센다 */
   if (slow) { R.긴프레임++; R.긴프레임최대ms = Math.max(R.긴프레임최대ms, Math.round(dt)); }
   P.forEach(p => { const q = prev.get(p[0]); if (!slow && q && q[3] && p[3] && q[4] === p[4] && q[7] === p[7]) { const d = Math.hypot(p[1] - q[1], p[2] - q[2]); if (d > 2) { R.튐++; if (R.튐예.length < 3) R.튐예.push(p[4] + ' ' + d.toFixed(1) + ' @' + Math.round(now / 1000) + 's ' + Math.round(dt) + 'ms'); } } prev.set(p[0], p); });
-  if (now >= nextSample) { nextSample += 500; R.표본++; const V = P.filter(p => p[3]); R.사람최대 = Math.max(R.사람최대, V.length);
+  { const V = P.filter(p => p[3]), seen = new Set();   /* 같은 둘이 얼마나 오래 겹쳤나 — 매 프레임 */
+    for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) { if (Math.abs(V[a][1] - V[b][1]) >= 0.6 || Math.abs(V[a][2] - V[b][2]) >= 0.6 || Math.hypot(V[a][1] - V[b][1], V[a][2] - V[b][2]) >= 0.6) continue;
+      const k = V[a][0] + '-' + V[b][0]; seen.add(k); if (!ov.has(k)) ov.set(k, { t: now, kind: V[a][4] + '/' + (V[a][7] || '-') + '+' + V[b][4] + '/' + (V[b][7] || '-') + ' ' + V[a][5] });
+      const e = ov.get(k); if (now - e.t > PASS_LONG && !longOv.has(k)) longOv.set(k, e); }
+    ov.forEach((e, k) => { if (!seen.has(k)) { if (now - e.t <= 300) R.스침++; ov.delete(k); } }); }
+  if (now >= nextSample) { nextSample += 500; if (has('__folkSpace')) { const g = (window.__folkSpace().그린자리 || {}); if (g.서있는사람) { R.박자합 += g.한칸박자; R.박자표본++; } } R.표본++; const V = P.filter(p => p[3]); R.사람최대 = Math.max(R.사람최대, V.length);
     let pairs = 0, near = 1e9; for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) { const d = Math.hypot(V[a][1] - V[b][1], V[a][2] - V[b][2]); if (d < near) near = d; if (d < 0.6) pairs++; }
     R.포갬쌍합 += pairs; if (pairs) R.포갬표본++; if (V.length > 1 && Math.abs(near - 4) < 0.01) R.줄세움표본++;
     const wall = V.filter(p => p[6] && (p[7] === '' || p[7] === 'carry') && !['play', 'pavilion', 'plaza', 'bench', 'minibench', 'green', 'fountain', 'garden'].includes(p[5]));
@@ -68,7 +73,7 @@ await new Promise(done => { const f = () => { const now = performance.now() - t0
   if (now < SEC * 1000) requestAnimationFrame(f); else done(); }; requestAnimationFrame(f); });
 obs.disconnect();
 const e1 = has('__errors') ? window.__errors() : null, g = has('__gfx') ? window.__gfx() : null;
-return { ...R, 우표, 빈30초말: said.filter(s => s[0] < 30000).length, 말: said.slice(0, 5), 삼킨오류: e1 && e0 ? (e1.삼킨오류 || 0) + (e1.덮개 || 0) - (e0.삼킨오류 || 0) - (e0.덮개 || 0) : null, 오류예: e1 ? e1.목록.slice(0, 2).map(x => x.말 + '@' + x.줄) : [], 저장멈춤: e1 ? !!e1.저장꺼짐 : null, 프레임평균ms: g ? g.프레임평균ms : null, 놓친비율: g ? g.놓친비율 : null };`;
+return { ...R, 오래포갬: longOv.size, 오래포갬예: [...longOv.values()].slice(0, 3).map(e => e.kind + ' @' + Math.round(e.t / 1000) + 's'), 한칸박자: R.박자표본 ? +(R.박자합 / R.박자표본).toFixed(2) : null, 우표, 빈30초말: said.filter(s => s[0] < 30000).length, 말: said.slice(0, 5), 삼킨오류: e1 && e0 ? (e1.삼킨오류 || 0) + (e1.덮개 || 0) - (e0.삼킨오류 || 0) - (e0.덮개 || 0) : null, 오류예: e1 ? e1.목록.slice(0, 2).map(x => x.말 + '@' + x.줄) : [], 저장멈춤: e1 ? !!e1.저장꺼짐 : null, 프레임평균ms: g ? g.프레임평균ms : null, 놓친비율: g ? g.놓친비율 : null };`;
 
 const results = [];
 try {
@@ -96,17 +101,17 @@ try {
 /* ── 표 ── */
 const r2 = x => x == null ? '—' : Math.round(x * 100) / 100, pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
 const L = [`사냥 하네스 — 판 ${BOARDS.length} × ${SEC}초 · ${HOUR == null ? '저장본 시각' : HOUR + '시'} · 전용 헤드리스(소프트웨어 GL) · sid guest · 운영 주소 막음 · 자리는 **그려진 자리**(__folkPos)`, ''];
-L.push('| 판 | 사람 | 포갬쌍/표본 | 포갬 표본 | (셈 포갬 표본) | 줄 세움 | 벽 통과 | 튐 | 갇힘 | 오류 | 우표 | 빈 30초 말 | 프레임ms | 긴 프레임 | 판정 |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+L.push('| 판 | 사람 | 오래 포갬 | 포갬쌍/표본 (스침) | 한 칸 박자 | (셈 포갬 표본) | 줄 세움 | 벽 통과 | 튐 | 갇힘 | 오류 | 우표 | 빈 30초 말 | 프레임ms | 긴 프레임 | 판정 |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const x of results) {
-  if (x.오류) { L.push(`| ${x.판} | 오류: ${x.오류} ||||||||||||| FAIL |`); continue; }
+  if (x.오류) { L.push(`| ${x.판} | 오류: ${x.오류} |||||||||||||| FAIL |`); continue; }
   const 쌍 = x.포갬쌍합 / Math.max(1, x.표본), 오류 = (x.페이지오류 || 0) + (x.삼킨오류 || 0);
-  const fail = [쌍 > PASS.포갬쌍 && '포갬', x.줄세움표본 && '줄 세움', x.벽통과표본 && '벽 통과', x.튐 && '튐', x.갇힘표본 && '갇힘', 오류 && '오류'].filter(Boolean);
-  const warn = [x.우표 != null && x.우표 < PASS.우표 && '우표 마을', SEC >= 30 && x.빈30초말 === 0 && '빈 30초', x.프레임평균ms > PASS.프레임ms && '프레임'].filter(Boolean);
+  const fail = [x.오래포갬 && '오래 포갬', x.줄세움표본 && '줄 세움', x.벽통과표본 && '벽 통과', x.튐 && '튐', x.갇힘표본 && '갇힘', 오류 && '오류'].filter(Boolean);
+  const warn = [쌍 > PASS.포갬쌍 && '포갬 평균', x.한칸박자 != null && x.한칸박자 > PASS.한칸박자 && '한 칸 박자', x.우표 != null && x.우표 < PASS.우표 && '우표 마을', SEC >= 30 && x.빈30초말 === 0 && '빈 30초', x.프레임평균ms > PASS.프레임ms && '프레임'].filter(Boolean);
   x.판정 = fail.length ? 'FAIL(' + fail.join('·') + ')' : x.사람최대 ? 'PASS' : 'REVIEW(사람 0 · 잴 게 없다)'; x.주의 = warn;
-  L.push(`| ${x.판} | ${x.사람최대} | ${r2(쌍)} | ${pct(x.포갬표본, x.표본)} | ${pct(x.셈포갬표본, x.표본)} | ${pct(x.줄세움표본, x.표본)} | ${x.벽통과표본}${x.벽예.length ? ' (' + x.벽예.join(', ') + ')' : ''} | ${x.튐}${x.튐예.length ? ' (' + x.튐예.join(', ') + ')' : ''} | ${x.갇힘표본} | ${오류} | ${r2(x.우표)} | ${x.빈30초말} | ${r2(x.프레임평균ms)} | ${x.긴프레임}${x.긴프레임 ? ' (최대 ' + x.긴프레임최대ms + 'ms)' : ''} | **${x.판정}**${warn.length ? ' · 주의: ' + warn.join('·') : ''} |`);
+  L.push(`| ${x.판} | ${x.사람최대} | ${x.오래포갬}${x.오래포갬예.length ? ' (' + x.오래포갬예.join(', ') + ')' : ''} | ${r2(쌍)} (${x.스침}) | ${r2(x.한칸박자)} | ${pct(x.셈포갬표본, x.표본)} | ${pct(x.줄세움표본, x.표본)} | ${x.벽통과표본}${x.벽예.length ? ' (' + x.벽예.join(', ') + ')' : ''} | ${x.튐}${x.튐예.length ? ' (' + x.튐예.join(', ') + ')' : ''} | ${x.갇힘표본} | ${오류} | ${r2(x.우표)} | ${x.빈30초말} | ${r2(x.프레임평균ms)} | ${x.긴프레임}${x.긴프레임 ? ' (최대 ' + x.긴프레임최대ms + 'ms)' : ''} | **${x.판정}**${warn.length ? ' · 주의: ' + warn.join('·') : ''} |`);
 }
-L.push('', `기준 — FAIL: 포갬쌍(그려진 자리 0.6 안) 표본 평균 > ${PASS.포갬쌍} · 줄 세움(가장 가까운 두 사람이 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘 ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
-  `주의: 우표 마을(물건 화면 폭 ÷ 창 폭 < ${PASS.우표}) · 빈 30초(아무것도 안 누른 30초 동안 말 0) · 프레임 > ${PASS.프레임ms}ms(헤드리스 소프트웨어 GL 이라 **참고만**).`,
+L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게) ≥ 1 · 줄 세움(가장 가까운 두 사람이 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
+  `주의: 포갬 평균(0.5초 표본마다 0.6 안 쌍 > ${PASS.포갬쌍} · 괄호 = 0.3초 안에 풀린 스침 수) · 한 칸 박자(서 있는 사람 가운데 가장 가까운 서 있는 이웃이 3.6~4.4 인 몫 > ${PASS.한칸박자}) · 우표 마을(물건 화면 폭 ÷ 창 폭 < ${PASS.우표}) · 빈 30초(아무것도 안 누른 30초 동안 말 0) · 프레임 > ${PASS.프레임ms}ms(헤드리스 소프트웨어 GL 이라 **참고만**).`,
   '안 잼(입력이 필요하다): 말 충돌(한 입력 뒤 #toast 와 #why) · 반응 ms · 흰 공(풍선 지름). 셈 포갬은 창조자 25회 표와 견주려고 함께 적는다(__folkOverlap · 셈 자리 2.0 안).');
 console.log(L.join('\n'));
 if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
