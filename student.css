@@ -1354,7 +1354,8 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
    움직임 줄이기 설정이면 걷지 않고(코드에서 타이머를 안 걸고) 꼬물만 느리게. */
 .deco-anim-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:2}
 .deco-anim-world{position:absolute;left:0;top:0;width:100%;height:100%}
-.deco-anim{position:absolute;left:0;top:0;transition:transform 1s linear;will-change:transform}
+/* [DECO-ANIM-LIVE-1] 걸음은 코드(한 돌림)가 매 틀 자리를 준다 — CSS 전환(1초 미끄러짐)은 없앴다 */
+.deco-anim{position:absolute;left:0;top:0;will-change:transform}
 .deco-anim .bob{position:absolute;left:0;bottom:0;width:100%;animation:decoBob 1.6s ease-in-out infinite}
 .deco-anim .bob img{display:block;width:100%;height:auto}
 @keyframes decoBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
@@ -1374,6 +1375,14 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .deco-anim .bob.hop{animation:decoHop .45s ease-out}
 @keyframes decoHop{0%,100%{transform:translateY(0)}35%{transform:translateY(-9px)}}
 .deco-anim.swim .bob{bottom:-4px;animation-duration:2.4s}
+/* [DECO-ANIM-LIVE-1] 부위 나눈 그림(<id>_idle 등)은 그림 안에서 스스로 숨 쉰다 — 2px 들썩임은 끈다 ·
+   옛 한 장 그림이 걸을 때는 발걸음처럼 통통(미끄러지는 스티커로 안 보이게) */
+.deco-anim.live .bob{animation:none}
+.deco-anim.walking:not(.live) .bob{animation:decoStep .3s ease-in-out infinite}
+@keyframes decoStep{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.deco-anim-heart{position:absolute;left:30%;bottom:100%;font-size:16px;line-height:1;pointer-events:none;animation:decoHeart 1.2s ease-out forwards}
+@keyframes decoHeart{0%{opacity:0;transform:translateY(4px) scale(.6)}20%{opacity:1;transform:translateY(-4px) scale(1)}100%{opacity:0;transform:translateY(-22px) scale(1)}}
+@media (prefers-reduced-motion: reduce){ .deco-anim.walking .bob,.deco-anim-heart{animation:none} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════
