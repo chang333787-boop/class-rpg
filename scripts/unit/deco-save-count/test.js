@@ -1409,6 +1409,22 @@
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
     }
 
+    //  ㉗ 내 집 그림(DECO-HOUSE-ART-1) — 디자인 #858 yard_house.svg 로 그린다 · 문 자리는 집 그림 안 · 문을 누르면 집 안
+    if (typeof _drawYardHouseArt === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      for (let i = 0; i < 20 && !_decoImg('yard_house'); i++) await sleep(100);
+      _drawDeco(); await sleep(50);
+      out('집그림_불러옴', !!_decoImg('yard_house'));
+      const C = _dC, hx = _houseCol0() * C, { _doorX: dx, _doorY: dy, _doorW: dw, _doorH: dh } = _dCv;
+      out('집그림_문은_집안쪽', dx > hx && dx + dw < hx + DH.cols * C && dy + dh <= DH.rows * C);
+      const s0 = DECO_SCENE, r = _dCv.getBoundingClientRect();
+      _dSuppressClick = false;   // (앞 시험의 끌기가 남긴 '클릭 무시' — 실제로는 손을 떼면 풀린다)
+      _decoClick({ clientX: r.left + (dx + dw / 2 - _dPanX) * r.width / _dW, clientY: r.top + (dy + dh / 2 - _dPanY) * r.height / _dH }); await sleep(300);
+      out('집그림_문누르면_집안', s0 === 'yard' && DECO_SCENE === 'indoor');
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
