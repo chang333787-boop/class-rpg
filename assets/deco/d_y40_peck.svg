@@ -1,5 +1,5 @@
 <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-<!-- d_y40_eat · 지금 코드의 먹는 장 = peck 과 같은 그림 · 양 2×1 · 무리 — 한 마리 그림(d_y57_peck)을 모아 박자를 어긋나게 · 왼쪽을 본다(표의 artLeft) · footprint y100~200 -->
+<!-- d_y40_peck 양 2×1 · 무리 — 한 마리 그림(d_y57_peck)을 모아 박자를 어긋나게 · 왼쪽을 본다(표의 artLeft) · footprint y100~200 -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}.p{transform-box:fill-box}.head{transform-origin:30% 95%;animation:gz 1.6s ease-in-out infinite}@keyframes gz{0%,100%{transform:translate(-6px,40px) rotate(20deg)}50%{transform:translate(-6px,42px) rotate(23deg)}}.jaw{transform-origin:50% 0;animation:ch .4s ease-in-out infinite alternate}@keyframes ch{to{transform:translateX(1.2px)}}.m2 .head{animation-delay:-0.9s}.m2 .jaw{animation-delay:-0.9s}</style></defs>
 <g data-mirror="1" transform="translate(200,0) scale(-1,1)">
 <ellipse cx="100" cy="188" rx="86" ry="8" fill="#000" opacity=".22"/><g class="m1" transform="translate(70,186) scale(1) translate(-50,-186)">
