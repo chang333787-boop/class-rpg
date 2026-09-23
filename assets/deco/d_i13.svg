@@ -1,10 +1,10 @@
 <svg width="100" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 300">
-<!-- d_i13 마법 거울 1×2 (legend) · 금테 전신거울, 보랏빛 발광 · footprint y100~300 -->
+<!-- d_i13 마법 거울 1×2 (legend) · 금테 전신거울, 보랏빛 발광 · footprint y100~300  · 2026-09-23 거울 유리를 보석 그라데이션 대신 평평한 보라 세 톤 + 빛줄 — 마법석과 같은 만화 결 · 둘레 광륜 뺌(밤 빛은 motion.json 몫) -->
 <defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round}</style>
 <radialGradient id="g" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#d9b8ff"/><stop offset=".6" stop-color="#8a5ed6"/><stop offset="1" stop-color="#4a2c8a"/></radialGradient>
 <radialGradient id="glow"><stop offset="0" stop-color="#b98ae6" stop-opacity=".22"/><stop offset="1" stop-color="#b98ae6" stop-opacity="0"/></radialGradient>
 </defs>
-<circle cx="50" cy="160" r="70" fill="url(#glow)"/>
+
 <path d="M22,282 L76.5,270 L96,290 L43.4,298 Z" fill="#000" opacity=".2"/>
 <ellipse cx="50" cy="286" rx="40" ry="9" fill="#000" opacity=".28"/>
 <!-- 받침 -->
@@ -15,7 +15,7 @@
 <path class="o" d="M16,262 v-180 q0,-40 34,-40 q34,0 34,40 v180z" fill="#b8892e"/>
 <path d="M22,258 v-176 q0,-34 28,-34 q28,0 28,34 v176" fill="none" stroke="#e8c26a" stroke-width="3"/>
 <!-- 거울면 -->
-<path class="i" d="M26,254 v-172 q0,-30 24,-30 q24,0 24,30 v172z" fill="url(#g)"/>
+<path class="i" d="M26,254 v-172 q0,-30 24,-30 q24,0 24,30 v172z" fill="#8a5ed6"/><path d="M26,150 v-68 q0,-30 24,-30 q18,0 22,18 L26,150z" fill="#a47ce8"/><path d="M26,254 v-40 L74,160 v94z" fill="#7650c4"/><path d="M40,254 L74,214 v12 L50,254z" fill="#a47ce8" opacity=".7"/>
 <path d="M32,120 q0,-24 12,-40" stroke="#efe0ff" stroke-width="4" stroke-linecap="round" opacity=".8" fill="none"/>
 <path d="M36,180 v40" stroke="#efe0ff" stroke-width="2.5" stroke-linecap="round" opacity=".5"/>
 <!-- 별·반짝 -->
