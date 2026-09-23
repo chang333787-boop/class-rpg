@@ -1452,6 +1452,14 @@
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
     }
 
+    //  ㉚ 알림 한 번에 하나(DECO-TOAST-1 · 계획 U2) — 꾸미기 전체화면에서 둘이 겹치지 않고, 서랍 카드를 안 가린다
+    if (_ifMode) {
+      toast('하나'); toast('둘');
+      const ts = [...document.querySelectorAll('.toast-msg')], dr = document.getElementById('if-deco-drawer').getBoundingClientRect();
+      out('알림_하나만', ts.length === 1 && ts[0].textContent === '둘');
+      out('알림_서랍위', ts.length > 0 && ts[0].getBoundingClientRect().bottom <= dr.top + 1);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
