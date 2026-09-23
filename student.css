@@ -1487,6 +1487,16 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 @media (max-height:700px) and (min-width:700px){ .deco-drawer.is-shop:not(.is-open) .deco-drawer-body{max-height:92px} }
 /* 최근 줄이 비었을 때(hidden) 도 display:flex 가 이겨 점선 한 줄(11px)이 남아 있었다 */
 .deco-quick[hidden]{display:none}
+/* [DECO-SEL-A5] 최근 칩(넓은 화면 머리줄) — 머리줄 높이(40)를 넘지 않아 '최근'이 생겨도 마당 높이가 그대로다 */
+.deco-quick-head{display:flex;align-items:center;gap:4px;flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+.deco-quick-head::-webkit-scrollbar{display:none}
+.deco-quick-head[hidden],.deco-drawer.is-shop .deco-quick-head{display:none}
+.deco-quick-head .deco-quick-label{margin-right:2px}
+.deco-qchip{flex-shrink:0;height:40px;min-width:44px;padding:0 6px;display:flex;align-items:center;gap:3px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--txt2)}
+.deco-qchip.is-sel{border-color:var(--gold);background:rgba(255,215,0,.18);color:var(--gold)}
+.deco-qchip .deco-thumb-box,.deco-qchip .deco-thumb{margin:0!important}
+@media (min-width:901px){ .deco-search-wrap{flex:1 1 200px;min-width:180px} }
 /* 사기 막대 — 머리 오른쪽(좁은 폭은 머리 아래 한 줄) */
 .deco-buybar{display:flex;align-items:center;gap:6px;min-width:0;flex:0 1 auto;height:44px;padding:0 4px 0 12px;border-radius:12px;
   border:1.5px solid rgba(217,164,65,.6);background:rgba(20,24,32,.6);color:var(--txt);font-size:13px;font-weight:700}
