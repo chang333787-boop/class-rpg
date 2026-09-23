@@ -1218,6 +1218,16 @@
       setDecoMode('floor'); ifSyncModeBtn(); _inPk.tab = 'room'; _inPk.tool = 'erase'; _inTap(5, 5);
       out('방_없애도_가구그대로', !rs().a && _decoList(CUR).length === nDeco);
       decoUndo(); out('방_↩되살림', rs().a === '3,3,10,7,carpet#pink,');
+      //  [DECO-RULE-R4] 벽걸이가 걸린 방을 없애면 그 액자는 가방으로(바닥 한가운데 서 있지 않게) · ↩ 면 방과 액자가 같이
+      const hung = () => _decoList(CUR).filter(p => p.id === 'd_i4' && p.row === 3 && p.col === 15).length;
+      const bagN = () => { const inv = (CUR.inventory || []).find(i => i.id === 'd_i4'); return inv.qty - (CUR.houseDecorations || []).filter(p => p.id === 'd_i4').length; };
+      const bag0 = bagN(), u0 = _decoUndo.length;
+      _inTap(5, 15);                                                        // 액자가 걸린 방 b 를 없앤다
+      out('R4_방없애면_액자는가방', !rs().b && hung() === 0 && bagN() === bag0 + 1 && /가방으로/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
+      out('R4_벽밖에_선액자없음', !_decoList(CUR).some(p => p.area === 'indoor' && _isWallDeco(p.id) && !_inIsWallRow(p.row, p.col)));
+      out('R4_한단계', _decoUndo.length === u0 + 1);
+      decoUndo(); out('R4_↩방과액자같이', rs().b === '3,13,6,4,,star#sky' && hung() === 1 && bagN() === bag0);
+      _inPk.tool = 'erase';
       //  못 읽는 값·판 밖·겹침은 읽을 때 버린다(그리기가 안 깨진다)
       const bad = _inRooms({ indoor: { 3: { rooms: { a: '1,1,5,4,,', b: '2,2,5,4,,', c: 'x,y', d: '25,45,10,10,,', e: '10,20,6,4,zzz,star#bogus' } } } }, 3);
       out('방_못읽는값_버림', bad.map(r => r.id).join('') === 'ae' && bad[1].floor === null && bad[1].wall.color === '');
