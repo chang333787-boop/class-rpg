@@ -10691,7 +10691,7 @@ if (STAGE.id) {
 (window.VRULES = window.VRULES || {}).terrain = { on: true };
 const TERR = { def: null, map: new Map(), sdef: null, streams: new Set(), allow: 0, stats: { 칸: 0, 막음: 0, 칠함: 0, 개울: 0, 개울깖: 0, 개울지킴: 0 } };
 const TERR_NAMES = ['물', '모래', '비탈', '고개'];
-const TERR_COL = { 물: '#4a9fd0', 물가: '#7ccbe8', 모래: '#f0dfb0', 비탈: '#6f8052', 비탈결: '#63734a', 고개: '#b39a70' };   // 물빛은 개울(#906)과 한 가족 — 디자인 담당 09-23
+const TERR_COL = { 물: '#4a9fd0', 물가: '#7ccbe8', 모래: '#f0dfb0', 비탈: '#6f8052', 비탈결: '#63734a', 고개: '#c2a77a' };   // 물빛은 개울(#906)과 한 가족 · 고갯길은 흙 테두리 결로 한 톤 밝게 — 디자인 담당 09-23
 const TERR_ON = { 물: new Set(['pier']),                           // 그 바닥에 올라설 수 있는 것(적힌 것만)
   비탈: new Set(['tree', 'bigtree', 'bush', 'flower', 'pot', 'fir', 'rock', 'boulder', 'bench', 'minibench', 'lamp', 'post', 'cabin']), 고개: new Set(['road', 'gravel']) };
 const TERR_NOT = { 모래: new Set(['field']) };                     // 모래 칸에 못 놓는 것
