@@ -9099,6 +9099,31 @@ function _drawDeco() {
   });
 }
 
+// [DECO-HOUSE-ART-1] 마당 '내 집' 한 장 — viewBox 600×400 · 한 칸 = 100 · 발밑 y100~400(= 집 자리 3줄) · 굴뚝 끝만 한 칸 위로.
+//  이름은 오른쪽 앞 푯말(글 가운데 x517·y343 · 폭 x446~588)에, '들어가기'는 문 앞 작은 표로.
+function _drawYardHouseArt(img, hx, hw, C) {
+  const ctx = _dCtx, y0 = -C, h = hw * (img.naturalHeight / img.naturalWidth);
+  //  집 칸은 바닥 그리기가 건너뛴다(옛 그리기는 네모로 덮었다) → 그림 둘레가 비지 않게 잔디를 먼저 깐다
+  const c0 = _houseCol0(), grass = () => 'grass';
+  for (let r = 0; r < DH.rows; r++) for (let c = c0; c < c0 + DH.cols; c++) {
+    if (!(FLOOR_SVG && _drawFloorSVG('grass', r, c, c * C, r * C, C, grass))) { ctx.fillStyle = (r + c) % 2 ? FLOOR_TILES.grass.alt : FLOOR_TILES.grass.bg; ctx.fillRect(c * C, r * C, C, C); }
+  }
+  ctx.drawImage(_svgBmp('d:yard_house', img, hw * 2, img.naturalHeight / img.naturalWidth), hx, y0, hw, h);
+  const u = hw / 600;   // 그림 한 단위 = 캔버스 px
+  const name = CUR && CUR.name ? CUR.name : '내 집';
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#3b2a18';
+  let fs = Math.max(7, 26 * u); ctx.font = `700 ${fs}px sans-serif`;
+  const maxW = 130 * u, tw = ctx.measureText(name).width;
+  if (tw > maxW) { fs = Math.max(6, fs * maxW / tw); ctx.font = `700 ${fs}px sans-serif`; }
+  ctx.fillText(name, hx + 517 * u, y0 + 343 * u);
+  //  문 앞 작은 표
+  const tf = Math.max(7, 20 * u); ctx.font = `700 ${tf}px sans-serif`;
+  const tag = '들어가기', tw2 = ctx.measureText(tag).width + tf;
+  ctx.fillStyle = 'rgba(20,24,32,.72)'; _drr(hx + 300 * u - tw2 / 2, y0 + 360 * u, tw2, tf * 1.5, tf * .5); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(tag, hx + 300 * u, y0 + 360 * u + tf * .78);
+  ctx.restore();
+}
 function _drawYard() {
   const C = _dC, W = _dW, H = _dH;
   const hx = _houseCol0() * C, hh = DH.rows * C, hw = DH.cols * C;
@@ -9127,6 +9152,11 @@ function _drawYard() {
   // ══════════════════════════════════════════════════════
   // 집 건물 (우상단, DH: 6칸×3칸)
   // ══════════════════════════════════════════════════════
+  //  [DECO-HOUSE-ART-1] 그림(assets/deco/yard_house.svg — 디자인 #858)이 오면 그 한 장으로 그린다(판자처럼 보이던 네모+글자 · 디자인 D1).
+  //   그림이 아직 안 왔으면 아래 옛 그리기 그대로.
+  const _houseArt = FLOOR_SVG && _decoImg('yard_house');
+  if (_houseArt) _drawYardHouseArt(_houseArt, hx, hw, C);
+  else {
   {
     const lx=hx, ly=0, lw=hw, lh=hh; // left-x, top-y, width, height
 
@@ -9262,6 +9292,7 @@ function _drawYard() {
     //  [DECO-VIEW-FIT-1] 집 둘레는 집 폭까지만(마당이 80칸으로 넓어진 뒤 집 오른쪽 잔디를 판 끝까지 가로지르던 줄 — 디자인 ⑯) + 오른쪽 변
     _dCtx.beginPath(); _dCtx.moveTo(hx,hh); _dCtx.lineTo(hx+hw,hh); _dCtx.lineTo(hx+hw,0); _dCtx.stroke();
   }
+  }   // [DECO-HOUSE-ART-1] 옛 그리기 끝
 
   // 격자 (집 영역 제외) — [DECO-VIEW-FIT-1] 판 크기까지(전엔 캔버스 크기 W·H 까지라 오른쪽·아래로 밀면 격자가 없었다 · 집 오른쪽 칸 위 3줄도)
   const BW = DY.cols*C, BH = DY.rows*C;
@@ -9333,7 +9364,9 @@ function _drawYard() {
   });
 
   // 문 클릭 좌표 저장 (새 문 위치 기준)
-  {
+  if (_houseArt) {   // [DECO-HOUSE-ART-1] 그림 속 문 자리(viewBox x268~332 · y248~352, 한 칸 = 100)
+    _dCv._doorX = hx + 2.68 * C; _dCv._doorY = -C + 2.48 * C; _dCv._doorW = 0.64 * C; _dCv._doorH = 1.04 * C;
+  } else {
     const _hw=hw, _hh=hh, _hx=hx;
     const _doorW=C*.88, _doorH=C*1.05;
     const _doorX=_hx+_hw/2-_doorW/2, _doorY=_hh-C*.28-_doorH;
@@ -9985,7 +10018,7 @@ function toggleDecoScene(){
   if (DECO_SCENE === 'yard') _decoViewRestore();   // [DECO-PT-1] 마당으로 돌아오면 그 자리로
   else if (_ifMode) _decoIndoorStart();           // [DECO-PHONE-INDOOR-1] 폰이면 집 안도 크게 · [INDOOR-ROOMS-1] 방이 있으면 방 둘레로
   if(_ifMode) ifSyncScene();
-  toast(isYard?'🌿 마당이에요! 집은 오른쪽 위 문으로 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
+  toast(isYard?'🌿 마당이에요! 위쪽 집 문을 누르면 들어가요.':'🏠 집 안이에요! 나가기 문으로 마당에 나가요.');
 }
 
 // ══ 장식 찾기 (DECO-FIND-1) — 이 장소만 · 이름 검색 · 최근 놓은 것 · 서랍 펼치기 ══
