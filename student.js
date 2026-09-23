@@ -4988,8 +4988,16 @@ function _inRoomsCommit(list, msg) {
   const prev = JSON.stringify(_inRooms(CUR)), next = JSON.stringify(list);
   if (prev === next) return false;
   _inRoomsSet(CUR, list);
-  _decoUndoPush({ t: 'rooms', sp: DECO_SPACE, prev, next });
-  decoDirty(); _drawDeco(); _inLookRender();
+  //  [DECO-RULE-R4] 방이 없어져 **벽이 사라진 벽걸이**는 가방으로 — 액자가 빈 바닥 한가운데 서 있지 않게.
+  //  (벽걸이 규칙 `_decoRuleWhy` 로는 이미 '안 되는 자리'다.) 같은 ↩ 한 단계에 담아, 되돌리면 방과 액자가 같이 돌아온다.
+  const bag = _decoList(CUR).filter(p => p.area === 'indoor' && _isWallDeco(p.id) && !_inIsWallRow(p.row, p.col));
+  if (bag.length) CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => bag.indexOf(p) < 0);
+  _decoUndoPush({ t: 'rooms', sp: DECO_SPACE, prev, next, bag: bag.map(p => Object.assign({}, p)) });
+  decoDirty(); _drawDeco(); renderDecoInv(); _inLookRender();
+  if (bag.length) {
+    const d = GAME_DATA.decorations.find(x => x.id === bag[0].id), nm = d ? d.icon + ' ' + d.name : '벽걸이';
+    msg = (msg || '').replace(/ \(↩ 되돌리기\)$/, '') + ` · 🎒 벽에 걸려 있던 ${nm}${bag.length > 1 ? ' 등 ' + bag.length + '개' : ''}${_josa(d ? d.name : '벽걸이', '은', '는')} 가방으로 (↩ 되돌리기)`;
+  }
   if (msg) toast(msg);
   return true;
 }
@@ -9558,6 +9566,12 @@ function _decoUndoOne(rec) {
   }
   if (rec.t === 'rooms') {   // [INDOOR-ROOMS-1] 방 만들기·없애기·방 벽지/바닥 — 그 공간의 방 목록을 앞 것으로
     _inRoomsSet(CUR, JSON.parse(rec.prev || '[]'), rec.sp);
+    //  [DECO-RULE-R4] 그때 가방으로 간 벽걸이를 제자리에 — 가진 수 안에서, 그 자리가 비어 있을 때만
+    (rec.bag || []).forEach(p => {
+      const inv = (CUR.inventory || []).find(i => i.id === p.id), used = (CUR.houseDecorations || []).filter(q => q.id === p.id).length;
+      if (!inv || inv.qty - used <= 0 || !canPlaceDeco(p.row, p.col, getDecoSize(p.id).w, getDecoSize(p.id).h, 'indoor', null, p.id)) return;
+      CUR.houseDecorations = (CUR.houseDecorations || []).concat([Object.assign({}, p)]);
+    });
     if (DECO_MODE === 'floor' && DECO_SCENE !== 'yard') _inLookRender();
     return true;
   }
