@@ -2085,7 +2085,7 @@ Object.keys(FLOWER_KINDS).forEach(id => { MAP_COL[id] = '#' + FLOWER_KINDS[id].m
 Object.keys(TOPIARY).forEach(id => { MAP_COL[id] = MAP_COL.tree; });   // [DESIGN-TOPIARY-1]
 function drawMap() {
   const g = mapCanvas.getContext('2d');
-  g.fillStyle = '#97cc5e'; g.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+  g.fillStyle = window.__miniBg || '#97cc5e'; g.fillRect(0, 0, mapCanvas.width, mapCanvas.height);   /* [MAC-MINIMAP] 모습 있는 판은 그 풀빛(stageSkin 이 정한다) · 없으면 예전 초록 그대로 */
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const rec = cells[idx(x, y)]; if (!rec) continue;
     g.fillStyle = MAP_COL[rec.k] || '#bdb7ab';
@@ -9814,6 +9814,7 @@ function stageSkin(def) {
   const g = skinHex(S.풀), gr = skinHex(S.바닥);
   SEASONS.forEach(s => { if (g != null) s.grass = g; if (gr != null) s.ground = gr; });
   VSKIN.stats.색 = { 계절: VSKIN.계절고정, 풀: g == null ? null : '#' + g.toString(16), 바닥: gr == null ? null : '#' + gr.toString(16) };
+  if (g != null) { window.__miniBg = '#' + g.toString(16).padStart(6, '0'); mapDirty = true; miniDirty = true; }   /* [MAC-MINIMAP] 미니맵·판 전체 지도 바탕도 판의 풀빛으로 — 화면은 모래빛인데 미니맵만 초록이던 말↔그림 어긋남(backlog 22) */
   /* [MAC-SKIN] **모습이 있는 판은 색을 곧바로 세운다.** seasonTick 은 바닥·하늘을 하루(3분)에 걸쳐 lerp 하므로,
      그대로 두면 아이가 바닷가 판을 열고 몇 분 동안 **초록 들판**을 본다(보스 실측: 연 직후 #a6cd6f · 15초 뒤 #adcd75 — 바란 색은 #ddd0a4).
      테마의 첫인상이 통째로 틀리는 자리다. 여기서 한 번만 lerp 없이 대입하고 판을 다시 칠한다.
