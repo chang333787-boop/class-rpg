@@ -10495,6 +10495,45 @@ window.__shopCap = () => { const 가게 = [], 필요별 = {}; cells.forEach((rec
     필요별[need] = { 단위: need === '배움' ? '아이' : '세대', 쓰는, 꽉찬, '꽉찬%': 쓰는 ? Math.round(꽉찬 / 쓰는 * 1000) / 10 : 0, 꽉찬집: s.full.size, 앉은집: s.asg.size, 말함: capSays(need) }; });
   const 장 = 필요별.장보기 || { 쓰는: 0, 꽉찬: 0, '꽉찬%': 0, 꽉찬집: 0, 앉은집: 0 };
   return { 켜짐: window.VRULES.shopCap.on, 돎: capLive() && capAny(), 가게, 필요별, 사는세대: 장.쓰는, 꽉찬세대: 장.꽉찬, '꽉찬%': 장['꽉찬%'], 꽉찬집: 장.꽉찬집, 앉은집: 장.앉은집, ...CAP.stats }; };
+/* ── [MAC-SEATSAVE] 자리 배정을 저장한다 — '누가 어느 일터·학교에 다니나' (설계 docs/village_seat_save_design.md #888 · 보스 09-23 Ⓐ 승인) ──
+   배정(JOBH · CAP)은 메모리에만 있어서, 다시 열면 '먼저 온 순서'가 '판을 훑는 순서'로 바뀌었다 — 빈 땅에서 키운 city 에서 일자리 10/10 · 학교 8/12 집이 바뀌었다
+   (처음부터 찬 판은 0 — 원래도 훑는 순서였으니). 그래서:
+   · 저장: 새 칸 `배정: { v: 1, 일: [[집, 일터, 자리], …], 배움: [[집, 학교, 자리], …] }` — 빈 칸은 안 적고, 배정이 없으면 칸 자체를 안 적는다(흐름 `flow` 와 같은 꼴).
+   · 열 때: 쌍마다 걸러 낸다(집·식구·곳·필요·몫·빈자리) → 되살린다 → **곧바로 한 바퀴**(모든 집을 한 번 훑어 모자란 표를 채움) — 그래서 첫 9초 '꽉 참' 빈틈도 없다.
+   · `SAVE_V` 는 2 그대로(올리면 옛 코드가 저장본을 통째로 치워 둔다) · 옛 코드는 모르는 칸을 지나간다 · 옛 저장본(칸 없음)은 지금과 똑같다.
+   · 원격 동기(sync.js)에는 안 넣는다 — 흐름과 함께 따로(Firebase 구조 = 사용자 승인 목록). 판(stage)은 원래 이 기기에만 저장한다.
+   원래 줄 수정 0 — serialize 감싸기 + loadSaved 에 한 줄 끼움. 끄면 VRULES.seatSave.on = false(저장도 되살리기도 안 함). */
+(window.VRULES = window.VRULES || {}).seatSave = { on: true };
+const SEATSV = { stats: { 적은쌍: 0, 되살린쌍: 0, 버린쌍: 0, 한바퀴: 0 } };
+function seatSave() { if (!window.VRULES.seatSave.on) return undefined; const out = {};
+  const 일 = []; JOBH.asg.forEach((a, h) => a.forEach((n, w) => { if (n > 0) 일.push([h, w, n]); })); if (일.length) out.일 = 일;
+  if (CAP) CAP.by.forEach((s, need) => { const arr = []; s.asg.forEach((a, h) => a.forEach((n, st) => { if (n > 0) arr.push([h, st, n]); })); if (arr.length) out[need] = arr; });
+  const n = Object.values(out).reduce((a, v) => a + v.length, 0); SEATSV.stats.적은쌍 = n; return n ? { v: 1, ...out } : undefined; }
+{ const s0 = serialize; serialize = function () { const d = s0.apply(this, arguments); try { const b = seatSave(); if (b) d.배정 = b; } catch (e) { /* 배정을 못 적어도 저장은 한다 */ } return d; }; }
+function seatLoad(b) { if (!window.VRULES.seatSave.on || !b || typeof b !== 'object') return;
+  const liveHouse = h => { const r = cells[h]; return r && r.root === h && r.k === 'house' && (res.get(h) || 0) > 0; };
+  const tri = v => Array.isArray(v) && v.length === 3 && v.every(x => Number.isFinite(+x)) ? v.map(x => x | 0) : null;
+  let kept = 0, drop = 0;
+  if (Array.isArray(b.일) && window.VRULES.jobsHomes.on && !soffOn('일자리')) { JOBH.wpDirty = true; const wp = jobsWpIndex(); JOBH.asg.clear(); JOBH.used.clear(); JOBH.lack.clear();
+    b.일.forEach(v => { const q = tri(v); if (!q) { drop++; return; } const [h, w, n0] = q; if (!liveHouse(h) || !wp.has(w) || n0 <= 0) { drop++; return; }
+      const a = JOBH.asg.get(h) || new Map(); let have = 0; a.forEach(x => have += x);
+      const n = Math.min(n0, jobsAdultsOf(h) - have, wp.get(w) - (JOBH.used.get(w) || 0)); if (n <= 0) { drop++; return; }
+      a.set(w, (a.get(w) || 0) + n); JOBH.asg.set(h, a); JOBH.used.set(w, (JOBH.used.get(w) || 0) + n); kept++; });
+    cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house') jobsHouseStep(rec); });   // 곧바로 한 바퀴 — 모자란 표를 채운다
+    cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const a = JOBH.asg.get(i); let have = 0; if (a) a.forEach(x => have += x);   // 모자란 표는 셈으로 다시 — '빈 집 먼저'(MAC-WORKFIRST)가 자리 있는 집을 한 바퀴 건너뛰어 비워 둔 채로 남지 않게
+      const need = jobsAdultsOf(i); if (need - have > 0) JOBH.lack.set(i, need - have); else JOBH.lack.delete(i); });
+    JOBH.cur = 0; JOBH.stats.한바퀴 = Math.max(1, JOBH.stats.한바퀴); }
+  if (CAP && capLive()) { const needs = capNeeds(); CAP.by.clear();
+    Object.keys(b).forEach(need => { if (need === 'v' || need === '일' || !Array.isArray(b[need])) return; if (!needs.has(need)) { drop += b[need].length; return; } const s = capS(need);
+      b[need].forEach(v => { const q = tri(v); if (!q) { drop++; return; } const [h, st, n0] = q; const c = cells[st];
+        if (!liveHouse(h) || !c || c.root !== st || capNeedOf(c.k) !== need || n0 <= 0) { drop++; return; }
+        const a = s.asg.get(h) || new Map(); let have = 0; a.forEach(x => have += x);
+        const n = Math.min(n0, capDemand(h, need) - have, capOf(c.k, need) - (s.used.get(st) || 0)); if (n <= 0) { drop++; return; }
+        a.set(st, (a.get(st) || 0) + n); s.asg.set(h, a); s.used.set(st, (s.used.get(st) || 0) + n); kept++; }); });
+    if (needs.size) { cells.forEach((rec, i) => { if (rec && rec.root === i && rec.k === 'house') needs.forEach(nd => capHouseStepNeed(rec, nd)); });   // 곧바로 한 바퀴
+      CAP.cur = 0; CAP.stats.한바퀴 = Math.max(1, CAP.stats.한바퀴); CAP.stores = new Set(); cells.forEach((rec, i) => { if (rec && rec.root === i && capNeedOf(rec.k)) CAP.stores.add(i); }); CAP.placed = placedTotal; } }
+  SEATSV.stats.되살린쌍 = kept; SEATSV.stats.버린쌍 = drop; SEATSV.stats.한바퀴++; }
+window.__seatSave = () => ({ 켜짐: window.VRULES.seatSave.on, ...SEATSV.stats });
 /* ── [MAC-EMPTYCARD] 빈 집은 웃지 않는다 (창조자 23회 ⓑ43 · 보스 09-23) ──
    satText 는 식구를 안 보고 필요만 세서, 주민 0 인 아파트가 "😊 4세대 · 다 있어요 · 나무가 많아 좋아요"라고 했다.
    아이가 집을 누르는 길(act)은 식구가 0 이면 이미 '빈집이에요 · …'로 갈라 이 말을 안 부르지만, 시험 훅(__houseText)·붐빔 조각 보기(__crowdSeg)는
@@ -11025,6 +11064,7 @@ function loadSaved(rawOverride) {
       const hh = Array.isArray(v) && v[3] > 1 ? Math.min(99, v[3] | 0) : 0;   /* [MAC-HOUSEHOLD] 네 번째 칸 · 없으면 한 세대(옛 저장본) */
       hinfo.set(+r, hh > 1 ? { lv: 1, hs, 세대: hh } : { lv, hs }); res.set(+r, Math.min(houseCap(+r), n)); if (lv > 1 || hh > 1) dirtyChunks.add(chunkOfCell(+r)); } }
   if (d.flow) flowLoad(d.flow);   /* [MAC-FLOW] 저장된 흐름(밭·가게 양 · 운반 중 · 세대 오늘 몫) */
+  if (d.배정 && typeof seatLoad === 'function') seatLoad(d.배정);   /* [MAC-SEATSAVE] 누가 어느 일터·학교에 다니나 — 되살리고 곧바로 한 바퀴 */
   if (Array.isArray(d.unlocked)) d.unlocked.forEach(k => { if (K[k]) unlocked.add(k); });
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
   if (Array.isArray(d.hist)) HIST = d.hist.filter(p => p && typeof p.d === 'number').slice(-HIST_MAX);   // 마을 흐름(F35)
