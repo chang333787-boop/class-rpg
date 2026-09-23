@@ -1339,6 +1339,72 @@
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       _decoUndoClear(); decoSpaceSet(1); await sleep(150);
     }
+
+    //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
+    //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
+    //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
+    {
+      let seed = 7; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+      const yard = GAME_DATA.decorations.filter(d => d.cat === 'yard' && !d.hidden).map(d => d.id);
+      const indoor = GAME_DATA.decorations.filter(d => d.cat === 'indoor' && !d.hidden).map(d => d.id);
+      //  가진 수 = 앞 시험이 이미 놓아 둔 수 + 3 (앞 시험 몫을 '초과'로 세지 않게)
+      const placedN = id => (CUR.houseDecorations || []).filter(p => p.id === id).length;
+      CUR.inventory = (CUR.inventory || []).filter(i => !GAME_DATA.decorations.some(d => d.id === i.id)).concat(yard.concat(indoor).map(id => ({ id, qty: placedN(id) + 3 })));
+      const tiles = ['water', 'stone', 'sand', 'brick', 'tulipbed#red+picket', 'hydrangea', 'grass'];
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const gold0 = CUR.gold, errs = [];
+      for (let i = 0; i < 900; i++) {
+        const k = rnd(20), area = DECO_SCENE;
+        try {
+          if (k < 11) { setDecoMode('deco'); SEL_DECO = (area === 'yard' ? yard : indoor)[rnd(area === 'yard' ? yard.length : indoor.length)];
+            _decoPlace(area, rnd(area === 'yard' ? DY.rows : DI.rows), rnd(area === 'yard' ? DY.cols : DI.cols)); }
+          else if (k < 12) { setDecoMode('erase'); _decoPlace(area, rnd(30), rnd(40)); setDecoMode('deco'); }
+          else if (k < 15 && area === 'yard') { setDecoMode('floor'); CUR_FLOOR_TILE = tiles[rnd(tiles.length)]; const r = rnd(40), c = rnd(70); if (!_isHC(r, c) && !_isFarmCell(r, c)) _paintFloor(r, c); setDecoMode('deco'); }
+          else if (k < 16 && area !== 'yard') _inRoomAdd(_inRoomFrom(rnd(22), rnd(40), rnd(22) + 3, rnd(40) + 4));
+          else if (k < 17 && area !== 'yard') { _inPk.tab = rnd(2) ? 'wall' : 'floor'; _inPk.wall = { name: 'star', color: 'sky' }; _inPk.floor = { name: 'carpet', color: 'pink' }; setDecoMode('floor'); _inTap(rnd(25), rnd(45)); setDecoMode('deco'); }
+          else if (k < 18 && area !== 'yard') { _inPk.tab = 'room'; _inPk.tool = 'erase'; setDecoMode('floor'); _inTap(rnd(25), rnd(45)); _inPk.tool = ''; setDecoMode('deco'); }
+          else if (k < 19 && rnd(3) === 0) decoUndo();
+          else if (k < 19) toggleDecoScene();
+          else decoSpaceSet(1 + rnd(3));
+        } catch (e) { errs.push(i + ' ' + String(e).slice(0, 60)); }
+      }
+      for (let i = 0; i < 20; i++) decoUndo();                              // 되돌리기 20번까지 몰아서
+      SEL_DECO = null; setDecoMode('deco'); _inPk.tab = 'wall'; _inPk.tool = '';
+      const bad = [], keepSp = DECO_SPACE;
+      for (let sp = 1; sp <= 3; sp++) {
+        DECO_SPACE = sp;
+        const list = _decoList(CUR), fl = _yardFloorGet(CUR);
+        list.forEach((p, i) => {
+          const d = GAME_DATA.decorations.find(x => x.id === p.id), z = getDecoSize(p.id), R = p.area === 'yard' ? DY_FULL : DI_FULL;
+          if (p.row < 0 || p.col < 0 || p.row + z.h > R.rows || p.col + z.w > R.cols) bad.push('판밖');
+          if (d && d.cat !== p.area) bad.push('장소');
+          for (let dr = 0; dr < z.h; dr++) for (let dc = 0; dc < z.w; dc++) {
+            const r = p.row + dr, c = p.col + dc;
+            if (p.area === 'yard' && _isHC(r, c)) bad.push('집칸');
+            if (p.area === 'yard' && _isFarmCell(r, c)) bad.push('밭칸');
+            if (p.area === 'yard' && typeof _floorPaintBlock === 'function' && _floorPaintBlock(r, c, fl[r + '_' + c] || 'grass') === p) bad.push('바닥규칙(' + p.id + ')');
+          }
+          if (p.area === 'indoor' && _isWallDeco(p.id) && !_inIsWallRow(p.row, p.col)) bad.push('벽밖액자');
+          if (p.area === 'indoor' && !_isWallDeco(p.id) && typeof _inCrossesWall === 'function' && _inCrossesWall(p.row, p.col, z.w, z.h, _inRooms(CUR))) bad.push('벽가로지름');
+          list.forEach((q, j) => { if (j <= i || q.area !== p.area) return; const zq = getDecoSize(q.id);
+            if (p.row < q.row + zq.h && q.row < p.row + z.h && p.col < q.col + zq.w && q.col < p.col + z.w && !_decoOverlapOk(p.id, q) && !_decoOverlapOk(q.id, p)) bad.push('겹침'); });
+        });
+      }
+      DECO_SPACE = keepSp;
+      const overIds = (CUR.inventory || []).filter(i => (CUR.houseDecorations || []).filter(p => p.id === i.id).length > i.qty).map(i => i.id), over = overIds.length;
+      decoFlush('막 누르기'); await sleep(800);
+      const sv = (await R.db.ref('classRPG_v3/students/' + R.sid).once('value')).val() || {};
+      const norm = v => JSON.stringify(v || null, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)) ? Object.keys(x).sort().reduce((o, kk) => (o[kk] = x[kk], o), {}) : x);
+      const arr = v => Array.isArray(v) ? v : Object.values(v || {});
+      out('막누르기_오류없음', errs.length === 0 ? true : errs.slice(0, 2).join(' / '));
+      out('막누르기_규칙어김0', bad.length === 0 ? true : [...new Set(bad)].join(','));
+      out('막누르기_가진수안', over === 0 ? true : overIds.join(','));
+      out('막누르기_골드불변', CUR.gold === gold0);
+      out('막누르기_서버같음', norm(arr(sv.houseDecorations)) === norm(CUR.houseDecorations) && norm(sv.yardFloor) === norm(CUR.yardFloor)
+        && [1, 2, 3].every(k => norm((sv.yardFloors || {})[k]) === norm((CUR.yardFloors || {})[k]) && norm((sv.indoor || {})[k]) === norm((CUR.indoor || {})[k])));
+      out('막누르기_놓인수', (CUR.houseDecorations || []).length);
+      decoSpaceSet(1); await sleep(100);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';
