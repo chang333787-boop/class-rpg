@@ -1217,7 +1217,9 @@ try {
     { id: 'd_y69', name: '먹이통', feeder: true },
     { id: 'd_y55', name: '닭 한 마리' },
   ];
-  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date,
+  //  시계는 가짜 — 타이머를 하나 돌릴 때마다 그 타이머의 ms 만큼 간다([DECO-WORDS-1] 줄 바꾸기는 '마지막 톡에서 4초 뒤'라 시간이 흘러야 한다)
+  const vclock = { t: 1e12 };
+  const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map, Date: { now: () => vclock.t },
     document: { hidden: false, getElementById: (id) => (id === 'if-topview' ? host : null), createElement: mkEl, addEventListener() {} },
     window: { matchMedia: () => ({ matches: false }) }, Image: function () { return { set src(v) {}, naturalWidth: 0 }; },
     getComputedStyle: () => ({ position: 'static' }),
@@ -1298,7 +1300,7 @@ try {
   test('닭이 갈 먹이통을 물고 있다', () => { if (!hen.feeder) throw new Error('먹이통 없음'); });
   let best = 99;
   for (let i = 0; i < 300 && timers.size; i++) {
-    const e = [...timers.entries()][0]; timers.delete(e[0]); e[1].fn();
+    const e = [...timers.entries()][0]; timers.delete(e[0]); vclock.t += e[1].ms || 0; e[1].fn();
     best = Math.min(best, Math.abs(hen.cur.row - 10) + Math.abs(hen.cur.col - 10));
   }
   test('300걸음 안에 먹이통 옆(1칸)까지 온다', () => { if (best > 1) throw new Error('가장 가까워진 거리 ' + best); });

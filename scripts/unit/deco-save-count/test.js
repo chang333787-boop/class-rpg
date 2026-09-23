@@ -1315,7 +1315,7 @@
       setDecoMode('deco'); _decoUndoClear(); renderDecoInv();
       const last = () => [...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent;
       selectDeco('d_y54'); _decoPlace('yard', 12, 12);
-      out('고름_다놓으면_내려놓기', SEL_DECO === null && /다 놓았어요/.test(last()));
+      out('고름_다놓으면_내려놓기', SEL_DECO === null && /다 놓/.test(last()));
       selectDeco('d_y2'); selectDeco('d_y54');                               // 든 카드가 있는데 ×0 카드를 누름
       out('고름_×0카드_누르면_풀림', SEL_DECO === null);
       selectDeco('d_y2'); selectDeco('d_y2');
@@ -1338,6 +1338,30 @@
       _decoSelClear(); _decoSelOff = null;
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       _decoUndoClear(); decoSpaceSet(1); await sleep(150);
+    }
+
+    //  ㉔ 말 ↔ 실제(DECO-WORDS-1) — 알림이 까닭을 말하고, 처음 아이에게 맞는 말을 한다
+    if (typeof _decoCantWhy === 'function') {
+      decoSpaceSet(3); await sleep(100);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      SEL_DECO = 'd_y12';
+      out('말_판끝', /판 끝이라/.test(_decoCantWhy(42, 78, 3, 3, 'yard')));
+      out('말_집에걸림', /집에 걸려요/.test(_decoCantWhy(1, 42, 3, 3, 'yard')));
+      { const k = DECO_SPACE; DECO_SPACE = 1; const fz = _getFarmZone(); out('말_밭에걸림', /밭에 걸려요/.test(_decoCantWhy(fz.startRow - 1, fz.startCol - 1, 3, 3, 'yard'))); DECO_SPACE = k; }   // 밭은 공간 1 에만
+      const keepInv = CUR.inventory;
+      CUR.inventory = (keepInv || []).filter(i => !GAME_DATA.decorations.some(d => d.id === i.id));
+      out('말_장식0이면_상점으로', /상점에서 골라/.test(_decoPickFirstWhy('yard')));
+      CUR.inventory = keepInv; SEL_DECO = null;
+      out('말_가졌으면_서랍에서', /아래에서 놓을 장식을 먼저/.test(_decoPickFirstWhy('yard')));
+      //  처음 아이(마당 장식 0)에게는 '넓어졌어요'를 안 띄운다
+      try { localStorage.removeItem('rpg.deco.landHint'); } catch (e) {}
+      const keepHD = CUR.houseDecorations; CUR.houseDecorations = (keepHD || []).filter(p => p.area !== 'yard');
+      const n0 = [...document.querySelectorAll('.toast-msg')].filter(e => /넓어졌어요/.test(e.textContent)).length;
+      _decoLandHint();
+      out('말_처음아이_넓어졌어요없음', [...document.querySelectorAll('.toast-msg')].filter(e => /넓어졌어요/.test(e.textContent)).length === n0);
+      CUR.houseDecorations = keepHD;
+      decoSpaceSet(1); await sleep(100);
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
