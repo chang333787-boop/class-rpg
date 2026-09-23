@@ -58,6 +58,7 @@
   },
   "건물": ["road", "avenue", "gravel", "house", "shop", "well", "play", "bench", "minibench", "tree", "bigtree", "bush", "flower", "pot", "lamp", "post", "rock", "boulder", "fir", "cabin", "lumber", "school", "library"],
   "흐름": { "on": true, "물건": "통나무",
+    "말": { "growing": "나무 베는 중", "ready": "벤 통나무가 있어요" },
     "만드는곳": { "lumber": { "간격틱": 600, "양": 1, "담을수": 5 } },
     "받는곳": { "shop": { "담을수": 8 } },
     "쓰는시각": 12, "세대몫": 1, "운반상한": 4, "칸당틱": 6 },

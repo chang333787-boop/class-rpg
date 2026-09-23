@@ -43,6 +43,7 @@
   },
   "건물": ["road", "avenue", "gravel", "house", "shop", "well", "play", "bench", "minibench", "tree", "bush", "flower", "pot", "lamp", "post", "lighthouse", "pier", "dune", "school", "library"],
   "흐름": { "on": true, "물건": "생선",
+    "말": { "growing": "고기 잡는 중", "ready": "잡은 생선이 있어요" },
     "만드는곳": { "pier": { "간격틱": 600, "양": 1, "담을수": 5 } },
     "받는곳": { "shop": { "담을수": 8 } },
     "쓰는시각": 12, "세대몫": 1, "운반상한": 4, "칸당틱": 6 },
