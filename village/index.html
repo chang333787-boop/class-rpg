@@ -2949,6 +2949,110 @@ function streamParts(rec) {
   hookAdd('removeAt', function (next, args) { const [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null, was = !!(c && c.k === 'sbr');
     const r = next(args); if (was && window.VRULES.streamBridge.on && !cells[idx(x, y)]) { placeAt('stream', x, y, 0); STREAM.stats.되돌림++; } return r; }); }
 window.__stream = (x, y) => ({ 켜짐: window.VRULES.stream.on, 다리켜짐: window.VRULES.streamBridge.on, ...STREAM.stats, 칸: x == null ? null : { 종류: inb(x, y) && cells[idx(x, y)] ? cells[idx(x, y)].k : null, 곧음: streamAxis(x, y) } });
+/* ── [MAC-STREAMLOOK] 개울이 '수로'가 아니라 개울로 보이게 — 물가 · 둥근 굽이 · 흐르는 결 · 나무 다리 (보스 09-23 · #885 뒤 '모습 한 묶음') ──
+   #885 의 개울은 옅은 파란 길처럼 곧게 판 도랑으로 읽혔다(보스). **판정 0 · 그림만** 바꾼다:
+   · 물가: 물 둘레에 흙 띠 → 그 바깥에 풀 띠(잔디 어두운 줄 색 · 철 따라 바뀐다). 안 이어진 변에 돌·갈대, 곧은 물에 가끔 수련 잎.
+     돌·갈대 자리는 **칸 자리로 정한다**(무작위 아님) → 다시 그려도, 저장했다 열어도 같다.
+   · 굽이: 물·흙·풀을 '가운데 → 이어진 변' 팔과 가운데 원으로 짓는다 → 굽음·T·끝의 바깥 모서리가 둥글다. 홀로 있는 칸은 둥근 웅덩이.
+   · 흐름: 물 위에 옅은 결(가는 흰 줄)이 흐르는 쪽으로 천천히 미끄러지며 나타났다 사라진다. 굽이에서는 제자리에서 반짝.
+     InstancedMesh 하나(개울이 없으면 숨김 · 있으면 draw call +1) · 칸마다 둘 · 최대 flowCap 개 · 셰이더·텍스처 없음(크롬북 예산).
+   · 다리: 판자 여러 장(두 나무색 번갈아 · 가운데가 살짝 솟음) · 판 밑 보 둘 · 기둥 셋씩 + 기둥 머리 · 위·가운데 난간 둘.
+   스위치 VRULES.streamLook(보기) — 끄면 #885 모습 그대로. 원래 줄 수정 0 — streamParts 바꿔 끼우기 · drawClock 감싸기(결 그리기). */
+(window.VRULES = window.VRULES || {}).streamLook = { on: true, width: .52, water: 0x69c4ea, waterH: .24, dirt: .42, dirtH: .17, grass: .16, grassH: .09, flowCap: 600, flowMs: 5200 };
+const SLOOK = { mesh: null, list: [], dirty: true, scanT: -1e9, stats: { 칸: 0, 결: 0, 다시셈: 0 } };
+const slookHash = (x, y, k) => { let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(k | 0, 1442695041) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+function streamLookParts(rec) {
+  const R = window.VRULES.streamLook, x = cX(rec.root), y = cY(rec.root), cx = wx(x), cz = wz(y), HALF = CS / 2, out = [];
+  const Wd = CS * (R.width || window.VRULES.stream.width || .62) / 2, bridge = rec.k === 'sbr', ax = bridge ? (rec.rot & 1) : -1;   // 물 너비는 #885 보다 좁게 — 웅덩이가 칸 안에서 불룩할 틈
+  const jn = bridge ? { n: ax === 0, s: ax === 0, w: ax === 1, e: ax === 1 } : { n: streamAt(x, y - 1), s: streamAt(x, y + 1), w: streamAt(x - 1, y), e: streamAt(x + 1, y) };
+  const straight = (jn.n && jn.s && !jn.w && !jn.e) || (jn.w && jn.e && !jn.n && !jn.s), lone = !jn.n && !jn.s && !jn.w && !jn.e, rW = lone ? CS * .36 : Wd;
+  const box = (c, s, p) => out.push({ g: 'box', c, s, p: [cx + p[0], p[1], cz + p[2]], abs: true });
+  const disk = (c, r, h, px, pz, py) => [0, Math.PI / 6].forEach(ry => out.push({ g: 'cyl', c, s: [r, h, r], p: [cx + (px || 0), py == null ? h / 2 : py, cz + (pz || 0)], ry, abs: true }));   // 육각 둘을 30° 엇갈려 — 거의 둥근 원
+  /* 층 셋 — 풀(가장 넓고 낮게) · 흙 · 물(가장 좁고 높게). 팔은 가운데에서 이어진 변 끝까지(이웃 칸과 이어진다) · T·끝은 가운데 원.
+     **굽음**은 안쪽 모서리를 중심으로 도는 활(조각 6개를 돌려 잇는다) — 바깥이 크게 둥글어 물이 휘돌아 흐른다. 모든 층이 칸 안에 든다. */
+  const DIR = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] }, con = ['n', 's', 'w', 'e'].filter(d => jn[d]);
+  const bend = !bridge && con.length === 2 && !straight ? { a: DIR[con[0]], b: DIR[con[1]] } : null;
+  if (bend) bend.C = [(bend.a[0] + bend.b[0]) * HALF, (bend.a[1] + bend.b[1]) * HALF];
+  const arcAt = (r, f) => [bend.C[0] + r * (-bend.b[0] * Math.cos(f) - bend.a[0] * Math.sin(f)), bend.C[1] + r * (-bend.b[1] * Math.cos(f) - bend.a[1] * Math.sin(f))];
+  const arc = (c, hw, h, py) => { const NS = 6, dF = Math.PI / 2 / NS;
+    for (let i = 0; i < NS; i++) { const f = (i + .5) * dF, [px, pz] = arcAt(HALF, f), tx = bend.b[0] * Math.sin(f) - bend.a[0] * Math.cos(f), tz = bend.b[1] * Math.sin(f) - bend.a[1] * Math.cos(f);
+      out.push({ g: 'box', c, s: [2 * (HALF + hw) * Math.sin(dF / 2) + .08, h, hw * 2], p: [cx + px, py == null ? h / 2 : py, cz + pz], ry: Math.atan2(-tz, tx), abs: true }); } };
+  /* 곧은 칸 절반쯤은 물이 불룩한 웅덩이(너비가 칸마다 달라 자로 그은 도랑이 안 된다) */
+  const pool = straight && !bridge && slookHash(x, y, 51) < .55, pr = Wd * (1.45 + slookHash(x, y, 52) * .25), po = (slookHash(x, y, 53) - .5) * .7, pX = jn.n ? po : 0, pZ = jn.n ? 0 : po;
+  [[R.grass, R.grassH, 0x6ea83c, HALF - .02], [R.dirt, R.dirtH, 0xd2b88a, HALF - .04], [0, R.waterH, R.water, HALF - .12]].forEach(([g, h, c, lim]) => { const hw = Math.min(HALF - .02, rW + g);
+    if (bend) { arc(c, hw, h); return; }
+    if (jn.n) box(c, [hw * 2, h, HALF], [0, h / 2, -HALF / 2]); if (jn.s) box(c, [hw * 2, h, HALF], [0, h / 2, HALF / 2]);
+    if (jn.w) box(c, [HALF, h, hw * 2], [-HALF / 2, h / 2, 0]); if (jn.e) box(c, [HALF, h, hw * 2], [HALF / 2, h / 2, 0]);
+    if (!straight) disk(c, hw, h); if (pool) disk(c, Math.min(lim - Math.abs(po), pr + g), h, pX, pZ); });
+  /* 가운데 깊은 물 한 줄(조금 진한 파랑) — 물이 얕은 판이 아니라 깊이가 있어 보이게 */
+  const deep = 0x4aa6d4, dw = Wd * .9, dy = R.waterH + .004;
+  if (bend) arc(deep, dw / 2, .012, dy);
+  else { if (jn.n) box(deep, [dw, .012, HALF], [0, dy, -HALF / 2]); if (jn.s) box(deep, [dw, .012, HALF], [0, dy, HALF / 2]);
+    if (jn.w) box(deep, [HALF, .012, dw], [-HALF / 2, dy, 0]); if (jn.e) box(deep, [HALF, .012, dw], [HALF / 2, dy, 0]);
+    if (!straight && !lone) disk(deep, dw / 2, .012, 0, 0, dy); }
+  /* 물가 자리 — 곧은·T·끝은 안 이어진 변을 따라, 굽음은 바깥 활(과 안쪽 모퉁이)을 따라. [x, z, 바깥쪽 x, 바깥쪽 z] */
+  const edge = rW + R.dirt * .5, bank = (k, off, t) => {
+    if (bend) { const f = .3 + slookHash(x, y, k + 81) * .97, [px, pz] = arcAt(HALF + edge + off, f); return [px, pz]; }
+    const [, sx, sz] = sides[k % sides.length]; return [sx ? sx * (edge + off) : t, sz ? sz * (edge + off) : t]; };
+  const sides = bridge ? [] : [['n', 0, -1], ['s', 0, 1], ['w', -1, 0], ['e', 1, 0]].filter(([d]) => !jn[d]);   // 다리 칸은 물가 장식 없음(판 위로 돌이 솟는다)
+  /* 돌(반쯤 나옴) — 변마다 하나둘 */
+  sides.forEach((sd, k) => { const h1 = slookHash(x, y, k + 1), h2 = slookHash(x, y, k + 11), t = (h1 - .5) * CS * .6;
+    if (h1 < .65) { const [px, pz] = bank(k, 0, t); out.push({ g: 'sph', c: h2 < .5 ? 0xd8d2c4 : P.stone, s: [.46, .3, .38], p: [cx + px, .2, cz + pz], abs: true }); }
+    if (h2 < .45) { const [px, pz] = bank(k + 5, .12, -t * .8); out.push({ g: 'sph', c: P.stoneD, s: [.3, .2, .26], p: [cx + px, .16, cz + pz], abs: true }); } });
+  if (bend && slookHash(x, y, 91) < .7) { const [px, pz] = arcAt(HALF - rW - R.dirt * .5, .6 + slookHash(x, y, 92) * .4); out.push({ g: 'sph', c: 0xd8d2c4, s: [.34, .22, .3], p: [cx + px, .18, cz + pz], abs: true }); }   // 안쪽 모퉁이 조약돌
+  /* 풀 덤불 — 물가 바깥 가장자리에 둥근 잎 덩이(물가 선이 들쭉날쭉해진다 · 잎 색이라 철 따라 바뀐다) */
+  sides.forEach((sd, k) => { const h = slookHash(x, y, k + 61); if (h > .7) return; const t = (slookHash(x, y, k + 71) - .5) * CS * .7, [px, pz] = bank(k + 9, R.dirt * .5 + .25, t);
+    out.push({ g: 'sph', c: h < .35 ? P.leaf : P.leafL, s: [.46, .3, .4], p: [cx + px, .14, cz + pz], abs: true }); });
+  /* 부들 한 무리 — 3×3 칸 조각마다 **한 칸에만**(조각 안 자리는 해시로) · 그 칸도 절반만 → 드문드문 무리로(칸마다 서면 울타리 말뚝 줄처럼 읽혔다 · 보스 #906)
+     2~4포기 · 초록 줄기 + 갈색 이삭(둘까지) · 밑동에 잎 덩이 */
+  const bx0 = Math.floor(x / 3), by0 = Math.floor(y / 3), pick = Math.floor(slookHash(bx0, by0, 24) * 9);
+  if (sides.length && !bridge && (x - bx0 * 3) + 3 * (y - by0 * 3) === pick && slookHash(bx0, by0, 25) < .55) { const k = Math.floor(slookHash(x, y, 21) * sides.length), t = (slookHash(x, y, 23) - .5) * CS * .5, [bx, bz] = bank(k + 13, 0, t), n = 2 + Math.floor(slookHash(x, y, 26) * 3);
+    out.push({ g: 'sph', c: P.leaf, s: [.42, .2, .36], p: [cx + bx, .14, cz + bz], abs: true });
+    [[0, 0, 1.25], [.26, .14, 1.0], [-.24, .18, 1.1], [.12, -.22, .85]].slice(0, n).forEach(([a, o, ht], j) => { const px = bx + a, pz = bz + o;
+      box(j % 2 ? P.leafL : P.leaf, [.14, ht, .14], [px, ht / 2, pz]);
+      if (j < 2) box(0x9a6a3a, [.17, .3, .17], [px, ht + .1, pz]); }); }
+  if (straight && !bridge && slookHash(x, y, 31) < .22) { const u = (slookHash(x, y, 32) - .5) * CS * .5, v = (slookHash(x, y, 33) - .5) * Wd * .8;
+    disk(P.leaf, .3, .03, jn.n ? v : u, jn.n ? u : v, R.waterH + .02); }
+  if (!bridge) return out;
+  /* 다리 — 길 방향(along)으로 판자를 여러 장 · 가운데가 한 뼘 솟는다 · 판 밑 보 둘 · 기둥 셋씩 + 머리 · 난간 둘 */
+  const alongX = ax === 0, DW = CS * .86, DT = .14, top = .36, N = 6, HUMP = .1;
+  const put = (c, sa, sy, sc, pa, py, pc) => alongX ? box(c, [sa, sy, sc], [pa, py, pc]) : box(c, [sc, sy, sa], [pc, py, pa]);
+  for (let i = 0; i < N; i++) { const u = (i + .5) / N - .5, hy = HUMP * (1 - 4 * u * u);
+    put(i % 2 ? P.woodD : P.wood, CS / N - .06, DT, DW, u * CS, top - DT / 2 + hy, 0);
+    put(0x8a6440, CS / N - .06, .02, DW * .92, u * CS, top + hy + .005, 0); }   // 판자 결(가운데 한 줄 어둡게)
+  [-1, 1].forEach(sg => put(P.woodD, CS, .16, .16, 0, top - DT - .08, sg * (DW / 2 - .18)));
+  [-1, 1].forEach(sg => { const c = sg * (DW / 2 - .06);
+    [-.42, 0, .42].forEach(a => { const hy = HUMP * (1 - 4 * (a * a)); put(P.woodD, .16, .64, .16, a * CS, top + hy + .3, c); put(P.woodL, .22, .07, .22, a * CS, top + hy + .65, c); });
+    put(P.woodD, CS * .96, .1, .1, 0, top + .58, c); put(P.wood, CS * .96, .07, .07, 0, top + .32, c); });
+  return out; }
+{ const sp0 = streamParts; streamParts = function (rec) { return window.VRULES.streamLook.on ? streamLookParts(rec) : sp0.apply(this, arguments); }; }
+/* 흐르는 결 — 곧은 개울 칸마다 둘이 흐르는 쪽(+x · +z)으로 미끄러지며 나타났다 사라진다. 굽이·끝은 제자리 반짝 */
+{ hookAdd('placeAt', function (next, args) { SLOOK.dirty = true; return next(args); }); hookAdd('removeAt', function (next, args) { SLOOK.dirty = true; return next(args); }); }
+function streamLookScan(now) { const L = []; SLOOK.dirty = false; SLOOK.scanT = now; SLOOK.stats.다시셈++;
+  for (let i = 0; i < W * H; i++) { const c = cells[i]; if (!c || c.k !== 'stream' || c.root !== i) continue; const x = cX(i), y = cY(i);
+    L.push({ x: wx(x), z: wz(y), ax: streamAxis(x, y), h: slookHash(x, y, 41), g: slookHash(x, y, 42) }); }
+  SLOOK.list = L; SLOOK.stats.칸 = L.length; }
+function streamFlowMesh() { if (SLOOK.mesh) return SLOOK.mesh;
+  const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .02, .1), new THREE.MeshLambertMaterial({ color: 0xf2fbff, emissive: 0x2a4a58, transparent: true, opacity: .6, depthWrite: false }), window.VRULES.streamLook.flowCap || 600);
+  m.count = 0; m.frustumCulled = false; m.renderOrder = 1; scene.add(m); SLOOK.mesh = m; return m; }
+let _slookD = null;   // 그릴 때 처음 만든다 — Object3D 는 uuid 를 Math.random 으로 뽑아, 불러올 때 만들면 시드 시뮬의 난수 차례가 한 칸 밀린다(판정 값이 움직였다 · 보스 #906 기준 ①)
+function streamFlowDraw(now) {
+  const R = window.VRULES.streamLook;
+  if (!R.on || !window.VRULES.stream.on) { if (SLOOK.mesh) { SLOOK.mesh.count = 0; SLOOK.mesh.visible = false; } return; }
+  if (SLOOK.dirty || now - SLOOK.scanT > 2000) streamLookScan(now);
+  if (!SLOOK.list.length) { if (SLOOK.mesh) { SLOOK.mesh.count = 0; SLOOK.mesh.visible = false; } return; }
+  if (!_slookD) _slookD = new THREE.Object3D();
+  const im = streamFlowMesh(), cap = Math.min(R.flowCap || 600, im.instanceMatrix.count), Wd = CS * (R.width || window.VRULES.stream.width || .62) / 2, y = R.waterH + .02; let k = 0;
+  for (const c of SLOOK.list) { if (k >= cap) break;
+    for (let j = 0; j < 2 && k < cap; j++) { const ph = (now / (R.flowMs || 5200) + c.h * 3 + j * .5) % 1, fade = Math.sin(Math.PI * ph);
+      if (c.ax >= 0) { const a = (ph - .5) * CS * .9, b = (j ? .42 : -.3) * Wd * (.6 + c.g * .6);
+        _slookD.position.set(c.x + (c.ax === 1 ? a : b), y, c.z + (c.ax === 1 ? b : a)); _slookD.rotation.set(0, c.ax === 1 ? 0 : Math.PI / 2, 0); _slookD.scale.set(.2 + .8 * fade, 1, .6 + .4 * fade); }
+      else { const ang = c.h * 6.283 + j * 2.4; _slookD.position.set(c.x + Math.cos(ang) * Wd * .4, y, c.z + Math.sin(ang) * Wd * .4); _slookD.rotation.set(0, ang, 0); _slookD.scale.set(.05 + .45 * fade, 1, .8); }
+      _slookD.updateMatrix(); im.setMatrixAt(k++, _slookD.matrix); } }
+  im.count = k; im.visible = k > 0; im.instanceMatrix.needsUpdate = true; SLOOK.stats.결 = k; }
+{ const dc0 = drawClock; drawClock = function () { const r = dc0.apply(this, arguments); streamFlowDraw(performance.now()); return r; }; }
+window.__streamLook = () => ({ 켜짐: window.VRULES.streamLook.on, ...SLOOK.stats, 보임: !!(SLOOK.mesh && SLOOK.mesh.visible) });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
    · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
