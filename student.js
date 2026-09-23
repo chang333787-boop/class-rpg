@@ -7970,6 +7970,14 @@ function _decoAttachGestures(cv) {
   cv.addEventListener('pointercancel', end);
   cv.addEventListener('lostpointercapture', end);
 
+  //  [DECO-SEL-HL-1] 마우스가 누르지 않은 채 움직이면 커서 칸에 놓일 모습 — 칸이 바뀔 때만 다시 그린다(터치는 hover 가 없다)
+  cv.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse' || e.buttons) return;
+    const k = _decoCellAt(e.clientX, e.clientY), h = _decoHover;
+    if ((!k && !h) || (k && h && k.area === h.area && k.r === h.r && k.c === h.c)) return;
+    _decoHover = k; if (SEL_DECO) _drawDeco();
+  });
+  cv.addEventListener('pointerleave', () => { if (_decoHover) { _decoHover = null; if (SEL_DECO) _drawDeco(); } });
   cv.addEventListener('contextmenu', e => e.preventDefault());   // [DECO-PAN-1] 오른쪽 끌기에 메뉴가 뜨지 않게
   cv.addEventListener('wheel', e => {
     e.preventDefault();
@@ -8445,12 +8453,83 @@ function _decoOverflowCells(p) {
   return out;
 }
 //  (r,c) 가 어느 장식의 솟은 그림 밑인가 — 그 장식(없으면 null)
+const _decoOverflowMemo = { key: '', map: null };
 function _decoOverflowAt(student, r, c) {
+  //  [DECO-SEL-HL-1] 내 마당은 상태가 같으면 한 번 센 지도를 쓴다(놓을 칸 모음이 칸마다 부른다)
+  if (student === CUR) {
+    const key = [DECO_SPACE, _decoStateVer, !!_decoBBox, (CUR.houseDecorations || []).length].join('|');
+    if (_decoOverflowMemo.key !== key) {
+      const map = new Map();
+      _decoList(CUR).forEach(p => { if (p.area !== 'yard' || ANIM_DECO[p.id] || _isPenDeco(p.id)) return;
+        _decoOverflowCells(p).forEach(([rr, cc]) => { if (!map.has(rr + '_' + cc)) map.set(rr + '_' + cc, p); }); });
+      _decoOverflowMemo.key = key; _decoOverflowMemo.map = map;
+    }
+    return _decoOverflowMemo.map.get(r + '_' + c) || null;
+  }
   for (const p of _decoList(student)) {
     if (p.area !== 'yard' || ANIM_DECO[p.id] || _isPenDeco(p.id)) continue;
     if (_decoOverflowCells(p).some(([rr, cc]) => rr === r && cc === c)) return p;
   }
   return null;
+}
+
+// ══ 놓을 곳 표시 (DECO-SEL-HL-1 · 디자인 D8) ══════════════════
+//  전: 놓일 수 있는 **시작 칸마다** 장식 크기 네모를 겹쳐 칠해 큰 장식일수록 겹친 곳이 하얗게 얼룩졌다 · 매 프레임 보이는 칸마다 다시 셌다 ·
+//      물·동물 뒷줄·방 벽 같은 규칙(_decoRuleWhy)은 안 봐서 '밝은데 안 놓이는 칸'이 있었다.
+//  후: 놓을 수 있는 자리들이 덮는 칸을 **칸마다 한 번** 옅게 + 그 둘레에 한 줄 · 규칙까지 본다 · 카드·공간·장면·상태가 같으면 다시 안 센다.
+//      마우스면 커서 칸에 놓일 모습을 반투명으로(놓이면 초록 점선, 안 되면 붉은 점선). 터치는 누르면 바로 놓이니 미리 보기가 없다.
+let _decoStateVer = 0;
+const _decoOkMemo = { key: '', cells: null };
+function _decoOkCells(area) {
+  const R = area === 'yard' ? DY : DI;
+  const key = [SEL_DECO, area, DECO_SPACE, _decoStateVer, !!_decoBBox, R.cols, R.rows, (CUR.houseDecorations || []).length].join('|');
+  if (_decoOkMemo.key === key) return _decoOkMemo.cells;
+  const sz = getDecoSize(SEL_DECO), occ = new Map(), cells = new Set();
+  _decoList(CUR).forEach(p => { if (p.area !== area) return; const z = getDecoSize(p.id);
+    for (let dr = 0; dr < z.h; dr++) for (let dc = 0; dc < z.w; dc++) { const k = (p.row + dr) + '_' + (p.col + dc); (occ.get(k) || occ.set(k, []).get(k)).push(p); } });
+  const cellOk = (r, c) => {   // canPlaceDeco 와 같은 잣대(판 안 · 집 · 밭 · 겹침 허용)를 칸 지도로
+    if (area === 'yard' && (_isHC(r, c) || _isFarmCell(r, c))) return false;
+    const o = occ.get(r + '_' + c);
+    return !o || o.every(p => _decoOverlapOk(SEL_DECO, p));
+  };
+  for (let r = 0; r + sz.h <= R.rows; r++) for (let c = 0; c + sz.w <= R.cols; c++) {
+    let ok = true;
+    for (let dr = 0; dr < sz.h && ok; dr++) for (let dc = 0; dc < sz.w && ok; dc++) ok = cellOk(r + dr, c + dc);
+    if (!ok || _decoRuleWhy(SEL_DECO, area, r, c, sz.w, sz.h)) continue;
+    if (area === 'yard' && ANIM_DECO[SEL_DECO] && !_animGroundOk(SEL_DECO, CUR, r, c, sz.w, sz.h)) continue;
+    for (let dr = 0; dr < sz.h; dr++) for (let dc = 0; dc < sz.w; dc++) cells.add((r + dr) + '_' + (c + dc));
+  }
+  _decoOkMemo.key = key; _decoOkMemo.cells = cells;
+  return cells;
+}
+//  칸마다 한 번 옅게 + 둘레 한 줄 — (ox,oy) 는 판 왼쪽 위(집 안은 _offX/_offY), v 는 보이는 칸 범위
+function _decoDrawOkCells(cells, ox, oy, C, v) {
+  const ctx = _dCtx, has = (r, c) => cells.has(r + '_' + c);
+  ctx.fillStyle = 'rgba(255,255,255,.1)';
+  for (let r = v.r0; r < v.r1; r++) for (let c = v.c0; c < v.c1; c++) if (has(r, c)) ctx.fillRect(ox + c * C, oy + r * C, C, C);
+  ctx.strokeStyle = 'rgba(255,240,150,.7)'; ctx.lineWidth = Math.max(1, C * .06); ctx.beginPath();
+  for (let r = v.r0; r < v.r1; r++) for (let c = v.c0; c < v.c1; c++) {
+    if (!has(r, c)) continue;
+    const x = ox + c * C, y = oy + r * C;
+    if (!has(r - 1, c)) { ctx.moveTo(x, y); ctx.lineTo(x + C, y); }
+    if (!has(r + 1, c)) { ctx.moveTo(x, y + C); ctx.lineTo(x + C, y + C); }
+    if (!has(r, c - 1)) { ctx.moveTo(x, y); ctx.lineTo(x, y + C); }
+    if (!has(r, c + 1)) { ctx.moveTo(x + C, y); ctx.lineTo(x + C, y + C); }
+  }
+  ctx.stroke();
+}
+//  마우스 커서 칸에 놓일 모습(반투명) — 초록 점선 = 놓임 · 붉은 점선 = 안 됨
+let _decoHover = null;
+function _decoDrawGhost(area, ox, oy, C) {
+  const h = _decoHover;
+  if (!h || h.area !== area || !SEL_DECO) return;
+  const d = GAME_DATA.decorations.find(x => x.id === SEL_DECO); if (!d || d.cat !== area) return;
+  const sz = getDecoSize(SEL_DECO), ok = canPlaceDeco(h.r, h.c, sz.w, sz.h, area, null) && !_decoRuleWhy(SEL_DECO, area, h.r, h.c, sz.w, sz.h)
+    && !(area === 'yard' && ANIM_DECO[SEL_DECO] && !_animGroundOk(SEL_DECO, CUR, h.r, h.c, sz.w, sz.h));
+  const x = ox + h.c * C, y = oy + h.r * C, ctx = _dCtx;
+  ctx.save(); ctx.globalAlpha = .55; _drawDecoSVG(SEL_DECO, x, y, sz.w * C, sz.h * C); ctx.restore();
+  ctx.save(); ctx.setLineDash([Math.max(3, C * .25), Math.max(2, C * .15)]); ctx.lineWidth = 2;
+  ctx.strokeStyle = ok ? 'rgba(90,220,120,.95)' : 'rgba(255,110,90,.95)'; ctx.strokeRect(x + 1, y + 1, sz.w * C - 2, sz.h * C - 2); ctx.restore();
 }
 function _animFreeMaker(student, rows, cols) {
   const taken = new Set();
@@ -8986,6 +9065,7 @@ function _drawDeco() {
     _dCtx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
     if (DECO_SCENE === 'yard') { _drawYard(); if (_decoRectPrev) _drawRectPreview(); }   // [DECO-FLOOR-RECT-1] 끄는 동안의 네모
     else _drawIndoor();
+    if (_decoHover && SEL_DECO) _decoDrawGhost(DECO_SCENE === 'yard' ? 'yard' : 'indoor', DECO_SCENE === 'yard' ? 0 : (_dCv._offX || 0), DECO_SCENE === 'yard' ? 0 : (_dCv._offY || 0), _dC);   // [DECO-SEL-HL-1]
     // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
     _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
   });
@@ -9179,20 +9259,8 @@ function _drawYard() {
   } else if(SEL_DECO) {
     const sd = GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
     if(sd?.cat==='yard') {
-      const ssz = sd.size||{w:1,h:1};
-      // 빈 칸마다 footprint 프리뷰 표시 — [DECO-ZOOM-1] 보이는 칸만(1,400칸 계산을 줄인다)
-      const _pv = _decoVisible(DY.rows, DY.cols);
-      for(let r=_pv.r0;r<_pv.r1;r++) for(let c=_pv.c0;c<_pv.c1;c++){
-        if(_isHC(r,c)) continue;
-        if(canPlaceDeco(r,c,ssz.w,ssz.h,'yard',null)
-           && (!ANIM_DECO[SEL_DECO] || _animGroundOk(SEL_DECO, CUR, r, c, ssz.w, ssz.h))){
-          // 배치 가능한 footprint 영역 강조
-          _dCtx.fillStyle='rgba(255,255,255,.1)';
-          _dCtx.fillRect(c*C+1,r*C+1,ssz.w*C-2,ssz.h*C-2);
-          _dCtx.strokeStyle='rgba(255,255,150,.35)'; _dCtx.lineWidth=1;
-          _dCtx.strokeRect(c*C+1,r*C+1,ssz.w*C-2,ssz.h*C-2);
-        }
-      }
+      // [DECO-SEL-HL-1] 놓을 수 있는 칸을 칸마다 한 번 + 둘레 한 줄 — 보이는 칸만 그린다(세는 것은 상태가 바뀔 때 한 번)
+      _decoDrawOkCells(_decoOkCells('yard'), 0, 0, C, _decoVisible(DY.rows, DY.cols));
     }
   }
 
@@ -9451,11 +9519,8 @@ function _drawIndoor() {
       _dCtx.fillRect(offX+c*C+2,offY+(wr-1)*C+2,C-4,C-4); _dCtx.strokeRect(offX+c*C+2,offY+(wr-1)*C+2,C-4,C-4);
     } });
   } else if(SEL_DECO && GAME_DATA.decorations.find(x=>x.id===SEL_DECO)?.cat==='indoor'){
-    _dCtx.fillStyle='rgba(255,220,100,.09)';
-    for(let r=0;r<DI.rows;r++) for(let c=0;c<DI.cols;c++){
-      if(!_decoList(CUR).find(p=>p.area==='indoor'&&p.row===r&&p.col===c))
-        _dCtx.fillRect(offX+c*C+1,offY+r*C+1,C-2,C-2);
-    }
+    // [DECO-SEL-HL-1] 크기·방 벽·깔개 규칙까지 본 '놓을 수 있는 칸' — 칸마다 한 번 + 둘레 한 줄(전엔 빈 1칸만 칠해 큰 가구가 안 들어가는 곳도 밝았다)
+    _decoDrawOkCells(_decoOkCells('indoor'), offX, offY, C, { r0: 0, c0: 0, r1: DI.rows, c1: DI.cols });
   }
 
   // [INDOOR-WALL-1] 벽걸이 — 0번 줄에 놓인 것은 한 칸 위 벽 띠에(벽걸이 판이 있으면 그것, 없으면 몸통을 띠에). 가구보다 먼저 = 가구가 그 앞에 선다
@@ -9552,6 +9617,7 @@ const DECO_SAVE_MS = 400;
 let _decoSaveTimer = null;
 
 function decoDirty() {
+  _decoStateVer++;   // [DECO-SEL-HL-1] 놓을 수 있는 칸 모음을 다시 세게
   if (_decoSaveTimer) clearTimeout(_decoSaveTimer);
   _decoSaveTimer = setTimeout(() => { _decoSaveTimer = null; DB.saveStudent(CUR); }, DECO_SAVE_MS);
 }
