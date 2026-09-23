@@ -6251,10 +6251,25 @@ function crowdPointCell(s) { const seg = CSEG.list[s]; if (!seg) return -1;
   const cap = window.VRULES.crowdHomes.cap || 3, m = c => (CROWDH.load.get(c) || 0) / (cap * (isWide(c) ? 2 : 1));
   const c = seg.칸.slice().sort((a, b) => m(b) - m(a)).find(crowdPointOk); CPOINT.stats.셈++;
   seg.점 = { ver: CPOINT.ver, c: c == null ? -1 : c }; return seg.점.c; }
+/* [MAC-CROWDPOINT ②] 점은 **누른 집의 문 앞**으로 (보스 09-23 · 디자인 담당에게서 넘겨받음 · #829 실측)
+   집의 붐빔은 **그 집이 고른 문 앞 한 칸**(crowdDoor)으로 정해진다([MAC-CROWDHOMES] mode 'front'). 그런데 점은 토막의 칸을 짚었다 —
+   #829: 토막 ✨ 10칸을 넓혀도 '길이 붐벼요' 26 → 25, **문 앞** 10칸은 26 → 18.8. 아이가 누른 집이 풀리려면 **그 집 문 앞**이 넓어져야 한다.
+   · 짚는 칸 = 그 문 앞 칸을 **덮는** 큰길 자리(누른 칸이 모서리 — 문 앞 칸 자신 · 왼 · 위 · 왼위 차례) 가운데 **눌러서 놓이는** 첫 칸.
+     판정은 새로 짓지 않는다 — crowdPointOk(= canPlace('avenue', …) · 곁 집 물리기 포함) 그대로.
+   · 그런 칸이 없으면(문 앞이 이미 큰길 · 곁이 막힘) **지금 그대로** — 토막의 칸을 짚고, 토막에도 없으면 '넓힐 자리가 없어요'.
+   · **말은 토막으로 모은다(#779 그대로)** — 같은 토막의 집은 같은 말을 하고, 점만 집마다 제 문 앞을 짚는다. */
+if (!('문앞' in window.VRULES.crowdPoint)) window.VRULES.crowdPoint.문앞 = true;
+CPOINT.stats.문앞 = 0; CPOINT.stats.문앞없음 = 0;
+function crowdPointDoorCell(rec) { if (!window.VRULES.crowdPoint.문앞 || !rec || rec.k !== 'house') return -1;
+  const b = crowdDoor(rec); if (b == null || b < 0 || isWide(b)) return -1;
+  const x = cX(b), y = cY(b);
+  for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) { if (!inb(x + ox, y + oy)) continue; const c = idx(x + ox, y + oy); if (crowdPointOk(c)) return c; }
+  return -1; }
 { hookAdd('placeAt', function (next, args) { CPOINT.ver++; return next(args); }); hookAdd('removeAt', function (next, args) { CPOINT.ver++; return next(args); });
   const ws = whereSpots; whereSpots = function (rec) { const n0 = CSEG.stats.짚음, r = ws.apply(this, arguments);
     if (!window.VRULES.crowdPoint.on || CSEG.stats.짚음 === n0 || !r || !r.length || crowdPointAvenueOff()) return r;   // 붐빔 토막 갈래가 짚은 때만
-    const s = crowdSegOfHome(rec.root), c = s < 0 ? -1 : crowdPointCell(s);
+    const s = crowdSegOfHome(rec.root), d = crowdPointDoorCell(rec), c = d >= 0 ? d : s < 0 ? -1 : crowdPointCell(s);   /* [MAC-CROWDPOINT ②] 문 앞이 먼저 · 없으면 토막 */
+    if (d >= 0) CPOINT.stats.문앞++; else CPOINT.stats.문앞없음++;
     if (c < 0) { CPOINT.stats.자리없음++; return null; }                                                  // 짚지 않는다 — 말(아래)이 그렇다고 한다
     CPOINT.stats.짚음++; if (c !== r[0]) CPOINT.stats.바꿔짚음++; return [c]; };
   hookAdd('satText', function (next, args) { const [rec] = args; const t = next(args);
@@ -6267,6 +6282,12 @@ window.__crowdPoint = (칸도) => ({ 켜짐: window.VRULES.crowdPoint.on, 큰길
     눌러놓이는칸: 칸도 ? s.칸.filter(crowdPointOk).map(c => [cX(c), cY(c)]) : s.칸.filter(crowdPointOk).length }; }) });
 /* 시험 훅(재기용 · village-sim 'widen @point n') — 가장 큰 토막의 ✨ 칸에 큰길을 n번 놓는다. 두 번 누름은 건너뛴다(__widenFront 와 같은 방법).
    한 번 놓을 때마다 짚는 칸을 다시 고른다 — 넓힌 칸은 이제 큰길이라 다음으로 붐비는 '눌러 놓이는 칸'으로 간다(붐빔 값은 그 순간 것 그대로). */
+/* 시험 훅(재기용) — 이 집을 누르면 어디를 짚나 · 문 앞 칸 · 토막 점. 놓기=true 면 짚은 칸에 큰길을 놓는다(두 번 누름은 건너뛴다 — __widenFront 와 같은 방법) */
+window.__crowdPointHome = (x, y, 놓기) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; if (!rec || rec.k !== 'house') return { 집: '없음' };
+  const b = crowdDoor(rec), s = crowdSegOfHome(rec.root), d = crowdPointDoorCell(rec), sp = s < 0 ? -1 : crowdPointCell(s), 짚 = whereSpots(rec), at = i => i == null || i < 0 ? null : [cX(i), cY(i)];
+  const out = { 말: satText(rec), 문앞칸: at(b), 문앞짚을칸: at(d), 토막점: at(sp), 짚은칸: 짚 && 짚.length ? at(짚[0]) : null };
+  if (놓기 && 짚 && 짚.length) { WIDEN3.force = true; try { out.놓음 = window.__put('avenue', cX(짚[0]), cY(짚[0]), 0); } finally { WIDEN3.force = false; } }
+  return out; };
 window.__crowdPointWiden = (n) => { const got = [];
   for (let k = 0; k < (n | 0 || 1); k++) { let s = -1; CSEG.list.forEach((seg, i) => { if (s < 0 || seg.칸.length > CSEG.list[s].칸.length) s = i; }); if (s < 0) break;
     const c = crowdPointCell(s); if (c < 0) break; WIDEN3.force = true; let r; try { r = window.__put('avenue', cX(c), cY(c), 0); } finally { WIDEN3.force = false; }
