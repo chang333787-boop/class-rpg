@@ -1364,6 +1364,30 @@
       decoSpaceSet(1); await sleep(100);
     }
 
+    //  ㉕ 동물은 키 큰 장식 바로 뒷줄(솟은 그림 밑)에 서지 않는다(DECO-RULE-R5 · 디자인 D6) — 공간 3
+    if (typeof _decoOverflowCells === 'function') {
+      decoSpaceSet(3); await sleep(100);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      for (let i = 0; i < 40 && !_decoBBox; i++) await sleep(50);            // 그림 상자 표가 올 때까지
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const nOf = id => (CUR.houseDecorations || []).filter(p => p.id === id).length;   // 앞 시험이 놓아 둔 수 + 3
+      CUR.inventory = (CUR.inventory || []).filter(i => !/^d_y(12|53|1)$/.test(i.id)).concat(['d_y12', 'd_y53', 'd_y1'].map(id => ({ id, qty: nOf(id) + 3 })));
+      setDecoMode('deco');
+      SEL_DECO = 'd_y12'; _decoPlace('yard', 10, 10);                        // 벚나무 3×3(10~12줄) — 그림이 약 0.9칸 솟는다
+      SEL_DECO = 'd_y1'; _decoPlace('yard', 20, 10);                         // 장미(낮다 — 안 솟는다)
+      const tree = _decoList(CUR).find(p => p.id === 'd_y12');
+      out('R5_벚나무_뒷줄한줄', JSON.stringify(_decoOverflowCells(tree)) === '[[9,10],[9,11],[9,12]]');
+      out('R5_낮은꽃은_안막음', _decoOverflowCells(_decoList(CUR).find(p => p.id === 'd_y1')).length === 0);
+      const free = _animFreeMaker(CUR, DY.rows, DY.cols);
+      out('R5_뒷줄엔_안걸음', !free(9, 11, 1, 1, 'd_y53', false) && free(8, 11, 1, 1, 'd_y53', false) && free(13, 11, 1, 1, 'd_y53', false));
+      SEL_DECO = 'd_y53'; _decoPlace('yard', 9, 11);
+      out('R5_뒷줄엔_안놓임', !_decoList(CUR).some(p => p.id === 'd_y53') && /바로 뒤라/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
+      _decoPlace('yard', 13, 11); SEL_DECO = null;
+      out('R5_앞줄엔_놓임', _decoList(CUR).some(p => p.id === 'd_y53' && p.row === 13));
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _decoUndoClear(); decoSpaceSet(1); await sleep(100);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

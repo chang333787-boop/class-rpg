@@ -5306,6 +5306,13 @@ function _decoRuleWhy(id, area, r, c, w, h) {
     for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++)
       if (fl[(r + dr) + '_' + (c + dc)] === 'water') return '🌊 물 위에는 놓을 수 없어요 — 물가 풀밭에 놓아 보세요';
   }
+  //  [DECO-RULE-R5] 동물을 키 큰 장식 바로 뒷줄(솟은 그림 밑)에 놓으면 지붕·나무 위에 선 것처럼 보인다
+  if (area === 'yard' && typeof ANIM_DECO !== 'undefined' && ANIM_DECO[id]) {
+    for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) {
+      const t = _decoOverflowAt(CUR, r + dr, c + dc);
+      if (t) { const d = GAME_DATA.decorations.find(x => x.id === t.id); return `${d ? d.icon + ' ' + d.name : '큰 장식'} 바로 뒤라 동물이 올라선 것처럼 보여요 — 앞쪽이나 옆에 놓아요`; }
+    }
+  }
   if (area === 'indoor' && DECO_WALL[id] && !_inIsWallRow(r, c)) return '🖼️ 벽에 거는 거예요 — 위쪽 벽(맨 윗줄이나 방의 윗벽)을 눌러 걸어 주세요';
   //  [DECO-RULE-R3] 가구가 방 벽을 가로지르면(반은 방 안·반은 밖) 안 놓는다
   if (area === 'indoor' && !DECO_WALL[id] && _inCrossesWall(r, c, w, h, _inRooms(CUR))) return '🧱 벽에 걸려요 — 방 안이나 밖에 다 들어가게 놓아 주세요';
@@ -8422,6 +8429,29 @@ function _animReduced() {
 }
 
 // 그 칸에 설 수 있나 — 판 안 · 집 영역 아님 · 농장 칸 아님 · 다른 장식 없음(동물끼리는 지나갈 수 있다)
+// [DECO-RULE-R5] 키 큰 장식의 그림은 발밑 칸보다 위로 솟는다(벚나무 약 0.9칸 · 헛간 1.6칸 · 정자 0.3칸 — bbox.json 의 그린 부분 위 끝).
+//  동물 층은 캔버스 위라, 솟은 부분이 덮는 칸(= 그 장식 바로 뒷줄)에 선 동물은 **지붕·나무 꼭대기 위에** 그려졌다(디자인 담당 D6).
+//  그 칸에는 동물이 걷지도 놓이지도 않는다. 솟은 부분이 칸의 20% 이하로 걸치면 막지 않는다(꽃 같은 낮은 것).
+//  그림 상자가 아직 안 왔으면 막지 않는다(더 막아서 아이가 헷갈리지 않게). 우리(pen)는 동물이 지나가는 것이라 뺀다.
+function _decoOverflowCells(p) {
+  const bb = _decoBBox && _decoBBox[p.id];
+  if (!Array.isArray(bb) || !(bb[4] > 0) || !(bb[5] > 0)) return [];
+  const sz = getDecoSize(p.id), per = sz.w / bb[4];             // 그림 한 단위 = 칸 몇 개(폭을 발밑에 맞춰 그린다)
+  const over = (bb[5] - bb[1]) * per - sz.h;                    // 발밑 칸 위로 솟은 칸 수
+  const k = Math.ceil(over - 0.2);
+  if (k <= 0) return [];
+  const c0 = p.col + Math.floor(bb[0] * per), c1 = p.col + Math.ceil((bb[0] + bb[2]) * per) - 1, out = [];
+  for (let dr = 1; dr <= k; dr++) for (let c = Math.max(p.col, c0); c <= Math.min(p.col + sz.w - 1, c1); c++) out.push([p.row - dr, c]);
+  return out;
+}
+//  (r,c) 가 어느 장식의 솟은 그림 밑인가 — 그 장식(없으면 null)
+function _decoOverflowAt(student, r, c) {
+  for (const p of _decoList(student)) {
+    if (p.area !== 'yard' || ANIM_DECO[p.id] || _isPenDeco(p.id)) continue;
+    if (_decoOverflowCells(p).some(([rr, cc]) => rr === r && cc === c)) return p;
+  }
+  return null;
+}
 function _animFreeMaker(student, rows, cols) {
   const taken = new Set();
   _decoList(student).forEach(p => {   // [DECO-SPACE-1]
@@ -8429,6 +8459,7 @@ function _animFreeMaker(student, rows, cols) {
     if (_isPenDeco(p.id)) return;   // [DECO-ANIM-3] 우리 안은 동물이 지날 수 있다
     const sz = getDecoSize(p.id);
     for (let dr = 0; dr < sz.h; dr++) for (let dc = 0; dc < sz.w; dc++) taken.add((p.row + dr) + '_' + (p.col + dc));
+    _decoOverflowCells(p).forEach(([r, c]) => taken.add(r + '_' + c));   // [DECO-RULE-R5] 솟은 그림 밑(바로 뒷줄)
   });
   //  id 를 주면 그 동물이 갈 수 있는 바닥까지 본다(DECO-ANIM-2).
   //  swim = 물에 놓인 동물이면 물에서만 다닌다.
