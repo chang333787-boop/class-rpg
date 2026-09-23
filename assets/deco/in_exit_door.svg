@@ -1,0 +1,13 @@
+<svg width="200" height="140" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140">
+<!-- in_exit_door 집 안 나가기 — 방 아래 벽에 뚫린 현관(2칸 폭). y100 = 방 아래 벽선. 위 100 = 방 바닥(발판 · 들어오는 빛) · 아래 40 = 벽 밖(환한 바깥 + 화살표). 글 '나가기'는 코드가 화살표 오른쪽(x122 · y126)에 -->
+<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style>
+<linearGradient id="sun" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#fff1b0" stop-opacity=".75"/><stop offset="1" stop-color="#fff1b0" stop-opacity="0"/></linearGradient>
+<linearGradient id="out" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f0c8"/><stop offset="1" stop-color="#9ccf6a"/></linearGradient></defs>
+<path d="M36,100 L48,30 L152,30 L164,100z" fill="url(#sun)"/>
+<path class="i" d="M60,56 h80 v38 h-80z" fill="#b8563d"/>
+<path d="M66,64 h68 M66,74 h68 M66,84 h68" stroke="#e8a07a" stroke-width="3.5" opacity=".85"/>
+<path class="o" d="M36,98 h128 v36 h-128z" fill="url(#out)"/>
+<path class="i" d="M30,92 h10 v44 h-10z M160,92 h10 v44 h-10z" fill="#5b3a20"/>
+<path class="i" d="M36,96 h128 v6 h-128z" fill="#c9a06a"/>
+<path d="M100,132 l-12,-12 h7 v-10 h10 v10 h7z" fill="#ffd866" stroke="#2b2118" stroke-width="1.8" stroke-linejoin="round"/>
+</svg>
