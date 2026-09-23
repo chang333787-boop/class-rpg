@@ -18,7 +18,7 @@ const DAY = 1800;   // 틱 · 하루 3분 ÷ 100ms
 /* 낮을수록 좋은 지표 — 나머지는 높을수록 좋다 */
 const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:|까닭:|못씀|못받은세대|못받은%)/.test(k);
 /* [MAC-JOBWHY] 집 카드가 일자리를 말하는 네 꼴 — 옛 index.html 은 첫 줄 하나뿐이라 그것도 그대로 잡힌다 */
-const JW_TXT = { none: '일할 곳이 없어요', cut: '길이 끊겨 일터에 못 가요', far: '일터가 멀어요', full: '가까운 일터가 꽉 찼어요' };
+const JW_TXT = { none: '일할 곳이 없어요', cut: '길이 끊겨 일터에 못 가요', far: '일터가 멀어요', full: '가까운 일터가 꽉 찼어요', soon: '곧 일자리를 찾아요' };   // soon: [MAC-JOBSOON] 배정 바퀴 사이(≤90틱) — 일먼집에는 그대로 든다
 const jobWhyOf = t => Object.keys(JW_TXT).find(k => t.includes(JW_TXT[k])) || null;
 /* 집 말은 필요 이름이 아니라 이 글로 나온다(index.html NEED_TXT) — '배울 곳이 멀어요' → 배움 */
 const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' }, NEED_OF = Object.fromEntries(Object.entries(NEED_TXT).map(([k, v]) => [v, k]));
@@ -46,7 +46,7 @@ function measure(w) {
     if (jw) { m.일먼집++; m['까닭:' + jw] = (m['까닭:' + jw] || 0) + 1; }
     missOf(txt).forEach(k => { need['없음:' + k] = (need['없음:' + k] || 0) + 1; });
   });
-  ['none', 'cut', 'far', 'full'].forEach(k => { if (m['까닭:' + k] == null) m['까닭:' + k] = 0; });
+  ['none', 'cut', 'far', 'full', 'soon'].forEach(k => { if (m['까닭:' + k] == null) m['까닭:' + k] = 0; });
   m['일닿음%'] = m.사는집 ? Math.round((1 - m.일먼집 / m.사는집) * 1000) / 10 : 100;
   /* 세대 수가 달라지면 '못 받은 세대'의 머릿수만으로는 못 견준다 — 가게를 하나 더 놓으면 돌아서는 집이 줄어 **사는 집이 늘고**,
      그러면 못 받은 세대도 같이 는다(실측). 비율로 봐야 '고쳤나'가 보인다. 흐름이 꺼진 판에서는 넣지 않는다. */

@@ -3130,6 +3130,12 @@ function jwLong(why, 칸) {
   if (why === 'far') return '💼 일터가 멀어요 — 이 동네에 하나 지어 봐요';
   if (why === 'full') return '💼 가까운 가게가 꽉 찼어요 — 일할 곳을 하나 더';
   return '💼 일할 곳이 없어요 — 가까이 일터를 하나 지어 봐요'; }
+/* ── [MAC-JOBSOON] '곧 일자리를 찾아요' (보스 09-23 결정 ② · 24회 ⓑ47 · #833 ⑥) ──
+   빈자리 있는 일터를 놓으면 다음 배정 바퀴(90틱 = 9초)까지 그 집은 아직 일자리가 없다(joblessHome 참). 까닭 셈은 그동안 '곧 배정된다'며
+   null 을 돌려줬고, 말 쪽이 null 에 **'일할 곳이 없어요'(none 의 말)** 를 빌려 썼다 — 일할 곳이 **늘었는데** "없어요"가 스쳤다.
+   이제 그 틈을 까닭 'soon' 으로 부르고 **"곧 일자리를 찾아요"**. 배정은 한 줄도 안 바뀐다. 계약 window.JOB_WHY 는 'soon' 을 예전처럼 null 로 낸다. */
+JW.stats.soon = 0; JW_SHORT.soon = '곧 일자리를 찾아요'; JW_CHIP.soon = '곧 일자리를 찾는 집';
+{ const jwLong0 = jwLong; jwLong = function (why, 칸) { return why === 'soon' ? '💼 곧 일자리를 찾아요 — 닿는 일터에 빈자리가 생겼어요' : jwLong0(why, 칸); }; }
 /* 길에서 닿는 일터 → Map(일터 root → 남은 자리) */
 function jobsNearFree(from, radius) { const wp = jobsWpIndex(), out = new Map(); if (Array.isArray(from) ? !from.length : from < 0) return out;
   const { reach } = roadBFS(from, undefined, radius);
@@ -3164,7 +3170,7 @@ function jobWhyCalc(root) {
   const R = window.VRULES.jobWhy, b = roadsBeside(rec);   /* [MAC-DOORS] */
   JW.stats.잰집++;
   const near = jobsNearFree(b, undefined);                                   // 배정과 같은 반경(PATH_RADIUS)
-  if (near.size) { if (jwAnyFree(near)) return null; return { why: 'full' }; }  // 닿는데 자리가 있으면 곧 배정된다 — 말할 것 없음
+  if (near.size) { if (jwAnyFree(near)) return { why: 'soon' }; return { why: 'full' }; }   /* [MAC-JOBSOON] 닿는 일터에 빈자리 — 다음 배정 바퀴(≤90틱)에 앉는다. 말만 '곧 찾아요' */  // 닿는데 자리가 있으면 곧 배정된다 — 말할 것 없음
   const wide = jobsNearFree(b, PATH_RADIUS * (R.wide || 3));                 // 길은 이어졌지만 배정 반경 밖
   if (wide.size) return { why: 'far' };   /* [MAC-JOBWHY2] 자리 여부는 안 본다 — 아래 cut 과 같은 까닭 */
   const cut = jobsCutCost(rec, R.cut || 6);
@@ -3176,7 +3182,7 @@ function jobWhyInfo(root) { const R = window.VRULES.jobWhy; if (!R || !R.on) ret
   if (JW.gen !== gen) { JW.memo.clear(); JW.gen = gen; }
   if (JW.memo.has(root)) { JW.stats.캐시++; return JW.memo.get(root); }
   const r = jobWhyCalc(root); JW.memo.set(root, r); if (r) JW.stats[r.why]++; return r; }
-window.JOB_WHY = root => { const r = jobWhyInfo(root); return r ? r.why : null; };
+window.JOB_WHY = root => { const r = jobWhyInfo(root); return r && r.why !== 'soon' ? r.why : null; };   /* [MAC-JOBSOON] 계약은 그대로 — 'soon' 은 예전처럼 null(연기 [ACT-JOBWHY] 가 안 흔들린다) */
 window.JOB_WHY.info = jobWhyInfo;
 /* 네 곳이 쓰는 말 — 모두 JOB_WHY 하나에서 나온다 */
 function jobWhySay(rec, group) { const OLD = '💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요';
@@ -3186,10 +3192,10 @@ function jobWhySay(rec, group) { const OLD = '💼 일할 곳이 닿지 않아�
   return r ? jwLong(r.why, r.칸) : OLD; }
 function jobWhyShort(rec) { const R = window.VRULES.jobWhy; if (!R || !R.on || !rec) return '일할 곳이 없어요';
   const r = jobWhyInfo(rec.root); return r ? JW_SHORT[r.why] : '일할 곳이 없어요'; }
-function jobWhyCount(roots) { const c = { none: 0, cut: 0, far: 0, full: 0 };
+function jobWhyCount(roots) { const c = { none: 0, cut: 0, far: 0, full: 0, soon: 0 };
   roots.forEach(h => { const rec = cells[h]; if (!rec) return; const r = jobWhyInfo(h); if (r) c[r.why]++; }); return c; }
 function jobWhyTop(roots) { const c = jobWhyCount(roots); let top = null, n = 0;
-  ['cut', 'full', 'far', 'none'].forEach(k => { if (c[k] > n) { n = c[k]; top = k; } }); return top; }
+  ['cut', 'full', 'far', 'none', 'soon'].forEach(k => { if (c[k] > n) { n = c[k]; top = k; } }); return top; }
 function jobWhyCut(roots, why) { let best = 0;
   roots.forEach(h => { const r = jobWhyInfo(h); if (r && r.why === why && r.칸) best = best ? Math.min(best, r.칸) : r.칸; }); return best || 1; }
 /* 'cut' 인 집이 있으면 이어 닿을 일터도 함께 반짝인다(칩을 눌렀을 때) — 새 안내 장치를 만들지 않고 있던 ✨ 를 쓴다 */
