@@ -2100,7 +2100,7 @@ function miniRange() {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
   cells.forEach((rec, i) => { if (!rec || rec.root !== i) return; const x = cX(i), y = cY(i); n++; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
   if (!n) { x0 = W / 2 - 20; y0 = H / 2 - 20; x1 = W / 2 + 20; y1 = H / 2 + 20; }
-  const pad = 20; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+  const pad = window.VRULES.miniLook && window.VRULES.miniLook.on ? window.VRULES.miniLook.pad : 20; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
   /* 미니맵 비율(4:3)에 맞춘다 */
   let w = x1 - x0 + 1, h = y1 - y0 + 1;
   if (w / h > 4 / 3) { const nh = w * 3 / 4; y0 -= (nh - h) / 2; y1 += (nh - h) / 2; } else { const nw = h * 4 / 3; x0 -= (nw - w) / 2; x1 += (nw - w) / 2; }
@@ -2121,6 +2121,53 @@ function drawMini() {
   miniG.strokeRect((cx - b.x0) * kx - rw / 2, (b.y1 - cy) * ky - rh / 2, rw, rh);
   miniLast = performance.now(); miniDirty = false;
 }
+/* ── [MAC-MINILOOK] 미니맵을 위계로 — 시안 B '덩어리로 묶는다' (보스 09-23 · #814 에서 고름) ──
+   전에는 집·가게가 같은 분홍이고 소품까지 칸마다 찍혀, 무엇이 무엇과 이어졌는지(이 엔진의 뼈 — 길로 닿아야 쓴다)가 안 읽혔다.
+   · 길 = 어두운 한 줄 뼈대(이웃한 길 칸끼리 이어 긋는다) · 붙은 집 = 한 동네 덩어리(크림 — 📣 동네 바람 카드와 같은 단위) · 가게·일터 = 주황 덩어리 + 짙은 테
+   · 특별 건물 = 흰 판에 어두운 테(발자국보다 크게 · 판마다 한 가지) · 물·나무·쉼터는 바탕 결 · 꽃·소품(가로등·의자·쓰레기통…)은 뺀다.
+   · 여백 20 → 8칸(miniRange 의 pad · 마을이 1.4~1.5배 커진다) · 캔버스 2배 해상도(화면 크기 160×120 그대로 — 레티나에서 흐리던 것).
+   · 비용: 덩어리 그림 한 장은 판이 바뀐 때(drawMap 이 돈 뒤) · 범위·바탕이 바뀐 때만 다시 그린다. 0.5초 박자·카메라 이동에는 그 한 장을 붙이고 보는 곳 테만 긋는다.
+   · 판 전체 지도(멀리서 볼 때의 mapCanvas)·미니맵을 눌러 가기·노란 후보 깜빡임은 그대로. on:false 면 예전 그림·예전 여백. */
+(window.VRULES = window.VRULES || {}).miniLook = { on: true, pad: 8, hi: 2 };
+const MINILOOK = { layer: document.createElement('canvas'), key: '', stats: { 다시그림: 0, 붙임: 0 } };
+const MINILOOK_SPECIAL = new Set(['dream', 'statue', 'clock', 'library', 'station', 'school', 'museum']), MINILOOK_WORK = new Set(['shop', 'windmill', 'greenhouse', 'barn', 'field']),
+  MINILOOK_OPEN = new Set(['plaza', 'play', 'fountain', 'pavilion', 'well', 'lawn']), MINILOOK_GREEN = new Set(['tree', 'bigtree', 'bush', 'fruit']);
+function miniLookCls(k) { const q = K[k] || {}; if (q.road) return 'road'; if (MINILOOK_SPECIAL.has(k) || q.special) return 'special'; if (k === 'house') return 'house';
+  if (MINILOOK_WORK.has(k) || (q.jobs || 0) > 0) return 'work'; if (k === 'pond') return 'water'; if (MINILOOK_GREEN.has(k) || TOPIARY[k]) return 'green'; if (MINILOOK_OPEN.has(k)) return 'open'; return ''; }   // '' = 미니맵에 안 그린다(꽃·소품)
+function miniLookMix(a, b, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), x = p(a), y = p(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+function miniLookDraw(b) {                                                          // 덩어리 그림 한 장 — 바뀔 때만 돈다
+  const L = MINILOOK.layer, g = L.getContext('2d'), kx = L.width / (b.x1 - b.x0 + 1), ky = L.height / (b.y1 - b.y0 + 1), hi = L.width / 160, bg = window.__miniBg || '#97cc5e';
+  const objs = new Map(), roads = [], xa = Math.max(0, Math.floor(b.x0) - 3), xb = Math.min(W - 1, Math.ceil(b.x1) + 3), ya = Math.max(0, Math.floor(b.y0) - 3), yb = Math.min(H - 1, Math.ceil(b.y1) + 3);
+  const isRoad = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return false; const r = cells[idx(x, y)]; return !!(r && K[r.k] && K[r.k].road); };
+  for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { const rec = cells[idx(x, y)]; if (!rec) continue; const c = miniLookCls(rec.k); if (!c) continue; if (c === 'road') { roads.push([x, y]); continue; }
+    const o = objs.get(rec.root); if (o) { o.x0 = Math.min(o.x0, x); o.x1 = Math.max(o.x1, x); o.y0 = Math.min(o.y0, y); o.y1 = Math.max(o.y1, y); } else objs.set(rec.root, { c, x0: x, x1: x, y0: y, y1: y }); }
+  const R = (o, p) => [(o.x0 - b.x0 - p) * kx, (b.y1 - o.y1 - p) * ky, (o.x1 - o.x0 + 1 + 2 * p) * kx, (o.y1 - o.y0 + 1 + 2 * p) * ky];   // 칸 범위 → 캔버스 사각형(drawMini 와 같은 식 · 위가 판의 +y 쪽) · p: 칸 단위로 넓힘(+)/들임(−)
+  const each = (c, fn) => objs.forEach(o => { if (o.c === c) fn(o); }), fill = (col, c, p) => { g.fillStyle = col; each(c, o => g.fillRect(...R(o, p))); };
+  g.fillStyle = miniLookMix(bg, '#ffffff', .12); g.fillRect(0, 0, L.width, L.height);                                        // 1 바탕(판 풀빛을 조금 밝게)
+  fill('#7cc9e3', 'water', -.05); g.fillStyle = miniLookMix(bg, '#1f4a1a', .25);
+  each('green', o => { g.beginPath(); g.arc((o.x0 - b.x0 + .5) * kx, (b.y1 - o.y1 + .5) * ky, Math.max(hi, .6 * kx), 0, Math.PI * 2); g.fill(); });
+  fill('#f1d9b5', 'house', .55); fill('#f3a55b', 'work', .45); fill(miniLookMix(bg, '#ffffff', .5), 'open', .1);            // 2 덩어리 — 한 칸 틈은 양쪽 .55 가 덮어 한 동네가 된다
+  fill('#dfbd92', 'house', -.3);                                                                                            // 3 집 한 채 한 채(결)
+  g.lineWidth = hi; g.strokeStyle = '#8a3a0c'; each('work', o => { const r = R(o, -.22); g.fillStyle = '#ef7a1f'; g.fillRect(...r); g.strokeRect(r[0] + hi / 2, r[1] + hi / 2, r[2] - hi, r[3] - hi); });   // 가게: 크기는 그대로, 짙은 테 한 줄로 세게(보스 조건 1)
+  const w = Math.max(1.5 * hi, .56 * kx); g.fillStyle = '#5c606b'; g.beginPath();                                           // 4 길 — 어두운 한 줄 뼈대. 한 경로로 채워야 칸 이음매에 흰 실금이 안 생긴다
+  roads.forEach(([x, y]) => { const cx = (x - b.x0 + .5) * kx, cy = (b.y1 - y + .5) * ky; g.rect(cx - w / 2, cy - w / 2, w, w);
+    if (isRoad(x + 1, y)) g.rect(cx, cy - w / 2, kx, w); if (isRoad(x, y + 1)) g.rect(cx - w / 2, cy - ky, w, ky);
+    if (isRoad(x + 1, y) && isRoad(x, y + 1) && isRoad(x + 1, y + 1)) g.rect(cx, cy - ky, kx, ky); });                      // 두 줄 넓은 길(2×2 가 다 길)은 한 띠로 — 안 그러면 점선으로 보였다(바닷가 mid36)
+  g.fill();
+  g.lineWidth = 1.2 * hi; g.strokeStyle = '#23262e'; each('special', o => { const r = R(o, .3); g.fillStyle = '#ffffff'; g.fillRect(...r); g.strokeRect(...r); });   // 5 특별 — 흰 판에 어두운 테(판마다 한 가지 · 보스 조건 2)
+}
+{ const draw0 = drawMini; drawMini = function () {
+    const R = window.VRULES.miniLook, hi = R.on ? Math.max(1, R.hi | 0) : 1; if (mini.width !== 160 * hi) { mini.width = 160 * hi; mini.height = 120 * hi; MINILOOK.key = ''; }
+    if (!R.on) return draw0.apply(this, arguments);
+    if (mapDirty) drawMap();                                                                   // 판 전체 지도는 예전처럼 — 그 그림이 돈 시각(mapLastDraw)이 곧 '판이 바뀌었다'
+    const b = miniBox, key = [mapLastDraw, b.x0, b.y0, b.x1, b.y1, mini.width, window.__miniBg].join(), L = MINILOOK.layer;
+    if (key !== MINILOOK.key) { L.width = mini.width; L.height = mini.height; miniLookDraw(b); MINILOOK.key = key; MINILOOK.stats.다시그림++; }
+    miniG.drawImage(L, 0, 0); MINILOOK.stats.붙임++;
+    const mw = mini.width, mh = mini.height, wpp = worldPerPixel(zoomMul), hw = wpp * innerWidth / 2, hh = wpp * innerHeight / 2 / Math.max(0.35, Math.sin(camEl));   // 보는 곳 — drawMini 와 같은 식(선 굵기만 해상도만큼)
+    const cx = camTarget.x / CS + (W - 1) / 2, cy = camTarget.z / CS + (H - 1) / 2, kx = mw / (b.x1 - b.x0 + 1), ky = mh / (b.y1 - b.y0 + 1), rw = Math.max(6 * hi, hw / CS * kx), rh = Math.max(6 * hi, hh / CS * ky);
+    miniG.strokeStyle = '#fff'; miniG.lineWidth = 2 * hi; miniG.strokeRect((cx - b.x0) * kx - rw / 2, (b.y1 - cy) * ky - rh / 2, rw, rh);
+    miniLast = performance.now(); miniDirty = false; }; }
+window.__miniLook = () => ({ 켜짐: window.VRULES.miniLook.on, 여백: window.VRULES.miniLook.on ? window.VRULES.miniLook.pad : 20, 캔버스: [mini.width, mini.height], 화면: [mini.clientWidth, mini.clientHeight], ...MINILOOK.stats });
 mini.addEventListener('click', e => {
   const r = mini.getBoundingClientRect(), b = miniBox;
   const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
@@ -3527,7 +3574,11 @@ const FS_ICON = {
   길: (x, z, m) => { const Y = 1.51 * m; return [
     { g: 'box', c: P.grassD, s: [.80 * m, .10 * m, .62 * m], p: [x, Y + .05 * m, z] },
     ...[-.24, .24].map(o => ({ g: 'box', c: P.pave,   s: [.28 * m, .09 * m, .44 * m], p: [x + o * m, Y + .13 * m, z] })),
-    ...[-.24, .24].map(o => ({ g: 'box', c: P.paveIn, s: [.24 * m, .02 * m, .38 * m], p: [x + o * m, Y + .18 * m, z] })) ]; } };
+    ...[-.24, .24].map(o => ({ g: 'box', c: P.paveIn, s: [.24 * m, .02 * m, .38 * m], p: [x + o * m, Y + .18 * m, z] })) ]; },
+  /* [MAC-FLOWMAKER] 밭이 아닌 만드는곳(부두·벌목장 …)의 짝 — 같은 문법(작은 땅 한 조각) 위에 상자 하나. 밭 그림을 바닷가 가게 팻말에 걸지 않는다 */
+  물건: (x, z, m) => { const Y = 1.51 * m; return [
+    { g: 'box', c: FS_C.흙,  s: [.80 * m, .10 * m, .62 * m], p: [x, Y + .05 * m, z] },
+    ...fsCrate(x, Y + .10 * m, z, .46 * m, .30 * m, .36 * m) ]; } };
 /* 가게에 쌓인 물건 — 매대부터 차고 넘치면 앞마당으로(시안 A · 숫자는 한 글자도 안 쓴다) */
 function fsStock(양) { const out = [];
   if (양 >= 1) out.push(...fsCrate(-2.2, 1.12, 3.30, 1.9, .70, 1.25));
@@ -3576,12 +3627,26 @@ function fsFieldParts(root, base) {
   return out; }
 { const po = partsOf; partsOf = function (rec) { const base = po.apply(this, arguments);
     if (!rec || !fsOn() || cells[rec.root] !== rec) return base;
-    if (flowMake(rec)) return fsFieldParts(rec.root, base);
+    if (flowMake(rec)) return rec.k === 'field' ? fsFieldParts(rec.root, base) : fsMakerParts(rec, base);   /* [MAC-FLOWMAKER] 이랑·이삭·자루는 밭일 때만 */
     if (flowTake(rec)) return fsShopParts(rec, base);
     return base; }; }
 /* 상태가 바뀐 것의 청크만 다시 합친다. 빈 가게의 **까닭**도 여기서만 읽는다(누를 때 뜨는 말과 같은 함수) */
-function fsWhy(root) { const c = flowWhyCode(root).까닭;   /* [MAC-FLOWWORDS] 말 속 글자가 아니라 까닭 값으로 — 말이 만드는곳 이름을 따라 바뀌어도 그림이 안 사라진다 */
-  return c === 'cut' ? '길' : (c === 'none' || c === 'growing') ? '밭' : null; }
+function fsWhy(root) { const w = flowWhyCode(root), c = w.까닭;   /* [MAC-FLOWWORDS] 말 속 글자가 아니라 까닭 값으로 — 말이 만드는곳 이름을 따라 바뀌어도 그림이 안 사라진다 */
+  if (c === 'cut') return '길'; if (c !== 'none' && c !== 'growing') return null;
+  const k = (w.rec && w.rec.k) || Object.keys(window.VRULES.flow.만드는곳 || {})[0];
+  return k === 'field' ? '밭' : '물건'; }   /* [MAC-FLOWMAKER] 밭 판은 그대로 '밭' · 부두·벌목장 판은 상자 그림 */
+/* [MAC-FLOWMAKER] 밭이 아닌 만드는곳 — **제 모양 그대로 + 쌓인 양만**(보스 09-23 · 부두 위에 곡식 이랑이 얹히던 것).
+   양은 상자로 센다(가게 매대의 fsCrate 와 같은 상자 — '물건'이 한 그림이다). 앞(+z) 가장자리 왼쪽부터 셋, 넘치면 두 켜 · cut 이면 흐리게.
+   자리는 판 파일의 w·h 에서 잰다(2×2 면 ±4). 벌목장의 통나무 더미(−z)·그루터기(+x+z)를 피한 자리다. */
+function fsMakerParts(rec, base) {
+  const st = flowFieldState(rec.root); if (!st) return base;
+  const 양 = flowField(rec.root).양, 끊김 = st === 'cut'; if (양 <= 0) return base;
+  const t = K[rec.k] || {}, hx = (t.w || 1) * CS / 2, hz = (t.h || 1) * CS / 2, n = Math.min(6, 양), out = base.slice();
+  for (let i = 0; i < n; i++) { const 켜 = i < 3 ? 0 : 1, j = i % 3;
+    const c = fsCrate(-hx + .95 + j * 1.2 + 켜 * .3, .2 + 켜 * .62, hz - .95 - 켜 * .15, 1.05, .6, .9);
+    out.push(...(끊김 ? c.map(pt => ({ ...pt, c: fsDim(pt.c, .3) })) : c)); }
+  FSHAPE.stats.그린만드는곳 = (FSHAPE.stats.그린만드는곳 || 0) + 1;
+  return out; }
 function fsTick() {
   const R = window.VRULES.flowShape, 쉴까 = !R || !R.on || !flowOn() || VISIT.on;
   if (쉴까 !== FSHAPE.쉼) { FSHAPE.쉼 = 쉴까;                       // 켜짐이 바뀐 순간 — 그리던 것 전부 다시 합친다
@@ -3869,7 +3934,7 @@ function act(clientX, clientY) {
     if (rec && K[rec.k].need) {                       // 필요 건물을 누르면 닿는 범위를 보여 준다
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
       const 흐름줄 = flowCardText(rec.root);   /* [MAC-FLOWLOOK] 흐름 글이 있으면 거기서 줄을 바꾼다 — 첫 줄은 물건 이야기, 둘째 줄은 본편 정보(창조자 14회 ⓑ7) */
-      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + ovHomeText(rec.root)   /* [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
+      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (capCardText(rec) || ovHomeText(rec.root))   /* [MAC-SHOPCAP ⑵] 정원 가게는 배정표 숫자 · [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
       whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
@@ -5402,7 +5467,7 @@ function awayGate(f, i) {
   movers = Math.max(0, movers - 1); f.slotFreed = true;                     // 돌아가는 길은 이사 자리를 안 차지한다(왕복이라 처리량이 반으로 주는 것 막기)
   let first = false; try { if (!localStorage.getItem(AWAY_SEEN_KEY())) { localStorage.setItem(AWAY_SEEN_KEY(), '1'); first = true; } } catch (e) {}
   if (first) { AWAY.stats.첫안내++; sayOnce('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
-  else { const key = miss.join(); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
+  else { const key = miss.join() + (capAwayFull(f.home, miss) ? '+꽉참' : ''); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + capAwayText(f.home, miss) + ' 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
   if (path.length < 2) return awayGate(f, i);                                // 나갈 길이 없다 — 그 자리에서 사라진다
   return true;
 }
@@ -6530,7 +6595,7 @@ function actWordsText(f) {
 }
 
 function whatDoing(f) {
-  if (f.leaving && f.away) return f.away.miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 돌아가요';   // [MAC-AWAY]
+  if (f.leaving && f.away) return capAwayText(f.home, f.away.miss) + ' 돌아가요';   // [MAC-AWAY] · [MAC-SHOPCAP ⑵] 꽉 참이면 '가게가 꽉 차서'
   if (f.comeback) return '살 만해졌다는 소식에 다시 와요';
   { const t = actGardenText(f); if (t) return t; }   // [ACT-GARDEN]
   if (f.arriving) return '이사 오는 중이에요';
@@ -9043,10 +9108,12 @@ window.__crowdLook = () => ({ 켜짐: window.VRULES.crowdLook.on, CROWD_AT있음
    스위치·수치 VRULES.workLook + 고리 둘(tickFolks 한 줄 · 루프 actBesideDraw 바로 아래 한 줄).
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).workLook = { on: true, gap: 1.0, inset: -0.9, tripH: 10.5, tripPauseMs: 1800,
-  kinds: { shop: { top: 0x2f8f83, props: ['crate'] }, green: { top: 0x5aa04a, props: ['can', 'basket'] }, windmill: { top: 0xb8894a, props: ['sack'] } } };
+  kinds: { shop: { top: 0x2f8f83, props: ['crate'] }, green: { top: 0x5aa04a, props: ['can', 'basket'] }, windmill: { top: 0xb8894a, props: ['sack'] } },
+  maker: { top: 0x4f7fa0, props: ['crate'] } };   /* [MAC-FLOWMAKER] 흐름을 켠 판의 만드는곳(일자리 있는 것 · 부두·벌목장)도 문 밖에서 — 흐름이 꺼진 판(기본 마을)에서는 한 사람도 안 달라진다 */
 const WORK_PROP = { crate: { s: [1.25, 0.55, 1.25], c: 0xf0c890 }, can: { s: [0.8, 0.95, 0.8], c: 0xc8f0d0 }, basket: { s: [1.15, 0.6, 1.15], c: 0xffe0a0 }, sack: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 } };
 const WORK = { tripDay: new Map(), stats: { 문밖일꾼: 0, 자루출발: 0, 자루나름: 0, 자루못감: 0 } };
-const workKind = root => { const b = cells[root]; return b && b.root === root && window.VRULES.workLook.kinds[b.k] ? b.k : null; };
+const workDef = k => { const R = window.VRULES.workLook; return R.kinds[k] || (R.maker && K[k] && K[k].jobs && flowOn() && flowMake({ k }) ? R.maker : null); };   /* [MAC-FLOWMAKER] */
+const workKind = root => { const b = cells[root]; return b && b.root === root && workDef(b.k) ? b.k : null; };
 function workPlace(f) {                                                 // 들어온 길 칸 쪽 건물 앞 가장자리 · 같은 일터 일꾼끼리 자리 나눔
   const R = window.VRULES.workLook, root = f.inside.root, b = cells[root], cell = f.inside.cell; if (!b || cell == null) return null;
   const used = new Set(); folks.forEach(g => { if (g !== f && g.beside && g.beside.work && g.beside.root === root && g.state === 'inside') used.add(g.beside.slot); });
@@ -9058,8 +9125,8 @@ function workPlace(f) {                                                 // 들�
   if (!spots.length) return null;
   const [sx, sy, dx, dz] = spots[slot % spots.length], side = (Math.floor(slot / spots.length) % 2 ? 0.8 : 0) * R.gap;   // 칸마다 한 사람 · 넘치면 옆으로
   const px = wx(sx) + dx * (CS / 2 + R.inset) + dz * side, pz = wz(sy) + dz * (CS / 2 + R.inset) - dx * side;
-  const k = b.k, props = R.kinds[k].props;
-  return { root, k, mode: 'work', work: true, slot, x: px, z: pz, dir: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), dir0: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), drop: 0,   /* 벽을 비스듬히 보고 선다 — 옆모습이 보이게 */ prop: props[slot % props.length], top: R.kinds[k].top };
+  const k = b.k, props = workDef(k).props;
+  return { root, k, mode: 'work', work: true, slot, x: px, z: pz, dir: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), dir0: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), drop: 0,   /* 벽을 비스듬히 보고 선다 — 옆모습이 보이게 */ prop: props[slot % props.length], top: workDef(k).top, maker: !R.kinds[k] };
 }
 /* tickFolks 고리 — 문 밖 자리 잡기 · 풍차 자루 나르기. true 면 이번 틱은 여기서 끝 */
 function actWorkTick(f, i, now) {
@@ -9107,7 +9174,7 @@ function actWorkDraw(now) {
     if (QUALITY.farFolk && (Math.abs(b.x - camTarget.x) > 60 || Math.abs(b.z - camTarget.z) > 60)) return;
     const ph = now / 700 + i * 1.7, P = WORK_PROP[b.prop];
     let dir = b.dir0, drop = 0, py = 0.26, fwd = 0.85, side = 0;
-    if (b.k === 'shop') { const bend = Math.max(0, Math.sin(ph)); drop = bend * 0.18; py = 0.2; fwd = 0.9; }                     // 진열 정리 — 굽혔다 폈다
+    if (b.k === 'shop' || b.maker) { const bend = Math.max(0, Math.sin(ph)); drop = bend * 0.18; py = 0.2; fwd = 0.9; }                     // 진열 정리 — 굽혔다 폈다
     else if (b.k === 'green') { dir = b.dir0 + Math.sin(ph * 0.6) * 0.6; py = b.prop === 'can' ? 0.95 + Math.sin(ph * 2) * 0.05 : 0.7; fwd = 0.55; side = 0.35; }   // 물 주기 · 바구니 — 좌우로 천천히
     else if (b.k === 'windmill') { py = 1.5 + Math.abs(Math.sin(ph)) * 0.12; fwd = 0.15; side = 0.35; }                           // 자루를 어깨에
     const co = Math.cos(dir), si = Math.sin(dir), parts = PERSON_PARTS;
@@ -9238,7 +9305,7 @@ window.__jobWhy = () => { const n = { none: 0, cut: 0, far: 0, full: 0 }; let �
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).flowAct = { on: true, nearCells: 14, retryMs: 1400,
   loadMs: 1400, dropMs: 1600, endMs: 1200, swing: 0.75, buyMs: 1000, shrugMs: 900, holdMs: 90000, cutH: 10.5, endH: 17, lastH: 23.5, stallTicks: 240 };   /* 막힘 시계는 **틱(시뮬 시간)** 으로 센다 — 240틱 = 시뮬 3.2시간. 배속을 올려도·일시정지해도·화면을 바꿔도 같은 뜻이다 */
-const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
+const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a }, box: { s: [1.25, 0.6, 1.1], c: 0xf0c890 } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
 const FACT = { 맡은밭: new Set(), cutDay: new Map(), 밭: [], gen: -1, 잰틱: -1e9, 집날: new Map(),
   stats: { 지고나섬: 0, 내려놓음: 0, 못가고돌아옴: 0, 받아감: 0, 빈손: 0, 다시나옴: 0, 막힘: 0, 문앞장바구니: 0, 중단: { 밤: 0, 들어감: 0, 길없음: 0, 막힘: 0 } } };
 /* 상태는 오직 여기서 읽는다(장면은 답만 쓴다). 프로그램 계약이 없는 판에서는 전부 null → 장면도 통째로 쉰다 */
@@ -9246,7 +9313,7 @@ const flowActState = root => (window.VRULES.flowAct.on && typeof window.FLOW ===
 const FACT_FIELD = { growing: 1, ready: 1, full: 1, waiting: 1, moving: 1, cut: 1 };
 const factField = root => { const s = flowActState(root); return FACT_FIELD[s] ? s : null; };          // 밭인가(그 밭의 상태)
 const factStore = root => { const s = flowActState(root); return s === 'stocked' || s === 'empty' ? s : null; };   // 가게인가
-const factProp = root => { const b = cells[root]; return b && b.k === 'windmill' ? 'flour' : 'crop'; };
+const factProp = root => { const b = cells[root]; return b && b.k === 'windmill' ? 'flour' : !b || b.k === 'field' || b.k === 'green' ? 'crop' : 'box'; };   /* [MAC-FLOWMAKER] 부두·벌목장은 상자 */
 /* 밭 목록 — **하루 한 번**(또는 놓은 것이 바뀔 때) 판을 훑는다. 틱마다 판 전체를 훑지 않는다(규모 문서 #656 에서 짚은 것) */
 function factFields() {
   if (typeof window.FLOW !== 'function') return FACT.밭.length ? (FACT.밭 = []) : FACT.밭;
@@ -9951,6 +10018,7 @@ function capHouseStep(rec) { const h = rec.root, need = houseLived(h);   /* [MAC
 /* 틱마다 판의 1/90 조각 — 한 바퀴가 끝나면 가게별 앉은 수를 배정표에서 다시 센다(치운 가게 자리에 새 가게가 와도 어긋나지 않게) */
 function capHomesStep() { const R = window.VRULES.shopCap;
   if (!capLive() || !capAny()) { if (CAP.asg.size || CAP.lack.size || CAP.full.size) capClear(); return; }
+  if (CAP.placed !== placedTotal) { CAP.placed = placedTotal; capNewStores(); }   /* [MAC-SHOPCAP ⑵] 새 정원 가게가 생겼으면 그 가게에 가까운 꽉 찬 집부터 */
   const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CAP.cur + step);
   for (let i = CAP.cur; i < end; i++) { const rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') capHouseStep(rec); else if (CAP.asg.has(i) || CAP.lack.has(i)) capRelease(i); }
   CAP.cur = end >= N ? 0 : end;
@@ -9961,7 +10029,7 @@ function capHit(k, met, box) { if (!(capOf(k) > 0) || !capLive()) return false; 
 /* computeSat 끝 — 정원 있는 가게만 닿은 집: 자리를 못 얻었으면 층 ②(꽉 참), 앉았거나 아직 한 바퀴 전이면 켠다 */
 function capSatEnd(rec, met, box) { if (!box.hit) { if (CAP && CAP.full.size) CAP.full.delete(rec.root); return; }
   if (met.장보기) { CAP.full.delete(rec.root); return; }
-  if (CAP.stats.한바퀴 && CAP.lack.has(rec.root)) { CAP.full.add(rec.root); return; }
+  if (CAP.stats.한바퀴 && CAP.lack.has(rec.root) && (res.get(rec.root) || 0) > 0) { CAP.full.add(rec.root); return; }   /* [MAC-SHOPCAP ⑵] 빈 집은 옛 표를 안 본다(마지막 식구가 나간 뒤 훑기 전) — 돌아섬이 맡는다 */
   CAP.full.delete(rec.root); met.장보기 = true; }
 /* 집 카드 말 — 여러 세대 가운데 일부만 못 앉았으면 몇 세대인지 */
 function capFullText(rec) { if (!CAP || !CAP.full.has(rec.root) || !capLive()) return '';
@@ -9970,6 +10038,38 @@ function capFullText(rec) { if (!CAP || !CAP.full.has(rec.root) || !capLive()) r
 function capFlowSkip(root) { return capLive() && CAP.full.has(root); }
 function capFlowStores(root, list) { if (!capLive()) return list; const a = CAP.asg.get(root);
   return list.filter(s => { const c = cells[s.root]; return !c || !(capOf(c.k) > 0) || !!(a && a.has(s.root)); }); }
+/* ── [MAC-SHOPCAP ⑵] 가게 카드 · 새 가게는 가까운 집부터 · 돌아섬 (보스 09-23 #815 뒤) ──
+   ① **까닭 → 그 자리 → 한 수 → 그 자리에서 결과.** 꽉 찬 아파트 바로 옆에 상가를 놓았는데 먼 아파트가 풀리면 아이 눈에는 "옆에 놨는데 안 됐다"다.
+      → 새 정원 가게가 생기면(놓은 수 placedTotal 이 바뀐 틱) 그 가게에서 길로 **가까운 차례로** 꽉 찬 집을 곧바로 다시 본다. 옛 집의 자리 지키기는 그대로.
+   ② 가게 카드 `(13세대 · 6세대까지 받아요 · 7세대가 못 와요)` — 숫자는 **배정표에서**(앉은 세대 + 이 가게에 닿는데 자리를 못 얻은 세대). 정원 없는 가게는 지금 숫자 그대로.
+   ③ 돌아섬 — 빈집에서 닿는 가게가 전부 정원 가게이고 **빈자리가 하나도 없으면** 새 이웃이 돌아선다(일자리 jobAway 와 같은 꼴 · 설계 4절 ⑦).
+      까닭 키는 새로 만들지 않고 **'장보기'** 를 쓴다(대기 집 모양·아이콘·말 사다리가 이미 안다) — 말만 "가게가 꽉 차서"로 바꾼다(CAP.awayFull). */
+CAP.stores = new Set(); CAP.placed = -1; CAP.awayFull = new Set(); CAP.stats.새가게 = 0; CAP.stats.돌아섬판정 = 0;
+/* 가게 쪽에서 길로 닿는 집 — computeSat 과 같은 잣대(14칸 · 큰길 20칸) · 가까운 것부터 */
+function capHomesNear(store) { const b = roadsBeside(store), out = []; if (!b.length) return out;
+  const { reach } = roadBFS(b, undefined, NEED_R_WIDE); const seen = new Set();
+  for (const i of reach) { if (bfsDepth[i] > NEED_R && !isWide(i)) continue; const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue;
+      const c = cells[idx(nx, ny)]; if (c && c.k === 'house' && !seen.has(c.root)) { seen.add(c.root); out.push(c.root); } } }
+  return out; }
+function capNewStores() { const now = new Set(); cells.forEach((rec, i) => { if (rec && rec.root === i && capOf(rec.k) > 0) now.add(i); });
+  const fresh = [...now].filter(s => !CAP.stores.has(s)); CAP.stores = now; if (!CAP.stats.한바퀴) return;   // 첫 바퀴 전(판을 막 연 때)은 훑기가 맡는다
+  fresh.forEach(s => { CAP.stats.새가게++; capHomesNear(cells[s]).forEach(h => { if (CAP.lack.has(h) && cells[h]) capHouseStep(cells[h]); }); }); }
+/* 가게 카드 한 줄 — 정원 가게만. 아니면 '' (지금 숫자 그대로) */
+function capCardText(rec) { if (!rec || !(capOf(rec.k) > 0) || !capLive()) return '';
+  const sit = CAP.used.get(rec.root) || 0; let miss = 0;
+  CAP.lack.forEach((n, h) => { const hr = cells[h]; if (hr && hr.k === 'house' && capStoresFrom(hr).list.includes(rec.root)) miss += n; });
+  return ' (' + (sit + miss) + '세대 · ' + capOf(rec.k) + '세대까지 받아요' + (miss ? ' · ' + miss + '세대가 못 와요' : '') + ')'; }
+/* 돌아섬 말 — 까닭 목록의 '장보기'가 꽉 참 때문이면 "가게가 꽉 차서". 빈집(awayFull)도, 식구가 있는 집(full · 층 ②)도 */
+function capAwayFull(root, miss) { return !!(capLive() && miss.includes('장보기') && (CAP.awayFull.has(root) || CAP.full.has(root))); }
+function capAwayText(root, miss) { const full = capAwayFull(root, miss), far = full ? miss.filter(k => k !== '장보기') : miss;
+  return (far.length ? far.map(k => NEED_TXT[k]).join('·') + (full ? '이 멀고 ' : '이 멀어서') : '') + (full ? '가게가 꽉 차서' : ''); }
+{ hookAdd('awayLacks', function (next, args) { let [rec] = args; const base = next(args), R = window.VRULES.turnAway;
+    if (!rec || !capLive() || !R.on || !CAP.stats.한바퀴 || population() < R.graceBelow || (res.get(rec.root) || 0) > 0) return base;   // 돌아섬은 빈집 앞 이야기
+    if (base && base.includes('장보기')) { CAP.awayFull.delete(rec.root); return base; }                                        // 층 ① 멀어요가 먼저
+    const { list, free } = capStoresFrom(rec);
+    if (free || !list.length || list.some(s => capOf(cells[s].k) - (CAP.used.get(s) || 0) > 0)) { CAP.awayFull.delete(rec.root); return base; }
+    CAP.stats.돌아섬판정++; CAP.awayFull.add(rec.root); return (base || []).concat('장보기'); }); }
 window.__shopCap = () => { const 가게 = []; cells.forEach((rec, i) => { if (rec && rec.root === i && capOf(rec.k) > 0) 가게.push({ 자리: i, k: rec.k, 정원: capOf(rec.k), 앉음: CAP.used.get(i) || 0 }); });
   let 사는세대 = 0, 꽉찬세대 = 0; res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') 사는세대 += houseLived(root); }); CAP.lack.forEach(v => 꽉찬세대 += v);
   return { 켜짐: window.VRULES.shopCap.on, 돎: capLive() && capAny(), 가게, 사는세대, 꽉찬세대, '꽉찬%': 사는세대 ? Math.round(꽉찬세대 / 사는세대 * 1000) / 10 : 0,
