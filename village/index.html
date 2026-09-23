@@ -3130,6 +3130,12 @@ function jwLong(why, 칸) {
   if (why === 'far') return '💼 일터가 멀어요 — 이 동네에 하나 지어 봐요';
   if (why === 'full') return '💼 가까운 가게가 꽉 찼어요 — 일할 곳을 하나 더';
   return '💼 일할 곳이 없어요 — 가까이 일터를 하나 지어 봐요'; }
+/* ── [MAC-JOBSOON] '곧 일자리를 찾아요' (보스 09-23 결정 ② · 24회 ⓑ47 · #833 ⑥) ──
+   빈자리 있는 일터를 놓으면 다음 배정 바퀴(90틱 = 9초)까지 그 집은 아직 일자리가 없다(joblessHome 참). 까닭 셈은 그동안 '곧 배정된다'며
+   null 을 돌려줬고, 말 쪽이 null 에 **'일할 곳이 없어요'(none 의 말)** 를 빌려 썼다 — 일할 곳이 **늘었는데** "없어요"가 스쳤다.
+   이제 그 틈을 까닭 'soon' 으로 부르고 **"곧 일자리를 찾아요"**. 배정은 한 줄도 안 바뀐다. 계약 window.JOB_WHY 는 'soon' 을 예전처럼 null 로 낸다. */
+JW.stats.soon = 0; JW_SHORT.soon = '곧 일자리를 찾아요'; JW_CHIP.soon = '곧 일자리를 찾는 집';
+{ const jwLong0 = jwLong; jwLong = function (why, 칸) { return why === 'soon' ? '💼 곧 일자리를 찾아요 — 닿는 일터에 빈자리가 생겼어요' : jwLong0(why, 칸); }; }
 /* 길에서 닿는 일터 → Map(일터 root → 남은 자리) */
 function jobsNearFree(from, radius) { const wp = jobsWpIndex(), out = new Map(); if (Array.isArray(from) ? !from.length : from < 0) return out;
   const { reach } = roadBFS(from, undefined, radius);
@@ -3164,7 +3170,7 @@ function jobWhyCalc(root) {
   const R = window.VRULES.jobWhy, b = roadsBeside(rec);   /* [MAC-DOORS] */
   JW.stats.잰집++;
   const near = jobsNearFree(b, undefined);                                   // 배정과 같은 반경(PATH_RADIUS)
-  if (near.size) { if (jwAnyFree(near)) return null; return { why: 'full' }; }  // 닿는데 자리가 있으면 곧 배정된다 — 말할 것 없음
+  if (near.size) { if (jwAnyFree(near)) return { why: 'soon' }; return { why: 'full' }; }   /* [MAC-JOBSOON] 닿는 일터에 빈자리 — 다음 배정 바퀴(≤90틱)에 앉는다. 말만 '곧 찾아요' */  // 닿는데 자리가 있으면 곧 배정된다 — 말할 것 없음
   const wide = jobsNearFree(b, PATH_RADIUS * (R.wide || 3));                 // 길은 이어졌지만 배정 반경 밖
   if (wide.size) return { why: 'far' };   /* [MAC-JOBWHY2] 자리 여부는 안 본다 — 아래 cut 과 같은 까닭 */
   const cut = jobsCutCost(rec, R.cut || 6);
@@ -3176,7 +3182,7 @@ function jobWhyInfo(root) { const R = window.VRULES.jobWhy; if (!R || !R.on) ret
   if (JW.gen !== gen) { JW.memo.clear(); JW.gen = gen; }
   if (JW.memo.has(root)) { JW.stats.캐시++; return JW.memo.get(root); }
   const r = jobWhyCalc(root); JW.memo.set(root, r); if (r) JW.stats[r.why]++; return r; }
-window.JOB_WHY = root => { const r = jobWhyInfo(root); return r ? r.why : null; };
+window.JOB_WHY = root => { const r = jobWhyInfo(root); return r && r.why !== 'soon' ? r.why : null; };   /* [MAC-JOBSOON] 계약은 그대로 — 'soon' 은 예전처럼 null(연기 [ACT-JOBWHY] 가 안 흔들린다) */
 window.JOB_WHY.info = jobWhyInfo;
 /* 네 곳이 쓰는 말 — 모두 JOB_WHY 하나에서 나온다 */
 function jobWhySay(rec, group) { const OLD = '💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요';
@@ -3186,10 +3192,10 @@ function jobWhySay(rec, group) { const OLD = '💼 일할 곳이 닿지 않아�
   return r ? jwLong(r.why, r.칸) : OLD; }
 function jobWhyShort(rec) { const R = window.VRULES.jobWhy; if (!R || !R.on || !rec) return '일할 곳이 없어요';
   const r = jobWhyInfo(rec.root); return r ? JW_SHORT[r.why] : '일할 곳이 없어요'; }
-function jobWhyCount(roots) { const c = { none: 0, cut: 0, far: 0, full: 0 };
+function jobWhyCount(roots) { const c = { none: 0, cut: 0, far: 0, full: 0, soon: 0 };
   roots.forEach(h => { const rec = cells[h]; if (!rec) return; const r = jobWhyInfo(h); if (r) c[r.why]++; }); return c; }
 function jobWhyTop(roots) { const c = jobWhyCount(roots); let top = null, n = 0;
-  ['cut', 'full', 'far', 'none'].forEach(k => { if (c[k] > n) { n = c[k]; top = k; } }); return top; }
+  ['cut', 'full', 'far', 'none', 'soon'].forEach(k => { if (c[k] > n) { n = c[k]; top = k; } }); return top; }
 function jobWhyCut(roots, why) { let best = 0;
   roots.forEach(h => { const r = jobWhyInfo(h); if (r && r.why === why && r.칸) best = best ? Math.min(best, r.칸) : r.칸; }); return best || 1; }
 /* 'cut' 인 집이 있으면 이어 닿을 일터도 함께 반짝인다(칩을 눌렀을 때) — 새 안내 장치를 만들지 않고 있던 ✨ 를 쓴다 */
@@ -6192,7 +6198,30 @@ function crowdSegOfHome(root) {
     if (!crowdSegOn() || !rec || rec.k !== 'house' || /길이 붐벼요/.test(t)) return t;
     if (crowdSegOfHome(rec.root) < 0) return t;
     CSEG.stats.말한집++;
-    return t.replace(/(😊|😐)/, '😐') + ' · 길이 붐벼요'; }); }
+    return window.VRULES.crowdSeg.제문앞 ? t + crowdSegNearSay(rec.root) : t.replace(/(😊|😐)/, '😐') + ' · 길이 붐벼요'; }); }   /* [MAC-CROWDOWN] 제 문 앞이 문턱 아래면 토막 말 대신 사실대로 */
+/* ── [MAC-CROWDOWN] 말은 사실을 따른다 — 풀린 집이 토막 말 때문에 '길이 붐벼요'를 계속 말하던 것 (보스 09-23 결정 ③ · #840 이 찾은 틈) ──
+   집의 붐빔은 **제 문 앞 한 칸**으로 정해진다(crowdedHome). 위 토막 말은 그 값이 문턱 아래인 집에만 닿는다(문턱 위면 이미 '길이 붐벼요'라서).
+   그래서 ✨ 대로 문 앞을 넓혀 **실제로 풀린 집**도 토막에 닿아 있으면 '길이 붐벼요'를 계속 말했다 — 한 일에 대답이 없었다.
+   · 제 문 앞이 문턱 아래 + 토막에 닿음 → 붐빈 적이 있던 집은 **'우리 집 앞은 풀렸어요 · 옆 길은 아직 붐벼요'**,
+     붐빈 적이 없던 집은 '우리 집 앞은 괜찮아요 · 옆 길은 붐벼요'. 얼굴은 안 내린다(얼굴은 제 문 앞 값으로만 — faceOfHome 그대로).
+   · '같은 토막 같은 말'(#779)은 이제 **아직 붐비는 집들끼리**에만 — 그 집들은 기본 말이 이미 같은 '길이 붐벼요'를 한다.
+   · '붐빈 적이 있나'는 붐빔 한 바퀴마다 적어 둔다(저장 0 · 치운 자리는 지운다 · 큰길에 밀려 물러난 집은 새 자리로 옮겨 적는다 — placeAt 고리 하나). 끄면(crowdSeg.제문앞 = false) 예전 토막 말. 원래 줄 수정 1. */
+if (!('제문앞' in window.VRULES.crowdSeg)) window.VRULES.crowdSeg.제문앞 = true;
+const COWN = { was: new Set(), 바퀴: -1, stats: { 풀렸어요: 0, 괜찮아요: 0 } };
+function crowdSegNearSay(root) { if (COWN.was.has(root)) { COWN.stats.풀렸어요++; return ' · 우리 집 앞은 풀렸어요 · 옆 길은 아직 붐벼요'; }
+  COWN.stats.괜찮아요++; return ' · 우리 집 앞은 괜찮아요 · 옆 길은 붐벼요'; }
+{ hookAdd('crowdTick', function (next, args) { const r = next(args);
+    if (COWN.바퀴 !== CROWDH.stats.한바퀴) { COWN.바퀴 = CROWDH.stats.한바퀴; crowd.forEach((v, root) => { if (v > 0.3) COWN.was.add(root); });
+      COWN.was.forEach(root => { const c = cells[root]; if (!c || c.k !== 'house' || c.root !== root) COWN.was.delete(root); }); }
+    return r; }); }
+/* 큰길에 밀려 한 칸 물러난 집([MAC-WIDEN2])도 '붐빈 적'을 이어받는다 — 물러난 집이 곧 ✨ 대로 한 그 집이다(자리만 바뀌었다) */
+{ hookAdd('placeAt', function (next, args) { const [kind, x, y, rot] = args;
+    const p = kind === 'avenue' && COWN.was.size && window.VRULES.widenShift && window.VRULES.widenShift.on && !WIDEN2.busy ? widenShiftPlan(x, y, rot) : null;
+    const was = p && p.house && COWN.was.has(p.house.root); const r = next(args);
+    if (was && p.to) { const c = cells[idx(p.to[0], p.to[1])]; if (c && c.k === 'house') COWN.was.add(c.root); }
+    return r; }); }
+window.__crowdOwn = (x, y) => { const rec = x == null ? null : cells[idx(x, y)];
+  return { 켜짐: !!window.VRULES.crowdSeg.제문앞, 붐빈적있는집: COWN.was.size, ...COWN.stats, ...(rec ? { 붐빈적: COWN.was.has(rec.root), 제문앞붐빔: crowdedHome(rec.root), 말: satText(rec) } : {}) }; };
 /* 짚기 — [MAC-WHERE] 의 갈래 하나. 토막의 **가장 붐비는 칸** 한 곳만(여럿 반짝이면 헷갈린다 · MAC-WHERE 조건 ②) */
 { const ws = whereSpots; whereSpots = function (rec) { const r = ws.apply(this, arguments);
     if (r && r.length) return r;
@@ -8358,6 +8387,7 @@ const homeReason = (root, salt) => { const st = sat.get(root); return st ? whySt
 /* 1초마다 — 빠진 것이 있던 집이 채워졌나(한 번에 여덟 채까지 다시 센다). 채워졌으면 그 집은 기뻐한다 */
 function breathScan(now) {
   const B = window.VRULES.breath; if (now - BREATH.lastScan < 1000) return; BREATH.lastScan = now;
+  joyFlush(now);   /* [MAC-JOYOTHERS] 모아 둔 🎉 를 창이 닫히면 한 번에 */
   const roots = []; BREATH.home.forEach((h, root) => { if (h.reason) roots.push(root); });
   for (let n = 0; n < Math.min(8, roots.length); n++) {
     const root = roots[(BREATH.rr++) % roots.length], rec = cells[root], h = BREATH.home.get(root);
@@ -8367,11 +8397,26 @@ function breathScan(now) {
       const was = h.reason; h.reason = homeReason(root, 0); h.since = now; h.restUntil = now + B.homeRestMs;
       h.joyUntil = now + B.joyMs; whyStats.누적기쁨++;
       const c = centerOf('house', cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 3000 });
-      if (now - BREATH.lastJoyToast > B.joyToastGapMs) { BREATH.lastJoyToast = now; const who = folks.find(f => f.home === root && !f.arriving && !f.visitor);
-        simSay('🎉 ' + (who ? folkName(who) + '네가' : '주민이') + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
+      joyNote(root, was, now);   /* [MAC-JOYOTHERS] 🎉 는 모아서 — 한 수로 여러 집이 풀리면 '○○네 외 N곳' */
     }
   }
 }
+/* ── [MAC-JOYOTHERS] 🎉 '○○네 외 N곳이 기뻐해요' (보스 09-23 결정 ④ · 창조자 24회 ⓑ46) ──
+   한 수로 아파트 둘이 풀렸는데 🎉 는 **한 집 이름으로 한 번**만 떴다(나머지는 joyToastGapMs 20초 안이라 조용했다).
+   몇 곳이 풀렸는지가 보이면 "가까운 집부터"가 말로 보인다. 그래서 첫 기쁨에서 **joyGroupMs(3초) 창**을 열고 그 사이 풀린 집을 모아
+   창이 닫힐 때 한 번 말한다 — 한 곳이면 예전 말 그대로(`🎉 ○○네가 기뻐해요 — …이 생겼어요`), 여럿이면 `🎉 ○○네 외 N곳이 기뻐해요 — …`.
+   말자리·간격(20초)·소리는 그대로 — 말이 3초 늦게 뜰 뿐이다(✨ 는 그 자리에서 곧바로). 원래 줄 수정 2(말하던 두 줄 → joyNote 한 줄) · 끼운 줄 1. */
+if (!('joyGroupMs' in window.VRULES.breath)) window.VRULES.breath.joyGroupMs = 3000;
+const JOYN = { at: -1, root: -1, was: null, roots: new Set(), stats: { 말함: 0, 외: 0, 모은집: 0 } };
+function joyNote(root, was, now) { const B = window.VRULES.breath;
+  if (JOYN.at >= 0 && now - JOYN.at <= (B.joyGroupMs | 0)) { JOYN.roots.add(root); return; }          // 같은 한 수로 풀린 집 — 모은다
+  if (now - BREATH.lastJoyToast > B.joyToastGapMs) { BREATH.lastJoyToast = now; JOYN.at = now; JOYN.root = root; JOYN.was = was; JOYN.roots = new Set([root]); } }
+function joyFlush(now) { if (JOYN.at < 0 || now - JOYN.at <= (window.VRULES.breath.joyGroupMs | 0)) return;
+  const root = JOYN.root, n = JOYN.roots.size, was = JOYN.was; JOYN.at = -1;
+  const who = folks.find(f => f.home === root && !f.arriving && !f.visitor), 이름 = who ? folkName(who) + '네' : '주민';
+  JOYN.stats.말함++; JOYN.stats.모은집 += n; if (n > 1) JOYN.stats.외++;
+  simSay('🎉 ' + 이름 + (n > 1 ? ' 외 ' + (n - 1) + '곳이' : (who ? '가' : '이')) + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
+window.__joyOthers = () => ({ 창ms: window.VRULES.breath.joyGroupMs, 열림: JOYN.at >= 0, 모으는중: JOYN.roots.size, ...JOYN.stats });
 function whyBubbleTick(now) {
   const R = window.VRULES.whyBubble, B = window.VRULES.breath;
   if (!R.on || OFF.has('faces')) { whyPool.forEach(im => im.count = 0); return; }
