@@ -68,6 +68,10 @@ function housesWith(w, what) {   // @jobs · @crowd · @need:물
 function doMove(w, cmd) {
   const a = cmd.trim().split(/\s+/);
   if (a[0] === 'del') { w.__del(+a[1], +a[2]); return { 한수: cmd, 됨: 1 }; }
+  if (a[0] === 'widen' && a[1] === '@point') {   // 'widen @point 5' — 붐빔 ✨ 가 짚는 칸(MAC-CROWDPOINT)에 큰길을 n번(index.html __crowdPointWiden)
+    if (typeof w.__crowdPointWiden !== 'function') throw new Error('이 판에는 __crowdPointWiden 이 없음');
+    const n = +(a[2] || 1), got = w.__crowdPointWiden(n); return { 한수: cmd, 됨: got.length, 까닭: got.length < n ? '짚을 칸이 모자람(' + got.length + '/' + n + ')' : undefined };
+  }
   if (a[0] === 'widen') {   // 'widen @crowd 5' — 붐비는 집 n채의 문 앞 길을 큰길로(index.html __widenFront · 바꿔 깔기)
     if (typeof w.__widenFront !== 'function') throw new Error('이 판에는 __widenFront 가 없음');
     const hs = housesWith(w, (a[1] || '@crowd').slice(1)), n = +(a[2] || 99), why = {}; let ok = 0, tried = 0;

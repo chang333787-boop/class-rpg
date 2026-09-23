@@ -6161,6 +6161,56 @@ window.__crowdSeg = (x, y) => { const R = { 켜짐: crowdSegOn(), ...CSEG.stats,
   return { ...R, 이집: rec.k, 토막: s, 토막칸: s >= 0 ? CSEG.list[s].칸.length : 0,
     가장붐빈칸: s >= 0 ? [cX(CSEG.list[s].최대칸), cY(CSEG.list[s].최대칸), +CSEG.list[s].최대.toFixed(2)] : null,
     말: rec.k === 'house' ? satText(rec) : null }; };
+/* ── [MAC-CROWDPOINT] 붐빔 ✨ 는 '큰길을 놓을 수 있는 칸'을 짚는다 (창조자 23회 ⓑ38 · 보스 09-23) ──
+   mid36 에서 붐빔 토막(61칸)에 닿은 26채가 모두 (137,143)을 짚었는데, 그 칸은 큰길이 안 되는 칸이었다("곁에 물러날 자리가 없어요").
+   옆에 큰길을 놓자 점이 (135,143)으로 옮겨 갔고 그 칸도 안 되는 칸이었다 — 판의 길 130칸 중 '안 되는 25칸'만 두 번 짚었다.
+   가장 붐빈 칸은 곧 가장 빽빽한(곁이 막힌) 칸이라 그렇다. 엔진의 약속 "까닭 → 그 자리 → 한 수"가 거기서 끊겼다(#776 과 같은 종류).
+   재 보니 (137,143)은 큰길이 **덮을 수는 있는** 칸이었다 — 그 칸을 덮는 2×2 네 자리 중 셋은 바로 놓인다. 안 되는 것은 **그 칸을 모서리로 한 자리** 하나뿐인데,
+   아이가 큰길 카드를 들고 ✨ 칸을 누르면 **누른 칸이 큰길의 모서리**가 된다(paintAt 은 누른 칸을 그대로 자리로 쓴다). 그래서 '짚은 칸을 누르면 안 놓인다'.
+   · 짚는 칸 = 그 토막에서 **그 칸을 눌러 큰길이 놓이는 칸 가운데 가장 붐비는 칸** — "✨ 를 누르면 된다"가 참이 되게.
+     판정은 새로 짓지 않는다 — 큰길 놓기 그 자체(canPlace('avenue', 그 칸) · 곁 집 한 채 물리기[MAC-WIDEN2] 포함)를 부른다.
+     두 번 누름[MAC-WIDEN3]은 사람 손의 확인이라 셈에서는 건너뛴다(WIDEN3.force — 시험 훅 __widenFront 와 같은 방법).
+   · 토막에 그런 칸이 하나도 없으면 **짚지 않고 말로** — "이 길은 넓힐 자리가 없어요 — 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요".
+     그때는 '…넓혀 봐요' 권유도 그 말로 바꾼다(말과 점이 서로 딴말을 하지 않게).
+   · 큰길을 아직 못 쓰면(🔒 · 판 건물 목록에 없음) 예전처럼 가장 붐빈 칸을 짚는다 — '자리가 없다'는 말이 거짓이 되니까.
+   · 셈은 토막마다 한 번 — 놓기·치우기가 있었거나 토막을 다시 묶으면(crowdHomes 한 바퀴) 새로 한다.
+   분류 '보기'(새 판정 0). 원래 줄 수정 0 — whereSpots·satText 감싸기 · placeAt·removeAt 고리(셈 무르기만). */
+(window.VRULES = window.VRULES || {}).crowdPoint = { on: true };
+const CPOINT = { ver: 0, stats: { 짚음: 0, 바꿔짚음: 0, 자리없음: 0, 셈: 0 } };
+function crowdPointAvenueOff() { return !K.avenue || lockedWhy('avenue') !== true || !!(STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes('avenue')); }
+/* 이 길 칸을 눌러 큰길(2×2)이 놓이나 — 누른 칸이 큰길의 자리(모서리)다. 큰길 놓기와 같은 판정 */
+function crowdPointOk(c) { const r = cells[c]; if (!r || r.k !== 'road') return false; const f0 = WIDEN3.force; WIDEN3.force = true;
+  try { return canPlace('avenue', cX(c), cY(c), 0) === true; } finally { WIDEN3.force = f0; } }
+/* 이 칸을 덮는 큰길 자리가 하나라도 있나(네 자리) — 재기용(말·점에는 안 쓴다) */
+function crowdPointCover(c) { const r = cells[c]; if (!r || r.k !== 'road') return false; const x = cX(c), y = cY(c), f0 = WIDEN3.force; WIDEN3.force = true;
+  try { return [[0, 0], [-1, 0], [0, -1], [-1, -1]].some(([ox, oy]) => canPlace('avenue', x + ox, y + oy, 0) === true); } finally { WIDEN3.force = f0; } }
+/* 토막 s 에서 짚을 칸 — 큰길을 놓을 수 있는 칸 가운데 가장 붐비는 칸 · 없으면 -1 */
+function crowdPointCell(s) { const seg = CSEG.list[s]; if (!seg) return -1;
+  if (seg.점 && seg.점.ver === CPOINT.ver) return seg.점.c;
+  const cap = window.VRULES.crowdHomes.cap || 3, m = c => (CROWDH.load.get(c) || 0) / (cap * (isWide(c) ? 2 : 1));
+  const c = seg.칸.slice().sort((a, b) => m(b) - m(a)).find(crowdPointOk); CPOINT.stats.셈++;
+  seg.점 = { ver: CPOINT.ver, c: c == null ? -1 : c }; return seg.점.c; }
+{ hookAdd('placeAt', function (next, args) { CPOINT.ver++; return next(args); }); hookAdd('removeAt', function (next, args) { CPOINT.ver++; return next(args); });
+  const ws = whereSpots; whereSpots = function (rec) { const n0 = CSEG.stats.짚음, r = ws.apply(this, arguments);
+    if (!window.VRULES.crowdPoint.on || CSEG.stats.짚음 === n0 || !r || !r.length || crowdPointAvenueOff()) return r;   // 붐빔 토막 갈래가 짚은 때만
+    const s = crowdSegOfHome(rec.root), c = s < 0 ? -1 : crowdPointCell(s);
+    if (c < 0) { CPOINT.stats.자리없음++; return null; }                                                  // 짚지 않는다 — 말(아래)이 그렇다고 한다
+    CPOINT.stats.짚음++; if (c !== r[0]) CPOINT.stats.바꿔짚음++; return [c]; };
+  hookAdd('satText', function (next, args) { const [rec] = args; const t = next(args);
+    if (!window.VRULES.crowdPoint.on || !rec || rec.k !== 'house' || !/길이 붐벼요/.test(t) || crowdPointAvenueOff()) return t;
+    const s = crowdSegOfHome(rec.root); if (s < 0 || crowdPointCell(s) >= 0) return t;
+    const say = ' · 🛣️ 이 길은 넓힐 자리가 없어요 — 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요';
+    return /넓혀 봐요/.test(t) ? t.replace(/ · 🛣️ [^·]*넓혀 봐요[^·]*/, say) : t + say; }); }
+window.__crowdPoint = (칸도) => ({ 켜짐: window.VRULES.crowdPoint.on, 큰길못씀: crowdPointAvenueOff(), ...CPOINT.stats,
+  토막: CSEG.list.map((s, k) => { const c = crowdPointCell(k), top = s.최대칸; return { 칸수: s.칸.length, 가장붐빈칸: [cX(top), cY(top)], 짚을칸: c < 0 ? null : [cX(c), cY(c)], 가장붐빈칸을눌러큰길: crowdPointOk(top), 가장붐빈칸을덮는큰길: crowdPointCover(top),
+    눌러놓이는칸: 칸도 ? s.칸.filter(crowdPointOk).map(c => [cX(c), cY(c)]) : s.칸.filter(crowdPointOk).length }; }) });
+/* 시험 훅(재기용 · village-sim 'widen @point n') — 가장 큰 토막의 ✨ 칸에 큰길을 n번 놓는다. 두 번 누름은 건너뛴다(__widenFront 와 같은 방법).
+   한 번 놓을 때마다 짚는 칸을 다시 고른다 — 넓힌 칸은 이제 큰길이라 다음으로 붐비는 '눌러 놓이는 칸'으로 간다(붐빔 값은 그 순간 것 그대로). */
+window.__crowdPointWiden = (n) => { const got = [];
+  for (let k = 0; k < (n | 0 || 1); k++) { let s = -1; CSEG.list.forEach((seg, i) => { if (s < 0 || seg.칸.length > CSEG.list[s].칸.length) s = i; }); if (s < 0) break;
+    const c = crowdPointCell(s); if (c < 0) break; WIDEN3.force = true; let r; try { r = window.__put('avenue', cX(c), cY(c), 0); } finally { WIDEN3.force = false; }
+    if (r !== true) break; got.push([cX(c), cY(c)]); }
+  return got; };
 
 
 /* ══════════════════════════════════════════════════════════════
