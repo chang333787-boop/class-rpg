@@ -5256,6 +5256,18 @@ function setSpeed(n) {
 }
 document.querySelectorAll('#spd button').forEach(b => b.onclick = () => setSpeed(+b.dataset.s));
 addEventListener('keydown', e => { if (e.key === ' ' && e.target === document.body) { e.preventDefault(); setSpeed(SIM.paused ? SIM.speed : 0); } });
+/* ── [ACT-SPEEDQUIET] 배속 단추는 말하지 않는다 (창조자 25회 ⓗ·ⓒ54 · 보스 09-23) ──
+   속도 단추를 누를 때마다 가운데 위에 "2배속"·"멈췄어요" 토스트가 떴다 — 누른 단추가 이미 금빛 테두리로 지금 속도를 보여 주는데 말이 한 번 더 튀어나왔고,
+   그 칸을 쓰던 말(목표·놓은 것의 대답)을 덮었다. 이제 **속도 단추 줄이 화면에 보이면** setSpeed 자신의 토스트만 쉰다(스페이스 멈춤도 같은 단추가 켜진다).
+   단추 줄이 안 보이는 때(사진 모드 등)는 전처럼 말한다 · 구경 중 "시간이 멈춰 있어요"는 그대로. 판정·저장 0 · 분류 '말'. */
+(window.VRULES = window.VRULES || {}).speedQuiet = { on: true };
+const SPDQ = { in: false, stats: { 쉼: 0, 말함: 0 } };
+{ const ss0 = setSpeed; setSpeed = function () { SPDQ.in = true; try { return ss0.apply(this, arguments); } finally { SPDQ.in = false; } }; }
+hookAdd('toast', function (next, a) { const el = document.getElementById('spd');
+  if (!SPDQ.in || !/^(멈췄어요|\d+배속)$/.test(String(a[0]))) return next(a);
+  if (window.VRULES.speedQuiet.on && el && el.offsetParent && getComputedStyle(el).visibility !== 'hidden') { SPDQ.stats.쉼++; return; }
+  SPDQ.stats.말함++; return next(a); });
+window.__speedQuiet = () => ({ 켜짐: window.VRULES.speedQuiet.on, ...SPDQ.stats });
 document.addEventListener('visibilitychange', () => {
   if (SND.ctx && SND.on) { if (document.hidden) SND.ctx.suspend(); else SND.ctx.resume(); } SIM.hidden = document.visibilityState !== 'visible'; SIM.acc = 0; });
 let clockShownDay = 0, clockShownH = -1;
