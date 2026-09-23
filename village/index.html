@@ -3004,11 +3004,14 @@ function streamLookParts(rec) {
   /* 풀 덤불 — 물가 바깥 가장자리에 둥근 잎 덩이(물가 선이 들쭉날쭉해진다 · 잎 색이라 철 따라 바뀐다) */
   sides.forEach((sd, k) => { const h = slookHash(x, y, k + 61); if (h > .7) return; const t = (slookHash(x, y, k + 71) - .5) * CS * .7, [px, pz] = bank(k + 9, R.dirt * .5 + .25, t);
     out.push({ g: 'sph', c: h < .35 ? P.leaf : P.leafL, s: [.46, .3, .4], p: [cx + px, .14, cz + pz], abs: true }); });
-  /* 갈대 한 무리 — 한 칸에 한 곳(부들: 줄기 + 갈색 이삭) */
-  if (sides.length && !bridge && slookHash(x, y, 22) < .6) { const k = Math.floor(slookHash(x, y, 21) * sides.length), t = (slookHash(x, y, 23) - .5) * CS * .5, [bx, bz] = bank(k + 13, 0, t);
-    [[0, 0, 1.4], [.24, .12, 1.1], [-.22, .2, 1.2], [.1, -.2, .9], [-.36, -.06, .8]].forEach(([a, o, ht], j) => { const px = bx + a, pz = bz + o;
-      box(j % 2 ? P.leafL : P.leaf, [.12, ht, .12], [px, ht / 2, pz]);
-      if (j < 3) box(0x7a4b2a, [.2, .34, .2], [px, ht + .1, pz]); }); }
+  /* 부들 한 무리 — 3×3 칸 조각마다 **한 칸에만**(조각 안 자리는 해시로) · 그 칸도 절반만 → 드문드문 무리로(칸마다 서면 울타리 말뚝 줄처럼 읽혔다 · 보스 #906)
+     2~4포기 · 초록 줄기 + 갈색 이삭(둘까지) · 밑동에 잎 덩이 */
+  const bx0 = Math.floor(x / 3), by0 = Math.floor(y / 3), pick = Math.floor(slookHash(bx0, by0, 24) * 9);
+  if (sides.length && !bridge && (x - bx0 * 3) + 3 * (y - by0 * 3) === pick && slookHash(bx0, by0, 25) < .55) { const k = Math.floor(slookHash(x, y, 21) * sides.length), t = (slookHash(x, y, 23) - .5) * CS * .5, [bx, bz] = bank(k + 13, 0, t), n = 2 + Math.floor(slookHash(x, y, 26) * 3);
+    out.push({ g: 'sph', c: P.leaf, s: [.42, .2, .36], p: [cx + bx, .14, cz + bz], abs: true });
+    [[0, 0, 1.25], [.26, .14, 1.0], [-.24, .18, 1.1], [.12, -.22, .85]].slice(0, n).forEach(([a, o, ht], j) => { const px = bx + a, pz = bz + o;
+      box(j % 2 ? P.leafL : P.leaf, [.14, ht, .14], [px, ht / 2, pz]);
+      if (j < 2) box(0x9a6a3a, [.17, .3, .17], [px, ht + .1, pz]); }); }
   if (straight && !bridge && slookHash(x, y, 31) < .22) { const u = (slookHash(x, y, 32) - .5) * CS * .5, v = (slookHash(x, y, 33) - .5) * Wd * .8;
     disk(P.leaf, .3, .03, jn.n ? v : u, jn.n ? u : v, R.waterH + .02); }
   if (!bridge) return out;
@@ -3033,12 +3036,13 @@ function streamLookScan(now) { const L = []; SLOOK.dirty = false; SLOOK.scanT = 
 function streamFlowMesh() { if (SLOOK.mesh) return SLOOK.mesh;
   const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .02, .1), new THREE.MeshLambertMaterial({ color: 0xf2fbff, emissive: 0x2a4a58, transparent: true, opacity: .6, depthWrite: false }), window.VRULES.streamLook.flowCap || 600);
   m.count = 0; m.frustumCulled = false; m.renderOrder = 1; scene.add(m); SLOOK.mesh = m; return m; }
-const _slookD = new THREE.Object3D();
+let _slookD = null;   // 그릴 때 처음 만든다 — Object3D 는 uuid 를 Math.random 으로 뽑아, 불러올 때 만들면 시드 시뮬의 난수 차례가 한 칸 밀린다(판정 값이 움직였다 · 보스 #906 기준 ①)
 function streamFlowDraw(now) {
   const R = window.VRULES.streamLook;
   if (!R.on || !window.VRULES.stream.on) { if (SLOOK.mesh) { SLOOK.mesh.count = 0; SLOOK.mesh.visible = false; } return; }
   if (SLOOK.dirty || now - SLOOK.scanT > 2000) streamLookScan(now);
   if (!SLOOK.list.length) { if (SLOOK.mesh) { SLOOK.mesh.count = 0; SLOOK.mesh.visible = false; } return; }
+  if (!_slookD) _slookD = new THREE.Object3D();
   const im = streamFlowMesh(), cap = Math.min(R.flowCap || 600, im.instanceMatrix.count), Wd = CS * (R.width || window.VRULES.stream.width || .62) / 2, y = R.waterH + .02; let k = 0;
   for (const c of SLOOK.list) { if (k >= cap) break;
     for (let j = 0; j < 2 && k < cap; j++) { const ph = (now / (R.flowMs || 5200) + c.h * 3 + j * .5) % 1, fade = Math.sin(Math.PI * ph);
