@@ -10628,6 +10628,45 @@ if (STAGE.id) {
     STAGE.def = def; stageApplyEarly(def);
   } catch (e) { STAGE.err = String(e && e.message || e); console.warn('[MAC-STAGE]', STAGE.err); }
 }
+/* ── [MAC-TERRAIN] 환경이 선택을 만드는 판 — 지형 바닥 + 칠하기 (설계 docs/village_environment_boards.md #898 · 보스 09-23 승인 · 바다 판 먼저: 물 · 모래) ──
+   판 파일 `지형: { 칸: [[x0, y0, x1, y1, '물'|'모래'], …] }`(뒤엣것이 앞엣것을 덮음). 지형은 **물건이 아니라 바닥**이다 — 칸(cells)에 들어가지 않으니
+   치우기·옮기기로 없어지지 않고, 저장본에도 안 들어간다(판 파일에만).
+   · 읽기: `[MAC-ON]` 의 `groundAt(x, y)`(지금까지 늘 '풀')가 판의 지형을 읽는다.
+   · 놓기 규칙(canPlace 고리 · 판정 0): **물** 에는 적힌 것만(부두) · **모래** 에는 밭 ✕ · **부두**는 물가에만(발자국이 물·모래 위 · 한 칸 이상 물).
+     `PLACE_ON` 표는 온 마을에 걸리는 표라(지형 없는 판의 부두를 막아 버림) 쓰지 않고, **지형이 있는 판에서만** 도는 이 표를 쓴다.
+     되살리기(opts.복원)는 보지 않는다 — 판 파일의 지형을 바꿔도 옛 저장본의 물건이 사라지지 않는다.
+   · 칠하기(paintBoard 감싸기): 열린 구역 안의 지형 칸만 색을 바꾼다(구역 테두리째 — 바다를 가로지르는 풀 줄이 없게 · 물은 물가 한 칸을 옅게). **지형이 없는 판은 한 줄도 안 돈다**(캔버스 그대로).
+   사람은 원래 길로만 다니니, 물에 길을 못 놓으면 다니는 길이 해안을 따라 생긴다. 새 VRULES `terrain`(rules.json '조작') · 시험 훅 `__terrain`·`__boardHash`. */
+(window.VRULES = window.VRULES || {}).terrain = { on: true };
+const TERR = { def: null, map: new Map(), stats: { 칸: 0, 막음: 0, 칠함: 0 } };
+const TERR_COL = { 물: '#5fa3c8', 물가: '#8cc3dc', 모래: '#efe0b6' };
+const TERR_ON = { 물: new Set(['pier']) };                        // 물 칸에 올라설 수 있는 것
+const TERR_NOT = { 모래: new Set(['field']) };                     // 모래 칸에 못 놓는 것
+const TERR_WHY = { 물: '🌊 바다에는 지을 수 없어요 — 부두는 물가에 놓아요', 모래: '🏖️ 모래밭에는 밭을 일굴 수 없어요', 부두: '🪵 부두는 물가에 — 바다에 걸치게 놓아요' };
+function terrainMap() { const d = STAGE.def && STAGE.def.지형; if (TERR.def === d) return TERR.map; TERR.def = d; TERR.map = new Map();
+  const L = d && Array.isArray(d.칸) ? d.칸 : [];
+  L.forEach(r => { if (!Array.isArray(r) || r.length !== 5 || !TERR_COL[r[4]]) return; const [x0, y0, x1, y1] = r.slice(0, 4).map(v => v | 0), nm = r[4];
+    for (let y = Math.max(0, Math.min(y0, y1)); y <= Math.min(H - 1, Math.max(y0, y1)); y++) for (let x = Math.max(0, Math.min(x0, x1)); x <= Math.min(W - 1, Math.max(x0, x1)); x++) TERR.map.set(idx(x, y), nm); });
+  TERR.stats.칸 = TERR.map.size; return TERR.map; }
+const terrainLive = () => !!(window.VRULES.terrain.on && STAGE.def && STAGE.def.지형 && terrainMap().size);
+{ const g0 = groundAt; groundAt = function (x, y) { if (terrainLive()) { const g = TERR.map.get(idx(x, y)); if (g) return g; } return g0(x, y); }; }
+function terrainWhy(kind, grounds) {
+  if (kind === 'pier') return grounds.every(g => g === '물' || g === '모래') && grounds.includes('물') ? null : TERR_WHY.부두;
+  for (const g of grounds) { if (TERR_ON[g] && !TERR_ON[g].has(kind)) return TERR_WHY[g]; if (TERR_NOT[g] && TERR_NOT[g].has(kind)) return TERR_WHY[g]; }
+  return null; }
+{ hookAdd('canPlace', function (next, args) { const [kind, x, y, rot, opts] = args; const r = next(args);
+    if (r !== true || (opts && opts.복원) || !terrainLive()) return r;
+    const w = terrainWhy(kind, footprint(kind, x, y, rot || 0).map(([px, py]) => groundAt(px, py)));
+    if (w) { TERR.stats.막음++; return w; } return r; }); }
+{ const pb0 = paintBoard; paintBoard = function () { pb0.apply(this, arguments); if (!terrainLive()) return;
+    const g = boardCv.getContext('2d'), px = BOARD_PX, m = TERR.map; let n = 0;
+    m.forEach((nm, i) => { const x = cX(i), y = cY(i); if (!plots.has(((x / PLOT) | 0) + ',' + ((y / PLOT) | 0))) return;
+      let c = TERR_COL[nm]; if (nm === '물' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(x + dx, y + dy) && m.get(idx(x + dx, y + dy)) !== '물')) c = TERR_COL.물가;   // 판 끝은 물가가 아니다
+      g.fillStyle = c; g.fillRect(x * px, (H - 1 - y) * px, px, px); n++; });
+    TERR.stats.칠함 = n; boardTex.needsUpdate = true; }; }
+window.__terrain = (x, y) => ({ 켜짐: terrainLive(), ...TERR.stats, ...(x != null ? { 바닥: groundAt(x, y) } : {}) });
+window.__boardHash = () => { const d = boardCv.getContext('2d').getImageData(0, 0, boardCv.width, boardCv.height).data; let h = 2166136261; for (let i = 0; i < d.length; i++) { h ^= d[i]; h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
+if (terrainLive()) paintBoard();
 window.__stage = () => ({ id: STAGE.id, 이름: STAGE.def && STAGE.def.이름, 오류: STAGE.err, 저장키: SAVE_KEY, 원격: !!window.VillageSync,
   목표: STAGE.goals.map(g => [g.t, goalsDone.has(g.id)]), 일닿음: STAGE_HOOKS['일닿음%'](), ...STAGE.stats });
 let saveBroken = false;                   // 저장이 막혔는가(용량 초과 등)
