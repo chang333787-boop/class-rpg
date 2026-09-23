@@ -11179,6 +11179,17 @@ window.__folkOverlap = () => {
   return { 사람: folks.length, 가장가까운거리: +worst.toFixed(2), 겹친쌍: pairs,
            잡은칸: claimed.size, 기다리는중: folks.filter(f => f.blockedAt).length };
 };
+/* [ACT-FIRST30] 시험 훅(읽기만) — 첫 30초 연기의 어설픔을 재는 scripts/village-sim/first30.mjs 가 쓴다.
+   사람마다 [이름표, x, z, 보이나, 상태, 선 칸의 종류, 키 큰 것 위인가, 곁 모드]. 자리는 **시뮬 좌표**이고, 건물 안에서 문 밖에 그려지는 사람(곁·일꾼)은 그 곁 자리로 바꿔 준다.
+   이름표는 사람 객체마다 처음 본 때 붙인다(folks 배열 차례는 이사로 바뀔 수 있다). '키 큰 것' = 판 조각 윗면이 1.5 넘는 종류(집·나무·가게 …). 판정·저장 0. */
+const F30 = { id: new WeakMap(), n: 0, tall: new Map() };
+const f30Tall = k => { if (F30.tall.has(k)) return F30.tall.get(k); const t = K[k]; let top = 0;
+  (Array.isArray(t && t.parts) ? t.parts : []).forEach(pt => { if (pt && Array.isArray(pt.p) && Array.isArray(pt.s)) top = Math.max(top, pt.p[1] + pt.s[1] / 2); });
+  F30.tall.set(k, top > 1.5); return top > 1.5; };
+window.__folkPos = () => folks.map(f => { let id = F30.id.get(f); if (id == null) { id = ++F30.n; F30.id.set(f, id); }
+  const b = f.state === 'inside' && f.beside ? f.beside : null, vis = f.state !== 'inside' || !!b, x = b ? b.x : f.x, z = b ? b.z : f.z;
+  const gx = Math.round(x / CS + (W - 1) / 2), gy = Math.round(z / CS + (H - 1) / 2), i = inb(gx, gy) ? idx(gx, gy) : -1, rec = i >= 0 ? cells[i] : null, road = i >= 0 && isRoad(i);
+  return [id, +x.toFixed(2), +z.toFixed(2), vis ? 1 : 0, f.state, rec ? (road ? 'road' : rec.k) : '', rec && !road && f30Tall(rec.k) ? 1 : 0, b ? (b.mode || 'beside') : (f.carry ? 'carry' : '')]; });
 window.__folkStep = (sec) => { if (folksDirty) { syncFolks(); folksDirty = false; } for (let t = 0; t < (sec || 0.1); t += 0.1) simTick(); drawFolks(SIM.t); return window.__folkCheck(); };
 /* 시간을 앞으로만 흘린다. 호출할 때마다 performance.now() 로 되돌리면
    앞선 호출에서 미래로 잡아둔 '쉬는 시간'이 영영 안 지나간다(실제로 그렇게 헤맸다). */

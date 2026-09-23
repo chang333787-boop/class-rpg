@@ -116,6 +116,7 @@ async function child(spec) {
   const stage = typeof w.__stage === 'function' ? w.__stage() : null;
   if (spec.stage && (!stage || stage.오류 || stage.id !== spec.stage)) throw new Error('판을 못 얹음: ' + (stage ? stage.오류 || stage.id : '__stage 없음'));
   setRules(w, spec.rules);
+  if (spec.first30 != null) { const { first30Child } = await import('./first30.mjs'); return first30Child(w, spec); }   // [ACT-FIRST30] 첫 30초 탐지기
   const ticks = [], samples = []; let tick = 0;
   const run = n => { const r = w.__tickBench(n); ticks.push(r.틱최대ms); tick += n; };
   const sample = () => { const s = w.__sim(); samples.push({ tick, 일: s.일, 시: s.시, m: measure(w) }); };
@@ -134,7 +135,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i].replace(/^--/, ''), v = argv[i + 1];
     if (k === 'vs') { o.vs.push(v); i++; } else if (k === 'json') { o.json = v; i++; } else if (k === 'child') { o.child = v; i++; }
-    else if (k === 'html' || k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name') { o[k] = v; i++; }
+    else if (k === 'html' || k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name' || k === 'first30') { o[k] = v; i++; }
     else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs') { o[k] = +v; i++; }
     else if (k === 'help' || k === 'h') o.help = true;
     else if (k === 'voice') o.voice = true;
@@ -247,6 +248,7 @@ const HELP = `마을 시뮬 도구 — scripts/village-sim/README.md 참고
   --vs '이름: do=…; rules=…; save=…'  (여러 번) — 같은 시드로 나란히 돌려 비교
   --show 인구,일먼집,…   --watch 일먼집 (비교 표 지표)   --by 1 (좋아짐 문턱)
   --show 까닭            일자리 까닭 넷(none·cut·far·full)을 함께 — 합은 일먼집과 같다
+  --first30 8,10         첫 30초 탐지기 — 그 시각들에 열어 300틱: 사는 모습 셋 · 어수선 · 연기의 어설픔 + PASS/FAIL (docs/village_first_screen.md)
   --voice (끝 날 동네별 바람표 · MAC-VOICE)   --every 150 (틱 · 재는 간격)   --warm 300   --hash 'hour=10'   --jobs 동시 프로세스 수   --json 결과.json`;
 
 /* [MAC-JOBWHY] '까닭' 한 마디로 넷을 다 본다: --show 까닭 · --watch 까닭:cut */
@@ -258,7 +260,15 @@ if (o.child) {
   child(JSON.parse(o.child)).then(r => { process.stdout.write('@@RESULT ' + JSON.stringify(r) + '\n'); process.exit(0); },
     e => { process.stdout.write('@@ERROR ' + String(e && e.message || e).split('\n')[0] + '\n'); process.exit(1); });
 } else if (o.help) console.log(HELP);
-else {
+else if (o.first30) {   /* [ACT-FIRST30] 시각 × 시드 — 한 판씩 자식 프로세스 */
+  const hours = String(o.first30).split(',').map(Number).filter(h => h >= 0 && h < 24), seeds = seedList(o.seeds), t0 = Date.now();
+  const base = variants(o)[0], specs = []; hours.forEach(h => seeds.forEach(seed => specs.push({ ...base, seed, first30: h, hash: o.hash })));
+  const n = o.jobs || Math.max(1, Math.min(os.cpus().length - 1, 6));
+  let res; try { res = await pool(specs, n, runChild); } catch (e) { console.error(e.message); process.exit(1); }
+  const { first30Report } = await import('./first30.mjs'); console.log(first30Report(o, res));
+  console.log(`(판 ${specs.length}개 · 프로세스 ${n}개 · ${r1((Date.now() - t0) / 1000)}초)`);
+  if (o.json) fs.writeFileSync(o.json, JSON.stringify({ args: o, results: res }, null, 1));
+} else {
   const vars = variants(o), seeds = seedList(o.seeds);
   const specs = []; vars.forEach(v => seeds.forEach(seed => specs.push({ ...v, seed, days: o.days, every: o.every, warm: o.warm, hash: o.hash, voice: !!o.voice })));
   const n = o.jobs || Math.max(1, Math.min(os.cpus().length - 1, 6)), t0 = Date.now();
