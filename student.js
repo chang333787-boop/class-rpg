@@ -10895,7 +10895,10 @@ function renderDecoInv(){
   _decoShopSync();   // [DECO-SHOP-1] 골드 배지 · 손끝 그림 끝내기 · 씬이 바뀌었으면 상점 목록도
   _decoRenderQuick(inv, placed);   // [DECO-FIND-1] 최근 놓은 것 줄
   if(!inv.length){
-    el.innerHTML=`<div style="font-size:.78rem;color:var(--txt3)">가진 장식품이 없어요. 위의 🛒 상점에서 사 보세요!</div>`;
+    //  [DECO-FIRST-1] 처음 아이 — 작은 글 한 줄 대신 누를 곳 하나를 크게(계획 U3). 누르면 서랍이 🛒 상점으로
+    el.innerHTML = _ifMode
+      ? `<button class="deco-first-card" onclick="decoTab('shop')"><span class="dfc-ico">🛒</span><span class="dfc-txt"><b>첫 장식 골라 보기</b><small>골드로 사서 ${DECO_SCENE === 'yard' ? '마당' : '집 안'}에 놓아요</small></span></button>`
+      : `<div style="font-size:.78rem;color:var(--txt3)">가진 장식품이 없어요. 위의 🛒 상점에서 사 보세요!</div>`;
     if(_ifMode) ifSyncInv();
     return;
   }
