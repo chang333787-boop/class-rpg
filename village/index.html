@@ -6192,7 +6192,30 @@ function crowdSegOfHome(root) {
     if (!crowdSegOn() || !rec || rec.k !== 'house' || /길이 붐벼요/.test(t)) return t;
     if (crowdSegOfHome(rec.root) < 0) return t;
     CSEG.stats.말한집++;
-    return t.replace(/(😊|😐)/, '😐') + ' · 길이 붐벼요'; }); }
+    return window.VRULES.crowdSeg.제문앞 ? t + crowdSegNearSay(rec.root) : t.replace(/(😊|😐)/, '😐') + ' · 길이 붐벼요'; }); }   /* [MAC-CROWDOWN] 제 문 앞이 문턱 아래면 토막 말 대신 사실대로 */
+/* ── [MAC-CROWDOWN] 말은 사실을 따른다 — 풀린 집이 토막 말 때문에 '길이 붐벼요'를 계속 말하던 것 (보스 09-23 결정 ③ · #840 이 찾은 틈) ──
+   집의 붐빔은 **제 문 앞 한 칸**으로 정해진다(crowdedHome). 위 토막 말은 그 값이 문턱 아래인 집에만 닿는다(문턱 위면 이미 '길이 붐벼요'라서).
+   그래서 ✨ 대로 문 앞을 넓혀 **실제로 풀린 집**도 토막에 닿아 있으면 '길이 붐벼요'를 계속 말했다 — 한 일에 대답이 없었다.
+   · 제 문 앞이 문턱 아래 + 토막에 닿음 → 붐빈 적이 있던 집은 **'우리 집 앞은 풀렸어요 · 옆 길은 아직 붐벼요'**,
+     붐빈 적이 없던 집은 '우리 집 앞은 괜찮아요 · 옆 길은 붐벼요'. 얼굴은 안 내린다(얼굴은 제 문 앞 값으로만 — faceOfHome 그대로).
+   · '같은 토막 같은 말'(#779)은 이제 **아직 붐비는 집들끼리**에만 — 그 집들은 기본 말이 이미 같은 '길이 붐벼요'를 한다.
+   · '붐빈 적이 있나'는 붐빔 한 바퀴마다 적어 둔다(저장 0 · 치운 자리는 지운다 · 큰길에 밀려 물러난 집은 새 자리로 옮겨 적는다 — placeAt 고리 하나). 끄면(crowdSeg.제문앞 = false) 예전 토막 말. 원래 줄 수정 1. */
+if (!('제문앞' in window.VRULES.crowdSeg)) window.VRULES.crowdSeg.제문앞 = true;
+const COWN = { was: new Set(), 바퀴: -1, stats: { 풀렸어요: 0, 괜찮아요: 0 } };
+function crowdSegNearSay(root) { if (COWN.was.has(root)) { COWN.stats.풀렸어요++; return ' · 우리 집 앞은 풀렸어요 · 옆 길은 아직 붐벼요'; }
+  COWN.stats.괜찮아요++; return ' · 우리 집 앞은 괜찮아요 · 옆 길은 붐벼요'; }
+{ hookAdd('crowdTick', function (next, args) { const r = next(args);
+    if (COWN.바퀴 !== CROWDH.stats.한바퀴) { COWN.바퀴 = CROWDH.stats.한바퀴; crowd.forEach((v, root) => { if (v > 0.3) COWN.was.add(root); });
+      COWN.was.forEach(root => { const c = cells[root]; if (!c || c.k !== 'house' || c.root !== root) COWN.was.delete(root); }); }
+    return r; }); }
+/* 큰길에 밀려 한 칸 물러난 집([MAC-WIDEN2])도 '붐빈 적'을 이어받는다 — 물러난 집이 곧 ✨ 대로 한 그 집이다(자리만 바뀌었다) */
+{ hookAdd('placeAt', function (next, args) { const [kind, x, y, rot] = args;
+    const p = kind === 'avenue' && COWN.was.size && window.VRULES.widenShift && window.VRULES.widenShift.on && !WIDEN2.busy ? widenShiftPlan(x, y, rot) : null;
+    const was = p && p.house && COWN.was.has(p.house.root); const r = next(args);
+    if (was && p.to) { const c = cells[idx(p.to[0], p.to[1])]; if (c && c.k === 'house') COWN.was.add(c.root); }
+    return r; }); }
+window.__crowdOwn = (x, y) => { const rec = x == null ? null : cells[idx(x, y)];
+  return { 켜짐: !!window.VRULES.crowdSeg.제문앞, 붐빈적있는집: COWN.was.size, ...COWN.stats, ...(rec ? { 붐빈적: COWN.was.has(rec.root), 제문앞붐빔: crowdedHome(rec.root), 말: satText(rec) } : {}) }; };
 /* 짚기 — [MAC-WHERE] 의 갈래 하나. 토막의 **가장 붐비는 칸** 한 곳만(여럿 반짝이면 헷갈린다 · MAC-WHERE 조건 ②) */
 { const ws = whereSpots; whereSpots = function (rec) { const r = ws.apply(this, arguments);
     if (r && r.length) return r;
