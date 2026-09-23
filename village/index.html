@@ -1418,6 +1418,7 @@ const board = new THREE.Mesh(new THREE.PlaneGeometry(W*CS, H*CS),
   new THREE.MeshLambertMaterial({ color:0xffffff, map: boardTex }));
 board.rotation.x = -Math.PI/2; board.position.y = 0.03; board.receiveShadow = true;
 scene.add(board);
+boardTex.flipY = false;   /* [MAC-BOARDFLIP] 캔버스는 칸 y 를 줄 H−1−y 에 칠한다(위 = 큰 y). flipY 기본값(true)이면 그 위가 −z 로 올라가 물건(wz: 큰 y = +z)과 z 로 뒤집혀 한 구역 어긋났다(#210 부터). 픽셀은 그대로 · 올리는 방향만 */
 const plotRimMat = new THREE.MeshLambertMaterial({ color:0xe0c68f }), plotMat = new THREE.MeshLambertMaterial({ color:0x97cc5e });
 const plotOf = (x, y) => ((x / PLOT) | 0) + ',' + ((y / PLOT) | 0);
 const plotOpen = (x, y) => plots.has(plotOf(x, y));
@@ -2079,6 +2080,7 @@ const mapCanvas = document.createElement('canvas'); mapCanvas.width = W * MAP_PX
 const mapTex = new THREE.CanvasTexture(mapCanvas); mapTex.magFilter = THREE.NearestFilter; mapTex.colorSpace = THREE.SRGBColorSpace;
 const mapPlane = new THREE.Mesh(new THREE.PlaneGeometry(W * CS, H * CS), new THREE.MeshBasicMaterial({ map: mapTex }));
 mapPlane.rotation.x = -Math.PI / 2; mapPlane.position.y = 0.06; mapPlane.visible = false; scene.add(mapPlane);
+mapTex.flipY = false;   // [MAC-BOARDFLIP] 멀리서 보는 지도 판도 같은 규칙(H−1−y)이라 같이 — 2D 미니맵은 캔버스를 그대로 베끼므로 영향 없음
 let mapDirty = true, mapMode = false, mapLastDraw = 0;
 const MAP_COL = { road:'#d9d6cf', gravel:'#b9b2a6', lawn:'#a3d86d', flower:'#f58fae', pond:'#7fd0e8', fountain:'#7fd0e8', well:'#9c968b',
   plaza:'#efeee8', house:'#f2889e', shop:'#f2889e', green:'#bfe6f7', pavilion:'#79cfd4', play:'#e9cfa4', tree:'#4f9a3a', bigtree:'#3f8a2e', bush:'#5fae44',
@@ -5255,6 +5257,18 @@ function setSpeed(n) {
 }
 document.querySelectorAll('#spd button').forEach(b => b.onclick = () => setSpeed(+b.dataset.s));
 addEventListener('keydown', e => { if (e.key === ' ' && e.target === document.body) { e.preventDefault(); setSpeed(SIM.paused ? SIM.speed : 0); } });
+/* ── [ACT-SPEEDQUIET] 배속 단추는 말하지 않는다 (창조자 25회 ⓗ·ⓒ54 · 보스 09-23) ──
+   속도 단추를 누를 때마다 가운데 위에 "2배속"·"멈췄어요" 토스트가 떴다 — 누른 단추가 이미 금빛 테두리로 지금 속도를 보여 주는데 말이 한 번 더 튀어나왔고,
+   그 칸을 쓰던 말(목표·놓은 것의 대답)을 덮었다. 이제 **속도 단추 줄이 화면에 보이면** setSpeed 자신의 토스트만 쉰다(스페이스 멈춤도 같은 단추가 켜진다).
+   단추 줄이 안 보이는 때(사진 모드 등)는 전처럼 말한다 · 구경 중 "시간이 멈춰 있어요"는 그대로. 판정·저장 0 · 분류 '말'. */
+(window.VRULES = window.VRULES || {}).speedQuiet = { on: true };
+const SPDQ = { in: false, stats: { 쉼: 0, 말함: 0 } };
+{ const ss0 = setSpeed; setSpeed = function () { SPDQ.in = true; try { return ss0.apply(this, arguments); } finally { SPDQ.in = false; } }; }
+hookAdd('toast', function (next, a) { const el = document.getElementById('spd');
+  if (!SPDQ.in || !/^(멈췄어요|\d+배속)$/.test(String(a[0]))) return next(a);
+  if (window.VRULES.speedQuiet.on && el && el.offsetParent && getComputedStyle(el).visibility !== 'hidden') { SPDQ.stats.쉼++; return; }
+  SPDQ.stats.말함++; return next(a); });
+window.__speedQuiet = () => ({ 켜짐: window.VRULES.speedQuiet.on, ...SPDQ.stats });
 document.addEventListener('visibilitychange', () => {
   if (SND.ctx && SND.on) { if (document.hidden) SND.ctx.suspend(); else SND.ctx.resume(); } SIM.hidden = document.visibilityState !== 'visible'; SIM.acc = 0; });
 let clockShownDay = 0, clockShownH = -1;
