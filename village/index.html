@@ -1417,6 +1417,7 @@ const board = new THREE.Mesh(new THREE.PlaneGeometry(W*CS, H*CS),
   new THREE.MeshLambertMaterial({ color:0xffffff, map: boardTex }));
 board.rotation.x = -Math.PI/2; board.position.y = 0.03; board.receiveShadow = true;
 scene.add(board);
+boardTex.flipY = false;   /* [MAC-BOARDFLIP] 캔버스는 칸 y 를 줄 H−1−y 에 칠한다(위 = 큰 y). flipY 기본값(true)이면 그 위가 −z 로 올라가 물건(wz: 큰 y = +z)과 z 로 뒤집혀 한 구역 어긋났다(#210 부터). 픽셀은 그대로 · 올리는 방향만 */
 const plotRimMat = new THREE.MeshLambertMaterial({ color:0xe0c68f }), plotMat = new THREE.MeshLambertMaterial({ color:0x97cc5e });
 const plotOf = (x, y) => ((x / PLOT) | 0) + ',' + ((y / PLOT) | 0);
 const plotOpen = (x, y) => plots.has(plotOf(x, y));
@@ -2078,6 +2079,7 @@ const mapCanvas = document.createElement('canvas'); mapCanvas.width = W * MAP_PX
 const mapTex = new THREE.CanvasTexture(mapCanvas); mapTex.magFilter = THREE.NearestFilter; mapTex.colorSpace = THREE.SRGBColorSpace;
 const mapPlane = new THREE.Mesh(new THREE.PlaneGeometry(W * CS, H * CS), new THREE.MeshBasicMaterial({ map: mapTex }));
 mapPlane.rotation.x = -Math.PI / 2; mapPlane.position.y = 0.06; mapPlane.visible = false; scene.add(mapPlane);
+mapTex.flipY = false;   // [MAC-BOARDFLIP] 멀리서 보는 지도 판도 같은 규칙(H−1−y)이라 같이 — 2D 미니맵은 캔버스를 그대로 베끼므로 영향 없음
 let mapDirty = true, mapMode = false, mapLastDraw = 0;
 const MAP_COL = { road:'#d9d6cf', gravel:'#b9b2a6', lawn:'#a3d86d', flower:'#f58fae', pond:'#7fd0e8', fountain:'#7fd0e8', well:'#9c968b',
   plaza:'#efeee8', house:'#f2889e', shop:'#f2889e', green:'#bfe6f7', pavilion:'#79cfd4', play:'#e9cfa4', tree:'#4f9a3a', bigtree:'#3f8a2e', bush:'#5fae44',
