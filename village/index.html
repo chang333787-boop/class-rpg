@@ -4392,6 +4392,7 @@ function vpadTilt() {
     const floor = Math.min(mini && mini.height ? mini.top : innerHeight, tabs && tabs.height ? tabs.top : innerHeight) - 10, ceil = (top ? top.bottom : 0) + 6;
     const col = floor - 150 >= ceil, row = !col && floor - 46 >= ceil; pad.style.display = col || row ? 'flex' : 'none'; pad.classList.toggle('row', row); pad.style.top = (floor - (col ? 150 : 46)) + 'px'; };
   addEventListener('resize', place); if (window.ResizeObserver) new ResizeObserver(place).observe(document.getElementById('tray')); setTimeout(place, 0); VPAD.place = place;
+  if (window.ResizeObserver) new ResizeObserver(place).observe(mini);   /* [MAC-VPADMINI] 판(스테이지)에서는 place 가 미니맵이 뜨기 전에 한 번 돌고 끝나 ＋－◢ 가 미니맵 오른쪽을 덮었다(1366×610) — 미니맵이 뜨고·크기가 바뀔 때도 다시 잰다 */
 })();
 window.__viewpad = () => ({ 켜짐: window.VRULES.viewPad.on, 배율: +zoomMul.toFixed(2), camEl: +camEl.toFixed(3), ...VPAD.stats });
 

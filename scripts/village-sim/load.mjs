@@ -30,6 +30,10 @@ function any() {
 function fakeGlobals({ saveText, hash, query, root }) {
   const g = globalThis, def = (k, v) => Object.defineProperty(g, k, { value: v, configurable: true, writable: true });
   const ls = new Map(); if (saveText != null) ls.set('rpg.village.guest', saveText);
+  /* 판(?stage=id)은 저장 칸이 따로다(`rpg.village.guest.<id>` · index.html stageKeyPart) — 그래서 --save 와 --stage 를 함께 주면
+     저장본이 기본 칸에만 들어가 판이 **빈 땅으로** 열렸다. 판 칸에도 같은 저장본을 넣는다(흐름이 켜진 판에서 시험 판을 재려면 이게 있어야 한다). */
+  { const st = /(?:^|&)stage=([^&]*)/.exec(query || ''); const id = st ? decodeURIComponent(st[1]).replace(/[^a-z0-9\-]/g, '').slice(0, 40) : '';
+    if (saveText != null && id) ls.set('rpg.village.guest.' + id, saveText); }
   def('localStorage', { getItem: k => ls.has(k) ? ls.get(k) : null, setItem: (k, v) => ls.set(k, String(v)), removeItem: k => ls.delete(k), key: i => [...ls.keys()][i] ?? null, clear: () => ls.clear(), get length() { return ls.size; } });
   def('sessionStorage', g.localStorage);
   def('location', new URL('http://sim.local/village/index.html?sid=guest&dev=1' + (query ? '&' + query : '') + '#' + (hash || '')));
