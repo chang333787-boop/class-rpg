@@ -3527,7 +3527,11 @@ const FS_ICON = {
   길: (x, z, m) => { const Y = 1.51 * m; return [
     { g: 'box', c: P.grassD, s: [.80 * m, .10 * m, .62 * m], p: [x, Y + .05 * m, z] },
     ...[-.24, .24].map(o => ({ g: 'box', c: P.pave,   s: [.28 * m, .09 * m, .44 * m], p: [x + o * m, Y + .13 * m, z] })),
-    ...[-.24, .24].map(o => ({ g: 'box', c: P.paveIn, s: [.24 * m, .02 * m, .38 * m], p: [x + o * m, Y + .18 * m, z] })) ]; } };
+    ...[-.24, .24].map(o => ({ g: 'box', c: P.paveIn, s: [.24 * m, .02 * m, .38 * m], p: [x + o * m, Y + .18 * m, z] })) ]; },
+  /* [MAC-FLOWMAKER] 밭이 아닌 만드는곳(부두·벌목장 …)의 짝 — 같은 문법(작은 땅 한 조각) 위에 상자 하나. 밭 그림을 바닷가 가게 팻말에 걸지 않는다 */
+  물건: (x, z, m) => { const Y = 1.51 * m; return [
+    { g: 'box', c: FS_C.흙,  s: [.80 * m, .10 * m, .62 * m], p: [x, Y + .05 * m, z] },
+    ...fsCrate(x, Y + .10 * m, z, .46 * m, .30 * m, .36 * m) ]; } };
 /* 가게에 쌓인 물건 — 매대부터 차고 넘치면 앞마당으로(시안 A · 숫자는 한 글자도 안 쓴다) */
 function fsStock(양) { const out = [];
   if (양 >= 1) out.push(...fsCrate(-2.2, 1.12, 3.30, 1.9, .70, 1.25));
@@ -3576,12 +3580,26 @@ function fsFieldParts(root, base) {
   return out; }
 { const po = partsOf; partsOf = function (rec) { const base = po.apply(this, arguments);
     if (!rec || !fsOn() || cells[rec.root] !== rec) return base;
-    if (flowMake(rec)) return fsFieldParts(rec.root, base);
+    if (flowMake(rec)) return rec.k === 'field' ? fsFieldParts(rec.root, base) : fsMakerParts(rec, base);   /* [MAC-FLOWMAKER] 이랑·이삭·자루는 밭일 때만 */
     if (flowTake(rec)) return fsShopParts(rec, base);
     return base; }; }
 /* 상태가 바뀐 것의 청크만 다시 합친다. 빈 가게의 **까닭**도 여기서만 읽는다(누를 때 뜨는 말과 같은 함수) */
-function fsWhy(root) { const c = flowWhyCode(root).까닭;   /* [MAC-FLOWWORDS] 말 속 글자가 아니라 까닭 값으로 — 말이 만드는곳 이름을 따라 바뀌어도 그림이 안 사라진다 */
-  return c === 'cut' ? '길' : (c === 'none' || c === 'growing') ? '밭' : null; }
+function fsWhy(root) { const w = flowWhyCode(root), c = w.까닭;   /* [MAC-FLOWWORDS] 말 속 글자가 아니라 까닭 값으로 — 말이 만드는곳 이름을 따라 바뀌어도 그림이 안 사라진다 */
+  if (c === 'cut') return '길'; if (c !== 'none' && c !== 'growing') return null;
+  const k = (w.rec && w.rec.k) || Object.keys(window.VRULES.flow.만드는곳 || {})[0];
+  return k === 'field' ? '밭' : '물건'; }   /* [MAC-FLOWMAKER] 밭 판은 그대로 '밭' · 부두·벌목장 판은 상자 그림 */
+/* [MAC-FLOWMAKER] 밭이 아닌 만드는곳 — **제 모양 그대로 + 쌓인 양만**(보스 09-23 · 부두 위에 곡식 이랑이 얹히던 것).
+   양은 상자로 센다(가게 매대의 fsCrate 와 같은 상자 — '물건'이 한 그림이다). 앞(+z) 가장자리 왼쪽부터 셋, 넘치면 두 켜 · cut 이면 흐리게.
+   자리는 판 파일의 w·h 에서 잰다(2×2 면 ±4). 벌목장의 통나무 더미(−z)·그루터기(+x+z)를 피한 자리다. */
+function fsMakerParts(rec, base) {
+  const st = flowFieldState(rec.root); if (!st) return base;
+  const 양 = flowField(rec.root).양, 끊김 = st === 'cut'; if (양 <= 0) return base;
+  const t = K[rec.k] || {}, hx = (t.w || 1) * CS / 2, hz = (t.h || 1) * CS / 2, n = Math.min(6, 양), out = base.slice();
+  for (let i = 0; i < n; i++) { const 켜 = i < 3 ? 0 : 1, j = i % 3;
+    const c = fsCrate(-hx + .95 + j * 1.2 + 켜 * .3, .2 + 켜 * .62, hz - .95 - 켜 * .15, 1.05, .6, .9);
+    out.push(...(끊김 ? c.map(pt => ({ ...pt, c: fsDim(pt.c, .3) })) : c)); }
+  FSHAPE.stats.그린만드는곳 = (FSHAPE.stats.그린만드는곳 || 0) + 1;
+  return out; }
 function fsTick() {
   const R = window.VRULES.flowShape, 쉴까 = !R || !R.on || !flowOn() || VISIT.on;
   if (쉴까 !== FSHAPE.쉼) { FSHAPE.쉼 = 쉴까;                       // 켜짐이 바뀐 순간 — 그리던 것 전부 다시 합친다
@@ -9040,10 +9058,12 @@ window.__crowdLook = () => ({ 켜짐: window.VRULES.crowdLook.on, CROWD_AT있음
    스위치·수치 VRULES.workLook + 고리 둘(tickFolks 한 줄 · 루프 actBesideDraw 바로 아래 한 줄).
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).workLook = { on: true, gap: 1.0, inset: -0.9, tripH: 10.5, tripPauseMs: 1800,
-  kinds: { shop: { top: 0x2f8f83, props: ['crate'] }, green: { top: 0x5aa04a, props: ['can', 'basket'] }, windmill: { top: 0xb8894a, props: ['sack'] } } };
+  kinds: { shop: { top: 0x2f8f83, props: ['crate'] }, green: { top: 0x5aa04a, props: ['can', 'basket'] }, windmill: { top: 0xb8894a, props: ['sack'] } },
+  maker: { top: 0x4f7fa0, props: ['crate'] } };   /* [MAC-FLOWMAKER] 흐름을 켠 판의 만드는곳(일자리 있는 것 · 부두·벌목장)도 문 밖에서 — 흐름이 꺼진 판(기본 마을)에서는 한 사람도 안 달라진다 */
 const WORK_PROP = { crate: { s: [1.25, 0.55, 1.25], c: 0xf0c890 }, can: { s: [0.8, 0.95, 0.8], c: 0xc8f0d0 }, basket: { s: [1.15, 0.6, 1.15], c: 0xffe0a0 }, sack: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 } };
 const WORK = { tripDay: new Map(), stats: { 문밖일꾼: 0, 자루출발: 0, 자루나름: 0, 자루못감: 0 } };
-const workKind = root => { const b = cells[root]; return b && b.root === root && window.VRULES.workLook.kinds[b.k] ? b.k : null; };
+const workDef = k => { const R = window.VRULES.workLook; return R.kinds[k] || (R.maker && K[k] && K[k].jobs && flowOn() && flowMake({ k }) ? R.maker : null); };   /* [MAC-FLOWMAKER] */
+const workKind = root => { const b = cells[root]; return b && b.root === root && workDef(b.k) ? b.k : null; };
 function workPlace(f) {                                                 // 들어온 길 칸 쪽 건물 앞 가장자리 · 같은 일터 일꾼끼리 자리 나눔
   const R = window.VRULES.workLook, root = f.inside.root, b = cells[root], cell = f.inside.cell; if (!b || cell == null) return null;
   const used = new Set(); folks.forEach(g => { if (g !== f && g.beside && g.beside.work && g.beside.root === root && g.state === 'inside') used.add(g.beside.slot); });
@@ -9055,8 +9075,8 @@ function workPlace(f) {                                                 // 들�
   if (!spots.length) return null;
   const [sx, sy, dx, dz] = spots[slot % spots.length], side = (Math.floor(slot / spots.length) % 2 ? 0.8 : 0) * R.gap;   // 칸마다 한 사람 · 넘치면 옆으로
   const px = wx(sx) + dx * (CS / 2 + R.inset) + dz * side, pz = wz(sy) + dz * (CS / 2 + R.inset) - dx * side;
-  const k = b.k, props = R.kinds[k].props;
-  return { root, k, mode: 'work', work: true, slot, x: px, z: pz, dir: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), dir0: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), drop: 0,   /* 벽을 비스듬히 보고 선다 — 옆모습이 보이게 */ prop: props[slot % props.length], top: R.kinds[k].top };
+  const k = b.k, props = workDef(k).props;
+  return { root, k, mode: 'work', work: true, slot, x: px, z: pz, dir: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), dir0: Math.atan2(dx, dz) + (slot % 2 ? 0.9 : -0.9), drop: 0,   /* 벽을 비스듬히 보고 선다 — 옆모습이 보이게 */ prop: props[slot % props.length], top: workDef(k).top, maker: !R.kinds[k] };
 }
 /* tickFolks 고리 — 문 밖 자리 잡기 · 풍차 자루 나르기. true 면 이번 틱은 여기서 끝 */
 function actWorkTick(f, i, now) {
@@ -9104,7 +9124,7 @@ function actWorkDraw(now) {
     if (QUALITY.farFolk && (Math.abs(b.x - camTarget.x) > 60 || Math.abs(b.z - camTarget.z) > 60)) return;
     const ph = now / 700 + i * 1.7, P = WORK_PROP[b.prop];
     let dir = b.dir0, drop = 0, py = 0.26, fwd = 0.85, side = 0;
-    if (b.k === 'shop') { const bend = Math.max(0, Math.sin(ph)); drop = bend * 0.18; py = 0.2; fwd = 0.9; }                     // 진열 정리 — 굽혔다 폈다
+    if (b.k === 'shop' || b.maker) { const bend = Math.max(0, Math.sin(ph)); drop = bend * 0.18; py = 0.2; fwd = 0.9; }                     // 진열 정리 — 굽혔다 폈다
     else if (b.k === 'green') { dir = b.dir0 + Math.sin(ph * 0.6) * 0.6; py = b.prop === 'can' ? 0.95 + Math.sin(ph * 2) * 0.05 : 0.7; fwd = 0.55; side = 0.35; }   // 물 주기 · 바구니 — 좌우로 천천히
     else if (b.k === 'windmill') { py = 1.5 + Math.abs(Math.sin(ph)) * 0.12; fwd = 0.15; side = 0.35; }                           // 자루를 어깨에
     const co = Math.cos(dir), si = Math.sin(dir), parts = PERSON_PARTS;
@@ -9235,7 +9255,7 @@ window.__jobWhy = () => { const n = { none: 0, cut: 0, far: 0, full: 0 }; let �
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).flowAct = { on: true, nearCells: 14, retryMs: 1400,
   loadMs: 1400, dropMs: 1600, endMs: 1200, swing: 0.75, buyMs: 1000, shrugMs: 900, holdMs: 90000, cutH: 10.5, endH: 17, lastH: 23.5, stallTicks: 240 };   /* 막힘 시계는 **틱(시뮬 시간)** 으로 센다 — 240틱 = 시뮬 3.2시간. 배속을 올려도·일시정지해도·화면을 바꿔도 같은 뜻이다 */
-const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
+const FACT_PROP = { crop: { s: [1.25, 0.8, 1.25], c: 0xd98f3f }, flour: { s: [0.95, 1.45, 0.95], c: 0xfff2d8 }, bag: { s: [0.92, 0.8, 0.92], c: 0xe8c07a }, box: { s: [1.25, 0.6, 1.1], c: 0xf0c890 } };   /* 풀밭 위에서 눈에 띄는 색으로 — 초록 바구니는 풀에 묻힌다(실제 그림으로 확인) */
 const FACT = { 맡은밭: new Set(), cutDay: new Map(), 밭: [], gen: -1, 잰틱: -1e9, 집날: new Map(),
   stats: { 지고나섬: 0, 내려놓음: 0, 못가고돌아옴: 0, 받아감: 0, 빈손: 0, 다시나옴: 0, 막힘: 0, 문앞장바구니: 0, 중단: { 밤: 0, 들어감: 0, 길없음: 0, 막힘: 0 } } };
 /* 상태는 오직 여기서 읽는다(장면은 답만 쓴다). 프로그램 계약이 없는 판에서는 전부 null → 장면도 통째로 쉰다 */
@@ -9243,7 +9263,7 @@ const flowActState = root => (window.VRULES.flowAct.on && typeof window.FLOW ===
 const FACT_FIELD = { growing: 1, ready: 1, full: 1, waiting: 1, moving: 1, cut: 1 };
 const factField = root => { const s = flowActState(root); return FACT_FIELD[s] ? s : null; };          // 밭인가(그 밭의 상태)
 const factStore = root => { const s = flowActState(root); return s === 'stocked' || s === 'empty' ? s : null; };   // 가게인가
-const factProp = root => { const b = cells[root]; return b && b.k === 'windmill' ? 'flour' : 'crop'; };
+const factProp = root => { const b = cells[root]; return b && b.k === 'windmill' ? 'flour' : !b || b.k === 'field' || b.k === 'green' ? 'crop' : 'box'; };   /* [MAC-FLOWMAKER] 부두·벌목장은 상자 */
 /* 밭 목록 — **하루 한 번**(또는 놓은 것이 바뀔 때) 판을 훑는다. 틱마다 판 전체를 훑지 않는다(규모 문서 #656 에서 짚은 것) */
 function factFields() {
   if (typeof window.FLOW !== 'function') return FACT.밭.length ? (FACT.밭 = []) : FACT.밭;
