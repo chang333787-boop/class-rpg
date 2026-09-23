@@ -8387,6 +8387,7 @@ const homeReason = (root, salt) => { const st = sat.get(root); return st ? whySt
 /* 1초마다 — 빠진 것이 있던 집이 채워졌나(한 번에 여덟 채까지 다시 센다). 채워졌으면 그 집은 기뻐한다 */
 function breathScan(now) {
   const B = window.VRULES.breath; if (now - BREATH.lastScan < 1000) return; BREATH.lastScan = now;
+  joyFlush(now);   /* [MAC-JOYOTHERS] 모아 둔 🎉 를 창이 닫히면 한 번에 */
   const roots = []; BREATH.home.forEach((h, root) => { if (h.reason) roots.push(root); });
   for (let n = 0; n < Math.min(8, roots.length); n++) {
     const root = roots[(BREATH.rr++) % roots.length], rec = cells[root], h = BREATH.home.get(root);
@@ -8396,11 +8397,26 @@ function breathScan(now) {
       const was = h.reason; h.reason = homeReason(root, 0); h.since = now; h.restUntil = now + B.homeRestMs;
       h.joyUntil = now + B.joyMs; whyStats.누적기쁨++;
       const c = centerOf('house', cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: now + 3000 });
-      if (now - BREATH.lastJoyToast > B.joyToastGapMs) { BREATH.lastJoyToast = now; const who = folks.find(f => f.home === root && !f.arriving && !f.visitor);
-        simSay('🎉 ' + (who ? folkName(who) + '네가' : '주민이') + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
+      joyNote(root, was, now);   /* [MAC-JOYOTHERS] 🎉 는 모아서 — 한 수로 여러 집이 풀리면 '○○네 외 N곳' */
     }
   }
 }
+/* ── [MAC-JOYOTHERS] 🎉 '○○네 외 N곳이 기뻐해요' (보스 09-23 결정 ④ · 창조자 24회 ⓑ46) ──
+   한 수로 아파트 둘이 풀렸는데 🎉 는 **한 집 이름으로 한 번**만 떴다(나머지는 joyToastGapMs 20초 안이라 조용했다).
+   몇 곳이 풀렸는지가 보이면 "가까운 집부터"가 말로 보인다. 그래서 첫 기쁨에서 **joyGroupMs(3초) 창**을 열고 그 사이 풀린 집을 모아
+   창이 닫힐 때 한 번 말한다 — 한 곳이면 예전 말 그대로(`🎉 ○○네가 기뻐해요 — …이 생겼어요`), 여럿이면 `🎉 ○○네 외 N곳이 기뻐해요 — …`.
+   말자리·간격(20초)·소리는 그대로 — 말이 3초 늦게 뜰 뿐이다(✨ 는 그 자리에서 곧바로). 원래 줄 수정 2(말하던 두 줄 → joyNote 한 줄) · 끼운 줄 1. */
+if (!('joyGroupMs' in window.VRULES.breath)) window.VRULES.breath.joyGroupMs = 3000;
+const JOYN = { at: -1, root: -1, was: null, roots: new Set(), stats: { 말함: 0, 외: 0, 모은집: 0 } };
+function joyNote(root, was, now) { const B = window.VRULES.breath;
+  if (JOYN.at >= 0 && now - JOYN.at <= (B.joyGroupMs | 0)) { JOYN.roots.add(root); return; }          // 같은 한 수로 풀린 집 — 모은다
+  if (now - BREATH.lastJoyToast > B.joyToastGapMs) { BREATH.lastJoyToast = now; JOYN.at = now; JOYN.root = root; JOYN.was = was; JOYN.roots = new Set([root]); } }
+function joyFlush(now) { if (JOYN.at < 0 || now - JOYN.at <= (window.VRULES.breath.joyGroupMs | 0)) return;
+  const root = JOYN.root, n = JOYN.roots.size, was = JOYN.was; JOYN.at = -1;
+  const who = folks.find(f => f.home === root && !f.arriving && !f.visitor), 이름 = who ? folkName(who) + '네' : '주민';
+  JOYN.stats.말함++; JOYN.stats.모은집 += n; if (n > 1) JOYN.stats.외++;
+  simSay('🎉 ' + 이름 + (n > 1 ? ' 외 ' + (n - 1) + '곳이' : (who ? '가' : '이')) + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
+window.__joyOthers = () => ({ 창ms: window.VRULES.breath.joyGroupMs, 열림: JOYN.at >= 0, 모으는중: JOYN.roots.size, ...JOYN.stats });
 function whyBubbleTick(now) {
   const R = window.VRULES.whyBubble, B = window.VRULES.breath;
   if (!R.on || OFF.has('faces')) { whyPool.forEach(im => im.count = 0); return; }
