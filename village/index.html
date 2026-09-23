@@ -2134,7 +2134,7 @@ const MINILOOK = { layer: document.createElement('canvas'), key: '', stats: { �
 const MINILOOK_SPECIAL = new Set(['dream', 'statue', 'clock', 'library', 'station', 'school', 'museum']), MINILOOK_WORK = new Set(['shop', 'windmill', 'greenhouse', 'barn', 'field']),
   MINILOOK_OPEN = new Set(['plaza', 'play', 'fountain', 'pavilion', 'well', 'lawn']), MINILOOK_GREEN = new Set(['tree', 'bigtree', 'bush', 'fruit']);
 function miniLookCls(k) { const q = K[k] || {}; if (q.road) return 'road'; if (MINILOOK_SPECIAL.has(k) || q.special) return 'special'; if (k === 'house') return 'house';
-  if (MINILOOK_WORK.has(k) || (q.jobs || 0) > 0) return 'work'; if (k === 'pond') return 'water'; if (MINILOOK_GREEN.has(k) || TOPIARY[k]) return 'green'; if (MINILOOK_OPEN.has(k)) return 'open'; return ''; }   // '' = 미니맵에 안 그린다(꽃·소품)
+  if (MINILOOK_WORK.has(k) || (q.jobs || 0) > 0) return 'work'; if (k === 'pond' || k === 'stream') return 'water'; if (MINILOOK_GREEN.has(k) || TOPIARY[k]) return 'green'; if (MINILOOK_OPEN.has(k)) return 'open'; return ''; }   // '' = 미니맵에 안 그린다(꽃·소품)
 function miniLookMix(a, b, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), x = p(a), y = p(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
 /* [MAC-MINICONTRAST] 동네 덩어리 색은 **판 바탕에서 계산**한다(보스 09-23) — 바닷가 모래빛(L* 85.6)에서 크림 덩어리(L* 87.8)가 차 2.2 로 묻혔다.
    바탕과 덩어리의 명도 차(CIE L*)가 minDL 보다 작으면, 밝은 바탕에선 어둡게 · 어두운 바탕에선 밝게 — 차가 toDL 이 될 만큼만 옮긴다.
@@ -2889,6 +2889,66 @@ schoolRoot = function () { return rootCached('school'); }; stationRoot = functio
 { hookAdd('placeAt', function (next, args) { let [kind] = args; if (ROOTC[kind] && ROOTC[kind].f0) ROOTC[kind].dirty = true; return next(args); });
   hookAdd('removeAt', function (next, args) { let [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null; if (c && ROOTC[c.k] && ROOTC[c.k].f0) ROOTC[c.k].dirty = true; return next(args); }); }
 window.__tickSplit = () => ({ 켜짐: window.VRULES.tickSplit.on, 예산: window.VRULES.tickSplit.rhythmBudget, ...TICKSPLIT.stats, 건물찾기: { ...ROOTC.stats }, 기다리는집: { ...WAITSCAN.stats }, 기억: { ...WAITMEMO.stats } });
+/* ── [MAC-STREAM] 이어지는 물 — 개울(stream)과 개울 다리 (보스 09-23 · '우리 마을 원본' 다듬기) ──
+   ① 아이가 마을을 가로지르는 개울을 끌어 그리고, 그 위로 길을 이어 다리를 놓을 수 있다.
+   ② 물길이 마을을 나누면 사람들이 다니는 길(다리)이 어디에 있어야 하는지 설명할 수 있다.
+   · 놓는 법 = 길 가족과 같다: 1×1 칸 · 끌어서 죽 그리기(MAC-STROKE 틈 메우기 그대로) · 이웃을 보고 곧음·굽음·T·끝이 저절로 이어진다
+     (길의 윗판 규칙을 빌린다 — 물은 이어진 변 끝까지, 안 이어진 변은 돌 둑). 연못에 닿은 변은 물이 끝까지 가 연못으로 흘러든다.
+   · 다리 = 개울 칸에 **길**을 놓으면 저절로 개울 다리(sbr · 트레이에 없음). 곧게 흐르는 칸에서만 — 굽음·T·끝이면
+     "다리는 곧게 흐르는 곳에만 놓을 수 있어요". 다리를 치우면(✕·되돌리기) 개울로 돌아온다. 큰길 다리는 다음(이번엔 길 한 칸 다리만).
+   · 판정 규칙 0: 개울은 길이 아니라 사람이 못 건넌다(길찾기 isRoad = K.road 만 — 새 코드 없음) · 다리는 road:true 라 건넌다.
+     집·시설은 개울 칸에 못 놓는다(한 칸 한 물건). 쉼·보기 같은 필요는 채우지 않는다(뜻이 정해진 뒤 따로).
+     ⚠ 연기 쪽과 겹치는 곳: 사람은 다리(road)로만 건너고, 다리 칸도 걷는 칸이라 붐빔·곁 자리 셈에 든다(길 한 칸과 같게).
+   · 저장: 새 종류 둘(stream · sbr)이 palette 끝에 붙을 뿐 — 옛 저장본은 그대로 열린다.
+   스위치 VRULES.stream(보기) · VRULES.streamBridge(조작). 원래 줄 수정 0 — K 에 둘 더함 · ORDER 에 개울 끼움 · partsOf·joinDirtyAround 감싸기 · canPlace·placeAt·removeAt 고리. */
+(window.VRULES = window.VRULES || {}).stream = { on: true, width: .7 };
+window.VRULES.streamBridge = { on: true };
+const STREAM = { stats: { 다리: 0, 곧지않음: 0, 되돌림: 0 } };
+K.stream = { nm: '개울', ic: '💧', grp: K.pond.grp, w: 1, h: 1, g: 64, cap: 900, parts: [{ g: 'box', c: P.water, s: [CS * .62, .3, CS], p: [0, .15, 0] }] };
+K.sbr = { nm: '개울 다리', ic: '🌉', grp: '(숨김)', w: 1, h: 1, g: 1, road: true, cap: 400, parts: [{ g: 'box', c: P.wood, s: [CS, .1, CS * .74], p: [0, .33, 0] }] };
+PLACE_OF.stream = 'ground'; PLACE_OF.sbr = 'path'; MAP_COL.stream = MAP_COL.pond; MAP_COL.sbr = MAP_COL.road; ROAD_JOIN_TO.add('sbr');
+{ const i = ORDER.indexOf('pond'); if (i >= 0) ORDER.splice(i + 1, 0, 'stream'); else ORDER.push('stream'); }   // 🌳 자연 탭 · 연못 바로 뒤
+const STREAM_JOIN = new Set(['stream', 'sbr', 'pond']);
+const streamAt = (x, y) => { if (!inb(x, y)) return false; const c = cells[idx(x, y)]; return !!(c && STREAM_JOIN.has(c.k)); };
+/* 곧게 흐르나 — 0: 위아래(y)로 흐름 · 1: 좌우(x)로 흐름 · −1: 굽음·T·끝·홀로 */
+function streamAxis(x, y) { const n = streamAt(x, y - 1), s = streamAt(x, y + 1), w = streamAt(x - 1, y), e = streamAt(x + 1, y);
+  if (n && s && !w && !e) return 0; if (w && e && !n && !s) return 1; return -1; }
+function streamParts(rec) {
+  const x = cX(rec.root), y = cY(rec.root), cx = wx(x), cz = wz(y), HALF = CS / 2, Wd = CS * (window.VRULES.stream.width || .62) / 2, out = [];
+  const bridge = rec.k === 'sbr', ax = bridge ? (rec.rot & 1) : -1;
+  const jn = bridge ? { n: ax === 0, s: ax === 0, w: ax === 1, e: ax === 1 } : { n: streamAt(x, y - 1), s: streamAt(x, y + 1), w: streamAt(x - 1, y), e: streamAt(x + 1, y) };
+  const x0 = jn.w ? -HALF : -Wd, x1 = jn.e ? HALF : Wd, z0 = jn.n ? -HALF : -Wd, z1 = jn.s ? HALF : Wd, RIM = .3;
+  out.push({ g: 'box', c: 0x6f8b5a, s: [x1 - x0 + RIM * 2, .06, z1 - z0 + RIM * 2], p: [cx + (x0 + x1) / 2, .03, cz + (z0 + z1) / 2], abs: true });   // 물가 풀밭 테(젖은 풀)
+  out.push({ g: 'box', c: P.water, s: [x1 - x0, .3, z1 - z0], p: [cx + (x0 + x1) / 2, .15, cz + (z0 + z1) / 2], abs: true });                       // 물(윗면 .30 — 연못 물 높이와 맞춤)
+  const rim = (sx, sz, px, pz) => out.push({ g: 'box', c: P.stoneD, s: [sx, .34, sz], p: [cx + px, .17, cz + pz], abs: true });                     // 안 이어진 변 = 돌 둑
+  if (!jn.w) rim(RIM, z1 - z0, x0 - RIM / 2, (z0 + z1) / 2); if (!jn.e) rim(RIM, z1 - z0, x1 + RIM / 2, (z0 + z1) / 2);
+  if (!jn.n) rim(x1 - x0 + RIM * 2, RIM, (x0 + x1) / 2, z0 - RIM / 2); if (!jn.s) rim(x1 - x0 + RIM * 2, RIM, (x0 + x1) / 2, z1 + RIM / 2);
+  if (!bridge) { if (!jn.n && !jn.s && !jn.w && !jn.e) out.push({ g: 'cyl', c: P.leaf, s: [.45, .06, .45], p: [cx + .3, .33, cz - .2], abs: true }); return out; }   // 홀로 있는 칸엔 수련 잎 하나
+  /* 다리: 흐름을 가로질러 판(길과 같은 폭 · 칸 끝까지 — 길 윗판과 이어진다) + 난간 둘 */
+  const across = ax === 0 ? 'x' : 'z', DW = CS * .86, DT = .14, top = .36;   // 판 윗면 .36 — 물(.30) 바로 위 · 길 윗면(.20)과 한 뼘 차
+  if (across === 'x') { out.push({ g: 'box', c: P.wood, s: [CS, DT, DW], p: [cx, top - DT / 2, cz], abs: true });
+    [-1, 1].forEach(sg => out.push({ g: 'box', c: P.woodD, s: [CS * .96, .14, .14], p: [cx, top + .55, cz + sg * (DW / 2 - .06)], abs: true }),
+      [-1, 1].forEach(sg => [-1, 1].forEach(sx => out.push({ g: 'box', c: P.woodD, s: [.18, .66, .18], p: [cx + sx * CS * .4, top + .3, cz + sg * (DW / 2 - .06)], abs: true })))); }
+  else { out.push({ g: 'box', c: P.wood, s: [DW, DT, CS], p: [cx, top - DT / 2, cz], abs: true });
+    [-1, 1].forEach(sg => out.push({ g: 'box', c: P.woodD, s: [.14, .14, CS * .96], p: [cx + sg * (DW / 2 - .06), top + .55, cz], abs: true }),
+      [-1, 1].forEach(sg => [-1, 1].forEach(sz => out.push({ g: 'box', c: P.woodD, s: [.18, .66, .18], p: [cx + sg * (DW / 2 - .06), top + .3, cz + sz * CS * .4], abs: true })))); }
+  return out; }
+{ const po0 = partsOf; partsOf = function (rec) { if (rec && (rec.k === 'stream' || rec.k === 'sbr') && window.VRULES.stream.on && rec.root != null) return streamParts(rec); return po0.apply(this, arguments); };
+  const jd0 = joinDirtyAround; joinDirtyAround = function (kind, x, y) { return jd0.call(this, (kind === 'stream' || kind === 'sbr') ? 'sbr' : kind, x, y); };   // 이웃 칸(길·개울)도 다시 합친다(±3)
+  /* 길 → 개울 칸: 곧게 흐르면 다리로 놓게 한다(그 칸을 잠깐 비우고 나머지 규칙 — 내 땅·잠금 등 — 은 원래대로) */
+  hookAdd('canPlace', function (next, args) { const [kind, x, y, rot, opts] = args; const r = next(args);
+    if (kind !== 'road' || r === true || !window.VRULES.streamBridge.on || (opts && opts.복원) || !inb(x, y)) return r;
+    const i = idx(x, y), c = cells[i]; if (!c || c.k !== 'stream') return r;
+    if (streamAxis(x, y) < 0) { STREAM.stats.곧지않음++; return '다리는 곧게 흐르는 곳에만 놓을 수 있어요'; }
+    cells[i] = null; let v; try { v = next(args); } finally { cells[i] = c; } return v; });
+  hookAdd('placeAt', function (next, args) { const [kind, x, y] = args;
+    if (kind === 'road' && window.VRULES.streamBridge.on && inb(x, y)) { const c = cells[idx(x, y)];
+      if (c && c.k === 'stream') { const ax = streamAxis(x, y); if (ax >= 0) { removeAt(x, y); STREAM.stats.다리++; return next(['sbr', x, y, ax]); } } }
+    return next(args); });
+  /* 다리를 치우면 개울로 돌아온다(길 한 칸을 놓았다 치운 것 = 개울은 그대로) */
+  hookAdd('removeAt', function (next, args) { const [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null, was = !!(c && c.k === 'sbr');
+    const r = next(args); if (was && window.VRULES.streamBridge.on && !cells[idx(x, y)]) { placeAt('stream', x, y, 0); STREAM.stats.되돌림++; } return r; }); }
+window.__stream = (x, y) => ({ 켜짐: window.VRULES.stream.on, 다리켜짐: window.VRULES.streamBridge.on, ...STREAM.stats, 칸: x == null ? null : { 종류: inb(x, y) && cells[idx(x, y)] ? cells[idx(x, y)].k : null, 곧음: streamAxis(x, y) } });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
    · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
