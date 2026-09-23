@@ -9101,6 +9101,19 @@ function _drawDeco() {
 
 // [DECO-HOUSE-ART-1] 마당 '내 집' 한 장 — viewBox 600×400 · 한 칸 = 100 · 발밑 y100~400(= 집 자리 3줄) · 굴뚝 끝만 한 칸 위로.
 //  이름은 오른쪽 앞 푯말(글 가운데 x517·y343 · 폭 x446~588)에, '들어가기'는 문 앞 작은 표로.
+//  [DECO-EXIT-DOOR-1] 집 안 나가기 문 그림(디자인 #858 in_exit_door.svg · 200×140 = 2칸 폭) — y100 이 방 아래 벽선.
+//  위 100 = 방 바닥(발판 · 들어오는 빛) · 아래 40 = 벽 밖(환한 바깥 + 화살표). 글 '나가기'는 화살표 오른쪽(x122 · y126).
+function _drawExitDoorArt(img, cx, wallY, C) {
+  const ctx = _dCtx, x0 = cx - C, y0 = wallY - C, u = C / 100;
+  ctx.drawImage(_svgBmp('d:in_exit_door', img, 2 * C * 2, .7), x0, y0, 2 * C, 1.4 * C);
+  ctx.save();
+  const fs = Math.max(8, 15 * u); ctx.font = `700 ${fs}px sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(2, fs * .22); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineJoin = 'round';
+  ctx.strokeText('나가기', x0 + 122 * u, y0 + 126 * u);
+  ctx.fillStyle = '#2b2118'; ctx.fillText('나가기', x0 + 122 * u, y0 + 126 * u);
+  ctx.restore();
+}
 function _drawYardHouseArt(img, hx, hw, C) {
   const ctx = _dCtx, y0 = -C, h = hw * (img.naturalHeight / img.naturalWidth);
   //  집 칸은 바닥 그리기가 건너뛴다(옛 그리기는 네모로 덮었다) → 그림 둘레가 비지 않게 잔디를 먼저 깐다
@@ -9556,6 +9569,12 @@ function _drawIndoor() {
   const _indoorPlaced = _decoList(CUR).filter(p=>p.area==='indoor');   // [DECO-SPACE-1]
   // [FLOOR-SVG-1] 바닥 레이어(러그) — 격자·가구보다 먼저
   _decoSorted(_indoorPlaced.filter(_isFloorLayerDeco)).forEach(_drawIndoorItem);
+  //  [DECO-EXIT-DOOR-1] 나가기 문 — 가장 아래 방의 아래 벽 가운데(방이 없으면 판 아래 가운데) · [INDOOR-ROOMS-1]
+  const _low = _rooms.slice().sort((a, b) => (b.r + b.h) - (a.r + a.h) || a.c - b.c)[0];
+  const _doorCx = _low ? offX + (_low.c + _low.w / 2) * C : offX + DI.cols * C / 2;
+  const _doorWall = _low ? offY + (_low.r + _low.h) * C : offY + DI.rows * C;
+  const _exitArt = FLOOR_SVG && _decoImg('in_exit_door');
+  if (_exitArt) _drawExitDoorArt(_exitArt, _doorCx, _doorWall, C);   // 발판·빛은 바닥 층이라 가구보다 먼저
 
   // 창문 (위쪽 벽) — 벽 SVG가 그려졌으면 생략
   if(offY > 14 && !wallSvgOk){
@@ -9597,9 +9616,11 @@ function _drawIndoor() {
   _decoSorted(_indoorPlaced.filter(p=>!_isFloorLayerDeco(p) && !_onWall(p))).forEach(_drawIndoorItem);
 
   // 나가기 문
-  const _low = _rooms.slice().sort((a, b) => (b.r + b.h) - (a.r + a.h) || a.c - b.c)[0];   // [INDOOR-ROOMS-1]
-  const dx = _low ? offX + (_low.c + _low.w / 2) * C - C * .35 : offX+DI.cols*C/2-C*.35;
-  const dy = _low ? offY + (_low.r + _low.h) * C - C * .75 : offY+DI.rows*C-C*.75;
+  if (_exitArt) {
+    //  [DECO-EXIT-DOOR-1] 누르는 자리는 벽 밖(환한 바깥 · 화살표) — 방 안 발판 칸은 가구를 놓을 수 있게 둔다. 손가락 몫으로 0.75칸 높이
+    _dCv._doorX = _doorCx - .64 * C; _dCv._doorY = _doorWall - .04 * C; _dCv._doorW = 1.28 * C; _dCv._doorH = .79 * C;
+  } else {
+  const dx = _doorCx - C * .35, dy = _doorWall - C * .75;
   _dCtx.fillStyle='#5a3010'; _drr(dx,dy,C*.7,C*.75,3); _dCtx.fill();
   _dCtx.strokeStyle='#3a1e08'; _dCtx.lineWidth=1.5; _dCtx.strokeRect(dx,dy,C*.7,C*.75);
   _dCtx.fillStyle='#FFD700'; _dc(dx+C*.58,dy+C*.38,C*.07); _dCtx.fill();
@@ -9607,6 +9628,7 @@ function _drawIndoor() {
   _dCtx.fillText('나가기', dx+C*.35, dy-C*.1);
 
   _dCv._doorX=dx; _dCv._doorY=dy; _dCv._doorW=C*.7; _dCv._doorH=C*.75;
+  }
   _dCv._offX=offX; _dCv._offY=offY;
   //  [INDOOR-ROOMS-1] 끄는 중인 네모 — 방 칸 + 벽 띠 줄까지 금색 점선(안 되면 붉게)
   if (_inRoomPrev) {

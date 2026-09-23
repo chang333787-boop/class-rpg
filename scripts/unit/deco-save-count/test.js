@@ -1251,7 +1251,9 @@
       out('방_못읽는값_버림', bad.map(r => r.id).join('') === 'ae' && bad[1].floor === null && bad[1].wall.color === '');
       //  그리기: 방이 있으면 빈 터(도면) 위에 방 · 나가기 문은 가장 아래 방 아래 벽
       _drawDeco(); await sleep(120);
-      out('방_나가기문_아래방', Math.abs(_dCv._doorY - (_dCv._offY + (3 + 7) * _dC - _dC * .75)) < 1);
+      //  (그림 문[DECO-EXIT-DOOR-1]이면 누르는 자리가 벽선 바로 밖, 옛 네모 문이면 벽선 안쪽 0.75칸 — 어느 쪽이든 그 벽에 붙는다)
+      const wallY = _dCv._offY + (3 + 7) * _dC;
+      out('방_나가기문_아래방', Math.abs(_dCv._doorY - (_decoImg('in_exit_door') ? wallY - _dC * .04 : wallY - _dC * .75)) < 1);
       //  전체 = 방 둘레
       out('방_전체는_방둘레', _inFitRooms() && _dZoom > 1);
       //  모든 방을 없애면 필드째 사라지고 큰 방으로
@@ -1422,6 +1424,31 @@
       _dSuppressClick = false;   // (앞 시험의 끌기가 남긴 '클릭 무시' — 실제로는 손을 떼면 풀린다)
       _decoClick({ clientX: r.left + (dx + dw / 2 - _dPanX) * r.width / _dW, clientY: r.top + (dy + dh / 2 - _dPanY) * r.height / _dH }); await sleep(300);
       out('집그림_문누르면_집안', s0 === 'yard' && DECO_SCENE === 'indoor');
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+    }
+
+    //  ㉘ 집 안 나가기 문 그림(DECO-EXIT-DOOR-1) — in_exit_door.svg · 누르는 자리는 방 아래 벽 밖 · 발판 칸은 가구를 놓을 수 있다
+    if (typeof _drawExitDoorArt === 'function') {
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keepIn = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined, keepDeco = (CUR.houseDecorations || []).slice();
+      _inRoomsSet(CUR, [{ id: 'a', r: 3, c: 8, w: 12, h: 8, floor: null, wall: null }]); _inFitRooms();
+      for (let i = 0; i < 20 && !_decoImg('in_exit_door'); i++) await sleep(100);
+      _drawDeco(); await sleep(50);
+      out('나가기문_그림불러옴', !!_decoImg('in_exit_door'));
+      const C = _dC, wallY = _dCv._offY + 11 * C, { _doorX: dx, _doorY: dy, _doorW: dw, _doorH: dh } = _dCv;
+      out('나가기문_누르는자리는_벽밖', dy >= wallY - C * .1 && Math.abs(dx + dw / 2 - (_dCv._offX + 14 * C)) < 1);
+      //  (누를 때마다 캔버스 자리를 다시 잰다 — 좁은 화면은 놓은 뒤 '최근' 줄이 생겨 캔버스가 움직인다)
+      const at = (x, y) => { const k = _dCv.getBoundingClientRect(); return { clientX: k.left + (x - _dPanX) * k.width / _dW, clientY: k.top + (y - _dPanY) * k.height / _dH }; };
+      SEL_DECO = 'd_i5'; setDecoMode('deco'); _dSuppressClick = false;
+      _decoClick(at(dx + dw / 2, wallY - C * .5)); await sleep(150);   // 발판 칸(방 맨 아랫줄)
+      out('나가기문_발판칸엔_가구', DECO_SCENE === 'indoor' && _decoList(CUR).some(p => p.id === 'd_i5' && p.row === 10));
+      SEL_DECO = null; _dSuppressClick = false;
+      _decoClick(at(dx + dw / 2, dy + dh / 2)); await sleep(300);
+      out('나가기문_누르면_마당', DECO_SCENE === 'yard');
+      CUR.houseDecorations = keepDeco; if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
+      _decoUndoClear(); decoSpaceSet(1); await sleep(100);
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
     }
 
