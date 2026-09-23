@@ -3210,6 +3210,11 @@ const FLOW_TXT = { growing: '자라는 중', ready: '거둘 것이 있어요', f
 const flowOn = () => { const R = window.VRULES.flow; return !!(R && R.on && Object.keys(R.만드는곳 || {}).length); };
 const flowMake = rec => (window.VRULES.flow.만드는곳 || {})[rec && rec.k];
 const flowTake = rec => (window.VRULES.flow.받는곳 || {})[rec && rec.k];
+/* [MAC-FLOWWORDS] 흐름의 말이 **만드는곳에 맞게** — 바닷가 판 빈 가게가 "밭을 더 만들어 볼까요?"라고 했다(09-23 실화면 · 그 판엔 밭이 없다).
+   growing·ready 두 말만 판 `흐름.말` 에서 받는다(없으면 FLOW_TXT 그대로) · 까닭 말의 '밭'은 **만드는곳의 이름**(K[k].nm)으로.
+   농촌(field = '밭')은 글자 하나 안 달라진다. 까닭은 말이 아니라 **값**(flowWhyCode)으로 먼저 정한다 — 그림(fsWhy)이 말 속 글자를 찾던 덫을 없앴다. */
+const flowTxt = st => { const M = window.VRULES.flow.말; return (M && (st === 'growing' || st === 'ready') && typeof M[st] === 'string' && M[st]) || FLOW_TXT[st]; };
+const flowMakerNm = rec => (rec && K[rec.k] && K[rec.k].nm) || (K[Object.keys(window.VRULES.flow.만드는곳 || {}).find(k => K[k]) || ''] || { nm: '밭' }).nm;
 function flowField(root) { let v = FLOW.밭.get(root); if (!v) { v = { 양: 0, 다음: 0 }; FLOW.밭.set(root, v); } return v; }
 function flowStore(root) { let v = FLOW.가게.get(root); if (!v) { v = { 양: 0 }; FLOW.가게.set(root, v); } return v; }
 /* 이 밭에서 길로 닿는 가게들 — 가까운 것부터. 길·건물이 바뀐 세대에만 다시 본다 */
@@ -3276,13 +3281,20 @@ function flowStoreState(root) { const rec = cells[root]; if (!rec || !flowTake(r
   return flowStore(root).양 > 0 ? 'stocked' : 'empty'; }
 function flowHomeState(root) { const h = FLOW.집.get(root); if (!h) return null; return h.받음 ? 'got' : 'missed'; }
 /* 빈 선반을 눌렀을 때 — 'empty' 는 원인이 아니라 결과다(설계 4절) */
-function flowWhyEmpty(root) {
+function flowWhyCode(root) {   /* 'coming' 오는 중 · 'cut' 만드는곳은 있는데 길이 끊김 · 'none' 만드는곳이 없음 · 'growing' 닿는 곳이 다 비었음 — 곁에 그 만드는곳 */
   const 밭들 = []; cells.forEach((rec, i) => { if (!rec || rec.root !== i || !flowMake(rec)) return;
     if (flowStoresFrom(rec).some(s => s.root === root)) 밭들.push(i); });
-  if (FLOW.짐.some(j => j.가게 === root)) return '곧 와요 — 오는 중이에요';
-  if (!밭들.length) { const 있나 = cells.some((rec, i) => rec && rec.root === i && flowMake(rec));
-    return 있나 ? '밭에 쌓여 있는데 길이 끊겼어요' : '이 가게에 오는 밭이 없어요'; }
-  if (밭들.every(i => flowField(i).양 <= 0)) return '밭이 아직 자라는 중이에요 — 밭을 더 만들어 볼까요?';
+  if (FLOW.짐.some(j => j.가게 === root)) return { 까닭: 'coming' };
+  if (!밭들.length) { const 있나 = cells.find((rec, i) => rec && rec.root === i && flowMake(rec));
+    return 있나 ? { 까닭: 'cut', rec: 있나 } : { 까닭: 'none', rec: null }; }
+  if (밭들.every(i => flowField(i).양 <= 0)) return { 까닭: 'growing', rec: cells[밭들[0]] };
+  return { 까닭: 'coming' }; }
+function flowWhyEmpty(root) {
+  const w = flowWhyCode(root), nm = w.까닭 === 'coming' ? '' : flowMakerNm(w.rec);
+  if (w.까닭 === 'cut') return nm + '에 쌓여 있는데 길이 끊겼어요';
+  if (w.까닭 === 'none') return '이 가게에 오는 ' + josa(nm, '이', '가') + ' 없어요';
+  if (w.까닭 === 'growing') { const g = flowTxt('growing');
+    return josa(nm, '이', '가') + ' 아직 ' + josa(g, '이에요', '예요') + ' — ' + josa(nm, '을', '를') + ' 더 만들어 볼까요?'; }
   return '곧 와요 — 오는 중이에요'; }
 { hookAdd('placeAt', function (next, args) { const r = next(args); if (flowOn()) FLOW.gen++; return r; }); }
 { hookAdd('removeAt', function (next, args) { const r = next(args); if (flowOn()) FLOW.gen++; return r; }); }
@@ -3379,7 +3391,7 @@ window.FLOW = (root) => { if (!flowOn()) return null;
 window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '없음';
   const fs = flowFieldState(rec.root), ss = flowStoreState(rec.root), hs = flowHomeState(rec.root);
   const s = fs || ss || hs; if (!s) return '흐름과 무관';
-  return { 상태: s, 말: FLOW_TXT[s], 양: fs ? flowField(rec.root).양 : ss ? flowStore(rec.root).양 : null,
+  return { 상태: s, 말: flowTxt(s), 양: fs ? flowField(rec.root).양 : ss ? flowStore(rec.root).양 : null,
     ...(ss === 'empty' ? { 까닭: flowWhyEmpty(rec.root) } : {}),
     ...(fs ? { 닿는가게: flowStoresFrom(rec).map(o => [cX(o.root), cY(o.root), o.거리]) } : {}),
     ...(fs === 'cut' ? { 이으면: (() => { const c = flowCutCost(rec, 8); return c ? { 칸: Math.max(1, c.칸), 가게: [cX(c.가게), cY(c.가게)] } : null; })() } : {}),
@@ -3455,12 +3467,12 @@ function flowCardText(root) {
   const rec = cells[root]; if (!rec) return '';
   const mk = flowMake(rec), tk = flowTake(rec), R = window.VRULES.flow;
   if (mk) { const st = flowFieldState(root), f = flowField(root), 담을수 = Math.max(1, mk.담을수 | 0 || 5);
-    let s = ' · ' + (R.물건 || '물건') + ' ' + f.양 + '/' + 담을수 + ' · ' + FLOW_TXT[st];
+    let s = ' · ' + (R.물건 || '물건') + ' ' + f.양 + '/' + 담을수 + ' · ' + flowTxt(st);
     if (st === 'cut') { const cut = flowCutCost(rec, 8);
       s += cut ? ' — 길 ' + Math.max(1, cut.칸) + '칸만 이으면 가게에 닿아요' : ' — 가게까지 길을 내 주세요'; }
     return s; }
   if (tk) { const st = flowStoreState(root), 담을수 = Math.max(1, tk.담을수 | 0 || 8);
-    let s = ' · ' + (R.물건 || '물건') + ' ' + flowStore(root).양 + '/' + 담을수 + ' · ' + FLOW_TXT[st];
+    let s = ' · ' + (R.물건 || '물건') + ' ' + flowStore(root).양 + '/' + 담을수 + ' · ' + flowTxt(st);
     if (st === 'empty') s += ' — ' + flowWhyEmpty(root);
     return s; }
   return ''; }
@@ -3568,8 +3580,8 @@ function fsFieldParts(root, base) {
     if (flowTake(rec)) return fsShopParts(rec, base);
     return base; }; }
 /* 상태가 바뀐 것의 청크만 다시 합친다. 빈 가게의 **까닭**도 여기서만 읽는다(누를 때 뜨는 말과 같은 함수) */
-function fsWhy(root) { const t = flowWhyEmpty(root) || '';
-  return t.indexOf('길이 끊') >= 0 ? '길' : t.indexOf('밭') >= 0 ? '밭' : null; }   /* '밭에 쌓여 있는데 길이 끊겼어요' 는 길이 먼저 */
+function fsWhy(root) { const c = flowWhyCode(root).까닭;   /* [MAC-FLOWWORDS] 말 속 글자가 아니라 까닭 값으로 — 말이 만드는곳 이름을 따라 바뀌어도 그림이 안 사라진다 */
+  return c === 'cut' ? '길' : (c === 'none' || c === 'growing') ? '밭' : null; }
 function fsTick() {
   const R = window.VRULES.flowShape, 쉴까 = !R || !R.on || !flowOn() || VISIT.on;
   if (쉴까 !== FSHAPE.쉼) { FSHAPE.쉼 = 쉴까;                       // 켜짐이 바뀐 순간 — 그리던 것 전부 다시 합친다
