@@ -7796,6 +7796,8 @@ function _decoBoardPx() {
   return { w: cols * _dC, h: rows * _dC };
 }
 
+//  [DECO-TOP-PAD-1] 마당은 판 위로 잔디 띠 두 칸까지 밀 수 있다(솟은 그림이 잘리지 않게) · 처음 열 때는 한 칸 보이게
+const DECO_YARD_TOP = 2;
 function _decoClampPan() {
   const b = _decoBoardPx();
   //  [DECO-VIEW-FIT-1] 집 안에 방이 있으면 판 밖도 도면이다 → 반 화면까지 더 밀 수 있다(판 끝에 붙은 방을 가운데로 — 디자인 D10)
@@ -7803,7 +7805,7 @@ function _decoClampPan() {
   const maxX = Math.max(0, b.w - _dW) + extraX, maxY = Math.max(0, b.h - _dH) + extraY;
   //  마당 판이 화면보다 작으면(전체 보기) 화면 안에서 움직일 수 있다(판이 화면 밖으로는 안 나간다) — 가운데 두기는 '전체'가 한다
   const yd = DECO_SCENE === 'yard';
-  const minX = yd && b.w < _dW ? -(_dW - b.w) : -extraX, minY = yd && b.h < _dH ? -(_dH - b.h) : -extraY;
+  const minX = yd && b.w < _dW ? -(_dW - b.w) : -extraX, minY = yd && b.h < _dH ? -(_dH - b.h) : yd ? -DECO_YARD_TOP * _dC : -extraY;
   _dPanX = Math.min(Math.max(minX, _dPanX), maxX);
   _dPanY = Math.min(Math.max(minY, _dPanY), maxY);
 }
@@ -7882,16 +7884,16 @@ function _decoFillStart() {
   const C0 = _dC / _dZoom;
   if (DY.rows * _dC >= _dH) return false;
   _decoSetZoom(Math.min(DECO_ZOOM_MAX, _dH / (DY.rows * C0)), 0, 0);
-  _dPanX = Math.max(0, (_houseCol0() + DH.cols + 2) * _dC - _dW); _dPanY = 0;
+  _dPanX = Math.max(0, (_houseCol0() + DH.cols + 2) * _dC - _dW); _dPanY = -_dC;   // [DECO-TOP-PAD-1] 굴뚝이 보이게 한 칸 위
   _decoClampPan(); _drawDeco();
   return true;
 }
 function _decoPhoneStart() {
   if (_decoFillStart()) return;   // [DECO-VIEW-FIT-1] 넓은 화면인데 판이 짧으면 높이 채우기
-  if (!_dC || _dW > 600) return;
+  if (!_dC || _dW > 600) { if (DECO_SCENE === 'yard' && _dPanY === 0) { _dPanY = -_dC; _decoClampPan(); _drawDeco(); } return; }   // [DECO-TOP-PAD-1] 넓은 화면도 한 칸 위부터
   const z = Math.min(DECO_ZOOM_MAX, 16 / Math.max(1, _dC / _dZoom));
   _decoSetZoom(z, 0, 0);
-  if (DECO_SCENE === 'yard') { _dPanX = (_houseCol0() - 4) * _dC; _dPanY = 0; }   // 집(기준 판 오른쪽 위) 앞이 보이게
+  if (DECO_SCENE === 'yard') { _dPanX = (_houseCol0() - 4) * _dC; _dPanY = -_dC; }   // 집(기준 판 오른쪽 위) 앞이 보이게 · [DECO-TOP-PAD-1] 굴뚝까지
   else { _dPanX = 0; _dPanY = 0; }
   _decoClampPan(); _drawDeco();
 }
@@ -9845,6 +9847,15 @@ function _drawYard() {
   };
   _floorCells(_vis);
   _decoGroundPatch(_vis.r0, _vis.c0, _vis.r1, _vis.c1, (r, c) => !_isHC(r, c) && _floorIsGrass(_floorParse(_yardFloorGet(CUR)[r + '_' + c]).name));   // [DECO-GROUND-1]
+  //  [DECO-TOP-PAD-1] 판 위 잔디 띠(DECO_YARD_TOP 칸) — 맨 윗줄 장식·집 굴뚝의 솟은 그림이 판 위 끝에서 잘리던 것(디자인 D7). 놓을 수는 없다(격자 없음)
+  if (_dPanY < 0) {
+    const grass = () => 'grass';
+    for (let r = -DECO_YARD_TOP; r < 0; r++) for (let c = _vis.c0; c < _vis.c1; c++) {
+      if (FLOOR_SVG && _drawFloorSVG('grass', r + 1000, c, c * C, r * C, C, grass)) continue;   // (변형 고르기는 음수 줄을 못 받는다 — 양수로)
+      _dCtx.fillStyle = (r + c) % 2 === 0 ? FLOOR_TILES.grass.bg : FLOOR_TILES.grass.alt; _dCtx.fillRect(c * C, r * C, C, C);
+    }
+    _decoGroundPatch(-DECO_YARD_TOP, _vis.c0, 0, _vis.c1, () => true);   // [DECO-GROUND-1] 띠에도 얼룩
+  }
   // 나무 타일은 가로줄 추가 (무늬) — texture 함수로 통합했으므로 기존 loop 삭제
 
   // ══════════════════════════════════════════════════════

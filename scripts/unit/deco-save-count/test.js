@@ -1774,6 +1774,15 @@
       out('밭그림_밭자리그대로', !!(_dCv._farmZone && _dCv._farmZone.cols > 0));
     }
 
+    //  ㉟ 판 위 잔디 띠(DECO-TOP-PAD-1 · 디자인 D7) — 두 칸 위까지 밀 수 있다 · 거기는 놓는 칸이 아니다
+    if (typeof DECO_YARD_TOP !== 'undefined') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      _decoSetZoom(2); _dPanY = -9999; _decoClampPan();
+      out('위띠_두칸까지', Math.abs(_dPanY + DECO_YARD_TOP * _dC) < 1);
+      out('위띠_놓는칸아님', _decoCellAt(_dCv.getBoundingClientRect().left + 5, _dCv.getBoundingClientRect().top + 5) === null);
+      _dPanY = 0; _decoClampPan(); _drawDeco();
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

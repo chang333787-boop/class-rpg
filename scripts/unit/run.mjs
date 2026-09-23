@@ -893,7 +893,7 @@ try {
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
   // 상태 선언
-  for (const d of ['let _dCv', 'const DECO_ZOOM_MIN', 'const DY_BASE', 'let _dZoom',
+  for (const d of ['let _dCv', 'const DECO_ZOOM_MIN', 'const DECO_YARD_TOP', 'const DY_BASE', 'let _dZoom',
                    'const DY_NORMAL', 'const DY_FULL', 'const DI_NORMAL', 'const DI_FULL', 'const DH ', 'let DY ', 'let DI ']) {
     const at = S.indexOf(d);
     if (at < 0) throw new Error('선언 없음: ' + d);
