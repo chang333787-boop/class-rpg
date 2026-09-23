@@ -9654,7 +9654,73 @@ function _drawDeco() {
     if (_decoHover && SEL_DECO) _decoDrawGhost(DECO_SCENE === 'yard' ? 'yard' : 'indoor', DECO_SCENE === 'yard' ? 0 : (_dCv._offX || 0), DECO_SCENE === 'yard' ? 0 : (_dCv._offY || 0), _dC);   // [DECO-SEL-HL-1]
     // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
     _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
+    try { _decoTplSync(); } catch (e) {}   // [DECO-FIRST-YARD-1]
   });
+}
+
+// [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기(디자인 ⑭ · 보스 결정 (A) 보여주기만 — 저장 0)
+//  마당에 장식을 한 번도 안 놓았고 바닥도 안 칠한 아이에게, 집 문 앞 돌길 2칸 폭(3~6줄) + 튤립 · 데이지를 반투명으로 보여 준다.
+//  '여기서 시작해 봐요' 말풍선은 돌길 왼쪽 아래(오른쪽은 확대 기둥과 겹친다). 첫 장식을 놓으면 0.4초에 사라진다.
+//  판 캔버스 위 투명 캔버스 한 장 — 숨쉬기(.45↔.6 · 2초)는 CSS 불투명도라 판을 매 틀 다시 그리지 않는다 · 움직임 줄이기면 .55 고정.
+//  누르기는 그대로 판으로 간다(pointer-events:none) · 칸을 차지하지 않는다.
+const DECO_TPL = { path: { c: [2, 3], r0: 3, r1: 6 }, items: [['d_y2', 3, 0], ['d_y42', 3, 5]] };   // 열은 집 첫 칸(_houseCol0) 기준
+let _decoTplCv = null, _decoTplOn = false;
+function _decoTplActive() {
+  if (!_ifMode || DECO_SCENE !== 'yard' || !_dCv) return false;
+  if ((CUR.houseDecorations || []).some(p => p.area === 'yard')) return false;   // 어느 공간에든 마당 장식을 놓아 본 아이는 아님
+  if (Object.keys(CUR.yardFloor || {}).length) return false;
+  const fs = CUR.yardFloors || {};
+  return !Object.keys(fs).some(k => fs[k] && Object.keys(fs[k]).length);
+}
+function _decoTplSync() {
+  const on = _decoTplActive(), host = _dCv && _dCv.parentNode;
+  if (!on) {
+    if (_decoTplOn && _decoTplCv) {   // 방금 꺼짐 — 0.4초에 사라진다
+      const cv = _decoTplCv; cv.classList.add('is-gone');
+      setTimeout(() => { if (cv.classList.contains('is-gone')) cv.style.display = 'none'; }, 420);
+    } else if (_decoTplCv) _decoTplCv.style.display = 'none';
+    _decoTplOn = false; return;
+  }
+  if (!_decoTplCv || _decoTplCv.parentNode !== host) {
+    _decoTplCv = document.createElement('canvas'); _decoTplCv.className = 'deco-tpl'; _decoTplCv.setAttribute('aria-hidden', 'true');
+    host.appendChild(_decoTplCv);
+  }
+  const cv = _decoTplCv, W = _dW, H = _dH, C = _dC;
+  cv.classList.remove('is-gone'); cv.classList.toggle('is-still', _animReduced()); cv.style.display = 'block';
+  cv.style.left = _dCv.offsetLeft + 'px'; cv.style.top = _dCv.offsetTop + 'px';
+  if (cv.width !== W * 2) cv.width = W * 2;
+  if (cv.height !== H * 2) cv.height = H * 2;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d'), keep = _dCtx;
+  ctx.setTransform(2, 0, 0, 2, 0, 0); ctx.clearRect(0, 0, W, H);
+  ctx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
+  const c0 = _houseCol0(), P = DECO_TPL.path, pc = P.c.map(k => c0 + k);
+  const isPath = (r, c) => r >= P.r0 && r <= P.r1 && pc.indexOf(c) >= 0;
+  _dCtx = ctx;   // 바닥·장식 그리기 도우미는 _dCtx 에 그린다 — 잠깐 이 캔버스로
+  try {
+    for (let r = P.r0; r <= P.r1; r++) for (const c of pc) {
+      if (!(FLOOR_SVG && _drawFloorSVG('stone', r, c, c * C, r * C, C, (rr, cc) => isPath(rr, cc) ? 'stone' : 'grass'))) {
+        ctx.fillStyle = FLOOR_TILES.stone ? FLOOR_TILES.stone.bg : '#9a9a9a'; ctx.fillRect(c * C, r * C, C, C);
+      }
+    }
+    DECO_TPL.items.forEach(([id, r, k]) => { const z = getDecoSize(id); _drawDecoSVG(id, (c0 + k) * C, r * C, z.w * C, z.h * C); });
+  } finally { _dCtx = keep; }
+  //  말풍선 — 돌길 왼쪽 아래
+  const msg = '여기서 시작해 봐요', fs = Math.max(11, Math.min(16, C * .55));
+  ctx.font = `700 ${fs}px sans-serif`;
+  const tw = ctx.measureText(msg).width, bw = tw + fs * 1.4, bh = fs * 1.9;
+  let bx = pc[0] * C - bw - C * .3, by = (P.r1 + 1) * C - bh * .4, below = false;
+  //  왼쪽에 자리가 없으면(폰 · 집이 화면 왼쪽) 돌길 바로 아래로 — 말풍선이 화면 밖으로 잘리지 않게
+  if (bx < _dPanX + 8) { below = true; bx = Math.max(_dPanX + 8, pc[0] * C + C - bw / 2); by = (P.r1 + 1) * C + C * .45; }
+  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.strokeStyle = 'rgba(43,33,24,.55)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, bh / 2); ctx.fill(); ctx.stroke();
+  const tx = pc[0] * C + C;   // 꼬리는 돌길 쪽으로
+  ctx.beginPath();
+  if (below) { ctx.moveTo(tx - bh * .25, by + 1); ctx.lineTo(tx, by - C * .4); ctx.lineTo(tx + bh * .25, by + 1); }
+  else { ctx.moveTo(bx + bw - bh * .3, by + bh * .2); ctx.lineTo(bx + bw + C * .3, by - C * .15); ctx.lineTo(bx + bw - bh * .1, by + bh * .55); }
+  ctx.fill();
+  ctx.fillStyle = '#2b2118'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, bx + bw / 2, by + bh / 2 + 1);
+  _decoTplOn = true;
 }
 
 // [DECO-HOUSE-ART-1] 마당 '내 집' 한 장 — viewBox 600×400 · 한 칸 = 100 · 발밑 y100~400(= 집 자리 3줄) · 굴뚝 끝만 한 칸 위로.

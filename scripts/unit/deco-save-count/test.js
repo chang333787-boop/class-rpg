@@ -1747,6 +1747,22 @@
 
     }
 
+    //  ㉜ 새 아이 첫 마당 본보기(DECO-FIRST-YARD-1 · 디자인 ⑭ (A) 보여주기만) — 마당 장식 0 · 바닥 0 이면 보이고, 저장 0 · 누르기는 판으로 · 놓으면 사라짐
+    if (typeof _decoTplSync === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const keep = { hd: CUR.houseDecorations, yf: CUR.yardFloor, yfs: CUR.yardFloors };
+      CUR.houseDecorations = (keep.hd || []).filter(p => p.area !== 'yard'); CUR.yardFloor = {}; CUR.yardFloors = {};
+      const snap = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]);
+      _drawDeco(); await sleep(120);
+      out('본보기_처음아이에게_보임', _decoTplOn && _decoTplCv && _decoTplCv.style.display === 'block');
+      out('본보기_누르기는_판으로', !!_decoTplCv && getComputedStyle(_decoTplCv).pointerEvents === 'none');
+      out('본보기_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]) === snap);
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_y2').concat([{ id: 'd_y2', qty: 5 }]);
+      SEL_DECO = 'd_y2'; _decoPlace('yard', 12, 12); await sleep(80);
+      out('본보기_놓으면_사라짐', !_decoTplOn && _decoTplCv.classList.contains('is-gone'));
+      SEL_DECO = null; CUR.houseDecorations = keep.hd; CUR.yardFloor = keep.yf; CUR.yardFloors = keep.yfs; _decoUndoClear(); _drawDeco(); await sleep(100);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
