@@ -3258,8 +3258,9 @@ function flowTick() {
     res.forEach((n, root) => { if (n <= 0) return; const h = FLOW.집.get(root);
       if (h && h.날 === 오늘) return;
       const rec = cells[root]; if (!rec) return;
+      if (capFlowSkip(root)) { FLOW.집.delete(root); return; }   /* [MAC-SHOPCAP] 꽉 찬 집은 흐름을 안 탄다 — 까닭은 한 집에 하나 */
       const 몫 = Math.max(1, R.세대몫 | 0 || 1) * houseHold(root); let 받음 = false;   /* [MAC-HOUSEHOLD] 한 칸에 여러 세대가 살면 그만큼 쓴다 — 여기가 새 관계의 본체다 */
-      for (const s of flowStoresFrom(rec)) { const st = flowStore(s.root);
+      for (const s of capFlowStores(root, flowStoresFrom(rec))) { const st = flowStore(s.root);   /* [MAC-SHOPCAP] 정원 있는 가게는 앉은 집만 */
         if (st.양 >= 몫) { st.양 -= 몫; 받음 = true; break; } }
       FLOW.집.set(root, { 날: 오늘, 받음 }); 받음 ? FLOW.stats.씀++ : FLOW.stats.못씀++; }); } }
 /* 상태 — 계약 이름 그대로 */
@@ -4780,6 +4781,7 @@ function simTick() {
   if ((SIM.ticks % 30) === 0) waitHomesTick();   // [MAC-WAITHOMES] 이웃을 기다리는 집 수(3초마다)
   if ((SIM.ticks % 30) === 7) waitLookTick();   // [MAC-WAITLOOK] 이웃을 기다리는 집의 모습 — 달라진 집의 청크만 다시(3초마다)
   crowdHomesStep();   // [MAC-CROWDHOMES] 붐빔을 식구 수로 — 틱마다 판의 1/90 조각
+  capHomesStep();   // [MAC-SHOPCAP] 가게 자리를 세대 단위로 — 틱마다 판의 1/90 조각(정원 있는 건물이 없으면 곧바로 돌아간다)
   flowTick();   // [MAC-FLOW] 흐름 — 만들기·보내기·나아가기·쓰기(판 파일 '흐름' 칸이 있을 때만)
   if ((SIM.ticks % (window.VRULES.flowLook.every || 30)) === 3) { fsTick(); flowLookDraw(); }   // [MAC-FLOWSHAPE] 밭 모습 · [MAC-FLOWLOOK] 남은 아이콘
   seasonTick(); if ((SIM.ticks % 50) === 0) albumTick();
@@ -5504,6 +5506,7 @@ const faceOf = n => n >= NEEDS.length ? 0 : n >= Math.ceil(NEEDS.length / 2) ? 1
 const faceOfHome = root => Math.min(2, faceOf((sat.get(root) || { n: 0 }).n) + (crowdedHome(root) ? 1 : 0) + (joblessHome(root) ? 1 : 0));   // 붐비면·일자리 없으면 한 단계 아래(F12·F27)
 function computeSat(rec) {
   const met = { 물: false, 장보기: false, 놀이: false, 쉼: false, 배움: false };
+  const capBox = { hit: false };   /* [MAC-SHOPCAP] 정원 있는 가게가 닿았나 */
   const b = roadsBeside(rec);   /* [MAC-DOORS] 닿는 문 앞 길을 모두 — 한 번의 멀티 소스 BFS */
   if (b.length) {
     const { reach } = roadBFS(b, undefined, NEED_R_WIDE);
@@ -5514,10 +5517,11 @@ function computeSat(rec) {
         const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0);
         if (!inb(nx, ny)) continue;
         const c = cells[idx(nx, ny)]; if (!c) continue;
-        const kk = K[c.k]; if (kk.need) met[kk.need] = true; if (kk.need2) met[kk.need2] = true;
+        const kk = K[c.k]; if (capHit(c.k, met, capBox)) continue; if (kk.need) met[kk.need] = true; if (kk.need2) met[kk.need2] = true;   /* [MAC-SHOPCAP] 정원 있는 가게는 자리가 있어야 켠다 */
       }
     }
   }
+  capSatEnd(rec, met, capBox);   /* [MAC-SHOPCAP] 앉았으면 켜고 · 자리를 못 얻었으면 '꽉 참'으로 적는다 */
   let n = 0; NEEDS.forEach(k => { if (met[k]) n++; });
   const out = { met, n, at: SIM.t };
   sat.set(rec.root, out);
@@ -5544,10 +5548,10 @@ function growHouse(rec, h) {
 function satText(rec) {
   const 세대 = houseHold(rec.root), 세대말 = 세대 > 1 ? 세대 + '세대 · ' : '';   /* [MAC-HOUSEHOLD] 여러 세대가 사는 집은 카드가 먼저 말한다 — 곱셈을 숨기지 않는다 */
   const st = sat.get(rec.root) || computeSat(rec);
-  const miss = NEEDS.filter(k => !st.met[k]);
+  const full = capFullText(rec), miss = NEEDS.filter(k => !st.met[k] && !(full && k === '장보기'));   /* [MAC-SHOPCAP] 꽉 찬 장보기는 '멀어요'가 아니다(까닭 층 ②) */
   const busy = (crowdedHome(rec.root) ? ' · 길이 붐벼요' : '') + (joblessHome(rec.root) ? ' · ' + jobWhyShort(rec) : '');   /* [MAC-JOBWHY] 까닭 넷에서 */
-  if (!miss.length) return (busy ? '😐 ' : '😊 ') + 세대말 + '다 있어요' + busy + amenText(rec.root);   // busy 에는 붐빔·일자리 사정이 든다. 꾸미기 한 줄은 뒤에(F33)
-  return (faceOfHome(rec.root) === 1 ? '😐 ' : '😟 ') + 세대말 + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어요' + busy + amenText(rec.root);
+  if (!miss.length) return (full ? (faceOfHome(rec.root) === 1 ? '😐 ' : '😟 ') : busy ? '😐 ' : '😊 ') + 세대말 + (full || '다 있어요') + busy + amenText(rec.root);   // busy 에는 붐빔·일자리 사정이 든다. 꾸미기 한 줄은 뒤에(F33)
+  return (faceOfHome(rec.root) === 1 ? '😐 ' : '😟 ') + 세대말 + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어요' + (full ? ' · ' + full : '') + busy + amenText(rec.root);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9803,6 +9807,7 @@ function stageKinds(def) {
       ...(NEED_TXT && t.need && NEED_TXT[t.need] ? { need: t.need } : {}),
       ...(t.jobs ? { jobs: Math.max(1, Math.min(9, t.jobs | 0)) } : {}),
       ...(t['세대'] > 1 ? { '세대': Math.max(2, Math.min(24, t['세대'] | 0)) } : {}),   /* [MAC-HOUSEHOLD] 한 칸에 몇 세대가 사나 — 놓이면 집이 된다(jobs·cap 과 같은 건물 값이라 판정 규칙 수가 안 는다) */
+      ...(t['정원'] > 0 ? { '정원': Math.max(1, Math.min(99, t['정원'] | 0)) } : {}),   /* [MAC-SHOPCAP] 가게가 받을 수 있는 세대 수 — 세대·jobs·cap 과 같은 건물 값(적힌 판에서만 수용량이 돈다) */
       ...(t.needRoad ? { needRoad: true } : {}) };
     if (ORDER.indexOf(k) < 0) ORDER.push(k);                                 // 트레이에 뜨게(해금 표에 없으니 처음부터 열려 있다)
     VSKIN.stats.더한것.push(k);
@@ -9857,7 +9862,7 @@ function stageApplyEarly(def) {   // 목표·건물 — 부팅(트레이·목표
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).stageOff = { on: true };
 const SOFF = { 묶음: new Set(), stats: { 일자리막음: 0, 붐빔막음: 0 } };
-const SOFF_ALL = ['일자리', '붐빔'];
+const SOFF_ALL = ['일자리', '붐빔', '수용량'];   /* [MAC-SHOPCAP] 수용량 = shopCap */
 const soffOn = g => window.VRULES.stageOff.on && SOFF.묶음.has(g);
 function stageOffRead(def) {                                   /* 판 로드 때 한 번 — 모르는 이름은 적어 두고 무시한다 */
   SOFF.묶음.clear(); const L = def && def.끄기; if (!Array.isArray(L)) return;
@@ -9881,6 +9886,76 @@ function stageOffRead(def) {                                   /* 판 로드 때
        이 비우기가 **붐빔을 끄는 실제 장치**다(위 crowdTick 고리가 아니다). 실측: 9초·표본 60 동안 최악집·집평균·붐비는집 전부 0. */
     return; }); }
 window.__stageOff = () => ({ 켜짐: window.VRULES.stageOff.on, 끈묶음: [...SOFF.묶음], 쓸수있는이름: SOFF_ALL, ...SOFF.stats });
+/* ══════════════════════════════════════════════════════════════
+   [MAC-SHOPCAP] 시설 수용량 — 가게마다 **받을 수 있는 세대 수(정원)** (설계 docs/village_capacity_design.md · 보스 09-23 #810)
+   창조자 21회 ⓑ27: 가게 카드의 `(13세대)` 는 원인만 말하고 **"그래서 가게 하나로는 모자라다"는 결과가 화면 어디에도 없었다.**
+   · 정원은 **건물 값**이다(`세대`·`jobs`·`cap` 과 같은 칸) — 판 파일 `건물정의` 에 `"정원": 6`. 기본 `shop` 에는 **없다**(끝이 없다).
+     → **정원이 적힌 건물이 없는 마을에서는 이 규칙이 한 줄도 안 돈다**(pop88·pop167 0 차이 · 통과 기준 ①).
+   · 앉히는 법은 일자리 배정([MAC-JOBSHOMES])과 같은 꼴 — 집마다 받은 자리를 적어 두고(CAP.asg) **먼저 온 순 · 자리 지키기**.
+     세는 단위는 **세대**(houseHold) — 식구로 세면 층이 올라 잘 만든 동네일수록 꽉 찬다(설계 2-가).
+   · 가게를 찾는 잣대는 **computeSat 과 같은 BFS**(문 전부 · 14칸 · 큰길 20칸 · 설계 2-라) — 집 카드와 배정이 같은 가게를 본다.
+   · 까닭은 층으로 가른다(설계 1-나): ① 닿는 가게가 없다 → '장 볼 곳이 멀어요'(그대로) ② 닿는 가게가 **다 정원 있는 가게이고 자리가 없다**
+     → '🛒 가게가 꽉 찼어요' ③ 앉았는데 선반이 비었다 → 흐름의 '오늘은 못 받았어요'. **정원 없는 가게가 하나라도 닿으면 자리가 필요 없다.**
+   · 흐름 소비는 정원 있는 가게에서 **그 가게에 앉은 집만** 한다 · 꽉 찬 집은 흐름을 안 탄다(두 까닭이 한 집에 같이 안 뜨게 · 설계 1-다).
+   스위치 VRULES.shopCap · 판 파일 `"끄기": ["수용량"]` 로 통째로 멈춘다. 원래 줄 수정: computeSat 1 · satText 3 · 흐름 소비 1 · SOFF_ALL 1
+   (+ 끼운 줄: stageKinds 1 · computeSat 2 · simTick 1 · 흐름 소비 1).
+   ══════════════════════════════════════════════════════════════ */
+(window.VRULES = window.VRULES || {}).shopCap = { on: true, every: 90 };
+var CAP = { asg: new Map(), used: new Map(), lack: new Map(), full: new Set(), cur: 0, stats: { 한바퀴: 0, 배정: 0, 풀림: 0 } };
+const CAP_TXT = '🛒 가게가 꽉 찼어요';
+/* 이 종류의 정원 — 장보기 가게이고 정원이 적혀 있을 때만. 0 = 끝이 없다 */
+function capOf(k) { const t = K[k]; if (!t || (t.need !== '장보기' && t.need2 !== '장보기')) return 0; return Math.max(0, t['정원'] | 0); }
+function capLive() { return !!(window.VRULES.shopCap.on && !soffOn('수용량')); }
+function capAny() { for (const k in K) if (capOf(k) > 0) return true; return false; }
+function capClear() { CAP.asg.clear(); CAP.used.clear(); CAP.lack.clear(); CAP.full.clear(); CAP.cur = 0; }
+function capRelease(h) { const a = CAP.asg.get(h); if (a) { a.forEach((n, s) => CAP.used.set(s, Math.max(0, (CAP.used.get(s) || 0) - n))); CAP.asg.delete(h); CAP.stats.풀림++; } CAP.lack.delete(h); }
+/* 집에서 닿는 장보기 가게 — computeSat 과 같은 잣대 · 가까운 것부터. free = 정원 없는 가게가 하나라도 닿는다 */
+function capStoresFrom(rec) { const b = roadsBeside(rec), list = []; let free = false; if (!b.length) return { list, free };
+  const { reach } = roadBFS(b, undefined, NEED_R_WIDE); const seen = new Set();
+  for (const i of reach) { if (bfsDepth[i] > NEED_R && !isWide(i)) continue; const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue;
+      const c = cells[idx(nx, ny)]; if (!c || seen.has(c.root)) continue; const kk = K[c.k]; if (kk.need !== '장보기' && kk.need2 !== '장보기') continue;
+      seen.add(c.root); if (capOf(c.k) > 0) list.push(c.root); else free = true; } }
+  return { list, free }; }
+function capHouseStep(rec) { const h = rec.root, need = (res.get(h) || 0) > 0 ? houseHold(h) : 0;
+  if (!need) { capRelease(h); return; }                                   // 빈 집은 자리를 안 차지한다(설계 4절 ⑧)
+  const { list, free } = capStoresFrom(rec);
+  if (free || !list.length) { capRelease(h); return; }                    // 정원 없는 가게가 닿으면 자리가 필요 없다 · 아무 가게도 안 닿으면 층 ①(멀어요)
+  const near = new Set(list); let a = CAP.asg.get(h);
+  if (a) a.forEach((n, s) => { if (!near.has(s)) { a.delete(s); CAP.used.set(s, Math.max(0, (CAP.used.get(s) || 0) - n)); } });   // 없어졌거나 안 닿게 된 가게의 자리만 푼다
+  let have = 0; if (a) a.forEach(n => have += n);
+  if (have > need && a) { for (const [s, n] of [...a].reverse()) { if (have <= need) break; const d = Math.min(n, have - need); a.set(s, n - d); if (n - d <= 0) a.delete(s); CAP.used.set(s, Math.max(0, (CAP.used.get(s) || 0) - d)); have -= d; } }
+  for (const s of list) { if (have >= need) break; const f = capOf(cells[s].k) - (CAP.used.get(s) || 0); if (f <= 0) continue;
+    const d = Math.min(f, need - have); if (!a) { a = new Map(); CAP.asg.set(h, a); }
+    a.set(s, (a.get(s) || 0) + d); CAP.used.set(s, (CAP.used.get(s) || 0) + d); have += d; CAP.stats.배정 += d; }
+  if (a && !a.size) CAP.asg.delete(h);
+  if (need - have > 0) CAP.lack.set(h, need - have); else CAP.lack.delete(h); }
+/* 틱마다 판의 1/90 조각 — 한 바퀴가 끝나면 가게별 앉은 수를 배정표에서 다시 센다(치운 가게 자리에 새 가게가 와도 어긋나지 않게) */
+function capHomesStep() { const R = window.VRULES.shopCap;
+  if (!capLive() || !capAny()) { if (CAP.asg.size || CAP.lack.size || CAP.full.size) capClear(); return; }
+  const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CAP.cur + step);
+  for (let i = CAP.cur; i < end; i++) { const rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') capHouseStep(rec); else if (CAP.asg.has(i) || CAP.lack.has(i)) capRelease(i); }
+  CAP.cur = end >= N ? 0 : end;
+  if (end >= N) { CAP.stats.한바퀴++; const u = new Map(); CAP.asg.forEach(a => a.forEach((n, s) => u.set(s, (u.get(s) || 0) + n))); CAP.used = u; } }
+/* computeSat 이 부른다 — 정원 있는 가게는 그 자리에서 '장보기'를 켜지 않고 표만 해 둔다(다른 필요는 그대로 켠다) */
+function capHit(k, met, box) { if (!(capOf(k) > 0) || !capLive()) return false; const kk = K[k]; box.hit = true;
+  if (kk.need && kk.need !== '장보기') met[kk.need] = true; if (kk.need2 && kk.need2 !== '장보기') met[kk.need2] = true; return true; }
+/* computeSat 끝 — 정원 있는 가게만 닿은 집: 자리를 못 얻었으면 층 ②(꽉 참), 앉았거나 아직 한 바퀴 전이면 켠다 */
+function capSatEnd(rec, met, box) { if (!box.hit) { if (CAP && CAP.full.size) CAP.full.delete(rec.root); return; }
+  if (met.장보기) { CAP.full.delete(rec.root); return; }
+  if (CAP.stats.한바퀴 && CAP.lack.has(rec.root)) { CAP.full.add(rec.root); return; }
+  CAP.full.delete(rec.root); met.장보기 = true; }
+/* 집 카드 말 — 여러 세대 가운데 일부만 못 앉았으면 몇 세대인지 */
+function capFullText(rec) { if (!CAP || !CAP.full.has(rec.root) || !capLive()) return '';
+  const hh = houseHold(rec.root), n = CAP.lack.get(rec.root) | 0; return CAP_TXT + (hh > 1 && n > 0 && n < hh ? ' (' + n + '세대)' : ''); }
+/* 흐름 소비 — 정원 있는 가게는 앉은 집만 · 꽉 찬 집은 흐름을 안 탄다(설계 1-다) */
+function capFlowSkip(root) { return capLive() && CAP.full.has(root); }
+function capFlowStores(root, list) { if (!capLive()) return list; const a = CAP.asg.get(root);
+  return list.filter(s => { const c = cells[s.root]; return !c || !(capOf(c.k) > 0) || !!(a && a.has(s.root)); }); }
+window.__shopCap = () => { const 가게 = []; cells.forEach((rec, i) => { if (rec && rec.root === i && capOf(rec.k) > 0) 가게.push({ 자리: i, k: rec.k, 정원: capOf(rec.k), 앉음: CAP.used.get(i) || 0 }); });
+  let 사는세대 = 0, 꽉찬세대 = 0; res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') 사는세대 += houseHold(root); }); CAP.lack.forEach(v => 꽉찬세대 += v);
+  return { 켜짐: window.VRULES.shopCap.on, 돎: capLive() && capAny(), 가게, 사는세대, 꽉찬세대, '꽉찬%': 사는세대 ? Math.round(꽉찬세대 / 사는세대 * 1000) / 10 : 0,
+    꽉찬집: CAP.full.size, 앉은집: CAP.asg.size, 모자란집: CAP.lack.size, ...CAP.stats }; };
 function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
   const def = STAGE.def; if (!def) return;
   if (def.흐름 && typeof def.흐름 === 'object' && window.VRULES.flow) {   /* [MAC-FLOW] 판이 흐름을 켠다(규칙 칸과 따로 — 판정이 아니라 '물건') */

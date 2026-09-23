@@ -40,7 +40,7 @@
       ]
     },
     "store": {
-      "nm": "상가", "ic": "🏪", "grp": "가게", "w": 2, "h": 1, "jobs": 2, "need": "장보기", "needRoad": true, "g": 110, "cap": 60,
+      "nm": "상가", "ic": "🏪", "grp": "가게", "w": 2, "h": 1, "jobs": 2, "need": "장보기", "정원": 6, "needRoad": true, "g": 110, "cap": 60,
       "parts": [
         { "g": "box", "c": "#8f8c85", "s": [1.8, 0.26, 0.86], "p": [0, 0.13, 0] },
         { "g": "box", "c": "#f2ede0", "s": [1.7, 3.2, 0.74], "p": [0, 1.7, 0] },
@@ -67,6 +67,7 @@
   },
   "건물": ["road", "avenue", "crosswalk", "treerow", "lawn", "plaza", "house", "apart", "office", "store", "shop", "well", "fountain", "play", "bench", "minibench", "tree", "bigtree", "bush", "flower", "pot", "lamp", "signal", "trashcan", "post", "wall", "statue", "clock", "school", "library", "station", "museum"],
   "규칙": {},
+  "끄기": ["붐빔"],
   "목표": [
     { "t": "아파트 4채", "셈": "kind", "k": "apart", "n": 4 },
     { "t": "상가 3채", "셈": "kind", "k": "store", "n": 3 },

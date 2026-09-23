@@ -49,6 +49,11 @@ else {
   안판정.length ? add('FAIL', '끄기 묶음 속', '판정이 아닌 규칙: ' + 안판정.join(' ')) : add('PASS', '끄기 묶음 속이 모두 판정 규칙');
 }
 let 끈판 = 0;
+/* [MAC-SHOPCAP] ㉮ 조건부 판정 — 그 판에서 한 줄도 안 도는 규칙은 켜진 판정으로 세지 않는다(보스 09-23 · 설계 5-나).
+   수용량(shopCap)은 **정원이 적힌 장보기 건물이 그 판에 있을 때만** 돈다 — 기본 shop 에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대) */
+const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need === '장보기' && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
+const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
+const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
 
 const files = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && f !== 'rules.json').sort();
@@ -72,9 +77,9 @@ for (const f of files) {
       else { def.끄기.forEach(g => (묶음[g] || []).forEach(k => 끈것.add(k)));
         add('PASS', P(`끄기 ${def.끄기.length}묶음 (${def.끄기.join('·')}) → 판정 ${끈것.size}개를 끔`)); 끈판++; } }
   }
-  const live = judge.filter(k => !끈것.has(k) && vrules[k] && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
+  const live = liveOf(def, 끈것);   /* [MAC-SHOPCAP] ㉮ 조건부 규칙은 그 판에서 돌 때만 */
   if (def.교과 == null) add('PASS', P(`켜진 판정 규칙 ${live.length}개 — 자유 놀이 판(교과 없음)이라 ≤6 면제`));   // 보스 09-20: ≤6 은 수업 판에만
-  else add(live.length <= 6 ? 'PASS' : 'FAIL', P(`켜진 판정 규칙 ${live.length}개`) + (끈것.size ? ` — 끄기 뒤 (끄기 전 ${live.length + 끈것.size})` : '') + (live.length > 6 ? '' : ' (≤6 · 수업 판)'), live.length > 6 ? '수업 판은 6 까지 — ' + live.join(' ') : '');
+  else add(live.length <= 한도 ? 'PASS' : 'FAIL', P(`켜진 판정 규칙 ${live.length}개`) + (끈것.size ? ` — 끄기 뒤 (끄기 전 ${live.length + 끈것.size})` : '') + (live.length > 한도 ? '' : ' (≤6 · 수업 판)'), live.length > 한도 ? '수업 판은 6 까지 — ' + live.join(' ') : '');
   if (def.변수 != null && !rk.includes(def.변수)) add('REVIEW', P('변수'), `'${def.변수}' 가 규칙 칸에 없음`);
   if (def.모습 != null) { const S = def.모습, 철 = ['봄', '여름', '가을', '겨울'];   /* [MAC-SKIN] */
     const 나쁨 = [];
@@ -104,6 +109,16 @@ for (const f of files) {
     빠짐.length ? add('FAIL', P('건물정의'), '판을 열었는데 안 생긴 종류: ' + 빠짐.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종이 판에서 실제로 생김`)); }
   ok ? add('PASS', P(`시뮬로 얹어 하루 돎 · 인구 ${res.samples[0].m.인구}→${res.samples[res.samples.length - 1].m.인구} · 네트워크 0`)) : add('FAIL', P('시뮬로 얹기'), JSON.stringify({ 네트워크: res.네트워크, 판: res.판 }));
 }
+
+/* [MAC-SHOPCAP] ㉮ 반대쪽 자기 시험 — 조건부 셈이 규칙을 **숨기지 않나**. city 를 베껴 끄기를 빼고 상가에 정원을 적으면
+   켜진 판정이 하나 늘어 **한도를 넘어 FAIL** 이어야 한다(정원을 빼면 하나 줄어야 한다). 보스 09-23 '반대쪽 시험을 같이' */
+{ const city = JSON.parse(fs.readFileSync(path.join(DIR, 'city.json'), 'utf8')); delete city.끄기;
+  const 있음 = JSON.parse(JSON.stringify(city)), 없음 = JSON.parse(JSON.stringify(city));
+  있음.건물정의.store.정원 = 6; delete 없음.건물정의.store.정원;
+  const a = liveOf(있음, new Set()), b = liveOf(없음, new Set());
+  (a.includes('shopCap') && !b.includes('shopCap') && a.length === b.length + 1 && a.length > 한도)
+    ? add('PASS', `조건부 판정 자기 시험 — city 에 정원을 적고 끄기를 빼면 켜진 판정 ${a.length}개 > ${한도} → FAIL 로 잡힌다 (정원 없으면 ${b.length}개)`)
+    : add('FAIL', '조건부 판정 자기 시험', `정원 있음 ${a.length}개(${a.join(' ')}) · 없음 ${b.length}개 — 정원이 적힌 판이 한도 넘김으로 안 잡힌다`); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
 끈판 ? add('PASS', `판정을 끈 판 ${끈판}개 (정본 2번 — 끄기를 실제로 쓴 판이 있다)`)
