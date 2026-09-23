@@ -3934,7 +3934,7 @@ function act(clientX, clientY) {
     if (rec && K[rec.k].need) {                       // 필요 건물을 누르면 닿는 범위를 보여 준다
       overlayFor(rec.k, cX(rec.root), cY(rec.root), rec.rot); ovUntil = performance.now() + 4000;
       const 흐름줄 = flowCardText(rec.root);   /* [MAC-FLOWLOOK] 흐름 글이 있으면 거기서 줄을 바꾼다 — 첫 줄은 물건 이야기, 둘째 줄은 본편 정보(창조자 14회 ⓑ7) */
-      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + ovHomeText(rec.root)   /* [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
+      toast(K[rec.k].nm + 흐름줄 + (흐름줄 ? '\n' : ' · ') + (K[rec.k].need2 ? NEED_TXT[K[rec.k].need] + '·' + NEED_TXT[K[rec.k].need2] : NEED_TXT[K[rec.k].need]) + ' · 파란 길까지 닿아요 · 노란 집 ' + ovInfo.집 + '채' + (capCardText(rec) || ovHomeText(rec.root))   /* [MAC-SHOPCAP ⑵] 정원 가게는 배정표 숫자 · [MAC-HOUSEHOLD] 아파트가 섞이면 '채'와 '세대'가 다르다 — 가게 하나로 몇 세대를 먹이는지가 여기서 보인다 */ + (K[rec.k].jobs ? ' · ' + jobText(rec) : ''), true);   /* [MAC-FLOWLOOK] 흐름 글을 이름 바로 뒤에 — 빈 가게를 누른 아이가 가장 먼저 볼 것은 곡식 이야기다(창조자 13회 ⓐ1) */
       whereGo(rec);   /* [MAC-WHERE] 까닭을 말했으면 그 자리도 짚는다 — 아이가 누른 것에만 */
       return;
     }
@@ -5464,7 +5464,7 @@ function awayGate(f, i) {
   movers = Math.max(0, movers - 1); f.slotFreed = true;                     // 돌아가는 길은 이사 자리를 안 차지한다(왕복이라 처리량이 반으로 주는 것 막기)
   let first = false; try { if (!localStorage.getItem(AWAY_SEEN_KEY())) { localStorage.setItem(AWAY_SEEN_KEY(), '1'); first = true; } } catch (e) {}
   if (first) { AWAY.stats.첫안내++; sayOnce('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
-  else { const key = miss.join(); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
+  else { const key = miss.join() + (capAwayFull(f.home, miss) ? '+꽉참' : ''); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + capAwayText(f.home, miss) + ' 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
   if (path.length < 2) return awayGate(f, i);                                // 나갈 길이 없다 — 그 자리에서 사라진다
   return true;
 }
@@ -6592,7 +6592,7 @@ function actWordsText(f) {
 }
 
 function whatDoing(f) {
-  if (f.leaving && f.away) return f.away.miss.map(k => NEED_TXT[k]).join('·') + '이 멀어서 돌아가요';   // [MAC-AWAY]
+  if (f.leaving && f.away) return capAwayText(f.home, f.away.miss) + ' 돌아가요';   // [MAC-AWAY] · [MAC-SHOPCAP ⑵] 꽉 참이면 '가게가 꽉 차서'
   if (f.comeback) return '살 만해졌다는 소식에 다시 와요';
   { const t = actGardenText(f); if (t) return t; }   // [ACT-GARDEN]
   if (f.arriving) return '이사 오는 중이에요';
@@ -10015,6 +10015,7 @@ function capHouseStep(rec) { const h = rec.root, need = (res.get(h) || 0) > 0 ? 
 /* 틱마다 판의 1/90 조각 — 한 바퀴가 끝나면 가게별 앉은 수를 배정표에서 다시 센다(치운 가게 자리에 새 가게가 와도 어긋나지 않게) */
 function capHomesStep() { const R = window.VRULES.shopCap;
   if (!capLive() || !capAny()) { if (CAP.asg.size || CAP.lack.size || CAP.full.size) capClear(); return; }
+  if (CAP.placed !== placedTotal) { CAP.placed = placedTotal; capNewStores(); }   /* [MAC-SHOPCAP ⑵] 새 정원 가게가 생겼으면 그 가게에 가까운 꽉 찬 집부터 */
   const N = W * H, step = Math.ceil(N / (R.every || 90)), end = Math.min(N, CAP.cur + step);
   for (let i = CAP.cur; i < end; i++) { const rec = cells[i]; if (rec && rec.root === i && rec.k === 'house') capHouseStep(rec); else if (CAP.asg.has(i) || CAP.lack.has(i)) capRelease(i); }
   CAP.cur = end >= N ? 0 : end;
@@ -10025,7 +10026,7 @@ function capHit(k, met, box) { if (!(capOf(k) > 0) || !capLive()) return false; 
 /* computeSat 끝 — 정원 있는 가게만 닿은 집: 자리를 못 얻었으면 층 ②(꽉 참), 앉았거나 아직 한 바퀴 전이면 켠다 */
 function capSatEnd(rec, met, box) { if (!box.hit) { if (CAP && CAP.full.size) CAP.full.delete(rec.root); return; }
   if (met.장보기) { CAP.full.delete(rec.root); return; }
-  if (CAP.stats.한바퀴 && CAP.lack.has(rec.root)) { CAP.full.add(rec.root); return; }
+  if (CAP.stats.한바퀴 && CAP.lack.has(rec.root) && (res.get(rec.root) || 0) > 0) { CAP.full.add(rec.root); return; }   /* [MAC-SHOPCAP ⑵] 빈 집은 옛 표를 안 본다(마지막 식구가 나간 뒤 훑기 전) — 돌아섬이 맡는다 */
   CAP.full.delete(rec.root); met.장보기 = true; }
 /* 집 카드 말 — 여러 세대 가운데 일부만 못 앉았으면 몇 세대인지 */
 function capFullText(rec) { if (!CAP || !CAP.full.has(rec.root) || !capLive()) return '';
@@ -10034,6 +10035,38 @@ function capFullText(rec) { if (!CAP || !CAP.full.has(rec.root) || !capLive()) r
 function capFlowSkip(root) { return capLive() && CAP.full.has(root); }
 function capFlowStores(root, list) { if (!capLive()) return list; const a = CAP.asg.get(root);
   return list.filter(s => { const c = cells[s.root]; return !c || !(capOf(c.k) > 0) || !!(a && a.has(s.root)); }); }
+/* ── [MAC-SHOPCAP ⑵] 가게 카드 · 새 가게는 가까운 집부터 · 돌아섬 (보스 09-23 #815 뒤) ──
+   ① **까닭 → 그 자리 → 한 수 → 그 자리에서 결과.** 꽉 찬 아파트 바로 옆에 상가를 놓았는데 먼 아파트가 풀리면 아이 눈에는 "옆에 놨는데 안 됐다"다.
+      → 새 정원 가게가 생기면(놓은 수 placedTotal 이 바뀐 틱) 그 가게에서 길로 **가까운 차례로** 꽉 찬 집을 곧바로 다시 본다. 옛 집의 자리 지키기는 그대로.
+   ② 가게 카드 `(13세대 · 6세대까지 받아요 · 7세대가 못 와요)` — 숫자는 **배정표에서**(앉은 세대 + 이 가게에 닿는데 자리를 못 얻은 세대). 정원 없는 가게는 지금 숫자 그대로.
+   ③ 돌아섬 — 빈집에서 닿는 가게가 전부 정원 가게이고 **빈자리가 하나도 없으면** 새 이웃이 돌아선다(일자리 jobAway 와 같은 꼴 · 설계 4절 ⑦).
+      까닭 키는 새로 만들지 않고 **'장보기'** 를 쓴다(대기 집 모양·아이콘·말 사다리가 이미 안다) — 말만 "가게가 꽉 차서"로 바꾼다(CAP.awayFull). */
+CAP.stores = new Set(); CAP.placed = -1; CAP.awayFull = new Set(); CAP.stats.새가게 = 0; CAP.stats.돌아섬판정 = 0;
+/* 가게 쪽에서 길로 닿는 집 — computeSat 과 같은 잣대(14칸 · 큰길 20칸) · 가까운 것부터 */
+function capHomesNear(store) { const b = roadsBeside(store), out = []; if (!b.length) return out;
+  const { reach } = roadBFS(b, undefined, NEED_R_WIDE); const seen = new Set();
+  for (const i of reach) { if (bfsDepth[i] > NEED_R && !isWide(i)) continue; const x = cX(i), y = cY(i);
+    for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue;
+      const c = cells[idx(nx, ny)]; if (c && c.k === 'house' && !seen.has(c.root)) { seen.add(c.root); out.push(c.root); } } }
+  return out; }
+function capNewStores() { const now = new Set(); cells.forEach((rec, i) => { if (rec && rec.root === i && capOf(rec.k) > 0) now.add(i); });
+  const fresh = [...now].filter(s => !CAP.stores.has(s)); CAP.stores = now; if (!CAP.stats.한바퀴) return;   // 첫 바퀴 전(판을 막 연 때)은 훑기가 맡는다
+  fresh.forEach(s => { CAP.stats.새가게++; capHomesNear(cells[s]).forEach(h => { if (CAP.lack.has(h) && cells[h]) capHouseStep(cells[h]); }); }); }
+/* 가게 카드 한 줄 — 정원 가게만. 아니면 '' (지금 숫자 그대로) */
+function capCardText(rec) { if (!rec || !(capOf(rec.k) > 0) || !capLive()) return '';
+  const sit = CAP.used.get(rec.root) || 0; let miss = 0;
+  CAP.lack.forEach((n, h) => { const hr = cells[h]; if (hr && hr.k === 'house' && capStoresFrom(hr).list.includes(rec.root)) miss += n; });
+  return ' (' + (sit + miss) + '세대 · ' + capOf(rec.k) + '세대까지 받아요' + (miss ? ' · ' + miss + '세대가 못 와요' : '') + ')'; }
+/* 돌아섬 말 — 까닭 목록의 '장보기'가 꽉 참 때문이면 "가게가 꽉 차서". 빈집(awayFull)도, 식구가 있는 집(full · 층 ②)도 */
+function capAwayFull(root, miss) { return !!(capLive() && miss.includes('장보기') && (CAP.awayFull.has(root) || CAP.full.has(root))); }
+function capAwayText(root, miss) { const full = capAwayFull(root, miss), far = full ? miss.filter(k => k !== '장보기') : miss;
+  return (far.length ? far.map(k => NEED_TXT[k]).join('·') + (full ? '이 멀고 ' : '이 멀어서') : '') + (full ? '가게가 꽉 차서' : ''); }
+{ hookAdd('awayLacks', function (next, args) { let [rec] = args; const base = next(args), R = window.VRULES.turnAway;
+    if (!rec || !capLive() || !R.on || !CAP.stats.한바퀴 || population() < R.graceBelow || (res.get(rec.root) || 0) > 0) return base;   // 돌아섬은 빈집 앞 이야기
+    if (base && base.includes('장보기')) { CAP.awayFull.delete(rec.root); return base; }                                        // 층 ① 멀어요가 먼저
+    const { list, free } = capStoresFrom(rec);
+    if (free || !list.length || list.some(s => capOf(cells[s].k) - (CAP.used.get(s) || 0) > 0)) { CAP.awayFull.delete(rec.root); return base; }
+    CAP.stats.돌아섬판정++; CAP.awayFull.add(rec.root); return (base || []).concat('장보기'); }); }
 window.__shopCap = () => { const 가게 = []; cells.forEach((rec, i) => { if (rec && rec.root === i && capOf(rec.k) > 0) 가게.push({ 자리: i, k: rec.k, 정원: capOf(rec.k), 앉음: CAP.used.get(i) || 0 }); });
   let 사는세대 = 0, 꽉찬세대 = 0; res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') 사는세대 += houseHold(root); }); CAP.lack.forEach(v => 꽉찬세대 += v);
   return { 켜짐: window.VRULES.shopCap.on, 돎: capLive() && capAny(), 가게, 사는세대, 꽉찬세대, '꽉찬%': 사는세대 ? Math.round(꽉찬세대 / 사는세대 * 1000) / 10 : 0,
