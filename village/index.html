@@ -306,6 +306,7 @@ const FREE = true;                               // 오픈 기념 무료 (2026-0
 const idx = (x, y) => y * W + x;
 const cX = i => i % W, cY = i => (i / W) | 0;
 const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
+const simRand = typeof window.__SIM_RAND === 'function' ? window.__SIM_RAND : () => Math.random();   /* [MAC-SIMRAND] 판정(사람 발길·드나듦·바람·이웃)만 쓰는 난수. 브라우저에선 Math.random 그대로. 시뮬(load.mjs)은 따로 시드한 줄기를 끼워, 그림·모형·three uuid 가 Math.random 을 몇 번 먹든 판정 값이 안 움직인다(보스 09-24 · #906·#918 거짓 FAIL) */
 const cells = new Array(W * H).fill(null);  // null 이거나 {k, root}
 /* 칸 (x,y) 의 한가운데 월드 좌표 */
 const wx = x => (x - (W - 1) / 2) * CS;
@@ -5562,10 +5563,10 @@ function pickDestination(f, who) {
   if (EV.fest && EV.festRoot >= 0) festPool = nice.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && c.root === EV.festRoot; }); });
   const pref = hourPref(simHour()), timely = pref ? errand.filter(i => needBeside(i) === pref) : [];   // 시간대별(F26)
-  const useTimely = !!(timely.length && !(festPool && festPool.length) && Math.random() < 0.85);
+  const useTimely = !!(timely.length && !(festPool && festPool.length) && simRand() < 0.85);
   if (pref) { destLog.후보 += timely.length ? 1 : 0; destLog.고름 += useTimely ? 1 : 0; destLog.전체++; }
-  const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : useTimely ? timely : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
-  let goal = pool[(Math.random() * pool.length) | 0];
+  const pool = (festPool && festPool.length && simRand() < 0.8) ? festPool : useTimely ? timely : (errand.length && simRand() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
+  let goal = pool[(simRand() * pool.length) | 0];
   if (f.visitor) { const g = visitorGoal(f, reach); if (g >= 0) goal = g; }
   /* [MAC-PATH] 손님이 돌아갈 때 visitorGoal 은 f.base 를 돌려주는데, 그 칸이 '남이 잡은 칸을 피한 탐색' 밖이면 prev 에 옛 탐색 찌꺼기가 남아 이웃하지 않은 칸을 잇는 경로가 나왔다(막다른 길 끝에서 이사 오는 사람과 영구 교착 → 이사가 끊김). 막힌 칸까지 넣어 다시 찾고, 그래도 없으면 잠깐 쉰다. */
   if (bfsSeen[goal] !== bfsGen) { ({ prev, reach } = roadBFS(here)); if (bfsSeen[goal] !== bfsGen) { f.state = 'idle'; f.until = simNow() + 900; return; } }
@@ -6080,7 +6081,7 @@ function tryEnter(f, i, cell) {
   const n = inside.get(b.root) || 0; if (n >= ENTER_MAX) return false;
   inside.set(b.root, n + 1);
   f.visits = f.visits || {}; f.visits[b.k] = (f.visits[b.k] || 0) + 1;   // 좋아하는 곳(F20)
-  f.inside = { root: b.root, until: simNow() + STAY_MIN + Math.random() * (STAY_MAX - STAY_MIN), cell };
+  f.inside = { root: b.root, until: simNow() + STAY_MIN + simRand() * (STAY_MAX - STAY_MIN), cell };
   f.state = 'inside'; f.walking = false; releaseAll(i);
   enterStats.들어감++;
   return true;
@@ -6089,7 +6090,7 @@ function leave(f, why) {
   const n = inside.get(f.inside.root) || 0; if (n <= 1) inside.delete(f.inside.root); else inside.set(f.inside.root, n - 1);
   const cell = f.inside.cell; f.inside = null;
   f.x = wx(cX(cell)); f.z = wz(cY(cell)); f.px = f.x; f.pz = f.z;
-  f.path = [cell]; f.step = 0; f.seg = 0; f.state = 'idle'; f.until = simNow() + 300 + Math.random() * 600;
+  f.path = [cell]; f.step = 0; f.seg = 0; f.state = 'idle'; f.until = simNow() + 300 + simRand() * 600;
   if (why === '쫓겨남') enterStats.쫓겨남++; else enterStats.나옴++;
 }
 
@@ -7179,9 +7180,9 @@ function wishTick() {
   const wishing = new Set(folks.filter(f => f.wish).map(f => f.home));            // 한 집에 바람 하나
   const cand = folks.filter(f => !f.visitor && !f.arriving && !f.wish && !wishing.has(f.home) && f.state !== 'inside' && sat.get(f.home) && NEEDS.some(k => !sat.get(f.home).met[k]));
   if (!cand.length) return;
-  const f = cand[(Math.random() * cand.length) | 0];
+  const f = cand[(simRand() * cand.length) | 0];
   const miss = NEEDS.filter(k => !sat.get(f.home).met[k]);
-  f.wish = { need: miss[(Math.random() * miss.length) | 0], at: now }; wishStats.나옴++;
+  f.wish = { need: miss[(simRand() * miss.length) | 0], at: now }; wishStats.나옴++;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -7660,7 +7661,7 @@ function neighborTick(now) {
   if (start < 0) return;
   const { reach } = roadBFS(start, undefined, 60); if (reach.length < 8) return;
   const b = reach[reach.length - 1];                                              // 길 먼 끝 = 마을 입구
-  folks.push({ home: b, ct: (Math.random() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
+  folks.push({ home: b, ct: (simRand() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
     x: wx(cX(b)), z: wz(cY(b)), px: wx(cX(b)), pz: wz(cY(b)), dir: 0, pdir: 0, path: [b], step: 0, seg: 0, state: 'idle', mx: 0, mz: 0, mt: 0 });
   folkPool.forEach(m => m.count = folks.length); neighborStats.옴++;
   simSay('🚶 이웃 마을 아이가 구경 왔어요', true);
@@ -7686,7 +7687,7 @@ function visitTick(now) {
 function visitorGoal(f, reach) {
   if (simNow() >= f.leaveAt) return f.base;               // 돌아갈 시간
   f.readTarget = null;
-  if (Math.random() < 0.5) {                              // 안 읽은 표지판·꿈나무가 있으면 절반은 그리로(F37)
+  if (simRand() < 0.5) {                              // 안 읽은 표지판·꿈나무가 있으면 절반은 그리로(F37)
     for (const i of reach) { const x = cX(i), y = cY(i);
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)];
         if (c && readable(c) && !f.read.has(c.root)) { f.readTarget = c.root; return i; } } }
@@ -7694,7 +7695,7 @@ function visitorGoal(f, reach) {
   const sights = reach.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && SIGHTS.has(c.k); }); });
   if (!sights.length) return -1;
-  const g = sights[(Math.random() * sights.length) | 0]; const b = buildingBeside(g); if (b && SIGHTS.has(b.k)) visitLikes[b.k] = (visitLikes[b.k] || 0) + 1;   // 손님이 좋아한 곳(50차)
+  const g = sights[(simRand() * sights.length) | 0]; const b = buildingBeside(g); if (b && SIGHTS.has(b.k)) visitLikes[b.k] = (visitLikes[b.k] || 0) + 1;   // 손님이 좋아한 곳(50차)
   return g;
 }
 const visitLikes = {};
@@ -8099,7 +8100,7 @@ function syncFolks() {
       home: rec.root, ct: (n % 4) + 1,
       x: front.x, z: front.z, dir: 0,
       path: null, step: 0, seg: 0,
-      state: 'idle', until: simNow() + Math.random() * 1500,
+      state: 'idle', until: simNow() + simRand() * 1500,
       px: front.x, pz: front.z, pdir: 0,
       base: -1, mx: front.x, mz: front.z, mt: Math.random() * 6.28
     });
@@ -8642,7 +8643,7 @@ function tickFolks(dt, now) {
         if (f.goal === 'school') { const sr = schoolNow(); if (sr >= 0 && buildingBeside(from) && buildingBeside(from).root === sr) { enterPlace(f, i, sr, from, 1e15); rhythmStats.등교++; continue; } }
         if (!f.visitor) { const bb = buildingBeside(from); if (bb && (K[bb.k].need || K[bb.k].jobs)) { f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; } }   // 닿기만 해도 센다 — 좋아하는 곳(F20, 51차)
         if (tryEnter(f, i, from)) continue;          // 볼 일 보러 들어간다(F10)
-        f.state = 'idle'; f.until = now + 400 + Math.random() * 900;   // 길 위에 서 있는 동안 그 칸을 막으므로 짧게
+        f.state = 'idle'; f.until = now + 400 + simRand() * 900;   // 길 위에 서 있는 동안 그 칸을 막으므로 짧게
         f.walking = false; f.path = [from]; f.step = 0; releaseAll(i); claim(from, i); continue; }
       /* 걷는 도중에 길이 뜯기면 그 자리에서 멈추고 다시 정한다 */
       if (!isRoad(to)) {
@@ -8660,7 +8661,7 @@ function tickFolks(dt, now) {
           f.blockedAt = 0;
           releaseAll(i); claim(from, i);
           f.path = [from]; f.step = 0; f.seg = 0;
-          f.state = 'idle'; f.until = now + 150 + Math.random() * 400;
+          f.state = 'idle'; f.until = now + 150 + simRand() * 400;
         }
         continue;
       }
@@ -9096,7 +9097,7 @@ function actRainTick(f, i, now) {
     rainSlots();   // [ACT-SHELTER] 같은 처마 밑 사람끼리 나란히 설 자리 · 칸마다 몇 명
     const wet = R.on && EV.rain && !isNightHour(simHour());
     if (wet) folks.forEach(g => { if (g.state === 'inside' && g.beside && g.beside.mode === 'sit' && !g.garden && !g.visitor) { leave(g, '나옴'); g.goal = null; g.beside = null; g.until = now; RAIN.stats.의자에서일어남++; } });
-    else folks.forEach(g => { if (!g.shelter || g.shelter.out) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + Math.random() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
+    else folks.forEach(g => { if (!g.shelter || g.shelter.out) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + simRand() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
   }
   const S = f.shelter;
   if (!R.on || !EV.rain || isNightHour(simHour())) return false;      // 흩어지기는 위(틱마다 한 번)에서
