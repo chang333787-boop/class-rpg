@@ -2636,7 +2636,7 @@ function updateGhost(clientX, clientY) {
     ok = !!rec;
     if (rec) { const d = dims(rec.k, rec.rot); w = d.w; h = d.h;
                const p = centerOf(rec.k, cX(rec.root), cY(rec.root), rec.rot); cx = p.x; cz = p.z; }
-    else { cx = wx(c.x); cz = wz(c.y); why = c.inside ? '여기엔 지울 게 없어요' : '판 밖이에요'; }
+    else { cx = wx(c.x); cz = wz(c.y); why = c.inside ? (erase1Hover(c) ? null : '여기엔 지울 게 없어요') : '판 밖이에요'; }   /* [MAC-ONEPRESS] 방금 치운 칸 위에서는 커서가 떠날 때까지 쉰다 */
   } else {
     const d = dims(sel, selRot); w = d.w; h = d.h;
     const v = canPlace(sel, c.x, c.y, selRot);
@@ -4000,24 +4000,24 @@ window.__growPause = (x, y) => { const R = { 켜짐: window.VRULES.growPause.on,
 
 /* ── [MAC-ONEPRESS] 한 번 누름 = 말 하나 · 확인 규칙 한 줄 · 물건을 누르면 그 물건 (창조자 25회 ⓐ4 · ⓑ52 · ⓑ50 · 보스 09-23) ──
    ⓐ4 빈 집을 치우기로 한 번 누르자 '집을 치웠어요'와 '여기엔 지울 게 없어요'가 같은 84ms 에 떴다(기본·sea·mountain).
-      재 보니 마우스(Playwright) · 터치 탭(hasTouch) · 앱 안 브라우저 클릭 셋 다 **이벤트 한 벌 · act 한 번 · 말 하나**였다 — 두 번 도는 길을 못 찾았다.
-      그래서 원인과 상관없이 **방금(0.5초 안) 치운 자리를 또 치우려 하면 말하지 않는다** — 치운 뒤 그 자리는 당연히 비어 있다.
-      막을 때마다 부른 곳(스택 첫 줄 셋)을 적어 둔다(`__onePress()`) — 다른 도구에서 다시 나면 원인이 남는다.
+      두 번 처리가 아니었다(창조자 25회 정정 #865): 뒤엣것은 **커서 옆 안내 풍선(#why)** — 치운 순간 커서 밑 칸이 비어 updateGhost 가 '지울 게 없어요'를 띄웠다.
+      그래서 **방금 치운 칸 위에서는 커서가 그 칸들을 떠날 때까지 풍선이 쉰다**(시간이 아니라 자리로). 떠났다 다시 오면 예전처럼 말한다.
+      누름 쪽(act)의 말은 그대로다 — 빈 칸을 **다시 누르면** '여기엔 지울 게 없어요'(한 번 누름 = 말 하나).
    ⓑ52 무엇을 한 번 더 묻나 — **사람이 사는 집 · 한 채뿐인 시설(special)만.** 나머지(빈 집·놀이터·가게·큰 물건)는 바로 치우고 ↩ 가 5초 빛난다.
       전에는 '빈 집은 바로, 빈 놀이터는 한 번 더'였다(2×2 이상·adv 도 물었다). 사람이 사는 집의 식구·층은 1분 맡아 둔다(MAC-KEEP 그대로).
       끌어서 치우기(MAC-SWEEP)는 **예전 무게**를 읽는다(keepOfSweep) — 끌면 작은 것만(길·꾸밈·빈 1층 집), 2×2 이상·adv·special·사는 집은 건너뛴다.
    ⓑ50 도구 없이 물건(등대·산장·전나무·바위 …)을 누르면 '놓을 물건을 먼저 고르세요'였다(빈 땅과 같은 말 → '안 눌렸다'로 읽혔다).
       이제 그 물건의 이름과 할 수 있는 일 한 줄. 빈 땅만 예전 말. 원래 줄 수정 4 · 끼운 줄 1. */
-(window.VRULES = window.VRULES || {}).onePress = { on: true, againMs: 500, oneRule: true, thingCard: true };
-const ERASE1 = { at: -1e9, cells: new Set(), stats: { 막음: 0, 부른곳: [] } };
+(window.VRULES = window.VRULES || {}).onePress = { on: true, oneRule: true, thingCard: true };
+const ERASE1 = { at: -1e9, cells: new Set(), stats: { 쉼: 0 } };
 function erase1Mark(k, x, y, rot) { ERASE1.at = performance.now(); ERASE1.cells = new Set(footprint(k, x, y, rot).map(([fx, fy]) => idx(fx, fy))); }
-function erase1Again(c) { const R = window.VRULES.onePress; if (!R.on || performance.now() - ERASE1.at > R.againMs || !ERASE1.cells.has(idx(c.x, c.y))) return false;
-  ERASE1.stats.막음++; const s = String(new Error().stack || '').split('\n').slice(2, 5).map(l => l.trim()).join(' ← '); ERASE1.stats.부른곳.push(s); if (ERASE1.stats.부른곳.length > 5) ERASE1.stats.부른곳.shift(); return true; }
+function erase1Hover(c) { const R = window.VRULES.onePress; if (!R.on || !ERASE1.cells.size) return false;
+  if (ERASE1.cells.has(idx(c.x, c.y))) { ERASE1.stats.쉼++; return true; } ERASE1.cells.clear(); return false; }   // 커서가 치운 칸들을 떠나면 끝 — 다시 오면 예전처럼 말한다
 /* 끌어서 치우기는 **예전 무게** 그대로(보스 09-23): 길을 쓸다가 가게·놀이터가 같이 사라지면 일자리·놀 곳이 한 번에 빠진다 — 까닭 모를 변화.
    한 줄로: "한 번 누르면 무엇이든 치운다(사는 집·하나뿐인 시설은 한 번 더 묻는다) · 끌면 작은 것만 치운다(길·꾸밈·빈 1층 집)." */
 function keepOfSweep(rec) { const R = window.VRULES.onePress, o = R && R.oneRule; if (R) R.oneRule = false; try { return keepOf(rec); } finally { if (R) R.oneRule = o; } }
 function thingSay(rec) { const k = K[rec.k] || {}; return (k.ic ? k.ic + ' ' : '') + (k.nm || rec.k) + ' — 🖐 로 옮기거나 🧽 로 치울 수 있어요 · 더 놓으려면 아래에서 카드를 골라요'; }
-window.__onePress = () => ({ ...window.VRULES.onePress, 막음: ERASE1.stats.막음, 부른곳: ERASE1.stats.부른곳.slice() });
+window.__onePress = () => ({ ...window.VRULES.onePress, 쉬는칸: ERASE1.cells.size, 쉼: ERASE1.stats.쉼 });
 function act(clientX, clientY) {
   const c = cellAt(clientX, clientY);
   if (!c) return;
@@ -4027,7 +4027,7 @@ function act(clientX, clientY) {
   if (eraser) {
     if (!c.inside) { toast('판 밖이에요'); return; }
     const rec = cells[idx(c.x, c.y)];
-    if (!rec) { if (!erase1Again(c)) toast('여기엔 지울 게 없어요'); return; }   /* [MAC-ONEPRESS] 방금 치운 자리를 곧바로 또 — 말하지 않는다 */
+    if (!rec) { toast('여기엔 지울 게 없어요'); return; }
     if (keepGuard(rec)) return;   // [MAC-KEEP] 무거운 것은 한 번 더 눌러야 치워진다
     const nm = K[rec.k].nm, rk = rec.k, rr = rec.rot, rx = cX(rec.root), ry = cY(rec.root), rh = (hinfo.get(rec.root) || {}).세대 | 0;   /* [MAC-HOUSEHOLD] 세대는 치우기 **전에** 적는다 — removeAt 이 hinfo 를 지운다 */
     removeAt(c.x, c.y);
