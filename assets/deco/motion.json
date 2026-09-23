@@ -160,7 +160,8 @@
    "colors": [
     "warm",
     "fire",
-    "moon"
+    "moon",
+    "magic"
    ],
    "when": "저녁·밤(색 막이 깔릴 때)",
    "on": {
@@ -199,6 +200,12 @@
      222,
      "fire",
      170
+    ],
+    "d_y13": [
+     52,
+     130,
+     "magic",
+     110
     ]
    },
    "_on": "id: [몸통 viewBox 안 x, y, 색, 지름]"
@@ -238,6 +245,37 @@
     1,
     3
    ]
+  },
+  "pool": {
+   "file": "light_pool.svg",
+   "colors": [
+    "warm",
+    "moon"
+   ],
+   "when": "저녁·밤(색 막이 깔릴 때) — 불빛 원보다 먼저, lighter 합성",
+   "_on": "id: [발밑 x, y(몸통 viewBox), 폭(viewBox 단위) — 높이는 폭의 .5]",
+   "on": {
+    "d_y6": [
+     50,
+     188,
+     280
+    ],
+    "d_y14": [
+     50,
+     188,
+     230
+    ]
+   }
+  },
+  "windows": {
+   "when": "저녁·밤 — 색 막을 깐 뒤 보통 합성으로(창이 밝게 남도록)",
+   "_on": "id: 몸통과 같은 viewBox 의 창 불빛 그림",
+   "on": {
+    "d_y28": "d_y28_night.svg",
+    "d_y33": "d_y33_night.svg",
+    "d_y34": "d_y34_night.svg",
+    "yard_house": "yard_house_night.svg"
+   }
   }
  }
 }

@@ -1,0 +1,4 @@
+<svg width="200" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300">
+<!-- d_y34_night 밤 창 불빛 — 창고 창 하나. 본 그림과 같은 viewBox 에 그대로 겹친다(투명 바탕). 밤 색 막을 깐 **뒤에** 보통 합성으로 그린다 · 2026-09-23 -->
+<defs><linearGradient id="pane" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1b8"/><stop offset=".55" stop-color="#ffd576"/><stop offset="1" stop-color="#f5a843"/></linearGradient><radialGradient id="halo"><stop offset=".35" stop-color="#ffd576" stop-opacity=".45"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient></defs><rect x="124.3" y="190.1" width="49.4" height="41.8" rx="13.0" fill="url(#halo)"/><rect x="136" y="200" width="26" height="22" rx="0" fill="url(#pane)"/><path d="M149.0,200 v22 M136,211.0 h26" stroke="#6b5238" stroke-width="2.0"/><rect x="136" y="200" width="26" height="22" rx="0" fill="none" stroke="#6b5238" stroke-width="2.1"/>
+</svg>

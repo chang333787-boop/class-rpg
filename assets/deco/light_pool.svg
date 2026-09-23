@@ -1,0 +1,4 @@
+<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+<!-- light_pool 땅 위 불빛 웅덩이 — 가로등·석등 발밑에 납작한 빛. 밤 색 막 뒤에 lighter 합성 권장. 색: #warm(기본) #moon -->
+<style>.a{stop-color:var(--a,#ffe29a)}.b{stop-color:var(--b,#f2a93b)}#moon:target~g{--a:#e6efff;--b:#7fa3e8}</style><g id="moon"/><g><defs><radialGradient id="p" cx=".5" cy=".5" r=".5"><stop offset="0" class="a" stop-opacity=".55"/><stop offset=".45" class="b" stop-opacity=".22"/><stop offset="1" class="b" stop-opacity="0"/></radialGradient></defs><ellipse cx="100" cy="50" rx="100" ry="50" fill="url(#p)"/></g>
+</svg>
