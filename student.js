@@ -8039,6 +8039,7 @@ function _decoStrokeApply(cell, st) {
   const inv = (CUR.inventory || []).find(i => i.id === SEL_DECO);
   if (!inv || inv.qty - placed.filter(p => p.id === SEL_DECO).length <= 0) { st.outOfStock = true; return false; }
   if (!canPlaceDeco(cell.r, cell.c, sz.w, sz.h, cell.area, null)) return false;
+  if (cell.area === 'yard' && _animAt(_ifActiveContainer || 'house-topview', cell.r, cell.c)) return false;   // [DECO-SEL-A5] 돌아다니는 동물 발밑에 놓지 않는다
   if (_decoRuleWhy(SEL_DECO, cell.area, cell.r, cell.c, sz.w, sz.h)) return false;   // [DECO-PT-2]
   if (cell.area === 'yard' && typeof ANIM_DECO !== 'undefined' && ANIM_DECO[SEL_DECO]
       && !_animGroundOk(SEL_DECO, CUR, cell.r, cell.c, sz.w, sz.h)) return false;
@@ -8092,10 +8093,11 @@ function _decoStrokeEnd(st) {
   if (!st || !st.active) return;
   decoUndoStroke(st.stroke);
   if (st.placed && SEL_DECO) _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
+  if (DECO_MODE !== 'floor' && SEL_DECO && _decoLeft(SEL_DECO) <= 0) { SEL_DECO = null; st.outOfStock = true; }   // [DECO-SEL-A5] 다 썼으면 내려놓기
   _drawDeco(); renderDecoInv();
   if (DECO_MODE === 'floor' && st.blocked && st.blocked.length) toast(_floorPaintWhy(st.blocked[0], CUR_FLOOR_TILE, st.blocked.length));   // [DECO-RULE-R1R2]
   if (DECO_MODE !== 'floor') {
-    if (st.placed && st.outOfStock) toast('✅ ' + st.placed + '개 놓았어요 — 이제 다 썼어요(상점에서 더 살 수 있어요)');   // [DECO-PT-1]
+    if (st.placed && st.outOfStock) toast('✅ ' + st.placed + '개 놓았어요 — 이제 다 썼어요(카드를 내려놓았어요)');   // [DECO-PT-1] · [DECO-SEL-A5]
     else if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
     else if (st.outOfStock) toast('가진 개수가 모자라요!');
   }
@@ -9472,7 +9474,8 @@ function _decoClick(e) {
     _decoLastTap = { area: 'yard', r, c, t: Date.now() };   // [DECO-DRAG-1]
     if(DECO_MODE==='floor') { _paintFloor(r,c); return; }
     // [DECO-ANIM-2] 카드를 안 고른 상태에서 동물을 누르면 반응(놓기가 먼저다)
-    if(!SEL_DECO && DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
+    //  [DECO-SEL-A5] 카드를 들었어도 — 보이는 동물을 누른 것은 쓰다듬기다(전엔 그 발밑에 하나가 더 놓였다 · 창조자 27회 ⓐ5)
+    if(DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
       const pet=_animAt(_ifActiveContainer||'house-topview', r, c);
       if(pet && _animPoke(pet, c)) return;
     }
@@ -9784,7 +9787,7 @@ function _decoPlace(area,row,col){
   } else if(existing){
     _decoRemoveOne(existing); return;   // [DECO-SPACE-1] 그 한 개만(다른 공간 같은 자리 것은 그대로)
   }
-  if(!SEL_DECO){ toast('먼저 아래 장식품을 선택해주세요!'); return; }
+  if(!SEL_DECO){ toast(_decoSelOffWhy() || '먼저 아래 장식품을 선택해주세요!'); return; }   // [DECO-SEL-A5]
   const d=GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
   if(!d) return;
   if(d.cat!==area){ toast(`이 장식은 ${d.cat==='yard'?'🌿 마당':'🏠 집 안'}에만 배치할 수 있어요!`); return; }
@@ -9802,8 +9805,11 @@ function _decoPlace(area,row,col){
   CUR.houseDecorations=[...placed,np];
   _decoUndoPush({ t: 'place', p: Object.assign({}, np) });   // [DECO-UNDO-1]
   _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
+  //  [DECO-SEL-A5] 마지막 하나를 놓았으면 카드를 내려놓는다 — 든 채로 두면 다음 누름(동물 쓰다듬기 등)이 '또 놓기'로 읽혔다
+  const out = _decoLeft(SEL_DECO) <= 0;
+  if (out) SEL_DECO = null;
   decoDirty(); _drawDeco(); renderDecoInv();   // [DECO-SAVE-1]
-  toast(`✅ ${d.icon} ${d.name} 배치!`);
+  toast(`✅ ${d.icon} ${d.name} 배치!` + (out ? ' — 다 놓았어요(카드를 내려놓았어요)' : ''));
 }
 
 function toggleDecoScene(){
@@ -10010,30 +10016,71 @@ function renderDecoInv(){
   _decoPillarSync();   // [DECO-THUMB-2] 서랍 키가 바뀌면 기둥도
 }
 
+//  [DECO-SEL-A5] 창 폭이 901px 을 넘나들면 최근 칩 ↔ 최근 줄을 바꿔 그린다
+if (typeof matchMedia === 'function') { try { matchMedia('(min-width:901px)').addEventListener('change', () => { if (_ifMode) renderDecoInv(); }); } catch (e) {} }
 //  최근 놓은 것 줄 — 지금 장소에 놓을 수 있고 아직 남은 것만. 비면 줄을 감춘다.
 function _decoRenderQuick(inv, placed) {
   const q = document.getElementById('if-deco-quick'); if (!q) return;
   const byId = {}; inv.forEach(i => { byId[i.id] = i; });
-  const cards = [];
+  const cards = [], ids = [];
   for (const id of _decoRecentGet()) {
     const i = byId[id]; const d = GAME_DATA.decorations.find(x => x.id === id);
     if (!i || !d || d.cat !== DECO_SCENE) continue;
     const avail = i.qty - placed.filter(p => p.id === id).length;
     if (avail <= 0) continue;
-    cards.push(_decoCardHtml(i, d, avail, DECO_SCENE));
+    cards.push(_decoCardHtml(i, d, avail, DECO_SCENE)); ids.push({ i, d, avail });
   }
-  q.hidden = !cards.length;
-  q.innerHTML = cards.length ? '<span class="deco-quick-label">🕘 최근</span>' + cards.join('') : '';
+  //  [DECO-SEL-A5] 머리줄이 한 줄인 넓은 화면(901px~)은 머리줄 안 칩으로 — 서랍 키가 안 변한다
+  const qh = document.getElementById('if-deco-quick-head');
+  const wide = !!qh && typeof matchMedia === 'function' && matchMedia('(min-width:901px)').matches;
+  if (qh) {
+    const chips = !wide ? [] : ids.map(({ i, d, avail }) => `<button class="deco-qchip${SEL_DECO === i.id ? ' is-sel' : ''}" data-deco-id="${i.id}" onclick="selectDeco('${i.id}')"`
+      + ` title="${escHtml(d.name)} ×${avail}" aria-label="최근 ${escHtml(d.name)} ${avail}개">${_decoThumb(d, 26)}<span>×${avail}</span></button>`);
+    qh.hidden = !chips.length;
+    qh.innerHTML = chips.length ? '<span class="deco-quick-label">🕘</span>' + chips.join('') : '';
+  }
+  q.hidden = wide || !cards.length;
+  q.innerHTML = !wide && cards.length ? '<span class="deco-quick-label">🕘 최근</span>' + cards.join('') : '';
 }
+
+// [DECO-SEL-A5] 고름 풀기 — 창조자 27회 ⓐ5 '쓰다듬으려다 또 놓임' · ⓑ59 '먼저 고르세요인데 방금 골랐음'
+//  카드는 ① 같은 카드 다시 누름 ② Escape ③ 마지막 하나를 놓음 ④ ×0 카드 누름 에서 내려놓는다.
+//  방금 내려놓았는데 판을 누르면(아이는 '또 놓으려고' 누른다) "먼저 고르세요" 대신 까닭을 말한다.
+let _decoSelOff = null;   // { id, t } — 마지막으로 내려놓은 카드와 때
+function _decoLeft(id) {
+  const iv = (CUR.inventory || []).find(x => x.id === id);
+  return iv ? iv.qty - (CUR.houseDecorations || []).filter(p => p.id === id).length : 0;
+}
+function _decoSelClear(say) {
+  if (!SEL_DECO) return;
+  const d = GAME_DATA.decorations.find(x => x.id === SEL_DECO);
+  _decoSelOff = { id: SEL_DECO, t: Date.now() };
+  SEL_DECO = null;
+  _drawDeco(); renderDecoInv();
+  if (say) toast(`${d ? d.icon + ' ' : ''}카드를 내려놓았어요 — 또 놓으려면 카드를 한 번 더 눌러요`);
+}
+function _decoSelOffWhy() {
+  const o = _decoSelOff;
+  if (!o || Date.now() - o.t > 10000) return '';
+  const d = GAME_DATA.decorations.find(x => x.id === o.id);
+  return `${d ? d.icon + ' ' + d.name + ' ' : ''}카드를 내려놓아서 놓지 않았어요 — 또 놓으려면 카드를 한 번 더 눌러요`;
+}
+if (typeof document !== 'undefined') document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !_ifMode || !SEL_DECO) return;
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;   // 찾기 칸의 Escape 는 그 칸 몫
+  _decoSelClear(true);
+});
 
 function selectDeco(id){
   //  [DECO-SHOP-BAG-1] 다 놓아서 ×0 인 카드 = 고르지 않고 놓인 그것을 보여 준다('산 게 없어졌다'로 보이지 않게)
   if (SEL_DECO !== id) {
     const iv = (CUR.inventory || []).find(x => x.id === id), n = (CUR.houseDecorations || []).filter(p => p.id === id).length;
-    if (iv && n > 0 && iv.qty - n <= 0) { _decoFlashPlaced(id); return; }
+    if (iv && n > 0 && iv.qty - n <= 0) { if (SEL_DECO) _decoSelClear(); _decoFlashPlaced(id); return; }   // [DECO-SEL-A5] 든 카드도 내려놓는다
   }
   if (DECO_MODE === 'erase') { setDecoMode('deco'); ifSyncModeBtn(); }   // [DECO-PT-2]
-  SEL_DECO=(SEL_DECO===id)?null:id;
+  if (SEL_DECO === id) { _decoSelClear(true); return; }   // [DECO-SEL-A5] 같은 카드를 다시 누름 = 내려놓기(말로 알린다)
+  SEL_DECO=id;
+  _decoSelOff = null;
   _drawDeco(); renderDecoInv();
   if(SEL_DECO){
     const d=GAME_DATA.decorations.find(x=>x.id===id);

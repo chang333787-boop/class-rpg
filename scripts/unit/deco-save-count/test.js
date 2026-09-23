@@ -1303,6 +1303,42 @@
       if (CUR.yardFloors) delete CUR.yardFloors[3];
       CUR_FLOOR_TILE = 'grass'; setDecoMode('deco'); _decoUndoClear(); decoSpaceSet(1); await sleep(150);
     }
+
+    //  ㉙ 고름 풀기(DECO-SEL-A5 · 창조자 27회 ⓐ5) — 다 놓으면 · ×0 카드 · 다시 누름(까닭을 말함) · Escape · 카드를 든 채 동물 누름 = 쓰다듬기
+    if (typeof _decoSelClear === 'function') {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const placedN = id => (CUR.houseDecorations || []).filter(p => p.id === id).length;
+      CUR.inventory = (CUR.inventory || []).filter(i => !/^d_y(2|54)$/.test(i.id)).concat([{ id: 'd_y2', qty: placedN('d_y2') + 3 }, { id: 'd_y54', qty: placedN('d_y54') + 1 }]);
+      setDecoMode('deco'); _decoUndoClear(); renderDecoInv();
+      const last = () => [...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent;
+      selectDeco('d_y54'); _decoPlace('yard', 12, 12);
+      out('고름_다놓으면_내려놓기', SEL_DECO === null && /다 놓았어요/.test(last()));
+      selectDeco('d_y2'); selectDeco('d_y54');                               // 든 카드가 있는데 ×0 카드를 누름
+      out('고름_×0카드_누르면_풀림', SEL_DECO === null);
+      selectDeco('d_y2'); selectDeco('d_y2');
+      out('고름_다시누름_말로', SEL_DECO === null && /내려놓았어요/.test(last()));
+      _decoPlace('yard', 14, 8);
+      out('고름_방금풀었으면_까닭', /내려놓아서 놓지 않았어요/.test(last()) && !_decoList(CUR).some(p => p.id === 'd_y2' && p.row === 14));
+      selectDeco('d_y2'); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      out('고름_Escape', !_ifMode || SEL_DECO === null);
+      //  카드를 든 채 보이는 동물을 누르면 — 그 발밑에 놓지 않는다(쓰다듬기)
+      _drawDeco(); await sleep(300);
+      const rec = _animLayers.get(_ifActiveContainer || 'house-topview'), cat = rec && [...rec.items.values()].find(s => s.id === 'd_y54');
+      if (cat) {
+        const n0 = placedN('d_y2'), cv = _dCv.getBoundingClientRect();
+        selectDeco('d_y2'); _dSuppressClick = false;
+        _decoClick({ clientX: cv.left + ((cat.cur.col + .5) * _dC - _dPanX) * cv.width / _dW, clientY: cv.top + ((cat.cur.row + .5) * _dC - _dPanY) * cv.height / _dH });
+        out('고름_든채_동물누름_안놓임', placedN('d_y2') === n0 && SEL_DECO === 'd_y2');
+      } else out('고름_든채_동물누름_안놓임', '동물층없음(건너뜀)');
+      //  좁은 화면(이 하네스 창)은 최근 '줄' — 머리줄 칩은 넓은 화면(901px~)에서만
+      out('고름_좁은화면_최근칩숨김', innerWidth >= 901 || document.getElementById('if-deco-quick-head').hidden);
+      _decoSelClear(); _decoSelOff = null;
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _decoUndoClear(); decoSpaceSet(1); await sleep(150);
+    }
     done();
   })().catch(e => { out('ERR', String(e && e.stack || e).slice(0, 300)); done(); });
   function done() { R.log.push('걸린시간_초=' + Math.round((Date.now() - t0) / 1000)); const pre = document.createElement('pre'); pre.id = 'rf-out'; pre.textContent = R.log.join('\n'); document.body.appendChild(pre); document.title = 'RF_DONE';

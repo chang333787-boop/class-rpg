@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260920mcv">
+<link rel="stylesheet" href="./student.css?v=20260923mc4">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -793,6 +793,8 @@
           <button id="if-deco-search-clear" onclick="decoFindSet('q','');document.getElementById('if-deco-search').value=''"
             aria-label="지우기" hidden>✕</button>
         </div>
+        <!-- [DECO-SEL-A5] 넓은 화면: 최근 놓은 것은 머리줄 안 작은 칩으로 — 따로 한 줄이 생기면 마당이 76px 줄어 아래를 누르면 서랍이었다 -->
+        <div id="if-deco-quick-head" class="deco-quick-head" role="group" aria-label="최근 놓은 것" hidden></div>
         <button id="if-deco-scene-only" class="deco-chip is-on" onclick="decoFindSet('sceneOnly')"
           aria-pressed="true">이 장소만</button>
         <span id="if-deco-gold" class="deco-gold" aria-label="가진 골드">💰 0G</span>
@@ -926,7 +928,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260923mc3"></script>
+<script src="./student.js?v=20260923mc4"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
