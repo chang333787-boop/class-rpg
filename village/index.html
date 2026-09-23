@@ -11958,6 +11958,28 @@ function stageCardBoot() { if (!STAGE.def || VISIT_SID || (STAGE.def.교과 == n
   setTimeout(go, 600); }
 window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
+/* ── [ACT-STAGERESET] [↺ 처음부터] — 수업 판마다 (수업 흐름 #841 L1 · 보스 09-23) ──
+   되돌리는 길이 마을 둘인 판(proto-flow 의 왼쪽 단추 줄)에만 있었다. town3·farm 에서는 Ctrl+Z 를 여러 번 누르거나 주소에 #fresh 를 붙여야 했는데,
+   #fresh 는 '빈 판'이라 준비된 시작 땅이 안 실린다(창조자 14회 ⓑ6). 이제 **수업 판(교과 칸)이거나 시작 저장본이 있는 판**이면 왼쪽 아래(트레이 곁)에 단추 하나.
+   누르면 한 번 묻고 → 이 판의 저장본과 판 카드 기록을 지우고 → 다시 연다(시작 저장본이 있으면 그것이, 없으면 빈 땅이 실린다 — proto-flow 의 단추와 같은 일).
+   모형 화면이 있는 판(pmapLive)은 제 단추 줄에 이미 있어 겹쳐 두지 않는다. 구경 중·기본 판·자유 놀이 판(교과 없음 · 시작 없음)엔 없다. 사진 찍을 때는 숨는다.
+   판정·저장 형식 0 — 지우는 것은 그 판의 저장 키(rpg.village.<sid>.<판>) 하나와 카드 기록 하나뿐이다. 분류 '조작'. */
+(window.VRULES = window.VRULES || {}).stageReset = { on: true };
+const SRESET = { el: null, stats: { 보임: 0, 누름: 0, 되돌림: 0 } };
+const sresetLive = () => !!(window.VRULES.stageReset.on && STAGE.def && !VISIT_SID && (STAGE.def.교과 != null || STAGE.def.시작) && !(typeof pmapLive === 'function' && pmapLive()));
+function stageResetGo() { SRESET.stats.누름++;
+  if (!confirm(STAGE.def.시작 ? '이 판을 처음 상태로 되돌릴까요? 지금까지 바꾼 것은 사라져요.' : '이 판을 처음(빈 땅)으로 되돌릴까요? 지금까지 놓은 것은 사라져요.')) return;
+  SRESET.stats.되돌림++;
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(scardKey()); } catch (e) {}   /* 판 카드도 다시 뜨게 — '처음부터'니까 */
+  location.replace(location.pathname + location.search); }
+function stageResetBoot() { if (SRESET.el || !sresetLive()) return;
+  const st = document.createElement('style'); st.textContent = '#stageReset{position:fixed;left:10px;bottom:14px;z-index:6;background:#232833e8;color:#e9edf5;border:1px solid #39404f;border-radius:10px;min-height:44px;padding:0 14px;font:800 14px/1 "Malgun Gothic",sans-serif;cursor:pointer}'
+    + '@media (max-width:700px){#stageReset{bottom:auto;top:64px}}body.photo #stageReset{display:none!important}';
+  document.head.appendChild(st);
+  const el = document.createElement('button'); el.id = 'stageReset'; el.type = 'button'; el.textContent = '↺ 처음부터'; el.title = '이 판을 처음 상태로 되돌려요';
+  el.onclick = stageResetGo; document.body.appendChild(el); SRESET.el = el; SRESET.stats.보임++; }
+setTimeout(stageResetBoot, 700);   /* 판 규칙(protoMap 등)이 얹힌 뒤 */
+window.__stageReset = () => ({ 켜짐: window.VRULES.stageReset.on, 쓸수있나: sresetLive(), 보임: !!SRESET.el, 시작땅: !!(STAGE.def && STAGE.def.시작), ...SRESET.stats });
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
 if (STAGE.def) { if (window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardBoot(); else if (STAGE.def.질문) toast('🔎 ' + STAGE.def.질문, true); } else if (STAGE.err) toast('판을 못 열었어요 — ' + STAGE.err + ' · 기본 규칙으로 열어요', false);   // [MAC-STAGE] 판 시작 한 줄(C1)
 
