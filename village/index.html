@@ -3472,7 +3472,7 @@ window.__flowAt = (x, y) => { const rec = cells[idx(x, y)]; if (!rec) return '�
    · 끊긴 밭을 누르면 **몇 칸만 이으면 닿는지**(일자리 cut 과 같은 꼴 · 창조자 12회 ⓑ2).
    · 흐름이 꺼진 판(기본 마을)에서는 개수가 0 이라 **그리지 않는다** — draw call 도 안 는다.
    끄면(VRULES.flowLook.on = false) 아무것도 안 보인다(흐름 셈은 그대로 돈다). 원래 줄 수정 0. */
-(window.VRULES = window.VRULES || {}).flowLook = { on: true, every: 30, 높이: 5.2, 크기: 2.6, 수레: true };   /* 수레 = [MAC-FLOWCART] — false 면 옛 곧은 선 아이콘 */
+(window.VRULES = window.VRULES || {}).flowLook = { on: true, every: 30, 높이: 5.2, 크기: 2.6, 수레: true, 끄는사람: true, pull: 3.0 };   /* 수레 = [MAC-FLOWCART] — false 면 옛 곧은 선 아이콘 */
 const FLOWLOOK_ICON = { 더미: '📦', 가득: '📦', 끊김: '⚠️', 있음: '🧺', 빈: '🫙', 짐: '🎒' };
 const flowIconMesh = (icon, 크기, cap) => { const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d'); g.font = '46px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
@@ -3532,7 +3532,7 @@ function fcartPath(j) {
     for (let i = end; i >= 0; i = prev.get(i)) path.push(i); path.reverse(); }
   FCART.길.set(key, { gen: FLOW.gen, path }); return path; }
 function fcartMesh() {
-  const all = cartParts(); if (FCART.mesh && FCART.parts === all) return FCART.mesh;
+  const all = cartParts(); if (FCART.mesh && FCART.parts === all && FCART.pp === PERSON_PARTS) return FCART.mesh;   /* 사람 모델(glb)이 늦게 오면 다시 굽는다 */
   if (FCART.mesh) { scene.remove(FCART.mesh); FCART.mesh.geometry.dispose(); }
   const parts = all.filter(pt => !pt.n && pt.p[1] + pt.s[1] / 2 <= 2.4);   /* 등불 기둥·팔·등불(높이 2.4 위)은 뺀다 */
   const pos = [], nrm = [], col = [], ix = [];
@@ -3540,6 +3540,16 @@ function fcartMesh() {
     for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); pos.push(cartV.x, cartV.y, cartV.z);
       cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); nrm.push(cartV.x, cartV.y, cartV.z); col.push(cartC.r, cartC.g, cartC.b); }
     for (let t = 0; t < base.idx.length; t++) ix.push(base.idx[t] + off); });
+  /* [ACT-CARTPULL] 끄는 이웃 — 창조자 25회 ⓑ54 '유령 수레'(손잡이 앞에 사람이 없다). 셈 속 주민을 붙이면 사람이 막힐 때 그림이 거짓말을 한다(#754 · 23회) —
+     그래서 **수레 모양 안에 끄는 사람을 함께 굽는다**: 짐과 같은 시계로 수레와 한 몸으로 가고, 막히지 않고, draw call 도 그대로다.
+     사람 모양은 마을 사람과 같은 것(glb 면 재료별 기하 · 아니면 상자 부위) · 옷은 일터 색(문 밖 일꾼과 같은 파랑) · 손잡이 앞(+z · pull)에 앞을 보고 선다. */
+  const R2 = window.VRULES.flowLook, PC = { top: 0x4f7fa0, skin: 0xf1c7a3, hair: 0x3a2a1e };
+  if (R2.끄는사람 !== false) PERSON_PARTS.forEach(pt => { const base = pt.geo ? { pos: pt.geo.attributes.position.array, nrm: pt.geo.attributes.normal.array, idx: pt.geo.index ? pt.geo.index.array : Array.from({ length: pt.geo.attributes.position.count }, (_, k) => k), nv: pt.geo.attributes.position.count } : BASE[pt.g];
+      if (!base) return; cartPartMatrix({ p: [pt.p[0], pt.p[1], pt.p[2] + (R2.pull || 3.0)], s: pt.s, ry: pt.ry || 0 }, cartP); cartN.getNormalMatrix(cartP); cartC.setHex(typeof pt.c === 'number' ? pt.c : (PC[pt.c] || 0x888888)); const off = pos.length / 3;
+      for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); pos.push(cartV.x, cartV.y, cartV.z);
+        cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); nrm.push(cartV.x, cartV.y, cartV.z); col.push(cartC.r, cartC.g, cartC.b); }
+      for (let t = 0; t < base.idx.length; t++) ix.push(base.idx[t] + off); });
+  FCART.pp = PERSON_PARTS;
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(ix);
   FCART.mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 8); FCART.mesh.count = 0; FCART.mesh.frustumCulled = false; FCART.mesh.castShadow = true; scene.add(FCART.mesh); FCART.parts = all;
   return FCART.mesh; }
@@ -3559,7 +3569,7 @@ function flowCartDraw() {
 { const ft = flowTick; flowTick = function () { const n0 = FLOW.stats.닿음, r = ft.apply(this, arguments);
     if (FLOW.stats.닿음 !== n0 && fcartOn() && fsOn()) { fsTick(); FCART.stats.닿는틱에다시합침++; } return r; }; }
 window.__flowCart = () => ({ 켜짐: fcartOn(), 짐: FLOW.짐.map(j => { const p = fcartPath(j), 전체 = Math.max(1, j.처음 || 1);
-    return { 밭: [cX(j.밭), cY(j.밭)], 가게: [cX(j.가게), cY(j.가게)], 길칸: p.length, 간것: +(1 - j.남은 / 전체).toFixed(2), 남은틱: j.남은 }; }), ...FCART.stats });
+    return { 끄는사람: window.VRULES.flowLook.끄는사람 !== false, 밭: [cX(j.밭), cY(j.밭)], 가게: [cX(j.가게), cY(j.가게)], 길칸: p.length, 간것: +(1 - j.남은 / 전체).toFixed(2), 남은틱: j.남은 }; }), ...FCART.stats });
 /* 끊긴 밭이 몇 칸만 이으면 가게에 닿나 — 일자리 cut(jobsCutCost)과 같은 꼴(ⓑ2) */
 function flowCutCost(rec, budget) {
   const cost = new Map(); let now = [], next = [];
