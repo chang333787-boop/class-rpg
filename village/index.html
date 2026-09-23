@@ -10638,14 +10638,17 @@ if (STAGE.id) {
    · 칠하기(paintBoard 감싸기): 열린 구역 안의 지형 칸만 색을 바꾼다(구역 테두리째 — 바다를 가로지르는 풀 줄이 없게 · 물은 물가 한 칸을 옅게). **지형이 없는 판은 한 줄도 안 돈다**(캔버스 그대로).
    사람은 원래 길로만 다니니, 물에 길을 못 놓으면 다니는 길이 해안을 따라 생긴다. 새 VRULES `terrain`(rules.json '조작') · 시험 훅 `__terrain`·`__boardHash`. */
 (window.VRULES = window.VRULES || {}).terrain = { on: true };
-const TERR = { def: null, map: new Map(), stats: { 칸: 0, 막음: 0, 칠함: 0 } };
-const TERR_COL = { 물: '#5fa3c8', 물가: '#8cc3dc', 모래: '#efe0b6' };
-const TERR_ON = { 물: new Set(['pier']) };                        // 물 칸에 올라설 수 있는 것
+const TERR = { def: null, map: new Map(), sdef: null, streams: new Set(), allow: 0, stats: { 칸: 0, 막음: 0, 칠함: 0, 개울: 0, 개울깖: 0, 개울지킴: 0 } };
+const TERR_NAMES = ['물', '모래', '비탈', '고개'];
+const TERR_COL = { 물: '#4a9fd0', 물가: '#7ccbe8', 모래: '#f0dfb0', 비탈: '#6f8052', 비탈결: '#63734a', 고개: '#b39a70' };   // 물빛은 개울(#906)과 한 가족 — 디자인 담당 09-23
+const TERR_ON = { 물: new Set(['pier']),                           // 그 바닥에 올라설 수 있는 것(적힌 것만)
+  비탈: new Set(['tree', 'bigtree', 'bush', 'flower', 'pot', 'fir', 'rock', 'boulder', 'bench', 'minibench', 'lamp', 'post', 'cabin']), 고개: new Set(['road', 'gravel']) };
 const TERR_NOT = { 모래: new Set(['field']) };                     // 모래 칸에 못 놓는 것
-const TERR_WHY = { 물: '🌊 바다에는 지을 수 없어요 — 부두는 물가에 놓아요', 모래: '🏖️ 모래밭에는 밭을 일굴 수 없어요', 부두: '🪵 부두는 물가에 — 바다에 걸치게 놓아요' };
+const TERR_WHY = { 물: '🌊 바다에는 지을 수 없어요 — 부두는 물가에 놓아요', 모래: '🏖️ 모래밭에는 밭을 일굴 수 없어요', 부두: '🪵 부두는 물가에 — 바다에 걸치게 놓아요',
+  비탈: '⛰️ 비탈에는 큰 건물을 지을 수 없어요 — 평평한 곳을 찾아요', 고개: '🛤️ 고갯길에는 길만 낼 수 있어요', 개울: '💧 이 개울은 산에서 흘러와요 — 치우거나 옮길 수 없어요 · 곧은 곳에 길을 놓으면 다리가 돼요' };
 function terrainMap() { const d = STAGE.def && STAGE.def.지형; if (TERR.def === d) return TERR.map; TERR.def = d; TERR.map = new Map();
   const L = d && Array.isArray(d.칸) ? d.칸 : [];
-  L.forEach(r => { if (!Array.isArray(r) || r.length !== 5 || !TERR_COL[r[4]]) return; const [x0, y0, x1, y1] = r.slice(0, 4).map(v => v | 0), nm = r[4];
+  L.forEach(r => { if (!Array.isArray(r) || r.length !== 5 || !TERR_NAMES.includes(r[4])) return; const [x0, y0, x1, y1] = r.slice(0, 4).map(v => v | 0), nm = r[4];
     for (let y = Math.max(0, Math.min(y0, y1)); y <= Math.min(H - 1, Math.max(y0, y1)); y++) for (let x = Math.max(0, Math.min(x0, x1)); x <= Math.min(W - 1, Math.max(x0, x1)); x++) TERR.map.set(idx(x, y), nm); });
   TERR.stats.칸 = TERR.map.size; return TERR.map; }
 const terrainLive = () => !!(window.VRULES.terrain.on && STAGE.def && STAGE.def.지형 && terrainMap().size);
@@ -10661,10 +10664,32 @@ function terrainWhy(kind, grounds) {
 { const pb0 = paintBoard; paintBoard = function () { pb0.apply(this, arguments); if (!terrainLive()) return;
     const g = boardCv.getContext('2d'), px = BOARD_PX, m = TERR.map; let n = 0;
     m.forEach((nm, i) => { const x = cX(i), y = cY(i); if (!plots.has(((x / PLOT) | 0) + ',' + ((y / PLOT) | 0))) return;
-      let c = TERR_COL[nm]; if (nm === '물' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(x + dx, y + dy) && m.get(idx(x + dx, y + dy)) !== '물')) c = TERR_COL.물가;   // 판 끝은 물가가 아니다
+      let c = nm === '비탈' && (x + y) % 3 === 0 ? TERR_COL.비탈결 : TERR_COL[nm]; if (nm === '물' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(x + dx, y + dy) && m.get(idx(x + dx, y + dy)) !== '물')) c = TERR_COL.물가;   // 판 끝은 물가가 아니다
       g.fillStyle = c; g.fillRect(x * px, (H - 1 - y) * px, px, px); n++; });
     TERR.stats.칠함 = n; boardTex.needsUpdate = true; }; }
-window.__terrain = (x, y) => ({ 켜짐: terrainLive(), ...TERR.stats, ...(x != null ? { 바닥: groundAt(x, y) } : {}) });
+/* [MAC-TERRAIN] 판이 그린 개울 — `지형.개울: [[x0, y0, x1, y1], …]`(곧은 줄 · 이어 그려 굽힘). 개울은 **물건**(`stream` · #885)이라 다리·길찾기·모습(#906)이 그대로 돈다.
+   · 판을 열 때(저장본을 되살린 **뒤**) 빈 칸에 깐다 — 처음 길이 지나는 칸은 곧게 흐르면 **다리**로 바꾼다. 저장본에 이미 있으면 아무것도 안 한다.
+   · 못 치운다: 🧽 치우기(한 번 누름·메뉴)·끌어 치우기·🖐 옮기기·돌리기에서 막고 까닭을 말한다(눌렀을 때 말 thingSay 도)(아이가 **그린** 개울은 지금처럼 치움).
+     removeAt 도 막는다(다리 놓기 · 판 비우기(VISIT.busy)만 통과) — 막히면 false. 곧은 곳에 길을 놓으면 다리, 다리를 치우면 개울로 돌아온다(#885 그대로). */
+function terrainStreams() { const d = STAGE.def && STAGE.def.지형, L = d && Array.isArray(d.개울) ? d.개울 : null; if (TERR.sdef === L) return TERR.streams; TERR.sdef = L; TERR.streams = new Set();
+  (L || []).forEach(r => { if (!Array.isArray(r) || r.length !== 4) return; const [x0, y0, x1, y1] = r.map(v => v | 0); if (x0 !== x1 && y0 !== y1) return;
+    for (let y = Math.max(0, Math.min(y0, y1)); y <= Math.min(H - 1, Math.max(y0, y1)); y++) for (let x = Math.max(0, Math.min(x0, x1)); x <= Math.min(W - 1, Math.max(x0, x1)); x++) TERR.streams.add(idx(x, y)); });
+  TERR.stats.개울 = TERR.streams.size; return TERR.streams; }
+const terrainFixed = rec => !!(rec && rec.k === 'stream' && window.VRULES.terrain.on && !TERR.allow && terrainStreams().has(rec.root));
+function terrainStreamLay() { if (!window.VRULES.terrain.on || VISIT.on || !K.stream || !K.sbr) return 0; const F = terrainStreams(); if (!F.size) return 0; const roads = []; let n = 0;
+  F.forEach(i => { const c = cells[i]; if (!c) { placeAt('stream', cX(i), cY(i), 0); n++; } else if (c.k === 'road' && c.root === i) roads.push(i); });
+  roads.forEach(i => { const x = cX(i), y = cY(i), ax = streamAxis(x, y); if (ax < 0) return; removeAt(x, y); placeAt('sbr', x, y, ax); n++; });   // 처음 길이 개울을 건너는 칸 = 다리
+  TERR.stats.개울깖 += n; if (n) markDirty(); return n; }
+{ hookAdd('removeAt', function (next, args) { const [x, y] = args; if (inb(x, y) && !VISIT.busy && terrainFixed(cells[idx(x, y)])) { TERR.stats.개울지킴++; return false; } return next(args); });
+  hookAdd('placeAt', function (next, args) { const [kind, x, y] = args; if (kind !== 'road' || !inb(x, y) || !terrainStreams().has(idx(x, y))) return next(args);
+    TERR.allow++; try { return next(args); } finally { TERR.allow--; } });   // 다리 놓기(#885 가 개울을 치우고 다리를 놓는다)
+  const say = () => { TERR.stats.개울지킴++; toast(TERR_WHY.개울); };
+  const kg0 = keepGuard; keepGuard = function (rec) { if (terrainFixed(rec)) { say(); return true; } return kg0.apply(this, arguments); };
+  const pu0 = pickUp; pickUp = function (cx, cy) { const c = cellAt(cx, cy); if (c && c.inside && terrainFixed(cells[idx(c.x, c.y)])) { say(); return false; } return pu0.apply(this, arguments); };
+  const sc0 = sweepCell; sweepCell = function (x, y) { if (inb(x, y) && terrainFixed(cells[idx(x, y)])) return; return sc0.apply(this, arguments); };
+  const hr0 = holdRotate; holdRotate = function () { const o = HOLD.open; if (o && terrainFixed(cells[o.root])) { say(); return; } return hr0.apply(this, arguments); };
+  const ts0 = thingSay; thingSay = function (rec) { return terrainFixed(rec) ? TERR_WHY.개울 : ts0.apply(this, arguments); }; }   // 눌렀을 때 말도 '옮기거나 치울 수 있어요'가 아니게
+window.__terrain = (x, y) => ({ 켜짐: terrainLive(), ...TERR.stats, ...(x != null ? { 바닥: groundAt(x, y), 판개울: terrainStreams().has(idx(x, y)) } : {}) });
 window.__boardHash = () => { const d = boardCv.getContext('2d').getImageData(0, 0, boardCv.width, boardCv.height).data; let h = 2166136261; for (let i = 0; i < d.length; i++) { h ^= d[i]; h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
 if (terrainLive()) paintBoard();
 window.__stage = () => ({ id: STAGE.id, 이름: STAGE.def && STAGE.def.이름, 오류: STAGE.err, 저장키: SAVE_KEY, 원격: !!window.VillageSync,
@@ -11251,6 +11276,7 @@ else if (hash.indexOf('adv') >= 0) {
 }
 if (!STORAGE_OK) { startInfo += ' · 이 창은 저장을 못 받음(미리보기 등)'; setTimeout(noteNoStorage, 400); }
 window.__START = startInfo;
+terrainStreamLay();   // [MAC-TERRAIN] 판이 그린 개울 — 저장본을 되살린 뒤 빈 칸에만
 if (window.VRULES.fresh.on && /모르는 저장본 버전/.test(startInfo)) freshGuardNewer('열 때');   // [MAC-FRESH] 더 새 형식의 저장본 — 기본 판으로 덮어쓰지 않는다
 setTimeout(() => freshCheck(true), 1500); setInterval(() => freshCheck(false), window.VRULES.fresh.everyMs); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && performance.now() - FRESH.checkedAt > 60000) freshCheck(false); });   // [MAC-FRESH]
 window.__fresh = () => ({ 켜짐: window.VRULES.fresh.on, 꺼진까닭: FRESH.off, 꼬리표: FRESH.tag, 문서시각: document.lastModified, 더새저장본: FRESH.newer || null, 저장끔: savingOff, ...FRESH.stats }); window.__freshCheck = boot => freshCheck(!!boot);
