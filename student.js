@@ -4957,6 +4957,19 @@ function _inRoomAt(r, c, student) {
 }
 //  벽걸이가 걸리는 줄인가 — 판 맨 윗줄(큰 방의 벽) 또는 어느 방의 윗줄
 function _inIsWallRow(r, c) { if (r === 0) return true; const h = _inRoomAt(r, c); return !!(h && !h.band && h.rm.r === r); }
+//  [DECO-RULE-R3] (r,c,w,h) 가 방 벽을 가로지르나 — 칸마다 '어느 방 안인가'(벽 띠·빈 터는 '밖')가 하나여야 한다.
+//  반은 방 안·반은 빈 터(또는 옆 방)면 벽이 가구를 가른다.
+function _inCrossesWall(r, c, w, h, rooms) {
+  if (!rooms.length) return false;
+  let zone = null;
+  for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) {
+    const rr = r + dr, cc = c + dc;
+    const rm = rooms.find(o => rr >= o.r && rr < o.r + o.h && cc >= o.c && cc < o.c + o.w);
+    const z = rm ? rm.id : '-';
+    if (zone === null) zone = z; else if (z !== zone) return true;
+  }
+  return false;
+}
 //  새 방을 놓아도 되나 — 안 되면 아이 말
 function _inRoomWhy(rooms, nr, skipId) {
   if (nr.w < ROOM_MIN[0] || nr.h < ROOM_MIN[1]) return `방은 가로 ${ROOM_MIN[0]}칸 · 세로 ${ROOM_MIN[1]}칸보다 커야 해요`;
@@ -4964,6 +4977,11 @@ function _inRoomWhy(rooms, nr, skipId) {
   const others = rooms.filter(o => o.id !== skipId);
   if (others.length >= ROOM_MAX_N) return `방은 ${ROOM_MAX_N}개까지 만들 수 있어요`;
   if (others.some(o => _inRoomOverlap(o, nr))) return '다른 방과 겹쳐요 — 방 사이에 벽 한 줄이 필요해요';
+  //  [DECO-RULE-R3] 벽이 이미 놓인 가구를 가르면 — 가구를 옮기지 않는다(아이 것은 그 자리) · 네모를 옮기게 말한다
+  const next = others.concat([Object.assign({ id: '~' }, nr)]);
+  const cut = _decoList(CUR).find(p => p.area === 'indoor' && !_isWallDeco(p.id)
+    && _inCrossesWall(p.row, p.col, getDecoSize(p.id).w, getDecoSize(p.id).h, next));
+  if (cut) { const d = GAME_DATA.decorations.find(x => x.id === cut.id); return `벽이 ${d ? d.icon + ' ' + d.name : '가구'}${_josa(d ? d.name : '가구', '을', '를')} 가르게 돼요 — 네모를 조금 옮겨 보세요`; }
   return '';
 }
 //  네모(r0,c0)~(r1,c1) → 판 안으로 자른 방(맨 윗줄은 벽 띠가 들어갈 자리가 필요 없다 — 판 위 여백이 벽이다)
@@ -5289,6 +5307,8 @@ function _decoRuleWhy(id, area, r, c, w, h) {
       if (fl[(r + dr) + '_' + (c + dc)] === 'water') return '🌊 물 위에는 놓을 수 없어요 — 물가 풀밭에 놓아 보세요';
   }
   if (area === 'indoor' && DECO_WALL[id] && !_inIsWallRow(r, c)) return '🖼️ 벽에 거는 거예요 — 위쪽 벽(맨 윗줄이나 방의 윗벽)을 눌러 걸어 주세요';
+  //  [DECO-RULE-R3] 가구가 방 벽을 가로지르면(반은 방 안·반은 밖) 안 놓는다
+  if (area === 'indoor' && !DECO_WALL[id] && _inCrossesWall(r, c, w, h, _inRooms(CUR))) return '🧱 벽에 걸려요 — 방 안이나 밖에 다 들어가게 놓아 주세요';
   return '';
 }
 
