@@ -10124,6 +10124,14 @@ window.__shopCap = () => { const 가게 = []; cells.forEach((rec, i) => { if (re
   let 사는세대 = 0, 꽉찬세대 = 0; res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') 사는세대 += houseLived(root); }); CAP.lack.forEach(v => 꽉찬세대 += v);
   return { 켜짐: window.VRULES.shopCap.on, 돎: capLive() && capAny(), 가게, 사는세대, 꽉찬세대, '꽉찬%': 사는세대 ? Math.round(꽉찬세대 / 사는세대 * 1000) / 10 : 0,
     꽉찬집: CAP.full.size, 앉은집: CAP.asg.size, 모자란집: CAP.lack.size, ...CAP.stats }; };
+/* ── [MAC-EMPTYCARD] 빈 집은 웃지 않는다 (창조자 23회 ⓑ43 · 보스 09-23) ──
+   satText 는 식구를 안 보고 필요만 세서, 주민 0 인 아파트가 "😊 4세대 · 다 있어요 · 나무가 많아 좋아요"라고 했다.
+   아이가 집을 누르는 길(act)은 식구가 0 이면 이미 '빈집이에요 · …'로 갈라 이 말을 안 부르지만, 시험 훅(__houseText)·붐빔 조각 보기(__crowdSeg)는
+   satText 를 그대로 부른다 — **한 집이 두 말을 하지 않게** 여기서도 누를 때와 같은 말을 한다(말은 act 의 그 줄과 같다).
+   맨 바깥 고리다(satText 고리 셋 — 도서관·붐빔·꾸미기 — 뒤에 둔다) → 빈 집에는 꾸미기·붐빔 한 줄도 안 붙는다. 원래 줄 수정 0. */
+{ hookAdd('satText', function (next, args) { const [rec] = args;
+    if (rec && rec.k === 'house' && !((res.get(rec.root) || 0) > 0)) { const why = moveInWhy(rec); return '빈집이에요 · ' + (why === true ? '곧 누가 걸어올 거예요' : why); }
+    return next(args); }); }
 function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된 뒤
   const def = STAGE.def; if (!def) return;
   if (def.흐름 && typeof def.흐름 === 'object' && window.VRULES.flow) {   /* [MAC-FLOW] 판이 흐름을 켠다(규칙 칸과 따로 — 판정이 아니라 '물건') */
