@@ -51,8 +51,8 @@ else {
 let 끈판 = 0;
 /* [MAC-SHOPCAP] ㉮ 조건부 판정 — 그 판에서 한 줄도 안 도는 규칙은 켜진 판정으로 세지 않는다(보스 09-23 · 설계 5-나).
    수용량(shopCap)은 **정원이 적힌 장보기 건물이 그 판에 있을 때만** 돈다 — 기본 shop 에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대) */
-const 조건부 = { flowGrow: def => !!(def.흐름 && def.흐름.on),   /* [MAC-FLOWGROW] 흐름이 켜진 판에서만 돈다 */
-  shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need === '장보기' && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
+const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need === '장보기' && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))) };
+조건부.flowGrow = def => !!(def.흐름 && def.흐름.on);   /* [MAC-FLOWGROW] 흐름이 켜진 판에서만 돈다 */
 const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
 const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
