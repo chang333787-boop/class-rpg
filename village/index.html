@@ -3311,7 +3311,7 @@ function flowTick() {
       if (h && h.날 === 오늘) return;
       const rec = cells[root]; if (!rec) return;
       if (capFlowSkip(root)) { FLOW.집.delete(root); return; }   /* [MAC-SHOPCAP] 꽉 찬 집은 흐름을 안 탄다 — 까닭은 한 집에 하나 */
-      const 몫 = Math.max(1, R.세대몫 | 0 || 1) * houseHold(root); let 받음 = false;   /* [MAC-HOUSEHOLD] 한 칸에 여러 세대가 살면 그만큼 쓴다 — 여기가 새 관계의 본체다 */
+      const 몫 = Math.max(1, R.세대몫 | 0 || 1) * houseLived(root); let 받음 = false;   /* [MAC-HOUSEHOLD] 한 칸에 여러 세대가 살면 그만큼 쓴다 — 여기가 새 관계의 본체다 */
       for (const s of capFlowStores(root, flowStoresFrom(rec))) { const st = flowStore(s.root);   /* [MAC-SHOPCAP] 정원 있는 가게는 앉은 집만 */
         if (st.양 >= 몫) { st.양 -= 몫; 받음 = true; break; } }
       FLOW.집.set(root, { 날: 오늘, 받음 }); 받음 ? FLOW.stats.씀++ : FLOW.stats.못씀++; }); } }
@@ -5220,6 +5220,9 @@ const houseLv = root => (hinfo.get(root) || {}).lv || 1;
    판 파일이 `건물정의` 에 `세대: 4` 를 적는다 — `jobs`·`cap` 과 같은 **건물 값**이라 판정 규칙 수가 안 는다. */
 const HOME_PER = 2;                               // 한 세대의 식구 수(= HOUSE_CAPS[1])
 const houseHold = root => Math.max(1, (hinfo.get(root) || {}).세대 | 0 || 1);   // 이 집에 몇 세대가 사나(보통 집은 1)
+/* [MAC-LIVED] **사는** 세대 — 빈 방은 장을 안 본다(보스 09-23 · #815 뒤). 한 명만 든 아파트가 4세대 몫을 쓰면 '보이는 것(사람 다섯)과 세는 것(16세대)'이 갈린다.
+   = min(세대, ceil(식구 / 2)). 보통 집은 식구가 있으면 늘 1 이라 **한 줄도 안 달라진다**. 흐름 소비와 가게 자리가 같은 잣대를 쓴다. */
+const houseLived = root => { const n = res.get(root) || 0; return n > 0 ? Math.min(houseHold(root), Math.ceil(n / HOME_PER)) : 0; };
 const houseCap = root => { const hh = (hinfo.get(root) || {}).세대 | 0; return hh > 1 ? hh * HOME_PER : HOUSE_CAPS[houseLv(root)]; };
 /* 저장할 때 — 세대가 붙은 집 가운데 `res` 에 없어 빠진 것을 채운다(빈 아파트).
    **보통 집은 한 채도 더하지 않는다** — 그래야 보통 집 마을의 저장본이 예전과 한 글자도 안 달라진다(통과 기준 ①). */
@@ -9421,7 +9424,7 @@ function actFlowTick(f, i, now) {
      설계(#797 ③)에서 내가 댄 보증이다: 여섯이 사는 집이 넷을 쓴다는 것을 아이가 **수를 안 읽고 문에서 세어** 본다.
      세는 것은 프로그램이 한다 — `window.FLOW(집 root)` 가 'got' 인 날만, 하루에 세대 수만큼. 보통 집은 한 줄도 안 달라진다(지금처럼 가게에서 들고 나온다). */
   if (!f.flowHold && !f.flowTrip && !f.flowBuy && f.state === 'inside' && f.inside && f.inside.root === f.home && !isNightHour(h)) {
-    const hh = houseHold(f.home);
+    const hh = houseLived(f.home);   /* [MAC-LIVED] 받은 몫(사는 세대)만큼만 — 둘이 사는 아파트가 1몫 받고 장바구니 4개가 되지 않게. 사는 세대 1 이면 아래 갈래를 안 타고 보통 집처럼 가게에서 들고 나온다 */
     if (hh > 1 && flowActState(f.home) === 'got') {
       const day = simDay(); let c = FACT.집날.get(f.home);
       if (!c || c.day !== day) { c = { day, n: 0 }; FACT.집날.set(f.home, c); }
@@ -9999,7 +10002,7 @@ function capStoresFrom(rec) { const b = roadsBeside(rec), list = []; let free = 
       const c = cells[idx(nx, ny)]; if (!c || seen.has(c.root)) continue; const kk = K[c.k]; if (kk.need !== '장보기' && kk.need2 !== '장보기') continue;
       seen.add(c.root); if (capOf(c.k) > 0) list.push(c.root); else free = true; } }
   return { list, free }; }
-function capHouseStep(rec) { const h = rec.root, need = (res.get(h) || 0) > 0 ? houseHold(h) : 0;
+function capHouseStep(rec) { const h = rec.root, need = houseLived(h);   /* [MAC-LIVED] 사는 세대만 자리를 찾는다 */
   if (!need) { capRelease(h); return; }                                   // 빈 집은 자리를 안 차지한다(설계 4절 ⑧)
   const { list, free } = capStoresFrom(rec);
   if (free || !list.length) { capRelease(h); return; }                    // 정원 없는 가게가 닿으면 자리가 필요 없다 · 아무 가게도 안 닿으면 층 ①(멀어요)
@@ -10068,7 +10071,7 @@ function capAwayText(root, miss) { const full = capAwayFull(root, miss), far = f
     if (free || !list.length || list.some(s => capOf(cells[s].k) - (CAP.used.get(s) || 0) > 0)) { CAP.awayFull.delete(rec.root); return base; }
     CAP.stats.돌아섬판정++; CAP.awayFull.add(rec.root); return (base || []).concat('장보기'); }); }
 window.__shopCap = () => { const 가게 = []; cells.forEach((rec, i) => { if (rec && rec.root === i && capOf(rec.k) > 0) 가게.push({ 자리: i, k: rec.k, 정원: capOf(rec.k), 앉음: CAP.used.get(i) || 0 }); });
-  let 사는세대 = 0, 꽉찬세대 = 0; res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') 사는세대 += houseHold(root); }); CAP.lack.forEach(v => 꽉찬세대 += v);
+  let 사는세대 = 0, 꽉찬세대 = 0; res.forEach((n, root) => { if (n > 0 && cells[root] && cells[root].k === 'house') 사는세대 += houseLived(root); }); CAP.lack.forEach(v => 꽉찬세대 += v);
   return { 켜짐: window.VRULES.shopCap.on, 돎: capLive() && capAny(), 가게, 사는세대, 꽉찬세대, '꽉찬%': 사는세대 ? Math.round(꽉찬세대 / 사는세대 * 1000) / 10 : 0,
     꽉찬집: CAP.full.size, 앉은집: CAP.asg.size, 모자란집: CAP.lack.size, ...CAP.stats }; };
 /* ── [MAC-EMPTYCARD] 빈 집은 웃지 않는다 (창조자 23회 ⓑ43 · 보스 09-23) ──
