@@ -11,7 +11,7 @@ export const F30_PASS = {
   문밖일꾼: { 최소: 1, 표본: 5 },      // 문 밖 일꾼 ≥ 1 이 5번 이상 — 8시 실측 11/30 (9시부터라 8시 전에 열면 드물다)
   멈칫평균: 0.5,                       // 붐빔 멈칫 평균 ≤ 0.5 — pop88 은 낮 내내 3(원본은 길 폭이 인구에 맞아야 한다)
 };
-/* 키 큰 것 위에 서도 되는 곳 — 사람이 들어가 머무는 자리(놀이터·정자·광장·벤치) */
+/* 부위 안에 서도 되는 곳 — 사람이 들어가 머무는 자리(놀이터·정자·광장·벤치). 부위 안인가는 index.html 의 __folkPos 가 몸 높이 부위 상자로 가린다 */
 const PASS_OK = new Set(['play', 'pavilion', 'plaza', 'bench', 'minibench', 'green', 'fountain', 'garden']);
 
 const has = (w, h) => typeof w[h] === 'function';

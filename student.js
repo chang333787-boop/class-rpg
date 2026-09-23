@@ -8024,6 +8024,8 @@ function _decoStrokeApply(cell, st) {
       st.stroke.push({ t: 'floor', key, prev: cur }); delete fm[key];
     } else {
       if (cur === CUR_FLOOR_TILE) return false;
+      const blk = _floorPaintBlock(cell.r, cell.c, CUR_FLOOR_TILE);   // [DECO-RULE-R1R2] 그 칸은 건너뛰고 끝에 한 번 말한다
+      if (blk) { st.blocked = st.blocked || []; if (st.blocked.indexOf(blk) < 0) st.blocked.push(blk); return false; }
       st.stroke.push({ t: 'floor', key, prev: cur }); fm[key] = CUR_FLOOR_TILE;
     }
     decoDirty();
@@ -8091,6 +8093,7 @@ function _decoStrokeEnd(st) {
   decoUndoStroke(st.stroke);
   if (st.placed && SEL_DECO) _decoRecentAdd(SEL_DECO);   // [DECO-FIND-1]
   _drawDeco(); renderDecoInv();
+  if (DECO_MODE === 'floor' && st.blocked && st.blocked.length) toast(_floorPaintWhy(st.blocked[0], CUR_FLOOR_TILE, st.blocked.length));   // [DECO-RULE-R1R2]
   if (DECO_MODE !== 'floor') {
     if (st.placed && st.outOfStock) toast('✅ ' + st.placed + '개 놓았어요 — 이제 다 썼어요(상점에서 더 살 수 있어요)');   // [DECO-PT-1]
     else if (st.placed) toast('✅ ' + st.placed + '개 놓았어요');
@@ -8150,13 +8153,16 @@ function _decoRectCommit(st) {
   _decoRectPrev = null; _decoRectTip();
   if (!p || !st.active) { _drawDeco(); return 0; }
   const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
-  let n = 0;
+  let n = 0; const blocked = [];
   for (let r = p.r0; r <= p.r1; r++) for (let c = p.c0; c <= p.c1; c++) {
     if (_isHC(r, c) || _isFarmCell(r, c)) continue;
     const key = r + '_' + c, cur = fm[key];
     if (cur === CUR_FLOOR_TILE) continue;
+    const blk = _floorPaintBlock(r, c, CUR_FLOOR_TILE);   // [DECO-RULE-R1R2]
+    if (blk) { if (blocked.indexOf(blk) < 0) blocked.push(blk); continue; }
     st.stroke.push({ t: 'floor', key, prev: cur }); fm[key] = CUR_FLOOR_TILE; n++;
   }
+  if (blocked.length) toast(_floorPaintWhy(blocked[0], CUR_FLOOR_TILE, blocked.length));
   decoUndoStroke(st.stroke);
   if (st.stroke.length) decoDirty();
   _drawDeco();
@@ -9630,9 +9636,34 @@ if (typeof document !== 'undefined') {
   });
 }
 
+// [DECO-RULE-R1R2] 바닥을 칠할 때도 놓을 때의 규칙을 지킨다 — 그 칸에 놓인 것이 새 바닥에 설 수 없으면 그 칸은 안 칠한다.
+//  (전엔 물 규칙을 놓을 때만 봐서, 나무를 놓고 발밑을 물로 칠하면 연못 한가운데 나무 · 닭 발밑을 물로 칠하면 물 위에 선 닭이 됐다)
+//  · 동물은 그 동물이 다니는 바닥(ANIM_DECO.ground) · 그 밖은 물만 안 된다(갈대·징검돌 DECO_WATER_OK 는 된다) — _decoRuleWhy·_animGroundOk 와 같은 잣대.
+//  · 잔디로 되돌리기(지우기)는 누구나 설 수 있어 막지 않는다. 막히는 칸을 되돌리기 줄에 남기지 않는다.
+function _floorPaintBlock(r, c, v) {
+  const kind = _groundKind(_floorParse(v || 'grass').name);
+  for (const p of _decoList(CUR)) {
+    if (p.area !== 'yard') continue;
+    const z = getDecoSize(p.id);
+    if (r < p.row || r >= p.row + z.h || c < p.col || c >= p.col + z.w) continue;
+    const a = typeof ANIM_DECO !== 'undefined' && ANIM_DECO[p.id];
+    if (a ? a.ground.indexOf(kind) < 0 : (kind === 'water' && !DECO_WATER_OK[p.id])) return p;
+  }
+  return null;
+}
+function _floorPaintWhy(p, v, n) {
+  const d = GAME_DATA.decorations.find(x => x.id === p.id), nm = d ? d.icon + ' ' + d.name : '장식';
+  const water = _groundKind(_floorParse(v).name) === 'water';
+  return (water ? '🌊 ' : '🐾 ') + (n > 1 ? `${nm} 등 ${n}개가 있는 칸은` : `${nm}${_josa(d ? d.name : '장식', '이', '가')} 있는 칸은`)
+    + ` ${water ? '물로' : '그 바닥으로'} 못 칠해요 — 먼저 옮겨 주세요`;
+}
+
 function _paintFloor(r, c, stroke) {
   const fm = _yardFloorMap(CUR);   // [DECO-SPACE-1]
   const key = r+'_'+c;
+  const nextV = fm[key] === CUR_FLOOR_TILE ? undefined : CUR_FLOOR_TILE;   // 같은 타일이면 잔디로
+  const blk = nextV !== undefined && _floorPaintBlock(r, c, nextV);   // [DECO-RULE-R1R2]
+  if (blk) { toast(_floorPaintWhy(blk, nextV, 1)); return; }
   const undoRec = { t: 'floor', key, prev: fm[key] };   // [DECO-UNDO-1]
   if (stroke) stroke.push(undoRec); else _decoUndoPush(undoRec);
   if(fm[key] === CUR_FLOOR_TILE) {
