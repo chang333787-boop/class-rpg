@@ -1549,6 +1549,7 @@
         await petDog(); await sleep(600);
         const f2 = friend(), last = [...document.querySelectorAll('.toast-msg')].map(e => e.textContent).join(' ');
         out('친해지기_다음날_+1_단계알림', !!f2 && f2.h === 3 && /알아봄/.test(last) && (_lifeGet(CUR).g.sticker || 0) >= 1 && _lifeGet(CUR).p >= 1);
+        out('친해지기_단계알림_볼곳', /선물 상자에서 봐요/.test(last));
       } finally { _lifeDay = od; }
       //  [DECO-LIFE-2] 카드 — 누르면 뜬다 · 이름 고르기(칩) = 잎 쓰기 1 · 통째 저장 0 · 판을 누르면 닫힘 · Escape
       if (typeof _lifeCardOpen === 'function') {
@@ -1567,6 +1568,10 @@
         out('카드_판누르면_닫힘', !_lifeCard && !document.querySelector('.deco-life-card'));
         await petDog(); await sleep(200); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
         out('카드_Escape_닫힘', !_lifeCard);
+        //  [DECO-LIFE-4] 같은 날 또 쓰다듬으면 한 줄(ⓑ97) · 이름을 지었으면 알림도 이름으로(ⓑ99)
+        await petDog(); await sleep(200);
+        out('카드_같은날_또_한줄', /오늘은 벌써 쓰다듬었어요/.test((document.querySelector('.deco-life-card') || {}).textContent || ''));
+        _lifeCardClose();
       }
       //  [DECO-LIFE-3] 작은 선물 — 4단계 닭은 매일 · 누르면 받음 = 잎 쓰기 1 · 통째 0 · 선물 상자 · 친구 구경엔 없음
       if (typeof _lifeGiftTake === 'function') {
@@ -1580,6 +1585,7 @@
         const w2 = _lifeWrites; saves = 0; sets = 0;
         if (gift()) gift().click(); await sleep(900);
         const L2 = _lifeGet(CUR);
+        out('선물_알림_누가줬나', /닭이 준 선물/.test([...document.querySelectorAll('.toast-msg')].map(e => e.textContent).join(' ')));
         out('선물_받기_잎쓰기1_통째0', { egg: L2.g.egg, 잎: _lifeWrites - w2, saveStudent: saves, sdkSet: sets, 맞나: L2.g.egg === egg0 + 1 && L2.a.a90.gd === t0 && _lifeWrites - w2 === 1 && saves === 0 && sets === 0 });
         _drawDeco(); await sleep(300);
         out('선물_받으면_없어짐', !gift());
