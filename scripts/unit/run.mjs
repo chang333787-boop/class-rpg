@@ -38,6 +38,8 @@ const SPACE_PRELUDE = (S) => 'let DECO_SPACE = 1;' + NL + ['_decoSpaceOf', '_dec
   .map(n => sliceFn(S, n)).join(NL) + NL;
 
 //  [DECO-BUNDLE-1] 그림 묶음 로더 — 모래상자엔 fetch 가 없어 늘 낱장 주소로 간다(기존 기대값 그대로)
+//  [DECO-LOOK-0] 마당 모습 표 + 해석기(YARD_LOOK_BASE ~ _yardPhase) — 계절 · 때를 읽는 그리기 함수가 쓴다(_seaNow 가 있어야 한다)
+const LOOK_PRELUDE = (S) => { const a = S.indexOf('const YARD_LOOK_BASE'), b = S.indexOf('\n', S.indexOf('function _yardPhase(')); if (a < 0 || b < 0) throw new Error('YARD_LOOKS 표를 못 찾음'); return S.slice(a, b) + '\n'; };
 const ART_PRELUDE = (S) => sliceConst(S, 'ART_BUNDLE_URL') + sliceConst(S, '_ART') + ['_artStart', '_artSrc', '_artHas'].map(n => sliceFn(S, n)).join(NL) + NL;
 
 function sliceFn(src, name) {
@@ -1298,8 +1300,8 @@ try {
   if (eAt < 0 || eEnd < 0) throw new Error('_FLOOR_EDGE_COLOR 표를 못 찾음');
   vm.runInContext(ART_PRELUDE(S) + 'const _FLOOR_IMG = {};' + NL + S.slice(vAt, vEnd + 2) + NL + S.slice(at, end + 3) + NL
     + sliceConst(S, '_FLOOR_BED_COLORS') + sliceConst(S, '_FLOOR_RIMS') + S.slice(eAt, eEnd + 4) + NL
-    + ['_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_floorPaint', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
-    + 'const _SVG_BMP = new Map();' + NL
+    + ['_seaNow', '_seaHash', '_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_floorPaint', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
+    + LOOK_PRELUDE(S) + 'const _SVG_BMP = new Map();' + NL
     + ';globalThis.__R = { _FLOOR_IMG, _FLOOR_VARIANTS, _FLOOR_COLORS, _FLOOR_BED_COLORS, _FLOOR_RIMS, _FLOOR_EDGE_COLOR, _floorImg, _floorIsGrass, _drawFloorSVG };', sb);
   const R = sb.__R, DIR = path.join(ROOT, 'assets', 'floor');
   const GARDEN = Object.keys(R._FLOOR_COLORS);
@@ -1417,6 +1419,57 @@ try {
   test("물려받은 이름('constructor')은 꽃밭이 아니다", () => eq(R._FLOOR_EDGE_COLOR.constructor, undefined));
 } catch (e) {
   test('정원 바닥 색 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+//  [DECO-LOOK-0] 마당 모습 표 — 계절 넷 줄 · 여름 = 바탕 · 겨울만 눈 · 줄에 때가 박혀 있으면 실제 시각보다 먼저(별빛은 밤 고정)
+cur = '꾸미기 마당 모습 표(DECO-LOOK-0)';
+try {
+  const S = read('student.js'), sb = { __sea: 'summer', __ph: 'day' };
+  vm.createContext(sb);
+  vm.runInContext('function _seaNow() { return globalThis.__sea; }' + NL + 'function _decoPhase() { return globalThis.__ph; }' + NL + LOOK_PRELUDE(S)
+    + ';globalThis.__L = { YARD_LOOKS, YARD_LOOK_BASE, _yardLook, _yardPhase };', sb);
+  const L = sb.__L;
+  test('계절 넷 줄 · season 칸 = 제 이름', () => ['spring', 'summer', 'autumn', 'winter'].forEach(k => eq(L.YARD_LOOKS[k].season, k, k)));
+  test('여름 줄 = 바탕(막 · 흩뿌림 · 눈 · 조각 없음 · 그림자 · 집 밑 땅 · 밭 모래는 기본값)', () => {
+    const su = L.YARD_LOOKS.summer;
+    eq([su.film, su.scatter, su.snow, su.groundFrag, su.waterFrag, su.bedWinter, su.ground, su.groundBg], ['', null, false, '', '', false, 'grass', '']);
+    eq([su.shadow, su.houseGround, su.farmSand.join(',')], ['rgba(30,52,14,.30)', 'grass', '#c8a855,#b89545']);
+  });
+  test('겨울만 눈 · 꽃밭 겨울잠 · 얼음 물 · 눈 바탕', () => ['spring', 'summer', 'autumn'].forEach(k => {
+    const r = L.YARD_LOOKS[k]; eq([r.snow, r.bedWinter, r.waterFrag, r.ground], [false, false, '', 'grass'], k);
+  }) || eq((w => [w.snow, w.bedWinter, w.waterFrag, w.ground, w.groundBg])(L.YARD_LOOKS.winter), [true, true, 'winter', 'snow', '#eef3f8']));
+  test('봄 · 가을만 막과 흩뿌림(봄 = 벚나무 꽃잎 · 가을 = 잎 나무 일곱 낙엽)', () => {
+    eq([L.YARD_LOOKS.spring.scatter.name, L.YARD_LOOKS.spring.scatter.trees], ['season_petals_', ['d_y12']]);
+    eq([L.YARD_LOOKS.autumn.scatter.name, L.YARD_LOOKS.autumn.scatter.trees.length], ['season_leaves_', 7]);
+    eq([!!L.YARD_LOOKS.spring.film, !!L.YARD_LOOKS.autumn.film, !!L.YARD_LOOKS.winter.film], [true, true, false]);
+  });
+  test('해석기: 계절대로 줄 · 모르는 계절은 여름', () => {
+    sb.__sea = 'autumn'; eq(L._yardLook(1), L.YARD_LOOKS.autumn);
+    sb.__sea = '?'; eq(L._yardLook(1), L.YARD_LOOKS.summer); sb.__sea = 'summer';
+  });
+  test('줄은 고정 객체(부를 때마다 새로 만들지 않는다 — 칸마다 부르는 길)', () => eq(L._yardLook(1) === L._yardLook(2), true));
+  test('별빛 줄: 계절 없음(여름 그림) · 남색 땅 · 풀 번짐·밑동 풀·물·헤엄 #star · 남색 그림자 · 눈·막·흩뿌림 없음', () => {
+    const st = L.YARD_LOOKS.star;
+    eq([st.season, st.ground, st.groundFrag, st.waterFrag, st.swimFrag, st.shadow], ['summer', 'star', 'star', 'star', 'star', 'rgba(8,10,34,.4)']);
+    eq([st.snow, st.film, st.scatter, st.bedWinter], [false, '', null, false]);
+  });
+  test('개발 스위치 ?look= — 놀이판(__PLAY + play-deco-none)에서만 · 다른 프로젝트 · 모르는 값은 무시(계절 줄)', () => {
+    const run = (win, pid, search) => { sb.window = win; sb.firebase = { app: () => ({ options: { projectId: pid } }) }; sb.location = { search }; sb.URLSearchParams = URLSearchParams;
+      vm.runInContext('_yardLookDev = null;', sb); const r = L._yardLook(1); delete sb.window; delete sb.firebase; delete sb.location; vm.runInContext('_yardLookDev = null;', sb); return r; };
+    sb.__sea = 'autumn';
+    eq(run({ __PLAY: {} }, 'play-deco-none', '?look=star'), L.YARD_LOOKS.star);
+    eq(run({}, 'play-deco-none', '?look=star'), L.YARD_LOOKS.autumn);                 // 놀이판 표지 없음
+    eq(run({ __PLAY: {} }, 'class-rpg-prod', '?look=star'), L.YARD_LOOKS.autumn);      // 다른 프로젝트
+    eq(run({ __PLAY: {} }, 'play-deco-none', '?look=moon'), L.YARD_LOOKS.autumn);      // 모르는 줄
+    eq(run({ __PLAY: {} }, 'play-deco-none', '?look=constructor'), L.YARD_LOOKS.autumn); // 물려받은 이름
+    sb.__sea = 'summer';
+  });
+  test('때: 줄에 없으면 실제 시각 · 줄에 박혀 있으면 그것(별빛 = 밤 고정)', () => {
+    sb.__ph = 'evening'; eq(L._yardPhase(1), 'evening');
+    L.YARD_LOOKS.summer.phase = 'night'; eq(L._yardPhase(1), 'night'); L.YARD_LOOKS.summer.phase = ''; sb.__ph = 'day';
+  });
+} catch (e) {
+  test('마당 모습 표 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 //  [DECO-FLOOR-PICK-1] 바닥 고르기 — 저장값은 `_floorJoin` 한 곳. 지우개 판정이 글자 그대로 비교하므로 한 조합 = 한 글자여야 한다.
