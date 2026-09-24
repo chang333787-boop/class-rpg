@@ -118,7 +118,7 @@ async function child(spec) {
   setRules(w, spec.rules);
   if (spec.first30 != null) { const { first30Child } = await import('./first30.mjs'); return first30Child(w, spec); }   // [ACT-FIRST30] 첫 30초 탐지기
   const ticks = [], samples = []; let tick = 0;
-  const run = n => { const r = w.__tickBench(n); ticks.push(r.틱최대ms); tick += n; };
+  const run = n => { const r = w.__tickBench(n); ticks.push(r.틱평균ms != null ? r.틱평균ms : r.틱최대ms); tick += n; };   // [MAC-SIMCLOCK] 모듈 안 벽시계는 멈춤 — 진짜 시계로 잰 묶음 평균
   const sample = () => { const s = w.__sim(); samples.push({ tick, 일: s.일, 시: s.시, m: measure(w) }); };
   run(spec.warm);
   sample();
@@ -254,7 +254,7 @@ function report(o, vars, res) {
       const t = rs.map(top3), same = t.filter(x => x === t[0]).length;
       L.push(`- 가장 많은 셋(동네·바람): ${t[0] || '—'} — 시드 ${same}/${t.length} 에서 같음`); });
   }
-  const tm = res.map(r => r.틱최대ms); L.push('', `틱 최대 ${r1(Math.max(...tm))}ms (node · 가짜 그림 포함 · 브라우저와 다름)`);
+  const tm = res.map(r => r.틱최대ms); L.push('', `틱 시간 ${r1(Math.max(...tm))}ms — 가장 느린 묶음의 한 틱 평균 (node · 가짜 그림 포함 · 브라우저와 다름)`);
   return L.join('\n');
 }
 
