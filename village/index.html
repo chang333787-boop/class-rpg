@@ -6414,7 +6414,7 @@ window.__stroll = () => { const byRoot = {}; folks.forEach(f => { if (f.state ==
    · 표시: 아픈 날 밖에 있는 동안 머리 위 🤒(판 전체 maxShow 명까지) · 의원에서 나오면 💊 pillMs 동안. 🤒·💊 는 전용 판 둘(없으면 개수 0 = draw call 0).
    · 의원이 없거나 길로 안 닿으면: 🤒 만 띄우고 그날은 못 간다(집 카드 말 '🏥 아플 때 갈 곳이 멀어요'는 엔진 몫).
    · 수업 판(교과 있음)에선 안 돈다(산책·귀가와 같은 틀 · stages.mjs 조건부 표). **판에 의원이 하나도 없으면 아무 일도 안 한다** — 지금(PR 2 전) 모든 판에서 판정·그림 0. 분류 '판정'(의원이 있는 판에선 방문 셈이 바뀐다). */
-(window.VRULES = window.VRULES || {}).sick = { on: true, rate: 0.015, winter: 2, maxShow: 4, near: 20, from: 9, to: 13, giveUp: 18, pillMs: 6000, kinds: ['clinic', 'hospital'] };
+(window.VRULES = window.VRULES || {}).sick = { on: true, rate: 0.015, winter: 2, maxShow: 4, near: 20, from: 9, to: 13, giveUp: 18, pillMs: 6000, slowK: 0.7, coughMs: 4000, puffMs: 900, kinds: ['clinic', 'hospital'] };
 const SICK = { day: -1, list: new Set(), done: new Set(), pill: new Map(), clinics: null, key: -1, stats: { 오늘아픔: 0, 의원감: 0, 의원듦: 0, 못감: 0, 나음: 0 } };
 function sickClinics() { if (SICK.key === placedTotal && SICK.clinics) return SICK.clinics; const R = window.VRULES.sick, out = [];
   cells.forEach((rec, i) => { if (!rec || rec.root !== i || !R.kinds.includes(rec.k)) return; const fp = footprint(rec.k, cX(i), cY(i), rec.rot), roads = new Set();
@@ -6451,16 +6451,28 @@ function sickRhythm(f, i, h) { const R = window.VRULES.sick; if (!R.on || f.visi
 const sickMesh = (() => { const mk = ch => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#fff4f0'; g.beginPath(); g.arc(32, 32, 29, 0, 6.283); g.fill(); g.lineWidth = 4; g.strokeStyle = '#d9534f'; g.stroke();
     g.font = '44px "Segoe UI Emoji","Apple Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 32, 36); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.2, 3.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 8); im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im); return im; };
-  let m = null; return () => m || (m = { ill: mk('🤒'), pill: mk('💊') }); })();   /* 처음 쓸 때 만든다 — 의원 없는 판의 장면은 그대로 */
+  const mkPuff = () => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); g.fillStyle = 'rgba(255,255,255,0.92)'; g.strokeStyle = 'rgba(150,160,170,0.8)'; g.lineWidth = 1.5; [[12, 18, 8], [20, 13, 7], [22, 21, 6]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.stroke(); });
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }), 8); im.count = 0; im.frustumCulled = false; im.renderOrder = 5; scene.add(im); return im; };
+  let m = null; return () => m || (m = { ill: mk('🤒'), pill: mk('💊'), puff: mkPuff() }); })();   /* puff = 기침 김(흰 뭉게 · 입 앞에서 잠깐) */   /* 처음 쓸 때 만든다 — 의원 없는 판의 장면은 그대로 */
 function sickDraw() { const R = window.VRULES.sick, now = performance.now(); let a = 0, p = 0; const k = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS);
   if (!sickMesh.made && !(R.on && SICK.day === simDay() && SICK.list.size) && !SICK.pill.size) return; const M = sickMesh(); sickMesh.made = true;
   const put = (im, n, f) => { const fx = f.px == null ? f.x : f.px + (f.x - f.px) * k, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * k;
     sayDummy.position.set(fx, 5.4 + Math.sin(now / 260) * 0.12, fz); sayDummy.quaternion.copy(camera.quaternion); sayDummy.scale.set(1, 1, 1); sayDummy.updateMatrix(); im.setMatrixAt(n, sayDummy.matrix); };
-  if (R.on && SICK.day === simDay()) SICK.list.forEach(f => { if (a >= R.maxShow || SICK.done.has(f) || f.state === 'inside' || f.arriving) return; put(M.ill, a++, f); });
+  let c = 0; if (R.on && SICK.day === simDay()) SICK.list.forEach(f => { if (a >= R.maxShow || SICK.done.has(f) || f.state === 'inside' || f.arriving) return; put(M.ill, a++, f);
+    const t = (now + ((f.home | 0) * 7919 % R.coughMs)) % R.coughMs; if (t >= R.puffMs || c >= 8) return; const u = t / R.puffMs;   /* 기침 — coughMs 마다 한 번 입 앞에 흰 김이 부풀었다 사라진다(집마다 박자가 다르게) */
+    const fx = f.px == null ? f.x : f.px + (f.x - f.px) * k, fz = f.pz == null ? f.z : f.pz + (f.z - f.pz) * k, d = f.dir || 0, fw = 0.7 + u * 0.9;
+    sayDummy.position.set(fx + Math.sin(d) * fw, 2.9 + u * 0.4, fz + Math.cos(d) * fw); sayDummy.quaternion.copy(camera.quaternion); const s = 0.6 + u * 0.9; sayDummy.scale.set(s, s, 1); sayDummy.updateMatrix(); M.puff.setMatrixAt(c++, sayDummy.matrix); });
   SICK.pill.forEach((until, f) => { if (until < now || f.state === 'inside') { SICK.pill.delete(f); return; } if (p < 8) put(M.pill, p++, f); });
-  M.ill.count = a; M.pill.count = p; if (a) M.ill.instanceMatrix.needsUpdate = true; if (p) M.pill.instanceMatrix.needsUpdate = true; }
+  M.puff.count = c; if (c) M.puff.instanceMatrix.needsUpdate = true; M.ill.count = a; M.pill.count = p; if (a) M.ill.instanceMatrix.needsUpdate = true; if (p) M.pill.instanceMatrix.needsUpdate = true; }
 { const sdS0 = sayDraw; sayDraw = function () { const r = sdS0.apply(this, arguments); sickDraw(); return r; }; }
-window.__sick = () => ({ 켜짐: window.VRULES.sick.on, 의원: (SICK.clinics || []).length, 오늘: SICK.day, 지금아픔: [...SICK.list].filter(f => !SICK.done.has(f)).length, 의원가는중: folks.filter(f => f.sickTrip).length, 의원안: folks.filter(f => f.state === 'inside' && f.inside && f.inside.sick).length, 표시: sickMesh.made ? { 아픔: sickMesh().ill.count, 약: sickMesh().pill.count } : null, ...SICK.stats });
+/* 천천히 — 의원 가는 길은 걸음 slowK 배(아이 걸음 고리 actKidTick 자리에서 덜어 낸다) · 말은 #1085 의 의원 말(words.go/stay.clinic)로 · 다 나아 나오면 '다 나아서 집에 가요' */
+{ const akS0 = actKidTick; actKidTick = function (f, dt) { const r = akS0.apply(this, arguments); const R = window.VRULES.sick;
+    if (R.on && f.sickTrip && f.state === 'walk' && f.path && f.path[f.step + 1] != null && !f.blockedAt) f.seg -= (WALK_SPEED * (1 - R.slowK) * dt) / CS; return r; }; }
+{ const awS0 = actWordsText; actWordsText = function (f) { const W = window.VRULES.words, S = f.sickTrip;
+    if (S && W && W.on && f.state === 'walk' && cells[S.root] && W.go && W.go.clinic) return K[cells[S.root].k].nm + W.go.clinic;
+    if (SICK.pill.has(f) && f.state !== 'inside') return '다 나아서 집에 가요';
+    return awS0.apply(this, arguments); }; }
+window.__sick = () => ({ 켜짐: window.VRULES.sick.on, 의원: (SICK.clinics || []).length, 오늘: SICK.day, 지금아픔: [...SICK.list].filter(f => !SICK.done.has(f)).length, 의원가는중: folks.filter(f => f.sickTrip).length, 의원안: folks.filter(f => f.state === 'inside' && f.inside && f.inside.sick).length, 표시: sickMesh.made ? { 아픔: sickMesh().ill.count, 약: sickMesh().pill.count, 김: sickMesh().puff.count } : null, ...SICK.stats });
 
 /* ══════════════════════════════════════════════════════════════
    붐빔(F12). 틱마다 길 위 사람 수를 칸별로 세고, 둘레 3×3 에 남이 몇인지로 속도를 정한다.
