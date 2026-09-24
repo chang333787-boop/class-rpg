@@ -9005,13 +9005,16 @@ function _lifeCardPlace() {
 function _lifeCardHTML(st, L, u) {
   const f = L.a[u], cfg = ANIM_DECO[st.id] || {}, kind = cfg.name || ((GAME_DATA.decorations.find(x => x.id === st.id) || {}).name) || '동물';
   const h = _lifeHearts(f), row = _lifeHeartRow(h), nm = _lifeNameOf(L, u), today = f && f.d === _lifeDay();
-  const hearts = Array.from({ length: row.need }, (_, i) => `<img src="./assets/deco/heart_${i < row.have ? 'full' : 'empty'}.svg" alt="">`).join('');
+  //  디자인 사양(#1003): 7칸까지 한 줄(22px · 7칸은 18px) · 10칸은 다섯씩 두 줄(18px) · 가족은 칸을 안 보인다
+  const hearts = row.left ? Array.from({ length: row.need }, (_, i) => `<img src="./assets/deco/heart_${i < row.have ? 'full' : 'empty'}.svg" alt="">`).join('') : '';
+  const hcls = row.need >= 10 ? ' h10' : row.need >= 7 ? ' h7' : '';
   const next = row.left ? `다음 단계 '${LIFE_STAGE_NAME[row.st]}'까지 하트 ${row.left}` : '가족이 됐어요 — 하트는 줄지 않아요';
   return `<div class="dlc-top"><img class="dlc-badge" src="./assets/deco/friend_stage${row.st}.svg" alt="${row.st}단계">`
     + `<div class="dlc-who"><div><b class="dlc-nm">${escHtml(nm || kind)}</b>${nm ? ` <span class="dlc-kind">· ${escHtml(kind)}</span>` : ''}</div>`
     + `<div class="dlc-sub">${row.st}단계 ${LIFE_STAGE_NAME[row.st - 1]}</div></div>`
     + (L.ro ? '' : `<button type="button" class="dlc-namebtn" aria-label="이름 고르기">🏷️ ${nm ? '이름 바꾸기' : '이름 짓기'}</button>`) + '</div>'
-    + `<div class="dlc-hearts" aria-label="하트 ${row.have}/${row.need}">${hearts}${today ? '<span class="dlc-today">+1 오늘</span>' : ''}</div>`
+    + (hearts ? `<div class="dlc-hearts${hcls}" aria-label="하트 ${row.have}/${row.need}"><span class="dlc-hrow">${hearts}</span>${today ? '<span class="dlc-today">+1 오늘</span>' : ''}</div>`
+      : (today ? '<div class="dlc-hearts"><span class="dlc-today">+1 오늘</span></div>' : ''))
     + `<div class="dlc-next">${next}</div><div class="dlc-chips" hidden></div>`;
 }
 function _lifeCardChips(k, more) {

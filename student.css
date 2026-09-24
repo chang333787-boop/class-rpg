@@ -1403,7 +1403,10 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .dlc-sub,.dlc-next{font-size:12px}
 .dlc-namebtn{flex:none;min-height:44px;padding:0 10px;border-radius:12px;border:1.5px solid #c9a27a;background:#fff;color:#5a3a1a;font:700 12px system-ui,sans-serif;cursor:pointer}
 .dlc-hearts{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:8px}
-.dlc-hearts img{width:20px;height:20px;display:block}
+.dlc-hrow{display:flex;flex-wrap:wrap;gap:3px}
+.dlc-hearts img{width:22px;height:22px;display:block}
+.dlc-hearts.h7 img,.dlc-hearts.h10 img{width:18px;height:18px}
+.dlc-hearts.h10 .dlc-hrow{width:calc(5 * 18px + 4 * 3px)}   /* 10칸은 다섯씩 두 줄 */
 .dlc-today{margin-left:6px;color:#e0507f;font-weight:800;font-size:12px}
 .dlc-next{margin-top:4px}
 .dlc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
