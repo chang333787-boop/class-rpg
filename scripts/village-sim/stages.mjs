@@ -69,7 +69,8 @@ let 끈판 = 0;
 const 조건부 = { health: def => (def.교과 == null || !!(def.규칙 && def.규칙.health)) && (!Array.isArray(def.건물) || !def.건물.length || def.건물.includes('clinic')) && (nw => !nw.on && !(Array.isArray(nw.keepStages) && nw.keepStages.includes(def.id)))(Object.assign({}, vrules.needWater, (def.규칙 || {}).needWater)),   /* [MAC-HEALTH] 코드의 healthOffer 와 같은 조건 — 수업 판은 판 규칙에 health 가 있을 때만 · 물을 지키는 판은 안 돎 */
   shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))),
   stroll: def => def.교과 == null,
-  homeTime: def => def.교과 == null };   // [ACT-HOMETIME] 귀가 나서기도 수업 판에선 안 돈다(코드의 homeTimeIs 와 같은 조건)   // [ACT-STROLL] 산책은 수업 판(교과 있음)에서는 안 돈다(코드의 strollTry 와 같은 조건)
+  homeTime: def => def.교과 == null,
+  sick: def => def.교과 == null };   // [ACT-SICK] 아픈 주민 나들이도 수업 판에선 안 돈다(의원이 없는 판에선 코드가 스스로 쉰다)   // [ACT-HOMETIME] 귀가 나서기도 수업 판에선 안 돈다(코드의 homeTimeIs 와 같은 조건)   // [ACT-STROLL] 산책은 수업 판(교과 있음)에서는 안 돈다(코드의 strollTry 와 같은 조건)
 const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
 const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
