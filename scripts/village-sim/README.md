@@ -100,3 +100,4 @@ node scripts/village-hunt/hunt.mjs --boards town3,farm+village/stages/boards/mid
   큰 줄 한 줄에 시설을 모아 **붐빔이 실제로 난다**. 아파트 셋 중 **하나는 비어 있다**(저장 왕복 시험용). 밭·헛간이 있어 **흐름은 `--stage farm` 으로** 잰다:
   `node scripts/village-sim/run.mjs --stage farm --save village/stages/boards/mid36.json --days 3 --seeds 1-5` — `--save` 와 `--stage` 를 함께 주면 저장본이 판 칸에도 들어간다.
   판 없이 열면 밭·헛간은 모르는 종류로 빠지고(흐름 꺼짐) 붐빔·돌아섬은 그대로 잰다.
+  **기준 ①(전/후 같은지)도 mid36 은 `--stage farm` 으로 잰다**(보스 09-24 · MAC-STAGEKINDS) — 판 없이 재면 밭·헛간 4칸이 빠진 채 돌아(⚠ 경고) 그 판의 흐름·일자리가 기준선에서 빠진다: `--stage farm --save village/stages/boards/mid36.json --vs '옛: html=<main>'`.
