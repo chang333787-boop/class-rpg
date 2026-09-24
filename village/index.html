@@ -9362,6 +9362,8 @@ window.__greet = () => ({ 켜짐: window.VRULES.greet.on, ...GREET.stats, 지금
    물 끈 마을([MAC-NOWATER] · 09-24 건강 PR 4)은 우물가 대신 분수·광장·정자·긴의자에서 모인다(kindsDry · 앉은 사람도 끼고 몸은 그대로). 물동이·'물을 길어요'·아침 끌림 '물'도 그 마을에선 끈다.
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).wellChat = { on: true, from: 6, to: 9, everyMs: 3500, waveMs: 1600, kinds: ['well', 'fountain', 'pond'], kindsDry: ['fountain', 'plaza', 'pavilion', 'bench', 'minibench', 'pond'] };   // kindsDry = 물 끈 마을([MAC-NOWATER])의 아침 수다 자리 — 분수·광장·정자·긴의자
+const WELLCHAT_AT = { well: '우물가에서', fountain: '분수 곁에서', pond: '연못가에서', plaza: '광장에서', pavilion: '정자에서', bench: '긴의자에서', minibench: '의자에서' };   /* 어제의 한 장 제목 — 모인 자리대로(물 끈 마을엔 우물가 모임이 없다) */
+const wellChatAt = root => { const c = cells[root]; return (c && WELLCHAT_AT[c.k]) || (c ? K[c.k].nm + ' 곁에서' : '길가에서'); };
 const WELLCHAT = { next: new Map(), turn: new Map(), who: new Map(), groups: new Map(), stats: { 인사: 0, 모인때: 0 } };
 function actWellChatDraw(now) {
   const R = window.VRULES.wellChat; if (!R.on || mapMode || OFF.has('faces')) return;
@@ -9996,7 +9998,7 @@ function actSnapTick(now) {
     else if (f.growLook) snapWant(1, f.x, f.z, now, '밤새 자란 나무를 올려다본 순간');
   });
   if (SNAP.rank < 1) folks.forEach(f => { if (SNAP.rank >= 1 || f.state !== 'inside' || !f.beside || !isSmall(f)) return; const b = cells[f.inside.root]; if (b && b.k === 'play') snapWant(1, f.beside.x, f.beside.z, now, '아이들이 놀이터에서 논 순간'); });   // 평범한 날의 한 장 — 놀이터의 아이
-  if (SNAP.rank < 1 && typeof WELLCHAT === 'object') WELLCHAT.who.forEach(w => { if (SNAP.rank < 1 && w && w.f && SIM.t <= w.until) snapWant(1, w.f.x, w.f.z, now, '아침 우물가에서 이웃끼리 👋'); });   // 아침 우물가
+  if (SNAP.rank < 1 && typeof WELLCHAT === 'object') WELLCHAT.who.forEach((w, root) => { if (SNAP.rank < 1 && w && w.f && SIM.t <= w.until) snapWant(1, w.f.x, w.f.z, now, '아침 ' + wellChatAt(root) + ' 이웃끼리 👋'); });   // 아침 우물가
   if (EV.fest && EV.festRoot >= 0 && fest >= R.festMin && cells[EV.festRoot]) { const r = cells[EV.festRoot], c = centerOf(r.k, cX(r.root), cY(r.root), r.rot); snapWant(5, c.x, c.z, now); }
 }
 function snapRain(now) {                                               // [ACT-SNAP 비] 처마 밑에 모인 이웃(한 칸에 셋 이상) · 비 오는 광장에 우산 넷 이상
