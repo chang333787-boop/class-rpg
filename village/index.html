@@ -2215,6 +2215,25 @@ mini.addEventListener('click', e => {
 function miniFlipY(fy) { return window.VRULES.miniFlip && window.VRULES.miniFlip.on ? 1 - fy : fy; }
 { const dm0 = drawMini; drawMini = function () { const t = window.VRULES.miniFlip && window.VRULES.miniFlip.on ? 'scaleY(-1)' : ''; if (mini.style.transform !== t) mini.style.transform = t; return dm0.apply(this, arguments); }; }
 window.__miniFlip = () => ({ 켜짐: !!(window.VRULES.miniFlip && window.VRULES.miniFlip.on), 보임변환: mini.style.transform || '(없음)' });
+/* ── [MAC-NIGHTMAP] 밤에도 미니맵·판 전체 보기가 한낮빛이던 것 — 밤만큼 어둡고 푸르게 · 가로등은 작은 노란 점 (보스 09-24 · #1014 확인 때 본 것) ──
+   21시 원본에서 오른쪽 아래 미니맵이 밝은 연두 상자로 튀고, 판 전체 보기(지도 판 · MeshBasicMaterial 이라 빛을 안 받음)는 밤인데 대낮 지도였다.
+   · 미니맵: 다 그린 뒤 **곱하기**로 밤빛(짙은 파랑)을 NIGHT.value 만큼 덮는다 — 밝기는 내려가도 서로의 대비(길 뼈대·동네 덩어리·흰 판)는 그대로 읽힌다.
+     그 위에 가로등 칸마다 작은 노란 점. (미니맵은 캔버스 좌표로 그리고 보이는 쪽에서 뒤집힌다 — MINIFLIP 그대로)
+   · 판 전체 보기: 지도 판 재질 색(텍스처에 곱해짐)을 밤만큼 푸르게 낮춘다. 가로등 점은 밤빛 웅덩이(MAC-NIGHTGLOW)가 지도 판 위에도 보이게(멀리선 작은 노란 점).
+   · 낮(NIGHT.value 0)에는 한 픽셀도 안 바뀐다(곱하기 흰색 · 재질 색 흰색). 판정·저장 0. 스위치 VRULES.nightMap(보기). 원래 줄 수정 0 — drawMini·applyDaylight 감싸기. */
+(window.VRULES = window.VRULES || {}).nightMap = { on: true, mini: [62, 78, 128], plane: [.22, .27, .52], lamp: '#ffd66b' };
+{ const dmN = drawMini; drawMini = function () { const r = dmN.apply(this, arguments), R = window.VRULES.nightMap, n = NIGHT.value;
+    if (!R || !R.on || n < .02) return r;
+    const b = miniBox, mw = mini.width, mh = mini.height, t = Math.min(1, n), c = R.mini.map(v => Math.round(255 - (255 - v) * t));
+    miniG.save(); miniG.globalCompositeOperation = 'multiply'; miniG.fillStyle = 'rgb(' + c.join(',') + ')'; miniG.fillRect(0, 0, mw, mh); miniG.restore();
+    if (n >= .35) { const kx = mw / (b.x1 - b.x0 + 1), ky = mh / (b.y1 - b.y0 + 1), rad = Math.max(1.2 * mw / 160, .5 * kx); miniG.fillStyle = R.lamp; miniG.beginPath();
+      for (let y = Math.max(0, Math.floor(b.y0)); y <= Math.min(H - 1, Math.ceil(b.y1)); y++) for (let x = Math.max(0, Math.floor(b.x0)); x <= Math.min(W - 1, Math.ceil(b.x1)); x++) {
+        const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'lamp') continue; const cx = (x - b.x0 + .5) * kx, cy = (b.y1 - y + .5) * ky; miniG.moveTo(cx + rad, cy); miniG.arc(cx, cy, rad, 0, Math.PI * 2); }
+      miniG.fill(); }
+    return r; }; }
+{ const adN = applyDaylight; applyDaylight = function () { const r = adN.apply(this, arguments), R = window.VRULES.nightMap, t = R && R.on ? Math.min(1, NIGHT.value) : 0;
+    mapPlane.material.color.setRGB(1 - (1 - R.plane[0]) * t, 1 - (1 - R.plane[1]) * t, 1 - (1 - R.plane[2]) * t); return r; }; }
+window.__nightMap = () => ({ 켜짐: !!(window.VRULES.nightMap && window.VRULES.nightMap.on), 밤: +NIGHT.value.toFixed(2), 지도판색: '#' + mapPlane.material.color.getHexString() });
 /* ── [MAC-MINIFADE] 놓거나 끄는 손가락이 미니맵 가까이 오면 미니맵이 옅어진다 (창조자의 눈 4회 🟡A5) ──
    길을 오른쪽 아래로 이어 가다 보면 길 끝이 미니맵 뒤로 들어가 안 보였다(1024×768). 미니맵을 접거나 옮기지 않고 — 가장 싼 길 — 그 순간만 비쳐 보이게 한다.
    · 죽 놓는 중·들고 옮기는 중·끌어 치우는 중에, 포인터가 미니맵에서 48px 안이면 미니맵이 옅어지고(0.18) 눌리지 않는다. 손을 떼면 0.4초 뒤 돌아온다.
@@ -5488,7 +5507,7 @@ function nightGlowDraw() { const R = window.VRULES.nightGlow, n = NIGHT.value;
   if (!NGLOW.base) NGLOW.base = { sky: hemi.color.clone(), gnd: hemi.groundColor.clone(), amb: amb.color.clone(), skyN: new THREE.Color(0x8ea4e6), gndN: new THREE.Color(0x2c3656), ambN: new THREE.Color(0xa9b8ff) };
   const B = NGLOW.base, t = R.on ? n * (R.blue || 0) : 0;
   hemi.color.copy(B.sky).lerp(B.skyN, t); hemi.groundColor.copy(B.gnd).lerp(B.gndN, t); amb.color.copy(B.amb).lerp(B.ambN, t);   // 낮(t 0)엔 처음 색 그대로
-  if (!R.on || n < .05 || mapMode) { if (NGLOW.mesh) NGLOW.mesh.visible = false; return; }
+  if (!R.on || n < .05) { if (NGLOW.mesh) NGLOW.mesh.visible = false; return; }   /* [MAC-NIGHTMAP] 판 전체 보기(지도 판)에서도 보인다 — 멀리선 가로등 노란 점 */
   const now = performance.now(); if (NGLOW.dirty || now - NGLOW.scanT > 3000) nightGlowScan(now);
   const m = NGLOW.mesh; m.visible = m.count > 0; m.material.opacity = (R.op || .55) * Math.min(1, (n - .05) / .45); }
 { const ad0 = applyDaylight; applyDaylight = function () { const r = ad0.apply(this, arguments); nightGlowDraw(); return r; }; }
