@@ -7898,14 +7898,32 @@ function _decoFillStart() {
   _decoClampPan(); _drawDeco();
   return true;
 }
+// [DECO-VIEW-THINGS-1] 처음 열 때(이 기기에 보던 자리가 없을 때) 아이 장식이 첫 화면 밖에 있으면 그쪽으로(창조자 31-ⓑ74 — 마당 80×44 의 왼쪽 위만 보여
+//  판 오른쪽 · 아래에 놓은 것이 첫 화면에 없었다). 장식 네모(나무 꼭대기 한 줄 포함)가 첫 화면에 다 들어 있으면 그대로 ·
+//  한 화면에 들어가면 네모 가운데 · 너무 넓으면 장식 한가운데(행·열 평균). 보던 자리를 되살리는 길(_decoViewRestore)은 그대로.
+function _decoStartOnThings() {
+  if (DECO_SCENE !== 'yard' || !_dC || !CUR) return false;
+  const list = _decoList(CUR).filter(p => p.area === 'yard');
+  if (!list.length) return false;
+  let r0 = 1e9, c0 = 1e9, r1 = -1e9, c1 = -1e9, sr = 0, sc = 0;
+  list.forEach(p => { const z = getDecoSize(p.id); r0 = Math.min(r0, p.row - 1); c0 = Math.min(c0, p.col); r1 = Math.max(r1, p.row + z.h); c1 = Math.max(c1, p.col + z.w); sr += p.row + z.h / 2; sc += p.col + z.w / 2; });
+  const C = _dC, vx0 = _dPanX / C, vy0 = _dPanY / C, vx1 = (_dPanX + _dW) / C, vy1 = (_dPanY + _dH) / C;
+  if (c0 >= vx0 && c1 <= vx1 && r0 >= vy0 && r1 <= vy1) return false;   // 이미 다 보인다
+  const fits = (c1 - c0) * C <= _dW && (r1 - r0) * C <= _dH;
+  const cx = fits ? (c0 + c1) / 2 : sc / list.length, cy = fits ? (r0 + r1) / 2 : sr / list.length;
+  _dPanX = cx * C - _dW / 2; _dPanY = cy * C - _dH / 2;
+  _decoClampPan(); _drawDeco();
+  return true;
+}
 function _decoPhoneStart() {
-  if (_decoFillStart()) return;   // [DECO-VIEW-FIT-1] 넓은 화면인데 판이 짧으면 높이 채우기
-  if (!_dC || _dW > 600) { if (DECO_SCENE === 'yard' && _dPanY === 0) { _dPanY = -_dC; _decoClampPan(); _drawDeco(); } return; }   // [DECO-TOP-PAD-1] 넓은 화면도 한 칸 위부터
+  if (_decoFillStart()) { _decoStartOnThings(); return; }   // [DECO-VIEW-FIT-1] 넓은 화면인데 판이 짧으면 높이 채우기 · [DECO-VIEW-THINGS-1]
+  if (!_dC || _dW > 600) { if (DECO_SCENE === 'yard' && _dPanY === 0) { _dPanY = -_dC; _decoClampPan(); _drawDeco(); } _decoStartOnThings(); return; }   // [DECO-TOP-PAD-1] 넓은 화면도 한 칸 위부터 · [DECO-VIEW-THINGS-1]
   const z = Math.min(DECO_ZOOM_MAX, 16 / Math.max(1, _dC / _dZoom));
   _decoSetZoom(z, 0, 0);
   if (DECO_SCENE === 'yard') { _dPanX = (_houseCol0() - 4) * _dC; _dPanY = -_dC; }   // 집(기준 판 오른쪽 위) 앞이 보이게 · [DECO-TOP-PAD-1] 굴뚝까지
   else { _dPanX = 0; _dPanY = 0; }
   _decoClampPan(); _drawDeco();
+  _decoStartOnThings();   // [DECO-VIEW-THINGS-1] 폰도 — 장식이 집 앞 밖이면 그쪽
 }
 
 function decoZoomIn()  { _decoSetZoom(_dZoom * DECO_ZOOM_STEP); }
