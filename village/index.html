@@ -9017,6 +9017,23 @@ function joyFlush(now) { if (JOYN.at < 0 || now - JOYN.at <= (window.VRULES.brea
   JOYN.stats.말함++; JOYN.stats.모은집 += n; if (n > 1) JOYN.stats.외++;
   simSay('🎉 ' + 이름 + (n > 1 ? ' 외 ' + (n - 1) + '곳이' : (who ? '가' : '이')) + ' 기뻐해요 — ' + NEED_TXT[was] + '이 생겼어요', true); sndFx('goal'); }
 window.__joyOthers = () => ({ 창ms: window.VRULES.breath.joyGroupMs, 열림: JOYN.at >= 0, 모으는중: JOYN.roots.size, ...JOYN.stats });
+/* ── [MAC-JOYWORD] '…이 생겼어요'는 정말 생겼을 때만 — 길·큰길로 닿게 된 것은 '이제 …까지 갈 수 있어요' (창조자 23-ⓑ41 · 보스 09-24 무한 모드) ──
+   🎉 기쁨(joyFlush)과 ✨ 바람(wishTick)이 필요가 채워지면 늘 '(필요 곳)이 생겼어요'라고 했다 — 큰길을 놓아 **이미 있던** 긴의자에 닿게 된 것도
+   "🎉 … 쉴 곳이 생겼어요"(23회 · 생긴 게 아니라 닿게 됨). 그 필요를 채우는 시설(need · need2)이 **방금**(freshMs · 시뮬 시각) 놓였으면 그대로 '생겼어요',
+   아니면(길·큰길 · 집을 옮김 · 자리가 남) '이제 (필요 곳)까지 갈 수 있어요'. 판정·저장 0 · 원래 줄 수정 0(simSay 감싸기 — 그 두 말꼴만 · placeAt 고리 — 시설을 놓은 시각).
+   불러온 직후(틱 0 — 저장본 되살리기·판 개울)에 놓인 것은 '방금'으로 치지 않는다. 분류 '말'. */
+(window.VRULES = window.VRULES || {}).joyWord = { on: true, freshMs: 20000 };
+const JOYW = { at: new Map(), stats: { 생김: 0, 닿음: 0 } };
+const JOYW_NEED = Object.fromEntries(Object.entries(NEED_TXT).map(([n, t]) => [t, n]));
+hookAdd('placeAt', function (next, args) { const r = next(args), k = K[args[0]];
+  if (k && (k.need || k.need2) && SIM.ticks > 0 && !VISIT.on) { if (k.need) JOYW.at.set(k.need, SIM.t); if (k.need2) JOYW.at.set(k.need2, SIM.t); }
+  return r; });
+{ const ss0 = simSay; simSay = function (m, ok) { const R = window.VRULES.joyWord;
+    const mm = R && R.on && typeof m === 'string' ? /^((?:🎉 .+ 기뻐해요|✨ .+의 바람을 들어줬어요) — )(.+)이 생겼어요$/.exec(m) : null;
+    if (mm && JOYW_NEED[mm[2]]) { const t = JOYW.at.get(JOYW_NEED[mm[2]]);
+      if (t != null && SIM.t - t <= (R.freshMs | 0)) JOYW.stats.생김++; else { JOYW.stats.닿음++; m = mm[1] + '이제 ' + mm[2] + '까지 갈 수 있어요'; } }
+    return ss0.call(this, m, ok); }; }
+window.__joyWord = () => ({ 켜짐: window.VRULES.joyWord.on, 방금놓음: Object.fromEntries([...JOYW.at].map(([n, t]) => [n, Math.round((SIM.t - t) / 1000) + '초 전'])), ...JOYW.stats });
 function whyBubbleTick(now) {
   const R = window.VRULES.whyBubble, B = window.VRULES.breath;
   if (!R.on || OFF.has('faces')) { whyPool.forEach(im => im.count = 0); return; }
