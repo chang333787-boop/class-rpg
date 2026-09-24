@@ -114,18 +114,22 @@ for (const f of files) {
       뭍 >= 512 ? add('PASS', P(`지형 ${L.length}네모 · ${바닥.size}칸` + (개울.size ? ` · 개울 ${개울.size}칸` : '') + ` · 첫 구역 평지 ${뭍}/1024`)) : add('FAIL', P('지형'), `첫 구역(128~159)의 평지가 ${뭍}칸 — 반은 남겨야 마을이 선다`);
       const 개울바닥 = [...개울].filter(i => !평지(at(i % 256, (i / 256) | 0))); if (개울바닥.length) add('FAIL', P('지형 개울'), `개울 ${개울바닥.length}칸이 평지가 아닌 바닥 위`);
       /* 실제로 열어 규칙을 누른다 — 바닥마다 한 곳씩 첫 구역에서 찾는다 */
-      const find = ok => { for (let y = 129; y < 158; y++) for (let x = 129; x < 158; x++) if (ok(x, y)) return [x, y]; return null; };
+      const find = (ok, x0 = 129) => { for (let y = 129; y < 158; y++) for (let x = x0; x < 158; x++) if (ok(x, y)) return [x, y]; return null; };
+      const 네칸 = (x, y, g) => [[0, 0], [1, 0], [0, 1], [1, 1]].every(([a, b]) => at(x + a, y + b) === g), 둘레 = (x, y) => [[-1, 0], [-1, 1], [2, 0], [2, 1], [0, -1], [1, -1], [0, 2], [1, 2]].map(([a, b]) => at(x + a, y + b));
       const 물가 = find((x, y) => at(x, y) === '모래' && at(x, y + 1) === '물' && at(x + 1, y) === '모래' && at(x + 1, y + 1) === '물');
       const 바다 = find((x, y) => y > 130 && [[0, 0], [1, 0], [0, 1], [1, 1]].every(([a, b]) => at(x + a, y + b) === '물'));
-      const 비탈 = find((x, y) => at(x, y) === '비탈' && at(x + 1, y) === '비탈'), 고개 = find((x, y) => at(x, y) === '고개');
+      const 비탈 = find((x, y) => 네칸(x, y, '비탈')), 고개 = find((x, y) => at(x, y) === '고개');
+      const 먼바다 = find((x, y) => 네칸(x, y, '물') && 둘레(x, y).every(g => g === '물')), 닿은바다 = find((x, y) => 네칸(x, y, '물') && 둘레(x, y).some(g => g !== '물'), 140);   // [MAC-TERRAIN 3] 35-ⓑ77
       const 풀 = find((x, y) => y < 140 && x > 131 && x < 150 && at(x, y) === '풀' && at(x, y + 4) === '풀' && !물줄(x, y) && !물줄(x, y + 4));
       const 곧은개울 = find((x, y) => 물줄(x, y) && y !== 144 && ((물줄(x, y - 1) && 물줄(x, y + 1) && !물줄(x - 1, y) && !물줄(x + 1, y)) || (물줄(x - 1, y) && 물줄(x + 1, y) && !물줄(x, y - 1) && !물줄(x, y + 1))));
       const 첫구역개울 = [...개울].map(i => [i % 256, (i / 256) | 0]).filter(([x, y]) => x >= 128 && x < 160 && y >= 128 && y < 160);
       if (!풀) add('REVIEW', P('지형 규칙'), '첫 구역에 풀 칸이 없어 규칙을 못 눌러 봄');
       else { const tries = [], 뜻 = [], 수 = (t, m, ok) => { tries.push(t); 뜻.push([m, ok]); }, 말 = s => v => typeof v === 'string' && v.includes(s);
-        if (바다) 수(['put', 'road', ...바다], '바다에 길', 말('바다'));
+        if (바다) { 수(['put', 'road', ...바다], '바다에 길', 말('바다')); 수(['put', 'house', ...바다], '바다에 집(길 없이 — 34-ⓑ78 바다가 먼저)', 말('바다')); }
+        if (먼바다 && (def.건물 || []).includes('pier')) 수(['put', 'pier', ...먼바다], '먼 바다에 부두(35-ⓑ77)', 말('뭍'));
+        if (닿은바다 && (def.건물 || []).includes('pier')) 수(['put', 'pier', ...닿은바다], '뭍에 닿은 바다에 부두', v => v === true);
         if (물가 && (def.건물 || []).includes('pier')) { 수(['put', 'pier', ...물가], '물가에 부두', v => v === true); 수(['put', 'pier', ...풀], '뭍에 부두', 말('물가')); }
-        if (비탈) { 수(['put', 'road', ...비탈], '비탈에 길', 말('비탈')); 수(['put', 'tree', 비탈[0] + 1, 비탈[1]], '비탈에 나무', v => v === true); }
+        if (비탈) { 수(['put', 'road', ...비탈], '비탈에 길', 말('비탈')); 수(['put', 'house', ...비탈], '비탈에 집(길 없이)', 말('비탈')); 수(['put', 'tree', 비탈[0] + 1, 비탈[1]], '비탈에 나무', v => v === true); }
         if (고개) { 수(['put', 'tree', ...고개], '고개에 나무', 말('고갯길')); 수(['put', 'road', ...고개], '고개에 길', v => v === true); }
         if (첫구역개울.length) 수(['kinds', 첫구역개울], `판 개울 ${첫구역개울.length}칸이 깔림(처음 길을 건너는 곳은 다리)`, v => Array.isArray(v) && v.every(k => k === 'stream' || k === 'sbr') && v.filter(k => k === 'stream').length > 0);
         if (곧은개울) { 수(['erase', ...곧은개울], '판 개울 치우기 막힘', v => v === false); 수(['kinds', [곧은개울]], '치운 뒤에도 개울', v => v && v[0] === 'stream');
