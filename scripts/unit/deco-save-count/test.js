@@ -1592,7 +1592,8 @@
         const t0 = _lifeDay(), egg0 = +(_lifeGet(CUR).g.egg || 0);
         _lifeWrite(CUR, { 'a/a90': { k: 'd_y55', r: 22, c: 34, sp: 3, m: t0 - 30, h: 16, d: t0 - 1 } }); await sleep(400);
         _drawDeco(); await sleep(400);
-        const gift = () => document.querySelector('.deco-gift');
+        //  닭(d_y55)의 달걀을 콕 집는다 — 날에 따라 앞 시험의 강아지 선물(나뭇가지)도 땅에 있어, 첫 선물을 누르면 그것을 받았다(09-25 에 드러남)
+        const gift = () => document.querySelector('.deco-gift[aria-label="선물 달걀 받기"]');
         out('선물_땅에있음', !!gift());
         const w2 = _lifeWrites; saves = 0; sets = 0;
         if (gift()) gift().click(); await sleep(900);
@@ -1614,7 +1615,7 @@
         if (hen) { const cv = _dCv.getBoundingClientRect(); _dSuppressClick = false; _lifeCardClose && _lifeCardClose();
           _decoClick({ clientX: cv.left + ((hen.cur.col + .5) * _dC - _dPanX) * cv.width / _dW, clientY: cv.top + ((hen.cur.row + .5) * _dC - _dPanY) * cv.height / _dH }); }
         await sleep(400);
-        const g2 = document.querySelector('.deco-gift');
+        const g2 = gift();   // 닭의 달걀(날에 따라 강아지 선물도 땅에 있다)
         out('선물_단계오른즉시_땅에', hen ? (!!g2 && _lifeGet(CUR).a.a90.h === 12) : '동물층없음');
         out('선물_누르는자리_44px', !!g2 && g2.getBoundingClientRect().width >= 43.5 && g2.getBoundingClientRect().height >= 43.5);
       }
@@ -2061,7 +2062,20 @@
       const full = {}; for (let r = 0; r < DY.rows; r++) for (let c = 0; c < DY.cols; c++) full[r + '_' + c] = 'stone';
       CUR.yardFloor = full; _decoStateVer++;
       out('행사_빈덩어리없으면_안뜸', _decoEventPlaced(ev) === null);
-      CUR.yardFloor = keepF; CUR.houseDecorations = keepH; _decoEventOv = null; _decoStateVer++; _drawDeco();
+      //  [DECO-EVENT-2] 첫 열림 알림 — 기기 · 행사 · 해마다 한 번(토스트 + 반짝) · 두 번째는 없음 · 별빛엔 없음 · 저장 0
+      CUR.yardFloor = keepF; CUR.houseDecorations = keepH; _decoStateVer++;
+      const gk = 'deco.eventSeen.autumn.' + new Date().getFullYear();
+      try { localStorage.removeItem(gk); } catch (e) {}
+      const lastT2 = () => { const a = [...document.querySelectorAll('.toast-msg')]; return a.length ? a[a.length - 1].textContent : ''; };
+      const svG = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.decoLife]), wG = _lifeWrites;
+      toast('—'); const g1 = _decoEventGreet(), tx = lastT2(), tw = !!document.querySelector('.deco-event-tw');
+      const g2 = _decoEventGreet();
+      out('행사_첫열림_한번_토스트반짝', g1 === true && /수확제가 마당에 놀러 왔어요 — 10\/19까지/.test(tx) && tw && g2 === false);
+      try { localStorage.removeItem(gk); } catch (e) {}
+      _yardLookDev = 'star'; out('행사_첫열림_별빛엔없음', _decoEventGreet() === false); _yardLookDev = null;
+      out('행사_첫열림_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.decoLife]) === svG && _lifeWrites === wG);
+      try { localStorage.setItem(gk, '1'); } catch (e) {}   // 뒤 시험에 알림이 끼지 않게
+      _decoEventOv = null; _decoStateVer++; _drawDeco();
     }
 
     //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
