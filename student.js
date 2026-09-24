@@ -13400,6 +13400,14 @@ function toast(msg) {
   t.textContent = msg;
   // 모바일: 바텀탭(65px) 위에, 데스크탑: 하단 20px
   t.style.bottom = isMobile ? '75px' : '20px';
+  //  [DECO-TOAST-1] 꾸미기 전체화면: 알림은 한 번에 하나(앞 것을 바로 치운다 — '골랐어요'와 '놓았어요'가 한 자리에 겹쳐 뭉개졌다)
+  //  · 자리는 서랍 바로 위(전엔 서랍 카드 둘째 줄을 2.4초 가렸다) · 산 뒤 손끝 안내가 떠 있으면 그 위
+  if (typeof _ifMode !== 'undefined' && _ifMode) {
+    document.querySelectorAll('.toast-msg').forEach(e => e.remove());
+    const fs = document.getElementById('interior-fullscreen'), tip = document.getElementById('deco-hand-tip');
+    const dh = fs ? parseFloat(getComputedStyle(fs).getPropertyValue('--deco-drawer-h')) || 0 : 0;
+    t.style.bottom = Math.round(dh + 10 + (tip && tip.offsetParent ? tip.offsetHeight + 8 : 0)) + 'px';
+  }
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2400);
 }
