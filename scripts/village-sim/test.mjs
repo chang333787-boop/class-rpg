@@ -149,6 +149,51 @@ const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(ou
   ok(A.p && JSON.stringify(A.p) === JSON.stringify(A.a) && B.p && JSON.stringify(B.p) === JSON.stringify(B.a), '미리 보기 ≠ 적용 ' + JSON.stringify({ A, B }).slice(0, 300));
 });
 
+/* [MAC-GOALLIVE] 목표판 '지금 n / m' — 길 곁 밭을 놓으면 1초(10틱) 안에 2 → 3 · 먼 밭은 그대로 · 목표판을 통째로 다시 그리지 않는다(창조자 61회 ⓑ106) */
+test('목표판 지금 값: farm+mid36 길 곁 밭 → 1초 안에 3 / 4 · 먼 밭은 2 그대로 · 통째 0', () => {
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: fs.readFileSync(${JSON.stringify(path.join(ROOT, 'village/stages/boards/mid36.json'))}, 'utf8'), seed: 1, hash: 'hour=10', query: 'stage=farm' });
+w.__tickBench(120); const a = w.__goalLive(); w.__put('field', 147, 127, 0); w.__tickBench(10); const b = w.__goalLive(); w.__put('field', 138, 153, 0); w.__tickBench(10); const c = w.__goalLive();
+process.stdout.write('@@' + JSON.stringify({ a, b, c, u: w.__usable('field').쓸수있는 }) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8' });
+  const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); ok(l, '__goalLive 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); const j = JSON.parse(l.slice(2));
+  ok(j.a.보이는글 && j.a.보이는글[0] === '· 지금 2 / 4개' && j.b.보이는글[0] === '· 지금 2 / 4개' && j.b.고쳐씀 === 0, '먼 밭 ' + JSON.stringify([j.a, j.b]));
+  ok(j.u === 3 && j.c.보이는글[0] === '· 지금 3 / 4개' && j.c.고쳐씀 === 1 && j.c.다시그림 === 0, '길 곁 밭 ' + JSON.stringify(j.c));
+});
+/* [MAC-NOUSE-2] 쓸수있는 목표 종류를 못 쓰는 자리에 놓으면 한 줄 — 불러오는 동안은 조용 · 먼 밭 → '길 옆에' · 둘째는 쉼 · 길 곁 밭은 조용 */
+test('못 쓰는 자리 한 줄: farm 먼 밭 → 길 옆에 · 둘째 먼 밭 → 쉼 · 길 곁 밭 → 조용 · 불러오는 동안 → 조용', () => {
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: fs.readFileSync(${JSON.stringify(path.join(ROOT, 'village/stages/boards/mid36.json'))}, 'utf8'), seed: 1, query: 'stage=farm' });
+w.__put('field', 147, 127, 0); const a = w.__noUseSay().말함; w.__tickBench(1); w.__LOADMS = 1;
+w.__put('field', 150, 120, 0); const b = w.__noUseSay(); w.__put('field', 153, 120, 0); const c = w.__noUseSay(); w.__put('field', 138, 153, 0); const d = w.__noUseSay();
+process.stdout.write('@@' + JSON.stringify({ a, b, c, d, 못씀: w.__usable('field').못쓰는자리.length }) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+  const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); ok(l, '훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); const j = JSON.parse(l.slice(2));
+  ok(j.a === 0, '불러오는 동안 말함 ' + j.a);
+  ok(j.b.말함 === 1 && /^밭은 길 옆에 있어야 주민이 쓸 수 있어요/.test(j.b.마지막), '먼 밭 ' + JSON.stringify(j.b));
+  ok(j.c.말함 === 1 && j.c.쉼 === 1, '둘째 먼 밭 ' + JSON.stringify(j.c));
+  ok(j.d.말함 === 1 && j.d.쉼 === 1 && j.못씀 === 3, '길 곁 밭 ' + JSON.stringify(j));
+});
+/* [MAC-WAITCHIPSAY] 🏠 칩 말 = 그 집을 눌렀을 때의 말 · 빈 그림 없음 */
+test('🏠 칩 말 = 그 집을 눌렀을 때 말 · 빈 그림 없음 (pop88 · farm+mid36)', () => {
+  const tap = (query, save) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: fs.readFileSync(${JSON.stringify(path.join(ROOT, save))}, 'utf8'), seed: 1, query: ${JSON.stringify(query)} });
+w.__tickBench(300); process.stdout.write('@@' + JSON.stringify([w.__waitHomesTap(), w.__waitHomesTap()]) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8' });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('__waitHomesTap 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const a = tap('', 'village/stages/boards/pop88.json'), b = tap('stage=farm', 'village/stages/boards/mid36.json');
+  [...a, ...b].forEach(t => { ok(t.말 && t.말.endsWith(' · ' + t.집말), '칩 말 ≠ 집 말: ' + JSON.stringify(t)); ok(!/—\s+중에/.test(t.말), '빈 그림: ' + t.말); });
+  ok(/^🏠 이 동네 18채 · 하나만 더/.test(a[0].말), 'pop88 첫 동네 ' + a[0].말);
+});
+/* [MAC-JOBVACANT] 빈 일자리 💼 — 일할 어른이 없으면 안 띄움(origin: 옛 5 → 0) · 일할 어른이 있으면 그 집 가까운 빈 자리에만(pop88 에 길이 끊긴 가게 — 멀면 안 띄움 · near 를 넓히면 띄움) */
+test('빈 자리 💼: origin 은 일할 어른 0 이라 안 띄움(끄면 옛 모습) · pop88 끊긴 가게는 가까울 때만', () => {
+  const go = (query, save, body) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${save ? `fs.readFileSync(${JSON.stringify(path.join(ROOT, save))}, 'utf8')` : 'null'}, seed: 1, query: ${JSON.stringify(query)} });
+const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error(query + ' 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const a = go('stage=origin', null, `w.__tickBench(600); const on = w.__jobVacant(); w.VRULES.jobVacant.on = false; return { on, off: w.__jobVacant() };`);
+  ok(a.on.일없는어른 === 0 && a.on.빈자리 > 0 && a.on.띄움.length === 0 && a.off.띄움.length > 0, 'origin ' + JSON.stringify([a.on.띄움.length, a.off.띄움.length, a.on.빈자리]));
+  const b = go('', 'village/stages/boards/pop88.json', `w.__tickBench(200); w.__put('road', 128, 110, 0); w.__put('shop', 129, 110, 0); w.__tickBench(400); const near = w.__jobVacant(); w.VRULES.jobVacant.near = 400; return { near, far: w.__jobVacant() };`);
+  ok(b.near.일없는어른 > 0 && b.near.빈자리 > 0 && !b.near.띄움.includes('shop@129,110') && b.far.띄움.includes('shop@129,110'), 'pop88 끊긴 가게 ' + JSON.stringify(b));
+});
+
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
 const f = results.filter(r => r[0] === 'FAIL').length;
 console.log(`\n요약: PASS ${results.length - f} · FAIL ${f}`);
