@@ -5328,8 +5328,11 @@ function _decoSpaceSync() {
 const DECO_WATER_OK = { d_y29: 1, d_y30: 1 };   // 갈대 묶음 · 징검돌 (+ 물을 좋아하는 동물은 동물 규칙이 본다)
 //  [INDOOR-WALL-1] 벽걸이 — 괘종시계(d_i3)는 서 있는 시계라 뺐다(그림에 바닥 그림자 · docs/indoor_look_rules_20260920.md §4, 보스 승인).
 //  벽걸이는 저장은 **0번 줄 그대로**, 그림만 한 칸 위 벽 띠에 그린다(`DECO_WALL_ART` 의 벽걸이 판 · 없으면 몸통을 띠에).
-const DECO_WALL = { d_i4: 1 };                   // 그림 액자
-const DECO_WALL_ART = { d_i4: 'd_i4_wall' };     // 벽 띠에 그릴 그림(assets/deco/<이름>.svg — 못·끈·벽 그림자까지 그린 판)
+const DECO_WALL = { d_i4: 1,                     // 그림 액자
+  //  [DECO-INDOOR-ITEMS-1] 두꺼운 벽 묶음 벽걸이 여섯 — 그림이 곧 벽 띠 판(못·그림자·걸레받이 위)
+  in_w_curtain: 1, in_w_window2: 1, in_w_clock: 1, in_w_board: 1, in_w_shelf: 1, in_w_bookshelf: 1 };
+const DECO_WALL_ART = { d_i4: 'd_i4_wall',       // 벽 띠에 그릴 그림(assets/deco/<이름>.svg — 못·끈·벽 그림자까지 그린 판)
+  in_w_curtain: 'in_w_curtain', in_w_window2: 'in_w_window2', in_w_clock: 'in_w_clock', in_w_board: 'in_w_board', in_w_shelf: 'in_w_shelf', in_w_bookshelf: 'in_w_bookshelf' };
 function _isWallDeco(id) { return !!DECO_WALL[id]; }
 function _decoRuleWhy(id, area, r, c, w, h) {
   if (!id) return '';
@@ -10967,7 +10970,7 @@ const _DECO_KIND_OLD = {
   animal: 'd_y32 d_y39 d_y40 d_y53 d_y54 d_y55 d_y56 d_y57 d_y58 d_y60 d_y62 d_y69',
   building: 'd_y11 d_y17 d_y27 d_y28 d_y33 d_y34 d_y63 d_y66 d_y67 d_y68',
   water: 'd_y10 d_y20 d_y31 d_y59',
-  furniture: 'd_i5 d_i6 d_i7 d_i8 d_i9 d_i10 d_i11 d_i12 d_i14',
+  furniture: 'd_i5 d_i6 d_i7 d_i8 d_i9 d_i10 d_i11 d_i12 d_i14 in_table_long in_chair_front in_chair_back',   // [DECO-INDOOR-ITEMS-1] 긴 탁자·의자
 };
 let _decoKindMap = null;
 function _decoShopKind(d) {

@@ -525,6 +525,16 @@ const GAME_DATA = {
     // ── 러그 (layer:'floor' = 가구·캐릭터 뒤 바닥 레이어에 그림, FLOOR-SVG-1) ──
     {id:'d_i15',name:'둥근 러그',     icon:'🟠', size:{w:2,h:2}, priceAdj:+20,  cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
     {id:'d_i16',name:'네모 러그',     icon:'🟦', size:{w:3,h:2}, priceAdj:+50, cat:'indoor', rarity:'rare',   reqLv:1, layer:'floor'},
+    // ── 집 안 두꺼운 벽 묶음 (DECO-INDOOR-ITEMS-1 · 디자인 docs/indoor_walls_20260923.md · 값은 사용자 승인 09-24: 벽걸이 = 액자 값대 · 긴 탁자 = 소파 값대 · 의자 = 램프 값대) ──
+    {id:'in_w_curtain',   name:'커튼 창',   icon:'🪟', priceAdj:+10, cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_w_window2',   name:'긴 창',     icon:'🪟', size:{w:2,h:1}, priceAdj:+10, cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_w_clock',     name:'벽시계',    icon:'🕗', priceAdj:+10, cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_w_board',     name:'게시판',    icon:'📌', size:{w:2,h:1}, priceAdj:+10, cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_w_shelf',     name:'벽 선반',   icon:'🧺', priceAdj:+10, cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_w_bookshelf', name:'걸이 책장', icon:'📚', priceAdj:+10, cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_table_long',  name:'긴 탁자',   icon:'🪵', size:{w:4,h:2}, priceAdj:+25, cat:'indoor', rarity:'rare',   reqLv:1},
+    {id:'in_chair_front', name:'의자(앞)',  icon:'🪑', priceAdj:0,  cat:'indoor', rarity:'common', reqLv:1},
+    {id:'in_chair_back',  name:'의자(뒤)',  icon:'🪑', priceAdj:0,  cat:'indoor', rarity:'common', reqLv:1},
     // ── 업적 전용 (상점 미판매, price:0) ──
     {id:'deco_trophy',    name:'트로피 (업적)',    icon:'🏆', price:0, cat:'yard',   rarity:'legend', reqLv:1},
     {id:'deco_bookshelf', name:'황금 책장 (업적)', icon:'📚', price:0, cat:'indoor', rarity:'legend', reqLv:1},
