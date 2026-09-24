@@ -98,8 +98,8 @@ w.__tickBench(300); process.stdout.write('@@' + JSON.stringify({ 물: w.__needWa
   ok(j.배움.팻말부위 === 0 && j.장보기.팻말부위 > 0, '팻말 ' + JSON.stringify(j));
 });
 
-/* [MAC-HEALTH] 건강 — 인구 100 이면 켜지고 저장 칸 건강:1 로 다시 열어도 · 수업 판(onebridge)·물을 지키는 판(town3)은 없음 · 스위치를 끄면 없음 */
-test('건강: pop167 은 50틱 뒤 건강 · 다시 열어도 · onebridge·town3 은 없음 · 끄면 없음', () => {
+/* [MAC-HEALTH] 건강 — 인구 100 이면 켜지고 저장 칸 건강:1 로 다시 열어도 · 판 규칙이 없는 수업 판(jobs-short)·물을 지키는 판(town3)은 없음 · 규칙을 적은 수업 판(onebridge · PR 3b)은 있음 · 스위치를 끄면 없음 */
+test('건강: pop167 은 50틱 뒤 건강 · 다시 열어도 · jobs-short·town3 은 없음 · onebridge(규칙)는 있음 · 끄면 없음', () => {
   const hl = (query, save, pre, ticks) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${save ? `fs.readFileSync(${JSON.stringify(path.isAbsolute(save) ? save : path.join(ROOT, save))}, 'utf8')` : 'null'}, seed: 1, query: ${JSON.stringify(query)} });
 ${pre || ''}
@@ -108,11 +108,12 @@ process.stdout.write('@@' + JSON.stringify({ h: w.__health(), t: w.__exportText(
     const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('__health 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
   const P = 'village/stages/boards/pop167.json', tf = path.join(os.tmpdir(), 'village-sim-test-health-' + process.pid + '.json');
   const a = hl('', null, '', 0), b = hl('', P, '', 50); fs.writeFileSync(tf, b.t);
-  const c = hl('', tf, '', 0), d = hl('stage=onebridge', null, '', 50), e = hl('stage=town3', null, '', 0), f = hl('', P, 'w.VRULES.health.on = false;', 50); fs.rmSync(tf, { force: true });
+  const c = hl('', tf, '', 0), d = hl('stage=jobs-short', null, '', 50), g = hl('stage=onebridge', null, '', 50), e = hl('stage=town3', null, '', 0), f = hl('', P, 'w.VRULES.health.on = false;', 50); fs.rmSync(tf, { force: true });
   ok(a.h.필요.join() === '장보기,놀이,쉼' && a.h.돌아섬필요.join() === '장보기,놀이,쉼' && a.h.의원.필요 === '건강' && a.h.의원.트레이 && a.h.의원.해금 === 80, '빈 땅 ' + JSON.stringify(a.h.의원));
   ok(b.h.걸쇠 && b.h.필요.join() === '장보기,놀이,쉼,배움,건강' && b.h.의원.열림 && /"건강":\s*1/.test(b.t), 'pop167 ' + b.h.필요.join());
   ok(c.h.걸쇠 && c.h.필요.join() === '장보기,놀이,쉼,배움,건강' && c.h.되살림 === 1, '다시 열기 ' + c.h.필요.join());
-  ok(!d.h.제공 && !d.h.필요.includes('건강'), 'onebridge ' + d.h.필요.join());
+  ok(!d.h.제공 && !d.h.필요.includes('건강'), 'jobs-short ' + d.h.필요.join());
+  ok(g.h.제공 && g.h.필요.includes('건강'), 'onebridge(규칙 health) ' + g.h.필요.join());
   ok(!e.h.제공 && e.h.필요.join() === '물,장보기,놀이,쉼' && e.h.의원.필요 === null, 'town3 ' + e.h.필요.join());
   ok(!f.h.제공 && !f.h.걸쇠 && !/"건강"/.test(f.t) && !/"clinic"/.test(f.t) && f.h.의원.필요 === null && !f.h.의원.트레이, '끔 ' + f.h.필요.join() + ' · clinic 해금 남음? ' + /"clinic"/.test(f.t));
 });
@@ -120,7 +121,7 @@ process.stdout.write('@@' + JSON.stringify({ h: w.__health(), t: w.__exportText(
 /* [MAC-HEALTH] 도중에 끄기 — 인구 80 을 넘으며 checkUnlocks 가 연 의원 해금도 되돌린다(origin 시작 땅에서 80 줄을 잠가 두고 · 보스 #1085 검토) */
 test('건강: 인구 80 에 열린 의원 해금도 도중에 끄면 저장 글에서 빠진다(origin)', () => {
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
-const d = JSON.parse(fs.readFileSync(${JSON.stringify(path.join(ROOT, 'village/stages/starts/origin.json'))}, 'utf8')); d.unlocked = d.unlocked.filter(k => !['green', 'sbridge', 'station'].includes(k));
+const d = JSON.parse(fs.readFileSync(${JSON.stringify(path.join(ROOT, 'village/stages/starts/origin.json'))}, 'utf8')); d.unlocked = d.unlocked.filter(k => !['green', 'sbridge', 'station', 'clinic'].includes(k)); d.palette = d.palette.map(k => k === 'clinic' ? 'field' : k);   /* 원본 7차(PR 3b)는 의원 넷이 놓여 있어 해금이 처음부터 열린다 — 의원 없는 원본으로(같은 2×2 밭으로 바꿔 둔다) */
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: JSON.stringify(d), seed: 1, query: 'stage=origin' });
 const a = w.__health().의원.열림; let n = 0; while (!w.__health().의원.열림 && n < 60) { w.__tickBench(100); n++; }
 const b = w.__health().의원.열림; w.VRULES.health.on = false; w.__tickBench(5);
