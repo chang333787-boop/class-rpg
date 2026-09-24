@@ -4956,7 +4956,14 @@ function _inRoomAt(r, c, student) {
   return null;
 }
 //  벽걸이가 걸리는 줄인가 — 판 맨 윗줄(큰 방의 벽) 또는 어느 방의 윗줄
-function _inIsWallRow(r, c) { if (r === 0) return true; const h = _inRoomAt(r, c); return !!(h && !h.band && h.rm.r === r); }
+function _inIsWallRow(r, c) {
+  const rooms = _inRooms(CUR);
+  if (r === 0 && !rooms.length) return true;   // 방이 없으면 판 맨 윗줄이 큰 방의 벽
+  const h = _inRoomAt(r, c);
+  if (!(h && !h.band && h.rm.r === r)) return r === 0 && !h;
+  //  [DECO-INDOOR-RULE-1] 위아래 문이 난 두 칸은 벽 띠가 아니라 통로다 — 그 칸엔 벽걸이가 안 걸린다
+  return !_inRoomDoors(rooms).some(d => d.row === r - 1 && c >= d.c0 && c < d.c1);
+}
 //  [DECO-RULE-R3] (r,c,w,h) 가 방 벽을 가로지르나 — 칸마다 '어느 방 안인가'(벽 띠·빈 터는 '밖')가 하나여야 한다.
 //  반은 방 안·반은 빈 터(또는 옆 방)면 벽이 가구를 가른다.
 function _inCrossesWall(r, c, w, h, rooms) {
@@ -5339,8 +5346,17 @@ function _decoRuleWhy(id, area, r, c, w, h) {
     }
   }
   if (area === 'indoor' && DECO_WALL[id] && !_inIsWallRow(r, c)) return '🖼️ 벽에 거는 거예요 — 위쪽 벽(맨 윗줄이나 방의 윗벽)을 눌러 걸어 주세요';
+  //  [DECO-INDOOR-RULE-1] 방이 있으면 벽은 방에만 있다 — 판 맨 윗줄(방 밖 마당)에 새로 걸지 않는다(이미 걸린 것은 그대로)
+  if (area === 'indoor' && DECO_WALL[id] && _inRooms(CUR).length) { const hw = _inRoomAt(r, c); if (!(hw && !hw.band && hw.rm.r === r)) return '🖼️ 방의 윗벽에 걸어 주세요 — 방 밖은 마당이에요'; }
   //  [DECO-RULE-R3] 가구가 방 벽을 가로지르면(반은 방 안·반은 밖) 안 놓는다
-  if (area === 'indoor' && !DECO_WALL[id] && _inCrossesWall(r, c, w, h, _inRooms(CUR))) return '🧱 벽에 걸려요 — 방 안이나 밖에 다 들어가게 놓아 주세요';
+  if (area === 'indoor' && !DECO_WALL[id] && _inCrossesWall(r, c, w, h, _inRooms(CUR))) return '🧱 벽에 걸려요 — 방 안에 다 들어가게 놓아 주세요';
+  //  [DECO-INDOOR-RULE-1] 보스 결정 ① 방이 하나라도 있으면 방 밖(마당 잔디)에는 가구를 놓지 않는다 · 방이 없으면 바닥 전체가 한 방
+  //  보스 결정 ② 나가기 문 발판 칸은 비워 둔다(나가는 길) — 둘 다 이미 놓인 것은 그대로(옮기지 않는다 · R3 와 같은 원칙)
+  if (area === 'indoor' && !DECO_WALL[id]) {
+    const rooms = _inRooms(CUR);
+    if (rooms.length && !rooms.some(o => r >= o.r && c >= o.c && r + h <= o.r + o.h && c + w <= o.c + o.w)) return '🌿 방 밖은 마당이에요 — 방 안에 놓아 주세요';
+    if (_inExitSpots(rooms).some(ex => r <= ex.matRow && r + h > ex.matRow && c < ex.c1 && c + w > ex.c0)) return '🚪 나가는 길이에요 — 문 앞 두 칸은 비워 두어요';   // [DECO-INDOOR-WALL-2] 문마다
+  }
   return '';
 }
 
