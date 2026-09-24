@@ -12063,6 +12063,7 @@ window.__cellScreen = (x, y) => {
     }
   return null;
 };
+window.__screenCell = (sx, sy) => { const c = cellAt(sx, sy); return c && c.inside ? [c.x, c.y] : null; };   // [MAC-LOOKSHOTS] 화면 점 → 칸(읽기만) — scripts/village-look 가 '차이 난 칸' 표를 만든다
 window.__del = (x, y) => removeAt(x, y);
 /* 지우기는 "맨 뒤를 빈 자리로 옮기는" 방식이라 자리가 어긋나기 쉽다.
    놓여 있는 물건 전부에 대해 실제로 GPU 에 올라간 행렬이 제 칸에 있는지 대조한다. */
