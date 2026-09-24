@@ -9260,8 +9260,8 @@ function drawUmbrellas() {
    **그리기만** 옮긴다: drawFolks·[ACT-KID] 가 쓴 행렬에 옆 걸음만 더한다(같은 묶음 · draw call +0). 우산([ACT-UMB])도 같은 만큼 따라간다(그 블록에 한 줄).
    판정·칸 잡기·붐빔·저장 0. 규칙 모듈 꼴: 스위치·수치 VRULES.passBy + 루프 고리 한 줄.
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).passBy = { on: true, side: 0.85, ease: 0.18 };
-const PASS = { cells: new Map(), m: new THREE.Matrix4(), t: new THREE.Matrix4(), stats: { 비켜그린틱: 0 } };
+(window.VRULES = window.VRULES || {}).passBy = { on: true, side: 0.85, ease: 0.18, ring: 0.8, row: 0.9 };   /* ring = 셋 넘게 한 칸에 서 있을 때 둘레로 선 이웃 사이 · row = 같은 쪽으로 걷는 셋째부터 한 걸음씩 뒤(두 줄) (09-24) */
+const PASS = { cells: new Map(), ring: new Map(), frame: 0, m: new THREE.Matrix4(), t: new THREE.Matrix4(), stats: { 비켜그린틱: 0, 둘레: 0 } };
 function actPassDraw() {
   const R = window.VRULES.passBy; if (!R.on || !folks.length || OFF.has('folks')) return;
   const a = SIM.paused ? 1 : Math.min(1, SIM.acc / TICK_MS), C = PASS.cells; C.clear();
@@ -9269,14 +9269,21 @@ function actPassDraw() {
     const x = f.px == null ? f.x : f.px + (f.x - f.px) * a, z = f.pz == null ? f.z : f.pz + (f.z - f.pz) * a, c = Math.round(x / CS + (W - 1) / 2) * 1000 + Math.round(z / CS + (H - 1) / 2);   // 칸 = cellOfFolk 과 같은 셈(칸 가운데에서 갈리지 않게)
     const l = C.get(c); if (l) l.push(i); else C.set(c, [i]); });
   folks.forEach(f => { f.passTx = 0; f.passTz = 0; });
-  C.forEach(list => { if (list.length < 2) return;
+  PASS.frame = (PASS.frame || 0) + 1; C.forEach((list, cell) => { list.cell = cell; if (list.length < 2) return;
     const walkers = list.filter(i => folks[i].walking), standers = list.filter(i => !folks[i].walking);
     walkers.forEach((i, k) => { const f = folks[i], co = Math.cos(f.dir), si = Math.sin(f.dir);
-      const same = walkers.slice(0, k).some(j => Math.cos(folks[j].dir - f.dir) > 0.5);   // 앞에 같은 쪽으로 가는 사람이 있으면 나는 왼쪽
-      const s = (same ? 1 : -1) * R.side * (1 + (f.crowdLv || 0) * 0.25);   // [ACT-CROWD] 붐빌수록 조금 더 비킨다                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
-      f.passTx = co * s; f.passTz = -si * s; });
-    if (standers.length >= 2) standers.forEach((i, k) => { const f = folks[i], s = (k % 2 ? 1 : -1) * R.side * (1 + (k >> 1) * 0.6);   // 한 칸에 둘 이상 서 있으면(큰길 · 가로등 아래 멈춤) 나란히 — 번갈아 좌우로
+      const m = walkers.slice(0, k).filter(j => Math.cos(folks[j].dir - f.dir) > 0.5).length;   // 앞에 같은 쪽으로 가는 사람 수 — 0 오른쪽 · 1 왼쪽 · 2 오른쪽 한 걸음 뒤 · 3 왼쪽 한 걸음 뒤 …(09-24: 셋째부터 모두 왼쪽에 겹쳤다 — 한 집 식구 밤 귀갓길)
+      const same = m > 0, back = Math.floor(m / 2) * (R.row || 0);
+      const s = (m % 2 ? 1 : -1) * R.side * (1 + (f.crowdLv || 0) * 0.25);   // [ACT-CROWD] 붐빌수록 조금 더 비킨다                                // (cos·s, −sin·s) 에서 s<0 = 걷는 방향(sin dir, cos dir)의 오른쪽(위에서 볼 때)
+      f.passTx = co * s - si * back; f.passTz = -si * s - co * back; });   /* back = 걷는 방향(sin dir, cos dir)의 뒤로 */
+    if (standers.length >= 3 && R.ring) { const key = list.cell, g = PASS.ring.get(key) || { slots: [] }; PASS.ring.set(key, g); g.seen = PASS.frame;   /* [09-24 저녁 문 앞] 셋 넘게 한 칸에 서면 — 둘레로 · 자리는 사람마다 붙박이 */
+      const here = new Set(standers.map(i => folks[i])); g.slots = g.slots.map(f => (f && here.has(f) ? f : null)); here.forEach(f => { if (g.slots.includes(f)) return; const e = g.slots.indexOf(null); if (e >= 0) g.slots[e] = f; else g.slots.push(f); });
+      while (g.slots.length > 3 && g.slots[g.slots.length - 1] === null) g.slots.pop();   /* 뒤쪽 빈자리만 줄인다 — 가운데가 비어도 나머지는 제자리 */
+      const n = g.slots.length, r = Math.max(R.side, R.ring / (2 * Math.sin(Math.PI / n)));
+      g.slots.forEach((f, k) => { if (!f) return; const t = k * 6.283 / n; f.passTx = Math.sin(t) * r; f.passTz = Math.cos(t) * r; }); PASS.stats.둘레++; }
+    else     if (standers.length >= 2) standers.forEach((i, k) => { const f = folks[i], s = (k % 2 ? 1 : -1) * R.side * (1 + (k >> 1) * 0.6);   // 한 칸에 둘 이상 서 있으면(큰길 · 가로등 아래 멈춤) 나란히 — 번갈아 좌우로
       const d0 = folks[standers[0]].dir; f.passTx = Math.cos(d0) * s; f.passTz = -Math.sin(d0) * s; }); });   // 한 축(첫 사람의 방향)으로 — 등을 맞댄 둘이 같은 자리로 가지 않게
+  PASS.ring.forEach((g, key) => { if (g.seen !== PASS.frame) PASS.ring.delete(key); });   /* 이번 틀에 셋 넘게 서 있지 않은 칸의 고리는 버린다 */
   let touched = false; const hasV = VISITOR_PARTS.length > 0;
   folks.forEach((f, i) => {
     const e = R.ease; f.passOx = (f.passOx || 0) + (f.passTx - (f.passOx || 0)) * e; f.passOz = (f.passOz || 0) + (f.passTz - (f.passOz || 0)) * e;
