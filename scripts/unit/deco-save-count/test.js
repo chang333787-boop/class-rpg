@@ -1574,6 +1574,38 @@
       _decoUndoClear(); decoSpaceSet(1); await sleep(150);
     }
 
+    //  ㊾ 동물 누르기 — 그려진 몸으로(DECO-ANIM-HIT-2 · 창조자 43-ⓑ93) · 바로 아래 칸에 닭이 서 있어도 강아지 가운데를 누르면 강아지
+    if (typeof _animAtPt === 'function') {
+      decoSpaceSet(3); await sleep(100);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      setDecoMode('deco'); SEL_DECO = null;
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const n3 = id => (CUR.houseDecorations || []).filter(p => p.id === id).length;
+      CUR.inventory = (CUR.inventory || []).filter(i => !/^d_y5[35]$/.test(i.id)).concat([{ id: 'd_y53', qty: n3('d_y53') + 1 }, { id: 'd_y55', qty: n3('d_y55') + 1 }]);
+      SEL_DECO = 'd_y55'; _decoPlace('yard', 16, 40); SEL_DECO = 'd_y53'; _decoPlace('yard', 15, 40); SEL_DECO = null;
+      _drawDeco(); await sleep(400);
+      const host = _ifActiveContainer || 'house-topview', rec = _animLayers.get(host);
+      const pokes = []; const oPoke = _animPoke; _animPoke = function (st, c) { pokes.push(st.id); return oPoke.apply(this, arguments); };
+      try {
+        const still = () => rec.items.forEach(st => { st.seg = null; st.path = []; st.cur = { row: st.home.row, col: st.home.col }; st.fx = st.home.col; st.fy = st.home.row; st.jx = 0; st.jy = 0; st.nextAt = Date.now() + 60000; _animPlace(st); });
+        const tapImg = (id) => { const st = [...rec.items.values()].find(x => x.id === id && x.home.col === 40); const im = st.img.getBoundingClientRect();
+          if (typeof _lifeCardClose === 'function') _lifeCardClose(); _dSuppressClick = false; pokes.length = 0;
+          _decoClick({ clientX: im.left + im.width / 2, clientY: im.top + im.height / 2 }); return pokes.slice(); };
+        still(); await sleep(50);
+        out('누르기_강아지가운데_아래닭있어도_강아지', tapImg('d_y53').join('/') === 'd_y53');
+        still(); await sleep(50);
+        out('누르기_닭가운데_닭', tapImg('d_y55').join('/') === 'd_y55');
+        if (typeof _lifeCardOpen === 'function') {   // 카드가 동물을 덮었을 때 — 단추 아닌 곳을 누르면 닫혀 다시 누를 수 있다
+          still(); await sleep(50); tapImg('d_y55'); await sleep(200);
+          const card = document.querySelector('.deco-life-card');
+          if (card) card.querySelector('.dlc-next').click();
+          out('카드_단추아닌곳_누르면_닫힘', !!card && !_lifeCard && !document.querySelector('.deco-life-card'));
+        }
+      } finally { _animPoke = oPoke; }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _decoUndoClear(); decoSpaceSet(1); await sleep(150);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

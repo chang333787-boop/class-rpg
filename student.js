@@ -8789,12 +8789,37 @@ function _animAt(hostId, r, c) {
   const rec = _animLayers.get(hostId);
   if (!rec) return null;
   //  그림은 발 칸 위로 솟는다 → 발 칸 위 한 줄까지 · 걷는 중이면 지금 그려진 자리(반올림)와 가는 칸
-  const hitAt = (row, col, st) => r >= row - 1 && r < row + st.h && c >= col && c < col + st.w;
+  //  [DECO-ANIM-HIT-2] 여럿이 걸리면 **발 칸**이 머리 줄보다 먼저 · 같으면 앞(아래 줄)에 그려진 것
+  //   (전: 처음 찾은 것 — 강아지 바로 아래 닭의 머리 줄이 강아지 칸과 겹쳐, 강아지 가운데를 누르면 닭이 반응했다 · 창조자 43-ⓑ93)
+  const hitAt = (row, col, st) => (c >= col && c < col + st.w) ? (r >= row && r < row + st.h ? 2 : r === row - 1 ? 1 : 0) : 0;
+  let best = null, bs = 0, bz = -1e9;
   for (const st of rec.items.values()) {
-    if (hitAt(Math.round(st.fy), Math.round(st.fx), st) || hitAt(st.cur.row, st.cur.col, st)) return st;
-    if (st.seg && hitAt(st.seg.r1, st.seg.c1, st)) return st;
+    const sc = Math.max(hitAt(Math.round(st.fy), Math.round(st.fx), st), hitAt(st.cur.row, st.cur.col, st), st.seg ? hitAt(st.seg.r1, st.seg.c1, st) : 0);
+    if (sc > bs || (sc && sc === bs && st.fy > bz)) { best = st; bs = sc; bz = st.fy; }
   }
-  return null;
+  return best;
+}
+//  [DECO-ANIM-HIT-2] 누른 **점**(판 px)이 그려진 몸(bbox.json 상자 · 뒤집힘 반영 · 둘레 .12칸 여유) 위에 있는 동물
+//  — 여럿이면 앞에 그려진 것(아래 줄) · 같으면 몸 가운데가 가까운 것. 몸 밖이면 null(부른 쪽이 칸 판정 _animAt 으로).
+function _animAtPt(hostId, bx, by) {
+  const rec = _animLayers.get(hostId);
+  if (!rec) return null;
+  let best = null, bz = -1e9, bd = 1e9;
+  for (const st of rec.items.values()) {
+    const C = st.C || 0;
+    if (!C) continue;
+    const bb = typeof _decoBBox !== 'undefined' && _decoBBox && _decoBBox[st.id], ok = Array.isArray(bb) && bb[4] > 0 && bb[5] > 0;
+    const vw = ok ? bb[4] : 100 * st.w, vh = ok ? bb[5] : 100 * (st.h + 1), w = st.w * C, H = w * vh / vw;
+    const x0 = (st.fx + (st.jx || 0)) * C, bot = (st.fy + (st.jy || 0) + st.h) * C, top = bot - H;
+    const flip = ((st.cfg && st.cfg.artLeft) ? -(st.dir || 1) : (st.dir || 1)) < 0;
+    const rw = ok ? bb[2] : vw, rh = ok ? bb[3] : vh, ry = ok ? bb[1] : 0;
+    let rx = ok ? bb[0] : 0; if (flip) rx = vw - rx - rw;
+    const pad = .12 * C, L = x0 + rx / vw * w - pad, R = x0 + (rx + rw) / vw * w + pad, T = top + ry / vh * H - pad, B = top + (ry + rh) / vh * H + pad;
+    if (bx < L || bx > R || by < T || by > B) continue;
+    const z = st.fy + (st.jy || 0), d = Math.hypot(bx - (L + R) / 2, by - (T + B) / 2);
+    if (z > bz + 1e-6 || (Math.abs(z - bz) <= 1e-6 && d < bd)) { best = st; bz = z; bd = d; }
+  }
+  return best;
 }
 //  그림이 발밑 칸 위로 솟은 칸 수(bbox.json) — 말풍선·💗 를 머리 위에
 function _animOverCells(st) {
@@ -9052,7 +9077,7 @@ function _lifeCardOpen(st) {
   el.addEventListener('click', e => {
     e.stopPropagation();
     const b = e.target.closest && e.target.closest('button');
-    if (!b) return;
+    if (!b) { _lifeCardClose(); return; }   // [DECO-ANIM-HIT-2] 단추 아닌 곳을 누르면 닫힌다(카드가 덮은 동물을 다시 누를 수 있게)
     if (b.classList.contains('dlc-namebtn')) _lifeCardChips(k, false);
     else if (b.classList.contains('dlc-more')) _lifeCardChips(k, true);
     else if (b.dataset.n) _lifeCardPick(k, +b.dataset.n);
@@ -10051,7 +10076,7 @@ function _decoClick(e) {
     // [DECO-ANIM-2] 카드를 안 고른 상태에서 동물을 누르면 반응(놓기가 먼저다)
     //  [DECO-SEL-A5] 카드를 들었어도 — 보이는 동물을 누른 것은 쓰다듬기다(전엔 그 발밑에 하나가 더 놓였다 · 창조자 27회 ⓐ5)
     if(DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
-      const pet=_animAt(_ifActiveContainer||'house-topview', r, c);
+      const pet=_animAtPt(_ifActiveContainer||'house-topview', mx, my)||_animAt(_ifActiveContainer||'house-topview', r, c);   // [DECO-ANIM-HIT-2] 그려진 몸 먼저
       if(pet && _animPoke(pet, c)) { _lifePetAnim(pet); _lifeCardOpen(pet); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1 · [DECO-LIFE-2] 카드
     }
     _decoPlace('yard',r,c);
