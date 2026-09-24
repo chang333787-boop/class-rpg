@@ -2159,6 +2159,7 @@ function miniLookDraw(b) {                                                      
   const R = (o, p) => [(o.x0 - b.x0 - p) * kx, (b.y1 - o.y1 - p) * ky, (o.x1 - o.x0 + 1 + 2 * p) * kx, (o.y1 - o.y0 + 1 + 2 * p) * ky];   // 칸 범위 → 캔버스 사각형(drawMini 와 같은 식 · 위가 판의 +y 쪽) · p: 칸 단위로 넓힘(+)/들임(−)
   const each = (c, fn) => objs.forEach(o => { if (o.c === c) fn(o); }), fill = (col, c, p) => { g.fillStyle = col; each(c, o => g.fillRect(...R(o, p))); };
   g.fillStyle = miniLookMix(bg, '#ffffff', .12); g.fillRect(0, 0, L.width, L.height);                                        // 1 바탕(판 풀빛을 조금 밝게)
+  try { if (terrainLive()) { const T = terrainLayers(); g.imageSmoothingEnabled = false; g.drawImage(T.open, b.x0 * BOARD_PX, (H - 1 - b.y1) * BOARD_PX, (b.x1 - b.x0 + 1) * BOARD_PX, (b.y1 - b.y0 + 1) * BOARD_PX, 0, 0, L.width, L.height); } } catch (e) {}   // [MAC-MINISEA] 지형 판(바다·모래·비탈·고개)은 바탕 위에 지형 층을 그대로(판 그림과 같은 줄 규칙 · 34-ⓑ80 미니맵 쪽) — 없는 판은 한 픽셀도 안 달라진다
   fill('#7cc9e3', 'water', -.05); g.fillStyle = miniLookMix(bg, '#1f4a1a', .25);
   each('green', o => { g.beginPath(); g.arc((o.x0 - b.x0 + .5) * kx, (b.y1 - o.y1 + .5) * ky, Math.max(hi, .6 * kx), 0, Math.PI * 2); g.fill(); });
   const HC = MINILOOK.대비 = miniLookHouseCol(miniLookMix(bg, '#ffffff', .12));                                                // [MAC-MINICONTRAST]
