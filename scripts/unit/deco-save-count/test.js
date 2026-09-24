@@ -16,6 +16,8 @@
   //   main 과 같은 배율로 재게. '전체' 자체를 재는 곳(㉖)만 decoZoomFit 을 부른다.
   const fitOld = () => { const yd = DECO_SCENE === 'yard'; _decoSetZoom(yd ? Math.min(DY_BASE.cols, DY.cols) / DY.cols : 1, 0, 0); _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); };
   const t0 = Date.now();
+  //  [DECO-DAYNIGHT-1] 시험은 실제 시각 대신 낮으로 — 헤드리스 시계(UTC)가 밤이면 동물이 자서 먹이통 시험이 흔들렸다(단추로 바꾼 값은 그대로 따른다)
+  try { if (typeof _decoPhase === 'function') _decoPhase = function () { return _decoPhaseOv || 'day'; }; } catch (e) {}
   (async () => {
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
       if (Date.now() - t0 > 20000) { out('ERR', 'timeout'); return done(); } await sleep(50);
@@ -1882,6 +1884,31 @@
       setDecoMode('deco'); _inPk.tab = 'wall'; _decoUndoClear();
       if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
+    //  ㊺ 낮·저녁·밤(DECO-DAYNIGHT-1) — 단추로 차례대로 · 저녁/밤이면 색 막 · 다시 열면 실제 시각 · 저장 0
+    if (typeof decoPhaseCycle === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const sv0 = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.indoor]);
+      _decoPhaseOv = 'day'; decoPhaseCycle();
+      out('낮밤_단추_차례', _decoPhase() === 'evening' && document.getElementById('if-phase-btn').textContent === '🌇');
+      decoPhaseCycle();
+      const fills = []; const fr = _dCtx.fillRect, fs = () => String(_dCtx.fillStyle);
+      _dCtx.fillRect = function () { fills.push(fs()); return fr.apply(this, arguments); };
+      try { _drawYard(); } finally { _dCtx.fillRect = fr; }
+      out('낮밤_밤이면_색막', _decoPhase() === 'night' && fills.some(f => /rgba\(20, 30, 80/.test(f)) && document.getElementById('if-topview').classList.contains('is-night'));
+      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(400);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      out('낮밤_다시열면_실제시각', _decoPhaseOv === null);
+      out('낮밤_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.indoor]) === sv0);
+      //  친구 구경도 밤이면 동물 층이 같은 결로(캔버스 색 막만 깔리고 동물이 밝게 떠 보이던 것)
+      _decoPhaseOv = 'night';
+      { const fr = JSON.parse(JSON.stringify(CUR)); fr.id = 'friend-n'; fr.name = '친구';
+        openFriendFullscreen(fr); await sleep(300);
+        const fh = document.getElementById('ff-topview');
+        out('낮밤_친구구경도_밤', !!fh && fh.classList.contains('is-night'));
+        closeFriendFullscreen(); await sleep(100); }
+      _decoPhaseOv = null;
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
