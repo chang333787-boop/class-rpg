@@ -1494,6 +1494,82 @@ try {
   test('네모로 코드를 돌릴 수 있다', () => { throw e; });
 }
 
+cur = '꾸미기 친해지기 저장 칸(DECO-LIFE-1)';
+try {
+  const S = read('student.js');
+  const sb = { DB: { _fbRef: { child: (p) => ({ update: (up) => { sb.__sent.push({ p, up }); return Promise.resolve(); } }) } }, __sent: [] };
+  sb.globalThis = sb; vm.createContext(sb);
+  const names = ['_lifeDay', '_lifeObj', '_lifeGet', '_lifeOk', '_lifeHearts', '_lifeStage', '_lifeNo', '_lifeFriendAt', '_lifeApply', '_lifeSend', '_lifeWrite', '_lifePet'];
+  vm.runInContext(SPACE_PRELUDE(S) + sliceConst(S, 'LIFE_STAGE_AT') + 'let _lifeWrites = 0;' + NL + names.map(n => sliceFn(S, n)).join(NL)
+    + ';globalThis.__L = { ' + names.join(', ') + ', writes: () => _lifeWrites };', sb);
+  const L = sb.__L, day = L._lifeDay(Date.UTC(2026, 8, 24, 3)), T = d => (d - 0) * 86400000 - 9 * 3600000 + 3600000;   // T(일 번호) = 그날 한국 새벽 1시
+  const kid = () => ({ id: 's1', houseDecorations: [{ id: 'd_y53', area: 'yard', row: 5, col: 9 }, { id: 'd_y55', area: 'yard', row: 7, col: 3 }] });
+  test('없으면 빈 것 · 읽기만으로는 필드가 안 생긴다', () => {
+    const k = kid(), g = L._lifeGet(k);
+    eq([g.ro, g.c, Object.keys(g.a).length, Object.keys(g.g).length, 'decoLife' in k], [false, 0, 0, 0, false]);
+  });
+  test('모양이 틀린 칸은 없는 셈(배열 · 숫자 · null) · 지우지 않는다', () => {
+    for (const bad of [[], 7, null, 'x', { a: [], g: 3, s: null, c: -4, p: 'x' }]) {
+      const k = kid(); k.decoLife = bad; const g = L._lifeGet(k);
+      eq([Object.keys(g.a).length, Object.keys(g.s).length, Object.keys(g.g).length, g.c, g.p], [0, 0, 0, 0, 0], JSON.stringify(bad));
+      eq(JSON.stringify(k.decoLife), JSON.stringify(bad), '그대로');
+    }
+  });
+  test('모르는 모양 번호(v:2)면 읽기 전용 — 쓰다듬어도 쓰기 0', () => {
+    const k = kid(); k.decoLife = { v: 2, a: {} }; sb.__sent.length = 0;
+    eq([L._lifeGet(k).ro, L._lifePet(k, k.houseDecorations[0], T(day)), sb.__sent.length], [true, null, 0]);
+  });
+  test('단계 문턱 0/3/8/15/25(보스 ①)', () => {
+    eq([0, 2, 3, 7, 8, 14, 15, 24, 25, 99].map(L._lifeStage), [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+  });
+  test('처음 쓰다듬기 = 새 친구 한 줄 · 잎 쓰기 1번(한 update) · 선 자리 · 하트 1', () => {
+    const k = kid(); sb.__sent.length = 0;
+    const r = L._lifePet(k, k.houseDecorations[0], T(day));
+    eq([r.u, r.gained, r.stage], ['a1', 1, 1]);
+    eq(k.decoLife.a.a1, { k: 'd_y53', r: 5, c: 9, m: day, h: 1, d: day });
+    eq([k.decoLife.v, k.decoLife.c], [1, 2]);
+    eq(sb.__sent.length, 1); eq(sb.__sent[0].p, 'students/s1');
+    eq(Object.keys(sb.__sent[0].up).sort(), ['decoLife/a/a1', 'decoLife/c', 'decoLife/v']);
+    eq(k.houseDecorations[0], { id: 'd_y53', area: 'yard', row: 5, col: 9 }, '자리 객체는 그대로');
+  });
+  test('같은 날 또 쓰다듬기 = 하트 그대로 · 쓰기 0 / 다음 날 = +1(서버 더하기)', () => {
+    const k = kid(); L._lifePet(k, k.houseDecorations[0], T(day)); sb.__sent.length = 0;
+    eq(L._lifePet(k, k.houseDecorations[0], T(day) + 5 * 3600000).gained, 0); eq(sb.__sent.length, 0);
+    const r = L._lifePet(k, k.houseDecorations[0], T(day + 1));
+    eq([r.gained, k.decoLife.a.a1.h, k.decoLife.a.a1.d], [1, 2, day + 1]);
+    eq(sb.__sent[0].up['decoLife/a/a1/d'], day + 1);
+    eq(Object.keys(sb.__sent[0].up).sort(), ['decoLife/a/a1/d', 'decoLife/a/a1/h']);
+  });
+  test('단계가 오르는 날 스티커 +1 · 알림 신호(stageUp)', () => {
+    const k = kid(); k.decoLife = { v: 1, c: 2, a: { a1: { k: 'd_y53', r: 5, c: 9, m: day - 9, h: 2, d: day - 1 } } };
+    const r = L._lifePet(k, k.houseDecorations[0], T(day));
+    eq([r.stage, r.stageUp, k.decoLife.a.a1.h, k.decoLife.g.sticker], [2, true, 3, 1]);
+  });
+  test('옮기기(치우고 다른 자리에 놓기) = 쉬던 친구가 돌아온다 · 선 자리만 고침', () => {
+    const k = kid(); k.decoLife = { v: 1, c: 3, a: { a1: { k: 'd_y53', r: 5, c: 9, m: day - 9, h: 6, d: day - 1, n: 2 }, a2: { k: 'd_y53', r: 1, c: 1, m: day - 3, h: 2, d: day - 1 } } };
+    k.houseDecorations = [{ id: 'd_y53', area: 'yard', row: 12, col: 20 }];      // 둘 다 쉬는 친구 → 하트 많은 a1
+    const r = L._lifePet(k, k.houseDecorations[0], T(day));
+    eq([r.u, k.decoLife.a.a1.r, k.decoLife.a.a1.c, k.decoLife.a.a1.h, k.decoLife.a.a1.n], ['a1', 12, 20, 7, 2]);
+    k.houseDecorations.push({ id: 'd_y53', area: 'yard', row: 2, col: 2 });      // 둘째 강아지 → 남은 쉬는 친구 a2
+    eq(L._lifePet(k, k.houseDecorations[1], T(day)).u, 'a2');
+  });
+  test('다른 종류 · 다른 공간 자리는 짝이 아니다 · 친구 번호는 늘기만(빈 번호를 다시 안 씀)', () => {
+    const k = kid(); k.decoLife = { v: 1, c: 5, a: { a4: { k: 'd_y53', r: 5, c: 9, sp: 2, h: 1, d: day - 1 } } };
+    k.houseDecorations = [{ id: 'd_y53', area: 'yard', row: 5, col: 9, sp: 2 }, { id: 'd_y55', area: 'yard', row: 5, col: 9 }];
+    eq(L._lifePet(k, k.houseDecorations[1], T(day)).u, 'a5');                   // 닭 — 강아지 친구와 짝 아님 · c=5 부터
+    eq(L._lifeFriendAt(k, k.houseDecorations[0], L._lifeGet(k)), 'a4');          // 공간 2 의 강아지
+  });
+  test('모르는 칸은 보존 · 빈 것 왕복(친구 0 · 선물 0)', () => {
+    const k = kid(); k.decoLife = { v: 1, future: { x: 1 } };
+    L._lifePet(k, k.houseDecorations[0], T(day));
+    eq(k.decoLife.future, { x: 1 });
+    const e = kid(); e.decoLife = JSON.parse(JSON.stringify({ v: 1, a: {}, g: {} }));
+    eq([Object.keys(L._lifeGet(e).a).length, L._lifeGet(e).ro], [0, false]);
+  });
+} catch (e) {
+  test('친해지기 저장 코드를 돌릴 수 있다', () => { throw e; });
+}
+
 // ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
