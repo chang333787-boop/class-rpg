@@ -4,13 +4,16 @@
 import { spawn } from 'node:child_process'; import { fileURLToPath } from 'node:url'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import net from 'node:net';
 const HERE=path.dirname(fileURLToPath(import.meta.url)), WT=path.resolve(HERE,'..','..','..');
 const OUT=path.join(os.tmpdir(),'deco_touch_rect'); fs.mkdirSync(OUT,{recursive:true});
-const [W,H]=(process.argv[2]||'1366x610').split('x').map(Number);
+const [W,H]=(process.argv.slice(2).find(a=>/^\d+x\d+$/.test(a))||'1366x610').split('x').map(Number);
+//  [DECO-GPU-1] 그래픽칩으로 그린다 — 맥은 Metal(--use-angle=metal --use-gl=angle · 보스 09-24). 크롬북도 GPU 가 있어 이쪽이 실제에 가깝다.
+//  그래픽칩이 없는 기기만 --soft(옛 --disable-gpu). 맥이 아니면 브라우저 기본값.
+const GPU_ARGS=process.argv.includes('--soft')?['--disable-gpu']:process.platform==='darwin'?['--use-angle=metal','--use-gl=angle']:[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>r(p));});});
 const pp=await freePort(); const play=spawn(process.execPath,[path.join(WT,'scripts/unit/deco-save-count/play.mjs'),String(pp)],{stdio:'ignore',env:{...process.env}}); await sleep(700);
 const prof=fs.mkdtempSync(path.join(os.tmpdir(),'trect_')); const dbg=await freePort();
 const BROWSER=process.env.BROWSER||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
-const ch=spawn(BROWSER,['--headless=new','--disable-gpu','--no-first-run',`--remote-debugging-port=${dbg}`,`--user-data-dir=${prof}`,`--window-size=${W},${H}`,'about:blank'],{stdio:'ignore'});
+const ch=spawn(BROWSER,['--headless=new',...GPU_ARGS,'--no-first-run',`--remote-debugging-port=${dbg}`,`--user-data-dir=${prof}`,`--window-size=${W},${H}`,'about:blank'],{stdio:'ignore'});
 const res={};
 try{ let t; for(let i=0;i<60;i++){await sleep(150);try{t=await(await fetch(`http://127.0.0.1:${dbg}/json`)).json();if(t.length)break;}catch(e){}}
 const ws=new WebSocket(t.find(x=>x.type==='page').webSocketDebuggerUrl); await new Promise(r=>ws.addEventListener('open',r));
