@@ -1508,6 +1508,17 @@ function plotTick() {
   }
   chooseMat.opacity = .22 + .18 * Math.sin(performance.now() / 300);   // 깜빡임
 }
+/* ── [MAC-CHOOSEPAUSE] 땅 고르기 '30초 뒤 저절로'는 멈춘 동안 세지 않는다 (보스 09-24 결정 · #996 에서 찾음) ──
+   plotTick 은 시뮬 틱 10번마다 불린다 — 멈춤(배속 0)·숨은 탭에서는 안 불린다. 그런데 30초는 진짜 시계(performance.now − CHOOSE.since)라
+   **다시 풀자마자** 멈춰 있던 시간까지 쳐서 곧바로 저절로 열었다 — 선생님이 멈춰 둔 사이 골라진 셈(아이는 고를 틈이 없다).
+   부른 사이 틈이 gapMs(2초 · 1배속의 정상 틈은 1초)를 넘으면 넘은 만큼을 멈춘 시간으로 보고 30초 셈에서 뺀다(CHOOSE.since 를 그만큼 뒤로).
+   도는 동안은 전과 같다. 시뮬 하네스는 벽시계가 멈춰 있어(#996) 전과 같이 저절로 열지 않는다 — 기준 ① 0. 원래 줄 수정 0 — plotTick 감싸기. 분류 '바로잡음'. */
+(window.VRULES = window.VRULES || {}).choosePause = { on: true, gapMs: 2000 };
+const CHOPA = { last: null, stats: { 뺀ms: 0, 뺀번: 0 } };
+{ const pt0 = plotTick; plotTick = function () { const R = window.VRULES.choosePause, now = performance.now();
+    if (R.on && CHOPA.last != null && CHOOSE.pending > 0 && CHOOSE.cands.length) { const over = now - CHOPA.last - (R.gapMs || 2000); if (over > 0) { CHOOSE.since += over; CHOPA.stats.뺀ms += Math.round(over); CHOPA.stats.뺀번++; } }
+    CHOPA.last = now; return pt0.apply(this, arguments); }; }
+window.__choosePause = () => ({ 켜짐: window.VRULES.choosePause.on, 기다림: CHOOSE.pending, 지난ms: CHOOSE.cands.length ? Math.round(performance.now() - CHOOSE.since) : null, ...CHOPA.stats });
 
 const forestLeaves = [];
 /* 바깥 숲 — 판 밖은 못 놓는다는 걸 눈으로 알려준다 */
