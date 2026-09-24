@@ -31,7 +31,7 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 |---|---|
 | `--stage <id>` | 판 파일 `village/stages/<id>.json` 으로 연다(`?stage=` 와 같은 길 · 시작 땅·규칙·목표). 판 파일만 디스크에서 읽어 주고 다른 주소는 여전히 거절 · 지표에 `판목표`(이룬 판 목표 수) |
 | `--html <파일>` | 다른 `index.html` 을 싣는다(vendor·판 파일은 이 저장소 것) — **고침 전/후가 같은지** 재기: `--vs '옛: html=/tmp/old.html'` 로 같은 시드끼리 나란히 · `--json` 으로 표본을 떠서 비교 |
-| `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅 |
+| `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅. 저장본에 **판 전용 종류**(field·villtree·pier…)가 있는데 그 판(`--stage` · vs 칸 `stage=`)이 없으면 ⚠ 로 크게 알린다(그 물건은 빠진 채 돈다 · 표 첫머리에 '못 살린 것 N개') — MAC-STAGEKINDS |
 | `--days N` · `--seeds 1-5` | 며칠 · 어느 시드(`1,3,7` 도 된다) |
 | `--lookseed N` | **그림 난수만** 따로 시드(MAC-SIMRAND). 판정(사람 발길·드나듦·바람·이웃)은 `simRand` 줄기라 `--seeds` 로만 움직인다 — 그림 PR 이 판정을 건드렸는지 재기: `--vs '그림흔듦: lookseed=99'` 가 다른 값 0 이어야 한다. vs 칸에도 `lookseed=` |
 | `--rules 'a.b=v,…'` | 불러온 뒤 `VRULES` 를 덮는다. 없는 키면 멈춘다 |
