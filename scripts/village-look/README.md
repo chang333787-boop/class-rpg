@@ -16,6 +16,7 @@ node scripts/village-look/shots.mjs --vs-ref origin/main
 | 명령 | 하는 일 |
 |---|---|
 | `--vs-ref origin/main` | 그 ref 의 `village/` 를 임시 폴더로 풀어 찍고, 이어서 작업 트리를 찍어 장면마다 견줍니다. **PR 검사는 이것.** |
+| `--more <판,판>` · `--soft <판,…>` | 표준 판에 더하기 · 그 판(판 이름이면 모든 조합)의 차이는 FAIL 이 아니라 '⚠ 바뀐 판 — 의도한 차이? PR 에 적기'. village-check 가 PR 이 바꾼 판에 스스로 쓴다(MAC-CHECKCHANGED). `--vs-ref` 에서 옛에 판 파일이 없는 새 판은 견주지 않는다 |
 | `--update` | 작업 트리로 기준 사진을 새로 찍습니다(`tmp/village-look/기준/` + `meta.json`). |
 | `--update --ref origin/main` | 기준을 그 ref 로 찍어 둡니다. 여러 번 고치며 볼 때 씁니다. |
 | (인자 없음) | 작업 트리를 찍어 저장된 기준과 견줍니다. |

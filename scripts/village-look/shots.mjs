@@ -19,13 +19,16 @@
 //   node scripts/village-look/shots.mjs --boards sea,mountain+village/stages/boards/mid36.json --shots default,whole
 // 장면: card(판 시작 카드 · UI) · default(첫 카메라 · 3D) · hud(첫 카메라 + UI · 목표판 펼침) · near(×1.8) · whole(판 전체 보기) — 기본은 다섯 모두
 //   그 밖: --hour 10 · --gfx fixed|high · --lookseed 1 · --frames 60 · --max 0(%) · --tol 2(채널 차) · --ui · --json <파일> · --dir tmp/village-look · --keep
+//   --more <판,판>(표준 판에 더함) · --soft <판이름,…>(그 판 장면은 달라도 FAIL 이 아니라 '⚠ 바뀐 판 · 의도한 차이? — PR 에 적기') — village-check 가 PR 이 바꾼 판에 쓴다
+//   --vs-ref 에서 옛(ref)에 판 파일이 없는 **새 판**은 견주지 않는다('새 판 — 옛에 없음')
 import { spawn, spawnSync } from 'node:child_process'; import crypto from 'node:crypto'; import fs from 'node:fs'; import http from 'node:http'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2), flag = k => args.includes('--' + k), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && args[i + 1] != null && !String(args[i + 1]).startsWith('--') ? args[i + 1] : d; };
 if (flag('help') || flag('h')) { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter(l => l.startsWith('//')).map(l => l.slice(3)).join('\n')); process.exit(0); }
 const MID = 'village/stages/boards/mid36.json';
-const BOARDS = opt('boards', `기본+village/stages/boards/pop88.json,town3,town3-origin,farm+${MID},city+${MID},sea,mountain,origin,proto-flow,proto-vote`).split(',').map(s => s.trim()).filter(Boolean);
+const BOARDS = [...new Set(opt('boards', `기본+village/stages/boards/pop88.json,town3,town3-origin,farm+${MID},city+${MID},sea,mountain,origin,proto-flow,proto-vote`).split(',').concat(String(opt('more', '')).split(',')).map(s => s.trim()).filter(Boolean))];   // [MAC-CHECKCHANGED] --more 는 더하기
+const SOFT = new Set(String(opt('soft', '')).split(',').map(s => s.trim()).filter(Boolean)), NEWB = new Set();   // NEWB: 옛에 판 파일이 없는 새 판(--vs-ref)
 const SHOTS = opt('shots', 'card,default,hud,near,whole').split(',').map(s => s.trim()).filter(Boolean);
 const DIR = path.resolve(ROOT, opt('dir', 'tmp/village-look')), BASEDIR = path.join(DIR, '기준'), NOWDIR = path.join(DIR, '지금'), DIFFDIR = path.join(DIR, '차이');
 const HOUR = +opt('hour', '10'), GFX = opt('gfx', 'fixed'), LOOKSEED = (+opt('lookseed', '1') >>> 0) || 1, FRAMES = Math.max(2, +opt('frames', '60') | 0);
@@ -168,7 +171,9 @@ let renderer = null;
 async function runAll(rootDir, outDir, label, onShot) {
   SERVE = rootDir; fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true });
   const rows = [];
-  for (const b of BOARDS) { process.stderr.write(`  [${label}] ${boardName(b)} … `); const t0 = Date.now();
+  for (const b of BOARDS) { const [bn] = b.split('+');
+    if (rootDir !== ROOT && bn !== '기본' && !fs.existsSync(path.join(rootDir, 'village/stages', bn + '.json'))) { NEWB.add(boardName(b)); rows.push({ 판: boardName(b), spec: b, 옛에없음: true, 장면: [] }); process.stderr.write(`  [${label}] ${boardName(b)} … 옛에 없음(새 판)\n`); continue; }
+    process.stderr.write(`  [${label}] ${boardName(b)} … `); const t0 = Date.now();
     try { const r = await shootBoard(b, outDir, onShot); rows.push(r); renderer = renderer || r.렌더러; process.stderr.write(((Date.now() - t0) / 1000).toFixed(1) + '초' + (r.오류 ? ' · 페이지 오류 ' + r.오류 : '') + '\n'); }
     catch (e) { rows.push({ 판: boardName(b), spec: b, 실패: String(e.message || e).slice(0, 200), 장면: [] }); process.stderr.write('실패 — ' + String(e.message || e).slice(0, 120) + '\n'); } }
   return rows;
@@ -218,21 +223,24 @@ try {
     /* 표 */
     const L = [`화면 회귀 — 판 ${BOARDS.length} × 장면 ${SHOTS.length} · 기준 ${baseLabel} · 지금 ${nowLabel} · 렌더러 ${renderer} · ${HOUR}시 · 그래픽 ${GFX} · lookseed ${LOOKSEED} · ${VIEW.w}×${VIEW.h}${UI ? ' · UI 포함' : ' · UI 숨김(3D·미니맵)'} · 허용 ${MAX}% (한 점 = 채널 차 > ${TOL}) · 바깥 주소 막음 ${blocked}`, '',
       '| 판 | 장면 | 차이 % | 차이 점 | 차이 네모(화면) | 가장 많이 다른 칸 |', '|---|---|---|---|---|---|'];
-    let over = 0, missing = 0;
+    let over = 0, missing = 0; const softList = [];
     for (const r of rows) {
       if (r.실패) { L.push(`| ${r.판} | — | 실패 | — | — | ${r.실패} |`); over++; continue; }
+      if (NEWB.has(r.판)) { L.push(`| ${r.판} (새 판) | — | — | — | — | 새 판 — 옛에 판 파일이 없어 견줄 것이 없음 |`); continue; }
+      const soft = SOFT.has(r.판) || SOFT.has(String(r.판).split('+')[0]);   // 판 이름이 바뀌면 그 판의 모든 조합(city+mid36 …)도
       for (const s of r.장면) { if (s.없음) { L.push(`| ${r.판} | ${s.shot} | — | — | — | (이 판엔 시작 카드가 없음) |`); continue; } const c = s.견줌 || {};
         if (c.기준없음) { L.push(`| ${r.판} | ${s.shot} | 기준 없음 | — | — | --update 로 찍을 것 |`); missing++; continue; }
-        if (c.크기다름) { L.push(`| ${r.판} | ${s.shot} | 크기 다름 | — | — | ${c.크기다름.join('×')} |`); over++; continue; }
-        const p = pct(c.차이점, c.전체); if (p > MAX) over++;
+        if (c.크기다름) { L.push(`| ${r.판} | ${s.shot} | 크기 다름 | — | — | ${c.크기다름.join('×')} |`); if (soft) softList.push(r.판 + ' ' + s.shot); else over++; continue; }
+        const p = pct(c.차이점, c.전체); if (p > MAX) { if (soft) softList.push(r.판 + ' ' + s.shot + ' ' + p + '%'); else over++; }
         const cells = !c.차이점 ? '—' : !c.칸짚음 ? '(칸 짚기 훅 없음)' : (c.칸.map(k => `(${k.칸.join(',')})${k.바닥 ? ' ' + k.바닥 : ''}${k.물건 ? '·' + k.물건 : ''} ${k.점}`).join(' · ') + (c.판밖점 ? ` · 판 밖 ${c.판밖점}` : '') + (c.칸수 > c.칸.length ? ` (칸 ${c.칸수}곳)` : ''));
-        L.push(`| ${r.판} | ${s.shot} | ${p > MAX ? '**' + p + '**' : p} | ${c.차이점} | ${c.네모 ? c.네모.join(',') : '—'} | ${cells} |`); }
+        L.push(`| ${r.판}${soft ? ' (바뀐 판)' : ''} | ${s.shot} | ${p > MAX ? '**' + p + '**' : p} | ${c.차이점} | ${c.네모 ? c.네모.join(',') : '—'} | ${cells} |`); }
       if (r.오류) L.push(`|  | ⚠ 페이지 오류 ${r.오류} | | | | ${(r.오류예 || []).join(' / ')} |`);
     }
     const nDiff = rows.reduce((a, r) => a + r.장면.filter(s => s.견줌 && s.견줌.차이점).length, 0);
-    L.push('', `판정: ${over ? 'FAIL — 허용을 넘은 장면 ' + over : missing ? 'REVIEW — 기준 없는 장면 ' + missing : 'PASS — 모든 장면이 기준과 ' + (MAX ? MAX + '% 안' : '같음')}` + (nDiff ? ` · 차이 그림 ${nDiff}장: ${path.relative(ROOT, DIFFDIR)}/` : ''));
+    L.push('', `판정: ${over ? 'FAIL — 허용을 넘은 장면 ' + over : missing ? 'REVIEW — 기준 없는 장면 ' + missing : 'PASS — ' + (softList.length ? '바뀐 판 말고는 ' : '') + '모든 장면이 기준과 ' + (MAX ? MAX + '% 안' : '같음')}` + (nDiff ? ` · 차이 그림 ${nDiff}장: ${path.relative(ROOT, DIFFDIR)}/` : ''));
+    if (softList.length) L.push(`⚠ 바뀐 판 장면이 옛과 다름 — 의도한 차이? PR 에 적기: ${softList.join(' · ')}`);   // [MAC-CHECKCHANGED] FAIL 로 막지 않고 눈에 띄게
     console.log(L.join('\n'));
-    if (!code) code = over ? 1 : 0; report = { 기준: baseLabel, 지금: nowLabel, 렌더러: renderer, 판: rows };
+    if (!code) code = over ? 1 : 0; report = { 기준: baseLabel, 지금: nowLabel, 렌더러: renderer, 판: rows, 바뀐판다름: softList, 새판: [...NEWB] };
   }
 } catch (e) { if (!e.quiet) console.error('멈춤: ' + (e.message || e)); code = 2; }
 finally { try { ws && ws.close(); } catch {} ch.kill('SIGKILL'); server.close(); await sleep(400); if (!flag('keep')) for (const d of temps) { try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {} } }

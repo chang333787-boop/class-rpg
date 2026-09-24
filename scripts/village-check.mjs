@@ -8,6 +8,9 @@
 //   node scripts/village-check.mjs --skip look,vsref  # 고르기(module·safety·paint·sim·stages·roundtrip·vsref·look)
 //   node scripts/village-check.mjs --ref HEAD~1       # ⑦⑧ 의 견줄 쪽
 //   그 밖: --allow(⑦ 에서 옛과 다른 값을 허용 — 의도한 차이 · PR 에 적는다) · --max <%>(⑧ 허용 차이)
+// [MAC-CHECKCHANGED] PR 이 바꾼 판은 스스로 더한다 — `git diff --name-only <ref>`(+ 새 파일)에 판 파일(stages/<id>.json) · 시작 땅(stages/starts/*) · 저장본(stages/boards/*)이
+//   있으면 그 판을 ⑦⑧ 에 더하고, 그 판의 차이는 FAIL 이 아니라 '⚠ 바뀐 판 — 의도한 차이? PR 에 적기' 줄로 보인다. rules.json · README 같은 공용 파일만 바뀐 것은 빼고,
+//   옛(ref)에 없는 새 판은 '새 판 — 옛에 없음'(견주지 않음). 끄기: --no-changed
 import { spawnSync } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,13 +37,27 @@ const STEPS = [
   ['stages', '판 검사(stages)', () => { const r = node('scripts/village-sim/stages.mjs'); const s = last(r.out, /^요약:/); return { ok: r.code === 0 && /FAIL 0/.test(s || ''), 요약: s || '요약 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => l.startsWith('FAIL')).slice(0, 3) }; }],
   ['roundtrip', '저장 왕복', () => { const r = node('scripts/village-sim/roundtrip.mjs', ['--days', QUICK ? '1' : '2']);
     const s = last(r.out, /^판정:/); return { ok: r.code === 0, 요약: s || '판정 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l)).slice(0, 3) }; }],
-  ['vsref', '기준 ① — vsref(' + REF + ')', () => { const r = node('scripts/village-sim/vsref.mjs', ['--ref', REF, ...(QUICK ? ['--days', '1', '--seeds', '1'] : []), ...(flag('allow') ? ['--allow'] : [])]);
-    const s = last(r.out, /^판정:/); return { ok: r.code === 0, 요약: s || '판정 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l)).slice(0, 3) }; }],
-  ['look', '화면 회귀 — village-look(' + REF + ')', () => { const r = node('scripts/village-look/shots.mjs', ['--vs-ref', REF, ...(QUICK ? ['--shots', 'default'] : []), ...(opt('max', null) ? ['--max', opt('max')] : [])]);
-    const s = last(r.out, /^판정:/); return { ok: r.code === 0, 요약: s || last(r.out, /\S/) || '판정 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l)).slice(0, 3) }; }],
+  ['vsref', '기준 ① — vsref(' + REF + ')', () => { const r = node('scripts/village-sim/vsref.mjs', ['--ref', REF, ...(QUICK ? ['--days', '1', '--seeds', '1'] : []), ...(flag('allow') ? ['--allow'] : []), ...chArgs]);
+    const s = last(r.out, /^판정:/), w = warnLine(r.out); return { ok: r.code === 0, 요약: s || '판정 줄 없음', sec: r.sec, 경고: w, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l) && !/\(바뀐 판\)/.test(l)).slice(0, 3) }; }],
+  ['look', '화면 회귀 — village-look(' + REF + ')', () => { const r = node('scripts/village-look/shots.mjs', ['--vs-ref', REF, ...(QUICK ? ['--shots', 'default'] : []), ...(opt('max', null) ? ['--max', opt('max')] : []), ...chArgs]);
+    const s = last(r.out, /^판정:/), w = warnLine(r.out); return { ok: r.code === 0, 요약: s || last(r.out, /\S/) || '판정 줄 없음', sec: r.sec, 경고: w, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l) && !/\(바뀐 판\)/.test(l)).slice(0, 3) }; }],
 ];
 
 const git = (...a) => { const r = spawnSync('git', a, { cwd: ROOT, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
+/* [MAC-CHECKCHANGED] 바뀐 판 — 판 파일 · 시작 땅(판의 '시작' 칸이 가리킴) · 저장본(표준 판 pop88·pop167·mid36 은 이미 있고, 새 저장본은 기본 판으로 더함) */
+const STD_SAVES = ['pop88', 'pop167', 'mid36'];   // vsref·look 표준 판이 쓰는 저장본(vsref.mjs · shots.mjs 의 BOARDS 와 같게)
+function changedBoards() { if (flag('no-changed')) return null;
+  const files = [...new Set([...(git('diff', '--name-only', REF, '--', 'village/stages') || '').split('\n'), ...(git('ls-files', '--others', '--exclude-standard', '--', 'village/stages') || '').split('\n')].map(f => f.trim()).filter(Boolean))];
+  const dir = path.join(ROOT, 'village/stages'), stages = fs.readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'rules.json').map(f => { let d = null; try { d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch {} return [f.slice(0, -5), d]; });
+  const has = id => stages.some(([s]) => s === id), ids = new Set(), saves = new Set(), gone = [];
+  for (const f of files) { const m1 = f.match(/^village\/stages\/([a-z0-9-]+)\.json$/); if (m1) { if (m1[1] === 'rules') continue; if (has(m1[1])) ids.add(m1[1]); else gone.push(m1[1]); continue; }
+    const m2 = f.match(/^village\/stages\/(starts|boards)\/([^/]+)\.json$/); if (!m2) continue;
+    stages.forEach(([id, d]) => { if (d && d.시작 === 'stages/' + m2[1] + '/' + m2[2] + '.json') ids.add(id); }); if (m2[1] === 'boards' && fs.existsSync(path.join(dir, 'boards', m2[2] + '.json'))) saves.add(m2[2]); }
+  const more = [...ids, ...[...saves].filter(b => !STD_SAVES.includes(b)).map(b => '기본+village/stages/boards/' + b + '.json')];
+  const soft = [...ids, ...[...saves].flatMap(b => ['기본+' + b, ...stages.map(([id]) => id + '+' + b)])];
+  return { files: files.length, ids: [...ids], saves: [...saves], gone, more, soft }; }
+const CH = changedBoards(), chArgs = CH && CH.more.length + CH.soft.length ? [...(CH.more.length ? ['--more', CH.more.join(',')] : []), '--soft', CH.soft.join(',')] : [];
+const warnLine = out => last(out, /^⚠ 바뀐 판/);
 const head = git('rev-parse', '--short', 'HEAD'), dirty = !!git('status', '--porcelain', '--', 'village', 'scripts'), refSha = git('rev-parse', '--short', REF);
 const rows = [];
 for (const [key, name, fn] of STEPS) {
@@ -49,13 +66,16 @@ for (const [key, name, fn] of STEPS) {
   let r; try { r = fn(); } catch (e) { r = { ok: false, 요약: '멈춤: ' + String(e.message || e).slice(0, 160), sec: 0 }; }
   rows.push({ key, name, ...r }); process.stderr.write((r.ok ? 'PASS' : 'FAIL') + ' · ' + r.sec.toFixed(1) + '초\n');
 }
-const L = [`마을 PR 검사 — 지금 ${head}${dirty ? ' + 고친 것' : ''} · 견줄 쪽 ${REF} (${refSha || '?'})${QUICK ? ' · 빠르게(--quick)' : ''}`, '', '| 검사 | 결과 | 초 | 요약 |', '|---|---|---|---|'];
+const L = [`마을 PR 검사 — 지금 ${head}${dirty ? ' + 고친 것' : ''} · 견줄 쪽 ${REF} (${refSha || '?'})${QUICK ? ' · 빠르게(--quick)' : ''}`,
+  ...(CH && (CH.ids.length || CH.saves.length || CH.gone.length) ? [`바뀐 판(스스로 더해 봄 · 차이는 '의도한 차이?'로): ${[...CH.ids, ...CH.saves.map(b => '저장본 ' + b)].join(' · ') || '—'}${CH.gone.length ? ' · 지워진 판 ' + CH.gone.join(' ') : ''}`] : []), '', '| 검사 | 결과 | 초 | 요약 |', '|---|---|---|---|'];
 for (const r of rows) {
   if (r.건너뜀) { L.push(`| ${r.name} | 건너뜀 | — | — |`); continue; }
   L.push(`| ${r.name} | ${r.ok ? 'PASS' : '**FAIL**'} | ${r.sec.toFixed(1)} | ${String(r.요약).replace(/\|/g, '/')} |`);
+  if (r.경고) L.push(`|  | ⚠ | | ${String(r.경고).replace(/\|/g, '/').slice(0, 220)} |`);   // [MAC-CHECKCHANGED] 바뀐 판 차이 — PASS 여도 보인다
   (r.실패 || []).forEach(f => L.push(`|  | ↳ | | ${String(f).replace(/\|/g, '/').slice(0, 180)} |`));
 }
 const bad = rows.filter(r => !r.건너뜀 && !r.ok);
-L.push('', bad.length ? `판정: FAIL — ${bad.map(r => r.key).join(' · ')}` : `판정: PASS — ${rows.filter(r => !r.건너뜀).length}가지 모두 통과`);
+const warned = rows.filter(r => r.경고).map(r => r.key);
+L.push('', (bad.length ? `판정: FAIL — ${bad.map(r => r.key).join(' · ')}` : `판정: PASS — ${rows.filter(r => !r.건너뜀).length}가지 모두 통과`) + (warned.length ? ` · ⚠ 바뀐 판 차이(${warned.join(' · ')}) — 의도한 차이면 PR 에 적기` : ''));
 console.log(L.join('\n'));
 process.exit(bad.length ? 1 : 0);
