@@ -49,6 +49,11 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 | `--voice` | 끝 날의 **동네 바람표**(MAC-VOICE · 동네 × 원하는 것 채 수 · 시드 평균)와 '가장 많은 셋'이 시드마다 같은지 |
 
 **마을 PR 검사 한 줄 — `scripts/village-check.mjs`**(MAC-CHECK): module `node --check` · verify-safety · village-paint · village-sim 시험 · 판 검사 · **vsref**(판정) · **village-look**(그림)을 차례로 하나씩 돌려 한 표로 — 끝값 0/1/2. `--quick`(vsref 하루·시드 1 · look default 장면만 · 잰 값 약 1분 50초 · 전부는 3~4분) · `--skip look,vsref` · `--ref HEAD~1` · `--allow`.
+- **바뀐 판은 스스로 더한다**(MAC-CHECKCHANGED · 09-24).
+  - `git diff --name-only <ref>`(+ 새 파일)에 판 파일 `stages/<id>.json` · 시작 땅 `stages/starts/*` · 저장본 `stages/boards/*` 가 있으면, 그 판을 vsref·village-look 에 `--more` 로 더하고 `--soft` 로 넘긴다.
+  - 그 판(과 그 판의 모든 조합 `farm+mid36` …)의 차이는 FAIL 이 아니라 **'⚠ 바뀐 판 — 의도한 차이? PR 에 적기'** 줄로 보인다(PASS 여도).
+  - 옛(ref)에 없는 새 판은 '새 판 — 옛에 없음'이다. `rules.json` · README 만 바뀐 것은 빼고, 끄기는 `--no-changed` 다.
+  - #1002(onebridge 시작 땅)에서 표준 판 열둘에 onebridge 가 없어 PASS 만 뜨던 구멍이다(따로 돌리면 53값 다름).
 
 **기준 ① 한 줄 — `vsref.mjs`**(MAC-VSREF): 지금 작업 트리와 그 ref(기본 `origin/main`)를 **같은 시드끼리 · 모든 표본 · 모든 지표**로 견주고, 덤으로 **그림 흔들기**(`lookseed 99` — 판정이 그림 난수를 안 먹는지 · #926)도 본다. 옛 쪽은 그 ref 의 `village/` 를 `git archive` 로 통째로 푼 자리(`root=`)라 **판 파일 변화까지** 잡는다.
 ```
