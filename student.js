@@ -5033,19 +5033,23 @@ function _inExitSpots(rooms) {
   return [...groups.values()].map(_inExitSpot).sort((e, f) => (f.room.r + f.room.h) - (e.room.r + e.room.h) || e.room.c - f.room.c);
 }
 //  방 목록을 바꾸고 ↩ 한 단계로 적는다
-function _inRoomsCommit(list, msg) {
+function _inRoomsCommit(list, msg, shrunk) {
   const prev = JSON.stringify(_inRooms(CUR)), next = JSON.stringify(list);
   if (prev === next) return false;
   _inRoomsSet(CUR, list);
   //  [DECO-RULE-R4] 방이 없어져 **벽이 사라진 벽걸이**는 가방으로 — 액자가 빈 바닥 한가운데 서 있지 않게.
   //  (벽걸이 규칙 `_decoRuleWhy` 로는 이미 '안 되는 자리'다.) 같은 ↩ 한 단계에 담아, 되돌리면 방과 액자가 같이 돌아온다.
-  const bag = _decoList(CUR).filter(p => p.area === 'indoor' && _isWallDeco(p.id) && !_inIsWallRow(p.row, p.col));
+  //  [DECO-ROOM-SHRINK-1] 방 크기를 줄이면 그 방 안에 있던 가구 중 새 방 밖(마당 잔디)에 남게 된 것도 같이 가방으로(보스 · #1075 뒤).
+  //  벽은 가구를 가르지 않으니(_inRoomWhy) 가구는 다 안이거나 다 밖이다. 방을 없앨 때는 전처럼 '가구는 그 자리에'(shrunk 없음).
+  const inside = (p, o) => { const z = getDecoSize(p.id); return p.row >= o.r && p.col >= o.c && p.row + z.h <= o.r + o.h && p.col + z.w <= o.c + o.w; };
+  const bag = _decoList(CUR).filter(p => p.area === 'indoor' && (_isWallDeco(p.id) ? !_inIsWallRow(p.row, p.col)
+    : !!shrunk && inside(p, shrunk) && !list.some(o => inside(p, o))));
   if (bag.length) CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => bag.indexOf(p) < 0);
   _decoUndoPush({ t: 'rooms', sp: DECO_SPACE, prev, next, bag: bag.map(p => Object.assign({}, p)) });
   decoDirty(); _drawDeco(); renderDecoInv(); _inLookRender();
   if (bag.length) {
-    const d = GAME_DATA.decorations.find(x => x.id === bag[0].id), nm = d ? d.icon + ' ' + d.name : '벽걸이';
-    msg = (msg || '').replace(/ \(↩ 되돌리기\)$/, '') + ` · 🎒 벽에 걸려 있던 ${nm}${bag.length > 1 ? ' 등 ' + bag.length + '개' : ''}${_josa(d ? d.name : '벽걸이', '은', '는')} 가방으로 (↩ 되돌리기)`;
+    const d = GAME_DATA.decorations.find(x => x.id === bag[0].id), nm = d ? d.icon + ' ' + d.name : '벽걸이', wall = _isWallDeco(bag[0].id);
+    msg = (msg || '').replace(/ \(↩ 되돌리기\)$/, '') + ` · 🎒 ${wall ? '벽에 걸려 있던' : '방 밖에 남은'} ${nm}${bag.length > 1 ? ' 등 ' + bag.length + '개' : ''}${_josa(d ? d.name : '벽걸이', '은', '는')} 가방으로 (↩ 되돌리기)`;
   }
   if (msg) toast(msg);
   return true;
@@ -8051,7 +8055,7 @@ function _decoAttachGestures(cv) {
         const pv = roomDrag.active && _inRoomPrev, edge = roomDrag.edge; roomDrag = null; _inRoomPrevSet(null);
         if (pv && edge) {   // [DECO-ROOM-RESIZE-1] 떼면 그 크기로(안 되면 까닭)
           if (pv.why) toast('🧱 ' + pv.why);
-          else _inRoomsCommit(_inRooms(CUR).map(o => o.id === edge.rm.id ? Object.assign({}, o, { r: pv.r, c: pv.c, w: pv.w, h: pv.h }) : o), `🧱 방 크기를 바꿨어요 — ${pv.w} × ${pv.h} (↩ 되돌리기)`);
+          else _inRoomsCommit(_inRooms(CUR).map(o => o.id === edge.rm.id ? Object.assign({}, o, { r: pv.r, c: pv.c, w: pv.w, h: pv.h }) : o), `🧱 방 크기를 바꿨어요 — ${pv.w} × ${pv.h} (↩ 되돌리기)`, edge.rm);   // [DECO-ROOM-SHRINK-1] 줄어 방 밖에 남은 가구는 가방으로
         } else if (pv) { if (pv.why) toast('🧱 ' + pv.why); else _inRoomAdd({ r: pv.r, c: pv.c, w: pv.w, h: pv.h }); }
       }
       if (paint) { if (paint.rect) _decoRectCommit(paint); else _decoStrokeEnd(paint); paint = null; }
@@ -9890,7 +9894,7 @@ async function decoPhoto(opt) {
     //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
     //  [DECO-DAYNIGHT-1] 저녁·밤 사진 — 동물은 색 막 뒤에 그리니 화면의 동물 층과 같은 필터(CSS 와 같은 값)로(안 하면 밤 사진에 동물만 밝게 떴다)
     const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day';
-    if (ph !== 'day') ctx.filter = ph === 'night' ? 'brightness(.58) saturate(.75) hue-rotate(8deg)' : 'brightness(.9) sepia(.18) saturate(1.05)';
+    if (ph !== 'day') ctx.filter = ph === 'night' ? 'brightness(.8) saturate(.85)' : 'brightness(.9) sepia(.18) saturate(1.05)';   // [DECO-NIGHT-FILM-1] 밤 막 .30 에 맞춘 값(CSS 와 같음)
     pets.forEach(p => {
       const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
       _drawDecoSVG(p.id, (st ? st.fx : p.col) * C, (st ? st.fy : p.row) * C, z.w * C, z.h * C);
@@ -9919,7 +9923,7 @@ async function decoPhoto(opt) {
 
 // [DECO-DAYNIGHT-1] 낮 · 저녁 · 밤 — 기본은 실제 시각(6~17시 낮 · 17~19시 저녁 · 그 밖 밤), ☀️🌇🌙 단추로 아이가 바꿔 본다(저장 0 · 다시 열면 실제 시각).
 //  보스 결정(09-24): 수업이 낮이라 단추가 없으면 밤을 못 본다. 그림은 디자인 motion.json `_ambient`(glow · pool · windows) 그대로:
-//  색 막(저녁 rgba(255,150,80,.2) · 밤 rgba(20,30,80,.48)) → 불빛 웅덩이·불빛 원(lighter · 지름 1.8배 · 저녁 .65·.8배 / 밤 .9·1배) → 창 불빛(보통 합성).
+//  색 막(저녁 rgba(255,150,80,.2) · 밤 rgba(20,30,80,.30) — [DECO-NIGHT-FILM-1] 전엔 .48) → 불빛 웅덩이·불빛 원(lighter · 지름 1.8배 · 저녁 .65·.8배 / 밤 .9·1배) → 창 불빛(보통 합성).
 //  동물·움직임 층(DOM)은 같은 결로 어둡게(CSS). 밤이면 동물은 쉼터 둘레에서 잔다(_animThink).
 let _decoPhaseOv = null;
 function _decoPhase(now) {
@@ -9960,7 +9964,10 @@ function _decoNightDraw(C) {
   _decoMotionLoad();
   const ctx = _dCtx, amb = _DECO_MOTION && _DECO_MOTION._ambient, night = ph === 'night';
   ctx.save();
-  ctx.fillStyle = night ? 'rgba(20,30,80,.48)' : 'rgba(255,150,80,.2)';
+  //  [DECO-NIGHT-FILM-1] 밤 막 .48 → .30(보스 · 별빛 시안에서 .45 는 꽃밭·헛간 색이 탁해지고 동물이 묻혔다 — 크롬북 화면이 어두우면 더)
+  //  고르는 동안(카드를 들었거나 바닥 모드 · 사진은 아님)은 절반 — 놓을 자리 · 칠할 칸이 잘 보이게
+  const edit = !_decoPhotoMode && (!!SEL_DECO || DECO_MODE === 'floor');
+  ctx.fillStyle = night ? (edit ? 'rgba(20,30,80,.15)' : 'rgba(20,30,80,.30)') : (edit ? 'rgba(255,150,80,.1)' : 'rgba(255,150,80,.2)');
   ctx.fillRect(_dPanX - C, _dPanY - C, _dW + C * 2, _dH + C * 2);   // 보이는 판 전체(위 잔디 띠까지)
   if (amb) {
     //  몸통 viewBox 안 자리 → 판 px (그림 폭 = 발자리 폭 · 아래 끝 = 발자리 아래)

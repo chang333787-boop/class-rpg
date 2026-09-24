@@ -1790,19 +1790,27 @@
     //   잔디 칸끼리 맞닿은 이음새(가로·세로 가운데 3픽셀씩)의 캔버스 알파가 255 · main 은 128~203 이었다
     if (typeof DECO_YARD_TOP !== 'undefined') {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
-      _decoSetZoom(1.017); _dPanX = 415.633; _dPanY = 106.248; _decoClampPan(); _drawDeco(); await sleep(150);
-      const fl = _yardFloorGet(CUR), W = _dCv.width, H = _dCv.height, d = _dCtx.getImageData(0, 0, W, H).data, C = _dC;
-      const grass = (r, c) => r >= 0 && c >= 0 && r < DY.rows && c < DY.cols && !_isHC(r, c) && _floorIsGrass(_floorParse(fl[r + '_' + c]).name);
-      const A = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 255 : d[(y * W + x) * 4 + 3];
-      let n = 0, low = 0;
-      for (let r = 1; r < DY.rows; r++) for (let c = 1; c < DY.cols; c++) {
-        if (!grass(r, c) || !grass(r - 1, c) || !grass(r, c - 1)) continue;
-        const x = (c * C - _dPanX) * 2, y = (r * C - _dPanY) * 2, mx = Math.round(x + C), my = Math.round(y + C);
-        if (x < 2 || y < 2 || x + 2 * C > W - 2 || y + 2 * C > H - 2) continue;
-        n++;
-        for (const k of [-1, 0, 1]) if (A(mx, Math.round(y) + k) < 255 || A(Math.round(x) + k, my) < 255) { low++; break; }
+      //  보스(#1070 뒤): 배율 여러 개에서 — 칸 14 · 18 · 21 · 27 · 38 · 47px · 옮기는 값은 늘 소수(.633 · .248)
+      const seam = [];
+      _decoSetZoom(1); const C0 = _dC;   // 배율 1 의 칸(기기 폭에 따라 다르다)
+      for (const CC of [14, 18, 21, 27, 38, 47]) {
+        _decoSetZoom(CC / C0); _dPanX = Math.max(0, Math.min(DY.cols * _dC - _dW, 12.5 * _dC)) + .633; _dPanY = Math.max(0, Math.min(DY.rows * _dC - _dH, 3.5 * _dC)) + .248;
+        _drawDeco(); await sleep(150);
+        const fl = _yardFloorGet(CUR), W = _dCv.width, H = _dCv.height, d = _dCtx.getImageData(0, 0, W, H).data, C = _dC;
+        const grass = (r, c) => r >= 0 && c >= 0 && r < DY.rows && c < DY.cols && !_isHC(r, c) && _floorIsGrass(_floorParse(fl[r + '_' + c]).name);
+        const A = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 255 : d[(y * W + x) * 4 + 3];
+        let n = 0, low = 0;
+        for (let r = 1; r < DY.rows; r++) for (let c = 1; c < DY.cols; c++) {
+          if (!grass(r, c) || !grass(r - 1, c) || !grass(r, c - 1)) continue;
+          const x = (c * C - _dPanX) * 2, y = (r * C - _dPanY) * 2, mx = Math.round(x + C), my = Math.round(y + C);
+          if (x < 2 || y < 2 || x + 2 * C > W - 2 || y + 2 * C > H - 2) continue;
+          n++;
+          for (const k of [-1, 0, 1]) if (A(mx, Math.round(y) + k) < 255 || A(Math.round(x) + k, my) < 255) { low++; break; }
+        }
+        seam.push(C + ':' + (n > 20 && low === 0 && (_dPanX * 2) % 1 !== 0 ? 'ok' : 'n' + n + '/틈' + low));
       }
-      out('잔디_이음새_불투명', n > 50 && low === 0 && (_dPanX * 2) % 1 !== 0);
+      out('잔디_이음새_불투명_배율여섯', seam.every(t => t.endsWith(':ok')) ? true : seam.join(' '));
+      out('잔디_이음새_잰칸', seam.map(t => t.split(':')[0]).join('·'));
       _decoSetZoom(1); _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco();
     }
 
@@ -1893,6 +1901,19 @@
       out('방크기_오른쪽변_끌면_가로+3', w1 === 11);
       decoUndo(); await sleep(50);
       out('방크기_↩한번', (_inRooms(CUR)[0] || {}).w === 8);
+      //  [DECO-ROOM-SHRINK-1] 줄이면 방 밖에 남는 가구는 가방으로(같은 ↩ 에 담김) · 안에 남는 가구는 그대로(보스 · #1075 뒤)
+      {
+        const f = GAME_DATA.decorations.find(d => d.cat === 'indoor' && !_isWallDeco(d.id) && getDecoSize(d.id).w === 1 && getDecoSize(d.id).h === 1);
+        const keepH = CUR.houseDecorations, outP = _decoNew(f.id, 'indoor', 6, 12), inP = _decoNew(f.id, 'indoor', 6, 8);
+        CUR.houseDecorations = (keepH || []).concat([outP, inP]); _decoUndoClear(); _drawDeco();
+        pe('pointerdown', a, 1); for (let i = 1; i <= 6; i++) pe('pointermove', { clientX: a.clientX - z * 3 * i / 6, clientY: a.clientY }, 1);
+        pe('pointerup', { clientX: a.clientX - z * 3, clientY: a.clientY }, 0); await sleep(80);
+        const has = p => CUR.houseDecorations.some(q => q.id === p.id && q.row === p.row && q.col === p.col && _decoSpaceOf(q) === _decoSpaceOf(p));
+        out('방줄이기_밖가구_가방으로', (_inRooms(CUR)[0] || {}).w === 5 && !has(outP) && has(inP));
+        decoUndo(); await sleep(50);
+        out('방줄이기_↩한번에_방과가구', (_inRooms(CUR)[0] || {}).w === 8 && has(outP) && has(inP));
+        CUR.houseDecorations = keepH;
+      }
       setDecoMode('deco'); _inPk.tab = 'wall'; _decoUndoClear();
       if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
@@ -1926,7 +1947,7 @@
         const orig = _drawDecoSVG; let fl = null;
         _drawDecoSVG = function (id) { if (id === 'd_y53' && _decoPhotoMode) fl = String(_dCtx.filter); return orig.apply(this, arguments); };
         try { await decoPhoto({ canvas: true }); } finally { _drawDecoSVG = orig; CUR.houseDecorations.splice(CUR.houseDecorations.indexOf(pet), 1); }
-        out('낮밤_밤사진_동물도_어둡게', !!fl && /brightness\(0?\.58\)/.test(fl));
+        out('낮밤_밤사진_동물도_어둡게', !!fl && /brightness\(0?\.8\)/.test(fl));   // [DECO-NIGHT-FILM-1] 막 .30 에 맞춘 .8(전 .58)
         _drawDeco();
       }
       _decoPhaseOv = null;
