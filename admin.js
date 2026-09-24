@@ -782,6 +782,7 @@ function resetStudentStats(id) {
   s.title = ''; s.achievements = [];
   s.equipmentIds = {}; s.inventory = [];
   s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {}; s.indoor = {};   // [DECO-SPACE-1] 공간 2·3 바닥도 · [IN-2] 집 안 벽지·바닥
+  s.decoLife = {};   // [DECO-LIFE-1] 친해지기·손님·선물도(보스 결정 ③)
   s.lastAttendDate = '';
   DB.saveStudent(s);
   closeModal();
@@ -801,6 +802,7 @@ function resetAllStudents() {
     s.title = ''; s.achievements = [];
     s.equipmentIds = {}; s.inventory = [];
     s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {}; s.indoor = {};   // [DECO-SPACE-1] 공간 2·3 바닥도 · [IN-2] 집 안 벽지·바닥
+    s.decoLife = {};   // [DECO-LIFE-1] 친해지기·손님·선물도(보스 결정 ③)
     s.lastAttendDate = '';
     DB.saveStudent(s);
   });

@@ -1382,7 +1382,10 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 @keyframes decoStep{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .deco-anim-heart{position:absolute;left:30%;bottom:100%;font-size:16px;line-height:1;pointer-events:none;animation:decoHeart 1.2s ease-out forwards}
 @keyframes decoHeart{0%{opacity:0;transform:translateY(4px) scale(.6)}20%{opacity:1;transform:translateY(-4px) scale(1)}100%{opacity:0;transform:translateY(-22px) scale(1)}}
-@media (prefers-reduced-motion: reduce){ .deco-anim.walking .bob,.deco-anim-heart{animation:none} }
+/* [DECO-LIFE-1] 하루 첫 쓰다듬기 = 하트 +1 — 말풍선(가운데)·💗(왼쪽)과 안 겹치게 오른쪽 위 */
+.deco-anim-plus{position:absolute;left:72%;bottom:100%;font:800 13px/1 system-ui,sans-serif;color:#ff4f8b;white-space:nowrap;pointer-events:none;
+  text-shadow:0 0 2px #fff,0 0 3px #fff,0 1px 1px #fff;animation:decoHeart 1.5s ease-out forwards}
+@media (prefers-reduced-motion: reduce){ .deco-anim.walking .bob,.deco-anim-heart,.deco-anim-plus{animation:none} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════

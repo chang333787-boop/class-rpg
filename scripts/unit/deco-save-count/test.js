@@ -1514,6 +1514,48 @@
       decoSpaceSet(1); await sleep(150);
     }
 
+    //  ㊽ 친해지기 저장 칸(DECO-LIFE-1) — 내 마당 동물을 누르면 하루 한 마리 하트 +1 · 잎 쓰기만(통째 저장 0) · 골드 불변
+    if (typeof _lifePet === 'function') {
+      decoSpaceSet(3); await sleep(100);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      setDecoMode('deco'); _decoSelClear && _decoSelClear(); SEL_DECO = null;
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const placedN = id => (CUR.houseDecorations || []).filter(p => p.id === id).length;
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_y53').concat([{ id: 'd_y53', qty: placedN('d_y53') + 1 }]);
+      SEL_DECO = 'd_y53'; _decoPlace('yard', 20, 30); SEL_DECO = null; decoFlush('시험'); await sleep(900);
+      _drawDeco(); await sleep(400);
+      const petDog = async () => {
+        const rec = _animLayers.get(_ifActiveContainer || 'house-topview'), dog = rec && [...rec.items.values()].find(x => x.id === 'd_y53' && x.home.row === 20 && x.home.col === 30);
+        if (!dog) return false;
+        const cv = _dCv.getBoundingClientRect(); _dSuppressClick = false;
+        _decoClick({ clientX: cv.left + ((dog.cur.col + .5) * _dC - _dPanX) * cv.width / _dW, clientY: cv.top + ((dog.cur.row + .5) * _dC - _dPanY) * cv.height / _dH });
+        return true;
+      };
+      const friend = () => { const L = _lifeGet(CUR); const u = Object.keys(L.a).find(k => L.a[k].k === 'd_y53' && L.a[k].r === 20 && L.a[k].c === 30 && L.a[k].sp === 3); return u ? L.a[u] : null; };
+      const gold0 = CUR.gold, w0 = _lifeWrites; saves = 0; sets = 0;
+      const ok1 = await petDog(); await sleep(300); const ok2 = await petDog(); await sleep(900);
+      const f1 = friend();
+      out('친해지기_두번쓰다듬기_하트1', ok1 && ok2 ? (!!f1 && f1.h === 1 && f1.d === _lifeDay()) : '동물층없음');
+      out('친해지기_잎쓰기1_통째저장0', { 잎: _lifeWrites - w0, saveStudent: saves, sdkSet: sets, 맞나: _lifeWrites - w0 === 1 && saves === 0 && sets === 0 });
+      const srv = await new Promise(r => DB._fbRef.child('students/' + CUR.id + '/decoLife').once('value', sn => r(sn.val())));
+      const canon = v => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)) ? Object.keys(x).sort().reduce((o, kk) => (o[kk] = x[kk], o), {}) : x);   // 서버는 키를 차례로 돌려준다
+      out('친해지기_서버같음', canon(srv) === canon(CUR.decoLife) ? true : { srv, cur: CUR.decoLife });
+      //  다음 날 + 단계 오름(하트 3 = '알아봄') — 날을 하루 민다
+      const od = _lifeDay; _lifeDay = t => od(t) + 1;
+      try {
+        const u = Object.keys(_lifeGet(CUR).a).find(k => _lifeGet(CUR).a[k] === friend());
+        _lifeWrite(CUR, { ['a/' + u + '/h']: 2 }); await sleep(300);
+        document.querySelectorAll('.toast-msg').forEach(e => e.remove());
+        await petDog(); await sleep(600);
+        const f2 = friend(), last = [...document.querySelectorAll('.toast-msg')].map(e => e.textContent).join(' ');
+        out('친해지기_다음날_+1_단계알림', !!f2 && f2.h === 3 && /알아봄/.test(last) && (_lifeGet(CUR).g.sticker || 0) >= 1);
+      } finally { _lifeDay = od; }
+      out('친해지기_골드불변', CUR.gold === gold0);
+      out('친해지기_자리객체그대로', !(CUR.houseDecorations || []).some(p => 'u' in p));
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      _decoUndoClear(); decoSpaceSet(1); await sleep(150);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

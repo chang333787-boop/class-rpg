@@ -8838,6 +8838,120 @@ function _animPoke(st, fromCol) {
   return true;
 }
 
+// ══ [DECO-LIFE-1] 친해지기 · 손님 · 작은 선물 — 저장 칸 (docs/deco_guests_design.md · 보스 승인 09-24) ══
+//  student.decoLife = { v:1, c:다음 번호, a:{ a7:{ k:장식 id, r,c,sp:선 자리, m:처음 만난 날, h:하트, d:마지막 하트 날, n:이름 번호 } },
+//                       s:{ 손님: 처음 본 날 }, g:{ 선물: 수 }, p:사진 조각 }
+//  · 없으면 빈 것으로 읽고 **필드를 만들지 않는다** — 처음 쓰다듬을 때 만든다(아무것도 안 한 아이의 문서는 그대로).
+//  · 쓰기는 **잎만** update(통째 저장 아님) · 수는 서버에서 더하기 — 통째 저장이 늘면 골드 유실 M2 창이 는다(§6-1).
+//  · 친구는 '선 자리'(r·c·sp)로 자리와 짝짓는다 — houseDecorations 배열은 건드리지 않는다.
+const LIFE_STAGE_AT = [0, 3, 8, 15, 25];   // 단계 1~5(처음 만남 · 알아봄 · 친구 · 단짝 · 가족)의 하트 문턱 — 보스 결정 ①
+const LIFE_STAGE_NAME = ['처음 만남', '알아봄', '친구', '단짝', '가족'];
+let _lifeWrites = 0;   // 잎 쓰기 수(시험이 센다)
+function _lifeDay(t) { return Math.floor(((t === undefined ? Date.now() : t) + 9 * 3600000) / 86400000); }   // 한국 날짜의 일 번호
+function _lifeObj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : null; }
+//  읽기 — 모양이 틀린 칸은 없는 셈(지우지 않는다) · 모르는 모양 번호면 ro(읽기 전용)
+function _lifeGet(student) {
+  const L = _lifeObj(student && student.decoLife);
+  const num = v => (typeof v === 'number' && isFinite(v) && v > 0) ? Math.floor(v) : 0;
+  return { ro: !!(L && L.v !== undefined && L.v !== 1), c: num(L && L.c), a: _lifeObj(L && L.a) || {}, s: _lifeObj(L && L.s) || {}, g: _lifeObj(L && L.g) || {}, p: num(L && L.p) };
+}
+function _lifeOk(f) { return !!(_lifeObj(f) && typeof f.k === 'string'); }
+function _lifeHearts(f) { const h = f && f.h; return (typeof h === 'number' && isFinite(h) && h > 0) ? Math.floor(h) : 0; }
+function _lifeStage(h) { let st = 1; for (let i = 1; i < LIFE_STAGE_AT.length; i++) if (h >= LIFE_STAGE_AT[i]) st = i + 1; return st; }
+function _lifeNo(u) { const m = /^a(\d+)$/.exec(u || ''); return m ? +m[1] : Infinity; }
+//  자리 p 의 친구 번호 — ① 그 자리에 선 친구 ② 없으면 같은 종류의 **쉬는 친구**(지금 어느 자리에도 안 선) 중 하트가 가장 많은(같으면 먼저 만난)
+//  ③ 없으면 null(새 친구). 치우고 다시 놓아도(= 옮기기) 이름·하트째 돌아온다(§2).
+function _lifeFriendAt(student, p, L) {
+  const sp = _decoSpaceOf(p), a = L.a;
+  const at = (f, q) => f.k === q.id && f.r === q.row && f.c === q.col && (f.sp || 1) === _decoSpaceOf(q);
+  for (const u in a) if (_lifeOk(a[u]) && at(a[u], p)) return u;
+  const placed = (student && student.houseDecorations) || [];
+  let best = null;
+  for (const u in a) {
+    const f = a[u];
+    if (!_lifeOk(f) || f.k !== p.id || placed.some(q => at(f, q))) continue;
+    if (!best || _lifeHearts(f) > _lifeHearts(a[best]) || (_lifeHearts(f) === _lifeHearts(a[best]) && _lifeNo(u) < _lifeNo(best))) best = u;
+  }
+  return best;
+}
+//  화면(student.decoLife)에 먼저 반영하고, 서버로 보낼 잎 목록을 돌려준다. { inc:n } 은 서버에서 더하기.
+function _lifeApply(student, ups) {
+  if (!student || _lifeGet(student).ro) return null;
+  if (!_lifeObj(student.decoLife)) student.decoLife = {};
+  const L = student.decoLife, out = {};
+  if (L.v === undefined) { L.v = 1; out.v = 1; }
+  for (const path of Object.keys(ups)) {
+    const ks = path.split('/'), val = ups[path];
+    let o = L;
+    for (let i = 0; i < ks.length - 1; i++) { if (!_lifeObj(o[ks[i]])) o[ks[i]] = {}; o = o[ks[i]]; }
+    const last = ks[ks.length - 1];
+    if (_lifeObj(val) && typeof val.inc === 'number') { o[last] = ((typeof o[last] === 'number' && isFinite(o[last])) ? o[last] : 0) + val.inc; out[path] = { inc: val.inc }; }
+    else { o[last] = _lifeObj(val) ? JSON.parse(JSON.stringify(val)) : val; out[path] = val; }
+  }
+  return out;
+}
+function _lifeSend(student, out) {
+  if (!out || !student || !student.id) return false;
+  const up = {};
+  for (const path of Object.keys(out)) {
+    const v = out[path];
+    up['decoLife/' + path] = (_lifeObj(v) && typeof v.inc === 'number' && typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue)
+      ? firebase.database.ServerValue.increment(v.inc) : v;
+  }
+  _lifeWrites++;
+  try {
+    const r = DB._fbRef.child('students/' + student.id).update(up);
+    if (r && r.catch) r.catch(e => { if (DB._onSaveError) DB._onSaveError(e); });
+  } catch (e) { console.error('꾸미기 친구 저장 실패', e); return false; }
+  return true;
+}
+function _lifeWrite(student, ups) { return _lifeSend(student, _lifeApply(student, ups)); }
+//  쓰다듬기 → 하루 한 마리 +1(§3). 같은 날이면 반응만(쓰기 0). 제 마당(CUR)에서만 부른다 — 친구 구경은 쓰기 0(§7).
+//  돌려주는 것: null(짝지을 자리 없음) · { u, gained:0|1, stage, stageUp }
+function _lifePet(student, p, now) {
+  if (!student || !p) return null;
+  const L = _lifeGet(student);
+  if (L.ro) return null;
+  const today = _lifeDay(now);
+  let u = _lifeFriendAt(student, p, L);
+  const f = u ? L.a[u] : null;
+  const h0 = _lifeHearts(f), s0 = _lifeStage(h0);
+  if (f && f.d === today) return { u, gained: 0, stage: s0, stageUp: false };
+  const ups = {}, sp = _decoSpaceOf(p);
+  if (!u) {
+    let n = Math.max(1, L.c);
+    for (const k in L.a) { const x = _lifeNo(k); if (x !== Infinity && x >= n) n = x + 1; }
+    u = 'a' + n; ups.c = n + 1;
+    ups['a/' + u] = Object.assign({ k: p.id, r: p.row, c: p.col }, sp !== 1 ? { sp } : {}, { m: today, h: 1, d: today });
+  } else {
+    if (f.r !== p.row || f.c !== p.col || (f.sp || 1) !== sp) { ups['a/' + u + '/r'] = p.row; ups['a/' + u + '/c'] = p.col; ups['a/' + u + '/sp'] = sp !== 1 ? sp : null; }   // 쉬던 친구가 새 자리로
+    ups['a/' + u + '/h'] = { inc: 1 }; ups['a/' + u + '/d'] = today;
+  }
+  const s1 = _lifeStage(h0 + 1);
+  if (s1 > s0) ups['g/sticker'] = { inc: 1 };   // 단계가 오르는 날 스티커 하나(§3)
+  _lifeWrite(student, ups);
+  return { u, gained: 1, stage: s1, stageUp: s1 > s0 };
+}
+//  누른 동물(st) → 그 자리 객체 → 하트. 하트를 얻으면 💗 옆에 +1 · 단계가 오르면 알림 한 줄.
+function _lifePetAnim(st) {
+  if (!st || !CUR) return null;
+  const p = (CUR.houseDecorations || []).find(q => q.area === 'yard' && q.id === st.id && q.row === st.home.row && q.col === st.home.col && _decoSpaceOf(q) === DECO_SPACE);
+  const r = _lifePet(CUR, p);
+  if (!r || !r.gained) return r;
+  if (st.el) {   // 💗 옆에 '+1' 배지 — 말풍선·하트와 안 겹치게 오른쪽 위
+    const plus = document.createElement('div'), over = _animOverCells(st) * (st.C || 0);
+    plus.className = 'deco-anim-plus'; plus.textContent = '+1 💗';
+    if (over) plus.style.marginBottom = Math.round(over) + 'px';
+    st.el.appendChild(plus);
+    setTimeout(() => { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1500);
+  }
+  if (r.stageUp) {
+    const d = GAME_DATA.decorations.find(x => x.id === st.id), nm = (d && d.name) || '동물';
+    toast(`🤝 ${nm}${_josa(nm, '과', '와')} 한 걸음 더 가까워졌어요 — '${LIFE_STAGE_NAME[r.stage - 1]}'`);
+  }
+  return r;
+}
+
 //  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.
 //  이미 있는 동물은 그 자리를 지킨다(다시 그려도 처음부터 걷지 않게).
 function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
@@ -9825,7 +9939,7 @@ function _decoClick(e) {
     //  [DECO-SEL-A5] 카드를 들었어도 — 보이는 동물을 누른 것은 쓰다듬기다(전엔 그 발밑에 하나가 더 놓였다 · 창조자 27회 ⓐ5)
     if(DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
       const pet=_animAt(_ifActiveContainer||'house-topview', r, c);
-      if(pet && _animPoke(pet, c)) return;
+      if(pet && _animPoke(pet, c)) { _lifePetAnim(pet); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1
     }
     _decoPlace('yard',r,c);
   } else {
