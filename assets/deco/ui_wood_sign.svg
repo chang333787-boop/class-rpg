@@ -1,0 +1,4 @@
+<svg width="120" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48">
+<!-- ui_wood_sign 나무 이름표 판 — CSS border-image 로 늘려 쓴다: border-image: url(ui_wood_sign.svg) 14 24 18 24 fill / 14px 24px 18px 24px stretch; (가운데는 결 무늬만이라 늘어나도 자연스럽다) · 친구 마당 이름표 · 2026-09-24 -->
+<rect x="3" y="5" width="114" height="40" rx="10" fill="#000" opacity=".25"/><rect x="2" y="2" width="116" height="40" rx="10" fill="#b07a4c" stroke="#2b2118" stroke-width="2.5" stroke-linejoin="round"/><rect x="6" y="6" width="108" height="32" rx="7" fill="#c99a66"/><path d="M8,15 H112 M8,24 H112 M8,33 H112" stroke="#b07a4c" stroke-width="1.3" opacity=".6"/><path d="M8,10 H112" stroke="#e2bd8a" stroke-width="2" opacity=".8"/><circle cx="12" cy="22" r="3" fill="#8a8580" stroke="#2b2118" stroke-width="1.2"/><circle cx="108" cy="22" r="3" fill="#8a8580" stroke="#2b2118" stroke-width="1.2"/>
+</svg>
