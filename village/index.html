@@ -6358,8 +6358,10 @@ function leave(f, why) {
    · 원래 pickDestination 이 난수를 **다 쓴 뒤** 길만 바꾼다(순서가 안 밀리게 — SITBY 시안의 흔들림이 여기서 났다). 닿으면 고른 그 쉼터에 든다(보통 들르기와 같은 난수 한 번).
      머무는 시간은 다른 들르기와 같다(STAY_MIN~MAX). 곁 자리(ACT-BESIDE)가 긴의자면 앉히고 정자·연못가면 세운다.
    분류 '판정'(방문 셈 · 오후 길 위 사람이 바뀐다 — 만족은 거리 셈이라 그대로). 끄면(VRULES.stroll.on = false) 옛 그대로.
+   [38-ⓑ89 · 보스 09-24 (가)] 가까운 쉼터에 오래 — near 16→10 · stayMul 2(머묾 두 배 · 난수 한 번 그대로) · joinHead(가는 중인 이웃도 join 에 셈).
+     걸음이 한 칸 판 속 10분이라 상한(maxOutPer)의 절반을 '가는 중'이 썼다 → 같은 상한 안에서 앉은 사람이 는다(origin 14~18시 · 세 번 평균 쉼터에 7.4→10.0 · 가는 중 6.4→4.1).
    **수업 판(교과 칸 있음)에서는 돌지 않는다** — 수업 판은 한 변수만 바꾸는 곳(켜진 판정 ≤6 · stages.mjs 조건부 표에 같은 조건). 기본 판·자유 놀이·원본 마을에서만. */
-(window.VRULES = window.VRULES || {}).stroll = { on: true, from: 14, to: 18, step: 6, near: 16, join: 3, kinds: ['bench', 'minibench', 'pavilion', 'pond', 'fountain', 'bigtree', 'villtree'],
+(window.VRULES = window.VRULES || {}).stroll = { on: true, from: 14, to: 18, step: 6, near: 10, join: 3, joinHead: true, stayMul: 2, kinds: ['bench', 'minibench', 'pavilion', 'pond', 'fountain', 'bigtree', 'villtree'],
   maxOut: 0, maxOutPer: 0.15, seats: { bench: 3, minibench: 1, pavilion: 4, pond: 3, fountain: 3, bigtree: 2, villtree: 3 } };   /* [38-ⓑ89 · 09-24] 큰나무·마을 나무 그늘도 · 상한 둘 — 마을 전체 동시에 산책 중·쉬는 사람 = 인구 × maxOutPer(0.15 · 원본 77명 → 12 · 새 원본 #1019 에서 없음/8/0.15/0.25 견줘 고름 — PR 표) · 쉼터마다 seats(없으면 ENTER_MAX) */
 const strollMaxOut = () => { const R = window.VRULES.stroll; return R.maxOutPer ? Math.max(3, Math.ceil(population() * R.maxOutPer)) : (R.maxOut | 0); };   /* 마을 전체 상한 — maxOutPer(인구 비례)가 있으면 그것 · 없으면 maxOut(0 = 없음) */
 const strollCap = root => { const c = cells[root], s = window.VRULES.stroll.seats; return (c && s && s[c.k]) || ENTER_MAX; };
@@ -6378,7 +6380,8 @@ function strollTry(f, who) {
   const spots = strollSpots(), here = f.path[0]; if (!spots.length || here == null || here < 0) return;
   roadBFS(here, undefined, R.near);   /* 지금 선 자리에서 — 걸음이 하루에 비해 느려(한 칸 1.25초 · 판 속 1시간 7.5초) 먼 쉼터는 밤에야 닿는다 */
   let best = null, bs = 1e9;
-  for (const s of spots) { const n = inside.get(s.root) || 0; if (n >= strollCap(s.root)) continue;
+  const head = new Map(); if (R.joinHead) folks.forEach(g => { if (g.stroll) head.set(g.stroll.root, (head.get(g.stroll.root) || 0) + 1); });   /* 가는 중인 이웃도 '누가 있다'로 — 걸음이 느려 앞사람이 닿기 전에 뒷사람이 고른다 */
+  for (const s of spots) { const n = (inside.get(s.root) || 0) + (head.get(s.root) || 0); if (n >= strollCap(s.root)) continue;
     for (const c of s.roads) { if (bfsSeen[c] !== bfsGen) continue; const sc = bfsDepth[c] - (n > 0 ? R.join : 0); if (sc < bs) { bs = sc; best = [s.root, c]; } } }
   if (!best) { STROLL.stats.멀어서안감++; return; }
   const dist = bfsDepth[best[1]], every = Math.max(1, Math.ceil((dist + 1) / Math.max(1, R.step)));   /* 가까울수록 자주 — step 칸마다 한 번씩 드물게(0~8칸 매일 · 9~16 이틀에 한 번 …) */
@@ -6394,7 +6397,7 @@ function strollTry(f, who) {
     const b = cells[S.root]; if (cell !== S.cell || !b || b.root !== S.root || (inside.get(S.root) || 0) >= strollCap(S.root)) return te0.apply(this, arguments);
     inside.set(b.root, (inside.get(b.root) || 0) + 1);                 /* 아래는 tryEnter 몸통 그대로 — 들어갈 건물만 고른 쉼터로(난수 한 번 · 같은 차례) */
     f.visits = f.visits || {}; f.visits[b.k] = (f.visits[b.k] || 0) + 1;
-    f.inside = { root: b.root, until: simNow() + STAY_MIN + simRand() * (STAY_MAX - STAY_MIN), cell, stroll: true };
+    f.inside = { root: b.root, until: simNow() + (STAY_MIN + simRand() * (STAY_MAX - STAY_MIN)) * (window.VRULES.stroll.stayMul || 1), cell, stroll: true };
     f.state = 'inside'; f.walking = false; releaseAll(i); enterStats.들어감++; STROLL.stats.들어감++; return true; }; }
 window.__strollDist = () => { const spots = strollSpots(), sp = new Set(spots.flatMap(s => s.roads)), out = [];   /* 집마다 집 앞 길에서 가장 가까운 쉼터 곁 길 칸까지 칸 수(60 까지) */
   cells.forEach((rec, i) => { if (!rec || rec.root !== i || rec.k !== 'house') return; const b = roadBeside(rec); if (b < 0) { out.push(-1); return; }
