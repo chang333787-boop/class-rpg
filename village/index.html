@@ -8587,12 +8587,12 @@ window.__noSnap = () => ({ 켜짐: window.VRULES.noSnap.on, ...NOSNAP.stats });
    · 가까이(face) 서 있는 둘은 **마주 본다**(몸 방향만 · 그리는 동안만).
    · 모두 ease 로 스민다(걷기 시작하면 0 으로 돌아간다 — 튀지 않게). 셈·판정·저장 0 · 분류 '연기'.
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).folkSpace = { on: true, side: [0.4, 0.9], along: 0.6, ease: 0.12, gap: 0.8, push: 0.6, keep: 0.97, sepMax: 1.6, face: 2.6 };
-const SPACE = { off: new WeakMap(), sep: new WeakMap(), id: new WeakMap(), n: 0, dirs: [], now: { 비켜섬: 0, 밀어냄: 0, 마주봄: 0 } };   /* sep = 밀려난 양(쌓이고 keep 배로 천천히 풀린다) — 그 프레임의 겹침만큼만 밀면 겹침이 조금 남은 채 멈춘다 */
+(window.VRULES = window.VRULES || {}).folkSpace = { on: true, side: [0.4, 0.9], along: 0.6, ease: 0.12, gap: 0.8, push: 0.6, keep: 0.97, sepMax: 1.6, face: 2.6, pair: 0.75, pairMax: 4.6, pairGap: 1.5, pairPull: 1.3 };   /* pair… = [33-ⓑ75] 이웃 칸에 선 둘을 짝으로(아래) */
+const SPACE = { off: new WeakMap(), sep: new WeakMap(), id: new WeakMap(), n: 0, dirs: [], now: { 비켜섬: 0, 밀어냄: 0, 마주봄: 0, 짝: 0 } };   /* sep = 밀려난 양(쌓이고 keep 배로 천천히 풀린다) — 그 프레임의 겹침만큼만 밀면 겹침이 조금 남은 채 멈춘다 */
 const spaceStand = f => f.state !== 'inside' && !f.walking && (f.state === 'idle' || f.state === 'walk') && !f.beside && !f.festSpot && !f.shelter && !f.garden && !f.arriving;
 const spaceRand = (f, k) => { let id = SPACE.id.get(f); if (id == null) { id = ++SPACE.n; SPACE.id.set(f, id); } return (((id * 2654435761 + k * 40503) >>> 0) % 10007) / 10007; };
 function spaceOn(held) {   /* 매개변수 이름을 H 로 두면 판 높이 H 를 가린다(칸 계산이 NaN 이 됐다) */
-  const R = window.VRULES.folkSpace, O = SPACE.off, now = SPACE.now; now.비켜섬 = now.밀어냄 = now.마주봄 = 0; SPACE.dirs.length = 0;
+  const R = window.VRULES.folkSpace, O = SPACE.off, now = SPACE.now; now.비켜섬 = now.밀어냄 = now.마주봄 = now.짝 = 0; SPACE.dirs.length = 0;
   const on = R.on && !OFF.has('folks'), list = [];
   for (const f of folks) { if (f.state === 'inside') { O.delete(f); continue; }
     const st = on && spaceStand(f); let tx = 0, tz = 0;
@@ -8602,6 +8602,15 @@ function spaceOn(held) {   /* 매개변수 이름을 H 로 두면 판 높이 H �
         const [lx, lz] = rx && !rz ? [0, 1] : rz && !rx ? [1, 0] : [0.707, 0.707], s = (spaceRand(f, 1) < 0.5 ? -1 : 1) * (R.side[0] + (R.side[1] - R.side[0]) * spaceRand(f, 2)), a = (spaceRand(f, 3) - 0.5) * 2 * R.along;
         tx = lx * s + lz * a; tz = lz * s - lx * a; now.비켜섬++; } }
     list.push([f, tx, tz, st]); }
+  /* [33-ⓑ75] '한 칸 한 명' 박자 — 칸을 잡는 셈이라 서 있는 사람이 길을 따라 한 칸(4)마다 하나씩 섰다(#881 뒤에도 박자는 남음 · 33회).
+     이웃 칸(pairMax 안)에 선 둘을 짝지어 서로 쪽으로 pairPull 까지 당긴다(짝 사이 pairGap) — 박자가 '둘씩 모여 선 무리'로 바뀌고, 가까우니 아래 face 로 마주 본다.
+     짝은 이름표 차례로 욕심껏 · 짝 가운데 pair 몫만 당긴다(모두 짝이면 또 다른 박자가 된다). 그리는 자리만 · 셈 0 */
+  if (on && R.pair > 0) { const st = list.filter(e => e[3]), taken = new Set(); st.sort((a, c) => spaceRand(a[0], 0) - spaceRand(c[0], 0));
+    for (const A of st) { if (taken.has(A[0])) continue; let best = null, bd = R.pairMax;
+      for (const B of st) { if (B === A || taken.has(B[0])) continue; const d = Math.hypot(B[0].x - A[0].x, B[0].z - A[0].z); if (d < bd && d > R.pairGap + 0.4) { bd = d; best = B; } }
+      if (!best) continue; taken.add(A[0]); taken.add(best[0]); if (spaceRand(A[0], 7) >= R.pair) continue;
+      const ux = (best[0].x - A[0].x) / bd, uz = (best[0].z - A[0].z) / bd, k = Math.min(R.pairPull, (bd - R.pairGap) / 2);
+      A[1] += ux * k; A[2] += uz * k; best[1] -= ux * k; best[2] -= uz * k; now.짝++; } }
   /* 그려질 자리(지금 층의 자리 + 비킴 + 지금 간격)끼리 — 가까우면 서 있는 사람이 밀려난다 */
   if (on) for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) { const A = list[a], B = list[c]; if (!A[3] && !B[3]) continue;
     const oa = O.get(A[0]) || [0, 0], ob = O.get(B[0]) || [0, 0], ax = A[0].x + (A[0].passOx || 0) + oa[0], az = A[0].z + (A[0].passOz || 0) + oa[1], bx = B[0].x + (B[0].passOx || 0) + ob[0], bz = B[0].z + (B[0].passOz || 0) + ob[1];
@@ -8609,6 +8618,13 @@ function spaceOn(held) {   /* 매개변수 이름을 H 로 두면 판 높이 H �
     if (d < 1e-3) { const t = spaceRand(A[0], 4) * 6.283; dx = Math.cos(t); dz = Math.sin(t); d = 1; } const need = R.gap - Math.hypot(ax - bx, az - bz), ux = dx / d, uz = dz / d;
     const wa = A[3] && B[3] ? 0.5 : A[3] ? 1 : 0, wb = 1 - wa, S = SPACE.sep, sa = S.get(A[0]) || [0, 0], sb = S.get(B[0]) || [0, 0], k = need * R.push;
     if (wa) { sa[0] += ux * k * wa; sa[1] += uz * k * wa; S.set(A[0], sa); } if (wb) { sb[0] -= ux * k * wb; sb[1] -= uz * k * wb; S.set(B[0], sb); } now.밀어냄++; }
+  /* [09-23 사냥 하네스 '오래 포갬'] 곁 자리에 그려진 사람(일꾼·우물가·놀이터 곁)은 목록 밖이라 아무도 피하지 않았다 — 길에 선 사람이 일꾼과 1초 넘게 포개졌다(pop167 · mountain).
+     이제 그들을 **움직이지 않는 자리**로 넣어, 가까운 서 있는 사람이 다 비킨다(같은 sep 에 쌓인다). */
+  if (on) { const fix = []; for (const g of folks) if (g.state === 'inside' && g.beside && g.beside.x != null) fix.push(g.beside);
+    if (fix.length) for (const A of list) { if (!A[3]) continue; const f = A[0], oa = O.get(f) || [0, 0], ax = f.x + (f.passOx || 0) + oa[0], az = f.z + (f.passOz || 0) + oa[1];
+      for (const bz of fix) { let dx = ax - bz.x, dz = az - bz.z, d = Math.hypot(dx, dz); if (d >= R.gap) continue;
+        if (d < 1e-3) { const t = spaceRand(f, 5) * 6.283; dx = Math.cos(t); dz = Math.sin(t); d = 1; } const k = (R.gap - Math.hypot(ax - bz.x, az - bz.z)) * R.push, S = SPACE.sep, sa = S.get(f) || [0, 0];
+        sa[0] += dx / d * k; sa[1] += dz / d * k; S.set(f, sa); now.밀어냄++; } } }
   for (const e of list) { const s = SPACE.sep.get(e[0]); if (!s) continue; if (!e[3]) { SPACE.sep.delete(e[0]); continue; }
     s[0] *= R.keep; s[1] *= R.keep; const m = Math.hypot(s[0], s[1]); if (m > R.sepMax) { s[0] *= R.sepMax / m; s[1] *= R.sepMax / m; } e[1] += s[0]; e[2] += s[1]; }
   for (const [f, tx, tz, st] of list) { const o = O.get(f) || [0, 0]; o[0] += (tx - o[0]) * R.ease; o[1] += (tz - o[1]) * R.ease;
@@ -8621,7 +8637,11 @@ function spaceOn(held) {   /* 매개변수 이름을 H 로 두면 판 높이 H �
     if (best) { SPACE.dirs.push([f, f.dir]); f.dir = Math.atan2(best.x - f.x, best.z - f.z); now.마주봄++; } } }
 function spaceOff() { for (const [f, d] of SPACE.dirs) f.dir = d; SPACE.dirs.length = 0; }
 const spaceAt = f => SPACE.off.get(f) || null;   /* __folkPos 가 읽는다 */
-window.__folkSpace = () => ({ 켜짐: window.VRULES.folkSpace.on, 지금: { ...SPACE.now } });
+window.__folkSpace = () => {   /* [33-ⓑ76] 그린 자리 기준 값도 — 창조자 도구가 셈 자리(__folkOverlap)밖에 못 재서 포갬·박자를 못 되밟았다 */
+  const V = window.__folkPos().filter(p => p[3]), S = new Set(folks.filter(spaceStand).map(f => F30.id.get(f))); let near = 999, pairs = 0, beat = 0, stN = 0;
+  for (let a = 0; a < V.length; a++) { let nb = 999; for (let c = 0; c < V.length; c++) { if (c === a) continue; const d = Math.hypot(V[a][1] - V[c][1], V[a][2] - V[c][2]); if (c > a) { if (d < near) near = d; if (d < 0.6) pairs++; } if (S.has(V[c][0]) && d < nb) nb = d; }
+    if (S.has(V[a][0]) && nb < 999) { stN++; if (nb > 3.6 && nb < 4.4) beat++; } }
+  return { 켜짐: window.VRULES.folkSpace.on, 지금: { ...SPACE.now }, 그린자리: { 가장가까운거리: +near.toFixed(2), 겹친쌍: pairs, 서있는사람: stN, 한칸박자: stN ? +(beat / stN).toFixed(2) : 0 } }; };   /* 한칸박자 = 서 있는 사람 가운데 가장 가까운 서 있는 이웃이 3.6~4.4(한 칸) 인 몫 */
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
@@ -10203,10 +10223,10 @@ function drawFolks(now) {
 (window.VRULES = window.VRULES || {}).beside = { on: true,
   kinds: { well: 'stand', fountain: 'stand', pond: 'stand', play: 'stand', dream: 'stand', flower: 'stand', plaza: 'on', bench: 'sit', minibench: 'sit' },   // 꽃밭 가족(FLOWER_KINDS)은 flower 를 따른다 · 여기 없는 곳(가게·정자·학교…)은 옛 그대로 안으로
   inset: { well: 1.3, fountain: 0.6, pond: -0.5, play: 0.8, dream: -0.3, flower: -0.6 },   // 길 가장자리에서 그 물건 쪽으로 몇 들어가 서나(세계 단위 · 한 칸 4). 음수 = 길 쪽에 남는다(꽃·물은 밟지 않는다)
-  gap: 1.15, seats: { bench: [-0.9, 0.9, -2.6], minibench: [0] }, sitDrop: 0.42, sitFwd: 0.2,
+  gap: 1.15, clear: 0.9, seats: { bench: [-0.9, 0.9, -2.6], minibench: [0] }, sitDrop: 0.42, sitFwd: 0.2,
   say: { well: '우물가에서 물을 길어요', sit: '에 앉아 쉬어요', on: '에 나와 있어요', stand: ' 곁에 있어요', carry: '물동이를 들고 집에 가요', rest: '물동이를 문 앞에 내려놓아요' },
   bucket: { on: true, from: ['well'], restMs: 1500, tries: 6, hand: [0.72, 0.62, 0.1] } };
-const besideStats = { 곁에섬: 0, 앉음: 0, 물동이: 0, 물동이도착: 0, 물동이들고밤귀가: 0, 물동이들고출근: 0, 물동이길없음: 0, 물동이최장칸: 0 };
+const besideStats = { 곁에섬: 0, 비켜섬: 0, 앉음: 0, 물동이: 0, 물동이도착: 0, 물동이들고밤귀가: 0, 물동이들고출근: 0, 물동이길없음: 0, 물동이최장칸: 0 };
 const besideMode = k => { const R = window.VRULES.beside; return R.kinds[k] || (FLOWER_KINDS[k] ? R.kinds.flower : null); };
 /* 들어간 첫 틱에 한 번 — 설 자리·볼 쪽을 정한다(그 뒤로는 그리기만) */
 function besidePlace(f) {
@@ -10224,8 +10244,15 @@ function besidePlace(f) {
   let dx = 0, dz = 0; const x = cX(cell), y = cY(cell);
   for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + ax, ny = y + ay; if (inb(nx, ny) && cells[idx(nx, ny)] && cells[idx(nx, ny)].root === root) { dx = ax; dz = ay; break; } }
   if (!dx && !dz) return;
-  const side = [0, -1, 1, -2, 2][slot % 5] * R.gap, inn = mode === 'on' ? CS * 0.5 + [0.4, 1.5, 0.9][slot % 3] : (R.inset[b.k] != null ? R.inset[b.k] : R.inset[FLOWER_KINDS[b.k] ? 'flower' : b.k] || 0);
-  const px = wx(x) + dx * (CS / 2 + inn) + dz * side, pz = wz(y) + dz * (CS / 2 + inn) - dx * side;
+  /* [09-23 곁 자리 모퉁이] 서로 직각인 두 길에서 들어온 둘이 모퉁이에서 같은 점에 섰다(옆 비킴 1.15 + 들어섬 0.8 ≈ 반 칸 2 · mountain 놀이터 16초 0.07 거리).
+     자리 후보를 k 번째로 늘어놓고(다섯 넘으면 한 줄 뒤 — 길 쪽으로), 이미 선 곁 사람과 clear 안이면 다음 후보로 비켜 선다. 그리는 자리만 · 판정 0 */
+  const inn0 = R.inset[b.k] != null ? R.inset[b.k] : R.inset[FLOWER_KINDS[b.k] ? 'flower' : b.k] || 0;
+  const spot = k => { const side = [0, -1, 1, -2, 2][k % 5] * R.gap, inn = mode === 'on' ? CS * 0.5 + [0.4, 1.5, 0.9][k % 3] : inn0 - (k >= 5 ? Math.floor(k / 5) * 0.9 : 0);
+    return [wx(x) + dx * (CS / 2 + inn) + dz * side, wz(y) + dz * (CS / 2 + inn) - dx * side]; };
+  let [px, pz] = spot(slot);
+  if (R.clear) { const others = []; folks.forEach(g => { if (g !== f && g.beside && g.state === 'inside') others.push(g.beside); });
+    const free = p => others.every(o => Math.hypot(o.x - p[0], o.z - p[1]) >= R.clear);
+    if (!free([px, pz])) for (let k = slot + 1; k < slot + 15; k++) { const p = spot(k); if (free(p)) { [px, pz] = p; besideStats.비켜섬++; break; } } }
   f.beside = { root, k: b.k, mode, slot, x: px, z: pz, dir: mode === 'on' ? Math.atan2(c.x - px, c.z - pz) : Math.atan2(dx, dz), drop: 0 };
   besideStats.곁에섬++;
 }
@@ -11696,7 +11723,12 @@ window.__rhythm = () => { let home = 0, sch = 0, out = 0; folks.forEach(f => { i
 window.__inside = () => { let n = 0, longest = 0; folks.forEach(f => { if (f.state === 'inside') { n++; longest = Math.max(longest, SIM.t - (f.inside.until - STAY_MAX)); } });
   const per = {}; inside.forEach((v, root) => per[cells[root] ? K[cells[root].k].nm : root] = (per[cells[root] ? K[cells[root].k].nm : root] || 0) + v);
   return { 안에: n, 건물별: per, ...enterStats, 최대동시: ENTER_MAX }; };
-window.__stuck = (sec) => { let worst = 0; folks.forEach(f => { if (f.state === 'inside' && SIM.t > f.inside.until + 1000) worst = Math.max(worst, SIM.t - f.inside.until); }); return { 갇힌사람: folks.filter(f => f.state === 'inside' && SIM.t > f.inside.until + 1000).length, 최대초과ms: worst }; };
+/* [09-23 사냥 하네스 FAIL 원인] 집·일터·학교는 inside.until 이 아니라 **시각**으로 나온다(tickFolks: isNightHour·isWorkHour·isSchoolHour) —
+   예전 훅은 그들까지 until+1초로 세어, pop167 8시의 '갇힘 6표본'이 전부 학교에 있는 아이였다(최대 8.5초 초과 · 가짜). 이제 갇힘은 until 로 나오는 '들름'만 센다. */
+const stuckKind = f => { const b = cells[f.inside.root]; return f.inside.root === f.home ? '집' : f.inside.root === f.job && f.goal === 'work' ? '일터' : b && b.k === 'school' ? '학교' : '들름'; };
+window.__stuck = (sec) => { const over = folks.filter(f => f.state === 'inside' && SIM.t > f.inside.until + 1000), drop = over.filter(f => stuckKind(f) === '들름');
+  return { 갇힌사람: drop.length, 최대초과ms: drop.reduce((m, f) => Math.max(m, SIM.t - f.inside.until), 0), 시각으로머묾: over.length - drop.length,
+    목록: over.slice(0, 8).map(f => { const b = cells[f.inside.root]; return [b ? b.k : '없음', stuckKind(f), Math.round(SIM.t - f.inside.until)]; }) }; };
 window.__overlay = (kind, x, y, rot) => { if (kind) overlayFor(kind, x, y, rot || 0); return { ...ovInfo, 키: ovKey }; };
 window.__sun = () => ({ 시: +simHour().toFixed(2), 방위: +sunDir.az.toFixed(3), 고도: +sunDir.el.toFixed(3), 밤: +NIGHT.value.toFixed(2), 해자리: [ +sun.position.x.toFixed(1), +sun.position.y.toFixed(1), +sun.position.z.toFixed(1) ] });
 window.__needs = () => ({ 필요: NEEDS.slice(), 배움: learnOn, 문턱: LEARN_POP });
@@ -11854,7 +11886,7 @@ const f30Solid = (rec, x, z) => { const t = K[rec.k]; if (!t || !Array.isArray(t
 window.__folkPos = () => folks.map(f => { let id = F30.id.get(f); if (id == null) { id = ++F30.n; F30.id.set(f, id); }
   const b = f.state === 'inside' && f.beside ? f.beside : null, vis = f.state !== 'inside' || !!b, so = !b && typeof nosnapAt === 'function' ? nosnapAt(f) : null, sp = !b && typeof spaceAt === 'function' ? spaceAt(f) : null, x = b ? b.x : f.x + (so ? so[0] : 0) + (sp ? sp[0] : 0) + (f.passOx || 0), z = b ? b.z : f.z + (so ? so[1] : 0) + (sp ? sp[1] : 0) + (f.passOz || 0);   /* [ACT-NOSNAP] [ACT-SPACE] 그려지는 자리(비킴 포함) */
   const gx = Math.round(x / CS + (W - 1) / 2), gy = Math.round(z / CS + (H - 1) / 2), i = inb(gx, gy) ? idx(gx, gy) : -1, rec = i >= 0 ? cells[i] : null, road = i >= 0 && isRoad(i);
-  return [id, +x.toFixed(2), +z.toFixed(2), vis ? 1 : 0, f.state, rec ? (road ? 'road' : rec.k) : '', rec && !road && f30Solid(rec, x, z) ? 1 : 0, b ? (b.mode || 'beside') : (f.carry ? 'carry' : '')]; });
+  return [id, +x.toFixed(2), +z.toFixed(2), vis ? 1 : 0, f.state, rec ? (road ? 'road' : rec.k) : '', rec && !road && f30Solid(rec, x, z) ? 1 : 0, b ? (b.mode || 'beside') : (f.carry ? 'carry' : ''), b ? b.root + ':' + b.slot : '']; });   /* 아홉째 = 곁 자리(물건 root:slot) — 곁 자리 겹침을 가르려고(09-23) */
 window.__folkStep = (sec) => { if (folksDirty) { syncFolks(); folksDirty = false; } for (let t = 0; t < (sec || 0.1); t += 0.1) simTick(); drawFolks(SIM.t); return window.__folkCheck(); };
 /* 시간을 앞으로만 흘린다. 호출할 때마다 performance.now() 로 되돌리면
    앞선 호출에서 미래로 잡아둔 '쉬는 시간'이 영영 안 지나간다(실제로 그렇게 헤맸다). */
