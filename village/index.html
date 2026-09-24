@@ -11318,14 +11318,15 @@ function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된
    ② 판이 그린 개울(stream · [MAC-TERRAIN]): 되살릴 때 그 판의 개울 칸이면 통과(아이가 새로 그리는 것은 판 목록 그대로 막는다).
    전엔 둘 다 되살리기(복원)에서 '이 판에서는 쓰지 않아요'로 막혀, 산 판을 다시 열면 '못 살린 것 38개' — 개울은 곧 다시 깔렸지만
    **아이가 놓은 다리와 처음 길의 다리는 개울로 돌아가 길이 끊겼다**(산 판 · 저장본 한 번 왕복). 판정 0 · 저장 칸 0 · 원래 줄 1줄(바로 위 판 목록 고리에 '&& !stageKindKeep(…)'). 분류 '저장'.
-   ③ 옛 우물(well · [MAC-NOWATER] · PR 3a): 판 목록에서 빠져도 되살리기(복원)는 통과 — 장식으로 열린다(필요 없음 · 트레이 숨김은 nwSync 그대로).
-      아이가 새로 놓기는 판 목록 그대로 막는다. 물을 지키는 판(NOWATER.off 거짓)과 결정 판(proto-vote — 옛 결정 우물이 A 자리를 막는다)에서는 안 푼다. */
+   ③ 옛 우물(well · [MAC-NOWATER] · PR 3a): 판 목록에서 빠져도 통과 — 되살리기(복원)는 장식으로 열리고, 이미 있는 옛 우물은 옮기기·돌리기·되돌리기도 된다
+      (옮기기·되돌리기는 canPlace 를 복원 없이 부른다 — 막으면 지운 뒤 ↩ 가 '그 자리가 이미 찼어요'로 우물을 잃었다 · 09-25 검토). 새로 고르는 길은 트레이 숨김(nwSync)이 막는다.
+      물을 켠 판(NOWATER.off 거짓)과 결정 판(proto-vote — 옛 결정 우물이 A 자리를 막는다)에서는 안 푼다. */
 (window.VRULES = window.VRULES || {}).stageKeep = { on: true };
 const SKEEP = { stats: { 다리: 0, 판개울: 0, 옛우물: 0 } };
 function stageKindKeep(kind, args) { if (!window.VRULES.stageKeep || !window.VRULES.stageKeep.on) return false; const [, x, y, , opts] = args;
   if (kind === 'sbr' && STAGE.def.건물.includes('road')) { SKEEP.stats.다리++; return true; }
   if (kind === 'stream' && opts && opts.복원 && inb(x, y) && terrainStreams().has(idx(x, y))) { SKEEP.stats.판개울++; return true; }
-  if (kind === 'well' && opts && opts.복원 && NOWATER.off && !(STAGE.def.결정 && STAGE.def.결정.on)) { SKEEP.stats.옛우물++; return true; }
+  if (kind === 'well' && NOWATER.off && !(STAGE.def.결정 && STAGE.def.결정.on)) { if (opts && opts.복원) SKEEP.stats.옛우물++; return true; }
   return false; }
 window.__stageKeep = () => ({ 켜짐: window.VRULES.stageKeep.on, ...SKEEP.stats });
 { hookAdd('goalTick', function (next, args) { const r = next(args);
