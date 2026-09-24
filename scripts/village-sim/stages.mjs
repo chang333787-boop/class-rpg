@@ -66,7 +66,7 @@ let 끈판 = 0;
 /* [MAC-SHOPCAP] ㉮ 조건부 판정 — 그 판에서 한 줄도 안 도는 규칙은 켜진 판정으로 세지 않는다(보스 09-23 · 설계 5-나).
    수용량(shopCap)은 **정원이 적힌 필요 시설이 그 판에 있을 때만** 돈다 — 기본 종류에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대).
    [MAC-FACILCAP] 가게에서 학교로(#857) — '장보기' 에서 '필요가 있는 시설 무엇이든' 으로 넓혔다. */
-const 조건부 = { health: def => (def.교과 == null || !!(def.규칙 && def.규칙.health)) && (!Array.isArray(def.건물) || !def.건물.length || def.건물.includes('clinic')) && (nw => !nw.on && !(Array.isArray(nw.keepStages) && nw.keepStages.includes(def.id)))(Object.assign({}, vrules.needWater, (def.규칙 || {}).needWater)),   /* [MAC-HEALTH] 코드의 healthOffer 와 같은 조건 — 수업 판은 판 규칙에 health 가 있을 때만 · 물을 지키는 판은 안 돎 */
+const 조건부 = { health: def => (def.교과 == null || !!(def.규칙 && def.규칙.health)) && (!Array.isArray(def.건물) || !def.건물.length || def.건물.includes('clinic') || !!(def.결정 && def.결정.on && def.결정.시설 === 'clinic')) && (nw => !nw.on && !(Array.isArray(nw.keepStages) && nw.keepStages.includes(def.id)))(Object.assign({}, vrules.needWater, (def.규칙 || {}).needWater)),   /* [MAC-HEALTH] 코드의 healthOffer 와 같은 조건 — 수업 판은 판 규칙에 health 가 있을 때만 · 물을 지키는 판은 안 돎 */
   shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))),
   stroll: def => def.교과 == null,
   homeTime: def => def.교과 == null };   // [ACT-HOMETIME] 귀가 나서기도 수업 판에선 안 돈다(코드의 homeTimeIs 와 같은 조건)   // [ACT-STROLL] 산책은 수업 판(교과 있음)에서는 안 돈다(코드의 strollTry 와 같은 조건)
@@ -185,6 +185,10 @@ for (const f of files) {
     const 빠짐 = 새종류.filter(k => !생김.includes(k));
     빠짐.length ? add('FAIL', P('건물정의'), '판을 열었는데 안 생긴 종류: ' + 빠짐.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종이 판에서 실제로 생김`)); }
   ok ? add('PASS', P(`시뮬로 얹어 하루 돎 · 인구 ${res.samples[0].m.인구}→${res.samples[res.samples.length - 1].m.인구} · 네트워크 0`)) : add('FAIL', P('시뮬로 얹기'), JSON.stringify({ 네트워크: res.네트워크, 판: res.판 }));
+  /* [MAC-STAGEKEEP] ③ · [MAC-HEALTH] PR 3a 가드 — FAIL 만 낸다(PASS 줄 0): ① 판 목록이 시작 땅의 물건을 조용히 막나 ② 의원을 쓰는 판인데 건강이 안 도나(keepStages · 판 규칙 health · 목록이 반쪽만 바뀐 때) */
+  if (def.시작 != null && res.못살림) add('FAIL', P('시작 땅'), `판에 얹으면 못 살린 것 ${res.못살림}개 — 판 목록(건물)이 시작 땅의 물건을 막는다([MAC-STAGEKEEP])`);
+  { const 의원씀 = (def.목표 || []).some(g => g.k === 'clinic') || ((def.역할 || {}).정한다 || []).some(d => (d.놓기 || []).includes('clinic')) || !!(def.결정 && def.결정.시설 === 'clinic');
+    if (의원씀 && !조건부.health(def)) add('FAIL', P('건강'), '의원을 쓰는 판인데 건강이 안 돎 — keepStages · 수업 판 규칙 health · 건물 목록'); }
 }
 
 /* [MAC-SHOPCAP] ㉮ 반대쪽 자기 시험 — 조건부 셈이 규칙을 **숨기지 않나**. city 를 베껴 끄기를 빼고 상가에 정원을 적으면

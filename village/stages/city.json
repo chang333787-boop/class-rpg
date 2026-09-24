@@ -84,7 +84,7 @@
       ]
     }
   },
-  "건물": ["road", "avenue", "crosswalk", "treerow", "lawn", "plaza", "house", "apart", "office", "store", "eschool", "well", "fountain", "play", "bench", "minibench", "tree", "bigtree", "bush", "flower", "pot", "lamp", "signal", "trashcan", "post", "wall", "statue", "clock", "station", "museum"],
+  "건물": ["road", "avenue", "crosswalk", "treerow", "lawn", "plaza", "house", "apart", "office", "store", "eschool", "fountain", "play", "bench", "minibench", "tree", "bigtree", "bush", "flower", "pot", "lamp", "signal", "trashcan", "post", "wall", "statue", "clock", "station", "museum"],
   "규칙": {},
   "끄기": ["붐빔"],
   "목표": [

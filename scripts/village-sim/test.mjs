@@ -74,17 +74,17 @@ test('규칙 덮기: VRULES 에 없는 키는 멈춘다', () => {
   ok(r.status !== 0 && /VRULES 에 없음/.test(r.stderr + r.stdout), '멈추지 않음');
 });
 
-/* [MAC-NOWATER] 물 끔 — 기본 마을은 필요 셋 · 옛 우물 숨김 · 목표 bench1 · 우물을 지키는 판(town3)은 옛 넷 · 옛 저장본의 well 은 bench1 으로 이어진다 */
-test('물 끔: 기본 마을 필요 셋 · town3 는 물 그대로 · pop88 은 목표 bench1 을 잇는다', () => {
+/* [MAC-NOWATER] 물 끔 — 기본 마을은 필요 셋 · 옛 우물 숨김 · 목표 bench1 · 우물을 지키는 판(nowater · PR 3b 까지)은 옛 넷 · 옛 저장본의 well 은 bench1 으로 이어진다 */
+test('물 끔: 기본 마을 필요 셋 · nowater 는 물 그대로 · pop88 은 목표 bench1 을 잇는다', () => {
   const nw = (query, save) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${save ? `fs.readFileSync(${JSON.stringify(path.join(ROOT, save))}, 'utf8')` : 'null'}, seed: 1, query: ${JSON.stringify(query)} });
 process.stdout.write('@@' + JSON.stringify(w.__needWater()) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8' });
     const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('__needWater 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
-  const a = nw(''), b = nw('stage=town3'), c = nw('', 'village/stages/boards/pop88.json');
+  const a = nw(''), b = nw('stage=nowater'), c = nw('', 'village/stages/boards/pop88.json');
   ok(a.필요.join() === '장보기,놀이,쉼' && a.돌아섬필요.join() === '장보기,놀이,쉼', '기본 필요 ' + a.필요.join());
   ok(a.우물.필요 === null && a.우물.묶음 === '(숨김)' && a.분수 === '쉼' && a.연못.join() === '쉼,', '우물·분수·연못 ' + JSON.stringify([a.우물, a.분수, a.연못]));
   ok(a.목표.join() === 'bench1' && a.말.셋멀.startsWith('두 가지 더') && a.말.점.join() === '○○,●○,●●', '목표·말 ' + JSON.stringify([a.목표, a.말]));
-  ok(!b.물끔 && b.필요.join() === '물,장보기,놀이,쉼' && b.목표.join() === 'well' && b.말.셋멀.startsWith('하나만 더'), 'town3 ' + JSON.stringify(b.필요));
+  ok(!b.물끔 && b.필요.join() === '물,장보기,놀이,쉼' && b.목표.join() === 'well' && b.말.셋멀.startsWith('하나만 더'), 'nowater ' + JSON.stringify(b.필요));
   ok(c.이음 === true && c.목표이음 === 1, 'pop88 이음 ' + c.이음);
 });
 
@@ -98,8 +98,8 @@ w.__tickBench(300); process.stdout.write('@@' + JSON.stringify({ 물: w.__needWa
   ok(j.배움.팻말부위 === 0 && j.장보기.팻말부위 > 0, '팻말 ' + JSON.stringify(j));
 });
 
-/* [MAC-HEALTH] 건강 — 인구 100 이면 켜지고 저장 칸 건강:1 로 다시 열어도 · 수업 판(onebridge)·물을 지키는 판(town3)은 없음 · 스위치를 끄면 없음 */
-test('건강: pop167 은 50틱 뒤 건강 · 다시 열어도 · onebridge·town3 은 없음 · 끄면 없음', () => {
+/* [MAC-HEALTH] 건강 — 인구 100 이면 켜지고 저장 칸 건강:1 로 다시 열어도 · 수업 판(onebridge)·물을 지키는 판(nowater)은 없음 · 판 규칙으로 켜는 판(town3 · proto-vote — PR 3a)은 처음부터 · 스위치를 끄면 없음 */
+test('건강: pop167 은 50틱 뒤 건강 · 다시 열어도 · onebridge·nowater 는 없음 · town3·proto-vote 는 처음부터 · 끄면 없음', () => {
   const hl = (query, save, pre, ticks) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${save ? `fs.readFileSync(${JSON.stringify(path.isAbsolute(save) ? save : path.join(ROOT, save))}, 'utf8')` : 'null'}, seed: 1, query: ${JSON.stringify(query)} });
 ${pre || ''}
@@ -108,12 +108,14 @@ process.stdout.write('@@' + JSON.stringify({ h: w.__health(), t: w.__exportText(
     const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('__health 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
   const P = 'village/stages/boards/pop167.json', tf = path.join(os.tmpdir(), 'village-sim-test-health-' + process.pid + '.json');
   const a = hl('', null, '', 0), b = hl('', P, '', 50); fs.writeFileSync(tf, b.t);
-  const c = hl('', tf, '', 0), d = hl('stage=onebridge', null, '', 50), e = hl('stage=town3', null, '', 0), f = hl('', P, 'w.VRULES.health.on = false;', 50); fs.rmSync(tf, { force: true });
+  const c = hl('', tf, '', 0), d = hl('stage=onebridge', null, '', 50), e = hl('stage=nowater', null, '', 0), f = hl('', P, 'w.VRULES.health.on = false;', 50), g = hl('stage=town3', null, '', 0), v = hl('stage=proto-vote', null, '', 0); fs.rmSync(tf, { force: true });
   ok(a.h.필요.join() === '장보기,놀이,쉼' && a.h.돌아섬필요.join() === '장보기,놀이,쉼' && a.h.의원.필요 === '건강' && a.h.의원.트레이 && a.h.의원.해금 === 80, '빈 땅 ' + JSON.stringify(a.h.의원));
   ok(b.h.걸쇠 && b.h.필요.join() === '장보기,놀이,쉼,배움,건강' && b.h.의원.열림 && /"건강":\s*1/.test(b.t), 'pop167 ' + b.h.필요.join());
   ok(c.h.걸쇠 && c.h.필요.join() === '장보기,놀이,쉼,배움,건강' && c.h.되살림 === 1, '다시 열기 ' + c.h.필요.join());
   ok(!d.h.제공 && !d.h.필요.includes('건강'), 'onebridge ' + d.h.필요.join());
-  ok(!e.h.제공 && e.h.필요.join() === '물,장보기,놀이,쉼' && e.h.의원.필요 === null, 'town3 ' + e.h.필요.join());
+  ok(!e.h.제공 && e.h.필요.join() === '물,장보기,놀이,쉼' && e.h.의원.필요 === null, 'nowater ' + e.h.필요.join());
+  ok(g.h.제공 && g.h.걸쇠 && g.h.필요.join() === '장보기,놀이,쉼,건강' && g.h.의원.열림 && g.h.의원.트레이 && g.h.걸쇠켬 === 1, 'town3 ' + g.h.필요.join());
+  ok(v.h.제공 && v.h.걸쇠 && v.h.필요.join() === '장보기,놀이,쉼,건강' && !v.h.의원.트레이, 'proto-vote ' + JSON.stringify(v.h.의원));
   ok(!f.h.제공 && !f.h.걸쇠 && !/"건강"/.test(f.t) && !/"clinic"/.test(f.t) && f.h.의원.필요 === null && !f.h.의원.트레이, '끔 ' + f.h.필요.join() + ' · clinic 해금 남음? ' + /"clinic"/.test(f.t));
 });
 
@@ -128,6 +130,21 @@ process.stdout.write('@@' + JSON.stringify({ a, b, 틱: n * 100, 인구80: w.__u
   const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); ok(l, '훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); const j = JSON.parse(l.slice(2));
   ok(j.a === false && j.b === true && j.인구80, '인구 80 에 의원이 안 열림 ' + JSON.stringify(j));
   ok(j.끈뒤 === false, '끈 뒤에도 clinic 해금이 저장 글에 남음 ' + JSON.stringify(j));
+});
+
+/* [MAC-STAGEKEEP] ③ 옛 우물 · PR 3a proto-vote — 목록에서 뺀 우물은 되살리기로만 열리고(새로 놓기는 막힘) · 결정 시설 의원의 미리 보기 = 적용 */
+test('PR 3a: proto-flow 옛 우물 둘 되살림 · 새로 놓기 막힘 · proto-vote 의원 미리 보기 = 적용', () => {
+  const go = (query, body) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: ${JSON.stringify(query)} });
+const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error(query + ' 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const f = go('stage=proto-flow', `const s = w.__START; const k = w.__stageKeep().옛우물, g = w.__needWater().우물.묶음; w.__erase(134, 138); return { s, k, g, 다시: w.__put('well', 134, 138, 0) };`);
+  ok(!/못 살린/.test(f.s) && f.k === 2 && f.g === '(숨김)', 'proto-flow 옛 우물 ' + JSON.stringify(f));
+  ok(typeof f.다시 === 'string' && /쓰지 않아요/.test(f.다시), '옛 우물을 새로 놓을 수 있음 ' + JSON.stringify(f.다시));
+  const pv = id => go('stage=proto-vote', `const p = w.__votePreview('${id}'), a = w.__voteApply('${id}'); return { 필요: w.__vote().필요, 막음: w.__put('clinic', 137, 102, 0), p: p.집별, a: a && a.집별 };`);
+  const A = pv('A'), B = pv('B');
+  ok(A.필요 === '건강' && /쓰지 않아요/.test(String(A.막음)), 'proto-vote 필요·막음 ' + JSON.stringify([A.필요, A.막음]));
+  ok(A.p && JSON.stringify(A.p) === JSON.stringify(A.a) && B.p && JSON.stringify(B.p) === JSON.stringify(B.a), '미리 보기 ≠ 적용 ' + JSON.stringify({ A, B }).slice(0, 300));
 });
 
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
