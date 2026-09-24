@@ -1603,6 +1603,16 @@
         out('선물상자_사진틀_조각칸', !!document.querySelector('#deco-giftbox .dgb-frame canvas') && /사진 조각 \d \/ 6/.test(document.getElementById('deco-giftbox').textContent));
         decoGiftBox(false);
         out('선물상자_닫힘', !document.getElementById('deco-giftbox'));
+        //  [DECO-LIFE-5] 쓰다듬어 단계가 올라 오늘 선물이 생기면 곧바로 땅에(55-ⓑ104) · 누르는 자리 44px 이상(55-ⓒ90)
+        _lifeWrite(CUR, { 'a/a90/h': 11, 'a/a90/d': t0 - 1, 'a/a90/gd': null }); await sleep(300);
+        document.querySelectorAll('.deco-gift').forEach(e => e.remove()); const rg = _animLayers.get(_ifActiveContainer || 'house-topview'); if (rg && rg.gifts) rg.gifts.clear();
+        const hen = rg && [...rg.items.values()].find(x => x.id === 'd_y55' && x.home.row === 22 && x.home.col === 34);
+        if (hen) { const cv = _dCv.getBoundingClientRect(); _dSuppressClick = false; _lifeCardClose && _lifeCardClose();
+          _decoClick({ clientX: cv.left + ((hen.cur.col + .5) * _dC - _dPanX) * cv.width / _dW, clientY: cv.top + ((hen.cur.row + .5) * _dC - _dPanY) * cv.height / _dH }); }
+        await sleep(400);
+        const g2 = document.querySelector('.deco-gift');
+        out('선물_단계오른즉시_땅에', hen ? (!!g2 && _lifeGet(CUR).a.a90.h === 12) : '동물층없음');
+        out('선물_누르는자리_44px', !!g2 && g2.getBoundingClientRect().width >= 43.5 && g2.getBoundingClientRect().height >= 43.5);
       }
       out('친해지기_골드불변', CUR.gold === gold0);
       out('친해지기_자리객체그대로', !(CUR.houseDecorations || []).some(p => 'u' in p));
@@ -1666,6 +1676,12 @@
         let went = false;
         if (dd) { _dSuppressClick = false; _decoClick({ clientX: k.left + (dd.x + dd.w / 2 - _dPanX) * k.width / _dW, clientY: k.top + (dd.y + dd.h / 2 - _dPanY) * k.height / _dH }); await sleep(300); went = DECO_SCENE === 'yard'; if (went) { toggleDecoScene(); await sleep(300); } }
         out('벽_따로방_문누르면_마당', went);
+        //  [DECO-INDOOR-FIT-2] 방이 있으면 벽걸이 안내는 '방의 윗벽' 하나(54-ⓑ103) · 방을 만든 직후 양옆에 다음 방 자리(54-ⓒ89)
+        const wm = _decoRuleWhy('in_w_clock', 'indoor', 6, 8, 1, 1) || '';
+        out('벽걸이안내_방있으면_방윗벽만', /방의 윗벽/.test(wm) && !/맨 윗줄/.test(wm));
+        _inRoomsSet(CUR, []); _inRoomAdd(_inRoomFrom(4, 10, 9, 17)); await sleep(300);
+        { const rm = _inRooms(CUR)[0], ox = _dCv._offX || 0, L = (ox + rm.c * _dC - _dPanX) / _dC, Rr = (_dW - (ox + (rm.c + rm.w) * _dC - _dPanX)) / _dC;
+          out('방만든직후_양옆여백', L >= 2.5 && Rr >= 2.5 ? true : { L: +L.toFixed(1), R: +Rr.toFixed(1) }); }
       }
       if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
