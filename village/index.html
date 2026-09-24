@@ -5783,7 +5783,7 @@ function roadBFS(from, who, radius) {
 
 /* 목적지를 하나 고른다 — 무엇이든 옆에 있는 길 칸을 좋아한다(집·광장·우물 앞) */
 /* 시간대별로 끌리는 필요(F26): 아침 물 · 낮 장보기 · 오후 놀이 · 저녁 쉼 */
-function hourPref(h) { return h >= 6 && h < 9 ? '물' : h >= 14 && h < 17 ? '놀이' : h >= 17 && h < 19 ? '장보기' : h >= 19 && h < 21 ? '쉼' : null; }   // 장보기는 퇴근 뒤 17~19(54차·보스 14:50)
+function hourPref(h) { return h >= 6 && h < 9 ? (NOWATER.off ? null : '물') : h >= 14 && h < 17 ? '놀이' : h >= 17 && h < 19 ? '장보기' : h >= 19 && h < 21 ? '쉼' : null; }   // 장보기는 퇴근 뒤 17~19(54차·보스 14:50)
 function needBeside(i) {
   const x = cX(i), y = cY(i);
   for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && K[c.k].need) return K[c.k].need; }
@@ -9359,17 +9359,21 @@ window.__greet = () => ({ 켜짐: window.VRULES.greet.on, ...GREET.stats, 지금
    [ACT-WELLCHAT] 아침 우물가는 이웃이 만나는 곳 (주민 연기 · 09-20 · 창조자의 눈 4회 — 아침 7시가 하루 중 좋은 풍선이 가장 적다 1.1 · 보스 ②).
    물 뜨는 시간(from~to)에 한 우물가(분수·연못 포함)에 둘 이상 서 있으면 서로 가운데를 보고 서고, everyMs 마다 한 사람씩 돌아가며 👋(새 이웃 인사와 같은 그림 · 같은 묶음).
    그리기만 한다(곁에 선 자리·몸 방향·풍선) — 판정·저장·확률 0 · draw call +0(👋 묶음에 더해 그린다). 루프 고리 한 줄.
+   물 끈 마을([MAC-NOWATER] · 09-24 건강 PR 4)은 우물가 대신 분수·광장·정자·긴의자에서 모인다(kindsDry · 앉은 사람도 끼고 몸은 그대로). 물동이·'물을 길어요'·아침 끌림 '물'도 그 마을에선 끈다.
    ══════════════════════════════════════════════════════════════ */
-(window.VRULES = window.VRULES || {}).wellChat = { on: true, from: 6, to: 9, everyMs: 3500, waveMs: 1600, kinds: ['well', 'fountain', 'pond'] };
+(window.VRULES = window.VRULES || {}).wellChat = { on: true, from: 6, to: 9, everyMs: 3500, waveMs: 1600, kinds: ['well', 'fountain', 'pond'], kindsDry: ['fountain', 'plaza', 'pavilion', 'bench', 'minibench', 'pond'] };   // kindsDry = 물 끈 마을([MAC-NOWATER])의 아침 수다 자리 — 분수·광장·정자·긴의자
+const WELLCHAT_AT = { well: '우물가에서', fountain: '분수 곁에서', pond: '연못가에서', plaza: '광장에서', pavilion: '정자에서', bench: '긴의자에서', minibench: '의자에서' };   /* 어제의 한 장 제목 — 모인 자리대로(물 끈 마을엔 우물가 모임이 없다) */
+const wellChatAt = root => { const c = cells[root]; return (c && WELLCHAT_AT[c.k]) || (c ? K[c.k].nm + ' 곁에서' : '길가에서'); };
 const WELLCHAT = { next: new Map(), turn: new Map(), who: new Map(), groups: new Map(), stats: { 인사: 0, 모인때: 0 } };
 function actWellChatDraw(now) {
   const R = window.VRULES.wellChat; if (!R.on || mapMode || OFF.has('faces')) return;
   const h = simHour(); if (h < R.from || h >= R.to) return;
   const G = WELLCHAT.groups; G.forEach(l => l.length = 0);
-  folks.forEach(f => { const b = f.beside; if (f.state !== 'inside' || !b || b.mode === 'sit' || !R.kinds.includes(b.k)) return; let l = G.get(b.root); if (!l) G.set(b.root, l = []); l.push(f); });
+  const dry = NOWATER.off, kinds = dry ? R.kindsDry : R.kinds;   /* 물 끈 마을은 쉼터에서 — 앉은 사람도 끼되 몸은 안 돌린다 */
+  folks.forEach(f => { const b = f.beside; if (f.state !== 'inside' || !b || (b.mode === 'sit' && !dry) || !kinds.includes(b.k)) return; let l = G.get(b.root); if (!l) G.set(b.root, l = []); l.push(f); });
   G.forEach((l, root) => { if (l.length < 2) { WELLCHAT.who.delete(root); return; }
     let cx = 0, cz = 0; l.forEach(f => { cx += f.beside.x; cz += f.beside.z; }); cx /= l.length; cz /= l.length;
-    l.forEach(f => { const dx = cx - f.beside.x, dz = cz - f.beside.z; if (dx * dx + dz * dz > 0.09) f.beside.dir = Math.atan2(dx, dz); });   // 서로 가운데를 보고
+    l.forEach(f => { const dx = cx - f.beside.x, dz = cz - f.beside.z; if (f.beside.mode !== 'sit' && dx * dx + dz * dz > 0.09) f.beside.dir = Math.atan2(dx, dz); });   // 서로 가운데를 보고
     if (now >= (WELLCHAT.next.get(root) || 0)) { const t = (WELLCHAT.turn.get(root) || 0) % l.length; WELLCHAT.turn.set(root, t + 1); WELLCHAT.who.set(root, { f: l[t], until: now + R.waveMs }); WELLCHAT.next.set(root, now + R.everyMs); WELLCHAT.stats.인사++; if (!t) WELLCHAT.stats.모인때++; }
     const w = WELLCHAT.who.get(root); if (!w || now > w.until || !l.includes(w.f) || greetPool.count >= 8) return;
     faceDummy.position.set(w.f.beside.x, 4.8 + Math.sin(now / 180) * 0.16, w.f.beside.z); faceDummy.quaternion.copy(camera.quaternion);
@@ -9994,7 +9998,7 @@ function actSnapTick(now) {
     else if (f.growLook) snapWant(1, f.x, f.z, now, '밤새 자란 나무를 올려다본 순간');
   });
   if (SNAP.rank < 1) folks.forEach(f => { if (SNAP.rank >= 1 || f.state !== 'inside' || !f.beside || !isSmall(f)) return; const b = cells[f.inside.root]; if (b && b.k === 'play') snapWant(1, f.beside.x, f.beside.z, now, '아이들이 놀이터에서 논 순간'); });   // 평범한 날의 한 장 — 놀이터의 아이
-  if (SNAP.rank < 1 && typeof WELLCHAT === 'object') WELLCHAT.who.forEach(w => { if (SNAP.rank < 1 && w && w.f && SIM.t <= w.until) snapWant(1, w.f.x, w.f.z, now, '아침 우물가에서 이웃끼리 👋'); });   // 아침 우물가
+  if (SNAP.rank < 1 && typeof WELLCHAT === 'object') WELLCHAT.who.forEach((w, root) => { if (SNAP.rank < 1 && w && w.f && SIM.t <= w.until) snapWant(1, w.f.x, w.f.z, now, '아침 ' + wellChatAt(root) + ' 이웃끼리 👋'); });   // 아침 우물가
   if (EV.fest && EV.festRoot >= 0 && fest >= R.festMin && cells[EV.festRoot]) { const r = cells[EV.festRoot], c = centerOf(r.k, cX(r.root), cY(r.root), r.rot); snapWant(5, c.x, c.z, now); }
 }
 function snapRain(now) {                                               // [ACT-SNAP 비] 처마 밑에 모인 이웃(한 칸에 셋 이상) · 비 오는 광장에 우산 넷 이상
@@ -10624,7 +10628,7 @@ function actBesideTick(f, i, now) {
   if (f.beside) {                                                      // 방금 나왔다 — 우물이었으면 물동이를 든다(출근·등교할 시간이면 그냥 간다)
     const from = f.beside; f.beside = null; const h = simHour();
     const busy = (!OFF.has('jobs') && f.job != null && isWorkHour(h)) || (schoolNow() >= 0 && (f.ct === 1 || f.ct === 2) && isSchoolHour(h));
-    if (R.on && R.bucket.on && !f.visitor && !busy && f.base >= 0 && f.state === 'idle' && R.bucket.from.includes(from.k)) { f.carry = { phase: 'go', tries: 0, cells: 0 }; besideStats.물동이++; }
+    if (R.on && R.bucket.on && !NOWATER.off && !f.visitor && !busy && f.base >= 0 && f.state === 'idle' && R.bucket.from.includes(from.k)) { f.carry = { phase: 'go', tries: 0, cells: 0 }; besideStats.물동이++; }
   }
   const c = f.carry; if (!c) return false;
   if (!R.on || f.visitor || f.base < 0 || f.state === 'mill') { f.carry = null; return false; }
@@ -10686,7 +10690,7 @@ function actBesideDraw(now) {
 /* whatDoing 고리 — "우물 안에 있어요" 대신 */
 function actBesideText(f) {
   const S = window.VRULES.beside.say;
-  if (f.state === 'inside' && f.beside) { const b = cells[f.inside.root], nm = b ? K[b.k].nm : ''; return f.beside.k === 'well' ? S.well : nm + (S[f.beside.mode] || S.stand); }   /* 표에 없는 모습은 '곁에 있어요'로(가게undefined 막음) */
+  if (f.state === 'inside' && f.beside) { const b = cells[f.inside.root], nm = b ? K[b.k].nm : ''; return f.beside.k === 'well' && !NOWATER.off ? S.well : nm + (S[f.beside.mode] || S.stand); }   /* 표에 없는 모습은 '곁에 있어요'로(가게undefined 막음) */
   if (f.carry && f.state !== 'inside') return f.carry.phase === 'rest' ? S.rest : S.carry;
   return null;
 }
