@@ -996,7 +996,7 @@ function lockedWhy(kind) { const need = LOCK_POP[kind]; if (!need || unlocked.ha
 function checkUnlocks() {
   const pop = population();
   UNLOCKS.forEach(u => { if (pop >= u.pop) u.kinds.forEach(k => { if (!unlocked.has(k)) { unlocked.add(k); const 쓰는 = u.kinds.filter(x => !(STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(x)));   /* [MAC-FACILCAP] 판에서 못 쓰는 종류는 '열렸어요'라고 하지 않는다(city 의 도서관) */
-    if (쓰는.length) sayOnce('🔓 ' + 쓰는.map(x => K[x].nm).join('·') + ' 이 열렸어요! (인구 ' + u.pop + '명)', true); buildTray(); } }); });
+    if (쓰는.length) sayOnce('🔓 ' + josa(쓰는.map(x => K[x].nm).join('·'), '이', '가') + ' 열렸어요! (인구 ' + u.pop + '명)', true); buildTray(); } }); });   // [MAC-TERRAIN] 37-ⓑ87 조사 — '… 이' 고정이던 것
 }
 
 /* ── 재기 위한 채움 계획 ──
@@ -5767,7 +5767,7 @@ function newsSeedText(names, flowerNames) { return names.length && names.every(n
     const R = window.VRULES.news; msg = String(msg);
     const big = msg.startsWith('🔓') || msg.startsWith('🎯') || msg.startsWith('🎉');
     if (!R.on || !big) { if (R.on && ok && performance.now() < NEWS.busyUntil) return; if (NEWS.q.length) { clearTimeout(NEWS.timer); NEWS.timer = setTimeout(pump, 2300); }   /* [MAC-KEEP-2] 못 놓는 이유·'한 번 더 누르면 치워요' 같은 말을 줄 선 소식이 덮지 않게 — 줄을 그만큼 미룬다 */ return toast0(msg, ok); }   // 큰 소식이 떠 있는 동안 자잘한 좋은 소식은 접는다. 못 놓는 이유(ok 아님)는 바로 보인다
-    const m = msg.match(/^🔓 (.+) 이 열렸어요! \(인구 \d+명\)$/);
+    const m = msg.match(/^🔓 (.+?) ?(?:이|가) 열렸어요! \(인구 \d+명\)$/);   // 37-ⓑ87 — 조사가 이/가 로 바뀌어도(옛 '… 이' 도) 읽는다
     if (m && typeof FLOWER_KINDS !== 'undefined') { const fl = new Set(Object.keys(FLOWER_KINDS).map(id => K[id] && K[id].nm)); const t = newsSeedText(m[1].split('·'), fl); if (t) { msg = t; NEWS.stats.씨앗++; } }
     const now = performance.now(), seen = NEWS.last.get(msg); if (seen && now - seen < R.sameMs) { NEWS.stats.같은말버림++; return; } NEWS.last.set(msg, now);
     if (now >= NEWS.busyUntil && !NEWS.q.length) return show(msg, ok);
@@ -6930,7 +6930,7 @@ function goalUnlockTick() {
   Object.keys(LOCK_GOAL).forEach(k => { if (unlocked.has(k)) return; if (goalsDone.has(LOCK_GOAL[k]) || (GU.first && countKind(k) > 0)) { unlocked.add(k); opened.push(k); } });   // 이미 놓여 있던 건 열린 것 — 말없이 잠그지 않는다
   const quiet = GU.first; GU.first = false; if (!opened.length) return;
   markDirty();
-  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); sayOnce('🔓 목표 보상! ' + opened.map(k => K[k].nm).join('·') + '이 열렸어요', true); simSound('goal'); }
+  if (!quiet) { const until = performance.now() + 8000; opened.forEach(k => GU.fresh.set(k, until)); sayOnce('🔓 목표 보상! ' + josa(opened.map(k => K[k].nm).join('·'), '이', '가') + ' 열렸어요', true); simSound('goal'); }
   buildTray();
 }
 /* buildTray 고리 — 잠긴 것은 '바로 다음 단계'만 보인다: 인구 문턱이 가장 가까운 것 + 지금 목표판에 뜬 목표의 보상 */
@@ -10977,14 +10977,14 @@ if (STAGE.id) {
      지도 판(판 전체 보기 · drawMap)에도 물건 밑에 깐다(34-ⓑ80). **지형이 없는 판은 한 줄도 안 돈다**(캔버스 그대로).
    사람은 원래 길로만 다니니, 물에 길을 못 놓으면 다니는 길이 해안을 따라 생긴다. 새 VRULES `terrain`(rules.json '조작') · 시험 훅 `__terrain`·`__boardHash`. */
 (window.VRULES = window.VRULES || {}).terrain = { on: true };
-const TERR = { def: null, map: new Map(), sdef: null, streams: new Set(), allow: 0, layers: null, stats: { 칸: 0, 막음: 0, 칠함: 0, 잠김칠함: 0, 칠줄: 0, 지도칠줄: 0, 개울: 0, 개울깖: 0, 개울지킴: 0, 누름말: 0 } };
+const TERR = { def: null, map: new Map(), sdef: null, streams: new Set(), allow: 0, layers: null, stats: { 칸: 0, 막음: 0, 칠함: 0, 잠김칠함: 0, 칠줄: 0, 지도칠줄: 0, 개울: 0, 개울깖: 0, 개울지킴: 0, 누름말: 0, 비탈길곁: 0 } };
 const TERR_NAMES = ['물', '모래', '비탈', '고개'];
 const TERR_COL = { 물: '#4a9fd0', 물가: '#7ccbe8', 모래: '#f0dfb0', 비탈: '#6f8052', 비탈결: '#63734a', 고개: '#c2a77a' };   // 물빛은 개울(#906)과 한 가족 · 고갯길은 흙 테두리 결로 한 톤 밝게 — 디자인 담당 09-23
 const TERR_ON = { 물: new Set(['pier']),                           // 그 바닥에 올라설 수 있는 것(적힌 것만)
   비탈: new Set(['tree', 'bigtree', 'bush', 'flower', 'pot', 'fir', 'rock', 'boulder', 'bench', 'minibench', 'lamp', 'post', 'cabin']), 고개: new Set(['road', 'gravel']) };
 const TERR_NOT = { 모래: new Set(['field']) };                     // 모래 칸에 못 놓는 것
 const TERR_WHY = { 물: '🌊 바다에는 지을 수 없어요 — 부두는 물가에 놓아요', 모래: '🏖️ 모래밭에는 밭을 일굴 수 없어요', 부두: '🪵 부두는 물가에 — 바다에 걸치게 놓아요', 먼바다: '🪵 부두는 뭍에 닿아야 해요 — 모래 가장자리에 붙여 놓아요',
-  비탈: '⛰️ 비탈에는 큰 건물을 지을 수 없어요 — 평평한 곳을 찾아요', 고개: '🛤️ 고갯길에는 길만 낼 수 있어요', 개울: '💧 이 개울은 산에서 흘러와요 — 치우거나 옮길 수 없어요 · 곧은 곳에 길을 놓으면 다리가 돼요' };
+  비탈: '⛰️ 비탈에는 큰 건물을 지을 수 없어요 — 평평한 곳을 찾아요', 고개: '🛤️ 고갯길에는 길만 낼 수 있어요', 비탈길: '⛰️ 비탈엔 길을 낼 수 없어요 — 산은 고갯길(흙빛 줄)로 넘어요', 고개좁음: '🛤️ 고갯길은 좁아서 한 칸 길(길·자갈길)만 낼 수 있어요', 개울: '💧 이 개울은 산에서 흘러와요 — 치우거나 옮길 수 없어요 · 곧은 곳에 길을 놓으면 다리가 돼요' };
 function terrainMap() { const d = STAGE.def && STAGE.def.지형; if (TERR.def === d) return TERR.map; TERR.def = d; TERR.map = new Map();
   const L = d && Array.isArray(d.칸) ? d.칸 : [];
   L.forEach(r => { if (!Array.isArray(r) || r.length !== 5 || !TERR_NAMES.includes(r[4])) return; const [x0, y0, x1, y1] = r.slice(0, 4).map(v => v | 0), nm = r[4];
@@ -10992,18 +10992,22 @@ function terrainMap() { const d = STAGE.def && STAGE.def.지형; if (TERR.def ==
   TERR.stats.칸 = TERR.map.size; return TERR.map; }
 const terrainLive = () => !!(window.VRULES.terrain.on && STAGE.def && STAGE.def.지형 && terrainMap().size);
 { const g0 = groundAt; groundAt = function (x, y) { if (terrainLive()) { const g = TERR.map.get(idx(x, y)); if (g) return g; } return g0(x, y); }; }
+const terrPath = k => !!(K[k] && (K[k].road || k === 'gravel'));   // 길 종류(자갈길은 road 표시가 없어 따로) — 비탈·고개에서 길 말을 하려고(36-ⓑ84)
 function terrainWhy(kind, fp) { const grounds = fp.map(([px, py]) => groundAt(px, py));
   if (kind === 'pier') { if (!grounds.every(g => g === '물' || g === '모래') || !grounds.includes('물')) return TERR_WHY.부두;
     const own = new Set(fp.map(([px, py]) => idx(px, py)));   // 뭍에 닿나 — 발자국에 모래가 있거나, 발자국 곁(4방향 · 판 안)에 물 아닌 칸이 있거나(35-ⓑ77 먼 바다 부두)
     return grounds.includes('모래') || fp.some(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(px + dx, py + dy) && !own.has(idx(px + dx, py + dy)) && groundAt(px + dx, py + dy) !== '물')) ? null : TERR_WHY.먼바다; }
-  for (const g of grounds) { if (TERR_ON[g] && !TERR_ON[g].has(kind)) return TERR_WHY[g]; if (TERR_NOT[g] && TERR_NOT[g].has(kind)) return TERR_WHY[g]; }
+  for (const g of grounds) { if (TERR_ON[g] && !TERR_ON[g].has(kind)) return terrPath(kind) && (g === '비탈' || g === '고개') ? TERR_WHY[g === '비탈' ? '비탈길' : '고개좁음'] : TERR_WHY[g]; if (TERR_NOT[g] && TERR_NOT[g].has(kind)) return TERR_WHY[g]; }
   return null; }
 { hookAdd('canPlace', function (next, args) { const [kind, x, y, rot, opts] = args;
     if ((opts && opts.복원) || !terrainLive()) return next(args);
     const fp = footprint(kind, x, y, rot || 0);
     if (fp.some(([px, py]) => !inb(px, py) || cells[idx(px, py)])) return next(args);   // 판 밖·겹침은 원래 말이 먼저(개울에 길 = 다리도 이 길로) — 그다음이 [MAC-ON] 바닥 자리
     const w = terrainWhy(kind, fp); if (w) { TERR.stats.막음++; return w; }           // 잠긴 땅·해금·하나만·길에 붙어야보다 먼저(34-ⓑ78 — 곁에 길이 없어도 '바다')
-    return next(args); }); }
+    const r = next(args);
+    if (typeof r === 'string' && K[kind] && K[kind].needRoad && /길에 붙어야/.test(r) && fp.some(([px, py]) => groundAt(px, py) === '비탈')) { TERR.stats.비탈길곁++;   // 36-ⓑ85 — '먼저 길을 놓아 주세요'는 비탈에선 따를 수 없다
+      return josa(K[kind].nm, '은', '는') + ' 길에 붙어야 해요 — 비탈엔 길을 못 내니, 골짜기 길이나 고갯길 바로 옆 비탈에 놓아요'; }
+    return r; }); }
 /* 칠하기 — 지형 그림을 **한 번만** 두 장으로 굽는다(판 파일이 바뀔 때만): open = 제 색 · lock = 한 겹 어둡게(잠긴 풀빛이 열린 풀빛보다 어두운 만큼).
    paintBoard 는 lock 을 통째로 얹고 열린 구역마다 open 을 그 네모만큼 덮는다 — 60초마다 도는 다시 칠하기가 칸 수(산 6만 칸)와 상관없이 drawImage 몇 번.
    같은 줄끼리 이어 칠한다(칠줄) · 비탈 결은 3칸 무늬(CanvasPattern — 캔버스 칸 (i, j) = 판 칸 (x, H−1−y) 라 (x + y) % 3 === 0 과 같은 결). */
