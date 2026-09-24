@@ -1448,6 +1448,9 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .dgb-frame img,.dgb-frame canvas{position:absolute;inset:0;width:100%;height:100%}
 .dgb-foot{padding:0 12px 12px;color:#8a6a4a;font-size:12px}
 @media (prefers-reduced-motion: reduce){ .deco-gift .dg-art,.deco-gift.pop .dg-art,.deco-gift.pop .dg-tw,.deco-gift.taken .dg-art{animation:none} }
+/* [DECO-EVENT-2] 행사 첫 열림 반짝 — 한 번(2.4초) · 누르기는 판으로 */
+.deco-event-tw{position:absolute;z-index:6;pointer-events:none;opacity:0;animation:dgTwinkle 1.2s ease-in-out 2}
+@media (prefers-reduced-motion: reduce){ .deco-event-tw{animation:none;opacity:.9} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════

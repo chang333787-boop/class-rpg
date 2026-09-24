@@ -5506,6 +5506,7 @@ let _ifActiveContainer = 'house-topview'; // 현재 캔버스 컨테이너
 
 function ifSyncScene() {
   const isYard = DECO_SCENE === 'yard';
+  if (isYard && typeof _decoEventGreet === 'function') setTimeout(() => { try { _decoEventGreet(); } catch (e) {} }, 700);   // [DECO-EVENT-2] 행사 첫 열림 알림(판을 그린 뒤)
   const sn = document.getElementById('if-scene-name');
   const sb = document.getElementById('if-scene-btn');
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
@@ -10075,6 +10076,30 @@ function _decoEventDraw(C) {
 function _decoEventAt(r, c) {
   const ev = _decoEventOn(), placed = ev && _decoEventPlaced(ev);
   return placed && placed.some(p => r >= p.r - 1 && r < p.r + p.h && c >= p.c && c < p.c + p.w) ? ev : null;
+}
+//  [DECO-EVENT-2] 행사 기간에 마당을 처음 열 때 한 번(기기 · 행사 · 해마다 — localStorage) — 토스트 한 줄 + 그 한 벌에 반짝 한 번(보스).
+//  행사 한 벌이 칸 27px 에서 작아 '왔다'는 것을 모르고 지나칠 수 있었다. 저장 0 · 카메라는 옮기지 않는다(아이가 보던 자리 그대로).
+//  저장소를 못 쓰는 기기(사생활 창 등)는 열 때마다 한 번씩 뜰 수 있다 — 벌 없는 알림이라 괜찮다.
+function _decoEventGreet() {
+  if (!_ifMode || DECO_SCENE !== 'yard' || !_dCv || (typeof _ffFriend !== 'undefined' && _ffFriend)) return false;
+  const ev = _decoEventOn(), placed = ev && _decoEventPlaced(ev);
+  if (!placed) return false;
+  const key = 'deco.eventSeen.' + ev.key + '.' + new Date().getFullYear();
+  try { if (localStorage.getItem(key)) return false; localStorage.setItem(key, '1'); } catch (e) {}
+  const u = ev.until.split('-').map(Number);
+  toast(`${ev.name}${_josa(ev.name, '이', '가')} 마당에 놀러 왔어요 — ${u[0]}/${u[1]}까지`);
+  //  반짝 — 판 위(한 벌 네모 가운데) · 2.4초 뒤 사라짐
+  const host = _dCv.parentNode, C = _dC;
+  if (host) {
+    const r0 = Math.min(...placed.map(p => p.r)), c0 = Math.min(...placed.map(p => p.c)), r1 = Math.max(...placed.map(p => p.r + p.h)), c1 = Math.max(...placed.map(p => p.c + p.w));
+    const tw = document.createElement('img'), sz = Math.max(40, Math.round((c1 - c0) * C * .8));
+    tw.className = 'deco-event-tw'; tw.src = _lifeArt('fx_twinkle'); tw.alt = '';
+    tw.style.width = tw.style.height = sz + 'px';
+    tw.style.left = Math.round((c0 + c1) / 2 * C - _dPanX - sz / 2 + (_dCv.offsetLeft || 0)) + 'px';
+    tw.style.top = Math.round((r0 + r1) / 2 * C - _dPanY - sz / 2 - C * .6 + (_dCv.offsetTop || 0)) + 'px';
+    host.appendChild(tw); setTimeout(() => { if (tw.parentNode) tw.parentNode.removeChild(tw); }, 2400);
+  }
+  return true;
 }
 function _decoEventSay(ev) {
   const u = ev.until.split('-').map(Number);
