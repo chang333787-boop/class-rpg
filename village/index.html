@@ -3134,6 +3134,15 @@ K.hospital = { nm: '작은 병원', ic: '🏥', grp: '(숨김)', w: 2, h: 2, g: 
     { g:'box', c:0x2fa865, s:[1.52,0.12,0.28], p:[0,5.55,3.32] },
     { g:'box', c:0x2fa865, s:[0.4,0.46,0.28], p:[0,5.55,3.32] } ] };
 MAP_COL.clinic = '#8fd3b0'; MAP_COL.hospital = '#9fc1e6';
+/* 동네 의원 넷이 첫 화면에 나란히 보여도 찍어 붙인 듯하지 않게 — 집 지붕처럼 **벽·지붕 색을 칸 자리로** 넷 가운데 하나(보스 09-24).
+   지붕 위 흰 판 + 초록 십자 · 유리·문은 넷 다 같게(한눈에 병원). 칸 자리로 정해 다시 그려도·저장했다 열어도 같다(난수 0). 끄기 VRULES.clinicVary.on = false. */
+(window.VRULES = window.VRULES || {}).clinicVary = { on: true };
+const CLINIC_VARY = { wall: [0xf4f1ea, 0xf3e4d6, 0xe4ecf1, 0xecf1e0], roof: [0x5fb88a, 0x4a9e9b, 0x78b46a, 0x5a9cc2] };
+{ const poH = partsOf; partsOf = function (rec) { const parts = poH.apply(this, arguments);
+    if (!rec || rec.k !== 'clinic' || rec.root == null || !window.VRULES.clinicVary.on || !Array.isArray(parts)) return parts;
+    let h = Math.imul(cX(rec.root), 0x9e3779b1) ^ Math.imul(cY(rec.root) + 11, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;   /* 섞는 해시 — 칸 자리의 1차식이면 동네 간격(12·4칸)이 4의 배수라 넷이 겹쳤다 */
+    const v = (h >>> 0) % CLINIC_VARY.wall.length; if (v === 0) return parts;
+    return parts.map(pt => pt.c === 0xf4f1ea ? { ...pt, c: CLINIC_VARY.wall[v] } : pt.c === 0x5fb88a ? { ...pt, c: CLINIC_VARY.roof[v] } : pt); }; }
 window.__hospitalShape = () => ({ 의원: !!K.clinic, 병원: !!K.hospital, 트레이: ORDER.includes('clinic') || ORDER.includes('hospital'), 필요: [K.clinic.need || null, K.hospital.need || null] });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
