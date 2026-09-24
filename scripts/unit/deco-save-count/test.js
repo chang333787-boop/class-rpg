@@ -2010,6 +2010,25 @@
         } finally { _floorBmp = ofb; _dCtx.drawImage = odi; CUR.houseDecorations = keepH; }
         const z = getDecoSize('d_y12'), cx = 20 + z.w / 2, cy = 12 + z.h / 2, rx = (z.w / 2 + 3) * 1.3 + .5, ry = (z.h / 2 + 2) * 1.3 + .5;
         out('계절_흩뿌림_나무없으면0', none === 0);
+        //  픽셀로도(보스 · #1091 뒤): 가을 잎 나무 하나를 두고 땅을 그린 것과 나무 없이 그린 것을 칸마다 견준다 — 나무 둘레(R) 밖 잔디 칸은 픽셀이 한 점도 다르지 않다
+        {
+          const off = document.createElement('canvas'), Cx = 12, keepCtx = _dCtx, keepC = _dC; off.width = 60 * Cx; off.height = 30 * Cx;
+          const octx = off.getContext('2d');
+          _decoSeasonOv = 'autumn';
+          for (let i = 0; i < 30 && !(_floorImg('season_leaves_a') && _floorImg('season_leaves_b')); i++) await sleep(100);
+          const paint = list => { CUR.houseDecorations = list; octx.setTransform(1, 0, 0, 1, 0, 0); octx.clearRect(0, 0, off.width, off.height); _decoGroundPatch(0, 0, 30, 60, () => true); return octx.getImageData(0, 0, off.width, off.height).data; };
+          let bare, leaf;
+          try { _dCtx = octx; _dC = Cx; const base = keepH.filter(p => p.area !== 'yard'); bare = paint(base); leaf = paint(base.concat([{ id: 'd_y9', area: 'yard', row: 12, col: 20 }])); }
+          finally { _dCtx = keepCtx; _dC = keepC; CUR.houseDecorations = keepH; }
+          const z9 = getDecoSize('d_y9'), cx9 = 20 + z9.w / 2, cy9 = 12 + z9.h / 2, R = Math.max(z9.w / 2 + 3, z9.h / 2 + 2) * 1.3 + 1;
+          let far = 0, farDiff = 0, near = 0;
+          for (let r = 0; r < 30; r++) for (let c = 0; c < 60; c++) {
+            let diff = false;
+            for (let y = r * Cx; y < (r + 1) * Cx && !diff; y++) for (let x = c * Cx; x < (c + 1) * Cx; x++) { const i = (y * off.width + x) * 4; if (bare[i] !== leaf[i] || bare[i + 1] !== leaf[i + 1] || bare[i + 2] !== leaf[i + 2]) { diff = true; break; } }
+            if (Math.hypot(c + .5 - cx9, r + .5 - cy9) > R) { far++; if (diff) farDiff++; } else if (diff) near++;
+          }
+          out('계절_가을낙엽_픽셀_나무밖0', far > 1000 && farDiff === 0 && near > 0 ? true : 'far' + far + '/diff' + farDiff + '/near' + near);
+        }
         out('계절_흩뿌림_나무둘레만', tree.length > 3 && tree.every(([r, c]) => Math.abs(c + .5 - cx) <= rx && Math.abs(r + .5 - cy) <= ry));
       }
       _decoSeasonOv = null;
