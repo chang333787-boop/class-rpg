@@ -8816,7 +8816,7 @@ function _animAdvance(st, now) {
 // ── 생각 — 먹이통이 있으면 모이기 · 아니면 성격대로 가만히 / 쪼기 / 몇 칸 걷기 ──
 function _animThink(st, now) {
   //  [DECO-DAYNIGHT-1] 밤 — 쉼터(가까운 나무·건물) 둘레에 모여 잔다 · 우리 안·물 위·쉼터가 없으면 그 자리에서
-  if (typeof _decoPhase === 'function' && _decoPhase() === 'night') {
+  if ((typeof _yardPhase === 'function' ? _yardPhase() : typeof _decoPhase === 'function' ? _decoPhase() : 'day') === 'night') {   // [DECO-LOOK-0]
     st.shelter = st.pen || st.swim ? null : _animShelter(st);
     if (st.shelter && _animGather(st, now, st.shelter, 'sleep')) return;
     _animSetState(st, 'sleep'); st.nextAt = now + _animRnd(6000, 9000); return;
@@ -9505,7 +9505,7 @@ const SEA_TREES = ['d_y9', 'd_y15', 'd_y19', 'd_y12', 'd_y47', 'd_y48', 'd_y64']
 const SEA_WINTER_ONLY = ['d_y1', 'd_y2', 'd_y3', 'd_y7', 'd_y41', 'd_y42', 'd_y43', 'd_y44', 'd_y21', 'd_y61', 'd_y58', 'd_y60', 'd_y63'];
 function _drawDecoSVG(id, px, py, bw, bh) {
   //  나무는 여름에도 #summer 를 넘긴다 — 주소 뒤가 없는 그림은 벚나무가 꽃 핀 모습이라 여름 초록이 아니다(사양 표 ②)
-  const sea = SEA_TREES.indexOf(id) >= 0 ? _seaNow() : (SEA_WINTER_ONLY.indexOf(id) >= 0 && _seaNow() === 'winter') ? 'winter' : '';
+  const sea = SEA_TREES.indexOf(id) >= 0 ? _yardLook().season : (SEA_WINTER_ONLY.indexOf(id) >= 0 && _yardLook().season === 'winter') ? 'winter' : '';   // [DECO-LOOK-0] 필요할 때만 표를 읽는다(장식마다 부르는 길)
   const img = sea ? (_ambImg(id, sea) || _decoImg(id)) : _decoImg(id);
   if (!img) return false;
   const nw = img.naturalWidth, nh = img.naturalHeight;
@@ -9626,6 +9626,25 @@ function _decoSeason(d) {
   return m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
 }
 function _seaNow() { return typeof _decoSeason === 'function' ? _decoSeason() : 'summer'; }
+// [DECO-LOOK-0] 마당 모습 표 — 그리는 코드는 _seaNow() · _decoPhase() · 하드코딩 색 대신 이 줄만 읽는다(docs/deco_star_yard_design.md §1).
+//  지금 줄은 계절 넷에서만 나온다 — 보이는 변화 0(관문: 계절 넷 × 낮·저녁·밤 · 사진 지문이 바로 앞 커밋과 같다). 별빛(P3)이 줄 하나를 더한다.
+//  season 나무·꽃·우리 조각 · ground 잔디 무리 무늬(grass | snow) · groundBg 무늬 아래 바탕('' = 칸 그림 그대로) · groundFrag 풀 번짐·밑동 풀 조각
+//  waterFrag 물 조각 · bedWinter 꽃밭 겨울잠 · film 잔디 계절 막 · scatter 흩뿌림(나무 둘레 hi · 그 밖 lo) · snow 장식·지붕 눈 겹
+//  shadow 밑동 그림자 · houseGround 집 밑·위 띠 땅 · farmSand 밭 그림이 아직 없을 때의 모래 두 색 · phase 때 고정(없으면 실제 시각 · 별빛은 'night')
+//  줄은 고정 객체다(칸마다 불러도 새로 만들지 않는다 — 뜨거운 길).
+const YARD_LOOK_BASE = { ground: 'grass', groundBg: '', groundFrag: '', waterFrag: '', bedWinter: false, film: '', scatter: null, snow: false,
+  shadow: 'rgba(30,52,14,.30)', houseGround: 'grass', farmSand: ['#c8a855', '#b89545'], phase: '' };
+const YARD_LOOKS = {
+  spring: Object.assign({}, YARD_LOOK_BASE, { season: 'spring', groundFrag: 'spring', film: 'rgba(200,235,130,.10)',   // 봄 막 #C8EB82 .10 · 벚나무 둘레 꽃잎(디자인 #1083)
+    scatter: { name: 'season_petals_', trees: ['d_y12'], k1: 1, k2: 3, hi: .55, drift: .04 } }),
+  summer: Object.assign({}, YARD_LOOK_BASE, { season: 'summer' }),
+  autumn: Object.assign({}, YARD_LOOK_BASE, { season: 'autumn', groundFrag: 'autumn', film: 'rgba(240,168,72,.14)',   // 가을 막 #F0A848 .14 · 잎 나무 둘레 낙엽
+    scatter: { name: 'season_leaves_', trees: ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'], k1: 2, k2: 4, hi: .6, drift: .04 } }),
+  winter: Object.assign({}, YARD_LOOK_BASE, { season: 'winter', ground: 'snow', groundBg: '#eef3f8', groundFrag: 'winter', waterFrag: 'winter', bedWinter: true, snow: true }),
+};
+//  공간(sp)마다 한 줄 — 지금은 모든 공간이 기기 달의 계절(자리만 잡아 둔다 · 별빛 P3 부터 공간별)
+function _yardLook(sp) { return YARD_LOOKS[_seaNow()] || YARD_LOOKS.summer; }
+function _yardPhase(sp) { const lk = _yardLook(sp); return lk.phase || (typeof _decoPhase === 'function' ? _decoPhase() : 'day'); }
 //  고정 난수(칸·열쇠마다 늘 같은 값) — 사양 그대로
 function _seaHash(r, c, k) { return ((((r * 73856093) ^ (c * 19349663) ^ (k * 83492791)) >>> 0) % 1000) / 1000; }
 // [DECO-FLOOR-BAKE-1] 칸 한 장 굽기 — 바탕 + 가장자리 조각(최대 13장)을 칸마다 매 틀 따로 그리던 것(무거운 마당 끌기 한 틀의 97% · 계획 C4)
@@ -9647,9 +9666,9 @@ function _floorPaint(pieces, px, py, C) {
   _dCtx.drawImage(b, px, py, C, C);
 }
 function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
-  const sea = _seaNow(), bedWinter = sea === 'winter' && !!_FLOOR_EDGE_COLOR[type];   // [DECO-SEASON-1] 겨울 꽃밭 = 흙 이랑·새싹·눈 조금
+  const lk = _yardLook(), bedWinter = lk.bedWinter && !!_FLOOR_EDGE_COLOR[type];   // [DECO-SEASON-1] 겨울 꽃밭 = 흙 이랑·새싹·눈 조금 · [DECO-LOOK-0] 표에서
   const bname = bedWinter ? 'tile_bed_winter_' + (_seaHash(r, c, 5) < .5 ? 'a' : 'b') : _floorBaseName(type, r, c);
-  const col = bedWinter ? '' : (type === 'water' && sea === 'winter') ? 'winter'   // [DECO-SEASON-1] ⑦ 겨울 물(tile_water_a·b#winter)
+  const col = bedWinter ? '' : (type === 'water' && lk.waterFrag) ? lk.waterFrag   // [DECO-SEASON-1] ⑦ 겨울 물(tile_water_a·b#winter)
     : (color && _FLOOR_COLORS[type] && _FLOOR_COLORS[type].indexOf(color) >= 0) ? color : '';   // [DECO-FLOOR-COLOR-1]
   const base = _floorImg(bname, col);
   if (!base) return false;
@@ -9700,7 +9719,7 @@ function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
   }
   if (!_floorIsGrass(type)) {
     const out = (dr, dc) => _floorIsGrass(T(dr, dc));
-    ring('fringe_grass_', v2, sea === 'summer' ? '' : sea, out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);   // [DECO-SEASON-1] 풀 번짐 계절색(겨울 = 눈 테)
+    ring('fringe_grass_', v2, lk.groundFrag, out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);   // [DECO-SEASON-1] 풀 번짐 계절색(겨울 = 눈 테) · [DECO-LOOK-0]
   }
   _floorPaint(pieces, px, py, C);
   return true;
@@ -9887,13 +9906,13 @@ async function decoPhoto(opt) {
     _dCv = cv; _dCtx = ctx; _dW = W; _dH = H - foot; _dC = C; _dPanX = F.c0 * C; _dPanY = F.r0 * C - top; _dZoom = 1;
     ctx.setTransform(1, 0, 0, 1, -_dPanX, -_dPanY);
     if (F.r0 === 0) {   // 판 맨 위를 찍으면 위 잔디 띠 한 줄(굴뚝·윗줄 나무)
-      const gr = () => 'grass';
-      for (let c = F.c0; c < F.c0 + F.cols; c++) if (!(FLOOR_SVG && _drawFloorSVG('grass', 999, c, c * C, -C, C, gr))) { ctx.fillStyle = FLOOR_TILES.grass.bg; ctx.fillRect(c * C, -C, C, C); }
+      const hg = _yardLook().houseGround, gr = () => hg;   // [DECO-LOOK-0]
+      for (let c = F.c0; c < F.c0 + F.cols; c++) if (!(FLOOR_SVG && _drawFloorSVG(hg, 999, c, c * C, -C, C, gr))) { ctx.fillStyle = FLOOR_TILES[hg].bg; ctx.fillRect(c * C, -C, C, C); }
     }
     _drawYard();
     //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
     //  [DECO-DAYNIGHT-1] 저녁·밤 사진 — 동물은 색 막 뒤에 그리니 화면의 동물 층과 같은 필터(CSS 와 같은 값)로(안 하면 밤 사진에 동물만 밝게 떴다)
-    const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day';
+    const ph = _yardPhase();   // [DECO-LOOK-0]
     if (ph !== 'day') ctx.filter = ph === 'night' ? 'brightness(.8) saturate(.85)' : 'brightness(.9) sepia(.18) saturate(1.05)';   // [DECO-NIGHT-FILM-1] 밤 막 .30 에 맞춘 값(CSS 와 같음)
     pets.forEach(p => {
       const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
@@ -9933,7 +9952,7 @@ function _decoPhase(now) {
 }
 const DECO_PHASE_ICON = { day: '☀️', evening: '🌇', night: '🌙' }, DECO_PHASE_NAME = { day: '낮', evening: '저녁', night: '밤' };
 function _decoPhaseSync() {
-  const ph = _decoPhase(), b = document.getElementById('if-phase-btn'), host = document.getElementById('if-topview');
+  const ph = _yardPhase(), b = document.getElementById('if-phase-btn'), host = document.getElementById('if-topview');   // [DECO-LOOK-0]
   if (b) { b.textContent = DECO_PHASE_ICON[ph]; b.title = DECO_PHASE_NAME[ph] + ' — 눌러서 바꿔 보기'; b.setAttribute('aria-label', '지금 ' + DECO_PHASE_NAME[ph] + ' · 눌러서 바꿔 보기'); }
   if (host) { host.classList.toggle('is-evening', DECO_SCENE === 'yard' && ph === 'evening'); host.classList.toggle('is-night', DECO_SCENE === 'yard' && ph === 'night'); }
 }
@@ -9959,7 +9978,7 @@ function _ambImg(name, color) {   // assets/deco/<name>.svg[#색] — 색은 그
   return null;
 }
 function _decoNightDraw(C) {
-  const ph = _decoPhase();
+  const ph = _yardPhase();   // [DECO-LOOK-0]
   if (ph === 'day') return;
   _decoMotionLoad();
   const ctx = _dCtx, amb = _DECO_MOTION && _DECO_MOTION._ambient, night = ph === 'night';
@@ -9998,8 +10017,9 @@ function _decoNightDraw(C) {
 
 // [DECO-SEASON-1] 겨울 눈 겹 — motion.json _ambient.snow.on 의 그림(몸통과 같은 viewBox 투명 겹)을 몸통 위 같은 자리에(밤이면 그 뒤에 색 막 · 창 불빛)
 function _decoSnowOver(id, px, py, bw, bh) {
-  if (_seaNow() === 'winter') _decoMotionLoad();
-  if (_seaNow() !== 'winter' || !_DECO_MOTION || !_DECO_MOTION._ambient || !_DECO_MOTION._ambient.snow) return;
+  const snow = _yardLook().snow;   // [DECO-LOOK-0]
+  if (snow) _decoMotionLoad();
+  if (!snow || !_DECO_MOTION || !_DECO_MOTION._ambient || !_DECO_MOTION._ambient.snow) return;
   const f = _DECO_MOTION._ambient.snow.on && _DECO_MOTION._ambient.snow.on[id], im = f && _ambImg(f.replace(/\.svg$/, '')), body = _decoImg(id);
   if (!im || !body) return;
   const h = bw * body.naturalHeight / body.naturalWidth;
@@ -10156,12 +10176,10 @@ function _groundPatterns(C, kind) {
   return pp;
 }
 //  [DECO-SEASON-1] 잔디 무리 칸 위 — 여름: 얼룩 · 봄/가을: 얼룩 → 계절 막 → 흩뿌림(꽃잎/낙엽 · 나무 둘레는 더 많이) · 겨울: 눈 바탕 + 눈 두 겹(얼룩 대신)
-//  막은 옅게 — 가을 #F0A848 .14 · 봄 #C8EB82 .10(디자인 #1083 · 옛 가을 .26 은 잔디와 섞여 올리브빛 · 봄 .14 는 라임빛). 계절은 나무 색이 말한다.
-const SEA_FILM = { spring: 'rgba(200,235,130,.10)', autumn: 'rgba(240,168,72,.14)' };
-const SEA_LEAF_TREES = ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'];
+//  [DECO-LOOK-0] 막 · 흩뿌림 · 바탕 · 무늬는 표(YARD_LOOKS)에서
 function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
   if (!FLOOR_SVG) return;
-  const C = _dC, sea = _seaNow(), winter = sea === 'winter';
+  const C = _dC, lk = _yardLook();
   const runs = [];   // [r, c0, c1)
   for (let r = r0; r < r1; r++) {
     let run = -1;
@@ -10173,24 +10191,25 @@ function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
   }
   if (!runs.length) return;
   const fill = st => { _dCtx.fillStyle = st; runs.forEach(([r, a, b]) => _dCtx.fillRect(a * C, r * C, (b - a) * C, C)); };
-  if (winter) fill('#eef3f8');
-  const gp = _groundPatterns(C, winter ? 'snow' : 'grass');
+  if (lk.groundBg) fill(lk.groundBg);
+  const gp = _groundPatterns(C, lk.ground);
   if (gp && gp.dark && gp.light) { fill(gp.dark); fill(gp.light); }
-  if (!SEA_FILM[sea]) return;
-  fill(SEA_FILM[sea]);
+  if (!lk.film) return;
+  fill(lk.film);
   //  흩뿌림 — 나무 둘레에만 무리(디자인 #1083 · 보스: '풍성함 ≠ 점의 개수' — 마당 전체에 흩으면 색종이·먼지처럼 보였다).
-  //  벚나무(봄 꽃잎) · 잎 나무(가을 낙엽) 발자리 가운데에서 멀어질수록 옅게: 타원(가로 발자리 반 + 3칸 · 세로 반 + 2칸) 안 p = hi × (1 − .75d)
-  //  · 바로 밖(d < 1.3) = 바람에 날린 몇 장 .04 · 그 밖 0(쉼 자리). 여러 나무가 겹치면 큰 쪽. 나무가 없으면 흩뿌림도 없다.
-  const trees = sea === 'spring' ? ['d_y12'] : SEA_LEAF_TREES, dens = new Map();
-  const k1 = sea === 'spring' ? 1 : 2, k2 = sea === 'spring' ? 3 : 4, hi = sea === 'spring' ? .55 : .6;
+  //  나무 발자리 가운데에서 멀어질수록 옅게: 타원(가로 발자리 반 + 3칸 · 세로 반 + 2칸) 안 p = hi × (1 − .75d)
+  //  · 바로 밖(d < 1.3) = 바람에 날린 몇 장 drift · 그 밖 0(쉼 자리). 여러 나무가 겹치면 큰 쪽. 나무가 없으면 흩뿌림도 없다(값은 표에).
+  const sc = lk.scatter;
+  if (!sc) return;
+  const trees = sc.trees, dens = new Map(), k1 = sc.k1, k2 = sc.k2, hi = sc.hi;
   _decoList(CUR).forEach(p => { if (p.area !== 'yard' || trees.indexOf(p.id) < 0) return; const z = getDecoSize(p.id);
     const cx = p.col + z.w / 2, cy = p.row + z.h / 2, rx = z.w / 2 + 3, ry = z.h / 2 + 2;
     for (let r = Math.floor(cy - ry * 1.3); r <= Math.ceil(cy + ry * 1.3); r++) for (let c = Math.floor(cx - rx * 1.3); c <= Math.ceil(cx + rx * 1.3); c++) {
-      const d = Math.hypot((c + .5 - cx) / rx, (r + .5 - cy) / ry), pr = d < 1 ? hi * (1 - .75 * d) : d < 1.3 ? .04 : 0, k = r + '_' + c;
+      const d = Math.hypot((c + .5 - cx) / rx, (r + .5 - cy) / ry), pr = d < 1 ? hi * (1 - .75 * d) : d < 1.3 ? sc.drift : 0, k = r + '_' + c;
       if (pr > (dens.get(k) || 0)) dens.set(k, pr);
     } });
   if (!dens.size) return;
-  const nm = sea === 'spring' ? 'season_petals_' : 'season_leaves_', ia = _floorImg(nm + 'a'), ib = _floorImg(nm + 'b');
+  const nm = sc.name, ia = _floorImg(nm + 'a'), ib = _floorImg(nm + 'b');
   if (!ia || !ib) return;
   runs.forEach(([r, a, b]) => { for (let c = a; c < b; c++) {
     if (_seaHash(r, c, k1) >= (dens.get(r + '_' + c) || 0)) continue;
@@ -10207,11 +10226,11 @@ function _decoGroundOn(p, d) {
 }
 function _decoGroundShadow(px, py, bw, bh, C) {
   const ctx = _dCtx;
-  ctx.fillStyle = 'rgba(30,52,14,.30)';
+  ctx.fillStyle = _yardLook().shadow;   // [DECO-LOOK-0]
   ctx.beginPath(); ctx.ellipse(px + bw / 2, py + bh - .06 * C, bw * .46, .16 * C, 0, 0, Math.PI * 2); ctx.fill();
 }
 function _decoGroundTufts(p, px, py, bw, bh, C, sz) {
-  const sea = _seaNow(), sc = sea === 'summer' ? '' : sea;   // [DECO-SEASON-1] 밑동 풀도 계절색
+  const sc = _yardLook().groundFrag;   // [DECO-SEASON-1] 밑동 풀도 계절색 · [DECO-LOOK-0] 표에서
   const fl = _yardFloorGet(CUR), a = _floorImg('ground_tuft_a', sc), b = _floorImg('ground_tuft_b', sc);
   if (!a || !b) return;
   for (let k = 0; k < sz.w; k++) {
@@ -10223,13 +10242,13 @@ function _decoGroundTufts(p, px, py, bw, bh, C, sz) {
 function _drawYardHouseArt(img, hx, hw, C) {
   const ctx = _dCtx, y0 = -C, h = hw * (img.naturalHeight / img.naturalWidth);
   //  집 칸은 바닥 그리기가 건너뛴다(옛 그리기는 네모로 덮었다) → 그림 둘레가 비지 않게 잔디를 먼저 깐다
-  const c0 = _houseCol0(), grass = () => 'grass';
+  const c0 = _houseCol0(), hg = _yardLook().houseGround, grass = () => hg;   // [DECO-LOOK-0] 집 밑 땅은 표에서
   for (let r = 0; r < DH.rows; r++) for (let c = c0; c < c0 + DH.cols; c++) {
-    if (!(FLOOR_SVG && _drawFloorSVG('grass', r, c, c * C, r * C, C, grass))) { ctx.fillStyle = (r + c) % 2 ? FLOOR_TILES.grass.alt : FLOOR_TILES.grass.bg; ctx.fillRect(c * C, r * C, C, C); }
+    if (!(FLOOR_SVG && _drawFloorSVG(hg, r, c, c * C, r * C, C, grass))) { ctx.fillStyle = (r + c) % 2 ? FLOOR_TILES[hg].alt : FLOOR_TILES[hg].bg; ctx.fillRect(c * C, r * C, C, C); }
   }
   _decoGroundPatch(0, c0, DH.rows, c0 + DH.cols, () => true);   // [DECO-GROUND-1] 집 둘레 잔디에도 얼룩
   ctx.drawImage(_svgBmp('d:yard_house', img, hw * 2, img.naturalHeight / img.naturalWidth), hx, y0, hw, h);
-  if (_seaNow() === 'winter') { const sn = _ambImg('yard_house_snow'); if (sn) ctx.drawImage(sn, hx, y0, hw, h); }   // [DECO-SEASON-1] 지붕 눈
+  if (_yardLook().snow) { const sn = _ambImg('yard_house_snow'); if (sn) ctx.drawImage(sn, hx, y0, hw, h); }   // [DECO-SEASON-1] 지붕 눈 · [DECO-LOOK-0]
   const u = hw / 600;   // 그림 한 단위 = 캔버스 px
   const name = CUR && CUR.name ? CUR.name : '내 집';
   ctx.save();
@@ -10271,10 +10290,10 @@ function _drawYard() {
   _decoGroundPatch(_vis.r0, _vis.c0, _vis.r1, _vis.c1, (r, c) => !_isHC(r, c) && _floorIsGrass(_floorParse(_yardFloorGet(CUR)[r + '_' + c]).name));   // [DECO-GROUND-1]
   //  [DECO-TOP-PAD-1] 판 위 잔디 띠(DECO_YARD_TOP 칸) — 맨 윗줄 장식·집 굴뚝의 솟은 그림이 판 위 끝에서 잘리던 것(디자인 D7). 놓을 수는 없다(격자 없음)
   if (_dPanY < 0) {
-    const grass = () => 'grass';
+    const hg = _yardLook().houseGround, grass = () => hg;   // [DECO-LOOK-0] 띠 땅은 표에서
     for (let r = -DECO_YARD_TOP; r < 0; r++) for (let c = _vis.c0; c < _vis.c1; c++) {
-      if (FLOOR_SVG && _drawFloorSVG('grass', r + 1000, c, c * C, r * C, C, grass)) continue;   // (변형 고르기는 음수 줄을 못 받는다 — 양수로)
-      _dCtx.fillStyle = (r + c) % 2 === 0 ? FLOOR_TILES.grass.bg : FLOOR_TILES.grass.alt; _dCtx.fillRect(c * C, r * C, C, C);
+      if (FLOOR_SVG && _drawFloorSVG(hg, r + 1000, c, c * C, r * C, C, grass)) continue;   // (변형 고르기는 음수 줄을 못 받는다 — 양수로)
+      _dCtx.fillStyle = (r + c) % 2 === 0 ? FLOOR_TILES[hg].bg : FLOOR_TILES[hg].alt; _dCtx.fillRect(c * C, r * C, C, C);
     }
     _decoGroundPatch(-DECO_YARD_TOP, _vis.c0, 0, _vis.c1, () => true);   // [DECO-GROUND-1] 띠에도 얼룩
   }
@@ -10582,7 +10601,7 @@ function _drawYardFarm(C) {
         ctx.drawImage(_svgBmp('farm:' + ((gr * 3 + gc * 7) % 2 ? 'b' : 'a'), t, C * 2, 1), px, py, C, C);
       } else {
         // ── 바닥: 항상 모래색 (체크무늬) ──
-        ctx.fillStyle = (r + c) % 2 === 0 ? '#c8a855' : '#b89545';
+        ctx.fillStyle = _yardLook().farmSand[(r + c) % 2];   // [DECO-LOOK-0]
         ctx.fillRect(px+1, py+1, C-2, C-2);
       }
 
@@ -13743,7 +13762,7 @@ function _renderFriendCanvas() {
   _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _ffView.panX, _ffView.panY);
   try { _decoMotionSync(); } catch (e) {}   // [DECO-FRIEND-MOTION-1] 풍차·분수·연기 층(구경 값으로 — 아직 전역을 빌린 채)
   {   // [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스에 색 막이 깔리니 동물 층도 같은 결로(내 마당 #if-topview 와 같은 CSS)
-    const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day', fh = document.getElementById('ff-topview');
+    const ph = typeof _yardPhase === 'function' ? _yardPhase() : 'day', fh = document.getElementById('ff-topview');   // [DECO-LOOK-0]
     if (fh) { fh.classList.toggle('is-evening', _ffScene === 'yard' && ph === 'evening'); fh.classList.toggle('is-night', _ffScene === 'yard' && ph === 'night'); }
   }
 
