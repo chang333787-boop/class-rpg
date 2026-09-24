@@ -47,7 +47,7 @@ async function once(playPort) {
     let id = 0; const pend = new Map(); const net0 = { n: 0, bytes: 0, urls: [] };
     ws.addEventListener('message', m => { const d = JSON.parse(m.data);
       if (d.id && pend.has(d.id)) { pend.get(d.id)(d); pend.delete(d.id); }
-      if (d.method === 'Network.requestWillBeSent') { net0.n++; net0.urls.push(d.params.request.url); }
+      if (d.method === 'Network.requestWillBeSent' && !/^(blob|data):/.test(d.params.request.url)) { net0.n++; net0.urls.push(d.params.request.url); }   // [DECO-BUNDLE-1] blob:·data: 는 서버 요청이 아니다
       if (d.method === 'Network.loadingFinished') net0.bytes += d.params.encodedDataLength || 0; });
     const send = (method, params = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
     const ev = async e => { const r = await send('Runtime.evaluate', { expression: e, awaitPromise: true, returnByValue: true }); if (r.result.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 300)); return r.result.result.value; };
