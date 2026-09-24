@@ -31,7 +31,7 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 |---|---|
 | `--stage <id>` | 판 파일 `village/stages/<id>.json` 으로 연다(`?stage=` 와 같은 길 · 시작 땅·규칙·목표). 판 파일만 디스크에서 읽어 주고 다른 주소는 여전히 거절 · 지표에 `판목표`(이룬 판 목표 수) |
 | `--html <파일>` | 다른 `index.html` 을 싣는다(vendor·판 파일은 이 저장소 것) — **고침 전/후가 같은지** 재기: `--vs '옛: html=/tmp/old.html'` 로 같은 시드끼리 나란히 · `--json` 으로 표본을 떠서 비교 |
-| `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅 |
+| `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅. 저장본에 **판 전용 종류**(field·villtree·pier…)가 있는데 그 판(`--stage` · vs 칸 `stage=`)이 없으면 ⚠ 로 크게 알린다(그 물건은 빠진 채 돈다 · 표 첫머리에 '못 살린 것 N개') — MAC-STAGEKINDS |
 | `--days N` · `--seeds 1-5` | 며칠 · 어느 시드(`1,3,7` 도 된다) |
 | `--rules 'a.b=v,…'` | 불러온 뒤 `VRULES` 를 덮는다. 없는 키면 멈춘다 |
 | `--do '…; …'` | 한 수: `put <종류> <x> <y> <rot>` · `put <종류> @jobs\|@crowd\|@need:물 <개수>` (그런 집들의 가운데서 가장 가까운 놓을 수 있는 자리) · `put <종류> @at:<x>,<y> <개수>` (그 점에서 가장 가까운 자리) · `road <x1> <y1> <x2> <y2>` (가로·세로 곧은 길 긋기 — 이미 길인 칸은 건너뜀) · `widen @crowd <n>` (붐비는 집 n채의 문 앞 길을 큰길로 — 바꿔 깔기) · `widen @point <n>` (붐빔 ✨ 가 짚는 칸에 큰길을 n번 — MAC-CROWDPOINT) · `del <x> <y>` |
