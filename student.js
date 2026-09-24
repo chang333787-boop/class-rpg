@@ -9213,6 +9213,65 @@ function _drawExitDoorArt(img, cx, wallY, C) {
   ctx.fillStyle = '#2b2118'; ctx.fillText('나가기', x0 + 122 * u, y0 + 126 * u);
   ctx.restore();
 }
+// [DECO-GROUND-1] 풀빛 얼룩 — 잔디 칸 위에 짙은 판(13칸 주기)·밝은 판(9칸 주기)을 무늬(pattern)로 한 번에 깐다.
+//  두 주기가 겹쳐 117칸마다만 되풀이된다 · 한 가지 초록에 모눈이 늘 보여 '모눈종이에 붙인 스티커' 같던 것(창조자 31회 ⓑ71 · docs/deco_ground_20260923.md).
+//  칸 조각에 넣어 굽지 않는다 — 칸마다 모양이 달라 확대 한 걸음마다 다시 구웠다(핀치 9 → 80ms). 잔디 칸에는 가장자리 조각이 없어 위에 깔아도 같다.
+//  무늬 판은 칸 크기를 4분의 1 옥타브 계단(_bmpStep)으로 구워 몇 장만 기억한다 — 두 손가락 확대 걸음마다 새로 굽지 않게(무늬 크기는 변환으로 맞춘다)
+const _GP = new Map();   // 'w' → { dark, light } (캔버스 판 · 무늬는 그리는 컨텍스트마다)
+function _groundPatterns(C) {
+  const dk = _floorImg('grass_patch_dark'), lt = _floorImg('grass_patch_light');
+  if (!dk || !lt || typeof document === 'undefined' || !_dCtx.createPattern) return null;
+  const sc = (_dCtx.getTransform && _dCtx.getTransform().a) || 1, w = _bmpStep(Math.max(2, C * sc));
+  let e = _GP.get(w);
+  if (!e) {
+    if (_GP.size > 6) _GP.clear();
+    const mk = (img, n) => { const cv = document.createElement('canvas'); cv.width = cv.height = n * w; cv.getContext('2d').drawImage(img, 0, 0, n * w, n * w); return cv; };
+    e = { dark: mk(dk, 13), light: mk(lt, 9), pats: new WeakMap() };
+    _GP.set(w, e);
+  }
+  let pp = e.pats.get(_dCtx);
+  if (!pp) { pp = { dark: _dCtx.createPattern(e.dark, 'repeat'), light: _dCtx.createPattern(e.light, 'repeat') }; e.pats.set(_dCtx, pp); }
+  if (typeof DOMMatrix === 'function') { const m = new DOMMatrix().scale(C / w, C / w); pp.dark.setTransform(m); pp.light.setTransform(m); }
+  return pp;
+}
+function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
+  if (!FLOOR_SVG) return;
+  const C = _dC, gp = _groundPatterns(C);
+  if (!gp || !gp.dark || !gp.light) return;
+  [gp.dark, gp.light].forEach(pt => {
+    _dCtx.fillStyle = pt;
+    for (let r = r0; r < r1; r++) {
+      let run = -1;
+      for (let c = c0; c <= c1; c++) {
+        const g = c < c1 && isGrass(r, c);
+        if (g && run < 0) run = c;
+        else if (!g && run >= 0) { _dCtx.fillRect(run * C, r * C, (c - run) * C, C); run = -1; }
+      }
+    }
+  });
+}
+// [DECO-GROUND-1] 밑동 접지 — 물건이 잔디에 '떠 있지' 않고 붙어 보이게. 동물(층에서 그림)·울타리(그림에 풀이 들어 있음)는 뺀다.
+//  발자리 가운데 칸이 잔디일 때만 그림자 · 맨 아래 줄은 칸마다 그 칸이 잔디면 풀 덮임(ground_tuft_a|b 번갈아). 돌길·벽돌·물 위는 없음.
+const _GROUND_SKIP = ['d_y49', 'd_y50', 'd_y51', 'd_y52', 'd_y70', 'd_y71', 'd_y72'];
+function _decoGroundOn(p, d) {
+  if (!FLOOR_SVG || ANIM_DECO[p.id] || _GROUND_SKIP.indexOf(p.id) >= 0 || (d && d.autoFence)) return false;
+  const z = getDecoSize(p.id), fl = _yardFloorGet(CUR);
+  return _floorIsGrass(_floorParse(fl[(p.row + z.h - 1) + '_' + (p.col + Math.floor((z.w - 1) / 2))]).name);
+}
+function _decoGroundShadow(px, py, bw, bh, C) {
+  const ctx = _dCtx;
+  ctx.fillStyle = 'rgba(30,52,14,.30)';
+  ctx.beginPath(); ctx.ellipse(px + bw / 2, py + bh - .06 * C, bw * .46, .16 * C, 0, 0, Math.PI * 2); ctx.fill();
+}
+function _decoGroundTufts(p, px, py, bw, bh, C, sz) {
+  const fl = _yardFloorGet(CUR), a = _floorImg('ground_tuft_a'), b = _floorImg('ground_tuft_b');
+  if (!a || !b) return;
+  for (let k = 0; k < sz.w; k++) {
+    if (!_floorIsGrass(_floorParse(fl[(p.row + sz.h - 1) + '_' + (p.col + k)]).name)) continue;
+    const img = (p.col + k) % 2 ? b : a;
+    _dCtx.drawImage(_svgBmp('t:' + ((p.col + k) % 2 ? 'b' : 'a'), img, C * 2, .4), px + k * C, py + bh - .3 * C, C, .4 * C);
+  }
+}
 function _drawYardHouseArt(img, hx, hw, C) {
   const ctx = _dCtx, y0 = -C, h = hw * (img.naturalHeight / img.naturalWidth);
   //  집 칸은 바닥 그리기가 건너뛴다(옛 그리기는 네모로 덮었다) → 그림 둘레가 비지 않게 잔디를 먼저 깐다
@@ -9220,6 +9279,7 @@ function _drawYardHouseArt(img, hx, hw, C) {
   for (let r = 0; r < DH.rows; r++) for (let c = c0; c < c0 + DH.cols; c++) {
     if (!(FLOOR_SVG && _drawFloorSVG('grass', r, c, c * C, r * C, C, grass))) { ctx.fillStyle = (r + c) % 2 ? FLOOR_TILES.grass.alt : FLOOR_TILES.grass.bg; ctx.fillRect(c * C, r * C, C, C); }
   }
+  _decoGroundPatch(0, c0, DH.rows, c0 + DH.cols, () => true);   // [DECO-GROUND-1] 집 둘레 잔디에도 얼룩
   ctx.drawImage(_svgBmp('d:yard_house', img, hw * 2, img.naturalHeight / img.naturalWidth), hx, y0, hw, h);
   const u = hw / 600;   // 그림 한 단위 = 캔버스 px
   const name = CUR && CUR.name ? CUR.name : '내 집';
@@ -9259,6 +9319,7 @@ function _drawYard() {
     }
   };
   _floorCells(_vis);
+  _decoGroundPatch(_vis.r0, _vis.c0, _vis.r1, _vis.c1, (r, c) => !_isHC(r, c) && _floorIsGrass(_floorParse(_yardFloorGet(CUR)[r + '_' + c]).name));   // [DECO-GROUND-1]
   // 나무 타일은 가로줄 추가 (무늬) — texture 함수로 통합했으므로 기존 loop 삭제
 
   // ══════════════════════════════════════════════════════
@@ -9408,7 +9469,8 @@ function _drawYard() {
 
   // 격자 (집 영역 제외) — [DECO-VIEW-FIT-1] 판 크기까지(전엔 캔버스 크기 W·H 까지라 오른쪽·아래로 밀면 격자가 없었다 · 집 오른쪽 칸 위 3줄도)
   const BW = DY.cols*C, BH = DY.rows*C;
-  _dCtx.strokeStyle='rgba(255,255,255,.12)'; _dCtx.lineWidth=.5;
+  //  [DECO-GROUND-1] 모눈은 고르는 동안(카드를 든 채 · 바닥 모드)만 — 평소엔 안 보이게(창조자 31회 '스티커를 모눈종이에 붙인 모습')
+  _dCtx.strokeStyle= (SEL_DECO || DECO_MODE==='floor') ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,0)'; _dCtx.lineWidth=.5;
   _dCtx.beginPath();
   for(let r=0;r<=DY.rows;r++){
     if(r<DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); _dCtx.moveTo(hx+hw,r*C); _dCtx.lineTo(BW,r*C); }
@@ -9446,7 +9508,9 @@ function _drawYard() {
     const sz=d.size||{w:1,h:1};
     const px=p.col*C, py=p.row*C;
     const bw=sz.w*C, bh=sz.h*C;
-    if(_drawDecoSVG(drawId, px, py, bw, bh)) return;   // SVG 있으면 그걸로 끝
+    const _gnd = _decoGroundOn(p, d);   // [DECO-GROUND-1] 잔디 위 물건이면 밑동 그림자 → 그림 → 풀 덮임
+    if (_gnd) _decoGroundShadow(px, py, bw, bh, C);
+    if(_drawDecoSVG(drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;

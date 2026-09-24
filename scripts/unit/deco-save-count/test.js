@@ -1491,6 +1491,29 @@
       decoSpaceSet(1); await sleep(150);
     }
 
+    //  ㊶ 땅(DECO-GROUND-1 · 창조자 31회 ⓑ71) — 모눈은 고를 때만 · 잔디 얼룩 무늬 · 잔디 위 물건엔 밑동 그림자(돌길 위엔 없음)
+    if (typeof _decoGroundPatch === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.houseDecorations.push({ id: 'd_y9', area: 'yard', row: 6, col: 6, sp: 3 }, { id: 'd_y5', area: 'yard', row: 10, col: 6, sp: 3 });
+      if (!CUR.yardFloors) CUR.yardFloors = {}; CUR.yardFloors[3] = { '10_6': 'stone', '10_7': 'stone' };
+      ['grass_patch_dark', 'grass_patch_light', 'ground_tuft_a', 'ground_tuft_b'].forEach(n => _floorImg(n));
+      for (let i = 0; i < 20 && !(_floorImg('grass_patch_dark') && _floorImg('ground_tuft_b')); i++) await sleep(100);
+      const spy = () => { const o = { grid: 0, ell: 0 }, st = _dCtx.stroke, sh = _decoGroundShadow;
+        _dCtx.stroke = function () { if (String(this.strokeStyle).indexOf('0.12') >= 0) o.grid++; return st.apply(this, arguments); };
+        _decoGroundShadow = function () { o.ell++; return sh.apply(this, arguments); };
+        try { _drawYard(); } finally { _dCtx.stroke = st; _decoGroundShadow = sh; } return o; };
+      SEL_DECO = null; setDecoMode('deco');
+      const off = spy(); SEL_DECO = 'd_y2'; const on = spy(); SEL_DECO = null;
+      out('땅_모눈은_고를때만', off.grid === 0 && on.grid > 0);
+      out('땅_얼룩무늬', !!_groundPatterns(_dC));
+      out('땅_밑동그림자_잔디위만', off.ell === 1 || off.ell);   // 나무(잔디) 1 · 벤치(돌길) 0
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3); delete CUR.yardFloors[3];
+      decoSpaceSet(1); await sleep(150);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
