@@ -2278,6 +2278,24 @@ function updateViewMode() {
   }
   if (mapMode && mapDirty && performance.now() - mapLastDraw > 500) drawMap();
 }
+/* ── [MAC-WHOLECAM] 넓게 볼 때 카메라를 뒤로 — 판 전체 보기에서 판의 가까운 절반이 곧은 줄로 잘려 하늘로 보이던 것 (village-look 이 처음 잡음 · 보스 09-24) ──
+   카메라는 직교(OrthographicCamera · near 0.1)인데 목표에서 camDist 150 만 떨어져 있다. 배율 1(판 전체 보기)이면 화면 아래쪽 땅이 목표에서 카메라 쪽으로
+   수백 칸까지 보이는데, 150 ÷ cos(높이각) ≈ 184(46칸)보다 가까운 땅은 카메라 **뒤**라 near 면 밖으로 잘렸다(모든 판 · #210 무렵부터).
+   · 화면 맨 아랫줄의 땅까지 카메라 앞에 오게 카메라를 뒤로 뺀다: 거리 = max(150, 아래 반높이 ÷ tan(높이각) + margin). 직교라 뒤로 빼도 그림 크기·자리는 같다.
+   · 안개는 카메라에서 잰 거리라 뺀 만큼 같이 민다(250·380 + 뺀 만큼 · 지도 판은 원래 안개 없음). far 도 뺀 만큼 늘린다(낮은 높이각으로 멀리 볼 때 먼 끝이 안 잘리게).
+   · 보통 배율(카메라가 150 그대로)에서는 거리·안개·far 가 예전 값 그대로 — 그림 한 점도 안 바뀐다(village-look default·near 0).
+   원래 줄 수정 0 — placeCamera 감싸기. 스위치 VRULES.wholeCam(보기). */
+(window.VRULES = window.VRULES || {}).wholeCam = { on: true, margin: 40 };
+const WHOLECAM = { stats: { 뒤로뺀프레임: 0, 가장먼거리: 150 } };
+{ const pc0 = placeCamera; placeCamera = function () {
+    const R = window.VRULES.wholeCam, base = 150, t = Math.max(0.15, Math.tan(camEl));
+    const d = R.on ? Math.max(base, Math.abs(camera.bottom) / t + (R.margin || 40)) : base, extra = d - base;
+    camDist = d;
+    if (!mapMode) { scene.fog.near = 250 + extra; scene.fog.far = 380 + extra; }
+    if (camera.far !== 2000 + extra) { camera.far = 2000 + extra; camera.updateProjectionMatrix(); }
+    if (extra > 0) { WHOLECAM.stats.뒤로뺀프레임++; if (d > WHOLECAM.stats.가장먼거리) WHOLECAM.stats.가장먼거리 = Math.round(d); }
+    return pc0.apply(this, arguments); }; }
+window.__wholeCam = () => ({ 켜짐: window.VRULES.wholeCam.on, 거리: +camDist.toFixed(1), far: camera.far, 안개: [scene.fog.near, scene.fog.far], ...WHOLECAM.stats });
 
 /* ══════════════════════════════════════════════════════════════
    [MAC-KEEP] 지우기 방어장치 — 아이들 마을을 지킨다 (사용자 09-20: "비싼 걸 막 지우면 안 되니 방어장치가 있어야 한다. 길 같은 건 상관없지만.")
