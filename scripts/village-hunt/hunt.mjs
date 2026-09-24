@@ -68,8 +68,8 @@ await new Promise(done => { const f = () => { const now = performance.now() - t0
       const e = ov.get(k); e.n++; if (now - e.t > PASS_LONG && e.n >= PASS_FR && !longOv.has(k)) longOv.set(k, e); }   /* 1초 **그리고** 20프레임 — 긴 프레임이 몰리면 프레임마다 벌리는 간격(ACT-SPACE)이 1초에 몇 번 못 돈다(09-24 sea · 최대 656ms 때 한 번) */
     ov.forEach((e, k) => { if (!seen.has(k)) { if (now - e.t <= 300) R.스침++; ov.delete(k); } }); }
   if (now >= nextSample) { nextSample += 500; if (has('__folkSpace')) { const g = (window.__folkSpace().그린자리 || {}); if (g.서있는사람) { R.박자합 += g.한칸박자; R.박자표본++; } } R.표본++; const V = P.filter(p => p[3]); R.사람최대 = Math.max(R.사람최대, V.length);
-    let pairs = 0, near = 1e9; for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) { const d = Math.hypot(V[a][1] - V[b][1], V[a][2] - V[b][2]); if (d < near) near = d; if (d < 0.6) pairs++; }
-    R.포갬쌍합 += pairs; if (pairs) R.포갬표본++; if (V.length > 1 && Math.abs(near - 4) < 0.01) R.줄세움표본++;
+    let pairs = 0, near = 1e9, np = ''; for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) { const d = Math.hypot(V[a][1] - V[b][1], V[a][2] - V[b][2]); if (d < near) { near = d; np = V[a][0] + '-' + V[b][0]; } if (d < 0.6) pairs++; }
+    R.포갬쌍합 += pairs; if (pairs) R.포갬표본++; { const line = V.length > 1 && Math.abs(near - 4) < 0.01 ? np : ''; if (line && line === R._줄) R.줄세움표본++; R._줄 = line; }   /* 같은 둘이 **두 표본 잇달아** 정확히 4.00 일 때만 — 스쳐 가는 둘이 한순간 4.00 이 되는 것은 뺀다(09-24 sea 21.7시 · 5명뿐인 밤에 마주 오는 둘 1.7×3.63 = 4.008) */
     const wall = V.filter(p => p[6] && (p[7] === '' || p[7] === 'carry') && !['play', 'pavilion', 'plaza', 'bench', 'minibench', 'green', 'fountain', 'garden'].includes(p[5]));
     if (wall.length) { R.벽통과표본++; if (R.벽예.length < 3) R.벽예.push(wall[0][5] + ':' + wall[0][4] + ' (' + wall[0][1] + ',' + wall[0][2] + ') @' + Math.round(now / 1000) + 's'); }
     if (has('__folkOverlap') && window.__folkOverlap().겹친쌍 > 0) R.셈포갬표본++;
@@ -118,7 +118,7 @@ for (const x of results) {
   x.판정 = fail.length ? 'FAIL(' + fail.join('·') + ')' : x.사람최대 ? 'PASS' : 'REVIEW(사람 0 · 잴 게 없다)'; x.주의 = warn;
   L.push(`| ${x.판} | ${x.사람최대} | ${x.오래포갬}${x.오래포갬예.length ? ' (' + x.오래포갬예.join(', ') + ')' : ''} | ${r2(쌍)} (${x.스침}) | ${r2(x.한칸박자)} | ${pct(x.셈포갬표본, x.표본)} | ${pct(x.줄세움표본, x.표본)} | ${x.벽통과표본}${x.벽예.length ? ' (' + x.벽예.join(', ') + ')' : ''} | ${x.튐}${x.튐예.length ? ' (' + x.튐예.join(', ') + ')' : ''} | ${x.갇힘표본} | ${오류} | ${r2(x.우표)} | ${x.빈30초말} | ${r2(x.프레임평균ms)} | ${x.긴프레임}${x.긴프레임 ? ' (최대 ' + x.긴프레임최대ms + 'ms)' : ''} | **${x.판정}**${warn.length ? ' · 주의: ' + warn.join('·') : ''} |`);
 }
-L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게 · ${PASS.오래포갬프레임}프레임 넘게) ≥ 1 · 줄 세움(가장 가까운 두 사람이 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
+L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게 · ${PASS.오래포갬프레임}프레임 넘게) ≥ 1 · 줄 세움(가장 가까운 **같은 둘**이 두 표본 잇달아 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
   `주의: 포갬 평균(0.5초 표본마다 0.6 안 쌍 > ${PASS.포갬쌍} · 괄호 = 0.3초 안에 풀린 스침 수) · 한 칸 박자(서 있는 사람 가운데 가장 가까운 서 있는 이웃이 3.6~4.4 인 몫 > ${PASS.한칸박자}) · 우표 마을(물건 화면 폭 ÷ 창 폭 < ${PASS.우표}) · 빈 30초(아무것도 안 누른 30초 동안 말 0) · 프레임 > ${PASS.프레임ms}ms(헤드리스 · 틀 수 상한 ${FPS || '없음'} 이라 **참고만**).`,
   '안 잼(입력이 필요하다): 말 충돌(한 입력 뒤 #toast 와 #why) · 반응 ms · 흰 공(풍선 지름). 셈 포갬은 창조자 25회 표와 견주려고 함께 적는다(__folkOverlap · 셈 자리 2.0 안).');
 L.push('', '그린 것: ' + ([...new Set(results.map(x => x.렌더러).filter(Boolean))].join(' · ') || '(못 읽음)'));
