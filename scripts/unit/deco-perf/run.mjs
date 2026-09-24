@@ -5,7 +5,7 @@
 //  재는 것: ①로그인 화면이 뜰 때까지 ②홈이 뜰 때까지 ③꾸미기 열어 첫 그림까지 · 그동안 요청 수·바이트
 //           ④장식 200개 + 바닥 절반 칠한 마당에서 끌기·핀치 한 프레임(그리기 함수 동기 비용, 중앙값)
 //           ⑤학생 문서 크기(장식 0/100/300개) ⑥자체 JS·CSS 바이트 ⑦꾸미기 20번 열고 닫은 뒤 동물 타이머·층 수
-//  사용: node scripts/unit/deco-perf/run.mjs [--cpu 4] [--runs 3] [--json] [--soft]   (--soft = 그래픽칩 끄기 · 기준선과 견주지 말 것)
+//  사용: node scripts/unit/deco-perf/run.mjs [--cpu 4] [--runs 3] [--json] [--soft] [--look star]   (--soft = 그래픽칩 끄기 · 기준선과 견주지 말 것 · --look = 놀이판 모습 스위치)
 //        전/후 비교: REPO=<다른 판을 푼 폴더> node scripts/unit/deco-perf/run.mjs   (ABAB 로 번갈아 두 번씩 돌릴 것 — 기기 상태에 흔들린다)
 //  의존성 0(노드 22+ 내장 WebSocket·fetch). 브라우저: BROWSER 환경변수 > 맥 크롬 > 윈도 엣지.
 import { spawn } from 'node:child_process';
@@ -16,6 +16,7 @@ const REPO = process.env.REPO || path.resolve(HERE, '..', '..', '..');
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const CPU = Number(opt('--cpu', 4)), RUNS = Number(opt('--runs', 3)), AS_JSON = argv.includes('--json');
+const LOOK = opt('--look', '');   // [DECO-STAR-P3] 놀이판 개발 스위치 ?look=<줄>(별빛 등) — '기본 / 별빛' 두 줄로 잴 때
 //  [DECO-GPU-1] 그래픽칩으로 그린다 — 맥은 Metal(--use-angle=metal --use-gl=angle · 보스 09-24). 크롬북도 GPU 가 있어 이쪽이 실제에 가깝다.
 //  그래픽칩이 없는 기기만 --soft(옛 --disable-gpu). 맥이 아니면 브라우저 기본값.
 const GPU_ARGS = argv.includes('--soft') ? ['--disable-gpu'] : process.platform === 'darwin' ? ['--use-angle=metal', '--use-gl=angle'] : [];
@@ -55,7 +56,7 @@ async function once(playPort) {
     await send('Emulation.setCPUThrottlingRate', { rate: CPU });
     await send('Network.enable'); await send('Page.enable'); await send('Runtime.enable');
     await send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
-    await send('Page.navigate', { url: `http://127.0.0.1:${playPort}/student.html` });
+    await send('Page.navigate', { url: `http://127.0.0.1:${playPort}/student.html` + (LOOK ? '?look=' + encodeURIComponent(LOOK) : '') });
     for (let i = 0; i < 400; i++) { await sleep(100); if (await ev(`!!(window.__perf && __perf.home)`)) break; }
     const out = {};
     const P = JSON.parse(await ev(`JSON.stringify(__perf)`));
