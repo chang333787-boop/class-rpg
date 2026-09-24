@@ -1405,9 +1405,11 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .dlc-hearts{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:8px}
 .dlc-hrow{display:flex;flex-wrap:wrap;gap:3px}
 .dlc-hearts img{width:22px;height:22px;display:block}
-.dlc-hearts.h7 img,.dlc-hearts.h10 img{width:18px;height:18px}
-.dlc-hearts.h10 .dlc-hrow{width:calc(5 * 18px + 4 * 3px)}   /* 10칸은 다섯씩 두 줄 */
+.dlc-hearts.h8 .dlc-hrow{width:calc(4 * 22px + 3 * 3px)}   /* 8칸은 넷씩 두 줄(디자인 #1022) */
 .dlc-today{margin-left:6px;color:#e0507f;font-weight:800;font-size:12px}
+.dlc-was{opacity:.95}
+.dlc-up{margin-left:6px;color:#d98a00;font-weight:800;font-size:12px}
+.dlc-again{margin-top:6px;padding:5px 8px;border-radius:10px;background:#fdeef3;color:#b24a6e;font-size:12px;font-weight:700}
 .dlc-next{margin-top:4px}
 .dlc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .dlc-chips[hidden]{display:none}

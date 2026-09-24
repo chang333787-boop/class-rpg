@@ -8870,7 +8870,7 @@ function _animPoke(st, fromCol) {
 //  · 없으면 빈 것으로 읽고 **필드를 만들지 않는다** — 처음 쓰다듬을 때 만든다(아무것도 안 한 아이의 문서는 그대로).
 //  · 쓰기는 **잎만** update(통째 저장 아님) · 수는 서버에서 더하기 — 통째 저장이 늘면 골드 유실 M2 창이 는다(§6-1).
 //  · 친구는 '선 자리'(r·c·sp)로 자리와 짝짓는다 — houseDecorations 배열은 건드리지 않는다.
-const LIFE_STAGE_AT = [0, 3, 8, 15, 25];   // 단계 1~5(처음 만남 · 알아봄 · 친구 · 단짝 · 가족)의 하트 문턱 — 보스 결정 ①
+const LIFE_STAGE_AT = [0, 3, 7, 12, 20];   // 단계 1~5(처음 만남 · 알아봄 · 친구 · 단짝 · 가족)의 하트 문턱 — 보스 결정 09-24(전 0/3/8/15/25 · 주 2회 교실이면 가족까지 10주)
 const LIFE_STAGE_NAME = ['처음 만남', '알아봄', '친구', '단짝', '가족'];
 let _lifeWrites = 0;   // 잎 쓰기 수(시험이 센다)
 function _lifeDay(t) { return Math.floor(((t === undefined ? Date.now() : t) + 9 * 3600000) / 86400000); }   // 한국 날짜의 일 번호
@@ -8958,6 +8958,13 @@ function _lifePet(student, p, now) {
   _lifeWrite(student, ups);
   return { u, gained: 1, stage: s1, stageUp: s1 > s0 };
 }
+//  [DECO-LIFE-4] 부르는 이름 — 지은 이름이 있으면 그 이름(같으면 '콩이 2'), 없으면 종류(강아지). 알림 · 카드 · 선물 말은 모두 이것으로(창조자 49-ⓑ99)
+function _lifeWho(id, L, u) {
+  const nm = (L && u && L.a && L.a[u]) ? _lifeNameOf(L, u) : '';
+  if (nm) return nm;
+  const c = typeof ANIM_DECO !== 'undefined' && ANIM_DECO[id];
+  return (c && c.name) || ((GAME_DATA.decorations.find(x => x.id === id) || {}).name) || '동물';
+}
 //  누른 동물(st) → 그 자리 객체 → 하트. 하트를 얻으면 💗 옆에 +1 · 단계가 오르면 알림 한 줄.
 function _lifePetAnim(st) {
   if (!st || !CUR) return null;
@@ -8971,9 +8978,9 @@ function _lifePetAnim(st) {
     st.el.appendChild(plus);
     setTimeout(() => { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1500);
   }
-  if (r.stageUp) {
-    const d = GAME_DATA.decorations.find(x => x.id === st.id), nm = (d && d.name) || '동물';
-    toast(`🤝 ${nm}${_josa(nm, '과', '와')} 한 걸음 더 가까워졌어요 — '${LIFE_STAGE_NAME[r.stage - 1]}' · 🧩 사진 조각 하나`);
+  if (r.stageUp) {   // [DECO-LIFE-4] 이름으로 부르고 · 받은 것(스티커 · 사진 조각)을 어디서 보는지까지(ⓑ99 · ⓒ85)
+    const who = _lifeWho(st.id, _lifeGet(CUR), r.u);
+    toast(`🤝 ${who}${_josa(who, '과', '와')} '${LIFE_STAGE_NAME[r.stage - 1]}' 사이가 됐어요! ⭐ 스티커 · 🧩 사진 조각 — 🎁 선물 상자에서 봐요`);
   }
   return r;
 }
@@ -9027,20 +9034,29 @@ function _lifeCardPlace() {
   k.el.classList.toggle('below', pos === 'below'); k.el.classList.toggle('side', pos === 'side');
   k.el.style.setProperty('--tip', Math.round(Math.max(16, Math.min(cw - 16, ax - x))) + 'px');
 }
-function _lifeCardHTML(st, L, u) {
+function _lifeCardHTML(st, L, u, pet) {
   const f = L.a[u], cfg = ANIM_DECO[st.id] || {}, kind = cfg.name || ((GAME_DATA.decorations.find(x => x.id === st.id) || {}).name) || '동물';
   const h = _lifeHearts(f), row = _lifeHeartRow(h), nm = _lifeNameOf(L, u), today = f && f.d === _lifeDay();
-  //  디자인 사양(#1003): 7칸까지 한 줄(22px · 7칸은 18px) · 10칸은 다섯씩 두 줄(18px) · 가족은 칸을 안 보인다
-  const hearts = row.left ? Array.from({ length: row.need }, (_, i) => `<img src="./assets/deco/heart_${i < row.have ? 'full' : 'empty'}.svg" alt="">`).join('') : '';
-  const hcls = row.need >= 10 ? ' h10' : row.need >= 7 ? ' h7' : '';
+  //  디자인 사양(#1022): 하트 칸 3·4·5·8 — 5칸까지 한 줄 · 8칸은 넷씩 두 줄(모두 22px) · 가족은 칸을 안 보인다
+  const hrow = (n, have) => Array.from({ length: n }, (_, i) => `<img src="./assets/deco/heart_${i < have ? 'full' : 'empty'}.svg" alt="">`).join('');
+  const hc = n => n >= 8 ? ' h8' : '';   // 하트 칸 3·4·5·8(#1022) — 5칸까지 한 줄 · 8칸은 넷씩 두 줄 · 모두 22px
+  const hearts = row.left ? hrow(row.need, row.have) : '';
+  const hcls = hc(row.need);
+  //  [DECO-LIFE-4] 단계가 오른 날은 방금 받은 하트가 사라져 보이지 않게 — 다 찬 옛 줄 + ⬆ 새 단계, 그 아래 새 줄(창조자 49-ⓑ98)
+  const upToday = today && row.st >= 2 && h === LIFE_STAGE_AT[row.st - 1];
+  const oldN = upToday ? LIFE_STAGE_AT[row.st - 1] - LIFE_STAGE_AT[row.st - 2] : 0;
+  const was = upToday ? `<div class="dlc-hearts dlc-was${hc(oldN)}" aria-label="지난 단계 하트 다 참"><span class="dlc-hrow">${hrow(oldN, oldN)}</span><span class="dlc-today">+1 오늘</span><span class="dlc-up">⬆ '${LIFE_STAGE_NAME[row.st - 1]}'!</span></div>` : '';
+  //  [DECO-LIFE-4] 같은 날 또 쓰다듬으면 — 반응은 그대로 · 하트가 왜 안 느는지 한 줄(벌 아님 · ⓑ97)
+  const again = pet && pet.gained === 0 ? '<div class="dlc-again">💗 오늘은 벌써 쓰다듬었어요 · 내일 또 만나요</div>' : '';
   const next = row.left ? `다음 단계 '${LIFE_STAGE_NAME[row.st]}'까지 하트 ${row.left}` : '가족이 됐어요 — 하트는 줄지 않아요';
   return `<div class="dlc-top"><img class="dlc-badge" src="./assets/deco/friend_stage${row.st}.svg" alt="${row.st}단계">`
     + `<div class="dlc-who"><div><b class="dlc-nm">${escHtml(nm || kind)}</b>${nm ? ` <span class="dlc-kind">· ${escHtml(kind)}</span>` : ''}</div>`
     + `<div class="dlc-sub">${row.st}단계 ${LIFE_STAGE_NAME[row.st - 1]}</div></div>`
     + (L.ro ? '' : `<button type="button" class="dlc-namebtn" aria-label="이름 고르기">🏷️ ${nm ? '이름 바꾸기' : '이름 짓기'}</button>`) + '</div>'
-    + (hearts ? `<div class="dlc-hearts${hcls}" aria-label="하트 ${row.have}/${row.need}"><span class="dlc-hrow">${hearts}</span>${today ? '<span class="dlc-today">+1 오늘</span>' : ''}</div>`
-      : (today ? '<div class="dlc-hearts"><span class="dlc-today">+1 오늘</span></div>' : ''))
-    + `<div class="dlc-next">${next}</div>${_lifeGiftLine(st.id, f, u)}<div class="dlc-chips" hidden></div>`;
+    + was
+    + (hearts ? `<div class="dlc-hearts${hcls}" aria-label="하트 ${row.have}/${row.need}"><span class="dlc-hrow">${hearts}</span>${today && !upToday ? '<span class="dlc-today">+1 오늘</span>' : ''}</div>`
+      : (today && !upToday ? '<div class="dlc-hearts"><span class="dlc-today">+1 오늘</span></div>' : ''))
+    + `<div class="dlc-next">${next}</div>${again}${_lifeGiftLine(st.id, f, u)}<div class="dlc-chips" hidden></div>`;
 }
 function _lifeCardChips(k, more) {
   const box = k.el.querySelector('.dlc-chips'), cfg = ANIM_DECO[k.st.id] || {}, s0 = LIFE_NAME_START[cfg.mood] || LIFE_NAME_COMMON;
@@ -9061,7 +9077,7 @@ function _lifeCardPick(k, n) {
   toast(`🏷️ 이제 '${nm}'${_josa(nm, '이에요', '예요')}`);
   _lifeCardOpen(k.st);
 }
-function _lifeCardOpen(st) {
+function _lifeCardOpen(st, pet) {
   _lifeCardClose();
   if (!st || !st.el || !CUR) return null;
   const rec = st.rec || _animLayers.get(_ifActiveContainer || 'house-topview');
@@ -9070,7 +9086,7 @@ function _lifeCardOpen(st) {
   if (!rec || !u || !L.a[u]) return null;
   const el = document.createElement('div');
   el.className = 'deco-life-card'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '동물 카드');
-  el.innerHTML = _lifeCardHTML(st, L, u);
+  el.innerHTML = _lifeCardHTML(st, L, u, pet);
   rec.world.appendChild(el);
   const k = _lifeCard = { el, st, rec, u, timer: 0, follow: 0 };
   ['pointerdown', 'touchstart', 'mousedown'].forEach(t => el.addEventListener(t, e => e.stopPropagation(), { passive: true }));
@@ -9146,8 +9162,8 @@ function _lifeGiftTake(u, el) {
   _lifeWrite(CUR, { ['a/' + u + '/gd']: day, ['g/' + kind]: { inc: 1 } });   // 잎 쓰기 하나 · 수는 서버 더하기
   if (el) { el.classList.add('taken'); el.disabled = true; setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 650); }
   const rec = _animLayers.get(_ifActiveContainer || 'house-topview'); if (rec && rec.gifts) rec.gifts.delete(u);
-  const nm = LIFE_GIFT_NAME[kind], n = _lifeGet(CUR).g[kind] || 0;
-  toast(`🎁 선물! ${nm}${_josa(nm, '을', '를')} 받았어요 — 선물 상자 ${n}개`);
+  const nm = LIFE_GIFT_NAME[kind], L2 = _lifeGet(CUR), n = L2.g[kind] || 0, who = _lifeWho(f.k, L2, u);   // [DECO-LIFE-4] 이름으로
+  toast(`🎁 ${who}${_josa(who, '이', '가')} 준 선물! ${nm}${_josa(nm, '을', '를')} 받았어요 — 선물 상자 ${n}개`);
   if (_lifeCard && _lifeCard.u === u) _lifeCardOpen(_lifeCard.st);
   return true;
 }
@@ -10173,7 +10189,7 @@ function _decoClick(e) {
     //  [DECO-SEL-A5] 카드를 들었어도 — 보이는 동물을 누른 것은 쓰다듬기다(전엔 그 발밑에 하나가 더 놓였다 · 창조자 27회 ⓐ5)
     if(DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
       const pet=_animAtPt(_ifActiveContainer||'house-topview', mx, my)||_animAt(_ifActiveContainer||'house-topview', r, c);   // [DECO-ANIM-HIT-2] 그려진 몸 먼저
-      if(pet && _animPoke(pet, c)) { _lifePetAnim(pet); _lifeCardOpen(pet); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1 · [DECO-LIFE-2] 카드
+      if(pet && _animPoke(pet, c)) { const pr = _lifePetAnim(pet); _lifeCardOpen(pet, pr); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1 · [DECO-LIFE-2] 카드
     }
     _decoPlace('yard',r,c);
   } else {
