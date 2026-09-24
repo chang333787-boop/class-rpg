@@ -276,6 +276,16 @@
     "d_y34": "d_y34_night.svg",
     "yard_house": "yard_house_night.svg"
    }
+  },
+  "snow": {
+   "when": "겨울(12·1·2월) — 몸통을 그린 뒤 같은 자리·크기로 보통 합성",
+   "_on": "id: 몸통과 같은 viewBox 의 지붕 눈 그림",
+   "on": {
+    "d_y28": "d_y28_snow.svg",
+    "d_y33": "d_y33_snow.svg",
+    "d_y34": "d_y34_snow.svg",
+    "yard_house": "yard_house_snow.svg"
+   }
   }
  }
 }
