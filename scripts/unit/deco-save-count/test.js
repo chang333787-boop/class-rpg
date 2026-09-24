@@ -18,6 +18,8 @@
   const t0 = Date.now();
   //  [DECO-DAYNIGHT-1] 시험은 실제 시각 대신 낮으로 — 헤드리스 시계(UTC)가 밤이면 동물이 자서 먹이통 시험이 흔들렸다(단추로 바꾼 값은 그대로 따른다)
   try { if (typeof _decoPhase === 'function') _decoPhase = function () { return _decoPhaseOv || 'day'; }; } catch (e) {}
+  //  [DECO-SEASON-1] 계절도 날짜 대신 여름(바탕 그림)으로 — 그림 지문·조각 수 시험이 달마다 바뀌지 않게(시험에서 바꾼 값은 그대로 따른다)
+  try { if (typeof _decoSeason === 'function') _decoSeason = function () { return _decoSeasonOv || 'summer'; }; } catch (e) {}
   (async () => {
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
       if (Date.now() - t0 > 20000) { out('ERR', 'timeout'); return done(); } await sleep(50);
@@ -1946,6 +1948,51 @@
       if (_decoWind.raf) { cancelAnimationFrame(_decoWind.raf); _decoWind.raf = 0; } _decoWind.set = new Map();
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
       decoSpaceSet(1); await sleep(150);
+    }
+
+    //  ㊼ 계절(DECO-SEASON-1) — 달로 고른다 · 겨울 꽃밭은 겨울 바탕에 꽃잎 가장자리 없음 · 풀 번짐 계절색 · 나무는 계절 그림 · 저장 0
+    if (typeof _seaHash === 'function') {
+      const seaOf = m => { const d = new Date(2026, m - 1, 15), mm = d.getMonth() + 1; return mm >= 3 && mm <= 5 ? 'spring' : mm >= 6 && mm <= 8 ? 'summer' : mm >= 9 && mm <= 11 ? 'autumn' : 'winter'; };
+      out('계절_달표', seaOf(1) === 'winter' && seaOf(4) === 'spring' && seaOf(8) === 'summer' && seaOf(11) === 'autumn');
+      const sv0 = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]);
+      const names = [], o = _floorImg;
+      _floorImg = function (n, c) { names.push(n + (c ? '#' + c : '')); return o.apply(this, arguments); };
+      try {
+        _decoSeasonOv = 'winter';
+        _drawFloorSVG('tulipbed', 5, 5, 0, 0, 20, () => 'grass', 'red'); _drawFloorSVG('stone', 5, 5, 0, 0, 20, () => 'grass');
+        _drawFloorSVG('water', 5, 5, 0, 0, 20, () => 'water');
+      } finally { _floorImg = o; }
+      //  ⑥ 꽃 장식 · ⑦ 우리 — 겨울에만 #winter(다른 철엔 바탕 그림 그대로)
+      const amb = [], oa = _ambImg;
+      _ambImg = function (n, c) { amb.push(n + (c ? '#' + c : '')); return oa.apply(this, arguments); };
+      try {
+        _drawDecoSVG('d_y1', 0, 0, 20, 20); _drawDecoSVG('d_y58', 0, 0, 80, 60);
+        _decoSeasonOv = 'spring'; _drawDecoSVG('d_y2', 0, 0, 20, 20);
+      } finally { _ambImg = oa; }
+      out('계절_겨울꽃밭_겨울바탕_꽃잎없음', names.some(n => /^tile_bed_winter_[ab]$/.test(n)) && !names.some(n => /^bed_/.test(n)));
+      out('계절_겨울_풀번짐_눈테', names.some(n => /^fringe_grass_.*#winter$/.test(n)));
+      out('계절_겨울물_얼음', names.some(n => /^tile_water_[ab]#winter$/.test(n)));
+      out('계절_꽃우리_겨울만_눈', amb.includes('d_y1#winter') && amb.includes('d_y58#winter') && !amb.some(n => n.startsWith('d_y2')));
+      //  흩뿌림은 나무 둘레에만(디자인 #1083 · 보스) — 나무가 없으면 0 · 벚나무 하나면 그 둘레(가로 반 + 3칸 · 세로 반 + 2칸 × 1.3) 안에만
+      {
+        const keepH = CUR.houseDecorations, cells = [], marked = new WeakSet(), ofb = _floorBmp, odi = _dCtx.drawImage;
+        _decoSeasonOv = 'spring';
+        for (let i = 0; i < 30 && !(_floorImg('season_petals_a') && _floorImg('season_petals_b')); i++) await sleep(100);
+        _floorBmp = function (n) { const b = ofb.apply(this, arguments); if (/^season_petals_/.test(n)) marked.add(b); return b; };
+        _dCtx.drawImage = function (img, x, y) { if (marked.has(img)) cells.push([Math.round(y / _dC), Math.round(x / _dC)]); return odi.apply(this, arguments); };
+        let none = -1, tree = null;
+        try {
+          CUR.houseDecorations = keepH.filter(p => p.area !== 'yard');
+          _decoGroundPatch(0, 0, 30, 60, () => true); none = cells.length;
+          CUR.houseDecorations = CUR.houseDecorations.concat([{ id: 'd_y12', area: 'yard', row: 12, col: 20 }]); cells.length = 0;
+          _decoGroundPatch(0, 0, 30, 60, () => true); tree = cells.slice();
+        } finally { _floorBmp = ofb; _dCtx.drawImage = odi; CUR.houseDecorations = keepH; }
+        const z = getDecoSize('d_y12'), cx = 20 + z.w / 2, cy = 12 + z.h / 2, rx = (z.w / 2 + 3) * 1.3 + .5, ry = (z.h / 2 + 2) * 1.3 + .5;
+        out('계절_흩뿌림_나무없으면0', none === 0);
+        out('계절_흩뿌림_나무둘레만', tree.length > 3 && tree.every(([r, c]) => Math.abs(c + .5 - cx) <= rx && Math.abs(r + .5 - cy) <= ry));
+      }
+      _decoSeasonOv = null;
+      out('계절_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]) === sv0);
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
