@@ -1453,6 +1453,13 @@ try {
     eq([st.season, st.ground, st.groundFrag, st.waterFrag, st.swimFrag, st.shadow], ['summer', 'star', 'star', 'star', 'star', 'rgba(8,10,34,.4)']);
     eq([st.snow, st.film, st.scatter, st.bedWinter], [false, '', null, false]);
   });
+  test('별밤 칸(P5): 별빛 = 밤 고정 · 섬 · 하늘 · 이름표 막 위 / 막(.30 · 고르는 동안 .15) · 동물 필터는 계절 넷과 같다(#1088)', () => {
+    const st = L.YARD_LOOKS.star;
+    eq([st.phase, st.island, st.sky, st.labelOverFilm], ['night', true, true, true]);
+    ['spring', 'summer', 'autumn', 'winter', 'star'].forEach(k => { const r = L.YARD_LOOKS[k];
+      eq([r.nightFilm, r.nightFilmEdit, r.animNight], ['rgba(20,30,80,.30)', 'rgba(20,30,80,.15)', 'brightness(.8) saturate(.85)'], k); });
+    ['spring', 'summer', 'autumn', 'winter'].forEach(k => { const r = L.YARD_LOOKS[k]; eq([r.phase, r.island, r.sky, r.labelOverFilm], ['', false, false, false], k); });
+  });
   test('개발 스위치 ?look= — 놀이판(__PLAY + play-deco-none)에서만 · 다른 프로젝트 · 모르는 값은 무시(계절 줄)', () => {
     const run = (win, pid, search) => { sb.window = win; sb.firebase = { app: () => ({ options: { projectId: pid } }) }; sb.location = { search }; sb.URLSearchParams = URLSearchParams;
       vm.runInContext('_yardLookDev = null;', sb); const r = L._yardLook(1); delete sb.window; delete sb.firebase; delete sb.location; vm.runInContext('_yardLookDev = null;', sb); return r; };

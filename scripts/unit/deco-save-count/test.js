@@ -2050,8 +2050,21 @@
       const starH = snap();
       out('별빛_땅그림_띠조각', names.includes('star_ground') && names.includes('star_band') && _STAR_BAND.size > 0);
       out('별빛_풀번짐물_star', names.some(n => /^fringe_grass_.*#star$/.test(n)) && names.some(n => /^tile_water_[ab]#star$/.test(n)));
-      _yardLookDev = ''; _drawDeco(); await sleep(150);
-      out('별빛_끄면_기본판그대로', starH !== base0 && snap() === base0);
+      //  [DECO-STAR-P5] 별밤 — 때는 밤 고정(단추 숨김) · 막 .30 · 섬(테·몸) · 판 밖 하늘 class · 이름표는 막 뒤에 한 번 더
+      if (typeof ifSyncScene === 'function') ifSyncScene();
+      const fills = [], texts = [], names5 = [], fr = _dCtx.fillRect, ft = _dCtx.fillText, of = _floorImg;
+      _dCtx.fillRect = function () { fills.push(String(_dCtx.fillStyle)); return fr.apply(this, arguments); };
+      _dCtx.fillText = function (t) { texts.push([t, fills.length]); return ft.apply(this, arguments); };
+      _floorImg = function (n, c) { names5.push(n); return of.apply(this, arguments); };
+      try { _decoPhaseSync(); _dPanY = 99999; _decoClampPan(); _drawYard(); } finally { _dCtx.fillRect = fr; _dCtx.fillText = ft; _floorImg = of; }
+      const filmAt = fills.findIndex(f => /rgba\(20, 30, 80, 0\.3\)/.test(f));
+      out('별밤_밤고정_막30', _yardPhase() === 'night' && filmAt >= 0 && !fills.some(f => /rgba\(20, 30, 80, 0\.48\)/.test(f)));
+      out('별밤_섬_하늘', names5.includes('island_rim') && names5.includes('island_under') && _dPanY > DY.rows * _dC - _dH && document.getElementById('if-topview').classList.contains('look-sky'));
+      out('별밤_때단추_숨김', getComputedStyle(document.getElementById('if-phase-btn')).display === 'none');
+      out('별밤_이름표_막위', texts.some(([t, i]) => t === '들어가기' && i > filmAt));
+      _dPanY = 0; _decoClampPan();
+      _yardLookDev = ''; _decoPhaseSync(); if (typeof ifSyncScene === 'function') ifSyncScene(); _drawDeco(); await sleep(150);
+      out('별빛_끄면_기본판그대로', starH !== base0 && snap() === base0 && !document.getElementById('if-topview').classList.contains('look-sky'));
       _yardLookDev = null;   // 다음에 읽을 때 주소로 다시(하네스 주소엔 ?look 없음)
     }
 
