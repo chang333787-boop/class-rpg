@@ -12607,6 +12607,16 @@ window.__startFit = () => ({ 켜짐: window.VRULES.startFit.on, 배율: +zoomMul
     x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
   if (n) camTarget.set(wx((x0 + x1) / 2), 2, wz((y0 + y1) / 2));
 })();
+/* ── [MAC-STARTCELL] 판이 첫 카메라 자리를 고른다 — `시작칸: { 칸: [x, y], 배율: n }` (보스 09-24 · 원본 3차 ②) ──
+   위(centerOnItems)는 물건들의 가운데로 간다. 원본은 숲 띠가 판 끝까지 둘러 가운데가 늘 큰길 네거리 — 첫 화면의 주인공이 회색 X자였다(보스 판정).
+   · 판 파일에 `시작칸`이 있으면 그 칸을 화면 가운데로(마을 나무·광장). `배율`이 있으면 시작 배율이 그보다 작지 않게(더 가까이) — 아이가 손으로 바꾸면 그대로 따른다.
+   · 저장본에는 카메라 칸이 없어 판 파일에 둔다. 판이 없거나 칸이 없으면 한 줄도 안 달라진다. 친구 마을 구경(?visit)에선 판을 안 읽는다(STAGE.def 없음).
+   판정·저장 0(카메라는 보기) · 원래 줄 수정 0 — startZoom 감싸기 + 여기 한 번. */
+const STARTCELL = (() => { const d = STAGE.def && STAGE.def.시작칸; if (!d || !Array.isArray(d.칸) || d.칸.length !== 2) return null; const x = +d.칸[0], y = +d.칸[1];
+  if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > W - 1 || y > H - 1) return null; return { x, y, z: isFinite(+d.배율) && +d.배율 > 0 ? Math.min(20, +d.배율) : null }; })();
+if (STARTCELL) camTarget.set(wx(STARTCELL.x), 2, wz(STARTCELL.y));
+{ const szC = startZoom; startZoom = function () { const z = szC.apply(this, arguments); return STARTCELL && STARTCELL.z ? Math.max(z, STARTCELL.z) : z; }; }
+window.__startCell = () => ({ 판: STAGE.id || null, 칸: STARTCELL ? [STARTCELL.x, STARTCELL.y] : null, 배율: STARTCELL ? STARTCELL.z : null, 지금배율: +zoomMul.toFixed(2) });
 resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
 if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
