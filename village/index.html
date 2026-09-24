@@ -306,6 +306,7 @@ const FREE = true;                               // 오픈 기념 무료 (2026-0
 const idx = (x, y) => y * W + x;
 const cX = i => i % W, cY = i => (i / W) | 0;
 const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
+const simRand = typeof window.__SIM_RAND === 'function' ? window.__SIM_RAND : () => Math.random();   /* [MAC-SIMRAND] 판정(사람 발길·드나듦·바람·이웃)만 쓰는 난수. 브라우저에선 Math.random 그대로. 시뮬(load.mjs)은 따로 시드한 줄기를 끼워, 그림·모형·three uuid 가 Math.random 을 몇 번 먹든 판정 값이 안 움직인다(보스 09-24 · #906·#918 거짓 FAIL) */
 const cells = new Array(W * H).fill(null);  // null 이거나 {k, root}
 /* 칸 (x,y) 의 한가운데 월드 좌표 */
 const wx = x => (x - (W - 1) / 2) * CS;
@@ -1417,6 +1418,7 @@ const board = new THREE.Mesh(new THREE.PlaneGeometry(W*CS, H*CS),
   new THREE.MeshLambertMaterial({ color:0xffffff, map: boardTex }));
 board.rotation.x = -Math.PI/2; board.position.y = 0.03; board.receiveShadow = true;
 scene.add(board);
+boardTex.flipY = false;   /* [MAC-BOARDFLIP] 캔버스는 칸 y 를 줄 H−1−y 에 칠한다(위 = 큰 y). flipY 기본값(true)이면 그 위가 −z 로 올라가 물건(wz: 큰 y = +z)과 z 로 뒤집혀 한 구역 어긋났다(#210 부터). 픽셀은 그대로 · 올리는 방향만 */
 const plotRimMat = new THREE.MeshLambertMaterial({ color:0xe0c68f }), plotMat = new THREE.MeshLambertMaterial({ color:0x97cc5e });
 const plotOf = (x, y) => ((x / PLOT) | 0) + ',' + ((y / PLOT) | 0);
 const plotOpen = (x, y) => plots.has(plotOf(x, y));
@@ -2078,6 +2080,7 @@ const mapCanvas = document.createElement('canvas'); mapCanvas.width = W * MAP_PX
 const mapTex = new THREE.CanvasTexture(mapCanvas); mapTex.magFilter = THREE.NearestFilter; mapTex.colorSpace = THREE.SRGBColorSpace;
 const mapPlane = new THREE.Mesh(new THREE.PlaneGeometry(W * CS, H * CS), new THREE.MeshBasicMaterial({ map: mapTex }));
 mapPlane.rotation.x = -Math.PI / 2; mapPlane.position.y = 0.06; mapPlane.visible = false; scene.add(mapPlane);
+mapTex.flipY = false;   // [MAC-BOARDFLIP] 멀리서 보는 지도 판도 같은 규칙(H−1−y)이라 같이 — 2D 미니맵은 캔버스를 그대로 베끼므로 영향 없음
 let mapDirty = true, mapMode = false, mapLastDraw = 0;
 const MAP_COL = { road:'#d9d6cf', gravel:'#b9b2a6', lawn:'#a3d86d', flower:'#f58fae', pond:'#7fd0e8', fountain:'#7fd0e8', well:'#9c968b',
   plaza:'#efeee8', house:'#f2889e', shop:'#f2889e', green:'#bfe6f7', pavilion:'#79cfd4', play:'#e9cfa4', tree:'#4f9a3a', bigtree:'#3f8a2e', bush:'#5fae44',
@@ -2949,6 +2952,110 @@ function streamParts(rec) {
   hookAdd('removeAt', function (next, args) { const [x, y] = args; const c = inb(x, y) ? cells[idx(x, y)] : null, was = !!(c && c.k === 'sbr');
     const r = next(args); if (was && window.VRULES.streamBridge.on && !cells[idx(x, y)]) { placeAt('stream', x, y, 0); STREAM.stats.되돌림++; } return r; }); }
 window.__stream = (x, y) => ({ 켜짐: window.VRULES.stream.on, 다리켜짐: window.VRULES.streamBridge.on, ...STREAM.stats, 칸: x == null ? null : { 종류: inb(x, y) && cells[idx(x, y)] ? cells[idx(x, y)].k : null, 곧음: streamAxis(x, y) } });
+/* ── [MAC-STREAMLOOK] 개울이 '수로'가 아니라 개울로 보이게 — 물가 · 둥근 굽이 · 흐르는 결 · 나무 다리 (보스 09-23 · #885 뒤 '모습 한 묶음') ──
+   #885 의 개울은 옅은 파란 길처럼 곧게 판 도랑으로 읽혔다(보스). **판정 0 · 그림만** 바꾼다:
+   · 물가: 물 둘레에 흙 띠 → 그 바깥에 풀 띠(잔디 어두운 줄 색 · 철 따라 바뀐다). 안 이어진 변에 돌·갈대, 곧은 물에 가끔 수련 잎.
+     돌·갈대 자리는 **칸 자리로 정한다**(무작위 아님) → 다시 그려도, 저장했다 열어도 같다.
+   · 굽이: 물·흙·풀을 '가운데 → 이어진 변' 팔과 가운데 원으로 짓는다 → 굽음·T·끝의 바깥 모서리가 둥글다. 홀로 있는 칸은 둥근 웅덩이.
+   · 흐름: 물 위에 옅은 결(가는 흰 줄)이 흐르는 쪽으로 천천히 미끄러지며 나타났다 사라진다. 굽이에서는 제자리에서 반짝.
+     InstancedMesh 하나(개울이 없으면 숨김 · 있으면 draw call +1) · 칸마다 둘 · 최대 flowCap 개 · 셰이더·텍스처 없음(크롬북 예산).
+   · 다리: 판자 여러 장(두 나무색 번갈아 · 가운데가 살짝 솟음) · 판 밑 보 둘 · 기둥 셋씩 + 기둥 머리 · 위·가운데 난간 둘.
+   스위치 VRULES.streamLook(보기) — 끄면 #885 모습 그대로. 원래 줄 수정 0 — streamParts 바꿔 끼우기 · drawClock 감싸기(결 그리기). */
+(window.VRULES = window.VRULES || {}).streamLook = { on: true, width: .52, water: 0x69c4ea, waterH: .24, dirt: .42, dirtH: .17, grass: .16, grassH: .09, flowCap: 600, flowMs: 5200 };
+const SLOOK = { mesh: null, list: [], dirty: true, scanT: -1e9, stats: { 칸: 0, 결: 0, 다시셈: 0 } };
+const slookHash = (x, y, k) => { let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(k | 0, 1442695041) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+function streamLookParts(rec) {
+  const R = window.VRULES.streamLook, x = cX(rec.root), y = cY(rec.root), cx = wx(x), cz = wz(y), HALF = CS / 2, out = [];
+  const Wd = CS * (R.width || window.VRULES.stream.width || .62) / 2, bridge = rec.k === 'sbr', ax = bridge ? (rec.rot & 1) : -1;   // 물 너비는 #885 보다 좁게 — 웅덩이가 칸 안에서 불룩할 틈
+  const jn = bridge ? { n: ax === 0, s: ax === 0, w: ax === 1, e: ax === 1 } : { n: streamAt(x, y - 1), s: streamAt(x, y + 1), w: streamAt(x - 1, y), e: streamAt(x + 1, y) };
+  const straight = (jn.n && jn.s && !jn.w && !jn.e) || (jn.w && jn.e && !jn.n && !jn.s), lone = !jn.n && !jn.s && !jn.w && !jn.e, rW = lone ? CS * .36 : Wd;
+  const box = (c, s, p) => out.push({ g: 'box', c, s, p: [cx + p[0], p[1], cz + p[2]], abs: true });
+  const disk = (c, r, h, px, pz, py) => [0, Math.PI / 6].forEach(ry => out.push({ g: 'cyl', c, s: [r, h, r], p: [cx + (px || 0), py == null ? h / 2 : py, cz + (pz || 0)], ry, abs: true }));   // 육각 둘을 30° 엇갈려 — 거의 둥근 원
+  /* 층 셋 — 풀(가장 넓고 낮게) · 흙 · 물(가장 좁고 높게). 팔은 가운데에서 이어진 변 끝까지(이웃 칸과 이어진다) · T·끝은 가운데 원.
+     **굽음**은 안쪽 모서리를 중심으로 도는 활(조각 6개를 돌려 잇는다) — 바깥이 크게 둥글어 물이 휘돌아 흐른다. 모든 층이 칸 안에 든다. */
+  const DIR = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] }, con = ['n', 's', 'w', 'e'].filter(d => jn[d]);
+  const bend = !bridge && con.length === 2 && !straight ? { a: DIR[con[0]], b: DIR[con[1]] } : null;
+  if (bend) bend.C = [(bend.a[0] + bend.b[0]) * HALF, (bend.a[1] + bend.b[1]) * HALF];
+  const arcAt = (r, f) => [bend.C[0] + r * (-bend.b[0] * Math.cos(f) - bend.a[0] * Math.sin(f)), bend.C[1] + r * (-bend.b[1] * Math.cos(f) - bend.a[1] * Math.sin(f))];
+  const arc = (c, hw, h, py) => { const NS = 6, dF = Math.PI / 2 / NS;
+    for (let i = 0; i < NS; i++) { const f = (i + .5) * dF, [px, pz] = arcAt(HALF, f), tx = bend.b[0] * Math.sin(f) - bend.a[0] * Math.cos(f), tz = bend.b[1] * Math.sin(f) - bend.a[1] * Math.cos(f);
+      out.push({ g: 'box', c, s: [2 * (HALF + hw) * Math.sin(dF / 2) + .08, h, hw * 2], p: [cx + px, py == null ? h / 2 : py, cz + pz], ry: Math.atan2(-tz, tx), abs: true }); } };
+  /* 곧은 칸 절반쯤은 물이 불룩한 웅덩이(너비가 칸마다 달라 자로 그은 도랑이 안 된다) */
+  const pool = straight && !bridge && slookHash(x, y, 51) < .55, pr = Wd * (1.45 + slookHash(x, y, 52) * .25), po = (slookHash(x, y, 53) - .5) * .7, pX = jn.n ? po : 0, pZ = jn.n ? 0 : po;
+  [[R.grass, R.grassH, 0x6ea83c, HALF - .02], [R.dirt, R.dirtH, 0xd2b88a, HALF - .04], [0, R.waterH, R.water, HALF - .12]].forEach(([g, h, c, lim]) => { const hw = Math.min(HALF - .02, rW + g);
+    if (bend) { arc(c, hw, h); return; }
+    if (jn.n) box(c, [hw * 2, h, HALF], [0, h / 2, -HALF / 2]); if (jn.s) box(c, [hw * 2, h, HALF], [0, h / 2, HALF / 2]);
+    if (jn.w) box(c, [HALF, h, hw * 2], [-HALF / 2, h / 2, 0]); if (jn.e) box(c, [HALF, h, hw * 2], [HALF / 2, h / 2, 0]);
+    if (!straight) disk(c, hw, h); if (pool) disk(c, Math.min(lim - Math.abs(po), pr + g), h, pX, pZ); });
+  /* 가운데 깊은 물 한 줄(조금 진한 파랑) — 물이 얕은 판이 아니라 깊이가 있어 보이게 */
+  const deep = 0x4aa6d4, dw = Wd * .9, dy = R.waterH + .004;
+  if (bend) arc(deep, dw / 2, .012, dy);
+  else { if (jn.n) box(deep, [dw, .012, HALF], [0, dy, -HALF / 2]); if (jn.s) box(deep, [dw, .012, HALF], [0, dy, HALF / 2]);
+    if (jn.w) box(deep, [HALF, .012, dw], [-HALF / 2, dy, 0]); if (jn.e) box(deep, [HALF, .012, dw], [HALF / 2, dy, 0]);
+    if (!straight && !lone) disk(deep, dw / 2, .012, 0, 0, dy); }
+  /* 물가 자리 — 곧은·T·끝은 안 이어진 변을 따라, 굽음은 바깥 활(과 안쪽 모퉁이)을 따라. [x, z, 바깥쪽 x, 바깥쪽 z] */
+  const edge = rW + R.dirt * .5, bank = (k, off, t) => {
+    if (bend) { const f = .3 + slookHash(x, y, k + 81) * .97, [px, pz] = arcAt(HALF + edge + off, f); return [px, pz]; }
+    const [, sx, sz] = sides[k % sides.length]; return [sx ? sx * (edge + off) : t, sz ? sz * (edge + off) : t]; };
+  const sides = bridge ? [] : [['n', 0, -1], ['s', 0, 1], ['w', -1, 0], ['e', 1, 0]].filter(([d]) => !jn[d]);   // 다리 칸은 물가 장식 없음(판 위로 돌이 솟는다)
+  /* 돌(반쯤 나옴) — 변마다 하나둘 */
+  sides.forEach((sd, k) => { const h1 = slookHash(x, y, k + 1), h2 = slookHash(x, y, k + 11), t = (h1 - .5) * CS * .6;
+    if (h1 < .65) { const [px, pz] = bank(k, 0, t); out.push({ g: 'sph', c: h2 < .5 ? 0xd8d2c4 : P.stone, s: [.46, .3, .38], p: [cx + px, .2, cz + pz], abs: true }); }
+    if (h2 < .45) { const [px, pz] = bank(k + 5, .12, -t * .8); out.push({ g: 'sph', c: P.stoneD, s: [.3, .2, .26], p: [cx + px, .16, cz + pz], abs: true }); } });
+  if (bend && slookHash(x, y, 91) < .7) { const [px, pz] = arcAt(HALF - rW - R.dirt * .5, .6 + slookHash(x, y, 92) * .4); out.push({ g: 'sph', c: 0xd8d2c4, s: [.34, .22, .3], p: [cx + px, .18, cz + pz], abs: true }); }   // 안쪽 모퉁이 조약돌
+  /* 풀 덤불 — 물가 바깥 가장자리에 둥근 잎 덩이(물가 선이 들쭉날쭉해진다 · 잎 색이라 철 따라 바뀐다) */
+  sides.forEach((sd, k) => { const h = slookHash(x, y, k + 61); if (h > .7) return; const t = (slookHash(x, y, k + 71) - .5) * CS * .7, [px, pz] = bank(k + 9, R.dirt * .5 + .25, t);
+    out.push({ g: 'sph', c: h < .35 ? P.leaf : P.leafL, s: [.46, .3, .4], p: [cx + px, .14, cz + pz], abs: true }); });
+  /* 부들 한 무리 — 3×3 칸 조각마다 **한 칸에만**(조각 안 자리는 해시로) · 그 칸도 절반만 → 드문드문 무리로(칸마다 서면 울타리 말뚝 줄처럼 읽혔다 · 보스 #906)
+     2~4포기 · 초록 줄기 + 갈색 이삭(둘까지) · 밑동에 잎 덩이 */
+  const bx0 = Math.floor(x / 3), by0 = Math.floor(y / 3), pick = Math.floor(slookHash(bx0, by0, 24) * 9);
+  if (sides.length && !bridge && (x - bx0 * 3) + 3 * (y - by0 * 3) === pick && slookHash(bx0, by0, 25) < .55) { const k = Math.floor(slookHash(x, y, 21) * sides.length), t = (slookHash(x, y, 23) - .5) * CS * .5, [bx, bz] = bank(k + 13, 0, t), n = 2 + Math.floor(slookHash(x, y, 26) * 3);
+    out.push({ g: 'sph', c: P.leaf, s: [.42, .2, .36], p: [cx + bx, .14, cz + bz], abs: true });
+    [[0, 0, 1.25], [.26, .14, 1.0], [-.24, .18, 1.1], [.12, -.22, .85]].slice(0, n).forEach(([a, o, ht], j) => { const px = bx + a, pz = bz + o;
+      box(j % 2 ? P.leafL : P.leaf, [.14, ht, .14], [px, ht / 2, pz]);
+      if (j < 2) box(0x9a6a3a, [.17, .3, .17], [px, ht + .1, pz]); }); }
+  if (straight && !bridge && slookHash(x, y, 31) < .22) { const u = (slookHash(x, y, 32) - .5) * CS * .5, v = (slookHash(x, y, 33) - .5) * Wd * .8;
+    disk(P.leaf, .3, .03, jn.n ? v : u, jn.n ? u : v, R.waterH + .02); }
+  if (!bridge) return out;
+  /* 다리 — 길 방향(along)으로 판자를 여러 장 · 가운데가 한 뼘 솟는다 · 판 밑 보 둘 · 기둥 셋씩 + 머리 · 난간 둘 */
+  const alongX = ax === 0, DW = CS * .86, DT = .14, top = .36, N = 6, HUMP = .1;
+  const put = (c, sa, sy, sc, pa, py, pc) => alongX ? box(c, [sa, sy, sc], [pa, py, pc]) : box(c, [sc, sy, sa], [pc, py, pa]);
+  for (let i = 0; i < N; i++) { const u = (i + .5) / N - .5, hy = HUMP * (1 - 4 * u * u);
+    put(i % 2 ? P.woodD : P.wood, CS / N - .06, DT, DW, u * CS, top - DT / 2 + hy, 0);
+    put(0x8a6440, CS / N - .06, .02, DW * .92, u * CS, top + hy + .005, 0); }   // 판자 결(가운데 한 줄 어둡게)
+  [-1, 1].forEach(sg => put(P.woodD, CS, .16, .16, 0, top - DT - .08, sg * (DW / 2 - .18)));
+  [-1, 1].forEach(sg => { const c = sg * (DW / 2 - .06);
+    [-.42, 0, .42].forEach(a => { const hy = HUMP * (1 - 4 * (a * a)); put(P.woodD, .16, .64, .16, a * CS, top + hy + .3, c); put(P.woodL, .22, .07, .22, a * CS, top + hy + .65, c); });
+    put(P.woodD, CS * .96, .1, .1, 0, top + .58, c); put(P.wood, CS * .96, .07, .07, 0, top + .32, c); });
+  return out; }
+{ const sp0 = streamParts; streamParts = function (rec) { return window.VRULES.streamLook.on ? streamLookParts(rec) : sp0.apply(this, arguments); }; }
+/* 흐르는 결 — 곧은 개울 칸마다 둘이 흐르는 쪽(+x · +z)으로 미끄러지며 나타났다 사라진다. 굽이·끝은 제자리 반짝 */
+{ hookAdd('placeAt', function (next, args) { SLOOK.dirty = true; return next(args); }); hookAdd('removeAt', function (next, args) { SLOOK.dirty = true; return next(args); }); }
+function streamLookScan(now) { const L = []; SLOOK.dirty = false; SLOOK.scanT = now; SLOOK.stats.다시셈++;
+  for (let i = 0; i < W * H; i++) { const c = cells[i]; if (!c || c.k !== 'stream' || c.root !== i) continue; const x = cX(i), y = cY(i);
+    L.push({ x: wx(x), z: wz(y), ax: streamAxis(x, y), h: slookHash(x, y, 41), g: slookHash(x, y, 42) }); }
+  SLOOK.list = L; SLOOK.stats.칸 = L.length; }
+function streamFlowMesh() { if (SLOOK.mesh) return SLOOK.mesh;
+  const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .02, .1), new THREE.MeshLambertMaterial({ color: 0xf2fbff, emissive: 0x2a4a58, transparent: true, opacity: .6, depthWrite: false }), window.VRULES.streamLook.flowCap || 600);
+  m.count = 0; m.frustumCulled = false; m.renderOrder = 1; scene.add(m); SLOOK.mesh = m; return m; }
+let _slookD = null;   // 그릴 때 처음 만든다 — Object3D 는 uuid 를 Math.random 으로 뽑아, 불러올 때 만들면 시드 시뮬의 난수 차례가 한 칸 밀린다(판정 값이 움직였다 · 보스 #906 기준 ①)
+function streamFlowDraw(now) {
+  const R = window.VRULES.streamLook;
+  if (!R.on || !window.VRULES.stream.on) { if (SLOOK.mesh) { SLOOK.mesh.count = 0; SLOOK.mesh.visible = false; } return; }
+  if (SLOOK.dirty || now - SLOOK.scanT > 2000) streamLookScan(now);
+  if (!SLOOK.list.length) { if (SLOOK.mesh) { SLOOK.mesh.count = 0; SLOOK.mesh.visible = false; } return; }
+  if (!_slookD) _slookD = new THREE.Object3D();
+  const im = streamFlowMesh(), cap = Math.min(R.flowCap || 600, im.instanceMatrix.count), Wd = CS * (R.width || window.VRULES.stream.width || .62) / 2, y = R.waterH + .02; let k = 0;
+  for (const c of SLOOK.list) { if (k >= cap) break;
+    for (let j = 0; j < 2 && k < cap; j++) { const ph = (now / (R.flowMs || 5200) + c.h * 3 + j * .5) % 1, fade = Math.sin(Math.PI * ph);
+      if (c.ax >= 0) { const a = (ph - .5) * CS * .9, b = (j ? .42 : -.3) * Wd * (.6 + c.g * .6);
+        _slookD.position.set(c.x + (c.ax === 1 ? a : b), y, c.z + (c.ax === 1 ? b : a)); _slookD.rotation.set(0, c.ax === 1 ? 0 : Math.PI / 2, 0); _slookD.scale.set(.2 + .8 * fade, 1, .6 + .4 * fade); }
+      else { const ang = c.h * 6.283 + j * 2.4; _slookD.position.set(c.x + Math.cos(ang) * Wd * .4, y, c.z + Math.sin(ang) * Wd * .4); _slookD.rotation.set(0, ang, 0); _slookD.scale.set(.05 + .45 * fade, 1, .8); }
+      _slookD.updateMatrix(); im.setMatrixAt(k++, _slookD.matrix); } }
+  im.count = k; im.visible = k > 0; im.instanceMatrix.needsUpdate = true; SLOOK.stats.결 = k; }
+{ const dc0 = drawClock; drawClock = function () { const r = dc0.apply(this, arguments); streamFlowDraw(performance.now()); return r; }; }
+window.__streamLook = () => ({ 켜짐: window.VRULES.streamLook.on, ...SLOOK.stats, 보임: !!(SLOOK.mesh && SLOOK.mesh.visible) });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
    · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
@@ -5202,6 +5309,18 @@ function setSpeed(n) {
 }
 document.querySelectorAll('#spd button').forEach(b => b.onclick = () => setSpeed(+b.dataset.s));
 addEventListener('keydown', e => { if (e.key === ' ' && e.target === document.body) { e.preventDefault(); setSpeed(SIM.paused ? SIM.speed : 0); } });
+/* ── [ACT-SPEEDQUIET] 배속 단추는 말하지 않는다 (창조자 25회 ⓗ·ⓒ54 · 보스 09-23) ──
+   속도 단추를 누를 때마다 가운데 위에 "2배속"·"멈췄어요" 토스트가 떴다 — 누른 단추가 이미 금빛 테두리로 지금 속도를 보여 주는데 말이 한 번 더 튀어나왔고,
+   그 칸을 쓰던 말(목표·놓은 것의 대답)을 덮었다. 이제 **속도 단추 줄이 화면에 보이면** setSpeed 자신의 토스트만 쉰다(스페이스 멈춤도 같은 단추가 켜진다).
+   단추 줄이 안 보이는 때(사진 모드 등)는 전처럼 말한다 · 구경 중 "시간이 멈춰 있어요"는 그대로. 판정·저장 0 · 분류 '말'. */
+(window.VRULES = window.VRULES || {}).speedQuiet = { on: true };
+const SPDQ = { in: false, stats: { 쉼: 0, 말함: 0 } };
+{ const ss0 = setSpeed; setSpeed = function () { SPDQ.in = true; try { return ss0.apply(this, arguments); } finally { SPDQ.in = false; } }; }
+hookAdd('toast', function (next, a) { const el = document.getElementById('spd');
+  if (!SPDQ.in || !/^(멈췄어요|\d+배속)$/.test(String(a[0]))) return next(a);
+  if (window.VRULES.speedQuiet.on && el && el.offsetParent && getComputedStyle(el).visibility !== 'hidden') { SPDQ.stats.쉼++; return; }
+  SPDQ.stats.말함++; return next(a); });
+window.__speedQuiet = () => ({ 켜짐: window.VRULES.speedQuiet.on, ...SPDQ.stats });
 document.addEventListener('visibilitychange', () => {
   if (SND.ctx && SND.on) { if (document.hidden) SND.ctx.suspend(); else SND.ctx.resume(); } SIM.hidden = document.visibilityState !== 'visible'; SIM.acc = 0; });
 let clockShownDay = 0, clockShownH = -1;
@@ -5510,10 +5629,10 @@ function pickDestination(f, who) {
   if (EV.fest && EV.festRoot >= 0) festPool = nice.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && c.root === EV.festRoot; }); });
   const pref = hourPref(simHour()), timely = pref ? errand.filter(i => needBeside(i) === pref) : [];   // 시간대별(F26)
-  const useTimely = !!(timely.length && !(festPool && festPool.length) && Math.random() < 0.85);
+  const useTimely = !!(timely.length && !(festPool && festPool.length) && simRand() < 0.85);
   if (pref) { destLog.후보 += timely.length ? 1 : 0; destLog.고름 += useTimely ? 1 : 0; destLog.전체++; }
-  const pool = (festPool && festPool.length && Math.random() < 0.8) ? festPool : useTimely ? timely : (errand.length && Math.random() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
-  let goal = pool[(Math.random() * pool.length) | 0];
+  const pool = (festPool && festPool.length && simRand() < 0.8) ? festPool : useTimely ? timely : (errand.length && simRand() < 0.67) ? errand : (nice.length ? nice : reach.filter(i => i !== here));
+  let goal = pool[(simRand() * pool.length) | 0];
   if (f.visitor) { const g = visitorGoal(f, reach); if (g >= 0) goal = g; }
   /* [MAC-PATH] 손님이 돌아갈 때 visitorGoal 은 f.base 를 돌려주는데, 그 칸이 '남이 잡은 칸을 피한 탐색' 밖이면 prev 에 옛 탐색 찌꺼기가 남아 이웃하지 않은 칸을 잇는 경로가 나왔다(막다른 길 끝에서 이사 오는 사람과 영구 교착 → 이사가 끊김). 막힌 칸까지 넣어 다시 찾고, 그래도 없으면 잠깐 쉰다. */
   if (bfsSeen[goal] !== bfsGen) { ({ prev, reach } = roadBFS(here)); if (bfsSeen[goal] !== bfsGen) { f.state = 'idle'; f.until = simNow() + 900; return; } }
@@ -6028,7 +6147,7 @@ function tryEnter(f, i, cell) {
   const n = inside.get(b.root) || 0; if (n >= ENTER_MAX) return false;
   inside.set(b.root, n + 1);
   f.visits = f.visits || {}; f.visits[b.k] = (f.visits[b.k] || 0) + 1;   // 좋아하는 곳(F20)
-  f.inside = { root: b.root, until: simNow() + STAY_MIN + Math.random() * (STAY_MAX - STAY_MIN), cell };
+  f.inside = { root: b.root, until: simNow() + STAY_MIN + simRand() * (STAY_MAX - STAY_MIN), cell };
   f.state = 'inside'; f.walking = false; releaseAll(i);
   enterStats.들어감++;
   return true;
@@ -6037,7 +6156,7 @@ function leave(f, why) {
   const n = inside.get(f.inside.root) || 0; if (n <= 1) inside.delete(f.inside.root); else inside.set(f.inside.root, n - 1);
   const cell = f.inside.cell; f.inside = null;
   f.x = wx(cX(cell)); f.z = wz(cY(cell)); f.px = f.x; f.pz = f.z;
-  f.path = [cell]; f.step = 0; f.seg = 0; f.state = 'idle'; f.until = simNow() + 300 + Math.random() * 600;
+  f.path = [cell]; f.step = 0; f.seg = 0; f.state = 'idle'; f.until = simNow() + 300 + simRand() * 600;
   if (why === '쫓겨남') enterStats.쫓겨남++; else enterStats.나옴++;
 }
 
@@ -7127,9 +7246,9 @@ function wishTick() {
   const wishing = new Set(folks.filter(f => f.wish).map(f => f.home));            // 한 집에 바람 하나
   const cand = folks.filter(f => !f.visitor && !f.arriving && !f.wish && !wishing.has(f.home) && f.state !== 'inside' && sat.get(f.home) && NEEDS.some(k => !sat.get(f.home).met[k]));
   if (!cand.length) return;
-  const f = cand[(Math.random() * cand.length) | 0];
+  const f = cand[(simRand() * cand.length) | 0];
   const miss = NEEDS.filter(k => !sat.get(f.home).met[k]);
-  f.wish = { need: miss[(Math.random() * miss.length) | 0], at: now }; wishStats.나옴++;
+  f.wish = { need: miss[(simRand() * miss.length) | 0], at: now }; wishStats.나옴++;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -7608,7 +7727,7 @@ function neighborTick(now) {
   if (start < 0) return;
   const { reach } = roadBFS(start, undefined, 60); if (reach.length < 8) return;
   const b = reach[reach.length - 1];                                              // 길 먼 끝 = 마을 입구
-  folks.push({ home: b, ct: (Math.random() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
+  folks.push({ home: b, ct: (simRand() * 4 | 0) + 1, visitor: true, neighbor: true, until: 0, leaveAt: now + NEIGHBOR_STAY, read: new Set(), base: b,
     x: wx(cX(b)), z: wz(cY(b)), px: wx(cX(b)), pz: wz(cY(b)), dir: 0, pdir: 0, path: [b], step: 0, seg: 0, state: 'idle', mx: 0, mz: 0, mt: 0 });
   folkPool.forEach(m => m.count = folks.length); neighborStats.옴++;
   simSay('🚶 이웃 마을 아이가 구경 왔어요', true);
@@ -7634,7 +7753,7 @@ function visitTick(now) {
 function visitorGoal(f, reach) {
   if (simNow() >= f.leaveAt) return f.base;               // 돌아갈 시간
   f.readTarget = null;
-  if (Math.random() < 0.5) {                              // 안 읽은 표지판·꿈나무가 있으면 절반은 그리로(F37)
+  if (simRand() < 0.5) {                              // 안 읽은 표지판·꿈나무가 있으면 절반은 그리로(F37)
     for (const i of reach) { const x = cX(i), y = cY(i);
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)];
         if (c && readable(c) && !f.read.has(c.root)) { f.readTarget = c.root; return i; } } }
@@ -7642,7 +7761,7 @@ function visitorGoal(f, reach) {
   const sights = reach.filter(i => { const x = cX(i), y = cY(i);
     return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && SIGHTS.has(c.k); }); });
   if (!sights.length) return -1;
-  const g = sights[(Math.random() * sights.length) | 0]; const b = buildingBeside(g); if (b && SIGHTS.has(b.k)) visitLikes[b.k] = (visitLikes[b.k] || 0) + 1;   // 손님이 좋아한 곳(50차)
+  const g = sights[(simRand() * sights.length) | 0]; const b = buildingBeside(g); if (b && SIGHTS.has(b.k)) visitLikes[b.k] = (visitLikes[b.k] || 0) + 1;   // 손님이 좋아한 곳(50차)
   return g;
 }
 const visitLikes = {};
@@ -8047,7 +8166,7 @@ function syncFolks() {
       home: rec.root, ct: (n % 4) + 1,
       x: front.x, z: front.z, dir: 0,
       path: null, step: 0, seg: 0,
-      state: 'idle', until: simNow() + Math.random() * 1500,
+      state: 'idle', until: simNow() + simRand() * 1500,
       px: front.x, pz: front.z, pdir: 0,
       base: -1, mx: front.x, mz: front.z, mt: Math.random() * 6.28
     });
@@ -8590,7 +8709,7 @@ function tickFolks(dt, now) {
         if (f.goal === 'school') { const sr = schoolNow(); if (sr >= 0 && buildingBeside(from) && buildingBeside(from).root === sr) { enterPlace(f, i, sr, from, 1e15); rhythmStats.등교++; continue; } }
         if (!f.visitor) { const bb = buildingBeside(from); if (bb && (K[bb.k].need || K[bb.k].jobs)) { f.visits = f.visits || {}; f.visits[bb.k] = (f.visits[bb.k] || 0) + 1; } }   // 닿기만 해도 센다 — 좋아하는 곳(F20, 51차)
         if (tryEnter(f, i, from)) continue;          // 볼 일 보러 들어간다(F10)
-        f.state = 'idle'; f.until = now + 400 + Math.random() * 900;   // 길 위에 서 있는 동안 그 칸을 막으므로 짧게
+        f.state = 'idle'; f.until = now + 400 + simRand() * 900;   // 길 위에 서 있는 동안 그 칸을 막으므로 짧게
         f.walking = false; f.path = [from]; f.step = 0; releaseAll(i); claim(from, i); continue; }
       /* 걷는 도중에 길이 뜯기면 그 자리에서 멈추고 다시 정한다 */
       if (!isRoad(to)) {
@@ -8608,7 +8727,7 @@ function tickFolks(dt, now) {
           f.blockedAt = 0;
           releaseAll(i); claim(from, i);
           f.path = [from]; f.step = 0; f.seg = 0;
-          f.state = 'idle'; f.until = now + 150 + Math.random() * 400;
+          f.state = 'idle'; f.until = now + 150 + simRand() * 400;
         }
         continue;
       }
@@ -8802,14 +8921,18 @@ window.__why2 = () => { const c = {}; folks.forEach(f => { if (f.whyShow && SIM.
    풍선 판은 월드 2.2 라 배율 14(1366×610)에서 화면 13~17px — 그 속 그림(🪣·🛒…)은 10px 남짓이라 '그림 없는 흰 공'이었다(+ 세 번에서야 읽힘).
    · 풍선(얼굴 😊😐😟 · 이유 🪣🛒… · 💼 · ✨)의 화면 지름이 px(28)보다 작으면 **그만큼 키운다**(배율에 따라 매 그림마다 한 번 셈) — 가까이 가면 원래 크기 그대로.
    · 키운 만큼 **위로 올려** 풍선 아래 끝이 원래 자리에 머문다(머리를 덮지 않게).
-   · 풍선을 놓는 곳(faceDummy)을 거치는 것만 — 건물 위 표시(sayDummy)는 그대로. 원래 줄 수정 0 — faceDummy.updateMatrix · drawFaces 감싸기. 분류 '보기'. */
-(window.VRULES = window.VRULES || {}).bubbleMin = { on: true, px: 28 };
+   · 풍선을 놓는 곳(faceDummy)을 거치는 것만 — 건물 위 표시(sayDummy)는 그대로. 원래 줄 수정 0 — faceDummy.updateMatrix · drawFaces 감싸기. 분류 '보기'.
+   덧(창조자 30회 ⓑ70 · 보스 09-23) — **멀리 볼수록 키움이 끝없이 커져** 판 전체 보기에서 풍선이 동네만 했다(최소 28px 를 지키느라 월드 크기로 5~14배).
+     · 키움은 kMax(2.6)배까지만 — 배율 14 의 1.9배는 그대로, 더 멀면 풍선도 화면에서 작아진다.
+     · 원래 화면 지름이 hidePx(5px)보다 작으면 **숨긴다**(키워도 그 속 그림은 못 읽고, 마을을 덮기만 한다). */
+(window.VRULES = window.VRULES || {}).bubbleMin = { on: true, px: 28, kMax: 2.6, hidePx: 5 };
 const BUBBLEMIN = { k: 1 };
 { const upd0 = faceDummy.updateMatrix; faceDummy.updateMatrix = function () { const k = BUBBLEMIN.k; if (k === 1) return upd0.call(this);
     const s = this.scale, sx = s.x, sy = s.y, y = this.position.y; s.x = sx * k; s.y = sy * k; this.position.y = y + (k - 1) * 1.1 * sy;
     const r = upd0.call(this); s.x = sx; s.y = sy; this.position.y = y; return r; };
-  const df0 = drawFaces; drawFaces = function (now) { const R = window.VRULES.bubbleMin; BUBBLEMIN.k = R && R.on ? Math.max(1, R.px * worldPerPixel(zoomMul) / 2.2) : 1; return df0.apply(this, arguments); }; }
-window.__bubbleMin = () => ({ 켜짐: window.VRULES.bubbleMin.on, 최소px: window.VRULES.bubbleMin.px, 키움: +BUBBLEMIN.k.toFixed(2), 원래지름px: +(2.2 / worldPerPixel(zoomMul)).toFixed(1), 지금지름px: +(2.2 * BUBBLEMIN.k / worldPerPixel(zoomMul)).toFixed(1) });
+  const df0 = drawFaces; drawFaces = function (now) { const R = window.VRULES.bubbleMin, d0 = 2.2 / worldPerPixel(zoomMul);   /* d0 = 키우기 전 화면 지름(px) */
+    BUBBLEMIN.k = !R || !R.on ? 1 : d0 < (R.hidePx || 0) ? 0 : Math.min(R.kMax || 99, Math.max(1, R.px / d0)); return df0.apply(this, arguments); }; }   /* k 0 = 숨김(크기 0) */
+window.__bubbleMin = () => ({ 켜짐: window.VRULES.bubbleMin.on, 최소px: window.VRULES.bubbleMin.px, 키움: +BUBBLEMIN.k.toFixed(2), 숨김: BUBBLEMIN.k === 0, 원래지름px: +(2.2 / worldPerPixel(zoomMul)).toFixed(1), 지금지름px: +(2.2 * BUBBLEMIN.k / worldPerPixel(zoomMul)).toFixed(1) });
 
 /* ══════════════════════════════════════════════════════════════
    [ACT-GREET] 새 이웃에게 인사 — 이사 온 다음 날 아침 한 번, 옆집 사람 하나가 새 집 앞에 멈춰 👋 (주민 연기 · 09-20 · 창조자의 눈 발견 3).
@@ -9040,7 +9163,7 @@ function actRainTick(f, i, now) {
     rainSlots();   // [ACT-SHELTER] 같은 처마 밑 사람끼리 나란히 설 자리 · 칸마다 몇 명
     const wet = R.on && EV.rain && !isNightHour(simHour());
     if (wet) folks.forEach(g => { if (g.state === 'inside' && g.beside && g.beside.mode === 'sit' && !g.garden && !g.visitor) { leave(g, '나옴'); g.goal = null; g.beside = null; g.until = now; RAIN.stats.의자에서일어남++; } });
-    else folks.forEach(g => { if (!g.shelter || g.shelter.out) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + Math.random() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
+    else folks.forEach(g => { if (!g.shelter || g.shelter.out) return; const was = g.shelter.at; g.shelter = null; if (was && g.state === 'idle') { g.until = now + simRand() * R.leaveMs; RAIN.stats.흩어짐++; } });   // 비가 그쳤거나 밤 — 모두 흩어진다(다른 고리가 먼저 데려간 사람도)
   }
   const S = f.shelter;
   if (!R.on || !EV.rain || isNightHour(simHour())) return false;      // 흩어지기는 위(틱마다 한 번)에서
