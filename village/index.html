@@ -11969,6 +11969,27 @@ document.getElementById('guideNext').onclick = () => { if (GUIDE.i < GUIDE_CARDS
 document.getElementById('guideSkip').onclick = () => guideEnd('건너뜀');
 if (DEV && QS.get('guide') === '1') setTimeout(() => guideStart(true), 1600);
 window.__guide = () => ({ 보임: GUIDE.on, 장: GUIDE.i + 1, 본적: guideSeen(), 뜬횟수: GUIDE.shown });
+/* ── [MAC-GUIDESPD] 첫 안내가 시계를 세운 동안 — 배속 단추는 흐리게(누를 수 없음) · 막을 누르면 "안내를 닫으면 시간이 흘러요" (창조자·보스 09-24) ──
+   기본 판을 처음 열면 첫 안내(3장)가 뜨고 읽는 동안 시계가 선다([MAC-GUIDE] guideHold — 뜻한 멈춤). 안내는 화면을 덮는 막이라
+   위 띠 배속 단추 자리의 맨 위가 막(#guide)이다 → 2×·4× 를 눌러도 아무 일 없이 '멈춤 · 배속 1 그대로'로 보였다(창조자 · 고장으로 읽음).
+   · 안내가 시계를 세운 동안 배속 단추를 방문 모드처럼 disabled + 흐리게(아이가 누른 멈춤이 아니라 ⏸ 표시는 그대로) — 닫으면 되돌린다(내가 끈 것만).
+   · 안내 카드 바깥(막)을 누르면 카드 안에 "⏸ 안내를 닫으면 시간이 흘러요" 한 줄 + [건너뛰기]·[다음] 을 살짝 흔든다(3초).
+   판정·저장 0 · 원래 줄 수정 0 — guideHold 감싸기 · 막에 누름 고리. 스위치 VRULES.guideSpeed(보기). */
+(window.VRULES = window.VRULES || {}).guideSpeed = { on: true, hintMs: 3000 };
+const GSPD = { off: [], t: 0, stats: { 흐림: 0, 막누름: 0 } };
+{ const st = document.createElement('style'); st.textContent = 'body.guideHold #spd button{opacity:.35;cursor:default}'
+    + '#guide .ghint{display:none;font-size:13px;color:#ffd98a;margin:-4px 0 10px}#guide .ghint.on{display:block}'
+    + '#guide.nudge .btns button{animation:gnudge .45s ease 2}@keyframes gnudge{50%{transform:scale(1.07)}}';
+  document.head.appendChild(st);
+  const dots = document.getElementById('guideDots'); if (dots) dots.insertAdjacentHTML('afterend', '<div class="ghint" id="guideHint">⏸ 안내를 닫으면 시간이 흘러요</div>');
+  const gh0 = guideHold; guideHold = function (on) { const r = gh0.apply(this, arguments), R = window.VRULES.guideSpeed;
+    if (on && R.on && SIM.paused) { GSPD.off = [...document.querySelectorAll('#spd button')].filter(b => !b.disabled); GSPD.off.forEach(b => { b.disabled = true; }); document.body.classList.add('guideHold'); GSPD.stats.흐림++; }
+    else if (!on) { GSPD.off.forEach(b => { b.disabled = false; }); GSPD.off = []; document.body.classList.remove('guideHold'); const h = document.getElementById('guideHint'); if (h) h.classList.remove('on'); document.getElementById('guide').classList.remove('nudge'); }
+    return r; };
+  document.getElementById('guide').addEventListener('click', e => { const R = window.VRULES.guideSpeed; if (!R.on || !GUIDE.on || e.target.id !== 'guide') return;   // 카드 바깥(막)만
+    GSPD.stats.막누름++; const g = document.getElementById('guide'), h = document.getElementById('guideHint'); if (h) h.classList.add('on'); g.classList.remove('nudge'); void g.offsetWidth; g.classList.add('nudge');
+    clearTimeout(GSPD.t); GSPD.t = setTimeout(() => { if (h) h.classList.remove('on'); g.classList.remove('nudge'); }, R.hintMs || 3000); }); }
+window.__guideSpeed = () => ({ 켜짐: window.VRULES.guideSpeed.on, 흐린단추: GSPD.off.length, 알림보임: !!(document.getElementById('guideHint') && document.getElementById('guideHint').classList.contains('on')), ...GSPD.stats });
 window.__destLog = (reset) => { const o = { ...destLog, 끌림: hourPref(simHour()), 시: +simHour().toFixed(1) }; if (reset) { destLog.전체 = destLog.후보 = destLog.고름 = 0; } return o; };
 window.__destMix = () => { const m = { 물: 0, 장보기: 0, 놀이: 0, 쉼: 0, 배움: 0, 기타: 0, 시: +simHour().toFixed(1), 끌림: hourPref(simHour()) }; folks.forEach(f => { if (f.state !== 'walk' || !f.path || f.visitor || f.goal) return; const n = needBeside(f.path[f.path.length - 1]); m[n && m[n] != null ? n : '기타']++; }); return m; };
 window.__signStats = () => ({ 표지판: [...signs.values()].map(v => [v.t, v.reads || 0]), 으뜸: topSign(), 좋아한곳: topLike(), 집계: { ...visitLikes } });

@@ -1386,6 +1386,34 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .deco-anim-plus{position:absolute;left:72%;bottom:100%;font:800 13px/1 system-ui,sans-serif;color:#ff4f8b;white-space:nowrap;pointer-events:none;
   text-shadow:0 0 2px #fff,0 0 3px #fff,0 1px 1px #fff;animation:decoHeart 1.5s ease-out forwards}
 @media (prefers-reduced-motion: reduce){ .deco-anim.walking .bob,.deco-anim-heart,.deco-anim-plus{animation:none} }
+/* [DECO-LIFE-2] 동물 카드 — 동물 위 말풍선(위 자리가 없으면 아래) · 이름 · 단계 배지 · 하트 칸 · 이름 고르기(고르기만) */
+.deco-life-card{position:absolute;left:0;top:0;z-index:1000;width:min(272px,calc(100vw - 32px));box-sizing:border-box;pointer-events:auto;
+  background:#fffaf0;border:2px solid #8a5a2b;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.28);padding:10px 12px 10px;
+  color:#3b2a18;font:500 13px/1.35 system-ui,-apple-system,sans-serif;animation:dlcIn .16s ease-out}
+.deco-life-card::after{content:'';position:absolute;left:var(--tip,50%);bottom:-9px;transform:translateX(-50%);
+  border-left:9px solid transparent;border-right:9px solid transparent;border-top:9px solid #8a5a2b}
+.deco-life-card.below::after{bottom:auto;top:-9px;border-top:0;border-bottom:9px solid #8a5a2b}
+.deco-life-card.side::after{display:none}
+@keyframes dlcIn{from{opacity:0;transform-origin:50% 100%}to{opacity:1}}
+.dlc-top{display:flex;align-items:center;gap:8px}
+.dlc-badge{width:34px;height:34px;flex:none}
+.dlc-who{min-width:0;flex:1}
+.dlc-nm{font-size:15px;font-weight:800}
+.dlc-kind,.dlc-sub,.dlc-next{color:#8a6a4a}
+.dlc-sub,.dlc-next{font-size:12px}
+.dlc-namebtn{flex:none;min-height:44px;padding:0 10px;border-radius:12px;border:1.5px solid #c9a27a;background:#fff;color:#5a3a1a;font:700 12px system-ui,sans-serif;cursor:pointer}
+.dlc-hearts{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:8px}
+.dlc-hrow{display:flex;flex-wrap:wrap;gap:3px}
+.dlc-hearts img{width:22px;height:22px;display:block}
+.dlc-hearts.h7 img,.dlc-hearts.h10 img{width:18px;height:18px}
+.dlc-hearts.h10 .dlc-hrow{width:calc(5 * 18px + 4 * 3px)}   /* 10칸은 다섯씩 두 줄 */
+.dlc-today{margin-left:6px;color:#e0507f;font-weight:800;font-size:12px}
+.dlc-next{margin-top:4px}
+.dlc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.dlc-chips[hidden]{display:none}
+.dlc-chip{min-height:44px;padding:0 12px;border-radius:22px;border:1.5px solid #c9a27a;background:#fff;color:#5a3a1a;font:700 13px system-ui,sans-serif;cursor:pointer}
+.dlc-chip.dlc-more{border-style:dashed;color:#8a6a4a}
+@media (prefers-reduced-motion: reduce){ .deco-life-card{animation:none} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════

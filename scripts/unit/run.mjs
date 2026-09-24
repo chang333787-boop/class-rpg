@@ -1570,6 +1570,28 @@ try {
   test('친해지기 저장 코드를 돌릴 수 있다', () => { throw e; });
 }
 
+cur = '꾸미기 동물 카드 · 이름(DECO-LIFE-2)';
+try {
+  const S = read('student.js');
+  const sb = {}; sb.globalThis = sb; vm.createContext(sb);
+  const names = ['_lifeObj', '_lifeOk', '_lifeHearts', '_lifeStage', '_lifeNo', '_lifeNameOf', '_lifeHeartRow'];
+  vm.runInContext(sliceConst(S, 'LIFE_STAGE_AT') + sliceConst(S, 'LIFE_NAMES_HIDDEN')
+    + S.match(/^const LIFE_NAMES = \[[\s\S]*?\];/m)[0] + NL + names.map(n => sliceFn(S, n)).join(NL)
+    + ';globalThis.__C = { ' + names.join(', ') + ', LIFE_NAMES };', sb);
+  const C = sb.__C;
+  test('이름 목록 40 · 번호 1 = 콩이 · 26 = 봄봄 · 40 = 해님(디자인 #969 순서)', () => eq([C.LIFE_NAMES.length, C.LIFE_NAMES[0], C.LIFE_NAMES[25], C.LIFE_NAMES[39]], [40, '콩이', '봄봄', '해님']));
+  test('같은 이름은 처음 만난 순서로 숫자(저장 안 함) · 번호 밖은 이름 없음', () => {
+    const L = { a: { a1: { k: 'd_y53', m: 30, n: 1 }, a2: { k: 'd_y53', m: 10, n: 1 }, a3: { k: 'd_y55', m: 5, n: 11 }, a4: { k: 'd_y55', m: 1, n: 99 }, a5: { k: 'd_y55', m: 1 } } };
+    eq([C._lifeNameOf(L, 'a2'), C._lifeNameOf(L, 'a1'), C._lifeNameOf(L, 'a3'), C._lifeNameOf(L, 'a4'), C._lifeNameOf(L, 'a5')], ['콩이', '콩이 2', '꼬꼬', '', '']);
+  });
+  test('하트 칸 = 다음 단계까지 필요한 수(3 · 5 · 7 · 10) · 가족은 다섯 칸 다 참', () => {
+    const r = h => { const x = C._lifeHeartRow(h); return [x.st, x.have, x.need, x.left]; };
+    eq([r(0), r(2), r(3), r(7), r(8), r(24), r(25), r(40)], [[1, 0, 3, 3], [1, 2, 3, 1], [2, 0, 5, 5], [2, 4, 5, 1], [3, 0, 7, 7], [4, 9, 10, 1], [5, 5, 5, 0], [5, 5, 5, 0]]);
+  });
+} catch (e) {
+  test('동물 카드 코드를 돌릴 수 있다', () => { throw e; });
+}
+
 // ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
