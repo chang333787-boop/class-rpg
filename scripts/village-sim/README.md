@@ -31,6 +31,7 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 |---|---|
 | `--stage <id>` | 판 파일 `village/stages/<id>.json` 으로 연다(`?stage=` 와 같은 길 · 시작 땅·규칙·목표). 판 파일만 디스크에서 읽어 주고 다른 주소는 여전히 거절 · 지표에 `판목표`(이룬 판 목표 수) |
 | `--html <파일>` | 다른 `index.html` 을 싣는다(vendor·판 파일은 이 저장소 것) — **고침 전/후가 같은지** 재기: `--vs '옛: html=/tmp/old.html'` 로 같은 시드끼리 나란히 · `--json` 으로 표본을 떠서 비교 |
+| `--vs '옛: root=<폴더>'` | 다른 **뿌리**(그 폴더의 `village/` — index.html·판 파일·vendor 모두 그것)로 돌린 판. `html=` 은 index.html 만 바꿔서 **판 파일 변화가 가려진다**. 저장본(`save=`)은 늘 이 저장소 것(같은 입력) — MAC-VSREF |
 | `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅. 저장본에 **판 전용 종류**(field·villtree·pier…)가 있는데 그 판(`--stage` · vs 칸 `stage=`)이 없으면 ⚠ 로 크게 알린다(그 물건은 빠진 채 돈다 · 표 첫머리에 '못 살린 것 N개') — MAC-STAGEKINDS |
 | `--days N` · `--seeds 1-5` | 며칠 · 어느 시드(`1,3,7` 도 된다) |
 | `--lookseed N` | **그림 난수만** 따로 시드(MAC-SIMRAND). 판정(사람 발길·드나듦·바람·이웃)은 `simRand` 줄기라 `--seeds` 로만 움직인다 — 그림 PR 이 판정을 건드렸는지 재기: `--vs '그림흔듦: lookseed=99'` 가 다른 값 0 이어야 한다. vs 칸에도 `lookseed=` |
@@ -42,6 +43,12 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 | `--every 150` · `--warm 300` · `--hash 'hour=10'` | 재는 간격(틱) · 한 수 전에 돌릴 틱 · 마을 주소 해시 |
 | `--json <파일>` | 모든 표본을 파일로 남긴다 |
 | `--voice` | 끝 날의 **동네 바람표**(MAC-VOICE · 동네 × 원하는 것 채 수 · 시드 평균)와 '가장 많은 셋'이 시드마다 같은지 |
+
+**기준 ① 한 줄 — `vsref.mjs`**(MAC-VSREF): 지금 작업 트리와 그 ref(기본 `origin/main`)를 **같은 시드끼리 · 모든 표본 · 모든 지표**로 견주고, 덤으로 **그림 흔들기**(`lookseed 99` — 판정이 그림 난수를 안 먹는지 · #926)도 본다. 옛 쪽은 그 ref 의 `village/` 를 `git archive` 로 통째로 푼 자리(`root=`)라 **판 파일 변화까지** 잡는다.
+```
+node scripts/village-sim/vsref.mjs
+```
+(표준 판 열둘 — 기본+pop88 · 기본+pop167 · farm+mid36 · farm · city · town3 · town3-origin · origin · sea · mountain · proto-flow · proto-vote · 2일 · 시드 1-3.) `--ref HEAD~1` · `--boards …` · `--days 1 --seeds 1` · `--no-look` · `--allow`(의도한 차이 — PR 에 적는다) · `--json`. 끝값 0 PASS · 1 옛과 다름(--allow 없이) 또는 흔들기에 다른 값 · 2 못 돎. 그림 쪽은 `scripts/village-look/shots.mjs --vs-ref origin/main`(화면 회귀)과 짝이다.
 
 **지표**(`measure`): 인구 · 사는집 · 웃는집(😊) · 찡그린집(😟) · 붐빔집 · 일먼집 · 일닿음%(사는 집 중 일할 곳이 닿는 비율) · 2층이상 · 3층 · 찬자리 · 일자리 · 목표(이룬 수) · 돌아선집 · `없음:<필요>`. 낮을수록 좋은 것: 붐빔집·일먼집·돌아선집·찡그린집·없음:*.
 
