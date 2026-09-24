@@ -915,6 +915,9 @@
         await sleep(50);
       }
       await sleep(300);
+      //  [DECO-GPU-1] 그래픽칩(Metal)은 SVG 를 바로 그릴 때 첫 번째와 두 번째부터(캐시된 결)의 픽셀이 조금 다르다
+      //   (집 안 마루·벽지 · 최대 36/255 · CPU 그리기에선 없음) → 한 번 데우고 잰다. 지문은 같은 '그래픽'끼리만 견준다.
+      await print();
       const g1 = await print(), g2 = await print();
       out('옛집안_가구그림_다옴', CUR.houseDecorations.every(p => _DECO_IMG[p.id] && _DECO_IMG[p.id].ok));
       out('옛집안_두번그려_같음', g1 === g2 && g1 !== 'no-canvas');
@@ -1485,6 +1488,29 @@
       SEL_DECO = 'd_y2';
       out('동물제자리_놓을곳덩어리', _decoAnimHomeCells().has('12_12') && !_decoOkCells('yard').has('12_12'));
       SEL_DECO = null; CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      decoSpaceSet(1); await sleep(150);
+    }
+
+    //  ㊶ 땅(DECO-GROUND-1 · 창조자 31회 ⓑ71) — 모눈은 고를 때만 · 잔디 얼룩 무늬 · 잔디 위 물건엔 밑동 그림자(돌길 위엔 없음)
+    if (typeof _decoGroundPatch === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.houseDecorations.push({ id: 'd_y9', area: 'yard', row: 6, col: 6, sp: 3 }, { id: 'd_y5', area: 'yard', row: 10, col: 6, sp: 3 });
+      if (!CUR.yardFloors) CUR.yardFloors = {}; CUR.yardFloors[3] = { '10_6': 'stone', '10_7': 'stone' };
+      ['grass_patch_dark', 'grass_patch_light', 'ground_tuft_a', 'ground_tuft_b'].forEach(n => _floorImg(n));
+      for (let i = 0; i < 20 && !(_floorImg('grass_patch_dark') && _floorImg('ground_tuft_b')); i++) await sleep(100);
+      const spy = () => { const o = { grid: 0, ell: 0 }, st = _dCtx.stroke, sh = _decoGroundShadow;
+        _dCtx.stroke = function () { if (String(this.strokeStyle).indexOf('0.12') >= 0) o.grid++; return st.apply(this, arguments); };
+        _decoGroundShadow = function () { o.ell++; return sh.apply(this, arguments); };
+        try { _drawYard(); } finally { _dCtx.stroke = st; _decoGroundShadow = sh; } return o; };
+      SEL_DECO = null; setDecoMode('deco');
+      const off = spy(); SEL_DECO = 'd_y2'; const on = spy(); SEL_DECO = null;
+      out('땅_모눈은_고를때만', off.grid === 0 && on.grid > 0);
+      out('땅_얼룩무늬', !!_groundPatterns(_dC));
+      out('땅_밑동그림자_잔디위만', off.ell === 1 || off.ell);   // 나무(잔디) 1 · 벤치(돌길) 0
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3); delete CUR.yardFloors[3];
       decoSpaceSet(1); await sleep(150);
     }
 
