@@ -1908,6 +1908,15 @@
         const fh = document.getElementById('ff-topview');
         out('낮밤_친구구경도_밤', !!fh && fh.classList.contains('is-night'));
         closeFriendFullscreen(); await sleep(100); }
+      //  밤 사진 — 동물은 색 막 뒤에 그리니 화면 동물 층과 같은 필터로(안 하면 밤 사진에 동물만 밝게 떴다)
+      if (typeof decoPhoto === 'function') {
+        const pet = { id: 'd_y53', area: 'yard', row: 20, col: 3 }; CUR.houseDecorations.push(pet);
+        const orig = _drawDecoSVG; let fl = null;
+        _drawDecoSVG = function (id) { if (id === 'd_y53' && _decoPhotoMode) fl = String(_dCtx.filter); return orig.apply(this, arguments); };
+        try { await decoPhoto({ canvas: true }); } finally { _drawDecoSVG = orig; CUR.houseDecorations.splice(CUR.houseDecorations.indexOf(pet), 1); }
+        out('낮밤_밤사진_동물도_어둡게', !!fl && /brightness\(0?\.58\)/.test(fl));
+        _drawDeco();
+      }
       _decoPhaseOv = null;
     }
 
