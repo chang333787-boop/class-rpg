@@ -37,6 +37,9 @@ const CHECKS = [
   { name: 'save-order',   file: 'scripts/unit/save-order-check.mjs', args: ['--baseline', SAVE_BASELINE],     pick: /요약:[^\n]*/ },
   // [CHAR-COMBO-CHECK-1] 캐릭터 종이인형 84장 조립 규칙(잘림·뚫림·무기-모자 닿음). assets/char 를 고친 PR 은 여기서 잡힌다.
   { name: 'char-combo',   file: 'scripts/unit/char-combo-check.mjs', args: [],                                pick: /요약:[^\n]*/ },
+  // [DECO-BUNDLE-1] 꾸미기 그림 묶음(assets/deco/bundle/art.json)이 assets/deco·floor·farm 의 SVG 와 같은가. 그림을 고친 PR 은
+  //   `node scripts/deco-bundle.mjs` 로 묶음을 다시 만들어 같이 올린다(안 하면 여기서 FAIL — 화면은 낡은 묶음을 쓴다).
+  { name: 'deco-bundle',  file: 'scripts/deco-bundle.mjs',            args: ['--check'],                       pick: /요약:[^\n]*/ },
 ];
 // 폴더에 있는 다른 자기검사 시뮬들(각자 exit 코드로 판정)
 for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'student-known-check']) {

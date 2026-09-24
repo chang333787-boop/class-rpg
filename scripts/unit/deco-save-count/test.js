@@ -2,6 +2,10 @@
 //  ① 쓰기 횟수(묶음이 끝난 뒤까지 센다) ② 잃는 것 0(대기 중 나가는 네 경우) ③ 스냅샷 경합
 (function () {
   const R = window.__RF, out = (k, v) => R.log.push(k + '=' + JSON.stringify(v));
+  //  [DECO-BUNDLE-1] 그림 주소가 blob: 이면 묶음 안 경로로 되짚어 파일 이름을 본다
+  const artIs = (src, re) => { src = String(src || ''); if (re.test(src)) return true;
+    if (typeof _ART === 'undefined') return false; const u = src.split('#')[0];
+    for (const [p, b] of _ART.urls) if (b === u && re.test(p)) return true; return false; };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   //  헤드리스 가상 시간에서는 rAF 가 한참 늦게 돈다. openInteriorFullscreen() 은 rAF 두 번 뒤에 판을 그리고
   //  _decoViewRestore(캔버스를 새로 잡음)를 부르는데, 그게 **다음 시험 도중**에 끼어들어 가끔 false 가 났다
@@ -346,7 +350,7 @@
       //  (화면 밖 동물은 쉰다[DECO-ANIM-LIVE-1] — 그 닭이 가운데 오게 층을 맞춘다)
       if (hen) _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, hen.cur.col * _dC - _dW / 2, hen.cur.row * _dC - _dH / 2);
       if (hen) { hen.nextAt = 0; hen.gathered = true; _animTick(Date.now()); }
-      out('먹이통옆_닭_먹는장', !!(hen && /d_y55_(peck|eat)\.svg/.test(_animSrcFor(hen, 'peck'))));
+      out('먹이통옆_닭_먹는장', !!(hen && artIs(_animSrcFor(hen, 'peck'), /d_y55_(peck|eat)\.svg/)));
       out('먹이통옆_닭_먹이통봄', !!(hen && hen.dir === -1 && !hen.seg));
       out('먹는장_파일있음', !!(_animArt['d_y55'] && (_animArt['d_y55'].peck || _animArt['d_y55'].eat)));
       const sheep = rec && [...rec.items.values()].find(x => x.id === 'd_y40');
@@ -512,7 +516,7 @@
       const duck = rec && [...rec.items.values()].find(x => x.id === 'd_y56');
       if (duck) _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, duck.cur.col * _dC - _dW / 2, duck.cur.row * _dC - _dH / 2);   // 화면 밖이면 쉰다 — 가운데로
       const img = duck && duck.el.querySelector('img');
-      out('물위오리_헤엄장', !!(img && /d_y56_swim\.svg/.test(img.src)));
+      out('물위오리_헤엄장', !!(img && artIs(img.src, /d_y56_swim\.svg/)));
       //  밭 칸은 공간 3 에서 놓을 수 있다(그림도 안 나온다)
       out('공간3_밭칸_놓임가능', !_isFarmCell(24, 45));
       //  다 썼을 때 어느 공간에 있는지
@@ -1488,7 +1492,7 @@
       out('동물_돌림하나', !!(_animRaf || _animWakeT));
       const cat = [..._animLayers.get(host).items.values()].find(x => x.id === 'd_y54');
       await sleep(600);
-      out('동물_상태그림', !!(cat && /d_y54(_idle|_walk|_peck|_happy)?\.svg/.test(cat.img.src) && cat.el.classList.contains('live') === !!(_animArt.d_y54 && _animArt.d_y54.idle)));
+      out('동물_상태그림', !!(cat && artIs(cat.img.src, /d_y54(_idle|_walk|_peck|_happy)?\.svg/) && cat.el.classList.contains('live') === !!(_animArt.d_y54 && _animArt.d_y54.idle)));
       SEL_DECO = 'd_y2';
       out('동물제자리_놓을곳덩어리', _decoAnimHomeCells().has('12_12') && !_decoOkCells('yard').has('12_12'));
       SEL_DECO = null; CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
@@ -1699,6 +1703,20 @@
       out('새9종_긴탁자_방안', _decoRuleWhy('in_table_long', 'indoor', 6, 8, 4, 2) === '' && _decoRuleWhy('in_table_long', 'indoor', 6, 16, 4, 2) !== '');
       if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
+    //  ㊿ 그림 묶음(DECO-BUNDLE-1) — 받았으면 blob 주소 · 묶음에 **없는** 그림(새로 더한 SVG)은 반드시 낱장 파일로(보스 조건 ④)
+    if (typeof _artSrc === 'function') {
+      for (let i = 0; i < 40 && _ART.state === 'loading'; i++) await sleep(100);
+      out('묶음_받음', _ART.state);
+      if (_ART.state === 'ready') {
+        const id = 'd_y3';
+        delete _ART.files['deco/' + id + '.svg']; delete _DECO_IMG[id];   // 묶음을 만든 뒤 새로 더한 그림인 셈
+        _decoImg(id); for (let i = 0; i < 30 && !(_DECO_IMG[id] && _DECO_IMG[id].ok); i++) await sleep(100);
+        const rec = _DECO_IMG[id];
+        out('묶음에없는그림_낱장으로', !!rec && rec.ok && /\/assets\/deco\/d_y3\.svg$/.test(rec.img.src));
+        out('묶음에있는그림_blob', !!_decoImg('d_y1') && /^blob:/.test(_DECO_IMG.d_y1.img.src));
+      }
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤

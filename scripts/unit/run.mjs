@@ -37,6 +37,9 @@ const NL = String.fromCharCode(10);
 const SPACE_PRELUDE = (S) => 'let DECO_SPACE = 1;' + NL + ['_decoSpaceOf', '_decoList', '_yardFloorGet', '_yardFloorMap', '_floorParse']
   .map(n => sliceFn(S, n)).join(NL) + NL;
 
+//  [DECO-BUNDLE-1] 그림 묶음 로더 — 모래상자엔 fetch 가 없어 늘 낱장 주소로 간다(기존 기대값 그대로)
+const ART_PRELUDE = (S) => sliceConst(S, 'ART_BUNDLE_URL') + sliceConst(S, '_ART') + ['_artStart', '_artSrc', '_artHas'].map(n => sliceFn(S, n)).join(NL) + NL;
+
 function sliceFn(src, name) {
   const re = new RegExp(`^function ${name}\\s*\\(`, 'm');
   const m = re.exec(src);
@@ -760,7 +763,7 @@ function animSandbox(S, { decos, size, hc, farm, extraConsts = [], extraFns = []
     getDecoSize: size || ((id) => { const d = decos.filter(x => x.id === id)[0]; return (d && d.size) || { w: 1, h: 1 }; }),
     GAME_DATA: { decorations: decos } };
   sb.globalThis = sb; vm.createContext(sb);
-  let src = SPACE_PRELUDE(S) + 'let _decoBBox = null;' + NL;
+  let src = SPACE_PRELUDE(S) + ART_PRELUDE(S) + 'let _decoBBox = null;' + NL;
   for (const n of ['ANIM_DECO', 'ANIM_MOOD', 'ANIM_STEP_MS', 'ANIM_ART_KEYS', 'GROUND_HARD', 'FEED_RANGE', '_animArt', '_animLayers', '_animHooked', '_animRaf'].concat(extraConsts)) {
     let at = S.indexOf('\nconst ' + n); if (at < 0) at = S.indexOf('\nlet ' + n);
     if (at < 0) throw new Error('선언 없음: ' + n);
@@ -1282,7 +1285,7 @@ try {
   const vAt = S.indexOf('const _FLOOR_VARIANTS = {'), vEnd = S.indexOf('};', vAt);
   const eAt = S.indexOf('const _FLOOR_EDGE_COLOR = '), eEnd = S.indexOf(NL + '});', eAt);
   if (eAt < 0 || eEnd < 0) throw new Error('_FLOOR_EDGE_COLOR 표를 못 찾음');
-  vm.runInContext('const _FLOOR_IMG = {};' + NL + S.slice(vAt, vEnd + 2) + NL + S.slice(at, end + 3) + NL
+  vm.runInContext(ART_PRELUDE(S) + 'const _FLOOR_IMG = {};' + NL + S.slice(vAt, vEnd + 2) + NL + S.slice(at, end + 3) + NL
     + sliceConst(S, '_FLOOR_BED_COLORS') + sliceConst(S, '_FLOOR_RIMS') + S.slice(eAt, eEnd + 4) + NL
     + ['_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_floorPaint', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
     + 'const _SVG_BMP = new Map();' + NL
@@ -1612,6 +1615,33 @@ try {
   });
 } catch (e) {
   test('선물 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+cur = '꾸미기 그림 묶음(DECO-BUNDLE-1)';
+try {
+  const S = read('student.js');
+  const mk = (fetchImpl) => {
+    const sb = { Blob: class { constructor(p, o) { this.p = p; this.o = o; } }, URL: { createObjectURL: () => 'blob:art/' + (++sb.__n) }, __n: 0, __ready: 0, fetch: fetchImpl };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(ART_PRELUDE(S) + 'function _artReady() { globalThis.__ready++; }' + NL + ';globalThis.__B = { _artStart, _artSrc, _artHas, _ART };', sb);
+    return sb;
+  };
+  const flush = () => new Promise(r => setImmediate(r));
+  let hold; const A = mk(() => new Promise(r => { hold = r; }));
+  const loading = A.__B._artSrc('deco/d_y1.svg');
+  hold({ ok: true, json: () => Promise.resolve({ v: 1, files: { 'deco/d_y1.svg': '<svg/>', 'floor/tile_water_a.svg': '<svg/>' } }) });
+  await flush(); await flush(); await flush();
+  const got = [A.__B._ART.state, A.__B._artSrc('deco/d_y1.svg'), A.__B._artSrc('deco/d_y1.svg'), A.__B._artSrc('floor/tile_water_a.svg', 'winter'), A.__B._artSrc('deco/없는 그림.svg'), A.__B._artHas('deco/d_y1_walk.svg'), A.__ready];
+  const B = mk(() => Promise.reject(new Error('net')));
+  B.__B._artSrc('deco/d_y1.svg'); await flush(); await flush(); await flush();
+  const C = mk(() => Promise.resolve({ ok: false }));
+  C.__B._artSrc('deco/d_y1.svg'); await flush(); await flush(); await flush();
+  test('받는 중엔 null(부른 쪽은 기록을 안 남긴다) · 도착하면 다시 그리기 한 번', () => eq([loading, got[0], got[6]], [null, 'ready', 1]));
+  test('묶음에 있으면 blob 주소 · 같은 그림은 같은 주소(한 번만 만든다) · #색은 뒤에 그대로', () => eq([got[1], got[2], got[3]], ['blob:art/1', 'blob:art/1', 'blob:art/2#winter']));
+  test('묶음에 없는 그림은 낱장 파일 주소(이름은 주소용으로 바꿈) · 있나 = false', () => eq([got[4], got[5]], ['./assets/deco/' + encodeURIComponent('없는 그림.svg'), false]));
+  test('받기 실패 · 404 면 꺼짐 → 늘 낱장 파일(예전 그대로)', () => eq([B.__B._ART.state, B.__B._artSrc('floor/tile_grass_a.svg', 'autumn'), C.__B._ART.state, C.__B._artHas('deco/d_y1.svg')], ['off', './assets/floor/tile_grass_a.svg#autumn', 'off', null]));
+} catch (e) {
+  test('그림 묶음 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -4377,6 +4377,7 @@ function houseTab(tab, el) {
 
 // 포트폴리오 열고 특정 탭 바로 활성화
 function openHouseTab(tab) {
+  if (typeof _artStart === 'function') _artStart();   // [DECO-BUNDLE-1] 그림 묶음을 미리 받기 시작(꾸미기를 열 즈음엔 와 있다)
   openModal('m-house');
   renderHouse();
   // 탭 버튼 찾아서 활성화
@@ -8486,7 +8487,9 @@ const _animArt = {};   // id → { idle, walk, peck, sleep, happy, swim, b, eat 
 const ANIM_ART_KEYS = ['idle', 'walk', 'peck', 'sleep', 'happy', 'swim', 'b', 'eat'];
 function _animProbeArt(id) {
   if (_animArt[id]) return _animArt[id];
+  if (_artStart() === 'loading') return {};   // [DECO-BUNDLE-1] 묶음이 오면 _artReady 가 다시 부른다
   const a = _animArt[id] = {};
+  if (_ART.state === 'ready') { ANIM_ART_KEYS.forEach(k => { a[k] = !!_artHas('deco/' + id + '_' + k + '.svg'); }); return a; }   // 묶음 목록으로 — 요청 0
   if (typeof Image !== 'function') return a;
   ANIM_ART_KEYS.forEach(k => {
     const img = new Image();
@@ -8496,7 +8499,7 @@ function _animProbeArt(id) {
   });
   return a;
 }
-function _animFile(id, k) { return './assets/deco/' + encodeURIComponent(id) + (k ? '_' + k : '') + '.svg'; }
+function _animFile(id, k) { return _artSrc('deco/' + id + (k ? '_' + k : '') + '.svg'); }   // [DECO-BUNDLE-1] 받는 중이면 null
 //  이 상태에 쓸 그림 — 새 상태 장 → 옛 장 → 한 장
 function _animSrcFor(st, state) {
   const a = _animArt[st.id] || {};
@@ -8511,7 +8514,7 @@ function _animSrcFor(st, state) {
 function _animApplySrc(st) {
   if (!st.img) return;
   const want = _animSrcFor(st, st.state || 'idle');
-  if (st.src !== want) { st.img.src = want; st.src = want; }
+  if (want && st.src !== want) { st.img.src = want; st.src = want; }
   const a = _animArt[st.id] || {};
   st.el.classList.toggle('live', !st.frozen && !!a.idle);          // 부위 그림이 스스로 숨 쉰다 — 들썩임은 끈다
   st.el.classList.toggle('walking', !st.frozen && st.state === 'walk');
@@ -9360,16 +9363,51 @@ function _decoFootRow(p) {
 function _decoSorted(list) {
   return [...list].sort((a, b) => (_decoFootRow(a) - _decoFootRow(b)) || (a.col - b.col));
 }
+// ══ [DECO-BUNDLE-1] 그림 묶음 — 장식·바닥·밭 SVG 를 한 파일로(assets/deco/bundle/art.json · scripts/deco-bundle.mjs 가 만든다) ══
+//  꾸미기를 열 때 그림 요청 60여 건 → 1건(압축 약 160KB). 받는 동안은 그림을 부르지 않고(끝나면 한 번에 다시 그린다),
+//  묶음이 없거나 · 실패하거나 · 묶음에 없는 그림은 예전처럼 낱장 파일. 주소 뒤 #색(:target)은 blob 주소에도 그대로 붙는다.
+const ART_BUNDLE_URL = './assets/deco/bundle/art.json';
+const _ART = { state: 'idle', files: null, urls: new Map() };
+function _artStart() {
+  if (_ART.state !== 'idle') return _ART.state;
+  if (typeof fetch !== 'function' || typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) return (_ART.state = 'off');
+  _ART.state = 'loading';
+  fetch(ART_BUNDLE_URL).then(r => r.ok ? r.json() : null).then(j => {
+    if (j && j.files && typeof j.files === 'object') { _ART.files = j.files; _ART.state = 'ready'; } else _ART.state = 'off';
+  }).catch(() => { _ART.state = 'off'; }).then(_artReady);
+  return 'loading';
+}
+//  path('deco/d_y1.svg') → 쓸 주소 · 받는 중이면 null(부른 쪽은 아무것도 남기지 않고 돌아간다 — 끝나면 _artReady 가 다시 그린다)
+function _artSrc(path, frag) {
+  const st = _artStart(), hash = frag ? '#' + frag : '';
+  if (st === 'loading') return null;
+  if (st === 'ready' && typeof _ART.files[path] === 'string') {
+    let u = _ART.urls.get(path);
+    if (!u) { u = URL.createObjectURL(new Blob([_ART.files[path]], { type: 'image/svg+xml' })); _ART.urls.set(path, u); }
+    return u + hash;
+  }
+  return './assets/' + path.split('/').map(encodeURIComponent).join('/') + hash;
+}
+function _artHas(path) { return _ART.state === 'ready' ? typeof _ART.files[path] === 'string' : null; }   // 묶음으로 '있나' — 모르면 null
+function _artReady() {
+  try { _animLayers.forEach(rec => rec.items.forEach(st => { _animProbeArt(st.id); _animApplySrc(st); })); } catch (e) {}
+  try { _drawDeco(); _ffRedrawSoon(); _floorPickSoon(); } catch (e) {}
+  try { if (typeof renderDecoInv === 'function' && CUR && _ifMode) renderDecoInv(); } catch (e) {}
+  try { if (typeof SHOP_TAB !== 'undefined' && SHOP_TAB === 'deco' && typeof renderShop === 'function' && CUR) renderShop(); } catch (e) {}
+}
+
 const _DECO_IMG = {};   // id → {img, ok} | {ok:false}  (없는 파일은 한 번만 시도)
 function _decoImg(id) {
   const hit = _DECO_IMG[id];
   if (hit) return hit.ok ? hit.img : null;
+  const src = _artSrc('deco/' + id + '.svg');   // [DECO-BUNDLE-1]
+  if (src === null) return null;
   const img = new Image();
   const rec = { img, ok: false };
   _DECO_IMG[id] = rec;
   img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); _floorPickSoon(); } };   // [DECO-FRIEND-ART-1] · [INDOOR-LOOK-1] 견본 액자
   img.onerror = () => { rec.ok = false; };
-  img.src = './assets/deco/' + encodeURIComponent(id) + '.svg';
+  img.src = src;
   return null;
 }
 
@@ -9405,12 +9443,14 @@ function _floorImg(name, color) {
   const key = color ? name + '#' + color : name;
   const hit = _FLOOR_IMG[key];
   if (hit) return hit.ok ? hit.img : null;
+  const src = _artSrc('floor/' + name + '.svg', color);   // [DECO-BUNDLE-1]
+  if (src === null) return null;
   const img = new Image();
   const rec = { img, ok: false };
   _FLOOR_IMG[key] = rec;
   img.onload  = () => { rec.ok = (img.naturalWidth > 0 && img.naturalHeight > 0); if (rec.ok) { _drawDeco(); _ffRedrawSoon(); _floorPickSoon(); } };   // [DECO-FRIEND-ART-1] · [DECO-FLOOR-PICK-1] 고르기 판 그림도
   img.onerror = () => { rec.ok = false; };
-  img.src = './assets/floor/' + encodeURIComponent(name) + '.svg' + (color ? '#' + color : '');
+  img.src = src;
   return null;
 }
 // [DECO-FLOOR-PARSE-1] 바닥 저장값 해석은 여기 한 곳 — '이름#색+마감'(예 'tulipbed#red+picket' · 'hydrangea+stone'). 옛 값('stone')은 이름뿐이다.
@@ -10798,11 +10838,12 @@ if (typeof fetch === 'function') {
 function _decoThumb(d, px) {
   const id = d.autoFence ? 'd_y49' : d.id;
   const emo = escHtml(d.icon || '🌸');
-  const src = './assets/deco/' + encodeURIComponent(id) + '.svg';
+  const src = _artSrc('deco/' + id + '.svg');   // [DECO-BUNDLE-1] 받는 중이면 잠깐 이모지 — 오면 서랍을 다시 그린다
+  if (src === null) return `<span style="font-size:${Math.round(px * 0.8)}px;display:block;text-align:center">${emo}</span>`;
   const onerr = ` onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${emo}',style:'font-size:${Math.round(px * 0.8)}px'}))"`;
   //  썸네일 전용 그림(bbox.json 의 thumbArt 목록에 있으면 <id>_thumb.svg 를 통째로)
   if (_decoBBox && Array.isArray(_decoBBox.thumbArt) && _decoBBox.thumbArt.indexOf(id) >= 0) {
-    return `<img class="deco-thumb" src="./assets/deco/${encodeURIComponent(id)}_thumb.svg" alt="" loading="lazy"`
+    return `<img class="deco-thumb" src="${_artSrc('deco/' + id + '_thumb.svg')}" alt="" loading="lazy"`
       + ` style="height:${px}px;width:auto;max-width:${Math.round(px * 1.6)}px;object-fit:contain;display:block;margin:0 auto"${onerr}>`;
   }
   const bb = _decoBBox && _decoBBox[id];
