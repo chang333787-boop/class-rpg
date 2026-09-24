@@ -1783,6 +1783,28 @@
       _dPanY = 0; _decoClampPan(); _drawDeco();
     }
 
+    //  ㊱ 움직임 층(DECO-MOTION-1 · 계획 C2) — 풍차는 몸통을 캔버스에, 날개는 DOM 층에서 돈다 · 집 안으로 가면 층이 없다
+    if (typeof _decoMotionSync === 'function' && _ifMode) {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.houseDecorations.push({ id: 'd_y11', area: 'yard', row: 8, col: 8, sp: 3 });
+      _decoSetZoom(1.4); _dPanX = 4 * _dC; _dPanY = 4 * _dC; _decoClampPan(); _drawDeco();
+      for (let i = 0; i < 40 && !_decoMotionBody('d_y11'); i++) { await sleep(100); _drawDeco(); }
+      await sleep(150);
+      out('움직임_몸통으로그림', _decoMotionBody('d_y11') === 'd_y11_body');
+      out('움직임_날개층', document.querySelectorAll('#if-topview .deco-mv-rotate').length === 1);
+      //  친구 구경 판은 층이 없다 → 본 그림(날개까지)으로 — 몸통을 쓰지 않는다
+      { const k = _dCv, fake = document.createElement('canvas'); document.body.appendChild(fake); _dCv = fake;
+        out('움직임_구경판은_본그림', _decoMotionBody('d_y11') === ''); _dCv = k; fake.remove(); }
+      toggleDecoScene(); await sleep(300);
+      out('움직임_집안엔_층없음', !document.querySelector('.deco-mv-layer'));
+      toggleDecoScene(); await sleep(300);
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      decoSpaceSet(1); await sleep(150);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

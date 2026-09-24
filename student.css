@@ -1700,3 +1700,20 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 @keyframes decoTplBreath{from{opacity:.45}to{opacity:.6}}
 @keyframes decoTplOut{from{opacity:.55}to{opacity:0}}
 @media (prefers-reduced-motion: reduce){.deco-tpl{animation:none;opacity:.55}.deco-tpl.is-gone{opacity:0}}
+
+/* [DECO-MOTION-1] 움직임 층 — 캔버스 바로 위 · 동물 층 아래 · 손가락 통과 · transform·opacity 만(합성기) */
+.deco-mv-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:1}
+.deco-mv{position:absolute}
+.deco-mv img{position:absolute;display:block;max-width:none;will-change:transform,opacity}
+.deco-mv-rotate{animation:decoMvRotate linear infinite;transform-origin:50% 50%}
+.deco-mv-turn{animation:decoMvTurn ease-in-out infinite;transform-origin:50% 100%}
+.deco-mv-rise{animation:decoMvRise linear infinite;transform-origin:50% 100%;opacity:0}
+.deco-mv-frames{animation-timing-function:step-end;animation-iteration-count:infinite;opacity:0}
+.deco-mv-frames.f2{animation-name:decoMvF2}
+.deco-mv-frames.f3{animation-name:decoMvF3}
+@keyframes decoMvRotate{to{transform:rotate(360deg)}}
+@keyframes decoMvTurn{0%,100%{transform:scaleX(1)}45%,55%{transform:scaleX(-1)}}
+@keyframes decoMvRise{0%{transform:translateY(0) scale(.8);opacity:0}20%{opacity:.9}100%{transform:translateY(-60%) scale(1.15);opacity:0}}
+@keyframes decoMvF2{0%{opacity:1}50%{opacity:0}100%{opacity:0}}
+@keyframes decoMvF3{0%{opacity:1}33.333%{opacity:0}100%{opacity:0}}
+
