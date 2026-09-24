@@ -10896,19 +10896,21 @@ if (STAGE.id) {
    판 파일 `지형: { 칸: [[x0, y0, x1, y1, '물'|'모래'], …] }`(뒤엣것이 앞엣것을 덮음). 지형은 **물건이 아니라 바닥**이다 — 칸(cells)에 들어가지 않으니
    치우기·옮기기로 없어지지 않고, 저장본에도 안 들어간다(판 파일에만).
    · 읽기: `[MAC-ON]` 의 `groundAt(x, y)`(지금까지 늘 '풀')가 판의 지형을 읽는다.
-   · 놓기 규칙(canPlace 고리 · 판정 0): **물** 에는 적힌 것만(부두) · **모래** 에는 밭 ✕ · **부두**는 물가에만(발자국이 물·모래 위 · 한 칸 이상 물).
+   · 놓기 규칙(canPlace 고리 · 판정 0): **물** 에는 적힌 것만(부두) · **모래** 에는 밭 ✕ · **부두**는 물가에만(발자국이 물·모래 위 · 한 칸 이상 물 · **뭍에 닿게** — 35-ⓑ77).
+     까닭은 `[MAC-ON]` 바닥 검사 자리(판 밖·겹침 다음 · 잠긴 땅·해금·길 앞)에서 먼저 말한다 — 곁에 길이 없어도 '바다'가 먼저(34-ⓑ78).
      `PLACE_ON` 표는 온 마을에 걸리는 표라(지형 없는 판의 부두를 막아 버림) 쓰지 않고, **지형이 있는 판에서만** 도는 이 표를 쓴다.
      되살리기(opts.복원)는 보지 않는다 — 판 파일의 지형을 바꿔도 옛 저장본의 물건이 사라지지 않는다.
-   · 칠하기(paintBoard 감싸기): 열린 구역 안의 지형 칸만 색을 바꾼다(구역 테두리째 — 바다를 가로지르는 풀 줄이 없게 · 물은 물가 한 칸을 옅게). **지형이 없는 판은 한 줄도 안 돈다**(캔버스 그대로).
+   · 칠하기(paintBoard 감싸기): 지형은 **잠긴 구역까지** 칠한다(35-ⓑ82 · 잠긴 곳은 한 겹 어둡게) · 열린 구역은 구역 테두리째(바다를 가로지르는 풀 줄이 없게) · 물은 물가 한 칸을 옅게.
+     지도 판(판 전체 보기 · drawMap)에도 물건 밑에 깐다(34-ⓑ80). **지형이 없는 판은 한 줄도 안 돈다**(캔버스 그대로).
    사람은 원래 길로만 다니니, 물에 길을 못 놓으면 다니는 길이 해안을 따라 생긴다. 새 VRULES `terrain`(rules.json '조작') · 시험 훅 `__terrain`·`__boardHash`. */
 (window.VRULES = window.VRULES || {}).terrain = { on: true };
-const TERR = { def: null, map: new Map(), sdef: null, streams: new Set(), allow: 0, stats: { 칸: 0, 막음: 0, 칠함: 0, 개울: 0, 개울깖: 0, 개울지킴: 0 } };
+const TERR = { def: null, map: new Map(), sdef: null, streams: new Set(), allow: 0, layers: null, stats: { 칸: 0, 막음: 0, 칠함: 0, 잠김칠함: 0, 칠줄: 0, 지도칠줄: 0, 개울: 0, 개울깖: 0, 개울지킴: 0, 누름말: 0 } };
 const TERR_NAMES = ['물', '모래', '비탈', '고개'];
 const TERR_COL = { 물: '#4a9fd0', 물가: '#7ccbe8', 모래: '#f0dfb0', 비탈: '#6f8052', 비탈결: '#63734a', 고개: '#c2a77a' };   // 물빛은 개울(#906)과 한 가족 · 고갯길은 흙 테두리 결로 한 톤 밝게 — 디자인 담당 09-23
 const TERR_ON = { 물: new Set(['pier']),                           // 그 바닥에 올라설 수 있는 것(적힌 것만)
   비탈: new Set(['tree', 'bigtree', 'bush', 'flower', 'pot', 'fir', 'rock', 'boulder', 'bench', 'minibench', 'lamp', 'post', 'cabin']), 고개: new Set(['road', 'gravel']) };
 const TERR_NOT = { 모래: new Set(['field']) };                     // 모래 칸에 못 놓는 것
-const TERR_WHY = { 물: '🌊 바다에는 지을 수 없어요 — 부두는 물가에 놓아요', 모래: '🏖️ 모래밭에는 밭을 일굴 수 없어요', 부두: '🪵 부두는 물가에 — 바다에 걸치게 놓아요',
+const TERR_WHY = { 물: '🌊 바다에는 지을 수 없어요 — 부두는 물가에 놓아요', 모래: '🏖️ 모래밭에는 밭을 일굴 수 없어요', 부두: '🪵 부두는 물가에 — 바다에 걸치게 놓아요', 먼바다: '🪵 부두는 뭍에 닿아야 해요 — 모래 가장자리에 붙여 놓아요',
   비탈: '⛰️ 비탈에는 큰 건물을 지을 수 없어요 — 평평한 곳을 찾아요', 고개: '🛤️ 고갯길에는 길만 낼 수 있어요', 개울: '💧 이 개울은 산에서 흘러와요 — 치우거나 옮길 수 없어요 · 곧은 곳에 길을 놓으면 다리가 돼요' };
 function terrainMap() { const d = STAGE.def && STAGE.def.지형; if (TERR.def === d) return TERR.map; TERR.def = d; TERR.map = new Map();
   const L = d && Array.isArray(d.칸) ? d.칸 : [];
@@ -10917,20 +10919,54 @@ function terrainMap() { const d = STAGE.def && STAGE.def.지형; if (TERR.def ==
   TERR.stats.칸 = TERR.map.size; return TERR.map; }
 const terrainLive = () => !!(window.VRULES.terrain.on && STAGE.def && STAGE.def.지형 && terrainMap().size);
 { const g0 = groundAt; groundAt = function (x, y) { if (terrainLive()) { const g = TERR.map.get(idx(x, y)); if (g) return g; } return g0(x, y); }; }
-function terrainWhy(kind, grounds) {
-  if (kind === 'pier') return grounds.every(g => g === '물' || g === '모래') && grounds.includes('물') ? null : TERR_WHY.부두;
+function terrainWhy(kind, fp) { const grounds = fp.map(([px, py]) => groundAt(px, py));
+  if (kind === 'pier') { if (!grounds.every(g => g === '물' || g === '모래') || !grounds.includes('물')) return TERR_WHY.부두;
+    const own = new Set(fp.map(([px, py]) => idx(px, py)));   // 뭍에 닿나 — 발자국에 모래가 있거나, 발자국 곁(4방향 · 판 안)에 물 아닌 칸이 있거나(35-ⓑ77 먼 바다 부두)
+    return grounds.includes('모래') || fp.some(([px, py]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(px + dx, py + dy) && !own.has(idx(px + dx, py + dy)) && groundAt(px + dx, py + dy) !== '물')) ? null : TERR_WHY.먼바다; }
   for (const g of grounds) { if (TERR_ON[g] && !TERR_ON[g].has(kind)) return TERR_WHY[g]; if (TERR_NOT[g] && TERR_NOT[g].has(kind)) return TERR_WHY[g]; }
   return null; }
-{ hookAdd('canPlace', function (next, args) { const [kind, x, y, rot, opts] = args; const r = next(args);
-    if (r !== true || (opts && opts.복원) || !terrainLive()) return r;
-    const w = terrainWhy(kind, footprint(kind, x, y, rot || 0).map(([px, py]) => groundAt(px, py)));
-    if (w) { TERR.stats.막음++; return w; } return r; }); }
+{ hookAdd('canPlace', function (next, args) { const [kind, x, y, rot, opts] = args;
+    if ((opts && opts.복원) || !terrainLive()) return next(args);
+    const fp = footprint(kind, x, y, rot || 0);
+    if (fp.some(([px, py]) => !inb(px, py) || cells[idx(px, py)])) return next(args);   // 판 밖·겹침은 원래 말이 먼저(개울에 길 = 다리도 이 길로) — 그다음이 [MAC-ON] 바닥 자리
+    const w = terrainWhy(kind, fp); if (w) { TERR.stats.막음++; return w; }           // 잠긴 땅·해금·하나만·길에 붙어야보다 먼저(34-ⓑ78 — 곁에 길이 없어도 '바다')
+    return next(args); }); }
+/* 칠하기 — 지형 그림을 **한 번만** 두 장으로 굽는다(판 파일이 바뀔 때만): open = 제 색 · lock = 한 겹 어둡게(잠긴 풀빛이 열린 풀빛보다 어두운 만큼).
+   paintBoard 는 lock 을 통째로 얹고 열린 구역마다 open 을 그 네모만큼 덮는다 — 60초마다 도는 다시 칠하기가 칸 수(산 6만 칸)와 상관없이 drawImage 몇 번.
+   같은 줄끼리 이어 칠한다(칠줄) · 비탈 결은 3칸 무늬(CanvasPattern — 캔버스 칸 (i, j) = 판 칸 (x, H−1−y) 라 (x + y) % 3 === 0 과 같은 결). */
+const TERR_CODE = { 물: 1, 모래: 3, 비탈: 4, 고개: 5 }, TERR_LOCK = 0.11;   // 2 = 물가 · 잠긴 곳 검정 11%(기본 판 잠긴 풀 #86b953 : 열린 풀 #97cc5e ≈ 0.89)
+function terrainFills(g, px) { const t = document.createElement('canvas'); t.width = t.height = 3 * px; const tg = t.getContext('2d');
+  tg.fillStyle = TERR_COL.비탈; tg.fillRect(0, 0, 3 * px, 3 * px); tg.fillStyle = TERR_COL.비탈결;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if ((i - j + H - 1 + 3) % 3 === 0) tg.fillRect(i * px, j * px, px, px);
+  return [null, TERR_COL.물, TERR_COL.물가, TERR_COL.모래, g.createPattern(t, 'repeat'), TERR_COL.고개]; }
+function terrainRuns(g, px, code, skip) { const F = terrainFills(g, px), at = i => (skip && skip(i) ? 0 : code[i]); let n = 0;   // 한 줄에서 같은 지형이 이어진 만큼 한 번에
+  for (let y = 0; y < H; y++) { const r = (H - 1 - y) * px; for (let x = 0; x < W;) { const c = at(idx(x, y)); let e = x + 1; while (e < W && at(idx(e, y)) === c) e++;
+      if (c) { g.fillStyle = F[c]; g.fillRect(x * px, r, (e - x) * px, px); n++; } x = e; } }
+  return n; }
+function terrainLayers() { const m = terrainMap(); if (TERR.layers && TERR.layers.map === m) return TERR.layers;
+  const code = new Uint8Array(W * H), per = new Map(), px = BOARD_PX;
+  m.forEach((nm, i) => { const x = cX(i), y = cY(i); let c = TERR_CODE[nm];
+    if (c === 1 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(x + dx, y + dy) && m.get(idx(x + dx, y + dy)) !== '물')) c = 2;   // 물가 — 판 끝은 물가가 아니다
+    code[i] = c; const k = ((x / PLOT) | 0) + ',' + ((y / PLOT) | 0); per.set(k, (per.get(k) || 0) + 1); });
+  const mk = () => { const c = document.createElement('canvas'); c.width = W * px; c.height = H * px; return c; }, open = mk(), lock = mk();
+  TERR.stats.칠줄 = terrainRuns(open.getContext('2d'), px, code, null);
+  const lg = lock.getContext('2d'); lg.drawImage(open, 0, 0); lg.globalCompositeOperation = 'source-atop'; lg.fillStyle = 'rgba(0,0,0,' + TERR_LOCK + ')'; lg.fillRect(0, 0, lock.width, lock.height); lg.globalCompositeOperation = 'source-over';
+  return (TERR.layers = { map: m, code, per, open, lock }); }
 { const pb0 = paintBoard; paintBoard = function () { pb0.apply(this, arguments); if (!terrainLive()) return;
-    const g = boardCv.getContext('2d'), px = BOARD_PX, m = TERR.map; let n = 0;
-    m.forEach((nm, i) => { const x = cX(i), y = cY(i); if (!plots.has(((x / PLOT) | 0) + ',' + ((y / PLOT) | 0))) return;
-      let c = nm === '비탈' && (x + y) % 3 === 0 ? TERR_COL.비탈결 : TERR_COL[nm]; if (nm === '물' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inb(x + dx, y + dy) && m.get(idx(x + dx, y + dy)) !== '물')) c = TERR_COL.물가;   // 판 끝은 물가가 아니다
-      g.fillStyle = c; g.fillRect(x * px, (H - 1 - y) * px, px, px); n++; });
-    TERR.stats.칠함 = n; boardTex.needsUpdate = true; }; }
+    const g = boardCv.getContext('2d'), px = BOARD_PX, L = terrainLayers(); let n = 0;
+    g.drawImage(L.lock, 0, 0);                                                              // 잠긴 구역까지(35-ⓑ82 '네모 연못') — 놓기 규칙은 그대로
+    plots.forEach(key => { const [pxi, pyi] = key.split(',').map(Number), x0 = pxi * PLOT, y0 = pyi * PLOT, cw = Math.min(PLOT, W - x0), r0 = Math.max(0, H - y0 - PLOT), ch = H - y0 - r0;
+      if (cw > 0 && ch > 0) g.drawImage(L.open, x0 * px, r0 * px, cw * px, ch * px, x0 * px, r0 * px, cw * px, ch * px); n += L.per.get(key) || 0; });
+    TERR.stats.칠함 = n; TERR.stats.잠김칠함 = TERR.map.size - n; boardTex.needsUpdate = true; };
+  const dm0 = drawMap; drawMap = function () { const r = dm0.apply(this, arguments); if (!terrainLive()) return r;   // 지도 판(판 전체 보기 · 34-ⓑ80) — 물건이 없는 지형 칸만, 물건 밑에
+    TERR.stats.지도칠줄 = terrainRuns(mapCanvas.getContext('2d'), MAP_PX, terrainLayers().code, i => !!cells[i]); mapTex.needsUpdate = true; return r; }; }
+/* 한 번 눌러 못 놓았는데 까닭이 지형이면 — 그 말을 토스트에도(풍선과 같은 말 · 34-ⓑ78). 죽 놓기의 실패 칸은 원래 조용하다(끄는 동안 시끄럽지 않게) —
+   그래서 카드를 고를 때 뜬 안내('길에 붙여 놓아요')가 남아 풍선과 둘로 갈렸다. 끌기(6px 넘게)와 놓은 누름은 건드리지 않는다(MAC-FIRST5 ② 와 같은 자리 · 같은 잣대). */
+const TERR_WHY_SET = new Set(Object.values(TERR_WHY));
+addEventListener('pointerup', e => {                                                        // 원래 pointerup(놓기) 다음에 돈다
+  if (!terrainLive() || e.target !== canvas || VISIT.on || PHOTO.on || !sel || !K[sel] || moved > 6 || F5.pushes > F5.p0 || F5.painted > 0) return;
+  const c = cellAt(e.clientX, e.clientY); if (!c || !c.inside) return;
+  const v = canPlace(sel, c.x, c.y, selRot); if (typeof v === 'string' && TERR_WHY_SET.has(v)) { TERR.stats.누름말++; toast(v); } });
 /* [MAC-TERRAIN] 판이 그린 개울 — `지형.개울: [[x0, y0, x1, y1], …]`(곧은 줄 · 이어 그려 굽힘). 개울은 **물건**(`stream` · #885)이라 다리·길찾기·모습(#906)이 그대로 돈다.
    · 판을 열 때(저장본을 되살린 **뒤**) 빈 칸에 깐다 — 처음 길이 지나는 칸은 곧게 흐르면 **다리**로 바꾼다. 저장본에 이미 있으면 아무것도 안 한다.
    · 못 치운다: 🧽 치우기(한 번 누름·메뉴)·끌어 치우기·🖐 옮기기·돌리기에서 막고 까닭을 말한다(눌렀을 때 말 thingSay 도)(아이가 **그린** 개울은 지금처럼 치움).
