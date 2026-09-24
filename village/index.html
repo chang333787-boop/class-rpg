@@ -12766,6 +12766,43 @@ function askCard(o, yes) {
   addEventListener('keydown', ASK.key, true);
   document.body.appendChild(bg); ASK.el = bg; no.focus(); }
 window.__ask = pick => { if (pick && ASK.el) ASK.el.querySelector(pick === 'ok' ? '.ok' : '.no').click(); return { 켜짐: window.VRULES.askCard.on, 떠있음: !!ASK.el, 글: ASK.el ? ASK.el.textContent : '', ...ASK.stats }; };
+/* ── [ACT-SHOWMODE] 교실 TV '보여 주기 모드' ① 숨김 + 글씨 (설계 docs/village_tv_mode.md · 창조자 30회 §3 · 보스 09-24) ──
+   1920×1080 교실 TV 에서 글씨(윗줄 13px · 토스트 13.5px)는 뒷자리에서 못 읽고, 아래 물건 상자가 화면의 17% 를 가렸다.
+   📺 단추(사진 📷 옆) 또는 주소 ?show=1 로 켠다 · 오른쪽 아래 구석 [📺 끝] 또는 Esc 로 끈다.
+   · 숨김: 물건 상자 · 미니맵 · 목표 · 윗줄 도움말·단추들 · 놓은 것 수 · 칩들(사진 모드의 숨김 틀과 같은 꼴 · body.show).
+   · 남김(크게): 마을 이름 · 시계 · 인구 · 배속 단추(선생님이 쓴다) · 토스트 · 떠오르는 글자 · #why — 배율 --showK = min(text, 폭/800).
+   · 켜진 동안 놓기·치우기·옮기기는 쉰다(setMode 를 막는다 — TV 앞에서 손이 마을을 바꾸지 않게). 집을 누르면 보이는 말은 그대로(크게).
+   · 사진 모드와 함께 켜지지 않는다. 사람 크게(②)·시점(③)은 다음 PR. 판정·저장 0 · 분류 '보기'. */
+(window.VRULES = window.VRULES || {}).showMode = { on: true, text: 2.4 };
+const SHOWM = { on: false, stats: { 켬: 0, 끔: 0, 막은놓기: 0 } };
+function showCss() { if (document.getElementById('showCss')) return; const st = document.createElement('style'); st.id = 'showCss';
+  const hide = ['#tray', '#mini', '#goals', '#top .hint', '#top > button', '#count', '#saved', '#jobsChip', '#voiceChip', '#voiceCard', '#stageReset', '#pmapBar', '#pmapCard', '#waitHomes', '#viewPad', '#hold', '#holdRing', '#seat', '#votePanel'];
+  st.textContent = hide.map(s => 'body.show ' + s).join(',') + '{display:none!important}'
+    + 'body.show #top{padding:calc(9px * var(--showK)) calc(13px * var(--showK));gap:calc(8px * var(--showK))}'
+    + 'body.show #top .ttl{font-size:calc(15px * var(--showK))}'
+    + 'body.show #clock,body.show #folk{font-size:calc(13.5px * var(--showK));padding:calc(6px * var(--showK)) calc(10px * var(--showK));border-radius:calc(9px * var(--showK))}'
+    + 'body.show #spd button{min-width:calc(44px * var(--showK) * .6);min-height:calc(44px * var(--showK) * .6);font-size:calc(13px * var(--showK) * .7)}'
+    + 'body.show #toast{font-size:calc(13.5px * var(--showK));max-width:70vw;top:calc(64px * var(--showK) * .8);padding:calc(10px * var(--showK) * .7) calc(16px * var(--showK) * .7)}'
+    + 'body.show #why{font-size:calc(12.5px * var(--showK))}'
+    + 'body.show .fword{font-size:calc(22px * var(--showK) * .85)}body.show .fword .s{font-size:calc(14px * var(--showK) * .85)}'
+    + '#showBtn{flex:0 0 auto;pointer-events:auto;background:#222630dd;border:1px solid #3a4050;color:#e8e6e0;border-radius:9px;min-width:44px;min-height:44px;padding:0;font-size:18px;cursor:pointer}'
+    + '#showEnd{position:fixed;right:12px;bottom:12px;z-index:12;display:none;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid #3a4050;background:#222630e6;color:#e8e6e0;font:800 14px "Malgun Gothic",sans-serif;cursor:pointer}'
+    + 'body.show #showEnd{display:block}body.photo #showBtn{display:none}';
+  document.head.appendChild(st); }
+const showK = () => Math.max(1, Math.min(window.VRULES.showMode.text || 2.4, innerWidth / 800));
+function showMode(on) { on = !!on && window.VRULES.showMode.on; if (on === SHOWM.on) return SHOWM.on;
+  showCss(); if (on) { if (typeof PHOTO === 'object' && PHOTO.on) photoMode(false); setMode(null, null); SHOWM.stats.켬++; } else SHOWM.stats.끔++;
+  SHOWM.on = on; document.documentElement.style.setProperty('--showK', showK().toFixed(2)); document.body.classList.toggle('show', on);
+  return on; }
+{ const sm0 = setMode; setMode = function (kind, tool) { if (SHOWM.on && (kind || tool)) { SHOWM.stats.막은놓기++; return; } return sm0.apply(this, arguments); }; }   /* 보여 주는 동안 놓기·치우기·옮기기 쉼 */
+{ const pm0 = photoMode; photoMode = function (on) { if (on && SHOWM.on) showMode(false); return pm0.apply(this, arguments); }; }   /* 둘은 함께 켜지지 않는다 */
+addEventListener('resize', () => { if (SHOWM.on) document.documentElement.style.setProperty('--showK', showK().toFixed(2)); });
+addEventListener('keydown', e => { if (SHOWM.on && e.key === 'Escape') { e.preventDefault(); showMode(false); } });
+{ showCss(); const b = document.createElement('button'); b.id = 'showBtn'; b.title = '보여 주기 — 교실 TV 에 크게(Esc 로 끝)'; b.textContent = '📺'; b.onclick = () => showMode(true);
+  const ph = document.getElementById('photoBtn'); if (ph && ph.parentNode) ph.parentNode.insertBefore(b, ph.nextSibling);
+  const end = document.createElement('button'); end.id = 'showEnd'; end.type = 'button'; end.textContent = '📺 끝'; end.onclick = () => showMode(false); document.body.appendChild(end);
+  if (QS.get('show') === '1') { const t = setInterval(() => { if (window.__LOADMS != null) { clearInterval(t); showMode(true); } }, 300); } }
+window.__showMode = on => { if (on != null) showMode(on); return { 켜짐: SHOWM.on, 배율: +showK().toFixed(2), ...SHOWM.stats }; };
 /* ── [ACT-STAGERESET] [↺ 처음부터] — 수업 판마다 (수업 흐름 #841 L1 · 보스 09-23) ──
    되돌리는 길이 마을 둘인 판(proto-flow 의 왼쪽 단추 줄)에만 있었다. town3·farm 에서는 Ctrl+Z 를 여러 번 누르거나 주소에 #fresh 를 붙여야 했는데,
    #fresh 는 '빈 판'이라 준비된 시작 땅이 안 실린다(창조자 14회 ⓑ6). 이제 **수업 판(교과 칸)이거나 시작 저장본이 있는 판**이면 왼쪽 아래(트레이 곁)에 단추 하나.
