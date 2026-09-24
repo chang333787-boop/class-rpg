@@ -112,7 +112,7 @@ function setRules(w, spec) {
 async function child(spec) {
   const { loadVillage } = await import('./load.mjs');
   const saveText = spec.save ? fs.readFileSync(path.resolve(ROOT, spec.save), 'utf8') : null;
-  const { w } = await loadVillage({ root: ROOT, html: spec.html || null, saveText, seed: spec.seed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
+  const { w } = await loadVillage({ root: ROOT, html: spec.html || null, saveText, seed: spec.seed, lookSeed: spec.lookseed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
   const stage = typeof w.__stage === 'function' ? w.__stage() : null;
   if (spec.stage && (!stage || stage.오류 || stage.id !== spec.stage)) throw new Error('판을 못 얹음: ' + (stage ? stage.오류 || stage.id : '__stage 없음'));
   setRules(w, spec.rules);
@@ -136,7 +136,7 @@ function parseArgs(argv) {
     const k = argv[i].replace(/^--/, ''), v = argv[i + 1];
     if (k === 'vs') { o.vs.push(v); i++; } else if (k === 'json') { o.json = v; i++; } else if (k === 'child') { o.child = v; i++; }
     else if (k === 'html' || k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name' || k === 'first30') { o[k] = v; i++; }
-    else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs') { o[k] = +v; i++; }
+    else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs' || k === 'lookseed') { o[k] = +v; i++; }   // lookseed: 그림 난수만 따로 시드(MAC-SIMRAND)
     else if (k === 'help' || k === 'h') o.help = true;
     else if (k === 'voice') o.voice = true;
     else throw new Error('모르는 인자: ' + argv[i]);
@@ -158,7 +158,8 @@ function variants(o) {
       else if (k === 'save') v.save = val;
       else if (k === 'stage') v.stage = val || null;
       else if (k === 'html') v.html = val || null;
-      else throw new Error('--vs 칸은 do · rules · save · stage · html: ' + k);
+      else if (k === 'lookseed') v.lookseed = +val;   // [MAC-SIMRAND] 그림 줄기만 흔든 판
+      else throw new Error('--vs 칸은 do · rules · save · stage · html · lookseed: ' + k);
     });
     list.push(v);
   });
@@ -270,7 +271,7 @@ else if (o.first30) {   /* [ACT-FIRST30] 시각 × 시드 — 한 판씩 자식 
   if (o.json) fs.writeFileSync(o.json, JSON.stringify({ args: o, results: res }, null, 1));
 } else {
   const vars = variants(o), seeds = seedList(o.seeds);
-  const specs = []; vars.forEach(v => seeds.forEach(seed => specs.push({ ...v, seed, days: o.days, every: o.every, warm: o.warm, hash: o.hash, voice: !!o.voice })));
+  const specs = []; vars.forEach(v => seeds.forEach(seed => specs.push({ ...v, seed, lookseed: v.lookseed != null ? v.lookseed : o.lookseed, days: o.days, every: o.every, warm: o.warm, hash: o.hash, voice: !!o.voice })));
   const n = o.jobs || Math.max(1, Math.min(os.cpus().length - 1, 6)), t0 = Date.now();
   let res; try { res = await pool(specs, n, runChild); } catch (e) { console.error(e.message); process.exit(1); }
   console.log(report(o, vars, res));

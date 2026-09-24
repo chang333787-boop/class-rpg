@@ -4,9 +4,13 @@
 // 한 프로세스에 한 판만 — 모듈 상태가 전역이라 두 판을 한 프로세스에 싣지 않는다(run.mjs 가 판마다 새 프로세스를 띄운다).
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 
-function seedRandom(seed) {   // mulberry32
-  let a = (seed >>> 0) || 1;
-  Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+function mulberry32(seed) { let a = (seed >>> 0) || 1;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+/* [MAC-SIMRAND] 난수 두 줄기 — 판정(simRand · window.__SIM_RAND)은 seed 로, 그림·모형·three uuid(Math.random)는 lookSeed(없으면 seed)로.
+   그림이 Math.random 을 몇 번 더 먹어도 판정 값이 안 움직인다(--lookseed 로 그림 줄기만 흔들어 확인). 옛 index.html(simRand 없음)은 Math.random 하나만 쓰니 예전과 같은 값. */
+function seedRandom(seed, lookSeed) {
+  Math.random = mulberry32(lookSeed != null ? lookSeed : seed);
+  globalThis.__SIM_RAND = mulberry32(((seed >>> 0) ^ 0x5EED5EED) >>> 0);
 }
 
 /* 아무 것이나 되는 가짜: 속성을 읽으면 또 가짜, 부르면 또 가짜, 숫자로 쓰면 0 */
@@ -62,7 +66,7 @@ function fakeGlobals({ saveText, hash, query, root }) {
   return ls;
 }
 
-/* opts: { root, html, saveText, seed, hash, query, quiet } → 마을의 window(시험 훅 __*) */
+/* opts: { root, html, saveText, seed, lookSeed, hash, query, quiet } → 마을의 window(시험 훅 __*) */
 export async function loadVillage(opts) {
   const root = opts.root, html = fs.readFileSync(opts.html ? path.resolve(root, opts.html) : path.join(root, 'village/index.html'), 'utf8');   // opts.html: 다른 index.html(전/후 비교용 · vendor·stages 는 root 것)
   const m = html.match(/<script type="module">([\s\S]*?)<\/script>/);
@@ -71,7 +75,7 @@ export async function loadVillage(opts) {
   const IMP = "import * as THREE from 'three';";
   if (!m[1].includes(IMP)) throw new Error('three import 줄이 바뀜: ' + IMP);
   const src = m[1].replace(IMP, "import * as THREE0 from '" + three + "'; const THREE = Object.assign({}, THREE0, { WebGLRenderer: globalThis.__FakeRenderer });");
-  seedRandom(opts.seed || 1);
+  seedRandom(opts.seed || 1, opts.lookSeed);
   const ls = fakeGlobals({ ...opts, root });
   // 떼어 낸 module 은 village/ 안에 뜬다 — 임시 폴더에 뜨면 './sim/*.js' 같은 상대 경로가 깨진다(ERR_MODULE_NOT_FOUND · 엔진 ④ 걸음 0)
   const file = path.join(root, 'village', '_simrun-' + process.pid + '-' + Date.now() + '.mjs');

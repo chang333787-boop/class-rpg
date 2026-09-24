@@ -33,6 +33,7 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 | `--html <파일>` | 다른 `index.html` 을 싣는다(vendor·판 파일은 이 저장소 것) — **고침 전/후가 같은지** 재기: `--vs '옛: html=/tmp/old.html'` 로 같은 시드끼리 나란히 · `--json` 으로 표본을 떠서 비교 |
 | `--save <json>` | 저장본(`__exportText` 꼴 v2). 없으면 빈 땅 |
 | `--days N` · `--seeds 1-5` | 며칠 · 어느 시드(`1,3,7` 도 된다) |
+| `--lookseed N` | **그림 난수만** 따로 시드(MAC-SIMRAND). 판정(사람 발길·드나듦·바람·이웃)은 `simRand` 줄기라 `--seeds` 로만 움직인다 — 그림 PR 이 판정을 건드렸는지 재기: `--vs '그림흔듦: lookseed=99'` 가 다른 값 0 이어야 한다. vs 칸에도 `lookseed=` |
 | `--rules 'a.b=v,…'` | 불러온 뒤 `VRULES` 를 덮는다. 없는 키면 멈춘다 |
 | `--do '…; …'` | 한 수: `put <종류> <x> <y> <rot>` · `put <종류> @jobs\|@crowd\|@need:물 <개수>` (그런 집들의 가운데서 가장 가까운 놓을 수 있는 자리) · `put <종류> @at:<x>,<y> <개수>` (그 점에서 가장 가까운 자리) · `road <x1> <y1> <x2> <y2>` (가로·세로 곧은 길 긋기 — 이미 길인 칸은 건너뜀) · `widen @crowd <n>` (붐비는 집 n채의 문 앞 길을 큰길로 — 바꿔 깔기) · `widen @point <n>` (붐빔 ✨ 가 짚는 칸에 큰길을 n번 — MAC-CROWDPOINT) · `del <x> <y>` |
 | `--vs '이름: do=…; rules=…; save=…'` | 나란히 돌릴 판. 여러 번 줄 수 있다. 첫 판(`기본`)과 같은 시드끼리 비교한다. do 여러 수는 `\|` 로 잇는다 |
