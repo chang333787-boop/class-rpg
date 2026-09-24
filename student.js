@@ -9863,10 +9863,14 @@ async function decoPhoto(opt) {
     }
     _drawYard();
     //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
+    //  [DECO-DAYNIGHT-1] 저녁·밤 사진 — 동물은 색 막 뒤에 그리니 화면의 동물 층과 같은 필터(CSS 와 같은 값)로(안 하면 밤 사진에 동물만 밝게 떴다)
+    const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day';
+    if (ph !== 'day') ctx.filter = ph === 'night' ? 'brightness(.58) saturate(.75) hue-rotate(8deg)' : 'brightness(.9) sepia(.18) saturate(1.05)';
     pets.forEach(p => {
       const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
       _drawDecoSVG(p.id, (st ? st.fx : p.col) * C, (st ? st.fy : p.row) * C, z.w * C, z.h * C);
     });
+    ctx.filter = 'none';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = 'rgba(14,22,33,.92)'; ctx.fillRect(0, H - foot, W, foot);
     ctx.fillStyle = '#ffd866'; ctx.font = `700 ${Math.round(foot * .45)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
