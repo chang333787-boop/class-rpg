@@ -1,6 +1,6 @@
 <svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-<!-- d_y60 양 목장 5×4 (pen) · 2026-09-20 축척 감사: 잔디 판 없앰 · 큰 건초더미는 크기 그대로 울타리 쪽으로 18 옮김(안쪽을 덜 가리게) · 건초 뭉치 1.4~1.5배 · 물통·양동이 1.3배 · · footprint y100~500 · 넓은 울타리 + 건초더미 + 물통, 안쪽은 비운다 -->
-<defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
+<!-- d_y60 양 목장 5×4 (pen) · 2026-09-20 축척 감사: 잔디 판 없앰 · 큰 건초더미는 크기 그대로 울타리 쪽으로 18 옮김(안쪽을 덜 가리게) · 건초 뭉치 1.4~1.5배 · 물통·양동이 1.3배 · · footprint y100~500 · 넓은 울타리 + 건초더미 + 물통, 안쪽은 비운다 · 2026-09-24 계절: 주소 뒤 #winter 면 지붕·울타리·놀이기구 윗면마다 얇은 눈. 주소 뒤가 없으면 지금 그대로 -->
+<defs><filter id="snowf" x="-5%" y="-5%" width="110%" height="110%"><feOffset in="SourceAlpha" dy="3.4" result="sh"/><feComposite in="SourceAlpha" in2="sh" operator="out" result="b0"/><feOffset in="b0" dy="1.4" result="b1"/><feComposite in="b1" in2="SourceAlpha" operator="in" result="band"/><feOffset in="SourceAlpha" dy="2.2" result="sh2"/><feComposite in="SourceAlpha" in2="sh2" operator="out" result="c0"/><feOffset in="c0" dy="1.4" result="c1"/><feComposite in="c1" in2="SourceAlpha" operator="in" result="band2"/><feFlood flood-color="#b9c8d9" result="k1"/><feComposite in="k1" in2="band" operator="in" result="shade"/><feFlood flood-color="#fbfdff" result="k2"/><feComposite in="k2" in2="band2" operator="in" result="top"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="shade"/><feMergeNode in="top"/></feMerge></filter></defs><style>#winter:target~g{filter:url(#snowf)}</style><g id="winter"/><g><defs><style>.o{stroke:#2b2118;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.i{stroke:#2b2118;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}</style></defs>
 <rect class="i" x="4" y="62" width="492" height="7" rx="2" fill="#7a5230"/><rect class="i" x="4" y="78" width="492" height="7" rx="2" fill="#7a5230"/><path d="M10,65 h480 M10,81 h480" fill="none" stroke="#7a5230" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
 <rect class="o" x="3.0" y="60" width="10" height="44" rx="2" fill="#5a3a20"/><path class="o" d="M3.0,60 l5,-7 l5,7z" fill="#5a3a20"/><path d="M6.0,64 v36" fill="none" stroke="#9c6e42" stroke-width="2.4" stroke-linecap="round"/>
 <rect class="o" x="124.0" y="60" width="10" height="44" rx="2" fill="#5a3a20"/><path class="o" d="M124.0,60 l5,-7 l5,7z" fill="#5a3a20"/><path d="M127.0,64 v36" fill="none" stroke="#9c6e42" stroke-width="2.4" stroke-linecap="round"/>
@@ -49,4 +49,4 @@
 <circle class="i" cx="462" cy="226" r="6" fill="#c0392b"/><circle cx="462" cy="226" r="2.2" fill="#efe6d4"/>
 <circle class="i" cx="250" cy="466" r="6" fill="#b98ae6"/><circle cx="250" cy="466" r="2.2" fill="#efe6d4"/>
 <circle class="i" cx="196" cy="160" r="6" fill="#e8c545"/><circle cx="196" cy="160" r="2.2" fill="#efe6d4"/>
-</svg>
+</g></svg>
