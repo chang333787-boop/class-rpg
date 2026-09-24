@@ -12779,7 +12779,11 @@ function pmapRoute() {
 function pmapPause(on) {
   const mk = window.VRULES.flow.만드는곳 || {};
   if (on) { PMAP.옛간격 = {}; Object.keys(mk).forEach(k => { PMAP.옛간격[k] = mk[k].간격틱; mk[k].간격틱 = 1e9; }); }
-  else if (PMAP.옛간격) Object.keys(PMAP.옛간격).forEach(k => { if (mk[k]) mk[k].간격틱 = PMAP.옛간격[k]; });
+  else if (PMAP.옛간격) { Object.keys(PMAP.옛간격).forEach(k => { if (mk[k]) mk[k].간격틱 = PMAP.옛간격[k]; });
+    /* [창조자 53회 ⓐ7 · 09-24] 멈춘 동안 수확 때가 온 밭은 '다음 때'를 지금 + 1e9 틱으로 적었다 — 간격만 되돌리면 그 때가 그대로 남아 **영영 안 만들었다**(하루 0번 · 가게 빔).
+       다시 누르면 지금 기준 한 간격 뒤로 다시 잡는다(한 간격보다 멀리 잡힌 것만 — 멈추기 전에 잡힌 가까운 때는 그대로). 저장본엔 '다음 때'가 안 들어가 다시 열면 원래 풀렸다. */
+    FLOW.밭.forEach((v, root) => { const rec = cells[root], m = rec && rec.root === root ? flowMake(rec) : null; if (!m) return; const gap = m.간격틱 | 0 || 600;
+      if (v.다음 > SIM.ticks + gap) { v.다음 = SIM.ticks + gap; PMAP.stats.다시잡음 = (PMAP.stats.다시잡음 || 0) + 1; } }); }
   PMAP.멈춤 = !!on; PMAP.stats.멈춤횟수 = (PMAP.stats.멈춤횟수 || 0) + (on ? 1 : 0);
 }
 function pmapShow(which) {
