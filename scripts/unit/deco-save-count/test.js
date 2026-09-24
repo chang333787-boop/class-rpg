@@ -915,6 +915,9 @@
         await sleep(50);
       }
       await sleep(300);
+      //  [DECO-GPU-1] 그래픽칩(Metal)은 SVG 를 바로 그릴 때 첫 번째와 두 번째부터(캐시된 결)의 픽셀이 조금 다르다
+      //   (집 안 마루·벽지 · 최대 36/255 · CPU 그리기에선 없음) → 한 번 데우고 잰다. 지문은 같은 '그래픽'끼리만 견준다.
+      await print();
       const g1 = await print(), g2 = await print();
       out('옛집안_가구그림_다옴', CUR.houseDecorations.every(p => _DECO_IMG[p.id] && _DECO_IMG[p.id].ok));
       out('옛집안_두번그려_같음', g1 === g2 && g1 !== 'no-canvas');

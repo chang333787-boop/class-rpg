@@ -54,7 +54,10 @@ const srv = http.createServer(async (req, res) => {
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 import { spawn } from 'node:child_process';
 let runErr = null;
-const child = spawn(BROWSER, ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${PROFILE}`, '--virtual-time-budget=90000', '--dump-dom',
+//  [DECO-GPU-1] 그래픽칩으로 그린다 — 맥은 Metal(--use-angle=metal --use-gl=angle · 보스 09-24). 크롬북도 GPU 가 있어 이쪽이 실제에 가깝다.
+//  그래픽칩이 없는 기기만 --soft(옛 --disable-gpu). 맥이 아니면 브라우저 기본값.
+const GPU_ARGS = process.argv.includes('--soft') ? ['--disable-gpu'] : process.platform === 'darwin' ? ['--use-angle=metal', '--use-gl=angle'] : [];
+const child = spawn(BROWSER, ['--headless=new', ...GPU_ARGS, '--no-first-run', `--user-data-dir=${PROFILE}`, '--virtual-time-budget=90000', '--dump-dom',
   `http://127.0.0.1:${srv.address().port}/student.html`], { stdio: 'ignore' });
 child.on('error', e => { runErr = e; doneResolve(); });
 child.on('exit', () => setTimeout(doneResolve, 1500));          // 결과 없이 죽었으면 여기서 끝난다

@@ -5,7 +5,7 @@
 //  재는 것: ①로그인 화면이 뜰 때까지 ②홈이 뜰 때까지 ③꾸미기 열어 첫 그림까지 · 그동안 요청 수·바이트
 //           ④장식 200개 + 바닥 절반 칠한 마당에서 끌기·핀치 한 프레임(그리기 함수 동기 비용, 중앙값)
 //           ⑤학생 문서 크기(장식 0/100/300개) ⑥자체 JS·CSS 바이트 ⑦꾸미기 20번 열고 닫은 뒤 동물 타이머·층 수
-//  사용: node scripts/unit/deco-perf/run.mjs [--cpu 4] [--runs 3] [--json]
+//  사용: node scripts/unit/deco-perf/run.mjs [--cpu 4] [--runs 3] [--json] [--soft]   (--soft = 그래픽칩 끄기 · 기준선과 견주지 말 것)
 //        전/후 비교: REPO=<다른 판을 푼 폴더> node scripts/unit/deco-perf/run.mjs   (ABAB 로 번갈아 두 번씩 돌릴 것 — 기기 상태에 흔들린다)
 //  의존성 0(노드 22+ 내장 WebSocket·fetch). 브라우저: BROWSER 환경변수 > 맥 크롬 > 윈도 엣지.
 import { spawn } from 'node:child_process';
@@ -16,6 +16,9 @@ const REPO = process.env.REPO || path.resolve(HERE, '..', '..', '..');
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const CPU = Number(opt('--cpu', 4)), RUNS = Number(opt('--runs', 3)), AS_JSON = argv.includes('--json');
+//  [DECO-GPU-1] 그래픽칩으로 그린다 — 맥은 Metal(--use-angle=metal --use-gl=angle · 보스 09-24). 크롬북도 GPU 가 있어 이쪽이 실제에 가깝다.
+//  그래픽칩이 없는 기기만 --soft(옛 --disable-gpu). 맥이 아니면 브라우저 기본값.
+const GPU_ARGS = argv.includes('--soft') ? ['--disable-gpu'] : process.platform === 'darwin' ? ['--use-angle=metal', '--use-gl=angle'] : [];
 const BROWSER = process.env.BROWSER || (process.platform === 'darwin'
   ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   : 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
@@ -32,10 +35,11 @@ const CLOCK = `(() => { const P = window.__perf = {}; const t = setInterval(() =
   if (P.home === undefined && typeof CUR !== 'undefined' && CUR && document.querySelector('[onclick*="openHouseTab"]')) { P.home = performance.now(); clearInterval(t); }
 }, 8); })();`;
 
+let GPU_NAME = null;   // [DECO-GPU-1] 그린 그래픽칩 이름 — 다르면 숫자를 견주지 않는다
 async function once(playPort) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'deco_perf_'));
   const dbg = await freePort();
-  const chrome = spawn(BROWSER, ['--headless=new', '--disable-gpu', '--no-first-run', `--remote-debugging-port=${dbg}`, `--user-data-dir=${profile}`, '--window-size=1366,610', 'about:blank'], { stdio: 'ignore' });
+  const chrome = spawn(BROWSER, ['--headless=new', ...GPU_ARGS, '--no-first-run', `--remote-debugging-port=${dbg}`, `--user-data-dir=${profile}`, '--window-size=1366,610', 'about:blank'], { stdio: 'ignore' });
   try {
     let targets; for (let i = 0; i < 60; i++) { await sleep(150); try { targets = await (await fetch(`http://127.0.0.1:${dbg}/json`)).json(); if (targets.length) break; } catch (e) {} }
     const ws = new WebSocket(targets.find(t => t.type === 'page').webSocketDebuggerUrl);
@@ -56,6 +60,7 @@ async function once(playPort) {
     const out = {};
     const P = JSON.parse(await ev(`JSON.stringify(__perf)`));
     out['로그인화면_ms'] = r1(P.login); out['홈_ms'] = r1(P.home);
+    if (!GPU_NAME) GPU_NAME = await ev(`(() => { try { const g = document.createElement('canvas').getContext('webgl'), e = g && g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '없음'; } catch (x) { return '없음'; } })()`);
     out['홈까지_요청수'] = net0.n; out['홈까지_KB'] = Math.round(net0.bytes / 1024);
     await sleep(1200);
     //  ③ 꾸미기 열어 첫 그림까지(판 한가운데 픽셀이 칠해질 때) + 그동안 요청 수·바이트
@@ -106,7 +111,7 @@ try { for (let i = 0; i < RUNS; i++) all.push(await once(playPort)); } finally {
 //  ⑥ 자체 파일 바이트(디스크 · gzip 아님)
 const sizeKB = f => fs.existsSync(path.join(REPO, f)) ? Math.round(fs.statSync(path.join(REPO, f)).size / 1024) : null;
 const files = ['student.js', 'student.css', 'student.html', 'gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js'];
-const result = { 'CPU감속': CPU, '횟수': RUNS };
+const result = { 'CPU감속': CPU, '횟수': RUNS, '그래픽': String(GPU_NAME || '없음').replace(/[=\n]/g, ' ') };
 for (const k of Object.keys(all[0])) result[k] = median(all.map(o => o[k]).filter(v => v != null));
 for (const f of files) result['파일KB_' + f] = sizeKB(f);
 if (AS_JSON) console.log(JSON.stringify(result, null, 1));
