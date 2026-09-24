@@ -1,0 +1,4 @@
+<svg width="20" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 14">
+<!-- ui_speech_tail 말풍선 꼬리 — 말풍선 아래 가운데에 붙인다(늘지 않는 조각) · 2026-09-24 -->
+<path d="M2,0 L10,12 L18,0" fill="#fffaf0" stroke="#2b2118" stroke-width="2.5" stroke-linejoin="round"/><path d="M3,-2 H17" stroke="#fffaf0" stroke-width="4"/>
+</svg>

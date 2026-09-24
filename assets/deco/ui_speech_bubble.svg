@@ -1,0 +1,4 @@
+<svg width="120" height="56" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 56">
+<!-- ui_speech_bubble 손님·동물 말풍선 판 — CSS border-image: url(ui_speech_bubble.svg) 18 22 26 22 fill / 18px 22px 26px 22px stretch; (꼬리는 아래 가운데 — 가운데 폭이 늘어도 꼬리는 slice 안이라 늘지 않게 꼬리는 따로: ui_speech_tail) · 2026-09-24 -->
+<rect x="4" y="6" width="112" height="38" rx="14" fill="#000" opacity=".2"/><path d="M16,3 H104 Q117,3 117,16 V28 Q117,41 104,41 H68 L60,53 L52,41 H16 Q3,41 3,28 V16 Q3,3 16,3Z" fill="#fffaf0" stroke="#2b2118" stroke-width="2.5" stroke-linejoin="round"/><path d="M14,9 H80" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+</svg>
