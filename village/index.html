@@ -6406,15 +6406,19 @@ window.__strollDist = () => { const spots = strollSpots(), sp = new Set(spots.fl
   return out; };
 window.__stroll = () => { const byRoot = {}; folks.forEach(f => { if (f.state === 'inside' && f.inside && STROLL.spots && STROLL.spots.some(s => s.root === f.inside.root)) byRoot[f.inside.root] = (byRoot[f.inside.root] || 0) + 1; });
   return { 켜짐: window.VRULES.stroll.on, ...STROLL.stats, 지금가는중: folks.filter(f => f.stroll).length, 지금쉼터에: Object.values(byRoot).reduce((a, b) => a + b, 0), 모인쉼터: Object.values(byRoot).filter(n => n >= 2).length, 쉼터수: (STROLL.spots || []).length }; };
-/* ── [ACT-SICK] 아픈 주민이 가끔 동네 의원에 들렀다 나아서 온다 (건강 설계 docs/village_need_health.md · 주민 연기 몫 · 보스 09-24) ──
-   엔진에 아픈 사람 목록이 없다 — 누가 아플지도 여기서 정한다: 날마다 **집·얼굴·날 해시**로 인구 × rate 명(적어도 1 · 겨울 ×winter) · 새 난수 0.
-   · 아픈 날 아침(from~to 시)엔 **출근·등교보다 의원이 먼저**다(rhythmTick 맨 앞 한 줄 · 그 한 사람만) — 다녀오면 평소 규칙대로(늦게 출근·등교).
-     (하교·퇴근 뒤로 두면 귀가·놀이·출근 규칙이 길을 가로채 한 번도 못 닿았다 — 09-24 시험.) 옛: 떠돌기 목적지를 고를 때 — 원래 pickDestination 이 난수를 **다 쓴 뒤** 길만 가장 가까운 의원(길로 near 칸 안)으로(산책과 같은 틀).
-     의원 곁 길 칸에 닿으면 **그 의원에** 든다(tryEnter 몸통 그대로 · 머무는 시간도 보통 들르기와 같다). 필요가 아직 없어도(PR 2 전) 쫓겨나지 않는다.
-   · 표시: 아픈 날 밖에 있는 동안 머리 위 🤒(판 전체 maxShow 명까지) · 의원에서 나오면 💊 pillMs 동안. 🤒·💊 는 전용 판 둘(없으면 개수 0 = draw call 0).
-   · 의원이 없거나 길로 안 닿으면: 🤒 만 띄우고 그날은 못 간다(집 카드 말 '🏥 아플 때 갈 곳이 멀어요'는 엔진 몫).
-   · 수업 판(교과 있음)에선 안 돈다(산책·귀가와 같은 틀 · stages.mjs 조건부 표). **판에 의원이 하나도 없으면 아무 일도 안 한다** — 지금(PR 2 전) 모든 판에서 판정·그림 0. 분류 '판정'(의원이 있는 판에선 방문 셈이 바뀐다). */
-(window.VRULES = window.VRULES || {}).sick = { on: true, rate: 0.015, winter: 2, maxShow: 4, near: 20, from: 9, to: 13, giveUp: 18, pillMs: 6000, slowK: 0.7, coughMs: 4000, puffMs: 900, kinds: ['clinic', 'hospital'] };
+/* ── [ACT-SICK] 아픈 주민이 가끔 기침하며 천천히 동네 의원에 들렀다 나아서 온다 (건강 설계 docs/village_need_health.md PR 4 · 주민 연기 몫 · 보스 09-24) ──
+   엔진에 아픈 사람 목록이 없다 — 누가 아플지도 여기서 정한다: 날마다 **집·얼굴·날 해시**로 어른 가운데 인구 × rate 명(적어도 1 · 겨울 ×winter) · 새 난수 0.
+     어른만(who) — 아이가 학교를 빠지면 층 오름이 늦었다(origin · 의원 하나 · 3일 · 시드 1-10: 2층이상 −0.4 · 10/10 같거나 나쁨). 어른은 0.
+   · 아픈 날 아침(from~to 시)엔 **출근보다 의원이 먼저**다(rhythmTick 맨 앞 한 줄 · 그 한 사람만) — 다녀오면 평소 규칙대로(늦게 출근).
+     (퇴근 뒤로 두면 귀가·놀이 규칙이 길을 가로채 한 번도 못 닿았다 — 09-24 시험.) 가는 동안은 창이 끝나도 지키고, giveUp 시면 놓는다.
+   · 걸음: 밤 귀갓길([ACT-NIGHT])처럼 **칸을 잡지 않고** slowK 배로 지나친다 · 붐빔 셈에서도 뺀다([MAC-CROWD] 꼴). 칸을 잡으면 느린 걸음이 이사 오는 사람을 막아
+     인구가 한쪽으로 줄었다(−0.8 · 좋아진 시드 0/10) → 지나치게 하니 흔들림 수준(어른 · 시드 1-20: 인구 −0.5 (−4~+7) · 대조(나서는 시각만 10시) −0.2 (−5~+7)).
+   · 의원 곁 길 칸에 닿으면 **그 의원에** 든다(tryEnter 몸통 그대로 · 난수 한 번 · 머무는 시간도 보통 들르기와 같다). 필요가 없어도 쫓겨나지 않는다.
+   · 표시: 밖에 있는 동안 머리 위 🤒(판 전체 maxShow 명까지) · coughMs 마다 입 앞 흰 김 · 나오면 💊 pillMs 동안. 셋 다 처음 쓸 때 만든다(미리 만들면 의원 없는 판도 화면이 흔들렸다).
+     말: 가는 길 = #1085 의 words.go.clinic('동네 의원에 진료받으러 가요') · 안 = words.stay.clinic · 💊 동안 '다 나아서 집에 가요'.
+   · 의원이 없거나 길로 near 칸 안에 안 닿으면: 🤒 만 띄우고 그날은 못 간다. **판에 의원이 하나도 없으면 아무 일도 안 한다**(판정·그림 0).
+   · 수업 판(교과 있음)에선 안 돈다(산책·귀가와 같은 틀 · stages.mjs 조건부 표). 분류 '판정'(의원이 있는 판에선 방문 셈·난수 차례가 바뀐다 — 흔들림 수준). */
+(window.VRULES = window.VRULES || {}).sick = { on: true, who: 'adult', rate: 0.015, winter: 2, maxShow: 4, near: 20, from: 9, to: 13, giveUp: 18, pillMs: 6000, slowK: 0.7, coughMs: 4000, puffMs: 900, kinds: ['clinic', 'hospital'] };
 const SICK = { day: -1, list: new Set(), done: new Set(), pill: new Map(), clinics: null, key: -1, stats: { 오늘아픔: 0, 의원감: 0, 의원듦: 0, 못감: 0, 나음: 0 } };
 function sickClinics() { if (SICK.key === placedTotal && SICK.clinics) return SICK.clinics; const R = window.VRULES.sick, out = [];
   cells.forEach((rec, i) => { if (!rec || rec.root !== i || !R.kinds.includes(rec.k)) return; const fp = footprint(rec.k, cX(i), cY(i), rec.rot), roads = new Set();
@@ -6423,11 +6427,11 @@ function sickClinics() { if (SICK.key === placedTotal && SICK.clinics) return SI
   SICK.key = placedTotal; SICK.clinics = out; return out; }
 function sickToday() { const R = window.VRULES.sick, d = simDay(); if (SICK.day === d && (SICK.list.size || SICK.listKey === placedTotal)) return SICK.list;   /* 명단이 비었으면 판이 바뀔 때(의원이 새로 생김) 다시 뽑는다 */
   if (SICK.day !== d) SICK.done = new Set(); SICK.day = d; SICK.list = new Set(); sickClinics(); SICK.listKey = placedTotal; if (!R.on || (typeof STAGE === 'object' && STAGE.def && STAGE.def.교과 != null) || !sickClinics().length) { SICK.stats.오늘아픔 = 0; return SICK.list; }   /* 의원이 없으면 아무도 안 아프다(보일 곳이 없다) */
-  const res_ = folks.filter(f => !f.visitor && !f.arriving && f.home != null), n = Math.min(res_.length, Math.max(1, Math.round(population() * R.rate)) * (seasonIdx() === 3 ? R.winter : 1));
+  const res_ = folks.filter(f => !f.visitor && !f.arriving && f.home != null && (R.who === 'kid' ? !isAdult(f) : R.who === 'adult' ? isAdult(f) : true)), n = Math.min(res_.length, Math.max(1, Math.round(population() * R.rate)) * (seasonIdx() === 3 ? R.winter : 1));
   const key = f => (((f.home | 0) * 2654435761) ^ (d * 40503) ^ ((f.ct | 0) * 97) ^ (folks.indexOf(f) * 131)) >>> 0;
   res_.map(f => [key(f), f]).sort((a, b) => a[0] - b[0]).slice(0, n).forEach(([, f]) => SICK.list.add(f)); SICK.stats.오늘아픔 = SICK.list.size; return SICK.list; }
 function sickRhythm(f, i, h) { const R = window.VRULES.sick; if (!R.on || f.visitor || f.arriving) return false;
-  if (f.sickTrip) { if (h >= R.giveUp || h < R.from) { f.sickTrip = null; return false; }   /* 저녁이면 놓는다 */
+  if (f.sickTrip) { if (h >= R.giveUp || h < R.from) { f.sickTrip = null; f.sickGhost = false; return false; }   /* 저녁이면 놓는다 */
     if (f.state === 'walk') return true;                                /* 가는 중엔(창이 끝나도) 다른 규칙(출근·등교)이 길을 안 바꾼다 */
     if (f.state !== 'idle' || simNow() < f.until) return f.state === 'idle';   /* 막혀 섰다 — 잠깐 쉬고 그 자리에서 다시 찾는다 */
   } else { if (h < R.from || h >= R.to || !sickToday().has(f) || SICK.done.has(f) || f.sickMiss === SICK.day || f.base < 0) return false; }
@@ -6466,8 +6470,22 @@ function sickDraw() { const R = window.VRULES.sick, now = performance.now(); let
   M.puff.count = c; if (c) M.puff.instanceMatrix.needsUpdate = true; M.ill.count = a; M.pill.count = p; if (a) M.ill.instanceMatrix.needsUpdate = true; if (p) M.pill.instanceMatrix.needsUpdate = true; }
 { const sdS0 = sayDraw; sayDraw = function () { const r = sdS0.apply(this, arguments); sickDraw(); return r; }; }
 /* 천천히 — 의원 가는 길은 걸음 slowK 배(아이 걸음 고리 actKidTick 자리에서 덜어 낸다) · 말은 #1085 의 의원 말(words.go/stay.clinic)로 · 다 나아 나오면 '다 나아서 집에 가요' */
-{ const akS0 = actKidTick; actKidTick = function (f, dt) { const r = akS0.apply(this, arguments); const R = window.VRULES.sick;
-    if (R.on && f.sickTrip && f.state === 'walk' && f.path && f.path[f.step + 1] != null && !f.blockedAt) f.seg -= (WALK_SPEED * (1 - R.slowK) * dt) / CS; return r; }; }
+/* 붐빔 셈에서 뺀다 — 아픈 사람의 나들이는 '길이 좁아 기다리는 것'이 아니다([MAC-CROWD] 밤 귀갓길과 같은 꼴) · 제 집 붐빔 평균·남의 칸 수에 안 들어간다 */
+{ hookAdd('crowdTick', function (next, args) { if (!window.VRULES.sick.on) return next(args);
+    const s = folks.filter(f => f.sickTrip && f.state !== 'inside'); s.forEach(f => { f._sst = f.state; f.state = 'inside'; });
+    try { return next(args); } finally { s.forEach(f => { f.state = f._sst; f._sst = undefined; f.crowdK = 1; }); } }); }
+/* 의원 가는 걸음 — 밤 귀갓길([ACT-NIGHT] actNightHome)처럼 **칸을 잡지 않고** 천천히(slowK) 지나친다. 칸을 잡으면 느린 걸음이 이사 오는 사람을 막아
+   인구가 줄었다(origin · 의원 하나 · 3일 · 시드 1-10: −0.8 · 좋아진 시드 0/10). 닿으면 tryEnter(고른 의원) · 걸음 고리는 actNightHome 자리를 빌린다. */
+function sickWalk(f, i, now, dt) { const R = window.VRULES.sick, S = f.sickTrip; if (!R.on || !S || f.state !== 'walk' || !f.path) return false;
+  if (!f.sickGhost) { releaseAll(i); f.sickGhost = true; f.blockedAt = 0; }
+  const a = f.path[f.step], b = f.path[f.step + 1];
+  if (b == null) { f.sickGhost = false; if (tryEnter(f, i, a)) return true; f.state = 'idle'; f.until = now; f.path = [a]; f.step = 0; f.seg = 0; f.walking = false; return true; }
+  if (!isRoad(b)) { f.sickGhost = false; f.state = 'idle'; f.until = now; f.path = [a]; f.step = 0; f.seg = 0; f.walking = false; return true; }
+  const ax = wx(cX(a)), az = wz(cY(a)), bx = wx(cX(b)), bz = wz(cY(b)), len = Math.hypot(bx - ax, bz - az) || 1;
+  f.seg += (WALK_SPEED * R.slowK * dt) / len;
+  if (f.seg >= 1) { f.seg = 0; f.step++; f.x = bx; f.z = bz; } else { f.x = ax + (bx - ax) * f.seg; f.z = az + (bz - az) * f.seg; }
+  f.dir = Math.atan2(bx - ax, bz - az); f.walking = true; return true; }
+{ const anS0 = actNightHome; actNightHome = function (f, i, now, dt) { if (sickWalk(f, i, now, dt)) return true; return anS0.apply(this, arguments); }; }
 { const awS0 = actWordsText; actWordsText = function (f) { const W = window.VRULES.words, S = f.sickTrip;
     if (S && W && W.on && f.state === 'walk' && cells[S.root] && W.go && W.go.clinic) return K[cells[S.root].k].nm + W.go.clinic;
     if (SICK.pill.has(f) && f.state !== 'inside') return '다 나아서 집에 가요';
