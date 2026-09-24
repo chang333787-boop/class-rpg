@@ -2230,7 +2230,21 @@ window.__miniFlip = () => ({ 켜짐: !!(window.VRULES.miniFlip && window.VRULES.
       for (let y = Math.max(0, Math.floor(b.y0)); y <= Math.min(H - 1, Math.ceil(b.y1)); y++) for (let x = Math.max(0, Math.floor(b.x0)); x <= Math.min(W - 1, Math.ceil(b.x1)); x++) {
         const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'lamp') continue; const cx = (x - b.x0 + .5) * kx, cy = (b.y1 - y + .5) * ky; miniG.moveTo(cx + rad, cy); miniG.arc(cx, cy, rad, 0, Math.PI * 2); }
       miniG.fill(); }
+    nightMapMarks(b, mw, mh);   /* 곱하기 뒤에 다시 — 흰 판 · 보는 곳 네모 */
     return r; }; }
+/* [MAC-NIGHTMAP 덧] 보스 09-24(#1040 머지 때): 보는 곳 네모(흰 테)도 곱하기에 눌려 파랗게 묻혔다 — '내가 어디 보나'가 미니맵에서 가장 중요한 정보.
+   곱하기 뒤에 특별 건물의 흰 판(MINILOOK ⑤와 같은 범위·테)과 보는 곳 네모(drawMini·MINILOOK 과 같은 식)를 다시 긋는다 — 밤에도 흰색 그대로. 낮엔 안 돈다. */
+function nightMapMarks(b, mw, mh) {
+  const on = window.VRULES.miniLook && window.VRULES.miniLook.on, hi = on ? mw / 160 : 1, kx = mw / (b.x1 - b.x0 + 1), ky = mh / (b.y1 - b.y0 + 1);
+  if (on) { const objs = new Map(), xa = Math.max(0, Math.floor(b.x0) - 3), xb = Math.min(W - 1, Math.ceil(b.x1) + 3), ya = Math.max(0, Math.floor(b.y0) - 3), yb = Math.min(H - 1, Math.ceil(b.y1) + 3);
+    for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { const rec = cells[idx(x, y)]; if (!rec || miniLookCls(rec.k) !== 'special') continue;
+      const o = objs.get(rec.root); if (o) { o.x0 = Math.min(o.x0, x); o.x1 = Math.max(o.x1, x); o.y0 = Math.min(o.y0, y); o.y1 = Math.max(o.y1, y); } else objs.set(rec.root, { x0: x, x1: x, y0: y, y1: y }); }
+    miniG.lineWidth = 1.2 * hi; miniG.strokeStyle = '#23262e'; miniG.fillStyle = '#ffffff';
+    objs.forEach(o => { const r = [(o.x0 - b.x0 - .3) * kx, (b.y1 - o.y1 - .3) * ky, (o.x1 - o.x0 + 1.6) * kx, (o.y1 - o.y0 + 1.6) * ky]; miniG.fillRect(...r); miniG.strokeRect(...r); }); }
+  const wpp = worldPerPixel(zoomMul), hw = wpp * innerWidth / 2, hh = wpp * innerHeight / 2 / Math.max(0.35, Math.sin(camEl));
+  const cx = camTarget.x / CS + (W - 1) / 2, cy = camTarget.z / CS + (H - 1) / 2, rw = Math.max(6 * hi, hw / CS * kx), rh = Math.max(6 * hi, hh / CS * ky);
+  miniG.strokeStyle = '#fff'; miniG.lineWidth = 2 * hi; miniG.strokeRect((cx - b.x0) * kx - rw / 2, (b.y1 - cy) * ky - rh / 2, rw, rh);
+}
 { const adN = applyDaylight; applyDaylight = function () { const r = adN.apply(this, arguments), R = window.VRULES.nightMap, t = R && R.on ? Math.min(1, NIGHT.value) : 0;
     mapPlane.material.color.setRGB(1 - (1 - R.plane[0]) * t, 1 - (1 - R.plane[1]) * t, 1 - (1 - R.plane[2]) * t); return r; }; }
 window.__nightMap = () => ({ 켜짐: !!(window.VRULES.nightMap && window.VRULES.nightMap.on), 밤: +NIGHT.value.toFixed(2), 지도판색: '#' + mapPlane.material.color.getHexString() });
