@@ -36,6 +36,13 @@
 ![마당에 온 손님](img/deco_guests_art_20260924/yard_guests.jpg)
 ![도감 화면 — 만난 손님 · 실루엣 + 힌트 · ★ 스티커](img/deco_guests_art_20260924/dex.jpg)
 
+## 손님 스티커 13 — `assets/deco/sticker_<영문>.svg`(120×120)
+![스티커 첩 — 만난 손님 다섯 · 나머지 ?](img/deco_guests_art_20260924/sticker_album.png)
+
+- 손님 그림에 **흰 칼선 테 + 옅은 그림자**를 입힌 것이다. 파일 안 필터 하나로 되어 있다.
+- 처음 만나면 받는다. 도감 카드의 ★ 와 **스티커 첩**(만난 것은 스티커를 조금 기울여 붙이고, 못 만난 것은 점선 칸 '?')에 쓴다.
+- 반딧불 스티커는 빛 원을 뺐다(흰 테가 빛을 따라가 버린다).
+
 ## 친해지기 · 작은 선물 — `assets/deco/`
 ![하트 · 단계 · 선물 · 반딧불](img/deco_guests_art_20260924/hearts_gifts.png)
 

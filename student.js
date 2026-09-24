@@ -8281,16 +8281,16 @@ function _decoBoardPoint(clientX, clientY) {
 //  한계(1판): 층이 캔버스 위라 키 큰 장식 뒤로 가도 앞에 보인다 → 반지름을 좁게 둔다.
 
 //  ground: 갈 수 있는 바닥 묶음 · water:true = 물에 놓으면 물 안에서만(헤엄)
-//  say: 누르면 뜨는 말 · hop: 줄 바꾸기(위·아래 한 칸 톡) 간격 ms
+//  say: 누르면 뜨는 말 · mood: 성격(ANIM_MOOD — 가만히·쪼기·걷기 · 빠르기)
 const ANIM_DECO = {
-  d_y32: { radius: 3, wait: [4000, 8000],  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
-  d_y39: { radius: 3, wait: [3500, 7000],  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
-  d_y40: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양', artLeft: true },   // 그림이 왼쪽을 본다
-  d_y53: { radius: 4, wait: [2500, 5500],  ground: ['soft', 'hard'], come: true,    say: '왈!',     name: '강아지' },
-  d_y54: { radius: 4, wait: [3000, 7000],  ground: ['soft', 'hard'],                say: '야옹',    name: '고양이' },
-  d_y55: { radius: 3, wait: [3500, 7000],  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
-  d_y56: { radius: 3, wait: [4000, 8000],  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
-  d_y57: { radius: 2, wait: [6000, 11000], ground: ['soft'],                        say: '메~',     name: '양' },
+  d_y32: { radius: 3, mood: 'duck',  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
+  d_y39: { radius: 3, mood: 'hen',  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
+  d_y40: { radius: 2, mood: 'sheep', ground: ['soft'],                        say: '메~',     name: '양', artLeft: true },   // 그림이 왼쪽을 본다
+  d_y53: { radius: 4, mood: 'dog',  ground: ['soft', 'hard'], come: true,    say: '왈!',     name: '강아지' },
+  d_y54: { radius: 4, mood: 'cat',  ground: ['soft', 'hard'],                say: '야옹',    name: '고양이' },
+  d_y55: { radius: 3, mood: 'hen',  ground: ['soft'],                        say: '꼬꼬댁',  name: '닭' },
+  d_y56: { radius: 3, mood: 'duck',  ground: ['soft', 'water'], water: true,  say: '꽥!',     name: '오리' },
+  d_y57: { radius: 2, mood: 'sheep', ground: ['soft'],                        say: '메~',     name: '양' },
 };
 
 // [DECO-FENCE-1] 울타리 자동 이음 — 아이가 가로·세로·코너를 고르지 않는다.
@@ -8418,45 +8418,73 @@ function _animWhyNot(id) {
   return '🐑 ' + cfg.name + '은 풀밭이나 흙에 놓아 주세요';
 }
 
-// 걸음 두 번째 장(<id>_b.svg) — 있으면 걷는 동안 그 장을 쓴다. 없으면 한 장으로 그냥 걷는다(404 안전).
-const _animFrameB = {};
-// [DECO-EAT-1] 먹는 장(<id>_eat.svg) — 먹이통 옆에 닿으면 고개 숙인 장으로 바꾼다(헤엄 중엔 안 씀)
-const _animFrameEat = {};
-// [DECO-SWIM-1] 헤엄 장(<id>_swim.svg) — 물 위 오리가 다리 두 개로 걷고 발밑에 풀이 따라오던 것(플레이 시험)
-const _animFrameSwim = {};
-function _animProbeSwim(id) {
-  if (id in _animFrameSwim) return _animFrameSwim[id];
-  _animFrameSwim[id] = false;
-  const img = new Image();
-  img.onload = () => {
-    _animFrameSwim[id] = (img.naturalWidth > 0);
-    //  그림 확인이 늦게 끝나도 이미 물 위에 있는 오리를 바로 헤엄 장으로(타이머를 따로 걸지 않는다)
-    if (_animFrameSwim[id]) _animLayers.forEach(rec => rec.items.forEach(st => { if (st.id === id) _animEatSync(st); }));
-  };
-  img.onerror = () => { _animFrameSwim[id] = false; };
-  img.src = './assets/deco/' + encodeURIComponent(id) + '_swim.svg';
-  return false;
+// ══ 살아 있는 동물 (DECO-ANIM-LIVE-1 · 디자인 'B 크게' · 창조자 27회 ⓑ55~57) ══════════════
+//  전: 동물마다 setTimeout 이 4~8초에 한 번 '옆 칸'을 정하고 CSS 전환 1초로 **미끄러졌다**(물건을 뚫고 · 걸음 그림 없이 · 2px 들썩임만).
+//  지금:
+//  · 상태 하나(st.state = idle · walk · peck · sleep · happy)가 그림 한 장을 고른다 — 디자인의 <id>_<상태>.svg(부위 나눈 SVG 가
+//    그림 안 CSS 로 스스로 숨 쉬고 걷는다). 그 장이 없으면 옛 장(<id>.svg · 걸음 <id>_b · 먹기 <id>_eat · 헤엄 <id>_swim).
+//  · 칸 길찾기(BFS · 4방향)로 장식·울타리·집·밭·다른 동물을 **돌아간다**. 가는 칸·목표 칸을 예약해 둘이 한 칸에 겹치지 않는다.
+//  · 걸음은 칸마다 0.6초(첫·끝 칸은 0.76초로 천천히 서고 떠난다) · 가는 쪽을 본다 · 성격(ANIM_MOOD)이 빠르기·쉬는 시간을 정한다.
+//  · 먹이통 = 둘레 고리(체비쇼프 1칸 → 다 차면 2칸)의 빈 칸으로 흩어져 모이고, 칸 안에서 조금씩 비켜 서서 먹이통을 보고 쫀다(세로 한 줄로 서지 않는다).
+//  · 누르면 happy 한 번 + 💗 + 소리 글자 · 둘레의 가만히 있는 동물이 그쪽을 본다 · 강아지는 누른 쪽으로 한 칸 온다.
+//  · 모든 동물이 **한 돌림**(걷는 동안만 requestAnimationFrame · 쉬는 동안은 다음 생각 때까지 타이머 하나)을 쓴다.
+//    화면 밖 · 숨은 탭 · 움직임 줄이기면 쉬고, 그림은 지금 한 장(<id>.svg — 그림 안 움직임도 멈춘다).
+//  · 위치는 **화면에만** 있다. DB 쓰기 0(전과 같음). 밤(쉼터에 모여 자기)은 꾸미기에 낮밤이 붙은 뒤(계획 ⑮).
+const ANIM_MOOD = {   // 성격 한 줄 — 가만히·쪼기 확률(나머지는 걷기) · 쉬는 시간(ms) · 한 번에 걷는 칸 · 빠르기(1 = 칸당 0.6초)
+  hen:   { idle: .35, peck: .35, rest: [1200, 3000], steps: [1, 3], speed: 1.0 },    // 닭 — 부산하다
+  duck:  { idle: .45, peck: .20, rest: [1500, 3500], steps: [1, 3], speed: .9 },
+  sheep: { idle: .60, peck: .30, rest: [3000, 7000], steps: [1, 2], speed: .7 },     // 양 — 느긋하다
+  dog:   { idle: .30, peck: .10, rest: [800, 2200],  steps: [2, 4], speed: 1.35 },   // 강아지 — 들떴다
+  cat:   { idle: .55, peck: .10, rest: [2500, 6000], steps: [1, 3], speed: .9 },
+};
+const ANIM_STEP_MS = 600;
+const _animArt = {};   // id → { idle, walk, peck, sleep, happy, swim, b, eat : true | false(없음) | undefined(확인 중) }
+const ANIM_ART_KEYS = ['idle', 'walk', 'peck', 'sleep', 'happy', 'swim', 'b', 'eat'];
+function _animProbeArt(id) {
+  if (_animArt[id]) return _animArt[id];
+  const a = _animArt[id] = {};
+  if (typeof Image !== 'function') return a;
+  ANIM_ART_KEYS.forEach(k => {
+    const img = new Image();
+    img.onload = () => { a[k] = img.naturalWidth > 0; _animLayers.forEach(rec => rec.items.forEach(st => { if (st.id === id) _animApplySrc(st); })); };
+    img.onerror = () => { a[k] = false; };
+    img.src = './assets/deco/' + encodeURIComponent(id) + '_' + k + '.svg';
+  });
+  return a;
 }
-function _animProbeEat(id) {
-  if (id in _animFrameEat) return _animFrameEat[id];
-  _animFrameEat[id] = false;
-  const img = new Image();
-  img.onload = () => { _animFrameEat[id] = (img.naturalWidth > 0); };
-  img.onerror = () => { _animFrameEat[id] = false; };
-  img.src = './assets/deco/' + encodeURIComponent(id) + '_eat.svg';
-  return false;
+function _animFile(id, k) { return './assets/deco/' + encodeURIComponent(id) + (k ? '_' + k : '') + '.svg'; }
+//  이 상태에 쓸 그림 — 새 상태 장 → 옛 장 → 한 장
+function _animSrcFor(st, state) {
+  const a = _animArt[st.id] || {};
+  if (st.frozen) return _animFile(st.id, '');
+  if (st.swim && a.swim && (state === 'idle' || state === 'walk' || state === 'peck')) return _animFile(st.id, 'swim');
+  if (a[state]) return _animFile(st.id, state);
+  if (state === 'walk' && a.b) return _animFile(st.id, 'b');
+  if (state === 'peck' && a.eat && !st.swim) return _animFile(st.id, 'eat');
+  if (a.idle && state !== 'idle') return _animFile(st.id, 'idle');
+  return _animFile(st.id, '');
 }
-function _animProbeFrameB(id) {
-  if (id in _animFrameB) return _animFrameB[id];
-  _animFrameB[id] = false;
-  const img = new Image();
-  img.onload = () => { _animFrameB[id] = (img.naturalWidth > 0); };
-  img.onerror = () => { _animFrameB[id] = false; };
-  img.src = './assets/deco/' + encodeURIComponent(id) + '_b.svg';
-  return false;
+function _animApplySrc(st) {
+  if (!st.img) return;
+  const want = _animSrcFor(st, st.state || 'idle');
+  if (st.src !== want) { st.img.src = want; st.src = want; }
+  const a = _animArt[st.id] || {};
+  st.el.classList.toggle('live', !st.frozen && !!a.idle);          // 부위 그림이 스스로 숨 쉰다 — 들썩임은 끈다
+  st.el.classList.toggle('walking', !st.frozen && st.state === 'walk');
 }
+function _animSetState(st, s) { st.state = s; _animApplySrc(st); }
+function _animFace(st, dir) {
+  if (!dir) return;
+  st.dir = dir;
+  if (st.img) st.img.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';   // 왼쪽을 보는 그림은 반대로
+}
+function _animPlace(st) {
+  st.el.style.transform = 'translate(' + ((st.fx + (st.jx || 0)) * st.C) + 'px,' + ((st.fy + (st.jy || 0)) * st.C) + 'px)';
+  st.el.style.zIndex = String(Math.round(st.fy));
+}
+function _animRnd(a, b) { return a + Math.random() * (b - a); }
 
-const _animLayers = new Map();   // hostId → { layer, items: Map(key → state) }
+const _animLayers = new Map();   // hostId → { layer, world, items: Map(key → state) }
 let _animHooked = false;
 
 function _animReduced() {
@@ -8531,8 +8559,9 @@ function _decoOkCells(area) {
   return cells;
 }
 //  칸마다 한 번 옅게 + 둘레 한 줄 — (ox,oy) 는 판 왼쪽 위(집 안은 _offX/_offY), v 는 보이는 칸 범위
-function _decoDrawOkCells(cells, ox, oy, C, v) {
-  const ctx = _dCtx, has = (r, c) => cells.has(r + '_' + c);
+//  also = 그리기만 같은 덩어리로 칠 칸(놓을 수는 없다) — [DECO-ANIM-LIVE-1] 동물이 떠난 제자리(ⓑ58: 빈 어두운 네모 + 둘레 줄이 흩어져 보였다)
+function _decoDrawOkCells(cells, ox, oy, C, v, also) {
+  const ctx = _dCtx, has = (r, c) => cells.has(r + '_' + c) || !!(also && also.has(r + '_' + c));
   ctx.fillStyle = 'rgba(255,255,255,.1)';
   for (let r = v.r0; r < v.r1; r++) for (let c = v.c0; c < v.c1; c++) if (has(r, c)) ctx.fillRect(ox + c * C, oy + r * C, C, C);
   ctx.strokeStyle = 'rgba(255,240,150,.7)'; ctx.lineWidth = Math.max(1, C * .06); ctx.beginPath();
@@ -8545,6 +8574,14 @@ function _decoDrawOkCells(cells, ox, oy, C, v) {
     if (!has(r, c + 1)) { ctx.moveTo(x + C, y); ctx.lineTo(x + C, y + C); }
   }
   ctx.stroke();
+}
+//  동물 '제자리'(놓은 칸) 중 다른 장식이 없는 칸 — 놓을 곳 표시를 그릴 때만 덩어리에 넣는다
+function _decoAnimHomeCells() {
+  const out = new Set(), other = new Set();
+  _decoList(CUR).forEach(p => { if (p.area !== 'yard') return; const z = getDecoSize(p.id);
+    for (let dr = 0; dr < z.h; dr++) for (let dc = 0; dc < z.w; dc++) (ANIM_DECO[p.id] ? out : other).add((p.row + dr) + '_' + (p.col + dc)); });
+  other.forEach(k => out.delete(k));
+  return out;
 }
 //  마우스 커서 칸에 놓일 모습(반투명) — 초록 점선 = 놓임 · 붉은 점선 = 안 됨
 let _decoHover = null;
@@ -8589,174 +8626,215 @@ function _animFreeMaker(student, rows, cols) {
   };
 }
 
-// 다음 칸 하나 고르기 — 순수 함수(단위 시험용)
-//  home 놓은 자리 · cur 지금 자리 · radius 집에서 몇 칸까지 · isFree(r,c) · rnd() 0~1
-//  이웃 네 칸 중 갈 수 있는 곳을 고른다. 갈 곳이 없으면 지금 자리 그대로.
-//  [DECO-ANIM-2] 걷기는 좌우만(그림이 옆모습이라 그게 정직하다).
-//  vertical=true 로 부르면 줄 바꾸기(위·아래 한 칸) 후보만 본다 — 드물게 '톡' 뛰는 용도.
-function _animNextCell(home, cur, radius, isFree, rnd, vertical) {
-  const cand = [];
-  const dirs = vertical ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1]];
-  for (const [dr, dc] of dirs) {
-    const r = cur.row + dr, c = cur.col + dc;
-    if (Math.abs(r - home.row) > radius || Math.abs(c - home.col) > radius) continue;
-    if (!isFree(r, c)) continue;
-    cand.push({ row: r, col: c });
+//  다른 동물이 차지한 칸인가 — 지금 칸 · 가는 칸 · 목표 칸(예약)을 모두 본다
+function _animOccMaker(rec, me) {
+  const others = [...rec.items.values()].filter(o => o !== me);
+  const hit = (r, c, w, h, cell) => cell && r < cell.row + h && cell.row < r + me.h && c < cell.col + w && cell.col < c + me.w;
+  return (r, c) => others.some(o => hit(r, c, o.w, o.h, o.cur) || (o.seg && hit(r, c, o.w, o.h, { row: o.seg.r1, col: o.seg.c1 })) || hit(r, c, o.w, o.h, o.goal));
+}
+//  다닐 수 있는 네모 — 우리 안이면 그 안(울타리 줄 뺀 곳) · 아니면 놓은 자리에서 반지름(먹이통이 있으면 거기까지 넉넉히)
+function _animBounds(st) {
+  if (st.pen) return { r0: st.pen.r0, c0: st.pen.c0, r1: st.pen.r1 - (st.h - 1), c1: st.pen.c1 - (st.w - 1) };
+  const R = st.feeder ? Math.max(st.cfg.radius, FEED_RANGE + 2) : st.cfg.radius;
+  return { r0: st.home.row - R, r1: st.home.row + R, c0: st.home.col - R, c1: st.home.col + R };
+}
+//  칸 길찾기(BFS · 4방향) — goal(r,c) 를 만족하는 가장 가까운 칸까지의 길(시작 칸 뺌) · 없으면 null. 순수(시험용)
+function _animBfs(st, goal, occ) {
+  const b = _animBounds(st), K = (r, c) => r * 4096 + c, pw = !!(st.pen && st.pen.water);
+  const s0 = st.cur, prev = new Map([[K(s0.row, s0.col), -1]]), q = [[s0.row, s0.col]];
+  const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]].sort(() => Math.random() - .5);
+  for (let qi = 0; qi < q.length && qi < 2000; qi++) {
+    const [r, c] = q[qi];
+    if ((r !== s0.row || c !== s0.col) && goal(r, c)) {
+      const out = []; let k = K(r, c);
+      while (k !== K(s0.row, s0.col)) { out.unshift({ row: Math.floor(k / 4096), col: k % 4096 }); k = prev.get(k); }
+      return out;
+    }
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc, nk = K(nr, nc);
+      if (nr < b.r0 || nr > b.r1 || nc < b.c0 || nc > b.c1 || prev.has(nk)) continue;
+      if (!st.isFree(nr, nc, st.w, st.h, st.id, st.swim, pw) || (occ && occ(nr, nc))) continue;
+      prev.set(nk, K(r, c)); q.push([nr, nc]);
+    }
   }
-  if (!cand.length) return { row: cur.row, col: cur.col };
-  const i = Math.floor((rnd ? rnd() : Math.random()) * cand.length) % cand.length;
-  return cand[i];
+  return null;
+}
+
+// ── 한 돌림 — 걷는 동물이 있으면 매 틀, 없으면 다음 생각할 때까지 타이머 하나 ──
+let _animRaf = 0, _animRafT = false, _animWakeT = 0;
+function _animKick() {
+  if (_animRaf) return;
+  if (_animWakeT) { clearTimeout(_animWakeT); _animWakeT = 0; }
+  if (typeof requestAnimationFrame === 'function') { _animRafT = false; _animRaf = requestAnimationFrame(_animFrame); }
+  else { _animRafT = true; _animRaf = setTimeout(_animFrame, 16); }
+}
+function _animFrame() { _animRaf = 0; _animTick(Date.now()); }
+function _animLoopStop() {
+  if (_animRaf) { if (_animRafT) clearTimeout(_animRaf); else if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(_animRaf); _animRaf = 0; }
+  if (_animWakeT) { clearTimeout(_animWakeT); _animWakeT = 0; }
+}
+function _animTick(now) {
+  if (typeof document !== 'undefined' && document.hidden) return;   // 숨은 탭 — visibilitychange 가 다시 깨운다
+  let moving = false, soon = Infinity;
+  _animLayers.forEach(rec => rec.items.forEach(st => {
+    if (st.frozen) return;
+    if (st.seg) _animAdvance(st, now);
+    if (!st.seg && now >= st.nextAt) _animThink(st, now);
+    if (st.seg) moving = true; else soon = Math.min(soon, st.nextAt);
+  }));
+  if (moving) _animKick();
+  else if (soon < Infinity && !_animWakeT) _animWakeT = setTimeout(() => { _animWakeT = 0; _animKick(); }, Math.max(16, soon - now));
+}
+
+// ── 걷기 ──
+function _animWalk(st, path, now, arrive) {
+  st.path = path.slice(); st.goal = path[path.length - 1]; st.arrive = arrive || null;
+  st.jx = 0; st.jy = 0; st.gathered = !!arrive && st.gathered;
+  _animSetState(st, 'walk');
+  _animNextSeg(st, now, true);
+}
+function _animNextSeg(st, now, first) {
+  const nx = st.path.shift();
+  //  그 사이 막혔으면(새로 놓은 장식 · 다른 동물) 거기서 선다
+  if (nx && !(st.isFree(nx.row, nx.col, st.w, st.h, st.id, st.swim, !!(st.pen && st.pen.water)) && !_animOccMaker(st.rec, st)(nx.row, nx.col))) { st.path = []; return _animNextSeg(st, now, first); }
+  if (!nx) {
+    st.seg = null; st.goal = null;
+    const arrive = st.arrive; st.arrive = null;
+    if (arrive) arrive(now);
+    else { _animSetState(st, 'idle'); st.nextAt = now + _animRnd(500, 1400); }
+    return;
+  }
+  const m = ANIM_MOOD[st.cfg.mood] || ANIM_MOOD.hen, last = !st.path.length, base = ANIM_STEP_MS / m.speed;
+  if (nx.col !== st.cur.col) _animFace(st, nx.col > st.cur.col ? 1 : -1);
+  st.seg = { r0: st.cur.row, c0: st.cur.col, r1: nx.row, c1: nx.col, t0: now, dur: (first || last) ? base * 1.27 : base, first, last };
+}
+function _animAdvance(st, now) {
+  const s = st.seg;
+  let k = (now - s.t0) / s.dur; if (k > 1) k = 1; if (k < 0) k = 0;
+  const e = s.first && s.last ? k * k * (3 - 2 * k) : s.first ? k * k : s.last ? 1 - (1 - k) * (1 - k) : k;   // 첫 칸은 천천히 떠나고 끝 칸은 천천히 선다
+  st.fx = s.c0 + (s.c1 - s.c0) * e; st.fy = s.r0 + (s.r1 - s.r0) * e;
+  _animPlace(st);
+  if (k >= 1) { st.cur = { row: s.r1, col: s.c1 }; st.seg = null; _animNextSeg(st, now, false); }
+}
+
+// ── 생각 — 먹이통이 있으면 모이기 · 아니면 성격대로 가만히 / 쪼기 / 몇 칸 걷기 ──
+function _animThink(st, now) {
+  if (st.feeder && !st.swim && _animGather(st, now)) return;
+  const m = ANIM_MOOD[st.cfg.mood] || ANIM_MOOD.hen, roll = Math.random();
+  if (roll < m.idle) { _animSetState(st, 'idle'); st.nextAt = now + _animRnd(m.rest[0], m.rest[1]); return; }
+  if (roll < m.idle + m.peck) { _animSetState(st, 'peck'); st.nextAt = now + 1300 * (Math.random() < .5 ? 1 : 2); return; }
+  const want = m.steps[0] + Math.floor(Math.random() * (m.steps[1] - m.steps[0] + 1));
+  const s0 = st.cur;
+  const occ = _animOccMaker(st.rec, st);
+  let p = _animBfs(st, (r, c) => Math.abs(r - s0.row) + Math.abs(c - s0.col) >= want && Math.random() < .35, occ);
+  if (!p) p = _animBfs(st, () => true, occ);   // 좁은 곳(작은 우리 안) — 그만큼 먼 칸이 없으면 갈 수 있는 옆 칸이라도(전엔 거의 안 움직였다)
+  if (p && p.length) _animWalk(st, p.slice(0, want), now);
+  else { _animSetState(st, 'idle'); st.nextAt = now + _animRnd(800, 1600); }
+}
+//  먹이통 둘레 고리 — 체비쇼프 1칸 안 빈 칸 → 다 차면 2칸. 고른 칸은 goal 로 예약 · 도착하면 칸 안에서 조금 비켜 서서 먹이통을 본다
+function _animGather(st, now) {
+  const T = st.feeder, tz = getDecoSize(T.id);
+  const dist = (r, c) => Math.max(Math.max(T.row - (r + st.h - 1), 0, r - (T.row + tz.h - 1)), Math.max(T.col - (c + st.w - 1), 0, c - (T.col + tz.w - 1)));
+  const settle = (t) => {
+    if (!st.jSet) { st.jx = (Math.random() - .5) * .5; st.jy = (Math.random() - .5) * .36; st.jSet = true; }
+    const dc = (T.col + tz.w / 2) - (st.cur.col + st.w / 2);
+    _animFace(st, dc > .01 ? 1 : dc < -.01 ? -1 : (Math.random() < .5 ? 1 : -1));
+    st.fx = st.cur.col; st.fy = st.cur.row; _animPlace(st);
+    _animSetState(st, Math.random() < .7 ? 'peck' : 'idle');
+    st.nextAt = t + _animRnd(1600, 3000);
+  };
+  const dNow = dist(st.cur.row, st.cur.col);
+  if (st.gathered && dNow >= 1 && dNow <= 2) { settle(now); return true; }
+  const occ = _animOccMaker(st.rec, st), b = _animBounds(st), pw = !!(st.pen && st.pen.water);
+  for (let d = 1; d <= 2; d++) {
+    const cand = [];
+    for (let r = T.row - d - st.h + 1; r <= T.row + tz.h - 1 + d; r++) for (let c = T.col - d - st.w + 1; c <= T.col + tz.w - 1 + d; c++) {
+      if (dist(r, c) !== d || r < b.r0 || r > b.r1 || c < b.c0 || c > b.c1) continue;
+      if (!st.isFree(r, c, st.w, st.h, st.id, st.swim, pw) || occ(r, c)) continue;
+      cand.push({ row: r, col: c });
+    }
+    while (cand.length) {
+      const pick = cand.splice(Math.floor(Math.random() * cand.length), 1)[0];
+      if (pick.row === st.cur.row && pick.col === st.cur.col) { st.gathered = true; settle(now); return true; }
+      const p = _animBfs(st, (r, c) => r === pick.row && c === pick.col, occ);
+      if (p) { st.gathered = true; st.jSet = false; _animWalk(st, p, now, settle); return true; }
+    }
+  }
+  return false;   // 고리에 빈 칸이 없다 — 평소처럼 논다
 }
 
 function _animStopLayer(hostId) {
   const rec = _animLayers.get(hostId);
   if (!rec) return;
-  rec.items.forEach(st => { if (st.timer) clearTimeout(st.timer); st.timer = null;
-    if (st.frameTimer) { clearTimeout(st.frameTimer); st.frameTimer = null; } });
   if (rec.layer && rec.layer.parentNode) rec.layer.parentNode.removeChild(rec.layer);
   _animLayers.delete(hostId);
+  if (!_animLayers.size) _animLoopStop();
 }
 
 function _animStopAll() { [..._animLayers.keys()].forEach(_animStopLayer); }
 
-function _animPauseAll() {
-  _animLayers.forEach(rec => rec.items.forEach(st => { if (st.timer) clearTimeout(st.timer); st.timer = null; }));
-}
+function _animPauseAll() { _animLoopStop(); }
 
 function _animResumeAll() {
   if (_animReduced()) return;
-  _animLayers.forEach(rec => rec.items.forEach(st => { if (!st.timer) _animSchedule(st); }));
-}
-
-function _animSchedule(st) {
-  const w = st.cfg.wait;
-  let wait = w[0] + Math.random() * (w[1] - w[0]);
-  // [DECO-FEED-1] 먹이통 옆이면 더 오래 머문다(먹는 것처럼) · 가는 길이면 빨리 걷는다
-  const fd = st.feeder;
-  if (fd) {
-    const near = Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1;
-    wait = near ? wait * 2 : Math.min(wait, 1800);
-  }
-  st.timer = setTimeout(() => _animStep(st), wait);
-}
-
-function _animStep(st) {
-  st.timer = null;
-  if (!st.el || !st.el.parentNode) return;
-  // [DECO-ANIM-2] 좌우로 걷고, 20~35초에 한 번만 줄을 바꾼다(위·아래 한 칸 '톡')
+  //  숨어 있는 동안 멈춘 걸음은 지금부터 다시 잰다(한 번에 순간이동하지 않게)
   const now = Date.now();
-  // [DECO-FEED-1] 먹이통이 있고 아직 그 옆이 아니면 그쪽으로 간다(줄도 더 자주 바꿔 붙는다)
-  const fd = st.feeder;
-  const atFeeder = fd && Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1;
-  const heading = !!(fd && !atFeeder);
-  const hopGap = heading ? 4000 : (20000 + Math.random() * 15000);
-  const wantHop = !st.swim && (heading ? (st.cur.row !== fd.row) : true) && now - (st.lastHop || 0) > hopGap;
-  const free = (r, c) => {
-    if (st.pen && (r < st.pen.r0 || r > st.pen.r1 - (st.h - 1) || c < st.pen.c0 || c > st.pen.c1 - (st.w - 1))) return false;
-    return st.isFree(r, c, st.w, st.h, st.id, st.swim, !!(st.pen && st.pen.water));
-  };
-  const radius = st.pen ? 99 : (heading ? Math.max(st.cfg.radius, FEED_RANGE) : st.cfg.radius);
-  //  먹이통으로 갈 때는 그 방향 한 칸을 먼저 본다(없으면 평소처럼 아무 쪽)
-  let next = null;
-  if (heading) {
-    if (wantHop && st.cur.row !== fd.row) {
-      const rr = st.cur.row + (fd.row > st.cur.row ? 1 : -1);
-      if (free(rr, st.cur.col)) next = { row: rr, col: st.cur.col };
-    }
-    if (!next && st.cur.col !== fd.col) {
-      const cc = st.cur.col + (fd.col > st.cur.col ? 1 : -1);
-      if (free(st.cur.row, cc)) next = { row: st.cur.row, col: cc };
-    }
-  }
-  let hopped = !!(next && next.row !== st.cur.row);
-  if (!next) {
-    next = _animNextCell(st.home, st.cur, radius, free, Math.random, wantHop);
-    hopped = wantHop && (next.row !== st.cur.row);
-    if (wantHop && !hopped) next = _animNextCell(st.home, st.cur, radius, free, Math.random, false);
-  }
-  if (hopped) st.lastHop = now;
-
-  if (next.row !== st.cur.row || next.col !== st.cur.col) {
-    const imgEl = st.el.querySelector('img');
-    if (next.col !== st.cur.col && imgEl) {
-      const dir = next.col > st.cur.col ? 1 : -1;
-      imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';   // [DECO-EAT-1] 왼쪽을 보는 그림은 반대로
-    }
-    const dur = hopped ? 300 : (900 + Math.random() * 700);
-    st.from = { row: st.cur.row, col: st.cur.col }; st.fromAt = Date.now();   // [DECO-PT-1] 걷는 동안 떠난 칸도 누를 수 있게
-    // 걸음 그림 두 장이 있으면 걷는 동안만 바꿔 준다(헤엄은 발이 안 보이니 안 바꾼다)
-    if (imgEl && _animFrameB[st.id] && !st.swim && !hopped) {
-      imgEl.src = './assets/deco/' + encodeURIComponent(st.id) + '_b.svg';
-      if (st.frameTimer) clearTimeout(st.frameTimer);
-      st.frameTimer = setTimeout(() => { st.frameTimer = null; if (imgEl) imgEl.src = st.srcA; st.eating = null; _animEatSync(st); }, dur);
-    }
-    st.el.style.transitionDuration = dur + 'ms';
-    st.cur = next;
-    st.el.style.transform = 'translate(' + (next.col * st.C) + 'px,' + (next.row * st.C) + 'px)';
-    st.el.style.zIndex = String(next.row);
-  }
-  _animEatSync(st);   // [DECO-EAT-1]
-  _animSchedule(st);
+  _animLayers.forEach(rec => rec.items.forEach(st => { if (st.seg) st.seg.t0 = now - Math.min(now - st.seg.t0, st.seg.dur * .5); }));
+  _animKick();
 }
 
-function _animEatSync(st) {
-  const imgEl = st.el && st.el.querySelector('img'); if (!imgEl) return;
-  const fd = st.feeder;
-  const near = !!(fd && Math.abs(st.cur.row - fd.row) + Math.abs(st.cur.col - fd.col) <= 1);
-  const eat = near && !st.swim && _animFrameEat[st.id];
-  const swim = !!(st.swim && _animFrameSwim[st.id]);   // [DECO-SWIM-1]
-  const want = eat ? './assets/deco/' + encodeURIComponent(st.id) + '_eat.svg'
-             : swim ? './assets/deco/' + encodeURIComponent(st.id) + '_swim.svg' : st.srcA;
-  const mode = eat ? 'eat' : swim ? 'swim' : 'rest';
-  if (st.eating === mode) return;
-  //  걸음 장(_b)이 도는 중이면 그 타이머가 끝날 때 다시 부른다
-  if (st.frameTimer) return;
-  imgEl.src = want; st.eating = mode;
-  //  먹을 때는 먹이통 쪽을 본다
-  if (eat && fd.col !== st.cur.col) {
-    const dir = fd.col > st.cur.col ? 1 : -1;
-    imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';
-  }
-}
-
-// [DECO-ANIM-2] 동물을 누르면 — 말풍선 + 폴짝. 강아지는 누른 쪽으로 한 칸 다가온다.
-//  손가락이 어느 동물을 눌렀는지는 '판의 칸'으로 찾는다(층은 손가락을 통과시킨다).
+// [DECO-ANIM-2] 동물을 누르면 — 손가락이 어느 동물을 눌렀는지는 '판의 칸'으로 찾는다(층은 손가락을 통과시킨다).
 function _animAt(hostId, r, c) {
   const rec = _animLayers.get(hostId);
   if (!rec) return null;
-  //  [DECO-PT-1] 그림은 발 칸 위로 솟는다 → 발 칸 위 한 줄까지 · 걷는 1초 남짓은 떠난 칸도 맞는다
+  //  그림은 발 칸 위로 솟는다 → 발 칸 위 한 줄까지 · 걷는 중이면 지금 그려진 자리(반올림)와 가는 칸
   const hitAt = (row, col, st) => r >= row - 1 && r < row + st.h && c >= col && c < col + st.w;
   for (const st of rec.items.values()) {
-    if (hitAt(st.cur.row, st.cur.col, st)) return st;
-    if (st.from && Date.now() - st.fromAt < 1700 && hitAt(st.from.row, st.from.col, st)) return st;
+    if (hitAt(Math.round(st.fy), Math.round(st.fx), st) || hitAt(st.cur.row, st.cur.col, st)) return st;
+    if (st.seg && hitAt(st.seg.r1, st.seg.c1, st)) return st;
   }
   return null;
 }
-
+//  그림이 발밑 칸 위로 솟은 칸 수(bbox.json) — 말풍선·💗 를 머리 위에
+function _animOverCells(st) {
+  const bb = typeof _decoBBox !== 'undefined' && _decoBBox && _decoBBox[st.id];
+  if (!Array.isArray(bb) || !(bb[4] > 0)) return 1;
+  return Math.max(0, (bb[5] - bb[1]) * (st.w / bb[4]) - st.h);
+}
 function _animPoke(st, fromCol) {
   if (!st || !st.el) return false;
-  // 말풍선
+  const now = Date.now(), over = _animOverCells(st) * (st.C || 0);
+  //  말풍선 · 💗
   const say = document.createElement('div');
   say.className = 'deco-anim-say';
   say.textContent = st.cfg.say || '…';
+  if (over) say.style.marginBottom = Math.round(over) + 'px';
   st.el.appendChild(say);
   setTimeout(() => { if (say.parentNode) say.parentNode.removeChild(say); }, 1200);
-  // 폴짝
-  const bob = st.el.querySelector('.bob');
-  if (bob) { bob.classList.remove('hop'); void bob.offsetWidth; bob.classList.add('hop'); }
-  // 강아지는 부르면 온다 — 누른 쪽으로 한 칸
+  const heart = document.createElement('div');
+  heart.className = 'deco-anim-heart';
+  heart.textContent = '💗';
+  if (over) heart.style.marginBottom = Math.round(over) + 'px';
+  st.el.appendChild(heart);
+  setTimeout(() => { if (heart.parentNode) heart.parentNode.removeChild(heart); }, 1200);
+  //  기쁨 — 그 그림이 있으면 한 번(0.9초) · 없으면 폴짝
+  const a = _animArt[st.id] || {};
+  if (!a.happy) { const bob = st.el.querySelector('.bob'); if (bob) { bob.classList.remove('hop'); void bob.offsetWidth; bob.classList.add('hop'); } }
+  //  둘레(6칸)의 가만히 있는 동물이 그쪽을 본다
+  if (st.rec) st.rec.items.forEach(o => {
+    if (o === st || o.seg || o.state === 'happy' || Math.max(Math.abs(o.cur.row - st.cur.row), Math.abs(o.cur.col - st.cur.col)) > 6) return;
+    if (o.cur.col !== st.cur.col) _animFace(o, st.cur.col > o.cur.col ? 1 : -1);
+  });
+  if (st.frozen || st.seg) return true;   // 걷는 중이면 말만(걸음을 끊지 않는다)
+  //  강아지는 부르면 온다 — 누른 쪽으로 한 칸
   if (st.cfg.come && fromCol !== undefined) {
-    const dir = fromCol > st.cur.col ? 1 : (fromCol < st.cur.col ? -1 : 0);
-    const to = { row: st.cur.row, col: st.cur.col + dir };
-    const penOk = !st.pen || (to.col >= st.pen.c0 && to.col <= st.pen.c1 - (st.w - 1));
-    if (dir && penOk && st.isFree(to.row, to.col, st.w, st.h, st.id, st.swim)) {
-      const imgEl = st.el.querySelector('img');
-      if (imgEl) imgEl.style.transform = 'scaleX(' + (st.cfg.artLeft ? -dir : dir) + ')';
-      st.cur = to;
-      st.el.style.transitionDuration = '500ms';
-      st.el.style.transform = 'translate(' + (to.col * st.C) + 'px,' + (to.row * st.C) + 'px)';
+    const dir = fromCol > st.cur.col ? 1 : (fromCol < st.cur.col ? -1 : 0), to = { row: st.cur.row, col: st.cur.col + dir }, b = _animBounds(st);
+    if (dir && to.col >= b.c0 && to.col <= b.c1 && st.isFree(to.row, to.col, st.w, st.h, st.id, st.swim, !!(st.pen && st.pen.water)) && !_animOccMaker(st.rec, st)(to.row, to.col)) {
+      _animWalk(st, [to], now); _animKick(); return true;
     }
   }
+  _animSetState(st, 'happy'); st.nextAt = now + 900;   // 0.9초 한 번 돌고 멈추는 그림 — 끝나면 다음 생각이 가만히로 돌린다
+  _animKick();
   return true;
 }
 
@@ -8794,7 +8872,9 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
 
   const isFree = _animFreeMaker(student, rows, cols);
   const feeders = _feedersOf(student);   // [DECO-FEED-1]
-  const keep = new Set();
+  const keep = new Set(), now = Date.now(), still = _animReduced();
+  //  보이는 칸 범위(한 칸 여유) — 밖이면 쉰다
+  const vr0 = (panY || 0) / C - 2, vr1 = ((panY || 0) + H) / C + 1, vc0 = (panX || 0) / C - 1, vc1 = ((panX || 0) + W) / C + 1;
 
   list.forEach(p => {
     const d = GAME_DATA.decorations.find(x => x.id === p.id);
@@ -8810,41 +8890,39 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
       bob.className = 'bob';
       const img = document.createElement('img');
       img.alt = d.name || '';
-      const srcA = './assets/deco/' + encodeURIComponent(p.id) + '.svg';
-      img.src = srcA;
       bob.appendChild(img);
       el.appendChild(bob);
       rec.world.appendChild(el);
-      _animProbeFrameB(p.id);
-      _animProbeEat(p.id);   // [DECO-EAT-1]
-      _animProbeSwim(p.id);  // [DECO-SWIM-1]
-      st = { el, id: p.id, srcA, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, timer: null, frameTimer: null,
-        lastHop: Date.now() };   // [DECO-WORDS-1] '20~35초에 한 번'을 첫 걸음부터 지킨다(0 이면 놓자마자 줄을 바꿨다)
+      _animProbeArt(p.id);
+      st = { el, img, id: p.id, home: { row: p.row, col: p.col }, cur: { row: p.row, col: p.col }, fx: p.col, fy: p.row, jx: 0, jy: 0,
+        dir: 1, state: 'idle', src: '', seg: null, path: [], goal: null, arrive: null,
+        nextAt: now + _animRnd(400, 2400) };   // 처음 생각은 조금씩 어긋나게(한꺼번에 움직이지 않게)
       rec.items.set(key, st);
     }
+    st.rec = rec;
     st.cfg = ANIM_DECO[p.id];
     st.w = sz.w; st.h = sz.h; st.C = C;
     st.isFree = isFree;
-    // [DECO-ANIM-2] 물에 놓인 오리는 물에서만 다닌다(놓인 자리 바닥으로 판정)
     st.pen = _penAt(student, p.row, p.col);   // [DECO-ANIM-3] 우리 안이면 그 안에서만
-    if (_animFrameSwim[p.id] || _animFrameEat[p.id]) _animEatSync(st);   // [DECO-SWIM-1] 이미 확인된 그림이면 바로
     st.feeder = _feederFor(student, st, feeders);   // [DECO-FEED-1] 갈 먹이통(없으면 null)
+    if (!st.feeder) st.gathered = false;
     //  헤엄: 바닥을 물로 칠한 자리이거나, 물 있는 우리(연못 우리) 안이면
     st.swim = !!(st.cfg.water && (_groundAt(student, p.row, p.col) === 'water' || (st.pen && st.pen.water)));
     st.el.classList.toggle('swim', st.swim);
+    //  쉼: 움직임 줄이기 · 화면 밖(걷는 중이면 그 걸음은 끝낸 자리로)
+    const vis = st.fx + st.w > vc0 && st.fx < vc1 && st.fy + st.h > vr0 && st.fy < vr1;
+    const frozen = still || !vis;
+    if (frozen && st.seg) { st.cur = { row: st.seg.r1, col: st.seg.c1 }; st.fx = st.cur.col; st.fy = st.cur.row; st.seg = null; st.path = []; st.goal = null; st.arrive = null; st.state = 'idle'; }
+    if (frozen !== st.frozen) { st.frozen = frozen; if (!frozen) st.nextAt = Math.min(st.nextAt, now + _animRnd(300, 1500)); }
+    _animApplySrc(st);
     st.el.style.width = (sz.w * C) + 'px';
     st.el.style.height = (sz.h * C) + 'px';
-    st.el.style.transitionDuration = '0ms';
-    st.el.style.transform = 'translate(' + (st.cur.col * C) + 'px,' + (st.cur.row * C) + 'px)';
-    st.el.style.zIndex = String(st.cur.row);
-    if (!st.timer && !_animReduced() && !document.hidden) _animSchedule(st);
+    _animPlace(st);
   });
 
   [...rec.items.keys()].forEach(k => {
     if (keep.has(k)) return;
     const st = rec.items.get(k);
-    if (st.timer) clearTimeout(st.timer);
-    if (st.frameTimer) clearTimeout(st.frameTimer);
     if (st.el && st.el.parentNode) st.el.parentNode.removeChild(st.el);
     rec.items.delete(k);
   });
@@ -8853,6 +8931,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     _animHooked = true;
     document.addEventListener('visibilitychange', () => { if (document.hidden) _animPauseAll(); else _animResumeAll(); });
   }
+  if (!still && !(typeof document !== 'undefined' && document.hidden)) _animKick();
 }
 
 // ══ 장식 SVG 파이프라인 (DECO-SVG-1) ══════════════════════
@@ -9333,7 +9412,7 @@ function _drawYard() {
     const sd = GAME_DATA.decorations.find(x=>x.id===SEL_DECO);
     if(sd?.cat==='yard') {
       // [DECO-SEL-HL-1] 놓을 수 있는 칸을 칸마다 한 번 + 둘레 한 줄 — 보이는 칸만 그린다(세는 것은 상태가 바뀔 때 한 번)
-      _decoDrawOkCells(_decoOkCells('yard'), 0, 0, C, _decoVisible(DY.rows, DY.cols));
+      _decoDrawOkCells(_decoOkCells('yard'), 0, 0, C, _decoVisible(DY.rows, DY.cols), _decoAnimHomeCells());
     }
   }
 

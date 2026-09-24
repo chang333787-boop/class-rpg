@@ -323,8 +323,8 @@
       out('서버_공간3바닥', !!(sv.yardFloors && sv.yardFloors[3]));
     }
 
-    //  ⑨ 먹는 장(DECO-EAT-1) — 먹이통(d_y69, 9/20 머지)은 시험에서만 표에 넣는다
-    if (typeof _animEatSync === 'function') {
+    //  ⑨ 먹는 장(DECO-EAT-1 → DECO-ANIM-LIVE-1) — 먹이통(d_y69, 9/20 머지)은 시험에서만 표에 넣는다
+    if (typeof _animSrcFor === 'function') {
       if (!GAME_DATA.decorations.find(d => d.id === 'd_y69'))
         GAME_DATA.decorations.push({ id: 'd_y69', name: '먹이통', icon: '🥣', cat: 'yard', rarity: 'common', price: 20, feeder: true });
       decoSpaceSet(3); await sleep(200);
@@ -342,10 +342,13 @@
       await sleep(100);
       const rec = _animLayers.get(_ifActiveContainer || 'house-topview');
       const hen = rec && [...rec.items.values()].find(x => x.id === 'd_y55');
-      if (hen) { _animEatSync(hen); }
-      const img = hen && hen.el.querySelector('img');
-      out('먹이통옆_닭_먹는장', !!(img && /d_y55_eat\.svg/.test(img.src)));
-      out('먹는장_파일있음', !!_animFrameEat['d_y55']);
+      //  먹이통 바로 옆 닭 — 생각하면 고리 안이라 그 자리에서 먹이통을 보고 쫀다(쪼기 그림은 _peck, 없으면 옛 _eat)
+      //  (화면 밖 동물은 쉰다[DECO-ANIM-LIVE-1] — 그 닭이 가운데 오게 층을 맞춘다)
+      if (hen) _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, hen.cur.col * _dC - _dW / 2, hen.cur.row * _dC - _dH / 2);
+      if (hen) { hen.nextAt = 0; hen.gathered = true; _animTick(Date.now()); }
+      out('먹이통옆_닭_먹는장', !!(hen && /d_y55_(peck|eat)\.svg/.test(_animSrcFor(hen, 'peck'))));
+      out('먹이통옆_닭_먹이통봄', !!(hen && hen.dir === -1 && !hen.seg));
+      out('먹는장_파일있음', !!(_animArt['d_y55'] && (_animArt['d_y55'].peck || _animArt['d_y55'].eat)));
       const sheep = rec && [...rec.items.values()].find(x => x.id === 'd_y40');
       out('양_그림왼쪽표시', !!(sheep && sheep.cfg.artLeft));
       decoSpaceSet(1); await sleep(200);
@@ -415,8 +418,8 @@
         _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
         const rec = _animLayers.get(host), st = rec && [...rec.items.values()].find(x => x.id === 'd_y53');
         if (!st) return;   // (고치기 전 판에서는 위에서 강아지가 이미 사라진다 — 뒤 시험이 계속 돌게)
-        if (st.timer) { clearTimeout(st.timer); st.timer = null; }
-        st.cur = { row: 30, col }; st.from = null;
+        st.seg = null; st.path = []; st.goal = null; st.nextAt = Infinity;   // 걸음을 멈추고 그 칸에 세운다
+        st.cur = { row: 30, col }; st.fx = col; st.fy = 30;
       };
       const dogs = () => _decoList(CUR).filter(p => p.id === 'd_y53').length;
       walkTo(13);
@@ -475,22 +478,23 @@
 
     //  ⑩-4 닫은 뒤에는 동물이 걷지 않는다(DECO-ANIM-HIDDEN-1) — 안 보이는 작은 판에 층·타이머가 생기던 것
     if (typeof _animSyncLayer === 'function') {
-      const timers = () => { let n = 0; _animLayers.forEach(rec => rec.items.forEach(st => { if (st.timer) n++; })); return n; };
+      //  [DECO-ANIM-LIVE-1] 동물마다 타이머가 아니라 한 돌림 — 돌고 있으면 1
+      const timers = () => (_animRaf || _animWakeT) ? 1 : 0;
       const keep = CUR.houseDecorations;
       CUR.houseDecorations = (keep || []).filter(p => p.id !== 'd_y53' && p.id !== 'd_y55').concat([{ id: 'd_y53', area: 'yard', row: 20, col: 6 }, { id: 'd_y55', area: 'yard', row: 21, col: 9 }]);
       _drawDeco(); await sleep(200);
       out('열려있을때_동물층', _animLayers.size + '층·타이머 ' + timers());
-      out('열려있을때_동물_걷는다', _animLayers.size === 1 && timers() === 2);
+      out('열려있을때_동물_걷는다', _animLayers.size === 1 && timers() === 1);
       closeInteriorFullscreen(); await sleep(300);
       out('닫은뒤_동물층_0', _animLayers.size === 0 && timers() === 0 && !document.querySelector('.deco-anim'));
       openInteriorFullscreen(); await sleep(400);
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
-      out('다시열면_동물_돌아옴', _animLayers.size === 1 && timers() === 2);
+      out('다시열면_동물_돌아옴', _animLayers.size === 1 && timers() === 1);
       CUR.houseDecorations = keep; _drawDeco(); await sleep(100);
     }
 
     //  ⑪ 헤엄 장·밭은 공간 1 만·다 썼을 때 어느 공간(DECO-SWIM-1·DECO-PT-3)
-    if (typeof _animProbeSwim === 'function') {
+    if (typeof _animProbeArt === 'function') {
       decoSpaceSet(3); await sleep(200);
       if (!_dCv) { renderHouseDeco(); await sleep(200); }
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
@@ -506,6 +510,7 @@
       await sleep(100);
       const rec = _animLayers.get(host);
       const duck = rec && [...rec.items.values()].find(x => x.id === 'd_y56');
+      if (duck) _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, duck.cur.col * _dC - _dW / 2, duck.cur.row * _dC - _dH / 2);   // 화면 밖이면 쉰다 — 가운데로
       const img = duck && duck.el.querySelector('img');
       out('물위오리_헤엄장', !!(img && /d_y56_swim\.svg/.test(img.src)));
       //  밭 칸은 공간 3 에서 놓을 수 있다(그림도 안 나온다)
@@ -1458,6 +1463,26 @@
       const ts = [...document.querySelectorAll('.toast-msg')], dr = document.getElementById('if-deco-drawer').getBoundingClientRect();
       out('알림_하나만', ts.length === 1 && ts[0].textContent === '둘');
       out('알림_서랍위', ts.length > 0 && ts[0].getBoundingClientRect().bottom <= dr.top + 1);
+    }
+
+    //  ㉝ 살아 있는 동물(DECO-ANIM-LIVE-1) — 돌림 하나 · 상태 그림 · 동물 제자리는 놓을 곳 표시에서 빈 네모로 안 남는다(ⓑ58)
+    if (typeof _animBfs === 'function') {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      CUR.houseDecorations.push({ id: 'd_y54', area: 'yard', row: 12, col: 12, sp: 3 });
+      _drawDeco(); await sleep(200);
+      const host = _ifActiveContainer || 'house-topview';
+      _animSyncLayer(host, CUR, DECO_SCENE, _dC, _dW, _dH, 12 * _dC - _dW / 2, 12 * _dC - _dH / 2);
+      out('동물_돌림하나', !!(_animRaf || _animWakeT));
+      const cat = [..._animLayers.get(host).items.values()].find(x => x.id === 'd_y54');
+      await sleep(600);
+      out('동물_상태그림', !!(cat && /d_y54(_idle|_walk|_peck|_happy)?\.svg/.test(cat.img.src) && cat.el.classList.contains('live') === !!(_animArt.d_y54 && _animArt.d_y54.idle)));
+      SEL_DECO = 'd_y2';
+      out('동물제자리_놓을곳덩어리', _decoAnimHomeCells().has('12_12') && !_decoOkCells('yard').has('12_12'));
+      SEL_DECO = null; CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      decoSpaceSet(1); await sleep(150);
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
