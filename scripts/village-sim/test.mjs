@@ -114,7 +114,7 @@ process.stdout.write('@@' + JSON.stringify({ h: w.__health(), t: w.__exportText(
   ok(c.h.걸쇠 && c.h.필요.join() === '장보기,놀이,쉼,배움,건강' && c.h.되살림 === 1, '다시 열기 ' + c.h.필요.join());
   ok(!d.h.제공 && !d.h.필요.includes('건강'), 'onebridge ' + d.h.필요.join());
   ok(!e.h.제공 && e.h.필요.join() === '물,장보기,놀이,쉼' && e.h.의원.필요 === null, 'town3 ' + e.h.필요.join());
-  ok(!f.h.제공 && !f.h.걸쇠 && !/"건강"/.test(f.t) && f.h.의원.필요 === null && !f.h.의원.트레이, '끔 ' + f.h.필요.join());
+  ok(!f.h.제공 && !f.h.걸쇠 && !/"건강"/.test(f.t) && !/"clinic"/.test(f.t) && f.h.의원.필요 === null && !f.h.의원.트레이, '끔 ' + f.h.필요.join() + ' · clinic 해금 남음? ' + /"clinic"/.test(f.t));
 });
 
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));

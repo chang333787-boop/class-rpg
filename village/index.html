@@ -11916,7 +11916,8 @@ window.__waitSignTry = (miss) => { const root = [...WAITLOOK.miss.keys()].find(r
 /* ── [MAC-HEALTH] 🏥 건강 — 마을이 커지면 '아플 때 갈 곳'도 바란다 (보스 09-24 결정 1·2·3 · docs/village_need_health.md PR 2) ──
    물을 뺀 빈 자리를 '건강'이 채운다. 배움(80)과 같은 꼴 — 주민 100명부터(VRULES.health.pop · 결정 1) · 한 번 켜지면 안 꺼진다(저장 칸 `건강: 1` · 결정 3 · SAVE_V 그대로 · sync.js 0).
    · 시설 = [DESIGN-HOSPITAL] 의 동네 의원(K.clinic — 모양은 그 블록). 여기서는 값만: need '건강' · 일자리 2 · 거리는 다른 시설과 같다(14 · 큰길 20)
-     · 해금 인구 80(필요보다 먼저 · 따로 한 줄) · 트레이 '🏠 집·가게'의 옛 우물 자리. 작은 병원은 숨긴 채(따로 PR).
+     · 해금 인구 80(필요보다 먼저 · 옛 80 줄 온실·돌다리·기차역에 기차역 앞으로 끼움 — 🔓 소식 한 번 · 노란 자리 안내는 그대로 기차역) · 트레이 '🏠 집·가게'의 옛 우물 자리. 작은 병원은 숨긴 채(따로 PR).
+     · 80 줄이 이미 열린 마을은 의원도 조용히 연다(열 때 · 인구가 80 아래여도) — 옛 셋까지 '방금 열렸어요'라고 하지 않게.
    · 돌아섬에는 안 넣는다(결정 2 — AWAY_NEEDS 셋 그대로 · 그래서 기다리는 집 팻말에도 건강은 안 선다).
    · 날마다 가는 곳이 아니다(1절 뜻 3): 볼일 목적지(pickDestination errand)와 붐빔 셈(crowdHomesStep)에서 건강을 뺀다 — 아픈 주민 나들이는 주민 연기(PR 4).
    · 켜는 조건(healthOffer): 스위치 · K.clinic · 물을 뺀 판(NOWATER.off — 물을 지키는 판·needWater.on 은 옛 넷 그대로) · 판 '건물' 목록에 의원이 있거나 목록 없음 ·
@@ -11927,7 +11928,7 @@ window.__waitSignTry = (miss) => { const root = [...WAITLOOK.miss.keys()].find(r
    · 🏥 표시·풍선 그림은 처음 쓸 때 만든다(불러올 때 three 객체를 만들면 그림 난수 줄기가 밀린다).
    원래 줄 수정 2(pickDestination 볼일 칸 · 첫 돌아섬 안내 키) · 덧붙인 줄 2(NEED_TXT.건강 · loadSaved 되살리기) · 시험 훅 둘은 [MAC-LEARNSAVE] 아래 ②. 분류 '판정'. */
 (window.VRULES = window.VRULES || {}).health = { on: true, pop: 100 };
-const HEALTH = { on: false, offer: false, rulesRead: false, sayPending: false, sayIm: null, whyIm: null, stats: { 바뀜: 0, 걸쇠켬: 0, 되살림: 0, 열림: 0, 맞춤: 0 } };
+const HEALTH = { on: false, offer: false, rulesRead: false, sayPending: false, opened: false, sayIm: null, whyIm: null, stats: { 바뀜: 0, 걸쇠켬: 0, 되살림: 0, 열림: 0, 맞춤: 0 } };
 const HEALTH_VAL = { need: '건강', jobs: 2, lockPop: 80, tab: USE_TABS[1][0] };
 const HEALTH_K0 = K.clinic ? { need: K.clinic.need, jobs: K.clinic.jobs, grp: K.clinic.grp, grp0: K.clinic.grp0 } : null;
 const HEALTH_ROW = { pop: HEALTH_VAL.lockPop, kinds: ['clinic'] };   /* 인구 80 줄(온실·돌다리·기차역)에 끼운다 — 따로 줄이면 🔓 소식이 두 번 뜬다 · 그 줄이 없을 때만 이 줄 */
@@ -11957,13 +11958,14 @@ function healthFac(on) {
   const q = K.clinic; if (!q) return;
   if (on) {
     q.need = HEALTH_VAL.need; q.jobs = HEALTH_VAL.jobs; q.grp = q.grp0 = HEALTH_VAL.tab; LOCK_POP.clinic = HEALTH_VAL.lockPop;
-    if (!UNLOCKS.some(u => u.kinds.includes('clinic'))) { const u80 = UNLOCKS.find(u => u.pop === HEALTH_VAL.lockPop); if (u80) u80.kinds.push('clinic'); else UNLOCKS.push(HEALTH_ROW); }
+    if (!UNLOCKS.some(u => u.kinds.includes('clinic'))) { const u80 = UNLOCKS.find(u => u.pop === HEALTH_VAL.lockPop); if (u80) { const j = u80.kinds.indexOf('station'); u80.kinds.splice(j >= 0 ? j : u80.kinds.length, 0, 'clinic'); } else UNLOCKS.push(HEALTH_ROW); }
     if (ORDER.indexOf('clinic') < 0) { const w = ORDER.indexOf('well'), sh = ORDER.indexOf('shop'); if (w >= 0) ORDER.splice(w + 1, 0, 'clinic'); else if (sh >= 0) ORDER.splice(sh, 0, 'clinic'); else ORDER.push('clinic'); }
   } else {
     if (HEALTH_K0.need === undefined) delete q.need; else q.need = HEALTH_K0.need;
     if (HEALTH_K0.jobs === undefined) delete q.jobs; else q.jobs = HEALTH_K0.jobs;
     q.grp = HEALTH_K0.grp; q.grp0 = HEALTH_K0.grp0; delete LOCK_POP.clinic;
     const r = UNLOCKS.indexOf(HEALTH_ROW); if (r >= 0) UNLOCKS.splice(r, 1); UNLOCKS.forEach(u => { const j = u.kinds.indexOf('clinic'); if (j >= 0) u.kinds.splice(j, 1); });
+    if (HEALTH.opened && !countKind('clinic')) unlocked.delete('clinic'); HEALTH.opened = false;   /* 이 블록이 연 해금은 되돌린다(도중에 끌 때 — 저장 글이 옛과 같게) */
     const o = ORDER.indexOf('clinic'); if (o >= 0) ORDER.splice(o, 1);
   }
   JOBH.wpDirty = true; sat.clear(); WAITMEMO.ver++; HEALTH.stats.바뀜++;
@@ -11977,14 +11979,15 @@ function healthSync(say, boot) {
     HEALTH.on = true; HEALTH.stats.걸쇠켬++;
     if (say && R.pop > 0) HEALTH.sayPending = true;
   }
-  if (healthLive() && !VISIT.on && !unlocked.has('clinic')) { unlocked.add('clinic'); HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
+  if (healthLive() && !VISIT.on && !unlocked.has('clinic')) { unlocked.add('clinic'); HEALTH.opened = true; HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
   return needsCompose();
 }
 function healthSayNow() { if (!HEALTH.sayPending || !healthLive() || VISIT.on || performance.now() < NEWS.busyUntil) return; HEALTH.sayPending = false; sayOnce('🏥 마을이 커졌어요 — 이제 아플 때 갈 곳도 바라요(동네 의원)', true); }
 function healthRestore() { if (HEALTH.on) return; HEALTH.on = true; HEALTH.stats.되살림++; needsCompose(); }
 /* 열 때 이미 인구 80 을 넘은 마을 — checkUnlocks 는 이사 때만 돌아 잠긴 채 남는다 → 조용히 연다(🔓 소식은 곧 올 🏥 소식을 덮을 수 있어 안 한다) */
 function healthLoaded() {
-  if (HEALTH.offer && !VISIT.on && !unlocked.has('clinic') && population() >= HEALTH_VAL.lockPop) { unlocked.add('clinic'); HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
+  const row = UNLOCKS.find(u => u.kinds.includes('clinic')), rowOpen = !!(row && row.kinds.length > 1 && row.kinds.every(k => k === 'clinic' || unlocked.has(k)));
+  if (HEALTH.offer && !VISIT.on && !unlocked.has('clinic') && (population() >= HEALTH_VAL.lockPop || rowOpen)) { unlocked.add('clinic'); HEALTH.opened = true; HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
   needsCompose();
 }
 function healthSayMesh() {
