@@ -3,7 +3,7 @@
 // 정적 서버도 스스로 띄운다(127.0.0.1 · 저장소 뿌리). sid 는 늘 guest · 운영 DB·구글 주소는 막는다(Network.setBlockedURLs). 끝나면 브라우저·서버를 닫는다(발열 규칙).
 //
 // 판 하나 = '판이름' 또는 '판이름+저장본'(저장본을 그 판 칸에 넣고 다시 연다 · 기본 판은 '기본'). 빈 시작 땅은 사람이 없어 잴 게 없으므로 기본 여섯은 저장본을 얹는다.
-//   node scripts/village-hunt/hunt.mjs                         # 기본 판 여섯 × 60초 · 아침 8시
+//   node scripts/village-hunt/hunt.mjs                         # 기본 판 일곱(원본 마을 origin 포함 · 09-24) × 60초 · 아침 8시
 //   node scripts/village-hunt/hunt.mjs --boards town3,farm+village/stages/boards/mid36.json --sec 30
 //   node scripts/village-hunt/hunt.mjs --hour none --json out.json      # 저장본의 시각 그대로
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import http from 'node:http'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
@@ -11,14 +11,14 @@ import { spawn } from 'node:child_process'; import fs from 'node:fs'; import htt
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const MID = 'village/stages/boards/mid36.json';
-const BOARDS = opt('boards', `기본+village/stages/boards/pop167.json,town3,farm+${MID},city+${MID},sea+${MID},mountain+${MID}`).split(',').map(s => s.trim()).filter(Boolean);
+const BOARDS = opt('boards', `기본+village/stages/boards/pop167.json,origin,town3,farm+${MID},city+${MID},sea+${MID},mountain+${MID}`).split(',').map(s => s.trim()).filter(Boolean);
 const WARM = +opt('warm', 2), SEC = +opt('sec', 60), HOUR = opt('hour', '8') === 'none' ? null : +opt('hour', '8'), JSON_OUT = opt('json', null);
 const CHROME = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell');
 if (!fs.existsSync(CHROME)) { console.error('헤드리스 크로미움이 없다: ' + CHROME + ' — CHROME=<경로> 로 알려 주거나 npx playwright install chromium-headless-shell'); process.exit(2); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* 기준 — 창조자 25회 3절 · ACT-SPACE(#881) 와 함께 정한 화면판 기준 */
-const PASS = { 포갬쌍: 0.5, 오래포갬ms: 1000, 우표: 0.4, 프레임ms: 20, 한칸박자: 0.5 };   /* 포갬 FAIL 은 '오래 포갬'(같은 둘이 1초 넘게 0.6 안) — 평균은 스쳐 지나감이 대부분이라 주의로만(09-23 · mountain 320쌍 중 317쌍이 0.3초 안) */
+const PASS = { 포갬쌍: 0.5, 오래포갬ms: 1000, 오래포갬프레임: 20, 우표: 0.4, 프레임ms: 20, 한칸박자: 0.5 };   /* 포갬 FAIL 은 '오래 포갬'(같은 둘이 1초 넘게 0.6 안) — 평균은 스쳐 지나감이 대부분이라 주의로만(09-23 · mountain 320쌍 중 317쌍이 0.3초 안) */
 
 /* ── 정적 서버 ── */
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
@@ -38,7 +38,7 @@ const evaluate = async (src) => { const r = await send('Runtime.evaluate', { exp
 /* 페이지 안에서 도는 잰 것 — 프레임마다(튐) · 0.5초마다(나머지) · 모두 읽기 훅만 */
 const SAMPLER = `
 const SEC = ${SEC}, HOUR = ${HOUR == null ? 'null' : +HOUR}, WARM = ${WARM};
-const sleep = ms => new Promise(r => setTimeout(r, ms)), PASS_LONG = ${PASS.오래포갬ms};
+const sleep = ms => new Promise(r => setTimeout(r, ms)), PASS_LONG = ${PASS.오래포갬ms}, PASS_FR = ${PASS.오래포갬프레임};
 for (let k = 0; k < 80 && window.__LOADMS == null; k++) await sleep(250);
 if (window.__LOADMS == null) return { 오류: '부팅 안 됨' };
 [...document.querySelectorAll('button')].filter(x => ['시작', '닫기'].includes(x.textContent.trim()) && x.offsetParent).forEach(b => b.click());
@@ -60,8 +60,8 @@ await new Promise(done => { const f = () => { const now = performance.now() - t0
   P.forEach(p => { const q = prev.get(p[0]); if (!slow && q && q[3] && p[3] && q[4] === p[4] && q[7] === p[7]) { const d = Math.hypot(p[1] - q[1], p[2] - q[2]); if (d > 2) { R.튐++; if (R.튐예.length < 3) R.튐예.push(p[4] + ' ' + d.toFixed(1) + ' @' + Math.round(now / 1000) + 's ' + Math.round(dt) + 'ms'); } } prev.set(p[0], p); });
   { const V = P.filter(p => p[3]), seen = new Set();   /* 같은 둘이 얼마나 오래 겹쳤나 — 매 프레임 */
     for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) { if (Math.abs(V[a][1] - V[b][1]) >= 0.6 || Math.abs(V[a][2] - V[b][2]) >= 0.6 || Math.hypot(V[a][1] - V[b][1], V[a][2] - V[b][2]) >= 0.6) continue;
-      const k = V[a][0] + '-' + V[b][0]; seen.add(k); if (!ov.has(k)) ov.set(k, { t: now, kind: V[a][4] + '/' + (V[a][7] || '-') + '+' + V[b][4] + '/' + (V[b][7] || '-') + ' ' + V[a][5] });
-      const e = ov.get(k); if (now - e.t > PASS_LONG && !longOv.has(k)) longOv.set(k, e); }
+      const k = V[a][0] + '-' + V[b][0]; seen.add(k); if (!ov.has(k)) ov.set(k, { t: now, n: 0, kind: V[a][4] + '/' + (V[a][7] || '-') + '+' + V[b][4] + '/' + (V[b][7] || '-') + ' ' + V[a][5] });
+      const e = ov.get(k); e.n++; if (now - e.t > PASS_LONG && e.n >= PASS_FR && !longOv.has(k)) longOv.set(k, e); }   /* 1초 **그리고** 20프레임 — 긴 프레임이 몰리면 프레임마다 벌리는 간격(ACT-SPACE)이 1초에 몇 번 못 돈다(09-24 sea · 최대 656ms 때 한 번) */
     ov.forEach((e, k) => { if (!seen.has(k)) { if (now - e.t <= 300) R.스침++; ov.delete(k); } }); }
   if (now >= nextSample) { nextSample += 500; if (has('__folkSpace')) { const g = (window.__folkSpace().그린자리 || {}); if (g.서있는사람) { R.박자합 += g.한칸박자; R.박자표본++; } } R.표본++; const V = P.filter(p => p[3]); R.사람최대 = Math.max(R.사람최대, V.length);
     let pairs = 0, near = 1e9; for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) { const d = Math.hypot(V[a][1] - V[b][1], V[a][2] - V[b][2]); if (d < near) near = d; if (d < 0.6) pairs++; }
@@ -110,7 +110,7 @@ for (const x of results) {
   x.판정 = fail.length ? 'FAIL(' + fail.join('·') + ')' : x.사람최대 ? 'PASS' : 'REVIEW(사람 0 · 잴 게 없다)'; x.주의 = warn;
   L.push(`| ${x.판} | ${x.사람최대} | ${x.오래포갬}${x.오래포갬예.length ? ' (' + x.오래포갬예.join(', ') + ')' : ''} | ${r2(쌍)} (${x.스침}) | ${r2(x.한칸박자)} | ${pct(x.셈포갬표본, x.표본)} | ${pct(x.줄세움표본, x.표본)} | ${x.벽통과표본}${x.벽예.length ? ' (' + x.벽예.join(', ') + ')' : ''} | ${x.튐}${x.튐예.length ? ' (' + x.튐예.join(', ') + ')' : ''} | ${x.갇힘표본} | ${오류} | ${r2(x.우표)} | ${x.빈30초말} | ${r2(x.프레임평균ms)} | ${x.긴프레임}${x.긴프레임 ? ' (최대 ' + x.긴프레임최대ms + 'ms)' : ''} | **${x.판정}**${warn.length ? ' · 주의: ' + warn.join('·') : ''} |`);
 }
-L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게) ≥ 1 · 줄 세움(가장 가까운 두 사람이 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
+L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게 · ${PASS.오래포갬프레임}프레임 넘게) ≥ 1 · 줄 세움(가장 가까운 두 사람이 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
   `주의: 포갬 평균(0.5초 표본마다 0.6 안 쌍 > ${PASS.포갬쌍} · 괄호 = 0.3초 안에 풀린 스침 수) · 한 칸 박자(서 있는 사람 가운데 가장 가까운 서 있는 이웃이 3.6~4.4 인 몫 > ${PASS.한칸박자}) · 우표 마을(물건 화면 폭 ÷ 창 폭 < ${PASS.우표}) · 빈 30초(아무것도 안 누른 30초 동안 말 0) · 프레임 > ${PASS.프레임ms}ms(헤드리스 소프트웨어 GL 이라 **참고만**).`,
   '안 잼(입력이 필요하다): 말 충돌(한 입력 뒤 #toast 와 #why) · 반응 ms · 흰 공(풍선 지름). 셈 포갬은 창조자 25회 표와 견주려고 함께 적는다(__folkOverlap · 셈 자리 2.0 안).');
 console.log(L.join('\n'));
