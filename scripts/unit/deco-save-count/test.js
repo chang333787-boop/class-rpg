@@ -2147,6 +2147,26 @@
       _dexSea = 'all'; CUR.decoLife = keepL;
     }
 
+    //  ㊼-6 처음 여는 자리(DECO-VIEW-THINGS-1 · 창조자 31-ⓑ74) — 보던 자리가 없으면 장식이 있는 쪽으로 · 보던 자리가 있으면 그 자리
+    if (typeof _decoStartOnThings === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const keepH = CUR.houseDecorations, keepV = (() => { try { return localStorage.getItem('rpg.deco.view'); } catch (e) { return null; } })();
+      const L = [['d_y12', 32, 58], ['d_y9', 34, 64], ['d_y46', 30, 70], ['d_y2', 36, 60], ['d_y41', 36, 62]];
+      CUR.houseDecorations = (keepH || []).filter(p => p.area !== 'yard').concat(L.map(([id, r, c]) => _decoNew(id, 'yard', r, c)));
+      const seen = () => { const C = _dC; return CUR.houseDecorations.filter(p => p.area === 'yard' && _decoSpaceOf(p) === DECO_SPACE).filter(p => { const z = getDecoSize(p.id);
+        return p.col * C >= _dPanX - 1 && (p.col + z.w) * C <= _dPanX + _dW + 1 && (p.row + z.h) * C >= _dPanY && p.row * C <= _dPanY + _dH; }).length; };
+      closeInteriorFullscreen(); await sleep(200); try { localStorage.removeItem('rpg.deco.view'); } catch (e) {}
+      openInteriorFullscreen(); await sleep(500); if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const n1 = seen();
+      out('처음자리_장식쪽으로', n1 === L.length ? true : n1 + '/' + L.length);
+      //  보던 자리가 있으면 그 자리(장식 쪽으로 끌지 않는다)
+      _dPanX = 0; _dPanY = 0; _decoClampPan(); closeInteriorFullscreen(); await sleep(200);
+      openInteriorFullscreen(); await sleep(500);
+      out('처음자리_보던자리는그대로', Math.round(_dPanX) === 0 && Math.round(_dPanY) === 0);
+      CUR.houseDecorations = keepH; try { if (keepV === null) localStorage.removeItem('rpg.deco.view'); else localStorage.setItem('rpg.deco.view', keepV); } catch (e) {}
+      _drawDeco();
+    }
+
     //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
     if (typeof _yardLookDev !== 'undefined' && typeof _starGroundFill === 'function' && _ifMode) {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
@@ -2169,13 +2189,14 @@
       _dCtx.fillRect = function () { fills.push(String(_dCtx.fillStyle)); return fr.apply(this, arguments); };
       _dCtx.fillText = function (t) { texts.push([t, fills.length]); return ft.apply(this, arguments); };
       _floorImg = function (n, c) { names5.push(n); return of.apply(this, arguments); };
+      const keepPY = _dPanY;   // 끝에 이 자리로 되돌린다(0 으로 두면 반 칸 어긋난 자리에서 '기본 그대로'가 틀렸다)
       try { _decoPhaseSync(); _dPanY = 99999; _decoClampPan(); _drawYard(); } finally { _dCtx.fillRect = fr; _dCtx.fillText = ft; _floorImg = of; }
       const filmAt = fills.findIndex(f => /rgba\(20, 30, 80, 0\.3\)/.test(f));
       out('별밤_밤고정_막30', _yardPhase() === 'night' && filmAt >= 0 && !fills.some(f => /rgba\(20, 30, 80, 0\.48\)/.test(f)));
       out('별밤_섬_하늘', names5.includes('island_rim') && names5.includes('island_under') && _dPanY > DY.rows * _dC - _dH && document.getElementById('if-topview').classList.contains('look-sky'));
       out('별밤_때단추_숨김', getComputedStyle(document.getElementById('if-phase-btn')).display === 'none');
       out('별밤_이름표_막위', texts.some(([t, i]) => t === '들어가기' && i > filmAt));
-      _dPanY = 0; _decoClampPan();
+      _dPanY = keepPY; _decoClampPan();
       _yardLookDev = ''; _decoPhaseSync(); if (typeof ifSyncScene === 'function') ifSyncScene(); _drawDeco(); await sleep(150);
       out('별빛_끄면_기본판그대로', starH !== base0 && snap() === base0 && !document.getElementById('if-topview').classList.contains('look-sky'));
       _yardLookDev = null;   // 다음에 읽을 때 주소로 다시(하네스 주소엔 ?look 없음)
