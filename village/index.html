@@ -7452,6 +7452,19 @@ function wishTick() {
    하루의 리듬(F24). 밤(20~6시)엔 집에, 아이(ct 1·2)는 8~14시 학교에.
    ══════════════════════════════════════════════════════════════ */
 const isNightHour = h => h >= 20 || h < 6;
+/* ── [ACT-HOMETIME] 집까지 걸리는 만큼 먼저 나선다 — 도착 목표 아이 18.5시 · 어른 20시 (보스 09-24 결정 · 보스함 19:10 귀가 조사) ──
+   누구든 20시(isNightHour)가 되어야 집으로 향해, 해진 뒤 한두 시간 온 가족이 길에 있었다(origin 21시 48명이 귀갓길 · 23시에도 19명).
+   걸음이 시계에 비해 느려(한 칸 1.25초 = 판 속 약 10분) 먼 집은 20시에 나서면 22~23시에 닿는다. 시계·걸음은 그대로 두고 **나서는 시각**만 당긴다:
+   나설 때 = 도착 목표 − (지금 칸 ~ 집 앞 칸 가로·세로 칸 수 × bend) × 10분 − margin. 어른은 퇴근(17시) 전·아이는 하교(14시) 전엔 안 나선다.
+   한 번 나서기로 한 날은 그날 밤까지 집으로(집에 든 뒤 20시 전에 다시 안 나온다 — 같은 조건). 수업 판(교과 있음)에선 안 돈다(산책과 같은 틀). 분류 '판정'. */
+(window.VRULES = window.VRULES || {}).homeTime = { on: true, kid: 18.5, adult: 20, bend: 1.2, margin: 0.25, kidFrom: 14, adultFrom: 17 };
+const homeTimeIs = (f, h) => { const R = window.VRULES.homeTime;
+  if (!R || !R.on || f.visitor || f.arriving || f.base == null || f.base < 0 || h < 12 || h >= 20 || (typeof STAGE === 'object' && STAGE.def && STAGE.def.교과 != null)) return false;
+  const d = simDay(); if (f.homeDay === d) return true;
+  const kid = f.ct === 1 || f.ct === 2, from = kid ? R.kidFrom : R.adultFrom; if (h < from) return false;
+  const gx = Math.round(f.x / CS + (W - 1) / 2), gy = Math.round(f.z / CS + (H - 1) / 2), cells_ = Math.abs(gx - cX(f.base)) + Math.abs(gy - cY(f.base));
+  const leave = (kid ? R.kid : R.adult) - cells_ * R.bend / 6 - R.margin;   /* 한 칸 ≈ 판 속 1/6 시간 */
+  if (h < leave) return false; f.homeDay = d; return true; };
 const isSchoolHour = h => h >= 8 && h < 14;
 /* ── 일터와 일자리(F27) ── */
 const isWorkHour = h => h >= 9 && h < 17;
@@ -7566,8 +7579,8 @@ function rhythmTick(f, i, now) {
   if (f.arriving || f.state === 'mill' || f.base < 0) return false;
   const h = simHour();
   if (f.state === 'inside') return false;
-  if (isNightHour(h)) {                                   // 집으로
-    if (f.goal !== 'home' || (f.state === 'idle' && now >= f.until)) { f.goal = 'home'; if (!pathTo(f, i, f.base)) { f.goal = null; return false; } }
+  if (isNightHour(h) || homeTimeIs(f, h)) {                                   // 집으로 · [ACT-HOMETIME] 도착 목표에 맞춰 먼저 나선다
+    if (f.goal !== 'home' || (f.state === 'idle' && now >= f.until)) { f.goal = 'home'; if (!(isNightHour(h) ? pathTo(f, i, f.base) : pathHomeAnyway(f, i))) { f.goal = null; return false; } f.goal = 'home'; }   // [ACT-HOMETIME] 20시 전 귀가는 막힌 칸까지 넣어서(밤엔 ACT-NIGHT 가 칸을 안 잡고 걷는다)
     return true;
   }
   const sr = schoolNow();
@@ -8920,7 +8933,7 @@ function tickFolks(dt, now) {
       if (!b || b.root !== f.inside.root || (!K[b.k].need && !home && !school && !work && !f.inside.stroll)) { leave(f, '쫓겨남'); continue; }   // [ACT-STROLL] 산책으로 든 나무 그늘은 필요가 없어도 쫓겨나지 않는다   // 건물이 없어졌다 — 문 앞으로
       const h = simHour();
       if (home && actDawnHold(f, h)) continue;   // [ACT-DAWN] 아침 6시엔 먼저 일어난 집 식구가 맨 먼저 나온다 — 다른 집은 조금 뒤
-      if (home ? !isNightHour(h) : work ? !isWorkHour(h) : school ? !isSchoolHour(h) : now >= f.inside.until) { leave(f, '나옴'); f.goal = null; }
+      if (home ? !(isNightHour(h) || homeTimeIs(f, h)) : work ? !isWorkHour(h) : school ? !isSchoolHour(h) : now >= f.inside.until) { leave(f, '나옴'); f.goal = null; }
       continue;
     }
     if (actNightHome(f, i, now, dt)) continue;   // [ACT-NIGHT] 밤 귀갓길은 칸을 잡지 않고 걷는다(서로 지나친다)
