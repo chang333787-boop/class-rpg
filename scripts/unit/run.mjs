@@ -1448,6 +1448,22 @@ try {
     sb.__sea = '?'; eq(L._yardLook(1), L.YARD_LOOKS.summer); sb.__sea = 'summer';
   });
   test('줄은 고정 객체(부를 때마다 새로 만들지 않는다 — 칸마다 부르는 길)', () => eq(L._yardLook(1) === L._yardLook(2), true));
+  test('별빛 줄: 계절 없음(여름 그림) · 남색 땅 · 풀 번짐·밑동 풀·물·헤엄 #star · 남색 그림자 · 눈·막·흩뿌림 없음', () => {
+    const st = L.YARD_LOOKS.star;
+    eq([st.season, st.ground, st.groundFrag, st.waterFrag, st.swimFrag, st.shadow], ['summer', 'star', 'star', 'star', 'star', 'rgba(8,10,34,.4)']);
+    eq([st.snow, st.film, st.scatter, st.bedWinter], [false, '', null, false]);
+  });
+  test('개발 스위치 ?look= — 놀이판(__PLAY + play-deco-none)에서만 · 다른 프로젝트 · 모르는 값은 무시(계절 줄)', () => {
+    const run = (win, pid, search) => { sb.window = win; sb.firebase = { app: () => ({ options: { projectId: pid } }) }; sb.location = { search }; sb.URLSearchParams = URLSearchParams;
+      vm.runInContext('_yardLookDev = null;', sb); const r = L._yardLook(1); delete sb.window; delete sb.firebase; delete sb.location; vm.runInContext('_yardLookDev = null;', sb); return r; };
+    sb.__sea = 'autumn';
+    eq(run({ __PLAY: {} }, 'play-deco-none', '?look=star'), L.YARD_LOOKS.star);
+    eq(run({}, 'play-deco-none', '?look=star'), L.YARD_LOOKS.autumn);                 // 놀이판 표지 없음
+    eq(run({ __PLAY: {} }, 'class-rpg-prod', '?look=star'), L.YARD_LOOKS.autumn);      // 다른 프로젝트
+    eq(run({ __PLAY: {} }, 'play-deco-none', '?look=moon'), L.YARD_LOOKS.autumn);      // 모르는 줄
+    eq(run({ __PLAY: {} }, 'play-deco-none', '?look=constructor'), L.YARD_LOOKS.autumn); // 물려받은 이름
+    sb.__sea = 'summer';
+  });
   test('때: 줄에 없으면 실제 시각 · 줄에 박혀 있으면 그것(별빛 = 밤 고정)', () => {
     sb.__ph = 'evening'; eq(L._yardPhase(1), 'evening');
     L.YARD_LOOKS.summer.phase = 'night'; eq(L._yardPhase(1), 'night'); L.YARD_LOOKS.summer.phase = ''; sb.__ph = 'day';

@@ -8553,7 +8553,10 @@ function _animFile(id, k) { return _artSrc('deco/' + id + (k ? '_' + k : '') + '
 function _animSrcFor(st, state) {
   const a = _animArt[st.id] || {};
   if (st.frozen) return _animFile(st.id, '');
-  if (st.swim && a.swim && (state === 'idle' || state === 'walk' || state === 'peck')) return _animFile(st.id, 'swim');
+  if (st.swim && a.swim && (state === 'idle' || state === 'walk' || state === 'peck')) {
+    const sf = typeof _yardLook === 'function' ? _yardLook().swimFrag : '';   // [DECO-STAR-P3] 별물 위 헤엄 = 물 띠도 별물 색(#star)
+    return sf ? _artSrc('deco/' + st.id + '_swim.svg', sf) : _animFile(st.id, 'swim');
+  }
   if (a[state]) return _animFile(st.id, state);
   if (state === 'walk' && a.b) return _animFile(st.id, 'b');
   if (state === 'peck' && a.eat && !st.swim) return _animFile(st.id, 'eat');
@@ -9630,10 +9633,11 @@ function _seaNow() { return typeof _decoSeason === 'function' ? _decoSeason() : 
 //  지금 줄은 계절 넷에서만 나온다 — 보이는 변화 0(관문: 계절 넷 × 낮·저녁·밤 · 사진 지문이 바로 앞 커밋과 같다). 별빛(P3)이 줄 하나를 더한다.
 //  season 나무·꽃·우리 조각 · ground 잔디 무리 무늬(grass | snow) · groundBg 무늬 아래 바탕('' = 칸 그림 그대로) · groundFrag 풀 번짐·밑동 풀 조각
 //  waterFrag 물 조각 · bedWinter 꽃밭 겨울잠 · film 잔디 계절 막 · scatter 흩뿌림(나무 둘레 hi · 그 밖 lo) · snow 장식·지붕 눈 겹
-//  shadow 밑동 그림자 · houseGround 집 밑·위 띠 땅 · farmSand 밭 그림이 아직 없을 때의 모래 두 색 · phase 때 고정(없으면 실제 시각 · 별빛은 'night')
+//  shadow 밑동 그림자 · houseGround 집 밑·위 띠 땅 · farmSand 밭 그림이 아직 없을 때의 모래 두 색 · swimFrag 헤엄 그림 조각
+//  phase 때 고정(없으면 실제 시각 · 별빛은 'night' — P5)
 //  줄은 고정 객체다(칸마다 불러도 새로 만들지 않는다 — 뜨거운 길).
 const YARD_LOOK_BASE = { ground: 'grass', groundBg: '', groundFrag: '', waterFrag: '', bedWinter: false, film: '', scatter: null, snow: false,
-  shadow: 'rgba(30,52,14,.30)', houseGround: 'grass', farmSand: ['#c8a855', '#b89545'], phase: '' };
+  shadow: 'rgba(30,52,14,.30)', houseGround: 'grass', farmSand: ['#c8a855', '#b89545'], swimFrag: '', phase: '' };
 const YARD_LOOKS = {
   spring: Object.assign({}, YARD_LOOK_BASE, { season: 'spring', groundFrag: 'spring', film: 'rgba(200,235,130,.10)',   // 봄 막 #C8EB82 .10 · 벚나무 둘레 꽃잎(디자인 #1083)
     scatter: { name: 'season_petals_', trees: ['d_y12'], k1: 1, k2: 3, hi: .55, drift: .04 } }),
@@ -9641,9 +9645,25 @@ const YARD_LOOKS = {
   autumn: Object.assign({}, YARD_LOOK_BASE, { season: 'autumn', groundFrag: 'autumn', film: 'rgba(240,168,72,.14)',   // 가을 막 #F0A848 .14 · 잎 나무 둘레 낙엽
     scatter: { name: 'season_leaves_', trees: ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'], k1: 2, k2: 4, hi: .6, drift: .04 } }),
   winter: Object.assign({}, YARD_LOOK_BASE, { season: 'winter', ground: 'snow', groundBg: '#eef3f8', groundFrag: 'winter', waterFrag: 'winter', bedWinter: true, snow: true }),
+  //  [DECO-STAR-P3] 별빛 — 계절 없음(여름 그림 그대로 · 결정 3) · 남색 땅(star_ground + 은하수 띠 star_band · 잔디 얼룩 없음) · 풀 번짐·밑동 풀·물·헤엄 #star · 남색 그림자.
+  //  밤 고정 · 밤 막 .30 · 섬 · 하늘은 P5. 아직 놀이판 개발 스위치(?look=star)로만 켠다(저장 0).
+  star: Object.assign({}, YARD_LOOK_BASE, { season: 'summer', ground: 'star', groundFrag: 'star', waterFrag: 'star', swimFrag: 'star', shadow: 'rgba(8,10,34,.4)' }),
 };
+//  [DECO-STAR-P3] 개발 스위치 ?look=<줄> — 놀이판(play-boot 의 __PLAY + 가짜 프로젝트 play-deco-none)에서만 읽는다. 운영 경로에서는 읽지 않는다(PR 마다 grep).
+let _yardLookDev = null;
+function _yardLookDevRead() {
+  if (_yardLookDev !== null) return _yardLookDev;
+  _yardLookDev = '';
+  try {
+    if (typeof window !== 'undefined' && window.__PLAY && typeof firebase !== 'undefined' && firebase.app().options.projectId === 'play-deco-none') {
+      const v = new URLSearchParams(location.search).get('look');
+      if (v && Object.prototype.hasOwnProperty.call(YARD_LOOKS, v)) _yardLookDev = v;
+    }
+  } catch (e) {}
+  return _yardLookDev;
+}
 //  공간(sp)마다 한 줄 — 지금은 모든 공간이 기기 달의 계절(자리만 잡아 둔다 · 별빛 P3 부터 공간별)
-function _yardLook(sp) { return YARD_LOOKS[_seaNow()] || YARD_LOOKS.summer; }
+function _yardLook(sp) { const dv = _yardLookDevRead(); return (dv && YARD_LOOKS[dv]) || YARD_LOOKS[_seaNow()] || YARD_LOOKS.summer; }
 function _yardPhase(sp) { const lk = _yardLook(sp); return lk.phase || (typeof _decoPhase === 'function' ? _decoPhase() : 'day'); }
 //  고정 난수(칸·열쇠마다 늘 같은 값) — 사양 그대로
 function _seaHash(r, c, k) { return ((((r * 73856093) ^ (c * 19349663) ^ (k * 83492791)) >>> 0) % 1000) / 1000; }
@@ -10191,6 +10211,7 @@ function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
   }
   if (!runs.length) return;
   const fill = st => { _dCtx.fillStyle = st; runs.forEach(([r, a, b]) => _dCtx.fillRect(a * C, r * C, (b - a) * C, C)); };
+  if (lk.ground === 'star' && _starGroundFill(runs, C)) return;   // [DECO-STAR-P3] 별빛 땅(막 · 흩뿌림 없음)
   if (lk.groundBg) fill(lk.groundBg);
   const gp = _groundPatterns(C, lk.ground);
   if (gp && gp.dark && gp.light) { fill(gp.dark); fill(gp.light); }
@@ -10215,6 +10236,49 @@ function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
     if (_seaHash(r, c, k1) >= (dens.get(r + '_' + c) || 0)) continue;
     const ab = _seaHash(r, c, k2) < .5; _dCtx.drawImage(_floorBmp(nm + (ab ? 'a' : 'b'), ab ? ia : ib, C), c * C, r * C, C, C);
   } });
+}
+// [DECO-STAR-P3] 별빛 땅 — 잔디 무리 칸 = star_ground(불투명 · 9칸 주기 무늬) → star_band(판 80×44 한 장에서 그 칸 자리를 떼어 붙임 · 되풀이 금지 · 줄무늬가 된다).
+//  잔디 얼룩은 건너뛴다. 띠는 8×8칸 조각으로 구워 둔다 — 판 한 장을 화면 해상도로 구우면 칸 27px 에서도 40MB 가 넘는다(확대하면 더).
+//  칸당 기기 px 는 64 까지(띠는 부드러운 그림이라 확대 3배에서 조금 흐려지는 것은 받아들인다) · 구운 조각 픽셀 합 6M 을 넘으면 비운다.
+const _STAR_BAND = new Map();
+let _starBandPx = 0;
+function _starBandChunk(img, cr, cc, k, u, N) {
+  const key = k + '|' + cr + '|' + cc;
+  let b = _STAR_BAND.get(key);
+  if (!b) {
+    if (_starBandPx > 6e6) { _STAR_BAND.clear(); _starBandPx = 0; }
+    b = document.createElement('canvas'); b.width = b.height = N * k;
+    b.getContext('2d').drawImage(img, cc * N * u, cr * N * u, N * u, N * u, 0, 0, N * k, N * k);
+    _STAR_BAND.set(key, b); _starBandPx += N * k * N * k;
+  }
+  return b;
+}
+function _starGroundFill(runs, C) {
+  const gi = _floorImg('star_ground'), bi = _floorImg('star_band');
+  if (!gi || typeof document === 'undefined' || !_dCtx.createPattern) return false;
+  const sc = (_dCtx.getTransform && _dCtx.getTransform().a) || 1, w = _bmpStep(Math.max(2, C * sc));
+  let e = _GP.get(w + 'g');
+  if (!e) {
+    if (_GP.size > 8) _GP.clear();
+    const cv = document.createElement('canvas'); cv.width = cv.height = 9 * w; cv.getContext('2d').drawImage(gi, 0, 0, 9 * w, 9 * w);
+    e = { g: cv, pats: new WeakMap() }; _GP.set(w + 'g', e);
+  }
+  let pt = e.pats.get(_dCtx);
+  if (!pt) { pt = _dCtx.createPattern(e.g, 'repeat'); e.pats.set(_dCtx, pt); }
+  if (typeof DOMMatrix === 'function') pt.setTransform(new DOMMatrix().scale(C / w, C / w));
+  _dCtx.fillStyle = pt; runs.forEach(([r, a, b]) => _dCtx.fillRect(a * C, r * C, (b - a) * C, C));
+  if (!bi) return true;
+  const N = 8, u = bi.naturalWidth / 80, colsB = 80, rowsB = Math.round(bi.naturalHeight / u), k = Math.min(64, w);
+  runs.forEach(([r, a, b]) => {
+    if (r < 0 || r >= rowsB) return;   // 판 위 띠(음수 줄)에는 띠가 없다
+    const cr = Math.floor(r / N);
+    for (let c = Math.max(0, a); c < Math.min(b, colsB); ) {
+      const cc = Math.floor(c / N), ce = Math.min(b, (cc + 1) * N, colsB);
+      _dCtx.drawImage(_starBandChunk(bi, cr, cc, k, u, N), (c - cc * N) * k, (r - cr * N) * k, (ce - c) * k, k, c * C, r * C, (ce - c) * C, C);
+      c = ce;
+    }
+  });
+  return true;
 }
 // [DECO-GROUND-1] 밑동 접지 — 물건이 잔디에 '떠 있지' 않고 붙어 보이게. 동물(층에서 그림)·울타리(그림에 풀이 들어 있음)는 뺀다.
 //  발자리 가운데 칸이 잔디일 때만 그림자 · 맨 아래 줄은 칸마다 그 칸이 잔디면 풀 덮임(ground_tuft_a|b 번갈아). 돌길·벽돌·물 위는 없음.

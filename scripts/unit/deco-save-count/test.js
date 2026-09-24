@@ -2015,6 +2015,26 @@
       _decoSeasonOv = null;
       out('계절_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]) === sv0);
     }
+    //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
+    if (typeof _yardLookDev !== 'undefined' && typeof _starGroundFill === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const snap = () => { const d = _dCtx.getImageData(0, 0, _dCv.width, _dCv.height).data; let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0; return h; };
+      _drawDeco(); await sleep(120); const base0 = snap();
+      const names = [], o = _floorImg;
+      _floorImg = function (n, c) { names.push(n + (c ? '#' + c : '')); return o.apply(this, arguments); };
+      try {
+        _yardLookDev = 'star'; _drawDeco(); await sleep(150);
+        _drawFloorSVG('stone', 5, 5, 0, 0, 20, () => 'grass'); _drawFloorSVG('water', 5, 5, 0, 0, 20, () => 'water');
+      } finally { _floorImg = o; }
+      for (let i = 0; i < 30 && !(_floorImg('star_ground') && _floorImg('star_band')); i++) await sleep(100);
+      _drawDeco(); await sleep(150);
+      const starH = snap();
+      out('별빛_땅그림_띠조각', names.includes('star_ground') && names.includes('star_band') && _STAR_BAND.size > 0);
+      out('별빛_풀번짐물_star', names.some(n => /^fringe_grass_.*#star$/.test(n)) && names.some(n => /^tile_water_[ab]#star$/.test(n)));
+      _yardLookDev = ''; _drawDeco(); await sleep(150);
+      out('별빛_끄면_기본판그대로', starH !== base0 && snap() === base0);
+      _yardLookDev = null;   // 다음에 읽을 때 주소로 다시(하네스 주소엔 ?look 없음)
+    }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
