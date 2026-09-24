@@ -9637,10 +9637,12 @@ function _seaNow() { return typeof _decoSeason === 'function' ? _decoSeason() : 
 //  shadow 밑동 그림자 · houseGround 집 밑·위 띠 땅 · farmSand 밭 그림이 아직 없을 때의 모래 두 색 · swimFrag 헤엄 그림 조각
 //  phase 때 고정(없으면 실제 시각 · 별빛은 'night') · nightFilm 밤 막(.30 — DECO-NIGHT-FILM-1) · nightFilmEdit 카드를 들었거나 바닥 모드일 때 밤 막(절반)
 //  animNight 밤 동물 층 필터(사진용 — 화면은 같은 값의 CSS) · island 떠 있는 섬(판 아래 테 + 몸) · sky 판 밖 별하늘(CSS) · labelOverFilm 집 이름표를 막 위에 다시
+//  events 계절 행사가 뜨는가(별빛 = 안 뜸)
 //  줄은 고정 객체다(칸마다 불러도 새로 만들지 않는다 — 뜨거운 길).
 const YARD_LOOK_BASE = { ground: 'grass', groundBg: '', groundFrag: '', waterFrag: '', bedWinter: false, film: '', scatter: null, snow: false,
   shadow: 'rgba(30,52,14,.30)', houseGround: 'grass', farmSand: ['#c8a855', '#b89545'], swimFrag: '', phase: '',
-  nightFilm: 'rgba(20,30,80,.30)', nightFilmEdit: 'rgba(20,30,80,.15)', animNight: 'brightness(.8) saturate(.85)', island: false, sky: false, labelOverFilm: false };
+  nightFilm: 'rgba(20,30,80,.30)', nightFilmEdit: 'rgba(20,30,80,.15)', animNight: 'brightness(.8) saturate(.85)', island: false, sky: false, labelOverFilm: false,
+  events: true };
 const YARD_LOOKS = {
   spring: Object.assign({}, YARD_LOOK_BASE, { season: 'spring', groundFrag: 'spring', film: 'rgba(200,235,130,.10)',   // 봄 막 #C8EB82 .10 · 벚나무 둘레 꽃잎(디자인 #1083)
     scatter: { name: 'season_petals_', trees: ['d_y12'], k1: 1, k2: 3, hi: .55, drift: .04 } }),
@@ -9652,19 +9654,23 @@ const YARD_LOOKS = {
   //  밤 고정 · 밤 막 .30 · 섬 · 하늘은 P5. 아직 놀이판 개발 스위치(?look=star)로만 켠다(저장 0).
   star: Object.assign({}, YARD_LOOK_BASE, { season: 'summer', ground: 'star', groundFrag: 'star', waterFrag: 'star', swimFrag: 'star', shadow: 'rgba(8,10,34,.4)',
     //  [DECO-STAR-P5] 별밤 — 때 밤 고정 · 섬 · 별하늘 · 이름표는 막 위(막 .30 · 고르는 동안 절반 · 동물 필터는 보통 밤과 같다 — #1088)
-    phase: 'night', island: true, sky: true, labelOverFilm: true }),
+    phase: 'night', island: true, sky: true, labelOverFilm: true,
+    events: false }),   // [DECO-EVENT-1] 별빛 공간에는 계절 행사가 안 뜬다(별빛 설계 결정 3)
 };
 //  [DECO-STAR-P3] 개발 스위치 ?look=<줄> — 놀이판(play-boot 의 __PLAY + 가짜 프로젝트 play-deco-none)에서만 읽는다. 운영 경로에서는 읽지 않는다(PR 마다 grep).
 let _yardLookDev = null;
+//  [DECO-EVENT-1] 놀이판 주소 값 하나 — 모습(?look=) · 행사(?event=)가 같이 쓴다. student.js 에서 location.search 를 읽는 곳은 여기 한 곳.
+function _playParam(name) {
+  try {
+    if (typeof window !== 'undefined' && window.__PLAY && typeof firebase !== 'undefined' && firebase.app().options.projectId === 'play-deco-none')
+      return new URLSearchParams(location.search).get(name) || '';
+  } catch (e) {}
+  return '';
+}
 function _yardLookDevRead() {
   if (_yardLookDev !== null) return _yardLookDev;
-  _yardLookDev = '';
-  try {
-    if (typeof window !== 'undefined' && window.__PLAY && typeof firebase !== 'undefined' && firebase.app().options.projectId === 'play-deco-none') {
-      const v = new URLSearchParams(location.search).get('look');
-      if (v && Object.prototype.hasOwnProperty.call(YARD_LOOKS, v)) _yardLookDev = v;
-    }
-  } catch (e) {}
+  const v = _playParam('look');
+  _yardLookDev = v && Object.prototype.hasOwnProperty.call(YARD_LOOKS, v) ? v : '';
   return _yardLookDev;
 }
 //  공간(sp)마다 한 줄 — 지금은 모든 공간이 기기 달의 계절(자리만 잡아 둔다 · 별빛 P3 부터 공간별)
@@ -10003,6 +10009,77 @@ function _ambImg(name, color) {   // assets/deco/<name>.svg[#색] — 색은 그
   img.src = src;
   return null;
 }
+// [DECO-EVENT-1] 계절 행사 — 계절마다 며칠만 마당에 잠깐 나타나는 장식 한 벌(docs/deco_season_events_20260924.md · 사용자 승인 09-24 · 저장 0)
+//  아이 것이 아니다(사지도 놓지도 않았다): 옮기기 · 치우기 · 팔기 안 됨 · 누르면 말 한 줄 · 카드를 들고 누르면 놓기가 먼저(행사가 비켜 간다).
+//  날짜는 이 표 한 줄씩(교사가 바꾸려면 여기만 · 끝날 포함 · 기기 날짜). 별빛 모습(표 events:false)에는 안 뜬다. 친구 마당도 같은 날이면 보인다.
+//  자리: 아이 마당 장식들의 한가운데(발자리 행·열 평균 · 없으면 집 문 앞 아래)에서 가장 가까운 빈 잔디 덩어리(3×3 · 여름 3×2 · 둘레 1칸까지 비어야 ·
+//  잔디 무리 바닥 · 집 · 밭 · 첫 마당 본보기 자리 아님 · 가로는 .8배로 잰다). 없으면 그 해 행사는 안 나타난다(아이 마당을 밀어내지 않는다).
+//  한 벌 = [그림 id, 덩어리 안 행, 열, 폭, 높이, 주소 뒤](디자인 시안 훅 그대로)
+const DECO_EVENTS = [
+  { key: 'spring', name: '🌸 벚꽃 축제', from: '04-01', until: '04-07', w: 3, h: 3, set: [['ev_lanterns', 0, 0, 3, 1, ''], ['ev_spring_mat', 2, 0, 2, 1, '']] },   // 등 줄은 주소 뒤가 없으면 봄 색
+  { key: 'summer', name: '💦 물놀이 날', from: '07-08', until: '07-14', w: 3, h: 2,
+    set: [['ev_summer_pinwheel', 0, 0, 1, 1, ''], ['ev_summer_pinwheel', 0, 2, 1, 1, ''], ['ev_summer_pool', 1, 0, 2, 1, ''], ['ev_summer_melon', 1, 2, 1, 1, '']] },
+  { key: 'autumn', name: '🎃 수확제', from: '10-13', until: '10-19', w: 3, h: 3, set: [['ev_lanterns', 0, 0, 3, 1, 'autumn'], ['ev_autumn_harvest', 2, 0, 2, 1, '']] },
+  { key: 'winter', name: '⛄ 눈사람 날', from: '12-15', until: '12-21', w: 3, h: 3,
+    set: [['ev_lanterns', 0, 0, 3, 1, 'winter'], ['ev_winter_snowman', 2, 0, 1, 1, ''], ['ev_winter_sled', 2, 2, 1, 1, '']] },
+];
+let _decoEventOv = null, _decoEventDev = null;   // 시험용(저장 0) · 놀이판 ?event=<key>
+function _decoEventNow(d) {
+  const byKey = k => DECO_EVENTS.find(e => e.key === k) || null;
+  if (_decoEventOv !== null) return byKey(_decoEventOv);
+  if (_decoEventDev === null) _decoEventDev = typeof _playParam === 'function' ? _playParam('event') : '';
+  if (_decoEventDev) return byKey(_decoEventDev);
+  const t = d || new Date(), md = String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+  return DECO_EVENTS.find(e => md >= e.from && md <= e.until) || null;
+}
+//  지금 뜨는 행사(모습이 막으면 없음)
+function _decoEventOn() { const ev = _decoEventNow(); return ev && _yardLook().events !== false ? ev : null; }
+//  자리 — 판 번호(_decoStateVer · 놓기·치우기·칠하기마다 오른다) · 학생 · 공간 · 판 크기가 같으면 다시 안 구한다
+let _decoEventMemo = null;
+function _decoEventPlaced(ev) {
+  const key = [ev.key, CUR && CUR.id, DECO_SPACE, typeof _decoStateVer !== 'undefined' ? _decoStateVer : 0, DY.rows, DY.cols].join('|');
+  if (_decoEventMemo && _decoEventMemo.key === key) return _decoEventMemo.placed;
+  const list = _decoList(CUR).filter(p => p.area === 'yard'), fl = _yardFloorGet(CUR), occ = new Set(), hc0 = _houseCol0();
+  list.forEach(p => { const z = getDecoSize(p.id); for (let r = p.row; r < p.row + z.h; r++) for (let c = p.col; c < p.col + z.w; c++) occ.add(r + '_' + c); });
+  const inFriend = typeof _ffFriend !== 'undefined' && !!_ffFriend && CUR === _ffFriend;   // 친구 구경엔 본보기가 없다
+  if (!inFriend && typeof _decoTplActive === 'function' && _decoTplActive())   // 첫 마당 본보기 자리는 비워 둔다
+    for (let r = DECO_TPL.path.r0; r <= DECO_TPL.path.r1 + 1; r++) for (let c = hc0 - 1; c <= hc0 + 6; c++) occ.add(r + '_' + c);
+  const ok = (r, c) => r >= 0 && c >= 0 && r < DY.rows && c < DY.cols && !occ.has(r + '_' + c) && !_isHC(r, c) && !_isFarmCell(r, c) && _floorIsGrass(_floorParse(fl[r + '_' + c]).name);
+  let cr = DH.rows + 4, cc = hc0 + DH.cols / 2;
+  if (list.length) { cr = 0; cc = 0; list.forEach(p => { cr += p.row; cc += p.col; }); cr /= list.length; cc /= list.length; }
+  let best = null;
+  for (let r = 1; r + ev.h < DY.rows; r++) for (let c = 1; c + ev.w < DY.cols; c++) {
+    let good = true;
+    for (let rr = r - 1; rr <= r + ev.h && good; rr++) for (let c2 = c - 1; c2 <= c + ev.w && good; c2++) if (!ok(rr, c2)) good = false;
+    if (!good) continue;
+    const d = Math.hypot(r + ev.h / 2 - cr, (c + ev.w / 2 - cc) * .8);
+    if (!best || d < best[0]) best = [d, r, c];
+  }
+  const placed = best ? ev.set.map(([id, r, c, w, h, frag]) => ({ id, r: best[1] + r, c: best[2] + c, w, h, frag })) : null;
+  _decoEventMemo = { key, placed };
+  return placed;
+}
+function _decoEventDraw(C) {
+  const ev = _decoEventOn();
+  if (!ev || !FLOOR_SVG) return;
+  const placed = _decoEventPlaced(ev);
+  if (!placed) return;
+  placed.slice().sort((a, b) => (a.r + a.h) - (b.r + b.h)).forEach(p => {   // 발자리 아랫줄 순서
+    const im = _ambImg(p.id, p.frag);
+    if (!im) return;
+    const W = p.w * C, ratio = im.naturalHeight / im.naturalWidth, H = W * ratio;
+    _dCtx.drawImage(_svgBmp('e:' + p.id + '#' + p.frag, im, W * 2, ratio), p.c * C, (p.r + p.h) * C - H, W, H);
+  });
+}
+//  누른 칸이 행사 장식이면 그 행사(그림이 발자리 위로 한 줄 솟는 것까지)
+function _decoEventAt(r, c) {
+  const ev = _decoEventOn(), placed = ev && _decoEventPlaced(ev);
+  return placed && placed.some(p => r >= p.r - 1 && r < p.r + p.h && c >= p.c && c < p.c + p.w) ? ev : null;
+}
+function _decoEventSay(ev) {
+  const u = ev.until.split('-').map(Number);
+  toast(`${ev.name}${_josa(ev.name, '이에요', '예요')}! (${u[0]}/${u[1]}까지) — 며칠만 놀러 온 장식이라 옮기거나 치울 수 없어요`);
+}
 function _decoNightDraw(C) {
   const ph = _yardPhase();   // [DECO-LOOK-0]
   if (ph === 'day') return;
@@ -10230,7 +10307,8 @@ function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
   //  · 바로 밖(d < 1.3) = 바람에 날린 몇 장 drift · 그 밖 0(쉼 자리). 여러 나무가 겹치면 큰 쪽. 나무가 없으면 흩뿌림도 없다(값은 표에).
   const sc = lk.scatter;
   if (!sc) return;
-  const trees = sc.trees, dens = new Map(), k1 = sc.k1, k2 = sc.k2, hi = sc.hi;
+  const evx = typeof _decoEventOn === 'function' && _decoEventOn();   // [DECO-EVENT-1] 벚꽃 축제 동안은 꽃잎 두 배(디자인 행사 표)
+  const trees = sc.trees, dens = new Map(), k1 = sc.k1, k2 = sc.k2, hi = Math.min(.95, sc.hi * (evx && evx.key === 'spring' && sc.name === 'season_petals_' ? 2 : 1));
   _decoList(CUR).forEach(p => { if (p.area !== 'yard' || trees.indexOf(p.id) < 0) return; const z = getDecoSize(p.id);
     const cx = p.col + z.w / 2, cy = p.row + z.h / 2, rx = z.w / 2 + 3, ry = z.h / 2 + 2;
     for (let r = Math.floor(cy - ry * 1.3); r <= Math.ceil(cy + ry * 1.3); r++) for (let c = Math.floor(cx - rx * 1.3); c <= Math.ceil(cx + rx * 1.3); c++) {
@@ -10621,6 +10699,7 @@ function _drawYard() {
 
   // ── 마당 농장 존 렌더링 (우하단, 읽기 전용) ──────────────
   _drawYardFarm(C);
+  _decoEventDraw(C);   // [DECO-EVENT-1] 계절 행사(장식 · 밭 다음 · 밤 막 아래)
   _decoNightDraw(C);   // [DECO-DAYNIGHT-1] 저녁·밤 — 색 막 · 불빛 · 창 불빛(맨 위)
 }
 
@@ -11036,6 +11115,8 @@ function _decoClick(e) {
       const pet=_animAtPt(_ifActiveContainer||'house-topview', mx, my)||_animAt(_ifActiveContainer||'house-topview', r, c);   // [DECO-ANIM-HIT-2] 그려진 몸 먼저
       if(pet && _animPoke(pet, c)) { const pr = _lifePetAnim(pet); _lifeCardOpen(pet, pr); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1 · [DECO-LIFE-2] 카드
     }
+    //  [DECO-EVENT-1] 계절 행사 장식 — 빈손 · 🧽 면 말 한 줄(치울 수 없다) · 카드를 들었으면 놓기가 먼저(행사가 다른 빈 잔디로 비켜 간다)
+    if(!SEL_DECO || DECO_MODE==='erase'){ const ev=_decoEventAt(r,c); if(ev){ _decoEventSay(ev); return; } }
     _decoPlace('yard',r,c);
   } else {
     const {_offX:ox,_offY:oy}=_dCv;
