@@ -11317,12 +11317,16 @@ function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된
    ① 개울 다리(sbr): 개울 위에 길을 놓으면 생기는 **길의 한 모습**(#885) — 판이 길(road)을 쓰면 다리도 쓴다(되살리기 · 옮기기).
    ② 판이 그린 개울(stream · [MAC-TERRAIN]): 되살릴 때 그 판의 개울 칸이면 통과(아이가 새로 그리는 것은 판 목록 그대로 막는다).
    전엔 둘 다 되살리기(복원)에서 '이 판에서는 쓰지 않아요'로 막혀, 산 판을 다시 열면 '못 살린 것 38개' — 개울은 곧 다시 깔렸지만
-   **아이가 놓은 다리와 처음 길의 다리는 개울로 돌아가 길이 끊겼다**(산 판 · 저장본 한 번 왕복). 판정 0 · 저장 칸 0 · 원래 줄 1줄(바로 위 판 목록 고리에 '&& !stageKindKeep(…)'). 분류 '저장'. */
+   **아이가 놓은 다리와 처음 길의 다리는 개울로 돌아가 길이 끊겼다**(산 판 · 저장본 한 번 왕복). 판정 0 · 저장 칸 0 · 원래 줄 1줄(바로 위 판 목록 고리에 '&& !stageKindKeep(…)'). 분류 '저장'.
+   ③ 옛 우물(well · [MAC-NOWATER] · PR 3a): 판 목록에서 빠져도 통과 — 되살리기(복원)는 장식으로 열리고, 이미 있는 옛 우물은 옮기기·돌리기·되돌리기도 된다
+      (옮기기·되돌리기는 canPlace 를 복원 없이 부른다 — 막으면 지운 뒤 ↩ 가 '그 자리가 이미 찼어요'로 우물을 잃었다 · 09-25 검토). 새로 고르는 길은 트레이 숨김(nwSync)이 막는다.
+      물을 켠 판(NOWATER.off 거짓)과 결정 판(proto-vote — 옛 결정 우물이 A 자리를 막는다)에서는 안 푼다. */
 (window.VRULES = window.VRULES || {}).stageKeep = { on: true };
-const SKEEP = { stats: { 다리: 0, 판개울: 0 } };
+const SKEEP = { stats: { 다리: 0, 판개울: 0, 옛우물: 0 } };
 function stageKindKeep(kind, args) { if (!window.VRULES.stageKeep || !window.VRULES.stageKeep.on) return false; const [, x, y, , opts] = args;
   if (kind === 'sbr' && STAGE.def.건물.includes('road')) { SKEEP.stats.다리++; return true; }
   if (kind === 'stream' && opts && opts.복원 && inb(x, y) && terrainStreams().has(idx(x, y))) { SKEEP.stats.판개울++; return true; }
+  if (kind === 'well' && NOWATER.off && !(STAGE.def.결정 && STAGE.def.결정.on)) { if (opts && opts.복원) SKEEP.stats.옛우물++; return true; }
   return false; }
 window.__stageKeep = () => ({ 켜짐: window.VRULES.stageKeep.on, ...SKEEP.stats });
 { hookAdd('goalTick', function (next, args) { const r = next(args);
@@ -11951,13 +11955,14 @@ function loadSaved(rawOverride) {
      판 '건물' 목록에 well 이 있으면 보임). 연못 = 쉼 하나 · 분수 = 쉼.
    · 기본 목표 well '우물 하나 놓기' → bench1 '긴의자 하나 놓기 — 쉴 곳'(결정 6). 옛 저장본의 well 은 goals 에 그대로 두고, 이룬 마을은 bench1 을 조용히 잇는다.
    · VRULES.needWater.on:true 이거나 keepStages 의 판이면 옛 넷 그대로 — 이 블록은 아무것도 안 만진다(기준 ① 0).
-     keepStages = 우물이 판의 전제인 판(town3 · town3-origin · nowater · proto-vote) — 그 판을 고치는 PR(3a · 3b)에서 뺀다.
+     keepStages = 우물이 판의 전제인 판 — 지금은 없다(09-25 · nowater 는 PR 3b 에서 nohealth 로 · town3 · town3-origin · proto-vote 는 PR 3a 에서 동네 의원으로).
+     나중 '옛날과 오늘날' 판처럼 물을 켜야 하는 판은 이 목록에 넣거나 판 규칙 `needWater: { on: true }` 로 켠다.
    · 자리: 판(STAGE.def)을 안 뒤 · 처음 상태(시연 판 · loadSaved)와 첫 틱 전 · 동기(시뮬은 setTimeout 을 안 돌린다).
      판 규칙(module 끝 stageApplyRules) · run.mjs --rules · 콘솔로 바뀌면 틱 머리에서 다시 맞춘다(바뀔 때만 · 난수 0 · 벽시계 0).
    원래 줄 수정 2(waitSayJob 의 4 · 첫 돌아섬 안내 글) · const 배열은 제자리 splice · NEEDS 는 다시 댐 · K 세 항목 · GOALS 한 칸.
    waitSay · waitDots 는 감싸기(몸은 그대로 — scripts/village-paint/test.mjs 가 몸을 꺼내 넷 기준으로 시험한다).
    아이콘 표(SAY_ICON · VOICE · WHY …)의 물 칸은 남긴다 — 물을 지키는 판이 쓰고, 물이 없는 판에서는 부를 일이 없다. 분류 '판정'. */
-(window.VRULES = window.VRULES || {}).needWater = { on: false, keepStages: ['town3', 'town3-origin', 'nowater', 'proto-vote'] };
+(window.VRULES = window.VRULES || {}).needWater = { on: false, keepStages: [] };
 const NOWATER = { off: false, rulesRead: false, carried: false, stats: { 바뀜: 0, 목표이음: 0 } };
 const NW0 = { wellNeed: K.well.need, wellNm: K.well.nm, wellGrp: K.well.grp0 != null ? K.well.grp0 : K.well.grp, wellGrp0: K.well.grp0, pondNeed: K.pond.need, pondNeed2: K.pond.need2, fountainNeed: K.fountain.need, goal: GOALS.find(g => g.id === 'well') || null };
 const NW_BENCH = { id: 'bench1', t: '긴의자 하나 놓기 — 쉴 곳', ok: () => countKind('bench') + countKind('minibench') >= 1 };
@@ -12039,6 +12044,7 @@ function healthOffer(R) {
   if (!R.on || !K.clinic || !NOWATER.off) return false;
   const d = STAGE.def; if (!d) return true;
   if (d.교과 != null && !(d.규칙 && d.규칙.health)) return false;
+  if (d.결정 && d.결정.on && d.결정.시설 === 'clinic' && (!window.VRULES.vote || window.VRULES.vote.on)) return true;   /* PR 3a · proto-vote — 결정 시설이 의원이면 목록에 없어도 건강(놓기는 결정 적용으로만) */
   return !(Array.isArray(d.건물) && d.건물.length && !d.건물.includes('clinic'));
 }
 function healthLive() { return HEALTH.offer && HEALTH.on; }
@@ -12052,7 +12058,7 @@ function healthFac(on) {
   if (on) {
     q.need = HEALTH_VAL.need; q.jobs = HEALTH_VAL.jobs; q.grp = q.grp0 = HEALTH_VAL.tab; LOCK_POP.clinic = HEALTH_VAL.lockPop;
     if (!UNLOCKS.some(u => u.kinds.includes('clinic'))) { const u80 = UNLOCKS.find(u => u.pop === HEALTH_VAL.lockPop); if (u80) { const j = u80.kinds.indexOf('station'); u80.kinds.splice(j >= 0 ? j : u80.kinds.length, 0, 'clinic'); } else UNLOCKS.push(HEALTH_ROW); }
-    if (ORDER.indexOf('clinic') < 0) { const w = ORDER.indexOf('well'), sh = ORDER.indexOf('shop'); if (w >= 0) ORDER.splice(w + 1, 0, 'clinic'); else if (sh >= 0) ORDER.splice(sh, 0, 'clinic'); else ORDER.push('clinic'); }
+    if (ORDER.indexOf('clinic') < 0 && !(STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes('clinic'))) { const w = ORDER.indexOf('well'), sh = ORDER.indexOf('shop'); if (w >= 0) ORDER.splice(w + 1, 0, 'clinic'); else if (sh >= 0) ORDER.splice(sh, 0, 'clinic'); else ORDER.push('clinic'); }
   } else {
     if (HEALTH_K0.need === undefined) delete q.need; else q.need = HEALTH_K0.need;
     if (HEALTH_K0.jobs === undefined) delete q.jobs; else q.jobs = HEALTH_K0.jobs;
@@ -13723,21 +13729,23 @@ if (STAGE.def) { if (window.VRULES.stageCard && window.VRULES.stageCard.on) stag
 
    · **새 판정을 하나도 만들지 않는다.** 접근성은 이미 있는 필요·거리 판정(computeSat — 집의 문 앞 길에서
      길을 따라 NEED_R=14칸 안에 그 필요 건물이 있나)을 **읽기만** 한다. 이 판이 바꾸는 판정 규칙 0개.
-   · **미리 보기는 세계를 바꾸지 않는다.** '저 자리에 우물이 있다고 치고' 같은 규칙을 돌릴 뿐,
+   · **미리 보기는 세계를 바꾸지 않는다.** '저 자리에 결정 시설이 있다고 치고' 같은 규칙을 돌릴 뿐,
      cells·sat·res·저장본에 **쓰기가 한 줄도 없다**(voteReach 는 읽기와 BFS 뿐). 지문(voteFinger)으로 확인한다.
-   · **미리 본 것과 적용한 것이 같아야 한다.** 후보지 둘은 길이 아닌 빈 땅이라 우물을 놓아도 길 그래프가
-     안 바뀐다 → 집에서 나가는 BFS 결과가 그대로다 → 새로 보이는 것은 '닿은 길 칸 옆에 우물이 있다' 하나뿐.
+   · **미리 본 것과 적용한 것이 같아야 한다.** 후보지 둘은 길이 아닌 빈 땅이라 결정 시설을 놓아도 길 그래프가
+     안 바뀐다 → 집에서 나가는 BFS 결과가 그대로다 → 새로 보이는 것은 '닿은 길 칸 옆에 결정 시설이 있다' 하나뿐.
      적용 뒤 패널은 **미리 보기 셈이 아니라 실제 판정(computeSat)** 을 읽어 적는다 — 어긋나면 화면에서 바로 보이게.
    · **승패로 처리하지 않는다**(정본 3절): 정답 후보지 없음 · 총점 판정 없음 · 가까워진 집과 **남는 불편**을
      늘 함께 적는다 · 두 안의 가까워지는 집 수가 4 로 같아 **숫자로는 고를 수 없다**.
    · **투표·채팅·대표 선출·AI 발언은 만들지 않는다** — 토의는 교실에서 한다.
    · 말은 기존 통로(toast)만 쓴다 — 미리 보기 1줄 · 적용 1줄, 새 말자리 0(아래 voteApply 주석: simSay 는 대기줄에 막혔다).
-   · 적용은 canPlace 를 거치지 않고 placeAt 을 곧바로 부른다: 판의 `건물` 목록에 well 이 없어서
+   · 적용은 canPlace 를 거치지 않고 placeAt 을 곧바로 부른다: 판의 `건물` 목록에 결정 시설(proto-vote: clinic)이 없어서
      (아이가 제3의 자리에 놓는 길을 안 연다) canPlace 가 막는다. 대신 **판 파일에 적힌 두 자리에만** 놓고
      놓기 전에 그 칸이 비었는지 스스로 본다. placeAt·removeAt 을 **감싸지 않는다**(다른 담당의 MAC-FLOWGONE 과 겹치지 않게).
-   · 되돌리기는 **판 저장본을 지우고 새로 여는 것** 하나뿐이다 — 우물만 치우면 그 사이 자란 집·늘어난 식구가
+   · 되돌리기는 **판 저장본을 지우고 새로 여는 것** 하나뿐이다 — 결정 시설만 치우면 그 사이 자란 집·늘어난 식구가
      남아 '앞 실행의 흔적 0'(정본 완료 시험)을 보장할 수 없다.
    · 판 파일에 `결정` 칸이 없으면 **아무것도 안 만든다** — 본편과 다른 판은 한 줄도 안 달라진다.
+   · 09-24 PR 3a: proto-vote 결정 시설 우물 → 동네 의원(물 끔). 건강은 healthOffer 의 결정 예외로 켜고(판 규칙 health.pop 0) 트레이에는 안 넣는다(healthFac).
+     그림은 K[시설].ic(🩺) · 후보 자리 rot 1/3(문이 길 쪽 x=139 로 — 의원은 needRoad).
    ══════════════════════════════════════════════════════════════ */
 (window.VRULES = window.VRULES || {}).vote = { on: true };
 /* 표 = 적용하는 **그 순간** 두 안을 다 재서 얼려 둔 것 — 적용 뒤에도 고르지 않은 안을 견줄 수 있게(관찰자 15회 ⓑ11).
@@ -13837,7 +13845,7 @@ function voteApply(id) {
   VOTE.표 = {}; d.후보.forEach(q => { VOTE.표[q.id] = votePreviewCalc(q.id); });   /* [ⓑ11] 놓기 **전에** 두 안을 다 재 얼려 둔다 */
   placeAt(d.시설, c.자리[0], c.자리[1], c.rot || 0); updateCount(); markDirty();
   VOTE.적용 = c.id; VOTE.미리 = null; VOTE.stats.적용횟수++;
-  toast('🪣 결정을 적용했어요 — ' + josa(d.이름, '이', '가') + ' ' + c.이름 + '에 놓였어요', true);   /* [37-ⓑ87] */   /* simSay 가 아니라 toast 인 까닭(실화면에서 재 보고 바꿨다):
+  toast((K[d.시설].ic || '🪣') + ' 결정을 적용했어요 — ' + josa(d.이름, '이', '가') + ' ' + c.이름 + '에 놓였어요', true);   /* [37-ⓑ87] */   /* simSay 가 아니라 toast 인 까닭(실화면에서 재 보고 바꿨다):
      simSay 는 마을이 스스로 하는 말이라 **말 대기줄**을 탄다 — 미리 보기 말이 아직 떠 있으면 적용 말이 뒤에서 기다리다가
      실화면에서 **한 번도 안 보였다**. 아이가 누른 것에 대한 대답은 곧바로 떠야 한다. 둘 다 기존 말 통로이고 새 말자리는 0. */
   /* [ⓑ12] 적용 뒤 지도 소식에 **기쁜 쪽만** 뜨는 것을 막는다(관찰자 15회 ⓑ12 · 1대 0).
@@ -13964,7 +13972,7 @@ function voteDraw() {
   el.innerHTML = '<h4>🗳️ ' + voteEsc(d.이름) + '을 어디에 놓을까요'
     + '<button data-vote="fold">' + (VOTE.접힘 ? '펼치기' : '접기') + '</button></h4>'
     + '<div class="body"><div class="who">' + who + '</div>'
-    + '<div class="tip">🪣 ' + voteEsc(d.이름) + '은 함께 정한 자리에만 놓여요 — 아래 상자에는 없어요</div>'   /* [ⓑ13] 빈 탭이 '고장 난 것'으로 읽힌다 — 그 한 줄이 이 판의 요점이다 */
+    + '<div class="tip">' + (K[d.시설].ic || '🪣') + ' ' + voteEsc(d.이름) + '은 함께 정한 자리에만 놓여요 — 아래 상자에는 없어요</div>'   /* [ⓑ13] 빈 탭이 '고장 난 것'으로 읽힌다 — 그 한 줄이 이 판의 요점이다 */
     + '<div class="cols"><div class="colL">' + ops0 + '<div class="btns">' + btn + '</div></div>'
     + '<div class="colR">' + box + '</div></div>'
     + qs + go + '</div>';   /* go 는 맨 끝 — 바닥에 붙어야 스크롤이 얼마가 남았든 눌린다(ⓐ1) */
@@ -13998,7 +14006,7 @@ function voteTrayWatch() {
     if (box.querySelector('.card:not(.tool)')) { VOTE.트레이말 = false; return; }   // 물건이 있는 탭 — 다음 빈 탭에서 다시 말한다
     if (VOTE.트레이말) return;
     VOTE.트레이말 = true; const d = voteDef();
-    toast('🪣 ' + d.이름 + '은 함께 정한 자리에만 놓여요 — 왼쪽에서 두 자리를 견주어 보세요', true); };
+    toast((K[d.시설].ic || '🪣') + ' ' + d.이름 + '은 함께 정한 자리에만 놓여요 — 왼쪽에서 두 자리를 견주어 보세요', true); };
   new MutationObserver(본다).observe(box, { childList: true });
   setTimeout(본다, 1200);
 }

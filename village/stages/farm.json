@@ -49,7 +49,7 @@
       ]
     }
   },
-  "건물": ["road", "avenue", "house", "well", "shop", "play", "bench", "tree", "flower", "windmill", "field", "barn", "silo"],
+  "건물": ["road", "avenue", "house", "shop", "play", "bench", "tree", "flower", "windmill", "field", "barn", "silo"],
   "흐름": { "on": true, "물건": "곡식",
     "만드는곳": { "field": { "간격틱": 600, "양": 1, "담을수": 5 } },
     "받는곳": { "shop": { "담을수": 8 } },
