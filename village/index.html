@@ -3097,6 +3097,44 @@ function streamFlowDraw(now) {
   im.count = k; im.visible = k > 0; im.instanceMatrix.needsUpdate = true; SLOOK.stats.결 = k; }
 { const dc0 = drawClock; drawClock = function () { const r = dc0.apply(this, arguments); streamFlowDraw(performance.now()); return r; }; }
 window.__streamLook = () => ({ 켜짐: window.VRULES.streamLook.on, ...SLOOK.stats, 보임: !!(SLOOK.mesh && SLOOK.mesh.visible) });
+/* ── [DESIGN-HOSPITAL] 🏥 건강 — 동네 의원 · 작은 병원의 **모양만** (사용자 09-24 '현대 마을에 우물은 없다' · 보스 결정 · 파일 경계: 값은 고장 블록) ──
+   빈 필요 자리 '건강'(아플 때 갈 곳)의 시설 둘. ① 동네 의원 = 기본 시설(동네마다) · ③ 작은 병원 = 마을이 커지면 놓는 큰 시설. (② 보건소 모양은 보스함 시안에 보관.)
+   · 위에서 내려다보는 판이라 **지붕 위 표**가 주인공 — 의원: 흰 판 + 초록 십자 · 작은 병원: 흰 원 + 파란 H(+ 앞면 초록 십자 간판). **빨간 십자 0**(적십자 표장은 법으로 보호).
+   · 2×2(우물과 같은 크기) · 높이 의원 4.1(집 5.9 보다 낮게 — 동네 건물) · 작은 병원 6.5.
+   · **값(need·jobs·반경·해금·말)은 넣지 않는다** — 고장 블록이 이 아래에서 `if (K.clinic) K.clinic.need = '건강'` 꼴로 얹는다. 그때까지는
+     트레이에 없다(grp '(숨김)' · ORDER 에 안 넣음) → 기본 마을·수업 판 변화 0. 고장 블록이 필요를 붙일 때 탭·ORDER 로 옮긴다.
+   원래 줄 수정 0 — K 에 둘 · MAP_COL 에 둘. 판정 0 · 저장 0(옛 저장본엔 없는 종류라 그대로 열린다). */
+K.clinic = { nm: '동네 의원', ic: '🩺', grp: '(숨김)', w: 2, h: 2, g: 90, needRoad: true, cap: 60, parts: [
+    { g:'box', c:0xcfd3d6, s:[7.6,0.25,7.6], p:[0,0.125,0] },
+    { g:'box', c:0xf4f1ea, s:[6.4,3.6,6], p:[0,1.9,0] },
+    { g:'box', c:P.glass, s:[6.48,0.6,6.08], p:[0,2.85,0] },
+    { g:'box', c:0x5fb88a, s:[7,0.3,6.6], p:[0,3.85,0] },
+    { g:'box', c:0x5fb88a, s:[3,0.12,1.6], p:[1.2,1.95,3.6] },
+    { g:'box', c:0xbfe6f7, s:[1.8,1.45,0.24], p:[1.2,0.98,3.08] },
+    { g:'box', c:0xffffff, s:[2.48,0.12,2.48], p:[0,4.1,0] },
+    { g:'box', c:0x2fa865, s:[1.84,0.16,0.56], p:[0,4.14,0] },
+    { g:'box', c:0x2fa865, s:[0.56,0.16,1.84], p:[0,4.14,0] },
+    { g:'box', c:0xffffff, s:[2.08,0.52,0.24], p:[-1.8,1.6,3.12] },
+    { g:'box', c:0x2fa865, s:[1.52,0.12,0.28], p:[-1.8,1.6,3.16] },
+    { g:'box', c:0x2fa865, s:[0.4,0.46,0.28], p:[-1.8,1.6,3.16] } ] };
+K.hospital = { nm: '작은 병원', ic: '🏥', grp: '(숨김)', w: 2, h: 2, g: 160, needRoad: true, cap: 30, parts: [
+    { g:'box', c:0xcfd3d6, s:[7.8,0.25,7.8], p:[0,0.125,0] },
+    { g:'box', c:0xf7f7f5, s:[6.8,6,6.4], p:[0,3.1,0] },
+    { g:'box', c:P.glass, s:[6.88,0.45,6.48], p:[0,1.9,0] },
+    { g:'box', c:P.glass, s:[6.88,0.45,6.48], p:[0,3.4,0] },
+    { g:'box', c:P.glass, s:[6.88,0.45,6.48], p:[0,4.9,0] },
+    { g:'box', c:0x2f6fb0, s:[7.2,0.26,6.8], p:[0,6.2,0] },
+    { g:'box', c:0x2f6fb0, s:[4.2,0.12,1.92], p:[0,1.4,3.92] },
+    { g:'box', c:0xbfe6f7, s:[2.2,1.1,0.24], p:[0,0.8,3.28] },
+    { g:'cyl', c:0xffffff, s:[2,0.1,2], p:[0,6.38,0] },
+    { g:'box', c:0x2f6fb0, s:[0.48,0.12,2.24], p:[-0.8,6.48,0] },
+    { g:'box', c:0x2f6fb0, s:[0.48,0.12,2.24], p:[0.8,6.48,0] },
+    { g:'box', c:0x2f6fb0, s:[1.6,0.12,0.48], p:[0,6.48,0] },
+    { g:'box', c:0xffffff, s:[2.08,0.52,0.24], p:[0,5.55,3.28] },
+    { g:'box', c:0x2fa865, s:[1.52,0.12,0.28], p:[0,5.55,3.32] },
+    { g:'box', c:0x2fa865, s:[0.4,0.46,0.28], p:[0,5.55,3.32] } ] };
+MAP_COL.clinic = '#8fd3b0'; MAP_COL.hospital = '#9fc1e6';
+window.__hospitalShape = () => ({ 의원: !!K.clinic, 병원: !!K.hospital, 트레이: ORDER.includes('clinic') || ORDER.includes('hospital'), 필요: [K.clinic.need || null, K.hospital.need || null] });
 /* ── [MAC-DOORROT] 문 있는 건물은 놓는 순간 문이 길을 보게 저절로 돈다 (사용자 09-20: "가게랑 그냥 막 지어도 길 방향을 보게 설정하면 안 돼?") ──
    규칙상 길은 발자국 어느 옆에 닿아도 놓이지만(canPlace), 문이 길 반대편을 보는 집이 많았다 — 주민은 문 앞(doorFront)에서 드나든다.
    · 가리킨 빈 칸에서 네 방향을 다 따져, 그 방향의 **문 앞 줄에 길이 몇 칸 닿나**(큰길은 한 칸을 둘로)를 센다. 놓을 수 없는 방향(발자국이 안 들어감)은 뺀다.
@@ -12041,6 +12079,24 @@ const GSPD = { off: [], t: 0, stats: { 흐림: 0, 막누름: 0 } };
     GSPD.stats.막누름++; const g = document.getElementById('guide'), h = document.getElementById('guideHint'); if (h) h.classList.add('on'); g.classList.remove('nudge'); void g.offsetWidth; g.classList.add('nudge');
     clearTimeout(GSPD.t); GSPD.t = setTimeout(() => { if (h) h.classList.remove('on'); g.classList.remove('nudge'); }, R.hintMs || 3000); }); }
 window.__guideSpeed = () => ({ 켜짐: window.VRULES.guideSpeed.on, 흐린단추: GSPD.off.length, 알림보임: !!(document.getElementById('guideHint') && document.getElementById('guideHint').classList.contains('on')), ...GSPD.stats });
+/* ── [MAC-GUIDEFIRST] 첫 안내 먼저 → 판 카드 — 두 막이 한꺼번에 뜨지 않게 (보스 09-24 결정 (가) · #1008 에서 찾음) ──
+   시작 저장본이 없는 판(sea·mountain·farm·city)을 처음 열면 판 카드(부팅 0.6초)와 첫 안내(빈 땅 길 1.5초)가 **함께** 떴다(안내가 카드 밑).
+   판 카드 부팅은 '안내가 떠 있으면 닫힌 뒤에'를 보지만 안내가 더 늦게 떠서 기다림이 걸리지 않았다 — 순서도 설계(안내 → 카드)와 거꾸로.
+   · 빈 땅 첫 열기라 안내가 뜰 판이면(안내를 본 적 없음 · 구경·시연 아님 · 판이 안내를 끄지 않음) **안내 결정(guideStart)이 날 때까지** 판 카드 부팅을 미룬다(최대 maxWaitMs).
+   · 안내가 뜨면 원래 부팅이 '안내가 닫힌 뒤에'를 지킨다 → 안내 → 판 카드. 안내를 이미 봤으면 곧장 판 카드(두 번째부터).
+   · village-look card 장면이 1.5초 타이머에 따라 흔들리던 것(보스: PR 쪽 FAIL 2 · 보스 쪽 PASS)도 이것으로 한 길이 된다.
+   판정·저장 0 · 원래 줄 수정 0 — guideStart·stageCardBoot 감싸기. 스위치 VRULES.guideFirst(보기). */
+(window.VRULES = window.VRULES || {}).guideFirst = { on: true, maxWaitMs: 4000 };
+const GFIRST = { decided: false, stats: { 기다림: 0, 기다린ms: 0, 넘김: 0 } };
+{ const gs0 = guideStart; guideStart = function () { GFIRST.decided = true; return gs0.apply(this, arguments); };
+  const guidePending = () => !GFIRST.decided && /기본 판/.test(String(window.__START || '')) && !guideSeen() && !VISIT.on && !savingOff && !stageNoGuide();
+  const sb0 = stageCardBoot; stageCardBoot = function () { const R = window.VRULES.guideFirst, self = this, args = arguments, t0 = performance.now();
+    if (!R.on || !guidePending()) return sb0.apply(self, args);
+    GFIRST.stats.기다림++; const go = () => { const waited = performance.now() - t0;
+      if (guidePending() && waited < (R.maxWaitMs || 4000)) { setTimeout(go, 150); return; }
+      GFIRST.stats.기다린ms = Math.round(waited); if (guidePending()) GFIRST.stats.넘김++; sb0.apply(self, args); };
+    setTimeout(go, 150); }; }
+window.__guideFirst = () => ({ 켜짐: window.VRULES.guideFirst.on, 안내결정남: GFIRST.decided, ...GFIRST.stats });
 window.__destLog = (reset) => { const o = { ...destLog, 끌림: hourPref(simHour()), 시: +simHour().toFixed(1) }; if (reset) { destLog.전체 = destLog.후보 = destLog.고름 = 0; } return o; };
 window.__destMix = () => { const m = { 물: 0, 장보기: 0, 놀이: 0, 쉼: 0, 배움: 0, 기타: 0, 시: +simHour().toFixed(1), 끌림: hourPref(simHour()) }; folks.forEach(f => { if (f.state !== 'walk' || !f.path || f.visitor || f.goal) return; const n = needBeside(f.path[f.path.length - 1]); m[n && m[n] != null ? n : '기타']++; }); return m; };
 window.__signStats = () => ({ 표지판: [...signs.values()].map(v => [v.t, v.reads || 0]), 으뜸: topSign(), 좋아한곳: topLike(), 집계: { ...visitLikes } });
