@@ -1,4 +1,4 @@
-// 마을 화면 회귀 검사 — 판 아홉 × 고정 카메라 몇 장을 찍어 **기준 사진과 픽셀 차이**를 낸다 (보스 09-24 · [MAC-LOOKSHOTS]).
+// 마을 화면 회귀 검사 — 판 열(보스의 아홉 + 수업 판 town3-origin) × 고정 카메라 몇 장을 찍어 **기준 사진과 픽셀 차이**를 낸다 (보스 09-24 · [MAC-LOOKSHOTS]).
 // flipY(#922) 처럼 규칙·기준 ① 은 그대로인데 **그림만 조용히 틀어지는** 부류를 PR 마다 잡는 장치다. 결과는 차이 % 와 '차이 난 칸' 표만 낸다.
 //
 // 브라우저는 이 스크립트가 띄운 **전용 headless 크로미움 하나**(ms-playwright 의 chrome-headless-shell · CDP 직결 — playwright 패키지 없이).
@@ -15,6 +15,7 @@
 //   node scripts/village-look/shots.mjs                            # 지금 작업 트리를 찍어 기준과 견준다(차이 > --max % 이면 끝값 1)
 //   node scripts/village-look/shots.mjs --vs-ref origin/main       # 기준을 그 ref 에서 바로 찍어 견준다(저장된 기준은 안 건드린다)
 //   node scripts/village-look/shots.mjs --update --ref origin/main # 기준을 그 ref 로 찍어 둔다
+//   node scripts/village-look/shots.mjs --self                     # 같은 코드를 두 번 찍어 견준다 — 사진이 흔들리지 않나(결정성) 스스로 보기
 //   node scripts/village-look/shots.mjs --boards sea,mountain+village/stages/boards/mid36.json --shots default,whole
 //   그 밖: --hour 10 · --gfx fixed|high · --lookseed 1 · --frames 60 · --max 0(%) · --tol 2(채널 차) · --ui · --json <파일> · --dir tmp/village-look · --keep
 import { spawn, spawnSync } from 'node:child_process'; import crypto from 'node:crypto'; import fs from 'node:fs'; import http from 'node:http'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
@@ -23,14 +24,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const args = process.argv.slice(2), flag = k => args.includes('--' + k), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && args[i + 1] != null && !String(args[i + 1]).startsWith('--') ? args[i + 1] : d; };
 if (flag('help') || flag('h')) { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter(l => l.startsWith('//')).map(l => l.slice(3)).join('\n')); process.exit(0); }
 const MID = 'village/stages/boards/mid36.json';
-const BOARDS = opt('boards', `기본+village/stages/boards/pop88.json,town3,farm+${MID},city+${MID},sea,mountain,origin,proto-flow,proto-vote`).split(',').map(s => s.trim()).filter(Boolean);
+const BOARDS = opt('boards', `기본+village/stages/boards/pop88.json,town3,town3-origin,farm+${MID},city+${MID},sea,mountain,origin,proto-flow,proto-vote`).split(',').map(s => s.trim()).filter(Boolean);
 const SHOTS = opt('shots', 'default,near,whole').split(',').map(s => s.trim()).filter(Boolean);
 const DIR = path.resolve(ROOT, opt('dir', 'tmp/village-look')), BASEDIR = path.join(DIR, '기준'), NOWDIR = path.join(DIR, '지금'), DIFFDIR = path.join(DIR, '차이');
 const HOUR = +opt('hour', '10'), GFX = opt('gfx', 'fixed'), LOOKSEED = (+opt('lookseed', '1') >>> 0) || 1, FRAMES = Math.max(2, +opt('frames', '60') | 0);
-const MAX = +opt('max', '0'), TOL = +opt('tol', '2'), JSON_OUT = opt('json', null), UI = flag('ui'), UPDATE = flag('update'), REF = opt('ref', null), VSREF = opt('vs-ref', null);
+const MAX = +opt('max', '0'), TOL = +opt('tol', '2'), JSON_OUT = opt('json', null), UI = flag('ui'), UPDATE = flag('update'), REF = opt('ref', null), VSREF = opt('vs-ref', null), SELF = flag('self');
 const VIEW = { w: 1366, h: 610 };
 const bad = SHOTS.filter(s => !['default', 'near', 'whole'].includes(s)); if (bad.length) { console.error('모르는 장면: ' + bad.join(' ') + ' (default · near · whole)'); process.exit(2); }
-if (UPDATE && VSREF) { console.error('--update 와 --vs-ref 는 같이 쓰지 않는다(--vs-ref 는 저장된 기준을 안 건드린다)'); process.exit(2); }
+if ([UPDATE, !!VSREF, SELF].filter(Boolean).length > 1) { console.error('--update · --vs-ref · --self 는 하나만(--vs-ref·--self 는 저장된 기준을 안 건드린다)'); process.exit(2); }
 if (REF && !UPDATE) { console.error('--ref 는 --update 와 함께(기준을 그 ref 로 찍는다) — 바로 견주려면 --vs-ref'); process.exit(2); }
 const CHROME = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell');
 if (!fs.existsSync(CHROME)) { console.error('헤드리스 크로미움이 없다: ' + CHROME + ' — CHROME=<경로> 로 알려 주거나 npx playwright install chromium-headless-shell'); process.exit(2); }
@@ -87,7 +88,7 @@ const nav = async url => { await send('Page.navigate', { url }); for (let k = 0;
 const until = async (cond, ms, what) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await evaluate('return !!(' + cond + ')')) return; } catch {} await sleep(150); } throw new Error(what + ' — ' + ms / 1000 + '초 안에 안 됨'); };
 const netIdle = async (ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (!inflight.size && Date.now() - lastNet > 400) return true; await sleep(100); } return false; };
 const pump = n => evaluate(`return window.__shots.step(${n | 0}, 1000 / 60)`);
-const HIDE = 'body * { visibility: hidden !important; } #cv, #mini { visibility: visible !important; }';
+const HIDE = 'body * { visibility: hidden !important; } #cv, #mini { visibility: visible !important; }', HIDE_UI = '#toast, #why { visibility: hidden !important; }';   // --ui 여도 토스트·풍선은 숨긴다(실제 시간으로 떴다 사라져 사진이 흔들린다)
 
 /* 한 판 — 판 밖 페이지에서 저장 키를 넣고(마을 페이지는 닫힐 때 제 판을 다시 적는다) 연 뒤, 멈추고 고정해서 장면마다 찍는다.
    onShot(spec, shot, file) 은 **그 장면의 카메라가 살아 있을 때** 부른다(견주기의 '칸' 짚기가 그 카메라를 쓴다). */
@@ -100,7 +101,7 @@ async function shootBoard(spec, outDir, onShot) {
   await nav(BASE + '/village/index.html?' + (stage ? 'stage=' + encodeURIComponent(stage) + '&' : '') + 'sid=guest');
   await until(`typeof window.__setSpeed === 'function' && typeof window.__view === 'function' && typeof window.__gfxMode === 'function' && window.__shots`, 30000, boardName(spec) + ' 불러오기');
   await pump(1); await until('window.__LOADMS != null', 5000, boardName(spec) + ' 첫 프레임');
-  if (!UI) await evaluate(`const s = document.createElement('style'); s.id = '__shotsHide'; s.textContent = ${JSON.stringify(HIDE)}; document.head.appendChild(s); return 1`);
+  await evaluate(`const s = document.createElement('style'); s.id = '__shotsHide'; s.textContent = ${JSON.stringify(UI ? HIDE_UI : HIDE)}; document.head.appendChild(s); return 1`);
   /* 안내·판 카드·제목 카드는 늦게 뜰 수 있다 — 실제 시간 1.5초 조용할 때까지 닫는다(프레임은 안 돌린다: 가짜 시계가 늘 같은 자리에 있게) */
   await evaluate(`const sl = ms => new Promise(r => setTimeout(r, ms)); let quiet = 0;
     for (let k = 0; k < 60 && quiet < 6; k++) { const bs = [...document.querySelectorAll('button')].filter(b => ['시작', '건너뛰기', '닫기'].includes(b.textContent.trim()) && b.offsetParent);
@@ -188,6 +189,7 @@ try {
   } else {
     let baseDir = BASEDIR, baseLabel, baseGL;
     if (VSREF) { const dir = path.join(DIR, 'ref'); await runAll(refRoot(VSREF), dir, VSREF); baseDir = dir; baseLabel = VSREF + ' (' + git('rev-parse', '--short', VSREF) + ') · 방금 찍음'; baseGL = renderer; }
+    else if (SELF) { const dir = path.join(DIR, 'self'); await runAll(ROOT, dir, '한 번 더'); baseDir = dir; baseLabel = '같은 코드를 방금 한 번 더(결정성)'; baseGL = renderer; }
     else { const mf = path.join(BASEDIR, 'meta.json'); if (!fs.existsSync(mf)) { console.error('기준 사진이 없다 — 먼저 --update (또는 --update --ref origin/main) · 아니면 --vs-ref origin/main'); throw Object.assign(new Error('기준 없음'), { quiet: true }); }
       const m = JSON.parse(fs.readFileSync(mf, 'utf8')); baseLabel = m.코드 + ' · ' + String(m.찍은때).slice(0, 16).replace('T', ' '); baseGL = m.렌더러;
       const c0 = JSON.stringify({ ...m.조건, 판: undefined, 장면: undefined }), c1 = JSON.stringify({ ...cond, 판: undefined, 장면: undefined });
