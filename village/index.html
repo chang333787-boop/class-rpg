@@ -8583,7 +8583,7 @@ const nosnapMoves = f => f.state === 'walk' || f.state === 'idle' || f.state ===
 function noSnapOn() { const H = NOSNAP.held; H.length = 0; if (!window.VRULES.noSnap.on) { if (typeof spaceOn === 'function') spaceOn(H); return; }
   for (const f of folks) { const o = NOSNAP.off.get(f); if (!o || !nosnapMoves(f)) continue; H.push([f, f.x, f.z, f.px, f.pz]);
     f.x += o[0]; f.z += o[1]; if (f.px != null) f.px += o[0]; if (f.pz != null) f.pz += o[1]; }
-  if (typeof spaceOn === 'function') spaceOn(H); if (typeof bwalkOn === 'function') bwalkOn(); }   /* [ACT-SPACE] 서 있는 사람의 간격도 같은 층에서 · [ACT-BRIDGEWALK] 다리 위 높이 */
+  if (typeof spaceOn === 'function') spaceOn(H); if (typeof bwalkOn === 'function') bwalkOn(); if (typeof showFolkTick === 'function') showFolkTick(); }   /* [ACT-SPACE] 서 있는 사람의 간격도 같은 층에서 · [ACT-BRIDGEWALK] 다리 위 높이 */
 function noSnapOff() { for (const [f, x, z, px, pz] of NOSNAP.held) { f.x = x; f.z = z; f.px = px; f.pz = pz; } NOSNAP.held.length = 0; if (typeof spaceOff === 'function') spaceOff(); }
 const nosnapAt = f => { const o = NOSNAP.off.get(f); return o && nosnapMoves(f) ? o : null; };   /* __folkPos 가 읽는다 */
 window.__noSnap = () => ({ 켜짐: window.VRULES.noSnap.on, ...NOSNAP.stats });
@@ -8678,6 +8678,30 @@ function bwalkOn() { const L = window.VRULES.bridgeWalk; let n = 0;
     if (!t && Math.abs(y) < 0.005) { if (y) f.liftY = 0; continue; } f.liftY = y + (t - y) * L.ease; if (t) n++; }
   BWALK.stats.올림 = n; }
 window.__bridgeWalk = () => ({ 켜짐: window.VRULES.bridgeWalk.on, 지금올린사람: BWALK.stats.올림, 사람: folks.filter(f => f.liftY > 0.01).map(f => +f.liftY.toFixed(2)).slice(0, 10) });
+/* ── [ACT-SHOWFOLK] 교실 TV '보여 주기 모드' ② 사람 크게 (설계 docs/village_tv_mode.md · 창조자 30회 §3 · 보스 09-24) ──
+   1920×1080 에서 사람은 몇~10px 의 점이라 뒷자리에서 '빈 거리'로 보였다. 보여 주기(body.show)일 때만 사람을 k 배(1.6)로 **그린다**.
+   · 방법: 사람 재료(folkPool · 그림자용 깊이 재료 · 수레 끄는 이웃)의 정점 셰이더에서 `transformed *= uFolkK` 한 줄 — glb 사람 부위는 모두 **발밑이 원점**이라
+     발 자리 그대로 키가 커진다. 그리는 곳이 여럿(drawFolks·곁 자리·비킴·비·아이·수레)이어도 한 곳에서 끝난다 · CPU 0 · draw call 0.
+   · 같이 맞추는 것: 우산 높이(umbPersonTop × k) · 수레 끄는 이웃 다리의 엉덩이 자리 · 서 있는 사람 간격(ACT-SPACE gap·pairGap·sepMax × k — 커진 둘이 겹쳐 보이지 않게).
+   · 상자 부위 사람(glb 없음)은 부위가 원점에서 떨어져 있어 몸이 떠 보일 수 있다 — 그땐 k 를 쓰지 않는다. 판정·저장·셈 자리 0 · 분류 '보기'. */
+(window.VRULES = window.VRULES || {}).showFolk = { on: true, k: 1.6 };
+const SHOWF = { u: { value: 1 }, patched: new WeakSet(), stats: { 고친재료: 0 } };
+const folkK = () => (window.VRULES.showFolk.on && document.body.classList.contains('show') && PERSON_PARTS.every(pt => !pt.p || (!pt.p[0] && !pt.p[1] && !pt.p[2]))) ? window.VRULES.showFolk.k : 1;
+function showFolkPatch(mat) { if (!mat || SHOWF.patched.has(mat)) return; SHOWF.patched.add(mat); SHOWF.stats.고친재료++;
+  const prev = mat.onBeforeCompile; mat.onBeforeCompile = function (sh, r) { if (prev) prev.call(this, sh, r); sh.uniforms.uFolkK = SHOWF.u;
+    sh.vertexShader = 'uniform float uFolkK;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed *= uFolkK;'); };
+  mat.customProgramCacheKey = () => 'showFolk'; mat.needsUpdate = true; }
+function showFolkMesh(im) { if (!im) return; showFolkPatch(im.material);
+  if (!im.customDepthMaterial) { const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }); showFolkPatch(dm); im.customDepthMaterial = dm; } }
+function showFolkTick() { SHOWF.u.value = folkK(); if (SHOWF.u.value === 1 && !SHOWF.stats.고친재료) return;   /* 한 번도 안 켰으면 재료를 안 건드린다 */
+  folkPool.forEach(showFolkMesh); if (typeof CSTEP === 'object') { showFolkMesh(CSTEP.body); showFolkMesh(CSTEP.leg); } }
+{ const up0 = umbPersonTop; umbPersonTop = function () { return up0.apply(this, arguments) * folkK(); }; }
+{ const so0 = spaceOn; spaceOn = function () { const k = folkK(); if (k === 1) return so0.apply(this, arguments);
+    const R = window.VRULES.folkSpace, keep = [R.gap, R.pairGap, R.sepMax]; R.gap *= k; R.pairGap *= k; R.sepMax *= k;
+    try { return so0.apply(this, arguments); } finally { [R.gap, R.pairGap, R.sepMax] = keep; } }; }
+{ const cp0 = cstepPut; cstepPut = function () { const k = folkK(); if (k === 1) return cp0.apply(this, arguments);
+    const keep = [CSTEP.hip, CSTEP.lx]; CSTEP.hip *= k; CSTEP.lx *= k; try { return cp0.apply(this, arguments); } finally { [CSTEP.hip, CSTEP.lx] = keep; } }; }
+window.__showFolk = () => ({ 켜짐: window.VRULES.showFolk.on, 지금배율: SHOWF.u.value, ...SHOWF.stats });
 
 function tickFolks(dt, now) {
   for (let i = folks.length - 1; i >= 0; i--) { const f = folks[i];
