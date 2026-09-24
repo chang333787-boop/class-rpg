@@ -10948,8 +10948,20 @@ function stageApplyRules() {   // module 맨 끝 — 모든 VRULES 가 정의된
     Object.assign(cur, v); STAGE.stats.규칙수++; });
 }
 { hookAdd('canPlace', function (next, args) { let [kind] = args;
-    if (STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(kind)) { STAGE.stats.막음++; return '이 판에서는 쓰지 않아요'; }
+    if (STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.length && !STAGE.def.건물.includes(kind) && !stageKindKeep(kind, args)) { STAGE.stats.막음++; return '이 판에서는 쓰지 않아요'; }
     return next(args); }); }
+/* [MAC-STAGEKEEP] 판 목록('건물')에 없어도 **판과 엔진이 스스로 까는 것**은 막지 않는다 (저장 왕복 시험 · 보스 09-24 무한 모드 '도구 두텁게').
+   ① 개울 다리(sbr): 개울 위에 길을 놓으면 생기는 **길의 한 모습**(#885) — 판이 길(road)을 쓰면 다리도 쓴다(되살리기 · 옮기기).
+   ② 판이 그린 개울(stream · [MAC-TERRAIN]): 되살릴 때 그 판의 개울 칸이면 통과(아이가 새로 그리는 것은 판 목록 그대로 막는다).
+   전엔 둘 다 되살리기(복원)에서 '이 판에서는 쓰지 않아요'로 막혀, 산 판을 다시 열면 '못 살린 것 38개' — 개울은 곧 다시 깔렸지만
+   **아이가 놓은 다리와 처음 길의 다리는 개울로 돌아가 길이 끊겼다**(산 판 · 저장본 한 번 왕복). 판정 0 · 저장 칸 0 · 원래 줄 1줄(바로 위 판 목록 고리에 '&& !stageKindKeep(…)'). 분류 '저장'. */
+(window.VRULES = window.VRULES || {}).stageKeep = { on: true };
+const SKEEP = { stats: { 다리: 0, 판개울: 0 } };
+function stageKindKeep(kind, args) { if (!window.VRULES.stageKeep || !window.VRULES.stageKeep.on) return false; const [, x, y, , opts] = args;
+  if (kind === 'sbr' && STAGE.def.건물.includes('road')) { SKEEP.stats.다리++; return true; }
+  if (kind === 'stream' && opts && opts.복원 && inb(x, y) && terrainStreams().has(idx(x, y))) { SKEEP.stats.판개울++; return true; }
+  return false; }
+window.__stageKeep = () => ({ 켜짐: window.VRULES.stageKeep.on, ...SKEEP.stats });
 { hookAdd('goalTick', function (next, args) { const r = next(args);
     if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (typeof stageCardEnd === 'function' && window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardEnd('목표'); else if (STAGE.def.되돌아보기) sayOnce('🎉 ' + STAGE.def.되돌아보기, true); }   // [MAC-STAGECARD] 끝 카드
     return r; }); }
@@ -11547,6 +11559,13 @@ function loadSaved(rawOverride) {
   folksDirty = true;
   return { ok:true, placed:placedN, skipped, sizeChanged, savedSize:d.w + '×' + d.h };
 }
+
+/* [MAC-DAYLOAD] 저장본을 열면 그 날을 '이미 본 날'로 — 흐름(F35)에 가짜 '1일' 점이 끼지 않게 (저장 왕복 시험 · 09-24).
+   어제 점을 찍은 날(savedDay)이 늘 1 에서 시작해, 며칠째인 저장본을 열면 첫 drawClock 이 '하루 넘어감'으로 읽고 흐름이 비어 있으면
+   **지금 값을 1일 점으로** 찍었다(+ 저장 한 번 · 흐름이 이미 있으면 '같은 날 두 번 없음'에 걸려 조용했다). 되살린 시계의 날로 맞춘다 —
+   그날의 점은 그날이 끝날 때 찍힌다. 판정 0 · 저장 칸 0 · 원래 줄 0(loadSaved 감싸기 — 구경 열기도 같은 길이지만 구경은 흐름을 안 찍는다). 분류 '저장'. */
+(window.VRULES = window.VRULES || {}).dayLoad = { on: true };
+{ const ls0 = loadSaved; loadSaved = function () { const r = ls0.apply(this, arguments); if (window.VRULES.dayLoad.on) savedDay = simDay(); return r; }; }
 
 /* ── 처음 상태 ──
    ① #fresh → 저장본을 지우고 빈 판

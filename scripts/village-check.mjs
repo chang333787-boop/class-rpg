@@ -1,13 +1,13 @@
 // 마을 PR 검사 한 줄 — 마을 PR 을 올리기 전에 돌리는 것을 **차례로 하나씩** 돌리고 한 표로 (보스 09-24 무한 모드 '도구 두텁게' · [MAC-CHECK]).
 //   ① module node --check(village/index.html 의 <script type="module"> 를 떼어) ② verify-safety ③ village-paint ④ village-sim 시험 ⑤ 판 검사(stages)
-//   ⑥ 기준 ① — vsref(그 ref 를 통째로 푼 뿌리와 · 그림 흔들기 덤) ⑦ 화면 회귀 — village-look --vs-ref(그림)
-// 무거운 것(⑥⑦)은 한 번에 하나. 창 0 · 네트워크 0(⑦은 전용 headless · 바깥 주소 막음). 끝값: 0 모두 통과 · 1 하나라도 FAIL · 2 못 돎.
+//   ⑥ 저장 왕복(roundtrip — 며칠 돌려 내보내고 다시 열어 같은 마을인가) ⑦ 기준 ① — vsref(그 ref 를 통째로 푼 뿌리와 · 그림 흔들기 덤) ⑧ 화면 회귀 — village-look --vs-ref(그림)
+// 무거운 것(⑦⑧)은 한 번에 하나. 창 0 · 네트워크 0(⑧은 전용 headless · 바깥 주소 막음). 끝값: 0 모두 통과 · 1 하나라도 FAIL · 2 못 돎.
 //
 //   node scripts/village-check.mjs                    # 전부 — origin/main 과(vsref 2일·시드 1-3 · look 세 장면 — 약 3~4분)
-//   node scripts/village-check.mjs --quick            # ⑥ 하루·시드 1 · ⑦ default 장면만(잰 값 약 1분 50초)
-//   node scripts/village-check.mjs --skip look,vsref  # 고르기(module·safety·paint·sim·stages·vsref·look)
-//   node scripts/village-check.mjs --ref HEAD~1       # ⑥⑦ 의 견줄 쪽
-//   그 밖: --allow(⑥ 에서 옛과 다른 값을 허용 — 의도한 차이 · PR 에 적는다) · --max <%>(⑦ 허용 차이)
+//   node scripts/village-check.mjs --quick            # ⑥ 하루 ⑦ 하루·시드 1 · ⑧ default 장면만(잰 값 약 1분 50초)
+//   node scripts/village-check.mjs --skip look,vsref  # 고르기(module·safety·paint·sim·stages·roundtrip·vsref·look)
+//   node scripts/village-check.mjs --ref HEAD~1       # ⑦⑧ 의 견줄 쪽
+//   그 밖: --allow(⑦ 에서 옛과 다른 값을 허용 — 의도한 차이 · PR 에 적는다) · --max <%>(⑧ 허용 차이)
 import { spawnSync } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,6 +32,8 @@ const STEPS = [
   ['paint', 'village-paint', () => { const r = node('scripts/village-paint/test.mjs'); const s = last(r.out, /^요약:/); return { ok: r.code === 0 && /FAIL 0/.test(s || ''), 요약: s || '요약 줄 없음', sec: r.sec }; }],
   ['sim', 'village-sim 시험', () => { const r = node('scripts/village-sim/test.mjs'); const s = last(r.out, /^요약:/); return { ok: r.code === 0 && /FAIL 0/.test(s || ''), 요약: s || '요약 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => l.startsWith('FAIL')).slice(0, 3) }; }],
   ['stages', '판 검사(stages)', () => { const r = node('scripts/village-sim/stages.mjs'); const s = last(r.out, /^요약:/); return { ok: r.code === 0 && /FAIL 0/.test(s || ''), 요약: s || '요약 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => l.startsWith('FAIL')).slice(0, 3) }; }],
+  ['roundtrip', '저장 왕복', () => { const r = node('scripts/village-sim/roundtrip.mjs', ['--days', QUICK ? '1' : '2']);
+    const s = last(r.out, /^판정:/); return { ok: r.code === 0, 요약: s || '판정 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l)).slice(0, 3) }; }],
   ['vsref', '기준 ① — vsref(' + REF + ')', () => { const r = node('scripts/village-sim/vsref.mjs', ['--ref', REF, ...(QUICK ? ['--days', '1', '--seeds', '1'] : []), ...(flag('allow') ? ['--allow'] : [])]);
     const s = last(r.out, /^판정:/); return { ok: r.code === 0, 요약: s || '판정 줄 없음', sec: r.sec, 실패: r.out.split('\n').filter(l => /^\| .*\*\*/.test(l)).slice(0, 3) }; }],
   ['look', '화면 회귀 — village-look(' + REF + ')', () => { const r = node('scripts/village-look/shots.mjs', ['--vs-ref', REF, ...(QUICK ? ['--shots', 'default'] : []), ...(opt('max', null) ? ['--max', opt('max')] : [])]);
