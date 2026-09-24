@@ -12602,6 +12602,35 @@ function stageCardBoot() { if (!STAGE.def || VISIT_SID || (STAGE.def.교과 == n
   const go = () => { if (GUIDE.on) { setTimeout(go, 800); return; } if (endAsk) stageCardEnd('교사'); else if (!scardLoad().started) stageCardStart(); };
   setTimeout(go, 600); }
 window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
+/* ── [MAC-CARDMAP] 첫 카드 가운데가 빈 사진틀(📷)이던 것 — 사진이 오기 전엔 그 판의 지도를 먼저 (창조자 22회 ⓑ33 · 어설픔 목록 22-ⓑ33 · 보스 09-24) ──
+   첫날 사진은 다음 그리기에서 따로 둔 카메라로 떠 낸다(MAC-STAGECARD). 빠른 기기에선 2초 안에 들어오지만, 느린 그리기(22회 headless)·숨은 탭·
+   바쁜 첫 프레임에서는 카드가 뜬 뒤에도 한동안 **빈 틀 📷** 이 판의 첫인상이 됐다.
+   · 사진이 없을 때의 틀(.ph)을 비워 두지 않고 **판 지도**로 채운다 — 바닥은 판 그림(boardCv · 바다·모래 지형 포함), 놓인 것은 미니맵과 같은 색(MAP_COL). 자리·넓이는 첫날 사진과 같은 틀(scardFrame).
+     첫날 사진과 같은 눈으로 그린다 — 카메라 방향만큼 돌리고 높이 각만큼 눌러 마름모(3D 화면과 같은 쪽 · MAC-MINIFLIP 과 같은 까닭). 사진이 오면 원래 줄이 .ph 를 사진으로 바꾼다(그대로).
+   · 시작 카드의 '첫날'과 끝 카드의 '오늘'에만 — 끝 카드에서 첫날 사진이 정말 없을 때(교사가 먼저 닫음)는 지금 지도를 '첫날'이라 부를 수 없어 📷 그대로.
+   2D 캔버스 한 장(320×180) · three 객체 0 · 난수 0 · 판정·저장 0. 스위치 VRULES.cardMap(보기). 원래 줄 수정 0 — scardPic·stageCardStart 감싸기. */
+(window.VRULES = window.VRULES || {}).cardMap = { on: true, size: [320, 180] };
+const CARDMAP = { starting: false, stats: { 지도: 0, 실패: 0 } };
+function cardMapUrl() { try { const R = window.VRULES.cardMap, F = scardFrame(), cx = F.x / CS + (W - 1) / 2 + .5, cy = F.z / CS + (H - 1) / 2 + .5;   /* 칸 좌표(연속) — scardFrame 의 가운데 */
+    const span = 2 * F.hw / CS, L = Math.ceil(span * 1.6), ua = Math.floor(cx - L / 2), va = Math.floor(cy - L / 2), P = 4;   /* 돌려도 귀퉁이가 비지 않게 넉넉히 */
+    /* ① 칸 공간(위 = 작은 y)에 판을 그린다 — 바닥은 판 그림(boardCv · 잔디·흙 테두리·물·모래 지형 · 위 = 큰 y 라 뒤집어서), 놓인 것은 미니맵과 같은 색(MAP_COL) */
+    const t = document.createElement('canvas'); t.width = t.height = L * P; const q = t.getContext('2d'); q.imageSmoothingEnabled = false;
+    q.fillStyle = '#' + groundCol.getHexString(); q.fillRect(0, 0, t.width, t.height);
+    q.save(); q.translate(0, t.height); q.scale(1, -1); q.drawImage(boardCv, ua * BOARD_PX, (H - (va + L)) * BOARD_PX, L * BOARD_PX, L * BOARD_PX, 0, 0, t.width, t.height); q.restore();
+    for (let y = Math.max(0, va); y < Math.min(H, va + L); y++) for (let x = Math.max(0, ua); x < Math.min(W, ua + L); x++) {
+      const rec = cells[idx(x, y)]; if (!rec) continue; q.fillStyle = MAP_COL[rec.k] || '#bdb7ab'; q.fillRect((x - ua) * P, (y - va) * P, P, P); }
+    /* ② 첫날 사진과 같은 눈으로 — 카메라 방향만큼 돌리고(π/2 − camAz · 기본 45°) 높이 각만큼 눌러(sin camEl) 마름모로. 사진 폭 = span 칸 */
+    const cv = document.createElement('canvas'); cv.width = R.size[0]; cv.height = R.size[1]; const g = cv.getContext('2d'), k = cv.width / span;
+    g.fillStyle = '#' + groundCol.getHexString(); g.fillRect(0, 0, cv.width, cv.height);
+    g.translate(cv.width / 2, cv.height / 2); g.scale(k, k * Math.max(.35, Math.sin(camEl))); g.rotate(Math.PI / 2 - camAz);
+    g.drawImage(t, ua - cx, va - cy, L, L);
+    CARDMAP.stats.지도++; return cv.toDataURL('image/png'); } catch (e) { CARDMAP.stats.실패++; return null; } }
+{ const sp0 = scardPic; scardPic = function (url, cap) { const R = window.VRULES.cardMap;
+    if (url || !R || !R.on || !(cap === '오늘' || (cap === '첫날' && CARDMAP.starting))) return sp0.apply(this, arguments);
+    const m = cardMapUrl(); if (!m) return sp0.apply(this, arguments);
+    return '<figure><div class="ph" style="background-image:url(' + m + ');image-rendering:pixelated"></div><figcaption>' + scardEsc(cap) + '</figcaption></figure>'; };   /* .ph 그대로 — 사진이 오면 원래 줄이 바꾼다 */
+  const st0 = stageCardStart; stageCardStart = function () { CARDMAP.starting = true; try { return st0.apply(this, arguments); } finally { CARDMAP.starting = false; } }; }
+window.__cardMap = () => ({ 켜짐: !!(window.VRULES.cardMap && window.VRULES.cardMap.on), ...CARDMAP.stats, 지금틀: SCARD.el ? (SCARD.el.querySelector('figure img') ? '사진' : SCARD.el.querySelector('figure .ph[style]') ? '지도' : '빈틀') : null });
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
 /* ── [ACT-ASKCARD] 되묻기는 게임 안 카드로 — 브라우저 기본 창(confirm) 대신 (창조자 28회 ⓒ60 · 보스 09-23) ──
    ↺ 처음부터를 누르면 브라우저의 회색 기본 창이 떴다 — 주소 이름이 찍히고 글꼴·단추가 게임과 달라 '밖에서 튀어나온 창'으로 읽혔다(28회).
