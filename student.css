@@ -1416,6 +1416,17 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
   .if-topbar button{font-size:.74rem!important;padding:.3rem .55rem!important}
   #if-scene-name{display:none}
 }
+/* [DECO-PHONE-TOP-1] 폰: 옆으로 미는 한 줄이었는데 밀 수 있다는 표시가 없어 🧽 치우기 · 집 안으로(마당으로)가 화면 밖이었다(계획 U1).
+   두 줄로 — 첫 줄 = ← · 공간 1~3 · 장면 단추 / 둘째 줄 = 🎨 · 🖌️ · 🧽 을 같은 폭으로. '← 내 기록으로'는 '←' 하나(aria-label 은 그대로) */
+.if-topbar-break{display:none}
+@media (max-width:480px){
+  .if-topbar{flex-wrap:wrap!important;overflow:visible;row-gap:.35rem!important}
+  .if-back-txt{display:none}
+  .if-back{padding:.3rem .7rem!important;font-size:1rem!important}
+  #if-scene-btn{order:5}
+  .if-topbar-break{display:block;order:9;flex-basis:100%;height:0}
+  #if-mode-deco,#if-mode-floor,#if-mode-erase{order:10;flex:1 1 0;min-height:40px}
+}
 /* #20 끌 때 글자가 파랗게 선택되지 않게 */
 #interior-fullscreen{-webkit-user-select:none;user-select:none}
 #interior-fullscreen input{-webkit-user-select:text;user-select:text}
@@ -1517,8 +1528,9 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 }
 @media (max-width:700px){   /* 폰: 첫 줄 = 탭·골드·⌃ / 둘째 줄 = 찾기·이 장소만 */
   .deco-gold{margin-left:auto}
-  .deco-search-wrap{order:5;flex:1 1 60%}
+  .deco-search-wrap{order:5;flex:1 1 120px}   /* [DECO-PHONE-TOP-1] 60% 면 ⌃ 가 셋째 줄로 밀렸다 */
   #if-deco-scene-only{order:6}
+  #if-deco-expand{order:7}   /* [DECO-PHONE-TOP-1] ⌃ 는 둘째 줄 끝 — 320 에서 첫 줄을 넘쳐 머리줄이 세 줄이 되었다 */
 }
 /* 산 직후 손끝 그림 — 놓기 전까지만. 누르는 것을 가로막지 않는다 */
 #deco-hand-ghost{position:fixed;left:0;top:0;z-index:9000;pointer-events:none;opacity:.6;will-change:transform;

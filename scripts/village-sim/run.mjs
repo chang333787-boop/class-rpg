@@ -126,7 +126,7 @@ async function child(spec) {
   const t0 = tick;
   while (tick - t0 < spec.days * DAY) { run(Math.min(spec.every, t0 + spec.days * DAY - tick)); sample(); }
   const voice = spec.voice && typeof w.__voice === 'function' ? w.__voice() : null;   // [MAC-VOICE] 끝 날의 동네별 바람표
-  return { name: spec.name, seed: spec.seed, moves, t0, samples, voice, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 새종류: (globalThis.__skin ? (globalThis.__skin().더한것 || []) : []), 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
+  return { name: spec.name, seed: spec.seed, 못살림: +((String(globalThis.__START || '').match(/못 살린 것 (\d+)개/) || [])[1] || 0), moves, t0, samples, voice, 틱최대ms: Math.max(...ticks), 네트워크: globalThis.__simNet || 0, 판: stage && stage.id ? { id: stage.id, 새종류: (globalThis.__skin ? (globalThis.__skin().더한것 || []) : []), 이름: stage.이름, 규칙수: stage.규칙수, 모르는규칙: stage.모르는규칙, 건물수: stage.건물수, 목표: stage.목표 } : null, 자기파일: [...new Set(globalThis.__simLocal || [])] };
 }
 
 /* ─────────────── 묶어 돌리기(부모) ─────────────── */
@@ -144,6 +144,20 @@ function parseArgs(argv) {
   return o;
 }
 const seedList = s => { const out = []; String(s).split(',').forEach(p => { const [a, b] = p.split('-').map(Number); for (let x = a; x <= (b || a); x++) out.push(x); }); return out; };
+
+/* [MAC-STAGEKINDS] 저장본에 **판 전용 종류**(판 파일 건물정의 — field·villtree·pier…)가 있는데 그 판(--stage · vs 칸 stage=)을 안 주면,
+   그 물건은 되살리기에서 조용히 빠진 채 돈다(보스 09-24 #878 10시 FAIL — origin 저장본을 --stage 없이). 크게 알린다.
+   멈추지는 않는다 — 기준 ① 표준판 mid36 에도 field 1칸이 있어 늘 쓰던 명령이 막히므로. 빠진 칸 수는 자식이 __START 에서 읽어 온다. */
+const STAGE_DIR = path.join(ROOT, 'village/stages');
+const stageKinds = (() => { const m = new Map(); try { fs.readdirSync(STAGE_DIR).filter(f => f.endsWith('.json') && f !== 'rules.json').forEach(f => {
+  try { Object.keys(JSON.parse(fs.readFileSync(path.join(STAGE_DIR, f), 'utf8')).건물정의 || {}).forEach(k => { if (!m.has(k)) m.set(k, []); m.get(k).push(f.replace(/\.json$/, '')); }); } catch (e) {} }); } catch (e) {} return m; })();
+function dropKinds(v) {
+  if (!v.save) return [];
+  let pal; try { pal = JSON.parse(fs.readFileSync(path.resolve(ROOT, v.save), 'utf8')).palette; } catch (e) { return []; }
+  if (!Array.isArray(pal)) return [];
+  return pal.filter(k => stageKinds.has(k) && !(v.stage && stageKinds.get(k).includes(v.stage))).map(k => k + '(' + stageKinds.get(k).join('·') + ')');
+}
+const dropSay = v => `⚠ '${v.name}' — 저장본 ${v.save} 의 판 전용 종류가 ${v.stage ? '판 ' + v.stage + ' 에 없어' : '--stage 없이'} 빠진 채 돈다: ${v.빠질종류.join(' ')} → --stage <판> (vs 칸은 stage=…)`;
 
 function variants(o) {
   const base = { name: o.name || (o.stage ? '판 ' + o.stage : '기본'), html: o.html || null, stage: o.stage || null, save: o.save || null, rules: o.rules || '', do: o.do || '' };
@@ -163,6 +177,7 @@ function variants(o) {
     });
     list.push(v);
   });
+  list.forEach(v => { v.빠질종류 = dropKinds(v); if (v.빠질종류.length) console.error(dropSay(v)); });   // [MAC-STAGEKINDS]
   return list;
 }
 
@@ -191,6 +206,7 @@ const sgn = x => (x > 0 ? '+' : '') + x;
 function report(o, vars, res) {
   const L = [], seeds = seedList(o.seeds), show = o.show.split(',');
   L.push(`판 ${o.stage ? '?stage=' + o.stage : o.save || '(빈 땅)'} · ${o.days}일 · 시드 ${seeds.join(',')} · 처음 ${o.warm}틱 돌린 뒤 한 수 · 값은 평균 (최소–최대)`);
+  vars.forEach(v => { if (v.빠질종류 && v.빠질종류.length) { const n = res.filter(r => r.name === v.name).map(r => r.못살림 || 0); L.push(dropSay(v) + (n.length ? ` · 시드마다 못 살린 것 ${[...new Set(n)].join('/')}개` : '')); } });   // [MAC-STAGEKINDS]
   vars.forEach(v => { const extra = [v.stage !== vars[0].stage && 'stage=' + (v.stage || '(없음)'), v.save !== vars[0].save && 'save=' + v.save, v.rules && 'rules=' + v.rules, v.do && 'do=' + v.do].filter(Boolean); if (extra.length) L.push(`- **${v.name}**: ${extra.join(' · ')}`); });
   const mv = res.filter(r => r.moves.length); if (mv.length) { const r = mv[0]; L.push(`- 한 수 결과(시드 ${r.seed} · ${r.name}): ` + r.moves.map(x => `${x.한수} → ${x.됨}개` + (x.자리 ? ' ' + JSON.stringify(x.자리.map(a => a.slice(0, 2))) : '') + (x.까닭 ? ' (' + x.까닭 + ')' : '')).join(' · ')); }
   L.push('');

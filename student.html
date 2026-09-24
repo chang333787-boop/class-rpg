@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260923mc4">
+<link rel="stylesheet" href="./student.css?v=20260923md1">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -711,11 +711,11 @@
   <!-- 상단 바 — [DECO-PT-1] 폰에서 한 글자씩 세로로 접히지 않게(if-topbar) -->
   <div class="if-topbar" style="display:flex;align-items:center;gap:.7rem;padding:.55rem 1rem;
     background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,215,0,.15);flex-shrink:0">
-    <button onclick="closeInteriorFullscreen()"
+    <button class="if-back" onclick="closeInteriorFullscreen()" aria-label="내 기록으로"
       style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
         color:#fff;padding:.35rem .85rem;border-radius:10px;cursor:pointer;
         font-family:inherit;font-size:.82rem;font-weight:700">
-      ← 내 기록으로
+      ←<span class="if-back-txt"> 내 기록으로</span>
     </button>
     <span id="if-scene-name" style="font-size:.9rem;font-weight:700;color:var(--gold)">🌿 마당</span>
     <!-- [DECO-SPACE-1] 꾸미기 공간 1~3 — 가진 장식은 세 공간이 나눠 쓴다 -->
@@ -725,6 +725,8 @@
       <button id="if-space-3" class="deco-space" onclick="decoSpaceSet(3)" aria-pressed="false">3</button>
     </div>
     <div style="flex:1"></div>
+    <!-- [DECO-PHONE-TOP-1] 폰(≤480)에서만 줄바꿈 자리 — 모드 단추 셋이 둘째 줄로 -->
+    <div class="if-topbar-break" aria-hidden="true"></div>
     <!-- 모드 버튼 -->
     <button id="if-mode-deco" onclick="setDecoMode('deco',this);ifSyncModeBtn()"
       style="padding:.3rem .75rem;border-radius:10px;font-size:.78rem;font-family:inherit;

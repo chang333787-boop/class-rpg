@@ -2186,11 +2186,22 @@ function miniLookDraw(b) {                                                      
 window.__miniLook = () => ({ 켜짐: window.VRULES.miniLook.on, 대비: MINILOOK.대비 || null, 여백: window.VRULES.miniLook.on ? window.VRULES.miniLook.pad : 20, 캔버스: [mini.width, mini.height], 화면: [mini.clientWidth, mini.clientHeight], ...MINILOOK.stats });
 mini.addEventListener('click', e => {
   const r = mini.getBoundingClientRect(), b = miniBox;
-  const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  const fx = (e.clientX - r.left) / r.width, fy = miniFlipY((e.clientY - r.top) / r.height);   // [MAC-MINIFLIP] 뒤집어 보인 만큼 되돌려 캔버스 줄로
   const x = b.x0 + fx * (b.x1 - b.x0 + 1), y = b.y1 - fy * (b.y1 - b.y0 + 1);
   camTarget.set(wx(x), 2, wz(y)); miniDirty = true;
   toast('거기로 갔어요', true);
 });
+/* ── [MAC-MINIFLIP] 미니맵이 3D 화면의 거울상이던 것 — 위아래를 뒤집어 보인다 (고장 프로토 담당 발견 · 보스 09-24) ──
+   재 보니(원본 판 · __cellScreen) 기본 시점에서 +x 는 화면 오른쪽 아래, +y 는 **왼쪽 아래**로 간다 — 3D 맨 위 꼭짓점이 (작은 x · 작은 y).
+   미니맵은 +x 오른쪽 · **+y 위**(캔버스 윗줄 = 큰 y)라, 돌려서는 못 맞추고 뒤집어야 맞았다(행렬식 부호가 반대). 미니맵을 누르면 제자리로 가서 티가 덜 났다.
+   · 캔버스 그림은 한 줄도 안 바꾼다 — 바탕·덩어리 층(MINILOOK)·보는 곳 테·노란 땅이 모두 같은 캔버스라 **보이는 쪽(CSS)에서 한 번** 뒤집는다(미니맵엔 글자가 없어 거울 글씨 걱정 없음).
+     그러면 미니맵 = 3D 마름모를 45° 돌린 모양 — 네 귀퉁이가 화면과 같은 쪽에 선다(위 = 작은 y · 오른쪽 = 큰 x).
+   · 누르기는 보인 위치를 캔버스 줄로 되돌려(1 − fy) 원래 셈에 넘긴다. 시험 훅 __miniClick(fx, fy)은 **캔버스 좌표** 그대로(바깥 스크립트가 쓰는 식 유지).
+   스위치 VRULES.miniFlip(보기) — 끄면 예전 그대로. 판정·저장 0 · 원래 줄 수정 1(누르기 fy).  */
+(window.VRULES = window.VRULES || {}).miniFlip = { on: true };
+function miniFlipY(fy) { return window.VRULES.miniFlip && window.VRULES.miniFlip.on ? 1 - fy : fy; }
+{ const dm0 = drawMini; drawMini = function () { const t = window.VRULES.miniFlip && window.VRULES.miniFlip.on ? 'scaleY(-1)' : ''; if (mini.style.transform !== t) mini.style.transform = t; return dm0.apply(this, arguments); }; }
+window.__miniFlip = () => ({ 켜짐: !!(window.VRULES.miniFlip && window.VRULES.miniFlip.on), 보임변환: mini.style.transform || '(없음)' });
 /* ── [MAC-MINIFADE] 놓거나 끄는 손가락이 미니맵 가까이 오면 미니맵이 옅어진다 (창조자의 눈 4회 🟡A5) ──
    길을 오른쪽 아래로 이어 가다 보면 길 끝이 미니맵 뒤로 들어가 안 보였다(1024×768). 미니맵을 접거나 옮기지 않고 — 가장 싼 길 — 그 순간만 비쳐 보이게 한다.
    · 죽 놓는 중·들고 옮기는 중·끌어 치우는 중에, 포인터가 미니맵에서 48px 안이면 미니맵이 옅어지고(0.18) 눌리지 않는다. 손을 떼면 0.4초 뒤 돌아온다.
