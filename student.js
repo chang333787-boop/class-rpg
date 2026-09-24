@@ -5447,6 +5447,7 @@ function _isHC(r,c){ const c0=_houseCol0(); return r < DH.rows && c >= c0 && c <
 function openInteriorFullscreen() {
   _ifMode = true;
   _decoPhaseOv = null; setTimeout(() => { try { _decoPhaseSync(); } catch (e) {} }, 0);   // [DECO-DAYNIGHT-1] 다시 열면 실제 시각
+  _decoWindStart();   // [DECO-WIND-1]
   _dZoom = 1; _dPanX = 0; _dPanY = 0;   // [DECO-ZOOM-1]
   try { const sp = +localStorage.getItem('rpg.deco.space'); if (sp >= 1 && sp <= DECO_SPACES) DECO_SPACE = sp; } catch (e) {}   // [DECO-SPACE-1]
   setTimeout(_decoSpaceSync, 0);
@@ -9970,6 +9971,55 @@ function _decoNightDraw(C) {
   ctx.restore();
 }
 
+// [DECO-WIND-1] 바람 한 줄기 — 11초마다 보이는 마당을 왼쪽→오른쪽으로 2.8초에 지나며 풀·꽃·나무를 한 번씩 흔들고 멈춘다(늘 흔들리면 멀미).
+//  보스 결정(09-24): 캔버스로 — DOM 층은 앞뒤 순서가 캔버스와 안 맞아 뒷줄 꽃이 앞줄 나무 위에 떴다(어설픔 ⓓ). 바람이 지나는 동안만 판을 다시 그린다.
+//  세기(docs/deco_living_yard_20260920.md §1·§2 '보통'): 풀·꽃 3° × 배수(2.6초 · 두 번 흔들고 잦아듦) · 나무 0.7° × 배수(3.4초 · 느리게) · 한 줄기 24개까지(가로 위치로 고르게 솎음).
+//  꺼지는 때: 움직임 줄이기 · 집 안 · 판이 안 보일 때 · 사진 찍을 때.
+const DECO_SWAY = { d_y7: 1, d_y45: 1.2, d_y29: 1.2, d_y8: .8, d_y2: .8, d_y44: .8, d_y41: .8, d_y42: .8, d_y1: .6, d_y43: .6, d_y16: .6, d_y25: .7, d_y35: .7, d_y36: .7, d_y15: .35 };
+const DECO_TILT = { d_y9: 1.1, d_y47: 1, d_y46: .7, d_y12: 1, d_y19: 1, d_y48: 1, d_y64: 1 };
+const DECO_WIND = { every: 11000, pass: 2800, sway: 2600, tilt: 3400, amp: 3, treeAmp: .7, max: 24 };
+const _decoWind = { t0: 0, set: new Map(), timer: 0, raf: 0 };
+function _decoWindOn() { return _ifMode && DECO_SCENE === 'yard' && !_animReduced() && !(typeof document !== 'undefined' && document.hidden) && !!_dCv; }
+function _decoWindStart() {
+  if (_decoWind.timer) return;
+  _decoWind.timer = setTimeout(function tick() {
+    _decoWind.timer = 0;
+    if (!_ifMode) return;   // 닫혔으면 끝(다시 열면 openInteriorFullscreen 이 다시 건다)
+    if (_decoWindOn()) _decoWindGust();
+    _decoWind.timer = setTimeout(tick, DECO_WIND.every);
+  }, 2500 + Math.random() * 3000);
+}
+function _decoWindGust() {
+  const C = _dC, v0 = _dPanX, vw = _dW, list = [];
+  _decoList(CUR).forEach(p => {
+    if (p.area !== 'yard' || !(DECO_SWAY[p.id] || DECO_TILT[p.id])) return;
+    const z = getDecoSize(p.id), x = (p.col + z.w / 2) * C;
+    if (x < v0 - C || x > v0 + vw + C || (p.row + z.h) * C < _dPanY || p.row * C > _dPanY + _dH + C * 2) return;
+    list.push({ key: p.id + '@' + p.row + '_' + p.col, x, tree: !DECO_SWAY[p.id], mult: DECO_SWAY[p.id] || DECO_TILT[p.id] });
+  });
+  if (!list.length) return;
+  list.sort((a, b) => a.x - b.x);
+  const pick = list.length <= DECO_WIND.max ? list : Array.from({ length: DECO_WIND.max }, (_, i) => list[Math.floor(i * list.length / DECO_WIND.max)]);
+  _decoWind.set = new Map(pick.map(o => [o.key, Object.assign(o, { delay: Math.max(0, Math.min(1, (o.x - v0) / vw)) * DECO_WIND.pass })]));
+  _decoWind.t0 = performance.now();
+  if (!_decoWind.raf) _decoWind.raf = requestAnimationFrame(function fr() {
+    _decoWind.raf = 0;
+    if (performance.now() - _decoWind.t0 > DECO_WIND.pass + DECO_WIND.tilt + 50) { _decoWind.set = new Map(); _drawDeco(); return; }
+    _drawDeco(); _decoWind.raf = requestAnimationFrame(fr);
+  });
+}
+//  지금 이 장식의 기울기(라디안) — 바람이 안 지나면 0
+function _decoWindAngle(p) {
+  if (!_decoWind.set.size || _decoPhotoMode) return 0;
+  const o = _decoWind.set.get(p.id + '@' + p.row + '_' + p.col);
+  if (!o) return 0;
+  const t = performance.now() - _decoWind.t0 - o.delay, dur = o.tree ? DECO_WIND.tilt : DECO_WIND.sway;
+  if (t <= 0 || t >= dur) return 0;
+  const k = t / dur, deg = (o.tree ? DECO_WIND.treeAmp : DECO_WIND.amp) * o.mult;
+  const wave = o.tree ? Math.sin(Math.PI * k) : Math.sin(2 * Math.PI * k * 2) * (1 - k) + .35 * Math.sin(Math.PI * k);   // 풀은 두 번 흔들며 잦아들고 · 나무는 한 번 느리게
+  return deg * wave * Math.PI / 180;
+}
+
 // [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기(디자인 ⑭ · 보스 결정 (A) 보여주기만 — 저장 0)
 //  마당에 장식을 한 번도 안 놓았고 바닥도 안 칠한 아이에게, 집 문 앞 돌길 2칸 폭(3~6줄) + 튤립 · 데이지를 반투명으로 보여 준다.
 //  '여기서 시작해 봐요' 말풍선은 돌길 왼쪽 아래(오른쪽은 확대 기둥과 겹친다). 첫 장식을 놓으면 0.4초에 사라진다.
@@ -10357,7 +10407,11 @@ function _drawYard() {
     const _gnd = _decoGroundOn(p, d);   // [DECO-GROUND-1] 잔디 위 물건이면 밑동 그림자 → 그림 → 풀 덮임
     if (_gnd) _decoGroundShadow(px, py, bw, bh, C);
     const mvBody = _decoMotionBody(p.id);   // [DECO-MOTION-1] 움직이는 부분은 DOM 층이 — 캔버스엔 멈춘 몸통
-    if(_drawDecoSVG(mvBody || drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
+    const _sway = _decoWindAngle(p);   // [DECO-WIND-1] 바람이 지나는 동안만 — 밑동 고정 기울임(skewX)
+    if (_sway) { _dCtx.save(); const bx = px + bw / 2, by = py + bh; _dCtx.translate(bx, by); _dCtx.transform(1, 0, -Math.tan(_sway), 1, 0, 0); _dCtx.translate(-bx, -by); }
+    const _drew = _drawDecoSVG(mvBody || drawId, px, py, bw, bh);
+    if (_sway) _dCtx.restore();
+    if(_drew) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;

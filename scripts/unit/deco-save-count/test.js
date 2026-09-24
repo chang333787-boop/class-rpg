@@ -1930,6 +1930,24 @@
       _decoPhaseOv = null;
     }
 
+    //  ㊻ 바람 한 줄기(DECO-WIND-1) — 지나는 동안 풀·꽃이 기울고 끝나면 0 · 흔들 것이 아닌 장식은 늘 0
+    if (typeof _decoWindGust === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const sun = { id: 'd_y7', area: 'yard', row: 6, col: 6, sp: 3 }, bench = { id: 'd_y5', area: 'yard', row: 8, col: 6, sp: 3 };
+      CUR.houseDecorations.push(sun, bench);
+      _decoSetZoom(1.5); _dPanX = 0; _dPanY = 0; _decoClampPan();
+      _decoWindGust(); _decoWind.t0 = performance.now() - 600;   // 줄기 시작 뒤 0.6초 — 왼쪽 해바라기는 흔들리는 중
+      out('바람_지나면_기움', Math.abs(_decoWindAngle(sun)) > 0 && _decoWindAngle(bench) === 0);
+      _decoWind.t0 = performance.now() - 20000;
+      out('바람_지나간뒤_0', _decoWindAngle(sun) === 0);
+      if (_decoWind.raf) { cancelAnimationFrame(_decoWind.raf); _decoWind.raf = 0; } _decoWind.set = new Map();
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      decoSpaceSet(1); await sleep(150);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
