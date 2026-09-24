@@ -1414,6 +1414,32 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .dlc-chip{min-height:44px;padding:0 12px;border-radius:22px;border:1.5px solid #c9a27a;background:#fff;color:#5a3a1a;font:700 13px system-ui,sans-serif;cursor:pointer}
 .dlc-chip.dlc-more{border-style:dashed;color:#8a6a4a}
 @media (prefers-reduced-motion: reduce){ .deco-life-card{animation:none} }
+/* [DECO-LIFE-3] 작은 선물 — 제자리 곁 땅에 · 누르면 받는다 · 🎁 선물 상자 */
+.deco-gift{position:absolute;left:0;top:0;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;
+  filter:drop-shadow(0 2px 1px rgba(0,0,0,.28));animation:dgBob 1.6s ease-in-out infinite}
+.deco-gift img{width:100%;height:100%;display:block}
+.deco-gift.taken{animation:dgTake .6s ease-in forwards}
+@keyframes dgBob{0%,100%{translate:0 0}50%{translate:0 -3px}}
+@keyframes dgTake{to{translate:0 -28px;opacity:0;scale:1.3}}
+.dlc-gift{display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 8px;border-radius:10px;background:#f6ecdb;font-size:12px;font-weight:700}
+.dlc-gift img{width:22px;height:22px}
+.dlc-gift.is-soon,.dlc-gift.is-done{background:none;padding:0;font-weight:500;color:#8a6a4a}
+.if-gift-btn{min-width:44px;min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);font-size:1.05rem;cursor:pointer}
+#deco-giftbox{position:absolute;right:12px;top:calc(var(--deco-host-top, 60px) + 6px);z-index:9002;width:min(300px,calc(100vw - 24px));box-sizing:border-box;
+  background:#fffaf0;border:2px solid #8a5a2b;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);color:#3b2a18;
+  font:500 13px/1.35 system-ui,-apple-system,sans-serif;overflow:hidden}
+.dgb-head{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 14px;background:#8a5a2b;color:#fff;font-weight:800;font-size:15px}
+.dgb-x{min-width:44px;min-height:44px;border:0;background:none;color:#fff;font-size:18px;cursor:pointer}
+.dgb-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:12px}
+.dgb-cell{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0;border-radius:10px;background:#fff;border:1.5px solid #e6d3b8;font-weight:700}
+.dgb-cell img{width:32px;height:32px}
+.dgb-cell.is-none{background:#efe6d8;color:#a08a70}
+.dgb-cell.is-none img{filter:brightness(0) opacity(.18)}
+.dgb-photo{margin:0 12px 10px;padding:10px;border-radius:10px;background:#fff;border:1.5px solid #e6d3b8;font-size:12px}
+.dgb-frame{position:relative;width:100%;aspect-ratio:300/225;margin-bottom:6px}
+.dgb-frame img,.dgb-frame canvas{position:absolute;inset:0;width:100%;height:100%}
+.dgb-foot{padding:0 12px 12px;color:#8a6a4a;font-size:12px}
+@media (prefers-reduced-motion: reduce){ .deco-gift,.deco-gift.taken{animation:none} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════

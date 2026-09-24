@@ -8954,7 +8954,7 @@ function _lifePet(student, p, now) {
     ups['a/' + u + '/h'] = { inc: 1 }; ups['a/' + u + '/d'] = today;
   }
   const s1 = _lifeStage(h0 + 1);
-  if (s1 > s0) ups['g/sticker'] = { inc: 1 };   // 단계가 오르는 날 스티커 하나(§3)
+  if (s1 > s0) { ups['g/sticker'] = { inc: 1 }; ups.p = { inc: 1 }; }   // 단계가 오르는 날 스티커 하나(§3) · 사진 조각 하나(보스 결정 · 디자인 #1003)
   _lifeWrite(student, ups);
   return { u, gained: 1, stage: s1, stageUp: s1 > s0 };
 }
@@ -8973,7 +8973,7 @@ function _lifePetAnim(st) {
   }
   if (r.stageUp) {
     const d = GAME_DATA.decorations.find(x => x.id === st.id), nm = (d && d.name) || '동물';
-    toast(`🤝 ${nm}${_josa(nm, '과', '와')} 한 걸음 더 가까워졌어요 — '${LIFE_STAGE_NAME[r.stage - 1]}'`);
+    toast(`🤝 ${nm}${_josa(nm, '과', '와')} 한 걸음 더 가까워졌어요 — '${LIFE_STAGE_NAME[r.stage - 1]}' · 🧩 사진 조각 하나`);
   }
   return r;
 }
@@ -9040,7 +9040,7 @@ function _lifeCardHTML(st, L, u) {
     + (L.ro ? '' : `<button type="button" class="dlc-namebtn" aria-label="이름 고르기">🏷️ ${nm ? '이름 바꾸기' : '이름 짓기'}</button>`) + '</div>'
     + (hearts ? `<div class="dlc-hearts${hcls}" aria-label="하트 ${row.have}/${row.need}"><span class="dlc-hrow">${hearts}</span>${today ? '<span class="dlc-today">+1 오늘</span>' : ''}</div>`
       : (today ? '<div class="dlc-hearts"><span class="dlc-today">+1 오늘</span></div>' : ''))
-    + `<div class="dlc-next">${next}</div><div class="dlc-chips" hidden></div>`;
+    + `<div class="dlc-next">${next}</div>${_lifeGiftLine(st.id, f, u)}<div class="dlc-chips" hidden></div>`;
 }
 function _lifeCardChips(k, more) {
   const box = k.el.querySelector('.dlc-chips'), cfg = ANIM_DECO[k.st.id] || {}, s0 = LIFE_NAME_START[cfg.mood] || LIFE_NAME_COMMON;
@@ -9088,6 +9088,100 @@ function _lifeCardOpen(st) {
   return k;
 }
 if (typeof document !== 'undefined') document.addEventListener('keydown', e => { if (e.key === 'Escape' && _lifeCard) _lifeCardClose(); });
+// ── [DECO-LIFE-3] 작은 선물 — 2단계 이상 친구가 제자리 곁에 두고 간다 · 누르면 모인다 · 골드 아님(팔 수 없음 · 경제 불변) ──
+//  빈도(보스 결정 ②): 2단계 3일에 한 번 · 3단계 2일에 한 번 · 4단계 이상 매일 — 친구마다 날이 어긋나게(번호로 민다).
+//  안 받은 선물은 그날이 지나면 없어진다(쌓이지 않는다 · 벌 아님). 받은 날은 친구 줄의 gd 에 적는다(잎 쓰기).
+const LIFE_GIFT_OF = { hen: 'egg', duck: 'duck_egg', sheep: 'wool', dog: 'stick', cat: 'yarn' };   // 강아지 나뭇가지 · 고양이 털실 공(디자인 #1003)
+const LIFE_GIFT_NAME = { egg: '달걀', duck_egg: '오리알', wool: '양털', stick: '나뭇가지', yarn: '털실 공', apple: '사과', cherry: '버찌', acorn: '도토리', feather: '깃털', sticker: '스티커' };
+const LIFE_GIFT_SAY = { stick: '나뭇가지를 물어 왔어요', yarn: '털실 공을 굴려 왔어요' };   // 없으면 'OO 하나를 두고 갔어요'
+const LIFE_GIFT_BOX = ['egg', 'duck_egg', 'wool', 'stick', 'yarn', 'apple', 'cherry', 'acorn', 'feather', 'sticker'];
+function _lifeGiftKind(id) { const c = ANIM_DECO[id]; return (c && LIFE_GIFT_OF[c.mood]) || ''; }
+function _lifeGiftDay(u, f, day) {   // 오늘 선물 날인가(받았든 안 받았든)
+  const st = _lifeStage(_lifeHearts(f)), per = st >= 4 ? 1 : st === 3 ? 2 : st === 2 ? 3 : 0;
+  if (!per) return false;
+  let o = 0; for (const ch of String(u)) o += ch.charCodeAt(0);
+  return (day + o) % per === 0;
+}
+function _lifeGiftOpen(u, f, day) { return !!f && _lifeGiftDay(u, f, day) && f.gd !== day; }   // 오늘 선물이 아직 땅에 있나
+function _lifeGiftLine(id, f, u) {
+  const kind = _lifeGiftKind(id);
+  if (!kind || !f) return '';
+  const day = _lifeDay(), nm = LIFE_GIFT_NAME[kind];
+  if (_lifeStage(_lifeHearts(f)) < 2) return `<div class="dlc-gift is-soon">🎁 '알아봄'이 되면 ${nm}${_josa(nm, '을', '를')} 두고 가요</div>`;
+  if (_lifeGiftOpen(u, f, day)) return `<div class="dlc-gift"><img src="./assets/deco/gift_${kind}.svg" alt=""> 선물! ${LIFE_GIFT_SAY[kind] || nm + ' 하나를 두고 갔어요'} — 땅에서 눌러요</div>`;
+  if (_lifeGiftDay(u, f, day)) return `<div class="dlc-gift is-done">✓ 오늘 선물 ${nm}${_josa(nm, '을', '를')} 받았어요</div>`;
+  return '';
+}
+//  동물 층 안에 오늘 선물을 놓는다 — 친구의 선 자리(제자리) 오른쪽 옆 칸(동물과 겹치면 쓰다듬으려던 손이 선물을 받는다)
+function _lifeGiftSync(rec, student, C) {
+  const L = _lifeGet(student), day = _lifeDay(), want = new Map();
+  if (!L.ro) for (const u in L.a) {
+    const f = L.a[u], kind = _lifeOk(f) ? _lifeGiftKind(f.k) : '';
+    if (!kind || (f.sp || 1) !== DECO_SPACE || !_lifeGiftOpen(u, f, day)) continue;
+    if (!(student.houseDecorations || []).some(q => q.area === 'yard' && q.id === f.k && q.row === f.r && q.col === f.c && _decoSpaceOf(q) === DECO_SPACE)) continue;   // 쉬는 친구는 두고 가지 않는다
+    want.set(u, { f, kind });
+  }
+  rec.gifts = rec.gifts || new Map();
+  rec.gifts.forEach((el, u) => { if (!want.has(u)) { if (el.parentNode) el.parentNode.removeChild(el); rec.gifts.delete(u); } });
+  want.forEach(({ f, kind }, u) => {
+    let el = rec.gifts.get(u);
+    if (!el) {
+      el = document.createElement('button');
+      el.type = 'button'; el.className = 'deco-gift'; el.setAttribute('aria-label', '선물 ' + LIFE_GIFT_NAME[kind] + ' 받기');
+      el.innerHTML = `<img src="./assets/deco/gift_${kind}.svg" alt="">`;
+      ['pointerdown', 'touchstart', 'mousedown'].forEach(t => el.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+      el.addEventListener('click', e => { e.stopPropagation(); _lifeGiftTake(u, el); });
+      rec.world.appendChild(el); rec.gifts.set(u, el);
+    }
+    const sz = getDecoSize(f.k), g = Math.max(18, Math.round(C * .62));
+    el.style.width = el.style.height = g + 'px';
+    el.style.transform = 'translate(' + Math.round((f.c + sz.w) * C + C * .12) + 'px,' + Math.round((f.r + sz.h) * C - g * 1.02) + 'px)';
+    el.style.zIndex = String(Math.round(f.r + sz.h));
+  });
+}
+function _lifeGiftTake(u, el) {
+  if (!CUR) return false;
+  const L = _lifeGet(CUR), f = L.a[u], day = _lifeDay(), kind = _lifeOk(f) ? _lifeGiftKind(f.k) : '';
+  if (L.ro || !kind || !_lifeGiftOpen(u, f, day)) return false;
+  _lifeWrite(CUR, { ['a/' + u + '/gd']: day, ['g/' + kind]: { inc: 1 } });   // 잎 쓰기 하나 · 수는 서버 더하기
+  if (el) { el.classList.add('taken'); el.disabled = true; setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 650); }
+  const rec = _animLayers.get(_ifActiveContainer || 'house-topview'); if (rec && rec.gifts) rec.gifts.delete(u);
+  const nm = LIFE_GIFT_NAME[kind], n = _lifeGet(CUR).g[kind] || 0;
+  toast(`🎁 선물! ${nm}${_josa(nm, '을', '를')} 받았어요 — 선물 상자 ${n}개`);
+  if (_lifeCard && _lifeCard.u === u) _lifeCardOpen(_lifeCard.st);
+  return true;
+}
+//  🎁 선물 상자 — 받은 것마다 개수 · 못 받은 것은 '?' · "골드가 아니에요"
+function decoGiftBox(open) {
+  let box = document.getElementById('deco-giftbox');
+  if (open === false || (open === undefined && box)) { if (box) box.remove(); return; }
+  const L = _lifeGet(CUR), host = document.getElementById('interior-fullscreen') || document.body;
+  if (!box) { box = document.createElement('div'); box.id = 'deco-giftbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '선물 상자'); host.appendChild(box); }
+  const cell = k => { const n = +L.g[k] || 0;
+    return `<div class="dgb-cell${n ? '' : ' is-none'}"><img src="./assets/deco/gift_${k}.svg" alt="${LIFE_GIFT_NAME[k]}"><span>${n ? '×' + n : '?'}</span></div>`; };
+  box.innerHTML = `<div class="dgb-head">🎁 선물 상자<button type="button" class="dgb-x" aria-label="닫기" onclick="decoGiftBox(false)">✕</button></div>`
+    + `<div class="dgb-grid">${LIFE_GIFT_BOX.map(cell).join('')}</div>`
+    + (L.p ? `<div class="dgb-photo"><div class="dgb-frame"><img src="./assets/deco/ui_photo_frame.svg" alt=""><canvas width="300" height="225"></canvas></div>`
+      + `<div><b>사진 조각 ${L.p % 6 || 6} / 6</b> — 친해지기 단계가 오를 때 한 조각${L.p >= 6 ? ` · 모은 사진 ${Math.floor(L.p / 6)}장` : ''}</div></div>` : '')
+    + `<div class="dgb-foot">골드가 아니에요 · 모아서 보는 것 · 팔 수 없어요</div>`;
+  if (L.p) _lifePhotoPaint(box.querySelector('.dgb-frame canvas'), L.p % 6 || 6);
+}
+//  사진 틀 여섯 칸(디자인 #1003: 칸 = x 24+84c · y 24+86r · 80×82) — 받은 조각 칸에 지금 내 마당 판의 그 부분을 그린다(저장 0)
+function _lifePhotoPaint(cv, n) {
+  if (!cv || !cv.getContext) return;
+  const x = cv.getContext('2d'), src = (typeof _dCv !== 'undefined' && _dCv && _dCv.width) ? _dCv : null;
+  x.clearRect(0, 0, 300, 225);
+  const sw = src ? Math.min(src.width, src.height * 252 / 168) : 0, sh = sw * 168 / 252, sx = src ? (src.width - sw) / 2 : 0, sy = src ? (src.height - sh) / 2 : 0;
+  for (let k = 0; k < 6; k++) {
+    const c = k % 3, r = Math.floor(k / 3), X = 24 + 84 * c, Y = 24 + 86 * r;
+    if (k < n) {
+      if (src) { try { x.drawImage(src, sx + sw * c / 3, sy + sh * r / 2, sw / 3, sh / 2, X, Y, 80, 82); } catch (e) {} }
+      else { x.fillStyle = '#7fae4e'; x.fillRect(X, Y, 80, 82); }
+    } else { x.setLineDash([5, 4]); x.strokeStyle = 'rgba(90,58,26,.45)'; x.lineWidth = 2; x.strokeRect(X + 3, Y + 3, 74, 76); x.setLineDash([]); }
+  }
+}
+if (typeof document !== 'undefined') document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('deco-giftbox')) decoGiftBox(false); });
+
 
 //  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.
 //  이미 있는 동물은 그 자리를 지킨다(다시 그려도 처음부터 걷지 않게).
@@ -9177,6 +9271,8 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     if (st.el && st.el.parentNode) st.el.parentNode.removeChild(st.el);
     rec.items.delete(k);
   });
+
+  if (hostId !== 'ff-topview' && typeof CUR !== 'undefined' && student === CUR && typeof _lifeGiftSync === 'function') _lifeGiftSync(rec, student, C);   // [DECO-LIFE-3] 오늘 두고 간 선물(내 마당만 · 친구 구경은 안 보임)
 
   if (!_animHooked) {
     _animHooked = true;
