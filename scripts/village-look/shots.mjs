@@ -17,6 +17,7 @@
 //   node scripts/village-look/shots.mjs --update --ref origin/main # 기준을 그 ref 로 찍어 둔다
 //   node scripts/village-look/shots.mjs --self                     # 같은 코드를 두 번 찍어 견준다 — 사진이 흔들리지 않나(결정성) 스스로 보기
 //   node scripts/village-look/shots.mjs --boards sea,mountain+village/stages/boards/mid36.json --shots default,whole
+// 장면: card(판 시작 카드 · UI) · default(첫 카메라 · 3D) · hud(첫 카메라 + UI · 목표판 펼침) · near(×1.8) · whole(판 전체 보기) — 기본은 다섯 모두
 //   그 밖: --hour 10 · --gfx fixed|high · --lookseed 1 · --frames 60 · --max 0(%) · --tol 2(채널 차) · --ui · --json <파일> · --dir tmp/village-look · --keep
 import { spawn, spawnSync } from 'node:child_process'; import crypto from 'node:crypto'; import fs from 'node:fs'; import http from 'node:http'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 
@@ -25,12 +26,12 @@ const args = process.argv.slice(2), flag = k => args.includes('--' + k), opt = (
 if (flag('help') || flag('h')) { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter(l => l.startsWith('//')).map(l => l.slice(3)).join('\n')); process.exit(0); }
 const MID = 'village/stages/boards/mid36.json';
 const BOARDS = opt('boards', `기본+village/stages/boards/pop88.json,town3,town3-origin,farm+${MID},city+${MID},sea,mountain,origin,proto-flow,proto-vote`).split(',').map(s => s.trim()).filter(Boolean);
-const SHOTS = opt('shots', 'default,near,whole').split(',').map(s => s.trim()).filter(Boolean);
+const SHOTS = opt('shots', 'card,default,hud,near,whole').split(',').map(s => s.trim()).filter(Boolean);
 const DIR = path.resolve(ROOT, opt('dir', 'tmp/village-look')), BASEDIR = path.join(DIR, '기준'), NOWDIR = path.join(DIR, '지금'), DIFFDIR = path.join(DIR, '차이');
 const HOUR = +opt('hour', '10'), GFX = opt('gfx', 'fixed'), LOOKSEED = (+opt('lookseed', '1') >>> 0) || 1, FRAMES = Math.max(2, +opt('frames', '60') | 0);
 const MAX = +opt('max', '0'), TOL = +opt('tol', '2'), JSON_OUT = opt('json', null), UI = flag('ui'), UPDATE = flag('update'), REF = opt('ref', null), VSREF = opt('vs-ref', null), SELF = flag('self');
 const VIEW = { w: 1366, h: 610 };
-const bad = SHOTS.filter(s => !['default', 'near', 'whole'].includes(s)); if (bad.length) { console.error('모르는 장면: ' + bad.join(' ') + ' (default · near · whole)'); process.exit(2); }
+const bad = SHOTS.filter(s => !['card', 'default', 'hud', 'near', 'whole'].includes(s)); if (bad.length) { console.error('모르는 장면: ' + bad.join(' ') + ' (card · default · hud · near · whole)'); process.exit(2); }
 if ([UPDATE, !!VSREF, SELF].filter(Boolean).length > 1) { console.error('--update · --vs-ref · --self 는 하나만(--vs-ref·--self 는 저장된 기준을 안 건드린다)'); process.exit(2); }
 if (REF && !UPDATE) { console.error('--ref 는 --update 와 함께(기준을 그 ref 로 찍는다) — 바로 견주려면 --vs-ref'); process.exit(2); }
 const CHROME = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell');
@@ -88,7 +89,8 @@ const nav = async url => { await send('Page.navigate', { url }); for (let k = 0;
 const until = async (cond, ms, what) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await evaluate('return !!(' + cond + ')')) return; } catch {} await sleep(150); } throw new Error(what + ' — ' + ms / 1000 + '초 안에 안 됨'); };
 const netIdle = async (ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (!inflight.size && Date.now() - lastNet > 400) return true; await sleep(100); } return false; };
 const pump = n => evaluate(`return window.__shots.step(${n | 0}, 1000 / 60)`);
-const HIDE = 'body * { visibility: hidden !important; } #cv, #mini { visibility: visible !important; }', HIDE_UI = '#toast, #why { visibility: hidden !important; }';   // --ui 여도 토스트·풍선은 숨긴다(실제 시간으로 떴다 사라져 사진이 흔들린다)
+const STILL = '*, *::before, *::after { transition: none !important; animation: none !important; } ';   // CSS 전환·애니메이션은 실제 시간이라 사진을 흔든다(visibility 전환이 0.2초 남아 트레이가 찍혔다) — 끈다
+const HIDE = STILL + 'body * { visibility: hidden !important; } #cv, #mini { visibility: visible !important; }', HIDE_UI = STILL + '#toast, #why { visibility: hidden !important; }';   // --ui 여도 토스트·풍선은 숨긴다(실제 시간으로 떴다 사라져 사진이 흔들린다)
 
 /* 한 판 — 판 밖 페이지에서 저장 키를 넣고(마을 페이지는 닫힐 때 제 판을 다시 적는다) 연 뒤, 멈추고 고정해서 장면마다 찍는다.
    onShot(spec, shot, file) 은 **그 장면의 카메라가 살아 있을 때** 부른다(견주기의 '칸' 짚기가 그 카메라를 쓴다). */
@@ -102,6 +104,23 @@ async function shootBoard(spec, outDir, onShot) {
   await until(`typeof window.__setSpeed === 'function' && typeof window.__view === 'function' && typeof window.__gfxMode === 'function' && window.__shots`, 30000, boardName(spec) + ' 불러오기');
   await pump(1); await until('window.__LOADMS != null', 5000, boardName(spec) + ' 첫 프레임');
   await evaluate(`const s = document.createElement('style'); s.id = '__shotsHide'; s.textContent = ${JSON.stringify(UI ? HIDE_UI : HIDE)}; document.head.appendChild(s); return 1`);
+  const out = [], setStyle = css => evaluate(`document.getElementById('__shotsHide').textContent = ${JSON.stringify(css)}; return 1`);
+  const shoot = async shot => {                                                               // 한 장 — 가짜 프레임을 화면에 붙이고 찍고, 곧바로 견준다(카메라가 살아 있을 때)
+    await evaluate('await window.__shots.real(); return 1');
+    const png = Buffer.from((await send('Page.captureScreenshot', { format: 'png', fromSurface: true })).data, 'base64');
+    const file = path.join(outDir, fname(spec, shot)); fs.writeFileSync(file, png);
+    const rec = { shot, file, sha: crypto.createHash('sha1').update(png).digest('hex').slice(0, 12) };
+    if (onShot) rec.견줌 = await onShot(spec, shot, file);
+    out.push(rec); };
+  /* card — 판 시작 카드(교과가 있거나 "카드": true 인 판 · 처음 여는 판). 첫 안내만 닫고 카드를 기다린다 · 첫날 사진은 그림 뒤 한가할 때 붙어서(requestIdleCallback) 실제 시간으로 기다린다 */
+  if (SHOTS.includes('card')) {
+    const has = await evaluate(`const sl = ms => new Promise(r => setTimeout(r, ms));
+      for (let k = 0; k < 40 && !document.getElementById('stageCard'); k++) { [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === '건너뛰기' && b.offsetParent).forEach(b => b.click()); await sl(200); } return !!document.getElementById('stageCard')`);
+    if (has) { await evaluate(`window.__gfxMode(${JSON.stringify(GFX)}); window.__setSpeed(0); window.__setHour(${HOUR}); return 1`);
+      await pump(FRAMES); await netIdle(); await pump(FRAMES);
+      await evaluate(`const sl = ms => new Promise(r => setTimeout(r, ms)); for (let k = 0; k < 30 && !document.querySelector('#stageCard figure img'); k++) { await window.__shots.step(2, 1000 / 60); await sl(100); } return 1`);
+      await setStyle(HIDE_UI); await evaluate('await new Promise(r => setTimeout(r, 400)); return 1'); await shoot('card'); await setStyle(UI ? HIDE_UI : HIDE); }
+    else out.push({ shot: 'card', 없음: true }); }
   /* 안내·판 카드·제목 카드는 늦게 뜰 수 있다 — 실제 시간 1.5초 조용할 때까지 닫는다(프레임은 안 돌린다: 가짜 시계가 늘 같은 자리에 있게) */
   await evaluate(`const sl = ms => new Promise(r => setTimeout(r, ms)); let quiet = 0;
     for (let k = 0; k < 60 && quiet < 6; k++) { const bs = [...document.querySelectorAll('button')].filter(b => ['시작', '건너뛰기', '닫기'].includes(b.textContent.trim()) && b.offsetParent);
@@ -109,18 +128,15 @@ async function shootBoard(spec, outDir, onShot) {
   await evaluate(`window.__gfxMode(${JSON.stringify(GFX)}); window.__setSpeed(0); window.__setHour(${HOUR}); return 1`);
   await pump(FRAMES); await netIdle(); await pump(FRAMES);                                     // 모형·그림이 다 오고 색이 선 뒤
   const meta = await evaluate('const c = document.getElementById("cv"), g = c && (c.getContext("webgl2") || c.getContext("webgl")), e = g && g.getExtension("WEBGL_debug_renderer_info"); return { gl: e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : null, sim: window.__sim() }');
-  const out = [];
-  for (const shot of SHOTS) {
+  for (const shot of SHOTS) { if (shot === 'card') continue;
     if (shot === 'near') await evaluate('const v = window.__view(); window.__view(v.zoomMul * 1.8); return 1');
     else if (shot === 'whole') await evaluate('document.getElementById("fitBtn").onclick(); return 1');
+    if (shot === 'hud') { await setStyle(HIDE_UI); await evaluate('const g = document.getElementById("goals"); if (g && !g.classList.contains("show")) document.getElementById("goalBtn").onclick(); return 1'); }   // UI 도 — 목표판을 펼치고 지금 카메라 그대로(기본 장면 바로 뒤에 두면 기본 카메라)
     await evaluate('window.__setSpeed(0); return 1');                                             // 카드가 닫히며 멈춤을 풀었을 수 있다
     await pump(FRAMES); await netIdle(3000); await pump(2);
-    await evaluate('await window.__shots.real(); return 1');                                    // 가짜 프레임이 실제 화면에 붙게(진짜 프레임 둘)
-    const png = Buffer.from((await send('Page.captureScreenshot', { format: 'png', fromSurface: true })).data, 'base64');
-    const file = path.join(outDir, fname(spec, shot)); fs.writeFileSync(file, png);
-    const rec = { shot, file, sha: crypto.createHash('sha1').update(png).digest('hex').slice(0, 12) };
-    if (onShot) rec.견줌 = await onShot(spec, shot, file);
-    out.push(rec);
+    if (shot === 'hud') await evaluate('await new Promise(r => setTimeout(r, 400)); return 1');   // 펼친 목표판의 CSS 전환이 끝나게(실제 시간)
+    await shoot(shot);                                                                           // 가짜 프레임이 실제 화면에 붙게(진짜 프레임 둘) · 찍고 곧바로 견줌
+    if (shot === 'hud') await setStyle(UI ? HIDE_UI : HIDE);
   }
   const errs = await evaluate('return window.__shots.errs.slice(0, 3)');
   return { 판: boardName(spec), spec, 렌더러: meta.gl, 시뮬: meta.sim, 장면: out, 오류: pageErr.length + errs.length, 오류예: [...pageErr.slice(0, 2), ...errs.slice(0, 2)] };
@@ -183,7 +199,7 @@ try {
     const label = REF ? 'ref ' + REF + ' (' + git('rev-parse', '--short', REF) + ')' : nowLabel;
     fs.writeFileSync(path.join(BASEDIR, 'meta.json'), JSON.stringify({ 찍은때: new Date().toISOString(), 코드: label, 렌더러: renderer, 조건: cond, 판: rows.map(r => ({ 판: r.판, 실패: r.실패 || null, 오류: r.오류 || 0, 장면: r.장면.map(s => [s.shot, s.sha]) })) }, null, 1));
     const badRows = rows.filter(r => r.실패 || r.오류);
-    console.log(`기준 사진 ${rows.reduce((a, r) => a + r.장면.length, 0)}장 — ${path.relative(ROOT, BASEDIR)} · ${label} · 렌더러 ${renderer} · 바깥 주소 막음 ${blocked}`);
+    console.log(`기준 사진 ${rows.reduce((a, r) => a + r.장면.filter(s => s.file).length, 0)}장 — ${path.relative(ROOT, BASEDIR)} · ${label} · 렌더러 ${renderer} · 바깥 주소 막음 ${blocked}`);
     badRows.forEach(r => console.log(`  ⚠ ${r.판}: ${r.실패 || '페이지 오류 ' + r.오류 + ' — ' + (r.오류예 || []).join(' / ')}`));
     code = badRows.length ? 1 : 0; report = { 기준: label, 렌더러: renderer, 판: rows };
   } else {
@@ -205,7 +221,7 @@ try {
     let over = 0, missing = 0;
     for (const r of rows) {
       if (r.실패) { L.push(`| ${r.판} | — | 실패 | — | — | ${r.실패} |`); over++; continue; }
-      for (const s of r.장면) { const c = s.견줌 || {};
+      for (const s of r.장면) { if (s.없음) { L.push(`| ${r.판} | ${s.shot} | — | — | — | (이 판엔 시작 카드가 없음) |`); continue; } const c = s.견줌 || {};
         if (c.기준없음) { L.push(`| ${r.판} | ${s.shot} | 기준 없음 | — | — | --update 로 찍을 것 |`); missing++; continue; }
         if (c.크기다름) { L.push(`| ${r.판} | ${s.shot} | 크기 다름 | — | — | ${c.크기다름.join('×')} |`); over++; continue; }
         const p = pct(c.차이점, c.전체); if (p > MAX) over++;
