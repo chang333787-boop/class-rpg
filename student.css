@@ -1380,10 +1380,12 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .deco-anim.live .bob{animation:none}
 .deco-anim.walking:not(.live) .bob{animation:decoStep .3s ease-in-out infinite}
 @keyframes decoStep{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-.deco-anim-heart{position:absolute;left:30%;bottom:100%;font-size:16px;line-height:1;pointer-events:none;animation:decoHeart 1.2s ease-out forwards}
+/* [DECO-FRIEND-VIEW-1] 💗 는 말풍선 왼쪽 · +1 은 오른쪽 — 한 칸짜리 동물은 left:30%·72% 로는 말풍선을 못 비켜 '왈!'을 덮었다.
+   간격은 JS 가 말풍선 폭을 재서 준다(아래 margin-left 는 3글자 말풍선 기준) · 위로 올리면 누를 때 뜨는 카드 밑에 숨는다 */
+.deco-anim-heart{position:absolute;left:50%;margin-left:-37px;bottom:100%;font-size:16px;line-height:1;pointer-events:none;animation:decoHeart 1.2s ease-out forwards}
 @keyframes decoHeart{0%{opacity:0;transform:translateY(4px) scale(.6)}20%{opacity:1;transform:translateY(-4px) scale(1)}100%{opacity:0;transform:translateY(-22px) scale(1)}}
-/* [DECO-LIFE-1] 하루 첫 쓰다듬기 = 하트 +1 — 말풍선(가운데)·💗(왼쪽)과 안 겹치게 오른쪽 위 */
-.deco-anim-plus{position:absolute;left:72%;bottom:100%;font:800 13px/1 system-ui,sans-serif;color:#ff4f8b;white-space:nowrap;pointer-events:none;
+/* [DECO-LIFE-1] 하루 첫 쓰다듬기 = 하트 +1 — 말풍선(가운데)·💗(왼쪽)과 안 겹치게 오른쪽 */
+.deco-anim-plus{position:absolute;left:50%;margin-left:18px;bottom:100%;font:800 13px/1 system-ui,sans-serif;color:#ff4f8b;white-space:nowrap;pointer-events:none;
   text-shadow:0 0 2px #fff,0 0 3px #fff,0 1px 1px #fff;animation:decoHeart 1.5s ease-out forwards}
 @media (prefers-reduced-motion: reduce){ .deco-anim.walking .bob,.deco-anim-heart,.deco-anim-plus{animation:none} }
 /* [DECO-LIFE-2] 동물 카드 — 동물 위 말풍선(위 자리가 없으면 아래) · 이름 · 단계 배지 · 하트 칸 · 이름 고르기(고르기만) */
@@ -1700,3 +1702,33 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 @keyframes decoTplBreath{from{opacity:.45}to{opacity:.6}}
 @keyframes decoTplOut{from{opacity:.55}to{opacity:0}}
 @media (prefers-reduced-motion: reduce){.deco-tpl{animation:none;opacity:.55}.deco-tpl.is-gone{opacity:0}}
+
+/* [DECO-MOTION-1] 움직임 층 — 캔버스 바로 위 · 동물 층 아래 · 손가락 통과 · transform·opacity 만(합성기) */
+.deco-mv-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:1}
+.deco-mv{position:absolute}
+.deco-mv img{position:absolute;display:block;max-width:none;will-change:transform,opacity}
+.deco-mv-rotate{animation:decoMvRotate linear infinite;transform-origin:50% 50%}
+.deco-mv-turn{animation:decoMvTurn ease-in-out infinite;transform-origin:50% 100%}
+.deco-mv-rise{animation:decoMvRise linear infinite;transform-origin:50% 100%;opacity:0}
+.deco-mv-frames{animation-timing-function:step-end;animation-iteration-count:infinite;opacity:0}
+.deco-mv-frames.f2{animation-name:decoMvF2}
+.deco-mv-frames.f3{animation-name:decoMvF3}
+@keyframes decoMvRotate{to{transform:rotate(360deg)}}
+@keyframes decoMvTurn{0%,100%{transform:scaleX(1)}45%,55%{transform:scaleX(-1)}}
+@keyframes decoMvRise{0%{transform:translateY(0) scale(.8);opacity:0}20%{opacity:.9}100%{transform:translateY(-60%) scale(1.15);opacity:0}}
+@keyframes decoMvF2{0%{opacity:1}50%{opacity:0}100%{opacity:0}}
+@keyframes decoMvF3{0%{opacity:1}33.333%{opacity:0}100%{opacity:0}}
+
+/* [DECO-FRIEND-VIEW-1] 친구 구경 — 확대 단추(꾸미기 기둥과 같은 크기 · 46px) · 안내 한 줄 */
+.ff-zoom{position:absolute;right:10px;bottom:12px;display:flex;flex-direction:column;gap:8px;z-index:3}
+.ff-zoom button{width:46px;height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(20,24,32,.88);
+  color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit}
+.ff-zoom button:last-child{font-size:12px}
+.ff-hint{margin-left:auto;font-size:.75rem;color:var(--txt3);white-space:nowrap}
+@media (max-width:480px){ .ff-hint{display:none} }
+
+/* [DECO-PHOTO-1] 📷 사진 단추 — 넓은 화면은 공간 단추 옆 · 폰은 둘째 줄 모드 단추 끝(아이콘만) */
+.if-photo{min-width:40px;height:40px;padding:0 8px;border-radius:10px;cursor:pointer;font-size:18px;line-height:1;font-family:inherit;
+  border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--txt2)}
+@media (max-width:480px){ #if-photo-btn{order:11;flex:0 0 44px;min-height:40px;font-size:16px!important} }
+

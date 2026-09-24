@@ -8895,6 +8895,7 @@ function _animPoke(st, fromCol) {
   heart.className = 'deco-anim-heart';
   heart.textContent = '💗';
   if (over) heart.style.marginBottom = Math.round(over) + 'px';
+  heart.style.marginLeft = -Math.round((say.offsetWidth || 30) / 2 + 22) + 'px';   // [DECO-FRIEND-VIEW-1] 말풍선 왼쪽 밖(한 칸 동물에서 '왈!'을 덮었다)
   st.el.appendChild(heart);
   setTimeout(() => { if (heart.parentNode) heart.parentNode.removeChild(heart); }, 1200);
   //  기쁨 — 그 그림이 있으면 한 번(0.9초) · 없으면 폴짝
@@ -9032,6 +9033,8 @@ function _lifePetAnim(st) {
     const plus = document.createElement('div'), over = _animOverCells(st) * (st.C || 0);
     plus.className = 'deco-anim-plus'; plus.textContent = '+1 💗';
     if (over) plus.style.marginBottom = Math.round(over) + 'px';
+    const say = st.el.querySelector('.deco-anim-say');   // [DECO-FRIEND-VIEW-1] 말풍선 오른쪽 밖
+    plus.style.marginLeft = Math.round((say ? say.offsetWidth : 30) / 2 + 3) + 'px';
     st.el.appendChild(plus);
     setTimeout(() => { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1500);
   }
@@ -9650,14 +9653,170 @@ function _drawDeco() {
     // [DECO-ZOOM-1] 보이는 창만 옮긴다 — 그리는 코드는 판 좌표를 그대로 쓴다
     _dCtx.setTransform(2, 0, 0, 2, 0, 0);
     _dCtx.clearRect(0, 0, _dW, _dH);
-    _dCtx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
+    //  [DECO-LAWN-SEAM-1] 옮기는 값은 캔버스 픽셀(2배) 단위로 — ＋·－ 기준점 계산으로 111.375 같은 값이 오면 칸 경계가 픽셀 사이에 걸려
+    //  이음새 알파가 191·143 → 판 뒤 어두운 바탕이 칸마다 가는 줄로 비쳤다(창조자 59-ⓑ105). 동물·움직임 층(DOM)과는 0.25px 안.
+    _dCtx.setTransform(2, 0, 0, 2, -Math.round(_dPanX * 2), -Math.round(_dPanY * 2));
     if (DECO_SCENE === 'yard') { _drawYard(); if (_decoRectPrev) _drawRectPreview(); }   // [DECO-FLOOR-RECT-1] 끄는 동안의 네모
     else _drawIndoor();
     if (_decoHover && SEL_DECO) _decoDrawGhost(DECO_SCENE === 'yard' ? 'yard' : 'indoor', DECO_SCENE === 'yard' ? 0 : (_dCv._offX || 0), DECO_SCENE === 'yard' ? 0 : (_dCv._offY || 0), _dC);   // [DECO-SEL-HL-1]
     // [DECO-ANIM-1] 캔버스 위 동물 층 맞추기(마당만)
     _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
     try { _decoTplSync(); } catch (e) {}   // [DECO-FIRST-YARD-1]
+    try { _decoMotionSync(); } catch (e) {}   // [DECO-MOTION-1]
   });
+}
+
+// [DECO-MOTION-1] 움직임 층 — 원래 움직이는 물건(풍차 날개 · 분수 물줄기 · 헛간 풍향계 · 오두막 연기 · 모닥불)을 산다(계획 C2 · 묶음 5 · docs/deco_living_yard_20260920.md).
+//  assets/deco/motion.json(디자인)이 장식마다 '몸통(body)'과 움직이는 층을 준다 → 캔버스에는 멈춘 몸통을, 층은 판 위 DOM 에 얹어 CSS transform·opacity 로만 돌린다
+//  (캔버스를 다시 그리지 않는다 · 합성기에서 돈다). 같은 장식끼리 박자가 맞지 않게 시작을 어긋나게. 저장 0.
+//  꺼지는 때: 움직임 줄이기 · 판이 안 보일 때(동물 층과 같은 규칙) — 그때는 캔버스가 본 그림(날개까지 그려진 한 장)을 그린다.
+//  아직 안 하는 것: 밤 불빛(glow — 꾸미기에 낮밤이 붙은 뒤) · 바람(흔들기) · 떠다니는 것(_ambient).
+let _DECO_MOTION = null, _decoMotionAsked = false;
+const _decoMvReady = {};   // id → true(층 그림까지 다 옴) | false(없음) | undefined(확인 중)
+function _decoMotionOn() {
+  if (!_ifMode || DECO_SCENE !== 'yard' || _animReduced()) return false;
+  //  내 꾸미기 판에서만 — 친구 구경(ff-topview)도 _drawYard 를 빌려 그리는데 거기엔 층이 없다(날개 없는 풍차가 되지 않게 본 그림으로)
+  if (!_dCv || !_dCv.parentNode || _dCv.parentNode.id !== 'if-topview') return false;
+  if (!_decoMotionAsked) {
+    _decoMotionAsked = true;
+    try { fetch('./assets/deco/motion.json').then(r => r.ok ? r.json() : null).then(j => { if (j) { _DECO_MOTION = j; _drawDeco(); } }).catch(() => {}); } catch (e) {}
+  }
+  return !!_DECO_MOTION;
+}
+//  이 장식을 몸통으로 그릴까 — 층 그림까지 다 왔을 때만(날개 없는 풍차가 잠깐이라도 보이지 않게)
+function _decoMotionBody(id) {
+  if (!_decoMotionOn()) return '';
+  const m = _DECO_MOTION[id];
+  if (!m || !m.body || !Array.isArray(m.layers)) return '';
+  if (_decoMvReady[id] === undefined) {
+    if (_artStart() === 'loading') return '';   // [DECO-BUNDLE-1] 묶음이 오면 다시 그린다
+    _decoMvReady[id] = null;
+    const files = [m.body].concat(...m.layers.filter(L => L.kind !== 'glow').map(L => L.files || [L.file]));
+    let left = files.length, bad = false;
+    files.forEach(f => { const img = new Image(); img.onload = img.onerror = (e) => { if (e.type === 'error' || !img.naturalWidth) bad = true;
+      if (--left === 0) { _decoMvReady[id] = !bad; if (!bad) _drawDeco(); } }; img.src = _artSrc('deco/' + f) || './assets/deco/' + f; });
+  }
+  return _decoMvReady[id] ? m.body.replace(/\.svg$/, '') : '';
+}
+const _decoMv = { layer: null, world: null, items: new Map() };
+function _decoMotionStop() {
+  if (_decoMv.layer && _decoMv.layer.parentNode) _decoMv.layer.parentNode.removeChild(_decoMv.layer);
+  _decoMv.items.clear(); _decoMv.layer = null;
+}
+function _decoMotionSync() {
+  const host = _dCv && _dCv.parentNode;
+  if (!host || !_decoMotionOn() || (typeof host.getClientRects === 'function' && !host.getClientRects().length)) { _decoMotionStop(); return; }
+  if (!_decoMv.layer) {
+    const layer = document.createElement('div'); layer.className = 'deco-mv-layer';
+    const world = document.createElement('div'); world.className = 'deco-anim-world';
+    layer.appendChild(world); _decoMv.layer = layer; _decoMv.world = world;
+  }
+  if (_decoMv.layer.parentNode !== host) host.insertBefore(_decoMv.layer, _dCv.nextSibling);   // 캔버스 바로 위(동물 층 아래 — z-index 1 · 동물 2)
+  const C = _dC, W = _dW, H = _dH;
+  _decoMv.layer.style.width = W + 'px'; _decoMv.layer.style.height = H + 'px';
+  _decoMv.world.style.transform = 'translate(' + (-_dPanX) + 'px,' + (-_dPanY) + 'px)';
+  const keep = new Set();
+  _decoList(CUR).forEach(p => {
+    if (p.area !== 'yard' || !_decoMotionBody(p.id)) return;
+    const z = getDecoSize(p.id), m = _DECO_MOTION[p.id], vb = (m.layers[0] && m.layers[0].bodyViewBox) || [100, 100];
+    const w = z.w * C, u = w / vb[0], h = vb[1] * u, x0 = p.col * C, y0 = (p.row + z.h) * C - h;
+    if (x0 + w < _dPanX - C || x0 > _dPanX + W + C || y0 + h < _dPanY - C || y0 > _dPanY + H + C) return;   // 화면 밖은 안 만든다
+    const key = p.id + '@' + p.row + '_' + p.col; keep.add(key);
+    let it = _decoMv.items.get(key);
+    if (!it) {
+      const box = document.createElement('div'); box.className = 'deco-mv';
+      const phase = Math.random();   // 같은 장식끼리 박자가 어긋나게
+      m.layers.forEach(L => {
+        if (L.kind === 'glow') return;   // 밤 불빛은 낮밤이 붙은 뒤
+        const files = L.files || [L.file], period = L.kind === 'frames' ? files.length * L.frameSec : (L.periodSec || 4);
+        const copies = L.kind === 'rise' ? 2 : 1;
+        for (let k = 0; k < copies; k++) files.forEach((f, i) => {
+          const img = document.createElement('img'); img.alt = ''; img.src = _artSrc('deco/' + f) || './assets/deco/' + f;   // [DECO-BUNDLE-1]
+          img.className = 'deco-mv-' + L.kind + (L.kind === 'frames' ? ' f' + files.length : '');
+          const delay = L.kind === 'frames' ? -(((files.length - i) % files.length) * L.frameSec + phase * period) : -(phase + k / copies) * period;
+          img.style.animationDuration = period + 's'; img.style.animationDelay = delay.toFixed(3) + 's';
+          img._L = L; box.appendChild(img);
+        });
+      });
+      _decoMv.world.appendChild(box);
+      it = { box }; _decoMv.items.set(key, it);
+    }
+    //  자리·크기(배율이 바뀌면 다시) — 층 그림 크기는 몸통 단위(size · pivotInBody)
+    const st = it.box.style;
+    st.left = x0 + 'px'; st.top = y0 + 'px'; st.width = w + 'px'; st.height = h + 'px'; st.zIndex = String(p.row + z.h);
+    [...it.box.children].forEach(img => {
+      const L = img._L, sz = L.size || vb, pv = L.pivotInBody || [vb[0] / 2, vb[1] / 2], s2 = img.style;
+      s2.width = sz[0] * u + 'px'; s2.height = sz[1] * u + 'px';
+      if (L.kind === 'frames') { s2.left = '0px'; s2.top = '0px'; }
+      else if (L.anchor === 'bottom-center') { s2.left = (pv[0] - sz[0] / 2) * u + 'px'; s2.top = (pv[1] - sz[1]) * u + 'px'; }
+      else { s2.left = (pv[0] - sz[0] / 2) * u + 'px'; s2.top = (pv[1] - sz[1] / 2) * u + 'px'; }
+    });
+  });
+  [..._decoMv.items.keys()].forEach(k => { if (!keep.has(k)) { const it = _decoMv.items.get(k); if (it.box.parentNode) it.box.parentNode.removeChild(it.box); _decoMv.items.delete(k); } });
+}
+
+// [DECO-PHOTO-1] 내 마당 사진 한 장 — 판 전체를 한 장으로(격자·놓을 곳 표시·마우스 모습 없이) · 동물은 지금 선 자리에 · 아래에 이름과 날짜.
+//  그림 파일로 내려받는다. 저장본·화면 상태는 안 바뀐다(그리는 동안만 전역 값을 빌린다 — 친구 구경과 같은 방법). 계획 묶음 6.
+let _decoPhotoMode = false;
+//  사진 틀 — 집·장식·칠한 바닥·밭을 품는 네모 + 둘레 3칸(적어도 24×14칸 · 판 안) · 칸 단위
+function _decoPhotoFrame() {
+  let r0 = 0, r1 = DH.rows - 1, c0 = _houseCol0(), c1 = _houseCol0() + DH.cols - 1;
+  const grow = (r, c, h, w) => { r0 = Math.min(r0, r); c0 = Math.min(c0, c); r1 = Math.max(r1, r + h - 1); c1 = Math.max(c1, c + w - 1); };
+  _decoList(CUR).forEach(p => { if (p.area === 'yard') { const z = getDecoSize(p.id); grow(p.row, p.col, z.h, z.w); } });
+  Object.keys(_yardFloorGet(CUR)).forEach(k => { const [r, c] = k.split('_').map(Number); if (r >= 0 && c >= 0) grow(r, c, 1, 1); });
+  if (DECO_SPACE === 1) { const f = _getFarmZone(); grow(f.startRow, f.startCol, f.rows, f.cols); }
+  r0 = Math.max(0, r0 - 3); c0 = Math.max(0, c0 - 3); r1 = Math.min(DY.rows - 1, r1 + 3); c1 = Math.min(DY.cols - 1, c1 + 3);
+  //  모자라면 양쪽으로 한 칸씩 넓힌다(판 끝에 닿으면 반대쪽만)
+  const need = (a, b, min, max) => { while (b - a + 1 < min && (a > 0 || b < max - 1)) { if (a > 0) a--; if (b - a + 1 < min && b < max - 1) b++; } return [a, b]; };
+  [c0, c1] = need(c0, c1, 24, DY.cols); [r0, r1] = need(r0, r1, 14, DY.rows);
+  return { r0, c0, rows: r1 - r0 + 1, cols: c1 - c0 + 1 };
+}
+async function decoPhoto(opt) {
+  if (DECO_SCENE !== 'yard') { toast('📷 사진은 마당에서 찍어요 — 🌿 마당으로 가서 눌러 주세요'); return null; }
+  //  동물은 캔버스가 안 그려서 그림이 아직 없을 수 있다 — 먼저 부른다(2초까지)
+  const pets = _decoList(CUR).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);
+  for (let i = 0; i < 20 && pets.some(p => !_decoImg(p.id)); i++) await new Promise(r => setTimeout(r, 100));
+  const F = _decoPhotoFrame();
+  const C = Math.max(12, Math.min(32, Math.floor(1920 / F.cols))), top = C, foot = Math.round(C * 1.6);
+  const W = F.cols * C, H = F.rows * C + top + foot;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const keep = { cv: _dCv, ctx: _dCtx, W: _dW, H: _dH, C: _dC, px: _dPanX, py: _dPanY, z: _dZoom, sel: SEL_DECO, hover: _decoHover, mode: DECO_MODE };
+  const rec = _animLayers.get(_ifActiveContainer || 'house-topview');
+  try {
+    _decoPhotoMode = true; SEL_DECO = null; _decoHover = null; DECO_MODE = 'deco';
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#0E1621'; ctx.fillRect(0, 0, W, H);
+    _dCv = cv; _dCtx = ctx; _dW = W; _dH = H - foot; _dC = C; _dPanX = F.c0 * C; _dPanY = F.r0 * C - top; _dZoom = 1;
+    ctx.setTransform(1, 0, 0, 1, -_dPanX, -_dPanY);
+    if (F.r0 === 0) {   // 판 맨 위를 찍으면 위 잔디 띠 한 줄(굴뚝·윗줄 나무)
+      const gr = () => 'grass';
+      for (let c = F.c0; c < F.c0 + F.cols; c++) if (!(FLOOR_SVG && _drawFloorSVG('grass', 999, c, c * C, -C, C, gr))) { ctx.fillStyle = FLOOR_TILES.grass.bg; ctx.fillRect(c * C, -C, C, C); }
+    }
+    _drawYard();
+    //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
+    pets.forEach(p => {
+      const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
+      _drawDecoSVG(p.id, (st ? st.fx : p.col) * C, (st ? st.fy : p.row) * C, z.w * C, z.h * C);
+    });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = 'rgba(14,22,33,.92)'; ctx.fillRect(0, H - foot, W, foot);
+    ctx.fillStyle = '#ffd866'; ctx.font = `700 ${Math.round(foot * .45)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const d = new Date(), day = d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.';
+    ctx.fillText('🌿 ' + (CUR.name || '') + '의 마당 · ' + day, W / 2, H - foot / 2);
+  } finally {
+    _decoPhotoMode = false; SEL_DECO = keep.sel; _decoHover = keep.hover; DECO_MODE = keep.mode;
+    _dCv = keep.cv; _dCtx = keep.ctx; _dW = keep.W; _dH = keep.H; _dC = keep.C; _dPanX = keep.px; _dPanY = keep.py; _dZoom = keep.z;
+  }
+  if (opt && opt.canvas) return cv;   // 시험용 — 내려받지 않는다
+  try {
+    cv.toBlob(b => {
+      if (!b) { toast('📷 사진을 만들지 못했어요'); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = (CUR.name || '내') + '_마당.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('📷 마당 사진을 저장했어요');
+    }, 'image/png');
+  } catch (e) { toast('📷 사진을 만들지 못했어요'); }
+  return cv;
 }
 
 // [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기(디자인 ⑭ · 보스 결정 (A) 보여주기만 — 저장 0)
@@ -9695,7 +9854,7 @@ function _decoTplSync() {
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   const ctx = cv.getContext('2d'), keep = _dCtx;
   ctx.setTransform(2, 0, 0, 2, 0, 0); ctx.clearRect(0, 0, W, H);
-  ctx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
+  ctx.setTransform(2, 0, 0, 2, -Math.round(_dPanX * 2), -Math.round(_dPanY * 2));   // [DECO-LAWN-SEAM-1] 판과 같은 반올림
   const c0 = _houseCol0(), P = DECO_TPL.path, pc = P.c.map(k => c0 + k);
   const isPath = (r, c) => r >= P.r0 && r <= P.r1 && pc.indexOf(c) >= 0;
   _dCtx = ctx;   // 바닥·장식 그리기 도우미는 _dCtx 에 그린다 — 잠깐 이 캔버스로
@@ -10005,8 +10164,8 @@ function _drawYard() {
 
   // 격자 (집 영역 제외) — [DECO-VIEW-FIT-1] 판 크기까지(전엔 캔버스 크기 W·H 까지라 오른쪽·아래로 밀면 격자가 없었다 · 집 오른쪽 칸 위 3줄도)
   const BW = DY.cols*C, BH = DY.rows*C;
-  //  [DECO-GROUND-1] 모눈은 고르는 동안(카드를 든 채 · 바닥 모드)만 — 평소엔 안 보이게(창조자 31회 '스티커를 모눈종이에 붙인 모습')
-  _dCtx.strokeStyle= (SEL_DECO || DECO_MODE==='floor') ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,0)'; _dCtx.lineWidth=.5;
+  //  [DECO-GROUND-1] 모눈은 고르는 동안(카드를 든 채 · 바닥 모드)만 — 평소엔 안 보이게(창조자 31회 '스티커를 모눈종이에 붙인 모습') · [DECO-PHOTO-1] 사진엔 없음
+  _dCtx.strokeStyle= (!_decoPhotoMode && (SEL_DECO || DECO_MODE==='floor')) ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,0)'; _dCtx.lineWidth=.5;
   _dCtx.beginPath();
   for(let r=0;r<=DY.rows;r++){
     if(r<DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); _dCtx.moveTo(hx+hw,r*C); _dCtx.lineTo(BW,r*C); }
@@ -10046,7 +10205,8 @@ function _drawYard() {
     const bw=sz.w*C, bh=sz.h*C;
     const _gnd = _decoGroundOn(p, d);   // [DECO-GROUND-1] 잔디 위 물건이면 밑동 그림자 → 그림 → 풀 덮임
     if (_gnd) _decoGroundShadow(px, py, bw, bh, C);
-    if(_drawDecoSVG(drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
+    const mvBody = _decoMotionBody(p.id);   // [DECO-MOTION-1] 움직이는 부분은 DOM 층이 — 캔버스엔 멈춘 몸통
+    if(_drawDecoSVG(mvBody || drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;
@@ -13128,12 +13288,67 @@ function requestPromotion() {
 // ── 친구 방문 전체화면 (읽기 전용) ─────────────────────
 let _ffFriend = null;
 let _ffScene  = 'yard';
+// [DECO-FRIEND-VIEW-1] 구경 판의 확대·이동은 구경만의 값(보스 채택 안 · 계획 C9) — 내 마당 값(_dPanX 등)과 섞이지 않는다. 저장 0 · 읽기 전용.
+let _ffView = { zoom: 1, panX: 0, panY: 0 }, _ffRaf = 0;
+function _ffViewReset() { _ffView = { zoom: 1, panX: 0, panY: 0 }; }
+function _ffRender() { if (_ffRaf) return; _ffRaf = requestAnimationFrame(() => { _ffRaf = 0; _renderFriendCanvas(); }); }
+//  (fx,fy) 화면 점을 고정한 채 배율을 바꾼다 — 1(처음 보던 크기) ~ 3배
+function _ffZoomAt(z, fx, fy) {
+  //  옛 칸 크기는 지금 배율로 셈한다(그린 값 v.C 는 한 틀 늦다 — 두 손가락 걸음이 그 사이 여러 번 오면 기준점이 밀렸다)
+  const v = _ffView, C0 = v.C0 || 1, oldC = Math.max(4, Math.round(C0 * v.zoom));
+  v.zoom = Math.min(3, Math.max(1, z));
+  const newC = Math.max(4, Math.round(C0 * v.zoom));
+  if (fx === undefined) { fx = (v.W || 0) / 2; fy = (v.H || 0) / 2; }
+  v.panX = (v.panX + fx) / oldC * newC - fx; v.panY = (v.panY + fy) / oldC * newC - fy;
+  _ffRender();
+}
+function ffZoom(k) { _ffZoomAt(_ffView.zoom * k); }
+function ffZoomReset() { _ffViewReset(); _ffRender(); }
+//  누르면 — 그 칸의 동물이 반응(말풍선 · 💗 · 강아지는 한 칸 온다 — 화면에만)
+function _ffTap(x, y) {
+  const v = _ffView;
+  if (_ffScene !== 'yard' || !v.C) return;
+  const c = Math.floor((x + v.panX) / v.C), r = Math.floor((y + v.panY) / v.C);
+  //  내 마당과 같은 판정(#1021) — 그려진 몸 먼저 · 몸 밖이면 칸
+  const st = _animAtPt('ff-topview', x + v.panX, y + v.panY) || _animAt('ff-topview', r, c);
+  if (st) _animPoke(st, c);
+}
+function _ffAttach(cv) {
+  const pts = new Map(); let pinch = null, drag = null;
+  const local = e => { const k = cv.getBoundingClientRect(); return { x: e.clientX - k.left, y: e.clientY - k.top }; };
+  cv.addEventListener('pointerdown', e => {
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    pts.set(e.pointerId, local(e));
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), z0: _ffView.zoom }; drag = null; }
+    else if (pts.size === 1) { const p = local(e); drag = { x: p.x, y: p.y, px: _ffView.panX, py: _ffView.panY, moved: 0 }; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, local(e));
+    if (pinch && pts.size >= 2) { const [a, b] = [...pts.values()]; if (pinch.d0 > 8) _ffZoomAt(pinch.z0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0, (a.x + b.x) / 2, (a.y + b.y) / 2); }
+    else if (drag) { const p = local(e); drag.moved = Math.max(drag.moved, Math.abs(p.x - drag.x) + Math.abs(p.y - drag.y));
+      if (drag.moved > 6) { _ffView.panX = drag.px - (p.x - drag.x); _ffView.panY = drag.py - (p.y - drag.y); _ffRender(); } }
+  });
+  cv.addEventListener('pointerup', e => {
+    const tap = !!drag && drag.moved <= 6 && !pinch && pts.size === 1, p = local(e);
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (!pts.size) { drag = null; if (tap) _ffTap(p.x, p.y); }
+  });
+  cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); pinch = null; drag = null; });
+  cv.addEventListener('wheel', e => {   // 트랙패드 두 손가락 = 이동 · 모으기(ctrl) = 확대
+    e.preventDefault();
+    if (e.ctrlKey) { const p = local(e); _ffZoomAt(_ffView.zoom * Math.exp(-e.deltaY * .01), p.x, p.y); }
+    else { _ffView.panX += e.deltaX; _ffView.panY += e.deltaY; _ffRender(); }
+  }, { passive: false });
+}
 
 function openFriendFullscreen(friendId) {
   const friend = typeof friendId === 'string' ? DB.getStudent(friendId) : friendId;
   if (!friend) return;
   _ffFriend = friend;
   _ffScene  = 'yard';
+  _ffViewReset();   // [DECO-FRIEND-VIEW-1]
   const fs = document.getElementById('friend-fullscreen');
   fs.style.display = 'flex';
   document.getElementById('ff-title').textContent = friend.avatar + ' ' + friend.name + '의 집';
@@ -13163,6 +13378,7 @@ function toggleFriendScene() {
   const isYard = _ffScene === 'yard';
   document.getElementById('ff-scene-btn').textContent = isYard ? '🏠 집 안 보기 →' : '🌿 마당 보기 ←';
   document.getElementById('ff-topview').innerHTML = '';
+  _ffViewReset();   // [DECO-FRIEND-VIEW-1]
   requestAnimationFrame(() => _renderFriendCanvas());
 }
 
@@ -13181,8 +13397,8 @@ function _renderFriendCanvas() {
   const prevC     = _dC;
   const prevIfMode = _ifMode;
   const prevCont  = _ifActiveContainer;
-  //  [DECO-FRIEND-PAN-1] 구경 판은 옮기지 않은 채 한 장으로 그린다 — 내 마당에서 옮겨 본 값(_dPanX/Y)이 새면
-  //  보이는 칸 고르기(_decoVisible)가 친구 마당 왼쪽·위를 안 그리고(까맣게 빔), 동물 층도 그만큼 밀려 사라졌다.
+  //  [DECO-FRIEND-PAN-1] 내 마당에서 옮겨 본 값(_dPanX/Y)이 새면 보이는 칸 고르기(_decoVisible)가 친구 마당 왼쪽·위를 안 그리고(까맣게 빔),
+  //  동물 층도 그만큼 밀려 사라졌다 → [DECO-FRIEND-VIEW-1] 이제 구경만의 값(_ffView)으로 그린다(아래에서 C 를 정한 뒤)
   const prevPanX = _dPanX, prevPanY = _dPanY, prevZoom = _dZoom;
   _dPanX = 0; _dPanY = 0; _dZoom = 1;
 
@@ -13193,10 +13409,15 @@ function _renderFriendCanvas() {
   DECO_SCENE = _ffScene;
   _ifMode    = true;
 
-  el.innerHTML = '';
-  const cv = document.createElement('canvas');
-  cv.style.cssText = 'display:block;cursor:default;touch-action:none';
-  el.appendChild(cv);
+  //  [DECO-FRIEND-VIEW-1] 캔버스는 다시 쓴다(끌기·확대 중에 매번 새로 만들지 않게) — 장면을 바꾸면 toggleFriendScene 이 비운다
+  let cv = el.querySelector('canvas');
+  if (!cv) {
+    el.innerHTML = '';
+    cv = document.createElement('canvas');
+    cv.style.cssText = 'display:block;cursor:grab;touch-action:none';
+    el.appendChild(cv);
+    _ffAttach(cv);
+  }
 
   const topH = 50;
   const W    = window.innerWidth;
@@ -13204,6 +13425,8 @@ function _renderFriendCanvas() {
   const cols = _ffScene === 'yard' ? DY.cols : DI.cols;
   const rows = _ffScene === 'yard' ? DY.rows : DI.rows;
   let C    = Math.floor(W / cols);
+  const _ffC0 = C;
+  C = Math.max(4, Math.round(_ffC0 * _ffView.zoom));   // [DECO-FRIEND-VIEW-1]
   let H    = Math.min(C * rows, maxH);
   //  [INDOOR-ROOMS-1] 친구 집 안에 방이 있으면 방 둘레에 맞춰 한 장(아래쪽 방이 안 잘리게)
   let fpx = 0, fpy = 0;
@@ -13213,22 +13436,33 @@ function _renderFriendCanvas() {
     fRooms.forEach(rm => { r0 = Math.min(r0, rm.r - 1); c0 = Math.min(c0, rm.c); r1 = Math.max(r1, rm.r + rm.h); c1 = Math.max(c1, rm.c + rm.w); });
     const bw = c1 - c0 + 1, bh = r1 - r0 + 1;
     C = Math.max(4, Math.min(Math.floor(W / bw), Math.floor(maxH / bh)));
+    _ffView.C0 = C; C = Math.max(4, Math.round(C * _ffView.zoom));   // [DECO-FRIEND-VIEW-1]
     H = Math.max(120, Math.min(maxH, bh * C));
     const offX = Math.max(0, Math.floor((W - cols * C) / 2)), offY = Math.max(Math.floor(C * .9), Math.floor((H - rows * C) / 2));
     fpx = offX + c0 * C - Math.max(0, (W - bw * C) / 2); fpy = offY + r0 * C - Math.max(0, (H - bh * C) / 2);
   }
 
+  //  [DECO-FRIEND-VIEW-1] 구경만의 이동 — 판 밖으로는 안 나간다(판이 화면보다 작으면 0)
+  if (!fRooms.length) _ffView.C0 = _ffC0;
+  //  마당 = 판 크기 · 집 안 = 처음 보던 한 장(방 둘레)을 배율만큼 키운 크기
+  const contentW = _ffScene === 'yard' ? cols * C : Math.round(W * _ffView.zoom), contentH = _ffScene === 'yard' ? rows * C : Math.round(H * _ffView.zoom);
+  const maxPX = Math.max(0, contentW - W), maxPY = Math.max(0, contentH - H);
+  _ffView.panX = Math.min(Math.max(0, _ffView.panX), maxPX); _ffView.panY = Math.min(Math.max(0, _ffView.panY), maxPY);
+  _ffView.C = C; _ffView.W = W; _ffView.H = H;
+  _dPanX = _ffView.panX; _dPanY = _ffView.panY; _dZoom = _ffView.zoom;
+
   _dCv  = cv; _dW = W; _dH = H; _dC = C;
-  cv.width  = W * 2; cv.height = H * 2;
+  if (cv.width !== W * 2) cv.width = W * 2;
+  if (cv.height !== H * 2) cv.height = H * 2;
   cv.style.width  = W + 'px'; cv.style.height = H + 'px';
   _dCtx = cv.getContext('2d');
-  _dCtx.scale(2, 2);
+  _dCtx.setTransform(2, 0, 0, 2, 0, 0);
   _dCtx.clearRect(0, 0, W, H);
-  if (fpx || fpy) _dCtx.translate(-fpx, -fpy);   // [INDOOR-ROOMS-1]
+  _dCtx.setTransform(2, 0, 0, 2, -Math.round((fpx + _ffView.panX) * 2), -Math.round((fpy + _ffView.panY) * 2));   // [INDOOR-ROOMS-1] 방 둘레 + [DECO-FRIEND-VIEW-1] 구경 이동
   if (_ffScene === 'yard') _drawYard();
   else _drawIndoor();
-  // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다
-  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, 0, 0);
+  // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다 — [DECO-FRIEND-VIEW-1] 구경 이동만큼 같이
+  _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _ffView.panX, _ffView.panY);
 
   // 복원
   _dPanX = prevPanX; _dPanY = prevPanY; _dZoom = prevZoom;   // [DECO-FRIEND-PAN-1]

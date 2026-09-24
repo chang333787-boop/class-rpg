@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260924me6">
+<link rel="stylesheet" href="./student.css?v=20260924mf2">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -696,11 +696,18 @@
   <!-- 캔버스 영역 -->
   <div id="ff-canvas-wrap" style="flex:1;overflow:hidden;min-height:0;position:relative">
     <div id="ff-topview" style="width:100%;height:100%"></div>
+    <!-- [DECO-FRIEND-VIEW-1] 구경도 크게·작게(두 손가락 · 트랙패드로도 된다) -->
+    <div class="ff-zoom" role="group" aria-label="구경 확대">
+      <button onclick="ffZoom(1.25)" aria-label="크게">＋</button>
+      <button onclick="ffZoom(0.8)" aria-label="작게">－</button>
+      <button onclick="ffZoomReset()" aria-label="처음 크기로">전체</button>
+    </div>
   </div>
   <!-- 하단 정보 -->
   <div style="flex-shrink:0;background:rgba(0,0,0,.35);border-top:1px solid rgba(255,255,255,.08);
     padding:.5rem 1rem;display:flex;align-items:center;gap:.6rem">
     <span id="ff-friend-info" style="font-size:.8rem;color:var(--txt2)"></span>
+    <span class="ff-hint">🐾 동물을 눌러 보세요 · 두 손가락으로 크게</span>
   </div>
 </div>
 
@@ -726,6 +733,8 @@
     </div>
     <!-- [DECO-LIFE-3] 🎁 선물 상자 — 동물 친구가 두고 간 것(골드 아님) -->
     <button id="if-gift-btn" class="if-gift-btn" onclick="decoGiftBox()" aria-label="선물 상자" title="선물 상자">🎁</button>
+    <!-- [DECO-PHOTO-1] 내 마당 사진 한 장(그림 파일로 저장 · 저장본은 안 바뀐다) -->
+    <button id="if-photo-btn" class="if-photo" onclick="decoPhoto()" title="내 마당 사진" aria-label="내 마당 사진 저장">📷</button>
     <div style="flex:1"></div>
     <!-- [DECO-PHONE-TOP-1] 폰(≤480)에서만 줄바꿈 자리 — 모드 단추 셋이 둘째 줄로 -->
     <div class="if-topbar-break" aria-hidden="true"></div>
@@ -932,7 +941,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260924me8"></script>
+<script src="./student.js?v=20260924mf2"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
