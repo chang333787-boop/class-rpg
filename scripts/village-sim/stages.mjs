@@ -67,7 +67,8 @@ let 끈판 = 0;
    수용량(shopCap)은 **정원이 적힌 필요 시설이 그 판에 있을 때만** 돈다 — 기본 종류에는 정원이 없다. 도는 것만 센다(끄기 #787 과 같은 잣대).
    [MAC-FACILCAP] 가게에서 학교로(#857) — '장보기' 에서 '필요가 있는 시설 무엇이든' 으로 넓혔다. */
 const 조건부 = { shopCap: def => Object.entries(def.건물정의 || {}).some(([k, t]) => t && t.need && t.정원 > 0 && (!Array.isArray(def.건물) || def.건물.includes(k))),
-  stroll: def => def.교과 == null };   // [ACT-STROLL] 산책은 수업 판(교과 있음)에서는 안 돈다(코드의 strollTry 와 같은 조건)
+  stroll: def => def.교과 == null,
+  homeTime: def => def.교과 == null };   // [ACT-HOMETIME] 귀가 나서기도 수업 판에선 안 돈다(코드의 homeTimeIs 와 같은 조건)   // [ACT-STROLL] 산책은 수업 판(교과 있음)에서는 안 돈다(코드의 strollTry 와 같은 조건)
 const 한도 = 6;   // 수업 판(교과 칸 있음)의 켜진 판정 규칙 상한
 const liveOf = (def, 끈것) => judge.filter(k => !끈것.has(k) && vrules[k] && (!조건부[k] || 조건부[k](def)) && ((def.규칙 || {})[k] && 'on' in def.규칙[k] ? def.규칙[k].on : vrules[k].on));
 const curri = fs.readFileSync(path.join(ROOT, 'docs/village_curriculum_map.md'), 'utf8');
