@@ -1548,7 +1548,7 @@
         document.querySelectorAll('.toast-msg').forEach(e => e.remove());
         await petDog(); await sleep(600);
         const f2 = friend(), last = [...document.querySelectorAll('.toast-msg')].map(e => e.textContent).join(' ');
-        out('친해지기_다음날_+1_단계알림', !!f2 && f2.h === 3 && /알아봄/.test(last) && (_lifeGet(CUR).g.sticker || 0) >= 1);
+        out('친해지기_다음날_+1_단계알림', !!f2 && f2.h === 3 && /알아봄/.test(last) && (_lifeGet(CUR).g.sticker || 0) >= 1 && _lifeGet(CUR).p >= 1);
       } finally { _lifeDay = od; }
       //  [DECO-LIFE-2] 카드 — 누르면 뜬다 · 이름 고르기(칩) = 잎 쓰기 1 · 통째 저장 0 · 판을 누르면 닫힘 · Escape
       if (typeof _lifeCardOpen === 'function') {
@@ -1567,6 +1567,28 @@
         out('카드_판누르면_닫힘', !_lifeCard && !document.querySelector('.deco-life-card'));
         await petDog(); await sleep(200); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
         out('카드_Escape_닫힘', !_lifeCard);
+      }
+      //  [DECO-LIFE-3] 작은 선물 — 4단계 닭은 매일 · 누르면 받음 = 잎 쓰기 1 · 통째 0 · 선물 상자 · 친구 구경엔 없음
+      if (typeof _lifeGiftTake === 'function') {
+        CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_y55').concat([{ id: 'd_y55', qty: placedN('d_y55') + 1 }]);
+        SEL_DECO = 'd_y55'; _decoPlace('yard', 22, 34); SEL_DECO = null; decoFlush('시험'); await sleep(900);
+        const t0 = _lifeDay(), egg0 = +(_lifeGet(CUR).g.egg || 0);
+        _lifeWrite(CUR, { 'a/a90': { k: 'd_y55', r: 22, c: 34, sp: 3, m: t0 - 30, h: 16, d: t0 - 1 } }); await sleep(400);
+        _drawDeco(); await sleep(400);
+        const gift = () => document.querySelector('.deco-gift');
+        out('선물_땅에있음', !!gift());
+        const w2 = _lifeWrites; saves = 0; sets = 0;
+        if (gift()) gift().click(); await sleep(900);
+        const L2 = _lifeGet(CUR);
+        out('선물_받기_잎쓰기1_통째0', { egg: L2.g.egg, 잎: _lifeWrites - w2, saveStudent: saves, sdkSet: sets, 맞나: L2.g.egg === egg0 + 1 && L2.a.a90.gd === t0 && _lifeWrites - w2 === 1 && saves === 0 && sets === 0 });
+        _drawDeco(); await sleep(300);
+        out('선물_받으면_없어짐', !gift());
+        decoGiftBox(true);
+        const cellTxt = [...document.querySelectorAll('#deco-giftbox .dgb-cell')].map(e => e.textContent.trim());
+        out('선물상자_개수·물음표·골드아님', cellTxt[0] === '×' + (egg0 + 1) && cellTxt.includes('?') && /골드가 아니에요/.test(document.getElementById('deco-giftbox').textContent));
+        out('선물상자_사진틀_조각칸', !!document.querySelector('#deco-giftbox .dgb-frame canvas') && /사진 조각 \d \/ 6/.test(document.getElementById('deco-giftbox').textContent));
+        decoGiftBox(false);
+        out('선물상자_닫힘', !document.getElementById('deco-giftbox'));
       }
       out('친해지기_골드불변', CUR.gold === gold0);
       out('친해지기_자리객체그대로', !(CUR.houseDecorations || []).some(p => 'u' in p));

@@ -1540,10 +1540,10 @@ try {
     eq(sb.__sent[0].up['decoLife/a/a1/d'], day + 1);
     eq(Object.keys(sb.__sent[0].up).sort(), ['decoLife/a/a1/d', 'decoLife/a/a1/h']);
   });
-  test('단계가 오르는 날 스티커 +1 · 알림 신호(stageUp)', () => {
+  test('단계가 오르는 날 스티커 +1 · 사진 조각 +1 · 알림 신호(stageUp)', () => {
     const k = kid(); k.decoLife = { v: 1, c: 2, a: { a1: { k: 'd_y53', r: 5, c: 9, m: day - 9, h: 2, d: day - 1 } } };
     const r = L._lifePet(k, k.houseDecorations[0], T(day));
-    eq([r.stage, r.stageUp, k.decoLife.a.a1.h, k.decoLife.g.sticker], [2, true, 3, 1]);
+    eq([r.stage, r.stageUp, k.decoLife.a.a1.h, k.decoLife.g.sticker, k.decoLife.p], [2, true, 3, 1, 1]);   // 사진 조각도 하나(디자인 #1003)
   });
   test('옮기기(치우고 다른 자리에 놓기) = 쉬던 친구가 돌아온다 · 선 자리만 고침', () => {
     const k = kid(); k.decoLife = { v: 1, c: 3, a: { a1: { k: 'd_y53', r: 5, c: 9, m: day - 9, h: 6, d: day - 1, n: 2 }, a2: { k: 'd_y53', r: 1, c: 1, m: day - 3, h: 2, d: day - 1 } } };
@@ -1590,6 +1590,28 @@ try {
   });
 } catch (e) {
   test('동물 카드 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+cur = '꾸미기 작은 선물(DECO-LIFE-3)';
+try {
+  const S = read('student.js');
+  const sb = {}; sb.globalThis = sb; vm.createContext(sb);
+  const names = ['_lifeOk', '_lifeObj', '_lifeHearts', '_lifeStage', '_lifeGiftKind', '_lifeGiftDay', '_lifeGiftOpen'];
+  vm.runInContext(sliceConst(S, 'LIFE_STAGE_AT') + sliceConst(S, 'LIFE_GIFT_OF')
+    + "const ANIM_DECO = { d_y55: { mood: 'hen' }, d_y32: { mood: 'duck' }, d_y57: { mood: 'sheep' }, d_y53: { mood: 'dog' }, d_y54: { mood: 'cat' }, d_y99: { mood: 'fox' } };" + NL
+    + names.map(n => sliceFn(S, n)).join(NL) + ';globalThis.__G = { ' + names.join(', ') + ' };', sb);
+  const G = sb.__G, days = (u, h) => Array.from({ length: 12 }, (_, i) => G._lifeGiftDay(u, { h }, 20700 + i)).filter(Boolean).length;
+  test('선물 종류 — 닭 달걀 · 오리 오리알 · 양 양털 · 강아지 나뭇가지 · 고양이 털실 공 · 모르는 동물은 없음', () => eq(['d_y55', 'd_y32', 'd_y57', 'd_y53', 'd_y54', 'd_y99'].map(G._lifeGiftKind), ['egg', 'duck_egg', 'wool', 'stick', 'yarn', '']));
+  test('빈도(보스 ②) — 1단계 없음 · 2단계 3일 · 3단계 2일 · 4단계 이상 매일(12일 중)', () => eq([days('a1', 0), days('a1', 3), days('a1', 8), days('a1', 15), days('a1', 25)], [0, 4, 6, 12, 12]));
+  test('친구마다 날이 어긋난다(같은 2단계라도)', () => {
+    const on = u => Array.from({ length: 3 }, (_, i) => G._lifeGiftDay(u, { h: 3 }, 20700 + i));
+    eq(JSON.stringify(on('a1')) !== JSON.stringify(on('a2')) || JSON.stringify(on('a1')) !== JSON.stringify(on('a3')), true);
+  });
+  test('받은 날(gd = 오늘)이면 땅에 없다 · 다음 선물 날엔 다시', () => {
+    eq([G._lifeGiftOpen('a1', { h: 20 }, 20700), G._lifeGiftOpen('a1', { h: 20, gd: 20700 }, 20700), G._lifeGiftOpen('a1', { h: 20, gd: 20700 }, 20701)], [true, false, true]);
+  });
+} catch (e) {
+  test('선물 코드를 돌릴 수 있다', () => { throw e; });
 }
 
 // ═══════════════════════════════════════════════════════════════
