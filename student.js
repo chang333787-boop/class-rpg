@@ -9310,19 +9310,19 @@ function _lifeGiftTake(u, el) {
 //  처음 누른 날만 decoLife.s[손님] = 오늘(잎 쓰기 하나 · 평생 13번) → ⭐ 스티커 · 반짝(fx_first_meet). 친구 구경은 반응만(쓰기 0 · §7).
 //  '물 몇 칸' = 이어진 물 바닥 칸 수 · '곁' = 둘레 3칸(디자인 표 그대로). sea = 계절(별빛 줄은 여름) · tm = 때(없으면 아무 때).
 const GUESTS = [
-  { k: 'frog', nm: '개구리', sea: 'spring summer autumn', say: '개굴! 갈대 사이가 좋아요', hint: '연못가 갈대 사이에서 개굴 소리가…' },
-  { k: 'heron', nm: '왜가리', sea: 'summer autumn', say: '넓은 연못 징검돌에서 쉬어 가요', hint: '넓은 연못의 징검돌 위에 누가 서 있을까' },
-  { k: 'butterfly', nm: '나비', sea: 'spring summer', say: '꽃밭이 넓어서 놀러 왔어요', hint: '꽃밭이 넓으면 날아와요', fly: 1 },
-  { k: 'sparrow', nm: '참새', sea: 'spring summer autumn winter', say: '짹짹! 곡식 냄새가 나요', hint: '곡식이 있는 곳에 짹짹' },
-  { k: 'magpie', nm: '까치', sea: 'spring summer autumn winter', say: '깍깍! 반가운 소식이에요', hint: '소나무 꼭대기에 반가운 손님이', top: 1 },
-  { k: 'squirrel', nm: '다람쥐', sea: 'autumn', say: '도토리가 어디 있을까?', hint: '가을 나무 아래 도토리를 찾는 누군가…' },
-  { k: 'bee', nm: '꿀벌', sea: 'summer', say: '붕붕! 꿀이 가득해요', hint: '해바라기가 많으면 붕붕…', fly: 1 },
-  { k: 'ladybug', nm: '무당벌레', sea: 'spring summer', say: '장미 잎이 폭신해요', hint: '장미 곁에 빨간 점이…', small: 1 },
-  { k: 'hedgehog', nm: '고슴도치', sea: 'spring summer autumn', tm: 'evening', say: '부스럭… 저녁 산책 중이에요', hint: '관목 덤불 속 부스럭…' },
-  { k: 'owl', nm: '부엉이', sea: 'spring summer autumn winter', tm: 'night', say: '부엉~ 밤 나무가 좋아요', hint: '큰 나무에 밤 손님이…', top: 1 },
-  { k: 'mallard', nm: '청둥오리', sea: 'autumn winter', say: '꽥! 아주 넓은 물이 좋아요', hint: '아주 넓은 물을 좋아해요' },
-  { k: 'snowhare', nm: '눈토끼', sea: 'winter', say: '눈 오는 날엔 관목 곁이 포근해요', hint: '눈 오는 날 관목 곁에…' },
-  { k: 'firefly', nm: '반딧불', sea: 'summer', tm: 'night', say: '반짝반짝… 여름 밤 물가예요', hint: '여름 밤 물가에 작은 불빛이…', fly: 1, small: 1 },
+  { k: 'frog', where: '연못 · 갈대', nm: '개구리', sea: 'spring summer autumn', say: '개굴! 갈대 사이가 좋아요', hint: '연못가 갈대 사이에서 개굴 소리가…' },
+  { k: 'heron', where: '넓은 연못 · 징검돌', nm: '왜가리', sea: 'summer autumn', say: '넓은 연못 징검돌에서 쉬어 가요', hint: '넓은 연못의 징검돌 위에 누가 서 있을까' },
+  { k: 'butterfly', where: '꽃밭', nm: '나비', sea: 'spring summer', say: '꽃밭이 넓어서 놀러 왔어요', hint: '꽃밭이 넓으면 날아와요', fly: 1 },
+  { k: 'sparrow', where: '밀밭 · 보리밭', nm: '참새', sea: 'spring summer autumn winter', say: '짹짹! 곡식 냄새가 나요', hint: '곡식이 있는 곳에 짹짹' },
+  { k: 'magpie', where: '침엽수', nm: '까치', sea: 'spring summer autumn winter', say: '깍깍! 반가운 소식이에요', hint: '소나무 꼭대기에 반가운 손님이', top: 1 },
+  { k: 'squirrel', where: '잎 나무 둘', nm: '다람쥐', sea: 'autumn', say: '도토리가 어디 있을까?', hint: '가을 나무 아래 도토리를 찾는 누군가…' },
+  { k: 'bee', where: '해바라기 · 라벤더', nm: '꿀벌', sea: 'summer', say: '붕붕! 꿀이 가득해요', hint: '해바라기가 많으면 붕붕…', fly: 1 },
+  { k: 'ladybug', where: '장미', nm: '무당벌레', sea: 'spring summer', say: '장미 잎이 폭신해요', hint: '장미 곁에 빨간 점이…', small: 1 },
+  { k: 'hedgehog', where: '낮은 관목 둘 · 저녁', nm: '고슴도치', sea: 'spring summer autumn', tm: 'evening', say: '부스럭… 저녁 산책 중이에요', hint: '관목 덤불 속 부스럭…' },
+  { k: 'owl', where: '큰 나무 · 벚나무 · 밤', nm: '부엉이', sea: 'spring summer autumn winter', tm: 'night', say: '부엉~ 밤 나무가 좋아요', hint: '큰 나무에 밤 손님이…', top: 1 },
+  { k: 'mallard', where: '아주 넓은 물', nm: '청둥오리', sea: 'autumn winter', say: '꽥! 아주 넓은 물이 좋아요', hint: '아주 넓은 물을 좋아해요' },
+  { k: 'snowhare', where: '관목 · 침엽수 · 겨울', nm: '눈토끼', sea: 'winter', say: '눈 오는 날엔 관목 곁이 포근해요', hint: '눈 오는 날 관목 곁에…' },
+  { k: 'firefly', where: '물가 · 여름 밤', nm: '반딧불', sea: 'summer', tm: 'night', say: '반짝반짝… 여름 밤 물가예요', hint: '여름 밤 물가에 작은 불빛이…', fly: 1, small: 1 },
 ];
 const GUEST_LEAF_TREES = ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'];   // 다람쥐 — 잎 나무(계절 낙엽과 같은 목록)
 function _guestHash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -9449,6 +9449,28 @@ function _guestTap(k, el, mine) {
   toast(`⭐ 처음 만난 손님 — ${g.nm}! 스티커를 받았어요 (손님 도감 ${n}/${GUESTS.length})`);
   return true;
 }
+// [DECO-GUEST-2] 🐾 손님 도감 — 만난 손님은 ★ 스티커 · 어디 · 처음 온 날 / 못 만난 손님은 실루엣 + 힌트(디자인 시안 dex) · 계절 칩으로 거르기 · 읽기만(저장 0).
+//  들어가는 길은 🎁 선물 상자 안 단추(윗줄을 더 붐비게 하지 않는다). 친구 것은 보지 않는다(내 도감).
+let _dexSea = 'all';
+function _guestDayText(day) { const d = new Date(day * 86400000); return (d.getUTCMonth() + 1) + '월 ' + d.getUTCDate() + '일'; }   // _lifeDay 의 날 번호 → 한국 날짜
+function decoGuestDex(open, sea) {
+  let box = document.getElementById('deco-dex');
+  if (open === false) { if (box) box.remove(); return; }
+  if (sea) _dexSea = sea;
+  const met = _lifeGet(CUR).s, host = document.getElementById('interior-fullscreen') || document.body;
+  if (!box) { box = document.createElement('div'); box.id = 'deco-dex'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '손님 도감'); host.appendChild(box); }
+  const n = GUESTS.filter(g => met[g.k]).length;
+  const SEAS = [['all', '전체'], ['spring', '🌸 봄'], ['summer', '☀️ 여름'], ['autumn', '🍂 가을'], ['winter', '❄️ 겨울']];
+  const list = GUESTS.filter(g => _dexSea === 'all' || g.sea.split(' ').indexOf(_dexSea) >= 0);
+  const card = g => met[g.k]
+    ? `<div class="ddx-card is-met"><span class="ddx-star" aria-hidden="true">★</span><img src="${_lifeArt('sticker_' + g.k)}" alt=""><b>${g.nm}</b><small>${g.where}</small><small>처음 온 날 ${_guestDayText(met[g.k])}</small></div>`
+    : `<div class="ddx-card"><img class="ddx-sil" src="${_lifeArt('guest_' + g.k)}" alt=""><b>?</b><small>${g.hint}</small></div>`;
+  box.innerHTML = `<div class="ddx-head"><span>🐾 손님 도감 <small>${GUESTS.length} 손님 중 <b>${n}</b> 만남</small></span>`
+    + `<span class="ddx-chips">${SEAS.map(([k, t]) => `<button type="button" class="ddx-chip${_dexSea === k ? ' on' : ''}" onclick="decoGuestDex(true,'${k}')">${t}</button>`).join('')}</span>`
+    + `<button type="button" class="dgb-x" aria-label="닫기" onclick="decoGuestDex(false)">✕</button></div>`
+    + `<div class="ddx-grid">${list.map(card).join('')}</div>`
+    + `<div class="ddx-foot">손님은 <b>놓은 것과 자리</b>를 보고 찾아와요 · 돌보지 않아도 괜찮아요 — 떠나거나 아프지 않아요 · 처음 만나면 ★ 스티커</div>`;
+}
 //  🎁 선물 상자 — 받은 것마다 개수 · 못 받은 것은 '?' · "골드가 아니에요"
 function decoGiftBox(open) {
   let box = document.getElementById('deco-giftbox');
@@ -9461,6 +9483,7 @@ function decoGiftBox(open) {
     + `<div class="dgb-grid">${LIFE_GIFT_BOX.map(cell).join('')}</div>`
     + (L.p ? `<div class="dgb-photo"><div class="dgb-frame"><img src="${_lifeArt('ui_photo_frame')}" alt=""><canvas width="300" height="225"></canvas></div>`
       + `<div><b>사진 조각 ${L.p % 6 || 6} / 6</b> — 친해지기 단계가 오를 때 한 조각${L.p >= 6 ? ` · 모은 사진 ${Math.floor(L.p / 6)}장` : ''}</div></div>` : '')
+    + (typeof GUESTS !== 'undefined' ? `<button type="button" class="dgb-dex" onclick="decoGiftBox(false);decoGuestDex(true)">🐾 손님 도감 ${GUESTS.filter(g => L.s[g.k]).length} / ${GUESTS.length}</button>` : '')   // [DECO-GUEST-2]
     + `<div class="dgb-foot">골드가 아니에요 · 모아서 보는 것 · 팔 수 없어요</div>`;
   if (L.p) _lifePhotoPaint(box.querySelector('.dgb-frame canvas'), L.p % 6 || 6);
 }
@@ -9479,6 +9502,7 @@ function _lifePhotoPaint(cv, n) {
   }
 }
 if (typeof document !== 'undefined') document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('deco-giftbox')) decoGiftBox(false); });
+if (typeof document !== 'undefined') document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('deco-dex')) decoGuestDex(false); });   // [DECO-GUEST-2]
 
 
 //  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.

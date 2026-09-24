@@ -2130,6 +2130,23 @@
       CUR.houseDecorations = keepH; CUR.yardFloor = keepF; CUR.decoLife = keepL; _decoSeasonOv = null; _decoPhaseOv = null; _decoStateVer++; _drawDeco();
     }
 
+    //  ㊼-5 손님 도감(DECO-GUEST-2) — 🎁 선물 상자 안 단추로 열림 · 만난 손님 ★ · 못 만난 손님 실루엣 · 계절 거르기 · 읽기만 · Escape 닫힘
+    if (typeof decoGuestDex === 'function') {
+      const keepL = CUR.decoLife, d = _lifeDay(), w0 = _lifeWrites, sv = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.inventory, CUR.gold]);
+      CUR.decoLife = { v: 1, s: { frog: d - 3, magpie: d - 1, owl: d } };
+      decoGiftBox(true); const btn = document.querySelector('#deco-giftbox .dgb-dex');
+      out('도감_선물상자단추', !!btn && /3 \/ 13/.test(btn.textContent));
+      if (btn) btn.click();
+      const box = document.getElementById('deco-dex');
+      out('도감_만남3_전체13', !!box && !document.getElementById('deco-giftbox') && box.querySelectorAll('.ddx-card.is-met').length === 3 && box.querySelectorAll('.ddx-card').length === 13 && /13 손님 중 3 만남/.test(box.textContent));
+      decoGuestDex(true, 'winter');
+      const wn = [...document.querySelectorAll('#deco-dex .ddx-card')].length;
+      out('도감_계절거르기_겨울', wn === GUESTS.filter(g => g.sea.includes('winter')).length);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      out('도감_Escape닫힘_읽기만', !document.getElementById('deco-dex') && _lifeWrites === w0 && JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.inventory, CUR.gold]) === sv);
+      _dexSea = 'all'; CUR.decoLife = keepL;
+    }
+
     //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
     if (typeof _yardLookDev !== 'undefined' && typeof _starGroundFill === 'function' && _ifMode) {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
