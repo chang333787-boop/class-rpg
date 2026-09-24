@@ -1988,6 +1988,7 @@ function buildChunk(cx, cz) {
     const parts = partsOf(rec);
     const item = { root: i, k: rec.k, rot: rec.rot, bucket: bucketOf(parts[0]), off: 0 };
     const lit = rec.k === 'house' && (res.get(i) || 0) > 0 && dawnLit(i);   // 사람이 사는 집만 창에 불이 켜진다 · [ACT-DAWN] 잠든 집은 끈다
+    const litK = lit && typeof homeLightOf === 'function' ? homeLightOf(i) : 1;   // [ACT-HOMELIGHT] 식구가 집에 있으면 환하게 · 아직 아무도 안 왔으면 은은하게
     const wait = rec.k === 'house' && waitHouseIs(i);           // [MAC-WAITLOOK] 이웃을 기다리는 집 — 디자인 담당의 WAITHOUSE 표로 색을 옅게·창을 어둡게
     parts.forEach((pt, pi) => {
       const b = bucket(bucketOf(pt)), base = BASE[pt.g], off = b.pos.length / 3;
@@ -2002,7 +2003,7 @@ function buildChunk(cx, cz) {
         let kind = 0;
         if (vc) { kind = vk[v]; if (kind === 1 || (kind === 8 && ROOF_FIX[rec.k])) _col.setHex(roofC); else if (kind === 2 || kind === 3 || kind === 7) { _col.setHex(seasonColor(kind === 3 ? P.leafL : P.leaf)); if (kind === 7) _col.multiplyScalar(.72); }   /* 7 = 짙은 잎(꽃밭 바탕 [DESIGN-FLOWER-3]) */ else _col.setRGB(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]); }   // glb(54차): 지붕 돌리기·잎 계절색·나머지 재료색
         if (vc && wait) window.WAITHOUSE.col(_col, kind, pt);   // [MAC-WAITLOOK] 모델 정점은 정점마다 색을 새로 정하므로 여기서
-        b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? 1 : 0);
+        b.col.push(_col.r, _col.g, _col.b); b.emis.push(pt.emis ? pt.emis * 1.6 : kind === 5 ? 0.8 : kind === 6 ? 1.4 : 0); b.night.push(lit && (pt.c === P.glass || kind === 4) ? litK : 0);
       }
       for (let t = 0; t < base.idx.length; t++) b.idx.push(base.idx[t] + off);
     });
@@ -9722,6 +9723,25 @@ function actDawnHold(f, h) {
   if (DAWN.early.has(f.home)) { if (f.dawnOut !== DAWN.day) { f.dawnOut = DAWN.day; DAWN.stats.먼저나옴++; } return false; }
   return h < 6 + R.outLag[dawnHash(f.home + 3) % R.outLag.length];
 }
+/* ── [ACT-HOMELIGHT] 창 불은 사람이 돌아와야 환하게 — '보이는 것 = 세는 것' (보스함 09-24 조사 · 보스 요청) ──
+   창은 '식구가 있는 집 · 잠들지 않음'이면 켜졌다(buildChunk lit). 해질녘 18.5~20시(창빛 0.28→1)에 켜진 집의 80~100% 는 **아무도 집에 없었다**
+   (origin 34채 중 18시 34채 빈 집 · 20시 28채 — 사람들은 20~22시에 귀가). 창이 '사람이 와서'가 아니라 '해가 져서' 켜졌다.
+   이제 창 빛 세기를 집 안 식구로: **한 명이라도 집 안이면 1(환하게) · 아직 아무도 없으면 empty(은은하게 · 현관등)**. 귀가하는 사람마다 그 집 창이 하나씩 환해진다.
+   완전히 끄지 않는 까닭: 창조자 50회 '밤이 우와'(#1014 밤빛) — 해질녘 마을이 비어 보이지 않게. empty 0 이면 끈다.
+   셈은 창이 보이는 때(from 시 ~ 다음 날 to 시)에만 everyTicks 틱마다 · 바뀐 집의 청크만 다시 합친다(ACT-DAWN 과 같은 길 · draw call +0).
+   빈 집(식구 0)·잠든 집은 옛 그대로 꺼짐. 그리기만 — 판정·저장 0 · 분류 '연기'. */
+(window.VRULES = window.VRULES || {}).homeLight = { on: true, empty: 0.3, from: 17, to: 7, everyTicks: 10 };
+const HOMEL = { occ: new Set(), ready: false, tick: -1, stats: { 셈: 0, 바뀐집: 0 } };
+function homeLightOf(root) { const R = window.VRULES.homeLight; if (!R || !R.on || !HOMEL.ready) return 1; return HOMEL.occ.has(root) ? 1 : R.empty; }
+function homeLightTick() { const R = window.VRULES.homeLight; if (!R || HOMEL.tick === SIM.ticks) return; HOMEL.tick = SIM.ticks;
+  if (!R.on) { if (HOMEL.ready) { HOMEL.ready = false; res.forEach((n, r) => { if (n > 0) dirtyChunks.add(chunkOfCell(r)); }); } return; }
+  const h = simHour(), show = h >= R.from || h < R.to; if (!show || SIM.ticks % Math.max(1, R.everyTicks)) return;
+  const now = new Set(); folks.forEach(f => { if (f.state === 'inside' && f.inside && f.inside.root === f.home && f.home != null) now.add(f.home); });
+  let n = 0; res.forEach((c, r) => { if (c <= 0) return; if (!HOMEL.ready || now.has(r) !== HOMEL.occ.has(r)) { dirtyChunks.add(chunkOfCell(r)); n++; } });
+  HOMEL.occ = now; HOMEL.ready = true; HOMEL.stats.셈++; HOMEL.stats.바뀐집 += n; }
+{ const dt0 = actDawnTick; actDawnTick = function () { const r = dt0.apply(this, arguments); homeLightTick(); return r; }; }   /* 틱마다 한 번 불리는 곳에 곁붙임 */
+window.__homeLight = () => { const R = window.VRULES.homeLight; let lit = 0, bright = 0; res.forEach((c, r) => { if (c > 0 && dawnLit(r)) { lit++; if (homeLightOf(r) === 1) bright++; } });
+  return { 켜짐: R.on, 셈함: HOMEL.ready, 켜진집: lit, 환한집: bright, 은은한집: lit - bright, ...HOMEL.stats }; };
 window.__dawn = () => DAWN ? { 켜짐: window.VRULES.dawn.on, 시: +simHour().toFixed(2), 잠든집: DAWN.asleep.size, 먼저: [...DAWN.early].map(r => [cX(r), cY(r), dawnAsleep(r, simHour()) ? '잠' : '깸']), ...DAWN.stats } : null;
 
 /* ══════════════════════════════════════════════════════════════
