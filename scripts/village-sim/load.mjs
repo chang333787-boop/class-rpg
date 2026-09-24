@@ -82,11 +82,23 @@ export async function loadVillage(opts) {
   fs.writeFileSync(file, src);
   const log = console.log, warn = console.warn;
   if (opts.quiet !== false) { console.log = () => {}; console.warn = () => {}; }
+  /* [MAC-SIMCLOCK] 벽시계를 멈춘다 — 싣는 순간부터 이 프로세스가 끝날 때까지 performance.now · Date.now 는 한 값(시뮬 동안 진짜 시간은 흐르지 않는다).
+     시뮬은 같은 시드면 같은 값이어야 하는데, 벽시계가 판정에 두 군데서 스몄다(09-24 보스 · 판 열둘을 한꺼번에 돌리면 farm+mid36 3값 · 다시 돌리면 0):
+     ① module 끝의 첫 loop() — lastT(싣는 중간에 잰 시각)부터 흐른 진짜 시간만큼(최대 250ms × 배속) 시뮬 틱을 미리 돌렸다. 싣기가 100ms 를 넘으면
+        (부하 · 다른 검사와 겹침) 1~2틱 앞서 시작 — 재현: 그 자리만 벽시계를 늦추면 150ms → 1틱 · 500ms → 2틱 · farm+mid36 틱 450 찡그린집 5 → 7.
+     ② 땅 고르기(F22 plotTick) — 인구 10명마다 새 땅을 '진짜 30초' 안 고르면 저절로 연다. 판 하나가 30초를 넘기면(부하) 열려 pop88 이틀째 인구 94 → 92.
+     index.html 은 그대로 — 브라우저에선 맞는 동작이다(아이의 30초). 멈춘 시계 = 한가한 기기에서 판 하나가 몇 초에 끝나던 지금까지의 값.
+     틱 시간 재기는 진짜 시계로 따로(__tickBench 결과의 틱평균ms · 묶음마다) — 모듈 안의 틱 ms 는 멈춘 시계라 0 이다. */
+  const realNow = performance.now, frozen = realNow.call(performance), frozenDate = Date.now();
+  Object.defineProperty(performance, 'now', { value: () => frozen, configurable: true, writable: true }); Date.now = () => frozenDate;
+  globalThis.__simRealNow = () => realNow.call(performance);
   try { await import(pathToFileURL(file).href); }
   catch (e) {   // 줄 번호를 index.html 기준으로(module 은 258줄 무렵에서 시작)
     const at = (e.stack || '').match(/\.mjs:(\d+):(\d+)/); const base = html.slice(0, m.index).split('\n').length;
     throw new Error('LOAD ERR ' + e.message + (at ? ' · index.html ' + (+at[1] + base - 1) + '줄 무렵' : ''));
   } finally { console.log = log; console.warn = warn; fs.rmSync(file, { force: true }); }
   if (typeof globalThis.__tickBench !== 'function') throw new Error('시험 훅 __tickBench 가 없음');
+  { const tb0 = globalThis.__tickBench; globalThis.__tickBench = n => { const t0 = realNow.call(performance), r = tb0(n);   // [MAC-SIMCLOCK] 틱 시간은 진짜 시계로(묶음 평균)
+      return { ...r, 틱평균ms: +((realNow.call(performance) - t0) / (n || 100)).toFixed(3) }; }; }
   return { w: globalThis, ls };
 }
