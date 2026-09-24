@@ -1228,8 +1228,10 @@
       SEL_DECO = 'd_i8'; _decoPlace('indoor', 6, 11);                   // 방 a(3~12칸)의 오른벽을 가로지름(11~13)
       out('R3_벽가로지르면_안놓임', sofas() === '' && /벽에 걸려요/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
       _decoPlace('indoor', 6, 9);                                           // 9~11 = 방 안
-      _decoPlace('indoor', 15, 20);                                         // 빈 터
-      out('R3_방안_빈터는_놓임', sofas() === '15,20 6,9');
+      _decoPlace('indoor', 15, 20);                                         // 빈 터 — [DECO-INDOOR-RULE-1] 보스 결정 ① 방이 있으면 방 밖은 안 된다
+      out('R3_방안은_놓임_방밖은_안됨', sofas() === '6,9' && /방 밖은 마당/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
+      //  옛 저장본엔 방 밖 가구가 있을 수 있다(그대로 둔다) — 새 방의 벽이 그것을 가르는지 보려고 하나 넣는다
+      CUR.houseDecorations.push(Object.assign(_decoNew('d_i8', 'indoor', 15, 20)));
       SEL_DECO = null;
       const cutWhy = _inRoomWhy(_inRooms(CUR), _inRoomFrom(13, 21, 18, 30));
       out('R3_새방벽이_가구가르면_막힘', /소파.*가르게 돼요/.test(cutWhy));
@@ -1454,7 +1456,9 @@
       const at = (x, y) => { const k = _dCv.getBoundingClientRect(); return { clientX: k.left + (x - _dPanX) * k.width / _dW, clientY: k.top + (y - _dPanY) * k.height / _dH }; };
       SEL_DECO = 'd_i5'; setDecoMode('deco'); _dSuppressClick = false;
       _decoClick(at(dx + dw / 2, wallY - C * .5)); await sleep(150);   // 발판 칸(방 맨 아랫줄)
-      out('나가기문_발판칸엔_가구', DECO_SCENE === 'indoor' && _decoList(CUR).some(p => p.id === 'd_i5' && p.row === 10));
+      //  [DECO-INDOOR-RULE-1] 보스 결정 ② 발판 칸은 비워 둔다(뒤집음 — 전엔 가구가 놓였다)
+      out('나가기문_발판칸은_비움', DECO_SCENE === 'indoor' && !_decoList(CUR).some(p => p.id === 'd_i5' && p.row === 10)
+        && /나가는 길/.test([...document.querySelectorAll('.toast-msg')].slice(-1)[0].textContent));
       SEL_DECO = null; _dSuppressClick = false;
       _decoClick(at(dx + dw / 2, dy + dh / 2)); await sleep(300);
       out('나가기문_누르면_마당', DECO_SCENE === 'yard');
@@ -1647,6 +1651,35 @@
       out('벽_나가기는_아래방_가운데', ex.room && ex.room.id === 'c' && ex.c0 === 10 && ex.wallRow === 18);
       let err = ''; try { _drawIndoor(); } catch (e) { err = String(e); }
       out('벽_그리기_오류0', !err || err);
+      //  [DECO-INDOOR-WALL-2] 떨어져 따로 둔 방에도 나가기 문(창조자 29-ⓑ63) — 첫 문은 그대로 · 그 문 앞 발판 비움 · 누르면 마당으로
+      if (typeof _inExitSpots === 'function') {
+        _inRoomsSet(CUR, R.map(o => ({ id: o.id, r: o.r, c: o.c, w: o.w, h: o.h, floor: null, wall: null })).concat([{ id: 'd', r: 3, c: 29, w: 6, h: 5, floor: null, wall: null }]));
+        const R2 = _inRooms(CUR), E = _inExitSpots(R2), ed = E.find(e => e.room.id === 'd');
+        out('벽_따로방도_나가기문', E.length === 2 && E[0].room.id === 'c' && !!ed && ed.wallRow === 8 && ed.c0 === 31);
+        out('벽_따로방_발판비움', /나가는 길/.test(_decoRuleWhy('d_i1', 'indoor', ed.matRow, ed.c0, 1, 1) || ''));
+        _drawDeco(); await sleep(250);
+        const dd = (_dCv._doors || []).find(d => Math.abs(d.x - ((_dCv._offX || 0) + (ed.c0 + 1) * _dC - .64 * _dC)) < 1), k = _dCv.getBoundingClientRect();
+        let went = false;
+        if (dd) { _dSuppressClick = false; _decoClick({ clientX: k.left + (dd.x + dd.w / 2 - _dPanX) * k.width / _dW, clientY: k.top + (dd.y + dd.h / 2 - _dPanY) * k.height / _dH }); await sleep(300); went = DECO_SCENE === 'yard'; if (went) { toggleDecoScene(); await sleep(300); } }
+        out('벽_따로방_문누르면_마당', went);
+      }
+      if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
+      decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
+    //  ㊸ 집 안 규칙(DECO-INDOOR-RULE-1 · 보스 결정 ①②) — 방이 있으면 방 밖엔 가구·벽걸이 안 됨 · 방이 없으면 어디나 · 위아래 문 통로엔 벽걸이 안 걸림 · 이미 놓인 것은 그대로
+    if (typeof _inExitSpot === 'function') {
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      const keepIn = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      if (CUR.indoor) delete CUR.indoor;
+      out('규칙_방없으면_어디나', _decoRuleWhy('d_i5', 'indoor', 20, 30, 2, 1) === '');
+      _inRoomsSet(CUR, [{ id: 'a', r: 3, c: 4, w: 12, h: 8, floor: null, wall: null }, { id: 'c', r: 12, c: 6, w: 10, h: 6, floor: null, wall: null }]);
+      out('규칙_방밖_가구안됨', /방 밖은 마당/.test(_decoRuleWhy('d_i5', 'indoor', 20, 30, 2, 1)));
+      out('규칙_방안_가구됨', _decoRuleWhy('d_i5', 'indoor', 5, 6, 2, 1) === '');
+      out('규칙_방밖_벽걸이안됨', /방의 윗벽/.test(_decoRuleWhy('d_i4', 'indoor', 0, 30, 1, 1)) && _decoRuleWhy('d_i4', 'indoor', 3, 6, 1, 1) === '');
+      const door = _inRoomDoors(_inRooms(CUR)).find(d => d.row === 11);
+      out('규칙_위아래문_통로엔_벽걸이안됨', !!door && !_inIsWallRow(12, door.c0) && _inIsWallRow(12, door.c0 - 2));
       if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
     }
