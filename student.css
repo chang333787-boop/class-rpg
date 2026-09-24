@@ -1735,5 +1735,7 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 /* [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스는 색 막을 그리고, 그 위 DOM 층(동물 · 움직임)은 같은 결로 어둡게 · 단추는 📷 옆(폰은 둘째 줄 끝) */
 #if-topview.is-evening .deco-anim-layer,#if-topview.is-evening .deco-mv-layer,#ff-topview.is-evening .deco-anim-layer,#ff-topview.is-evening .deco-mv-layer{filter:brightness(.9) sepia(.18) saturate(1.05)}
 #if-topview.is-night .deco-anim-layer,#if-topview.is-night .deco-mv-layer,#ff-topview.is-night .deco-anim-layer,#ff-topview.is-night .deco-mv-layer{filter:brightness(.8) saturate(.85)}
+/* [DECO-STAR-P5] 별빛 — 판 밖 별하늘(캔버스 비용 0 · 캔버스가 비운 곳에 보인다) · 동물 층 필터는 보통 밤과 같다(표 animNight · 사진도 이 값) */
+#if-topview.look-sky,#ff-topview.look-sky{background:#12163a url('assets/ui/sky_stars.svg') repeat}
 @media (max-width:480px){ #if-phase-btn{order:12;flex:0 0 44px;min-height:40px;font-size:16px!important} }
 
