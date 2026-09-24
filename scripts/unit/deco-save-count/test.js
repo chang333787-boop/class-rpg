@@ -2034,6 +2034,36 @@
       _decoSeasonOv = null;
       out('계절_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]) === sv0);
     }
+    //  ㊼-3 계절 행사(DECO-EVENT-1) — 장식 한가운데 가까운 빈 잔디 3×3(둘레 1칸 비움) · 그림 · 누르면 말 한 줄 · 저장 0 · 별빛엔 안 뜸 · 빈 덩어리 없으면 안 뜸
+    if (typeof _decoEventNow === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const keepH = CUR.houseDecorations, keepF = CUR.yardFloor, sv0 = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.inventory, CUR.gold]);
+      _decoEventOv = 'autumn'; _decoStateVer++;
+      const ev = _decoEventNow(), pl = _decoEventPlaced(ev);
+      const occ = new Set(); _decoList(CUR).filter(p => p.area === 'yard').forEach(p => { const z = getDecoSize(p.id); for (let r = p.row; r < p.row + z.h; r++) for (let c = p.col; c < p.col + z.w; c++) occ.add(r + '_' + c); });
+      let clear = !!pl;
+      if (pl) { const r0 = Math.min(...pl.map(p => p.r)), c0 = Math.min(...pl.map(p => p.c));
+        for (let r = r0 - 1; r <= r0 + ev.h; r++) for (let c = c0 - 1; c <= c0 + ev.w; c++) if (occ.has(r + '_' + c) || _isHC(r, c) || _isFarmCell(r, c)) clear = false; }
+      out('행사_수확제_빈잔디3x3_둘레비움', ev && ev.key === 'autumn' && clear);
+      const amb = [], oa = _ambImg; _ambImg = function (n, c) { amb.push(n + (c ? '#' + c : '')); return oa.apply(this, arguments); };
+      try { _drawYard(); } finally { _ambImg = oa; }
+      out('행사_그림_등줄가을_수확', amb.includes('ev_lanterns#autumn') && amb.includes('ev_autumn_harvest'));
+      const lastT = () => { const a = [...document.querySelectorAll('.toast-msg')]; return a.length ? a[a.length - 1].textContent : ''; };
+      toast('—'); const t0 = lastT(), hit = pl && pl[1];
+      let atHit = null;
+      if (hit) { const k = _dCv.getBoundingClientRect(); const keepSel = SEL_DECO, keepMode = DECO_MODE; SEL_DECO = null; DECO_MODE = 'deco'; _dSuppressClick = false;
+        atHit = _decoEventAt(hit.r, hit.c);
+        _decoClick({ clientX: k.left + ((hit.c + .5) * _dC - _dPanX) * k.width / _dW, clientY: k.top + ((hit.r + .5) * _dC - _dPanY) * k.height / _dH }); SEL_DECO = keepSel; DECO_MODE = keepMode; }
+      const t1 = lastT();
+      out('행사_누르면_말한줄', !!atHit && t1 !== t0 && /수확제/.test(t1) ? true : 'at' + !!atHit + '/' + t1.slice(0, 20));
+      out('행사_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.inventory, CUR.gold]) === sv0);
+      _yardLookDev = 'star'; out('행사_별빛엔_안뜸', !_decoEventOn()); _yardLookDev = null;
+      const full = {}; for (let r = 0; r < DY.rows; r++) for (let c = 0; c < DY.cols; c++) full[r + '_' + c] = 'stone';
+      CUR.yardFloor = full; _decoStateVer++;
+      out('행사_빈덩어리없으면_안뜸', _decoEventPlaced(ev) === null);
+      CUR.yardFloor = keepF; CUR.houseDecorations = keepH; _decoEventOv = null; _decoStateVer++; _drawDeco();
+    }
+
     //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
     if (typeof _yardLookDev !== 'undefined' && typeof _starGroundFill === 'function' && _ifMode) {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
@@ -2050,8 +2080,21 @@
       const starH = snap();
       out('별빛_땅그림_띠조각', names.includes('star_ground') && names.includes('star_band') && _STAR_BAND.size > 0);
       out('별빛_풀번짐물_star', names.some(n => /^fringe_grass_.*#star$/.test(n)) && names.some(n => /^tile_water_[ab]#star$/.test(n)));
-      _yardLookDev = ''; _drawDeco(); await sleep(150);
-      out('별빛_끄면_기본판그대로', starH !== base0 && snap() === base0);
+      //  [DECO-STAR-P5] 별밤 — 때는 밤 고정(단추 숨김) · 막 .30 · 섬(테·몸) · 판 밖 하늘 class · 이름표는 막 뒤에 한 번 더
+      if (typeof ifSyncScene === 'function') ifSyncScene();
+      const fills = [], texts = [], names5 = [], fr = _dCtx.fillRect, ft = _dCtx.fillText, of = _floorImg;
+      _dCtx.fillRect = function () { fills.push(String(_dCtx.fillStyle)); return fr.apply(this, arguments); };
+      _dCtx.fillText = function (t) { texts.push([t, fills.length]); return ft.apply(this, arguments); };
+      _floorImg = function (n, c) { names5.push(n); return of.apply(this, arguments); };
+      try { _decoPhaseSync(); _dPanY = 99999; _decoClampPan(); _drawYard(); } finally { _dCtx.fillRect = fr; _dCtx.fillText = ft; _floorImg = of; }
+      const filmAt = fills.findIndex(f => /rgba\(20, 30, 80, 0\.3\)/.test(f));
+      out('별밤_밤고정_막30', _yardPhase() === 'night' && filmAt >= 0 && !fills.some(f => /rgba\(20, 30, 80, 0\.48\)/.test(f)));
+      out('별밤_섬_하늘', names5.includes('island_rim') && names5.includes('island_under') && _dPanY > DY.rows * _dC - _dH && document.getElementById('if-topview').classList.contains('look-sky'));
+      out('별밤_때단추_숨김', getComputedStyle(document.getElementById('if-phase-btn')).display === 'none');
+      out('별밤_이름표_막위', texts.some(([t, i]) => t === '들어가기' && i > filmAt));
+      _dPanY = 0; _decoClampPan();
+      _yardLookDev = ''; _decoPhaseSync(); if (typeof ifSyncScene === 'function') ifSyncScene(); _drawDeco(); await sleep(150);
+      out('별빛_끄면_기본판그대로', starH !== base0 && snap() === base0 && !document.getElementById('if-topview').classList.contains('look-sky'));
       _yardLookDev = null;   // 다음에 읽을 때 주소로 다시(하네스 주소엔 ?look 없음)
     }
 

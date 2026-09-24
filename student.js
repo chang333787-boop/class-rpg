@@ -5511,7 +5511,7 @@ function ifSyncScene() {
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
   if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
   //  [DECO-DAYNIGHT-1] 📷 사진 · ☀️🌙 낮밤은 마당 것 — 집 안에선 감춘다(폰 320 집 안에서 윗줄이 세 줄이 되었다)
-  ['if-photo-btn', 'if-phase-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = isYard ? '' : 'none'; });
+  ['if-photo-btn', 'if-phase-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = isYard && !(id === 'if-phase-btn' && typeof _yardLook === 'function' && _yardLook().phase) ? '' : 'none'; });   // [DECO-STAR-P5] 때가 박힌 모습(별빛 = 밤)이면 단추가 할 일이 없다
   // [INDOOR-LOOK-1] 집 안에서는 같은 자리가 '🖌️ 벽지·바닥'(#631 이 감춰 두었던 단추가 돌아온다). 바닥 모드인 채 장면을 바꾸면 판도 그 장면 것으로.
   const fb = document.getElementById('if-mode-floor');
   if (fb) { fb.style.display = ''; fb.textContent = isYard ? '🖌️ 바닥' : '🖌️ 벽지·바닥'; }
@@ -7810,17 +7810,18 @@ function _decoClampPan() {
   const b = _decoBoardPx();
   //  [DECO-VIEW-FIT-1] 집 안에 방이 있으면 판 밖도 도면이다 → 반 화면까지 더 밀 수 있다(판 끝에 붙은 방을 가운데로 — 디자인 D10)
   const extraX = (DECO_SCENE !== 'yard' && _inRooms(CUR).length) ? _dW / 2 : 0, extraY = extraX ? _dH / 2 : 0;
-  const maxX = Math.max(0, b.w - _dW) + extraX, maxY = Math.max(0, b.h - _dH) + extraY;
+  const maxX = Math.max(0, b.w - _dW) + extraX, maxY = Math.max(0, b.h + (DECO_SCENE === 'yard' && typeof _yardIslandCells === 'function' ? _yardIslandCells() * _dC : 0) - _dH) + extraY;
   //  마당 판이 화면보다 작으면(전체 보기) 화면 안에서 움직일 수 있다(판이 화면 밖으로는 안 나간다) — 가운데 두기는 '전체'가 한다
   const yd = DECO_SCENE === 'yard';
-  const minX = yd && b.w < _dW ? -(_dW - b.w) : -extraX, minY = yd && b.h < _dH ? -(_dH - b.h) : yd ? -DECO_YARD_TOP * _dC : -extraY;
+  const isl = yd && typeof _yardIslandCells === 'function' ? _yardIslandCells() * _dC : 0, bh = b.h + isl;   // [DECO-STAR-P5] 떠 있는 섬까지 밀어 볼 수 있게(섬 없는 모습은 0)
+  const minX = yd && b.w < _dW ? -(_dW - b.w) : -extraX, minY = yd && bh < _dH ? -(_dH - bh) : yd ? -DECO_YARD_TOP * _dC : -extraY;
   _dPanX = Math.min(Math.max(minX, _dPanX), maxX);
   _dPanY = Math.min(Math.max(minY, _dPanY), maxY);
 }
 // [DECO-VIEW-FIT-1] 판 전체가 한 화면에 들어오는 배율 — '전체'는 폭만 맞춰 1366×610 에서 마당 아래(밭 포함)가 화면 밖이었다(디자인 D17)
 function _decoWholeZoom() {
   if (!_dW || !_dH) return DECO_ZOOM_MIN;
-  const yard = DECO_SCENE === 'yard', cols = yard ? DY.cols : DI.cols, rows = yard ? DY.rows : DI.rows + 2;   // 집 안은 위 벽 띠 몫
+  const yard = DECO_SCENE === 'yard', cols = yard ? DY.cols : DI.cols, rows = yard ? DY.rows + (typeof _yardIslandCells === 'function' ? _yardIslandCells() : 0) : DI.rows + 2;   // 집 안은 위 벽 띠 몫 · [DECO-STAR-P5] 섬 몫
   const C0 = Math.floor(_dW / Math.min(cols, yard ? DY_BASE.cols : DI.cols));
   //  칸 크기를 내림으로 정한 뒤 배율로 — _initDeco 가 칸을 반올림해 판이 화면보다 몇 px 넓어지지 않게
   return Math.max(4, Math.floor(Math.min(_dW / cols, _dH / rows))) / C0;
@@ -7917,8 +7918,8 @@ function decoZoomFit() {
   _dPanX = 0; _dPanY = 0;
   _decoSetZoom(z, 0, 0);
   //  판이 화면보다 작으면 가운데에(왼쪽·위에 붙고 나머지가 비던 것)
-  const b = _decoBoardPx();
-  _dPanX = b.w < _dW ? -(_dW - b.w) / 2 : 0; _dPanY = b.h < _dH ? -(_dH - b.h) / 2 : 0;
+  const b = _decoBoardPx(), bh = b.h + (DECO_SCENE === 'yard' && typeof _yardIslandCells === 'function' ? _yardIslandCells() * _dC : 0);   // [DECO-STAR-P5] 섬까지 한 덩어리로 가운데에
+  _dPanX = b.w < _dW ? -(_dW - b.w) / 2 : 0; _dPanY = bh < _dH ? -(_dH - bh) / 2 : 0;
   _decoClampPan(); _drawDeco();
 }
 
@@ -9634,10 +9635,14 @@ function _seaNow() { return typeof _decoSeason === 'function' ? _decoSeason() : 
 //  season 나무·꽃·우리 조각 · ground 잔디 무리 무늬(grass | snow) · groundBg 무늬 아래 바탕('' = 칸 그림 그대로) · groundFrag 풀 번짐·밑동 풀 조각
 //  waterFrag 물 조각 · bedWinter 꽃밭 겨울잠 · film 잔디 계절 막 · scatter 흩뿌림(나무 둘레 hi · 그 밖 lo) · snow 장식·지붕 눈 겹
 //  shadow 밑동 그림자 · houseGround 집 밑·위 띠 땅 · farmSand 밭 그림이 아직 없을 때의 모래 두 색 · swimFrag 헤엄 그림 조각
-//  phase 때 고정(없으면 실제 시각 · 별빛은 'night' — P5)
+//  phase 때 고정(없으면 실제 시각 · 별빛은 'night') · nightFilm 밤 막(.30 — DECO-NIGHT-FILM-1) · nightFilmEdit 카드를 들었거나 바닥 모드일 때 밤 막(절반)
+//  animNight 밤 동물 층 필터(사진용 — 화면은 같은 값의 CSS) · island 떠 있는 섬(판 아래 테 + 몸) · sky 판 밖 별하늘(CSS) · labelOverFilm 집 이름표를 막 위에 다시
+//  events 계절 행사가 뜨는가(별빛 = 안 뜸)
 //  줄은 고정 객체다(칸마다 불러도 새로 만들지 않는다 — 뜨거운 길).
 const YARD_LOOK_BASE = { ground: 'grass', groundBg: '', groundFrag: '', waterFrag: '', bedWinter: false, film: '', scatter: null, snow: false,
-  shadow: 'rgba(30,52,14,.30)', houseGround: 'grass', farmSand: ['#c8a855', '#b89545'], swimFrag: '', phase: '' };
+  shadow: 'rgba(30,52,14,.30)', houseGround: 'grass', farmSand: ['#c8a855', '#b89545'], swimFrag: '', phase: '',
+  nightFilm: 'rgba(20,30,80,.30)', nightFilmEdit: 'rgba(20,30,80,.15)', animNight: 'brightness(.8) saturate(.85)', island: false, sky: false, labelOverFilm: false,
+  events: true };
 const YARD_LOOKS = {
   spring: Object.assign({}, YARD_LOOK_BASE, { season: 'spring', groundFrag: 'spring', film: 'rgba(200,235,130,.10)',   // 봄 막 #C8EB82 .10 · 벚나무 둘레 꽃잎(디자인 #1083)
     scatter: { name: 'season_petals_', trees: ['d_y12'], k1: 1, k2: 3, hi: .55, drift: .04 } }),
@@ -9647,19 +9652,25 @@ const YARD_LOOKS = {
   winter: Object.assign({}, YARD_LOOK_BASE, { season: 'winter', ground: 'snow', groundBg: '#eef3f8', groundFrag: 'winter', waterFrag: 'winter', bedWinter: true, snow: true }),
   //  [DECO-STAR-P3] 별빛 — 계절 없음(여름 그림 그대로 · 결정 3) · 남색 땅(star_ground + 은하수 띠 star_band · 잔디 얼룩 없음) · 풀 번짐·밑동 풀·물·헤엄 #star · 남색 그림자.
   //  밤 고정 · 밤 막 .30 · 섬 · 하늘은 P5. 아직 놀이판 개발 스위치(?look=star)로만 켠다(저장 0).
-  star: Object.assign({}, YARD_LOOK_BASE, { season: 'summer', ground: 'star', groundFrag: 'star', waterFrag: 'star', swimFrag: 'star', shadow: 'rgba(8,10,34,.4)' }),
+  star: Object.assign({}, YARD_LOOK_BASE, { season: 'summer', ground: 'star', groundFrag: 'star', waterFrag: 'star', swimFrag: 'star', shadow: 'rgba(8,10,34,.4)',
+    //  [DECO-STAR-P5] 별밤 — 때 밤 고정 · 섬 · 별하늘 · 이름표는 막 위(막 .30 · 고르는 동안 절반 · 동물 필터는 보통 밤과 같다 — #1088)
+    phase: 'night', island: true, sky: true, labelOverFilm: true,
+    events: false }),   // [DECO-EVENT-1] 별빛 공간에는 계절 행사가 안 뜬다(별빛 설계 결정 3)
 };
 //  [DECO-STAR-P3] 개발 스위치 ?look=<줄> — 놀이판(play-boot 의 __PLAY + 가짜 프로젝트 play-deco-none)에서만 읽는다. 운영 경로에서는 읽지 않는다(PR 마다 grep).
 let _yardLookDev = null;
+//  [DECO-EVENT-1] 놀이판 주소 값 하나 — 모습(?look=) · 행사(?event=)가 같이 쓴다. student.js 에서 location.search 를 읽는 곳은 여기 한 곳.
+function _playParam(name) {
+  try {
+    if (typeof window !== 'undefined' && window.__PLAY && typeof firebase !== 'undefined' && firebase.app().options.projectId === 'play-deco-none')
+      return new URLSearchParams(location.search).get(name) || '';
+  } catch (e) {}
+  return '';
+}
 function _yardLookDevRead() {
   if (_yardLookDev !== null) return _yardLookDev;
-  _yardLookDev = '';
-  try {
-    if (typeof window !== 'undefined' && window.__PLAY && typeof firebase !== 'undefined' && firebase.app().options.projectId === 'play-deco-none') {
-      const v = new URLSearchParams(location.search).get('look');
-      if (v && Object.prototype.hasOwnProperty.call(YARD_LOOKS, v)) _yardLookDev = v;
-    }
-  } catch (e) {}
+  const v = _playParam('look');
+  _yardLookDev = v && Object.prototype.hasOwnProperty.call(YARD_LOOKS, v) ? v : '';
   return _yardLookDev;
 }
 //  공간(sp)마다 한 줄 — 지금은 모든 공간이 기기 달의 계절(자리만 잡아 둔다 · 별빛 P3 부터 공간별)
@@ -9933,7 +9944,7 @@ async function decoPhoto(opt) {
     //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
     //  [DECO-DAYNIGHT-1] 저녁·밤 사진 — 동물은 색 막 뒤에 그리니 화면의 동물 층과 같은 필터(CSS 와 같은 값)로(안 하면 밤 사진에 동물만 밝게 떴다)
     const ph = _yardPhase();   // [DECO-LOOK-0]
-    if (ph !== 'day') ctx.filter = ph === 'night' ? 'brightness(.8) saturate(.85)' : 'brightness(.9) sepia(.18) saturate(1.05)';   // [DECO-NIGHT-FILM-1] 밤 막 .30 에 맞춘 값(CSS 와 같음)
+    if (ph !== 'day') ctx.filter = ph === 'night' ? _yardLook().animNight : 'brightness(.9) sepia(.18) saturate(1.05)';   // [DECO-STAR-P5] 밤 필터는 표에서(CSS 와 같은 값)
     pets.forEach(p => {
       const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
       _drawDecoSVG(p.id, (st ? st.fx : p.col) * C, (st ? st.fy : p.row) * C, z.w * C, z.h * C);
@@ -9974,7 +9985,8 @@ const DECO_PHASE_ICON = { day: '☀️', evening: '🌇', night: '🌙' }, DECO_
 function _decoPhaseSync() {
   const ph = _yardPhase(), b = document.getElementById('if-phase-btn'), host = document.getElementById('if-topview');   // [DECO-LOOK-0]
   if (b) { b.textContent = DECO_PHASE_ICON[ph]; b.title = DECO_PHASE_NAME[ph] + ' — 눌러서 바꿔 보기'; b.setAttribute('aria-label', '지금 ' + DECO_PHASE_NAME[ph] + ' · 눌러서 바꿔 보기'); }
-  if (host) { host.classList.toggle('is-evening', DECO_SCENE === 'yard' && ph === 'evening'); host.classList.toggle('is-night', DECO_SCENE === 'yard' && ph === 'night'); }
+  if (host) { host.classList.toggle('is-evening', DECO_SCENE === 'yard' && ph === 'evening'); host.classList.toggle('is-night', DECO_SCENE === 'yard' && ph === 'night');
+    host.classList.toggle('look-sky', DECO_SCENE === 'yard' && _yardLook().sky); }   // [DECO-STAR-P5] 판 밖 별하늘 · 동물 층 별밤 필터(CSS)
 }
 function decoPhaseCycle() {
   const order = ['day', 'evening', 'night'], next = order[(order.indexOf(_decoPhase()) + 1) % 3];
@@ -9997,17 +10009,89 @@ function _ambImg(name, color) {   // assets/deco/<name>.svg[#색] — 색은 그
   img.src = src;
   return null;
 }
+// [DECO-EVENT-1] 계절 행사 — 계절마다 며칠만 마당에 잠깐 나타나는 장식 한 벌(docs/deco_season_events_20260924.md · 사용자 승인 09-24 · 저장 0)
+//  아이 것이 아니다(사지도 놓지도 않았다): 옮기기 · 치우기 · 팔기 안 됨 · 누르면 말 한 줄 · 카드를 들고 누르면 놓기가 먼저(행사가 비켜 간다).
+//  날짜는 이 표 한 줄씩(교사가 바꾸려면 여기만 · 끝날 포함 · 기기 날짜). 별빛 모습(표 events:false)에는 안 뜬다. 친구 마당도 같은 날이면 보인다.
+//  자리: 아이 마당 장식들의 한가운데(발자리 행·열 평균 · 없으면 집 문 앞 아래)에서 가장 가까운 빈 잔디 덩어리(3×3 · 여름 3×2 · 둘레 1칸까지 비어야 ·
+//  잔디 무리 바닥 · 집 · 밭 · 첫 마당 본보기 자리 아님 · 가로는 .8배로 잰다). 없으면 그 해 행사는 안 나타난다(아이 마당을 밀어내지 않는다).
+//  한 벌 = [그림 id, 덩어리 안 행, 열, 폭, 높이, 주소 뒤](디자인 시안 훅 그대로)
+const DECO_EVENTS = [
+  { key: 'spring', name: '🌸 벚꽃 축제', from: '04-01', until: '04-07', w: 3, h: 3, set: [['ev_lanterns', 0, 0, 3, 1, ''], ['ev_spring_mat', 2, 0, 2, 1, '']] },   // 등 줄은 주소 뒤가 없으면 봄 색
+  { key: 'summer', name: '💦 물놀이 날', from: '07-08', until: '07-14', w: 3, h: 2,
+    set: [['ev_summer_pinwheel', 0, 0, 1, 1, ''], ['ev_summer_pinwheel', 0, 2, 1, 1, ''], ['ev_summer_pool', 1, 0, 2, 1, ''], ['ev_summer_melon', 1, 2, 1, 1, '']] },
+  { key: 'autumn', name: '🎃 수확제', from: '10-13', until: '10-19', w: 3, h: 3, set: [['ev_lanterns', 0, 0, 3, 1, 'autumn'], ['ev_autumn_harvest', 2, 0, 2, 1, '']] },
+  { key: 'winter', name: '⛄ 눈사람 날', from: '12-15', until: '12-21', w: 3, h: 3,
+    set: [['ev_lanterns', 0, 0, 3, 1, 'winter'], ['ev_winter_snowman', 2, 0, 1, 1, ''], ['ev_winter_sled', 2, 2, 1, 1, '']] },
+];
+let _decoEventOv = null, _decoEventDev = null;   // 시험용(저장 0) · 놀이판 ?event=<key>
+function _decoEventNow(d) {
+  const byKey = k => DECO_EVENTS.find(e => e.key === k) || null;
+  if (_decoEventOv !== null) return byKey(_decoEventOv);
+  if (_decoEventDev === null) _decoEventDev = typeof _playParam === 'function' ? _playParam('event') : '';
+  if (_decoEventDev) return byKey(_decoEventDev);
+  const t = d || new Date(), md = String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+  return DECO_EVENTS.find(e => md >= e.from && md <= e.until) || null;
+}
+//  지금 뜨는 행사(모습이 막으면 없음)
+function _decoEventOn() { const ev = _decoEventNow(); return ev && _yardLook().events !== false ? ev : null; }
+//  자리 — 판 번호(_decoStateVer · 놓기·치우기·칠하기마다 오른다) · 학생 · 공간 · 판 크기가 같으면 다시 안 구한다
+let _decoEventMemo = null;
+function _decoEventPlaced(ev) {
+  const key = [ev.key, CUR && CUR.id, DECO_SPACE, typeof _decoStateVer !== 'undefined' ? _decoStateVer : 0, DY.rows, DY.cols].join('|');
+  if (_decoEventMemo && _decoEventMemo.key === key) return _decoEventMemo.placed;
+  const list = _decoList(CUR).filter(p => p.area === 'yard'), fl = _yardFloorGet(CUR), occ = new Set(), hc0 = _houseCol0();
+  list.forEach(p => { const z = getDecoSize(p.id); for (let r = p.row; r < p.row + z.h; r++) for (let c = p.col; c < p.col + z.w; c++) occ.add(r + '_' + c); });
+  const inFriend = typeof _ffFriend !== 'undefined' && !!_ffFriend && CUR === _ffFriend;   // 친구 구경엔 본보기가 없다
+  if (!inFriend && typeof _decoTplActive === 'function' && _decoTplActive())   // 첫 마당 본보기 자리는 비워 둔다
+    for (let r = DECO_TPL.path.r0; r <= DECO_TPL.path.r1 + 1; r++) for (let c = hc0 - 1; c <= hc0 + 6; c++) occ.add(r + '_' + c);
+  const ok = (r, c) => r >= 0 && c >= 0 && r < DY.rows && c < DY.cols && !occ.has(r + '_' + c) && !_isHC(r, c) && !_isFarmCell(r, c) && _floorIsGrass(_floorParse(fl[r + '_' + c]).name);
+  let cr = DH.rows + 4, cc = hc0 + DH.cols / 2;
+  if (list.length) { cr = 0; cc = 0; list.forEach(p => { cr += p.row; cc += p.col; }); cr /= list.length; cc /= list.length; }
+  let best = null;
+  for (let r = 1; r + ev.h < DY.rows; r++) for (let c = 1; c + ev.w < DY.cols; c++) {
+    let good = true;
+    for (let rr = r - 1; rr <= r + ev.h && good; rr++) for (let c2 = c - 1; c2 <= c + ev.w && good; c2++) if (!ok(rr, c2)) good = false;
+    if (!good) continue;
+    const d = Math.hypot(r + ev.h / 2 - cr, (c + ev.w / 2 - cc) * .8);
+    if (!best || d < best[0]) best = [d, r, c];
+  }
+  const placed = best ? ev.set.map(([id, r, c, w, h, frag]) => ({ id, r: best[1] + r, c: best[2] + c, w, h, frag })) : null;
+  _decoEventMemo = { key, placed };
+  return placed;
+}
+function _decoEventDraw(C) {
+  const ev = _decoEventOn();
+  if (!ev || !FLOOR_SVG) return;
+  const placed = _decoEventPlaced(ev);
+  if (!placed) return;
+  placed.slice().sort((a, b) => (a.r + a.h) - (b.r + b.h)).forEach(p => {   // 발자리 아랫줄 순서
+    const im = _ambImg(p.id, p.frag);
+    if (!im) return;
+    const W = p.w * C, ratio = im.naturalHeight / im.naturalWidth, H = W * ratio;
+    _dCtx.drawImage(_svgBmp('e:' + p.id + '#' + p.frag, im, W * 2, ratio), p.c * C, (p.r + p.h) * C - H, W, H);
+  });
+}
+//  누른 칸이 행사 장식이면 그 행사(그림이 발자리 위로 한 줄 솟는 것까지)
+function _decoEventAt(r, c) {
+  const ev = _decoEventOn(), placed = ev && _decoEventPlaced(ev);
+  return placed && placed.some(p => r >= p.r - 1 && r < p.r + p.h && c >= p.c && c < p.c + p.w) ? ev : null;
+}
+function _decoEventSay(ev) {
+  const u = ev.until.split('-').map(Number);
+  toast(`${ev.name}${_josa(ev.name, '이에요', '예요')}! (${u[0]}/${u[1]}까지) — 며칠만 놀러 온 장식이라 옮기거나 치울 수 없어요`);
+}
 function _decoNightDraw(C) {
   const ph = _yardPhase();   // [DECO-LOOK-0]
   if (ph === 'day') return;
   _decoMotionLoad();
-  const ctx = _dCtx, amb = _DECO_MOTION && _DECO_MOTION._ambient, night = ph === 'night';
+  const ctx = _dCtx, amb = _DECO_MOTION && _DECO_MOTION._ambient, night = ph === 'night', lk = _yardLook();
   ctx.save();
-  //  [DECO-NIGHT-FILM-1] 밤 막 .48 → .30(보스 · 별빛 시안에서 .45 는 꽃밭·헛간 색이 탁해지고 동물이 묻혔다 — 크롬북 화면이 어두우면 더)
-  //  고르는 동안(카드를 들었거나 바닥 모드 · 사진은 아님)은 절반 — 놓을 자리 · 칠할 칸이 잘 보이게
+  //  [DECO-NIGHT-FILM-1] 밤 막 .30(전 .48) · [DECO-STAR-P5] 세기는 표에서 — 고르는 동안(카드를 들었거나 바닥 모드 · 사진 아님)은 절반(밤 .15 · 저녁 .10)
+  //  섬이 있는 모습은 판 · 위 띠 · 섬에만(판 밖 별하늘은 그대로)
   const edit = !_decoPhotoMode && (!!SEL_DECO || DECO_MODE === 'floor');
-  ctx.fillStyle = night ? (edit ? 'rgba(20,30,80,.15)' : 'rgba(20,30,80,.30)') : (edit ? 'rgba(255,150,80,.1)' : 'rgba(255,150,80,.2)');
-  ctx.fillRect(_dPanX - C, _dPanY - C, _dW + C * 2, _dH + C * 2);   // 보이는 판 전체(위 잔디 띠까지)
+  ctx.fillStyle = night ? (edit ? lk.nightFilmEdit : lk.nightFilm) : (edit ? 'rgba(255,150,80,.1)' : 'rgba(255,150,80,.2)');
+  if (lk.island) ctx.fillRect(0, -DECO_YARD_TOP * C, DY.cols * C, (DY.rows + DECO_YARD_TOP + _yardIslandCells()) * C);
+  else ctx.fillRect(_dPanX - C, _dPanY - C, _dW + C * 2, _dH + C * 2);   // 보이는 판 전체(위 잔디 띠까지)
   if (amb) {
     //  몸통 viewBox 안 자리 → 판 px (그림 폭 = 발자리 폭 · 아래 끝 = 발자리 아래)
     const box = p => { const img = _decoImg(p.id), z = getDecoSize(p.id); if (!img) return null;
@@ -10033,6 +10117,7 @@ function _decoNightDraw(C) {
     if (hn && hi && FLOOR_SVG) { const hw = DH.cols * C; ctx.drawImage(hn, _houseCol0() * C, -C, hw, hw * hi.naturalHeight / hi.naturalWidth); }
   }
   ctx.restore();
+  if (night && lk.labelOverFilm && FLOOR_SVG && _decoImg('yard_house')) _yardHouseLabel(_houseCol0() * C, DH.cols * C, C);   // [DECO-STAR-P5] 이름표는 막 위에
 }
 
 // [DECO-SEASON-1] 겨울 눈 겹 — motion.json _ambient.snow.on 의 그림(몸통과 같은 viewBox 투명 겹)을 몸통 위 같은 자리에(밤이면 그 뒤에 색 막 · 창 불빛)
@@ -10222,7 +10307,8 @@ function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
   //  · 바로 밖(d < 1.3) = 바람에 날린 몇 장 drift · 그 밖 0(쉼 자리). 여러 나무가 겹치면 큰 쪽. 나무가 없으면 흩뿌림도 없다(값은 표에).
   const sc = lk.scatter;
   if (!sc) return;
-  const trees = sc.trees, dens = new Map(), k1 = sc.k1, k2 = sc.k2, hi = sc.hi;
+  const evx = typeof _decoEventOn === 'function' && _decoEventOn();   // [DECO-EVENT-1] 벚꽃 축제 동안은 꽃잎 두 배(디자인 행사 표)
+  const trees = sc.trees, dens = new Map(), k1 = sc.k1, k2 = sc.k2, hi = Math.min(.95, sc.hi * (evx && evx.key === 'spring' && sc.name === 'season_petals_' ? 2 : 1));
   _decoList(CUR).forEach(p => { if (p.area !== 'yard' || trees.indexOf(p.id) < 0) return; const z = getDecoSize(p.id);
     const cx = p.col + z.w / 2, cy = p.row + z.h / 2, rx = z.w / 2 + 3, ry = z.h / 2 + 2;
     for (let r = Math.floor(cy - ry * 1.3); r <= Math.ceil(cy + ry * 1.3); r++) for (let c = Math.floor(cx - rx * 1.3); c <= Math.ceil(cx + rx * 1.3); c++) {
@@ -10236,6 +10322,16 @@ function _decoGroundPatch(r0, c0, r1, c1, isGrass) {
     if (_seaHash(r, c, k1) >= (dens.get(r + '_' + c) || 0)) continue;
     const ab = _seaHash(r, c, k2) < .5; _dCtx.drawImage(_floorBmp(nm + (ab ? 'a' : 'b'), ab ? ia : ib, C), c * C, r * C, C, C);
   } });
+}
+// [DECO-STAR-P5] 떠 있는 섬 — 판 아래끝 바로 밑에 island_rim(칸마다 · 칸 폭 × .4칸 · 좌우 끝이 같아 이어진다) + 그 밑에 island_under(판 폭 한 장 · 1600×120 = 80칸 × 6칸)
+function _yardIslandCells() { return _yardLook().island ? .4 + DY.cols * 120 / 1600 : 0; }
+function _drawYardIsland(C, v) {
+  if (!_yardLook().island || !FLOOR_SVG) return;
+  const y = DY.rows * C;
+  if (y > _dPanY + _dH + C) return;   // 화면 아래 밖
+  const ri = _floorImg('island_rim'), ui = _floorImg('island_under');
+  if (ri) { const b = _svgBmp('f:island_rim', ri, C * 2, .4); for (let c = v.c0; c < v.c1; c++) _dCtx.drawImage(b, c * C, y, C, .4 * C); }
+  if (ui) { const w = DY.cols * C, h = w * 120 / 1600; _dCtx.drawImage(_svgBmp('f:island_under', ui, Math.min(w * 2, 4096), 120 / 1600), 0, y + .4 * C, w, h); }
 }
 // [DECO-STAR-P3] 별빛 땅 — 잔디 무리 칸 = star_ground(불투명 · 9칸 주기 무늬) → star_band(판 80×44 한 장에서 그 칸 자리를 떼어 붙임 · 되풀이 금지 · 줄무늬가 된다).
 //  잔디 얼룩은 건너뛴다. 띠는 8×8칸 조각으로 구워 둔다 — 판 한 장을 화면 해상도로 구우면 칸 27px 에서도 40MB 가 넘는다(확대하면 더).
@@ -10313,7 +10409,11 @@ function _drawYardHouseArt(img, hx, hw, C) {
   _decoGroundPatch(0, c0, DH.rows, c0 + DH.cols, () => true);   // [DECO-GROUND-1] 집 둘레 잔디에도 얼룩
   ctx.drawImage(_svgBmp('d:yard_house', img, hw * 2, img.naturalHeight / img.naturalWidth), hx, y0, hw, h);
   if (_yardLook().snow) { const sn = _ambImg('yard_house_snow'); if (sn) ctx.drawImage(sn, hx, y0, hw, h); }   // [DECO-SEASON-1] 지붕 눈 · [DECO-LOOK-0]
-  const u = hw / 600;   // 그림 한 단위 = 캔버스 px
+  _yardHouseLabel(hx, hw, C);
+}
+//  집 이름표 · 문 앞 '들어가기' — [DECO-STAR-P5] 별밤이면 막 위에 한 번 더(_decoNightDraw)
+function _yardHouseLabel(hx, hw, C) {
+  const ctx = _dCtx, y0 = -C, u = hw / 600;   // 그림 한 단위 = 캔버스 px
   const name = CUR && CUR.name ? CUR.name : '내 집';
   ctx.save();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#3b2a18';
@@ -10351,6 +10451,7 @@ function _drawYard() {
     }
   };
   _floorCells(_vis);
+  _drawYardIsland(C, _vis);   // [DECO-STAR-P5] 섬(섬 없는 모습은 그리지 않는다)
   _decoGroundPatch(_vis.r0, _vis.c0, _vis.r1, _vis.c1, (r, c) => !_isHC(r, c) && _floorIsGrass(_floorParse(_yardFloorGet(CUR)[r + '_' + c]).name));   // [DECO-GROUND-1]
   //  [DECO-TOP-PAD-1] 판 위 잔디 띠(DECO_YARD_TOP 칸) — 맨 윗줄 장식·집 굴뚝의 솟은 그림이 판 위 끝에서 잘리던 것(디자인 D7). 놓을 수는 없다(격자 없음)
   if (_dPanY < 0) {
@@ -10598,6 +10699,7 @@ function _drawYard() {
 
   // ── 마당 농장 존 렌더링 (우하단, 읽기 전용) ──────────────
   _drawYardFarm(C);
+  _decoEventDraw(C);   // [DECO-EVENT-1] 계절 행사(장식 · 밭 다음 · 밤 막 아래)
   _decoNightDraw(C);   // [DECO-DAYNIGHT-1] 저녁·밤 — 색 막 · 불빛 · 창 불빛(맨 위)
 }
 
@@ -11013,6 +11115,8 @@ function _decoClick(e) {
       const pet=_animAtPt(_ifActiveContainer||'house-topview', mx, my)||_animAt(_ifActiveContainer||'house-topview', r, c);   // [DECO-ANIM-HIT-2] 그려진 몸 먼저
       if(pet && _animPoke(pet, c)) { const pr = _lifePetAnim(pet); _lifeCardOpen(pet, pr); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1 · [DECO-LIFE-2] 카드
     }
+    //  [DECO-EVENT-1] 계절 행사 장식 — 빈손 · 🧽 면 말 한 줄(치울 수 없다) · 카드를 들었으면 놓기가 먼저(행사가 다른 빈 잔디로 비켜 간다)
+    if(!SEL_DECO || DECO_MODE==='erase'){ const ev=_decoEventAt(r,c); if(ev){ _decoEventSay(ev); return; } }
     _decoPlace('yard',r,c);
   } else {
     const {_offX:ox,_offY:oy}=_dCv;
@@ -13784,7 +13888,7 @@ function _renderFriendCanvas() {
   const W    = window.innerWidth;
   const maxH = window.innerHeight - topH - 48;
   const cols = _ffScene === 'yard' ? DY.cols : DI.cols;
-  const rows = _ffScene === 'yard' ? DY.rows : DI.rows;
+  const rows = _ffScene === 'yard' ? DY.rows + (typeof _yardIslandCells === 'function' ? _yardIslandCells() : 0) : DI.rows;   // [DECO-STAR-P5] 섬 몫(섬 없는 모습은 0)
   let C    = Math.floor(W / cols);
   const _ffC0 = C;
   C = Math.max(4, Math.round(_ffC0 * _ffView.zoom));   // [DECO-FRIEND-VIEW-1]
@@ -13827,7 +13931,8 @@ function _renderFriendCanvas() {
   try { _decoMotionSync(); } catch (e) {}   // [DECO-FRIEND-MOTION-1] 풍차·분수·연기 층(구경 값으로 — 아직 전역을 빌린 채)
   {   // [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스에 색 막이 깔리니 동물 층도 같은 결로(내 마당 #if-topview 와 같은 CSS)
     const ph = typeof _yardPhase === 'function' ? _yardPhase() : 'day', fh = document.getElementById('ff-topview');   // [DECO-LOOK-0]
-    if (fh) { fh.classList.toggle('is-evening', _ffScene === 'yard' && ph === 'evening'); fh.classList.toggle('is-night', _ffScene === 'yard' && ph === 'night'); }
+    if (fh) { fh.classList.toggle('is-evening', _ffScene === 'yard' && ph === 'evening'); fh.classList.toggle('is-night', _ffScene === 'yard' && ph === 'night');
+      fh.classList.toggle('look-sky', _ffScene === 'yard' && typeof _yardLook === 'function' && _yardLook().sky); }   // [DECO-STAR-P5]
   }
 
   // 복원

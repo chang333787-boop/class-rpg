@@ -1421,6 +1421,27 @@ try {
   test('정원 바닥 색 코드를 돌릴 수 있다', () => { throw e; });
 }
 
+//  [DECO-EVENT-1] 계절 행사 날짜 — 표 한 줄씩 · 끝날 포함 · 그 밖은 없음
+cur = '꾸미기 계절 행사 날짜(DECO-EVENT-1)';
+try {
+  const S = read('student.js'), a = S.indexOf('const DECO_EVENTS = ['), f = S.indexOf('function _decoEventNow('), b = S.indexOf('\n}\n', f);
+  if (a < 0 || f < 0 || b < 0) throw new Error('DECO_EVENTS · _decoEventNow 를 못 찾음');
+  const sb = {}; vm.createContext(sb);
+  vm.runInContext(S.slice(a, S.indexOf('\n];\n', a) + 4) + NL + 'let _decoEventOv = null, _decoEventDev = null;' + NL + S.slice(f, b + 3) + ';globalThis.__E = { DECO_EVENTS, _decoEventNow };', sb);
+  const E = sb.__E, at = (m, d) => (E._decoEventNow(new Date(2026, m - 1, d)) || {}).key || '';
+  test('수확제 10/13 ~ 10/19(끝날 포함) · 앞뒤 날은 없음', () => eq([at(10, 12), at(10, 13), at(10, 19), at(10, 20)], ['', 'autumn', 'autumn', '']));
+  test('벚꽃 4/1 ~ 4/7 · 물놀이 7/8 ~ 7/14 · 눈사람 12/15 ~ 12/21', () => eq([at(3, 31), at(4, 1), at(4, 7), at(4, 8), at(7, 7), at(7, 8), at(7, 14), at(7, 15), at(12, 14), at(12, 15), at(12, 21), at(12, 22)],
+    ['', 'spring', 'spring', '', '', 'summer', 'summer', '', '', 'winter', 'winter', '']));
+  test('오늘(9월 말)은 행사 없음', () => eq(at(9, 24), ''));
+  test('행사 한 벌은 제 덩어리 안에(3×3 · 여름 3×2)', () => E.DECO_EVENTS.forEach(e => e.set.forEach(([id, r, c, w, h]) => eq(r >= 0 && c >= 0 && r + h <= e.h && c + w <= e.w, true, e.key + ':' + id))));
+  test('그림 파일이 다 있다(주소 뒤 조각은 ev_lanterns 안 :target)', () => E.DECO_EVENTS.forEach(e => e.set.forEach(([id, , , , , frag]) => {
+    const f = path.join(ROOT, 'assets', 'deco', id + '.svg'); eq(fs.existsSync(f), true, id);
+    if (frag) eq(fs.readFileSync(f, 'utf8').includes('#' + frag + ':target'), true, id + '#' + frag);
+  })));
+} catch (e) {
+  test('계절 행사 코드를 돌릴 수 있다', () => { throw e; });
+}
+
 //  [DECO-LOOK-0] 마당 모습 표 — 계절 넷 줄 · 여름 = 바탕 · 겨울만 눈 · 줄에 때가 박혀 있으면 실제 시각보다 먼저(별빛은 밤 고정)
 cur = '꾸미기 마당 모습 표(DECO-LOOK-0)';
 try {
@@ -1452,6 +1473,13 @@ try {
     const st = L.YARD_LOOKS.star;
     eq([st.season, st.ground, st.groundFrag, st.waterFrag, st.swimFrag, st.shadow], ['summer', 'star', 'star', 'star', 'star', 'rgba(8,10,34,.4)']);
     eq([st.snow, st.film, st.scatter, st.bedWinter], [false, '', null, false]);
+  });
+  test('별밤 칸(P5): 별빛 = 밤 고정 · 섬 · 하늘 · 이름표 막 위 / 막(.30 · 고르는 동안 .15) · 동물 필터는 계절 넷과 같다(#1088)', () => {
+    const st = L.YARD_LOOKS.star;
+    eq([st.phase, st.island, st.sky, st.labelOverFilm], ['night', true, true, true]);
+    ['spring', 'summer', 'autumn', 'winter', 'star'].forEach(k => { const r = L.YARD_LOOKS[k];
+      eq([r.nightFilm, r.nightFilmEdit, r.animNight], ['rgba(20,30,80,.30)', 'rgba(20,30,80,.15)', 'brightness(.8) saturate(.85)'], k); });
+    ['spring', 'summer', 'autumn', 'winter'].forEach(k => { const r = L.YARD_LOOKS[k]; eq([r.phase, r.island, r.sky, r.labelOverFilm], ['', false, false, false], k); });
   });
   test('개발 스위치 ?look= — 놀이판(__PLAY + play-deco-none)에서만 · 다른 프로젝트 · 모르는 값은 무시(계절 줄)', () => {
     const run = (win, pid, search) => { sb.window = win; sb.firebase = { app: () => ({ options: { projectId: pid } }) }; sb.location = { search }; sb.URLSearchParams = URLSearchParams;
