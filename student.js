@@ -8766,6 +8766,7 @@ function _animGather(st, now) {
 function _animStopLayer(hostId) {
   const rec = _animLayers.get(hostId);
   if (!rec) return;
+  if (typeof _lifeCard !== 'undefined' && _lifeCard && _lifeCard.rec === rec) _lifeCardClose();   // [DECO-LIFE-2]
   if (rec.layer && rec.layer.parentNode) rec.layer.parentNode.removeChild(rec.layer);
   _animLayers.delete(hostId);
   if (!_animLayers.size) _animLoopStop();
@@ -8951,6 +8952,114 @@ function _lifePetAnim(st) {
   }
   return r;
 }
+
+// ── [DECO-LIFE-2] 동물 카드 — 누르면 말풍선 카드: 이름 · 단계 배지 · 하트 칸 · '+1 오늘' · 이름 고르기 ──
+//  이름은 **고르기만**(자유 입력 없음 · 친구 구경에 보인다) · 저장은 목록 번호(디자인 #969 — 뒤에 더하기만 · 빼지 말고 안 보임에).
+const LIFE_NAMES = ['콩이', '보리', '호두', '초코', '뭉치', '모카', '두부', '밤톨', '달콩', '까망', '꼬꼬', '삐약', '옥수수', '콩알', '좁쌀',
+  '꽥꽥', '방울', '퐁당', '동글', '물방울', '솜이', '구름', '몽글', '폭신', '뭉게', '봄봄', '단비', '이슬', '새싹', '감자', '고구마', '쿠키',
+  '말랑', '포근', '토리', '도토리', '별콩', '반짝', '소복', '해님'];
+const LIFE_NAMES_HIDDEN = [];   // 더 안 보일 번호(지우지 않는다 — 이미 고른 아이의 이름이 바뀌지 않게)
+const LIFE_NAME_START = { dog: 1, cat: 6, hen: 11, duck: 16, sheep: 21 }, LIFE_NAME_COMMON = 26;
+//  같은 이름을 둘이 고르면 처음 만난 순서로 뒤에 숫자(콩이 2) — 저장하지 않고 그때 센다(결정 ⑤)
+function _lifeNameOf(L, u) {
+  const f = L.a[u], n = f && f.n;
+  if (!(typeof n === 'number' && n >= 1 && n <= LIFE_NAMES.length)) return '';
+  const same = Object.keys(L.a).filter(k => _lifeOk(L.a[k]) && L.a[k].n === n)
+    .sort((a, b) => ((L.a[a].m || 0) - (L.a[b].m || 0)) || (_lifeNo(a) - _lifeNo(b)));
+  const i = same.indexOf(u);
+  return LIFE_NAMES[n - 1] + (i > 0 ? ' ' + (i + 1) : '');
+}
+//  하트 칸 = 다음 단계까지 필요한 수(3 · 5 · 7 · 10) — 한 번 쓰다듬기 = 한 칸. 5단계(가족)는 다섯 칸이 다 찬다.
+function _lifeHeartRow(h) {
+  const st = _lifeStage(h);
+  if (st >= LIFE_STAGE_AT.length) return { st, have: 5, need: 5, left: 0 };
+  const a = LIFE_STAGE_AT[st - 1], b = LIFE_STAGE_AT[st];
+  return { st, have: h - a, need: b - a, left: b - h };
+}
+let _lifeCard = null;   // { el, st, rec, u, timer, follow }
+function _lifeCardClose() {
+  const k = _lifeCard; _lifeCard = null;
+  if (!k) return;
+  clearTimeout(k.timer); clearInterval(k.follow);
+  if (k.el && k.el.parentNode) k.el.parentNode.removeChild(k.el);
+}
+function _lifeCardPlace() {
+  const k = _lifeCard;
+  if (!k || !k.el.isConnected || !k.st.el || !k.st.el.isConnected) { _lifeCardClose(); return; }
+  const st = k.st, C = st.C || _dC, W = k.rec.layer.clientWidth, H = k.rec.layer.clientHeight;
+  const cw = k.el.offsetWidth, ch = k.el.offsetHeight, px = _dPanX || 0, py = _dPanY || 0;
+  const ax = (st.fx + (st.jx || 0) + (st.w || 1) / 2) * C, top = (st.fy + (st.jy || 0) - _animOverCells(st)) * C, bot = (st.fy + (st.jy || 0) + (st.h || 1)) * C;
+  let x = Math.max(px + 8, Math.min(px + W - 8 - cw, ax - cw / 2)), y = top - ch - 30, pos = 'above';   // 말풍선('멍!')·'+1 💗' 위로 한 뼘
+  if (y < py + 8) {
+    if (bot + 12 + ch <= py + H - 8) { y = bot + 12; pos = 'below'; }   // 위에 자리가 없으면 아래로
+    else {   // 위도 아래도 다 안 들어가면(이름 칩을 펼쳐 길어졌을 때) 동물 옆 — 동물을 덮지 않는다
+      const w = (st.w || 1) * C, rx = (st.fx + (st.jx || 0)) * C + w + 10, lx = (st.fx + (st.jx || 0)) * C - 10 - cw;
+      x = rx + cw <= px + W - 8 ? rx : Math.max(px + 8, lx);
+      y = Math.max(py + 8, Math.min(py + H - 8 - ch, (top + bot) / 2 - ch / 2)); pos = 'side';
+    }
+  }
+  k.el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  k.el.classList.toggle('below', pos === 'below'); k.el.classList.toggle('side', pos === 'side');
+  k.el.style.setProperty('--tip', Math.round(Math.max(16, Math.min(cw - 16, ax - x))) + 'px');
+}
+function _lifeCardHTML(st, L, u) {
+  const f = L.a[u], cfg = ANIM_DECO[st.id] || {}, kind = cfg.name || ((GAME_DATA.decorations.find(x => x.id === st.id) || {}).name) || '동물';
+  const h = _lifeHearts(f), row = _lifeHeartRow(h), nm = _lifeNameOf(L, u), today = f && f.d === _lifeDay();
+  const hearts = Array.from({ length: row.need }, (_, i) => `<img src="./assets/deco/heart_${i < row.have ? 'full' : 'empty'}.svg" alt="">`).join('');
+  const next = row.left ? `다음 단계 '${LIFE_STAGE_NAME[row.st]}'까지 하트 ${row.left}` : '가족이 됐어요 — 하트는 줄지 않아요';
+  return `<div class="dlc-top"><img class="dlc-badge" src="./assets/deco/friend_stage${row.st}.svg" alt="${row.st}단계">`
+    + `<div class="dlc-who"><div><b class="dlc-nm">${escHtml(nm || kind)}</b>${nm ? ` <span class="dlc-kind">· ${escHtml(kind)}</span>` : ''}</div>`
+    + `<div class="dlc-sub">${row.st}단계 ${LIFE_STAGE_NAME[row.st - 1]}</div></div>`
+    + (L.ro ? '' : `<button type="button" class="dlc-namebtn" aria-label="이름 고르기">🏷️ ${nm ? '이름 바꾸기' : '이름 짓기'}</button>`) + '</div>'
+    + `<div class="dlc-hearts" aria-label="하트 ${row.have}/${row.need}">${hearts}${today ? '<span class="dlc-today">+1 오늘</span>' : ''}</div>`
+    + `<div class="dlc-next">${next}</div><div class="dlc-chips" hidden></div>`;
+}
+function _lifeCardChips(k, more) {
+  const box = k.el.querySelector('.dlc-chips'), cfg = ANIM_DECO[k.st.id] || {}, s0 = LIFE_NAME_START[cfg.mood] || LIFE_NAME_COMMON;
+  const ok = n => n >= 1 && n <= LIFE_NAMES.length && LIFE_NAMES_HIDDEN.indexOf(n) < 0;
+  const nums = [0, 1, 2, 3, 4].map(i => s0 + i).filter(ok);
+  if (more) for (let n = LIFE_NAME_COMMON; n <= LIFE_NAMES.length; n++) if (ok(n) && nums.indexOf(n) < 0) nums.push(n);
+  box.innerHTML = nums.map(n => `<button type="button" class="dlc-chip" data-n="${n}">${escHtml(LIFE_NAMES[n - 1])}</button>`).join('')
+    + (more ? '' : '<button type="button" class="dlc-chip dlc-more">더 보기 …</button>');
+  box.hidden = false;
+  clearTimeout(k.timer);   // 고르는 동안은 안 닫힌다
+  _lifeCardPlace();
+}
+function _lifeCardPick(k, n) {
+  const L = _lifeGet(CUR);
+  if (L.ro || !L.a[k.u]) return;
+  _lifeWrite(CUR, { ['a/' + k.u + '/n']: n });   // 잎 쓰기 하나(§6-1)
+  const nm = _lifeNameOf(_lifeGet(CUR), k.u);
+  toast(`🏷️ 이제 '${nm}'${_josa(nm, '이에요', '예요')}`);
+  _lifeCardOpen(k.st);
+}
+function _lifeCardOpen(st) {
+  _lifeCardClose();
+  if (!st || !st.el || !CUR) return null;
+  const rec = st.rec || _animLayers.get(_ifActiveContainer || 'house-topview');
+  const p = (CUR.houseDecorations || []).find(q => q.area === 'yard' && q.id === st.id && q.row === st.home.row && q.col === st.home.col && _decoSpaceOf(q) === DECO_SPACE);
+  const L = _lifeGet(CUR), u = p ? _lifeFriendAt(CUR, p, L) : null;
+  if (!rec || !u || !L.a[u]) return null;
+  const el = document.createElement('div');
+  el.className = 'deco-life-card'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '동물 카드');
+  el.innerHTML = _lifeCardHTML(st, L, u);
+  rec.world.appendChild(el);
+  const k = _lifeCard = { el, st, rec, u, timer: 0, follow: 0 };
+  ['pointerdown', 'touchstart', 'mousedown'].forEach(t => el.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    const b = e.target.closest && e.target.closest('button');
+    if (!b) return;
+    if (b.classList.contains('dlc-namebtn')) _lifeCardChips(k, false);
+    else if (b.classList.contains('dlc-more')) _lifeCardChips(k, true);
+    else if (b.dataset.n) _lifeCardPick(k, +b.dataset.n);
+  });
+  _lifeCardPlace();
+  k.follow = setInterval(_lifeCardPlace, 120);          // 강아지가 한 칸 걸어와도 따라간다
+  k.timer = setTimeout(_lifeCardClose, 6000);           // 6초 뒤 스스로 닫힌다(이름을 고르는 동안은 안 닫힘)
+  return k;
+}
+if (typeof document !== 'undefined') document.addEventListener('keydown', e => { if (e.key === 'Escape' && _lifeCard) _lifeCardClose(); });
 
 //  hostId 안(캔버스 위)에 동물 층을 맞춘다. 마당이 아니면 층을 없앤다.
 //  이미 있는 동물은 그 자리를 지킨다(다시 그려도 처음부터 걷지 않게).
@@ -9919,6 +10028,7 @@ function _drawIndoor() {
 function _decoClick(e) {
   if(!_dCv||!_dCtx) return;
   if(_dSuppressClick) return;   // [DECO-ZOOM-1] 화면을 끈 직후·핀치 직후의 클릭은 놓기가 아니다
+  if(_lifeCard) _lifeCardClose();   // [DECO-LIFE-2] 판을 누르면 동물 카드는 닫힌다(동물을 누른 것이면 다시 열린다)
   const _bp=_decoBoardPoint(e.clientX, e.clientY);   // [DECO-ZOOM-1] 이동·확대 반영
   const mx=_bp.x, my=_bp.y;
   const C=_dC;
@@ -9939,7 +10049,7 @@ function _decoClick(e) {
     //  [DECO-SEL-A5] 카드를 들었어도 — 보이는 동물을 누른 것은 쓰다듬기다(전엔 그 발밑에 하나가 더 놓였다 · 창조자 27회 ⓐ5)
     if(DECO_MODE!=='erase'){   // [DECO-PT-2] 치우기 모드에서는 동물도 치운다(전엔 동물을 치울 방법이 없었다)
       const pet=_animAt(_ifActiveContainer||'house-topview', r, c);
-      if(pet && _animPoke(pet, c)) { _lifePetAnim(pet); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1
+      if(pet && _animPoke(pet, c)) { _lifePetAnim(pet); _lifeCardOpen(pet); return; }   // [DECO-LIFE-1] 하루 한 마리 하트 +1 · [DECO-LIFE-2] 카드
     }
     _decoPlace('yard',r,c);
   } else {

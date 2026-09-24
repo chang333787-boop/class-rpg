@@ -1550,6 +1550,24 @@
         const f2 = friend(), last = [...document.querySelectorAll('.toast-msg')].map(e => e.textContent).join(' ');
         out('친해지기_다음날_+1_단계알림', !!f2 && f2.h === 3 && /알아봄/.test(last) && (_lifeGet(CUR).g.sticker || 0) >= 1);
       } finally { _lifeDay = od; }
+      //  [DECO-LIFE-2] 카드 — 누르면 뜬다 · 이름 고르기(칩) = 잎 쓰기 1 · 통째 저장 0 · 판을 누르면 닫힘 · Escape
+      if (typeof _lifeCardOpen === 'function') {
+        _lifeCardClose(); await petDog(); await sleep(300);
+        out('카드_누르면_뜸', !!_lifeCard && !!document.querySelector('.deco-life-card .dlc-hearts'));
+        const w1 = _lifeWrites; saves = 0; sets = 0;
+        document.querySelector('.dlc-namebtn').click(); await sleep(100);
+        const chips = [...document.querySelectorAll('.dlc-chip')].map(b => b.textContent);
+        out('카드_이름칩_강아지다섯_더보기', chips.slice(0, 5).join(',') === '콩이,보리,호두,초코,뭉치' && /더 보기/.test(chips[5] || ''));
+        document.querySelector('.dlc-chip[data-n="2"]').click(); await sleep(700);
+        const f3 = friend();
+        out('카드_이름고르기_잎쓰기1_통째0', { n: f3 && f3.n, 잎: _lifeWrites - w1, saveStudent: saves, sdkSet: sets, 맞나: !!f3 && f3.n === 2 && _lifeWrites - w1 === 1 && saves === 0 && sets === 0 });
+        out('카드_이름보임', !!_lifeCard && /보리/.test(document.querySelector('.deco-life-card .dlc-nm').textContent));
+        const cv = _dCv.getBoundingClientRect(); _dSuppressClick = false;
+        _decoClick({ clientX: cv.left + 5, clientY: cv.top + cv.height - 5 });
+        out('카드_판누르면_닫힘', !_lifeCard && !document.querySelector('.deco-life-card'));
+        await petDog(); await sleep(200); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        out('카드_Escape_닫힘', !_lifeCard);
+      }
       out('친해지기_골드불변', CUR.gold === gold0);
       out('친해지기_자리객체그대로', !(CUR.houseDecorations || []).some(p => 'u' in p));
       CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
