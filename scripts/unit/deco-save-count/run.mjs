@@ -57,11 +57,12 @@ let runErr = null;
 //  [DECO-GPU-1] 그래픽칩으로 그린다 — 맥은 Metal(--use-angle=metal --use-gl=angle · 보스 09-24). 크롬북도 GPU 가 있어 이쪽이 실제에 가깝다.
 //  그래픽칩이 없는 기기만 --soft(옛 --disable-gpu). 맥이 아니면 브라우저 기본값.
 const GPU_ARGS = process.argv.includes('--soft') ? ['--disable-gpu'] : process.platform === 'darwin' ? ['--use-angle=metal', '--use-gl=angle'] : [];
-const child = spawn(BROWSER, ['--headless=new', ...GPU_ARGS, '--no-first-run', `--user-data-dir=${PROFILE}`, '--virtual-time-budget=90000', '--dump-dom',
+const child = spawn(BROWSER, ['--headless=new', ...GPU_ARGS, '--no-first-run', `--user-data-dir=${PROFILE}`, '--virtual-time-budget=150000', '--dump-dom',
   `http://127.0.0.1:${srv.address().port}/student.html`], { stdio: 'ignore' });
 child.on('error', e => { runErr = e; doneResolve(); });
 child.on('exit', () => setTimeout(doneResolve, 1500));          // 결과 없이 죽었으면 여기서 끝난다
-const giveUp = setTimeout(doneResolve, 180000);
+//  [DECO-GUEST-1] 가상 시간 90초가 꽉 찼다(09-25 · 걸린시간_초=90) — 시험이 늘면 끝 표식 없이 끊겼다 → 150초 · 실제 포기 240초
+const giveUp = setTimeout(doneResolve, 240000);
 await donePromise; clearTimeout(giveUp);
 try { child.kill('SIGKILL'); } catch (e) {}
 const text = doneText !== null ? doneText : 'no output';

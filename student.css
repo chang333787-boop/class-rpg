@@ -1451,6 +1451,16 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 /* [DECO-EVENT-2] 행사 첫 열림 반짝 — 한 번(2.4초) · 누르기는 판으로 */
 .deco-event-tw{position:absolute;z-index:6;pointer-events:none;opacity:0;animation:dgTwinkle 1.2s ease-in-out 2}
 @media (prefers-reduced-motion: reduce){ .deco-event-tw{animation:none;opacity:.9} }
+/* [DECO-GUEST-1] 손님 — 선물과 같은 층 · 누르는 자리 44px · 아직 못 만난 손님은 반짝 · 나는 손님은 조금 더 들썩 · 처음 만나면 빛살(fx_first_meet) */
+.deco-guest{position:absolute;left:0;top:0;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center}
+.deco-guest .dgu-art{width:var(--g,18px);height:var(--g,18px);display:block;animation:dgBob 2.2s ease-in-out infinite}   /* 그림에 제 그림자 타원이 있다(디자인 #1099) — 코드 그림자는 안 겹친다 */
+.deco-guest.fly .dgu-art{animation:dguFly 1.4s ease-in-out infinite}
+.deco-guest .dgu-tw{position:absolute;right:2%;top:2%;width:calc(var(--g,18px) * .7);height:calc(var(--g,18px) * .7);opacity:0;pointer-events:none}
+.deco-guest.is-new .dgu-tw{animation:dgTwinkle 1.6s ease-in-out infinite}
+.deco-guest .dgu-first{position:absolute;left:50%;top:50%;width:calc(var(--g,18px) * 2);height:calc(var(--g,18px) * 2);translate:-50% -60%;pointer-events:none;animation:dguFirst .8s ease-out forwards}
+@keyframes dguFly{0%,100%{translate:0 0}50%{translate:2px -5px}}
+@keyframes dguFirst{0%{opacity:0;scale:.3}40%{opacity:1;scale:1.1}100%{opacity:0;scale:1.3}}
+@media (prefers-reduced-motion: reduce){ .deco-guest .dgu-art,.deco-guest.fly .dgu-art,.deco-guest.is-new .dgu-tw,.deco-guest .dgu-first{animation:none} .deco-guest.is-new .dgu-tw{opacity:1} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════
@@ -1736,8 +1746,8 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 @media (max-width:480px){ #if-photo-btn{order:11;flex:0 0 44px;min-height:40px;font-size:16px!important} }
 
 /* [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스는 색 막을 그리고, 그 위 DOM 층(동물 · 움직임)은 같은 결로 어둡게 · 단추는 📷 옆(폰은 둘째 줄 끝) */
-#if-topview.is-evening .deco-anim-layer,#if-topview.is-evening .deco-mv-layer,#ff-topview.is-evening .deco-anim-layer,#ff-topview.is-evening .deco-mv-layer{filter:brightness(.9) sepia(.18) saturate(1.05)}
-#if-topview.is-night .deco-anim-layer,#if-topview.is-night .deco-mv-layer,#ff-topview.is-night .deco-anim-layer,#ff-topview.is-night .deco-mv-layer{filter:brightness(.8) saturate(.85)}
+#if-topview.is-evening .deco-anim-layer > .deco-anim-world > :not(.glow),#if-topview.is-evening .deco-mv-layer,#ff-topview.is-evening .deco-anim-layer > .deco-anim-world > :not(.glow),#ff-topview.is-evening .deco-mv-layer{filter:brightness(.9) sepia(.18) saturate(1.05)}
+#if-topview.is-night .deco-anim-layer > .deco-anim-world > :not(.glow),#if-topview.is-night .deco-mv-layer,#ff-topview.is-night .deco-anim-layer > .deco-anim-world > :not(.glow),#ff-topview.is-night .deco-mv-layer{filter:brightness(.8) saturate(.85)}
 /* [DECO-STAR-P5] 별빛 — 판 밖 별하늘(캔버스 비용 0 · 캔버스가 비운 곳에 보인다) · 동물 층 필터는 보통 밤과 같다(표 animNight · 사진도 이 값) */
 #if-topview.look-sky,#ff-topview.look-sky{background:#12163a url('assets/ui/sky_stars.svg') repeat}
 @media (max-width:480px){ #if-phase-btn{order:12;flex:0 0 44px;min-height:40px;font-size:16px!important} }

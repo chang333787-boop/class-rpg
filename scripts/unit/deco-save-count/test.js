@@ -2078,6 +2078,58 @@
       _decoEventOv = null; _decoStateVer++; _drawDeco();
     }
 
+    //  ㊼-4 손님(DECO-GUEST-1) — 조건마다 자리 · 하루 최대 둘(못 만난 손님 먼저) · 처음 누를 때만 잎 쓰기 1 · 또 누름 0 · 친구 구경 0 · 동물이 없어도 온다
+    if (typeof _guestToday === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const keepH = CUR.houseDecorations, keepF = CUR.yardFloor, keepL = CUR.decoLife, sv0 = JSON.stringify([CUR.inventory, CUR.gold]);
+      const L = [['d_y46', 5, 12], ['d_y25', 9, 30], ['d_y29', 8, 21], ['d_y1', 12, 14], ['d_y15', 6, 33], ['d_y15', 6, 35], ['d_y9', 8, 16]];
+      CUR.houseDecorations = (keepH || []).filter(p => p.area !== 'yard').concat(L.map(([id, r, c]) => _decoNew(id, 'yard', r, c)));
+      const wf = {}; for (let r = 8; r < 12; r++) for (let c = 22; c < 26; c++) wf[r + '_' + c] = 'water';
+      CUR.yardFloor = wf; CUR.decoLife = {}; _decoStateVer++;
+      const Sx = _guestScan(CUR), has = k => !!_guestSpot(k, Sx);
+      out('손님_조건_자리', has('frog') && has('mallard') && has('sparrow') && has('magpie') && has('squirrel') && has('ladybug') && has('hedgehog') && has('snowhare') && has('firefly')
+        && !has('heron') && !has('butterfly') && !has('bee'));
+      _decoSeasonOv = 'autumn'; _decoPhaseOv = 'day'; _decoStateVer++;
+      const t1 = _guestToday(CUR).map(x => x.g.k), t2 = (_guestMemo = null, _guestToday(CUR).map(x => x.g.k));
+      out('손님_하루최대둘_같은날같은손님', t1.length === 2 && t1.join() === t2.join() && t1.every(k => GUESTS.find(g => g.k === k).sea.includes('autumn')));
+      {   //  때 조건 — 큰 나무 하나만 있는 마당: 낮엔 아무도 · 밤엔 부엉이
+        const hk = CUR.houseDecorations, fk = CUR.yardFloor;
+        CUR.houseDecorations = hk.filter(p => p.area !== 'yard').concat([_decoNew('d_y19', 'yard', 10, 10)]); CUR.yardFloor = {};
+        _decoPhaseOv = 'day'; _decoStateVer++; const d = _guestToday(CUR).map(x => x.g.k).join();
+        _decoPhaseOv = 'night'; _decoStateVer++; const n = _guestToday(CUR).map(x => x.g.k).join();
+        out('손님_때조건_부엉이는밤만', d === '' && n === 'owl' ? true : 'day[' + d + ']/night[' + n + ']');
+        CUR.houseDecorations = hk; CUR.yardFloor = fk;
+      }
+      _decoPhaseOv = 'day'; _decoStateVer++; _drawDeco(); await sleep(250);
+      const el = document.querySelector('#if-topview .deco-guest'), w0 = _lifeWrites, k0 = t1[0];
+      if (el) el.click(); await sleep(100);
+      const w1 = _lifeWrites; if (el) el.click(); await sleep(100);
+      out('손님_처음누름_잎쓰기1_또누름0', !!el && w1 - w0 === 1 && _lifeWrites === w1 && _lifeGet(CUR).s[k0] === _lifeDay());
+      //  못 만난 손님 먼저 — 만난 손님은 다음 순서로 밀린다
+      _decoStateVer++; const t3 = _guestToday(CUR).map(x => x.g.k);
+      out('손님_못만난손님먼저', t3.length === 2 && t3.indexOf(k0) < 0);   // 가을에 올 수 있는 손님 다섯 — 만난 손님은 뒤로
+      //  동물이 하나도 없어도 층이 생겨 손님이 온다
+      out('손님_동물없어도옴', !CUR.houseDecorations.some(p => p.area === 'yard' && ANIM_DECO[p.id]) && document.querySelectorAll('#if-topview .deco-guest').length >= 1);
+      //  친구 구경 — 반응만(쓰기 0)
+      const fr = JSON.parse(JSON.stringify(CUR)); fr.id = 'friend-g'; fr.name = '친구'; fr.decoLife = {};
+      openFriendFullscreen(fr); await sleep(400);
+      const fe = document.querySelector('#ff-topview .deco-guest'), w2 = _lifeWrites; if (fe) fe.click(); await sleep(100);
+      out('손님_친구구경_쓰기0', !!fe && _lifeWrites === w2 && JSON.stringify(fr.decoLife) === '{}');
+      closeFriendFullscreen(); await sleep(100);
+      out('손님_저장0_다른칸', JSON.stringify([CUR.inventory, CUR.gold]) === sv0);
+      //  밤 — #night 조각(디자인 #1099) · 반딧불은 어둡게 필터를 안 받는다(빛) · 다른 손님은 받는다
+      //  소나무 + 연못 16칸만 — 여름 밤에 올 수 있는 손님은 까치 · 반딧불 둘뿐
+      CUR.houseDecorations = (keepH || []).filter(p => p.area !== 'yard').concat([_decoNew('d_y46', 'yard', 5, 12)]); CUR.yardFloor = wf;
+      _decoSeasonOv = 'summer'; _decoPhaseOv = 'night'; _decoPhaseSync(); _decoStateVer++; _guestMemo = null; _drawDeco(); await sleep(300);
+      const ffly = [...document.querySelectorAll('#if-topview .deco-guest')].find(e => /손님 반딧불/.test(e.getAttribute('aria-label') || ''));
+      const other = [...document.querySelectorAll('#if-topview .deco-guest')].find(e => e !== ffly);
+      const fl2 = e => e ? getComputedStyle(e).filter : '';
+      out('손님_밤_조각_반딧불빛', !!ffly && /night/.test(ffly.querySelector('.dgu-art').src) && ffly.classList.contains('glow') && fl2(ffly) === 'none' && (!other || fl2(other) !== 'none')
+        ? true : { 반딧불: !!ffly, 조각: ffly && ffly.querySelector('.dgu-art').src.slice(-12), 필터: fl2(ffly), 다른: fl2(other) });
+      _decoPhaseOv = 'day'; _decoPhaseSync();
+      CUR.houseDecorations = keepH; CUR.yardFloor = keepF; CUR.decoLife = keepL; _decoSeasonOv = null; _decoPhaseOv = null; _decoStateVer++; _drawDeco();
+    }
+
     //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
     if (typeof _yardLookDev !== 'undefined' && typeof _starGroundFill === 'function' && _ifMode) {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }

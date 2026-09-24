@@ -9305,6 +9305,150 @@ function _lifeGiftTake(u, el) {
   if (_lifeCard && _lifeCard.u === u) _lifeCardOpen(_lifeCard.st);
   return true;
 }
+// [DECO-GUEST-1] 손님 — 놓은 것 + 자리(+ 계절 · 때)를 보고 그날 찾아온다(디자인 docs/deco_guests_art_20260924.md · 저장 설계 docs/deco_guests_design.md §4).
+//  계산만 한다(저장 0) — 그날 올 수 있는 손님 중 최대 둘 · 아직 못 만난 손님 먼저, 그다음 hash(학생, 날) · 같은 날 다시 열어도 같은 손님. 떠나거나 벌 없음.
+//  처음 누른 날만 decoLife.s[손님] = 오늘(잎 쓰기 하나 · 평생 13번) → ⭐ 스티커 · 반짝(fx_first_meet). 친구 구경은 반응만(쓰기 0 · §7).
+//  '물 몇 칸' = 이어진 물 바닥 칸 수 · '곁' = 둘레 3칸(디자인 표 그대로). sea = 계절(별빛 줄은 여름) · tm = 때(없으면 아무 때).
+const GUESTS = [
+  { k: 'frog', nm: '개구리', sea: 'spring summer autumn', say: '개굴! 갈대 사이가 좋아요', hint: '연못가 갈대 사이에서 개굴 소리가…' },
+  { k: 'heron', nm: '왜가리', sea: 'summer autumn', say: '넓은 연못 징검돌에서 쉬어 가요', hint: '넓은 연못의 징검돌 위에 누가 서 있을까' },
+  { k: 'butterfly', nm: '나비', sea: 'spring summer', say: '꽃밭이 넓어서 놀러 왔어요', hint: '꽃밭이 넓으면 날아와요', fly: 1 },
+  { k: 'sparrow', nm: '참새', sea: 'spring summer autumn winter', say: '짹짹! 곡식 냄새가 나요', hint: '곡식이 있는 곳에 짹짹' },
+  { k: 'magpie', nm: '까치', sea: 'spring summer autumn winter', say: '깍깍! 반가운 소식이에요', hint: '소나무 꼭대기에 반가운 손님이', top: 1 },
+  { k: 'squirrel', nm: '다람쥐', sea: 'autumn', say: '도토리가 어디 있을까?', hint: '가을 나무 아래 도토리를 찾는 누군가…' },
+  { k: 'bee', nm: '꿀벌', sea: 'summer', say: '붕붕! 꿀이 가득해요', hint: '해바라기가 많으면 붕붕…', fly: 1 },
+  { k: 'ladybug', nm: '무당벌레', sea: 'spring summer', say: '장미 잎이 폭신해요', hint: '장미 곁에 빨간 점이…', small: 1 },
+  { k: 'hedgehog', nm: '고슴도치', sea: 'spring summer autumn', tm: 'evening', say: '부스럭… 저녁 산책 중이에요', hint: '관목 덤불 속 부스럭…' },
+  { k: 'owl', nm: '부엉이', sea: 'spring summer autumn winter', tm: 'night', say: '부엉~ 밤 나무가 좋아요', hint: '큰 나무에 밤 손님이…', top: 1 },
+  { k: 'mallard', nm: '청둥오리', sea: 'autumn winter', say: '꽥! 아주 넓은 물이 좋아요', hint: '아주 넓은 물을 좋아해요' },
+  { k: 'snowhare', nm: '눈토끼', sea: 'winter', say: '눈 오는 날엔 관목 곁이 포근해요', hint: '눈 오는 날 관목 곁에…' },
+  { k: 'firefly', nm: '반딧불', sea: 'summer', tm: 'night', say: '반짝반짝… 여름 밤 물가예요', hint: '여름 밤 물가에 작은 불빛이…', fly: 1, small: 1 },
+];
+const GUEST_LEAF_TREES = ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'];   // 다람쥐 — 잎 나무(계절 낙엽과 같은 목록)
+function _guestHash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+//  마당을 한 번 훑은 것(물 덩어리 · 꽃밭 덩어리 · 장식 자리) — 손님 조건이 같이 쓴다
+function _guestScan(student) {
+  const fl = _yardFloorGet(student), name = (r, c) => _floorParse(fl[r + '_' + c]).name;
+  const comps = (want) => {   // 이어진(상하좌우) 칸 덩어리들 — 큰 것부터
+    const seen = new Set(), out = [];
+    Object.keys(fl).forEach(k => {
+      if (seen.has(k)) return;
+      const [r0, c0] = k.split('_').map(Number);
+      if (!want(name(r0, c0))) return;
+      const cells = [], q = [[r0, c0]]; seen.add(k);
+      while (q.length) { const [r, c] = q.pop(); cells.push([r, c]);
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => { const kk = (r + dr) + '_' + (c + dc); if (!seen.has(kk) && fl[kk] !== undefined && want(name(r + dr, c + dc))) { seen.add(kk); q.push([r + dr, c + dc]); } }); }
+      out.push(cells);
+    });
+    return out.sort((a, b) => b.length - a.length);
+  };
+  const water = comps(t => t === 'water'), beds = comps(t => !!_FLOOR_EDGE_COLOR[t] || t === 'wildflower');
+  const decos = _decoList(student).filter(p => p.area === 'yard');
+  return { water, beds, decos, of: ids => decos.filter(p => ids.indexOf(p.id) >= 0) };
+}
+//  칸 거리(발자리 네모끼리 · 체비셰프)
+function _guestGap(p, q) { const a = getDecoSize(p.id), b = getDecoSize(q.id);
+  const dr = Math.max(0, q.row - (p.row + a.h - 1), p.row - (q.row + b.h - 1)), dc = Math.max(0, q.col - (p.col + a.w - 1), p.col - (q.col + b.w - 1)); return Math.max(dr, dc); }
+function _guestBeside(p) { const z = getDecoSize(p.id); return { r: p.row + z.h - 1, c: p.col + z.w, deco: p }; }   // 발자리 오른쪽 옆 칸
+function _guestOn(p, top) { const z = getDecoSize(p.id); return { r: p.row + z.h - 1, c: p.col + (z.w - 1) / 2, deco: p, top: !!top }; }
+//  손님 k 가 올 자리(없으면 null)
+function _guestSpot(k, S) {
+  const w = S.water, big = n => w.find(cc => cc.length >= n), near = (p, cells, d) => cells.some(([r, c]) => { const z = getDecoSize(p.id);
+    return r >= p.row - d && r <= p.row + z.h - 1 + d && c >= p.col - d && c <= p.col + z.w - 1 + d; });
+  const mid = cells => cells[Math.floor(cells.length / 2)];
+  switch (k) {
+    case 'frog': { const cc = big(4), p = cc && S.of(['d_y29']).find(q => near(q, cc, 1)); return p ? _guestBeside(p) : null; }
+    case 'heron': { const cc = big(9), p = cc && S.of(['d_y30']).find(q => near(q, cc, 1)); return p ? _guestOn(p) : null; }
+    case 'butterfly': {
+      const b9 = S.beds.find(cc => cc.length >= 9); if (b9) { const [r, c] = mid(b9); return { r: r - .6, c, fly: 1 }; }
+      for (const cc of S.beds) for (const [r, c] of cc) if (w.some(wc => wc.some(([r2, c2]) => Math.max(Math.abs(r2 - r), Math.abs(c2 - c)) <= 3))) return { r: r - .6, c, fly: 1 };
+      return null;
+    }
+    case 'sparrow': { const p = S.of(['d_y25', 'd_y35', 'd_y36'])[0]; return p ? _guestBeside(p) : null; }
+    case 'magpie': { const p = S.of(['d_y46'])[0]; return p ? _guestOn(p, 1) : null; }
+    case 'squirrel': { const t = S.of(GUEST_LEAF_TREES); for (let i = 0; i < t.length; i++) for (let j = i + 1; j < t.length; j++) if (_guestGap(t[i], t[j]) <= 3) return _guestBeside(t[i]); return null; }
+    case 'bee': { const f = S.of(['d_y7', 'd_y41']); return f.length >= 3 ? Object.assign(_guestOn(f[0]), { r: _guestOn(f[0]).r - .7, fly: 1 }) : null; }
+    case 'ladybug': { const p = S.of(['d_y1', 'd_y43', 'd_y21'])[0]; return p ? _guestOn(p) : null; }
+    case 'hedgehog': { const f = S.of(['d_y15']); return f.length >= 2 ? _guestBeside(f[0]) : null; }
+    case 'owl': { const p = S.of(['d_y19', 'd_y12'])[0]; return p ? _guestOn(p, 1) : null; }
+    case 'mallard': { const cc = big(16); if (!cc) return null; const [r, c] = mid(cc); return { r, c }; }
+    case 'snowhare': { const p = S.of(['d_y15', 'd_y46'])[0]; return p ? _guestBeside(p) : null; }
+    case 'firefly': { const cc = big(4); if (!cc) return null; const [r, c] = cc[0]; return { r: r - .8, c, fly: 1 }; }
+  }
+  return null;
+}
+//  오늘 온 손님(최대 둘) — 판 번호 · 학생 · 공간 · 날 · 계절 · 때가 같으면 다시 안 센다
+let _guestMemo = null;
+function _guestToday(student) {
+  if (!student || typeof _yardLook !== 'function') return [];
+  const lk = _yardLook(), ph = _yardPhase(), day = _lifeDay();
+  const key = [student.id, DECO_SPACE, typeof _decoStateVer !== 'undefined' ? _decoStateVer : 0, day, lk.season, ph, DY.rows, DY.cols].join('|');
+  if (_guestMemo && _guestMemo.key === key) return _guestMemo.list;
+  const S = _guestScan(student), met = _lifeGet(student).s, out = [];
+  GUESTS.forEach(g => {
+    if (g.sea.split(' ').indexOf(lk.season) < 0 || (g.tm && g.tm !== ph)) return;
+    const at = _guestSpot(g.k, S);
+    if (at && at.r >= 0 && at.c >= 0 && at.c < DY.cols && at.r < DY.rows) out.push({ g, at, met: !!met[g.k] });
+  });
+  out.sort((a, b) => (a.met - b.met) || (_guestHash(student.id + '|' + day + '|' + a.g.k) - _guestHash(student.id + '|' + day + '|' + b.g.k)));
+  const list = out.slice(0, 2);
+  _guestMemo = { key, list };
+  return list;
+}
+//  동물 층 안에 손님을 둔다(선물과 같은 층 · 누르면 말 · 처음이면 스티커)
+function _guestSync(rec, student, C, hostId) {
+  const mine = hostId !== 'ff-topview' && typeof CUR !== 'undefined' && student === CUR;
+  const want = new Map(_guestToday(student).map(x => [x.g.k, x]));
+  //  밤(별빛 포함)이면 #night 조각(까치 · 고슴도치 달빛 테 · 부엉이 눈 · 반딧불 빛 — 디자인 #1099 · 조각 없는 손님은 무시) · 반딧불은 밤 어둡게 필터를 안 받는다(빛으로 보이게)
+  const nf = _yardPhase() === 'night' ? 'night' : '';
+  const art = k => (typeof _artSrc === 'function' && _artSrc('deco/guest_' + k + '.svg', nf || undefined)) || ('./assets/deco/guest_' + k + '.svg' + (nf ? '#' + nf : ''));
+  rec.guests = rec.guests || new Map();
+  rec.guests.forEach((el, k) => { if (!want.has(k)) { if (el.parentNode) el.parentNode.removeChild(el); rec.guests.delete(k); } });
+  want.forEach(({ g, at, met }, k) => {
+    let el = rec.guests.get(k);
+    if (!el) {
+      el = document.createElement('button');
+      el.type = 'button'; el.className = 'deco-guest'; el.setAttribute('aria-label', '손님 ' + g.nm);
+      el.innerHTML = `<img class="dgu-art" src="${art(k)}" alt="${g.nm}"><img class="dgu-tw" src="${_lifeArt('fx_twinkle')}" alt="">`; el._nf = nf;
+      ['pointerdown', 'touchstart', 'mousedown'].forEach(t => el.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+      el.addEventListener('click', e => { e.stopPropagation(); _guestTap(k, el, mine); });
+      rec.world.appendChild(el); rec.guests.set(k, el);
+    }
+    el.classList.toggle('is-new', mine && !met);   // 아직 못 만난 손님은 반짝 — 눌러 보게
+    if (el._nf !== nf) { el._nf = nf; const im = el.querySelector('.dgu-art'); if (im) im.src = art(k); }   // 때가 바뀌면 그림 조각도
+    el.classList.toggle('glow', k === 'firefly' && !!nf);
+    el.classList.toggle('fly', !!(at.fly || g.fly));
+    //  크기 = 칸의 .78(작은 벌레 .5 · 디자인 '칸의 .5~.8' 위쪽 — .62 는 칸 27px 에서 17px 라 잘 안 보였다) · 누르는 자리 44px 이상 · 발은 그 칸 아래(나무 위 손님은 그림 꼭대기)
+    const gz = Math.max(16, Math.round(C * (g.small ? .5 : .78))), hit = Math.max(44, gz);
+    let footY = (at.r + 1) * C;
+    if (at.top && at.deco) {
+      const im = _decoImg(at.deco.id), z = getDecoSize(at.deco.id);
+      const hDraw = im && im.naturalWidth ? z.w * C * im.naturalHeight / im.naturalWidth : (z.h + 1) * C;
+      footY = (at.deco.row + z.h) * C - hDraw * .86;
+    }
+    const cx = (at.c + .5) * C;
+    el.style.width = el.style.height = hit + 'px'; el.style.setProperty('--g', gz + 'px');
+    el.style.transform = 'translate(' + Math.round(cx - hit / 2) + 'px,' + Math.round(footY - gz / 2 - hit / 2 - gz * .35) + 'px)';
+    el.style.zIndex = String(Math.round(at.r + 2));
+  });
+}
+function _guestTap(k, el, mine) {
+  const g = GUESTS.find(x => x.k === k);
+  if (!g) return false;
+  const say = document.createElement('div');
+  say.className = 'deco-anim-say'; say.textContent = g.say;
+  el.appendChild(say); setTimeout(() => { if (say.parentNode) say.parentNode.removeChild(say); }, 1600);
+  if (!mine || !CUR) return false;   // 친구 구경 — 반응만(쓰기 0)
+  const L = _lifeGet(CUR);
+  if (L.ro || L.s[k]) return false;   // 이미 만난 손님 — 말만(쓰기 0)
+  _lifeWrite(CUR, { ['s/' + k]: _lifeDay() });   // 처음 만난 날 — 잎 쓰기 하나
+  el.classList.remove('is-new');
+  const fx = document.createElement('img'); fx.className = 'dgu-first'; fx.src = _lifeArt('fx_first_meet'); fx.alt = '';
+  el.appendChild(fx); setTimeout(() => { if (fx.parentNode) fx.parentNode.removeChild(fx); }, 900);
+  const n = Object.keys(_lifeGet(CUR).s).filter(x => GUESTS.some(q => q.k === x)).length;
+  toast(`⭐ 처음 만난 손님 — ${g.nm}! 스티커를 받았어요 (손님 도감 ${n}/${GUESTS.length})`);
+  return true;
+}
 //  🎁 선물 상자 — 받은 것마다 개수 · 못 받은 것은 '?' · "골드가 아니에요"
 function decoGiftBox(open) {
   let box = document.getElementById('deco-giftbox');
@@ -9349,7 +9493,8 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
 
   const rows = DY.rows, cols = DY.cols;
   const list = _decoList(student).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);   // [DECO-SPACE-1]
-  if (!list.length) { _animStopLayer(hostId); return; }
+  const guests = typeof _guestToday === 'function' ? _guestToday(student) : [];   // [DECO-GUEST-1] 동물이 없어도 손님이 오는 날이면 층을 만든다
+  if (!list.length && !guests.length) { _animStopLayer(hostId); return; }
 
   let rec = _animLayers.get(hostId);
   if (!rec) {
@@ -9427,7 +9572,8 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     rec.items.delete(k);
   });
 
-  if (hostId !== 'ff-topview' && typeof CUR !== 'undefined' && student === CUR && typeof _lifeGiftSync === 'function') _lifeGiftSync(rec, student, C);   // [DECO-LIFE-3] 오늘 두고 간 선물(내 마당만 · 친구 구경은 안 보임)
+  if (hostId !== 'ff-topview' && typeof CUR !== 'undefined' && student === CUR && typeof _lifeGiftSync === 'function') _lifeGiftSync(rec, student, C);
+  if (typeof _guestSync === 'function') _guestSync(rec, student, C, hostId);   // [DECO-GUEST-1] 손님(친구 구경도 · 쓰기는 내 마당만)   // [DECO-LIFE-3] 오늘 두고 간 선물(내 마당만 · 친구 구경은 안 보임)
 
   if (!_animHooked) {
     _animHooked = true;
