@@ -74,6 +74,20 @@ test('규칙 덮기: VRULES 에 없는 키는 멈춘다', () => {
   ok(r.status !== 0 && /VRULES 에 없음/.test(r.stderr + r.stdout), '멈추지 않음');
 });
 
+/* [MAC-NOWATER] 물 끔 — 기본 마을은 필요 셋 · 옛 우물 숨김 · 목표 bench1 · 우물을 지키는 판(town3)은 옛 넷 · 옛 저장본의 well 은 bench1 으로 이어진다 */
+test('물 끔: 기본 마을 필요 셋 · town3 는 물 그대로 · pop88 은 목표 bench1 을 잇는다', () => {
+  const nw = (query, save) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${save ? `fs.readFileSync(${JSON.stringify(path.join(ROOT, save))}, 'utf8')` : 'null'}, seed: 1, query: ${JSON.stringify(query)} });
+process.stdout.write('@@' + JSON.stringify(w.__needWater()) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8' });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('__needWater 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const a = nw(''), b = nw('stage=town3'), c = nw('', 'village/stages/boards/pop88.json');
+  ok(a.필요.join() === '장보기,놀이,쉼' && a.돌아섬필요.join() === '장보기,놀이,쉼', '기본 필요 ' + a.필요.join());
+  ok(a.우물.필요 === null && a.우물.묶음 === '(숨김)' && a.분수 === '쉼' && a.연못.join() === '쉼,', '우물·분수·연못 ' + JSON.stringify([a.우물, a.분수, a.연못]));
+  ok(a.목표.join() === 'bench1' && a.말.셋멀.startsWith('두 가지 더') && a.말.점.join() === '○○,●○,●●', '목표·말 ' + JSON.stringify([a.목표, a.말]));
+  ok(!b.물끔 && b.필요.join() === '물,장보기,놀이,쉼' && b.목표.join() === 'well' && b.말.셋멀.startsWith('하나만 더'), 'town3 ' + JSON.stringify(b.필요));
+  ok(c.이음 === true && c.목표이음 === 1, 'pop88 이음 ' + c.이음);
+});
+
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
 const f = results.filter(r => r[0] === 'FAIL').length;
 console.log(`\n요약: PASS ${results.length - f} · FAIL ${f}`);
