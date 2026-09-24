@@ -3722,7 +3722,7 @@ function fcartPath(j) {
     for (let i = end; i >= 0; i = prev.get(i)) path.push(i); path.reverse(); }
   FCART.길.set(key, { gen: FLOW.gen, path }); return path; }
 function fcartMesh() {
-  const all = cartParts(); if (FCART.mesh && FCART.parts === all && FCART.pp === PERSON_PARTS) return FCART.mesh;   /* 사람 모델(glb)이 늦게 오면 다시 굽는다 */
+  const all = cartParts(); if (FCART.mesh && FCART.parts === all && FCART.pp === PERSON_PARTS && FCART.st === cstepOn()) return FCART.mesh;   /* 사람 모델(glb)이 늦게 오면 다시 굽는다 */
   if (FCART.mesh) { scene.remove(FCART.mesh); FCART.mesh.geometry.dispose(); }
   const parts = all.filter(pt => !pt.n && pt.p[1] + pt.s[1] / 2 <= 2.4);   /* 등불 기둥·팔·등불(높이 2.4 위)은 뺀다 */
   const pos = [], nrm = [], col = [], ix = [];
@@ -3734,7 +3734,8 @@ function fcartMesh() {
      그래서 **수레 모양 안에 끄는 사람을 함께 굽는다**: 짐과 같은 시계로 수레와 한 몸으로 가고, 막히지 않고, draw call 도 그대로다.
      사람 모양은 마을 사람과 같은 것(glb 면 재료별 기하 · 아니면 상자 부위) · 옷은 일터 색(문 밖 일꾼과 같은 파랑) · 손잡이 앞(+z · pull)에 앞을 보고 선다. */
   const R2 = window.VRULES.flowLook, PC = { top: 0x4f7fa0, skin: 0xf1c7a3, hair: 0x3a2a1e };
-  if (R2.끄는사람 !== false) PERSON_PARTS.forEach(pt => { const base = pt.geo ? { pos: pt.geo.attributes.position.array, nrm: pt.geo.attributes.normal.array, idx: pt.geo.index ? pt.geo.index.array : Array.from({ length: pt.geo.attributes.position.count }, (_, k) => k), nv: pt.geo.attributes.position.count } : BASE[pt.g];
+  FCART.st = cstepOn(); if (R2.끄는사람 !== false && !FCART.st) PERSON_PARTS.forEach(pt => {   /* [ACT-CARTSTEP] 켜져 있으면 끄는 이웃은 따로(걷는다) */
+    const base = pt.geo ? { pos: pt.geo.attributes.position.array, nrm: pt.geo.attributes.normal.array, idx: pt.geo.index ? pt.geo.index.array : Array.from({ length: pt.geo.attributes.position.count }, (_, k) => k), nv: pt.geo.attributes.position.count } : BASE[pt.g];
       if (!base) return; cartPartMatrix({ p: [pt.p[0], pt.p[1], pt.p[2] + (R2.pull || 3.0)], s: pt.s, ry: pt.ry || 0 }, cartP); cartN.getNormalMatrix(cartP); cartC.setHex(typeof pt.c === 'number' ? pt.c : (PC[pt.c] || 0x888888)); const off = pos.length / 3;
       for (let v = 0; v < base.nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); pos.push(cartV.x, cartV.y, cartV.z);
         cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); nrm.push(cartV.x, cartV.y, cartV.z); col.push(cartC.r, cartC.g, cartC.b); }
@@ -3753,8 +3754,59 @@ function flowCartDraw() {
     const x0 = wx(cX(path[i0])), z0 = wz(cY(path[i0])), x1 = wx(cX(path[i1])), z1 = wz(cY(path[i1]));
     const dir = i1 !== i0 ? Math.atan2(x1 - x0, z1 - z0) : (FCART.방향.get(j) || 0); FCART.방향.set(j, dir);
     folkDummy.position.set(x0 + (x1 - x0) * u, 0.2, z0 + (z1 - z0) * u); folkDummy.rotation.set(0, dir, 0); folkDummy.scale.set(1, 1, 1); folkDummy.updateMatrix();
-    m.setMatrixAt(n++, folkDummy.matrix); }
+    m.setMatrixAt(n++, folkDummy.matrix); if (cstepOn()) cstepPut(j, folkDummy.position.x, folkDummy.position.z, dir, s); }   // [ACT-CARTSTEP] 끄는 이웃은 따로 걷는다
   m.count = n; if (n) m.instanceMatrix.needsUpdate = true; FCART.stats.그림 = n; }
+/* ── [ACT-CARTSTEP] 끄는 이웃이 걷는다 — 다리를 번갈아 내딛고, 걸음마다 들썩이고, 앞으로 조금 기울어 끈다 (보스 09-23 · 33회 되밟기 뒤 '미끄러짐') ──
+   #884 의 끄는 이웃은 수레 모양 안에 **굳은 채** 구워져 있어 수레와 함께 미끄러졌다(마을 사람은 걸을 때 들썩이기라도 한다).
+   이제 끄는 이웃만 수레 모양에서 떼어 두 묶음으로 그린다: 몸(들썩임 · 앞기울임) · 다리(person.glb 의 바지·신발은 왼·오른 상자 둘 — 왼쪽 하나를 굽고 두 번 그린다 · 엉덩이 축으로 번갈아).
+   걸음 박자는 **수레가 간 거리**로 센다(짐과 같은 시계) — 멈추면 다리가 모이고, 배속이 빨라도 한 프레임에 maxStep 까지만 돈다(빨리 떨지 않게).
+   사람 모델이 상자 부위(glb 없음)면 다리가 한 덩이라 몸만 들썩인다. 수레가 없으면 두 묶음 개수 0(draw call 0) · 있으면 +2.
+   판정·저장 0 · 분류 '연기'. 끄면(VRULES.cartStep.on = false) #884 그대로(굳은 채 구운 사람). */
+(window.VRULES = window.VRULES || {}).cartStep = { on: true, stride: 3.0, swing: 0.55, bob: 0.09, lean: 0.14, maxStep: 0.35 };   /* stride = 두 걸음 길이(1배속 수레 약 6.7/초 → 초당 2.2번) · maxStep = 한 프레임 최대 위상(4배속에도 60fps 에서 초당 3.3번까지) */
+const CSTEP = { body: null, leg: null, pp: null, hip: 0, lx: 0, ph: new WeakMap(), n: 0, o: new THREE.Object3D(), stats: { 그림: 0, 다리: 0, 흔듦: 0 } };
+CSTEP.o.rotation.order = 'YXZ';
+const cstepOn = () => !!(window.VRULES.cartStep && window.VRULES.cartStep.on && window.VRULES.flowLook.끄는사람 !== false);
+const cstepLegPart = pt => !!pt.geo && (pt.c === 0x3b4252 || pt.c === 0x2a1b10);   /* glb 의 바지·신발(personGlbParts 의 색) */
+function cstepMeshes() {
+  if (CSTEP.body && CSTEP.pp === PERSON_PARTS) return CSTEP;
+  [CSTEP.body, CSTEP.leg].forEach(m => { if (m) { scene.remove(m); m.geometry.dispose(); } }); CSTEP.body = CSTEP.leg = null;
+  const PC = { top: 0x4f7fa0, skin: 0xf1c7a3, hair: 0x3a2a1e }, colOf = pt => typeof pt.c === 'number' ? pt.c : (PC[pt.c] || 0x888888);
+  const src = pt => pt.geo ? { pos: pt.geo.attributes.position.array, nrm: pt.geo.attributes.normal.array, idx: pt.geo.index ? pt.geo.index.array : Array.from({ length: pt.geo.attributes.position.count }, (_, k) => k) } : BASE[pt.g];
+  /* 몸 — 다리를 뺀 부위(상자 부위면 전부) */
+  const B = { pos: [], nrm: [], col: [], ix: [] };
+  PERSON_PARTS.forEach(pt => { if (cstepLegPart(pt)) return; const base = src(pt); if (!base) return;
+    cartPartMatrix({ p: pt.p, s: pt.s, ry: pt.ry || 0 }, cartP); cartN.getNormalMatrix(cartP); cartC.setHex(colOf(pt)); const nv = base.pos.length / 3, off = B.pos.length / 3;
+    for (let v = 0; v < nv; v++) { cartV.set(base.pos[v * 3], base.pos[v * 3 + 1], base.pos[v * 3 + 2]).applyMatrix4(cartP); B.pos.push(cartV.x, cartV.y, cartV.z);
+      cartV.set(base.nrm[v * 3], base.nrm[v * 3 + 1], base.nrm[v * 3 + 2]).applyMatrix3(cartN).normalize(); B.nrm.push(cartV.x, cartV.y, cartV.z); B.col.push(cartC.r, cartC.g, cartC.b); }
+    for (let t = 0; t < base.idx.length; t++) B.ix.push(base.idx[t] + off); });
+  /* 다리 — 왼쪽(삼각형 가운데 x < 0)만 · 엉덩이(바지 위 끝)가 원점이 되게 */
+  const L = { pos: [], nrm: [], col: [], ix: [] }, legs = PERSON_PARTS.filter(cstepLegPart); let hip = 0, xs = 0, xn = 0;
+  legs.forEach(pt => { const a = pt.geo.attributes.position.array; for (let v = 0; v < a.length; v += 3) if (a[v] < 0) { if (pt.c === 0x3b4252) hip = Math.max(hip, a[v + 1] * pt.s[1]); xs += a[v] * pt.s[0]; xn++; } });
+  const lx = xn ? xs / xn : 0;
+  legs.forEach(pt => { const base = src(pt); cartC.setHex(colOf(pt));
+    for (let t = 0; t < base.idx.length; t += 3) { const i3 = [base.idx[t], base.idx[t + 1], base.idx[t + 2]]; if (i3.reduce((s, i) => s + base.pos[i * 3], 0) >= 0) continue;
+      i3.forEach(i => { L.pos.push(base.pos[i * 3] * pt.s[0] - lx, base.pos[i * 3 + 1] * pt.s[1] - hip, base.pos[i * 3 + 2] * pt.s[2]); L.nrm.push(base.nrm[i * 3], base.nrm[i * 3 + 1], base.nrm[i * 3 + 2]); L.col.push(cartC.r, cartC.g, cartC.b); L.ix.push(L.ix.length); }); } });
+  const mk = G => { if (!G.ix.length) return null; const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(G.pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(G.nrm, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(G.col, 3)); geo.setIndex(G.ix); const m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 16);
+    m.count = 0; m.frustumCulled = false; m.castShadow = true; scene.add(m); return m; };
+  CSTEP.body = mk(B); CSTEP.leg = mk(L); CSTEP.hip = hip; CSTEP.lx = lx; CSTEP.pp = PERSON_PARTS; return CSTEP; }
+/* 수레 하나의 끄는 이웃 — x·z·dir 은 수레 자리, s 는 길을 간 칸 수 */
+function cstepPut(j, x, z, dir, s) { const R = window.VRULES.cartStep, C = cstepMeshes(); if (!C.body || CSTEP.n >= 8) return;
+  const d = s * CS; let ph = CSTEP.ph.get(j); if (!ph) { ph = { d, a: 0 }; CSTEP.ph.set(j, ph); }
+  const dd = d - ph.d; ph.d = d;
+  if (dd > 1e-4) ph.a += Math.min(R.maxStep, dd / R.stride * 6.283); else ph.a += (Math.round(ph.a / Math.PI) * Math.PI - ph.a) * 0.15;   /* 멈추면 다리가 모인다 */
+  const pull = window.VRULES.flowLook.pull || 3.0, co = Math.cos(dir), si = Math.sin(dir), bob = Math.abs(Math.cos(ph.a)) * R.bob, sw = Math.sin(ph.a) * R.swing, o = CSTEP.o, k = CSTEP.n++;
+  o.position.set(x + si * pull, 0.2 + bob, z + co * pull); o.rotation.set(R.lean, dir, 0); o.scale.set(1, 1, 1); o.updateMatrix(); C.body.setMatrixAt(k, o.matrix);
+  if (!C.leg) return;
+  const hy = CSTEP.hip * Math.cos(R.lean), hz = pull + CSTEP.hip * Math.sin(R.lean);
+  [-1, 1].forEach((side, q) => { const lx = CSTEP.lx * -side;   /* 왼쪽 상자의 가운데 x(음수)를 오른쪽엔 뒤집어서 */
+    o.position.set(x + lx * co + hz * si, 0.2 + bob + hy, z - lx * si + hz * co); o.rotation.set(R.lean + (q ? sw : -sw), dir, 0); o.updateMatrix(); C.leg.setMatrixAt(k * 2 + q, o.matrix); });
+  CSTEP.stats.다리 = k + 1; if (!k) CSTEP.stats.흔듦 = +sw.toFixed(2); }
+{ const fcd = flowCartDraw; flowCartDraw = function () { CSTEP.n = 0; CSTEP.stats.다리 = 0; const r = fcd.apply(this, arguments);
+    if (CSTEP.body) { CSTEP.body.count = CSTEP.n; if (CSTEP.n) CSTEP.body.instanceMatrix.needsUpdate = true; }
+    if (CSTEP.leg) { CSTEP.leg.count = CSTEP.stats.다리 * 2; if (CSTEP.leg.count) CSTEP.leg.instanceMatrix.needsUpdate = true; }
+    CSTEP.stats.그림 = CSTEP.n; return r; }; }
+window.__cartStep = () => ({ 켜짐: cstepOn(), 엉덩이: +CSTEP.hip.toFixed(2), 다리모양: !!CSTEP.leg, ...CSTEP.stats });
 /* 닿는 틱에 가게 모습도 — 모습은 30틱마다 다시 합치므로(fsTick) 그대로 두면 수레가 닿고 3초 뒤에야 상자가 오른다 */
 { const ft = flowTick; flowTick = function () { const n0 = FLOW.stats.닿음, r = ft.apply(this, arguments);
     if (FLOW.stats.닿음 !== n0 && fcartOn() && fsOn()) { fsTick(); FCART.stats.닿는틱에다시합침++; } return r; }; }
