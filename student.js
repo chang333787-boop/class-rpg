@@ -10096,15 +10096,39 @@ function _isFarmCell(r, c) {
   return r >= startRow && r < startRow + rows && c >= startCol && c < startCol + cols;
 }
 
+// [DECO-FARM-ART-1] 밭 그림(디자인 #453 · assets/farm) — 모래색 체크 + 진행 막대 + 주황 테두리(UI 판)가 윤곽 그림들 사이에서 튀던 것(디자인 D12)
+//  흙 = tile_soil_a·b(옆 칸과 이어진다) · 작물 = 새싹(stage_sprout · 절반 전) → 포기(stage_grow) → 다 자라면 그 작물 아이콘 · 시듦 = stage_wither.
+//  진행 막대·주황 테두리는 뺀다(밭은 여기서 읽기만 — 거두기는 🌾 농장 탭). 그림이 아직 안 왔으면 옛 그리기.
+const _FARM_IMG = {};
+function _farmImg(name) {
+  const hit = _FARM_IMG[name];
+  if (hit) return hit.ok ? hit.img : null;
+  const src = _artSrc('farm/' + name + '.svg');   // [DECO-BUNDLE-1] 묶음을 받는 중이면 나중에
+  if (src === null) return null;
+  const img = new Image(), rec = { img, ok: false };
+  _FARM_IMG[name] = rec;
+  img.onload = () => { rec.ok = img.naturalWidth > 0; if (rec.ok) _drawDeco(); };
+  img.onerror = () => { rec.ok = false; };
+  img.src = src;
+  return null;
+}
 function _drawYardFarm(C) {
   if (DECO_SPACE !== 1) return;   // [DECO-PT-3] 밭은 공간 1 에만(그림도) — 공간 2·3 에서 장식을 가리던 것
   const farm = CUR.farm || [];
   const {startCol, startRow, cols, rows} = _getFarmZone();
   const ctx = _dCtx;
+  const soilA = _farmImg('tile_soil_a'), soilB = _farmImg('tile_soil_b');
+  const art = !!(soilA && soilB);   // [DECO-FARM-ART-1]
 
-  // 농장 외곽 배경
-  ctx.fillStyle = 'rgba(0,0,0,.25)';
-  ctx.fillRect(startCol*C - 2, startRow*C - 2, cols*C + 4, rows*C + 4);
+  if (art) {
+    //  둘레에 흙 그림자 한 겹 — 잔디 위에 갈아엎은 밭이 앉아 보이게(테두리 선 대신)
+    ctx.fillStyle = 'rgba(43,33,24,.35)';
+    ctx.beginPath(); ctx.roundRect(startCol * C - C * .06, startRow * C - C * .04, cols * C + C * .12, rows * C + C * .14, C * .12); ctx.fill();
+  } else {
+    // 농장 외곽 배경
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.fillRect(startCol*C - 2, startRow*C - 2, cols*C + 4, rows*C + 4);
+  }
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -10114,9 +10138,14 @@ function _drawYardFarm(C) {
       const slot = r * cols + c;
       const plot = farm.find(f => f.slot === slot);
 
-      // ── 바닥: 항상 모래색 (체크무늬) ──
-      ctx.fillStyle = (r + c) % 2 === 0 ? '#c8a855' : '#b89545';
-      ctx.fillRect(px+1, py+1, C-2, C-2);
+      if (art) {
+        const t = (gr * 3 + gc * 7) % 2 ? soilB : soilA;
+        ctx.drawImage(_svgBmp('farm:' + ((gr * 3 + gc * 7) % 2 ? 'b' : 'a'), t, C * 2, 1), px, py, C, C);
+      } else {
+        // ── 바닥: 항상 모래색 (체크무늬) ──
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#c8a855' : '#b89545';
+        ctx.fillRect(px+1, py+1, C-2, C-2);
+      }
 
       if (plot) {
         const sd = Utils.getSeedByCrop(plot.crop);
@@ -10125,6 +10154,24 @@ function _drawYardFarm(C) {
         const elapsed  = Date.now() - plot.planted;
         const withered = ready && elapsed > sd.growHours * 3600000 * 3;
         const pct      = Utils.cropProgress(plot.planted, sd.growHours);
+
+        if (art) {
+          //  [DECO-FARM-ART-1] 단계 그림 — 다 자란 것만 그 작물 아이콘(작물마다 그림이 따로 없다) + 옅은 빛
+          const stage = withered ? 'stage_wither' : !ready ? (pct < 50 ? 'stage_sprout' : 'stage_grow') : '';
+          const si = stage && _farmImg(stage);
+          if (si) ctx.drawImage(_svgBmp('farm:' + stage, si, C * 2, 1), px, py, C, C);
+          if (ready && !withered) {
+            const g = ctx.createRadialGradient(px + C / 2, py + C * .55, 0, px + C / 2, py + C * .55, C * .55);
+            g.addColorStop(0, 'rgba(255,236,150,.55)'); g.addColorStop(1, 'rgba(255,236,150,0)');
+            ctx.fillStyle = g; ctx.fillRect(px, py, C, C);
+          }
+          if ((ready && !withered) || (!si && !withered)) {
+            ctx.font = `${Math.max(C * .62, 8)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(ready ? sd.cropIcon : '🌱', px + C / 2, py + C * .5);
+          }
+          if (plot.isMutant && !withered) { ctx.font = `${Math.max(C * .32, 7)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⚡', px + C * .82, py + C * .2); }
+          continue;
+        }
 
         // ── 수확 가능 시 살짝 밝은 오버레이 ──
         if (ready && !withered) {
@@ -10152,10 +10199,12 @@ function _drawYardFarm(C) {
     }
   }
 
-  // 농장 테두리
-  ctx.strokeStyle = 'rgba(255,180,0,.6)';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(startCol*C, startRow*C, cols*C, rows*C);
+  if (!art) {
+    // 농장 테두리
+    ctx.strokeStyle = 'rgba(255,180,0,.6)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(startCol*C, startRow*C, cols*C, rows*C);
+  }
   // 저장용
   _dCv._farmZone = {startCol, startRow, cols, rows};
 }
