@@ -1298,7 +1298,7 @@ try {
   if (eAt < 0 || eEnd < 0) throw new Error('_FLOOR_EDGE_COLOR 표를 못 찾음');
   vm.runInContext(ART_PRELUDE(S) + 'const _FLOOR_IMG = {};' + NL + S.slice(vAt, vEnd + 2) + NL + S.slice(at, end + 3) + NL
     + sliceConst(S, '_FLOOR_BED_COLORS') + sliceConst(S, '_FLOOR_RIMS') + S.slice(eAt, eEnd + 4) + NL
-    + ['_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_floorPaint', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
+    + ['_seaNow', '_seaHash', '_floorImg', '_floorBaseName', '_floorIsGrass', '_bmpStep', '_svgBmp', '_floorBmp', '_floorPaint', '_drawFloorSVG'].map(n => sliceFn(S, n)).join(NL) + NL
     + 'const _SVG_BMP = new Map();' + NL
     + ';globalThis.__R = { _FLOOR_IMG, _FLOOR_VARIANTS, _FLOOR_COLORS, _FLOOR_BED_COLORS, _FLOOR_RIMS, _FLOOR_EDGE_COLOR, _floorImg, _floorIsGrass, _drawFloorSVG };', sb);
   const R = sb.__R, DIR = path.join(ROOT, 'assets', 'floor');
