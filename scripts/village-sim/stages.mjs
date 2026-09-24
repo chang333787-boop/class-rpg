@@ -9,7 +9,7 @@ const add = (kind, name, why) => results.push([kind, name, why || '']);
 const FIELDS = ['id', '이름', '교과', '질문', '되돌아보기', '현상', '변수', '시작', '규칙', '건물', '목표'];
 const SEMS = { kind: g => typeof g.k === 'string' && g.n > 0, pop: g => g.n > 0, hook: g => typeof g.훅 === 'string' && typeof g.n === 'number' && ['>=', '<='].includes(g.비교) };
 const HOOKS = ['일닿음%', '다있음%'];   // index.html STAGE_HOOKS 와 같게
-const 지형이름 = ['물', '모래'];   // index.html [MAC-TERRAIN] TERR_COL 과 같게(물가는 칠하기 색일 뿐)
+const 지형이름 = ['물', '모래', '비탈', '고개'];   // index.html [MAC-TERRAIN] TERR_NAMES 와 같게
 
 /* 마을을 한 번 실어 VRULES 기본값·건물 종류를 읽는다(시뮬 · 네트워크 0) */
 const probe = path.join(os.tmpdir(), 'village-stages-probe-' + process.pid + '.mjs');
@@ -32,12 +32,14 @@ process.stdout.write('@@' + JSON.stringify(bad) + '\\n'); process.exit(0);`);
   const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : list;
 }
 
-/* [MAC-TERRAIN] 지형이 깔린 판을 실제로 열어 — 바닥을 읽고 · 바다엔 길 ✕ · 물가 부두 ○ · 뭍 부두 ✕ · 풀밭 나무 ○ (시뮬 · 네트워크 0) */
+/* [MAC-TERRAIN] 지형이 깔린 판을 실제로 열어 규칙을 누른다(시뮬 · 네트워크 0). 한 수 = ['put', 종류, x, y] · ['erase', x, y] · ['kinds', [[x, y], …]] — 차례대로 */
 function terrainProbe(n, tries) {
   const f = path.join(os.tmpdir(), 'village-stages-terrain-' + process.pid + '.mjs');
   fs.writeFileSync(f, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: 'stage=' + ${JSON.stringify(n)} });
-const out = { t: w.__terrain ? w.__terrain() : null, r: ${JSON.stringify(tries)}.map(([k, x, y]) => { try { return w.__put(k, x, y, 0); } catch (e) { return 'ERR ' + e.message; } }) };
+const kind = (x, y) => { const s = w.__stream(x, y); return s.칸 ? s.칸.종류 : null; };
+const one = ([op, a, b, c]) => { try { if (op === 'put') return w.__put(a, b, c, 0); if (op === 'erase') return w.__erase(a, b); if (op === 'kinds') return a.map(([x, y]) => kind(x, y)); return 'ERR 모르는 수 ' + op; } catch (e) { return 'ERR ' + e.message; } };
+const out = { t: w.__terrain ? w.__terrain() : null, r: ${JSON.stringify(tries)}.map(one) };
 process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`);
   const r = spawnSync(process.execPath, [f], { encoding: 'utf8' }); fs.rmSync(f, { force: true });
   const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : { err: (r.stderr || '').trim().split('\n').slice(-1)[0] };
@@ -99,30 +101,41 @@ for (const f of files) {
     if (S.계절 != null && !철.includes(S.계절)) 나쁨.push('계절');
     ['풀', '바닥'].forEach(k => { const v = S[k]; if (v != null && !(typeof v === 'string' && (/^#[0-9a-fA-F]{6}$/.test(v) || /^[a-zA-Z]+$/.test(v)))) 나쁨.push(k); });
     나쁨.length ? add('FAIL', P('모습'), '칸이 틀림: ' + 나쁨.join(' ')) : add('PASS', P('모습 칸(계절·풀·바닥)')); }
-  if (def.지형 != null) { const L = def.지형 && def.지형.칸;   /* [MAC-TERRAIN] 지형 = 바닥(칸 네모 목록 · 뒤엣것이 덮음) */
+  if (def.지형 != null) { const L = def.지형 && def.지형.칸, SL = def.지형 && def.지형.개울;   /* [MAC-TERRAIN] 지형 = 바닥(칸 네모 목록 · 뒤엣것이 덮음) · 개울 = 판이 그린 곧은 줄 */
     const 나쁨 = Array.isArray(L) ? L.filter(r => !Array.isArray(r) || r.length !== 5 || r.slice(0, 4).some(v => !Number.isInteger(v) || v < 0 || v > 255) || !지형이름.includes(r[4])) : null;
+    const 개울나쁨 = SL == null ? [] : !Array.isArray(SL) ? ['배열이 아님'] : SL.filter(r => !Array.isArray(r) || r.length !== 4 || r.some(v => !Number.isInteger(v) || v < 0 || v > 255) || (r[0] !== r[2] && r[1] !== r[3]));
     if (!나쁨) add('FAIL', P('지형'), '칸 이 배열이어야 한다');
     else if (나쁨.length) add('FAIL', P('지형'), '꼴이 틀림(네모 [x0,y0,x1,y1,이름] · 이름 ' + 지형이름.join('·') + '): ' + 나쁨.map(r => JSON.stringify(r)).join(' '));
-    else { const 바닥 = new Map(); L.forEach(([x0, y0, x1, y1, nm]) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) 바닥.set(y * 256 + x, nm); });
-      let 뭍 = 0; for (let y = 128; y < 160; y++) for (let x = 128; x < 160; x++) if (!바닥.has(y * 256 + x) || 바닥.get(y * 256 + x) !== '물') 뭍++;
-      뭍 >= 512 ? add('PASS', P(`지형 ${L.length}네모 · ${바닥.size}칸 · 첫 구역 뭍 ${뭍}/1024`)) : add('FAIL', P('지형'), `첫 구역(128~159)의 뭍이 ${뭍}칸 — 반은 남겨야 마을이 선다`);
-      /* 실제로 열어 규칙을 누른다 — 물가(모래 옆 물) 한 곳 · 바다 한 칸 · 뭍 한 칸을 첫 구역에서 찾는다 */
-      const at = (x, y) => 바닥.get(y * 256 + x) || '풀';
-      let 물가 = null, 바다 = null, 풀 = null;
-      for (let y = 129; y < 158 && !(물가 && 바다 && 풀); y++) for (let x = 129; x < 158; x++) {
-        if (!물가 && at(x, y) === '모래' && at(x, y + 1) === '물' && at(x + 1, y) === '모래' && at(x + 1, y + 1) === '물') 물가 = [x, y];
-        if (!바다 && at(x, y) === '물' && at(x + 1, y) === '물' && at(x, y + 1) === '물' && at(x + 1, y + 1) === '물' && y > 130) 바다 = [x, y];
-        if (!풀 && y < 140 && x > 131 && x < 150 && at(x, y) === '풀') 풀 = [x, y]; }
+    else if (개울나쁨.length) add('FAIL', P('지형 개울'), '곧은 줄 [x0,y0,x1,y1](가로나 세로)이어야 한다: ' + 개울나쁨.map(r => JSON.stringify(r)).join(' '));
+    else { const 바닥 = new Map(), 개울 = new Set(); L.forEach(([x0, y0, x1, y1, nm]) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) 바닥.set(y * 256 + x, nm); });
+      (SL || []).forEach(([x0, y0, x1, y1]) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) 개울.add(y * 256 + x); });
+      const at = (x, y) => 바닥.get(y * 256 + x) || '풀', 평지 = g => g === '풀' || g === '모래', 물줄 = (x, y) => 개울.has(y * 256 + x);
+      let 뭍 = 0; for (let y = 128; y < 160; y++) for (let x = 128; x < 160; x++) if (평지(at(x, y)) && !물줄(x, y)) 뭍++;
+      뭍 >= 512 ? add('PASS', P(`지형 ${L.length}네모 · ${바닥.size}칸` + (개울.size ? ` · 개울 ${개울.size}칸` : '') + ` · 첫 구역 평지 ${뭍}/1024`)) : add('FAIL', P('지형'), `첫 구역(128~159)의 평지가 ${뭍}칸 — 반은 남겨야 마을이 선다`);
+      const 개울바닥 = [...개울].filter(i => !평지(at(i % 256, (i / 256) | 0))); if (개울바닥.length) add('FAIL', P('지형 개울'), `개울 ${개울바닥.length}칸이 평지가 아닌 바닥 위`);
+      /* 실제로 열어 규칙을 누른다 — 바닥마다 한 곳씩 첫 구역에서 찾는다 */
+      const find = ok => { for (let y = 129; y < 158; y++) for (let x = 129; x < 158; x++) if (ok(x, y)) return [x, y]; return null; };
+      const 물가 = find((x, y) => at(x, y) === '모래' && at(x, y + 1) === '물' && at(x + 1, y) === '모래' && at(x + 1, y + 1) === '물');
+      const 바다 = find((x, y) => y > 130 && [[0, 0], [1, 0], [0, 1], [1, 1]].every(([a, b]) => at(x + a, y + b) === '물'));
+      const 비탈 = find((x, y) => at(x, y) === '비탈' && at(x + 1, y) === '비탈'), 고개 = find((x, y) => at(x, y) === '고개');
+      const 풀 = find((x, y) => y < 140 && x > 131 && x < 150 && at(x, y) === '풀' && at(x, y + 4) === '풀' && !물줄(x, y) && !물줄(x, y + 4));
+      const 곧은개울 = find((x, y) => 물줄(x, y) && y !== 144 && ((물줄(x, y - 1) && 물줄(x, y + 1) && !물줄(x - 1, y) && !물줄(x + 1, y)) || (물줄(x - 1, y) && 물줄(x + 1, y) && !물줄(x, y - 1) && !물줄(x, y + 1))));
+      const 첫구역개울 = [...개울].map(i => [i % 256, (i / 256) | 0]).filter(([x, y]) => x >= 128 && x < 160 && y >= 128 && y < 160);
       if (!풀) add('REVIEW', P('지형 규칙'), '첫 구역에 풀 칸이 없어 규칙을 못 눌러 봄');
-      else { const tries = [], 뜻 = [];
-        if (바다) { tries.push(['road', ...바다]); 뜻.push(['바다에 길', v => typeof v === 'string' && v.includes('바다')]); }
-        if (물가 && (def.건물 || []).includes('pier')) { tries.push(['pier', ...물가]); 뜻.push(['물가에 부두', v => v === true]);
-          tries.push(['pier', ...풀]); 뜻.push(['뭍에 부두', v => typeof v === 'string' && v.includes('물가')]); }
-        tries.push(['tree', 풀[0], 풀[1] + 4]); 뜻.push(['풀밭에 나무', v => v === true]);
+      else { const tries = [], 뜻 = [], 수 = (t, m, ok) => { tries.push(t); 뜻.push([m, ok]); }, 말 = s => v => typeof v === 'string' && v.includes(s);
+        if (바다) 수(['put', 'road', ...바다], '바다에 길', 말('바다'));
+        if (물가 && (def.건물 || []).includes('pier')) { 수(['put', 'pier', ...물가], '물가에 부두', v => v === true); 수(['put', 'pier', ...풀], '뭍에 부두', 말('물가')); }
+        if (비탈) { 수(['put', 'road', ...비탈], '비탈에 길', 말('비탈')); 수(['put', 'tree', 비탈[0] + 1, 비탈[1]], '비탈에 나무', v => v === true); }
+        if (고개) { 수(['put', 'tree', ...고개], '고개에 나무', 말('고갯길')); 수(['put', 'road', ...고개], '고개에 길', v => v === true); }
+        if (첫구역개울.length) 수(['kinds', 첫구역개울], `판 개울 ${첫구역개울.length}칸이 깔림(처음 길을 건너는 곳은 다리)`, v => Array.isArray(v) && v.every(k => k === 'stream' || k === 'sbr') && v.filter(k => k === 'stream').length > 0);
+        if (곧은개울) { 수(['erase', ...곧은개울], '판 개울 치우기 막힘', v => v === false); 수(['kinds', [곧은개울]], '치운 뒤에도 개울', v => v && v[0] === 'stream');
+          수(['put', 'road', ...곧은개울], '곧은 개울에 길 = 다리', v => v === true); 수(['kinds', [곧은개울]], '다리가 됨', v => v && v[0] === 'sbr');
+          수(['erase', ...곧은개울], '다리는 치워짐', v => v === true); 수(['kinds', [곧은개울]], '다리를 치우면 개울로', v => v && v[0] === 'stream'); }
+        수(['put', 'tree', 풀[0], 풀[1] + 4], '풀밭에 나무', v => v === true);
         const o = terrainProbe(n, tries);
         if (!o.t || !o.t.켜짐) add('FAIL', P('지형 규칙'), '판을 열었는데 지형이 안 켜짐: ' + JSON.stringify(o));
         else { const 틀림 = 뜻.map(([m, ok], i) => ok(o.r[i]) ? null : m + ' → ' + JSON.stringify(o.r[i])).filter(Boolean);
-          틀림.length ? add('FAIL', P('지형 규칙'), 틀림.join(' · ')) : add('PASS', P(`지형 규칙 ${뜻.length}가지(${뜻.map(x => x[0]).join(' · ')}) · 엔진 지형 ${o.t.칸}칸`)); } } } }
+          틀림.length ? add('FAIL', P('지형 규칙'), 틀림.join(' · ')) : add('PASS', P(`지형 규칙 ${뜻.length}가지(${뜻.map(x => x[0]).join(' · ')}) · 엔진 지형 ${o.t.칸}칸` + (o.t.개울 ? ` · 판 개울 ${o.t.개울}칸` : ''))); } } } }
   /* [MAC-SKIN] 판이 스스로 만드는 종류(건물정의)는 기본 판에 없는 게 맞다 — 빼고 검사하고, 정의 자체를 따로 본다 */
   const 새종류 = def.건물정의 && typeof def.건물정의 === 'object' ? Object.keys(def.건물정의) : [];
   if (새종류.length) {
