@@ -9078,14 +9078,32 @@ function _svgBmp(key, img, needW, ratio) {
   return b;
 }
 function _floorBmp(name, img, C) { return _svgBmp('f:' + name, img, C * 2, 1); }
+// [DECO-FLOOR-BAKE-1] 칸 한 장 굽기 — 바탕 + 가장자리 조각(최대 13장)을 칸마다 매 틀 따로 그리던 것(무거운 마당 끌기 한 틀의 97% · 계획 C4)
+//  → 그 칸에 올릴 조각 목록을 먼저 모으고, 목록이 같으면 한 번 구운 한 장을 그린다(목록 = 이웃 모양의 서명 · 아직 안 온 조각은 목록에서 빠져 다른 열쇠가 된다).
+const _FLOOR_CELL = new Map();
+let _floorCellPx = 0;   // 구운 칸들의 픽셀 합 — 6M(약 24MB)을 넘으면 비운다(확대 3배면 칸 한 장이 162px 이라 개수로는 못 막는다)
+function _floorPaint(pieces, px, py, C) {
+  if (pieces.length === 1 || typeof document === 'undefined') { pieces.forEach(([k, img]) => _dCtx.drawImage(_floorBmp(k, img, C), px, py, C, C)); return; }
+  //  캔버스는 2배 — 칸 한 장을 화면 픽셀 그대로(2C)로 구워 1:1 로 찍는다(조각마다 2C 로 줄여 찍던 것과 픽셀이 같다 · 옛 마당 지문 불변)
+  const w = Math.round(C * 2), key = w + '|' + pieces.map(p => p[0]).join('|');
+  let b = _FLOOR_CELL.get(key);
+  if (!b) {
+    if (_floorCellPx > 6e6) { _FLOOR_CELL.clear(); _floorCellPx = 0; }
+    b = document.createElement('canvas'); b.width = b.height = w;
+    const x = b.getContext('2d');
+    pieces.forEach(([k, img]) => x.drawImage(_floorBmp(k, img, C), 0, 0, w, w));
+    _FLOOR_CELL.set(key, b); _floorCellPx += w * w;
+  }
+  _dCtx.drawImage(b, px, py, C, C);
+}
 function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
   const bname = _floorBaseName(type, r, c);
   const col = (color && _FLOOR_COLORS[type] && _FLOOR_COLORS[type].indexOf(color) >= 0) ? color : '';   // [DECO-FLOOR-COLOR-1]
   const base = _floorImg(bname, col);
   if (!base) return false;
-  _dCtx.drawImage(_floorBmp(col ? bname + '#' + col : bname, base, C), px, py, C, C);   // 같은 파일·다른 색 = 다른 비트맵
+  const pieces = [[col ? bname + '#' + col : bname, base]];   // 같은 파일·다른 색 = 다른 비트맵 · [DECO-FLOOR-BAKE-1] 그리지 않고 모은다
   const T = (dr, dc) => { const t = typeAt(r + dr, c + dc); return (t == null) ? type : t; };
-  const put = (name, ec) => { const img = _floorImg(name, ec); if (img) _dCtx.drawImage(_floorBmp(ec ? name + '#' + ec : name, img, C), px, py, C, C); };
+  const put = (name, ec) => { const img = _floorImg(name, ec); if (img) pieces.push([ec ? name + '#' + ec : name, img]); };
   //  [DECO-FLOOR-EDGE-1] 변 넷 · 안 모서리 넷 · 바깥 모서리 넷 — 물가·꽃밭 가장자리·잔디 번짐이 같은 판정, 같은 순서다.
   //  n/e/s/w = 그 변의 이웃이 '바깥'인가 · out(dr,dc) = 그 대각선 이웃이 '바깥'인가 · v = 변 조각의 변형('' | '2') · ec = 조각 색
   const ring = (pre, v, ec, n, e, s, w, out) => {
@@ -9119,6 +9137,7 @@ function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
     let ec = '';
     if (!rm) { ec = (col && Object.prototype.hasOwnProperty.call(EC, col)) ? EC[col] : EC['']; if (ec === 'pink') ec = ''; }   // bed_* 의 기본색 = pink(주소에 안 붙인다)
     ring(rm ? 'rim_' + rm + '_' : 'bed_', v2, ec, out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);
+    _floorPaint(pieces, px, py, C);
     return true;
   }
   //  [DECO-WATER-ORDER-1] 물 칸은 **물가(shore_*)를 먼저, 잔디 번짐(fringe_grass_*)을 나중에** — 풀이 모래 띠 위로 번져
@@ -9131,6 +9150,7 @@ function _drawFloorSVG(type, r, c, px, py, C, typeAt, color, rim) {
     const out = (dr, dc) => _floorIsGrass(T(dr, dc));
     ring('fringe_grass_', v2, '', out(-1, 0), out(0, 1), out(1, 0), out(0, -1), out);
   }
+  _floorPaint(pieces, px, py, C);
   return true;
 }
 // 집 안 벽 띠(벽지+걸레받이+창)와 마루. 그려졌으면 true(호출부가 구식 창문을 생략).
