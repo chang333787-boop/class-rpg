@@ -1417,10 +1417,14 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .dlc-chip.dlc-more{border-style:dashed;color:#8a6a4a}
 @media (prefers-reduced-motion: reduce){ .deco-life-card{animation:none} }
 /* [DECO-LIFE-3] 작은 선물 — 제자리 곁 땅에 · 누르면 받는다 · 🎁 선물 상자 */
-.deco-gift{position:absolute;left:0;top:0;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;
-  filter:drop-shadow(0 2px 1px rgba(0,0,0,.28));animation:dgBob 1.6s ease-in-out infinite}
-.deco-gift img{width:100%;height:100%;display:block}
-.deco-gift.taken{animation:dgTake .6s ease-in forwards}
+.deco-gift{position:absolute;left:0;top:0;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center}
+.deco-gift .dg-art{width:var(--g,18px);height:var(--g,18px);display:block;filter:drop-shadow(0 2px 1px rgba(0,0,0,.28));animation:dgBob 1.6s ease-in-out infinite}
+.deco-gift .dg-tw{position:absolute;right:4%;top:4%;width:calc(var(--g,18px) * .8);height:calc(var(--g,18px) * .8);opacity:0;pointer-events:none}
+.deco-gift.pop .dg-art{animation:dgPop .6s cubic-bezier(.3,1.6,.5,1) both,dgBob 1.6s ease-in-out .6s infinite}   /* [DECO-LIFE-5] 처음 나타날 때 통통 */
+.deco-gift.pop .dg-tw{animation:dgTwinkle 1.2s ease-in-out .2s 2}
+@keyframes dgPop{0%{scale:.2}60%{scale:1.2}100%{scale:1}}
+@keyframes dgTwinkle{0%,100%{opacity:0;scale:.5;rotate:0deg}50%{opacity:1;scale:1;rotate:45deg}}
+.deco-gift.taken .dg-art{animation:dgTake .6s ease-in forwards}
 @keyframes dgBob{0%,100%{translate:0 0}50%{translate:0 -3px}}
 @keyframes dgTake{to{translate:0 -28px;opacity:0;scale:1.3}}
 .dlc-gift{display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 8px;border-radius:10px;background:#f6ecdb;font-size:12px;font-weight:700}
@@ -1441,7 +1445,7 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .dgb-frame{position:relative;width:100%;aspect-ratio:300/225;margin-bottom:6px}
 .dgb-frame img,.dgb-frame canvas{position:absolute;inset:0;width:100%;height:100%}
 .dgb-foot{padding:0 12px 12px;color:#8a6a4a;font-size:12px}
-@media (prefers-reduced-motion: reduce){ .deco-gift,.deco-gift.taken{animation:none} }
+@media (prefers-reduced-motion: reduce){ .deco-gift .dg-art,.deco-gift.pop .dg-art,.deco-gift.pop .dg-tw,.deco-gift.taken .dg-art{animation:none} }
 @media (prefers-reduced-motion: reduce){ .deco-anim .bob.hop{animation:none} }
 
 /* ══ 꾸미기 서랍 — 장식 찾기 (DECO-FIND-1) ══════════════════════

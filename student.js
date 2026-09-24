@@ -5090,6 +5090,10 @@ function _inFitRooms() {
   if (DECO_SCENE === 'yard' || !rooms.length || !_dCv) return false;
   let r0 = 99, c0 = 99, r1 = -1, c1 = -1;
   rooms.forEach(rm => { r0 = Math.min(r0, rm.r - 1); c0 = Math.min(c0, rm.c); r1 = Math.max(r1, rm.r + rm.h); c1 = Math.max(c1, rm.c + rm.w); });
+  //  [DECO-INDOOR-FIT-2] 둘레 여백 — 가로 3칸 · 세로 1칸(좌우 같게 — 판 끝에 붙은 방도 가운데 · 방이 있으면 판 밖도 도면이라 밀 수 있다).
+  //   방에 딱 맞추면 다음 방을 붙일 자리가 화면 밖이었다(창조자 54-ⓒ89) · 넓은 화면은 세로가 먼저 차서 가로 여백은 칸 크기를 거의 줄이지 않는다.
+  //   만든 직후 · 들어올 때 · [전체] 모두 같은 틀.
+  r0 -= 1; r1 += 1; c0 -= 3; c1 += 3;
   const bw = c1 - c0 + 1, bh = r1 - r0 + 1, C0 = Math.floor(_dW / DI.cols);
   const z = Math.max(DECO_ZOOM_MIN, Math.min(DECO_ZOOM_MAX, Math.min(_dW / (bw * C0), _dH / (bh * C0)) * 0.95));
   _dZoom = z; _initDeco();
@@ -5349,7 +5353,8 @@ function _decoRuleWhy(id, area, r, c, w, h) {
       if (t) { const d = GAME_DATA.decorations.find(x => x.id === t.id); return `${d ? d.icon + ' ' + d.name : '큰 장식'} 바로 뒤라 동물이 올라선 것처럼 보여요 — 앞쪽이나 옆에 놓아요`; }
     }
   }
-  if (area === 'indoor' && DECO_WALL[id] && !_inIsWallRow(r, c)) return '🖼️ 벽에 거는 거예요 — 위쪽 벽(맨 윗줄이나 방의 윗벽)을 눌러 걸어 주세요';
+  //  [DECO-INDOOR-FIT-2] 방이 있으면 벽은 방 윗벽뿐 — 안내도 하나로(맨 윗줄은 '방 밖은 마당'으로 거절되던 것 · 창조자 54-ⓑ103)
+  if (area === 'indoor' && DECO_WALL[id] && !_inIsWallRow(r, c)) return _inRooms(CUR).length ? '🖼️ 벽에 거는 거예요 — 방의 윗벽을 눌러 걸어 주세요' : '🖼️ 벽에 거는 거예요 — 위쪽 벽(맨 윗줄)을 눌러 걸어 주세요';
   //  [DECO-INDOOR-RULE-1] 방이 있으면 벽은 방에만 있다 — 판 맨 윗줄(방 밖 마당)에 새로 걸지 않는다(이미 걸린 것은 그대로)
   if (area === 'indoor' && DECO_WALL[id] && _inRooms(CUR).length) { const hw = _inRoomAt(r, c); if (!(hw && !hw.band && hw.rm.r === r)) return '🖼️ 방의 윗벽에 걸어 주세요 — 방 밖은 마당이에요'; }
   //  [DECO-RULE-R3] 가구가 방 벽을 가로지르면(반은 방 안·반은 밖) 안 놓는다
@@ -9005,6 +9010,8 @@ function _lifePet(student, p, now) {
   _lifeWrite(student, ups);
   return { u, gained: 1, stage: s1, stageUp: s1 > s0 };
 }
+//  [DECO-BUNDLE-1] 친해지기 그림(하트 · 단계 배지 · 선물 · 사진 틀 · 반짝) — 묶음이 있으면 blob, 받는 중·없으면 낱장
+function _lifeArt(n) { return (typeof _artSrc === 'function' && _artSrc('deco/' + n + '.svg')) || './assets/deco/' + n + '.svg'; }
 //  [DECO-LIFE-4] 부르는 이름 — 지은 이름이 있으면 그 이름(같으면 '콩이 2'), 없으면 종류(강아지). 알림 · 카드 · 선물 말은 모두 이것으로(창조자 49-ⓑ99)
 function _lifeWho(id, L, u) {
   const nm = (L && u && L.a && L.a[u]) ? _lifeNameOf(L, u) : '';
@@ -9018,6 +9025,7 @@ function _lifePetAnim(st) {
   const p = (CUR.houseDecorations || []).find(q => q.area === 'yard' && q.id === st.id && q.row === st.home.row && q.col === st.home.col && _decoSpaceOf(q) === DECO_SPACE);
   const r = _lifePet(CUR, p);
   if (!r || !r.gained) return r;
+  _drawDeco();   // [DECO-LIFE-5] 하트로 오늘 선물이 생길 수 있다 — 판을 한 번 다시 그려 땅에 바로 보이게(창조자 55-ⓑ104)
   if (st.el) {   // 💗 옆에 '+1' 배지 — 말풍선·하트와 안 겹치게 오른쪽 위
     const plus = document.createElement('div'), over = _animOverCells(st) * (st.C || 0);
     plus.className = 'deco-anim-plus'; plus.textContent = '+1 💗';
@@ -9085,7 +9093,7 @@ function _lifeCardHTML(st, L, u, pet) {
   const f = L.a[u], cfg = ANIM_DECO[st.id] || {}, kind = cfg.name || ((GAME_DATA.decorations.find(x => x.id === st.id) || {}).name) || '동물';
   const h = _lifeHearts(f), row = _lifeHeartRow(h), nm = _lifeNameOf(L, u), today = f && f.d === _lifeDay();
   //  디자인 사양(#1022): 하트 칸 3·4·5·8 — 5칸까지 한 줄 · 8칸은 넷씩 두 줄(모두 22px) · 가족은 칸을 안 보인다
-  const hrow = (n, have) => Array.from({ length: n }, (_, i) => `<img src="./assets/deco/heart_${i < have ? 'full' : 'empty'}.svg" alt="">`).join('');
+  const hrow = (n, have) => Array.from({ length: n }, (_, i) => `<img src="${_lifeArt('heart_' + (i < have ? 'full' : 'empty'))}" alt="">`).join('');
   const hc = n => n >= 8 ? ' h8' : '';   // 하트 칸 3·4·5·8(#1022) — 5칸까지 한 줄 · 8칸은 넷씩 두 줄 · 모두 22px
   const hearts = row.left ? hrow(row.need, row.have) : '';
   const hcls = hc(row.need);
@@ -9096,7 +9104,7 @@ function _lifeCardHTML(st, L, u, pet) {
   //  [DECO-LIFE-4] 같은 날 또 쓰다듬으면 — 반응은 그대로 · 하트가 왜 안 느는지 한 줄(벌 아님 · ⓑ97)
   const again = pet && pet.gained === 0 ? '<div class="dlc-again">💗 오늘은 벌써 쓰다듬었어요 · 내일 또 만나요</div>' : '';
   const next = row.left ? `다음 단계 '${LIFE_STAGE_NAME[row.st]}'까지 하트 ${row.left}` : '가족이 됐어요 — 하트는 줄지 않아요';
-  return `<div class="dlc-top"><img class="dlc-badge" src="./assets/deco/friend_stage${row.st}.svg" alt="${row.st}단계">`
+  return `<div class="dlc-top"><img class="dlc-badge" src="${_lifeArt('friend_stage' + row.st)}" alt="${row.st}단계">`
     + `<div class="dlc-who"><div><b class="dlc-nm">${escHtml(nm || kind)}</b>${nm ? ` <span class="dlc-kind">· ${escHtml(kind)}</span>` : ''}</div>`
     + `<div class="dlc-sub">${row.st}단계 ${LIFE_STAGE_NAME[row.st - 1]}</div></div>`
     + (L.ro ? '' : `<button type="button" class="dlc-namebtn" aria-label="이름 고르기">🏷️ ${nm ? '이름 바꾸기' : '이름 짓기'}</button>`) + '</div>'
@@ -9171,7 +9179,7 @@ function _lifeGiftLine(id, f, u) {
   if (!kind || !f) return '';
   const day = _lifeDay(), nm = LIFE_GIFT_NAME[kind];
   if (_lifeStage(_lifeHearts(f)) < 2) return `<div class="dlc-gift is-soon">🎁 '알아봄'이 되면 ${nm}${_josa(nm, '을', '를')} 두고 가요</div>`;
-  if (_lifeGiftOpen(u, f, day)) return `<div class="dlc-gift"><img src="./assets/deco/gift_${kind}.svg" alt=""> 선물! ${LIFE_GIFT_SAY[kind] || nm + ' 하나를 두고 갔어요'} — 땅에서 눌러요</div>`;
+  if (_lifeGiftOpen(u, f, day)) return `<div class="dlc-gift"><img src="${_lifeArt('gift_' + kind)}" alt=""> 선물! ${LIFE_GIFT_SAY[kind] || nm + ' 하나를 두고 갔어요'} — 땅에서 눌러요</div>`;
   if (_lifeGiftDay(u, f, day)) return `<div class="dlc-gift is-done">✓ 오늘 선물 ${nm}${_josa(nm, '을', '를')} 받았어요</div>`;
   return '';
 }
@@ -9191,14 +9199,18 @@ function _lifeGiftSync(rec, student, C) {
     if (!el) {
       el = document.createElement('button');
       el.type = 'button'; el.className = 'deco-gift'; el.setAttribute('aria-label', '선물 ' + LIFE_GIFT_NAME[kind] + ' 받기');
-      el.innerHTML = `<img src="./assets/deco/gift_${kind}.svg" alt="">`;
+      //  [DECO-LIFE-5] 처음 나타날 때 통통 + 반짝(fx_twinkle) — 아이가 찾게(창조자 55-ⓒ90)
+      el.innerHTML = `<img class="dg-art" src="${_lifeArt('gift_' + kind)}" alt=""><img class="dg-tw" src="${_lifeArt('fx_twinkle')}" alt="">`;
+      el.classList.add('pop'); setTimeout(() => el.classList.remove('pop'), 2600);
       ['pointerdown', 'touchstart', 'mousedown'].forEach(t => el.addEventListener(t, e => e.stopPropagation(), { passive: true }));
       el.addEventListener('click', e => { e.stopPropagation(); _lifeGiftTake(u, el); });
       rec.world.appendChild(el); rec.gifts.set(u, el);
     }
-    const sz = getDecoSize(f.k), g = Math.max(18, Math.round(C * .62));
-    el.style.width = el.style.height = g + 'px';
-    el.style.transform = 'translate(' + Math.round((f.c + sz.w) * C + C * .12) + 'px,' + Math.round((f.r + sz.h) * C - g * 1.02) + 'px)';
+    //  그림은 그대로(칸의 .62) · 누르는 자리는 44px 이상(창조자 55-ⓒ90 — 18px 이라 터치로 찾기 어려웠다) · 그림 가운데를 기준으로 넓힌다
+    const sz = getDecoSize(f.k), g = Math.max(18, Math.round(C * .62)), hit = Math.max(44, g);
+    const gx = (f.c + sz.w) * C + C * .12, gy = (f.r + sz.h) * C - g * 1.02;
+    el.style.width = el.style.height = hit + 'px'; el.style.setProperty('--g', g + 'px');
+    el.style.transform = 'translate(' + Math.round(gx + g / 2 - hit / 2) + 'px,' + Math.round(gy + g / 2 - hit / 2) + 'px)';
     el.style.zIndex = String(Math.round(f.r + sz.h));
   });
 }
@@ -9221,10 +9233,10 @@ function decoGiftBox(open) {
   const L = _lifeGet(CUR), host = document.getElementById('interior-fullscreen') || document.body;
   if (!box) { box = document.createElement('div'); box.id = 'deco-giftbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', '선물 상자'); host.appendChild(box); }
   const cell = k => { const n = +L.g[k] || 0;
-    return `<div class="dgb-cell${n ? '' : ' is-none'}"><img src="./assets/deco/gift_${k}.svg" alt="${LIFE_GIFT_NAME[k]}"><span>${n ? '×' + n : '?'}</span></div>`; };
+    return `<div class="dgb-cell${n ? '' : ' is-none'}"><img src="${_lifeArt('gift_' + k)}" alt="${LIFE_GIFT_NAME[k]}"><span>${n ? '×' + n : '?'}</span></div>`; };
   box.innerHTML = `<div class="dgb-head">🎁 선물 상자<button type="button" class="dgb-x" aria-label="닫기" onclick="decoGiftBox(false)">✕</button></div>`
     + `<div class="dgb-grid">${LIFE_GIFT_BOX.map(cell).join('')}</div>`
-    + (L.p ? `<div class="dgb-photo"><div class="dgb-frame"><img src="./assets/deco/ui_photo_frame.svg" alt=""><canvas width="300" height="225"></canvas></div>`
+    + (L.p ? `<div class="dgb-photo"><div class="dgb-frame"><img src="${_lifeArt('ui_photo_frame')}" alt=""><canvas width="300" height="225"></canvas></div>`
       + `<div><b>사진 조각 ${L.p % 6 || 6} / 6</b> — 친해지기 단계가 오를 때 한 조각${L.p >= 6 ? ` · 모은 사진 ${Math.floor(L.p / 6)}장` : ''}</div></div>` : '')
     + `<div class="dgb-foot">골드가 아니에요 · 모아서 보는 것 · 팔 수 없어요</div>`;
   if (L.p) _lifePhotoPaint(box.querySelector('.dgb-frame canvas'), L.p % 6 || 6);
