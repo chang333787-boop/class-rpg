@@ -1634,6 +1634,23 @@
       _decoUndoClear(); decoSpaceSet(1); await sleep(150);
     }
 
+    //  ㊷ 집 안 두꺼운 벽(DECO-INDOOR-WALL-1 · 시안 A) — 위아래 방 문 · 사이 벽은 하나 · 나가기 자리 · 그리기 오류 0
+    if (typeof _inWallGeom === 'function') {
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keepIn = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      _inRoomsSet(CUR, [{ id: 'a', r: 3, c: 4, w: 12, h: 8, floor: null, wall: null }, { id: 'b', r: 3, c: 16, w: 9, h: 8, floor: null, wall: null }, { id: 'c', r: 12, c: 6, w: 10, h: 6, floor: null, wall: null }]);
+      const R = _inRooms(CUR), D = _inRoomDoors(R), G = _inWallGeom(R, _dCv._offX || 0, _dCv._offY || 0, _dC), ex = _inExitSpot(R);
+      out('벽_옆문_위아래문', D.some(d => d.col === 16) && D.some(d => d.row === 11 && d.c1 - d.c0 === 2));
+      out('벽_사이벽은_하나', G.shared.length > 0 && !G.back.some(r => Math.abs(r.y + G.T - ((_dCv._offY || 0) + 11 * _dC)) < 1 && r.x >= (_dCv._offX || 0) + 6 * _dC - G.T && r.x < (_dCv._offX || 0) + 16 * _dC));
+      out('벽_나가기는_아래방_가운데', ex.room && ex.room.id === 'c' && ex.c0 === 10 && ex.wallRow === 18);
+      let err = ''; try { _drawIndoor(); } catch (e) { err = String(e); }
+      out('벽_그리기_오류0', !err || err);
+      if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
+      decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

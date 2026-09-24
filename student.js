@@ -4990,16 +4990,39 @@ function _inRoomFrom(r0, c0, r1, c1) {
   return { r, c, w: Math.min(DI_FULL.cols, Math.max(c0, c1) + 1) - c, h: Math.min(DI_FULL.rows, Math.max(r0, r1) + 1) - r };
 }
 //  저절로 난 문 — 옆으로 맞닿은 두 방의 벽 가운데 2줄 [{x 칸 경계, r0, r1}]
+//  [DECO-INDOOR-WALL-1] 위아래로 맞닿은 방(아랫방 벽 띠 줄이 윗방 바로 아래)도 같은 규칙 — 맞닿은 벽이 2칸 이상이면 가운데 2칸 {row, c0, c1}
+//  (row = 윗방 아래 벽선 = 아랫방 벽 띠 줄 · 옆문은 지금 모양 그대로 {col, r0, r1})
 function _inRoomDoors(rooms) {
-  const out = [];
+  const out = [], door = (o, a, b) => Object.defineProperties(o, { a: { value: a }, b: { value: b } });   // [DECO-INDOOR-WALL-2] 이은 두 방(열거 안 됨 — 문 모양은 그대로)
   rooms.forEach(a => rooms.forEach(b => {
-    if (a === b || a.c + a.w !== b.c) return;
-    const top = Math.max(a.r, b.r), bot = Math.min(a.r + a.h, b.r + b.h);
-    if (bot - top < 2) return;
-    const mid = Math.floor((top + bot) / 2);
-    out.push({ col: b.c, r0: mid - 1, r1: mid + 1 });
+    if (a === b) return;
+    if (a.c + a.w === b.c) {
+      const top = Math.max(a.r, b.r), bot = Math.min(a.r + a.h, b.r + b.h);
+      if (bot - top >= 2) { const mid = Math.floor((top + bot) / 2); out.push(door({ col: b.c, r0: mid - 1, r1: mid + 1 }, a, b)); }
+    }
+    if (b.r - 1 === a.r + a.h) {
+      const l = Math.max(a.c, b.c), r = Math.min(a.c + a.w, b.c + b.w);
+      if (r - l >= 2) { const mid = Math.floor((l + r) / 2); out.push(door({ row: a.r + a.h, c0: mid - 1, c1: mid + 1 }, a, b)); }
+    }
   }));
   return out;
+}
+//  [DECO-INDOOR-WALL-1] 나가기 문 자리 — 규칙으로 정한다(저장 0): 가장 아래 방(같으면 왼쪽) 아래 벽 가운데 2칸 · 방이 없으면 판 아래 가운데
+//  발판 = 그 두 칸의 방 맨 아랫줄 · 칸 경계에 맞춘다(그림 가운데가 칸 반에 걸려 벽 틈과 어긋나지 않게)
+function _inExitSpot(rooms) {
+  const low = rooms.slice().sort((a, b) => (b.r + b.h) - (a.r + a.h) || a.c - b.c)[0];
+  const cc = low ? low.c + Math.floor(low.w / 2) : Math.floor(DI.cols / 2), wallRow = low ? low.r + low.h : DI.rows;
+  return { room: low || null, c0: cc - 1, c1: cc + 1, wallRow, matRow: wallRow - 1 };
+}
+//  [DECO-INDOOR-WALL-2] 나가기 문은 **문으로 이어진 방 묶음마다 하나** — 떨어져 따로 둔 방에도 들어갈 길(창조자 29-ⓑ63 · 48회 '방 다섯 중 셋')
+//  묶음마다 _inExitSpot 규칙(맨 아래 방 · 아래 벽 가운데 2칸) · 첫째는 전과 같은 자리(가장 아래 방) — 방이 다 붙은 집은 그대로. 저장 0.
+function _inExitSpots(rooms) {
+  if (rooms.length < 2) return [_inExitSpot(rooms)];
+  const up = new Map(rooms.map(r => [r, r])), top = r => { while (up.get(r) !== r) r = up.get(r); return r; };
+  _inRoomDoors(rooms).forEach(d => { const x = top(d.a), y = top(d.b); if (x !== y) up.set(x, y); });
+  const groups = new Map();
+  rooms.forEach(r => { const k = top(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+  return [...groups.values()].map(_inExitSpot).sort((e, f) => (f.room.r + f.room.h) - (e.room.r + e.room.h) || e.room.c - f.room.c);
 }
 //  방 목록을 바꾸고 ↩ 한 단계로 적는다
 function _inRoomsCommit(list, msg) {
@@ -5025,7 +5048,9 @@ function _inRoomAdd(nr) {
   const id = ROOM_IDS.split('').find(x => !rooms.some(o => o.id === x));
   const first = !rooms.length;
   _inRoomsCommit(rooms.concat([Object.assign({ id, floor: null, wall: null }, nr)]),
-    `🧱 ${nr.w} × ${nr.h} 방이 생겼어요${first ? ' — 방 밖은 빈 터예요(가구는 어디나 놓여요)' : ''} (↩ 되돌리기)`);
+    `🧱 ${nr.w} × ${nr.h} 방이 생겼어요${first ? ' — 방 밖은 마당이에요' : ''} (↩ 되돌리기)`);
+  //  [DECO-INDOOR-WALL-1] 방을 만들면 방들 둘레에 맞춰 본다(창조자 29회 — 만든 방이 화면 구석에 작게 남았다 · 768 에서 칸 15px)
+  if (_ifMode) setTimeout(() => { if (DECO_SCENE !== 'yard') _inFitRooms(); }, 0);
   return true;
 }
 //  가구 둘레로 첫 방 — 이미 가구가 있는 아이가 '내 가구가 밖에 버려진' 느낌 없이 시작하게
@@ -9999,45 +10024,121 @@ function _drawYardFarm(C) {
 }
 
 // [INDOOR-ROOMS-1] 빈 터 + 방들 — 규칙 docs/indoor_look_rules_20260920.md §1(빈 터 도면) · §2(벽 띠·벽·문)
+// [DECO-INDOOR-WALL-1] 집 안 두꺼운 벽 — 디자인 시안 A(docs/indoor_walls_20260923.md · 보스 채택): 벽 윗면·앞면으로 방이 또렷하고, 벽이 끊긴 문 자리,
+//  아래벽에 뚫린 현관, 방 밖은 마당 잔디 + 방 그림자(어두운 도면 79~87% 를 없앤다). 저장 0 — 전부 방 목록에서 나온다. 방이 없으면 지금 큰 방 그대로.
+//  그리는 순서: 방 밖 → 방(바닥·벽 띠·그림자) → 뒷벽·옆벽 윗면 → 문 → (가구) → 아래벽 윗면·앞면(_inDrawFrontWalls — 앞에 선 벽)
+const IW = { top: '#3e7b7a', light: '#63a7a2', edge: '#1f3a3c', face: '#2b5557', faceLow: '#203f41', sill: '#b98a58', sillLine: '#7a5230' };
+function _inWallGeom(rooms, offX, offY, C) {
+  const T = .34 * C, doors = _inRoomDoors(rooms), exits = _inExitSpots(rooms), exit = exits[0];   // [DECO-INDOOR-WALL-2]
+  //  가로 구간 [a,b) 에서 틈들을 뺀다
+  const cut = (a, b, gaps) => { let segs = [[a, b]]; gaps.forEach(([g0, g1]) => { segs = segs.flatMap(([s0, s1]) => g1 <= s0 || g0 >= s1 ? [[s0, s1]] : [[s0, Math.max(s0, g0)], [Math.min(s1, g1), s1]].filter(([u, v]) => v - u > .5)); }); return segs; };
+  const back = [], side = [], bottom = [], shared = [];
+  //  위아래로 맞닿은 두 방 사이 벽은 하나 — 윗방 아래벽 자리에 뒷벽들과 같이(가구 전에) 그리고, 아랫방 뒷벽은 그 칸들에서 뺀다(두 겹 · 속선이 보였다)
+  const above = rm => rooms.filter(o => o.r + o.h === rm.r - 1).map(o => [offX + Math.max(o.c, rm.c) * C, offX + Math.min(o.c + o.w, rm.c + rm.w) * C]).filter(([a, b]) => b > a);
+  const below = rm => rooms.filter(o => o.r - 1 === rm.r + rm.h).map(o => [offX + Math.max(o.c, rm.c) * C, offX + Math.min(o.c + o.w, rm.c + rm.w) * C]).filter(([a, b]) => b > a);
+  rooms.forEach(rm => {
+    const x0 = offX + rm.c * C, x1 = offX + (rm.c + rm.w) * C, yb = offY + (rm.r - 1) * C, y1 = offY + (rm.r + rm.h) * C;
+    const hgBack = doors.filter(d => d.row !== undefined && d.row === rm.r - 1).map(d => [offX + d.c0 * C, offX + d.c1 * C]).concat(above(rm).map(([a, b]) => [a - T / 2, b + T / 2]));   // 모서리 반 두께 삐죽이까지
+    cut(x0 - T / 2, x1 + T / 2, hgBack).forEach(([a, b]) => back.push({ x: a, y: yb - T, w: b - a, h: T, hz: true }));
+    [[x0, rm.c], [x1, rm.c + rm.w]].forEach(([x, col]) => {
+      const vg = doors.filter(d => d.col === col && d.r0 >= rm.r && d.r1 <= rm.r + rm.h).map(d => [offY + d.r0 * C, offY + d.r1 * C]);
+      //  위: 뒷벽 윗면 윗끝부터(위에 방이 붙어 사이 벽이면 그 벽 윗끝부터) · 아래: 아래벽 윗면 윗끝까지(그 아래는 아래벽이 덮는다)
+      const capped = above(rm).some(([a, b]) => x >= a - T && x <= b + T);
+      let segs = [[capped ? yb - T / 2 : yb - T, y1 - T / 2]];
+      vg.forEach(([g0, g1]) => { segs = segs.flatMap(([s0, s1]) => g1 <= s0 || g0 >= s1 ? [[s0, s1]] : [[s0, g0], [g1, s1]].filter(([u, v]) => v - u > .5)); });
+      segs.forEach(([a, b]) => side.push({ x: x - T / 2, y: a, w: T, h: b - a, hz: false, end: b === y1 - T / 2 }));
+    });
+    const hgBot = doors.filter(d => d.row !== undefined && d.row === rm.r + rm.h).map(d => [offX + d.c0 * C, offX + d.c1 * C])
+      .concat(exits.filter(e => e.room === rm).map(e => [offX + e.c0 * C, offX + e.c1 * C]));
+    //  아래에 방이 붙은 칸 = 사이 벽(뒤로) · 나머지 = 앞에 선 아래벽
+    const bl = below(rm);
+    cut(x0 - T / 2, x1 + T / 2, hgBot).forEach(([a, b]) => {
+      cut(a, b, bl).forEach(([u, v]) => bottom.push({ x: u, y: y1 - T / 2, w: v - u, h: T, hz: true }));
+      bl.forEach(([g0, g1]) => { const u = Math.max(a, g0), v = Math.min(b, g1); if (v - u > .5) shared.push({ x: u, y: y1 - T / 2, w: v - u, h: T, hz: true }); });
+    });
+  });
+  return { T, back, side, bottom, shared, doors, exit, exits };
+}
+//  벽 윗면 여럿 — ① 테두리색 칠 + 두 배 폭 선 ② 윗면색(선 없이) ③ 밝은 줄(가로 벽 위쪽 · 세로 벽 왼쪽 22%) — 모퉁이·T자 만남에 속선이 안 생긴다
+function _inWallTops(list, C) {
+  const ctx = _dCtx, bw = Math.max(1.4, .035 * C);
+  ctx.fillStyle = IW.edge; ctx.strokeStyle = IW.edge; ctx.lineWidth = bw * 2; ctx.lineJoin = 'miter';
+  list.forEach(r => { ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeRect(r.x, r.y, r.w, r.h); });
+  ctx.fillStyle = IW.top; list.forEach(r => ctx.fillRect(r.x, r.y, r.w, r.h));
+  ctx.fillStyle = IW.light; list.forEach(r => r.hz ? ctx.fillRect(r.x, r.y, r.w, r.h * .22) : ctx.fillRect(r.x, r.y, r.w * .22, r.h));
+}
 function _inDrawRooms(rooms, offX, offY, C) {
-  const ctx = _dCtx, cols = DI.cols, rows = DI.rows;
-  //  빈 터 — 짙은 남색 + 옅은 칸줄, 5칸마다 조금 진하게(판 밖까지 칠해 확대해 밀어도 끊기지 않게)
-  ctx.fillStyle = '#161b28'; ctx.fillRect(-C * 60, -C * 60, cols * C + offX * 2 + C * 120, rows * C + offY * 2 + C * 120);
-  ctx.lineWidth = 1;
-  for (let c = 0; c <= cols; c++) { ctx.strokeStyle = c % 5 ? 'rgba(140,170,220,.09)' : 'rgba(140,170,220,.2)';
-    ctx.beginPath(); ctx.moveTo(offX + c * C + .5, offY - C); ctx.lineTo(offX + c * C + .5, offY + rows * C); ctx.stroke(); }
-  for (let r = -1; r <= rows; r++) { ctx.strokeStyle = r % 5 ? 'rgba(140,170,220,.09)' : 'rgba(140,170,220,.2)';
-    ctx.beginPath(); ctx.moveTo(offX, offY + r * C + .5); ctx.lineTo(offX + cols * C, offY + r * C + .5); ctx.stroke(); }
-  const t = Math.max(3, C * .16), bb = _floorImg('wall_baseboard');
+  const ctx = _dCtx, cols = DI.cols, rows = DI.rows, G = _inWallGeom(rooms, offX, offY, C), T = G.T;
+  //  방 밖 A — 마당 잔디(칸마다 고정 변형 · 판 밖까지 화면에 보이는 만큼)
+  const c0 = Math.floor((_dPanX - offX) / C) - 1, c1 = Math.ceil((_dPanX + _dW - offX) / C) + 1;
+  const r0 = Math.floor((_dPanY - offY) / C) - 1, r1 = Math.ceil((_dPanY + _dH - offY) / C) + 1, grass = () => 'grass';
+  for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) {
+    if (!(FLOOR_SVG && _drawFloorSVG('grass', r + 1000, c + 1000, offX + c * C, offY + r * C, C, grass))) {
+      ctx.fillStyle = (r + c) % 2 ? FLOOR_TILES.grass.alt : FLOOR_TILES.grass.bg; ctx.fillRect(offX + c * C, offY + r * C, C, C);
+    }
+  }
+  //  방 그림자 — 방(벽 띠 · 벽 두께까지)을 두른 상자 · 흐림 .18C · 아래로 .25C · .45
+  ctx.save(); ctx.filter = `blur(${Math.max(1, .18 * C)}px)`; ctx.fillStyle = 'rgba(0,0,0,.45)';
+  rooms.forEach(rm => ctx.fillRect(offX + rm.c * C - T / 2, offY + (rm.r - 1) * C - T + .25 * C, rm.w * C + T, (rm.h + 1) * C + T * 1.5));
+  ctx.restore();
+  const bb = _floorImg('wall_baseboard');
   rooms.forEach(rm => {
     const [fa, fc] = _inLookArt('floor', rm.floor), [wa, wc] = _inLookArt('wall', rm.wall);
     const fi = _floorImg(fa, fc), wi = _floorImg(wa, wc), x0 = offX + rm.c * C, y0 = offY + rm.r * C;
     ctx.fillStyle = '#C4955A'; ctx.fillRect(x0, y0, rm.w * C, rm.h * C);
     ctx.fillStyle = '#8B6520'; ctx.fillRect(x0, y0 - C, rm.w * C, C);
+    //  위아래 문: 아랫방 벽 띠의 그 두 칸은 벽이 아니라 통로 — 바닥으로
+    const passage = G.doors.filter(d => d.row !== undefined && d.row === rm.r - 1);
+    const isPass = c => passage.some(d => c >= d.c0 && c < d.c1);
     for (let c = 0; c < rm.w; c++) {
       if (fi) for (let r = 0; r < rm.h; r++) ctx.drawImage(fi, x0 + c * C, y0 + r * C, C, C);
+      if (isPass(rm.c + c)) { if (fi) ctx.drawImage(fi, x0 + c * C, y0 - C, C, C); continue; }
       if (wi) ctx.drawImage(wi, x0 + c * C, y0 - C, C, C);
       if (bb) ctx.drawImage(bb, x0 + c * C, y0 - C, C, C);
     }
-    //  벽 그림자 — 벽 띠가 바닥에서 떨어져 서 있어 보이게
+    //  벽 그림자 — 뒷벽 아래 .35C(벽 띠가 바닥에서 떨어져 서 있어 보이게) · 옆벽 오른쪽 .28C
     const g = ctx.createLinearGradient(0, y0, 0, y0 + C * .35);
     g.addColorStop(0, 'rgba(40,20,5,.22)'); g.addColorStop(1, 'rgba(40,20,5,0)');
     ctx.fillStyle = g; ctx.fillRect(x0, y0, rm.w * C, C * .35);
+    const g2 = ctx.createLinearGradient(x0 + T / 2, 0, x0 + T / 2 + C * .28, 0);
+    g2.addColorStop(0, 'rgba(40,20,5,.2)'); g2.addColorStop(1, 'rgba(40,20,5,0)');
+    ctx.fillStyle = g2; ctx.fillRect(x0 + T / 2, y0 - C, C * .28, (rm.h + 1) * C);
   });
-  //  벽 — 칸을 차지하지 않는 막대(윗면 · 옆 · 아래) + 위쪽 밝은 줄
-  rooms.forEach(rm => {
-    const x0 = offX + rm.c * C, y0 = offY + (rm.r - 1) * C, x1 = offX + (rm.c + rm.w) * C, y1 = offY + (rm.r + rm.h) * C;
-    ctx.fillStyle = '#5b3a20';
-    ctx.fillRect(x0 - t / 2, y0 - t / 2, x1 - x0 + t, t);
-    ctx.fillRect(x0 - t / 2, y0, t, y1 - y0); ctx.fillRect(x1 - t / 2, y0, t, y1 - y0);
-    ctx.fillRect(x0 - t / 2, y1 - t / 2, x1 - x0 + t, t);
-    ctx.fillStyle = '#8a5e36'; ctx.fillRect(x0 - t / 2, y0 - t / 2, x1 - x0 + t, t * .35);
+  //  뒷벽·옆벽 윗면(가구보다 먼저 — 가구가 그 앞에 선다)
+  _inWallTops(G.back.concat(G.shared, G.side), C);
+  //  문턱 — 옆문은 세로로, 위아래 문은 가로로(폭 T · 양옆 선)
+  G.doors.forEach(d => {
+    ctx.fillStyle = IW.sill;
+    if (d.col !== undefined) {
+      const x = offX + d.col * C, y = offY + d.r0 * C, h = (d.r1 - d.r0) * C;
+      ctx.fillRect(x - T / 2, y, T, h); ctx.fillStyle = IW.sillLine; ctx.fillRect(x - T / 2, y, 1.2, h); ctx.fillRect(x + T / 2 - 1.2, y, 1.2, h);
+    } else {
+      const x = offX + d.c0 * C, y = offY + d.row * C, w = (d.c1 - d.c0) * C;
+      ctx.fillRect(x, y - T / 2, w, T); ctx.fillStyle = IW.sillLine; ctx.fillRect(x, y - T / 2, w, 1.2); ctx.fillRect(x, y + T / 2 - 1.2, w, 1.2);
+    }
   });
-  //  저절로 난 문 — 옆으로 맞닿은 벽의 가운데 두 줄: 벽을 비우고 문턱
-  _inRoomDoors(rooms).forEach(d => {
-    const x = offX + d.col * C, y = offY + d.r0 * C, h = (d.r1 - d.r0) * C;
-    ctx.fillStyle = '#c9a06a'; ctx.fillRect(x - t * .8, y, t * 1.6, h);
-    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x - t * .8, y, 1.2, h); ctx.fillRect(x + t * .8 - 1.2, y, 1.2, h);
+}
+//  아래벽 — 가구보다 나중에(앞에 선 벽): 윗면 + 칸 밖 앞면 .3C(아래 40% 짙게) · 옆벽과 만나는 자리의 속선은 윗면색으로 덮는다
+function _inDrawFrontWalls(rooms, offX, offY, C) {
+  const ctx = _dCtx, G = _inWallGeom(rooms, offX, offY, C), T = G.T, bw = Math.max(1.4, .035 * C), fh = .3 * C;
+  G.bottom.forEach(r => {
+    ctx.fillStyle = IW.edge; ctx.fillRect(r.x - bw, r.y + T, r.w + bw * 2, fh + bw);
+    ctx.fillStyle = IW.face; ctx.fillRect(r.x, r.y + T, r.w, fh * .6);
+    ctx.fillStyle = IW.faceLow; ctx.fillRect(r.x, r.y + T + fh * .6, r.w, fh * .4);
+  });
+  _inWallTops(G.bottom, C);
+  //  이음 — 나중에 그린 아래벽의 테두리 선이 먼저 그린 벽(옆벽 · 사이 벽) 위로 넘어간 자리를 그 벽의 윗면색·밝은 줄로 다시 덮는다(속선 · 돌기 없음)
+  const early = G.back.concat(G.shared, G.side);
+  G.bottom.forEach(b => {
+    const ex = { x: b.x - bw * 2, y: b.y - bw * 2, w: b.w + bw * 4, h: b.h + bw * 4 };
+    early.forEach(r => {
+      const x0 = Math.max(ex.x, r.x), y0 = Math.max(ex.y, r.y), x1 = Math.min(ex.x + ex.w, r.x + r.w), y1 = Math.min(ex.y + ex.h, r.y + r.h);
+      if (x1 <= x0 || y1 <= y0) return;
+      ctx.fillStyle = IW.top; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fillStyle = IW.light;
+      if (r.hz) { const ly1 = Math.min(y1, r.y + r.h * .22); if (ly1 > y0) ctx.fillRect(x0, y0, x1 - x0, ly1 - y0); }
+      else { const lx1 = Math.min(x1, r.x + r.w * .22); if (lx1 > x0) ctx.fillRect(x0, y0, lx1 - x0, y1 - y0); }
+    });
   });
 }
 function _drawIndoor() {
@@ -10096,11 +10197,11 @@ function _drawIndoor() {
   // [FLOOR-SVG-1] 바닥 레이어(러그) — 격자·가구보다 먼저
   _decoSorted(_indoorPlaced.filter(_isFloorLayerDeco)).forEach(_drawIndoorItem);
   //  [DECO-EXIT-DOOR-1] 나가기 문 — 가장 아래 방의 아래 벽 가운데(방이 없으면 판 아래 가운데) · [INDOOR-ROOMS-1]
-  const _low = _rooms.slice().sort((a, b) => (b.r + b.h) - (a.r + a.h) || a.c - b.c)[0];
-  const _doorCx = _low ? offX + (_low.c + _low.w / 2) * C : offX + DI.cols * C / 2;
-  const _doorWall = _low ? offY + (_low.r + _low.h) * C : offY + DI.rows * C;
+  const _exs = _inExitSpots(_rooms), _ex = _exs[0];   // [DECO-INDOOR-WALL-1] 규칙으로 정한 자리(칸 경계) — 아래벽 틈과 같은 자리 · [DECO-INDOOR-WALL-2] 묶음마다
+  const _doorCx = offX + (_ex.c0 + 1) * C;
+  const _doorWall = offY + _ex.wallRow * C;
   const _exitArt = FLOOR_SVG && _decoImg('in_exit_door');
-  if (_exitArt) _drawExitDoorArt(_exitArt, _doorCx, _doorWall, C);   // 발판·빛은 바닥 층이라 가구보다 먼저
+  if (_exitArt) _exs.forEach(e => _drawExitDoorArt(_exitArt, offX + (e.c0 + 1) * C, offY + e.wallRow * C, C));   // 발판·빛은 바닥 층이라 가구보다 먼저
 
   // 창문 (위쪽 벽) — 벽 SVG가 그려졌으면 생략
   if(offY > 14 && !wallSvgOk){
@@ -10140,11 +10241,13 @@ function _drawIndoor() {
   });
   // 배치된 가구 (바닥 레이어 제외 — 러그는 위에서 먼저 그렸다)
   _decoSorted(_indoorPlaced.filter(p=>!_isFloorLayerDeco(p) && !_onWall(p))).forEach(_drawIndoorItem);
+  if (_rooms.length) _inDrawFrontWalls(_rooms, offX, offY, C);   // [DECO-INDOOR-WALL-1] 아래벽은 가구 앞에 선다
 
   // 나가기 문
   if (_exitArt) {
     //  [DECO-EXIT-DOOR-1] 누르는 자리는 벽 밖(환한 바깥 · 화살표) — 방 안 발판 칸은 가구를 놓을 수 있게 둔다. 손가락 몫으로 0.75칸 높이
     _dCv._doorX = _doorCx - .64 * C; _dCv._doorY = _doorWall - .04 * C; _dCv._doorW = 1.28 * C; _dCv._doorH = .79 * C;
+    _dCv._doors = _exs.map(e => ({ x: offX + (e.c0 + 1) * C - .64 * C, y: offY + e.wallRow * C - .04 * C, w: 1.28 * C, h: .79 * C }));   // [DECO-INDOOR-WALL-2]
   } else {
   const dx = _doorCx - C * .35, dy = _doorWall - C * .75;
   _dCtx.fillStyle='#5a3010'; _drr(dx,dy,C*.7,C*.75,3); _dCtx.fill();
@@ -10154,6 +10257,7 @@ function _drawIndoor() {
   _dCtx.fillText('나가기', dx+C*.35, dy-C*.1);
 
   _dCv._doorX=dx; _dCv._doorY=dy; _dCv._doorW=C*.7; _dCv._doorH=C*.75;
+  _dCv._doors = null;
   }
   _dCv._offX=offX; _dCv._offY=offY;
   //  [INDOOR-ROOMS-1] 끄는 중인 네모 — 방 칸 + 벽 띠 줄까지 금색 점선(안 되면 붉게)
@@ -10176,6 +10280,7 @@ function _decoClick(e) {
   // 문 클릭 체크
   const {_doorX:dx,_doorY:dy,_doorW:dw,_doorH:dh}=_dCv;
   if(dx!==undefined&&mx>=dx&&mx<=dx+dw&&my>=dy&&my<=dy+dh){ toggleDecoScene(); return; }
+  if(DECO_SCENE!=='yard' && Array.isArray(_dCv._doors) && _dCv._doors.some(d=>mx>=d.x&&mx<=d.x+d.w&&my>=d.y&&my<=d.y+d.h)){ toggleDecoScene(); return; }   // [DECO-INDOOR-WALL-2] 묶음마다 나가기 문
 
   if(DECO_SCENE==='yard'){
     const c=Math.floor(mx/C), r=Math.floor(my/C);
