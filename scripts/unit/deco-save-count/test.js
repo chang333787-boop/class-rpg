@@ -1805,6 +1805,30 @@
       decoSpaceSet(1); await sleep(150);
     }
 
+    //  ㊲ 친구 구경 확대·이동·동물 누르기(DECO-FRIEND-VIEW-1 · 계획 C9) — 읽기 전용: 친구 저장본 한 글자도 안 바뀜 · 내 화면 자리 그대로
+    if (typeof _ffZoomAt === 'function') {
+      const fr = JSON.parse(JSON.stringify(CUR)); fr.id = 'friend-h'; fr.name = '친구'; fr.avatar = '🧒';
+      fr.houseDecorations = [{ id: 'd_y53', area: 'yard', row: 6, col: 6 }, { id: 'd_y9', area: 'yard', row: 9, col: 9 }];
+      const snap = JSON.stringify(fr), mine = [_dPanX, _dPanY, _dZoom, _dC].join(',');
+      openFriendFullscreen(fr); await sleep(400);
+      _ffZoomAt(2, 0, 0); await sleep(120);
+      out('구경_확대', _ffView.zoom === 2 && _ffView.C === Math.max(4, Math.round(_ffView.C0 * 2)));
+      _ffView.panX = 99999; _ffView.panY = 99999; _renderFriendCanvas();
+      out('구경_이동은_판안', _ffView.panX === 80 * _ffView.C - _ffView.W || _ffView.panX === Math.max(0, DY_FULL.cols * _ffView.C - _ffView.W));
+      _ffView.panX = 0; _ffView.panY = 0; _renderFriendCanvas(); await sleep(100);
+      const dog = [..._animLayers.get('ff-topview').items.values()].find(x => x.id === 'd_y53');
+      if (dog) _ffTap((dog.cur.col + .5) * _ffView.C, (dog.cur.row + .5) * _ffView.C);
+      out('구경_동물누르면_반응', !!document.querySelector('#ff-topview .deco-anim-say'));
+      {   //  💗 가 말풍선 왼쪽 밖 — 한 칸 동물에서 '왈!'을 덮던 것(main 은 266px² 겹침)
+        const a = document.querySelector('#ff-topview .deco-anim-say'), h = document.querySelector('#ff-topview .deco-anim-heart');
+        const A = a && a.getBoundingClientRect(), H = h && h.getBoundingClientRect();
+        out('구경_하트는_말풍선밖', !!(A && H && A.width > 0 && Math.max(0, Math.min(A.right, H.right) - Math.max(A.left, H.left)) * Math.max(0, Math.min(A.bottom, H.bottom) - Math.max(A.top, H.top)) === 0));
+      }
+      closeFriendFullscreen(); await sleep(100);
+      out('구경_친구저장본_그대로', JSON.stringify(fr) === snap);
+      out('구경뒤_내화면값_그대로', [_dPanX, _dPanY, _dZoom, _dC].join(',') === mine);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
