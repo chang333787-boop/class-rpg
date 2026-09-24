@@ -13061,6 +13061,41 @@ function gkeepOpen(why) { if (!gkeepStage()) return; GKEEP.on = true; GKEEP.done
 function gkeepTry(n) { if (GKEEP.done || !gkeepStage()) return; if ((typeof GUIDE !== 'undefined' && GUIDE.on) || SCARD.el || (STAGE.id && !scardLoad().started && window.VRULES.stageCard && window.VRULES.stageCard.on)) { if (n > 0) setTimeout(() => gkeepTry(n - 1), 800); return; } gkeepOpen('열 때'); }
 setTimeout(() => gkeepTry(40), 2000);
 window.__goalsKeep = () => ({ 켜짐: window.VRULES.goalsKeep.on, 펴둠: GKEEP.on, 까닭: GKEEP.why || null, 판목표: STAGE.goals.length, 판이룸: STAGE.goals.filter(g => goalsDone.has(g.id)).length, 보임: document.getElementById('goals').classList.contains('show'), ...GKEEP.stats });
+/* ── [MAC-STAGEHINT] 창조자 51회 두 줄 — ⓑ101 판 목표만 · ⓑ100 다리 끝 한 줄 · 판의 한 곳을 가리키는 권유 (보스 09-24) ──
+   ⓑ101 목표가 하나뿐인 판(nowater · onebridge)의 목표판 남는 두 줄을 기본 목표('3층 집 하나 → 🎄' · '인구 80명')가 채웠다 — 수업과 무관한 목표가 2/3.
+        판 목표가 남아 있는 동안은 **판 목표만**(openGoals) — 기본 목표는 그동안 셈하지도 알리지도 않는다. 판 목표를 다 이루면 기본 목표가 다시 이어진다
+        (검토: 끝까지 막으면 기본 목표에 걸린 꾸밈 보상이 영영 잠긴 채 '목표를 이루면 열려요'라고 남았다). 판 목표가 없는 판은 그대로.
+   ⓑ100 ① 개울 위에 길을 놓아 다리가 됐는데 양 끝이 길과 안 이어지면 아무 말이 없었다("다리를 놓았는데 왜 그대로지?").
+          놓고 잠시 뒤(끌어 잇는 중이면 기다림) **빈 끝**(아무것도 없고 내 땅)이 남아 있으면 "🌉 다리 끝이 길과 이어져야 건널 수 있어요".
+          끝이 길이면 이어진 것 · 집·시설이 붙은 끝은 그 집이 다리로 닿으니 이어진 것으로 · 꽃밭처럼 막힌 끝은 말하지 않는다(검토: 할 수 없는 일을 시켰다).
+        ② 판의 한 곳 권유: 판 파일 `권유: { 말, 자리: [x, y], 집: [x0, y0, x1, y1] }` — 그 네모 안의 집이 필요를 못 채우면 집 말의 도서관 권유 대신 판의 말을 붙이고,
+          누르면(MAC-WHERE) 그 자리를 짚는다. onebridge: 개울 건너 골목 12채 → '다리 놓고 양 끝을 길과 이어요'(도서관 옮기기 권유가 다리에서 멀었다).
+   판정 0 · 원래 줄 수정 0 — openGoals·whereSpots 감싸기 · placeAt·satText 고리. 저장 칸 0(판 목표만일 때는 이룬 기본 목표가 그만큼 늦게 적힌다).
+   스위치 VRULES.stageHint(말) · 판 목표만은 .goalsOnly · 다리 말은 .bridge. */
+(window.VRULES = window.VRULES || {}).stageHint = { on: true, goalsOnly: true, bridge: true, bridgeWaitMs: 900 };
+const SHINT = { stats: { 판목표만: 0, 다리말: 0, 권유: 0, 짚음: 0 } };
+{ const og0 = openGoals; openGoals = function () { const R = window.VRULES.stageHint;
+    const left = R.on && R.goalsOnly && STAGE.def ? STAGE.goals.filter(g => !goalsDone.has(g.id)) : [];
+    if (left.length) { SHINT.stats.판목표만++; return left.slice(0, 3); }
+    return og0.apply(this, arguments); }; }
+/* ① 다리 끝 — sbr 의 돌림 = 개울 방향(0: 위아래로 흐름 → 다리는 좌우로 건넘) · 끝마다 '길' | '빈' | '딴것'(집·시설·꽃밭·판 밖·남의 땅) */
+const shintEnds = (x, y, rot) => ((rot & 1) === 0 ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]]).map(([ex, ey]) => { if (!inb(ex, ey)) return '딴것'; const e = cells[idx(ex, ey)]; if (!e) return plotOpen(ex, ey) ? '빈' : '딴것'; return K[e.k] && (K[e.k].road || e.k === 'sbr') ? '길' : '딴것'; });
+hookAdd('placeAt', function (next, args) { const [kind, x, y] = args, was = inb(x, y) ? cells[idx(x, y)] : null, r = next(args), R = window.VRULES.stageHint;
+  if (kind !== 'road' || !was || was.k !== 'stream' || !R.on || !R.bridge || SIM.ticks === 0 || VISIT.on) return r;
+  const c = cells[idx(x, y)]; if (!c || c.k !== 'sbr') return r;
+  setTimeout(() => { const now = cells[idx(x, y)]; if (!now || now.k !== 'sbr') return; const n = shintEnds(x, y, now.rot).filter(e => e === '빈').length;   // 끌어 잇는 중이면 그 사이 이어진다
+    if (!n) return; SHINT.stats.다리말++; toast('🌉 다리 끝이 길과 이어져야 건널 수 있어요 — ' + (n === 2 ? '양쪽 끝에' : '비어 있는 끝에') + ' 길을 이어 봐요'); }, R.bridgeWaitMs || 900);
+  return r; });
+/* ② 판의 한 곳 권유 */
+const shintAdv = () => { const a = window.VRULES.stageHint.on && STAGE.def && STAGE.def.권유; return a && typeof a.말 === 'string' && Array.isArray(a.집) && a.집.length === 4 ? a : null; };
+function shintHouse(rec) { const a = shintAdv(); if (!a || !rec || rec.k !== 'house' || !(res.get(rec.root) > 0)) return false; const x = cX(rec.root), y = cY(rec.root), [x0, y0, x1, y1] = a.집;
+  if (x < x0 || x > x1 || y < y0 || y > y1) return false; const st = sat.get(rec.root) || computeSat(rec); return NEEDS.some(n => !st.met[n]); }
+hookAdd('satText', function (next, args) { const [rec] = args, t = next(args); if (!shintHouse(rec)) return t; SHINT.stats.권유++;
+  return String(t).replace(/ · 📚 [^·]*$/, '') + ' · ' + shintAdv().말; });   // [MAC-LIBRARY] 의 도서관 권유(끝 한 칸)를 판의 말로 바꾼다
+{ const ws0 = whereSpots; whereSpots = function (rec) { if (shintHouse(rec)) { const a = shintAdv(), p = Array.isArray(a.자리) ? a.자리 : null;
+      if (p && inb(p[0] | 0, p[1] | 0)) { SHINT.stats.짚음++; return [idx(p[0] | 0, p[1] | 0)]; } }
+    return ws0.apply(this, arguments); }; }
+window.__stageHint = () => ({ 켜짐: window.VRULES.stageHint.on, 판권유: shintAdv(), ...SHINT.stats });
 /* ── [MAC-PREDICT] 예상 남기기(L2) — 시작 카드에서 짐작 하나를 고르고, 끝 카드에서 해 본 결과와 나란히 (설계 docs/village_role_predict_design.md 3절 · #981 승인 · 보스 09-24) ──
    판 파일 `예상: { 물음, 보기: [셋], 결과: { 셈: kind|pop|hook(목표 셈 꼴 그대로 · 새 셈 0), k?·훅?, t: 이름 } }` — 판 검사가 꼴을 본다.
    ① 시작 카드(처음 열 때): 첫날 사진 **옆**에 🤔 물음 + 보기 셋 + '모르겠어요'(2×2) — 하나를 고르면 [시작]이 켜진다 · 작은 [건너뛰기](수업 속도 · 교사 판단).

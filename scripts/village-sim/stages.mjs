@@ -173,6 +173,14 @@ for (const f of files) {
     else if (g.셈 === 'kind' && Array.isArray(def.건물) && !def.건물.includes(g.k)) 나쁨.push('결과 종류가 이 판에 없음: ' + g.k);
     if (def.교과 == null && def.카드 !== true) 나쁨.push('시작 카드가 안 뜨는 판(교과 없음 · 카드 아님) — 물을 자리가 없다');
     나쁨.length ? add('FAIL', P('예상'), 나쁨.join(' · ')) : add('PASS', P(`예상 '${e.물음}' · 보기 3 + 모르겠어요 · 결과 ${g.t}`)); }
+  if (def.권유 != null) { const a = def.권유 || {}, 나쁨 = [], inB = (x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < 256 && y < 256;   /* [MAC-STAGEHINT] 판의 한 곳 권유 — 말 · 자리 · 집 네모 */
+    if (typeof a.말 !== 'string' || !a.말.trim()) 나쁨.push('말이 비었음');
+    if (a.자리 != null && !(Array.isArray(a.자리) && a.자리.length === 2 && inB(a.자리[0], a.자리[1]))) 나쁨.push('자리는 [x, y] (판 안)');
+    if (!(Array.isArray(a.집) && a.집.length === 4 && inB(a.집[0], a.집[1]) && inB(a.집[2], a.집[3]) && a.집[0] <= a.집[2] && a.집[1] <= a.집[3])) 나쁨.push('집은 [x0, y0, x1, y1] (판 안 · 작은 쪽이 먼저)');
+    if (!나쁨.length && a.자리 != null) { const [x, y] = a.자리, pr = terrainProbe(n, [['kinds', [[x, y], [x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]]]), k = pr.r ? pr.r[0] : null, open = v => v == null || v === 'road' || v === 'sbr';   /* 자리가 개울이면 건너는 두 끝이 길이나 빈 칸이어야 — 막힌 끝이면 권유를 따를 수 없다(검토 ⓑ100) */
+      if (!Array.isArray(k)) 나쁨.push('자리를 열어 보지 못함: ' + (pr.err || '?'));
+      else if (k[0] === 'stream' && !((open(k[1]) && open(k[2])) || (open(k[3]) && open(k[4])))) 나쁨.push(`자리 ${x},${y} 의 다리 끝이 막힘(${k.slice(1).map(v => v || '빈').join(' · ')})`); }
+    나쁨.length ? add('FAIL', P('권유'), 나쁨.join(' · ')) : add('PASS', P(`권유 '${a.말.slice(0, 24)}…' · 집 네모 ${a.집.join(',')}` + (a.자리 ? ` · 자리 ${a.자리.join(',')}(다리 끝 열림)` : ''))); }
   const gbad = (def.목표 || []).filter(g => !g.t || !SEMS[g.셈] || !SEMS[g.셈](g) || (g.셈 === 'hook' && !HOOKS.includes(g.훅)));
   gbad.length ? add('FAIL', P('목표'), '셈 꼴이 틀림: ' + gbad.map(g => g.t || '?').join(' · ')) : add('PASS', P(`목표 ${(def.목표 || []).length}개 셈 꼴`));
   const r = spawnSync(process.execPath, [path.join(HERE, 'run.mjs'), '--stage', n, '--days', '1', '--seeds', '1', '--json', path.join(os.tmpdir(), 'vs-stage-' + n + '.json')], { cwd: ROOT, encoding: 'utf8' });
