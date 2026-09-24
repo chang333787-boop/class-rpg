@@ -1684,6 +1684,23 @@
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
     }
 
+    //  ㊹ 새 9종(DECO-INDOOR-ITEMS-1 · 사용자 승인 값) — 표 줄 · 벽걸이 등록 · 두 칸 게시판은 방 윗벽에 · 긴 탁자는 방 안에
+    if (GAME_DATA.decorations.some(d => d.id === 'in_table_long')) {
+      const g = id => GAME_DATA.decorations.find(d => d.id === id) || {};
+      //  값은 '같은 값대' 로 승인 — 벽걸이 = 그림 액자 · 긴 탁자 = 소파 · 의자 = 램프(표를 읽을 때 priceAdj 가 price 로 풀린다)
+      out('새9종_표', ['in_w_curtain', 'in_w_window2', 'in_w_clock', 'in_w_board', 'in_w_shelf', 'in_w_bookshelf'].every(id => g(id).price === g('d_i4').price && g(id).rarity === 'common' && g(id).cat === 'indoor' && DECO_WALL[id])
+        && g('in_w_window2').size.w === 2 && g('in_w_board').size.w === 2 && g('in_table_long').price === g('d_i8').price && g('in_table_long').rarity === 'rare'
+        && g('in_table_long').size.w === 4 && g('in_chair_front').price === g('d_i2').price && g('in_chair_back').rarity === 'common');
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      const keepIn = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      _inRoomsSet(CUR, [{ id: 'a', r: 3, c: 4, w: 14, h: 8, floor: null, wall: null }]);
+      out('새9종_게시판은_윗벽', _decoRuleWhy('in_w_board', 'indoor', 3, 6, 2, 1) === '' && _decoRuleWhy('in_w_board', 'indoor', 6, 6, 2, 1) !== '');
+      out('새9종_긴탁자_방안', _decoRuleWhy('in_table_long', 'indoor', 6, 8, 4, 2) === '' && _decoRuleWhy('in_table_long', 'indoor', 6, 16, 4, 2) !== '');
+      if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
+      decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
