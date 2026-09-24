@@ -12868,6 +12868,35 @@ function cardMapUrl() { try { const R = window.VRULES.cardMap, F = scardFrame(),
   const st0 = stageCardStart; stageCardStart = function () { CARDMAP.starting = true; try { return st0.apply(this, arguments); } finally { CARDMAP.starting = false; } }; }
 window.__cardMap = () => ({ 켜짐: !!(window.VRULES.cardMap && window.VRULES.cardMap.on), ...CARDMAP.stats, 지금틀: SCARD.el ? (SCARD.el.querySelector('figure img') ? '사진' : SCARD.el.querySelector('figure .ph[style]') ? '지도' : '빈틀') : null });
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
+/* ── [MAC-GOALSKEEP] 수업 판의 목표판 — 카드를 닫아도 할 일이 화면에 남게 · '이룬 것'은 판 목표만 (창조자 40회 ⓑ90·ⓑ91 · 보스 09-24 무한 모드) ──
+   ⓑ90: town3·town3-origin 은 시작 저장본이 있어 '첫 열기' 길(goalsPeek 20초)을 안 탄다 → 카드를 닫으면 목표판이 닫혀 있고 할 일이 화면에 없었다(바닷가는 20초만 열림).
+        판 목표가 있는 판이면 **시작 카드가 닫힐 때**(시작·건너뛰기) · 카드 없이 다시 열 때 목표판을 편다. 아이가 🎯 로 닫거나 목표판을 눌러 닫기 전까지는
+        '잠깐 보여 주기'(goalsPeek — 목표를 이룰 때 등)가 스스로 접지 않는다. 판 목표를 다 이뤘으면 펴지 않는다. 역할 이름표(MAC-ROLE)도 이 판에 있다.
+   ⓑ91: '이룬 것 N개'가 goalsDone 전부를 셌다 — 판 목표는 기본 목표 앞에 끼워질 뿐이라(GOALS.unshift) 시작 저장본의 기본 목표(길·집·주민·꾸밈)까지 세어
+        town3-origin 이 시작부터 '5개'. 판이면 **판 목표만** 'a / b'로(아직 0이면 줄 없음 — 원래와 같게).
+   판정·저장 0 · 원래 줄 수정 0(renderGoals·goalsPeek·scardClose·stageCardStart 감싸기 · 🎯·목표판 누름 고리). 스위치 VRULES.goalsKeep(보기). */
+(window.VRULES = window.VRULES || {}).goalsKeep = { on: true };
+const GKEEP = { on: false, done: false, stats: { 폄: 0, 잠깐막음: 0, 아이가닫음: 0, 판셈: 0 } };
+const gkeepStage = () => !!(window.VRULES.goalsKeep.on && STAGE.def && STAGE.goals.length && !VISIT_SID && !STAGE.goals.every(g => goalsDone.has(g.id)));
+function gkeepOpen(why) { if (!gkeepStage()) return; GKEEP.on = true; GKEEP.done = true; GKEEP.why = why; GKEEP.stats.폄++;
+  goalsAutoUntil = 0; goalsShown = true; document.getElementById('goals').classList.add('show'); renderGoals(); }
+{ const gp0 = goalsPeek; goalsPeek = function () { if (!GKEEP.on) return gp0.apply(this, arguments); GKEEP.stats.잠깐막음++;   // 펴 둔 동안엔 '잠깐'이 접지 않는다
+    goalsAutoUntil = 0; goalsShown = true; document.getElementById('goals').classList.add('show'); renderGoals(); };
+  const rg0 = renderGoals; renderGoals = function () { const x = rg0.apply(this, arguments); if (!window.VRULES.goalsKeep.on || !STAGE.goals.length) return x;
+    const el = document.getElementById('goals'), d = el && el.querySelector('.g.done'); if (!d) return x;
+    const n = STAGE.goals.filter(g => goalsDone.has(g.id)).length; GKEEP.stats.판셈++;
+    if (n) d.textContent = '이룬 것 ' + n + ' / ' + STAGE.goals.length; else d.remove();
+    return x; };
+  const sc0 = scardClose; scardClose = function () { const was = !!(SCARD.el && SCARD.el.dataset.kind === 'start'); const x = sc0.apply(this, arguments); if (was) gkeepOpen('카드 닫힘'); return x; };
+  const st0 = stageCardStart; stageCardStart = function () { const x = st0.apply(this, arguments); if (SCARD.el) SCARD.el.dataset.kind = 'start'; return x; };
+  const gb = document.getElementById('goalBtn'), ge = document.getElementById('goals'), gb0 = gb.onclick, ge0 = ge.onclick;
+  gb.onclick = function () { const x = gb0.apply(this, arguments); if (!goalsShown && GKEEP.on) { GKEEP.on = false; GKEEP.stats.아이가닫음++; } return x; };
+  ge.onclick = function () { const x = ge0.apply(this, arguments); if (!goalsShown && GKEEP.on) { GKEEP.on = false; GKEEP.stats.아이가닫음++; } return x; };
+  if (goalsShown) renderGoals(); }
+/* 카드 없이 다시 연 판(이미 시작함) — 첫 안내·카드가 없을 때 편다(카드가 뜨면 그 카드가 닫힐 때 편다) */
+function gkeepTry(n) { if (GKEEP.done || !gkeepStage()) return; if ((typeof GUIDE !== 'undefined' && GUIDE.on) || SCARD.el || (STAGE.id && !scardLoad().started && window.VRULES.stageCard && window.VRULES.stageCard.on)) { if (n > 0) setTimeout(() => gkeepTry(n - 1), 800); return; } gkeepOpen('열 때'); }
+setTimeout(() => gkeepTry(40), 2000);
+window.__goalsKeep = () => ({ 켜짐: window.VRULES.goalsKeep.on, 펴둠: GKEEP.on, 까닭: GKEEP.why || null, 판목표: STAGE.goals.length, 판이룸: STAGE.goals.filter(g => goalsDone.has(g.id)).length, 보임: document.getElementById('goals').classList.contains('show'), ...GKEEP.stats });
 /* ── [MAC-PREDICT] 예상 남기기(L2) — 시작 카드에서 짐작 하나를 고르고, 끝 카드에서 해 본 결과와 나란히 (설계 docs/village_role_predict_design.md 3절 · #981 승인 · 보스 09-24) ──
    판 파일 `예상: { 물음, 보기: [셋], 결과: { 셈: kind|pop|hook(목표 셈 꼴 그대로 · 새 셈 0), k?·훅?, t: 이름 } }` — 판 검사가 꼴을 본다.
    ① 시작 카드(처음 열 때): 첫날 사진 **옆**에 🤔 물음 + 보기 셋 + '모르겠어요'(2×2) — 하나를 고르면 [시작]이 켜진다 · 작은 [건너뛰기](수업 속도 · 교사 판단).
