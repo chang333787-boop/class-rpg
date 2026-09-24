@@ -6029,7 +6029,7 @@ function waitLookTick() {
   WAITLOOK.stats.센횟수++; WAITLOOK.stats.다시합친청크 += keys.size; WAITLOOK.stats.센ms = +(performance.now() - t0).toFixed(2);
 }
 { const parts0 = partsOf; partsOf = function (rec) { const p = parts0.apply(this, arguments);
-    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root) && WAITLOOK.miss.get(rec.root) !== '일자리') return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
+    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root) && window.WAITHOUSE.icons.includes(WAITLOOK.miss.get(rec.root))) return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
 window.__waitLook = () => ({ 켜짐: window.VRULES.waitLook.on, 기다리는집: WAITLOOK.miss.size, 빠진것첫째: [...new Set(WAITLOOK.miss.values())], ...WAITLOOK.stats });
 
 (window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 1, bubbleMs: 6000 };
@@ -11872,6 +11872,12 @@ window.__needWater = () => ({ 켜짐: !!(window.VRULES.needWater && window.VRULE
   목표: GOALS.filter(g => g.id === 'well' || g.id === 'bench1').map(g => g.id), 이음: NOWATER.carried,
   말: { 셋멀: waitSay(['장보기', '놀이', '쉼'], 2), 둘멀: waitSay(['놀이', '쉼'], 2), 점: [3, 2, 1].map(n => waitDots(n, 2)) }, ...NOWATER.stats });
 nwSync();
+/* 팻말 — 문 앞 팻말은 아이콘이 있는 부족(물·장보기·놀이·쉼)에만 선다. 배움·정원처럼 아이콘이 없으면 세우지 않는다
+   (전엔 WAITHOUSE.props 가 '물'로 떨어져, 물을 끈 판에서도 정원 찬 학교 옆 빈집에 파란 물방울이 섰다 — 보스 #1064 검토). 원래 줄 1(partsOf 고리의 조건).
+   시험 훅: 기다리는 집 하나의 부족을 잠시 miss 로 바꿔 partsOf 를 부르고 팻말 부위(keep)를 센다 — 판정 0(WAITLOOK 은 보기용 · 곧 되돌림). */
+window.__waitSignTry = (miss) => { const root = [...WAITLOOK.miss.keys()].find(r => waitHouseIs(r)); if (root == null) return { 집: null };
+  const was = WAITLOOK.miss.get(root); WAITLOOK.miss.set(root, miss); let n = 0; try { n = partsOf(cells[root]).filter(pt => pt && pt.keep).length; } finally { WAITLOOK.miss.set(root, was); }
+  return { 집: root, 팻말부위: n }; };
 
 /* ── 처음 상태 ──
    ① #fresh → 저장본을 지우고 빈 판
