@@ -1467,6 +1467,13 @@ html,body{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-
 .deco-drawer-body{max-height:152px;overflow-y:auto}
 .deco-drawer.is-open .deco-drawer-body{max-height:48vh}
 .deco-empty{font-size:13px;color:var(--txt3);padding:10px 4px;word-break:keep-all}
+/* [DECO-FIRST-1] 처음 아이 카드 — 서랍 빈자리를 채우는 누를 곳 하나(움직임 없음) */
+.deco-first-card{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 20px;border-radius:14px;cursor:pointer;
+  font-family:inherit;text-align:left;border:2px solid var(--gold);background:rgba(217,164,65,.16);color:var(--txt)}
+.deco-first-card .dfc-ico{font-size:30px;line-height:1}
+.deco-first-card .dfc-txt{display:flex;flex-direction:column;gap:2px}
+.deco-first-card b{font-size:16px;color:var(--gold)}
+.deco-first-card small{font-size:12px;color:var(--txt2)}
 /* 카드 글자 12px (디자인 시스템 최소) */
 #if-deco-inv .deco-card .dc-name,#if-deco-quick .deco-card .dc-name{font-size:12px!important}
 #if-deco-inv .deco-card .dc-qty,#if-deco-quick .deco-card .dc-qty{font-size:12px!important}
@@ -1685,3 +1692,11 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 .deco-rect-tip[hidden]{display:none}
 .deco-rect-tip.is-capped{color:#ffb86b;border-color:rgba(255,184,107,.6)}
 @media (max-height:480px){ .fpk-side .pk-cap{display:none} }   /* 폰 가로: 캡션 줄은 접는다(끄는 동안 아래 글이 대신 말한다) */
+
+/* [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기 — '제안'으로 읽히게 숨쉬기(.45↔.6 · 2초) · 움직임 줄이기면 .55 고정 · 놓으면 0.4초에 사라짐 */
+.deco-tpl{position:absolute;pointer-events:none;opacity:.55;animation:decoTplBreath 2s ease-in-out infinite alternate}
+.deco-tpl.is-still{animation:none;opacity:.55}
+.deco-tpl.is-gone{opacity:0;animation:decoTplOut .4s ease}
+@keyframes decoTplBreath{from{opacity:.45}to{opacity:.6}}
+@keyframes decoTplOut{from{opacity:.55}to{opacity:0}}
+@media (prefers-reduced-motion: reduce){.deco-tpl{animation:none;opacity:.55}.deco-tpl.is-gone{opacity:0}}

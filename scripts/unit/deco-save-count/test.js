@@ -1735,6 +1735,54 @@
       }
     }
 
+    //  ㉛ 처음 아이 카드(DECO-FIRST-1 · 계획 U3) — 가진 장식 0 이면 서랍에 큰 카드 하나 · 누르면 🛒 상점
+    if (_ifMode) {
+      const keepInv = CUR.inventory;
+      CUR.inventory = (keepInv || []).filter(i => !GAME_DATA.decorations.some(d => d.id === i.id)); renderDecoInv();
+      const card = document.querySelector('#if-deco-inv .deco-first-card');
+      out('처음아이_카드', !!card);
+      if (card) card.click(); await sleep(200);
+      out('처음아이_카드누르면_상점', DECO_TAB === 'shop' && document.querySelectorAll('#if-deco-shop .deco-scard').length > 0);
+      decoTab('own'); CUR.inventory = keepInv; renderDecoInv(); await sleep(100);
+
+    }
+
+    //  ㉜ 새 아이 첫 마당 본보기(DECO-FIRST-YARD-1 · 디자인 ⑭ (A) 보여주기만) — 마당 장식 0 · 바닥 0 이면 보이고, 저장 0 · 누르기는 판으로 · 놓으면 사라짐
+    if (typeof _decoTplSync === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const keep = { hd: CUR.houseDecorations, yf: CUR.yardFloor, yfs: CUR.yardFloors };
+      CUR.houseDecorations = (keep.hd || []).filter(p => p.area !== 'yard'); CUR.yardFloor = {}; CUR.yardFloors = {};
+      const snap = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]);
+      _drawDeco(); await sleep(120);
+      out('본보기_처음아이에게_보임', _decoTplOn && _decoTplCv && _decoTplCv.style.display === 'block');
+      out('본보기_누르기는_판으로', !!_decoTplCv && getComputedStyle(_decoTplCv).pointerEvents === 'none');
+      out('본보기_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.yardFloors]) === snap);
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_y2').concat([{ id: 'd_y2', qty: 5 }]);
+      SEL_DECO = 'd_y2'; _decoPlace('yard', 12, 12); await sleep(80);
+      out('본보기_놓으면_사라짐', !_decoTplOn && _decoTplCv.classList.contains('is-gone'));
+      SEL_DECO = null; CUR.houseDecorations = keep.hd; CUR.yardFloor = keep.yf; CUR.yardFloors = keep.yfs; _decoUndoClear(); _drawDeco(); await sleep(100);
+    }
+
+    //  ㉞ 밭 그림(DECO-FARM-ART-1 · 디자인 D12 · #453) — 흙 타일 두 장 · 단계 그림
+    if (typeof _farmImg === 'function') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(1); await sleep(100);
+      ['tile_soil_a', 'tile_soil_b', 'stage_sprout', 'stage_grow', 'stage_wither'].forEach(_farmImg);
+      for (let i = 0; i < 20 && !(_farmImg('tile_soil_a') && _farmImg('stage_wither')); i++) await sleep(100);
+      out('밭그림_불러옴', ['tile_soil_a', 'tile_soil_b', 'stage_sprout', 'stage_grow', 'stage_wither'].every(n => !!_farmImg(n)));
+      _drawDeco(); await sleep(60);
+      out('밭그림_밭자리그대로', !!(_dCv._farmZone && _dCv._farmZone.cols > 0));
+    }
+
+    //  ㉟ 판 위 잔디 띠(DECO-TOP-PAD-1 · 디자인 D7) — 두 칸 위까지 밀 수 있다 · 거기는 놓는 칸이 아니다
+    if (typeof DECO_YARD_TOP !== 'undefined') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      _decoSetZoom(2); _dPanY = -9999; _decoClampPan();
+      out('위띠_두칸까지', Math.abs(_dPanY + DECO_YARD_TOP * _dC) < 1);
+      out('위띠_놓는칸아님', _decoCellAt(_dCv.getBoundingClientRect().left + 5, _dCv.getBoundingClientRect().top + 5) === null);
+      _dPanY = 0; _decoClampPan(); _drawDeco();
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
