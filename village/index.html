@@ -12827,6 +12827,17 @@ addEventListener('keydown', e => { if (SHOWM.on && e.key === 'Escape') { e.preve
   const end = document.createElement('button'); end.id = 'showEnd'; end.type = 'button'; end.textContent = '📺 끝'; end.onclick = () => showMode(false); document.body.appendChild(end);
   if (QS.get('show') === '1') { const t = setInterval(() => { if (window.__LOADMS != null) { clearInterval(t); showMode(true); } }, 300); } }
 window.__showMode = on => { if (on != null) showMode(on); return { 켜짐: SHOWM.on, 배율: +showK().toFixed(2), ...SHOWM.stats }; };
+/* ── [ACT-SHOWVIEW] 보여 주기 모드 ③ 시점 (설계 docs/village_tv_mode.md · 사진 모드의 PHOTO.keep 과 같은 꼴) ──
+   켤 때 카메라(방향·기울기·배율·손으로 확대했나)를 적어 두고 한 번 조금 가까이(zoom 배 · 20 까지) — 물건 상자가 사라져 넓어진 화면을 마을로 채우고 사람도 커 보이게.
+   끌 때 적어 둔 그대로 되돌린다. 켜진 동안 확대·끌기는 그대로 된다(선생님이 가리킬 곳으로). 판정·저장 0 · 분류 '보기'. */
+(window.VRULES = window.VRULES || {}).showView = { on: true, zoom: 1.25 };
+const SHOWV = { keep: null, stats: { 가까이: 0, 되돌림: 0 } };
+{ const s0 = showMode; showMode = function () { const was = SHOWM.on, r = s0.apply(this, arguments), R = window.VRULES.showView;
+    if (was === SHOWM.on) return r;
+    if (SHOWM.on && R.on) { SHOWV.keep = { az: camAz, el: camEl, zoom: zoomMul, user: userZoomed }; userZoomed = true; zoomMul = Math.min(20, zoomMul * (R.zoom || 1)); resize(); SHOWV.stats.가까이++; }
+    else if (!SHOWM.on && SHOWV.keep) { const K0 = SHOWV.keep; camAz = K0.az; camEl = K0.el; zoomMul = K0.zoom; userZoomed = K0.user; resize(); SHOWV.keep = null; SHOWV.stats.되돌림++; }
+    return r; }; }
+window.__showView = () => ({ 켜짐: window.VRULES.showView.on, 적어둠: !!SHOWV.keep, 배율: +zoomMul.toFixed(2), ...SHOWV.stats });
 /* ── [ACT-STAGERESET] [↺ 처음부터] — 수업 판마다 (수업 흐름 #841 L1 · 보스 09-23) ──
    되돌리는 길이 마을 둘인 판(proto-flow 의 왼쪽 단추 줄)에만 있었다. town3·farm 에서는 Ctrl+Z 를 여러 번 누르거나 주소에 #fresh 를 붙여야 했는데,
    #fresh 는 '빈 판'이라 준비된 시작 땅이 안 실린다(창조자 14회 ⓑ6). 이제 **수업 판(교과 칸)이거나 시작 저장본이 있는 판**이면 왼쪽 아래(트레이 곁)에 단추 하나.
