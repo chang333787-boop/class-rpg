@@ -90,7 +90,10 @@ export async function loadVillage(opts) {
      index.html 은 그대로 — 브라우저에선 맞는 동작이다(아이의 30초). 멈춘 시계 = 한가한 기기에서 판 하나가 몇 초에 끝나던 지금까지의 값.
      틱 시간 재기는 진짜 시계로 따로(__tickBench 결과의 틱평균ms · 묶음마다) — 모듈 안의 틱 ms 는 멈춘 시계라 0 이다. */
   const realNow = performance.now, frozen = realNow.call(performance), frozenDate = Date.now();
-  Object.defineProperty(performance, 'now', { value: () => frozen, configurable: true, writable: true }); Date.now = () => frozenDate;
+  /* [MAC-PLOTSAUTO] opts.clock === 'sim' 이면 벽시계가 시뮬 시계를 따라간다(1배속 브라우저처럼 · 시뮬 1ms = 벽 1ms) — '땅 고르기 30초 뒤 저절로'가 시뮬 30초(300틱) 뒤에 돈다.
+     run.mjs --plots auto(선택 칸 · 기본은 멈춘 시계 → 기준 ① 0). 싣는 동안은 __sim 이 아직 없어 멈춘 값 그대로. */
+  const simT = () => { try { return globalThis.__sim ? globalThis.__sim().t : 0; } catch (e) { return 0; } };
+  Object.defineProperty(performance, 'now', { value: opts.clock === 'sim' ? () => frozen + simT() : () => frozen, configurable: true, writable: true }); Date.now = () => frozenDate;
   globalThis.__simRealNow = () => realNow.call(performance);
   try { await import(pathToFileURL(file).href); }
   catch (e) {   // 줄 번호를 index.html 기준으로(module 은 258줄 무렵에서 시작)

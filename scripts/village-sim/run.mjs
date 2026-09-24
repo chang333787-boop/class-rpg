@@ -52,6 +52,7 @@ function measure(w) {
      그러면 못 받은 세대도 같이 는다(실측). 비율로 봐야 '고쳤나'가 보인다. 흐름이 꺼진 판에서는 넣지 않는다. */
   if (m.못받은세대 != null) m['못받은%'] = m.사는집 ? Math.round(m.못받은세대 / m.사는집 * 1000) / 10 : 0;
   if (typeof w.__stage === 'function') { const st = w.__stage(); if (st.id) { m.판목표 = st.목표.filter(g => g[1]).length; m.판목표수 = st.목표.length; } }
+  try { m.구역 = w.__plots().열린구역.length; } catch { /* 옛 index.html */ }   // [MAC-PLOTSAUTO] 열린 구역 수 — --plots auto 에서 움직인다(기본은 멈춘 시계라 그대로)
   return Object.assign(m, need);
 }
 
@@ -112,7 +113,7 @@ function setRules(w, spec) {
 async function child(spec) {
   const { loadVillage } = await import('./load.mjs');
   const saveText = spec.save ? fs.readFileSync(path.resolve(ROOT, spec.save), 'utf8') : null;
-  const { w } = await loadVillage({ root: spec.root || ROOT, html: spec.html || null, saveText, seed: spec.seed, lookSeed: spec.lookseed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
+  const { w } = await loadVillage({ root: spec.root || ROOT, html: spec.html || null, saveText, seed: spec.seed, lookSeed: spec.lookseed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '', clock: spec.plots === 'auto' ? 'sim' : undefined });   // [MAC-PLOTSAUTO]
   const stage = typeof w.__stage === 'function' ? w.__stage() : null;
   if (spec.stage && (!stage || stage.오류 || stage.id !== spec.stage)) throw new Error('판을 못 얹음: ' + (stage ? stage.오류 || stage.id : '__stage 없음'));
   setRules(w, spec.rules);
@@ -135,7 +136,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i].replace(/^--/, ''), v = argv[i + 1];
     if (k === 'vs') { o.vs.push(v); i++; } else if (k === 'json') { o.json = v; i++; } else if (k === 'child') { o.child = v; i++; }
-    else if (k === 'html' || k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name' || k === 'first30') { o[k] = v; i++; }
+    else if (k === 'html' || k === 'stage' || k === 'save' || k === 'rules' || k === 'do' || k === 'seeds' || k === 'hash' || k === 'show' || k === 'watch' || k === 'name' || k === 'first30' || k === 'plots') { o[k] = v; i++; }
     else if (k === 'days' || k === 'every' || k === 'warm' || k === 'by' || k === 'jobs' || k === 'lookseed') { o[k] = +v; i++; }   // lookseed: 그림 난수만 따로 시드(MAC-SIMRAND)
     else if (k === 'help' || k === 'h') o.help = true;
     else if (k === 'voice') o.voice = true;
@@ -160,7 +161,7 @@ function dropKinds(v) {
 const dropSay = v => `⚠ '${v.name}' — 저장본 ${v.save} 의 판 전용 종류가 ${v.stage ? '판 ' + v.stage + ' 에 없어' : '--stage 없이'} 빠진 채 돈다: ${v.빠질종류.join(' ')} → --stage <판> (vs 칸은 stage=…)`;
 
 function variants(o) {
-  const base = { name: o.name || (o.stage ? '판 ' + o.stage : '기본'), html: o.html || null, stage: o.stage || null, save: o.save || null, rules: o.rules || '', do: o.do || '' };
+  const base = { name: o.name || (o.stage ? '판 ' + o.stage : '기본'), html: o.html || null, stage: o.stage || null, save: o.save || null, rules: o.rules || '', do: o.do || '', plots: o.plots || null };
   const list = [base];
   o.vs.forEach(s => {   // '이름: do=…; rules=…; save=…' — do 안의 여러 수는 '|' 로 잇는다
     const c = s.indexOf(':'); if (c < 0) throw new Error("--vs 는 '이름: do=… ; rules=…' 꼴");
@@ -174,7 +175,8 @@ function variants(o) {
       else if (k === 'html') v.html = val || null;
       else if (k === 'root') v.root = val ? path.resolve(val) : null;   // [MAC-VSREF] 다른 뿌리(그 ref 의 village/ 를 푼 자리) — index.html·판 파일·vendor 모두 그것. 저장본(save=)은 늘 이 저장소 것
       else if (k === 'lookseed') v.lookseed = +val;   // [MAC-SIMRAND] 그림 줄기만 흔든 판
-      else throw new Error('--vs 칸은 do · rules · save · stage · html · root · lookseed: ' + k);
+      else if (k === 'plots') v.plots = val || null;   // [MAC-PLOTSAUTO] 'auto' — 땅 고르기를 시뮬 30초 뒤 저절로
+      else throw new Error('--vs 칸은 do · rules · save · stage · html · root · lookseed · plots: ' + k);
     });
     list.push(v);
   });
@@ -266,6 +268,7 @@ const HELP = `마을 시뮬 도구 — scripts/village-sim/README.md 참고
   --vs '이름: do=…; rules=…; save=…'  (여러 번) — 같은 시드로 나란히 돌려 비교
   --show 인구,일먼집,…   --watch 일먼집 (비교 표 지표)   --by 1 (좋아짐 문턱)
   --show 까닭            일자리 까닭 넷(none·cut·far·full)을 함께 — 합은 일먼집과 같다
+  --plots auto           땅 고르기를 시뮬 30초(300틱) 뒤 저절로(벽시계가 시뮬을 따라감 · 1배속 브라우저처럼) — 기본은 안 엶(멈춘 시계) · vs 칸 plots=auto
   --first30 8,10         첫 30초 탐지기 — 그 시각들에 열어 300틱: 사는 모습 셋 · 어수선 · 연기의 어설픔 + PASS/FAIL (docs/village_first_screen.md)
   --voice (끝 날 동네별 바람표 · MAC-VOICE)   --every 150 (틱 · 재는 간격)   --warm 300   --hash 'hour=10'   --jobs 동시 프로세스 수   --json 결과.json`;
 
