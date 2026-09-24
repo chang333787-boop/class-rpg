@@ -12868,6 +12868,56 @@ function cardMapUrl() { try { const R = window.VRULES.cardMap, F = scardFrame(),
   const st0 = stageCardStart; stageCardStart = function () { CARDMAP.starting = true; try { return st0.apply(this, arguments); } finally { CARDMAP.starting = false; } }; }
 window.__cardMap = () => ({ 켜짐: !!(window.VRULES.cardMap && window.VRULES.cardMap.on), ...CARDMAP.stats, 지금틀: SCARD.el ? (SCARD.el.querySelector('figure img') ? '사진' : SCARD.el.querySelector('figure .ph[style]') ? '지도' : '빈틀') : null });
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
+/* ── [MAC-PREDICT] 예상 남기기(L2) — 시작 카드에서 짐작 하나를 고르고, 끝 카드에서 해 본 결과와 나란히 (설계 docs/village_role_predict_design.md 3절 · #981 승인 · 보스 09-24) ──
+   판 파일 `예상: { 물음, 보기: [셋], 결과: { 셈: kind|pop|hook(목표 셈 꼴 그대로 · 새 셈 0), k?·훅?, t: 이름 } }` — 판 검사가 꼴을 본다.
+   ① 시작 카드(처음 열 때): 첫날 사진 **옆**에 🤔 물음 + 보기 셋 + '모르겠어요'(2×2) — 하나를 고르면 [시작]이 켜진다 · 작은 [건너뛰기](수업 속도 · 교사 판단).
+      사진 옆인 까닭: 1366×610 에서 town3 카드가 이미 562px(한도 586 · 잰 값) — 아래에 붙이면 넘친다.
+      고른 것은 판 카드 기록(rpg.stagecard.<sid>.<판> · 로컬 전용)에 `예상: { 고름: 0~3 | null(건너뜀), 글, t }` — 마을 저장본·sync·Firebase 0.
+      📋 할 일 다시 보기로 다시 열면 묻지 않고 '내 짐작' 한 줄만.
+   ② 끝 카드: 새로 생긴 것 줄 아래 "🤔 처음 짐작: … → 해 보니 🎯 a/b · <결과 이름> <지금 값>" + 작은 물음. **맞다·틀리다를 매기지 않는다**(답이 여럿 · 매기면 '정답 맞히기'가 된다).
+   판정 0 · 마을 저장 0 · 원래 줄 수정 0 — stageCardStart·stageCardEnd 감싸기. 스위치 VRULES.predict(보기). */
+(window.VRULES = window.VRULES || {}).predict = { on: true };
+const PRED = { pick: null, stats: { 물음: 0, 고름: 0, 건너뜀: 0, 다시봄: 0, 끝줄: 0 } };
+const PRED_IDK = '모르겠어요';
+const predDef = () => { const e = window.VRULES.predict.on && STAGE.def && STAGE.def.예상; return e && typeof e.물음 === 'string' && Array.isArray(e.보기) && e.보기.length ? e : null; };
+function predCss() { if (document.getElementById('predictCss')) return; const st = document.createElement('style'); st.id = 'predictCss';
+  st.textContent = '#stageCard .pred{width:min(42vw,330px);display:flex;flex-direction:column;justify-content:center;gap:6px;text-align:left;word-break:keep-all}'
+    + '#stageCard .pred .pq{font-size:14px;line-height:1.35;color:#cfe3ff}#stageCard .pred .pq b{color:#fff;font-size:15px}'
+    + '#stageCard .pred .po{display:grid;grid-template-columns:1fr 1fr;gap:6px}'
+    + '#stageCard .pred .po button{margin:0;min-width:0;min-height:44px;padding:4px 8px;background:#262b38;color:#e8e6e0;border:2px solid #3a4050;border-radius:10px;font-size:14px;font-weight:700;line-height:1.25}'
+    + '#stageCard .pred .po button.on{background:#3a4460;border-color:#ffe9b8;color:#fff}#stageCard .pred .pn{font-size:12px;color:#a8adba}'
+    + '#stageCard button:disabled{opacity:.45;cursor:default}#stageCard button.skip{background:none;color:#a8adba;min-width:0;padding:0 10px;margin-left:6px;font-size:13px;font-weight:600;text-decoration:underline}'
+    + '#stageCard .pend{font-size:14px;color:#cfe3ff;margin:6px 0 0;word-break:keep-all}#stageCard .pend b{color:#fff}';
+  document.head.appendChild(st); }
+/* 해 본 결과 한 줄 — 이룬 목표 수 · 판이 정한 값 하나(목표 셈 꼴 그대로 — stageGoalNow) */
+function predResult() { const e = predDef(), g = e && e.결과, all = STAGE.goals.length, done = STAGE.goals.filter(x => goalsDone.has(x.id)).length;
+  const v = g && g.셈 ? stageGoalNow({ n: 1, 비교: '>=', ...g }) : null;
+  return [all ? '🎯 ' + done + '/' + all : '', g && g.t ? scardEsc(g.t) + ' ' + (v ? v.지금 + v.꼴 : '—') : ''].filter(Boolean).join(' · '); }
+{ const st0 = stageCardStart; stageCardStart = function () { const r = st0.apply(this, arguments), e = predDef(), el = SCARD.el; if (!e || !el) return r;
+    const rec = scardLoad(), pics = el.querySelector('.pics'), go = el.querySelector('.card > div:last-child > button'); if (!pics || !go) return r; predCss();
+    const box = document.createElement('div'); box.className = 'pred'; pics.appendChild(box);
+    if (rec.started || rec.예상 !== undefined) {   // 📋 다시 보기 — 다시 묻지 않는다(고른 것이 있으면 한 줄만)
+      if (rec.예상 && rec.예상.글) { PRED.stats.다시봄++; box.innerHTML = '<div class="pq">🤔 ' + scardEsc(e.물음) + '</div><div class="pq">내 짐작: <b>' + scardEsc(rec.예상.글) + '</b></div>'; } else box.remove();
+      return r; }
+    PRED.stats.물음++; PRED.pick = null; const opts = [...e.보기.slice(0, 3), PRED_IDK];
+    box.innerHTML = '<div class="pq">🤔 먼저 짐작해 봐요<br><b>' + scardEsc(e.물음) + '</b></div><div class="po">'
+      + opts.map((t, i) => '<button type="button" data-i="' + i + '" aria-pressed="false">' + scardEsc(t) + '</button>').join('') + '</div><div class="pn">하나를 고르면 [시작]이 켜져요 · 정답은 없어요</div>';
+    go.disabled = true;
+    box.querySelectorAll('.po button').forEach(b => b.onclick = () => { PRED.pick = +b.dataset.i; go.disabled = false;
+      box.querySelectorAll('.po button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+      box.querySelector('.pn').textContent = '고른 것: ' + opts[PRED.pick] + ' — 바꿔도 돼요'; });
+    const keep = i => { rec.예상 = { 고름: i, 글: i == null ? null : opts[i], t: Date.now() }; scardSave(); };
+    go.addEventListener('click', () => { if (PRED.pick == null) return; PRED.stats.고름++; keep(PRED.pick); });   // 원래 onclick(닫기 · started 적기) 다음에 돈다
+    const sk = document.createElement('button'); sk.type = 'button'; sk.className = 'skip'; sk.textContent = '건너뛰기';
+    sk.onclick = () => { PRED.stats.건너뜀++; keep(null); go.onclick(); }; go.after(sk);
+    return r; };
+  const se0 = stageCardEnd; stageCardEnd = function () { const n0 = SCARD.stats.끝, r = se0.apply(this, arguments), e = predDef(), el = SCARD.el;
+    if (!e || !el || SCARD.stats.끝 === n0) return r;   // 끝 카드를 그리지 않았으면(교과 없음 · 이미 닫음) 그대로
+    const see = el.querySelector('.see'); if (!see) return r; predCss(); const p = scardLoad().예상, 글 = p && p.글; PRED.stats.끝줄++;
+    see.insertAdjacentHTML('afterend', '<div class="pend">' + (글 ? '🤔 처음 짐작: <b>' + scardEsc(글) + '</b> → 해 보니 ' : '해 보니 ') + predResult() + '</div>'
+      + (글 ? '<div class="cur">' + (p.고름 === 3 ? '해 보니 어떻게 되었나요? 왜 그랬을까요?' : '짐작과 같았나요? 달랐다면 왜일까요?') + '</div>' : ''));
+    return r; }; }
+window.__predict = () => { const rec = STAGE.id ? scardLoad() : null; return { 켜짐: window.VRULES.predict.on, 판: predDef(), 기록: rec && rec.예상 !== undefined ? rec.예상 : null, 고르는중: PRED.pick, 결과줄: predDef() ? predResult() : null, ...PRED.stats }; };
 /* ── [ACT-ASKCARD] 되묻기는 게임 안 카드로 — 브라우저 기본 창(confirm) 대신 (창조자 28회 ⓒ60 · 보스 09-23) ──
    ↺ 처음부터를 누르면 브라우저의 회색 기본 창이 떴다 — 주소 이름이 찍히고 글꼴·단추가 게임과 달라 '밖에서 튀어나온 창'으로 읽혔다(28회).
    이제 마을 위에 카드 하나: 물음 · 한 줄 설명 · [그만두기] [↺ 처음부터]. 되돌릴 수 없는 일이라 **처음 초점은 그만두기** · Esc·바깥 누르기도 그만두기.
