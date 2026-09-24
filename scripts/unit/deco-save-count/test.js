@@ -859,7 +859,10 @@
           out('들꽃잔디는_풀_돌칸에_잔디가_번진다', stGrass === (await cellPrint('stone', ring8('wildflower#snow'))) && stGrass !== (await cellPrint('stone', ring8('stone'))));
           out('들꽃잔디는_풀_제칸엔_번짐없음', (await cellPrint('wildflower')) === (await cellPrint('wildflower', ring8('wildflower'))));
           //  홀로 선 꽃밭 칸 = 바탕 1 + 가장자리 8(변 4 · 안 모서리 4)뿐 — 잔디 번짐(8)을 또 얹지 않는다. 마당 전체를 그리는 drawImage 횟수의 차로 센다.
-          const drawsFor = (fx3) => { CUR.yardFloor = fx3; const o = _dCtx.drawImage; let n = 0; _dCtx.drawImage = function () { n++; return o.apply(this, arguments); }; try { _drawYard(); } finally { _dCtx.drawImage = o; } return n; };
+          //  [DECO-FLOOR-BAKE-1] 칸 조각은 한 장으로 구워 그린다 → 굽기 전에 모은 조각 수로 센다(없으면 drawImage 횟수)
+          const drawsFor = (fx3) => { CUR.yardFloor = fx3; let n = 0;
+            if (typeof _floorPaint === 'function') { const o = _floorPaint; _floorPaint = function (pc) { n += pc.length; return o.apply(this, arguments); }; try { _drawYard(); } finally { _floorPaint = o; } return n; }
+            const o = _dCtx.drawImage; _dCtx.drawImage = function () { n++; return o.apply(this, arguments); }; try { _drawYard(); } finally { _dCtx.drawImage = o; } return n; };
           const dGrass = drawsFor({}), dBed = drawsFor({ [gk]: 'tulipbed' });
           out('꽃밭칸_조각수', '홀로 선 칸 = 잔디 칸 +' + (dBed - dGrass));
           out('꽃밭칸엔_잔디번짐_안얹는다', dBed - dGrass === 8);
