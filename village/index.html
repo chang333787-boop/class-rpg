@@ -12508,8 +12508,7 @@ function pmapBar() {
     bar.appendChild(q); }
   if (STAGE.def.시작) { const r = document.createElement('button'); r.type = 'button'; r.textContent = '↺ 처음부터';   /* #fresh 는 '빈 판'이라 시작 저장본이 안 실린다 — 되돌릴 길이 필요했다(창조자 14회 ⓑ6) */
     r.onclick = () => askCard({ q: '이 판을 처음 상태로 되돌릴까요?', sub: '지금까지 바꾼 것은 사라져요.', ok: '↺ 처음부터' }, () => {   /* [ACT-ASKCARD] 게임 안 카드로 */
-      try { localStorage.removeItem(SAVE_KEY); if (typeof scardKey === 'function') localStorage.removeItem(scardKey()); } catch (e) {}   /* 과제 카드도 다시 뜨게 — '처음부터'니까 */
-      location.replace(location.pathname + location.search); });
+      stageResetKeep(); });   /* [MAC-TWOTRY] 마을 저장본만 지우고 판 카드 기록은 '지난 시도'로 남겨 다시 연다(옛: 둘 다 지움 · 과제 카드는 그대로 다시 뜬다) */
     bar.appendChild(r); }
   document.body.appendChild(bar); PMAP.el = bar;
   const 덧 = document.createElement('div'); 덧.id = 'pmapExtra'; bar.appendChild(덧); PMAP.덧 = 덧;
@@ -12825,7 +12824,7 @@ function stageCardStart() { const d = STAGE.def, rec = scardLoad(); SCARD.stats.
   if (rec.first && rec.first.url) { draw(rec.first.url); return; }
   draw(null); rec.first = { t: Date.now(), day: simDay(), counts: scardCounts(), pop: population(), frame: scardFrame(), url: null };
   SCARD.shoot = { frame: rec.first.frame, done: url => { rec.first.url = url; scardSave(); const img = SCARD.el && SCARD.el.querySelector('figure .ph'); if (img && url) img.outerHTML = '<img alt="" src="' + url + '">'; } }; }
-function stageCardEnd(why) { if (!STAGE.def || STAGE.def.교과 == null) return; const d = STAGE.def, rec = scardLoad(); if (why === '목표' && rec.ended) return; SCARD.stats.끝++;   // 한 번 닫은 끝 카드는 목표로는 다시 안 뜬다(교사의 #끝 은 언제나)
+function stageCardEnd(why) { if (!STAGE.def || (STAGE.def.교과 == null && !stageEndOk())) return; const d = STAGE.def, rec = scardLoad(); if (why === '목표' && rec.ended) return; SCARD.stats.끝++;   // 한 번 닫은 끝 카드는 목표로는 다시 안 뜬다(교사의 #끝 은 언제나)
   if (!rec.first) rec.first = { t: Date.now(), day: simDay(), counts: scardCounts(), pop: population(), frame: scardFrame(), url: null };   // 시작 카드 전에 끝(교사가 닫음) — 첫날 사진은 없다
   const now = scardCounts(), see = scardSee(rec.first.counts || {}, now), pop0 = rec.first.pop || 0, pop1 = population();
   const html = url => scardTop(why === '목표' ? '🎉 목표를 이뤘어요' : '판을 마쳐요') + '<div class="pics">' + scardPic(rec.first.url, '첫날') + scardPic(url, '오늘') + '</div>'
@@ -12920,6 +12919,59 @@ function predResult() { const e = predDef(), g = e && e.결과, all = STAGE.goal
       + (글 ? '<div class="cur">' + (p.고름 === 3 ? '해 보니 어떻게 되었나요? 왜 그랬을까요?' : '짐작과 같았나요? 달랐다면 왜일까요?') + '</div>' : ''));
     return r; }; }
 window.__predict = () => { const rec = STAGE.id ? scardLoad() : null; return { 켜짐: window.VRULES.predict.on, 판: predDef(), 기록: rec && rec.예상 !== undefined ? rec.예상 : null, 고르는중: PRED.pick, 결과줄: predDef() ? predResult() : null, ...PRED.stats }; };
+/* ── [MAC-TWOTRY] 두 선택 나란히(L8) — ↺ 처음부터가 판 카드 기록을 지우지 않고 '지난 시도' 한 칸으로 남긴다 · 끝 카드에 지난 선택 ↔ 이번 선택 (설계 docs/village_role_predict_design.md 4절 · #981 승인 · 보스 09-24) ──
+   ① ↺ 처음부터(수업 판 왼쪽 아래 단추 · 모형 화면 판의 단추 줄 — 두 곳 모두 stageResetKeep 한 줄): **마을 저장본만** 지우고,
+      판 카드 기록은 `{ first(첫날 그대로), 지난: { 사진, 셈, 인구, 예상, 목표: [이룬, 모두], 값, t } }` 로 바꿔 적은 뒤 다시 연다.
+      지난 사진은 첫날과 **같은 틀**(rec.first.frame)로 찍는다 — 안 오면(지도 보기·숨은 탭) waitMs 뒤 판 지도(MAC-CARDMAP)로. 한 칸뿐 — 셋째 시도는 둘째를 덮는다.
+      시작 카드는 다시 뜬다(started·예상이 빠짐) → 짐작도 다시 고른다. 지우기 전에 저장을 멈춘다(savingOff) — 기다리던 저장·닫힐 때 저장(pagehide)이 지운 저장본을 되살리지 않게.
+   ② 끝 카드: 지난 시도가 있으면 두 장을 **지난 선택 ↔ 이번 선택**으로(첫날 ↔ 오늘 자리) · 줄 둘(🤔 짐작 · 🎯 목표 · 결과 값 · 👥) · 💭 "무엇을 바꿨더니 무엇이 달라졌나요?"
+      — [MAC-PREDICT] 의 한 줄('처음 짐작 → 해 보니')은 이 둘로 바뀐다. '처음·두 번째'가 아니라 '지난·이번' — 셋째 시도에서도 말이 맞게.
+   ③ 교과 없는 판(proto-flow · proto-vote)도 끝 카드가 뜬다 — 판 파일 `끝카드: true` 또는 (`카드: true` + 되돌아보기). 목표가 없어 저절로는 안 뜨고 **교사의 #끝** 으로만.
+      그 판엔 교과 이름 줄(3~4학년 (2) · 4-2)을 뺀다. 원래 줄 수정 1(stageCardEnd 첫 줄 조건).
+   ④ 교사: 주소 끝 **#기록지움** — 그 판의 카드 기록(첫날·지난 시도·짐작)을 지우고 연다(주소에서 #기록지움 은 곧 지운다).
+   저장: 로컬 rpg.stagecard.<sid>.<판> 뿐 — 마을 저장본(SAVE_V 2)·sync·Firebase 0. 판정 0. 원래 줄 수정 3(↺ 두 곳 · 끝 카드 조건). 스위치 VRULES.twoTry(조작) — 끄면 옛 ↺(둘 다 지움). */
+(window.VRULES = window.VRULES || {}).twoTry = { on: true, waitMs: 1200 };
+const TWO = { stats: { 적어둠: 0, 사진: 0, 지도사진: 0, 나란히: 0, 교과없는끝: 0, 기록지움: 0 } };
+function stageEndOk() { const d = STAGE.def, R = window.VRULES.twoTry; return !!(R && R.on && d && (d.끝카드 === true || (d.카드 === true && typeof d.되돌아보기 === 'string' && d.되돌아보기.trim()))); }
+/* 지금 시도의 결과 — 목표 수 · 판 예상의 결과 값(MAC-PREDICT 와 같은 셈 · 새 셈 0) · 인구 */
+function twoNow() { const gs = STAGE.goals, e = typeof predDef === 'function' ? predDef() : null, g = e && e.결과, v = g && g.셈 ? stageGoalNow({ n: 1, 비교: '>=', ...g }) : null;
+  return { 목표: gs.length ? [gs.filter(x => goalsDone.has(x.id)).length, gs.length] : null, 값: v ? v.지금 + v.꼴 : null, 인구: population() }; }
+function twoLine(lab, p, r) { const e = typeof predDef === 'function' ? predDef() : null, g = e && e.결과;
+  return '<div class="pend"><b>' + lab + '</b> ' + [p && p.글 ? '🤔 ' + scardEsc(p.글) : '', r.목표 ? '🎯 ' + r.목표[0] + '/' + r.목표[1] : '', r.값 != null && g && g.t ? scardEsc(g.t) + ' ' + scardEsc(r.값) : '', g && g.셈 === 'pop' && r.값 != null ? '' : '👥 ' + r.인구 + '명'].filter(Boolean).join(' · ') + '</div>'; }   // 결과가 인구면 👥 는 겹쳐 뺀다
+/* ↺ 처음부터 — 두 곳(ACT-STAGERESET · 모형 화면 단추 줄)이 부른다 */
+function stageResetKeep() { const R = window.VRULES.twoTry, go = () => location.replace(location.pathname + location.search);
+  try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  if (!R || !R.on || !STAGE.id) { try { localStorage.removeItem(scardKey()); } catch (e) {} go(); return; }
+  const rec = scardLoad(), 지난 = { t: Date.now(), 셈: scardCounts(), 예상: rec.예상 || null, ...twoNow(), 사진: null };
+  const keep = (url, how) => { if (keep.done) return; keep.done = true; 지난.사진 = url || null; if (url) TWO.stats[how]++; const next = { first: rec.first || null, 지난 };
+    try { localStorage.setItem(scardKey(), JSON.stringify(next)); } catch (e) { try { 지난.사진 = null; localStorage.setItem(scardKey(), JSON.stringify(next)); } catch (e2) {} }   // 넘치면 사진 없이
+    TWO.stats.적어둠++; go(); };
+  SCARD.shoot = { frame: rec.first && rec.first.frame ? rec.first.frame : scardFrame(), done: url => keep(url, '사진') };
+  setTimeout(() => keep(typeof cardMapUrl === 'function' ? cardMapUrl() : null, '지도사진'), R.waitMs || 1200);
+  toast('📸 이번 시도를 적어 두고 처음으로 돌아가요', true); }
+{ const se1 = stageCardEnd; stageCardEnd = function () { const n0 = SCARD.stats.끝, r = se1.apply(this, arguments), el = SCARD.el;
+    if (SCARD.stats.끝 === n0 || !el || !STAGE.def) return r;   // 끝 카드를 그리지 않았으면 그대로
+    if (STAGE.def.교과 == null) { TWO.stats.교과없는끝++; el.querySelectorAll('.cur').forEach(c => { if (/^(3~4학년 \(2\) 지역의 변화|4-2 지역 문제 해결)$/.test(c.textContent)) c.remove(); }); }
+    const rec = scardLoad(), L = rec.지난; if (!L || !window.VRULES.twoTry.on) return r; TWO.stats.나란히++; predCss();
+    const name = () => { const f = el.querySelectorAll('.pics figure figcaption'); if (f[0]) f[0].textContent = '지난 선택'; if (f[1]) f[1].textContent = '이번 선택'; };
+    const f0 = el.querySelector('.pics figure'); if (f0) f0.outerHTML = scardPic(L.사진, '지난 선택'); name();
+    el.querySelectorAll('.pend').forEach(p => { const nx = p.nextElementSibling; if (nx && nx.classList.contains('cur')) nx.remove(); p.remove(); });   // [MAC-PREDICT] 한 줄(과 그 밑 물음) → 두 줄로
+    const see = el.querySelector('.see'); if (see) see.insertAdjacentHTML('afterend', '<div class="pend">🔁 <b>무엇을 바꿨더니 무엇이 달라졌나요?</b></div>' + twoLine('지난 선택', L.예상, L) + twoLine('이번 선택', rec.예상, twoNow()));   // 물음은 두 줄의 제목 — 💭 는 판의 되돌아보기 하나만
+    const S = SCARD.shoot; if (S && S.done) { const d0 = S.done; S.done = url => { d0(url); name(); }; }   // 오늘 사진이 오면 원래 줄이 '오늘'로 다시 적는다 — 이름을 되돌린다
+    return r; }; }
+/* 다시 고르는 시작 카드 — 짐작 상자(MAC-PREDICT) 밑에 '지난번' 한 줄(다른 선택을 해 보게 · 사진 옆 상자 안이라 카드 높이는 그대로) */
+{ const st1 = stageCardStart; stageCardStart = function () { const r = st1.apply(this, arguments), el = SCARD.el, L = STAGE.id ? scardLoad().지난 : null;
+    const pn = el && L && window.VRULES.twoTry.on ? el.querySelector('.pred .po + .pn') : null; if (!pn) return r;
+    const e = typeof predDef === 'function' ? predDef() : null, g = e && e.결과;
+    pn.insertAdjacentHTML('afterend', '<div class="pn">지난번: ' + [L.예상 && L.예상.글 ? '🤔 ' + scardEsc(L.예상.글) : '짐작 없음', L.목표 ? '🎯 ' + L.목표[0] + '/' + L.목표[1] : '', L.값 != null && g && g.t ? scardEsc(g.t) + ' ' + scardEsc(L.값) : ''].filter(Boolean).join(' · ') + '</div>');
+    return r; }; }
+/* ④ 교사 — 판 카드 기록 지우기. 열 때(#기록지움 을 붙여 연 주소)와 열린 뒤(주소 끝만 바꾸면 다시 불러오지 않는다 — hashchange) 둘 다 */
+function twoClear(open) { if (!STAGE.id || !window.VRULES.twoTry.on || !/(^|,)기록지움(,|$)/.test(decodeURIComponent(location.hash.slice(1)))) return;
+  try { localStorage.removeItem(scardKey()); } catch (e) {} SCARD.rec = null; TWO.stats.기록지움++;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  setTimeout(() => toast('🧽 이 판의 카드 기록(첫날·지난 시도·짐작)을 지웠어요' + (open ? '' : ' — 다시 열면 첫 카드부터'), true), open ? 900 : 0); }
+twoClear(true); addEventListener('hashchange', () => twoClear(false));
+window.__twoTry = () => { const L = STAGE.id ? scardLoad().지난 : null; return { 켜짐: window.VRULES.twoTry.on, 끝카드되는판: STAGE.def ? (STAGE.def.교과 != null || stageEndOk()) : false, 지난: L ? { ...L, 사진: !!L.사진 } : null, ...TWO.stats }; };
 /* ── [ACT-ASKCARD] 되묻기는 게임 안 카드로 — 브라우저 기본 창(confirm) 대신 (창조자 28회 ⓒ60 · 보스 09-23) ──
    ↺ 처음부터를 누르면 브라우저의 회색 기본 창이 떴다 — 주소 이름이 찍히고 글꼴·단추가 게임과 달라 '밖에서 튀어나온 창'으로 읽혔다(28회).
    이제 마을 위에 카드 하나: 물음 · 한 줄 설명 · [그만두기] [↺ 처음부터]. 되돌릴 수 없는 일이라 **처음 초점은 그만두기** · Esc·바깥 누르기도 그만두기.
@@ -13012,8 +13064,7 @@ const sresetLive = () => !!(window.VRULES.stageReset.on && STAGE.def && !VISIT_S
 function stageResetGo() { SRESET.stats.누름++;
   askCard(STAGE.def.시작 ? { q: '이 판을 처음 상태로 되돌릴까요?', sub: '지금까지 바꾼 것은 사라져요.', ok: '↺ 처음부터' } : { q: '이 판을 처음(빈 땅)으로 되돌릴까요?', sub: '지금까지 놓은 것은 사라져요.', ok: '↺ 처음부터' }, () => {   /* [ACT-ASKCARD] */
   SRESET.stats.되돌림++;
-  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(scardKey()); } catch (e) {}   /* 판 카드도 다시 뜨게 — '처음부터'니까 */
-  location.replace(location.pathname + location.search); }); }
+  stageResetKeep(); }); }   /* [MAC-TWOTRY] 마을 저장본만 지우고 판 카드 기록은 '지난 시도'로 남겨 다시 연다(옛: 둘 다 지움 · 판 카드는 그대로 다시 뜬다) */
 function stageResetBoot() { if (SRESET.el || !sresetLive()) return;
   const st = document.createElement('style'); st.textContent = '#stageReset{position:fixed;left:10px;bottom:14px;z-index:6;background:#232833e8;color:#e9edf5;border:1px solid #39404f;border-radius:10px;min-height:44px;padding:0 14px;font:800 14px/1 "Malgun Gothic",sans-serif;cursor:pointer}'
     + '@media (max-width:700px){#stageReset{bottom:auto;top:64px}}body.photo #stageReset{display:none!important}';
