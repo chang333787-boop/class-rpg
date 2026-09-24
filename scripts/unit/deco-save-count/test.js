@@ -1816,9 +1816,10 @@
       await sleep(150);
       out('움직임_몸통으로그림', _decoMotionBody('d_y11') === 'd_y11_body');
       out('움직임_날개층', document.querySelectorAll('#if-topview .deco-mv-rotate').length === 1);
-      //  친구 구경 판은 층이 없다 → 본 그림(날개까지)으로 — 몸통을 쓰지 않는다
+      //  꾸미기 판 · 친구 구경 판이 아닌 캔버스(사진처럼 판 밖)는 층이 없다 → 본 그림(날개까지)으로 — 몸통을 쓰지 않는다
+      //  (친구 구경 판은 [DECO-FRIEND-MOTION-1] 부터 층이 있다 — ㊲ '구경_풍차층')
       { const k = _dCv, fake = document.createElement('canvas'); document.body.appendChild(fake); _dCv = fake;
-        out('움직임_구경판은_본그림', _decoMotionBody('d_y11') === ''); _dCv = k; fake.remove(); }
+        out('움직임_판밖캔버스는_본그림', _decoMotionBody('d_y11') === ''); _dCv = k; fake.remove(); }
       toggleDecoScene(); await sleep(300);
       out('움직임_집안엔_층없음', !document.querySelector('.deco-mv-layer'));
       toggleDecoScene(); await sleep(300);
@@ -1848,6 +1849,15 @@
       closeFriendFullscreen(); await sleep(100);
       out('구경_친구저장본_그대로', JSON.stringify(fr) === snap);
       out('구경뒤_내화면값_그대로', [_dPanX, _dPanY, _dZoom, _dC].join(',') === mine);
+      //  친구 마당에서도 풍차가 돈다(DECO-FRIEND-MOTION-1 · 창조자 63-ⓑ107) · 닫으면 층이 없다
+      if (typeof _decoMvOf === 'function' && !_animReduced()) {
+        const fm = JSON.parse(JSON.stringify(CUR)); fm.id = 'friend-m'; fm.name = '친구';
+        fm.houseDecorations = [{ id: 'd_y11', area: 'yard', row: 3, col: 3 }];
+        openFriendFullscreen(fm); await sleep(500); _ffRender(); await sleep(300);
+        out('구경_풍차층', document.querySelectorAll('#ff-topview .deco-mv').length === 1);
+        closeFriendFullscreen(); await sleep(100);
+        out('구경_닫으면_층없음', !document.querySelector('#ff-topview .deco-mv-layer'));
+      }
     }
 
     //  ㊳ 내 마당 사진(DECO-PHOTO-1 · 묶음 6) — 한 장이 나오고 화면 상태·저장본은 그대로(내려받기는 시험에서 안 누른다)

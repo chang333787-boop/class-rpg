@@ -9741,8 +9741,9 @@ let _DECO_MOTION = null, _decoMotionAsked = false;
 const _decoMvReady = {};   // id → true(층 그림까지 다 옴) | false(없음) | undefined(확인 중)
 function _decoMotionOn() {
   if (!_ifMode || DECO_SCENE !== 'yard' || _animReduced()) return false;
-  //  내 꾸미기 판에서만 — 친구 구경(ff-topview)도 _drawYard 를 빌려 그리는데 거기엔 층이 없다(날개 없는 풍차가 되지 않게 본 그림으로)
-  if (!_dCv || !_dCv.parentNode || _dCv.parentNode.id !== 'if-topview') return false;
+  //  내 꾸미기 판 · 친구 구경 판(ff-topview)만 — 사진처럼 붙어 있지 않은 캔버스엔 층이 없다(날개 없는 풍차가 되지 않게 본 그림으로)
+  //  [DECO-FRIEND-MOTION-1] 친구 마당에서도 풍차가 돈다(창조자 63-ⓑ107 — 내 마당에선 도는 풍차가 친구 집에선 멈춰 있었다)
+  if (!_dCv || !_dCv.parentNode || !/^(if|ff)-topview$/.test(_dCv.parentNode.id)) return false;
   _decoMotionFetch();
   return !!_DECO_MOTION;
 }
@@ -9763,18 +9764,23 @@ function _decoMotionBody(id) {
     const files = [m.body].concat(...m.layers.filter(L => L.kind !== 'glow').map(L => L.files || [L.file]));
     let left = files.length, bad = false;
     files.forEach(f => { const img = new Image(); img.onload = img.onerror = (e) => { if (e.type === 'error' || !img.naturalWidth) bad = true;
-      if (--left === 0) { _decoMvReady[id] = !bad; if (!bad) _drawDeco(); } }; img.src = _artSrc('deco/' + f) || './assets/deco/' + f; });
+      if (--left === 0) { _decoMvReady[id] = !bad; if (!bad) { _drawDeco(); if (typeof _ffRedrawSoon === 'function') _ffRedrawSoon(); } } }; img.src = _artSrc('deco/' + f) || './assets/deco/' + f; });
   }
   return _decoMvReady[id] ? m.body.replace(/\.svg$/, '') : '';
 }
-const _decoMv = { layer: null, world: null, items: new Map() };
-function _decoMotionStop() {
-  if (_decoMv.layer && _decoMv.layer.parentNode) _decoMv.layer.parentNode.removeChild(_decoMv.layer);
-  _decoMv.items.clear(); _decoMv.layer = null;
+//  [DECO-FRIEND-MOTION-1] 판마다 따로(host id — 내 마당 if-topview · 친구 구경 ff-topview)
+const _decoMvs = new Map();
+function _decoMvOf(id) { let mv = _decoMvs.get(id); if (!mv) { mv = { layer: null, world: null, items: new Map() }; _decoMvs.set(id, mv); } return mv; }
+function _decoMotionStop(id) {
+  const mv = _decoMvs.get(id || 'if-topview');
+  if (!mv) return;
+  if (mv.layer && mv.layer.parentNode) mv.layer.parentNode.removeChild(mv.layer);
+  mv.items.clear(); mv.layer = null;
 }
 function _decoMotionSync() {
-  const host = _dCv && _dCv.parentNode;
-  if (!host || !_decoMotionOn() || (typeof host.getClientRects === 'function' && !host.getClientRects().length)) { _decoMotionStop(); return; }
+  const host = _dCv && _dCv.parentNode, hid = (host && host.id) || 'if-topview';
+  if (!host || !_decoMotionOn() || (typeof host.getClientRects === 'function' && !host.getClientRects().length)) { _decoMotionStop(hid); return; }
+  const _decoMv = _decoMvOf(hid);
   if (!_decoMv.layer) {
     const layer = document.createElement('div'); layer.className = 'deco-mv-layer';
     const world = document.createElement('div'); world.className = 'deco-anim-world';
@@ -13524,6 +13530,7 @@ function _ffRedrawSoon() {
 
 function closeFriendFullscreen() {
   _animStopLayer('ff-topview');   // [DECO-ANIM-1]
+  _decoMotionStop('ff-topview');   // [DECO-FRIEND-MOTION-1]
   document.getElementById('friend-fullscreen').style.display = 'none';
   _ffFriend = null;
 }
@@ -13618,6 +13625,7 @@ function _renderFriendCanvas() {
   else _drawIndoor();
   // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다 — [DECO-FRIEND-VIEW-1] 구경 이동만큼 같이
   _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _ffView.panX, _ffView.panY);
+  try { _decoMotionSync(); } catch (e) {}   // [DECO-FRIEND-MOTION-1] 풍차·분수·연기 층(구경 값으로 — 아직 전역을 빌린 채)
   {   // [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스에 색 막이 깔리니 동물 층도 같은 결로(내 마당 #if-topview 와 같은 CSS)
     const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day', fh = document.getElementById('ff-topview');
     if (fh) { fh.classList.toggle('is-evening', _ffScene === 'yard' && ph === 'evening'); fh.classList.toggle('is-night', _ffScene === 'yard' && ph === 'night'); }
