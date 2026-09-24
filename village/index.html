@@ -3261,7 +3261,7 @@ const JOBSON = { memo: new Map(), roots: [], seen: new Set(), stats: { 돌아섬
 /* 순수 함수 — 돌아섬 말. miss 에 '일자리'가 있으면 그것을 따로 말한다 */
 function waitSayJob(miss, minHave, rec) { const job = miss.includes('일자리'), rest = miss.filter(k => k !== '일자리');
   const jobT = jobWhySay(rec);   /* [MAC-JOBWHY] 까닭 넷에서 — rec 가 없으면 예전 말 */
-  if (!job) return waitSay(rest, minHave); if (!rest.length || 4 - rest.length >= (minHave || 2)) return jobT; return waitSay(rest, minHave) + ' · 💼 일할 곳도 멀어요'; }
+  if (!job) return waitSay(rest, minHave); if (!rest.length || AWAY_NEEDS.length - rest.length >= (minHave || 2)) return jobT; return waitSay(rest, minHave) + ' · 💼 일할 곳도 멀어요'; }
 /* 빈 자리 있는 일터가 이 집 앞 길에서 닿나 */
 function jobsReachFree(rec) { const b = roadsBeside(rec); if (!b.length) return false; const wp = jobsWpIndex(), { reach } = roadBFS(b);   /* [MAC-DOORS] */
   for (const i of reach) { const x = cX(i), y = cY(i); for (let k = 0; k < 4; k++) { const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0); if (!inb(nx, ny)) continue; const c = cells[idx(nx, ny)]; if (c && wp.has(c.root) && wp.get(c.root) - (JOBH.used.get(c.root) || 0) > 0) return true; } }
@@ -6061,7 +6061,7 @@ function waitLookTick() {
   WAITLOOK.stats.센횟수++; WAITLOOK.stats.다시합친청크 += keys.size; WAITLOOK.stats.센ms = +(performance.now() - t0).toFixed(2);
 }
 { const parts0 = partsOf; partsOf = function (rec) { const p = parts0.apply(this, arguments);
-    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root) && WAITLOOK.miss.get(rec.root) !== '일자리') return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
+    if (rec && rec.k === 'house' && cells[rec.root] === rec && waitHouseIs(rec.root) && window.WAITHOUSE.icons.includes(WAITLOOK.miss.get(rec.root))) return p.concat(window.WAITHOUSE.props(WAITLOOK.miss.get(rec.root))); return p; }; }
 window.__waitLook = () => ({ 켜짐: window.VRULES.waitLook.on, 기다리는집: WAITLOOK.miss.size, 빠진것첫째: [...new Set(WAITLOOK.miss.values())], ...WAITLOOK.stats });
 
 (window.VRULES = window.VRULES || {}).turnAway = { on: true, graceBelow: 10, minHave: 2, retryMs: DAY_MS, comebackDepth: 12, maxLeavers: 1, bubbleMs: 6000 };
@@ -6097,7 +6097,7 @@ function awayGate(f, i) {
   f.path = path; f.step = 0; f.seg = 0; f.state = 'walk'; f.blockedAt = 0; f.stuckN = 0;
   movers = Math.max(0, movers - 1); f.slotFreed = true;                     // 돌아가는 길은 이사 자리를 안 차지한다(왕복이라 처리량이 반으로 주는 것 막기)
   let first = false; try { if (!localStorage.getItem(AWAY_SEEN_KEY())) { localStorage.setItem(AWAY_SEEN_KEY(), '1'); first = true; } } catch (e) {}
-  if (first) { AWAY.stats.첫안내++; sayOnce('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 물·가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
+  if (first) { AWAY.stats.첫안내++; sayOnce('🚶 새 이웃이 집 앞에서 돌아갔어요 — 이제는 ' + (AWAY_NEEDS.includes('물') ? '물·' : '') + '가게·놀 곳·쉴 곳 중 두 가지가 가까운 집에만 이사 와요', true); }   // 첫 돌아섬에 한 번(옛 마을 포함 — #214 점검표)
   else { const key = miss.join() + (capAwayFull(f.home, miss) ? '+꽉참' : ''); if (!AWAY.toasted.has(key)) { AWAY.toasted.add(key); simSay('🚶 ' + capAwayText(f.home, miss) + ' 새 이웃이 돌아갔어요', true); } }   // 같은 이유는 한 번만 — 나머지는 말풍선
   if (path.length < 2) return awayGate(f, i);                                // 나갈 길이 없다 — 그 자리에서 사라진다
   return true;
@@ -11848,6 +11848,68 @@ function loadSaved(rawOverride) {
    그날의 점은 그날이 끝날 때 찍힌다. 판정 0 · 저장 칸 0 · 원래 줄 0(loadSaved 감싸기 — 구경 열기도 같은 길이지만 구경은 흐름을 안 찍는다). 분류 '저장'. */
 (window.VRULES = window.VRULES || {}).dayLoad = { on: true };
 { const ls0 = loadSaved; loadSaved = function () { const r = ls0.apply(this, arguments); if (window.VRULES.dayLoad.on) savedDay = simDay(); return r; }; }
+
+/* ── [MAC-NOWATER] 현대 마을은 수돗물 — 필요 '물'을 뺀다 (보스 09-24 결정 · docs/village_need_health.md PR 1 '물 끔') ──
+   사용자 방향: "현대시대에 뭔 우물 때문에 물이 부족해". 물은 수도로 집마다 늘 나온다고 본다(판 카드 '가정하는 것').
+   · 필요 넷 → 셋(장보기·놀이·쉼) · 배움은 그대로 인구 80 에 붙는다 · 돌아섬은 '셋 중 둘'(turnAway.minHave 2 그대로 · 결정 2).
+   · 우물은 종류·모양·저장 id 그대로(옛 마을이 그대로 열린다) — 필요를 잃고 '옛 우물' · 현대 트레이에서 숨김(울타리·벽 '(옛 모양)'과 같은 꼴 ·
+     판 '건물' 목록에 well 이 있으면 보임). 연못 = 쉼 하나 · 분수 = 쉼.
+   · 기본 목표 well '우물 하나 놓기' → bench1 '긴의자 하나 놓기 — 쉴 곳'(결정 6). 옛 저장본의 well 은 goals 에 그대로 두고, 이룬 마을은 bench1 을 조용히 잇는다.
+   · VRULES.needWater.on:true 이거나 keepStages 의 판이면 옛 넷 그대로 — 이 블록은 아무것도 안 만진다(기준 ① 0).
+     keepStages = 우물이 판의 전제인 판(town3 · town3-origin · nowater · proto-vote) — 그 판을 고치는 PR(3a · 3b)에서 뺀다.
+   · 자리: 판(STAGE.def)을 안 뒤 · 처음 상태(시연 판 · loadSaved)와 첫 틱 전 · 동기(시뮬은 setTimeout 을 안 돌린다).
+     판 규칙(module 끝 stageApplyRules) · run.mjs --rules · 콘솔로 바뀌면 틱 머리에서 다시 맞춘다(바뀔 때만 · 난수 0 · 벽시계 0).
+   원래 줄 수정 2(waitSayJob 의 4 · 첫 돌아섬 안내 글) · const 배열은 제자리 splice · NEEDS 는 다시 댐 · K 세 항목 · GOALS 한 칸.
+   waitSay · waitDots 는 감싸기(몸은 그대로 — scripts/village-paint/test.mjs 가 몸을 꺼내 넷 기준으로 시험한다).
+   아이콘 표(SAY_ICON · VOICE · WHY …)의 물 칸은 남긴다 — 물을 지키는 판이 쓰고, 물이 없는 판에서는 부를 일이 없다. 분류 '판정'. */
+(window.VRULES = window.VRULES || {}).needWater = { on: false, keepStages: ['town3', 'town3-origin', 'nowater', 'proto-vote'] };
+const NOWATER = { off: false, rulesRead: false, carried: false, stats: { 바뀜: 0, 목표이음: 0 } };
+const NW0 = { wellNeed: K.well.need, wellNm: K.well.nm, wellGrp: K.well.grp0 != null ? K.well.grp0 : K.well.grp, wellGrp0: K.well.grp0, pondNeed: K.pond.need, pondNeed2: K.pond.need2, fountainNeed: K.fountain.need, goal: GOALS.find(g => g.id === 'well') || null };
+const NW_BENCH = { id: 'bench1', t: '긴의자 하나 놓기 — 쉴 곳', ok: () => countKind('bench') + countKind('minibench') >= 1 };
+function nwWant() {
+  const R = window.VRULES.needWater; if (!R) return false;
+  const d = STAGE.def, g = !NOWATER.rulesRead && d && d.규칙 && d.규칙.needWater && typeof d.규칙.needWater === 'object' ? d.규칙.needWater : null;   /* 판 규칙은 module 끝에야 VRULES 에 얹힌다 — 그 전엔 판 파일에서 미리 읽는다 */
+  const on = g && 'on' in g ? g.on : R.on, keep = g && Array.isArray(g.keepStages) ? g.keepStages : R.keepStages;
+  return !on && !(STAGE.id && Array.isArray(keep) && keep.includes(STAGE.id));
+}
+function nwGoalCarry() {
+  if (NOWATER.off && goalsDone.has('well') && !goalsDone.has('bench1')) { goalsDone.add('bench1'); NOWATER.carried = true; NOWATER.stats.목표이음++; }
+  else if (!NOWATER.off && NOWATER.carried) { goalsDone.delete('bench1'); NOWATER.carried = false; }
+}
+function nwSync() {
+  const off = nwWant(); if (off === NOWATER.off) return false;
+  NOWATER.off = off; NOWATER.stats.바뀜++;
+  const drop = a => { const i = a.indexOf('물'); if (i >= 0) a.splice(i, 1); }, put = a => { if (!a.includes('물')) a.splice(0, 0, '물'); };
+  if (off) { drop(NEEDS_BASE); drop(AWAY_NEEDS); NEEDS = NEEDS.filter(k => k !== '물'); }
+  else { put(NEEDS_BASE); put(AWAY_NEEDS); if (!NEEDS.includes('물')) NEEDS = ['물'].concat(NEEDS); }
+  if (off) { delete K.well.need; K.well.nm = '옛 우물'; K.pond.need = '쉼'; delete K.pond.need2; K.fountain.need = '쉼'; }
+  else { K.well.need = NW0.wellNeed; K.well.nm = NW0.wellNm; K.pond.need = NW0.pondNeed; K.pond.need2 = NW0.pondNeed2; K.fountain.need = NW0.fountainNeed; }
+  const gi = GOALS.findIndex(g => g.id === (off ? 'well' : 'bench1')); if (gi >= 0 && NW0.goal) GOALS[gi] = off ? NW_BENCH : NW0.goal;
+  nwGoalCarry();
+  const listed = !!(STAGE.def && Array.isArray(STAGE.def.건물) && STAGE.def.건물.includes('well')), hide = off && !listed;
+  K.well.grp = hide ? '(숨김)' : NW0.wellGrp; K.well.grp0 = hide ? '(숨김)' : NW0.wellGrp0;
+  sat.clear(); WAITMEMO.ver++;
+  if (typeof buildTray === 'function') buildTray();
+  if (goalsShown) renderGoals();
+  return true;
+}
+/* 필요 수(AWAY_NEEDS.length)를 넷 기준 순수 함수에 맞춰 넘긴다 — 넷이면 그대로 */
+{ const ws0 = waitSay; waitSay = function (miss, minHave) { return ws0.call(this, miss, (minHave || 2) + (4 - AWAY_NEEDS.length)); }; }
+{ const wd0 = waitDots; waitDots = function (missLen, minHave) { return wd0.call(this, missLen + (4 - AWAY_NEEDS.length), minHave); }; }
+{ const nwLoad0 = loadSaved; loadSaved = function () { const r = nwLoad0.apply(this, arguments); nwGoalCarry(); return r; }; }
+{ const nwRules0 = stageApplyRules; stageApplyRules = function () { const r = nwRules0.apply(this, arguments); NOWATER.rulesRead = true; nwSync(); return r; }; }
+{ const nwTick0 = simTick; simTick = function () { nwSync(); return nwTick0.apply(this, arguments); }; }
+window.__needWater = () => ({ 켜짐: !!(window.VRULES.needWater && window.VRULES.needWater.on), 판: STAGE.id, 물끔: NOWATER.off, 필요: NEEDS.slice(), 기본필요: NEEDS_BASE.slice(), 돌아섬필요: AWAY_NEEDS.slice(),
+  우물: { 이름: K.well.nm, 필요: K.well.need || null, 묶음: K.well.grp }, 연못: [K.pond.need || null, K.pond.need2 || null], 분수: K.fountain.need || null,
+  목표: GOALS.filter(g => g.id === 'well' || g.id === 'bench1').map(g => g.id), 이음: NOWATER.carried,
+  말: { 셋멀: waitSay(['장보기', '놀이', '쉼'], 2), 둘멀: waitSay(['놀이', '쉼'], 2), 점: [3, 2, 1].map(n => waitDots(n, 2)) }, ...NOWATER.stats });
+nwSync();
+/* 팻말 — 문 앞 팻말은 아이콘이 있는 부족(물·장보기·놀이·쉼)에만 선다. 배움·정원처럼 아이콘이 없으면 세우지 않는다
+   (전엔 WAITHOUSE.props 가 '물'로 떨어져, 물을 끈 판에서도 정원 찬 학교 옆 빈집에 파란 물방울이 섰다 — 보스 #1064 검토). 원래 줄 1(partsOf 고리의 조건).
+   시험 훅: 기다리는 집 하나의 부족을 잠시 miss 로 바꿔 partsOf 를 부르고 팻말 부위(keep)를 센다 — 판정 0(WAITLOOK 은 보기용 · 곧 되돌림). */
+window.__waitSignTry = (miss) => { const root = [...WAITLOOK.miss.keys()].find(r => waitHouseIs(r)); if (root == null) return { 집: null };
+  const was = WAITLOOK.miss.get(root); WAITLOOK.miss.set(root, miss); let n = 0; try { n = partsOf(cells[root]).filter(pt => pt && pt.keep).length; } finally { WAITLOOK.miss.set(root, was); }
+  return { 집: root, 팻말부위: n }; };
 
 /* ── 처음 상태 ──
    ① #fresh → 저장본을 지우고 빈 판
