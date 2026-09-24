@@ -1735,6 +1735,18 @@
       }
     }
 
+    //  ㉛ 처음 아이 카드(DECO-FIRST-1 · 계획 U3) — 가진 장식 0 이면 서랍에 큰 카드 하나 · 누르면 🛒 상점
+    if (_ifMode) {
+      const keepInv = CUR.inventory;
+      CUR.inventory = (keepInv || []).filter(i => !GAME_DATA.decorations.some(d => d.id === i.id)); renderDecoInv();
+      const card = document.querySelector('#if-deco-inv .deco-first-card');
+      out('처음아이_카드', !!card);
+      if (card) card.click(); await sleep(200);
+      out('처음아이_카드누르면_상점', DECO_TAB === 'shop' && document.querySelectorAll('#if-deco-shop .deco-scard').length > 0);
+      decoTab('own'); CUR.inventory = keepInv; renderDecoInv(); await sleep(100);
+
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)
