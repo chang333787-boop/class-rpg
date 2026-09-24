@@ -12730,6 +12730,24 @@ function scardShow(html, btn, onClose) { scardCss(); scardClose(); const el = do
   el.querySelector('button').onclick = () => { scardClose(); if (onClose) onClose(); }; document.body.appendChild(el); SCARD.el = el; }
 function scardClose() { if (SCARD.el) { SCARD.el.remove(); SCARD.el = null; } }
 function scardTop(extra) { const d = STAGE.def; return '<div class="top">' + scardEsc(d.이름) + (extra ? ' · ' + scardEsc(extra) : '') + '</div>'; }
+/* ── [MAC-ROLE] 역할을 게임 안에 — 판 카드 7칸 '나는 누구이며 무엇을 결정할 수 있나'를 화면 세 곳에 같은 말로 (설계 docs/village_role_predict_design.md 1단계 · #981 · 저장 0 · 판정 0) ──
+   판 파일 `역할: { 나는, 정한다: [{ 말, 놓기?: [종류], 잇기?: true, 고르기?: true }], 못한다? }` — 판 검사가 '정한다'를 그 판에서 할 수 있는지 본다(지킬 수 없는 약속 막기).
+   ① 시작 카드: 판 이름 아래 · 🔎 질문 위 한 줄 "🧑 오늘 나는 … — 정할 것: …" (+ 작게 '이번엔: 못한다') — scardTop 감싸기(시작 카드만 · extra 없는 부름)
+   ② 목표판(🎯 지금 목표) 맨 위 작은 이름표 "🧑 …" — 수업 내내 한 줄로 남는다 · renderGoals 감싸기
+   ③ 끝 카드: 새로 생긴 것 줄 앞에 "🧑 내가 놓은 것" — scardSee 감싸기
+   역할 칸이 없는 판은 한 줄도 안 돈다. 원래 줄 수정 0. 스위치 VRULES.role(보기). */
+(window.VRULES = window.VRULES || {}).role = { on: true };
+const ROLE = { stats: { 시작카드: 0, 목표판: 0, 끝카드: 0 } };
+const roleDef = () => { const r = window.VRULES.role.on && STAGE.def && STAGE.def.역할; return r && typeof r.나는 === 'string' && r.나는 ? r : null; };
+const roleDecide = r => (Array.isArray(r.정한다) ? r.정한다 : []).map(d => d && d.말).filter(Boolean).join(' · ');
+{ const st0 = scardTop; scardTop = function (extra) { const h = st0.apply(this, arguments), r = roleDef(); if (!r || extra) return h; ROLE.stats.시작카드++; const dec = roleDecide(r);
+    return h + '<div class="role" style="font-size:14px;color:#cfe3ff;margin:2px 0 4px">🧑 오늘 나는 <b style="color:#fff">' + scardEsc(r.나는) + '</b>' + (dec ? ' — 정할 것: ' + scardEsc(dec) : '') + '</div>'
+      + (r.못한다 ? '<div class="cur" style="margin:0 0 4px">(이번엔: ' + scardEsc(r.못한다) + ')</div>' : ''); };
+  const ss0 = scardSee; scardSee = function () { const s = ss0.apply(this, arguments); if (!roleDef() || s === '처음 그대로예요') return s; ROLE.stats.끝카드++; return '<small>🧑 내가 놓은 것</small> ' + s; };
+  const rg0 = renderGoals; renderGoals = function () { const x = rg0.apply(this, arguments), r = roleDef(), el = document.getElementById('goals');
+    if (r && el) { ROLE.stats.목표판++; el.insertAdjacentHTML('afterbegin', '<div class="role" style="font-size:12px;color:#cfe3ff;margin-bottom:3px">🧑 ' + scardEsc(r.나는) + '</div>'); } return x; };
+  if (roleDef()) renderGoals(); }   // 목표판은 이 블록보다 먼저 한 번 그려졌을 수 있다 — 이름표를 붙여 다시
+window.__role = () => ({ 켜짐: window.VRULES.role.on, 역할: roleDef(), 정할것: roleDef() ? roleDecide(roleDef()) : null, ...ROLE.stats });
 function stageCardStart() { const d = STAGE.def, rec = scardLoad(); SCARD.stats.시작++;
   const goals = STAGE.goals.map(g => '<div class="goal">🎯 ' + scardEsc(g.t) + '</div>').join('');
   const draw = url => scardShow(scardTop() + '<div class="q">🔎 ' + scardEsc(d.질문 || '') + '</div>' + goals + '<div class="pics">' + scardPic(url, '첫날') + '</div>'

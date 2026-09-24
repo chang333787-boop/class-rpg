@@ -153,6 +153,16 @@ for (const f of files) {
     if (겹침.length) add('FAIL', P('건물정의'), '이미 있는 종류를 덮으려 함: ' + 겹침.join(' '));
   }
   if (def.건물 != null) { const bad = kindsOk(def.건물.filter(k => !새종류.includes(k))); bad.length ? add('FAIL', P('건물'), '없는 종류: ' + bad.join(' ')) : add('PASS', P(`건물 ${def.건물.length}종`)); if (!def.건물.includes('road')) add('FAIL', P('건물'), '길(road)이 없음'); }
+  if (def.역할 != null) { const r = def.역할 || {}, 나쁨 = [], 목록 = Array.isArray(def.건물) ? def.건물 : null, 새 = def.건물정의 && typeof def.건물정의 === 'object' ? Object.keys(def.건물정의) : [];   /* [MAC-ROLE] 역할 — 화면이 지킬 수 없는 약속을 막는다 */
+    if (typeof r.나는 !== 'string' || !r.나는.trim()) 나쁨.push('나는 이 비었음');
+    const 정 = Array.isArray(r.정한다) && r.정한다.length ? r.정한다 : null; if (!정) 나쁨.push('정한다 가 비었음');
+    const 놓을것 = []; (정 || []).forEach((d, i) => { if (!d || typeof d.말 !== 'string' || !d.말.trim()) { 나쁨.push('정한다[' + i + '] 말 없음'); return; }
+      if (!d.놓기 && !d.잇기 && !d.고르기) 나쁨.push(`'${d.말}' — 행동(놓기·잇기·고르기)이 없음`);
+      if (d.놓기 != null) { if (!Array.isArray(d.놓기) || !d.놓기.length) 나쁨.push(`'${d.말}' — 놓기는 종류 목록`); else { const 못 = 목록 ? d.놓기.filter(k => !목록.includes(k)) : []; if (못.length) 나쁨.push(`'${d.말}' — 이 판에 없는 종류: ${못.join(' ')}`); 놓을것.push(...d.놓기.filter(k => !새.includes(k))); } }
+      if (d.잇기 && 목록 && !목록.includes('road')) 나쁨.push(`'${d.말}' — 길(road)이 없음`);
+      if (d.고르기 && !def.결정) 나쁨.push(`'${d.말}' — 결정 칸이 없음`); });
+    if (!목록 && 놓을것.length) { const 모름 = kindsOk([...new Set(놓을것)]); if (모름.length) 나쁨.push('모르는 종류: ' + 모름.join(' ')); }
+    나쁨.length ? add('FAIL', P('역할'), 나쁨.join(' · ')) : add('PASS', P(`역할 '${r.나는}' · 정할 것 ${정.length}`)); }
   const gbad = (def.목표 || []).filter(g => !g.t || !SEMS[g.셈] || !SEMS[g.셈](g) || (g.셈 === 'hook' && !HOOKS.includes(g.훅)));
   gbad.length ? add('FAIL', P('목표'), '셈 꼴이 틀림: ' + gbad.map(g => g.t || '?').join(' · ')) : add('PASS', P(`목표 ${(def.목표 || []).length}개 셈 꼴`));
   const r = spawnSync(process.execPath, [path.join(HERE, 'run.mjs'), '--stage', n, '--days', '1', '--seeds', '1', '--json', path.join(os.tmpdir(), 'vs-stage-' + n + '.json')], { cwd: ROOT, encoding: 'utf8' });
