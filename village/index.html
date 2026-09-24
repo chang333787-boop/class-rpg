@@ -6068,7 +6068,7 @@ window.__waitLook = () => ({ 켜짐: window.VRULES.waitLook.on, 기다리는집:
 const AWAY_NEEDS = ['물', '장보기', '놀이', '쉼'];
 const AWAY_ICON = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 다시: '🏠' };
 const AWAY_KEYS = Object.keys(AWAY_ICON);
-const AWAY_SEEN_KEY = () => 'rpg.village.awaySeen.' + SID + (AWAY_NEEDS.includes('물') ? '' : '.물없음');      // 첫 돌아섬 안내를 봤나(기기마다 · 저장본 밖)
+const AWAY_SEEN_KEY = () => 'rpg.village.awaySeen.' + SID + (AWAY_NEEDS.includes('물') ? '' : '.물없음');      // 첫 돌아섬 안내를 봤나(기기마다 · 저장본 밖) · '.물없음' = [MAC-HEALTH] 에 실렸지만 건강 스위치와 무관 — 물 끔([MAC-NOWATER]) 쪽 변경(안내 글이 물 있음/없음으로 다르다)
 const AWAY = { turned: new Map(), toasted: new Set(), rr: 0, stats: { 돌아섬: 0, 건너뜀: 0, 다시옴: 0, 첫안내: 0 }, log: [] };
 /* 순수 함수 — 이 집에 빠진 것 목록(살 만하면 null). THREE·DOM 을 안 만진다 */
 function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]); return needs.length - miss.length >= minHave ? null : miss; }
@@ -11972,7 +11972,7 @@ function healthFac(on) {
     if (HEALTH_K0.jobs === undefined) delete q.jobs; else q.jobs = HEALTH_K0.jobs;
     q.grp = HEALTH_K0.grp; q.grp0 = HEALTH_K0.grp0; delete LOCK_POP.clinic;
     const r = UNLOCKS.indexOf(HEALTH_ROW); if (r >= 0) UNLOCKS.splice(r, 1); UNLOCKS.forEach(u => { const j = u.kinds.indexOf('clinic'); if (j >= 0) u.kinds.splice(j, 1); });
-    if (HEALTH.opened && !countKind('clinic')) unlocked.delete('clinic'); HEALTH.opened = false;   /* 이 블록이 연 해금은 되돌린다(도중에 끌 때 — 저장 글이 옛과 같게) */
+    if (!countKind('clinic')) unlocked.delete('clinic'); HEALTH.opened = false;   /* 도중에 끌 때 의원 해금은 되돌린다 — 누가 열었든(열 때 조용히 · checkUnlocks 인구 80) 의원이 하나도 없으면 · 저장 글이 옛과 같게(보스 #1085 검토) */
     const o = ORDER.indexOf('clinic'); if (o >= 0) ORDER.splice(o, 1);
   }
   JOBH.wpDirty = true; sat.clear(); WAITMEMO.ver++; HEALTH.stats.바뀜++;
@@ -11983,7 +11983,7 @@ function healthSync(say, boot) {
   const R = healthRule(), offer = healthOffer(R);
   if (offer !== HEALTH.offer) { HEALTH.offer = offer; healthFac(offer); }
   if (offer && !HEALTH.on && !VISIT.on && (say || (boot && STAGE.def && STAGE.def.규칙 && STAGE.def.규칙.health)) && population() >= R.pop) {
-    HEALTH.on = true; HEALTH.stats.걸쇠켬++;
+    HEALTH.on = true; HEALTH.stats.걸쇠켬++; markDirty();   /* 걸쇠가 켜지면 곧 저장 — 멈춘 채 닫아도 `건강: 1` 이 남게(안 그러면 열 때마다 🏥 소식 · 보스 #1085 검토) */
     if (say && R.pop > 0) HEALTH.sayPending = true;
   }
   if (healthLive() && !VISIT.on && !unlocked.has('clinic')) { unlocked.add('clinic'); HEALTH.opened = true; HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
@@ -12020,7 +12020,7 @@ function healthWhyMesh() {
   im.count = 0; im.frustumCulled = false; im.renderOrder = 5; scene.add(im);
   WHY_ICON.건강 = '🏥'; WHY_KEYS.push('건강'); whyPool.push(im); HEALTH.whyIm = im;
 }
-{ const hsNt0 = needsTick; needsTick = function () { const r = hsNt0.apply(this, arguments); healthSync(true, false); healthSayNow(); return r; }; }
+{ const hsNt0 = needsTick; needsTick = function () { const learn0 = learnOn, r = hsNt0.apply(this, arguments); if (!learn0 && learnOn && !VISIT.on) markDirty(); healthSync(true, false); healthSayNow(); return r; }; }   /* 배움 걸쇠도 같은 길 — 켜지면 곧 저장([MAC-LEARNSAVE] 칸이 적히게) */
 { const hsRules0 = stageApplyRules; stageApplyRules = function () { const r = hsRules0.apply(this, arguments); HEALTH.rulesRead = true; healthSync(false, true); return r; }; }
 { const hsTick0 = simTick; simTick = function () { nwSync(); healthSync(false, false); return hsTick0.apply(this, arguments); }; }
 { const hsLoad0 = loadSaved; loadSaved = function () { const r = hsLoad0.apply(this, arguments); healthLoaded(); return r; }; }
