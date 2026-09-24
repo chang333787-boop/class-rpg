@@ -12254,9 +12254,9 @@ function pmapBar() {
     q.onclick = () => { if (typeof stageCardStart === 'function') stageCardStart(); else toast('🔎 ' + STAGE.def.질문, true); };
     bar.appendChild(q); }
   if (STAGE.def.시작) { const r = document.createElement('button'); r.type = 'button'; r.textContent = '↺ 처음부터';   /* #fresh 는 '빈 판'이라 시작 저장본이 안 실린다 — 되돌릴 길이 필요했다(창조자 14회 ⓑ6) */
-    r.onclick = () => { if (!confirm('이 판을 처음 상태로 되돌릴까요? 지금까지 바꾼 것은 사라져요.')) return;
+    r.onclick = () => askCard({ q: '이 판을 처음 상태로 되돌릴까요?', sub: '지금까지 바꾼 것은 사라져요.', ok: '↺ 처음부터' }, () => {   /* [ACT-ASKCARD] 게임 안 카드로 */
       try { localStorage.removeItem(SAVE_KEY); if (typeof scardKey === 'function') localStorage.removeItem(scardKey()); } catch (e) {}   /* 과제 카드도 다시 뜨게 — '처음부터'니까 */
-      location.replace(location.pathname + location.search); };
+      location.replace(location.pathname + location.search); });
     bar.appendChild(r); }
   document.body.appendChild(bar); PMAP.el = bar;
   const 덧 = document.createElement('div'); 덧.id = 'pmapExtra'; bar.appendChild(덧); PMAP.덧 = 덧;
@@ -12560,6 +12560,38 @@ function stageCardBoot() { if (!STAGE.def || VISIT_SID || (STAGE.def.교과 == n
   setTimeout(go, 600); }
 window.__stageEnd = () => { stageCardEnd('교사'); return SCARD.stats; };
 window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!SCARD.el, 시작함: !!(STAGE.id && scardLoad().started), 첫날사진: !!(STAGE.id && scardLoad().first && scardLoad().first.url), ...SCARD.stats });
+/* ── [ACT-ASKCARD] 되묻기는 게임 안 카드로 — 브라우저 기본 창(confirm) 대신 (창조자 28회 ⓒ60 · 보스 09-23) ──
+   ↺ 처음부터를 누르면 브라우저의 회색 기본 창이 떴다 — 주소 이름이 찍히고 글꼴·단추가 게임과 달라 '밖에서 튀어나온 창'으로 읽혔다(28회).
+   이제 마을 위에 카드 하나: 물음 · 한 줄 설명 · [그만두기] [↺ 처음부터]. 되돌릴 수 없는 일이라 **처음 초점은 그만두기** · Esc·바깥 누르기도 그만두기.
+   카드가 떠 있는 동안 게임 단축키(스페이스·Ctrl+Z 등)는 쉰다. 쓰는 곳: 수업 판 ↺(ACT-STAGERESET) · 모형 화면 판 ↺ · 결정 판 되돌리기(MAC-VOTE).
+   끄면(VRULES.askCard.on = false) 옛 confirm 그대로. 판정·저장 0 · 분류 '조작'. */
+(window.VRULES = window.VRULES || {}).askCard = { on: true };
+const ASK = { el: null, key: null, stats: { 물음: 0, 예: 0, 그만: 0 } };
+function askCss() { if (document.getElementById('askCss')) return; const st = document.createElement('style'); st.id = 'askCss';
+  st.textContent = '#askCard{position:fixed;inset:0;z-index:30;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}'
+    + '#askCard .box{max-width:min(380px,100%);background:#1c202af7;border:2px solid #e8b04b;border-radius:16px;box-shadow:0 10px 30px #000b;padding:16px 16px 14px;color:#e8e6e0;font:14px/1.4 "Malgun Gothic",sans-serif;text-align:center}'
+    + '#askCard .q{font-size:17px;font-weight:900;color:#ffe08a}#askCard .s{margin-top:6px;color:#c9ccd6}#askCard .b{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}'
+    + '#askCard button{min-width:120px;min-height:52px;border-radius:12px;font:800 15px "Malgun Gothic",sans-serif;cursor:pointer}'
+    + '#askCard .no{background:#262b38;border:2px solid #3a4050;color:#e8e6e0}#askCard .ok{background:#c8553d;border:2px solid #e8866e;color:#fff}'
+    + '#askCard button:focus-visible{outline:3px solid #7bc6ff;outline-offset:2px}body.photo #askCard{display:none!important}';
+  document.head.appendChild(st); }
+function askClose() { if (!ASK.el) return; ASK.el.remove(); ASK.el = null; removeEventListener('keydown', ASK.key, true); ASK.key = null; }
+/* o = { q: 물음, sub: 한 줄, ok: 예 단추 글, no: 그만 단추 글 } · 예를 누르면 yes() */
+function askCard(o, yes) {
+  if (!window.VRULES.askCard.on) { if (confirm(o.q + (o.sub ? '\n' + o.sub : ''))) yes(); return; }
+  askClose(); askCss(); ASK.stats.물음++;
+  const bg = document.createElement('div'); bg.id = 'askCard';
+  bg.innerHTML = '<div class="box" role="alertdialog" aria-modal="true"><div class="q"></div><div class="s"></div><div class="b"><button type="button" class="no"></button><button type="button" class="ok"></button></div></div>';
+  bg.querySelector('.q').textContent = o.q; bg.querySelector('.s').textContent = o.sub || ''; if (!o.sub) bg.querySelector('.s').remove();
+  const no = bg.querySelector('.no'), ok = bg.querySelector('.ok'); no.textContent = o.no || '그만두기'; ok.textContent = o.ok || '네';
+  const cancel = () => { askClose(); ASK.stats.그만++; };
+  ['pointerdown', 'pointerup', 'click', 'wheel', 'contextmenu'].forEach(t => bg.addEventListener(t, e => e.stopPropagation()));
+  bg.addEventListener('click', e => { if (e.target === bg) cancel(); });
+  no.onclick = cancel; ok.onclick = () => { askClose(); ASK.stats.예++; yes(); };
+  ASK.key = e => { if (!ASK.el) return; if (e.key === 'Escape') { e.preventDefault(); cancel(); } e.stopImmediatePropagation(); };   /* 카드가 떠 있는 동안 게임 단축키는 쉰다(단추의 스페이스·엔터는 그대로 눌린다) */
+  addEventListener('keydown', ASK.key, true);
+  document.body.appendChild(bg); ASK.el = bg; no.focus(); }
+window.__ask = pick => { if (pick && ASK.el) ASK.el.querySelector(pick === 'ok' ? '.ok' : '.no').click(); return { 켜짐: window.VRULES.askCard.on, 떠있음: !!ASK.el, 글: ASK.el ? ASK.el.textContent : '', ...ASK.stats }; };
 /* ── [ACT-STAGERESET] [↺ 처음부터] — 수업 판마다 (수업 흐름 #841 L1 · 보스 09-23) ──
    되돌리는 길이 마을 둘인 판(proto-flow 의 왼쪽 단추 줄)에만 있었다. town3·farm 에서는 Ctrl+Z 를 여러 번 누르거나 주소에 #fresh 를 붙여야 했는데,
    #fresh 는 '빈 판'이라 준비된 시작 땅이 안 실린다(창조자 14회 ⓑ6). 이제 **수업 판(교과 칸)이거나 시작 저장본이 있는 판**이면 왼쪽 아래(트레이 곁)에 단추 하나.
@@ -12570,10 +12602,10 @@ window.__stageCard = () => ({ 켜짐: window.VRULES.stageCard.on, 떠있음: !!S
 const SRESET = { el: null, stats: { 보임: 0, 누름: 0, 되돌림: 0 } };
 const sresetLive = () => !!(window.VRULES.stageReset.on && STAGE.def && !VISIT_SID && (STAGE.def.교과 != null || STAGE.def.시작) && !(typeof pmapLive === 'function' && pmapLive()));
 function stageResetGo() { SRESET.stats.누름++;
-  if (!confirm(STAGE.def.시작 ? '이 판을 처음 상태로 되돌릴까요? 지금까지 바꾼 것은 사라져요.' : '이 판을 처음(빈 땅)으로 되돌릴까요? 지금까지 놓은 것은 사라져요.')) return;
+  askCard(STAGE.def.시작 ? { q: '이 판을 처음 상태로 되돌릴까요?', sub: '지금까지 바꾼 것은 사라져요.', ok: '↺ 처음부터' } : { q: '이 판을 처음(빈 땅)으로 되돌릴까요?', sub: '지금까지 놓은 것은 사라져요.', ok: '↺ 처음부터' }, () => {   /* [ACT-ASKCARD] */
   SRESET.stats.되돌림++;
   try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(scardKey()); } catch (e) {}   /* 판 카드도 다시 뜨게 — '처음부터'니까 */
-  location.replace(location.pathname + location.search); }
+  location.replace(location.pathname + location.search); }); }
 function stageResetBoot() { if (SRESET.el || !sresetLive()) return;
   const st = document.createElement('style'); st.textContent = '#stageReset{position:fixed;left:10px;bottom:14px;z-index:6;background:#232833e8;color:#e9edf5;border:1px solid #39404f;border-radius:10px;min-height:44px;padding:0 14px;font:800 14px/1 "Malgun Gothic",sans-serif;cursor:pointer}'
     + '@media (max-width:700px){#stageReset{bottom:auto;top:64px}}body.photo #stageReset{display:none!important}';
@@ -12722,7 +12754,7 @@ function voteApply(id) {
 }
 function voteReset(quiet) {
   const d = voteDef(); if (!d) return '결정 판이 아니에요';
-  if (!quiet && typeof confirm === 'function' && !confirm('처음 상태로 되돌릴까요?\n이번에 한 것은 남지 않아요.')) return false;
+  if (!quiet) { askCard({ q: '처음 상태로 되돌릴까요?', sub: '이번에 한 것은 남지 않아요.', ok: '↺ 처음부터' }, () => voteReset(true)); return false; }   /* [ACT-ASKCARD] 게임 안 카드로 — 예를 누르면 조용히 다시 */
   VOTE.stats.되돌린횟수++; VOTE.표 = null; VOTE.적용 = null; VOTE.미리 = null;
   try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) { console.warn('[MAC-VOTE] 되돌리기', e); }
   location.replace(location.href);   // 판 파일의 `시작` 저장본이 다시 깔린다 → 앞 실행의 흔적 0
