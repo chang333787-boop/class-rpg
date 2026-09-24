@@ -774,7 +774,7 @@ function animSandbox(S, { decos, size, hc, farm, extraConsts = [], extraFns = []
   }
   for (const n of ['_isPenDeco', '_penAt', '_feedersOf', '_feederFor', '_groundKind', '_groundAt', '_animGroundOk', '_animWhyNot', '_animProbeArt', '_animFile', '_animSrcFor',
     '_animApplySrc', '_animSetState', '_animFace', '_animPlace', '_animRnd', '_animReduced', '_decoOverflowCells', '_animFreeMaker', '_animOccMaker', '_animBounds', '_animBfs',
-    '_animKick', '_animFrame', '_animLoopStop', '_animTick', '_animWalk', '_animNextSeg', '_animAdvance', '_animThink', '_animGather', '_animStopLayer', '_animStopAll',
+    '_animKick', '_animFrame', '_animLoopStop', '_animTick', '_animWalk', '_animNextSeg', '_animAdvance', '_animThink', '_animGather', '_animShelter', '_animStopLayer', '_animStopAll',
     '_animPauseAll', '_animResumeAll', '_animAt', '_animOverCells', '_animPoke', '_animSyncLayer'].concat(extraFns)) src += sliceFn(S, n) + NL;
   src += ';globalThis.__A = { ' + ['_animSyncLayer', '_animStopLayer', '_animLayers', '_animBfs', '_animOccMaker', '_groundKind', '_animGroundOk', '_animWhyNot', '_animAt', '_animPoke',
     '_animFreeMaker', '_isPenDeco', '_penAt', '_feedersOf'].concat(extraFns).join(', ') + ' };';
@@ -1072,6 +1072,17 @@ try {
   R._animPoke(h1);
   test('닭을 누르면 기쁨 상태', () => eq(h1.state, 'happy'));
   test('둘레의 가만히 있는 양이 누른 닭 쪽(왼쪽)을 본다', () => eq(s1.dir, -1));
+  R._animStopLayer('if-topview');
+  //  [DECO-DAYNIGHT-1] 밤이면 잔다(쉼터가 없으면 그 자리에서) · 낮이 되면 다시 논다
+  X.sb._decoPhase = () => 'night';
+  R._animSyncLayer('if-topview', { yardFloor: {}, houseDecorations: [0, 1, 2].map(i => ({ id: 'd_y55', area: 'yard', row: 5, col: 5 + i * 3 })) }, 'yard', 20, 1000, 560, 0, 0);
+  X.run(12000);
+  const sleepers = [...R._animLayers.get('if-topview').items.values()];
+  test('밤이면 동물이 잔다', () => { if (!sleepers.every(h => h.state === 'sleep' && !h.seg)) throw new Error(sleepers.map(h => h.state).join()); });
+  X.sb._decoPhase = () => 'day';
+  X.run(20000);
+  test('낮이 되면 깨어 논다', () => { if (sleepers.some(h => h.state === 'sleep')) throw new Error(sleepers.map(h => h.state).join()); });
+  delete X.sb._decoPhase;
   R._animStopLayer('if-topview');
 } catch (e) {
   test('동물 규칙 코드를 돌릴 수 있다', () => { throw e; });

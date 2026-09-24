@@ -1732,3 +1732,8 @@ body.deco-floor-mode #if-deco-drawer{display:none}
   border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--txt2)}
 @media (max-width:480px){ #if-photo-btn{order:11;flex:0 0 44px;min-height:40px;font-size:16px!important} }
 
+/* [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스는 색 막을 그리고, 그 위 DOM 층(동물 · 움직임)은 같은 결로 어둡게 · 단추는 📷 옆(폰은 둘째 줄 끝) */
+#if-topview.is-evening .deco-anim-layer,#if-topview.is-evening .deco-mv-layer,#ff-topview.is-evening .deco-anim-layer,#ff-topview.is-evening .deco-mv-layer{filter:brightness(.9) sepia(.18) saturate(1.05)}
+#if-topview.is-night .deco-anim-layer,#if-topview.is-night .deco-mv-layer,#ff-topview.is-night .deco-anim-layer,#ff-topview.is-night .deco-mv-layer{filter:brightness(.58) saturate(.75) hue-rotate(8deg)}
+@media (max-width:480px){ #if-phase-btn{order:12;flex:0 0 44px;min-height:40px;font-size:16px!important} }
+

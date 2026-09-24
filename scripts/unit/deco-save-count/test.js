@@ -16,6 +16,8 @@
   //   main 과 같은 배율로 재게. '전체' 자체를 재는 곳(㉖)만 decoZoomFit 을 부른다.
   const fitOld = () => { const yd = DECO_SCENE === 'yard'; _decoSetZoom(yd ? Math.min(DY_BASE.cols, DY.cols) / DY.cols : 1, 0, 0); _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); };
   const t0 = Date.now();
+  //  [DECO-DAYNIGHT-1] 시험은 실제 시각 대신 낮으로 — 헤드리스 시계(UTC)가 밤이면 동물이 자서 먹이통 시험이 흔들렸다(단추로 바꾼 값은 그대로 따른다)
+  try { if (typeof _decoPhase === 'function') _decoPhase = function () { return _decoPhaseOv || 'day'; }; } catch (e) {}
   (async () => {
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
       if (Date.now() - t0 > 20000) { out('ERR', 'timeout'); return done(); } await sleep(50);
@@ -1814,9 +1816,10 @@
       await sleep(150);
       out('움직임_몸통으로그림', _decoMotionBody('d_y11') === 'd_y11_body');
       out('움직임_날개층', document.querySelectorAll('#if-topview .deco-mv-rotate').length === 1);
-      //  친구 구경 판은 층이 없다 → 본 그림(날개까지)으로 — 몸통을 쓰지 않는다
+      //  꾸미기 판 · 친구 구경 판이 아닌 캔버스(사진처럼 판 밖)는 층이 없다 → 본 그림(날개까지)으로 — 몸통을 쓰지 않는다
+      //  (친구 구경 판은 [DECO-FRIEND-MOTION-1] 부터 층이 있다 — ㊲ '구경_풍차층')
       { const k = _dCv, fake = document.createElement('canvas'); document.body.appendChild(fake); _dCv = fake;
-        out('움직임_구경판은_본그림', _decoMotionBody('d_y11') === ''); _dCv = k; fake.remove(); }
+        out('움직임_판밖캔버스는_본그림', _decoMotionBody('d_y11') === ''); _dCv = k; fake.remove(); }
       toggleDecoScene(); await sleep(300);
       out('움직임_집안엔_층없음', !document.querySelector('.deco-mv-layer'));
       toggleDecoScene(); await sleep(300);
@@ -1846,6 +1849,15 @@
       closeFriendFullscreen(); await sleep(100);
       out('구경_친구저장본_그대로', JSON.stringify(fr) === snap);
       out('구경뒤_내화면값_그대로', [_dPanX, _dPanY, _dZoom, _dC].join(',') === mine);
+      //  친구 마당에서도 풍차가 돈다(DECO-FRIEND-MOTION-1 · 창조자 63-ⓑ107) · 닫으면 층이 없다
+      if (typeof _decoMvOf === 'function' && !_animReduced()) {
+        const fm = JSON.parse(JSON.stringify(CUR)); fm.id = 'friend-m'; fm.name = '친구';
+        fm.houseDecorations = [{ id: 'd_y11', area: 'yard', row: 3, col: 3 }];
+        openFriendFullscreen(fm); await sleep(500); _ffRender(); await sleep(300);
+        out('구경_풍차층', document.querySelectorAll('#ff-topview .deco-mv').length === 1);
+        closeFriendFullscreen(); await sleep(100);
+        out('구경_닫으면_층없음', !document.querySelector('#ff-topview .deco-mv-layer'));
+      }
     }
 
     //  ㊳ 내 마당 사진(DECO-PHOTO-1 · 묶음 6) — 한 장이 나오고 화면 상태·저장본은 그대로(내려받기는 시험에서 안 누른다)
@@ -1882,6 +1894,58 @@
       setDecoMode('deco'); _inPk.tab = 'wall'; _decoUndoClear();
       if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
       decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
+    //  ㊺ 낮·저녁·밤(DECO-DAYNIGHT-1) — 단추로 차례대로 · 저녁/밤이면 색 막 · 다시 열면 실제 시각 · 저장 0
+    if (typeof decoPhaseCycle === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const sv0 = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.indoor]);
+      _decoPhaseOv = 'day'; decoPhaseCycle();
+      out('낮밤_단추_차례', _decoPhase() === 'evening' && document.getElementById('if-phase-btn').textContent === '🌇');
+      decoPhaseCycle();
+      const fills = []; const fr = _dCtx.fillRect, fs = () => String(_dCtx.fillStyle);
+      _dCtx.fillRect = function () { fills.push(fs()); return fr.apply(this, arguments); };
+      try { _drawYard(); } finally { _dCtx.fillRect = fr; }
+      out('낮밤_밤이면_색막', _decoPhase() === 'night' && fills.some(f => /rgba\(20, 30, 80/.test(f)) && document.getElementById('if-topview').classList.contains('is-night'));
+      closeInteriorFullscreen(); await sleep(200); openInteriorFullscreen(); await sleep(400);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      out('낮밤_다시열면_실제시각', _decoPhaseOv === null);
+      out('낮밤_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.indoor]) === sv0);
+      //  친구 구경도 밤이면 동물 층이 같은 결로(캔버스 색 막만 깔리고 동물이 밝게 떠 보이던 것)
+      _decoPhaseOv = 'night';
+      { const fr = JSON.parse(JSON.stringify(CUR)); fr.id = 'friend-n'; fr.name = '친구';
+        openFriendFullscreen(fr); await sleep(300);
+        const fh = document.getElementById('ff-topview');
+        out('낮밤_친구구경도_밤', !!fh && fh.classList.contains('is-night'));
+        closeFriendFullscreen(); await sleep(100); }
+      //  밤 사진 — 동물은 색 막 뒤에 그리니 화면 동물 층과 같은 필터로(안 하면 밤 사진에 동물만 밝게 떴다)
+      if (typeof decoPhoto === 'function') {
+        const pet = { id: 'd_y53', area: 'yard', row: 20, col: 3 }; CUR.houseDecorations.push(pet);
+        const orig = _drawDecoSVG; let fl = null;
+        _drawDecoSVG = function (id) { if (id === 'd_y53' && _decoPhotoMode) fl = String(_dCtx.filter); return orig.apply(this, arguments); };
+        try { await decoPhoto({ canvas: true }); } finally { _drawDecoSVG = orig; CUR.houseDecorations.splice(CUR.houseDecorations.indexOf(pet), 1); }
+        out('낮밤_밤사진_동물도_어둡게', !!fl && /brightness\(0?\.58\)/.test(fl));
+        _drawDeco();
+      }
+      _decoPhaseOv = null;
+    }
+
+    //  ㊻ 바람 한 줄기(DECO-WIND-1) — 지나는 동안 풀·꽃이 기울고 끝나면 0 · 흔들 것이 아닌 장식은 늘 0
+    if (typeof _decoWindGust === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      const sun = { id: 'd_y7', area: 'yard', row: 6, col: 6, sp: 3 }, bench = { id: 'd_y5', area: 'yard', row: 8, col: 6, sp: 3 };
+      CUR.houseDecorations.push(sun, bench);
+      _decoSetZoom(1.5); _dPanX = 0; _dPanY = 0; _decoClampPan();
+      _decoWindGust(); _decoWind.t0 = performance.now() - 600;   // 줄기 시작 뒤 0.6초 — 왼쪽 해바라기는 흔들리는 중
+      out('바람_지나면_기움', Math.abs(_decoWindAngle(sun)) > 0 && _decoWindAngle(bench) === 0);
+      _decoWind.t0 = performance.now() - 20000;
+      out('바람_지나간뒤_0', _decoWindAngle(sun) === 0);
+      if (_decoWind.raf) { cancelAnimationFrame(_decoWind.raf); _decoWind.raf = 0; } _decoWind.set = new Map();
+      CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => p.sp !== 3);
+      decoSpaceSet(1); await sleep(150);
     }
 
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤

@@ -5446,6 +5446,8 @@ function _isHC(r,c){ const c0=_houseCol0(); return r < DH.rows && c >= c0 && c <
 // ── 전체화면 인테리어 모드 ──────────────────────────────
 function openInteriorFullscreen() {
   _ifMode = true;
+  _decoPhaseOv = null; setTimeout(() => { try { _decoPhaseSync(); } catch (e) {} }, 0);   // [DECO-DAYNIGHT-1] 다시 열면 실제 시각
+  _decoWindStart();   // [DECO-WIND-1]
   _dZoom = 1; _dPanX = 0; _dPanY = 0;   // [DECO-ZOOM-1]
   try { const sp = +localStorage.getItem('rpg.deco.space'); if (sp >= 1 && sp <= DECO_SPACES) DECO_SPACE = sp; } catch (e) {}   // [DECO-SPACE-1]
   setTimeout(_decoSpaceSync, 0);
@@ -5504,6 +5506,8 @@ function ifSyncScene() {
   const sb = document.getElementById('if-scene-btn');
   if (sn) sn.textContent = isYard ? '🌿 마당' : '🏠 집 안';
   if (sb) sb.textContent = isYard ? '🏠 집 안으로 →' : '🌿 마당으로 ←';
+  //  [DECO-DAYNIGHT-1] 📷 사진 · ☀️🌙 낮밤은 마당 것 — 집 안에선 감춘다(폰 320 집 안에서 윗줄이 세 줄이 되었다)
+  ['if-photo-btn', 'if-phase-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = isYard ? '' : 'none'; });
   // [INDOOR-LOOK-1] 집 안에서는 같은 자리가 '🖌️ 벽지·바닥'(#631 이 감춰 두었던 단추가 돌아온다). 바닥 모드인 채 장면을 바꾸면 판도 그 장면 것으로.
   const fb = document.getElementById('if-mode-floor');
   if (fb) { fb.style.display = ''; fb.textContent = isYard ? '🖌️ 바닥' : '🖌️ 벽지·바닥'; }
@@ -8723,7 +8727,7 @@ function _animOccMaker(rec, me) {
 //  다닐 수 있는 네모 — 우리 안이면 그 안(울타리 줄 뺀 곳) · 아니면 놓은 자리에서 반지름(먹이통이 있으면 거기까지 넉넉히)
 function _animBounds(st) {
   if (st.pen) return { r0: st.pen.r0, c0: st.pen.c0, r1: st.pen.r1 - (st.h - 1), c1: st.pen.c1 - (st.w - 1) };
-  const R = st.feeder ? Math.max(st.cfg.radius, FEED_RANGE + 2) : st.cfg.radius;
+  const R = st.feeder || st.shelter ? Math.max(st.cfg.radius, FEED_RANGE + 2) : st.cfg.radius;
   return { r0: st.home.row - R, r1: st.home.row + R, c0: st.home.col - R, c1: st.home.col + R };
 }
 //  칸 길찾기(BFS · 4방향) — goal(r,c) 를 만족하는 가장 가까운 칸까지의 길(시작 칸 뺌) · 없으면 null. 순수(시험용)
@@ -8807,6 +8811,13 @@ function _animAdvance(st, now) {
 
 // ── 생각 — 먹이통이 있으면 모이기 · 아니면 성격대로 가만히 / 쪼기 / 몇 칸 걷기 ──
 function _animThink(st, now) {
+  //  [DECO-DAYNIGHT-1] 밤 — 쉼터(가까운 나무·건물) 둘레에 모여 잔다 · 우리 안·물 위·쉼터가 없으면 그 자리에서
+  if (typeof _decoPhase === 'function' && _decoPhase() === 'night') {
+    st.shelter = st.pen || st.swim ? null : _animShelter(st);
+    if (st.shelter && _animGather(st, now, st.shelter, 'sleep')) return;
+    _animSetState(st, 'sleep'); st.nextAt = now + _animRnd(6000, 9000); return;
+  }
+  st.shelter = null;
   if (st.feeder && !st.swim && _animGather(st, now)) return;
   const m = ANIM_MOOD[st.cfg.mood] || ANIM_MOOD.hen, roll = Math.random();
   if (roll < m.idle) { _animSetState(st, 'idle'); st.nextAt = now + _animRnd(m.rest[0], m.rest[1]); return; }
@@ -8820,14 +8831,20 @@ function _animThink(st, now) {
   else { _animSetState(st, 'idle'); st.nextAt = now + _animRnd(800, 1600); }
 }
 //  먹이통 둘레 고리 — 체비쇼프 1칸 안 빈 칸 → 다 차면 2칸. 고른 칸은 goal 로 예약 · 도착하면 칸 안에서 조금 비켜 서서 먹이통을 본다
-function _animGather(st, now) {
-  const T = st.feeder, tz = getDecoSize(T.id);
+//  [DECO-DAYNIGHT-1] 대상과 몸짓을 받는다 — 먹이통이면 쪼기, 밤 쉼터면 잠(같은 고리 규칙)
+function _animGather(st, now, T, act) {
+  T = T || st.feeder; act = act || 'eat';
+  const gk = T.id + '@' + T.row + '_' + T.col + ':' + act;
+  if (st.gKey && st.gKey !== gk) { st.gathered = false; st.jSet = false; }   // 대상이 바뀌면(먹이통 ↔ 쉼터) 다시 모인다
+  st.gKey = gk;
+  const tz = getDecoSize(T.id);
   const dist = (r, c) => Math.max(Math.max(T.row - (r + st.h - 1), 0, r - (T.row + tz.h - 1)), Math.max(T.col - (c + st.w - 1), 0, c - (T.col + tz.w - 1)));
   const settle = (t) => {
     if (!st.jSet) { st.jx = (Math.random() - .5) * .5; st.jy = (Math.random() - .5) * .36; st.jSet = true; }
     const dc = (T.col + tz.w / 2) - (st.cur.col + st.w / 2);
     _animFace(st, dc > .01 ? 1 : dc < -.01 ? -1 : (Math.random() < .5 ? 1 : -1));
     st.fx = st.cur.col; st.fy = st.cur.row; _animPlace(st);
+    if (act === 'sleep') { _animSetState(st, 'sleep'); st.nextAt = t + _animRnd(6000, 9000); return; }
     _animSetState(st, Math.random() < .7 ? 'peck' : 'idle');
     st.nextAt = t + _animRnd(1600, 3000);
   };
@@ -8851,6 +8868,20 @@ function _animGather(st, now) {
   return false;   // 고리에 빈 칸이 없다 — 평소처럼 논다
 }
 
+//  밤 쉼터 — 놓은 자리에서 가까운(FEED_RANGE 안) 나무·건물 · 없으면 null(그 자리에서 잔다)
+function _animShelter(st) {
+  const stu = st.rec && st.rec.student;
+  if (!stu || typeof _decoShopKind !== 'function') return null;
+  let best = null, bd = 1e9;
+  _decoList(stu).forEach(p => {
+    if (p.area !== 'yard' || ANIM_DECO[p.id]) return;
+    const d = GAME_DATA.decorations.find(x => x.id === p.id), k = d && _decoShopKind(d);
+    if (k !== 'tree' && k !== 'building') return;
+    const dist = Math.abs(p.row - st.home.row) + Math.abs(p.col - st.home.col);
+    if (dist <= FEED_RANGE && dist < bd) { bd = dist; best = p; }
+  });
+  return best;
+}
 function _animStopLayer(hostId) {
   const rec = _animLayers.get(hostId);
   if (!rec) return;
@@ -9321,6 +9352,7 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     rec = { layer, world, items: new Map() };
     _animLayers.set(hostId, rec);
   }
+  rec.student = student;   // [DECO-DAYNIGHT-1] 밤 쉼터 찾기
   if (rec.layer.parentNode !== host) {
     try { if (getComputedStyle(host).position === 'static') host.style.position = 'relative'; } catch (e) {}
     host.appendChild(rec.layer);
@@ -9697,6 +9729,7 @@ function _drawDeco() {
     _animSyncLayer(_ifActiveContainer || 'house-topview', CUR, DECO_SCENE, _dC, _dW, _dH, _dPanX, _dPanY);
     try { _decoTplSync(); } catch (e) {}   // [DECO-FIRST-YARD-1]
     try { _decoMotionSync(); } catch (e) {}   // [DECO-MOTION-1]
+    try { _decoPhaseSync(); } catch (e) {}   // [DECO-DAYNIGHT-1] 층 어둡게(CSS)·단추
   });
 }
 
@@ -9709,13 +9742,17 @@ let _DECO_MOTION = null, _decoMotionAsked = false;
 const _decoMvReady = {};   // id → true(층 그림까지 다 옴) | false(없음) | undefined(확인 중)
 function _decoMotionOn() {
   if (!_ifMode || DECO_SCENE !== 'yard' || _animReduced()) return false;
-  //  내 꾸미기 판에서만 — 친구 구경(ff-topview)도 _drawYard 를 빌려 그리는데 거기엔 층이 없다(날개 없는 풍차가 되지 않게 본 그림으로)
-  if (!_dCv || !_dCv.parentNode || _dCv.parentNode.id !== 'if-topview') return false;
-  if (!_decoMotionAsked) {
-    _decoMotionAsked = true;
-    try { fetch('./assets/deco/motion.json').then(r => r.ok ? r.json() : null).then(j => { if (j) { _DECO_MOTION = j; _drawDeco(); } }).catch(() => {}); } catch (e) {}
-  }
+  //  내 꾸미기 판 · 친구 구경 판(ff-topview)만 — 사진처럼 붙어 있지 않은 캔버스엔 층이 없다(날개 없는 풍차가 되지 않게 본 그림으로)
+  //  [DECO-FRIEND-MOTION-1] 친구 마당에서도 풍차가 돈다(창조자 63-ⓑ107 — 내 마당에선 도는 풍차가 친구 집에선 멈춰 있었다)
+  if (!_dCv || !_dCv.parentNode || !/^(if|ff)-topview$/.test(_dCv.parentNode.id)) return false;
+  _decoMotionFetch();
   return !!_DECO_MOTION;
+}
+//  [DECO-DAYNIGHT-1] 표는 한 번만 부른다 — 밤 불빛(_ambient)은 친구 구경에서도 쓴다(내 판을 안 열고 구경부터 가도)
+function _decoMotionFetch() {
+  if (_decoMotionAsked) return;
+  _decoMotionAsked = true;
+  try { fetch('./assets/deco/motion.json').then(r => r.ok ? r.json() : null).then(j => { if (j) { _DECO_MOTION = j; _drawDeco(); if (typeof _ffRedrawSoon === 'function') _ffRedrawSoon(); } }).catch(() => {}); } catch (e) {}
 }
 //  이 장식을 몸통으로 그릴까 — 층 그림까지 다 왔을 때만(날개 없는 풍차가 잠깐이라도 보이지 않게)
 function _decoMotionBody(id) {
@@ -9728,18 +9765,23 @@ function _decoMotionBody(id) {
     const files = [m.body].concat(...m.layers.filter(L => L.kind !== 'glow').map(L => L.files || [L.file]));
     let left = files.length, bad = false;
     files.forEach(f => { const img = new Image(); img.onload = img.onerror = (e) => { if (e.type === 'error' || !img.naturalWidth) bad = true;
-      if (--left === 0) { _decoMvReady[id] = !bad; if (!bad) _drawDeco(); } }; img.src = _artSrc('deco/' + f) || './assets/deco/' + f; });
+      if (--left === 0) { _decoMvReady[id] = !bad; if (!bad) { _drawDeco(); if (typeof _ffRedrawSoon === 'function') _ffRedrawSoon(); } } }; img.src = _artSrc('deco/' + f) || './assets/deco/' + f; });
   }
   return _decoMvReady[id] ? m.body.replace(/\.svg$/, '') : '';
 }
-const _decoMv = { layer: null, world: null, items: new Map() };
-function _decoMotionStop() {
-  if (_decoMv.layer && _decoMv.layer.parentNode) _decoMv.layer.parentNode.removeChild(_decoMv.layer);
-  _decoMv.items.clear(); _decoMv.layer = null;
+//  [DECO-FRIEND-MOTION-1] 판마다 따로(host id — 내 마당 if-topview · 친구 구경 ff-topview)
+const _decoMvs = new Map();
+function _decoMvOf(id) { let mv = _decoMvs.get(id); if (!mv) { mv = { layer: null, world: null, items: new Map() }; _decoMvs.set(id, mv); } return mv; }
+function _decoMotionStop(id) {
+  const mv = _decoMvs.get(id || 'if-topview');
+  if (!mv) return;
+  if (mv.layer && mv.layer.parentNode) mv.layer.parentNode.removeChild(mv.layer);
+  mv.items.clear(); mv.layer = null;
 }
 function _decoMotionSync() {
-  const host = _dCv && _dCv.parentNode;
-  if (!host || !_decoMotionOn() || (typeof host.getClientRects === 'function' && !host.getClientRects().length)) { _decoMotionStop(); return; }
+  const host = _dCv && _dCv.parentNode, hid = (host && host.id) || 'if-topview';
+  if (!host || !_decoMotionOn() || (typeof host.getClientRects === 'function' && !host.getClientRects().length)) { _decoMotionStop(hid); return; }
+  const _decoMv = _decoMvOf(hid);
   if (!_decoMv.layer) {
     const layer = document.createElement('div'); layer.className = 'deco-mv-layer';
     const world = document.createElement('div'); world.className = 'deco-anim-world';
@@ -9828,10 +9870,14 @@ async function decoPhoto(opt) {
     }
     _drawYard();
     //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
+    //  [DECO-DAYNIGHT-1] 저녁·밤 사진 — 동물은 색 막 뒤에 그리니 화면의 동물 층과 같은 필터(CSS 와 같은 값)로(안 하면 밤 사진에 동물만 밝게 떴다)
+    const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day';
+    if (ph !== 'day') ctx.filter = ph === 'night' ? 'brightness(.58) saturate(.75) hue-rotate(8deg)' : 'brightness(.9) sepia(.18) saturate(1.05)';
     pets.forEach(p => {
       const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
       _drawDecoSVG(p.id, (st ? st.fx : p.col) * C, (st ? st.fy : p.row) * C, z.w * C, z.h * C);
     });
+    ctx.filter = 'none';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = 'rgba(14,22,33,.92)'; ctx.fillRect(0, H - foot, W, foot);
     ctx.fillStyle = '#ffd866'; ctx.font = `700 ${Math.round(foot * .45)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -9851,6 +9897,127 @@ async function decoPhoto(opt) {
     }, 'image/png');
   } catch (e) { toast('📷 사진을 만들지 못했어요'); }
   return cv;
+}
+
+// [DECO-DAYNIGHT-1] 낮 · 저녁 · 밤 — 기본은 실제 시각(6~17시 낮 · 17~19시 저녁 · 그 밖 밤), ☀️🌇🌙 단추로 아이가 바꿔 본다(저장 0 · 다시 열면 실제 시각).
+//  보스 결정(09-24): 수업이 낮이라 단추가 없으면 밤을 못 본다. 그림은 디자인 motion.json `_ambient`(glow · pool · windows) 그대로:
+//  색 막(저녁 rgba(255,150,80,.2) · 밤 rgba(20,30,80,.48)) → 불빛 웅덩이·불빛 원(lighter · 지름 1.8배 · 저녁 .65·.8배 / 밤 .9·1배) → 창 불빛(보통 합성).
+//  동물·움직임 층(DOM)은 같은 결로 어둡게(CSS). 밤이면 동물은 쉼터 둘레에서 잔다(_animThink).
+let _decoPhaseOv = null;
+function _decoPhase(now) {
+  if (_decoPhaseOv) return _decoPhaseOv;
+  const h = (now || new Date()).getHours();
+  return h >= 6 && h < 17 ? 'day' : h >= 17 && h < 19 ? 'evening' : 'night';
+}
+const DECO_PHASE_ICON = { day: '☀️', evening: '🌇', night: '🌙' }, DECO_PHASE_NAME = { day: '낮', evening: '저녁', night: '밤' };
+function _decoPhaseSync() {
+  const ph = _decoPhase(), b = document.getElementById('if-phase-btn'), host = document.getElementById('if-topview');
+  if (b) { b.textContent = DECO_PHASE_ICON[ph]; b.title = DECO_PHASE_NAME[ph] + ' — 눌러서 바꿔 보기'; b.setAttribute('aria-label', '지금 ' + DECO_PHASE_NAME[ph] + ' · 눌러서 바꿔 보기'); }
+  if (host) { host.classList.toggle('is-evening', DECO_SCENE === 'yard' && ph === 'evening'); host.classList.toggle('is-night', DECO_SCENE === 'yard' && ph === 'night'); }
+}
+function decoPhaseCycle() {
+  const order = ['day', 'evening', 'night'], next = order[(order.indexOf(_decoPhase()) + 1) % 3];
+  _decoPhaseOv = next;
+  _decoPhaseSync(); _drawDeco();
+  //  동물이 바로 알아채게 — 다음 생각을 당긴다
+  const now = Date.now();
+  _animLayers.forEach(rec => rec.items.forEach(st => { if (!st.seg) st.nextAt = Math.min(st.nextAt, now + _animRnd(200, 900)); }));
+  if (typeof _animKick === 'function') _animKick();
+  toast(DECO_PHASE_ICON[next] + ' ' + DECO_PHASE_NAME[next] + '이에요' + (next === 'night' ? ' — 동물들이 잘 곳을 찾아요' : '') + ' (다시 열면 지금 시각으로)');
+}
+const _AMB_IMG = {};
+function _ambImg(name, color) {   // assets/deco/<name>.svg[#색] — 색은 그림 안 :target 규칙
+  const key = color ? name + '#' + color : name, hit = _AMB_IMG[key];
+  if (hit) return hit.ok ? hit.img : null;
+  const src = _artSrc('deco/' + name + '.svg', color);   // [DECO-BUNDLE-1]
+  if (src === null) return null;
+  const img = new Image(), rec = { img, ok: false }; _AMB_IMG[key] = rec;
+  img.onload = () => { rec.ok = img.naturalWidth > 0; if (rec.ok) { _drawDeco(); if (typeof _ffRedrawSoon === 'function') _ffRedrawSoon(); } };   // 친구 구경도 같은 그림을 쓴다
+  img.src = src;
+  return null;
+}
+function _decoNightDraw(C) {
+  const ph = _decoPhase();
+  if (ph === 'day') return;
+  const ctx = _dCtx, amb = _DECO_MOTION && _DECO_MOTION._ambient, night = ph === 'night';
+  if (!_DECO_MOTION) _decoMotionFetch();
+  ctx.save();
+  ctx.fillStyle = night ? 'rgba(20,30,80,.48)' : 'rgba(255,150,80,.2)';
+  ctx.fillRect(_dPanX - C, _dPanY - C, _dW + C * 2, _dH + C * 2);   // 보이는 판 전체(위 잔디 띠까지)
+  if (amb) {
+    //  몸통 viewBox 안 자리 → 판 px (그림 폭 = 발자리 폭 · 아래 끝 = 발자리 아래)
+    const box = p => { const img = _decoImg(p.id), z = getDecoSize(p.id); if (!img) return null;
+      const w = z.w * C, u = w / img.naturalWidth, h = img.naturalHeight * u; return { x: p.col * C, y: (p.row + z.h) * C - h, u, w, h }; };
+    const list = _decoList(CUR).filter(p => p.area === 'yard');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = night ? .9 : .65;
+    list.forEach(p => {
+      const pl = amb.pool && amb.pool.on && amb.pool.on[p.id], b = pl && box(p), im = pl && _ambImg('light_pool', 'warm');
+      if (b && im) { const w = pl[2] * b.u * (night ? 1 : .8), h = w * .5; ctx.drawImage(im, b.x + pl[0] * b.u - w / 2, b.y + pl[1] * b.u - h / 2, w, h); }
+    });
+    list.forEach(p => {
+      const g = amb.glow && amb.glow.on && amb.glow.on[p.id], b = g && box(p), im = g && _ambImg('glow', g[2]);
+      if (b && im) { const d = g[3] * b.u * 1.8 * (night ? 1 : .8); ctx.drawImage(im, b.x + g[0] * b.u - d / 2, b.y + g[1] * b.u - d / 2, d, d); }
+    });
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    //  창 불빛 — 색 막 위에 보통 합성(창이 밝게 남도록)
+    list.forEach(p => {
+      const f = amb.windows && amb.windows.on && amb.windows.on[p.id], b = f && box(p), im = f && _ambImg(f.replace(/\.svg$/, ''));
+      if (b && im) ctx.drawImage(im, b.x, b.y, b.w, b.h);
+    });
+    const hn = amb.windows && amb.windows.on && amb.windows.on.yard_house && _ambImg('yard_house_night'), hi = _decoImg('yard_house');
+    if (hn && hi && FLOOR_SVG) { const hw = DH.cols * C; ctx.drawImage(hn, _houseCol0() * C, -C, hw, hw * hi.naturalHeight / hi.naturalWidth); }
+  }
+  ctx.restore();
+}
+
+// [DECO-WIND-1] 바람 한 줄기 — 11초마다 보이는 마당을 왼쪽→오른쪽으로 2.8초에 지나며 풀·꽃·나무를 한 번씩 흔들고 멈춘다(늘 흔들리면 멀미).
+//  보스 결정(09-24): 캔버스로 — DOM 층은 앞뒤 순서가 캔버스와 안 맞아 뒷줄 꽃이 앞줄 나무 위에 떴다(어설픔 ⓓ). 바람이 지나는 동안만 판을 다시 그린다.
+//  세기(docs/deco_living_yard_20260920.md §1·§2 '보통'): 풀·꽃 3° × 배수(2.6초 · 두 번 흔들고 잦아듦) · 나무 0.7° × 배수(3.4초 · 느리게) · 한 줄기 24개까지(가로 위치로 고르게 솎음).
+//  꺼지는 때: 움직임 줄이기 · 집 안 · 판이 안 보일 때 · 사진 찍을 때.
+const DECO_SWAY = { d_y7: 1, d_y45: 1.2, d_y29: 1.2, d_y8: .8, d_y2: .8, d_y44: .8, d_y41: .8, d_y42: .8, d_y1: .6, d_y43: .6, d_y16: .6, d_y25: .7, d_y35: .7, d_y36: .7, d_y15: .35 };
+const DECO_TILT = { d_y9: 1.1, d_y47: 1, d_y46: .7, d_y12: 1, d_y19: 1, d_y48: 1, d_y64: 1 };
+const DECO_WIND = { every: 11000, pass: 2800, sway: 2600, tilt: 3400, amp: 3, treeAmp: .7, max: 24 };
+const _decoWind = { t0: 0, set: new Map(), timer: 0, raf: 0 };
+function _decoWindOn() { return _ifMode && DECO_SCENE === 'yard' && !_animReduced() && !(typeof document !== 'undefined' && document.hidden) && !!_dCv; }
+function _decoWindStart() {
+  if (_decoWind.timer) return;
+  _decoWind.timer = setTimeout(function tick() {
+    _decoWind.timer = 0;
+    if (!_ifMode) return;   // 닫혔으면 끝(다시 열면 openInteriorFullscreen 이 다시 건다)
+    if (_decoWindOn()) _decoWindGust();
+    _decoWind.timer = setTimeout(tick, DECO_WIND.every);
+  }, 2500 + Math.random() * 3000);
+}
+function _decoWindGust() {
+  const C = _dC, v0 = _dPanX, vw = _dW, list = [];
+  _decoList(CUR).forEach(p => {
+    if (p.area !== 'yard' || !(DECO_SWAY[p.id] || DECO_TILT[p.id])) return;
+    const z = getDecoSize(p.id), x = (p.col + z.w / 2) * C;
+    if (x < v0 - C || x > v0 + vw + C || (p.row + z.h) * C < _dPanY || p.row * C > _dPanY + _dH + C * 2) return;
+    list.push({ key: p.id + '@' + p.row + '_' + p.col, x, tree: !DECO_SWAY[p.id], mult: DECO_SWAY[p.id] || DECO_TILT[p.id] });
+  });
+  if (!list.length) return;
+  list.sort((a, b) => a.x - b.x);
+  const pick = list.length <= DECO_WIND.max ? list : Array.from({ length: DECO_WIND.max }, (_, i) => list[Math.floor(i * list.length / DECO_WIND.max)]);
+  _decoWind.set = new Map(pick.map(o => [o.key, Object.assign(o, { delay: Math.max(0, Math.min(1, (o.x - v0) / vw)) * DECO_WIND.pass })]));
+  _decoWind.t0 = performance.now();
+  if (!_decoWind.raf) _decoWind.raf = requestAnimationFrame(function fr() {
+    _decoWind.raf = 0;
+    if (performance.now() - _decoWind.t0 > DECO_WIND.pass + DECO_WIND.tilt + 50) { _decoWind.set = new Map(); _drawDeco(); return; }
+    _drawDeco(); _decoWind.raf = requestAnimationFrame(fr);
+  });
+}
+//  지금 이 장식의 기울기(라디안) — 바람이 안 지나면 0
+function _decoWindAngle(p) {
+  if (!_decoWind.set.size || _decoPhotoMode) return 0;
+  const o = _decoWind.set.get(p.id + '@' + p.row + '_' + p.col);
+  if (!o) return 0;
+  const t = performance.now() - _decoWind.t0 - o.delay, dur = o.tree ? DECO_WIND.tilt : DECO_WIND.sway;
+  if (t <= 0 || t >= dur) return 0;
+  const k = t / dur, deg = (o.tree ? DECO_WIND.treeAmp : DECO_WIND.amp) * o.mult;
+  const wave = o.tree ? Math.sin(Math.PI * k) : Math.sin(2 * Math.PI * k * 2) * (1 - k) + .35 * Math.sin(Math.PI * k);   // 풀은 두 번 흔들며 잦아들고 · 나무는 한 번 느리게
+  return deg * wave * Math.PI / 180;
 }
 
 // [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기(디자인 ⑭ · 보스 결정 (A) 보여주기만 — 저장 0)
@@ -10240,7 +10407,11 @@ function _drawYard() {
     const _gnd = _decoGroundOn(p, d);   // [DECO-GROUND-1] 잔디 위 물건이면 밑동 그림자 → 그림 → 풀 덮임
     if (_gnd) _decoGroundShadow(px, py, bw, bh, C);
     const mvBody = _decoMotionBody(p.id);   // [DECO-MOTION-1] 움직이는 부분은 DOM 층이 — 캔버스엔 멈춘 몸통
-    if(_drawDecoSVG(mvBody || drawId, px, py, bw, bh)) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
+    const _sway = _decoWindAngle(p);   // [DECO-WIND-1] 바람이 지나는 동안만 — 밑동 고정 기울임(skewX)
+    if (_sway) { _dCtx.save(); const bx = px + bw / 2, by = py + bh; _dCtx.translate(bx, by); _dCtx.transform(1, 0, -Math.tan(_sway), 1, 0, 0); _dCtx.translate(-bx, -by); }
+    const _drew = _drawDecoSVG(mvBody || drawId, px, py, bw, bh);
+    if (_sway) _dCtx.restore();
+    if(_drew) { if (_gnd) _decoGroundTufts(p, px, py, bw, bh, C, sz); return; }   // SVG 있으면 그걸로 끝
     const cx=px+bw/2, cy=py+bh/2;
     // s = bounding box의 절반 (fn 함수는 ±s 범위로 그림)
     const s = Math.min(bw, bh) * 0.62;
@@ -10282,6 +10453,7 @@ function _drawYard() {
 
   // ── 마당 농장 존 렌더링 (우하단, 읽기 전용) ──────────────
   _drawYardFarm(C);
+  _decoNightDraw(C);   // [DECO-DAYNIGHT-1] 저녁·밤 — 색 막 · 불빛 · 창 불빛(맨 위)
 }
 
 // ── 마당 농장 존 렌더 + 판정 헬퍼 ──────────────────────────
@@ -13412,6 +13584,7 @@ function _ffRedrawSoon() {
 
 function closeFriendFullscreen() {
   _animStopLayer('ff-topview');   // [DECO-ANIM-1]
+  _decoMotionStop('ff-topview');   // [DECO-FRIEND-MOTION-1]
   document.getElementById('friend-fullscreen').style.display = 'none';
   _ffFriend = null;
 }
@@ -13506,6 +13679,11 @@ function _renderFriendCanvas() {
   else _drawIndoor();
   // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다 — [DECO-FRIEND-VIEW-1] 구경 이동만큼 같이
   _animSyncLayer('ff-topview', _ffFriend, _ffScene, C, W, H, _ffView.panX, _ffView.panY);
+  try { _decoMotionSync(); } catch (e) {}   // [DECO-FRIEND-MOTION-1] 풍차·분수·연기 층(구경 값으로 — 아직 전역을 빌린 채)
+  {   // [DECO-DAYNIGHT-1] 저녁·밤 — 캔버스에 색 막이 깔리니 동물 층도 같은 결로(내 마당 #if-topview 와 같은 CSS)
+    const ph = typeof _decoPhase === 'function' ? _decoPhase() : 'day', fh = document.getElementById('ff-topview');
+    if (fh) { fh.classList.toggle('is-evening', _ffScene === 'yard' && ph === 'evening'); fh.classList.toggle('is-night', _ffScene === 'yard' && ph === 'night'); }
+  }
 
   // 복원
   _dPanX = prevPanX; _dPanY = prevPanY; _dZoom = prevZoom;   // [DECO-FRIEND-PAN-1]
