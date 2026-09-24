@@ -21,7 +21,7 @@ const LOWER = k => /^(붐빔집|일먼집|돌아선집|찡그린집|없음:|까�
 const JW_TXT = { none: '일할 곳이 없어요', cut: '길이 끊겨 일터에 못 가요', far: '일터가 멀어요', full: '가까운 일터가 꽉 찼어요', soon: '곧 일자리를 찾아요' };   // soon: [MAC-JOBSOON] 배정 바퀴 사이(≤90틱) — 일먼집에는 그대로 든다
 const jobWhyOf = t => Object.keys(JW_TXT).find(k => t.includes(JW_TXT[k])) || null;
 /* 집 말은 필요 이름이 아니라 이 글로 나온다(index.html NEED_TXT) — '배울 곳이 멀어요' → 배움 */
-const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' }, NEED_OF = Object.fromEntries(Object.entries(NEED_TXT).map(([k, v]) => [v, k]));
+const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳', 건강: '아플 때 갈 곳' }, NEED_OF = Object.fromEntries(Object.entries(NEED_TXT).map(([k, v]) => [v, k]));
 const missOf = txt => { const mm = txt.match(/^[^ ]+ (.+?)이 멀어요/); return mm ? mm[1].split('·').map(t => NEED_OF[t] || t) : []; };
 
 /* ─────────────── 한 판(자식 프로세스) ─────────────── */
@@ -246,7 +246,7 @@ function report(o, vars, res) {
     }));
   }
   if (o.voice) {   // [MAC-VOICE] 동네별 바람표 — 끝 날 · 시드 평균 · 줄 차례는 사다리 순(고정)
-    const VK = ['물', '장보기', '놀이', '쉼', '배움', '일자리', '붐빔'];
+    const VK = ['물', '장보기', '놀이', '쉼', '배움', '건강', '일자리', '붐빔'];
     vars.forEach(v => { const rs = res.filter(r => r.name === v.name && r.voice); if (!rs.length) return;
       const keys = [...new Set(rs.flatMap(r => r.voice.map(e => e.동네)))];
       L.push('', `### 동네 바람표 — ${v.name} (${o.days}일 뒤 · 원하는 집 채 수 · 시드 평균)`, '| 동네 | 집 | 사는 집 | ' + VK.join(' | ') + ' |', '|---|---|---|' + VK.map(() => '---').join('|') + '|');

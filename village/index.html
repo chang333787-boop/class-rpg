@@ -5812,7 +5812,7 @@ function pickDestination(f, who) {
   /* 볼 일이 있는 곳(필요 건물 옆) 을 셋 중 두 번은 고른다 — 우물에 물 뜨러, 가게에 장 보러 가는 게 보인다 */
   const errand = nice.filter(i => {
     const x = cX(i), y = cY(i);
-    return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && K[c.k].need; });
+    return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) return false; const c = cells[idx(nx, ny)]; return c && K[c.k].need && K[c.k].need !== '건강'; });
   });
   let festPool = null;
   if (EV.fest && EV.festRoot >= 0) festPool = nice.filter(i => { const x = cX(i), y = cY(i);
@@ -6068,7 +6068,7 @@ window.__waitLook = () => ({ 켜짐: window.VRULES.waitLook.on, 기다리는집:
 const AWAY_NEEDS = ['물', '장보기', '놀이', '쉼'];
 const AWAY_ICON = { 물: '🪣', 장보기: '🛒', 놀이: '🛝', 쉼: '🪑', 다시: '🏠' };
 const AWAY_KEYS = Object.keys(AWAY_ICON);
-const AWAY_SEEN_KEY = () => 'rpg.village.awaySeen.' + SID;      // 첫 돌아섬 안내를 봤나(기기마다 · 저장본 밖)
+const AWAY_SEEN_KEY = () => 'rpg.village.awaySeen.' + SID + (AWAY_NEEDS.includes('물') ? '' : '.물없음');      // 첫 돌아섬 안내를 봤나(기기마다 · 저장본 밖)
 const AWAY = { turned: new Map(), toasted: new Set(), rr: 0, stats: { 돌아섬: 0, 건너뜀: 0, 다시옴: 0, 첫안내: 0 }, log: [] };
 /* 순수 함수 — 이 집에 빠진 것 목록(살 만하면 null). THREE·DOM 을 안 만진다 */
 function homeLacks(met, needs, minHave) { const miss = needs.filter(k => !met[k]); return needs.length - miss.length >= minHave ? null : miss; }
@@ -6209,6 +6209,7 @@ let NEEDS = NEEDS_BASE.slice();
 const NEED_TXT = { 물: '물 뜰 곳', 장보기: '장 볼 곳', 놀이: '놀 곳', 쉼: '쉴 곳', 배움: '배울 곳' };
 /* [MAC-JOBSON-2] 돌아섬 까닭의 '일자리'(#676)도 말로 — 없어서 "…쉴 곳·이 멀어서 새 이웃이 돌아갔어요"(빈 칸)·주민 카드 "…·이 멀어서 돌아가요"가 됐다. 키를 훑는 곳은 없다(값만 읽음) · 원래 줄 수정 0 */
 NEED_TXT.일자리 = '일할 곳';
+NEED_TXT.건강 = '아플 때 갈 곳';   /* [MAC-HEALTH] 새 필요 '건강'의 말 — JOYW_NEED(불러올 때 한 번 짓는 표)·판 건물정의(need 거르기)보다 위에 둔다 · 켜는 것은 [MAC-HEALTH] 블록 */
 let learnOn = false;
 function needsTick() {                            // 인구 80 을 넘으면 '배움'이 생긴다(한 번 생기면 안 없어진다)
   if (!learnOn && population() >= LEARN_POP) { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); sayOnce('📚 마을이 커졌어요 — 이제 배울 곳도 바라요(도서관·학교)', true); }
@@ -11830,6 +11831,7 @@ function loadSaved(rawOverride) {
       hinfo.set(+r, hh > 1 ? { lv: 1, hs, 세대: hh } : { lv, hs }); res.set(+r, Math.min(houseCap(+r), n)); if (lv > 1 || hh > 1) dirtyChunks.add(chunkOfCell(+r)); } }
   if (d.flow) flowLoad(d.flow);   /* [MAC-FLOW] 저장된 흐름(밭·가게 양 · 운반 중 · 세대 오늘 몫) */
   if (d.배움 && typeof learnRestore === 'function') learnRestore();   /* [MAC-LEARNSAVE] '배움' 필요가 켜진 마을은 열 때부터 켠다 */
+  if (d.건강 && typeof healthRestore === 'function') healthRestore();   /* [MAC-HEALTH] '건강' 필요가 켜진 마을은 열 때부터 켠다(조용히 · [MAC-LEARNSAVE] 꼴) */
   if (d.배정 && typeof seatLoad === 'function') seatLoad(d.배정);   /* [MAC-SEATSAVE] 누가 어느 일터·학교에 다니나 — 되살리고 곧바로 한 바퀴 */
   if (Array.isArray(d.unlocked)) d.unlocked.forEach(k => { if (K[k]) unlocked.add(k); });
   if (Array.isArray(d.goals)) d.goals.forEach(id => goalsDone.add(id)); if (d.festSeen) EV.festSeen = true;
@@ -11917,6 +11919,120 @@ nwSync();
 window.__waitSignTry = (miss) => { const root = [...WAITLOOK.miss.keys()].find(r => waitHouseIs(r)); if (root == null) return { 집: null };
   const was = WAITLOOK.miss.get(root); WAITLOOK.miss.set(root, miss); let n = 0; try { n = partsOf(cells[root]).filter(pt => pt && pt.keep).length; } finally { WAITLOOK.miss.set(root, was); }
   return { 집: root, 팻말부위: n }; };
+
+/* ── [MAC-HEALTH] 🏥 건강 — 마을이 커지면 '아플 때 갈 곳'도 바란다 (보스 09-24 결정 1·2·3 · docs/village_need_health.md PR 2) ──
+   물을 뺀 빈 자리를 '건강'이 채운다. 배움(80)과 같은 꼴 — 주민 100명부터(VRULES.health.pop · 결정 1) · 한 번 켜지면 안 꺼진다(저장 칸 `건강: 1` · 결정 3 · SAVE_V 그대로 · sync.js 0).
+   · 시설 = [DESIGN-HOSPITAL] 의 동네 의원(K.clinic — 모양은 그 블록). 여기서는 값만: need '건강' · 일자리 2 · 거리는 다른 시설과 같다(14 · 큰길 20)
+     · 해금 인구 80(필요보다 먼저 · 옛 80 줄 온실·돌다리·기차역에 기차역 앞으로 끼움 — 🔓 소식 한 번 · 노란 자리 안내는 그대로 기차역) · 트레이 '🏠 집·가게'의 옛 우물 자리. 작은 병원은 숨긴 채(따로 PR).
+     · 80 줄이 이미 열린 마을은 의원도 조용히 연다(열 때 · 인구가 80 아래여도) — 옛 셋까지 '방금 열렸어요'라고 하지 않게.
+   · 돌아섬에는 안 넣는다(결정 2 — AWAY_NEEDS 셋 그대로 · 그래서 기다리는 집 팻말에도 건강은 안 선다).
+   · 날마다 가는 곳이 아니다(1절 뜻 3): 볼일 목적지(pickDestination errand)와 붐빔 셈(crowdHomesStep)에서 건강을 뺀다 — 아픈 주민 나들이는 주민 연기(PR 4).
+   · 켜는 조건(healthOffer): 스위치 · K.clinic · 물을 뺀 판(NOWATER.off — 물을 지키는 판·needWater.on 은 옛 넷 그대로) · 판 '건물' 목록에 의원이 있거나 목록 없음 ·
+     수업 판(교과 칸)은 판이 규칙 칸에 health 를 적을 때만(설계 3절 · onebridge 같은 수업 판의 목표가 의원 없이 무너지지 않게). scripts/village-sim/stages.mjs 조건부.health 와 같은 조건.
+     조건이 아니면 시설 값도 모양 블록 그대로(need·jobs 없음 · '(숨김)' · ORDER·해금 줄 없음) → on:false 는 물 끔(#1064)과 판정·저장 글·화면 0(기준 ①).
+   · NEEDS 는 needsCompose 한 곳에서 — needsTick · learnRestore · __forceLearn 이 NEEDS_BASE+배움 으로 다시 대면 건강이 빠지니 그 뒤마다 다시 맞춘다.
+   · 🏥 소식은 큰 소식(🔓·🎯·🎉)이 떠 있으면 다음 needsTick 으로 미룬다(한 번 켜진 걸쇠는 저장되니 잃으면 다시 안 온다).
+   · 🏥 표시·풍선 그림은 처음 쓸 때 만든다(불러올 때 three 객체를 만들면 그림 난수 줄기가 밀린다).
+   원래 줄 수정 2(pickDestination 볼일 칸 · 첫 돌아섬 안내 키) · 덧붙인 줄 2(NEED_TXT.건강 · loadSaved 되살리기) · 시험 훅 둘은 [MAC-LEARNSAVE] 아래 ②. 분류 '판정'. */
+(window.VRULES = window.VRULES || {}).health = { on: true, pop: 100 };
+const HEALTH = { on: false, offer: false, rulesRead: false, sayPending: false, opened: false, sayIm: null, whyIm: null, stats: { 바뀜: 0, 걸쇠켬: 0, 되살림: 0, 열림: 0, 맞춤: 0 } };
+const HEALTH_VAL = { need: '건강', jobs: 2, lockPop: 80, tab: USE_TABS[1][0] };
+const HEALTH_K0 = K.clinic ? { need: K.clinic.need, jobs: K.clinic.jobs, grp: K.clinic.grp, grp0: K.clinic.grp0 } : null;
+const HEALTH_ROW = { pop: HEALTH_VAL.lockPop, kinds: ['clinic'] };   /* 인구 80 줄(온실·돌다리·기차역)에 끼운다 — 따로 줄이면 🔓 소식이 두 번 뜬다 · 그 줄이 없을 때만 이 줄 */
+SAY_ICON.건강 = '🏥'; if (!SAY_KEYS.includes('건강')) SAY_KEYS.push('건강');
+PCOUNT_ICON.건강 = '🏥';
+if (!VOICE_KEYS.includes('건강')) VOICE_KEYS.splice(VOICE_KEYS.indexOf('배움') + 1, 0, '건강');
+VOICE_TXT.건강 = '🏥 아플 때 갈 곳';
+if (window.VRULES.words && window.VRULES.words.go && window.VRULES.words.stay) { window.VRULES.words.go.clinic = '에 진료받으러 가요'; window.VRULES.words.stay.clinic = '에서 진료를 받아요'; }
+/* 판 규칙은 module 끝(stageApplyRules)에야 VRULES 에 얹힌다 — 그 전엔 판 파일에서 미리 읽는다(nwWant 와 같은 꼴) */
+function healthRule() {
+  const R = window.VRULES.health || {}, d = STAGE.def, g = !HEALTH.rulesRead && d && d.규칙 && d.규칙.health && typeof d.규칙.health === 'object' ? d.규칙.health : null;
+  return { on: !!(g && 'on' in g ? g.on : R.on), pop: +(g && 'pop' in g ? g.pop : R.pop) };
+}
+function healthOffer(R) {
+  if (!R.on || !K.clinic || !NOWATER.off) return false;
+  const d = STAGE.def; if (!d) return true;
+  if (d.교과 != null && !(d.규칙 && d.규칙.health)) return false;
+  return !(Array.isArray(d.건물) && d.건물.length && !d.건물.includes('clinic'));
+}
+function healthLive() { return HEALTH.offer && HEALTH.on; }
+function needsCompose() {
+  const want = NEEDS_BASE.concat(learnOn ? ['배움'] : [], healthLive() ? ['건강'] : []);
+  if (want.length === NEEDS.length && want.every((k, i) => k === NEEDS[i])) return false;
+  NEEDS = want; HEALTH.stats.맞춤++; return true;
+}
+function healthFac(on) {
+  const q = K.clinic; if (!q) return;
+  if (on) {
+    q.need = HEALTH_VAL.need; q.jobs = HEALTH_VAL.jobs; q.grp = q.grp0 = HEALTH_VAL.tab; LOCK_POP.clinic = HEALTH_VAL.lockPop;
+    if (!UNLOCKS.some(u => u.kinds.includes('clinic'))) { const u80 = UNLOCKS.find(u => u.pop === HEALTH_VAL.lockPop); if (u80) { const j = u80.kinds.indexOf('station'); u80.kinds.splice(j >= 0 ? j : u80.kinds.length, 0, 'clinic'); } else UNLOCKS.push(HEALTH_ROW); }
+    if (ORDER.indexOf('clinic') < 0) { const w = ORDER.indexOf('well'), sh = ORDER.indexOf('shop'); if (w >= 0) ORDER.splice(w + 1, 0, 'clinic'); else if (sh >= 0) ORDER.splice(sh, 0, 'clinic'); else ORDER.push('clinic'); }
+  } else {
+    if (HEALTH_K0.need === undefined) delete q.need; else q.need = HEALTH_K0.need;
+    if (HEALTH_K0.jobs === undefined) delete q.jobs; else q.jobs = HEALTH_K0.jobs;
+    q.grp = HEALTH_K0.grp; q.grp0 = HEALTH_K0.grp0; delete LOCK_POP.clinic;
+    const r = UNLOCKS.indexOf(HEALTH_ROW); if (r >= 0) UNLOCKS.splice(r, 1); UNLOCKS.forEach(u => { const j = u.kinds.indexOf('clinic'); if (j >= 0) u.kinds.splice(j, 1); });
+    if (HEALTH.opened && !countKind('clinic')) unlocked.delete('clinic'); HEALTH.opened = false;   /* 이 블록이 연 해금은 되돌린다(도중에 끌 때 — 저장 글이 옛과 같게) */
+    const o = ORDER.indexOf('clinic'); if (o >= 0) ORDER.splice(o, 1);
+  }
+  JOBH.wpDirty = true; sat.clear(); WAITMEMO.ver++; HEALTH.stats.바뀜++;
+  if (typeof buildTray === 'function') buildTray();
+}
+/* say = needsTick 에서(인구로 처음 켜질 때 소식) · boot = 판 규칙을 얹은 직후(판이 health 를 적었으면 조용히 처음부터) · 그 밖(틱 머리)은 맞추기만 */
+function healthSync(say, boot) {
+  const R = healthRule(), offer = healthOffer(R);
+  if (offer !== HEALTH.offer) { HEALTH.offer = offer; healthFac(offer); }
+  if (offer && !HEALTH.on && !VISIT.on && (say || (boot && STAGE.def && STAGE.def.규칙 && STAGE.def.규칙.health)) && population() >= R.pop) {
+    HEALTH.on = true; HEALTH.stats.걸쇠켬++;
+    if (say && R.pop > 0) HEALTH.sayPending = true;
+  }
+  if (healthLive() && !VISIT.on && !unlocked.has('clinic')) { unlocked.add('clinic'); HEALTH.opened = true; HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
+  return needsCompose();
+}
+function healthSayNow() { if (!HEALTH.sayPending || !healthLive() || VISIT.on || performance.now() < NEWS.busyUntil) return; HEALTH.sayPending = false; sayOnce('🏥 마을이 커졌어요 — 이제 아플 때 갈 곳도 바라요(동네 의원)', true); }
+function healthRestore() { if (HEALTH.on) return; HEALTH.on = true; HEALTH.stats.되살림++; needsCompose(); }
+/* 열 때 이미 인구 80 을 넘은 마을 — checkUnlocks 는 이사 때만 돌아 잠긴 채 남는다 → 조용히 연다(🔓 소식은 곧 올 🏥 소식을 덮을 수 있어 안 한다) */
+function healthLoaded() {
+  const row = UNLOCKS.find(u => u.kinds.includes('clinic')), rowOpen = !!(row && row.kinds.length > 1 && row.kinds.every(k => k === 'clinic' || unlocked.has(k)));
+  if (HEALTH.offer && !VISIT.on && !unlocked.has('clinic') && (population() >= HEALTH_VAL.lockPop || rowOpen)) { unlocked.add('clinic'); HEALTH.opened = true; HEALTH.stats.열림++; if (typeof buildTray === 'function') buildTray(); }
+  needsCompose();
+}
+function healthSayMesh() {
+  if (HEALTH.sayIm || sayPool.length !== SAY_KEYS.indexOf('건강')) return;
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#e9f8ec'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '36px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(SAY_ICON.건강, 30, 37);
+  g.fillStyle = '#2e9d57'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText('✓', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), 16);
+  im.count = 0; im.frustumCulled = false; im.renderOrder = 6; scene.add(im);
+  sayPool.push(im); HEALTH.sayIm = im;
+}
+function healthWhyMesh() {
+  if (HEALTH.whyIm || WHY_KEYS.includes('건강') || WHY_KEYS.length !== whyPool.length) return;
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#fffaf0'; g.beginPath(); g.arc(32, 32, 30, 0, 6.283); g.fill();
+  g.font = '38px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🏥', 30, 37);
+  g.fillStyle = '#d9482f'; g.beginPath(); g.arc(50, 15, 12, 0, 6.283); g.fill();
+  g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText('?', 50, 16);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false }), FOLK_CAP);
+  im.count = 0; im.frustumCulled = false; im.renderOrder = 5; scene.add(im);
+  WHY_ICON.건강 = '🏥'; WHY_KEYS.push('건강'); whyPool.push(im); HEALTH.whyIm = im;
+}
+{ const hsNt0 = needsTick; needsTick = function () { const r = hsNt0.apply(this, arguments); healthSync(true, false); healthSayNow(); return r; }; }
+{ const hsRules0 = stageApplyRules; stageApplyRules = function () { const r = hsRules0.apply(this, arguments); HEALTH.rulesRead = true; healthSync(false, true); return r; }; }
+{ const hsTick0 = simTick; simTick = function () { nwSync(); healthSync(false, false); return hsTick0.apply(this, arguments); }; }
+{ const hsLoad0 = loadSaved; loadSaved = function () { const r = hsLoad0.apply(this, arguments); healthLoaded(); return r; }; }
+{ const hsSer0 = serialize; serialize = function () { const d = hsSer0.apply(this, arguments); if (HEALTH.on) d.건강 = 1; return d; }; }
+{ const hsSay0 = sayDraw; sayDraw = function () { if (!HEALTH.sayIm && SAY.marks.some(m => m.key === '건강')) { healthSayMesh(); if (!HEALTH.sayIm) SAY.marks = SAY.marks.filter(m => m.key !== '건강'); } return hsSay0.apply(this, arguments); }; }
+{ const hsWhy0 = whyBubbleTick; whyBubbleTick = function () { if (!HEALTH.whyIm && NEEDS.includes('건강')) healthWhyMesh(); return hsWhy0.apply(this, arguments); }; }
+{ hookAdd('crowdHomesStep', function (next, args) { if (!NEEDS.includes('건강')) return next(args); const keep = NEEDS; NEEDS = NEEDS.filter(k => k !== '건강'); try { return next(args); } finally { NEEDS = keep; } }); }   /* 붐빔 셈은 날마다 가는 길 — 건강은 뺀다(1절 뜻 3) */
+window.__forceHealth = () => { HEALTH.on = true; healthSync(false, false); return window.__needs(); };
+window.__health = () => ({ 켜짐: !!(window.VRULES.health && window.VRULES.health.on), 문턱: window.VRULES.health ? window.VRULES.health.pop : null, 판: STAGE.id, 제공: HEALTH.offer, 걸쇠: HEALTH.on, 필요: NEEDS.slice(), 돌아섬필요: AWAY_NEEDS.slice(),
+  의원: K.clinic ? { 필요: K.clinic.need || null, 일자리: K.clinic.jobs || 0, 묶음: K.clinic.grp, 트레이: ORDER.includes('clinic'), 해금: LOCK_POP.clinic || null, 열림: unlocked.has('clinic') } : null,
+  그림: { 표시: !!HEALTH.sayIm, 풍선: !!HEALTH.whyIm }, ...HEALTH.stats });
+healthSync(false, false);
 
 /* ── 처음 상태 ──
    ① #fresh → 저장본을 지우고 빈 판
@@ -12300,6 +12416,9 @@ window.__needs = () => ({ 필요: NEEDS.slice(), 배움: learnOn, 문턱: LEARN_
 function learnRestore() { if (learnOn) return; learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); }
 { const s1 = serialize; serialize = function () { const d = s1.apply(this, arguments); if (learnOn) d.배움 = 1; return d; }; }
 window.__forceLearn = () => { learnOn = true; NEEDS = NEEDS_BASE.concat(['배움']); return window.__needs(); };
+/* [MAC-HEALTH] ② 시험 훅 — __needs 에 건강 칸 · __forceLearn 이 건강을 떨구지 않게(바로 위 줄이 NEEDS 를 BASE+배움 으로 다시 댄다) · 원래 줄 수정 0 */
+{ const hsNd0 = window.__needs; window.__needs = () => ({ ...hsNd0(), 건강: HEALTH.on, 건강필요: NEEDS.includes('건강'), 건강문턱: window.VRULES.health ? window.VRULES.health.pop : null }); }
+{ const hsFl0 = window.__forceLearn; window.__forceLearn = () => { hsFl0(); needsCompose(); return window.__needs(); }; }
 window.__sat = (x, y) => { const rec = cells[idx(x, y)]; if (!rec || rec.k !== 'house') return '집 없음'; const st = computeSat(rec); return { 채움: st.n, 얼굴: ['😊','😐','😟'][faceOf(st.n)], 빠진것: NEEDS.filter(k => !st.met[k]), 말: satText(rec) }; };
 window.__faces = () => { const c = [0,0,0,0]; folks.forEach(f => { if (f.faceShow != null && f.faceShow >= 0 && SIM.t <= f.faceUntil) c[f.faceShow]++; }); return { '😊': c[0], '😐': c[1], '😟': c[2] }; };   // 이모지 키는 따옴표가 있어야 한다
 window.__pop = () => ({ 인구: population(), 이사중: movers, 집: [...res.entries()].length, 사람: folks.length,
