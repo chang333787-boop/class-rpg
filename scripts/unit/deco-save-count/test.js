@@ -1860,6 +1860,30 @@
       toggleDecoScene(); await sleep(300);
     }
 
+    //  ㊴ 방 크기 바꾸기(DECO-ROOM-RESIZE-1 · 계획 C8) — ⬛ 방에서 오른쪽 변을 3칸 끌면 가로 +3 · ↩ 한 번에 돌아옴
+    if (typeof _inRoomEdgeAt === 'function') {
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      decoSpaceSet(3); await sleep(150);
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keepIn = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined;
+      _inRoomsSet(CUR, [{ id: 'a', r: 4, c: 6, w: 8, h: 5, floor: null, wall: null }]); _inFitRooms();
+      setDecoMode('floor'); _inPk.tab = 'room'; _inPk.tool = ''; _decoUndoClear(); _drawDeco(); await sleep(100);
+      const cv = document.querySelector('#if-topview canvas'), k = cv.getBoundingClientRect();
+      const at = (r, c) => ({ clientX: k.left + (_dCv._offX + c * _dC - _dPanX) * k.width / _dW, clientY: k.top + (_dCv._offY + r * _dC - _dPanY) * k.height / _dH });
+      const pe = (type, p, b) => cv.dispatchEvent(new PointerEvent(type, Object.assign({ pointerId: 41, pointerType: 'mouse', button: 0, buttons: b, bubbles: true, cancelable: true }, p)));
+      const a = at(6.5, 14), z = _dC * k.width / _dW;
+      out('방크기_가장자리찾음', !!(_inRoomEdgeAt(a.clientX, a.clientY) || {}).R);
+      pe('pointerdown', a, 1); for (let i = 1; i <= 6; i++) pe('pointermove', { clientX: a.clientX + z * 3 * i / 6, clientY: a.clientY }, 1);
+      pe('pointerup', { clientX: a.clientX + z * 3, clientY: a.clientY }, 0); await sleep(80);
+      const w1 = (_inRooms(CUR)[0] || {}).w;
+      out('방크기_오른쪽변_끌면_가로+3', w1 === 11);
+      decoUndo(); await sleep(50);
+      out('방크기_↩한번', (_inRooms(CUR)[0] || {}).w === 8);
+      setDecoMode('deco'); _inPk.tab = 'wall'; _decoUndoClear();
+      if (keepIn !== undefined) CUR.indoor = keepIn; else delete CUR.indoor;
+      decoSpaceSet(1); await sleep(100); toggleDecoScene(); await sleep(300);
+    }
+
     //  ㉓ 막 누르기 한 판(DECO-FUZZ-1) — 놓기·치우기·칠하기·방·벽지·되돌리기·공간·장면을 섞어 900번(시드 고정) 뒤
     //    놓인 것마다 규칙 검사 · 가진 수 · 서버 = 화면 · 골드 불변. 상용 계획(docs/deco_commercial_plan.md) §1-3·4·5 의 잣대.
     //    (맨 끝에 둔다 — 마당·집 안·공간 1~3 을 다 흔든다)

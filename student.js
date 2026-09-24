@@ -5081,7 +5081,7 @@ function _inRoomPrevSet(p) {
   if (!el) { el = document.createElement('div'); el.id = 'if-rect-tip'; el.className = 'deco-rect-tip'; el.setAttribute('role', 'status'); host.appendChild(el); }
   el.hidden = false;
   el.classList.toggle('is-capped', !!p.why);
-  el.textContent = p.why ? `${p.w} × ${p.h}칸 · ${p.why}` : `${p.w} × ${p.h}칸 — 손을 떼면 방이 돼요 · 잘못하면 ↩`;
+  el.textContent = p.why ? `${p.w} × ${p.h}칸 · ${p.why}` : p.resize ? `${p.w} × ${p.h}칸 — 손을 떼면 이 크기로 · 잘못하면 ↩` : `${p.w} × ${p.h}칸 — 손을 떼면 방이 돼요 · 잘못하면 ↩`;   // [DECO-ROOM-RESIZE-1]
   _drawDeco();
 }
 //  방 둘레에 맞춰 보기(열 때·'전체') — 방이 없으면 false
@@ -5237,7 +5237,7 @@ function _inRoomRender(host, wide, small) {
   const rooms = _inRooms(CUR), tool = _inPk.tool;
   const sw = host.querySelector('.fpk-side');
   const caps = tool === 'erase' ? ['없앨 방을 눌러요', '가구는 그 자리에 남아요']
-    : tool ? ['빈 곳을 누르면 그 자리에 놓여요', '방끼리 붙이면 문이 저절로 나요'] : ['빈 곳을 네모로 끌면 방이 돼요', '방끼리 붙이면 문이 저절로 나요'];
+    : tool ? ['빈 곳을 누르면 그 자리에 놓여요', '방끼리 붙이면 문이 저절로 나요'] : ['빈 곳을 끌면 새 방', '노란 손잡이 = 크기 바꾸기', '붙은 방 사이엔 문이 저절로'];   // [DECO-ROOM-RESIZE-1] 한 줄씩 짧게(180px 판)
   const szI = tool === 's0' ? 0 : tool === 's1' ? 1 : tool === 's2' ? 2 : 1;
   _pkSwatch(sw, small ? 150 : 180, small ? 96 : 112, _inRoomDrawSmall(ROOM_SIZES[szI][1], ROOM_SIZES[szI][2]),
     tool === 'erase' ? '🗑️ 방 없애기' : tool ? ROOM_SIZES[szI][0] + ' ' + ROOM_SIZES[szI][1] + '×' + ROOM_SIZES[szI][2] : '⬛ 네모로 방 만들기', caps);
@@ -7973,7 +7973,7 @@ function _decoAttachGestures(cv) {
     } else if (pts.size === 1 && _inRoomDragMode()) {
       //  [INDOOR-ROOMS-1] ⬛ 방 — 끌면 네모(떼면 방)
       const k = _inCellClamp(e.clientX, e.clientY);
-      roomDrag = { r0: k.r, c0: k.c, active: false };
+      roomDrag = { r0: k.r, c0: k.c, active: false, edge: _inRoomEdgeAt(e.clientX, e.clientY) };   // [DECO-ROOM-RESIZE-1] 가장자리면 크기 바꾸기
     } else if (pts.size === 1) {
       //  [DECO-DRAG-1] 카드를 골랐거나 바닥 모드 — 끌면 칠하기·놓기
       const cell = _decoCellAt(e.clientX, e.clientY);
@@ -7997,6 +7997,11 @@ function _decoAttachGestures(cv) {
       const k = _inCellClamp(e.clientX, e.clientY);
       if (!roomDrag.active && k.r === roomDrag.r0 && k.c === roomDrag.c0) return;
       roomDrag.active = true; _dSuppressClick = true;
+      if (roomDrag.edge) {   // [DECO-ROOM-RESIZE-1]
+        const nr = _inRoomResized(roomDrag.edge, e.clientX, e.clientY);
+        _inRoomPrevSet(Object.assign(nr, { why: _inRoomWhy(_inRooms(CUR), nr, roomDrag.edge.rm.id), resize: true }));
+        return;
+      }
       const nr = _inRoomFrom(roomDrag.r0, roomDrag.c0, k.r, k.c);
       _inRoomPrevSet(Object.assign(nr, { why: _inRoomWhy(_inRooms(CUR), nr) }));
       return;
@@ -8039,8 +8044,11 @@ function _decoAttachGestures(cv) {
     if (pts.size < 2) pinch = null;
     if (!pts.size) {
       if (roomDrag) {   // [INDOOR-ROOMS-1] 떼면 방(안 되면 그 까닭 한 줄)
-        const pv = roomDrag.active && _inRoomPrev; roomDrag = null; _inRoomPrevSet(null);
-        if (pv) { if (pv.why) toast('🧱 ' + pv.why); else _inRoomAdd({ r: pv.r, c: pv.c, w: pv.w, h: pv.h }); }
+        const pv = roomDrag.active && _inRoomPrev, edge = roomDrag.edge; roomDrag = null; _inRoomPrevSet(null);
+        if (pv && edge) {   // [DECO-ROOM-RESIZE-1] 떼면 그 크기로(안 되면 까닭)
+          if (pv.why) toast('🧱 ' + pv.why);
+          else _inRoomsCommit(_inRooms(CUR).map(o => o.id === edge.rm.id ? Object.assign({}, o, { r: pv.r, c: pv.c, w: pv.w, h: pv.h }) : o), `🧱 방 크기를 바꿨어요 — ${pv.w} × ${pv.h} (↩ 되돌리기)`);
+        } else if (pv) { if (pv.why) toast('🧱 ' + pv.why); else _inRoomAdd({ r: pv.r, c: pv.c, w: pv.w, h: pv.h }); }
       }
       if (paint) { if (paint.rect) _decoRectCommit(paint); else _decoStrokeEnd(paint); paint = null; }
       drag = null; setTimeout(() => { _dSuppressClick = false; }, 0);
@@ -8053,6 +8061,8 @@ function _decoAttachGestures(cv) {
   //  [DECO-SEL-HL-1] 마우스가 누르지 않은 채 움직이면 커서 칸에 놓일 모습 — 칸이 바뀔 때만 다시 그린다(터치는 hover 가 없다)
   cv.addEventListener('pointermove', e => {
     if (e.pointerType !== 'mouse' || e.buttons) return;
+    if (_inRoomDragMode()) cv.style.cursor = _inRoomCursor(_inRoomEdgeAt(e.clientX, e.clientY)) || 'crosshair';   // [DECO-ROOM-RESIZE-1] 가장자리면 크기 바꾸기 커서
+    else if (cv.style.cursor && cv.style.cursor !== 'pointer') cv.style.cursor = 'pointer';
     const k = _decoCellAt(e.clientX, e.clientY), h = _decoHover;
     if ((!k && !h) || (k && h && k.area === h.area && k.r === h.r && k.c === h.c)) return;
     _decoHover = k; if (SEL_DECO) _drawDeco();
@@ -8308,6 +8318,30 @@ function _decoRectTip() {
 
 // [INDOOR-ROOMS-1] 지금 한 손가락 끌기가 '방 네모'인가 — 집 안 🖌️ 판의 ⬛ 방 탭에서 크기 칩·없애기를 안 골랐을 때
 function _inRoomDragMode() { return DECO_MODE === 'floor' && DECO_SCENE !== 'yard' && _inPk.tab === 'room' && !_inPk.tool; }
+// [DECO-ROOM-RESIZE-1] 방 크기 바꾸기 — ⬛ 방(네모 끌기)일 때 방 가장자리·모서리를 누르고 끌면 그 변이 따라온다(계획 C8 · 묶음 7).
+//  같은 규칙(크기 · 다른 방과 벽 한 줄 · 벽이 가구를 가르지 않음 — _inRoomWhy)으로 미리 보고, 떼면 ↩ 한 단계. 저장 모양은 그대로(r,c,w,h 숫자만).
+//  윗변을 옮기면 벽이 옮겨 간다 → 옛 벽에 걸린 액자는 가방으로(R4 · 같은 ↩ 에 담긴다).
+function _inRoomEdgeAt(clientX, clientY) {
+  if (!_dCv) return null;
+  const bp = _decoBoardPoint(clientX, clientY), C = _dC, fx = (bp.x - (_dCv._offX || 0)) / C, fy = (bp.y - (_dCv._offY || 0)) / C;
+  const t = Math.max(.45, 12 / C);   // 손가락 몫 — 칸이 작으면 넉넉히
+  for (const rm of _inRooms(CUR)) {
+    const inX = fx > rm.c - t && fx < rm.c + rm.w + t, inY = fy > rm.r - 1 - t && fy < rm.r + rm.h + t;
+    const L = inY && Math.abs(fx - rm.c) < t, R = inY && Math.abs(fx - (rm.c + rm.w)) < t;
+    const T = inX && (Math.abs(fy - rm.r) < t || Math.abs(fy - (rm.r - 1)) < t), B = inX && Math.abs(fy - (rm.r + rm.h)) < t;
+    if (L || R || T || B) return { rm, L, R: R && !L, T, B: B && !T, fx, fy };
+  }
+  return null;
+}
+//  잡은 변을 끈 거리(칸 · 반올림)만큼 옮긴다 — 손가락 아래 칸으로 맞추면 오른쪽·아래 변이 한 칸 더 갔다(놀이판에서 잡음)
+function _inRoomResized(e, clientX, clientY) {
+  const rm = e.rm, bp = _decoBoardPoint(clientX, clientY), C = _dC;
+  const dc = Math.round((bp.x - (_dCv._offX || 0)) / C - e.fx), dr = Math.round((bp.y - (_dCv._offY || 0)) / C - e.fy);
+  let r0 = rm.r, c0 = rm.c, r1 = rm.r + rm.h - 1, c1 = rm.c + rm.w - 1;
+  if (e.L) c0 += dc; if (e.R) c1 += dc; if (e.T) r0 += dr; if (e.B) r1 += dr;
+  return _inRoomFrom(r0, c0, r1, c1);
+}
+function _inRoomCursor(e) { return !e ? '' : (e.L || e.R) && (e.T || e.B) ? ((e.L && e.T) || (e.R && e.B) ? 'nwse-resize' : 'nesw-resize') : (e.L || e.R) ? 'ew-resize' : 'ns-resize'; }
 function _inCellClamp(clientX, clientY) {
   const bp = _decoBoardPoint(clientX, clientY), C = _dC, ox = _dCv._offX || 0, oy = _dCv._offY || 0;
   return { r: Math.max(0, Math.min(DI.rows - 1, Math.floor((bp.y - oy) / C))), c: Math.max(0, Math.min(DI.cols - 1, Math.floor((bp.x - ox) / C))) };
@@ -10617,6 +10651,15 @@ function _drawIndoor() {
   _dCv._doors = null;
   }
   _dCv._offX=offX; _dCv._offY=offY;
+  //  [DECO-ROOM-RESIZE-1] ⬛ 방(네모 끌기)일 때 방마다 손잡이 — 모서리 넷 · 변 가운데 넷(끌면 크기가 바뀐다)
+  if (_inRoomDragMode() && !_inRoomPrev) {
+    const hs = Math.max(6, C * .32);
+    _dCtx.fillStyle = '#ffd866'; _dCtx.strokeStyle = 'rgba(43,33,24,.85)'; _dCtx.lineWidth = 1.5;
+    _rooms.forEach(rm => {
+      const x0 = offX + rm.c * C, y0 = offY + (rm.r - 1) * C, x1 = offX + (rm.c + rm.w) * C, y1 = offY + (rm.r + rm.h) * C, xm = (x0 + x1) / 2, ym = (y0 + y1) / 2;
+      [[x0, y0], [xm, y0], [x1, y0], [x0, ym], [x1, ym], [x0, y1], [xm, y1], [x1, y1]].forEach(([x, y]) => { _dCtx.fillRect(x - hs / 2, y - hs / 2, hs, hs); _dCtx.strokeRect(x - hs / 2, y - hs / 2, hs, hs); });
+    });
+  }
   //  [INDOOR-ROOMS-1] 끄는 중인 네모 — 방 칸 + 벽 띠 줄까지 금색 점선(안 되면 붉게)
   if (_inRoomPrev) {
     const p = _inRoomPrev, x = offX + p.c * C, y = offY + (p.r - 1) * C, w = p.w * C, h = (p.h + 1) * C;
