@@ -3,8 +3,8 @@
 //   ⑥ 기준 ① — vsref(그 ref 를 통째로 푼 뿌리와 · 그림 흔들기 덤) ⑦ 화면 회귀 — village-look --vs-ref(그림)
 // 무거운 것(⑥⑦)은 한 번에 하나. 창 0 · 네트워크 0(⑦은 전용 headless · 바깥 주소 막음). 끝값: 0 모두 통과 · 1 하나라도 FAIL · 2 못 돎.
 //
-//   node scripts/village-check.mjs                    # 전부(약 2분) — origin/main 과
-//   node scripts/village-check.mjs --quick            # ⑥ 하루·시드 1 · ⑦ default 장면만(약 40초)
+//   node scripts/village-check.mjs                    # 전부 — origin/main 과(vsref 2일·시드 1-3 · look 세 장면 — 약 3~4분)
+//   node scripts/village-check.mjs --quick            # ⑥ 하루·시드 1 · ⑦ default 장면만(잰 값 약 1분 50초)
 //   node scripts/village-check.mjs --skip look,vsref  # 고르기(module·safety·paint·sim·stages·vsref·look)
 //   node scripts/village-check.mjs --ref HEAD~1       # ⑥⑦ 의 견줄 쪽
 //   그 밖: --allow(⑥ 에서 옛과 다른 값을 허용 — 의도한 차이 · PR 에 적는다) · --max <%>(⑦ 허용 차이)
@@ -23,7 +23,7 @@ function moduleCheck() { const t0 = Date.now(), html = fs.readFileSync(path.join
   if (!m) return { ok: false, 요약: 'module 스크립트를 못 찾음', sec: 0 };
   const f = path.join(os.tmpdir(), 'village-check-' + process.pid + '.mjs'); fs.writeFileSync(f, m[1]);
   const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' }); fs.rmSync(f, { force: true });
-  const base = html.slice(0, m.index).split('\n').length, err = (r.stderr || '').split(f).join('module').replace(/:(\d+)\n/, (s, n) => ' · index.html ' + (+n + base - 1) + '줄 무렵\n').split('\n').filter(Boolean).slice(0, 2).join(' ');
+  const base = html.slice(0, m.index).split('\n').length, err = (r.stderr || '').replace(/\S*village-check-\d+\.mjs/g, 'module').replace(/:(\d+)\n/, (s, n) => ' · index.html ' + (+n + base - 1) + '줄 무렵\n').split('\n').filter(Boolean).slice(0, 2).join(' ');
   return { ok: r.status === 0, 요약: r.status === 0 ? 'MODULE_OK' : err.slice(0, 200), sec: (Date.now() - t0) / 1000 }; }
 
 const STEPS = [

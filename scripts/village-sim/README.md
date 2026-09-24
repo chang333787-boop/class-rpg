@@ -44,7 +44,7 @@ node scripts/village-sim/stages.mjs   # 판 파일 검사 (village/stages/README
 | `--json <파일>` | 모든 표본을 파일로 남긴다 |
 | `--voice` | 끝 날의 **동네 바람표**(MAC-VOICE · 동네 × 원하는 것 채 수 · 시드 평균)와 '가장 많은 셋'이 시드마다 같은지 |
 
-**마을 PR 검사 한 줄 — `scripts/village-check.mjs`**(MAC-CHECK): module `node --check` · verify-safety · village-paint · village-sim 시험 · 판 검사 · **vsref**(판정) · **village-look**(그림)을 차례로 하나씩 돌려 한 표로 — 끝값 0/1/2. `--quick`(vsref 하루·시드 1 · look default 장면만 · 약 2분) · `--skip look,vsref` · `--ref HEAD~1` · `--allow`.
+**마을 PR 검사 한 줄 — `scripts/village-check.mjs`**(MAC-CHECK): module `node --check` · verify-safety · village-paint · village-sim 시험 · 판 검사 · **vsref**(판정) · **village-look**(그림)을 차례로 하나씩 돌려 한 표로 — 끝값 0/1/2. `--quick`(vsref 하루·시드 1 · look default 장면만 · 잰 값 약 1분 50초 · 전부는 3~4분) · `--skip look,vsref` · `--ref HEAD~1` · `--allow`.
 
 **기준 ① 한 줄 — `vsref.mjs`**(MAC-VSREF): 지금 작업 트리와 그 ref(기본 `origin/main`)를 **같은 시드끼리 · 모든 표본 · 모든 지표**로 견주고, 덤으로 **그림 흔들기**(`lookseed 99` — 판정이 그림 난수를 안 먹는지 · #926)도 본다. 옛 쪽은 그 ref 의 `village/` 를 `git archive` 로 통째로 푼 자리(`root=`)라 **판 파일 변화까지** 잡는다.
 ```
