@@ -163,6 +163,15 @@ for (const f of files) {
       if (d.고르기 && !def.결정) 나쁨.push(`'${d.말}' — 결정 칸이 없음`); });
     if (!목록 && 놓을것.length) { const 모름 = kindsOk([...new Set(놓을것)]); if (모름.length) 나쁨.push('모르는 종류: ' + 모름.join(' ')); }
     나쁨.length ? add('FAIL', P('역할'), 나쁨.join(' · ')) : add('PASS', P(`역할 '${r.나는}' · 정할 것 ${정.length}`)); }
+  if (def.예상 != null) { const e = def.예상 || {}, 나쁨 = [], g = e.결과;   /* [MAC-PREDICT] 예상(L2) — 물음 · 보기 셋('모르겠어요'는 엔진이 붙인다) · 결과(목표 셈 꼴 + 이름) · 시작 카드가 뜨는 판이어야 물을 자리가 있다 */
+    if (typeof e.물음 !== 'string' || !e.물음.trim()) 나쁨.push('물음이 비었음');
+    if (!Array.isArray(e.보기) || e.보기.length !== 3 || e.보기.some(b => typeof b !== 'string' || !b.trim())) 나쁨.push('보기는 글 셋');
+    else if (e.보기.includes('모르겠어요')) 나쁨.push("'모르겠어요'는 엔진이 붙인다 — 보기에서 빼기"); else if (new Set(e.보기).size !== 3) 나쁨.push('보기가 겹침');
+    const 결과꼴 = { kind: x => typeof x.k === 'string' && !!x.k, pop: () => true, hook: x => HOOKS.includes(x.훅) };
+    if (!g || typeof g.t !== 'string' || !g.t.trim() || !결과꼴[g.셈] || !결과꼴[g.셈](g)) 나쁨.push('결과는 목표 셈 꼴(kind·pop·hook) + t(이름)');
+    else if (g.셈 === 'kind' && Array.isArray(def.건물) && !def.건물.includes(g.k)) 나쁨.push('결과 종류가 이 판에 없음: ' + g.k);
+    if (def.교과 == null && def.카드 !== true) 나쁨.push('시작 카드가 안 뜨는 판(교과 없음 · 카드 아님) — 물을 자리가 없다');
+    나쁨.length ? add('FAIL', P('예상'), 나쁨.join(' · ')) : add('PASS', P(`예상 '${e.물음}' · 보기 3 + 모르겠어요 · 결과 ${g.t}`)); }
   const gbad = (def.목표 || []).filter(g => !g.t || !SEMS[g.셈] || !SEMS[g.셈](g) || (g.셈 === 'hook' && !HOOKS.includes(g.훅)));
   gbad.length ? add('FAIL', P('목표'), '셈 꼴이 틀림: ' + gbad.map(g => g.t || '?').join(' · ')) : add('PASS', P(`목표 ${(def.목표 || []).length}개 셈 꼴`));
   const r = spawnSync(process.execPath, [path.join(HERE, 'run.mjs'), '--stage', n, '--days', '1', '--seeds', '1', '--json', path.join(os.tmpdir(), 'vs-stage-' + n + '.json')], { cwd: ROOT, encoding: 'utf8' });
