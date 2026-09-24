@@ -112,7 +112,7 @@ function setRules(w, spec) {
 async function child(spec) {
   const { loadVillage } = await import('./load.mjs');
   const saveText = spec.save ? fs.readFileSync(path.resolve(ROOT, spec.save), 'utf8') : null;
-  const { w } = await loadVillage({ root: ROOT, html: spec.html || null, saveText, seed: spec.seed, lookSeed: spec.lookseed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
+  const { w } = await loadVillage({ root: spec.root || ROOT, html: spec.html || null, saveText, seed: spec.seed, lookSeed: spec.lookseed, hash: spec.hash, query: spec.stage ? 'stage=' + encodeURIComponent(spec.stage) : '' });
   const stage = typeof w.__stage === 'function' ? w.__stage() : null;
   if (spec.stage && (!stage || stage.오류 || stage.id !== spec.stage)) throw new Error('판을 못 얹음: ' + (stage ? stage.오류 || stage.id : '__stage 없음'));
   setRules(w, spec.rules);
@@ -172,8 +172,9 @@ function variants(o) {
       else if (k === 'save') v.save = val;
       else if (k === 'stage') v.stage = val || null;
       else if (k === 'html') v.html = val || null;
+      else if (k === 'root') v.root = val ? path.resolve(val) : null;   // [MAC-VSREF] 다른 뿌리(그 ref 의 village/ 를 푼 자리) — index.html·판 파일·vendor 모두 그것. 저장본(save=)은 늘 이 저장소 것
       else if (k === 'lookseed') v.lookseed = +val;   // [MAC-SIMRAND] 그림 줄기만 흔든 판
-      else throw new Error('--vs 칸은 do · rules · save · stage · html · lookseed: ' + k);
+      else throw new Error('--vs 칸은 do · rules · save · stage · html · root · lookseed: ' + k);
     });
     list.push(v);
   });
