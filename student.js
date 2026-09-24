@@ -9755,6 +9755,70 @@ function _decoMotionSync() {
   [..._decoMv.items.keys()].forEach(k => { if (!keep.has(k)) { const it = _decoMv.items.get(k); if (it.box.parentNode) it.box.parentNode.removeChild(it.box); _decoMv.items.delete(k); } });
 }
 
+// [DECO-PHOTO-1] 내 마당 사진 한 장 — 판 전체를 한 장으로(격자·놓을 곳 표시·마우스 모습 없이) · 동물은 지금 선 자리에 · 아래에 이름과 날짜.
+//  그림 파일로 내려받는다. 저장본·화면 상태는 안 바뀐다(그리는 동안만 전역 값을 빌린다 — 친구 구경과 같은 방법). 계획 묶음 6.
+let _decoPhotoMode = false;
+//  사진 틀 — 집·장식·칠한 바닥·밭을 품는 네모 + 둘레 3칸(적어도 24×14칸 · 판 안) · 칸 단위
+function _decoPhotoFrame() {
+  let r0 = 0, r1 = DH.rows - 1, c0 = _houseCol0(), c1 = _houseCol0() + DH.cols - 1;
+  const grow = (r, c, h, w) => { r0 = Math.min(r0, r); c0 = Math.min(c0, c); r1 = Math.max(r1, r + h - 1); c1 = Math.max(c1, c + w - 1); };
+  _decoList(CUR).forEach(p => { if (p.area === 'yard') { const z = getDecoSize(p.id); grow(p.row, p.col, z.h, z.w); } });
+  Object.keys(_yardFloorGet(CUR)).forEach(k => { const [r, c] = k.split('_').map(Number); if (r >= 0 && c >= 0) grow(r, c, 1, 1); });
+  if (DECO_SPACE === 1) { const f = _getFarmZone(); grow(f.startRow, f.startCol, f.rows, f.cols); }
+  r0 = Math.max(0, r0 - 3); c0 = Math.max(0, c0 - 3); r1 = Math.min(DY.rows - 1, r1 + 3); c1 = Math.min(DY.cols - 1, c1 + 3);
+  //  모자라면 양쪽으로 한 칸씩 넓힌다(판 끝에 닿으면 반대쪽만)
+  const need = (a, b, min, max) => { while (b - a + 1 < min && (a > 0 || b < max - 1)) { if (a > 0) a--; if (b - a + 1 < min && b < max - 1) b++; } return [a, b]; };
+  [c0, c1] = need(c0, c1, 24, DY.cols); [r0, r1] = need(r0, r1, 14, DY.rows);
+  return { r0, c0, rows: r1 - r0 + 1, cols: c1 - c0 + 1 };
+}
+async function decoPhoto(opt) {
+  if (DECO_SCENE !== 'yard') { toast('📷 사진은 마당에서 찍어요 — 🌿 마당으로 가서 눌러 주세요'); return null; }
+  //  동물은 캔버스가 안 그려서 그림이 아직 없을 수 있다 — 먼저 부른다(2초까지)
+  const pets = _decoList(CUR).filter(p => p.area === 'yard' && ANIM_DECO[p.id]);
+  for (let i = 0; i < 20 && pets.some(p => !_decoImg(p.id)); i++) await new Promise(r => setTimeout(r, 100));
+  const F = _decoPhotoFrame();
+  const C = Math.max(12, Math.min(32, Math.floor(1920 / F.cols))), top = C, foot = Math.round(C * 1.6);
+  const W = F.cols * C, H = F.rows * C + top + foot;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const keep = { cv: _dCv, ctx: _dCtx, W: _dW, H: _dH, C: _dC, px: _dPanX, py: _dPanY, z: _dZoom, sel: SEL_DECO, hover: _decoHover, mode: DECO_MODE };
+  const rec = _animLayers.get(_ifActiveContainer || 'house-topview');
+  try {
+    _decoPhotoMode = true; SEL_DECO = null; _decoHover = null; DECO_MODE = 'deco';
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#0E1621'; ctx.fillRect(0, 0, W, H);
+    _dCv = cv; _dCtx = ctx; _dW = W; _dH = H - foot; _dC = C; _dPanX = F.c0 * C; _dPanY = F.r0 * C - top; _dZoom = 1;
+    ctx.setTransform(1, 0, 0, 1, -_dPanX, -_dPanY);
+    if (F.r0 === 0) {   // 판 맨 위를 찍으면 위 잔디 띠 한 줄(굴뚝·윗줄 나무)
+      const gr = () => 'grass';
+      for (let c = F.c0; c < F.c0 + F.cols; c++) if (!(FLOOR_SVG && _drawFloorSVG('grass', 999, c, c * C, -C, C, gr))) { ctx.fillStyle = FLOOR_TILES.grass.bg; ctx.fillRect(c * C, -C, C, C); }
+    }
+    _drawYard();
+    //  동물 — 지금 선 자리(층이 없으면 놓은 자리) · 한 장 그림
+    pets.forEach(p => {
+      const st = rec && rec.items.get(p.id + '@' + p.row + '_' + p.col), z = getDecoSize(p.id);
+      _drawDecoSVG(p.id, (st ? st.fx : p.col) * C, (st ? st.fy : p.row) * C, z.w * C, z.h * C);
+    });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = 'rgba(14,22,33,.92)'; ctx.fillRect(0, H - foot, W, foot);
+    ctx.fillStyle = '#ffd866'; ctx.font = `700 ${Math.round(foot * .45)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const d = new Date(), day = d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.';
+    ctx.fillText('🌿 ' + (CUR.name || '') + '의 마당 · ' + day, W / 2, H - foot / 2);
+  } finally {
+    _decoPhotoMode = false; SEL_DECO = keep.sel; _decoHover = keep.hover; DECO_MODE = keep.mode;
+    _dCv = keep.cv; _dCtx = keep.ctx; _dW = keep.W; _dH = keep.H; _dC = keep.C; _dPanX = keep.px; _dPanY = keep.py; _dZoom = keep.z;
+  }
+  if (opt && opt.canvas) return cv;   // 시험용 — 내려받지 않는다
+  try {
+    cv.toBlob(b => {
+      if (!b) { toast('📷 사진을 만들지 못했어요'); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = (CUR.name || '내') + '_마당.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('📷 마당 사진을 저장했어요');
+    }, 'image/png');
+  } catch (e) { toast('📷 사진을 만들지 못했어요'); }
+  return cv;
+}
+
 // [DECO-FIRST-YARD-1] 새 아이 첫 마당 본보기(디자인 ⑭ · 보스 결정 (A) 보여주기만 — 저장 0)
 //  마당에 장식을 한 번도 안 놓았고 바닥도 안 칠한 아이에게, 집 문 앞 돌길 2칸 폭(3~6줄) + 튤립 · 데이지를 반투명으로 보여 준다.
 //  '여기서 시작해 봐요' 말풍선은 돌길 왼쪽 아래(오른쪽은 확대 기둥과 겹친다). 첫 장식을 놓으면 0.4초에 사라진다.
@@ -10100,8 +10164,8 @@ function _drawYard() {
 
   // 격자 (집 영역 제외) — [DECO-VIEW-FIT-1] 판 크기까지(전엔 캔버스 크기 W·H 까지라 오른쪽·아래로 밀면 격자가 없었다 · 집 오른쪽 칸 위 3줄도)
   const BW = DY.cols*C, BH = DY.rows*C;
-  //  [DECO-GROUND-1] 모눈은 고르는 동안(카드를 든 채 · 바닥 모드)만 — 평소엔 안 보이게(창조자 31회 '스티커를 모눈종이에 붙인 모습')
-  _dCtx.strokeStyle= (SEL_DECO || DECO_MODE==='floor') ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,0)'; _dCtx.lineWidth=.5;
+  //  [DECO-GROUND-1] 모눈은 고르는 동안(카드를 든 채 · 바닥 모드)만 — 평소엔 안 보이게(창조자 31회 '스티커를 모눈종이에 붙인 모습') · [DECO-PHOTO-1] 사진엔 없음
+  _dCtx.strokeStyle= (!_decoPhotoMode && (SEL_DECO || DECO_MODE==='floor')) ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,0)'; _dCtx.lineWidth=.5;
   _dCtx.beginPath();
   for(let r=0;r<=DY.rows;r++){
     if(r<DH.rows){ _dCtx.moveTo(0,r*C); _dCtx.lineTo(hx,r*C); _dCtx.moveTo(hx+hw,r*C); _dCtx.lineTo(BW,r*C); }
