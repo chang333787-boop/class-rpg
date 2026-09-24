@@ -5410,6 +5410,41 @@ function applyDaylight() {
   NIGHT.value = 1 - day;
   nightLift();   // [MAC-NIGHT]
 }
+/* ── [MAC-NIGHTGLOW] 밤이 '어두워진 낮'이 아니라 밤이 되게 — 푸른 밤빛 + 가로등·불 켜진 창 밑 따뜻한 빛 웅덩이 (창조자 46회 ⓑ96 · 보스 09-24) ──
+   밤빛이 어두운 초록이었다 — 하늘빛(HemisphereLight)의 땅 쪽 색이 풀빛(#8fc457)이라 밤에도 초록이 비쳤다. 가로등 밑에 빛이 없어 가로등이 '막대'였다.
+   · 밤빛: 밤(NIGHT.value)만큼 하늘빛 두 색과 둘레빛을 **푸른 쪽**으로 옮긴다(낮엔 그대로 · 원래 색은 이 블록이 기억한 처음 값).
+   · 빛 웅덩이: 가로등 칸 · **사람 사는 집의 문 앞**(창에 불이 켜지는 집 — withEmis 의 aNight 와 같은 조건)에 바닥에 붙은 둥근 빛. 밤에만 · 웅덩이 안만 따뜻하다.
+     InstancedMesh **하나 · 재질 하나**(더하기 섞기 · 둥근 그라데이션 텍스처) — 가로등이 수백이어도 그리기 1회. 진짜 조명(PointLight 등) 0.
+     자리는 판이 바뀌거나 3초마다 한 번만 다시 센다(매 프레임은 밝기 숫자 하나만).
+   · 불러올 때 three 객체를 만들지 않는다(그릴 때 처음 — 판정 난수 흔들림 방지 · #906 에서 배운 것).
+   스위치 VRULES.nightGlow(보기). 판정·저장 0. 원래 줄 수정 0 — applyDaylight 감싸기. */
+(window.VRULES = window.VRULES || {}).nightGlow = { on: true, blue: .75, lampR: 1.2, winR: 1.0, winOff: 1.3, op: .7, cap: 1500 };
+const NGLOW = { mesh: null, D: null, base: null, dirty: true, scanT: -1e9, stats: { 등: 0, 창: 0, 다시셈: 0 } };
+{ hookAdd('placeAt', function (next, args) { NGLOW.dirty = true; return next(args); }); hookAdd('removeAt', function (next, args) { NGLOW.dirty = true; return next(args); }); }
+function nightGlowMesh() { if (NGLOW.mesh) return NGLOW.mesh;
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.45, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: t, color: 0xffc26a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), window.VRULES.nightGlow.cap || 1500);
+  m.count = 0; m.frustumCulled = false; m.renderOrder = 2; m.visible = false; scene.add(m); NGLOW.mesh = m; NGLOW.D = new THREE.Object3D(); return m; }
+function nightGlowScan(now) { const R = window.VRULES.nightGlow, m = nightGlowMesh(), D = NGLOW.D, cap = Math.min(R.cap || 1500, m.instanceMatrix.count); let k = 0, nl = 0, nw = 0;
+  NGLOW.dirty = false; NGLOW.scanT = now; NGLOW.stats.다시셈++; D.rotation.set(-Math.PI / 2, 0, 0);
+  for (let i = 0; i < W * H && k < cap; i++) { const c = cells[i]; if (!c || c.root !== i) continue;
+    if (c.k === 'lamp') { D.position.set(wx(cX(i)), .235, wz(cY(i))); const d = CS * R.lampR * 2; D.scale.set(d, d, 1); nl++; }
+    else if (c.k === 'house' && (res.get(i) || 0) > 0) { const ce = centerOf(c.k, cX(i), cY(i), c.rot), th = c.rot * Math.PI / 2, o = CS * R.winOff;
+      D.position.set(ce.x + o * Math.sin(th), .235, ce.z + o * Math.cos(th)); const d = CS * R.winR * 2; D.scale.set(d * 1.3, d, 1); nw++; }
+    else continue;
+    D.updateMatrix(); m.setMatrixAt(k++, D.matrix); }
+  m.count = k; m.instanceMatrix.needsUpdate = true; NGLOW.stats.등 = nl; NGLOW.stats.창 = nw; }
+function nightGlowDraw() { const R = window.VRULES.nightGlow, n = NIGHT.value;
+  if (!NGLOW.base) NGLOW.base = { sky: hemi.color.clone(), gnd: hemi.groundColor.clone(), amb: amb.color.clone(), skyN: new THREE.Color(0x8ea4e6), gndN: new THREE.Color(0x2c3656), ambN: new THREE.Color(0xa9b8ff) };
+  const B = NGLOW.base, t = R.on ? n * (R.blue || 0) : 0;
+  hemi.color.copy(B.sky).lerp(B.skyN, t); hemi.groundColor.copy(B.gnd).lerp(B.gndN, t); amb.color.copy(B.amb).lerp(B.ambN, t);   // 낮(t 0)엔 처음 색 그대로
+  if (!R.on || n < .05 || mapMode) { if (NGLOW.mesh) NGLOW.mesh.visible = false; return; }
+  const now = performance.now(); if (NGLOW.dirty || now - NGLOW.scanT > 3000) nightGlowScan(now);
+  const m = NGLOW.mesh; m.visible = m.count > 0; m.material.opacity = (R.op || .55) * Math.min(1, (n - .05) / .45); }
+{ const ad0 = applyDaylight; applyDaylight = function () { const r = ad0.apply(this, arguments); nightGlowDraw(); return r; }; }
+window.__nightGlow = () => ({ 켜짐: window.VRULES.nightGlow.on, 밤: +NIGHT.value.toFixed(2), 보임: !!(NGLOW.mesh && NGLOW.mesh.visible), ...NGLOW.stats });
 const folks = [];                 // {home, ct, x, z, dir, path, step, seg, state, until, base}
 
 /* ── 서로 비켜 가기 ──
@@ -11135,6 +11170,17 @@ function terrainLayers() { const m = terrainMap(); if (TERR.layers && TERR.layer
     TERR.stats.칠함 = n; TERR.stats.잠김칠함 = TERR.map.size - n; boardTex.needsUpdate = true; };
   const dm0 = drawMap; drawMap = function () { const r = dm0.apply(this, arguments); if (!terrainLive()) return r;   // 지도 판(판 전체 보기 · 34-ⓑ80) — 물건이 없는 지형 칸만, 물건 밑에
     TERR.stats.지도칠줄 = terrainRuns(mapCanvas.getContext('2d'), MAP_PX, terrainLayers().code, i => !!cells[i]); mapTex.needsUpdate = true; return r; }; }
+/* ── [MAC-MAPLOCK] 판 전체 보기(지도 판 · mapCanvas)에서 잠긴 땅이 풀빛이던 것 — 잠긴 구역은 판의 '바닥' 색으로 (보스 09-24 · 41-ⓑ92 뒤 확인) ──
+   drawMap 은 바탕 전체를 풀빛(__miniBg)으로 칠하고 물건만 얹어, 멀리서 보면 열린 구역과 잠긴 땅이 한 색이었다(3D 판 그림은 잠긴 곳을 바닥 색으로 칠한다).
+   · 지도를 다 그린 뒤 **잠긴 구역 네모만** 바닥 색(groundCol — 판 모습 '바닥')으로 덮는다. 잠긴 곳엔 물건이 없어(놓기는 열린 구역만) 덮을 것이 없다.
+   · 지형 판(바다·산)은 건드리지 않는다 — 지형 층이 잠긴 곳까지 칠해 두었다(#946). 미니맵(MINILOOK)은 제 바탕을 따로 그려 그대로.
+   스위치 VRULES.mapLock(보기). 판정·저장 0. 원래 줄 수정 0 — drawMap 감싸기(지형 감싸기 바깥). */
+(window.VRULES = window.VRULES || {}).mapLock = { on: true };
+{ const dmL = drawMap; drawMap = function () { const r = dmL.apply(this, arguments); const R = window.VRULES.mapLock;
+    if (!R || !R.on || (typeof terrainLive === 'function' && terrainLive())) return r;
+    const g = mapCanvas.getContext('2d'), w = PLOT * MAP_PX; g.fillStyle = '#' + groundCol.getHexString();
+    for (let py = 0; py < NPY; py++) for (let px = 0; px < NPX; px++) if (!plots.has(px + ',' + py)) g.fillRect(px * w, (H - (py + 1) * PLOT) * MAP_PX, w, w);
+    mapTex.needsUpdate = true; return r; }; }
 /* 한 번 눌러 못 놓았는데 까닭이 지형이면 — 그 말을 토스트에도(풍선과 같은 말 · 34-ⓑ78). 죽 놓기의 실패 칸은 원래 조용하다(끄는 동안 시끄럽지 않게) —
    그래서 카드를 고를 때 뜬 안내('길에 붙여 놓아요')가 남아 풍선과 둘로 갈렸다. 끌기(6px 넘게)와 놓은 누름은 건드리지 않는다(MAC-FIRST5 ② 와 같은 자리 · 같은 잣대). */
 const TERR_WHY_SET = new Set(Object.values(TERR_WHY));
