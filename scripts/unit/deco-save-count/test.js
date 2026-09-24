@@ -1782,6 +1782,25 @@
       out('위띠_놓는칸아님', _decoCellAt(_dCv.getBoundingClientRect().left + 5, _dCv.getBoundingClientRect().top + 5) === null);
       _dPanY = 0; _decoClampPan(); _drawDeco();
     }
+    //  ㉟-2 배율을 바꿔도 잔디에 칸마다 줄이 없다(DECO-LAWN-SEAM-1 · 창조자 59-ⓑ105) — 옮기는 값이 406.248 같은 소수여도
+    //   잔디 칸끼리 맞닿은 이음새(가로·세로 가운데 3픽셀씩)의 캔버스 알파가 255 · main 은 128~203 이었다
+    if (typeof DECO_YARD_TOP !== 'undefined') {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      _decoSetZoom(1.017); _dPanX = 415.633; _dPanY = 106.248; _decoClampPan(); _drawDeco(); await sleep(150);
+      const fl = _yardFloorGet(CUR), W = _dCv.width, H = _dCv.height, d = _dCtx.getImageData(0, 0, W, H).data, C = _dC;
+      const grass = (r, c) => r >= 0 && c >= 0 && r < DY.rows && c < DY.cols && !_isHC(r, c) && _floorIsGrass(_floorParse(fl[r + '_' + c]).name);
+      const A = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 255 : d[(y * W + x) * 4 + 3];
+      let n = 0, low = 0;
+      for (let r = 1; r < DY.rows; r++) for (let c = 1; c < DY.cols; c++) {
+        if (!grass(r, c) || !grass(r - 1, c) || !grass(r, c - 1)) continue;
+        const x = (c * C - _dPanX) * 2, y = (r * C - _dPanY) * 2, mx = Math.round(x + C), my = Math.round(y + C);
+        if (x < 2 || y < 2 || x + 2 * C > W - 2 || y + 2 * C > H - 2) continue;
+        n++;
+        for (const k of [-1, 0, 1]) if (A(mx, Math.round(y) + k) < 255 || A(Math.round(x) + k, my) < 255) { low++; break; }
+      }
+      out('잔디_이음새_불투명', n > 50 && low === 0 && (_dPanX * 2) % 1 !== 0);
+      _decoSetZoom(1); _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco();
+    }
 
     //  ㊱ 움직임 층(DECO-MOTION-1 · 계획 C2) — 풍차는 몸통을 캔버스에, 날개는 DOM 층에서 돈다 · 집 안으로 가면 층이 없다
     if (typeof _decoMotionSync === 'function' && _ifMode) {

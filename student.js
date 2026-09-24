@@ -9653,7 +9653,9 @@ function _drawDeco() {
     // [DECO-ZOOM-1] 보이는 창만 옮긴다 — 그리는 코드는 판 좌표를 그대로 쓴다
     _dCtx.setTransform(2, 0, 0, 2, 0, 0);
     _dCtx.clearRect(0, 0, _dW, _dH);
-    _dCtx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
+    //  [DECO-LAWN-SEAM-1] 옮기는 값은 캔버스 픽셀(2배) 단위로 — ＋·－ 기준점 계산으로 111.375 같은 값이 오면 칸 경계가 픽셀 사이에 걸려
+    //  이음새 알파가 191·143 → 판 뒤 어두운 바탕이 칸마다 가는 줄로 비쳤다(창조자 59-ⓑ105). 동물·움직임 층(DOM)과는 0.25px 안.
+    _dCtx.setTransform(2, 0, 0, 2, -Math.round(_dPanX * 2), -Math.round(_dPanY * 2));
     if (DECO_SCENE === 'yard') { _drawYard(); if (_decoRectPrev) _drawRectPreview(); }   // [DECO-FLOOR-RECT-1] 끄는 동안의 네모
     else _drawIndoor();
     if (_decoHover && SEL_DECO) _decoDrawGhost(DECO_SCENE === 'yard' ? 'yard' : 'indoor', DECO_SCENE === 'yard' ? 0 : (_dCv._offX || 0), DECO_SCENE === 'yard' ? 0 : (_dCv._offY || 0), _dC);   // [DECO-SEL-HL-1]
@@ -9788,7 +9790,7 @@ function _decoTplSync() {
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   const ctx = cv.getContext('2d'), keep = _dCtx;
   ctx.setTransform(2, 0, 0, 2, 0, 0); ctx.clearRect(0, 0, W, H);
-  ctx.setTransform(2, 0, 0, 2, -_dPanX * 2, -_dPanY * 2);
+  ctx.setTransform(2, 0, 0, 2, -Math.round(_dPanX * 2), -Math.round(_dPanY * 2));   // [DECO-LAWN-SEAM-1] 판과 같은 반올림
   const c0 = _houseCol0(), P = DECO_TPL.path, pc = P.c.map(k => c0 + k);
   const isPath = (r, c) => r >= P.r0 && r <= P.r1 && pc.indexOf(c) >= 0;
   _dCtx = ctx;   // 바닥·장식 그리기 도우미는 _dCtx 에 그린다 — 잠깐 이 캔버스로
@@ -13392,7 +13394,7 @@ function _renderFriendCanvas() {
   _dCtx = cv.getContext('2d');
   _dCtx.setTransform(2, 0, 0, 2, 0, 0);
   _dCtx.clearRect(0, 0, W, H);
-  _dCtx.setTransform(2, 0, 0, 2, -(fpx + _ffView.panX) * 2, -(fpy + _ffView.panY) * 2);   // [INDOOR-ROOMS-1] 방 둘레 + [DECO-FRIEND-VIEW-1] 구경 이동
+  _dCtx.setTransform(2, 0, 0, 2, -Math.round((fpx + _ffView.panX) * 2), -Math.round((fpy + _ffView.panY) * 2));   // [INDOOR-ROOMS-1] 방 둘레 + [DECO-FRIEND-VIEW-1] 구경 이동
   if (_ffScene === 'yard') _drawYard();
   else _drawIndoor();
   // [DECO-ANIM-1] 친구 마당에서도 동물이 돌아다닌다 — [DECO-FRIEND-VIEW-1] 구경 이동만큼 같이
