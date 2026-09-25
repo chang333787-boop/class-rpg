@@ -13639,13 +13639,14 @@ window.__endCard2 = () => ({ 켜짐: window.VRULES.endCard2.on, 시작땅: EC2.r
    ① 결과 값: 흐름이 켜진 판 가운데 **목표 0 · 예상 결과 없음** 인 판만 — 🌾 쌓인 곡식 · 🏪 선반 · 🏠 못 받은 집(고장 전체 카드와 같은 셈 window.__flow).
       twoNow 감싸기로 결과 값(값)에 그 한 줄을 넣는다 → ↺ 때 지난 시도에 적히고 · '두 번 다 같았어요'는 그 값끼리 견준다(MAC-TWOTRY·MAC-ENDCARD2 원래 줄 그대로).
       지난·이번 줄(twoLine)은 짐작 + 그 값 한 줄 · 새로 생긴 것 줄의 '처음 그대로예요'는 첫날 → 지금 흐름 값으로(첫날 값은 처음 시작 카드 때 판 카드 기록 first.흐름 에 적는다).
-   ② 사진: 판 카드 사진(첫날·지난·오늘)은 **모든 판에서** 그날 hour 시 빛으로 — 두 장을 견줄 수 있게(밤 사진 둘은 무엇이 달라졌는지 안 보였다).
+   ② 사진: 판 카드 사진(첫날·지난·오늘)은 모든 판에서, **밤·저녁(NIGHT > night)에 찍을 때만** 그날 hour 시 빛으로 — 두 장을 견줄 수 있게(밤 사진 둘은 무엇이 달라졌는지 안 보였다).
+      낮에 찍는 사진은 그대로(낮 빛끼리는 견줄 수 있다 · 화면 회귀 0).
       사진 한 장 그리는 동안만 빛·하늘·해 자리(clear 면 비 흐림도 뺌)를 바꾸고 곧 되돌린다(아이 화면 그대로 · SIM.t 는 applyDaylight 한 번 동안만 · 사람 자리는 그 시각 그대로).
    ③ 사진 틀: 흐름 판은 밭·가게가 틀 안에 들도록 넓힌다(원래 틀은 가게가 위 끝 밖 · 밭 둘이 오른쪽 밖이었다 — 잰 값) · 새 판 카드 기록부터(틀은 first.frame 에 적힌다).
    저장: 판 카드 기록(로컬 rpg.stagecard.<sid>.<판>)의 first.흐름 하나 — 마을 저장본·sync·Firebase 0. 판정 0 · 원래 줄 수정 0 — twoNow·twoLine·scardSee·stageCardStart·scardShootNow 감싸기.
    스위치 VRULES.flowEnd(보기) · VRULES.cardDay(보기). */
 (window.VRULES = window.VRULES || {}).flowEnd = { on: true };
-(window.VRULES = window.VRULES || {}).cardDay = { on: true, hour: 12, clear: true };
+(window.VRULES = window.VRULES || {}).cardDay = { on: true, hour: 12, clear: true, night: .05 };
 const FEND = { stats: { 값셈: 0, 줄: 0, 첫날값: 0, 낮사진: 0 } };
 const fendOn = () => { const e = typeof predDef === 'function' ? predDef() : null; return !!(window.VRULES.flowEnd.on && STAGE.def && flowOn() && !STAGE.goals.length && !(e && e.결과)); };
 function fendNow() { const f = window.__flow(); return { 곡식: f.밭.reduce((a, o) => a + o.양, 0), 선반: f.가게.reduce((a, o) => a + o.양, 0), 못받음: f.세대.못받음 }; }
@@ -13658,7 +13659,7 @@ function fendText(v, v0) { const R = window.VRULES.flow, mk = K[Object.keys(R.�
     return s === '처음 그대로예요' ? t : s + '<br>' + t; };
   const st2 = stageCardStart; stageCardStart = function () { const r = st2.apply(this, arguments), rec = STAGE.id ? scardLoad() : null;
     if (rec && rec.first && !rec.first.흐름 && !rec.started && fendOn()) { rec.first.흐름 = fendNow(); FEND.stats.첫날값++; scardSave(); } return r; };
-  const sn0 = scardShootNow; scardShootNow = function () { const R = window.VRULES.cardDay; if (!R || !R.on || !SCARD.shoot) return sn0.apply(this, arguments);
+  const sn0 = scardShootNow; scardShootNow = function () { const R = window.VRULES.cardDay; if (!R || !R.on || !SCARD.shoot || NIGHT.value < (R.night == null ? .05 : R.night)) return sn0.apply(this, arguments);
     const t0 = SIM.t, rain0 = EV.rain, sp = sun.position.clone(), fly = FLY.mesh && FLY.mesh.visible ? FLY.mesh : null;
     try { SIM.t = Math.floor(t0 / DAY_MS) * DAY_MS + (((R.hour - DAY_START_H) + 24) % 24) / 24 * DAY_MS; if (R.clear) EV.rain = false; applyDaylight(); SIM.t = t0; EV.rain = rain0;
       const sr = 140 * Math.cos(sunDir.el); sun.position.set(camTarget.x + Math.cos(sunDir.az) * sr, 140 * Math.sin(sunDir.el), camTarget.z - Math.sin(sunDir.az) * sr);   /* placeCamera 의 해 줄과 같은 셈 */
