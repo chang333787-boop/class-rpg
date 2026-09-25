@@ -13634,6 +13634,41 @@ function ec2Mark(fig, pts) { if (!fig) return; const old = fig.querySelector('.e
     return sr0.apply(this, arguments); }; }
 if (STAGE.id) setTimeout(() => { ec2StartSet(); }, 2500);   // 시작 땅을 미리 받아 둔다(↺ 때 곧바로 쓰게)
 window.__endCard2 = () => ({ 켜짐: window.VRULES.endCard2.on, 시작땅: EC2.ready ? EC2.ready.size : null, 지금놓은곳: EC2.ready ? ec2Spots(EC2.ready).map(([k, i]) => k + '@' + cX(i) + ',' + cY(i)) : null, ...EC2.stats });
+/* ── [MAC-FLOWEND] 목표 없는 흐름 판의 끝 카드 — 실험 값(곡식·선반·못 받은 집)을 결과로 · 판 카드 사진은 그날 12시 빛으로 (창조자 53회 ⓑ102 · 보스 09-24) ──
+   빈 가게 판(proto-flow)은 목표도 예상 결과도 없어 끝 카드가 '처음 그대로예요'(놓은 것만 셈) · 지난↔이번을 인구로만 견줘 원인이 달라도 늘 '🔁 두 번 다 같았어요' · 두 사진이 같은 밤 거리였다.
+   ① 결과 값: 흐름이 켜진 판 가운데 **목표 0 · 예상 결과 없음** 인 판만 — 🌾 쌓인 곡식 · 🏪 선반 · 🏠 못 받은 집(고장 전체 카드와 같은 셈 window.__flow).
+      twoNow 감싸기로 결과 값(값)에 그 한 줄을 넣는다 → ↺ 때 지난 시도에 적히고 · '두 번 다 같았어요'는 그 값끼리 견준다(MAC-TWOTRY·MAC-ENDCARD2 원래 줄 그대로).
+      지난·이번 줄(twoLine)은 짐작 + 그 값 한 줄 · 새로 생긴 것 줄의 '처음 그대로예요'는 첫날 → 지금 흐름 값으로(첫날 값은 처음 시작 카드 때 판 카드 기록 first.흐름 에 적는다).
+   ② 사진: 판 카드 사진(첫날·지난·오늘)은 **모든 판에서** 그날 hour 시 빛으로 — 두 장을 견줄 수 있게(밤 사진 둘은 무엇이 달라졌는지 안 보였다).
+      사진 한 장 그리는 동안만 빛·하늘·해 자리(clear 면 비 흐림도 뺌)를 바꾸고 곧 되돌린다(아이 화면 그대로 · SIM.t 는 applyDaylight 한 번 동안만 · 사람 자리는 그 시각 그대로).
+   ③ 사진 틀: 흐름 판은 밭·가게가 틀 안에 들도록 넓힌다(원래 틀은 가게가 위 끝 밖 · 밭 둘이 오른쪽 밖이었다 — 잰 값) · 새 판 카드 기록부터(틀은 first.frame 에 적힌다).
+   저장: 판 카드 기록(로컬 rpg.stagecard.<sid>.<판>)의 first.흐름 하나 — 마을 저장본·sync·Firebase 0. 판정 0 · 원래 줄 수정 0 — twoNow·twoLine·scardSee·stageCardStart·scardShootNow 감싸기.
+   스위치 VRULES.flowEnd(보기) · VRULES.cardDay(보기). */
+(window.VRULES = window.VRULES || {}).flowEnd = { on: true };
+(window.VRULES = window.VRULES || {}).cardDay = { on: true, hour: 12, clear: true };
+const FEND = { stats: { 값셈: 0, 줄: 0, 첫날값: 0, 낮사진: 0 } };
+const fendOn = () => { const e = typeof predDef === 'function' ? predDef() : null; return !!(window.VRULES.flowEnd.on && STAGE.def && flowOn() && !STAGE.goals.length && !(e && e.결과)); };
+function fendNow() { const f = window.__flow(); return { 곡식: f.밭.reduce((a, o) => a + o.양, 0), 선반: f.가게.reduce((a, o) => a + o.양, 0), 못받음: f.세대.못받음 }; }
+function fendText(v, v0) { const R = window.VRULES.flow, mk = K[Object.keys(R.만드는곳 || {}).find(k => K[k]) || ''] || {}, a = k => (v0 && v0[k] != null ? v0[k] + ' → ' : '') + v[k];
+  return (mk.ic || '📦') + ' 쌓인 ' + (R.물건 || '물건') + ' ' + a('곡식') + ' · 🏪 선반 ' + a('선반') + ' · 🏠 못 받은 집 ' + a('못받음'); }
+{ const tn0 = twoNow; twoNow = function () { const r = tn0.apply(this, arguments); if (!fendOn()) return r; FEND.stats.값셈++; r.흐름 = fendNow(); r.값 = fendText(r.흐름); return r; };
+  const tl0 = twoLine; twoLine = function (lab, p, r) { if (!fendOn() || !r || r.값 == null) return tl0.apply(this, arguments); FEND.stats.줄++;
+    return '<div class="pend"><b>' + lab + '</b> ' + [p && p.글 ? '🤔 ' + scardEsc(p.글) : '', scardEsc(r.값)].filter(Boolean).join(' · ') + '</div>'; };
+  const ss1 = scardSee; scardSee = function () { const s = ss1.apply(this, arguments); if (!fendOn()) return s; const f = scardLoad().first, t = scardEsc(fendText(fendNow(), f && f.흐름));
+    return s === '처음 그대로예요' ? t : s + '<br>' + t; };
+  const st2 = stageCardStart; stageCardStart = function () { const r = st2.apply(this, arguments), rec = STAGE.id ? scardLoad() : null;
+    if (rec && rec.first && !rec.first.흐름 && !rec.started && fendOn()) { rec.first.흐름 = fendNow(); FEND.stats.첫날값++; scardSave(); } return r; };
+  const sn0 = scardShootNow; scardShootNow = function () { const R = window.VRULES.cardDay; if (!R || !R.on || !SCARD.shoot) return sn0.apply(this, arguments);
+    const t0 = SIM.t, rain0 = EV.rain, sp = sun.position.clone(), fly = FLY.mesh && FLY.mesh.visible ? FLY.mesh : null;
+    try { SIM.t = Math.floor(t0 / DAY_MS) * DAY_MS + (((R.hour - DAY_START_H) + 24) % 24) / 24 * DAY_MS; if (R.clear) EV.rain = false; applyDaylight(); SIM.t = t0; EV.rain = rain0;
+      const sr = 140 * Math.cos(sunDir.el); sun.position.set(camTarget.x + Math.cos(sunDir.az) * sr, 140 * Math.sin(sunDir.el), camTarget.z - Math.sin(sunDir.az) * sr);   /* placeCamera 의 해 줄과 같은 셈 */
+      renderer.shadowMap.needsUpdate = true; if (fly) fly.visible = false; FEND.stats.낮사진++;
+      return sn0.apply(this, arguments); }
+    finally { SIM.t = t0; EV.rain = rain0; applyDaylight(); sun.position.copy(sp); if (fly) fly.visible = true; } }; }
+{ const sf0 = scardFrame; scardFrame = function () { const F = sf0.apply(this, arguments); if (!fendOn()) return F; let m = .45;   /* ③ 밭·가게가 사진 틀 안(0.05~0.95)에 들 만큼 반폭을 넓힌다 */
+    cells.forEach((rec, i) => { if (!rec || rec.root !== i || !(flowMake(rec) || flowTake(rec))) return; const c = centerOf(rec.k, cX(i), cY(i), rec.rot | 0), [u, v] = ec2Project(F, c.x, c.z); m = Math.max(m, Math.abs(u - .5), Math.abs(v - .5)); });
+    F.hw *= m / .45; return F; }; }
+window.__flowEnd = () => ({ 켜짐: window.VRULES.flowEnd.on, 쓰는판: fendOn(), 지금: fendOn() ? fendText(fendNow()) : null, 첫날: STAGE.id && scardLoad().first ? scardLoad().first.흐름 || null : null, 사진시각: window.VRULES.cardDay.on ? window.VRULES.cardDay.hour + '시' : '끔', ...FEND.stats });
 /* ── [ACT-ASKCARD] 되묻기는 게임 안 카드로 — 브라우저 기본 창(confirm) 대신 (창조자 28회 ⓒ60 · 보스 09-23) ──
    ↺ 처음부터를 누르면 브라우저의 회색 기본 창이 떴다 — 주소 이름이 찍히고 글꼴·단추가 게임과 달라 '밖에서 튀어나온 창'으로 읽혔다(28회).
    이제 마을 위에 카드 하나: 물음 · 한 줄 설명 · [그만두기] [↺ 처음부터]. 되돌릴 수 없는 일이라 **처음 초점은 그만두기** · Esc·바깥 누르기도 그만두기.
