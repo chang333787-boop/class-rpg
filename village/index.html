@@ -13518,6 +13518,43 @@ function predResult() { const e = predDef(), g = e && e.결과, all = STAGE.goal
       + (글 ? '<div class="cur">' + (p.고름 === 3 ? '해 보니 어떻게 되었나요? 왜 그랬을까요?' : '짐작과 같았나요? 달랐다면 왜일까요?') + '</div>' : ''));
     return r; }; }
 window.__predict = () => { const rec = STAGE.id ? scardLoad() : null; return { 켜짐: window.VRULES.predict.on, 판: predDef(), 기록: rec && rec.예상 !== undefined ? rec.예상 : null, 고르는중: PRED.pick, 결과줄: predDef() ? predResult() : null, ...PRED.stats }; };
+/* ── [MAC-STAGEHINT] 창조자 51회 ⓑ101 · ⓑ100 — 판 목표만 · 다리 빈 끝 한 줄 · 판의 한 곳 권유 (보스 09-24 · PR 3b #1092 뒤 다시 얹음) ──
+   ⓑ101 목표가 하나뿐인 판(onebridge · nohealth · jobs-short)의 목표판 남는 두 줄을 기본 목표('어른들 일할 곳 만들기' · '3층 집 하나')가 채웠다 — 수업과 무관한 목표가 2/3.
+        판 목표가 셋 미만인 판에서, 판 목표가 남아 있는 동안은 **판 목표만**(openGoals) — 기본 목표는 그동안 셈하지도 알리지도 않는다. 판 목표를 다 이루면 기본 목표가 다시 이어진다
+        (끝까지 막으면 기본 목표에 걸린 꾸밈 보상이 영영 잠긴다). 판 목표가 없는 판·기본 마을은 그대로. 스위치 VRULES.stageGoalsOnly(목표).
+   ⓑ100 판 모양(개울 칸에 길 한 칸이면 양쪽 길이 이어짐)은 PR 3b 가 고쳤다 — 여기는 말 둘:
+        ① 다리의 끝이 **빈 칸**(아무것도 없고 내 땅)이면 [MAC-ROADJOIN] 이 손을 뗀 뒤 보는 그 자리에서 ROADJOIN 의 말 대신 "🌉 다리 끝이 길과 이어져야 건널 수 있어요" 한 줄.
+           끝이 길이면 이어진 것 · 집·시설이 붙은 끝은 그 집이 다리로 닿으니 말하지 않는다 · 꽃밭처럼 막힌 끝도 말하지 않는다(할 수 없는 일을 시키지 않게).
+           ROADJOIN 의 되풀이 막음·'말함' 표시를 같이 쓴다 → 말이 둘 겹치지 않고, 이으면 ROADJOIN 의 '🛣️ 이어졌어요'가 온다.
+        ② 판 파일 `권유: { 말, 자리: [[x, y], …], 집: [x0, y0, x1, y1] }` — 판 목표가 남은 동안 그 네모 안의 사는 집이 필요를 못 채우면
+           집 말 끝의 도서관 권유([MAC-LIBRARY]) 대신 판의 말 · 누르면(MAC-WHERE) 아직 개울인 자리들을 짚는다(어느 자리를 고를지는 아이 몫).
+   판정 0 · 원래 줄 수정 0 — openGoals·roadJoinCheck·whereSpots 감싸기 · satText 고리. 저장 칸 0. 스위치 VRULES.stageHint(말) · .bridge */
+(window.VRULES = window.VRULES || {}).stageHint = { on: true, bridge: true };
+window.VRULES.stageGoalsOnly = { on: true };
+const SHINT = { stats: { 판목표만: 0, 다리말: 0, 권유: 0, 짚음: 0 } };
+const shintLeft = () => (STAGE.def ? STAGE.goals.filter(g => !goalsDone.has(g.id)) : []);
+{ const og0 = openGoals; openGoals = function () { const left = window.VRULES.stageGoalsOnly.on && STAGE.goals.length < 3 ? shintLeft() : [];   /* 판 목표가 셋 이상이면 목표판이 이미 판 목표로 찬다 — 막지 않는다(farm 처럼 판 목표가 남은 채 기본 목표 보상이 하루 내내 밀리지 않게) */
+    if (left.length) { SHINT.stats.판목표만++; return left.slice(0, 3); }
+    return og0.apply(this, arguments); }; }
+/* 다리(sbr)의 돌림 = 개울 방향(0: 위아래로 흐름 → 좌우로 건넘) · 끝마다 '길' | '빈' | '딴것'(집·시설·꽃밭·판 밖·남의 땅) */
+const shintEnds = (x, y, rot) => ((rot & 1) === 0 ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]]).map(([ex, ey]) => { if (!inb(ex, ey)) return '딴것'; const e = cells[idx(ex, ey)]; if (!e) return plotOpen(ex, ey) ? '빈' : '딴것'; return K[e.k] && K[e.k].road ? '길' : '딴것'; });
+const shintEmptyEnds = list => { let n = 0; list.forEach(i => { const c = cells[i]; if (c && c.k === 'sbr' && c.root === i) n = Math.max(n, shintEnds(cX(i), cY(i), c.rot | 0).filter(e => e === '빈').length); }); return n; };
+{ const rj0 = roadJoinCheck; roadJoinCheck = function () { const R = window.VRULES.stageHint, near = new Set(RJOIN.pend); RJOIN.pend.forEach(i => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { if (inb(cX(i) + dx, cY(i) + dy)) near.add(idx(cX(i) + dx, cY(i) + dy)); }));
+    { const from = RJOIN.pend.filter(i => cells[i] && K[cells[i].k] && K[cells[i].k].road); if (from.length) roadBFS(from, undefined, 6).reach.forEach(i => near.add(i)); }   /* 건너편부터 길을 이어 와도 그 다리를 찾게(검토 — 한 칸 옆만 보면 '이어졌어요'가 먼저 왔다) */
+    const n = R.on && R.bridge && !GUIDE.on && roadJoinHasPlace() ? shintEmptyEnds([...near]) : 0;   /* 방금 놓은 다리 · 방금 놓은 길에 붙은 다리 — 한 끝만 이으면 '이어졌어요'가 먼저 오지 않게 */
+    if (!n) return rj0.apply(this, arguments);
+    RJOIN.pend.length = 0; RJOIN.set.clear(); RJOIN.joined = false; RJOIN.last = performance.now(); RJOIN.warned = true; SHINT.stats.다리말++;
+    toast('🌉 다리 끝이 길과 이어져야 건널 수 있어요 — ' + (n === 2 ? '양쪽 끝에' : '비어 있는 끝에') + ' 길을 이어 봐요'); }; }
+const shintAdv = () => { const a = window.VRULES.stageHint.on && STAGE.def && STAGE.def.권유; return a && typeof a.말 === 'string' && Array.isArray(a.집) && a.집.length === 4 && shintLeft().length ? a : null; };
+function shintHouse(rec) { const a = shintAdv(); if (!a || !rec || rec.k !== 'house' || !(res.get(rec.root) > 0)) return false; const x = cX(rec.root), y = cY(rec.root), [x0, y0, x1, y1] = a.집;
+  if (x < x0 || x > x1 || y < y0 || y > y1) return false; const st = sat.get(rec.root) || computeSat(rec); return NEEDS.some(n => !st.met[n]); }
+hookAdd('satText', function (next, args) { const [rec] = args, t = next(args); if (!shintHouse(rec)) return t; SHINT.stats.권유++;
+  return String(t).split(' · ').filter(s => !s.startsWith('📚 ')).join(' · ') + ' · ' + shintAdv().말; });   /* [MAC-LIBRARY] 의 도서관 권유(📚 …)를 판의 말로 바꾼다 */
+const shintSpots = a => (Array.isArray(a.자리) ? a.자리 : []).filter(p => Array.isArray(p) && inb(p[0] | 0, p[1] | 0)).map(p => idx(p[0] | 0, p[1] | 0)).filter(i => cells[i] && cells[i].k === 'stream');
+{ const ws0 = whereSpots; whereSpots = function (rec) { if (whereOn() && shintHouse(rec)) { const s = shintSpots(shintAdv()); if (s.length) { SHINT.stats.짚음++; return s; } }
+    return ws0.apply(this, arguments); }; }
+window.__stageHint = (x, y) => { const c = x != null && inb(x, y) ? cells[idx(x, y)] : null;
+  return { 켜짐: window.VRULES.stageHint.on, 판목표만: window.VRULES.stageGoalsOnly.on, 판권유: shintAdv(), ...SHINT.stats, ...(c && c.k === 'sbr' ? { 끝: shintEnds(x, y, c.rot | 0), 빈끝: shintEmptyEnds([idx(x, y)]) } : {}) }; };
 /* ── [MAC-TWOTRY] 두 선택 나란히(L8) — ↺ 처음부터가 판 카드 기록을 지우지 않고 '지난 시도' 한 칸으로 남긴다 · 끝 카드에 지난 선택 ↔ 이번 선택 (설계 docs/village_role_predict_design.md 4절 · #981 승인 · 보스 09-24) ──
    ① ↺ 처음부터(수업 판 왼쪽 아래 단추 · 모형 화면 판의 단추 줄 — 두 곳 모두 stageResetKeep 한 줄): **마을 저장본만** 지우고,
       판 카드 기록은 `{ first(첫날 그대로), 지난: { 사진, 셈, 인구, 예상, 목표: [이룬, 모두], 값, t } }` 로 바꿔 적은 뒤 다시 연다.
