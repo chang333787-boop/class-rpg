@@ -134,21 +134,6 @@ process.stdout.write('@@' + JSON.stringify({ a, b, 틱: n * 100, 인구80: w.__u
   ok(j.끈뒤 === false, '끈 뒤에도 clinic 해금이 저장 글에 남음 ' + JSON.stringify(j));
 });
 
-/* [MAC-STAGEKEEP] ③ 옛 우물 · PR 3a proto-vote — 목록에서 뺀 우물도 되살아나고 옮기기·되돌리기가 된다(새로 고르는 길은 트레이 숨김) · 결정 시설 의원의 미리 보기 = 적용 */
-test('PR 3a: proto-flow 옛 우물 둘 되살림 · 지운 뒤 ↩ 로 살아남 · proto-vote 의원 미리 보기 = 적용', () => {
-  const go = (query, body) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
-const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: ${JSON.stringify(query)} });
-const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
-    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error(query + ' 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
-  const f = go('stage=proto-flow', `const s = w.__START; const k = w.__stageKeep().옛우물, g = w.__needWater().우물.묶음; const kind = () => w.__stream(134, 138).칸.종류; const 전 = kind(); w.__erase(134, 138); const 지움 = kind(); w.__undo(); return { s, k, g, 전, 지움, 되돌림: kind() };`);
-  ok(!/못 살린/.test(f.s) && f.k === 2 && f.g === '(숨김)', 'proto-flow 옛 우물(되살림 · 트레이 숨김) ' + JSON.stringify(f));
-  ok(f.전 === 'well' && f.지움 === null && f.되돌림 === 'well', '옛 우물을 지운 뒤 ↩ 로 못 살림 ' + JSON.stringify(f));
-  const pv = id => go('stage=proto-vote', `const p = w.__votePreview('${id}'), a = w.__voteApply('${id}'); return { 필요: w.__vote().필요, 막음: w.__put('clinic', 137, 102, 0), p: p.집별, a: a && a.집별 };`);
-  const A = pv('A'), B = pv('B');
-  ok(A.필요 === '건강' && /쓰지 않아요/.test(String(A.막음)), 'proto-vote 필요·막음 ' + JSON.stringify([A.필요, A.막음]));
-  ok(A.p && JSON.stringify(A.p) === JSON.stringify(A.a) && B.p && JSON.stringify(B.p) === JSON.stringify(B.a), '미리 보기 ≠ 적용 ' + JSON.stringify({ A, B }).slice(0, 300));
-});
-
 /* [MAC-STAGEHINT] 창조자 51회 ⓑ101 · ⓑ100 — onebridge: 목표판엔 판 목표만(판 목표를 이루면 기본 목표가 다시) · 개울 건너 집 말 끝은 도서관 대신 판의 권유 · 누르면 다리 자리 셋 · 빈 끝 다리는 '빈 끝' 셈 */
 test('onebridge 판 목표만 · 권유(🌉 · 📚 없음 · 자리 셋) · 다리 빈 끝 셈 · 이루면 기본 목표·권유 끝', () => {
   const go = (query, body) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
@@ -163,6 +148,21 @@ const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(ou
   ok(JSON.stringify(o.s0) === '[[151,147],[151,144],[151,150]]', '짚을 칸 ' + JSON.stringify(o.s0));
   ok(o.e === 2 && o.f === 0, '빈 끝 ' + JSON.stringify([o.e, o.f]));
   ok(o.판 === true && o.g1 === 3 && o.권유 === null && !/🌉/.test(o.t1), '이룬 뒤 ' + JSON.stringify({ 판: o.판, g1: o.g1, 권유: o.권유, t1: o.t1 }));
+});
+
+/* [MAC-STAGEKEEP] ③ 옛 우물 · PR 3a proto-vote — 목록에서 뺀 우물도 되살아나고 옮기기·되돌리기가 된다(새로 고르는 길은 트레이 숨김) · 결정 시설 의원의 미리 보기 = 적용 */
+test('PR 3a: proto-flow 옛 우물 둘 되살림 · 지운 뒤 ↩ 로 살아남 · proto-vote 의원 미리 보기 = 적용', () => {
+  const go = (query, body) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: ${JSON.stringify(query)} });
+const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error(query + ' 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const f = go('stage=proto-flow', `const s = w.__START; const k = w.__stageKeep().옛우물, g = w.__needWater().우물.묶음; const kind = () => w.__stream(134, 138).칸.종류; const 전 = kind(); w.__erase(134, 138); const 지움 = kind(); w.__undo(); return { s, k, g, 전, 지움, 되돌림: kind() };`);
+  ok(!/못 살린/.test(f.s) && f.k === 2 && f.g === '(숨김)', 'proto-flow 옛 우물(되살림 · 트레이 숨김) ' + JSON.stringify(f));
+  ok(f.전 === 'well' && f.지움 === null && f.되돌림 === 'well', '옛 우물을 지운 뒤 ↩ 로 못 살림 ' + JSON.stringify(f));
+  const pv = id => go('stage=proto-vote', `const p = w.__votePreview('${id}'), a = w.__voteApply('${id}'); return { 필요: w.__vote().필요, 막음: w.__put('clinic', 137, 102, 0), p: p.집별, a: a && a.집별 };`);
+  const A = pv('A'), B = pv('B');
+  ok(A.필요 === '건강' && /쓰지 않아요/.test(String(A.막음)), 'proto-vote 필요·막음 ' + JSON.stringify([A.필요, A.막음]));
+  ok(A.p && JSON.stringify(A.p) === JSON.stringify(A.a) && B.p && JSON.stringify(B.p) === JSON.stringify(B.a), '미리 보기 ≠ 적용 ' + JSON.stringify({ A, B }).slice(0, 300));
 });
 
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
