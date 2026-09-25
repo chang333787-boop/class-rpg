@@ -74,6 +74,16 @@ test('규칙 덮기: VRULES 에 없는 키는 멈춘다', () => {
   ok(r.status !== 0 && /VRULES 에 없음/.test(r.stderr + r.stdout), '멈추지 않음');
 });
 
+/* [MAC-FLOWEND] 53-ⓑ102 — 목표 없는 흐름 판(proto-flow)만 실험 값을 결과로 · 길을 끊으면 못 받은 집이 는다 · 다른 판은 안 씀 */
+test('FLOWEND: proto-flow 결과 = 곡식·선반·못 받은 집 · 끊으면 못 받은 집이 는다 · farm/town3/proto-vote 는 안 씀', () => {
+  const go = (query, body) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: ${JSON.stringify(query)} });
+const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error(query + ' 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const f = go('stage=proto-flow', `const a = w.__flowEnd(); w.__tickBench(600); w.__del(142, 140); w.__tickBench(1800); return { a, b: w.__flowEnd() };`);
+  ok(f.a.쓰는판 && /^🌾 쌓인 곡식 \d+ · 🏪 선반 \d+ · 🏠 못 받은 집 0$/.test(f.a.지금) && /못 받은 집 [1-9]/.test(f.b.지금) && f.a.지금 !== f.b.지금, JSON.stringify(f));
+  for (const s of ['farm', 'town3', 'proto-vote']) { const o = go('stage=' + s, 'return w.__flowEnd();'); ok(o.쓰는판 === false && o.지금 === null, s + ' ' + JSON.stringify(o)); }
+});
 /* [MAC-NOWATER] 물 끔 — 기본 마을은 필요 셋 · 옛 우물 숨김 · 목표 bench1 · 물을 켜면(needWater.on — 우물을 지키는 판은 3b 뒤 없음 · 판 규칙 needWater 로 켤 수 있음) 옛 넷 · 옛 저장본의 well 은 bench1 으로 이어진다 */
 test('물 끔: 기본 마을 필요 셋 · 물을 켜면 옛 넷 · pop88 은 목표 bench1 을 잇는다', () => {
   const nw = (query, save, pre) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
