@@ -992,8 +992,14 @@ function buildCharDoll(s) {
   }
 
   out += headSvg + pick('weapon', eq.weapon) + fingers;
-  return '<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
-       + 'style="width:100%;height:100%">' + out + '</svg>';
+  // [CHAR-IDLE-1] 땅 그림자만 떼고 나머지를 한 묶음(cd-body)으로 — student.css 가 숨쉬기(발 기준 세로 늘임)·눈 깜빡임을 준다.
+  const shadowM = out.match(/<ellipse cx="60" cy="151"[^>]*\/>/);
+  const shadow = shadowM ? shadowM[0] : '';
+  if (shadow) out = out.replace(shadow, '');
+  return '<svg class="cdoll" viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
+       + 'style="width:100%;height:100%">'
+       + (shadow ? shadow.replace('<ellipse ', '<ellipse class="cd-shadow" ') : '')
+       + '<g class="cd-body">' + out + '</g></svg>';
 }
 
 // 화면이 쓰는 입구. 에셋이 준비됐으면 종이인형, 아니면 예전 그림.

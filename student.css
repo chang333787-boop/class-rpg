@@ -1772,3 +1772,11 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 #if-topview.look-sky,#ff-topview.look-sky{background:#12163a url('assets/ui/sky_stars.svg') repeat}
 @media (max-width:480px){ #if-phase-btn{order:12;flex:0 0 44px;min-height:40px;font-size:16px!important} }
 
+/* [CHAR-IDLE-1] 캐릭터 종이인형 — 서 있을 때 숨쉬기(발 기준 세로로 살짝 늘었다 줄기)·땅 그림자 따라 숨쉬기·가끔 눈 깜빡임 */
+.cdoll .cd-body{transform-box:view-box;transform-origin:60px 147px;animation:cdBreath 3.2s ease-in-out infinite}
+.cdoll .cd-shadow{transform-box:view-box;transform-origin:60px 151px;animation:cdShadow 3.2s ease-in-out infinite}
+.cdoll .blink{animation:cdBlink 4.7s linear infinite}
+@keyframes cdBreath{0%,100%{transform:scale(1,1)}50%{transform:scale(1.006,1.014)}}
+@keyframes cdShadow{0%,100%{transform:scale(1,1)}50%{transform:scale(.96,1)}}
+@keyframes cdBlink{0%,94%,100%{opacity:0}95%,97.5%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.cdoll .cd-body,.cdoll .cd-shadow,.cdoll .blink{animation:none}}
