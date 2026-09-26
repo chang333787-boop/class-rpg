@@ -180,7 +180,7 @@ w.__tickBench(300); process.stdout.write('@@' + JSON.stringify([w.__waitHomesTap
     const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('__waitHomesTap 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
   const a = tap('', 'village/stages/boards/pop88.json'), b = tap('stage=farm', 'village/stages/boards/mid36.json');
   [...a, ...b].forEach(t => { ok(t.말 && t.말.endsWith(' · ' + t.집말), '칩 말 ≠ 집 말: ' + JSON.stringify(t)); ok(!/—\s+중에/.test(t.말), '빈 그림: ' + t.말); });
-  ok(/^🏠 이 동네 18채 · 하나만 더/.test(a[0].말), 'pop88 첫 동네 ' + a[0].말);
+  ok(/^🏠 이 동네 18채 · (하나만 더|새 가족은)/.test(a[0].말), 'pop88 첫 동네 ' + a[0].말);   /* '새 가족은 …' = [MAC-BUBBLEHELP] 가 waitSayJob 을 규칙 문구로 바꾼 뒤 */
 });
 /* [MAC-JOBVACANT] 빈 일자리 💼 — 일할 어른이 없으면 안 띄움(origin: 옛 5 → 0) · 일할 어른이 있으면 그 집 가까운 빈 자리에만(pop88 에 길이 끊긴 가게 — 멀면 안 띄움 · near 를 넓히면 띄움) */
 test('빈 자리 💼: origin 은 일할 어른 0 이라 안 띄움(끄면 옛 모습) · pop88 끊긴 가게는 가까울 때만', () => {
