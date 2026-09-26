@@ -13571,6 +13571,68 @@ function twoClear(open) { if (!STAGE.id || !window.VRULES.twoTry.on || !/(^|,)�
   setTimeout(() => toast('🧽 이 판의 카드 기록(첫날·지난 시도·짐작)을 지웠어요' + (open ? '' : ' — 다시 열면 첫 카드부터'), true), open ? 900 : 0); }
 twoClear(true); addEventListener('hashchange', () => twoClear(false));
 window.__twoTry = () => { const L = STAGE.id ? scardLoad().지난 : null; return { 켜짐: window.VRULES.twoTry.on, 끝카드되는판: STAGE.def ? (STAGE.def.교과 != null || stageEndOk()) : false, 지난: L ? { ...L, 사진: !!L.사진 } : null, ...TWO.stats }; };
+/* ── [MAC-BUBBLEHELP] 풍선 뜻 · 새 가족이 오는 규칙을 화면에서 (사용자 09-26 — "말풍선이 정확히 뭘 원하는지 모르겠어 · 애들은 이해 못할 것 같아 · 가이드가 필요" ·
+   "저 가방 같은 게 일자리였구나 몰랐어 · 왜 이사 안 오나 했더니 인프라가 갖춰져야 오는 거였구나 — 네가 말 안 해줬으면 몰랐음") ──
+   선생님도 💼=일자리 · 이사 규칙을 몰랐다 — 규칙은 코드에만 있고 화면이 말하지 않았다.
+   ① 🎯 목표판 맨 아래 [❓ 풍선 뜻 · 이사 규칙] → 네 장 카드(머리 위 ? 그림 · 얼굴과 ♥ 그림 · 새 가족이 오는 규칙 · 시설이 닿는 곳). 읽는 동안 시계를 세운다(첫 안내 꼴).
+   ② 첫 안내 셋째 장(🎯)에 '❓ 풍선 뜻도 거기 있어요' 한 줄.
+   ③ 주민을 누르면, 그 주민 머리 위에 지금 떠 있는 풍선의 뜻 한 줄을 붙인다.
+   ④ 빈 집을 누르면 규칙을 그대로 — "새 가족은 가게·놀이터·긴의자 중 둘이 가까우면 와요 — 지금 가게 ✓ · 놀이터 ✗ · 긴의자 ✗" (waitSayJob 감싸기).
+      이 글은 빈 집 이사 판정(moveInWhy)의 참·거짓으로도 쓰여 **빈 글을 돌려주지 않는다**(모르는 경우는 옛 말).
+   숫자는 코드 값(turnAway.graceBelow · minHave · AWAY_NEEDS · JOB_POP · MOVEIN_MIN_ROAD · NEED_R · NEED_R_WIDE)에서 읽는다.
+   판정 0 · 저장 0 · 원래 줄 0(renderGoals · folkCard · waitSayJob 감싸기 · 첫 안내 셋째 장 글). 스위치 VRULES.bubbleHelp(말). */
+(window.VRULES = window.VRULES || {}).bubbleHelp = { on: true };
+const BHELP = { on: false, i: 0, held: false, el: null, css: false, stats: { 열림: 0, 주민말: 0, 빈집말: 0 } };
+const BH_PLACE = { 물: '우물', 장보기: '가게', 놀이: '놀이터', 쉼: '긴의자', 배움: '도서관', 건강: '동네 의원' };
+const BH_NUM = ['', '하나', '둘', '셋', '넷', '다섯'];
+const bhNames = () => AWAY_NEEDS.map(k => BH_PLACE[k] || NEED_TXT[k] || k);
+function bhPages() { const T = window.VRULES.turnAway, n = T.minHave | 0 || 2, names = bhNames().join(' · ');
+  return [
+    { pic: '🛒❓', txt: '머리 위 <b>?</b> 그림은 <b>가까이 있었으면 하는 곳</b>이에요.<br>🛒 가게 · 🛝 놀이터 · 🪑 긴의자 · 📚 도서관 · 🏥 의원<br>💼 일할 곳 · 🚶 덜 붐비는 길 · 🌳 나무·꽃<br>그 집 <b>가까이</b>(길로) 지어 주면 풍선이 사라져요.' },
+    { pic: '😊 😐 😟', txt: '얼굴은 <b>기분</b>이에요. 😊 다 가까워요 · 😐 😟 무언가 멀어요 → <b>집을 눌러</b> 보세요.<br><b>♥</b> 그림은 좋은 일 — 🎉 바라던 게 생겼어요 · 🌸 꾸민 게 좋아요<br>💬 바라는 게 있어요(주민을 눌러요) · 🤒 아파요<br>가게·일터 위 <b>💼</b> = 거기 <b>빈 일자리</b>가 있어요.' },
+    { pic: '🏠', txt: '<b>새 가족은 이럴 때 이사 와요</b><br>집은 <b>길 옆</b> · 길이 <b>' + MOVEIN_MIN_ROAD + '칸</b> 넘게 이어져야 해요.<br>주민 <b>' + T.graceBelow + '명</b>부터: <b>' + names + '</b> 중 <b>' + (BH_NUM[n] || n) + '</b>이 가까워야 와요.<br>주민 <b>' + JOB_POP + '명</b>부터: <b>일할 곳</b>(가게·온실·풍차)도 가까워야 와요.<br>빈 집을 누르면 무엇이 모자란지 알려 줘요.' },
+    { pic: '🛝➡️🏠', txt: '시설은 <b>길로 ' + NEED_R + '칸</b> 안에 있는 집이 써요(큰길은 ' + NEED_R_WIDE + '칸).<br>시설을 누르면 <b>파란 길</b>(닿는 곳)과<br><b>노란 집</b>(쓰는 집)이 잠깐 보여요.' } ]; }
+function bhCss() { if (BHELP.css || !document.head || !document.createElement) return; BHELP.css = true;   /* 목표판 단추도 이 모양을 쓰니 그릴 때 먼저 넣는다 */
+  const st = document.createElement('style'); st.textContent = '#bubbleHelp{position:fixed;inset:0;z-index:21;background:#0f111699;display:none;align-items:center;justify-content:center;padding:20px}#bubbleHelp.show{display:flex}'
+    + "#bubbleHelp .card{background:#1a1d26;border:1px solid #3a4050;border-radius:16px;padding:20px 22px;width:min(92vw,440px);box-shadow:0 12px 40px #000b;font:15.5px/1.6 'Malgun Gothic',sans-serif;color:#e8e6e0;text-align:center}"
+    + '#bubbleHelp .pic{font-size:44px;line-height:1.2;margin-bottom:6px}#bubbleHelp .txt{min-height:96px}#bubbleHelp .txt b{color:#e8b04b}#bubbleHelp .dots{margin:8px 0 12px;color:#556}#bubbleHelp .dots b{color:#e8b04b}'
+    + '#bubbleHelp .btns{display:flex;gap:10px;justify-content:center}#bubbleHelp button{background:#222630;border:1px solid #3a4050;color:#e8e6e0;border-radius:10px;padding:10px 16px;font-size:15px;cursor:pointer;min-height:44px;min-width:96px}'
+    + '#bubbleHelp button.main{background:#e8b04b;color:#1a1d26;border-color:#e8b04b;font-weight:800}#goals .bh{margin-top:6px}#goals .bh button{background:#223a2a;border:1px solid #5fc27e;color:#e8f5ea;border-radius:9px;min-height:36px;padding:0 10px;font:700 12.5px/1 "Malgun Gothic",sans-serif;cursor:pointer}';
+  document.head.appendChild(st); }
+function bhEl() { if (BHELP.el) return BHELP.el; bhCss();
+  const el = document.createElement('div'); el.id = 'bubbleHelp';
+  el.innerHTML = '<div class="card"><div class="pic"></div><div class="txt"></div><div class="dots"></div><div class="btns"><button data-bh="back">이전</button><button data-bh="next" class="main">다음</button><button data-bh="close">닫기</button></div></div>';
+  el.addEventListener('click', e => { const b = e.target && e.target.closest ? e.target.closest('button[data-bh]') : null; if (!b) return; const a = b.getAttribute('data-bh'), N = bhPages().length;
+    if (a === 'back') { if (BHELP.i > 0) { BHELP.i--; bhRender(); } } else if (a === 'next') { if (BHELP.i < N - 1) { BHELP.i++; bhRender(); } else bhClose(); } else bhClose(); });
+  ['pointerdown', 'pointerup', 'wheel', 'touchstart'].forEach(t => el.addEventListener(t, e => e.stopPropagation()));
+  document.body.appendChild(el); BHELP.el = el; return el; }
+function bhRender() { const el = bhEl(), P = bhPages(), p = P[BHELP.i] || P[0];
+  el.querySelector('.pic').textContent = p.pic; el.querySelector('.txt').innerHTML = p.txt; el.querySelector('.dots').innerHTML = P.map((_, k) => k === BHELP.i ? '<b>●</b>' : '○').join(' ');
+  el.querySelector('button[data-bh="back"]').style.visibility = BHELP.i ? '' : 'hidden'; el.querySelector('button[data-bh="next"]').textContent = BHELP.i === P.length - 1 ? '알겠어요' : '다음'; }
+function bhOpen(page) { if (!window.VRULES.bubbleHelp.on) return false; const el = bhEl(); BHELP.i = page | 0; BHELP.on = true; BHELP.stats.열림++;
+  BHELP.held = !SIM.paused; if (BHELP.held) SIM.paused = true; el.classList.add('show'); bhRender(); return true; }
+function bhClose() { if (!BHELP.el) return; BHELP.el.classList.remove('show'); BHELP.on = false; if (BHELP.held) { BHELP.held = false; SIM.paused = false; } }
+{ const rg0 = renderGoals; renderGoals = function () { const x = rg0.apply(this, arguments); if (!window.VRULES.bubbleHelp.on) return x; const el = document.getElementById('goals'); if (!el || !el.insertAdjacentHTML) return x; bhCss();
+    el.insertAdjacentHTML('beforeend', '<div class="g bh"><button data-bh="open">❓ 풍선 뜻 · 이사 규칙</button></div>');
+    const b = el.querySelector && el.querySelector('button[data-bh="open"]'); if (b) b.onclick = e => { e.stopPropagation(); bhOpen(0); }; return x; }; }
+if (GUIDE_CARDS[2] && window.VRULES.bubbleHelp.on) GUIDE_CARDS[2].txt += '<br>🎯 안의 <b>❓ 풍선 뜻</b>에서 머리 위 그림의 뜻을 볼 수 있어요.';
+/* ③ 주민을 누르면 머리 위 풍선의 뜻 */
+const BH_WHY = { 좋아요: '🌸 꾸민 게 좋아요', 콧노래: '🎵 기분이 좋아요', 인사: '👋 이웃과 인사해요', 기쁨: '🎉 바라던 게 생겼어요', 붐빔: '🚶? 길이 붐벼요 — 길을 더 이어 주세요', 삭막: '🌳? 거리가 삭막해요 — 나무·꽃을 가까이 놓아 주세요', 일자리: '💼? 일할 곳이 멀어요 — 가게·온실·풍차를 가까이 지어 주세요' };
+function bhFolkLine(f) { const now = performance.now(); if (!f || f.wish) return '';
+  if (f.whyShow && now <= (f.whyUntil || 0)) { const k = f.whyShow, pl = BH_PLACE[k]; if (BH_WHY[k]) return '머리 위 ' + BH_WHY[k]; if (pl) return '머리 위 ' + (WHY_ICON[k] || '') + '? ' + josa(pl, '이', '가') + ' 멀어요 — 집 가까이 지어 주세요'; }
+  if (f.faceShow != null && f.faceShow >= 0 && f.faceShow <= 2 && now <= (f.faceUntil || 0)) return f.faceShow === 0 ? '😊 필요한 곳이 다 가까워요' : '머리 위 ' + ['😊', '😐', '😟'][f.faceShow] + ' 무언가 멀어요 — 집을 눌러 보세요';
+  return ''; }
+{ const fc0 = folkCard; folkCard = function (f) { const t = fc0.apply(this, arguments); if (!window.VRULES.bubbleHelp.on) return t; const w = bhFolkLine(f); if (w) BHELP.stats.주민말++; return w ? t + '\n' + w : t; }; }
+/* ④ 빈 집을 누르면 규칙 그대로 — 빈 글은 돌려주지 않는다(이사 판정이 참·거짓으로 읽는다) */
+function bhRuleText(miss, minHave) { const n = minHave || 2, job = miss.includes('일자리'), rest = miss.filter(k => AWAY_NEEDS.includes(k)), other = miss.filter(k => k !== '일자리' && !AWAY_NEEDS.includes(k)), parts = [];
+  if (AWAY_NEEDS.length - rest.length < n) parts.push('새 가족은 ' + bhNames().join('·') + ' 중 ' + (BH_NUM[n] || n) + '이 가까우면 와요 — 지금 ' + AWAY_NEEDS.map(k => (BH_PLACE[k] || k) + (rest.includes(k) ? ' ✗' : ' ✓')).join(' · '));
+  if (job) parts.push('주민 ' + JOB_POP + '명부터는 일할 곳(가게·온실·풍차)도 가까워야 와요 — 지금 ✗');
+  other.forEach(k => parts.push(typeof capSayOf === 'function' ? capSayOf(k) : (NEED_TXT[k] || k) + '이 멀어요'));
+  return parts.join(' · '); }
+{ const wj0 = waitSayJob; waitSayJob = function (miss, minHave, rec) { if (!window.VRULES.bubbleHelp.on || !Array.isArray(miss)) return wj0.apply(this, arguments); const t = bhRuleText(miss, minHave);
+    if (!t) return wj0.apply(this, arguments); BHELP.stats.빈집말++; return t; }; }
+window.__bubbleHelp = (page) => { if (page != null) bhOpen(page); return { 켜짐: window.VRULES.bubbleHelp.on, 열림: BHELP.on, 장: BHELP.i + 1, 멈춤: SIM.paused, 글: bhPages().map(p => p.txt.replace(/<[^>]+>/g, '')), 주민예: (() => { for (const f of folks) { if (bhFolkLine(f)) return folkCard(f); } return null; })(), ...BHELP.stats }; };
+window.__bhRule = (miss, minHave) => bhRuleText(miss, minHave || window.VRULES.turnAway.minHave);
 /* ── [MAC-ENDCARD2] 끝 카드 셋 — ⓑ94 내가 놓은 곳 동그라미 · ⓑ95 단원 이름은 판의 교과 · ⓒ83 두 번 다 같으면 다음 시도를 부르는 한 줄 (창조자 45회 · 보스 09-24) ──
    ⓑ94 끝 카드 두 사진(첫날↔오늘 · 지난↔이번)은 판 전체를 같은 틀로 찍어, 아이가 놓은 우물·가게가 320×180 사진에서 안 보였다.
         두 사진 위에 **내가 놓은 곳**을 노란 동그라미로 둔다.
