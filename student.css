@@ -1580,10 +1580,20 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 .deco-tab.is-on{background:#d9a441;color:#231c12}
 .deco-gold{flex-shrink:0;display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:20px;white-space:nowrap;
   background:rgba(255,255,255,.05);border:1px solid rgba(217,164,65,.4);color:#d9a441;font-size:14px;font-weight:800}
-.deco-kinds,#if-deco-shop{display:none}
-.deco-drawer.is-shop .deco-kinds{display:flex;gap:6px;overflow-x:auto;margin-bottom:6px;scrollbar-width:none}
+#if-deco-shop{display:none}
+/* [DECO-KINDS-1] 종류 칩 — 두 탭이 같이 쓰고 머리줄 안에 산다(사용자 09-26 "찾기 칸이 긴데 그 공간 좀 쓰지").
+   넓은 화면(901~) = 찾기 칸 옆 남는 폭 전부 · 좁은 화면 = 머리 아래 한 줄(아래 @media). 넘치면 옆으로 밀고 오른쪽 끝이 흐려진다 */
+.deco-kinds{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 0;min-width:120px}
+.deco-kinds[hidden]{display:none}
 .deco-kinds::-webkit-scrollbar{display:none}
 .deco-kinds .deco-chip{height:44px}
+.deco-kinds.is-more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
+/* 종류 이름표 — '전체'로 볼 때 묶음 앞에. 누르는 것이 아니다(거르기는 칩) */
+.deco-ghead{flex-shrink:0;align-self:stretch;width:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  margin-left:4px;border-left:2px solid rgba(217,164,65,.45);color:var(--txt3);font-size:11px;font-weight:800;line-height:1;user-select:none}
+.deco-ghead:first-child{margin-left:0}
+.deco-ghead .dgh-i{font-size:15px}
+.deco-ghead .dgh-t{writing-mode:vertical-rl;letter-spacing:1px;white-space:nowrap}
 .deco-drawer.is-shop #if-deco-shop{display:flex;flex-wrap:wrap;gap:10px .35rem}   /* 줄 사이 10px — 아랫줄의 NEW 알약이 한 줄 서랍 밑으로 비치지 않게 */
 .deco-drawer.is-shop #if-deco-inv,.deco-drawer.is-shop #if-deco-quick,
 .deco-drawer.is-shop #if-deco-empty,.deco-drawer.is-shop #if-deco-scene-only{display:none!important}
@@ -1622,7 +1632,7 @@ body.deco-floor-mode #if-deco-drawer{display:none}
   font-family:inherit;font-size:12px;font-weight:700;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--txt2)}
 .deco-qchip.is-sel{border-color:var(--gold);background:rgba(255,215,0,.18);color:var(--gold)}
 .deco-qchip .deco-thumb-box,.deco-qchip .deco-thumb{margin:0!important}
-@media (min-width:901px){ .deco-search-wrap{flex:1 1 200px;min-width:180px} }
+@media (min-width:901px){ .deco-search-wrap{flex:0 1 210px;min-width:160px} }   /* [DECO-KINDS-1] 964px 로 늘어나던 찾기 칸 — 남는 폭은 종류 칩이 쓴다 */
 /* 사기 막대 — 머리 오른쪽(좁은 폭은 머리 아래 한 줄) */
 .deco-buybar{display:flex;align-items:center;gap:6px;min-width:0;flex:0 1 auto;height:44px;padding:0 4px 0 12px;border-radius:12px;
   border:1.5px solid rgba(217,164,65,.6);background:rgba(20,24,32,.6);color:var(--txt);font-size:13px;font-weight:700}
@@ -1640,6 +1650,18 @@ body.deco-floor-mode #if-deco-drawer{display:none}
   .deco-drawer-head{flex-wrap:wrap}
   .deco-buybar{order:10;flex:1 1 100%}
   .deco-buybar .db-msg{flex:1}
+  .deco-kinds{order:8;flex:1 1 100%}   /* [DECO-KINDS-1] 머리 아래 한 줄 — 옛 상점 칩 줄 자리 그대로 */
+  /* '내 것'은 칩 줄을 펼쳤을 때(⌃)만 — 접힌 서랍에 한 줄 더하면 폰 마당이 화면 절반 밑(45%)으로. 묶음 이름표는 늘 있다 */
+  .deco-drawer:not(.is-shop):not(.is-open) .deco-kinds{display:none}
+}
+/* 키 작은 좁은 화면(756×469 등)은 펼쳐도 — 펼친 서랍이 한 줄 더 크면 위 장식·바닥·치우기 단추를 덮었다(하네스 안눌리는단추_펼침) */
+@media (max-width:900px) and (max-height:599px){ .deco-drawer:not(.is-shop) .deco-kinds{display:none} }
+/* [DECO-KINDS-1] 901~1279 는 칩이 머리줄에 들어오면서 사기 막대 자리가 모자라다(1024: 칩 120px · 값이 '오리 가…'로 잘림)
+   → 카드를 골랐을 때만 막대가 머리 아래 한 줄. 그때 서랍 키 = 옛 상점(칩 한 줄) 그대로 · 안 골랐을 때는 한 줄 낮다 */
+@media (min-width:901px) and (max-width:1279px){   /* is-buying = 막대가 보일 때만(최근 칩이 많은 '내 것' 머리줄은 한 줄 그대로) */
+  .deco-drawer.is-buying .deco-drawer-head{flex-wrap:wrap}
+  .deco-drawer.is-buying .deco-buybar{order:10;flex:1 1 100%}
+  .deco-drawer.is-buying .deco-buybar .db-msg{flex:1}
 }
 @media (max-width:700px){   /* 폰: 첫 줄 = 탭·골드·⌃ / 둘째 줄 = 찾기·이 장소만 */
   .deco-gold{margin-left:auto}

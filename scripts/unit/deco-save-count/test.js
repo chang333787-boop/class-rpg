@@ -2188,6 +2188,35 @@
       _drawDeco();
     }
 
+    //  ㊼-7 종류 칩 · 종류 묶음(DECO-KINDS-1 · 사용자 09-26) — 칩은 머리줄 안 한 자리(두 탭이 같이) · '전체'는 종류마다 이름표 + 그 종류 카드만 뒤에 ·
+    //    칩 = 그 종류만(이름표 없음) · 고른 종류는 상점도 같이 · 그 장소에 없는 종류면 전체 · 한 종류뿐이면 칩 숨김 · 거르기만(저장 0)
+    if (typeof decoKindSet === 'function' && _ifMode) {
+      if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }
+      const keepI = CUR.inventory, keepK = _decoShop.kind, keepQ = _decoFind.q, keepSO = _decoFind.sceneOnly, sv = JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.gold]);
+      const K = id => _decoShopKind(GAME_DATA.decorations.find(d => d.id === id)), order = DECO_SHOP_KINDS.map(k => k[0]);
+      CUR.inventory = ['d_y9', 'd_y1', 'd_y32', 'd_y12', 'd_y2', 'd_y39', 'd_y11', 'd_y10', 'd_i5'].filter(id => GAME_DATA.decorations.some(d => d.id === id)).map(id => ({ id, qty: 1 }));
+      saves = 0; _decoFind.q = ''; _decoFind.sceneOnly = true; decoTab('own'); decoKindSet('all'); await sleep(50);
+      const chipsEl = document.getElementById('if-deco-kinds');
+      out('종류칩_머리줄안·한자리', chipsEl.parentElement.classList.contains('deco-drawer-head') && document.querySelectorAll('#if-deco-kinds').length === 1);
+      const want = [...new Set(CUR.inventory.map(i => GAME_DATA.decorations.find(d => d.id === i.id)).filter(d => d.cat === 'yard').map(d => _decoShopKind(d)))].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      { let cur = null, ok = true; const heads = [];
+        document.querySelectorAll('#if-deco-inv > .deco-ghead, #if-deco-inv > .deco-card').forEach(e => {
+          if (e.classList.contains('deco-ghead')) { cur = e.dataset.kind; heads.push(cur); } else if (K(e.dataset.decoId) !== cur) ok = false; });
+        out('종류묶음_전체_이름표·순서', { 이름표: heads.join(' '), 맞나: ok && heads.join(' ') === want.join(' ') }); }
+      out('종류칩_있는종류만', [...chipsEl.querySelectorAll('.deco-chip')].map(c => c.dataset.kind).join(' ') === ['all'].concat(want).join(' '));
+      decoKindSet('animal'); await sleep(30);
+      { const an = [...document.querySelectorAll('#if-deco-inv .deco-card')].map(c => c.dataset.decoId), on = chipsEl.querySelector('.is-on');
+        out('종류칩_누르면_그종류만·이름표없음', an.length === 2 && an.every(id => K(id) === 'animal') && !document.querySelector('#if-deco-inv .deco-ghead') && !!on && on.dataset.kind === 'animal'); }
+      decoTab('shop'); await sleep(30);
+      { const sh = [...document.querySelectorAll('#if-deco-shop .deco-scard')].map(c => c.dataset.shopId), on = chipsEl.querySelector('.is-on');
+        out('종류칩_상점도같이', sh.length > 0 && sh.every(id => K(id) === 'animal') && !!on && on.dataset.kind === 'animal'); }
+      decoTab('own'); toggleDecoScene(); await sleep(300);
+      out('종류칩_집안엔없는종류→전체·한종류면숨김', _decoShop.kind === 'all' && chipsEl.hidden && [...document.querySelectorAll('#if-deco-inv .deco-card')].some(c => c.dataset.decoId === 'd_i5'));
+      toggleDecoScene(); await sleep(300);
+      out('종류칩_거르기만_저장0', saves === 0 && JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.gold]) === sv);
+      CUR.inventory = keepI; _decoFind.q = keepQ; _decoFind.sceneOnly = keepSO; decoKindSet(keepK || 'all'); decoTab('own'); renderDecoInv();
+    }
+
     //  ㊼-2 별빛 땅(DECO-STAR-P3 · 놀이판 개발 스위치) — 켜면 잔디 무리 칸이 남색 땅 + 은하수 띠 · 풀 번짐·물 #star · 끄면 기본 판 픽셀 그대로(캐시가 섞이지 않는다)
     if (typeof _yardLookDev !== 'undefined' && typeof _starGroundFill === 'function' && _ifMode) {
       if (DECO_SCENE !== 'yard') { toggleDecoScene(); await sleep(300); }

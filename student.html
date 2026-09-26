@@ -15,7 +15,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260924mh1">
+<link rel="stylesheet" href="./student.css?v=20260924mh2">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
@@ -808,6 +808,8 @@
           <button id="if-deco-search-clear" onclick="decoFindSet('q','');document.getElementById('if-deco-search').value=''"
             aria-label="지우기" hidden>✕</button>
         </div>
+        <!-- [DECO-KINDS-1] 종류 칩 — 두 탭이 같이 쓴다. 넓은 화면은 찾기 칸 옆(머리줄 안 · 서랍 키 그대로), 좁은 화면은 머리 아래 한 줄 -->
+        <div id="if-deco-kinds" class="deco-kinds" role="group" aria-label="종류" onscroll="_decoKindsFade(this)"></div>
         <!-- [DECO-SEL-A5] 넓은 화면: 최근 놓은 것은 머리줄 안 작은 칩으로 — 따로 한 줄이 생기면 마당이 76px 줄어 아래를 누르면 서랍이었다 -->
         <div id="if-deco-quick-head" class="deco-quick-head" role="group" aria-label="최근 놓은 것" hidden></div>
         <button id="if-deco-scene-only" class="deco-chip is-on" onclick="decoFindSet('sceneOnly')"
@@ -816,7 +818,6 @@
         <div id="if-deco-buybar" class="deco-buybar" hidden></div>
         <button id="if-deco-expand" class="deco-chip" onclick="decoDrawerToggle()" aria-label="서랍 펼치기">⌃</button>
       </div>
-      <div id="if-deco-kinds" class="deco-kinds" role="group" aria-label="상점 분류"></div>
       <div id="if-deco-quick" class="deco-quick" hidden></div>
       <div id="if-deco-body" class="deco-drawer-body">
         <div id="if-deco-inv" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
@@ -943,7 +944,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260924mh1"></script>
+<script src="./student.js?v=20260924mh2"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
