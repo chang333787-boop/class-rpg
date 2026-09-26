@@ -11786,7 +11786,7 @@ function _decoPillarSync() {
   if (h > 0) fs.style.setProperty('--deco-drawer-h', h + 'px');
   else if (fs.style.display !== 'none' && dr.offsetParent === null) fs.style.setProperty('--deco-drawer-h', '0px');   // 바닥 모드(서랍 숨김)
 }
-if (typeof window !== 'undefined') addEventListener('resize', () => { try { _decoPillarSync(); } catch (e) {} });
+if (typeof window !== 'undefined') addEventListener('resize', () => { try { _decoPillarSync(); _decoKindsKeep(); } catch (e) {} });   // [DECO-KINDS-1] 폭이 바뀌면 칩 끝 흐림 · 고른 칩도
 
 function decoDrawerToggle() {
   const dr = document.getElementById('if-deco-drawer'); if (!dr) return;
@@ -11861,6 +11861,7 @@ function renderDecoInv(){
   _decoShopSync();   // [DECO-SHOP-1] 골드 배지 · 손끝 그림 끝내기 · 씬이 바뀌었으면 상점 목록도
   _decoRenderQuick(inv, placed);   // [DECO-FIND-1] 최근 놓은 것 줄
   if(!inv.length){
+    if (DECO_TAB !== 'shop') _decoKindsRender({}, 'all');   // [DECO-KINDS-1] 거를 것이 없다
     //  [DECO-FIRST-1] 처음 아이 — 작은 글 한 줄 대신 누를 곳 하나를 크게(계획 U3). 누르면 서랍이 🛒 상점으로
     el.innerHTML = _ifMode
       ? `<button class="deco-first-card" onclick="decoTab('shop')"><span class="dfc-ico">🛒</span><span class="dfc-txt"><b>첫 장식 골라 보기</b><small>골드로 사서 ${DECO_SCENE === 'yard' ? '마당' : '집 안'}에 놓아요</small></span></button>`
@@ -11869,27 +11870,30 @@ function renderDecoInv(){
     return;
   }
   //  [DECO-FIND-1] 이 장소만 · 이름 검색으로 거른다(값·개수·놓기 규칙은 그대로)
-  let hidden = 0;
+  //  [DECO-KINDS-1] 종류 칩도 — 칩은 '이 장소만'까지 거른 것에 있는 종류만(찾기 글과는 따로)
+  const dOf = id => GAME_DATA.decorations.find(x => x.id === id), has = {};
+  inv.forEach(i => { const d = dOf(i.id); if (d && (!_decoFind.sceneOnly || d.cat === DECO_SCENE)) has[_decoShopKind(d)] = 1; });
+  const kind = _decoKindFor(has, DECO_TAB !== 'shop');
+  if (DECO_TAB !== 'shop') _decoKindsRender(has, kind);
   const shown = inv.filter(i => {
-    const d = GAME_DATA.decorations.find(x => x.id === i.id);
-    const ok = _decoFindMatch(d, DECO_SCENE, _decoFind);
-    if (!ok) hidden++;
-    return ok;
+    const d = dOf(i.id);
+    return _decoFindMatch(d, DECO_SCENE, _decoFind) && (kind === 'all' || _decoShopKind(d) === kind);
   });
   //  [DECO-SHOP-1] 방금 산 것은 골라져 있는 동안 맨 앞에(서랍 끝에 붙으면 크롬북 한 줄 서랍에서 안 보인다)
   if (_decoShop.front && SEL_DECO === _decoShop.front) shown.sort((a, b) => (b.id === SEL_DECO) - (a.id === SEL_DECO));
   else _decoShop.front = null;
-  el.innerHTML = shown.map(i => {
-    const d = GAME_DATA.decorations.find(x => x.id === i.id); if (!d) return '';
+  const card = i => {
+    const d = dOf(i.id); if (!d) return '';
     const avail = i.qty - placed.filter(p => p.id === i.id).length;
     return _decoCardHtml(i, d, avail, DECO_SCENE);
-  }).join('');
+  };
+  el.innerHTML = kind === 'all' ? _decoGroupHtml(shown, i => _decoShopKind(dOf(i.id)), card, _decoShop.front) : shown.map(card).join('');
   const empty = document.getElementById('if-deco-empty');
   if (empty) {
     if (!shown.length) {
       empty.hidden = false;
       empty.textContent = (_decoFind.q || '').trim()
-        ? '"' + _decoFind.q.trim() + '" 이름인 장식이 없어요'
+        ? '"' + _decoFind.q.trim() + '" 이름인 ' + (kind === 'all' ? '장식이 없어요' : _decoKindName(kind) + _josa(_decoKindName(kind), '이', '가') + ' 없어요 — 칩을 "전체"로 바꿔 보세요')
         : (DECO_SCENE === 'yard' ? '마당에 놓을 장식이 없어요' : '집 안에 놓을 장식이 없어요') + ' — "이 장소만"을 끄면 다 보여요';
     } else empty.hidden = true;
   }
@@ -12043,33 +12047,88 @@ function decoTab(tab) {
   const q = tab === 'shop' ? _decoShop.q : _decoFind.q, inp = document.getElementById('if-deco-search'), clr = document.getElementById('if-deco-search-clear');
   if (inp) { inp.value = q || ''; inp.placeholder = tab === 'shop' ? '🔍 상점에서 찾기' : '🔍 이름으로 찾기'; }
   if (clr) clr.hidden = !(q || '').length;
-  if (tab === 'shop') _decoShopRender(); else _decoShopBarSync();
+  if (tab === 'shop') _decoShopRender(); else { _decoShopBarSync(); renderDecoInv(); }   // [DECO-KINDS-1] 종류 칩은 두 탭이 한 자리 — 내 것 칩으로 다시
   if (body) body.scrollTop = _decoShop.scroll[tab] || 0;
   _decoPillarSync(); _decoFit();
 }
 
-function decoShopKind(k) { _decoShop.kind = k; _decoShopRender(); }
+// ══ 종류 칩 · 종류 묶음 (DECO-KINDS-1) — 사용자 09-26 "항목별로 구분하면 더 눈에 잘 보이지 않을까 · 찾기 칸이 긴데 그 공간 좀 쓰지"
+//  고른 종류는 두 탭이 같이 쓴다(🌳 나무를 보다가 🛒 로 가면 나무 상점) — 값은 _decoShop.kind 하나.
+//  그 탭에 없는 종류면 '전체'로 본다. 지금 보이는 탭만 값을 되돌린다(안 보이는 탭이 그리다가 바꾸지 않게).
+function _decoKindFor(has, active) {
+  const k = _decoShop.kind;
+  if (k === 'all' || has[k]) return k;
+  if (active) _decoShop.kind = 'all';   // 마당↔집 안 · 이 장소만 · 탭을 오가면 그 종류가 없을 수 있다
+  return 'all';
+}
+const _decoKindName = k => { const x = DECO_SHOP_KINDS.find(y => y[0] === k); return x ? x[1].replace(/^\S+\s/, '') : ''; };   // '🌳 나무' → '나무'
+function _decoKindsRender(has, kind) {
+  const chips = document.getElementById('if-deco-kinds'); if (!chips) return;
+  const list = DECO_SHOP_KINDS.filter(k => k[0] === 'all' || has[k[0]]);
+  chips.hidden = list.length < 3;   // '전체' + 한 종류뿐이면 칩이 거를 것이 없다
+  chips.innerHTML = chips.hidden ? '' : list.map(k =>
+    `<button class="deco-chip${kind === k[0] ? ' is-on' : ''}" data-kind="${k[0]}" aria-pressed="${kind === k[0]}" onclick="decoKindSet('${k[0]}')">${k[1]}</button>`).join('');
+  _decoKindsKeep(chips);
+}
+//  칩이 넘치면 오른쪽 끝을 흐리게 — '옆으로 더 있다'. 끝까지 밀면 걷는다
+function _decoKindsFade(el) {
+  if (!el) return;
+  el.classList.toggle('is-more', el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+}
+//  고른 칩이 늘 보이게(사기 막대가 생겨 칩 자리가 줄어도) — scrollIntoView 는 서랍 바깥까지 밀 수 있어 칩 줄 안에서만 민다
+function _decoKindsKeep(el) {
+  el = el || document.getElementById('if-deco-kinds'); if (!el) return;
+  const on = el.querySelector('.deco-chip.is-on');
+  if (on && el.clientWidth) {
+    const c = el.getBoundingClientRect(), r = on.getBoundingClientRect();
+    if (r.left < c.left) el.scrollLeft -= c.left - r.left + 8;
+    else if (r.right > c.right - 36) el.scrollLeft += r.right - c.right + 44;   // 36 = 끝 흐림 폭
+  }
+  _decoKindsFade(el);
+}
+function decoKindSet(k) {
+  _decoShop.kind = DECO_SHOP_KINDS.some(x => x[0] === k) ? k : 'all';
+  const body = document.getElementById('if-deco-body'); if (body) body.scrollTop = 0;   // 거른 목록은 처음부터
+  if (DECO_TAB === 'shop') _decoShopRender(); else renderDecoInv();
+}
+//  '전체'로 볼 때 종류끼리 모아 앞에 작은 이름표 — 종류가 둘 이상일 때만. 방금 산 것(front)이 있으면 그 묶음을 맨 앞에.
+function _decoGroupHtml(list, kindOf, card, front) {
+  const by = {};
+  list.forEach(x => { const k = kindOf(x); (by[k] = by[k] || []).push(x); });
+  const keys = DECO_SHOP_KINDS.map(k => k[0]).filter(k => by[k]);
+  if (keys.length < 2) return list.map(card).join('');
+  const f = front && list.find(x => x.id === front);
+  if (f) { const k = kindOf(f); keys.splice(keys.indexOf(k), 1); keys.unshift(k); by[k].sort((a, b) => (b.id === front) - (a.id === front)); }
+  const name = {}; DECO_SHOP_KINDS.forEach(([k, t]) => { name[k] = t; });
+  return keys.map(k => {
+    const [ico, ...w] = name[k].split(' ');
+    return `<div class="deco-ghead" data-kind="${k}" role="heading" aria-level="3" aria-label="${name[k]} ${by[k].length}개">`
+      + `<span class="dgh-i" aria-hidden="true">${ico}</span><span class="dgh-t" aria-hidden="true">${w.join(' ')}</span></div>`
+      + by[k].map(card).join('');
+  }).join('');
+}
 
 function _decoShopRender() {
-  const el = document.getElementById('if-deco-shop'), chips = document.getElementById('if-deco-kinds');
+  const el = document.getElementById('if-deco-shop');
   if (!el || !CUR) return;
   _decoShop.scene = DECO_SCENE;
   const list = GAME_DATA.decorations.filter(d => _decoShopState(d) !== 'none');
   const has = {}; list.forEach(d => { has[_decoShopKind(d)] = 1; });
-  if (_decoShop.kind !== 'all' && !has[_decoShop.kind]) _decoShop.kind = 'all';   // 마당↔집 안을 오가면 그 분류가 없을 수 있다
-  if (chips) chips.innerHTML = DECO_SHOP_KINDS.filter(k => k[0] === 'all' || has[k[0]]).map(k =>
-    `<button class="deco-chip${_decoShop.kind === k[0] ? ' is-on' : ''}" aria-pressed="${_decoShop.kind === k[0]}" onclick="decoShopKind('${k[0]}')">${k[1]}</button>`).join('');
+  const kind = _decoKindFor(has, true);
+  _decoKindsRender(has, kind);
   const q = (_decoShop.q || '').trim(), free = !!(GAME_DATA.decoFreeNow && GAME_DATA.decoFreeNow());
   const d0 = new Date(), today = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
-  const shown = list.filter(d => (_decoShop.kind === 'all' || _decoShopKind(d) === _decoShop.kind) && (!q || String(d.name || '').indexOf(q) >= 0));
+  const shown = list.filter(d => (kind === 'all' || _decoShopKind(d) === kind) && (!q || String(d.name || '').indexOf(q) >= 0));
   if (_decoShop.sel && !shown.some(d => d.id === _decoShop.sel)) _decoShop.sel = null;
-  el.innerHTML = shown.length ? shown.map(d => {
+  const card = d => {
     const st = _decoShopState(d), own = _decoQtyOf(d.id);
     const price = st === 'gift' ? '🎁 도감 선물' : st === 'lock' ? `🔒 Lv${d.reqLv}+` : free ? `🎁 무료 <s>${d.price}G</s>` : `💰 ${_decoCostOf(d)}G`;
     return `<div class="deco-scard is-${st}${free && st === 'ok' ? ' is-free' : ''}${_decoShop.sel === d.id ? ' is-sel' : ''}" data-shop-id="${d.id}" onclick="decoShopPick('${d.id}')">`
       + `<div class="ds-art">${_decoThumb(d, 34)}</div><div class="dc-name">${escHtml(_decoShopName(d))}</div><div class="ds-price">${price}</div>`
       + (own > 0 ? `<span class="ds-own">×${own}</span>` : '') + ((d.newUntil && today <= d.newUntil) ? '<span class="ds-new">NEW</span>' : '') + '</div>';
-  }).join('') : `<div class="deco-empty">${q ? '"' + escHtml(q) + '" 이름인 장식이 상점에 없어요' : '여기에 놓을 장식이 상점에 없어요'}</div>`;
+  };
+  el.innerHTML = shown.length ? (kind === 'all' ? _decoGroupHtml(shown, _decoShopKind, card) : shown.map(card).join(''))
+    : `<div class="deco-empty">${q ? '"' + escHtml(q) + '" 이름인 ' + (kind === 'all' ? '장식이 상점에 없어요' : escHtml(_decoKindName(kind)) + _josa(_decoKindName(kind), '이', '가') + ' 상점에 없어요 — 칩을 "전체"로 바꿔 보세요') : '여기에 놓을 장식이 상점에 없어요'}</div>`;
   _decoShopBarSync();
 }
 
@@ -12106,7 +12165,8 @@ function _decoShopBarSync() {
     bar.innerHTML = `<span class="db-msg">${msg}</span>${btn}<button class="db-x" onclick="decoShopPick(null)" aria-label="고르기 풀기">✕</button>`;
     bar.hidden = false;
   }
-  if (was !== !bar.hidden) { _decoPillarSync(); _decoFit(); }   // 좁은 폭에서는 막대가 한 줄을 더 쓴다
+  const dr = document.getElementById('if-deco-drawer'); if (dr) dr.classList.toggle('is-buying', !bar.hidden);   // [DECO-KINDS-1] 901~1279 는 막대를 한 줄 아래로
+  if (was !== !bar.hidden) { _decoPillarSync(); _decoFit(); _decoKindsKeep(); }   // 좁은 폭에서는 막대가 한 줄을 더 쓴다 · [DECO-KINDS-1] 칩 자리도 바뀐다
 }
 
 function _josa(word, a, b) {   // 받침 있으면 a, 없으면 b
