@@ -6199,9 +6199,11 @@ function waitHomesGo() {
   if (groups.every(q => q.some(r => WAITHOMES.seen.has(r)))) WAITHOMES.seen.clear();
   WAITHOMES.seen.add(root); WAITHOMES.stats.눌러감++; const c = centerOf('house', cX(root), cY(root), rec.rot); camTarget.set(c.x, 2, c.z); miniDirty = true;
   sparkle.push({ x: c.x, z: c.z, until: SIM.t + 3000 }); const miss = WAITSCAN.lack.get(root), why = moveInWhy(rec);
-  toast(miss ? '🏠 이 동네 ' + g.length + '채 · ' + waitSay(miss, window.VRULES.turnAway.minHave) : why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, true);
+  toast(miss ? '🏠 이 동네 ' + g.length + '채 · ' + waitSayJob(miss, window.VRULES.turnAway.minHave, rec) : why === true ? '빈집이에요 · 곧 누가 걸어올 거예요' : '빈집이에요 · ' + why, true);
 }
 window.__waitHomes = () => ({ 켜짐: window.VRULES.waitHomes.on, 수: waitHomesScan(true).length, 훑기: { ...WAITSCAN.stats, 기억: { ...WAITMEMO.stats } }, 보임: !!(document.getElementById('waitHomes') && document.getElementById('waitHomes').style.display !== 'none'), 글: (document.getElementById('waitHomes') || {}).textContent || '', ...WAITHOMES.stats });
+/* [MAC-WAITCHIPSAY] 🏠 칩 말은 그 집을 눌렀을 때의 말과 같게 — waitSay 에 '일자리'·정원 부족이 섞여 '두 가지 더'·빈 그림이 나왔다(원래 줄 1 · waitSayJob) · 시험 훅: 칩을 한 번 누른 말과 그 집을 눌렀을 때의 말 */
+window.__waitHomesTap = () => { let said = null; const t0 = toast; toast = function (msg) { said = String(msg); return t0.apply(this, arguments); }; try { waitHomesGo(); } finally { toast = t0; } const r = [...WAITHOMES.seen].pop(); return { 말: said, 집: r == null ? null : [cX(r), cY(r)], 집말: r == null ? null : moveInWhy(cells[r]) }; };
 
 window.__away = () => ({ 켜짐: window.VRULES.turnAway.on, ...AWAY.stats, 돌아선집: AWAY.turned.size, 나가는중: awayLeavers(), 이사중: movers, 최근: AWAY.log.slice(-5) });
 
@@ -9196,8 +9198,8 @@ function drawFaces(now) {
   if (OFF.has('faces')) { facePool.forEach(im => im.count = 0); return; }
   const cnt = [0, 0, 0, 0, 0, 0];
   sparkle = sparkle.filter(sp => now <= sp.until);
-  if (jobStats.일없는어른 === 0 && jobStats.찬자리 < jobStats.일자리 && population() >= JOB_POP && !mapMode && (performance.now() % 6000) < 3000)   // 일터만 많다 — 빈 자리 위에 💼(3초마다)
-    jobCount.forEach((n, root) => { const rec = cells[root]; if (!rec || n >= K[rec.k].jobs || cnt[4] >= FOLK_CAP) return; const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
+  if (jobVacantOn() && population() >= JOB_POP && !mapMode && (performance.now() % 6000) < 3000)   // 빈 자리 위에 💼(3초마다) — [MAC-JOBVACANT] 일할 어른이 있을 때만(끄면 옛 '일터만 많다')
+    jobCount.forEach((n, root) => { const rec = cells[root]; if (!rec || n >= K[rec.k].jobs || cnt[4] >= FOLK_CAP || !jobVacantNear(root)) return; const c = centerOf(rec.k, cX(root), cY(root), rec.rot);
       faceDummy.position.set(c.x, 9.5, c.z); faceDummy.quaternion.copy(camera.quaternion); faceDummy.scale.set(1.4, 1.4, 1); faceDummy.updateMatrix(); facePool[4].setMatrixAt(cnt[4]++, faceDummy.matrix); });
   sparkle.forEach(sp => {
     faceDummy.position.set(sp.x, 9 + Math.sin(now / 120) * 0.3, sp.z); faceDummy.quaternion.copy(camera.quaternion);
@@ -13219,6 +13221,37 @@ function nouseDraw(now) {
   im.count = NOUSE.자리.length; if (im.count) im.instanceMatrix.needsUpdate = true;
 }
 window.__noUse = () => ({ 켜짐: nouseLive(), 자리: NOUSE.자리.map(([x, z]) => [Math.round(x / CS) + 128, Math.round(z / CS) + 128]), ...NOUSE.stats });
+/* ── [MAC-NOUSE-2] 못 쓰는 자리에 놓은 그 순간 한 줄 (창조자 61-ⓒ93 · 보스) ──
+   길에서 먼 밭은 '주민이 쓸 수 있는 밭' 목표에 **말없이** 안 세어졌다 — 긴의자는 MAC-SAY 가 "길 옆에 있어야 … — 길에 붙여 보세요"라 하는데
+   밭·부두·벌목장(필요를 안 채우는 것)은 그 말의 조건(need)에 안 들어 조용했다. 🚫(MAC-NOUSE)는 1초 안에 뜨지만 까닭을 말하지 않는다.
+   · 잣대는 🚫 와 **같은 것** — 그 판의 "쓸수있는" 목표 종류(nouseLive) · 놓인 것이 stageUsableOne 거짓. 새 판정 0.
+   · 말은 셋: 길 옆이 아니면 '길 옆에 있어야' · 길 옆인데 집까지 안 닿으면 '길로 집까지 닿아야' · 판에 집이 하나도 없으면 '집도 지어 보세요'.
+   · 필요를 채우는 것이 길 옆이 아닌 때는 MAC-SAY·PCOUNT 가 이미 말한다 — 건너뛴다(한 수에 같은 말 둘 ✗). 종류마다 gapMs 에 한 번.
+   · 불러오는 동안·구경·시연 판(sayLive)·틱 0(첫 틱 전 — 시작 땅을 까는 동안)에는 조용. 판정 0 · 저장 0 · 원래 줄 수정 0(placeAt 고리). 분류 '말'. */
+(window.VRULES = window.VRULES || {}).noUseSay = { on: true, gapMs: 20000 };
+const NUSAY = { at: new Map(), last: '', stats: { 말함: 0, 쉼: 0 } };
+hookAdd('placeAt', function (next, args) { const r = next(args), [, x, y] = args, R = window.VRULES.noUseSay;
+  if (!r || !R.on || !nouseLive() || !sayLive() || SIM.ticks <= 0 || !inb(x, y)) return r;
+  const rec = cells[idx(x, y)], k = rec && K[rec.k];
+  if (!k || !STAGE.def.목표.some(g => g.쓸수있는 && g.k === rec.k) || stageUsableOne(rec)) return r;
+  const 옆길 = roadsBeside(rec).length > 0; if (!옆길 && (k.need || k.need2) && !k.needRoad) return r;   /* MAC-SAY·PCOUNT 가 '길 옆에'를 이미 말한다 */
+  const now = performance.now(), t0 = NUSAY.at.get(rec.k); if (t0 != null && now - t0 < (R.gapMs | 0)) { NUSAY.stats.쉼++; return r; } NUSAY.at.set(rec.k, now);
+  const m = josa(k.nm, '은', '는') + (!옆길 ? ' 길 옆에 있어야 주민이 쓸 수 있어요 — 길에 붙여 보세요'
+    : countKind('house') ? ' 길로 집까지 닿아야 주민이 쓸 수 있어요 — 집 가까운 길 옆에 놓아 보세요' : ' 길로 집까지 닿아야 주민이 쓸 수 있어요 — 길 옆에 집도 지어 보세요');
+  NUSAY.last = m; NUSAY.stats.말함++; setTimeout(() => toast(m), 0); return r; });
+window.__noUseSay = () => ({ 켜짐: window.VRULES.noUseSay.on, 마지막: NUSAY.last, ...NUSAY.stats });
+/* ── [MAC-JOBVACANT] 빈 일자리 💼 — 일할 어른이 있을 때만, 그 집 가까운 빈 자리 위에 (보스 09-25 · 주민 연기 #1103 '살아 있는 첫 화면' 잰 값) ──
+   원본 첫 30초의 풍선 대부분이 💼 일곱 개였다 — drawFaces 가 '일터만 많다(일 없는 어른 0 · 빈 자리 있음)'일 때 빈 자리마다 💼 를 3초마다 깜박였다.
+   일 없는 어른이 0 이면 빈 자리는 걱정이 아니다(보이는 것 = 세는 것). 그래서 뒤집는다:
+   · 일 없는 어른이 **있을 때만**, 그 어른들 집(JOBH.lack)에서 곧은 거리 near(24칸) 안의 빈 자리 위에 💼. 길로 안 닿아 못 가는 빈 자리를 짚어 준다.
+   · 집별 일 없는 어른을 모를 때(옛 셈 jobsHomes 끔)는 빈 자리 모두.
+   · 건물을 눌렀을 때 카드의 '빈 자리 n'은 그대로. 판정 0 · 저장 0 · 원래 줄 2줄(drawFaces 의 조건 한 줄 · 빈 자리 거르기 한 줄). 스위치 VRULES.jobVacant(보기) — 끄면 옛 모습. */
+(window.VRULES = window.VRULES || {}).jobVacant = { on: true, near: 24 };
+function jobVacantOn() { const R = window.VRULES.jobVacant; return jobStats.찬자리 < jobStats.일자리 && (R && R.on ? jobStats.일없는어른 > 0 : jobStats.일없는어른 === 0); }
+function jobVacantNear(root) { const R = window.VRULES.jobVacant; if (!R || !R.on || !JOBH.lack.size) return true; const x = cX(root), y = cY(root), d = R.near | 0 || 24;
+  for (const h of JOBH.lack.keys()) { if (Math.abs(cX(h) - x) + Math.abs(cY(h) - y) <= d) return true; } return false; }
+window.__jobVacant = () => { const out = []; if (jobVacantOn()) jobCount.forEach((n, root) => { const rec = cells[root]; if (rec && n < (K[rec.k].jobs | 0) && jobVacantNear(root)) out.push(rec.k + '@' + cX(root) + ',' + cY(root)); });
+  return { 켜짐: window.VRULES.jobVacant.on, 일없는어른: jobStats.일없는어른, 빈자리: jobStats.일자리 - jobStats.찬자리, 띄움: out }; };
 function loop() {
   requestAnimationFrame(loop);
   const now = performance.now();
@@ -13468,6 +13501,32 @@ function gkeepOpen(why) { if (!gkeepStage()) return; GKEEP.on = true; GKEEP.done
 function gkeepTry(n) { if (GKEEP.done || !gkeepStage()) return; if ((typeof GUIDE !== 'undefined' && GUIDE.on) || SCARD.el || (STAGE.id && !scardLoad().started && window.VRULES.stageCard && window.VRULES.stageCard.on)) { if (n > 0) setTimeout(() => gkeepTry(n - 1), 800); return; } gkeepOpen('열 때'); }
 setTimeout(() => gkeepTry(40), 2000);
 window.__goalsKeep = () => ({ 켜짐: window.VRULES.goalsKeep.on, 펴둠: GKEEP.on, 까닭: GKEEP.why || null, 판목표: STAGE.goals.length, 판이룸: STAGE.goals.filter(g => goalsDone.has(g.id)).length, 보임: document.getElementById('goals').classList.contains('show'), ...GKEEP.stats });
+/* ── [MAC-GOALLIVE] 목표판 '지금 n / m'을 제때 — 값이 바뀐 줄의 숫자만 고쳐 쓴다 (창조자 61회 ⓑ106) ──
+   ⓑ106: 농촌 판에서 길 곁 밭을 놓고 15초가 지나도 '지금 2 / 4개' — 🎯 로 닫았다 열어야 3. 목표판(renderGoals)은 목표를 이루거나
+         목록이 바뀔 때 · 펼 때만 그려서, 그 사이에는 '지금 값'(MAC-GOALPROG)이 멈춰 있었다.
+   · 목표 검사(goalTick · 1초마다) 바로 뒤, **목표판이 떠 있고 판 목표가 있을 때만** 떠 있는 줄의 지금 값(g.진도 = stageGoalNow · 목표와 같은 셈)을 다시 잰다.
+   · 그려 둔 글(GLIVE.shown — renderGoals 가 그릴 때 적어 둔다)과 다른 줄만 그 줄의 <b> 글을 바꾼다 — 목표판을 통째로 다시 그리지 않는다
+     (보상 그림 · 이름표 · 누르는 자리 그대로 · 아이가 누르는 사이에 줄이 안 갈린다). 지금 값이 새로 생기거나 없어진 줄 · 목록이 어긋난 때만 통째로.
+   판정·저장 0 · 원래 줄 수정 0(renderGoals 감싸기 · goalTick 고리). 판 목표가 없는 기본 마을은 한 줄도 안 돈다. 스위치 VRULES.goalLive(목표). */
+(window.VRULES = window.VRULES || {}).goalLive = { on: true };
+const GLIVE = { shown: null, stats: { 고쳐씀: 0, 다시그림: 0 } };
+function goalLiveText(g) { const p = g && typeof g.진도 === 'function' ? g.진도() : null; if (!p) return '';   /* goalProgText 의 <b> 안 글과 같은 꼴 */
+  return '· 지금 ' + (p.꼴 === '%' ? (p.지금 + '% / ' + p.끝 + '%') : (p.지금 + ' / ' + p.끝 + p.꼴)); }
+{ const rg0 = renderGoals; renderGoals = function () { const x = rg0.apply(this, arguments);
+    GLIVE.shown = window.VRULES.goalProg.on && STAGE.goals.length ? openGoals().map(g => ({ id: g.id, t: goalLiveText(g) })) : null; return x; }; }
+function goalLiveTick() {
+  if (!window.VRULES.goalLive.on || !window.VRULES.goalProg.on || !goalsShown || !STAGE.goals.length) return 0;
+  const open = openGoals(), S = GLIVE.shown, el = document.getElementById('goals');
+  if (!el || !S || S.length !== open.length || S.some((s, i) => s.id !== open[i].id)) { GLIVE.stats.다시그림++; renderGoals(); return -1; }
+  const now = open.map(goalLiveText), put = [];
+  for (let i = 0; i < open.length; i++) { if (now[i] === S[i].t) continue;
+    const b = S[i].t && now[i] ? el.querySelector('.g[data-gi="' + i + '"] > b') : null;
+    if (!b) { GLIVE.stats.다시그림++; renderGoals(); return -1; }
+    put.push([b, i]); }
+  put.forEach(([b, i]) => { b.textContent = now[i]; S[i].t = now[i]; });
+  GLIVE.stats.고쳐씀 += put.length; return put.length; }
+hookAdd('goalTick', function (next, args) { const r = next(args); goalLiveTick(); return r; });
+window.__goalLive = () => ({ 켜짐: window.VRULES.goalLive.on, 보이는글: GLIVE.shown ? GLIVE.shown.map(s => s.t) : null, 지금글: STAGE.goals.length ? openGoals().map(goalLiveText) : null, ...GLIVE.stats });
 /* ── [MAC-PREDICT] 예상 남기기(L2) — 시작 카드에서 짐작 하나를 고르고, 끝 카드에서 해 본 결과와 나란히 (설계 docs/village_role_predict_design.md 3절 · #981 승인 · 보스 09-24) ──
    판 파일 `예상: { 물음, 보기: [셋], 결과: { 셈: kind|pop|hook(목표 셈 꼴 그대로 · 새 셈 0), k?·훅?, t: 이름 } }` — 판 검사가 꼴을 본다.
    ① 시작 카드(처음 열 때): 첫날 사진 **옆**에 🤔 물음 + 보기 셋 + '모르겠어요'(2×2) — 하나를 고르면 [시작]이 켜진다 · 작은 [건너뛰기](수업 속도 · 교사 판단).
