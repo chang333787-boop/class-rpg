@@ -9342,7 +9342,8 @@ const GUESTS = [
   { k: 'snowhare', where: '관목 · 침엽수 · 겨울', nm: '눈토끼', sea: 'winter', say: '눈 오는 날엔 관목 곁이 포근해요', hint: '눈 오는 날 관목 곁에…' },
   { k: 'firefly', where: '물가 · 여름 밤', nm: '반딧불', sea: 'summer', tm: 'night', say: '반짝반짝… 여름 밤 물가예요', hint: '여름 밤 물가에 작은 불빛이…', fly: 1, small: 1 },
 ];
-const GUEST_LEAF_TREES = ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'];   // 다람쥐 — 잎 나무(계절 낙엽과 같은 목록)
+const GUEST_LEAF_TREES = ['d_y9', 'd_y12', 'd_y15', 'd_y19', 'd_y47', 'd_y48', 'd_y64'];
+const GUEST_SEAT = { d_y12: .06, d_y19: .14, d_y46: .13 };   // 나무 위 앉을 자리 = 그림 위에서부터의 비율(디자인 #1109 · 맨 위 + 약 2.5%)   // 다람쥐 — 잎 나무(계절 낙엽과 같은 목록)
 function _guestHash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 //  마당을 한 번 훑은 것(물 덩어리 · 꽃밭 덩어리 · 장식 자리) — 손님 조건이 같이 쓴다
 function _guestScan(student) {
@@ -9386,7 +9387,7 @@ function _guestSpot(k, S) {
     case 'magpie': { const p = S.of(['d_y46'])[0]; return p ? _guestOn(p, 1) : null; }
     case 'squirrel': { const t = S.of(GUEST_LEAF_TREES); for (let i = 0; i < t.length; i++) for (let j = i + 1; j < t.length; j++) if (_guestGap(t[i], t[j]) <= 3) return _guestBeside(t[i]); return null; }
     case 'bee': { const f = S.of(['d_y7', 'd_y41']); return f.length >= 3 ? Object.assign(_guestOn(f[0]), { r: _guestOn(f[0]).r - .7, fly: 1 }) : null; }
-    case 'ladybug': { const p = S.of(['d_y1', 'd_y43', 'd_y21'])[0]; return p ? _guestOn(p) : null; }
+    case 'ladybug': { const p = S.of(['d_y1', 'd_y43', 'd_y21'])[0]; if (!p) return null; const z = getDecoSize(p.id); return { r: p.row + z.h - 1, c: p.col + z.w - .2, deco: p }; }   // 장미 곁(디자인 #1109 — 장미 속에선 빨간 몸이 안 보였다)
     case 'hedgehog': { const f = S.of(['d_y15']); return f.length >= 2 ? _guestBeside(f[0]) : null; }
     case 'owl': { const p = S.of(['d_y19', 'd_y12'])[0]; return p ? _guestOn(p, 1) : null; }
     case 'mallard': { const cc = big(16); if (!cc) return null; const [r, c] = mid(cc); return { r, c }; }
@@ -9436,17 +9437,19 @@ function _guestSync(rec, student, C, hostId) {
     if (el._nf !== nf) { el._nf = nf; const im = el.querySelector('.dgu-art'); if (im) im.src = art(k); }   // 때가 바뀌면 그림 조각도
     el.classList.toggle('glow', k === 'firefly' && !!nf);
     el.classList.toggle('fly', !!(at.fly || g.fly));
-    //  크기 = 칸의 .78(작은 벌레 .5 · 디자인 '칸의 .5~.8' 위쪽 — .62 는 칸 27px 에서 17px 라 잘 안 보였다) · 누르는 자리 44px 이상 · 발은 그 칸 아래(나무 위 손님은 그림 꼭대기)
-    const gz = Math.max(16, Math.round(C * (g.small ? .5 : .78))), hit = Math.max(44, gz);
+    //  크기 · 자리 = 디자인 규칙 A(#1109 · 보스 09-25): 보통 max(18, 칸 × 1.0) · 작은(무당벌레 · 반딧불) max(14, 칸 × .7) · 누르는 자리 44px 이상
+    //  발 = 선 — 그림 아래 = 발 줄(그림의 발이 y90~95 라 동물과 같은 선에 선다 · 전엔 .35 × 그림만큼 떠 있었다)
+    //  나무 위 손님은 나무 그림 맨 위 + 약 2.5% 에 앉는다(GUEST_SEAT · 표에 없는 나무 .14)
+    const gz = g.small ? Math.max(14, Math.round(C * .7)) : Math.max(18, Math.round(C)), hit = Math.max(44, gz);
     let footY = (at.r + 1) * C;
     if (at.top && at.deco) {
       const im = _decoImg(at.deco.id), z = getDecoSize(at.deco.id);
       const hDraw = im && im.naturalWidth ? z.w * C * im.naturalHeight / im.naturalWidth : (z.h + 1) * C;
-      footY = (at.deco.row + z.h) * C - hDraw * .86;
+      footY = (at.deco.row + z.h) * C - hDraw * (1 - (GUEST_SEAT[at.deco.id] || .14));
     }
     const cx = (at.c + .5) * C;
     el.style.width = el.style.height = hit + 'px'; el.style.setProperty('--g', gz + 'px');
-    el.style.transform = 'translate(' + Math.round(cx - hit / 2) + 'px,' + Math.round(footY - gz / 2 - hit / 2 - gz * .35) + 'px)';
+    el.style.transform = 'translate(' + Math.round(cx - hit / 2) + 'px,' + Math.round(footY - gz / 2 - hit / 2) + 'px)';
     el.style.zIndex = String(Math.round(at.r + 2));
   });
 }
@@ -9614,8 +9617,8 @@ function _animSyncLayer(hostId, student, scene, C, W, H, panX, panY) {
     rec.items.delete(k);
   });
 
-  if (hostId !== 'ff-topview' && typeof CUR !== 'undefined' && student === CUR && typeof _lifeGiftSync === 'function') _lifeGiftSync(rec, student, C);
-  if (typeof _guestSync === 'function') _guestSync(rec, student, C, hostId);   // [DECO-GUEST-1] 손님(친구 구경도 · 쓰기는 내 마당만)   // [DECO-LIFE-3] 오늘 두고 간 선물(내 마당만 · 친구 구경은 안 보임)
+  if (hostId !== 'ff-topview' && typeof CUR !== 'undefined' && student === CUR && typeof _lifeGiftSync === 'function') _lifeGiftSync(rec, student, C);   // [DECO-LIFE-3] 오늘 두고 간 선물(내 마당만 · 친구 구경은 안 보임)
+  if (typeof _guestSync === 'function') _guestSync(rec, student, C, hostId);   // [DECO-GUEST-1] 손님(친구 구경도 · 쓰기는 내 마당만)
 
   if (!_animHooked) {
     _animHooked = true;

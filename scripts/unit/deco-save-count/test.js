@@ -20,6 +20,8 @@
   try { if (typeof _decoPhase === 'function') _decoPhase = function () { return _decoPhaseOv || 'day'; }; } catch (e) {}
   //  [DECO-SEASON-1] 계절도 날짜 대신 여름(바탕 그림)으로 — 그림 지문·조각 수 시험이 달마다 바뀌지 않게(시험에서 바꾼 값은 그대로 따른다)
   try { if (typeof _decoSeason === 'function') _decoSeason = function () { return _decoSeasonOv || 'summer'; }; } catch (e) {}
+  //  [DECO-EVENT-1] 행사도 날짜 대신 '없음'으로 — 행사 날(10/13~19 등)에 돌리면 다른 시험에 행사 한 벌 · 첫 열림 토스트가 끼었다(행사 시험만 켰다가 '' 로 되돌린다)
+  try { if (typeof _decoEventOv !== 'undefined') _decoEventOv = ''; } catch (e) {}
   (async () => {
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
       if (Date.now() - t0 > 20000) { out('ERR', 'timeout'); return done(); } await sleep(50);
@@ -2075,7 +2077,7 @@
       _yardLookDev = 'star'; out('행사_첫열림_별빛엔없음', _decoEventGreet() === false); _yardLookDev = null;
       out('행사_첫열림_저장0', JSON.stringify([CUR.houseDecorations, CUR.yardFloor, CUR.decoLife]) === svG && _lifeWrites === wG);
       try { localStorage.setItem(gk, '1'); } catch (e) {}   // 뒤 시험에 알림이 끼지 않게
-      _decoEventOv = null; _decoStateVer++; _drawDeco();
+      _decoEventOv = ''; _decoStateVer++; _drawDeco();   // 날짜 대신 '없음'(머리에서 고정한 값)
     }
 
     //  ㊼-4 손님(DECO-GUEST-1) — 조건마다 자리 · 하루 최대 둘(못 만난 손님 먼저) · 처음 누를 때만 잎 쓰기 1 · 또 누름 0 · 친구 구경 0 · 동물이 없어도 온다
@@ -2110,6 +2112,20 @@
       out('손님_못만난손님먼저', t3.length === 2 && t3.indexOf(k0) < 0);   // 가을에 올 수 있는 손님 다섯 — 만난 손님은 뒤로
       //  동물이 하나도 없어도 층이 생겨 손님이 온다
       out('손님_동물없어도옴', !CUR.houseDecorations.some(p => p.area === 'yard' && ANIM_DECO[p.id]) && document.querySelectorAll('#if-topview .deco-guest').length >= 1);
+      //  크기 · 발 줄(디자인 규칙 A #1109): 보통 max(18, 칸) · 작은 max(14, 칸 × .7) · 땅 손님의 그림 아래 = 발 줄(1px 안 · 전엔 .35 × 그림만큼 떴다)
+      _drawDeco(); await sleep(250);   // 앞 줄에서 만난 손님이 생겨 오늘 목록이 바뀌었다 — 층을 한 번 맞춘 뒤 잰다
+      {
+        const rec = _animLayers.get(_ifActiveContainer || 'house-topview'), bad = [];
+        _guestToday(CUR).forEach(({ g, at }) => {
+          const el = rec && rec.guests && rec.guests.get(g.k); if (!el) { bad.push(g.k + ':없음'); return; }
+          const gz = parseFloat(el.style.getPropertyValue('--g')), want = g.small ? Math.max(14, Math.round(_dC * .7)) : Math.max(18, Math.round(_dC));
+          const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform), hit = parseFloat(el.style.height);
+          const bottom = m ? +m[2] + hit / 2 + gz / 2 : NaN;
+          if (gz !== want) bad.push(g.k + ':크기' + gz + '≠' + want);
+          if (!at.top && !at.fly && !g.fly && !(Math.abs(bottom - (at.r + 1) * _dC) <= 1)) bad.push(g.k + ':발' + Math.round(bottom) + '≠' + Math.round((at.r + 1) * _dC));
+        });
+        out('손님_크기규칙A_발줄', bad.length ? bad.join(' ') : true);
+      }
       //  친구 구경 — 반응만(쓰기 0)
       const fr = JSON.parse(JSON.stringify(CUR)); fr.id = 'friend-g'; fr.name = '친구'; fr.decoLife = {};
       openFriendFullscreen(fr); await sleep(400);
@@ -2139,6 +2155,11 @@
       if (btn) btn.click();
       const box = document.getElementById('deco-dex');
       out('도감_만남3_전체13', !!box && !document.getElementById('deco-giftbox') && box.querySelectorAll('.ddx-card.is-met').length === 3 && box.querySelectorAll('.ddx-card').length === 13 && /13 손님 중 3 만남/.test(box.textContent));
+      {   //  아래 안내 한 줄이 판 안에 다 보인다(보스 #1107 뒤 — 1366×610 에서 판 아래 끝에 닿아 잘렸다) · 칸만 스크롤
+        const f = box && box.querySelector('.ddx-foot'), k = f && f.getBoundingClientRect();
+        const pts = k ? [[k.left + 8, k.top + 4], [k.right - 8, k.bottom - 4], [(k.left + k.right) / 2, (k.top + k.bottom) / 2]] : [];
+        out('도감_아래줄_다보임', !!k && k.bottom <= innerHeight && pts.every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && (e === f || f.contains(e)); }));
+      }
       decoGuestDex(true, 'winter');
       const wn = [...document.querySelectorAll('#deco-dex .ddx-card')].length;
       out('도감_계절거르기_겨울', wn === GUESTS.filter(g => g.sea.includes('winter')).length);
