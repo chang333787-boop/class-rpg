@@ -971,13 +971,19 @@ function buildCharDoll(s) {
 
   // 머리: 투구를 쓰면 base 의 정수리(hair-top)를 뺀다. 왕관처럼 정수리를 안 덮는 것은 남긴다.
   const headSvg = pick('head', eq.head);
-  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) base = _dropGroup(base, 'hair-top');
+  //   정수리를 빼면 모자 챙 아래로 앞머리·옆머리(hair-cap)를 대신 보인다 — 맨이마·대머리처럼 보이지 않게.
+  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) {
+    base = _dropGroup(base, 'hair-top');
+    //   볼가리개 투구(full-helm)는 이마 띠가 눈썹 바로 위라 앞머리가 끼면 한 줄 눈썹처럼 보인다 — 그땐 안 보인다.
+    if (headSvg.indexOf('full-helm') === -1) base = base.replace('<g class="hair-cap" display="none">', '<g class="hair-cap">');
+  }
 
   // 손: 손가락(fingers-front)은 무기 자루 앞에 다시 그려야 해서 따로 떼어 둔다.
   let fingers = _grabGroup(base, 'fingers-front');
   base = _dropGroup(base, 'fingers-front');
 
-  let out = base + pick('shoe', eq.shoe) + pick('body', eq.body);
+  // 신발은 옷 다음(위)에 그린다 — 로브·갑옷의 바짓단이 부츠 목 안으로 들어가게(옷이 신발을 덮으면 바지가 부츠 위로 튀어나온다).
+  let out = base + pick('body', eq.body) + pick('shoe', eq.shoe);
 
   const gloveSvg = pick('glove', eq.glove);
   if (gloveSvg) {                       // 장갑이 있으면 손가락도 장갑 것을 쓴다
@@ -986,8 +992,14 @@ function buildCharDoll(s) {
   }
 
   out += headSvg + pick('weapon', eq.weapon) + fingers;
-  return '<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
-       + 'style="width:100%;height:100%">' + out + '</svg>';
+  // [CHAR-IDLE-1] 땅 그림자만 떼고 나머지를 한 묶음(cd-body)으로 — student.css 가 숨쉬기(발 기준 세로 늘임)·눈 깜빡임을 준다.
+  const shadowM = out.match(/<ellipse cx="60" cy="151"[^>]*\/>/);
+  const shadow = shadowM ? shadowM[0] : '';
+  if (shadow) out = out.replace(shadow, '');
+  return '<svg class="cdoll" viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
+       + 'style="width:100%;height:100%">'
+       + (shadow ? shadow.replace('<ellipse ', '<ellipse class="cd-shadow" ') : '')
+       + '<g class="cd-body">' + out + '</g></svg>';
 }
 
 // 화면이 쓰는 입구. 에셋이 준비됐으면 종이인형, 아니면 예전 그림.
