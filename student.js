@@ -960,6 +960,30 @@ function _redrawCharSpots() {
   });
 }
 
+// [CHAR-AURA-1] 높은 등급(8 황금·9 전설·10 왕) 장비를 여러 칸 입으면 캐릭터 뒤에 빛 — 멀리서도 등급이 보이게.
+//  3~4칸 = 은은한 빛, 5칸 모두 = 빛 + 반짝이. 등급은 id 끝 번호(e_b18 → 8, e_ws10 → 10).
+let _charAuraSeq = 0;
+function _charTier(id) {
+  const m = /(\d+)$/.exec(String(id || ''));
+  return m ? ((+m[1] - 1) % 10) + 1 : 0;
+}
+function _charAuraSVG(eq) {
+  const n = ['head', 'body', 'weapon', 'glove', 'shoe'].filter(k => eq[k] && eq[k] !== 'none' && _charTier(eq[k]) >= 8).length;
+  if (n < 3) return '';
+  const gid = 'cdAura' + (++_charAuraSeq);
+  let out = '<defs><radialGradient id="' + gid + '" cx="50%" cy="50%" r="50%">'
+          + '<stop offset="0" stop-color="#fff0b0" stop-opacity=".95"/><stop offset=".5" stop-color="#ffcf55" stop-opacity=".5"/>'
+          + '<stop offset="1" stop-color="#ffb020" stop-opacity="0"/></radialGradient></defs>'
+          + '<g class="cd-aura"><ellipse cx="60" cy="86" rx="50" ry="68" fill="url(#' + gid + ')"/>';
+  if (n >= 5) {
+    const star = (x, y, r, d) => '<path class="cd-spark" style="animation-delay:' + d + 's" d="M' + x + ',' + (y - r)
+      + ' Q' + x + ',' + y + ' ' + (x + r) + ',' + y + ' Q' + x + ',' + y + ' ' + x + ',' + (y + r)
+      + ' Q' + x + ',' + y + ' ' + (x - r) + ',' + y + ' Q' + x + ',' + y + ' ' + x + ',' + (y - r) + 'z" fill="#fff4c2"/>';
+    out += star(16, 40, 6, 0) + star(105, 56, 5, .9) + star(11, 102, 4.4, 1.7) + star(109, 118, 5.4, 2.4) + star(98, 18, 4, 3.1);
+  }
+  return out + '</g>';
+}
+
 // 종이인형 합성. base 가 없으면 null 을 돌려 호출부가 폴백하게 한다.
 function buildCharDoll(s) {
   const ct = (s && s.charType >= 1 && s.charType <= 4) ? s.charType : 1;
@@ -971,13 +995,19 @@ function buildCharDoll(s) {
 
   // 머리: 투구를 쓰면 base 의 정수리(hair-top)를 뺀다. 왕관처럼 정수리를 안 덮는 것은 남긴다.
   const headSvg = pick('head', eq.head);
-  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) base = _dropGroup(base, 'hair-top');
+  //   정수리를 빼면 모자 챙 아래로 앞머리·옆머리(hair-cap)를 대신 보인다 — 맨이마·대머리처럼 보이지 않게.
+  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) {
+    base = _dropGroup(base, 'hair-top');
+    //   볼가리개 투구(full-helm)는 이마 띠가 눈썹 바로 위라 앞머리가 끼면 한 줄 눈썹처럼 보인다 — 그땐 안 보인다.
+    if (headSvg.indexOf('full-helm') === -1) base = base.replace('<g class="hair-cap" display="none">', '<g class="hair-cap">');
+  }
 
   // 손: 손가락(fingers-front)은 무기 자루 앞에 다시 그려야 해서 따로 떼어 둔다.
   let fingers = _grabGroup(base, 'fingers-front');
   base = _dropGroup(base, 'fingers-front');
 
-  let out = base + pick('shoe', eq.shoe) + pick('body', eq.body);
+  // 신발은 옷 다음(위)에 그린다 — 로브·갑옷의 바짓단이 부츠 목 안으로 들어가게(옷이 신발을 덮으면 바지가 부츠 위로 튀어나온다).
+  let out = base + pick('body', eq.body) + pick('shoe', eq.shoe);
 
   const gloveSvg = pick('glove', eq.glove);
   if (gloveSvg) {                       // 장갑이 있으면 손가락도 장갑 것을 쓴다
@@ -986,8 +1016,15 @@ function buildCharDoll(s) {
   }
 
   out += headSvg + pick('weapon', eq.weapon) + fingers;
-  return '<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
-       + 'style="width:100%;height:100%">' + out + '</svg>';
+  // [CHAR-IDLE-1] 땅 그림자만 떼고 나머지를 한 묶음(cd-body)으로 — student.css 가 숨쉬기(발 기준 세로 늘임)·눈 깜빡임을 준다.
+  const shadowM = out.match(/<ellipse cx="60" cy="151"[^>]*\/>/);
+  const shadow = shadowM ? shadowM[0] : '';
+  if (shadow) out = out.replace(shadow, '');
+  return '<svg class="cdoll" viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
+       + 'style="width:100%;height:100%">'
+       + _charAuraSVG(eq)
+       + (shadow ? shadow.replace('<ellipse ', '<ellipse class="cd-shadow" ') : '')
+       + '<g class="cd-body">' + out + '</g></svg>';
 }
 
 // 화면이 쓰는 입구. 에셋이 준비됐으면 종이인형, 아니면 예전 그림.
@@ -2048,7 +2085,7 @@ function renderShop() {
               ${item.name}${elemBadge}${badge}
             </div>
             <div class="ic-stats" style="margin-top:.06rem">${Utils.statText(item.stats)}</div>
-            ${reasonHtml}
+            ${reasonHtml}${_shopTryBtn(item, isEquip)}
           </div>
           <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;gap:.18rem;align-items:flex-end">
             <div style="font-size:.8rem;font-weight:700;color:var(--gold)">💰${item.price}G</div>
@@ -2061,7 +2098,7 @@ function renderShop() {
       </div>`;
     });
 
-    document.getElementById('shop-items').innerHTML = bodyFilterBar + (() => {
+    document.getElementById('shop-items').innerHTML = _shopFitHTML() + bodyFilterBar + (() => {
       // weapon 탭: 검/스태프 섹션 헤더 삽입 (그리드 구조 유지)
       if (cat === 'weapon') {
         const secHdr = (label) => `<div style="grid-column:1/-1;font-size:.75rem;font-weight:700;
@@ -2090,7 +2127,7 @@ function renderShop() {
                   ${item.name}${badge}
                 </div>
                 <div class="ic-stats" style="margin-top:.06rem">${Utils.statText(item.stats)}</div>
-                ${reasonHtml}
+                ${reasonHtml}${_shopTryBtn(item, isEquip)}
               </div>
               <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;gap:.18rem;align-items:flex-end">
                 <div style="font-size:.8rem;font-weight:700;color:var(--gold)">💰${item.price}G</div>
@@ -2263,6 +2300,62 @@ function shopTab(tab, el) {
 }
 
 let SHOP_BODY_ELEM = 'all'; // body 탭 속성 필터
+
+// ══ 미리 입어 보기 (SHOP-TRYON-1) ═════════════════════════════
+//  상점 장비 줄의 [👀 입어 보기] → 내 캐릭터에 입혀서 '지금 ↔ 입어 보기'를 나란히 보여 준다.
+//  화면에만 쓰는 임시 값(SHOP_TRY) — CUR·저장·골드는 건드리지 않는다. 여러 칸을 겹쳐 입어 볼 수 있다.
+let SHOP_TRY = {};   // slot → itemId
+
+function _shopTryBtn(item, isEquip) {
+  if (isEquip) return '';
+  const on = SHOP_TRY[GAME_DATA.getSlotForItem(item.id)] === item.id;
+  return `<button type="button" class="shop-try-btn${on ? ' on' : ''}"
+    onclick="event.stopPropagation();shopTryOn('${item.id}')">${on ? '👕 벗기' : '👀 입어 보기'}</button>`;
+}
+
+function shopTryOn(itemId) {
+  const slot = GAME_DATA.getSlotForItem(itemId);
+  if (!slot) return;
+  if (SHOP_TRY[slot] === itemId) delete SHOP_TRY[slot]; else SHOP_TRY[slot] = itemId;
+  renderShop();
+}
+
+function shopTryClear() { SHOP_TRY = {}; renderShop(); }
+
+// 입어 본 장비와 지금 장비의 능력치 차이 (칸별 아이템 능력치 합)
+function _shopTryDiff(tryEq) {
+  const cur = (CUR && CUR.equipmentIds) || {}, d = {};
+  Object.keys(tryEq).forEach(slot => {
+    const a = cur[slot] ? GAME_DATA.getItemById(cur[slot]) : null;
+    const b = GAME_DATA.getItemById(tryEq[slot]);
+    Object.entries((b && b.stats) || {}).forEach(([k, v]) => { d[k] = (d[k] || 0) + v; });
+    Object.entries((a && a.stats) || {}).forEach(([k, v]) => { d[k] = (d[k] || 0) - v; });
+  });
+  const names = { atk: '공격', def: '방어', mag: '마력', spd: '속도' };
+  return Object.entries(d).filter(([, v]) => v).map(([k, v]) =>
+    `<span style="color:${v > 0 ? 'var(--emerald)' : 'var(--red)'}">${names[k] || k} ${v > 0 ? '+' : ''}${v}</span>`).join(' ');
+}
+
+function _shopFitHTML() {
+  // 이미 입고 있는 것과 같으면 뺀다(산 뒤 등)
+  const cur = (CUR && CUR.equipmentIds) || {};
+  Object.keys(SHOP_TRY).forEach(k => { if (cur[k] === SHOP_TRY[k]) delete SHOP_TRY[k]; });
+  const n = Object.keys(SHOP_TRY).length;
+  if (!n) return `<div class="shop-fit-hint">👀 <b>입어 보기</b>를 누르면 사기 전에 내 캐릭터에 입혀 볼 수 있어요</div>`;
+  const tried = { ...CUR, equipmentIds: { ...cur, ...SHOP_TRY } };
+  const names = Object.values(SHOP_TRY).map(id => (GAME_DATA.getItemById(id) || {}).name).filter(Boolean).join(' · ');
+  const diff = _shopTryDiff(SHOP_TRY);
+  return `<div class="shop-fit">
+    <div class="shop-fit-doll"><div class="shop-fit-svg">${charSVG(CUR)}</div><div class="shop-fit-cap">지금</div></div>
+    <div class="shop-fit-arrow">➜</div>
+    <div class="shop-fit-doll on"><div class="shop-fit-svg">${charSVG(tried)}</div><div class="shop-fit-cap">입어 보기</div></div>
+    <div class="shop-fit-info">
+      <div class="shop-fit-names">${escHtml(names)}</div>
+      ${diff ? `<div class="shop-fit-diff">${diff}</div>` : ''}
+      <button type="button" class="shop-try-btn" onclick="shopTryClear()">↩ 모두 벗기</button>
+    </div>
+  </div>`;
+}
 
 function setBodyElemFilter(elem) {
   SHOP_BODY_ELEM = elem;

@@ -172,7 +172,9 @@ for (const h of heads) {
   for (const bd of bodies) {   // 요소끼리 겹친 넓이 합(전체 bbox 는 빈 공간이 많아 과장됨)
     const B = F[bd]; if (!B) continue;
     let a = 0;
-    for (const he of H.elems) for (const be of B.elems) a += area(inter(he.bbox, be.bbox));
+    // 팔 획(어깨 38,67 / 82,67 에서 시작 — 테두리·채움·위팔 굵게가 한 자리에 겹쳐 그려짐)은 뺀다: 같은 자리를 여러 번 세어 과장되고,
+    // 볼가리개가 어깨 위에 오는 건 정상이다 (CHAR-DRESS-FIT-1 ②·④ 뒤 15→72 로 부푼 원인).
+    for (const he of H.elems) for (const be of B.elems) { if (/\sd="M(38|82),67 /.test(be.attrs || '')) continue; a += area(inter(he.bbox, be.bbox)); }
     if (a / area(hb) > 0.35) add('겹침', '모자가 몸통을 35% 넘게 덮음', `${h} × ${bd}`, `${Math.round(a / area(hb) * 100)}%`);   // 투구 볼가리개가 깃·견갑 위에 오는 건 정상(15~32%)
   }
 }
