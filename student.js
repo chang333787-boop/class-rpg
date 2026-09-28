@@ -209,7 +209,7 @@ function startAccessTimer() {
 
 // ══════════════════════════════════════════════════
 //  영어 복습앱 연동 (ENGLISH-LINK-1)
-//  · 영어 학습은 별도 앱(https://jeongrim-english.web.app)에서 하고, RPG는 그 기록을
+//  · 영어 학습은 별도 앱(https://jeongrim-english.firebaseapp.com · 옛 web.app 주소는 09-28 SSL 실패)에서 하고, RPG는 그 기록을
 //    **읽어서** 보상만 준다. 영어앱이 RPG DB에 쓰는 일은 없다(규칙·저장 경로 불변).
 //  · 영어앱 기록은 다른 Firebase 프로젝트(jeongrim-equip)의 Firestore에 있으므로
 //    compat SDK로 두 번째 앱('english')을 띄워 읽는다. 기본 앱/RTDB와 완전히 분리.
@@ -219,7 +219,7 @@ function startAccessTimer() {
 //  · 실패(오프라인·이름 불일치·SDK 미로드)는 조용히 건너뛰고 게임 진입을 막지 않는다.
 // ══════════════════════════════════════════════════
 const ENGLISH_APP = {
-  url: 'https://jeongrim-english.web.app/',
+  url: 'https://jeongrim-english.firebaseapp.com/',   // [ENGLISH-DOMAIN-1] 09-28 web.app 주소가 SSL 연결 실패(수업 중 영어 안 열림) → 같은 앱의 firebaseapp.com 주소
   pass: '1234',                       // 영어앱 반 비밀번호(자동 입장 링크에 사용)
   cls: 'jeongrim',                    // 영어앱 Firestore 문서 접두어
   firebase: {
