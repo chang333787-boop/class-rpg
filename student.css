@@ -1796,3 +1796,9 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 .shop-try-btn{margin-top:.25rem;min-height:34px;padding:.25rem .7rem;border-radius:17px;border:1px solid rgba(126,200,227,.5);
   background:rgba(126,200,227,.1);color:#9fd7ee;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit}
 .shop-try-btn.on{border-color:var(--gold);background:rgba(217,164,65,.18);color:var(--gold)}
+/* [CHAR-AURA-1] 높은 등급 빛 — 천천히 숨쉬는 광륜 + 반짝이 */
+.cdoll .cd-aura{transform-box:view-box;transform-origin:60px 86px;animation:cdAura 3.2s ease-in-out infinite}
+.cdoll .cd-spark{transform-box:fill-box;transform-origin:center;animation:cdSpark 3.6s ease-in-out infinite;opacity:0}
+@keyframes cdAura{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes cdSpark{0%,60%,100%{opacity:0;transform:scale(.3)}75%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.cdoll .cd-aura{animation:none}.cdoll .cd-spark{animation:none;opacity:.8}}
