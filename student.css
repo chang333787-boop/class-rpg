@@ -1780,3 +1780,19 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 @keyframes cdShadow{0%,100%{transform:scale(1,1)}50%{transform:scale(.96,1)}}
 @keyframes cdBlink{0%,94%,100%{opacity:0}95%,97.5%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.cdoll .cd-body,.cdoll .cd-shadow,.cdoll .blink{animation:none}}
+/* [SHOP-TRYON-1] 상점 미리 입어 보기 — 목록 위에 붙는 탈의실(스크롤해도 위에 남음) · 줄마다 [👀 입어 보기] */
+.shop-fit-hint{grid-column:1/-1;font-size:.72rem;color:var(--txt2);padding:.35rem .6rem;border-radius:8px;background:rgba(255,255,255,.04)}
+.shop-fit{grid-column:1/-1;position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-radius:12px;
+  background:linear-gradient(145deg,#2b2419,#3d3122);border:1px solid rgba(217,164,65,.45);box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.shop-fit-doll{text-align:center;flex-shrink:0}
+.shop-fit-svg{width:66px;height:88px}
+.shop-fit-doll.on .shop-fit-svg{width:78px;height:104px}
+.shop-fit-cap{font-size:.62rem;color:var(--txt3)}
+.shop-fit-doll.on .shop-fit-cap{color:var(--gold);font-weight:700}
+.shop-fit-arrow{color:var(--txt3);font-size:.9rem}
+.shop-fit-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:.25rem;align-items:flex-start}
+.shop-fit-names{font-size:.74rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.shop-fit-diff{font-size:.7rem;display:flex;flex-wrap:wrap;gap:.1rem .45rem}
+.shop-try-btn{margin-top:.25rem;min-height:34px;padding:.25rem .7rem;border-radius:17px;border:1px solid rgba(126,200,227,.5);
+  background:rgba(126,200,227,.1);color:#9fd7ee;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit}
+.shop-try-btn.on{border-color:var(--gold);background:rgba(217,164,65,.18);color:var(--gold)}

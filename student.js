@@ -2060,7 +2060,7 @@ function renderShop() {
               ${item.name}${elemBadge}${badge}
             </div>
             <div class="ic-stats" style="margin-top:.06rem">${Utils.statText(item.stats)}</div>
-            ${reasonHtml}
+            ${reasonHtml}${_shopTryBtn(item, isEquip)}
           </div>
           <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;gap:.18rem;align-items:flex-end">
             <div style="font-size:.8rem;font-weight:700;color:var(--gold)">💰${item.price}G</div>
@@ -2073,7 +2073,7 @@ function renderShop() {
       </div>`;
     });
 
-    document.getElementById('shop-items').innerHTML = bodyFilterBar + (() => {
+    document.getElementById('shop-items').innerHTML = _shopFitHTML() + bodyFilterBar + (() => {
       // weapon 탭: 검/스태프 섹션 헤더 삽입 (그리드 구조 유지)
       if (cat === 'weapon') {
         const secHdr = (label) => `<div style="grid-column:1/-1;font-size:.75rem;font-weight:700;
@@ -2102,7 +2102,7 @@ function renderShop() {
                   ${item.name}${badge}
                 </div>
                 <div class="ic-stats" style="margin-top:.06rem">${Utils.statText(item.stats)}</div>
-                ${reasonHtml}
+                ${reasonHtml}${_shopTryBtn(item, isEquip)}
               </div>
               <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;gap:.18rem;align-items:flex-end">
                 <div style="font-size:.8rem;font-weight:700;color:var(--gold)">💰${item.price}G</div>
@@ -2275,6 +2275,62 @@ function shopTab(tab, el) {
 }
 
 let SHOP_BODY_ELEM = 'all'; // body 탭 속성 필터
+
+// ══ 미리 입어 보기 (SHOP-TRYON-1) ═════════════════════════════
+//  상점 장비 줄의 [👀 입어 보기] → 내 캐릭터에 입혀서 '지금 ↔ 입어 보기'를 나란히 보여 준다.
+//  화면에만 쓰는 임시 값(SHOP_TRY) — CUR·저장·골드는 건드리지 않는다. 여러 칸을 겹쳐 입어 볼 수 있다.
+let SHOP_TRY = {};   // slot → itemId
+
+function _shopTryBtn(item, isEquip) {
+  if (isEquip) return '';
+  const on = SHOP_TRY[GAME_DATA.getSlotForItem(item.id)] === item.id;
+  return `<button type="button" class="shop-try-btn${on ? ' on' : ''}"
+    onclick="event.stopPropagation();shopTryOn('${item.id}')">${on ? '👕 벗기' : '👀 입어 보기'}</button>`;
+}
+
+function shopTryOn(itemId) {
+  const slot = GAME_DATA.getSlotForItem(itemId);
+  if (!slot) return;
+  if (SHOP_TRY[slot] === itemId) delete SHOP_TRY[slot]; else SHOP_TRY[slot] = itemId;
+  renderShop();
+}
+
+function shopTryClear() { SHOP_TRY = {}; renderShop(); }
+
+// 입어 본 장비와 지금 장비의 능력치 차이 (칸별 아이템 능력치 합)
+function _shopTryDiff(tryEq) {
+  const cur = (CUR && CUR.equipmentIds) || {}, d = {};
+  Object.keys(tryEq).forEach(slot => {
+    const a = cur[slot] ? GAME_DATA.getItemById(cur[slot]) : null;
+    const b = GAME_DATA.getItemById(tryEq[slot]);
+    Object.entries((b && b.stats) || {}).forEach(([k, v]) => { d[k] = (d[k] || 0) + v; });
+    Object.entries((a && a.stats) || {}).forEach(([k, v]) => { d[k] = (d[k] || 0) - v; });
+  });
+  const names = { atk: '공격', def: '방어', mag: '마력', spd: '속도' };
+  return Object.entries(d).filter(([, v]) => v).map(([k, v]) =>
+    `<span style="color:${v > 0 ? 'var(--emerald)' : 'var(--red)'}">${names[k] || k} ${v > 0 ? '+' : ''}${v}</span>`).join(' ');
+}
+
+function _shopFitHTML() {
+  // 이미 입고 있는 것과 같으면 뺀다(산 뒤 등)
+  const cur = (CUR && CUR.equipmentIds) || {};
+  Object.keys(SHOP_TRY).forEach(k => { if (cur[k] === SHOP_TRY[k]) delete SHOP_TRY[k]; });
+  const n = Object.keys(SHOP_TRY).length;
+  if (!n) return `<div class="shop-fit-hint">👀 <b>입어 보기</b>를 누르면 사기 전에 내 캐릭터에 입혀 볼 수 있어요</div>`;
+  const tried = { ...CUR, equipmentIds: { ...cur, ...SHOP_TRY } };
+  const names = Object.values(SHOP_TRY).map(id => (GAME_DATA.getItemById(id) || {}).name).filter(Boolean).join(' · ');
+  const diff = _shopTryDiff(SHOP_TRY);
+  return `<div class="shop-fit">
+    <div class="shop-fit-doll"><div class="shop-fit-svg">${charSVG(CUR)}</div><div class="shop-fit-cap">지금</div></div>
+    <div class="shop-fit-arrow">➜</div>
+    <div class="shop-fit-doll on"><div class="shop-fit-svg">${charSVG(tried)}</div><div class="shop-fit-cap">입어 보기</div></div>
+    <div class="shop-fit-info">
+      <div class="shop-fit-names">${escHtml(names)}</div>
+      ${diff ? `<div class="shop-fit-diff">${diff}</div>` : ''}
+      <button type="button" class="shop-try-btn" onclick="shopTryClear()">↩ 모두 벗기</button>
+    </div>
+  </div>`;
+}
 
 function setBodyElemFilter(elem) {
   SHOP_BODY_ELEM = elem;
