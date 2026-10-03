@@ -9,6 +9,7 @@
 //   · 겹침   : 무기 bbox 가 모자 bbox 에 닿음(칼끝·오브가 모자 옆), 모자가 몸통을 15% 넘게 덮음  (모자 10 × 무기 20, 모자 10 × 몸통 30)
 //   · 어색   : 몸통 팔 끝이 손 자리(19,100)/(101,100)가 아님, 장갑 손등이 그 자리가 아님,
 //              무기에 손잡이(97|96.5, 86) 가 없음                                            (몸통 30, 장갑 10, 무기 20)
+//   · 신발   : 신발 중심이 다리 중심(50.5/69.5) ±2.5 밖, 윗선이 바지 밑단(132)과 안 겹침, 좌우 폭 다름   (신발 10 + base 4, 어색/겹침 경고)
 //  bbox 는 제어점까지 포함한 근사(실제보다 조금 큼)라 '안'이면 확실히 안이고, '밖' 판정은 여유 1px 를 둔다.
 //
 // 실행: node scripts/unit/char-combo-check.mjs [--json 파일] [--dir assets/char]
@@ -126,6 +127,8 @@ const names = [];
 for (let i = 1; i <= 4; i++) names.push('base_' + i);
 for (let i = 1; i <= 30; i++) names.push('body_e_b' + i);
 for (let i = 1; i <= 10; i++) names.push('head_e_h' + i, 'glove_e_g' + i, 'shoe_e_s' + i, 'weapon_e_w' + i, 'weapon_e_ws' + i);
+// 목록 밖의 추가 부품(물리 12종 e_h3p 같은 새 id)도 같은 규칙으로 검사한다 — 파일명 규칙 <slot>_e_<id>.svg
+for (const f of fs.readdirSync(DIR)) { const m = /^(head|body|glove|shoe|weapon)_e_[a-z0-9]+\.svg$/.exec(f); if (m && !names.includes(f.slice(0, -4))) names.push(f.slice(0, -4)); }
 const F = {};
 let missing = 0;
 for (const n of names) {
@@ -192,6 +195,24 @@ for (const w of weapons) {
   const t = F[w] && F[w].text; if (!t) continue;
   if (!/<rect x="9(?:7|6\.5)" y="86" width="(?:8|9)" height="\d+"/.test(t)) add('어색', '무기 손잡이 rect(97|96.5, 86)가 없음', w, '');
 }
+// 4b) 신발 × 다리 정렬 (사용자 신고 "신발이 안 맞는다", 2026-09-15)
+//   다리 = base rect 43~58 / 62~77 (밑단 y132). 신발 각 발의 중심 x 가 다리 중심(50.5 / 69.5) ±2.5 안,
+//   신발 윗선이 바지 밑단(132) 보다 위(겹침 ≥1px, 목 없는 낮은 신발 포함), 좌우 발 폭 대칭(±1.5).
+const LEG = { L: { x0: 43, x1: 58 }, R: { x0: 62, x1: 77 }, hem: 132 };
+const shoes = names.filter(n => n.startsWith('shoe_'));
+const shoeCheck = (n, elems) => {
+  const feet = elems.filter(e => e.tag === 'path' && /fill="#/.test(e.attrs) && (e.bbox.y1 - e.bbox.y0) >= 8 && (e.bbox.x1 - e.bbox.x0) < 32);   // 발 덩어리(밑창·하이라이트 줄·양쪽 날개 path 제외)
+  const L = feet.filter(e => (e.bbox.x0 + e.bbox.x1) / 2 < 60).reduce((a, e) => union(a, e.bbox), null);
+  const R = feet.filter(e => (e.bbox.x0 + e.bbox.x1) / 2 >= 60).reduce((a, e) => union(a, e.bbox), null);
+  if (!L || !R) { add('어색', '신발 발 덩어리를 못 찾음(왼/오른 path)', n, ''); return; }
+  const cL = (L.x0 + L.x1) / 2, cR = (R.x0 + R.x1) / 2;
+  if (Math.abs(cL - 50.5) > 2.5 || Math.abs(cR - 69.5) > 2.5) add('어색', '신발 중심이 다리 중심(50.5/69.5)에서 2.5px 넘게 벗어남', n, `왼 ${r1(cL)} 오른 ${r1(cR)}`);
+  const top = Math.min(...elems.map(e => e.bbox.y0));
+  if (top > LEG.hem - 1) add('겹침', '신발 윗선이 바지 밑단(y132)과 안 겹침', n, `윗선 ${r1(top)}`);
+  if (Math.abs((L.x1 - L.x0) - (R.x1 - R.x0)) > 1.5) add('어색', '좌우 신발 폭이 다름', n, `왼 ${r1(L.x1 - L.x0)} 오른 ${r1(R.x1 - R.x0)}`);
+};
+for (const s of shoes) if (F[s]) shoeCheck(s, F[s].elems);
+for (const b of bases) if (F[b]) shoeCheck(b + '(기본 신발)', F[b].elems.filter(e => e.bbox.y0 >= 125 && e.bbox.y1 <= 147 && e.tag === 'path' && !e.cls.length));
 // 5) 합성 그룹 규격
 for (const b of bases) {
   const t = F[b] && F[b].text; if (!t) continue;
