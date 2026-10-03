@@ -110,6 +110,16 @@ function showScreen(id) {
 }
 function hideScreen(id) { document.getElementById(id).classList.add('hidden'); }
 
+// [TITLE-BOARD-1] 첫 화면 칠판 오른쪽 위 = 오늘 날짜 (한국 시각 — 접속 시간 검사와 같은 셈)
+function fillTitleDate() {
+  const el = document.getElementById('tb-date');
+  if (!el) return;
+  const k = new Date(Date.now() + 9 * 3600000);
+  el.innerHTML = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일<br>${'일월화수목금토'[k.getUTCDay()]}요일`;
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillTitleDate);
+else fillTitleDate();
+
 function selectStudent(id, el) {
   document.querySelectorAll('.stu-btn').forEach(b => b.classList.remove('sel'));
   el.classList.add('sel'); SEL_STUDENT = id;
@@ -209,7 +219,7 @@ function startAccessTimer() {
 
 // ══════════════════════════════════════════════════
 //  영어 복습앱 연동 (ENGLISH-LINK-1)
-//  · 영어 학습은 별도 앱(https://jeongrim-english.web.app)에서 하고, RPG는 그 기록을
+//  · 영어 학습은 별도 앱(https://jeongrim-english.firebaseapp.com · 옛 web.app 주소는 09-28 SSL 실패)에서 하고, RPG는 그 기록을
 //    **읽어서** 보상만 준다. 영어앱이 RPG DB에 쓰는 일은 없다(규칙·저장 경로 불변).
 //  · 영어앱 기록은 다른 Firebase 프로젝트(jeongrim-equip)의 Firestore에 있으므로
 //    compat SDK로 두 번째 앱('english')을 띄워 읽는다. 기본 앱/RTDB와 완전히 분리.
@@ -219,7 +229,7 @@ function startAccessTimer() {
 //  · 실패(오프라인·이름 불일치·SDK 미로드)는 조용히 건너뛰고 게임 진입을 막지 않는다.
 // ══════════════════════════════════════════════════
 const ENGLISH_APP = {
-  url: 'https://jeongrim-english.web.app/',
+  url: 'https://jeongrim-english.firebaseapp.com/',   // [ENGLISH-DOMAIN-1] 09-28 web.app 주소가 SSL 연결 실패(수업 중 영어 안 열림) → 같은 앱의 firebaseapp.com 주소
   pass: '1234',                       // 영어앱 반 비밀번호(자동 입장 링크에 사용)
   cls: 'jeongrim',                    // 영어앱 Firestore 문서 접두어
   firebase: {
@@ -257,6 +267,29 @@ function externalStudyItems() {
       sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 경험치·골드',
       href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)',
       embed: true },   // [ENGLISH-EMBED-1] 새 탭 대신 RPG 안 전체화면 모달로
+    // [THINKBOARD-1] 생각판 — 선생님이 연 판에 생각 카드를 붙인다(RPG 로그인 이름 그대로 · 저장 = classRPG_thinkboard · 보상과 묶지 않음)
+    { key: 'thinkboard', icon: '🧠', title: '생각판',
+      sub: '선생님이 연 판에 내 생각을 붙이고 친구 생각을 봐요',
+      href: 'thinkboard/index.html?rpg=1&sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(53,99,233,.35)', bg: 'rgba(53,99,233,.07)', embed: true },
+    // [MUSIC-ROOM-1] 음악실 — 작곡 · 리코더 연습(흘러가는 음표 + 운지) · 리듬 게임(키보드). 저장 = classRPG_music · 보상과 묶지 않음
+    //   autoFocus: 리듬 게임 키(A S D F J K L ;)가 iframe 에 바로 들어가게(마을과 같은 이유)
+    { key: 'music', icon: '🎵', title: '음악실',
+      sub: '가락을 짓고 · 리코더로 따라 불고 · 키보드 리듬 게임',
+      href: 'music/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(240,140,46,.40)', bg: 'rgba(240,140,46,.08)', embed: true, autoFocus: true },
+    // [CODING-ROOM-1] 기초 코딩 — 블록으로 몬스터(도감 몬스터마다 아는 명령이 다름)를 움직이고 불씨 참새로 그림 · 1~4단원 34판 · 선생님 막힘 지도(#/t)
+    //   저장 = classRPG_coding · 보상과 묶지 않음 · Blockly(구글)는 coding/index.html 이 싣는다
+    { key: 'coding', icon: '🧩', title: '기초 코딩',
+      sub: '블록으로 몬스터에게 명령해요 · 불씨 참새 그림 코딩',
+      href: 'coding/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(61,139,253,.40)', bg: 'rgba(61,139,253,.08)', embed: true, autoFocus: true },
+    // [PATTERN-1] 무늬 공방 — 도장을 밀고 · 뒤집고 · 돌려 무늬 만들기(4학년 수학 '평면도형의 이동' + 미술) · 5장 28판 · 선생님 헷갈림 지도(#/t)
+    //   저장 = classRPG_pattern · 보상과 묶지 않음
+    { key: 'pattern', icon: '🦋', title: '무늬 공방',
+      sub: '도장을 밀고 · 뒤집고 · 돌려서 무늬를 만들어요',
+      href: 'pattern/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(142,91,208,.45)', bg: 'rgba(142,91,208,.09)', embed: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -273,6 +306,58 @@ function externalStudyItems() {
       href: 'village/index.html?sid=' + sid,
       border: 'rgba(120,200,140,.40)', bg: 'rgba(120,200,140,.08)', embed: true, study: false, autoFocus: true },
   ];
+}
+// ── [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈 '오늘'의 우리 반 소식에([HOME-C-1]) — 한 번 누르면 그 판으로 ──
+//   classRPG_thinkboard/listed = { <판 id>: { t 제목 · c 만든 때 · o 쓰기 열림 · p 질문 } } — 생각판 선생님 쪽이 맞춰 둔다.
+//   판 내용(카드·기록)은 받지 않고 이 작은 목록 하나에만 붙는다. 수업 중에 판을 열면 아이 홈에 바로 뜬다.
+//   누구나 쓸 수 있는 DB 라 글은 escHtml, 판 id 는 글자·숫자·_·- 만 받는다.
+let _tbHome = null, _tbHomeOn = false;
+function watchThinkboardHome() {
+  if (_tbHomeOn) return;
+  try {
+    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+    _tbHomeOn = true;
+    firebase.database().ref('classRPG_thinkboard/listed').on('value', snap => {
+      _tbHome = snap.val() || null;
+      document.querySelectorAll('.home-thinkboard').forEach(el => { el.innerHTML = thinkboardHomeCards(); });
+    }, e => console.warn('[THINKBOARD-HOME-1]', e));
+  } catch (e) { console.warn('[THINKBOARD-HOME-1]', e); }
+}
+const _tbSafeId = id => /^[\w-]{1,40}$/.test(String(id || ''));
+function thinkboardHomeCards() {
+  const list = Object.entries(_tbHome || {})
+    .filter(([id, b]) => _tbSafeId(id) && b && b.t)
+    .sort((a, z) => (Number(z[1].c) || 0) - (Number(a[1].c) || 0));
+  // 넷 이상(모둠마다 판 등)이면 둘 + '모두 보기' 하나 — 내 모둠 판이 밀려 안 보이는 일이 없게
+  const shown = list.length > 3 ? list.slice(0, 2) : list;
+  const more = list.length > 3 ? `
+    <div class="today-card" onclick="openExternalEmbed('thinkboard')"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(110,150,240,.4);margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:1.4rem">🧠</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:800;color:var(--gold)">생각판 · 열린 판 ${list.length}개 모두 보기</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">내 모둠 판을 골라 들어가요</div>
+        </div>
+        <span style="color:var(--txt3)">▶</span>
+      </div>
+    </div>` : '';
+  return shown.map(([id, b]) => `
+    <div class="today-card" onclick="openThinkboardBoard('${id}')"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(110,150,240,.4);margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:1.4rem">🧠</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:800;color:var(--gold)">생각판 · ${escHtml(String(b.t).slice(0, 40))}</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">${b.p ? escHtml(String(b.p).slice(0, 60)) : (b.o === false ? '선생님이 연 판 · 보기만 해요' : '선생님이 연 판에 내 생각을 붙여요')}</div>
+        </div>
+        <span style="color:var(--txt3)">▶</span>
+      </div>
+    </div>`).join('') + more;
+}
+function openThinkboardBoard(id) {
+  if (!_tbSafeId(id)) return;
+  openExternalEmbed('thinkboard', '#/b/' + id);
 }
 let _embedState = null;   // { key, href, loaded, timer }
 function _embedEl() {
@@ -310,10 +395,10 @@ function _embedEl() {
   });
   return el;
 }
-function openExternalEmbed(key) {
+function openExternalEmbed(key, hash) {
   const x = externalStudyItems().find(i => i.key === key && i.embed);
   if (!x) return;
-  const item = { title: x.icon + ' ' + x.title, href: x.href };
+  const item = { title: x.icon + ' ' + x.title, href: x.href + (hash || '') };   // hash: 생각판 판 하나로 바로(#/b/<id>)
   // 같은 도메인(수채화·데생)이면 no-cors가 아니라 보통 HEAD로 확인해 상태 코드까지 본다(404 페이지도 폴백)
   let sameOrigin = false;
   try { sameOrigin = new URL(item.href, location.href).origin === location.origin; } catch (e) {}
@@ -449,6 +534,7 @@ function enterGame() {
   cleanInactivePending();
 
   loadCharDolls();   // [CHAR-DOLL-1] 캐릭터 SVG 84장 미리 받기(실패해도 게임 진행에 영향 없음)
+  watchThinkboardHome();   // [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈에 바로
 
   // ★ 미완료 전투 감지: 전투 도중 창을 닫고 재접속한 경우
   // 횟수는 startBattle()에서 이미 차감됐으므로 상태만 정리 (패배 처리)
@@ -461,6 +547,7 @@ function enterGame() {
   }
 
   document.getElementById('s-game').classList.add('active');
+  setHomeSec(HOME_SEC);   // [HOME-C-1] 지난번에 보던 홈 구역(처음이면 '오늘')
   applyLayout(LAYOUT_MODE);
   // 화면 맞춤 버튼 초기 상태 복원
   const sBtn = document.getElementById('scale-mode-btn');
@@ -1071,6 +1158,7 @@ function renderMain() {
   try {
     document.getElementById('main-area').innerHTML = buildMainHTML();
     _restoreHomeOpen(document.getElementById('main-area'));    // [HOME-KEEP-OPEN-1]
+    renderRail();                                              // [HOME-C-1] 레일 배지
   } catch(e) {
     console.error('renderMain 오류:', e);
     document.getElementById('main-area').innerHTML = `
@@ -1226,10 +1314,10 @@ function renderRewardList() {
             + (done.length >= REWARD_LIST_MAX
                 ? `<div style="font-size:.7rem;color:var(--txt3);padding:.4rem .2rem">최근 ${REWARD_LIST_MAX}개만 보여요.</div>` : '')
           : empty('아직 받은 보상이 없어요.'))
-    + `<button onclick="closeModal('m-reward');toggleSection('bottom-section','bottom-arrow')"
+    + `<button onclick="closeModal('m-reward');setHomeSec('me');_openHomeSection('bottom-section','bottom-arrow')"
         style="width:100%;padding:.45rem;border-radius:8px;background:rgba(255,255,255,.04);
           border:1px solid rgba(255,255,255,.08);color:var(--txt2);font-size:.76rem;
-          cursor:pointer;font-family:inherit">📜 전체 기록 보기 (감정 · 최근 활동)</button>`;
+          cursor:pointer;font-family:inherit">📜 전체 기록 보기 (최근 활동)</button>`;
 }
 
 // ══ 보상 승인 알림 (REWARD-STATUS-1) ═══════════════════════════
@@ -1568,35 +1656,54 @@ function buildMainHTML() {
       ${t.btnLabel ? `<button class="todo-btn ${t.type}" style="font-size:.68rem;padding:.3rem .6rem" onclick="event.stopPropagation();${t.action}">${t.btnLabel}</button>` : t.action ? '<div class="todo-arrow">›</div>' : ''}
     </div>`).join('') : '';
 
-  return `
-    <!-- 오늘의 링크 — 기본 접힘 (HOME-PLACE-1)
-         링크가 8개면 278px를 먹어 크롬북(1366×610)에서 학습·퀘스트가 전부 화면 밖으로
-         밀려났다. 헤더만 남기고 접어 둔다. 개수는 헤더에 표시. -->
-    ${(()=>{
-      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>safeUrl(l.url)&&l.title);
-      if (!todayLinks.length) return '';
-      return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
-        border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
-        <button onclick="toggleSection('today-links','today-links-arrow')"
-          style="width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
-            display:flex;align-items:center;gap:.4rem;color:var(--sky)">
-          <span style="font-size:.75rem;font-weight:700">🔗 오늘의 링크</span>
-          <span style="font-size:.68rem;color:var(--txt3)">${todayLinks.length}개</span>
-          <span id="today-links-arrow" style="margin-left:auto;font-size:.7rem;color:var(--txt3)">▼</span>
-        </button>
-        <div id="today-links" style="display:none;margin-top:.4rem">
-        ${todayLinks.map(l=>`
-          <a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener"
-            style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
-              text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
-            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${escHtml(l.title)}</span>
-            <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
-          </a>`).join('')}
-        </div>
-      </div>`;
-    })()}
+  // ══ [HOME-C-1] 홈 = 네 구역(오늘 · 배우고 만들기 · 나의 공간 · 모험). 사용자 10-03 시안 C 선택.
+  //   네 구역을 다 그리고 데스크톱(701px↑)은 CSS 가 고른 구역 하나만 보인다(#s-game[data-home-sec]).
+  //   폰(#mob-main-tab)은 지금처럼 위에서 아래로 다 보인다 — 어느 입구도 빠지지 않게.
+  //   다른 코드가 기대는 id(today-links · rest-todo-* · quest-section · bottom-section · ach-tile-notif)와
+  //   .home-thinkboard · [onclick*="openHouseTab"] 는 한 벌씩 그대로 둔다.
+  const ZOOM = { 'deco/d_y22.svg': 2.3, 'deco/deco_garden.svg': 2.1, 'deco/d_y34.svg': 1.8, 'deco/d_y36.svg': 1.4, 'deco/deco_trophy.svg': 1.8,
+    'deco/deco_bookshelf.svg': 1.5, 'deco/in_w_clock.svg': 1.2, 'deco/d_i9.svg': 1.2, 'deco/d_i5.svg': 1.2, 'deco/guest_owl.svg': 1.3 };
+  const asset = (f, cls = 'hc-art') => `<img class="${cls}" src="./assets/${f}" alt="" loading="lazy"${ZOOM[f] && cls === 'hc-art' ? ` style="--z:${ZOOM[f]}"` : ''}>`;
+  const dateKo = (() => { const k = new Date(Date.now() + 9 * 3600000); return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${'일월화수목금토'[k.getUTCDay()]}요일`; })();
+  const studyRecs = typeof CurriculumUtils !== 'undefined' ? getTodayStudyRecords(s.id) : [];
+  const studyDone = studyRecs.reduce((n, r) => n + (r.total || 0), 0);
+  const studyLeft = typeof CurriculumUtils !== 'undefined' && studyDone < STUDY_PER_DAY;
+  const realTodos = todos.filter(t => t.type !== 'done' && t.type !== 'hint' && t.type !== 'info').length + (studyLeft ? 1 : 0);
+  _homeCounts = { todo: realTodos, attemptsLeft: canFight ? attemptsLeft : 0, farmReady, pendingCount };
+  // 우리 반 소식 — 이미 있는 데이터만(새 저장소 없음)
+  const newsRows = [];
+  const weekArt = galleryArtworks().filter(a => (a.date || '') >= weekStart);
+  if (weekArt.length) {
+    const nm = id => { const st = DB.getStudent(id); return st ? st.name : ''; };
+    newsRows.push(`<div class="hc-news" onclick="openArtFree('class')">${asset('deco/ui_photo_frame.svg', 'hc-news-art')}
+      <div><b>이번 주 새 작품 ${weekArt.length}점</b><span>${weekArt.slice(0, 2).map(a => escHtml((a.title || '작품') + (nm(a.studentId) ? ' · ' + nm(a.studentId) : ''))).join(' / ')}</span></div></div>`);
+  }
+  const newQuests = boardQuests.filter(q => q.date === today);
+  if (newQuests.length) newsRows.push(`<div class="hc-news" onclick="openQuestModal()">${asset('deco/gift_sticker.svg', 'hc-news-art')}
+      <div><b>선생님이 새 퀘스트를 올렸어요</b><span>${newQuests.slice(0, 2).map(q => escHtml(q.name || '')).join(' · ')}</span></div></div>`);
+  // 입구 하나(그림 · 이름 · 한 줄 · 배지)
+  const door = (art, name, sub, action, badge = '', cls = '') => `
+    <div class="hc-door ${cls}" onclick="${action}">${badge ? `<span class="hc-badge">${badge}</span>` : ''}
+      ${art}<b>${name}</b><span>${sub}</span></div>`;
+  const ext = key => externalStudyItems().find(x => x.key === key);
 
-    <!-- 이번 주 목표 카드 -->
+  return `
+  <section class="home-sec hs-today" data-sec="today">
+    <div class="hs-cols">
+      <div class="hs-main">
+        <div class="hs-head"><span class="hs-date">${dateKo}</span><h2>${realTodos ? `오늘 할 일 ${realTodos}개` : '오늘 할 일 다 했어요'}</h2></div>
+        ${alerts.join('')}
+        ${buildStudyTaskHTML(s)}
+        ${topTodoHtml}
+        ${restTodos.length > 0 ? `
+          <div id="rest-todo-wrap" style="display:none">${restTodoHtml}</div>
+          <button onclick="toggleRestTodo()"
+            id="rest-todo-btn"
+            style="width:100%;padding:.35rem;background:none;border:1px solid rgba(255,255,255,.08);
+              border-radius:8px;color:var(--txt3);font-size:.72rem;cursor:pointer;
+              font-family:inherit;margin-top:.3rem;margin-bottom:.3rem">
+            ▼ 할 일 더보기 (${restTodos.length}개)
+          </button>` : ''}
     ${(()=>{
       const wk   = Utils.weekKey();
       const goal = DB.getWeeklyGoal(s.id, wk);
@@ -1627,129 +1734,7 @@ function buildMainHTML() {
           </div>
         </div>`;
     })()}
-    ${alerts.join('')}
-
-    <!-- ① 오늘의 학습 — 매일 하는 핵심 기능이라 할 일보다 위 (HOME-PLACE-1) -->
-    <div class="sec-label">📚 오늘의 공부</div>
-    ${buildStudyCardHTML(s)}
-
-    <!-- ② 핵심 할 일 1개 강조 + 나머지 요약 -->
-    <div class="sec-label">✅ 오늘 할 일</div>
-    ${topTodoHtml}
-    ${restTodos.length > 0 ? `
-      <div id="rest-todo-wrap" style="display:none">${restTodoHtml}</div>
-      <button onclick="toggleRestTodo()"
-        id="rest-todo-btn"
-        style="width:100%;padding:.35rem;background:none;border:1px solid rgba(255,255,255,.08);
-          border-radius:8px;color:var(--txt3);font-size:.72rem;cursor:pointer;
-          font-family:inherit;margin-top:.3rem;margin-bottom:.3rem">
-        ▼ 할 일 더보기 (${restTodos.length}개)
-      </button>` : ''}
-
-    <!-- ③ 주요 메뉴 4개 -->
-    <div class="sec-label">🎮 메뉴</div>
-    <div class="menu-grid" style="margin-bottom:.5rem">
-      <div class="menu-tile mt-quest" onclick="openQuestModal()">
-        ${pendingCount>0?`<div class="tile-notif">${pendingCount}</div>`:''}
-        <div class="tile-icon">📋</div><div class="tile-name">퀘스트</div>
-        <div class="tile-desc">확인 · 보상</div>
-      </div>
-      <div class="menu-tile mt-monster" onclick="openMonsterModal()">
-        ${canFight?`<div class="tile-notif">${attemptsLeft}회</div>`:''}
-        <div class="tile-icon">⚔️</div><div class="tile-name">몬스터</div>
-        <div class="tile-desc">${canFight?`${attemptsLeft}회 남음`:'오늘 완료'}</div>
-      </div>
-      <div class="menu-tile mt-shop" onclick="openModal('m-shop');renderShop()">
-        <div class="tile-icon">🏪</div><div class="tile-name">상점</div>
-        <div class="tile-desc">장비·씨앗</div>
-      </div>
-      <div class="menu-tile mt-farm" onclick="openModal('m-farm');renderFarmModal()">
-        ${farmReady?'<div class="tile-notif">수확!</div>':''}
-        <div class="tile-icon">🌱</div><div class="tile-name">농장</div>
-        <div class="tile-desc">심기 · 수확</div>
-      </div>
-      <div class="menu-tile" onclick="openModal('m-inv');renderInv()"
-        style="border-color:rgba(255,255,255,.1)">
-        <div class="tile-icon">🎒</div><div class="tile-name">가방</div>
-        <div class="tile-desc">아이템</div>
-      </div>
-      <div class="menu-tile" onclick="openModal('m-rank');renderRankingModal()"
-        style="border-color:rgba(255,215,0,.2)">
-        <div class="tile-icon">🏆</div><div class="tile-name">랭킹</div>
-        <div class="tile-desc">우리반 순위</div>
-      </div>
-      <!-- [VILLAGE-DOOR-1] 3칸 격자에 6개가 꽉 차 있어 7번째는 한 줄 전체로 둔다(하나만 덩그러니 남지 않게). -->
-      <div class="menu-tile" onclick="openExternalEmbed('village')"
-        style="grid-column:1/-1;border-color:rgba(120,200,140,.35)">
-        <div class="tile-icon">🏘️</div><div class="tile-name">우리 마을</div>
-        <div class="tile-desc">짓고 · 키우기</div>
-      </div>
-    </div>
-
-    <!-- 내집 섹션 -->
-    <div class="sec-label">🏠 내 집</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.5rem">
-      <div onclick="openHouseTab('stats')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">📊</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">기록</div>
-      </div>
-      <div onclick="openHouseTab('weekly')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(93,173,226,.2)">
-        <div style="font-size:1.1rem">📅</div>
-        <div style="font-size:.63rem;color:var(--sky);margin-top:.12rem;font-weight:700">주간 다짐</div>
-      </div>
-      <div onclick="openHouseTab('book')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">📚</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">독서</div>
-      </div>
-      <div onclick="openHouseTab('deco')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">🌸</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">꾸미기</div>
-      </div>
-      <div onclick="openHouseTab('artwork')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">🖼️</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">작품</div>
-      </div>
-      <div onclick="openHouseTab('memory')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">📸</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">추억</div>
-      </div>
-      <div onclick="openHouseTab('emotion')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">💭</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">감정</div>
-      </div>
-      <div onclick="openHouseTab('ach')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          position:relative;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
-        <div style="font-size:1.1rem">🏅</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">업적</div>
-      </div>
-      <div onclick="toast('🎵 리코더 기록장은 곧 열릴 예정이에요')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          position:relative;opacity:.5;
-          background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1)">
-        <div style="font-size:1.1rem;filter:grayscale(.4)">🎵</div>
-        <div style="font-size:.63rem;color:var(--txt3);margin-top:.12rem">리코더</div>
-        <span style="position:absolute;top:-3px;right:-2px;font-size:.5rem;font-weight:800;
-          background:#e67e22;color:#fff;border-radius:5px;padding:.05rem .25rem;line-height:1.4">예정</span>
-      </div>
-    </div>
-
+        ${emotionCard}
     <!-- ④ 퀘스트 목록 (기본 접힘) -->
     ${boardQuests.length>0 ? `
     <button onclick="toggleSection('quest-section','quest-arrow')"
@@ -1766,17 +1751,83 @@ function buildMainHTML() {
     <div id="quest-section" style="display:none">
       <div class="mission-list" style="margin-bottom:.6rem">${missionHtml}</div>
     </div>` : ''}
+      </div>
+      <aside class="hs-news">
+        <div class="sec-label">우리 반 소식</div>
+    ${(()=>{
+      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>safeUrl(l.url)&&l.title);
+      if (!todayLinks.length) return '';
+      return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
+        border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
+        <button onclick="toggleSection('today-links','today-links-arrow')"
+          style="width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+            display:flex;align-items:center;gap:.4rem;color:var(--sky)">
+          <span style="font-size:.75rem;font-weight:700">🔗 오늘의 링크</span>
+          <span style="font-size:.68rem;color:var(--txt3)">${todayLinks.length}개</span>
+          <span id="today-links-arrow" style="margin-left:auto;font-size:.7rem;color:var(--txt3)">▼</span>
+        </button>
+        <div id="today-links" style="display:none;margin-top:.4rem">
+        ${todayLinks.map(l=>`
+          <a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener"
+            style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
+              text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${escHtml(l.title)}</span>
+            <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
+          </a>`).join('')}
+        </div>
+      </div>`;
+    })()}
+        ${buildThinkboardSlotHTML()}
+        ${newsRows.join('')}
+        ${!newsRows.length && !_tbHome ? '<div class="hc-empty">새 소식이 오면 여기에 떠요. 선생님이 생각판을 열거나 친구가 작품을 올리면 보여요.</div>' : ''}
+      </aside>
+    </div>
+  </section>
 
-    <!-- ⑥ 하단 정보 — 기본 접힘 -->
+  <section class="home-sec hs-learn" data-sec="learn">
+    <div class="hs-head"><h2>배우고 만들기</h2><span class="hs-sub">문제 풀고 · 생각 나누고 · 만들어요</span></div>
+    <div class="hc-grid">
+      ${door(asset('deco/d_i5.svg'), '오늘의 학습', typeof CurriculumUtils === 'undefined' ? '교과 문제' : studyLeft ? `하루 ${STUDY_PER_DAY}문제 · ${studyDone}문제 했어요` : '오늘 공부 끝!', 'openStudyModal()', studyLeft ? '오늘' : '')}
+      ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
+      ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')", 'NEW')}
+      ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')", 'NEW')}
+      ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')", 'NEW')}
+      ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
+      ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
+      ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
+      ${ext('english') ? door(asset('deco/guest_owl.svg'), '영어 복습', '단어 · 표현 · 듣기 · 말하기', "openExternalEmbed('english')") : ''}
+      ${door(asset('deco/in_w_bookshelf.svg'), '독서 기록', `읽은 책 ${(s.books || []).length}권`, "openHouseTab('book')")}
+    </div>
+  </section>
+
+  <section class="home-sec hs-me" data-sec="me">
+    <div class="hs-head"><h2>나의 공간</h2><span class="hs-sub">내 캐릭터 · 내 집 · 내 기록</span></div>
+    <div class="hc-grid small">
+      ${door(asset('deco/d_y22.svg'), '가방', '아이템 · 장비', "openModal('m-inv');renderInv()")}
+      ${door(asset('deco/deco_garden.svg'), '꾸미기', '마당 · 방 꾸미기', "openHouseTab('deco')")}
+      ${door(asset('deco/heart_full.svg'), '주간 다짐', '이번 주 다짐 · 돌아보기', "openHouseTab('weekly')")}
+      ${door(asset('deco/heart_empty.svg'), '감정', '내 감정 기록', "openHouseTab('emotion')")}
+      ${door(asset('deco/deco_bookshelf.svg'), '독서', '읽은 책 기록', "openHouseTab('book')")}
+      ${door(asset('deco/d_i4_wall.svg'), '내 작품', '내가 올린 그림', "openHouseTab('artwork')")}
+      ${door(asset('deco/gift_photo.svg'), '추억', '우리 반 사진', "openHouseTab('memory')")}
+      <div class="hc-door" onclick="openHouseTab('ach')"><div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
+        ${asset('deco/fx_first_meet.svg')}<b>업적</b><span>모은 업적</span></div>
+      ${door(asset('deco/in_w_clock.svg'), '기록', '활동 기록 · 그래프', "openHouseTab('stats')")}
+      ${door(asset('deco/d_i9.svg'), '리코더', '리코더 기록장', "openExternalEmbed('music','#/log')")}
+    </div>
+    <div class="hc-links">
+      <button onclick="openNoteList()">선생님 쪽지</button>
+      <button onclick="openRewardList()">내 보상 기록</button>
+    </div>
+    <!-- 최근 활동 — 기본 접힘(보상 목록의 '전체 기록 보기'가 여기를 연다) -->
     <button onclick="toggleSection('bottom-section','bottom-arrow')"
       style="width:100%;padding:.4rem .7rem;border-radius:8px;background:rgba(255,255,255,.03);
         border:1px solid rgba(255,255,255,.07);color:var(--txt3);font-size:.72rem;
         cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
-      <span>📅 감정 · 최근 활동 · 친구 방문</span>
+      <span>최근 활동</span>
       <span id="bottom-arrow" style="font-size:.7rem">▼</span>
     </button>
     <div id="bottom-section" style="display:none">
-      ${emotionCard}
       <div class="today-grid" style="margin-bottom:.5rem">
         <div class="today-card" style="overflow-y:auto;max-height:160px;grid-column:1/-1">
           <div class="tc-label">📜 최근 활동</div>
@@ -1796,6 +1847,22 @@ function buildMainHTML() {
             </div>`).join('');
           })()}
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="home-sec hs-adv" data-sec="adv">
+    <div class="hs-head"><h2>모험</h2><span class="hs-sub">사냥 · 상점 · 농장 · 우리 마을</span></div>
+    <div class="hc-grid">
+      ${door(asset('monsters/m28.png'), '몬스터', canFight ? `오늘 ${attemptsLeft}번 남았어요` : '오늘 도전 끝', 'openMonsterModal()', canFight ? `${attemptsLeft}회` : '', 'big')}
+      ${door(asset('deco/gift_sticker.svg'), '퀘스트', '확인 · 보상', 'openQuestModal()', pendingCount > 0 ? String(pendingCount) : '')}
+      ${door(asset('deco/d_y34.svg'), '상점', '장비 · 씨앗', "openModal('m-shop');renderShop()")}
+      ${door(asset('deco/d_y36.svg'), '농장', '심기 · 수확', "openModal('m-farm');renderFarmModal()", farmReady ? '수확!' : '')}
+      ${door(asset('deco/deco_trophy.svg'), '랭킹', '우리 반 순위', "openModal('m-rank');renderRankingModal()")}
+      ${door(asset('deco/yard_house.svg'), '우리 마을', '짓고 · 키우기', "openExternalEmbed('village')")}
+      ${canPromo ? door(asset('deco/fx_first_meet.svg'), `Lv.${s.level} 승급`, '승급 신청하기', "openModal('m-promo')", '!') : ''}
+    </div>
+    <div class="today-grid" style="margin-top:.6rem">
         <div class="today-card" style="grid-column:1/-1">
           <div class="tc-label">👥 친구 방문</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
@@ -1805,9 +1872,37 @@ function buildMainHTML() {
           </div>`).join('')}
           </div>
         </div>
-      </div>
-    </div>`;
+    </div>
+  </section>`;
 }
+// ══ [HOME-C-1] 홈 네 구역 — 왼쪽 레일(student.html 고정)로 고른다. 상태는 #s-game[data-home-sec] 에 둬서
+//   홈이 innerHTML 로 통째 다시 그려져도(데이터가 바뀔 때마다) 고른 구역이 그대로다. 이 기기에 기억(localStorage).
+const HOME_SECS = ['today', 'learn', 'me', 'adv'];
+let _homeCounts = null;
+let HOME_SEC = (() => { try { const v = localStorage.getItem('rpg.homeSec'); return HOME_SECS.includes(v) ? v : 'today'; } catch (e) { return 'today'; } })();
+function setHomeSec(sec) {
+  if (!HOME_SECS.includes(sec)) sec = 'today';
+  HOME_SEC = sec;
+  try { localStorage.setItem('rpg.homeSec', sec); } catch (e) {}
+  const g = document.getElementById('s-game');
+  if (g) g.dataset.homeSec = sec;
+  document.querySelectorAll('#home-rail .hr-item').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
+  const m = document.getElementById('main-area');
+  if (m) m.scrollTop = 0;
+}
+function renderRail() {
+  const c = _homeCounts || {}, set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  set('hr-sub-today', c.todo ? `할 일 ${c.todo}` : '다 했어요');
+  set('hr-sub-learn', '학습 · 생각판 · 음악실');
+  set('hr-sub-me', '가방 · 꾸미기 · 기록');
+  set('hr-sub-adv', c.attemptsLeft ? `몬스터 ${c.attemptsLeft}번` : c.farmReady ? '수확할 것 있어요' : '상점 · 농장 · 마을');
+}
+// 펼치기만(이미 열렸으면 그대로) — 보상 목록의 '전체 기록 보기'
+function _openHomeSection(sectionId, arrowId) {
+  const sec = _homeEl(sectionId);
+  if (sec && sec.style.display === 'none') toggleSection(sectionId, arrowId);
+}
+
 // ══ 보상 받기 ══
 // [HOME-TOGGLE-MOBILE-1] buildMainHTML 은 데스크톱(#main-area)과 모바일(#mob-main-tab)에 **두 번** 그려져
 //   같은 id 가 두 벌 생긴다. getElementById 는 DOM 앞쪽(#main-area, 폰에선 display:none)을 돌려줘서
@@ -2188,7 +2283,7 @@ function renderShop() {
       return `<div class="item-card" onclick="${lockFn}" style="opacity:${locked?.55:1}">
         <div class="ic-icon">${iconImg(s, 'seeds', '1.4rem', s.id)}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
         <div class="ic-name">${s.name}${locked?`<span style="color:var(--txt3);font-size:.62rem"> Lv${s.reqLv}+</span>`:''}</div>
-        <div class="ic-stats">${s.growHours}h → ${s.sellPrice}G (순익 +${s.sellPrice-s.price}G)</div>
+        <div class="ic-stats">${s.growHours}시간 → ${s.sellPrice}G (남는 골드 +${s.sellPrice-s.price}G)</div>
         <div class="ic-price">💰 ${s.price}G</div>
       </div>`;
     });
@@ -2208,7 +2303,7 @@ function renderShop() {
             border-radius:4px;padding:.05rem .3rem;margin-left:.2rem">위험</span>
           ${locked?`<span style="color:var(--txt3);font-size:.62rem"> Lv${s.reqLv}+</span>`:''}
         </div>
-        <div class="ic-stats" style="color:var(--txt2)">${s.growHours}h · ${s.desc}</div>
+        <div class="ic-stats" style="color:var(--txt2)">${s.growHours}시간 · ${s.desc}</div>
         <div class="ic-stats" style="color:rgba(255,165,0,.8);font-size:.62rem">
           성공 ${pct}% → +${successG}G / 실패 → 0G
         </div>
@@ -2534,7 +2629,7 @@ function startBattle(monId) {
 
   closeModal('m-monster');
   openModal('m-battle');
-  document.getElementById('battle-title').textContent = `⚔️ ${mon.name} 출현!`;
+  document.getElementById('battle-title').textContent = BV2_ZONE[mon.zone] || '사냥터';
 
   if (BATTLE_STATE) {
     if (BATTLE_STATE.turn === 'monster') {
@@ -2551,179 +2646,294 @@ function startBattle(monId) {
   }
 }
 
-// ── 새 턴제 전투 화면 렌더 ──
-function renderBattleNew() {
-  const s     = BATTLE_STATE;
-  const mon   = s.monster;
-  const player = CUR;
-  const arenaEl = document.getElementById('battle-arena');
-  if (!arenaEl) return;
-
-  const playerHpPct  = Math.max(0, Math.round(s.playerHp  / s.playerHpMax  * 100));
-  const monsterHpPct = Math.max(0, Math.round(s.monsterHp / s.monsterHpMax * 100));
-  const recentLog    = s.log.slice(-4).join('<br>');
-
-  // 공격 버튼 — 장착 스킬 4슬롯 기준
-  const typeColors = {
-    normal: ['rgba(255,255,255,.08)','rgba(255,215,0,.12)','rgba(255,215,0,.2)','rgba(255,215,0,.35)'],
-    fire:   ['rgba(255,107,53,.08)','rgba(255,107,53,.15)','rgba(255,107,53,.25)','rgba(255,107,53,.4)'],
-    water:  ['rgba(79,195,247,.08)','rgba(79,195,247,.15)','rgba(79,195,247,.25)','rgba(79,195,247,.4)'],
-    grass:  ['rgba(102,187,106,.08)','rgba(102,187,106,.15)','rgba(102,187,106,.25)','rgba(102,187,106,.4)'],
+// ══ [BATTLE-V2] 무대형 배틀 화면 ══════════════════════════════════════
+//  계산·저장·횟수는 그대로(gamedata.js 엔진 · startBattle · _finishBattle · finalizeBattle · 무한배틀 규칙). 그리는 것만 새로.
+//  무대는 전투(BATTLE_STATE)마다 한 번 그리고, 차례마다는 체력·차례·단추·소식만 바꾼다 — 등장 연출이 다시 돌지 않게.
+//  크롬북 1366×610 에서 스크롤 없이: 위 띠 46 · 무대 · 아래 행동판. 업적은 결과 카드 안 한 줄(위에 덮지 않음).
+const BV2_ZONE = { beginner: '초급 사냥터', intermediate: '중급 사냥터', advanced: '고급 사냥터' };
+const BV2_EL = { fire: { name: '불꽃', c: '#FF9A7A' }, water: { name: '냉기', c: '#8fd3ff' }, grass: { name: '자연', c: '#7fe08f' } };
+const BV2_ATK = {
+  normal: { t: '일반 공격', c: '#F2D27C', g: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>' },
+  fire:   { t: '화염 공격', c: '#FF7A45', g: '<path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.2-2-5.6-4-7.6.2 2-1 3.4-2.3 3.4C11.4 11.2 11 9 12.5 6 9 7.5 5 11 5 15.4 5 19.1 7.6 22 12 22z"/>' },
+  water:  { t: '냉기 공격', c: '#5CC8FF', g: '<path d="M12 2v20M4.5 6.5l15 11M19.5 6.5l-15 11"/><path d="M9.5 3.5 12 6l2.5-2.5M9.5 20.5 12 18l2.5 2.5"/>' },
+  grass:  { t: '자연 공격', c: '#5FD27A', g: '<path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19 13 11"/>' },
+};
+const BV2_SK = {
+  heal:     { t: '응급치료',   d: '체력 30% 회복',    g: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>' },
+  guard:    { t: '방어',       d: '받는 피해 절반',   g: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/>' },
+  counter:  { t: '최후의 반격', d: '체력 40% 아래일 때', g: '<path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5"/>' },
+  prep:     { t: '일격 준비',   d: '다음 공격 ×2.3',   g: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/>' },
+  reckless: { t: '무리한 공격', d: '반반 확률 ×2.2',   g: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  rush:     { t: '몰아치기',   d: '2턴 공격력↑',      g: '<path d="m5 6 6 6-6 6M13 6l6 6-6 6"/>' },
+};
+const _bv2Svg = (d, s) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+// 받침에 맞는 조사 — '슬라임이' · '골렘이' · '박쥐가'
+function _bv2Jong(w) { const s = String(w || ''), c = s.charCodeAt(s.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; }
+const _bv2J = (w, a, b) => String(w) + (_bv2Jong(w) ? a : b);
+// 엔진 기록 한 줄 → 소식 글: 태그 · 앞 그림문자를 빼고 '이(가)' 같은 조사를 받침에 맞게
+function _bv2Text(html) {
+  let t = String(html || '').replace(/<[^>]+>/g, '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '').trim();
+  return t.replace(/([가-힣A-Za-z0-9]+)(이\(가\)|을\(를\)|은\(는\)|와\(과\))/g, (m, w, p) => { const [a, b] = p.replace(')', '').split('('); return w + (_bv2Jong(w) ? a : b); });
+}
+function _bv2Expect(type, s) {   // [BATTLE-V2] 이 공격의 예상 피해 — 계산식은 엔진(calculatePlayerDamage)과 같고 급소·빗나감만 뺀다
+  const mon = s.monster, ps = s.playerStats || {}, lv = (s.skillLevels || {})[type] || 0;
+  if (type !== 'normal' && lv < 1) return 0;
+  const tab = type === 'normal' ? SKILL_MULTIPLIERS.normal : SKILL_MULTIPLIERS.element;
+  const stat = type === 'normal' ? (ps.atk || 0) : (ps.mag || 0);
+  const gap = (mon.level || mon.recLv || 1) - (ps.level || 1);
+  const lvMult = gap > 0 ? Math.max(BALANCE.playerAttack.levelGap.floor, 1 - gap * BALANCE.playerAttack.levelGap.perLevel) : 1;
+  const d = stat * (tab[Math.min(lv, BALANCE.skill.maxLevel)] || 1) * (BALANCE.damage.defScale / (BALANCE.damage.defScale + (mon.def || 0)))
+    * getElementMultiplier(type, mon.element) * getTraitMultiplier(mon, type) * lvMult;
+  return Math.max(BALANCE.damage.minDamage, Math.round(d));
+}
+function _bv2Match(type, mon) {   // 공격 속성이 이 몬스터에게 강한가(관리자 상성표를 따르는 ELEMENT_CHART 그대로)
+  if (!mon || type === 'normal' || !mon.element || typeof ELEMENT_CHART === 'undefined') return 1;
+  return (ELEMENT_CHART[type] && ELEMENT_CHART[type][mon.element]) || 1;
+}
+function _bv2StageHTML(s, mon) {
+  const zone = BV2_ZONE[mon.zone] ? mon.zone : 'beginner';
+  const el = BV2_EL[mon.element];
+  const rar = s.ibRarity === 'legend' ? '<span class="bv2-tag gold">전설</span>' : s.ibRarity === 'rare' ? '<span class="bv2-tag rare">희귀</span>' : '';
+  const hp = k => `<div class="bv2-hp ${k}"><i class="trail"></i><i class="fill"></i></div>`;
+  return `<div class="bv2-stage" data-zone="${zone}" id="bv2-stage">
+    <div class="bv2-bg bv2-sky"></div>
+    <div class="bv2-bg bv2-far"><svg viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 210 C140 120 260 150 380 170 S620 90 760 140 1020 110 1200 160 V300 H0Z" fill="var(--bv2-h1)" opacity=".75"/>
+      <path d="M0 250 C160 190 300 220 460 230 S760 170 920 210 1100 200 1200 220 V300 H0Z" fill="var(--bv2-h2)" opacity=".85"/>
+      <path d="M0 285 C200 250 420 270 600 265 S980 245 1200 268 V300 H0Z" fill="var(--bv2-h3)"/></svg></div>
+    <div class="bv2-deco" aria-hidden="true"><svg viewBox="0 0 1200 430" preserveAspectRatio="xMidYMax slice">
+      <g class="z zb"><g opacity=".62"><rect x="173" y="226" width="9" height="46" rx="3" fill="#5b4632"/><circle cx="160" cy="214" r="26" fill="#4f9a4f"/><circle cx="196" cy="206" r="30" fill="#5aa957"/><circle cx="178" cy="186" r="26" fill="#6bb862"/>
+        <rect x="1003" y="222" width="10" height="50" rx="3" fill="#5b4632"/><circle cx="988" cy="210" r="30" fill="#4f9a4f"/><circle cx="1028" cy="202" r="33" fill="#5aa957"/><circle cx="1008" cy="178" r="29" fill="#6bb862"/>
+        <circle cx="250" cy="258" r="16" fill="#58a654"/><circle cx="266" cy="262" r="12" fill="#4f9a4f"/><circle cx="1066" cy="258" r="15" fill="#58a654"/></g>
+        <g fill="#fff" opacity=".75"><ellipse cx="300" cy="70" rx="58" ry="16"/><ellipse cx="336" cy="62" rx="36" ry="18"/><ellipse cx="860" cy="96" rx="70" ry="15"/><ellipse cx="900" cy="88" rx="40" ry="17"/></g></g>
+      <g class="z zi" opacity=".7"><path d="M120 270 150 150 178 270Z M200 270 214 196 232 270Z M960 270 992 132 1024 270Z M1044 270 1060 200 1078 270Z" fill="#3a1610"/>
+        <g fill="#ffb26b" opacity=".75"><circle cx="420" cy="120" r="2.4"/><circle cx="640" cy="80" r="2"/><circle cx="760" cy="150" r="2.6"/><circle cx="540" cy="190" r="1.8"/><circle cx="880" cy="60" r="2.2"/></g></g>
+      <g class="z za"><g fill="#fff"><circle cx="120" cy="60" r="1.6"/><circle cx="260" cy="110" r="1.2"/><circle cx="420" cy="40" r="1.8"/><circle cx="560" cy="90" r="1.1"/><circle cx="700" cy="50" r="1.5"/><circle cx="820" cy="120" r="1.2"/><circle cx="1080" cy="80" r="1.7"/><circle cx="340" cy="170" r="1"/><circle cx="640" cy="150" r="1.2"/></g>
+        <path d="M985 70a36 36 0 1 0 30 56 30 30 0 1 1-30-56z" fill="#f4ecff" opacity=".85"/>
+        <g fill="#15133a" opacity=".85"><rect x="150" y="160" width="26" height="110"/><rect x="140" y="150" width="46" height="12"/><rect x="1010" y="170" width="24" height="100"/><rect x="1000" y="160" width="44" height="12"/></g></g>
+    </svg></div>
+    <div class="bv2-bg bv2-ground"></div>
+    <div class="bv2-spot me"></div><div class="bv2-spot foe"></div>
+    <div class="bv2-bg bv2-light"></div><div class="bv2-bg bv2-vig"></div>
+    <div class="bv2-plate me"><div class="bv2-prow"><b>${escHtml(CUR.name || '나')}</b><span>Lv.${CUR.level || 1}</span></div>${hp('me')}<div class="bv2-pnum"><span>체력</span><b class="bv2-hpn-me"></b></div></div>
+    <div class="bv2-plate foe"><div class="bv2-prow"><b>${escHtml(mon.name)}</b><span>Lv.${mon.level || 1}</span>${rar}${el ? `<span class="bv2-tag" style="color:${el.c}">${el.name}</span>` : ''}${mon.trait === 'ghost' ? '<span class="bv2-tag">유령</span>' : ''}</div>${hp('foe')}<div class="bv2-pnum"><span></span><b class="bv2-hpn-foe"></b></div></div>
+    <div class="bv2-turn" id="bv2-turn"></div>
+    <div class="bv2-fighter me idle" id="ba-char-emoji">${charSVG(CUR)}</div>
+    <div class="bv2-fighter foe idle" id="ba-mon-emoji">${iconImg(mon, 'monsters', '100%')}</div>
+    <div class="bv2-fx" id="bv2-fx"></div>
+    <div class="bv2-banner" id="bv2-banner"></div>
+    <div class="bv2-ticker" id="ba-log"></div>
+    <div class="bv2-result" id="bv2-result"></div>
+  </div>
+  <div class="bv2-actions" id="bv2-actions"><div class="bv2-atk-row" id="bv2-atk-row"></div><div class="bv2-sk-row" id="bv2-sk-row"></div></div>`;
+}
+// 체력바: 채움은 바로, 깎인 자리 잔상은 조금 늦게
+function _updateBattleHpBars(state) {
+  const st = state || BATTLE_STATE; if (!st) return;
+  const set = (k, hp, max) => {
+    const bar = document.querySelector('.bv2-hp.' + k); if (!bar) return;
+    const pct = Math.max(0, Math.min(100, hp / Math.max(1, max) * 100));
+    bar.classList.toggle('low', pct <= 30);
+    bar.querySelector('.fill').style.width = pct + '%'; bar.querySelector('.trail').style.width = pct + '%';
+    const n = document.querySelector('.bv2-hpn-' + k); if (n) n.textContent = `${Math.max(0, hp)} / ${max}`;
   };
-  const typeBorder    = { normal:'rgba(255,215,0,.3)', fire:'rgba(255,107,53,.45)', water:'rgba(79,195,247,.45)', grass:'rgba(102,187,106,.45)' };
-  const typeTextColor = { normal:'var(--gold)', fire:'#FF8A80', water:'#7ec8e3', grass:'#6fd49d' };
-  const typeLabels    = { normal:'⚔️ 일반 공격', fire:'🔥 화염 공격', water:'💧 냉기 공격', grass:'🌿 자연 공격' };
-
-  // equippedSkills: null 슬롯은 버튼 없음, 중복 제거
-  const equippedTypes = [...new Set((CUR.equippedSkills || ['normal',null,null,null]).filter(Boolean))];
-  // 아무것도 없으면 노말 기본 보장
-  const battleBtnTypes = equippedTypes.length > 0 ? equippedTypes : ['normal'];
-
-  const btns = battleBtnTypes.map(type => {
-    const lvl    = (s.skillLevels[type] || 0);
-    const canUse = lvl >= 1;
-    const tier   = _skillEffectTier(lvl) - 1;
-    const bg     = canUse ? (typeColors[type]||typeColors.normal)[tier] : 'rgba(255,255,255,.04)';
-    const bc     = canUse ? (typeBorder[type]||'rgba(255,215,0,.3)') : 'rgba(255,255,255,.1)';
-    const tc     = canUse ? (typeTextColor[type]||'var(--gold)') : 'var(--txt3)';
-    const disabled = (!canUse || s.finished || s.turn !== 'player') ? 'disabled' : '';
-    return `<button class="btn-sm" ${disabled} onclick="doAttack('${type}')"
-      style="flex:1;min-width:0;font-size:.76rem;padding:.4rem .2rem;border-radius:8px;
-             border:1.5px solid ${bc};background:${bg};color:${tc};
-             ${!canUse?'opacity:.35':''}">
-      ${typeLabels[type]||type}<br>
-      <span style="font-size:.6rem">${canUse ? `Lv${lvl}` : '미습득'}</span>
-    </button>`;
+  set('me', st.playerHp, st.playerHpMax); set('foe', st.monsterHp, st.monsterHpMax);
+}
+function _bv2Turn() {
+  const s = BATTLE_STATE, t = document.getElementById('bv2-turn'); if (!s || !t) return;
+  const mine = s.turn === 'player', txt = s.finished ? '' : mine ? '내 차례' : `${s.monster.name} 차례`;
+  if (t.textContent === txt) return;
+  t.textContent = txt; t.classList.toggle('foe-turn', !mine); t.classList.toggle('off', !txt);
+  t.classList.remove('swap'); void t.offsetWidth; t.classList.add('swap');
+}
+function _bv2Actions() {
+  const s = BATTLE_STATE, mon = s && s.monster;
+  const row = document.getElementById('bv2-atk-row'), sk = document.getElementById('bv2-sk-row'), box = document.getElementById('bv2-actions');
+  if (!s || !row || !sk) return;
+  box.classList.toggle('done', !!s.finished);
+  const myTurn = !s.finished && s.turn === 'player', reck = BATTLE_MENU === 'reckless';
+  const types = [...new Set((CUR.equippedSkills || ['normal', null, null, null]).filter(Boolean))];
+  const list = types.length ? types : ['normal'];
+  row.style.setProperty('--n', list.length);
+  // 상성만 보면 '강한' 공격이 실제로는 더 약할 수 있다(일반 = 공격력, 속성 = 마력) → 예상 피해로 정직하게
+  const exp = Object.fromEntries(list.map(t => [t, _bv2Expect(t, s)]));
+  const top = Math.max(...Object.values(exp));
+  row.innerHTML = list.map(type => {
+    const a = BV2_ATK[type] || BV2_ATK.normal, lv = (s.skillLevels || {})[type] || 0, can = lv >= 1, m = _bv2Match(type, mon);
+    const badge = can && exp[type] === top && list.filter(t => exp[t] === top).length === 1 && list.length > 1 ? '<span class="bv2-badge">가장 세요</span>' : '';
+    const why = !can ? '' : m > 1 ? ' · 상성 좋음' : m < 1 ? ' · 상성 나쁨' : '';
+    const go = reck ? `doReckless('${type}')` : `doAttack('${type}')`;
+    return `<button class="bv2-atk" style="--ec:${a.c}" ${can && myTurn ? '' : 'disabled'} onclick="BATTLE_MENU='main';${go}">${badge}
+      <span class="bv2-gl">${_bv2Svg(a.g, 26)}</span><span><span class="bv2-at">${a.t}</span><span class="bv2-as">${can ? '예상 ' + exp[type] + why : '아직 못 배웠어요'}</span></span></button>`;
   }).join('');
-
-  // ── 2단계 액션 메뉴 ─────────────────────────────────
-  const SKILL2_INFO = {
-    heal:     { label:'💊 응급치료',    desc:'HP 30% 회복' },
-    prep:     { label:'🎯 일격 준비',   desc:'다음 공격 ×2.3' },
-    reckless: { label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2' },
-    guard:    { label:'🛡️ 방어',       desc:'피해 50% 감소' },
-    counter:  { label:'⚔️ 최후의 반격',desc:'HP40%↓ / 50% 반사' },
-    rush:     { label:'🔥 몰아치기',   desc:'2턴 공격력↑' },
-  };
-
-  let actionHtml = '';
-  if (!s.finished && s.turn === 'player') {
-    const hasSkill2 = (s.equippedSkill2 || []).filter(Boolean).some(id => !s.skill2Used?.[id]);
-
-    if (BATTLE_MENU === 'main') {
-      actionHtml = `<div class="bat-actions">
-        <button class="bat-btn-attack" onclick="BATTLE_MENU='attack';renderBattleNew()">⚔️ 공격</button>
-        <button class="bat-btn-skill" onclick="BATTLE_MENU='skill';renderBattleNew()"
-          ${!hasSkill2?'disabled':''}>✨ 스킬</button>
-      </div>`;
-
-    } else if (BATTLE_MENU === 'attack') {
-      const attackBtns = battleBtnTypes.map(type => {
-        const lvl = s.skillLevels[type] || 0;
-        const canUse = lvl >= 1;
-        const tier = _skillEffectTier(lvl) - 1;
-        const bg = canUse ? (typeColors[type]||typeColors.normal)[tier] : 'rgba(255,255,255,.04)';
-        const bc = canUse ? (typeBorder[type]||'rgba(255,215,0,.3)') : 'rgba(255,255,255,.1)';
-        const tc = canUse ? (typeTextColor[type]||'var(--gold)') : 'var(--txt3)';
-        return `<button class="bat-sub-btn" ${!canUse?'disabled':''} onclick="BATTLE_MENU='main';doAttack('${type}')"
-          style="border:1.5px solid ${bc};background:${bg};color:${tc};${!canUse?'opacity:.35':''}">
-          ${typeLabels[type]||type}<br>
-          <span style="font-size:.58rem">${canUse?`Lv${lvl}`:'미습득'}</span>
-        </button>`;
-      }).join('');
-      actionHtml = `<div>
-        <button class="bat-back-btn" onclick="BATTLE_MENU='main';renderBattleNew()">← 뒤로 &nbsp;<span style="color:var(--gold);font-size:.7rem">⚔️ 공격 선택</span></button>
-        <div class="bat-sub-row">${attackBtns}</div>
-      </div>`;
-
-    } else if (BATTLE_MENU === 'skill') {
-      const skillBtns = (s.equippedSkill2 || []).filter(Boolean).map(id => {
-        const info = SKILL2_INFO[id]; if (!info) return '';
-        const used = !!(s.skill2Used?.[id]);
-        const condFail = (id === 'counter' && s.playerHp / s.playerHpMax > 0.4);
-        const off = used || condFail;
-        return `<button class="bat-sub-btn" ${off?'disabled':''} onclick="BATTLE_MENU='main';doSkill2('${id}')"
-          style="border:1.5px solid rgba(93,173,226,.35);background:rgba(93,173,226,.08);
-            color:var(--sky);${off?'opacity:.4':''}">
-          ${info.label}<br>
-          <span style="font-size:.56rem;color:var(--txt3)">${used?'사용완료':info.desc}</span>
-        </button>`;
-      }).join('');
-      actionHtml = `<div>
-        <button class="bat-back-btn" onclick="BATTLE_MENU='main';renderBattleNew()">← 뒤로 &nbsp;<span style="color:var(--sky);font-size:.7rem">✨ 스킬 선택</span></button>
-        <div class="bat-sub-row">${skillBtns}</div>
-      </div>`;
-    }
+  sk.innerHTML = reck ? '<div class="bv2-hint">무리한 공격 — 어떤 공격으로 할까요?</div>'
+    : (s.equippedSkill2 || []).filter(Boolean).map(id => {
+      const k = BV2_SK[id]; if (!k) return '';
+      const used = !!(s.skill2Used && s.skill2Used[id]), cond = id === 'counter' && s.playerHp / s.playerHpMax > 0.4;
+      return `<button class="bv2-sk" ${used || cond || !myTurn ? 'disabled' : ''} onclick="doSkill2('${id}')">${_bv2Svg(k.g, 17)}${k.t}<small>${used ? '썼어요' : k.d}</small></button>`;
+    }).join('');
+}
+function _bv2Say(html) { const t = document.getElementById('ba-log'); if (t) t.innerHTML = html; }
+function _updateBattleLog(state) {   // 엔진 기록의 마지막 줄을 소식 한 줄로(글은 escHtml 거친 엔진 문장)
+  const st = state || BATTLE_STATE; if (!st || !st.log.length) return;
+  _bv2Say(escHtml(_bv2Text(st.log[st.log.length - 1])));
+}
+// ── 효과: 번쩍 · 밀림 · 흔들림 · 파편 · 숫자
+function _bv2El(k) { return document.getElementById(k === 'me' ? 'ba-char-emoji' : 'ba-mon-emoji'); }
+function _bv2At(k) {
+  const el = _bv2El(k), st = document.getElementById('bv2-stage'); if (!el || !st) return { x: 0, y: 0 };
+  const r = el.getBoundingClientRect(), s = st.getBoundingClientRect();
+  return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height * 0.42 };
+}
+function _bv2Fx() { return document.getElementById('bv2-fx'); }
+function _bv2Burst(k, color, n, big) {
+  const fx = _bv2Fx(); if (!fx || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const at = _bv2At(k);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, d = (big ? 110 : 70) + Math.random() * 60, sp = document.createElement('i');
+    sp.className = 'bv2-spark';
+    sp.style.cssText = `left:${at.x}px;top:${at.y}px;--c:${color};--s:${5 + Math.random() * 7}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`;
+    fx.appendChild(sp); setTimeout(() => sp.remove(), 650);
   }
-
-  // ── 결과 박스 ──
-  let resultHtml = '';
-  if (s.finished) {
-    if (s.win) {
-      resultHtml = `<div class="ba-result-box ba-result-win">
-        <div style="font-size:1.6rem;font-weight:900;color:var(--gold);margin-bottom:.3rem">🏆 승리!</div>
-        <div style="font-size:.85rem;color:var(--gold)">+${mon.gold}G 획득</div>
-      </div>`;
-    } else {
-      resultHtml = `<div class="ba-result-box ba-result-lose">
-        <div style="font-size:1.6rem;font-weight:900;color:#FF8A80;margin-bottom:.3rem">💀 패배...</div>
-        <div style="font-size:.78rem;color:var(--txt3)">전투 기회 1회 소모</div>
-      </div>`;
-    }
-  }
-
-  // ── 배틀 헤더 서브 텍스트 업데이트 ──
+  const ring = document.createElement('i'); ring.className = 'bv2-ring'; ring.style.cssText = `left:${at.x}px;top:${at.y}px;--c:${color}`;
+  fx.appendChild(ring); setTimeout(() => ring.remove(), 500);
+}
+function _bv2Num(k, text, o) {
+  const fx = _bv2Fx(); if (!fx) return; o = o || {};
+  const at = _bv2At(k), n = document.createElement('div');
+  n.className = 'bv2-num' + (o.crit ? ' crit' : '') + (o.small ? ' small' : '');
+  n.style.cssText = `left:${at.x + (Math.random() * 30 - 15)}px;top:${at.y - 30}px;--o:${o.outline || '#5a2410'}`;
+  n.innerHTML = (o.tag ? `<span class="tag">${escHtml(o.tag)}</span>` : '') + escHtml(String(text));
+  fx.appendChild(n); setTimeout(() => n.remove(), 1000);
+}
+function _bv2Chip(k, text, bg) {
+  const fx = _bv2Fx(); if (!fx) return;
+  const at = _bv2At(k), c = document.createElement('div');
+  c.className = 'bv2-chip'; c.style.cssText = `left:${at.x}px;top:${at.y - 110}px;--b:${bg}`; c.textContent = text;
+  fx.appendChild(c); setTimeout(() => c.remove(), 1250);
+}
+function _bv2Shake(big) {
+  const st = document.getElementById('bv2-stage'); if (!st) return;
+  st.classList.remove('shake', 'shake-big'); void st.offsetWidth; st.classList.add(big ? 'shake-big' : 'shake');
+}
+function _bv2Hit(k) { const el = _bv2El(k); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
+function _bv2Dash(k) {
+  const el = _bv2El(k); if (!el) return;
+  el.classList.remove('idle'); el.classList.add('dash');
+  setTimeout(() => { el.classList.remove('dash'); el.classList.add('idle'); }, 190);
+}
+function _bv2Banner(text, lose) {
+  const b = document.getElementById('bv2-banner'); if (!b) return;
+  b.className = 'bv2-banner' + (lose ? ' lose' : ''); b.textContent = text; void b.offsetWidth; b.classList.add('show');
+}
+function _bv2Result(html) {
+  const r = document.getElementById('bv2-result'), st = document.getElementById('bv2-stage'); if (!r) return;
+  r.innerHTML = html; st && st.classList.add('done');
+  const b = document.getElementById('bv2-banner'); b && b.classList.add('up');
+  setTimeout(() => {
+    r.classList.add('show');
+    r.querySelectorAll('[data-count]').forEach(el => {
+      const to = +el.dataset.count || 0, t0 = performance.now();
+      const f = t => { const k = Math.min(1, (t - t0) / 700); el.textContent = '+' + Math.round(to * (1 - Math.pow(1 - k, 3))) + 'G'; if (k < 1) requestAnimationFrame(f); };
+      requestAnimationFrame(f);
+    });
+    r.querySelectorAll('.bv2-bar i').forEach(i => { i.style.width = i.dataset.w || '0%'; });
+  }, 180);
+}
+// 무대 첫 그림 — 몬스터가 들어오고, 몬스터가 먼저였으면 그 한 대를 보여 준 뒤 숫자를 맞춘다
+function _bv2Enter(s) {
+  const mon = s.monster, foe = _bv2El('foe');
+  if (foe && foe.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+    foe.animate([{ transform: 'translateX(140px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  const first = s.firstTurn === 'monster' && s.lastMonsterAction && !s.lastPlayerAction;
+  if (s.ibRarity === 'legend' || s.ibRarity === 'rare') setTimeout(() => _bv2Chip('foe', s.ibRarity === 'legend' ? '전설 몬스터 등장!' : '희귀 몬스터 등장!', '#F6D27A'), 520);
+  if (!first) { _bv2Say(`${_bv2J(mon.name, '이', '가')} 나타났어요!${s.firstTurn === 'player' ? ' 내가 먼저예요' : ''}`); return; }
+  const ma = s.lastMonsterAction, hp = s.playerHp;
+  s.playerHp = Math.min(s.playerHpMax, hp + (ma.dmg || 0)); _updateBattleHpBars(s); s.playerHp = hp;   // 맞기 전 숫자로 잠깐
+  _bv2Say(`${_bv2J(mon.name, '이', '가')} 먼저 덤벼요!`);
+  setTimeout(() => {
+    _bv2Dash('foe');
+    setTimeout(() => {
+      if (ma.miss) _bv2Num('me', '피했어요!', { small: true });
+      else { _bv2Hit('me'); _bv2Shake(false); _bv2Num('me', ma.dmg, { outline: '#6a1010' }); }
+      _updateBattleHpBars(s);
+    }, 200);
+  }, 700);
+}
+// 화면: 같은 전투면 바뀐 것만, 새 전투(또는 무한배틀 다음 몬스터)면 무대부터
+function renderBattleNew() {
+  const s = BATTLE_STATE; if (!s) return;
+  const mon = s.monster, arenaEl = document.getElementById('battle-arena'); if (!arenaEl) return;
+  if (!s._v2key) s._v2key = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  if (arenaEl.dataset.bv2 !== s._v2key || !document.getElementById('bv2-stage')) {
+    arenaEl.dataset.bv2 = s._v2key;
+    arenaEl.innerHTML = _bv2StageHTML(s, mon);
+    _updateBattleHpBars(s); _bv2Enter(s);
+  } else _updateBattleHpBars(s);
+  _bv2Turn(); _bv2Actions();
   const subEl = document.getElementById('battle-sub');
-  if (subEl) {
-    const attLeft = Utils.monsterAttemptsLeft(CUR);
-    const lim = Utils._getBattleLimit();
-    subEl.textContent = `오늘 ${attLeft}/${lim}번 남아있어요`;
+  if (subEl && !s.isInfinite) subEl.textContent = `오늘 남은 도전 ${Utils.monsterAttemptsLeft(CUR)}번`;
+  if (s.finished && !s.isInfinite) _bv2End();
+}
+// ── 끝: 이겼을 때 · 졌을 때(한 번만)
+function _bv2End() {
+  const s = BATTLE_STATE; if (!s || s._v2ended) return; s._v2ended = true;
+  const mon = s.monster, me = _bv2El('me'), foe = _bv2El('foe');
+  if (s.win) {
+    setTimeout(() => { if (foe) { foe.classList.remove('idle'); foe.classList.add('down'); } _bv2Burst('foe', '#ffe7a0', 24, true); }, 250);
+    setTimeout(() => { _bv2Banner('승리!'); _bv2Say(`${_bv2J(mon.name, '을', '를')} 물리쳤어요!`); }, 850);
+    setTimeout(() => _bv2Result(_bv2WinCard(s, mon)), 1650);
+  } else {
+    setTimeout(() => { if (me) { me.classList.remove('idle'); me.classList.add('down'); } }, 120);
+    setTimeout(() => { _bv2Banner('아쉬워요', true); _bv2Say('다음엔 이길 수 있어요'); }, 520);
+    setTimeout(() => _bv2Result(_bv2LoseCard(s, mon)), 1150);
   }
-
-  arenaEl.innerHTML = `
-    <!-- 대치 무대 -->
-    <div class="ba-stage">
-      <!-- 플레이어 -->
-      <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#7ec8e3">${escHtml(player.name)}</div>
-        <div class="ba-fighter-icon" style="width:80px;height:100px;margin:0 auto" id="ba-char-emoji">${charSVG(player)}</div>
-        <div style="width:100%">
-          <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-char-hp" style="width:${playerHpPct}%"></div></div>
-          <div class="ba-hp-txt">${s.playerHp} / ${s.playerHpMax}</div>
-        </div>
-        <div class="ba-stats-txt">ATK ${s.playerStats.atk} · MAG ${s.playerStats.mag}<br>DEF ${s.playerStats.def} · SPD ${s.playerStats.spd}</div>
-      </div>
-      <!-- 가운데 VS -->
-      <div class="ba-vs-center">
-        <div class="ba-vs-bolt">⚡</div>
-        <div class="ba-vs-label">VS</div>
-      </div>
-      <!-- 몬스터 -->
-      <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#FF8A80">${escHtml(mon.name)}</div>
-        <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
-        <div style="width:100%">
-          <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-mon-hp" style="width:${monsterHpPct}%"></div></div>
-          <div class="ba-hp-txt">${s.monsterHp} / ${s.monsterHpMax}</div>
-        </div>
-        <div class="ba-stats-txt">ATK ${mon.atk} · DEF ${mon.def} · SPD ${mon.spd}<br>
-          ${mon.element?`<span style="color:${mon.element==='fire'?'#FF8A80':mon.element==='water'?'#7ec8e3':'#6fd49d'}">${{fire:'🔥 불꽃',water:'💧 냉기',grass:'🌿 자연'}[mon.element]||mon.element}</span>`:''}
-          ${mon.trait==='ghost'?' <span style="color:#bbb">👻 유령</span>':''}
-        </div>
-      </div>
-    </div>
-    <!-- 전투 로그 -->
-    <div class="ba-log-wrap">
-      <div class="ba-log-title">BATTLE LOG</div>
-      <div class="ba-log" id="ba-log">${recentLog || '<span style="color:#aaa">전투 시작!</span>'}</div>
-    </div>
-    <!-- 결과 or 행동 -->
-    ${resultHtml}
-    ${s.finished
-      ? `<button class="btn-ok" style="width:100%" onclick="closeBattle()">✅ 확인</button>`
-      : actionHtml
-    }`;
-
+}
+function _bv2AchRows(list) {
+  return (list || []).map(a => `<div class="bv2-ri ach">업적 달성 — ${escHtml(a.name)}<b>+${(a.reward && a.reward.gold) || 20}G${a.reward && a.reward.exp ? ' · +' + a.reward.exp + 'EXP' : ''}</b></div>`).join('');
+}
+function _bv2Again(left) {
+  return left > 0 ? `<button onclick="closeBattle();openMonsterModal()">다른 몬스터와 (남은 ${left}번)</button>` : '';
+}
+function _bv2WinCard(s, mon) {
+  const zm = GAME_DATA.monsters.filter(m => m.zone === mon.zone), log = CUR.monsterLog || [];
+  const seen = zm.filter(m => log.includes(m.id)).length, all = zm.length || 1;
+  const rows = [`<div class="bv2-ri">골드<b data-count="${mon.gold || 0}">+0G</b></div>`];
+  (s._v2dex || []).forEach(b => {
+    if (b.type === 'firstKill') rows.push(`<div class="bv2-ri">처음 만난 몬스터 보너스<b>+${b.gold}G</b></div>`);
+    if (b.type === 'zoneComplete') rows.push(`<div class="bv2-ri ach">도감 완성!${b.title ? ' · ' + escHtml(b.title) : ''}<b>+${b.gold}G</b></div>`);
+  });
+  if (BV2_ZONE[mon.zone]) rows.push(`<div class="bv2-ri">${BV2_ZONE[mon.zone]} 도감<span class="bv2-bar"><i data-w="${Math.round(seen / all * 100)}%"></i></span><b>${seen} / ${zm.length}</b></div>`);
+  return `<div class="bv2-rh">${iconImg(mon, 'monsters', '56px')}<div><div class="bv2-rt">${escHtml(_bv2J(mon.name, '을', '를'))} 물리쳤어요!</div><div class="bv2-rs">남은 체력 ${s.playerHp} / ${s.playerHpMax}</div></div></div>
+    <div class="bv2-rl">${rows.join('')}${_bv2AchRows(s._v2ach)}</div>
+    <div class="bv2-rb">${_bv2Again(Utils.monsterAttemptsLeft(CUR))}<button class="pri" onclick="closeBattle()">확인</button></div>`;
+}
+function _bv2LoseCard(s, mon) {   // 귀띔은 예상 피해로(상성만 보면 틀릴 수 있다 — 일반=공격력, 속성=마력)
+  const worn = [...new Set((CUR.equippedSkills || ['normal']).filter(Boolean))];
+  const all = ['normal', 'fire', 'water', 'grass'].map(t => ({ t, e: _bv2Expect(t, s), learned: t === 'normal' || ((s.skillLevels || {})[t] || 0) >= 1, worn: worn.includes(t) }));
+  const bestWorn = all.filter(a => a.worn && a.learned).sort((a, b) => b.e - a.e)[0] || all[0];
+  const better = all.filter(a => a.learned && !a.worn && a.e > bestWorn.e).sort((a, b) => b.e - a.e)[0];
+  const tip = better
+    ? `이 몬스터에게는 <b>${BV2_ATK[better.t].t}</b>(예상 ${better.e})이 가장 세요. 가방의 스킬 칸에 끼워 보세요.`
+    : `이 몬스터에게 가장 센 공격은 <b>${BV2_ATK[bestWorn.t].t}</b>(예상 ${bestWorn.e})이에요. 체력이 반쯤 남았을 때 <b>응급치료</b>를 쓰면 더 오래 버텨요.`;
+  return `<div class="bv2-rh">${iconImg(mon, 'monsters', '56px')}<div><div class="bv2-rt">${escHtml(_bv2J(mon.name, '이', '가'))} 이번엔 더 셌어요</div><div class="bv2-rs">남긴 체력 ${Math.max(0, s.monsterHp)} / ${s.monsterHpMax} · 쓴 기회는 1번이에요</div></div></div>
+    <div class="bv2-tip">${tip}</div>${s._v2ach && s._v2ach.length ? `<div class="bv2-rl">${_bv2AchRows(s._v2ach)}</div>` : ''}
+    <div class="bv2-rb">${_bv2Again(Utils.monsterAttemptsLeft(CUR))}<button class="pri" onclick="closeBattle()">확인</button></div>`;
+}
+// 무한배틀: 한 마리 처치(다음 몬스터가 들어오기 전 잠깐)
+function _bv2IbKill(gold, heal, last) {
+  const foe = _bv2El('foe');
+  if (foe) { foe.classList.remove('idle'); foe.classList.add('down'); }
+  _bv2Burst('foe', '#ffe7a0', 18, true);
+  _bv2Chip('foe', `처치! +${gold}G`, '#F6D27A');
+  _bv2Say(last ? '10마리를 모두 물리쳤어요!' : `체력 +${heal} · 다음 몬스터가 오고 있어요`);
+  document.getElementById('bv2-actions')?.classList.add('done');
+}
+function _bv2IbEndHTML(forfeit, isNewBest, best, ach) {
+  return `<div class="bv2-rh"><div class="bv2-rbig">${IB.kills}</div><div><div class="bv2-rt">무한배틀 끝${forfeit ? ' (그만둠)' : ''} — ${IB.kills}마리 처치</div><div class="bv2-rs">${BV2_ZONE[IB.zone] || ''}</div></div></div>
+    <div class="bv2-rl"><div class="bv2-ri">모은 골드<b data-count="${IB.gold}">+0G</b></div>
+      <div class="bv2-ri${isNewBest ? ' ach' : ''}">${isNewBest ? '최고 기록 새로!' : '최고 기록'}<b>${best}마리</b></div>${_bv2AchRows(ach)}</div>
+    <div class="bv2-rb"><button class="pri" onclick="closeModal('m-battle');renderMain();renderMobile()">확인</button></div>`;
 }
 
 // ── 스킬 레벨 → 이펙트 티어 ──
@@ -2742,154 +2952,80 @@ const SKILL_EFFECT = {
   grass:  { t1:'🌿', t2:'🍃🌿', t3:'🌿🌸🌿', t4:'🌳💚🌳', color:['#66BB6A','#7ECB7E','#96DB94','#AEEBA8'] },
 };
 
-// ── 공격 버튼 클릭 ──
+// ── 공격 버튼 클릭 ── [BATTLE-V2] 계산 순서는 그대로(performPlayerTurn → 맞힘 → 끝났나 · 몬스터 차례), 연출만 새로
 function doAttack(attackType) {
   if (!BATTLE_STATE || BATTLE_STATE.finished || BATTLE_STATE.turn !== 'player') return;
   document.querySelectorAll('#battle-arena button').forEach(b => b.disabled = true);
-
-  // ── 1단계: 플레이어 공격 계산 (수치만, 연출 아직 안 함) ──
   BATTLE_STATE = performPlayerTurn(BATTLE_STATE, attackType);
-  const pa = BATTLE_STATE.lastPlayerAction;
-
-  const tier     = _skillEffectTier(pa.skillLv);
-  const eff      = SKILL_EFFECT[attackType] || SKILL_EFFECT.normal;
-  const effEmoji = eff[`t${tier}`] || eff.t1;
-  const effColor = eff.color[tier - 1] || eff.color[0];
-  const isCrit   = pa.crit;
-  const isHeavy  = isCrit || (pa.skill2Label && pa.skill2Label.includes('일격'));
-  const typeNames = { normal:'일반 공격', fire:'화염 공격', water:'냉기 공격', grass:'자연 공격' };
-
-  // 캐릭터 전진
-  const charEl = document.getElementById('ba-char-emoji');
-  if (charEl) {
-    charEl.style.transition = 'transform .15s';
-    charEl.style.transform  = 'translateX(22px) scale(1.1)';
-    setTimeout(() => { if (charEl) charEl.style.transform = ''; }, 220);
-  }
-
-  // 행동 문구 먼저 로그에 표시
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.35초 후 — 데미지/HP 반영
+  const pa = BATTLE_STATE.lastPlayerAction, mon = BATTLE_STATE.monster;
+  const a = BV2_ATK[attackType] || BV2_ATK.normal;
+  const isCrit = pa.crit, isHeavy = isCrit || (pa.skill2Label && pa.skill2Label.includes('일격'));
+  _bv2Dash('me');
   setTimeout(() => {
     if (pa.miss) {
-      spawnDmgFloat('공격이 빗나갔다!', '#888', 'top');
+      _bv2Num('foe', '빗나감', { small: true }); _bv2Say('공격이 빗나갔어요!');
       _updateBattleHpBars(BATTLE_STATE);
-      // 빗나감: 0.45초 후 몬스터 턴
-      setTimeout(() => _doMonsterTurn(), 450);
-    } else {
-      // 몬스터 피격 애니
-      const monEl = document.getElementById('ba-mon-emoji');
-      if (monEl) {
-        monEl.classList.remove('ba-mon-hit'); void monEl.offsetWidth;
-        monEl.classList.add('ba-mon-hit');
-        setTimeout(() => monEl.classList.remove('ba-mon-hit'), 400);
-      }
-      // 급소면 0.35초 더 대기 후 피해 표시
-      const hitDelay = isCrit ? 350 : 0;
-      if (isCrit) spawnDmgFloat('급소!', '#FFD700', 'top');
-      setTimeout(() => {
-        spawnDmgFloat(`${effEmoji} -${pa.dmg}`, isCrit ? '#FFD700' : effColor);
-        if (pa.isGhost)          spawnDmgFloat('유령 저항!', '#bbb', 'top');
-        else if (pa.elemMult > 1.0) spawnDmgFloat('효과 굉장함!', '#FF8C00', 'top');
-        else if (pa.elemMult < 1.0) spawnDmgFloat('효과 별로...', '#888', 'top');
-        _updateBattleHpBars(BATTLE_STATE);
-        // 중요한 공격은 0.55초, 일반은 0.45초 후 몬스터 턴
-        const afterDelay = isHeavy ? 550 : 450;
-        if (BATTLE_STATE.finished) {
-          setTimeout(() => _finishBattle(), afterDelay);
-        } else {
-          setTimeout(() => _doMonsterTurn(), afterDelay);
-        }
-      }, hitDelay);
+      setTimeout(() => _doMonsterTurn(), 650);
+      return;
     }
-  }, 350);
+    setTimeout(() => {   // 맞는 순간 아주 잠깐 멈춤(급소는 더 길게)
+      _bv2Hit('foe'); _bv2Shake(isCrit); _bv2Burst('foe', a.c, isCrit ? 22 : 14, isCrit);
+      _bv2Num('foe', pa.dmg, { crit: isCrit, tag: isCrit ? '급소!' : '', outline: isCrit ? '#8a5a00' : '#5a2410' });
+      if (pa.isGhost) _bv2Chip('foe', '유령이라 덜 아파요', '#cfc8d8');
+      else if (pa.elemMult > 1) _bv2Chip('foe', '효과가 굉장해요!', '#F6D27A');
+      else if (pa.elemMult < 1) _bv2Chip('foe', '효과가 별로예요', '#bcae9a');
+      _bv2Say(`${escHtml(mon.name)}에게 <span class="hl">${pa.dmg}</span> 피해${isCrit ? ' · 급소!' : ''}${pa.elemMult > 1 ? ' · 상성이 좋아요' : ''}`);
+      _updateBattleHpBars(BATTLE_STATE);
+      if (BATTLE_STATE.finished) setTimeout(() => _finishBattle(), isHeavy ? 550 : 450);
+      else setTimeout(() => _doMonsterTurn(), isHeavy ? 800 : 700);
+    }, isCrit ? 130 : 50);
+  }, 190);
 }
 
-// ── 몬스터 턴 실행 (doAttack/doSkill2 공통) ──
+// ── 몬스터 턴 실행 (doAttack/doSkill2/doReckless 공통)
 function _doMonsterTurn() {
   if (!BATTLE_STATE || BATTLE_STATE.finished) return;
-
+  const before = BATTLE_STATE.log.length;
   BATTLE_STATE = performMonsterTurn(BATTLE_STATE);
-  const ma = BATTLE_STATE.lastMonsterAction;
-
-  // 몬스터 전진
-  const monEl2 = document.getElementById('ba-mon-emoji');
-  if (monEl2) {
-    monEl2.style.transition = 'transform .15s';
-    monEl2.style.transform  = 'translateX(-22px) scale(1.1)';
-    setTimeout(() => { if (monEl2) monEl2.style.transform = ''; }, 220);
-  }
-
-  // 로그 먼저 표시
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.4초 후 — 데미지 적용
+  const ma = BATTLE_STATE.lastMonsterAction, mon = BATTLE_STATE.monster;
+  const extra = BATTLE_STATE.log.slice(before).map(_bv2Text).join(' ');
+  const t = document.getElementById('bv2-turn');
+  if (t) { t.textContent = `${mon.name} 차례`; t.classList.add('foe-turn'); t.classList.remove('off'); }
   setTimeout(() => {
-    if (ma.miss) {
-      spawnDmgFloat('빗나감!', '#888', 'top');
-      _updateBattleHpBars(BATTLE_STATE);
-      setTimeout(() => _afterMonsterTurn(), 450);
-    } else {
-      const charEl2 = document.getElementById('ba-char-emoji');
-      // 강공이면 문구 먼저
-      const isHeavyMon = ma.roleLabel === '강공!' || ma.crit;
-      const hitDelay = isHeavyMon ? 300 : 0;
-      if (isHeavyMon && ma.roleLabel) spawnDmgFloat(ma.roleLabel, '#e74c3c', 'top');
-      if (ma.crit && !ma.roleLabel)   spawnDmgFloat('몬스터 급소!', '#ef9a9a', 'top');
-
-      setTimeout(() => {
-        if (charEl2) {
-          charEl2.classList.remove('ba-player-hit'); void charEl2.offsetWidth;
-          charEl2.classList.add('ba-player-hit');
-          setTimeout(() => charEl2.classList.remove('ba-player-hit'), 400);
-        }
-        spawnDmgFloat(`⚔️ -${ma.dmg}`, ma.crit ? '#ef9a9a' : '#E74C3C');
-        if (ma.crit && ma.roleLabel)   spawnDmgFloat('몬스터 급소!', '#ef9a9a', 'top');
-        if (ma.armorMult < 1.0)  spawnDmgFloat('방어 상성 유리!', '#4fc3f7', 'top');
-        if (ma.armorMult > 1.0)  spawnDmgFloat('방어 상성 불리!', '#ef9a9a', 'top');
+    _bv2Dash('foe');
+    setTimeout(() => {
+      if (ma.miss) {
+        _bv2Num('me', '피했어요!', { small: true }); _bv2Say(`${escHtml(mon.name)}의 공격을 피했어요!`);
         _updateBattleHpBars(BATTLE_STATE);
-        const afterDelay = isHeavyMon ? 550 : 450;
-        setTimeout(() => _afterMonsterTurn(), afterDelay);
-      }, hitDelay);
-    }
-  }, 400);
+        setTimeout(() => _afterMonsterTurn(extra), 500);
+        return;
+      }
+      const heavy = ma.roleLabel === '강공!' || ma.crit;
+      setTimeout(() => {
+        _bv2Hit('me'); _bv2Shake(heavy); _bv2Burst('me', '#ff6a5a', 10);
+        _bv2Num('me', ma.dmg, { outline: '#6a1010', tag: ma.roleLabel ? ma.roleLabel.replace(/!$/, '') : (ma.crit ? '급소' : '') });
+        if (ma.armorMult < 1) _bv2Chip('me', '옷 상성이 좋아요', '#bfe7ff');
+        else if (ma.armorMult > 1) _bv2Chip('me', '옷 상성이 안 좋아요', '#ffb0a2');
+        _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} <span class="warn">${ma.dmg}</span> 피해를 줬어요`);
+        _updateBattleHpBars(BATTLE_STATE);
+        setTimeout(() => _afterMonsterTurn(extra), heavy ? 600 : 500);
+      }, heavy ? 120 : 40);
+    }, 190);
+  }, 380);
 }
 
-// ── 몬스터 턴 종료 후 처리 ──
-function _afterMonsterTurn() {
-  if (BATTLE_STATE.finished) {
-    setTimeout(() => _finishBattle(), 300);
-  } else {
-    BATTLE_MENU = 'main';
-    setTimeout(() => renderBattleNew(), 300);
-  }
-}
-
-// HP 바만 업데이트 (innerHTML 재생성 없이)
-function _updateBattleHpBars(state) {
-  const charHpPct = Math.max(0, Math.round(state.playerHp  / state.playerHpMax  * 100));
-  const monHpPct  = Math.max(0, Math.round(state.monsterHp / state.monsterHpMax * 100));
-
-  const charBar = document.querySelector('.ba-char-hp');
-  const monBar  = document.querySelector('.ba-mon-hp');
-  const charTxt = document.querySelector('.ba-char-hp')?.closest('.ba-hp-bar-bg')?.nextElementSibling;
-  const monTxt  = document.querySelector('.ba-mon-hp')?.closest('.ba-hp-bar-bg')?.nextElementSibling;
-
-  if (charBar) charBar.style.width = charHpPct + '%';
-  if (monBar)  monBar.style.width  = monHpPct  + '%';
-  if (charTxt) charTxt.textContent = `${state.playerHp} / ${state.playerHpMax}`;
-  if (monTxt)  monTxt.textContent  = `${state.monsterHp} / ${state.monsterHpMax}`;
-}
-
-// 로그만 업데이트
-function _updateBattleLog(state) {
-  const logEl  = document.getElementById('ba-log');
-  const wrapEl = logEl?.closest('.ba-log-wrap');
-  if (!logEl) return;
-  logEl.innerHTML = state.log.slice(-8).join('<br>') || '';
-  // 자동 스크롤 — 최신 로그가 보이게
-  if (wrapEl) requestAnimationFrame(() => { wrapEl.scrollTop = wrapEl.scrollHeight; });
+// ── 몬스터 턴 종료 후 처리 — 다음에 올 큰 공격은 미리 알려 준다(무엇을 할지 고르게)
+function _afterMonsterTurn(extra) {
+  if (BATTLE_STATE.finished) { setTimeout(() => _finishBattle(), 300); return; }
+  const mon = BATTLE_STATE.monster, sk = BATTLE_STATE.equippedSkill2 || [], used = BATTLE_STATE.skill2Used || {};
+  BATTLE_MENU = 'main';
+  setTimeout(() => {
+    renderBattleNew();
+    if (extra && /강한 일격을 준비/.test(extra))
+      _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} 강한 일격을 준비해요${sk.includes('guard') && !used.guard ? ' — <span class="good">방어</span>를 써 보세요' : '!'}`);
+    else if (extra && /한 번 더/.test(extra)) _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} 재빠르게 한 번 더 덤볐어요!`);
+    else if (extra && /버텨/.test(extra)) _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} 단단히 버티며 반격을 노려요`);
+  }, 300);
 }
 
 // 전투 종료 처리
@@ -2907,20 +3043,12 @@ function _finishBattle() {
   CUR.level = Utils.levelFromExp(CUR.exp);
   BATTLE_DONE = true;
   DB.saveStudent(CUR);
-  renderHUD();
   // 전투는 EXP 0(설계: 레벨은 학급퀘스트로만) → 레벨업 없음. 헛도는 레벨업 연출 트리거 제거 (DI-5).
-  setTimeout(() => checkAchievements(), 600);
-  // 도감 보상 알림
-  if (CUR._dexBonusLog && CUR._dexBonusLog.length > 0) {
-    const bonuses = CUR._dexBonusLog;
-    CUR._dexBonusLog = [];
-    setTimeout(() => {
-      bonuses.forEach(b => {
-        if (b.type === 'firstKill') toast(`📖 첫 처치 보너스! +${b.gold}G`);
-        if (b.type === 'zoneComplete') toast(`🏆 도감 완성!\n${b.zone} +${b.gold}G${b.title?' · '+b.title:''}`);
-      });
-    }, 800);
-  }
+  // [BATTLE-V2] 업적 · 도감 보너스는 위에 덮는 팝업 대신 결과 카드 안 한 줄로
+  BATTLE_STATE._v2ach = checkAchievements({ inline: true }) || [];
+  BATTLE_STATE._v2dex = CUR._dexBonusLog || [];
+  CUR._dexBonusLog = [];
+  renderHUD();
   renderBattleNew();
 }
 
@@ -3115,7 +3243,7 @@ function openSkill2SlotPicker(slotIndex) {
     { id:'prep',     label:'🎯 일격 준비',   desc:'다음 공격 ×2.3', color:'#FFD700' },
     { id:'reckless', label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2', color:'#FF8A80' },
     { id:'guard',    label:'🛡️ 방어',       desc:'피해 50% 감소', color:'#7ec8e3' },
-    { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP40%↓ / 50% 반사', color:'#c39bd3' },
+    { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP 40% 아래면 50% 반사', color:'#c39bd3' },
     { id:'rush',     label:'🔥 몰아치기',   desc:'2턴 공격력↑', color:'#f39c12' },
   ];
   const usedInOther = eq2.filter((id, i) => i !== slotIndex && id);
@@ -3299,44 +3427,11 @@ function setSkillSlot(slotIndex, skillType) {
 
 // ── 스킬2 사용 ──
 // 스킬2 캐릭터 이펙트
-function playSkill2Effect(skill2Id) {
-  const charEl = document.getElementById('ba-char-emoji');
-  if (!charEl) return;
-
-  const fxMap = {
-    heal:     { cls:'skill-fx-heal',    flash:'rgba(111,212,157,.25)', label:'💊', txt:'#6fd49d' },
-    guard:    { cls:'skill-fx-guard',   flash:'rgba(126,200,227,.22)', label:'🛡️', txt:'#7ec8e3' },
-    counter:  { cls:'skill-fx-counter', flash:'rgba(195,155,211,.22)', label:'⚔️', txt:'#c39bd3' },
-    prep:     { cls:'skill-fx-prep',    flash:'rgba(255,215,0,.25)',   label:'🎯', txt:'#FFD700' },
-    reckless: { cls:'skill-fx-ki',      flash:'rgba(255,100,0,.25)',   label:'⚡', txt:'#FF8A80' },
-    rush:     { cls:'skill-fx-rush',    flash:'rgba(243,156,18,.22)',  label:'🔥', txt:'#f39c12' },
-  };
-  const fx = fxMap[skill2Id];
-  if (!fx) return;
-
-  // 캐릭터 애니메이션
-  charEl.classList.remove(fx.cls);
-  void charEl.offsetWidth;
-  charEl.classList.add(fx.cls);
-  setTimeout(() => charEl.classList.remove(fx.cls), 800);
-
-  // 플래시 오버레이
-  const flash = document.createElement('div');
-  flash.className = 'skill-flash-overlay';
-  flash.style.background = fx.flash;
-  charEl.style.position = 'relative';
-  charEl.appendChild(flash);
-  setTimeout(() => flash.remove(), 550);
-
-  // 스킬 이름 큰 글씨 팝업
-  const popup = document.createElement('div');
-  popup.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    font-size:1.6rem;font-weight:900;color:${fx.txt};z-index:999;pointer-events:none;
-    text-shadow:0 0 12px ${fx.txt},0 2px 4px rgba(0,0,0,.8);
-    animation:skill-flash .65s ease-out forwards;white-space:nowrap;`;
-  popup.textContent = fx.label;
-  const arena = document.getElementById('battle-arena');
-  if (arena) { arena.style.position='relative'; arena.appendChild(popup); setTimeout(()=>popup.remove(),700); }
+function playSkill2Effect(skill2Id) {   // [BATTLE-V2] 기술 이름 + 빛 파편(내 캐릭터 둘레)
+  const k = BV2_SK[skill2Id]; if (!k) return;
+  const col = { heal: '#7fe08f', guard: '#8fd3ff', counter: '#d3a6ff', prep: '#F6D27A', reckless: '#ff9a7a', rush: '#ffb26b' }[skill2Id] || '#8fd3ff';
+  _bv2Burst('me', col, 12, false); _bv2Chip('me', k.t + '!', col);
+  const el = _bv2El('me'); if (el) { el.classList.remove('cast'); void el.offsetWidth; el.classList.add('cast'); setTimeout(() => el.classList.remove('cast'), 700); }
 }
 
 function doSkill2(skill2Id) {
@@ -3376,63 +3471,34 @@ function doSkill2(skill2Id) {
   }, 250);
 }
 
-function _showRecklessSkillPicker() {
-  const sl = BATTLE_STATE.skillLevels || {};
-  const equippedTypes = [...new Set((CUR.equippedSkills||['normal']).filter(Boolean))];
-  const typeNames = { normal:'⚔️ 일반 공격', fire:'🔥 화염 공격', water:'💧 냉기 공격', grass:'🌿 자연 공격' };
-
-  // battle-arena 안 actionHtml 자리에 인라인으로 렌더
-  const arenaEl = document.getElementById('battle-arena');
-  if (!arenaEl) return;
-
-  // 기존 피커가 있으면 제거
-  document.getElementById('reckless-picker')?.remove();
-
-  const picker = document.createElement('div');
-  picker.id = 'reckless-picker';
-  picker.innerHTML = `
-    <div style="margin-top:.2rem">
-      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem;font-weight:700">
-        ⚡ 무리한 공격 — 스킬 선택
-      </div>
-      ${equippedTypes.map(type => `
-        <div onclick="doReckless('${type}')"
-          style="padding:.5rem .8rem;border-radius:10px;cursor:pointer;margin-bottom:.35rem;
-            border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
-            display:flex;justify-content:space-between;align-items:center;
-            transition:background .15s"
-          onmouseenter="this.style.background='rgba(255,255,255,.1)'"
-          onmouseleave="this.style.background='rgba(255,255,255,.05)'">
-          <span style="font-size:.82rem;font-weight:700">${typeNames[type]||type}</span>
-          <span style="font-size:.7rem;color:var(--txt3)">Lv.${sl[type]||0}</span>
-        </div>`).join('')}
-    </div>`;
-
-  // battle-arena 마지막에 붙이기
-  arenaEl.appendChild(picker);
+function _showRecklessSkillPicker() {   // [BATTLE-V2] 아래 공격 단추가 '무리한 공격 — 어떤 공격으로?' 고르기로
+  BATTLE_MENU = 'reckless';
+  renderBattleNew();
 }
 
 function doReckless(attackType) {
-  document.getElementById('reckless-picker')?.remove();
+  if (!BATTLE_STATE || BATTLE_STATE.finished) return;
+  BATTLE_MENU = 'main';
+  document.querySelectorAll('#battle-arena button').forEach(b => b.disabled = true);
+  const hpBefore = BATTLE_STATE.monsterHp;
   BATTLE_STATE = performRecklessAttack(BATTLE_STATE, attackType);
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.35초 후 결과 연출
+  const dmg = Math.max(0, hpBefore - BATTLE_STATE.monsterHp);   // 실패·빗나감이면 0 (예전엔 지난 공격 숫자가 다시 떴다)
+  _bv2Dash('me');
   setTimeout(() => {
-    const pa = BATTLE_STATE.lastPlayerAction;
-    if (pa && pa.dmg > 0) {
-      const monEl = document.getElementById('ba-mon-emoji');
-      if (monEl) { monEl.classList.remove('ba-mon-hit'); void monEl.offsetWidth; monEl.classList.add('ba-mon-hit'); setTimeout(()=>monEl.classList.remove('ba-mon-hit'),400); }
-      spawnDmgFloat(`⚡ -${pa.dmg}`, '#FFD700');
+    if (dmg > 0) {
+      _bv2Hit('foe'); _bv2Shake(true); _bv2Burst('foe', (BV2_ATK[attackType] || BV2_ATK.normal).c, 20, true);
+      _bv2Num('foe', dmg, { crit: true, tag: '무리한 공격', outline: '#8a5a00' });
+      _bv2Say(`${escHtml(BATTLE_STATE.monster.name)}에게 <span class="hl">${dmg}</span> 피해 · 무리한 공격 성공!`);
+    } else {
+      _bv2Num('foe', '실패', { small: true }); _bv2Say('무리한 공격이 실패했어요');
     }
     _updateBattleHpBars(BATTLE_STATE);
-    if (BATTLE_STATE.finished) { setTimeout(()=>_finishBattle(),400); return; }
-    // 0.45초 후 몬스터 턴
+    if (BATTLE_STATE.finished) { setTimeout(() => _finishBattle(), 450); return; }
     setTimeout(() => {
       if (BATTLE_STATE.turn === 'monster') _doMonsterTurn();
-      else { BATTLE_MENU='main'; renderBattleNew(); }
-    }, 450);
-  }, 350);
+      else { BATTLE_MENU = 'main'; renderBattleNew(); }
+    }, 650);
+  }, 230);
 }
 
 function closeBattle() {
@@ -3464,10 +3530,10 @@ function setMonsterTab(tab) {
     btn.style.borderColor = active ? 'rgba(255,215,0,.4)' : 'rgba(255,255,255,.15)';
   });
   if (tab === 'infinite') {
-    document.getElementById('monster-modal-title').textContent = '♾️ 무한배틀';
+    document.getElementById('monster-modal-title').textContent = '무한배틀';
     renderInfiniteBattleZoneSelect();
   } else {
-    document.getElementById('monster-modal-title').textContent = '⚔️ 사냥터';
+    document.getElementById('monster-modal-title').textContent = '사냥터';
     MONSTER_STEP = 'zone';
     renderMonsterStep();
   }
@@ -3588,9 +3654,9 @@ function renderInfiniteBattleZoneSelect() {
 
   const lv = CUR.level || 1;
   const zones = [
-    { id:'beginner',     icon:'🌿', name:'초급 사냥터', color:'#6fd49d', border:'rgba(111,212,157,.35)', bg:'rgba(111,212,157,.07)', gold:IB_CONFIG.beginner.baseGold + 'G / 마리', minLv:1  },
-    { id:'intermediate', icon:'🔥', name:'중급 사냥터', color:'#FF8A80', border:'rgba(255,138,128,.35)', bg:'rgba(255,138,128,.07)', gold:IB_CONFIG.intermediate.baseGold + 'G / 마리', minLv:1  },
-    { id:'advanced',     icon:'⚡', name:'고급 사냥터', color:'#7ec8e3', border:'rgba(126,200,227,.35)', bg:'rgba(126,200,227,.07)', gold:IB_CONFIG.advanced.baseGold + 'G / 마리', minLv:21 },
+    { id:'beginner',     icon:'🌿', name:'초급 사냥터', color:'#6fd49d', border:'rgba(111,212,157,.35)', bg:'rgba(111,212,157,.07)', gold:'마리당 ' + IB_CONFIG.beginner.baseGold + 'G', minLv:1  },
+    { id:'intermediate', icon:'🔥', name:'중급 사냥터', color:'#FF8A80', border:'rgba(255,138,128,.35)', bg:'rgba(255,138,128,.07)', gold:'마리당 ' + IB_CONFIG.intermediate.baseGold + 'G', minLv:1  },
+    { id:'advanced',     icon:'⚡', name:'고급 사냥터', color:'#7ec8e3', border:'rgba(126,200,227,.35)', bg:'rgba(126,200,227,.07)', gold:'마리당 ' + IB_CONFIG.advanced.baseGold + 'G', minLv:21 },
   ];
 
   body.innerHTML = `
@@ -3627,7 +3693,7 @@ function renderInfiniteBattleZoneSelect() {
                     ${z.name}${locked ? ` <span style="font-size:.68rem">(Lv.${z.minLv} 필요)</span>` : ''}
                   </div>
                   <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">
-                    ${locked ? `현재 Lv.${lv} · Lv.${z.minLv}부터 입장 가능` : `${z.gold} · rare/legend 확률 상승`}
+                    ${locked ? `현재 Lv.${lv} · Lv.${z.minLv}부터 입장 가능` : `${z.gold} · 희귀·전설 몬스터가 더 자주 나와요`}
                   </div>
                 </div>
                 <div style="text-align:right">
@@ -3719,30 +3785,11 @@ function _ibNextMonster() {
   BATTLE_DONE  = false;
   BATTLE_MENU  = 'main';
   document.getElementById('battle-title').textContent =
-    `♾️ 무한배틀 — ${IB.kills + 1}번째`;
+    `무한배틀 — ${IB.kills + 1}번째`;
   document.getElementById('battle-sub').textContent =
     `${IB.zone === 'beginner' ? '초급' : IB.zone === 'intermediate' ? '중급' : '고급'} · 처치 ${IB.kills}마리 · 모은 골드 ${IB.gold}G`;
 
-  const rarityBanner = mon._ibRarity === 'legend'
-    ? `<div style="text-align:center;color:#FFD700;font-weight:800;font-size:.82rem;margin-bottom:.3rem">
-        ✨ 전설 몬스터 등장! ✨</div>`
-    : mon._ibRarity === 'rare'
-    ? `<div style="text-align:center;color:#c39bd3;font-weight:700;font-size:.78rem;margin-bottom:.3rem">
-        💜 희귀 몬스터 등장!</div>`
-    : '';
-
-  openModal('m-battle');
-  // 기존 battle-arena에 희귀도 배너 삽입 후 renderBattleNew 호출
-  setTimeout(() => {
-    if (rarityBanner) {
-      const arenaEl = document.getElementById('battle-arena');
-      if (arenaEl) {
-        const banner = document.createElement('div');
-        banner.innerHTML = rarityBanner;
-        arenaEl.prepend(banner);
-      }
-    }
-  }, 100);
+  openModal('m-battle');   // [BATTLE-V2] 희귀·전설은 무대 이름표 꼬리표 + 등장 알림(_bv2Enter)
 
   if (BATTLE_STATE.turn === 'monster') {
     renderBattleNew();
@@ -3775,31 +3822,14 @@ function _finishInfiniteBattle() {
       CUR.monsterLog = [...(CUR.monsterLog || []), monId];
     }
 
-    // 짧은 결과 표시 후 다음 몬스터
-    const arenaEl = document.getElementById('battle-arena');
-    if (arenaEl) {
-      arenaEl.innerHTML = `
-        <div style="text-align:center;padding:1.4rem .8rem">
-          <div style="font-size:1.6rem;margin-bottom:.3rem">🏆</div>
-          <div style="font-size:.95rem;font-weight:800;color:#6fd49d;margin-bottom:.2rem">처치!</div>
-          <div style="font-size:.82rem;color:var(--gold);margin-bottom:.1rem">+${gold}G · 체력 +${heal}</div>
-          <div style="font-size:.72rem;color:var(--txt3)">다음 몬스터 등장 중...</div>
-        </div>`;
-    }
+    // 짧은 결과 표시 후 다음 몬스터 — [BATTLE-V2] 무대 위에서 쓰러지고 다음이 들어온다
+    _bv2IbKill(gold, heal, IB.kills >= 10);
     DB.saveStudent(CUR);
 
     // 10승 달성 시 자동 종료
     if (IB.kills >= 10) {
-      const arenaEl2 = document.getElementById('battle-arena');
-      if (arenaEl2) {
-        arenaEl2.innerHTML = `
-          <div style="text-align:center;padding:1.4rem .8rem">
-            <div style="font-size:2rem;margin-bottom:.3rem">🏆</div>
-            <div style="font-size:1rem;font-weight:800;color:var(--gold);margin-bottom:.2rem">배틀 완료!</div>
-            <div style="font-size:.82rem;color:var(--txt3)">10마리 처치 달성!</div>
-          </div>`;
-      }
-      setTimeout(() => _endInfiniteBattleSession(false), 1600);
+      setTimeout(() => _bv2Banner('10마리 처치!'), 500);
+      setTimeout(() => _endInfiniteBattleSession(false), 1700);
     } else {
       setTimeout(() => _ibNextMonster(), 1400);
     }
@@ -3833,33 +3863,13 @@ function _endInfiniteBattleSession(forfeit) {
 
   DB.saveStudent(CUR);
   renderHUD();
-  checkAchievements();
+  const ach = checkAchievements({ inline: true }) || [];   // [BATTLE-V2] 업적은 결과 카드 안
 
-  const zoneNames = { beginner:'🌿 초급', intermediate:'🔥 중급', advanced:'⚡ 고급' };
   const arenaEl = document.getElementById('battle-arena');
-  if (arenaEl) {
-    arenaEl.innerHTML = `
-      <div style="text-align:center;padding:1rem .8rem">
-        <div style="font-size:1.8rem;margin-bottom:.4rem">${IB.kills > 0 ? '⚔️' : '💀'}</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--gold);margin-bottom:.6rem">
-          무한배틀 종료${forfeit ? ' (포기)' : ''}
-        </div>
-        <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:.7rem;margin-bottom:.6rem">
-          <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.3rem">${zoneNames[IB.zone]} 사냥터</div>
-          <div style="font-size:1.3rem;font-weight:800;color:var(--gold)">${IB.kills}마리 처치</div>
-          <div style="font-size:.88rem;color:#6fd49d;margin-top:.1rem">+${IB.gold}G 획득</div>
-          ${isNewBest ? `<div style="font-size:.75rem;color:#FFD700;margin-top:.3rem;font-weight:700">
-            ✨ 최고 기록 갱신!</div>` : `<div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">
-            최고 기록: ${best[IB.zone]}마리</div>`}
-        </div>
-        <button onclick="closeModal('m-battle');renderMain();renderMobile()"
-          style="padding:.55rem 2rem;border-radius:12px;font-family:inherit;font-size:.88rem;
-            cursor:pointer;border:1px solid rgba(255,215,0,.3);
-            background:rgba(255,215,0,.12);color:var(--gold);font-weight:700">
-          ✅ 확인
-        </button>
-      </div>`;
-  }
+  if (arenaEl && !document.getElementById('bv2-stage'))
+    arenaEl.innerHTML = '<div class="bv2-stage solo" id="bv2-stage" data-zone="' + (BV2_ZONE[IB.zone] ? IB.zone : 'beginner') + '"><div class="bv2-bg bv2-sky"></div><div class="bv2-bg bv2-vig"></div><div class="bv2-banner" id="bv2-banner"></div><div class="bv2-result" id="bv2-result"></div></div>';
+  document.getElementById('bv2-actions')?.classList.add('done');
+  _bv2Result(_bv2IbEndHTML(forfeit, isNewBest, best[IB.zone] || 0, ach));
 }
 
 function renderMonsterStep() {
@@ -3874,7 +3884,7 @@ function renderMonsterStep() {
 
   // ── 1단계: 구역 선택 ──────────────────────────────────
   if (MONSTER_STEP === 'zone') {
-    title.textContent = '⚔️ 사냥터';
+    title.textContent = '사냥터';
     const ZONE_INFO = [
       { id:'beginner',     icon:'🌿', name:'초급 사냥터', sub:'Lv 1 ~ 10',  minLv:1,
         color:'#6fd49d', bg:'linear-gradient(150deg,#0a2318,#152e1e)', border:'rgba(111,212,157,.4)',
@@ -3955,7 +3965,7 @@ function renderMonsterStep() {
     const zoneNames  = { beginner:'🌿 초급 사냥터', intermediate:'🔥 중급 사냥터', advanced:'⚡ 고급 사냥터' };
     const zoneColors = { beginner:'#6fd49d', intermediate:'#FF8A80', advanced:'#7ec8e3' };
     const zoneBgs    = { beginner:'linear-gradient(150deg,#0a2318,#152e1e)', intermediate:'linear-gradient(150deg,#2a0d0d,#401515)', advanced:'linear-gradient(150deg,#0a1828,#162840)' };
-    title.textContent = zoneNames[CUR_ZONE] || '⚔️ 사냥터';
+    title.textContent = zoneNames[CUR_ZONE] || '사냥터';
     const zc = zoneColors[CUR_ZONE] || '#FF8A80';
 
     // offers 로드
@@ -4325,7 +4335,7 @@ function renderFarmModal() {
         return `<div class="seed-chip ${SEL_SEED===inv.id?'sel':''}" onclick="SEL_SEED='${inv.id}';renderFarmModal()">
           ${sd.icon} ${sd.name}${mutTag} x${inv.qty}</div>`;
       }).join('')
-    : `<span style="font-size:.75rem;color:var(--txt3)">씨앗 없음 (상점에서 구매)</span>`;
+    : `<span style="font-size:.75rem;color:var(--txt3)">씨앗이 없어요 · 상점에서 살 수 있어요</span>`;
 
   let gridHtml = '';
   for (let i = 0; i < farmSize; i++) {
@@ -4348,7 +4358,7 @@ function renderFarmModal() {
   document.getElementById('farm-grid-wrap').innerHTML =
     `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:3px">${gridHtml}</div>`;
   document.getElementById('farm-info').textContent =
-    `밭 크기: ${cols}×${rows} (${farmSize}칸) | 심은 작물: ${farm.length} | 수확 가능: ${farm.filter(p=>{const sd=Utils.getSeedByCrop(p.crop);return sd&&Utils.cropReady(p.planted,sd.growHours)}).length}`;
+    `밭 ${farmSize}칸 · 심은 작물 ${farm.length} · 거둘 수 있는 작물 ${farm.filter(p=>{const sd=Utils.getSeedByCrop(p.crop);return sd&&Utils.cropReady(p.planted,sd.growHours)}).length}`;
 }
 
 // ══ 집 ══
@@ -4531,6 +4541,7 @@ function setDecoMode(mode, btn) {
   document.body.classList.toggle('deco-floor-mode', mode === 'floor');   // [DECO-PT-2] 바닥 모드면 장식 서랍 접기
   _floorPickShow(mode === 'floor');   // [DECO-FLOOR-PICK-1] 접힌 서랍 자리에 바닥 고르기 판
   if (_decoRectPrev) { _decoRectPrev = null; _decoRectTip(); }   // [DECO-FLOOR-RECT-1]
+  if (_inRoomPrev && _inRoomPrev.ghost) _inRoomPrevSet(null);   // [DECO-ROOM-HOUSE-1] 크기 칩 미리 보기는 그 모드에서만
   setTimeout(() => { try { _decoPillarSync(); } catch (e) {} }, 0);
   document.body.classList.toggle('deco-erase-mode', mode === 'erase');
   if (mode === 'erase') { SEL_DECO = null; if (typeof renderDecoInv === 'function') renderDecoInv(); }
@@ -5026,41 +5037,102 @@ function _inExitSpot(rooms) {
 //  묶음마다 _inExitSpot 규칙(맨 아래 방 · 아래 벽 가운데 2칸) · 첫째는 전과 같은 자리(가장 아래 방) — 방이 다 붙은 집은 그대로. 저장 0.
 function _inExitSpots(rooms) {
   if (rooms.length < 2) return [_inExitSpot(rooms)];
+  return _inRoomGroups(rooms).map(_inExitSpot).sort((e, f) => (f.room.r + f.room.h) - (e.room.r + e.room.h) || e.room.c - f.room.c);
+}
+//  문으로 이어진 방 묶음들 [[방…]…] — 같은 목록의 방 객체끼리 문(_inRoomDoors 의 a·b)으로 잇는다
+function _inRoomGroups(rooms) {
   const up = new Map(rooms.map(r => [r, r])), top = r => { while (up.get(r) !== r) r = up.get(r); return r; };
   _inRoomDoors(rooms).forEach(d => { const x = top(d.a), y = top(d.b); if (x !== y) up.set(x, y); });
   const groups = new Map();
   rooms.forEach(r => { const k = top(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
-  return [...groups.values()].map(_inExitSpot).sort((e, f) => (f.room.r + f.room.h) - (e.room.r + e.room.h) || e.room.c - f.room.c);
+  return [...groups.values()];
+}
+
+// ══ 집은 한 채 (DECO-ROOM-HOUSE-1) ══════════════════════════
+//  사용자 지적(10-03 운영 화면): 방을 떨어뜨려 지으면 잔디밭 위에 오두막 여러 채가 되고, 방마다 '나가기'가 생기고,
+//  방 밖에 남은 TV·책장이 잔디 위에(벽에 박혀) 서 있었다. → 두 번째 방부터는 **있는 방에 문으로 붙여** 짓는다.
+//  · 붙는다 = 문이 나는 맞닿음(옆으로 2줄 · 위아래로 2칸 이상 — _inRoomDoors 규칙 그대로). 떨어진 자리를 누르거나 끌면
+//    가장 가까운 붙는 자리로 옮겨 짓는다(크기 칩은 겹쳐도 옮긴다 — 누른 칸이 방의 왼쪽 위라 겨누기 어렵다).
+//  · 집을 둘로 가르는 일(가운데 방 없애기 · 크기를 줄여 떨어뜨리기)은 막는다. 옛 저장본의 떨어진 방은 그대로 그린다(묶음마다 문).
+//  · 저장 모양은 그대로(r,c,w,h) — 규칙은 짓는 손짓에만 있다.
+function _inRoomGroupCount(rooms) { return rooms.length < 2 ? rooms.length : _inRoomGroups(rooms).length; }
+function _inRoomAttached(rooms, nr) {
+  if (!rooms.length) return true;
+  const t = Object.assign({ id: '~' }, nr);
+  return _inRoomDoors(rooms.concat([t])).some(d => d.a === t || d.b === t);
+}
+//  같은 크기로 있는 방의 네 변을 따라 미끄러뜨린 자리 중 nr 에 가장 가까운 '붙는 자리'(없으면 null)
+//  옆 = 옆벽을 나눔 · 아래 = 아랫방 벽 띠가 윗방 바로 아래 줄 · 위 = 그 반대(_inRoomDoors 와 같은 꼴)
+function _inRoomSnap(rooms, nr) {
+  if (!rooms.length) return null;
+  const { w, h } = nr, cx = nr.c + w / 2, cy = nr.r + h / 2, cand = [];
+  rooms.forEach(o => {
+    for (let r = o.r - h + 2; r <= o.r + o.h - 2; r++) cand.push({ r, c: o.c + o.w, w, h }, { r, c: o.c - w, w, h });
+    for (let c = o.c - w + 2; c <= o.c + o.w - 2; c++) cand.push({ r: o.r + o.h + 1, c, w, h }, { r: o.r - 1 - h, c, w, h });
+  });
+  return cand.filter(k => k.r >= 0 && k.c >= 0 && k.r + k.h <= DI_FULL.rows && k.c + k.w <= DI_FULL.cols)
+    .map(k => ({ k, d: (k.c + w / 2 - cx) ** 2 + (k.r + h / 2 - cy) ** 2 })).sort((a, b) => a.d - b.d)
+    .map(x => x.k).find(k => !_inRoomWhy(rooms, k) && _inRoomAttached(rooms, k)) || null;
+}
+//  새 방 자리 정하기 → { rect, why, moved }. loose = 크기 칩(겹쳐도 옮긴다) · 끌기는 겹치면 그 까닭(빨간 네모)
+function _inRoomPlan(rooms, nr, loose) {
+  const why = _inRoomWhy(rooms, nr);
+  if (!rooms.length) return { rect: nr, why, moved: false };
+  const fixed = rooms.length >= ROOM_MAX_N || nr.w < ROOM_MIN[0] || nr.h < ROOM_MIN[1] || nr.w > ROOM_MAX[0] || nr.h > ROOM_MAX[1];   // 옮겨도 안 되는 까닭
+  if (fixed) return { rect: nr, why, moved: false };
+  if (!why && _inRoomAttached(rooms, nr)) return { rect: nr, why: '', moved: false };
+  if (!loose && rooms.some(o => _inRoomOverlap(o, nr))) return { rect: nr, why, moved: false };
+  const s = _inRoomSnap(rooms, nr);
+  return s ? { rect: s, why: '', moved: true } : { rect: nr, why: '집에 붙일 자리가 없어요 — 방은 있는 방에 붙여 지어요', moved: false };
+}
+//  크기 칩 방 — 누른 칸이 왼쪽 위 · 판 끝이면 판 안으로 민다(전엔 판 밖으로 나간 만큼 방이 잘려 작아졌다)
+function _inChipRect(r, c, sz) {
+  const w = sz[1], h = sz[2];
+  return { r: Math.max(0, Math.min(r, DI_FULL.rows - h)), c: Math.max(0, Math.min(c, DI_FULL.cols - w)), w, h };
+}
+//  크기를 바꾼 방이 집에서 떨어지면 그 까닭 — 크기 · 겹침 · 가구 가름 규칙(_inRoomWhy) 다음
+function _inRoomResizeWhy(rooms, id, nr) {
+  const why = _inRoomWhy(rooms, nr, id);
+  if (why) return why;
+  const next = rooms.map(o => o.id === id ? Object.assign({ id }, nr) : o);
+  return _inRoomGroupCount(next) > _inRoomGroupCount(rooms) ? '방이 집에서 떨어져요 — 다른 방과 두 칸 넘게 맞닿게 해 주세요' : '';
 }
 //  방 목록을 바꾸고 ↩ 한 단계로 적는다
-function _inRoomsCommit(list, msg, shrunk) {
+function _inRoomsCommit(list, msg) {
   const prev = JSON.stringify(_inRooms(CUR)), next = JSON.stringify(list);
   if (prev === next) return false;
   _inRoomsSet(CUR, list);
   //  [DECO-RULE-R4] 방이 없어져 **벽이 사라진 벽걸이**는 가방으로 — 액자가 빈 바닥 한가운데 서 있지 않게.
   //  (벽걸이 규칙 `_decoRuleWhy` 로는 이미 '안 되는 자리'다.) 같은 ↩ 한 단계에 담아, 되돌리면 방과 액자가 같이 돌아온다.
   //  [DECO-ROOM-SHRINK-1] 방 크기를 줄이면 그 방 안에 있던 가구 중 새 방 밖(마당 잔디)에 남게 된 것도 같이 가방으로(보스 · #1075 뒤).
-  //  벽은 가구를 가르지 않으니(_inRoomWhy) 가구는 다 안이거나 다 밖이다. 방을 없앨 때는 전처럼 '가구는 그 자리에'(shrunk 없음).
+  //  [DECO-ROOM-HOUSE-1] 같은 규칙을 **방 자리가 바뀌는 모든 때**로 — 첫 방을 지을 때 · 방을 없앨 때 · 크기를 바꿀 때, 방이 하나라도 남으면
+  //  방 밖(잔디)에 서게 된 가구와 나가기 문 발판을 막게 된 가구는 가방으로(놓기 규칙 _decoRuleWhy 로는 이미 '안 되는 자리'다).
+  //  벽지·바닥만 바꾼 것은 자리 정리를 안 한다. 방이 다 없어지면 집 전체가 한 방이라 가구는 그 자리에 그대로.
   const inside = (p, o) => { const z = getDecoSize(p.id); return p.row >= o.r && p.col >= o.c && p.row + z.h <= o.r + o.h && p.col + z.w <= o.c + o.w; };
+  const geo = rs => rs.map(o => [o.id, o.r, o.c, o.w, o.h].join(',')).sort().join(' ');
+  const tidy = list.length > 0 && geo(JSON.parse(prev)) !== geo(list), exits = tidy ? _inExitSpots(_inRooms(CUR)) : [];
+  const onMat = p => { const z = getDecoSize(p.id); return exits.some(ex => p.row <= ex.matRow && p.row + z.h > ex.matRow && p.col < ex.c1 && p.col + z.w > ex.c0); };
   const bag = _decoList(CUR).filter(p => p.area === 'indoor' && (_isWallDeco(p.id) ? !_inIsWallRow(p.row, p.col)
-    : !!shrunk && inside(p, shrunk) && !list.some(o => inside(p, o))));
+    : tidy && (!list.some(o => inside(p, o)) || onMat(p))));
   if (bag.length) CUR.houseDecorations = (CUR.houseDecorations || []).filter(p => bag.indexOf(p) < 0);
   _decoUndoPush({ t: 'rooms', sp: DECO_SPACE, prev, next, bag: bag.map(p => Object.assign({}, p)) });
   decoDirty(); _drawDeco(); renderDecoInv(); _inLookRender();
   if (bag.length) {
-    const d = GAME_DATA.decorations.find(x => x.id === bag[0].id), nm = d ? d.icon + ' ' + d.name : '벽걸이', wall = _isWallDeco(bag[0].id);
-    msg = (msg || '').replace(/ \(↩ 되돌리기\)$/, '') + ` · 🎒 ${wall ? '벽에 걸려 있던' : '방 밖에 남은'} ${nm}${bag.length > 1 ? ' 등 ' + bag.length + '개' : ''}${_josa(d ? d.name : '벽걸이', '은', '는')} 가방으로 (↩ 되돌리기)`;
+    const p0 = bag[0], d = GAME_DATA.decorations.find(x => x.id === p0.id), nm = d ? d.icon + ' ' + d.name : '벽걸이';
+    const where = _isWallDeco(p0.id) ? '벽에 걸려 있던' : list.some(o => inside(p0, o)) ? '문 앞을 막던' : '방 밖에 남은';
+    msg = (msg || '').replace(/ \(↩ 되돌리기\)$/, '') + ` · 🎒 ${where} ${nm}${bag.length > 1 ? ' 등 ' + bag.length + '개' : ''}${_josa(d ? d.name : '벽걸이', '은', '는')} 가방으로 (↩ 되돌리기)`;
   }
   if (msg) toast(msg);
   return true;
 }
-function _inRoomAdd(nr) {
-  const rooms = _inRooms(CUR), why = _inRoomWhy(rooms, nr);
-  if (why) { toast('🧱 ' + why); return false; }
+function _inRoomAdd(nr, loose) {
+  const rooms = _inRooms(CUR), plan = _inRoomPlan(rooms, nr, loose);   // [DECO-ROOM-HOUSE-1] 두 번째 방부터는 집에 붙여
+  if (plan.why) { toast('🧱 ' + plan.why); return false; }
+  nr = { r: plan.rect.r, c: plan.rect.c, w: plan.rect.w, h: plan.rect.h };
   const id = ROOM_IDS.split('').find(x => !rooms.some(o => o.id === x));
   const first = !rooms.length;
   _inRoomsCommit(rooms.concat([Object.assign({ id, floor: null, wall: null }, nr)]),
-    `🧱 ${nr.w} × ${nr.h} 방이 생겼어요${first ? ' — 방 밖은 마당이에요' : ''} (↩ 되돌리기)`);
+    `🧱 ${nr.w} × ${nr.h} 방이 생겼어요${first ? ' — 방 밖은 마당 · 다음 방은 이 방에 붙여요' : plan.moved ? ' — 집에 붙여 지었어요 · 문은 저절로' : ' — 문이 저절로 났어요'} (↩ 되돌리기)`);
   //  [DECO-INDOOR-WALL-1] 방을 만들면 방들 둘레에 맞춰 본다(창조자 29회 — 만든 방이 화면 구석에 작게 남았다 · 768 에서 칸 15px)
   if (_ifMode) setTimeout(() => { if (DECO_SCENE !== 'yard') _inFitRooms(); }, 0);
   return true;
@@ -5085,7 +5157,9 @@ function _inRoomPrevSet(p) {
   if (!el) { el = document.createElement('div'); el.id = 'if-rect-tip'; el.className = 'deco-rect-tip'; el.setAttribute('role', 'status'); host.appendChild(el); }
   el.hidden = false;
   el.classList.toggle('is-capped', !!p.why);
-  el.textContent = p.why ? `${p.w} × ${p.h}칸 · ${p.why}` : p.resize ? `${p.w} × ${p.h}칸 — 손을 떼면 이 크기로 · 잘못하면 ↩` : `${p.w} × ${p.h}칸 — 손을 떼면 방이 돼요 · 잘못하면 ↩`;   // [DECO-ROOM-RESIZE-1]
+  el.textContent = p.why ? `${p.w} × ${p.h}칸 · ${p.why}` : p.resize ? `${p.w} × ${p.h}칸 — 손을 떼면 이 크기로 · 잘못하면 ↩`
+    : p.ghost ? `${p.w} × ${p.h}칸 — 누르면 여기에 방${p.moved ? ' · 집에 붙여 지어요' : ''}`   // [DECO-ROOM-HOUSE-1] 크기 칩 — 마우스가 올라간 자리
+    : `${p.w} × ${p.h}칸 — ${p.moved ? '집에 붙여 지어요 · ' : ''}손을 떼면 방이 돼요 · 잘못하면 ↩`;   // [DECO-ROOM-RESIZE-1]
   _drawDeco();
 }
 //  방 둘레에 맞춰 보기(열 때·'전체') — 방이 없으면 false
@@ -5116,13 +5190,16 @@ function _inTap(r, c) {
   if (kind === 'room') {
     if (_inPk.tool === 'erase') {
       if (!hit) { toast('🗑️ 없앨 방을 눌러 주세요'); return; }
-      _inRoomsCommit(rooms.filter(o => o.id !== hit.rm.id), '🗑️ 방을 없앴어요 — 가구는 그 자리에 그대로예요 (↩ 되돌리기)');
+      const rest = rooms.filter(o => o.id !== hit.rm.id);
+      //  [DECO-ROOM-HOUSE-1] 가운데 방을 없애 집이 둘로 갈라지면 막는다(끝 방부터) · 마지막 방이면 집 전체가 다시 한 방(가구 그대로)
+      if (rest.length && _inRoomGroupCount(rest) > _inRoomGroupCount(rooms)) { toast('🧱 이 방을 없애면 집이 둘로 나뉘어요 — 끝에 붙은 방부터 없애 보세요'); return; }
+      _inRoomsCommit(rest, rest.length ? '🗑️ 방을 없앴어요 (↩ 되돌리기)' : '🗑️ 방을 없앴어요 — 다시 집 전체가 한 방이에요 · 가구는 그 자리에 (↩ 되돌리기)');
       return;
     }
     const sz = ROOM_SIZES[_inPk.tool === 's1' ? 1 : _inPk.tool === 's2' ? 2 : _inPk.tool === 's0' ? 0 : -1];
     if (!sz) { toast('⬛ 빈 곳을 네모로 끌거나, 방 크기를 고르고 눌러 주세요'); return; }
-    const rr = Math.max(0, r);
-    _inRoomAdd(_inRoomFrom(rr, c, rr + sz[2] - 1, c + sz[1] - 1));
+    _inRoomPrevSet(null);   // [DECO-ROOM-HOUSE-1] 마우스 미리 보기를 걷고
+    _inRoomAdd(_inChipRect(r, c, sz), true);
     return;
   }
   if (!rooms.length) { _inLookApply(); return; }   // 방이 없으면 큰 방(IN-2)
@@ -5240,8 +5317,10 @@ function _inRoomDrawSmall(w, h) {
 function _inRoomRender(host, wide, small) {
   const rooms = _inRooms(CUR), tool = _inPk.tool;
   const sw = host.querySelector('.fpk-side');
-  const caps = tool === 'erase' ? ['없앨 방을 눌러요', '가구는 그 자리에 남아요']
-    : tool ? ['빈 곳을 누르면 그 자리에 놓여요', '방끼리 붙이면 문이 저절로 나요'] : ['빈 곳을 끌면 새 방', '노란 손잡이 = 크기 바꾸기', '붙은 방 사이엔 문이 저절로'];   // [DECO-ROOM-RESIZE-1] 한 줄씩 짧게(180px 판)
+  //  [DECO-ROOM-HOUSE-1] 두 번째 방부터는 집에 붙는다 — 말도 그 순서로
+  const caps = tool === 'erase' ? ['없앨 방을 눌러요', '끝 방부터 없앨 수 있어요']
+    : tool ? (rooms.length ? ['누른 곳 가까이 집에 붙어요', '붙은 방 사이엔 문이 저절로'] : ['빈 곳을 누르면 첫 방', '다음 방은 이 방에 붙여요'])
+    : (rooms.length ? ['집 옆을 끌면 새 방', '노란 손잡이 = 크기 바꾸기', '붙은 방 사이엔 문이 저절로'] : ['빈 곳을 끌면 첫 방', '다음 방은 이 방에 붙여요']);   // [DECO-ROOM-RESIZE-1] 한 줄씩 짧게(180px 판)
   const szI = tool === 's0' ? 0 : tool === 's1' ? 1 : tool === 's2' ? 2 : 1;
   _pkSwatch(sw, small ? 150 : 180, small ? 96 : 112, _inRoomDrawSmall(ROOM_SIZES[szI][1], ROOM_SIZES[szI][2]),
     tool === 'erase' ? '🗑️ 방 없애기' : tool ? ROOM_SIZES[szI][0] + ' ' + ROOM_SIZES[szI][1] + '×' + ROOM_SIZES[szI][2] : '⬛ 네모로 방 만들기', caps);
@@ -5252,7 +5331,7 @@ function _inRoomRender(host, wide, small) {
   const r = host.querySelector('.fpk-row[data-row="fams"]'); if (!r) return;
   r.hidden = false;
   const sc = r.querySelector('.fpk-scroll'); sc.textContent = '';
-  const cw = wide ? 52 : 54, ch = wide ? 34 : 40, pickT = t => { _inPk.tool = _inPk.tool === t ? '' : t; _inLookRender(); };
+  const cw = wide ? 52 : 54, ch = wide ? 34 : 40, pickT = t => { _inPk.tool = _inPk.tool === t ? '' : t; _inRoomPrevSet(null); _inLookRender(); };   // [DECO-ROOM-HOUSE-1] 칩이 바뀌면 미리 보기도
   ROOM_SIZES.forEach(([lab, w, h], i) => sc.appendChild(_pkChip(lab, cw, ch, _inRoomDrawSmall(w, h), tool === 's' + i, () => pickT('s' + i))));
   if (!rooms.length && _decoList(CUR).some(p => p.area === 'indoor'))
     sc.appendChild(_pkButton('pk-chip', '가구 둘레로 첫 방 만들기', false, () => _inRoomAroundFurniture(), b => { b.textContent = '🪑 가구 둘레로'; }));
@@ -8027,11 +8106,11 @@ function _decoAttachGestures(cv) {
       roomDrag.active = true; _dSuppressClick = true;
       if (roomDrag.edge) {   // [DECO-ROOM-RESIZE-1]
         const nr = _inRoomResized(roomDrag.edge, e.clientX, e.clientY);
-        _inRoomPrevSet(Object.assign(nr, { why: _inRoomWhy(_inRooms(CUR), nr, roomDrag.edge.rm.id), resize: true }));
+        _inRoomPrevSet(Object.assign(nr, { why: _inRoomResizeWhy(_inRooms(CUR), roomDrag.edge.rm.id, nr), resize: true }));   // [DECO-ROOM-HOUSE-1] 집에서 떨어지면 빨갛게
         return;
       }
-      const nr = _inRoomFrom(roomDrag.r0, roomDrag.c0, k.r, k.c);
-      _inRoomPrevSet(Object.assign(nr, { why: _inRoomWhy(_inRooms(CUR), nr) }));
+      const raw = _inRoomFrom(roomDrag.r0, roomDrag.c0, k.r, k.c), pl = _inRoomPlan(_inRooms(CUR), raw, false);   // [DECO-ROOM-HOUSE-1] 떨어져 있으면 붙는 자리를 미리 보인다
+      _inRoomPrevSet(Object.assign({}, pl.rect, { why: pl.why, moved: pl.moved, raw: pl.moved ? raw : null }));
       return;
     }
     if (paint && paint.rect && pts.size === 1) {   // [DECO-FLOOR-RECT-1] 시작 칸을 벗어나면 네모 미리보기(집·밭 위로도 늘어난다 — 칠할 때 건너뜀)
@@ -8075,7 +8154,7 @@ function _decoAttachGestures(cv) {
         const pv = roomDrag.active && _inRoomPrev, edge = roomDrag.edge; roomDrag = null; _inRoomPrevSet(null);
         if (pv && edge) {   // [DECO-ROOM-RESIZE-1] 떼면 그 크기로(안 되면 까닭)
           if (pv.why) toast('🧱 ' + pv.why);
-          else _inRoomsCommit(_inRooms(CUR).map(o => o.id === edge.rm.id ? Object.assign({}, o, { r: pv.r, c: pv.c, w: pv.w, h: pv.h }) : o), `🧱 방 크기를 바꿨어요 — ${pv.w} × ${pv.h} (↩ 되돌리기)`, edge.rm);   // [DECO-ROOM-SHRINK-1] 줄어 방 밖에 남은 가구는 가방으로
+          else _inRoomsCommit(_inRooms(CUR).map(o => o.id === edge.rm.id ? Object.assign({}, o, { r: pv.r, c: pv.c, w: pv.w, h: pv.h }) : o), `🧱 방 크기를 바꿨어요 — ${pv.w} × ${pv.h} (↩ 되돌리기)`);   // [DECO-ROOM-SHRINK-1] 줄어 방 밖에 남은 가구는 가방으로(_inRoomsCommit)
         } else if (pv) { if (pv.why) toast('🧱 ' + pv.why); else _inRoomAdd({ r: pv.r, c: pv.c, w: pv.w, h: pv.h }); }
       }
       if (paint) { if (paint.rect) _decoRectCommit(paint); else _decoStrokeEnd(paint); paint = null; }
@@ -8089,13 +8168,14 @@ function _decoAttachGestures(cv) {
   //  [DECO-SEL-HL-1] 마우스가 누르지 않은 채 움직이면 커서 칸에 놓일 모습 — 칸이 바뀔 때만 다시 그린다(터치는 hover 가 없다)
   cv.addEventListener('pointermove', e => {
     if (e.pointerType !== 'mouse' || e.buttons) return;
+    if (_inChipMode()) { _inChipGhost(e.clientX, e.clientY); return; }   // [DECO-ROOM-HOUSE-1] 크기 칩 — 누르면 지어질 자리
     if (_inRoomDragMode()) cv.style.cursor = _inRoomCursor(_inRoomEdgeAt(e.clientX, e.clientY)) || 'crosshair';   // [DECO-ROOM-RESIZE-1] 가장자리면 크기 바꾸기 커서
     else if (cv.style.cursor && cv.style.cursor !== 'pointer') cv.style.cursor = 'pointer';
     const k = _decoCellAt(e.clientX, e.clientY), h = _decoHover;
     if ((!k && !h) || (k && h && k.area === h.area && k.r === h.r && k.c === h.c)) return;
     _decoHover = k; if (SEL_DECO) _drawDeco();
   });
-  cv.addEventListener('pointerleave', () => { if (_decoHover) { _decoHover = null; if (SEL_DECO) _drawDeco(); } });
+  cv.addEventListener('pointerleave', () => { if (_decoHover) { _decoHover = null; if (SEL_DECO) _drawDeco(); } if (_inRoomPrev && _inRoomPrev.ghost) _inRoomPrevSet(null); });
   cv.addEventListener('contextmenu', e => e.preventDefault());   // [DECO-PAN-1] 오른쪽 끌기에 메뉴가 뜨지 않게
   cv.addEventListener('wheel', e => {
     e.preventDefault();
@@ -8346,6 +8426,15 @@ function _decoRectTip() {
 
 // [INDOOR-ROOMS-1] 지금 한 손가락 끌기가 '방 네모'인가 — 집 안 🖌️ 판의 ⬛ 방 탭에서 크기 칩·없애기를 안 골랐을 때
 function _inRoomDragMode() { return DECO_MODE === 'floor' && DECO_SCENE !== 'yard' && _inPk.tab === 'room' && !_inPk.tool; }
+//  [DECO-ROOM-HOUSE-1] 크기 칩을 고른 채 마우스가 판 위에 있으면 누르면 지어질 자리(붙는 자리로 옮겨질 곳)를 금색으로 — 칸이 바뀔 때만 다시 그린다
+function _inChipMode() { return DECO_MODE === 'floor' && DECO_SCENE !== 'yard' && _inPk.tab === 'room' && /^s[012]$/.test(_inPk.tool || ''); }
+function _inChipGhost(clientX, clientY) {
+  if (!_dCv) return;
+  const k = _inCellClamp(clientX, clientY), g = _inRoomPrev && _inRoomPrev.ghost ? _inRoomPrev : null;
+  if (g && g.kr === k.r && g.kc === k.c && g.tool === _inPk.tool) return;
+  const raw = _inChipRect(k.r, k.c, ROOM_SIZES[+_inPk.tool.slice(1)]), pl = _inRoomPlan(_inRooms(CUR), raw, true);
+  _inRoomPrevSet(Object.assign({}, pl.rect, { why: pl.why, moved: pl.moved, raw: pl.moved ? raw : null, ghost: true, kr: k.r, kc: k.c, tool: _inPk.tool }));
+}
 // [DECO-ROOM-RESIZE-1] 방 크기 바꾸기 — ⬛ 방(네모 끌기)일 때 방 가장자리·모서리를 누르고 끌면 그 변이 따라온다(계획 C8 · 묶음 7).
 //  같은 규칙(크기 · 다른 방과 벽 한 줄 · 벽이 가구를 가르지 않음 — _inRoomWhy)으로 미리 보고, 떼면 ↩ 한 단계. 저장 모양은 그대로(r,c,w,h 숫자만).
 //  윗변을 옮기면 벽이 옮겨 간다 → 옛 벽에 걸린 액자는 가방으로(R4 · 같은 ↩ 에 담긴다).
@@ -11263,8 +11352,12 @@ function _drawIndoor() {
     else _drawDecoSVG(p.id, px, py, sz.w * C, C);
   });
   // 배치된 가구 (바닥 레이어 제외 — 러그는 위에서 먼저 그렸다)
-  _decoSorted(_indoorPlaced.filter(p=>!_isFloorLayerDeco(p) && !_onWall(p))).forEach(_drawIndoorItem);
+  //  [DECO-ROOM-HOUSE-1] 옛 저장본의 방 밖 가구(잔디 위)는 아래벽 **뒤가 아니라 앞**에 — 방 아래 줄의 TV 가 벽에 박혀 보였다(사용자 10-03)
+  const _outRoom = p => { const z = getDecoSize(p.id); return _rooms.length && !_rooms.some(o => p.row >= o.r && p.col >= o.c && p.row + z.h <= o.r + o.h && p.col + z.w <= o.c + o.w); };
+  const _standing = _indoorPlaced.filter(p=>!_isFloorLayerDeco(p) && !_onWall(p));
+  _decoSorted(_standing.filter(p => !_outRoom(p))).forEach(_drawIndoorItem);
   if (_rooms.length) _inDrawFrontWalls(_rooms, offX, offY, C);   // [DECO-INDOOR-WALL-1] 아래벽은 가구 앞에 선다
+  _decoSorted(_standing.filter(_outRoom)).forEach(_drawIndoorItem);
 
   // 나가기 문
   if (_exitArt) {
@@ -11293,8 +11386,13 @@ function _drawIndoor() {
     });
   }
   //  [INDOOR-ROOMS-1] 끄는 중인 네모 — 방 칸 + 벽 띠 줄까지 금색 점선(안 되면 붉게)
-  if (_inRoomPrev) {
+  if (_inRoomPrev && (!_inRoomPrev.ghost || _inChipMode())) {
     const p = _inRoomPrev, x = offX + p.c * C, y = offY + (p.r - 1) * C, w = p.w * C, h = (p.h + 1) * C;
+    if (p.raw) {   // [DECO-ROOM-HOUSE-1] 끈(누른) 자리는 옅은 점선 — 실제로 지어질 곳(금색)과 같이 보인다
+      const q = p.raw;
+      _dCtx.save(); _dCtx.setLineDash([Math.max(3, C * .18), Math.max(3, C * .18)]); _dCtx.lineWidth = 1.5; _dCtx.strokeStyle = 'rgba(255,255,255,.55)';
+      _dCtx.strokeRect(offX + q.c * C, offY + (q.r - 1) * C, q.w * C, (q.h + 1) * C); _dCtx.restore();
+    }
     _dCtx.fillStyle = p.why ? 'rgba(255,110,90,.2)' : 'rgba(255,216,102,.2)'; _dCtx.fillRect(x, y, w, h);
     _dCtx.save(); _dCtx.setLineDash([Math.max(4, C * .3), Math.max(3, C * .2)]); _dCtx.lineWidth = 3;
     _dCtx.strokeStyle = p.why ? '#ff8a73' : '#ffd866'; _dCtx.strokeRect(x, y, w, h); _dCtx.restore();
@@ -13132,7 +13230,7 @@ function editEmotionRecord(date, period) {
   _emoSelectedKey   = null;
   _emoSelectedLevel = null;
   const existing = DB_EMOTION.get(CUR.id, date, period);
-  const title = `✏️ ${date.slice(5).replace('-','/')} ${period==='am'?'오전':'오후'} 수정`;
+  const title = `${date.slice(5).replace('-','/')} ${period==='am'?'오전':'오후'} 수정`;
   document.getElementById('emotion-modal-title').textContent = title;
   document.getElementById('emotion-step1').style.display = '';
   document.getElementById('emotion-step2').style.display = 'none';
@@ -13205,9 +13303,9 @@ function openEmotionModal(period) {
 
   const today = Utils.todayStr();
   const existing = DB_EMOTION.get(CUR.id, today, period);
-  const title = period === 'am' ? '🌅 오전 감정' : '🌇 오후 감정';
+  const title = period === 'am' ? '오전 감정' : '오후 감정';
   document.getElementById('emotion-modal-title').textContent =
-    (existing ? '✏️ 수정: ' : '💭 ') + title;
+    (existing ? '수정: ' : '') + title;
 
   // step1 표시
   document.getElementById('emotion-step1').style.display = '';
@@ -13336,7 +13434,7 @@ function renderInv() {
 
     // ── 스킬 현황 카드 ──────────────────────────────────────
     html += `<div style="font-size:.78rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">📖 보유 스킬 현황</div>`;
-    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">마스터리북을 사면 레벨이 올라요. 상점 → 📚 마스터리북 탭</div>`;
+    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">마스터리북을 사면 레벨이 올라요. 상점의 마스터리북 탭에서 살 수 있어요.</div>`;
     html += typeInfo.map(({ type, label, color, maxLv }) => {
       const lv   = sl[type] ?? 0;
       const pct  = Math.round(lv / maxLv * 100);
@@ -13364,7 +13462,7 @@ function renderInv() {
           <div style="height:100%;width:${pct}%;background:${color};border-radius:5px;transition:width .4s ease"></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.68rem;color:var(--txt3)">계수 <strong style="color:${color}">${multTxt}</strong></span>
+          <span style="font-size:.68rem;color:var(--txt3)">세기 <strong style="color:${color}">${multTxt}</strong></span>
           ${nextTxt}
         </div>
       </div>`;
@@ -13377,7 +13475,7 @@ function renderInv() {
       { id:'prep',     label:'🎯 일격 준비',   desc:'다음 공격 ×2.3', color:'#FFD700' },
       { id:'reckless', label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2', color:'#FF8A80' },
       { id:'guard',    label:'🛡️ 방어',       desc:'피해 50% 감소', color:'#7ec8e3' },
-      { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP40%↓ / 반사', color:'#c39bd3' },
+      { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP 40% 아래면 반사', color:'#c39bd3' },
       { id:'rush',     label:'🔥 몰아치기',   desc:'2턴 공격력↑', color:'#f39c12' },
     ];
 
@@ -13411,7 +13509,7 @@ function renderInv() {
       {k:'head',icon:'🪖',l:'머리'},{k:'body',icon:'🥋',l:'옷'},{k:'weapon',icon:'⚔️',l:'무기'},
       {k:'glove',icon:'🧤',l:'장갑'},{k:'shoe',icon:'👟',l:'신발'}
     ];
-    html += `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">⚔️ 현재 장착 장비</div>`;
+    html += `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">현재 장착 장비</div>`;
     html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.35rem;margin-bottom:1rem">`;
     html += slots.map(sl => {
       const eqId   = CUR.equipmentIds?.[sl.k];
@@ -13524,7 +13622,7 @@ function renderInv() {
         return `<div class="inv-slot filled">
           <div class="inv-icon">${d.icon}</div>
           <div class="inv-name">${d.name}</div>
-          <div class="inv-qty">x${i.qty} <span style="color:var(--txt3)">(배치:${used})</span></div>
+          <div class="inv-qty">${i.qty}개 <span style="color:var(--txt3)">· 놓은 것 ${used}</span></div>
         </div>`;
       }).join('') + Array(blanks).fill('<div class="inv-slot"></div>').join('') + `</div>`;
   }
@@ -14256,9 +14354,9 @@ function visitFriend(id) {
     </div>
     <!-- 탭 -->
     <div class="modal-tabs" style="margin-bottom:.8rem" id="${modalId}-tabs">
-      <button class="mtab on" onclick="openFriendFullscreen('${id}')">🌸 꾸미기 보기</button>
-      <button class="mtab"    onclick="vfTab('${modalId}','books',this)">📚 독서</button>
-      <button class="mtab"    onclick="vfTab('${modalId}','artwork',this)">🖼️ 작품</button>
+      <button class="mtab on" onclick="openFriendFullscreen('${id}')">꾸미기 보기</button>
+      <button class="mtab"    onclick="vfTab('${modalId}','books',this)">독서</button>
+      <button class="mtab"    onclick="vfTab('${modalId}','artwork',this)">작품</button>
     </div>
     <!-- 인테리어 탭 (전체화면으로 열림) -->
     <div id="${modalId}-deco">
@@ -14401,8 +14499,8 @@ function applyLayout(mode) {
 //   숨기면 폰에서 넓게 보기로 돌아갈 길이 없어지므로 글자만 빼고 아이콘은 남긴다.
 //   폭이 바뀌면(가로/세로 돌리기) 다시 맞춘다.
 const HUD_NARROW_PX = 430;
-function hudBtnText(icon, label) {
-  return window.innerWidth <= HUD_NARROW_PX ? icon : icon + ' ' + label;
+function hudBtnText(icon, label) {   // [DESLOP-3] 이모지 없이 글자만 — 좁은 화면은 '보기'를 뺀 짧은 말
+  return window.innerWidth <= HUD_NARROW_PX ? label.replace(' 보기', '') : label;
 }
 function syncHudButtons() {
   const lb = document.getElementById('layout-toggle-btn');
@@ -14432,6 +14530,7 @@ window.addEventListener('resize', applyScale);
 
 
 function triggerLevelUp(newLv) {
+  if (_fxBusy()) { _fxWhenFree(() => triggerLevelUp(newLv)); return; }   // [BATTLE-V2] 배틀·업적 카드가 끝난 뒤
   const fx = document.getElementById('lup-fx');
   document.getElementById('lup-sub').textContent = `Lv.${newLv}이 됐어요!`;
   const isPromo = Utils.isPromotionLevel(newLv);
@@ -15042,10 +15141,21 @@ function renderHouseAchievements() {
     ${render(lockedList, true)}`;
 }
 
-function checkAchievements() {
+// [BATTLE-V2] 연출 줄 세우기 — 배틀 창 · 업적 카드 · 레벨업이 서로 위에 덮지 않게 하나씩
+function _fxBusy() {
+  const bat = document.getElementById('m-battle'), ach = document.getElementById('ach-popup'), lup = document.getElementById('lup-fx');
+  return !!((bat && bat.classList.contains('open')) || (ach && ach.style.display === 'block') || (lup && lup.classList.contains('show')));
+}
+function _fxWhenFree(fn, tries) { tries = tries || 0; if (!_fxBusy() || tries > 450) return fn(); setTimeout(() => _fxWhenFree(fn, tries + 1), 400); }
+
+function checkAchievements(opts) {
   const newOnes = AchievementUtils.checkNew(CUR);
-  if (newOnes.length === 0) return;
+  if (newOnes.length === 0) return [];
   DB.saveStudent(CUR);
+  if (opts && opts.inline) {   // 배틀 결과 카드가 직접 보여 준다 — 알림 빨간 점만
+    document.querySelectorAll('[id="ach-tile-notif"]').forEach(n => { n.style.display = ''; });
+    return newOnes;
+  }
   // 업적 달성 팝업 (순서대로)
   let idx = 0;
   const showNext = () => {
@@ -15066,7 +15176,8 @@ function checkAchievements() {
     // 3초 후 자동 닫기 (다음 업적)
     setTimeout(() => { closeAchPopup(); setTimeout(showNext, 300); }, 3000);
   };
-  showNext();
+  _fxWhenFree(showNext);
+  return newOnes;
 }
 
 function closeAchPopup() {
@@ -15129,7 +15240,7 @@ function openModal(id) {
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.overlay').forEach(o => {
-  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+  o.addEventListener('click', e => { if (e.target === o && o.id !== 'm-battle') o.classList.remove('open'); });   // [BATTLE-V2] 배틀은 '나가기'로만
 });
 
 // ══ 토스트 ══ (스타일 태그 중복 추가 버그 수정)
@@ -15549,16 +15660,16 @@ function getTodayStudyRecords(studentId) {
 }
 
 // 홈에 붙는 "오늘의 학습" 카드
+// [HOME-C-1] 세 조각(생각판 칸 · 우리 반 작품 · 오늘의 학습)을 홈 구역마다 따로 쓴다. 예전 이름은 셋을 이어 붙여 돌려준다.
 function buildStudyCardHTML(s) {
-  if (typeof CurriculumUtils === 'undefined') return '';
-  const recs  = getTodayStudyRecords(s.id);
-  const done  = recs.reduce((n, r) => n + (r.total || 0), 0);
-  const right = recs.reduce((n, r) => n + (r.correct || 0), 0);
-  const cleared = done >= STUDY_PER_DAY;
-  const pct = done > 0 ? Math.round(right / done * 100) : 0;
-
-  // [ARTFREE-1] 그림 올리기는 집 탭 안쪽에 있어 아이들이 못 찾았다 — 홈에서 바로 들어가게 한다
-  const artCard = `
+  if (typeof CurriculumUtils === 'undefined') return buildThinkboardSlotHTML();
+  return buildThinkboardSlotHTML() + buildArtCardHTML() + buildStudyTaskHTML(s);
+}
+function buildThinkboardSlotHTML() {
+  return `<div class="home-thinkboard" style="display:contents">${thinkboardHomeCards()}</div>`;   // [THINKBOARD-HOME-1]
+}
+function buildArtCardHTML() {
+  return `
     <div class="today-card" onclick="openArtFree('class')"
       style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(200,150,46,.3);margin-top:.5rem">
       <div style="display:flex;align-items:center;gap:.6rem">
@@ -15570,8 +15681,17 @@ function buildStudyCardHTML(s) {
         <span style="color:var(--txt3)">▶</span>
       </div>
     </div>`;
+}
+function buildStudyTaskHTML(s) {
+  if (typeof CurriculumUtils === 'undefined') return '';
+  const recs  = getTodayStudyRecords(s.id);
+  const done  = recs.reduce((n, r) => n + (r.total || 0), 0);
+  const right = recs.reduce((n, r) => n + (r.correct || 0), 0);
+  const cleared = done >= STUDY_PER_DAY;
+  const pct = done > 0 ? Math.round(right / done * 100) : 0;
 
-  return artCard + `
+  // [ARTFREE-1] 그림 올리기는 집 탭 안쪽에 있어 아이들이 못 찾았다 — 홈에서 바로 들어가게 한다(→ buildArtCardHTML)
+  return `
     <div class="today-card" onclick="openStudyModal()"
       style="cursor:pointer;grid-column:1/-1;border:1px solid ${cleared?'rgba(46,204,113,.35)':'rgba(255,215,0,.28)'}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">
@@ -15636,7 +15756,7 @@ function renderStudySubjectPick() {
   const body = document.getElementById('study-body');
   const ttl  = document.getElementById('study-title');
   if (!body) return;
-  if (ttl) ttl.textContent = '📚 오늘의 학습';
+  if (ttl) ttl.textContent = '오늘의 학습';
 
   const active = CurriculumUtils.activeUnitIds();   // 교사가 켠 단원(없으면 전체)
   const stats  = getUnitStats(CUR.id);

@@ -5,67 +5,83 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>우리반 성장 RPG</title>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!-- [TITLE-BOARD-1] 첫 화면 칠판 분필 글씨 — 칠판에 쓰는 글자만 받는다(text=). 칠판 글을 바꾸면 여기 글자도 같이 -->
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&text=%200123456789GPR%EA%B8%88%EA%B8%B0%EB%8A%98%EB%8F%84%EB%9D%BC%EB%A6%AC%EB%AA%A8%EB%AA%A9%EB%B0%98%EB%BC%98%EC%84%B1%EC%88%98%EC%94%A9%EC%98%A4%EC%9A%94%EC%9A%B0%EC%9B%94%EC%9D%98%EC%9D%BC%EC%9E%90%EC%9E%A5%ED%86%A0%ED%95%9C%ED%97%98%ED%99%94&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><!-- [ENGLISH-LINK-1] 영어앱 기록 읽기 전용 -->
-<script src="./gamedata.js?v=20260924me2"></script>
+<script src="./gamedata.js?v=20261003ds2"></script>
 <script src="./curriculum.js?v=20260915stn"></script>
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20260924mg9">
+<link rel="stylesheet" href="./student.css?v=20261003hc2">
 </head>
 <body>
-<div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
-  <div style="font-size:3rem">🏫</div>
-  <div style="font-size:1rem;font-weight:700;color:#FFD700">우리반 성장 RPG</div>
-  <div style="font-size:.8rem;color:#8899aa;margin-top:.5rem">서버에 연결하는 중...</div>
-  <div style="width:180px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:.5rem;overflow:hidden">
-    <div style="width:40%;height:100%;background:#FFD700;border-radius:2px;animation:ldBar 1.2s ease-in-out infinite"></div>
+<div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#ecdcbf;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.7rem">
+  <div style="font-size:1.15rem;font-weight:800;color:#5a3a1a">우리반 성장 RPG</div>
+  <div style="font-size:.85rem;color:#8a6a48">서버에 연결하는 중...</div>
+  <div style="width:180px;height:4px;background:rgba(90,58,26,.15);border-radius:2px;margin-top:.3rem;overflow:hidden">
+    <div style="width:40%;height:100%;background:#d9a441;border-radius:2px;animation:ldBar 1.2s ease-in-out infinite"></div>
   </div>
 </div>
 
-<!-- 타이틀 -->
+<!-- 타이틀 — [TITLE-BOARD-1] 교실 칠판 (날짜는 student.js fillTitleDate) -->
 <div class="screen" id="s-title">
-  <div class="title-logo">우리반 성장 RPG</div>
-  <div class="title-sub">✦ 오늘의 모험을 시작해볼까요? ✦</div>
-  <div class="title-floaters">
-    <div class="floater">⚔️</div><div class="floater">🌱</div>
-    <div class="floater">🏆</div><div class="floater">🐉</div>
+  <div class="tb-scene">
+    <div class="tb-board">
+      <div class="tb-chalk tb-corner-l">오늘의 모험</div>
+      <div class="tb-chalk tb-corner-r" id="tb-date"></div>
+      <div class="tb-chalk tb-title">우리반 성장 RPG</div>
+      <div class="tb-chalk tb-sub">오늘도 한 뼘씩 자라기</div>
+      <svg class="tb-line" viewBox="0 0 300 14" aria-hidden="true"><path d="M4 9 C60 3 120 12 180 6 S270 4 296 8"/></svg>
+      <img class="tb-doodle tb-d1" src="./assets/monsters/m31.png" alt="">
+      <img class="tb-doodle tb-d2" src="./assets/monsters/m45.png" alt="">
+    </div>
+    <div class="tb-ledge" aria-hidden="true">
+      <img class="tb-sit tb-s1" src="./assets/monsters/m22.png" alt="">
+      <img class="tb-sit tb-s2" src="./assets/monsters/m1.png" alt="">
+    </div>
+    <div class="tb-crew" aria-hidden="true">
+      <img class="tb-m1" src="./assets/monsters/m28.png" alt="">
+      <img class="tb-m2" src="./assets/monsters/m32.png" alt="">
+      <img class="tb-m3" src="./assets/monsters/m24.png" alt="">
+      <img class="tb-m4" src="./assets/monsters/m38.png" alt="">
+    </div>
+    <button class="btn-gold tb-go" onclick="gotoLogin()">시작하기</button>
   </div>
-  <button class="btn-gold" onclick="gotoLogin()">▶ 시작하기</button>
 </div>
 
 <!-- 로그인 -->
 <div class="screen hidden" id="s-login">
   <div class="login-card">
-    <div class="login-head">🗝️ 로그인</div>
+    <div class="login-head">로그인</div>
     <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.7rem">이름을 선택하세요</div>
     <div class="student-grid" id="student-grid"></div>
     <input class="login-input" type="password" placeholder="비밀번호" id="pw-input"
       onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-err" id="login-err"></div>
-    <button class="btn-red" onclick="doLogin()" style="margin-top:.4rem">🎮 입장하기</button>
+    <button class="btn-gold btn-block" onclick="doLogin()" style="margin-top:.4rem">입장하기</button>
     <button onclick="openPwReset()" style="background:none;border:none;color:var(--txt3);font-size:.72rem;
-      cursor:pointer;margin-top:.5rem;text-decoration:underline">🔑 비밀번호를 잊었어요</button>
-    <div class="login-admin-link"><a href="admin.html">👨‍🏫 교사 관리자 페이지</a></div>
+      cursor:pointer;margin-top:.5rem;text-decoration:underline">비밀번호를 잊었어요</button>
+    <div class="login-admin-link"><a href="admin.html">선생님 관리 화면</a></div>
   </div>
 </div>
 
 <!-- 캐릭터 선택 -->
 <div class="screen hidden" id="s-charsel">
   <div class="charsel-title">캐릭터를 선택하세요</div>
-  <div class="charsel-sub">처음 로그인할 때만 선택할 수 있어요!</div>
+  <div class="charsel-sub">처음 한 번만 고를 수 있어요</div>
   <div class="char-options">
-    <div class="char-opt" onclick="selChar(1,this)">🧑‍🦱<div class="char-opt-name">남학생 A</div></div>
-    <div class="char-opt" onclick="selChar(2,this)">👧<div class="char-opt-name">여학생 A</div></div>
-    <div class="char-opt" onclick="selChar(3,this)">🧑<div class="char-opt-name">남학생 B</div></div>
-    <div class="char-opt" onclick="selChar(4,this)">👩<div class="char-opt-name">여학생 B</div></div>
+    <div class="char-opt" onclick="selChar(1,this)"><img class="char-opt-art" src="assets/char/base_1.svg" alt="모습 1" draggable="false"><div class="char-opt-name">모습 1</div></div>
+    <div class="char-opt" onclick="selChar(2,this)"><img class="char-opt-art" src="assets/char/base_2.svg" alt="모습 2" draggable="false"><div class="char-opt-name">모습 2</div></div>
+    <div class="char-opt" onclick="selChar(3,this)"><img class="char-opt-art" src="assets/char/base_3.svg" alt="모습 3" draggable="false"><div class="char-opt-name">모습 3</div></div>
+    <div class="char-opt" onclick="selChar(4,this)"><img class="char-opt-art" src="assets/char/base_4.svg" alt="모습 4" draggable="false"><div class="char-opt-name">모습 4</div></div>
   </div>
-  <button class="btn-gold" id="btn-char-ok" onclick="confirmChar()" style="opacity:.4" disabled>이 캐릭터로 시작!</button>
+  <button class="btn-gold" id="btn-char-ok" onclick="confirmChar()" style="opacity:.4" disabled>이 모습으로 시작</button>
 </div>
 
 <!-- 게임 -->
@@ -87,12 +103,19 @@
     <div class="hud-badges">
       <div class="badge lv">⚡ Lv.<span id="hud-lv">1</span></div>
       <div class="badge gold">💰 <span id="hud-gold">0</span>G</div>
-      <button id="layout-toggle-btn" class="hud-mini-btn" onclick="toggleLayout()">🖥️ 넓게 보기</button>
-      <button id="scale-mode-btn" class="hud-mini-btn" onclick="toggleScaleMode()">🔍 화면 맞춤</button>
+      <button id="layout-toggle-btn" class="hud-mini-btn" onclick="toggleLayout()">넓게 보기</button>
+      <button id="scale-mode-btn" class="hud-mini-btn" onclick="toggleScaleMode()">화면 맞춤</button>
     </div>
   </div>
 
   <div class="game-body">
+    <!-- [HOME-C-1] 왼쪽 레일 — 홈 네 구역. 데스크톱(701px 이상)만 · 폰과 '넓게 보기 끔'(모바일 배치)에서는 숨김 -->
+    <nav class="home-rail" id="home-rail" aria-label="홈 구역">
+      <button class="hr-item on" data-sec="today" onclick="setHomeSec('today')"><span class="hr-art hr-board" aria-hidden="true"></span><b>오늘</b><small id="hr-sub-today"></small></button>
+      <button class="hr-item" data-sec="learn" onclick="setHomeSec('learn')"><img class="hr-art" src="./assets/deco/d_i9.svg" alt=""><b>배우고 만들기</b><small id="hr-sub-learn"></small></button>
+      <button class="hr-item" data-sec="me" onclick="setHomeSec('me')"><img class="hr-art" src="./assets/deco/yard_house.svg" alt=""><b>나의 공간</b><small id="hr-sub-me"></small></button>
+      <button class="hr-item" data-sec="adv" onclick="setHomeSec('adv')"><img class="hr-art" src="./assets/monsters/m28.png" alt=""><b>모험</b><small id="hr-sub-adv"></small></button>
+    </nav>
     <!-- 사이드 (데스크탑) -->
     <div class="side-panel" id="side-panel">
       <div class="char-card">
@@ -105,7 +128,7 @@
       <div class="panel-box">
         <div class="panel-label" onclick="toggleSideSection('equip-section','equip-arrow')"
           style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-          <span>🧰 장착 장비</span>
+          <span>장착 장비</span>
           <span id="equip-arrow" style="font-size:.7rem;color:var(--txt3)">▲</span>
         </div>
         <div id="equip-section">
@@ -137,7 +160,7 @@
         <div class="char-combat" id="mob-char-combat"></div>
       </div>
       <div class="panel-box" style="margin-bottom:.8rem">
-        <div class="panel-label">🧰 장착 장비</div>
+        <div class="panel-label">장착 장비</div>
         <div class="equip-grid" id="mob-equip-grid"></div>
       </div>
       <div class="panel-box">
@@ -154,19 +177,19 @@
   <div class="bottom-tabs">
     <div class="bottom-tabs-inner">
       <div class="btab active" id="bt-home" onclick="switchMobTab('home',this)">
-        <div class="btab-icon">🏠</div><div class="btab-label">홈</div>
+        <div class="btab-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></div><div class="btab-label">홈</div>
       </div>
       <div class="btab" id="bt-char" onclick="switchMobTab('char',this)">
-        <div class="btab-icon">⚔️</div><div class="btab-label">캐릭터</div>
+        <div class="btab-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-1.5A5.5 5.5 0 0 1 10.5 14h3a5.5 5.5 0 0 1 5.5 5.5V21"/></svg></div><div class="btab-label">캐릭터</div>
       </div>
       <div class="btab" id="bt-farm" onclick="switchMobTab('farm',this);openModal('m-farm');renderFarmModal()">
-        <div class="btab-icon">🌾</div><div class="btab-label">농장</div>
+        <div class="btab-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 12c0-4 3-6.5 7-6.5 0 4-3 6.5-7 6.5zM12 15c0-3-2.4-5-5.5-5 0 3 2.4 5 5.5 5z"/></svg></div><div class="btab-label">농장</div>
       </div>
       <div class="btab" id="bt-shop" onclick="switchMobTab('shop',this);openModal('m-shop');renderShop()">
-        <div class="btab-icon">🏪</div><div class="btab-label">상점</div>
+        <div class="btab-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5h16v.5a2.7 2.7 0 0 1-5.3 0 2.7 2.7 0 0 1-5.4 0A2.7 2.7 0 0 1 4 10z"/><path d="M5.5 12.5V20h13v-7.5M10 20v-4.5h4V20"/></svg></div><div class="btab-label">상점</div>
       </div>
       <div class="btab" id="bt-inv" onclick="switchMobTab('inv',this);openModal('m-inv');renderInv()">
-        <div class="btab-icon">🎒</div><div class="btab-label">가방</div>
+        <div class="btab-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z"/><path d="M9 8.5V6a3 3 0 0 1 6 0v2.5M9 14h6"/></svg></div><div class="btab-label">가방</div>
       </div>
     </div>
   </div>
@@ -175,13 +198,13 @@
 <!-- ════ 모달들 ════ -->
 <div class="overlay" id="m-quest"><div class="modal large-modal">
   <div class="lm-header">
-    <div class="modal-title">📋 활동 · 퀘스트</div>
+    <div class="modal-title">활동 · 퀘스트</div>
     <button class="modal-close" onclick="closeModal('m-quest')">✕</button>
   </div>
   <div class="lm-tabs">
     <div class="modal-tabs" style="margin-bottom:0">
-      <button class="mtab on" onclick="questTab('board',this)">📌 퀘스트 게시판</button>
-      <button class="mtab"    onclick="questTab('rewards',this)">🎁 내 보상</button>
+      <button class="mtab on" onclick="questTab('board',this)">퀘스트 게시판</button>
+      <button class="mtab"    onclick="questTab('rewards',this)">내 보상</button>
     </div>
   </div>
   <div class="lm-body">
@@ -198,20 +221,20 @@
 
 <div class="overlay" id="m-shop"><div class="modal large-modal">
   <div class="lm-header">
-    <div class="modal-title">🏪 상점</div>
+    <div class="modal-title">상점</div>
     <button class="modal-close" onclick="closeModal('m-shop')">✕</button>
   </div>
   <div class="lm-tabs">
     <div style="font-size:.8rem;color:var(--gold);margin-bottom:.4rem">💰 보유 골드: <strong id="shop-gold-disp">0</strong>G</div>
     <div class="modal-tabs" style="margin-bottom:0">
-      <button class="mtab on" onclick="shopTab('head',this)">🪖 머리</button>
-      <button class="mtab" onclick="shopTab('body',this)">🥋 옷</button>
-      <button class="mtab" onclick="shopTab('weapon',this)">⚔️ 무기</button>
-      <button class="mtab" onclick="shopTab('glove',this)">🧤 장갑</button>
-      <button class="mtab" onclick="shopTab('shoe',this)">👟 신발</button>
-      <button class="mtab" onclick="shopTab('skill',this)">📚 마스터리북</button>
-      <button class="mtab" onclick="shopTab('seed',this)">🌱 씨앗</button>
-      <button class="mtab" onclick="shopTab('deco',this)">🌸 장식</button>
+      <button class="mtab on" onclick="shopTab('head',this)">머리</button>
+      <button class="mtab" onclick="shopTab('body',this)">옷</button>
+      <button class="mtab" onclick="shopTab('weapon',this)">무기</button>
+      <button class="mtab" onclick="shopTab('glove',this)">장갑</button>
+      <button class="mtab" onclick="shopTab('shoe',this)">신발</button>
+      <button class="mtab" onclick="shopTab('skill',this)">마스터리북</button>
+      <button class="mtab" onclick="shopTab('seed',this)">씨앗</button>
+      <button class="mtab" onclick="shopTab('deco',this)">장식</button>
     </div>
   </div>
   <div class="lm-body">
@@ -222,7 +245,7 @@
 <div class="overlay" id="m-monster"><div class="modal large-modal" style="height:auto;max-height:92vh">
   <div class="lm-header">
     <div style="display:flex;align-items:center;gap:.6rem">
-      <div class="modal-title" id="monster-modal-title">⚔️ 사냥터</div>
+      <div class="modal-title" id="monster-modal-title">사냥터</div>
       <div style="display:flex;gap:.3rem">
         <button id="mon-tab-normal" onclick="setMonsterTab('normal')"
           style="font-size:.7rem;padding:.2rem .55rem;border-radius:12px;cursor:pointer;
@@ -231,7 +254,7 @@
         <button id="mon-tab-infinite" onclick="setMonsterTab('infinite')"
           style="font-size:.7rem;padding:.2rem .55rem;border-radius:12px;cursor:pointer;
             border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
-            color:var(--txt3);font-family:inherit">♾️ 무한배틀</button>
+            color:var(--txt3);font-family:inherit">무한배틀</button>
       </div>
     </div>
     <button class="modal-close" onclick="closeModal('m-monster')">✕</button>
@@ -241,13 +264,12 @@
   </div>
 </div></div>
 
-<div class="overlay" id="m-battle"><div class="modal battle-modal" style="position:relative">
-  <!-- 배틀 헤더 -->
+<div class="overlay" id="m-battle"><div class="modal battle-modal bv2" style="position:relative">
+  <!-- 배틀 위 띠 [BATTLE-V2] 사냥터 · 남은 도전 · 나가기 -->
   <div class="bat-header">
-    <div class="bat-header-deco">— ⚔️ —</div>
-    <div class="bat-title" id="battle-title">전투!</div>
+    <div class="bat-title" id="battle-title">사냥터</div>
     <div class="bat-sub" id="battle-sub"></div>
-    <button class="modal-close bat-close" onclick="requestCloseBattle()">✕</button>
+    <button class="modal-close bat-close" onclick="requestCloseBattle()">나가기</button>
   </div>
   <!-- 전투 무대 -->
   <div class="battle-arena" id="battle-arena"></div>
@@ -255,10 +277,10 @@
 
 <div class="overlay" id="m-farm"><div class="modal" style="width:min(480px,96vw)">
   <div class="modal-hd">
-    <div class="modal-title">🌾 내 농장</div>
+    <div class="modal-title">내 농장</div>
     <button class="modal-close" onclick="closeModal('m-farm')">✕</button>
   </div>
-  <div style="font-size:.72rem;color:var(--txt2);margin-bottom:.4rem">빈 칸 클릭 → 씨앗 심기 / 익은 작물 → 수확</div>
+  <div style="font-size:.72rem;color:var(--txt2);margin-bottom:.4rem">빈 칸을 누르면 씨앗을 심고, 다 자란 작물을 누르면 거둬요</div>
   <div style="font-size:.72rem;color:var(--txt2);margin-bottom:.3rem">🌱 심을 씨앗:</div>
   <div class="farm-seed-list" id="farm-seed-select"></div>
   <div style="margin-top:.5rem" id="farm-grid-wrap"></div>
@@ -266,20 +288,20 @@
 </div></div>
 
 <div class="overlay" id="m-house"><div class="modal">
-  <div class="modal-hd"><div class="modal-title">🏠 내 집 · 내 기록</div><button class="modal-close" onclick="closeModal('m-house')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">내 집 · 내 기록</div><button class="modal-close" onclick="closeModal('m-house')">✕</button></div>
   <div class="modal-tabs">
-    <button class="mtab on" onclick="houseTab('stats',this)">📊 기록</button>
-    <button class="mtab"    onclick="houseTab('weekly',this)">📅 주간 다짐</button>
-    <button class="mtab"    onclick="houseTab('book',this)">📚 독서</button>
-    <button class="mtab"    onclick="houseTab('deco',this)">🌸 꾸미기</button>
-    <button class="mtab"    onclick="houseTab('artwork',this)">🖼️ 작품</button>
-    <button class="mtab"    onclick="houseTab('memory',this)">📸 추억</button>
-    <button class="mtab"    onclick="houseTab('emotion',this)">💭 감정</button>
-    <button class="mtab"    id="house-tab-ach-btn" onclick="houseTab('ach',this)">🏅 업적</button>
+    <button class="mtab on" onclick="houseTab('stats',this)">기록</button>
+    <button class="mtab"    onclick="houseTab('weekly',this)">주간 다짐</button>
+    <button class="mtab"    onclick="houseTab('book',this)">독서</button>
+    <button class="mtab"    onclick="houseTab('deco',this)">꾸미기</button>
+    <button class="mtab"    onclick="houseTab('artwork',this)">작품</button>
+    <button class="mtab"    onclick="houseTab('memory',this)">추억</button>
+    <button class="mtab"    onclick="houseTab('emotion',this)">감정</button>
+    <button class="mtab"    id="house-tab-ach-btn" onclick="houseTab('ach',this)">업적</button>
     <button class="mtab"    id="house-tab-recorder-btn"
       onclick="toast('🎵 리코더 기록장은 곧 열릴 예정이에요')"
       style="opacity:.5;position:relative">
-      🎵 리코더
+      리코더
       <span style="position:absolute;top:-4px;right:-2px;font-size:.5rem;font-weight:800;
         background:#e67e22;color:#fff;border-radius:6px;padding:.05rem .3rem;line-height:1.4">
         예정</span>
@@ -615,12 +637,12 @@
 </div>
 
 <div class="overlay" id="m-inv"><div class="modal">
-  <div class="modal-hd"><div class="modal-title">🎒 가방</div><button class="modal-close" onclick="closeModal('m-inv')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">가방</div><button class="modal-close" onclick="closeModal('m-inv')">✕</button></div>
   <div class="modal-tabs">
-    <button class="mtab on" onclick="invTab('equip',this)">⚔️ 장비</button>
-    <button class="mtab" onclick="invTab('skill',this)">📖 스킬</button>
-    <button class="mtab" onclick="invTab('seed',this)">🌱 씨앗</button>
-    <button class="mtab" onclick="invTab('deco',this)">🌸 장식</button>
+    <button class="mtab on" onclick="invTab('equip',this)">장비</button>
+    <button class="mtab" onclick="invTab('skill',this)">스킬</button>
+    <button class="mtab" onclick="invTab('seed',this)">씨앗</button>
+    <button class="mtab" onclick="invTab('deco',this)">장식</button>
   </div>
   <div id="inv-slots" style="margin-top:.8rem"></div>
 </div></div>
@@ -628,29 +650,29 @@
 <!-- 승급 모달 -->
 <!-- 내 쪽지 (NOTES-1) -->
 <div class="overlay" id="m-note"><div class="modal" style="max-width:460px">
-  <div class="modal-hd"><div class="modal-title">📝 내 쪽지</div><button class="modal-close" onclick="closeModal('m-note')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">내 쪽지</div><button class="modal-close" onclick="closeModal('m-note')">✕</button></div>
   <div id="note-body" style="padding:.5rem 0"></div>
 </div></div>
 
 <!-- 내 보상 (REWARD-LIST-1) — 대기 배너·승인 배너에서 연다 -->
 <div class="overlay" id="m-reward"><div class="modal" style="max-width:460px">
-  <div class="modal-hd"><div class="modal-title">🎁 내 보상</div><button class="modal-close" onclick="closeModal('m-reward')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">내 보상</div><button class="modal-close" onclick="closeModal('m-reward')">✕</button></div>
   <div id="reward-list-body" style="padding:.5rem 0"></div>
 </div></div>
 
 <div class="overlay" id="m-promo"><div class="modal" style="max-width:400px">
-  <div class="modal-hd"><div class="modal-title">⬆️ 승급 신청</div><button class="modal-close" onclick="closeModal('m-promo')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">승급 신청</div><button class="modal-close" onclick="closeModal('m-promo')">✕</button></div>
   <div class="promo-modal-inner" id="promo-body"></div>
 </div></div>
 
 <!-- 업적 -->
 <div class="overlay" id="m-rank"><div class="modal">
-  <div class="modal-hd"><div class="modal-title">🏆 우리반 랭킹</div><button class="modal-close" onclick="closeModal('m-rank')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">우리반 랭킹</div><button class="modal-close" onclick="closeModal('m-rank')">✕</button></div>
   <div id="rank-modal-body" style="padding:.5rem 0"></div>
 </div></div>
 
 <div class="overlay" id="m-ach"><div class="modal">
-  <div class="modal-hd"><div class="modal-title">🏅 업적</div><button class="modal-close" onclick="closeModal('m-ach')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">업적</div><button class="modal-close" onclick="closeModal('m-ach')">✕</button></div>
   <div id="ach-list"></div>
 </div></div>
 
@@ -658,7 +680,7 @@
 <div class="overlay" id="m-study" style="align-items:center">
   <div class="modal">
     <div class="modal-hd">
-      <div class="modal-title" id="study-title">📚 오늘의 학습</div>
+      <div class="modal-title" id="study-title">오늘의 학습</div>
       <button class="modal-close" onclick="closeStudyModal()">✕</button>
     </div>
     <div id="study-body" style="padding:.5rem 0;min-height:200px"></div>
@@ -669,7 +691,7 @@
 <div class="overlay" id="m-weekly" style="align-items:center">
   <div class="modal" style="max-width:480px;max-height:85vh">
     <div class="modal-hd">
-      <div class="modal-title" id="weekly-modal-title">📅 주간 다짐</div>
+      <div class="modal-title" id="weekly-modal-title">주간 다짐</div>
       <button class="modal-close" onclick="closeModal('m-weekly')">✕</button>
     </div>
     <div id="weekly-modal-body" style="padding:.5rem 0;overflow-y:auto;max-height:calc(85vh - 60px)"></div>
@@ -854,7 +876,7 @@
 
 <!-- 보스 -->
 <div class="overlay" id="m-boss"><div class="modal" style="max-width:440px">
-  <div class="modal-hd"><div class="modal-title">🔥 금요일 보스!</div><button class="modal-close" onclick="closeModal('m-boss')">✕</button></div>
+  <div class="modal-hd"><div class="modal-title">금요일 보스</div><button class="modal-close" onclick="closeModal('m-boss')">✕</button></div>
   <div class="battle-arena" id="boss-arena"></div>
 </div></div>
 
@@ -869,7 +891,7 @@
 <!-- 감정 돌아보기 팝업 -->
 <div class="overlay" id="m-reflection"><div class="modal" style="max-width:420px">
   <div class="modal-hd">
-    <div class="modal-title">💭 잠깐, 돌아볼까요?</div>
+    <div class="modal-title">잠깐, 돌아볼까요?</div>
     <button class="modal-close" onclick="dismissReflection()">✕</button>
   </div>
   <!-- step1: 질문 + 기본 선택지 -->
@@ -907,7 +929,7 @@
 <!-- 감정 입력 모달 -->
 <div class="overlay" id="m-emotion"><div class="modal" style="max-width:480px">
   <div class="modal-hd">
-    <div class="modal-title" id="emotion-modal-title">💭 오늘의 감정</div>
+    <div class="modal-title" id="emotion-modal-title">오늘의 감정</div>
     <button class="modal-close" onclick="closeModal('m-emotion')">✕</button>
   </div>
   <!-- step1: 감정 선택 -->
@@ -943,7 +965,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20260924mh0"></script>
+<script src="./student.js?v=20261003pt1"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

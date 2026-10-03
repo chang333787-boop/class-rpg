@@ -142,13 +142,46 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages'];
-const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
-  rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황', villages:'🏘️ 우리 마을',
-  memories:'📸 추억 관리',
-  recorder:'🎵 리코더 관리',
-  weekly:'📅 주간 다짐', study:'📚 학습 범위',
-  monsters:'⚔️ 몬스터',settings:'⚙️ 설정',promotion:'⬆️ 승급 관리',pwreset:'🔑 비번 초기화',activity:'📅 활동 내역', stats:'📊 능력치 내역', emotion:'💭 감정 현황', emotionalerts:'🔔 감정 대화 요청'};
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard'];
+const titles = {thinkboard:'생각판',dashboard:'대시보드',students:'학생 목록',approve:'활동 승인',
+  rank:'랭킹',quests:'퀘스트 관리',reward:'보상 지급',artwork:'작품 관리', books:'독서 현황', villages:'우리 마을',
+  memories:'추억 관리',
+  recorder:'리코더 관리',
+  weekly:'주간 다짐', study:'학습 범위',
+  monsters:'몬스터',settings:'설정',promotion:'승급 관리',pwreset:'비번 초기화',activity:'활동 내역', stats:'능력치 내역', emotion:'감정 현황', emotionalerts:'감정 대화 요청'};
+
+// [DESLOP-3] 왼쪽 메뉴 그림 — 이모지 대신 같은 굵기(2) 선 그림 한 벌 · 색은 글자색(admin.html 은 .nav-icon[data-i] 자리만 둔다)
+const NAV_ICONS = {
+  dashboard: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  students: '<path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7.5" r="3.5"/><path d="M22 20v-1.5a4 4 0 0 0-3-3.9M16 4.1a3.5 3.5 0 0 1 0 6.8"/>',
+  approve: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12.5 3 3 5-6"/>',
+  promotion: '<circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8 11l4-4 4 4"/>',
+  rank: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  activity: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',
+  emotion: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>',
+  emotionalerts: '<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  quests: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+  reward: '<rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8.5h14V12M12 8v12.5M12 8S10.5 3.5 8 4.5 9 8 12 8zM12 8s1.5-4.5 4-3.5S15 8 12 8z"/>',
+  stats: '<path d="M4 20V11M10 20V5M16 20v-7M2.5 20.5h19"/>',
+  artwork: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/>',
+  thinkboard: '<path d="M4 4h16v12H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/>',
+  villages: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  books: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5zM4 19.5A1.5 1.5 0 0 0 5.5 21H20"/>',
+  memories: '<path d="M4 7.5h3l1.8-2.5h6.4L17 7.5h3a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
+  weekly: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M9 15l2 2 4-4"/>',
+  study: '<path d="M2.5 5.5h6A3.5 3.5 0 0 1 12 9v11a2.5 2.5 0 0 0-2.5-2.5h-7zM21.5 5.5h-6A3.5 3.5 0 0 0 12 9v11a2.5 2.5 0 0 1 2.5-2.5h7z"/>',
+  recorder: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  monsters: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>',
+  pwreset: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'
+};
+function fillNavIcons() {
+  document.querySelectorAll('.nav-icon[data-i]').forEach(el => {
+    const d = NAV_ICONS[el.getAttribute('data-i')];
+    if (d) el.innerHTML = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  });
+}
+fillNavIcons();
 
 // ══ [NARROW-1] 좁은 화면 메뉴 서랍 ════════════════════════════
 //  768px 이하에서만 의미가 있다. 넓은 화면에서는 햄버거 버튼이 CSS 로 숨겨져 있어
@@ -195,6 +228,7 @@ function nav(page, el) {
   document.getElementById('topbar-title').textContent = titles[page] || page;
   // 페이지 전환 시 스크롤 최상단으로
   document.querySelector('.main').scrollTop = 0;
+  if (page === 'thinkboard') openThinkboardInline();   // [THINKBOARD-2] 관리 화면 안에서
   if (page === 'reward')   populateRewardStudents();
   if (page === 'artwork')  { renderArtworkPending(); renderArtworkAdmin(); }
   if (page === 'books')    renderBooksPage();
@@ -4575,7 +4609,7 @@ function updateBattleSettingsSummary() {
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">👻 유령배율: <strong>${ghost}</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">속성유리: <strong>×${adv}</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">속성불리: <strong>×${dis}</strong></span>
-    <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">노말계수: <strong>${nmStr}</strong></span>
+    <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">기본 공격 계수: <strong>${nmStr}</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">도감첫처치: <strong>${dr.firstKillEnabled?`ON(${dr.firstKillGold}G)`:'OFF'}</strong></span>
     <span style="font-size:.7rem;color:var(--txt3);align-self:center">${modified}</span>`;
 }
@@ -5656,6 +5690,9 @@ async function saveBackup(auto) {
   BACKUP_NODES.forEach(k => {
     if (db[k] !== undefined && db[k] !== null) snapshot[k] = db[k];
   });
+  // [THINKBOARD-2] 생각판(classRPG_thinkboard)도 같은 날짜 백업에 담는다 — 연구 자료가 RPG 기록과 함께 남게.
+  //   되돌리기(롤백)는 BACKUP_NODES 만 되살린다 — 생각판은 백업에서 꺼내 볼 수만 있다(수업 중 판이 갑자기 되감기지 않게).
+  try { const tb = await firebase.database().ref('classRPG_thinkboard').once('value'); if (tb.exists()) snapshot.thinkboard = tb.val(); } catch (e) { console.warn('생각판 백업 건너뜀', e); }
   await backupsRef().child(dateKey).set(snapshot);
 
   // 보관기간 초과분 자동 삭제 (새 위치만 — 옛 위치는 건드리지 않는다)
@@ -5783,7 +5820,7 @@ async function cleanupDerivedNodes() {
 
   if (!confirm(
     `중복 저장된 옛 퀘스트 목록 ${cnt}건(약 ${kb}KB)을 지울까요?\n\n` +
-    `· 이 데이터는 활동 기록(questLogs)에서 매번 자동으로 다시 만들어집니다\n` +
+    `· 이 데이터는 활동 기록에서 매번 자동으로 다시 만들어집니다\n` +
     `· 지워도 기록·통계·완료 판정에 영향이 없습니다\n` +
     `· 접속할 때마다 오가던 데이터가 그만큼 줄어듭니다`)) return;
 
@@ -6120,4 +6157,20 @@ function setAllStudyUnits(on) {
   _saveActiveUnits(all);
   renderStudyScopePage();
   notify('전체 단원을 켰어요');
+}
+
+// [THINKBOARD-1·2] 생각판 선생님 화면 — 관리 화면 안(쪽)에서 연다. 관리 화면에 로그인했으니 비밀번호를 다시 묻지 않게
+//   이 기기에 12시간 '선생님' 표시를 남긴다(TV 처럼 새 탭으로 연 화면도 통과). 학생은 자기 크롬북이라 이 표시가 없다.
+function _tbTeacherMark() {
+  try { sessionStorage.setItem('tb.teacher', '1'); localStorage.setItem('tb.teacherUntil', String(Date.now() + 12 * 3600 * 1000)); } catch (e) {}
+}
+function openThinkboardInline() {
+  _tbTeacherMark();
+  const f = document.getElementById('tb-frame');
+  if (f && !f.getAttribute('src')) f.setAttribute('src', 'thinkboard/index.html?rpg=1#/t');
+}
+function openThinkboard() {   // 새 탭(TV 등)
+  _tbTeacherMark();
+  const w = window.open('thinkboard/index.html?rpg=1#/t', '_blank');
+  if (!w) location.href = 'thinkboard/index.html?rpg=1#/t';
 }
