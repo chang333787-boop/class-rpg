@@ -1,0 +1,62 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1366px;height:610px;background:#0f0b08;font-family:'Noto Sans KR',sans-serif;color:#fff;overflow:hidden;word-break:keep-all}
+.wrap{position:absolute;left:93px;top:8px;width:1180px;height:594px;border-radius:14px;overflow:hidden;background:#1a130d}
+.top{position:absolute;left:0;right:0;top:0;height:40px;display:flex;align-items:center;padding:0 16px;gap:10px;font-size:14px;color:#cdbfa6;z-index:9;background:linear-gradient(#0f0b08cc,transparent)}
+.top b{color:#fff}.top .x{margin-left:auto;color:#cdbfa6}
+.stage{position:absolute;left:0;right:0;top:0;height:470px;overflow:hidden;background:linear-gradient(#a8d7ec 0%,#d6eedf 46%,#c3e0a6 47%)}
+.ground{position:absolute;left:-20%;right:-20%;bottom:-40%;height:120%;background:#86bf68 url(../assets/floor/grass_patch_light.svg) 0 0/220px;transform:perspective(520px) rotateX(58deg);transform-origin:50% 100%;
+  box-shadow:inset 0 80px 120px rgba(255,255,255,.18)}
+.ground::after{content:"";position:absolute;inset:0;background:url(../assets/floor/grass_patch_dark.svg) 60px 40px/300px;opacity:.45}
+.far{position:absolute;bottom:262px;height:90px;filter:saturate(.55) brightness(1.12);opacity:.75}
+.prop{position:absolute}
+.mon{position:absolute;right:205px;bottom:150px;width:250px;filter:drop-shadow(0 10px 10px rgba(30,40,10,.25))}
+.mon-sh{position:absolute;right:225px;bottom:140px;width:210px;height:34px;border-radius:50%;background:radial-gradient(rgba(40,60,20,.35),transparent 70%)}
+.me{position:absolute;left:190px;bottom:22px;width:205px;filter:drop-shadow(0 10px 10px rgba(30,40,10,.3))}
+.me-sh{position:absolute;left:205px;bottom:12px;width:180px;height:30px;border-radius:50%;background:radial-gradient(rgba(40,60,20,.4),transparent 70%)}
+.tag{position:absolute;text-shadow:0 2px 0 #3b2a14,0 0 6px rgba(0,0,0,.45)}
+.tag .nm{font-family:'Black Han Sans';font-size:26px;letter-spacing:.5px}
+.tag .lv{font-size:13px;font-weight:700;margin-left:6px;opacity:.9}
+.hp{margin-top:5px;width:230px;height:12px;border-radius:7px;background:rgba(40,25,15,.55);box-shadow:0 0 0 2px rgba(40,25,15,.55)}
+.hp i{display:block;height:100%;border-radius:7px;background:#7be06a;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.hp.foe i{background:#ff7a5c}
+.num{font-size:13px;font-weight:700;margin-top:3px;opacity:.95}
+.arrow{position:absolute;left:278px;top:212px;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:14px solid #ffd35a;filter:drop-shadow(0 2px 0 #6a4a10)}
+.say{position:absolute;left:0;right:0;top:50px;text-align:center;font-weight:900;font-size:21px;text-shadow:0 2px 0 #2f3b18,0 0 10px rgba(0,0,0,.35)}
+.cmd{position:absolute;left:0;right:0;bottom:0;height:124px;background:#22180f;display:flex;gap:12px;padding:16px 18px;align-items:stretch}
+.b{flex:1;border-radius:16px;padding:10px 16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;box-shadow:inset 0 -6px 0 rgba(0,0,0,.25);color:#fff}
+.b .n{font-family:'Black Han Sans';font-size:40px;line-height:1}
+.b .l{font-weight:900;font-size:16px}
+.b .h{position:absolute;right:14px;top:12px;font-size:13px;font-weight:700;opacity:.9}
+.b.nrm{background:#e0a93a;color:#2a1704}.b.fir{background:#e9603e}.b.wat{background:#3d8fd6}.b.off{background:#3a2e24;color:#8d8170}
+.b.nrm::before{content:"가장 센 한 방";position:absolute;left:14px;top:-11px;font-size:12px;font-weight:900;background:#2a1704;color:#ffd35a;padding:2px 9px;border-radius:6px}
+.sk{width:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-radius:16px;background:#3a2c20;box-shadow:inset 0 -5px 0 rgba(0,0,0,.25);font-size:13px;font-weight:700;color:#e9dcc6}
+.sk svg{width:28px;height:28px}
+</style></head><body><div class="wrap">
+<div class="top"><b>초급 사냥터</b> · 오늘 남은 도전 2번<span class="x">나가기</span></div>
+<div class="stage">
+  <div class="ground"></div>
+  <img class="far" src="../assets/deco/d_y46.svg" style="left:640px"><img class="far" src="../assets/deco/d_y47.svg" style="left:710px;height:80px"><img class="far" src="../assets/deco/d_y46.svg" style="left:1010px;height:100px"><img class="far" src="../assets/deco/d_y9.svg" style="left:90px;height:70px">
+  <img class="prop" src="../assets/deco/d_y19.svg" style="left:-70px;bottom:120px;height:330px">
+  <img class="prop" src="../assets/deco/d_y26.svg" style="left:520px;bottom:200px;height:62px">
+  <img class="prop" src="../assets/deco/d_y15.svg" style="right:90px;bottom:170px;height:70px">
+  <div class="mon-sh"></div><img class="mon" src="../assets/monsters/m1.png">
+  <img class="prop" src="../assets/deco/d_y45.svg" style="right:-10px;bottom:-10px;height:150px">
+  <img class="prop" src="../assets/deco/d_y29.svg" style="left:430px;bottom:-14px;height:120px">
+  <div class="me-sh"></div><img class="me" src="../assets/char/base_1.svg">
+  <div class="say">슬라임이 풀숲에서 튀어나왔어요!</div>
+  <div class="tag" style="right:215px;top:118px"><span class="nm">슬라임</span><span class="lv">Lv.1 · 풀</span><div class="hp foe"><i style="width:100%"></i></div><div class="num">34 / 34</div></div>
+  <div class="arrow"></div>
+  <div class="tag" style="left:186px;top:232px;display:none"></div>
+  <div class="tag" style="left:420px;bottom:30px"><span class="nm">시험</span><span class="lv">Lv.12</span><div class="hp"><i style="width:94%"></i></div><div class="num">210 / 224</div></div>
+</div>
+<div class="cmd">
+  <div class="b nrm"><span class="h">공격력으로</span><span class="n">17</span><span class="l">일반 공격</span></div>
+  <div class="b fir"><span class="h">상성 좋음</span><span class="n">13</span><span class="l">불 공격</span></div>
+  <div class="b wat"><span class="h">상성 나쁨</span><span class="n">7</span><span class="l">물 공격</span></div>
+  <div class="b off"><span class="h">마스터리북 필요</span><span class="n">—</span><span class="l">풀 공격</span></div>
+  <div class="sk"><svg viewBox="0 0 24 24" fill="none" stroke="#9fe8a8" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>회복</div>
+  <div class="sk"><svg viewBox="0 0 24 24" fill="none" stroke="#9fd6ff" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/></svg>막기</div>
+</div></div></body></html>
