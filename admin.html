@@ -12,7 +12,7 @@
 <script src="./gamedata.js?v=20261003ds2"></script>
 <script src="./curriculum.js?v=20260915stn"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./admin.css?v=20260915d3e">
+<link rel="stylesheet" href="./admin.css?v=20261003ds3">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:99998;background:var(--bg);
@@ -53,35 +53,35 @@
   <!-- ════ SIDEBAR ════ -->
   <div class="sidebar" id="admin-sidebar">
     <div class="sidebar-logo">
-      <div class="logo-title">🏫 우리반 성장 RPG</div>
+      <div class="logo-title">우리반 성장 RPG</div>
       <div class="logo-sub">교사 관리자 페이지</div>
     </div>
     <div class="nav-section">대시보드</div>
-    <div class="nav-item active" id="nav-dashboard" onclick="nav('dashboard',this)"><span class="nav-icon">📊</span> 대시보드</div>
+    <div class="nav-item active" id="nav-dashboard" onclick="nav('dashboard',this)"><span class="nav-icon" data-i="dashboard"></span> 대시보드</div>
     <div class="nav-section">학생 관리</div>
-    <div class="nav-item" id="nav-students" onclick="nav('students',this)"><span class="nav-icon">👥</span> 학생 목록</div>
-    <div class="nav-item" id="nav-approve" onclick="nav('approve',this)"><span class="nav-icon">✅</span> 활동 승인 <span id="pending-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
-    <div class="nav-item" id="nav-promo" onclick="nav('promotion',this)"><span class="nav-icon">⬆️</span> 승급 관리 <span id="promo-badge" style="margin-left:auto;background:var(--purple);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
-    <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon">🏆</span> 랭킹</div>
-    <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon">📅</span> 활동 내역</div>
-    <div class="nav-item" onclick="nav('emotion',this)"><span class="nav-icon">💭</span> 감정 현황</div>
-    <div class="nav-item" onclick="nav('emotionalerts',this)"><span class="nav-icon">🔔</span> 감정 대화 요청 <span id="emotion-alert-badge" style="margin-left:auto;background:var(--sky);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" id="nav-students" onclick="nav('students',this)"><span class="nav-icon" data-i="students"></span> 학생 목록</div>
+    <div class="nav-item" id="nav-approve" onclick="nav('approve',this)"><span class="nav-icon" data-i="approve"></span> 활동 승인 <span id="pending-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" id="nav-promo" onclick="nav('promotion',this)"><span class="nav-icon" data-i="promotion"></span> 승급 관리 <span id="promo-badge" style="margin-left:auto;background:var(--purple);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon" data-i="rank"></span> 랭킹</div>
+    <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon" data-i="activity"></span> 활동 내역</div>
+    <div class="nav-item" onclick="nav('emotion',this)"><span class="nav-icon" data-i="emotion"></span> 감정 현황</div>
+    <div class="nav-item" onclick="nav('emotionalerts',this)"><span class="nav-icon" data-i="emotionalerts"></span> 감정 대화 요청 <span id="emotion-alert-badge" style="margin-left:auto;background:var(--sky);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-section">콘텐츠</div>
-    <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon">📋</span> 퀘스트 관리</div>
-    <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
-    <div class="nav-item" onclick="nav('stats',this)"><span class="nav-icon">📊</span> 활동능력치 관리</div>
-    <div class="nav-item" onclick="nav('artwork',this)"><span class="nav-icon">🖼️</span> 작품 관리</div>
-    <div class="nav-item" onclick="nav('thinkboard',this)"><span class="nav-icon">🧠</span> 생각판</div>
-    <div class="nav-item" onclick="nav('villages',this)"><span class="nav-icon">🏘️</span> 우리 마을</div>
-    <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon">📚</span> 독서 현황</div>
-    <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon">📸</span> 추억 관리</div>
-    <div class="nav-item" onclick="nav('weekly',this)"><span class="nav-icon">📅</span> 주간 다짐</div>
-    <div class="nav-item" onclick="nav('study',this)"><span class="nav-icon">📚</span> 학습 범위</div>
-    <div class="nav-item" onclick="nav('recorder',this)"><span class="nav-icon">🎵</span> 리코더 관리</div>
-    <div class="nav-item" onclick="nav('monsters',this)"><span class="nav-icon">⚔️</span> 몬스터 관리</div>
+    <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon" data-i="quests"></span> 퀘스트 관리</div>
+    <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon" data-i="reward"></span> 보상 지급</div>
+    <div class="nav-item" onclick="nav('stats',this)"><span class="nav-icon" data-i="stats"></span> 활동능력치 관리</div>
+    <div class="nav-item" onclick="nav('artwork',this)"><span class="nav-icon" data-i="artwork"></span> 작품 관리</div>
+    <div class="nav-item" onclick="nav('thinkboard',this)"><span class="nav-icon" data-i="thinkboard"></span> 생각판</div>
+    <div class="nav-item" onclick="nav('villages',this)"><span class="nav-icon" data-i="villages"></span> 우리 마을</div>
+    <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon" data-i="books"></span> 독서 현황</div>
+    <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon" data-i="memories"></span> 추억 관리</div>
+    <div class="nav-item" onclick="nav('weekly',this)"><span class="nav-icon" data-i="weekly"></span> 주간 다짐</div>
+    <div class="nav-item" onclick="nav('study',this)"><span class="nav-icon" data-i="study"></span> 학습 범위</div>
+    <div class="nav-item" onclick="nav('recorder',this)"><span class="nav-icon" data-i="recorder"></span> 리코더 관리</div>
+    <div class="nav-item" onclick="nav('monsters',this)"><span class="nav-icon" data-i="monsters"></span> 몬스터 관리</div>
     <div class="nav-section">시스템</div>
-    <div class="nav-item" id="nav-pwreset" onclick="nav('pwreset',this)"><span class="nav-icon">🔑</span> 비번 초기화 <span id="pwreset-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
-    <div class="nav-item" onclick="nav('settings',this)"><span class="nav-icon">⚙️</span> 게임 설정</div>
+    <div class="nav-item" id="nav-pwreset" onclick="nav('pwreset',this)"><span class="nav-icon" data-i="pwreset"></span> 비번 초기화 <span id="pwreset-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" onclick="nav('settings',this)"><span class="nav-icon" data-i="settings"></span> 게임 설정</div>
     <div class="sidebar-bottom">
       <div class="sidebar-student-count" id="sb-count">학생 수: -명</div>
       <a href="student.html" style="display:block;margin-top:.5rem;font-size:.75rem;color:var(--txt3);">← 학생 화면으로</a>
@@ -1592,6 +1592,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20261003ds2"></script>
+<script src="./admin.js?v=20261003ds3"></script>
 </body>
 </html>
