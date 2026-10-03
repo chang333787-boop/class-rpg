@@ -1,0 +1,58 @@
+// 기초 코딩 판 시험 — 정답이 정말 풀리나 · 블록 수 · 몬스터가 아는 명령만 썼나 · 고치기 판의 처음 코드는 정말 틀렸나 · 붓 그림이 판 안에 들어가나
+//  node scripts/unit/coding/stages.test.mjs   (DOM 없음 · 네트워크 없음)
+import { STAGES, HERO_BLOCKS } from '../../../coding/js/stages.js';
+import { parse, countBlocks, runToEnd, T2TYPE } from '../../../coding/js/interp.js';
+import { makeMaze, makePen, compareDrawing } from '../../../coding/js/world.js';
+
+const results = [];
+const test = (name, fn) => { try { const r = fn(); results.push([r === false ? 'FAIL' : 'PASS', name]); } catch (e) { results.push(['FAIL', name, e.message]); } };
+const ok = (c, m) => { if (!c) throw new Error(m); };
+const typesOf = ast => ast.flatMap(n => [T2TYPE[n.t], ...(n.body ? typesOf(n.body) : [])]);
+const penSegs = (s, src) => { const w = makePen({ start: s.start }); const r = runToEnd(parse(src), w); return { r, segs: w.st.segs }; };
+
+for (const s of STAGES) {
+  test(`${s.id} ${s.title} — 정답이 풀린다`, () => {
+    const ast = parse(s.sol);
+    if (s.world === 'maze') {
+      const w = makeMaze(s), r = runToEnd(ast, w);
+      ok(r.ok, `정답 실행 중 멈춤: ${r.why}`);
+      ok(w.result().ok, `정답이 끝났는데 ${w.result().why}`);
+    } else {
+      const { r, segs } = penSegs(s, s.sol);
+      ok(r.ok && segs.length, '정답 그림 없음');
+      const xs = segs.flatMap(g => [g.x1, g.x2]), ys = segs.flatMap(g => [g.y1, g.y2]);
+      ok(Math.min(...xs) >= 10 && Math.max(...xs) <= 390 && Math.min(...ys) >= 10 && Math.max(...ys) <= 390, `그림이 판 밖: x ${Math.min(...xs).toFixed(0)}~${Math.max(...xs).toFixed(0)} y ${Math.min(...ys).toFixed(0)}~${Math.max(...ys).toFixed(0)}`);
+      ok(compareDrawing(segs, segs).ok, '자기 자신과 다름');
+    }
+  });
+  test(`${s.id} 몬스터가 아는 명령만 · 블록 수`, () => {
+    const allowed = new Set(s.blocks), used = typesOf(parse(s.sol));
+    for (const t of used) ok(allowed.has(t), `${t} 는 이 판 블록이 아님`);
+    ok(s.best === countBlocks(parse(s.sol)), 'best 셈');
+    if (s.limit) ok(s.best <= s.limit, `정답 ${s.best} > 한도 ${s.limit}`);
+    if (s.unit === 1) ok(!used.includes('c_repeat'), '1단원 정답에 반복');
+  });
+  if (s.buggy) test(`${s.id} 고치기 판 — 처음 코드는 틀렸다`, () => {
+    if (s.world === 'maze') {
+      const w = makeMaze(s), r = runToEnd(parse(s.buggy), w);
+      ok(!(r.ok && w.result().ok), '처음 코드가 이미 풀림');
+    } else {
+      const target = penSegs(s, s.sol).segs, drawn = penSegs(s, s.buggy).segs;
+      ok(!compareDrawing(target, drawn).ok, '처음 그림이 이미 같음');
+    }
+  });
+}
+// 그림 견주기 — 같은 변을 둘로 나눠 그려도 같다 · 왼쪽으로 돌면(뒤집힌 네모) 다르다
+test('붓: 나눠 그려도 같은 그림', () => {
+  const s = STAGES.find(x => x.id === '2-8');
+  const a = penSegs(s, '4(f100 r90)').segs, b = penSegs(s, '4(f50 f50 r90)').segs, c = penSegs(s, '4(f100 l90)').segs;
+  ok(compareDrawing(a, b).ok, '나눠 그린 네모가 다르다고 함');
+  ok(!compareDrawing(a, c).ok, '뒤집힌 네모가 같다고 함');
+});
+test('끝없는 반복은 멈춘다', () => { const w = makeMaze(STAGES[0]); const r = runToEnd(parse('999(L)'), w, { max: 500 }); ok(!r.ok && r.why === 'loop', String(r.why)); });
+test('단원별 판 수', () => { const n = [1, 2, 3, 4].map(u => STAGES.filter(s => s.unit === u).length); ok(n.join(',') === '10,10,6,8', n.join(',')); });
+
+const fails = results.filter(r => r[0] === 'FAIL');
+for (const r of fails) console.log('FAIL', r[1], r[2] || '');
+console.log(`\n요약: PASS ${results.length - fails.length} · FAIL ${fails.length}`);
+process.exit(fails.length ? 1 : 0);
