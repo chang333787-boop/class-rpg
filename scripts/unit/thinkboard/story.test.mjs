@@ -6,7 +6,8 @@ import { boardOutline, boardToText, storyLines } from '../../../thinkboard/js/ex
 import { withDefaults, LAYOUTS, SEQ_WORDS } from '../../../thinkboard/js/settings.js';
 
 const results = [];
-const test = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message]); } };
+const pending = [];
+const test = (name, fn) => { try { const r = fn(); if (r && r.then) pending.push(r.then(() => results.push(['PASS', name]), e => results.push(['FAIL', name, e.message]))); else results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message]); } };
 const ok = (c, m) => { if (!c) throw new Error(m); };
 const tpl = id => BUILTIN.find(t => t.id === id);
 const run = (b, name, args) => { const r = ops[name](b, { by: '아이', sid: 's1', ...args }); applyPatch(b, r.patch); return r; };
@@ -105,6 +106,22 @@ test('정리본 · AI 글 — 차례 · 갈림길 · 끝 · 재료 · 이름 없
   ok(boardOutline(t).includes('- 주제\n  - 갈래'), '나무 정리본');
 });
 
+// [THINKBOARD-PREVIEW-1] 판 틀 미리보기 — 틀마다 예시 카드가 있고, 아이 눈에 보인다(친구 카드 안 보이는 판 = 내 카드로)
+test('미리보기 예시 — 기본 틀 모두 카드가 있고 메모리에만', async () => {
+  const { sampleBoard, memoryStore } = await import('../../../thinkboard/js/preview.js');
+  for (const t of BUILTIN) {
+    const b = sampleBoard(t), st = withDefaults(b.settings), cards = Object.values(b.cards);
+    ok(cards.length > 0, t.id + ' 카드 없음');
+    if (st.others === false) ok(cards.every(c => c.by === '미리보기'), t.id + ' 내 카드가 아님(아이 화면에서 안 보임)');
+    if (st.limit > 0) ok(cards.filter(c => c.by === '미리보기').length <= st.limit, t.id + ' 한 사람 장수 넘음');
+    if (st.layout === 'pins') ok((st.images || []).length === 2 && cards.every(c => c.pin), t.id + ' 그림 · 핀');
+  }
+  const b = sampleBoard(BUILTIN[0]), m = memoryStore(b); let n = 0; m.subscribe(b.id, () => n++);
+  await m.patch(b.id, ops.addCard(b, { text: '써 봄', x: 0, y: 0, by: '미리보기' }).patch);
+  ok(n === 2 && Object.values(b.cards).some(c => c.text === '써 봄'), '메모리 저장소');
+});
+
+await Promise.all(pending);
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const r of fails) console.log('FAIL', r[1], r[2] || '');
 console.log(`생각판 이야기 줄 · 나무 시험 — PASS ${results.length - fails.length} · FAIL ${fails.length}`);

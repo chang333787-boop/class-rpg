@@ -21,18 +21,25 @@ export function mountTeacher(root, { store, home, roster = [] }) {
   const stopWatch = store.watchAll(() => { clearTimeout(timer); timer = setTimeout(load, 150); });
 
   let pickTpl = null;   // 새 판 만들기에서 고른 틀
+  //  [THINKBOARD-PREVIEW-1] 새 판 만들기 칸은 한 번만 만든다 — 아이들이 카드를 쓸 때마다 목록이 다시 그려져도 미리보기 창이 깜빡이거나 처음으로 돌아가지 않게
+  //  (틀 목록이 바뀔 때만 새로)
+  let shell = null;
   function render(boards) {
     const keepOpen = root.querySelector('details.tpl')?.open;
-    root.innerHTML = '';
-    root.append(h('div', { class: 't-wrap' },
-      h('header', { class: 't-head' }, h('button', { class: 'ibtn', onclick: home, title: '처음으로' }, icon('home')),
-        h('h1', {}, '생각판'), h('span', { class: 'pill' }, '선생님'),
-        store.kind === 'local' ? h('span', { class: 'sub' }, '로컬 시험 — 이 브라우저 안에만 저장돼요') : null,
-        h('span', { class: 'grow' }), h('button', { class: 'btn', onclick: () => research(boards) }, icon('download', 16), '연구 자료 내보내기')),
-      newForm(),
-      h('h2', { class: 't-h2' }, '만든 판', h('span', { class: 'sub' }, boards.length ? ` ${boards.length}개` : '')),
-      h('div', { class: 't-list' }, boards.length ? boards.map(row) : h('div', { class: 'fl-empty' }, '아직 판이 없어요. 위에서 틀을 골라 만들어 보세요.')),
-      tplSection(keepOpen)));
+    const key = tpls.map(t => t.id).join(',');
+    const head = h('header', { class: 't-head' }, h('button', { class: 'ibtn', onclick: home, title: '처음으로' }, icon('home')),
+      h('h1', {}, '생각판'), h('span', { class: 'pill' }, '선생님'),
+      store.kind === 'local' ? h('span', { class: 'sub' }, '로컬 시험 — 이 브라우저 안에만 저장돼요') : null,
+      h('span', { class: 'grow' }), h('button', { class: 'btn', onclick: () => research(boards) }, icon('download', 16), '연구 자료 내보내기'));
+    if (!shell || shell.key !== key || !root.contains(shell.wrap)) {
+      root.innerHTML = '';
+      shell = { key, head, form: newForm(), list: h('div', {}), tpl: h('div', {}) };
+      shell.wrap = h('div', { class: 't-wrap' }, shell.head, shell.form, shell.list, shell.tpl);
+      root.append(shell.wrap);
+    } else { shell.wrap.replaceChild(head, shell.head); shell.head = head; }
+    shell.list.replaceChildren(h('h2', { class: 't-h2' }, '만든 판', h('span', { class: 'sub' }, boards.length ? ` ${boards.length}개` : '')),
+      h('div', { class: 't-list' }, boards.length ? boards.map(row) : h('div', { class: 'fl-empty' }, '아직 판이 없어요. 위에서 틀을 골라 만들어 보세요.')));
+    shell.tpl.replaceChildren(tplSection(keepOpen));
   }
 
   // 틀 한 줄 설명 — 판 모양 · 칸
@@ -45,18 +52,37 @@ export function mountTeacher(root, { store, home, roster = [] }) {
     const HUES = ['#eef3ff', '#fff4e3', '#eaf7ef', '#fdeef3', '#f2eefd', '#eef6f7'];
     const tiles = h('div', { class: 't-tiles' }, tpls.map((t, ti) => h('button', {
       class: 't-tile' + (t.id === pickTpl ? ' on' : ''), type: 'button',
-      onclick: e => { pickTpl = t.id; tiles.querySelectorAll('.t-tile').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); } },
+      onclick: e => { pickTpl = t.id; tiles.querySelectorAll('.t-tile').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); showPreview(); } },
       h('span', { class: 'ti', style: { background: HUES[ti % HUES.length] } }, t.icon || '📋'), h('span', { class: 'tn' }, t.name), h('span', { class: 'td' }, tplDesc(t)))));
+    //  [THINKBOARD-PREVIEW-1] 미리보기 — 고른 틀을 예시 카드로 · 아이 화면 그대로(작게) · 눌러 볼 수 있음(저장 안 됨)
+    const VW = 1100, VH = 640;   // 크롬북 화면 크기쯤(작게 줄여도 글이 덜 작게)
+    const frame = h('iframe', { class: 't-prev-frame', title: '판 미리보기', loading: 'lazy' });
+    const box = h('div', { class: 't-prev-box' }, frame);
+    const cap = h('div', { class: 't-prev-cap' });
+    const fit = () => { const k = Math.min(1, (box.clientWidth || 520) / VW); frame.style.transform = `scale(${k})`; box.style.height = Math.round(VH * k) + 'px'; };
+    const srcOf = t => `index.html?preview=${encodeURIComponent(t.id)}`;
+    function showPreview() {
+      const t = tpls.find(x => x.id === pickTpl);
+      if (!t) return;
+      if (!BUILTIN.includes(t)) { try { sessionStorage.setItem('tb.previewTpl', JSON.stringify(t)); } catch {} }
+      frame.src = srcOf(t) + '&v=' + Date.now().toString(36);   // 같은 틀을 다시 골라도 처음 모습으로
+      const st = withDefaults(t.settings || {});
+      cap.replaceChildren(h('b', {}, `${t.icon || '📋'} ${t.name}`), h('span', { class: 'sub' }, ` — ${LAYOUTS[st.layout] || ''}`),
+        h('span', { class: 'grow' }), h('button', { class: 'btn small', type: 'button', onclick: () => window.open(srcOf(t), '_blank', 'noopener') }, icon('fit', 14), '크게 보기'));
+    }
+    const prev = h('aside', { class: 't-prev' }, cap, box, h('p', { class: 'help' }, '아이들은 이렇게 봐요 — 예시 카드예요. 눌러서 만져 볼 수 있지만 저장되지 않아요.'));
+    new ResizeObserver(fit).observe(box);
+    requestAnimationFrame(() => { fit(); showPreview(); });
     const create = async () => {
       const tpl = tpls.find(t => t.id === pickTpl);
       if (!tpl) return toast('틀을 골라 주세요');
       const name = title.value.trim() || tpl.name;
       const k = +n.value;
       for (let i = 1; i <= k; i++) await store.create(newBoard({ title: k > 1 ? `${name} · ${i}모둠` : name, template: tpl }));
-      toast(`판 ${k}개를 만들었어요`);
+      toast(`판 ${k}개를 만들었어요`); title.value = '';
     };
-    return h('section', { class: 't-new' }, h('h2', { class: 't-h2' }, '새 판 만들기'), tiles,
-      h('div', { class: 't-new-row' }, title, n, h('button', { class: 'btn primary', onclick: create }, icon('plus', 16), '만들기')));
+    return h('section', { class: 't-new' }, h('h2', { class: 't-h2' }, '새 판 만들기'),
+      h('div', { class: 't-new-grid' }, h('div', {}, tiles, h('div', { class: 't-new-row' }, title, n, h('button', { class: 'btn primary', onclick: create }, icon('plus', 16), '만들기'))), prev));
   }
 
   // 작은 메뉴(⋯)
