@@ -1,14 +1,19 @@
 // 판 화면 — 왼쪽 = 몬스터 세계(이야기 · 판 · 실행 단추) · 오른쪽 = 블록 작업판(+ 글 코드)
 //  ▶ 실행 = 끝까지 움직이며 지금 블록을 밝힌다 · 한 걸음씩 = 누를 때마다 블록 하나(디버깅) · ⟲ = 처음 자리로
+//  [CODING-U9] 작은 게임 판 = ▶ 게임 시작 뒤 화살표 키(또는 화면 단추) · 똑딱 시계가 이벤트 묶음을 부른다(game.js)
 import { h, toast, modal, lsGet, lsSet } from './util.js';
-import { HEROES, makeMaze, makePen, compareDrawing, whyText } from './world.js';
-import { parse, countBlocks, runAst, astFromBlock, stateFromAst, runToEnd, defsOf, usesCall } from './interp.js';
-import { makeWorkspace, startOf, pythonOf, setConds } from './blocks.js';
+import { HEROES, makeMaze, makePen, compareDrawing, whyText, josa } from './world.js';
+import { parse, countBlocks, runAst, astFromBlock, stateFromAst, runToEnd, defsOf, usesCall, handlersOf } from './interp.js';
+import { makeWorkspace, startOf, pythonOf, setConds, setKeys, KEY_NAMES } from './blocks.js';
+import { makeGame, KEY_OF, TOK } from './game.js';
 import { drawMaze, drawPen, heroImg } from './draw.js';
 import { UNITS, stagesOf } from './stages.js';
 
 const SPEEDS = [['slow', '천천히', 700], ['normal', '보통', 380], ['fast', '빠르게', 150], ['instant', '바로', 0]];
 const durOf = sp => (SPEEDS.find(s => s[0] === sp) || SPEEDS[1])[2];
+const GAME_T = { slow: [1100, 260], normal: [800, 170], fast: [520, 110], instant: [520, 110] };   // 게임: [똑딱 간격, 한 걸음 움직임] ms
+const ARROW = { up: '↑', down: '↓', left: '←', right: '→' };
+const QUICK = new Set(['loop', 'check', 'var', 'call', 'color', 'pen']);   // 게임에서는 기다리지 않는 마디(반복 · 살피기 · 주머니 · 기술 부르기)
 const starsOf = (n, best) => n <= best ? 3 : n <= best + 2 ? 2 : 1;
 const STAR = n => '★'.repeat(n) + '☆'.repeat(3 - n);
 
@@ -16,21 +21,27 @@ export async function mountPlay(root, ctx, stage) {
   const Bk = globalThis.Blockly;
   const hero = HEROES[stage.hero], unit = UNITS.find(u => u.id === stage.unit);
   const list = stagesOf(stage.unit), idx = list.indexOf(stage), next = list[idx + 1] || null;
+  const isGame = !!stage.game;
+  let game = null, q = [], busy = false, tickT = 0, manual = false;   // [CODING-U9] 게임 — 일 줄(키 · 똑딱) · 지금 묶음이 도는 중 · 똑딱 시계 · 시험용 손 시계
   let speed = lsGet('coding.speed', 'normal'), running = false, gen = null, world = null, view = null, raf = 0, failN = 0, pyOpen = lsGet('coding.py', false), saveT = 0, alive = true;
+  if (isGame && speed === 'instant') speed = 'fast';   // 게임에는 '바로'가 없다
   const target = stage.world === 'pen' ? (() => { const w = makePen({ start: stage.start }); runToEnd(parse(stage.sol), w); return w.st.segs; })() : [];
 
   // ── 화면 ──
   const cv = h('canvas', { class: 'w-cv' }), over = h('div', { class: 'w-over' });
+  //  [CODING-U9] 화면 단추(태블릿 · 마우스) — 게임 중에만 아래 줄에(판을 가리지 않게) · 이 판에서 쓰는 키만
+  const pad = isGame ? h('div', { class: 'pad', hidden: true }, ...['left', 'up', 'down', 'right'].filter(k => (stage.keys || []).includes(k))
+    .map(k => h('button', { class: 'pbtn', title: KEY_NAMES[k], onpointerdown: e => { e.preventDefault(); push('key:' + k); } }, ARROW[k]))) : null;
   const stageWrap = h('div', { class: 'w-stage' }, cv, over);
   const msg = h('div', { class: 'w-msg' });
-  const runBtn = h('button', { class: 'btn primary', onclick: () => run(false) }, '▶ 실행');
+  const runBtn = h('button', { class: 'btn primary', onclick: () => run(false) }, isGame ? '▶ 게임 시작' : '▶ 실행');
   const stepBtn = h('button', { class: 'btn', onclick: () => run(true), title: '블록 하나씩 실행해요(어디서 틀렸는지 찾기)' }, '한 걸음씩');
   const resetBtn = h('button', { class: 'btn', onclick: () => reset() }, '⟲ 처음으로');
-  const speedSel = h('select', { class: 'speed', onchange: e => { speed = e.target.value; lsSet('coding.speed', speed); } },
-    ...SPEEDS.map(([v, t]) => { const o = h('option', { value: v }, t); if (v === speed) o.selected = true; return o; }));
+  const speedSel = h('select', { class: 'speed', title: isGame ? '게임 빠르기(똑딱 간격)' : '움직이는 빠르기', onchange: e => { speed = e.target.value; lsSet('coding.speed', speed); if (tickT) startTick(); } },
+    ...SPEEDS.filter(([v]) => !(isGame && v === 'instant')).map(([v, t]) => { const o = h('option', { value: v }, t); if (v === speed) o.selected = true; return o; }));
   const hintBtn = h('button', { class: 'btn small hint', onclick: () => modal('💡 힌트', stage.hint || '블록을 하나씩 따라가 보세요.') }, '💡 힌트');
   hintBtn.style.display = 'none';
-  const bugBtn = stage.buggy ? h('button', { class: 'btn small', onclick: () => { loadState(stateFromAst(parse(stage.buggy))); toast('처음 코드로 돌렸어요'); } }, '처음 코드로') : null;
+  const bugBtn = stage.buggy ? h('button', { class: 'btn small bugbtn', onclick: () => { loadState(stateFromAst(parse(stage.buggy))); toast('처음 코드로 돌렸어요'); } }, '처음 코드로') : null;
   const countEl = h('span', { class: 'bcount' });
   const pyPre = h('pre', { class: 'py' });
   const pyBtn = h('button', { class: 'btn small' + (pyOpen ? ' on' : ''), onclick: () => { pyOpen = !pyOpen; lsSet('coding.py', pyOpen); pyBtn.classList.toggle('on', pyOpen); pyPre.hidden = !pyOpen; updatePy(); Bk.svgResize(ws); } }, '글 코드');
@@ -43,19 +54,24 @@ export async function mountPlay(root, ctx, stage) {
   const tabs = h('div', { class: 'maptabs' });
   //  [CODING-U7] 실행하는 동안 주머니(변수) · 받는 값이 지금 몇인지
   const varsEl = h('div', { class: 'vars' });
-  function showVars(v) { if (!v || !Object.keys(v).length) { varsEl.replaceChildren(); return; } varsEl.replaceChildren(h('span', { class: 'muted' }, '주머니'), ...Object.entries(v).map(([k, x]) => h('span', { class: 'vchip' }, `${k} = ${Math.round(x * 100) / 100}`))); }
+  function showVars(v) {
+    const nuts = isGame && world && world.map.acorns.length ? [h('span', { class: 'vchip nut' }, `🌰 주운 도토리 ${world.map.acorns.length - world.st.acorns.size} / ${world.map.acorns.length}`)] : [];   // [CODING-U9] 게임 = 점수판 옆에 주운 수
+    const bag = v && Object.keys(v).length ? [h('span', { class: 'muted' }, '주머니'), ...Object.entries(v).map(([k, x]) => h('span', { class: 'vchip' }, `${k} = ${Math.round(x * 100) / 100}`))] : [];
+    varsEl.replaceChildren(...nuts, ...bag);
+  }
   function renderTabs() {
     if (!maps) return;
     tabs.replaceChildren(h('span', { class: 'muted' }, '코드 하나로'), ...maps.map((m, i) => h('button', { class: 'btn small' + (i === mi ? ' on' : ''), onclick: () => { if (running || gen) return; fresh(i); render(); } },
       `길 ${i + 1}${mapRes[i] === 'ok' ? ' ✓' : mapRes[i] === 'bad' ? ' ✗' : ''}`)), h('span', { class: 'muted' }, '모두 가야 성공'));
   }
+  const ctrl = h('div', { class: 'ctrl' }, runBtn, isGame ? null : stepBtn, resetBtn, speedSel, h('span', { class: 'sp' }), pad, hintBtn, bugBtn);
   root.replaceChildren(
     ctx.topBar(`${stage.id} · ${stage.title}`, { back: '#/', right: [h('span', { class: 'chip c-unit' }, `${unit.id}단원 ${unit.title}`), h('span', { class: 'chip' }, hero.name)] }),
     h('div', { class: 'play' },
       h('section', { class: 'world' },
         h('div', { class: 'story' }, heroPic, h('div', {}, h('b', {}, stage.title), h('p', {}, stage.story))),
         maps ? tabs : null, stageWrap, varsEl, msg,
-        h('div', { class: 'ctrl' }, runBtn, stepBtn, resetBtn, speedSel, h('span', { class: 'sp' }), hintBtn, bugBtn)),
+        ctrl),
       h('section', { class: 'code' },
         h('div', { class: 'code-head' }, h('b', {}, '블록'), countEl, h('span', { class: 'sp' }), h('span', { class: 'muted small' }, hero.about), pyBtn),
         wsDiv, pyPre)));
@@ -70,6 +86,7 @@ export async function mountPlay(root, ctx, stage) {
 
   // ── 작업판 ──
   setConds(stage.conds);   // [CODING-U5] 만약 블록의 살피기 = 이 몬스터 것만
+  setKeys(stage.keys);     // [CODING-U9] 키 모자의 키 = 이 판에서 쓰는 것만
   const ws = makeWorkspace(wsDiv, stage);
   function loadState(state) {
     ws.clear();
@@ -93,6 +110,7 @@ export async function mountPlay(root, ctx, stage) {
   });
   function program() { const st = startOf(ws); return st ? astFromBlock(st.getNextBlock()) : []; }
   function defsNow() { return stage.unit >= 8 ? defsOf(ws) : []; }   // 함수 선언(작업판을 처음 실을 때 이미 불린다)
+  function handlersNow() { return isGame ? handlersOf(ws) : []; }
   //  [CODING-U7·U8] 이 판에서 꼭 써야 하는 것 — 주머니(넣고 꺼내 쓰기) · 기술(만들어 쓰기)
   function hasVarUse(list) { return list.some(n => (n.e && JSON.stringify(n.e).includes('"k":"var"')) || (n.body && hasVarUse(n.body)) || (n.else && hasVarUse(n.else))); }
   function hasSet(list) { return list.some(n => n.t === 'set' || (n.body && hasSet(n.body)) || (n.else && hasSet(n.else))); }
@@ -100,10 +118,13 @@ export async function mountPlay(root, ctx, stage) {
     const all = [...ast, ...defs.flatMap(d => d.body)];
     if (stage.require === 'var' && !(hasSet(all) && hasVarUse(all))) return 'needvar';
     if (stage.require === 'call' && !usesCall(ast)) return 'needcall';
+    const hat = ev => ast.some(n => n.t === 'on' && n.ev === ev && (n.body || []).length);
+    if (stage.require === 'touch' && !hat('touch')) return 'needtouch';
+    if (stage.require === 'tick' && !hat('tick')) return 'needtick';
     return '';
   }
   function updateCount() {
-    const n = countBlocks(program());
+    const n = countBlocks(program()) + countBlocks(handlersNow());
     const nn = n + countBlocks(defsNow());
     countEl.textContent = `${nn}${stage.limit ? ' / ' + stage.limit : ''}개 · ★★★ = ${stage.best}개 이하`;
     countEl.classList.toggle('over', !!stage.limit && n > stage.limit);
@@ -115,13 +136,17 @@ export async function mountPlay(root, ctx, stage) {
     mi = i;
     world = stage.world === 'maze' ? makeMaze(maps ? { ...stage, map: maps[i].map, dir: maps[i].dir } : stage) : makePen({ start: stage.start });
     view = stage.world === 'maze' ? { x: world.st.x, y: world.st.y, dir: world.st.dir } : { x: world.st.x, y: world.st.y, h: world.st.h };
-    renderTabs();
+    renderTabs(); if (isGame) showVars(null);
   }
   function render() { if (!W || !world) return; stage.world === 'maze' ? drawMaze(g, W, H, world, view) : drawPen(g, W, H, world, target, view); }
   function say(t, kind = '') { msg.textContent = t; msg.className = 'w-msg ' + kind; }
   function highlight(id) { try { ws.highlightBlock(id || null); } catch (e) {} }
-  function setButtons() { runBtn.disabled = running; stepBtn.textContent = gen && !running ? '다음 한 걸음' : '한 걸음씩'; }
-  function stopRun() { running = false; gen = null; cancelAnimationFrame(raf); highlight(null); setButtons(); over.replaceChildren(); over.style.display = 'none'; }
+  function setButtons() {
+    if (isGame) { runBtn.textContent = game ? '■ 멈추기' : '▶ 게임 시작'; runBtn.classList.toggle('primary', !game); pad.hidden = !game; ctrl.classList.toggle('playing', !!game); return; }
+    runBtn.disabled = running; stepBtn.textContent = gen && !running ? '다음 한 걸음' : '한 걸음씩';
+  }
+  function stopGame() { clearInterval(tickT); tickT = 0; game = null; q = []; busy = false; }
+  function stopRun() { stopGame(); running = false; gen = null; cancelAnimationFrame(raf); highlight(null); setButtons(); over.replaceChildren(); over.style.display = 'none'; }
   function reset() { stopRun(); mapRes = []; fresh(0); say(''); render(); }
 
   // 지금 세계 상태 그대로의 모습(바로 실행 · 움직임 끝)
@@ -140,8 +165,8 @@ export async function mountPlay(root, ctx, stage) {
   }
   const BUMP = { fwd: null, jump: null, up: [0, -1], down: [0, 1], west: [-1, 0], east: [1, 0] }, FACE = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   // 움직임 하나를 dur 동안 그린다(끝나면 done) — 막힌 걸음은 그쪽으로 살짝 부딪혔다 돌아온다
-  function animate(ev, done) {
-    const dur = durOf(speed), from = { ...view };
+  function animate(ev, done, dOver) {
+    const dur = dOver != null ? dOver : durOf(speed), from = { ...view };
     if (!dur || ev.kind === 'loop' || ev.kind === 'color' || ev.kind === 'pen') {
       syncView(ev); render(); if (ev.kind === 'loop' && dur) setTimeout(done, 90); else done(); return;
     }
@@ -169,6 +194,7 @@ export async function mountPlay(root, ctx, stage) {
   let curDefs = [];
   function startMap(i) { fresh(i); gen = runAst(curAst, world, { max: 1500, defs: curDefs }); showVars(null); }
   function run(step) {
+    if (isGame) { if (game) { stopRun(); say('멈췄어요 — 블록을 고치고 다시 시작해요'); } else startGame(); return; }
     if (running) return;
     over.style.display = 'none';
     if (!gen) {
@@ -202,6 +228,53 @@ export async function mountPlay(root, ctx, stage) {
       if (running) advance(); else setButtons();
     });
   }
+  // ── [CODING-U9] 게임 — 일(키 · 똑딱)이 줄을 서고, 한 번에 한 묶음씩 돈다. 묶음이 끝날 때마다 점수판 · 집 확인 ──
+  function startGame() {
+    over.style.display = 'none';
+    const start = program(), hs = handlersNow(), defs = defsNow(), all = [...start, ...hs];
+    if (!hs.some(x => (x.body || []).length)) { say(whyText('nokeys', stage.hero), 'bad'); return; }
+    if (stage.limit && countBlocks(all) > stage.limit) { say(`블록이 ${stage.limit}개를 넘었어요 — 옮겨서 고쳐 봐요`, 'bad'); return; }
+    const need = needs(all, defs); if (need) { say(whyText(need, stage.hero), 'bad'); return; }
+    nUsed = countBlocks(all) + countBlocks(defs);
+    fresh(0); render();
+    game = makeGame(world, { start, on: hs, defs }, { score: stage.score || '' });
+    running = true; q = []; busy = true; showVars(null);
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); Bk.hideChaff && Bk.hideChaff(); } catch (e) {}
+    say(stage.tick ? `게임 시작! ${josa(hero.name, '이', '가')} 저절로 가요 — ← → 키(또는 아래 단추)로 방향을 바꿔요` : '게임 시작! 화살표 키(또는 아래 단추)로 조종해요', '');
+    setButtons();
+    gen = game.begin(); stepGame();
+  }
+  function startTick() { clearInterval(tickT); tickT = 0; if (game && game.has('tick') && !manual) tickT = setInterval(() => push('tick'), GAME_T[speed][0]); }
+  function push(ev) {
+    if (!game) return;
+    if (ev === 'tick') { if (q.includes('tick')) return; } else if (q.length >= 3) return;
+    q.push(ev); pump();
+  }
+  function pump() { if (!game || busy || !q.length) return; gen = game.fire(q.shift()); busy = true; stepGame(); }
+  function stepGame() {
+    while (game && gen) {
+      let r;
+      try { r = gen.next(); } catch (e) { return endGame(false, e.why, e.id); }
+      if (r.done) {
+        busy = false; gen = null; highlight(null); render(); showVars(game.globals.size ? Object.fromEntries(game.globals) : null);
+        const st = game.check();
+        if (st.won) return endGame(true);
+        if (st.fail) return endGame(false, st.why, null, st);
+        if (st.note) say(whyText(st.note, stage.hero, st), 'good');
+        if (!tickT) startTick();
+        return pump();
+      }
+      const ev = r.value;
+      highlight(ev.id); if (ev.vars) showVars(ev.vars);
+      if (ev.ok && QUICK.has(ev.kind)) continue;   // 반복 · 살피기 · 주머니 = 기다리지 않음
+      return animate(ev, () => { if (game) stepGame(); }, GAME_T[speed][1]);
+    }
+  }
+  function endGame(won, why, id, res = {}) {
+    stopGame(); gen = null; running = false;
+    syncView(); render(); setButtons();
+    if (won) finish(); else fail(why, id, res);
+  }
   // 한 길이 끝났을 때 — 이 길을 못 가면 실패, 다음 길이 있으면 'next'(같은 코드로 다시), 다 갔으면 성공
   function mapEnd() {
     const res = stage.world === 'maze' ? world.result() : (compareDrawing(target, world.st.segs).ok ? { ok: true } : { ok: false, why: 'draw' });
@@ -226,7 +299,7 @@ export async function mountPlay(root, ctx, stage) {
       h('img', { src: heroImg(stage.hero).src, alt: '' }),
       h('div', { class: 'stars' }, STAR(stars)),
       h('b', {}, '성공!'),
-      h('p', {}, `블록 ${n}개로 풀었어요.` + (maps ? ` 같은 코드로 길 ${maps.length}개를 다 갔어요.` : '') + (n > stage.best ? ` 블록 ${stage.best}개로도 풀 수 있어요 — 더 줄여 볼래요?` : ' 가장 짧은 코드예요!')),
+      h('p', {}, (isGame ? `게임 완성! 블록 ${n}개로 만들었어요.` : `블록 ${n}개로 풀었어요.`) + (maps ? ` 같은 코드로 길 ${maps.length}개를 다 갔어요.` : '') + (n > stage.best ? ` 블록 ${stage.best}개로도 풀 수 있어요 — 더 줄여 볼래요?` : ' 가장 짧은 코드예요!')),
       h('div', { class: 'row' },
         h('button', { class: 'btn', onclick: () => { over.style.display = 'none'; reset(); } }, '다시 하기'),
         next ? h('button', { class: 'btn primary', onclick: () => ctx.go('#/s/' + next.id) }, '다음 판 →') : h('button', { class: 'btn primary', onclick: () => ctx.go('#/') }, `${stage.unit}단원 끝! 목록으로`))));
@@ -248,10 +321,21 @@ export async function mountPlay(root, ctx, stage) {
   size(); setButtons();
   heroImg(stage.hero).onload = () => render();
   if (idx === 0 && !lsGet('coding.intro.' + unit.id, false)) { lsSet('coding.intro.' + unit.id, true); modal(`${unit.id}단원 · ${unit.title}`, h('div', {}, h('p', {}, unit.intro), h('p', { class: 'muted' }, `배우는 것: ${unit.concept}`))); }
-  if (stage.buggy && !saved) say('이 코드는 틀렸어요. ▶ 실행해서 어디서 어긋나는지 보고 고쳐요.', '');
-  if (globalThis.location && /[?&]debug=1/.test(location.search)) globalThis.__coding = { ws, stage, world: () => world, program, run, reset, state: () => ({ running, gen: !!gen, msg: msg.textContent }), load: src => loadState(stateFromAst(parse(src))) };
+  if (stage.buggy && !saved) say(isGame ? '친구가 만든 게임이에요. ▶ 게임 시작으로 해 보고, 어디가 틀렸는지 고쳐요.' : '이 코드는 틀렸어요. ▶ 실행해서 어디서 어긋나는지 보고 고쳐요.', '');
+  //  [CODING-U9] 키보드 — 게임 중에만 화살표를 가져온다(작업판 · 쪽 넘김에 안 감) · 꾹 누르면 줄이 빌 때만 한 번 더
+  const onKey = e => {
+    if (!game) return;
+    const k = KEY_OF[e.key]; if (!k || !(stage.keys || []).includes(k)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.repeat && q.length) return;
+    push('key:' + k);
+  };
+  addEventListener('keydown', onKey, true);
+  if (globalThis.location && /[?&]debug=1/.test(location.search)) globalThis.__coding = { ws, stage, world: () => world, program, run, reset, state: () => ({ running, gen: !!gen, game: !!game, msg: msg.textContent }), load: src => loadState(stateFromAst(parse(src))),
+    //  시험: 놀이 글을 차례로(똑딱도 손으로) — 묶음 하나가 끝날 때마다 다음
+    feed: async script => { manual = true; clearInterval(tickT); tickT = 0; for (const t of String(script).trim().split(/\s+/)) { if (!game) break; push(t === '.' ? 'tick' : 'key:' + (TOK[t] || t)); for (let i = 0; i < 400 && game && (busy || q.length); i++) await new Promise(r => setTimeout(r, 15)); } return msg.textContent; } };
   //  나갈 때 아직 안 쓴 코드는 바로 쓴다(고치고 0.7초 안에 나가도 남게)
   const flush = () => { if (!saveT) return; clearTimeout(saveT); saveT = 0; try { ctx.store.saveCode(stage.id, JSON.stringify(Bk.serialization.workspaces.save(ws))).catch(err => console.warn(err)); } catch (err) { console.warn(err); } };
   addEventListener('pagehide', flush);
-  return { unmount() { alive = false; flush(); removeEventListener('pagehide', flush); cancelAnimationFrame(raf); ro.disconnect(); try { ws.dispose(); } catch (e) {} } };
+  return { unmount() { alive = false; stopGame(); removeEventListener('keydown', onKey, true); flush(); removeEventListener('pagehide', flush); cancelAnimationFrame(raf); ro.disconnect(); try { ws.dispose(); } catch (e) {} } };
 }

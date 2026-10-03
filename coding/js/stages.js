@@ -20,7 +20,8 @@ export const UNITS = [
     intro: "주머니에 이름표를 붙이고 숫자를 넣어 둬요. 꺼내 쓰고, 조금씩 늘리면 — 걸음이 자라는 소용돌이가 그려져요(수학의 '규칙 찾기'와 같아요)." },
   { id: 8, title: '나만의 블록', concept: '함수 · 매개변수', open: true,
     intro: "자주 쓰는 블록 묶음에 이름을 붙이면 몬스터의 '기술'이 돼요. '받는 값'을 두면 같은 기술로 크기가 다른 네모, 변의 수가 다른 다각형을 그려요." },
-  { id: 9, title: '작은 게임', concept: '이벤트', open: false, intro: '키를 누르면 움직이고, 닿으면 점수가 오르는 작은 게임을 만들어 친구와 나눠요.' },
+  { id: 9, title: '작은 게임', concept: '이벤트', open: true,
+    intro: "이제 블록이 위에서 아래로 한 번만 도는 게 아니에요. '→ 키를 누르면' · '도토리에 닿으면' · '시계가 똑딱할 때마다' — 그 일이 생길 때마다 밑의 블록 묶음이 돌아요(이벤트). 조종기를 만들고, 점수판을 달고, 저절로 달리는 게임을 만들어 직접 해 봐요." },
 ];
 
 // 몬스터마다 쓸 수 있는 블록(2단원부터 반복 블록이 붙는다)
@@ -81,6 +82,11 @@ const MAP = {
   hop6B: ['###########', '#S~..~.~.G#', '###########'],
   mazeA: ['#########', '#S..#...#', '###.#.#.#', '#...#.#.#', '#.###.#.#', '#.....#G#', '#########'],
   mazeB: ['#########', '#S......#', '#.#####.#', '#.#...#.#', '#.#.#.#.#', '#...#G..#', '#########'],
+  // 9단원 — 작은 게임(직접 조종)
+  gameNuts: ['#########', '#Sa..a..#', '#######.#', '#G.a..a.#', '#########'],
+  gameSnake: ['##########', '#Sa..a...#', '########.#', '#..a...a.#', '#.########', '#..a....G#', '##########'],
+  runSnake: ['##########', '#S.......#', '########.#', '#........#', '#.########', '#.......G#', '##########'],
+  bigSnake: ['###########', '#S..a....a#', '#########.#', '#.a...a...#', '#.#########', '#...a...a.#', '#########.#', '#G..a.....#', '###########'],
 };
 
 const STAGES = [];
@@ -88,6 +94,9 @@ const maze = (id, hero, title, story, map, dir, sol, o = {}) => STAGES.push({ id
 // 길 둘 이상 — maps = [[지도, 방향], …] · 코드 하나로 모두 풀어야 성공(첫 길이 map · dir)
 const maze2 = (id, hero, title, story, maps, sol, o = {}) => STAGES.push({ id, unit: +id.split('-')[0], world: 'maze', hero, title, story,
   maps: maps.map(([m, d]) => ({ map: MAP[m] || m, dir: d })), map: MAP[maps[0][0]], dir: maps[0][1], sol, ...o });
+// [CODING-U9] 작은 게임 — keys = 쓸 수 있는 화살표 · touch = '도토리에 닿으면' · tick = '시계가 똑딱할 때마다' · score = 점수판 주머니
+//  play = 정답 코드로 이기는 놀이(^ v < > = 화살표 키 · . = 똑딱) — 시험이 정말 이기는지 잰다
+const game = (id, hero, title, story, map, dir, sol, play, o = {}) => STAGES.push({ id, unit: +id.split('-')[0], world: 'maze', game: true, hero, title, story, map: MAP[map] || map, mapKey: map, dir, sol, play, ...o });
 const pen = (id, title, story, start, sol, o = {}) => STAGES.push({ id, unit: +id.split('-')[0], world: 'pen', hero: 'sparrow', title, story, start, sol, ...o });
 
 // ── 1단원 · 차례대로(순차) ──
@@ -225,9 +234,36 @@ maze('8-5', 'slime', '계단 기술', "'계단 한 칸'을 슬라임의 기술�
 maze2('8-6', 'frog', '한 걸음 기술 — 길 둘', "'웅덩이면 뛰고 아니면 걷기'를 개구리의 기술로 만들고, 집에 닿을 때까지 써요.",
   [['hop6A', 'E'], ['hop6B', 'E']], 'D:한걸음:(E:puddle(J|F)) U(C:한걸음())', { require: 'call', prefill: 'D:한걸음:()', hint: "기술 안에 '만약 앞이 웅덩이라면 뛰기, 아니면 앞으로'. 시작하면 밑: 될 때까지 반복 안에 기술 쓰기." });
 
+// ── 9단원 · 작은 게임(이벤트) — ▶ 게임 시작 뒤 화살표 키(또는 화면 단추)로 직접 조종 ──
+const ARROWS = ['up', 'down', 'left', 'right'], TURN3 = ['up', 'left', 'right'];
+const PLAY_MAZE_ABS = '> > v v < < v v > > > > ^ ^ ^ ^ > > v v v v', PLAY_MAZE_REL = '^ ^ > ^ ^ > ^ ^ < ^ ^ < ^ ^ ^ ^ < ^ ^ ^ ^ > ^ ^ > ^ ^ ^ ^';
+const PLAY_SNAKE = '^ ^ ^ ^ ^ ^ ^ > ^ ^ > ^ ^ ^ ^ ^ ^ ^ < ^ ^ < ^ ^ ^ ^ ^ ^ ^';
+game('9-1', 'crab', '조종기 만들기', "이제 내가 직접 조종해요! 키마다 할 일을 정하고, ▶ 게임 시작 뒤 화살표 키로 게를 집까지 데려가요. '→ 키를 누르면'은 놓아 뒀어요 — 나머지 셋을 만들어요.",
+  'mazeA', null, 'K:up(U) K:down(D) K:left(W) K:right(E)', PLAY_MAZE_ABS, { keys: ARROWS, prefill: 'K:right(E)',
+  hint: "'이벤트' 서랍에서 ↑ ↓ ← 키 모자를 꺼내 모자 밑에 같은 쪽 걸음을 붙여요. 블록이 위에서 아래로 도는 게 아니라, 키를 누를 때마다 그 모자 밑만 돌아요." });
+game('9-2', 'slime', '같은 키, 다른 몬스터', '같은 미로를 슬라임으로! 슬라임은 옆으로 걷지 못하고 제자리에서 돌기만 해요. 슬라임 조종기를 만들어 봐요 — 게 때와 무엇이 달라요?',
+  'mazeA', 'E', 'K:up(F) K:left(L) K:right(R)', PLAY_MAZE_REL, { keys: ARROWS,
+  hint: '↑ 키 → 앞으로 한 칸 · ← 키 → 왼쪽으로 돌기 · → 키 → 오른쪽으로 돌기. 돌 때는 슬라임 머리 위 화살표를 봐요.' });
+game('9-3', 'squirrel', '닿으면 줍기', "이번엔 키가 아니라 세상이 일을 일으켜요. '도토리에 닿으면 → 줍기'를 만들면 다람쥐가 도토리 칸에 들어설 때마다 저절로 주워요. 조종기는 놓아 뒀어요.",
+  'gameNuts', 'E', 'K:up(F) K:left(L) K:right(R) X:acorn(P)', '^ ^ ^ ^ ^ ^ > ^ ^ > ^ ^ ^ ^ ^ ^', { keys: TURN3, touch: true, require: 'touch', prefill: 'K:up(F) K:left(L) K:right(R)',
+  hint: "'이벤트' 서랍의 '도토리에 닿으면' 모자 밑에 '도토리 줍기'. 그다음 게임 시작!" });
+game('9-4', 'squirrel', '점수판', "게임에는 점수가 있어야죠! 주머니 '점수'를 시작할 때 0으로, 도토리를 주울 때마다 1씩 늘려요. 점수판이 주운 도토리 수와 다르면 게임이 멈춰요.",
+  'gameSnake', 'E', 'set(점수,0) K:up(F) K:left(L) K:right(R) X:acorn(P add(점수,1))', PLAY_SNAKE, { keys: TURN3, touch: true, vars: ['점수'], score: '점수', prefill: 'K:up(F) K:left(L) K:right(R) X:acorn(P)',
+  hint: "'시작하면' 밑에 '주머니 점수에 0 넣기'. '도토리에 닿으면' 밑, 줍기 다음에 '점수를 1만큼 늘리기'." });
+game('9-5', 'slime', '저절로 달려요', "'시계가 똑딱할 때마다 → 앞으로 한 칸'이면 슬라임이 저절로 달려요. 나는 ← → 키로 방향만 바꿔요. 이제 진짜 게임 같죠?",
+  'runSnake', 'E', 'Q(F) K:left(L) K:right(R)', '. . . . . . . > . . > . . . . . . . < . . < . . . . . . .', { keys: ['left', 'right'], tick: true, require: 'tick',
+  hint: "'똑딱할 때마다' 모자 밑에 앞으로 한 칸. ← 키 → 왼쪽으로 돌기 · → 키 → 오른쪽으로 돌기. 꺾이는 곳에 닿으면 바로 돌아요(늦어도 쿵 하고 기다려 줘요)." });
+game('9-6', 'squirrel', '도토리 달리기', '배운 것을 다 모아 게임을 처음부터 만들어요. 다람쥐가 저절로 달리고, ← → 로 방향을 바꾸고, 도토리에 닿으면 줍고 점수가 올라요. 도토리 일곱 개를 모아 집으로!',
+  'bigSnake', 'E', 'set(점수,0) Q(F) K:left(L) K:right(R) X:acorn(P add(점수,1))', '. . . . . . . . > . . > . . . . . . . . < . . < . . . . . . . . > . . > . . . . . . . .',
+  { keys: ['left', 'right'], tick: true, touch: true, vars: ['점수'], score: '점수', require: 'tick',
+  hint: '시작하면(점수에 0) · 똑딱할 때마다(앞으로) · ← 키(왼쪽으로 돌기) · → 키(오른쪽으로 돌기) · 도토리에 닿으면(줍기 · 점수 1 늘리기).' });
+game('9-7', 'squirrel', '점수가 이상해요', "친구가 만든 게임인데, 도토리를 안 주워도 점수가 올라가요. '점수 1 늘리기'는 어느 이벤트 밑에 있어야 할까요?",
+  'gameSnake', 'E', 'set(점수,0) K:up(F) K:left(L) K:right(R) X:acorn(P add(점수,1))', PLAY_SNAKE, { keys: TURN3, touch: true, vars: ['점수'], score: '점수',
+  buggy: 'set(점수,0) K:up(F add(점수,1)) K:left(L) K:right(R) X:acorn(P)', hint: "점수는 ↑ 키를 누를 때가 아니라 도토리에 닿을 때 올라야 해요 — '점수 1 늘리기' 블록을 옮겨요." });
+
 for (const s of STAGES) {
   s.best = countBlocks(parse(s.sol));
-  s.blocks = [...HERO_BLOCKS[s.hero], ...(s.unit >= 2 ? ['c_repeat'] : []), ...(s.unit >= 5 && s.world === 'maze' ? ['c_if', 'c_ifelse'] : []), ...(s.unit >= 6 && s.world === 'maze' ? ['c_until'] : [])];
+  s.blocks = [...HERO_BLOCKS[s.hero], ...(s.unit >= 2 ? ['c_repeat'] : []), ...(s.unit >= 5 && s.world === 'maze' ? ['c_if', 'c_ifelse'] : []), ...(s.unit >= 6 && s.world === 'maze' && !s.game ? ['c_until'] : [])];
   s.conds = HERO_CONDS[s.hero];
   if (s.buggy) s.limit = Math.max(countBlocks(parse(s.buggy)), s.best) + 2;
 }
