@@ -6,6 +6,7 @@
 //           I:살피기( … ) 만약 · E:살피기( … | … ) 만약/아니면 · U( … ) 집에 닿을 때까지 반복   [CODING-U5]
 //           set(걸음,10) 넣기 · add(걸음,10) 늘리기 · f[걸음] r[360/변] 값 칸 붓 · [변]( … ) 값 칸 반복                [CODING-U7]
 //           D:기술:받는값,받는값( … ) 기술(함수) 만들기 · C:기술(값,값) 기술 쓰기                                         [CODING-U8]
+//           K:up( … ) ↑ 키를 누르면 · X:acorn( … ) 도토리에 닿으면 · Q( … ) 시계가 똑딱할 때마다  — 이벤트(맨 위 칸에만)   [CODING-U9]
 import { PEN_COLORS } from './world.js';
 
 export const T2TYPE = { fwd: 'm_fwd', left: 'm_left', right: 'm_right', up: 'm_up', down: 'm_down', west: 'm_west', east: 'm_east', jump: 'm_jump', pick: 'm_pick',
@@ -29,7 +30,7 @@ export function parseExpr(src) {
 }
 
 export function parse(src) {
-  const toks = String(src).match(/D:[^:()\s]+:[^()\s]*\(|C:[^()\s]+\([^)]*\)|set\([^)]*\)|add\([^)]*\)|\[[^\]]+\]\(|[frl]\[[^\]]+\]|\d+\(|[IE]:[a-zA-Z]+\(|U\(|\)|\||pu|pd|f\d+|r\d+|l\d+|c[^\s()|]+|[FLRUDWEJP]/g) || [];
+  const toks = String(src).match(/K:[a-z]+\(|X:[a-z]+\(|Q\(|D:[^:()\s]+:[^()\s]*\(|C:[^()\s]+\([^)]*\)|set\([^)]*\)|add\([^)]*\)|\[[^\]]+\]\(|[frl]\[[^\]]+\]|\d+\(|[IE]:[a-zA-Z]+\(|U\(|\)|\||pu|pd|f\d+|r\d+|l\d+|c[^\s()|]+|[FLRUDWEJP]/g) || [];
   let i = 0;
   const list = () => {
     const out = [];
@@ -41,6 +42,9 @@ export function parse(src) {
       else if (/^E:/.test(k)) { const body = list(); i++; const els = list(); i++; out.push({ t: 'ifelse', c: k.slice(2, -1), body, else: els }); }
       else if (k === 'U(') { const body = list(); i++; out.push({ t: 'until', body }); }
       else if (/^D:/.test(k)) { const [, name, ps] = k.slice(0, -1).split(':'); const body = list(); i++; out.push({ t: 'def', name, params: ps ? ps.split(',').filter(Boolean) : [], body }); }
+      else if (/^K:/.test(k)) { const body = list(); i++; out.push({ t: 'on', ev: 'key', k: k.slice(2, -1), body }); }
+      else if (/^X:/.test(k)) { const body = list(); i++; out.push({ t: 'on', ev: 'touch', k: k.slice(2, -1), body }); }
+      else if (k === 'Q(') { const body = list(); i++; out.push({ t: 'on', ev: 'tick', body }); }
       else if (/^C:/.test(k)) { const m = /^C:([^(]+)\((.*)\)$/.exec(k); out.push({ t: 'call', name: m[1], args: m[2] ? m[2].split(',').map(parseExpr) : [] }); }
       else if (/^set\(/.test(k)) { const [v, x] = k.slice(4, -1).split(','); out.push({ t: 'set', v, e: parseExpr(x) }); }
       else if (/^add\(/.test(k)) { const [v, x] = k.slice(4, -1).split(','); out.push({ t: 'change', v, e: parseExpr(x) }); }
@@ -94,6 +98,12 @@ export function defsOf(ws) {
   return ws.getTopBlocks(false).filter(b => b.type === 'procedures_defnoreturn' && (!b.isEnabled || b.isEnabled()))
     .map(b => ({ t: 'def', id: b.id, name: b.getFieldValue('NAME'), params: b.getVars ? b.getVars() : [], body: astFromBlock(b.getInputTargetBlock('STACK')) }));
 }
+// [CODING-U9] 작업판의 이벤트 모자들('~하면' 밑에 이은 블록 묶음) — 위에서 아래 · 왼쪽에서 오른쪽 차례
+export const HAT_EV = { e_key: 'key', e_touch: 'touch', e_tick: 'tick' };
+export function handlersOf(ws) {
+  return ws.getTopBlocks(true).filter(b => HAT_EV[b.type] && (!b.isEnabled || b.isEnabled()))
+    .map(b => ({ t: 'on', id: b.id, ev: HAT_EV[b.type], k: b.type === 'e_key' ? b.getFieldValue('K') : b.type === 'e_touch' ? 'acorn' : '', body: astFromBlock(b.getNextBlock()) }));
+}
 
 // ── AST → Blockly 저장 꼴('시작하면' 밑에 줄줄이 · 기술 정의는 옆에 따로) ──
 export function stateFromAst(ast, pos = { x: 28, y: 28 }) {
@@ -121,7 +131,7 @@ export function stateFromAst(ast, pos = { x: 28, y: 28 }) {
     return b;
   };
   const chain = list => {
-    list = list.filter(n => n.t !== 'def');
+    list = list.filter(n => n.t !== 'def' && n.t !== 'on');
     if (!list.length) return null;
     const first = blk(list[0]); let cur = first;
     for (const n of list.slice(1)) { const b = blk(n); cur.next = { block: b }; cur = b; }
@@ -136,6 +146,12 @@ export function stateFromAst(ast, pos = { x: 28, y: 28 }) {
     blocks.push({ type: 'procedures_defnoreturn', x: pos.x + 360, y: pos.y + k * 220, fields: { NAME: d.name },
       ...(d.params.length ? { extraState: { params: d.params.map(p => ({ name: p, id: 'v_' + p })) } } : {}), ...(st ? { inputs: { STACK: { block: st } } } : {}) });
   });
+  //  [CODING-U9] 이벤트 모자 — '시작하면' 밑으로 두 줄씩
+  ast.filter(n => n.t === 'on').forEach((n, k) => {
+    const st = chain(n.body || []);
+    blocks.push({ type: n.ev === 'key' ? 'e_key' : n.ev === 'touch' ? 'e_touch' : 'e_tick', x: pos.x + (k % 2) * 290, y: pos.y + 140 + Math.floor(k / 2) * 190,
+      ...(n.ev === 'key' ? { fields: { K: n.k } } : {}), ...(st ? { next: { block: st } } : {}) });
+  });
   const state = { blocks: { languageVersion: 0, blocks } };
   if (vars.size) state.variables = [...vars].map(v => ({ name: v, id: 'v_' + v }));
   return state;
@@ -143,11 +159,13 @@ export function stateFromAst(ast, pos = { x: 28, y: 28 }) {
 
 // ── 한 걸음씩 — 마디마다 { id, kind, ok … } 를 내고, 안 되는 걸음이면 그 까닭으로 던진다 ──
 //  끝없는 반복은 max 걸음에서 · 기술 부르기는 40겹까지. 주머니(변수)는 판 하나 동안 살아 있고, 기술 안의 받는 값은 그 기술 안에서만.
-export function* runAst(ast, world, { max = 3000, defs: extDefs = null } = {}) {
+//  [CODING-U9] 게임: globals = 이벤트 묶음끼리 함께 쓰는 주머니 · soft = 부딪히기 같은 걸음 실패는 '쿵'만 하고 계속(게임이 안 끝난다)
+const SOFT = new Set(['wall', 'water', 'edge', 'tree', 'land', 'noacorn']);
+export function* runAst(ast, world, { max = 3000, defs: extDefs = null, globals: extGlobals = null, soft = false } = {}) {
   let steps = 0, depth = 0;
   const fail = (why, id) => { const e = new Error(why); e.why = why; e.id = id; return e; };
   const defs = new Map(); (extDefs || []).forEach(d => defs.set(d.name, d)); ast.forEach(n => { if (n.t === 'def') defs.set(n.name, n); });
-  const globals = new Map(), frames = [];
+  const globals = extGlobals || new Map(), frames = [];
   const get = v => { const f = frames[frames.length - 1]; if (f && f.has(v)) return f.get(v); return globals.has(v) ? globals.get(v) : 0; };
   const put = (v, x) => { const f = frames[frames.length - 1]; if (f && f.has(v)) f.set(v, x); else globals.set(v, x); };
   const val = e => { if (!e) return 0; if (e.k === 'num') return e.n; if (e.k === 'var') return get(e.v); const a = val(e.a), b = val(e.b);
@@ -155,7 +173,7 @@ export function* runAst(ast, world, { max = 3000, defs: extDefs = null } = {}) {
   const snap = () => { const o = Object.fromEntries(globals); const f = frames[frames.length - 1]; if (f) for (const [k, v] of f) o[k] = v; return o; };
   function* list(xs) { for (const b of xs) yield* one(b); }
   function* one(b) {
-    if (b.t === 'def') return;   // 기술 정의는 부를 때만 돈다
+    if (b.t === 'def' || b.t === 'on') return;   // 기술 정의는 부를 때만 · 이벤트 묶음은 그 일이 생길 때만 돈다
     if (++steps > max) throw fail('loop', b.id);
     if (b.t === 'repeat') { const n = b.e ? Math.max(0, Math.floor(val(b.e))) : b.n; for (let i = 0; i < n; i++) { yield { id: b.id, kind: 'loop', i, ok: true, vars: snap() }; yield* list(b.body || []); } return; }
     if (b.t === 'if' || b.t === 'ifelse') {   // 살피고(움직이지 않음) 맞으면 안쪽 · 아니면 '아니면' 쪽
@@ -182,7 +200,7 @@ export function* runAst(ast, world, { max = 3000, defs: extDefs = null } = {}) {
     const v = b.e ? val(b.e) : b.v;
     const r = world.act(b.t, v);
     yield { id: b.id, t: b.t, v, ...r, vars: snap() };
-    if (!r.ok) throw fail(r.why, b.id);
+    if (!r.ok && !(soft && SOFT.has(r.why))) throw fail(r.why, b.id);
   }
   yield* list(ast);
 }

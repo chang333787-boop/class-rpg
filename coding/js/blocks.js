@@ -22,6 +22,12 @@ let THEME = null, done = false;
 let condList = ['wall', 'ahead', 'left', 'right'];
 export function setConds(list) { if (list && list.length) condList = list.slice(); }
 const condOptions = () => condList.map(k => [CONDS[k] ? CONDS[k][0] : k, k]);
+//  [CODING-U9] 이벤트 — '~하면' 모자 블록('시작하면'과 같은 색). 쓸 수 있는 키는 판마다(작업판을 만들기 전에 정한다)
+export const KEY_NAMES = { up: '↑ 위쪽 화살표', down: '↓ 아래쪽 화살표', left: '← 왼쪽 화살표', right: '→ 오른쪽 화살표' };
+let keyList = ['up', 'down', 'left', 'right'];
+export function setKeys(list) { keyList = list && list.length ? list.slice() : ['up', 'down', 'left', 'right']; }
+const keyOptions = () => keyList.map(k => [KEY_NAMES[k] || k, k]);
+const NM = x => String(x || '').trim().replace(/\s+/g, '_');   // 글 코드 이름 — 한글 그대로(파이썬 3 은 한글 이름을 쓸 수 있다)
 
 export function defineAll() {
   if (done || !B) return;
@@ -29,7 +35,7 @@ export function defineAll() {
   THEME = B.Theme.defineTheme('codingDark', {
     name: 'codingDark', base: B.Themes.Classic, startHats: true, blockStyles: STYLE,
     categoryStyles: { move_category: { colour: '#3d8bfd' }, loop_category: { colour: '#f59a23' }, if_category: { colour: '#9b5de5' }, pen_category: { colour: '#e0533d' },
-      var_category: { colour: '#d39a1c' }, math_category: { colour: '#4f9a6a' }, skill_category: { colour: '#d6457a' } },
+      var_category: { colour: '#d39a1c' }, math_category: { colour: '#4f9a6a' }, skill_category: { colour: '#d6457a' }, event_category: { colour: '#f2a93b' } },
     componentStyles: {
       workspaceBackgroundColour: '#1d1611', toolboxBackgroundColour: '#241b13', toolboxForegroundColour: '#f3e8d6',
       flyoutBackgroundColour: '#2a2018', flyoutForegroundColour: '#d9c9ae', flyoutOpacity: 1,
@@ -80,6 +86,18 @@ export function defineAll() {
     this.appendStatementInput('DO'); this.appendDummyInput().appendField('아니면'); this.appendStatementInput('ELSE');
     this.setPreviousStatement(true); this.setNextStatement(true); this.setStyle('if_blocks');
   } };
+  B.Blocks.e_key = { init() {
+    this.appendDummyInput().appendField(new B.FieldDropdown(keyOptions), 'K').appendField('키를 누르면');
+    this.setNextStatement(true); this.setStyle('hat_blocks'); this.setTooltip('그 키를 누를 때마다 밑의 블록들이 돌아요');
+  } };
+  B.Blocks.e_touch = { init() {
+    this.appendDummyInput().appendField('🌰 도토리에 닿으면');
+    this.setNextStatement(true); this.setStyle('hat_blocks'); this.setTooltip('몬스터가 도토리 칸에 들어설 때마다 밑의 블록들이 돌아요');
+  } };
+  B.Blocks.e_tick = { init() {
+    this.appendDummyInput().appendField('⏱ 시계가 똑딱할 때마다');
+    this.setNextStatement(true); this.setStyle('hat_blocks'); this.setTooltip('시계가 똑딱할 때마다(빠르기에 따라) 밑의 블록들이 저절로 돌아요');
+  } };
   B.Blocks.c_until = { init() {
     this.appendDummyInput().appendField('집에 닿을 때까지 반복');
     this.appendStatementInput('DO'); this.setPreviousStatement(true); this.setNextStatement(true); this.setStyle('loop_blocks');
@@ -96,7 +114,7 @@ export function defineAll() {
     f.c_ifelse = (b, g) => `if ${cond(b)}:\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}else:\n${g.statementToCode(b, 'ELSE') || g.INDENT + 'pass\n'}`;
     f.c_until = (b, g) => `while not at_home():\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}`;
     f.p_fwd = b => `forward(${b.getFieldValue('N')})\n`;
-    const NM = x => String(x || '').trim().replace(/\s+/g, '_'), V = (b, g, n) => g.valueToCode(b, n, 99) || '0';   // 한글 이름 그대로(파이썬 3 은 한글 이름을 쓸 수 있다)
+    const V = (b, g, n) => g.valueToCode(b, n, 99) || '0';
     f.p_fwd_v = (b, g) => `forward(${V(b, g, 'N')})\n`; f.p_right_v = (b, g) => `right(${V(b, g, 'N')})\n`; f.p_left_v = (b, g) => `left(${V(b, g, 'N')})\n`;
     f.c_repeat_v = (b, g) => `for i in range(${V(b, g, 'N')}):\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}`;
     f.variables_get = b => [NM(b.getField('VAR').getText()), 0];
@@ -121,6 +139,19 @@ function toolboxFor(stage) {
   }
   const cat = (name, style, contents) => ({ kind: 'category', name, categorystyle: style, contents });
   const cats = [];
+  if (stage.game) {   // [CODING-U9] 이벤트 칸이 맨 위 — 키마다 모자 하나씩 꺼내 놓는다
+    cats.push(cat('이벤트', 'event_category', [...(stage.keys || []).map(k => ({ kind: 'block', type: 'e_key', fields: { K: k } })),
+      ...(stage.touch ? [{ kind: 'block', type: 'e_touch' }] : []), ...(stage.tick ? [{ kind: 'block', type: 'e_tick' }] : [])]));
+    cats.push(cat('움직임', 'move_category', blocks.filter(t => /^m_/.test(t)).map(t => ({ kind: 'block', type: t }))));
+    cats.push(cat('반복', 'loop_category', [{ kind: 'block', type: 'c_repeat' }]));
+    cats.push(cat('만약', 'if_category', [{ kind: 'block', type: 'c_if' }, { kind: 'block', type: 'c_ifelse' }]));
+    if (stage.vars) {
+      cats.push({ kind: 'category', name: '주머니', categorystyle: 'var_category', custom: 'VARIABLE' });
+      cats.push(cat('셈', 'math_category', [{ kind: 'block', type: 'math_number', fields: { NUM: 0 } }]));   // '점수에 0 넣기'의 0
+    }
+    cats.push({ kind: 'category', name: '기술', categorystyle: 'skill_category', custom: 'SKILLS' });
+    return { kind: 'categoryToolbox', contents: cats };
+  }
   if (stage.world === 'pen') cats.push(cat('붓', 'pen_category', [num('p_fwd_v', 100), num('p_right_v', 90), num('p_left_v', 90), { kind: 'block', type: 'p_color' }, { kind: 'block', type: 'p_pen' }]));
   else cats.push(cat('움직임', 'move_category', blocks.filter(t => /^m_/.test(t)).map(t => ({ kind: 'block', type: t }))));
   cats.push(cat('반복', 'loop_category', stage.world === 'pen' ? [num('c_repeat_v', 4)] : [{ kind: 'block', type: 'c_repeat' }, ...(blocks.includes('c_until') ? [{ kind: 'block', type: 'c_until' }] : [])]));
@@ -138,7 +169,8 @@ export function makeWorkspace(div, stage) {
   const ws = B.inject(div, {
     toolbox: toolboxFor(stage),
     theme: THEME, renderer: 'zelos', trashcan: true, sounds: false, media: MEDIA,
-    maxBlocks: stage.limit ? stage.limit + 1 : Infinity,
+    //  Blockly 한도는 숫자 칸(그림자 블록)까지 센다 — 값 칸이 있는 7단원부터는 서랍이 처음부터 잠기므로 ▶ 때만 센다(play.js)
+    maxBlocks: stage.limit && stage.unit < 7 ? stage.limit + 1 : Infinity,
     zoom: { controls: true, wheel: false, startScale: 0.9, maxScale: 1.6, minScale: 0.55, scaleSpeed: 1.15 },
     move: { scrollbars: true, drag: true, wheel: true },
   });
@@ -155,12 +187,20 @@ export function makeWorkspace(div, stage) {
 export const startOf = ws => ws.getTopBlocks(false).find(b => b.type === 'start') || null;
 
 // '시작하면' 밑의 코드 + 기술 정의를 글로(떨어져 있는 다른 블록은 안 들어간다 — 실행도 똑같이 안 한다)
+//  [CODING-U9] 이벤트 모자 = 그 일이 생기면 불리는 함수(def on_key_up(): …) · 묶음 안에서 바꾸는 주머니는 global
+const HAT_PY = { e_key: b => ['on_key_' + b.getFieldValue('K'), (KEY_NAMES[b.getFieldValue('K')] || '') + ' 키를 누르면'], e_touch: () => ['on_touch_acorn', '도토리에 닿으면'], e_tick: () => ['on_tick', '시계가 똑딱할 때마다'] };
 export function pythonOf(ws) {
   const st = startOf(ws);
   if (!PY || !st) return '';
   PY.init(ws);
   delete PY.definitions_.variables;   // 'x = None' 줄은 빼고(아이 코드에 없는 줄)
   for (const d of ws.getTopBlocks(false).filter(b => b.type === 'procedures_defnoreturn')) PY.blockToCode(d);
-  const code = PY.finish(PY.blockToCode(st) || '').replace(/^\s*\n/, '').replace(/\s+$/, '');
+  let hats = '';
+  for (const hb of ws.getTopBlocks(true).filter(b => HAT_PY[b.type] && (!b.isEnabled || b.isEnabled()))) {
+    const [fn, ko] = HAT_PY[hb.type](hb), nx = hb.getNextBlock(), body = nx ? PY.blockToCode(nx) : '';
+    const gl = [...new Set(hb.getDescendants(false).filter(d => d.type === 'variables_set' || d.type === 'math_change').map(d => NM(d.getField('VAR').getText())))];
+    hats += `\n# ${ko}\ndef ${fn}():\n` + (gl.length ? PY.INDENT + 'global ' + gl.join(', ') + '\n' : '') + (body ? PY.prefixLines(body, PY.INDENT) : PY.INDENT + 'pass\n');
+  }
+  const code = PY.finish((PY.blockToCode(st) || '') + hats).replace(/^\s*\n/, '').replace(/\s+$/, '');
   return code ? code + '\n' : '';
 }
