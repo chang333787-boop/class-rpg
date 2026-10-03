@@ -1635,11 +1635,11 @@ function buildMainHTML() {
     ${alerts.join('')}
 
     <!-- ① 오늘의 학습 — 매일 하는 핵심 기능이라 할 일보다 위 (HOME-PLACE-1) -->
-    <div class="sec-label">📚 오늘의 공부</div>
+    <div class="sec-label">오늘의 공부</div>
     ${buildStudyCardHTML(s)}
 
     <!-- ② 핵심 할 일 1개 강조 + 나머지 요약 -->
-    <div class="sec-label">✅ 오늘 할 일</div>
+    <div class="sec-label">오늘 할 일</div>
     ${topTodoHtml}
     ${restTodos.length > 0 ? `
       <div id="rest-todo-wrap" style="display:none">${restTodoHtml}</div>
@@ -1652,7 +1652,7 @@ function buildMainHTML() {
       </button>` : ''}
 
     <!-- ③ 주요 메뉴 4개 -->
-    <div class="sec-label">🎮 메뉴</div>
+    <div class="sec-label">메뉴</div>
     <div class="menu-grid" style="margin-bottom:.5rem">
       <div class="menu-tile mt-quest" onclick="openQuestModal()">
         ${pendingCount>0?`<div class="tile-notif">${pendingCount}</div>`:''}
@@ -1692,7 +1692,7 @@ function buildMainHTML() {
     </div>
 
     <!-- 내집 섹션 -->
-    <div class="sec-label">🏠 내 집</div>
+    <div class="sec-label">내 집</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.5rem">
       <div onclick="openHouseTab('stats')"
         style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
@@ -2193,7 +2193,7 @@ function renderShop() {
       return `<div class="item-card" onclick="${lockFn}" style="opacity:${locked?.55:1}">
         <div class="ic-icon">${iconImg(s, 'seeds', '1.4rem', s.id)}${locked?'<span style="font-size:.7rem">🔒</span>':''}</div>
         <div class="ic-name">${s.name}${locked?`<span style="color:var(--txt3);font-size:.62rem"> Lv${s.reqLv}+</span>`:''}</div>
-        <div class="ic-stats">${s.growHours}h → ${s.sellPrice}G (순익 +${s.sellPrice-s.price}G)</div>
+        <div class="ic-stats">${s.growHours}시간 → ${s.sellPrice}G (남는 골드 +${s.sellPrice-s.price}G)</div>
         <div class="ic-price">💰 ${s.price}G</div>
       </div>`;
     });
@@ -2213,7 +2213,7 @@ function renderShop() {
             border-radius:4px;padding:.05rem .3rem;margin-left:.2rem">위험</span>
           ${locked?`<span style="color:var(--txt3);font-size:.62rem"> Lv${s.reqLv}+</span>`:''}
         </div>
-        <div class="ic-stats" style="color:var(--txt2)">${s.growHours}h · ${s.desc}</div>
+        <div class="ic-stats" style="color:var(--txt2)">${s.growHours}시간 · ${s.desc}</div>
         <div class="ic-stats" style="color:rgba(255,165,0,.8);font-size:.62rem">
           성공 ${pct}% → +${successG}G / 실패 → 0G
         </div>
@@ -2607,7 +2607,7 @@ function renderBattleNew() {
     prep:     { label:'🎯 일격 준비',   desc:'다음 공격 ×2.3' },
     reckless: { label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2' },
     guard:    { label:'🛡️ 방어',       desc:'피해 50% 감소' },
-    counter:  { label:'⚔️ 최후의 반격',desc:'HP40%↓ / 50% 반사' },
+    counter:  { label:'⚔️ 최후의 반격',desc:'HP 40% 아래면 50% 반사' },
     rush:     { label:'🔥 몰아치기',   desc:'2턴 공격력↑' },
   };
 
@@ -3120,7 +3120,7 @@ function openSkill2SlotPicker(slotIndex) {
     { id:'prep',     label:'🎯 일격 준비',   desc:'다음 공격 ×2.3', color:'#FFD700' },
     { id:'reckless', label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2', color:'#FF8A80' },
     { id:'guard',    label:'🛡️ 방어',       desc:'피해 50% 감소', color:'#7ec8e3' },
-    { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP40%↓ / 50% 반사', color:'#c39bd3' },
+    { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP 40% 아래면 50% 반사', color:'#c39bd3' },
     { id:'rush',     label:'🔥 몰아치기',   desc:'2턴 공격력↑', color:'#f39c12' },
   ];
   const usedInOther = eq2.filter((id, i) => i !== slotIndex && id);
@@ -3469,10 +3469,10 @@ function setMonsterTab(tab) {
     btn.style.borderColor = active ? 'rgba(255,215,0,.4)' : 'rgba(255,255,255,.15)';
   });
   if (tab === 'infinite') {
-    document.getElementById('monster-modal-title').textContent = '♾️ 무한배틀';
+    document.getElementById('monster-modal-title').textContent = '무한배틀';
     renderInfiniteBattleZoneSelect();
   } else {
-    document.getElementById('monster-modal-title').textContent = '⚔️ 사냥터';
+    document.getElementById('monster-modal-title').textContent = '사냥터';
     MONSTER_STEP = 'zone';
     renderMonsterStep();
   }
@@ -3593,9 +3593,9 @@ function renderInfiniteBattleZoneSelect() {
 
   const lv = CUR.level || 1;
   const zones = [
-    { id:'beginner',     icon:'🌿', name:'초급 사냥터', color:'#6fd49d', border:'rgba(111,212,157,.35)', bg:'rgba(111,212,157,.07)', gold:IB_CONFIG.beginner.baseGold + 'G / 마리', minLv:1  },
-    { id:'intermediate', icon:'🔥', name:'중급 사냥터', color:'#FF8A80', border:'rgba(255,138,128,.35)', bg:'rgba(255,138,128,.07)', gold:IB_CONFIG.intermediate.baseGold + 'G / 마리', minLv:1  },
-    { id:'advanced',     icon:'⚡', name:'고급 사냥터', color:'#7ec8e3', border:'rgba(126,200,227,.35)', bg:'rgba(126,200,227,.07)', gold:IB_CONFIG.advanced.baseGold + 'G / 마리', minLv:21 },
+    { id:'beginner',     icon:'🌿', name:'초급 사냥터', color:'#6fd49d', border:'rgba(111,212,157,.35)', bg:'rgba(111,212,157,.07)', gold:'마리당 ' + IB_CONFIG.beginner.baseGold + 'G', minLv:1  },
+    { id:'intermediate', icon:'🔥', name:'중급 사냥터', color:'#FF8A80', border:'rgba(255,138,128,.35)', bg:'rgba(255,138,128,.07)', gold:'마리당 ' + IB_CONFIG.intermediate.baseGold + 'G', minLv:1  },
+    { id:'advanced',     icon:'⚡', name:'고급 사냥터', color:'#7ec8e3', border:'rgba(126,200,227,.35)', bg:'rgba(126,200,227,.07)', gold:'마리당 ' + IB_CONFIG.advanced.baseGold + 'G', minLv:21 },
   ];
 
   body.innerHTML = `
@@ -3632,7 +3632,7 @@ function renderInfiniteBattleZoneSelect() {
                     ${z.name}${locked ? ` <span style="font-size:.68rem">(Lv.${z.minLv} 필요)</span>` : ''}
                   </div>
                   <div style="font-size:.7rem;color:var(--txt3);margin-top:.1rem">
-                    ${locked ? `현재 Lv.${lv} · Lv.${z.minLv}부터 입장 가능` : `${z.gold} · rare/legend 확률 상승`}
+                    ${locked ? `현재 Lv.${lv} · Lv.${z.minLv}부터 입장 가능` : `${z.gold} · 희귀·전설 몬스터가 더 자주 나와요`}
                   </div>
                 </div>
                 <div style="text-align:right">
@@ -3724,7 +3724,7 @@ function _ibNextMonster() {
   BATTLE_DONE  = false;
   BATTLE_MENU  = 'main';
   document.getElementById('battle-title').textContent =
-    `♾️ 무한배틀 — ${IB.kills + 1}번째`;
+    `무한배틀 — ${IB.kills + 1}번째`;
   document.getElementById('battle-sub').textContent =
     `${IB.zone === 'beginner' ? '초급' : IB.zone === 'intermediate' ? '중급' : '고급'} · 처치 ${IB.kills}마리 · 모은 골드 ${IB.gold}G`;
 
@@ -3879,7 +3879,7 @@ function renderMonsterStep() {
 
   // ── 1단계: 구역 선택 ──────────────────────────────────
   if (MONSTER_STEP === 'zone') {
-    title.textContent = '⚔️ 사냥터';
+    title.textContent = '사냥터';
     const ZONE_INFO = [
       { id:'beginner',     icon:'🌿', name:'초급 사냥터', sub:'Lv 1 ~ 10',  minLv:1,
         color:'#6fd49d', bg:'linear-gradient(150deg,#0a2318,#152e1e)', border:'rgba(111,212,157,.4)',
@@ -3960,7 +3960,7 @@ function renderMonsterStep() {
     const zoneNames  = { beginner:'🌿 초급 사냥터', intermediate:'🔥 중급 사냥터', advanced:'⚡ 고급 사냥터' };
     const zoneColors = { beginner:'#6fd49d', intermediate:'#FF8A80', advanced:'#7ec8e3' };
     const zoneBgs    = { beginner:'linear-gradient(150deg,#0a2318,#152e1e)', intermediate:'linear-gradient(150deg,#2a0d0d,#401515)', advanced:'linear-gradient(150deg,#0a1828,#162840)' };
-    title.textContent = zoneNames[CUR_ZONE] || '⚔️ 사냥터';
+    title.textContent = zoneNames[CUR_ZONE] || '사냥터';
     const zc = zoneColors[CUR_ZONE] || '#FF8A80';
 
     // offers 로드
@@ -4330,7 +4330,7 @@ function renderFarmModal() {
         return `<div class="seed-chip ${SEL_SEED===inv.id?'sel':''}" onclick="SEL_SEED='${inv.id}';renderFarmModal()">
           ${sd.icon} ${sd.name}${mutTag} x${inv.qty}</div>`;
       }).join('')
-    : `<span style="font-size:.75rem;color:var(--txt3)">씨앗 없음 (상점에서 구매)</span>`;
+    : `<span style="font-size:.75rem;color:var(--txt3)">씨앗이 없어요 · 상점에서 살 수 있어요</span>`;
 
   let gridHtml = '';
   for (let i = 0; i < farmSize; i++) {
@@ -4353,7 +4353,7 @@ function renderFarmModal() {
   document.getElementById('farm-grid-wrap').innerHTML =
     `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:3px">${gridHtml}</div>`;
   document.getElementById('farm-info').textContent =
-    `밭 크기: ${cols}×${rows} (${farmSize}칸) | 심은 작물: ${farm.length} | 수확 가능: ${farm.filter(p=>{const sd=Utils.getSeedByCrop(p.crop);return sd&&Utils.cropReady(p.planted,sd.growHours)}).length}`;
+    `밭 ${farmSize}칸 · 심은 작물 ${farm.length} · 거둘 수 있는 작물 ${farm.filter(p=>{const sd=Utils.getSeedByCrop(p.crop);return sd&&Utils.cropReady(p.planted,sd.growHours)}).length}`;
 }
 
 // ══ 집 ══
@@ -13137,7 +13137,7 @@ function editEmotionRecord(date, period) {
   _emoSelectedKey   = null;
   _emoSelectedLevel = null;
   const existing = DB_EMOTION.get(CUR.id, date, period);
-  const title = `✏️ ${date.slice(5).replace('-','/')} ${period==='am'?'오전':'오후'} 수정`;
+  const title = `${date.slice(5).replace('-','/')} ${period==='am'?'오전':'오후'} 수정`;
   document.getElementById('emotion-modal-title').textContent = title;
   document.getElementById('emotion-step1').style.display = '';
   document.getElementById('emotion-step2').style.display = 'none';
@@ -13210,9 +13210,9 @@ function openEmotionModal(period) {
 
   const today = Utils.todayStr();
   const existing = DB_EMOTION.get(CUR.id, today, period);
-  const title = period === 'am' ? '🌅 오전 감정' : '🌇 오후 감정';
+  const title = period === 'am' ? '오전 감정' : '오후 감정';
   document.getElementById('emotion-modal-title').textContent =
-    (existing ? '✏️ 수정: ' : '💭 ') + title;
+    (existing ? '수정: ' : '') + title;
 
   // step1 표시
   document.getElementById('emotion-step1').style.display = '';
@@ -13341,7 +13341,7 @@ function renderInv() {
 
     // ── 스킬 현황 카드 ──────────────────────────────────────
     html += `<div style="font-size:.78rem;font-weight:700;color:var(--txt1);margin-bottom:.5rem">📖 보유 스킬 현황</div>`;
-    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">마스터리북을 사면 레벨이 올라요. 상점 → 📚 마스터리북 탭</div>`;
+    html += `<div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">마스터리북을 사면 레벨이 올라요. 상점의 마스터리북 탭에서 살 수 있어요.</div>`;
     html += typeInfo.map(({ type, label, color, maxLv }) => {
       const lv   = sl[type] ?? 0;
       const pct  = Math.round(lv / maxLv * 100);
@@ -13369,7 +13369,7 @@ function renderInv() {
           <div style="height:100%;width:${pct}%;background:${color};border-radius:5px;transition:width .4s ease"></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.68rem;color:var(--txt3)">계수 <strong style="color:${color}">${multTxt}</strong></span>
+          <span style="font-size:.68rem;color:var(--txt3)">세기 <strong style="color:${color}">${multTxt}</strong></span>
           ${nextTxt}
         </div>
       </div>`;
@@ -13382,7 +13382,7 @@ function renderInv() {
       { id:'prep',     label:'🎯 일격 준비',   desc:'다음 공격 ×2.3', color:'#FFD700' },
       { id:'reckless', label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2', color:'#FF8A80' },
       { id:'guard',    label:'🛡️ 방어',       desc:'피해 50% 감소', color:'#7ec8e3' },
-      { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP40%↓ / 반사', color:'#c39bd3' },
+      { id:'counter',  label:'⚔️ 최후의 반격',desc:'HP 40% 아래면 반사', color:'#c39bd3' },
       { id:'rush',     label:'🔥 몰아치기',   desc:'2턴 공격력↑', color:'#f39c12' },
     ];
 
@@ -13416,7 +13416,7 @@ function renderInv() {
       {k:'head',icon:'🪖',l:'머리'},{k:'body',icon:'🥋',l:'옷'},{k:'weapon',icon:'⚔️',l:'무기'},
       {k:'glove',icon:'🧤',l:'장갑'},{k:'shoe',icon:'👟',l:'신발'}
     ];
-    html += `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">⚔️ 현재 장착 장비</div>`;
+    html += `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">현재 장착 장비</div>`;
     html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.35rem;margin-bottom:1rem">`;
     html += slots.map(sl => {
       const eqId   = CUR.equipmentIds?.[sl.k];
@@ -13529,7 +13529,7 @@ function renderInv() {
         return `<div class="inv-slot filled">
           <div class="inv-icon">${d.icon}</div>
           <div class="inv-name">${d.name}</div>
-          <div class="inv-qty">x${i.qty} <span style="color:var(--txt3)">(배치:${used})</span></div>
+          <div class="inv-qty">${i.qty}개 <span style="color:var(--txt3)">· 놓은 것 ${used}</span></div>
         </div>`;
       }).join('') + Array(blanks).fill('<div class="inv-slot"></div>').join('') + `</div>`;
   }
@@ -14261,9 +14261,9 @@ function visitFriend(id) {
     </div>
     <!-- 탭 -->
     <div class="modal-tabs" style="margin-bottom:.8rem" id="${modalId}-tabs">
-      <button class="mtab on" onclick="openFriendFullscreen('${id}')">🌸 꾸미기 보기</button>
-      <button class="mtab"    onclick="vfTab('${modalId}','books',this)">📚 독서</button>
-      <button class="mtab"    onclick="vfTab('${modalId}','artwork',this)">🖼️ 작품</button>
+      <button class="mtab on" onclick="openFriendFullscreen('${id}')">꾸미기 보기</button>
+      <button class="mtab"    onclick="vfTab('${modalId}','books',this)">독서</button>
+      <button class="mtab"    onclick="vfTab('${modalId}','artwork',this)">작품</button>
     </div>
     <!-- 인테리어 탭 (전체화면으로 열림) -->
     <div id="${modalId}-deco">
@@ -15641,7 +15641,7 @@ function renderStudySubjectPick() {
   const body = document.getElementById('study-body');
   const ttl  = document.getElementById('study-title');
   if (!body) return;
-  if (ttl) ttl.textContent = '📚 오늘의 학습';
+  if (ttl) ttl.textContent = '오늘의 학습';
 
   const active = CurriculumUtils.activeUnitIds();   // 교사가 켠 단원(없으면 전체)
   const stats  = getUnitStats(CUR.id);

@@ -4576,7 +4576,7 @@ function updateBattleSettingsSummary() {
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">👻 유령배율: <strong>${ghost}</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">속성유리: <strong>×${adv}</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">속성불리: <strong>×${dis}</strong></span>
-    <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">노말계수: <strong>${nmStr}</strong></span>
+    <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">기본 공격 계수: <strong>${nmStr}</strong></span>
     <span style="background:rgba(255,215,0,.12);border-radius:6px;padding:.15rem .5rem">도감첫처치: <strong>${dr.firstKillEnabled?`ON(${dr.firstKillGold}G)`:'OFF'}</strong></span>
     <span style="font-size:.7rem;color:var(--txt3);align-self:center">${modified}</span>`;
 }
@@ -5787,7 +5787,7 @@ async function cleanupDerivedNodes() {
 
   if (!confirm(
     `중복 저장된 옛 퀘스트 목록 ${cnt}건(약 ${kb}KB)을 지울까요?\n\n` +
-    `· 이 데이터는 활동 기록(questLogs)에서 매번 자동으로 다시 만들어집니다\n` +
+    `· 이 데이터는 활동 기록에서 매번 자동으로 다시 만들어집니다\n` +
     `· 지워도 기록·통계·완료 판정에 영향이 없습니다\n` +
     `· 접속할 때마다 오가던 데이터가 그만큼 줄어듭니다`)) return;
 

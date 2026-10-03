@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="./gamedata.js?v=20260924me2"></script>
+<script src="./gamedata.js?v=20261003ds2"></script>
 <script src="./curriculum.js?v=20260915stn"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
 <link rel="stylesheet" href="./admin.css?v=20260915d3e">
@@ -654,9 +654,9 @@
                 <option value="intermediate">🔥 중급만</option>
                 <option value="advanced">⚡ 고급만</option>
                 <option value="ghost">👻 유령형만</option>
-                <option value="common">일반(common)만</option>
-                <option value="rare">희귀(rare)만</option>
-                <option value="legend">전설(legend)만</option>
+                <option value="common">일반만</option>
+                <option value="rare">희귀만</option>
+                <option value="legend">전설만</option>
               </select>
               <select id="bulk-stat" class="form-select" style="width:auto;font-size:.78rem">
                 <option value="hp">HP</option>
@@ -748,7 +748,7 @@
             </div>
             <!-- 유령형 노말 배율 -->
             <div style="display:flex;align-items:center;gap:.8rem">
-              <label style="font-size:.82rem;font-weight:600;min-width:140px">유령형 노말 배율</label>
+              <label style="font-size:.82rem;font-weight:600;min-width:140px">유령형 기본 공격 배율</label>
               <input class="form-input w-80" type="number" id="bs-ghost-mult" value="0.55" min="0.1" max="1.0" step="0.05">
               <span class="text-muted-base">× (1.0 = 감소 없음, 0.55 기본)</span>
             </div>
@@ -793,7 +793,7 @@
         </div>
         <!-- 노말 스킬 계수 -->
         <div class="table-card mb-08">
-          <div class="tc-header"><div class="tc-title">⚔️ 노말 스킬 계수 (Lv1~7)</div></div>
+          <div class="tc-header"><div class="tc-title">⚔️ 기본 공격 계수 (Lv1~7)</div></div>
           <div style="padding:1rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
               ${[1,2,3,4,5,6,7].map(lv=>`
@@ -1592,6 +1592,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20261003tb2"></script>
+<script src="./admin.js?v=20261003ds2"></script>
 </body>
 </html>
