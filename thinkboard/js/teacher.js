@@ -2,7 +2,7 @@
 import { h, toast, modal, copyText } from './util.js';
 import { newBoard, ops, stats, SRC } from './model.js';
 import { BUILTIN } from './templates.js';
-import { boardToText, promptFor, parseMail } from './export.js';
+import { boardToText, promptFor, parseMail, boardOutline } from './export.js';
 import { settingsForm, withDefaults, LAYOUTS } from './settings.js';
 import { icon } from './icons.js';
 import { studentRows, cardRows, logRows, toCSV, people } from './research.js';
@@ -74,6 +74,7 @@ export function mountTeacher(root, { store, home, roster = [] }) {
     const meta = [LAYOUTS[st.layout]?.replace(/\(.*\)/, ''), `${s.writers}명 · 카드 ${s.cards}장`, s.mailNew ? `우편함 새 카드 ${s.mailNew}` : null, st.open ? null : '쓰기 닫힘'].filter(Boolean).join(' · ');
     const more = h('button', { class: 'ibtn', title: '더 보기', onclick: e => menu(e.currentTarget, [
       [st.open ? 'lock' : 'unlock', st.open ? '쓰기 닫기' : '쓰기 열기', () => apply(b, 'setSettings', { settings: { open: !st.open } })],
+      ['book', '정리본 보기(자료 만들기용)', () => outline(b)],
       ['send', 'Claude에게 보내기', () => toClaude(b)],
       ['download', 'AI 카드 넣기(우편함)', () => putMail(b)],
       ['clip', '결과물 붙이기', () => addResult(b)],
@@ -118,6 +119,16 @@ export function mountTeacher(root, { store, home, roster = [] }) {
       { label: '카드 CSV', onclick: csv('카드', cardRows) },
       { label: '전체 JSON', onclick: json },
       { label: '학생별 요약 CSV', primary: true, onclick: csv('학생별', studentRows) },
+    ]);
+  }
+
+  // [THINKBOARD-STORY-1] 정리본 — 아이들이 정리한 것을 그대로 글로(이야기 줄 = 차례 · 갈림길 · 끝 / 나무 = 층) · 이름 · 출처 없음
+  function outline(b) {
+    const ta = h('textarea', { class: 'mono', rows: 18, readonly: true });
+    ta.value = boardOutline(b);
+    modal(`정리본 — ${b.title}`, h('div', {}, h('p', { class: 'help' }, '아이들이 판에 정리한 그대로예요. 복사해서 학습지 · 그림책 · 발표 자료를 만들 때 써요. 아이 이름은 들어가지 않아요.'), ta), [
+      { label: '글로 받기(.txt)', onclick: () => { const a = h('a', { href: URL.createObjectURL(new Blob([ta.value], { type: 'text/plain;charset=utf-8' })), download: `정리본-${b.title}-${new Date().toISOString().slice(0, 10)}.txt` }); a.click(); } },
+      { label: '복사', primary: true, onclick: async () => toast((await copyText(ta.value)) ? '정리본을 복사했어요' : '복사 실패') },
     ]);
   }
 

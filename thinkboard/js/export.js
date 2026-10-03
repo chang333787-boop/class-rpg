@@ -1,10 +1,60 @@
 // 판 → 글(Claude가 읽는 모양) · AI 지시문 · AI 답(JSON) → 우편함 카드
 // 아이 이름은 내보내지 않는다(개인정보) — 카드 글과 출처만.
-import { SRC } from './model.js';
+import { SRC, storyGraph, treeOf, matZonesOf } from './model.js';
+import { withDefaults } from './settings.js';
 
 const srcTag = c => (c.kind === 'unknown' ? '❔' : SRC[c.src] || c.src) + (c.ar ? ' · 결과 보고 고침' : '');
 
+// [THINKBOARD-STORY-1] 이야기 줄 → 글: 차례대로 · 갈림길은 A · B 로 들여 · 끝 · 붙인 인물/장소 · 길이 멈춘 곳
+export function storyLines(b, { src = false } = {}) {
+  const g = storyGraph(b), L = [], seen = new Set();
+  const tagTxt = c => { const t = Object.keys(c.tags || {}).map(k => b.cards[k]).filter(Boolean).map(x => `${x.zone} ${x.text}`); return t.length ? ` (${t.join(' · ')})` : ''; };
+  const one = c => `${c.zone === '선택' ? '[고르는 장면] ' : ''}${c.spine ? c.spine + ' ' : ''}${c.text}${tagTxt(c)}${c.end ? ' [끝]' : ''}${src ? ` [${srcTag(c)}]` : ''}`;
+  const walk = (id, depth, label) => {
+    const pad = '  '.repeat(depth), c = b.cards[id];
+    if (seen.has(id)) { L.push(`${pad}${label}→ 앞의 "${c.text.slice(0, 12)}"(으)로 이어져요`); return; }
+    seen.add(id); L.push(`${pad}${label}${one(c)}`);
+    const outs = g.out.get(id) || [];
+    if (!outs.length) { if (!c.end) L.push(`${pad}  … (이 길은 아직 끝이 없어요)`); return; }
+    if (outs.length === 1) return walk(outs[0].to, depth, '');
+    outs.forEach((l, i) => walk(l.to, depth + 1, `${'ABCD'[i] || '·'}. `));
+  };
+  g.lines.forEach((r, i) => { if (i) L.push('', '(다른 줄)'); walk(r.id, 0, ''); });
+  return { lines: L, g };
+}
+// 나무 → 글: 층마다 두 칸 들여
+export function treeLines(b) {
+  const T = treeOf(b), L = [];
+  const walk = (id, d) => T.kids(id).forEach(c => { L.push(`${'  '.repeat(d)}- ${c.text}`); walk(c.id, d + 1); });
+  walk('', 0);
+  return L;
+}
+// 선생님 정리본 — 아이들이 정리한 것을 그대로 글로(이름 · 출처 빼고) · 자료 만들기용
+export function boardOutline(b) {
+  const st = withDefaults(b.settings), L = [b.title, ''];
+  const cards = Object.values(b.cards).filter(c => !c.hidden);
+  const unk = cards.filter(c => c.kind === 'unknown');
+  if (st.layout === 'story') {
+    const { lines, g } = storyLines({ ...b, cards: Object.fromEntries(cards.map(c => [c.id, c])) });
+    for (const z of matZonesOf(b)) { const m = g.mats.filter(c => c.zone === z); if (m.length) L.push(`${z}: ${m.map(c => c.text).join(', ')}`); }
+    L.push('', ...(lines.length ? lines : ['(아직 사건이 없어요)']));
+    if (g.loose.length) L.push('', '줄에 안 이은 카드:', ...g.loose.map(c => `- ${c.text}`));
+  } else if (st.layout === 'tree') {
+    const t = treeLines({ ...b, cards: Object.fromEntries(cards.map(c => [c.id, c])) });
+    L.push(...(t.length ? t : ['(아직 없어요)']));
+  } else {
+    const zones = b.template.zones || [], used = new Set();
+    for (const z of zones) { const l = cards.filter(c => c.zone === z && c.kind !== 'unknown'); l.forEach(c => used.add(c.id)); L.push(`[${z}]`, ...(l.length ? l.map(c => `- ${c.text}`) : ['- (비어 있음)']), ''); }
+    const rest = cards.filter(c => !used.has(c.id) && c.kind !== 'unknown');
+    if (rest.length) L.push(zones.length ? '[그 밖]' : '[카드]', ...rest.sort((a, z) => a.t - z.t).map(c => `- ${c.text}`));
+  }
+  if (unk.length) L.push('', '아직 안 정한 것:', ...unk.map(c => `- ${c.text}`));
+  return L.join('\n');
+}
+
 export function boardToText(b) {
+  const st = withDefaults(b.settings);
+  if (st.layout === 'story' || st.layout === 'tree') return structText(b, st);
   const cards = Object.values(b.cards).sort((a, z) => a.y - z.y || a.x - z.x);
   const name = id => (b.cards[id] ? `"${b.cards[id].text}"` : '(지운 카드)');
   const L = [`# ${b.title} — ${b.template.name}`, ''];
@@ -35,6 +85,23 @@ export function boardToText(b) {
   }
   const res = Object.values(b.results);
   if (res.length) L.push('## 결과물', ...res.map(r => `- ${r.title || r.url} ${r.url}`), '');
+  return L.join('\n');
+}
+
+// 이야기 줄 · 나무 판을 AI 가 읽는 글로 — 차례 · 갈림길 · 끝 · 층이 보이게(출처 붙임 · 이름 없음)
+function structText(b, st) {
+  const L = [`# ${b.title} — ${b.template.name}`, ''];
+  if (st.layout === 'story') {
+    const { lines, g } = storyLines(b, { src: true });
+    for (const z of matZonesOf(b)) { const m = g.mats.filter(c => c.zone === z); L.push(`## ${z}`, ...(m.length ? m.map(c => `- ${c.text} [${srcTag(c)}]`) : ['- (비어 있음)']), ''); }
+    L.push('## 이야기 줄(차례 · 갈림길)', ...(lines.length ? lines : ['- (아직 사건이 없어요)']), '');
+    if (g.loose.length) L.push('## 아직 줄에 안 이은 카드', ...g.loose.map(c => `- ${c.text} [${srcTag(c)}]`), '');
+  } else {
+    const t = treeLines(b);
+    L.push('## 주제 나무', ...(t.length ? t : ['- (비어 있음)']), '');
+  }
+  const unk = Object.values(b.cards).filter(c => c.kind === 'unknown');
+  L.push('## ❔ 아직 안 정한 것', ...(unk.length ? unk.map(c => `- ${c.text}`) : ['- (없음)']), '');
   return L.join('\n');
 }
 
