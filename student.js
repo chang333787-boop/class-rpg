@@ -14459,8 +14459,8 @@ function applyLayout(mode) {
 //   숨기면 폰에서 넓게 보기로 돌아갈 길이 없어지므로 글자만 빼고 아이콘은 남긴다.
 //   폭이 바뀌면(가로/세로 돌리기) 다시 맞춘다.
 const HUD_NARROW_PX = 430;
-function hudBtnText(icon, label) {
-  return window.innerWidth <= HUD_NARROW_PX ? icon : icon + ' ' + label;
+function hudBtnText(icon, label) {   // [DESLOP-3] 이모지 없이 글자만 — 좁은 화면은 '보기'를 뺀 짧은 말
+  return window.innerWidth <= HUD_NARROW_PX ? label.replace(' 보기', '') : label;
 }
 function syncHudButtons() {
   const lb = document.getElementById('layout-toggle-btn');
