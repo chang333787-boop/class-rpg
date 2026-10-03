@@ -2592,7 +2592,7 @@ function startBattle(monId) {
 
   closeModal('m-monster');
   openModal('m-battle');
-  document.getElementById('battle-title').textContent = `⚔️ ${mon.name} 출현!`;
+  document.getElementById('battle-title').textContent = BV2_ZONE[mon.zone] || '사냥터';
 
   if (BATTLE_STATE) {
     if (BATTLE_STATE.turn === 'monster') {
@@ -2609,179 +2609,280 @@ function startBattle(monId) {
   }
 }
 
-// ── 새 턴제 전투 화면 렌더 ──
-function renderBattleNew() {
-  const s     = BATTLE_STATE;
-  const mon   = s.monster;
-  const player = CUR;
-  const arenaEl = document.getElementById('battle-arena');
-  if (!arenaEl) return;
-
-  const playerHpPct  = Math.max(0, Math.round(s.playerHp  / s.playerHpMax  * 100));
-  const monsterHpPct = Math.max(0, Math.round(s.monsterHp / s.monsterHpMax * 100));
-  const recentLog    = s.log.slice(-4).join('<br>');
-
-  // 공격 버튼 — 장착 스킬 4슬롯 기준
-  const typeColors = {
-    normal: ['rgba(255,255,255,.08)','rgba(255,215,0,.12)','rgba(255,215,0,.2)','rgba(255,215,0,.35)'],
-    fire:   ['rgba(255,107,53,.08)','rgba(255,107,53,.15)','rgba(255,107,53,.25)','rgba(255,107,53,.4)'],
-    water:  ['rgba(79,195,247,.08)','rgba(79,195,247,.15)','rgba(79,195,247,.25)','rgba(79,195,247,.4)'],
-    grass:  ['rgba(102,187,106,.08)','rgba(102,187,106,.15)','rgba(102,187,106,.25)','rgba(102,187,106,.4)'],
+// ══ [BATTLE-V2] 무대형 배틀 화면 ══════════════════════════════════════
+//  계산·저장·횟수는 그대로(gamedata.js 엔진 · startBattle · _finishBattle · finalizeBattle · 무한배틀 규칙). 그리는 것만 새로.
+//  무대는 전투(BATTLE_STATE)마다 한 번 그리고, 차례마다는 체력·차례·단추·소식만 바꾼다 — 등장 연출이 다시 돌지 않게.
+//  크롬북 1366×610 에서 스크롤 없이: 위 띠 46 · 무대 · 아래 행동판. 업적은 결과 카드 안 한 줄(위에 덮지 않음).
+const BV2_ZONE = { beginner: '초급 사냥터', intermediate: '중급 사냥터', advanced: '고급 사냥터' };
+const BV2_EL = { fire: { name: '불꽃', c: '#FF9A7A' }, water: { name: '냉기', c: '#8fd3ff' }, grass: { name: '자연', c: '#7fe08f' } };
+const BV2_ATK = {
+  normal: { t: '일반 공격', c: '#F2D27C', g: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>' },
+  fire:   { t: '화염 공격', c: '#FF7A45', g: '<path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.2-2-5.6-4-7.6.2 2-1 3.4-2.3 3.4C11.4 11.2 11 9 12.5 6 9 7.5 5 11 5 15.4 5 19.1 7.6 22 12 22z"/>' },
+  water:  { t: '냉기 공격', c: '#5CC8FF', g: '<path d="M12 2v20M4.5 6.5l15 11M19.5 6.5l-15 11"/><path d="M9.5 3.5 12 6l2.5-2.5M9.5 20.5 12 18l2.5 2.5"/>' },
+  grass:  { t: '자연 공격', c: '#5FD27A', g: '<path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19 13 11"/>' },
+};
+const BV2_SK = {
+  heal:     { t: '응급치료',   d: '체력 30% 회복',    g: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>' },
+  guard:    { t: '방어',       d: '받는 피해 절반',   g: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/>' },
+  counter:  { t: '최후의 반격', d: '체력 40% 아래일 때', g: '<path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5"/>' },
+  prep:     { t: '일격 준비',   d: '다음 공격 ×2.3',   g: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/>' },
+  reckless: { t: '무리한 공격', d: '반반 확률 ×2.2',   g: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  rush:     { t: '몰아치기',   d: '2턴 공격력↑',      g: '<path d="m5 6 6 6-6 6M13 6l6 6-6 6"/>' },
+};
+const _bv2Svg = (d, s) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+// 받침에 맞는 조사 — '슬라임이' · '골렘이' · '박쥐가'
+function _bv2Jong(w) { const s = String(w || ''), c = s.charCodeAt(s.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; }
+const _bv2J = (w, a, b) => String(w) + (_bv2Jong(w) ? a : b);
+// 엔진 기록 한 줄 → 소식 글: 태그 · 앞 그림문자를 빼고 '이(가)' 같은 조사를 받침에 맞게
+function _bv2Text(html) {
+  let t = String(html || '').replace(/<[^>]+>/g, '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '').trim();
+  return t.replace(/([가-힣A-Za-z0-9]+)(이\(가\)|을\(를\)|은\(는\)|와\(과\))/g, (m, w, p) => { const [a, b] = p.replace(')', '').split('('); return w + (_bv2Jong(w) ? a : b); });
+}
+function _bv2Match(type, mon) {   // 공격 속성이 이 몬스터에게 강한가(관리자 상성표를 따르는 ELEMENT_CHART 그대로)
+  if (!mon || type === 'normal' || !mon.element || typeof ELEMENT_CHART === 'undefined') return 1;
+  return (ELEMENT_CHART[type] && ELEMENT_CHART[type][mon.element]) || 1;
+}
+function _bv2StageHTML(s, mon) {
+  const zone = BV2_ZONE[mon.zone] ? mon.zone : 'beginner';
+  const el = BV2_EL[mon.element];
+  const rar = s.ibRarity === 'legend' ? '<span class="bv2-tag gold">전설</span>' : s.ibRarity === 'rare' ? '<span class="bv2-tag rare">희귀</span>' : '';
+  const hp = k => `<div class="bv2-hp ${k}"><i class="trail"></i><i class="fill"></i></div>`;
+  return `<div class="bv2-stage" data-zone="${zone}" id="bv2-stage">
+    <div class="bv2-bg bv2-sky"></div>
+    <div class="bv2-bg bv2-far"><svg viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 210 C140 120 260 150 380 170 S620 90 760 140 1020 110 1200 160 V300 H0Z" fill="var(--bv2-h1)" opacity=".75"/>
+      <path d="M0 250 C160 190 300 220 460 230 S760 170 920 210 1100 200 1200 220 V300 H0Z" fill="var(--bv2-h2)" opacity=".85"/>
+      <path d="M0 285 C200 250 420 270 600 265 S980 245 1200 268 V300 H0Z" fill="var(--bv2-h3)"/></svg></div>
+    <div class="bv2-deco" aria-hidden="true"><svg viewBox="0 0 1200 430" preserveAspectRatio="xMidYMax slice">
+      <g class="z zb"><g opacity=".62"><rect x="173" y="226" width="9" height="46" rx="3" fill="#5b4632"/><circle cx="160" cy="214" r="26" fill="#4f9a4f"/><circle cx="196" cy="206" r="30" fill="#5aa957"/><circle cx="178" cy="186" r="26" fill="#6bb862"/>
+        <rect x="1003" y="222" width="10" height="50" rx="3" fill="#5b4632"/><circle cx="988" cy="210" r="30" fill="#4f9a4f"/><circle cx="1028" cy="202" r="33" fill="#5aa957"/><circle cx="1008" cy="178" r="29" fill="#6bb862"/>
+        <circle cx="250" cy="258" r="16" fill="#58a654"/><circle cx="266" cy="262" r="12" fill="#4f9a4f"/><circle cx="1066" cy="258" r="15" fill="#58a654"/></g>
+        <g fill="#fff" opacity=".75"><ellipse cx="300" cy="70" rx="58" ry="16"/><ellipse cx="336" cy="62" rx="36" ry="18"/><ellipse cx="860" cy="96" rx="70" ry="15"/><ellipse cx="900" cy="88" rx="40" ry="17"/></g></g>
+      <g class="z zi" opacity=".7"><path d="M120 270 150 150 178 270Z M200 270 214 196 232 270Z M960 270 992 132 1024 270Z M1044 270 1060 200 1078 270Z" fill="#3a1610"/>
+        <g fill="#ffb26b" opacity=".75"><circle cx="420" cy="120" r="2.4"/><circle cx="640" cy="80" r="2"/><circle cx="760" cy="150" r="2.6"/><circle cx="540" cy="190" r="1.8"/><circle cx="880" cy="60" r="2.2"/></g></g>
+      <g class="z za"><g fill="#fff"><circle cx="120" cy="60" r="1.6"/><circle cx="260" cy="110" r="1.2"/><circle cx="420" cy="40" r="1.8"/><circle cx="560" cy="90" r="1.1"/><circle cx="700" cy="50" r="1.5"/><circle cx="820" cy="120" r="1.2"/><circle cx="1080" cy="80" r="1.7"/><circle cx="340" cy="170" r="1"/><circle cx="640" cy="150" r="1.2"/></g>
+        <path d="M985 70a36 36 0 1 0 30 56 30 30 0 1 1-30-56z" fill="#f4ecff" opacity=".85"/>
+        <g fill="#15133a" opacity=".85"><rect x="150" y="160" width="26" height="110"/><rect x="140" y="150" width="46" height="12"/><rect x="1010" y="170" width="24" height="100"/><rect x="1000" y="160" width="44" height="12"/></g></g>
+    </svg></div>
+    <div class="bv2-bg bv2-ground"></div>
+    <div class="bv2-spot me"></div><div class="bv2-spot foe"></div>
+    <div class="bv2-bg bv2-light"></div><div class="bv2-bg bv2-vig"></div>
+    <div class="bv2-plate me"><div class="bv2-prow"><b>${escHtml(CUR.name || '나')}</b><span>Lv.${CUR.level || 1}</span></div>${hp('me')}<div class="bv2-pnum"><span>체력</span><b class="bv2-hpn-me"></b></div></div>
+    <div class="bv2-plate foe"><div class="bv2-prow"><b>${escHtml(mon.name)}</b><span>Lv.${mon.level || 1}</span>${rar}${el ? `<span class="bv2-tag" style="color:${el.c}">${el.name}</span>` : ''}${mon.trait === 'ghost' ? '<span class="bv2-tag">유령</span>' : ''}</div>${hp('foe')}<div class="bv2-pnum"><span></span><b class="bv2-hpn-foe"></b></div></div>
+    <div class="bv2-turn" id="bv2-turn"></div>
+    <div class="bv2-fighter me idle" id="ba-char-emoji">${charSVG(CUR)}</div>
+    <div class="bv2-fighter foe idle" id="ba-mon-emoji">${iconImg(mon, 'monsters', '100%')}</div>
+    <div class="bv2-fx" id="bv2-fx"></div>
+    <div class="bv2-banner" id="bv2-banner"></div>
+    <div class="bv2-ticker" id="ba-log"></div>
+    <div class="bv2-result" id="bv2-result"></div>
+  </div>
+  <div class="bv2-actions" id="bv2-actions"><div class="bv2-atk-row" id="bv2-atk-row"></div><div class="bv2-sk-row" id="bv2-sk-row"></div></div>`;
+}
+// 체력바: 채움은 바로, 깎인 자리 잔상은 조금 늦게
+function _updateBattleHpBars(state) {
+  const st = state || BATTLE_STATE; if (!st) return;
+  const set = (k, hp, max) => {
+    const bar = document.querySelector('.bv2-hp.' + k); if (!bar) return;
+    const pct = Math.max(0, Math.min(100, hp / Math.max(1, max) * 100));
+    bar.classList.toggle('low', pct <= 30);
+    bar.querySelector('.fill').style.width = pct + '%'; bar.querySelector('.trail').style.width = pct + '%';
+    const n = document.querySelector('.bv2-hpn-' + k); if (n) n.textContent = `${Math.max(0, hp)} / ${max}`;
   };
-  const typeBorder    = { normal:'rgba(255,215,0,.3)', fire:'rgba(255,107,53,.45)', water:'rgba(79,195,247,.45)', grass:'rgba(102,187,106,.45)' };
-  const typeTextColor = { normal:'var(--gold)', fire:'#FF8A80', water:'#7ec8e3', grass:'#6fd49d' };
-  const typeLabels    = { normal:'⚔️ 일반 공격', fire:'🔥 화염 공격', water:'💧 냉기 공격', grass:'🌿 자연 공격' };
-
-  // equippedSkills: null 슬롯은 버튼 없음, 중복 제거
-  const equippedTypes = [...new Set((CUR.equippedSkills || ['normal',null,null,null]).filter(Boolean))];
-  // 아무것도 없으면 노말 기본 보장
-  const battleBtnTypes = equippedTypes.length > 0 ? equippedTypes : ['normal'];
-
-  const btns = battleBtnTypes.map(type => {
-    const lvl    = (s.skillLevels[type] || 0);
-    const canUse = lvl >= 1;
-    const tier   = _skillEffectTier(lvl) - 1;
-    const bg     = canUse ? (typeColors[type]||typeColors.normal)[tier] : 'rgba(255,255,255,.04)';
-    const bc     = canUse ? (typeBorder[type]||'rgba(255,215,0,.3)') : 'rgba(255,255,255,.1)';
-    const tc     = canUse ? (typeTextColor[type]||'var(--gold)') : 'var(--txt3)';
-    const disabled = (!canUse || s.finished || s.turn !== 'player') ? 'disabled' : '';
-    return `<button class="btn-sm" ${disabled} onclick="doAttack('${type}')"
-      style="flex:1;min-width:0;font-size:.76rem;padding:.4rem .2rem;border-radius:8px;
-             border:1.5px solid ${bc};background:${bg};color:${tc};
-             ${!canUse?'opacity:.35':''}">
-      ${typeLabels[type]||type}<br>
-      <span style="font-size:.6rem">${canUse ? `Lv${lvl}` : '미습득'}</span>
-    </button>`;
+  set('me', st.playerHp, st.playerHpMax); set('foe', st.monsterHp, st.monsterHpMax);
+}
+function _bv2Turn() {
+  const s = BATTLE_STATE, t = document.getElementById('bv2-turn'); if (!s || !t) return;
+  const mine = s.turn === 'player', txt = s.finished ? '' : mine ? '내 차례' : `${s.monster.name} 차례`;
+  if (t.textContent === txt) return;
+  t.textContent = txt; t.classList.toggle('foe-turn', !mine); t.classList.toggle('off', !txt);
+  t.classList.remove('swap'); void t.offsetWidth; t.classList.add('swap');
+}
+function _bv2Actions() {
+  const s = BATTLE_STATE, mon = s && s.monster;
+  const row = document.getElementById('bv2-atk-row'), sk = document.getElementById('bv2-sk-row'), box = document.getElementById('bv2-actions');
+  if (!s || !row || !sk) return;
+  box.classList.toggle('done', !!s.finished);
+  const myTurn = !s.finished && s.turn === 'player', reck = BATTLE_MENU === 'reckless';
+  const types = [...new Set((CUR.equippedSkills || ['normal', null, null, null]).filter(Boolean))];
+  const list = types.length ? types : ['normal'];
+  row.style.setProperty('--n', list.length);
+  row.innerHTML = list.map(type => {
+    const a = BV2_ATK[type] || BV2_ATK.normal, lv = (s.skillLevels || {})[type] || 0, can = lv >= 1, m = _bv2Match(type, mon);
+    const badge = !can ? '' : m > 1 ? '<span class="bv2-badge">강해요!</span>' : m < 1 ? '<span class="bv2-badge weak">약해요</span>' : '';
+    const go = reck ? `doReckless('${type}')` : `doAttack('${type}')`;
+    return `<button class="bv2-atk" style="--ec:${a.c}" ${can && myTurn ? '' : 'disabled'} onclick="BATTLE_MENU='main';${go}">${badge}
+      <span class="bv2-gl">${_bv2Svg(a.g, 26)}</span><span><span class="bv2-at">${a.t}</span><span class="bv2-as">${can ? 'Lv.' + lv : '아직 못 배웠어요'}</span></span></button>`;
   }).join('');
-
-  // ── 2단계 액션 메뉴 ─────────────────────────────────
-  const SKILL2_INFO = {
-    heal:     { label:'💊 응급치료',    desc:'HP 30% 회복' },
-    prep:     { label:'🎯 일격 준비',   desc:'다음 공격 ×2.3' },
-    reckless: { label:'⚡ 무리한 공격', desc:'50% 확률 ×2.2' },
-    guard:    { label:'🛡️ 방어',       desc:'피해 50% 감소' },
-    counter:  { label:'⚔️ 최후의 반격',desc:'HP 40% 아래면 50% 반사' },
-    rush:     { label:'🔥 몰아치기',   desc:'2턴 공격력↑' },
-  };
-
-  let actionHtml = '';
-  if (!s.finished && s.turn === 'player') {
-    const hasSkill2 = (s.equippedSkill2 || []).filter(Boolean).some(id => !s.skill2Used?.[id]);
-
-    if (BATTLE_MENU === 'main') {
-      actionHtml = `<div class="bat-actions">
-        <button class="bat-btn-attack" onclick="BATTLE_MENU='attack';renderBattleNew()">⚔️ 공격</button>
-        <button class="bat-btn-skill" onclick="BATTLE_MENU='skill';renderBattleNew()"
-          ${!hasSkill2?'disabled':''}>✨ 스킬</button>
-      </div>`;
-
-    } else if (BATTLE_MENU === 'attack') {
-      const attackBtns = battleBtnTypes.map(type => {
-        const lvl = s.skillLevels[type] || 0;
-        const canUse = lvl >= 1;
-        const tier = _skillEffectTier(lvl) - 1;
-        const bg = canUse ? (typeColors[type]||typeColors.normal)[tier] : 'rgba(255,255,255,.04)';
-        const bc = canUse ? (typeBorder[type]||'rgba(255,215,0,.3)') : 'rgba(255,255,255,.1)';
-        const tc = canUse ? (typeTextColor[type]||'var(--gold)') : 'var(--txt3)';
-        return `<button class="bat-sub-btn" ${!canUse?'disabled':''} onclick="BATTLE_MENU='main';doAttack('${type}')"
-          style="border:1.5px solid ${bc};background:${bg};color:${tc};${!canUse?'opacity:.35':''}">
-          ${typeLabels[type]||type}<br>
-          <span style="font-size:.58rem">${canUse?`Lv${lvl}`:'미습득'}</span>
-        </button>`;
-      }).join('');
-      actionHtml = `<div>
-        <button class="bat-back-btn" onclick="BATTLE_MENU='main';renderBattleNew()">← 뒤로 &nbsp;<span style="color:var(--gold);font-size:.7rem">⚔️ 공격 선택</span></button>
-        <div class="bat-sub-row">${attackBtns}</div>
-      </div>`;
-
-    } else if (BATTLE_MENU === 'skill') {
-      const skillBtns = (s.equippedSkill2 || []).filter(Boolean).map(id => {
-        const info = SKILL2_INFO[id]; if (!info) return '';
-        const used = !!(s.skill2Used?.[id]);
-        const condFail = (id === 'counter' && s.playerHp / s.playerHpMax > 0.4);
-        const off = used || condFail;
-        return `<button class="bat-sub-btn" ${off?'disabled':''} onclick="BATTLE_MENU='main';doSkill2('${id}')"
-          style="border:1.5px solid rgba(93,173,226,.35);background:rgba(93,173,226,.08);
-            color:var(--sky);${off?'opacity:.4':''}">
-          ${info.label}<br>
-          <span style="font-size:.56rem;color:var(--txt3)">${used?'사용완료':info.desc}</span>
-        </button>`;
-      }).join('');
-      actionHtml = `<div>
-        <button class="bat-back-btn" onclick="BATTLE_MENU='main';renderBattleNew()">← 뒤로 &nbsp;<span style="color:var(--sky);font-size:.7rem">✨ 스킬 선택</span></button>
-        <div class="bat-sub-row">${skillBtns}</div>
-      </div>`;
-    }
+  sk.innerHTML = reck ? '<div class="bv2-hint">무리한 공격 — 어떤 공격으로 할까요?</div>'
+    : (s.equippedSkill2 || []).filter(Boolean).map(id => {
+      const k = BV2_SK[id]; if (!k) return '';
+      const used = !!(s.skill2Used && s.skill2Used[id]), cond = id === 'counter' && s.playerHp / s.playerHpMax > 0.4;
+      return `<button class="bv2-sk" ${used || cond || !myTurn ? 'disabled' : ''} onclick="doSkill2('${id}')">${_bv2Svg(k.g, 17)}${k.t}<small>${used ? '썼어요' : k.d}</small></button>`;
+    }).join('');
+}
+function _bv2Say(html) { const t = document.getElementById('ba-log'); if (t) t.innerHTML = html; }
+function _updateBattleLog(state) {   // 엔진 기록의 마지막 줄을 소식 한 줄로(글은 escHtml 거친 엔진 문장)
+  const st = state || BATTLE_STATE; if (!st || !st.log.length) return;
+  _bv2Say(escHtml(_bv2Text(st.log[st.log.length - 1])));
+}
+// ── 효과: 번쩍 · 밀림 · 흔들림 · 파편 · 숫자
+function _bv2El(k) { return document.getElementById(k === 'me' ? 'ba-char-emoji' : 'ba-mon-emoji'); }
+function _bv2At(k) {
+  const el = _bv2El(k), st = document.getElementById('bv2-stage'); if (!el || !st) return { x: 0, y: 0 };
+  const r = el.getBoundingClientRect(), s = st.getBoundingClientRect();
+  return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height * 0.42 };
+}
+function _bv2Fx() { return document.getElementById('bv2-fx'); }
+function _bv2Burst(k, color, n, big) {
+  const fx = _bv2Fx(); if (!fx || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const at = _bv2At(k);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, d = (big ? 110 : 70) + Math.random() * 60, sp = document.createElement('i');
+    sp.className = 'bv2-spark';
+    sp.style.cssText = `left:${at.x}px;top:${at.y}px;--c:${color};--s:${5 + Math.random() * 7}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`;
+    fx.appendChild(sp); setTimeout(() => sp.remove(), 650);
   }
-
-  // ── 결과 박스 ──
-  let resultHtml = '';
-  if (s.finished) {
-    if (s.win) {
-      resultHtml = `<div class="ba-result-box ba-result-win">
-        <div style="font-size:1.6rem;font-weight:900;color:var(--gold);margin-bottom:.3rem">🏆 승리!</div>
-        <div style="font-size:.85rem;color:var(--gold)">+${mon.gold}G 획득</div>
-      </div>`;
-    } else {
-      resultHtml = `<div class="ba-result-box ba-result-lose">
-        <div style="font-size:1.6rem;font-weight:900;color:#FF8A80;margin-bottom:.3rem">💀 패배...</div>
-        <div style="font-size:.78rem;color:var(--txt3)">전투 기회 1회 소모</div>
-      </div>`;
-    }
-  }
-
-  // ── 배틀 헤더 서브 텍스트 업데이트 ──
+  const ring = document.createElement('i'); ring.className = 'bv2-ring'; ring.style.cssText = `left:${at.x}px;top:${at.y}px;--c:${color}`;
+  fx.appendChild(ring); setTimeout(() => ring.remove(), 500);
+}
+function _bv2Num(k, text, o) {
+  const fx = _bv2Fx(); if (!fx) return; o = o || {};
+  const at = _bv2At(k), n = document.createElement('div');
+  n.className = 'bv2-num' + (o.crit ? ' crit' : '') + (o.small ? ' small' : '');
+  n.style.cssText = `left:${at.x + (Math.random() * 30 - 15)}px;top:${at.y - 30}px;--o:${o.outline || '#5a2410'}`;
+  n.innerHTML = (o.tag ? `<span class="tag">${escHtml(o.tag)}</span>` : '') + escHtml(String(text));
+  fx.appendChild(n); setTimeout(() => n.remove(), 1000);
+}
+function _bv2Chip(k, text, bg) {
+  const fx = _bv2Fx(); if (!fx) return;
+  const at = _bv2At(k), c = document.createElement('div');
+  c.className = 'bv2-chip'; c.style.cssText = `left:${at.x}px;top:${at.y - 110}px;--b:${bg}`; c.textContent = text;
+  fx.appendChild(c); setTimeout(() => c.remove(), 1250);
+}
+function _bv2Shake(big) {
+  const st = document.getElementById('bv2-stage'); if (!st) return;
+  st.classList.remove('shake', 'shake-big'); void st.offsetWidth; st.classList.add(big ? 'shake-big' : 'shake');
+}
+function _bv2Hit(k) { const el = _bv2El(k); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
+function _bv2Dash(k) {
+  const el = _bv2El(k); if (!el) return;
+  el.classList.remove('idle'); el.classList.add('dash');
+  setTimeout(() => { el.classList.remove('dash'); el.classList.add('idle'); }, 190);
+}
+function _bv2Banner(text, lose) {
+  const b = document.getElementById('bv2-banner'); if (!b) return;
+  b.className = 'bv2-banner' + (lose ? ' lose' : ''); b.textContent = text; void b.offsetWidth; b.classList.add('show');
+}
+function _bv2Result(html) {
+  const r = document.getElementById('bv2-result'), st = document.getElementById('bv2-stage'); if (!r) return;
+  r.innerHTML = html; st && st.classList.add('done');
+  const b = document.getElementById('bv2-banner'); b && b.classList.add('up');
+  setTimeout(() => {
+    r.classList.add('show');
+    r.querySelectorAll('[data-count]').forEach(el => {
+      const to = +el.dataset.count || 0, t0 = performance.now();
+      const f = t => { const k = Math.min(1, (t - t0) / 700); el.textContent = '+' + Math.round(to * (1 - Math.pow(1 - k, 3))) + 'G'; if (k < 1) requestAnimationFrame(f); };
+      requestAnimationFrame(f);
+    });
+    r.querySelectorAll('.bv2-bar i').forEach(i => { i.style.width = i.dataset.w || '0%'; });
+  }, 180);
+}
+// 무대 첫 그림 — 몬스터가 들어오고, 몬스터가 먼저였으면 그 한 대를 보여 준 뒤 숫자를 맞춘다
+function _bv2Enter(s) {
+  const mon = s.monster, foe = _bv2El('foe');
+  if (foe && foe.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+    foe.animate([{ transform: 'translateX(140px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  const first = s.firstTurn === 'monster' && s.lastMonsterAction && !s.lastPlayerAction;
+  if (s.ibRarity === 'legend' || s.ibRarity === 'rare') setTimeout(() => _bv2Chip('foe', s.ibRarity === 'legend' ? '전설 몬스터 등장!' : '희귀 몬스터 등장!', '#F6D27A'), 520);
+  if (!first) { _bv2Say(`${_bv2J(mon.name, '이', '가')} 나타났어요!${s.firstTurn === 'player' ? ' 내가 먼저예요' : ''}`); return; }
+  const ma = s.lastMonsterAction, hp = s.playerHp;
+  s.playerHp = Math.min(s.playerHpMax, hp + (ma.dmg || 0)); _updateBattleHpBars(s); s.playerHp = hp;   // 맞기 전 숫자로 잠깐
+  _bv2Say(`${_bv2J(mon.name, '이', '가')} 먼저 덤벼요!`);
+  setTimeout(() => {
+    _bv2Dash('foe');
+    setTimeout(() => {
+      if (ma.miss) _bv2Num('me', '피했어요!', { small: true });
+      else { _bv2Hit('me'); _bv2Shake(false); _bv2Num('me', ma.dmg, { outline: '#6a1010' }); }
+      _updateBattleHpBars(s);
+    }, 200);
+  }, 700);
+}
+// 화면: 같은 전투면 바뀐 것만, 새 전투(또는 무한배틀 다음 몬스터)면 무대부터
+function renderBattleNew() {
+  const s = BATTLE_STATE; if (!s) return;
+  const mon = s.monster, arenaEl = document.getElementById('battle-arena'); if (!arenaEl) return;
+  if (!s._v2key) s._v2key = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  if (arenaEl.dataset.bv2 !== s._v2key || !document.getElementById('bv2-stage')) {
+    arenaEl.dataset.bv2 = s._v2key;
+    arenaEl.innerHTML = _bv2StageHTML(s, mon);
+    _updateBattleHpBars(s); _bv2Enter(s);
+  } else _updateBattleHpBars(s);
+  _bv2Turn(); _bv2Actions();
   const subEl = document.getElementById('battle-sub');
-  if (subEl) {
-    const attLeft = Utils.monsterAttemptsLeft(CUR);
-    const lim = Utils._getBattleLimit();
-    subEl.textContent = `오늘 ${attLeft}/${lim}번 남아있어요`;
+  if (subEl && !s.isInfinite) subEl.textContent = `오늘 남은 도전 ${Utils.monsterAttemptsLeft(CUR)}번`;
+  if (s.finished && !s.isInfinite) _bv2End();
+}
+// ── 끝: 이겼을 때 · 졌을 때(한 번만)
+function _bv2End() {
+  const s = BATTLE_STATE; if (!s || s._v2ended) return; s._v2ended = true;
+  const mon = s.monster, me = _bv2El('me'), foe = _bv2El('foe');
+  if (s.win) {
+    setTimeout(() => { if (foe) { foe.classList.remove('idle'); foe.classList.add('down'); } _bv2Burst('foe', '#ffe7a0', 24, true); }, 250);
+    setTimeout(() => { _bv2Banner('승리!'); _bv2Say(`${_bv2J(mon.name, '을', '를')} 물리쳤어요!`); }, 850);
+    setTimeout(() => _bv2Result(_bv2WinCard(s, mon)), 1650);
+  } else {
+    setTimeout(() => { if (me) { me.classList.remove('idle'); me.classList.add('down'); } }, 120);
+    setTimeout(() => { _bv2Banner('아쉬워요', true); _bv2Say('다음엔 이길 수 있어요'); }, 520);
+    setTimeout(() => _bv2Result(_bv2LoseCard(s, mon)), 1150);
   }
-
-  arenaEl.innerHTML = `
-    <!-- 대치 무대 -->
-    <div class="ba-stage">
-      <!-- 플레이어 -->
-      <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#7ec8e3">${escHtml(player.name)}</div>
-        <div class="ba-fighter-icon" style="width:80px;height:100px;margin:0 auto" id="ba-char-emoji">${charSVG(player)}</div>
-        <div style="width:100%">
-          <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-char-hp" style="width:${playerHpPct}%"></div></div>
-          <div class="ba-hp-txt">${s.playerHp} / ${s.playerHpMax}</div>
-        </div>
-        <div class="ba-stats-txt">ATK ${s.playerStats.atk} · MAG ${s.playerStats.mag}<br>DEF ${s.playerStats.def} · SPD ${s.playerStats.spd}</div>
-      </div>
-      <!-- 가운데 VS -->
-      <div class="ba-vs-center">
-        <div class="ba-vs-bolt">⚡</div>
-        <div class="ba-vs-label">VS</div>
-      </div>
-      <!-- 몬스터 -->
-      <div class="ba-fighter">
-        <div class="ba-fighter-name" style="color:#FF8A80">${escHtml(mon.name)}</div>
-        <div class="ba-emoji" id="ba-mon-emoji">${iconImg(mon, 'monsters', '3.8rem')}</div>
-        <div style="width:100%">
-          <div class="ba-hp-bar-bg" style="height:10px"><div class="ba-hp-bar-fill ba-mon-hp" style="width:${monsterHpPct}%"></div></div>
-          <div class="ba-hp-txt">${s.monsterHp} / ${s.monsterHpMax}</div>
-        </div>
-        <div class="ba-stats-txt">ATK ${mon.atk} · DEF ${mon.def} · SPD ${mon.spd}<br>
-          ${mon.element?`<span style="color:${mon.element==='fire'?'#FF8A80':mon.element==='water'?'#7ec8e3':'#6fd49d'}">${{fire:'🔥 불꽃',water:'💧 냉기',grass:'🌿 자연'}[mon.element]||mon.element}</span>`:''}
-          ${mon.trait==='ghost'?' <span style="color:#bbb">👻 유령</span>':''}
-        </div>
-      </div>
-    </div>
-    <!-- 전투 로그 -->
-    <div class="ba-log-wrap">
-      <div class="ba-log-title">BATTLE LOG</div>
-      <div class="ba-log" id="ba-log">${recentLog || '<span style="color:#aaa">전투 시작!</span>'}</div>
-    </div>
-    <!-- 결과 or 행동 -->
-    ${resultHtml}
-    ${s.finished
-      ? `<button class="btn-ok" style="width:100%" onclick="closeBattle()">✅ 확인</button>`
-      : actionHtml
-    }`;
-
+}
+function _bv2AchRows(list) {
+  return (list || []).map(a => `<div class="bv2-ri ach">업적 달성 — ${escHtml(a.name)}<b>+${(a.reward && a.reward.gold) || 20}G${a.reward && a.reward.exp ? ' · +' + a.reward.exp + 'EXP' : ''}</b></div>`).join('');
+}
+function _bv2Again(left) {
+  return left > 0 ? `<button onclick="closeBattle();openMonsterModal()">다른 몬스터와 (남은 ${left}번)</button>` : '';
+}
+function _bv2WinCard(s, mon) {
+  const zm = GAME_DATA.monsters.filter(m => m.zone === mon.zone), log = CUR.monsterLog || [];
+  const seen = zm.filter(m => log.includes(m.id)).length, all = zm.length || 1;
+  const rows = [`<div class="bv2-ri">골드<b data-count="${mon.gold || 0}">+0G</b></div>`];
+  (s._v2dex || []).forEach(b => {
+    if (b.type === 'firstKill') rows.push(`<div class="bv2-ri">처음 만난 몬스터 보너스<b>+${b.gold}G</b></div>`);
+    if (b.type === 'zoneComplete') rows.push(`<div class="bv2-ri ach">도감 완성!${b.title ? ' · ' + escHtml(b.title) : ''}<b>+${b.gold}G</b></div>`);
+  });
+  if (BV2_ZONE[mon.zone]) rows.push(`<div class="bv2-ri">${BV2_ZONE[mon.zone]} 도감<span class="bv2-bar"><i data-w="${Math.round(seen / all * 100)}%"></i></span><b>${seen} / ${zm.length}</b></div>`);
+  return `<div class="bv2-rh">${iconImg(mon, 'monsters', '56px')}<div><div class="bv2-rt">${escHtml(_bv2J(mon.name, '을', '를'))} 물리쳤어요!</div><div class="bv2-rs">남은 체력 ${s.playerHp} / ${s.playerHpMax}</div></div></div>
+    <div class="bv2-rl">${rows.join('')}${_bv2AchRows(s._v2ach)}</div>
+    <div class="bv2-rb">${_bv2Again(Utils.monsterAttemptsLeft(CUR))}<button class="pri" onclick="closeBattle()">확인</button></div>`;
+}
+function _bv2LoseCard(s, mon) {
+  const el = BV2_EL[mon.element], sl = s.skillLevels || {};
+  const strong = ['fire', 'water', 'grass'].find(t => _bv2Match(t, mon) > 1);
+  const worn = (CUR.equippedSkills || []).includes(strong), learned = strong && (sl[strong] || 0) >= 1;
+  let tip;
+  if (!strong || !el) tip = '방어력이 높은 옷을 입으면 받는 피해가 줄어요. 체력이 반쯤 남았을 때 <b>응급치료</b>를 써 보세요.';
+  else if (learned && worn) tip = `<b>${el.name}</b> 몬스터에게는 <b>${BV2_ATK[strong].t}</b>이 강해요. 다음엔 처음부터 <b>${BV2_ATK[strong].t}</b>을 눌러 보세요.`;
+  else if (learned) tip = `<b>${el.name}</b> 몬스터에게는 <b>${BV2_ATK[strong].t}</b>이 강해요. 가방의 스킬 칸에 <b>${BV2_ATK[strong].t}</b>을 끼워 보세요.`;
+  else tip = `<b>${el.name}</b> 몬스터에게는 <b>${BV2_ATK[strong].t}</b>이 강해요. 상점의 마스터리북에서 배울 수 있어요.`;
+  return `<div class="bv2-rh">${iconImg(mon, 'monsters', '56px')}<div><div class="bv2-rt">${escHtml(_bv2J(mon.name, '이', '가'))} 이번엔 더 셌어요</div><div class="bv2-rs">남긴 체력 ${Math.max(0, s.monsterHp)} / ${s.monsterHpMax} · 쓴 기회는 1번이에요</div></div></div>
+    <div class="bv2-tip">${tip}</div>${s._v2ach && s._v2ach.length ? `<div class="bv2-rl">${_bv2AchRows(s._v2ach)}</div>` : ''}
+    <div class="bv2-rb">${_bv2Again(Utils.monsterAttemptsLeft(CUR))}<button class="pri" onclick="closeBattle()">확인</button></div>`;
+}
+// 무한배틀: 한 마리 처치(다음 몬스터가 들어오기 전 잠깐)
+function _bv2IbKill(gold, heal, last) {
+  const foe = _bv2El('foe');
+  if (foe) { foe.classList.remove('idle'); foe.classList.add('down'); }
+  _bv2Burst('foe', '#ffe7a0', 18, true);
+  _bv2Chip('foe', `처치! +${gold}G`, '#F6D27A');
+  _bv2Say(last ? '10마리를 모두 물리쳤어요!' : `체력 +${heal} · 다음 몬스터가 오고 있어요`);
+  document.getElementById('bv2-actions')?.classList.add('done');
+}
+function _bv2IbEndHTML(forfeit, isNewBest, best, ach) {
+  return `<div class="bv2-rh"><div class="bv2-rbig">${IB.kills}</div><div><div class="bv2-rt">무한배틀 끝${forfeit ? ' (그만둠)' : ''} — ${IB.kills}마리 처치</div><div class="bv2-rs">${BV2_ZONE[IB.zone] || ''}</div></div></div>
+    <div class="bv2-rl"><div class="bv2-ri">모은 골드<b data-count="${IB.gold}">+0G</b></div>
+      <div class="bv2-ri${isNewBest ? ' ach' : ''}">${isNewBest ? '최고 기록 새로!' : '최고 기록'}<b>${best}마리</b></div>${_bv2AchRows(ach)}</div>
+    <div class="bv2-rb"><button class="pri" onclick="closeModal('m-battle');renderMain();renderMobile()">확인</button></div>`;
 }
 
 // ── 스킬 레벨 → 이펙트 티어 ──
@@ -2800,154 +2901,80 @@ const SKILL_EFFECT = {
   grass:  { t1:'🌿', t2:'🍃🌿', t3:'🌿🌸🌿', t4:'🌳💚🌳', color:['#66BB6A','#7ECB7E','#96DB94','#AEEBA8'] },
 };
 
-// ── 공격 버튼 클릭 ──
+// ── 공격 버튼 클릭 ── [BATTLE-V2] 계산 순서는 그대로(performPlayerTurn → 맞힘 → 끝났나 · 몬스터 차례), 연출만 새로
 function doAttack(attackType) {
   if (!BATTLE_STATE || BATTLE_STATE.finished || BATTLE_STATE.turn !== 'player') return;
   document.querySelectorAll('#battle-arena button').forEach(b => b.disabled = true);
-
-  // ── 1단계: 플레이어 공격 계산 (수치만, 연출 아직 안 함) ──
   BATTLE_STATE = performPlayerTurn(BATTLE_STATE, attackType);
-  const pa = BATTLE_STATE.lastPlayerAction;
-
-  const tier     = _skillEffectTier(pa.skillLv);
-  const eff      = SKILL_EFFECT[attackType] || SKILL_EFFECT.normal;
-  const effEmoji = eff[`t${tier}`] || eff.t1;
-  const effColor = eff.color[tier - 1] || eff.color[0];
-  const isCrit   = pa.crit;
-  const isHeavy  = isCrit || (pa.skill2Label && pa.skill2Label.includes('일격'));
-  const typeNames = { normal:'일반 공격', fire:'화염 공격', water:'냉기 공격', grass:'자연 공격' };
-
-  // 캐릭터 전진
-  const charEl = document.getElementById('ba-char-emoji');
-  if (charEl) {
-    charEl.style.transition = 'transform .15s';
-    charEl.style.transform  = 'translateX(22px) scale(1.1)';
-    setTimeout(() => { if (charEl) charEl.style.transform = ''; }, 220);
-  }
-
-  // 행동 문구 먼저 로그에 표시
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.35초 후 — 데미지/HP 반영
+  const pa = BATTLE_STATE.lastPlayerAction, mon = BATTLE_STATE.monster;
+  const a = BV2_ATK[attackType] || BV2_ATK.normal;
+  const isCrit = pa.crit, isHeavy = isCrit || (pa.skill2Label && pa.skill2Label.includes('일격'));
+  _bv2Dash('me');
   setTimeout(() => {
     if (pa.miss) {
-      spawnDmgFloat('공격이 빗나갔다!', '#888', 'top');
+      _bv2Num('foe', '빗나감', { small: true }); _bv2Say('공격이 빗나갔어요!');
       _updateBattleHpBars(BATTLE_STATE);
-      // 빗나감: 0.45초 후 몬스터 턴
-      setTimeout(() => _doMonsterTurn(), 450);
-    } else {
-      // 몬스터 피격 애니
-      const monEl = document.getElementById('ba-mon-emoji');
-      if (monEl) {
-        monEl.classList.remove('ba-mon-hit'); void monEl.offsetWidth;
-        monEl.classList.add('ba-mon-hit');
-        setTimeout(() => monEl.classList.remove('ba-mon-hit'), 400);
-      }
-      // 급소면 0.35초 더 대기 후 피해 표시
-      const hitDelay = isCrit ? 350 : 0;
-      if (isCrit) spawnDmgFloat('급소!', '#FFD700', 'top');
-      setTimeout(() => {
-        spawnDmgFloat(`${effEmoji} -${pa.dmg}`, isCrit ? '#FFD700' : effColor);
-        if (pa.isGhost)          spawnDmgFloat('유령 저항!', '#bbb', 'top');
-        else if (pa.elemMult > 1.0) spawnDmgFloat('효과 굉장함!', '#FF8C00', 'top');
-        else if (pa.elemMult < 1.0) spawnDmgFloat('효과 별로...', '#888', 'top');
-        _updateBattleHpBars(BATTLE_STATE);
-        // 중요한 공격은 0.55초, 일반은 0.45초 후 몬스터 턴
-        const afterDelay = isHeavy ? 550 : 450;
-        if (BATTLE_STATE.finished) {
-          setTimeout(() => _finishBattle(), afterDelay);
-        } else {
-          setTimeout(() => _doMonsterTurn(), afterDelay);
-        }
-      }, hitDelay);
+      setTimeout(() => _doMonsterTurn(), 650);
+      return;
     }
-  }, 350);
+    setTimeout(() => {   // 맞는 순간 아주 잠깐 멈춤(급소는 더 길게)
+      _bv2Hit('foe'); _bv2Shake(isCrit); _bv2Burst('foe', a.c, isCrit ? 22 : 14, isCrit);
+      _bv2Num('foe', pa.dmg, { crit: isCrit, tag: isCrit ? '급소!' : '', outline: isCrit ? '#8a5a00' : '#5a2410' });
+      if (pa.isGhost) _bv2Chip('foe', '유령이라 덜 아파요', '#cfc8d8');
+      else if (pa.elemMult > 1) _bv2Chip('foe', '효과가 굉장해요!', '#F6D27A');
+      else if (pa.elemMult < 1) _bv2Chip('foe', '효과가 별로예요', '#bcae9a');
+      _bv2Say(`${escHtml(mon.name)}에게 <span class="hl">${pa.dmg}</span> 피해${isCrit ? ' · 급소!' : ''}${pa.elemMult > 1 ? ' · 상성이 좋아요' : ''}`);
+      _updateBattleHpBars(BATTLE_STATE);
+      if (BATTLE_STATE.finished) setTimeout(() => _finishBattle(), isHeavy ? 550 : 450);
+      else setTimeout(() => _doMonsterTurn(), isHeavy ? 800 : 700);
+    }, isCrit ? 130 : 50);
+  }, 190);
 }
 
-// ── 몬스터 턴 실행 (doAttack/doSkill2 공통) ──
+// ── 몬스터 턴 실행 (doAttack/doSkill2/doReckless 공통)
 function _doMonsterTurn() {
   if (!BATTLE_STATE || BATTLE_STATE.finished) return;
-
+  const before = BATTLE_STATE.log.length;
   BATTLE_STATE = performMonsterTurn(BATTLE_STATE);
-  const ma = BATTLE_STATE.lastMonsterAction;
-
-  // 몬스터 전진
-  const monEl2 = document.getElementById('ba-mon-emoji');
-  if (monEl2) {
-    monEl2.style.transition = 'transform .15s';
-    monEl2.style.transform  = 'translateX(-22px) scale(1.1)';
-    setTimeout(() => { if (monEl2) monEl2.style.transform = ''; }, 220);
-  }
-
-  // 로그 먼저 표시
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.4초 후 — 데미지 적용
+  const ma = BATTLE_STATE.lastMonsterAction, mon = BATTLE_STATE.monster;
+  const extra = BATTLE_STATE.log.slice(before).map(_bv2Text).join(' ');
+  const t = document.getElementById('bv2-turn');
+  if (t) { t.textContent = `${mon.name} 차례`; t.classList.add('foe-turn'); t.classList.remove('off'); }
   setTimeout(() => {
-    if (ma.miss) {
-      spawnDmgFloat('빗나감!', '#888', 'top');
-      _updateBattleHpBars(BATTLE_STATE);
-      setTimeout(() => _afterMonsterTurn(), 450);
-    } else {
-      const charEl2 = document.getElementById('ba-char-emoji');
-      // 강공이면 문구 먼저
-      const isHeavyMon = ma.roleLabel === '강공!' || ma.crit;
-      const hitDelay = isHeavyMon ? 300 : 0;
-      if (isHeavyMon && ma.roleLabel) spawnDmgFloat(ma.roleLabel, '#e74c3c', 'top');
-      if (ma.crit && !ma.roleLabel)   spawnDmgFloat('몬스터 급소!', '#ef9a9a', 'top');
-
-      setTimeout(() => {
-        if (charEl2) {
-          charEl2.classList.remove('ba-player-hit'); void charEl2.offsetWidth;
-          charEl2.classList.add('ba-player-hit');
-          setTimeout(() => charEl2.classList.remove('ba-player-hit'), 400);
-        }
-        spawnDmgFloat(`⚔️ -${ma.dmg}`, ma.crit ? '#ef9a9a' : '#E74C3C');
-        if (ma.crit && ma.roleLabel)   spawnDmgFloat('몬스터 급소!', '#ef9a9a', 'top');
-        if (ma.armorMult < 1.0)  spawnDmgFloat('방어 상성 유리!', '#4fc3f7', 'top');
-        if (ma.armorMult > 1.0)  spawnDmgFloat('방어 상성 불리!', '#ef9a9a', 'top');
+    _bv2Dash('foe');
+    setTimeout(() => {
+      if (ma.miss) {
+        _bv2Num('me', '피했어요!', { small: true }); _bv2Say(`${escHtml(mon.name)}의 공격을 피했어요!`);
         _updateBattleHpBars(BATTLE_STATE);
-        const afterDelay = isHeavyMon ? 550 : 450;
-        setTimeout(() => _afterMonsterTurn(), afterDelay);
-      }, hitDelay);
-    }
-  }, 400);
+        setTimeout(() => _afterMonsterTurn(extra), 500);
+        return;
+      }
+      const heavy = ma.roleLabel === '강공!' || ma.crit;
+      setTimeout(() => {
+        _bv2Hit('me'); _bv2Shake(heavy); _bv2Burst('me', '#ff6a5a', 10);
+        _bv2Num('me', ma.dmg, { outline: '#6a1010', tag: ma.roleLabel ? ma.roleLabel.replace(/!$/, '') : (ma.crit ? '급소' : '') });
+        if (ma.armorMult < 1) _bv2Chip('me', '옷 상성이 좋아요', '#bfe7ff');
+        else if (ma.armorMult > 1) _bv2Chip('me', '옷 상성이 안 좋아요', '#ffb0a2');
+        _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} <span class="warn">${ma.dmg}</span> 피해를 줬어요`);
+        _updateBattleHpBars(BATTLE_STATE);
+        setTimeout(() => _afterMonsterTurn(extra), heavy ? 600 : 500);
+      }, heavy ? 120 : 40);
+    }, 190);
+  }, 380);
 }
 
-// ── 몬스터 턴 종료 후 처리 ──
-function _afterMonsterTurn() {
-  if (BATTLE_STATE.finished) {
-    setTimeout(() => _finishBattle(), 300);
-  } else {
-    BATTLE_MENU = 'main';
-    setTimeout(() => renderBattleNew(), 300);
-  }
-}
-
-// HP 바만 업데이트 (innerHTML 재생성 없이)
-function _updateBattleHpBars(state) {
-  const charHpPct = Math.max(0, Math.round(state.playerHp  / state.playerHpMax  * 100));
-  const monHpPct  = Math.max(0, Math.round(state.monsterHp / state.monsterHpMax * 100));
-
-  const charBar = document.querySelector('.ba-char-hp');
-  const monBar  = document.querySelector('.ba-mon-hp');
-  const charTxt = document.querySelector('.ba-char-hp')?.closest('.ba-hp-bar-bg')?.nextElementSibling;
-  const monTxt  = document.querySelector('.ba-mon-hp')?.closest('.ba-hp-bar-bg')?.nextElementSibling;
-
-  if (charBar) charBar.style.width = charHpPct + '%';
-  if (monBar)  monBar.style.width  = monHpPct  + '%';
-  if (charTxt) charTxt.textContent = `${state.playerHp} / ${state.playerHpMax}`;
-  if (monTxt)  monTxt.textContent  = `${state.monsterHp} / ${state.monsterHpMax}`;
-}
-
-// 로그만 업데이트
-function _updateBattleLog(state) {
-  const logEl  = document.getElementById('ba-log');
-  const wrapEl = logEl?.closest('.ba-log-wrap');
-  if (!logEl) return;
-  logEl.innerHTML = state.log.slice(-8).join('<br>') || '';
-  // 자동 스크롤 — 최신 로그가 보이게
-  if (wrapEl) requestAnimationFrame(() => { wrapEl.scrollTop = wrapEl.scrollHeight; });
+// ── 몬스터 턴 종료 후 처리 — 다음에 올 큰 공격은 미리 알려 준다(무엇을 할지 고르게)
+function _afterMonsterTurn(extra) {
+  if (BATTLE_STATE.finished) { setTimeout(() => _finishBattle(), 300); return; }
+  const mon = BATTLE_STATE.monster, sk = BATTLE_STATE.equippedSkill2 || [], used = BATTLE_STATE.skill2Used || {};
+  BATTLE_MENU = 'main';
+  setTimeout(() => {
+    renderBattleNew();
+    if (extra && /강한 일격을 준비/.test(extra))
+      _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} 강한 일격을 준비해요${sk.includes('guard') && !used.guard ? ' — <span class="good">방어</span>를 써 보세요' : '!'}`);
+    else if (extra && /한 번 더/.test(extra)) _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} 재빠르게 한 번 더 덤볐어요!`);
+    else if (extra && /버텨/.test(extra)) _bv2Say(`${escHtml(_bv2J(mon.name, '이', '가'))} 단단히 버티며 반격을 노려요`);
+  }, 300);
 }
 
 // 전투 종료 처리
@@ -2965,20 +2992,12 @@ function _finishBattle() {
   CUR.level = Utils.levelFromExp(CUR.exp);
   BATTLE_DONE = true;
   DB.saveStudent(CUR);
-  renderHUD();
   // 전투는 EXP 0(설계: 레벨은 학급퀘스트로만) → 레벨업 없음. 헛도는 레벨업 연출 트리거 제거 (DI-5).
-  setTimeout(() => checkAchievements(), 600);
-  // 도감 보상 알림
-  if (CUR._dexBonusLog && CUR._dexBonusLog.length > 0) {
-    const bonuses = CUR._dexBonusLog;
-    CUR._dexBonusLog = [];
-    setTimeout(() => {
-      bonuses.forEach(b => {
-        if (b.type === 'firstKill') toast(`📖 첫 처치 보너스! +${b.gold}G`);
-        if (b.type === 'zoneComplete') toast(`🏆 도감 완성!\n${b.zone} +${b.gold}G${b.title?' · '+b.title:''}`);
-      });
-    }, 800);
-  }
+  // [BATTLE-V2] 업적 · 도감 보너스는 위에 덮는 팝업 대신 결과 카드 안 한 줄로
+  BATTLE_STATE._v2ach = checkAchievements({ inline: true }) || [];
+  BATTLE_STATE._v2dex = CUR._dexBonusLog || [];
+  CUR._dexBonusLog = [];
+  renderHUD();
   renderBattleNew();
 }
 
@@ -3357,44 +3376,11 @@ function setSkillSlot(slotIndex, skillType) {
 
 // ── 스킬2 사용 ──
 // 스킬2 캐릭터 이펙트
-function playSkill2Effect(skill2Id) {
-  const charEl = document.getElementById('ba-char-emoji');
-  if (!charEl) return;
-
-  const fxMap = {
-    heal:     { cls:'skill-fx-heal',    flash:'rgba(111,212,157,.25)', label:'💊', txt:'#6fd49d' },
-    guard:    { cls:'skill-fx-guard',   flash:'rgba(126,200,227,.22)', label:'🛡️', txt:'#7ec8e3' },
-    counter:  { cls:'skill-fx-counter', flash:'rgba(195,155,211,.22)', label:'⚔️', txt:'#c39bd3' },
-    prep:     { cls:'skill-fx-prep',    flash:'rgba(255,215,0,.25)',   label:'🎯', txt:'#FFD700' },
-    reckless: { cls:'skill-fx-ki',      flash:'rgba(255,100,0,.25)',   label:'⚡', txt:'#FF8A80' },
-    rush:     { cls:'skill-fx-rush',    flash:'rgba(243,156,18,.22)',  label:'🔥', txt:'#f39c12' },
-  };
-  const fx = fxMap[skill2Id];
-  if (!fx) return;
-
-  // 캐릭터 애니메이션
-  charEl.classList.remove(fx.cls);
-  void charEl.offsetWidth;
-  charEl.classList.add(fx.cls);
-  setTimeout(() => charEl.classList.remove(fx.cls), 800);
-
-  // 플래시 오버레이
-  const flash = document.createElement('div');
-  flash.className = 'skill-flash-overlay';
-  flash.style.background = fx.flash;
-  charEl.style.position = 'relative';
-  charEl.appendChild(flash);
-  setTimeout(() => flash.remove(), 550);
-
-  // 스킬 이름 큰 글씨 팝업
-  const popup = document.createElement('div');
-  popup.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    font-size:1.6rem;font-weight:900;color:${fx.txt};z-index:999;pointer-events:none;
-    text-shadow:0 0 12px ${fx.txt},0 2px 4px rgba(0,0,0,.8);
-    animation:skill-flash .65s ease-out forwards;white-space:nowrap;`;
-  popup.textContent = fx.label;
-  const arena = document.getElementById('battle-arena');
-  if (arena) { arena.style.position='relative'; arena.appendChild(popup); setTimeout(()=>popup.remove(),700); }
+function playSkill2Effect(skill2Id) {   // [BATTLE-V2] 기술 이름 + 빛 파편(내 캐릭터 둘레)
+  const k = BV2_SK[skill2Id]; if (!k) return;
+  const col = { heal: '#7fe08f', guard: '#8fd3ff', counter: '#d3a6ff', prep: '#F6D27A', reckless: '#ff9a7a', rush: '#ffb26b' }[skill2Id] || '#8fd3ff';
+  _bv2Burst('me', col, 12, false); _bv2Chip('me', k.t + '!', col);
+  const el = _bv2El('me'); if (el) { el.classList.remove('cast'); void el.offsetWidth; el.classList.add('cast'); setTimeout(() => el.classList.remove('cast'), 700); }
 }
 
 function doSkill2(skill2Id) {
@@ -3434,63 +3420,34 @@ function doSkill2(skill2Id) {
   }, 250);
 }
 
-function _showRecklessSkillPicker() {
-  const sl = BATTLE_STATE.skillLevels || {};
-  const equippedTypes = [...new Set((CUR.equippedSkills||['normal']).filter(Boolean))];
-  const typeNames = { normal:'⚔️ 일반 공격', fire:'🔥 화염 공격', water:'💧 냉기 공격', grass:'🌿 자연 공격' };
-
-  // battle-arena 안 actionHtml 자리에 인라인으로 렌더
-  const arenaEl = document.getElementById('battle-arena');
-  if (!arenaEl) return;
-
-  // 기존 피커가 있으면 제거
-  document.getElementById('reckless-picker')?.remove();
-
-  const picker = document.createElement('div');
-  picker.id = 'reckless-picker';
-  picker.innerHTML = `
-    <div style="margin-top:.2rem">
-      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem;font-weight:700">
-        ⚡ 무리한 공격 — 스킬 선택
-      </div>
-      ${equippedTypes.map(type => `
-        <div onclick="doReckless('${type}')"
-          style="padding:.5rem .8rem;border-radius:10px;cursor:pointer;margin-bottom:.35rem;
-            border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);
-            display:flex;justify-content:space-between;align-items:center;
-            transition:background .15s"
-          onmouseenter="this.style.background='rgba(255,255,255,.1)'"
-          onmouseleave="this.style.background='rgba(255,255,255,.05)'">
-          <span style="font-size:.82rem;font-weight:700">${typeNames[type]||type}</span>
-          <span style="font-size:.7rem;color:var(--txt3)">Lv.${sl[type]||0}</span>
-        </div>`).join('')}
-    </div>`;
-
-  // battle-arena 마지막에 붙이기
-  arenaEl.appendChild(picker);
+function _showRecklessSkillPicker() {   // [BATTLE-V2] 아래 공격 단추가 '무리한 공격 — 어떤 공격으로?' 고르기로
+  BATTLE_MENU = 'reckless';
+  renderBattleNew();
 }
 
 function doReckless(attackType) {
-  document.getElementById('reckless-picker')?.remove();
+  if (!BATTLE_STATE || BATTLE_STATE.finished) return;
+  BATTLE_MENU = 'main';
+  document.querySelectorAll('#battle-arena button').forEach(b => b.disabled = true);
+  const hpBefore = BATTLE_STATE.monsterHp;
   BATTLE_STATE = performRecklessAttack(BATTLE_STATE, attackType);
-  _updateBattleLog(BATTLE_STATE);
-
-  // 0.35초 후 결과 연출
+  const dmg = Math.max(0, hpBefore - BATTLE_STATE.monsterHp);   // 실패·빗나감이면 0 (예전엔 지난 공격 숫자가 다시 떴다)
+  _bv2Dash('me');
   setTimeout(() => {
-    const pa = BATTLE_STATE.lastPlayerAction;
-    if (pa && pa.dmg > 0) {
-      const monEl = document.getElementById('ba-mon-emoji');
-      if (monEl) { monEl.classList.remove('ba-mon-hit'); void monEl.offsetWidth; monEl.classList.add('ba-mon-hit'); setTimeout(()=>monEl.classList.remove('ba-mon-hit'),400); }
-      spawnDmgFloat(`⚡ -${pa.dmg}`, '#FFD700');
+    if (dmg > 0) {
+      _bv2Hit('foe'); _bv2Shake(true); _bv2Burst('foe', (BV2_ATK[attackType] || BV2_ATK.normal).c, 20, true);
+      _bv2Num('foe', dmg, { crit: true, tag: '무리한 공격', outline: '#8a5a00' });
+      _bv2Say(`${escHtml(BATTLE_STATE.monster.name)}에게 <span class="hl">${dmg}</span> 피해 · 무리한 공격 성공!`);
+    } else {
+      _bv2Num('foe', '실패', { small: true }); _bv2Say('무리한 공격이 실패했어요');
     }
     _updateBattleHpBars(BATTLE_STATE);
-    if (BATTLE_STATE.finished) { setTimeout(()=>_finishBattle(),400); return; }
-    // 0.45초 후 몬스터 턴
+    if (BATTLE_STATE.finished) { setTimeout(() => _finishBattle(), 450); return; }
     setTimeout(() => {
       if (BATTLE_STATE.turn === 'monster') _doMonsterTurn();
-      else { BATTLE_MENU='main'; renderBattleNew(); }
-    }, 450);
-  }, 350);
+      else { BATTLE_MENU = 'main'; renderBattleNew(); }
+    }, 650);
+  }, 230);
 }
 
 function closeBattle() {
@@ -3781,26 +3738,7 @@ function _ibNextMonster() {
   document.getElementById('battle-sub').textContent =
     `${IB.zone === 'beginner' ? '초급' : IB.zone === 'intermediate' ? '중급' : '고급'} · 처치 ${IB.kills}마리 · 모은 골드 ${IB.gold}G`;
 
-  const rarityBanner = mon._ibRarity === 'legend'
-    ? `<div style="text-align:center;color:#FFD700;font-weight:800;font-size:.82rem;margin-bottom:.3rem">
-        ✨ 전설 몬스터 등장! ✨</div>`
-    : mon._ibRarity === 'rare'
-    ? `<div style="text-align:center;color:#c39bd3;font-weight:700;font-size:.78rem;margin-bottom:.3rem">
-        💜 희귀 몬스터 등장!</div>`
-    : '';
-
-  openModal('m-battle');
-  // 기존 battle-arena에 희귀도 배너 삽입 후 renderBattleNew 호출
-  setTimeout(() => {
-    if (rarityBanner) {
-      const arenaEl = document.getElementById('battle-arena');
-      if (arenaEl) {
-        const banner = document.createElement('div');
-        banner.innerHTML = rarityBanner;
-        arenaEl.prepend(banner);
-      }
-    }
-  }, 100);
+  openModal('m-battle');   // [BATTLE-V2] 희귀·전설은 무대 이름표 꼬리표 + 등장 알림(_bv2Enter)
 
   if (BATTLE_STATE.turn === 'monster') {
     renderBattleNew();
@@ -3833,31 +3771,14 @@ function _finishInfiniteBattle() {
       CUR.monsterLog = [...(CUR.monsterLog || []), monId];
     }
 
-    // 짧은 결과 표시 후 다음 몬스터
-    const arenaEl = document.getElementById('battle-arena');
-    if (arenaEl) {
-      arenaEl.innerHTML = `
-        <div style="text-align:center;padding:1.4rem .8rem">
-          <div style="font-size:1.6rem;margin-bottom:.3rem">🏆</div>
-          <div style="font-size:.95rem;font-weight:800;color:#6fd49d;margin-bottom:.2rem">처치!</div>
-          <div style="font-size:.82rem;color:var(--gold);margin-bottom:.1rem">+${gold}G · 체력 +${heal}</div>
-          <div style="font-size:.72rem;color:var(--txt3)">다음 몬스터 등장 중...</div>
-        </div>`;
-    }
+    // 짧은 결과 표시 후 다음 몬스터 — [BATTLE-V2] 무대 위에서 쓰러지고 다음이 들어온다
+    _bv2IbKill(gold, heal, IB.kills >= 10);
     DB.saveStudent(CUR);
 
     // 10승 달성 시 자동 종료
     if (IB.kills >= 10) {
-      const arenaEl2 = document.getElementById('battle-arena');
-      if (arenaEl2) {
-        arenaEl2.innerHTML = `
-          <div style="text-align:center;padding:1.4rem .8rem">
-            <div style="font-size:2rem;margin-bottom:.3rem">🏆</div>
-            <div style="font-size:1rem;font-weight:800;color:var(--gold);margin-bottom:.2rem">배틀 완료!</div>
-            <div style="font-size:.82rem;color:var(--txt3)">10마리 처치 달성!</div>
-          </div>`;
-      }
-      setTimeout(() => _endInfiniteBattleSession(false), 1600);
+      setTimeout(() => _bv2Banner('10마리 처치!'), 500);
+      setTimeout(() => _endInfiniteBattleSession(false), 1700);
     } else {
       setTimeout(() => _ibNextMonster(), 1400);
     }
@@ -3891,33 +3812,13 @@ function _endInfiniteBattleSession(forfeit) {
 
   DB.saveStudent(CUR);
   renderHUD();
-  checkAchievements();
+  const ach = checkAchievements({ inline: true }) || [];   // [BATTLE-V2] 업적은 결과 카드 안
 
-  const zoneNames = { beginner:'🌿 초급', intermediate:'🔥 중급', advanced:'⚡ 고급' };
   const arenaEl = document.getElementById('battle-arena');
-  if (arenaEl) {
-    arenaEl.innerHTML = `
-      <div style="text-align:center;padding:1rem .8rem">
-        <div style="font-size:1.8rem;margin-bottom:.4rem">${IB.kills > 0 ? '⚔️' : '💀'}</div>
-        <div style="font-size:1rem;font-weight:800;color:var(--gold);margin-bottom:.6rem">
-          무한배틀 종료${forfeit ? ' (포기)' : ''}
-        </div>
-        <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:.7rem;margin-bottom:.6rem">
-          <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.3rem">${zoneNames[IB.zone]} 사냥터</div>
-          <div style="font-size:1.3rem;font-weight:800;color:var(--gold)">${IB.kills}마리 처치</div>
-          <div style="font-size:.88rem;color:#6fd49d;margin-top:.1rem">+${IB.gold}G 획득</div>
-          ${isNewBest ? `<div style="font-size:.75rem;color:#FFD700;margin-top:.3rem;font-weight:700">
-            ✨ 최고 기록 갱신!</div>` : `<div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">
-            최고 기록: ${best[IB.zone]}마리</div>`}
-        </div>
-        <button onclick="closeModal('m-battle');renderMain();renderMobile()"
-          style="padding:.55rem 2rem;border-radius:12px;font-family:inherit;font-size:.88rem;
-            cursor:pointer;border:1px solid rgba(255,215,0,.3);
-            background:rgba(255,215,0,.12);color:var(--gold);font-weight:700">
-          ✅ 확인
-        </button>
-      </div>`;
-  }
+  if (arenaEl && !document.getElementById('bv2-stage'))
+    arenaEl.innerHTML = '<div class="bv2-stage solo" id="bv2-stage" data-zone="' + (BV2_ZONE[IB.zone] ? IB.zone : 'beginner') + '"><div class="bv2-bg bv2-sky"></div><div class="bv2-bg bv2-vig"></div><div class="bv2-banner" id="bv2-banner"></div><div class="bv2-result" id="bv2-result"></div></div>';
+  document.getElementById('bv2-actions')?.classList.add('done');
+  _bv2Result(_bv2IbEndHTML(forfeit, isNewBest, best[IB.zone] || 0, ach));
 }
 
 function renderMonsterStep() {
@@ -14490,6 +14391,7 @@ window.addEventListener('resize', applyScale);
 
 
 function triggerLevelUp(newLv) {
+  if (_fxBusy()) { _fxWhenFree(() => triggerLevelUp(newLv)); return; }   // [BATTLE-V2] 배틀·업적 카드가 끝난 뒤
   const fx = document.getElementById('lup-fx');
   document.getElementById('lup-sub').textContent = `Lv.${newLv}이 됐어요!`;
   const isPromo = Utils.isPromotionLevel(newLv);
@@ -15100,10 +15002,21 @@ function renderHouseAchievements() {
     ${render(lockedList, true)}`;
 }
 
-function checkAchievements() {
+// [BATTLE-V2] 연출 줄 세우기 — 배틀 창 · 업적 카드 · 레벨업이 서로 위에 덮지 않게 하나씩
+function _fxBusy() {
+  const bat = document.getElementById('m-battle'), ach = document.getElementById('ach-popup'), lup = document.getElementById('lup-fx');
+  return !!((bat && bat.classList.contains('open')) || (ach && ach.style.display === 'block') || (lup && lup.classList.contains('show')));
+}
+function _fxWhenFree(fn, tries) { tries = tries || 0; if (!_fxBusy() || tries > 450) return fn(); setTimeout(() => _fxWhenFree(fn, tries + 1), 400); }
+
+function checkAchievements(opts) {
   const newOnes = AchievementUtils.checkNew(CUR);
-  if (newOnes.length === 0) return;
+  if (newOnes.length === 0) return [];
   DB.saveStudent(CUR);
+  if (opts && opts.inline) {   // 배틀 결과 카드가 직접 보여 준다 — 알림 빨간 점만
+    document.querySelectorAll('[id="ach-tile-notif"]').forEach(n => { n.style.display = ''; });
+    return newOnes;
+  }
   // 업적 달성 팝업 (순서대로)
   let idx = 0;
   const showNext = () => {
@@ -15124,7 +15037,8 @@ function checkAchievements() {
     // 3초 후 자동 닫기 (다음 업적)
     setTimeout(() => { closeAchPopup(); setTimeout(showNext, 300); }, 3000);
   };
-  showNext();
+  _fxWhenFree(showNext);
+  return newOnes;
 }
 
 function closeAchPopup() {
@@ -15187,7 +15101,7 @@ function openModal(id) {
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.overlay').forEach(o => {
-  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+  o.addEventListener('click', e => { if (e.target === o && o.id !== 'm-battle') o.classList.remove('open'); });   // [BATTLE-V2] 배틀은 '나가기'로만
 });
 
 // ══ 토스트 ══ (스타일 태그 중복 추가 버그 수정)
