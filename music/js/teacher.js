@@ -4,6 +4,7 @@ import { h, toast, modal } from './util.js';
 import { normalize } from './song.js';
 import { renderStaff } from './notation.js';
 import { meterOf } from './theory.js';
+import { songBad, hidden } from './safety.js';
 
 async function gate(ctx) {
   if (ctx.store.me.guest) return true;
@@ -40,7 +41,8 @@ export async function mountTeacher(root, ctx) {
           try { await ctx.store.setHidden(k.sid, s.id, nowHidden); nowHidden ? hidden.add(ck) : hidden.delete(ck); hideBtn.textContent = nowHidden ? '다시 올리기' : '음악회에서 내리기'; hideBtn.classList.toggle('on', nowHidden); toast(nowHidden ? '음악회에서 내렸어요' : '다시 올렸어요'); }
           catch (e) { console.warn(e); toast('바꾸지 못했어요'); }
         } }, isHidden ? '다시 올리기' : '음악회에서 내리기') : h('span', { class: 'muted', style: { fontSize: '.8rem' } }, '나만 보기');
-        return h('div', { class: 'song-row' }, h('div', { class: 't' }, h('b', {}, s.title || '제목 없는 곡'), h('span', {}, `${meterOf(s).key} · ${s.bars}마디 · 음 ${s.notes.length}개 · 고친 때 ${day(s.updated)} · ${s.rev || 1}번 저장`)),
+        const bad = songBad(s), badAll = [...bad.title, ...bad.lyrics];
+        return h('div', { class: 'song-row' }, h('div', { class: 't' }, h('b', {}, s.title || '제목 없는 곡', badAll.length ? h('span', { class: 'bad-tag', title: '음악회에는 안 올라가요' }, '고운 말 확인: ' + badAll.map(hidden).join(', ')) : null), h('span', {}, `${meterOf(s).key} · ${s.bars}마디 · 음 ${s.notes.length}개 · 고친 때 ${day(s.updated)} · ${s.rev || 1}번 저장`)),
           h('div', { class: 'acts' }, play, h('button', { class: 'btn small', onclick: () => { const { el } = renderStaff(s, { width: Math.min(1040, innerWidth - 90) }); modal(`${s.title || '곡'} — ${k.name || ''}`, el, [{ label: '닫기', primary: true }], { wide: true }); } }, '악보'), hideBtn));
       })))));
   return { unmount() {} };

@@ -6,6 +6,7 @@ import { librarySongs, normalize, buildEvents, songKey, emptySong } from './song
 import { engine, Player } from './audio.js';
 import { SCALES, colorOf, meterOf, solfege } from './theory.js';
 import { recorderOK, SYSTEMS } from './recorder.js';
+import { badWords, songBad } from './safety.js';
 import { mountCompose } from './compose.js';
 import { mountPractice } from './practice.js';
 import { mountRhythm } from './rhythm.js';
@@ -44,7 +45,11 @@ const ctx = {
     if (ref.startsWith('u.')) {
       const [, owner, id] = ref.split('.');
       const raw = await store.getSong(owner, id);
-      return raw ? normalize(raw) : null;
+      if (!raw) return null;
+      const s = normalize(raw);
+      // [MUSIC-SAFE-1] 친구 곡: 노랫말이 고운 말이 아니면 노랫말 없이(가락은 그대로)
+      if (owner !== store.me.sid && songBad(s).lyrics.length) s.notes = s.notes.map(n => ({ ...n, w: '' }));
+      return s;
     }
     return null;
   },
@@ -85,7 +90,8 @@ function mountHome(root) {
     mine.replaceChildren(...(list.length ? list.slice(0, 4).map(s => songRow(normalize(s), 'mine')) : [h('div', { class: 'empty' }, '아직 지은 곡이 없어요. "작곡하기"에서 첫 곡을 지어 보세요. 기본 곡을 바꿔 쓰는 것도 좋아요.')]));
     if (list.length > 4) mine.append(h('button', { class: 'btn small', onclick: () => ctx.go('#/pick/mine') }, `내 곡 모두 보기 (${list.length})`));
   }).catch(e => { console.warn(e); mine.replaceChildren(h('div', { class: 'empty' }, '내 곡을 불러오지 못했어요.')); });
-  const stopWatch = store.watchConcert(list => {
+  const stopWatch = store.watchConcert(all => {
+    const list = all.filter(c => !badWords(c.t).length);   // [MUSIC-SAFE-1]
     concert.replaceChildren(...(list.length ? list.slice(0, 4).map(c => concertRow(c)) : [h('div', { class: 'empty' }, '아직 올라온 곡이 없어요. 곡을 저장할 때 "우리 반 음악회에 올리기"를 고르면 여기 떠요.')]));
     if (list.length > 4) concert.append(h('button', { class: 'btn small', onclick: () => ctx.go('#/pick/class') }, `모두 보기 (${list.length})`));
   });
@@ -129,7 +135,7 @@ function mountPick(root, mode) {
     try {
       if (tab === 'lib') songs = LIB.map(s => ({ s, ref: s.id }));
       else if (tab === 'mine') songs = (await store.listMySongs()).map(r => normalize(r)).map(s => ({ s, ref: ctx.refOf(s) }));
-      else songs = (await store.listConcert()).map(c => ({ c, ref: `u.${c.sid}.${c.id}` }));
+      else songs = (await store.listConcert()).filter(c => !badWords(c.t).length).map(c => ({ c, ref: `u.${c.sid}.${c.id}` }));
     } catch (e) { console.warn(e); }
     if (!songs.length) { list.replaceChildren(h('div', { class: 'empty' }, tab === 'mine' ? '아직 지은 곡이 없어요.' : tab === 'class' ? '아직 음악회에 올라온 곡이 없어요.' : '')); return; }
     list.replaceChildren(...songs.map(({ s, c, ref }) => {
