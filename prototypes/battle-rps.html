@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>속성 가위바위보 배틀</title>
+<!-- [BATTLE-RPS 시제품 10-03] 불·물·풀을 동시에 낸다 · 몬스터는 '둘 중 하나'를 미리 보여 준다 · 갑옷 = 내 속성 · 기술 고르기 없음(막기·필살기) — 실제 게임엔 아직 안 넣음 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap">
+<script src="../gamedata.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0f0b08;font-family:'Noto Sans KR',sans-serif;color:#fff;overflow:hidden;word-break:keep-all}
+button{font-family:inherit;border:0;cursor:pointer}
+.wrap{position:fixed;inset:8px;max-width:1180px;margin:0 auto;border-radius:14px;overflow:hidden;background:#1a130d;display:flex;flex-direction:column}
+.stage{position:relative;flex:1;min-height:0;overflow:hidden;background:linear-gradient(#a8d7ec 0%,#d6eedf 46%,#c3e0a6 47%)}
+.stage[data-z=intermediate]{background:linear-gradient(#e8b98a 0%,#f1d7b0 46%,#d6b07a 47%)}
+.stage[data-z=advanced]{background:linear-gradient(#9fa6d8 0%,#cfd0ea 46%,#a3a8cf 47%)}
+.ground{position:absolute;left:-20%;right:-20%;bottom:-40%;height:120%;background:#86bf68 url(../assets/floor/grass_patch_light.svg) 0 0/220px;transform:perspective(520px) rotateX(58deg);transform-origin:50% 100%;box-shadow:inset 0 80px 120px rgba(255,255,255,.18)}
+.ground::after{content:"";position:absolute;inset:0;background:url(../assets/floor/grass_patch_dark.svg) 60px 40px/300px;opacity:.45}
+.stage[data-z=intermediate] .ground{background-color:#c39a5e;filter:sepia(.35) saturate(1.2) hue-rotate(-18deg)}
+.stage[data-z=advanced] .ground{background-color:#7d86b8;filter:saturate(.5) hue-rotate(160deg) brightness(.95)}
+.far{position:absolute;filter:saturate(.55) brightness(1.12);opacity:.75}
+.prop{position:absolute;pointer-events:none}
+.top{position:absolute;left:0;right:0;top:0;height:40px;display:flex;align-items:center;padding:0 16px;gap:10px;font-size:14px;color:#3a2a18;z-index:9}
+.top b{color:#1f150b}.top .x{margin-left:auto;color:#3a2a18;background:rgba(255,255,255,.55);padding:4px 10px;border-radius:8px;font-weight:700}
+.mon{position:absolute;right:16%;bottom:24%;width:250px;filter:drop-shadow(0 10px 10px rgba(30,40,10,.25));transition:transform .18s}
+.mon-sh{position:absolute;right:calc(16% + 20px);bottom:calc(24% - 10px);width:210px;height:34px;border-radius:50%;background:radial-gradient(rgba(40,60,20,.35),transparent 70%)}
+.me{position:absolute;left:16%;bottom:4%;width:200px;filter:drop-shadow(0 10px 10px rgba(30,40,10,.3));transition:transform .18s}
+.me-sh{position:absolute;left:calc(16% + 15px);bottom:calc(4% - 10px);width:170px;height:30px;border-radius:50%;background:radial-gradient(rgba(40,60,20,.4),transparent 70%)}
+.tag{position:absolute;text-shadow:0 2px 0 #3b2a14,0 0 6px rgba(0,0,0,.45);z-index:4}
+.tag .hp,.tag .gauge{display:block}
+#ftag .hp{margin-left:auto}
+.tag .nm{font-family:'Black Han Sans','Noto Sans KR',sans-serif;font-size:26px;letter-spacing:.5px}
+.tag .lv{font-size:13px;font-weight:700;margin-left:6px}
+.hp{margin-top:5px;width:230px;height:12px;border-radius:7px;background:rgba(40,25,15,.55);box-shadow:0 0 0 2px rgba(40,25,15,.55);overflow:hidden;position:relative}
+.hp i{position:absolute;inset:0 auto 0 0;border-radius:7px;transition:width .3s ease-out}
+.hp .tr{background:#fff0c2;transition:width .5s ease .3s}
+.hp .fi{background:#7be06a;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.hp.foe .fi{background:#ff7a5c}
+.num{font-size:13px;font-weight:700;margin-top:3px}
+.gauge{margin-top:6px;width:230px;height:7px;border-radius:5px;background:rgba(40,25,15,.55);overflow:hidden}
+.gauge i{display:block;height:100%;width:0;background:#ffd35a;transition:width .3s}
+.type{display:inline-flex;align-items:center;gap:4px;margin-left:8px;font-size:13px;font-weight:900;padding:2px 8px;border-radius:7px;background:var(--c);color:#fff;text-shadow:none;vertical-align:3px}
+/* 몬스터가 낼 것 미리 보기 */
+.hint{position:absolute;right:calc(16% + 268px);top:172px;display:flex;align-items:center;gap:8px;z-index:5;font-weight:900;font-size:15px;color:#2a1c0e;text-shadow:none}
+.hint .lbl{background:rgba(255,255,255,.82);padding:5px 10px;border-radius:9px}
+.hint .el{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--c);box-shadow:0 3px 0 rgba(0,0,0,.25);color:#fff}
+.hint .or{font-weight:900;color:#2a1c0e}
+.hint.big .lbl{background:#7a2416;color:#fff}
+.say{position:absolute;left:50%;top:46px;transform:translateX(-50%);max-width:70%;text-align:center;font-weight:900;font-size:17px;padding:7px 14px;border-radius:10px;background:rgba(30,20,10,.62);z-index:4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 동시에 내는 순간 */
+.clash{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);display:flex;gap:26px;z-index:6;pointer-events:none}
+.cl{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#fff;box-shadow:0 6px 0 rgba(0,0,0,.25),0 0 0 6px rgba(255,255,255,.6);opacity:0}
+.cl.show{animation:clin .35s cubic-bezier(.2,1.4,.4,1) forwards}
+.cl.win{animation:clwin .5s ease-out forwards}
+.cl.lose{animation:cllose .5s ease-out forwards}
+@keyframes clin{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes clwin{0%{transform:scale(1);opacity:1}40%{transform:scale(1.25)}100%{transform:scale(1.1);opacity:1;box-shadow:0 6px 0 rgba(0,0,0,.25),0 0 0 10px #ffd35a}}
+@keyframes cllose{0%{transform:scale(1);opacity:1}100%{transform:scale(.72) translateY(14px);opacity:.55;filter:grayscale(.6)}}
+.res{position:absolute;left:50%;top:22%;transform:translateX(-50%);font-family:'Black Han Sans','Noto Sans KR',sans-serif;font-size:44px;z-index:6;text-shadow:0 3px 0 #3b2a14,0 0 12px rgba(0,0,0,.4);opacity:0}
+.res.show{animation:resin .4s ease-out forwards}
+@keyframes resin{0%{opacity:0;transform:translate(-50%,10px)}100%{opacity:1;transform:translate(-50%,0)}}
+.dmg{position:absolute;font-family:'Black Han Sans','Noto Sans KR',sans-serif;font-size:48px;color:#fff;text-shadow:-3px -3px 0 #5a2410,3px -3px 0 #5a2410,-3px 3px 0 #5a2410,3px 3px 0 #5a2410;animation:dmg .9s ease-out forwards;z-index:7;pointer-events:none}
+@keyframes dmg{0%{transform:translateY(0) scale(.6);opacity:0}20%{transform:translateY(-20px) scale(1.2);opacity:1}80%{opacity:1}100%{transform:translateY(-60px);opacity:0}}
+.hit{animation:hit .3s ease-out}
+@keyframes hit{0%{filter:brightness(3) saturate(0)}100%{filter:none}}
+.shake{animation:shake .3s linear}
+@keyframes shake{25%{transform:translate(-6px,3px)}50%{transform:translate(5px,-3px)}75%{transform:translate(-3px,2px)}}
+/* 아래 단추 */
+.cmd{flex:none;display:flex;gap:12px;padding:14px 16px;background:#22180f}
+.b{flex:1;min-height:92px;border-radius:16px;padding:10px 14px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;position:relative;box-shadow:inset 0 -6px 0 rgba(0,0,0,.25);color:#fff;text-align:left}
+.b:not(:disabled):hover{filter:brightness(1.07)}.b:not(:disabled):active{transform:translateY(2px)}
+.b:disabled{opacity:.45;cursor:default}
+.b .t{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:25px;display:flex;align-items:center;gap:8px}
+.b .s{font-size:13px;font-weight:700;opacity:.95}
+.b.fire{background:#e9603e}.b.water{background:#3d8fd6}.b.grass{background:#4fae5a}.b.guard{background:#5b4a3a;flex:.8}
+.b.ult{background:linear-gradient(135deg,#ffd35a,#e9a23a);color:#2a1704;flex:1.1;animation:ult 1s ease-in-out infinite}
+@keyframes ult{50%{box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),0 0 0 4px rgba(255,211,90,.35)}}
+.b .mine{position:absolute;right:12px;top:10px;font-size:12px;font-weight:900;background:rgba(0,0,0,.25);padding:2px 8px;border-radius:7px}
+/* 결과 */
+.end{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(20,14,8,.55);z-index:10}
+.end.show{display:flex}
+.endc{width:min(470px,92%);background:#fff8ea;color:#2a1c0e;border-radius:18px;padding:20px 22px;box-shadow:0 0 0 5px #c99a4a,0 20px 40px rgba(0,0,0,.4)}
+.endc h2{font-family:'Black Han Sans','Noto Sans KR',sans-serif;font-size:34px;font-weight:400}
+.endc p{margin:6px 0 12px;color:#6b5236;font-size:15px}
+.rows{display:flex;gap:8px;margin-bottom:14px}
+.rows div{flex:1;text-align:center;padding:10px 6px;border-radius:12px;background:#f1e4c8;font-weight:700;font-size:13px}
+.rows b{display:block;font-family:'Black Han Sans','Noto Sans KR',sans-serif;font-size:28px;font-weight:400}
+.endc button{width:100%;padding:13px;border-radius:12px;background:#e0a93a;color:#2a1704;font-weight:900;font-size:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <div class="ground"></div>
+    <img class="far" src="../assets/deco/d_y46.svg" style="left:52%;bottom:52%;height:90px">
+    <img class="far" src="../assets/deco/d_y47.svg" style="left:58%;bottom:52%;height:80px">
+    <img class="far" src="../assets/deco/d_y46.svg" style="left:84%;bottom:52%;height:100px">
+    <img class="far" src="../assets/deco/d_y9.svg" style="left:8%;bottom:52%;height:70px">
+    <img class="prop" src="../assets/deco/d_y19.svg" style="left:-70px;bottom:24%;height:330px">
+    <img class="prop" src="../assets/deco/d_y26.svg" style="left:44%;bottom:40%;height:62px">
+    <img class="prop" src="../assets/deco/d_y15.svg" style="right:7%;bottom:34%;height:70px">
+    <div class="mon-sh"></div><img class="mon" id="mon">
+    <img class="prop" src="../assets/deco/d_y45.svg" style="right:-10px;bottom:-10px;height:150px">
+    <div class="me-sh"></div><img class="me" id="me" src="../assets/char/base_1.svg">
+    <div class="top"><b id="zone">사냥터</b> · 오늘 남은 도전 2번<span class="x" onclick="location.reload()">나가기</span></div>
+    <div class="say" id="say"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tag" id="ftag" style="right:calc(16% + 262px);top:92px;text-align:right"></div>
+    <div class="tag" id="mtag" style="left:calc(16% + 230px);bottom:7%"></div>
+    <div class="clash"><div class="cl" id="c1"></div><div class="cl" id="c2"></div></div>
+    <div class="res" id="res"></div>
+    <div class="end" id="end"><div class="endc" id="endc"></div></div>
+  </div>
+  <div class="cmd" id="cmd"></div>
+</div>
+<script>
+// ════ 속성 가위바위보 — 규칙(설계 시뮬과 같은 수)
+//  물이 불을 끄고 · 불이 풀을 태우고 · 풀이 물을 마신다. 둘이 동시에 낸다.
+//  이기면 내 공격 ×1.6 · 몬스터 ×0.5 / 비기면 둘 다 ×1 / 지면 내 ×0.5 · 몬스터 ×1.6 / 막기: 나는 안 치고 받는 피해 ×0.2
+//  내 속성(입은 갑옷) 으로 내면 ×1.25 · 3차례마다 몬스터 큰 공격(×2, 무엇을 낼지 정확히 보여 줌)
+//  기세: 이기면 +34 · 비기면 +15 · 막기 +40 → 다 차면 필살기(가위바위보 없이 ×2.4)
+//  힘 = 공격력 + 마력(지금 장비 그대로) · 몬스터 체력 ×2.2 · 공격 ×2.0
+const Q = new URLSearchParams(location.search);
+const MON = GAME_DATA.monsters.find(m => m.id === (Q.get('m') || 'm45'));
+const ARMOR = Q.get('armor') || 'fire';
+const EL = { fire: { n: '불', c: '#e9603e', g: '<path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.2-2-5.6-4-7.6.2 2-1 3.4-2.3 3.4C11.4 11.2 11 9 12.5 6 9 7.5 5 11 5 15.4 5 19.1 7.6 22 12 22z"/>' },
+  water: { n: '물', c: '#3d8fd6', g: '<path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z"/>' },
+  grass: { n: '풀', c: '#4fae5a', g: '<path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19 13 11"/>' } };
+const KEYS = ['fire', 'water', 'grass'];
+const BEATS = { water: 'fire', fire: 'grass', grass: 'water' };
+const rps = (a, b) => a === b ? 0 : BEATS[a] === b ? 1 : -1;
+const svg = (d, s) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const jong = w => { const c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
+const J = (w, a, b) => w + (jong(w) ? a : b);
+const K = { level: 12, atk: 27, mag: 15, def: 27, name: '시험' };       // Lv12 · 강철검 · 철 갑옷 등(풀장비)
+const S = { php: 80 + 12 * K.level, phpMax: 80 + 12 * K.level, mhp: Math.round(MON.hp * 2.2), mhpMax: Math.round(MON.hp * 2.2),
+  power: K.atk + K.mag + 4 + K.level * 0.6, turn: 0, gauge: 0, w: 0, t: 0, l: 0, busy: false, choice: null, hint: [], big: false };
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function setup() {
+  $('stage').dataset.z = MON.zone; $('zone').textContent = { beginner: '초급 사냥터', intermediate: '중급 사냥터', advanced: '고급 사냥터' }[MON.zone];
+  $('mon').src = '../assets/monsters/' + MON.id + '.png';
+  $('ftag').innerHTML = `<span class="nm">${MON.name}</span><span class="lv">Lv.${MON.level}</span><span class="type" style="--c:${EL[MON.element].c}">${EL[MON.element].n}</span><div class="hp foe"><i class="tr"></i><i class="fi"></i></div><div class="num" id="fnum"></div>`;
+  $('mtag').innerHTML = `<span class="nm">${K.name}</span><span class="lv">Lv.${K.level}</span><span class="type" style="--c:${EL[ARMOR].c}">${EL[ARMOR].n} 갑옷</span><div class="hp"><i class="tr"></i><i class="fi"></i></div><div class="num" id="mnum"></div><div class="gauge"><i id="gauge"></i></div>`;
+  draw(); $('say').textContent = `${J(MON.name, '이', '가')} 나타났어요! 무엇을 낼지 둘 중 하나는 알려 줘요`;
+  next();
+}
+function draw() {
+  const set = (sel, v, m) => { const p = Math.max(0, v / m * 100); document.querySelectorAll(sel + ' i').forEach(i => i.style.width = p + '%'); };
+  set('#ftag .hp', S.mhp, S.mhpMax); set('#mtag .hp', S.php, S.phpMax);
+  $('fnum').textContent = `${Math.max(0, S.mhp)} / ${S.mhpMax}`; $('mnum').textContent = `${Math.max(0, S.php)} / ${S.phpMax}`;
+  $('gauge').style.width = S.gauge + '%';
+}
+// 몬스터가 다음에 낼 것: 자기 속성 반 · 나머지 반 / 힌트 = 진짜 + 하나 더(큰 공격은 진짜만)
+function next() {
+  S.turn++; S.big = S.turn % 3 === 0;
+  S.choice = S.big ? MON.element : (Math.random() < .5 ? MON.element : KEYS.filter(k => k !== MON.element)[Math.random() < .5 ? 0 : 1]);
+  const other = KEYS.filter(k => k !== S.choice)[Math.random() < .5 ? 0 : 1];
+  S.hint = S.big ? [S.choice] : (Math.random() < .5 ? [S.choice, other] : [other, S.choice]);
+  const h = $('hint'); h.className = 'hint' + (S.big ? ' big' : '');
+  h.innerHTML = `<span class="lbl">${S.big ? '큰 공격 준비!' : '다음에 낼 것'}</span>` + S.hint.map((k, i) => (i ? '<span class="or">또는</span>' : '') + `<span class="el" style="--c:${EL[k].c}">${svg(EL[k].g, 24)}</span>`).join('');
+  drawCmd();
+}
+function outcomeWord(k) {   // 이 단추를 누르면 힌트 둘에 대해 어떻게 되나 — 아이가 읽는 연습
+  const r = [...new Set(S.hint.map(h => rps(k, h)))].sort((a, b) => b - a);
+  const w = { 1: '이겨요', 0: '비겨요', '-1': '져요' };
+  return r.length === 1 ? w[r[0]] : `${w[r[0]].replace('요', '')}거나 ${w[r[1]]}`;
+}
+function drawCmd() {
+  const ult = S.gauge >= 100;
+  $('cmd').innerHTML = (ult ? `<button class="b ult" onclick="go('ult')"><span class="t">${svg('<path d="M12 2l2.6 6.3L21 9.2l-5 4.4 1.5 6.6L12 16.9 6.5 20.2 8 13.6 3 9.2l6.4-.9z"/>', 24)}필살기</span><span class="s">가위바위보 없이 큰 한 방</span></button>` : '') +
+    KEYS.map(k => `<button class="b ${k}" onclick="go('${k}')">${k === ARMOR ? '<span class="mine">내 속성 ×1.25</span>' : ''}<span class="t">${svg(EL[k].g, 24)}${EL[k].n}</span><span class="s">${outcomeWord(k)}</span></button>`).join('') +
+    `<button class="b guard" onclick="go('guard')"><span class="t">${svg('<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/>', 24)}막기</span><span class="s">${S.big ? '큰 공격을 막아요' : '받는 피해 아주 작게'}</span></button>`;
+}
+function pop(el, text, dx) {
+  const r = el.getBoundingClientRect(), s = $('stage').getBoundingClientRect(), d = document.createElement('div');
+  d.className = 'dmg'; d.textContent = text; d.style.left = (r.left - s.left + r.width / 2 - 30 + (dx || 0)) + 'px'; d.style.top = (r.top - s.top + r.height * .25) + 'px';
+  $('stage').appendChild(d); setTimeout(() => d.remove(), 950);
+  el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit');
+}
+async function go(k) {
+  if (S.busy) return; S.busy = true; document.querySelectorAll('.b').forEach(b => b.disabled = true);
+  const df = 100 / (100 + (MON.def || 0)), pf = 100 / (100 + K.def), atk = MON.atk * 2.0 * (S.big ? 2 : 1);
+  const c1 = $('c1'), c2 = $('c2'), res = $('res');
+  const show = (el, key) => { el.style.setProperty('--c', key === 'guard' ? '#5b4a3a' : key === 'ult' ? '#e9a23a' : EL[key].c); el.innerHTML = key === 'guard' ? svg('<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/>', 54) : key === 'ult' ? svg('<path d="M12 2l2.6 6.3L21 9.2l-5 4.4 1.5 6.6L12 16.9 6.5 20.2 8 13.6 3 9.2l6.4-.9z"/>', 54) : svg(EL[key].g, 54); el.className = 'cl'; void el.offsetWidth; el.classList.add('show'); };
+  show(c1, k); show(c2, S.choice); await wait(500);
+  let pd = 0, md = 0, word = '';
+  if (k === 'ult') { pd = Math.round(S.power * 2.4 * df); md = Math.round(atk * .6 * pf); S.gauge = 0; word = '필살기!'; c1.className = 'cl show win'; }
+  else if (k === 'guard') { md = Math.round(atk * .2 * pf); S.gauge = Math.min(100, S.gauge + 40); word = S.big ? '막았다!' : '막기'; c1.className = 'cl show win'; }
+  else {
+    const r = rps(k, S.choice), crit = Math.random() < .08 ? 1.5 : 1;
+    pd = Math.round(S.power * (k === ARMOR ? 1.25 : 1) * (r > 0 ? 1.6 : r === 0 ? 1 : .5) * df * crit);
+    md = Math.round(atk * (r > 0 ? .5 : r === 0 ? 1 : 1.6) * pf);
+    S.gauge = Math.min(100, S.gauge + (r > 0 ? 34 : r === 0 ? 15 : 0));
+    if (r > 0) { S.w++; word = '이겼다!'; c1.className = 'cl show win'; c2.className = 'cl show lose'; }
+    else if (r < 0) { S.l++; word = '졌다…'; c1.className = 'cl show lose'; c2.className = 'cl show win'; }
+    else { S.t++; word = '비겼다'; }
+  }
+  res.textContent = word; res.className = 'res'; void res.offsetWidth; res.classList.add('show');
+  await wait(450);
+  if (pd) { S.mhp -= pd; pop($('mon'), pd); $('stage').classList.remove('shake'); void $('stage').offsetWidth; if (pd > S.power * 1.5) $('stage').classList.add('shake'); }
+  await wait(350);
+  if (S.mhp > 0 && md) { S.php -= md; pop($('me'), md); }
+  draw();
+  const why = k === 'ult' ? `필살기! ${MON.name}에게 ${pd}` : k === 'guard' ? `막기 — ${md}만 받았어요` :
+    `나 ${EL[k].n} · ${MON.name} ${EL[S.choice].n} → ${word.replace('!', '').replace('…', '')} (${pd} 주고 ${md} 받음)`;
+  $('say').textContent = why;
+  await wait(900);
+  [c1, c2, res].forEach(e => e.className = e === res ? 'res' : 'cl');
+  if (S.mhp <= 0 || S.php <= 0) return end();
+  S.busy = false; next();
+}
+function end() {
+  const win = S.mhp <= 0;
+  if (win) $('mon').animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-30px) scale(.6)', opacity: 0 }], { duration: 700, fill: 'forwards' });
+  $('endc').innerHTML = `<h2>${win ? '이겼어요!' : '아쉬워요'}</h2><p>${win ? `${J(MON.name, '을', '를')} ${S.turn}차례 만에 물리쳤어요 · +${MON.gold}G` : `다음엔 힌트 둘 중 <b>이기는 쪽</b>을 내 보세요 — 힌트가 '불 또는 풀'이면 불(풀을 태우고 불과는 비김)`}</p>
+    <div class="rows"><div><b>${S.w}</b>이긴 차례</div><div><b>${S.t}</b>비긴 차례</div><div><b>${S.l}</b>진 차례</div></div><button onclick="location.reload()">확인</button>`;
+  setTimeout(() => $('end').classList.add('show'), 600);
+}
+window.proto = { S, go, draw, next };
+setup();
+</script>
+</body>
+</html>
