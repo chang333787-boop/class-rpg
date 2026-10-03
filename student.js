@@ -110,6 +110,16 @@ function showScreen(id) {
 }
 function hideScreen(id) { document.getElementById(id).classList.add('hidden'); }
 
+// [TITLE-BOARD-1] 첫 화면 칠판 오른쪽 위 = 오늘 날짜 (한국 시각 — 접속 시간 검사와 같은 셈)
+function fillTitleDate() {
+  const el = document.getElementById('tb-date');
+  if (!el) return;
+  const k = new Date(Date.now() + 9 * 3600000);
+  el.innerHTML = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일<br>${'일월화수목금토'[k.getUTCDay()]}요일`;
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillTitleDate);
+else fillTitleDate();
+
 function selectStudent(id, el) {
   document.querySelectorAll('.stu-btn').forEach(b => b.classList.remove('sel'));
   el.classList.add('sel'); SEL_STUDENT = id;

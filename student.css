@@ -1955,3 +1955,75 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
 @media (min-height:800px){.bv2-fighter.me{width:190px;height:252px;}.bv2-fighter.foe{width:280px;height:280px;}}
 @media (max-width:700px){.bv2-plate{width:calc(50% - 21px);}.bv2-turn{top:auto;bottom:62px;}.bv2-fighter.me{left:6%;width:104px;height:140px;}.bv2-fighter.foe{right:4%;width:150px;height:150px;}.bv2-spot{display:none;}.bv2-atk-row{grid-template-columns:repeat(2,1fr);}.bv2-atk{min-height:56px;}.bv2-at{font-size:15px;}.bv2-banner{font-size:52px;}}
 @media (prefers-reduced-motion:reduce){.bv2-stage.shake,.bv2-stage.shake-big{animation:none;}.bv2-spark,.bv2-ring{display:none;}.bv2-fighter.idle > *{animation:none;}}
+
+/* ════ [TITLE-BOARD-1] 첫 화면 = 교실 칠판 (사용자 10-03 시안 3 · 아이 캐릭터 대신 몬스터) ════
+   크롬북 1366×610 화면이 기준 그림이고 --u 는 그 그림의 1px. 가로 화면은 통째로 줄거나 늘고(최대 1.25배),
+   세로 화면(휴대폰·세로 아이패드)은 아래 @media 에서 칠판 → 몬스터 줄 → 단추로 쌓는다.
+   분필 글씨(나눔 펜)는 student.html 에서 칠판 글자만 받는다 — 칠판 글을 바꾸면 거기 text= 도 같이. */
+#s-title{--u:min(1.25px,100vw / 1366,100vh / 610);overflow:hidden;
+  background:repeating-linear-gradient(90deg,rgba(120,80,40,.05) 0 2px,transparent 2px 64px),linear-gradient(#f3e6cf,#ecdcbf);}
+.tb-scene{position:relative;flex:none;width:calc(920*var(--u));height:calc(544*var(--u));margin-top:calc(18*var(--u));}
+.tb-scene::before{content:"";position:absolute;z-index:0;left:-100vw;right:-100vw;top:calc(416*var(--u));height:100vh;
+  background:linear-gradient(#b98a5a,#a7764a 40%,#9a6c42);border-top:calc(5*var(--u)) solid #93653c;}
+.tb-board{position:absolute;z-index:1;left:0;top:0;width:calc(920*var(--u));height:calc(380*var(--u));border-radius:calc(8*var(--u));
+  background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px) 0 0/5px 5px,radial-gradient(ellipse at 40% 35%,#41705a,#2c4f3c 72%);
+  box-shadow:0 0 0 calc(14*var(--u)) #8a5a2e,0 0 0 calc(18*var(--u)) #6b4220,0 calc(18*var(--u)) calc(30*var(--u)) rgba(60,35,10,.35);}
+.tb-chalk{position:absolute;margin:0;font-family:'Nanum Pen Script','Noto Sans KR',sans-serif;font-weight:400;line-height:1;white-space:nowrap;
+  color:#f4f1e6;text-shadow:0 0 1px rgba(255,255,255,.55);}
+.tb-corner-l,.tb-corner-r{top:calc(20*var(--u));font-size:calc(30*var(--u));line-height:1.15;}
+.tb-corner-l{left:calc(20*var(--u));}
+.tb-corner-r{right:calc(20*var(--u));text-align:right;}
+.tb-title{left:0;right:0;top:calc(42*var(--u));text-align:center;font-size:calc(118*var(--u));}
+.tb-sub{left:0;right:0;top:calc(164*var(--u));text-align:center;font-size:calc(40*var(--u));color:#ffe48f;}
+.tb-line{position:absolute;left:0;right:0;margin:0 auto;top:calc(212*var(--u));width:calc(300*var(--u));height:calc(14*var(--u));overflow:visible;}
+.tb-line path{fill:none;stroke:#ffe48f;stroke-width:3;stroke-linecap:round;opacity:.8;}
+.tb-doodle{position:absolute;pointer-events:none;filter:grayscale(1) brightness(2.2) contrast(.8);mix-blend-mode:screen;opacity:.42;}
+.tb-d1{left:calc(60*var(--u));top:calc(226*var(--u));height:calc(120*var(--u));}
+.tb-d2{left:calc(740*var(--u));top:calc(214*var(--u));height:calc(130*var(--u));}
+/* 분필 받침 — 지우개·분필 두 개, 그 위에 앉은 몬스터 둘 */
+.tb-ledge{position:absolute;z-index:2;left:calc(-20*var(--u));top:calc(394*var(--u));width:calc(960*var(--u));height:calc(14*var(--u));
+  border-radius:calc(3*var(--u));background:#7a4c24;box-shadow:0 calc(6*var(--u)) calc(10*var(--u)) rgba(60,35,10,.3);}
+.tb-ledge::before{content:"";position:absolute;left:calc(150*var(--u));bottom:calc(11*var(--u));width:calc(66*var(--u));height:calc(17*var(--u));
+  border-radius:calc(3*var(--u));background:linear-gradient(#56657a 0 52%,#ece6d8 52%);box-shadow:0 1px 0 rgba(0,0,0,.2);}
+.tb-ledge::after{content:"";position:absolute;left:calc(250*var(--u));bottom:calc(12*var(--u));width:calc(30*var(--u));height:calc(6*var(--u));
+  border-radius:calc(3*var(--u));background:#f6f2e8;box-shadow:calc(40*var(--u)) 0 0 #ffe48f;}
+.tb-sit{position:absolute;bottom:calc(6*var(--u));pointer-events:none;}
+.tb-s1{left:calc(550*var(--u));height:calc(60*var(--u));}
+.tb-s2{left:calc(630*var(--u));height:calc(66*var(--u));}
+/* 칠판 앞에 선 몬스터 넷 */
+.tb-crew{position:absolute;z-index:3;inset:0;pointer-events:none;}
+.tb-crew img{position:absolute;filter:drop-shadow(0 calc(6*var(--u)) calc(5*var(--u)) rgba(60,35,10,.28));}
+.tb-m1{left:calc(-157*var(--u));top:calc(294*var(--u));height:calc(190*var(--u));}
+.tb-m2{left:calc(-3*var(--u));top:calc(348*var(--u));height:calc(136*var(--u));}
+.tb-m3{left:calc(757*var(--u));top:calc(336*var(--u));height:calc(150*var(--u));}
+.tb-m4{left:calc(887*var(--u));top:calc(360*var(--u));height:calc(126*var(--u));}
+.btn-gold.tb-go{position:absolute;z-index:4;left:0;right:0;margin:0 auto;width:max-content;top:calc(482*var(--u));
+  min-height:0;font-size:clamp(17px,calc(23*var(--u)),26px);padding:.62em 2.35em;border-radius:14px;color:#3a2006;background:#f2a93b;
+  box-shadow:inset 0 -5px 0 rgba(0,0,0,.16),0 8px 18px rgba(60,35,10,.3);}
+.btn-gold.tb-go:hover{background:#f5b44d;}
+@media (max-aspect-ratio:1/1){
+  #s-title{--u:min(1.6px,100vw / 400,100vh / 720);}
+  .tb-scene{width:calc(372*var(--u));height:calc(590*var(--u));margin-top:calc(13*var(--u));}
+  .tb-scene::before{top:calc(356*var(--u));}
+  .tb-board{width:calc(372*var(--u));height:calc(330*var(--u));
+    box-shadow:0 0 0 calc(10*var(--u)) #8a5a2e,0 0 0 calc(13*var(--u)) #6b4220,0 calc(12*var(--u)) calc(22*var(--u)) rgba(60,35,10,.35);}
+  .tb-corner-l,.tb-corner-r{top:calc(14*var(--u));font-size:calc(21*var(--u));}
+  .tb-corner-l{left:calc(14*var(--u));}
+  .tb-corner-r{right:calc(14*var(--u));}
+  .tb-title{top:calc(78*var(--u));font-size:calc(66*var(--u));}
+  .tb-sub{top:calc(160*var(--u));font-size:calc(28*var(--u));}
+  .tb-line{top:calc(196*var(--u));width:calc(220*var(--u));height:calc(12*var(--u));}
+  .tb-d1{left:calc(26*var(--u));top:calc(214*var(--u));height:calc(96*var(--u));}
+  .tb-d2{left:calc(250*var(--u));top:calc(206*var(--u));height:calc(104*var(--u));}
+  .tb-ledge{left:calc(-12*var(--u));top:calc(340*var(--u));width:calc(396*var(--u));height:calc(11*var(--u));}
+  .tb-ledge::before{left:calc(56*var(--u));width:calc(46*var(--u));height:calc(12*var(--u));bottom:calc(9*var(--u));}
+  .tb-ledge::after{left:calc(124*var(--u));width:calc(22*var(--u));height:calc(5*var(--u));bottom:calc(9*var(--u));box-shadow:calc(30*var(--u)) 0 0 #ffe48f;}
+  .tb-sit{bottom:calc(5*var(--u));}
+  .tb-s1{left:calc(214*var(--u));height:calc(44*var(--u));}
+  .tb-s2{left:calc(262*var(--u));height:calc(48*var(--u));}
+  .tb-m1{left:calc(-6*var(--u));top:calc(372*var(--u));height:calc(132*var(--u));}
+  .tb-m2{left:calc(106*var(--u));top:calc(414*var(--u));height:calc(90*var(--u));}
+  .tb-m3{left:calc(186*var(--u));top:calc(400*var(--u));height:calc(104*var(--u));}
+  .tb-m4{left:calc(284*var(--u));top:calc(418*var(--u));height:calc(86*var(--u));}
+  .btn-gold.tb-go{top:calc(522*var(--u));}
+}
