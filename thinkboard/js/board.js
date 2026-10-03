@@ -6,6 +6,7 @@ import { ops, REASONS } from './model.js';
 import { zoneLayout, zoneAt, slotIn, freeSpot, estH, evalHints, ZW, ZHEAD, CW } from './templates.js';
 import { withDefaults, zoneNames, COLORS } from './settings.js';
 import { keyOf } from './util.js';
+import { icon } from './icons.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -36,6 +37,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
   world.append(layerZ, svg, layerC);
   stage.append(world);
   const flow = h('div', { class: 'tb-flow' });
+  const fab = h('div', { class: 'tb-fab' });
   const banner = h('div', { class: 'tb-banner' });
   const drawer = h('div', { class: 'tb-drawer' });
   const legend = h('div', { class: 'tb-legend' },
@@ -43,7 +45,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     h('span', { class: 'lg src-ai-edit' }, 'AI 카드를 고침'),
     h('span', { class: 'lg src-ai-keep' }, 'AI 카드 그대로'),
     h('span', { class: 'lg unknown' }, '❔ 아직 모름'));
-  root.append(top, promptBar, stage, flow, banner, drawer, legend);
+  root.append(top, promptBar, stage, flow, fab, banner, drawer, legend);
 
   let flashId = null;        // 방금 생긴 카드 — 잠깐 반짝
   const act = async (name, args) => {
@@ -90,7 +92,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     if (S.layout !== 'pins') pinMode = false;
     zones = zoneLayout(B);
     if (sel && !B.cards[sel]) sel = null;
-    renderTop(); renderPrompt();
+    renderTop(); renderPrompt(); renderFab();
     stage.style.display = canvasMode() ? '' : 'none';
     flow.style.display = canvasMode() ? 'none' : '';
     if (canvasMode()) {
@@ -100,54 +102,66 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     renderPanel();
     const showLegend = S.mail !== 'off' || Object.values(B.cards).some(c => c.src !== 'me');
     legend.style.display = showLegend && !tv ? '' : 'none';
+    root.classList.toggle('src-on', !!showLegend);   // 출처 색은 우편함을 쓰는 판에서만(연구) — 아니면 종이 카드
     const n = Object.values(B.mail).filter(m => m.status === 'new').length;
     if (!teacher && !tv && lastNew >= 0 && n > lastNew) toast('📬 우편함에 카드가 왔어요!');
     lastNew = n;
   }
 
+  // 위 줄: 판 이름 · 조용한 도구(우편함 · 결과물 · 잇기 · 확대) · 나
+  const tbtn = (ic, label, on, fn, extra = '') => h('button', { class: 'tbtn' + (on ? ' on' : '') + extra, onclick: fn, title: label }, icon(ic), h('span', {}, label));
   function renderTop() {
     const nNew = Object.values(B.mail).filter(m => m.status === 'new').length;
     const showMail = !tv && (S.mail !== 'off' || Object.keys(B.mail).length);
-    const add = canAdd(false), writers = new Set(Object.values(B.cards).filter(kidCard).map(c => c.by)).size;
+    const writers = new Set(Object.values(B.cards).filter(kidCard).map(c => c.by)).size;
+    const sub = B.template.name && B.template.name !== B.title ? B.template.name : '';
     top.innerHTML = '';
     top.append(...[
-      tv ? null : h('button', { class: 'icon', title: '처음으로', onclick: home }, '🏠'),
-      h('div', { class: 'tb-title' }, h('b', {}, B.title), h('span', { class: 'sub' }, `${B.template.icon || ''} ${B.template.name}`)),
+      tv ? null : h('button', { class: 'ibtn', title: '처음으로', onclick: home }, icon(teacher ? 'back' : 'home')),
+      h('div', { class: 'tb-title' }, h('b', {}, B.title), sub ? h('span', { class: 'sub' }, sub) : null),
       h('div', { class: 'grow' }),
-      !teacher && !tv && !S.open ? h('span', { class: 'chip closed' }, '🔒 지금은 보기만 해요') : null,
-      !teacher && !tv && S.open && S.limit > 0 ? h('span', { class: 'chip' }, `✏️ ${myCount()} / ${S.limit}장`) : null,
-      (teacher || tv) ? h('span', { class: 'chip' }, `✍️ ${writers}명 · 카드 ${Object.values(B.cards).filter(visible).length}장`) : null,
-      open() && S.layout === 'pins' ? h('button', { class: 'tool' + (pinMode ? ' on' : '') + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) setPin(!pinMode); } }, '📍 핀 꽂기') : null,
-      open() && S.layout !== 'pins' ? h('button', { class: 'tool' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addIn(''); } }, '＋ 카드') : null,
-      open() && S.unknown ? h('button', { class: 'tool unk' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addIn('', 'unknown'); } }, '❔ 모르는 것') : null,
-      open() && canvasMode() && S.links ? h('button', { class: 'tool' + (linkFrom !== null ? ' on' : ''), onclick: () => setLink(linkFrom === null ? '' : null) }, '🔗 잇기') : null,
-      showMail ? h('button', { class: 'tool' + (panel === 'mail' ? ' on' : '') + (nNew ? ' has' : ''), onclick: () => togglePanel('mail') },
-        '📬 우편함', nNew ? h('span', { class: 'badge' }, nNew) : null) : null,
-      tv ? null : h('button', { class: 'tool' + (panel === 'res' ? ' on' : ''), onclick: () => togglePanel('res') },
-        '📎 결과물', Object.keys(B.results).length ? h('span', { class: 'badge soft' }, Object.keys(B.results).length) : null),
+      !teacher && !tv && !S.open ? h('span', { class: 'pill warn' }, icon('lock', 15), '보기만 해요') : null,
+      (teacher || tv) ? h('span', { class: 'pill' }, icon('users', 15), `${writers}명 · ${Object.values(B.cards).filter(visible).length}장`) : null,
+      open() && canvasMode() && S.links ? tbtn('link', '잇기', linkFrom !== null, () => setLink(linkFrom === null ? '' : null)) : null,
+      showMail ? h('button', { class: 'tbtn' + (panel === 'mail' ? ' on' : '') + (nNew ? ' has' : ''), onclick: () => togglePanel('mail'), title: '우편함' },
+        icon('inbox'), h('span', {}, '우편함'), nNew ? h('span', { class: 'badge' }, nNew) : null) : null,
+      tv || !(teacher || S.mail !== 'off' || Object.keys(B.results).length) ? null : h('button', { class: 'tbtn' + (panel === 'res' ? ' on' : ''), onclick: () => togglePanel('res'), title: '결과물' },
+        icon('clip'), h('span', {}, '결과물'), Object.keys(B.results).length ? h('span', { class: 'badge soft' }, Object.keys(B.results).length) : null),
       canvasMode() ? h('div', { class: 'zoom' },
-        h('button', { class: 'icon', onclick: () => zoomBy(1 / 1.2), title: '작게' }, '−'),
-        h('button', { class: 'icon', onclick: fit, title: '한눈에' }, '⤢'),
-        h('button', { class: 'icon', onclick: () => zoomBy(1.2), title: '크게' }, '＋')) : null,
-      h('span', { class: 'me' }, tv ? '📺' : teacher ? '🧑‍🏫 선생님' : '✏️ ' + me)].filter(Boolean));   // DOM append 는 null 을 글자로 쓴다
+        h('button', { class: 'ibtn', onclick: () => zoomBy(1 / 1.2), title: '작게' }, icon('minus')),
+        h('button', { class: 'ibtn', onclick: fit, title: '한눈에' }, icon('fit')),
+        h('button', { class: 'ibtn', onclick: () => zoomBy(1.2), title: '크게' }, icon('plus'))) : null,
+      tv ? null : h('span', { class: 'me' }, teacher ? '선생님' : me)].filter(Boolean));   // DOM append 는 null 을 글자로 쓴다
   }
 
-  function renderPrompt() {
+  // 오른쪽 아래: 쓰기 단추(주 동작 하나) + 모르는 것
+  function renderFab() {
+    fab.innerHTML = '';
+    if (!open()) return;
+    const add = canAdd(false), left = !teacher && S.limit > 0 ? ` ${myCount()}/${S.limit}` : '';
+    if (S.unknown) fab.append(h('button', { class: 'fab-2' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addIn('', 'unknown'); } }, icon('help'), h('span', {}, '모르는 것')));
+    fab.append(S.layout === 'pins'
+      ? h('button', { class: 'fab' + (pinMode ? ' on' : '') + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) setPin(!pinMode); } }, icon(pinMode ? 'x' : 'mapPin', 20), h('span', {}, pinMode ? '그만' : '핀 꽂기' + left))
+      : h('button', { class: 'fab' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addIn(''); } }, icon('plus', 20), h('span', {}, '생각 쓰기' + left)));
+  }
+
+  function renderPrompt() {   // 자유 배치는 위 띠, 흐르는 판은 판 맨 위(renderFlow)
     promptBar.innerHTML = '';
-    root.classList.toggle('has-prompt', !!S.prompt);
-    if (S.prompt) promptBar.append(h('span', { class: 'pq' }, '💬'), h('span', {}, S.prompt));
+    const on = !!S.prompt && canvasMode();
+    root.classList.toggle('has-prompt', on);
+    if (on) promptBar.append(h('span', {}, S.prompt));
   }
 
-  // 카드 속 아래 줄: 이름 · 공감 · 표시(허락 기다림 · 가림 · 고정)
+  // 카드 속 아래 줄: 이름 · 표시(허락 기다림 · 가림 · 고정) · 공감
   function cardMeta(c) {
     const nm = nameOf(c), rk = Object.keys(c.react || {}).length, mineR = !!(c.react && c.react[keyOf(teacher ? 'teacher' : me)]);
     const tags = [];
-    if (c.top) tags.push(h('span', { class: 'tag' }, '📌'));
-    if (waiting(c)) tags.push(h('span', { class: 'tag wait' }, teacher ? '⏳ 허락 기다림' : '⏳ 선생님이 보고 있어요'));
-    if (teacher && c.hidden) tags.push(h('span', { class: 'tag hid' }, '🙈 가림'));
+    if (c.top) tags.push(h('span', { class: 'tag' }, icon('pinTop', 13), '맨 앞'));
+    if (waiting(c)) tags.push(h('span', { class: 'tag wait' }, teacher ? '허락 기다림' : '선생님이 보고 있어요'));
+    if (teacher && c.hidden) tags.push(h('span', { class: 'tag hid' }, icon('eyeOff', 13), '가림'));
     const heart = S.react === 'heart'
-      ? h('button', { class: 'heart' + (mineR ? ' on' : ''), disabled: tv, onpointerdown: e => e.stopPropagation(),
-          onclick: e => { e.stopPropagation(); act('react', { id: c.id }); } }, mineR ? '❤️' : '🤍', rk ? ' ' + rk : '')
+      ? h('button', { class: 'heart' + (mineR ? ' on' : ''), disabled: tv, title: '공감', onpointerdown: e => e.stopPropagation(),
+          onclick: e => { e.stopPropagation(); act('react', { id: c.id }); } }, icon('heart', 16), rk ? h('span', {}, rk) : null)
       : null;
     if (!nm && !heart && !tags.length) return null;
     return h('div', { class: 'cmeta' }, nm ? h('span', { class: 'who' }, nm) : null, ...tags, h('span', { class: 'grow' }), heart);
@@ -178,8 +192,8 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
       layerZ.append(h('div', { class: 'zone', style: { left: z.x + 'px', top: z.y + 'px', width: ZW + 'px', height: H + 'px' } },
         h('div', { class: 'zone-head', style: { height: ZHEAD + 'px' } },
           h('span', {}, z.name),
-          open() ? h('button', { class: 'zadd', title: `${z.name}에 카드 더하기`, onclick: () => { if (canAdd(true)) addIn(z.name); } }, '＋') : null),
-        hints[z.name] ? h('div', { class: 'hint' }, '💭 ', hints[z.name]) : null));
+          open() ? h('button', { class: 'zadd', title: `${z.name}에 카드 더하기`, onclick: () => { if (canAdd(true)) addIn(z.name); } }, icon('plus', 16)) : null),
+        hints[z.name] ? h('div', { class: 'hint' }, hints[z.name]) : null));
     }
   }
 
@@ -189,28 +203,31 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     const list = Object.values(B.cards).filter(visible).sort((a, z) => a.t - z.t);
     for (const c of list) {
       const el = h('div', { class: cardClass(c), style: { left: c.x + 'px', top: c.y + 'px', width: CW + 'px' } },
-        cardText(c), cardBadges(c), cardMeta(c));
-      if (sel === c.id) el.append(cardTools(c));
+        cardText(c), cardBadges(c), cardMeta(c), sel === c.id ? cardTools(c) : null);
       bindCard(el, c.id);
       layerC.append(el);
       cardEls.set(c.id, el);
     }
   }
 
+  // 고른 카드의 동작 — 카드 안에 펼친다(다른 것을 덮지 않게)
   function cardTools(c) {
     const stop = e => e.stopPropagation();
     const edit = canEdit(c), cols = colNames();
-    return h('div', { class: 'card-tools', onpointerdown: stop },
-      edit ? h('button', { onclick: () => editCard(c.id) }, '✏️ 고치기') : null,
-      edit && canvasMode() && S.links ? h('button', { onclick: () => setLink(c.id) }, '🔗') : null,
-      edit && c.kind === 'unknown' ? h('button', { onclick: () => act('resolveCard', { id: c.id }) }, '✅ 정했어요') : null,
+    const b = (ic, label, fn, cls = '', bare = false) => h('button', { class: 'abtn ' + cls + (bare ? ' bare' : ''), title: label, 'aria-label': label, onclick: e => { e.stopPropagation(); fn(); } }, icon(ic, 15), bare ? null : h('span', {}, label));
+    const items = [
+      edit ? b('edit', '고치기', () => editCard(c.id)) : null,
+      edit && canvasMode() && S.links ? b('link', '화살표 잇기', () => setLink(c.id), '', true) : null,
+      edit && c.kind === 'unknown' ? b('check', '정했어요', () => act('resolveCard', { id: c.id })) : null,
       canMove(c) && S.layout === 'columns' && cols.length > 1
-        ? h('select', { class: 'mv', onchange: e => { act('moveCard', { id: c.id, x: c.x, y: c.y, zone: e.target.value }); } },
-          cols.map(z => h('option', { value: z, selected: c.zone === z }, '↔ ' + z))) : null,
-      teacher && waiting(c) ? h('button', { onclick: () => act('moderate', { id: c.id, ok: true }) }, '✅ 허락') : null,
-      teacher ? h('button', { onclick: () => act('moderate', { id: c.id, hidden: !c.hidden }) }, c.hidden ? '👀 보이기' : '🙈 가리기') : null,
-      teacher && !canvasMode() ? h('button', { onclick: () => act('moderate', { id: c.id, top: !c.top }) }, c.top ? '📌 풀기' : '📌 맨 앞') : null,
-      edit ? h('button', { onclick: () => { if (confirm('이 카드를 지울까요?')) act('deleteCard', { id: c.id }); } }, '🗑') : null);
+        ? h('label', { class: 'abtn sel-wrap', onclick: stop }, icon('move', 15), h('select', { onchange: e => { act('moveCard', { id: c.id, x: c.x, y: c.y, zone: e.target.value }); } },
+          cols.map(z => h('option', { value: z, selected: c.zone === z }, z)))) : null,
+      teacher && waiting(c) ? b('check', '허락', () => act('moderate', { id: c.id, ok: true }), 'ok') : null,
+      teacher ? b(c.hidden ? 'eye' : 'eyeOff', c.hidden ? '다시 보이기' : '아이들에게 가리기', () => act('moderate', { id: c.id, hidden: !c.hidden }), '', true) : null,
+      teacher && !canvasMode() ? b('pinTop', c.top ? '맨 앞 고정 풀기' : '맨 앞에 고정', () => act('moderate', { id: c.id, top: !c.top }), c.top ? 'on' : '', true) : null,
+      edit ? b('trash', '지우기', () => { if (confirm('이 카드를 지울까요?')) act('deleteCard', { id: c.id }); }, 'danger', true) : null,
+    ].filter(Boolean);
+    return items.length ? h('div', { class: 'card-tools', onpointerdown: stop }, items) : null;
   }
 
   function renderLinks() {
@@ -238,11 +255,20 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
 
   // ─────────── 칸 나누기 · 담벼락 · 한 줄 · 그림에 핀 꽂기(흐르는 판)
   function flowCard(c, num) {
+    const t = sel === c.id ? cardTools(c) : null;
     const el = h('div', { class: cardClass(c, ' fcard') },
-      num ? h('span', { class: 'pnum' }, num) : null, cardText(c), cardBadges(c), cardMeta(c));
-    if (sel === c.id) el.append(cardTools(c));
+      num ? h('span', { class: 'pnum' }, num) : null, cardText(c), cardBadges(c), cardMeta(c), t);
     el.addEventListener('click', e => { if (e.target.closest('.card-tools, .heart')) return; tapCard(c.id); });
     return el;
+  }
+
+  // 담벼락: 순서대로 왼쪽→오른쪽 칸에 돌려 담는다 — 새 글이 맨 앞(왼쪽 위)에서 읽히고 높이는 제각각
+  function wall(els) {
+    const w = (flow.clientWidth || innerWidth) - 56, cw = tv ? 320 : 250, gap = 16;
+    const n = Math.max(1, Math.floor((w + gap) / (cw + gap)));
+    const cols = Array.from({ length: n }, () => h('div', { class: 'fl-wcol' }));
+    els.forEach((el, i) => cols[i % n].append(el));
+    return h('div', { class: 'fl-wall' }, cols);
   }
 
   function renderFlow() {
@@ -250,21 +276,23 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     flow.innerHTML = '';
     const list = sorted(Object.values(B.cards).filter(visible));
     const hiddenOthers = !teacher && !S.others ? Object.values(B.cards).filter(c => !mine(c) && !c.hidden).length : 0;
+    if (S.prompt) flow.append(h('div', { class: 'fl-hero' }, h('div', { class: 'q' }, S.prompt)));
+    const empty = () => h('div', { class: 'fl-empty' }, open() ? '아직 카드가 없어요. 오른쪽 아래에서 첫 생각을 써 볼까요?' : '아직 카드가 없어요');
     if (S.layout === 'columns') {
       const names = colNames(), hints = S.hints ? evalHints({ ...B, settings: { ...B.settings, zones: true } }) : {};
       const extra = list.filter(c => !names.includes(c.zone));
       const cols = names.map(n => [n, list.filter(c => c.zone === n)]);
       if (extra.length) cols.push(['기타', extra]);
-      flow.append(h('div', { class: 'fl-cols' }, cols.map(([n, cs]) => h('div', { class: 'fl-col' },
-        h('div', { class: 'fl-head' }, h('span', {}, n), h('span', { class: 'cnt' }, cs.length),
-          open() && n !== '기타' ? h('button', { class: 'zadd', title: `${n}에 카드 더하기`, onclick: () => { if (canAdd(true)) addIn(n); } }, '＋') : null),
-        hints[n] ? h('div', { class: 'hint' }, '💭 ', hints[n]) : null,
-        h('div', { class: 'fl-list' }, cs.map(c => flowCard(c)))))));
+      flow.append(h('div', { class: 'fl-cols' }, cols.map(([n, cs]) => h('section', { class: 'fl-col' },
+        h('header', { class: 'fl-head' }, h('span', { class: 'nm' }, n), h('span', { class: 'cnt' }, cs.length)),
+        hints[n] ? h('div', { class: 'hint flow' }, hints[n]) : null,
+        h('div', { class: 'fl-list' }, cs.map(c => flowCard(c)),
+          open() && n !== '기타' ? h('button', { class: 'fl-add', onclick: () => { if (canAdd(true)) addIn(n); } }, icon('plus', 16), '여기에 붙이기') : null)))));
     } else if (S.layout === 'pins') {
       const order = Object.values(B.cards).sort((a, z) => a.t - z.t), numOf = new Map(order.map((c, i) => [c.id, i + 1]));
       const imgs = S.images || [];
       flow.append(h('div', { class: 'fl-pins' + (pinMode ? ' picking' : '') },
-        imgs.length ? h('div', { class: 'pin-imgs' }, imgs.map((src, i) => {
+        imgs.length ? h('div', { class: 'pin-imgs' + (imgs.length > 1 ? ' two' : '') }, imgs.map((src, i) => {
           const box = h('div', { class: 'pin-img' }, h('img', { src, alt: `그림 ${i + 1}`, draggable: 'false' }),
             list.filter(c => c.pin && c.pin.i === i).map(c => h('button', {
               class: 'pin' + (mine(c) && !teacher ? ' mine' : '') + (sel === c.id ? ' sel' : ''), style: { left: c.pin.x + '%', top: c.pin.y + '%' },
@@ -276,13 +304,12 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
             setPin(false); addIn('', 'idea', { i, x, y });
           });
           return box;
-        })) : h('div', { class: 'dr-empty' }, teacher ? '⚙️ 설정 → 그림(주소)에 그림을 넣어 주세요' : '선생님이 그림을 넣으면 여기에 보여요'),
-        h('div', { class: 'fl-wall' }, list.map(c => flowCard(c, numOf.get(c.id))))));
+        })) : h('div', { class: 'fl-empty' }, teacher ? '설정 → 그림에 그림 주소를 넣어 주세요' : '선생님이 그림을 넣으면 여기에 보여요'),
+        list.length ? wall(list.map(c => flowCard(c, numOf.get(c.id)))) : empty()));
     } else {
-      flow.append(h('div', { class: S.layout === 'stream' ? 'fl-stream' : 'fl-wall' }, list.map(c => flowCard(c))));
+      flow.append(list.length ? (S.layout === 'stream' ? h('div', { class: 'fl-stream' }, list.map(c => flowCard(c))) : wall(list.map(c => flowCard(c)))) : empty());
     }
-    if (!list.length) flow.append(h('div', { class: 'dr-empty' }, open() ? '아직 카드가 없어요. 첫 카드를 써 볼까요?' : '아직 카드가 없어요'));
-    if (hiddenOthers) flow.append(h('div', { class: 'dr-empty' }, `친구 카드 ${hiddenOthers}장은 선생님만 봐요`));
+    if (hiddenOthers) flow.append(h('div', { class: 'fl-empty small' }, `친구 카드 ${hiddenOthers}장은 선생님만 봐요`));
     flow.scrollTop = keep;
   }
 
@@ -557,7 +584,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     }
   };
   window.addEventListener('keydown', onKey);
-  const onResize = () => { if (canvasMode()) applyView(); };
+  const onResize = () => { if (canvasMode()) applyView(); else if (B && (S.layout === 'wall' || S.layout === 'pins')) render(); };
   window.addEventListener('resize', onResize);
 
   return () => { unsub(); root.classList.remove('panel-open', 'tv', 'teacher-view', 'has-prompt'); window.removeEventListener('keydown', onKey); window.removeEventListener('resize', onResize); document.querySelector('.editor-wrap')?.remove(); };

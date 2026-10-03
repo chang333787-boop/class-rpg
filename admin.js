@@ -6121,3 +6121,10 @@ function setAllStudyUnits(on) {
   renderStudyScopePage();
   notify('전체 단원을 켰어요');
 }
+
+// [THINKBOARD-1] 생각판 선생님 화면 — 새 탭으로 연다. 관리 화면에 이미 로그인했으니 그 탭은 비밀번호를 다시 묻지 않는다(sessionStorage 는 새 탭에 복사됨).
+function openThinkboard() {
+  try { sessionStorage.setItem('tb.teacher', '1'); } catch (e) {}
+  const w = window.open('thinkboard/index.html?rpg=1#/t', '_blank');
+  if (!w) location.href = 'thinkboard/index.html?rpg=1#/t';
+}

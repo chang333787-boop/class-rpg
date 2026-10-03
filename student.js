@@ -257,6 +257,11 @@ function externalStudyItems() {
       sub: '단어·표현·듣기·말하기 · 공부하면 선생님 승인 후 경험치·골드',
       href: englishAppLink(), border: 'rgba(255,215,0,.35)', bg: 'rgba(255,215,0,.08)',
       embed: true },   // [ENGLISH-EMBED-1] 새 탭 대신 RPG 안 전체화면 모달로
+    // [THINKBOARD-1] 생각판 — 선생님이 연 판에 생각 카드를 붙인다(RPG 로그인 이름 그대로 · 저장 = classRPG_thinkboard · 보상과 묶지 않음)
+    { key: 'thinkboard', icon: '🧠', title: '생각판',
+      sub: '선생님이 연 판에 내 생각을 붙이고 친구 생각을 봐요',
+      href: 'thinkboard/index.html?rpg=1&sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(53,99,233,.35)', bg: 'rgba(53,99,233,.07)', embed: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
