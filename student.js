@@ -278,6 +278,12 @@ function externalStudyItems() {
       sub: '가락을 짓고 · 리코더로 따라 불고 · 키보드 리듬 게임',
       href: 'music/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(240,140,46,.40)', bg: 'rgba(240,140,46,.08)', embed: true, autoFocus: true },
+    // [CODING-ROOM-1] 기초 코딩 — 블록으로 몬스터(도감 몬스터마다 아는 명령이 다름)를 움직이고 불씨 참새로 그림 · 1~4단원 34판 · 선생님 막힘 지도(#/t)
+    //   저장 = classRPG_coding · 보상과 묶지 않음 · Blockly(구글)는 coding/index.html 이 싣는다
+    { key: 'coding', icon: '🧩', title: '기초 코딩',
+      sub: '블록으로 몬스터에게 명령해요 · 불씨 참새 그림 코딩',
+      href: 'coding/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(61,139,253,.40)', bg: 'rgba(61,139,253,.08)', embed: true, autoFocus: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -1778,6 +1784,7 @@ function buildMainHTML() {
       ${door(asset('deco/d_i5.svg'), '오늘의 학습', typeof CurriculumUtils === 'undefined' ? '교과 문제' : studyLeft ? `하루 ${STUDY_PER_DAY}문제 · ${studyDone}문제 했어요` : '오늘 공부 끝!', 'openStudyModal()', studyLeft ? '오늘' : '')}
       ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
       ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')", 'NEW')}
+      ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')", 'NEW')}
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
       ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
