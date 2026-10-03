@@ -142,8 +142,8 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages'];
-const titles = {dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard'];
+const titles = {thinkboard:'🧠 생각판',dashboard:'📊 대시보드',students:'👥 학생 목록',approve:'✅ 활동 승인',
   rank:'🏆 랭킹',quests:'📋 퀘스트 관리',reward:'🎁 보상 지급',artwork:'🖼️ 작품 관리', books:'📚 독서 현황', villages:'🏘️ 우리 마을',
   memories:'📸 추억 관리',
   recorder:'🎵 리코더 관리',
@@ -195,6 +195,7 @@ function nav(page, el) {
   document.getElementById('topbar-title').textContent = titles[page] || page;
   // 페이지 전환 시 스크롤 최상단으로
   document.querySelector('.main').scrollTop = 0;
+  if (page === 'thinkboard') openThinkboardInline();   // [THINKBOARD-2] 관리 화면 안에서
   if (page === 'reward')   populateRewardStudents();
   if (page === 'artwork')  { renderArtworkPending(); renderArtworkAdmin(); }
   if (page === 'books')    renderBooksPage();
@@ -5656,6 +5657,9 @@ async function saveBackup(auto) {
   BACKUP_NODES.forEach(k => {
     if (db[k] !== undefined && db[k] !== null) snapshot[k] = db[k];
   });
+  // [THINKBOARD-2] 생각판(classRPG_thinkboard)도 같은 날짜 백업에 담는다 — 연구 자료가 RPG 기록과 함께 남게.
+  //   되돌리기(롤백)는 BACKUP_NODES 만 되살린다 — 생각판은 백업에서 꺼내 볼 수만 있다(수업 중 판이 갑자기 되감기지 않게).
+  try { const tb = await firebase.database().ref('classRPG_thinkboard').once('value'); if (tb.exists()) snapshot.thinkboard = tb.val(); } catch (e) { console.warn('생각판 백업 건너뜀', e); }
   await backupsRef().child(dateKey).set(snapshot);
 
   // 보관기간 초과분 자동 삭제 (새 위치만 — 옛 위치는 건드리지 않는다)
@@ -6122,9 +6126,18 @@ function setAllStudyUnits(on) {
   notify('전체 단원을 켰어요');
 }
 
-// [THINKBOARD-1] 생각판 선생님 화면 — 새 탭으로 연다. 관리 화면에 이미 로그인했으니 그 탭은 비밀번호를 다시 묻지 않는다(sessionStorage 는 새 탭에 복사됨).
-function openThinkboard() {
-  try { sessionStorage.setItem('tb.teacher', '1'); } catch (e) {}
+// [THINKBOARD-1·2] 생각판 선생님 화면 — 관리 화면 안(쪽)에서 연다. 관리 화면에 로그인했으니 비밀번호를 다시 묻지 않게
+//   이 기기에 12시간 '선생님' 표시를 남긴다(TV 처럼 새 탭으로 연 화면도 통과). 학생은 자기 크롬북이라 이 표시가 없다.
+function _tbTeacherMark() {
+  try { sessionStorage.setItem('tb.teacher', '1'); localStorage.setItem('tb.teacherUntil', String(Date.now() + 12 * 3600 * 1000)); } catch (e) {}
+}
+function openThinkboardInline() {
+  _tbTeacherMark();
+  const f = document.getElementById('tb-frame');
+  if (f && !f.getAttribute('src')) f.setAttribute('src', 'thinkboard/index.html?rpg=1#/t');
+}
+function openThinkboard() {   // 새 탭(TV 등)
+  _tbTeacherMark();
   const w = window.open('thinkboard/index.html?rpg=1#/t', '_blank');
   if (!w) location.href = 'thinkboard/index.html?rpg=1#/t';
 }

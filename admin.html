@@ -71,7 +71,7 @@
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon">🎁</span> 보상 지급</div>
     <div class="nav-item" onclick="nav('stats',this)"><span class="nav-icon">📊</span> 활동능력치 관리</div>
     <div class="nav-item" onclick="nav('artwork',this)"><span class="nav-icon">🖼️</span> 작품 관리</div>
-    <div class="nav-item" onclick="openThinkboard()"><span class="nav-icon">🧠</span> 생각판</div>
+    <div class="nav-item" onclick="nav('thinkboard',this)"><span class="nav-icon">🧠</span> 생각판</div>
     <div class="nav-item" onclick="nav('villages',this)"><span class="nav-icon">🏘️</span> 우리 마을</div>
     <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon">📚</span> 독서 현황</div>
     <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon">📸</span> 추억 관리</div>
@@ -1064,6 +1064,11 @@
     </div>
 
     <!-- ── VILLAGES ── [VILLAGE-ADMIN-1] 읽기만. classRPG_villages GET 만 한다(쓰기 0). -->
+    <!-- [THINKBOARD-2] 생각판 선생님 화면(관리 화면 안) -->
+    <div class="page" id="p-thinkboard" style="padding:0">
+      <div style="display:flex;justify-content:flex-end;padding:.4rem .8rem 0"><button class="btn btn-sm" onclick="openThinkboard()">새 탭으로 열기</button></div>
+      <iframe id="tb-frame" title="생각판" style="display:block;width:100%;height:calc(100vh - 110px);border:0;background:#f6f5f2"></iframe>
+    </div>
     <div class="page" id="p-villages">
       <div class="section-header">
         <div><div class="sh-title">🏘️ 우리 마을</div>
@@ -1587,6 +1592,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20261003tb1"></script>
+<script src="./admin.js?v=20261003tb2"></script>
 </body>
 </html>

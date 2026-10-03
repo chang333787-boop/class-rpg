@@ -16,6 +16,7 @@ const store = RPG ? createRtdbStore() : createLocalStore();
 const root = document.getElementById('app');
 let unmount = null;
 
+const meId = RPG ? (Q.get('sid') || '').slice(0, 60) : '';   // 학급 RPG 학생 id — 카드 · 기록에 함께 남겨 연구 자료를 RPG 학생과 잇는다
 const getName = () => { if (RPG && Q.get('n')) return Q.get('n').slice(0, 20); try { return localStorage.getItem('tb.name') || ''; } catch { return ''; } };
 const setName = n => { try { localStorage.setItem('tb.name', n); } catch {} };
 const home = () => { location.hash = '#/'; };
@@ -23,7 +24,7 @@ const home = () => { location.hash = '#/'; };
 // 선생님 화면 잠금(RPG): 관리 화면에서 열면 통과(sessionStorage) · 아니면 관리자 비밀번호
 async function teacherOK() {
   if (!RPG) return true;
-  try { if (sessionStorage.getItem('tb.teacher') === '1') return true; } catch {}
+  try { if (sessionStorage.getItem('tb.teacher') === '1' || +localStorage.getItem('tb.teacherUntil') > Date.now()) return true; } catch {}
   const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
   if (!pw) return false;
   try {
@@ -91,6 +92,15 @@ function askName() {
   return null;
 }
 
+// RPG 학생 명단(선생님 화면만) — 연구 자료 · '아직 안 쓴 아이'를 RPG 학생과 잇는다. classRPG_v3 는 읽기만.
+let rosterP = null;
+function loadRoster() {
+  if (!RPG) return Promise.resolve([]);
+  return rosterP ||= store.db.ref('classRPG_v3/students').once('value').then(s => Object.values(s.val() || {})
+    .filter(x => x && x.id && x.name && !x.deleted && !x.hidden).map(x => ({ id: String(x.id), name: String(x.name) })))
+    .catch(e => { console.warn('명단을 못 읽었어요', e); rosterP = null; return []; });
+}
+
 let seq = 0;
 async function route() {
   const my = ++seq;
@@ -101,12 +111,14 @@ async function route() {
   const teacherRoute = hash === '/t' || hash.startsWith('/tb/') || hash.startsWith('/tv/');
   if (teacherRoute && !(await teacherOK())) { if (my === seq) home(); return; }
   if (my !== seq) return;   // 기다리는 사이 주소가 바뀜
-  if (hash.startsWith('/tb/')) unmount = mountBoard(root, { store, boardId: hash.slice(4), me: '선생님', home: () => { location.hash = '#/t'; }, teacher: true });
+  const roster = teacherRoute ? await loadRoster() : [];
+  if (my !== seq) return;
+  if (hash.startsWith('/tb/')) unmount = mountBoard(root, { store, boardId: hash.slice(4), me: '선생님', home: () => { location.hash = '#/t'; }, teacher: true, roster });
   else if (hash.startsWith('/tv/')) unmount = mountBoard(root, { store, boardId: hash.slice(4), me: 'TV', home, tv: true });
   else if (hash.startsWith('/b/')) {
     const me = getName();
-    unmount = me ? mountBoard(root, { store, boardId: hash.slice(3), me, home }) : askName();
-  } else if (hash === '/t') unmount = mountTeacher(root, { store, home });
+    unmount = me ? mountBoard(root, { store, boardId: hash.slice(3), me, meId, home }) : askName();
+  } else if (hash === '/t') unmount = mountTeacher(root, { store, home, roster });
   else unmount = RPG ? mountRpgHome() : mountHome();
 }
 

@@ -12,7 +12,7 @@ const NS = 'http://www.w3.org/2000/svg';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const COLOR_NAME = { '': '기본', yellow: '노랑', pink: '분홍', green: '초록', blue: '파랑', purple: '보라' };
 
-export function mountBoard(root, { store, boardId, me, home, teacher = false, tv = false }) {
+export function mountBoard(root, { store, boardId, me, meId = '', home, teacher = false, tv = false, roster = [] }) {   // meId = RPG 학생 id(연구 자료 열쇠)
   let B = null, S = withDefaults(), zones = [];
   const view = { x: 24, y: 16, s: 1 };
   let sel = null;            // 고른 카드
@@ -49,7 +49,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
 
   let flashId = null;        // 방금 생긴 카드 — 잠깐 반짝
   const act = async (name, args) => {
-    const r = ops[name](B, { ...args, by: teacher ? 'teacher' : me });
+    const r = ops[name](B, { ...args, by: teacher ? 'teacher' : me, ...(teacher || !meId ? {} : { sid: meId }) });
     if (r.id && (name === 'addCard' || name === 'judgeMail')) { flashId = r.id; setTimeout(() => { if (flashId === r.id) flashId = null; }, 1800); }
     await store.patch(boardId, r.patch);
     return r;
@@ -58,7 +58,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
 
   // ─────────── 설정으로 정해지는 것
   const canvasMode = () => S.layout === 'canvas';
-  const mine = c => c.by === me;
+  const mine = c => (meId && c.sid ? c.sid === meId : c.by === me);   // RPG 에선 학생 id 로, 로컬 시험에선 이름으로
   const kidCard = c => c.src === 'me' && !c.via;                     // 아이가 직접 쓴 카드(허락이 걸리는 카드)
   const waiting = c => S.approve && kidCard(c) && !c.ok;               // 선생님 허락을 기다리는 카드
   function visible(c) {
@@ -113,7 +113,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
   function renderTop() {
     const nNew = Object.values(B.mail).filter(m => m.status === 'new').length;
     const showMail = !tv && (S.mail !== 'off' || Object.keys(B.mail).length);
-    const writers = new Set(Object.values(B.cards).filter(kidCard).map(c => c.by)).size;
+    const writers = new Set(Object.values(B.cards).filter(kidCard).map(c => c.sid || c.by)).size;
     const sub = B.template.name && B.template.name !== B.title ? B.template.name : '';
     top.innerHTML = '';
     top.append(...[
@@ -121,7 +121,8 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
       h('div', { class: 'tb-title' }, h('b', {}, B.title), sub ? h('span', { class: 'sub' }, sub) : null),
       h('div', { class: 'grow' }),
       !teacher && !tv && !S.open ? h('span', { class: 'pill warn' }, icon('lock', 15), '보기만 해요') : null,
-      (teacher || tv) ? h('span', { class: 'pill' }, icon('users', 15), `${writers}명 · ${Object.values(B.cards).filter(visible).length}장`) : null,
+      teacher && roster.length ? h('button', { class: 'tbtn' + (panel === 'who' ? ' on' : ''), onclick: () => togglePanel('who'), title: '누가 썼나' }, icon('users'), h('span', {}, `${writers} / ${roster.length}명 · ${Object.values(B.cards).filter(visible).length}장`))
+        : (teacher || tv) ? h('span', { class: 'pill' }, icon('users', 15), `${writers}명 · ${Object.values(B.cards).filter(visible).length}장`) : null,
       open() && canvasMode() && S.links ? tbtn('link', '잇기', linkFrom !== null, () => setLink(linkFrom === null ? '' : null)) : null,
       showMail ? h('button', { class: 'tbtn' + (panel === 'mail' ? ' on' : '') + (nNew ? ' has' : ''), onclick: () => togglePanel('mail'), title: '우편함' },
         icon('inbox'), h('span', {}, '우편함'), nNew ? h('span', { class: 'badge' }, nNew) : null) : null,
@@ -154,7 +155,7 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
 
   // 카드 속 아래 줄: 이름 · 표시(허락 기다림 · 가림 · 고정) · 공감
   function cardMeta(c) {
-    const nm = nameOf(c), rk = Object.keys(c.react || {}).length, mineR = !!(c.react && c.react[keyOf(teacher ? 'teacher' : me)]);
+    const nm = nameOf(c), rk = Object.keys(c.react || {}).length, mineR = !!(c.react && c.react[keyOf(teacher ? 'teacher' : (meId || me))]);
     const tags = [];
     if (c.top) tags.push(h('span', { class: 'tag' }, icon('pinTop', 13), '맨 앞'));
     if (waiting(c)) tags.push(h('span', { class: 'tag wait' }, teacher ? '허락 기다림' : '선생님이 보고 있어요'));
@@ -503,9 +504,9 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
     root.classList.toggle('panel-open', !!panel);
     drawer.innerHTML = '';
     if (!panel) return;
-    drawer.append(h('div', { class: 'dr-head' }, panel === 'mail' ? '📬 우편함' : '📎 결과물',
+    drawer.append(h('div', { class: 'dr-head' }, panel === 'mail' ? '우편함' : panel === 'who' ? '누가 썼나' : '결과물',
       h('button', { class: 'x', onclick: () => togglePanel(panel) }, '✕')));
-    if (panel === 'mail') renderMail(); else renderResults();
+    if (panel === 'mail') renderMail(); else if (panel === 'who') renderWho(); else renderResults();
   }
 
   async function judge(m, action, extra = {}) {
@@ -555,6 +556,17 @@ export function mountBoard(root, { store, boardId, me, home, teacher = false, tv
         old.map(m => h('div', { class: 'old' }, m.type === 'question' ? '❓ ' : '💡 ', m.text,
           h('span', { class: 'st' }, ` → ${lbl[m.status] || m.status}${m.reason ? ` · ${m.reason}` : ''}`)))));
     }
+  }
+
+  // 선생님: RPG 명단으로 아직 안 쓴 아이 · 쓴 아이(장수)
+  function renderWho() {
+    const n = new Map();
+    for (const c of Object.values(B.cards)) if (kidCard(c)) { const k = c.sid || c.by; n.set(k, (n.get(k) || 0) + 1); }
+    const yet = roster.filter(r => !n.has(r.id) && !n.has(r.name)), did = roster.filter(r => n.has(r.id) || n.has(r.name));
+    drawer.append(h('div', { class: 'who-sec' }, h('div', { class: 'who-h' }, `아직 안 쓴 아이 ${yet.length}명`),
+      yet.length ? h('div', { class: 'who-list' }, yet.map(r => h('span', { class: 'who-chip yet' }, r.name))) : h('div', { class: 'dr-empty' }, '모두 썼어요')));
+    drawer.append(h('div', { class: 'who-sec' }, h('div', { class: 'who-h' }, `쓴 아이 ${did.length}명`),
+      h('div', { class: 'who-list' }, did.map(r => h('span', { class: 'who-chip' }, r.name, h('b', {}, n.get(r.id) || n.get(r.name)))))));
   }
 
   function renderResults() {

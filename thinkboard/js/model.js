@@ -43,62 +43,66 @@ export function applyPatch(board, patch) {
   return board;
 }
 
-const log = (by, op, data) => ({ ['log.' + uid('l')]: { t: now(), by: by || '?', op, ...data } });
+// sid = 학급 RPG 학생 id(연구 자료를 RPG 학생과 잇는 열쇠 · 이름은 보여 주기용). 로컬 시험에는 없다.
+const log = (by, op, data, sid) => ({ ['log.' + uid('l')]: { t: now(), by: by || '?', ...(sid ? { sid } : {}), op, ...data } });
 const after = (b, t) => (b.meta?.lastResultAt && t > b.meta.lastResultAt ? { ar: true } : {});
 
 // 모든 op: (board, args) → { patch, id? }
 export const ops = {
-  addCard(b, { text, kind = 'idea', x, y, zone = '', by, src = 'me', via, color, pin }) {
+  addCard(b, { text, kind = 'idea', x, y, zone = '', by, sid, src = 'me', via, color, pin }) {
     const id = uid('c'), t = now();
-    const card = { id, text, kind, x, y, zone, src, by, t, ut: t, ...(via ? { via } : {}), ...(color ? { color } : {}), ...(pin ? { pin } : {}), ...after(b, t) };
-    return { id, patch: { ['cards.' + id]: card, ...log(by, 'add', { card: id, kind, src, zone, text }) } };
+    const card = { id, text, kind, x, y, zone, src, by, ...(sid ? { sid } : {}), t, ut: t, ...(via ? { via } : {}), ...(color ? { color } : {}), ...(pin ? { pin } : {}), ...after(b, t) };
+    return { id, patch: { ['cards.' + id]: card, ...log(by, 'add', { card: id, kind, src, zone, text }, sid) } };
   },
 
-  editCard(b, { id, text, by }) {
+  // 고치기 · 옮기기 · 정했어요는 카드 통째가 아니라 바뀐 칸만 쓴다 — 여럿이 동시에 쓸 때 남의 공감 · 선생님 가림 · 허락을 덮지 않게
+  editCard(b, { id, text, by, sid }) {
     const c = b.cards[id];
     if (!c || c.text === text) return { patch: {} };
-    const t = now();
+    const t = now(), P = 'cards.' + id + '.';
     const src = c.src === 'ai-keep' ? 'ai-edit' : c.src;
-    const orig = c.orig ?? (c.src === 'ai-keep' ? c.text : undefined);
-    const card = { ...c, text, src, ut: t, ...(orig !== undefined ? { orig } : {}), ...after(b, t) };
-    return { patch: { ['cards.' + id]: card, ...log(by, 'edit', { card: id, from: c.text, text, src }) } };
+    const patch = { [P + 'text']: text, [P + 'src']: src, [P + 'ut']: t };
+    if (c.orig === undefined && c.src === 'ai-keep') patch[P + 'orig'] = c.text;
+    if (after(b, t).ar) patch[P + 'ar'] = true;
+    return { patch: { ...patch, ...log(by, 'edit', { card: id, from: c.text, text, src }, sid) } };
   },
 
-  moveCard(b, { id, x, y, zone = '', by }) {
+  moveCard(b, { id, x, y, zone = '', by, sid }) {
     const c = b.cards[id];
     if (!c) return { patch: {} };
-    const patch = { ['cards.' + id]: { ...c, x, y, zone } };
-    if (zone !== c.zone) Object.assign(patch, log(by, 'zone', { card: id, from: c.zone, zone }));
+    const P = 'cards.' + id + '.';
+    const patch = { [P + 'x']: x, [P + 'y']: y, [P + 'zone']: zone };
+    if (zone !== c.zone) Object.assign(patch, log(by, 'zone', { card: id, from: c.zone, zone }, sid));
     return { patch };
   },
 
-  deleteCard(b, { id, by }) {
+  deleteCard(b, { id, by, sid }) {
     const c = b.cards[id];
     if (!c) return { patch: {} };
-    const patch = { ['cards.' + id]: null, ...log(by, 'delete', { card: id, text: c.text, src: c.src, kind: c.kind }) };
+    const patch = { ['cards.' + id]: null, ...log(by, 'delete', { card: id, text: c.text, src: c.src, kind: c.kind }, sid) };
     for (const l of Object.values(b.links)) if (l.from === id || l.to === id) patch['links.' + l.id] = null;
     return { patch };
   },
 
   // ❔ 카드 → 정했어요
-  resolveCard(b, { id, by }) {
+  resolveCard(b, { id, by, sid }) {
     const c = b.cards[id];
     if (!c || c.kind !== 'unknown') return { patch: {} };
-    const t = now();
-    return { patch: { ['cards.' + id]: { ...c, kind: 'idea', ut: t, resolved: t }, ...log(by, 'resolve', { card: id, text: c.text }) } };
+    const t = now(), P = 'cards.' + id + '.';
+    return { patch: { [P + 'kind']: 'idea', [P + 'ut']: t, [P + 'resolved']: t, ...log(by, 'resolve', { card: id, text: c.text }, sid) } };
   },
 
-  addLink(b, { from, to, by }) {
+  addLink(b, { from, to, by, sid }) {
     if (from === to || !b.cards[from] || !b.cards[to]) return { patch: {} };
     if (Object.values(b.links).some(l => l.from === from && l.to === to)) return { patch: {} };
     const id = uid('k');
-    return { id, patch: { ['links.' + id]: { id, from, to, by, t: now() }, ...log(by, 'link', { from, to }) } };
+    return { id, patch: { ['links.' + id]: { id, from, to, by, ...(sid ? { sid } : {}), t: now() }, ...log(by, 'link', { from, to }, sid) } };
   },
 
-  deleteLink(b, { id, by }) {
+  deleteLink(b, { id, by, sid }) {
     const l = b.links[id];
     if (!l) return { patch: {} };
-    return { patch: { ['links.' + id]: null, ...log(by, 'unlink', { from: l.from, to: l.to }) } };
+    return { patch: { ['links.' + id]: null, ...log(by, 'unlink', { from: l.from, to: l.to }, sid) } };
   },
 
   // 우편함에 AI 카드 넣기(교사 또는 서버). items = [{ type: 'question'|'suggest', text, zone, why }]
@@ -116,32 +120,32 @@ export const ops = {
   // 아이의 판단. action:
   //  제안: keep(그대로) · edit(고쳐서, text) · drop(버림)
   //  질문: answer(답 카드, text) · unknown(❔로 남기기) · drop(필요 없어)
-  judgeMail(b, { id, action, reason = '', text, x, y, zone = '', by }) {
+  judgeMail(b, { id, action, reason = '', text, x, y, zone = '', by, sid }) {
     const m = b.mail[id];
     if (!m || m.status !== 'new') return { patch: {} };
     const t = now();
     let patch = {}, cardId = null;
-    const mk = (args) => { const r = ops.addCard(b, { x, y, zone, by, ...args }); cardId = r.id; Object.assign(patch, r.patch); };
+    const mk = (args) => { const r = ops.addCard(b, { x, y, zone, by, sid, ...args }); cardId = r.id; Object.assign(patch, r.patch); };
     if (action === 'keep') mk({ text: m.text, src: 'ai-keep', via: id });
     else if (action === 'edit') { mk({ text, src: 'ai-edit', via: id }); patch['cards.' + cardId].orig = m.text; }
     else if (action === 'answer') mk({ text, src: 'me', via: id });
     else if (action === 'unknown') mk({ text: m.text, kind: 'unknown', src: 'ai-keep', via: id });
-    patch['mail.' + id] = { ...m, status: action, reason, by, jt: t, ...(cardId ? { card: cardId } : {}) };
-    Object.assign(patch, log(by, 'judge', { mail: id, type: m.type, action, reason, ...(text ? { text } : {}) }));
+    patch['mail.' + id] = { ...m, status: action, reason, by, ...(sid ? { sid } : {}), jt: t, ...(cardId ? { card: cardId } : {}) };
+    Object.assign(patch, log(by, 'judge', { mail: id, type: m.type, action, reason, ...(text ? { text } : {}) }, sid));
     return { id: cardId, patch };
   },
 
-  addResult(b, { url, title, by }) {
+  addResult(b, { url, title, by, sid }) {
     const id = uid('r'), t = now();
-    return { id, patch: { ['results.' + id]: { id, url, title, by, t }, 'meta.lastResultAt': t, ...log(by, 'result', { url, title }) } };
+    return { id, patch: { ['results.' + id]: { id, url, title, by, ...(sid ? { sid } : {}), t }, 'meta.lastResultAt': t, ...log(by, 'result', { url, title }, sid) } };
   },
 
   // ❤️ 공감 — 한 사람 한 번(다시 누르면 거둠). 수는 기록만(보상과 묶지 않음)
-  react(b, { id, by }) {
+  react(b, { id, by, sid }) {
     const c = b.cards[id];
     if (!c || !by) return { patch: {} };
-    const k = keyOf(by), on = !(c.react && c.react[k]);
-    return { patch: { ['cards.' + id + '.react.' + k]: on ? 1 : null, ...log(by, on ? 'react' : 'unreact', { card: id }) } };
+    const k = keyOf(sid || by), on = !(c.react && c.react[k]);   // 공감 키 = 학생 id(없으면 이름)
+    return { patch: { ['cards.' + id + '.react.' + k]: on ? 1 : null, ...log(by, on ? 'react' : 'unreact', { card: id }, sid) } };
   },
 
   // 선생님: 허락(ok) · 가리기(hidden) · 맨 앞 고정(top) — 넘긴 것만 바꾼다
@@ -178,6 +182,6 @@ export function stats(b) {
     judged: by(mail.filter(m => m.status !== 'new'), m => m.status),
     reasons: by(mail.filter(m => m.reason), m => m.reason),
     reacts: cards.reduce((n, c) => n + Object.keys(c.react || {}).length, 0),   // 기록만
-    writers: new Set(cards.filter(c => c.src === 'me' && !c.via).map(c => c.by)).size,
+    writers: new Set(cards.filter(c => c.src === 'me' && !c.via).map(c => c.sid || c.by)).size,
   };
 }
