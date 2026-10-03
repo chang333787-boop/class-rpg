@@ -252,3 +252,21 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .finger .rec-hole.thumb{stroke:#f3ead8;stroke-width:2.2}
 .save-warn{color:#ff8a7a;font-weight:700;font-size:.88rem;line-height:1.5}
 .bad-tag{margin-left:8px;font-size:.72rem;font-weight:800;color:#fff;background:#c0392b;border-radius:6px;padding:1px 7px}
+/* [MUSIC-REST-1] 쉬는 동안 */
+.p-name .rest-now{font-size:1.9rem;font-weight:900;color:#ffe48f}
+.p-name .rest-sub{display:block;font-size:.78rem;color:var(--txt2);text-align:center;margin-top:2px}
+/* [MUSIC-HARM-1] 가락 칸 / 화음 칸 · [MUSIC-KEYS-1] 키보드 자리 */
+.seg{display:inline-flex;border-radius:10px;background:var(--bg3);padding:3px;gap:2px}
+.seg button{height:28px;padding:0 12px;border-radius:8px;font-weight:800;font-size:.85rem;color:var(--txt3)}
+.seg button.on{background:var(--gold);color:#2a1a08}
+.c-note.harm{background:color-mix(in srgb,var(--c) 22%,transparent);box-shadow:inset 0 0 0 2.5px var(--c);color:#fff}
+.c-note.harm span{color:var(--txt);text-shadow:none}
+.c-note.dim{opacity:.38;pointer-events:none}
+.c-cursor{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#ffe48f;opacity:.85;z-index:4;pointer-events:none}
+.c-cursor::before{content:"";position:absolute;left:-5px;top:-1px;border:6.5px solid transparent;border-top-color:#ffe48f}
+.keys-help{display:grid;gap:10px}
+.kh-row{display:flex;gap:6px;flex-wrap:wrap}
+.kh-key{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:9px;background:var(--bg3);font-weight:800;font-size:.85rem}
+.kh-key b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--gold);color:#2a1a08}
+.staff .st-voice{font-size:11px;font-weight:800;fill:#8a7a62}
+.p-card .lv-line{font-weight:800;color:var(--gold2)}

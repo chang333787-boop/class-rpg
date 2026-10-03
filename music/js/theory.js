@@ -94,6 +94,16 @@ export const ROMAN = {
 export const chordRoot = (roman, key = 0) => (key + ROMAN[roman].off) % 12;
 export const chordPcs = (roman, key = 0) => { const r = chordRoot(roman, key); return [r, (r + 4) % 12, (r + 7) % 12]; };
 export const chordName = (roman, key = 0) => LETTERS[chordRoot(roman, key)];
+// 화음 이름 → 반음 번호들. 'C' · 'Am' · 'F#' · 'Bb' · 'Bdim' · 'E7'(7은 딸림7) · '-' = 화음 없음
+export function chordByName(name) {
+  const m = /^([A-G])([#b]?)(m|dim|7)?$/.exec(String(name || '').trim());
+  if (!m) return null;
+  const root = (({ C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 })[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? 11 : 0)) % 12;
+  const third = m[3] === 'm' || m[3] === 'dim' ? 3 : 4, fifth = m[3] === 'dim' ? 6 : 7;
+  const pcs = [root, (root + third) % 12, (root + fifth) % 12];
+  if (m[3] === '7') pcs.push((root + 10) % 12);
+  return { name: m[0], root, pcs };
+}
 export const keyName = (key = 0) => ({ 0: '다장조', 7: '사장조', 5: '바장조', 2: '라장조' })[key] || LETTERS[key] + ' 장조';
 
 // 마디마다 어울리는 화음 고르기 — 센박·긴 음에 무게, 화음 밖 음은 감점. manual[bar] 가 있으면 그것.
