@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>생각판</title>
+  <link rel="stylesheet" href="css/app.css?v=4">
+  <!-- 캐시: 모듈마다 ?v= 를 붙이는 대신 여기 한 곳(import map)에서 판 번호를 올린다 -->
+  <script type="importmap">{ "imports": {
+    "./js/app.js": "./js/app.js?v=4", "./js/util.js": "./js/util.js?v=4", "./js/model.js": "./js/model.js?v=4", "./js/store.js": "./js/store.js?v=4",
+    "./js/templates.js": "./js/templates.js?v=4", "./js/export.js": "./js/export.js?v=4", "./js/board.js": "./js/board.js?v=4",
+    "./js/teacher.js": "./js/teacher.js?v=4", "./js/settings.js": "./js/settings.js?v=4" } }</script>
+
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="js/app.js?v=4"></script>
+</body>
+</html>
