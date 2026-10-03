@@ -272,6 +272,12 @@ function externalStudyItems() {
       sub: '선생님이 연 판에 내 생각을 붙이고 친구 생각을 봐요',
       href: 'thinkboard/index.html?rpg=1&sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(53,99,233,.35)', bg: 'rgba(53,99,233,.07)', embed: true },
+    // [MUSIC-ROOM-1] 음악실 — 작곡 · 리코더 연습(흘러가는 음표 + 운지) · 리듬 게임(키보드). 저장 = classRPG_music · 보상과 묶지 않음
+    //   autoFocus: 리듬 게임 키(A S D F J K L ;)가 iframe 에 바로 들어가게(마을과 같은 이유)
+    { key: 'music', icon: '🎵', title: '음악실',
+      sub: '가락을 짓고 · 리코더로 따라 불고 · 키보드 리듬 게임',
+      href: 'music/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(240,140,46,.40)', bg: 'rgba(240,140,46,.08)', embed: true, autoFocus: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -1807,14 +1813,12 @@ function buildMainHTML() {
         <div style="font-size:1.1rem">🏅</div>
         <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">업적</div>
       </div>
-      <div onclick="toast('🎵 리코더 기록장은 곧 열릴 예정이에요')"
+      <div onclick="openExternalEmbed('music','#/log')"
         style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          position:relative;opacity:.5;
-          background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1)">
-        <div style="font-size:1.1rem;filter:grayscale(.4)">🎵</div>
-        <div style="font-size:.63rem;color:var(--txt3);margin-top:.12rem">리코더</div>
-        <span style="position:absolute;top:-3px;right:-2px;font-size:.5rem;font-weight:800;
-          background:#e67e22;color:#fff;border-radius:5px;padding:.05rem .25rem;line-height:1.4">예정</span>
+          position:relative;
+          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:1.1rem">🎵</div>
+        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">리코더</div>
       </div>
     </div>
 
