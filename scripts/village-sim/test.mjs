@@ -192,6 +192,10 @@ const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(ou
   ok(a.on.일없는어른 === 0 && a.on.빈자리 > 0 && a.on.띄움.length === 0 && a.off.띄움.length > 0, 'origin ' + JSON.stringify([a.on.띄움.length, a.off.띄움.length, a.on.빈자리]));
   const b = go('', 'village/stages/boards/pop88.json', `w.__tickBench(200); w.__put('road', 128, 110, 0); w.__put('shop', 129, 110, 0); w.__tickBench(400); const near = w.__jobVacant(); w.VRULES.jobVacant.near = 400; return { near, far: w.__jobVacant() };`);
   ok(b.near.일없는어른 > 0 && b.near.빈자리 > 0 && !b.near.띄움.includes('shop@129,110') && b.far.띄움.includes('shop@129,110'), 'pop88 끊긴 가게 ' + JSON.stringify(b));
+  /* 첫 배정 바퀴 전 창 — 열고 틱 30~110(3~11초)에 옛 셈을 믿어 빈 자리마다 💼 가 떴다(origin 18 · pop88 7 · 엔진 검토 10-03) */
+  const win = `const n = []; w.__tickBench(30); for (let t = 30; t <= 110; t += 10) { n.push(w.__jobVacant().띄움.length); w.__tickBench(10); } return n;`;
+  const c = go('stage=origin', null, win), d = go('', 'village/stages/boards/pop88.json', win);
+  ok(c.every(n => n === 0) && d.every(n => n === 0), '열고 3~11초 💼 ' + JSON.stringify({ origin: c, pop88: d }));
 });
 
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));

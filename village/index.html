@@ -13355,9 +13355,10 @@ window.__noUseSay = () => ({ 켜짐: window.VRULES.noUseSay.on, 마지막: NUSAY
    일 없는 어른이 0 이면 빈 자리는 걱정이 아니다(보이는 것 = 세는 것). 그래서 뒤집는다:
    · 일 없는 어른이 **있을 때만**, 그 어른들 집(JOBH.lack)에서 곧은 거리 near(24칸) 안의 빈 자리 위에 💼. 길로 안 닿아 못 가는 빈 자리를 짚어 준다.
    · 집별 일 없는 어른을 모를 때(옛 셈 jobsHomes 끔)는 빈 자리 모두.
-   · 건물을 눌렀을 때 카드의 '빈 자리 n'은 그대로. 판정 0 · 저장 0 · 원래 줄 2줄(drawFaces 의 조건 한 줄 · 빈 자리 거르기 한 줄). 스위치 VRULES.jobVacant(보기) — 끄면 옛 모습. */
+   · 건물을 눌렀을 때 카드의 '빈 자리 n'은 그대로. 판정 0 · 저장 0 · 원래 줄 2줄(drawFaces 의 조건 한 줄 · 빈 자리 거르기 한 줄). 스위치 VRULES.jobVacant(보기) — 끄면 옛 모습.
+   · 첫 배정 두 바퀴(JOBH.stats.한바퀴 ≥ 2)를 기다린다 — 그 전 jobStats 는 옛 표본 셈이고 JOBH.lack 은 비어 있어, 열고 3~11초 동안 빈 자리마다 💼 가 떴다(origin 18 · pop88 7 · 엔진 검토 10-03). */
 (window.VRULES = window.VRULES || {}).jobVacant = { on: true, near: 24 };
-function jobVacantOn() { const R = window.VRULES.jobVacant; return jobStats.찬자리 < jobStats.일자리 && (R && R.on ? jobStats.일없는어른 > 0 : jobStats.일없는어른 === 0); }
+function jobVacantOn() { const R = window.VRULES.jobVacant; return jobStats.찬자리 < jobStats.일자리 && (R && R.on ? (window.VRULES.jobsHomes.on ? JOBH.stats.한바퀴 >= 2 && JOBH.lack.size > 0 : jobStats.일없는어른 > 0) : jobStats.일없는어른 === 0); }
 function jobVacantNear(root) { const R = window.VRULES.jobVacant; if (!R || !R.on || !JOBH.lack.size) return true; const x = cX(root), y = cY(root), d = R.near | 0 || 24;
   for (const h of JOBH.lack.keys()) { if (Math.abs(cX(h) - x) + Math.abs(cY(h) - y) <= d) return true; } return false; }
 window.__jobVacant = () => { const out = []; if (jobVacantOn()) jobCount.forEach((n, root) => { const rec = cells[root]; if (rec && n < (K[rec.k].jobs | 0) && jobVacantNear(root)) out.push(rec.k + '@' + cX(root) + ',' + cY(root)); });
