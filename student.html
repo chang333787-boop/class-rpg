@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><!-- [ENGLISH-LINK-1] 영어앱 기록 읽기 전용 -->
-<script src="./gamedata.js?v=20260924me2"></script>
+<script src="./gamedata.js?v=20261003ds2"></script>
 <script src="./curriculum.js?v=20260915stn"></script>
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
@@ -101,7 +101,7 @@
       <div class="panel-box">
         <div class="panel-label" onclick="toggleSideSection('equip-section','equip-arrow')"
           style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-          <span>🧰 장착 장비</span>
+          <span>장착 장비</span>
           <span id="equip-arrow" style="font-size:.7rem;color:var(--txt3)">▲</span>
         </div>
         <div id="equip-section">
@@ -133,7 +133,7 @@
         <div class="char-combat" id="mob-char-combat"></div>
       </div>
       <div class="panel-box" style="margin-bottom:.8rem">
-        <div class="panel-label">🧰 장착 장비</div>
+        <div class="panel-label">장착 장비</div>
         <div class="equip-grid" id="mob-equip-grid"></div>
       </div>
       <div class="panel-box">
@@ -218,7 +218,7 @@
 <div class="overlay" id="m-monster"><div class="modal large-modal" style="height:auto;max-height:92vh">
   <div class="lm-header">
     <div style="display:flex;align-items:center;gap:.6rem">
-      <div class="modal-title" id="monster-modal-title">⚔️ 사냥터</div>
+      <div class="modal-title" id="monster-modal-title">사냥터</div>
       <div style="display:flex;gap:.3rem">
         <button id="mon-tab-normal" onclick="setMonsterTab('normal')"
           style="font-size:.7rem;padding:.2rem .55rem;border-radius:12px;cursor:pointer;
@@ -227,7 +227,7 @@
         <button id="mon-tab-infinite" onclick="setMonsterTab('infinite')"
           style="font-size:.7rem;padding:.2rem .55rem;border-radius:12px;cursor:pointer;
             border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
-            color:var(--txt3);font-family:inherit">♾️ 무한배틀</button>
+            color:var(--txt3);font-family:inherit">무한배틀</button>
       </div>
     </div>
     <button class="modal-close" onclick="closeModal('m-monster')">✕</button>
@@ -254,7 +254,7 @@
     <div class="modal-title">내 농장</div>
     <button class="modal-close" onclick="closeModal('m-farm')">✕</button>
   </div>
-  <div style="font-size:.72rem;color:var(--txt2);margin-bottom:.4rem">빈 칸 클릭 → 씨앗 심기 / 익은 작물 → 수확</div>
+  <div style="font-size:.72rem;color:var(--txt2);margin-bottom:.4rem">빈 칸을 누르면 씨앗을 심고, 다 자란 작물을 누르면 거둬요</div>
   <div style="font-size:.72rem;color:var(--txt2);margin-bottom:.3rem">🌱 심을 씨앗:</div>
   <div class="farm-seed-list" id="farm-seed-select"></div>
   <div style="margin-top:.5rem" id="farm-grid-wrap"></div>
@@ -654,7 +654,7 @@
 <div class="overlay" id="m-study" style="align-items:center">
   <div class="modal">
     <div class="modal-hd">
-      <div class="modal-title" id="study-title">📚 오늘의 학습</div>
+      <div class="modal-title" id="study-title">오늘의 학습</div>
       <button class="modal-close" onclick="closeStudyModal()">✕</button>
     </div>
     <div id="study-body" style="padding:.5rem 0;min-height:200px"></div>
@@ -903,7 +903,7 @@
 <!-- 감정 입력 모달 -->
 <div class="overlay" id="m-emotion"><div class="modal" style="max-width:480px">
   <div class="modal-hd">
-    <div class="modal-title" id="emotion-modal-title">💭 오늘의 감정</div>
+    <div class="modal-title" id="emotion-modal-title">오늘의 감정</div>
     <button class="modal-close" onclick="closeModal('m-emotion')">✕</button>
   </div>
   <!-- step1: 감정 선택 -->
@@ -939,7 +939,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20261003tb1"></script>
+<script src="./student.js?v=20261003ds2"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
