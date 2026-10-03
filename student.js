@@ -295,7 +295,7 @@ function externalStudyItems() {
       border: 'rgba(120,200,140,.40)', bg: 'rgba(120,200,140,.08)', embed: true, study: false, autoFocus: true },
   ];
 }
-// ── [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈 '오늘의 공부' 맨 위에 — 한 번 누르면 그 판으로 ──
+// ── [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈 '오늘'의 우리 반 소식에([HOME-C-1]) — 한 번 누르면 그 판으로 ──
 //   classRPG_thinkboard/listed = { <판 id>: { t 제목 · c 만든 때 · o 쓰기 열림 · p 질문 } } — 생각판 선생님 쪽이 맞춰 둔다.
 //   판 내용(카드·기록)은 받지 않고 이 작은 목록 하나에만 붙는다. 수업 중에 판을 열면 아이 홈에 바로 뜬다.
 //   누구나 쓸 수 있는 DB 라 글은 escHtml, 판 id 는 글자·숫자·_·- 만 받는다.
@@ -535,6 +535,7 @@ function enterGame() {
   }
 
   document.getElementById('s-game').classList.add('active');
+  setHomeSec(HOME_SEC);   // [HOME-C-1] 지난번에 보던 홈 구역(처음이면 '오늘')
   applyLayout(LAYOUT_MODE);
   // 화면 맞춤 버튼 초기 상태 복원
   const sBtn = document.getElementById('scale-mode-btn');
@@ -1145,6 +1146,7 @@ function renderMain() {
   try {
     document.getElementById('main-area').innerHTML = buildMainHTML();
     _restoreHomeOpen(document.getElementById('main-area'));    // [HOME-KEEP-OPEN-1]
+    renderRail();                                              // [HOME-C-1] 레일 배지
   } catch(e) {
     console.error('renderMain 오류:', e);
     document.getElementById('main-area').innerHTML = `
@@ -1300,10 +1302,10 @@ function renderRewardList() {
             + (done.length >= REWARD_LIST_MAX
                 ? `<div style="font-size:.7rem;color:var(--txt3);padding:.4rem .2rem">최근 ${REWARD_LIST_MAX}개만 보여요.</div>` : '')
           : empty('아직 받은 보상이 없어요.'))
-    + `<button onclick="closeModal('m-reward');toggleSection('bottom-section','bottom-arrow')"
+    + `<button onclick="closeModal('m-reward');setHomeSec('me');_openHomeSection('bottom-section','bottom-arrow')"
         style="width:100%;padding:.45rem;border-radius:8px;background:rgba(255,255,255,.04);
           border:1px solid rgba(255,255,255,.08);color:var(--txt2);font-size:.76rem;
-          cursor:pointer;font-family:inherit">📜 전체 기록 보기 (감정 · 최근 활동)</button>`;
+          cursor:pointer;font-family:inherit">📜 전체 기록 보기 (최근 활동)</button>`;
 }
 
 // ══ 보상 승인 알림 (REWARD-STATUS-1) ═══════════════════════════
@@ -1642,35 +1644,54 @@ function buildMainHTML() {
       ${t.btnLabel ? `<button class="todo-btn ${t.type}" style="font-size:.68rem;padding:.3rem .6rem" onclick="event.stopPropagation();${t.action}">${t.btnLabel}</button>` : t.action ? '<div class="todo-arrow">›</div>' : ''}
     </div>`).join('') : '';
 
-  return `
-    <!-- 오늘의 링크 — 기본 접힘 (HOME-PLACE-1)
-         링크가 8개면 278px를 먹어 크롬북(1366×610)에서 학습·퀘스트가 전부 화면 밖으로
-         밀려났다. 헤더만 남기고 접어 둔다. 개수는 헤더에 표시. -->
-    ${(()=>{
-      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>safeUrl(l.url)&&l.title);
-      if (!todayLinks.length) return '';
-      return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
-        border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
-        <button onclick="toggleSection('today-links','today-links-arrow')"
-          style="width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
-            display:flex;align-items:center;gap:.4rem;color:var(--sky)">
-          <span style="font-size:.75rem;font-weight:700">🔗 오늘의 링크</span>
-          <span style="font-size:.68rem;color:var(--txt3)">${todayLinks.length}개</span>
-          <span id="today-links-arrow" style="margin-left:auto;font-size:.7rem;color:var(--txt3)">▼</span>
-        </button>
-        <div id="today-links" style="display:none;margin-top:.4rem">
-        ${todayLinks.map(l=>`
-          <a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener"
-            style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
-              text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
-            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${escHtml(l.title)}</span>
-            <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
-          </a>`).join('')}
-        </div>
-      </div>`;
-    })()}
+  // ══ [HOME-C-1] 홈 = 네 구역(오늘 · 배우고 만들기 · 나의 공간 · 모험). 사용자 10-03 시안 C 선택.
+  //   네 구역을 다 그리고 데스크톱(701px↑)은 CSS 가 고른 구역 하나만 보인다(#s-game[data-home-sec]).
+  //   폰(#mob-main-tab)은 지금처럼 위에서 아래로 다 보인다 — 어느 입구도 빠지지 않게.
+  //   다른 코드가 기대는 id(today-links · rest-todo-* · quest-section · bottom-section · ach-tile-notif)와
+  //   .home-thinkboard · [onclick*="openHouseTab"] 는 한 벌씩 그대로 둔다.
+  const ZOOM = { 'deco/d_y22.svg': 2.3, 'deco/deco_garden.svg': 2.1, 'deco/d_y34.svg': 1.8, 'deco/d_y36.svg': 1.4, 'deco/deco_trophy.svg': 1.8,
+    'deco/deco_bookshelf.svg': 1.5, 'deco/in_w_clock.svg': 1.2, 'deco/d_i9.svg': 1.2, 'deco/d_i5.svg': 1.2, 'deco/guest_owl.svg': 1.3 };
+  const asset = (f, cls = 'hc-art') => `<img class="${cls}" src="./assets/${f}" alt="" loading="lazy"${ZOOM[f] && cls === 'hc-art' ? ` style="--z:${ZOOM[f]}"` : ''}>`;
+  const dateKo = (() => { const k = new Date(Date.now() + 9 * 3600000); return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${'일월화수목금토'[k.getUTCDay()]}요일`; })();
+  const studyRecs = typeof CurriculumUtils !== 'undefined' ? getTodayStudyRecords(s.id) : [];
+  const studyDone = studyRecs.reduce((n, r) => n + (r.total || 0), 0);
+  const studyLeft = typeof CurriculumUtils !== 'undefined' && studyDone < STUDY_PER_DAY;
+  const realTodos = todos.filter(t => t.type !== 'done' && t.type !== 'hint' && t.type !== 'info').length + (studyLeft ? 1 : 0);
+  _homeCounts = { todo: realTodos, attemptsLeft: canFight ? attemptsLeft : 0, farmReady, pendingCount };
+  // 우리 반 소식 — 이미 있는 데이터만(새 저장소 없음)
+  const newsRows = [];
+  const weekArt = galleryArtworks().filter(a => (a.date || '') >= weekStart);
+  if (weekArt.length) {
+    const nm = id => { const st = DB.getStudent(id); return st ? st.name : ''; };
+    newsRows.push(`<div class="hc-news" onclick="openArtFree('class')">${asset('deco/ui_photo_frame.svg', 'hc-news-art')}
+      <div><b>이번 주 새 작품 ${weekArt.length}점</b><span>${weekArt.slice(0, 2).map(a => escHtml((a.title || '작품') + (nm(a.studentId) ? ' · ' + nm(a.studentId) : ''))).join(' / ')}</span></div></div>`);
+  }
+  const newQuests = boardQuests.filter(q => q.date === today);
+  if (newQuests.length) newsRows.push(`<div class="hc-news" onclick="openQuestModal()">${asset('deco/gift_sticker.svg', 'hc-news-art')}
+      <div><b>선생님이 새 퀘스트를 올렸어요</b><span>${newQuests.slice(0, 2).map(q => escHtml(q.name || '')).join(' · ')}</span></div></div>`);
+  // 입구 하나(그림 · 이름 · 한 줄 · 배지)
+  const door = (art, name, sub, action, badge = '', cls = '') => `
+    <div class="hc-door ${cls}" onclick="${action}">${badge ? `<span class="hc-badge">${badge}</span>` : ''}
+      ${art}<b>${name}</b><span>${sub}</span></div>`;
+  const ext = key => externalStudyItems().find(x => x.key === key);
 
-    <!-- 이번 주 목표 카드 -->
+  return `
+  <section class="home-sec hs-today" data-sec="today">
+    <div class="hs-cols">
+      <div class="hs-main">
+        <div class="hs-head"><span class="hs-date">${dateKo}</span><h2>${realTodos ? `오늘 할 일 ${realTodos}개` : '오늘 할 일 다 했어요'}</h2></div>
+        ${alerts.join('')}
+        ${buildStudyTaskHTML(s)}
+        ${topTodoHtml}
+        ${restTodos.length > 0 ? `
+          <div id="rest-todo-wrap" style="display:none">${restTodoHtml}</div>
+          <button onclick="toggleRestTodo()"
+            id="rest-todo-btn"
+            style="width:100%;padding:.35rem;background:none;border:1px solid rgba(255,255,255,.08);
+              border-radius:8px;color:var(--txt3);font-size:.72rem;cursor:pointer;
+              font-family:inherit;margin-top:.3rem;margin-bottom:.3rem">
+            ▼ 할 일 더보기 (${restTodos.length}개)
+          </button>` : ''}
     ${(()=>{
       const wk   = Utils.weekKey();
       const goal = DB.getWeeklyGoal(s.id, wk);
@@ -1701,127 +1722,7 @@ function buildMainHTML() {
           </div>
         </div>`;
     })()}
-    ${alerts.join('')}
-
-    <!-- ① 오늘의 학습 — 매일 하는 핵심 기능이라 할 일보다 위 (HOME-PLACE-1) -->
-    <div class="sec-label">오늘의 공부</div>
-    ${buildStudyCardHTML(s)}
-
-    <!-- ② 핵심 할 일 1개 강조 + 나머지 요약 -->
-    <div class="sec-label">오늘 할 일</div>
-    ${topTodoHtml}
-    ${restTodos.length > 0 ? `
-      <div id="rest-todo-wrap" style="display:none">${restTodoHtml}</div>
-      <button onclick="toggleRestTodo()"
-        id="rest-todo-btn"
-        style="width:100%;padding:.35rem;background:none;border:1px solid rgba(255,255,255,.08);
-          border-radius:8px;color:var(--txt3);font-size:.72rem;cursor:pointer;
-          font-family:inherit;margin-top:.3rem;margin-bottom:.3rem">
-        ▼ 할 일 더보기 (${restTodos.length}개)
-      </button>` : ''}
-
-    <!-- ③ 주요 메뉴 4개 -->
-    <div class="sec-label">메뉴</div>
-    <div class="menu-grid" style="margin-bottom:.5rem">
-      <div class="menu-tile mt-quest" onclick="openQuestModal()">
-        ${pendingCount>0?`<div class="tile-notif">${pendingCount}</div>`:''}
-        <div class="tile-icon">📋</div><div class="tile-name">퀘스트</div>
-        <div class="tile-desc">확인 · 보상</div>
-      </div>
-      <div class="menu-tile mt-monster" onclick="openMonsterModal()">
-        ${canFight?`<div class="tile-notif">${attemptsLeft}회</div>`:''}
-        <div class="tile-icon">⚔️</div><div class="tile-name">몬스터</div>
-        <div class="tile-desc">${canFight?`${attemptsLeft}회 남음`:'오늘 완료'}</div>
-      </div>
-      <div class="menu-tile mt-shop" onclick="openModal('m-shop');renderShop()">
-        <div class="tile-icon">🏪</div><div class="tile-name">상점</div>
-        <div class="tile-desc">장비·씨앗</div>
-      </div>
-      <div class="menu-tile mt-farm" onclick="openModal('m-farm');renderFarmModal()">
-        ${farmReady?'<div class="tile-notif">수확!</div>':''}
-        <div class="tile-icon">🌱</div><div class="tile-name">농장</div>
-        <div class="tile-desc">심기 · 수확</div>
-      </div>
-      <div class="menu-tile" onclick="openModal('m-inv');renderInv()"
-        style="border-color:rgba(255,255,255,.1)">
-        <div class="tile-icon">🎒</div><div class="tile-name">가방</div>
-        <div class="tile-desc">아이템</div>
-      </div>
-      <div class="menu-tile" onclick="openModal('m-rank');renderRankingModal()"
-        style="border-color:rgba(255,215,0,.2)">
-        <div class="tile-icon">🏆</div><div class="tile-name">랭킹</div>
-        <div class="tile-desc">우리반 순위</div>
-      </div>
-      <!-- [VILLAGE-DOOR-1] 3칸 격자에 6개가 꽉 차 있어 7번째는 한 줄 전체로 둔다(하나만 덩그러니 남지 않게). -->
-      <div class="menu-tile" onclick="openExternalEmbed('village')"
-        style="grid-column:1/-1;border-color:rgba(120,200,140,.35)">
-        <div class="tile-icon">🏘️</div><div class="tile-name">우리 마을</div>
-        <div class="tile-desc">짓고 · 키우기</div>
-      </div>
-    </div>
-
-    <!-- 내집 섹션 -->
-    <div class="sec-label">내 집</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.5rem">
-      <div onclick="openHouseTab('stats')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">📊</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">기록</div>
-      </div>
-      <div onclick="openHouseTab('weekly')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(93,173,226,.2)">
-        <div style="font-size:1.1rem">📅</div>
-        <div style="font-size:.63rem;color:var(--sky);margin-top:.12rem;font-weight:700">주간 다짐</div>
-      </div>
-      <div onclick="openHouseTab('book')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">📚</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">독서</div>
-      </div>
-      <div onclick="openHouseTab('deco')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">🌸</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">꾸미기</div>
-      </div>
-      <div onclick="openHouseTab('artwork')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">🖼️</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">작품</div>
-      </div>
-      <div onclick="openHouseTab('memory')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">📸</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">추억</div>
-      </div>
-      <div onclick="openHouseTab('emotion')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">💭</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">감정</div>
-      </div>
-      <div onclick="openHouseTab('ach')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          position:relative;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
-        <div style="font-size:1.1rem">🏅</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">업적</div>
-      </div>
-      <div onclick="openExternalEmbed('music','#/log')"
-        style="padding:.5rem .2rem;text-align:center;border-radius:10px;cursor:pointer;
-          position:relative;
-          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:1.1rem">🎵</div>
-        <div style="font-size:.63rem;color:var(--txt2);margin-top:.12rem">리코더</div>
-      </div>
-    </div>
-
+        ${emotionCard}
     <!-- ④ 퀘스트 목록 (기본 접힘) -->
     ${boardQuests.length>0 ? `
     <button onclick="toggleSection('quest-section','quest-arrow')"
@@ -1838,17 +1739,81 @@ function buildMainHTML() {
     <div id="quest-section" style="display:none">
       <div class="mission-list" style="margin-bottom:.6rem">${missionHtml}</div>
     </div>` : ''}
+      </div>
+      <aside class="hs-news">
+        <div class="sec-label">우리 반 소식</div>
+    ${(()=>{
+      const todayLinks = (DB.getSettings().todayLinks||[]).filter(l=>safeUrl(l.url)&&l.title);
+      if (!todayLinks.length) return '';
+      return `<div style="background:rgba(93,173,226,.07);border:1px solid rgba(93,173,226,.2);
+        border-radius:12px;padding:.55rem .9rem;margin-bottom:.5rem">
+        <button onclick="toggleSection('today-links','today-links-arrow')"
+          style="width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+            display:flex;align-items:center;gap:.4rem;color:var(--sky)">
+          <span style="font-size:.75rem;font-weight:700">🔗 오늘의 링크</span>
+          <span style="font-size:.68rem;color:var(--txt3)">${todayLinks.length}개</span>
+          <span id="today-links-arrow" style="margin-left:auto;font-size:.7rem;color:var(--txt3)">▼</span>
+        </button>
+        <div id="today-links" style="display:none;margin-top:.4rem">
+        ${todayLinks.map(l=>`
+          <a href="${escHtml(safeUrl(l.url))}" target="_blank" rel="noopener"
+            style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;
+              text-decoration:none;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="font-size:.8rem;color:var(--sky);font-weight:600">${escHtml(l.title)}</span>
+            <span style="font-size:.63rem;color:var(--txt3);margin-left:auto">열기 →</span>
+          </a>`).join('')}
+        </div>
+      </div>`;
+    })()}
+        ${buildThinkboardSlotHTML()}
+        ${newsRows.join('')}
+        ${!newsRows.length && !_tbHome ? '<div class="hc-empty">새 소식이 오면 여기에 떠요. 선생님이 생각판을 열거나 친구가 작품을 올리면 보여요.</div>' : ''}
+      </aside>
+    </div>
+  </section>
 
-    <!-- ⑥ 하단 정보 — 기본 접힘 -->
+  <section class="home-sec hs-learn" data-sec="learn">
+    <div class="hs-head"><h2>배우고 만들기</h2><span class="hs-sub">문제 풀고 · 생각 나누고 · 만들어요</span></div>
+    <div class="hc-grid">
+      ${door(asset('deco/d_i5.svg'), '오늘의 학습', typeof CurriculumUtils === 'undefined' ? '교과 문제' : studyLeft ? `하루 ${STUDY_PER_DAY}문제 · ${studyDone}문제 했어요` : '오늘 공부 끝!', 'openStudyModal()', studyLeft ? '오늘' : '')}
+      ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
+      ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')", 'NEW')}
+      ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
+      ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
+      ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
+      ${ext('english') ? door(asset('deco/guest_owl.svg'), '영어 복습', '단어 · 표현 · 듣기 · 말하기', "openExternalEmbed('english')") : ''}
+      ${door(asset('deco/in_w_bookshelf.svg'), '독서 기록', `읽은 책 ${(s.books || []).length}권`, "openHouseTab('book')")}
+    </div>
+  </section>
+
+  <section class="home-sec hs-me" data-sec="me">
+    <div class="hs-head"><h2>나의 공간</h2><span class="hs-sub">내 캐릭터 · 내 집 · 내 기록</span></div>
+    <div class="hc-grid small">
+      ${door(asset('deco/d_y22.svg'), '가방', '아이템 · 장비', "openModal('m-inv');renderInv()")}
+      ${door(asset('deco/deco_garden.svg'), '꾸미기', '마당 · 방 꾸미기', "openHouseTab('deco')")}
+      ${door(asset('deco/heart_full.svg'), '주간 다짐', '이번 주 다짐 · 돌아보기', "openHouseTab('weekly')")}
+      ${door(asset('deco/heart_empty.svg'), '감정', '내 감정 기록', "openHouseTab('emotion')")}
+      ${door(asset('deco/deco_bookshelf.svg'), '독서', '읽은 책 기록', "openHouseTab('book')")}
+      ${door(asset('deco/d_i4_wall.svg'), '내 작품', '내가 올린 그림', "openHouseTab('artwork')")}
+      ${door(asset('deco/gift_photo.svg'), '추억', '우리 반 사진', "openHouseTab('memory')")}
+      <div class="hc-door" onclick="openHouseTab('ach')"><div id="ach-tile-notif" class="tile-notif" style="display:none">!</div>
+        ${asset('deco/fx_first_meet.svg')}<b>업적</b><span>모은 업적</span></div>
+      ${door(asset('deco/in_w_clock.svg'), '기록', '활동 기록 · 그래프', "openHouseTab('stats')")}
+      ${door(asset('deco/d_i9.svg'), '리코더', '리코더 기록장', "openExternalEmbed('music','#/log')")}
+    </div>
+    <div class="hc-links">
+      <button onclick="openNoteList()">선생님 쪽지</button>
+      <button onclick="openRewardList()">내 보상 기록</button>
+    </div>
+    <!-- 최근 활동 — 기본 접힘(보상 목록의 '전체 기록 보기'가 여기를 연다) -->
     <button onclick="toggleSection('bottom-section','bottom-arrow')"
       style="width:100%;padding:.4rem .7rem;border-radius:8px;background:rgba(255,255,255,.03);
         border:1px solid rgba(255,255,255,.07);color:var(--txt3);font-size:.72rem;
         cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
-      <span>📅 감정 · 최근 활동 · 친구 방문</span>
+      <span>최근 활동</span>
       <span id="bottom-arrow" style="font-size:.7rem">▼</span>
     </button>
     <div id="bottom-section" style="display:none">
-      ${emotionCard}
       <div class="today-grid" style="margin-bottom:.5rem">
         <div class="today-card" style="overflow-y:auto;max-height:160px;grid-column:1/-1">
           <div class="tc-label">📜 최근 활동</div>
@@ -1868,6 +1833,22 @@ function buildMainHTML() {
             </div>`).join('');
           })()}
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="home-sec hs-adv" data-sec="adv">
+    <div class="hs-head"><h2>모험</h2><span class="hs-sub">사냥 · 상점 · 농장 · 우리 마을</span></div>
+    <div class="hc-grid">
+      ${door(asset('monsters/m28.png'), '몬스터', canFight ? `오늘 ${attemptsLeft}번 남았어요` : '오늘 도전 끝', 'openMonsterModal()', canFight ? `${attemptsLeft}회` : '', 'big')}
+      ${door(asset('deco/gift_sticker.svg'), '퀘스트', '확인 · 보상', 'openQuestModal()', pendingCount > 0 ? String(pendingCount) : '')}
+      ${door(asset('deco/d_y34.svg'), '상점', '장비 · 씨앗', "openModal('m-shop');renderShop()")}
+      ${door(asset('deco/d_y36.svg'), '농장', '심기 · 수확', "openModal('m-farm');renderFarmModal()", farmReady ? '수확!' : '')}
+      ${door(asset('deco/deco_trophy.svg'), '랭킹', '우리 반 순위', "openModal('m-rank');renderRankingModal()")}
+      ${door(asset('deco/yard_house.svg'), '우리 마을', '짓고 · 키우기', "openExternalEmbed('village')")}
+      ${canPromo ? door(asset('deco/fx_first_meet.svg'), `Lv.${s.level} 승급`, '승급 신청하기', "openModal('m-promo')", '!') : ''}
+    </div>
+    <div class="today-grid" style="margin-top:.6rem">
         <div class="today-card" style="grid-column:1/-1">
           <div class="tc-label">👥 친구 방문</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
@@ -1877,9 +1858,37 @@ function buildMainHTML() {
           </div>`).join('')}
           </div>
         </div>
-      </div>
-    </div>`;
+    </div>
+  </section>`;
 }
+// ══ [HOME-C-1] 홈 네 구역 — 왼쪽 레일(student.html 고정)로 고른다. 상태는 #s-game[data-home-sec] 에 둬서
+//   홈이 innerHTML 로 통째 다시 그려져도(데이터가 바뀔 때마다) 고른 구역이 그대로다. 이 기기에 기억(localStorage).
+const HOME_SECS = ['today', 'learn', 'me', 'adv'];
+let _homeCounts = null;
+let HOME_SEC = (() => { try { const v = localStorage.getItem('rpg.homeSec'); return HOME_SECS.includes(v) ? v : 'today'; } catch (e) { return 'today'; } })();
+function setHomeSec(sec) {
+  if (!HOME_SECS.includes(sec)) sec = 'today';
+  HOME_SEC = sec;
+  try { localStorage.setItem('rpg.homeSec', sec); } catch (e) {}
+  const g = document.getElementById('s-game');
+  if (g) g.dataset.homeSec = sec;
+  document.querySelectorAll('#home-rail .hr-item').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
+  const m = document.getElementById('main-area');
+  if (m) m.scrollTop = 0;
+}
+function renderRail() {
+  const c = _homeCounts || {}, set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  set('hr-sub-today', c.todo ? `할 일 ${c.todo}` : '다 했어요');
+  set('hr-sub-learn', '학습 · 생각판 · 음악실');
+  set('hr-sub-me', '가방 · 꾸미기 · 기록');
+  set('hr-sub-adv', c.attemptsLeft ? `몬스터 ${c.attemptsLeft}번` : c.farmReady ? '수확할 것 있어요' : '상점 · 농장 · 마을');
+}
+// 펼치기만(이미 열렸으면 그대로) — 보상 목록의 '전체 기록 보기'
+function _openHomeSection(sectionId, arrowId) {
+  const sec = _homeEl(sectionId);
+  if (sec && sec.style.display === 'none') toggleSection(sectionId, arrowId);
+}
+
 // ══ 보상 받기 ══
 // [HOME-TOGGLE-MOBILE-1] buildMainHTML 은 데스크톱(#main-area)과 모바일(#mob-main-tab)에 **두 번** 그려져
 //   같은 id 가 두 벌 생긴다. getElementById 는 DOM 앞쪽(#main-area, 폰에선 display:none)을 돌려줘서
@@ -15549,17 +15558,16 @@ function getTodayStudyRecords(studentId) {
 }
 
 // 홈에 붙는 "오늘의 학습" 카드
+// [HOME-C-1] 세 조각(생각판 칸 · 우리 반 작품 · 오늘의 학습)을 홈 구역마다 따로 쓴다. 예전 이름은 셋을 이어 붙여 돌려준다.
 function buildStudyCardHTML(s) {
-  const tbSlot = `<div class="home-thinkboard" style="display:contents">${thinkboardHomeCards()}</div>`;   // [THINKBOARD-HOME-1]
-  if (typeof CurriculumUtils === 'undefined') return tbSlot;
-  const recs  = getTodayStudyRecords(s.id);
-  const done  = recs.reduce((n, r) => n + (r.total || 0), 0);
-  const right = recs.reduce((n, r) => n + (r.correct || 0), 0);
-  const cleared = done >= STUDY_PER_DAY;
-  const pct = done > 0 ? Math.round(right / done * 100) : 0;
-
-  // [ARTFREE-1] 그림 올리기는 집 탭 안쪽에 있어 아이들이 못 찾았다 — 홈에서 바로 들어가게 한다
-  const artCard = `
+  if (typeof CurriculumUtils === 'undefined') return buildThinkboardSlotHTML();
+  return buildThinkboardSlotHTML() + buildArtCardHTML() + buildStudyTaskHTML(s);
+}
+function buildThinkboardSlotHTML() {
+  return `<div class="home-thinkboard" style="display:contents">${thinkboardHomeCards()}</div>`;   // [THINKBOARD-HOME-1]
+}
+function buildArtCardHTML() {
+  return `
     <div class="today-card" onclick="openArtFree('class')"
       style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(200,150,46,.3);margin-top:.5rem">
       <div style="display:flex;align-items:center;gap:.6rem">
@@ -15571,8 +15579,17 @@ function buildStudyCardHTML(s) {
         <span style="color:var(--txt3)">▶</span>
       </div>
     </div>`;
+}
+function buildStudyTaskHTML(s) {
+  if (typeof CurriculumUtils === 'undefined') return '';
+  const recs  = getTodayStudyRecords(s.id);
+  const done  = recs.reduce((n, r) => n + (r.total || 0), 0);
+  const right = recs.reduce((n, r) => n + (r.correct || 0), 0);
+  const cleared = done >= STUDY_PER_DAY;
+  const pct = done > 0 ? Math.round(right / done * 100) : 0;
 
-  return tbSlot + artCard + `
+  // [ARTFREE-1] 그림 올리기는 집 탭 안쪽에 있어 아이들이 못 찾았다 — 홈에서 바로 들어가게 한다(→ buildArtCardHTML)
+  return `
     <div class="today-card" onclick="openStudyModal()"
       style="cursor:pointer;grid-column:1/-1;border:1px solid ${cleared?'rgba(46,204,113,.35)':'rgba(255,215,0,.28)'}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">

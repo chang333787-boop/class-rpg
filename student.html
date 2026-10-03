@@ -17,7 +17,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20261003tb1">
+<link rel="stylesheet" href="./student.css?v=20261003hc1">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#ecdcbf;
@@ -109,6 +109,13 @@
   </div>
 
   <div class="game-body">
+    <!-- [HOME-C-1] 왼쪽 레일 — 홈 네 구역. 데스크톱(701px 이상)만 · 폰과 '넓게 보기 끔'(모바일 배치)에서는 숨김 -->
+    <nav class="home-rail" id="home-rail" aria-label="홈 구역">
+      <button class="hr-item on" data-sec="today" onclick="setHomeSec('today')"><span class="hr-art hr-board" aria-hidden="true"></span><b>오늘</b><small id="hr-sub-today"></small></button>
+      <button class="hr-item" data-sec="learn" onclick="setHomeSec('learn')"><img class="hr-art" src="./assets/deco/d_i9.svg" alt=""><b>배우고 만들기</b><small id="hr-sub-learn"></small></button>
+      <button class="hr-item" data-sec="me" onclick="setHomeSec('me')"><img class="hr-art" src="./assets/deco/yard_house.svg" alt=""><b>나의 공간</b><small id="hr-sub-me"></small></button>
+      <button class="hr-item" data-sec="adv" onclick="setHomeSec('adv')"><img class="hr-art" src="./assets/monsters/m28.png" alt=""><b>모험</b><small id="hr-sub-adv"></small></button>
+    </nav>
     <!-- 사이드 (데스크탑) -->
     <div class="side-panel" id="side-panel">
       <div class="char-card">
@@ -958,7 +965,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20261003mu1"></script>
+<script src="./student.js?v=20261003hc1"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
