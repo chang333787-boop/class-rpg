@@ -7,7 +7,7 @@ import { createLocalStore } from './store.js';
 import { createRtdbStore } from './store-rtdb.js';
 import { mountBoard } from './board.js';
 import { mountTeacher } from './teacher.js';
-import { withDefaults, LAYOUTS } from './settings.js';
+import { withDefaults } from './settings.js';
 import { icon } from './icons.js';
 
 const Q = new URLSearchParams(location.search);
@@ -65,20 +65,24 @@ function mountRpgHome() {
     h('header', { class: 't-head' }, h('h1', {}, '생각판'), h('span', { class: 'sub' }, `${getName() || ''} · 선생님이 연 판에 생각을 붙여요`)),
     list));
   const draw = async () => {
-    let boards = [];
-    try { boards = (await store.list()).filter(b => withDefaults(b.settings).listed !== false).sort((a, z) => z.created - a.created); }
-    catch (e) { list.innerHTML = ''; list.append(h('div', { class: 'fl-empty' }, '판을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요')); return; }
+    let items = [];
+    try {
+      items = await store.listOpen();
+      // 선생님 화면을 아직 안 연 옛 판은 작은 목록에 없다 — 비었을 때만 판 전체에서 한 번 고른다
+      if (!items.length) items = (await store.list()).filter(b => withDefaults(b.settings).listed !== false)
+        .map(b => ({ id: b.id, title: b.title, created: b.created, open: withDefaults(b.settings).open !== false, prompt: withDefaults(b.settings).prompt || '', icon: b.template?.icon || '' }));
+      items.sort((a, z) => z.created - a.created);
+    } catch (e) { list.innerHTML = ''; list.append(h('div', { class: 'fl-empty' }, '판을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요')); return; }
     list.innerHTML = '';
-    if (!boards.length) return list.append(h('div', { class: 'fl-empty' }, '아직 열린 판이 없어요. 선생님이 판을 열면 여기에 보여요'));
-    for (const b of boards) {
-      const st = withDefaults(b.settings);
+    if (!items.length) return list.append(h('div', { class: 'fl-empty' }, '아직 열린 판이 없어요. 선생님이 판을 열면 여기에 보여요'));
+    for (const b of items) {
       list.append(h('a', { class: 't-row as-link', href: '#/b/' + b.id },
-        h('span', { class: 't-ico' }, b.template?.icon || '📋'),
-        h('div', { class: 't-main' }, h('div', { class: 't-title' }, b.title), h('div', { class: 't-meta' }, [LAYOUTS[st.layout]?.replace(/\(.*\)/, ''), st.prompt].filter(Boolean).join(' · '))),
-        st.open ? h('span', { class: 'pill' }, icon('edit', 14), '쓸 수 있어요') : h('span', { class: 'pill warn' }, icon('lock', 14), '보기만')));
+        h('span', { class: 't-ico' }, b.icon || '📋'),
+        h('div', { class: 't-main' }, h('div', { class: 't-title' }, b.title), b.prompt ? h('div', { class: 't-meta' }, b.prompt) : null),
+        b.open ? h('span', { class: 'pill' }, icon('edit', 14), '쓸 수 있어요') : h('span', { class: 'pill warn' }, icon('lock', 14), '보기만')));
     }
   };
-  const stop = store.watchAll(draw);
+  const stop = store.watchOpen(draw);
   draw();
   return stop;
 }

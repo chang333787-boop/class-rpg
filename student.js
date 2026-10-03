@@ -279,6 +279,58 @@ function externalStudyItems() {
       border: 'rgba(120,200,140,.40)', bg: 'rgba(120,200,140,.08)', embed: true, study: false, autoFocus: true },
   ];
 }
+// ── [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈 '오늘의 공부' 맨 위에 — 한 번 누르면 그 판으로 ──
+//   classRPG_thinkboard/listed = { <판 id>: { t 제목 · c 만든 때 · o 쓰기 열림 · p 질문 } } — 생각판 선생님 쪽이 맞춰 둔다.
+//   판 내용(카드·기록)은 받지 않고 이 작은 목록 하나에만 붙는다. 수업 중에 판을 열면 아이 홈에 바로 뜬다.
+//   누구나 쓸 수 있는 DB 라 글은 escHtml, 판 id 는 글자·숫자·_·- 만 받는다.
+let _tbHome = null, _tbHomeOn = false;
+function watchThinkboardHome() {
+  if (_tbHomeOn) return;
+  try {
+    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+    _tbHomeOn = true;
+    firebase.database().ref('classRPG_thinkboard/listed').on('value', snap => {
+      _tbHome = snap.val() || null;
+      document.querySelectorAll('.home-thinkboard').forEach(el => { el.innerHTML = thinkboardHomeCards(); });
+    }, e => console.warn('[THINKBOARD-HOME-1]', e));
+  } catch (e) { console.warn('[THINKBOARD-HOME-1]', e); }
+}
+const _tbSafeId = id => /^[\w-]{1,40}$/.test(String(id || ''));
+function thinkboardHomeCards() {
+  const list = Object.entries(_tbHome || {})
+    .filter(([id, b]) => _tbSafeId(id) && b && b.t)
+    .sort((a, z) => (Number(z[1].c) || 0) - (Number(a[1].c) || 0));
+  // 넷 이상(모둠마다 판 등)이면 둘 + '모두 보기' 하나 — 내 모둠 판이 밀려 안 보이는 일이 없게
+  const shown = list.length > 3 ? list.slice(0, 2) : list;
+  const more = list.length > 3 ? `
+    <div class="today-card" onclick="openExternalEmbed('thinkboard')"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(110,150,240,.4);margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:1.4rem">🧠</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:800;color:var(--gold)">생각판 · 열린 판 ${list.length}개 모두 보기</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">내 모둠 판을 골라 들어가요</div>
+        </div>
+        <span style="color:var(--txt3)">▶</span>
+      </div>
+    </div>` : '';
+  return shown.map(([id, b]) => `
+    <div class="today-card" onclick="openThinkboardBoard('${id}')"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(110,150,240,.4);margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:1.4rem">🧠</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:800;color:var(--gold)">생각판 · ${escHtml(String(b.t).slice(0, 40))}</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">${b.p ? escHtml(String(b.p).slice(0, 60)) : (b.o === false ? '선생님이 연 판 · 보기만 해요' : '선생님이 연 판에 내 생각을 붙여요')}</div>
+        </div>
+        <span style="color:var(--txt3)">▶</span>
+      </div>
+    </div>`).join('') + more;
+}
+function openThinkboardBoard(id) {
+  if (!_tbSafeId(id)) return;
+  openExternalEmbed('thinkboard', '#/b/' + id);
+}
 let _embedState = null;   // { key, href, loaded, timer }
 function _embedEl() {
   let el = document.getElementById('m-embed');
@@ -315,10 +367,10 @@ function _embedEl() {
   });
   return el;
 }
-function openExternalEmbed(key) {
+function openExternalEmbed(key, hash) {
   const x = externalStudyItems().find(i => i.key === key && i.embed);
   if (!x) return;
-  const item = { title: x.icon + ' ' + x.title, href: x.href };
+  const item = { title: x.icon + ' ' + x.title, href: x.href + (hash || '') };   // hash: 생각판 판 하나로 바로(#/b/<id>)
   // 같은 도메인(수채화·데생)이면 no-cors가 아니라 보통 HEAD로 확인해 상태 코드까지 본다(404 페이지도 폴백)
   let sameOrigin = false;
   try { sameOrigin = new URL(item.href, location.href).origin === location.origin; } catch (e) {}
@@ -454,6 +506,7 @@ function enterGame() {
   cleanInactivePending();
 
   loadCharDolls();   // [CHAR-DOLL-1] 캐릭터 SVG 84장 미리 받기(실패해도 게임 진행에 영향 없음)
+  watchThinkboardHome();   // [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈에 바로
 
   // ★ 미완료 전투 감지: 전투 도중 창을 닫고 재접속한 경우
   // 횟수는 startBattle()에서 이미 차감됐으므로 상태만 정리 (패배 처리)
@@ -15555,7 +15608,8 @@ function getTodayStudyRecords(studentId) {
 
 // 홈에 붙는 "오늘의 학습" 카드
 function buildStudyCardHTML(s) {
-  if (typeof CurriculumUtils === 'undefined') return '';
+  const tbSlot = `<div class="home-thinkboard" style="display:contents">${thinkboardHomeCards()}</div>`;   // [THINKBOARD-HOME-1]
+  if (typeof CurriculumUtils === 'undefined') return tbSlot;
   const recs  = getTodayStudyRecords(s.id);
   const done  = recs.reduce((n, r) => n + (r.total || 0), 0);
   const right = recs.reduce((n, r) => n + (r.correct || 0), 0);
@@ -15576,7 +15630,7 @@ function buildStudyCardHTML(s) {
       </div>
     </div>`;
 
-  return artCard + `
+  return tbSlot + artCard + `
     <div class="today-card" onclick="openStudyModal()"
       style="cursor:pointer;grid-column:1/-1;border:1px solid ${cleared?'rgba(46,204,113,.35)':'rgba(255,215,0,.28)'}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">
