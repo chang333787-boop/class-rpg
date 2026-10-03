@@ -126,6 +126,31 @@ w.__tickBench(300); process.stdout.write('@@' + JSON.stringify({ 물: w.__needWa
   ok(j.배움.팻말부위 === 0 && j.장보기.팻말부위 > 0, '팻말 ' + JSON.stringify(j));
 });
 
+/* [MAC-BUBBLEHELP] 풍선 뜻 · 이사 규칙(사용자 09-26) — 빈 집을 누르면 규칙 그대로 · 카드 숫자는 코드 값 · 끄면 옛 말 */
+test('풍선 뜻: pop88 빈 집 말 = "새 가족은 … 중 둘이 가까우면 와요 — 지금 …" · 카드에 10명·20명·6칸 · 끄면 옛 말', () => {
+  const go = (pre) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: fs.readFileSync(${JSON.stringify(path.join(ROOT, 'village/stages/boards/pop88.json'))}, 'utf8'), seed: 1, query: '' });
+${pre || ''} w.__tickBench(300); const t = []; for (let y = 90; y < 170; y++) for (let x = 90; x < 170; x++) { if (w.__stream(x, y).칸.종류 !== 'house') continue; const why = w.__why(x, y); if (why !== true && !t.includes(why)) t.push(why); }
+const T = w.__sim().t, folk = [w.__bhFolk({ whyShow: '장보기', whyUntil: T + 4000 }), w.__bhFolk({ whyShow: '장보기', whyUntil: T - 1 })];
+process.stdout.write('@@' + JSON.stringify({ t, 카드: w.__bubbleHelp().글, 일: w.__bhRule(['일자리']), folk, T }) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error('훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+  const a = go(''), b = go('w.VRULES.bubbleHelp.on = false;');
+  ok(a.t.some(x => /^새 가족은 가게·놀이터·긴의자 중 둘이 가까우면 와요 — 지금 가게 [✓✗] · 놀이터 [✓✗] · 긴의자 [✓✗]/.test(x)), '빈 집 말 ' + JSON.stringify(a.t));
+  ok(/^주민 20명부터는 일할 곳/.test(a.일), '일할 곳 말 ' + a.일);
+  ok(/주민 10명부터/.test(a.카드[2]) && /주민 20명부터/.test(a.카드[2]) && /6칸/.test(a.카드[2]) && /14칸/.test(a.카드[3]), '카드 숫자 ' + JSON.stringify(a.카드));
+  ok(!b.t.some(x => /^새 가족은/.test(x)) && b.t.some(x => /가까이 있으면 이웃이 와요/.test(x)), '끄면 옛 말 ' + JSON.stringify(b.t));
+  /* (10-03 엔진 검토) ① 주민 풍선 뜻은 시뮬 시각 — 저장본 마을(SIM.t 큼)에서 지난 풍선은 빈 말 ② 빈 집 규칙 문구도 귀띔 톤 정규식에 걸림 ③ 판이 끈 묶음(onebridge: 일자리 · 붐빔)은 카드가 말하지 않음 */
+  ok(a.T > 1e6 && /^머리 위 .*가게가 멀어요/.test(a.folk[0]) && a.folk[1] === '', '풍선 뜻 시계 ' + JSON.stringify({ T: a.T, folk: a.folk }));
+  const tone = fs.readFileSync(path.join(ROOT, 'village/index.html'), 'utf8').match(/\/\^빈집이에요 · \.\*\(([^)]+)\)\//);
+  ok(tone, '빈 집 귀띔 톤 정규식을 못 찾음'); const re = new RegExp('^빈집이에요 · .*(' + (tone ? tone[1] : '') + ')');
+  const rule = [...a.t.filter(x => /^(새 가족은|주민 \d+명부터)/.test(x)), a.일];   /* 이 PR 의 규칙 문구만(꽉 찬 집 '이 집은 꽉 찼어요' 같은 사는 집 말은 빈 집 토스트가 아님) */
+  ok(rule.length >= 2 && rule.every(x => re.test('빈집이에요 · ' + x)), '귀띔 톤에 안 걸리는 빈 집 규칙 말 ' + JSON.stringify(rule.filter(x => !re.test('빈집이에요 · ' + x))));
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: 'stage=onebridge' });
+w.__tickBench(300); process.stdout.write('@@' + JSON.stringify({ 끔: w.__stageOff().끈묶음, 카드: w.__bubbleHelp().글 }) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+  const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); ok(l, 'onebridge 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); const o = l ? JSON.parse(l.slice(2)) : { 끔: [], 카드: [] };
+  ok(o.끔.includes('일자리') && o.끔.includes('붐빔') && !o.카드.some(x => /💼|일할 곳|🚶/.test(x)) && a.카드.some(x => /💼/.test(x)) && a.카드.some(x => /🚶/.test(x)), '판이 끈 묶음을 카드가 말함 ' + JSON.stringify(o));
+});
 /* [MAC-HEALTH] 건강 — 인구 100 이면 켜지고 저장 칸 건강:1 로 다시 열어도 · 판 규칙이 없는 수업 판(jobs-short)·물을 켠 마을(needWater.on)은 없음 · 규칙을 적은 수업 판(onebridge · PR 3b)은 있음 · 판 규칙으로 켜는 판(town3 · proto-vote — PR 3a)은 처음부터 · 스위치를 끄면 없음 */
 test('건강: pop167 은 50틱 뒤 건강 · 다시 열어도 · jobs-short·물 켬은 없음 · onebridge(규칙)·town3·proto-vote 는 있음 · 끄면 없음', () => {
   const hl = (query, save, pre, ticks) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
