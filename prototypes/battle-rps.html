@@ -158,7 +158,7 @@ function setup() {
   $('mon').src = '../assets/monsters/' + MON.id + '.png';
   $('ftag').innerHTML = `<span class="nm">${MON.name}</span><span class="lv">Lv.${MON.level}</span><span class="type" style="--c:${EL[MON.element].c}">${EL[MON.element].n}</span><div class="hp foe"><i class="tr"></i><i class="fi"></i></div><div class="num" id="fnum"></div>`;
   $('mtag').innerHTML = `<span class="nm">${K.name}</span><span class="lv">Lv.${K.level}</span><span class="type" style="--c:${EL[ARMOR].c}">${EL[ARMOR].n} 갑옷</span><div class="hp"><i class="tr"></i><i class="fi"></i></div><div class="num" id="mnum"></div><div class="gauge"><i id="gauge"></i></div>`;
-  draw(); $('say').textContent = `${J(MON.name, '이', '가')} 나타났어요! 무엇을 낼지 둘 중 하나는 알려 줘요`;
+  draw(); $('say').textContent = `${J(MON.name, '이', '가')} 나타났어요! ${EL[MON.element].n} 몬스터라 ${EL[MON.element].n}을 자주 내고, 가끔 꾀를 부려요`;
   next();
 }
 function draw() {
@@ -167,14 +167,15 @@ function draw() {
   $('fnum').textContent = `${Math.max(0, S.mhp)} / ${S.mhpMax}`; $('mnum').textContent = `${Math.max(0, S.php)} / ${S.phpMax}`;
   $('gauge').style.width = S.gauge + '%';
 }
-// 몬스터가 다음에 낼 것: 자기 속성 반 · 나머지 반 / 힌트 = 진짜 + 하나 더(큰 공격은 진짜만)
+// 몬스터 속성 = 주 무기: 자기 속성 70% · 가끔(30%) 꾀를 부려 다른 속성 / 큰 공격은 언제나 자기 속성
+//  힌트 = '자주 ○ · 가끔 △'(△ = 이번에 부릴 수 있는 꾀) — 진짜는 둘 중 하나
 function next() {
   S.turn++; S.big = S.turn % 3 === 0;
-  S.choice = S.big ? MON.element : (Math.random() < .5 ? MON.element : KEYS.filter(k => k !== MON.element)[Math.random() < .5 ? 0 : 1]);
-  const other = KEYS.filter(k => k !== S.choice)[Math.random() < .5 ? 0 : 1];
-  S.hint = S.big ? [S.choice] : (Math.random() < .5 ? [S.choice, other] : [other, S.choice]);
+  const trick = KEYS.filter(k => k !== MON.element)[Math.random() < .5 ? 0 : 1];      // 이번 차례에 부릴 수 있는 꾀
+  S.choice = S.big ? MON.element : (Math.random() < .7 ? MON.element : trick);
+  S.hint = S.big ? [MON.element] : [MON.element, trick];
   const h = $('hint'); h.className = 'hint' + (S.big ? ' big' : '');
-  h.innerHTML = `<span class="lbl">${S.big ? '큰 공격 준비!' : '다음에 낼 것'}</span>` + S.hint.map((k, i) => (i ? '<span class="or">또는</span>' : '') + `<span class="el" style="--c:${EL[k].c}">${svg(EL[k].g, 24)}</span>`).join('');
+  h.innerHTML = `<span class="lbl">${S.big ? '큰 공격 준비!' : '다음에 낼 것'}</span>` + S.hint.map((k, i) => (i ? '<span class="or">가끔</span>' : (S.big ? '' : '<span class="or">자주</span>')) + `<span class="el" style="--c:${EL[k].c}${i ? ';width:34px;height:34px;opacity:.85' : ''}">${svg(EL[k].g, i ? 18 : 24)}</span>`).join('');
   drawCmd();
 }
 function outcomeWord(k) {   // 이 단추를 누르면 힌트 둘에 대해 어떻게 되나 — 아이가 읽는 연습
