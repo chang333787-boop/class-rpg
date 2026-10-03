@@ -1,7 +1,7 @@
 // 기초 코딩 판 시험 — 정답이 정말 풀리나 · 블록 수 · 몬스터가 아는 명령만 썼나 · 고치기 판의 처음 코드는 정말 틀렸나 · 붓 그림이 판 안에 들어가나
 //  node scripts/unit/coding/stages.test.mjs   (DOM 없음 · 네트워크 없음)
 import { STAGES, HERO_BLOCKS } from '../../../coding/js/stages.js';
-import { parse, countBlocks, runToEnd, runAst, T2TYPE } from '../../../coding/js/interp.js';
+import { parse, countBlocks, runToEnd, runAst, T2TYPE, usesCall } from '../../../coding/js/interp.js';
 import { makeMaze, makePen, compareDrawing } from '../../../coding/js/world.js';
 
 const results = [];
@@ -32,11 +32,21 @@ for (const s of STAGES) {
   });
   test(`${s.id} 몬스터가 아는 명령만 · 블록 수`, () => {
     const allowed = new Set(s.blocks), used = typesOf(parse(s.sol));
-    for (const t of used) ok(allowed.has(t), `${t} 는 이 판 블록이 아님`);
+    for (const t of used) if (s.unit < 7 || /^m_/.test(t)) ok(allowed.has(t), `${t} 는 이 판 블록이 아님`);   // 7단원부터는 종류 칸 서랍 — 움직임만 몬스터 것인지 본다
     ok(s.best === countBlocks(parse(s.sol)), 'best 셈');
     if (s.limit) ok(s.best <= s.limit, `정답 ${s.best} > 한도 ${s.limit}`);
     if (s.unit === 1) ok(!used.includes('c_repeat'), '1단원 정답에 반복');
     for (const c of condsOf(parse(s.sol))) ok((s.conds || []).includes(c), `살피기 ${c} 는 이 몬스터 것이 아님`);
+  });
+  if (s.require) test(`${s.id} 꼭 써야 하는 것(${s.require})을 정답이 쓴다`, () => {
+    const ast = parse(s.sol), all = [...ast, ...ast.filter(n => n.t === 'def').flatMap(d => d.body)];
+    const has = (l, f) => l.some(n => f(n) || (n.body && has(n.body, f)) || (n.else && has(n.else, f)));
+    if (s.require === 'var') ok(has(all, n => n.t === 'set') && has(all, n => n.e && JSON.stringify(n.e).includes('"k":"var"')), '주머니 넣기·꺼내 쓰기 없음');
+    if (s.require === 'call') ok(usesCall(ast.filter(n => n.t !== 'def')), '기술 쓰기 없음');
+  });
+  if (s.prefill) test(`${s.id} 처음 놓아 둔 기술 껍데기만으로는 안 풀린다`, () => {
+    if (s.world === 'maze') ok(solveAll(s, s.prefill).some(x => x !== 'ok'), '껍데기로 풀림');
+    else ok(!compareDrawing(penSegs(s, s.sol).segs, penSegs(s, s.prefill).segs).ok, '껍데기로 같은 그림');
   });
   if (s.maps && s.maps.length > 1) test(`${s.id} 길 둘 — 첫 길만 받아 적은 코드는 둘째 길에서 실패`, () => {
     const flat = traceOn(s, s.maps[0]);
@@ -61,7 +71,14 @@ test('붓: 나눠 그려도 같은 그림', () => {
   ok(!compareDrawing(a, c).ok, '뒤집힌 네모가 같다고 함');
 });
 test('끝없는 반복은 멈춘다', () => { const w = makeMaze(STAGES[0]); const r = runToEnd(parse('999(L)'), w, { max: 500 }); ok(!r.ok && r.why === 'loop', String(r.why)); });
-test('단원별 판 수', () => { const n = [1, 2, 3, 4, 5, 6].map(u => STAGES.filter(s => s.unit === u).length); ok(n.join(',') === '10,10,6,8,7,6', n.join(',')); });
+test('단원별 판 수', () => { const n = [1, 2, 3, 4, 5, 6, 7, 8].map(u => STAGES.filter(s => s.unit === u).length); ok(n.join(',') === '10,10,6,8,7,6,6,6', n.join(',')); });
+test('기술 · 받는 값 · 주머니 — 실행기', () => {
+  const s = STAGES.find(x => x.id === '8-3'), w = makePen({ start: s.start }), r = runToEnd(parse(s.sol), w);
+  ok(r.ok && w.st.segs.length === 3 + 4 + 5 + 6, '다각형 선 수 ' + w.st.segs.length);
+  const v = makePen({ start: { x: 200, y: 200, h: 0 } }); runToEnd(parse('set(a,5) add(a,3) f[a*2]'), v); ok(Math.abs(v.st.y - (200 - 16)) < 1e-6, '주머니 셈 ' + v.st.y);
+  const z = makePen({ start: { x: 200, y: 200, h: 0 } }); ok(!runToEnd(parse('C:없는기술()'), z).ok, '없는 기술이 돌았다');
+  const rec = makePen({ start: { x: 200, y: 200, h: 0 } }); const rr = runToEnd(parse('D:또:(C:또()) C:또()'), rec, { max: 5000 }); ok(!rr.ok && rr.why === 'loop', '끝없는 기술 부르기 ' + rr.why);
+});
 test('끝없이 도는 고치기 판은 걸음 한도에서 멈춘다(6-6)', () => { const s = STAGES.find(x => x.id === '6-6'); const w = makeMaze({ ...s, map: s.maps[0].map, dir: s.maps[0].dir }); const r = runToEnd(parse(s.buggy), w, { max: 600 }); ok(!r.ok && r.why === 'loop', String(r.why)); });
 
 const fails = results.filter(r => r[0] === 'FAIL');
