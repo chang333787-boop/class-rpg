@@ -396,3 +396,12 @@ input[type="checkbox"]:not(.sw) { width: 20px; height: 20px; min-height: 0; padd
 .card.tcard .cmeta { margin-top: 4px; min-height: 0; }
 .tr-cnt { margin-left: 8px; font-size: .76rem; font-weight: 700; color: var(--sub); }
 .tr-unk { display: flex; flex-direction: column; gap: 8px; }
+
+/* [THINKBOARD-PREVIEW-1] 새 판 만들기 — 틀 고르기 옆 미리보기(아이 화면 그대로 작게) */
+.t-new-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 46%); gap: 18px; align-items: start; }
+.t-prev { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.t-prev-cap { display: flex; align-items: center; gap: 4px; font-size: .92rem; min-height: 32px; }
+.t-prev-box { position: relative; width: 100%; overflow: hidden; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg); box-shadow: var(--sh-1); }
+.t-prev-frame { position: absolute; left: 0; top: 0; width: 1100px; height: 640px; border: 0; transform-origin: 0 0; background: var(--bg); }
+.t-prev .help { margin: 0; font-size: .82rem; }
+@media (max-width: 900px) { .t-new-grid { grid-template-columns: 1fr; } .t-prev { position: static; } }

@@ -2,6 +2,7 @@
 //  #/        처음 — 로컬: 판 코드로 들어가기 · RPG: 우리 반 판 목록
 //  #/b/<id>  판(아이)   #/t 선생님 화면   #/tb/<id> 선생님이 보는 판   #/tv/<id> 교실 TV
 //  ?rpg=1    학급 RPG 안에서 연다 — 저장 = Firebase(classRPG_thinkboard) · 이름 = RPG 로그인(?n=) · 선생님 화면은 관리자만
+//  ?preview=<틀 id>  [THINKBOARD-PREVIEW-1] 판 틀 미리보기(선생님 새 판 고르기 칸의 작은 창) — 예시 카드 · 메모리 저장소(어디에도 안 씀)
 import { h, toast } from './util.js';
 import { createLocalStore } from './store.js';
 import { createRtdbStore } from './store-rtdb.js';
@@ -9,10 +10,13 @@ import { mountBoard } from './board.js';
 import { mountTeacher } from './teacher.js';
 import { withDefaults } from './settings.js';
 import { icon } from './icons.js';
+import { BUILTIN } from './templates.js';
+import { sampleBoard, memoryStore } from './preview.js';
 
 const Q = new URLSearchParams(location.search);
 const RPG = Q.get('rpg') === '1';
-const store = RPG ? createRtdbStore() : createLocalStore();
+const PREVIEW = Q.get('preview');
+const store = PREVIEW ? null : RPG ? createRtdbStore() : createLocalStore();   // 미리보기는 저장소를 만들지 않는다(Firebase 안 붙음)
 const root = document.getElementById('app');
 let unmount = null;
 
@@ -105,8 +109,19 @@ function loadRoster() {
     .catch(e => { console.warn('명단을 못 읽었어요', e); rosterP = null; return []; });
 }
 
+// 미리보기 — 틀 id(기본 틀) · 선생님이 더한 틀은 같은 창 sessionStorage 'tb.previewTpl'
+function mountPreview() {
+  let tpl = BUILTIN.find(t => t.id === PREVIEW);
+  if (!tpl) { try { const t = JSON.parse(sessionStorage.getItem('tb.previewTpl') || 'null'); if (t && t.id === PREVIEW) tpl = t; } catch {} }
+  if (!tpl) { root.append(h('div', { class: 'empty' }, '미리 볼 틀이 없어요')); return null; }
+  const b = sampleBoard(tpl);
+  document.body.dataset.view = 'board'; document.body.classList.add('preview');
+  return mountBoard(root, { store: memoryStore(b), boardId: b.id, me: '미리보기', home: () => {} });
+}
+
 let seq = 0;
 async function route() {
+  if (PREVIEW) { unmount?.(); root.innerHTML = ''; unmount = mountPreview(); return; }
   const my = ++seq;
   unmount?.(); unmount = null;
   root.innerHTML = '';
