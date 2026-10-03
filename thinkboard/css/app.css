@@ -300,3 +300,17 @@ input.sw:checked::before { transform: translateX(16px); }
   .pin-imgs.two { grid-template-columns: 1fr; }
   .set-row { grid-template-columns: 1fr; } .set-row .set-help { grid-column: 1; }
 }
+
+/* 누가 썼나 · 연구 자료 */
+.who-sec { margin: 6px 0 16px; }
+.who-h { font-weight: 800; font-size: .9rem; color: var(--ink-2); margin-bottom: 8px; }
+.who-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.who-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 15px; background: var(--soft); font-size: .86rem; font-weight: 600; }
+.who-chip.yet { background: var(--warn-bg); color: var(--warn); }
+.who-chip b { font-size: .76rem; color: var(--sub); }
+.rs-boards { max-height: 34vh; overflow: auto; background: #f8f7f4; border-radius: 12px; padding: 4px 14px; }
+.heart { height: 32px; padding: 0 8px; }
+.abtn { height: 34px; }
+.abtn.bare { width: 34px; }
+input[type="checkbox"]:not(.sw) { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); flex: none; }
+.rs-boards .set-row.tog { grid-template-columns: 30px 1fr; }

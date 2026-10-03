@@ -5,8 +5,9 @@ import { BUILTIN } from './templates.js';
 import { boardToText, promptFor, parseMail } from './export.js';
 import { settingsForm, withDefaults, LAYOUTS } from './settings.js';
 import { icon } from './icons.js';
+import { studentRows, cardRows, logRows, toCSV, people } from './research.js';
 
-export function mountTeacher(root, { store, home }) {
+export function mountTeacher(root, { store, home, roster = [] }) {
   let tpls = BUILTIN, timer = 0;
   const apply = async (b, name, args) => store.patch(b.id, ops[name](b, { by: 'teacher', ...args }).patch);
 
@@ -25,7 +26,8 @@ export function mountTeacher(root, { store, home }) {
     root.append(h('div', { class: 't-wrap' },
       h('header', { class: 't-head' }, h('button', { class: 'ibtn', onclick: home, title: '처음으로' }, icon('home')),
         h('h1', {}, '생각판'), h('span', { class: 'pill' }, '선생님'),
-        store.kind === 'local' ? h('span', { class: 'sub' }, '로컬 시험 — 이 브라우저 안에만 저장돼요') : null),
+        store.kind === 'local' ? h('span', { class: 'sub' }, '로컬 시험 — 이 브라우저 안에만 저장돼요') : null,
+        h('span', { class: 'grow' }), h('button', { class: 'btn', onclick: () => research(boards) }, icon('download', 16), '연구 자료 내보내기')),
       newForm(),
       h('h2', { class: 't-h2' }, '만든 판', h('span', { class: 'sub' }, boards.length ? ` ${boards.length}개` : '')),
       h('div', { class: 't-list' }, boards.length ? boards.map(row) : h('div', { class: 'fl-empty' }, '아직 판이 없어요. 위에서 틀을 골라 만들어 보세요.')),
@@ -86,6 +88,36 @@ export function mountTeacher(root, { store, home }) {
         h('button', { class: 'btn', onclick: () => settings(b) }, icon('gear', 16), '설정'),
         h('a', { class: 'btn', href: '#/tv/' + b.id, title: '교실 TV에 크게' }, icon('tv', 16), 'TV'),
         more));
+  }
+
+  // 연구 자료 내보내기 — 생각판 기록을 RPG 학생(id)과 이어 표로(학생별 요약 · 카드 · 기록) + 전체 JSON
+  function research(boards) {
+    if (!boards.length) return toast('아직 판이 없어요');
+    const checks = boards.map(b => { const c = h('input', { type: 'checkbox', checked: true }); c.dataset.id = b.id; return [b, c]; });
+    const pseudo = h('input', { type: 'checkbox', class: 'sw', checked: true }), text = h('input', { type: 'checkbox', class: 'sw', checked: true });
+    const chosen = () => checks.filter(([, c]) => c.checked).map(([b]) => b);
+    const opts = () => ({ pseudo: pseudo.checked, text: text.checked });
+    const day = new Date().toISOString().slice(0, 10);
+    const save = (name, body, type) => { const a = h('a', { href: URL.createObjectURL(new Blob([body], { type })), download: `생각판-${name}-${day}${opts().pseudo ? '-가명' : ''}.${type.includes('json') ? 'json' : 'csv'}` }); a.click(); };
+    const csv = (name, fn) => () => { const bs = chosen(); if (!bs.length) return toast('판을 골라 주세요'); save(name, toCSV(fn(bs, roster, opts())), 'text/csv;charset=utf-8'); };
+    const json = () => {
+      const bs = chosen(); if (!bs.length) return toast('판을 골라 주세요');
+      const o = opts(), P = people(bs, roster, o);
+      const scrub = x => { if (!x || typeof x !== 'object') return x; const y = { ...x }; if (o.pseudo && (y.sid || (y.by && y.by !== 'teacher'))) { const p = P.get(y.sid || y.by); y.by = p ? p.label : '?'; delete y.sid; } if (!o.text) { delete y.text; delete y.from; delete y.orig; } return y; };
+      const out = bs.map(b => ({ ...b, cards: Object.fromEntries(Object.entries(b.cards).map(([k, v]) => [k, scrub(v)])), log: Object.fromEntries(Object.entries(b.log).map(([k, v]) => [k, scrub(v)])),
+        mail: Object.fromEntries(Object.entries(b.mail).map(([k, v]) => [k, scrub(v)])), links: Object.fromEntries(Object.entries(b.links).map(([k, v]) => [k, scrub(v)])) }));
+      save('전체', JSON.stringify({ exported: new Date().toISOString(), pseudo: o.pseudo, students: [...P.values()].map(p => o.pseudo ? { label: p.label } : { label: p.label, id: p.id, name: p.name }), boards: out }, null, 2), 'application/json');
+    };
+    modal('연구 자료 내보내기', h('div', { class: 'form' },
+      h('p', { class: 'help' }, roster.length ? `학급 RPG 학생 ${roster.length}명과 이어요(안 쓴 아이도 0으로 들어가요). 출처 색 · 공감 수는 성과가 아니라 흔적이에요.` : '학생 명단 없이 판에 쓴 사람만으로 만들어요(RPG 밖 시험).'),
+      h('div', { class: 'rs-boards' }, checks.map(([b, c]) => h('label', { class: 'set-row tog' }, c, h('span', {}, `${b.template.icon || ''} ${b.title}`)))),
+      h('label', { class: 'set-row tog' }, pseudo, h('span', {}, '가명으로(S01 …) — 이름 · RPG id 빼기'), h('span', { class: 'set-help' }, '대회 보고서 · 다른 사람과 나눌 때는 켜 두세요')),
+      h('label', { class: 'set-row tog' }, text, h('span', {}, '카드 글 넣기'), h('span', { class: 'set-help' }, '글 속에 아이가 쓴 친구 이름은 가명으로 바뀌지 않아요 — 나눌 때는 끄세요'))), [
+      { label: '기록(시간순) CSV', onclick: csv('기록', logRows) },
+      { label: '카드 CSV', onclick: csv('카드', cardRows) },
+      { label: '전체 JSON', onclick: json },
+      { label: '학생별 요약 CSV', primary: true, onclick: csv('학생별', studentRows) },
+    ]);
   }
 
   function toClaude(b) {
