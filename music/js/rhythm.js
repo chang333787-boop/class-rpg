@@ -4,7 +4,7 @@
 //  2박 넘는 긴 음은 끝까지 누르고 있기. 반주(화음·베이스·장단)는 뒤에서 깔린다.
 import { h, toast, lsGet, lsSet, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, pc } from './theory.js';
-import { buildEvents, beatChords } from './song.js';
+import { buildEvents } from './song.js';
 import { engine, Player } from './audio.js';
 
 const KEYS = { 8: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon'], 6: ['KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL'], 4: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'] };
@@ -14,13 +14,15 @@ const LANE8 = ['도', '레', '미', '파', '솔', '라', '시', '높은 도'];
 const LANE8_COLOR = [0, 2, 4, 5, 7, 9, 11, 0].map(c => colorOf(60 + c));
 const LANE4_COLOR = ['#e5484d', '#f2c230', '#2fa3e6', '#9b59d0'];
 const DIAT = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
-// [MUSIC-LEVEL-1] 난이도 — 판정 넓이 · 줄 수 · 빠르기 · 화음 음표(두 키 같이) · 사라지는 음표
+// [MUSIC-LEVEL-1] 난이도 — 판정 넓이 · 줄 수 · 빠르기 · 사라지는 음표
+//  [MUSIC-LEVEL-2] 화음 음표(두 키 같이 · 테두리 음표)는 뺐다 — 사용자 10-03 '누르면 안 되는 걸로 낚시하는 것 같아 너무 빡세다'.
+//   테두리만 있는 음표가 미끼처럼 보였다. 이제 어려움은 '더 빠르고 · 더 정확하게'로만 오른다(악보는 가락 그대로).
 //  [MUSIC-6KEY-1] lanes = 그 난이도의 기본 키 수. 키 수(4 · 6 · 8)는 따로 고를 수 있다(사용자 10-03 '6키짜리도') — 안 고르면 기본 그대로
 const LEVELS = {
-  easy:   { name: '쉬움', lanes: 4, win: { perfect: 0.075, great: 0.13, good: 0.2 }, tempo: 1, extra: false, hide: false },
-  normal: { name: '보통', lanes: 8, win: { perfect: 0.055, great: 0.105, good: 0.16 }, tempo: 1, extra: false, hide: false },
-  hard:   { name: '어려움', lanes: 8, win: { perfect: 0.042, great: 0.085, good: 0.13 }, tempo: 1, extra: true, hide: false },
-  expert: { name: '아주 어려움', lanes: 8, win: { perfect: 0.035, great: 0.07, good: 0.11 }, tempo: 1.15, extra: true, hide: true },
+  easy:   { name: '쉬움', lanes: 4, win: { perfect: 0.075, great: 0.13, good: 0.2 }, tempo: 1, hide: false },
+  normal: { name: '보통', lanes: 8, win: { perfect: 0.055, great: 0.105, good: 0.16 }, tempo: 1, hide: false },
+  hard:   { name: '어려움', lanes: 8, win: { perfect: 0.042, great: 0.085, good: 0.13 }, tempo: 1.1, hide: false },
+  expert: { name: '아주 어려움', lanes: 8, win: { perfect: 0.035, great: 0.07, good: 0.11 }, tempo: 1.25, hide: true },
 };
 const LANE8_P = [60, 62, 64, 65, 67, 69, 71, 72];
 const JUDGE = { perfect: { ko: '완벽!', w: 1, c: '#ffe48f' }, great: { ko: '좋아!', w: 0.7, c: '#8fd07d' }, good: { ko: '괜찮아', w: 0.4, c: '#7fc4f0' }, miss: { ko: '놓쳤어', w: 0, c: '#e5484d' } };
@@ -48,7 +50,6 @@ export function mountRhythm(root, ctx, { song, key }) {
   //   · 여섯 이하면 한 키 = 한 음(가운데로 모음) — 그 곡의 작은 건반이다.
   //   · 여섯을 넘으면 이웃한 음끼리 한 키를 나눠 쓴다. 이때 가락이 자주 오가는 두 음은 가르지 않는다
   //     (같은 키 안에서 다른 음으로 가면 오르내림이 손에 안 보인다) — 나누는 자리를 셈으로 고른다(옮겨 가는 횟수가 가장 적게 · 같으면 고르게).
-  //   · 화음 음표(어려움↑)는 같은 이름 음을 가락 음역으로 옮겨 가장 가까운 가락 음의 키에.
   const six = (() => {
     const n = distinct.length, L = 6, groups = Array.from({ length: L }, () => []);
     if (n <= L) { const off = Math.floor((L - n) / 2); distinct.forEach((p, i) => groups[i + off].push(p)); return groups; }
@@ -65,7 +66,7 @@ export function mountRhythm(root, ctx, { song, key }) {
   })();
   const lane6 = new Map(); six.forEach((g, i) => g.forEach(p => lane6.set(p, i)));
   const mid = distinct.length ? (distinct[0] + distinct[distinct.length - 1]) / 2 : 66;
-  function near6(p) {                       // 가락에 없는 음(화음) → 같은 이름 음을 가락 음역으로 → 가장 가까운 가락 음
+  function near6(p) {                       // 안전망: 가락에 없는 음 → 같은 이름 음을 가락 음역으로 → 가장 가까운 가락 음(화음 음표를 뺀 뒤로는 거의 안 쓴다)
     let q = p; while (q < mid - 6) q += 12; while (q > mid + 6) q -= 12;
     let bp = distinct[0], bd = Infinity; for (const d of distinct) { const dd = Math.abs(d - q); if (dd < bd) { bd = dd; bp = d; } }
     return lane6.get(bp) ?? 0;
@@ -105,26 +106,6 @@ export function mountRhythm(root, ctx, { song, key }) {
       const d = n.d * st;
       return { t: n.s * st, d, p: n.p, lane: laneOf(n.p), long: n.d >= song.sub * 2 && d >= 0.6, hit: null, tail: null, holding: false, voice: null };
     });
-    // 어려움 이상: 화음 음표 — 아이가 쌓은 화음(있으면) 또는 마디 첫 박의 화음 뿌리음. 가락과 같은 줄이면 뺀다(두 번 못 누르니까)
-    //  어려움 = 마디 첫 박(4박자는 셋째 박도)에 화음의 뿌리음 + 5음(두 키) · 아주 어려움 = 박마다 세 음 화음(뿌리·3·5음)
-    //  화음 음 높이 = 다장조 한 옥타브(도~시) 안 — 8줄 건반 그대로. 가락과 같은 줄이면 뺀다(두 번 못 누르니까)
-    if (LEVELS[level].extra && lanes >= 6) {   // [MUSIC-6KEY-1] 6키도 화음 음표(4키는 없음)
-      //  그 키가 비어 있어야 — 다른 음이 막 지나가는 때(앞뒤 0.1초)거나, 긴 음을 누르고 있는 동안이면 못 놓는다(한 키를 두 번 못 누른다)
-      const extra = [], GAP = 0.1;
-      const busy = (lane, t) => chart.some(c => c.lane === lane && (Math.abs(c.t - t) < GAP || (c.long && t > c.t && t < c.t + c.d + GAP))) || extra.some(c => c.lane === lane && Math.abs(c.t - t) < GAP);
-      const add = (p, t, d) => { const lane = laneOf(p); if (!busy(lane, t)) extra.push({ t, d, p, lane, long: false, hit: null, tail: null, holding: false, voice: null, extra: true }); };
-      if ((song.harm || []).length) for (const n of song.harm) add(n.p, n.s * st, n.d * st);   // 아이가 쌓은 화음이 있으면 그것부터
-      const chords = beatChords(song), full = level === 'expert';
-      chords.forEach((c, b) => {
-        if (!c) return;
-        const inBar = b % song.beats;
-        const strong = inBar === 0 || (song.beats === 4 && inBar === 2);
-        if (!full && !strong) return;
-        const t = b * beat, tones = full ? c.pcs.slice(0, 3) : [c.pcs[0], c.pcs[2]];
-        for (const pcv of tones) add(60 + pcv, t, beat * 0.9);
-      });
-      chart = [...chart, ...extra].sort((a, z) => a.t - z.t);
-    }
     stats = { perfect: 0, great: 0, good: 0, miss: 0, combo: 0, maxCombo: 0, sum: 0, count: chart.length + chart.filter(c => c.long).length };
     return beat;
   }
@@ -209,10 +190,7 @@ export function mountRhythm(root, ctx, { song, key }) {
         const yy = c.holding ? lineY : y;
         g.fillStyle = hexA(col, c.holding ? 0.75 : 0.5); round(x + w * 0.22, tailY, w * 0.56, Math.max(4, yy - tailY), 6); g.fill();
       }
-      if (!(c.long && c.holding) && c.extra) {                // 화음 음표 = 테두리 음표
-        g.fillStyle = hexA(col, 0.25); round(x + 3, y - 11, w - 6, 22, 8); g.fill();
-        g.strokeStyle = col; g.lineWidth = 3; round(x + 3, y - 11, w - 6, 22, 8); g.stroke();
-      } else if (!(c.long && c.holding)) {
+      if (!(c.long && c.holding)) {
         g.fillStyle = col; round(x, y - 13, w, 26, 9); g.fill();
         g.fillStyle = 'rgba(255,255,255,.35)'; round(x + 4, y - 10, w - 8, 7, 4); g.fill();
         if (w > 40) { g.fillStyle = '#fff'; g.font = '900 13px "Noto Sans KR",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(solfege(c.p, { short: true }), x + w / 2, y + 1); }
@@ -299,7 +277,7 @@ export function mountRhythm(root, ctx, { song, key }) {
     const guideBtn = h('button', { class: 'btn small' + (guide ? ' on' : ''), onclick: () => { guide = !guide; guideBtn.classList.toggle('on', guide); } }, '가락 도와주기');
     over.replaceChildren(h('div', { class: 'p-card' },
       h('h2', {}, song.title || '곡'),
-      h('p', { class: 'lv-line' }, `난이도 ${LEVELS[level].name} · ${lanes}키`, LEVELS[level].extra && lanes >= 6 ? ' · 테두리 음표 = 화음(두 키 같이)' : '', LEVELS[level].hide ? ' · 음표가 판정선 앞에서 사라져요' : ''),
+      h('p', { class: 'lv-line' }, `난이도 ${LEVELS[level].name} · ${lanes}키`, LEVELS[level].tempo !== 1 ? ` · 빠르기 ×${LEVELS[level].tempo}` : '', LEVELS[level].hide ? ' · 음표가 판정선 앞에서 사라져요' : ''),
       h('p', { class: 'muted' }, lanes === 8 ? '건반처럼: 왼손 A S D F = 도 레 미 파 · 오른손 J K L ; = 솔 라 시 높은 도'
         : lanes === 6 ? '6키: 왼손 S D F · 오른손 J K L — 이 곡의 음을 낮은 음부터 왼쪽에 놓았어요(키 아래 계이름)' + (distinct.length > 6 ? ' · 음이 여섯보다 많아 이웃한 음이 한 키를 같이 써요' : '')
         : '4키: D F J K — 가락이 올라가면 오른쪽, 내려가면 왼쪽'),
