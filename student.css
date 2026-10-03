@@ -1772,3 +1772,43 @@ body.deco-floor-mode #if-deco-drawer{display:none}
 #if-topview.look-sky,#ff-topview.look-sky{background:#12163a url('assets/ui/sky_stars.svg') repeat}
 @media (max-width:480px){ #if-phase-btn{order:12;flex:0 0 44px;min-height:40px;font-size:16px!important} }
 
+
+/* ════ [D4 차분한 겉모습 · 1단계] AI 틀 같은 장식 줄이기 (사용자 10-03 "슬롭 느낌 나는 거") ════
+   빛나는 글자 · 떠다니는 이모지 · 끝없이 깜빡이는 효과 · 종류마다 다른 색 줄 · 별가루를 끈다.
+   꾸미기 놀이의 움직임 · 농장 수확 표시처럼 '뜻이 있는 움직임'은 그대로. 강조색 = 금색 하나 + 급한 것만 빨강. */
+body::before{display:none;}
+body{word-break:keep-all;overflow-wrap:anywhere;}
+/* 첫 화면 셋 */
+#s-title,#s-charsel{background:var(--bg0);}
+.title-logo{font-family:'Noto Sans KR',sans-serif;font-weight:900;letter-spacing:-.02em;color:var(--gold);
+  background:none;-webkit-text-fill-color:currentColor;filter:none;animation:none;}
+.title-sub{letter-spacing:0;font-size:1rem;margin:.6rem 0 2.2rem;}
+.btn-gold{background:var(--gold);box-shadow:none;animation:none;border-radius:12px;font-weight:800;padding:.85rem 2.4rem;transition:background .15s;}
+.btn-gold:hover{transform:none;background:#E3B254;}
+.btn-gold.btn-block{width:100%;padding:.8rem;font-size:1rem;}
+.login-head,.charsel-title{font-family:'Noto Sans KR',sans-serif;font-weight:800;letter-spacing:-.01em;}
+.char-opt{font-size:1rem;height:172px;}
+.char-opt:hover{transform:none;}
+.char-opt.sel{box-shadow:none;}
+.char-opt-art{width:84px;height:112px;object-fit:contain;pointer-events:none;}
+/* 끝없이 도는 장식 효과 끄기 */
+.promotion-badge,.promo-banner,.todo-card.urgent,.todo-card.farm.urgent,.todo-card.promo,.boss-banner,.ba-vs-bolt,.char-emoji,.promo-emoji{animation:none;}
+.zone-shine{display:none;}
+/* 메뉴 타일: 종류마다 다른 색 줄 · 색 바탕 → 금색 하나 */
+.menu-tile::before{display:none;}
+.menu-tile:hover{transform:none;}
+.menu-tile:hover[class*="mt-"]{background:rgba(217,164,65,.06);border-color:rgba(217,164,65,.3);}
+/* 할 일 카드: 금색 줄 하나 · 급한 것만 빨강 */
+.todo-card:hover{transform:none;}
+.todo-card.quest::before,.todo-card.farm::before,.todo-card.promo::before,.todo-card.monster::before{background:rgba(217,164,65,.55);}
+.todo-card.monster{border-color:rgba(255,255,255,.07);background:var(--bg3);}
+.todo-card.urgent::before,.todo-card.farm.urgent::before{background:var(--red);}
+/* 레벨업 글자도 본문 글꼴(D3 에서 명조를 뺀 그대로) */
+.lup-text{font-family:'Noto Sans KR',sans-serif;font-weight:900;}
+/* 알림: 옛 남색 상자 → 갈색 한 벌 */
+body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);color:var(--txt);box-shadow:0 8px 24px rgba(0,0,0,.35);}
+/* 화면 설정 단추(넓게 보기 · 화면 맞춤)는 조용하게 */
+.hud-mini-btn{opacity:.72;}
+.hud-mini-btn:hover{opacity:1;}
+/* 아래 탭 아이콘(선 그림) */
+.btab-icon svg{display:block;margin:0 auto;}
