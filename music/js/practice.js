@@ -1,6 +1,6 @@
 // 리코더 연습 — 음표 발판이 오른쪽에서 흘러오고, 몬스터가 박에 맞춰 발판을 밟는다. 왼쪽 = 지금 음의 큰 운지.
 //  소리를 듣고 틀린 음을 잡지는 않는다(마이크 없음). 끝나면 스스로 별을 매기고 '리코더 기록장'에 쌓인다.
-import { h, toast } from './util.js';
+import { h, toast, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, totalSteps } from './theory.js';
 import { buildEvents } from './song.js';
 import { engine, Player } from './audio.js';
@@ -146,11 +146,7 @@ export function mountPractice(root, ctx, { song, key }) {
     g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(16, 14, W - 32, 6);
     g.fillStyle = '#f2a93b'; g.fillRect(16, 14, Math.max(0, Math.min(1, t / total)) * (W - 32), 6);
     // 세어 주기
-    if (state === 'play' && t < 0) {
-      const left = Math.ceil(-t / beatSec());
-      g.fillStyle = 'rgba(255,255,255,.92)'; g.font = '900 96px "Noto Sans KR",sans-serif'; g.textAlign = 'center';
-      g.fillText(String(left), W * 0.6, H / 2); g.textAlign = 'left';
-    }
+    if (state === 'play' && t < 0) readyCount(g, t, off(), beatSec(), song.beats, W * 0.6, H / 2);   // [MUSIC-READY-1] 3 · 2 · 1 → 하나 둘 셋 넷
     showFinger(t < 0 ? -1 : idxAt(t), t >= 0 ? restAt(t) : null);
     // 노랫말
     if (song.notes.some(n => n.w)) {
@@ -166,7 +162,7 @@ export function mountPractice(root, ctx, { song, key }) {
     engine.ensure(); engine.setReverb(0.1);
     built = buildEvents(song, { scale: speed, countIn: song.beats, melody: true, chord: acc && song.acc.chord, bass: acc && song.acc.bass, drum: acc ? song.acc.drum : 'none' });
     player.mute = { melody: !guide };
-    t0 = player.start(built.events.map(e => e.track === 'melody' ? { ...e, inst: 'recorder', vel: 0.75 } : { ...e, vel: (e.vel || 0.8) * 0.7 }), { total: built.total, onEnd: () => finish() });
+    t0 = player.start(built.events.map(e => e.track === 'melody' ? { ...e, inst: 'recorder', vel: 0.75 } : { ...e, vel: (e.vel || 0.8) * 0.7 }), { at: engine.now + READY_SEC + 0.1, total: built.total, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작(리코더를 들 시간)
     state = 'play'; over.replaceChildren(); over.style.display = 'none';
     stopBtn.style.display = '';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
