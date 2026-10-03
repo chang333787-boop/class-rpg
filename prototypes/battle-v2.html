@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>배틀 시제품</title>
+<!-- [BATTLE-V2 시제품 10-03] 실제 게임에 아직 안 넣음 · 계산은 gamedata.js 엔진 그대로 · 열기: prototypes/battle-v2.html?m=m1 (m45 중급 · m100 고급) -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap">
+<script src="../gamedata.js"></script>
+<style>
+:root{
+  --bg0:#120d09; --panel:#1c150f; --panel2:#251c14; --line:rgba(255,236,200,.10);
+  --txt:#f6ecda; --txt2:#cdbfa6; --txt3:#968a76; --gold:#E2B04A; --gold2:#F6D27A; --red:#E8574A;
+  --fire:#FF7A45; --water:#5CC8FF; --grass:#5FD27A; --normal:#F2D27C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg0);color:var(--txt);font-family:'Noto Sans KR',sans-serif;word-break:keep-all;overflow:hidden}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+
+/* ── 틀: 위 띠 · 무대 · 아래 행동판 — 1366×610 에서 스크롤 없이 */
+.battle{position:fixed;inset:0;display:grid;grid-template-rows:46px 1fr auto;max-width:1180px;margin:0 auto;background:var(--bg0)}
+.b-top{display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--line)}
+.b-where{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--txt2)}
+.zone-dot{width:10px;height:10px;border-radius:50%;background:var(--zc)}
+.tries{font-weight:500;font-size:13px;color:var(--txt3);padding-left:8px;border-left:1px solid var(--line)}
+.b-exit{margin-left:auto;font-size:13px;color:var(--txt3);padding:6px 10px;border-radius:8px}
+.b-exit:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+
+/* ── 무대 */
+.stage{position:relative;overflow:hidden;isolation:isolate}
+.bg{position:absolute;inset:0;pointer-events:none}
+.sky{background:var(--sky)}
+.far{bottom:30%;top:auto;height:46%}
+.far svg{width:100%;height:100%;display:block}
+.ground{top:auto;height:38%;background:var(--ground);border-top:1px solid rgba(255,255,255,.08)}
+.ground::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 2px,transparent 2px 46px);mask:linear-gradient(transparent,#000 60%)}
+.light{background:radial-gradient(ellipse 60% 55% at 72% 18%,rgba(255,255,255,.22),transparent 70%)}
+.deco{position:absolute;inset:0;pointer-events:none}.deco svg{position:absolute;inset:0;width:100%;height:100%}
+.deco .z{display:none}[data-zone=beginner] .deco .zb,[data-zone=intermediate] .deco .zi,[data-zone=advanced] .deco .za{display:block}
+.spot{position:absolute;bottom:calc(var(--b) - 18px);width:var(--sw);height:46px;margin-left:calc(var(--sw)/-2);border-radius:50%;background:radial-gradient(rgba(255,255,255,.20),transparent 68%);pointer-events:none}
+.vignette{background:radial-gradient(ellipse 90% 85% at 50% 50%,transparent 55%,rgba(10,6,3,.55) 100%)}
+
+[data-zone=beginner]{--zc:#5FD27A;--sky:linear-gradient(#78bde9 0%,#a9dcf7 45%,#e4f5ff 72%);--ground:linear-gradient(#7ccd6a,#4d9a45 60%,#3c7d38);--hill1:#8fd07d;--hill2:#6cb764;--hill3:#4f9a52}
+[data-zone=intermediate]{--zc:#FF8A6A;--sky:linear-gradient(#3a1714 0%,#8c3b23 48%,#e08a48 74%);--ground:linear-gradient(#9a5631,#6a351f 60%,#4c2416);--hill1:#7a3420;--hill2:#5c2617;--hill3:#431a10}
+[data-zone=advanced]{--zc:#8EA8FF;--sky:linear-gradient(#0d1030 0%,#262a6c 52%,#5b4da6 76%);--ground:linear-gradient(#433a8a,#2b2560 60%,#1d1944);--hill1:#33307a;--hill2:#262463;--hill3:#1b1a4b}
+
+.fighter{position:absolute;bottom:13%;width:var(--w);height:var(--h);transform-origin:50% 100%}
+.fighter .shadow{position:absolute;left:50%;bottom:-10px;width:78%;height:22px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(rgba(0,0,0,.38),transparent 70%)}
+.fighter img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28));user-select:none;-webkit-user-drag:none}
+.me{left:17%;--w:160px;--h:214px}
+.foe{right:15%;--w:220px;--h:220px;bottom:15%}
+.idle img{animation:breathe 2.6s ease-in-out infinite}
+.foe.idle img{animation-duration:2.1s}
+@keyframes breathe{50%{transform:translateY(-3px) scaleY(1.015)}}
+
+/* 이름표 + 체력 — 무대 위 양쪽 모서리 */
+.plate{position:absolute;top:14px;width:min(34%,330px);padding:10px 12px 11px;border-radius:14px;background:rgba(18,12,8,.72);backdrop-filter:blur(4px);border:1px solid rgba(255,236,200,.12)}
+.plate.me-p{left:14px}.plate.foe-p{right:14px}
+.p-row{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+.p-name{font-weight:900;font-size:17px;letter-spacing:-.01em}
+.p-lv{font-size:12px;color:var(--txt3);font-weight:700}
+.p-tag{margin-left:auto;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--tc,var(--txt2))}
+.hp{position:relative;height:14px;border-radius:8px;background:#2b1f16;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.5)}
+.hp i{position:absolute;inset:0 auto 0 0;border-radius:8px}
+.hp .trail{background:#fff0c2;transition:width .45s cubic-bezier(.4,0,.2,1) .32s}
+.hp .fill{transition:width .22s ease-out}
+.me-p .fill{background:linear-gradient(#8ef08e,#3fb35a)}
+.foe-p .fill{background:linear-gradient(#ff9a86,#e2483a)}
+.hp.low .fill{background:linear-gradient(#ffc36b,#ff7a30);animation:lowpulse 1s ease-in-out infinite}
+@keyframes lowpulse{50%{filter:brightness(1.25)}}
+.p-num{margin-top:5px;font-size:12.5px;color:var(--txt2);font-variant-numeric:tabular-nums;display:flex;justify-content:space-between}
+.p-num b{color:var(--txt);font-weight:700}
+
+/* 차례 표시 · 한 줄 소식 */
+.turn{position:absolute;top:16px;left:50%;transform:translateX(-50%);padding:7px 16px;border-radius:999px;font-weight:900;font-size:15px;background:var(--gold);color:#2a1a08;box-shadow:0 6px 16px rgba(0,0,0,.25);transition:background .2s,color .2s}
+.turn.foe-turn{background:#3a1814;color:#ffb3a6;border:1px solid rgba(255,140,120,.35)}
+.turn.swap{animation:swap .32s ease-out}
+@keyframes swap{0%{transform:translateX(-50%) scale(.85);opacity:.4}100%{transform:translateX(-50%) scale(1);opacity:1}}
+.ticker{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);max-width:70%;padding:8px 16px;border-radius:12px;background:rgba(14,9,6,.72);font-size:15.5px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ticker .hl{color:var(--gold2)} .ticker .warn{color:#ffb0a2} .ticker .good{color:#9ff0b0}
+
+/* 효과: 번쩍 · 밀림 · 흔들림 · 파편 · 숫자 */
+.stage.shake{animation:shake .24s linear}
+.stage.shake-big{animation:shake-big .36s linear}
+@keyframes shake{20%{transform:translate(-5px,2px)}40%{transform:translate(4px,-3px)}60%{transform:translate(-3px,2px)}80%{transform:translate(2px,-1px)}}
+@keyframes shake-big{15%{transform:translate(-9px,4px)}30%{transform:translate(8px,-5px)}45%{transform:translate(-6px,3px)}60%{transform:translate(5px,-3px)}80%{transform:translate(-2px,1px)}}
+.fighter.dash{transition:transform .17s cubic-bezier(.2,.8,.3,1)}
+.me.dash{transform:translateX(70px) scale(1.04)}
+.foe.dash{transform:translateX(-80px) scale(1.04)}
+.fighter.hit img{animation:hitflash .32s ease-out}
+.me.hit{animation:knock-l .3s ease-out}
+.foe.hit{animation:knock-r .3s ease-out}
+@keyframes hitflash{0%{filter:brightness(3.2) saturate(0) drop-shadow(0 0 0 #fff)}100%{filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}}
+@keyframes knock-r{30%{transform:translateX(22px) rotate(3deg)}100%{transform:none}}
+@keyframes knock-l{30%{transform:translateX(-18px) rotate(-3deg)}100%{transform:none}}
+.foe.down{animation:faint .9s ease-in forwards}
+@keyframes faint{0%{transform:none;opacity:1}25%{transform:scale(1.08,.86)}60%{transform:translateY(-14px) scale(.9);opacity:.85;filter:brightness(1.8)}100%{transform:translateY(-34px) scale(.6);opacity:0;filter:brightness(2.4)}}
+.me.down{animation:kneel .7s ease-out forwards}
+@keyframes kneel{100%{transform:translateY(10px) rotate(-9deg);filter:grayscale(.7) brightness(.8)}}
+.fx{position:absolute;inset:0;pointer-events:none;z-index:5}
+.spark{position:absolute;width:var(--s);height:var(--s);margin:calc(var(--s)/-2);border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);animation:fly .55s cubic-bezier(.15,.8,.3,1) forwards}
+@keyframes fly{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+.ring{position:absolute;width:30px;height:30px;margin:-15px;border-radius:50%;border:4px solid var(--c);animation:ring .42s ease-out forwards}
+@keyframes ring{100%{transform:scale(5.5);opacity:0;border-width:1px}}
+.num{position:absolute;transform:translate(-50%,-50%);font-weight:900;font-size:46px;line-height:1;color:#fff;letter-spacing:-.02em;
+  text-shadow:0 0 0 #000,-3px -3px 0 var(--o),3px -3px 0 var(--o),-3px 3px 0 var(--o),3px 3px 0 var(--o),0 5px 10px rgba(0,0,0,.45);animation:pop .95s cubic-bezier(.2,.9,.3,1) forwards;white-space:nowrap}
+.num.crit{font-size:62px;color:#fff6c8}
+.num.small{font-size:24px;color:#e9e3d6;--o:#3b2f24}
+.num .tag{display:block;font-size:17px;margin-bottom:2px;color:var(--gold2);text-shadow:0 2px 6px rgba(0,0,0,.6)}
+@keyframes pop{0%{transform:translate(-50%,-30%) scale(.5);opacity:0}18%{transform:translate(-50%,-70%) scale(1.22);opacity:1}32%{transform:translate(-50%,-75%) scale(1)}78%{opacity:1}100%{transform:translate(-50%,-130%) scale(.95);opacity:0}}
+.chip-say{position:absolute;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;font-weight:900;font-size:15px;background:var(--b);color:#1d1208;animation:say 1.2s ease-out forwards;white-space:nowrap}
+@keyframes say{0%{transform:translate(-50%,-30%) scale(.7);opacity:0}15%{transform:translate(-50%,-50%) scale(1.06);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-80%);opacity:0}}
+.banner{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;font-weight:900;font-size:72px;letter-spacing:-.03em;color:#fff6d8;
+  text-shadow:-4px -4px 0 #6a3d0a,4px -4px 0 #6a3d0a,-4px 4px 0 #6a3d0a,4px 4px 0 #6a3d0a,0 10px 30px rgba(0,0,0,.5);pointer-events:none;z-index:6}
+.banner.show{animation:banner .6s cubic-bezier(.2,1.4,.4,1) forwards}
+.banner.lose{color:#e9e2ee;text-shadow:-4px -4px 0 #2d2638,4px -4px 0 #2d2638,-4px 4px 0 #2d2638,4px 4px 0 #2d2638,0 10px 30px rgba(0,0,0,.5)}
+@keyframes banner{100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.banner.up{transition:opacity .3s,transform .4s;transform:translate(-50%,-70%) scale(.9)!important;animation:none;opacity:0}
+.stage.done .ticker,.stage.done .turn{opacity:0;transition:opacity .2s}
+
+/* ── 아래 행동판 */
+.b-actions{padding:12px 14px 14px;background:var(--panel);border-top:1px solid rgba(226,176,74,.18)}
+.atk-row{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:10px}
+.atk{position:relative;display:flex;align-items:center;gap:12px;min-height:72px;padding:10px 14px;border-radius:14px;background:var(--panel2);border:1.5px solid rgba(255,255,255,.08);text-align:left;transition:transform .12s,border-color .12s,background .12s}
+.atk:not(:disabled):hover{transform:translateY(-2px);border-color:var(--ec);background:#2c2117}
+.atk:not(:disabled):active{transform:translateY(1px) scale(.99)}
+.atk:disabled{opacity:.45;cursor:default}
+.atk .gl{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:color-mix(in srgb,var(--ec) 18%,transparent);color:var(--ec)}
+.atk .t{font-weight:900;font-size:17px}
+.atk .s{font-size:12.5px;color:var(--txt3);margin-top:2px}
+.atk .badge{position:absolute;top:-9px;right:10px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:900;background:var(--gold);color:#2a1a08}
+.atk .badge.weak{background:#3a2c22;color:var(--txt3)}
+.atk kbd{position:absolute;bottom:7px;right:10px;font:700 11px 'Noto Sans KR';color:var(--txt3);opacity:.7}
+.sk-row{display:flex;gap:8px;margin-top:10px}
+.sk{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);font-size:13.5px;font-weight:700;color:var(--txt2)}
+.sk:not(:disabled):hover{border-color:rgba(92,200,255,.45);color:var(--txt)}
+.sk:disabled{opacity:.4;cursor:default}
+.sk small{font-weight:500;color:var(--txt3)}
+.sk svg{color:#8fd3ff}
+.b-actions.locked .atk,.b-actions.locked .sk{pointer-events:none}
+
+/* ── 결과 */
+.result{position:absolute;left:50%;bottom:16px;transform:translate(-50%,20px);opacity:0;width:min(520px,92%);padding:18px 20px;border-radius:18px;background:rgba(24,17,11,.94);border:1px solid rgba(226,176,74,.35);box-shadow:0 18px 40px rgba(0,0,0,.45);z-index:7;transition:transform .35s cubic-bezier(.2,1,.3,1),opacity .25s}
+.result.show{transform:translate(-50%,0);opacity:1}
+.r-head{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.r-head img{width:58px;height:58px;object-fit:contain}
+.r-title{font-weight:900;font-size:19px}
+.r-sub{font-size:13px;color:var(--txt3);margin-top:2px}
+.r-list{display:grid;gap:7px;margin-bottom:14px}
+.r-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:14.5px}
+.r-item b{margin-left:auto;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
+.r-item .bar{flex:1;height:7px;border-radius:5px;background:#2b1f16;overflow:hidden;margin-left:8px}
+.r-item .bar i{display:block;height:100%;background:var(--zc);border-radius:5px;transition:width .8s ease-out .3s}
+.r-item.ach{background:rgba(226,176,74,.10);color:var(--gold2)}
+.r-btns{display:flex;gap:10px}
+.r-btns button{flex:1;padding:12px;border-radius:12px;font-weight:900;font-size:15.5px;background:rgba(255,255,255,.07)}
+.r-btns .pri{background:var(--gold);color:#2a1a08}
+.tip{font-size:14px;line-height:1.55;color:var(--txt2);padding:10px 12px;border-radius:12px;background:rgba(92,200,255,.08);border:1px solid rgba(92,200,255,.18);margin-bottom:14px}
+.tip b{color:#bfe7ff}
+
+@media (max-height:640px){.fighter.me{--w:132px;--h:176px}.fighter.foe{--w:196px;--h:196px}.plate{padding:8px 11px 9px}.atk{min-height:64px}}
+@media (min-height:800px){.fighter.me{--w:190px;--h:252px}.fighter.foe{--w:280px;--h:280px}}
+@media (prefers-reduced-motion:reduce){.stage.shake,.stage.shake-big{animation:none}.spark,.ring{display:none}.idle img{animation:none}}
+</style>
+</head>
+<body>
+<div class="battle" id="battle" data-zone="beginner">
+  <header class="b-top">
+    <div class="b-where"><span class="zone-dot"></span><span id="zone-name">초급 사냥터</span><span class="tries" id="tries">오늘 남은 도전 2번</span></div>
+    <button class="b-exit" onclick="location.reload()">나가기</button>
+  </header>
+  <section class="stage" id="stage">
+    <div class="bg sky"></div>
+    <div class="bg far"><svg viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 210 C140 120 260 150 380 170 S620 90 760 140 1020 110 1200 160 V300 H0Z" fill="var(--hill1)" opacity=".75"/>
+      <path d="M0 250 C160 190 300 220 460 230 S760 170 920 210 1100 200 1200 220 V300 H0Z" fill="var(--hill2)" opacity=".85"/>
+      <path d="M0 285 C200 250 420 270 600 265 S980 245 1200 268 V300 H0Z" fill="var(--hill3)"/>
+    </svg></div>
+    <div class="deco" aria-hidden="true"><svg viewBox="0 0 1200 430" preserveAspectRatio="xMidYMax slice">
+      <g class="z zb">
+        <g opacity=".62"><rect x="173" y="226" width="9" height="46" rx="3" fill="#5b4632"/><circle cx="160" cy="214" r="26" fill="#4f9a4f"/><circle cx="196" cy="206" r="30" fill="#5aa957"/><circle cx="178" cy="186" r="26" fill="#6bb862"/>
+          <rect x="1003" y="222" width="10" height="50" rx="3" fill="#5b4632"/><circle cx="988" cy="210" r="30" fill="#4f9a4f"/><circle cx="1028" cy="202" r="33" fill="#5aa957"/><circle cx="1008" cy="178" r="29" fill="#6bb862"/>
+          <circle cx="250" cy="258" r="16" fill="#58a654"/><circle cx="266" cy="262" r="12" fill="#4f9a4f"/><circle cx="1066" cy="258" r="15" fill="#58a654"/></g>
+        <g fill="#fff" opacity=".75"><ellipse cx="300" cy="70" rx="58" ry="16"/><ellipse cx="336" cy="62" rx="36" ry="18"/><ellipse cx="860" cy="96" rx="70" ry="15"/><ellipse cx="900" cy="88" rx="40" ry="17"/></g></g>
+      <g class="z zi" opacity=".7"><path d="M120 270 150 150 178 270Z M200 270 214 196 232 270Z M960 270 992 132 1024 270Z M1044 270 1060 200 1078 270Z" fill="#3a1610"/>
+        <g fill="#ffb26b" opacity=".75"><circle cx="420" cy="120" r="2.4"/><circle cx="640" cy="80" r="2"/><circle cx="760" cy="150" r="2.6"/><circle cx="540" cy="190" r="1.8"/><circle cx="880" cy="60" r="2.2"/></g></g>
+      <g class="z za"><g fill="#fff"><circle cx="120" cy="60" r="1.6"/><circle cx="260" cy="110" r="1.2"/><circle cx="420" cy="40" r="1.8"/><circle cx="560" cy="90" r="1.1"/><circle cx="700" cy="50" r="1.5"/><circle cx="820" cy="120" r="1.2"/><circle cx="1080" cy="80" r="1.7"/><circle cx="340" cy="170" r="1"/><circle cx="640" cy="150" r="1.2"/></g>
+        <path d="M985 70a36 36 0 1 0 30 56 30 30 0 1 1-30-56z" fill="#f4ecff" opacity=".85"/>
+        <g fill="#15133a" opacity=".85"><rect x="150" y="160" width="26" height="110"/><rect x="140" y="150" width="46" height="12"/><rect x="1010" y="170" width="24" height="100"/><rect x="1000" y="160" width="44" height="12"/></g></g>
+    </svg></div>
+    <div class="bg ground"></div>
+    <div class="spot" style="left:calc(17% + 75px);--b:13%;--sw:220px"></div>
+    <div class="spot" style="left:calc(85% - 110px);--b:15%;--sw:300px"></div>
+    <div class="bg light"></div>
+    <div class="bg vignette"></div>
+
+    <div class="plate me-p"><div class="p-row"><span class="p-name" id="me-name">나</span><span class="p-lv" id="me-lv"></span></div>
+      <div class="hp" id="me-hp"><i class="trail"></i><i class="fill"></i></div><div class="p-num"><span>체력</span><span><b id="me-hpn"></b></span></div></div>
+    <div class="plate foe-p"><div class="p-row"><span class="p-name" id="foe-name"></span><span class="p-lv" id="foe-lv"></span><span class="p-tag" id="foe-el"></span></div>
+      <div class="hp" id="foe-hp"><i class="trail"></i><i class="fill"></i></div><div class="p-num"><span id="foe-role"></span><span><b id="foe-hpn"></b></span></div></div>
+
+    <div class="turn" id="turn">내 차례</div>
+    <div class="fighter me idle" id="me"><div class="shadow"></div><img id="me-img" alt=""></div>
+    <div class="fighter foe idle" id="foe"><div class="shadow"></div><img id="foe-img" alt=""></div>
+    <div class="fx" id="fx"></div>
+    <div class="banner" id="banner"></div>
+    <div class="ticker" id="ticker"></div>
+    <div class="result" id="result"></div>
+  </section>
+  <footer class="b-actions" id="actions"><div class="atk-row" id="atk-row"></div><div class="sk-row" id="sk-row"></div></footer>
+</div>
+<script>
+// ════ 배틀 시제품 — 계산은 진짜 게임 엔진(gamedata.js: startBattleEngine · performPlayerTurn · performMonsterTurn · performSkill2) 그대로.
+//      화면만 새로: 무대 · 큰 그림 · 한 번 누르기 · 타격감 · 결과 한 장 · 1366×610 에 스크롤 없이.
+const Q = new URLSearchParams(location.search);
+const MON = GAME_DATA.monsters.find(m => m.id === (Q.get('m') || 'm1')) || GAME_DATA.monsters[0];
+const ZONE = { beginner: '초급 사냥터', intermediate: '중급 사냥터', advanced: '고급 사냥터' };
+const EL = { fire: { name: '불꽃', c: 'var(--fire)' }, water: { name: '냉기', c: 'var(--water)' }, grass: { name: '자연', c: 'var(--grass)' } };
+const ATK = {
+  normal: { t: '일반 공격', c: 'var(--normal)', hex: '#F2D27C', g: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>' },
+  fire:   { t: '화염 공격', c: 'var(--fire)', hex: '#FF7A45', g: '<path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.2-2-5.6-4-7.6.2 2-1 3.4-2.3 3.4C11.4 11.2 11 9 12.5 6 9 7.5 5 11 5 15.4 5 19.1 7.6 22 12 22z"/>' },
+  water:  { t: '냉기 공격', c: 'var(--water)', hex: '#5CC8FF', g: '<path d="M12 2v20M4.5 6.5l15 11M19.5 6.5l-15 11"/><path d="M9.5 3.5 12 6l2.5-2.5M9.5 20.5 12 18l2.5 2.5"/>' },
+  grass:  { t: '자연 공격', c: 'var(--grass)', hex: '#5FD27A', g: '<path d="M5 19C5 10 11 4 20 4c0 9-6 15-15 15z"/><path d="M5 19 13 11"/>' },
+};
+const SK2 = {
+  heal: { t: '응급치료', d: '체력 30% 회복', g: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>' },
+  guard: { t: '방어', d: '다음 피해 절반', g: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/>' },
+  counter: { t: '최후의 반격', d: '체력 40% 아래일 때', g: '<path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5"/>' },
+  prep: { t: '일격 준비', d: '다음 공격 ×2.3', g: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/>' },
+  reckless: { t: '무리한 공격', d: '반반 확률 ×2.2', g: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  rush: { t: '몰아치기', d: '2턴 공격력↑', g: '<path d="m5 6 6 6-6 6M13 6l6 6-6 6"/>' },
+};
+const svg = (d, s = 26) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+// 받침에 맞는 조사(이/가 · 을/를 · 은/는 · 와/과)
+const jong = w => { const c = String(w).charCodeAt(String(w).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
+const J = (w, a, b) => w + (jong(w) ? a : b);
+
+const ME = { id: 'proto', name: Q.get('n') || '시험', level: +(Q.get('lv') || 12), charType: 1,
+  combat: { atk: 14, mag: 9, def: 6, spd: 5 }, skillLevels: { normal: 3, fire: 2, water: 1 },
+  equippedSkills: ['normal', 'fire', 'water', null], equippedSkill2: ['heal', 'guard', 'counter'] };
+let S = null, busy = false;
+const $ = id => document.getElementById(id);
+const stage = $('stage'), fx = $('fx');
+
+function setup() {
+  $('battle').dataset.zone = MON.zone || 'beginner';
+  $('zone-name').textContent = ZONE[MON.zone] || '사냥터';
+  $('me-img').src = '../assets/char/base_' + (ME.charType || 1) + '.svg';
+  $('foe-img').src = '../assets/monsters/' + MON.id + '.png';
+  $('me-name').textContent = ME.name; $('me-lv').textContent = 'Lv.' + ME.level;
+  $('foe-name').textContent = MON.name; $('foe-lv').textContent = 'Lv.' + (MON.level || 1);
+  const el = EL[MON.element]; const tag = $('foe-el');
+  if (el) { tag.textContent = el.name; tag.style.setProperty('--tc', el.c); } else tag.remove();
+  S = startBattleEngine(ME, MON);
+  drawHp(true); drawActions();
+  say(`${J(MON.name, '이', '가')} 나타났어요!`);
+  $('foe').animate([{ transform: 'translateX(140px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  setTurn();
+  if (S.turn === 'monster') { lock(true); setTimeout(monsterTurn, 1100); }
+}
+
+// ── 그리기
+function drawHp(instant) {
+  const set = (k, hp, max) => {
+    const pct = Math.max(0, hp / max * 100), bar = $(k + '-hp');
+    bar.classList.toggle('low', pct <= 30);
+    const fill = bar.querySelector('.fill'), trail = bar.querySelector('.trail');
+    if (instant) { fill.style.transition = trail.style.transition = 'none'; requestAnimationFrame(() => { fill.style.transition = trail.style.transition = ''; }); }
+    fill.style.width = pct + '%'; trail.style.width = pct + '%';
+    $(k + '-hpn').textContent = `${Math.max(0, hp)} / ${max}`;
+  };
+  set('me', S.playerHp, S.playerHpMax); set('foe', S.monsterHp, S.monsterHpMax);
+}
+function matchup(type) {   // 공격 속성 → 이 몬스터에게 강한가
+  if (type === 'normal' || !MON.element || typeof ELEMENT_CHART === 'undefined') return 1;
+  return (ELEMENT_CHART[type] && ELEMENT_CHART[type][MON.element]) || 1;
+}
+function drawActions() {
+  const types = [...new Set((ME.equippedSkills || ['normal']).filter(Boolean))];
+  const row = $('atk-row'); row.style.setProperty('--n', types.length);
+  row.innerHTML = types.map((t, i) => {
+    const a = ATK[t], lv = S.skillLevels[t] || 0, m = matchup(t);
+    const badge = m > 1 ? '<span class="badge">강해요!</span>' : m < 1 ? '<span class="badge weak">약해요</span>' : '';
+    return `<button class="atk" style="--ec:${a.c}" ${lv < 1 ? 'disabled' : ''} onclick="attack('${t}')">${badge}
+      <span class="gl">${svg(a.g)}</span><span><div class="t">${a.t}</div><div class="s">${lv < 1 ? '아직 못 배웠어요' : 'Lv.' + lv}</div></span><kbd>${i + 1}</kbd></button>`;
+  }).join('');
+  $('sk-row').innerHTML = (S.equippedSkill2 || []).filter(Boolean).map(id => {
+    const k = SK2[id]; if (!k) return '';
+    const used = !!(S.skill2Used || {})[id], cond = id === 'counter' && S.playerHp / S.playerHpMax > 0.4;
+    return `<button class="sk" ${used || cond ? 'disabled' : ''} onclick="skill('${id}')">${svg(k.g, 17)}${k.t} <small>${used ? '썼어요' : k.d}</small></button>`;
+  }).join('');
+}
+function setTurn() {
+  const t = $('turn'), mine = S.turn === 'player';
+  t.textContent = mine ? '내 차례' : `${MON.name} 차례`;
+  t.classList.toggle('foe-turn', !mine); t.classList.remove('swap'); void t.offsetWidth; t.classList.add('swap');
+}
+function lock(on) { busy = on; $('actions').classList.toggle('locked', on); document.querySelectorAll('.atk,.sk').forEach(b => { if (on) b.dataset.was = b.disabled ? 1 : 0; b.disabled = on ? true : b.dataset.was === '1'; }); }
+function say(html) { $('ticker').innerHTML = html; }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const center = el => { const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect(); return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height * 0.42 }; };
+function burst(at, color, n = 14, big = false) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, d = (big ? 110 : 70) + Math.random() * 60, sp = document.createElement('i');
+    sp.className = 'spark'; sp.style.cssText = `left:${at.x}px;top:${at.y}px;--c:${color};--s:${5 + Math.random() * 7}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`;
+    fx.append(sp); setTimeout(() => sp.remove(), 650);
+  }
+  const ring = document.createElement('i'); ring.className = 'ring'; ring.style.cssText = `left:${at.x}px;top:${at.y}px;--c:${color}`; fx.append(ring); setTimeout(() => ring.remove(), 500);
+}
+function number(at, text, { outline = '#7a2a12', crit = false, small = false, tag = '' } = {}) {
+  const n = document.createElement('div'); n.className = 'num' + (crit ? ' crit' : '') + (small ? ' small' : '');
+  n.style.cssText = `left:${at.x + (Math.random() * 30 - 15)}px;top:${at.y - 30}px;--o:${outline}`;
+  n.innerHTML = (tag ? `<span class="tag">${tag}</span>` : '') + text; fx.append(n); setTimeout(() => n.remove(), 1000);
+}
+function chip(at, text, bg) { const c = document.createElement('div'); c.className = 'chip-say'; c.style.cssText = `left:${at.x}px;top:${at.y - 110}px;--b:${bg}`; c.textContent = text; fx.append(c); setTimeout(() => c.remove(), 1250); }
+function shake(big) { stage.classList.remove('shake', 'shake-big'); void stage.offsetWidth; stage.classList.add(big ? 'shake-big' : 'shake'); }
+function hit(el) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
+function newLogs(before) { return S.log.slice(before).map(h => h.replace(/<[^>]+>/g, '')); }
+
+// ── 내 차례
+async function attack(type) {
+  if (busy || S.finished || S.turn !== 'player') return;
+  lock(true);
+  const me = $('me'), foe = $('foe'), before = S.log.length;
+  S = performPlayerTurn(S, type);
+  const pa = S.lastPlayerAction, a = ATK[type];
+  me.classList.remove('idle'); me.classList.add('dash'); await wait(170);
+  me.classList.remove('dash');
+  if (pa.miss) {
+    number(center(foe), '빗나감', { small: true }); say('공격이 빗나갔어요!');
+  } else {
+    await wait(pa.crit ? 130 : 60);                         // 맞는 순간 아주 잠깐 멈춤(급소는 더 길게)
+    hit(foe); shake(pa.crit); burst(center(foe), a.hex, pa.crit ? 22 : 14, pa.crit);
+    number(center(foe), pa.dmg, { outline: pa.crit ? '#8a5a00' : '#5a2410', crit: pa.crit, tag: pa.crit ? '급소!' : '' });
+    if (pa.isGhost) chip(center(foe), '유령이라 덜 아파요', '#cfc8d8');
+    else if (pa.elemMult > 1) chip(center(foe), '효과가 굉장해요!', '#F6D27A');
+    else if (pa.elemMult < 1) chip(center(foe), '효과가 별로예요', '#bcae9a');
+    say(`${MON.name}에게 <span class="hl">${pa.dmg}</span> 피해${pa.crit ? ' · 급소!' : ''}${pa.elemMult > 1 ? ' · 상성이 좋아요' : ''}`);
+  }
+  drawHp(); me.classList.add('idle');
+  if (S.finished) return victory();
+  await wait(820); monsterTurn(before);
+}
+async function skill(id) {
+  if (busy || S.finished || S.turn !== 'player') return;
+  lock(true); const before = S.log.length;
+  S = performSkill2(S, id);
+  const k = SK2[id], at = center($('me'));
+  burst(at, '#8fd3ff', 10); chip(at, k.t + '!', '#bfe7ff');
+  say(newLogs(before).pop() || k.t);
+  drawHp(); drawActions();
+  if (S.finished) return victory();
+  if (S.turn === 'player') { lock(false); return; }
+  await wait(900); monsterTurn(before);
+}
+
+// ── 몬스터 차례
+async function monsterTurn() {
+  if (S.finished) return;
+  setTurn(); await wait(480);
+  const me = $('me'), foe = $('foe'), before = S.log.length;
+  S = performMonsterTurn(S);
+  const ma = S.lastMonsterAction, extra = newLogs(before).join(' ');
+  foe.classList.remove('idle'); foe.classList.add('dash'); await wait(190); foe.classList.remove('dash');
+  if (ma.miss) { number(center(me), '피했어요!', { small: true }); say(`${MON.name}의 공격을 피했어요!`); }
+  else {
+    await wait(ma.crit || ma.roleLabel ? 110 : 50);
+    hit(me); shake(ma.crit || !!ma.roleLabel); burst(center(me), '#ff6a5a', 10);
+    number(center(me), ma.dmg, { outline: '#6a1010', tag: ma.roleLabel ? ma.roleLabel.replace('!', '') : (ma.crit ? '급소' : '') });
+    if (ma.armorMult < 1) chip(center(me), '옷 상성이 좋아요', '#bfe7ff');
+    say(`${J(MON.name, '이', '가')} <span class="warn">${ma.dmg}</span> 피해를 줬어요`);
+  }
+  drawHp(); foe.classList.add('idle');
+  if (/강한 일격을 준비/.test(extra)) { await wait(700); say(`${J(MON.name, '이', '가')} 강한 일격을 준비해요 — <span class="good">방어</span>를 써 보세요`); }
+  else if (/한 번 더/.test(extra)) { await wait(600); say(`${J(MON.name, '이', '가')} 재빠르게 한 번 더 덤벼요!`); }
+  if (S.finished) return defeat();
+  await wait(620);
+  if (S.turn !== 'player') S.turn = 'player';
+  setTurn(); drawActions(); lock(false);
+}
+
+// ── 끝: 이겼을 때 · 졌을 때 (업적은 결과 카드 안 한 줄로 — 위에 덮지 않는다)
+async function victory() {
+  lock(true); await wait(380);
+  const foe = $('foe'); foe.classList.remove('idle');
+  burst(center(foe), '#ffe7a0', 24, true); foe.classList.add('down');
+  await wait(650);
+  const b = $('banner'); b.className = 'banner'; b.textContent = '승리!'; void b.offsetWidth; b.classList.add('show');
+  say(`${J(MON.name, '을', '를')} 물리쳤어요!`);
+  await wait(700);
+  const gold = MON.gold || 18, first = Q.get('first') !== '0';
+  const seen = 1, all = GAME_DATA.monsters.filter(m => m.zone === MON.zone).length || 30;
+  showResult(`
+    <div class="r-head"><img src="../assets/monsters/${MON.id}.png" alt=""><div><div class="r-title">${J(MON.name, '을', '를')} 물리쳤어요!</div><div class="r-sub">${S.turnCount || ''}${S.turnCount ? '번 만에 · ' : ''}남은 체력 ${S.playerHp}</div></div></div>
+    <div class="r-list">
+      <div class="r-item">골드 <b id="g-count">+0G</b></div>
+      ${first ? `<div class="r-item">처음 만난 몬스터 보너스 <b>+10G</b></div>` : ''}
+      <div class="r-item">${ZONE[MON.zone] || ''} 도감 <span class="bar"><i id="dex-bar" style="width:0%"></i></span><b>${seen} / ${all}</b></div>
+      ${first ? `<div class="r-item ach">업적 달성 — 첫 사냥 <b>+20G</b></div>` : ''}
+    </div>
+    <div class="r-btns"><button onclick="location.reload()">한 번 더 (남은 1번)</button><button class="pri" onclick="location.reload()">확인</button></div>`);
+  countUp($('g-count'), gold); requestAnimationFrame(() => { $('dex-bar').style.width = (seen / all * 100) + '%'; });
+}
+async function defeat() {
+  lock(true); await wait(300);
+  $('me').classList.remove('idle'); $('me').classList.add('down');
+  await wait(500);
+  const b = $('banner'); b.className = 'banner lose'; b.textContent = '아쉬워요'; void b.offsetWidth; b.classList.add('show');
+  say('다음엔 이길 수 있어요');
+  await wait(700);
+  const strong = Object.keys(ATK).find(t => t !== 'normal' && matchup(t) > 1);
+  const have = strong && (S.skillLevels[strong] || 0) >= 1 && (ME.equippedSkills || []).includes(strong);
+  const elName = EL[MON.element] ? EL[MON.element].name : '';
+  const tip = !strong ? '방어력이 높은 옷을 입으면 받는 피해가 줄어요. 체력이 반쯤 남았을 때 <b>응급치료</b>를 써 보세요.'
+    : have ? `<b>${elName}</b> 몬스터에게는 <b>${ATK[strong].t}</b>이 강해요. 다음엔 처음부터 <b>${ATK[strong].t}</b>을 눌러 보세요.`
+           : `<b>${elName}</b> 몬스터에게는 <b>${ATK[strong].t}</b>이 강해요. 상점의 마스터리북에서 배울 수 있어요.`;
+  showResult(`
+    <div class="r-head"><img src="../assets/monsters/${MON.id}.png" alt=""><div><div class="r-title">${J(MON.name, '이', '가')} 이번엔 더 셌어요</div><div class="r-sub">남긴 체력 ${S.monsterHp} / ${S.monsterHpMax}</div></div></div>
+    <div class="tip">${tip}</div>
+    <div class="r-btns"><button onclick="location.reload()">다시 도전 (남은 1번)</button><button class="pri" onclick="location.reload()">확인</button></div>`);
+}
+function showResult(html) { const r = $('result'); r.innerHTML = html; stage.classList.add('done'); $('banner').classList.add('up'); setTimeout(() => r.classList.add('show'), 180); }
+function countUp(el, to) { const t0 = performance.now(), d = 700; const f = t => { const k = Math.min(1, (t - t0) / d); el.textContent = '+' + Math.round(to * (1 - Math.pow(1 - k, 3))) + 'G'; if (k < 1) requestAnimationFrame(f); }; requestAnimationFrame(f); }
+
+addEventListener('keydown', e => { const i = +e.key - 1; const b = document.querySelectorAll('.atk')[i]; if (b && !b.disabled) b.click(); });
+window.proto = { get S() { return S; }, attack, skill, set: (k, v) => { S[k] = v; drawHp(); } };
+setup();
+</script>
+</body>
+</html>
