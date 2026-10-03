@@ -1,10 +1,12 @@
 // 아이 화면: 판 하나. 카드 · ❔ · 화살표 · 구역 · 우편함 · 결과물.
-//  [설정 틀] 판 모양(자유 배치 · 칸 나누기 · 담벼락 · 한 줄 · 그림에 핀 꽂기)과 쓰기 · 보기 · 반응 설정을 따른다(settings.js 표).
+//  [설정 틀] 판 모양(자유 배치 · 칸 나누기 · 담벼락 · 한 줄 · 그림에 핀 꽂기 · 이야기 줄 · 나무)과 쓰기 · 보기 · 반응 설정을 따른다(settings.js 표).
+//  [THINKBOARD-STORY-1] 이야기 줄 = 사건 중심(사건 카드를 차례로 잇고 고르는 장면에서 갈림 · 인물 · 장소는 선반에서 사건에 붙임 · 이야기로 읽어 보기)
+//                       나무 = 노션처럼 주제 밑에 넣고 접고 편다(들여쓰기 · 내어쓰기 · 위아래)
 //  teacher: 선생님이 보는 판(이름 늘 보임 · 허락 · 가리기 · 맨 앞 고정) · tv: 교실 TV(크게 · 보기만)
 import { h, toast } from './util.js';
-import { ops, REASONS } from './model.js';
+import { ops, REASONS, storyGraph, storyCoach, optLetter, treeOf, matZonesOf, lineZoneOf } from './model.js';
 import { zoneLayout, zoneAt, slotIn, freeSpot, estH, evalHints, ZW, ZHEAD, CW } from './templates.js';
-import { withDefaults, zoneNames, COLORS } from './settings.js';
+import { withDefaults, zoneNames, COLORS, SEQ_WORDS } from './settings.js';
 import { keyOf } from './util.js';
 import { icon } from './icons.js';
 
@@ -22,6 +24,7 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
   let panel = null;          // 'mail' | 'res' | null
   let lastNew = -1;
   const pick = new Map();    // 우편함 카드 id → 'keep'|'drop'|'qdrop' (이유 고르는 중)
+  const folded = new Set();  // [나무] 접은 항목(이 화면에서만)
   const cardEls = new Map();
 
   root.innerHTML = '';
@@ -124,6 +127,7 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
       teacher && roster.length ? h('button', { class: 'tbtn' + (panel === 'who' ? ' on' : ''), onclick: () => togglePanel('who'), title: '누가 썼나' }, icon('users'), h('span', {}, `${writers} / ${roster.length}명 · ${Object.values(B.cards).filter(visible).length}장`))
         : (teacher || tv) ? h('span', { class: 'pill' }, icon('users', 15), `${writers}명 · ${Object.values(B.cards).filter(visible).length}장`) : null,
       open() && canvasMode() && S.links ? tbtn('link', '잇기', linkFrom !== null, () => setLink(linkFrom === null ? '' : null)) : null,
+      S.layout === 'story' ? tbtn('book', '이야기로 읽어 보기', false, () => readStory()) : null,
       showMail ? h('button', { class: 'tbtn' + (panel === 'mail' ? ' on' : '') + (nNew ? ' has' : ''), onclick: () => togglePanel('mail'), title: '우편함' },
         icon('inbox'), h('span', {}, '우편함'), nNew ? h('span', { class: 'badge' }, nNew) : null) : null,
       tv || !(teacher || S.mail !== 'off' || Object.keys(B.results).length) ? null : h('button', { class: 'tbtn' + (panel === 'res' ? ' on' : ''), onclick: () => togglePanel('res'), title: '결과물' },
@@ -141,8 +145,11 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
     if (!open()) return;
     const add = canAdd(false), left = !teacher && S.limit > 0 ? ` ${myCount()}/${S.limit}` : '';
     if (S.unknown) fab.append(h('button', { class: 'fab-2' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addIn('', 'unknown'); } }, icon('help'), h('span', {}, '모르는 것')));
+    const selC = sel && B.cards[sel];
     fab.append(S.layout === 'pins'
       ? h('button', { class: 'fab' + (pinMode ? ' on' : '') + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) setPin(!pinMode); } }, icon(pinMode ? 'x' : 'mapPin', 20), h('span', {}, pinMode ? '그만' : '핀 꽂기' + left))
+      : S.layout === 'story' ? h('button', { class: 'fab' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addNext(fabAfter()); } }, icon('plus', 20), h('span', {}, (storyGraph(B, visible).start ? '사건 더하기' : '첫 사건 쓰기') + left))
+      : S.layout === 'tree' ? h('button', { class: 'fab' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addChildOf(selC && selC.kind !== 'unknown' ? selC.id : ''); } }, icon(selC ? 'sub' : 'plus', 20), h('span', {}, (selC ? '밑에 넣기' : '주제 더하기') + left))
       : h('button', { class: 'fab' + (add ? '' : ' dim'), onclick: () => { if (canAdd(true)) addIn(''); } }, icon('plus', 20), h('span', {}, '생각 쓰기' + left)));
   }
 
@@ -278,6 +285,8 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
     const list = sorted(Object.values(B.cards).filter(visible));
     const hiddenOthers = !teacher && !S.others ? Object.values(B.cards).filter(c => !mine(c) && !c.hidden).length : 0;
     if (S.prompt) flow.append(h('div', { class: 'fl-hero' }, h('div', { class: 'q' }, S.prompt)));
+    if (S.layout === 'story') { renderStory(); flow.scrollTop = keep; return; }
+    if (S.layout === 'tree') { renderTree(); flow.scrollTop = keep; return; }
     const empty = () => h('div', { class: 'fl-empty' }, open() ? '아직 카드가 없어요. 오른쪽 아래에서 첫 생각을 써 볼까요?' : '아직 카드가 없어요');
     if (S.layout === 'columns') {
       const names = colNames(), hints = S.hints ? evalHints({ ...B, settings: { ...B.settings, zones: true } }) : {};
@@ -312,6 +321,266 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
     }
     if (hiddenOthers) flow.append(h('div', { class: 'fl-empty small' }, `친구 카드 ${hiddenOthers}장은 선생님만 봐요`));
     flow.scrollTop = keep;
+  }
+
+  // ─────────── [THINKBOARD-STORY-1] 이야기 줄 — 사건 중심
+  //  사건 카드를 위에서 아래로 차례대로(책 읽듯 · 크롬북 1366×610 에서 옆으로 밀지 않게) · 길이 둘 이상 나가면 갈림길(옆으로 나란히)
+  //  카드 위 = 이어 주는 말(그러던 어느 날 · 그래서 …) · 카드 안 = 붙인 인물 · 장소 · 끝 · 줄 끝마다 '+ 다음 사건'
+  const LANE = 230, SR = 34;   // 갈래 너비(카드 204 + 사이) · 사건 사이(화살표 자리)
+  let storyScroll = 0;
+  const seqWords = () => SEQ_WORDS[S.seqWords] || [];
+  const lineZone = () => lineZoneOf(B) || '사건';
+  // 다음 사건에 권할 말 — 첫 사건 · 두 번째 · 갈림길 뒤 · 그 밖
+  function nextWord(after, g) {
+    const w = seqWords();
+    if (!w.length) return '';
+    if (!after) return w[0];
+    const p = g.pos.get(after), col = p ? p.col + 1 : 1, story = S.seqWords !== 'steps';
+    if (story) return col === 1 ? w[1] : col === 2 ? w[2] : (B.cards[after] || {}).zone === '선택' ? '' : '그래서';
+    return w[Math.min(col, 1)];
+  }
+  // 오른쪽 아래 단추가 붙일 곳: 고른 카드가 줄 끝이면 그 뒤 · 아니면 첫 줄의 끝
+  function fabAfter() {
+    const g = storyGraph(B, visible);
+    if (sel && g.leaves.some(c => c.id === sel)) return sel;
+    let cur = g.start ? g.start.id : '';
+    for (let i = 0; cur && i < 999; i++) { const o = g.out.get(cur) || []; if (!o.length) break; cur = o[0].to; }
+    return cur;
+  }
+  const spot = (after, g) => { const p = g && after ? g.pos.get(after) : null; return freeSpot(B, ((p ? p.col : -1) + 1) * 210, 80 + (p ? p.row : 0) * 150); };   // 자유 배치로 바꿔도 줄 모양으로
+  function addNext(after) {
+    const g = storyGraph(B, visible), a = after && B.cards[after] ? after : '';
+    if (a && B.cards[a].end) { toast('끝으로 정한 사건이에요 — 끝을 풀면 이어 쓸 수 있어요'); return; }
+    const w = nextWord(a, g);
+    openEditor({ title: a ? '다음 사건' : '첫 사건', placeholder: a ? '무슨 일이 일어났나요?' : '누가, 어디에서, 어떻게 지냈나요?', spines: seqWords(), spine: w,
+      onSave: (text, o) => { const p = spot(a, g); act('addAfter', { after: a, text, spine: o.spine || '', zone: lineZone(), x: p.x, y: p.y }); } });
+  }
+  function addBranchAfter(after) {
+    const g = storyGraph(B, visible);
+    if (after && B.cards[after]?.end) { toast('끝으로 정한 사건이에요 — 끝을 풀면 이어 쓸 수 있어요'); return; }
+    openBranch({ onSave: (q, opts) => { const p = spot(after, g); act('addBranch', { after, q, opts, x: p.x, y: p.y }); } });
+  }
+  function addOption(choice) {
+    const g = storyGraph(B, visible);
+    if ((g.out.get(choice) || []).length >= 4) { toast('고를 것은 넷까지예요'); return; }
+    openEditor({ title: '고를 것 더하기', placeholder: '예: 혼자 몰래 간다', onSave: text => { const p = spot(choice, g); act('addAfter', { after: choice, text, zone: lineZone(), x: p.x, y: p.y }); } });
+  }
+  function insertOn(link) {
+    openEditor({ title: '사이에 사건 넣기', placeholder: '그 사이에 무슨 일이?', spines: seqWords(), spine: '',
+      onSave: (text, o) => { const l = B.links[link], f = l && B.cards[l.from]; act('insertBetween', { link, text, spine: o.spine || '', x: f ? f.x + 30 : 40, y: f ? f.y + 40 : 40 }); } });
+  }
+  function attachLoose(id) {   // 안 이은 카드 → 첫 줄 끝에
+    const end = fabAfter();
+    if (!end || end === id) return act('addLink', { from: id, to: id });
+    if (B.cards[end]?.end) return toast('첫 줄이 끝났어요 — 끝을 풀거나, 줄 끝 카드를 골라 이어 주세요');
+    act('addLink', { from: end, to: id });
+  }
+
+  function storyTools(c, g) {
+    const edit = canEdit(c), leaf = !(g.out.get(c.id) || []).length, choice = c.zone === '선택' || (g.out.get(c.id) || []).length > 1;
+    const b = (ic, label, fn, cls = '', bare = false) => h('button', { class: 'abtn ' + cls + (bare ? ' bare' : ''), title: label, 'aria-label': label, onclick: e => { e.stopPropagation(); fn(); } }, icon(ic, 15), bare ? null : h('span', {}, label));
+    const words = seqWords();
+    const items = [
+      edit ? b('edit', '고치기', () => editCard(c.id)) : null,
+      edit && words.length && !choice ? h('label', { class: 'abtn sel-wrap', title: '이어 주는 말', onclick: e => e.stopPropagation() }, icon('next', 15),
+        h('select', { onchange: e => act('setSpine', { id: c.id, spine: e.target.value }) }, ['', ...words].map(w => h('option', { value: w, selected: (c.spine || '') === w }, w || '(이어 주는 말 없음)')))) : null,
+      edit && leaf && !c.end && open() ? b('next', '다음 사건', () => addNext(c.id)) : null,
+      edit && leaf && !c.end && open() && S.branch ? b('branch', '갈림길', () => addBranchAfter(c.id)) : null,
+      edit && choice && open() ? b('plus', '고를 것 더하기', () => addOption(c.id)) : null,
+      edit && leaf ? b('flag', c.end ? '끝 풀기' : '끝', () => act('setEnd', { id: c.id, end: !c.end }), c.end ? 'on' : '') : null,
+      teacher && waiting(c) ? b('check', '허락', () => act('moderate', { id: c.id, ok: true }), 'ok') : null,
+      teacher ? b(c.hidden ? 'eye' : 'eyeOff', c.hidden ? '다시 보이기' : '아이들에게 가리기', () => act('moderate', { id: c.id, hidden: !c.hidden }), '', true) : null,
+      edit ? b('trash', '지우기', () => { if (confirm('이 사건을 지울까요? 앞뒤 사건은 다시 이어 줘요.')) act('removeInLine', { id: c.id }); }, 'danger', true) : null,
+    ].filter(Boolean);
+    const mz = matZonesOf(B);
+    return h('div', { class: 'card-tools', onpointerdown: e => e.stopPropagation() }, items,
+      edit && mz.length && !choice ? h('div', { class: 'st-taghint' }, icon('tag', 13), `왼쪽 선반의 ${mz.join(' · ')}을(를) 누르면 이 사건에 붙어요`) : null);
+  }
+
+  function storyCard(c, g) {
+    const L = optLetter(g, c.id), choice = c.zone === '선택';
+    const tags = Object.keys(c.tags || {}).map(k => B.cards[k]).filter(t => t && visible(t));
+    const el = h('div', { class: cardClass(c, ' scard' + (choice ? ' choice' : '') + (c.end ? ' end' : '')), 'data-id': c.id },
+      (c.spine || L || choice) ? h('div', { class: 'sc-top' }, L ? h('span', { class: 'opt' }, L) : null, choice ? h('span', { class: 'spine q' }, '고르는 장면') : c.spine ? h('span', { class: 'spine' }, c.spine) : null) : null,
+      cardText(c),
+      tags.length ? h('div', { class: 'sc-tags' }, tags.map(t => h('span', { class: 'mtag' }, t.text))) : null,
+      c.end ? h('div', { class: 'sc-end' }, icon('flag', 13), '끝') : null,
+      cardBadges(c), cardMeta(c), sel === c.id ? storyTools(c, g) : null);
+    el.addEventListener('click', e => { if (e.target.closest('.card-tools, .heart')) return; tapCard(c.id); });
+    return el;
+  }
+
+  function renderStory() {
+    const g = storyGraph(B, visible), mz = matZonesOf(B), selNode = sel && g.pos.has(sel) ? sel : '';
+    // 선반 — 인물 · 장소(사건을 고른 채 누르면 그 사건에 붙는다) · ❔ · 안 이은 카드
+    const matChip = m => {
+      const on = selNode && B.cards[selNode]?.tags?.[m.id];
+      const el = h('div', { class: cardClass(m, ' mchip' + (on ? ' tagged' : '') + (selNode ? ' can-tag' : '')) }, cardText(m), cardMeta(m), sel === m.id ? cardTools(m) : null);
+      el.addEventListener('click', e => {
+        if (e.target.closest('.card-tools, .heart')) return;
+        if (selNode && canEdit(B.cards[selNode])) { act('tagCard', { id: selNode, mat: m.id, on: !on }); return; }
+        tapCard(m.id);
+      });
+      return el;
+    };
+    const used = id => g.nodes.some(c => c.tags && c.tags[id]);
+    const shelf = h('aside', { class: 'st-shelf' },
+      ...mz.map(z => h('section', { class: 'st-sec' },
+        h('header', {}, h('b', {}, z), h('span', { class: 'cnt' }, g.mats.filter(m => m.zone === z).length), open() ? h('button', { class: 'zadd', title: `${z} 더하기`, onclick: () => { if (canAdd(true)) addIn(z); } }, icon('plus', 15)) : null),
+        h('div', { class: 'st-mats' }, g.mats.filter(m => m.zone === z).map(m => { const el = matChip(m); if (!used(m.id) && g.nodes.length) el.title = '아직 어느 사건에도 안 나와요'; return el; })),
+        !g.mats.some(m => m.zone === z) ? h('div', { class: 'st-none' }, open() ? `＋로 ${z}을(를) 적어요` : '아직 없어요') : null)),
+      g.unk.length ? h('section', { class: 'st-sec' }, h('header', {}, h('b', {}, '❔ 아직 안 정한 것')), h('div', { class: 'st-mats' }, g.unk.map(c => flowCard(c)))) : null,
+      g.loose.length ? h('section', { class: 'st-sec loose' }, h('header', {}, h('b', {}, '아직 줄에 안 이은 카드')),
+        h('div', { class: 'st-mats' }, g.loose.map(c => h('div', { class: 'st-loose' }, flowCard(c), open() && canEdit(c) ? h('button', { class: 'btn small', onclick: () => attachLoose(c.id) }, icon('next', 14), '줄 끝에 잇기') : null)))) : null);
+    // 줄 — 두 번 그리기(먼저 놓고 높이를 잰 뒤 자리 잡기)
+    const scroller = h('div', { class: 'st-scroll' }), area = h('div', { class: 'st-area' }), lay = h('div', { class: 'st-layer' });
+    const sv = document.createElementNS(NS, 'svg'); sv.setAttribute('class', 'st-links');
+    area.append(sv, lay); scroller.append(area);
+    const coach = S.hints ? storyCoach(B, g) : [];
+    flow.append(h('div', { class: 'st-wrap' }, shelf, h('div', { class: 'st-main' }, scroller,
+      coach.length ? h('div', { class: 'st-coach' }, coach.map(t => h('span', {}, t))) : null)));
+    const els = new Map(), ghosts = [];
+    for (const c of g.nodes) if (g.pos.has(c.id)) { const el = storyCard(c, g); lay.append(el); els.set(c.id, el); }
+    if (!g.start) {
+      lay.append(open() ? h('button', { class: 'st-first', onclick: () => { if (canAdd(true)) addNext(''); } }, icon('plus', 20),
+        h('b', {}, seqWords()[0] ? `${seqWords()[0]}…` : '첫 사건'), h('span', {}, S.seqWords === 'steps' ? '첫 단계를 써요' : '이야기의 처음 — 누가, 어디에서 지냈나요?')) : h('div', { class: 'fl-empty' }, '아직 사건이 없어요'));
+      return;
+    }
+    if (open()) for (const c of g.leaves) if (!c.end && canAdd(false)) {
+      const w = nextWord(c.id, g);
+      const gh = h('div', { class: 'st-ghost' },
+        h('button', { class: 'gh-main', onclick: () => { if (canAdd(true)) addNext(c.id); } }, icon('plus', 16), h('span', {}, w ? `${w}…` : '다음 사건')),
+        S.branch && c.zone !== '선택' ? h('button', { class: 'gh-br', title: '여기서 길이 갈라져요', onclick: () => { if (canAdd(true)) addBranchAfter(c.id); } }, icon('branch', 15), '갈림길') : null);
+      lay.append(gh); ghosts.push([c.id, gh]);
+    }
+    //  자리 — 차례(pos.col) = 아래로 · 갈래(pos.row) = 옆으로. 차례마다 그 줄에서 가장 큰 카드 높이만큼
+    const depthH = [];
+    const grow = (d, hh) => { depthH[d] = Math.max(depthH[d] || 0, hh); };
+    for (const [id, el] of els) grow(g.pos.get(id).col, el.offsetHeight);
+    for (const [id, gh] of ghosts) grow(g.pos.get(id).col + 1, gh.offsetHeight);
+    const depthY = []; let y = 6;
+    for (let d = 0; d < depthH.length; d++) { depthY[d] = y; y += (depthH[d] || 0) + SR; }
+    let maxLane = 0;
+    const at = (el, depth, lane) => { el.style.left = 8 + lane * LANE + 'px'; el.style.top = depthY[depth] + 'px'; maxLane = Math.max(maxLane, lane); };
+    for (const [id, el] of els) { const p = g.pos.get(id); at(el, p.col, p.row); }
+    for (const [id, gh] of ghosts) { const p = g.pos.get(id); at(gh, p.col + 1, p.row); }
+    const W = 8 + (maxLane + 1) * LANE + 30, H = y + 10;
+    area.style.width = W + 'px'; area.style.height = H + 'px'; sv.setAttribute('width', W); sv.setAttribute('height', H);
+    // 화살표 — 아래 가운데 → 위 가운데(갈래가 다르면 꺾어서) · 화살표 위 '+' = 사이에 넣기
+    sv.innerHTML = '<defs><marker id="sarr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker></defs>';
+    for (const l of g.links) {
+      const a = els.get(l.from), z = els.get(l.to);
+      if (!a || !z) continue;
+      const x1 = a.offsetLeft + a.offsetWidth / 2, y1 = a.offsetTop + a.offsetHeight, x2 = z.offsetLeft + z.offsetWidth / 2, y2 = z.offsetTop;
+      const back = y2 <= y1;   // 앞 사건으로 돌아가는 화살표(자유 배치에서 만든 것) — 오른쪽으로 둘러 간다
+      const ym = y1 + Math.min(14, (y2 - y1) / 2);
+      const d = back ? `M${a.offsetLeft + a.offsetWidth},${y1 - 16} C${a.offsetLeft + a.offsetWidth + 60},${y1} ${z.offsetLeft + z.offsetWidth + 60},${y2 + 16} ${z.offsetLeft + z.offsetWidth},${y2 + 16}`
+        : x1 === x2 ? `M${x1},${y1} L${x2},${y2}` : `M${x1},${y1} L${x1},${ym} L${x2},${ym} L${x2},${y2}`;
+      const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d); path.setAttribute('class', 'st-link'); path.setAttribute('marker-end', 'url(#sarr)');
+      sv.append(path);
+      if (open() && !back && canAdd(false)) {
+        const plus = h('button', { class: 'st-ins', title: '사이에 사건 넣기', style: { left: x2 + 14 + 'px', top: (x1 === x2 ? (y1 + y2) / 2 : (ym + y2) / 2) - 10 + 'px' }, onclick: e => { e.stopPropagation(); if (canAdd(true)) insertOn(l.id); } }, icon('plus', 12));
+        lay.append(plus);
+      }
+    }
+    scroller.scrollLeft = storyScroll;
+    scroller.addEventListener('scroll', () => { storyScroll = scroller.scrollLeft; }, { passive: true });
+    //  방금 쓴 사건이 화면 밖이면 보이게(긴 이야기 · 갈림길 아래)
+    const fresh = flashId && els.get(flashId);
+    if (fresh) requestAnimationFrame(() => { try { fresh.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); } catch {} });
+  }
+
+  // 이야기로 읽어 보기 — 책처럼 한 사건씩 · 갈림길에서 직접 고른다 · 길이 멈추면 '아직 끝이 없어요'
+  function readStory() {
+    const g = storyGraph(B, visible);
+    if (!g.start) { toast('아직 사건이 없어요'); return; }
+    let cur = g.start.id, trail = [];
+    const page = h('div', { class: 'rd-page' });
+    const wrap = h('div', { class: 'rd-wrap', onpointerdown: e => { if (e.target === wrap) close(); } }, h('div', { class: 'rd-book' },
+      h('div', { class: 'rd-head' }, h('b', {}, B.title), h('button', { class: 'ibtn', title: '닫기', onclick: () => close() }, icon('x'))), page));
+    const close = () => { wrap.remove(); removeEventListener('keydown', onK, true); };
+    const onK = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    addEventListener('keydown', onK, true);
+    const go = id => { trail.push(cur); cur = id; show(); };
+    function show() {
+      const c = B.cards[cur]; if (!c) return close();
+      const outs = (g.out.get(cur) || []).filter(l => B.cards[l.to] && visible(B.cards[l.to]));
+      const tags = Object.keys(c.tags || {}).map(k => B.cards[k]).filter(t => t && visible(t));
+      const choice = c.zone === '선택' || outs.length > 1;
+      page.replaceChildren(...[   // replaceChildren 은 null 을 글자로 쓴다 — 거른다
+        c.spine && !choice ? h('div', { class: 'rd-spine' }, c.spine) : null,
+        h('p', { class: 'rd-text' + (choice ? ' q' : '') }, c.text),
+        tags.length ? h('div', { class: 'sc-tags' }, tags.map(t => h('span', { class: 'mtag' }, t.text))) : null,
+        choice ? h('div', { class: 'rd-opts' }, outs.map((l, i) => h('button', { class: 'rd-opt', onclick: () => go(l.to) }, h('span', { class: 'opt' }, 'ABCD'[i] || ''), B.cards[l.to].text)))
+          : outs.length ? h('div', { class: 'rd-row' }, h('button', { class: 'btn primary', onclick: () => go(outs[0].to) }, '다음', icon('next', 16)))
+          : h('div', { class: 'rd-endbox' + (c.end ? ' done' : '') }, c.end ? '— 끝 —' : '여기서 이야기가 멈췄어요. 아직 끝이 없어요.',
+            h('div', { class: 'rd-row' }, h('button', { class: 'btn', onclick: () => { trail = []; cur = g.start.id; show(); } }, '처음부터 다시'), g.nodes.some(n => (g.out.get(n.id) || []).length > 1) ? h('span', { class: 'help' }, '다른 길도 골라 봐요') : null)),
+        trail.length ? h('div', { class: 'rd-back' }, h('button', { class: 'btn ghost small', onclick: () => { cur = trail.pop(); show(); } }, icon('back', 14), '앞으로')) : null].filter(Boolean));
+    }
+    document.body.append(wrap); show();
+  }
+
+  // 갈림길 쓰기 — 고르는 장면 하나 + 고를 것 둘(셋째는 나중에 '고를 것 더하기')
+  function openBranch({ onSave }) {
+    busy++;
+    const max = S.maxLen || 40;
+    const q = h('input', { maxlength: max, placeholder: '고르는 장면 — 예: 별을 살리려면?' });
+    const a = h('input', { maxlength: max, placeholder: 'A — 예: 얼음 동굴의 요정에게 간다' }), b2 = h('input', { maxlength: max, placeholder: 'B — 예: 숲 친구들을 모은다' });
+    const close = () => { wrap.remove(); busy--; flush(); };
+    const save = () => { const v = [q, a, b2].map(x => x.value.trim().replace(/\s+/g, ' ')); if (!v[0]) return q.focus(); if (!v[1] || !v[2]) return (v[1] ? b2 : a).focus(); close(); onSave(v[0], [v[1], v[2]]); };
+    const wrap = h('div', { class: 'editor-wrap', onpointerdown: e => { if (e.target === wrap) close(); } },
+      h('div', { class: 'editor' }, h('div', { class: 'ed-title' }, '갈림길 — 여기서 길이 갈라져요'),
+        h('div', { class: 'br-form' }, q, h('div', { class: 'br-opts' }, a, b2)),
+        h('div', { class: 'ed-row' }, h('span', { class: 'help' }, '고른 다음 어떻게 되는지는 길마다 이어 써요'), h('div', { class: 'grow' }),
+          h('button', { class: 'btn', onclick: close }, '취소'), h('button', { class: 'btn primary', onclick: save }, '저장'))));
+    [q, a, b2].forEach(x => x.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); } if (e.key === 'Escape') close(); }));
+    document.body.append(wrap); setTimeout(() => q.focus(), 30);
+  }
+
+  // ─────────── [THINKBOARD-STORY-1] 나무 — 노션처럼 주제 밑에 넣기 · 접고 펴기
+  function addChildOf(parent, after = '') {
+    const T = treeOf(B, visible), depth = (() => { let d = 0; for (let p = parent; p && d < 20; p = (B.cards[p] || {}).parent || '') d++; return d; })();
+    openEditor({ title: parent ? `'${(B.cards[parent] || {}).text || ''}' 밑에 넣기` : after ? '같은 층에 더하기' : '주제 더하기', placeholder: parent ? '이 주제 밑에 들어갈 생각' : '큰 주제 하나',
+      onSave: text => { const n = T.items.length; act('addChild', { parent, after, text, x: 40 + depth * 40, y: 40 + n * 56 }); if (parent) folded.delete(parent); } });
+  }
+  function treeTools(c, T) {
+    const edit = canEdit(c), sibs = T.kids(c.parent && B.cards[c.parent] ? c.parent : ''), i = sibs.indexOf(c);
+    const prev = sibs[i - 1], next = sibs[i + 1], par = c.parent && B.cards[c.parent] ? B.cards[c.parent] : null;
+    const b = (ic, label, fn, cls = '', bare = false) => h('button', { class: 'abtn ' + cls + (bare ? ' bare' : ''), title: label, 'aria-label': label, onclick: e => { e.stopPropagation(); fn(); } }, icon(ic, 15), bare ? null : h('span', {}, label));
+    const ordAfter = (list, j) => { const a = list[j] ? list[j].ord || 0 : 0, n = list[j + 1]; return n ? (a + (n.ord || 0)) / 2 : a + 1; };
+    const items = [
+      edit ? b('edit', '고치기', () => editCard(c.id)) : null,
+      edit && open() ? b('sub', '밑에 넣기', () => { if (canAdd(true)) addChildOf(c.id); }) : null,
+      edit && open() ? b('plus', '아래에 같은 층', () => { if (canAdd(true)) addChildOf(par ? par.id : '', c.id); }) : null,
+      edit && prev ? b('indent', '들여쓰기', () => { const k = T.kids(prev.id); act('treeMove', { id: c.id, parent: prev.id, ord: (k.length ? k[k.length - 1].ord || 0 : 0) + 1 }); folded.delete(prev.id); }, '', true) : null,
+      edit && par ? b('outdent', '내어쓰기', () => { const up = T.kids(par.parent && B.cards[par.parent] ? par.parent : ''); act('treeMove', { id: c.id, parent: par.parent || '', ord: ordAfter(up, up.indexOf(par)) }); }, '', true) : null,
+      edit && prev ? b('up', '위로', () => { const pp = sibs[i - 2]; act('treeMove', { id: c.id, parent: c.parent || '', ord: pp ? ((pp.ord || 0) + (prev.ord || 0)) / 2 : (prev.ord || 0) - 1 }); }, '', true) : null,
+      edit && next ? b('down', '아래로', () => { const nn = sibs[i + 2]; act('treeMove', { id: c.id, parent: c.parent || '', ord: nn ? ((next.ord || 0) + (nn.ord || 0)) / 2 : (next.ord || 0) + 1 }); }, '', true) : null,
+      teacher && waiting(c) ? b('check', '허락', () => act('moderate', { id: c.id, ok: true }), 'ok') : null,
+      teacher ? b(c.hidden ? 'eye' : 'eyeOff', c.hidden ? '다시 보이기' : '아이들에게 가리기', () => act('moderate', { id: c.id, hidden: !c.hidden }), '', true) : null,
+      edit ? b('trash', '지우기', () => { if (confirm('이 항목을 지울까요? 밑에 있던 것은 한 칸 위로 올라가요.')) act('removeInTree', { id: c.id }); }, 'danger', true) : null,
+    ].filter(Boolean);
+    return h('div', { class: 'card-tools', onpointerdown: e => e.stopPropagation() }, items);
+  }
+  function renderTree() {
+    const T = treeOf(B, visible), list = h('div', { class: 'tr-list' });
+    const row = (c, depth) => {
+      const kids = T.kids(c.id), f = folded.has(c.id);
+      const el = h('div', { class: 'tr-row', style: { paddingLeft: depth * 30 + 'px' } },
+        h('button', { class: 'tr-fold' + (kids.length ? '' : ' leaf'), title: kids.length ? (f ? '펴기' : '접기') : '', onclick: e => { e.stopPropagation(); if (!kids.length) return; if (f) folded.delete(c.id); else folded.add(c.id); render(); } }, kids.length ? (f ? '▸' : '▾') : '•'),
+        h('div', { class: cardClass(c, ' tcard' + (depth === 0 ? ' root' : '')) }, cardText(c), f && kids.length ? h('span', { class: 'tr-cnt' }, `밑에 ${kids.length}`) : null, cardBadges(c), cardMeta(c), sel === c.id ? treeTools(c, T) : null));
+      el.querySelector('.tcard').addEventListener('click', e => { if (e.target.closest('.card-tools, .heart')) return; tapCard(c.id); });
+      list.append(el);
+      if (!f) kids.forEach(k => row(k, depth + 1));
+    };
+    const roots = T.kids('');
+    roots.forEach(c => row(c, 0));
+    const unk = Object.values(B.cards).filter(visible).filter(c => c.kind === 'unknown');
+    const empties = S.hints && roots.length > 1 ? roots.filter(r => !T.kids(r.id).length && roots.some(o => T.kids(o.id).length)) : [];
+    flow.append(h('div', { class: 'tr-wrap' },
+      roots.length ? list : h('div', { class: 'fl-empty' }, open() ? '큰 주제부터 하나 써 볼까요? 오른쪽 아래 [주제 더하기]' : '아직 주제가 없어요'),
+      empties.length ? h('div', { class: 'st-coach' }, empties.map(r => h('span', {}, `'${r.text.slice(0, 12)}' 밑이 아직 비어 있어요`))) : null,
+      unk.length ? h('div', { class: 'tr-unk' }, h('b', {}, '❔ 아직 안 정한 것'), h('div', { class: 'st-mats' }, unk.map(c => flowCard(c)))) : null));
   }
 
   // ─────────── 카드 끌기 · 누르기(자유 배치)
@@ -439,8 +708,8 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
   }
 
   // ─────────── 글 쓰기 창
-  //  colors: 색 고르기 · cols: 칸 고르기(칸 나누기에서 위 ＋로 쓸 때)
-  function openEditor({ title, text = '', placeholder = '', color = '', zone = '', cols = null, onSave }) {
+  //  colors: 색 고르기 · cols: 칸 고르기(칸 나누기에서 위 ＋로 쓸 때) · spines: 이어 주는 말 고르기(이야기 줄 — 글 앞에 붙는 말)
+  function openEditor({ title, text = '', placeholder = '', color = '', zone = '', cols = null, spines = null, spine = '', onSave }) {
     busy++;
     const max = S.maxLen || 40;
     const ta = h('textarea', { maxlength: max, placeholder, rows: max > 80 ? 4 : 3 });
@@ -453,8 +722,11 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
       class: 'dot' + (cv ? ' c-' + cv : ' c-none') + (cv === col ? ' on' : ''), title: COLOR_NAME[cv], type: 'button',
       onclick: e => { col = cv; dots.querySelectorAll('.dot').forEach(d => d.classList.remove('on')); e.currentTarget.classList.add('on'); } }))) : null;
     const zsel = cols && cols.length ? h('select', { class: 'ed-zone' }, cols.map(z => h('option', { value: z, selected: z === zone }, z))) : null;
+    let sp = spine;
+    const spRow = spines && spines.length ? h('div', { class: 'ed-spines' }, h('span', { class: 'sub' }, '이어 주는 말'), ['', ...spines].map(w => h('button', { type: 'button', class: 'chip' + (w === sp ? ' on' : ''),
+      onclick: e => { sp = w; spRow.querySelectorAll('.chip').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); ta.focus(); } }, w || '없음'))) : null;
     const close = () => { wrap.remove(); busy--; flush(); };
-    const save = () => { const v = ta.value.trim().replace(/\s+/g, ' '); if (!v) return ta.focus(); close(); onSave(v, { color: col, zone: zsel ? zsel.value : zone }); };
+    const save = () => { const v = ta.value.trim().replace(/\s+/g, ' '); if (!v) return ta.focus(); close(); onSave(v, { color: col, zone: zsel ? zsel.value : zone, spine: sp }); };
     ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); save(); }
       if (e.key === 'Escape') close();
@@ -463,7 +735,7 @@ export function mountBoard(root, { store, boardId, me, meId = '', home, teacher 
       h('div', { class: 'editor' },
         title ? h('div', { class: 'ed-title' }, title) : null,
         zsel ? h('div', { class: 'ed-row' }, h('span', { class: 'sub' }, '어느 칸에?'), zsel) : null,
-        ta, dots,
+        spRow, ta, dots,
         h('div', { class: 'ed-row' }, cnt, h('div', { class: 'grow' }),
           h('button', { class: 'btn', onclick: close }, '취소'),
           h('button', { class: 'btn primary', onclick: save }, '저장'))));

@@ -8,6 +8,7 @@ import { zoneNames } from './settings.js';
 //  unit   : 'group'(모둠 판) · 'solo'(개인 판) · 'class'(학급 전체)
 export const BUILTIN = [
   {
+    // [THINKBOARD-STORY-1] 사건 중심 — 사건 카드를 차례로 잇고(이야기 줄), 고르는 장면에서 길이 갈린다. 인물 · 장소는 선반에서 사건에 붙인다.
     id: 'story', name: '이야기 만들기', icon: '📖', unit: 'group', mail: 'qs',
     zones: ['장소', '인물', '사건', '선택'],
     hints: [
@@ -16,6 +17,7 @@ export const BUILTIN = [
       { linksFrom: '선택', msg: '고른 다음 어떻게 되는지 화살표가 없어요' },
     ],
     ai: '사건과 사건 사이의 이유(왜 그렇게 됐는지)와, 고른 다음에 어떻게 되는지가 빠진 곳을 물어봐 주세요.',
+    settings: { layout: 'story', seqWords: 'story', branch: true, maxLen: 80 },
   },
   {
     id: 'game', name: '게임 만들기', icon: '🎮', unit: 'group', mail: 'qs',
@@ -57,6 +59,20 @@ export const BUILTIN = [
     ai: '아이들이 무엇을 만들려는지 판에서 읽고, 아직 정하지 않은 중요한 것만 물어봐 주세요.',
   },
 ];
+
+// ─ [THINKBOARD-STORY-1] 이야기 말고 일반 주제에도 — 차례 줄(과정 · 절차) · 주제 나무(노션처럼 주제 밑에 넣기)
+BUILTIN.push(
+  {
+    id: 'steps', name: '차례 줄(과정 · 절차)', icon: '🪜', unit: 'group', mail: 'q', zones: ['준비물', '단계'], hints: [],
+    ai: '빠진 단계, 단계의 차례가 바뀌면 생기는 문제, 준비물이 쓰이는 때를 물어봐 주세요.',
+    settings: { layout: 'story', seqWords: 'steps', branch: false, maxLen: 80 },
+  },
+  {
+    id: 'outline', name: '주제 나무(노션처럼)', icon: '🌳', unit: 'group', mail: 'q', zones: [], hints: [],
+    ai: '주제 밑에 아직 비어 있는 갈래, 같은 층에 섞여 있는 다른 층의 생각을 물어봐 주세요.',
+    settings: { layout: 'tree', maxLen: 80, unknown: true },
+  },
+);
 
 // ─ 설정 틀을 미리 골라 둔 판 틀(패들렛식 · 반 전체 판). 엔진은 같고 settings 만 다르다(settings.js 표의 값).
 BUILTIN.push(

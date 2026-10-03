@@ -2,6 +2,17 @@
 //  icon('plus') → <svg> · 색은 글자색(currentColor)을 따른다.
 const P = {
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  // [THINKBOARD-STORY-1] 이야기 줄 · 나무
+  book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
+  branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 7v10M18 11c0 4-6 3-11.5 6.5"/>',
+  flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  next: '<path d="M5 12h12M13 7l5 5-5 5"/>',
+  sub: '<path d="M6 4v9a3 3 0 0 0 3 3h9M14 12l4 4-4 4"/>',
+  indent: '<path d="M4 6h16M10 12h10M10 18h10M4 10l3 2-3 2"/>',
+  outdent: '<path d="M4 6h16M10 12h10M10 18h10M7 10l-3 2 3 2"/>',
+  up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6"/><path d="M12 16.8h.01"/>',

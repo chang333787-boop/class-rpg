@@ -9,7 +9,14 @@
 //   · 설정을 바꾸면 log 에 남는다(model.js setSettings) — 발판을 언제 줄였는지가 연구 자료다.
 import { h } from './util.js';
 
-export const LAYOUTS = { canvas: '자유 배치(끌어서 어디든)', columns: '칸 나누기', wall: '담벼락(차곡차곡)', stream: '한 줄로', pins: '그림에 핀 꽂기' };
+export const LAYOUTS = { canvas: '자유 배치(끌어서 어디든)', columns: '칸 나누기', wall: '담벼락(차곡차곡)', stream: '한 줄로', pins: '그림에 핀 꽂기',
+  story: '이야기 줄(사건 차례 · 갈림길)', tree: '나무(주제 밑에 넣기)' };   // [THINKBOARD-STORY-1]
+//  이야기 줄의 이어 주는 말 — 빈자리 안내 · 사건 카드 위 말(이야기 줄기 문장 / 차례 말)
+export const SEQ_WORDS = {
+  story: ['옛날 옛적에', '날마다', '그러던 어느 날', '그래서', '그런데', '그때', '마침내', '그 뒤로'],
+  steps: ['먼저', '그다음', '그리고', '그런데', '그래서', '마지막으로'],
+  off: [],
+};
 export const BGS = { paper: '종이', sky: '하늘', mint: '민트', peach: '살구', grape: '포도', night: '밤' };
 export const COLORS = ['', 'yellow', 'pink', 'green', 'blue', 'purple'];   // '' = 기본(출처 색)
 
@@ -23,6 +30,8 @@ export const SCHEMA = [
     { key: 'prompt', label: '질문 · 안내(판 맨 위)', type: 'text', def: '', help: '예: 두 그림에서 달라진 곳을 찾아 핀을 꽂아요' },
     { key: 'images', label: '그림(주소 · 2장까지)', type: 'images', def: [], help: '그림에 핀 꽂기 · 질문 그림으로 써요. https:// 주소' },
     { key: 'bg', label: '바탕', type: 'select', options: BGS, def: 'paper' },
+    { key: 'seqWords', label: '이어 주는 말', type: 'select', options: { story: '이야기 말(옛날 옛적에 · 그러던 어느 날 · 그래서 …)', steps: '차례 말(먼저 · 그다음 · 마지막으로 …)', off: '없음' }, def: 'story',
+      show: s => s.layout === 'story', help: '사건 카드 위에 붙는 말 — 빈자리 안내로도 떠요. 이야기가 아닌 차례(실험 · 만들기 순서)는 차례 말로.' },
   ] },
   { sec: '쓰기', items: [
     { key: 'open', label: '아이들이 쓸 수 있어요', type: 'toggle', def: true, help: '끄면 보기만 해요(쓰기 쉬는 시간)' },
@@ -31,6 +40,7 @@ export const SCHEMA = [
     { key: 'colors', label: '카드 색 고르기', type: 'toggle', def: false },
     { key: 'unknown', label: '모르는 것(?) 카드', type: 'toggle', def: true },
     { key: 'links', label: '화살표 잇기', type: 'toggle', def: true, show: s => s.layout === 'canvas' },
+    { key: 'branch', label: '갈림길 만들기', type: 'toggle', def: true, show: s => s.layout === 'story', help: '끄면 한 줄 이야기(차례)만 — 3학년 · 차례 쓰기' },
     { key: 'move', label: '카드 옮기기', type: 'select', options: { all: '누구나', own: '내 카드만', none: '못 옮겨요' }, def: 'all', show: s => s.layout === 'canvas' || s.layout === 'columns' },
     { key: 'edit', label: '고치기 · 지우기', type: 'select', options: { all: '누구나(모둠 판)', own: '내 카드만' }, def: 'all' },
   ] },
