@@ -1,6 +1,6 @@
 // 블록 정의 · 파이썬 글 코드 · 어두운 테마 — Blockly 11(구글 · Apache-2.0)은 index.html 의 <script> 가 싣는다(전역 Blockly · python)
 //  [CODING-ROOM-1] 블록 편집기는 검증된 엔진을 쓰고, 우리는 내용(판 · 몬스터 · 교과 연결)과 기록에 힘을 쓴다.
-import { PEN_COLORS } from './world.js';
+import { PEN_COLORS, CONDS } from './world.js';
 
 const B = globalThis.Blockly;
 const PY = globalThis.python && globalThis.python.pythonGenerator;
@@ -11,9 +11,14 @@ const STYLE = {
   move_blocks: { colourPrimary: '#3d8bfd', colourSecondary: '#8ab6ff', colourTertiary: '#2a62b5' },
   act_blocks: { colourPrimary: '#2fae6a', colourSecondary: '#7fd4a3', colourTertiary: '#1f7a49' },
   loop_blocks: { colourPrimary: '#f59a23', colourSecondary: '#ffc068', colourTertiary: '#b86d0c' },
+  if_blocks: { colourPrimary: '#9b5de5', colourSecondary: '#c39bf0', colourTertiary: '#6c3aa8' },
   pen_blocks: { colourPrimary: '#e0533d', colourSecondary: '#ff9585', colourTertiary: '#a3382a' },
 };
 let THEME = null, done = false;
+//  [CODING-U5] 만약 블록의 살피기 목록 — 판(몬스터)마다 다르다. 작업판을 만들기 전에 정한다(서랍 블록이 그때 만들어진다)
+let condList = ['wall', 'ahead', 'left', 'right'];
+export function setConds(list) { if (list && list.length) condList = list.slice(); }
+const condOptions = () => condList.map(k => [CONDS[k] ? CONDS[k][0] : k, k]);
 
 export function defineAll() {
   if (done || !B) return;
@@ -48,6 +53,20 @@ export function defineAll() {
     { type: 'p_color', message0: '붓 색 %1', args0: [{ type: 'field_dropdown', name: 'C', options: PEN_COLORS.map(([n, c]) => [n, c]) }], previousStatement: null, nextStatement: null, style: 'pen_blocks' },
     { type: 'p_pen', message0: '붓 %1', args0: [{ type: 'field_dropdown', name: 'S', options: [['내리기(그리기)', 'down'], ['들기(안 그리기)', 'up']] }], previousStatement: null, nextStatement: null, style: 'pen_blocks' },
   ]);
+  //  만약 · 만약/아니면 · 될 때까지 — 살피기 칸은 판마다 바뀌어 JS 로 정의
+  B.Blocks.c_if = { init() {
+    this.appendDummyInput().appendField('만약').appendField(new B.FieldDropdown(condOptions), 'C');
+    this.appendStatementInput('DO'); this.setPreviousStatement(true); this.setNextStatement(true); this.setStyle('if_blocks');
+  } };
+  B.Blocks.c_ifelse = { init() {
+    this.appendDummyInput().appendField('만약').appendField(new B.FieldDropdown(condOptions), 'C');
+    this.appendStatementInput('DO'); this.appendDummyInput().appendField('아니면'); this.appendStatementInput('ELSE');
+    this.setPreviousStatement(true); this.setNextStatement(true); this.setStyle('if_blocks');
+  } };
+  B.Blocks.c_until = { init() {
+    this.appendDummyInput().appendField('집에 닿을 때까지 반복');
+    this.appendStatementInput('DO'); this.setPreviousStatement(true); this.setNextStatement(true); this.setStyle('loop_blocks');
+  } };
   if (PY) {   // 블록 옆 '글 코드' — 파이썬 모양(6학년 · 중학교 정보로 이어지는 다리)
     const f = PY.forBlock, line = s => () => s + '\n';
     f.start = () => '';
@@ -55,6 +74,10 @@ export function defineAll() {
     f.m_up = line('up()'); f.m_down = line('down()'); f.m_west = line('left()'); f.m_east = line('right()');
     f.m_jump = line('jump()'); f.m_pick = line('pick()');
     f.c_repeat = (b, g) => `for i in range(${b.getFieldValue('N')}):\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}`;
+    const cond = b => (CONDS[b.getFieldValue('C')] || ['', 'check()'])[1];
+    f.c_if = (b, g) => `if ${cond(b)}:\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}`;
+    f.c_ifelse = (b, g) => `if ${cond(b)}:\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}else:\n${g.statementToCode(b, 'ELSE') || g.INDENT + 'pass\n'}`;
+    f.c_until = (b, g) => `while not at_home():\n${g.statementToCode(b, 'DO') || g.INDENT + 'pass\n'}`;
     f.p_fwd = b => `forward(${b.getFieldValue('N')})\n`;
     f.p_right = b => `right(${b.getFieldValue('N')})\n`;
     f.p_left = b => `left(${b.getFieldValue('N')})\n`;

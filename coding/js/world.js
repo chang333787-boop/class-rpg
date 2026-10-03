@@ -63,6 +63,25 @@ export function makeMaze(def) {
       }
       return { ok: false, why: 'unknown' };
     },
+    // [CODING-U5] 살피기 — 만약 · 될 때까지 블록이 묻는다(움직이지 않는다)
+    sense(c) {
+      const [dx, dy] = DIRS[st.dir], [lx, ly] = DIRS[(st.dir + 3) % 4], [rx, ry] = DIRS[(st.dir + 1) % 4];
+      const walk = (x, y) => WALK.includes(cell(x, y) || '#');
+      switch (c) {
+        case 'ahead': return walk(st.x + dx, st.y + dy);
+        case 'wall': return !walk(st.x + dx, st.y + dy);
+        case 'left': return walk(st.x + lx, st.y + ly);
+        case 'right': return walk(st.x + rx, st.y + ry);
+        case 'acorn': return st.acorns.has(st.x + ',' + st.y);
+        case 'puddle': return cell(st.x + dx, st.y + dy) === '~';
+        case 'pathN': return walk(st.x, st.y - 1);
+        case 'pathE': return walk(st.x + 1, st.y);
+        case 'pathS': return walk(st.x, st.y + 1);
+        case 'pathW': return walk(st.x - 1, st.y);
+        case 'goal': return st.x === m.goal.x && st.y === m.goal.y;
+      }
+      return false;
+    },
     // 끝난 뒤: 집에 닿았고 도토리를 다 모았나
     result() {
       const atGoal = st.x === m.goal.x && st.y === m.goal.y;
@@ -72,6 +91,14 @@ export function makeMaze(def) {
     },
   };
 }
+
+// 살피기 이름(블록 말 · 글 코드) — 몬스터마다 쓰는 것이 다르다(stages.js HERO_CONDS)
+export const CONDS = {
+  wall: ['앞이 막혔으면', 'wall_ahead()'], ahead: ['앞에 길이 있으면', 'path_ahead()'],
+  left: ['왼쪽에 길이 있으면', 'path_left()'], right: ['오른쪽에 길이 있으면', 'path_right()'],
+  acorn: ['도토리 위라면', 'on_acorn()'], puddle: ['앞이 웅덩이라면', 'puddle_ahead()'],
+  pathE: ['오른쪽이 길이면', 'path_east()'], pathS: ['아래가 길이면', 'path_south()'], pathN: ['위가 길이면', 'path_north()'], pathW: ['왼쪽이 길이면', 'path_west()'],
+};
 
 // ── 불씨 참새 붓 ──  판 400×400 · 방향 0 = 위, 시계 방향으로 도(°)
 export const PEN_COLORS = [['빨강', '#e5484d'], ['주황', '#f08c2e'], ['노랑', '#f2c230'], ['초록', '#3fae62'], ['파랑', '#2f7fe0'], ['보라', '#8e5bd0'], ['검정', '#2b2b2b'], ['흰색', '#ffffff']];
