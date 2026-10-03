@@ -3,7 +3,7 @@
 import { h, toast, modal, lsGet, lsSet } from './util.js';
 import { HEROES, makeMaze, makePen, compareDrawing, whyText } from './world.js';
 import { parse, countBlocks, runAst, astFromBlock, stateFromAst, runToEnd } from './interp.js';
-import { makeWorkspace, startOf, pythonOf } from './blocks.js';
+import { makeWorkspace, startOf, pythonOf, setConds } from './blocks.js';
 import { drawMaze, drawPen, heroImg } from './draw.js';
 import { UNITS, stagesOf } from './stages.js';
 
@@ -37,12 +37,21 @@ export async function mountPlay(root, ctx, stage) {
   pyPre.hidden = !pyOpen;
   const wsDiv = h('div', { class: 'ws' });
   const heroPic = h('img', { class: 'st-hero', src: '../assets/monsters/' + hero.img + '.png', alt: hero.name });
+  //  [CODING-U5] 길 둘 이상 — 코드 하나로 모두. 탭 = 미리 보기(실행 중이 아닐 때) · 표시 ✓ ✗
+  const maps = stage.maps && stage.maps.length > 1 ? stage.maps : null;
+  let mi = 0, mapRes = [];
+  const tabs = h('div', { class: 'maptabs' });
+  function renderTabs() {
+    if (!maps) return;
+    tabs.replaceChildren(h('span', { class: 'muted' }, '코드 하나로'), ...maps.map((m, i) => h('button', { class: 'btn small' + (i === mi ? ' on' : ''), onclick: () => { if (running || gen) return; fresh(i); render(); } },
+      `길 ${i + 1}${mapRes[i] === 'ok' ? ' ✓' : mapRes[i] === 'bad' ? ' ✗' : ''}`)), h('span', { class: 'muted' }, '모두 가야 성공'));
+  }
   root.replaceChildren(
     ctx.topBar(`${stage.id} · ${stage.title}`, { back: '#/', right: [h('span', { class: 'chip c-unit' }, `${unit.id}단원 ${unit.title}`), h('span', { class: 'chip' }, hero.name)] }),
     h('div', { class: 'play' },
       h('section', { class: 'world' },
         h('div', { class: 'story' }, heroPic, h('div', {}, h('b', {}, stage.title), h('p', {}, stage.story))),
-        stageWrap, msg,
+        maps ? tabs : null, stageWrap, msg,
         h('div', { class: 'ctrl' }, runBtn, stepBtn, resetBtn, speedSel, h('span', { class: 'sp' }), hintBtn, bugBtn)),
       h('section', { class: 'code' },
         h('div', { class: 'code-head' }, h('b', {}, '블록'), countEl, h('span', { class: 'sp' }), h('span', { class: 'muted small' }, hero.about), pyBtn),
@@ -57,6 +66,7 @@ export async function mountPlay(root, ctx, stage) {
   };
 
   // ── 작업판 ──
+  setConds(stage.conds);   // [CODING-U5] 만약 블록의 살피기 = 이 몬스터 것만
   const ws = makeWorkspace(wsDiv, { blocks: stage.blocks, limit: stage.limit });
   function loadState(state) {
     ws.clear();
@@ -87,16 +97,18 @@ export async function mountPlay(root, ctx, stage) {
   function updatePy() { if (pyOpen) pyPre.textContent = pythonOf(ws) || '# ‘시작하면’ 아래에 블록을 이어요'; }
 
   // ── 세계 ──
-  function fresh() {
-    world = stage.world === 'maze' ? makeMaze(stage) : makePen({ start: stage.start });
+  function fresh(i = mi) {
+    mi = i;
+    world = stage.world === 'maze' ? makeMaze(maps ? { ...stage, map: maps[i].map, dir: maps[i].dir } : stage) : makePen({ start: stage.start });
     view = stage.world === 'maze' ? { x: world.st.x, y: world.st.y, dir: world.st.dir } : { x: world.st.x, y: world.st.y, h: world.st.h };
+    renderTabs();
   }
   function render() { if (!W || !world) return; stage.world === 'maze' ? drawMaze(g, W, H, world, view) : drawPen(g, W, H, world, target, view); }
   function say(t, kind = '') { msg.textContent = t; msg.className = 'w-msg ' + kind; }
   function highlight(id) { try { ws.highlightBlock(id || null); } catch (e) {} }
   function setButtons() { runBtn.disabled = running; stepBtn.textContent = gen && !running ? '다음 한 걸음' : '한 걸음씩'; }
   function stopRun() { running = false; gen = null; cancelAnimationFrame(raf); highlight(null); setButtons(); over.replaceChildren(); over.style.display = 'none'; }
-  function reset() { stopRun(); fresh(); say(''); render(); }
+  function reset() { stopRun(); mapRes = []; fresh(0); say(''); render(); }
 
   // 지금 세계 상태 그대로의 모습(바로 실행 · 움직임 끝)
   function syncView(ev) {
@@ -139,6 +151,8 @@ export async function mountPlay(root, ctx, stage) {
     raf = requestAnimationFrame(tick);
   }
 
+  let curAst = null, nUsed = 0;
+  function startMap(i) { fresh(i); gen = runAst(curAst, world, { max: 600 }); }
   function run(step) {
     if (running) return;
     over.style.display = 'none';
@@ -146,12 +160,15 @@ export async function mountPlay(root, ctx, stage) {
       const ast = program();
       if (!ast.length) { say(whyText('empty', stage.hero), 'bad'); return; }
       if (stage.limit && countBlocks(ast) > stage.limit) { say(`블록이 ${stage.limit}개를 넘었어요 — 반복으로 줄여 봐요`, 'bad'); return; }
-      fresh(); gen = runAst(ast, world, { max: 600 }); gen.n = countBlocks(ast); say('');
+      curAst = ast; nUsed = countBlocks(ast); mapRes = []; startMap(0); say(maps ? '길 1부터 가요' : '');
     }
     running = !step; setButtons();
-    if (speed === 'instant' && !step) {   // 바로 = 움직임 없이 끝까지(막히면 그 자리에서 멈춤)
-      try { while (!gen.next().done) {} } catch (e) { syncView(); render(); return fail(e.why, e.id); }
-      syncView(); render(); return finish();
+    if (speed === 'instant' && !step) {   // 바로 = 움직임 없이 끝까지(막히면 그 자리에서 멈춤) · 길 둘이면 차례로
+      for (;;) {
+        try { while (!gen.next().done) {} } catch (e) { syncView(); render(); return fail(e.why, e.id); }
+        syncView(); render();
+        const r = mapEnd(); if (r !== 'next') return r;
+      }
     }
     advance();
   }
@@ -159,7 +176,7 @@ export async function mountPlay(root, ctx, stage) {
     if (!gen) return;
     let r;
     try { r = gen.next(); } catch (e) { return fail(e.why, e.id); }
-    if (r.done) return finish();
+    if (r.done) { const m = mapEnd(); if (m === 'next') { if (running) setTimeout(() => { if (alive && gen) advance(); }, 650); else setButtons(); } return; }
     const ev = r.value;
     highlight(ev.id);
     animate(ev, () => {
@@ -168,14 +185,23 @@ export async function mountPlay(root, ctx, stage) {
       if (running) advance(); else setButtons();
     });
   }
-  async function finish() {
-    const n = gen ? gen.n : 0;
-    running = false; gen = null; setButtons();
+  // 한 길이 끝났을 때 — 이 길을 못 가면 실패, 다음 길이 있으면 'next'(같은 코드로 다시), 다 갔으면 성공
+  function mapEnd() {
     const res = stage.world === 'maze' ? world.result() : (compareDrawing(target, world.st.segs).ok ? { ok: true } : { ok: false, why: 'draw' });
-    if (!res.ok) return fail(res.why, null, res, n);
+    if (!res.ok) { fail(res.why, null, res); return 'fail'; }
+    if (maps && mi < maps.length - 1) {
+      mapRes[mi] = 'ok'; say(`길 ${mi + 1} 성공! 같은 코드로 길 ${mi + 2}도 가 봐요`, 'good');
+      startMap(mi + 1); render(); return 'next';
+    }
+    if (maps) mapRes[mi] = 'ok';
+    finish(); return 'done';
+  }
+  async function finish() {
+    const n = nUsed;
+    running = false; gen = null; setButtons(); renderTabs();
     highlight(null);
     const stars = starsOf(n, stage.best);
-    say(`🎉 성공! ${STAR(stars)} · 블록 ${n}개`, 'good');
+    say(`🎉 성공! ${STAR(stars)} · 블록 ${n}개${maps ? ' · 길 ' + maps.length + '개 모두' : ''}`, 'good');
     try { await ctx.store.saveRun(stage.id, { ok: true, n, stars }); } catch (e) { console.warn(e); }
     ctx.onProgress && ctx.onProgress();
     over.style.display = 'grid';
@@ -183,16 +209,18 @@ export async function mountPlay(root, ctx, stage) {
       h('img', { src: heroImg(stage.hero).src, alt: '' }),
       h('div', { class: 'stars' }, STAR(stars)),
       h('b', {}, '성공!'),
-      h('p', {}, `블록 ${n}개로 풀었어요.` + (n > stage.best ? ` 블록 ${stage.best}개로도 풀 수 있어요 — 더 줄여 볼래요?` : ' 가장 짧은 코드예요!')),
+      h('p', {}, `블록 ${n}개로 풀었어요.` + (maps ? ` 같은 코드로 길 ${maps.length}개를 다 갔어요.` : '') + (n > stage.best ? ` 블록 ${stage.best}개로도 풀 수 있어요 — 더 줄여 볼래요?` : ' 가장 짧은 코드예요!')),
       h('div', { class: 'row' },
         h('button', { class: 'btn', onclick: () => { over.style.display = 'none'; reset(); } }, '다시 하기'),
         next ? h('button', { class: 'btn primary', onclick: () => ctx.go('#/s/' + next.id) }, '다음 판 →') : h('button', { class: 'btn primary', onclick: () => ctx.go('#/') }, `${stage.unit}단원 끝! 목록으로`))));
   }
-  async function fail(why, id, res = {}, n = gen ? gen.n : 0) {
+  async function fail(why, id, res = {}) {
+    const n = nUsed;
     running = false; gen = null; setButtons();
+    if (maps) { mapRes[mi] = 'bad'; renderTabs(); }
     if (id) highlight(id); else highlight(null);
     failN++;
-    say(whyText(why, stage.hero, res), 'bad');
+    say((maps ? `길 ${mi + 1}: ` : '') + whyText(why, stage.hero, res), 'bad');
     if (failN >= 2 && stage.hint) hintBtn.style.display = '';
     try { await ctx.store.saveRun(stage.id, { ok: false, why, n }); } catch (e) { console.warn(e); }
   }

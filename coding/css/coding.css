@@ -128,3 +128,6 @@ select{font:inherit;color:var(--txt);background:var(--bg3);border:1px solid var(
   .units{grid-template-columns:1fr}
   .sgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+/* [CODING-U5] 길 둘 — 코드 하나로 모두 */
+.maptabs{flex:none;display:flex;align-items:center;gap:6px;padding:0 14px 6px;font-size:.8rem}
+.maptabs .btn.small{height:28px;padding:0 .7rem}
