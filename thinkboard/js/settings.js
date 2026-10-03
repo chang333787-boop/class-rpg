@@ -36,7 +36,7 @@ export const SCHEMA = [
   ] },
   { sec: '보기', items: [
     { key: 'names', label: '쓴 사람 이름', type: 'select', options: { off: '안 보여요', show: '보여요', anon: '친구에겐 익명(선생님은 봐요)' }, def: 'off' },
-    { key: 'listed', label: '아이들 판 목록에 보여요', type: 'toggle', def: true, help: '끄면 학급 RPG 생각판 목록에서 숨어요(준비 중인 판)' },
+    { key: 'listed', label: '아이들에게 보여요', type: 'toggle', def: true, help: '켜면 아이 RPG 홈 \'오늘의 공부\'에 바로 떠요 · 끄면 숨어요(준비 중인 판)' },
     { key: 'others', label: '친구 카드 보기', type: 'toggle', def: true, help: '끄면 자기 카드만 보여요(출구 카드 · 비밀 답)' },
     { key: 'approve', label: '선생님이 허락한 카드만 친구에게 보여요', type: 'toggle', def: false, help: '아이가 직접 쓴 카드에만 걸려요' },
     { key: 'sort', label: '카드 순서', type: 'select', options: { old: '먼저 쓴 것이 앞', new: '새 것이 앞' }, def: 'old', show: s => s.layout !== 'canvas' },

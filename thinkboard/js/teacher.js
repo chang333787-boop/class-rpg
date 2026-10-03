@@ -16,6 +16,7 @@ export function mountTeacher(root, { store, home, roster = [] }) {
     // 최근에 만든 것 위로, 같이 만든 모둠 판끼리는 1·2·3모둠 순서
     const boards = (await store.list()).sort((a, z) => Math.floor(z.created / 60000) - Math.floor(a.created / 60000) || a.title.localeCompare(z.title, 'ko', { numeric: true }));
     render(boards);
+    store.reconcileIndex?.(boards);   // [THINKBOARD-HOME-1] 아이 홈 카드 목록을 판 목록과 맞춘다(다를 때만 씀)
   }
   const stopWatch = store.watchAll(() => { clearTimeout(timer); timer = setTimeout(load, 150); });
 
@@ -82,7 +83,7 @@ export function mountTeacher(root, { store, home, roster = [] }) {
     return h('div', { class: 't-row' },
       h('span', { class: 't-ico' }, b.template.icon || '📋'),
       h('div', { class: 't-main' }, h('div', { class: 't-title' }, b.title, st.open ? null : h('span', { class: 'pill warn sm' }, icon('lock', 13), '닫힘')), h('div', { class: 't-meta' }, meta)),
-      h('div', { class: 't-code', title: '아이들이 들어올 때 쓰는 판 코드' }, b.code),
+      store.kind === 'rtdb' ? null : h('div', { class: 't-code', title: '아이들이 들어올 때 쓰는 판 코드' }, b.code),   // RPG 안에서는 코드 없이 아이 홈에 뜬다
       h('div', { class: 't-btns' },
         h('a', { class: 'btn primary', href: '#/tb/' + b.id }, '열기'),
         h('button', { class: 'btn', onclick: () => settings(b) }, icon('gear', 16), '설정'),

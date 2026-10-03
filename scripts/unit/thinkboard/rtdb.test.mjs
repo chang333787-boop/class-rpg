@@ -37,6 +37,9 @@ ok(B && B.title === '시험 판', '만든 판을 다시 읽음');
 ok(B.cards && typeof B.cards === 'object' && B.log && B.mail && B.results && B.links, '빈 칸(cards·log…) 복원');
 ok(Array.isArray(B.template.zones) && B.template.zones.join() === tpl.zones.join(), '판 틀 칸 배열 복원');
 ok(B.settings.layout === 'columns' && B.settings.react === 'heart', '판 틀 설정 그대로');
+// [THINKBOARD-HOME-1] 아이 홈 작은 목록(listed) — 판 내용 없이 제목·열림만
+const L = () => clone(getAt(ROOT + '/listed')) || {};
+ok(L()[b0.id] && L()[b0.id].t === '시험 판' && L()[b0.id].o === true && !('cards' in L()[b0.id]), '만들면 아이 홈 목록에 뜬다(제목만)');
 
 const run = async (name, args, by) => { const r = ops[name](B, { ...args, by }); await store.patch(B.id, r.patch); B = await store.get(B.id); return r.id; };
 const c1 = await run('addCard', { text: '좋았어요', zone: '좋은 점', x: 1, y: 2, color: 'yellow' }, '민준');
@@ -53,6 +56,20 @@ ok(!B.cards[c2].hidden && B.cards[c2].ok === true, '다시 보이기(허락은 �
 await run('setSettings', { settings: { ...B.settings, open: false, cols: ['가', '나'], images: ['/a.jpg'] } }, 'teacher');
 ok(B.settings.open === false && Array.isArray(B.settings.cols) && B.settings.cols.join() === '가,나' && B.settings.images[0] === '/a.jpg', '설정 · 배열 설정 복원');
 ok(Object.values(B.log).some(l => l.op === 'settings'), '설정 바꿈이 기록에(연구)');
+ok(L()[B.id] && L()[B.id].o === false, '쓰기를 닫으면 아이 홈 목록에도 보기만');
+await run('setSettings', { settings: { listed: false } }, 'teacher');
+ok(!L()[B.id], '아이들에게 안 보이게 하면 목록에서 빠진다');
+await run('setSettings', { settings: { listed: true, prompt: '오늘 질문' } }, 'teacher');
+ok(L()[B.id] && L()[B.id].p === '오늘 질문', '다시 보이게 하면 돌아온다 · 질문도');
+let w0 = writes.length;
+await run('addCard', { text: '목록과 무관한 카드', zone: '좋은 점', x: 0, y: 0 }, '민준');
+ok(!writes.slice(w0).some(w => w.startsWith(ROOT + '/listed')), '아이가 카드를 써도 목록은 안 쓴다');
+setAt(ROOT + '/listed/ghost', { t: '없는 판' }); setAt(ROOT + '/listed/bad id!', { t: '나쁜 id' });
+ok((await store.listOpen()).every(b => /^[\w-]+$/.test(b.id)), '목록 읽기: 이상한 판 id 는 버린다');
+await store.reconcileIndex();
+ok(!L().ghost && !L()['bad id!'] && L()[B.id], '선생님 화면 맞추기: 없는 판은 빼고 있는 판은 둔다');
+w0 = writes.length; await store.reconcileIndex();
+ok(writes.length === w0, '맞추기: 같으면 쓰기 0');
 await run('editCard', { id: c1, text: '정말 좋았어요' }, '민준');
 ok(B.cards[c1].text === '정말 좋았어요' && Object.keys(B.cards[c1].react || {}).length === 1, '고쳐도 공감 남음');
 await run('deleteCard', { id: c2 }, '서연');
@@ -71,6 +88,7 @@ await store.saveTemplates([{ id: 'x', name: '틀', zones: ['a'], hints: [], ai: 
 ok((await store.templates())[0].zones[0] === 'a', '교사 틀 저장');
 await store.remove(B.id);
 ok((await store.list()).length === 0, '판 지우기');
+ok(!L()[B.id], '판을 지우면 아이 홈 목록에서도');
 
 ok(writes.every(w => w.startsWith(ROOT + '/')), '모든 쓰기는 ' + ROOT + ' 아래 — ' + [...new Set(writes.map(w => w.split('/')[0]))].join(','));
 ok(toSlash({ 'cards.c1.react.k': 1, 'x': undefined })['cards/c1/react/k'] === 1 && toSlash({ x: undefined }).x === null, '점 → 슬래시');
