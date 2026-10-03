@@ -290,6 +290,12 @@ function externalStudyItems() {
       sub: '도장을 밀고 · 뒤집고 · 돌려서 무늬를 만들어요',
       href: 'pattern/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(142,91,208,.45)', bg: 'rgba(142,91,208,.09)', embed: true },
+    // [PAINT-1] 물감 연구소 — 빨강 · 노랑 · 파랑 + 흰색 · 검정을 한 방울씩 섞어 색 만들기(예상 → 섞기 → 견주기 · 보색 · 자연의 색 · 느낌의 색 모자이크) · 5장 33판 · 선생님 헷갈림 지도(#/t)
+    //   저장 = classRPG_paint · 보상과 묶지 않음 · 진짜 물감 연습은 아래 수채화 기초(색 섞기 · 색상환 차시)와 이어짐
+    { key: 'paint', icon: '🖌️', title: '물감 연구소',
+      sub: '세 물감을 한 방울씩 섞어 색을 만들어요',
+      href: 'paint/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(53,163,220,.42)', bg: 'rgba(53,163,220,.08)', embed: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -1792,6 +1798,7 @@ function buildMainHTML() {
       ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')", 'NEW')}
       ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')", 'NEW')}
       ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')", 'NEW')}
+      ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')", 'NEW')}
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
       ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
