@@ -1,5 +1,5 @@
 // 무늬 공방 — 밀기 · 뒤집기 · 돌리기(4학년 수학 '평면도형의 이동')로 도장을 움직여 무늬를 만드는 미술실 놀이
-//  RPG 안(?sid=&n=)에서 열면 내 이름으로 저장, 아니면 손님(이 기기에만). 주소: #/ · #/p/<판> · #/t(선생님)
+//  RPG 안(?sid=&n=)에서 열면 내 이름으로 저장, 아니면 손님(이 기기에만). 주소: #/ · #/p/<판> · #/make(도장 공방) · #/gallery(우리 반 무늬 전시) · #/w/<sid>/<id>(친구 무늬 맞히기) · #/t(선생님)
 //  설계 = docs/pattern_workshop_design.md · 판 정본 = stages.js(시험 = scripts/unit/pattern/stages.test.mjs)
 import { h } from './util.js';
 import { createStore } from './store.js';
@@ -8,6 +8,8 @@ import { CHAPTERS, PUZ, puzById, puzOf } from './stages.js';
 import { tileCanvas, wallCanvas } from './draw.js';
 import { mountPuzzle, HOST } from './play.js';
 import { mountTeacher } from './teacher.js';
+import { mountMake } from './make.js';
+import { mountGallery, mountFriend } from './gallery.js';
 
 const Q = new URLSearchParams(location.search);
 const TEACHER = Q.has('teacher');
@@ -37,6 +39,13 @@ function home() {
   const total = PUZ.length, done = PUZ.filter(p => progress[p.id]).length, stars = PUZ.reduce((a, p) => a + ((progress[p.id] || {}).st || 0), 0);
   const chCard = c => {
     const list = puzOf(c.id), got = list.filter(p => progress[p.id]).length;
+    if (c.free) return h('div', { class: 'ccard free' },   // [PATTERN-6] 나의 무늬 — 판 대신 공방 · 전시
+      h('div', { class: 'c-head' }, h('b', {}, `${c.id}장 · ${c.title}`), h('span', { class: 'chip' }, c.concept)),
+      h('p', {}, c.intro),
+      h('div', { class: 'free-row' },
+        h('button', { class: 'fbtn', onclick: () => ctx.go('#/make') }, h('span', { class: 'big' }, '🎨'), h('b', {}, '도장 공방'), h('span', { class: 'muted small' }, '도장 그리기 · 규칙 칸 · 전시에 걸기')),
+        h('button', { class: 'fbtn', onclick: () => ctx.go('#/gallery') }, h('span', { class: 'big' }, '🖼'), h('b', {}, '우리 반 무늬 전시'), h('span', { class: 'muted small' }, '친구 무늬의 규칙 맞히기'))),
+      h('p', { class: 'muted small' }, '4장 무늬 만들기를 먼저 해 보면 규칙 칸이 쉬워요.'));
     if (!c.open) return h('div', { class: 'ccard soon' },
       h('div', { class: 'c-head' }, h('b', {}, `${c.id}장 · ${c.title}`), h('span', { class: 'chip' }, c.concept), h('span', { class: 'soon-tag' }, '곧 열려요')), h('p', {}, c.intro));
     return h('div', { class: 'ccard' },
@@ -77,6 +86,9 @@ async function route() {
     return;
   }
   if (a === 't') { current = await mountTeacher(app, ctx); return; }
+  if (a === 'make') { current = mountMake(app, ctx); return; }
+  if (a === 'gallery') { current = await mountGallery(app, ctx); return; }
+  if (a === 'w' && b) { const c = (location.hash || '').split('/')[3] || ''; current = await mountFriend(app, ctx, decodeURIComponent(b), decodeURIComponent(c)); return; }
   home();
 }
 addEventListener('hashchange', route);

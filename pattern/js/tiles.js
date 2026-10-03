@@ -75,3 +75,20 @@ export function wallpaper(motif, unit, cols, rows) {
 export const sameWall = (a, b) => a.length === b.length && a.every((row, y) => row.length === b[y].length && row.every((t, x) => same(t, b[y][x])));
 // 규칙 칸마다 정답 움직임들(그림이 같으면 다 정답)
 export const unitAnswers = (motif, unit) => unit.map(row => row.map(m => answersOfMove(motif, m)));
+
+// ── [PATTERN-6] 나의 무늬 ──
+// 이 도장이 어떤 움직임에 그대로인가(대칭) — 도장 공방이 아이에게 보여 준다(5학년 '합동과 대칭'으로 가는 다리)
+export const symOf = g => MOVE_KEYS.filter(m => m !== 'id' && same(apply(g, m), g));
+export const SYM_SAY = { fh: '좌우가 똑같아요', fv: '위아래가 똑같아요', r180: '180° 돌려도 그대로예요', r90: '90° 돌려도 그대로예요' };
+export const isBlank = g => g.every(r => /^0+$/.test(r));
+// 저장된 작품이 멀쩡한가(학급 DB 는 열려 있다 — 그리기 전에 꼭 거른다): 칸 그림 3~6칸 정사각 · 규칙 칸 1~2 × 1~2 · 아는 움직임만
+export function validWork(w) {
+  if (!w || !Array.isArray(w.g) || !Array.isArray(w.u)) return false;
+  const n = w.g.length;
+  if (n < 3 || n > 6 || !w.g.every(r => typeof r === 'string' && r.length === n && /^[0-9]+$/.test(r)) || isBlank(w.g)) return false;
+  if (w.u.length < 1 || w.u.length > 2) return false;
+  const uw = Array.isArray(w.u[0]) ? w.u[0].length : 0;
+  return uw >= 1 && uw <= 2 && w.u.every(r => Array.isArray(r) && r.length === uw && r.every(m => MOVE_KEYS.includes(m)));
+}
+// 전시 · 맞히기 판 크기 — 규칙 칸이 딱 나뉘게(가로 6 · 세로 4)
+export const WALL = { cols: 6, rows: 4 };

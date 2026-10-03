@@ -1,6 +1,6 @@
 // 무늬 공방 판 시험 — 움직임 대수 · 고르기 보기 넷이 다 다른 그림인가 · 탐정 판 정답 수 · 누구 말 판 · 무늬 판 · 고치기 판의 틀린 칸이 정말 하나인가
 //  node scripts/unit/pattern/stages.test.mjs   (DOM 없음 · 네트워크 없음)
-import { MOTIFS, MOVE_KEYS, apply, same, answersOfMove, mistakeOf, wallpaper, sameWall, unitAnswers, canon, ALIAS } from '../../../pattern/js/tiles.js';
+import { MOTIFS, MOVE_KEYS, apply, same, answersOfMove, mistakeOf, wallpaper, sameWall, unitAnswers, canon, ALIAS, symOf, validWork, isBlank, WALL } from '../../../pattern/js/tiles.js';
 import { PUZ, CHAPTERS } from '../../../pattern/js/stages.js';
 
 const results = [];
@@ -68,6 +68,28 @@ test('친구 말 판 — 정답이 고루(둘 다 · 한 명)', () => { const c 
 test('고르기 판 — 정답 자리가 고루', () => { const pos = new Set(PUZ.filter(p => p.kind === 'predict').map(p => p.choices.indexOf(p.move))); ok(pos.size >= 3, [...pos].join(',')); });
 test('ㄱ을 180° 돌리면 ㄴ 모양', () => { const g = apply(MOTIFS.giyeok.g, 'r180'); ok(g[3] === '5550' && g.slice(0, 3).every(r => r === '5000'), g.join(' ')); });
 test('canon — 다른 이름', () => { ok(canon('fhL') === 'fh' && canon('cw270') === 'r270' && canon('r90') === 'r90', 'canon'); });
+
+// ── [PATTERN-6] 나의 무늬 ──
+test('대칭 알림 — 도장마다 그대로인 움직임', () => {
+  ok(symOf(MOTIFS.arrow.g).join() === 'fv', 'arrow ' + symOf(MOTIFS.arrow.g));
+  ok(symOf(MOTIFS.mushroom.g).join() === 'fh', 'mushroom ' + symOf(MOTIFS.mushroom.g));
+  ok(symOf(MOTIFS.flag.g).length === 0, 'flag');
+  const plus = ['01110', '11111', '11111', '11111', '01110'];   // 사방 대칭 — 움직임 다섯 모두 그대로
+  ok(symOf(plus).length === 5, 'plus ' + symOf(plus));
+});
+test('작품 거르기(학급 DB 는 열려 있다)', () => {
+  const g = MOTIFS.boot.g;
+  ok(validWork({ g, u: [['id', 'fh']] }) && validWork({ g, u: [['id', 'r90'], ['r270', 'r180']] }) && validWork({ g: MOTIFS.flag.g, u: [['id'], ['fv']] }), '멀쩡한 작품을 거름');
+  const bad = [null, {}, { g, u: [] }, { g, u: [['id', 'zz']] }, { g, u: [['id', 'fh', 'fv']] }, { g, u: [['id'], ['fv', 'fh']] }, { g: ['01', '10'], u: [['id']] },
+    { g: ['0000', '0000', '0000', '0000'], u: [['id']] }, { g: ['0a00', '0000', '0000', '0000'], u: [['id']] }, { g: ['000', '0000', '000'], u: [['id']] }, { g: Array(7).fill('1111111'), u: [['id']] }, { g: 'xx', u: [['id']] }];
+  bad.forEach((w, i) => ok(!validWork(w), '나쁜 작품 ' + i + ' 통과'));
+  ok(isBlank(['000', '000', '000']) && !isBlank(['000', '010', '000']), 'isBlank');
+});
+test('전시 판(6×4)은 규칙 칸 넷 모두로 딱 나뉜다', () => {
+  for (const [w, hh] of [[1, 1], [2, 1], [1, 2], [2, 2]]) ok(WALL.cols % w === 0 && WALL.rows % hh === 0, `${w}×${hh}`);
+  const u = [['id', 'fh'], ['fv', 'r180']], t = wallpaper(MOTIFS.boot.g, u, WALL.cols, WALL.rows);
+  ok(sameWall(wallpaper(MOTIFS.boot.g, [['id', 'fhL'], ['fvU', 'r180']], WALL.cols, WALL.rows), t), '다른 이름 규칙이 같은 무늬를 안 만듦');
+});
 
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const r of fails) console.log('FAIL', r[1], r[2] || '');

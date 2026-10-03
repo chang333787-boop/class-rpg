@@ -2,8 +2,9 @@
 //  답을 고르면 도장이 그 움직임을 실제로 해 보인다 — 맞으면 그 모습 그대로 멈추고, 틀리면 "그렇게 움직이면 이렇게 돼요"를 보여 주고 되돌린다.
 //  틀린 답마다 헷갈림 이름(좌우·위아래 / 돌리는 방향 / 각도 / 뒤집기·돌리기 …)을 센다 → 선생님 헷갈림 지도.
 import { h, modal, lsGet, lsSet } from './util.js';
-import { MOTIFS, MOVES, MOVE_KEYS, apply, same, canon, mistakeOf, answersOfMove, unitAnswers } from './tiles.js';
-import { tileCanvas, wallCanvas, fitPx, moveEl, resetEl } from './draw.js';
+import { MOTIFS, MOVES, MOVE_KEYS, apply, same, canon, mistakeOf, answersOfMove } from './tiles.js';
+import { tileCanvas, fitPx, moveEl, resetEl } from './draw.js';
+import { makeBuilder } from './builder.js';
 import { CHAPTERS, puzOf } from './stages.js';
 
 export const HOST = '../assets/monsters/m3.png';   // 마법 애벌레 — 무늬 공방 주인(마디마디 되풀이 · 나비가 되면 대칭)
@@ -22,7 +23,6 @@ const SAID = { id: '그대로 밀었어요', fh: '오른쪽으로 뒤집었어�
 const starsOf = wrong => (wrong === 0 ? 3 : wrong === 1 ? 2 : 1);
 const STAR = n => '★'.repeat(n) + '☆'.repeat(3 - n);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const blank = n => Array.from({ length: n }, () => '0'.repeat(n));
 // 아이 이름 + '이'(받침이 있으면) — 민준이 말 · 지호 말
 const nameI = n => { const c = String(n).charCodeAt(String(n).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 ? n + '이' : n; };
 const mvBtn = (m, onclick, extra = '') => h('button', { class: 'mvbtn' + extra, 'data-m': m, onclick }, h('span', { class: 'ic' }, MOVES[m].icon), h('span', {}, MOVES[m].short));
@@ -137,40 +137,18 @@ export function mountPuzzle(root, ctx, p) {
     }
   }
 
-  // ── 무늬 만들기 — 규칙 칸에 움직임을 정하면 밀어서 판을 채운다(실시간) · 목표와 같으면 끝 ──
+  // ── 무늬 만들기 — 규칙 칸에 움직임을 정하면 밀어서 판을 채운다(실시간) · 목표와 같으면 끝(builder.js) ──
   function build() {
-    const uw = p.unit[0].length, uh = p.unit.length, ans = unitAnswers(p.motif, p.unit), cells = uw * uh;
-    const cur = p.unit.map(r => r.map(() => ''));
-    let sel = [0, 0], changes = 0;
-    const tBox = h('div', { class: 'wallbox' }), pBox = h('div', { class: 'wallbox small' }), unitEl = h('div', { class: 'unit' }), picker = h('div', { class: 'moves small' });
-    unitEl.style.gridTemplateColumns = `repeat(${uw}, auto)`;
-    Q.replaceChildren(h('p', { class: 'cap' }, '목표 무늬'), tBox);
-    A.replaceChildren(h('p', { class: 'a-q' }, `규칙 칸(가로 ${uw} × 세로 ${uh})의 움직임을 정해요 — 칸을 누르고 아래에서 골라요`), h('div', { class: 'unit-row' }, unitEl, picker),
-      h('p', { class: 'cap' }, '내 무늬 — 규칙 칸(점선)을 밀어서 채운 것'), pBox);
-    const tileAt = (x, y) => { const m = cur[y % uh][x % uw]; return m ? apply(p.grid, m) : blank(p.grid.length); };
-    const mine = () => Array.from({ length: p.rows }, (_, y) => Array.from({ length: p.cols }, (_, x) => tileAt(x, y)));
-    function renderUnit() {
-      unitEl.replaceChildren(...cur.flatMap((row, y) => row.map((m, x) => h('button', { class: 'ucell' + (sel[0] === x && sel[1] === y ? ' sel' : ''), 'data-xy': x + ',' + y, onclick: () => { sel = [x, y]; renderUnit(); renderPicker(); } },
-        tileCanvas(m ? apply(p.grid, m) : blank(p.grid.length), 70), h('span', {}, m ? MOVES[m].short : '?')))));
-    }
-    function renderPicker() { picker.replaceChildren(...MOVE_KEYS.map(m => mvBtn(m, () => setMove(m), cur[sel[1]][sel[0]] === m ? ' on' : ''))); }
-    function renderWalls() {
-      const tw = tBox.clientWidth || 560, th = tBox.clientHeight || 360, pw = pBox.clientWidth || 300, ph = pBox.clientHeight || 150;
-      tBox.replaceChildren(wallCanvas(p.wall, fitPx(p.cols, p.rows, tw, th)));
-      pBox.replaceChildren(wallCanvas(mine(), fitPx(p.cols, p.rows, pw, ph), { unit: [uw, uh] }));
-    }
-    function setMove(m) {
-      if (solved) return;
-      const [x, y] = sel; if (cur[y][x] === m) return;
-      cur[y][x] = m; changes++;
-      const mk = mistakeOf(m, ans[y][x]); if (mk) miss(mk);
-      renderUnit(); renderPicker(); renderWalls();
-      const all = cur.every(r => r.every(Boolean)), match = all && cur.every((r, yy) => r.every((mm, xx) => ans[yy][xx].includes(mm)));
-      if (match) { solved = true; finish('규칙 칸 하나를 밀어서 판을 가득 — 이게 규칙적인 무늬예요.', changes <= cells ? 3 : changes <= cells + 2 ? 2 : 1); }
-      else if (all) say('아직 목표 무늬와 달라요 — 목표 무늬의 왼쪽 위 칸들을 하나씩 견줘 봐요.', '');
-      else { const nx = cur.flat().findIndex(v => !v); if (nx >= 0) { sel = [nx % uw, Math.floor(nx / uw)]; renderUnit(); renderPicker(); } }
-    }
-    renderUnit(); renderPicker(); onSize = renderWalls; requestAnimationFrame(renderWalls);
+    const uw = p.unit[0].length, uh = p.unit.length;
+    const b = makeBuilder({ grid: p.grid, uw, uh, cols: p.cols, rows: p.rows, target: p.wall }, {
+      onWrong: mk => miss(mk),
+      onMismatch: () => say('아직 목표 무늬와 달라요 — 목표 무늬의 왼쪽 위 칸들을 하나씩 견줘 봐요.', ''),
+      onSolved: ({ changes, cells }) => { solved = true; finish('규칙 칸 하나를 밀어서 판을 가득 — 이게 규칙적인 무늬예요.', changes <= cells ? 3 : changes <= cells + 2 ? 2 : 1); },
+    });
+    Q.replaceChildren(h('p', { class: 'cap' }, '목표 무늬'), b.tBox);
+    A.replaceChildren(h('p', { class: 'a-q' }, `규칙 칸(가로 ${uw} × 세로 ${uh})의 움직임을 정해요 — 칸을 누르고 아래에서 골라요`), h('div', { class: 'unit-row' }, b.unitEl, b.picker),
+      h('p', { class: 'cap' }, '내 무늬 — 규칙 칸(점선)을 밀어서 채운 것'), b.prevBox);
+    b.render(); onSize = b.renderWalls; requestAnimationFrame(b.renderWalls);
   }
 
   // ── 무늬 고치기 — 틀린 칸 하나를 찾아 맞는 움직임으로 ──
