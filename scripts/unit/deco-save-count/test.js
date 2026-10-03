@@ -1285,6 +1285,62 @@
       _inPk.tab = 'wall'; _inPk.tool = ''; setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear();
       toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
     }
+    //  ㉑-나 집은 한 채(DECO-ROOM-HOUSE-1 · 사용자 10-03 '방 만드는 게 이상') — 둘째 방부터 붙여 짓기 · 가운데 방은 못 없앰 · 방 밖·문 앞 가구는 가방으로 · ↩ 한 번
+    if (typeof _inRoomPlan === 'function') {
+      decoSpaceSet(3); await sleep(150);
+      if (DECO_SCENE !== 'indoor') { toggleDecoScene(); await sleep(300); }
+      if (!_dCv) { renderHouseDeco(); await sleep(200); }
+      const keep = CUR.indoor ? JSON.parse(JSON.stringify(CUR.indoor)) : undefined, keepH = CUR.houseDecorations, keepInv = CUR.inventory;
+      delete CUR.indoor; _decoUndoClear();
+      CUR.houseDecorations = (keepH || []).filter(p => p.sp !== 3);
+      CUR.inventory = (CUR.inventory || []).filter(i => i.id !== 'd_i1').concat([{ id: 'd_i1', qty: 9 }]);
+      const pot = (r, c) => { CUR.houseDecorations.push(_decoNew('d_i1', 'indoor', r, c)); };
+      const at = (r, c) => _decoList(CUR).some(p => p.id === 'd_i1' && p.area === 'indoor' && p.row === r && p.col === c);
+      const last = () => ([...document.querySelectorAll('.toast-msg')].slice(-1)[0] || {}).textContent || '';
+      const R = () => _inRooms(CUR), mk = (id, r, c, w, h) => ({ id, r, c, w, h, floor: null, wall: null });
+      setDecoMode('floor'); ifSyncModeBtn(); _inPk.tab = 'room'; _inPk.tool = ''; _inLookRender(); await sleep(80);
+      //  ① 첫 방 — 방 밖에 남는 가구는 가방으로(안의 것은 그대로) · ↩ 면 방과 가구가 같이
+      pot(5, 5); pot(20, 40);
+      _inRoomAdd(_inRoomFrom(3, 3, 9, 12));
+      out('집한채_첫방_밖가구_가방', R().length === 1 && at(5, 5) && !at(20, 40) && /가방으로/.test(last()));
+      decoUndo(); await sleep(50);
+      out('집한채_첫방_↩가구도', R().length === 0 && at(5, 5) && at(20, 40));
+      _inRoomAdd(_inRoomFrom(3, 3, 9, 12));
+      //  ② 크기 칩으로 떨어진 곳을 누르면 가장 가까운 붙는 자리 · 판 끝에서도 잘리지 않음
+      _inPk.tool = 's1'; _inTap(20, 30); await sleep(50);
+      const b = R().find(o => o.id !== 'a');
+      out('집한채_칩_떨어진곳_붙여지음', R().length === 2 && !!b && b.w === 9 && b.h === 5 && _inRoomGroupCount(R()) === 1 && !(b.r === 20 && b.c === 30));
+      const edge = _inChipRect(5, 47, ROOM_SIZES[2]);
+      out('집한채_칩_판끝_안잘림', edge.w === 13 && edge.h === 7 && edge.c === 50 - 13 && edge.r === 5);
+      //  ③ 끌기(엄격) — 떨어져 있으면 붙는 자리로 옮겨 보이고, 겹치면 그 까닭
+      const far = _inRoomPlan(R(), { r: 3, c: 36, w: 5, h: 4 }, false);
+      out('집한채_끌기_떨어짐은_옮김', far.moved && !far.why && _inRoomAttached(R(), far.rect));
+      out('집한채_끌기_겹침은_까닭', !!_inRoomPlan(R(), { r: 4, c: 4, w: 5, h: 4 }, false).why);
+      //  ④ 가운데 방은 못 없앰 · 끝 방은 없앰(그 방 가구는 가방으로) · ↩ 한 번에 방과 가구
+      _inRoomsSet(CUR, [mk('a', 3, 3, 6, 5), mk('b', 3, 9, 6, 5), mk('c', 3, 15, 6, 5)]); _decoUndoClear();
+      pot(5, 16);
+      _inPk.tool = 'erase'; _inTap(5, 11); await sleep(50);
+      out('집한채_가운데방_못없앰', R().length === 3 && /둘로 나뉘어요/.test(last()));
+      _inTap(5, 18); await sleep(50);
+      out('집한채_끝방_없앰_가구가방', R().length === 2 && !at(5, 16) && /가방으로/.test(last()));
+      decoUndo(); await sleep(50);
+      out('집한채_끝방_↩방과가구', R().length === 3 && at(5, 16));
+      //  ⑤ 크기를 줄여 떨어지면 까닭(빨간 네모) · 붙은 채 늘리면 됨
+      out('집한채_줄여서_떨어지면_까닭', /떨어져요/.test(_inRoomResizeWhy(R(), 'b', { r: 3, c: 9, w: 5, h: 5 })));
+      out('집한채_붙은채_늘림_됨', _inRoomResizeWhy(R(), 'b', { r: 3, c: 9, w: 6, h: 7 }) === '');
+      //  ⑥ 마지막 방을 없애면 집 전체가 한 방 — 가구는 그 자리에
+      _inRoomsSet(CUR, [mk('a', 3, 3, 6, 5)]); _decoUndoClear();
+      _inTap(5, 5); await sleep(50);
+      out('집한채_마지막방_가구그대로', R().length === 0 && at(5, 5));
+      //  ⑦ 옛 저장본의 떨어진 방 · 방 밖 가구는 그대로 그린다(오류 0 · 묶음마다 나가기 문)
+      _inRoomsSet(CUR, [mk('a', 4, 4, 9, 5), mk('b', 7, 22, 13, 7)]); pot(9, 12); pot(20, 40);
+      let err = ''; try { _drawIndoor(); } catch (e) { err = String(e); }
+      out('집한채_옛떨어진방_그리기_오류0', !err && _inExitSpots(R()).length === 2);
+      CUR.houseDecorations = keepH; CUR.inventory = keepInv;
+      if (keep !== undefined) CUR.indoor = keep; else delete CUR.indoor;
+      _inPk.tab = 'wall'; _inPk.tool = ''; setDecoMode('deco'); ifSyncModeBtn(); _decoUndoClear();
+      toggleDecoScene(); await sleep(300); decoSpaceSet(1); await sleep(150);
+    }
     //  ㉒ 바닥을 칠할 때도 놓을 때의 규칙(DECO-RULE-R1R2) — 공간 3 마당에서
     if (typeof _floorPaintBlock === 'function') {
       decoSpaceSet(3); await sleep(150);

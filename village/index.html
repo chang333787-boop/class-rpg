@@ -4582,6 +4582,116 @@ function paintLine4(x0, y0, x1, y1) {
         mid.forEach(q => { if (inb(q.x, q.y)) at0({ x: q.x, y: q.y, inside: true }); }); STROKE.stats.메운칸 += p.list.length - n0; STROKE.stats.이은획++; } }
     return at0.apply(this, arguments); }; }
 window.__strokeFill = () => ({ 켜짐: window.VRULES.strokeFill.on, ...STROKE.stats });   // (__stroke 는 이미 있는 훅이다)
+/* ── [ROAD-LINE-1] 길은 시작 칸을 누르고 끌면 곧은 길이 미리 깔리고, 손을 떼면 놓인다 (사용자 09-30 · 시티즈 스카이라인 길 도구) ──
+   · 누른 칸 = 시작. 끄는 동안 시작 → 지금 칸까지 긴 쪽으로 곧게 가다 한 번 꺾는다(순수 함수 paintL). 모양이 바뀌면 빠진 칸은 거두고 새 칸만 놓는다.
+   · 손을 떼면 한 획(↩ 한 번). 끄는 중 Esc 나 오른쪽 단추 = 그 획을 모두 거둔다. 커서 곁에 'N칸' 이름표.
+   · 못 놓는 칸(물건 · 내 땅 아님 · 이미 길)은 건너뛴다. 손가락·마우스로 끌 때만 — 시험 훅(__stroke 등)은 예전 그대로. 원래 줄 수정 0 — paintAt·paintEnd 감싸기. */
+(window.VRULES = window.VRULES || {}).roadLine = { on: true, kinds: ['road', 'gravel'] };
+const ROADLINE = { ptr: false, stats: { 획: 0, 취소: 0 } };
+function paintL(x0, y0, x1, y1) {
+  const out = [{ x: x0, y: y0 }], sx = Math.sign(x1 - x0), sy = Math.sign(y1 - y0); let x = x0, y = y0;
+  const goX = () => { while (x !== x1) { x += sx; out.push({ x, y }); } }, goY = () => { while (y !== y1) { y += sy; out.push({ x, y }); } };
+  if (Math.abs(x1 - x0) >= Math.abs(y1 - y0)) { goX(); goY(); } else { goY(); goX(); }
+  return out;
+}
+function roadTag(n) {
+  let t = document.getElementById('roadTag');
+  if (n == null) { if (t) t.remove(); return; }
+  if (!t) { t = document.createElement('div'); t.id = 'roadTag'; document.body.appendChild(t); }
+  t.textContent = '🛣 ' + n + '칸 · 손을 떼면 놓여요 · Esc 취소';
+  t.style.left = (lastMouse.x + 16) + 'px'; t.style.top = (lastMouse.y - 36) + 'px';
+}
+function roadLineCancel() {
+  const p = painting; if (!p || !p.line) return false;
+  painting = null; p.list.forEach(q => removeAt(q.x, q.y)); roadTag(null); ROADLINE.stats.취소++;
+  if (p.list.length) { updateCount(); markDirty(); }
+  toast('길 놓기를 취소했어요', true); return true;
+}
+{ const at1 = paintAt; paintAt = function (c) {
+    const R = window.VRULES.roadLine, p = painting;
+    if (!R.on || !p || !R.kinds.includes(p.k)) return at1.apply(this, arguments);
+    if (!p.line && !p.noLine && !ROADLINE.ptr) p.noLine = true;
+    if (p.noLine) return at1.apply(this, arguments);
+    if (!c || !c.inside) return;
+    if (!p.line) { p.line = { x0: c.x, y0: c.y }; ROADLINE.stats.획++; }
+    const key = c.x + ',' + c.y; if (key === p.last) return; p.last = key;
+    const want = paintL(p.line.x0, p.line.y0, c.x, c.y).filter(q => inb(q.x, q.y)), wk = new Set(want.map(q => q.x + ',' + q.y));
+    p.list = p.list.filter(q => { if (wk.has(q.x + ',' + q.y)) return true; removeAt(q.x, q.y); return false; });
+    const have = new Set(p.list.map(q => q.x + ',' + q.y));
+    want.forEach(q => { if (have.has(q.x + ',' + q.y) || canPlace(p.k, q.x, q.y, p.rot) !== true) return; placeAt(p.k, q.x, q.y, p.rot); p.list.push({ x: q.x, y: q.y }); });
+    roadTag(want.length);
+  }; }
+{ const end1 = paintEnd; paintEnd = function () { roadTag(null); return end1.apply(this, arguments); }; }
+canvas.addEventListener('pointerdown', () => { ROADLINE.ptr = true; }, true);
+addEventListener('pointerup', () => { ROADLINE.ptr = false; });
+canvas.addEventListener('pointermove', e => { if (painting && painting.line && (e.buttons & 2)) roadLineCancel(); }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && painting && painting.line) { e.stopImmediatePropagation(); e.preventDefault(); roadLineCancel(); } }, true);
+window.__roadLine = () => ({ 켜짐: window.VRULES.roadLine.on, ...ROADLINE.stats });
+
+/* ── [VIEW-WASD-1] W · A · S · D(와 화살표)로 화면을 옮긴다 (사용자 09-30 · 심시티처럼) — 누르고 있는 동안 부드럽게 · 글 칸에 쓰는 중엔 안 움직인다 ──
+   e.code 로 읽어 한글 자판에서도 된다. 화면 픽셀 기준 속도라 확대해도 같은 빠르기. 원래 줄 수정 0. */
+(window.VRULES = window.VRULES || {}).wasd = { on: true, pxPerSec: 720 };
+const WASD = { down: new Set(), t: 0, raf: 0 };
+const WASD_KEY = { KeyW: [0, 1], KeyS: [0, -1], KeyA: [1, 0], KeyD: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [1, 0], ArrowRight: [-1, 0] };
+function wasdTick(now) {
+  const dt = Math.min(0.05, (now - WASD.t) / 1000); WASD.t = now;
+  if (!WASD.down.size) { WASD.raf = 0; return; }
+  let dx = 0, dy = 0; WASD.down.forEach(k => { dx += WASD_KEY[k][0]; dy += WASD_KEY[k][1]; });
+  const s = window.VRULES.wasd.pxPerSec * dt; if (dx || dy) panBy(dx * s, dy * s);
+  WASD.raf = requestAnimationFrame(wasdTick);
+}
+addEventListener('keydown', e => {
+  if (!window.VRULES.wasd.on || e.ctrlKey || e.metaKey || e.altKey || !WASD_KEY[e.code]) return;
+  const el = document.activeElement; if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+  e.preventDefault(); if (!e.repeat) { const v = WASD_KEY[e.code], s0 = window.VRULES.wasd.pxPerSec * 0.05; panBy(v[0] * s0, v[1] * s0); }   // 한 번 톡 눌러도 조금 움직인다
+  WASD.down.add(e.code);
+  if (!WASD.raf) { WASD.t = performance.now(); WASD.raf = requestAnimationFrame(wasdTick); }
+});
+addEventListener('keyup', e => { WASD.down.delete(e.code); });
+addEventListener('blur', () => WASD.down.clear());
+
+/* ── [CHIRP-1] 주민 소식 — 오른쪽 아래 💬 를 누르면 주민들이 바라는 것이 글로 모인다 (사용자 09-30 · 시티즈 스카이라인 '치퍼') ──
+   · 글 = 집을 눌렀을 때와 같은 말(satText) — 새 판정 없음. 😟 → 😐 → 😊 순 · 최대 8개 · 2초마다 새로(글이 같으면 그대로 두어 스크롤이 튀지 않음).
+   · 창을 연 동안만 센다(닫혀 있으면 판을 안 건드림). 미니맵 왼쪽 · 사진 모드에서는 숨는다. 원래 줄 수정 0. */
+(window.VRULES = window.VRULES || {}).chirp = { on: true, max: 8, everyMs: 2000 };
+const CHIRP = { open: false, html: '' };
+function chirpPosts() {
+  const out = [];
+  cells.forEach((rec, i) => {
+    if (!rec || rec.root !== i || rec.k !== 'house' || !(res.get(i) || 0)) return;
+    const names = folks.filter(f => !f.arriving && f.home === i).map(folkName).join('·'); if (!names) return;
+    const t = satText(rec); out.push({ face: t.startsWith('😟') ? 0 : t.startsWith('😐') ? 1 : 2, names, t });
+  });
+  return out.sort((a, b) => a.face - b.face);
+}
+function chirpSync() {
+  if (!window.VRULES.chirp.on) return;
+  if (!document.getElementById('chirpCss')) { const st = document.createElement('style'); st.id = 'chirpCss'; st.textContent =
+      '#chirpBtn{position:fixed;right:176px;bottom:150px;z-index:6;width:44px;height:44px;border-radius:50%;border:2px solid #3a4050;background:#fff;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}'
+    + '#chirp{position:fixed;right:176px;bottom:200px;z-index:7;width:300px;max-height:min(340px,calc(100vh - 260px));overflow:auto;background:#fff;border:2px solid #3a4050;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.25);font:13px/1.45 system-ui,sans-serif;color:#223}'
+    + '#chirp .ch-h{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:6px 6px 6px 12px;background:#2c3444;color:#fff;font-weight:700}'
+    + '#chirp .ch-h button{border:0;background:none;color:#fff;font-size:16px;cursor:pointer;min-width:36px;min-height:36px}'
+    + '#chirp .ch-p{padding:8px 12px;border-bottom:1px solid #e6e8ee}#chirp .ch-n{font-weight:700;color:#2f6fb0}#chirp .ch-e{color:#778}'
+    + '#roadTag{position:fixed;z-index:9;pointer-events:none;padding:4px 8px;border-radius:6px;background:rgba(20,26,36,.85);color:#fff;font:600 12px/1.3 system-ui,sans-serif;white-space:nowrap}'
+    + '@media(max-width:900px){#chirpBtn{right:128px;bottom:132px}#chirp{right:10px;bottom:184px;width:min(300px,calc(100vw - 20px))}}'
+    + 'body.photo #chirpBtn,body.photo #chirp{display:none!important}';
+    document.head.appendChild(st); }
+  let b = document.getElementById('chirpBtn');
+  if (!b) { b = document.createElement('button'); b.id = 'chirpBtn'; b.type = 'button'; b.title = '주민 소식'; b.setAttribute('aria-label', '주민 소식');
+    b.addEventListener('click', () => { CHIRP.open = !CHIRP.open; chirpSync(); }); document.body.appendChild(b); }
+  if (b.textContent !== '💬') b.textContent = '💬';
+  let pn = document.getElementById('chirp');
+  if (!CHIRP.open) { if (pn) pn.remove(); CHIRP.html = ''; return; }
+  const posts = chirpPosts();   // 창을 열었을 때만 센다 — 닫혀 있을 땐 집 사정을 건드리지 않는다(화면 회귀 0)
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const html = '<div class="ch-h">💬 주민 소식<button type="button" aria-label="닫기">✕</button></div>'
+    + (posts.length ? posts.slice(0, window.VRULES.chirp.max).map(p => '<div class="ch-p"><div class="ch-n">' + esc(p.names) + '</div><div class="ch-t">' + esc(p.t) + '</div></div>').join('')
+                    : '<div class="ch-p ch-e">아직 사는 사람이 없어요</div>');
+  if (!pn) { pn = document.createElement('div'); pn.id = 'chirp'; document.body.appendChild(pn); }
+  if (html !== CHIRP.html) { pn.innerHTML = html; CHIRP.html = html; pn.querySelector('.ch-h button').addEventListener('click', () => { CHIRP.open = false; chirpSync(); }); }
+}
+setInterval(() => { try { chirpSync(); } catch (e) {} }, window.VRULES.chirp.everyMs);
+window.__chirp = () => { try { const p = chirpPosts(); return { 켜짐: window.VRULES.chirp.on, 열림: CHIRP.open, 글: p.length, 걱정: p.filter(x => x.face === 0).length }; } catch (e) { return { 오류: String(e) }; } };
 
 /* ── [MAC-SAY-2] 집을 놓는 순간의 귀띔 — 그 자리가 '이웃이 돌아설 자리'면 한마디 (인구 정체 조사 docs/village_pop_stall_20260920.md 후보 1 · 보스 승인) ──
    pop88 판의 인구가 100 에서 멈춘 까닭은 시설이 하나도 없는 새 거리에 집만 18채 지은 것이었다 — 그리고 집을 놓을 때 아무 말이 없었다.
