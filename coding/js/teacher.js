@@ -4,8 +4,8 @@ import { h, toast, modal } from './util.js';
 import { STAGES, UNITS } from './stages.js';
 import { defineAll, pythonOf } from './blocks.js';
 
-const WHY = ['wall', 'water', 'edge', 'tree', 'land', 'noacorn', 'short', 'acorns', 'loop', 'draw', 'empty'];
-const WHY_KO = { wall: '나무에 부딪힘', water: '웅덩이', edge: '길 밖', tree: '나무 뛰기', land: '내릴 곳 없음', noacorn: '빈손 줍기', short: '덜 감', acorns: '도토리 덜 주움', loop: '끝없는 반복', draw: '그림 다름', empty: '빈 코드' };
+const WHY = ['wall', 'water', 'edge', 'tree', 'land', 'noacorn', 'short', 'acorns', 'loop', 'draw', 'empty', 'nofunc'];
+const WHY_KO = { wall: '나무에 부딪힘', water: '웅덩이', edge: '길 밖', tree: '나무 뛰기', land: '내릴 곳 없음', noacorn: '빈손 줍기', short: '덜 감', acorns: '도토리 덜 주움', loop: '끝없는 반복', draw: '그림 다름', empty: '빈 코드', nofunc: '없는 기술' };
 
 async function gate(ctx) {
   if (ctx.store.me.guest) return true;

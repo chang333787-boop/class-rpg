@@ -2,7 +2,7 @@
 //  ▶ 실행 = 끝까지 움직이며 지금 블록을 밝힌다 · 한 걸음씩 = 누를 때마다 블록 하나(디버깅) · ⟲ = 처음 자리로
 import { h, toast, modal, lsGet, lsSet } from './util.js';
 import { HEROES, makeMaze, makePen, compareDrawing, whyText } from './world.js';
-import { parse, countBlocks, runAst, astFromBlock, stateFromAst, runToEnd } from './interp.js';
+import { parse, countBlocks, runAst, astFromBlock, stateFromAst, runToEnd, defsOf, usesCall } from './interp.js';
 import { makeWorkspace, startOf, pythonOf, setConds } from './blocks.js';
 import { drawMaze, drawPen, heroImg } from './draw.js';
 import { UNITS, stagesOf } from './stages.js';
@@ -41,6 +41,9 @@ export async function mountPlay(root, ctx, stage) {
   const maps = stage.maps && stage.maps.length > 1 ? stage.maps : null;
   let mi = 0, mapRes = [];
   const tabs = h('div', { class: 'maptabs' });
+  //  [CODING-U7] 실행하는 동안 주머니(변수) · 받는 값이 지금 몇인지
+  const varsEl = h('div', { class: 'vars' });
+  function showVars(v) { if (!v || !Object.keys(v).length) { varsEl.replaceChildren(); return; } varsEl.replaceChildren(h('span', { class: 'muted' }, '주머니'), ...Object.entries(v).map(([k, x]) => h('span', { class: 'vchip' }, `${k} = ${Math.round(x * 100) / 100}`))); }
   function renderTabs() {
     if (!maps) return;
     tabs.replaceChildren(h('span', { class: 'muted' }, '코드 하나로'), ...maps.map((m, i) => h('button', { class: 'btn small' + (i === mi ? ' on' : ''), onclick: () => { if (running || gen) return; fresh(i); render(); } },
@@ -51,7 +54,7 @@ export async function mountPlay(root, ctx, stage) {
     h('div', { class: 'play' },
       h('section', { class: 'world' },
         h('div', { class: 'story' }, heroPic, h('div', {}, h('b', {}, stage.title), h('p', {}, stage.story))),
-        maps ? tabs : null, stageWrap, msg,
+        maps ? tabs : null, stageWrap, varsEl, msg,
         h('div', { class: 'ctrl' }, runBtn, stepBtn, resetBtn, speedSel, h('span', { class: 'sp' }), hintBtn, bugBtn)),
       h('section', { class: 'code' },
         h('div', { class: 'code-head' }, h('b', {}, '블록'), countEl, h('span', { class: 'sp' }), h('span', { class: 'muted small' }, hero.about), pyBtn),
@@ -67,7 +70,7 @@ export async function mountPlay(root, ctx, stage) {
 
   // ── 작업판 ──
   setConds(stage.conds);   // [CODING-U5] 만약 블록의 살피기 = 이 몬스터 것만
-  const ws = makeWorkspace(wsDiv, { blocks: stage.blocks, limit: stage.limit });
+  const ws = makeWorkspace(wsDiv, stage);
   function loadState(state) {
     ws.clear();
     try { Bk.serialization.workspaces.load(state, ws); } catch (e) { console.warn(e); }
@@ -80,7 +83,7 @@ export async function mountPlay(root, ctx, stage) {
   try { saved = await Promise.race([ctx.store.loadCode(stage.id), new Promise(r => setTimeout(() => r(null), 3000))]); } catch (e) { console.warn(e); }   // 늦으면 새로 시작
   if (!alive) return { unmount() {} };
   let first = null; try { first = saved ? JSON.parse(saved) : null; } catch (e) { first = null; }
-  loadState(first || stateFromAst(stage.buggy ? parse(stage.buggy) : []));
+  loadState(first || stateFromAst(stage.buggy ? parse(stage.buggy) : stage.prefill ? parse(stage.prefill) : []));
   ws.addChangeListener(e => {
     if (e.isUiEvent) return;
     if (running || gen) stopRun();
@@ -89,9 +92,20 @@ export async function mountPlay(root, ctx, stage) {
     saveT = setTimeout(() => { saveT = 0; try { ctx.store.saveCode(stage.id, JSON.stringify(Bk.serialization.workspaces.save(ws))).catch(err => console.warn(err)); } catch (err) { console.warn(err); } }, 700);
   });
   function program() { const st = startOf(ws); return st ? astFromBlock(st.getNextBlock()) : []; }
+  function defsNow() { return stage.unit >= 8 ? defsOf(ws) : []; }   // 함수 선언(작업판을 처음 실을 때 이미 불린다)
+  //  [CODING-U7·U8] 이 판에서 꼭 써야 하는 것 — 주머니(넣고 꺼내 쓰기) · 기술(만들어 쓰기)
+  function hasVarUse(list) { return list.some(n => (n.e && JSON.stringify(n.e).includes('"k":"var"')) || (n.body && hasVarUse(n.body)) || (n.else && hasVarUse(n.else))); }
+  function hasSet(list) { return list.some(n => n.t === 'set' || (n.body && hasSet(n.body)) || (n.else && hasSet(n.else))); }
+  function needs(ast, defs) {
+    const all = [...ast, ...defs.flatMap(d => d.body)];
+    if (stage.require === 'var' && !(hasSet(all) && hasVarUse(all))) return 'needvar';
+    if (stage.require === 'call' && !usesCall(ast)) return 'needcall';
+    return '';
+  }
   function updateCount() {
     const n = countBlocks(program());
-    countEl.textContent = `${n}${stage.limit ? ' / ' + stage.limit : ''}개 · ★★★ = ${stage.best}개 이하`;
+    const nn = n + countBlocks(defsNow());
+    countEl.textContent = `${nn}${stage.limit ? ' / ' + stage.limit : ''}개 · ★★★ = ${stage.best}개 이하`;
     countEl.classList.toggle('over', !!stage.limit && n > stage.limit);
   }
   function updatePy() { if (pyOpen) pyPre.textContent = pythonOf(ws) || '# ‘시작하면’ 아래에 블록을 이어요'; }
@@ -152,7 +166,8 @@ export async function mountPlay(root, ctx, stage) {
   }
 
   let curAst = null, nUsed = 0;
-  function startMap(i) { fresh(i); gen = runAst(curAst, world, { max: 600 }); }
+  let curDefs = [];
+  function startMap(i) { fresh(i); gen = runAst(curAst, world, { max: 1500, defs: curDefs }); showVars(null); }
   function run(step) {
     if (running) return;
     over.style.display = 'none';
@@ -160,12 +175,14 @@ export async function mountPlay(root, ctx, stage) {
       const ast = program();
       if (!ast.length) { say(whyText('empty', stage.hero), 'bad'); return; }
       if (stage.limit && countBlocks(ast) > stage.limit) { say(`블록이 ${stage.limit}개를 넘었어요 — 반복으로 줄여 봐요`, 'bad'); return; }
-      curAst = ast; nUsed = countBlocks(ast); mapRes = []; startMap(0); say(maps ? '길 1부터 가요' : '');
+      const defs = defsNow(), need = needs(ast, defs);
+      if (need) { say(whyText(need, stage.hero), 'bad'); return; }
+      curAst = ast; curDefs = defs; nUsed = countBlocks(ast) + countBlocks(defs); mapRes = []; startMap(0); say(maps ? '길 1부터 가요' : '');
     }
     running = !step; setButtons();
     if (speed === 'instant' && !step) {   // 바로 = 움직임 없이 끝까지(막히면 그 자리에서 멈춤) · 길 둘이면 차례로
       for (;;) {
-        try { while (!gen.next().done) {} } catch (e) { syncView(); render(); return fail(e.why, e.id); }
+        try { let r; while (!(r = gen.next()).done) { if (r.value.vars) showVars(r.value.vars); } } catch (e) { syncView(); render(); return fail(e.why, e.id); }
         syncView(); render();
         const r = mapEnd(); if (r !== 'next') return r;
       }
@@ -178,7 +195,7 @@ export async function mountPlay(root, ctx, stage) {
     try { r = gen.next(); } catch (e) { return fail(e.why, e.id); }
     if (r.done) { const m = mapEnd(); if (m === 'next') { if (running) setTimeout(() => { if (alive && gen) advance(); }, 650); else setButtons(); } return; }
     const ev = r.value;
-    highlight(ev.id);
+    highlight(ev.id); if (ev.vars) showVars(ev.vars);
     animate(ev, () => {
       if (!gen) return;
       if (!ev.ok) { try { gen.next(); } catch (e) { return fail(e.why, e.id); } return fail(ev.why, ev.id); }
