@@ -1,7 +1,7 @@
 // 작곡 — 칸을 눌러 음을 놓고(음 길이를 골라서), 반주 친구와 함께 들어 보고, 악보·운지로 확인하고, 저장한다.
 import { h, toast, modal, clamp } from './util.js';
 import { SCALES, METERS, solfege, colorOf, scaleRows, barSteps, totalSteps, lengthChoices, valueName, beatsText, fitChords, chordName, ROMAN, pc } from './theory.js';
-import { emptySong, normalize, placeNote, removeNote, buildEvents, INSTS, DRUMS } from './song.js';
+import { emptySong, normalize, placeNote, removeNote, buildEvents, INSTS, DRUMS, placeHarm, removeHarm, chordify } from './song.js';
 import { engine, Player } from './audio.js';
 import { renderStaff } from './notation.js';
 import { coach, ideas } from './coach.js';
@@ -27,12 +27,13 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   let song = normalize(init || emptySong());
   if (init && init.lib) { song.title = init.title + ' 바꿔 쓰기'; song.id = null; delete song.lib; delete song.lk; delete song.pub; }
   let dirty = false, L = song.sub === 3 ? 3 : 2, erase = false, lyricsOn = song.notes.some(n => n.w);
+  let layer = 'mel', cursor = 0;   // [MUSIC-HARM-1] 가락 칸 / 화음 칸 · [MUSIC-KEYS-1] 키보드로 놓는 자리
   const player = new Player(engine);
   let raf = 0, playStart = 0, built = null;
 
   // ── 윗줄 ──
   const title = h('input', { class: 'c-title', placeholder: '곡 제목', maxlength: 30, value: song.title, oninput: () => { song.title = title.value; dirty = true; } });
-  const playBtn = h('button', { class: 'btn primary', onclick: () => togglePlay() }, '▶ 들어 보기');
+  const playBtn = h('button', { class: 'btn primary', title: 'Enter', onclick: () => togglePlay() }, '▶ 들어 보기');
   const tempoV = h('b', {}, String(song.tempo));
   const tempo = d => { song.tempo = clamp(song.tempo + d, 50, 180); tempoV.textContent = song.tempo; dirty = true; if (player.playing) togglePlay(true); };
   const top = ctx.topBar('작곡', {
@@ -59,20 +60,43 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   const LABEL = 58;
 
   function renderTools() {
-    tools.replaceChildren(
+    tools.replaceChildren(...[
+      h('div', { class: 'seg', role: 'group', 'aria-label': '칸' },
+        h('button', { class: layer === 'mel' ? 'on' : '', onclick: () => setLayer('mel'), title: 'Tab 으로 바꿔요' }, '가락'),
+        h('button', { class: layer === 'harm' ? 'on' : '', onclick: () => setLayer('harm'), title: 'Tab 으로 바꿔요' }, '화음')),
       h('span', { class: 'c-lbl' }, '음 길이'),
       ...lengthChoices(song.sub).map(d => h('button', { class: 'btn small len' + (!erase && L === d ? ' on' : ''), title: (valueName(d, song.sub) || '') + ' · ' + beatsText(d, song.sub),
         onclick: () => { L = d; erase = false; renderTools(); } }, h('i', {}, NOTE_ICON[d] || '♩'), beatsText(d, song.sub))),
       h('button', { class: 'btn small' + (erase ? ' on' : ''), onclick: () => { erase = !erase; renderTools(); } }, '지우개'),
+      layer === 'harm' ? h('button', { class: 'btn small', title: '가락 음마다 두 칸 아래(3도) 음을 화음으로', onclick: () => thirdsBelow() }, '아래 3도 넣기') : null,
+      layer === 'harm' && song.harm.length ? h('button', { class: 'btn small', onclick: () => { song.harm = []; dirty = true; renderGrid(); } }, '화음 지우기') : null,
       h('span', { class: 'sp' }),
-      h('button', { class: 'btn small' + (lyricsOn ? ' on' : ''), onclick: () => { lyricsOn = !lyricsOn; renderTools(); layout(); } }, '노랫말'),
+      layer === 'mel' ? h('button', { class: 'btn small' + (lyricsOn ? ' on' : ''), onclick: () => { lyricsOn = !lyricsOn; renderTools(); layout(); } }, '노랫말') : null,
+      h('button', { class: 'btn small', title: '키보드로 작곡하는 법', onclick: () => showKeys() }, '⌨ 키보드'),
       h('button', { class: 'btn small', onclick: () => showStaff() }, '악보 보기'),
-      h('button', { class: 'btn small', onclick: () => showFingers() }, '리코더 운지'),
-      h('button', { class: 'btn small', onclick: () => { if (!song.notes.length) return; modal('모두 지울까요?', '놓은 음을 전부 지워요.', [{ label: '그만두기' }, { label: '모두 지우기', primary: true, onclick: c => { song.notes = []; dirty = true; c(); renderGrid(); } }]); } }, '모두 지우기'));
+      layer === 'mel' ? h('button', { class: 'btn small', onclick: () => showFingers() }, '리코더 운지') : null,
+      layer === 'mel' ? h('button', { class: 'btn small', onclick: () => { if (!song.notes.length) return; modal('모두 지울까요?', '놓은 음을 전부 지워요.', [{ label: '그만두기' }, { label: '모두 지우기', primary: true, onclick: c => { song.notes = []; dirty = true; c(); renderGrid(); } }]); } }, '다 지우기') : null,
+    ].filter(Boolean));
+  }
+
+  function setLayer(v) { layer = v; erase = false; renderTools(); renderGrid(); }
+  // 화음 도우미 — 가락 음마다 음계에서 두 칸 아래 음(장음계면 3도)을 같은 길이로. 이미 있는 화음 자리는 그대로
+  function thirdsBelow() {
+    if (!song.notes.length) { toast('먼저 가락 칸에 음을 놓아 주세요'); return; }
+    const rowsUp = scaleRows(song.scale, [...song.notes, ...song.harm]);
+    let n = 0;
+    for (const m of song.notes) {
+      if (song.harm.some(x => x.s === m.s)) continue;
+      const i = rowsUp.indexOf(m.p), q = rowsUp[i - 2];
+      if (i >= 2 && q != null) { song.harm.push({ s: m.s, d: m.d, p: q }); n++; }
+    }
+    song.harm = chordify(song.harm);
+    dirty = true; renderGrid();
+    toast(n ? `가락 아래 두 칸 음 ${n}개를 화음으로 넣었어요 — 들어 보고 마음에 안 드는 곳은 지워요` : '더 넣을 자리가 없어요(이미 화음이 있거나 너무 낮은 음)', 3200);
   }
 
   function layout() {
-    rows = scaleRows(song.scale, song.notes).reverse();      // 위가 높은 음
+    rows = scaleRows(song.scale, [...song.notes, ...song.harm]).reverse();      // 위가 높은 음
     lyricRow.style.display = lyricsOn ? '' : 'none';
     const avW = Math.max(400, main.clientWidth - 8), avH = Math.max(200, root.clientHeight - 50 - 46 - 34 - (lyricsOn ? 44 : 0) - 74);
     const steps = totalSteps(song);
@@ -96,11 +120,20 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     song.notes.forEach(n => {
       const r = rows.indexOf(n.p);
       if (r < 0) return;
-      const el = h('div', { class: 'c-note', style: { left: LABEL + n.s * cellW + 1 + 'px', top: r * rowH + 2 + 'px', width: n.d * cellW - 2 + 'px', height: rowH - 4 + 'px', '--c': colorOf(n.p) } },
+      const el = h('div', { class: 'c-note' + (layer === 'harm' ? ' dim' : ''), style: { left: LABEL + n.s * cellW + 1 + 'px', top: r * rowH + 2 + 'px', width: n.d * cellW - 2 + 'px', height: rowH - 4 + 'px', '--c': colorOf(n.p) } },
         h('span', {}, n.w || (n.d * cellW >= 30 ? solfege(n.p, { short: true }) : '')), h('i', { class: 'grip' }));
       el._n = n;
       kids.push(el);
     });
+    song.harm.forEach(n => {                                      // [MUSIC-HARM-1] 화음 음 = 테두리 칸
+      const r = rows.indexOf(n.p);
+      if (r < 0) return;
+      const el = h('div', { class: 'c-note harm' + (layer === 'mel' ? ' dim' : ''), style: { left: LABEL + n.s * cellW + 1 + 'px', top: r * rowH + 2 + 'px', width: n.d * cellW - 2 + 'px', height: rowH - 4 + 'px', '--c': colorOf(n.p) } },
+        h('span', {}, n.d * cellW >= 30 ? solfege(n.p, { short: true }) : ''), h('i', { class: 'grip' }));
+      el._h = n;
+      kids.push(el);
+    });
+    kids.push(h('div', { class: 'c-cursor', style: { left: LABEL + Math.min(cursor, steps) * cellW + 'px' }, title: '키보드로 놓는 자리' }));
     kids.push(h('div', { class: 'c-head', id: 'c-head' }));
     grid.replaceChildren(...kids);
     // 화음 이름(화음 친구가 켜졌을 때) — 누르면 I → IV → V → 자동
@@ -128,8 +161,21 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   let drag = null;
   grid.addEventListener('pointerdown', e => {
     if (e.button > 0) return;
-    const noteEl = e.target.closest('.c-note');
+    const noteEl = e.target.closest(layer === 'harm' ? '.c-note.harm' : '.c-note:not(.harm)');
     const { step, row } = cellAt(e);
+    if (layer === 'harm') {
+      if (noteEl) {
+        const n = noteEl._h, rect = noteEl.getBoundingClientRect();
+        if (!erase && e.clientX > rect.right - Math.max(10, Math.min(18, rect.width * 0.35))) { drag = { h: n, el: noteEl, kind: 'hresize' }; grid.setPointerCapture(e.pointerId); return; }
+        drag = { h: n, kind: 'htap', x: e.clientX, y: e.clientY };
+        return;
+      }
+      if (step < 0 || step >= totalSteps(song) || row < 0 || row >= rows.length || erase) return;
+      const r = placeHarm(song, step, rows[row], L);
+      if (r === 'full') { toast('화음은 한 자리에 세 음까지예요'); return; }
+      if (r) { dirty = true; cursor = step; engine.note(song.inst, rows[row], engine.now, 0.6, 0.7); renderGrid(); }
+      return;
+    }
     if (noteEl) {
       const n = noteEl._n, rect = noteEl.getBoundingClientRect();
       if (!erase && e.clientX > rect.right - Math.max(10, Math.min(18, rect.width * 0.35))) { drag = { n, el: noteEl, kind: 'resize' }; grid.setPointerCapture(e.pointerId); return; }
@@ -140,11 +186,19 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     if (erase) return;
     const bs = barSteps(song), barEnd = (Math.floor(step / bs) + 1) * bs;
     const n = placeNote(song, step, rows[row], Math.min(L, barEnd - step));
-    dirty = true;
+    dirty = true; cursor = n.s + n.d;
     engine.note(song.inst, n.p, engine.now, Math.min(0.9, n.d * 60 / song.tempo / song.sub), 0.85);
     renderGrid();
   });
   grid.addEventListener('pointermove', e => {
+    if (drag && drag.kind === 'hresize') {                         // 화음 하나(같은 때 시작한 음 모두)의 길이
+      const { step } = cellAt(e), n = drag.h, bs = barSteps(song);
+      const barEnd = (Math.floor(n.s / bs) + 1) * bs;
+      const next = song.harm.filter(x => x.s > n.s).sort((a, z) => a.s - z.s)[0];
+      const d = clamp(step - n.s + 1, 1, Math.min(barEnd, next ? next.s : Infinity) - n.s);
+      if (d !== n.d) { for (const x of song.harm) if (x.s === n.s) x.d = d; dirty = true; grid.querySelectorAll('.c-note.harm').forEach(el => { if (el._h.s === n.s) el.style.width = d * cellW - 2 + 'px'; }); }
+      return;
+    }
     if (!drag || drag.kind !== 'resize') return;
     const { step } = cellAt(e), n = drag.n, bs = barSteps(song);
     const barEnd = (Math.floor(n.s / bs) + 1) * bs;
@@ -157,6 +211,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     if (!drag) return;
     const dd = drag; drag = null;
     if (dd.kind === 'tap' && Math.hypot(e.clientX - dd.x, e.clientY - dd.y) < 8) { removeNote(song, dd.n); dirty = true; }
+    if (dd.kind === 'htap' && Math.hypot(e.clientX - dd.x, e.clientY - dd.y) < 8) { removeHarm(song, dd.h); dirty = true; }
     renderGrid();
   });
 
@@ -335,7 +390,53 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   requestAnimationFrame(layout);
   const onResize = () => layout();
   addEventListener('resize', onResize);
-  const onKey = e => { if (e.code === 'Space' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) { e.preventDefault(); togglePlay(); } };
+  // [MUSIC-KEYS-1] 키보드로 작곡 — 리듬 게임과 같은 자리: A S D F J K L ; = 도 레 미 파 솔 라 시 높은 도 (Shift = 한 옥타브 위)
+  //   스페이스 = 쉼(커서를 음 길이만큼) · Backspace = 앞 음 지우기 · ← → = 한 칸 · 1~6 = 음 길이 · Tab = 가락/화음 칸 · Enter = 들어 보기
+  const KEY_P = { KeyA: 60, KeyS: 62, KeyD: 64, KeyF: 65, KeyJ: 67, KeyK: 69, KeyL: 71, Semicolon: 72 };
+  const onKey = e => {
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.querySelector('.modal-wrap')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const total = totalSteps(song), bs = barSteps(song);
+    if (e.code === 'Enter') { e.preventDefault(); togglePlay(); return; }
+    if (e.code === 'Tab') { e.preventDefault(); setLayer(layer === 'mel' ? 'harm' : 'mel'); return; }
+    if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') { e.preventDefault(); cursor = clamp(cursor + (e.code === 'ArrowRight' ? 1 : -1), 0, total); renderGrid(); return; }
+    if (/^Digit[1-6]$/.test(e.code)) { const d = lengthChoices(song.sub)[+e.code.slice(5) - 1]; if (d) { L = d; erase = false; renderTools(); } return; }
+    if (e.code === 'Space') { e.preventDefault(); cursor = Math.min(total, layer === 'mel' ? cursor + L : nextMelStart()); renderGrid(); return; }
+    if (e.code === 'Backspace') { e.preventDefault(); backspace(); return; }
+    const base = KEY_P[e.code];
+    if (base == null || e.repeat) return;
+    e.preventDefault();
+    const p = Math.min(84, base + (e.shiftKey ? 12 : 0));
+    if (cursor >= total) { toast('곡 끝이에요 — 마디를 늘리거나 ← 로 돌아가요'); return; }
+    if (layer === 'harm') {
+      const r = placeHarm(song, cursor, p, L);
+      if (r === 'full') { toast('화음은 한 자리에 세 음까지예요'); return; }
+      engine.note(song.inst, p, engine.now, 0.6, 0.7); dirty = true; layout(); return;
+    }
+    const n = placeNote(song, cursor, p, Math.min(L, (Math.floor(cursor / bs) + 1) * bs - cursor));
+    engine.note(song.inst, p, engine.now, Math.min(0.9, n.d * 60 / song.tempo / song.sub), 0.85);
+    cursor = n.s + n.d; dirty = true; layout();
+  };
+  // 화음 칸에서 스페이스 = 다음 가락 음 자리로(가락 음마다 화음을 쌓기 좋게)
+  const nextMelStart = () => { const nx = song.notes.filter(n => n.s > cursor).sort((a, z) => a.s - z.s)[0]; return nx ? nx.s : cursor + L; };
+  function backspace() {
+    if (layer === 'harm') {
+      const at = song.harm.filter(n => n.s <= cursor).sort((a, z) => z.s - a.s || z.p - a.p)[0];
+      if (at) { removeHarm(song, at); cursor = at.s; dirty = true; renderGrid(); }
+      return;
+    }
+    const prev = song.notes.filter(n => n.s < cursor).sort((a, z) => z.s - a.s)[0];
+    if (prev) { removeNote(song, prev); cursor = prev.s; dirty = true; } else cursor = 0;
+    renderGrid();
+  }
+  function showKeys() {
+    modal('키보드로 작곡하기', h('div', { class: 'keys-help' },
+      h('div', { class: 'kh-row' }, ...['A 도', 'S 레', 'D 미', 'F 파', 'J 솔', 'K 라', 'L 시', '; 높은 도'].map(t => { const [k, n] = t.split(' '); return h('span', { class: 'kh-key' }, h('b', {}, k), n + (t.split(' ')[2] ? ' ' + t.split(' ')[2] : '')); })),
+      h('p', {}, h('b', {}, 'Shift'), ' + 글쇠 = 한 옥타브 위(높은 레 · 높은 미 …)'),
+      h('p', {}, h('b', {}, '스페이스'), ' = 쉼(음 길이만큼 건너뛰기) · ', h('b', {}, 'Backspace'), ' = 앞 음 지우기 · ', h('b', {}, '← →'), ' = 한 칸 옮기기'),
+      h('p', {}, h('b', {}, '1 ~ 6'), ' = 음 길이 고르기 · ', h('b', {}, 'Tab'), ' = 가락 칸 / 화음 칸 · ', h('b', {}, 'Enter'), ' = 들어 보기 / 멈추기'),
+      h('p', { class: 'muted' }, '노란 세로줄이 음이 놓일 자리예요. 칸을 누르면 그 뒤로 옮겨 가요.')));
+  }
   addEventListener('keydown', onKey);
   const beforeUnload = e => { if (dirty && song.notes.length) { e.preventDefault(); e.returnValue = ''; } };
   addEventListener('beforeunload', beforeUnload);

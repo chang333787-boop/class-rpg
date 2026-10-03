@@ -1,7 +1,7 @@
 // 리코더 연습 — 음표 발판이 오른쪽에서 흘러오고, 몬스터가 박에 맞춰 발판을 밟는다. 왼쪽 = 지금 음의 큰 운지.
 //  소리를 듣고 틀린 음을 잡지는 않는다(마이크 없음). 끝나면 스스로 별을 매기고 '리코더 기록장'에 쌓인다.
 import { h, toast } from './util.js';
-import { solfege, colorOf } from './theory.js';
+import { solfege, colorOf, totalSteps } from './theory.js';
 import { buildEvents } from './song.js';
 import { engine, Player } from './audio.js';
 import { fingerSVG, fingering, SYSTEMS } from './recorder.js';
@@ -14,6 +14,9 @@ export function mountPractice(root, ctx, { song, key }) {
   const player = new Player(engine);
   const notes = [...song.notes].sort((a, z) => a.s - z.s);
   const pitches = [...new Set(notes.map(n => n.p))].sort((a, z) => a - z);
+  // [MUSIC-REST-1] 쉼표 — 음과 음 사이 빈 곳(처음·끝 포함). 발판처럼 보여서 '여기서 쉬어요'를 눈으로 센다
+  const rests = [];
+  { let at = 0; for (const n of notes) { if (n.s > at) rests.push({ s: at, d: n.s - at }); at = Math.max(at, n.s + n.d); } const end = totalSteps(song); if (end > at) rests.push({ s: at, d: end - at }); }
   const hopper = new Image(); hopper.src = `../assets/monsters/${HOPPERS[(song.title || '').length % HOPPERS.length]}.png`;
 
   const sel = (opts, val, on) => h('select', { onchange: e => on(e.target.value) }, ...opts.map(([v, t]) => { const o = h('option', { value: v }, t); if (String(v) === String(val)) o.selected = true; return o; }));
@@ -49,10 +52,19 @@ export function mountPractice(root, ctx, { song, key }) {
   const noteT = n => n.s * stepSec();
   const idxAt = t => { let k = -1; for (let i = 0; i < notes.length; i++) { if (noteT(notes[i]) <= t + 0.02) k = i; else break; } return k; };
 
-  // ── 왼쪽 운지 ──
-  function showFinger(i) {
-    if (i === lastIdx) return;
-    lastIdx = i;
+  const restAt = t => rests.find(r => r.s * stepSec() <= t + 0.02 && t < (r.s + r.d) * stepSec() - 0.02) || null;
+  // ── 왼쪽 운지 ──  쉬는 동안에는 '숨 쉬고 다음 음 준비'(다음 음 운지를 크게)
+  function showFinger(i, rest = null) {
+    const key = rest ? 'r' + rest.s : i;
+    if (key === lastIdx) return;
+    lastIdx = key;
+    if (rest) {
+      const nx = notes.find(n => n.s >= rest.s + rest.d);
+      bigF.replaceChildren(...(nx ? [fingerSVG(nx.p, { size: Math.min(300, stage.clientHeight - 150), sys, prev: i >= 0 ? notes[i]?.p : null })] : []));
+      bigName.replaceChildren(h('b', { class: 'rest-now' }, '쉼'), h('small', { class: 'rest-sub' }, nx ? `숨 쉬고 · 다음 '${solfege(nx.p, { short: true })}' 준비` : '끝까지 쉬어요'));
+      nextBox.replaceChildren(h('span', {}, `${(rest.d / song.sub)}박 쉬어요`));
+      return;
+    }
     const n = notes[Math.max(0, i)], nx = notes[i + 1];
     const p = i < 0 ? notes[0]?.p : n?.p;
     if (p == null) return;
@@ -82,6 +94,19 @@ export function mountPractice(root, ctx, { song, key }) {
     }
     // 발판
     const ph = Math.max(14, rowH * 0.56);
+    // 쉼표 발판 — 음 줄 가운데에 점선 칸. 지금 쉬는 칸은 밝게
+    const yMid = y0 + used / 2;
+    for (const r of rests) {
+      const x = playX + (r.s * stepSec() - t) * pxSec, w = Math.max(10, r.d * stepSec() * pxSec - 6);
+      if (x > W + 10 || x + w < -10) continue;
+      const now = r.s * stepSec() <= t && t < (r.s + r.d) * stepSec(), past = (r.s + r.d) * stepSec() < t;
+      g.globalAlpha = past ? 0.25 : 1;
+      g.setLineDash([6, 5]); g.lineWidth = now ? 2.5 : 1.6; g.strokeStyle = now ? '#ffe48f' : 'rgba(255,255,255,.45)';
+      g.fillStyle = now ? 'rgba(255,228,143,.12)' : 'rgba(255,255,255,.05)';
+      round(x, yMid - ph * 0.42, w, ph * 0.84, 10); g.fill(); g.stroke(); g.setLineDash([]);
+      if (w >= 34) { g.fillStyle = now ? '#ffe48f' : 'rgba(255,255,255,.7)'; g.font = '800 12px "Noto Sans KR","Noto Music",sans-serif'; g.textAlign = 'left'; g.fillText(w >= 70 ? '쉼 · 숨 쉬기' : '쉼', x + 8, yMid + 1); }
+      g.globalAlpha = 1;
+    }
     notes.forEach((n, i) => {
       const x = playX + (noteT(n) - t) * pxSec, w = Math.max(10, n.d * stepSec() * pxSec - 6);
       if (x > W + 10 || x + w < -10) return;
@@ -110,7 +135,7 @@ export function mountPractice(root, ctx, { song, key }) {
       const sz = Math.max(46, Math.min(78, rowH * 1.25));
       let yy = yOf(cur.p) - ph / 2;
       if (k >= 0 && nx) {
-        const a = noteT(cur) + cur.d * stepSec() * 0.55, z = noteT(nx);
+        const z = noteT(nx), a = Math.max(noteT(cur) + cur.d * stepSec() * 0.55, z - 0.42);   // 쉬는 동안은 발판에 앉아 기다렸다 다음 음 직전에 뜀
         if (t > a && z > a) { const u = Math.min(1, (t - a) / (z - a)); const ya = yOf(cur.p), yb = yOf(nx.p); yy = (ya + (yb - ya) * u) - ph / 2 - Math.sin(Math.PI * u) * (rowH * 0.9 + 18); }
       } else if (k < 0) yy = yOf(notes[0].p) - ph / 2;
       const squash = k >= 0 && t - noteT(cur) < 0.08 ? 0.9 : 1;
@@ -126,7 +151,7 @@ export function mountPractice(root, ctx, { song, key }) {
       g.fillStyle = 'rgba(255,255,255,.92)'; g.font = '900 96px "Noto Sans KR",sans-serif'; g.textAlign = 'center';
       g.fillText(String(left), W * 0.6, H / 2); g.textAlign = 'left';
     }
-    showFinger(t < 0 ? -1 : idxAt(t));
+    showFinger(t < 0 ? -1 : idxAt(t), t >= 0 ? restAt(t) : null);
     // 노랫말
     if (song.notes.some(n => n.w)) {
       const k = idxAt(t), from = Math.max(0, k - 6);

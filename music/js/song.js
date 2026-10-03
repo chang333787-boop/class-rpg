@@ -1,7 +1,9 @@
 // 곡 한 개의 모양과 다루기 — 저장 모양 = 화면 모양(점 경로 없음). 한 번에 한 음(단선율)만 울리는 가락.
 //  song = { v, id, title, beats, sub, bars, tempo, key(조: 다장조 0), scale, inst, notes:[{ s 시작 칸, d 칸 수, p 음 높이, w 노랫말 한 글자 }],
-//           chords:[마디별로 손으로 고른 화음 'I'|'IV'|'V'|null], acc:{ chord, bass, drum }, mood, reverb }
-import { parsePitch, barSteps, totalSteps, stepSec, fitChords, chordPcs, chordRoot, ROMAN, SCALES } from './theory.js';
+//           chords:[마디별로 손으로 고른 화음 'I'|'IV'|'V'|null], acc:{ chord, bass, drum }, mood, reverb,
+//           harm:[{ s, d, p }] = 아이가 직접 쌓는 화음 음(같은 때 최대 3음 · 같은 때 시작한 음은 길이가 같다 = 화음 하나) }
+import { chordName } from './theory.js';
+import { parsePitch, barSteps, totalSteps, stepSec, fitChords, chordPcs, chordRoot, chordByName, ROMAN, SCALES } from './theory.js';
 import { LIBRARY } from './library.js';
 
 export const INSTS = {
@@ -11,7 +13,7 @@ export const DRUMS = { basic: '쿵짝 리듬', semachi: '세마치 장단', gutg
 
 export function emptySong() {
   return { v: 1, id: null, title: '', beats: 4, sub: 2, bars: 4, tempo: 100, key: 0, scale: 'penta', inst: 'piano',
-    notes: [], chords: [], acc: { chord: true, bass: true, drum: 'basic' }, mood: null, reverb: 0.12 };
+    notes: [], harm: [], chords: [], acc: { chord: true, bass: true, drum: 'basic' }, mood: null, reverb: 0.12 };
 }
 
 // 'G4/1 E4/1 E4/2 | F4/1 …' → { notes, bars }
@@ -42,7 +44,8 @@ export function fromLibrary(item) {
   const drum = item.beats === 3 && item.sub === 3 ? 'semachi' : item.beats === 4 && item.sub === 3 ? 'gutgeori' : 'basic';
   return { v: 1, id: 'lib_' + item.key, lib: true, lk: item.key, title: item.title, origin: item.origin, level: item.level,
     beats: item.beats, sub: item.sub, bars, tempo: item.tempo, key: item.key2 || 0, scale: item.scale, inst: item.inst,
-    notes, chords: [], acc: { chord: true, bass: true, drum }, mood: null, reverb: 0.12, practice: !!item.practice };
+    notes, harm: [], chords: [], acc: { chord: true, bass: true, drum: item.drum || drum }, mood: null, reverb: 0.12, practice: !!item.practice,
+    ...(item.prog ? { prog: item.prog.trim().split(/\s+/), progEvery: item.progEvery || 1 } : {}) };
 }
 export const librarySongs = () => LIBRARY.map(fromLibrary);
 
@@ -70,6 +73,10 @@ export function normalize(raw) {
     .filter(n => Number.isFinite(n.s) && Number.isFinite(n.d) && Number.isFinite(n.p) && n.s >= 0 && n.d >= 1 && n.s < total && n.p >= 48 && n.p <= 84)
     .map(n => ({ ...n, d: Math.min(n.d, total - n.s) }));
   s.notes = mono(s.notes);
+  const hl = Array.isArray(raw.harm) ? raw.harm : raw.harm && typeof raw.harm === 'object' ? Object.values(raw.harm) : [];
+  s.harm = chordify(hl.map(n => ({ s: Math.round(+n.s), d: Math.round(+n.d), p: Math.round(+n.p) }))
+    .filter(n => Number.isFinite(n.s) && Number.isFinite(n.d) && Number.isFinite(n.p) && n.s >= 0 && n.d >= 1 && n.s < total && n.p >= 48 && n.p <= 84)
+    .map(n => ({ ...n, d: Math.min(n.d, total - n.s) })).slice(0, 400));
   const ch = Array.isArray(raw.chords) ? raw.chords : raw.chords && typeof raw.chords === 'object' ? Object.assign([], raw.chords) : [];
   s.chords = Array.from({ length: s.bars }, (_, i) => ROMAN[ch[i]] ? ch[i] : null);
   for (const k of ['lib', 'lk', 'origin', 'level', 'practice', 'by', 'byName', 'created', 'updated', 'pub', 'rev']) if (raw[k] != null) s[k] = raw[k];
@@ -87,6 +94,36 @@ export function mono(notes) {
   }
   return out.filter(n => n.d >= 1);
 }
+// 화음 음 정리 — 같은 때 시작한 음 = 화음 하나(길이는 가장 짧은 것 · 3음까지) · 뒤 화음이 시작하면 앞 화음은 거기서 끝
+export function chordify(harm) {
+  const by = new Map();
+  for (const n of harm) { if (!by.has(n.s)) by.set(n.s, []); const c = by.get(n.s); if (!c.some(x => x.p === n.p)) c.push(n); }
+  const starts = [...by.keys()].sort((a, z) => a - z), out = [];
+  starts.forEach((st, k) => {
+    const c = by.get(st).slice(0, 3);
+    let d = Math.min(...c.map(n => n.d));
+    if (k + 1 < starts.length) d = Math.min(d, starts[k + 1] - st);
+    if (d >= 1) for (const n of c.sort((a, z) => a.p - z.p)) out.push({ s: st, d, p: n.p });
+  });
+  return out;
+}
+export const chordAt = (song, s) => song.harm.filter(n => n.s === s);
+// 화음 음 하나 놓기 — 그 자리에 화음이 있으면 거기에 쌓고(길이는 그 화음 것), 없으면 새 화음(마디·다음 화음 앞까지)
+export function placeHarm(song, s, p, d) {
+  const total = totalSteps(song), bs = barSteps(song);
+  const here = chordAt(song, s);
+  if (here.some(n => n.p === p)) return null;
+  if (here.length >= 3) return 'full';
+  if (here.length) { song.harm = chordify([...song.harm, { s, d: here[0].d, p }]); return true; }
+  const next = song.harm.filter(n => n.s > s).sort((a, z) => a.s - z.s)[0];
+  const barEnd = (Math.floor(s / bs) + 1) * bs;
+  d = Math.max(1, Math.min(d, total - s, barEnd - s, next ? next.s - s : Infinity));
+  // 앞 화음이 이 자리를 덮고 있으면 여기서 끊는다
+  const cut = song.harm.map(n => n.s < s && n.s + n.d > s ? { ...n, d: s - n.s } : n);
+  song.harm = chordify([...cut, { s, d, p }]);
+  return true;
+}
+export function removeHarm(song, n) { song.harm = song.harm.filter(x => !(x.s === n.s && x.p === n.p)); }
 export const noteAt = (song, step) => song.notes.find(n => n.s <= step && step < n.s + n.d) || null;
 // 칸 s 에 길이 d 의 음 p 를 놓는다 — 그 자리의 음은 비키고(잘리거나 지워짐), 마디·곡 끝을 넘지 않는다
 export function placeNote(song, s, p, d) {
@@ -114,6 +151,23 @@ const voice = (roman, key) => chordPcs(roman, key).map(c => 50 + ((c - 50 % 12 +
 const bassOf = (roman, key) => 45 + ((chordRoot(roman, key) - 45 % 12 + 12) % 12);
 const DRONE_VOICE = { pyeong: [55, 62], gyemyeon: [57, 64] };
 
+// 박 k 의 화음(진행이 적힌 곡만) — { name, root, pcs } · '-' 또는 없으면 null
+export function progAt(song, beat) {
+  if (!song.prog || !song.prog.length) return null;
+  const nm = song.prog[Math.floor(beat / (song.progEvery || 1)) % song.prog.length];
+  return nm === '-' ? null : chordByName(nm);
+}
+// 박마다 반주 화음(진행이 있으면 그것, 없으면 마디 자동 화음) — 리듬 게임 화음 음표 · 악보 화음 이름이 쓴다
+export function beatChords(song) {
+  const out = [], key = song.key || 0;
+  const auto = song.prog ? null : fitChords(song, song.chords);
+  for (let b = 0; b < song.bars * song.beats; b++) {
+    if (song.prog) { out.push(progAt(song, b)); continue; }
+    const r = auto[Math.floor(b / song.beats)];
+    out.push({ name: chordName(r, key), root: chordRoot(r, key), pcs: chordPcs(r, key) });
+  }
+  return out;
+}
 export function buildEvents(song, o = {}) {
   const opt = { melody: true, chord: song.acc.chord, bass: song.acc.bass, drum: song.acc.drum, scale: 1, countIn: 0, ...o };
   const sd = stepSec(song, opt.scale), bs = barSteps(song), beat = sd * song.sub;
@@ -121,6 +175,7 @@ export function buildEvents(song, o = {}) {
   const ev = [];
   for (let i = 0; i < opt.countIn; i++) ev.push({ t: i * beat, kind: 'click', accent: i === 0, track: 'count' });
   if (opt.melody) song.notes.forEach((n, i) => ev.push({ t: off + n.s * sd, d: n.d * sd, kind: 'note', inst: song.inst, p: n.p, vel: 0.85, track: 'melody', i }));
+  if (opt.harm !== false) for (const n of song.harm || []) ev.push({ t: off + n.s * sd, d: n.d * sd, kind: 'note', inst: song.inst, p: n.p, vel: 0.5, track: 'harm' });   // 아이가 쌓은 화음
   const korean = SCALES[song.scale]?.family === 'korean';
   const chords = fitChords(song, song.chords);
   for (let b = 0; b < song.bars; b++) {
@@ -130,6 +185,7 @@ export function buildEvents(song, o = {}) {
     } else {
       const ch = chords[b];
       const beats = song.beats;
+      if (song.prog) { progBar(ev, song, b, t0, beat, opt); for (const d of drumBar(song, opt.drum)) ev.push({ t: t0 + d.at * sd, kind: 'drum', drum: d.k, vel: d.v ?? 0.8, track: 'drum', span: sd }); continue; }
       const bassBeats = beats === 4 ? [0, 2] : [0];
       const chordBeats = opt.bass ? (beats === 4 ? [1, 3] : beats === 3 ? [1, 2] : [1]) : [...Array(beats).keys()];
       if (opt.bass) for (const k of bassBeats) ev.push({ t: t0 + k * beat, d: beat * 0.9, kind: 'note', inst: 'bass', p: bassOf(ch, song.key || 0), vel: 0.55, track: 'bass' });
@@ -158,5 +214,17 @@ export function drumBar(song, kind) {
     for (let i = 0; i < sub; i++) out.push({ at: at + i, k: 'hat', v: i === 0 ? 0.35 : 0.22 });
   }
   return out;
+}
+// 진행이 적힌 곡의 한 마디 반주 — 박마다(화음이 바뀌는 박에) 베이스 뿌리음 + 화음
+function progBar(ev, song, b, t0, beat, opt) {
+  for (let k = 0; k < song.beats; k++) {
+    const c = progAt(song, b * song.beats + k);
+    if (!c) continue;
+    const prev = k || b ? progAt(song, b * song.beats + k - 1) : null;
+    const change = !prev || prev.name !== c.name;
+    const t = t0 + k * beat;
+    if (opt.bass && (change || k === 0)) ev.push({ t, d: beat * 0.9, kind: 'note', inst: 'bass', p: 45 + ((c.root - 45 % 12 + 12) % 12), vel: 0.55, track: 'bass' });
+    if (opt.chord) for (const pc of c.pcs.slice(0, 3)) ev.push({ t, d: beat * 0.85, kind: 'note', inst: 'pad', p: 50 + ((pc - 50 % 12 + 12) % 12), vel: change ? 0.22 : 0.16, track: 'chord' });
+  }
 }
 export const JANGDAN_TEXT = { deong: '덩', kung: '쿵', deok: '덕', gi: '기', roll: '더러러러' };

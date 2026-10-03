@@ -42,6 +42,18 @@ export function coach(song) {
   const lens = new Set(notes.map(n => n.d));
   if (lens.size === 1 && notes.length >= 6) out.push({ kind: 'tip', text: '모든 음의 길이가 같아요. 긴 음을 섞으면 리듬이 살아나요(음 길이 고르기).' });
   else if (lens.size >= 3) out.push({ kind: 'good', text: '짧은 음과 긴 음이 섞여 리듬이 재미있어요.' });
+  // [MUSIC-HARM-1] 화음 — 가락과 같은 때 울리는 화음 음이 어울리나(바로 옆 음 = 부딪힘 · 3도·5도·6도 = 어울림)
+  if (song.harm && song.harm.length) {
+    let good = 0; const clash = [];
+    for (const hn of song.harm) {
+      const m = notes.find(n => n.s <= hn.s && hn.s < n.s + n.d);
+      if (!m) continue;
+      const iv = ((m.p - hn.p) % 12 + 12) % 12;
+      if ([1, 2, 10, 11].includes(iv)) clash.push(hn); else good++;
+    }
+    if (clash.length) out.push({ kind: 'tip', text: `화음과 가락이 부딪히는 곳이 ${clash.length}군데 있어요(예: ${Math.floor(clash[0].s / bs) + 1}마디 '${solfege(clash[0].p, { short: true })}'). 바로 옆 음끼리는 부딪혀요 — 두 칸 떨어진 음(3도)이 잘 어울려요.` });
+    else if (good) out.push({ kind: 'good', text: `화음 ${good}음이 가락과 잘 어울려요(3도 · 5도 · 6도).` });
+  }
   // 국악 느낌
   if (sc.family === 'korean') out.push({ kind: 'good', text: `${sc.name}: ${sc.hint}` });
   const good = out.filter(x => x.kind === 'good'), tip = out.filter(x => x.kind === 'tip');
