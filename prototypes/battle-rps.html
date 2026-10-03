@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>속성 가위바위보 배틀</title>
+<title>속성 힘겨루기 배틀</title>
 <!-- [BATTLE-RPS 시제품 10-03] 불·물·풀을 동시에 낸다 · 몬스터는 '둘 중 하나'를 미리 보여 준다 · 갑옷 = 내 속성 · 기술 고르기 없음(막기·필살기) — 실제 게임엔 아직 안 넣음 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap">
 <script src="../gamedata.js"></script>
@@ -57,6 +57,11 @@ button{font-family:inherit;border:0;cursor:pointer}
 @keyframes clin{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
 @keyframes clwin{0%{transform:scale(1);opacity:1}40%{transform:scale(1.25)}100%{transform:scale(1.1);opacity:1;box-shadow:0 6px 0 rgba(0,0,0,.25),0 0 0 10px #ffd35a}}
 @keyframes cllose{0%{transform:scale(1);opacity:1}100%{transform:scale(.72) translateY(14px);opacity:.55;filter:grayscale(.6)}}
+.tug{position:absolute;left:50%;top:calc(44% + 78px);transform:translateX(-50%);width:300px;z-index:6;opacity:0;transition:opacity .2s}
+.tug.show{opacity:1}
+.tug .bar{height:14px;border-radius:8px;background:var(--c2);overflow:hidden;box-shadow:0 0 0 3px rgba(40,25,15,.55)}
+.tug .bar i{display:block;height:100%;width:50%;background:var(--c1);transition:width .5s cubic-bezier(.2,.9,.3,1)}
+.tug .nums{display:flex;justify-content:space-between;margin-top:5px;font-weight:900;font-size:16px;text-shadow:0 2px 0 #3b2a14}
 .res{position:absolute;left:50%;top:22%;transform:translateX(-50%);font-family:'Black Han Sans','Noto Sans KR',sans-serif;font-size:44px;z-index:6;text-shadow:0 3px 0 #3b2a14,0 0 12px rgba(0,0,0,.4);opacity:0}
 .res.show{animation:resin .4s ease-out forwards}
 @keyframes resin{0%{opacity:0;transform:translate(-50%,10px)}100%{opacity:1;transform:translate(-50%,0)}}
@@ -109,6 +114,7 @@ button{font-family:inherit;border:0;cursor:pointer}
     <div class="tag" id="ftag" style="right:calc(16% + 262px);top:92px;text-align:right"></div>
     <div class="tag" id="mtag" style="left:calc(16% + 230px);bottom:7%"></div>
     <div class="clash"><div class="cl" id="c1"></div><div class="cl" id="c2"></div></div>
+    <div class="tug" id="tug"><div class="bar"><i id="tugi"></i></div><div class="nums"><span id="tug1"></span><span id="tug2"></span></div></div>
     <div class="res" id="res"></div>
     <div class="end" id="end"><div class="endc" id="endc"></div></div>
   </div>
@@ -117,12 +123,15 @@ button{font-family:inherit;border:0;cursor:pointer}
 <script>
 // ════ 속성 가위바위보 — 규칙(설계 시뮬과 같은 수)
 //  물이 불을 끄고 · 불이 풀을 태우고 · 풀이 물을 마신다. 둘이 동시에 낸다.
+//  [힘겨루기] 상성은 배수: 유리 ×1.5 · 불리 ×0.67. 서로의 '힘 × 상성'을 견줘 1.25배 넘게 세면 이김 · 0.8배보다 약하면 짐 · 그 사이는 비김
+//    (산불은 컵에 든 물로 못 끈다 — 힘 차이가 크면 상성이 뒤집힌다)
 //  이기면 내 공격 ×1.6 · 몬스터 ×0.5 / 비기면 둘 다 ×1 / 지면 내 ×0.5 · 몬스터 ×1.6 / 막기: 나는 안 치고 받는 피해 ×0.2
 //  내 속성(입은 갑옷) 으로 내면 ×1.25 · 3차례마다 몬스터 큰 공격(×2, 무엇을 낼지 정확히 보여 줌)
 //  기세: 이기면 +34 · 비기면 +15 · 막기 +40 → 다 차면 필살기(가위바위보 없이 ×2.4)
 //  힘 = 공격력 + 마력(지금 장비 그대로) · 몬스터 체력 ×2.2 · 공격 ×2.0
 const Q = new URLSearchParams(location.search);
 const MON = GAME_DATA.monsters.find(m => m.id === (Q.get('m') || 'm45'));
+const ZLV = +(Q.get('lv') || 12);
 const ARMOR = Q.get('armor') || 'fire';
 const EL = { fire: { n: '불', c: '#e9603e', g: '<path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.2-2-5.6-4-7.6.2 2-1 3.4-2.3 3.4C11.4 11.2 11 9 12.5 6 9 7.5 5 11 5 15.4 5 19.1 7.6 22 12 22z"/>' },
   water: { n: '물', c: '#3d8fd6', g: '<path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z"/>' },
@@ -130,6 +139,12 @@ const EL = { fire: { n: '불', c: '#e9603e', g: '<path d="M12 22c4.4 0 7-2.9 7-6
 const KEYS = ['fire', 'water', 'grass'];
 const BEATS = { water: 'fire', fire: 'grass', grass: 'water' };
 const rps = (a, b) => a === b ? 0 : BEATS[a] === b ? 1 : -1;
+const EM = (a, b) => { const r = rps(a, b); return r > 0 ? 1.5 : r < 0 ? 0.67 : 1; };
+function clash(k, m, big) {   // 내 힘 × 상성 (× 내 속성) 대 몬스터 힘 × 상성 (× 큰 공격)
+  const mine = S.power * EM(k, m) * (k === ARMOR ? 1.25 : 1), theirs = MON.atk * 2.3 * EM(m, k) * (big ? 2 : 1);
+  const r = mine / theirs;
+  return { mine: Math.round(mine), theirs: Math.round(theirs), out: r >= 1.25 ? 1 : r <= 0.8 ? -1 : 0 };
+}
 const svg = (d, s) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const jong = w => { const c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
 const J = (w, a, b) => w + (jong(w) ? a : b);
@@ -163,9 +178,9 @@ function next() {
   drawCmd();
 }
 function outcomeWord(k) {   // 이 단추를 누르면 힌트 둘에 대해 어떻게 되나 — 아이가 읽는 연습
-  const r = [...new Set(S.hint.map(h => rps(k, h)))].sort((a, b) => b - a);
-  const w = { 1: '이겨요', 0: '비겨요', '-1': '져요' };
-  return r.length === 1 ? w[r[0]] : `${w[r[0]].replace('요', '')}거나 ${w[r[1]]}`;
+  const r = [...new Set(S.hint.map(h => clash(k, h, S.big).out))].sort((a, b) => b - a);
+  const w = { 1: '이겨요', 0: '비겨요', '-1': '져요' }, stem = { 1: '이기', 0: '비기', '-1': '지' };
+  return r.length === 1 ? w[r[0]] : `${stem[r[0]]}거나 ${w[r[1]]}`;   // 이기거나 져요 · 비기거나 져요 · 이기거나 비겨요
 }
 function drawCmd() {
   const ult = S.gauge >= 100;
@@ -189,7 +204,14 @@ async function go(k) {
   if (k === 'ult') { pd = Math.round(S.power * 2.4 * df); md = Math.round(atk * .6 * pf); S.gauge = 0; word = '필살기!'; c1.className = 'cl show win'; }
   else if (k === 'guard') { md = Math.round(atk * .2 * pf); S.gauge = Math.min(100, S.gauge + 40); word = S.big ? '막았다!' : '막기'; c1.className = 'cl show win'; }
   else {
-    const r = rps(k, S.choice), crit = Math.random() < .08 ? 1.5 : 1;
+    const cl = clash(k, S.choice, S.big), r = cl.out, crit = Math.random() < .08 ? 1.5 : 1;
+    const tg = $('tug'); tg.style.setProperty('--c1', EL[k].c); tg.style.setProperty('--c2', EL[S.choice].c);
+    $('tug1').textContent = `내 ${EL[k].n} ${cl.mine}`; $('tug2').textContent = `${EL[S.choice].n} ${cl.theirs}`;
+    tg.classList.add('show'); requestAnimationFrame(() => { $('tugi').style.width = Math.round(cl.mine / (cl.mine + cl.theirs) * 100) + '%'; });
+    const elR = rps(k, S.choice);
+    S.why = elR > 0 && r < 1 ? `${EL[k].n}이 ${EL[S.choice].n}에 강하지만, ${MON.name}의 힘이 너무 커서 ${r === 0 ? '비겼어요' : '밀렸어요'} (${cl.mine} 대 ${cl.theirs})`
+          : elR < 0 && r > -1 ? `${EL[k].n}은 ${EL[S.choice].n}에 약하지만, 내 힘이 훨씬 커서 ${r > 0 ? '이겼어요' : '버텼어요'} (${cl.mine} 대 ${cl.theirs})`
+          : `${cl.mine} 대 ${cl.theirs}`;
     pd = Math.round(S.power * (k === ARMOR ? 1.25 : 1) * (r > 0 ? 1.6 : r === 0 ? 1 : .5) * df * crit);
     md = Math.round(atk * (r > 0 ? .5 : r === 0 ? 1 : 1.6) * pf);
     S.gauge = Math.min(100, S.gauge + (r > 0 ? 34 : r === 0 ? 15 : 0));
@@ -204,10 +226,10 @@ async function go(k) {
   if (S.mhp > 0 && md) { S.php -= md; pop($('me'), md); }
   draw();
   const why = k === 'ult' ? `필살기! ${MON.name}에게 ${pd}` : k === 'guard' ? `막기 — ${md}만 받았어요` :
-    `나 ${EL[k].n} · ${MON.name} ${EL[S.choice].n} → ${word.replace('!', '').replace('…', '')} (${pd} 주고 ${md} 받음)`;
+    `${word.replace('!', '').replace('…', '')} — ${S.why} · ${pd} 주고 ${md} 받음`;
   $('say').textContent = why;
   await wait(900);
-  [c1, c2, res].forEach(e => e.className = e === res ? 'res' : 'cl');
+  [c1, c2, res].forEach(e => e.className = e === res ? 'res' : 'cl'); $('tug').classList.remove('show'); $('tugi').style.width = '50%';
   if (S.mhp <= 0 || S.php <= 0) return end();
   S.busy = false; next();
 }
