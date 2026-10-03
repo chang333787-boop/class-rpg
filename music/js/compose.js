@@ -6,6 +6,7 @@ import { engine, Player } from './audio.js';
 import { renderStaff } from './notation.js';
 import { coach, ideas } from './coach.js';
 import { fingerSVG, recorderOK } from './recorder.js';
+import { songBad, hidden } from './safety.js';
 
 const NOTE_ICON = { 1: '♪', 2: '♩', 3: '♩.', 4: '𝅗𝅥', 6: '𝅗𝅥.', 8: '𝅝' };
 const MOODS = {
@@ -303,12 +304,21 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     if (!song.notes.length) { toast('음을 하나 이상 놓아야 저장할 수 있어요'); return; }
     const t = h('input', { value: song.title, maxlength: 30, placeholder: '곡 제목', style: { width: '100%' } });
     const pub = h('input', { type: 'checkbox' }); pub.checked = !!song.pub;
+    const warn = h('p', { class: 'save-warn', style: { display: 'none' } });
     modal('곡 저장하기', h('div', { class: 'save' },
       h('label', {}, h('b', {}, '제목'), t),
       h('label', { class: 'chk' }, pub, h('span', {}, h('b', {}, '우리 반 음악회에 올리기'), h('small', { class: 'muted' }, '친구들이 듣고, 내 곡으로 리듬 게임 · 리코더 연습도 할 수 있어요'))),
-      ctx.store.me.guest ? h('p', { class: 'muted' }, '손님으로 열어서 이 기기에만 저장돼요. RPG 에서 열면 내 이름으로 저장돼요.') : null),
+      ctx.store.me.guest ? h('p', { class: 'muted' }, '손님으로 열어서 이 기기에만 저장돼요. RPG 에서 열면 내 이름으로 저장돼요.') : null, warn),
       [{ label: '그만두기' }, { label: '저장', primary: true, onclick: async c => {
-        song.title = (t.value || '').trim().slice(0, 30) || '제목 없는 곡'; title.value = song.title; song.pub = pub.checked;
+        const nt = (t.value || '').trim().slice(0, 30) || '제목 없는 곡';
+        // [MUSIC-SAFE-1] 음악회는 반 친구 모두가 보는 곳 — 고운 말이 아니면 올리지 않는다(나만 보기 저장은 된다)
+        const bad = songBad({ ...song, title: nt });
+        if (pub.checked && (bad.title.length || bad.lyrics.length)) {
+          warn.style.display = '';
+          warn.textContent = '음악회는 반 친구 모두가 보는 곳이에요. 고운 말로 바꿔 주세요 — ' + [bad.title.length ? '제목: ' + bad.title.map(hidden).join(', ') : '', bad.lyrics.length ? '노랫말: ' + bad.lyrics.map(hidden).join(', ') : ''].filter(Boolean).join(' · ') + ' (음악회에 올리지 않으면 나만 보기로 저장돼요)';
+          return;
+        }
+        song.title = nt; title.value = song.title; song.pub = pub.checked;
         try { await ctx.store.saveSong(song); dirty = false; c(); toast(song.pub ? '저장했어요 · 우리 반 음악회에 올렸어요' : '저장했어요'); ctx.replaceRef(ctx.refOf(song)); after && after(); }
         catch (e) { console.warn(e); toast('저장하지 못했어요 — 인터넷을 확인해 주세요', 3200); }
       } }]);

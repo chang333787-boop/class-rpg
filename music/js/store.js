@@ -7,6 +7,8 @@
 //  rhythm/<곡키>/<sid>       = 리듬 게임 최고 기록 { best, acc, combo, grade, t 때, n 이름 }
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { uid, keyOf, lsGet, lsSet } from './util.js';
+import { songBad } from './safety.js';
+const clean = s => { const b = songBad(s); return !b.title.length && !b.lyrics.length; };
 
 export const ROOT = 'classRPG_music';
 // gamedata.js FIREBASE_CONFIG 와 같은 값(학급 RPG 프로젝트)
@@ -44,7 +46,7 @@ function rtdbStore(fb, sid, name) {
       const up = {};
       up[`songs/${sid}/${song.id}`] = songOut(song);
       up[`songlog/${sid}/${song.id}/${t}`] = { t, ev: song.rev === 1 ? 'new' : 'save', nn: song.notes.length, bars: song.bars, pub: !!song.pub };   // 지우지 않고 쌓는 기록(연구용)
-      up[`concert/${concertKey(song.id)}`] = song.pub
+      up[`concert/${concertKey(song.id)}`] = song.pub && clean(song)
         ? { sid, n: name || '', id: song.id, t: song.title || '제목 없음', u: t, beats: song.beats, sub: song.sub, bars: song.bars, scale: song.scale, nn: song.notes.length }
         : null;
       await root.update(up);
