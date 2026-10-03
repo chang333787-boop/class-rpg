@@ -2027,3 +2027,77 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
   .tb-m4{left:calc(284*var(--u));top:calc(418*var(--u));height:calc(86*var(--u));}
   .btn-gold.tb-go{top:calc(522*var(--u));}
 }
+
+/* ════ [HOME-C-1] 홈 = 왼쪽 레일 네 구역(오늘 · 배우고 만들기 · 나의 공간 · 모험) — 사용자 10-03 시안 C. 색은 지금 그대로.
+   데스크톱(701px↑, 모바일 배치가 아닐 때)만 레일을 보이고 고른 구역 하나만 보인다. 폰은 네 구역이 위에서 아래로 이어진다. */
+.home-rail{display:none}
+@media (min-width:701px){
+  #s-game:not(.force-mobile) .game-body{grid-template-columns:196px 1fr}
+  #s-game:not(.force-mobile) .home-rail{display:flex;flex-direction:column;gap:2px;padding:10px 0;background:#120e0a;border-right:1px solid var(--border);overflow-y:auto;min-height:0}
+  #s-game:not(.force-mobile) .side-panel{display:none}
+  #s-game:not(.force-mobile)[data-home-sec="me"] .game-body{grid-template-columns:196px minmax(250px,24%) 1fr}
+  #s-game:not(.force-mobile)[data-home-sec="me"] .side-panel{display:flex}
+  #main-area .home-sec{display:none}
+  #s-game:not([data-home-sec]) #main-area .home-sec[data-sec="today"],
+  #s-game[data-home-sec="today"] #main-area .home-sec[data-sec="today"],
+  #s-game[data-home-sec="learn"] #main-area .home-sec[data-sec="learn"],
+  #s-game[data-home-sec="me"] #main-area .home-sec[data-sec="me"],
+  #s-game[data-home-sec="adv"] #main-area .home-sec[data-sec="adv"]{display:block}
+}
+.hr-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:112px;padding:8px 6px;
+  background:none;border:none;color:var(--txt3);font-family:inherit;cursor:pointer;text-align:center}
+.hr-item:hover{background:rgba(255,255,255,.03);color:var(--txt2)}
+.hr-item.on{background:var(--bg2);color:var(--txt)}
+.hr-item.on::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 3px 3px 0;background:var(--gold)}
+.hr-item b{font-size:.95rem;font-weight:900}
+.hr-item small{font-size:.7rem;color:var(--txt3)}
+.hr-art{height:50px;width:auto;max-width:110px;object-fit:contain}
+.hr-board{display:block;width:70px;height:44px;border-radius:4px;background:#2f5a43;box-shadow:0 0 0 4px #8a5a2e}
+.hr-item:not(.on) .hr-art{opacity:.75}
+/* 구역 머리 */
+.hs-head{display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap;margin:.1rem 0 .8rem}
+.hs-head h2{font-size:1.35rem;font-weight:900;letter-spacing:-.01em;color:var(--txt)}
+.hs-date{width:100%;font-size:.8rem;font-weight:700;color:var(--txt3)}
+.hs-sub{font-size:.82rem;color:var(--txt3)}
+/* 오늘: 할 일 | 우리 반 소식 */
+.hs-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,34%);gap:1.4rem;align-items:start}
+.hs-news .sec-label{margin-top:.15rem}
+.hc-news{display:flex;align-items:center;gap:.7rem;padding:.65rem .2rem;border-bottom:1px solid var(--border);cursor:pointer}
+.hc-news:hover{background:rgba(255,255,255,.03)}
+.hc-news-art{width:40px;height:40px;object-fit:contain;flex:none}
+.hc-news b{display:block;font-size:.88rem;font-weight:800;color:var(--txt)}
+.hc-news span{font-size:.74rem;color:var(--txt3)}
+.hc-empty{font-size:.8rem;color:var(--txt3);line-height:1.6;padding:.6rem .2rem}
+/* 입구 카드 */
+.hc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem}
+.hc-grid.small{grid-template-columns:repeat(5,minmax(0,1fr));gap:.55rem}
+.hc-door{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.2rem;min-height:150px;padding:.8rem .6rem .75rem;
+  border-radius:14px;background:var(--bg2);cursor:pointer;text-align:center;transition:background .15s}
+.hc-door:hover{background:var(--bg3)}
+.hc-door .hc-art{flex:1;min-height:0;max-height:78px;width:auto;max-width:90%;object-fit:contain;margin-bottom:.25rem}
+.hc-door b{font-size:.95rem;font-weight:900;color:var(--txt)}
+.hc-door span{font-size:.72rem;color:var(--txt3);line-height:1.35}
+.hc-grid.small .hc-door{min-height:118px}
+.hc-grid.small .hc-art{max-height:56px}
+.hc-door.big{grid-row:span 2}
+.hc-door.big .hc-art{max-height:150px}
+.hc-badge{position:absolute;top:8px;right:8px;font-size:.68rem;font-weight:900;color:#2a1a08;background:var(--gold);border-radius:6px;padding:1px 6px}
+.hc-links{display:flex;gap:.5rem;margin:.8rem 0 .6rem}
+.hc-links button{flex:1;padding:.55rem;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--txt2);font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
+@media (max-width:700px){ .hs-cols{grid-template-columns:1fr} .hc-grid,.hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))} .home-sec{margin-bottom:1rem} }
+#s-game.force-mobile .hs-cols{grid-template-columns:1fr}
+#s-game.force-mobile .hc-grid,#s-game.force-mobile .hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hc-door .hc-art{transform:scale(var(--z,1));transform-origin:50% 100%}
+.hc-door.big .hc-art{transform:none}
+/* [HOME-C-1] 폭에 맞춰 칸 수 자동 · 좁은 데스크톱/태블릿(701~1100)은 레일을 줄이고 소식을 아래로 */
+.hc-grid{grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr))}
+.hc-grid.small{grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr))}
+@media (min-width:701px) and (max-width:1100px){
+  #s-game:not(.force-mobile) .game-body{grid-template-columns:150px 1fr}
+  #s-game:not(.force-mobile)[data-home-sec="me"] .game-body{grid-template-columns:150px minmax(230px,30%) 1fr}
+  .hr-item{min-height:96px}
+  .hr-art{height:40px}
+  .hr-item small{display:none}
+  .hs-cols{grid-template-columns:1fr}
+}
+.hc-door .hc-badge{color:#2a1a08;font-size:.68rem;line-height:1.5}
