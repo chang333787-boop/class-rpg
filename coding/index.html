@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>기초 코딩</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/coding.css?v=4">
+  <!-- 학급 RPG 안(?sid=)에서는 RPG 와 같은 Firebase(compat 9.23)의 classRPG_coding 에 저장 -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- 블록 엔진: Blockly 11.2.2(구글 · Apache-2.0) — 판 번호 고정 + integrity(CDN 파일이 바뀌면 안 실린다) -->
+  <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.2/blockly_compressed.js" integrity="sha384-nXdS/O1XBg7d1iom7upZrVOtjvQfnVGDx67ecaCgU823024LIITNe/9Vf3o9ouRl" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.2/blocks_compressed.js" integrity="sha384-HrJy1eOfAncgHWDhGobRG4+LW7lqYE6yk+XU5mArpfriaJP69d+R+sdziP7jswuL" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.2/python_compressed.js" integrity="sha384-iXAeTR0jGgSq/HwRZYUHS0GixxUkcNU5bQzQavmWgZ5CK6SouQoy7uiTWy97QrgP" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.2/msg/ko.js" integrity="sha384-7Kxri7z7aco7EtXgOpGicGkbuuwWp+LGYe3Z43yHG2Yt/zTF1P0iOyndIk23b0OD" crossorigin="anonymous"></script>
+  <!-- 캐시: 모듈마다 ?v= 대신 여기 한 곳(import map)에서 판 번호를 올린다 -->
+  <script type="importmap">{ "imports": {
+    "./js/app.js": "./js/app.js?v=1", "./js/util.js": "./js/util.js?v=1", "./js/store.js": "./js/store.js?v=1", "./js/world.js": "./js/world.js?v=4",
+    "./js/interp.js": "./js/interp.js?v=4", "./js/stages.js": "./js/stages.js?v=4", "./js/blocks.js": "./js/blocks.js?v=4", "./js/draw.js": "./js/draw.js?v=1",
+    "./js/play.js": "./js/play.js?v=4", "./js/teacher.js": "./js/teacher.js?v=3", "./js/game.js": "./js/game.js?v=1" } }</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>

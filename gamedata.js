@@ -1987,14 +1987,14 @@ const ACHIEVEMENTS = [
   { id:'ach_mon_all',  icon:'👑', name:'도감 완성자',    desc:'전체 몬스터 100종 모두 발견',check: s=>(s.monsterLog||[]).length>=GAME_DATA.monsters.length, reward:{exp:300,gold:200,title:'도감 마스터',deco:'deco_trophy'} },
 
   // 희귀도 업적 — common(42) / rare(62) / legend(21)
-  { id:'ach_rar_com5',  icon:'🔵', name:'일반 몬스터 발견자', desc:'일반(common) 몬스터 5종', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;},  reward:{exp:20,gold:15,title:null,deco:null} },
-  { id:'ach_rar_com20', icon:'🔵', name:'일반 수집가',        desc:'일반(common) 몬스터 20종',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=20;}, reward:{exp:50,gold:30,title:null,deco:null} },
-  { id:'ach_rar_com42', icon:'🔵', name:'일반 도감 완성',     desc:'일반(common) 몬스터 전부',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:100,gold:60,title:null,deco:null} },
-  { id:'ach_rar_rare3', icon:'🟣', name:'희귀 몬스터 발견자', desc:'희귀(rare) 몬스터 첫 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='rare').map(m=>m.id);return (s.monsterLog||[]).some(id=>ms.includes(id));}, reward:{exp:40,gold:30,title:null,deco:null} },
-  { id:'ach_rar_rare20',icon:'🟣', name:'희귀 수집가',        desc:'희귀(rare) 몬스터 20종', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='rare').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=20;}, reward:{exp:80,gold:60,title:null,deco:null} },
-  { id:'ach_rar_leg1',  icon:'🌟', name:'전설의 발견자',      desc:'전설(legend) 몬스터 첫 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return (s.monsterLog||[]).some(id=>ms.includes(id));}, reward:{exp:80,gold:60,title:'전설 목격자',deco:null} },
-  { id:'ach_rar_leg10', icon:'🌟', name:'전설 추적자',        desc:'전설(legend) 몬스터 10종',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=10;}, reward:{exp:150,gold:100,title:'전설 추적자',deco:null} },
-  { id:'ach_rar_leg21', icon:'💫', name:'전설 완성자',        desc:'전설(legend) 몬스터 전부',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:250,gold:180,title:'전설의 사냥꾼',deco:'deco_trophy'} },
+  { id:'ach_rar_com5',  icon:'🔵', name:'일반 몬스터 발견자', desc:'일반 몬스터 5종', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;},  reward:{exp:20,gold:15,title:null,deco:null} },
+  { id:'ach_rar_com20', icon:'🔵', name:'일반 수집가',        desc:'일반 몬스터 20종',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=20;}, reward:{exp:50,gold:30,title:null,deco:null} },
+  { id:'ach_rar_com42', icon:'🔵', name:'일반 도감 완성',     desc:'일반 몬스터 전부',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='common').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:100,gold:60,title:null,deco:null} },
+  { id:'ach_rar_rare3', icon:'🟣', name:'희귀 몬스터 발견자', desc:'희귀 몬스터 첫 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='rare').map(m=>m.id);return (s.monsterLog||[]).some(id=>ms.includes(id));}, reward:{exp:40,gold:30,title:null,deco:null} },
+  { id:'ach_rar_rare20',icon:'🟣', name:'희귀 수집가',        desc:'희귀 몬스터 20종', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='rare').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=20;}, reward:{exp:80,gold:60,title:null,deco:null} },
+  { id:'ach_rar_leg1',  icon:'🌟', name:'전설의 발견자',      desc:'전설 몬스터 첫 발견',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return (s.monsterLog||[]).some(id=>ms.includes(id));}, reward:{exp:80,gold:60,title:'전설 목격자',deco:null} },
+  { id:'ach_rar_leg10', icon:'🌟', name:'전설 추적자',        desc:'전설 몬스터 10종',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=10;}, reward:{exp:150,gold:100,title:'전설 추적자',deco:null} },
+  { id:'ach_rar_leg21', icon:'💫', name:'전설 완성자',        desc:'전설 몬스터 전부',check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.rarity==='legend').map(m=>m.id);return ms.every(id=>(s.monsterLog||[]).includes(id));}, reward:{exp:250,gold:180,title:'전설의 사냥꾼',deco:'deco_trophy'} },
 
   // 속성 업적 (element: fire/water/grass)
   { id:'ach_el_fire',  icon:'🔥', name:'불꽃 탐험가',     desc:'불꽃 속성 몬스터 5종 이상', check: s=>{const ms=GAME_DATA.monsters.filter(m=>m.element==='fire').map(m=>m.id);return (s.monsterLog||[]).filter(id=>ms.includes(id)).length>=5;}, reward:{exp:50,gold:30,title:null,deco:null} },
@@ -2374,7 +2374,7 @@ const EMOTION_DATA = [
   { key:'shameful',   label:'창피하다',   group:'neutral',  icon:'😳' },
   { key:'shy',        label:'부끄럽다',   group:'neutral',  icon:'😊' },
   { key:'surprised',  label:'놀라다',     group:'neutral',  icon:'😲' },
-  { key:'annoyed',    label:'알밉다',     group:'neutral',  icon:'😒' },
+  { key:'annoyed',    label:'얄밉다',     group:'neutral',  icon:'😒' },
   // 부정 (negative)
   { key:'scared',     label:'무섭다',     group:'negative', icon:'😨' },
   { key:'sad',        label:'슬프다',     group:'negative', icon:'😢' },
@@ -2562,7 +2562,7 @@ const EMOTION_PAST_TEXT = {
   "답답하다":"답답했다고","걱정되다":"걱정됐다고","설레다":"설렜다고",
   "샘나다":"샘이 났다고","실망하다":"실망했다고","울고싶다":"울고 싶었다고",
   "부끄럽다":"부끄러웠다고","재미있다":"재미있었다고","편안하다":"편안했다고",
-  "기쁘다":"기뻤다고","알밉다":"밉게 느껴졌다고","속상하다":"속상했다고",
+  "기쁘다":"기뻤다고","얄밉다":"얄밉게 느껴졌다고","알밉다":"얄밉게 느껴졌다고","속상하다":"속상했다고",
   "뿌듯하다":"뿌듯했다고","우울하다":"우울했다고","서운하다":"서운했다고",
   "만족하다":"만족스러웠다고","불안하다":"불안했다고","놀라다":"놀랐다고",
   "쓸쓸하다":"쓸쓸했다고","신경질나다":"신경질이 났다고","아쉽다":"아쉬웠다고",

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>음악실</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <!-- 높은음자리표·쉼표·음표 글리프만(필요한 글자 8개) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Music&text=%F0%9D%84%9E%F0%9D%84%BD%F0%9D%84%BE%F0%9D%84%BF%F0%9D%85%9D%F0%9D%85%9E%E2%99%A9%E2%99%AA&display=block" rel="stylesheet">
+  <link rel="stylesheet" href="css/music.css?v=4">
+  <!-- 학급 RPG 안(?sid=)에서는 RPG 와 같은 Firebase(compat 9.23)의 classRPG_music 에 저장 -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- 캐시: 모듈마다 ?v= 대신 여기 한 곳(import map)에서 판 번호를 올린다 -->
+  <script type="importmap">{ "imports": {
+    "./js/app.js": "./js/app.js?v=2", "./js/util.js": "./js/util.js?v=2", "./js/theory.js": "./js/theory.js?v=2", "./js/library.js": "./js/library.js?v=2",
+    "./js/song.js": "./js/song.js?v=3", "./js/audio.js": "./js/audio.js?v=1", "./js/store.js": "./js/store.js?v=2", "./js/recorder.js": "./js/recorder.js?v=1",
+    "./js/notation.js": "./js/notation.js?v=3", "./js/coach.js": "./js/coach.js?v=2", "./js/compose.js": "./js/compose.js?v=4",
+    "./js/practice.js": "./js/practice.js?v=3", "./js/rhythm.js": "./js/rhythm.js?v=4", "./js/teacher.js": "./js/teacher.js?v=2", "./js/safety.js": "./js/safety.js?v=1" } }</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="js/app.js?v=2"></script>
+</body>
+</html>
