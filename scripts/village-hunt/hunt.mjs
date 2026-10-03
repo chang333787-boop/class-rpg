@@ -83,12 +83,13 @@ const 렌더러 = (() => { try { const c = document.querySelector('canvas'), g =
 return { ...R, 렌더러, 오래포갬: longOv.size, 오래포갬예: [...longOv.values()].slice(0, 3).map(e => e.kind + ' @' + Math.round(e.t / 1000) + 's'), 한칸박자: R.박자표본 ? +(R.박자합 / R.박자표본).toFixed(2) : null, 우표, 빈30초말: said.filter(s => s[0] < 30000).length, 말: said.slice(0, 5), 삼킨오류: e1 && e0 ? (e1.삼킨오류 || 0) + (e1.덮개 || 0) - (e0.삼킨오류 || 0) - (e0.덮개 || 0) : null, 오류예: e1 ? e1.목록.slice(0, 2).map(x => x.말 + '@' + x.줄) : [], 저장멈춤: e1 ? !!e1.저장꺼짐 : null, 프레임평균ms: g ? g.프레임평균ms : null, 놓친비율: g ? g.놓친비율 : null };`;
 
 /* ── 입력 단계(--input) — 입력은 CDP 마우스(진짜 포인터 사건) · 기록은 페이지 안 MutationObserver(#toast · #why) ──
-   흰 공: 풍선 판의 세계 크기 × (한칸px ÷ 칸 4) × 그림 원 60/64 — 얼굴 2.2 · 말 표(🪣✓ 꼴) 3.6. 24px 아래면 그림이 안 읽힌다(창조자 25회 ⓑ48 제안 기준 · 주의만).
+   흰 공: 풍선 판의 세계 크기 × (월드 1 의 화면 px) × 그림 원 60/64 — 얼굴 2.2(MAC-BUBBLEMIN 이 키운 뒤 · __bubbleMin().지금지름px) · 말 표(🪣✓ 꼴 · 안 키움) 3.6. (09-25 고침: 전엔 한칸px(칸 대각선)로 셈해 √2 배 컸고 얼굴 키움을 안 봤다 — 실제 사진 픽셀로 맞춤) 24px 아래면 그림이 안 읽힌다(창조자 25회 ⓑ48 제안 기준 · 주의만).
    반응: 누른 때(페이지 시계) → #toast · #why 의 글이 처음 바뀐 때. 말 충돌: 한 번 누른 뒤 1초 안에 #toast 와 #why 가 **둘 다** 보이고 글이 다르다(ⓐ4 '치웠어요'+'없어요' · MAC-ONEPRESS 로 고침 — 되돌아오는지 지킨다). */
 const PROBE_PREP = `
 { const sk = [...document.querySelectorAll('button')].find(e => ['건너뛰기', '시작', '닫기'].includes(e.textContent.trim()) && e.getClientRects().length && !e.disabled); if (sk) { sk.click(); await new Promise(r => setTimeout(r, 600)); } }   /* 수업 판 시작 카드('시작'은 짐작을 골라야 켜진다 → 건너뛰기) — 카드가 판을 덮으면 누름이 카드에 간다 */
-const st = window.__state(), px = st.한칸px / 4 * 60 / 64;
-const 흰공 = { 얼굴: Math.round(2.2 * px), 말표: Math.round(3.6 * px) };
+const st = window.__state(), bm = window.__bubbleMin ? window.__bubbleMin() : null;   /* [09-25 디자인] 화면 지름 = 판 크기 ÷ worldPerPixel(직교) — 한칸px(칸 대각선 · √2 배)로 셈하면 1.41배 컸고, 얼굴은 MAC-BUBBLEMIN 이 키운 뒤 크기를 봐야 한다 */
+const ppw = bm && bm.원래지름px ? bm.원래지름px / 2.2 : st.한칸px / 4 / Math.SQRT2, 원 = 60 / 64;   /* ppw = 월드 1 이 화면 몇 px · 원 = 그림 속 흰 원(60/64) */
+const 흰공 = { 얼굴: Math.round((bm ? bm.지금지름px : 2.2 * ppw) * 원), 말표: Math.round(3.6 * ppw * 원), 얼굴키움: bm ? bm.키움 : null };
 const snap = window.__snapshot(), hs = (snap.물건 || []).map(t => /^house@(\\d+),(\\d+)/.exec(t)).filter(Boolean).map(m => [+m[1], +m[2]]);
 const lived = ([x, y]) => { const e = snap.집 && snap.집[y * 256 + x]; return !!(e && e[0] > 0); };
 const pick = want => { for (const c of hs.filter(c => lived(c) === want).slice(0, 25)) { const p = window.__cellScreen(c[0], c[1]); if (p && p[1] > 110 && p[1] < innerHeight - 190) return { cell: c, xy: p }; } return null; };
