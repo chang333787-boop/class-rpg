@@ -2101,3 +2101,13 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
   .hs-cols{grid-template-columns:1fr}
 }
 .hc-door .hc-badge{color:#2a1a08;font-size:.68rem;line-height:1.5}
+/* [HOME-C-2] 넓은 화면(맥북·큰 모니터)에서도 크롬북과 같은 짜임 — 칸 수 고정 + 내용 폭 상한 + 가운데.
+   (자동 칸 수로 두었더니 넓은 화면에서 한 줄 7칸 + 3칸으로 고르지 않게 끊기고 막대 단추가 끝까지 늘어나 산만했다) */
+#main-area .home-sec{max-width:1180px;margin-left:auto;margin-right:auto}
+#main-area .hs-me{max-width:1000px}
+.hc-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.hc-grid.small{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1100px){ .hc-grid{grid-template-columns:repeat(3,minmax(0,1fr))} .hc-grid.small{grid-template-columns:repeat(4,minmax(0,1fr))} }
+@media (max-width:900px){ .hc-grid.small{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:700px){ .hc-grid,.hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))} }
+#s-game.force-mobile .hc-grid,#s-game.force-mobile .hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))}
