@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>우리반 성장 RPG</title>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!-- [TITLE-BOARD-1] 첫 화면 칠판 분필 글씨 — 칠판에 쓰는 글자만 받는다(text=). 칠판 글을 바꾸면 여기 글자도 같이 -->
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&text=%200123456789GPR%EA%B8%88%EA%B8%B0%EB%8A%98%EB%8F%84%EB%9D%BC%EB%A6%AC%EB%AA%A8%EB%AA%A9%EB%B0%98%EB%BC%98%EC%84%B1%EC%88%98%EC%94%A9%EC%98%A4%EC%9A%94%EC%9A%B0%EC%9B%94%EC%9D%98%EC%9D%BC%EC%9E%90%EC%9E%A5%ED%86%A0%ED%95%9C%ED%97%98%ED%99%94&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -15,24 +17,42 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20261003bv1">
+<link rel="stylesheet" href="./student.css?v=20261003tb1">
 </head>
 <body>
-<div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#0E1621;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
-  <div style="font-size:3rem">🏫</div>
-  <div style="font-size:1rem;font-weight:700;color:#FFD700">우리반 성장 RPG</div>
-  <div style="font-size:.8rem;color:#8899aa;margin-top:.5rem">서버에 연결하는 중...</div>
-  <div style="width:180px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:.5rem;overflow:hidden">
-    <div style="width:40%;height:100%;background:#FFD700;border-radius:2px;animation:ldBar 1.2s ease-in-out infinite"></div>
+<div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#ecdcbf;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.7rem">
+  <div style="font-size:1.15rem;font-weight:800;color:#5a3a1a">우리반 성장 RPG</div>
+  <div style="font-size:.85rem;color:#8a6a48">서버에 연결하는 중...</div>
+  <div style="width:180px;height:4px;background:rgba(90,58,26,.15);border-radius:2px;margin-top:.3rem;overflow:hidden">
+    <div style="width:40%;height:100%;background:#d9a441;border-radius:2px;animation:ldBar 1.2s ease-in-out infinite"></div>
   </div>
 </div>
 
-<!-- 타이틀 -->
+<!-- 타이틀 — [TITLE-BOARD-1] 교실 칠판 (날짜는 student.js fillTitleDate) -->
 <div class="screen" id="s-title">
-  <div class="title-logo">우리반 성장 RPG</div>
-  <div class="title-sub">오늘의 모험을 시작해 볼까요?</div>
-  <button class="btn-gold" onclick="gotoLogin()">시작하기</button>
+  <div class="tb-scene">
+    <div class="tb-board">
+      <div class="tb-chalk tb-corner-l">오늘의 모험</div>
+      <div class="tb-chalk tb-corner-r" id="tb-date"></div>
+      <div class="tb-chalk tb-title">우리반 성장 RPG</div>
+      <div class="tb-chalk tb-sub">오늘도 한 뼘씩 자라기</div>
+      <svg class="tb-line" viewBox="0 0 300 14" aria-hidden="true"><path d="M4 9 C60 3 120 12 180 6 S270 4 296 8"/></svg>
+      <img class="tb-doodle tb-d1" src="./assets/monsters/m31.png" alt="">
+      <img class="tb-doodle tb-d2" src="./assets/monsters/m45.png" alt="">
+    </div>
+    <div class="tb-ledge" aria-hidden="true">
+      <img class="tb-sit tb-s1" src="./assets/monsters/m22.png" alt="">
+      <img class="tb-sit tb-s2" src="./assets/monsters/m1.png" alt="">
+    </div>
+    <div class="tb-crew" aria-hidden="true">
+      <img class="tb-m1" src="./assets/monsters/m28.png" alt="">
+      <img class="tb-m2" src="./assets/monsters/m32.png" alt="">
+      <img class="tb-m3" src="./assets/monsters/m24.png" alt="">
+      <img class="tb-m4" src="./assets/monsters/m38.png" alt="">
+    </div>
+    <button class="btn-gold tb-go" onclick="gotoLogin()">시작하기</button>
+  </div>
 </div>
 
 <!-- 로그인 -->
@@ -938,7 +958,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20261003bv2"></script>
+<script src="./student.js?v=20261003tb1"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;
