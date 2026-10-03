@@ -284,6 +284,12 @@ function externalStudyItems() {
       sub: '블록으로 몬스터에게 명령해요 · 불씨 참새 그림 코딩',
       href: 'coding/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(61,139,253,.40)', bg: 'rgba(61,139,253,.08)', embed: true, autoFocus: true },
+    // [PATTERN-1] 무늬 공방 — 도장을 밀고 · 뒤집고 · 돌려 무늬 만들기(4학년 수학 '평면도형의 이동' + 미술) · 5장 28판 · 선생님 헷갈림 지도(#/t)
+    //   저장 = classRPG_pattern · 보상과 묶지 않음
+    { key: 'pattern', icon: '🦋', title: '무늬 공방',
+      sub: '도장을 밀고 · 뒤집고 · 돌려서 무늬를 만들어요',
+      href: 'pattern/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(142,91,208,.45)', bg: 'rgba(142,91,208,.09)', embed: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -1785,6 +1791,7 @@ function buildMainHTML() {
       ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
       ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')", 'NEW')}
       ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')", 'NEW')}
+      ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')", 'NEW')}
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
       ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
