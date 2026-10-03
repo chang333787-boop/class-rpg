@@ -2638,6 +2638,17 @@ function _bv2Text(html) {
   let t = String(html || '').replace(/<[^>]+>/g, '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '').trim();
   return t.replace(/([가-힣A-Za-z0-9]+)(이\(가\)|을\(를\)|은\(는\)|와\(과\))/g, (m, w, p) => { const [a, b] = p.replace(')', '').split('('); return w + (_bv2Jong(w) ? a : b); });
 }
+function _bv2Expect(type, s) {   // [BATTLE-V2] 이 공격의 예상 피해 — 계산식은 엔진(calculatePlayerDamage)과 같고 급소·빗나감만 뺀다
+  const mon = s.monster, ps = s.playerStats || {}, lv = (s.skillLevels || {})[type] || 0;
+  if (type !== 'normal' && lv < 1) return 0;
+  const tab = type === 'normal' ? SKILL_MULTIPLIERS.normal : SKILL_MULTIPLIERS.element;
+  const stat = type === 'normal' ? (ps.atk || 0) : (ps.mag || 0);
+  const gap = (mon.level || mon.recLv || 1) - (ps.level || 1);
+  const lvMult = gap > 0 ? Math.max(BALANCE.playerAttack.levelGap.floor, 1 - gap * BALANCE.playerAttack.levelGap.perLevel) : 1;
+  const d = stat * (tab[Math.min(lv, BALANCE.skill.maxLevel)] || 1) * (BALANCE.damage.defScale / (BALANCE.damage.defScale + (mon.def || 0)))
+    * getElementMultiplier(type, mon.element) * getTraitMultiplier(mon, type) * lvMult;
+  return Math.max(BALANCE.damage.minDamage, Math.round(d));
+}
 function _bv2Match(type, mon) {   // 공격 속성이 이 몬스터에게 강한가(관리자 상성표를 따르는 ELEMENT_CHART 그대로)
   if (!mon || type === 'normal' || !mon.element || typeof ELEMENT_CHART === 'undefined') return 1;
   return (ELEMENT_CHART[type] && ELEMENT_CHART[type][mon.element]) || 1;
@@ -2707,12 +2718,16 @@ function _bv2Actions() {
   const types = [...new Set((CUR.equippedSkills || ['normal', null, null, null]).filter(Boolean))];
   const list = types.length ? types : ['normal'];
   row.style.setProperty('--n', list.length);
+  // 상성만 보면 '강한' 공격이 실제로는 더 약할 수 있다(일반 = 공격력, 속성 = 마력) → 예상 피해로 정직하게
+  const exp = Object.fromEntries(list.map(t => [t, _bv2Expect(t, s)]));
+  const top = Math.max(...Object.values(exp));
   row.innerHTML = list.map(type => {
     const a = BV2_ATK[type] || BV2_ATK.normal, lv = (s.skillLevels || {})[type] || 0, can = lv >= 1, m = _bv2Match(type, mon);
-    const badge = !can ? '' : m > 1 ? '<span class="bv2-badge">강해요!</span>' : m < 1 ? '<span class="bv2-badge weak">약해요</span>' : '';
+    const badge = can && exp[type] === top && list.filter(t => exp[t] === top).length === 1 && list.length > 1 ? '<span class="bv2-badge">가장 세요</span>' : '';
+    const why = !can ? '' : m > 1 ? ' · 상성 좋음' : m < 1 ? ' · 상성 나쁨' : '';
     const go = reck ? `doReckless('${type}')` : `doAttack('${type}')`;
     return `<button class="bv2-atk" style="--ec:${a.c}" ${can && myTurn ? '' : 'disabled'} onclick="BATTLE_MENU='main';${go}">${badge}
-      <span class="bv2-gl">${_bv2Svg(a.g, 26)}</span><span><span class="bv2-at">${a.t}</span><span class="bv2-as">${can ? 'Lv.' + lv : '아직 못 배웠어요'}</span></span></button>`;
+      <span class="bv2-gl">${_bv2Svg(a.g, 26)}</span><span><span class="bv2-at">${a.t}</span><span class="bv2-as">${can ? '예상 ' + exp[type] + why : '아직 못 배웠어요'}</span></span></button>`;
   }).join('');
   sk.innerHTML = reck ? '<div class="bv2-hint">무리한 공격 — 어떤 공격으로 할까요?</div>'
     : (s.equippedSkill2 || []).filter(Boolean).map(id => {
@@ -2856,15 +2871,14 @@ function _bv2WinCard(s, mon) {
     <div class="bv2-rl">${rows.join('')}${_bv2AchRows(s._v2ach)}</div>
     <div class="bv2-rb">${_bv2Again(Utils.monsterAttemptsLeft(CUR))}<button class="pri" onclick="closeBattle()">확인</button></div>`;
 }
-function _bv2LoseCard(s, mon) {
-  const el = BV2_EL[mon.element], sl = s.skillLevels || {};
-  const strong = ['fire', 'water', 'grass'].find(t => _bv2Match(t, mon) > 1);
-  const worn = (CUR.equippedSkills || []).includes(strong), learned = strong && (sl[strong] || 0) >= 1;
-  let tip;
-  if (!strong || !el) tip = '방어력이 높은 옷을 입으면 받는 피해가 줄어요. 체력이 반쯤 남았을 때 <b>응급치료</b>를 써 보세요.';
-  else if (learned && worn) tip = `<b>${el.name}</b> 몬스터에게는 <b>${BV2_ATK[strong].t}</b>이 강해요. 다음엔 처음부터 <b>${BV2_ATK[strong].t}</b>을 눌러 보세요.`;
-  else if (learned) tip = `<b>${el.name}</b> 몬스터에게는 <b>${BV2_ATK[strong].t}</b>이 강해요. 가방의 스킬 칸에 <b>${BV2_ATK[strong].t}</b>을 끼워 보세요.`;
-  else tip = `<b>${el.name}</b> 몬스터에게는 <b>${BV2_ATK[strong].t}</b>이 강해요. 상점의 마스터리북에서 배울 수 있어요.`;
+function _bv2LoseCard(s, mon) {   // 귀띔은 예상 피해로(상성만 보면 틀릴 수 있다 — 일반=공격력, 속성=마력)
+  const worn = [...new Set((CUR.equippedSkills || ['normal']).filter(Boolean))];
+  const all = ['normal', 'fire', 'water', 'grass'].map(t => ({ t, e: _bv2Expect(t, s), learned: t === 'normal' || ((s.skillLevels || {})[t] || 0) >= 1, worn: worn.includes(t) }));
+  const bestWorn = all.filter(a => a.worn && a.learned).sort((a, b) => b.e - a.e)[0] || all[0];
+  const better = all.filter(a => a.learned && !a.worn && a.e > bestWorn.e).sort((a, b) => b.e - a.e)[0];
+  const tip = better
+    ? `이 몬스터에게는 <b>${BV2_ATK[better.t].t}</b>(예상 ${better.e})이 가장 세요. 가방의 스킬 칸에 끼워 보세요.`
+    : `이 몬스터에게 가장 센 공격은 <b>${BV2_ATK[bestWorn.t].t}</b>(예상 ${bestWorn.e})이에요. 체력이 반쯤 남았을 때 <b>응급치료</b>를 쓰면 더 오래 버텨요.`;
   return `<div class="bv2-rh">${iconImg(mon, 'monsters', '56px')}<div><div class="bv2-rt">${escHtml(_bv2J(mon.name, '이', '가'))} 이번엔 더 셌어요</div><div class="bv2-rs">남긴 체력 ${Math.max(0, s.monsterHp)} / ${s.monsterHpMax} · 쓴 기회는 1번이에요</div></div></div>
     <div class="bv2-tip">${tip}</div>${s._v2ach && s._v2ach.length ? `<div class="bv2-rl">${_bv2AchRows(s._v2ach)}</div>` : ''}
     <div class="bv2-rb">${_bv2Again(Utils.monsterAttemptsLeft(CUR))}<button class="pri" onclick="closeBattle()">확인</button></div>`;
