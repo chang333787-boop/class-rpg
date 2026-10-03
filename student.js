@@ -299,9 +299,22 @@ const _tbSafeId = id => /^[\w-]{1,40}$/.test(String(id || ''));
 function thinkboardHomeCards() {
   const list = Object.entries(_tbHome || {})
     .filter(([id, b]) => _tbSafeId(id) && b && b.t)
-    .sort((a, z) => (Number(z[1].c) || 0) - (Number(a[1].c) || 0))
-    .slice(0, 3);
-  return list.map(([id, b]) => `
+    .sort((a, z) => (Number(z[1].c) || 0) - (Number(a[1].c) || 0));
+  // 넷 이상(모둠마다 판 등)이면 둘 + '모두 보기' 하나 — 내 모둠 판이 밀려 안 보이는 일이 없게
+  const shown = list.length > 3 ? list.slice(0, 2) : list;
+  const more = list.length > 3 ? `
+    <div class="today-card" onclick="openExternalEmbed('thinkboard')"
+      style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(110,150,240,.4);margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:1.4rem">🧠</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:800;color:var(--gold)">생각판 · 열린 판 ${list.length}개 모두 보기</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem">내 모둠 판을 골라 들어가요</div>
+        </div>
+        <span style="color:var(--txt3)">▶</span>
+      </div>
+    </div>` : '';
+  return shown.map(([id, b]) => `
     <div class="today-card" onclick="openThinkboardBoard('${id}')"
       style="cursor:pointer;grid-column:1/-1;border:1px solid rgba(110,150,240,.4);margin-bottom:.5rem">
       <div style="display:flex;align-items:center;gap:.6rem">
@@ -312,7 +325,7 @@ function thinkboardHomeCards() {
         </div>
         <span style="color:var(--txt3)">▶</span>
       </div>
-    </div>`).join('');
+    </div>`).join('') + more;
 }
 function openThinkboardBoard(id) {
   if (!_tbSafeId(id)) return;
