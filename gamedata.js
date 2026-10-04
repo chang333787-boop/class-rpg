@@ -1363,13 +1363,18 @@ const DB = {
   //   보상만 빠지고 골드가 안 들어갔다(검토 F2). 이제 **빼려는 보상이 서버에 모두 있을 때만** 빼면서 골드·EXP·그 밖을 함께 얹는다.
   //  보상이 이미 없으면(다른 탭·다른 기기가 먼저 승인 · 학생이 취소) 아무것도 안 바꾸고 code 'REWARD_GONE' 으로 실패 —
   //   같은 보상을 두 번 주지 않는다(검토 D2 교사 두 기기). 'disconnect'·'set' 이면 같은 일감으로 다시(_txRetry · 이미 들어갔으면 보상이 없어 멈춤).
-  //  학생 기록 전체를 보내는 쓰기라(예전 통째 set 과 같은 크기) 승인에만 쓴다. 학생 기기가 아주 잦게 저장해 SDK 가 25번 다시 해도
-  //   못 맞추면('maxretry' — 서버엔 안 들어감) 바뀐 칸 update + 보상 transaction 으로 보낸다.
+  //  관리 화면은 보상마다 한 번씩 부른다(approveAndSave — 한 학생의 여러 보상을 한 쓰기로 묶으면 하나가 사라질 때 나머지도 막힌다).
+  //  학생 기록 전체를 보내는 쓰기라(예전 통째 set 과 같은 크기) 승인에만 쓴다. 학생 기기가 아주 잦게 저장해 서버 값이 계속 바뀌면
+  //   SDK 가 통째 기록을 25번까지 다시 보낸다(검토 실측 391KB·3.5초) — 그래서 일감이 ATOMIC_RUNS 번을 넘게 불리면 그만두고
+  //   _stuSendGated(작은 보상 transaction 으로 그 보상을 실제로 뺐을 때만 골드·EXP update)로 보낸다. SDK 'maxretry' 도 같은 길.
+  ATOMIC_RUNS: 4,
+  _rewardGone() { const e = new Error('REWARD_GONE: 이미 처리된 보상이라 아무것도 안 바꿈'); e.code = 'REWARD_GONE'; return e; },
   _stuSendAtomic(id, ops, levelTrack) {
     const ref = this._fbRef.child('students/' + id);
     const gate = ops.pr.del.slice();
-    const gone = () => { const e = new Error('REWARD_GONE: 이미 처리된 보상이라 아무것도 안 바꿈'); e.code = 'REWARD_GONE'; return e; };
+    let runs = 0, busy = false, sawDisc = false;
     const fn = cur => {
+      if (++runs > this.ATOMIC_RUNS) { busy = true; return; }   // 계속 낡음 → 그만(아래에서 작은 쓰기로)
       if (cur == null) return null;   // 이 기기에 아직 값이 없을 때 — SDK 가 서버 값과 다르면 서버 값으로 다시 부른다
       const have = new Set(this._prList(cur.pendingRewards).map(r => this._prKey(r)));
       if (gate.some(k => !have.has(k))) return;   // 이미 없음 → 그만(아무것도 안 바꿈)
@@ -1377,22 +1382,44 @@ const DB = {
       if (levelTrack && typeof Utils !== 'undefined') out.level = Utils.levelFromExp(out.exp);
       return out;
     };
-    let retried = null;
-    const p = this._txRetry(ref, fn, null, why => { retried = why; }).then(r => {
+    //  끊김은 **한 번이라도** 있었는지 기억한다(검토 Y6: 끊김 뒤 다시 → 'set' 으로 또 다시 → 마지막 이유만 보면 '이미 처리'로 잘못 알림)
+    const onRetry = why => { if (why === 'disconnect') sawDisc = true; runs = 0; busy = false; };
+    const p = this._txRetry(ref, fn, null, onRetry).then(r => {
+      //  들어갔으면(committed) 그걸로 끝 — '그만'은 들어가지 않았을 때만 폴백으로
+      if (busy && !(r && r.committed)) return this._stuSendGated(id, ops, sawDisc);
       if (!r || r.committed === false || (r.snapshot && typeof r.snapshot.val === 'function' && r.snapshot.val() == null)) {
         //  끊김('disconnect') 뒤 다시 돌렸더니 보상이 없음 = 거의 늘 **내 첫 쓰기가 서버에 들어갔는데 답만 못 받은 것** → 승인 끝으로 본다
         //   (드물게 그 몇 초 사이 다른 기기가 승인했거나 학생이 취소했어도 두 번 주지는 않는다 — 설계 문서 '남은 위험')
-        if (retried === 'disconnect') { console.warn('[APPROVE-ATOMIC-1] 끊긴 뒤 다시 보니 이미 들어가 있음:', id); return r; }
-        throw gone();
+        if (sawDisc) { console.warn('[APPROVE-ATOMIC-1] 끊긴 뒤 다시 보니 이미 들어가 있음:', id); return r; }
+        throw this._rewardGone();
       }
       return r;
     }, e => {
-      if (e && e.message === 'maxretry') return this._stuSend(id, ops).catch(e2 => { if (e2 && typeof e2 === 'object') e2._told = true; throw e2; });   // _stuSend 가 이미 알림
+      if (e && e.message === 'maxretry') return this._stuSendGated(id, ops, sawDisc);
       throw e;
     });
     //  REWARD_GONE 은 저장 실패가 아니라 일부러 안 바꾼 것 — '인터넷 연결 확인' 알림 대신 승인 화면이 따로 알린다
     p.catch(e => { if (e && e.code === 'REWARD_GONE') console.warn('[APPROVE-ATOMIC-1]', id, e.message); else if (!(e && e._told)) this._onSaveError(e); });
     return p;
+  },
+  //  승인 폴백: 보상 transaction(작은 pendingRewards 자리)으로 빼려는 보상이 **모두 있을 때만** 빼고, 그게 된 뒤에만 골드·EXP 등을 update.
+  //   '있을 때만'은 지킨다(다른 교사 기기와 겹쳐도 한 번 — 검토 Y4). 두 쓰기라 둘 사이(왕복 하나)에 update 가 거부되거나 창이 닫히면 보상만 빠진다(설계 문서 §5).
+  //   끊김 뒤 다시 보니 보상이 없으면 내 첫 보상 쓰기가 들어간 것으로 보고 update 를 보낸다(_stuSendAtomic 과 같은 가정).
+  _stuSendGated(id, ops, sawDisc) {
+    const gate = ops.pr.del.slice();
+    let had = false, disc = !!sawDisc;
+    const prRef = this._fbRef.child('students/' + id + '/pendingRewards');
+    return this._txRetry(prRef, cur => {
+      if (cur == null) { had = false; return null; }   // 값이 없으면 null(SDK 가 서버 값으로 다시 부름 · 정말 없으면 아무것도 안 바뀜)
+      const have = new Set(this._prList(cur).map(r => this._prKey(r)));
+      had = gate.every(k => have.has(k));
+      return had ? this._prApply(cur, ops.pr) : undefined;
+    }, null, why => { if (why === 'disconnect') disc = true; }).then(r => {
+      if (!(r && r.committed !== false && had) && !disc) throw this._rewardGone();
+      const rest = { set: ops.set, inc: ops.inc, pr: null };
+      //  _stuSend 는 실패를 스스로 알린다(_onSaveError) — 두 번 안 알리게 표시
+      return this._opsEmpty(rest) ? r : this._stuSend(id, rest).catch(e => { if (e && typeof e === 'object') e._told = true; throw e; });
+    });
   },
 
   //  보낼 일감 → 쓰기. 셈 칸은 increment, 그 밖은 칸 update, 보상은 id 합치기 transaction.

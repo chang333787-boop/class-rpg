@@ -2028,12 +2028,21 @@ try {
   sb.globalThis = sb; vm.createContext(sb);
   vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB; globalThis.__U = Utils;', sb);
   const DB = sb.__DB, U = sb.__U;
-  //  가짜 ref — transaction 은 script 에서 한 걸음씩(Error 면 그 오류로 끝 · 아니면 그 결과) · 일감 fn 은 남겨 둔다
-  const log = [], script = [];
+  //  가짜 ref — transaction 은 script 에서 한 걸음씩(Error 면 그 오류로 끝 · 객체면 그 결과) · script 가 비면 일감을 srv[자리] 값으로
+  //   실제로 돌려(undefined 면 committed false) 그 결과로 끝 · 일감 fn 은 log 에 남겨 둔다
+  const log = [], script = [], srv = {};
   const mkRef = (p) => ({ child: (k) => mkRef(p ? p + '/' + k : k),
     update: (v) => { log.push(['update', p, JSON.parse(JSON.stringify(v))]); return Promise.resolve(); },
     set: () => { log.push(['set', p]); return Promise.resolve(); },
-    transaction: (fn) => { log.push(['tx', p, fn]); const st = script.shift(); return st instanceof Error ? Promise.reject(st) : Promise.resolve(st || { committed: true, snapshot: { val: () => ({}) } }); } });
+    transaction: (fn) => {
+      log.push(['tx', p, fn]);
+      const st = script.shift();
+      if (st instanceof Error) return Promise.reject(st);
+      if (st) return Promise.resolve(st);
+      if (!(p in srv)) return Promise.resolve({ committed: true, snapshot: { val: () => ({}) } });
+      const out = fn(JSON.parse(JSON.stringify(srv[p])));
+      return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => (out === undefined ? srv[p] : out) } });
+    } });
   DB._fbRef = mkRef('');
   const settle = (p) => p.then(v => ['ok', v && v.committed], e => ['err', e.code || e.message]);
   const txs = () => log.filter(c => c[0] === 'tx').length;
@@ -2077,10 +2086,31 @@ try {
   script.push(new Error('disconnect'), { committed: false, snapshot: { val: () => ({}) } });
   const r5 = await settle(approve({ atomic: true })); const n5 = txs(); log.length = 0;
   test("끊긴 뒤 다시 돌렸더니 보상이 없음 = 내 첫 쓰기가 들어간 것 → 승인 끝(두 번 안 줌)", () => eq([r5[0], n5], ['ok', 2]));
+  srv['students/s1/pendingRewards'] = [{ id: 'rw' }, { id: 'other' }];
   script.push(new Error('maxretry'));
   const r6 = await settle(approve({ atomic: true })); const c6 = log.splice(0).map(x => [x[0], x[1]]);
-  test("'maxretry'(학생이 아주 잦게 저장) → 예전 방식(바뀐 칸 update + 보상 transaction)으로", () =>
-    eq([r6[0], c6], ['ok', [['tx', 'students/s1'], ['update', 'students/s1'], ['tx', 'students/s1/pendingRewards']]]));
+  test("'maxretry' → 폴백: 보상 transaction 으로 그 보상을 **실제로 뺀 뒤에만** 골드 update(순서: 보상 → 골드)", () =>
+    eq([r6[0], c6], ['ok', [['tx', 'students/s1'], ['tx', 'students/s1/pendingRewards'], ['update', 'students/s1']]]));
+  srv['students/s1/pendingRewards'] = [{ id: 'other' }];
+  script.push(new Error('maxretry'));
+  const r6b = await settle(approve({ atomic: true })); const c6b = log.splice(0).map(x => [x[0], x[1]]);
+  test("폴백인데 보상이 이미 없음(다른 교사 기기가 먼저 승인) → 골드 update 안 보냄 · REWARD_GONE", () =>
+    eq([r6b, c6b], [['err', 'REWARD_GONE'], [['tx', 'students/s1'], ['tx', 'students/s1/pendingRewards']]]));
+  delete srv['students/s1/pendingRewards'];
+  //  학생이 아주 잦게 저장 = 서버 값이 계속 바뀌어 SDK 가 일감을 거듭 다시 부름 → ATOMIC_RUNS 번을 넘으면 그만두고 폴백(통째 기록을 25번 보내지 않게)
+  {
+    const p7 = settle(approve({ atomic: true }));
+    const big = log.find(x => x[0] === 'tx' && x[1] === 'students/s1');
+    const node = { id: 's1', gold: 100, totalGold: 100, exp: 0, level: 1, pendingRewards: [{ id: 'rw' }] };
+    const outs = []; for (let i = 0; i < DB.ATOMIC_RUNS + 2; i++) outs.push(big[2](JSON.parse(JSON.stringify(node))) === undefined ? 'stop' : 'val');
+    await p7;
+    test(`일감이 ${DB.ATOMIC_RUNS}번까지는 값을 내고 그 뒤로는 그만(→ 폴백) — 통째 기록을 25번 보내지 않음`, () =>
+      eq(outs, [...Array(DB.ATOMIC_RUNS).fill('val'), 'stop', 'stop']));
+    log.length = 0;
+  }
+  script.push(new Error('disconnect'), new Error('set'), { committed: false, snapshot: { val: () => ({}) } });
+  const r8 = await settle(approve({ atomic: true })); log.length = 0;
+  test("끊김 → 'set' → 다시 보니 보상 없음: 끊김을 한 번이라도 봤으면 승인 끝(마지막 이유만 보지 않음 · 검토 Y6)", () => eq(r8[0], 'ok'));
   await approve(); const c7 = log.splice(0).map(x => [x[0], x[1]]);
   test('atomic 없이(학생 기기 저장)는 그대로 바뀐 칸 update + 보상 transaction', () => eq(c7, [['update', 'students/s1'], ['tx', 'students/s1/pendingRewards']]));
 } catch (e) {
@@ -2096,6 +2126,7 @@ try {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cur-alias-'));
   fs.mkdirSync(path.join(dir, 'student'));
   fs.writeFileSync(path.join(dir, 'student.html'), '<script src="./student.js?v=1"></script><script src="./student/x.js?v=1"></script>');
+  fs.writeFileSync(path.join(dir, 'student/deco.js'), 'function decoNothing() {\n}\n');   // [DECO-LAZY-1] 늦게 부르는 파일도 늘 읽는다
   fs.writeFileSync(path.join(dir, 'student.js'), [
     'function good() {', '  const s = CUR;', '  s.gold += 1;', '  DB.saveStudent(CUR);', '  setTimeout(() => renderHUD(), 10);', '}',
     'async function bad1() {', '  const s = CUR;', '  await sleep(300);', '  s.gold += 7;', '  DB.saveStudent(CUR);', '}', ''].join('\n'));

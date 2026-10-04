@@ -80,9 +80,10 @@ function makeWorld({ seedData, clock }) {
     const INC = '__inc__';
     const applyOp = (tree, op) => {
       if (op.kind === 'set') return setAt(tree, op.path, op.value);
-      if (op.kind === 'tx') {                    // 그 순간 그 나무의 값으로 다시 계산(로컬: 지금 서버 판 위, 서버: 도착할 때 서버 값 위)
-        const out = op.fn(clone(getAt(tree, op.path)));
-        return out === undefined ? tree : setAt(tree, op.path, out);
+      if (op.kind === 'tx') {                    // 로컬 겹쳐 보이기: 보낼 때 이 기기 값으로 한 번 낸 결과(op.localOut) 그대로
+        //  SDK 는 보낸 transaction 을 답이 올 때까지 다시 부르지 않고 처음 낸 값을 그 자리에 겹쳐 보여 준다(서버에선 도착할 때 서버 값으로 다시 계산 — write 안).
+        //  전에는 화면 값을 셀 때마다 일감을 다시 불러 일감이 불린 횟수가 부풀었다(APPROVE-ATOMIC-1 의 ATOMIC_RUNS 가 이 횟수를 센다).
+        return op.localOut === undefined ? tree : setAt(tree, op.path, op.localOut);
       }
       let t = tree;
       for (const k of Object.keys(op.value)) {
@@ -106,7 +107,10 @@ function makeWorld({ seedData, clock }) {
     const write = (kind, p, value) => new Promise((resolve, reject) => {
       const op = kind === 'tx' ? { id: ++wid, kind, path: p, fn: value } : { id: ++wid, kind, path: p, value: clone(value) };
       // SDK: transaction 은 먼저 이 기기의 지금 값으로 돌려 보고 undefined 면 서버에 안 보내고 바로 그만(committed false)
-      if (kind === 'tx' && value(clone(getAt(c.localView(), p))) === undefined) { resolve({ committed: false, snapshot: snap(getAt(c.localView(), p)) }); return; }
+      if (kind === 'tx') {
+        op.localOut = value(clone(getAt(c.localView(), p)));
+        if (op.localOut === undefined) { resolve({ committed: false, snapshot: snap(getAt(c.localView(), p)) }); return; }
+      }
       const inj = (c.inject || []).find(j => !j.used && j.match(kind, p));
       if (inj) inj.used = true;
       const how = inj ? inj.how : null;
@@ -210,7 +214,7 @@ async function bootTeacher(world, clock, opt) {
   // admin.js 의 approveReward / approveSingle 을 그대로 잘라 넣는다(화면 함수는 빈 스텁)
   //   [APPROVE-AWAIT-1] 승인 함수가 쓰는 저장 약속 받기(saveStudentAwait·afterSaves)와 [전체 승인] 제외 목록도 함께
   //   [SYNC-MERGE-2] 학생 상세 창 저장(saveStudentDetail)·[💰 골드 지급](quickGiveGold)도 실제 admin.js 그대로
-  vm.runInContext(`var notify=function(m){ (globalThis.__notes = globalThis.__notes || []).push(String(m)); }, renderAll=function(){}, closeModal=function(){}, confirm=function(){ return true; }, prompt=function(){ return globalThis.__promptAns; };\n${sliceConst(ADMIN, 'APPROVE_ALL_SKIP_TYPES')}\n${sliceFn(ADMIN, 'saveStudentAwait')}\n${sliceFn(ADMIN, 'afterSaves')}\n${sliceFn(ADMIN, 'approveReward')}\n${sliceFn(ADMIN, 'approveSingle')}\n${sliceFn(ADMIN, 'approveAll')}\n${sliceFn(ADMIN, 'saveStudentDetail')}\n${sliceFn(ADMIN, 'quickGiveGold')}\n` +
+  vm.runInContext(`var notify=function(m){ (globalThis.__notes = globalThis.__notes || []).push(String(m)); }, renderAll=function(){}, closeModal=function(){}, confirm=function(){ return true; }, prompt=function(){ return globalThis.__promptAns; };\n${sliceConst(ADMIN, 'APPROVE_ALL_SKIP_TYPES')}\n${sliceFn(ADMIN, 'saveStudentAwait')}\n${/^function approveAndSave\s*\(/m.test(ADMIN) ? sliceFn(ADMIN, 'approveAndSave') : ''}\n${sliceFn(ADMIN, 'afterSaves')}\n${sliceFn(ADMIN, 'approveReward')}\n${sliceFn(ADMIN, 'approveSingle')}\n${sliceFn(ADMIN, 'approveAll')}\n${sliceFn(ADMIN, 'saveStudentDetail')}\n${sliceFn(ADMIN, 'quickGiveGold')}\n` +
     'globalThis.__approveSingle = approveSingle; globalThis.__approveAll = approveAll; globalThis.__saveDetail = saveStudentDetail; globalThis.__give = quickGiveGold;', c.sb);
   c.approveSingle = (sid, rid) => c.sb.__approveSingle(sid, rid);
   c.approveAll = () => c.sb.__approveAll();
@@ -422,7 +426,7 @@ async function extraCase(name, desc, seedData, body) {
   const ids = (s.pendingRewards == null ? [] : Object.values(s.pendingRewards)).filter(Boolean).map(r => r.id).sort();
   const want = (out.pending || []).slice().sort();
   const goldDiff = out.gold - (s.gold || 0);   // + 유실 · − 중복 지급
-  const checkErr = out.check ? out.check(s) : '';
+  const checkErr = out.check ? out.check(s, getAt(world.server.tree, 'classRPG_v3') || {}) : '';
   const pendingBad = JSON.stringify(ids) !== JSON.stringify(want) || !!checkErr;
   extras.push({ name, desc, goldDiff, pendingBad, ids, want, gold: s.gold, expectGold: out.gold, total: s.totalGold, expectTotal: out.total, checkErr });
 }
@@ -602,6 +606,73 @@ await extraCase('F3', '교사 승인 쓰기가 서버에서 거부(권한) → �
   clock.at(1000, () => tea.approveSingle(sid, 'rw_1'));
   return { sid, gold: 1000, total: 1000, pending: ['rw_1'],
     check: () => [!noteHas(tea, /실패/) && `교사 알림 ${JSON.stringify(tea.notes())}`].filter(Boolean).join(' · ') };
+});
+//  ── [APPROVE-AFTER-1] 보상마다 한 쓰기 · 기록은 저장이 된 뒤에만 (PR #1162 2차 검토 Y2·Y3·Y4·Y6·Y8·Y9) ─────────
+const logsOf = (root, sid) => Object.values(root.questLogs || {}).filter(q => q && q.studentId === sid).map(q => q.boardQuestId || q.name).sort();
+const artsOf = (root, sid) => Object.values(root.artworks || {}).filter(a => a && a.studentId === sid).length;
+const gdOf = (root, sid) => Object.values(root.goldDaily || {}).filter(v => v && v.s === sid)
+  .reduce((a, v) => a + Object.entries(v).filter(([k]) => k !== 's' && k !== 'd').reduce((x, [, n]) => x + (+n || 0), 0), 0);
+const seedAB = () => { const d = seed(); const sid = sidOf(1);
+  d.boardQuests = [{ id: 'bq_a', name: '청소', type: 'daily', exp: 10, gold: 20, active: true }, { id: 'bq_b', name: '책정리', type: 'daily', exp: 10, gold: 30, active: true }];
+  d.students[sid].pendingRewards = [
+    { id: 'pr_a', boardQuestId: 'bq_a', boardQuestType: 'daily', label: '청소', type: 'quest', exp: 10, gold: 20, date: '2026-09-15' },
+    { id: 'pr_b', boardQuestId: 'bq_b', boardQuestType: 'daily', label: '책정리', type: 'quest', exp: 10, gold: 30, date: '2026-09-15' }];
+  return d; };
+const seedArt = () => { const d = seed(); d.students[sidOf(1)].pendingRewards = [{ id: 'art_1', type: 'artwork', label: '그림', artTitle: '그림', artUrl: 'u', gold: 20, exp: 30 }]; return d; };
+await extraCase('Y8', '키오스크에서 아이가 청소 신청을 취소하는 순간 교사가 [전체 승인] → 3초 뒤 다시 [전체 승인] → 책정리 30G 는 들어가고 청소 기록은 없음', seedAB(), async ({ world, clock }) => {
+  const sid = sidOf(1);
+  const kio = await bootKiosk(world, clock, { up: 30, down: 30 });
+  const tea = await bootTeacher(world, clock, { up: 60, down: 60 });
+  clock.at(1000, () => kio.cancel(sid, 'bq_a'));
+  clock.at(1010, () => tea.approveAll());
+  clock.at(3000, () => tea.approveAll());
+  return { sid, gold: 1030, total: 1030, pending: [],
+    check: (s, root) => [JSON.stringify(logsOf(root, sid)) !== '["bq_b"]' && `퀘스트 기록 ${JSON.stringify(logsOf(root, sid))}(책정리 하나여야)`, gdOf(root, sid) !== 30 && `goldDaily ${gdOf(root, sid)}(30 이어야)`].filter(Boolean).join(' · ') };
+});
+await extraCase('Y9', '교사 두 기기: 하나가 청소 승인 ↔ 다른 하나가 같은 순간 [전체 승인] → 다시 [전체 승인] → 20+30 한 번씩', seedAB(), async ({ world, clock }) => {
+  const sid = sidOf(1);
+  const t1 = await bootTeacher(world, clock, { up: 40, down: 40 });
+  const t2 = await bootTeacher(world, clock, { up: 60, down: 60 });
+  clock.at(1000, () => t1.approveSingle(sid, 'pr_a'));
+  clock.at(1010, () => t2.approveAll());
+  clock.at(3000, () => t2.approveAll());
+  return { sid, gold: 1050, total: 1050, pending: [],
+    check: (s, root) => [JSON.stringify(logsOf(root, sid)) !== '["bq_a","bq_b"]' && `퀘스트 기록 ${JSON.stringify(logsOf(root, sid))}`, gdOf(root, sid) !== 50 && `goldDaily ${gdOf(root, sid)}(50 이어야)`].filter(Boolean).join(' · ') };
+});
+await extraCase('Y2', '교사 두 기기가 같은 작품 보상(20G)을 0.03초 차 승인 → 골드·작품 전시·기록·goldDaily 모두 한 번', seedArt(), async ({ world, clock }) => {
+  const sid = sidOf(1);
+  const t1 = await bootTeacher(world, clock, { up: 40, down: 40 });
+  const t2 = await bootTeacher(world, clock, { up: 60, down: 60 });
+  clock.at(1000, () => t1.approveSingle(sid, 'art_1'));
+  clock.at(1030, () => t2.approveSingle(sid, 'art_1'));
+  return { sid, gold: 1020, total: 1020, pending: [],
+    check: (s, root) => [artsOf(root, sid) !== 1 && `작품 ${artsOf(root, sid)}`, logsOf(root, sid).length !== 1 && `기록 ${logsOf(root, sid).length}`, gdOf(root, sid) !== 20 && `goldDaily ${gdOf(root, sid)}`].filter(Boolean).join(' · ') };
+});
+await extraCase('Y3', '학생이 작품 신청을 취소하는 순간 교사가 승인 → 골드 0 · 작품 전시 0 · 기록 0', seedArt(), async ({ world, clock }) => {
+  const sid = sidOf(1);
+  const stu = await bootStudent(world, clock, sid, { up: 30, down: 30 });
+  const tea = await bootTeacher(world, clock, { up: 60, down: 60 });
+  clock.at(1000, () => { stu.CUR.pendingRewards = (stu.CUR.pendingRewards || []).filter(r => r.id !== 'art_1'); stu.DB.saveStudent(stu.CUR); });
+  clock.at(1010, () => tea.approveSingle(sid, 'art_1'));
+  return { sid, gold: 1000, total: 1000, pending: [],
+    check: (s, root) => [artsOf(root, sid) && `작품 ${artsOf(root, sid)}`, logsOf(root, sid).length && `기록 ${logsOf(root, sid).length}`, gdOf(root, sid) && `goldDaily ${gdOf(root, sid)}`, !noteHas(tea, /이미 다른 곳에서 처리/) && `교사 알림 ${JSON.stringify(tea.notes())}`].filter(Boolean).join(' · ') };
+});
+await extraCase('Y4', '느린 교사 기기 승인이 폴백(maxretry) ↔ 빠른 교사 기기가 같은 보상 승인 → 폴백도 "보상이 있을 때만" → 한 번', seed({ pendingGold: 50 }), async ({ world, clock }) => {
+  const sid = sidOf(1);
+  const t1 = await bootTeacher(world, clock, { up: 40, down: 40 });
+  const t2 = await bootTeacher(world, clock, { up: 200, down: 200 });
+  t2.inject = [{ match: (k, p) => k === 'tx' && /students\/s\d+$/.test(p), how: 'maxretry' }];
+  clock.at(1000, () => t2.approveSingle(sid, 'rw_1'));
+  clock.at(1010, () => t1.approveSingle(sid, 'rw_1'));
+  return { sid, gold: 1050, total: 1050, pending: [], check: (s, root) => [gdOf(root, sid) !== 50 && `goldDaily ${gdOf(root, sid)}`].filter(Boolean).join(' · ') };
+});
+await extraCase('Y6', '승인 끊김(서버엔 들어감) → 다시 → "set" 으로 또 다시 → 보상 없음 → 끊김을 기억해 "승인 완료"', seed({ pendingGold: 50 }), async ({ world, clock }) => {
+  const sid = sidOf(1);
+  const tea = await bootTeacher(world, clock, { up: 40, down: 40 });
+  tea.inject = [{ match: (k, p) => k === 'tx' && /students\/s\d+$/.test(p), how: 'disconnect-applied' }, { match: (k, p) => k === 'tx' && /students\/s\d+$/.test(p), how: 'set' }];
+  clock.at(1000, () => tea.approveSingle(sid, 'rw_1'));
+  return { sid, gold: 1050, total: 1050, pending: [],
+    check: (s, root) => [!noteHas(tea, /승인 완료/) && `교사 알림 ${JSON.stringify(tea.notes())}`, logsOf(root, sid).length !== 1 && `기록 ${logsOf(root, sid).length}`].filter(Boolean).join(' · ') };
 });
 // K2 의 키오스크 신청 id 는 시각으로 만들어지므로(pr_<시각>_<학생>) 실제 id 로 바꿔 끼운다
 for (const x of extras) if (x.want.includes('KIOSK')) {

@@ -1168,11 +1168,16 @@ function rejectPwResetDash(reqId, btn) {
 // ══════════════════════════════════════════════════
 //  핵심 승인 함수 (모든 승인은 이 함수만 사용)
 // ══════════════════════════════════════════════════
-function approveReward(student, reward) {
+// [APPROVE-AFTER-1] later({ run: [], logs: [] })를 주면 기록 쓰기(goldDaily·작품 전시·퀘스트 기록)를 바로 하지 않고 later.run 에 모은다 —
+//   부르는 쪽(approveAndSave)이 학생 저장(보상이 서버에 있을 때만 바뀌는 transaction)이 **된 뒤에만** 돌린다.
+//   '이미 처리'(REWARD_GONE)·실패면 안 돌린다(PR #1162 검토: 교사 두 기기·학생 취소 순간 승인에서 작품 두 번 전시·기록 두 줄·0G 인데 전시).
+//   later.logs = 이번 묶음에서 아직 안 보낸 퀘스트 기록 — A1 중복 막이가 같은 묶음 안의 같은 퀘스트도 본다.
+function approveReward(student, reward, later) {
+  const write = (f) => { if (later) later.run.push(f); else f(); };
   // 0. [A1] 중복 지급 방지 — 이미 완료 로그가 있는 퀘스트면 보상 없이 신청만 정리.
   //    (교사가 퀘스트 관리에서 ✔완료 처리한 뒤 남은 신청을 다시 승인하는 경로 차단)
   if (reward.boardQuestId) {
-    const doneLogs = DB.load().quests || [];
+    const doneLogs = (DB.load().quests || []).concat((later && later.logs) || []);
     const qType = reward.boardQuestType || reward.type || 'special';
     if (Utils.isQuestDoneToday(doneLogs, student.id, reward.boardQuestId, qType)) {
       student.pendingRewards = (student.pendingRewards||[]).filter(r =>
@@ -1189,7 +1194,8 @@ function approveReward(student, reward) {
     student.totalGold = (student.totalGold||0) + reward.gold; // [R7] 누적 골드
     // [GOLD-LOG-1] 승인 시점이 곧 지급 시점이다. 기록 실패는 무시된다(logGold 안에서 catch) —
     //   교사가 승인을 눌렀는데 로그 때문에 지급이 안 되는 일은 없어야 한다.
-    DB.logGold(student.id, DB.goldSourceOf(reward.boardQuestType || reward.type), reward.gold);
+    const sid = student.id, src = DB.goldSourceOf(reward.boardQuestType || reward.type), g = reward.gold;
+    write(() => DB.logGold(sid, src, g));
   }
   student.level = Utils.levelFromExp(student.exp);
 
@@ -1201,7 +1207,7 @@ function approveReward(student, reward) {
 
   // 3. 타입별 처리
   if (reward.type === 'artwork') {
-    DB.saveArtwork({
+    const aw = {
       id: 'aw_' + Date.now() + '_' + student.id,
       studentId: student.id,
       title:   reward.artTitle || reward.label,
@@ -1210,7 +1216,8 @@ function approveReward(student, reward) {
       subject: reward.subject  || '',
       kind:    reward.kind     || 'lesson',   // [ARTFREE-1] 수업 작품 / 자유 작품 구분
       date:    reward.date     || Utils.todayStr(),
-    });
+    };
+    write(() => DB.saveArtwork(aw));
   } else if (reward.type === 'book') {
     // [R4] 독서 탭(confirmBookRecord)과 같은 필드 집합으로 저장.
     //   기존엔 title/review/date 3개만 남겨서 이 경로로 승인하면 별점·분류·인물이 사라지고,
@@ -1240,7 +1247,7 @@ function approveReward(student, reward) {
   }
 
   // 4. quests 로그 저장 (boardQuestId + boardQuestType + date 포함)
-  DB.saveQuestLog({
+  const qlog = {
     studentId:    student.id,
     boardQuestId: reward.boardQuestId || null,
     boardQuestType: reward.boardQuestType || reward.type || 'special',
@@ -1256,7 +1263,9 @@ function approveReward(student, reward) {
     date:         reward.date || Utils.todayStr(),
     approvedAt:   Utils.todayStr(),
     approved:     true,
-  });
+  };
+  if (later && later.logs) later.logs.push(qlog);
+  write(() => DB.saveQuestLog(qlog));
 
   // 5. pendingReward 즉시 제거
   student.pendingRewards = (student.pendingRewards||[]).filter(r =>
@@ -1264,6 +1273,18 @@ function approveReward(student, reward) {
   );
 
   return student;
+}
+
+// [APPROVE-AFTER-1] 보상 하나 승인 = 상태 바꾸기(approveReward) + 학생 저장(students/<id> transaction 하나 · 그 보상이 서버에 있을 때만)
+//   + 저장이 **된 뒤에만** 기록 쓰기(goldDaily·작품 전시·퀘스트 기록). 돌려주는 약속: 저장 결과(REWARD_GONE·실패면 거절).
+//   logs: 같은 묶음([전체 승인])의 아직 안 보낸 퀘스트 기록(A1 중복 막이가 함께 본다)
+function approveAndSave(s, reward, logs) {
+  const later = { run: [], logs: logs || [] };
+  approveReward(s, reward, later);
+  return saveStudentAwait(s, { atomic: true }).then(r => {
+    later.run.forEach(f => { try { f(); } catch (e) { console.error('[APPROVE-AFTER-1] 기록 쓰기 실패', e); } });
+    return r;
+  });
 }
 
 // [APPROVE-AWAIT-1] 학생 저장의 약속(Promise)을 받는다.
@@ -1298,15 +1319,15 @@ function saveStudentAwait(s, opt) {
 
 // [APPROVE-AWAIT-1] 저장 약속들이 끝난 뒤 알린다. 8초가 지나도 안 끝나면 '아직 저장 중' 을 한 번 알린다(오프라인이면 SDK 가 계속 기다린다).
 //   [APPROVE-ATOMIC-1] onDone(실패 수, 전체 수, 이미 처리된 보상 수) — 셋째 = 승인 저장이 '이미 다른 곳에서 처리된 보상'이라
-//   아무것도 안 바꾼 수(DB._stuSendAtomic 의 REWARD_GONE · 실패 수에 들어 있다)
+//   아무것도 안 바꾼 수(DB._stuSendAtomic 의 REWARD_GONE). 실패가 아니므로 첫째(실패 수)에는 안 넣는다.
 function afterSaves(promises, onDone) {
   const list = (promises || []).map(p => Promise.resolve(p));
   let finished = false;
   const slow = setTimeout(() => { if (!finished) notify('⏳ 아직 저장 중이에요 — 인터넷 연결을 확인해 주세요', 'error'); }, 8000);
   return Promise.allSettled(list).then(rs => {
     finished = true; clearTimeout(slow);
-    const failed = rs.filter(r => r.status === 'rejected').length;
     const gone = rs.filter(r => r.status === 'rejected' && r.reason && r.reason.code === 'REWARD_GONE').length;
+    const failed = rs.filter(r => r.status === 'rejected').length - gone;
     onDone(failed, rs.length, gone);
     return failed;
   });
@@ -1319,9 +1340,9 @@ function approveSingle(studentId, rewardId, opts) {
   if (!s) { notify('학생을 찾을 수 없어요', 'error'); renderAll(); return Promise.resolve(false); }
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
   if (!reward) { notify('이미 처리된 보상이에요', 'error'); renderAll(); return Promise.resolve(false); }
-  approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
   //  [APPROVE-ATOMIC-1] 보상 빼기 + 골드·EXP 를 한 쓰기로 — 보상이 서버에 아직 있을 때만(다른 기기가 먼저 승인했으면 아무것도 안 함)
-  const saved = saveStudentAwait(s, { atomic: true });
+  //  [APPROVE-AFTER-1] 기록 쓰기는 저장이 된 뒤에만
+  const saved = approveAndSave(s, reward);
   renderAll();
   if (opts && opts.quiet) return saved;   // 묶음 승인(approveAllByQuest)은 끝에 한 번만 알린다
   // [APPROVE-AWAIT-1] 저장이 끝난 뒤에 알린다. 실패면 실패 안내.
@@ -1367,19 +1388,20 @@ function approveAll() {
     const go   = pending.filter(r => !APPROVE_ALL_SKIP_TYPES.includes(r.type));
     skipped += held.length;
     if (go.length === 0) return;
-    go.forEach(r => approveReward(s, r));
-    // 승인한 것은 즉시 제거 — 남긴 것(작품·독서록)만 그대로 둔다
-    s.pendingRewards = held;
-    saves.push(saveStudentAwait(s, { atomic: true }));   // [APPROVE-ATOMIC-1] 학생마다 한 쓰기 · 승인할 보상이 다 있을 때만
+    //  [APPROVE-ATOMIC-1] **보상마다** 한 쓰기(그 보상이 서버에 있을 때만) — 학생 한 명을 한 쓰기로 묶으면 그중 하나가 사라졌을 때
+    //   (키오스크 취소·다른 교사 기기) 다른 보상까지 지급이 안 되고, 기록만 남아 다시 승인하면 A1 이 0G 로 지웠다(PR #1162 검토 Y8·Y9).
+    //   승인한 것은 approveReward 가 하나씩 뺀다 — 남는 것은 작품·독서록(held)뿐
+    const logs = [];
+    go.forEach(r => saves.push(approveAndSave(s, r, logs)));
     count += go.length;
   });
   renderAll();
   // [APPROVE-AWAIT-1] 저장이 끝난 뒤에 알린다
   return afterSaves(saves, (failed, n, gone) => {
     const tail = skipped ? ` · 따로 확인할 것 ${skipped}건(작품·독서록)` : '';
-    const goneTail = gone ? ` · ${gone}명은 이미 다른 곳에서 처리돼 그대로 둠` : '';
-    if (failed) notify(`⚠️ ${n}명 중 ${failed}명 저장 안 됨 — 새로고침 뒤 다시 확인해 주세요${goneTail}${tail}`, 'error');
-    else notify(`✅ ${count}개 전체 승인 완료!${tail}`);
+    const goneTail = gone ? ` · ${gone}건은 이미 다른 곳에서 처리돼 그대로 둠` : '';
+    if (failed) notify(`⚠️ ${n}건 중 ${failed}건 저장 안 됨 — 새로고침 뒤 다시 확인해 주세요${goneTail}${tail}`, 'error');
+    else notify(`✅ ${n - gone}건 전체 승인 완료!${goneTail}${tail}`);
   });
 }
 
@@ -1542,8 +1564,7 @@ function gridApprove(studentId, rewardId) {
   if (!s) return;
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId);
   if (!reward) return;
-  approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
-  const saved = saveStudentAwait(s, { atomic: true });   // [APPROVE-AWAIT-1] · [APPROVE-ATOMIC-1] 한 쓰기 · 보상이 있을 때만
+  const saved = approveAndSave(s, reward);   // [APPROVE-AWAIT-1] · [APPROVE-ATOMIC-1] 한 쓰기 · 보상이 있을 때만 · [APPROVE-AFTER-1] 기록은 그 뒤
   renderApproveGrid();
   renderApproveList();
   renderDashboard();
@@ -1720,9 +1741,11 @@ function approveAllByQuest(boardQuestId) {
     if (reward) { saves.push(approveSingle(s.id, reward.id, { quiet: true })); count++; }
   });
   // [APPROVE-AWAIT-1] 저장이 끝난 뒤 한 번만 알린다
-  if (count > 0) afterSaves(saves, failed => failed
-    ? notify(`⚠️ ${count}명 중 ${failed}명 저장 실패 — 새로고침 뒤 다시 확인해 주세요`, 'error')
-    : notify(`✅ ${count}명 전체 승인 완료!`));
+  if (count > 0) afterSaves(saves, (failed, n, gone) => {   // [APPROVE-ATOMIC-1] '이미 처리'는 실패와 따로
+    const goneTail = gone ? ` · ${gone}명은 이미 다른 곳에서 처리돼 그대로 둠` : '';
+    if (failed) notify(`⚠️ ${count}명 중 ${failed}명 저장 실패 — 새로고침 뒤 다시 확인해 주세요${goneTail}`, 'error');
+    else notify(`✅ ${count - gone}명 전체 승인 완료!${goneTail}`);
+  });
 }
 
 // ══════════════════════════════════════════════════
@@ -2457,12 +2480,16 @@ function approveArtwork(studentId, rewardId) {
   // 선생님 코멘트를 reward에 반영 후 approveReward로 처리
   const comment = document.getElementById('aw-cmt-'+rewardId)?.value.trim() || '';
   if (comment) reward.artDesc = comment;
-  approveReward(s, reward);
-  // 작품은 승인 즉시 pendingRewards에서 제거 (학생 받기 버튼 불필요)
-  s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId);
-  DB.saveStudent(s, { atomic: true });   // [APPROVE-ATOMIC-1] 보상 빼기 + 골드·EXP 한 쓰기 · 보상이 있을 때만
+  //  작품은 승인 즉시 pendingRewards에서 제거(approveReward 가 뺀다 — 학생 받기 버튼 불필요)
+  //  [APPROVE-ATOMIC-1] 보상 빼기 + 골드·EXP 한 쓰기 · 보상이 있을 때만 · [APPROVE-AFTER-1] 작품 전시·기록은 저장이 된 뒤에만
+  const saved = approveAndSave(s, reward);
   renderAll();
-  notify(`✅ ${s.name} · "${reward.artTitle||reward.label}" 전시 완료!`);
+  const what = `${s.name} · "${reward.artTitle||reward.label}"`;
+  afterSaves([saved], (failed, n, gone) => gone
+    ? notify(`ℹ️ ${what} 은(는) 이미 다른 곳에서 처리된 작품이에요 — 다시 전시하지 않았어요`, 'error')
+    : failed
+    ? notify(`⚠️ ${what} 전시 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error')
+    : notify(`✅ ${what} 전시 완료!`));
 }
 
 
