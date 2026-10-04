@@ -35,6 +35,28 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 | 우리 마을 | `village/index.html` | 미니 세상 마을(three.js). 학생 홈 🏘️ 타일이 iframe으로 연다(`?sid=<학생id>`). 교과 연결 없음 |
 | 수채화·데생 | `watercolor/index.html` | 수채화 16차시·데생 10차시 앱. 학생 홈에서 iframe으로 연다 |
 
+### 하위 앱 (폴더마다 `index.html` 하나)
+
+학생 홈에서 iframe 으로 열고 주소에 `?sid=<학생id>&n=<이름>` 을 붙인다(없으면 손님 — 그 기기에만 저장).
+학습 앱은 **자기 저장 루트만** 쓰고 RPG 본 데이터(`classRPG_v3`)는 쓰지 않는다(선생님 화면 비밀번호 확인용 `classRPG_adminPw` 읽기만).
+선생님 화면 = `<폴더>/index.html?teacher=1#/t` (관리 비밀번호를 한 번 묻는다). ES 모듈 + import map 이라 버스터는 **import map 의 `?v=` 숫자**를 올린다.
+
+| 폴더 | 이름 | 하는 일 | 저장 루트 | 시험 |
+|---|---|---|---|---|
+| `art/` | 명화 탐정 | 옛 명화를 자세히 보며 찾기 → 단서 → 느낌 → 질문 · 조형 요소 돋보기 카드 | `classRPG_art` | `scripts/unit/art/cases.test.mjs` |
+| `coding/` | 기초 코딩 | 블록 코딩(Blockly) — 몬스터에게 명령하기(길 찾기) · 그림 그리기 · 선생님 막힘 지도 | `classRPG_coding` | `scripts/unit/coding/stages.test.mjs` |
+| `ink/` | 먹 연구소 | 먹색(농담) 만들기 · 한지에 붓 긋기 · 판본체 쓰기 | `classRPG_ink` | `scripts/unit/ink/stages.test.mjs` |
+| `music/` | 음악실 | 작곡 · 리코더 연습 · 리듬 게임 · 우리 반 음악회 · 리코더 기록장 | `classRPG_music` | — |
+| `paint/` | 물감 연구소 | 삼원색 섞기 · 밝게 어둡게 · 보색 · 느낌의 색 모자이크 | `classRPG_paint` | `scripts/unit/paint/stages.test.mjs` |
+| `pattern/` | 무늬 공방 | 밀기 · 뒤집기 · 돌리기(4학년 수학 '평면도형의 이동')로 무늬 만들기 · 우리 반 무늬 전시 · 친구 무늬 맞히기 | `classRPG_pattern` | `scripts/unit/pattern/stages.test.mjs` |
+| `print/` | 판화 놀이 | 판을 새기고 잉크를 발라 찍기 — 좌우가 바뀐다 · 파낸 곳은 하얗게 · 여러 장 | `classRPG_print` | `scripts/unit/print/stages.test.mjs` |
+| `thinkboard/` | 생각판 | 사건 중심 이야기 줄 · 나무 · 정리본. 관리 화면 안에서도 연다(`thinkboard/index.html?rpg=1#/t`) | `classRPG_thinkboard` | `scripts/unit/thinkboard/rtdb.test.mjs` · `story.test.mjs` |
+| `watercolor/` | 수채화 · 데생 | 차시별 따라 하기 · 내 기록 · TV 수업. 선생님 모드는 화면 위 [선생님] 단추 | `classRPG_watercolor` | — |
+| `scan/` | 학습지 스캔 | 카메라로 학습지를 찍어 JPEG 를 학생 화면에 돌려준다(postMessage) | 없음 | — |
+| `village/` | 우리 마을 | three.js 마을. **다른 세션 구역** — 여기서 고치지 않는다 | `classRPG_villages/<sid>` | `scripts/village-sync/` |
+
+`watercolor/index.html` 은 루트 `../gamedata.js` 도 부른다 → gamedata 버스터는 **html 네 곳**(student · admin · kiosk · watercolor) 같은 값.
+
 ---
 
 ## 파일 구조
@@ -53,16 +75,22 @@ assets/monsters/                               몬스터 이미지 100장 (iconI
 assets/char · deco · floor · seeds · crops …   캐릭터 종이인형 84 · 장식 SVG · 바닥 타일 · 씨앗 등
 village/                                       우리 마을: index.html · sync.js(원격 저장층) · vendor/three.module.js
 watercolor/                                    수채화·데생 앱
+art/ coding/ ink/ music/ paint/ pattern/ print/ thinkboard/ scan/   하위 앱(위 표)
 scripts/verify-safety.mjs                      저장 안전 정적 검증 스크립트 (Node 기본 모듈만)
 scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test (캐시버스터는 html에서 읽어 교차검증)
 scripts/unit/run.mjs                           student.js 순수 함수 단위 테스트(함수 본문만 떼어 vm 실행)
-scripts/unit/buster-check.mjs [base] [head]    캐시버스터 누락 검사(머지 뒤 값 기준, git 읽기만)
+scripts/unit/precheck.mjs [--no-deco]          PR 전 검사 한 번에(아래 검사 전부 + 하위 앱 시험을 저절로 모음)
+scripts/unit/buster-check.mjs [base] [head]    캐시버스터 누락 검사(머지 뒤 값 기준, git 읽기만 · 하위 앱 index.html 포함)
+scripts/unit/global-dup-check.mjs              한 페이지 클래식 스크립트끼리 최상위 function/const 이름 겹침
+scripts/unit/esc-parity.mjs                    escHtml · escJsAttr · safeUrl 복사본들이 같은 결과를 내나
+scripts/unit/<앱>/*.test.mjs                   하위 앱 시험(art · coding · ink · paint · pattern · print · thinkboard)
+scripts/ci/check.yml                           CI 설정(node 22, 브라우저 없는 검사만) — .github/workflows/ 로 옮기면 켜짐
 scripts/unit/whole-set-check.mjs               모음 통째 set 이 기준선보다 늘면 FAIL(동시 쓰기 유실 막기)
 scripts/unit/gold-sync-sim.mjs · gold-loss-real-sdk/  골드 유실 재현(수정 뒤 --expect-fixed 로 0 확인)
 scripts/unit/promo-sync-sim.mjs · settings-field-sim.mjs  승급 신청·설정 동시 쓰기 시뮬
 scripts/village-backup.mjs · village-restore.mjs      마을 백업(읽기만)·한 학생 되살리기
 scripts/village-sync/                          sync.js 가짜 RTDB 대조 시험
-docs/                                          리팩토링 안전 규칙 / 인수인계 / 에셋 명세 문서
+docs/                                          문서 — 색인은 docs/README.md
 CNAME                                          GitHub Pages 커스텀 도메인 (funclassrpg.kr)
 ```
 
@@ -91,7 +119,8 @@ CNAME                                          GitHub Pages 커스텀 도메인 
   → 스크립트를 모듈화하거나 `defer`로 바꾸면 **전역이 깨진다.** 평면 전역 스코프를 유지해야 한다.
 - 캐시 무효화: 모든 JS/CSS에 `?v=<날짜><접미>`를 붙인다(예: `student.js?v=20260915q1a`).
   - **html 한 곳만 고친다**(smoke-test가 html에서 읽는다, #205).
-  - `gamedata.js`·`curriculum.js`처럼 여러 화면이 쓰는 파일은 student·admin·kiosk html에서 **같은 값으로 함께** 올린다.
+  - `gamedata.js`·`curriculum.js`처럼 여러 화면이 쓰는 파일은 student·admin·kiosk html(gamedata 는 `watercolor/index.html` 까지)에서 **같은 값으로 함께** 올린다. `buster-check` 가 다르면 FAIL 을 낸다.
+  - 한 페이지의 클래식 스크립트는 전역 하나를 나눠 쓴다 → 다른 파일과 같은 최상위 `function` 이름을 쓰면 뒤 파일이 말없이 덮는다(`global-dup-check` 가 잡음).
   - 충돌이 안 났어도 main보다 앞선 값인지 눈으로 확인한다(같은 값으로 조용히 병합되면 옛 캐시가 배포된다).
 
 ---
@@ -146,7 +175,7 @@ curl -s "https://funclassrpg.kr/student.js?v=20260602&cb=$(date +%s)"
 | `studentNotes` | 교사가 학생마다 써 준 쪽지(`studentNotes/<sid>/<noteId>`, 비밀번호 칸 없음) |
 | `backups` | **옛 위치**(읽기 폴백만). 새 백업은 루트 밖 `classRPG_backups`에 쓴다 |
 
-- `classRPG_v3` 밖의 루트 키: `classRPG_adminPw`(관리자 인증값) · `classRPG_backups`(백업 스냅샷, BACKUP_NODES 23개 노드) · `classRPG_villages/<sid>`(마을 원격 저장, 규칙 게시 뒤 사용).
+- `classRPG_v3` 밖의 루트 키: `classRPG_adminPw`(관리자 인증값) · `classRPG_backups`(백업 스냅샷, BACKUP_NODES 23개 노드) · `classRPG_villages/<sid>`(마을 원격 저장 — `village/sync.js`, 2026-09-14 VILLAGE-45 로 연결) · `classRPG_<앱>`(하위 앱마다 하나, [하위 앱](#하위-앱-폴더마다-indexhtml-하나) 표).
 - **비밀번호 값은 문서·쪽지·커밋 어디에도 적지 않는다.**
 - REST로 직접 읽을 때: 배열 필드는 객체맵으로 올 수 있다(`Array.isArray` 확인 후 `Object.values`). `students`는 숫자 키 옛 사본과 id 키 본이 함께 있으니 **id로 중복 제거**한다.
 - **저장 안전 원칙**: 루트 전체 쓰기(`_fbRef.set/remove/update`)는 학생 데이터 클로버 위험(footgun)이라 일반 작업에서 금지한다.
@@ -166,7 +195,14 @@ node scripts/verify-safety.mjs
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
 - 현재 기대 결과: **`PASS 18 · REVIEW 1 · FAIL 0`** (exit code 0)
-- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 29 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 66 · FAIL 0`** (2026-09-15 오후 기준 · smoke 29번째 = CACHE-SORT-GUARD-1)
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 29 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 279 · FAIL 0`** (2026-10-04 기준 · smoke 29번째 = CACHE-SORT-GUARD-1)
+- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 23 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초).
+  smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle · global-dup · 시뮬 다섯(esc-parity 포함) · 밸런스 둘 ·
+  하위 앱 시험 8개를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).
+  저장 경로를 건드렸으면 `--gold` 도(골드 유실 시뮬 · 지금 main 에서는 REPRO 가 정상이라 REVIEW).
+- 하위 앱 시험만: `for f in $(find scripts/unit -name '*.test.mjs' | sort); do node "$f" | tail -1; done` → 8개 모두 FAIL 0(2026-10-04 · 380개).
+- **CI(준비됨 · 아직 꺼짐)**: `scripts/ci/check.yml` — PR · main push 마다 verify-safety · smoke-test · precheck --no-deco · 하위 앱 시험(node 22 · 비밀값 없음 · 브랜치 보호 없음 — 결과만 보여 줌).
+  GitHub 은 `.github/workflows/` 안의 파일만 돌린다. 세션 토큰에 `workflow` 권한이 없어 거기로 못 올렸으니, 켤 때 사용자가 `git mv scripts/ci/check.yml .github/workflows/check.yml` 뒤 push(또는 웹에서 새 파일).
 - 남은 `REVIEW 1`건 = 루트 쓰기 후보(`gamedata.js` 1 + `admin.js` 4). 전부 위의 **의도된 게이팅 경로**다.
   0으로 강제하지 않는다 — 강제하면 새로 추가되는 진짜 루트 쓰기를 못 잡는 사각이 생긴다. **안전 알림으로 유지**한다.
 
@@ -216,9 +252,9 @@ HTML 인라인 `<script>`/`<style>` 잔여 등.
 ## 현재 안정화 상태
 
 - 리팩토링 1차 마감 commit: `7c3350e` (2026-07)
-- 2026-09-15 오후 main 기준: `verify-safety` 18/1/0 · `smoke-test` 29/0/0 · `unit/run` 66/0 · `whole-set-check` 16/0 · `buster-check` FAIL 0
-- 알려진 미해결: `gold-sync-sim` 은 지금 코드에서 🔴 REPRO(골드 유실 재현). 수정 PR(#288) 뒤 `--expect-fixed` 로 0 확인
-- 열린 게이트: Firebase 규칙 게시 → #214(마을 45차 서버 저장) 머지. 규칙 전에는 마을이 기기(localStorage)에만 저장된다
+- 2026-10-04 main 기준: `verify-safety` 18/1/0 · `smoke-test` 29/0/0 · `unit/run` 279/0 · `whole-set-check` 14/0 · `buster-check` FAIL 0 · `global-dup-check` FAIL 0 · `precheck --no-deco` 23/1/0/SKIP 1 · 하위 앱 시험 380/0
+- 알려진 미해결: `gold-sync-sim` 은 지금 코드에서 🔴 REPRO(골드 유실 재현 — 2026-10-04 에 다시 돌려도 같음). 수정 PR(#288) 뒤 `--expect-fixed` 로 0 확인
+- 마을 서버 저장: #214(마을 45차 · sync.js 연결)는 '규칙 게시 뒤 머지' 조건으로 2026-09-14 main 에 들어갔다(VILLAGE-45). 실제 규칙 상태는 Firebase 콘솔에서만 확인한다(저장소 검사로는 못 봄)
 - JS/CSS 외부화 완료, HTML 인라인 `<script>`/`<style>` 잔여 **0건**
 - `DB.save(`/`this.save(` 0건, 루트 저장 위험 정리됨
 - 날짜 기준·kiosk 정규화 단일 소스 통일 완료

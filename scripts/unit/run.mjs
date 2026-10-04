@@ -349,6 +349,57 @@ cur = 'buster-check';
     const head = { ...base, 'kiosk.html': base['kiosk.html'] + '<script src="./kiosk.js"></script>' };
     eq(lv(check({ changed: new Set(), baseHtml: base, headHtml: head }), 'REVIEW').length, 1);
   });
+  // [BUSTER-SUBAPP-1] 하위 앱 index.html — 루트 파일은 ①②③ 그대로, 자기 파일은 REVIEW 수준
+  const wc = (gd) => `<script src="https://x/f.js"></script><script src="../gamedata.js?v=${gd}"></script>`;
+  test('하위 앱(watercolor)만 gamedata 값이 낡음 → ③ 불일치 FAIL', () => {
+    const b2 = { ...base, 'watercolor/index.html': wc('20260730') };
+    const f = lv(check({ changed: new Set(), baseHtml: b2, headHtml: b2 }), 'FAIL');
+    if (!f.some(m => m.includes('watercolor/index.html=20260730'))) throw new Error('하위 앱 불일치 못 잡음: ' + JSON.stringify(f));
+  });
+  test('gamedata 를 고치고 루트 셋 + 하위 앱 모두 올림 → FAIL 0', () => {
+    const b2 = { ...base, 'watercolor/index.html': wc('20260910g') };
+    const head = { ...H(page('student.js?v=20260914b', '20260915q1b', '20260909e'), page('admin.js?v=20260910k', '20260915q1b', '20260909e'), '<script src="./gamedata.js?v=20260915q1b"></script>'), 'watercolor/index.html': wc('20260915q1b') };
+    eq(lv(check({ changed: new Set(['gamedata.js']), baseHtml: b2, headHtml: head }), 'FAIL').length, 0);
+  });
+  const sub = (app, util) => `<link rel="stylesheet" href="css/a.css?v=1"><script type="importmap">{ "imports": { "./js/app.js": "./js/app.js?v=${app}", "./js/util.js": "./js/util.js?v=${util}", "three": "./vendor/t.js" } }</script><script type="module" src="js/app.js?v=${app}"></script>`;
+  test('하위 앱 자기 모듈을 고쳤는데 import map 값 그대로 → REVIEW(FAIL 아님)', () => {
+    const b2 = { ...base, 'art/index.html': sub(3, 1) };
+    const r = check({ changed: new Set(['art/js/util.js']), baseHtml: b2, headHtml: b2 });
+    eq(lv(r, 'FAIL').length, 0);
+    if (!lv(r, 'REVIEW').some(m => m.includes('art/js/util.js') && m.includes('그대로'))) throw new Error('자기 모듈 누락 못 잡음');
+  });
+  test('하위 앱 자기 모듈 올림 · 맨 이름 키(three)는 무시 → REVIEW 0', () => {
+    const b2 = { ...base, 'art/index.html': sub(3, 1) };
+    const r = check({ changed: new Set(['art/js/util.js']), baseHtml: b2, headHtml: { ...b2, 'art/index.html': sub(3, 2) } });
+    eq(lv(r, 'REVIEW').length, 0);
+  });
+  test('하위 앱 js 가 import map 에 없음 · src 와 map 값이 다름 → REVIEW 2', () => {
+    const odd = sub(3, 1).replace('src="js/app.js?v=3"', 'src="js/app.js?v=4"');
+    const b2 = { ...base, 'art/index.html': odd };
+    const r = check({ changed: new Set(), baseHtml: b2, headHtml: b2, headFiles: ['art/js/app.js', 'art/js/util.js', 'art/js/new.js'] });
+    eq(lv(r, 'REVIEW').length, 2);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = 'global-dup-check (GLOBAL-DUP-1)';
+{
+  const { checkPage, topDecls } = await import('./global-dup-check.mjs');
+  const lv = (r, l) => r.filter(x => x.level === l).map(x => x.msg);
+  test('들여 쓴 선언은 최상위로 안 셈', () => {
+    eq(topDecls('function a() {\n  function b() {}\n  const c = 1;\n}\nconst D = 2;\nasync function e() {}').map(d => d.name), ['a', 'D', 'e']);
+  });
+  test('뒤 파일이 function 을 덮음 → FAIL', () => {
+    eq(lv(checkPage('p.html', [{ label: 'a.js', src: 'function f() {}' }, { label: 'b.js', src: 'function f() {}' }], {}), 'FAIL').length, 1);
+  });
+  test('기준선에 있는 덮어쓰기 → PASS', () => {
+    const r = checkPage('p.html', [{ label: 'a.js', src: 'function f() {}' }, { label: 'b.js', src: 'function f() {}' }], { 'p.html|f|a.js|b.js': '일부러' });
+    eq([lv(r, 'FAIL').length, lv(r, 'PASS').length], [0, 1]);
+  });
+  test('const 와 function 이름 겹침 → FAIL(SyntaxError)', () => {
+    const r = checkPage('p.html', [{ label: 'a.js', src: 'const X = 1;' }, { label: 'b.js', src: 'function X() {}' }], { 'p.html|X|a.js|b.js': '기준선이어도' });
+    if (!lv(r, 'FAIL').some(m => m.includes('SyntaxError'))) throw new Error('let/const 겹침 못 잡음');
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

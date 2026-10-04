@@ -13,6 +13,11 @@
 //   ② 고치지 않은 파일인데 브랜치가 버스터를 과거 날짜로 바꿨는가 — 머지하면 되돌리는 셈이라 FAIL.
 //   ③ 같은 파일(gamedata·curriculum 등)을 여러 html 이 참조하면 머지 뒤 값이 모두 같은가 — 다르면 FAIL.
 //   ④ 로컬 js/css 참조에 ?v= 가 없으면 REVIEW.
+//  [BUSTER-SUBAPP-1] 하위 앱(<폴더>/index.html)도 본다.
+//   · 하위 앱이 **루트 파일**(../gamedata.js 등)을 부르면 그 줄은 루트 html 과 똑같이 ①②③ 으로 판정(FAIL 가능).
+//   · 하위 앱 **자기 파일**(css · import map 의 ./js/*.js)은 REVIEW 수준: 고쳤는데 값 그대로 · import map 에 없는 js ·
+//     같은 html 안에서 <script src> 와 import map 값이 다름(같은 모듈이 두 번 실행될 수 있음).
+//     하위 앱은 정수 버스터(?v=7)를 쓰므로 날짜 비교는 하지 않는다.
 //  순서는 **앞 8자리 날짜로만** 본다. 같은 날 세션 코드끼리(q3a·rfa·st…)는 글자 순서에 뜻이 없고,
 //  캐시는 '처음 보는 문자열'이면 새로 받으므로 같은 날 다른 값이면 통과다(09-15 #220 q3a←rfa 오탐으로 확인).
 //  진짜 위험은 ⓐ 그대로 ⓑ 날짜가 과거로 감(옛 값 재사용 가능성) 두 가지.
@@ -26,42 +31,78 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const [BASE = 'origin/main', HEAD = 'HEAD'] = process.argv.slice(2);
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
+const SUB_HTML_RE = /^[^/]+\/index\.html$/;   // [BUSTER-SUBAPP-1] art/index.html · watercolor/index.html …
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64e6 });
 const show = (rev, file) => { try { return git('show', `${rev}:${file}`); } catch { return null; } };
 
-export function parseRefs(html) {
+const dirOf = (h) => { const d = path.posix.dirname(h); return d === '.' ? '' : d; };
+// html 안의 상대 주소 → 저장소 기준 경로(../gamedata.js → gamedata.js)
+const resolveIn = (dir, p) => {
+  const r = path.posix.normalize(path.posix.join(dir || '.', p));
+  return r.startsWith('../') ? null : r;
+};
+const splitUrl = (u) => {
+  const [p, q = ''] = u.split('?');
+  return { p, ver: (q.match(/(?:^|&)v=([^&]*)/) || [])[1] || '' };
+};
+
+// dir: html 이 있는 폴더('' = 루트). via: 'tag'(src/href) | 'importmap'
+export function parseRefs(html, dir = '') {
   const out = [];
   for (const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
     const u = m[1];
-    if (/^(?:https?:)?\/\//.test(u) || u.startsWith('data:') || u.startsWith('#')) continue;
-    const [p, q = ''] = u.split('?');
-    const file = p.replace(/^\.\//, '');
-    if (!/\.(js|css)$/.test(file)) continue;
-    const ver = (q.match(/(?:^|&)v=([^&]*)/) || [])[1] || '';
-    out.push({ file, ver });
+    if (/^(?:https?:)?\/\//.test(u) || u.startsWith('data:') || u.startsWith('#') || u.includes('${')) continue;
+    const { p, ver } = splitUrl(u);
+    const file = resolveIn(dir, p);
+    if (!file || !/\.(js|css)$/.test(file)) continue;
+    out.push({ file, ver, via: 'tag' });
+  }
+  // [BUSTER-SUBAPP-1] import map 의 상대 주소 값("./js/app.js": "./js/app.js?v=7"). 맨 이름 키("three")는 외부 묶음이라 뺀다.
+  for (const m of html.matchAll(/<script\s+type="importmap"\s*>([\s\S]*?)<\/script>/g)) {
+    let map; try { map = JSON.parse(m[1]); } catch { continue; }
+    for (const [key, val] of Object.entries((map && map.imports) || {})) {
+      if (!key.startsWith('./') || typeof val !== 'string') continue;
+      const { p, ver } = splitUrl(val);
+      const file = resolveIn(dir, p);
+      if (!file || !/\.(js|css)$/.test(file)) continue;
+      out.push({ file, ver, via: 'importmap' });
+    }
   }
   return out;
 }
 const dateOf = (v) => (String(v).match(/^\d{8}/) || [''])[0];
 const behind = (v, b) => dateOf(v) && dateOf(b) && dateOf(v) < dateOf(b);
-const refMap = (html) => { const m = new Map(); if (html) for (const r of parseRefs(html)) m.set(r.file, r.ver); return m; };
+const refMap = (html, dir = '') => { const m = new Map(); if (html) for (const r of parseRefs(html, dir)) m.set(r.file, r.ver); return m; };
+// 하위 앱 html 의 '자기 파일'인가(그 폴더 안). 루트 html 은 늘 아님.
+const ownOf = (h, file) => { const d = dirOf(h); return !!d && file.startsWith(d + '/'); };
 
 // base = merge-base(갈라진 곳), tip = main 끝, head = 이 브랜치.
 // 브랜치가 안 건드린 줄은 머지하면 main 값이 남는다(squash·3-way). 그래서 '머지 뒤 값'으로 판정한다.
-export function check({ changed, baseHtml, tipHtml = baseHtml, headHtml }) {
+// headFiles(선택): head 의 전체 파일 목록 — 하위 앱 import map 에 빠진 js 를 찾는 데 쓴다.
+export function check({ changed, baseHtml, tipHtml = baseHtml, headHtml, headFiles = null }) {
   const results = [];
   const add = (level, msg) => results.push({ level, msg });
   const merged = new Map(); // file → [{html, ver}]  머지 뒤 값
-  for (const h of HTML_FILES) {
-    const mb = refMap(baseHtml[h]), tip = refMap(tipHtml[h]), head = refMap(headHtml[h]);
+  const htmlList = Object.keys(headHtml).filter(h => headHtml[h] != null)
+    .sort((a, b) => (a.includes('/') - b.includes('/')) || HTML_FILES.indexOf(a) - HTML_FILES.indexOf(b) || a.localeCompare(b));
+  for (const h of htmlList) {
+    const dir = dirOf(h);
+    const mb = refMap(baseHtml[h], dir), tip = refMap(tipHtml[h], dir), head = refMap(headHtml[h], dir);
     for (const [file, ver] of head) {
       const bv = mb.get(file), tv = tip.has(file) ? tip.get(file) : bv;
       const touched = ver !== bv;                       // 이 브랜치가 그 줄을 고쳤나
+      const after = touched ? ver : tv;
+      if (ownOf(h, file)) {
+        // [BUSTER-SUBAPP-1] 하위 앱 자기 파일 — REVIEW 수준만
+        if (!after) { add('REVIEW', `${h}: ${file} 에 ?v= 없음`); continue; }
+        if (changed.has(file) && bv !== undefined && !touched) add('REVIEW', `${h}: ${file} 를 고쳤는데 ?v= 그대로 (v=${after}) — import map · <script>/<link> 값 올리기`);
+        else if (changed.has(file) && touched) add('PASS', `${h}: ${file} ${bv ?? '(새)'} → ${ver}`);
+        continue;
+      }
       if (touched && bv !== undefined && tv !== bv) {
         add('REVIEW', `${h}: ${file} 버스터를 main 도 바꿨음 (${bv} → main ${tv} / 이 브랜치 ${ver}) — 충돌 예상, rebase 뒤 다시 검사`);
       }
-      const after = touched ? ver : tv;
       (merged.get(file) || merged.set(file, []).get(file)).push({ html: h, ver: after });
       if (!after) { add('REVIEW', `${h}: ${file} 에 ?v= 없음`); continue; }
       if (changed.has(file)) {
@@ -74,6 +115,22 @@ export function check({ changed, baseHtml, tipHtml = baseHtml, headHtml }) {
         else add('REVIEW', `${h}: ${file} 는 안 고쳤는데 버스터만 바뀜 (${bv} → ${ver}) — 해는 없음`);
       }
     }
+    if (!dir) continue;
+    // [BUSTER-SUBAPP-1] 같은 html 안에서 <script src> 와 import map 값이 다르면 같은 모듈이 두 주소로 두 번 돈다.
+    const refs = parseRefs(headHtml[h], dir);
+    const byFile = new Map();
+    for (const r of refs) (byFile.get(r.file) || byFile.set(r.file, new Set()).get(r.file)).add(r.ver);
+    for (const [file, vs] of byFile) if (vs.size > 1) add('REVIEW', `${h}: ${file} 값이 html 안에서 다름 (${[...vs].join(' · ')}) — <script src> 와 import map 을 같은 값으로`);
+    // import map 에 빠진 자기 js(./js/ 아래) — 버스터 없이 받아져 옛 캐시가 남는다.
+    const mapped = new Set(refs.filter(r => r.via === 'importmap').map(r => r.file));
+    if (mapped.size) {
+      const pool = new Set([...(headFiles || []), ...changed]);
+      for (const f of pool) {
+        if (f.startsWith(dir + '/js/') && f.endsWith('.js') && !mapped.has(f) && (!headFiles || headFiles.includes(f))) {
+          add('REVIEW', `${h}: ${f} 가 import map 에 없음 — 버스터 없이 받아짐`);
+        }
+      }
+    }
   }
   for (const [file, list] of merged) {
     if (list.length < 2) continue;
@@ -82,7 +139,7 @@ export function check({ changed, baseHtml, tipHtml = baseHtml, headHtml }) {
   }
   for (const f of changed) {
     if (!/\.(js|css)$/.test(f) || f.includes('/')) continue;
-    if (!HTML_FILES.some(h => refMap(headHtml[h]).has(f))) add('REVIEW', `${f} 를 고쳤지만 세 html 어디서도 참조 안 함`);
+    if (!htmlList.some(h => refMap(headHtml[h], dirOf(h)).has(f))) add('REVIEW', `${f} 를 고쳤지만 어느 html 에서도 참조 안 함`);
   }
   return results;
 }
@@ -91,11 +148,13 @@ export function check({ changed, baseHtml, tipHtml = baseHtml, headHtml }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const mb = git('merge-base', BASE, HEAD).trim();
   const changed = new Set(git('diff', '--name-only', `${mb}..${HEAD}`).split(/\r?\n/).filter(Boolean));
+  const headFiles = git('ls-tree', '-r', '--name-only', HEAD).split(/\r?\n/).filter(Boolean);
+  const subHtml = headFiles.filter(f => SUB_HTML_RE.test(f));
   const baseHtml = {}, tipHtml = {}, headHtml = {};
-  for (const h of HTML_FILES) { baseHtml[h] = show(mb, h); tipHtml[h] = show(BASE, h); headHtml[h] = show(HEAD, h); }
-  const res = check({ changed, baseHtml, tipHtml, headHtml });
+  for (const h of [...HTML_FILES, ...subHtml]) { baseHtml[h] = show(mb, h); tipHtml[h] = show(BASE, h); headHtml[h] = show(HEAD, h); }
+  const res = check({ changed, baseHtml, tipHtml, headHtml, headFiles });
   const icon = { PASS: '✅ PASS  ', REVIEW: '🟡 REVIEW', FAIL: '❌ FAIL  ' };
-  console.log(`base ${BASE} (${git('rev-parse', '--short', BASE).trim()}) · head ${HEAD} (${git('rev-parse', '--short', HEAD).trim()}) · merge-base ${mb.slice(0, 7)} · 바뀐 파일 ${changed.size}`);
+  console.log(`base ${BASE} (${git('rev-parse', '--short', BASE).trim()}) · head ${HEAD} (${git('rev-parse', '--short', HEAD).trim()}) · merge-base ${mb.slice(0, 7)} · 바뀐 파일 ${changed.size} · html ${HTML_FILES.length}+하위 앱 ${subHtml.length}`);
   for (const r of res) console.log(`${icon[r.level]} ${r.msg}`);
   const n = l => res.filter(r => r.level === l).length;
   console.log(`\n요약: PASS ${n('PASS')} · REVIEW ${n('REVIEW')} · FAIL ${n('FAIL')}`);
