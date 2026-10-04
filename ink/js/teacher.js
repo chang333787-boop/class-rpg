@@ -2,6 +2,8 @@
 //  관리자 비밀번호로 연다(물감 연구소 · 무늬 공방과 같은 방식). 쓰는 것 없음(읽기만).
 import { h, toast, modal } from './util.js';
 import { ST, CHAPTERS } from './stages.js';
+//  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
+const STD = '3~4학년 미술 [4미02-02] 표현 재료(한지 · 먹)와 용구의 특성 · 사용 방법 · [4미02-03] 조형 요소(선 · 질감) 탐색 · [4미03-02] 작품의 특징 설명. 미술 교과서 9종 모두 3학년에 먹 · 수묵화, 4학년에 판본체 붓글씨가 있어요.';
 
 export const MISTAKES = { dark: '너무 진함(물 모자람)', pale: '너무 옅음(먹 모자람)', amount: '양 · 비율', pick: '섞기 예상', order: '차례(농담 · 획순)', paper: '먹 없이 물만', reverse: '획 방향', off: '밑그림 밖', weak: '획이 덜 곧고 고름' };
 const MK = Object.keys(MISTAKES);
@@ -20,7 +22,7 @@ async function gate(ctx) {
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
-  root.replaceChildren(ctx.topBar('먹 연구소 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, box));
+  root.replaceChildren(ctx.topBar('먹 연구소 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
   const { progress, stats, names } = await ctx.store.all();
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));

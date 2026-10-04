@@ -90,7 +90,7 @@ function home() {
         h('div', { class: 'my-tones' }, h('div', { class: 'mt-row' }, ...tones.map(x => h('span', { class: 'mt' + (x.c ? '' : ' is-empty'), style: { background: x.c || '' }, title: x.t.name }))),
           h('span', { class: 'muted small' }, `내 먹색 다섯 ${got} / 5`))),
       h('div', { class: 'chapters' }, ...CHAPTERS.filter(c => ST.some(s => s.ch === c.id)).map(chCard), artCard()),
-      h('p', { class: 'muted small foot' }, '3~4학년 미술 [4미02-02] 표현 재료(한지 · 먹)와 용구의 특성 · 사용 방법 · [4미02-03] 조형 요소(선 · 질감) 탐색 · [4미03-02] 작품의 특징 설명. 미술 교과서 9종 모두 3학년에 먹 · 수묵화, 4학년에 판본체 붓글씨가 있어요. 진짜 먹과 붓으로 한 번 더 해 보면 손이 기억해요.'))));
+      h('p', { class: 'muted small foot' }, '진짜 먹과 붓으로 한 번 더 해 보면 손이 기억해요.'))));
 }
 
 async function route() {

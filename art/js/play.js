@@ -18,11 +18,11 @@ const r1 = v => Math.round(v * 10) / 10;
 // 먹색 차례 재기 — 잰 밝기(L*)를 회색 칸으로 · 먹 연구소 먹색 다섯(ink/js/inkcolor.js TONES 와 같은 L*) 가운데 가장 가까운 이름
 const grayOf = L => { const Y = L > 8 ? Math.pow((L + 16) / 116, 3) : L / 903.3, v = Y <= 0.0031308 ? 12.92 * Y : 1.055 * Math.pow(Y, 1 / 2.4) - 0.055, n = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0'); return '#' + n + n + n; };
 const INK_TONES = [[7.5, '진한 먹'], [34.3, '조금 진한 먹'], [57.8, '중간 먹'], [73.3, '옅은 먹'], [92.1, '종이색']];
-//  연필 명도 띠 5단계(데생 기초 2차시 — 1단계 = 흰 종이 · 5단계 = 가장 어두움)
+//  연필 밝기 띠 5단계(데생 기초 2차시 — 1단계 = 흰 종이 · 5단계 = 가장 어두움)
 const PENCIL_TONES = [[15, '5단계(가장 어두움)'], [32, '4단계'], [50, '3단계'], [70, '2단계'], [90, '1단계(흰 종이)']];
 const toneName = (L, scale) => (scale === 'pencil' ? PENCIL_TONES : INK_TONES).reduce((a, t) => (Math.abs(t[0] - L) < Math.abs(a[0] - L) ? t : a))[1];
 //  차례 재기 말 — 먹(진하다 · 옅다) · 연필(어둡다 · 밝다)
-const ORDER_WORDS = { ink: { dark: '진한', light: '옅은', measure: '먹색', lead: '먹 연구소의 농담 꼬리처럼!' }, pencil: { dark: '어두운', light: '밝은', measure: '밝기', lead: '데생 기초의 명도 띠처럼!' } };
+const ORDER_WORDS = { ink: { dark: '진한', light: '옅은', measure: '먹색', lead: '먹 연구소의 농담 꼬리처럼!' }, pencil: { dark: '어두운', light: '밝은', measure: '밝기', lead: '데생 기초의 밝기 띠처럼!' } };
 const owOf = t => ORDER_WORDS[t.scale || 'ink'];
 // 붓 자국 읽기 — 먹 연구소 2장 붓 놀이 · 수채화 기초 차시와 같은 낱말. 사건마다 think.choices 로 넷을 고른다(없으면 먹 넷)
 export const TECH = { dot: '점을 콕콕 찍었어요', line: '선을 죽죽 내리그었어요', wet: '물을 많이 써서 번지게 칠했어요', dry: '마른 붓으로 거칠게 문질렀어요',

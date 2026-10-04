@@ -64,8 +64,10 @@ window.onload = async () => {
         // [DECO-SAVE-1] CUR 을 통째 교체하기 **직전에** 묶여 있던 꾸미기 변경을 보낸다.
         //  (보내고 나서 교체하므로 순서는 지금과 같다 — 서버 값이 이긴다)
         if (typeof decoFlush === 'function') decoFlush('스냅샷');
+        const prevId = CUR.id, prevLv = CUR.level || 1;
         const fresh = DB.getStudent(CUR.id);
         if (fresh) CUR = fresh;
+        _remoteLevelUpCheck(prevId, prevLv);   // [UX-TRIM-G4] 선생님 승인으로 오른 레벨 — 한 번만 축하
 
         if (BATTLE_STATE && !BATTLE_STATE.finished) {
           if (typeof renderHUD === 'function') renderHUD();
@@ -396,6 +398,7 @@ function openThinkboardBoard(id) {
   openExternalEmbed('thinkboard', '#/b/' + id);
 }
 let _embedState = null;   // { key, href, loaded, timer }
+let _lupAfterEmbed = 0;   // [UX-TRIM-G4b] 학습 앱 창이 열린 동안 미룬 레벨업 축하(레벨) — 창을 닫으면 띄운다
 function _embedEl() {
   let el = document.getElementById('m-embed');
   if (el) return el;
@@ -480,6 +483,7 @@ function closeExternalEmbed(fromPop) {
   // 돌아오면 영어 보상 동기화 한 번 더 (방금 공부한 것 반영). 수채화·데생의 작품 제출은
   // iframe이 같은 RTDB의 students/<key>/pendingRewards에 직접 쓰고, DB.onDataChange가 CUR을 갱신한다.
   if (closedKey === 'english') { try { syncEnglishRewards(true); } catch (e) {} }
+  if (_lupAfterEmbed) { const lv = _lupAfterEmbed; _lupAfterEmbed = 0; setTimeout(() => triggerLevelUp(lv), 300); }   // [UX-TRIM-G4b]
 }
 window.addEventListener('popstate', () => {
   // 모달이 열려 있는데 embed 상태가 사라졌다면(뒤로가기) 닫는다
@@ -556,7 +560,22 @@ async function syncEnglishRewards(force) {
   toast(`🔤 영어 복습 보상 ${adds.length}개 신청됐어요 (+${exp}EXP +${gold}G) · 선생님이 확인하면 받아요`);
 }
 
+// [UX-TRIM-G4] 선생님 승인(관리 화면)처럼 **이 기기 밖에서** 레벨이 오르면 축하 연출이 없었다.
+//   이 기기에서 올린 레벨(보스 · 학습 보상 등)은 CUR 을 먼저 고치고 저장하므로 스냅샷과 같아 여기 안 걸린다(중복 없음).
+//   로그인 직후 몇 초는 늦게 온 내 기록이 덮이는 때라 축하하지 않고 기준만 맞춘다. 이미 축하한 레벨은 다시 안 한다.
+let _lvSeen = null;   // { id, lv, at } — 이 탭에서 본 가장 높은 레벨 · 들어온 시각
+function _remoteLevelUpCheck(prevId, prevLv) {
+  if (!CUR || CUR.id !== prevId) return;
+  const lv = CUR.level || 1;
+  if (!_lvSeen || _lvSeen.id !== CUR.id) _lvSeen = { id: CUR.id, lv: prevLv, at: 0 };
+  if (lv <= prevLv || lv <= _lvSeen.lv) { if (lv > _lvSeen.lv) _lvSeen.lv = lv; return; }
+  _lvSeen.lv = lv;
+  if (Date.now() - _lvSeen.at < 6000) return;   // 로그인 직후 — 오연출 막기
+  if (typeof triggerLevelUp === 'function') setTimeout(() => triggerLevelUp(lv), 300);
+}
+
 function enterGame() {
+  if (CUR) _lvSeen = { id: CUR.id, lv: CUR.level || 1, at: Date.now() };   // [UX-TRIM-G4]
   // [Q-2B] 교사가 admin을 열지 않아도 학생 첫 접속 시 오늘 일일 퀘스트가 생성되게 한다.
   // 로직은 Q-2A에서 공통화한 DB.ensureDailyQuests()(gamedata.js)를 그대로 호출.
   // (DB.init 완료 후 호출되는 흐름이며, 실패해도 게임 진입이 막히지 않도록 보호)
@@ -1593,7 +1612,17 @@ function buildMainHTML() {
       sub:'씨앗을 심으면 골드를 벌 수 있어요',
       action:"openModal('m-farm');renderFarmModal()", btnLabel:'심기'});
 
-  if (todos.length === 0)
+  // [UX-TRIM-G4] '오늘 할 일' 수 = 할 일 카드 + 남은 오늘의 학습 + 아직 신청 안 한 선생님 퀘스트.
+  //   '완료!' 카드는 이 셋이 모두 0 일 때만 — 전엔 학습이 남아도 카드가 떠 '할 일 1개' 제목과 어긋났다.
+  const studyRecs = typeof CurriculumUtils !== 'undefined' ? getTodayStudyRecords(s.id) : [];
+  const studyDone = studyRecs.reduce((n, r) => n + (r.total || 0), 0);
+  const studyLeft = typeof CurriculumUtils !== 'undefined' && studyDone < STUDY_PER_DAY;
+  const boardQuests = (db.boardQuests||[]).filter(q=>q.active!==false);
+  const activeBQIds = new Set(boardQuests.map(q=>q.id));
+  const questLogs   = db.quests || [];
+  const questStat   = q => Utils.questStatus(s.id, q.id, q.type, questLogs, s.pendingRewards, activeBQIds);
+  const openQuests  = boardQuests.filter(q => questStat(q) === 'none');   // questStatus: done · pending · none(=아직 안 함)
+  if (todos.length === 0 && !studyLeft && openQuests.length === 0)
     todos.push({type:'done', icon:'🌟', badge:null,
       title:'오늘 할 일 완료!',
       sub:'정말 열심히 했어요. 내일도 파이팅! 💪',
@@ -1609,29 +1638,15 @@ function buildMainHTML() {
       ${t.btnLabel ? `<button class="todo-btn ${t.type}" onclick="event.stopPropagation();${t.action}">${t.btnLabel}</button>` : t.action ? '<div class="todo-arrow">›</div>' : ''}
     </div>`).join('');
 
-  // ── 오늘의 미션 (퀘스트 인라인 체크리스트) ──
-  const boardQuests = (db.boardQuests||[]).filter(q=>q.active!==false);
-  // 날짜 기반 완료 판단 - 일일은 오늘, 주간은 이번주, 과제/특별은 영구
-  const _allQuests = db.quests||[];
-  const isDoneByType = (qId, qType) => {
-    if (typeof Utils.isQuestDoneToday === 'function') {
-      return Utils.isQuestDoneToday(_allQuests, s.id, qId, qType);
-    }
-    // 폴백: 단순 완료 여부만 체크
-    return _allQuests.some(q => q.studentId===s.id && q.boardQuestId===qId);
-  };
-  const activeBQIds = new Set(boardQuests.map(q=>q.id));
-  const questLogs   = db.quests || [];
-
-  const missionHtml = boardQuests.length > 0
-    ? boardQuests.map(q=>{
-        const status  = Utils.questStatus(s.id, q.id, q.type, questLogs, s.pendingRewards, activeBQIds);
+  // ── 오늘의 미션 (퀘스트 인라인 체크리스트) ── 날짜 기반 완료 판단(일일=오늘 · 주간=이번 주 · 과제/특별=영구)은 Utils.questStatus
+  const missionRow = q=>{
+        const status  = questStat(q);
         const done    = status === 'done';
         const pending = status === 'pending';
         const typeLabel = {daily:'📋 일일',weekly:'📅 주간',special:'✏️ 과제',event:'⭐ 특별'}[q.type]||'📋';
         return `
         <div class="mission-row ${done?'done':pending?'pending':''}"
-          onclick="${(!done&&!pending)?`submitQuestFromMain('${q.id}')`:''}"
+          onclick="${(!done&&!pending)?`openQuestModal('${q.id}')`:''}"
           style="cursor:${(!done&&!pending)?'pointer':'default'}">
           <div class="mission-check ${done?'done':pending?'wait':''}">
             ${done?'✓':pending?'⏳':''}
@@ -1645,13 +1660,18 @@ function buildMainHTML() {
             <span class="mission-reward">+${q.exp}EXP</span>
             ${done?`<span style="font-size:.65rem;color:var(--emerald);font-weight:700">완료!</span>`
               :pending?`<span style="font-size:.65rem;color:var(--gold)">확인 중…</span>`
-              :`<span style="font-size:.65rem;color:var(--txt3)">탭하면 신청</span>`}
+              :`<span style="font-size:.65rem;color:var(--txt3)">열어 보기 ›</span>`}
           </div>
         </div>`;
-      }).join('')
-    : `<div style="font-size:.78rem;color:var(--txt3);padding:1rem 0;text-align:center">
-        선생님이 퀘스트를 올리면 여기에 표시돼요 📋
-      </div>`;
+      };
+  // [UX-TRIM-G4] 아직 신청 안 한 퀘스트는 위에 펼쳐 두고, 신청했거나 끝난 것만 아래 접힌 칸에
+  //   [UX-TRIM-G4b] 줄을 누르면 바로 신청되지 않고 퀘스트 창(그 퀘스트)이 열린다 — 신청은 창의 '신청' 단추(전과 같은 흐름).
+  //   펼치는 건 셋까지 — 퀘스트가 많아도 첫 할 일 카드가 화면 안에 남게. 나머지는 '퀘스트 N개 더 보기'(펼침 상태는 다시 그려도 유지)
+  const OPEN_Q_SHOW = 3;
+  const openQuestHtml = openQuests.slice(0, OPEN_Q_SHOW).map(missionRow).join('');
+  const openQuestMore = openQuests.slice(OPEN_Q_SHOW).map(missionRow).join('');
+  const closedQuests  = boardQuests.filter(q => questStat(q) !== 'none');
+  const missionHtml   = closedQuests.map(missionRow).join('');
 
   const allStudents = DB.getStudents().filter(st=>st.id!==s.id);
   const {cols:_fc, rows:_fr} = getFarmLayout(s.level||1);
@@ -1696,10 +1716,7 @@ function buildMainHTML() {
     'deco/deco_bookshelf.svg': 1.5, 'deco/in_w_clock.svg': 1.2, 'deco/d_i9.svg': 1.2, 'deco/d_i5.svg': 1.2, 'deco/guest_owl.svg': 1.3 };
   const asset = (f, cls = 'hc-art') => `<img class="${cls}" src="./assets/${f}" alt="" loading="lazy"${ZOOM[f] && cls === 'hc-art' ? ` style="--z:${ZOOM[f]}"` : ''}>`;
   const dateKo = (() => { const k = new Date(Date.now() + 9 * 3600000); return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${'일월화수목금토'[k.getUTCDay()]}요일`; })();
-  const studyRecs = typeof CurriculumUtils !== 'undefined' ? getTodayStudyRecords(s.id) : [];
-  const studyDone = studyRecs.reduce((n, r) => n + (r.total || 0), 0);
-  const studyLeft = typeof CurriculumUtils !== 'undefined' && studyDone < STUDY_PER_DAY;
-  const realTodos = todos.filter(t => t.type !== 'done' && t.type !== 'hint' && t.type !== 'info').length + (studyLeft ? 1 : 0);
+  const realTodos = todos.filter(t => t.type !== 'done' && t.type !== 'hint' && t.type !== 'info').length + (studyLeft ? 1 : 0) + openQuests.length;
   _homeCounts = { todo: realTodos, attemptsLeft: canFight ? attemptsLeft : 0, farmReady, pendingCount };
   // 우리 반 소식 — 이미 있는 데이터만(새 저장소 없음)
   const newsRows = [];
@@ -1725,6 +1742,16 @@ function buildMainHTML() {
         <div class="hs-head"><span class="hs-date">${dateKo}</span><h2>${realTodos ? `오늘 할 일 ${realTodos}개` : '오늘 할 일 다 했어요'}</h2></div>
         ${alerts.join('')}
         ${buildStudyTaskHTML(s)}
+        ${openQuests.length ? `
+        <div class="home-quest-open">
+          <div style="font-size:.78rem;font-weight:800;color:var(--gold);margin:.2rem 0 .35rem">📋 선생님 퀘스트 ${openQuests.length}개 · 다 하면 눌러서 신청해요</div>
+          <div class="mission-list" style="margin-bottom:.6rem">${openQuestHtml}</div>
+          ${openQuestMore ? `
+          <div id="quest-open-more" class="mission-list" style="display:none;margin-bottom:.6rem">${openQuestMore}</div>
+          <button class="home-quest-more" onclick="toggleSection('quest-open-more','quest-open-more-arrow')">
+            <span>📋 퀘스트 ${openQuests.length - OPEN_Q_SHOW}개 더 보기</span><span id="quest-open-more-arrow">▼</span>
+          </button>` : ''}
+        </div>` : ''}
         ${topTodoHtml}
         ${restTodos.length > 0 ? `
           <div id="rest-todo-wrap" style="display:none">${restTodoHtml}</div>
@@ -1766,15 +1793,15 @@ function buildMainHTML() {
         </div>`;
     })()}
         ${emotionCard}
-    <!-- ④ 퀘스트 목록 (기본 접힘) -->
-    ${boardQuests.length>0 ? `
+    <!-- ④ 신청했거나 끝난 퀘스트 (기본 접힘) — 열린 퀘스트는 위에 펼쳐 둔다 [UX-TRIM-G4] -->
+    ${closedQuests.length>0 ? `
     <button onclick="toggleSection('quest-section','quest-arrow')"
       style="width:100%;padding:.4rem .7rem;border-radius:8px;background:rgba(255,255,255,.03);
         border:1px solid rgba(255,255,255,.07);color:var(--txt2);font-size:.78rem;
         cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
       <span>📋 퀘스트
         <span style="font-size:.7rem;color:var(--txt3);margin-left:.4rem">
-          ${boardQuests.filter(q=>Utils.questStatus(s.id,q.id,q.type,questLogs,s.pendingRewards,activeBQIds)==='done').length}/${boardQuests.length} 완료
+          ${boardQuests.filter(q=>questStat(q)==='done').length}/${boardQuests.length} 완료
         </span>
       </span>
       <span id="quest-arrow" style="font-size:.7rem">▼</span>
@@ -1818,20 +1845,21 @@ function buildMainHTML() {
   <section class="home-sec hs-learn" data-sec="learn">
     <div class="hs-head"><h2>배우고 만들기</h2><span class="hs-sub">문제 풀고 · 생각 나누고 · 만들어요</span></div>
     <div class="hc-grid">
+      <!-- [UX-TRIM-G4] 매일 쓰는 문(학습 · 생각판 · 보상 있는 영어 · 독서 · 우리 반 작품)이 앞 — 1366×610 첫 화면 안. 학습 앱 일곱은 뒤 · 늘 붙던 NEW 뗌 -->
       ${door(asset('deco/d_i5.svg'), '오늘의 학습', typeof CurriculumUtils === 'undefined' ? '교과 문제' : studyLeft ? `하루 ${STUDY_PER_DAY}문제 · ${studyDone}문제 했어요` : '오늘 공부 끝!', 'openStudyModal()', studyLeft ? '오늘' : '')}
       ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
-      ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')", 'NEW')}
-      ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')", 'NEW')}
-      ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')", 'NEW')}
-      ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')", 'NEW')}
-      ${door(asset('monsters/m30.png'), '명화 탐정', '옛 그림 속 숨은 것 찾기 · 질문 만들기', "openExternalEmbed('art')", 'NEW')}
-      ${door(asset('monsters/m49.png'), '먹 연구소', '먹색 · 붓 놀이 · 판본체 글씨 · 수묵화', "openExternalEmbed('ink')", 'NEW')}
-      ${door(asset('monsters/m71.png'), '판화 놀이', '새기고 찍으면 거울처럼 · 판화 읽기', "openExternalEmbed('print')", 'NEW')}
-      ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
-      ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
-      ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
       ${ext('english') ? door(asset('deco/guest_owl.svg'), '영어 복습', '단어 · 표현 · 듣기 · 말하기', "openExternalEmbed('english')") : ''}
       ${door(asset('deco/in_w_bookshelf.svg'), '독서 기록', `읽은 책 ${(s.books || []).length}권`, "openHouseTab('book')")}
+      ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
+      ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')")}
+      ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')")}
+      ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')")}
+      ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')")}
+      ${door(asset('monsters/m30.png'), '명화 탐정', '옛 그림 속 숨은 것 찾기 · 질문 만들기', "openExternalEmbed('art')")}
+      ${door(asset('monsters/m49.png'), '먹 연구소', '먹색 · 붓 놀이 · 판본체 글씨 · 수묵화', "openExternalEmbed('ink')")}
+      ${door(asset('monsters/m71.png'), '판화 놀이', '새기고 찍으면 거울처럼 · 판화 읽기', "openExternalEmbed('print')")}
+      ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
+      ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
     </div>
   </section>
 
@@ -13764,7 +13792,7 @@ function renderQuestBoard() {
     const status  = Utils.questStatus(CUR.id, q.id, q.type, questLogs, CUR.pendingRewards, activeBQIds);
     const done    = status === 'done';
     const pending = status === 'pending';
-    return `<div style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':pending?'rgba(255,215,0,.25)':'rgba(255,255,255,.08)'};
+    return `<div data-qid="${escHtml(String(q.id))}" style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':pending?'rgba(255,215,0,.25)':'rgba(255,255,255,.08)'};
       border-radius:12px;padding:.9rem 1rem;margin-bottom:.6rem;${done?'opacity:.6':''}">
       <div style="display:flex;align-items:flex-start;gap:.7rem">
         <div style="font-size:1.6rem;flex-shrink:0">${escHtml(q.icon||'📋')}</div>
@@ -13825,10 +13853,16 @@ function submitQuestFromMain(questId) {
 }
 
 // 퀘스트 모달 열 때 게시판 탭이 기본
-function openQuestModal() {
+//  [UX-TRIM-G4b] focusId — 홈 '선생님 퀘스트' 줄에서 누른 퀘스트를 창 가운데로 · 테두리(신청은 창의 '신청' 단추로만)
+function openQuestModal(focusId) {
   openModal('m-quest');
   const firstTab = document.querySelector('#m-quest .mtab');
   questTab('board', firstTab);
+  if (typeof focusId !== 'string' || !focusId) return;
+  const card = [...document.querySelectorAll('#quest-board-list [data-qid]')].find(el => el.dataset.qid === focusId);
+  if (!card) return;
+  card.classList.add('q-focus');
+  try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
 }
 // ══ 독서 기록 ══
 // ── 독서 기록 제출 (승인 요청) ──
@@ -14483,6 +14517,13 @@ const STORAGE_KEYS = Object.freeze({
 });
 let LAYOUT_MODE = localStorage.getItem(STORAGE_KEYS.LAYOUT_MODE) || 'desktop';
 let SCALE_MODE  = localStorage.getItem(STORAGE_KEYS.SCALE_MODE) === 'true'; // 비율 스케일링 on/off
+// [UX-TRIM-G4] HUD 의 '넓게 보기'·'화면 맞춤' 단추를 뺐다(이름과 반대로 폰 배치가 되고 기기에 저장됐다 · 1366 에선 맞춤이 안 걸렸다).
+//   단추가 없으니 예전에 눌러 저장된 값은 되돌릴 길이 없다 → 넓은 화면(701px↑)에선 폰 배치를 기본으로 되돌리고, 맞춤도 끈다.
+//   폰(700px↓)은 폭 미디어쿼리가 폰 배치를 고르므로 저장값을 건드리지 않는다. 함수(toggleLayout · toggleScaleMode)는 남긴다.
+try {
+  if (LAYOUT_MODE === 'mobile' && window.innerWidth >= 701) { LAYOUT_MODE = 'desktop'; localStorage.setItem(STORAGE_KEYS.LAYOUT_MODE, 'desktop'); }
+  if (SCALE_MODE) { SCALE_MODE = false; localStorage.removeItem(STORAGE_KEYS.SCALE_MODE); }
+} catch (e) {}
 const SCALE_BASE_WIDTH = 2560; // QHD 모니터 기준
 
 // [HUDBTN-1] 좁은 화면에서는 화면 맞춤을 무시한다.
@@ -14592,6 +14633,8 @@ window.addEventListener('resize', applyScale);
 
 
 function triggerLevelUp(newLv) {
+  // [UX-TRIM-G4b] 학습 앱 창(z 9000)이 열려 있으면 축하(999)가 그 밑에 가려진다 → 창을 닫은 뒤 한 번(그동안 오른 가장 높은 레벨)
+  if (_embedState) { _lupAfterEmbed = Math.max(_lupAfterEmbed || 0, newLv); return; }
   if (_fxBusy()) { _fxWhenFree(() => triggerLevelUp(newLv)); return; }   // [BATTLE-V2] 배틀·업적 카드가 끝난 뒤
   const fx = document.getElementById('lup-fx');
   document.getElementById('lup-sub').textContent = `Lv.${newLv}이 됐어요!`;
@@ -15859,14 +15902,14 @@ function renderStudySubjectPick() {
   const dueList = dueCountsBySubject();
   const dueTotal = dueList.reduce((n, d) => n + d.n, 0);
   const dueCard = dueTotal === 0 ? '' : `
-          <div style="padding:1.1rem 1.2rem;border-radius:14px;margin-bottom:.9rem;
+          <div style="padding:.8rem 1.1rem;border-radius:14px;margin-bottom:.8rem;
             border:1px solid rgba(93,173,226,.4);background:rgba(93,173,226,.10)">
-            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem">
-              <span style="font-size:1.6rem">🔁</span>
-              <span style="font-size:1.15rem;font-weight:800;color:var(--sky)">오늘 복습할 것 ${dueTotal}개</span>
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.15rem">
+              <span style="font-size:1.4rem">🔁</span>
+              <span style="font-size:1.1rem;font-weight:800;color:var(--sky)">오늘 복습할 것 ${dueTotal}개</span>
             </div>
-            <div style="font-size:.88rem;color:var(--txt3);margin-bottom:.8rem">한 번 푼 문제를 잊을 때쯤 다시 보여 줘요</div>
-            <div style="display:grid;gap:.45rem">
+            <div style="font-size:.85rem;color:var(--txt3);margin-bottom:.6rem">한 번 푼 문제를 잊을 때쯤 다시 보여 줘요</div>
+            <div class="st-due-row">
               ${dueList.map(d => `
                 <button onclick="startStudySession('${d.key}','',true)"
                   style="display:flex;align-items:center;gap:.7rem;width:100%;padding:.7rem .9rem;border-radius:11px;
@@ -15883,28 +15926,15 @@ function renderStudySubjectPick() {
   // [ENGLISH-LINK-1] 외부 학습 앱 카드 — RPG 내부 문항 대신 전용 앱으로 보낸다.
   //   다음 앱(예: 데생)은 EXTERNAL_STUDY에 한 줄만 추가하면 된다. 순서 = 배열 순서.
   const EXTERNAL_STUDY = externalStudyItems().filter(x => x.study !== false);   // [WATERCOLOR-EMBED-1] 정의는 최상위 externalStudyItems() · [VILLAGE-DOOR-1] 마을은 뺀다
+  // [UX-TRIM-G4] 과목이 먼저 — 외부 앱은 그 아래 '학습 앱' 묶음에 작은 타일(그림 · 이름)로. 설명은 title 로 남긴다
   const externalCards = EXTERNAL_STUDY.map(x => x.embed ? `
-          <button class="st-subject-card" onclick="openExternalEmbed('${x.key}')"
-            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
-              border:1px solid ${x.border};cursor:pointer;
-              background:${x.bg};color:var(--txt);font-family:inherit;text-align:left;box-sizing:border-box">
-            <span style="font-size:2.2rem">${x.icon}</span>
-            <span style="flex:1;min-width:0">
-              <span class="st-subject" style="display:block;font-weight:700">${escHtml(x.title)}</span>
-              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">${escHtml(x.sub)}</span>
-            </span>
-            <span style="font-size:1.3rem;color:var(--txt3)">▶</span>
+          <button class="st-app-tile" onclick="openExternalEmbed('${x.key}')" title="${escHtml(x.sub)}"
+            style="border-color:${x.border};background:${x.bg}">
+            <span class="st-app-ic">${x.icon}</span><span class="st-app-name">${escHtml(x.title)}</span>
           </button>` : `
-          <a class="st-subject-card" href="${x.href}" target="_blank" rel="noopener"
-            style="display:flex;align-items:center;gap:1rem;width:100%;padding:1.15rem 1.2rem;
-              border:1px solid ${x.border};cursor:pointer;text-decoration:none;
-              background:${x.bg};color:var(--txt);font-family:inherit;text-align:left;box-sizing:border-box">
-            <span style="font-size:2.2rem">${x.icon}</span>
-            <span style="flex:1;min-width:0">
-              <span class="st-subject" style="display:block;font-weight:700">${escHtml(x.title)}</span>
-              <span class="st-subject-sub" style="display:block;color:var(--txt3);margin-top:.2rem">${escHtml(x.sub)}</span>
-            </span>
-            <span style="font-size:1.3rem;color:var(--txt3)">↗</span>
+          <a class="st-app-tile" href="${x.href}" target="_blank" rel="noopener" title="${escHtml(x.sub)}"
+            style="border-color:${x.border};background:${x.bg}">
+            <span class="st-app-ic">${x.icon}</span><span class="st-app-name">${escHtml(x.title)}</span>
           </a>`).join('');
 
   // [STUDY-MODES-1] 1~3학년 수학 보충 — 보상 없이 연습만. curriculum_review.js가 있을 때만 보인다
@@ -15939,8 +15969,7 @@ function renderStudySubjectPick() {
           : `오늘 ${STUDY_PER_DAY}문제 중 <b style="color:var(--gold)">${done}</b>문제 했어요`}
       </div>
       ${dueCard}
-      <div style="display:grid;gap:.7rem">
-        ${externalCards}
+      <div class="st-subject-grid">
         ${subjects.map(sub => {
           const pct = sub.t >= 3 ? Math.round(sub.c / sub.t * 100) : null;
           return `
@@ -15961,6 +15990,9 @@ function renderStudySubjectPick() {
         }).join('')}
         ${reviewCard}
       </div>
+      ${externalCards ? `
+      <div class="st-app-head">학습 앱</div>
+      <div class="st-app-grid">${externalCards}</div>` : ''}
     </div>`;
 }
 

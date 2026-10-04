@@ -3,6 +3,8 @@
 import { h, toast, modal } from './util.js';
 import { ST, CHAPTERS } from './stages.js';
 import { mosaicEl } from './feel.js';
+//  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
+const STD = '3~4학년 미술 [4미02-03] 조형 요소(색)의 특징 탐색 · 5~6학년 [6미02-03] 조형 요소의 어울림 → 조형 원리(대비). 아이 낱말은 밝기 · 선명함 · 색깔(명도 · 채도는 쓰지 않아요). 수채화 기초 2차시 색 섞기 · 9차시 색상환과 보색과 이어져요.';
 
 export const MISTAKES = { light: '밝기가 다름', chroma: '선명함이 다름', hue: '색깔이 다름', amount: '양 · 비율', pick: '섞기 예상', wheel: '보색 자리', contrast: '보색 대비', sort: '따뜻함 · 차가움', order: '진하기 차례' };
 const MK = Object.keys(MISTAKES);
@@ -21,7 +23,7 @@ async function gate(ctx) {
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
-  root.replaceChildren(ctx.topBar('물감 연구소 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, box));
+  root.replaceChildren(ctx.topBar('물감 연구소 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
   const { progress, stats, names, feel = {} } = await ctx.store.all();
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));

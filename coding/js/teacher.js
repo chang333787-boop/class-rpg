@@ -3,6 +3,8 @@
 import { h, toast, modal } from './util.js';
 import { STAGES, UNITS } from './stages.js';
 import { defineAll, pythonOf } from './blocks.js';
+//  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
+const STD = '1~4단원 = 순차 · 반복 · 반복 속 반복 · 디버깅(3~4학년 놀이 중심 프로그래밍) → 5단원부터 조건 · 변수 · 함수 · 이벤트(5~6학년 실과 ‘디지털 사회와 인공지능’ [6실05-01~03])로 이어져요.';
 
 const WHY = ['wall', 'water', 'edge', 'tree', 'land', 'noacorn', 'short', 'acorns', 'loop', 'draw', 'empty', 'nofunc', 'score'];
 const WHY_KO = { wall: '나무에 부딪힘', water: '웅덩이', edge: '길 밖', tree: '나무 뛰기', land: '내릴 곳 없음', noacorn: '빈손 줍기', short: '덜 감', acorns: '도토리 덜 주움', loop: '끝없는 반복', draw: '그림 다름', empty: '빈 코드', nofunc: '없는 기술', score: '점수판 틀림' };
@@ -20,7 +22,7 @@ async function gate(ctx) {
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
-  root.replaceChildren(ctx.topBar('기초 코딩 · 막힘 지도', { back: '#/' }), h('div', { class: 'view' }, box));
+  root.replaceChildren(ctx.topBar('기초 코딩 · 막힘 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
   const { progress, stats, names } = await ctx.store.all();
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));

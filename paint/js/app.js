@@ -76,7 +76,7 @@ function home() {
             h('div', { class: 'mine' }, h('b', {}, `${done} / ${total}`), h('span', {}, '한 판'), h('b', {}, String(stars)), h('span', {}, '별')))),
         h('div', { class: 'my-wheel' }, wheelSvg({ colors: wheelColors(mine), size: 150, labels: false }), h('span', { class: 'muted small' }, `내 색 바퀴 ${filled} / 12`))),
       h('div', { class: 'chapters' }, ...CHAPTERS.map(chCard)),
-      h('p', { class: 'muted small foot' }, '3~4학년 미술 [4미02-03] 조형 요소(색)의 특징 탐색 · 5~6학년 [6미02-03] 조형 요소의 어울림 → 조형 원리(대비). 아이 낱말은 밝기 · 선명함 · 색깔(명도 · 채도는 쓰지 않아요). 진짜 물감으로는 ‘수채화 기초’ 2차시 색 섞기 · 9차시 색상환과 보색에서 이어서 해요.'))));
+      h('p', { class: 'muted small foot' }, '진짜 물감으로는 ‘수채화 기초’의 색 섞기 · 색상환과 보색 시간에 이어서 해요.'))));
 }
 
 async function route() {

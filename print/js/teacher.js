@@ -2,6 +2,8 @@
 //  관리자 비밀번호로 연다(먹 연구소 · 물감 연구소와 같은 방식). 쓰는 것 없음(읽기만).
 import { h, toast, modal } from './util.js';
 import { ST, CHAPTERS } from './stages.js';
+//  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
+const STD = '3~4학년 미술 [4미02-02] 표현 재료와 용구(판 · 칼 · 롤러 · 바렌)의 특성 · 사용 방법 · [4미02-03] 조형 요소(형 · 선) 탐색. 미술 교과서 8종이 4학년에 판화를 다뤄요.';
 
 export const MISTAKES = { pick: '찍힘 예상', choose: '판 고르기', mirror: '거울 실수(반대로 팜)', over: '넘쳐 팜', less: '덜 팜', ink: '잉크 덜 바름', rub: '덜 문지름' };
 const MK = Object.keys(MISTAKES);
@@ -20,7 +22,7 @@ async function gate(ctx) {
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
-  root.replaceChildren(ctx.topBar('판화 놀이 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, box));
+  root.replaceChildren(ctx.topBar('판화 놀이 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
   const { progress, stats, names } = await ctx.store.all();
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));
