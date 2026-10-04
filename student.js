@@ -628,7 +628,7 @@ function enterGame() {
   }
 
   document.getElementById('s-game').classList.add('active');
-  setHomeSec(HOME_SEC);   // [HOME-C-1] 지난번에 보던 홈 구역(처음이면 '오늘')
+  setHomeSec(_homeSecSaved());   // [HOME-C-1] 지난번에 보던 홈 구역(처음이면 '오늘') · [HOME-SEC-PER-STUDENT] 이 아이 것
   applyLayout(LAYOUT_MODE);
   // 화면 맞춤 버튼 초기 상태 복원
   const sBtn = document.getElementById('scale-mode-btn');
@@ -1450,13 +1450,22 @@ function buildMainHTML() {
 }
 // ══ [HOME-C-1] 홈 네 구역 — 왼쪽 레일(student.html 고정)로 고른다. 상태는 #s-game[data-home-sec] 에 둬서
 //   홈이 innerHTML 로 통째 다시 그려져도(데이터가 바뀔 때마다) 고른 구역이 그대로다. 이 기기에 기억(localStorage).
+//  [HOME-SEC-PER-STUDENT] 한 크롬북을 여러 아이가 쓰므로 **아이마다** 기억한다('rpg.homeSec.<아이 id>'). 옛 키 'rpg.homeSec'(기기에 한 값 —
+//   앞 아이가 보던 구역이 다음 아이에게 열렸다)는 읽지 않는다(지우지도 않음). 로그인 전에는 기억할 아이가 없어 '오늘'.
 const HOME_SECS = ['today', 'learn', 'me', 'adv'];
 let _homeCounts = null;
-let HOME_SEC = (() => { try { const v = localStorage.getItem('rpg.homeSec'); return HOME_SECS.includes(v) ? v : 'today'; } catch (e) { return 'today'; } })();
+let HOME_SEC = 'today';
+function _homeSecKey() { return (typeof CUR !== 'undefined' && CUR && CUR.id) ? 'rpg.homeSec.' + CUR.id : null; }
+function _homeSecSaved() {   // 이 아이가 지난번에 보던 구역(처음이면 '오늘')
+  const k = _homeSecKey();
+  if (!k) return 'today';
+  try { const v = localStorage.getItem(k); return HOME_SECS.includes(v) ? v : 'today'; } catch (e) { return 'today'; }
+}
 function setHomeSec(sec) {
   if (!HOME_SECS.includes(sec)) sec = 'today';
   HOME_SEC = sec;
-  try { localStorage.setItem('rpg.homeSec', sec); } catch (e) {}
+  const k = _homeSecKey();
+  if (k) { try { localStorage.setItem(k, sec); } catch (e) {} }
   const g = document.getElementById('s-game');
   if (g) g.dataset.homeSec = sec;
   document.querySelectorAll('#home-rail .hr-item').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
