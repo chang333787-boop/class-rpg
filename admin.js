@@ -579,7 +579,8 @@ function renderDashboard() {
   }
 
   // ── 레벨 현황 ──
-  document.getElementById('dash-level-list').innerHTML = students
+  //   [DASH-SORT-COPY-1] 사본을 정렬한다 — students 는 DB 캐시 배열 자체라, 제자리 정렬하면 그 뒤 학생 목록·승인 격자·선택 상자가 레벨순으로 뒤섞였다
+  document.getElementById('dash-level-list').innerHTML = [...students]
     .sort((a,b) => b.level - a.level)
     .map(s => {
       const pct = Math.min(100,
