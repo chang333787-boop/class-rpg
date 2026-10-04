@@ -526,6 +526,15 @@ function _doMonsterTurn() {
   setTimeout(() => {
     _bv2Dash('foe');
     setTimeout(() => {
+      if (ma.counterKill) {   // [COUNTER-WIN-1] 반격이 받아쳐 몬스터가 쓰러짐 — 나는 안 다치고, 끝은 _afterMonsterTurn → _finishBattle(내 공격 승리와 같은 길)
+        _bv2Chip('me', '반격!', '#d3a6ff');
+        _bv2Hit('foe'); _bv2Shake(true); _bv2Burst('foe', '#d3a6ff', 18, true);
+        _bv2Num('foe', ma.reflectDmg, { crit: true, tag: '반격', outline: '#4a2a6a' });
+        _bv2Say(`반격 성공! ${escHtml(mon.name)}에게 <span class="hl">${ma.reflectDmg}</span> 피해를 돌려줬어요`);
+        _updateBattleHpBars(BATTLE_STATE);
+        setTimeout(() => _afterMonsterTurn(extra), 600);
+        return;
+      }
       if (ma.miss) {
         _bv2Num('me', '피했어요!', { small: true }); _bv2Say(`${escHtml(mon.name)}의 공격을 피했어요!`);
         _updateBattleHpBars(BATTLE_STATE);

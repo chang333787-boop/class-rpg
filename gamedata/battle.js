@@ -386,6 +386,13 @@ function performMonsterTurn(state) {
       const reflectDmg = Math.max(1, Math.round(finalDmg * BALANCE.skill2.counter.reflectMult));
       state.monsterHp = Math.max(0, state.monsterHp - reflectDmg);
       state.log.push(`<span class="good">⚡ 반격 성공! 몬스터에게 -${reflectDmg} 반사!</span>`);
+      // [COUNTER-WIN-1] 반사로 쓰러뜨리면 그 자리에서 승리 — 내 공격으로 이긴 것과 같은 끝(finished·win·turn).
+      //   몬스터가 먼저 쓰러졌으니 이번 몬스터 공격은 없다(아이 HP 그대로). 보상·기록은 화면의 _finishBattle → finalizeBattle 이 같은 길로.
+      if (state.monsterHp <= 0) {
+        state.lastMonsterAction = { dmg: 0, armorMult, miss: false, crit: false, roleLabel: '', counterKill: true, reflectDmg };
+        state.finished = true; state.win = true; state.turn = null;
+        return state;
+      }
     } else {
       state.log.push(`<span style="color:#888;font-size:.78rem">반격 실패...</span>`);
     }
