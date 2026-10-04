@@ -1536,15 +1536,8 @@ function buildMainHTML() {
   // ── 오늘 할 일 카드 ──
   const todos = [];
 
-  // 쪽지 — 안 읽은 쪽지가 있을 때만 '할 일'로 낸다.
-  //   [NOTE-TODO-1] 전엔 쪽지가 한 번이라도 오면 매일 첫 할 일(금테)로 떴다.
-  //   지난 쪽지는 '나' 구역의 [선생님 쪽지] 단추로 언제든 다시 본다.
-  const unseenNoteCount = getUnseenNotes().length;
-  if (unseenNoteCount > 0)
-    todos.push({type:'info', icon:'📝', badge:unseenNoteCount,
-      title:`새 쪽지 ${unseenNoteCount}개`,
-      sub:'선생님이 준 안내를 읽어 보세요',
-      action:"openNoteList();dismissNoteSeen()", btnLabel:'보기'});   // 열어 보면 읽은 것으로
+  // [NOTE-TODO-1] 쪽지는 '할 일'로 내지 않는다. 전엔 쪽지가 한 번이라도 오면 매일 첫 할 일(금테)로 떴다.
+  //   새 쪽지는 위 쪽지 배너('선생님이 쪽지를 줬어요 · N개')가 알리고, 지난 쪽지는 '나의 공간'의 [선생님 쪽지]로 본다.
 
   // 2순위: 시든 작물 경고
   const witheredCount = (s.farm||[]).filter(p=>{
