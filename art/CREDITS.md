@@ -1,6 +1,6 @@
 # 명화 탐정 — 그림 출처
 
-그림 스물한 장은 모두 저작권이 끝난 옛 그림이에요. 2026-10-04 위키미디어 공용(Wikimedia Commons)에서 받아(사용자 허락 뒤 — 열두 장, 그다음 3장 수묵화 세 장 · 4장 수채화 여섯 장) 크기를 줄이고 WebP 로 바꿨어요(`art/img/*.webp` · 작은 그림 `art/img/thumb/*.webp`).
+그림 스물세 장은 모두 저작권이 끝난 옛 그림이에요. 2026-10-04 위키미디어 공용(Wikimedia Commons)에서 받아(사용자 허락 뒤 — 열두 장, 그다음 3장 수묵화 세 장 · 4장 수채화 여섯 장 · 5장 판화 두 장) 크기를 줄이고 WebP 로 바꿨어요(`art/img/*.webp` · 작은 그림 `art/img/thumb/*.webp`).
 
 | 파일 | 그림 | 권리 | 원본 파일(위키미디어 공용) |
 |---|---|---|---|
@@ -25,10 +25,12 @@
 | `sloop_nassau.webp` | 윈슬로 호머 「나소의 돛단배」(원제 「슬루프, 나소」 · 1899 · 메트로폴리탄 미술관) | CC0(메트로폴리탄 미술관 열린 이용) | [Sloop, Nassau MET DP119112.jpg](https://commons.wikimedia.org/wiki/File:Sloop,_Nassau_MET_DP119112.jpg) |
 | `blue_boat.webp` | 윈슬로 호머 「파란 배」(1892 · 보스턴 미술관) | 퍼블릭 도메인 | [Winslow Homer - The Blue Boat - Google Art Project.jpg](https://commons.wikimedia.org/wiki/File:Winslow_Homer_-_The_Blue_Boat_-_Google_Art_Project.jpg) |
 | `alligators.webp` | 존 싱어 사전트 「진흙투성이 악어들」(1917 · 우스터 미술관) | 퍼블릭 도메인 | [Sargent - Muddy Alligators.jpg](https://commons.wikimedia.org/wiki/File:Sargent_-_Muddy_Alligators.jpg) |
+| `rhinoceros.webp` | 알브레히트 뒤러 「코뿔소」(1515 · 목판화 · 미국 국립미술관 소장본) | CC0(미국 국립미술관 열린 이용) | [Albrecht Dürer, The Rhinoceros, 1515, NGA 47903.jpg](https://commons.wikimedia.org/wiki/File:Albrecht_D%C3%BCrer,_The_Rhinoceros,_1515,_NGA_47903.jpg) |
+| `hunmin.webp` | 「훈민정음 해례본」(1446 · 목판본 · 국보 · 간송미술관 간송본) | 퍼블릭 도메인 | [Hunminjeongeum Haerye Kansong copy pages.jpg](https://commons.wikimedia.org/wiki/File:Hunminjeongeum_Haerye_Kansong_copy_pages.jpg) |
 
 - 「초충도 — 수박과 들쥐」: 출처 표시 — 국립중앙박물관(공공누리 제1유형). 화면의 ‘그림 정보’와 첫 화면 ‘그림 출처’에도 적었어요.
-- 「나소의 돛단배」: 메트로폴리탄 미술관이 CC0(아무 조건 없이 써도 됨)으로 연 사진이에요.
-- 나머지 열아홉 장: 그린 사람이 세상을 떠난 지 오래되어 저작권이 끝난 그림(퍼블릭 도메인)을 평면 그대로 찍은 사진이에요.
+- 「나소의 돛단배」 · 「코뿔소」: 메트로폴리탄 미술관 · 미국 국립미술관이 CC0(아무 조건 없이 써도 됨)으로 연 사진이에요.
+- 나머지 스무 장: 그린 사람이 세상을 떠난 지 오래되어 저작권이 끝난 그림(퍼블릭 도메인)을 평면 그대로 찍은 사진이에요.
 - 함께 받았지만 쓰지 않은 그림: 호머 「허리케인이 지난 뒤, 바하마」 — 바닷가에 쓰러진 사람(흔히 숨진 선원으로 봄)이 주인공이라 3~4학년 탐정 놀이에서 뺐어요(저장소에 넣지 않음).
 - 「세한도」 작은 그림(`thumb/sehando.webp`)은 긴 두루마리에서 집 · 소나무가 있는 부분(가로 46~82%)만 잘라 만들었어요. 「금강전도」 파일은 색이 조금 누렇게 찍힌 사진이에요(먹색 재기는 3장에서 인왕제색도로만).
 - 다시 받을 때도 같은 원본 파일 · 같은 크기(긴 변 960~1920px)로. 새 그림을 넣을 때는 저작권이 끝났는지 먼저 확인해요.

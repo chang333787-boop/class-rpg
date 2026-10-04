@@ -308,6 +308,12 @@ function externalStudyItems() {
       sub: '먹물과 물로 먹색을 만들고 한지에 붓으로 그어요',
       href: 'ink/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(170,170,180,.42)', bg: 'rgba(170,170,180,.08)', embed: true },
+    // [PRINT-1] 판화 놀이 — 나무판을 새기고(세모칼 · 둥근칼) 롤러 · 바렌으로 찍어 보며 판화의 원리(좌우가 바뀐다 · 파낸 곳은 하얗게 · 여러 장)
+    //   · 4장 = 명화 탐정 판화 사건(뒤러 코뿔소 · 훈민정음 해례본 · 호쿠사이) · 저장 = classRPG_print · 보상과 묶지 않음(docs/print_lab_design.md)
+    { key: 'print', icon: '🪞', title: '판화 놀이',
+      sub: '나무판을 새기고 찍으면 거울처럼',
+      href: 'print/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(214,176,128,.45)', bg: 'rgba(214,176,128,.09)', embed: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -1813,6 +1819,7 @@ function buildMainHTML() {
       ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')", 'NEW')}
       ${door(asset('monsters/m30.png'), '명화 탐정', '옛 그림 속 숨은 것 찾기 · 질문 만들기', "openExternalEmbed('art')", 'NEW')}
       ${door(asset('monsters/m49.png'), '먹 연구소', '먹색 만들기 · 붓 놀이 · 수묵화 읽기', "openExternalEmbed('ink')", 'NEW')}
+      ${door(asset('monsters/m71.png'), '판화 놀이', '새기고 찍으면 거울처럼 · 판화 읽기', "openExternalEmbed('print')", 'NEW')}
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
       ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}

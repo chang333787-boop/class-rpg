@@ -1,10 +1,10 @@
 // 사건 화면 — 왼쪽 그림(확대 · 짚기) · 오른쪽 탐정 수첩(① 찾기 → ② 생각 → ③ 느낌 → ④ 질문 → 사건 해결)
-//  ② 생각 갈래: 단서 짚기 · 놀이 고르기 · 흑백 실험 · 색 점 세기 · 먹색 차례 재기(order) · 붓 자국 읽기(how) · 경계 재기(edge) — 뒤의 셋은 3 · 4장(먹 연구소 · 수채화 기초와 이어짐)
+//  ② 생각 갈래: 단서 짚기 · 놀이 고르기 · 흑백 실험 · 색 점 세기 · 먹색 차례 재기(order) · 붓 자국 읽기(how) · 경계 재기(edge) · 거울 실험(mirror) — 뒤의 넷은 3 · 4 · 5장(먹 연구소 · 수채화 기초 · 판화 놀이와 이어짐)
 //  [4미03-01] 작품을 자세히 보고(찾기) · 무엇을 보고 그렇게 생각했는지 단서로 말하고(생각) · 느낌을 고르고 · 작품과 화가에게 질문을 만든다
 import { h, modal, toast } from './util.js';
 import { makeViewer } from './viewer.js';
 import { FEELS, BECAUSE } from './cases.js';
-import { kindsFor, kindOf, questionText, partAt, inRect } from './ask.js';
+import { kindsFor, kindOf, questionText, partAt, inRect, jo } from './ask.js';
 import { COLOR_NAMES, colorShare, judgeColors, edgeWidth } from './colors.js';
 import { MAX_ASK } from './store.js';
 
@@ -96,6 +96,7 @@ export function mountCase(root, ctx, c) {
       if (t.mode === 'order') t.spots.forEach(([n, r], i) => { const k = tOrder.indexOf(i), m = tMeasure && tMeasure.find(x => x.i === i); list.push({ r, kind: k >= 0 ? 'ev' : 'region', label: m ? `${n} ${Math.round(m.L)}` : k >= 0 ? `${k + 1} ${n}` : n }); });
       if (t.mode === 'how') t.items.forEach((x, i) => { if (tShown) list.push({ r: x.r, kind: 'ev', label: `${x.n} — ${TECH_WORD[x.a]}` }); else if (i === hIdx) list.push({ r: x.r, kind: 'region' }); });
       if (t.mode === 'edge') t.edges.forEach((e, i) => list.push({ line: [e.a, e.b], label: EL[i] + (eRes ? ' ' + (i === softOf(eRes) ? '부드러움' : '또렷함') : ''), on: eGuess === i }));
+      if (t.mode === 'mirror' && tShown) list.push({ r: viewer.mirror ? mirRect(t.mark) : t.mark, kind: 'ev', label: viewer.mirror ? `판 위의 ‘${t.markName}’` : `종이 위의 ‘${t.markName}’` });
     }
     if (step === 3) {
       const qs = askList();
@@ -115,6 +116,7 @@ export function mountCase(root, ctx, c) {
     if (i > 0 && !board) await loadBoard();
     if (!alive) return;
     if (i !== 1 && viewer.gray) viewer.setGray(false);
+    if (i !== 1 && viewer.mirror) viewer.setMirror(false);
     say(['그림을 자세히 보고 찾아서 짚어요.', '무슨 일일까요? 그림에서 단서를 찾아요.', '이 그림의 느낌을 골라요.', '궁금한 곳을 짚어 질문을 만들어요.'][i]);
     render();
   }
@@ -258,6 +260,15 @@ export function mountCase(root, ctx, c) {
       } else parts.push(h('ul', { class: 'evs' }, ...t.items.map(x => h('li', {}, `🖌 ${x.n} — ${TECH_WORD[x.a]}`))), rev(), tryBtn(),
         thinkTally(k => (k === 'right' ? '첫눈에 알아봤어요' : '한 번 더 보고 알았어요')));
     }
+    if (t.mode === 'mirror') {
+      if (tChoice < 0) parts.push(h('p', { class: 'lead' }, '판화는 찍으면 좌우가 바뀌어요. 그러면 판에는 …?'), h('div', { class: 'opts' }, ...t.opts.map((o, i) => h('button', { class: 'opt', 'data-o': i, onclick: () => { tChoice = i; say('예상했어요! 이제 뒤집어 봐요.'); render(); } }, o))));
+      else {
+        parts.push(h('div', { class: 'picked' }, h('span', { class: 'muted small' }, '내 예상'), h('b', {}, t.opts[tChoice])),
+          h('div', { class: 'go-row' }, h('button', { class: 'btn' + (viewer.mirror ? '' : ' primary'), 'data-act': 'mirror', onclick: () => mirrorTest() }, viewer.mirror ? '📄 종이로 다시 보기' : '🪞 나무판처럼 뒤집어 보기')));
+        if (tShown) parts.push(h('div', { class: 'measure' }, h('b', {}, '나무판에서는'), h('p', {}, `‘${t.markName}’ 글자가 거울 글씨로 새겨져 있었어요 — 점선 네모를 크게 봐요.`),
+          h('p', { class: tChoice === t.answer ? 'good' : 'bad' }, tChoice === t.answer ? '예상이 맞았어요!' : '예상과 달랐어요 — 그래서 뒤집어 보는 거예요.')), rev(), tryBtn(), thinkTally(k => t.opts[+k] || k));
+      }
+    }
     if (t.mode === 'edge') {
       if (!eRes) {
         parts.push(h('p', { class: 'lead' }, '그림 위 두 줄(ㄱ · ㄴ)이 경계를 가로질러요. 🔍로 크게 보고, 더 부드럽게 번진 쪽을 골라요.'),
@@ -276,7 +287,18 @@ export function mountCase(root, ctx, c) {
     }
     body.replaceChildren(...parts.filter(Boolean));
   }
-  //  해 보러 가기 — 먹 연구소(hash) · 수채화 기초(차시 번호). 같은 sid · 이름 그대로
+  //  거울 실험 — 그림만 좌우로(나무판에 새겨진 모습) · 표시 자리는 100 − x
+  const mirRect = r => [100 - r[2], r[1], 100 - r[0], r[3]];
+  async function mirrorTest() {
+    const t = c.think, on = !viewer.mirror;
+    viewer.setMirror(on);
+    if (on) viewer.zoomTo(mirRect(t.mark), 3); else viewer.reset();
+    if (on && !tShown) { tShown = true; await saveThink(tChoice); }
+    if (!alive) return;
+    say(on ? `나무판에서는 이렇게 — 점선 네모 안의 ‘${t.markName}’${jo(t.markName, '을', '를').slice(t.markName.length)} 봐요.` : '종이에서는 바르게 읽혀요.', on ? 'good' : '');
+    render();
+  }
+  //  해 보러 가기 — 먹 연구소 · 판화 놀이(hash) · 수채화 기초(차시 번호). 같은 sid · 이름 그대로
   function tryBtn() {
     const t = c.think; if (!t.try) return null;
     const q = new URLSearchParams(location.search); q.delete('from'); q.delete('debug'); q.delete('lesson');
@@ -284,7 +306,8 @@ export function mountCase(root, ctx, c) {
       const w = new URLSearchParams(); if (q.get('sid')) w.set('sid', q.get('sid')); w.set('lesson', String(t.try.lesson));
       return h('a', { class: 'btn try', href: `../watercolor/index.html?${w}`, 'data-act': 'try' }, '🎨 ' + t.try.label);
     }
-    return h('a', { class: 'btn try', href: `../ink/index.html${q.toString() ? '?' + q : ''}${t.try.hash}`, 'data-act': 'try' }, '🖌 ' + t.try.label);
+    const app = t.try.app === 'print' ? ['../print/index.html', '🪞 '] : ['../ink/index.html', '🖌 '];
+    return h('a', { class: 'btn try', href: `${app[0]}${q.toString() ? '?' + q : ''}${t.try.hash}`, 'data-act': 'try' }, app[1] + t.try.label);
   }
   //  경계 재기 — 두 줄의 밝기 곡선(가로 = 그림 점 거리 · 세로 = 밝기) · 더 길게 바뀐 쪽이 부드러운 경계
   const softOf = res => (res[0].w >= res[1].w ? 0 : 1);
@@ -357,6 +380,7 @@ export function mountCase(root, ctx, c) {
     }
     if (t.mode === 'how') { say('오른쪽에서 붓 자국을 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
     if (t.mode === 'edge') { say('오른쪽에서 ㄱ · ㄴ 가운데 더 부드러운 쪽을 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
+    if (t.mode === 'mirror') { say('오른쪽에서 예상을 고르고 뒤집어 봐요 — 그림은 마음껏 확대해 봐요.'); return; }
     if (t.mode === 'pick' && !thinkDone) {
       const sp = t.spots.find(s => inRect(x, y, s[1], 1));
       tPick = sp ? { label: sp[0], r: sp[1] } : { label: t.other, x, y };

@@ -1,0 +1,212 @@
+/* 판화 놀이 — 먹 연구소 · 물감 연구소와 같은 바탕 · 금색 하나 · 판은 나무색 · 찍힌 종이는 늘 밝은 종이 위 */
+:root{--bg0:#15110d;--bg1:#1d1611;--bg2:#241b13;--bg3:#2e241a;--line:#3a2e22;--txt:#f3e8d6;--txt2:#d9c9ae;--txt3:#a8977d;--gold:#f2a93b;--gold2:#ffc766;--red:#e5484d;--ok:#8fd07d;--r:14px;font-size:16px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--txt);font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden;word-break:keep-all}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:40px;padding:0 1rem;border-radius:11px;background:var(--bg3);font-weight:800;font-size:.95rem;white-space:nowrap}
+.btn:hover{background:#3a2e22}
+.btn.primary{background:var(--gold);color:#2a1a08}
+.btn.primary:hover{background:var(--gold2)}
+.btn.small{height:32px;padding:0 .75rem;font-size:.85rem;border-radius:9px}
+.muted{color:var(--txt3)}
+.small{font-size:.8rem}
+.sp{flex:1}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:999;background:#2e241a;color:var(--txt);padding:.7rem 1.2rem;border-radius:12px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:opacity .35s}
+.toast.out{opacity:0}
+.modal-wrap{position:fixed;inset:0;z-index:900;background:rgba(8,6,4,.62);display:grid;place-items:center;padding:16px}
+.modal{width:min(480px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--bg2);border-radius:18px;padding:22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.modal.wide{width:min(760px,100%)}
+.modal h2{font-size:1.2rem;font-weight:900;margin-bottom:12px}
+.modal-body{font-size:.95rem;line-height:1.65;color:var(--txt2)}
+.modal-body p+p{margin-top:8px}
+.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
+.empty{padding:16px;border-radius:12px;background:var(--bg2);color:var(--txt3);font-size:.9rem;line-height:1.6;margin:16px}
+.chip{font-size:.75rem;font-weight:800;color:var(--txt2);background:var(--bg3);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.chip.c-ch{color:#2a1a08;background:var(--gold)}
+
+/* 윗줄 */
+.top{flex:none;height:50px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--bg1)}
+.top .back{height:34px;padding:0 .7rem;border-radius:9px;background:var(--bg3);font-weight:800;font-size:.88rem;white-space:nowrap}
+.top h1{font-size:1.05rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .who{font-size:.85rem;color:var(--txt3);white-space:nowrap}
+.top .who b{color:var(--txt2)}
+.guest{font-size:.75rem;font-weight:800;color:#2a1a08;background:var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px}
+.view{flex:1;min-height:0;position:relative;overflow:auto}
+
+/* 첫 화면 */
+.home{max-width:1240px;margin:0 auto;padding:16px 22px 26px;display:grid;gap:14px}
+.intro{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#2b2d31,#241b13 70%);border-radius:18px;padding:14px 20px}
+.intro .host{width:92px;height:92px;object-fit:contain;flex:none}
+.intro h2{font-size:1.3rem;font-weight:900}
+.intro p{color:var(--txt2);margin:4px 0 8px;line-height:1.5;max-width:760px}
+.intro .mine{margin-left:auto;display:grid;grid-template-columns:auto auto;gap:2px 8px;align-items:baseline;flex:none}
+.intro .mine b{font-size:1.3rem;font-weight:900;color:var(--gold2);text-align:right}
+.intro .mine span{font-size:.8rem;color:var(--txt3)}
+.chapters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ccard{background:var(--bg2);border-radius:16px;padding:14px 16px;display:grid;gap:8px;align-content:start}
+.ccard .c-head{display:flex;align-items:center;gap:8px}
+.ccard .c-head b{font-size:1.05rem;font-weight:900}
+.ccard p{font-size:.85rem;color:var(--txt2);line-height:1.5}
+.ccard.soon{opacity:.62;background:var(--bg1);border:1px dashed var(--line)}
+.soon-tag{margin-left:auto;font-size:.75rem;font-weight:800;color:var(--txt3)}
+.pgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-top:2px}
+.pbtn{display:grid;justify-items:center;gap:2px;padding:7px 4px 6px;border-radius:12px;background:var(--bg3);text-align:center;min-height:92px}
+.pbtn:hover:not(:disabled){background:#3d3024}
+.pbtn .pid{font-size:.72rem;font-weight:900;color:var(--txt3)}
+.pbtn .pt{font-size:.76rem;font-weight:800;line-height:1.2}
+.pbtn .stars{font-size:.72rem;color:var(--gold2);min-height:1em}
+.pbtn.done{box-shadow:inset 0 0 0 2px rgba(242,169,59,.55)}
+.pbtn.lock{opacity:.45;cursor:default}
+.foot{text-align:center;line-height:1.6}
+/* 판 화면 — 왼쪽 문제 · 오른쪽 답 */
+.pz{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;position:relative}
+.q,.a{display:flex;flex-direction:column;min-height:0;min-width:0}
+.q{border-right:1px solid var(--line);background:var(--bg1)}
+.story{flex:none;display:flex;gap:10px;align-items:center;padding:10px 16px}
+.story img{width:46px;height:46px;object-fit:contain;flex:none}
+.story b{font-weight:900;font-size:.98rem}
+.story p{font-size:.86rem;color:var(--txt2);line-height:1.45}
+.q-body{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:8px 16px 14px;overflow:hidden}
+.a-body{flex:1;min-height:0;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.a-q{font-weight:900;font-size:1rem}
+.cap{font-size:.82rem;font-weight:800;color:var(--txt3);align-self:flex-start}
+.cap.c{align-self:center}
+.foot-row{flex:none;display:flex;align-items:center;gap:8px;padding:8px 18px 12px;border-top:1px solid var(--line);min-height:54px}
+.msg{font-size:.9rem;font-weight:800;line-height:1.4}
+.msg.bad{color:#ff9d8f}
+.msg.good{color:var(--gold2)}
+.hint{color:var(--gold2)}
+/* 맞았어요 카드 */
+.over{position:absolute;inset:0;display:none;place-items:center;background:rgba(10,8,6,.5);z-index:5}
+.win-card{background:var(--bg2);border-radius:18px;padding:18px 24px;text-align:center;display:grid;gap:6px;justify-items:center;max-width:min(460px,92%);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.win-card img{width:64px;height:64px;object-fit:contain}
+.win-card .stars{font-size:1.6rem;color:var(--gold2);letter-spacing:2px}
+.win-card b{font-size:1.25rem;font-weight:900}
+.win-card p{font-size:.9rem;color:var(--txt2);line-height:1.5}
+.win-card .row{display:flex;gap:8px;margin-top:6px}
+
+/* 선생님 헷갈림 지도 */
+.teacher{padding:14px 18px}
+.hard{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:#3a1f1c;border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:.88rem}
+.hard b{color:#ffb3a8}
+.tscroll{overflow:auto;border-radius:12px;background:var(--bg2)}
+.tmap{border-collapse:collapse;font-size:.78rem;min-width:100%}
+.tmap th,.tmap td{border:1px solid var(--line);padding:4px 5px;text-align:center;white-space:nowrap}
+.tmap th{background:var(--bg1);color:var(--txt2);position:sticky;top:0}
+.tmap th.u{color:var(--gold2)}
+.tmap .nm{text-align:left;font-weight:800;position:sticky;left:0;background:var(--bg2)}
+.tmap .c{cursor:pointer;min-width:30px}
+.tmap .c.ok{color:var(--gold2)}
+.tmap .c.try{color:#ffb3a8}
+.tmap .c.none{color:#5a4a3a}
+.tmap .mk{text-align:left;color:#ffb3a8}
+
+/* ── 판화 놀이(물감 · 먹 연구소와 같은 판 꼴) ── */
+:root{--paper:#f6f0e4;--paper2:#e9e0cf}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.go{height:46px;padding:0 1.3rem;font-size:1rem}
+.intro-t{flex:1;min-width:0}
+.intro-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.intro .mine{margin-left:0}
+.pgrid{grid-template-columns:repeat(5,minmax(0,1fr))}
+.chapters .ccard:last-child:nth-child(odd){grid-column:1 / -1}
+
+/* 고르기 보기 */
+.choices4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.choice{padding:8px;border-radius:14px;background:var(--bg3);transition:box-shadow .2s,transform .15s}
+.choice:hover{transform:translateY(-2px)}
+.choice.ok{box-shadow:inset 0 0 0 3px var(--ok)!important;background:#26381f}
+.choice.bad{box-shadow:inset 0 0 0 3px var(--red);animation:shake .35s;opacity:.7}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.choice.pic{display:grid;justify-items:center;gap:6px;padding:10px 8px;text-align:center;font-size:.9rem}
+.choice.pic canvas,.choice.pic .swatch{width:112px;height:112px;border-radius:8px;box-shadow:0 0 0 2px #e9e0cf,0 4px 10px rgba(0,0,0,.3)}
+.go-row{display:flex;align-items:center;gap:12px}
+.seg{display:flex;gap:6px}
+.segb{flex:1;height:40px;border-radius:10px;background:var(--bg3);font-weight:800;font-size:.85rem}
+.segb.on{background:var(--gold);color:#2a1a08}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+/* 판 · 찍힌 종이 카드 */
+.pair{display:flex;gap:20px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+figure.card{display:grid;justify-items:center;gap:6px;margin:0}
+figure.card canvas{display:block;border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.45);max-width:100%;height:auto}
+figure.card figcaption{font-size:.82rem;font-weight:800;color:var(--txt2)}
+figure.card.target figcaption{color:var(--gold2)}
+.peel{animation:peel .8s cubic-bezier(.2,.8,.3,1)}
+@keyframes peel{0%{opacity:0;transform:perspective(600px) rotateX(70deg) translateY(-30px)}100%{opacity:1;transform:none}}
+/* 새기기 */
+.carve-wrap{position:relative;line-height:0;touch-action:none}
+.carve-wrap canvas{border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.5);cursor:crosshair;touch-action:none;max-width:100%;height:auto}
+.woodchip{position:absolute;width:7px;height:4px;border-radius:3px 1px;background:#d9b078;box-shadow:0 0 0 1px rgba(90,60,30,.35);pointer-events:none}
+.tgt{display:flex;gap:14px;align-items:flex-start}
+.tgt-t{display:grid;gap:8px;flex:1;min-width:0}
+.tgt .card canvas{width:150px;height:150px}
+.result{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.result .card canvas{width:200px;height:200px}
+.result .good{color:var(--ok);font-weight:900}
+.result .bad{color:#ffb3a8;font-weight:900}
+/* 찍기 — 롤러 · 종이 · 바렌 */
+.press-wrap{position:relative;line-height:0;touch-action:none;user-select:none}
+.press-wrap>canvas{border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.5);max-width:100%;height:auto}
+.paper-sheet{position:absolute;inset:-6px;display:none;border-radius:6px;background:#f4efe3;box-shadow:0 12px 30px rgba(0,0,0,.45);transform-origin:top center}
+.paper-sheet canvas{width:100%;height:100%;border-radius:6px;opacity:.95}
+.paper-sheet.lifting{animation:lift .65s ease-in forwards}
+@keyframes lift{100%{transform:perspective(700px) rotateX(-75deg) translateY(-40px);opacity:0}}
+.roller,.barren{position:absolute;left:0;top:0;pointer-events:none;display:none}
+.press-wrap[data-phase="ink"] .roller{display:block}
+.press-wrap[data-phase="rub"] .barren{display:block}
+.roller .roll{position:absolute;left:-118px;top:-15px;width:236px;height:30px;border-radius:15px;background:linear-gradient(180deg,#4b4b52,#1d1c21 45%,#3a3a40);box-shadow:0 6px 14px rgba(0,0,0,.45)}
+.roller .handle{position:absolute;left:-7px;top:12px;width:14px;height:60px;border-radius:7px;background:linear-gradient(90deg,#8a5a2b,#c38b4f,#8a5a2b);box-shadow:0 4px 10px rgba(0,0,0,.4)}
+.barren{width:0;height:0}
+.barren::before{content:'';position:absolute;left:-42px;top:-42px;width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e7c99a,#a06a35 70%,#7a4a22);box-shadow:0 8px 18px rgba(0,0,0,.45)}
+.press-wrap.down .roller .roll{filter:brightness(1.15)}
+.press-wrap.down .barren::before{transform:scale(.94)}
+ol.steps{list-style:none;display:grid;gap:8px}
+ol.steps li{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--bg2);opacity:.6}
+ol.steps li.now{opacity:1;box-shadow:inset 0 0 0 2px var(--gold)}
+ol.steps .btn:disabled{opacity:.35}
+.bar{width:120px;height:10px;border-radius:5px;background:var(--bg3);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .2s}
+/* 여러 장 · 잉크 색 */
+.multi-wrap{display:grid;gap:12px;justify-items:center}
+.slots{--sz:128px;display:grid;grid-template-columns:repeat(3,var(--sz));gap:10px}
+.slots.small{--sz:92px}
+.slot-p{width:var(--sz);height:var(--sz);border-radius:8px;border:2px dashed #5a4a3a;line-height:0}
+.slot-p.full{border:0}
+.slot-p canvas{width:100%;height:100%;border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.multi-wrap .card canvas{width:250px;height:250px}
+.inks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.inkb{display:flex;align-items:center;gap:8px;height:38px;padding:0 10px;border-radius:10px;background:var(--bg3);font-weight:800;font-size:.85rem}
+.inkb i{width:20px;height:20px;border-radius:50%;box-shadow:0 0 0 2px #e9e0cf}
+.inkb.on{box-shadow:inset 0 0 0 3px var(--gold);background:#4a3a24}
+.win-prints{display:flex;gap:6px}
+.win-prints canvas{border-radius:6px}
+/* 첫 화면 */
+canvas.sicon{width:44px;height:44px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.4);display:block}
+canvas.demo{width:132px;height:132px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.45);flex:none}
+.agrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.acase{display:grid;grid-template-columns:96px 1fr;grid-template-rows:auto auto;gap:4px 10px;align-items:center;padding:8px;border-radius:12px;background:var(--bg3);color:inherit;text-decoration:none}
+.acase:hover{background:#3d3024}
+.acase .thumb{grid-row:1 / 3;width:96px;height:72px;border-radius:8px;overflow:hidden;background:#f6f0e4}
+.acase .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.acase .ac-t{display:grid;gap:2px;font-size:.85rem;line-height:1.35}
+.acase .stars{font-size:.76rem;color:var(--gold2);font-weight:800}
+.acase.done{box-shadow:inset 0 0 0 2px rgba(242,169,59,.55)}
+.chapters .print-art{grid-column:1 / -1}
+.pz.wide{grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr)}
+.pz.wide .q-body{padding:6px 12px 12px}
+.pz.wide .a-body{gap:10px;padding:12px 16px}
+.tsw{display:inline-block;width:12px;height:12px;border-radius:50%}
+.tfeel{margin-top:16px;display:grid;gap:10px}
+
+/* 좁은 화면(태블릿 세로 · 폰) — 위아래로 */
+@media (max-width:900px){
+  .pz,.pz.wide{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
+  .q{border-right:0;border-bottom:1px solid var(--line)}
+  .chapters{grid-template-columns:1fr}
+  .pgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .agrid{grid-template-columns:1fr}
+  .intro{flex-wrap:wrap}
+  .slots{--sz:min(28vw,128px)}
+}

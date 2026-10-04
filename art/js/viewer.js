@@ -163,5 +163,8 @@ export function makeViewer({ src, w, h: H0, alt = '', onTap = () => {} }) {
 
   const ro = new ResizeObserver(() => fit()); ro.observe(el);
   ready.then(fit);
-  return { el, img, ready, setMarks, ripple, zoomTo, reset, setGray, sample, lightOf, lineL, get gray() { return grayOn; }, destroy() { ro.disconnect(); } };
+  // 거울 보기 — 그림(과 흑백 판)만 좌우로 뒤집는다(나무판에 새겨진 모습 · 판화). 표시는 뒤집지 않으니 자리는 부르는 쪽이 100 − x 로
+  let mirrorOn = false;
+  function setMirror(on) { mirrorOn = !!on; el.classList.toggle('is-mirror', mirrorOn); }
+  return { el, img, ready, setMarks, ripple, zoomTo, reset, setGray, setMirror, sample, lightOf, lineL, get gray() { return grayOn; }, get mirror() { return mirrorOn; }, destroy() { ro.disconnect(); } };
 }
