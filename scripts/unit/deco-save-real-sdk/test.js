@@ -37,7 +37,9 @@
       } catch (e) { log.enterErr = e.message; }
     }, 300);
 
-    setTimeout(() => {
+    //  [DECO-LAZY-1] student/deco.js 는 이제 꾸미기를 열 때 불린다 — 꾸미기 함수(_decoPlace·_paintFloor)·전역(SEL_DECO)을 쓰기 전에 불러 둔다
+    const decoReadyP = typeof decoLoad === 'function' ? decoLoad() : Promise.resolve();
+    setTimeout(() => decoReadyP.then(() => {
       log.savingBefore = DB._saving;
       log.goldBefore = CUR.gold;
       // 쓰기 횟수 세기: students/<id> 로 나가는 실제 SDK set/update
@@ -99,6 +101,6 @@
           });
         }, 1200);
       })();
-    }, 1800);
+    }, e => { log.err = 'decoLoad ' + (e && e.message); done(); }), 1800);
   })();
 })();

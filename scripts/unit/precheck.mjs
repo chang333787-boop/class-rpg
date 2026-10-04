@@ -12,8 +12,8 @@
 //    --save-order-baseline N   save-order-check 기준선(기본 11 = 2026-09-15 main). 새 자리가 늘면 FAIL.
 //
 //  기본으로 도는 것: smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle ·
-//    global-dup · 자기검사 시뮬 다섯(esc-parity 포함) · 밸런스 둘 · 하위 앱 시험(scripts/unit/**/*.test.mjs, 저절로 모음).
-//    2026-10-04 main 기준(--no-deco): PASS 23 · REVIEW 1(save-order 11곳 기준선) · FAIL 0 · SKIP 1 · 약 10초.
+//    global-dup · deco-lazy · 자기검사 시뮬 다섯(esc-parity 포함) · 밸런스 둘 · 하위 앱 시험(scripts/unit/**/*.test.mjs, 저절로 모음).
+//    2026-10-04 기준(--no-deco · R6 deco-lazy 포함): PASS 25 · REVIEW 1(save-order 11곳 기준선) · FAIL 0 · SKIP 1 · 약 15초.
 //
 //  판정: 하나라도 FAIL(exit≠0)이면 exit 1. 골드 검사는 **수정 전 main 에서 LOSS 가 정상**이라
 //        --gold 는 기본 REVIEW(기록만)이고, `--gold-strict` 를 주면 --expect-fixed 로 돌려 FAIL 로 셈한다.
@@ -47,6 +47,8 @@ const CHECKS = [
 ];
 // [GLOBAL-DUP-1] 한 페이지 클래식 스크립트끼리 최상위 function/const 이름 겹침(뒤 파일이 말없이 덮음 · SyntaxError)
 CHECKS.push({ name: 'global-dup', file: 'scripts/unit/global-dup-check.mjs', args: [], pick: /요약:[^\n]*/ });
+// [DECO-LAZY-CHECK-1] 꾸미기(student/deco.js)는 열 때 늦게 부른다 — 바깥이 deco 이름을 부르는 자리가 지킴이·typeof 가드·불러온 뒤만 셋 중 하나인가
+CHECKS.push({ name: 'deco-lazy', file: 'scripts/unit/deco-lazy-check.mjs', args: [], pick: /요약:[^\n]*/ });
 // 폴더에 있는 다른 자기검사 시뮬들(각자 exit 코드로 판정)
 for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'student-known-check']) {
   CHECKS.push({ name: f, file: `scripts/unit/${f}.mjs`, args: [], pick: /(최종 결과:[^\n]*|PASS[^\n]*|FAIL[^\n]*)$/m, optional: true });

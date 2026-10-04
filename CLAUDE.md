@@ -59,6 +59,7 @@ Firebase 데이터 직접 수정 금지 / 운영 write 버튼 클릭 금지.
 
 - **🏘️ 마을 `village/`:** **맥북 마을 기획자 세션 전용.** 다른 세션은 읽기만 하고 고치지 않는다.
 - **🏡 꾸미기(마당·집 안 — `student/deco.js` + student.js 의 집 허브·농장 · assets/deco):** 맥북(2026-09-23 사용자 지시로 재개).
+  - `student/deco.js` 는 **html 태그 없이 꾸미기를 열 때 불러온다**(DECO-LAZY-1). 고치면 student.js 의 `DECO_SRC` `?v=` 를 올리고(그러면 student.html 의 student.js `?v=` 도) · 바깥에서 deco 이름을 새로 부르면 `deco-lazy-check`(precheck)가 지킴이·typeof 가드·불러온 뒤만 셋 중 하나인지 본다. [docs/module_architecture.md §17](docs/module_architecture.md)
 - **📚 학습 · 관리 정비:** 원래 학교 몫이었으나 **2026-10-04 사용자가 맥북 세션에도 맡겼다**(학습 앱 · admin · kiosk · gamedata 정비 포함).
 - **🏫 학교(Windows):** 학습 · 관리 작업(맥북과 나눠 맡음 — 같은 파일을 동시에 고치지 않게 최신 worklog 핸드오프를 먼저 본다).
 - **규칙:** `student.js`·`student/*.js` 는 여러 세션이 함께 고치므로 **PR 전에 main 을 다시 받아(rebase/merge) 충돌을 먼저 푼다.**

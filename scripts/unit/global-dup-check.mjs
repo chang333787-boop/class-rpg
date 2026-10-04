@@ -21,6 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LAZY_STUDENT_FILES } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LIST = process.argv.includes('--list');
@@ -103,6 +104,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (html == null) { all.push({ level: 'REVIEW', msg: `${page} 없음` }); continue; }
     const dir = path.posix.dirname(page) === '.' ? '' : path.posix.dirname(page);
     const scripts = classicScripts(html, dir, read, page);
+    //  [DECO-LAZY-1] student.html 이 태그 없이 늦게 부르는 파일(student/deco.js)도 같은 전역에 들어온다 — 다른 파일이 다 돈 뒤라 맨 뒤에.
+    //  늦게 부르는 파일의 let/const 가 앞 파일 이름과 겹치면 **불러오는 순간** SyntaxError(꾸미기가 통째로 안 열림)라 여기서 잡는다.
+    if (page === 'student.html') for (const f of LAZY_STUDENT_FILES) if (!scripts.some(x => x.label === f)) { const src = read(f); if (src != null) scripts.push({ label: f, src }); }
     if (LIST) console.log(`· ${page}: ${scripts.map(s => `${s.label}(${topDecls(s.src).length})`).join(' → ')}`);
     all.push(...checkPage(page, scripts));
   }

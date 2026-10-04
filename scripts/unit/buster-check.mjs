@@ -30,6 +30,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lazyRefsIn } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const [BASE = 'origin/main', HEAD = 'HEAD'] = process.argv.slice(2);
@@ -184,6 +185,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const subHtml = headFiles.filter(f => SUB_HTML_RE.test(f));
   const baseHtml = {}, tipHtml = {}, headHtml = {};
   for (const h of [...HTML_FILES, ...subHtml]) { baseHtml[h] = show(mb, h); tipHtml[h] = show(BASE, h); headHtml[h] = show(HEAD, h); }
+  //  [DECO-LAZY-1] student.js 가 html 태그 없이 부르는 파일('./student/deco.js?v=…')도 html 줄처럼 판정한다 —
+  //  deco.js 를 고치고 그 ?v= 를 안 올리면 ① FAIL. 줄 이름은 'student.js'(그 주소를 적은 곳).
+  const lazyHtml = (src) => src == null ? null : lazyRefsIn(src).map(r => `<script src="./${r.file}${r.ver ? '?v=' + r.ver : ''}"></script>`).join('\n');
+  baseHtml['student.js'] = lazyHtml(show(mb, 'student.js')); tipHtml['student.js'] = lazyHtml(show(BASE, 'student.js')); headHtml['student.js'] = lazyHtml(show(HEAD, 'student.js'));
   const res = check({ changed, baseHtml, tipHtml, headHtml, headFiles });
   res.push(...commonGaps({ headHtml, headFiles, read: f => show(HEAD, f) }));   // [BUSTER-COMMON-1]
   const icon = { PASS: '✅ PASS  ', REVIEW: '🟡 REVIEW', FAIL: '❌ FAIL  ' };

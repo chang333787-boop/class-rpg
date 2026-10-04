@@ -2267,7 +2267,10 @@ function houseTab(tab, el) {
   if (tab==='emotion') renderEmotionHistory();
   if (tab==='memory')  renderMyMemories();
   if (tab==='ach')     renderHouseAchievements();
-  if (tab==='deco') { /* 버튼으로 직접 열기 */ }
+  if (tab==='deco') {   // 버튼으로 직접 열기
+    //  [DECO-LAZY-1] 꾸미기 탭을 보면 deco.js 를 미리 받는다(누를 즈음엔 와 있게) · 오면 그림 묶음도(openHouseTab 이 하던 미리 받기)
+    if (!decoReady()) decoLoad().then(() => _artStart()).catch(() => {});
+  }
 }
 
 // 포트폴리오 열고 특정 탭 바로 활성화
@@ -2372,6 +2375,64 @@ function renderHouse() {
 }
 
 // ── [SPLIT-1] 여기 있던 'deco' 덩어리(7830줄)는 student/deco.js 로 옮겼다 — 글자 그대로 ──
+
+// ══ 꾸미기 늦게 불러오기 (DECO-LAZY-1) ══════════════════════
+//  student/deco.js(꾸미기 마당·집 안 + 친구 마당 구경 · 약 530KB = 학생 JS 의 절반)는 첫 화면에서 받지 않는다.
+//  꾸미기·친구 마당을 열 때 한 번만 부른다(집 허브 꾸미기 탭을 열면 미리) — decoLoad().
+//  · 바깥(student.js·student/*.js·html)이 deco.js 이름을 부르는 자리는 셋 중 하나여야 한다:
+//    ① 아래 자리 지킴이  ② typeof 가드  ③ 불러온 뒤에만 열리는 자리(꾸미기·친구 전체화면 안 단추 · _ifMode 가 켜졌을 때).
+//    scripts/unit/deco-lazy-check.mjs 가 전부 센다(precheck) — 새로 부르는 자리가 생기면 거기서 FAIL.
+//  · 자리 지킴이는 꼭 `window.이름 = function` 꼴. 같은 이름을 function 선언으로 두면 시험(run.mjs sliceFn)이 진짜 대신 지킴이를
+//    잘라 가고 global-dup 이 덮어쓰기로 본다. deco.js 가 불리면 그쪽 function 선언이 같은 전역 이름을 진짜로 바꿔 끼운다.
+//  · deco.js 를 고치면 아래 DECO_SRC 의 ?v= 를 올린다(그러면 student.js 도 바뀌니 student.html 의 student.js ?v= 도) — buster-check 가 본다.
+const DECO_SRC = './student/deco.js?v=20261004r6b';
+let DECO_SCENE = 'yard'; // 'yard' | 'indoor'  — [DECO-LAZY-1] deco.js 에서 옮김: 집 허브 '집 안 꾸미기' 단추가 불러오기 전에 값을 넣는다
+let _ifMode = false; // 전체화면 인테리어 모드 여부 — [DECO-LAZY-1] deco.js 에서 옮김: 농장·토스트가 불러오기 전에도 읽는다
+function decoReady() { return typeof _decoReadyMark !== 'undefined'; }   // deco.js 가 맨 끝 줄까지 돌았나
+function decoLoad() {
+  if (decoReady()) return Promise.resolve();
+  return loadScriptOnce(DECO_SRC).then(() => { if (!decoReady()) throw new Error('deco.js 가 끝까지 안 돎'); });
+}
+//  열기 지킴이 — 0.3초 넘게 걸리면 '…펴는 중…' 한 줄 · 다 오면 진짜 함수로 이어 부름 · 못 받으면 토스트(다시 누르면 다시 받는다).
+//  받는 동안 또 누르면 한 번만 연다(마지막에 누른 것으로).
+const _decoStubs = {}, _decoWaiting = {};
+function _decoLazyOpen(name, args, waitMsg, failMsg) {
+  const first = !(name in _decoWaiting);
+  _decoWaiting[name] = args;
+  if (!first) return;
+  let tip = null;
+  const timer = setTimeout(() => {
+    tip = document.createElement('div');
+    tip.className = 'toast-msg';
+    tip.textContent = waitMsg;
+    tip.style.animation = 'toastIn .3s ease';   // 보통 토스트는 2초 뒤 사라진다 — 다 받을 때까지 그대로
+    tip.style.bottom = window.innerWidth <= 700 ? '75px' : '20px';
+    document.body.appendChild(tip);
+  }, 300);
+  const end = () => { clearTimeout(timer); if (tip) tip.remove(); const a = _decoWaiting[name]; delete _decoWaiting[name]; return a; };
+  decoLoad().then(() => {
+    const a = end(), real = window[name];
+    if (typeof real === 'function' && real !== _decoStubs[name]) real.apply(null, a);
+  }, () => { end(); toast(failMsg); });
+}
+_decoStubs.openInteriorFullscreen = window.openInteriorFullscreen = function () {
+  _decoLazyOpen('openInteriorFullscreen', [...arguments], '꾸미기를 펴는 중…', '꾸미기를 불러오지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.');
+};
+_decoStubs.visitFriend = window.visitFriend = function () {
+  _decoLazyOpen('visitFriend', [...arguments], '친구 마당을 펴는 중…', '친구 마당을 불러오지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.');
+};
+//  상점 꾸미기 탭 썸네일 — 불러오기 전엔 이모지(진짜 _decoThumb 가 그림 묶음을 받는 동안 쓰는 것과 같은 모양) · 받으면 상점을 한 번 다시 그린다
+let _decoThumbWait = false;
+_decoStubs._decoThumb = window._decoThumb = function (d, px) {
+  if (!_decoThumbWait) {
+    _decoThumbWait = true;
+    decoLoad().then(() => {
+      _decoThumbWait = false;
+      if (CUR && SHOP_TAB === 'deco' && document.getElementById('m-shop')?.classList.contains('open')) renderShop();
+    }, () => { _decoThumbWait = false; });
+  }
+  return `<span style="font-size:${Math.round(px * 0.8)}px;display:block;text-align:center">${escHtml(d.icon || '🌸')}</span>`;
+};
 // ── [SPLIT-1] 여기 있던 'art' 덩어리(546줄)는 student/art.js 로 옮겼다 — 글자 그대로 ──
 // ── [SPLIT-1] 여기 있던 'emotion' 덩어리(522줄)는 student/emotion.js 로 옮겼다 — 글자 그대로 ──
 // ══ 인벤토리 ══// ══ 인벤토리 ══
