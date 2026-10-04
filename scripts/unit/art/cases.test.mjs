@@ -7,6 +7,8 @@ import { CASES, CHAPTERS, FEELS, BECAUSE, caseById } from '../../../art/js/cases
 import { KINDS, kindsFor, questionText, partAt, jo, inRect } from '../../../art/js/ask.js';
 import { colorOf, colorShare, judgeColors, edgeWidth } from '../../../art/js/colors.js';
 import { starsOf, TECH, choicesOf } from '../../../art/js/play.js';
+import { ELEMENTS, FAMS, EFEELS, measure, findAt, countOf, cellAtPct, cellRect, bestOf, topLabels } from '../../../art/js/elements.js';
+import { MISSIONS } from '../../../art/js/hunt.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const results = [];
@@ -112,6 +114,45 @@ test('경계 재기 — 또렷한 경계는 짧게 · 부드러운 경계는 길
   const noisy = step.map((v, i) => v + ((i * 37) % 5) - 2);
   ok(edgeWidth(noisy, 1.6).w < 12, '얼룩이 조금 있어도 또렷한 경계는 짧게');
   ok(edgeWidth([...Array(64)].fill(50), 2).w === 0, '바뀜 없으면 0');
+});
+// ── 조형 요소 찾기 — 합성 그림(4 × 3 판)으로 돋보기가 요소를 바르게 가려내는가 ──
+function synth() {
+  const W = 480, H = 320, px = new Uint8ClampedArray(W * H * 4); let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const col = Math.floor(x / 120), row = Math.floor(y / (H / 3)), lx = x % 120, ly = y % (H / 3); let c = [150, 150, 150];
+    const st = v => (v ? [40, 40, 40] : [210, 210, 210]);
+    if (row === 0) c = col === 0 ? st(Math.floor(ly / 6) % 2) : col === 1 ? st(Math.floor(lx / 6) % 2) : col === 2 ? st(Math.floor((lx + ly) / 8.5) % 2) : st(Math.floor(Math.hypot(lx - 60, ly - 53) / 7) % 2);
+    else if (row === 1) c = [[210, 40, 30], [30, 80, 210], [250, 250, 250], [12, 12, 12]][col];
+    else if (col === 0) { const v = Math.round(240 - ly / (H / 3) * 200); c = [v, v, v]; } else if (col === 1) { const v = Math.round(140 + (rnd() - 0.5) * 120); c = [v, v, v]; }
+    const o = (y * W + x) * 4; px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
+  }
+  return measure(px, W, H);
+}
+test('조형 요소 돋보기 — 합성 그림 판마다 맞는 요소', () => {
+  const F = synth(), by = {};
+  for (const c of F.cells) { const r = cellRect(F, c), p = `${Math.floor((r[0] + r[2]) / 2 / 25)},${Math.floor((r[1] + r[3]) / 2 / 33.4)}`; for (const k of Object.keys(c.labels)) { by[k] = by[k] || {}; by[k][p] = (by[k][p] || 0) + 1; } }
+  const n = (k, p) => ((by[k] || {})[p] || 0);
+  ok(n('horiz', '0,0') >= 15 && n('vert', '0,0') <= 2 && n('curve', '0,0') <= 2, '가로줄 판 ' + JSON.stringify([n('horiz', '0,0'), n('vert', '0,0')]));
+  ok(n('vert', '1,0') >= 15 && n('horiz', '1,0') <= 2, '세로줄 판');
+  ok(n('diag', '2,0') >= 15 && n('horiz', '2,0') + n('vert', '2,0') <= 2, '사선줄 판');
+  ok(n('curve', '3,0') >= 10 && n('curve', '3,0') > 3 * (n('curve', '0,0') + n('curve', '1,0') + n('curve', '2,0')), '동그라미 판 = 곡선 ' + n('curve', '3,0'));
+  ok(n('warm', '0,1') >= 20 && n('cool', '0,1') === 0 && n('vivid', '0,1') >= 20, '빨강 = 따뜻 · 선명');
+  ok(n('cool', '1,1') >= 20 && n('warm', '1,1') === 0 && n('vivid', '1,1') >= 20, '파랑 = 차가움 · 선명');
+  ok(n('bright', '2,1') >= 20 && n('dark', '3,1') >= 20 && n('bright', '3,1') === 0, '흰색 = 밝음 · 검정 = 어두움');
+  ok(n('shade', '0,2') >= 8 && n('rough', '1,2') >= 20 && n('smooth', '1,2') === 0 && n('smooth', '2,2') >= 15 && n('rough', '2,2') === 0, '명암 = 양감 · 잡티 = 거침 · 고른 회색 = 매끄러움');
+  ok(findAt(F, 12, 16, 'horiz').ok && !findAt(F, 12, 16, 'vert').ok && findAt(F, 37, 16, 'vert').ok && findAt(F, 12, 50, 'warm').ok && !findAt(F, 37, 50, 'warm').ok, '짚어서 찾기');
+  ok(cellAtPct(F, 0, 0) === F.cells[0] && cellAtPct(F, 100, 100) === F.cells[F.cells.length - 1] && cellAtPct(F, 50, 50), '가장자리 짚기도 칸');
+  ok(bestOf(F, 'curve', 1)[0].labels.curve && topLabels(cellAtPct(F, 12, 50), 4).some(x => x.k === 'warm'), '힌트 · 이름표 차례');
+});
+test('조형 요소 찾기 — 카드 열둘 · 카드마다 서로 다른 그림 셋', () => {
+  ok(ELEMENTS.length === 12 && new Set(ELEMENTS.map(e => e.k)).size === 12 && FAMS.every(([f]) => ELEMENTS.some(e => e.fam === f)), '카드 · 갈래');
+  const fw = new Set(EFEELS.map(f => f[0]));
+  for (const e of ELEMENTS) {
+    const m = MISSIONS[e.k];
+    ok(m && m.length === 3 && new Set(m).size === 3 && m.every(id => caseById(id)), e.k + ' 미션 그림 셋');
+    ok(e.name && e.desc && e.icon && e.feel.length === 2 && e.feel.every(f => fw.has(f)), e.k + ' 글 · 느낌');
+  }
+  ok(Object.keys(MISSIONS).every(k => ELEMENTS.some(e => e.k === k)), '남는 미션 없음');
 });
 test('그림 출처 문서 — 스물여섯 장 모두', () => {
   const t = fs.readFileSync(path.join(ROOT, 'art/CREDITS.md'), 'utf8');
