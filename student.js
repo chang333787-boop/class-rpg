@@ -1007,7 +1007,7 @@ function buildMainHTML() {
     alerts.push(`<div class="boss-banner" onclick="openBoss()" style="margin-bottom:.6rem">
       <div style="font-size:2rem">${escHtml(settings.bossIcon||'🧌')}</div>
       <div style="flex:1"><div style="font-weight:900;color:var(--red)">${escHtml(settings.bossName||'금요일 보스')} 출현!</div>
-      <div style="font-size:.76rem;color:var(--txt2)">${bossClaimedThisWeek(s) ? '이번 주 보상 받음 ✓' : `보상: 💰${Number(settings.bossGold)||150}G + 30EXP`}</div></div>
+      <div style="font-size:.76rem;color:var(--txt2)">${bossClaimedThisWeek(s) ? '이번 주 보상 받음 ✓' : `보상: 💰${Utils.intOr(settings.bossGold, 150)}G + 30EXP`}</div></div>
       <button class="bb-btn">${bossClaimedThisWeek(s) ? '보기' : '도전!'}</button>
     </div>`);
 
@@ -2074,7 +2074,7 @@ function openBoss() {
         ? '이번 주 보상은 벌써 받았어요 ✓<br>다음 주에 다시 만나요!'
         : '보스를 이기면 보상을 받아요! (한 주에 한 번)'}</div>
       <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.2rem">
-        <span class="rb-tag">💰 ${Number(settings.bossGold)||150}G</span>
+        <span class="rb-tag">💰 ${Utils.intOr(settings.bossGold, 150)}G</span>
         <span class="rb-tag">+30EXP</span>
       </div>
       ${done
@@ -2086,7 +2086,7 @@ function openBoss() {
 function doBossFight() {
   if (bossClaimedThisWeek()) { toast('이번 주 보스 보상은 벌써 받았어요'); openBoss(); return; }
   const settings = DB.getSettings();
-  const gold = Number(settings.bossGold) || 150;
+  const gold = Utils.intOr(settings.bossGold, 150);   // [ZERO-OK-1] 교사가 0 을 넣으면 0
   const win = Math.random() > 0.35;
   document.getElementById('boss-arena').innerHTML = `
     <div style="text-align:center;padding:1rem">
@@ -2103,7 +2103,7 @@ function claimBoss(btn) {
   if (btn) btn.disabled = true;   // 두 번 눌러 두 번 받기 막기
   closeModal('m-boss');
   if (!CUR || bossClaimedThisWeek()) { toast('이번 주 보스 보상은 벌써 받았어요'); return; }
-  const gold = Number((DB.getSettings() || {}).bossGold) || 150;
+  const gold = Utils.intOr((DB.getSettings() || {}).bossGold, 150);   // [ZERO-OK-1]
   CUR.bossClaimedWeek = Utils.weekStartStr();
   CUR.gold += gold; CUR.exp += 30;
   CUR.totalGold = (CUR.totalGold||0) + gold;

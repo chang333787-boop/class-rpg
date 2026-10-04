@@ -1898,6 +1898,27 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// [ZERO-OK-1] 교사 숫자 칸: 0 은 0 · 빈칸·글자·음수만 기본값(gamedata.js Utils.intOr 를 그대로 꺼내 돌린다)
+let ZERO_OK_INTOR = null;
+cur = '교사 숫자 칸 0 은 0(ZERO-OK-1)';
+try {
+  const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__U = Utils;', sb);
+  ZERO_OK_INTOR = sb.__U.intOr.bind(sb.__U);
+  test('0 은 0 · 숫자 글자도 숫자로', () => eq(['0', 0, '45', 12, '7.9'].map(v => ZERO_OK_INTOR(v, 30)), [0, 0, 45, 12, 7]));
+  test('빈칸·글자·음수·없음 → 기본값', () => eq(['', 'abc', '-5', null, undefined, NaN].map(v => ZERO_OK_INTOR(v, 30)), [30, 30, 30, 30, 30, 30]));
+  test('관리 화면에 `parseInt(..) || 기본값` 으로 남은 골드·EXP 칸이 없다(빠른 승인·몬스터·도감·감정 보상·보스)', () => {
+    const src = readAdminSources(ROOT);
+    const bad = src.split('\n').filter(l => /(parseInt|Number)\(.*(qa-exp|qa-gold|me-gold|me-exp|dex-first-gold|set-boss-gold|emo-reward-[a-z]+-(exp|gold)).*\)\s*\|\|\s*\d/.test(l));
+    eq(bad.length, 0);
+  });
+} catch (e) {
+  test('Utils.intOr 를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 cur = '금요일 보스 한 주 한 번(BOSS-WEEK-1)';
 try {
   const S = STUDENT;
@@ -1910,7 +1931,7 @@ try {
       CUR: student, openModal() {}, closeModal() {}, renderAll() {}, triggerLevelUp() {},
       toast: (m) => sb.toasts.push(m), escHtml: (x) => String(x),
     };
-    sb.Utils = { weekStartStr: () => sb.week, levelFromExp: () => 1 };
+    sb.Utils = { weekStartStr: () => sb.week, levelFromExp: () => 1, intOr: ZERO_OK_INTOR };   // [ZERO-OK-1] 실제 함수
     sb.globalThis = sb; vm.createContext(sb);
     vm.runInContext(['bossClaimedThisWeek', 'openBoss', 'doBossFight', 'claimBoss'].map(n => sliceFn(S, n)).join(NL)
       + ';globalThis.__B = { bossClaimedThisWeek, openBoss, doBossFight, claimBoss };', sb);

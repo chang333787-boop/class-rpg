@@ -79,21 +79,25 @@ window.onload = async () => {
       applyBattleSettings(); // 전투 설정 변경 시 실시간 반영
       // 관리자 로그인 상태일 때만 재렌더
       if (document.getElementById('admin-app').style.display !== 'none') {
-        renderAll();
-        updatePendingBadge();
-        updatePromoBadge();
-        updatePwResetBadge();
-        // 현재 열려 있는 탭도 재렌더
+        _adminLive = true; // [LIVE-INPUT-1] 이 안의 다시 그리기 = 실시간 경로
         try {
-          const activePage = document.querySelector('.page.active')?.id?.replace('p-','');
-          if (activePage === 'weekly')   renderWeeklyAdminPage();
-          if (activePage === 'books')    renderBooksPage();
-          if (activePage === 'memories') renderMemoriesPage();
-          if (activePage === 'activity') renderActivityPage();
-          if (activePage === 'study')    renderStudyScopePage();
-          if (activePage === 'stats')    renderStatsPage();
-          if (activePage === 'emotion')  renderEmotionPage();
-        } catch(e) { console.warn('탭 재렌더 오류:', e.message); }
+          renderAll();
+          updatePendingBadge();
+          updatePromoBadge();
+          updatePwResetBadge();
+          // 현재 열려 있는 탭도 재렌더
+          try {
+            const activePage = document.querySelector('.page.active')?.id?.replace('p-','');
+            if (activePage === 'weekly')   renderWeeklyAdminPage();
+            if (activePage === 'books'    && !adminLiveBusy('books-list'))    renderBooksPage();
+            if (activePage === 'memories' && !adminLiveBusy('memories-list')) renderMemoriesPage();
+            if (activePage === 'activity') renderActivityPage();
+            if (activePage === 'study' && !adminLiveBusy('study-scope-body')) renderStudyScopePage();
+            if (activePage === 'stats')    renderStatsPage();
+            if (activePage === 'emotion')  renderEmotionPage();
+            if (activePage === 'emotionalerts') renderEmotionAlerts(); // [LIVE-INPUT-1] 아이의 '선생님과 이야기' 요청이 바로 뜨게
+          } catch(e) { console.warn('탭 재렌더 오류:', e.message); }
+        } finally { _adminLive = false; }
       }
     });
   } catch(e) {
@@ -106,6 +110,25 @@ window.onload = async () => {
     if (e.key === 'Enter') adminLogin();
   });
 };
+
+// [LIVE-INPUT-1] 학생 저장 → onDataChange → 다시 그리기가 교사가 쓰던 칸(선생님 한마디·독서 코멘트·추억 제목·학습 보상)을
+//  지우지 않게. 실시간 경로에서만, 그 영역 안에 쓰는 중(포커스)이거나 고친 뒤 아직 저장 안 한 칸이 있으면 이번 그리기를 미룬다.
+//  교사가 직접 누른 단추 뒤의 renderAll() 은 그대로 다시 그린다. 배지·대시보드·승인 격자는 가드 없이 늘 실시간.
+let _adminLive = false;
+const _adminTyped = new WeakSet();
+document.addEventListener('input', e => {
+  const t = e.target;
+  // 스스로 저장하는 칸(onchange·onblur 저장)은 '저장 안 한 값'으로 치지 않는다 — 포커스 동안만 지킨다
+  if (t && t.matches && t.matches('input,textarea,select') && !t.hasAttribute('onchange') && !t.hasAttribute('onblur')) _adminTyped.add(t);
+}, true);
+function adminLiveBusy(boxId) {
+  if (!_adminLive) return false;
+  const box = document.getElementById(boxId);
+  if (!box) return false;
+  const a = document.activeElement;
+  if (a && box.contains(a) && a.matches('input,textarea,select')) return true;
+  return [...box.querySelectorAll('input,textarea,select')].some(el => _adminTyped.has(el));
+}
 
 function renderAll() {
   // 각 함수를 개별 try/catch로 감싸서 한 곳 실패해도 나머지 계속 실행
@@ -122,7 +145,7 @@ function renderAll() {
   safe(loadSettings,          'settings');
   safe(updatePwResetBadge,    'pwBadge');
   safe(updateEmotionAlertBadge,'emotionBadge');
-  safe(renderArtworkPending,  'artPending');
+  safe(() => { if (!adminLiveBusy('artwork-pending-list')) renderArtworkPending(); }, 'artPending');
   safe(renderArtworkAdmin,    'artAdmin');
   try {
     const students = DB.getStudents();
@@ -556,7 +579,8 @@ function renderDashboard() {
   }
 
   // ── 레벨 현황 ──
-  document.getElementById('dash-level-list').innerHTML = students
+  //   [DASH-SORT-COPY-1] 사본을 정렬한다 — students 는 DB 캐시 배열 자체라, 제자리 정렬하면 그 뒤 학생 목록·승인 격자·선택 상자가 레벨순으로 뒤섞였다
+  document.getElementById('dash-level-list').innerHTML = [...students]
     .sort((a,b) => b.level - a.level)
     .map(s => {
       const pct = Math.min(100,
