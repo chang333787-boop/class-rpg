@@ -3077,17 +3077,20 @@ function _fxBusy() {
 function _fxWhenFree(fn, tries) { tries = tries || 0; if (!_fxBusy() || tries > 450) return fn(); setTimeout(() => _fxWhenFree(fn, tries + 1), 400); }
 
 function checkAchievements(opts) {
+  const oldLv = CUR.level || 1;   // [LVUP-FX-1] 업적 EXP 로 오른 레벨도 축하 — checkNew 가 그 자리에서 level 을 바꾼다
   const newOnes = AchievementUtils.checkNew(CUR);
   if (newOnes.length === 0) return [];
+  const newLv = CUR.level || 1;
   DB.saveStudent(CUR);
   if (opts && opts.inline) {   // 배틀 결과 카드가 직접 보여 준다 — 알림 빨간 점만
     document.querySelectorAll('[id="ach-tile-notif"]').forEach(n => { n.style.display = ''; });
+    if (newLv > oldLv) triggerLevelUp(newLv);   // [LVUP-FX-1] 배틀 창이 닫힌 뒤(_fxWhenFree)
     return newOnes;
   }
   // 업적 달성 팝업 (순서대로)
   let idx = 0;
   const showNext = () => {
-    if (idx >= newOnes.length) { renderAll(); return; }
+    if (idx >= newOnes.length) { renderAll(); if (newLv > oldLv) triggerLevelUp(newLv); return; }   // [LVUP-FX-1] 팝업이 다 끝난 뒤
     const a = newOnes[idx++];
     const rewardParts = [];
     if (a.reward.exp)   rewardParts.push(`+${a.reward.exp} EXP`);
