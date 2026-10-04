@@ -18,11 +18,18 @@ const r1 = v => Math.round(v * 10) / 10;
 // 먹색 차례 재기 — 잰 밝기(L*)를 회색 칸으로 · 먹 연구소 먹색 다섯(ink/js/inkcolor.js TONES 와 같은 L*) 가운데 가장 가까운 이름
 const grayOf = L => { const Y = L > 8 ? Math.pow((L + 16) / 116, 3) : L / 903.3, v = Y <= 0.0031308 ? 12.92 * Y : 1.055 * Math.pow(Y, 1 / 2.4) - 0.055, n = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0'); return '#' + n + n + n; };
 const INK_TONES = [[7.5, '진한 먹'], [34.3, '조금 진한 먹'], [57.8, '중간 먹'], [73.3, '옅은 먹'], [92.1, '종이색']];
-const inkName = L => INK_TONES.reduce((a, t) => (Math.abs(t[0] - L) < Math.abs(a[0] - L) ? t : a))[1];
+//  연필 명도 띠 5단계(데생 기초 2차시 — 1단계 = 흰 종이 · 5단계 = 가장 어두움)
+const PENCIL_TONES = [[15, '5단계(가장 어두움)'], [32, '4단계'], [50, '3단계'], [70, '2단계'], [90, '1단계(흰 종이)']];
+const toneName = (L, scale) => (scale === 'pencil' ? PENCIL_TONES : INK_TONES).reduce((a, t) => (Math.abs(t[0] - L) < Math.abs(a[0] - L) ? t : a))[1];
+//  차례 재기 말 — 먹(진하다 · 옅다) · 연필(어둡다 · 밝다)
+const ORDER_WORDS = { ink: { dark: '진한', light: '옅은', measure: '먹색', lead: '먹 연구소의 농담 꼬리처럼!' }, pencil: { dark: '어두운', light: '밝은', measure: '밝기', lead: '데생 기초의 명도 띠처럼!' } };
+const owOf = t => ORDER_WORDS[t.scale || 'ink'];
 // 붓 자국 읽기 — 먹 연구소 2장 붓 놀이 · 수채화 기초 차시와 같은 낱말. 사건마다 think.choices 로 넷을 고른다(없으면 먹 넷)
 export const TECH = { dot: '점을 콕콕 찍었어요', line: '선을 죽죽 내리그었어요', wet: '물을 많이 써서 번지게 칠했어요', dry: '마른 붓으로 거칠게 문질렀어요',
-  fine: '가는 붓으로 한 올씩 그었어요', wash: '물 많은 붓으로 넓게 쓱 칠했어요', white: '칠하지 않고 종이를 남겨 두었어요', layer: '마른 뒤에 진한 색을 겹쳐 칠했어요' };
-const TECH_WORD = { dot: '먹점', line: '내리그은 선', wet: '번지기', dry: '마른 붓', fine: '가는 붓으로 한 올씩', wash: '넓게 쓱(평칠)', white: '흰 종이 남기기', layer: '겹쳐 칠하기' };
+  fine: '가는 붓으로 한 올씩 그었어요', wash: '물 많은 붓으로 넓게 쓱 칠했어요', white: '칠하지 않고 종이를 남겨 두었어요', layer: '마른 뒤에 진한 색을 겹쳐 칠했어요',
+  hatch: '나란한 선을 여러 번 그었어요(해칭)', cross: '선을 엇갈려 겹쳐 그었어요(크로스해칭)', curl: '휘어진 짧은 선을 겹겹이 그었어요', long: '가늘고 긴 선을 길게 그었어요' };
+const TECH_WORD = { dot: '점', line: '내리그은 선', wet: '번지기', dry: '마른 붓', fine: '가는 붓으로 한 올씩', wash: '넓게 쓱(평칠)', white: '종이 남기기', layer: '겹쳐 칠하기',
+  hatch: '해칭(나란한 선)', cross: '크로스해칭(엇갈린 선)', curl: '휘어진 짧은 선', long: '가늘고 긴 선' };
 export const choicesOf = t => t.choices || ['dot', 'line', 'wet', 'dry'];
 const EL = ['ㄱ', 'ㄴ'];   // 경계 재기 줄 이름
 
@@ -234,16 +241,17 @@ export function mountCase(root, ctx, c) {
     if (t.mode === 'order') {
       const names = t.spots.map(sp => sp[0]);
       if (!tMeasure) {
-        parts.push(h('p', { class: 'lead' }, '그림 속 네모를 가장 진한 곳부터 차례로 짚어요(아래 이름을 눌러도 돼요). 먹 연구소의 농담 꼬리처럼!'),
-          h('ol', { class: 'order' }, ...t.spots.map((_, k) => { const i = tOrder[k]; return h('li', { class: i == null ? 'is-empty' : '' }, h('span', { class: 'on' }, String(k + 1)), i == null ? h('span', { class: 'muted' }, k === 0 ? '가장 진한 곳' : k === t.spots.length - 1 ? '가장 옅은 곳' : '그다음') : h('b', {}, names[i])); })),
+        const ow = owOf(t);
+        parts.push(h('p', { class: 'lead' }, `그림 속 네모를 가장 ${ow.dark} 곳부터 차례로 짚어요(아래 이름을 눌러도 돼요). ${ow.lead}`),
+          h('ol', { class: 'order' }, ...t.spots.map((_, k) => { const i = tOrder[k]; return h('li', { class: i == null ? 'is-empty' : '' }, h('span', { class: 'on' }, String(k + 1)), i == null ? h('span', { class: 'muted' }, k === 0 ? `가장 ${ow.dark} 곳` : k === t.spots.length - 1 ? `가장 ${ow.light} 곳` : '그다음') : h('b', {}, names[i])); })),
           h('div', { class: 'chips' }, ...t.spots.map((sp, i) => h('button', { class: 'wchip' + (tOrder.includes(i) ? ' on' : ''), 'data-s': i, disabled: tOrder.includes(i), onclick: () => pickSpot(i) }, sp[0]))),
-          h('div', { class: 'go-row' }, h('button', { class: 'btn small', disabled: !tOrder.length, onclick: () => { tOrder = []; say('다시 짚어요 — 가장 진한 곳부터.'); render(); } }, '다시 짚기'), h('span', { class: 'sp' }),
-            h('button', { class: 'btn primary', 'data-act': 'measure', disabled: tOrder.length < t.spots.length, onclick: () => orderTest() }, '🔬 먹색 재기')));
+          h('div', { class: 'go-row' }, h('button', { class: 'btn small', disabled: !tOrder.length, onclick: () => { tOrder = []; say(`다시 짚어요 — 가장 ${ow.dark} 곳부터.`); render(); } }, '다시 짚기'), h('span', { class: 'sp' }),
+            h('button', { class: 'btn primary', 'data-act': 'measure', disabled: tOrder.length < t.spots.length, onclick: () => orderTest() }, `🔬 ${ow.measure} 재기`)));
       } else {
         const right = tMeasure.slice().sort((a, z) => a.L - z.L).map(x => x.i), okAll = right.every((i, k) => tOrder[k] === i);
         parts.push(h('div', { class: 'measure' }, h('b', {}, '재어 보니(사람 눈 밝기 · 0 = 검정 · 100 = 흰색)'),
           h('div', { class: 'olist' }, ...right.map((i, k) => { const m = tMeasure.find(x => x.i === i); return h('div', { class: 'orow' + (tOrder[k] === i ? ' ok' : ' no') },
-            h('span', { class: 'osw', style: { background: grayOf(m.L) } }), h('b', {}, names[i]), h('span', { class: 'ol' }, String(Math.round(m.L))), h('span', { class: 'muted small' }, '≈ ' + inkName(m.L))); })),
+            h('span', { class: 'osw', style: { background: grayOf(m.L) } }), h('b', {}, names[i]), h('span', { class: 'ol' }, String(Math.round(m.L))), h('span', { class: 'muted small' }, '≈ ' + toneName(m.L, t.scale))); })),
           h('p', { class: okAll ? 'good' : 'bad' }, okAll ? '차례가 딱 맞았어요!' : '내 차례와 조금 달라요 — 눈은 둘레 색에 속기도 해요. 그래서 재어 보는 거예요.'),
           h('p', { class: 'muted small' }, `내 차례: ${tOrder.map(i => names[i]).join(' → ')}`)),
           rev(), tryBtn(), thinkTally(k => k.split(',').map(i => names[+i] || '?').join(' → ')));
@@ -253,7 +261,7 @@ export function mountCase(root, ctx, c) {
       const it = t.items[hIdx];
       if (!tShown) {
         if (hZoomed !== hIdx) { hZoomed = hIdx; viewer.zoomTo(it.r, 3); }
-        parts.push(h('p', { class: 'lead' }, `${hIdx + 1} / ${t.items.length} — 점선 네모 안을 크게 봐요. 붓 자국이 어떤 모양인가요?`),
+        parts.push(h('p', { class: 'lead' }, `${hIdx + 1} / ${t.items.length} — 점선 네모 안을 크게 봐요. 그은 자국이 어떤 모양인가요?`),
           h('div', { class: 'picked' }, h('span', { class: 'muted small' }, '읽을 곳'), h('b', {}, it.n)),
           h('div', { class: 'opts' }, ...choicesOf(t).map(k => h('button', { class: 'opt' + (hBad.has(k) ? ' no' : ''), 'data-h': k, disabled: hBad.has(k), onclick: () => pickHow(k) }, TECH[k]))),
           hIdx ? h('ul', { class: 'evs' }, ...t.items.slice(0, hIdx).map(x => h('li', {}, `🖌 ${x.n} — ${TECH_WORD[x.a]}`))) : null);
@@ -302,9 +310,9 @@ export function mountCase(root, ctx, c) {
   function tryBtn() {
     const t = c.think; if (!t.try) return null;
     const q = new URLSearchParams(location.search); q.delete('from'); q.delete('debug'); q.delete('lesson');
-    if (t.try.app === 'watercolor') {
-      const w = new URLSearchParams(); if (q.get('sid')) w.set('sid', q.get('sid')); w.set('lesson', String(t.try.lesson));
-      return h('a', { class: 'btn try', href: `../watercolor/index.html?${w}`, 'data-act': 'try' }, '🎨 ' + t.try.label);
+    if (t.try.app === 'watercolor' || t.try.app === 'drawing') {
+      const w = new URLSearchParams(); if (t.try.app === 'drawing') w.set('course', 'drawing'); if (q.get('sid')) w.set('sid', q.get('sid')); w.set('lesson', String(t.try.lesson));
+      return h('a', { class: 'btn try', href: `../watercolor/index.html?${w}`, 'data-act': 'try' }, (t.try.app === 'drawing' ? '✏️ ' : '🎨 ') + t.try.label);
     }
     const app = t.try.app === 'print' ? ['../print/index.html', '🪞 '] : ['../ink/index.html', '🖌 '];
     return h('a', { class: 'btn try', href: `${app[0]}${q.toString() ? '?' + q : ''}${t.try.hash}`, 'data-act': 'try' }, app[1] + t.try.label);
@@ -336,12 +344,13 @@ export function mountCase(root, ctx, c) {
     if (tMeasure || tOrder.includes(i) || tOrder.length >= c.think.spots.length) return;
     tOrder.push(i);
     const left = c.think.spots.length - tOrder.length;
-    say(left ? `${tOrder.length}번째: ${c.think.spots[i][0]} — 다음으로 진한 곳은?` : '다 짚었어요! 먹색을 재어 봐요.', 'good');
+    const ow = owOf(c.think);
+    say(left ? `${tOrder.length}번째: ${c.think.spots[i][0]} — 다음으로 ${ow.dark} 곳은?` : `다 짚었어요! ${ow.measure}${ow.measure === '먹색' ? '을' : '를'} 재어 봐요.`, 'good');
     render();
   }
   async function orderTest() {
     const t = c.think;
-    say('먹색을 재는 중…');
+    say(`${owOf(t).measure}${owOf(t).measure === '먹색' ? '을' : '를'} 재는 중…`);
     const out = [];
     for (const [i, sp] of t.spots.entries()) out.push({ i, L: await viewer.lightOf([sp[1]]) });
     if (!alive) return;
@@ -354,7 +363,7 @@ export function mountCase(root, ctx, c) {
     const t = c.think, it = t.items[hIdx];
     if (tShown || hBad.has(k)) return;
     if (hFirst[hIdx] == null) hFirst[hIdx] = k;
-    if (k !== it.a) { hBad.add(k); ctx.store.tap(c.id, 'tmiss').catch(e => console.warn(e)); say('다시 크게 봐요 — 붓 자국 하나하나의 모양을 봐요.', 'bad'); render(); return; }
+    if (k !== it.a) { hBad.add(k); ctx.store.tap(c.id, 'tmiss').catch(e => console.warn(e)); say('다시 크게 봐요 — 자국 하나하나의 모양을 봐요.', 'bad'); render(); return; }
     say('맞아요! ' + it.say, 'good');
     hIdx++; hBad = new Set();
     if (hIdx >= t.items.length) { hIdx = t.items.length - 1; tShown = true; viewer.reset(); await saveThink(hFirst.every((a, j) => a === t.items[j].a) ? 'right' : 'retry'); }
@@ -378,7 +387,7 @@ export function mountCase(root, ctx, c) {
       if (tOrder.includes(i)) { say('벌써 짚은 곳이에요.'); return; }
       viewer.ripple(x, y, 'good'); pickSpot(i); return;
     }
-    if (t.mode === 'how') { say('오른쪽에서 붓 자국을 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
+    if (t.mode === 'how') { say('오른쪽에서 어떻게 그었는지 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
     if (t.mode === 'edge') { say('오른쪽에서 ㄱ · ㄴ 가운데 더 부드러운 쪽을 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
     if (t.mode === 'mirror') { say('오른쪽에서 예상을 고르고 뒤집어 봐요 — 그림은 마음껏 확대해 봐요.'); return; }
     if (t.mode === 'pick' && !thinkDone) {

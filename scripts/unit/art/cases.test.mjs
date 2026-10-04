@@ -26,9 +26,10 @@ function webpSize(file) {
   throw new Error('모르는 WebP ' + t);
 }
 
-test('사건 스물셋 · 장 다섯 · 이름 겹침 없음', () => {
-  ok(CASES.length === 23 && new Set(CASES.map(c => c.id)).size === 23, '사건 23');
-  ok([6, 6, 3, 6, 2].every((n, i) => CASES.filter(c => c.ch === CHAPTERS[i].id).length === n) && CHAPTERS.length === 5, '장마다 여섯 · 여섯 · 셋 · 여섯 · 둘');
+test('사건 스물여섯 · 장 여섯 · 이름 겹침 없음', () => {
+  ok(CASES.length === 26 && new Set(CASES.map(c => c.id)).size === 26, '사건 26');
+  ok([6, 6, 3, 6, 2, 3].every((n, i) => CASES.filter(c => c.ch === CHAPTERS[i].id).length === n) && CHAPTERS.length === 6, '장마다 여섯 · 여섯 · 셋 · 여섯 · 둘 · 셋');
+  ok(caseById('aman_jean').think.mode === 'order' && caseById('aman_jean').think.scale === 'pencil' && ['praying_hands', 'wheatfield_pen'].every(id => caseById(id).think.mode === 'how'), '6장 데생 판');
   ok(caseById('hunmin').think.mode === 'mirror' && caseById('rhinoceros').think.mode === 'evidence', '5장 판화 판');
   ok(caseById('blue_rigi').think.mode === 'edge' && ['hare', 'sloop_nassau'].every(id => caseById(id).think.mode === 'how'), '4장 수채화 판');
   ok(caseById('impression').think.mode === 'gray' && caseById('grande_jatte').think.mode === 'colors' && caseById('childrens_games').think.mode === 'pick', '실험 판');
@@ -72,7 +73,8 @@ for (const c of CASES) test(`${c.id} ${c.title} — 그림 · 자리 · 짜임`,
     ok(t.items.length >= 2 && t.items.every(x => x.n && rectOK(x.r) && ch.includes(x.a) && x.say), '붓 자국 읽기 — 곳마다 보기 안의 답 · 해설');
   }
   if (t.mode === 'edge') ok(t.edges.length === 2 && t.edges.every(e => e.n && [e.a, e.b].every(p => p.length === 2 && p.every(v => v >= 0 && v <= 100))) && [0, 1].includes(t.soft), '경계 재기 — 줄 둘 · 부드러운 쪽');
-  if (t.try) ok(t.try.label && (t.try.app === 'watercolor' ? Number.isInteger(t.try.lesson) && t.try.lesson >= 0 && t.try.lesson <= 15 : /^#\/s\/\d-\d$/.test(t.try.hash)), '해 보러 가기 길(먹 연구소 · 판화 놀이 판 · 수채화 기초 차시)');
+  if (t.try) ok(t.try.label && (t.try.app === 'watercolor' ? Number.isInteger(t.try.lesson) && t.try.lesson >= 0 && t.try.lesson <= 15 : t.try.app === 'drawing' ? Number.isInteger(t.try.lesson) && t.try.lesson >= 0 && t.try.lesson <= 9 : /^#\/s\/\d-\d$/.test(t.try.hash)), '해 보러 가기 길(먹 연구소 · 판화 놀이 판 · 수채화 · 데생 기초 차시)');
+  if (t.mode === 'order') ok(!t.scale || ['ink', 'pencil'].includes(t.scale), '차례 재기 자');
   // 질문 만들기
   ok(c.parts.length >= 4 && new Set(c.parts.map(p => p.n)).size === c.parts.length, '이름 붙은 곳 넷 이상 · 겹침 없음');
   for (const [i, p] of c.parts.entries()) {
@@ -111,7 +113,7 @@ test('경계 재기 — 또렷한 경계는 짧게 · 부드러운 경계는 길
   ok(edgeWidth(noisy, 1.6).w < 12, '얼룩이 조금 있어도 또렷한 경계는 짧게');
   ok(edgeWidth([...Array(64)].fill(50), 2).w === 0, '바뀜 없으면 0');
 });
-test('그림 출처 문서 — 스물세 장 모두', () => {
+test('그림 출처 문서 — 스물여섯 장 모두', () => {
   const t = fs.readFileSync(path.join(ROOT, 'art/CREDITS.md'), 'utf8');
   for (const c of CASES) ok(t.includes(c.img + '.webp'), c.img + ' 출처 없음');
   ok(/공공누리 제1유형/.test(t), '공공누리 표시');
