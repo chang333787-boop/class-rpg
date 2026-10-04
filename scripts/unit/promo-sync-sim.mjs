@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readStudentSources } from './student-sources.mjs';
 
 const ROOT = process.env.PROMO_SIM_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GAMEDATA = fs.readFileSync(path.join(ROOT, 'gamedata.js'), 'utf8');
@@ -133,7 +134,7 @@ function makeWorld({ seedData, clock }) {
   }
   return { server, clients, makeClient };
 }
-const STUDENT = fs.readFileSync(path.join(ROOT, 'student.js'), 'utf8');
+const STUDENT = readStudentSources(ROOT);   // [SPLIT-1] student.js + student/*.js
 function sliceFn(src, name) {
   const m = new RegExp('^function ' + name + '[ \\t]*[(]', 'm').exec(src);
   if (!m) throw new Error('함수 없음: ' + name);

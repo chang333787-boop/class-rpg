@@ -2,7 +2,7 @@
 // 캐릭터 종이인형 84장 — 조립 규칙 전수 검사 (CHAR-COMBO-CHECK-1, 디자인2 2026-09-15)
 //
 //  assets/char/*.svg 를 브라우저 없이 읽어(경로·도형·transform 을 직접 계산) 부품 bbox 를 만들고,
-//  student.js buildCharDoll 의 합성 규칙대로 쌍별(pairwise) 조합을 전부 검사한다.
+//  student/char.js buildCharDoll 의 합성 규칙대로 쌍별(pairwise) 조합을 전부 검사한다.
 //   · 잘림   : 부품 bbox 가 뷰박스(0 0 120 160) 밖 → 카드·전투 무대에서 잘린다            (84장)
 //   · 뚫림   : 모자를 써도 남는 머리카락(hair-mid/hair-bottom)이 모자 위로 올라감,
 //              모자가 두개골 꼭대기(y20)를 못 덮음                                          (모자 10 × base 4)

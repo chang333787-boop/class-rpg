@@ -179,6 +179,7 @@ kiosk가 첫 파일럿으로 적합한 이유: **가장 작고(753줄), 함수 �
 - 시작은 **저위험 독립 기능부터**: lightbox / emotion / quests 같은 비교적 경계가 분명한 부분.
 - **보류(고위험, §13)**: `buildMainHTML`(메인 화면 대형 빌더), canvas 렌더(`_drawYard`/`_drawTileTexture`), `buildCharSVG`, 전투 로직(`renderMonsterStep`/`renderBattleNew`/`doFight`). 픽셀/동작 회귀 위험이 커서 별도 승인 + 조사 Phase 없이는 건드리지 않는다.
 - 대형 render는 **먼저 기능 지도(문서)를 만든 뒤** 접근한다. 지도 없이 분해 시작 금지.
+- **2026-10-04 1차 나누기(R1)** = 기능 덩어리를 글자 그대로 `student/*.js` 로 떼어 옮김 → §16. 함수 안을 쪼개는 일(위 보류 목록)은 아직 하지 않았다.
 
 ---
 
@@ -197,10 +198,10 @@ kiosk가 첫 파일럿으로 적합한 이유: **가장 작고(753줄), 함수 �
   - `node scripts/verify-safety.mjs` (저장 안전·로드 규약·날짜/정규화 통일)
   - `node scripts/smoke-test.mjs` (로컬 HTTP 200·로드 구조·전역 심볼 존재)
 - **JS 변경 시**: `node --check <file>.js`.
-- **현재 기대 기준선**: verify-safety = PASS 18 · REVIEW 1 · FAIL 0, smoke-test = PASS 30 · REVIEW 0 · FAIL 0
-  (2026-07-02 gamedata 캐시버스터 검사 3건 추가로 27→30). FAIL 발생 또는 기준선 이탈 시 중단·보고.
+- **현재 기대 기준선**: verify-safety = PASS 26 · REVIEW 1 · FAIL 0, smoke-test = PASS 30 · REVIEW 0 · FAIL 0
+  (2026-10-04 student 나누기 뒤 — §16. 그 전 verify 18 · smoke 29). FAIL 발생 또는 기준선 이탈 시 중단·보고.
 - **REVIEW 1 유지**: root write 후보 5건(gamedata.js init, admin import/rollback/reset/resetAll)은 의도된 게이팅 경로. 0으로 강제하지 않고 알림으로 둔다(신규 root write 탐지 사각 방지).
-- **파일을 나누면 smoke-test 대상/심볼 목록도 함께 보강**해야 한다(별도 검토). 단 이 문서 Phase에서는 scripts를 수정하지 않는다.
+- **파일을 나누면 smoke-test 대상/심볼 목록도 함께 보강**해야 한다. student 는 2026-10-04 에 그렇게 했다(§16 — 학생 코드를 읽는 시험은 `scripts/unit/student-sources.mjs` 로).
 - HTTP/브라우저 런타임 검증(DOM 렌더, pageerror, 클릭 동작)이 필요하면 **별도 승인** 후 진행. **Firebase write 없이** 검증한다.
 
 ---
@@ -250,6 +251,49 @@ kiosk가 첫 파일럿으로 적합한 이유: **가장 작고(753줄), 함수 �
 | 이후 | Vite / ES module / 이벤트 위임 본격화 여부 재판단 | §14 기준 |
 
 각 단계는 **사용자 지시 후 시작**하며, PR은 작게·자동 merge 금지·보고 후 정지 원칙을 따른다.
+
+---
+
+## 16. 2026-10-04 student 나누기 (R1 · 떼어 옮기기)
+
+student.js(16,774줄 · 976KB)를 **글자 하나 안 바꾸고** 덩어리째 새 클래식 스크립트로 옮겼다. 기준 = main `1b6d3e5c`.
+
+| 파일 | 줄 | KB | 담은 것 (원래 student.js 줄) |
+|------|---:|---:|------|
+| `student.js` | 3,131 | 174 | 바탕 — 상태·초기화·화면 전환·홈(buildMainHTML)·쪽지·보상·상점·보스·농장·집 허브(houseTab·openHouseTab·renderHouse)·인벤토리·퀘스트·레이아웃·업적·랭킹·모달·토스트 |
+| `student/char.js` | 520 | 26 | 캐릭터 그림 — SVG 빌더·종이인형 84장 (688–1204) |
+| `student/battle.js` | 1,713 | 90 | 몬스터·사냥터·전투 (2535–4244) — 보스는 student.js |
+| `student/deco.js` | 8,188 | 516 | 꾸미기 인테리어(마당·집 안) (4573–12402) + 친구 마당 구경·방문 (14159–14512) |
+| `student/art.js` | 787 | 39 | 작품 전시(Storage) (12403–12948) + 우리 반 작품 올리기 ARTFREE (15415–15651) |
+| `student/emotion.js` | 525 | 23 | 감정 돌아보기 팝업 (12949–13470) |
+| `student/reading.js` | 295 | 13 | 독서 기록 (13867–14158) |
+| `student/weekly.js` | 389 | 22 | 주간 다짐 (14698–15083) |
+| `student/study.js` | 1,266 | 72 | 영어 단어장·팝업 퀴즈 (15084–15211) + 오늘의 학습 (15405–15414) + 문항별 숙달도 MASTERY (15652–끝) |
+
+**원칙(지킨 것)**
+- 코드 글자 그대로 — 옮긴 자리에는 `// ── [SPLIT-1] 여기 있던 '<이름>' 덩어리(N줄)는 student/<파일> 로 옮겼다 ──` 한 줄, 새 파일 머리에는 주석 두 줄 + 덩어리마다 원래 줄 번호 한 줄. 표시 줄 자리에 덩어리를 다시 끼우면 원본과 **바이트까지 같다**(R1 PR 본문의 verbatim 결과).
+- 전역 그대로 · 클래식 `<script>` · 순서 = `student.js` 바로 뒤 `char → battle → deco → art → emotion → reading → weekly → study` · 각 `?v=`.
+- 안 한 것: ES 모듈 전환 · onclick 전환 · 이름 바꾸기 · 죽은 코드 지우기 · buildMainHTML 쪼개기 · 함수 안 쪼개기.
+- 경계는 모두 **최상위 문장 사이**(걸친 문장 0). 최상위 이름 겹침 0(`global-dup-check`: 1,096개 그대로).
+
+**왜 동작이 같은가 / 달라진 한 가지**
+- 옮긴 덩어리가 불러오는 즉시 실행하는 코드(이벤트 등록·`loadCharDolls()`·`fetch(bbox.json)` 등)는 student.js 쪽 이름(이미 다 정의됨)이나 같은 파일 이름만 쓴다. student.js 쪽 즉시 실행 코드는 옮긴 이름을 쓰지 않는다(쓰는 곳은 `window.onload`·이벤트 처리기 안 — 모든 스크립트가 끝난 뒤 돈다).
+- 달라진 것: `resize` 처리기 **등록 순서** — 꾸미기 둘(`_floorPickSoon`·`_decoPillarSync`)이 student.js 의 `syncHudButtons`·`applyScale` 뒤로 갔다. 꾸미기 전체화면(#interior-fullscreen)은 `#s-game` 밖이라 `applyScale`(#s-game 크기)과 서로 영향이 없고, `syncHudButtons` 는 단추 글자만 바꾼다. keydown·visibilitychange·DOMContentLoaded 처리기의 서로 순서는 그대로.
+
+**시험(안전망)도 함께 고쳤다** — student.js 글자만 읽으면 옮긴 파일을 조용히 빠뜨린다.
+- `scripts/unit/student-sources.mjs`: `studentScriptFiles(ROOT)`(student.html 의 실제 `<script>` 순서) · `readStudentSources(ROOT)`(이어 붙인 글자) · `studentDirFiles(ROOT)`.
+- 이걸로 읽게 바꾼 것: `run.mjs`(`read('student.js')` 는 이제 오류 — 실수로 다시 쓰면 바로 드러남) · `deco-life-sync-sim` · `promo-sync-sim` · `save-order-check` · `whole-set-check` · `student-known-check` · `esc-parity` · `verify-safety`(문법·저장 패턴·로드 순서·클래식) · `smoke-test`(필수 파일·클래식·DB 캐시 정렬 + **student/ 폴더 파일이 모두 student.html 에 있나** 새 검사) · `deco-perf`(파일 KB + 학생 JS 합) · `precheck`(student/ 를 고친 PR 도 꾸미기 하네스가 돈다).
+- 따로 고칠 것 없던 것: `global-dup-check`(html 순서를 읽음) · `buster-check`(html 의 `student/…?v=` 줄을 그대로 봄).
+- 숫자: verify-safety 18 → **26**(`node --check` student/*.js 8개) · smoke 29 → **30** · save-order **11곳 그대로** · whole-set 14 · student-known 29 · unit 287 · precheck --no-deco 23 그대로.
+
+**새로 고칠 때**
+- 그 기능이 있는 `student/` 파일을 고치고, 그 파일 줄의 `?v=` 만 올린다(student.html). 새 파일을 만들면 html 에 `<script>` 한 줄(student.js 뒤)을 꼭 — 빠지면 smoke 가 FAIL.
+- 덩어리 사이 부르기는 전역 그대로라 자유롭지만, **불러오는 즉시 도는 코드**에서 뒤 파일 이름을 부르면 안 된다(아직 없음).
+
+**다음 단계(제안 · 각각 따로 승인)**
+1. **꾸미기 늦게 불러오기** — `student/deco.js`(516KB, 학생 JS 의 절반)를 꾸미기를 열 때만 부른다. 그래서 집 허브(houseTab·openHouseTab·renderHouse)와 농장은 student.js 에 남겼다(첫 화면·집 모달이 deco.js 없이 돈다). 그 전에 student.js·다른 파일이 deco 이름을 부르는 자리(대개 `typeof … === 'function'` 가드)를 지도로 만들고, 상점 꾸미기 썸네일·친구 마당·`decoFlush`(onload·pagehide) 처럼 열기 전에도 불리는 길을 먼저 정한다.
+2. **꾸미기 안 더 쪼개기** — deco.js 8,188줄을 그리기·바닥·동물·서랍·사진 등으로(같은 떼어 옮기기 방식).
+3. **admin.js** — 같은 방식으로 탭별 떼어 옮기기(admin.html · 시험은 같은 꼴의 admin-sources).
 
 ---
 

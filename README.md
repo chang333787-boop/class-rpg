@@ -65,7 +65,8 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 
 ```
 gamedata.js        공유 데이터 + DB 레이어 (게임 상수, Utils, Firebase 연결/정규화/저장 helper)
-student.html  / student.js  / student.css     학생 화면
+student.html  / student.js  / student.css     학생 화면 (student.js = 홈·집 허브·농장·상점·보스·HUD 등 바탕)
+student/*.js                                   student.js 에서 떼어 옮긴 학생 화면 조각 8개(char·battle·deco·art·emotion·reading·weekly·study) — 클래식, student.js 바로 뒤
 admin.html    / admin.js    / admin.css       관리(교사) 화면
 kiosk.html    / kiosk.js    / kiosk.css        키오스크(할 일 체크판) 화면
 curriculum.js / curriculum_review.js           학습 문항 은행(국어·수학·사회) + 복습 문항 · CurriculumUtils
@@ -78,7 +79,8 @@ watercolor/                                    수채화·데생 앱
 art/ coding/ ink/ music/ paint/ pattern/ print/ thinkboard/ scan/   하위 앱(위 표)
 scripts/verify-safety.mjs                      저장 안전 정적 검증 스크립트 (Node 기본 모듈만)
 scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test (캐시버스터는 html에서 읽어 교차검증)
-scripts/unit/run.mjs                           student.js 순수 함수 단위 테스트(함수 본문만 떼어 vm 실행)
+scripts/unit/run.mjs                           student.js(+student/*.js) 순수 함수 단위 테스트(함수 본문만 떼어 vm 실행)
+scripts/unit/student-sources.mjs               학생 코드 읽기 단일 출처(student.html 의 script 순서) — 학생 코드를 읽는 시험은 이걸로
 scripts/unit/precheck.mjs [--no-deco]          PR 전 검사 한 번에(아래 검사 전부 + 하위 앱 시험을 저절로 모음)
 scripts/unit/buster-check.mjs [base] [head]    캐시버스터 누락 검사(머지 뒤 값 기준, git 읽기만 · 하위 앱 index.html 포함)
 scripts/unit/global-dup-check.mjs              한 페이지 클래식 스크립트끼리 최상위 function/const 이름 겹침
@@ -100,7 +102,7 @@ CNAME                                          GitHub Pages 커스텀 도메인 
   - `GAME_DATA`: 게임 상수(기본 학생, 장비/몬스터/씨앗, expTable 등)
   - `Utils`: 공통 유틸. 날짜는 `Utils.todayStr()`(KST, `YYYY-MM-DD`), 주 시작은 `Utils.weekStartStr()`(KST, 일요일 시작)로 **단일 소스 통일**
   - `DB`: Firebase 연결·실시간 구독·정규화(`_normalizeArrays`/`_migrate`)·저장 helper(`saveStudent` 등)
-- **`student.js`** — 학생 화면 전체 로직(가장 큼). 캐릭터 렌더(SVG)·농장(canvas)·전투·퀘스트·보상 수령 등
+- **`student.js` + `student/*.js`** — 학생 화면 로직. 2026-10-04 에 덩어리째 떼어 옮겼다(글자 그대로 · 전역 그대로 · [docs/module_architecture.md §16](docs/module_architecture.md)). student.js = 바탕(초기화·홈·쪽지·보상·상점·보스·농장·집 허브·인벤토리·퀘스트·업적·토스트) · `student/char.js` 캐릭터 그림 · `battle.js` 사냥·전투 · `deco.js` 꾸미기+친구 마당 · `art.js` 작품 · `emotion.js` 감정 · `reading.js` 독서 · `weekly.js` 주간 다짐 · `study.js` 단어장·오늘의 학습·숙달도
 - **`admin.js`** — 교사 관리 로직. 학생 편집, 퀘스트/보상 승인, 설정, 백업/가져오기/롤백/초기화
 - **`kiosk.js`** — 키오스크 로직. 퀘스트 신청/취소를 학생의 `pendingRewards` 경로만 **부분 저장**(전체 학생 객체 클로버 방지)
 - **CSS 3종(`student.css` / `admin.css` / `kiosk.css`)** — 각 화면 전용 스타일. HTML에 인라인 `<style>` 없음
@@ -113,6 +115,7 @@ CNAME                                          GitHub Pages 커스텀 도메인 
 
 ```
 (Firebase compat SDK, Chart.js)  →  ./gamedata.js  →  ./<화면>.js
+                                    student.html 은 ./student.js → ./student/char.js … ./student/study.js (8개, 모두 클래식)
 ```
 
 - HTML에 인라인 `onclick`/`ontouchstart` 등 전역 함수·전역 변수에 의존하는 핸들러가 많다.
@@ -194,8 +197,8 @@ node scripts/verify-safety.mjs
 ```
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
-- 현재 기대 결과: **`PASS 18 · REVIEW 1 · FAIL 0`** (exit code 0)
-- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 29 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 279 · FAIL 0`** (2026-10-04 기준 · smoke 29번째 = CACHE-SORT-GUARD-1)
+- 현재 기대 결과: **`PASS 26 · REVIEW 1 · FAIL 0`** (exit code 0 · 2026-10-04 student 나누기로 18→26 = `node --check` student/*.js 8개)
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 30 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 287 · FAIL 0`** (2026-10-04 기준 · smoke 30번째 = student/ 폴더 js 가 모두 student.html 에 있나 [SPLIT-1])
 - **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 23 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초).
   smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle · global-dup · 시뮬 다섯(esc-parity 포함) · 밸런스 둘 ·
   하위 앱 시험 8개를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).

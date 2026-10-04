@@ -6,7 +6,7 @@
 //         CUR.gold += g  →  DB.logGold(...)  →  …  →  DB.saveStudent(CUR)
 //      순서면, logGold 의 동기 에코가 CUR 을 옛 캐시로 바꾼 뒤 saveStudent 가 g 빠진 학생을 저장한다(골드 유실 M1).
 //      같은 모양으로 #218 의 logSpend 가 '상점 구매 공짜'를 만들었다(2026-09-15, 5분 만에 되돌림).
-//  무엇: student.js·gamedata.js·admin.js 의 함수마다, **다른 경로 쓰기(logGold·logSpend·saveQuestLog)가
+//  무엇: student.js(+student/*.js)·gamedata.js·admin.js 의 함수마다, **다른 경로 쓰기(logGold·logSpend·saveQuestLog)가
 //        같은 함수의 saveStudent 보다 앞에** 있으면 적는다. 실제 SDK 테스트(gold-loss-real-sdk)가 못 도는
 //        경로(돌연변이 수확, 감정 보상, 교사 화면 등)까지 코드 모양으로 훑기 위한 것.
 //  한계: 정적 검사다.
@@ -21,9 +21,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { studentScriptFiles } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FILES = ['student.js', 'gamedata.js', 'admin.js'];
+const FILES = [...studentScriptFiles(ROOT), 'gamedata.js', 'admin.js'];   // [SPLIT-1] student.js + student/*.js(html 순서)
 const argv = process.argv.slice(2);
 const STRICT = argv.includes('--strict');
 const bi = argv.indexOf('--baseline');

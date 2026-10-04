@@ -14,9 +14,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readStudentSources } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+//  [SPLIT-1] 학생 코드는 student.js + student/*.js 로 나뉘었다 — student.js 만 읽으면 옮긴 코드를 빠뜨리므로 막는다.
+const read = (f) => {
+  if (f === 'student.js') throw new Error('student.js 만 읽지 말 것 — readStudentSources(ROOT) 로(student/*.js 까지) [SPLIT-1]');
+  return fs.readFileSync(path.join(ROOT, f), 'utf8');
+};
 
 const results = [];
 let cur = '';
@@ -61,7 +66,7 @@ function sliceConst(src, name) {
   return m[0];
 }
 
-const STUDENT = read('student.js');
+const STUDENT = readStudentSources(ROOT);
 
 // 샌드박스 하나: student.js 에서 필요한 조각만 넣고, 바깥 의존(DB·Utils·CurriculumUtils·CUR)은 스텁으로.
 function studentSandbox(stubs = {}) {
@@ -622,7 +627,7 @@ try {
   }
   // G3 — doLogin 은 attachMine 이 끝난 뒤에만 enterGame
   {
-    const STU = read('student.js');
+    const STU = readStudentSources(ROOT);
     let resolveMine; const calls = [];
     const sb = {
       SEL_STUDENT: 's1', CUR: null, checkAccessTime: () => false,
@@ -709,7 +714,7 @@ cur = 'admin 전투 설정 저장·초기화(BATTLE-SET-NAN-1·BATTLE-RESET-KEEP
 cur = '홈 펼침 상태 유지(HOME-KEEP-OPEN-1)';
 try {
   //  onDataChange 가 홈을 다시 그리면(innerHTML) 펼친 섹션이 접혔다. 펼친 것만 기억해 다시 펼치는지.
-  const STU = read('student.js');
+  const STU = readStudentSources(ROOT);
   const mkBox = (ids) => {
     const els = {};
     for (const id of ids) els[id] = { id, style: { display: 'none' }, textContent: id.endsWith('arrow') ? '▼' : '' };
@@ -847,7 +852,7 @@ function animSandbox(S, { decos, size, hc, farm, extraConsts = [], extraFns = []
   return { sb, A: sb.__A, host, timers, clock, run };
 }
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const DECOS = [
     { id: 'd_y39', name: '닭 3마리', size: { w: 2, h: 1 } },
     { id: 'd_y40', name: '양', size: { w: 2, h: 1 } },
@@ -941,7 +946,7 @@ try {
 // ═══════════════════════════════════════════════════════════════
 cur = '꾸미기 확대·이동(DECO-ZOOM-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const sb = { console: { log() {}, warn() {}, error() {} }, Math, JSON, Object, Array, Number, String, Boolean, Set, Map };
   sb.globalThis = sb; vm.createContext(sb);
   let src = SPACE_PRELUDE(S);
@@ -1039,7 +1044,7 @@ try {
 // ═══════════════════════════════════════════════════════════════
 cur = '꾸미기 동물 규칙·상호작용(DECO-ANIM-2)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const X = animSandbox(S, { decos: [{ id: 'd_y56', name: '오리 한 마리' }, { id: 'd_y57', name: '양 한 마리' }, { id: 'd_y53', name: '강아지' }, { id: 'd_y55', name: '닭 한 마리' }],
     size: () => ({ w: 1, h: 1 }) });
   const R = X.A;
@@ -1145,7 +1150,7 @@ try {
 // ═══════════════════════════════════════════════════════════════
 cur = '꾸미기 동물 우리(DECO-ANIM-3)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const DECOS = [
     { id: 'd_y55', name: '닭 한 마리' },
     { id: 'pen_hen', name: '닭장', size: { w: 3, h: 3 }, pen: true },
@@ -1206,7 +1211,7 @@ try {
 // ═══════════════════════════════════════════════════════════════
 cur = '꾸미기 울타리 자동 이음·먹이통(DECO-FENCE-1·DECO-FEED-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const DECOS = [
     { id: 'd_y49', name: '울타리 가로형' }, { id: 'd_y50', name: '울타리 세로형' },
     { id: 'd_y51', name: '울타리 왼쪽 코너' }, { id: 'd_y52', name: '울타리 오른쪽 코너' },
@@ -1300,7 +1305,7 @@ try {
 //  [DECO-FLOOR-PARSE-1] 바닥 저장값 해석 — '이름#색+마감'. 옛 값은 이름 그대로여야 옛 마당이 안 바뀐다.
 cur = '꾸미기 바닥 저장값 해석(DECO-FLOOR-PARSE-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const sb = {}; sb.globalThis = sb; vm.createContext(sb);
   //  FLOOR_TILES 표(옛 바닥 14종)를 소스에서 그대로 잘라 온다 — 표에 있는 이름은 전부 '이름 그대로'여야 한다
   const at = S.indexOf('const FLOOR_TILES = {'), end = S.indexOf(NL + '};', at);
@@ -1339,7 +1344,7 @@ try {
 //  [DECO-FLOOR-COLOR-1] 정원 바닥 — 변형 표·색 표가 그림 파일과 맞는가 · 색이 그림 주소와 기억 키에 들어가는가 · 쓴 색만 부르는가
 cur = '꾸미기 정원 바닥 색(DECO-FLOOR-COLOR-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const srcs = [], draws = [];
   const sb = { Image: function () { const o = { naturalWidth: 100, naturalHeight: 100 }; Object.defineProperty(o, 'src', { set(v) { srcs.push(v); } }); return o; },
     encodeURIComponent, _drawDeco() {}, _ffRedrawSoon() {}, _dCtx: { drawImage(img) { draws.push(img); } } };
@@ -1475,7 +1480,7 @@ try {
 //  [DECO-EVENT-1] 계절 행사 날짜 — 표 한 줄씩 · 끝날 포함 · 그 밖은 없음
 cur = '꾸미기 계절 행사 날짜(DECO-EVENT-1)';
 try {
-  const S = read('student.js'), a = S.indexOf('const DECO_EVENTS = ['), f = S.indexOf('function _decoEventNow('), b = S.indexOf('\n}\n', f);
+  const S = readStudentSources(ROOT), a = S.indexOf('const DECO_EVENTS = ['), f = S.indexOf('function _decoEventNow('), b = S.indexOf('\n}\n', f);
   if (a < 0 || f < 0 || b < 0) throw new Error('DECO_EVENTS · _decoEventNow 를 못 찾음');
   const sb = {}; vm.createContext(sb);
   vm.runInContext(S.slice(a, S.indexOf('\n];\n', a) + 4) + NL + 'let _decoEventOv = null, _decoEventDev = null;' + NL + S.slice(f, b + 3) + ';globalThis.__E = { DECO_EVENTS, _decoEventNow };', sb);
@@ -1496,7 +1501,7 @@ try {
 //  [DECO-LOOK-0] 마당 모습 표 — 계절 넷 줄 · 여름 = 바탕 · 겨울만 눈 · 줄에 때가 박혀 있으면 실제 시각보다 먼저(별빛은 밤 고정)
 cur = '꾸미기 마당 모습 표(DECO-LOOK-0)';
 try {
-  const S = read('student.js'), sb = { __sea: 'summer', __ph: 'day' };
+  const S = readStudentSources(ROOT), sb = { __sea: 'summer', __ph: 'day' };
   vm.createContext(sb);
   vm.runInContext('function _seaNow() { return globalThis.__sea; }' + NL + 'function _decoPhase() { return globalThis.__ph; }' + NL + LOOK_PRELUDE(S)
     + ';globalThis.__L = { YARD_LOOKS, YARD_LOOK_BASE, _yardLook, _yardPhase };', sb);
@@ -1554,7 +1559,7 @@ try {
 //  [DECO-FLOOR-PICK-1] 바닥 고르기 — 저장값은 `_floorJoin` 한 곳. 지우개 판정이 글자 그대로 비교하므로 한 조합 = 한 글자여야 한다.
 cur = '꾸미기 바닥 고르기(DECO-FLOOR-PICK-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const own = {};   // 가진 장식 id → 수(잠긴 색 문턱)
   const DECOS = [{ id: 'd_y1', k: 'plant' }, { id: 'd_y21', k: 'plant' }, { id: 'd_y43', k: 'plant' }, { id: 'd_y42', k: 'plant' }, { id: 'd_y41', k: 'plant' }, { id: 'd_y7', k: 'plant' },
     ...Array.from({ length: 10 }, (_, i) => ({ id: 'p' + i, k: 'plant' })), ...['d_y10', 'd_y20', 'd_y31', 'd_y59'].map(id => ({ id, k: 'water' })),
@@ -1621,7 +1626,7 @@ try {
 //  [DECO-FLOOR-RECT-1] ⬛ 네모로 — 시작 칸 ↔ 지금 칸 네모 · 상한(칸 수)을 넘으면 시작 칸 쪽으로 줄인다
 cur = '꾸미기 바닥 네모로(DECO-FLOOR-RECT-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const sb = {}; sb.globalThis = sb; vm.createContext(sb);
   vm.runInContext(sliceConst(S, 'DECO_RECT_MAX') + sliceFn(S, '_decoRectFrom') + ';globalThis.__R = { _decoRectFrom, DECO_RECT_MAX };', sb);
   const F = sb.__R._decoRectFrom, box = o => [o.r0, o.c0, o.r1, o.c1, o.w, o.h, o.capped];
@@ -1642,7 +1647,7 @@ try {
 
 cur = '꾸미기 친해지기 저장 칸(DECO-LIFE-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const sb = { DB: { _fbRef: { child: (p) => ({ update: (up) => { sb.__sent.push({ p, up }); return Promise.resolve(); } }) } }, __sent: [] };
   sb.globalThis = sb; vm.createContext(sb);
   const names = ['_lifeDay', '_lifeObj', '_lifeGet', '_lifeOk', '_lifeHearts', '_lifeStage', '_lifeNo', '_lifeFriendAt', '_lifeApply', '_lifeSend', '_lifeWrite', '_lifePet'];
@@ -1718,7 +1723,7 @@ try {
 
 cur = '꾸미기 동물 카드 · 이름(DECO-LIFE-2)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const sb = {}; sb.globalThis = sb; vm.createContext(sb);
   const names = ['_lifeObj', '_lifeOk', '_lifeHearts', '_lifeStage', '_lifeNo', '_lifeNameOf', '_lifeHeartRow'];
   vm.runInContext(sliceConst(S, 'LIFE_STAGE_AT') + sliceConst(S, 'LIFE_NAMES_HIDDEN')
@@ -1740,7 +1745,7 @@ try {
 
 cur = '꾸미기 작은 선물(DECO-LIFE-3)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const sb = {}; sb.globalThis = sb; vm.createContext(sb);
   const names = ['_lifeOk', '_lifeObj', '_lifeHearts', '_lifeStage', '_lifeGiftKind', '_lifeGiftDay', '_lifeGiftOpen'];
   vm.runInContext(sliceConst(S, 'LIFE_STAGE_AT') + sliceConst(S, 'LIFE_GIFT_OF')
@@ -1762,7 +1767,7 @@ try {
 
 cur = '꾸미기 그림 묶음(DECO-BUNDLE-1)';
 try {
-  const S = read('student.js');
+  const S = readStudentSources(ROOT);
   const mk = (fetchImpl) => {
     const sb = { Blob: class { constructor(p, o) { this.p = p; this.o = o; } }, URL: { createObjectURL: () => 'blob:art/' + (++sb.__n) }, __n: 0, __ready: 0, fetch: fetchImpl };
     sb.globalThis = sb; vm.createContext(sb);

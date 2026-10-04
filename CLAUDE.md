@@ -29,11 +29,12 @@ Firebase 데이터 직접 수정 금지 / 운영 write 버튼 클릭 금지.
 
 - 시작: `git checkout main && git pull --ff-only` → 최신화, working tree clean 확인
 - read-only 조사 먼저 → 수정 Phase면 새 브랜치(`refactor/...`)
-- 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 18 · REVIEW 1 · FAIL 0`)
+- 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 26 · REVIEW 1 · FAIL 0` — 2026-10-04 student 나누기로 `node --check` 가 student/*.js 8개를 더 본다 · smoke-test 는 `PASS 30 · REVIEW 0 · FAIL 0`)
 - JS 변경 시 `node --check <file>.js`
 - PR 전 한 번에: `node scripts/unit/precheck.mjs --no-deco` (기대값 `PASS 23 · REVIEW 1 · FAIL 0 · SKIP 1`, 2026-10-04 · 약 10초)
   — smoke · verify-safety · unit · buster-check · global-dup · esc-parity · 밸런스 · **하위 앱 시험(`scripts/unit/**/*.test.mjs`)** 까지 모아 돈다.
   꾸미기 파일을 고쳤으면 `--deco`, 저장 경로를 고쳤으면 `--gold` 를 더한다.
+- **학생 코드 = `student.js` + `student/*.js`**(2026-10-04 떼어 옮기기 · 클래식 `<script>` · 전역 그대로 · `docs/module_architecture.md` §16). 학생 코드를 글자로 읽는 시험은 `scripts/unit/student-sources.mjs`(`readStudentSources`·`studentScriptFiles`)로 읽는다 — student.js 만 읽으면 옮긴 코드를 조용히 빠뜨린다. `student/` 에 파일을 더하면 student.html 에 `<script>` 한 줄(student.js 뒤 · `?v=`)을 꼭 같이.
 - 하위 앱 시험만: `for f in $(find scripts/unit -name '*.test.mjs' | sort); do node "$f" | tail -1; done` (전부 FAIL 0)
 - CI 설정 = `scripts/ci/check.yml`(PR · main push 에 같은 검사 · 결과만 보여 줌). **아직 꺼져 있다** — `.github/workflows/` 로 옮겨야 돈다(세션 토큰에 workflow 권한이 없어 사용자가 옮김).
 - 검증은 **Firebase write 없이** (로드·정적·typeof·grep으로 대체)
@@ -57,10 +58,10 @@ Firebase 데이터 직접 수정 금지 / 운영 write 버튼 클릭 금지.
 ### 4.1 현재 담당 분담 (2026-10-04 기준)
 
 - **🏘️ 마을 `village/`:** **맥북 마을 기획자 세션 전용.** 다른 세션은 읽기만 하고 고치지 않는다.
-- **🏡 꾸미기(마당·집 안 — student.js 의 deco 부분 · assets/deco):** 맥북(2026-09-23 사용자 지시로 재개).
+- **🏡 꾸미기(마당·집 안 — `student/deco.js` + student.js 의 집 허브·농장 · assets/deco):** 맥북(2026-09-23 사용자 지시로 재개).
 - **📚 학습 · 관리 정비:** 원래 학교 몫이었으나 **2026-10-04 사용자가 맥북 세션에도 맡겼다**(학습 앱 · admin · kiosk · gamedata 정비 포함).
 - **🏫 학교(Windows):** 학습 · 관리 작업(맥북과 나눠 맡음 — 같은 파일을 동시에 고치지 않게 최신 worklog 핸드오프를 먼저 본다).
-- **규칙:** `student.js` 는 여러 세션이 함께 고치므로 **PR 전에 main 을 다시 받아(rebase/merge) 충돌을 먼저 푼다.**
+- **규칙:** `student.js`·`student/*.js` 는 여러 세션이 함께 고치므로 **PR 전에 main 을 다시 받아(rebase/merge) 충돌을 먼저 푼다.**
   JS 변경 시 **자기 파일 캐시버스터만** 올리고 smoke-test 맵 동기화(다른 파일 값 보존).
 - 지난 분담(2026-07-13: student.js 는 학교만 편집)은 `docs/worklog/2026-07-13.md` 에 기록으로 남아 있다.
 
