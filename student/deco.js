@@ -1,5 +1,7 @@
 // student/deco.js — 꾸미기(인테리어 = 마당·집 안 장식 배치) + 친구 마당 구경·방문(꾸미기 이름을 씀) · 집 허브·농장은 student.js 에 남음
-//  student.js 에서 떼어 옮긴 클래식 스크립트 [SPLIT-1] — 글자 그대로 · 전역 그대로 · student.html 에서 student.js 바로 뒤에 부른다.
+//  student.js 에서 떼어 옮긴 클래식 스크립트 [SPLIT-1] — 글자 그대로 · 전역 그대로.
+//  [DECO-LAZY-1] student.html 태그 없이 student.js 의 decoLoad() 가 꾸미기·친구 마당을 열 때 한 번 부른다(그때는 다른 학생 파일이 다 돈 뒤).
+//  바깥이 이 파일 이름을 새로 부르면 지킴이·typeof 가드·불러온 뒤만 셋 중 하나로 — scripts/unit/deco-lazy-check.mjs 가 본다.
 // ── [SPLIT-1] 'deco' — 원래 student.js 4573~12402줄 ──
 // ══ 인테리어 (장식 배치) ══
 // ══ 집 인테리어 (탑뷰 SVG) ══
@@ -1014,7 +1016,7 @@ function canPlaceDeco(r, c, w, h, area, excludeId, placingId) {
 }
 
 let SEL_DECO = null;
-let DECO_SCENE = 'yard'; // 'yard' | 'indoor'
+// [DECO-LAZY-1] 'let DECO_SCENE' 줄은 student.js(꾸미기 늦게 불러오기 자리)로 옮겼다 — 집 허브 단추가 불러오기 전에 값을 넣는다
 let _dCv = null, _dCtx = null, _dC = 28, _dW = 0, _dH = 0;
 // [DECO-ZOOM-1] 꾸미기 확대/축소·화면 이동 — 판은 격자 좌표 그대로 그리고, 보이는 창만 옮긴다.
 //  _dZoom 1 = 지금까지 보던 크기. 칸 크기 C = 기준칸 × _dZoom.
@@ -1022,7 +1024,7 @@ let _dCv = null, _dCtx = null, _dC = 28, _dW = 0, _dH = 0;
 const DECO_ZOOM_MIN = 0.5, DECO_ZOOM_MAX = 3, DECO_ZOOM_STEP = 1.25;
 const DY_BASE = { cols: 50, rows: 28 };   // 집·농장 자리를 재는 기준 판(넓혀도 자리가 안 움직이게)
 let _dZoom = 1, _dPanX = 0, _dPanY = 0;
-let _ifMode = false; // 전체화면 인테리어 모드 여부
+// [DECO-LAZY-1] 'let _ifMode' 줄은 student.js 로 옮겼다 — 농장·토스트가 불러오기 전에도 읽는다
 
 // ── 그리드 상수 ──
 // 전체화면 모드: 셀 24px 기준으로 화면 크기에서 역산
@@ -8186,3 +8188,4 @@ function vfTab(modalId, tab, btn) {
   btn.classList.add('on');
 }
 
+const _decoReadyMark = true;   // [DECO-LAZY-1] 맨 끝 줄까지 돌았다는 표시(student.js decoReady() 가 본다) — 이 줄은 늘 파일 맨 끝에

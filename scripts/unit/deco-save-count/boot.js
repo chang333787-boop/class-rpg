@@ -9,6 +9,9 @@
   window.requestAnimationFrame = cb => { const id = ++rafId; rafMap.set(id, setTimeout(() => { rafMap.delete(id); cb(performance.now()); }, 16)); return id; };
   window.cancelAnimationFrame = id => { clearTimeout(rafMap.get(id)); rafMap.delete(id); };
   firebase.initializeApp({ apiKey: 'x', projectId: 'rf-deco-none', databaseURL: 'https://rf-deco-none-default-rtdb.firebaseio.com' });
+  //  [LAZY-SDK-1] 영어앱 Firestore SDK 는 이제 html 태그가 아니라 syncEnglishRewards 가 처음 필요할 때 부른다.
+  //  run 이 태그를 빼던 것과 같게 '이미 있는 것'으로 막는다 — 받지 않고 firestore() 가 null → 조용히 건너뜀(운영 영어앱 읽기 0).
+  firebase.firestore = function () { return null; };
   const db = firebase.database();
   db.goOffline();
   const sid = 's1773621060761';

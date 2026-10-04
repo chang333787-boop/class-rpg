@@ -297,6 +297,32 @@ student.js(16,774줄 · 976KB)를 **글자 하나 안 바꾸고** 덩어리째 �
 
 ---
 
+## 17. 2026-10-04 첫 로딩 줄이기 (R6 · R7 · 늦게 불러오기)
+
+반 25명이 아침에 한꺼번에 들어오는 학교 와이파이에서 학생 첫 화면이 받는 것을 줄였다. 바탕 = student.js 의 `loadScriptOnce(url)`(같은 주소 한 번 · 실패하면 다시 시도할 수 있게 기록을 지움).
+
+| 무엇 | 전 | 후 | 못 받으면 |
+|------|----|----|-----------|
+| Chart.js 4.4.0 (감정 차트 둘) | `<head>` 동기 태그 | 감정 탭에서 차트를 그리기 직전(student/emotion.js `CHART_JS_SRC`) | 차트 자리에만 '차트를 불러오지 못했어요' · 다음에 탭을 열면 다시 |
+| firebase-firestore-compat 9.23.0 (영어앱 기록 읽기) | `<head>` 동기 태그 | `syncEnglishRewards` 가 처음 필요할 때(student.js `ENGLISH_FS_SDK`) | 예전처럼 조용히 건너뜀 |
+| `student/deco.js` (꾸미기·친구 마당 · 학생 JS 의 절반) | `<script>` 태그 | 꾸미기·친구 마당을 열 때 `decoLoad()` · 집 허브 꾸미기 탭을 보면 미리 | 토스트 · 다시 누르면 다시 받음 · 0.3초 넘으면 '꾸미기를 펴는 중…' |
+
+**꾸미기 진입점 (DECO-LAZY-1)** — deco.js 이름을 바깥에서 부르는 자리는 셋 중 하나:
+- ① **자리 지킴이**(student.js `window.이름 = function`): `openInteriorFullscreen`(집 허브 단추 둘) · `visitFriend`(홈 친구 줄) · `_decoThumb`(상점 장식 탭 — 불러오기 전엔 이모지, 오면 상점을 다시 그림). 불러오면 deco.js 의 function 선언이 같은 전역을 진짜로 바꿔 끼운다. 꼭 `window.` 꼴(function 선언이면 run.mjs sliceFn 이 지킴이를 잘라 가고 global-dup 이 덮어쓰기로 본다).
+- ② **typeof 가드**: `decoFlush`(스냅샷 직전) · `_artStart`(집 허브 미리 받기).
+- ③ **불러온 뒤만**: 꾸미기·친구 전체화면 안 단추(#interior-fullscreen · #friend-fullscreen · 숨긴 #floor-tile-row) · 농장 `if (_ifMode) _drawDeco()` · `decoLoad().then(…)` 안.
+- 불러오기 전에 바깥이 값을 넣는 `let DECO_SCENE` · `let _ifMode` 두 줄은 student.js 로 옮겼다(deco.js 가 나중에 같은 let 을 선언하면 값이 가려지거나 SyntaxError).
+- deco.js 맨 끝 줄 `const _decoReadyMark = true;` 로 '끝까지 돌았나'를 본다(`decoReady()`).
+- 지킴 장치: `scripts/unit/deco-lazy-check.mjs`(precheck · 위 셋이 아니면 FAIL) · `global-dup-check`(늦게 부르는 파일도 맨 뒤에 넣어 이름 겹침을 봄) · `buster-check`(student.js 안 `'./student/deco.js?v=…'` 를 html 줄처럼 판정) · `smoke`(늦게 부르는 파일은 html 태그가 없고 ?v= 주소가 있어야).
+- 시험 읽기: `scripts/unit/student-sources.mjs` 의 `LAZY_STUDENT_FILES`(한 곳) — `studentScriptFiles` 는 태그 파일 + 늦게 부르는 파일(맨 뒤), `studentTagFiles` 는 태그만.
+
+**새로 고칠 때**
+- deco.js 를 고치면 student.js `DECO_SRC` 의 `?v=` 를 올린다 → student.js 가 바뀌었으니 student.html 의 student.js `?v=` 도.
+- 바깥에서 deco 함수를 새로 부르려면: 불러오기 전에도 불릴 수 있는 자리면 지킴이나 `typeof` 가드, 꾸미기 판 안에서만 불리면 그대로(검사가 판 안을 안다).
+- 하네스가 꾸미기 함수를 바로 쓰면 맨 앞에서 `await decoLoad()`(deco-save-count/test.js · deco-save-real-sdk/test.js 처럼).
+
+---
+
 ## 부록: 관련 문서
 
 - `README.md` — 프로젝트 개요·실행·배포·Firebase 노드

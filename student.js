@@ -26,6 +26,24 @@ function safeUrl(u) {
   return 'https://' + s.replace(/^\/+/, '');
 }
 
+// ══ 바깥 스크립트 한 번만 불러오기 (LAZY-SDK-1) ══
+//  첫 화면에서 안 쓰는 큰 스크립트(Chart.js·영어앱 Firestore SDK·꾸미기 student/deco.js)는 html 태그 대신 처음 필요할 때 여기서 부른다.
+//  같은 주소는 한 번만(부르는 중이면 같은 약속을 돌려준다). 실패하면 기록을 지워 다음에 다시 시도할 수 있다(오프라인 → 다시 누르기).
+const _scriptOnce = new Map();   // 주소 → Promise
+function loadScriptOnce(url) {
+  let p = _scriptOnce.get(url);
+  if (p) return p;
+  p = new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => ok();
+    s.onerror = () => { _scriptOnce.delete(url); s.remove(); no(new Error('스크립트를 못 받음: ' + url)); };
+    document.head.appendChild(s);
+  });
+  _scriptOnce.set(url, p);
+  return p;
+}
+
 // monsterLog 항목(id) → 표시용 이름 (매핑 실패 시 원본 그대로 — 옛 커스텀 이름 등)
 function monsterNameById(id) {
   const mon = getActiveMonsters().find(m => m.id === id);
@@ -493,6 +511,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeExterna
 
 let _englishFs = null;       // 두 번째 앱의 Firestore 핸들
 let _englishLastSync = 0;
+//  [LAZY-SDK-1] 영어앱 기록 읽기에만 쓰는 Firestore SDK — 첫 화면 태그에서 빼고 syncEnglishRewards 가 처음 필요할 때 부른다.
+//  student.html 의 firebase-app-compat 과 같은 9.23.0(앱이 먼저 떠 있어야 붙는다 — 로그인 뒤라 늘 그렇다).
+const ENGLISH_FS_SDK = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
 function _englishStore() {
   if (_englishFs) return _englishFs;
   if (typeof firebase === 'undefined' || typeof firebase.firestore !== 'function') return null;
@@ -508,6 +529,11 @@ async function syncEnglishRewards(force) {
   const now = Date.now();
   if (!force && now - _englishLastSync < 5 * 60 * 1000) return;
   _englishLastSync = now;
+  //  [LAZY-SDK-1] SDK 가 아직 없으면 한 번 받는다 — 실패(오프라인 등)하면 예전처럼 조용히 건너뜀(5분 뒤·영어 창을 닫을 때 다시)
+  if (typeof firebase !== 'undefined' && typeof firebase.firestore !== 'function') {
+    try { await loadScriptOnce(ENGLISH_FS_SDK); } catch (e) { return; }
+    if (!CUR || !CUR.name) return;   // 받는 사이 로그아웃
+  }
   const fs = _englishStore();
   if (!fs) return;
   let data = null;
@@ -602,7 +628,7 @@ function enterGame() {
   }
 
   document.getElementById('s-game').classList.add('active');
-  setHomeSec(HOME_SEC);   // [HOME-C-1] 지난번에 보던 홈 구역(처음이면 '오늘')
+  setHomeSec(_homeSecSaved());   // [HOME-C-1] 지난번에 보던 홈 구역(처음이면 '오늘') · [HOME-SEC-PER-STUDENT] 이 아이 것
   applyLayout(LAYOUT_MODE);
   // 화면 맞춤 버튼 초기 상태 복원
   const sBtn = document.getElementById('scale-mode-btn');
@@ -1424,13 +1450,22 @@ function buildMainHTML() {
 }
 // ══ [HOME-C-1] 홈 네 구역 — 왼쪽 레일(student.html 고정)로 고른다. 상태는 #s-game[data-home-sec] 에 둬서
 //   홈이 innerHTML 로 통째 다시 그려져도(데이터가 바뀔 때마다) 고른 구역이 그대로다. 이 기기에 기억(localStorage).
+//  [HOME-SEC-PER-STUDENT] 한 크롬북을 여러 아이가 쓰므로 **아이마다** 기억한다('rpg.homeSec.<아이 id>'). 옛 키 'rpg.homeSec'(기기에 한 값 —
+//   앞 아이가 보던 구역이 다음 아이에게 열렸다)는 읽지 않는다(지우지도 않음). 로그인 전에는 기억할 아이가 없어 '오늘'.
 const HOME_SECS = ['today', 'learn', 'me', 'adv'];
 let _homeCounts = null;
-let HOME_SEC = (() => { try { const v = localStorage.getItem('rpg.homeSec'); return HOME_SECS.includes(v) ? v : 'today'; } catch (e) { return 'today'; } })();
+let HOME_SEC = 'today';
+function _homeSecKey() { return (typeof CUR !== 'undefined' && CUR && CUR.id) ? 'rpg.homeSec.' + CUR.id : null; }
+function _homeSecSaved() {   // 이 아이가 지난번에 보던 구역(처음이면 '오늘')
+  const k = _homeSecKey();
+  if (!k) return 'today';
+  try { const v = localStorage.getItem(k); return HOME_SECS.includes(v) ? v : 'today'; } catch (e) { return 'today'; }
+}
 function setHomeSec(sec) {
   if (!HOME_SECS.includes(sec)) sec = 'today';
   HOME_SEC = sec;
-  try { localStorage.setItem('rpg.homeSec', sec); } catch (e) {}
+  const k = _homeSecKey();
+  if (k) { try { localStorage.setItem(k, sec); } catch (e) {} }
   const g = document.getElementById('s-game');
   if (g) g.dataset.homeSec = sec;
   document.querySelectorAll('#home-rail .hr-item').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
@@ -2241,7 +2276,10 @@ function houseTab(tab, el) {
   if (tab==='emotion') renderEmotionHistory();
   if (tab==='memory')  renderMyMemories();
   if (tab==='ach')     renderHouseAchievements();
-  if (tab==='deco') { /* 버튼으로 직접 열기 */ }
+  if (tab==='deco') {   // 버튼으로 직접 열기
+    //  [DECO-LAZY-1] 꾸미기 탭을 보면 deco.js 를 미리 받는다(누를 즈음엔 와 있게) · 오면 그림 묶음도(openHouseTab 이 하던 미리 받기)
+    if (!decoReady()) decoLoad().then(() => _artStart()).catch(() => {});
+  }
 }
 
 // 포트폴리오 열고 특정 탭 바로 활성화
@@ -2346,6 +2384,64 @@ function renderHouse() {
 }
 
 // ── [SPLIT-1] 여기 있던 'deco' 덩어리(7830줄)는 student/deco.js 로 옮겼다 — 글자 그대로 ──
+
+// ══ 꾸미기 늦게 불러오기 (DECO-LAZY-1) ══════════════════════
+//  student/deco.js(꾸미기 마당·집 안 + 친구 마당 구경 · 약 530KB = 학생 JS 의 절반)는 첫 화면에서 받지 않는다.
+//  꾸미기·친구 마당을 열 때 한 번만 부른다(집 허브 꾸미기 탭을 열면 미리) — decoLoad().
+//  · 바깥(student.js·student/*.js·html)이 deco.js 이름을 부르는 자리는 셋 중 하나여야 한다:
+//    ① 아래 자리 지킴이  ② typeof 가드  ③ 불러온 뒤에만 열리는 자리(꾸미기·친구 전체화면 안 단추 · _ifMode 가 켜졌을 때).
+//    scripts/unit/deco-lazy-check.mjs 가 전부 센다(precheck) — 새로 부르는 자리가 생기면 거기서 FAIL.
+//  · 자리 지킴이는 꼭 `window.이름 = function` 꼴. 같은 이름을 function 선언으로 두면 시험(run.mjs sliceFn)이 진짜 대신 지킴이를
+//    잘라 가고 global-dup 이 덮어쓰기로 본다. deco.js 가 불리면 그쪽 function 선언이 같은 전역 이름을 진짜로 바꿔 끼운다.
+//  · deco.js 를 고치면 아래 DECO_SRC 의 ?v= 를 올린다(그러면 student.js 도 바뀌니 student.html 의 student.js ?v= 도) — buster-check 가 본다.
+const DECO_SRC = './student/deco.js?v=20261004r6b';
+let DECO_SCENE = 'yard'; // 'yard' | 'indoor'  — [DECO-LAZY-1] deco.js 에서 옮김: 집 허브 '집 안 꾸미기' 단추가 불러오기 전에 값을 넣는다
+let _ifMode = false; // 전체화면 인테리어 모드 여부 — [DECO-LAZY-1] deco.js 에서 옮김: 농장·토스트가 불러오기 전에도 읽는다
+function decoReady() { return typeof _decoReadyMark !== 'undefined'; }   // deco.js 가 맨 끝 줄까지 돌았나
+function decoLoad() {
+  if (decoReady()) return Promise.resolve();
+  return loadScriptOnce(DECO_SRC).then(() => { if (!decoReady()) throw new Error('deco.js 가 끝까지 안 돎'); });
+}
+//  열기 지킴이 — 0.3초 넘게 걸리면 '…펴는 중…' 한 줄 · 다 오면 진짜 함수로 이어 부름 · 못 받으면 토스트(다시 누르면 다시 받는다).
+//  받는 동안 또 누르면 한 번만 연다(마지막에 누른 것으로).
+const _decoStubs = {}, _decoWaiting = {};
+function _decoLazyOpen(name, args, waitMsg, failMsg) {
+  const first = !(name in _decoWaiting);
+  _decoWaiting[name] = args;
+  if (!first) return;
+  let tip = null;
+  const timer = setTimeout(() => {
+    tip = document.createElement('div');
+    tip.className = 'toast-msg';
+    tip.textContent = waitMsg;
+    tip.style.animation = 'toastIn .3s ease';   // 보통 토스트는 2초 뒤 사라진다 — 다 받을 때까지 그대로
+    tip.style.bottom = window.innerWidth <= 700 ? '75px' : '20px';
+    document.body.appendChild(tip);
+  }, 300);
+  const end = () => { clearTimeout(timer); if (tip) tip.remove(); const a = _decoWaiting[name]; delete _decoWaiting[name]; return a; };
+  decoLoad().then(() => {
+    const a = end(), real = window[name];
+    if (typeof real === 'function' && real !== _decoStubs[name]) real.apply(null, a);
+  }, () => { end(); toast(failMsg); });
+}
+_decoStubs.openInteriorFullscreen = window.openInteriorFullscreen = function () {
+  _decoLazyOpen('openInteriorFullscreen', [...arguments], '꾸미기를 펴는 중…', '꾸미기를 불러오지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.');
+};
+_decoStubs.visitFriend = window.visitFriend = function () {
+  _decoLazyOpen('visitFriend', [...arguments], '친구 마당을 펴는 중…', '친구 마당을 불러오지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.');
+};
+//  상점 꾸미기 탭 썸네일 — 불러오기 전엔 이모지(진짜 _decoThumb 가 그림 묶음을 받는 동안 쓰는 것과 같은 모양) · 받으면 상점을 한 번 다시 그린다
+let _decoThumbWait = false;
+_decoStubs._decoThumb = window._decoThumb = function (d, px) {
+  if (!_decoThumbWait) {
+    _decoThumbWait = true;
+    decoLoad().then(() => {
+      _decoThumbWait = false;
+      if (CUR && SHOP_TAB === 'deco' && document.getElementById('m-shop')?.classList.contains('open')) renderShop();
+    }, () => { _decoThumbWait = false; });
+  }
+  return `<span style="font-size:${Math.round(px * 0.8)}px;display:block;text-align:center">${escHtml(d.icon || '🌸')}</span>`;
+};
 // ── [SPLIT-1] 여기 있던 'art' 덩어리(546줄)는 student/art.js 로 옮겼다 — 글자 그대로 ──
 // ── [SPLIT-1] 여기 있던 'emotion' 덩어리(522줄)는 student/emotion.js 로 옮겼다 — 글자 그대로 ──
 // ══ 인벤토리 ══// ══ 인벤토리 ══

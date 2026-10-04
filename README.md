@@ -104,7 +104,7 @@ CNAME                                          GitHub Pages 커스텀 도메인 
   - `GAME_DATA`: 게임 상수(기본 학생, 장비/몬스터/씨앗, expTable 등)
   - `Utils`: 공통 유틸. 날짜는 `Utils.todayStr()`(KST, `YYYY-MM-DD`), 주 시작은 `Utils.weekStartStr()`(KST, 일요일 시작)로 **단일 소스 통일**
   - `DB`: Firebase 연결·실시간 구독·정규화(`_normalizeArrays`/`_migrate`)·저장 helper(`saveStudent` 등)
-- **`student.js` + `student/*.js`** — 학생 화면 로직. 2026-10-04 에 덩어리째 떼어 옮겼다(글자 그대로 · 전역 그대로 · [docs/module_architecture.md §16](docs/module_architecture.md)). student.js = 바탕(초기화·홈·쪽지·보상·상점·보스·농장·집 허브·인벤토리·퀘스트·업적·토스트) · `student/char.js` 캐릭터 그림 · `battle.js` 사냥·전투 · `deco.js` 꾸미기+친구 마당 · `art.js` 작품 · `emotion.js` 감정 · `reading.js` 독서 · `weekly.js` 주간 다짐 · `study.js` 단어장·오늘의 학습·숙달도
+- **`student.js` + `student/*.js`** — 학생 화면 로직. 2026-10-04 에 덩어리째 떼어 옮겼다(글자 그대로 · 전역 그대로 · [docs/module_architecture.md §16](docs/module_architecture.md)). student.js = 바탕(초기화·홈·쪽지·보상·상점·보스·농장·집 허브·인벤토리·퀘스트·업적·토스트) · `student/char.js` 캐릭터 그림 · `battle.js` 사냥·전투 · `deco.js` 꾸미기+친구 마당(html 태그 없이 꾸미기를 열 때 불러온다 — §17) · `art.js` 작품 · `emotion.js` 감정 · `reading.js` 독서 · `weekly.js` 주간 다짐 · `study.js` 단어장·오늘의 학습·숙달도
 - **`admin.js`** — 교사 관리 로직. 학생 편집, 퀘스트/보상 승인, 설정, 백업/가져오기/롤백/초기화
 - **`kiosk.js`** — 키오스크 로직. 퀘스트 신청/취소를 학생의 `pendingRewards` 경로만 **부분 저장**(전체 학생 객체 클로버 방지)
 - **CSS 3종(`student.css` / `admin.css` / `kiosk.css`)** — 각 화면 전용 스타일. HTML에 인라인 `<style>` 없음

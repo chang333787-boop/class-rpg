@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { studentScriptFiles, studentDirFiles } from './unit/student-sources.mjs';
+import { studentScriptFiles, studentTagFiles, studentDirFiles, LAZY_STUDENT_FILES, lazyRefsIn } from './unit/student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const results = []; // { level, msg }
@@ -29,8 +29,9 @@ const exists = (f) => fs.existsSync(rel(f));
 const read = (f) => fs.readFileSync(rel(f), 'utf8');
 
 // [SPLIT-1] 학생 코드 = student.js + student/*.js(student.html 의 <script> 순서가 단일 출처)
-let STUDENT_FILES = ['student.js'];
-try { STUDENT_FILES = studentScriptFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+let STUDENT_FILES = ['student.js'], STUDENT_TAGS = ['student.js'];
+try { STUDENT_FILES = studentScriptFiles(ROOT); STUDENT_TAGS = studentTagFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+//  [DECO-LAZY-1] 필수 파일·문법·DB 캐시 정렬은 늦게 부르는 파일(student/deco.js)까지 · 클래식 태그는 html 태그로 부르는 것만
 const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', ...STUDENT_FILES, 'admin.js', 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
@@ -148,7 +149,7 @@ for (const f of HTML_FILES) {
   else add('FAIL', `${f}: 로드 순서 비정상 (gamedata=${gIdx}, ${js}=${jIdx})`);
 
   // 전용 JS가 클래식 로드(module/async/defer 없음) — [SPLIT-1] student.html 은 student/*.js 태그까지
-  const jsList = f === 'student.html' ? STUDENT_FILES : [js];
+  const jsList = f === 'student.html' ? STUDENT_TAGS : [js];
   const nonClassic = jsList.map((x) => (html.match(new RegExp(`<script\\b[^>]*\\b${x.replace(/\./g, '\\.')}[^>]*>`)) || [])[0] || '')
     .filter((tag) => tag && /\b(type=["']?module|async|defer)\b/.test(tag));
   if (nonClassic.length) add('FAIL', `${f}: 비클래식 로드 (${nonClassic.join(' · ')})`);
@@ -214,10 +215,20 @@ for (const f of HTML_FILES) {
   const onDisk = studentDirFiles(ROOT);
   const notLoaded = onDisk.filter((f) => !STUDENT_FILES.includes(f));
   const si = html.indexOf('./student.js');
-  const early = STUDENT_FILES.filter((f) => f !== 'student.js' && html.indexOf('./' + f) < si);
-  if (notLoaded.length) add('FAIL', `student/ 파일이 student.html 에 없음: ${notLoaded.join(', ')} — <script src="./student/…?v=…"> 를 student.js 뒤에`);
+  const early = STUDENT_TAGS.filter((f) => f !== 'student.js' && html.indexOf('./' + f) < si);
+  //  [DECO-LAZY-1] 늦게 부르는 파일은 html 태그가 **없어야** 하고(있으면 두 번 돈다 — let 이 겹쳐 SyntaxError), student.js 가 ?v= 붙은 주소로 부른다
+  const lazyRefs = exists('student.js') ? lazyRefsIn(read('student.js')) : [];
+  const lazyBad = LAZY_STUDENT_FILES.flatMap((f) => {
+    const r = lazyRefs.find((x) => x.file === f);
+    return STUDENT_TAGS.includes(f) ? [`${f}: html 태그도 있음(늦게 부르는 파일)`]
+      : !exists(f) ? [`${f}: 파일 없음`] : !r ? [`${f}: student.js 에 './${f}?v=…' 주소 없음`] : !r.ver ? [`${f}: 주소에 ?v= 없음`] : [];
+  });
+  const lazyOk = LAZY_STUDENT_FILES.filter((f) => !STUDENT_TAGS.includes(f));
+  if (notLoaded.length) add('FAIL', `student/ 파일이 student.html 에 없음: ${notLoaded.join(', ')} — <script src="./student/…?v=…"> 를 student.js 뒤에(늦게 부르면 student-sources LAZY_STUDENT_FILES 에)`);
   else if (early.length) add('FAIL', `student/ 파일이 student.js 보다 먼저 불림: ${early.join(', ')}`);
-  else add('PASS', `student/ 폴더 js ${onDisk.length}개 모두 student.html 에서 student.js 뒤에 부름`);
+  else if (lazyBad.length) add('FAIL', `늦게 부르는 student/ 파일: ${lazyBad.join(' · ')}`);
+  else add('PASS', `student/ 폴더 js ${onDisk.length}개 — student.html 에서 student.js 뒤에 ${onDisk.length - lazyOk.length}개` +
+    (lazyOk.length ? ` + 늦게 ${lazyOk.length}개(${lazyOk.map((f) => `${f}?v=${lazyRefs.find((x) => x.file === f).ver}`).join(', ')})` : ''));
 }
 
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──

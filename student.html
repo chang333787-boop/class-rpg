@@ -7,11 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <!-- [TITLE-BOARD-1] 첫 화면 칠판 분필 글씨 — 칠판에 쓰는 글자만 받는다(text=). 칠판 글을 바꾸면 여기 글자도 같이 -->
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&text=%200123456789GPR%EA%B8%88%EA%B8%B0%EB%8A%98%EB%8F%84%EB%9D%BC%EB%A6%AC%EB%AA%A8%EB%AA%A9%EB%B0%98%EB%BC%98%EC%84%B1%EC%88%98%EC%94%A9%EC%98%A4%EC%9A%94%EC%9A%B0%EC%9B%94%EC%9D%98%EC%9D%BC%EC%9E%90%EC%9E%A5%ED%86%A0%ED%95%9C%ED%97%98%ED%99%94&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<!-- [LAZY-SDK-1] Chart.js(감정 차트)·firebase-firestore-compat(영어앱 기록 읽기)은 첫 화면에서 안 받는다 — 쓰기 직전에 loadScriptOnce 로 한 번 -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><!-- [ENGLISH-LINK-1] 영어앱 기록 읽기 전용 -->
 <script src="./gamedata.js?v=20261004g2b"></script>
 <script src="./curriculum.js?v=20260915stn"></script>
 <script src="./figures.js?v=20260915stl"></script>
@@ -959,12 +958,12 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20261004r1a"></script>
+<script src="./student.js?v=20261004r6c"></script>
 <script src="./student/char.js?v=20261004r1a"></script>
 <script src="./student/battle.js?v=20261004r1a"></script>
-<script src="./student/deco.js?v=20261004r1a"></script>
+<!-- [DECO-LAZY-1] 꾸미기(student/deco.js)는 태그 없이 꾸미기·친구 마당을 열 때 부른다 — 주소·?v= 는 그 코드의 DECO_SRC 한 줄 -->
 <script src="./student/art.js?v=20261004r1a"></script>
-<script src="./student/emotion.js?v=20261004r1a"></script>
+<script src="./student/emotion.js?v=20261004r6a"></script>
 <script src="./student/reading.js?v=20261004r1a"></script>
 <script src="./student/weekly.js?v=20261004r1a"></script>
 <script src="./student/study.js?v=20261004r1a"></script>

@@ -16,11 +16,17 @@
   //   main 과 같은 배율로 재게. '전체' 자체를 재는 곳(㉖)만 decoZoomFit 을 부른다.
   const fitOld = () => { const yd = DECO_SCENE === 'yard'; _decoSetZoom(yd ? Math.min(DY_BASE.cols, DY.cols) / DY.cols : 1, 0, 0); _dPanX = 0; _dPanY = 0; _decoClampPan(); _drawDeco(); };
   const t0 = Date.now();
-  //  [DECO-DAYNIGHT-1] 시험은 실제 시각 대신 낮으로 — 헤드리스 시계(UTC)가 밤이면 동물이 자서 먹이통 시험이 흔들렸다(단추로 바꾼 값은 그대로 따른다)
-  try { if (typeof _decoPhase === 'function') _decoPhase = function () { return _decoPhaseOv || 'day'; }; } catch (e) {}
-  //  [DECO-SEASON-1] 계절도 날짜 대신 여름(바탕 그림)으로 — 그림 지문·조각 수 시험이 달마다 바뀌지 않게(시험에서 바꾼 값은 그대로 따른다)
-  try { if (typeof _decoSeason === 'function') _decoSeason = function () { return _decoSeasonOv || 'summer'; }; } catch (e) {}
+  //  [DECO-LAZY-1] student/deco.js 는 이제 꾸미기를 열 때 불린다 — 시험은 맨 앞에서 먼저 불러 둔다(아래 바꿔 끼우기가 진짜 함수에 닿게)
+  const decoReadyP = typeof decoLoad === 'function' ? decoLoad() : Promise.resolve();
+  const fakeClock = () => {
+    //  [DECO-DAYNIGHT-1] 시험은 실제 시각 대신 낮으로 — 헤드리스 시계(UTC)가 밤이면 동물이 자서 먹이통 시험이 흔들렸다(단추로 바꾼 값은 그대로 따른다)
+    try { if (typeof _decoPhase === 'function') _decoPhase = function () { return _decoPhaseOv || 'day'; }; } catch (e) {}
+    //  [DECO-SEASON-1] 계절도 날짜 대신 여름(바탕 그림)으로 — 그림 지문·조각 수 시험이 달마다 바뀌지 않게(시험에서 바꾼 값은 그대로 따른다)
+    try { if (typeof _decoSeason === 'function') _decoSeason = function () { return _decoSeasonOv || 'summer'; }; } catch (e) {}
+  };
   (async () => {
+    try { await decoReadyP; } catch (e) { out('ERR', 'decoLoad ' + (e && e.message)); return done(); }
+    fakeClock();
     while (!(typeof DB !== 'undefined' && DB._cache && document.getElementById('loading-screen')?.style.display === 'none')) {
       if (Date.now() - t0 > 20000) { out('ERR', 'timeout'); return done(); } await sleep(50);
     }

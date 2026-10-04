@@ -433,6 +433,42 @@ cur = 'global-dup-check (GLOBAL-DUP-1)';
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'deco-lazy-check (DECO-LAZY-CHECK-1)';
+{
+  //  꾸미기(student/deco.js)를 늦게 부르므로 바깥이 deco 이름을 부르는 자리는 지킴이·typeof 가드·불러온 뒤만 셋 중 하나여야 한다
+  const { judge } = await import('./deco-lazy-check.mjs');
+  const DECO = 'function decoOpen() {}\nfunction _decoDraw() {}\nlet SEL = null;';
+  const HTML = '<div id="interior-fullscreen"><button onclick="_decoDraw()">x</button></div>\n<button onclick="decoOpen()">열기</button>';
+  const J = (src, html = '', stub = 'window.decoOpen = function () {};') => judge({ decoSrc: DECO, studentSrc: stub, files: [{ label: 'student.js', src: stub + '\n' + src }], html });
+  test('지킴이·가드·decoLoad().then 안·전체화면 판 안 → FAIL 0', () => {
+    const r = J('function a() { if (typeof _decoDraw === \'function\') _decoDraw(); }\nfunction b() { decoLoad().then(() => _decoDraw()); }', HTML);
+    eq([r.fails.length, r.counts['지킴이'] > 0, r.counts['가드'], r.counts['불러온 뒤만']], [0, true, 2, 2]);
+  });
+  test('가드 없이 새로 부르면 FAIL', () => {
+    eq(J('function a() { _decoDraw(); }').fails.length, 1);
+  });
+  test('판 밖 html 단추가 지킴이 없는 이름을 부르면 FAIL', () => {
+    eq(J('', '<button onclick="_decoDraw()">x</button>').fails.length, 1);
+  });
+  test('html 이 deco 의 let 에 대입해도 FAIL(불러올 때 가려져 값이 사라짐)', () => {
+    eq(J('', '<button onclick="SEL=1;decoOpen()">x</button>').fails.length, 1);
+  });
+  test('스크립트가 만든 onclick 글자도 본다', () => {
+    eq(J('function a() { return `<div onclick="_decoDraw()">`; }').fails.length, 1);
+  });
+  test('같은 함수 안 지역 이름은 다른 뜻 → 건넘', () => {
+    const r = J('function a(SEL) { const _decoDraw = 1; return SEL + _decoDraw; }');
+    eq([r.fails.length, r.counts['지역 이름']], [0, 4]);   // 선언 둘 + 쓰기 둘
+  });
+  test('지킴이 이름이 deco.js 에 function 이 아니면 FAIL', () => {
+    eq(J('', '', 'window.SEL = function () {};').fails.some(m => m.includes('function 선언이 아님')), true);
+  });
+  test('전체화면 판을 deco.js 밖에서 띄우면 FAIL', () => {
+    eq(J("function a() { document.getElementById('interior-fullscreen').style.display = 'flex'; }").fails.length, 1);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 cur = 'admin 비번 초기화 알림(PW-NOTIFY-1)';
 {
   //  교사 PC 는 TV 로 미러링된다. 초기화 알림(notify)에 새 비밀번호 값이 찍히면 반 아이들이 본다.
