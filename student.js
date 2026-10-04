@@ -141,13 +141,25 @@ function checkAccessTime() {
   return cur < start || cur >= end;
 }
 
+// [ACCESS-MSG-1] '16:00' → '오후 4:00' (아이 화면용)
+function accessTimeLabel(hhmm) {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  if (!Number.isFinite(h)) return String(hhmm || '');
+  const ampm = h < 12 ? '오전' : '오후';
+  const h12 = (h % 12) || 12;
+  return `${ampm} ${h12}:${String(Number.isFinite(m) ? m : 0).padStart(2, '0')}`;
+}
+
 function doLogin() {
   if (!SEL_STUDENT) { document.getElementById('login-err').textContent = '이름을 선택해주세요!'; return; }
   if (doLogin._pending) return;              // [STUDENT-COLD-1] 내 기록 받는 중 엔터 두 번 → enterGame 두 번 막기
 
-  // 접속 시간 체크 (8:30~16:00만 허용)
+  // 접속 시간 체크 (선생님이 정한 시간만 허용)
   if (checkAccessTime()) {
-    document.getElementById('login-err').textContent = '⏰ 접속 가능 시간: 오전 8:30 ~ 오후 4:00';
+    //  [ACCESS-MSG-1] 안내 문구도 선생님 설정(accessStart/accessEnd)을 따른다 — 전엔 8:30~4:00 고정이었다
+    const st = DB.getSettings() || {};
+    document.getElementById('login-err').textContent =
+      `⏰ 접속 가능 시간: ${accessTimeLabel(st.accessStart || '08:30')} ~ ${accessTimeLabel(st.accessEnd || '16:00')}`;
     return;
   }
 
@@ -1466,8 +1478,8 @@ function buildMainHTML() {
     alerts.push(`<div class="boss-banner" onclick="openBoss()" style="margin-bottom:.6rem">
       <div style="font-size:2rem">${escHtml(settings.bossIcon||'🧌')}</div>
       <div style="flex:1"><div style="font-weight:900;color:var(--red)">${escHtml(settings.bossName||'금요일 보스')} 출현!</div>
-      <div style="font-size:.76rem;color:var(--txt2)">보상: 💰${settings.bossGold||150}G + 특별 씨앗</div></div>
-      <button class="bb-btn">도전!</button>
+      <div style="font-size:.76rem;color:var(--txt2)">${bossClaimedThisWeek(s) ? '이번 주 보상 받음 ✓' : `보상: 💰${Number(settings.bossGold)||150}G + 30EXP`}</div></div>
+      <button class="bb-btn">${bossClaimedThisWeek(s) ? '보기' : '도전!'}</button>
     </div>`);
 
   // ── 오늘의 감정 카드 ──
@@ -1524,13 +1536,8 @@ function buildMainHTML() {
   // ── 오늘 할 일 카드 ──
   const todos = [];
 
-  // 쪽지 — 있으면 언제든 다시 볼 수 있게
-  const myNoteCount = getMyNotes().length;
-  if (myNoteCount > 0)
-    todos.push({type:'info', icon:'📝', badge:myNoteCount,
-      title:`내 쪽지 ${myNoteCount}개`,
-      sub:'선생님이 준 안내를 다시 볼 수 있어요',
-      action:"openNoteList()", btnLabel:'보기'});
+  // [NOTE-TODO-1] 쪽지는 '할 일'로 내지 않는다. 전엔 쪽지가 한 번이라도 오면 매일 첫 할 일(금테)로 떴다.
+  //   새 쪽지는 위 쪽지 배너('선생님이 쪽지를 줬어요 · N개')가 알리고, 지난 쪽지는 '나의 공간'의 [선생님 쪽지]로 본다.
 
   // 2순위: 시든 작물 경고
   const witheredCount = (s.farm||[]).filter(p=>{
@@ -4208,37 +4215,58 @@ function selectMonsterCard(monId) {
 }
 
 // ══ 보스 ══
+//  [BOSS-WEEK-1] 이긴 보상은 학생마다 한 주에 한 번(일요일에 새 주). 전엔 '확인'을 누를 때마다 끝없이 받을 수 있었다.
+//   · 주 키 = Utils.weekStartStr()(감정 보상과 같은 주 셈) · 학생 레코드 bossClaimedWeek 한 칸
+//   · 보상 금액(선생님 설정 bossGold · 30EXP)은 그대로. 주지 않던 '특별 씨앗' 표시는 뺐다.
+//   · 혼자 싸우는 보스라 '전체 학생이 힘을 합쳐' 문구도 고쳤다.
+function bossClaimedThisWeek(s) {
+  s = s || CUR;
+  return !!(s && s.bossClaimedWeek === Utils.weekStartStr());
+}
+
 function openBoss() {
   const settings = DB.getSettings();
+  const done = bossClaimedThisWeek();
   openModal('m-boss');
   document.getElementById('boss-arena').innerHTML = `
     <div style="text-align:center;padding:1rem">
       <div style="font-size:5rem;animation:floatY 3s ease-in-out infinite">${escHtml(settings.bossIcon||'🧌')}</div>
-      <div style="font-size:1.2rem;font-weight:700;color:var(--red);margin:.5rem 0">${escHtml(settings.bossName)}</div>
-      <div style="font-size:.82rem;color:var(--txt2);margin-bottom:1.2rem">전체 학생이 힘을 합쳐 물리쳐요!</div>
+      <div style="font-size:1.2rem;font-weight:700;color:var(--red);margin:.5rem 0">${escHtml(settings.bossName||'금요일 보스')}</div>
+      <div style="font-size:.82rem;color:var(--txt2);margin-bottom:1.2rem">${done
+        ? '이번 주 보상은 벌써 받았어요 ✓<br>다음 주에 다시 만나요!'
+        : '보스를 이기면 보상을 받아요! (한 주에 한 번)'}</div>
       <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.2rem">
-        <span class="rb-tag">💰 ${settings.bossGold}G</span>
-        <span class="rb-tag">+30EXP</span><span class="rb-tag">🌱 특별 씨앗</span>
+        <span class="rb-tag">💰 ${Number(settings.bossGold)||150}G</span>
+        <span class="rb-tag">+30EXP</span>
       </div>
-      <button class="btn-battle" onclick="doBossFight()">⚔️ 협력 공격!</button>
+      ${done
+        ? `<button class="btn-battle" disabled style="opacity:.45;cursor:default">✓ 이번 주 보상 받음</button>`
+        : `<button class="btn-battle" onclick="doBossFight()">⚔️ 공격!</button>`}
     </div>`;
 }
 
 function doBossFight() {
+  if (bossClaimedThisWeek()) { toast('이번 주 보스 보상은 벌써 받았어요'); openBoss(); return; }
   const settings = DB.getSettings();
+  const gold = Number(settings.bossGold) || 150;
   const win = Math.random() > 0.35;
   document.getElementById('boss-arena').innerHTML = `
     <div style="text-align:center;padding:1rem">
       <div style="font-size:4rem">${win?'🏆':'💀'}</div>
       <div class="ba-result ${win?'win':'lose'}" style="margin:1rem 0">${win?'🎉 보스 처치 성공!':'😢 패배...'}</div>
       <div style="font-size:.85rem;color:var(--txt2);margin-bottom:1rem">
-        ${win?`💰 +${settings.bossGold}G · +30EXP · 🌱 특별 씨앗!`:'다음에 다시 도전해요!'}
+        ${win?`💰 +${gold}G · +30EXP`:'다시 도전해 봐요!'}
       </div>
-      <button class="btn-ok" onclick="${win?`claimBoss(${settings.bossGold});`:''}closeModal('m-boss')">확인</button>
+      <button class="btn-ok" onclick="${win?'claimBoss(this)':"closeModal('m-boss')"}">확인</button>
     </div>`;
 }
 
-function claimBoss(gold) {
+function claimBoss(btn) {
+  if (btn) btn.disabled = true;   // 두 번 눌러 두 번 받기 막기
+  closeModal('m-boss');
+  if (!CUR || bossClaimedThisWeek()) { toast('이번 주 보스 보상은 벌써 받았어요'); return; }
+  const gold = Number((DB.getSettings() || {}).bossGold) || 150;
+  CUR.bossClaimedWeek = Utils.weekStartStr();
   CUR.gold += gold; CUR.exp += 30;
   CUR.totalGold = (CUR.totalGold||0) + gold;
   const oldLv = CUR.level;
@@ -13284,12 +13312,16 @@ function editEmotionRecord(date, period) {
 
 function claimEmotionReward(rewardId) {
   const weekStart = Utils.weekStartStr();
-  const reward = EMOTION_REWARDS.find(r => r.id === rewardId);
-  if (!reward) return;
+  if (!EMOTION_REWARDS.some(r => r.id === rewardId)) return;
 
   // 이미 수령 여부 재확인
   const claimed = (CUR.emotionRewardsClaimed || {})[weekStart] || [];
   if (claimed.includes(rewardId)) { toast('이미 받은 보상이에요!'); return; }
+
+  // [EMO-REWARD-CFG-1] 금액은 화면에 보인 것과 같은 함수(getClaimableEmotionRewards)에서 읽는다.
+  //   전엔 화면은 선생님 설정값, 지급은 고정 기본값이라 둘이 달랐다. 조건도 여기서 한 번 더 본다.
+  const reward = getClaimableEmotionRewards(CUR, weekStart).find(r => r.id === rewardId);
+  if (!reward) { toast('아직 받을 수 없는 보상이에요'); return; }
 
   // 지급
   CUR.exp   = (CUR.exp||0)   + reward.exp;
@@ -13328,6 +13360,7 @@ function openEmotionModal(period) {
   _emoCurrentPeriod = period;
   _emoSelectedKey   = null;
   _emoSelectedLevel = null;
+  _emoEditDate      = null;   // [EMO-DATE-1] 지난 날 수정 창을 저장 없이 닫았어도 '오늘 감정'은 오늘로 저장
 
   const today = Utils.todayStr();
   const existing = DB_EMOTION.get(CUR.id, today, period);
@@ -14030,10 +14063,12 @@ function removeBook(idx) {}
 
 function renderQuestModal() {
   const quests = DB.getQuests().filter(q => q.studentId === CUR.id);
-  const pending = CUR.pendingRewards||[];
+  // [QUEST-REWARD-TAB-1] 승인 대기는 '내 보상' 창(renderRewardList)과 같은 기준·같은 말(⏳ 기다리는 중).
+  //   전엔 selfApplied(아무 데서도 안 세움) 때문에 대기 항목이 전부 '🎁 받기 가능'으로 보였다.
+  const pending = (CUR.pendingRewards||[]).filter(r => !r.approved);
   const all = [
     ...pending.map(p => ({
-      name:p.label, status: p.selfApplied ? 'self' : 'claim',
+      name:p.label, status:'wait',
       exp:p.exp, gold:p.gold, date:p.date||'오늘', icon:p.icon||'🎉'
     })),
     ...quests.slice(-10).reverse().map(q => ({
@@ -14042,8 +14077,7 @@ function renderQuestModal() {
   ];
   const claimBtn = ''; // 보상 자동 지급으로 받기 버튼 제거
   const statusLabel = {
-    claim: `<span class="qr-status approved">🎁 받기 가능</span>`,
-    self:  `<span class="qr-status waiting">📨 신청 중</span>`,
+    wait:  `<span class="qr-status waiting">⏳ 기다리는 중</span>`,
     done:  `<span class="qr-status approved">✅ 완료</span>`,
   };
   document.getElementById('quest-list').innerHTML = (claimBtn||'') + (all.length > 0
@@ -14052,11 +14086,11 @@ function renderQuestModal() {
         <div class="qr-body"><div class="qr-name">${escHtml(q.name)}</div><div class="qr-desc">${q.date||''}</div></div>
         <div class="qr-right">
           ${statusLabel[q.status]||statusLabel.done}
-          <span class="qr-rewards">${q.exp>0?`+${q.exp}EXP · `:''}${q.gold>0?`+${q.gold}G`:q.status==='self'?'보상 대기':''}</span>
+          <span class="qr-rewards">${q.exp>0?`+${q.exp}EXP · `:''}${q.gold>0?`+${q.gold}G`:''}</span>
         </div>
       </div>`).join('')
     : `<div style="color:var(--txt3);font-size:.82rem;padding:1rem 0">아직 활동 내역이 없어요<br>
-       <span style="font-size:.72rem">✏️ 활동 신청 탭에서 오늘 활동을 알려주세요!</span></div>`);
+       <span style="font-size:.72rem">📋 퀘스트 게시판에서 퀘스트를 해 보세요!</span></div>`);
 }
 
 function renderPromoModal() {
@@ -15129,6 +15163,9 @@ if (window.speechSynthesis) {
 // ── 퀴즈 생성 + 진행 ────────────────────────────────
 let VOCAB_QUIZ = { questions:[], cur:0, correct:0, wrongIds:[] };
 
+// [ACH-GOLD-1] 업적 골드 — gamedata AchievementUtils.checkNew 가 주는 값과 같은 셈(reward.gold, 없으면 20)
+function achRewardGold(a) { return (a && a.reward && a.reward.gold) || 20; }
+
 function renderHouseAchievements() {
   const earned = new Set(CUR.achievements || []);
   const doneList   = ACHIEVEMENTS.filter(a =>  earned.has(a.id));
@@ -15139,7 +15176,7 @@ function renderHouseAchievements() {
   const rewardText = a => {
     const parts = [];
     if (a.reward.exp)   parts.push(`+${a.reward.exp}EXP`);
-    parts.push('+20G');
+    parts.push(`+${achRewardGold(a)}G`);   // [ACH-GOLD-1] 실제 지급과 같은 값
     if (a.reward.title) parts.push(`칭호 "${a.reward.title}"`);
     if (a.reward.deco)  parts.push('특별 장식');
     return parts.join(' · ');
@@ -15191,7 +15228,7 @@ function checkAchievements(opts) {
     const a = newOnes[idx++];
     const rewardParts = [];
     if (a.reward.exp)   rewardParts.push(`+${a.reward.exp} EXP`);
-    rewardParts.push('+20 골드');
+    rewardParts.push(`+${achRewardGold(a)} 골드`);   // [ACH-GOLD-1]
     if (a.reward.title) rewardParts.push(`칭호 "${a.reward.title}" 획득!`);
     document.getElementById('ach-popup-icon').textContent   = a.icon;
     document.getElementById('ach-popup-name').textContent   = a.name;
@@ -15266,9 +15303,26 @@ function openModal(id) {
   if (id==='m-house') renderHouse();
   if (id==='m-promo') renderPromoModal();
 }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); _afterModalClose(id); }
+// [MODAL-CLOSE-1] 창이 닫힌 뒤 뒷정리 — ✕ 단추와 바깥 누르기 둘 다 여기를 지난다
+//   · 감정: 지난 날 수정 날짜를 비운다(다음 '오늘 감정'이 지난 날로 저장되던 것 [EMO-DATE-1])
+//   · 폰 하단 탭의 농장·상점·가방: 창을 닫으면 홈으로 돌아간다(빈 화면이 남던 것 [MOB-TAB-HOME-1])
+const _MOB_TAB_MODAL = { farm: 'm-farm', shop: 'm-shop', inv: 'm-inv' };
+function _afterModalClose(id) {
+  if (id === 'm-emotion') _emoEditDate = null;
+  if (_MOB_TAB_MODAL[MOB_TAB] === id) {
+    const bt = document.getElementById('bt-home');
+    if (bt) switchMobTab('home', bt);
+  }
+}
+//   [BATTLE-V2] 배틀은 '나가기'로만 · [STUDY-CLOSE-1] 오늘의 학습은 바깥을 눌러도 안 닫힌다(✕ 로만 — 푼 문제가 한 번에 사라지던 것)
+const _NO_BACKDROP_CLOSE = ['m-battle', 'm-study'];
 document.querySelectorAll('.overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o && o.id !== 'm-battle') o.classList.remove('open'); });   // [BATTLE-V2] 배틀은 '나가기'로만
+  o.addEventListener('click', e => {
+    if (e.target !== o || _NO_BACKDROP_CLOSE.includes(o.id)) return;
+    o.classList.remove('open');
+    _afterModalClose(o.id);
+  });
 });
 
 // ══ 토스트 ══ (스타일 태그 중복 추가 버그 수정)
@@ -15750,6 +15804,9 @@ function openStudyModal() {
 }
 
 function closeStudyModal() {
+  // [STUDY-CLOSE-1] 푸는 중에 ✕ — 기록은 끝에서만 저장되므로 한 문제라도 풀었으면 먼저 물어본다
+  const doneN = (STUDY_SESSION && STUDY_SESSION.answers) ? STUDY_SESSION.answers.length : 0;
+  if (doneN > 0 && !confirm(`푼 문제 ${doneN}개가 사라져요. 그만할까요?`)) return;
   STUDY_SESSION = null;
   closeModal('m-study');
   renderAll();

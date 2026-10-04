@@ -1737,6 +1737,82 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = '감정 수정 날짜가 남지 않음(EMO-DATE-1)';
+try {
+  const S = STUDENT;
+  const el = () => ({ style: {}, classList: { add() {}, remove() {}, toggle() {} }, textContent: '', value: '', innerHTML: '', scrollIntoView() {} });
+  const mk = () => {
+    const els = {};
+    const sb = {
+      console, saved: [], today: '2026-10-05', MOB_TAB: 'home',
+      document: { getElementById: (id) => (els[id] = els[id] || el()) },
+      EMOTION_DATA: [{ key: 'happy', icon: '😊', label: '행복' }],
+      DB_EMOTION: { get: () => null, save: (...a) => sb.saved.push(a) },
+      CUR: { id: 's1' },
+      toast() {}, openModal() {}, renderMain() {}, renderMobile() {}, renderEmotionHistory() {}, switchMobTab() {}, escHtml: (x) => String(x),
+    };
+    sb.Utils = { todayStr: () => sb.today };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext([
+      'let _emoCurrentPeriod = "am", _emoSelectedKey = null, _emoSelectedLevel = null, _emoEditDate = null;',
+      sliceConst(S, '_MOB_TAB_MODAL'),
+      ...['editEmotionRecord', 'openEmotionModal', 'selectEmotion', 'selectEmotionLevel', 'submitEmotion', 'closeModal', '_afterModalClose'].map(n => sliceFn(S, n)),
+      ';globalThis.__E = { editEmotionRecord, openEmotionModal, selectEmotion, selectEmotionLevel, submitEmotion, closeModal, getEdit: () => _emoEditDate };',
+    ].join(NL), sb);
+    return sb;
+  };
+  // 지난 날 수정 창을 열었다가 저장 없이 닫힘(✕·바깥·로그아웃 어느 길이든) → 오늘 감정 입력
+  const A = mk(); const E = A.__E;
+  E.editEmotionRecord('2026-09-30', 'am');
+  E.openEmotionModal('pm'); E.selectEmotion('happy'); E.selectEmotionLevel(2); E.submitEmotion('');
+  test('지난 날 수정 창을 닫지 않은 채 오늘 감정을 열어도 오늘 날짜로 저장', () => eq(A.saved.map(a => [a[1], a[2]]), [['2026-10-05', 'pm']]));
+  const B = mk();
+  B.__E.editEmotionRecord('2026-09-30', 'am'); B.__E.closeModal('m-emotion');
+  test('수정 창을 ✕ 로 닫으면 수정 날짜를 비운다', () => eq(B.__E.getEdit(), null));
+  const C = mk();
+  C.__E.editEmotionRecord('2026-09-30', 'am'); C.__E.selectEmotion('happy'); C.__E.selectEmotionLevel(1); C.__E.submitEmotion('이유');
+  test('지난 날 수정은 그대로 그 날짜에 저장', () => eq(C.saved.map(a => [a[1], a[2], a[5]]), [['2026-09-30', 'am', '이유']]));
+} catch (e) {
+  test('감정 수정 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = '금요일 보스 한 주 한 번(BOSS-WEEK-1)';
+try {
+  const S = STUDENT;
+  const mk = (student) => {
+    const arena = { innerHTML: '' };
+    const sb = {
+      console, week: '2026-10-04', saves: 0, toasts: [], arena,
+      document: { getElementById: () => arena },
+      DB: { getSettings: () => ({ bossGold: 150, bossName: '보스', bossIcon: '🧌' }), saveStudent: () => { sb.saves++; } },
+      CUR: student, openModal() {}, closeModal() {}, renderAll() {}, triggerLevelUp() {},
+      toast: (m) => sb.toasts.push(m), escHtml: (x) => String(x),
+    };
+    sb.Utils = { weekStartStr: () => sb.week, levelFromExp: () => 1 };
+    sb.globalThis = sb; vm.createContext(sb);
+    vm.runInContext(['bossClaimedThisWeek', 'openBoss', 'doBossFight', 'claimBoss'].map(n => sliceFn(S, n)).join(NL)
+      + ';globalThis.__B = { bossClaimedThisWeek, openBoss, doBossFight, claimBoss };', sb);
+    return sb;
+  };
+  const st = { id: 's1', gold: 0, exp: 0, totalGold: 0, level: 1 };
+  const A = mk(st); const B = A.__B;
+  const btn = { disabled: false };
+  B.claimBoss(btn); B.claimBoss(btn); B.claimBoss(null);
+  test('이긴 보상은 한 주에 한 번만(확인을 여러 번 눌러도 150G·30EXP 한 번)', () => eq([st.gold, st.exp, st.totalGold, A.saves, st.bossClaimedWeek, btn.disabled], [150, 30, 150, 1, '2026-10-04', true]));
+  B.openBoss();
+  test('받은 주엔 공격 단추가 막히고 안내가 보인다', () => eq([/doBossFight\(\)/.test(A.arena.innerHTML), /벌써 받았어요/.test(A.arena.innerHTML)], [false, true]));
+  A.arena.innerHTML = ''; B.doBossFight();
+  test('받은 주에 싸움을 불러도 결과(보상 단추)가 안 나온다', () => eq(/claimBoss/.test(A.arena.innerHTML), false));
+  A.week = '2026-10-11';
+  B.openBoss();
+  test('다음 주엔 다시 도전 · 받기 가능', () => { eq(/doBossFight\(\)/.test(A.arena.innerHTML), true); B.claimBoss(); eq([st.gold, st.bossClaimedWeek], [300, '2026-10-11']); });
+  test('주지 않는 특별 씨앗 · 전체 학생 문구가 없다', () => eq(/특별 씨앗|전체 학생/.test(sliceFn(S, 'openBoss') + sliceFn(S, 'doBossFight')), false));
+} catch (e) {
+  test('보스 코드를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);
