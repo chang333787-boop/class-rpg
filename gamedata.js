@@ -1386,7 +1386,7 @@ const DB = {
     const onRetry = why => { if (why === 'disconnect') sawDisc = true; runs = 0; busy = false; };
     const p = this._txRetry(ref, fn, null, onRetry).then(r => {
       //  들어갔으면(committed) 그걸로 끝 — '그만'은 들어가지 않았을 때만 폴백으로
-      if (busy && !(r && r.committed)) return this._stuSendGated(id, ops, sawDisc);
+      if (busy && !(r && r.committed)) return this._stuSendGated(id, ops, false);   // 폴백은 자기 끊김만 본다 — 앞 transaction 의 끊김을 넘기면 그 쓰기가 들어갔는데 골드를 또 보낼 수 있다(3차 검토 #3)
       if (!r || r.committed === false || (r.snapshot && typeof r.snapshot.val === 'function' && r.snapshot.val() == null)) {
         //  끊김('disconnect') 뒤 다시 돌렸더니 보상이 없음 = 거의 늘 **내 첫 쓰기가 서버에 들어갔는데 답만 못 받은 것** → 승인 끝으로 본다
         //   (드물게 그 몇 초 사이 다른 기기가 승인했거나 학생이 취소했어도 두 번 주지는 않는다 — 설계 문서 '남은 위험')
@@ -1395,7 +1395,7 @@ const DB = {
       }
       return r;
     }, e => {
-      if (e && e.message === 'maxretry') return this._stuSendGated(id, ops, sawDisc);
+      if (e && e.message === 'maxretry') return this._stuSendGated(id, ops, false);   // 폴백은 자기 끊김만 본다 — 앞 transaction 의 끊김을 넘기면 그 쓰기가 들어갔는데 골드를 또 보낼 수 있다(3차 검토 #3)
       throw e;
     });
     //  REWARD_GONE 은 저장 실패가 아니라 일부러 안 바꾼 것 — '인터넷 연결 확인' 알림 대신 승인 화면이 따로 알린다

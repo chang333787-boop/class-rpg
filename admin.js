@@ -1177,7 +1177,8 @@ function approveReward(student, reward, later) {
   // 0. [A1] 중복 지급 방지 — 이미 완료 로그가 있는 퀘스트면 보상 없이 신청만 정리.
   //    (교사가 퀘스트 관리에서 ✔완료 처리한 뒤 남은 신청을 다시 승인하는 경로 차단)
   if (reward.boardQuestId) {
-    const doneLogs = (DB.load().quests || []).concat((later && later.logs) || []);
+    const inFlight = (typeof approveAndSave === 'function' && approveAndSave._inFlight) || [];   // [APPROVE-INFLIGHT-1]
+    const doneLogs = (DB.load().quests || []).concat((later && later.logs) || [], inFlight);
     const qType = reward.boardQuestType || reward.type || 'special';
     if (Utils.isQuestDoneToday(doneLogs, student.id, reward.boardQuestId, qType)) {
       student.pendingRewards = (student.pendingRewards||[]).filter(r =>
@@ -1278,13 +1279,21 @@ function approveReward(student, reward, later) {
 // [APPROVE-AFTER-1] 보상 하나 승인 = 상태 바꾸기(approveReward) + 학생 저장(students/<id> transaction 하나 · 그 보상이 서버에 있을 때만)
 //   + 저장이 **된 뒤에만** 기록 쓰기(goldDaily·작품 전시·퀘스트 기록). 돌려주는 약속: 저장 결과(REWARD_GONE·실패면 거절).
 //   logs: 같은 묶음([전체 승인])의 아직 안 보낸 퀘스트 기록(A1 중복 막이가 함께 본다)
+//  [APPROVE-INFLIGHT-1] 답을 기다리는 승인의 퀘스트 기록 — 기록은 저장 답 뒤에 캐시에 들어가므로, 그 사이(왕복 하나·오프라인)
+//   따로 누른 같은 퀘스트의 다른 신청을 A1 이 못 보고 또 지급했다(PR #1162 3차 검토: 0ms 간격 1040 · 기대 1020). 끝나면(성공·실패) 뺀다.
+//   목록은 함수에 붙여 둔다(approveAndSave._inFlight) — 시험이 함수만 잘라 써도 같은 목록을 본다.
 function approveAndSave(s, reward, logs) {
   const later = { run: [], logs: logs || [] };
+  const mark = later.logs.length;
   approveReward(s, reward, later);
+  const mine = later.logs.slice(mark);
+  approveAndSave._inFlight = (approveAndSave._inFlight || []).concat(mine);
+  const done = () => { approveAndSave._inFlight = (approveAndSave._inFlight || []).filter(l => !mine.includes(l)); };
   return saveStudentAwait(s, { atomic: true }).then(r => {
     later.run.forEach(f => { try { f(); } catch (e) { console.error('[APPROVE-AFTER-1] 기록 쓰기 실패', e); } });
+    done();
     return r;
-  });
+  }, e => { done(); throw e; });
 }
 
 // [APPROVE-AWAIT-1] 학생 저장의 약속(Promise)을 받는다.
