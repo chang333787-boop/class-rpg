@@ -13,9 +13,9 @@ const FROM = Q.get('from');   // ink = 먹 연구소 3장 · wc = 수채화 기�
 const store = createStore({ sid: Q.get('sid') || (TEACHER ? 'teacher' : ''), name: TEACHER ? '선생님' : (Q.get('n') || '').slice(0, 20) });
 const app = document.getElementById('app');
 const inkHome = () => { const q = new URLSearchParams(location.search); q.delete('from'); q.delete('lesson'); return `../ink/index.html${q.toString() ? '?' + q : ''}#/`; };
-const wcLesson = () => { const w = new URLSearchParams(); if (Q.get('sid')) w.set('sid', Q.get('sid')); if (Q.get('lesson') != null) w.set('lesson', Q.get('lesson')); return `../watercolor/index.html?${w}`; };
+const wcLesson = () => { const w = new URLSearchParams(); if (Q.get('course') === 'drawing') w.set('course', 'drawing'); if (Q.get('sid')) w.set('sid', Q.get('sid')); if (Q.get('lesson') != null) w.set('lesson', Q.get('lesson')); return `../watercolor/index.html?${w}`; };
 const printHome = () => { const q = new URLSearchParams(location.search); q.delete('from'); q.delete('lesson'); return `../print/index.html${q.toString() ? '?' + q : ''}#/`; };
-const backOut = () => (FROM === 'ink' ? h('a', { class: 'btn small back-ink', href: inkHome() }, '🖌 먹 연구소로') : FROM === 'wc' ? h('a', { class: 'btn small back-ink', href: wcLesson() }, '🎨 수채화 기초로')
+const backOut = () => (FROM === 'ink' ? h('a', { class: 'btn small back-ink', href: inkHome() }, '🖌 먹 연구소로') : FROM === 'wc' ? h('a', { class: 'btn small back-ink', href: wcLesson() }, Q.get('course') === 'drawing' ? '✏️ 데생 기초로' : '🎨 수채화 기초로')
   : FROM === 'print' ? h('a', { class: 'btn small back-ink', href: printHome() }, '🪞 판화 놀이로') : null);
 let current = null, progress = {};
 

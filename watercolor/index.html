@@ -361,11 +361,12 @@ function renderHome(){
   document.querySelectorAll('.lesson').forEach(el => el.onclick = () => openLesson(+el.dataset.id));
 }
 function openLesson(id){ const L = LESSONS.find(l=>l.id===id); cur = { lesson:L, step: -1 }; show('lessonScreen'); renderStep(); }
-/* [ART-WC-1] 명화 탐정 4장(수채화)과 서로 오가기 — 차시 → 그 기법이 보이는 명화 · 명화 탐정의 '해 보기' 단추 → ?lesson=<차시> */
+/* [ART-WC-1] 명화 탐정 4장(수채화) · 6장(데생)과 서로 오가기 — 차시 → 그 기법이 보이는 명화 · 명화 탐정의 '해 보기' 단추 → ?lesson=<차시>(데생은 &course=drawing) */
 const SEE = COURSE.key === 'watercolor' ? { 4: [['blue_rigi', '터너 「푸른 리기산, 해돋이」']], 5: [['hare', '뒤러 「어린 산토끼」'], ['blue_boat', '호머 「파란 배」']],
-  6: [['sloop_nassau', '호머 「나소의 돛단배」'], ['alligators', '사전트 「진흙투성이 악어들」']], 13: [['turf', '뒤러 「커다란 풀숲」']] } : {};
+  6: [['sloop_nassau', '호머 「나소의 돛단배」'], ['alligators', '사전트 「진흙투성이 악어들」']], 13: [['turf', '뒤러 「커다란 풀숲」']] }
+  : COURSE.key === 'drawing' ? { 2: [['aman_jean', '쇠라 「아망장」']], 3: [['praying_hands', '뒤러 「기도하는 손」']], 8: [['wheatfield_pen', '고흐 「밀밭」']] } : {};
 function seeHTML(L){ const list = SEE[L.id]; if (!list) return '';
-  const q = new URLSearchParams(); if (student && student !== '0'){ q.set('sid', student); q.set('n', studentName || ''); } q.set('from', 'wc'); q.set('lesson', String(L.id));
+  const q = new URLSearchParams(); if (student && student !== '0'){ q.set('sid', student); q.set('n', studentName || ''); } q.set('from', 'wc'); q.set('lesson', String(L.id)); if (COURSE.key !== 'watercolor') q.set('course', COURSE.key);
   return `<div class="see" style="margin-top:10px">🔎 <b>명작에서 이 기법 찾아보기</b> · ${list.map(([id, t]) => `<a href="../art/index.html?${q}#/c/${id}" style="color:var(--accent)">${escHtml(t)}</a>`).join(' · ')}</div>`; }
 $('backBtn').onclick = () => { stopTimer(); speechSynthesis.cancel(); renderHome(); show('home'); };
 
