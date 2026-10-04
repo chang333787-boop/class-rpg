@@ -29,7 +29,7 @@ Firebase 데이터 직접 수정 금지 / 운영 write 버튼 클릭 금지.
 
 - 시작: `git checkout main && git pull --ff-only` → 최신화, working tree clean 확인
 - read-only 조사 먼저 → 수정 Phase면 새 브랜치(`refactor/...`)
-- 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 18 · REVIEW 1 · FAIL 0`)
+- 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 26 · REVIEW 1 · FAIL 0` — 2026-10-04 student 나누기로 `node --check` 가 student/*.js 8개를 더 본다 · smoke-test 는 `PASS 30 · REVIEW 0 · FAIL 0`)
 - JS 변경 시 `node --check <file>.js`
 - 검증은 **Firebase write 없이** (로드·정적·typeof·grep으로 대체)
 - JS/CSS 수정 시 해당 HTML의 `?v=` 캐시버스터 갱신 검토

@@ -13,11 +13,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readStudentSources } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GAMEDATA = fs.readFileSync(path.join(ROOT, 'gamedata.js'), 'utf8');
 const ADMIN = fs.readFileSync(path.join(ROOT, 'admin.js'), 'utf8');
-const STUDENT = fs.readFileSync(path.join(ROOT, 'student.js'), 'utf8');
+const STUDENT = readStudentSources(ROOT);   // [SPLIT-1] student.js + student/*.js(_life* 는 student/deco.js)
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const seg = (p) => String(p || '').split('/').filter(Boolean);

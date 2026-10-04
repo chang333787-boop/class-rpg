@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readStudentSources } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FILES = ['student.js', 'admin.js', 'kiosk.js', 'watercolor/index.html'];
@@ -28,7 +29,8 @@ function sliceFn(src, name) {
   return null;
 }
 function load(file) {
-  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  //  [SPLIT-1] 'student.js' = 학생 화면 전체(student.js + student/*.js) — 도우미가 옮겨 가도 같은 칸으로 본다
+  const src = file === 'student.js' ? readStudentSources(ROOT) : fs.readFileSync(path.join(ROOT, file), 'utf8');
   const fns = {};
   const ctx = {};
   vm.createContext(ctx);

@@ -11,6 +11,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import net from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { studentScriptFiles } from '../student-sources.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.REPO || path.resolve(HERE, '..', '..', '..');
 const argv = process.argv.slice(2);
@@ -111,9 +112,13 @@ const all = [];
 try { for (let i = 0; i < RUNS; i++) all.push(await once(playPort)); } finally { play.kill(); }
 //  ⑥ 자체 파일 바이트(디스크 · gzip 아님)
 const sizeKB = f => fs.existsSync(path.join(REPO, f)) ? Math.round(fs.statSync(path.join(REPO, f)).size / 1024) : null;
-const files = ['student.js', 'student.css', 'student.html', 'gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js'];
+//  [SPLIT-1] 학생 코드는 student.js + student/*.js — 파일마다 + 합(나누기 전 판 student.js 와 견줄 값)
+let stuFiles = ['student.js'];
+try { stuFiles = studentScriptFiles(REPO); } catch (e) {}
+const files = [...stuFiles, 'student.css', 'student.html', 'gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js'];
 const result = { 'CPU감속': CPU, '횟수': RUNS, '그래픽': String(GPU_NAME || '없음').replace(/[=\n]/g, ' ') };
 for (const k of Object.keys(all[0])) result[k] = median(all.map(o => o[k]).filter(v => v != null));
 for (const f of files) result['파일KB_' + f] = sizeKB(f);
+result['파일KB_학생JS합'] = stuFiles.reduce((n, f) => n + (sizeKB(f) || 0), 0);
 if (AS_JSON) console.log(JSON.stringify(result, null, 1));
 else { for (const [k, v] of Object.entries(result)) console.log(k + '=' + v); console.log('끝=1'); }

@@ -8,7 +8,7 @@
 //    --base    buster-check 비교 기준(기본 origin/main). 현재 체크아웃(HEAD)을 검사한다.
 //    --gold    느린 골드 검사도 돌린다: gold-sync-sim · gold-loss-real-sdk(엣지 필요). 저장 경로를 건드린 PR이면 켤 것.
 //    --deco    꾸미기 하네스(헤드리스 크롬/엣지, 약 1분)를 무조건 돌린다. 안 줘도 **base 대비 꾸미기 파일**
-//              (student.js·student.css·student.html·scripts/unit/deco-save-count/)을 고친 PR 이면 저절로 돈다. --no-deco 로 끈다.
+//              (student.js·student/*.js·student.css·student.html·scripts/unit/deco-save-count/)을 고친 PR 이면 저절로 돈다. --no-deco 로 끈다.
 //    --save-order-baseline N   save-order-check 기준선(기본 11 = 2026-09-15 main). 새 자리가 늘면 FAIL.
 //
 //  기본으로 도는 것: smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle ·
@@ -72,7 +72,7 @@ CHECKS.push({ name: 'balance-gate', file: 'scripts/balance/gate.mjs', args: ['--
 // [DECO-HARNESS-PRECHECK-1] 꾸미기 하네스 — 실제 student.html 을 없는 프로젝트+오프라인으로 띄워 100줄쯤을 잰다(운영 통신 0).
 //   느려서(약 1분) 꾸미기 파일을 고친 PR 에서만 저절로 돈다. 판정은 deco-save-count/check.mjs(틀린 줄 0 = PASS · 흔들림 = REVIEW).
 {
-  const DECO_PATHS = /^(student\.(js|css|html)|scripts\/unit\/deco-save-count\/)/;
+  const DECO_PATHS = /^(student\.(js|css|html)|student\/|scripts\/unit\/deco-save-count\/)/;   // [SPLIT-1] student/deco.js 만 고친 PR 도
   let touched = false;
   try {
     const d = spawnSync('git', ['diff', '--name-only', `${BASE}...HEAD`], { cwd: ROOT, encoding: 'utf8' }).stdout || '';

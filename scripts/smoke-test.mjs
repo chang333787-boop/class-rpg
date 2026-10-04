@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { studentScriptFiles, studentDirFiles } from './unit/student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const results = []; // { level, msg }
@@ -27,7 +28,10 @@ const rel = (f) => path.join(ROOT, f);
 const exists = (f) => fs.existsSync(rel(f));
 const read = (f) => fs.readFileSync(rel(f), 'utf8');
 
-const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', 'student.js', 'admin.js', 'kiosk.js'];
+// [SPLIT-1] 학생 코드 = student.js + student/*.js(student.html 의 <script> 순서가 단일 출처)
+let STUDENT_FILES = ['student.js'];
+try { STUDENT_FILES = studentScriptFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', ...STUDENT_FILES, 'admin.js', 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -143,10 +147,12 @@ for (const f of HTML_FILES) {
   if (gIdx !== -1 && jIdx !== -1 && gIdx < jIdx) add('PASS', `${f}: gamedata.js → ${js} 로드 순서 정상`);
   else add('FAIL', `${f}: 로드 순서 비정상 (gamedata=${gIdx}, ${js}=${jIdx})`);
 
-  // 전용 JS가 클래식 로드(module/async/defer 없음)
-  const jsTag = (html.match(new RegExp(`<script\\b[^>]*\\b${js.replace('.', '\\.')}[^>]*>`)) || [])[0] || '';
-  if (jsTag && /\b(type=["']?module|async|defer)\b/.test(jsTag)) add('FAIL', `${f}: ${js} 비클래식 로드 (${jsTag})`);
-  else add('PASS', `${f}: ${js} 클래식 로드 (module/async/defer 없음)`);
+  // 전용 JS가 클래식 로드(module/async/defer 없음) — [SPLIT-1] student.html 은 student/*.js 태그까지
+  const jsList = f === 'student.html' ? STUDENT_FILES : [js];
+  const nonClassic = jsList.map((x) => (html.match(new RegExp(`<script\\b[^>]*\\b${x.replace(/\./g, '\\.')}[^>]*>`)) || [])[0] || '')
+    .filter((tag) => tag && /\b(type=["']?module|async|defer)\b/.test(tag));
+  if (nonClassic.length) add('FAIL', `${f}: 비클래식 로드 (${nonClassic.join(' · ')})`);
+  else add('PASS', `${f}: ${js}${jsList.length > 1 ? ` + student/ ${jsList.length - 1}개` : ''} 클래식 로드 (module/async/defer 없음)`);
 
   // 인라인 <script>(src 없음) / <style> 0건
   const scriptOpen = (html.match(/<script\b/g) || []).length;
@@ -199,6 +205,19 @@ for (const f of HTML_FILES) {
   } else {
     add('FAIL', '캐시버스터 없는 참조: ' + noVer.join(', '));
   }
+}
+
+// ── [SPLIT-1] student/ 폴더 js 는 모두 student.html 에서 student.js 뒤에 불려야 한다 ──
+//  student.js 에서 떼어 옮긴 파일(student/*.js)을 html 에 안 적으면 그 코드는 **조용히 안 돈다**(오류 없이 단추만 먹통).
+{
+  const html = exists('student.html') ? read('student.html') : '';
+  const onDisk = studentDirFiles(ROOT);
+  const notLoaded = onDisk.filter((f) => !STUDENT_FILES.includes(f));
+  const si = html.indexOf('./student.js');
+  const early = STUDENT_FILES.filter((f) => f !== 'student.js' && html.indexOf('./' + f) < si);
+  if (notLoaded.length) add('FAIL', `student/ 파일이 student.html 에 없음: ${notLoaded.join(', ')} — <script src="./student/…?v=…"> 를 student.js 뒤에`);
+  else if (early.length) add('FAIL', `student/ 파일이 student.js 보다 먼저 불림: ${early.join(', ')}`);
+  else add('PASS', `student/ 폴더 js ${onDisk.length}개 모두 student.html 에서 student.js 뒤에 부름`);
 }
 
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──
@@ -274,7 +293,7 @@ for (const f of HTML_FILES) {
   const MUT = 'sort|reverse|splice|push|pop|shift|unshift|fill|copyWithin';
   const g = GETTERS.join('|');
   const hits = [];
-  for (const f of ['admin.js', 'student.js', 'kiosk.js']) {
+  for (const f of ['admin.js', ...STUDENT_FILES, 'kiosk.js']) {   // [SPLIT-1] student/*.js 까지
     let src; try { src = read(f); } catch (e) { continue; }
     const lines = src.split('\n');
     // ① DB.getX(...).sort(  /  DB.load().x.sort(

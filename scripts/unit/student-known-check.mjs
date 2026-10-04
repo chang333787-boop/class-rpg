@@ -16,10 +16,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { studentScriptFiles } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const FILES = ['gamedata.js', 'student.js', 'admin.js', 'kiosk.js'];
+const FILES = ['gamedata.js', ...studentScriptFiles(ROOT), 'admin.js', 'kiosk.js'];   // [SPLIT-1] student/*.js 까지
 
 const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
 sb.globalThis = sb; vm.createContext(sb);

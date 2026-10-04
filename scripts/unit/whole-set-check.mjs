@@ -13,9 +13,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { studentScriptFiles } from './student-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FILES = ['gamedata.js', 'admin.js', 'student.js', 'kiosk.js'];
+const FILES = ['gamedata.js', 'admin.js', ...studentScriptFiles(ROOT), 'kiosk.js'];   // [SPLIT-1] student/*.js 는 BASELINE 없음 = 통째 set 0곳
 
 // 파일 → 모음 → { n: 허용 개수, why }
 //  학생 기기에서도 불리는 곳(gamedata 의 학생 경로)은 why 에 "여러 기기" 로 적고 줄이는 게 목표.
