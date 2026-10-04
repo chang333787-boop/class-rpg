@@ -2,18 +2,19 @@
 //  붓을 오래 누를수록 점이 커지고(누르는 시간), 천천히 그을수록 굵다(빠르기 = 붓을 드는 정도), 물을 많이 머금으면 번진다.
 //  그리기: 붓질 하나는 따로 된 층에 털마다 끊김 없는 선으로(불투명 — 마디 · 줄무늬가 안 생김) 그리고, 다 그으면 종이에 '곱하기'로 얹는다
 //   → 먹은 빛을 거르는 막이라 겹칠수록 진해진다(inkcolor.js 비어-람베르트와 같은 생각 · 종이 위 한 겹 = 그 먹색 그대로).
-//  붓질 하나가 끝날 때마다 onStroke({ dot, len, avgW, maxW, dry, wet, tone }) — judge.js 가 센다.
+//  붓질 하나가 끝날 때마다 onStroke({ dot, len, avgW, maxW, dry, wet, tone, pts:[[x,y,w]], hold }) — judge.js 가 세고 write.js 가 획을 읽는다.
 import { h } from './util.js';
 import { inkRgb, PAPER } from './inkcolor.js';
 
-const N = 16, MAXW = 26, MINW = 3, SOLID = 0.15;
+const N = 16, MINW = 3, SOLID = 0.15;
 const seeded = s => () => ((s = (s * 16807) % 2147483647) / 2147483647);
 const P255 = PAPER.map(v => Math.round(v * 255));
 // 곱하기 색 — 종이 위에 곱하면 정확히 그 먹색이 되는 색(먹색 ÷ 종이색)
 const mulOf = tone => inkRgb(tone.ink, tone.water).map((v, i) => Math.min(1, v * 255 / P255[i]));
 const css = (m, k = 1) => `rgb(${m.map(v => Math.round(255 * (1 - (1 - v) * k))).join(',')})`;   // k<1 = 더 옅게(하양 쪽)
 
-export function makeBrush(wrap, { onStroke = () => {} } = {}) {
+//  maxW = 가장 굵은 붓(종이 px · 붓 놀이 26 · 판본체 쓰기 34) · underlay(ctx, W, H) = 한지 밑에 비치는 본보기(체본) · onFit(W, H) = 종이 크기가 바뀜
+export function makeBrush(wrap, { onStroke = () => {}, maxW: MAXW = 26, underlay = null, onFit = null } = {}) {
   const canvas = h('canvas', { class: 'paper' });
   const ring = h('span', { class: 'press-ring' });
   wrap.append(canvas, ring);
@@ -31,6 +32,7 @@ export function makeBrush(wrap, { onStroke = () => {} } = {}) {
       bx.strokeStyle = r() < 0.55 ? 'rgba(255,255,255,.4)' : 'rgba(120,95,60,.07)'; bx.lineWidth = 0.5 + r() * 0.9;
       bx.beginPath(); bx.moveTo(x, y); bx.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + (r() - 0.5) * 7, y + Math.sin(a) * l * 0.5 + (r() - 0.5) * 7, x + Math.cos(a) * l, y + Math.sin(a) * l); bx.stroke();
     }
+    if (underlay) { try { underlay(bx, W, H); } catch (e) { console.warn(e); } }   // 한지 밑 본보기 — 먹은 그 위에 곱하기로 얹힌다(얇은 한지 아래 체본처럼)
     bx.restore();
   }
   // 보이는 화면 = 종이(+ 앞 붓질) × 지금 붓질
@@ -48,6 +50,7 @@ export function makeBrush(wrap, { onStroke = () => {} } = {}) {
     for (const c of [canvas, base, layer]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     lx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (onFit) onFit(W, H);
     paper(); compose();
   }
   //  붓에 먹 묻히기 — 털마다 먹 양 · 마르는 빠르기 · 흔들림이 조금씩 달라 갈라지는 자리가 늘 다르다('조금' = 30%)
@@ -147,7 +150,7 @@ export function makeBrush(wrap, { onStroke = () => {} } = {}) {
       lx.beginPath(); lx.moveTo(br.last.x, br.last.y); lx.lineTo(br.last.x + cur.dir.x * ext + nx * (Math.random() - 0.5), br.last.y + cur.dir.y * ext + ny * (Math.random() - 0.5)); lx.stroke();
     }
   }
-  const holdR = () => 3 + 14 * Math.min(1, (performance.now() - cur.t0) / 700);
+  const holdR = () => 3 + MAXW * 0.54 * Math.min(1, (performance.now() - cur.t0) / 700);
   function showRing() {
     if (!cur || cur.moved) { ring.style.display = 'none'; return; }
     const r = holdR(); ring.style.display = 'block'; ring.style.width = ring.style.height = r * 2 + 'px';
@@ -160,7 +163,7 @@ export function makeBrush(wrap, { onStroke = () => {} } = {}) {
     e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch {}
     const p = pos(e); dip();
     lx.save(); lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, layer.width, layer.height); lx.restore();
-    cur = { id: e.pointerId, p0: p, last: p, t0: p.t, w: MAXW * 0.7, moved: false, len: 0, wsum: 0, maxW: 0, dryLen: 0, wet, ph: Math.random() * 6.28, dir: null };
+    cur = { id: e.pointerId, p0: p, last: p, t0: p.t, w: MAXW * 0.7, moved: false, len: 0, wsum: 0, maxW: 0, dryLen: 0, wet, ph: Math.random() * 6.28, dir: null, pts: [], hold: 0 };
     showRing();
   });
   canvas.addEventListener('pointermove', e => {
@@ -168,7 +171,8 @@ export function makeBrush(wrap, { onStroke = () => {} } = {}) {
     const p = pos(e), d = Math.hypot(p.x - cur.last.x, p.y - cur.last.y);
     if (!cur.moved && Math.hypot(p.x - cur.p0.x, p.y - cur.p0.y) < 6) return;
     if (!cur.moved) {   // 붓을 댄 자리 — 누른 만큼의 둥근 시작(기필)
-      cur.moved = true; cur.w = Math.min(MAXW, holdR() * 2); ring.style.display = 'none';
+      cur.moved = true; cur.hold = p.t - cur.t0; cur.w = Math.min(MAXW, holdR() * 2); ring.style.display = 'none';
+      cur.pts.push([cur.p0.x, cur.p0.y, cur.w]);
       const m = mulOf(tone);
       if (cur.wet) { lx.globalCompositeOperation = 'destination-over'; halo(cur.p0.x, cur.p0.y, cur.w / 2, cur.w * 1.15, m, 1); lx.globalCompositeOperation = 'source-over'; }
       if (load === 'full') blot(cur.p0.x, cur.p0.y, cur.w / 2, css(m, 0.95), 0.08);
@@ -180,15 +184,16 @@ export function makeBrush(wrap, { onStroke = () => {} } = {}) {
     cur.w = cur.w * 0.7 + target * 0.3;
     if (d > 0.5) cur.dir = { x: (p.x - cur.last.x) / d, y: (p.y - cur.last.y) / d };
     seg(cur.last, p, cur.w); cur.last = p;
+    cur.pts.push([p.x, p.y, cur.w]);   // 획의 길과 굵기(판본체 쓰기가 읽는다)
     schedule();
   });
   const end = e => {
     if (!cur || e.pointerId !== cur.id) return;
     cancelAnimationFrame(ringRaf); ring.style.display = 'none';
     let st;
-    if (!cur.moved) { const r = holdR(); dot(cur.p0, r); st = { dot: true, len: 0, avgW: r * 2, maxW: r * 2, dry: 0 }; }
-    else { tail(); st = { dot: false, len: Math.round(cur.len), avgW: cur.len ? cur.wsum / cur.len : 0, maxW: cur.maxW, dry: cur.len ? cur.dryLen / cur.len : 0 }; }
-    st.wet = cur.wet; st.tone = tone.k; st.load = load;
+    if (!cur.moved) { const r = holdR(); dot(cur.p0, r); st = { dot: true, len: 0, avgW: r * 2, maxW: r * 2, dry: 0, pts: [[cur.p0.x, cur.p0.y, r * 2]], hold: performance.now() - cur.t0 }; }
+    else { tail(); st = { dot: false, len: Math.round(cur.len), avgW: cur.len ? cur.wsum / cur.len : 0, maxW: cur.maxW, dry: cur.len ? cur.dryLen / cur.len : 0, pts: cur.pts, hold: cur.hold }; }
+    st.wet = cur.wet; st.tone = tone.k; st.load = load; st.W = W; st.H = H; st.cap = MAXW;
     //  다 그은 붓질을 종이에 얹는다(곱하기 — 겹치면 더 진하게)
     bx.save(); bx.setTransform(1, 0, 0, 1, 0, 0); bx.globalCompositeOperation = 'multiply'; bx.drawImage(layer, 0, 0); bx.restore();
     cur = null;

@@ -3,7 +3,7 @@
 import { h, toast, modal } from './util.js';
 import { ST, CHAPTERS } from './stages.js';
 
-export const MISTAKES = { dark: '너무 진함(물 모자람)', pale: '너무 옅음(먹 모자람)', amount: '양 · 비율', pick: '섞기 예상', order: '농담 차례', paper: '먹 없이 물만' };
+export const MISTAKES = { dark: '너무 진함(물 모자람)', pale: '너무 옅음(먹 모자람)', amount: '양 · 비율', pick: '섞기 예상', order: '차례(농담 · 획순)', paper: '먹 없이 물만', reverse: '획 방향', off: '밑그림 밖', weak: '획이 덜 곧고 고름' };
 const MK = Object.keys(MISTAKES);
 const SCORED = ST.filter(s => s.kind !== 'brush');
 
@@ -54,7 +54,7 @@ export async function mountTeacher(root, ctx) {
         h('tr', {}, h('th', { rowspan: 2 }, '이름'), ...CHAPTERS.filter(c => ST.some(s => s.ch === c.id)).map(c => h('th', { colspan: ST.filter(s => s.ch === c.id).length, class: 'u' }, `${c.id}장 ${c.title}`)), h('th', { rowspan: 2 }, '많이 헷갈린 것')),
         h('tr', {}, ...ST.map(s => h('th', { title: s.title }, s.id)))),
       h('tbody', {}, ...kids.map(k => { const top = topMk(mkOf(k))[0]; return h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...ST.map(s => cell(k, s)), h('td', { class: 'mk' }, top ? `${MISTAKES[top[0]]} ${top[1]}` : '—')); })))),
-    h('p', { class: 'muted small', style: { margin: '8px 2px 0' } }, '너무 진함 = 물이 모자람 · 너무 옅음 = 먹이 모자람 · 양 · 비율 = 먹색은 맞는데 방울 수가 모자람 · 농담 차례 = 앞 칸보다 옅게 칠하지 못함. 숫자는 그 판에서 답을 냈다가 안 맞은 횟수예요.'),
+    h('p', { class: 'muted small', style: { margin: '8px 2px 0' } }, '너무 진함 = 물이 모자람 · 너무 옅음 = 먹이 모자람 · 양 · 비율 = 먹색은 맞는데 방울 수가 모자람 · 차례 = 농담 꼬리에서 앞 칸보다 옅게 못 칠함 · 판본체 쓰기에서 획순이 다름 · 획 방향 = 가로를 오른쪽에서, 세로를 아래에서 그음 · 밑그림 밖 = 본보기 밖에 그은 획. 숫자는 그 판에서 답을 냈다가(다 써 봤다가) 안 맞은 횟수예요.'),
     tails.length ? h('div', { class: 'tfeel' }, h('h3', {}, '우리 반 먹색 꼬리(1-5)'),
       h('div', { class: 'tails' }, ...tails.map(([k, r]) => h('div', { class: 'tail' }, h('span', { class: 'nm' }, names[k] || k), h('span', { class: 'tail-c' }, ...r.c.map(c => h('i', { style: { background: c } }))), h('span', { class: 'muted small' }, '★'.repeat(r.st))))),
       h('p', { class: 'muted small' }, '칸 사이 밝기 차이가 고를수록 별이 많아요. 한쪽 끝에 비슷한 칸이 몰린 아이는 ‘물을 조금씩 더하기’를 진짜 먹으로 한 번 더 해 보면 좋아요.')) : null,

@@ -33,7 +33,7 @@ const ctx = {
 const artQuery = () => { const q = new URLSearchParams(location.search); q.delete('debug'); q.set('from', 'ink'); return q.toString(); };
 // 판이 열렸나 — 장 안에서 앞 판을 풀어야 다음 판(선생님은 다 열림)
 const isOpen = s => { if (TEACHER) return true; const l = stOf(s.ch), i = l.indexOf(s); return i === 0 || !!progress[l[i - 1].id]; };
-const KIND = { predict: '예상', mix: '섞기', chain: '꼬리', brush: '붓' };
+const KIND = { predict: '예상', mix: '섞기', chain: '꼬리', brush: '붓', write: '쓰기' };
 const TASK_ICON = { dots: 'radial-gradient(circle at 34% 40%,#1b1d22 0 18%,transparent 19%),radial-gradient(circle at 70% 64%,#1b1d22 0 9%,transparent 10%)', lines: 'linear-gradient(115deg,transparent 30%,#1b1d22 31% 44%,transparent 45% 62%,#555a60 63% 66%,transparent 67%)', dry: 'repeating-linear-gradient(0deg,#2a2c30 0 2px,transparent 2px 5px)', wet: 'radial-gradient(circle,#2a2c30 0 22%,rgba(42,44,48,.35) 30%,transparent 52%)', free: 'linear-gradient(160deg,transparent 40%,#8d9196 41% 54%,transparent 55%),linear-gradient(20deg,transparent 46%,#1b1d22 47% 66%,transparent 67%)' };
 // 판 단추 그림 — 판이 무엇을 하는지 한눈에(작은 동그라미 하나)
 function iconOf(s) {
@@ -41,6 +41,7 @@ function iconOf(s) {
   if (s.kind === 'predict') bg = `conic-gradient(#1b1d22 0 25%,#bcd8e6 25% 100%)`;
   else if (s.kind === 'mix') bg = hx(s.target.d);
   else if (s.kind === 'chain') bg = `linear-gradient(90deg,${TONES.map(t => hx(t)).join(',')})`;
+  else if (s.kind === 'write') return h('span', { class: 'sicon glyph' }, s.glyph);   // 판본체 쓰기 — 그 판의 글자
   else bg = TASK_ICON[s.task] + ',#f1ebdf';
   return h('span', { class: 'sicon', style: { background: bg } });
 }
@@ -66,9 +67,9 @@ function home() {
           h('span', { class: 'stars' }, pr ? (s.kind === 'brush' ? '✓ 해 봤어요' : '★'.repeat(pr.st) + '☆'.repeat(3 - pr.st)) : open ? KIND[s.kind] : '🔒'));
       })));
   };
-  //  3장 = 명화 탐정의 수묵 사건으로(같은 sid · 이름 그대로 넘긴다)
+  //  4장 = 명화 탐정의 수묵 사건으로(같은 sid · 이름 그대로 넘긴다)
   const artCard = () => {
-    const c = CHAPTERS.find(x => x.id === 3), n = INK_CASES.filter(k => artDone[k.id]).length;
+    const c = CHAPTERS.find(x => x.id === 4), n = INK_CASES.filter(k => artDone[k.id]).length;
     return h('div', { class: 'ccard ink-art' },
       h('div', { class: 'c-head' }, h('b', {}, `${c.id}장 · ${c.title}`), h('span', { class: 'chip' }, c.concept), h('span', { class: 'sp' }), h('span', { class: 'muted' }, `${n} / ${INK_CASES.length}`)),
       h('p', {}, c.intro),
@@ -83,13 +84,13 @@ function home() {
       h('div', { class: 'intro' },
         h('img', { class: 'host', src: HOST, alt: '' }),
         h('div', { class: 'intro-t' }, h('h2', {}, '먹 하나로 진하게, 옅게'),
-          h('p', {}, '숯늑대의 먹 연구소예요. 먹은 나무나 기름을 태운 그을음을 아교로 굳혀 만들어요. 먹물에 물을 섞을수록 옅어지는 먹색(농담)을 만들고, 한지에 붓으로 점 · 선 · 마른 붓 · 번짐을 그어 봐요. 그다음 옛 화가의 그림에서 먹색을 읽어요.'),
+          h('p', {}, '숯늑대의 먹 연구소예요. 먹은 나무나 기름을 태운 그을음을 아교로 굳혀 만들어요. 먹물에 물을 섞을수록 옅어지는 먹색(농담)을 만들고, 한지에 붓으로 점 · 선 · 마른 붓 · 번짐을 그어 보고, 판본체 글씨를 써요. 그다음 옛 화가의 그림에서 먹색을 읽어요.'),
           h('div', { class: 'intro-row' },
             h('div', { class: 'mine' }, h('b', {}, `${done} / ${ST.length}`), h('span', {}, '한 판'), h('b', {}, String(stars)), h('span', {}, '별')))),
         h('div', { class: 'my-tones' }, h('div', { class: 'mt-row' }, ...tones.map(x => h('span', { class: 'mt' + (x.c ? '' : ' is-empty'), style: { background: x.c || '' }, title: x.t.name }))),
           h('span', { class: 'muted small' }, `내 먹색 다섯 ${got} / 5`))),
       h('div', { class: 'chapters' }, ...CHAPTERS.filter(c => ST.some(s => s.ch === c.id)).map(chCard), artCard()),
-      h('p', { class: 'muted small foot' }, '3~4학년 미술 [4미02-02] 표현 재료(한지 · 먹)와 용구의 특성 · 사용 방법 · [4미02-03] 조형 요소(선 · 질감) 탐색 · [4미03-02] 작품의 특징 설명. 미술 교과서 9종 모두 3학년에 먹 · 수묵화가 있어요. 진짜 먹과 붓으로 한 번 더 해 보면 손이 기억해요.'))));
+      h('p', { class: 'muted small foot' }, '3~4학년 미술 [4미02-02] 표현 재료(한지 · 먹)와 용구의 특성 · 사용 방법 · [4미02-03] 조형 요소(선 · 질감) 탐색 · [4미03-02] 작품의 특징 설명. 미술 교과서 9종 모두 3학년에 먹 · 수묵화, 4학년에 판본체 붓글씨가 있어요. 진짜 먹과 붓으로 한 번 더 해 보면 손이 기억해요.'))));
 }
 
 async function route() {

@@ -6,6 +6,7 @@ import { judgeMix, judgeCell, chainStars, judgeBrush, readStroke } from './judge
 import { CHAPTERS, stOf } from './stages.js';
 import { makeDish, POTS } from './dish.js';
 import { makeBrush } from './brush.js';
+import { GLYPHS, STROKE_W, KIND_NAME, layoutCells, toCellStroke, makeSheet } from './write.js';
 
 export const HOST = '../assets/monsters/m49.png';   // 숯늑대 — 먹 연구소 조수(먹은 나무를 태운 그을음으로 만든다)
 const STAR = n => '★'.repeat(n) + '☆'.repeat(3 - n);
@@ -51,12 +52,12 @@ export function mountStage(root, ctx, s) {
   const msg = h('div', { class: 'msg' });
   const say = (t, kind = '') => { msg.textContent = t; msg.className = 'msg ' + kind; };
   const hintBtn = h('button', { class: 'btn small hint', onclick: () => modal('💡 힌트', h('p', {}, s.hint)) }, '💡 힌트');
-  hintBtn.style.display = s.kind === 'brush' ? '' : 'none';   // 붓 놀이는 틀림이 없어 힌트를 늘 보여 준다
+  hintBtn.style.display = s.kind === 'brush' || s.kind === 'write' ? '' : 'none';   // 붓 놀이는 틀림이 없어 힌트를 늘 보여 준다
   const over = h('div', { class: 'over' });
   const Q = h('div', { class: 'q-body' }), A = h('div', { class: 'a-body' });
   root.replaceChildren(
     ctx.topBar(`${s.id} · ${s.title}`, { back: '#/', right: [h('span', { class: 'chip c-ch' }, `${ch.id}장 ${ch.title}`)] }),
-    h('div', { class: 'pz' + (s.kind === 'brush' ? ' wide' : '') },
+    h('div', { class: 'pz' + (s.kind === 'brush' || s.kind === 'write' ? ' wide' : '') },
       h('section', { class: 'q' }, h('div', { class: 'story' }, h('img', { src: HOST, alt: '' }), h('div', {}, h('b', {}, s.title), h('p', {}, s.story))), Q),
       h('section', { class: 'a' }, A, h('div', { class: 'foot-row' }, msg, h('span', { class: 'sp' }), hintBtn)),
       over));
@@ -182,7 +183,112 @@ export function mountStage(root, ctx, s) {
     check();
   }
 
-  const RUN = { predict, mix: mixStage, chain, brush: brushStage };
+  // ── 판본체 쓰기 — 한지 밑 연한 본보기(체본) 위에 붓으로 따라 쓰기 · 획마다 읽어 주기 · 획순 · 방향 ──
+  function writeStage() {
+    const n = s.cells.length, NS = 'http://www.w3.org/2000/svg';
+    let cells = [], guide = true, sheet = makeSheet(s.cells), ended = false;
+    const paperWrap = h('div', { class: 'paper-wrap write' }), ov = document.createElementNS(NS, 'svg');
+    ov.setAttribute('class', 'write-ov');
+    //  본보기(칸 좌표) → 종이 px
+    const X = (c, v) => c.x + v / 100 * c.s, Y = (c, v) => c.y + v / 100 * c.s, U = (c, v) => v / 100 * c.s;
+    function drawModel(g, c, m, { fill, width }) {
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      if (m.k === 'circle' || m.k === 'dot') {
+        const [cx, cy, r] = m.c; g.beginPath(); g.arc(X(c, cx), Y(c, cy), U(c, r), 0, Math.PI * 2);
+        if (m.k === 'dot') { g.fillStyle = fill; g.fill(); } else { g.strokeStyle = fill; g.lineWidth = width; g.stroke(); }
+        return;
+      }
+      g.strokeStyle = fill; g.lineWidth = width; g.beginPath();
+      m.p.forEach(([x, y], i) => (i ? g.lineTo(X(c, x), Y(c, y)) : g.moveTo(X(c, x), Y(c, y)))); g.stroke();
+    }
+    //  한지 밑에 비치는 것 — 붉은 칸 · 十 안내선 · 연한 본보기 글자
+    function underlay(g) {
+      for (const [ci, c] of cells.entries()) {
+        g.save();
+        g.strokeStyle = 'rgba(190,70,50,.55)'; g.lineWidth = 1.5; g.strokeRect(c.x, c.y, c.s, c.s);
+        g.setLineDash([5, 5]); g.strokeStyle = 'rgba(190,70,50,.3)'; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(c.x + c.s / 2, c.y); g.lineTo(c.x + c.s / 2, c.y + c.s); g.moveTo(c.x, c.y + c.s / 2); g.lineTo(c.x + c.s, c.y + c.s / 2); g.stroke();
+        g.restore();
+        if (guide) for (const m of GLYPHS[s.cells[ci]]) drawModel(g, c, m, { fill: 'rgba(120,112,100,.24)', width: U(c, STROKE_W) });
+      }
+    }
+    //  획순 숫자 · 다음 획 화살표(종이 위 · 눌림 없음)
+    function overlay() {
+      const W = paperWrap.clientWidth, H = paperWrap.clientHeight, nx = sheet.next();
+      ov.setAttribute('viewBox', `0 0 ${W} ${H}`); ov.replaceChildren();
+      if (!guide) return;
+      const add = (tag, at, txt) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(at)) e.setAttribute(k, v); if (txt != null) e.textContent = txt; ov.append(e); return e; };
+      sheet.model.forEach((m, j) => {
+        const c = cells[m.cell]; if (!c) return;
+        const isDone = sheet.done[j] && (m.k !== 'circle' || sheet.done[j].complete), isNext = j === nx;
+        let sx, sy, ex, ey;
+        if (m.k === 'circle' || m.k === 'dot') { sx = X(c, m.c[0]); sy = Y(c, m.c[1] - m.c[2]); ex = sx - 1; ey = sy; }
+        else { [sx, sy] = [X(c, m.p[0][0]), Y(c, m.p[0][1])]; [ex, ey] = [X(c, m.p[1][0]), Y(c, m.p[1][1])]; }
+        const L = Math.hypot(ex - sx, ey - sy) || 1, ux = (ex - sx) / L, uy = (ey - sy) / L, off = Math.max(13, U(c, 7));
+        const bx = m.k === 'circle' || m.k === 'dot' ? sx : sx - ux * off - uy * off * 0.9, by = m.k === 'circle' || m.k === 'dot' ? sy - off : sy - uy * off + ux * off * 0.9;
+        if (isNext && m.k !== 'dot') {   // 다음 획 — 그을 방향 화살표
+          const ax = sx + ux * Math.min(L * 0.55, U(c, 30)), ay = sy + uy * Math.min(L * 0.55, U(c, 30));
+          if (m.k === 'circle') { const r = U(c, m.c[2]), cx = X(c, m.c[0]), cy = Y(c, m.c[1]); add('path', { d: `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx - r} ${cy}`, class: 'wo-arrow' }); }
+          else add('line', { x1: sx, y1: sy, x2: ax, y2: ay, class: 'wo-arrow' });
+        }
+        add('circle', { cx: bx, cy: by, r: 11, class: 'wo-dot' + (isDone ? ' done' : isNext ? ' next' : '') });
+        add('text', { x: bx, y: by + 4, class: 'wo-num' + (isDone ? ' done' : isNext ? ' next' : '') }, isDone ? '✓' : String(j + 1));
+      });
+    }
+    const brush = makeBrush(paperWrap, {
+      maxW: 34, underlay: g => underlay(g),
+      onFit: (W, H) => { cells = layoutCells(W, H, n); requestAnimationFrame(overlay); },
+      onStroke: st => onStroke(st),
+    });
+    paperWrap.append(ov);
+    cleanup = () => brush.destroy();
+    const reads = h('ol', { class: 'reads' }), nextEl = h('p', { class: 'a-q next-stroke' });
+    const sample = h('div', { class: 'sample' });
+    //  본보기(작게) — 칸마다 글자 그림 + 획 수
+    for (const key of s.cells) {
+      const sv = document.createElementNS(NS, 'svg'); sv.setAttribute('viewBox', '-4 -4 108 108'); sv.setAttribute('class', 'sample-g');
+      sv.innerHTML = `<rect x="0" y="0" width="100" height="100" class="sg-box"/>` + GLYPHS[key].map((m, j) => (m.k === 'circle' ? `<circle cx="${m.c[0]}" cy="${m.c[1]}" r="${m.c[2]}" class="sg-s"/>` : m.k === 'dot' ? `<circle cx="${m.c[0]}" cy="${m.c[1]}" r="${m.c[2]}" class="sg-d"/>` : `<polyline points="${m.p.map(q => q.join(',')).join(' ')}" class="sg-s"/>`) + `<text x="${m.k === 'circle' || m.k === 'dot' ? m.c[0] : m.p[0][0] - 6}" y="${m.k === 'circle' || m.k === 'dot' ? m.c[1] - m.c[2] - 3 : m.p[0][1] - 4}" class="sg-n">${j + 1}</text>`).join('');
+      sample.append(sv);
+    }
+    if (s.hunmin) {   // 해례본 그 글자(art/img/hunmin.webp 의 한 곳을 크게)
+      const [x0, y0, x1, y1] = s.hunmin, B = 104, bgW = B / ((x1 - x0) / 100), bgH = bgW * 1038 / 1280, hgt = B * ((y1 - y0) * 1038) / ((x1 - x0) * 1280);
+      sample.append(h('figure', { class: 'hunmin' }, h('div', { class: 'hm-crop', style: { width: B + 'px', height: Math.round(hgt) + 'px', backgroundImage: 'url(../art/img/hunmin.webp)', backgroundSize: `${bgW}px ${bgH}px`, backgroundPosition: `${-x0 / 100 * bgW}px ${-y0 / 100 * bgH}px` } }),
+        h('figcaption', {}, '1446년 해례본의 글자'), h('figcaption', { class: 'small' }, '왼쪽 두 점 = 방점(소리 높낮이)')));
+    }
+    const guideBtn = h('button', { class: 'btn small', 'data-act': 'guide', onclick: () => { guide = !guide; guideBtn.textContent = guide ? '👻 밑그림 없이 쓰기' : '📄 밑그림 보이기'; fresh(guide ? '밑그림을 다시 깔았어요.' : '밑그림 없이 — 칸과 획순만 생각하며 써요.'); } }, '👻 밑그림 없이 쓰기');
+    function fresh(msgText = '새 한지를 깔았어요.') { sheet = makeSheet(s.cells); ended = false; reads.replaceChildren(); brush.clear(); overlay(); showNext(); say(msgText); }
+    function showNext() {
+      const j = sheet.next();
+      if (j < 0) { nextEl.textContent = '다 썼어요!'; return; }
+      const m = sheet.model[j], dir = m.k === 'h' ? '왼쪽 → 오른쪽' : m.k === 'v' ? '위 → 아래' : m.k === 'bend' ? '처음 자리에서 꺾어' : m.k === 'circle' ? '맨 위에서 둥글게' : '꾹 눌렀다 떼기';
+      nextEl.textContent = `다음: ${j + 1}번 ${m.n} — ${dir}`;
+    }
+    function onStroke(st) {
+      if (ended) { say('다 썼어요 — 🧻 새 한지에 다시 써 봐요.'); return; }
+      const ev = sheet.add(toCellStroke(st, cells));
+      if (globalThis.__write) lastW = (st.pts || []).map(p => Math.round(p[2] * 10) / 10);
+      if (!ev || ev.type === 'tiny') return;
+      const ok = ev.type === 'ok' || ev.type === 'part', label = ev.idx != null ? `${ev.idx + 1}. ${ev.m.n}` : '밖';
+      const note = ev.type === 'order' ? ` · 획순: ${sheet.next() + 1}번보다 먼저 썼어요` : ev.type === 'reverse' ? ' · 방향이 거꾸로예요' : '';
+      reads.append(h('li', { class: ok && !ev.weak ? 'ok' : 'warn' }, h('b', {}, label), h('span', {}, (ev.issue ? `⚠ ${ev.issue} · ` : '') + (ev.say || '') + note)));
+      reads.scrollTop = reads.scrollHeight;
+      say(ev.type === 'order' ? '획순이 달라요 — 숫자 차례대로 써요' : ev.type === 'reverse' ? (ev.m.k === 'h' ? '가로획은 왼쪽에서 오른쪽으로!' : ev.m.k === 'v' ? '세로획은 위에서 아래로!' : '본보기 숫자 자리에서 시작해요') : ev.type === 'off' ? ev.say : `🖌 ${label} — ${ev.say}`, ok ? '' : 'bad');
+      overlay(); showNext();
+      const r = sheet.result();
+      if (!r.finished) return;
+      ended = true;
+      if (r.pass) { solved = true; const img = h('img', { class: 'win-sheet', src: brush.canvas.toDataURL('image/png'), alt: '내 글씨' }); finish(s.why, r.stars, { show: img }); return; }
+      miss(r.kind); say(`${r.why} — 🧻 새 한지에 다시 써요`, 'bad');
+    }
+    put(Q, paperWrap);
+    put(A, h('div', { class: 'write-top' }, sample, h('div', { class: 'write-side' }, nextEl, h('div', { class: 'row' }, h('button', { class: 'btn small', 'data-act': 'fresh', onclick: () => fresh() }, '🧻 새 한지'), guideBtn))),
+      h('div', { class: 'reads-box' }, h('b', {}, '획 읽기'), reads));
+    showNext();
+    let lastW = null;
+    if (globalThis.location && /[?&]debug=1/.test(location.search)) globalThis.__write = { cells: () => cells, model: () => sheet.model, result: () => sheet.result(), widths: () => lastW };
+  }
+
+  const RUN = { predict, mix: mixStage, chain, brush: brushStage, write: writeStage };
   RUN[s.kind]();
   // 장 안내(처음 한 번)
   if (idx === 0 && !lsGet('ink.intro.' + ch.id, false)) { lsSet('ink.intro.' + ch.id, true); modal(`${ch.id}장 · ${ch.title}`, h('div', {}, h('p', {}, ch.intro))); }
