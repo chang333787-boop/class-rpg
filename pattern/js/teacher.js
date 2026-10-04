@@ -1,6 +1,7 @@
 // 선생님 헷갈림 지도 — 아이 × 판 표(푼 판은 별, 못 푼 판은 답한 수) + 아이마다 헷갈림 셈(좌우·위아래 · 돌리는 방향 · 각도 · 뒤집기·돌리기 …)
 //  관리자 비밀번호로 연다(기초 코딩 · 음악실과 같은 방식). 쓰는 것 = 우리 반 무늬 전시에서 내리기 하나뿐.
 import { h, toast, modal } from './util.js';
+import { teacherGate } from '../../common/teacher-gate.js';
 import { PUZ, CHAPTERS } from './stages.js';
 import { MISTAKES, validWork, wallpaper, WALL } from './tiles.js';
 import { wallCanvas } from './draw.js';
@@ -9,15 +10,8 @@ const STD = '4학년 수학 ‘평면도형의 이동’ [4수03-04] 밀기 · �
 
 const MK = Object.keys(MISTAKES);
 
-async function gate(ctx) {
-  if (ctx.store.me.guest) return true;
-  try { if (sessionStorage.getItem('pattern.teacher') === '1') return true; } catch {}
-  const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
-  if (!pw) return false;
-  try { if (await ctx.store.teacherOK(pw)) { try { sessionStorage.setItem('pattern.teacher', '1'); } catch {} return true; } } catch (e) { console.warn(e); }
-  toast('비밀번호가 맞지 않아요');
-  return false;
-}
+// 선생님 화면 문 — 손님 · 이 창에서 통과('pattern.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
+function gate(ctx) { return teacherGate(ctx, 'pattern.teacher'); }
 
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }

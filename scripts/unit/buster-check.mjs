@@ -18,6 +18,9 @@
 //   · 하위 앱 **자기 파일**(css · import map 의 ./js/*.js)은 REVIEW 수준: 고쳤는데 값 그대로 · import map 에 없는 js ·
 //     같은 html 안에서 <script src> 와 import map 값이 다름(같은 모듈이 두 번 실행될 수 있음).
 //     하위 앱은 정수 버스터(?v=7)를 쓰므로 날짜 비교는 하지 않는다.
+//  [BUSTER-COMMON-1] 하위 앱 공통 파일(common/util.js · rpg-firebase.js · teacher-gate.js · subapp.css)은 import map 의 "../common/…" 키 ·
+//   <link href="../common/…"> 로 부른다 → 루트 파일과 똑같이 ①②③(여러 앱이 부르면 머지 뒤 값이 모두 같은가 = FAIL 가능).
+//   ⑤ 앱 모듈(그리고 그 모듈이 부르는 common 모듈)이 import 하는 common/*.js 가 그 앱 import map 에 없으면 FAIL — ?v= 없이 받아져 옛 캐시가 남는다.
 //  순서는 **앞 8자리 날짜로만** 본다. 같은 날 세션 코드끼리(q3a·rfa·st…)는 글자 순서에 뜻이 없고,
 //  캐시는 '처음 보는 문자열'이면 새로 받으므로 같은 날 다른 값이면 통과다(09-15 #220 q3a←rfa 오탐으로 확인).
 //  진짜 위험은 ⓐ 그대로 ⓑ 날짜가 과거로 감(옛 값 재사용 가능성) 두 가지.
@@ -59,10 +62,11 @@ export function parseRefs(html, dir = '') {
     out.push({ file, ver, via: 'tag' });
   }
   // [BUSTER-SUBAPP-1] import map 의 상대 주소 값("./js/app.js": "./js/app.js?v=7"). 맨 이름 키("three")는 외부 묶음이라 뺀다.
+  //  [BUSTER-COMMON-1] "../common/util.js" 처럼 위 폴더 키도 본다(resolveIn 이 저장소 기준 common/util.js 로 바꾼다).
   for (const m of html.matchAll(/<script\s+type="importmap"\s*>([\s\S]*?)<\/script>/g)) {
     let map; try { map = JSON.parse(m[1]); } catch { continue; }
     for (const [key, val] of Object.entries((map && map.imports) || {})) {
-      if (!key.startsWith('./') || typeof val !== 'string') continue;
+      if (!/^\.\.?\//.test(key) || typeof val !== 'string') continue;
       const { p, ver } = splitUrl(val);
       const file = resolveIn(dir, p);
       if (!file || !/\.(js|css)$/.test(file)) continue;
@@ -138,10 +142,38 @@ export function check({ changed, baseHtml, tipHtml = baseHtml, headHtml, headFil
     else add('PASS', `${file} html ${list.length}곳 동일 (v=${list[0].ver})`);
   }
   for (const f of changed) {
-    if (!/\.(js|css)$/.test(f) || f.includes('/')) continue;
+    if (!/\.(js|css)$/.test(f) || (f.includes('/') && !f.startsWith('common/'))) continue;   // [BUSTER-COMMON-1] common/ 도 루트처럼
     if (!htmlList.some(h => refMap(headHtml[h], dirOf(h)).has(f))) add('REVIEW', `${f} 를 고쳤지만 어느 html 에서도 참조 안 함`);
   }
   return results;
+}
+
+// [BUSTER-COMMON-1] ⑤ 하위 앱이 부르는 common 모듈이 그 앱 import map 에 있는가.
+//  앱 js(<폴더>/js/*.js)의 상대 import 를 따라가 common/*.js 에 닿으면(공통 모듈끼리 부르는 것도 따라감) 그 html 의 import map 에 있어야 한다.
+//  read(file) = 그 파일 글(없으면 null). 정적 import · export … from · import('…') 만 본다(이 저장소 꼴).
+export function commonGaps({ headHtml, headFiles, read }) {
+  const out = [];
+  for (const h of Object.keys(headHtml)) {
+    const dir = dirOf(h); if (!dir || !headHtml[h]) continue;
+    const refs = parseRefs(headHtml[h], dir).filter(r => r.via === 'importmap');
+    if (!refs.length) continue;
+    const mapped = new Set(refs.map(r => r.file)), seen = new Set(), miss = new Map();
+    const todo = headFiles.filter(f => f.startsWith(dir + '/js/') && f.endsWith('.js'));
+    while (todo.length) {
+      const f = todo.pop(); if (seen.has(f)) continue; seen.add(f);
+      const src = read(f) || '';
+      for (const m of src.matchAll(/^\s*(?:import|export)\b[^'"\n]*?from\s*['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)/gm)) {
+        const spec = m[1] || m[2]; if (!/^\.\.?\//.test(spec)) continue;
+        const t = path.posix.normalize(path.posix.join(path.posix.dirname(f), spec));
+        if (!t.startsWith('common/')) continue;
+        if (!mapped.has(t) && !miss.has(t)) miss.set(t, f);
+        todo.push(t);
+      }
+    }
+    for (const [t, f] of miss) out.push({ level: 'FAIL', msg: `${h}: ${f} 가 ${t} 를 부르는데 import map 에 없음 — ?v= 없이 받아져 옛 캐시가 남음 ("../${t}" 키 더하기)` });
+    if (!miss.size && [...seen].some(f => f.startsWith('common/'))) out.push({ level: 'PASS', msg: `${h}: 부르는 common 모듈 ${[...seen].filter(f => f.startsWith('common/')).length}개 모두 import map 에 있음` });
+  }
+  return out;
 }
 
 // ── 실행 ──
@@ -153,6 +185,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const baseHtml = {}, tipHtml = {}, headHtml = {};
   for (const h of [...HTML_FILES, ...subHtml]) { baseHtml[h] = show(mb, h); tipHtml[h] = show(BASE, h); headHtml[h] = show(HEAD, h); }
   const res = check({ changed, baseHtml, tipHtml, headHtml, headFiles });
+  res.push(...commonGaps({ headHtml, headFiles, read: f => show(HEAD, f) }));   // [BUSTER-COMMON-1]
   const icon = { PASS: '✅ PASS  ', REVIEW: '🟡 REVIEW', FAIL: '❌ FAIL  ' };
   console.log(`base ${BASE} (${git('rev-parse', '--short', BASE).trim()}) · head ${HEAD} (${git('rev-parse', '--short', HEAD).trim()}) · merge-base ${mb.slice(0, 7)} · 바뀐 파일 ${changed.size} · html ${HTML_FILES.length}+하위 앱 ${subHtml.length}`);
   for (const r of res) console.log(`${icon[r.level]} ${r.msg}`);

@@ -384,6 +384,31 @@ cur = 'buster-check';
     const r = check({ changed: new Set(), baseHtml: b2, headHtml: b2, headFiles: ['art/js/app.js', 'art/js/util.js', 'art/js/new.js'] });
     eq(lv(r, 'REVIEW').length, 2);
   });
+  // [BUSTER-COMMON-1] 하위 앱 공통 파일(common/) — "../common/…" import map 키 · <link> 는 루트 파일처럼 ①②③
+  const { commonGaps } = await import('./buster-check.mjs');
+  const cm = (u, css = u) => `<link rel="stylesheet" href="../common/subapp.css?v=${css}"><script type="importmap">{ "imports": { "./js/app.js": "./js/app.js?v=1", "../common/util.js": "../common/util.js?v=${u}" } }</script>`;
+  test('공통 util 을 두 앱이 다른 값으로 부름 → ③ 불일치 FAIL', () => {
+    const b2 = { ...base, 'art/index.html': cm('20261004r5a'), 'ink/index.html': cm('20261004r5a') };
+    const head = { ...b2, 'ink/index.html': cm('20261005x1a', '20261004r5a') };
+    const f = lv(check({ changed: new Set(['common/util.js']), baseHtml: b2, headHtml: head }), 'FAIL');
+    if (!f.some(m => m.includes('common/util.js') && m.includes('html 마다 다름'))) throw new Error('불일치 못 잡음: ' + JSON.stringify(f));
+  });
+  test('공통 util 을 고치고 두 앱 모두 올림 → FAIL 0 · 안 올리면 FAIL', () => {
+    const b2 = { ...base, 'art/index.html': cm('20261004r5a'), 'ink/index.html': cm('20261004r5a') };
+    const head = { ...b2, 'art/index.html': cm('20261005x1a', '20261004r5a'), 'ink/index.html': cm('20261005x1a', '20261004r5a') };
+    eq(lv(check({ changed: new Set(['common/util.js']), baseHtml: b2, headHtml: head }), 'FAIL').length, 0);
+    eq(lv(check({ changed: new Set(['common/util.js', 'common/subapp.css']), baseHtml: b2, headHtml: head }), 'FAIL').length, 2);   // css 두 곳 그대로
+  });
+  test('⑤ 앱 모듈이 부르는 common 모듈이 import map 에 없음 → FAIL(공통끼리 부르는 것까지 따라감)', () => {
+    const files = { 'art/js/app.js': "import { h } from './util.js';", 'art/js/util.js': "export * from '../../common/util.js';", 'art/js/teacher.js': "import { teacherGate } from '../../common/teacher-gate.js';", 'common/util.js': 'export const h = 1;', 'common/teacher-gate.js': "import { toast } from './util.js';" };
+    const read = f => files[f] ?? null, headFiles = Object.keys(files);
+    const full = `<script type="importmap">{ "imports": { "./js/app.js": "./js/app.js?v=1", "../common/util.js": "../common/util.js?v=a", "../common/teacher-gate.js": "../common/teacher-gate.js?v=a" } }</script>`;
+    eq(commonGaps({ headHtml: { 'art/index.html': full }, headFiles, read }).filter(r => r.level === 'FAIL').length, 0);
+    const noGate = full.replace(', "../common/teacher-gate.js": "../common/teacher-gate.js?v=a"', '');
+    eq(commonGaps({ headHtml: { 'art/index.html': noGate }, headFiles, read }).filter(r => r.level === 'FAIL').map(r => r.msg.includes('common/teacher-gate.js')), [true]);
+    const noUtil = full.replace('"../common/util.js": "../common/util.js?v=a", ', '');
+    eq(commonGaps({ headHtml: { 'art/index.html': noUtil }, headFiles, read }).filter(r => r.level === 'FAIL').length, 1);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

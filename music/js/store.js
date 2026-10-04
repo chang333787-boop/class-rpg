@@ -7,20 +7,11 @@
 //  rhythm/<곡키>/<sid>       = 리듬 게임 최고 기록 { best, acc, combo, grade, t 때, n 이름 }
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { uid, keyOf, lsGet, lsSet } from './util.js';
+import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
 import { songBad } from './safety.js';
 const clean = s => { const b = songBad(s); return !b.title.length && !b.lyrics.length; };
 
 export const ROOT = 'classRPG_music';
-// gamedata.js FIREBASE_CONFIG 와 같은 값(학급 RPG 프로젝트)
-const CONFIG = {
-  apiKey: 'AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4',
-  authDomain: 'class-rpg-6f409.firebaseapp.com',
-  databaseURL: 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'class-rpg-6f409',
-  storageBucket: 'class-rpg-6f409.firebasestorage.app',
-  messagingSenderId: '408824743154',
-  appId: '1:408824743154:web:382fdd431f7e2dbce13c6b',
-};
 const plain = v => JSON.parse(JSON.stringify(v));   // undefined 빼기
 const vals = o => o && typeof o === 'object' ? Object.values(o) : [];
 const songOut = s => plain({ ...s, notes: s.notes.map(n => n.w ? n : { s: n.s, d: n.d, p: n.p }) });
@@ -32,8 +23,7 @@ export function createStore({ sid, name, fb = globalThis.firebase, offline = fal
 }
 
 function rtdbStore(fb, sid, name) {
-  if (!fb.apps.length) fb.initializeApp(CONFIG);
-  const db = fb.database(), root = db.ref(ROOT);
+  const db = rpgDb(fb), root = db.ref(ROOT);
   const concertKey = id => keyOf(sid + '_' + id);
   const st = {
     me: { sid, name: name || '', guest: false }, online: true, db,
@@ -73,7 +63,7 @@ function rtdbStore(fb, sid, name) {
     },
     async topRhythm(key, n = 5) { return Object.entries((await root.child('rhythm/' + keyOf(key)).once('value')).val() || {}).map(([s, x]) => ({ sid: s, ...x })).sort((a, z) => z.best - a.best).slice(0, n); },
     // ── 선생님 ──
-    async teacherOK(pw) { const real = (await db.ref('classRPG_adminPw').once('value')).val(); return real != null && String(pw) === String(real); },
+    async teacherOK(pw) { return adminPwOK(db, pw); },
     async allSongs() { return (await root.child('songs').once('value')).val() || {}; },
     async allPractice() { return (await root.child('practice').once('value')).val() || {}; },
     async allConcert() { return vals((await root.child('concert').once('value')).val()); },

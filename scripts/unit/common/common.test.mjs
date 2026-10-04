@@ -1,0 +1,142 @@
+// 하위 앱 공통 뼈대(common/) 시험 [SUBAPP-COMMON-1] — util · rpg-firebase · teacher-gate · subapp.css 가 앱들과 제대로 이어졌나
+//  node scripts/unit/common/common.test.mjs   (DOM 없음 · 네트워크 없음 · 가짜 firebase)
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as U from '../../../common/util.js';
+import { RPG_FIREBASE, rpgDb, adminPwOK } from '../../../common/rpg-firebase.js';
+import { teacherGate } from '../../../common/teacher-gate.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const results = [];
+const test = async (name, fn) => { try { await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message]); } };
+const ok = (c, m) => { if (!c) throw new Error(m); };
+
+const SHIM_APPS = ['art', 'coding', 'ink', 'paint', 'pattern', 'print'];          // js/util.js = 공통 그대로
+const GATE_APPS = [...SHIM_APPS, 'music'];                                          // teacher.js 가 공통 문을 씀
+const FB_APPS = [...GATE_APPS, 'thinkboard'];                                       // 학급 RPG Firebase 를 씀
+const CSS_APPS = SHIM_APPS;                                                         // common/subapp.css 를 먼저 부름
+const CORE = ['uid', 'keyOf', 'clamp', 'h', 'toast', 'modal', 'lsGet', 'lsSet'];
+
+// ── util ──
+await test('공통 util 이 내보내는 것 = 여덟 가지', () => { ok(JSON.stringify(Object.keys(U).sort()) === JSON.stringify([...CORE].sort()), Object.keys(U).join(',')); });
+await test('keyOf · clamp · uid', () => {
+  ok(U.keyOf('a.b#c$d/e[f]g') === 'a_b_c_d_e_f_g', 'keyOf 금지 글자');
+  ok(U.keyOf('') === '_' && U.keyOf(null) === '_', 'keyOf 빈 값');
+  ok(U.keyOf('x'.repeat(60)).length === 40, 'keyOf 40자');
+  ok(U.clamp(5, 0, 3) === 3 && U.clamp(-1, 0, 3) === 0 && U.clamp(2, 0, 3) === 2, 'clamp');
+  ok(/^s[0-9a-z]{6,}$/.test(U.uid('s')), 'uid 꼴');
+});
+await test('lsGet · lsSet — localStorage 가 없어도 기본값', () => { ok(U.lsGet('없음', 7) === 7, 'lsGet 기본값'); U.lsSet('x', 1); });
+for (const a of SHIM_APPS) {
+  await test(`${a}/js/util.js = 공통을 그대로(같은 함수)`, async () => {
+    const m = await import(`../../../${a}/js/util.js`);
+    ok(JSON.stringify(Object.keys(m).sort()) === JSON.stringify([...CORE].sort()), Object.keys(m).join(','));
+    for (const k of CORE) ok(m[k] === U[k], k + ' 가 다른 함수');
+  });
+}
+await test('music/js/util.js = 공통 + 음악실 것(esc · svg · 준비 셈)', async () => {
+  const m = await import('../../../music/js/util.js');
+  for (const k of CORE) ok(m[k] === U[k], k + ' 가 다른 함수');
+  for (const k of ['esc', 'svg', 'READY_SEC', 'readyCount']) ok(k in m, k + ' 없음');
+  ok(m.esc('<a href="x">\'&') === '&lt;a href=&quot;x&quot;&gt;&#39;&amp;', 'esc');
+});
+await test('생각판 util 은 따로(모양이 다름 — keyOf 규칙 · modal)', async () => {
+  const m = await import('../../../thinkboard/js/util.js');
+  ok(m.keyOf !== U.keyOf && m.keyOf('a b') === 'a b' && U.keyOf('a b') === 'a_b', '생각판 keyOf 가 공통과 같아짐');
+});
+
+// ── rpg-firebase ──
+const fakeFb = (pw) => { const reads = []; const db = { ref: p => ({ once: async () => { reads.push(p); return { val: () => (p === 'classRPG_adminPw' ? pw : null) }; } }) };
+  return { apps: [], inits: [], initializeApp(c) { this.inits.push(c); this.apps.push({}); }, database: () => db, reads, db }; };
+await test('rpgDb — 처음 한 번만 학급 RPG 설정으로 앱을 만든다', () => {
+  const fb = fakeFb(); const d1 = rpgDb(fb), d2 = rpgDb(fb);
+  ok(fb.inits.length === 1 && fb.inits[0] === RPG_FIREBASE, '초기화 횟수 ' + fb.inits.length);
+  ok(d1 === fb.db && d2 === fb.db, '데이터베이스');
+  ok(RPG_FIREBASE.projectId === 'class-rpg-6f409' && /asia-southeast1\.firebasedatabase\.app$/.test(RPG_FIREBASE.databaseURL), '설정 값');
+});
+await test('rpgDb — 이미 앱이 있으면 그대로(두 번 만들지 않음)', () => { const fb = fakeFb(); fb.apps.push({}); rpgDb(fb); ok(fb.inits.length === 0, '또 만듦'); });
+await test('gamedata.js FIREBASE_CONFIG 와 같은 값', () => {
+  const g = read('gamedata.js'); for (const [k, v] of Object.entries(RPG_FIREBASE)) ok(g.includes(`${k}: "${v}"`) || g.includes(`${k}: '${v}'`), k + ' 다름');
+});
+await test('adminPwOK — 관리자 비밀번호만 읽고 글자로 견준다', async () => {
+  const fb = fakeFb(1234);
+  ok(await adminPwOK(fb.db, '1234') === true, '숫자 비번 = 글 비번');
+  ok(await adminPwOK(fb.db, '123') === false, '틀린 비번');
+  ok(await adminPwOK(fakeFb(null).db, 'null') === false, '비번이 없으면 늘 아님');
+  ok(fb.reads.every(p => p === 'classRPG_adminPw'), '다른 곳 읽음: ' + fb.reads.join(','));
+});
+// 앱 저장소가 공통으로 이어졌나 — 같은 설정으로 한 번 만들고 · 선생님 비번은 관리자 비밀번호로
+const fakeFb2 = (pw) => { const reads = []; const ref = p => ({ once: async () => { reads.push(p); return { val: () => (p === 'classRPG_adminPw' ? pw : null) }; }, child: c => ref(p + '/' + c), on() {}, off() {} });
+  const fb = { apps: [], inits: [], reads, initializeApp(c) { this.inits.push(c); this.apps.push({}); }, database: Object.assign(() => ({ ref }), { ServerValue: { increment: n => ({ inc: n }) } }) }; return fb; };
+for (const a of GATE_APPS) {
+  await test(`${a}/js/store.js — 학급 RPG 설정으로 앱 만들기 · teacherOK = 관리자 비밀번호`, async () => {
+    const { createStore } = await import(`../../../${a}/js/store.js`);
+    const fb = fakeFb2('7777'), st = createStore({ sid: 's_1', name: '시험', fb });
+    ok(st.online === true && fb.inits.length === 1 && fb.inits[0] === RPG_FIREBASE, '초기화');
+    ok(await st.teacherOK('7777') === true && await st.teacherOK('1') === false, 'teacherOK');
+    ok(fb.reads.every(p => p === 'classRPG_adminPw'), '다른 곳 읽음: ' + fb.reads.join(','));
+    const guest = createStore({ fb });
+    ok(guest.me.guest === true && await guest.teacherOK('아무거나') === true && fb.inits.length === 1, '손님 저장소');
+  });
+}
+await test('thinkboard/js/store-rtdb.js — 학급 RPG 설정으로 앱 만들기', async () => {
+  const { createRtdbStore } = await import('../../../thinkboard/js/store-rtdb.js');
+  const fb = fakeFb2('1'); const st = createRtdbStore(fb); createRtdbStore(fb);
+  ok(st.kind === 'rtdb' && fb.inits.length === 1 && fb.inits[0] === RPG_FIREBASE, '초기화');
+});
+for (const a of FB_APPS) {
+  await test(`${a} — Firebase 설정 · 앱 만들기는 공통에서만`, () => {
+    const files = fs.readdirSync(path.join(ROOT, a, 'js')).map(f => `${a}/js/${f}`);
+    for (const f of files) { const s = read(f); ok(!/initializeApp|apiKey|classRPG_adminPw'\)\.once/.test(s), f + ' 에 설정 · 초기화 · 비번 읽기가 남음'); }
+  });
+}
+
+// ── teacher-gate ──
+{
+  const ss = new Map(); let asked = 0, answer = null; const toasts = [];
+  globalThis.sessionStorage = { getItem: k => ss.has(k) ? ss.get(k) : null, setItem: (k, v) => ss.set(k, String(v)) };
+  globalThis.prompt = () => { asked++; return answer; };
+  globalThis.document = { createElement: () => ({ classList: { add() {} }, remove() {}, append() {}, setAttribute() {}, addEventListener() {}, style: {} }), body: { append: el => toasts.push(el) } };
+  const ctx = (guest, okPw) => ({ store: { me: { guest }, teacherOK: async pw => pw === okPw } });
+  await test('문: 손님이면 묻지 않고 연다', async () => { asked = 0; ok(await teacherGate(ctx(true), 'x.teacher') === true && asked === 0, '물음'); });
+  await test('문: 이 창에서 통과했으면(앱마다 키) 묻지 않는다', async () => { asked = 0; ss.set('ink.teacher', '1'); ok(await teacherGate(ctx(false), 'ink.teacher') === true && asked === 0, '물음'); ok(asked === 0, ''); });
+  await test('문: 다른 앱 키는 통과 아님 · 비워 두면 닫힘', async () => { asked = 0; answer = null; ok(await teacherGate(ctx(false), 'art.teacher') === false && asked === 1, '열림'); });
+  await test('문: 맞는 비번 → 열고 이 창에 표시', async () => { answer = 'pw'; ok(await teacherGate(ctx(false, 'pw'), 'paint.teacher') === true && ss.get('paint.teacher') === '1', '표시 없음'); });
+  await test('문: 틀린 비번 → 닫고 알림 한 번', async () => { answer = 'no'; const n = toasts.length; ok(await teacherGate(ctx(false, 'pw'), 'print.teacher') === false && !ss.has('print.teacher') && toasts.length === n + 1, '알림'); });
+  delete globalThis.document; delete globalThis.prompt; delete globalThis.sessionStorage;
+}
+for (const a of GATE_APPS) {
+  await test(`${a}/js/teacher.js — 공통 문 · 키 '${a}.teacher' 그대로`, () => {
+    const s = read(`${a}/js/teacher.js`);
+    ok(s.includes(`teacherGate(ctx, '${a}.teacher')`), '키 다름');
+    ok(!/prompt\(|sessionStorage/.test(s), '옛 문이 남음');
+  });
+}
+
+// ── index.html · css ──
+const importMap = h => JSON.parse(h.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]).imports;
+await test('공통 파일 ?v= — 부르는 index.html 모두 같은 값', () => {
+  const seen = {};
+  for (const a of FB_APPS) for (const [k, v] of Object.entries(importMap(read(`${a}/index.html`)))) if (k.startsWith('../common/')) (seen[k] = seen[k] || new Set()).add(v);
+  for (const a of CSS_APPS) { const m = read(`${a}/index.html`).match(/href="(\.\.\/common\/subapp\.css[^"]*)"/); ok(m, a + ' 에 subapp.css 없음'); (seen.css = seen.css || new Set()).add(m[1]); }
+  for (const [k, s] of Object.entries(seen)) ok(s.size === 1, `${k} 값이 여럿: ${[...s].join(' · ')}`);
+  ok(Object.keys(seen).length === 4, '공통 파일 수 ' + Object.keys(seen).join(','));
+});
+await test('subapp.css 는 앱 css 보다 먼저(같은 특이도 규칙의 차례 = 원래 줄 차례)', () => {
+  for (const a of CSS_APPS) { const h = read(`${a}/index.html`), i = h.indexOf('../common/subapp.css'), j = h.search(/href="css\/[a-z]+\.css/); ok(i > 0 && j > i, a + ' 차례'); }
+});
+await test('subapp.css 줄이 앱 css 에 다시 생기지 않음(두 벌 막기)', () => {
+  const rules = read('common/subapp.css').split('\n').filter(l => /\{.*\}/.test(l));
+  ok(rules.length >= 30, '공통 규칙 수 ' + rules.length);
+  for (const a of CSS_APPS) {   // 음악실 · 생각판은 바탕(:root · body)이 달라 공통 css 를 안 쓴다 — 같은 줄이 있어도 그대로 둔다
+    const dir = path.join(ROOT, a, 'css');
+    for (const f of fs.readdirSync(dir)) { const lines = new Set(fs.readFileSync(path.join(dir, f), 'utf8').split('\n')); const dup = rules.filter(r => lines.has(r)); ok(!dup.length, `${a}/css/${f} 에 공통 줄 ${dup.length}: ${dup[0]}`); }
+  }
+});
+
+const fails = results.filter(r => r[0] === 'FAIL');
+for (const r of fails) console.log('FAIL', r[1], r[2] || '');
+console.log(`하위 앱 공통 뼈대 시험 — PASS ${results.length - fails.length} · FAIL ${fails.length}`);
+process.exit(fails.length ? 1 : 0);

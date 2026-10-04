@@ -6,17 +6,9 @@
 //  feel/<판>/<sid>      = 느낌의 색 { c #rrggbb, w 고른 까닭 칩 'bright,warm', t }  — 글 입력 없음(색과 칩뿐)
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { keyOf, lsGet, lsSet } from './util.js';
+import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
 
 export const ROOT = 'classRPG_paint';
-const CONFIG = {   // gamedata.js FIREBASE_CONFIG 와 같은 값(학급 RPG 프로젝트)
-  apiKey: 'AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4',
-  authDomain: 'class-rpg-6f409.firebaseapp.com',
-  databaseURL: 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'class-rpg-6f409',
-  storageBucket: 'class-rpg-6f409.firebasestorage.app',
-  messagingSenderId: '408824743154',
-  appId: '1:408824743154:web:382fdd431f7e2dbce13c6b',
-};
 const better = (a, b) => !a || (b.st > (a.st || 0)) || (b.st === a.st && b.n < a.n);
 // 학급 DB 는 열려 있어 그리기 전에 거른다 — 색은 #rrggbb · 칩은 아는 낱말만
 export const validHex = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
@@ -29,8 +21,7 @@ export function createStore({ sid, name, fb = globalThis.firebase, offline = fal
 }
 
 function rtdbStore(fb, sid, name) {
-  if (!fb.apps.length) fb.initializeApp(CONFIG);
-  const db = fb.database(), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
+  const db = rpgDb(fb), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
   let mine = null;
   const st = {
     me: { sid, name: name || '', guest: false }, online: true,
@@ -59,7 +50,7 @@ function rtdbStore(fb, sid, name) {
       return { feel: f.val() || {}, names: n.val() || {} };
     },
     // ── 선생님 ──
-    async teacherOK(pw) { const real = (await db.ref('classRPG_adminPw').once('value')).val(); return real != null && String(pw) === String(real); },
+    async teacherOK(pw) { return adminPwOK(db, pw); },
     async all() { const v = (await root.once('value')).val() || {}; return { progress: v.progress || {}, stats: v.stats || {}, names: v.names || {}, feel: v.feel || {} }; },
   };
   return st;

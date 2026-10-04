@@ -1,42 +1,8 @@
 /* 물감 연구소 — 무늬 공방 · 기초 코딩 · RPG 홈과 같은 어두운 바탕 · 금색 하나 · 색은 늘 종이(밝은 바탕) 위에서 견준다 */
-:root{--bg0:#15110d;--bg1:#1d1611;--bg2:#241b13;--bg3:#2e241a;--line:#3a2e22;--txt:#f3e8d6;--txt2:#d9c9ae;--txt3:#a8977d;--gold:#f2a93b;--gold2:#ffc766;--red:#e5484d;--ok:#8fd07d;--r:14px;font-size:16px}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{background:var(--bg0);color:var(--txt);font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden;word-break:keep-all}
-button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-#app{position:fixed;inset:0;display:flex;flex-direction:column}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:40px;padding:0 1rem;border-radius:11px;background:var(--bg3);font-weight:800;font-size:.95rem;white-space:nowrap}
-.btn:hover{background:#3a2e22}
-.btn.primary{background:var(--gold);color:#2a1a08}
-.btn.primary:hover{background:var(--gold2)}
-.btn.small{height:32px;padding:0 .75rem;font-size:.85rem;border-radius:9px}
-.muted{color:var(--txt3)}
-.small{font-size:.8rem}
-.sp{flex:1}
-.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:999;background:#2e241a;color:var(--txt);padding:.7rem 1.2rem;border-radius:12px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:opacity .35s}
-.toast.out{opacity:0}
-.modal-wrap{position:fixed;inset:0;z-index:900;background:rgba(8,6,4,.62);display:grid;place-items:center;padding:16px}
-.modal{width:min(480px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--bg2);border-radius:18px;padding:22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
-.modal.wide{width:min(760px,100%)}
-.modal h2{font-size:1.2rem;font-weight:900;margin-bottom:12px}
-.modal-body{font-size:.95rem;line-height:1.65;color:var(--txt2)}
-.modal-body p+p{margin-top:8px}
-.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
-.empty{padding:16px;border-radius:12px;background:var(--bg2);color:var(--txt3);font-size:.9rem;line-height:1.6;margin:16px}
-.chip{font-size:.75rem;font-weight:800;color:var(--txt2);background:var(--bg3);border-radius:999px;padding:3px 10px;white-space:nowrap}
+/* 바탕 · 단추 · 알림 · 가운데 창 · 윗줄 · .home = ../../common/subapp.css (index.html 이 이 파일보다 먼저 부른다) [SUBAPP-COMMON-1] */
 .chip.c-ch{color:#2a1a08;background:var(--gold)}
 
-/* 윗줄 */
-.top{flex:none;height:50px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--bg1)}
-.top .back{height:34px;padding:0 .7rem;border-radius:9px;background:var(--bg3);font-weight:800;font-size:.88rem;white-space:nowrap}
-.top h1{font-size:1.05rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.top .who{font-size:.85rem;color:var(--txt3);white-space:nowrap}
-.top .who b{color:var(--txt2)}
-.guest{font-size:.75rem;font-weight:800;color:#2a1a08;background:var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px}
-.view{flex:1;min-height:0;position:relative;overflow:auto}
-
 /* 첫 화면 */
-.home{max-width:1240px;margin:0 auto;padding:16px 22px 26px;display:grid;gap:14px}
 .intro{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#1f3346,#241b13 70%);border-radius:18px;padding:14px 20px}
 .intro .host{width:92px;height:92px;object-fit:contain;flex:none}
 .intro h2{font-size:1.3rem;font-weight:900}
