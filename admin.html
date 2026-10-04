@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="./gamedata.js?v=20261004g5a"></script>
+<script src="./gamedata.js?v=20261004g2b"></script>
 <script src="./curriculum.js?v=20260915stn"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
 <link rel="stylesheet" href="./admin.css?v=20261003ds3">
@@ -65,13 +65,14 @@
     <div class="nav-item" onclick="nav('rank',this)"><span class="nav-icon" data-i="rank"></span> 랭킹</div>
     <div class="nav-item" onclick="nav('activity',this)"><span class="nav-icon" data-i="activity"></span> 활동 내역</div>
     <div class="nav-item" onclick="nav('emotion',this)"><span class="nav-icon" data-i="emotion"></span> 감정 현황</div>
-    <div class="nav-item" onclick="nav('emotionalerts',this)"><span class="nav-icon" data-i="emotionalerts"></span> 감정 대화 요청 <span id="emotion-alert-badge" style="margin-left:auto;background:var(--sky);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
+    <div class="nav-item" id="nav-emotionalerts" onclick="nav('emotionalerts',this)"><span class="nav-icon" data-i="emotionalerts"></span> 감정 대화 요청 <span id="emotion-alert-badge" style="margin-left:auto;background:var(--sky);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
     <div class="nav-section">콘텐츠</div>
     <div class="nav-item" onclick="nav('quests',this)"><span class="nav-icon" data-i="quests"></span> 퀘스트 관리</div>
     <div class="nav-item" id="nav-reward" onclick="nav('reward',this)"><span class="nav-icon" data-i="reward"></span> 보상 지급</div>
     <div class="nav-item" onclick="nav('stats',this)"><span class="nav-icon" data-i="stats"></span> 활동능력치 관리</div>
     <div class="nav-item" onclick="nav('artwork',this)"><span class="nav-icon" data-i="artwork"></span> 작품 관리</div>
     <div class="nav-item" onclick="nav('thinkboard',this)"><span class="nav-icon" data-i="thinkboard"></span> 생각판</div>
+    <div class="nav-item" id="nav-learnapps" onclick="nav('learnapps',this)"><span class="nav-icon" data-i="learnapps"></span> 학습 앱 기록</div>
     <div class="nav-item" onclick="nav('villages',this)"><span class="nav-icon" data-i="villages"></span> 우리 마을</div>
     <div class="nav-item" onclick="nav('books',this)"><span class="nav-icon" data-i="books"></span> 독서 현황</div>
     <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon" data-i="memories"></span> 추억 관리</div>
@@ -120,6 +121,9 @@
 
       <!-- 긴급 처리 배너 -->
       <div id="dash-urgent-banner" style="display:none;margin-bottom:1rem"></div>
+
+      <!-- [DASH-EMO-ALERT-1] 감정 대화 요청(안 읽은 것) — 아이가 선생님께 말하고 싶다고 한 기록. renderDashboard 가 채운다 -->
+      <div id="dash-emo-banner" style="display:none;margin-bottom:1rem"></div>
 
       <!-- 요약 스탯 -->
       <div class="stat-row" id="stat-row"></div>
@@ -227,7 +231,7 @@
         <div><div class="sh-title">✅ 활동 승인</div>
           <div class="sh-sub">학생의 오프라인 활동을 확인하고 승인하세요</div></div>
         <div style="display:flex;gap:.5rem">
-          <button class="btn-sm success" onclick="approveAll()">전체 승인</button>
+          <button class="btn-sm success" onclick="approveAllAsk()">전체 승인</button>
         </div>
       </div>
       <!-- 활동 프리셋 -->
@@ -449,7 +453,7 @@
 
         <!-- 일일 템플릿 -->
         <div id="qt-daily">
-          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📋 35EXP + 25G</div>
+          <div style="font-size:.75rem;color:var(--txt2);margin-bottom:.8rem">체크한 항목이 게시판에 올라가요 · 기본 보상: 📋 <span id="auto-daily-reward-txt">35EXP + 25G</span> <span style="color:var(--txt3)">(게임 설정 → 밸런스 조정에서 바꿔요)</span></div>
           <div id="qt-daily-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
           <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
             <input class="form-input flex-1" id="qt-daily-custom" placeholder="+ 항목 직접 추가">
@@ -610,7 +614,7 @@
             <label class="form-label">칭호 부여</label>
             <select class="form-select" id="rw-title">
               <option value="">없음</option>
-              ${GAME_DATA.titles.map(t=>`<option>${t}</option>`).join('')}
+              <!-- [ADMIN-TPL-1] 칭호 선택지는 admin.js fillStaticTemplates 가 GAME_DATA.titles 로 채운다 -->
             </select>
           </div>
           <div class="form-group">
@@ -795,28 +799,16 @@
         <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">⚔️ 기본 공격 계수 (Lv1~7)</div></div>
           <div style="padding:1rem">
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-              ${[1,2,3,4,5,6,7].map(lv=>`
-              <div class="text-center">
-                <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.2rem">Lv${lv}</div>
-                <input class="form-input" type="number" id="bs-nm-${lv}" step="0.01"
-                  style="width:68px;text-align:center;font-size:.8rem">
-              </div>`).join('')}
-            </div>
+            <!-- [ADMIN-TPL-1] 칸 bs-nm-1~7 은 admin.js fillStaticTemplates 가 만든다 -->
+            <div id="bs-nm-wrap" style="display:flex;gap:.5rem;flex-wrap:wrap"></div>
           </div>
         </div>
         <!-- 속성 스킬 계수 -->
         <div class="table-card mb-08">
           <div class="tc-header"><div class="tc-title">🔥 속성 스킬 계수 (Lv0~7)</div></div>
           <div style="padding:1rem">
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-              ${[0,1,2,3,4,5,6,7].map(lv=>`
-              <div class="text-center">
-                <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.2rem">Lv${lv}</div>
-                <input class="form-input" type="number" id="bs-el-${lv}" step="0.01"
-                  style="width:68px;text-align:center;font-size:.8rem">
-              </div>`).join('')}
-            </div>
+            <!-- [ADMIN-TPL-1] 칸 bs-el-0~7 은 admin.js fillStaticTemplates 가 만든다 -->
+            <div id="bs-el-wrap" style="display:flex;gap:.5rem;flex-wrap:wrap"></div>
           </div>
         </div>
         <button class="btn-sm success" style="width:100%" onclick="saveBattleSettings()">💾 전투 설정 저장</button>
@@ -872,19 +864,8 @@
             </div>
           </div>
           <div style="padding:.6rem 1rem;font-size:.78rem;font-weight:700;color:var(--txt1);border-top:1px solid rgba(255,255,255,.06)">zone별 도감 달성 보상</div>
-          <div style="padding:.6rem 1rem;display:flex;flex-direction:column;gap:.7rem">
-            ${[{z:'beginner',label:'🌿 초급',n:30},{z:'intermediate',label:'🔥 중급',n:50},{z:'advanced',label:'⚡ 고급',n:20}].map(({z,label,n})=>`
-            <div style="background:rgba(255,255,255,.03);border-radius:8px;padding:.7rem">
-              <div style="font-size:.8rem;font-weight:700;margin-bottom:.5rem">${label} (${n}마리 완성)</div>
-              <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-                <span class="text-muted-base">달성 골드:</span>
-                <input class="form-input w-80" type="number" id="dex-${z}-gold" value="100" min="0">
-                <span class="text-muted-base">G</span>
-                <span class="text-muted-base">칭호:</span>
-                <input class="form-input" id="dex-${z}-title" placeholder="없음" style="width:100px;font-size:.78rem">
-              </div>
-            </div>`).join('')}
-          </div>
+          <!-- [ADMIN-TPL-1] 구역별 칸 dex-<구역>-gold · dex-<구역>-title 은 admin.js fillStaticTemplates 가 만든다 -->
+          <div id="dex-zone-wrap" style="padding:.6rem 1rem;display:flex;flex-direction:column;gap:.7rem"></div>
         </div>
         <button class="btn-sm success" style="width:100%" onclick="saveDexSettings()">💾 도감 보상 설정 저장</button>
       </div>
@@ -922,6 +903,10 @@
   </div>
   <div style="background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:.8rem;margin-bottom:1rem;font-size:.8rem;color:#e74c3c">
     ⚠️ 롤백하면 선택 날짜 이후의 <strong>모든 데이터가 삭제</strong>됩니다. 되돌릴 수 없어요!
+  </div>
+  <!-- [BACKUP-ROOTS-1] 학습 앱 기록은 백업에 담기지만 롤백은 RPG 기록만 -->
+  <div style="font-size:.74rem;color:var(--txt2);margin:-.4rem 0 .9rem;line-height:1.55">
+    롤백은 RPG 기록(학생·퀘스트·설정 등)만 되돌려요. 생각판·음악실 같은 학습 앱 기록은 백업에 함께 담기지만 되돌리지 않아요.
   </div>
   <div class="mb-08">
     <div style="font-size:.8rem;font-weight:700;margin-bottom:.4rem">복원할 날짜 선택</div>
@@ -1045,7 +1030,7 @@
             </select>
             <select id="books-cat-filter" class="form-select" style="width:auto;font-size:.78rem" onchange="renderBooksPage()">
               <option value="all">전체 주제</option>
-              ${['우정','가족','용기','배려','꿈·성장','자연·생명'].map(c=>`<option value="${c}">${c}</option>`).join('')}
+              <!-- [ADMIN-TPL-1] 주제 선택지는 admin.js fillStaticTemplates 가 채운다 -->
             </select>
             <select id="books-check-filter" class="form-select" style="width:auto;font-size:.78rem" onchange="renderBooksPage()">
               <option value="all">전체</option>
@@ -1068,6 +1053,14 @@
     <div class="page" id="p-thinkboard" style="padding:0">
       <div style="display:flex;justify-content:flex-end;padding:.4rem .8rem 0"><button class="btn btn-sm" onclick="openThinkboard()">새 탭으로 열기</button></div>
       <iframe id="tb-frame" title="생각판" style="display:block;width:100%;height:calc(100vh - 110px);border:0;background:#f6f5f2"></iframe>
+    </div>
+    <!-- [LEARN-APPS-1] 학습 앱 7개의 선생님 화면 모음 — 카드는 admin.js renderLearnAppsPage 가 그린다 -->
+    <div class="page" id="p-learnapps">
+      <div class="section-header">
+        <div><div class="sh-title">🧩 학습 앱 기록</div>
+          <div class="sh-sub">앱마다 선생님 화면(아이별 기록 · 막힘/헷갈림 지도)을 새 탭으로 엽니다. 관리 화면에 들어와 있으니 비밀번호를 다시 묻지 않아요</div></div>
+      </div>
+      <div id="learnapps-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.8rem"></div>
     </div>
     <div class="page" id="p-villages">
       <div class="section-header">
@@ -1384,13 +1377,15 @@
         </div>
         <div class="settings-card">
           <div class="sc-head">🎮 밸런스 조정</div>
+          <!-- [AUTO-DAILY-REWARD-1] 예전 '기본 일일 EXP/골드' 칸은 읽는 코드가 없었다(저장만 됨). 이제 자동 일일 퀘스트 보상이 이 값을 따른다.
+               옛 저장값(baseExp·baseGold, 기본 80/50·30)은 쓰지 않는다 — 그대로 쓰면 배포 순간 지급이 바뀐다. 새 키 autoDailyExp·autoDailyGold, 비우면 35/25. -->
           <div class="setting-row">
-            <div><div class="sr-label">기본 일일 EXP</div></div>
-            <input class="form-input" id="set-base-exp" style="width:70px" value="10" type="number">
+            <div><div class="sr-label">자동 일일 퀘스트 EXP</div><div class="sr-sub">퀘스트 1개 보상 · 기본 35 · 다음에 올라오는 퀘스트부터</div></div>
+            <input class="form-input" id="set-base-exp" style="width:70px" value="35" type="number" min="0" max="1000">
           </div>
           <div class="setting-row">
-            <div><div class="sr-label">기본 일일 골드</div></div>
-            <input class="form-input" id="set-base-gold" style="width:70px" value="10" type="number">
+            <div><div class="sr-label">자동 일일 퀘스트 골드</div><div class="sr-sub">퀘스트 1개 보상 · 기본 25</div></div>
+            <input class="form-input" id="set-base-gold" style="width:70px" value="25" type="number" min="0" max="1000">
           </div>
           <div class="setting-row" style="opacity:.4;pointer-events:none">
             <div><div class="sr-label">몬스터 성공률 (%)</div>
@@ -1501,7 +1496,7 @@
           <div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.15);border-radius:10px;padding:.8rem;margin-bottom:.8rem">
             <div style="font-size:.8rem;font-weight:700;color:var(--gold);margin-bottom:.6rem">💾 백업 & 롤백</div>
             <div class="setting-row" style="margin-bottom:.5rem">
-              <div><div class="sr-label">수동 백업</div><div class="sr-sub">지금 백업 만들기</div></div>
+              <div><div class="sr-label">수동 백업</div><div class="sr-sub">지금 백업 만들기 · 누를 때마다 새로 남아요(최근 14개)</div></div>
               <button class="btn-sm success" onclick="saveBackup()">💾 백업</button>
             </div>
             <div class="setting-row" style="margin-bottom:.5rem">
@@ -1545,7 +1540,7 @@
             </div>
           </div>
           <div class="setting-row">
-            <div><div class="sr-label">🔄 전체 학생 수치 초기화</div><div class="sr-sub">이름·비번은 유지, 레벨·EXP·골드·아이템 초기화</div></div>
+            <div><div class="sr-label">🔄 전체 학생 수치 초기화</div><div class="sr-sub">이름·비번은 유지, 레벨·EXP·골드·아이템·승급 기록 초기화 · 하기 전에 자동 백업</div></div>
             <button class="btn-sm danger" onclick="resetAllStudents()">초기화</button>
           </div>
           <div class="setting-row">
@@ -1553,11 +1548,11 @@
             <button class="btn-sm danger" onclick="confirmReset()">초기화</button>
           </div>
           <div class="setting-row">
-            <div><div class="sr-label">데이터 내보내기</div><div class="sr-sub">백업 파일로 저장</div></div>
+            <div><div class="sr-label">데이터 내보내기</div><div class="sr-sub">백업 파일로 저장 · RPG + 학습 앱 + 우리 마을</div></div>
             <button class="btn-sm outline" onclick="exportData()">내보내기</button>
           </div>
           <div class="setting-row">
-            <div><div class="sr-label">데이터 가져오기</div><div class="sr-sub">백업 파일로 되돌리기</div></div>
+            <div><div class="sr-label">데이터 가져오기</div><div class="sr-sub">백업 파일로 RPG 기록 되돌리기 · 하기 전에 자동 백업</div></div>
             <button class="btn-sm outline" onclick="document.getElementById('import-file').click()">가져오기</button>
             <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
           </div>
@@ -1592,6 +1587,6 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20261003ds3"></script>
+<script src="./admin.js?v=20261004g2a"></script>
 </body>
 </html>
