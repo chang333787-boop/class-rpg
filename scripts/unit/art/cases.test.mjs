@@ -7,8 +7,8 @@ import { CASES, CHAPTERS, FEELS, BECAUSE, caseById } from '../../../art/js/cases
 import { KINDS, kindsFor, questionText, partAt, jo, inRect } from '../../../art/js/ask.js';
 import { colorOf, colorShare, judgeColors, edgeWidth } from '../../../art/js/colors.js';
 import { starsOf, TECH, choicesOf } from '../../../art/js/play.js';
-import { ELEMENTS, FAMS, EFEELS, measure, findAt, countOf, cellAtPct, cellRect, bestOf, topLabels } from '../../../art/js/elements.js';
-import { MISSIONS } from '../../../art/js/hunt.js';
+import { ELEMENTS, FAMS, EFEELS, measure, findAt, countOf, cellAtPct, cellRect, bestOf, topLabels, labelsOf, whyNot, dirZone, lineOf } from '../../../art/js/elements.js';
+import { MISSIONS, lineWord, lensLine, proofText, whyText } from '../../../art/js/hunt.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const results = [];
@@ -153,6 +153,48 @@ test('조형 요소 찾기 — 카드 열둘 · 카드마다 서로 다른 그�
     ok(e.name && e.desc && e.icon && e.feel.length === 2 && e.feel.every(f => fw.has(f)), e.k + ' 글 · 느낌');
   }
   ok(Object.keys(MISSIONS).every(k => ELEMENTS.some(e => e.k === k)), '남는 미션 없음');
+});
+// [UX-TRIM-G4b] 돋보기 말이 판정(이름표)과 어긋나지 않는가 — 무작위 칸 6000개 + 합성 그림 칸 · 카드 열둘 모두
+//  (전엔 말 구간 ±4° · ±15° 가 판정 문턱과 달라 '이 선은 비스듬히 기운 선이에요 — 비스듬히 기운 선을 찾아요'가 틀린 칸의 16~45% 에서 나왔다)
+function randCells(n) {
+  let seed = 11; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const F = { stats: { E95: 1, L25: 20 + r() * 40, L75: 50 + r() * 40, R25: 0.3 + r() * 1.5, R75: 1 + r() * 3 } };
+    const c = { en: r(), coh: r(), ang: r() * 180, L: r() * 100, warmM: r() * 0.8, coolM: r() * 0.8, vivM: r() * 0.8, roughM: r() * 5, curve: r() < 0.3 ? r() : 0, shade: r() < 0.3 ? r() : 0 };
+    c.labels = labelsOf(F, c); out.push([F, c]);
+  }
+  return out;
+}
+test('돋보기 말 — whyNot 은 이름표와 꼭 맞다(붙었으면 null · 아니면 까닭)', () => {
+  let bad = 0;
+  for (const [F, c] of randCells(6000)) for (const e of ELEMENTS) { const w = whyNot(F, c, e.k); if (!!c.labels[e.k] === !!w) bad++; }
+  ok(bad === 0, '어긋남 ' + bad);
+  ok(dirZone(0).k === 'horiz' && dirZone(17).k === 'horiz' && dirZone(20).k === null && dirZone(45).k === 'diag' && dirZone(70).k === null && dirZone(90).k === 'vert' && dirZone(165).k === 'horiz', '방향 갈래');
+});
+test('돋보기 말 — 찾은 칸 · 틀린 칸 말이 판정과 모순 없음(카드 열둘)', () => {
+  const CORE = { horiz: '가로선', vert: '세로선', diag: '사선' }, bad = [];
+  const SF = synth(), synthCells = SF.cells.map(c => [SF, c]);
+  for (const [F, c] of [...randCells(6000), ...synthCells]) for (const e of ELEMENTS) {
+    const k = e.k, found = !!c.labels[k];
+    if (found) {
+      const t = proofText(k, c);
+      if (/거의 없어요|조금 있어요|흐릿/.test(t)) bad.push(k + ' 찾음 · ' + t);
+      if (k === 'bright' && !/밝아요|밝은 편/.test(t)) bad.push(k + ' 찾음 · ' + t);
+      if (k === 'dark' && !/어두/.test(t)) bad.push(k + ' 찾음 · ' + t);
+      if (CORE[k] && (!lineWord(c.ang).includes(CORE[k]) || /흐릿/.test(lensLine(c)) || dirZone(c.ang).k !== k)) bad.push(k + ' 찾음 · 돋보기 ' + lensLine(c));
+    } else {
+      const t = whyText(F, k, c);
+      if (CORE[k] && (t.includes(`이 선은 ${CORE[k]}이에요`) || lensLine(c) === `${CORE[k]} — 뚜렷해요` || lensLine(c) === `${CORE[k]} — 아주 뚜렷해요`)) bad.push(k + ' 틀림 · ' + t + ' / ' + lensLine(c));
+      if (CORE[k] && /흐릿/.test(t) && lineOf(c) >= 0.5) bad.push(k + ' 틀림인데 흐릿 · ' + t);
+      if (k === 'smooth' && /거의 없어요 — 자국 없이/.test(t)) bad.push(k + ' 틀림 · ' + t);
+      if (['warm', 'cool', 'vivid'].includes(k) && /아주 많아요/.test(t)) bad.push(k + ' 틀림 · ' + t);
+      if (k === 'bright' && /아주 밝아요 — 더 환한/.test(t)) bad.push(k + ' 틀림 · ' + t);
+      if (k === 'dark' && /아주 어두워요 — 더 어두운/.test(t)) bad.push(k + ' 틀림 · ' + t);
+      if (k === 'curve' && /선이 곧아요/.test(t)) bad.push(k + ' 틀림 · ' + t);
+    }
+  }
+  ok(bad.length === 0, bad.length + '건 · ' + bad.slice(0, 3).join(' | '));
 });
 test('그림 출처 문서 — 스물여섯 장 모두', () => {
   const t = fs.readFileSync(path.join(ROOT, 'art/CREDITS.md'), 'utf8');

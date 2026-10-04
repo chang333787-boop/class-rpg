@@ -112,11 +112,25 @@ function shadeOf(F, c) {
   const r2 = Math.min(1, (cxL * cxL / vx + cyL * cyL / vy) / vL), sd = Math.sqrt(vL), sf = sharp / n;
   return Math.max(0, Math.min(1, (r2 - 0.45) / 0.35)) * Math.max(0, Math.min(1, (sd - 3) / 5)) * Math.max(0, Math.min(1, 1 - (sf - 0.03) / 0.1));
 }
+//  [UX-TRIM-G4b] 선 세기 · 방향 몫 — labelsOf 와 돋보기 말(hunt.js)이 같은 셈을 쓴다(말과 판정이 어긋나지 않게)
+export const LABEL_MIN = 0.5;   // 이름표 문턱
+export const lineOf = c => (c.en >= 0.35 && c.coh >= 0.45 ? Math.min(1, (c.en - 0.2) / 0.5) * Math.min(1, (c.coh - 0.3) / 0.4) : 0);
+export function dirOf(a) {
+  const dH = Math.min(a, 180 - a), dV = Math.abs(a - 90), dD = Math.min(Math.abs(a - 45), Math.abs(a - 135));
+  return { horiz: Math.max(0, 1 - Math.max(0, dH - 12) / 10), vert: Math.max(0, 1 - Math.max(0, dV - 12) / 10), diag: Math.max(0, 1 - Math.max(0, dD - 15) / 10) };
+}
+//  선 방향 갈래 — 이름표가 붙을 수 있는 쪽(몫 ≥ 문턱 · 가로 ≤17° · 사선 25~65° · 세로 ≥73° 라 겹치지 않는다) · full = 몫 1(반듯)
+//   그 사이 각도(17~25° · 65~73°)는 어느 이름표도 못 붙는다 → k = null · near = 가까운 쪽(가로 · 세로)
+export function dirZone(a) {
+  const d = dirOf(a);
+  for (const k of ['horiz', 'vert', 'diag']) if (d[k] >= LABEL_MIN) return { k, full: d[k] >= 1 };
+  return { k: null, full: false, near: Math.min(a, 180 - a) < 45 ? 'horiz' : 'vert' };
+}
+export const lineSeen = c => c.en >= 0.3 && c.coh >= 0.4;   // 돋보기가 선 방향을 보여 주는 칸(곡선 셈의 선 칸과 같다)
 //  칸의 이름표 — { k: 세기 0~1 } 가운데 0.5 넘는 것(그림 안 견줌 + 정한 문턱)
 export function labelsOf(F, c) {
-  const s = {}, S = F.stats, line = c.en >= 0.35 && c.coh >= 0.45 ? Math.min(1, (c.en - 0.2) / 0.5) * Math.min(1, (c.coh - 0.3) / 0.4) : 0;
-  const a = c.ang, dH = Math.min(a, 180 - a), dV = Math.abs(a - 90), dD = Math.min(Math.abs(a - 45), Math.abs(a - 135));
-  if (line) { s.horiz = line * Math.max(0, 1 - Math.max(0, dH - 12) / 10); s.vert = line * Math.max(0, 1 - Math.max(0, dV - 12) / 10); s.diag = line * Math.max(0, 1 - Math.max(0, dD - 15) / 10); }
+  const s = {}, S = F.stats, line = lineOf(c);
+  if (line) { const d = dirOf(c.ang); s.horiz = line * d.horiz; s.vert = line * d.vert; s.diag = line * d.diag; }
   s.curve = c.curve;
   s.warm = Math.max(0, Math.min(1, (c.warmM - 0.2) / 0.3)); s.cool = Math.max(0, Math.min(1, (c.coolM - 0.2) / 0.3)); s.vivid = Math.max(0, Math.min(1, (c.vivM - 0.15) / 0.35));
   s.bright = c.L >= 70 && c.L >= S.L75 ? Math.min(1, (c.L - 62) / 16) : 0;
@@ -124,7 +138,24 @@ export function labelsOf(F, c) {
   s.shade = c.shade;
   s.rough = c.roughM >= Math.max(1.6, S.R75) ? Math.min(1, (c.roughM - 1.0) / 2.0) : 0;
   s.smooth = c.roughM <= Math.min(1.0, S.R25) && c.en < 0.3 ? Math.min(1, (1.4 - c.roughM) / 0.8) : 0;
-  return Object.fromEntries(Object.entries(s).filter(([, v]) => v >= 0.5).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+  return Object.fromEntries(Object.entries(s).filter(([, v]) => v >= LABEL_MIN).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+}
+//  [UX-TRIM-G4b] 이름표 k 가 왜 안 붙었나 — labelsOf 와 같은 문턱(붙었으면 null). 돋보기의 '틀렸을 때' 말이 이것을 따른다.
+//   가로 · 세로 · 사선: noline(선이 안 보임) · dir(다른 쪽 선) · weak(그 쪽이지만 선이 흐릿) · tilt(선은 뚜렷하지만 조금 기욺)
+//   밝은 · 어두운 · 거친 · 매끄러운: abs(정한 문턱 밖) · rel(문턱은 넘지만 이 그림 안에서 견주면 덜함) · 매끄러운 edge(밝기가 확 바뀜)
+//   나머지(곡선 · 색 · 양감): abs
+export function whyNot(F, c, k) {
+  if ((c.labels || labelsOf(F, c))[k]) return null;
+  if (k === 'horiz' || k === 'vert' || k === 'diag') {
+    if (!lineSeen(c)) return 'noline';
+    if (dirZone(c.ang).k !== k) return 'dir';
+    return lineOf(c) < LABEL_MIN ? 'weak' : 'tilt';
+  }
+  if (k === 'bright') return c.L < 70 ? 'abs' : 'rel';
+  if (k === 'dark') return c.L > 38 ? 'abs' : 'rel';
+  if (k === 'rough') return c.roughM < 2 ? 'abs' : 'rel';
+  if (k === 'smooth') return c.en >= 0.3 ? 'edge' : c.roughM > 1 ? 'abs' : 'rel';
+  return 'abs';
 }
 // 짚은 자리(그림 %) → 칸
 const slot = (bounds, v) => { let i = 0; while (i < bounds.length - 2 && v >= bounds[i + 1]) i++; return i; };

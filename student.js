@@ -398,6 +398,7 @@ function openThinkboardBoard(id) {
   openExternalEmbed('thinkboard', '#/b/' + id);
 }
 let _embedState = null;   // { key, href, loaded, timer }
+let _lupAfterEmbed = 0;   // [UX-TRIM-G4b] 학습 앱 창이 열린 동안 미룬 레벨업 축하(레벨) — 창을 닫으면 띄운다
 function _embedEl() {
   let el = document.getElementById('m-embed');
   if (el) return el;
@@ -482,6 +483,7 @@ function closeExternalEmbed(fromPop) {
   // 돌아오면 영어 보상 동기화 한 번 더 (방금 공부한 것 반영). 수채화·데생의 작품 제출은
   // iframe이 같은 RTDB의 students/<key>/pendingRewards에 직접 쓰고, DB.onDataChange가 CUR을 갱신한다.
   if (closedKey === 'english') { try { syncEnglishRewards(true); } catch (e) {} }
+  if (_lupAfterEmbed) { const lv = _lupAfterEmbed; _lupAfterEmbed = 0; setTimeout(() => triggerLevelUp(lv), 300); }   // [UX-TRIM-G4b]
 }
 window.addEventListener('popstate', () => {
   // 모달이 열려 있는데 embed 상태가 사라졌다면(뒤로가기) 닫는다
@@ -1644,7 +1646,7 @@ function buildMainHTML() {
         const typeLabel = {daily:'📋 일일',weekly:'📅 주간',special:'✏️ 과제',event:'⭐ 특별'}[q.type]||'📋';
         return `
         <div class="mission-row ${done?'done':pending?'pending':''}"
-          onclick="${(!done&&!pending)?`submitQuestFromMain('${q.id}')`:''}"
+          onclick="${(!done&&!pending)?`openQuestModal('${q.id}')`:''}"
           style="cursor:${(!done&&!pending)?'pointer':'default'}">
           <div class="mission-check ${done?'done':pending?'wait':''}">
             ${done?'✓':pending?'⏳':''}
@@ -1658,12 +1660,16 @@ function buildMainHTML() {
             <span class="mission-reward">+${q.exp}EXP</span>
             ${done?`<span style="font-size:.65rem;color:var(--emerald);font-weight:700">완료!</span>`
               :pending?`<span style="font-size:.65rem;color:var(--gold)">확인 중…</span>`
-              :`<span style="font-size:.65rem;color:var(--txt3)">탭하면 신청</span>`}
+              :`<span style="font-size:.65rem;color:var(--txt3)">열어 보기 ›</span>`}
           </div>
         </div>`;
       };
   // [UX-TRIM-G4] 아직 신청 안 한 퀘스트는 위에 펼쳐 두고, 신청했거나 끝난 것만 아래 접힌 칸에
-  const openQuestHtml = openQuests.map(missionRow).join('');
+  //   [UX-TRIM-G4b] 줄을 누르면 바로 신청되지 않고 퀘스트 창(그 퀘스트)이 열린다 — 신청은 창의 '신청' 단추(전과 같은 흐름).
+  //   펼치는 건 셋까지 — 퀘스트가 많아도 첫 할 일 카드가 화면 안에 남게. 나머지는 '퀘스트 N개 더 보기'(펼침 상태는 다시 그려도 유지)
+  const OPEN_Q_SHOW = 3;
+  const openQuestHtml = openQuests.slice(0, OPEN_Q_SHOW).map(missionRow).join('');
+  const openQuestMore = openQuests.slice(OPEN_Q_SHOW).map(missionRow).join('');
   const closedQuests  = boardQuests.filter(q => questStat(q) !== 'none');
   const missionHtml   = closedQuests.map(missionRow).join('');
 
@@ -1738,8 +1744,13 @@ function buildMainHTML() {
         ${buildStudyTaskHTML(s)}
         ${openQuests.length ? `
         <div class="home-quest-open">
-          <div style="font-size:.78rem;font-weight:800;color:var(--gold);margin:.2rem 0 .35rem">📋 선생님 퀘스트 ${openQuests.length}개 · 하고 나서 눌러 신청해요</div>
+          <div style="font-size:.78rem;font-weight:800;color:var(--gold);margin:.2rem 0 .35rem">📋 선생님 퀘스트 ${openQuests.length}개 · 다 하면 눌러서 신청해요</div>
           <div class="mission-list" style="margin-bottom:.6rem">${openQuestHtml}</div>
+          ${openQuestMore ? `
+          <div id="quest-open-more" class="mission-list" style="display:none;margin-bottom:.6rem">${openQuestMore}</div>
+          <button class="home-quest-more" onclick="toggleSection('quest-open-more','quest-open-more-arrow')">
+            <span>📋 퀘스트 ${openQuests.length - OPEN_Q_SHOW}개 더 보기</span><span id="quest-open-more-arrow">▼</span>
+          </button>` : ''}
         </div>` : ''}
         ${topTodoHtml}
         ${restTodos.length > 0 ? `
@@ -13781,7 +13792,7 @@ function renderQuestBoard() {
     const status  = Utils.questStatus(CUR.id, q.id, q.type, questLogs, CUR.pendingRewards, activeBQIds);
     const done    = status === 'done';
     const pending = status === 'pending';
-    return `<div style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':pending?'rgba(255,215,0,.25)':'rgba(255,255,255,.08)'};
+    return `<div data-qid="${escHtml(String(q.id))}" style="background:rgba(255,255,255,.04);border:1px solid ${done?'rgba(46,204,113,.3)':pending?'rgba(255,215,0,.25)':'rgba(255,255,255,.08)'};
       border-radius:12px;padding:.9rem 1rem;margin-bottom:.6rem;${done?'opacity:.6':''}">
       <div style="display:flex;align-items:flex-start;gap:.7rem">
         <div style="font-size:1.6rem;flex-shrink:0">${escHtml(q.icon||'📋')}</div>
@@ -13842,10 +13853,16 @@ function submitQuestFromMain(questId) {
 }
 
 // 퀘스트 모달 열 때 게시판 탭이 기본
-function openQuestModal() {
+//  [UX-TRIM-G4b] focusId — 홈 '선생님 퀘스트' 줄에서 누른 퀘스트를 창 가운데로 · 테두리(신청은 창의 '신청' 단추로만)
+function openQuestModal(focusId) {
   openModal('m-quest');
   const firstTab = document.querySelector('#m-quest .mtab');
   questTab('board', firstTab);
+  if (typeof focusId !== 'string' || !focusId) return;
+  const card = [...document.querySelectorAll('#quest-board-list [data-qid]')].find(el => el.dataset.qid === focusId);
+  if (!card) return;
+  card.classList.add('q-focus');
+  try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
 }
 // ══ 독서 기록 ══
 // ── 독서 기록 제출 (승인 요청) ──
@@ -14616,6 +14633,8 @@ window.addEventListener('resize', applyScale);
 
 
 function triggerLevelUp(newLv) {
+  // [UX-TRIM-G4b] 학습 앱 창(z 9000)이 열려 있으면 축하(999)가 그 밑에 가려진다 → 창을 닫은 뒤 한 번(그동안 오른 가장 높은 레벨)
+  if (_embedState) { _lupAfterEmbed = Math.max(_lupAfterEmbed || 0, newLv); return; }
   if (_fxBusy()) { _fxWhenFree(() => triggerLevelUp(newLv)); return; }   // [BATTLE-V2] 배틀·업적 카드가 끝난 뒤
   const fx = document.getElementById('lup-fx');
   document.getElementById('lup-sub').textContent = `Lv.${newLv}이 됐어요!`;

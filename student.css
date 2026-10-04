@@ -2078,6 +2078,12 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
 .hs-sub{font-size:.82rem;color:var(--txt3)}
 /* 오늘: 할 일 | 우리 반 소식 */
 .hs-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,34%);gap:1.4rem;align-items:start}
+/* [UX-TRIM-G4b] 좁은 폭 한 칸(1fr)은 긴 퀘스트 이름(줄 안 바꿈)만큼 늘어나 '오늘' 칸이 화면 밖으로 넘쳤다(768 폭 778px) → 칸 최소 0 */
+.hs-cols > *{min-width:0}
+/* [UX-TRIM-G4b] 위에 펼친 선생님 퀘스트 — 이름은 한 줄 말줄임(.mission-name 그대로 · 누르면 퀘스트 창에 전체) · 셋 넘으면 '더 보기' · 누른 퀘스트는 창에서 테두리로 */
+.home-quest-more{width:100%;padding:.35rem .7rem;margin:-.2rem 0 .6rem;background:none;border:1px solid rgba(255,255,255,.08);border-radius:8px;
+  color:var(--txt2);font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center}
+#quest-board-list .q-focus{box-shadow:0 0 0 2px var(--gold);}
 .hs-news .sec-label{margin-top:.15rem}
 .hc-news{display:flex;align-items:center;gap:.7rem;padding:.65rem .2rem;border-bottom:1px solid var(--border);cursor:pointer}
 .hc-news:hover{background:rgba(255,255,255,.03)}
@@ -2101,8 +2107,8 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
 .hc-badge{position:absolute;top:8px;right:8px;font-size:.68rem;font-weight:900;color:#2a1a08;background:var(--gold);border-radius:6px;padding:1px 6px}
 .hc-links{display:flex;gap:.5rem;margin:.8rem 0 .6rem}
 .hc-links button{flex:1;padding:.55rem;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--txt2);font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
-@media (max-width:700px){ .hs-cols{grid-template-columns:1fr} .hc-grid,.hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))} .home-sec{margin-bottom:1rem} }
-#s-game.force-mobile .hs-cols{grid-template-columns:1fr}
+@media (max-width:700px){ .hs-cols{grid-template-columns:minmax(0,1fr)} .hc-grid,.hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))} .home-sec{margin-bottom:1rem} }
+#s-game.force-mobile .hs-cols{grid-template-columns:minmax(0,1fr)}
 #s-game.force-mobile .hc-grid,#s-game.force-mobile .hc-grid.small{grid-template-columns:repeat(2,minmax(0,1fr))}
 .hc-door .hc-art{transform:scale(var(--z,1));transform-origin:50% 100%}
 .hc-door.big .hc-art{transform:none}
@@ -2115,7 +2121,7 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
   .hr-item{min-height:96px}
   .hr-art{height:40px}
   .hr-item small{display:none}
-  .hs-cols{grid-template-columns:1fr}
+  .hs-cols{grid-template-columns:minmax(0,1fr)}
 }
 .hc-door .hc-badge{color:#2a1a08;font-size:.68rem;line-height:1.5}
 /* [HOME-C-2] 넓은 화면(맥북·큰 모니터)에서도 크롬북과 같은 짜임 — 칸 수 고정 + 내용 폭 상한 + 가운데.
