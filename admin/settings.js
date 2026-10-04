@@ -787,36 +787,38 @@ async function autoBackupOnLogin() {
 // ══════════════════════════════════════════════════
 // [LIVE-INPUT-1] 설정 칸 채우기 — 교사가 쓰는 중(포커스)이거나, 지난번 채운 값에서 고쳐 놓고 아직 저장 안 한 칸은 건드리지 않는다.
 //  학생 저장마다 renderAll → loadSettings 가 돌아 쓰던 학급명·보스·접속 시간이 옛 값으로 돌아가던 것. 저장된 값이 바뀌었고
-//  교사가 손대지 않은 칸만 새 값으로 바뀐다(저장 뒤엔 칸 값 = 새 값이라 그대로 이어진다).
-function _fillSettingField(el, val, prop = 'value') {
+//  교사가 손대지 않은 칸만 새 값으로 바뀐다.
+//  [LIVE-INPUT-2] force = 설정 저장 직후. 저장값은 정리돼 칸 값과 다를 수 있으니(0회→3회 등) 모든 칸을 실제 저장값으로 다시 채운다.
+function _fillSettingField(el, val, prop = 'value', force = false) {
   if (!el) return;
   const v = prop === 'checked' ? !!val : String(val);
   const cur = el[prop];
-  if (document.activeElement === el) return;
-  if (el.dataset.filled !== undefined && String(cur) !== el.dataset.filled && String(cur) !== String(v)) return;
+  if (!force && document.activeElement === el) return;
+  if (!force && el.dataset.filled !== undefined && String(cur) !== el.dataset.filled && String(cur) !== String(v)) return;
   el[prop] = v;
   el.dataset.filled = String(v);
 }
 
-function loadSettings() {
+function loadSettings(force = false) {
   const s = DB.getSettings();
   const $ = id => document.getElementById(id);
-  _fillSettingField($('set-classname'),   s.className||'우리반');
-  _fillSettingField($('set-boss-active'), s.bossActive||false, 'checked');
-  _fillSettingField($('set-boss-name'),   s.bossName||'거대 트롤');
-  _fillSettingField($('set-boss-icon'),   s.bossIcon||'🧌');
-  _fillSettingField($('set-boss-gold'),   Utils.intOr(s.bossGold, 150));   // [ZERO-OK-1]
+  const fill = (el, val, prop = 'value') => _fillSettingField(el, val, prop, force);   // [LIVE-INPUT-2]
+  fill($('set-classname'),   s.className||'우리반');
+  fill($('set-boss-active'), s.bossActive||false, 'checked');
+  fill($('set-boss-name'),   s.bossName||'거대 트롤');
+  fill($('set-boss-icon'),   s.bossIcon||'🧌');
+  fill($('set-boss-gold'),   Utils.intOr(s.bossGold, 150));   // [ZERO-OK-1]
   // [AUTO-DAILY-REWARD-1] 이 두 칸 = 자동 일일 퀘스트 보상(예전 baseExp·baseGold 는 읽는 곳이 없던 값이라 안 쓴다)
   const _adr = DB.autoDailyReward(s);
-  _fillSettingField($('set-base-exp'),  _adr.exp);
-  _fillSettingField($('set-base-gold'), _adr.gold);
+  fill($('set-base-exp'),  _adr.exp);
+  fill($('set-base-gold'), _adr.gold);
   const _adrTxt = document.getElementById('auto-daily-reward-txt');
   if (_adrTxt) _adrTxt.textContent = `${_adr.exp}EXP + ${_adr.gold}G`;
-  _fillSettingField($('set-monster-rate'), s.monsterWinRate||80);
+  fill($('set-monster-rate'), s.monsterWinRate||80);
   // [BATTLE-SET-1] 이 칸은 예전에 settings.monsterDailyLimit(읽는 곳 0)에 썼다. 실제 전투가 읽는 키로 통일.
-  _fillSettingField($('set-monster-limit'), (s.customBattleSettings || {}).dailyBattleLimit ?? 3);
-  _fillSettingField($('set-access-start'), s.accessStart||'08:30');
-  _fillSettingField($('set-access-end'),   s.accessEnd  ||'16:00');
+  fill($('set-monster-limit'), (s.customBattleSettings || {}).dailyBattleLimit ?? 3);
+  fill($('set-access-start'), s.accessStart||'08:30');
+  fill($('set-access-end'),   s.accessEnd  ||'16:00');
   renderTodayLinksList();
 }
 
@@ -891,6 +893,7 @@ function saveSettings() {
     accessStart: document.getElementById('set-access-start')?.value || '08:30',
     accessEnd:   document.getElementById('set-access-end')?.value   || '16:00',
   });
+  loadSettings(true);   // [LIVE-INPUT-2] 정리된 저장값(0회→3회·5000→1000 등)을 칸에 되돌려 화면 = 실제 값
   notify('⚙️ 설정 저장 완료!');
 }
 
