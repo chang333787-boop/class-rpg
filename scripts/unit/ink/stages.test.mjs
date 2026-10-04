@@ -7,6 +7,7 @@ import { inkRgb, lightOf, TONES, MAX_DROPS, PASS_DL, closeness, starsOf } from '
 import { CHAPTERS, ST, INK_CASES, stById } from '../../../ink/js/stages.js';
 import { judgeMix, nextStep, judgeCell, chainStars, judgeBrush, TASKS, readStroke, CHAIN_LAST } from '../../../ink/js/judge.js';
 import { caseById } from '../../../art/js/cases.js';
+import { GLYPHS, layoutCells, toCellStroke, makeSheet, samples } from '../../../ink/js/write.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const results = [];
@@ -27,10 +28,63 @@ test('먹 엔진 — 진하기는 양이 아니라 비율', () => {
   ok(lightOf(1, 9) < CHAIN_LAST + 10 && lightOf(1, 9) > CHAIN_LAST, '먹 1 : 물 9 = 가장 옅은 먹(마지막 칸에 닿음)');
   ok(closeness(0) === 100 && closeness(PASS_DL) === 80 && starsOf(1) === 3 && starsOf(5) === 1 && starsOf(PASS_DL + 1) === 0, '가까움 · 별');
 });
-test('판 짜임 — 장 셋 · 이름 겹침 없음 · 글', () => {
-  ok(CHAPTERS.length === 3 && new Set(ST.map(s => s.id)).size === ST.length, '장 · 이름');
-  ok(ST.filter(s => s.ch === 1).length === 5 && ST.filter(s => s.ch === 2).length === 5, '1장 다섯 · 2장 다섯');
-  for (const s of ST) ok(s.title && s.story && s.hint && s.why && ['predict', 'mix', 'chain', 'brush'].includes(s.kind), s.id + ' 글 · 갈래');
+test('판 짜임 — 장 넷 · 이름 겹침 없음 · 글', () => {
+  ok(CHAPTERS.length === 4 && new Set(ST.map(s => s.id)).size === ST.length, '장 · 이름');
+  ok(ST.filter(s => s.ch === 1).length === 5 && ST.filter(s => s.ch === 2).length === 5 && ST.filter(s => s.ch === 3).length === 7 && !ST.some(s => s.ch === 4), '1장 다섯 · 2장 다섯 · 3장 일곱 · 4장 = 명화 탐정');
+  for (const s of ST) ok(s.title && s.story && s.hint && s.why && ['predict', 'mix', 'chain', 'brush', 'write'].includes(s.kind), s.id + ' 글 · 갈래');
+});
+// ── 3장 판본체 쓰기 — 칸 좌표 본보기를 종이 px 붓 자국으로(같은 빠르기 · 시작 멈춤) ──
+const W0 = 826, H0 = 476;
+function strokeOf(cells, m, { reverse = false, w = 29, tilt = 0, jitter = false, path = null, hold = 250, part = null } = {}) {
+  const c = cells[m.cell], P = ([x, y]) => [c.x + x / 100 * c.s, c.y + y / 100 * c.s];
+  if (m.k === 'dot') return { dot: true, pts: [[...P(m.c), m.c[2] * 2 * c.s / 100]], hold: 600, cap: 34 };
+  let pts = path ? path : m.k === 'circle' ? samples(m) : samples(m);
+  if (part) pts = pts.slice(part[0], part[1]);
+  if (tilt) { const [ax, ay] = pts[0], r = tilt * Math.PI / 180; pts = pts.map(([x, y]) => [ax + (x - ax) * Math.cos(r) - (y - ay) * Math.sin(r), ay + (x - ax) * Math.sin(r) + (y - ay) * Math.cos(r)]); }
+  if (reverse) pts = [...pts].reverse();
+  return { dot: false, pts: pts.map((q, i) => [...P(q), jitter ? (i % 4 < 2 ? 12 : 30) : w]), hold, cap: 34 };
+}
+const writeAll = (keys, plan = null) => {
+  const cells = layoutCells(W0, H0, keys.length), sh = makeSheet(keys), evs = [];
+  const list = plan ? plan(sh.model) : sh.model.map(m => [m, {}]);
+  for (const [m, o] of list) evs.push(sh.add(toCellStroke(strokeOf(cells, m, o), cells)));
+  return { sh, r: sh.result(), evs };
+};
+test('판본체 — 본보기 글자 · 판마다 칸 · 획 모양', () => {
+  for (const s of ST.filter(s => s.kind === 'write')) ok(s.cells.every(k => GLYPHS[k]) && s.glyph, s.id + ' 칸 글자');
+  for (const [k, g] of Object.entries(GLYPHS)) for (const m of g) {
+    const inside = v => v >= 0 && v <= 100;
+    ok(m.n && (m.p ? m.p.length >= 2 && m.p.flat().every(inside) : m.c && inside(m.c[0] - m.c[2]) && inside(m.c[0] + m.c[2]) && inside(m.c[1] - m.c[2]) && inside(m.c[1] + m.c[2])), `${k} 획 ${m.n}`);
+    if (m.k === 'h') ok(m.p[0][0] < m.p[1][0] && m.p[0][1] === m.p[1][1], `${k} 가로는 왼쪽에서`);
+    if (m.k === 'v') ok(m.p[0][1] < m.p[1][1] && m.p[0][0] === m.p[1][0], `${k} 세로는 위에서`);
+  }
+  const L = layoutCells(W0, H0, 2); ok(L[0].x > 0 && L[1].x + L[1].s < W0 && L[0].y > 0 && L[0].y + L[0].s < H0 && L[1].x > L[0].x + L[0].s, '칸 두 개가 종이 안에 나란히');
+});
+test('판본체 — 본보기 그대로 쓰면 일곱 판 모두 통과(별 셋)', () => {
+  for (const s of ST.filter(s => s.kind === 'write')) { const { r, evs } = writeAll(s.cells); ok(r.pass && r.stars === 3 && evs.every(e => e.type === 'ok'), `${s.id} ${r.why}`); }
+});
+test('판본체 — 획순 · 방향 · 밖 · 실수로 콕', () => {
+  const o = writeAll(['bu', 'mo'], M => [[M[1], {}], [M[0], {}], ...M.slice(2).map(m => [m, {}])]);
+  ok(!o.r.pass && o.r.kind === 'order' && o.evs[0].type === 'order', 'ㅂ 오른 세로를 먼저 = 획순');
+  const rv = writeAll(['vlines'], M => [[M[0], {}], [M[1], { reverse: true }], [M[2], {}]]);
+  ok(!rv.r.pass && rv.r.kind === 'reverse' && rv.evs[1].type === 'reverse', '세로를 아래에서 = 방향');
+  const off = writeAll(['hlines'], M => [[M[0], {}], [M[1], { path: [[10, 10], [90, 90]] }], [M[1], {}], [M[2], {}]]);
+  ok(!off.r.pass && off.r.kind === 'off' && off.evs[1].type === 'off', '대각선 = 밑그림 밖');
+  const cells = layoutCells(W0, H0, 1), sh = makeSheet(['hlines']);
+  ok(sh.add(toCellStroke({ dot: true, pts: [[cells[0].x + 40, cells[0].y + 40, 6]], hold: 60, cap: 34 }, cells)).type === 'tiny' && sh.next() === 0, '실수로 콕 = 안 셈');
+});
+test('판본체 — 획 읽기(기울기 · 가는 획 · 들쭉날쭉 · 동그라미 두 번에)', () => {
+  const t = writeAll(['hlines'], M => [[M[0], {}], [M[1], { tilt: 16 }], [M[2], {}]]);
+  ok(!t.r.pass && t.r.kind === 'weak' && /기울었어요\(1[56]°\)/.test(t.r.why), '16° 기울면 ' + t.r.why);
+  const th = writeAll(['vlines'], M => M.map(m => [m, { w: 9 }]));
+  ok(!th.r.pass && /가늘어요/.test(th.r.why), '가늘면 ' + th.r.why);
+  const j = writeAll(['hlines'], M => M.map(m => [m, { jitter: true }]));
+  ok(j.r.stars < 3 && j.evs.every(e => e.sc.even < 0.6), '들쭉날쭉 굵기는 별이 줄어듦 ' + j.evs.map(e => e.sc.even.toFixed(2)));
+  const half = samples(GLYPHS.ieung[0]).length;
+  const c2 = writeAll(['ieung'], M => [[M[0], { part: [0, Math.ceil(half / 2) + 1] }], [M[0], { part: [Math.floor(half / 2), half] }]]);
+  ok(c2.evs[0].type === 'part' && c2.r.pass, '동그라미 반쪽 둘 = 통과 ' + c2.r.why);
+  const nh = writeAll(['hlines'], M => M.map(m => [m, { hold: 20 }]));
+  ok(nh.r.pass && nh.evs.every(e => / 시작에 잠깐 멈춰요/.test(e.say)), '시작 멈춤 없음 = 도움말만(통과는 됨)');
 });
 test('예상 판 — 답이 맞고 보기 먹색이 서로 뚜렷이 다름', () => {
   for (const s of ST.filter(s => s.kind === 'predict')) {

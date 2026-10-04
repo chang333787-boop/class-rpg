@@ -302,10 +302,10 @@ function externalStudyItems() {
       sub: '옛 그림 속 숨은 것을 찾고 질문을 만들어요',
       href: 'art/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(201,167,232,.42)', bg: 'rgba(201,167,232,.08)', embed: true },
-    // [INK-1] 먹 연구소 — 먹물 · 물 방울로 먹색(농담) 만들기 · 농담 꼬리 잇기 · 한지에 붓 놀이(점 · 선 · 마른 붓 · 번짐) · 3장 = 명화 탐정 수묵 사건
+    // [INK-1] 먹 연구소 — 먹물 · 물 방울로 먹색(농담) 만들기 · 농담 꼬리 잇기 · 한지에 붓 놀이(점 · 선 · 마른 붓 · 번짐) · [PANBON-1] 3장 판본체 쓰기 · 4장 = 명화 탐정 수묵 사건
     //   저장 = classRPG_ink · 보상과 묶지 않음 · 교과서 9종 모두 3학년에 먹 · 수묵화가 있어 만듦(docs/art34_analysis.md · docs/ink_lab_design.md)
     { key: 'ink', icon: '🖋️', title: '먹 연구소',
-      sub: '먹물과 물로 먹색을 만들고 한지에 붓으로 그어요',
+      sub: '먹물과 물로 먹색을 만들고 한지에 붓으로 긋고 판본체를 써요',
       href: 'ink/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(170,170,180,.42)', bg: 'rgba(170,170,180,.08)', embed: true },
     // [PRINT-1] 판화 놀이 — 나무판을 새기고(세모칼 · 둥근칼) 롤러 · 바렌으로 찍어 보며 판화의 원리(좌우가 바뀐다 · 파낸 곳은 하얗게 · 여러 장)
@@ -1818,7 +1818,7 @@ function buildMainHTML() {
       ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')", 'NEW')}
       ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')", 'NEW')}
       ${door(asset('monsters/m30.png'), '명화 탐정', '옛 그림 속 숨은 것 찾기 · 질문 만들기', "openExternalEmbed('art')", 'NEW')}
-      ${door(asset('monsters/m49.png'), '먹 연구소', '먹색 만들기 · 붓 놀이 · 수묵화 읽기', "openExternalEmbed('ink')", 'NEW')}
+      ${door(asset('monsters/m49.png'), '먹 연구소', '먹색 · 붓 놀이 · 판본체 글씨 · 수묵화', "openExternalEmbed('ink')", 'NEW')}
       ${door(asset('monsters/m71.png'), '판화 놀이', '새기고 찍으면 거울처럼 · 판화 읽기', "openExternalEmbed('print')", 'NEW')}
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
