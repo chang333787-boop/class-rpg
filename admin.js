@@ -51,6 +51,7 @@ async function adminLogin() {
     updatePwResetBadge();
     populateSelectStudents();
     autoBackupOnLogin(); // 오늘 백업 없으면 자동 저장
+    if (typeof assignAdminBoot === 'function') assignAdminBoot();   // [CLASS-ASSIGN-1] 수업 칩 · 교사 기기 연결(쪽을 안 열어도)
   } else {
     document.getElementById('admin-login-err').textContent = '❌ 비밀번호가 틀렸어요';
   }
@@ -165,8 +166,8 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard','learnapps'];
-const titles = {thinkboard:'생각판', learnapps:'학습 앱 기록',dashboard:'대시보드',students:'학생 목록',approve:'활동 승인',
+const pages = ['assign','dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard','learnapps'];
+const titles = {assign:'과제·수업', thinkboard:'생각판', learnapps:'학습 앱 기록',dashboard:'대시보드',students:'학생 목록',approve:'활동 승인',
   rank:'랭킹',quests:'퀘스트 관리',reward:'보상 지급',artwork:'작품 관리', books:'독서 현황', villages:'우리 마을',
   memories:'추억 관리',
   recorder:'리코더 관리',
@@ -175,6 +176,7 @@ const titles = {thinkboard:'생각판', learnapps:'학습 앱 기록',dashboard:
 
 // [DESLOP-3] 왼쪽 메뉴 그림 — 이모지 대신 같은 굵기(2) 선 그림 한 벌 · 색은 글자색(admin.html 은 .nav-icon[data-i] 자리만 둔다)
 const NAV_ICONS = {
+  assign: '<rect x="4" y="3" width="13" height="18" rx="2"/><path d="M8 8h5M8 12h5M8 16h3"/><circle cx="19" cy="17" r="3"/>',   // [CLASS-ASSIGN-1]
   dashboard: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
   students: '<path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7.5" r="3.5"/><path d="M22 20v-1.5a4 4 0 0 0-3-3.9M16 4.1a3.5 3.5 0 0 1 0 6.8"/>',
   approve: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12.5 3 3 5-6"/>',
@@ -297,6 +299,7 @@ function nav(page, el) {
   document.getElementById('topbar-title').textContent = titles[page] || page;
   // 페이지 전환 시 스크롤 최상단으로
   document.querySelector('.main').scrollTop = 0;
+  if (page === 'assign') renderAssignPage();           // [CLASS-ASSIGN-1]
   if (page === 'thinkboard') openThinkboardInline();   // [THINKBOARD-2] 관리 화면 안에서
   if (page === 'learnapps')  renderLearnAppsPage();    // [LEARN-APPS-1]
   if (page === 'reward')   populateRewardStudents();
