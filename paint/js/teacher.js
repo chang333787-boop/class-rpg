@@ -1,6 +1,7 @@
 // 선생님 헷갈림 지도 — 아이 × 판 표(푼 판은 별, 못 푼 판은 답한 수) + 아이마다 무엇이 달랐는지(밝기 · 선명함 · 색깔 …) + 느낌의 색 모자이크(이름과 함께)
 //  관리자 비밀번호로 연다(무늬 공방 · 기초 코딩과 같은 방식). 쓰는 것 없음(읽기만).
-import { h, toast, modal } from './util.js';
+import { h, modal } from './util.js';
+import { teacherGate } from '../../common/teacher-gate.js';
 import { ST, CHAPTERS } from './stages.js';
 import { mosaicEl } from './feel.js';
 //  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
@@ -10,15 +11,8 @@ export const MISTAKES = { light: '밝기가 다름', chroma: '선명함이 다�
 const MK = Object.keys(MISTAKES);
 const SCORED = ST.filter(s => s.kind !== 'feel'), FEEL = ST.filter(s => s.kind === 'feel');
 
-async function gate(ctx) {
-  if (ctx.store.me.guest) return true;
-  try { if (sessionStorage.getItem('paint.teacher') === '1') return true; } catch {}
-  const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
-  if (!pw) return false;
-  try { if (await ctx.store.teacherOK(pw)) { try { sessionStorage.setItem('paint.teacher', '1'); } catch {} return true; } } catch (e) { console.warn(e); }
-  toast('비밀번호가 맞지 않아요');
-  return false;
-}
+// 선생님 화면 문 — 손님 · 이 창에서 통과('paint.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
+function gate(ctx) { return teacherGate(ctx, 'paint.teacher'); }
 
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }

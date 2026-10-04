@@ -6,17 +6,9 @@
 //  4장(판화 감상)은 명화 탐정 사건 — 푼 것만 classRPG_art/progress/<sid> 에서 읽는다(쓰지 않음). 판(새긴 그림)은 저장하지 않는다.
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { keyOf, lsGet, lsSet } from './util.js';
+import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
 
 export const ROOT = 'classRPG_print';
-const CONFIG = {   // gamedata.js FIREBASE_CONFIG 와 같은 값(학급 RPG 프로젝트)
-  apiKey: 'AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4',
-  authDomain: 'class-rpg-6f409.firebaseapp.com',
-  databaseURL: 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'class-rpg-6f409',
-  storageBucket: 'class-rpg-6f409.firebasestorage.app',
-  messagingSenderId: '408824743154',
-  appId: '1:408824743154:web:382fdd431f7e2dbce13c6b',
-};
 const better = (a, b) => !a || (b.st > (a.st || 0)) || (b.st === a.st && b.n < a.n);
 
 export function createStore({ sid, name, fb = globalThis.firebase, offline = false } = {}) {
@@ -26,8 +18,7 @@ export function createStore({ sid, name, fb = globalThis.firebase, offline = fal
 }
 
 function rtdbStore(fb, sid, name) {
-  if (!fb.apps.length) fb.initializeApp(CONFIG);
-  const db = fb.database(), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
+  const db = rpgDb(fb), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
   let mine = null;
   const st = {
     me: { sid, name: name || '', guest: false }, online: true,
@@ -44,7 +35,7 @@ function rtdbStore(fb, sid, name) {
     },
     async artDone() { return (await db.ref('classRPG_art/progress/' + sid).once('value')).val() || {}; },
     // ── 선생님 ──
-    async teacherOK(pw) { const real = (await db.ref('classRPG_adminPw').once('value')).val(); return real != null && String(pw) === String(real); },
+    async teacherOK(pw) { return adminPwOK(db, pw); },
     async all() { const v = (await root.once('value')).val() || {}; return { progress: v.progress || {}, stats: v.stats || {}, names: v.names || {} }; },
   };
   return st;

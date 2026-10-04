@@ -1,6 +1,7 @@
 // 선생님 헷갈림 지도 — 아이 × 판 표(푼 판은 별 · 자유 판화는 ✓, 못 푼 판은 답한 수) + 아이마다 무엇이 달랐는지(거울 실수 · 넘쳐 팜 …)
 //  관리자 비밀번호로 연다(먹 연구소 · 물감 연구소와 같은 방식). 쓰는 것 없음(읽기만).
-import { h, toast, modal } from './util.js';
+import { h, modal } from './util.js';
+import { teacherGate } from '../../common/teacher-gate.js';
 import { ST, CHAPTERS } from './stages.js';
 //  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
 const STD = '3~4학년 미술 [4미02-02] 표현 재료와 용구(판 · 칼 · 롤러 · 바렌)의 특성 · 사용 방법 · [4미02-03] 조형 요소(형 · 선) 탐색. 미술 교과서 8종이 4학년에 판화를 다뤄요.';
@@ -9,15 +10,8 @@ export const MISTAKES = { pick: '찍힘 예상', choose: '판 고르기', mirror
 const MK = Object.keys(MISTAKES);
 const SCORED = ST.filter(s => s.kind !== 'free');
 
-async function gate(ctx) {
-  if (ctx.store.me.guest) return true;
-  try { if (sessionStorage.getItem('print.teacher') === '1') return true; } catch {}
-  const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
-  if (!pw) return false;
-  try { if (await ctx.store.teacherOK(pw)) { try { sessionStorage.setItem('print.teacher', '1'); } catch {} return true; } } catch (e) { console.warn(e); }
-  toast('비밀번호가 맞지 않아요');
-  return false;
-}
+// 선생님 화면 문 — 손님 · 이 창에서 통과('print.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
+function gate(ctx) { return teacherGate(ctx, 'print.teacher'); }
 
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }

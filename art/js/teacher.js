@@ -2,6 +2,7 @@
 //  + 조형 요소 찾기(아이 × 카드 · 찾다가 다른 요소를 짚은 헷갈림 · 요소마다 고른 느낌)
 //  관리자 비밀번호로 연다(물감 연구소 · 무늬 공방과 같은 방식). 쓰는 것 = 질문 내리기 하나뿐.
 import { h, toast, modal } from './util.js';
+import { teacherGate } from '../../common/teacher-gate.js';
 import { CASES, FEELS, BECAUSE } from './cases.js';
 import { kindOf, questionText, LEVELS } from './ask.js';
 import { ELEMENTS, EFEELS, elementOf } from './elements.js';
@@ -10,15 +11,8 @@ const STD = '3~4학년 미술 감상 [4미03-01] 미술 작품을 자세히 보�
 
 const FEEL_WORD = Object.fromEntries(FEELS), BEC_WORD = Object.fromEntries(BECAUSE);
 
-async function gate(ctx) {
-  if (ctx.store.me.guest) return true;
-  try { if (sessionStorage.getItem('art.teacher') === '1') return true; } catch {}
-  const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
-  if (!pw) return false;
-  try { if (await ctx.store.teacherOK(pw)) { try { sessionStorage.setItem('art.teacher', '1'); } catch {} return true; } } catch (e) { console.warn(e); }
-  toast('비밀번호가 맞지 않아요');
-  return false;
-}
+// 선생님 화면 문 — 손님 · 이 창에서 통과('art.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
+function gate(ctx) { return teacherGate(ctx, 'art.teacher'); }
 const count = (obj, key) => { const cnt = {}; for (const v of Object.values(obj || {})) for (const k of String((v || {})[key] || '').split(',').filter(Boolean)) cnt[k] = (cnt[k] || 0) + 1; return Object.entries(cnt).sort((a, z) => z[1] - a[1]); };
 
 export async function mountTeacher(root, ctx) {

@@ -40,9 +40,11 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 학생 홈에서 iframe 으로 열고 주소에 `?sid=<학생id>&n=<이름>` 을 붙인다(없으면 손님 — 그 기기에만 저장).
 학습 앱은 **자기 저장 루트만** 쓰고 RPG 본 데이터(`classRPG_v3`)는 쓰지 않는다(선생님 화면 비밀번호 확인용 `classRPG_adminPw` 읽기만).
 선생님 화면 = `<폴더>/index.html?teacher=1#/t` (관리 비밀번호를 한 번 묻는다). ES 모듈 + import map 이라 버스터는 **import map 의 `?v=` 숫자**를 올린다.
+공통 뼈대는 `common/`(아래 표 첫 줄) — 고치면 그 파일을 부르는 **모든** 앱 index.html 의 `"../common/…"` 값을 같게 올린다(`buster-check` 가 다르면 FAIL).
 
 | 폴더 | 이름 | 하는 일 | 저장 루트 | 시험 |
 |---|---|---|---|---|
+| `common/` | 하위 앱 공통 뼈대 | `util.js`(h · toast · modal · lsGet … — 6앱 `js/util.js` 는 다시 내보내기만 · 음악실은 + 자기 것) · `rpg-firebase.js`(학급 RPG 설정 하나 · 앱 만들기 · 관리자 비밀번호 확인 — 8앱) · `teacher-gate.js`(선생님 화면 문 — 7앱 · 키 `<앱>.teacher` 그대로) · `subapp.css`(바탕 · 단추 · 창 · 윗줄 — 6앱, 앱 css 보다 **먼저** 부른다). 생각판 util · 음악실 · 생각판 css 는 모양이 달라 따로 | 없음 | `scripts/unit/common/common.test.mjs` |
 | `art/` | 명화 탐정 | 옛 명화를 자세히 보며 찾기 → 단서 → 느낌 → 질문 · 조형 요소 돋보기 카드 | `classRPG_art` | `scripts/unit/art/cases.test.mjs` |
 | `coding/` | 기초 코딩 | 블록 코딩(Blockly) — 몬스터에게 명령하기(길 찾기) · 그림 그리기 · 선생님 막힘 지도 | `classRPG_coding` | `scripts/unit/coding/stages.test.mjs` |
 | `ink/` | 먹 연구소 | 먹색(농담) 만들기 · 한지에 붓 긋기 · 판본체 쓰기 | `classRPG_ink` | `scripts/unit/ink/stages.test.mjs` |
@@ -76,16 +78,16 @@ assets/monsters/                               몬스터 이미지 100장 (iconI
 assets/char · deco · floor · seeds · crops …   캐릭터 종이인형 84 · 장식 SVG · 바닥 타일 · 씨앗 등
 village/                                       우리 마을: index.html · sync.js(원격 저장층) · vendor/three.module.js
 watercolor/                                    수채화·데생 앱
-art/ coding/ ink/ music/ paint/ pattern/ print/ thinkboard/ scan/   하위 앱(위 표)
+art/ coding/ ink/ music/ paint/ pattern/ print/ thinkboard/ scan/ common/   하위 앱 · 공통 뼈대(위 표)
 scripts/verify-safety.mjs                      저장 안전 정적 검증 스크립트 (Node 기본 모듈만)
 scripts/smoke-test.mjs                         로컬 HTTP/정적 구조 smoke-test (캐시버스터는 html에서 읽어 교차검증)
 scripts/unit/run.mjs                           student.js(+student/*.js) 순수 함수 단위 테스트(함수 본문만 떼어 vm 실행)
 scripts/unit/student-sources.mjs               학생 코드 읽기 단일 출처(student.html 의 script 순서) — 학생 코드를 읽는 시험은 이걸로
 scripts/unit/precheck.mjs [--no-deco]          PR 전 검사 한 번에(아래 검사 전부 + 하위 앱 시험을 저절로 모음)
-scripts/unit/buster-check.mjs [base] [head]    캐시버스터 누락 검사(머지 뒤 값 기준, git 읽기만 · 하위 앱 index.html 포함)
+scripts/unit/buster-check.mjs [base] [head]    캐시버스터 누락 검사(머지 뒤 값 기준, git 읽기만 · 하위 앱 index.html · common/ 포함)
 scripts/unit/global-dup-check.mjs              한 페이지 클래식 스크립트끼리 최상위 function/const 이름 겹침
 scripts/unit/esc-parity.mjs                    escHtml · escJsAttr · safeUrl 복사본들이 같은 결과를 내나
-scripts/unit/<앱>/*.test.mjs                   하위 앱 시험(art · coding · ink · paint · pattern · print · thinkboard)
+scripts/unit/<앱>/*.test.mjs                   하위 앱 시험(art · coding · ink · paint · pattern · print · thinkboard · common)
 scripts/ci/check.yml                           CI 설정(node 22, 브라우저 없는 검사만) — .github/workflows/ 로 옮기면 켜짐
 scripts/unit/whole-set-check.mjs               모음 통째 set 이 기준선보다 늘면 FAIL(동시 쓰기 유실 막기)
 scripts/unit/gold-sync-sim.mjs · gold-loss-real-sdk/  골드 유실 재현(수정 뒤 --expect-fixed 로 0 확인)
@@ -198,12 +200,12 @@ node scripts/verify-safety.mjs
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
 - 현재 기대 결과: **`PASS 26 · REVIEW 1 · FAIL 0`** (exit code 0 · 2026-10-04 student 나누기로 18→26 = `node --check` student/*.js 8개)
-- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 30 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 287 · FAIL 0`** (2026-10-04 기준 · smoke 30번째 = student/ 폴더 js 가 모두 student.html 에 있나 [SPLIT-1])
-- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 23 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초).
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 30 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 290 · FAIL 0`** (2026-10-04 기준 · smoke 30번째 = student/ 폴더 js 가 모두 student.html 에 있나 [SPLIT-1])
+- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 24 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초 · R5 에서 공통 뼈대 시험 하나 더해 23→24).
   smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle · global-dup · 시뮬 다섯(esc-parity 포함) · 밸런스 둘 ·
-  하위 앱 시험 8개를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).
+  하위 앱 시험 9개(공통 뼈대 포함)를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).
   저장 경로를 건드렸으면 `--gold` 도(골드 유실 시뮬 · 지금 main 에서는 REPRO 가 정상이라 REVIEW).
-- 하위 앱 시험만: `for f in $(find scripts/unit -name '*.test.mjs' | sort); do node "$f" | tail -1; done` → 8개 모두 FAIL 0(2026-10-04 · 380개).
+- 하위 앱 시험만: `for f in $(find scripts/unit -name '*.test.mjs' | sort); do node "$f" | tail -1; done` → 9개 모두 FAIL 0(2026-10-04 · 하위 앱 382 + 공통 뼈대 46 = 428개).
 - **CI(준비됨 · 아직 꺼짐)**: `scripts/ci/check.yml` — PR · main push 마다 verify-safety · smoke-test · precheck --no-deco · 하위 앱 시험(node 22 · 비밀값 없음 · 브랜치 보호 없음 — 결과만 보여 줌).
   GitHub 은 `.github/workflows/` 안의 파일만 돌린다. 세션 토큰에 `workflow` 권한이 없어 거기로 못 올렸으니, 켤 때 사용자가 `git mv scripts/ci/check.yml .github/workflows/check.yml` 뒤 push(또는 웹에서 새 파일).
 - 남은 `REVIEW 1`건 = 루트 쓰기 후보(`gamedata.js` 1 + `admin.js` 4). 전부 위의 **의도된 게이팅 경로**다.

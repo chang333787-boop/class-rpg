@@ -1,6 +1,7 @@
 // 선생님 막힘 지도 — 아이 × 판 표: 푼 판은 별, 못 푼 판은 실행 횟수(5번 넘게 못 풀면 '막힘') · 판마다 많이 한 실수
 //  칸을 누르면 그 아이의 마지막 코드(글 코드)와 실수 셈. 관리자 비밀번호로 연다(음악실 · 생각판과 같은 방식). 쓰는 것 0.
-import { h, toast, modal } from './util.js';
+import { h, modal } from './util.js';
+import { teacherGate } from '../../common/teacher-gate.js';
 import { STAGES, UNITS } from './stages.js';
 import { defineAll, pythonOf } from './blocks.js';
 //  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
@@ -9,15 +10,8 @@ const STD = '1~4단원 = 순차 · 반복 · 반복 속 반복 · 디버깅(3~4�
 const WHY = ['wall', 'water', 'edge', 'tree', 'land', 'noacorn', 'short', 'acorns', 'loop', 'draw', 'empty', 'nofunc', 'score'];
 const WHY_KO = { wall: '나무에 부딪힘', water: '웅덩이', edge: '길 밖', tree: '나무 뛰기', land: '내릴 곳 없음', noacorn: '빈손 줍기', short: '덜 감', acorns: '도토리 덜 주움', loop: '끝없는 반복', draw: '그림 다름', empty: '빈 코드', nofunc: '없는 기술', score: '점수판 틀림' };
 
-async function gate(ctx) {
-  if (ctx.store.me.guest) return true;
-  try { if (sessionStorage.getItem('coding.teacher') === '1') return true; } catch {}
-  const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
-  if (!pw) return false;
-  try { if (await ctx.store.teacherOK(pw)) { try { sessionStorage.setItem('coding.teacher', '1'); } catch {} return true; } } catch (e) { console.warn(e); }
-  toast('비밀번호가 맞지 않아요');
-  return false;
-}
+// 선생님 화면 문 — 손님 · 이 창에서 통과('coding.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
+function gate(ctx) { return teacherGate(ctx, 'coding.teacher'); }
 
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }

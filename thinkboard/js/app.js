@@ -12,6 +12,7 @@ import { withDefaults } from './settings.js';
 import { icon } from './icons.js';
 import { BUILTIN } from './templates.js';
 import { sampleBoard, memoryStore } from './preview.js';
+import { adminPwOK } from '../../common/rpg-firebase.js';
 
 const Q = new URLSearchParams(location.search);
 const RPG = Q.get('rpg') === '1';
@@ -32,8 +33,7 @@ async function teacherOK() {
   const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
   if (!pw) return false;
   try {
-    const real = (await store.db.ref('classRPG_adminPw').once('value')).val();
-    if (real != null && pw === String(real)) { try { sessionStorage.setItem('tb.teacher', '1'); } catch {} return true; }
+    if (await adminPwOK(store.db, pw)) { try { sessionStorage.setItem('tb.teacher', '1'); } catch {} return true; }   // [SUBAPP-COMMON-1] 비밀번호 확인 = 하위 앱 공통
   } catch (e) { console.warn(e); }
   toast('비밀번호가 맞지 않아요');
   return false;

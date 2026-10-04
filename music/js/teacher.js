@@ -1,20 +1,14 @@
 // 선생님 화면 — 아이별 곡 · 리코더 연습 횟수 · 음악회에서 내리기/다시 올리기. 관리자 비밀번호로 연다(생각판과 같은 방식).
 //  쓰는 것은 음악회 목록의 숨김 표시(concert/<키>/hide) 하나뿐. 아이 곡은 고치지 않는다.
 import { h, toast, modal } from './util.js';
+import { teacherGate } from '../../common/teacher-gate.js';
 import { normalize } from './song.js';
 import { renderStaff } from './notation.js';
 import { meterOf } from './theory.js';
 import { songBad, hidden } from './safety.js';
 
-async function gate(ctx) {
-  if (ctx.store.me.guest) return true;
-  try { if (sessionStorage.getItem('music.teacher') === '1') return true; } catch {}
-  const pw = prompt('선생님 화면이에요. 관리자 비밀번호를 넣어 주세요');
-  if (!pw) return false;
-  try { if (await ctx.store.teacherOK(pw)) { try { sessionStorage.setItem('music.teacher', '1'); } catch {} return true; } } catch (e) { console.warn(e); }
-  toast('비밀번호가 맞지 않아요');
-  return false;
-}
+// 선생님 화면 문 — 손님 · 이 창에서 통과('music.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
+function gate(ctx) { return teacherGate(ctx, 'music.teacher'); }
 
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }

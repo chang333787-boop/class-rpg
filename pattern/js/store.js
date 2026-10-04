@@ -7,17 +7,9 @@
 //  solves/<sid>__<id>/<맞힌 sid> = 때  — 친구 무늬의 규칙을 맞힌 친구
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { keyOf, lsGet, lsSet } from './util.js';
+import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
 
 export const ROOT = 'classRPG_pattern';
-const CONFIG = {   // gamedata.js FIREBASE_CONFIG 와 같은 값(학급 RPG 프로젝트)
-  apiKey: 'AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4',
-  authDomain: 'class-rpg-6f409.firebaseapp.com',
-  databaseURL: 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'class-rpg-6f409',
-  storageBucket: 'class-rpg-6f409.firebasestorage.app',
-  messagingSenderId: '408824743154',
-  appId: '1:408824743154:web:382fdd431f7e2dbce13c6b',
-};
 export const MAX_WORKS = 12;
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const better = (a, b) => !a || (b.st > (a.st || 0)) || (b.st === a.st && b.n < a.n);
@@ -29,8 +21,7 @@ export function createStore({ sid, name, fb = globalThis.firebase, offline = fal
 }
 
 function rtdbStore(fb, sid, name) {
-  if (!fb.apps.length) fb.initializeApp(CONFIG);
-  const db = fb.database(), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
+  const db = rpgDb(fb), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
   let mine = null;
   const st = {
     me: { sid, name: name || '', guest: false }, online: true,
@@ -55,7 +46,7 @@ function rtdbStore(fb, sid, name) {
     async deleteWork(owner, id) { await root.child(`works/${keyOf(owner)}/${keyOf(id)}`).remove(); },
     async solve(owner, id) { await root.child(`solves/${keyOf(owner)}__${keyOf(id)}/${sid}`).set(Date.now()); },
     // ── 선생님 ──
-    async teacherOK(pw) { const real = (await db.ref('classRPG_adminPw').once('value')).val(); return real != null && String(pw) === String(real); },
+    async teacherOK(pw) { return adminPwOK(db, pw); },
     async all() { const v = (await root.once('value')).val() || {}; return { progress: v.progress || {}, stats: v.stats || {}, names: v.names || {}, works: v.works || {} }; },
   };
   return st;

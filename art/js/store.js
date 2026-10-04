@@ -13,17 +13,9 @@
 //  efeel/<카드>/<sid>       = { f 'calm,wide', t } — 그 요소가 주는 느낌(우리 반 셈)
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { keyOf, lsGet, lsSet } from './util.js';
+import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
 
 export const ROOT = 'classRPG_art';
-const CONFIG = {   // gamedata.js FIREBASE_CONFIG 와 같은 값(학급 RPG 프로젝트)
-  apiKey: 'AIzaSyCV_u6yKdGInPuCJanK4bzBfnLJuvIbyX4',
-  authDomain: 'class-rpg-6f409.firebaseapp.com',
-  databaseURL: 'https://class-rpg-6f409-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'class-rpg-6f409',
-  storageBucket: 'class-rpg-6f409.firebasestorage.app',
-  messagingSenderId: '408824743154',
-  appId: '1:408824743154:web:382fdd431f7e2dbce13c6b',
-};
 export const MAX_ASK = 3;   // 한 그림에 한 아이 질문 셋까지
 const newId = sid => sid + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
 const better = (a, b) => !a || (b.st > (a.st || 0)) || (b.st === a.st && b.n < a.n);
@@ -35,8 +27,7 @@ export function createStore({ sid, name, fb = globalThis.firebase, offline = fal
 }
 
 function rtdbStore(fb, sid, name) {
-  if (!fb.apps.length) fb.initializeApp(CONFIG);
-  const db = fb.database(), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
+  const db = rpgDb(fb), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
   let mine = null;
   const withName = up => { if (name) up[`names/${sid}`] = name; return up; };
   const st = {
@@ -58,7 +49,7 @@ function rtdbStore(fb, sid, name) {
       return { think: th.val() || {}, feel: fe.val() || {}, ask: as.val() || {}, like: li.val() || {}, names: nm.val() || {} };
     },
     // ── 선생님 ──
-    async teacherOK(pw) { const real = (await db.ref('classRPG_adminPw').once('value')).val(); return real != null && String(pw) === String(real); },
+    async teacherOK(pw) { return adminPwOK(db, pw); },
     async all() { const v = (await root.once('value')).val() || {}; return { progress: v.progress || {}, stats: v.stats || {}, names: v.names || {}, think: v.think || {}, feel: v.feel || {}, ask: v.ask || {}, like: v.like || {} }; },
     async removeAsk(c, id) { await st.unask(c, id); },
     // ── 조형 요소 찾기 ──
