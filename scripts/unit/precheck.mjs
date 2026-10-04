@@ -15,6 +15,7 @@
 //    global-dup · deco-lazy · 자기검사 시뮬 다섯(esc-parity 포함) · 밸런스 둘 · 하위 앱 시험(scripts/unit/**/*.test.mjs, 저절로 모음).
 //    2026-10-04 기준(--no-deco · R6 deco-lazy 포함): PASS 25 · REVIEW 1(save-order 11곳 기준선) · FAIL 0 · SKIP 1 · 약 15초.
 //    (PR #1162 뒤 cur-alias 가 하나 더해져 PASS 26)
+//    (BATTLE-RULES-1 뒤 battle-rules 가 하나 더해져 PASS 27)
 //
 //  판정: 하나라도 FAIL(exit≠0)이면 exit 1. 골드 검사는 **수정 전 main 에서 LOSS 가 정상**이라
 //        --gold 는 기본 REVIEW(기록만)이고, `--gold-strict` 를 주면 --expect-fixed 로 돌려 FAIL 로 셈한다.
@@ -58,6 +59,8 @@ for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'stud
 }
 // [PRECHECK-APPS-1] 출력 이스케이프 도우미(escHtml·escJsAttr·safeUrl) 복사본들이 같은 결과를 내나(ESC-PARITY-1)
 CHECKS.push({ name: 'esc-parity', file: 'scripts/unit/esc-parity.mjs', args: [], pick: /요약:[^\n]*/, optional: true });
+// [BATTLE-RULES-1] 전투 규칙(불변식) — 무작위 행동 1만 판: 몬스터 HP 0 이면 끝 · 끝난 뒤 행동 0 · 아이 HP 0 이면 패배 · 반격 승리 보상 = 일반 승리(약 1초)
+CHECKS.push({ name: 'battle-rules', file: 'scripts/unit/battle-rules-sim.mjs', args: [], pick: /요약:[^\n]*/ });
 // [PRECHECK-APPS-1] 하위 앱 시험(scripts/unit/<앱>/*.test.mjs) — 저절로 모아 한 줄씩. 순수 node · 각 1초 안쪽.
 //   새 앱이 시험 파일을 더하면 여기서 바로 돈다(목록 고칠 일 없음). 판정은 각 파일 exit 코드, 표시는 마지막 줄.
 {
