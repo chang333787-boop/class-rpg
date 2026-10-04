@@ -7,6 +7,10 @@
 //  ask/<그림>/<질문 id>     = 질문 { s sid, k 갈래, p 이름 붙은 곳 번호, x, y, t } — 글 입력 없음(문장은 cases.js · ask.js 가 만든다)
 //  like/<그림>/<질문 id>/<sid> = 1 — 나도 궁금해요
 //  names/<sid>              = 이름(선생님 화면 · 질문판)
+//  ── 조형 요소 찾기(hunt.js) ──
+//  elem/<sid>/<카드>        = { f 찾은 곳 'caseId:x:y|…', st 별(셋 다 찾으면), n 헛짚음, h 힌트, t }
+//  estats/<sid>/<카드>      = 셈 { tries, ok, miss, hint, x_<요소> = 찾다가 다른 요소를 짚음 }
+//  efeel/<카드>/<sid>       = { f 'calm,wide', t } — 그 요소가 주는 느낌(우리 반 셈)
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { keyOf, lsGet, lsSet } from './util.js';
 
@@ -57,13 +61,20 @@ function rtdbStore(fb, sid, name) {
     async teacherOK(pw) { const real = (await db.ref('classRPG_adminPw').once('value')).val(); return real != null && String(pw) === String(real); },
     async all() { const v = (await root.once('value')).val() || {}; return { progress: v.progress || {}, stats: v.stats || {}, names: v.names || {}, think: v.think || {}, feel: v.feel || {}, ask: v.ask || {}, like: v.like || {} }; },
     async removeAsk(c, id) { await st.unask(c, id); },
+    // ── 조형 요소 찾기 ──
+    async elemProgress() { return (await root.child('elem/' + sid).once('value')).val() || {}; },
+    async elemSave(k, rec) { await root.update(withName({ [`elem/${sid}/${keyOf(k)}`]: { ...rec, t: Date.now() } })); },
+    async elemTap(k, kind) { const up = {}, b = `estats/${sid}/${keyOf(k)}`; up[`${b}/tries`] = inc(1); up[`${b}/${keyOf(kind)}`] = inc(1); await root.update(up); },
+    async elemFeel(k, f) { await root.update(withName({ [`efeel/${keyOf(k)}/${sid}`]: { f, t: Date.now() } })); },
+    async elemBoard(k) { const [fe, nm] = await Promise.all([root.child('efeel/' + keyOf(k)).once('value'), root.child('names').once('value')]); return { feel: fe.val() || {}, names: nm.val() || {} }; },
+    async elemAll() { const [e, s, f, nm] = await Promise.all(['elem', 'estats', 'efeel', 'names'].map(x => root.child(x).once('value'))); return { elem: e.val() || {}, estats: s.val() || {}, efeel: f.val() || {}, names: nm.val() || {} }; },
   };
   return st;
 }
 
 function localStore(sid, name) {
   const KEY = 'art.local';
-  const load = () => { const d = lsGet(KEY, {}); for (const k of ['progress', 'stats', 'think', 'feel', 'ask', 'like']) d[k] = d[k] || {}; return d; };
+  const load = () => { const d = lsGet(KEY, {}); for (const k of ['progress', 'stats', 'think', 'feel', 'ask', 'like', 'elem', 'estats', 'efeel']) d[k] = d[k] || {}; return d; };
   const save = d => lsSet(KEY, d);
   const at = (o, a, b) => (o[a] = o[a] || {}, o[a][b] = o[a][b] || {}, o[a][b]);
   const st = {
@@ -80,6 +91,12 @@ function localStore(sid, name) {
     async teacherOK() { return true; },
     async all() { const d = load(); return { progress: { [sid]: d.progress }, stats: { [sid]: d.stats }, names: { [sid]: name }, think: d.think, feel: d.feel, ask: d.ask, like: d.like }; },
     async removeAsk(c, id) { await st.unask(c, id); },
+    async elemProgress() { return load().elem; },
+    async elemSave(k, rec) { const d = load(); d.elem[k] = { ...rec, t: Date.now() }; save(d); },
+    async elemTap(k, kind) { const d = load(), t = d.estats[k] = d.estats[k] || {}; t.tries = (t.tries || 0) + 1; t[kind] = (t[kind] || 0) + 1; save(d); },
+    async elemFeel(k, f) { const d = load(); d.efeel[k] = { ...(d.efeel[k] || {}), [sid]: { f, t: Date.now() } }; save(d); },
+    async elemBoard(k) { const d = load(); return { feel: d.efeel[k] || {}, names: { [sid]: name } }; },
+    async elemAll() { const d = load(); return { elem: { [sid]: d.elem }, estats: { [sid]: d.estats }, efeel: d.efeel, names: { [sid]: name } }; },
   };
   return st;
 }

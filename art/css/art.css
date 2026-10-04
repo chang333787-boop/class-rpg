@@ -266,3 +266,56 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .vw-in img,.vw-gray{transition:transform .6s cubic-bezier(.3,.7,.3,1)}
 .vw.is-mirror .vw-in img,.vw.is-mirror .vw-gray{transform:scaleX(-1)}
 .vw.is-mirror{box-shadow:inset 0 0 0 3px #7cf29a}
+/* 조형 요소 찾기 — 첫 화면 띠 · 카드 · 돋보기 */
+.hunt-banner{display:flex;align-items:center;gap:14px;width:100%;padding:12px 16px;border-radius:16px;background:linear-gradient(120deg,#2b3550,#3a2c18);text-align:left;box-shadow:inset 0 0 0 2px rgba(242,169,59,.35)}
+.hunt-banner:hover{box-shadow:inset 0 0 0 2px var(--gold)}
+.hb-icons{font-size:1.15rem;letter-spacing:4px;color:var(--gold2);white-space:nowrap}
+.hb-t{display:grid;gap:2px;flex:1;min-width:0}
+.hb-t b{font-size:1.05rem}
+.hb-t span{font-size:.85rem;color:var(--txt2)}
+.hb-go{font-weight:900;color:var(--gold2);white-space:nowrap}
+.egrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ecard{display:grid;gap:4px;justify-items:start;text-align:left;padding:10px 12px;border-radius:14px;background:var(--bg3)}
+.ecard:hover{background:#3d3024}
+.ecard.done{box-shadow:inset 0 0 0 2px rgba(242,169,59,.6)}
+.e-icon{font-size:1.4rem;line-height:1;color:var(--gold2);font-weight:900}
+.e-icon.big{font-size:2rem;width:44px;text-align:center;flex:none}
+.ecard b{font-size:.98rem}
+.e-desc{font-size:.76rem;color:var(--txt3);line-height:1.35}
+.e-dots{display:flex;gap:4px}
+.e-dots i{width:10px;height:10px;border-radius:50%;background:var(--bg2);box-shadow:inset 0 0 0 1px #5a4a3a}
+.e-dots i.on{background:var(--gold)}
+.ecard .stars{font-size:.76rem;color:var(--gold2);font-weight:800}
+.e-card-head{display:flex;gap:10px;align-items:center;background:var(--bg2);border-radius:12px;padding:8px 10px}
+.e-card-head b{font-size:1.05rem}
+.e-card-head p{color:var(--txt2);line-height:1.4}
+.e-missions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.e-mis{display:grid;gap:3px;justify-items:center;padding:5px;border-radius:10px;background:var(--bg3);text-align:center}
+.e-mis .thumb{width:100%;height:52px;border-radius:6px;overflow:hidden;background:#100c09}
+.e-mis .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.e-mis.on{box-shadow:inset 0 0 0 2px var(--gold)}
+.e-mis.done{background:#26381f}
+.e-mis:disabled{opacity:.45;cursor:default}
+.lens{display:grid;gap:5px;background:#22202b;border-radius:14px;padding:10px 12px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.06)}
+.lens.ok{box-shadow:inset 0 0 0 2px rgba(143,208,125,.7)}
+.l-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.l-chips{display:flex;gap:5px;flex-wrap:wrap}
+.l-chip{font-size:.75rem;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--bg3);color:var(--txt2)}
+.l-chip.on{background:var(--ok);color:#1d2a14}
+.l-row{display:grid;grid-template-columns:62px auto 1fr;align-items:center;gap:8px;font-size:.84rem}
+.l-row>span:first-child{color:var(--txt3);font-weight:800}
+.l-row b{font-size:.82rem}
+.l-bar{height:9px;border-radius:5px;background:var(--bg3);overflow:hidden;grid-column:2}
+.l-row:has(.l-bar){grid-template-columns:62px 1fr 42px}
+.l-bar i{display:block;height:100%;background:#9aa0a6}
+.l-bar.warm i{background:#e8743b}
+.l-bar.cool i{background:#3b82e8}
+.l-bar.vivid i{background:linear-gradient(90deg,#e8743b,#e8d23b,#3be86b,#3b82e8)}
+.l-bar.rough i{background:#b08a5a}
+.l-bar.shade i{background:linear-gradient(90deg,#f6f0e4,#555)}
+.l-arrow{width:24px;height:24px;background:#f6f0e4;border-radius:6px}
+.l-arrow line{stroke:#1b1d22;stroke-width:2.6;stroke-linecap:round}
+.l-arrow circle{fill:#9a8f80}
+.l-sw{display:inline-block;width:24px;height:24px;border-radius:6px;box-shadow:0 0 0 2px #f6f0e4}
+.e-feel{display:grid;gap:8px}
+@media (max-width:900px){.egrid{grid-template-columns:repeat(2,minmax(0,1fr))}.hb-icons{display:none}}

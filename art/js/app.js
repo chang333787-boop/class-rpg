@@ -6,6 +6,8 @@ import { createStore } from './store.js';
 import { CHAPTERS, CASES, caseById, casesOf } from './cases.js';
 import { mountCase, HOST } from './play.js';
 import { mountTeacher } from './teacher.js';
+import { mountHuntHome, mountHunt } from './hunt.js';
+import { elementOf } from './elements.js';
 
 const Q = new URLSearchParams(location.search);
 const TEACHER = Q.has('teacher');
@@ -59,6 +61,8 @@ function home() {
         h('div', { class: 'intro-t' }, h('h2', {}, '그림 속 사건을 푸는 탐정이 되어 봐요'),
           h('p', {}, `오래된 명화 ${CASES.length}장. 숨은 것을 찾고(찾기) → 무슨 일인지 그림 속 단서로 생각하고(생각) → 느낌을 고르고(느낌) → 궁금한 것을 질문으로 만들어요(질문). 자세히 볼수록 그림이 말을 걸어요.`)),
         h('div', { class: 'mine' }, h('b', {}, `${done} / ${CASES.length}`), h('span', {}, '해결한 사건'), h('b', {}, String(stars)), h('span', {}, '별'))),
+      h('button', { class: 'hunt-banner', 'data-act': 'hunt', onclick: () => ctx.go('#/e') },
+        h('span', { class: 'hb-icons' }, '─ ∿ 🔥 💧 ◐ ▒'), h('span', { class: 'hb-t' }, h('b', {}, '🔍 조형 요소 찾기'), h('span', {}, '선 · 색 · 명암 · 질감을 그림에서 찾아 짚으면 돋보기가 재어 알려 줘요 — 카드 열둘 모으기')), h('span', { class: 'hb-go' }, '열기 →')),
       ...CHAPTERS.map(ch => h('div', { class: 'ccard' },
         h('div', { class: 'c-head' }, h('b', {}, `${ch.id}장 · ${ch.title}`), h('span', { class: 'sp' }), h('span', { class: 'muted' }, `${casesOf(ch.id).filter(c => progress[c.id]).length} / ${casesOf(ch.id).length}`)),
         h('p', {}, ch.intro),
@@ -73,6 +77,7 @@ async function route() {
   const [, a, b] = (location.hash || '#/').split('/');
   if (a === 'c' && b) { const c = caseById(b); if (!c) { ctx.go('#/'); return; } current = mountCase(app, ctx, c); return; }
   if (a === 't') { current = await mountTeacher(app, ctx); return; }
+  if (a === 'e') { current = b && elementOf(b) ? await mountHunt(app, ctx, b) : await mountHuntHome(app, ctx); return; }   // 조형 요소 찾기
   home();
 }
 addEventListener('hashchange', route);

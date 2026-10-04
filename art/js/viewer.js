@@ -163,8 +163,16 @@ export function makeViewer({ src, w, h: H0, alt = '', onTap = () => {} }) {
 
   const ro = new ResizeObserver(() => fit()); ro.observe(el);
   ready.then(fit);
+  // 줄인 그림 점들(조형 요소 돋보기 — 긴 변 long 점) · { data, w, h }
+  async function small(long = 480) {
+    await ready;
+    const k = long / Math.max(img.naturalWidth, img.naturalHeight), w = Math.max(8, Math.round(img.naturalWidth * k)), hh = Math.max(8, Math.round(img.naturalHeight * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = hh;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, w, hh);
+    return { data: g.getImageData(0, 0, w, hh).data, w, h: hh };
+  }
   // 거울 보기 — 그림(과 흑백 판)만 좌우로 뒤집는다(나무판에 새겨진 모습 · 판화). 표시는 뒤집지 않으니 자리는 부르는 쪽이 100 − x 로
   let mirrorOn = false;
   function setMirror(on) { mirrorOn = !!on; el.classList.toggle('is-mirror', mirrorOn); }
-  return { el, img, ready, setMarks, ripple, zoomTo, reset, setGray, setMirror, sample, lightOf, lineL, get gray() { return grayOn; }, get mirror() { return mirrorOn; }, destroy() { ro.disconnect(); } };
+  return { el, img, ready, setMarks, ripple, zoomTo, reset, setGray, setMirror, sample, lightOf, lineL, small, get gray() { return grayOn; }, get mirror() { return mirrorOn; }, destroy() { ro.disconnect(); } };
 }
