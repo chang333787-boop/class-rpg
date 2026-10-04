@@ -442,7 +442,15 @@ function _asgRender(inst, force) {
   _asgScratchOff(st);
   body.innerHTML = _asgScreenHTML(st, sc, cell);
   _asgNoteShow(st);
-  if (sc.view === 'self' || sc.view === 'ask') _asgAfterQuestion(st, sc.i);
+  if (sc.view === 'self' || sc.view === 'ask') { _asgAfterQuestion(st, sc.i); if (sc.view === 'self') _asgStartedMark(st); }
+}
+//  처음 연 때(걸린 시간의 시작 · 교사 표 '하는 중') — 내 칸에 없을 때 한 번만
+function _asgStartedMark(st) {
+  if (st.startedSent || !_ASG.cellReady[st.aid] || !_ASG.db) return;
+  st.startedSent = true;
+  const cell = _ASG.cells[st.aid];
+  if (cell && cell.startedAt) return;
+  try { _asgRef(AssignCore.path.result(st.aid, st.sid)).update({ startedAt: _asgTS() }).catch(() => {}); } catch (e) {}
 }
 function _asgNote(st, msg) { st.note = msg || ''; _asgNoteShow(st); }
 function _asgNoteShow(st) {
@@ -511,12 +519,13 @@ function _asgQuestionHTML(st, i, live) {
   //  소리 — 과제함은 화면이 뜨면 한 번 읽어 준다 · 수업은 자동 읽기 없음(25대가 한꺼번에) · 목소리가 없으면 건너뛰기(영어도)
   const lang = AssignCore.itemLang(it);
   const noVoice = it.audio && typeof hasVoiceFor === 'function' && !hasVoiceFor(lang);
-  const speak = JSON.stringify({ lang, rate: it.cat === 'dictation' ? 0.8 : 0.85 }).replace(/"/g, '&quot;');
+  //  onclick 글자 안 JS 문자열 — 받은 정의는 믿지 않는 글이라 JSON 다음 escHtml(& 부터)로(&quot; 를 그대로 넣어 속성 밖으로 나가는 것 막기)
+  const speak = escHtml(JSON.stringify({ lang, rate: it.cat === 'dictation' ? 0.8 : 0.85 }));
   const audioHtml = !it.audio ? '' : noVoice ? `<div class="asg-novoice"><div style="font-size:1.6rem">🔇</div>
       <b>이 기기에서는 ${lang.startsWith('ko') ? '한국어' : '영어'} 소리가 나오지 않아요</b>
       <span>선생님께 알려 주세요. 이 문제는 건너뛰어도 돼요.</span>
       <button class="asg-skip" onclick="asgSkip(${I})">이 문제 건너뛰기</button></div>`
-    : `<div class="asg-audio"><button class="asg-audio-btn" onclick="speakWord(${JSON.stringify(String(it.audio)).replace(/"/g, '&quot;')}, ${speak})"><span>🔊</span> ${live ? '듣기' : '다시 듣기'}</button>
+    : `<div class="asg-audio"><button class="asg-audio-btn" onclick="speakWord(${escHtml(JSON.stringify(String(it.audio)))}, ${speak})"><span>🔊</span> ${live ? '듣기' : '다시 듣기'}</button>
       <div class="asg-audio-sub">${live ? '이어폰으로 들어요' : '잘 안 들리면 버튼을 눌러 보세요'}</div></div>`;
   const scratch = def.content.quiz.subject === 'math' ? `<div class="st-scratch"><div class="st-scratch-head"><span>✏️ 여기에 풀어 보세요</span>
       <button type="button" class="st-scratch-clear" onclick="asgScratchClear('${st.inst}')">🧹 지우기</button></div>

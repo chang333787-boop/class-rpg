@@ -348,6 +348,27 @@ check('과제: 홈 카드 · 실행기가 형식마다(보기 · OX · 수 · �
   asgCloseInbox();
   return true;
 })()`, 'assign-render'));
+check('과제: 믿지 않는 글(누구나 쓸 수 있는 DB) — 제목 · 물음 · 보기 · 소리 글이 화면을 깨지 않음(escape · onclick 속성 밖으로 못 나감)', () => run(`(function () {
+  const bad = '<img src=x onerror=alert(1)>';
+  const def = AssignCore.normDef({ id: 'aEvil', kind: 'quiz', title: bad, content: { quiz: { subject: 'english', items: [
+    { id: 'e1', unitId: 'en4-1-1', type: 'choice', q: '"><script>alert(1)</script>', choices: [bad, 'b&quot;); alert(2);//'], a: bad, audio: 'x&quot;); alert(3);//', lang: 'en-US' } ] } }, createdAt: 2 }, 'aEvil');
+  _ASG.open.aEvil = def; _ASG.cells.aEvil = null; _ASG.cellReady.aEvil = true; _ASG.cellOffs.aEvil = () => {};
+  const card = buildAssignCardsHTML();
+  const realVoice = hasVoiceFor; hasVoiceFor = () => true;   // 소리 단추가 그려지게(이 시험 칸에는 speechSynthesis 가 없다)
+  try { _asgInstStart('i', 'aEvil'); } finally { hasVoiceFor = realVoice; }
+  const h = document.getElementById('asgi-body').innerHTML;
+  const raw = [card, h].join('');
+  if (/<img src=x|<script>/.test(raw)) return '꺾쇠가 그대로 들어감';
+  //  소리 단추 onclick 안의 &quot; 는 &amp;quot; 로 — 속성을 풀어도 JS 문자열 안의 글자로 남는다
+  const at = h.indexOf('onclick="speakWord(');
+  if (at < 0) return '소리 단추 없음';
+  const attr = h.slice(at + 9, h.indexOf('"', at + 9));
+  const decoded = attr.split('&quot;').join('"').split('&amp;').join('&');   // 브라우저가 속성 값을 푸는 것처럼
+  if (decoded.includes('"); alert(3)')) return '소리 글이 속성 밖으로 나갈 수 있음: ' + attr.slice(0, 80);
+  asgCloseInbox();
+  delete _ASG.open.aEvil; delete _ASG.cells.aEvil; delete _ASG.cellReady.aEvil; delete _ASG.cellOffs.aEvil;
+  return true;
+})()`, 'assign-escape'));
 check('수업 덮개: 열면 밑의 학습 세션 · 학습 앱 창을 안 건드림 · 한 문제씩 화면 · 끝나면 걷힘 · 레벨업은 덮개 동안 미룸', () => run(`(function () {
   const sGame = document.getElementById('s-game'); sGame.classList.add('active');
   const ss = { subjectKey: 'math', questions: [{ id: 'z' }], cur: 0, answers: [] }; STUDY_SESSION = ss;
