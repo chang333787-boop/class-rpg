@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { studentScriptFiles, studentTagFiles } from './unit/student-sources.mjs';
+import { adminScriptFiles } from './unit/admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const results = []; // { level, msg }
@@ -23,8 +24,11 @@ const countMatches = (text, re) => (text.match(re) || []).length;
 // [SPLIT-1] 학생 코드 = student.js + student/*.js(student.html 의 <script> 순서가 단일 출처). 문법·저장 패턴을 모두 본다.
 let STUDENT_FILES = ['student.js'], STUDENT_TAGS = ['student.js'];
 try { STUDENT_FILES = studentScriptFiles(ROOT); STUDENT_TAGS = studentTagFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+// [ADMIN-SPLIT-1] 관리 코드 = admin.js + admin/*.js(admin.html 의 <script> 순서가 단일 출처)
+let ADMIN_FILES = ['admin.js'];
+try { ADMIN_FILES = adminScriptFiles(ROOT); } catch (e) { add('FAIL', `admin.html 관리 스크립트 목록: ${e.message}`); }
 //  [DECO-LAZY-1] 문법·저장 패턴은 늦게 부르는 파일(student/deco.js)까지 · 로드 순서·클래식 태그는 html 태그로 부르는 것만
-const JS_FILES = ['gamedata.js', ...STUDENT_FILES, 'admin.js', 'kiosk.js'];
+const JS_FILES = ['gamedata.js', ...STUDENT_FILES, ...ADMIN_FILES, 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -117,12 +121,12 @@ for (const f of HTML_FILES) {
   const pj = PAGE_JS[f];
   const di = html.indexOf('./' + pj);
   // [SPLIT-1] student.html 은 student.js 뒤에 student/*.js 가 와야 한다(옮긴 코드가 student.js 의 전역을 쓴다)
-  const more = f === 'student.html' ? STUDENT_TAGS.filter((x) => x !== pj) : [];
+  const more = f === 'student.html' ? STUDENT_TAGS.filter((x) => x !== pj) : f === 'admin.html' ? ADMIN_FILES.filter((x) => x !== pj) : [];   // [ADMIN-SPLIT-1] admin/*.js 도 admin.js 뒤
   const early = more.filter((x) => html.indexOf('./' + x) < di);
   if (gi === -1 || di === -1) add('FAIL', `${f} 로드 순서: gamedata.js(${gi}) 또는 ${pj}(${di}) 누락`);
   else if (gi > di) add('FAIL', `${f} 로드 순서 역전 (gamedata.js가 ${pj} 뒤)`);
   else if (early.length) add('FAIL', `${f} 로드 순서 역전 (${early.join(', ')} 이 ${pj} 앞)`);
-  else add('PASS', `${f} 로드 순서 정상 (gamedata.js → ${pj}${more.length ? ` → student/ ${more.length}개` : ''})`);
+  else add('PASS', `${f} 로드 순서 정상 (gamedata.js → ${pj}${more.length ? ` → ${pj.replace('.js', '')}/ ${more.length}개` : ''})`);
 }
 
 // ── 8) 전용 JS script 태그에 module/async/defer 금지 ──
@@ -131,7 +135,7 @@ for (const f of HTML_FILES) {
   const html = read(f);
   const pj = PAGE_JS[f];
   // 전용 JS를 로드하는 <script ...src="./page.js"...> 태그 추출 — [SPLIT-1] student.html 은 student/*.js 태그까지
-  const jsList = f === 'student.html' ? STUDENT_TAGS : [pj];
+  const jsList = f === 'student.html' ? STUDENT_TAGS : f === 'admin.html' ? ADMIN_FILES : [pj];   // [ADMIN-SPLIT-1]
   const missing = [], bads = [];
   for (const js of jsList) {
     const m = html.match(new RegExp(`<script\\b[^>]*src=["']\\./${js.replace(/\./g, '\\.')}[^>]*>`));
@@ -139,7 +143,7 @@ for (const f of HTML_FILES) {
     const bad = ['type="module"', 'defer', 'async'].filter((x) => m[0].includes(x));
     if (bad.length) bads.push(`${js}: ${bad.join(', ')}`);
   }
-  const label = pj + (jsList.length > 1 ? ` + student/ ${jsList.length - 1}개` : '');
+  const label = pj + (jsList.length > 1 ? ` + ${pj.replace('.js', '')}/ ${jsList.length - 1}개` : '');
   if (missing.length) add('FAIL', `${f}: ${missing.join(', ')} script 태그 못 찾음`);
   else if (bads.length === 0) add('PASS', `${f}: ${label} 클래식 로드 (module/async/defer 없음)`);
   else add('FAIL', `${f}: 태그에 금지 속성 — ${bads.join(' · ')}`);
@@ -154,7 +158,7 @@ for (const f of HTML_FILES) {
 
 // ── 10) admin 날짜 helper 재발 방지 (Utils.todayStr/weekStartStr로 통일 유지) ──
 if (exists('admin.js')) {
-  const a = read('admin.js');
+  const a = ADMIN_FILES.map(read).join('\n');   // [ADMIN-SPLIT-1] admin.js + admin/*.js
   const defToday = countMatches(a, /function\s+todayStr\(/g);
   const defWeek  = countMatches(a, /function\s+weekStartStr\(/g);
   // bare 호출 = 전체 호출 − Utils. 프리픽스 − 함수 정의

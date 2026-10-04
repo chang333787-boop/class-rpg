@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from './student-sources.mjs';
+import { readAdminSources, adminWhere } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FILES = ['gamedata.js', 'admin.js', ...studentScriptFiles(ROOT), 'kiosk.js'];   // [SPLIT-1] student/*.js 는 BASELINE 없음 = 통째 set 0곳
@@ -49,9 +50,11 @@ const lineOf = (src, i) => src.slice(0, i).split('\n').length;
 let pass = 0, fail = 0;
 const out = [];
 for (const f of FILES) {
-  const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+  // [ADMIN-SPLIT-1] 'admin.js' 칸 = 관리 화면 전체(admin.js + admin/*.js, admin.html 순서) — 덩어리를 옮겨도 BASELINE 수는 그대로
+  const src = f === 'admin.js' ? readAdminSources(ROOT) : fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const at = f === 'admin.js' ? adminWhere(ROOT) : (i) => lineOf(src, i);
   const found = {};
-  for (const m of src.matchAll(RE)) (found[m[2]] ||= []).push(lineOf(src, m.index));
+  for (const m of src.matchAll(RE)) (found[m[2]] ||= []).push(at(m.index));
   const base = BASELINE[f] || {};
   for (const name of new Set([...Object.keys(found), ...Object.keys(base)])) {
     const lines = found[name] || [], allow = base[name]?.n || 0;
@@ -63,7 +66,7 @@ for (const f of FILES) {
       pass++; out.push(`✅ PASS   ${f}: ${name} ${allow}곳 · ${base[name].why}`);
     }
   }
-  const roots = [...src.matchAll(RE_ROOT)].map(m => lineOf(src, m.index));
+  const roots = [...src.matchAll(RE_ROOT)].map(m => at(m.index));
   const rAllow = ROOT_SET_BASELINE[f] || 0;
   if (roots.length > rAllow) { fail++; out.push(`❌ FAIL   ${f}: root 통째 set ${roots.length}곳(허용 ${rAllow}) — 줄 ${roots.join(',')}`); }
   else if (rAllow) { pass++; out.push(`✅ PASS   ${f}: root 통째 set ${roots.length}곳(허용 ${rAllow})`); }

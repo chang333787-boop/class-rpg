@@ -12,10 +12,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readAdminSources } from './admin-sources.mjs';
 
 const ROOT = process.env.SIM_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GAMEDATA = fs.readFileSync(path.join(ROOT, 'gamedata.js'), 'utf8');
-const ADMIN = fs.readFileSync(path.join(ROOT, 'admin.js'), 'utf8');
+const ADMIN = readAdminSources(ROOT);   // [ADMIN-SPLIT-1] admin.js + admin/*.js(admin.html 순서)
 const EXPECT_FIXED = process.argv.includes('--expect-fixed');
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));

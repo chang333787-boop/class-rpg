@@ -321,6 +321,32 @@ student.js(16,774줄 · 976KB)를 **글자 하나 안 바꾸고** 덩어리째 �
 - 바깥에서 deco 함수를 새로 부르려면: 불러오기 전에도 불릴 수 있는 자리면 지킴이나 `typeof` 가드, 꾸미기 판 안에서만 불리면 그대로(검사가 판 안을 안다).
 - 하네스가 꾸미기 함수를 바로 쓰면 맨 앞에서 `await decoLoad()`(deco-save-count/test.js · deco-save-real-sdk/test.js 처럼).
 
+
+---
+
+## 17. admin 나누기 (R3 · 떼어 옮기기)
+
+admin.js(6,589줄)를 §16 과 같은 방식으로 **글자 하나 안 바꾸고** 덩어리째 새 클래식 스크립트 9개로 옮겼다. 경계는 줄 번호가 아니라 **══ 머리 상자의 제목 글자**(그 위 ═ 한 줄 포함)이고, 모두 최상위 문장 사이다.
+
+| 파일 | 줄 | KB | 담은 것 (원래 admin.js 줄) |
+|------|---:|---:|------|
+| `admin.js` | 627 | 38 | 바탕 — 이스케이프·로그인·INIT(`window.onload`·renderAll)·NAV(`nav()`·메뉴 그림)·정적 템플릿·좁은 화면 서랍·우리 마을(읽기)·대시보드·UTILS(closeModal·notify·저장 실패 알림) |
+| `admin/students.js` | 529 | 29 | 학생 목록 · 학생 상세 창(쪽지 · 일괄 쪽지 · 능력치/승급/전체 초기화 · 저장 · 골드 주기) · 학생 추가 (596–1121) |
+| `admin/approve.js` | 834 | 44 | 대시보드 인라인 처리 · 핵심 승인(approveReward·approveAll) · 승인 탭(프리셋·필터·격자·목록) · 선택 상자·배지 · 승급 관리 (1122–1952) |
+| `admin/records.js` | 469 | 24 | 랭킹(공용 빌더) · 능력치 내역 · 활동 내역(일일퀘스트 주간/월간 기록) · renderRank (1953–2418) |
+| `admin/works.js` | 599 | 31 | 작품 관리(승인·반려·라이트박스·작품 종류) · 독서 현황 (2419–3014) |
+| `admin/memories.js` | 899 | 43 | 추억 관리(앨범·여러 장 올리기·이름 바꾸기) · 리코더 관리 · 업적 재계산 · 주간 다짐 · 중복 정리·작품 키 정리·작품 내리기/지우기 (3015–3910) |
+| `admin/quests.js` | 931 | 45 | 비번 초기화 · 퀘스트(템플릿·능력치 퀘스트·자동 일일·게시판 퀘스트) · 가져오기(importData) · 개별 보상 지급 (3911–4838) |
+| `admin/battle.js` | 582 | 30 | 몬스터·전투 설정(일괄 조정·장비·마스터리북·도감 보상) · getActiveMonsters(관리 화면 판 — gamedata.js 판을 덮는다) · 몬스터 편집 (4839–5417) |
+| `admin/settings.js` | 916 | 48 | 상점 관리(+감정 보상 설정) · 과목 관리(+감정 대화 요청) · 감정 현황(차트) · 백업·되돌리기 · 설정(오늘의 링크·저장·초기화·내보내기) (5418–6330) |
+| `admin/study.js` | 239 | 14 | 학습 범위(STUDY-SCOPE) · 오늘의 공부 보상 · 생각판(관리 화면 안) · 학습 앱 기록 (6354–6589) |
+
+- admin.html: `admin.js` 바로 뒤에 students.js → approve.js → records.js → works.js → memories.js → quests.js → battle.js → settings.js → study.js 순서(원래 글 순서)로 9줄 · 각 `?v=`. 표시 줄 = `// ── [ADMIN-SPLIT-1] 여기 있던 '<이름>' 덩어리(N줄)는 admin/<파일> 로 옮겼다 ──`.
+- **왜 동작이 같은가**: 불러오는 즉시 도는 문장은 admin.js 바탕에만 있다(`fillNavIcons()`·`fillStaticTemplates()`·keydown·DOMContentLoaded·#m-student 클릭 등록·`window.onDbSaveError`) — 모두 바탕 이름만 쓴다. 옮긴 파일의 즉시 문장은 글자·배열 상수와 DOMContentLoaded 등록 하나(추억 끌어 놓기)뿐이다. 옮긴 이름은 `window.onload`·처리기 안에서만 불린다(모든 스크립트가 끝난 뒤). gamedata.js 판을 덮는 `getActiveMonsters` 는 admin/ 파일로 옮겨도 gamedata.js 뒤라 덮는 결과가 같다(`global-dup-check` 기준선 파일 이름만 바뀜).
+- **시험**: `scripts/unit/admin-sources.mjs`(`adminScriptFiles`·`readAdminSources`·`adminWhere`·`adminDirFiles`) — admin.html 의 `<script>` 순서가 단일 출처. 바꾼 것: run.mjs(`read('admin.js')` 는 오류) · gold/promo/deco-life/settings-field 시뮬 · save-order · whole-set('admin.js' 칸 = 관리 전체, 기준선 그대로) · student-known(BACKUP_NODES 를 못 찾으면 FAIL) · esc-parity · verify-safety · smoke-test(+admin/ 폴더 파일이 모두 admin.html 에 있나) · global-dup 기준선.
+- 숫자: verify-safety 26 → **35**(`node --check` admin/*.js 9개) · smoke 30 → **31** · save-order **11곳 그대로**(줄 표시만 새 파일) · whole-set 14 · student-known 29 · esc 8 · global-dup 4 · 시뮬 출력 글자 같음.
+- **새로 고칠 때**: 그 기능이 있는 `admin/` 파일을 고치고 그 줄의 `?v=` 만 올린다. 불러오는 즉시 도는 코드에서 뒤 파일 이름을 부르지 말 것(아직 없음).
+
 ---
 
 ## 부록: 관련 문서

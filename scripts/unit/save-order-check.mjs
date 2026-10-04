@@ -22,9 +22,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from './student-sources.mjs';
+import { adminScriptFiles } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FILES = [...studentScriptFiles(ROOT), 'gamedata.js', 'admin.js'];   // [SPLIT-1] student.js + student/*.js(html 순서)
+const FILES = [...studentScriptFiles(ROOT), 'gamedata.js', ...adminScriptFiles(ROOT)];   // [SPLIT-1] student.js + student/*.js(html 순서) · [ADMIN-SPLIT-1] admin.js + admin/*.js
 const argv = process.argv.slice(2);
 const STRICT = argv.includes('--strict');
 const bi = argv.indexOf('--baseline');

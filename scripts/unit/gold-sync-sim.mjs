@@ -26,10 +26,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readAdminSources } from './admin-sources.mjs';
 
 const ROOT = process.env.GOLD_SIM_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GAMEDATA = fs.readFileSync(path.join(ROOT, 'gamedata.js'), 'utf8');
-const ADMIN = fs.readFileSync(path.join(ROOT, 'admin.js'), 'utf8');
+const ADMIN = readAdminSources(ROOT);   // [ADMIN-SPLIT-1] admin.js + admin/*.js(admin.html 순서)
 const KIOSK = fs.readFileSync(path.join(ROOT, 'kiosk.js'), 'utf8');
 const EXPECT_FIXED = process.argv.includes('--expect-fixed');
 // 실험 스위치: 학생 화면이 logGold 를 saveStudent **뒤에** 부르면(순서만 바꾸면) 무엇이 남는지 본다. 앱 코드는 안 바꾼다.

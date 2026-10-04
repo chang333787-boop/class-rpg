@@ -15,11 +15,13 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { readStudentSources } from './student-sources.mjs';
+import { readAdminSources } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 //  [SPLIT-1] 학생 코드는 student.js + student/*.js 로 나뉘었다 — student.js 만 읽으면 옮긴 코드를 빠뜨리므로 막는다.
 const read = (f) => {
   if (f === 'student.js') throw new Error('student.js 만 읽지 말 것 — readStudentSources(ROOT) 로(student/*.js 까지) [SPLIT-1]');
+  if (f === 'admin.js') throw new Error('admin.js 만 읽지 말 것 — readAdminSources(ROOT) 로(admin/*.js 까지) [ADMIN-SPLIT-1]');
   return fs.readFileSync(path.join(ROOT, f), 'utf8');
 };
 
@@ -472,7 +474,7 @@ cur = 'deco-lazy-check (DECO-LAZY-CHECK-1)';
 cur = 'admin 비번 초기화 알림(PW-NOTIFY-1)';
 {
   //  교사 PC 는 TV 로 미러링된다. 초기화 알림(notify)에 새 비밀번호 값이 찍히면 반 아이들이 본다.
-  const ADMIN = read('admin.js');
+  const ADMIN = readAdminSources(ROOT);
   const run = (fnName, call) => {
     const said = [];
     const stu = { id: 's1', name: '학생1', pw: 'old' };
@@ -501,7 +503,7 @@ cur = 'admin 비번 초기화 알림(PW-NOTIFY-1)';
 cur = 'admin 학생 상세 비번 가림(DET-PW-MASK-1)';
 {
   //  학생 상세를 열면 비밀번호 칸이 TV 에 그대로 보였다. 기본은 가림(type=password), [보기] 로만 잠깐.
-  const ADMIN = read('admin.js');
+  const ADMIN = readAdminSources(ROOT);
   // openStudentDetail 은 화면 전체를 그리므로 통째로 돌리지 않고, 비밀번호 칸 줄만 본다
   const m = /<input[^>]*id="det-pw"[^>]*>/.exec(sliceFn(ADMIN, 'openStudentDetail'));
   test('det-pw 칸이 있다', () => { if (!m) throw new Error('det-pw input 없음'); });
@@ -523,7 +525,7 @@ cur = 'admin 작품 키 정리·중복 정리 확인(DEDUPE-ART-1·DEDUPE-CONFIR
 try {
   //  운영 artworks 는 옛 배열(숫자 키). 내리기·좋아요는 artworks/<id>/… 에만 써서 진짜 작품이 안 내려갔다.
   //  정리는 통째 set 이 아니라 **바뀔 키만** update 하고, id 키에 쓰인 조각(hidden·likes)은 합쳐야 한다.
-  const ADMIN = read('admin.js');
+  const ADMIN = readAdminSources(ROOT);
   const sliceAsync = (name) => {
     const m = new RegExp('^async function ' + name + '[ \\t]*[(]', 'm').exec(ADMIN);
     if (!m) throw new Error('함수 없음: ' + name);
@@ -710,7 +712,7 @@ try {
 // ═══════════════════════════════════════════════════════════════
 cur = 'admin 전투 설정 저장·초기화(BATTLE-SET-NAN-1·BATTLE-RESET-KEEP-1)';
 {
-  const ADMIN = read('admin.js');
+  const ADMIN = readAdminSources(ROOT);
   const hasNan = (v) => v !== null && typeof v === 'object' ? Object.values(v).some(hasNan) : (typeof v === 'number' && Number.isNaN(v));
   const run = (fields, initialCbs, confirmAns = true, fn = 'saveBattleSettings') => {
     const writes = [], said = [];
@@ -802,7 +804,7 @@ try {
 // ═══════════════════════════════════════════════════════════════
 cur = 'admin 기본값 초기화 범위(RESET-SCOPE-1)';
 {
-  const ADMIN = read('admin.js');
+  const ADMIN = readAdminSources(ROOT);
   const run = (fn, db, extra = {}) => {
     const writes = [];
     const sb = {
@@ -838,7 +840,7 @@ cur = 'admin 기본값 초기화 범위(RESET-SCOPE-1)';
 // ═══════════════════════════════════════════════════════════════
 cur = 'admin 승급 직업은 꿈 기준(PROMO-JOB-DREAM-1)';
 try {
-  const ADMIN = read('admin.js');
+  const ADMIN = readAdminSources(ROOT);
   const gd = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
   gd.globalThis = gd; vm.createContext(gd); vm.runInContext(read('gamedata.js') + ';globalThis.__U = Utils;', gd);
   const stu = { id: 's1', name: '가', job: '대학생', dream: '의사', level: 19, exp: 0, gold: 0, totalGold: 0, promotedLevels: [] };

@@ -17,10 +17,11 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from './student-sources.mjs';
+import { adminScriptFiles, readAdminSources } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const FILES = ['gamedata.js', ...studentScriptFiles(ROOT), 'admin.js', 'kiosk.js'];   // [SPLIT-1] student/*.js 까지
+const FILES = ['gamedata.js', ...studentScriptFiles(ROOT), ...adminScriptFiles(ROOT), 'kiosk.js'];   // [SPLIT-1] student/*.js 까지 · [ADMIN-SPLIT-1] admin/*.js 까지
 
 const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
 sb.globalThis = sb; vm.createContext(sb);
@@ -44,9 +45,10 @@ for (const f of FILES) {
   for (const m of body.matchAll(/\bdata\.([A-Za-z][A-Za-z0-9_]*)\s*=/g)) add(m[1], 'gamedata.js _normalizeArrays');
 }
 {
-  const src = read('admin.js');
+  const src = readAdminSources(ROOT);   // [ADMIN-SPLIT-1] BACKUP_NODES 는 admin/*.js 로 옮겨 갔다
   const m = /const BACKUP_NODES = \[([\s\S]*?)\];/.exec(src);
   if (m) for (const n of m[1].matchAll(/'([A-Za-z][A-Za-z0-9_]*)'/g)) add(n[1], 'admin.js BACKUP_NODES');
+  else { console.log('❌ FAIL   관리 코드에서 BACKUP_NODES 목록을 못 찾음 — 노드 목록이 조용히 줄어든다 [ADMIN-SPLIT-1]'); process.exitCode = 1; }
 }
 
 // root 밖 노드(다른 ref) — classRPG_v3 아래가 아니므로 제외
