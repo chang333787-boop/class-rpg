@@ -1,6 +1,9 @@
 // 실제 firebase SDK 를 쓰되 가짜(존재하지 않는) 프로젝트 + 오프라인. gamedata.js 보다 먼저 실행된다 → DB.init 은 이 앱을 그대로 쓴다.
 (function () {
   firebase.initializeApp({ apiKey: 'x', projectId: 'q1-probe-none', databaseURL: 'https://q1-probe-none-default-rtdb.firebaseio.com' });
+  //  [LAZY-SDK-1] 영어앱 Firestore SDK 는 이제 html 태그가 아니라 syncEnglishRewards 가 처음 필요할 때 부른다.
+  //  run 이 태그를 빼던 것과 같게 '이미 있는 것'으로 막는다 — 받지 않고 firestore() 가 null → 조용히 건너뜀(운영 영어앱 읽기 0).
+  firebase.firestore = function () { return null; };
   const db = firebase.database();
   db.goOffline();
   const sid = 's1773621060761';

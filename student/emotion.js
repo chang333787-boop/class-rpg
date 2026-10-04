@@ -129,6 +129,35 @@ function shouldShowTeacherOption(studentId) {
 
 let _emoScoreChart = null;
 let _emoDistChart  = null;
+//  [LAZY-SDK-1] 감정 차트 둘(꺾은선·도넛)에만 쓰는 Chart.js 4.4.0 — 첫 화면 태그에서 빼고 차트를 그리기 직전에 한 번 부른다(loadScriptOnce).
+//  받는 동안엔 차트 자리를 비워 두고, 다 오면 감정 탭이 열려 있을 때 한 번 더 그린다.
+//  못 받으면 차트 자리에만 '차트를 불러오지 못했어요' 한 줄 — 요약·자주 느낀 감정·달력은 그대로. 다음에 탭을 열면 다시 받는다.
+const CHART_JS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+let _emoChartBusy = false;
+function _emoChartMsg(cv, msg) {
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, cv.width, cv.height);
+  if (!msg) return;
+  c.fillStyle = 'rgba(255,255,255,.3)';
+  c.font = '14px Noto Sans KR';
+  c.textAlign = 'center';
+  c.fillText(msg, cv.width / 2, 60);
+}
+function _emoChartLoad(cv) {
+  _emoChartMsg(cv, '');
+  if (_emoChartBusy) return;
+  _emoChartBusy = true;
+  loadScriptOnce(CHART_JS_SRC).then(() => {
+    _emoChartBusy = false;
+    if (typeof Chart === 'undefined') throw new Error('Chart 없음');
+    const open = document.getElementById('m-house')?.classList.contains('open');
+    const tab = document.getElementById('house-tab-emotion');
+    if (CUR && open && tab && tab.style.display !== 'none') renderEmotionHistory();
+  }).catch(() => {
+    _emoChartBusy = false;
+    ['emo-score-chart', 'emo-dist-chart'].forEach(id => { const c = document.getElementById(id); if (c) _emoChartMsg(c, '차트를 불러오지 못했어요'); });
+  });
+}
 
 function renderEmotionHistory() {
   // 월 셀렉트 초기화
@@ -185,7 +214,9 @@ function renderEmotionHistory() {
 
   if (_emoScoreChart) _emoScoreChart.destroy();
   const scoreCtx = document.getElementById('emo-score-chart');
-  if (scoreCtx && dateLabels.length > 0) {
+  if (scoreCtx && dateLabels.length > 0 && typeof Chart === 'undefined') {
+    _emoChartLoad(scoreCtx);   // [LAZY-SDK-1] 받고 나서 다시 그린다
+  } else if (scoreCtx && dateLabels.length > 0) {
     _emoScoreChart = new Chart(scoreCtx, {
       type: 'line',
       data: {
@@ -218,7 +249,9 @@ function renderEmotionHistory() {
   // ── 감정 분포 도넛 ──
   if (_emoDistChart) _emoDistChart.destroy();
   const distCtx = document.getElementById('emo-dist-chart');
-  if (distCtx && total > 0) {
+  if (distCtx && total > 0 && typeof Chart === 'undefined') {
+    _emoChartLoad(distCtx);   // [LAZY-SDK-1]
+  } else if (distCtx && total > 0) {
     _emoDistChart = new Chart(distCtx, {
       type: 'doughnut',
       data: {

@@ -26,6 +26,24 @@ function safeUrl(u) {
   return 'https://' + s.replace(/^\/+/, '');
 }
 
+// ══ 바깥 스크립트 한 번만 불러오기 (LAZY-SDK-1) ══
+//  첫 화면에서 안 쓰는 큰 스크립트(Chart.js·영어앱 Firestore SDK·꾸미기 student/deco.js)는 html 태그 대신 처음 필요할 때 여기서 부른다.
+//  같은 주소는 한 번만(부르는 중이면 같은 약속을 돌려준다). 실패하면 기록을 지워 다음에 다시 시도할 수 있다(오프라인 → 다시 누르기).
+const _scriptOnce = new Map();   // 주소 → Promise
+function loadScriptOnce(url) {
+  let p = _scriptOnce.get(url);
+  if (p) return p;
+  p = new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => ok();
+    s.onerror = () => { _scriptOnce.delete(url); s.remove(); no(new Error('스크립트를 못 받음: ' + url)); };
+    document.head.appendChild(s);
+  });
+  _scriptOnce.set(url, p);
+  return p;
+}
+
 // monsterLog 항목(id) → 표시용 이름 (매핑 실패 시 원본 그대로 — 옛 커스텀 이름 등)
 function monsterNameById(id) {
   const mon = getActiveMonsters().find(m => m.id === id);
@@ -493,6 +511,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeExterna
 
 let _englishFs = null;       // 두 번째 앱의 Firestore 핸들
 let _englishLastSync = 0;
+//  [LAZY-SDK-1] 영어앱 기록 읽기에만 쓰는 Firestore SDK — 첫 화면 태그에서 빼고 syncEnglishRewards 가 처음 필요할 때 부른다.
+//  student.html 의 firebase-app-compat 과 같은 9.23.0(앱이 먼저 떠 있어야 붙는다 — 로그인 뒤라 늘 그렇다).
+const ENGLISH_FS_SDK = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
 function _englishStore() {
   if (_englishFs) return _englishFs;
   if (typeof firebase === 'undefined' || typeof firebase.firestore !== 'function') return null;
@@ -508,6 +529,11 @@ async function syncEnglishRewards(force) {
   const now = Date.now();
   if (!force && now - _englishLastSync < 5 * 60 * 1000) return;
   _englishLastSync = now;
+  //  [LAZY-SDK-1] SDK 가 아직 없으면 한 번 받는다 — 실패(오프라인 등)하면 예전처럼 조용히 건너뜀(5분 뒤·영어 창을 닫을 때 다시)
+  if (typeof firebase !== 'undefined' && typeof firebase.firestore !== 'function') {
+    try { await loadScriptOnce(ENGLISH_FS_SDK); } catch (e) { return; }
+    if (!CUR || !CUR.name) return;   // 받는 사이 로그아웃
+  }
   const fs = _englishStore();
   if (!fs) return;
   let data = null;
