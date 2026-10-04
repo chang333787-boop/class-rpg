@@ -227,7 +227,7 @@ function startAccessTimer() {
   if (_accessTimer) clearInterval(_accessTimer);
   _accessTimer = setInterval(() => {
     if (!CUR) return;
-    if (checkAccessTime()) {
+    if (checkAccessTime() && !(typeof classLiveIsOpen === 'function' && classLiveIsOpen())) {   // [CLASS-LIVE-1] 수업 중엔 내보내지 않음(끝난 뒤 다음 검사에서)
       clearInterval(_accessTimer);
       _accessTimer = null;
       // 데이터 저장 후 로그아웃
@@ -448,7 +448,7 @@ function _embedEl() {
     if (_embedState) { _embedState.loaded = true; clearTimeout(_embedState.timer); }
     // [VILLAGE-DOOR-1] autoFocus 인 앱만 iframe 에 포커스를 넘긴다. 다른 앱(영어·수채화·데생)은 그대로 둔다 —
     //   포커스가 iframe 으로 가면 부모의 Esc 닫기가 안 들린다.
-    if (_embedState && _embedState.autoFocus) { try { el.querySelector('#embed-frame').contentWindow.focus(); } catch (e) {} }
+    if (_embedState && _embedState.autoFocus && !(typeof classLiveIsOpen === 'function' && classLiveIsOpen())) { try { el.querySelector('#embed-frame').contentWindow.focus(); } catch (e) {} }   // [CLASS-LIVE-1] 수업 덮개 위로 포커스를 뺏지 않게
   });
   return el;
 }
@@ -504,6 +504,7 @@ function closeExternalEmbed(fromPop) {
   if (_lupAfterEmbed) { const lv = _lupAfterEmbed; _lupAfterEmbed = 0; setTimeout(() => triggerLevelUp(lv), 300); }   // [UX-TRIM-G4b]
 }
 window.addEventListener('popstate', () => {
+  if (typeof classLiveIsOpen === 'function' && classLiveIsOpen()) return;   // [CLASS-LIVE-1] 수업 덮개 밑의 학습 앱 창은 뒤로 연타에도 안 닫는다(덮개가 한 칸을 다시 쌓음 — student/assign.js)
   // 모달이 열려 있는데 embed 상태가 사라졌다면(뒤로가기) 닫는다
   if (!(history.state && history.state.embed)) closeExternalEmbed(true);
 });
@@ -636,6 +637,7 @@ function enterGame() {
   applyScale();
   renderAll();
   startAccessTimer();
+  if (typeof asgEnter === 'function') asgEnter();   // [CLASS-ASSIGN-1] 선생님 과제 · 수업 — 내 칸 구독 · 수업 중이면 바로 덮개(student/assign.js)
   // [ENGLISH-LINK-1] 영어 복습앱 기록 → 보상 (실패해도 진입에 영향 없음)
   setTimeout(() => { try { syncEnglishRewards(true); } catch (e) { console.warn('영어앱 연동:', e); } }, 800);
   // [DAILY-STUDY-1] 로그인 직후 자동 팝업 3종(주간다짐 1.5초·단어퀴즈 20초·회고 30초) 폐기.
@@ -1132,7 +1134,8 @@ function buildMainHTML() {
   const questLogs   = db.quests || [];
   const questStat   = q => Utils.questStatus(s.id, q.id, q.type, questLogs, s.pendingRewards, activeBQIds);
   const openQuests  = boardQuests.filter(q => questStat(q) === 'none');   // questStatus: done · pending · none(=아직 안 함)
-  if (todos.length === 0 && !studyLeft && openQuests.length === 0)
+  const assignLeft = typeof assignTodoCount === 'function' ? assignTodoCount() : 0;   // [CLASS-ASSIGN-1] 안 끝낸 선생님 과제
+  if (todos.length === 0 && !studyLeft && openQuests.length === 0 && !assignLeft)
     todos.push({type:'done', icon:'🌟', badge:null,
       title:'오늘 할 일 완료!',
       sub:'정말 열심히 했어요. 내일도 파이팅! 💪',
@@ -1226,7 +1229,7 @@ function buildMainHTML() {
     'deco/deco_bookshelf.svg': 1.5, 'deco/in_w_clock.svg': 1.2, 'deco/d_i9.svg': 1.2, 'deco/d_i5.svg': 1.2, 'deco/guest_owl.svg': 1.3 };
   const asset = (f, cls = 'hc-art') => `<img class="${cls}" src="./assets/${f}" alt="" loading="lazy"${ZOOM[f] && cls === 'hc-art' ? ` style="--z:${ZOOM[f]}"` : ''}>`;
   const dateKo = (() => { const k = new Date(Date.now() + 9 * 3600000); return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${'일월화수목금토'[k.getUTCDay()]}요일`; })();
-  const realTodos = todos.filter(t => t.type !== 'done' && t.type !== 'hint' && t.type !== 'info').length + (studyLeft ? 1 : 0) + openQuests.length;
+  const realTodos = todos.filter(t => t.type !== 'done' && t.type !== 'hint' && t.type !== 'info').length + (studyLeft ? 1 : 0) + openQuests.length + assignLeft;
   _homeCounts = { todo: realTodos, attemptsLeft: canFight ? attemptsLeft : 0, farmReady, pendingCount };
   // 우리 반 소식 — 이미 있는 데이터만(새 저장소 없음)
   const newsRows = [];
@@ -1250,6 +1253,7 @@ function buildMainHTML() {
     <div class="hs-cols">
       <div class="hs-main">
         <div class="hs-head"><span class="hs-date">${dateKo}</span><h2>${realTodos ? `오늘 할 일 ${realTodos}개` : '오늘 할 일 다 했어요'}</h2></div>
+        ${typeof buildAssignCardsHTML === 'function' ? buildAssignCardsHTML() : ''}
         ${alerts.join('')}
         ${buildStudyTaskHTML(s)}
         ${openQuests.length ? `
@@ -2965,6 +2969,7 @@ window.addEventListener('resize', applyScale);
 
 
 function triggerLevelUp(newLv) {
+  if (typeof classLiveDefer === 'function' && classLiveDefer(newLv)) return;   // [CLASS-LIVE-1] 수업 덮개 동안 미룸 — 끝나면 한 번
   // [UX-TRIM-G4b] 학습 앱 창(z 9000)이 열려 있으면 축하(999)가 그 밑에 가려진다 → 창을 닫은 뒤 한 번(그동안 오른 가장 높은 레벨)
   if (_embedState) { _lupAfterEmbed = Math.max(_lupAfterEmbed || 0, newLv); return; }
   if (_fxBusy()) { _fxWhenFree(() => triggerLevelUp(newLv)); return; }   // [BATTLE-V2] 배틀·업적 카드가 끝난 뒤
@@ -3072,7 +3077,8 @@ function renderHouseAchievements() {
 // [BATTLE-V2] 연출 줄 세우기 — 배틀 창 · 업적 카드 · 레벨업이 서로 위에 덮지 않게 하나씩
 function _fxBusy() {
   const bat = document.getElementById('m-battle'), ach = document.getElementById('ach-popup'), lup = document.getElementById('lup-fx');
-  return !!((bat && bat.classList.contains('open')) || (ach && ach.style.display === 'block') || (lup && lup.classList.contains('show')));
+  return !!((bat && bat.classList.contains('open')) || (ach && ach.style.display === 'block') || (lup && lup.classList.contains('show'))
+    || (typeof classLiveIsOpen === 'function' && classLiveIsOpen()));   // [CLASS-LIVE-1] 수업 덮개 동안 업적 카드도 기다림
 }
 function _fxWhenFree(fn, tries) { tries = tries || 0; if (!_fxBusy() || tries > 450) return fn(); setTimeout(() => _fxWhenFree(fn, tries + 1), 400); }
 

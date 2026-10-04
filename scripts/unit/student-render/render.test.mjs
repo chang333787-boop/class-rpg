@@ -312,6 +312,65 @@ check('업적 보상으로 레벨이 오르면 축하 한 번(inline·팝업 둘
   })()`, 'lvup-ach');
 });
 
+// 5) [CLASS-ASSIGN-1] 선생님 과제 카드 · 과제함 실행기(문항 형식마다) · 수업 덮개 열고 닫기 — 예외 0 · 기대 조각 · 밑 상태 그대로
+check('과제: 홈 카드 · 실행기가 형식마다(보기 · OX · 수 · 글 · 분수 · 받아쓰기 · 영어 글 · 영어 듣기 · 그림 · 지문) 그려짐', () => run(`(function () {
+  const all = CurriculumUtils.allProblems();
+  const pick = [p => p.type === 'choice' && p.cat !== 'ox' && !p.fig && !p.passageId && !p.audio, p => p.cat === 'ox', p => p.type === 'number' && String(p.unitId).startsWith('ma'),
+    p => p.type === 'short' && String(p.unitId).startsWith('ko') && p.cat !== 'dictation', p => p.type === 'fraction', p => p.cat === 'dictation',
+    p => String(p.unitId).startsWith('en') && p.type === 'short' && !p.audio, p => String(p.unitId).startsWith('en') && p.type === 'choice' && p.audio, p => !!p.fig, p => !!p.passageId].map(f => all.find(f));
+  if (pick.some(x => !x)) return '은행에서 형식을 못 찾음';
+  const psg = READING_PASSAGES.find(r => r.id === pick[9].passageId);
+  const def = AssignCore.normDef({ id: 'aRender1', kind: 'quiz', title: '견본 과제', content: { quiz: { subject: 'math', items: pick.map(p => AssignCore.snapItem(p)), passages: { [psg.id]: { id: psg.id, title: psg.title, text: psg.text } } } }, createdAt: 1 }, 'aRender1');
+  _ASG.booted = true; _ASG.db = firebase.database(); _ASG.sid = CUR.id; _ASG.open = { aRender1: def }; _ASG.cells = { aRender1: null }; _ASG.cellReady = { aRender1: true }; _ASG.cellOffs = { aRender1: () => {} };
+  const card = buildAssignCardsHTML();
+  if (!card.includes('견본 과제') || !card.includes('asgOpenInbox(') || assignTodoCount() !== 1) return '카드 ' + card.slice(0, 200);
+  //  소리 문항: 이 시험 칸에는 speechSynthesis 가 없다 → '소리가 나오지 않아요 · 건너뛰기'(영어도) 쪽이 맞다
+  const want = ['asg-opt', 'st-ox-btn', 'asgi-input', 'asgi-input', 'asgi-fn', 'asgSkip(', 'lang="en"', 'asgSkip(', 'st-fig', 'asg-psg'];
+  const els = []; const answers = {};
+  for (let i = 0; i < def.n; i++) {
+    _ASG.cells.aRender1 = { answers: Object.assign({}, answers) };
+    _asgInstStart('i', 'aRender1');
+    const h = document.getElementById('asgi-body').innerHTML;
+    if (!h.includes('asg-q') || !h.includes(want[i])) els.push(i + ':' + want[i]);
+    answers['q' + i] = { a: 'x', ok: i % 2 === 0, at: 1 + i };
+  }
+  if (els.length) return '문항 화면 조각 없음 ' + els.join(',');
+  //  수학 과제 — 연습장 캔버스(id 따로)
+  _ASG.cells.aRender1 = null; _asgInstStart('i', 'aRender1');
+  if (!document.getElementById('asgi-body').innerHTML.includes('asgi-scratch')) return '연습장 없음';
+  //  답 내기(보기 정답) → 피드백
+  const it0 = def.content.quiz.items[0];
+  asgPick('i', 0, it0.choices.indexOf(it0.a)); _asgRender('i', true);
+  if (!document.getElementById('asgi-body').innerHTML.includes('맞았어요')) return '피드백 ' + document.getElementById('asgi-body').innerHTML.slice(0, 120);
+  //  다 낸 뒤 — 결과 화면
+  _ASG.inst.i.fb = null; _ASG.cells.aRender1 = { answers }; _asgRender('i', true);
+  if (!document.getElementById('asgi-body').innerHTML.includes('asg-score')) return '끝 화면';
+  asgCloseInbox();
+  return true;
+})()`, 'assign-render'));
+check('수업 덮개: 열면 밑의 학습 세션 · 학습 앱 창을 안 건드림 · 한 문제씩 화면 · 끝나면 걷힘 · 레벨업은 덮개 동안 미룸', () => run(`(function () {
+  const sGame = document.getElementById('s-game'); sGame.classList.add('active');
+  const ss = { subjectKey: 'math', questions: [{ id: 'z' }], cur: 0, answers: [] }; STUDY_SESSION = ss;
+  const now = Date.now();
+  const def = _ASG.open.aRender1;
+  def.pacing = 'step';
+  _ASG.hosts = { h1: { on: true, at: now - 1000 } }; _ASG.offset = 0; _ASG.connected = true;
+  _ASG.live = { on: true, aid: 'aRender1', kind: 'quiz', pacing: 'step', step: -1, phase: 'lobby', startedAt: now, resumeAt: now, endsAt: now + 40 * 60000, rev: 1 };
+  _ASG.cells.aRender1 = null;
+  _asgLiveSync();
+  if (!classLiveIsOpen()) return '안 열림 ' + JSON.stringify(_asgLiveState());
+  if (!document.getElementById('asgl-body').innerHTML.includes('곧 시작해요')) return '로비';
+  _ASG.live = { ..._ASG.live, step: 0, phase: 'answer' }; _asgLiveSync();
+  if (!document.getElementById('asgl-body').innerHTML.includes('asg-opt')) return '묻기';
+  _ASG.live = { ..._ASG.live, phase: 'reveal', revealAt: { q0: now } }; _asgLiveSync();
+  if (!document.getElementById('asgl-body').innerHTML.includes('못 냈어요')) return '공개';
+  const calls = []; const real = triggerLevelUp;
+  if (!classLiveDefer(7)) return '레벨업 미룸 안 됨';
+  _ASG.live = { ..._ASG.live, on: false }; _asgLiveSync();
+  if (classLiveIsOpen()) return '안 닫힘';
+  if (STUDY_SESSION !== ss || STUDY_SESSION.cur !== 0) return '학습 세션이 바뀜';
+  return true;
+})()`, 'assign-live'));
 check('싣기·그리기 중 console.error · 약속 거절 0', () => (errors.length ? errors.slice(0, 5).join(' / ') : true));
 
 process.off('unhandledRejection', onRej);
