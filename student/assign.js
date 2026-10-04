@@ -15,6 +15,8 @@ const _ASG = {
 };
 const _asgLv = { open: false, aid: '', prevFocus: null, overflow: '', pushed: false, presRef: null, focusTimer: 0, deferLv: 0 };
 const ASG_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
+//  수업 덮개 안에서 iframe 으로 여는 학습 앱 과제(각자 풀기) — 앱 쪽이 common/assign.js 계약(?assign=&live=1)을 붙인 것만 [ASSIGN-CODING-1]
+const ASG_LIVE_APPS = ['coding'];
 
 // ── 연결 ──────────────────────────────────────────────
 function _asgRef(p) { return _ASG.db.ref(AssignCore.path.full(p)); }
@@ -347,8 +349,8 @@ if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('message', e => {
     const d = e.data;
     if (!d || d.type !== 'rpg:assign-report' || e.origin !== location.origin) return;
-    const f = document.getElementById('embed-frame');
-    if (!f || e.source !== f.contentWindow) return;
+    const f = document.getElementById('embed-frame'), lf = document.getElementById('asgl-frame');   // 학습 앱 창 · 수업 덮개 안 앱 [ASSIGN-CODING-1]
+    if (!((f && e.source === f.contentWindow) || (lf && e.source === lf.contentWindow))) return;
     _asgApplyReport(d, ok => { try { e.source.postMessage({ type: 'rpg:assign-ack', id: d.id, ok }, location.origin); } catch (er) {} });
   });
 }
@@ -410,8 +412,22 @@ function _asgInstStop(inst) {
   const st = _ASG.inst[inst];
   if (!st) return;
   _asgScratchOff(st);
+  _asgAppFrameOff(inst);
   _ASG.inst[inst] = null;
   _asgSyncCells();
+}
+//  덮개 안 학습 앱 iframe 을 뗀다 — 떼면 앱의 pagehide 가 쓰던 코드를 저장한다(src 를 바꾸지 않아 뒤로 칸도 안 생김) [ASSIGN-CODING-1]
+function _asgAppFrameOff(inst) {
+  const fr = document.getElementById(_asgP(inst) + '-frame');
+  if (fr) fr.remove();
+  const el = inst === 'l' ? document.getElementById('class-live') : null;
+  if (el) el.classList.remove('asg-app');
+}
+//  덮개 안 학습 앱 주소 — 학습 앱 창(openExternalEmbed)과 같은 주소 + 과제 + live=1
+function _asgAppSrc(def) {
+  if (!def || !ASG_LIVE_APPS.includes(def.kind) || typeof externalStudyItems !== 'function') return '';
+  const x = externalStudyItems().find(i => i.key === def.kind && i.embed);
+  return x && x.href ? x.href + '&assign=' + encodeURIComponent(def.id) + '&live=1' : '';
 }
 //  지금 보일 화면
 function _asgScreen(st) {
@@ -440,6 +456,13 @@ function _asgRender(inst, force) {
   if (!force && key === st.key) { _asgNoteShow(st); return; }
   st.key = key;
   _asgScratchOff(st);
+  _asgAppFrameOff(inst);
+  const appSrc = inst === 'l' && sc.view === 'app' ? _asgAppSrc(st.def) : '';
+  if (appSrc) {   // [ASSIGN-CODING-1] 기초 코딩 각자 풀기 — 덮개 안 iframe(밑의 학습 앱 창은 그대로)
+    document.getElementById('class-live').classList.add('asg-app');
+    body.innerHTML = `<iframe id="${_asgP(inst)}-frame" class="asg-app-frame" src="${escHtml(appSrc)}" title="${escHtml(st.def.title)}" allow="autoplay"></iframe>`;
+    return;
+  }
   body.innerHTML = _asgScreenHTML(st, sc, cell);
   _asgNoteShow(st);
   if (sc.view === 'self' || sc.view === 'ask') { _asgAfterQuestion(st, sc.i); if (sc.view === 'self') _asgStartedMark(st); }

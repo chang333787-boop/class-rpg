@@ -254,6 +254,10 @@ sequenceDiagram
 
 ### 4-5 수업 · 각자 · 기초 코딩 / 음악실 리듬 — **1차에는 하지 않음**(반박 #6)
 
+> **10-05 [ASSIGN-CODING-1] 기초 코딩은 붙였다**(갈래 `feat/class-assign-coding` · draft) — 덮개 안 iframe `coding/index.html?…&assign=<과제>&live=1`(`student/assign.js` `ASG_LIVE_APPS`) · 관리 만들기에서 기초 코딩도 [🔴 지금 모두 같이](각자 풀기만) · 목록 [수업으로].
+> 연결 수 걱정(R6)은 그대로다: 수업 중 아이 한 명 = 학생 화면 1 + 덮개 안 코딩 1(+ 밑에 학습 앱 창이 열려 있었으면 1) → 25명이면 50~75. **요금제(§17 Q10) 확인 전에는 코딩 수업 모드를 큰 반에서 쓰지 말 것** — 막을 곳은 `ASG_LIVE_APPS` 한 줄 · 관리 `_assignLiveOK`.
+> 음악실 리듬은 아직 과제함만.
+
 덮개 안 두 번째 iframe 은 아이마다 RTDB 연결을 하나 더 만든다(25명 × 최대 3 = 75 + 교사 · TV). 무료 요금제 동시 연결 100 에 닿을 수 있어
 1차는 코딩 · 리듬을 **과제함만** 둔다(관리 화면 '지금 모두 같이' 단추가 막혀 있음). 아래 표는 연결 수를 확인한 뒤의 몫으로 남긴다.
 
@@ -725,7 +729,8 @@ node scripts/unit/fake-rtdb/server.mjs 8870    # (#1173 머지 전이면 그 갈
 | **P4** 관리 과제·수업 | ✅ (백업 · 내보내기에 `classRPG_assign` 넣기는 안 함 — §17 Q11) | `admin/assign.js` · `admin.html` · `admin.js` · `admin.css` |
 | **P5** 수업 모드 + TV | ✅ | `student/assign.js` · `admin/assign.js` · `assign/index.html` · `assign/js/tv.js` · `assign/css/tv.css` · `scripts/unit/assign/assign-live-check.mjs` |
 | 하위 앱 계약 | ✅ 계약 · 결과 쓰기(부모) · 시험 | `common/assign.js` · `scripts/unit/common/assign-subapp.test.mjs` |
-| **P6** 코딩 · 음악 앱 쪽 | ⏭ 다음 단계 — §7-3 · §7-4 · 관리 만들기의 `assignCodingPickerHTML(d)` · `assignMusicPickerHTML(d)` 를 채우고 `ASSIGN_APP_KINDS_READY = true` · 코딩/음악 import map 에 `common/assign*.js` | |
+| **P6a** 기초 코딩 앱 쪽 [ASSIGN-CODING-1] | ✅ 갈래 `feat/class-assign-coding` — `?assign` 과제 쪽(그 판들만 · 잠금 없음 · 처음엔 안 푼 첫 판) · 과제 판 코드 · 셈은 `<판>__asg_<과제>` 열쇠(전에 푼 코드 · 막힘 지도 안 덮음) · 실행마다 `reportAssign`(attempt · 판 기록 rank · 푼 판 수 · 다 하면 done · 마지막 글 코드 300자) · 이긴 카드 '다음 과제 판' · 멈춤 신호 · 수업 덮개 안 iframe · 관리 판 고르기(단원 → 판 칩 1~3) · 결과 칸(판마다 ★/실행/막힘 · 막힌 판 · 많이 한 실수 · 마지막 코드) | `coding/js/{asg,app,play,store}.js` · `coding/index.html` · `admin/assign-coding.js` · `admin/assign.js`(갈고리) · `student/assign.js`(덮개 iframe) · `scripts/unit/coding/assign.test.mjs` |
+| **P6** 코딩 · 음악 앱 쪽 | ⏭ 다음 단계(음악) — §7-3 · §7-4 · 관리 만들기의 `assignCodingPickerHTML(d)` · `assignMusicPickerHTML(d)` 를 채우고 `ASSIGN_APP_KINDS_READY = true` · 코딩/음악 import map 에 `common/assign*.js` | |
 | **P7** 문서 | 이 문서 · 운영 안내 · 패치 노트는 시연 뒤 | |
 
 - `village/` · 경제 수치 · gamedata.js · gamedata/*.js 는 안 고쳤다.
