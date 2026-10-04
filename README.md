@@ -69,7 +69,8 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 gamedata.js        공유 데이터 + DB 레이어 (게임 상수, Utils, Firebase 연결/정규화/저장 helper)
 student.html  / student.js  / student.css     학생 화면 (student.js = 홈·집 허브·농장·상점·보스·HUD 등 바탕)
 student/*.js                                   student.js 에서 떼어 옮긴 학생 화면 조각 8개(char·battle·deco·art·emotion·reading·weekly·study) — 클래식, student.js 바로 뒤
-admin.html    / admin.js    / admin.css       관리(교사) 화면
+admin.html    / admin.js    / admin.css       관리(교사) 화면 (admin.js = 로그인·초기화·메뉴·대시보드·우리 마을·공용 도구 바탕)
+admin/*.js                                     admin.js 에서 떼어 옮긴 관리 화면 조각 9개(students·approve·records·works·memories·quests·battle·settings·study) — 클래식, admin.js 바로 뒤
 kiosk.html    / kiosk.js    / kiosk.css        키오스크(할 일 체크판) 화면
 curriculum.js / curriculum_review.js           학습 문항 은행(국어·수학·사회) + 복습 문항 · CurriculumUtils
 curriculum_reading.js                          국어 지문 세트(READING_PASSAGES·READING_ITEMS, 지문 20편×4문항)
@@ -105,7 +106,7 @@ CNAME                                          GitHub Pages 커스텀 도메인 
   - `Utils`: 공통 유틸. 날짜는 `Utils.todayStr()`(KST, `YYYY-MM-DD`), 주 시작은 `Utils.weekStartStr()`(KST, 일요일 시작)로 **단일 소스 통일**
   - `DB`: Firebase 연결·실시간 구독·정규화(`_normalizeArrays`/`_migrate`)·저장 helper(`saveStudent` 등)
 - **`student.js` + `student/*.js`** — 학생 화면 로직. 2026-10-04 에 덩어리째 떼어 옮겼다(글자 그대로 · 전역 그대로 · [docs/module_architecture.md §16](docs/module_architecture.md)). student.js = 바탕(초기화·홈·쪽지·보상·상점·보스·농장·집 허브·인벤토리·퀘스트·업적·토스트) · `student/char.js` 캐릭터 그림 · `battle.js` 사냥·전투 · `deco.js` 꾸미기+친구 마당(html 태그 없이 꾸미기를 열 때 불러온다 — §17) · `art.js` 작품 · `emotion.js` 감정 · `reading.js` 독서 · `weekly.js` 주간 다짐 · `study.js` 단어장·오늘의 학습·숙달도
-- **`admin.js`** — 교사 관리 로직. 학생 편집, 퀘스트/보상 승인, 설정, 백업/가져오기/롤백/초기화
+- **`admin.js` + `admin/*.js`** — 교사 관리 로직. 학생 편집, 퀘스트/보상 승인, 설정, 백업/가져오기/롤백/초기화. 덩어리째 떼어 옮겼다(글자 그대로 · 전역 그대로 · [docs/module_architecture.md §17](docs/module_architecture.md)). admin.js = 바탕(로그인·초기화·메뉴·대시보드·우리 마을·closeModal/notify) · `admin/students.js` 학생 목록·상세 창·학생 추가 · `admin/approve.js` 승인·승급 · `admin/records.js` 랭킹·능력치·활동 내역 · `admin/works.js` 작품·독서 · `admin/memories.js` 추억·리코더·업적 재계산·주간 다짐·데이터 정리 · `admin/quests.js` 비번 초기화·퀘스트·가져오기·개별 보상 · `admin/battle.js` 몬스터·전투 설정 · `admin/settings.js` 상점·과목·감정·백업·설정 · `admin/study.js` 학습 범위·생각판·학습 앱
 - **`kiosk.js`** — 키오스크 로직. 퀘스트 신청/취소를 학생의 `pendingRewards` 경로만 **부분 저장**(전체 학생 객체 클로버 방지)
 - **CSS 3종(`student.css` / `admin.css` / `kiosk.css`)** — 각 화면 전용 스타일. HTML에 인라인 `<style>` 없음
 - **`scripts/verify-safety.mjs`** — 저장 안전/구조 정적 검증(아래 [안전 검증](#안전-검증))
@@ -199,9 +200,9 @@ node scripts/verify-safety.mjs
 ```
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
-- 현재 기대 결과: **`PASS 26 · REVIEW 1 · FAIL 0`** (exit code 0 · 2026-10-04 student 나누기로 18→26 = `node --check` student/*.js 8개)
-- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 30 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 290 · FAIL 0`** (2026-10-04 기준 · smoke 30번째 = student/ 폴더 js 가 모두 student.html 에 있나 [SPLIT-1])
-- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 24 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초 · R5 에서 공통 뼈대 시험 하나 더해 23→24).
+- 현재 기대 결과: **`PASS 35 · REVIEW 1 · FAIL 0`** (exit code 0 · student 나누기로 18→26 = `node --check` student/*.js 8개 · admin 나누기(R3)로 26→35 = admin/*.js 9개)
+- 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 31 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 331 · FAIL 0`** (2026-10-04 기준 · smoke 30번째 = student/ 폴더 js 가 모두 student.html 에 있나 [SPLIT-1] · 31번째 = admin/ 폴더 js 가 모두 admin.html 에 있나 [ADMIN-SPLIT-1])
+- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 26 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초 · R5 공통 뼈대 시험 · cur-alias · deco-lazy 검사가 더해져 26 · admin 나누기 뒤에도 같음).
   smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle · global-dup · 시뮬 다섯(esc-parity 포함) · 밸런스 둘 ·
   하위 앱 시험 9개(공통 뼈대 포함)를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).
   저장 경로를 건드렸으면 `--gold` 도(골드 유실 시뮬 · 지금 main 에서는 REPRO 가 정상이라 REVIEW).

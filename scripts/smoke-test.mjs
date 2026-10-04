@@ -19,6 +19,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles, studentTagFiles, studentDirFiles, LAZY_STUDENT_FILES, lazyRefsIn } from './unit/student-sources.mjs';
+import { adminScriptFiles, adminDirFiles, readAdminSources } from './unit/admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const results = []; // { level, msg }
@@ -31,8 +32,11 @@ const read = (f) => fs.readFileSync(rel(f), 'utf8');
 // [SPLIT-1] 학생 코드 = student.js + student/*.js(student.html 의 <script> 순서가 단일 출처)
 let STUDENT_FILES = ['student.js'], STUDENT_TAGS = ['student.js'];
 try { STUDENT_FILES = studentScriptFiles(ROOT); STUDENT_TAGS = studentTagFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+// [ADMIN-SPLIT-1] 관리 코드 = admin.js + admin/*.js(admin.html 의 <script> 순서가 단일 출처)
+let ADMIN_FILES = ['admin.js'];
+try { ADMIN_FILES = adminScriptFiles(ROOT); } catch (e) { add('FAIL', `admin.html 관리 스크립트 목록: ${e.message}`); }
 //  [DECO-LAZY-1] 필수 파일·문법·DB 캐시 정렬은 늦게 부르는 파일(student/deco.js)까지 · 클래식 태그는 html 태그로 부르는 것만
-const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', ...STUDENT_FILES, 'admin.js', 'kiosk.js'];
+const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', ...STUDENT_FILES, ...ADMIN_FILES, 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -149,11 +153,11 @@ for (const f of HTML_FILES) {
   else add('FAIL', `${f}: 로드 순서 비정상 (gamedata=${gIdx}, ${js}=${jIdx})`);
 
   // 전용 JS가 클래식 로드(module/async/defer 없음) — [SPLIT-1] student.html 은 student/*.js 태그까지
-  const jsList = f === 'student.html' ? STUDENT_TAGS : [js];
+  const jsList = f === 'student.html' ? STUDENT_TAGS : f === 'admin.html' ? ADMIN_FILES : [js];   // [ADMIN-SPLIT-1]
   const nonClassic = jsList.map((x) => (html.match(new RegExp(`<script\\b[^>]*\\b${x.replace(/\./g, '\\.')}[^>]*>`)) || [])[0] || '')
     .filter((tag) => tag && /\b(type=["']?module|async|defer)\b/.test(tag));
   if (nonClassic.length) add('FAIL', `${f}: 비클래식 로드 (${nonClassic.join(' · ')})`);
-  else add('PASS', `${f}: ${js}${jsList.length > 1 ? ` + student/ ${jsList.length - 1}개` : ''} 클래식 로드 (module/async/defer 없음)`);
+  else add('PASS', `${f}: ${js}${jsList.length > 1 ? ` + ${js.replace('.js', '')}/ ${jsList.length - 1}개` : ''} 클래식 로드 (module/async/defer 없음)`);
 
   // 인라인 <script>(src 없음) / <style> 0건
   const scriptOpen = (html.match(/<script\b/g) || []).length;
@@ -231,6 +235,19 @@ for (const f of HTML_FILES) {
     (lazyOk.length ? ` + 늦게 ${lazyOk.length}개(${lazyOk.map((f) => `${f}?v=${lazyRefs.find((x) => x.file === f).ver}`).join(', ')})` : ''));
 }
 
+// ── [ADMIN-SPLIT-1] admin/ 폴더 js 는 모두 admin.html 에서 admin.js 뒤에 불려야 한다 ──
+//  admin.js 에서 떼어 옮긴 파일(admin/*.js)을 html 에 안 적으면 그 코드는 **조용히 안 돈다**(오류 없이 단추만 먹통).
+{
+  const html = exists('admin.html') ? read('admin.html') : '';
+  const onDisk = adminDirFiles(ROOT);
+  const notLoaded = onDisk.filter((f) => !ADMIN_FILES.includes(f));
+  const ai = html.indexOf('./admin.js');
+  const early = ADMIN_FILES.filter((f) => f !== 'admin.js' && html.indexOf('./' + f) < ai);
+  if (notLoaded.length) add('FAIL', `admin/ 파일이 admin.html 에 없음: ${notLoaded.join(', ')} — <script src="./admin/…?v=…"> 를 admin.js 뒤에`);
+  else if (early.length) add('FAIL', `admin/ 파일이 admin.js 보다 먼저 불림: ${early.join(', ')}`);
+  else add('PASS', `admin/ 폴더 js ${onDisk.length}개 모두 admin.html 에서 admin.js 뒤에 부름`);
+}
+
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──
 {
   const checks = [
@@ -250,7 +267,7 @@ for (const f of HTML_FILES) {
   ];
   for (const [f, re, label] of checks) {
     if (!exists(f)) { add('FAIL', `${f}: 파일 없음 (${label})`); continue; }
-    if (re.test(read(f))) add('PASS', `${f}: ${label} 존재`);
+    if (re.test(f === 'admin.js' ? readAdminSources(ROOT) : read(f))) add('PASS', `${f}: ${label} 존재`);   // [ADMIN-SPLIT-1] 'admin.js' 칸 = 관리 코드 전체
     else add('FAIL', `${f}: ${label} 미발견`);
   }
 }
@@ -304,7 +321,7 @@ for (const f of HTML_FILES) {
   const MUT = 'sort|reverse|splice|push|pop|shift|unshift|fill|copyWithin';
   const g = GETTERS.join('|');
   const hits = [];
-  for (const f of ['admin.js', ...STUDENT_FILES, 'kiosk.js']) {   // [SPLIT-1] student/*.js 까지
+  for (const f of [...ADMIN_FILES, ...STUDENT_FILES, 'kiosk.js']) {   // [SPLIT-1] student/*.js 까지 · [ADMIN-SPLIT-1] admin/*.js 까지
     let src; try { src = read(f); } catch (e) { continue; }
     const lines = src.split('\n');
     // ① DB.getX(...).sort(  /  DB.load().x.sort(

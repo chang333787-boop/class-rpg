@@ -14,6 +14,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { readStudentSources } from './student-sources.mjs';
+import { readAdminSources } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FILES = ['student.js', 'admin.js', 'kiosk.js', 'watercolor/index.html'];
@@ -30,7 +31,8 @@ function sliceFn(src, name) {
 }
 function load(file) {
   //  [SPLIT-1] 'student.js' = 학생 화면 전체(student.js + student/*.js) — 도우미가 옮겨 가도 같은 칸으로 본다
-  const src = file === 'student.js' ? readStudentSources(ROOT) : fs.readFileSync(path.join(ROOT, file), 'utf8');
+  //  [ADMIN-SPLIT-1] 'admin.js' = 관리 화면 전체(admin.js + admin/*.js)
+  const src = file === 'student.js' ? readStudentSources(ROOT) : file === 'admin.js' ? readAdminSources(ROOT) : fs.readFileSync(path.join(ROOT, file), 'utf8');
   const fns = {};
   const ctx = {};
   vm.createContext(ctx);
