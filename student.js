@@ -296,6 +296,12 @@ function externalStudyItems() {
       sub: '세 물감을 한 방울씩 섞어 색을 만들어요',
       href: 'paint/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
       border: 'rgba(53,163,220,.42)', bg: 'rgba(53,163,220,.08)', embed: true },
+    // [ART-1] 명화 탐정 — 저작권이 끝난 옛 그림 열두 장(김홍도 · 브뤼헐 · 모네 …)에서 숨은 것 찾기 · 단서로 생각하기 · 느낌 · 질문 만들기([4미03-01] 감상)
+    //   저장 = classRPG_art · 보상과 묶지 않음 · 그림 출처 = art/CREDITS.md
+    { key: 'art', icon: '🔎', title: '명화 탐정',
+      sub: '옛 그림 속 숨은 것을 찾고 질문을 만들어요',
+      href: 'art/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(201,167,232,.42)', bg: 'rgba(201,167,232,.08)', embed: true },
     { key: 'watercolor', icon: '🎨', title: '수채화 기초',
       sub: '태블릿 보며 진짜 종이에 연습 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?sid=' + sid,
@@ -1799,6 +1805,7 @@ function buildMainHTML() {
       ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')", 'NEW')}
       ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')", 'NEW')}
       ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')", 'NEW')}
+      ${door(asset('monsters/m30.png'), '명화 탐정', '옛 그림 속 숨은 것 찾기 · 질문 만들기', "openExternalEmbed('art')", 'NEW')}
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
       ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
