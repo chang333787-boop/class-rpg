@@ -35,12 +35,13 @@
     hideScreen('s-login'); enterGame();
     await sleep(600);
     // 저장 횟수 세기: DB.saveStudent 와 실제 SDK set 둘 다
-    let saves = 0, sets = 0;
+    //  [SYNC-MERGE-2] saveStudent 는 이제 바뀐 칸만 update 한다 → set(통째)·update(칸) 를 따로 센다
+    let saves = 0, sets = 0, ups = 0;
     const origSave = DB.saveStudent.bind(DB);
     DB.saveStudent = (s) => { saves++; return origSave(s); };
     const ref = DB._fbRef.child('students/' + R.sid);
     const origSet = ref.set.bind(ref);
-    DB._fbRef.child = ((orig) => (p) => { const r = orig(p); if (String(p).startsWith('students/')) { const os = r.set.bind(r); r.set = (v) => { sets++; return os(v); }; } return r; })(DB._fbRef.child.bind(DB._fbRef));
+    DB._fbRef.child = ((orig) => (p) => { const r = orig(p); if (String(p).startsWith('students/')) { const os = r.set.bind(r), ou = r.update.bind(r); r.set = (v) => { sets++; return os(v); }; r.update = (v) => { ups++; return ou(v); }; } return r; })(DB._fbRef.child.bind(DB._fbRef));
     // 꾸미기 화면 열기(전체화면 인테리어)
     openHouseTab('deco'); await sleep(300);
     openInteriorFullscreen(); await sleep(800);
@@ -659,10 +660,11 @@
         out('상점_서랍자리', { 창: innerWidth + 'x' + innerHeight, 판위: Math.round(tv.top), 서랍위: Math.round(dr.top), 서랍키: Math.round(dr.height), 마당비율: Math.round((dr.top - tv.top) / innerHeight * 100) + '%' }); }
       //  ① 싼 것 — 한 번에. 꾸미기 묶음 저장이 대기 중이어도 저장은 1번(그 대기분은 구매 저장에 실려 간다)
       CUR.yardFloor = CUR.yardFloor || {}; CUR.yardFloor['23_46'] = 'stone'; decoDirty();
-      saves = 0; sets = 0;
+      saves = 0; sets = 0; ups = 0;
       decoShopPick(cheap.id); decoShopBuy(); await sleep(900);
       out('상점_사기_골드·가진수', { 골드: CUR.gold, 가진수: qty(cheap.id), 값: cheap.price, 맞나: CUR.gold === 1000 - cheap.price && qty(cheap.id) === 1 });
-      out('상점_사기_저장1번', { saveStudent: saves, sdkSet: sets, 맞나: saves === 1 && sets === 1 });
+      //  [SYNC-MERGE-2] 쓰기 1번 = 통째 set 1번(옛 판) 또는 바뀐 칸 update 1번(지금 판)
+      out('상점_사기_저장1번', { saveStudent: saves, sdkSet: sets, sdkUpdate: ups, 맞나: saves === 1 && sets + ups === 1 });
       const sv = await server();
       out('상점_사기_서버에도', sv.gold === CUR.gold && (sv.inventory || []).some(i => i.id === cheap.id && i.qty === 1) && !!(sv.yardFloor && sv.yardFloor['23_46']));
       out('상점_산직후_내것탭·골라짐·맨앞·손끝', DECO_TAB === 'own' && SEL_DECO === cheap.id && (document.querySelector('#if-deco-inv .deco-card') || { dataset: {} }).dataset.decoId === cheap.id && !!document.getElementById('deco-hand-ghost'));

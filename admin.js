@@ -942,13 +942,21 @@ async function resetAllStudents() {
 
 function saveStudentDetail(id) {
   const s = DB.getStudent(id);
+  // [SYNC-MERGE-2] 창을 연 뒤 **바꾼 칸만** 저장한다. 창은 열 때 값으로 칸을 채우므로, 안 바꾼 칸까지 되쓰면
+  //   그사이 학생이 번 골드·EXP·받은 칭호를 열 때 값으로 되돌렸다. 바꿨는지는 칸의 처음 값(defaultValue)과 견준다.
+  const $ = (k) => document.getElementById(k);
+  const touched = (k) => { const el = $(k); return !!el && el.value !== el.defaultValue; };
+  const titleEl = $('det-title');
+  const titleTouched = !!titleEl && titleEl.selectedIndex !== Math.max(0, Array.from(titleEl.options).findIndex(o => o.defaultSelected));
 
   // [GOLD-GUARD-1] 골드는 다른 필드보다 **먼저** 판정한다.
   //   DB.getStudent()는 캐시 객체를 그대로 돌려주므로, 필드를 바꾼 뒤 확인 창에서 취소하면
   //   저장은 안 되지만 바뀐 값이 캐시에 남는다. 그래서 아무것도 건드리기 전에 묻는다.
+  //   [SYNC-MERGE-2] 골드는 '바꾼 만큼'(적은 값 − 연 때 값)을 지금 골드에 더한다 — 그사이 번 골드를 지우지 않는다.
   const prevGold = s.gold || 0;
-  const newGold  = parseInt(document.getElementById('det-gold').value) || 0;
-  const goldDelta = newGold - prevGold;
+  const goldEl = $('det-gold');
+  const goldDelta = touched('det-gold') ? (parseInt(goldEl.value) || 0) - (parseInt(goldEl.defaultValue) || 0) : 0;
+  const newGold  = Math.max(0, prevGold + goldDelta);
 
   // 오타 방어 — 현재 골드의 10배를 넘거나 한 번에 +50,000G 이상 늘리면 되묻는다.
   //   (2026-09-10 골드 감사: 게임으로는 만들어질 수 없는 89만G 두 건이 확인됐고,
@@ -967,28 +975,32 @@ function saveStudentDetail(id) {
     if (!ok) return;   // 다른 필드도 아직 안 건드린 상태 — 그대로 빠져나간다
   }
 
-  s.name = document.getElementById('det-name').value;
-  s.job = document.getElementById('det-job').value;
-  s.title = document.getElementById('det-title').value;
-  s.pw = document.getElementById('det-pw').value;
-  s.level = parseInt(document.getElementById('det-lv').value) || 1;
-  s.gold  = newGold;
-  // [R7][GOLD-GUARD-1] 누적 골드 — quickGiveGold와 같은 규칙: 늘어난 만큼만 반영, 차감은 제외.
-  //   이게 없으면 gold > totalGold가 되어 '얼마나 벌었나' 통계·골드 랭킹·누적 골드 업적이 어긋난다.
-  if (goldDelta > 0) s.totalGold = (s.totalGold || 0) + goldDelta;
-  // ★ exp 필드를 직접 입력했으면 그대로, 아니면 level에 맞는 exp 최솟값으로 맞춤
-  const inputExp = parseInt(document.getElementById('det-exp').value) || 0;
-  const levelFromInputExp = Utils.levelFromExp(inputExp);
-  if (levelFromInputExp !== s.level) {
-    // exp와 level이 불일치 → level 기준으로 exp를 맞춤 (level 변경 의도)
-    s.exp = Utils.expForLevel(s.level);
-  } else {
-    s.exp = inputExp;
+  if (touched('det-name')) s.name = $('det-name').value;
+  if (touched('det-job'))  s.job = $('det-job').value;
+  if (titleTouched)        s.title = titleEl.value;
+  if (touched('det-pw'))   s.pw = $('det-pw').value;
+  if (goldDelta) {
+    s.gold = newGold;
+    // [R7][GOLD-GUARD-1] 누적 골드 — quickGiveGold와 같은 규칙: 늘어난 만큼만 반영, 차감은 제외.
+    //   이게 없으면 gold > totalGold가 되어 '얼마나 벌었나' 통계·골드 랭킹·누적 골드 업적이 어긋난다.
+    if (goldDelta > 0) s.totalGold = (s.totalGold || 0) + goldDelta;
   }
-  s.bookCount = parseInt(document.getElementById('det-books').value) || 0;
+  // ★ exp 필드를 직접 입력했으면 그대로, 아니면 level에 맞는 exp 최솟값으로 맞춤 — [SYNC-MERGE-2] 레벨·EXP 중 하나라도 바꿨을 때만
+  if (touched('det-lv') || touched('det-exp')) {
+    s.level = parseInt($('det-lv').value) || 1;
+    const inputExp = parseInt($('det-exp').value) || 0;
+    const levelFromInputExp = Utils.levelFromExp(inputExp);
+    if (levelFromInputExp !== s.level) {
+      // exp와 level이 불일치 → level 기준으로 exp를 맞춤 (level 변경 의도)
+      s.exp = Utils.expForLevel(s.level);
+    } else {
+      s.exp = inputExp;
+    }
+  }
+  if (touched('det-books')) s.bookCount = parseInt($('det-books').value) || 0;
   ['read','study','art','value','health','life'].forEach(k => {
-    const el = document.getElementById(`det-stat-${k}`);
-    if (el) s.stats[k] = Math.round((parseFloat(el.value)||0) * 10) / 10;
+    const el = $(`det-stat-${k}`);
+    if (el && el.value !== el.defaultValue) { s.stats = s.stats || {}; s.stats[k] = Math.round((parseFloat(el.value)||0) * 10) / 10; }
   });
   DB.saveStudent(s);
   closeModal();

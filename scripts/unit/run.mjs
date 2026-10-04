@@ -1930,6 +1930,95 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'gamedata 학생 기록 합치기(SYNC-MERGE-2)';
+try {
+  //  설계 docs/sync_merge_design.md. 여러 기기 겹침은 gold-sync-sim · 실제 SDK 는 gold-loss-real-sdk 가 잰다 — 여기는 순수 셈만.
+  const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+  const DB = sb.__DB;
+  const ids = (l) => l.map(r => r.id);
+  test('보상 합치기: 서버 목록(객체 꼴·구멍) 위에 더하기 — 이미 있는 id 는 안 겹침', () =>
+    eq(ids(DB._prApply({ 0: { id: 'a' }, 2: { id: 'b' } }, { add: [{ id: 'b' }, { id: 'c' }] })), ['a', 'b', 'c']));
+  test('보상 합치기: id 로 빼기 · 바꾸기는 있을 때만(남이 승인해 뺀 보상을 안 살림)', () =>
+    eq(DB._prApply([{ id: 'a', x: 1 }, { id: 'b' }], { del: ['i:b'], put: [{ id: 'a', x: 2 }, { id: 'z' }] }), [{ id: 'a', x: 2 }]));
+  test('보상 합치기: 조건 빼기(키오스크 취소) · 빈 서버 목록에 더하기', () => {
+    eq(ids(DB._prApply([{ id: 'a', boardQuestId: 'q' }, { id: 'b' }], { drop: r => r.boardQuestId === 'q' })), ['b']);
+    eq(ids(DB._prApply(null, { add: [{ id: 'a' }] })), ['a']);
+  });
+  test('보상 합치기: id 없는 옛 보상은 내용 전체가 열쇠(키 순서 무관)', () =>
+    eq(DB._prApply([{ label: '옛', gold: 5 }, { id: 'n' }], { del: [DB._prKey({ gold: 5, label: '옛' })] }), [{ id: 'n' }]));
+  test('바뀐 칸만: 셈 칸은 차이(없던 칸은 0 에서) · 그 밖은 칸 통째 · 키 순서만 다르면 안 바뀐 것', () => {
+    const ops = DB._stuDiff({ id: 's', gold: 100, stats: { a: 1, b: 2 }, job: 'x' }, { id: 's', gold: 130, totalGold: 30, stats: { b: 2, a: 1 }, job: 'y' });
+    eq([ops.inc, ops.set, ops.pr], [{ gold: 30, totalGold: 30 }, { job: 'y' }, null]);
+  });
+  test('바뀐 칸만: 지운 칸은 null · NaN 섞인 칸은 안 보냄 · 숫자 아닌 옛 골드는 덮어쓰기', () => {
+    const ops = DB._stuDiff({ id: 's', title: '용사', gold: '7', bd: { used: 1 } }, { id: 's', gold: 9, bd: { used: NaN } });
+    eq([ops.set, ops.inc], [{ title: null, gold: 9 }, {}]);
+  });
+  test('바뀐 칸만: pendingRewards 는 id 로 더한 것·뺀 것·바뀐 것', () =>
+    eq(DB._stuDiff({ pendingRewards: [{ id: 'a' }, { id: 'b', g: 1 }] }, { pendingRewards: [{ id: 'b', g: 2 }, { id: 'c' }] }).pr,
+      { del: ['i:a'], add: [{ id: 'c' }], put: [{ id: 'b', g: 2 }] }));
+  test('일감 얹기 = 서버 increment 와 같은 셈(남이 더한 것 보존) · 원본은 그대로', () => {
+    const srv = { gold: 150, pendingRewards: [{ id: 'x' }] };
+    const out = DB._stuApply(srv, { set: { job: 'y' }, inc: { gold: 30, exp: 5 }, pr: { del: [], add: [{ id: 'y' }], put: [] } });
+    eq([out, srv.gold], [{ gold: 180, pendingRewards: [{ id: 'x' }, { id: 'y' }], job: 'y', exp: 5 }, 150]);
+  });
+  // saveStudent · 받은 판 합치기 — 가짜 ref 로 쓰기 모양만 본다
+  const calls = [];
+  const mkRef = (p) => ({ child: (k) => mkRef(p ? p + '/' + k : k),
+    update: (v) => { calls.push(['update', p, JSON.parse(JSON.stringify(v))]); return Promise.resolve(); },
+    set: (v) => { calls.push(['set', p]); return Promise.resolve(); },
+    transaction: (fn) => { calls.push(['tx', p, fn([{ id: 'srv' }])]); return Promise.resolve({ committed: true }); } });
+  DB._fbRef = mkRef('');
+  const stu = (o) => ({ id: 's1', name: '가', level: 1, exp: 0, gold: 100, totalGold: 100, pendingRewards: [], ...o });
+  DB._cache = DB._ingest({ students: { s1: stu(), 0: { id: 's5', name: '옛', gold: 1 } } });
+  const s = DB.getStudent('s1');
+  DB.saveStudent(s);
+  test('saveStudent: 바뀐 게 없으면 쓰기 0', () => eq(calls.length, 0));
+  s.gold += 30; s.totalGold += 30; DB.saveStudent(s);
+  test('saveStudent: 골드만 바뀌면 students/<id> update 한 번(increment) — 통째 set 없음', () => eq(calls.splice(0), [['update', 'students/s1', { gold: { inc: 30 }, totalGold: { inc: 30 } }]]));
+  s.pendingRewards = [{ id: 'r1' }]; DB.saveStudent(s);
+  test('saveStudent: 보상 신청은 pendingRewards transaction(서버 목록 위에 더함)', () => eq(calls.splice(0), [['tx', 'students/s1/pendingRewards', [{ id: 'srv' }, { id: 'r1' }]]]));
+  {  // 다른 기기가 경험치를 더한 것(아직 이 객체엔 안 들어온 기준)이 있을 때, 둘을 합치면 레벨 문턱을 넘는다
+    const lv2 = vm.runInContext('Utils.expForLevel(2)', sb);
+    DB._stuBase.s1 = { ...DB._stuBase.s1, exp: lv2 - 5 };
+    s.exp += 10; s.level = vm.runInContext(`Utils.levelFromExp(${s.exp})`, sb);   // 이 기기 혼자 보면 아직 레벨 1
+    DB.saveStudent(s);
+    test('saveStudent: 경험치 더하기 → 합친 경험치(남의 것 + 내 것)로 레벨도 같이 맞춰 보냄', () => {
+      const c = calls.splice(0);
+      eq([c.length, c[0][2].exp, c[0][2].level, s.level, s.exp], [1, { inc: 10 }, 2, 2, lv2 + 5]);
+    });
+  }
+  DB.saveStudent({ id: 's9', name: '새 학생' });
+  const o = DB.getStudent('s5'); o.gold = 2; DB.saveStudent(o);
+  test('saveStudent: 새 학생 · id 키 기록이 없는(옛 숫자 키만) 학생은 지금처럼 통째 set', () => eq(calls.splice(0), [['set', 'students/s9'], ['set', 'students/s5']]));
+  s.gold += 5;   // 아직 안 보낸 고침
+  const sGold = s.gold, sLv = s.level;
+  //  student.js onDataChange 순서 그대로: prevLv = CUR.level → CUR = DB.getStudent(id) (#1161 승인 레벨업 축하가 이 앞뒤를 견준다)
+  let seen = null;
+  DB.onDataChange(() => { const prevLv = s.level; const fresh = DB.getStudent('s1'); seen = { prevLv, lv: fresh.level }; });
+  DB._onSnap({ val: () => ({ students: { s1: stu({ gold: 180, totalGold: 180, exp: 300, level: sLv + 1, pendingRewards: [{ id: 'r1' }], job: '교사가 고침' }) } }) });
+  DB.onDataChange(null);
+  const n = DB.getStudent('s1');
+  test('받은 판 합치기: 새 객체 = 남의 변경 + 안 보낸 고침(+5) · 옛 객체는 그대로', () =>
+    eq([n === s, n.gold, n.job, s.gold, s.job], [false, 185, '교사가 고침', sGold, undefined]));
+  test('받은 판 합치기: 콜백 안에서 옛 CUR 레벨과 새 레벨을 견줄 수 있다(#1161 승인 레벨업 축하)', () => eq(seen, { prevLv: sLv, lv: sLv + 1 }));
+  //  콜백 첫머리 decoFlush 처럼 **옛 객체**를 저장 → 이은 객체(n)로 넘겨 n 의 안 보낸 고침(+5)을 한 번 보낸다 · 옛 객체는 그대로
+  DB.saveStudent(s);
+  test('밀린 옛 객체 저장 = 이은 객체 저장: 안 보낸 고침(+5)만 한 번 · 옛 객체 값은 그대로', () =>
+    eq([calls.splice(0), s.gold, DB.getStudent('s1') === n], [[['update', 'students/s1', { gold: { inc: 5 } }]], sGold, true]));
+  DB.saveStudent(n);
+  test('그다음 이은 객체를 저장해도 다시 안 보낸다(두 번 지급 없음)', () => eq(calls.splice(0), []));
+  s.title = '늦은 고침'; DB.saveStudent(s);
+  test('밀린 뒤 옛 객체에 고친 것은 이은 객체에 얹어 그 칸만 보낸다(교사가 고친 칸 안 되돌림)', () =>
+    eq([calls.splice(0), n.title, n.job], [[['update', 'students/s1', { title: '늦은 고침' }]], '늦은 고침', '교사가 고침']));
+} catch (e) {
+  test('합치기 함수를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);

@@ -68,12 +68,15 @@ for (const { label, pat } of [
 // ── 4) kiosk pendingRewards 부분 저장 유지 ──
 if (exists('kiosk.js')) {
   const k = read('kiosk.js');
-  const partial = countMatches(k, /\/pendingRewards'\)\.set\(s\.pendingRewards\)/g);
+  // [SYNC-MERGE-2] 같은 pendingRewards 한 갈래지만, 배열 통째 set 대신 id 합치기 transaction(신청·취소 2건).
+  //   배열 통째 set 이 다시 생기면(그사이 승인한 보상 되살림·막 넣은 신청 지움) FAIL.
+  const partial = countMatches(k, /\/pendingRewards'\)\.transaction\(/g);
+  const arraySet = countMatches(k, /\/pendingRewards'\)\.set\(/g);
   const fullSet = countMatches(k, /child\('students\/'\+s\.id\)\.set\(s\)/g);
-  if (partial === 2 && fullSet === 0) {
-    add('PASS', `kiosk pendingRewards 부분 저장 2건 / 전체 set 0건`);
+  if (partial === 2 && arraySet === 0 && fullSet === 0) {
+    add('PASS', `kiosk pendingRewards 부분 저장(id 합치기 transaction) 2건 / 배열 통째 set 0건 / 전체 set 0건`);
   } else {
-    add('FAIL', `kiosk 저장 기대(부분 2, 전체 0) ≠ 실제(부분 ${partial}, 전체 ${fullSet})`);
+    add('FAIL', `kiosk 저장 기대(transaction 2, 배열 set 0, 전체 0) ≠ 실제(transaction ${partial}, 배열 set ${arraySet}, 전체 ${fullSet})`);
   }
 } else {
   add('FAIL', 'kiosk.js 없음 — pendingRewards 검사 불가');

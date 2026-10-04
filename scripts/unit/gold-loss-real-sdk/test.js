@@ -7,13 +7,16 @@
 //   ?case=buyEquip 실제 buyEquip('e_h1' 천 모자)                    → OK (골드 차감 + 머리 칸 장착)   [GOLD-SPEND-2]
 //   ?case=buyDeco  실제 buyDeco(첫 유료 장식)                       → OK (골드 차감 + 가방 1)
 //   ?case=skill    실제 buySkillBook('sb_f1' 화염 1권)               → OK (골드 차감 + 화염 Lv1)
+//   ?case=study    실제 grantStudyReward(오늘 10문제 · 자동 지급)    → NO_LOSS (EXP·골드 둘 다)   [SYNC-MERGE-2]
+//                  saveQuestLog 가 saveStudent 보다 먼저 동기 value 이벤트를 띄워 CUR 이 서버 값으로 바뀌면 EXP 가 사라지고,
+//                  첫 보상이면 CUR.studyRewards 가 없어 TypeError 까지 났다(검토자 재현 · 보스 알림 10-04).
 //   구매 4종은 logSpend(지출 기록)가 goldDaily 에 x_ 필드를 남겼는지도 적는다(spendLogged).
 // 흐름: SDK 로컬에 준비(업적 전부·밭) → 로그인 → 한가(_saving 풀림) → 케이스 실행 → SDK 로컬 값으로 판정.
 (function () {
   const Q = window.__Q1;
   const out = (k, v) => { Q.log.push(k + '=' + JSON.stringify(v)); };
   const CASE = new URLSearchParams(location.search).get('case') || 'battle';
-  const KNOWN = ['battle', 'buySeed', 'farm', 'infinite', 'buyEquip', 'buyDeco', 'skill'];
+  const KNOWN = ['battle', 'buySeed', 'farm', 'infinite', 'buyEquip', 'buyDeco', 'skill', 'study'];
   const BUYS = { buySeed: 'seed', buyEquip: 'equip', buyDeco: 'deco', skill: 'skill' };
   const t0 = Date.now();
   (function wait() {
@@ -53,8 +56,9 @@
       let changes = 0; const prev = DB._onChangeCb; DB._onChangeCb = function () { changes++; return prev && prev.apply(this, arguments); };
       const before = CUR.totalGold || 0;
       const goldBefore = CUR.gold || 0;
+      const expBefore = CUR.exp || 0;
       const objBefore = CUR;
-      let seedId = null, invBefore = 0, expectGain = 0, price = 0, itemId = null;
+      let seedId = null, invBefore = 0, expectGain = 0, price = 0, itemId = null, expectExp = 0, caseErr = false;
       window.confirm = () => true;   // 구매 확인창은 '예'
       try {
         if (CASE === 'buySeed') {
@@ -68,7 +72,8 @@
         } else if (CASE === 'buyDeco') {
           const d = GAME_DATA.decorations.find(x => x.price > 0); itemId = d.id; price = d.price;
           invBefore = ((CUR.inventory || []).find(i => i.id === d.id) || { qty: 0 }).qty;
-          out('deco', { id: d.id, price }); buyDeco(d.id);
+          //  [SYNC-MERGE-2] DECO-PT-1 부터 상점은 '한 번 누름 = 확인, 3초 안에 한 번 더 = 산다' — 한 번만 부르면 안 사서 BROKEN 이 났다
+          out('deco', { id: d.id, price }); buyDeco(d.id); buyDeco(d.id);
         } else if (CASE === 'skill') {
           const b = SKILL_BOOKS.find(x => x.id === 'sb_f1'); itemId = b.id; price = b.price;
           out('book', { id: b.id, price }); buySkillBook(b.id);
@@ -80,12 +85,18 @@
           expectGain = 15;
           IB = { zone: 'beginner', kills: 3, gold: 15, active: true, playerHp: 10, playerHpMax: 10 };
           _endInfiniteBattleSession(false);
+        } else if (CASE === 'study') {
+          const cfg = studyRewardCfg();   // 설정 없으면 기본값(자동 지급) — 다 맞혀 보너스까지
+          expectExp = (cfg.exp || 0) + (cfg.bonusExp || 0);
+          expectGain = (cfg.gold || 0) + (cfg.bonusGold || 0);
+          out('study', { mode: cfg.mode, exp: expectExp, gold: expectGain, hadStudyRewards: !!CUR.studyRewards });
+          grantStudyReward({ id: 'pr_q1_study', total: STUDY_PER_DAY, correct: STUDY_PER_DAY });
         } else {
           expectGain = 10;
           BATTLE_STATE = { isInfinite: false, monster: { id: 'mon_q1', name: '시험몹', gold: 10 }, win: true, finished: true };
           _finishBattle();
         }
-      } catch (e) { out('caseErr', String(e.stack || e.message).split(String.fromCharCode(10)).slice(0, 3).join(' | ')); }
+      } catch (e) { caseErr = true; out('caseErr', String(e.stack || e.message).split(String.fromCharCode(10)).slice(0, 3).join(' | ')); }
       out('savedAfter_saving', DB._saving);
       out('onDataChangeCalls', changes);
       out('CURswapped', CUR !== objBefore);
@@ -106,6 +117,11 @@
             : ((st.skillLevels || {}).fire || 0) >= 1;
           out('sdkLocal.gotItem', got);
           out('VERDICT', (st.gold === goldBefore - price && got) ? 'OK' : (got && st.gold === goldBefore) ? 'FREE_ITEM' : 'BROKEN');
+        } else if (CASE === 'study') {
+          out('sdkLocal.exp', st.exp); out('expectExp', expBefore + expectExp); out('expectTotal', before + expectGain);
+          out('sdkLocal.studyRewardsToday', !!(st.studyRewards && st.studyRewards[Utils.todayStr()]));
+          out('VERDICT', caseErr ? 'BROKEN'
+            : (st.exp >= expBefore + expectExp && st.totalGold >= before + expectGain && st.studyRewards && st.studyRewards[Utils.todayStr()]) ? 'NO_LOSS' : 'LOSS');
         } else {
           if (CASE === 'farm') out('sdkLocal.farmLeft', st.farm ? Object.values(st.farm).length : 0);
           out('expectTotal', before + expectGain);
