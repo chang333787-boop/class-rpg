@@ -5,6 +5,8 @@ import { h, toast, modal } from './util.js';
 import { CASES, FEELS, BECAUSE } from './cases.js';
 import { kindOf, questionText, LEVELS } from './ask.js';
 import { ELEMENTS, EFEELS, elementOf } from './elements.js';
+//  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
+const STD = '3~4학년 미술 감상 [4미03-01] 미술 작품을 자세히 보고 작품과 미술가에 관해 질문할 수 있다 · [4미03-02] 미술 작품의 특징과 작품에 관한 자신의 느낌과 생각을 설명할 수 있다 · 조형 요소 찾기 = [4미02-03] 조형 요소(선 · 형과 형태 · 색 · 질감 · 양감)의 특징 탐색.';
 
 const FEEL_WORD = Object.fromEntries(FEELS), BEC_WORD = Object.fromEntries(BECAUSE);
 
@@ -22,7 +24,7 @@ const count = (obj, key) => { const cnt = {}; for (const v of Object.values(obj 
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
-  root.replaceChildren(ctx.topBar('명화 탐정 · 탐정 기록', { back: '#/' }), h('div', { class: 'view' }, box));
+  root.replaceChildren(ctx.topBar('명화 탐정 · 탐정 기록', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
   const { progress, stats, names: names0, think, feel, ask, like } = await ctx.store.all();
   let EL = { elem: {}, estats: {}, efeel: {}, names: {} };
   try { EL = await ctx.store.elemAll(); } catch (e) { console.warn(e); }

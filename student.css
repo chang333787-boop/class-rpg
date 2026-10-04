@@ -405,6 +405,22 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   border-color:rgba(217,164,65,.35);
 }
 #study-body .st-subject-card:active{transform:translateY(0) scale(.99)}
+/* [UX-TRIM-G4] 과목 고르기 — 복습 · 과목이 먼저(넓은 화면은 두 줄로 놓아 1366×610 에서 내리지 않고 보인다),
+   외부 학습 앱은 그 아래 '학습 앱' 작은 타일 묶음 */
+#study-body .st-subject-grid{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));}
+#study-body .st-due-row{display:grid;gap:.45rem;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));}
+#study-body .st-app-head{margin:1.3rem 0 .55rem;font-size:.95rem;font-weight:800;color:var(--txt2);
+  display:flex;align-items:center;gap:.6rem;}
+#study-body .st-app-head::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.1);}
+#study-body .st-app-grid{display:grid;gap:.5rem;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
+#study-body .st-app-tile{display:flex;align-items:center;gap:.55rem;min-height:52px;padding:.55rem .75rem;
+  border:1px solid rgba(255,255,255,.12);border-radius:var(--r);cursor:pointer;color:var(--txt);
+  font-family:inherit;text-align:left;text-decoration:none;
+  transition:transform .14s cubic-bezier(.34,1.56,.64,1), filter .15s;}
+#study-body .st-app-tile:hover{transform:translateY(-2px);filter:brightness(1.12);}
+#study-body .st-app-tile:active{transform:translateY(0) scale(.98);}
+#study-body .st-app-ic{font-size:1.45rem;flex-shrink:0;}
+#study-body .st-app-name{font-size:.95rem;font-weight:700;min-width:0;word-break:keep-all;}
 /* 정답·오답 반응 */
 @keyframes st-pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 @keyframes st-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}

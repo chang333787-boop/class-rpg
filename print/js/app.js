@@ -78,7 +78,7 @@ function home() {
           h('div', { class: 'intro-row' }, h('div', { class: 'mine' }, h('b', {}, `${done} / ${ST.length}`), h('span', {}, '한 판'), h('b', {}, String(stars)), h('span', {}, '별')))),
         demo),
       h('div', { class: 'chapters' }, ...CHAPTERS.filter(c => ST.some(s => s.ch === c.id)).map(chCard), artCard()),
-      h('p', { class: 'muted small foot' }, '3~4학년 미술 [4미02-02] 표현 재료와 용구(판 · 칼 · 롤러 · 바렌)의 특성 · 사용 방법 · [4미02-03] 조형 요소(형 · 선) 탐색. 미술 교과서 8종이 4학년에 판화를 다뤄요. 칼을 쓸 때는 늘 손을 칼 앞에 두지 않아요.'))));
+      h('p', { class: 'muted small foot' }, '칼을 쓸 때는 늘 손을 칼 앞에 두지 않아요.'))));
   try { drawBlock(demo, blocks.pressFish(), { size: 132 }); } catch (e) { console.warn(e); }
 }
 

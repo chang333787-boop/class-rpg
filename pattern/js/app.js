@@ -71,7 +71,7 @@ function home() {
           band),
         h('div', { class: 'mine' }, h('b', {}, `${done} / ${total}`), h('span', {}, '푼 판'), h('b', {}, String(stars)), h('span', {}, '별'))),
       h('div', { class: 'chapters' }, ...CHAPTERS.map(chCard)),
-      h('p', { class: 'muted small foot' }, '4학년 수학 ‘평면도형의 이동’ [4수03-04] 밀기 · 뒤집기 · 돌리기 · [4수03-12] 모양을 만들거나 채우기 + 미술 [4미02-03] 조형 요소 · [4미02-05] 다른 교과와 관련지어 표현. 돌리고 뒤집기처럼 겹친 움직임은 다루지 않아요(교육과정).'))));
+      h('p', { class: 'muted small foot' }, '밀고 · 뒤집고 · 돌려서 무늬를 만들어요. 수학 시간에 배우는 ‘평면도형의 이동’과 이어져요.'))));
 }
 
 async function route() {

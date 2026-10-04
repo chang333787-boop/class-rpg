@@ -17,7 +17,7 @@
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
-<link rel="stylesheet" href="./student.css?v=20261004tg1">
+<link rel="stylesheet" href="./student.css?v=20261004g4a">
 </head>
 <body>
 <div id="loading-screen" style="position:fixed;inset:0;z-index:999999;background:#ecdcbf;
@@ -103,8 +103,7 @@
     <div class="hud-badges">
       <div class="badge lv">⚡ Lv.<span id="hud-lv">1</span></div>
       <div class="badge gold">💰 <span id="hud-gold">0</span>G</div>
-      <button id="layout-toggle-btn" class="hud-mini-btn" onclick="toggleLayout()">넓게 보기</button>
-      <button id="scale-mode-btn" class="hud-mini-btn" onclick="toggleScaleMode()">화면 맞춤</button>
+      <!-- [UX-TRIM-G4] '넓게 보기'(누르면 오히려 폰 배치) · '화면 맞춤'(1366 에서 안 걸림) 두 단추를 뺐다. 배치는 화면 폭이 고른다 -->
     </div>
   </div>
 
@@ -298,14 +297,9 @@
     <button class="mtab"    onclick="houseTab('memory',this)">추억</button>
     <button class="mtab"    onclick="houseTab('emotion',this)">감정</button>
     <button class="mtab"    id="house-tab-ach-btn" onclick="houseTab('ach',this)">업적</button>
+    <!-- [UX-TRIM-G4] 리코더 — '곧 열릴 예정' 대신 홈 문과 같은 음악실 리코더 기록장으로(닫으면 이 창으로 돌아온다) -->
     <button class="mtab"    id="house-tab-recorder-btn"
-      onclick="toast('🎵 리코더 기록장은 곧 열릴 예정이에요')"
-      style="opacity:.5;position:relative">
-      리코더
-      <span style="position:absolute;top:-4px;right:-2px;font-size:.5rem;font-weight:800;
-        background:#e67e22;color:#fff;border-radius:6px;padding:.05rem .3rem;line-height:1.4">
-        예정</span>
-    </button>
+      onclick="openExternalEmbed('music','#/log')">리코더</button>
   </div>
   <div class="house-tab-body">
 
@@ -965,7 +959,7 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20261004g1b"></script>
+<script src="./student.js?v=20261004g4a"></script>
 
 <!-- 작품 라이트박스 -->
 <div id="artwork-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;

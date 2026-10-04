@@ -67,7 +67,7 @@ function home() {
         h('div', { class: 'c-head' }, h('b', {}, `${ch.id}장 · ${ch.title}`), h('span', { class: 'sp' }), h('span', { class: 'muted' }, `${casesOf(ch.id).filter(c => progress[c.id]).length} / ${casesOf(ch.id).length}`)),
         h('p', {}, ch.intro),
         h('div', { class: 'cgrid' }, ...casesOf(ch.id).map(card)))),
-      h('p', { class: 'muted small foot' }, '3~4학년 미술 감상 [4미03-01] 미술 작품을 자세히 보고 작품과 미술가에 관해 질문할 수 있다 · [4미03-02] 미술 작품의 특징과 작품에 관한 자신의 느낌과 생각을 설명할 수 있다. 진짜 미술관처럼 천천히, 오래 보세요.'))));
+      h('p', { class: 'muted small foot' }, '진짜 미술관처럼 천천히, 오래 보세요.'))));
 }
 
 async function route() {

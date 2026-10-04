@@ -4,6 +4,8 @@ import { h, toast, modal } from './util.js';
 import { PUZ, CHAPTERS } from './stages.js';
 import { MISTAKES, validWork, wallpaper, WALL } from './tiles.js';
 import { wallCanvas } from './draw.js';
+//  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
+const STD = '4학년 수학 ‘평면도형의 이동’ [4수03-04] 밀기 · 뒤집기 · 돌리기 · [4수03-12] 모양을 만들거나 채우기 + 미술 [4미02-03] 조형 요소 · [4미02-05] 다른 교과와 관련지어 표현. 돌리고 뒤집기처럼 겹친 움직임은 다루지 않아요(교육과정 적용 시 고려 사항).';
 
 const MK = Object.keys(MISTAKES);
 
@@ -20,7 +22,7 @@ async function gate(ctx) {
 export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
-  root.replaceChildren(ctx.topBar('무늬 공방 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, box));
+  root.replaceChildren(ctx.topBar('무늬 공방 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
   const { progress, stats, names, works = {} } = await ctx.store.all();
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));

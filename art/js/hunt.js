@@ -1,6 +1,7 @@
 // 조형 요소 찾기 — 카드 열둘(선 · 색 · 명암 · 양감 · 질감) · 카드마다 그림 세 점에서 그 요소를 찾아 짚는다.
 //  짚으면 돋보기가 그 자리를 잰다(elements.js — 그림을 긴 변 480점으로 줄여 칸마다): 찾는 요소가 그 칸(이나 바로 둘레 칸)에 있으면 찾음.
-//  틀려도 그 자리에 무엇이 있는지 재어 보여 준다(선 방향 ° · 밝기 · 따뜻함 · 차가움 · 선명함 · 거칠기 · 명암 변화).
+//  틀려도 그 자리에 무엇이 있는지 재어 보여 준다(선 방향 · 밝기 · 따뜻함 · 차가움 · 선명함 · 거칠기 · 명암 변화).
+//  [UX-TRIM-G4] 아이 화면엔 숫자(° · %) 대신 쉬운 말('거의 수평인 선 — 아주 뚜렷해요' · 막대 옆 '조금 · 꽤 · 아주').
 //  셋 다 찾으면 '그 요소가 주는 느낌'을 고르고 우리 반 셈을 본다 — [4미02-03] 조형 요소의 특징 탐색 · 주제 표현에 알맞게 활용.
 import { h } from './util.js';
 import { makeViewer } from './viewer.js';
@@ -21,7 +22,12 @@ const jo = (w, a, b) => { const base = String(w).replace(/\([^)]*\)$/, ''), c = 
 const pct = v => Math.round(Math.max(0, Math.min(1, v)) * 100);
 const parseF = f => String(f || '').split('|').filter(Boolean).map(s => { const [c, x, y] = s.split(':'); return { c, x: +x, y: +y }; });
 const fStr = list => list.map(o => `${o.c}:${o.x}:${o.y}`).join('|');
-const dirName = a => { const dH = Math.min(a, 180 - a), dV = Math.abs(a - 90); return dH <= 12 ? '가로' : dV <= 12 ? '세로' : '비스듬히'; };
+//  [UX-TRIM-G4] 잰 값 → 쉬운 말(셈은 그대로 · 보여 주는 말만)
+const lineWord = a => { const dH = Math.min(a, 180 - a), dV = Math.abs(a - 90); return dH <= 4 ? '수평인 선' : dH <= 15 ? '거의 수평인 선' : dV <= 4 ? '수직인 선' : dV <= 15 ? '거의 수직인 선' : '비스듬히 기운 선'; };
+const amt = v => (v < 0.1 ? '거의 없어요' : v < 0.35 ? '조금' : v < 0.65 ? '꽤' : '아주');
+const clearWord = v => (v < 0.1 ? '흐릿해요' : `${amt(v)} 뚜렷해요`);
+const lightWord = L => (L >= 80 ? '아주 밝아요' : L >= 60 ? '밝은 편이에요' : L >= 40 ? '중간 밝기예요' : L >= 20 ? '어두운 편이에요' : '아주 어두워요');
+const much = (v, what) => `${what} ${v < 0.1 ? '거의 없어요' : v < 0.35 ? '조금 있어요' : v < 0.65 ? '꽤 많아요' : '아주 많아요'}`;
 
 // ── 첫 화면 — 갈래마다 카드 ──
 export async function mountHuntHome(root, ctx) {
@@ -40,11 +46,11 @@ export async function mountHuntHome(root, ctx) {
     h('div', { class: 'view' }, h('div', { class: 'home hunt-home' },
       h('div', { class: 'intro' }, h('img', { class: 'host', src: HOST, alt: '' }),
         h('div', { class: 'intro-t' }, h('h2', {}, '그림 속 선 · 색 · 명암 · 질감 찾기'),
-          h('p', {}, '카드를 고르고, 그림에서 그 요소를 찾아 짚어요. 짚으면 돋보기가 그 자리를 재어 알려 줘요 — 선이 몇 도 기울었는지, 얼마나 밝은지, 따뜻한 색인지. 카드마다 그림 세 점에서 찾으면 모여요.')),
+          h('p', {}, '카드를 고르고, 그림에서 그 요소를 찾아 짚어요. 짚으면 돋보기가 그 자리를 재어 알려 줘요 — 선이 어느 쪽으로 누웠는지, 얼마나 밝은지, 따뜻한 색인지. 카드마다 그림 세 점에서 찾으면 모여요.')),
         h('div', { class: 'mine' }, h('b', {}, `${done} / ${ELEMENTS.length}`), h('span', {}, '모은 카드'))),
       ...FAMS.map(([fk, fn]) => h('div', { class: 'ccard' }, h('div', { class: 'c-head' }, h('b', {}, fn)),
         h('div', { class: 'egrid' }, ...ELEMENTS.filter(e => e.fam === fk).map(card)))),
-      h('p', { class: 'muted small foot' }, '3~4학년 미술 [4미02-03] "조형 요소에는 선, 형과 형태, 색, 질감, 양감 등이 있다"(해설). 형(모양)은 무늬 공방 · 데생 기초에서 다뤄요. 돋보기는 그림을 작게 줄여 칸마다 재기 때문에 아주 작은 것은 못 잴 수 있어요.'))));
+      h('p', { class: 'muted small foot' }, '그림을 이루는 것에는 선 · 모양 · 색 · 질감 · 양감이 있어요. 모양은 무늬 공방 · 데생 기초에서 다뤄요. 돋보기는 그림을 작게 줄여 재기 때문에 아주 작은 것은 못 잴 수 있어요.'))));   // [UX-TRIM-G4] 성취기준 번호는 선생님 화면(#/t)
   return { unmount() {} };
 }
 
@@ -86,18 +92,18 @@ export async function mountHunt(root, ctx, k) {
     const labs = topLabels(cell, 4), line = cell.en >= 0.3 && cell.coh >= 0.4, a = Math.round(cell.ang), NS = 'http://www.w3.org/2000/svg';
     const arrow = document.createElementNS(NS, 'svg'); arrow.setAttribute('viewBox', '-12 -12 24 24'); arrow.setAttribute('class', 'l-arrow');
     const r = a * Math.PI / 180; arrow.innerHTML = line ? `<line x1="${-9 * Math.cos(r)}" y1="${-9 * Math.sin(r)}" x2="${9 * Math.cos(r)}" y2="${9 * Math.sin(r)}"/>` : '<circle r="3"/>';
-    const bar = (name, v, cls = '') => h('div', { class: 'l-row' }, h('span', {}, name), h('span', { class: 'l-bar ' + cls }, h('i', { style: { width: pct(v) + '%' } })), h('b', {}, pct(v) + '%'));
+    const bar = (name, v, cls = '') => h('div', { class: 'l-row' }, h('span', {}, name), h('span', { class: 'l-bar ' + cls }, h('i', { style: { width: pct(v) + '%' } })), h('b', {}, v < 0.1 ? '없음' : amt(v)));
     return h('div', { class: 'lens' + (ok ? ' ok' : '') },
       h('div', { class: 'l-head' }, h('b', {}, '🔍 돋보기'), h('span', { class: 'l-chips' }, ...(labs.length ? labs.map(x => h('span', { class: 'l-chip' + (x.k === k ? ' on' : '') }, elementOf(x.k).name)) : [h('span', { class: 'muted small' }, '뚜렷한 요소가 없는 곳')]))),
-      h('div', { class: 'l-row' }, h('span', {}, '선'), arrow, h('b', { class: 'l-line' }, line ? `${dirName(a)} · ${a}° · 뚜렷함 ${pct(cell.en * cell.coh)}%` : '뚜렷한 선 없음')),
-      h('div', { class: 'l-row' }, h('span', {}, '색'), h('i', { class: 'l-sw', style: { background: `rgb(${cell.rgb.join(',')})` } }), h('b', {}, `밝기 ${Math.round(cell.L)}`)),
+      h('div', { class: 'l-row' }, h('span', {}, '선'), arrow, h('b', { class: 'l-line' }, line ? `${lineWord(a)} — ${clearWord(cell.en * cell.coh)}` : '뚜렷한 선 없음')),
+      h('div', { class: 'l-row' }, h('span', {}, '색'), h('i', { class: 'l-sw', style: { background: `rgb(${cell.rgb.join(',')})` } }), h('b', {}, lightWord(cell.L))),
       bar('따뜻함', cell.warmM, 'warm'), bar('차가움', cell.coolM, 'cool'), bar('선명함', cell.vivM, 'vivid'),
       bar('거칠기', cell.roughM / 4, 'rough'), bar('명암 변화', cell.shade, 'shade'));
   }
   //  찾았을 때 — 돋보기가 잰 증거 한 줄(+ 그곳에 함께 있는 다른 요소)
   function proof(cell) {
-    const a = Math.round(cell.ang), ev = { horiz: `선 방향 ${a}°`, vert: `선 방향 ${a}°`, diag: `선 방향 ${a}°`, curve: '선 방향이 조금씩 바뀌어요', warm: `따뜻함 ${pct(cell.warmM)}%`, cool: `차가움 ${pct(cell.coolM)}%`,
-      vivid: `선명함 ${pct(cell.vivM)}%`, bright: `밝기 ${Math.round(cell.L)}`, dark: `밝기 ${Math.round(cell.L)}`, shade: `명암 변화 ${pct(cell.shade)}%`, rough: `거칠기 ${pct(cell.roughM / 4)}%`, smooth: `거칠기 ${pct(cell.roughM / 4)}%` }[k];
+    const a = Math.round(cell.ang), ln = `${lineWord(a)}이에요`, ev = { horiz: ln, vert: ln, diag: ln, curve: '선 방향이 조금씩 바뀌어요', warm: much(cell.warmM, '따뜻한 색이'), cool: much(cell.coolM, '차가운 색이'),
+      vivid: much(cell.vivM, '또렷한 색이'), bright: lightWord(cell.L), dark: lightWord(cell.L), shade: much(cell.shade, '차츰 바뀌는 명암이'), rough: much(cell.roughM / 4, '자잘한 자국이'), smooth: much(cell.roughM / 4, '자잘한 자국이') }[k];
     const more = topLabels(cell, 3).filter(x => x.k !== k).map(x => elementOf(x.k).name);
     return `돋보기로 재어 보니 ${jo(E.name, '이에요', '예요')} — ${ev}.${more.length ? ` 이곳에는 ${more.join(' · ')}도 있어요.` : ''}`;
   }
@@ -105,11 +111,11 @@ export async function mountHunt(root, ctx, k) {
   function why(cell) {
     const labs = topLabels(cell, 3).map(x => elementOf(x.k).name), here = labs.length ? `여기는 ${labs.join(' · ')}` : '여기는 뚜렷한 요소가 없는 곳', line = cell.en >= 0.3 && cell.coh >= 0.4, a = Math.round(cell.ang);
     const tip = {
-      horiz: line ? `선이 ${a}° — 0°(수평)에 가까운 선을 찾아요` : '선이 뚜렷한 곳에서 찾아요', vert: line ? `선이 ${a}° — 90°(수직)에 가까운 선을 찾아요` : '선이 뚜렷한 곳에서 찾아요',
-      diag: line ? `선이 ${a}° — 45°나 135°쯤 기운 선을 찾아요` : '선이 뚜렷한 곳에서 찾아요', curve: line ? '선이 곧아요 — 방향이 조금씩 바뀌며 휘는 선을 찾아요' : '선이 뚜렷한 곳에서 찾아요',
-      warm: `따뜻함 ${pct(cell.warmM)}% — 빨강 · 주황 · 노랑이 더 짙은 곳을 찾아요`, cool: `차가움 ${pct(cell.coolM)}% — 청록 · 파랑이 더 짙은 곳을 찾아요`,
-      vivid: `선명함 ${pct(cell.vivM)}% — 회색이 덜 섞인 또렷한 색을 찾아요`, bright: `밝기 ${Math.round(cell.L)} — 더 환한 곳을 찾아요`, dark: `밝기 ${Math.round(cell.L)} — 더 어두운 곳을 찾아요`,
-      shade: '밝음에서 어둠으로 차츰 바뀌는 둥근 곳을 찾아요(날카로운 경계는 아니에요)', rough: `거칠기 ${pct(cell.roughM / 4)}% — 자잘한 자국이 많은 곳을 찾아요`, smooth: `거칠기 ${pct(cell.roughM / 4)}% — 자국 없이 고른 곳을 찾아요`,
+      horiz: line ? `이 선은 ${lineWord(a)}이에요 — 옆으로 판판하게 누운 선을 찾아요` : '선이 뚜렷한 곳에서 찾아요', vert: line ? `이 선은 ${lineWord(a)}이에요 — 위아래로 곧게 선 선을 찾아요` : '선이 뚜렷한 곳에서 찾아요',
+      diag: line ? `이 선은 ${lineWord(a)}이에요 — 비스듬히 기운 선을 찾아요` : '선이 뚜렷한 곳에서 찾아요', curve: line ? '선이 곧아요 — 방향이 조금씩 바뀌며 휘는 선을 찾아요' : '선이 뚜렷한 곳에서 찾아요',
+      warm: `${much(cell.warmM, '따뜻한 색이')} — 빨강 · 주황 · 노랑이 더 짙은 곳을 찾아요`, cool: `${much(cell.coolM, '차가운 색이')} — 청록 · 파랑이 더 짙은 곳을 찾아요`,
+      vivid: `${much(cell.vivM, '또렷한 색이')} — 회색이 덜 섞인 또렷한 색을 찾아요`, bright: `${lightWord(cell.L)} — 더 환한 곳을 찾아요`, dark: `${lightWord(cell.L)} — 더 어두운 곳을 찾아요`,
+      shade: '밝음에서 어둠으로 차츰 바뀌는 둥근 곳을 찾아요(날카로운 경계는 아니에요)', rough: `${much(cell.roughM / 4, '자잘한 자국이')} — 자국이 더 많은 곳을 찾아요`, smooth: `${much(cell.roughM / 4, '자잘한 자국이')} — 자국 없이 고른 곳을 찾아요`,
     }[k];
     return `${here}${labs.length ? jo(labs[labs.length - 1], '이에요', '예요').slice(labs[labs.length - 1].length) : '이에요'}. ${tip}`;
   }

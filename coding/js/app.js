@@ -59,7 +59,7 @@ function home() {
         h('div', { class: 'mine' }, h('b', {}, `${done} / ${total}`), h('span', {}, '푼 판'), h('b', {}, String(stars)), h('span', {}, '별'))),
       h('div', { class: 'heroes' }, ...heroCards),
       h('div', { class: 'units' }, ...UNITS.map(unitCard)),
-      h('p', { class: 'muted small foot' }, '1~4단원 = 순차 · 반복 · 반복 속 반복 · 디버깅(3~4학년 놀이 중심 프로그래밍) → 5단원부터 조건 · 변수 · 함수 · 이벤트(5~6학년 실과 ‘디지털 사회와 인공지능’ [6실05-01~03])로 이어져요.'))));
+      h('p', { class: 'muted small foot' }, '1단원부터 차례로 풀어 가면 마지막에는 작은 게임까지 만들 수 있어요.'))));
 }
 
 async function route() {
