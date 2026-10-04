@@ -9,12 +9,14 @@ import { mountTeacher } from './teacher.js';
 
 const Q = new URLSearchParams(location.search);
 const TEACHER = Q.has('teacher');
-const FROM = Q.get('from');   // ink = 먹 연구소 3장 · wc = 수채화 기초 차시에서 왔으면 윗줄에 돌아가는 단추
+const FROM = Q.get('from');   // ink = 먹 연구소 3장 · wc = 수채화 기초 차시 · print = 판화 놀이 4장에서 왔으면 윗줄에 돌아가는 단추
 const store = createStore({ sid: Q.get('sid') || (TEACHER ? 'teacher' : ''), name: TEACHER ? '선생님' : (Q.get('n') || '').slice(0, 20) });
 const app = document.getElementById('app');
 const inkHome = () => { const q = new URLSearchParams(location.search); q.delete('from'); q.delete('lesson'); return `../ink/index.html${q.toString() ? '?' + q : ''}#/`; };
 const wcLesson = () => { const w = new URLSearchParams(); if (Q.get('sid')) w.set('sid', Q.get('sid')); if (Q.get('lesson') != null) w.set('lesson', Q.get('lesson')); return `../watercolor/index.html?${w}`; };
-const backOut = () => (FROM === 'ink' ? h('a', { class: 'btn small back-ink', href: inkHome() }, '🖌 먹 연구소로') : FROM === 'wc' ? h('a', { class: 'btn small back-ink', href: wcLesson() }, '🎨 수채화 기초로') : null);
+const printHome = () => { const q = new URLSearchParams(location.search); q.delete('from'); q.delete('lesson'); return `../print/index.html${q.toString() ? '?' + q : ''}#/`; };
+const backOut = () => (FROM === 'ink' ? h('a', { class: 'btn small back-ink', href: inkHome() }, '🖌 먹 연구소로') : FROM === 'wc' ? h('a', { class: 'btn small back-ink', href: wcLesson() }, '🎨 수채화 기초로')
+  : FROM === 'print' ? h('a', { class: 'btn small back-ink', href: printHome() }, '🪞 판화 놀이로') : null);
 let current = null, progress = {};
 
 const ctx = {
