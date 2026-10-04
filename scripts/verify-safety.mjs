@@ -70,7 +70,8 @@ if (exists('kiosk.js')) {
   const k = read('kiosk.js');
   // [SYNC-MERGE-2] 같은 pendingRewards 한 갈래지만, 배열 통째 set 대신 id 합치기 transaction(신청·취소 2건).
   //   배열 통째 set 이 다시 생기면(그사이 승인한 보상 되살림·막 넣은 신청 지움) FAIL.
-  const partial = countMatches(k, /\/pendingRewards'\)\.transaction\(/g);
+  //   [TX-RETRY-1] transaction 은 DB.prTransaction(그 pendingRewards ref, 일감) 으로 보낸다(끊기면 같은 일감으로 다시) — 맨 transaction 도 셈.
+  const partial = countMatches(k, /\/pendingRewards'\)\.transaction\(/g) + countMatches(k, /DB\.prTransaction\([^;]*\/pendingRewards'\)\s*,/g);
   const arraySet = countMatches(k, /\/pendingRewards'\)\.set\(/g);
   const fullSet = countMatches(k, /child\('students\/'\+s\.id\)\.set\(s\)/g);
   if (partial === 2 && arraySet === 0 && fullSet === 0) {

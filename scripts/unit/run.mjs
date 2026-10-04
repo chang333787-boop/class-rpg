@@ -2019,6 +2019,101 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'gamedata 끊김 다시 돌리기 · 승인 한 쓰기(TX-RETRY-1 · APPROVE-ATOMIC-1)';
+try {
+  //  SDK 9.23 은 보낸 transaction 이 답 전에 끊기면 Error('disconnect') 로 끝내고 다시 안 보낸다 — 같은 일감으로 다시 돌리는지.
+  //  승인은 students/<id> transaction 하나 · 보상이 서버에 있을 때만. 여러 기기·실제 흐름은 gold-sync-sim X1~X6·D2·F3.
+  const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB; globalThis.__U = Utils;', sb);
+  const DB = sb.__DB, U = sb.__U;
+  //  가짜 ref — transaction 은 script 에서 한 걸음씩(Error 면 그 오류로 끝 · 아니면 그 결과) · 일감 fn 은 남겨 둔다
+  const log = [], script = [];
+  const mkRef = (p) => ({ child: (k) => mkRef(p ? p + '/' + k : k),
+    update: (v) => { log.push(['update', p, JSON.parse(JSON.stringify(v))]); return Promise.resolve(); },
+    set: () => { log.push(['set', p]); return Promise.resolve(); },
+    transaction: (fn) => { log.push(['tx', p, fn]); const st = script.shift(); return st instanceof Error ? Promise.reject(st) : Promise.resolve(st || { committed: true, snapshot: { val: () => ({}) } }); } });
+  DB._fbRef = mkRef('');
+  const settle = (p) => p.then(v => ['ok', v && v.committed], e => ['err', e.code || e.message]);
+  const txs = () => log.filter(c => c[0] === 'tx').length;
+
+  script.push(new Error('disconnect'));
+  const r1 = await settle(DB.prTransaction(mkRef('students/s1/pendingRewards'), { add: [{ id: 'a' }] }));
+  const n1 = txs(); log.length = 0;
+  test("보상 transaction 이 'disconnect' 로 끝나면 같은 일감으로 다시 → 성공", () => eq([r1, n1], [['ok', true], 2]));
+  script.push(new Error('PERMISSION_DENIED'));
+  const r2 = await settle(DB.prTransaction(mkRef('students/s1/pendingRewards'), { add: [{ id: 'a' }] }));
+  const n2 = txs(); log.length = 0;
+  test('권한 거부는 다시 안 돌림(그대로 실패)', () => eq([r2, n2], [['err', 'PERMISSION_DENIED'], 1]));
+  for (let i = 0; i < 9; i++) script.push(new Error('disconnect'));
+  const r3 = await settle(DB.prTransaction(mkRef('students/s1/pendingRewards'), { add: [{ id: 'a' }] }));
+  const n3 = txs(); log.length = 0; script.length = 0;
+  test(`계속 끊기면 ${DB.TX_RETRY}번까지만 다시(무한 반복 없음)`, () => eq([r3, n3], [['err', 'disconnect'], DB.TX_RETRY + 1]));
+
+  //  승인 모양 저장(골드 더하기 + 보상 빼기)
+  const stu = (o) => ({ id: 's1', name: '가', level: 1, exp: 0, gold: 100, totalGold: 100, pendingRewards: [{ id: 'rw', gold: 50, exp: 0 }], ...o });
+  const approve = (opt, exp = 0) => {
+    DB._cache = null; DB._stuRaw = {}; DB._stuBase = {};   // 판마다 새로 받은 것처럼(앞 판 객체를 이어 쓰지 않게)
+    DB._cache = DB._ingest({ students: { s1: stu() } });
+    const s = DB.getStudent('s1');
+    s.gold += 50; s.totalGold += 50; s.exp += exp; s.level = U.levelFromExp(s.exp); s.pendingRewards = [];
+    return DB.saveStudent(s, opt);
+  };
+  const lv2 = U.expForLevel(2);
+  const pa = settle(approve({ atomic: true }, lv2));
+  const c = log.splice(0);
+  const fn = c[0] && c[0][2];
+  const onSrv = fn && fn({ id: 's1', gold: 130, totalGold: 130, exp: 5, level: 1, pendingRewards: [{ id: 'rw' }, { id: 'other' }], job: '남이 고침' });
+  const onGone = fn && fn({ id: 's1', gold: 130, totalGold: 130, exp: 5, level: 1, pendingRewards: [{ id: 'other' }] });
+  await pa;
+  test('승인(atomic): students/<id> transaction 하나 — update·보상 transaction 따로 없음', () => eq(c.map(x => [x[0], x[1]]), [['tx', 'students/s1']]));
+  test('승인 일감 = 서버 값 + 골드·EXP 더하기 + 그 보상만 빼기 · 레벨은 합친 EXP 로 · 남의 칸 그대로', () =>
+    eq([onSrv.gold, onSrv.totalGold, onSrv.exp, onSrv.level, onSrv.pendingRewards, onSrv.job], [180, 180, lv2 + 5, U.levelFromExp(lv2 + 5), [{ id: 'other' }], '남이 고침']));
+  test('보상이 서버에 이미 없으면(다른 기기가 먼저 승인) 일감이 아무것도 안 바꿈(undefined = 그만)', () => eq(onGone, undefined));
+  script.push({ committed: false, snapshot: { val: () => ({}) } });
+  const r4 = await settle(approve({ atomic: true })); log.length = 0;
+  test("이미 처리된 보상이면 code 'REWARD_GONE' 으로 실패(관리 화면이 '이미 다른 곳에서 처리' 로 알림)", () => eq(r4, ['err', 'REWARD_GONE']));
+  script.push(new Error('disconnect'), { committed: false, snapshot: { val: () => ({}) } });
+  const r5 = await settle(approve({ atomic: true })); const n5 = txs(); log.length = 0;
+  test("끊긴 뒤 다시 돌렸더니 보상이 없음 = 내 첫 쓰기가 들어간 것 → 승인 끝(두 번 안 줌)", () => eq([r5[0], n5], ['ok', 2]));
+  script.push(new Error('maxretry'));
+  const r6 = await settle(approve({ atomic: true })); const c6 = log.splice(0).map(x => [x[0], x[1]]);
+  test("'maxretry'(학생이 아주 잦게 저장) → 예전 방식(바뀐 칸 update + 보상 transaction)으로", () =>
+    eq([r6[0], c6], ['ok', [['tx', 'students/s1'], ['update', 'students/s1'], ['tx', 'students/s1/pendingRewards']]]));
+  await approve(); const c7 = log.splice(0).map(x => [x[0], x[1]]);
+  test('atomic 없이(학생 기기 저장)는 그대로 바뀐 칸 update + 보상 transaction', () => eq(c7, [['update', 'students/s1'], ['tx', 'students/s1/pendingRewards']]));
+} catch (e) {
+  test('다시 돌리기·승인 한 쓰기를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = 'CUR 별칭 검사(CUR-ALIAS-CHECK-1)';
+try {
+  //  scripts/unit/cur-alias-check.mjs 가 '비동기 경계 뒤 옛 CUR 별칭 고침'을 잡고, 경계 앞에서만 쓰는 별칭은 안 잡는지 — 시험 폴더로
+  const { spawnSync } = await import('node:child_process');
+  const os = await import('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cur-alias-'));
+  fs.mkdirSync(path.join(dir, 'student'));
+  fs.writeFileSync(path.join(dir, 'student.html'), '<script src="./student.js?v=1"></script><script src="./student/x.js?v=1"></script>');
+  fs.writeFileSync(path.join(dir, 'student.js'), [
+    'function good() {', '  const s = CUR;', '  s.gold += 1;', '  DB.saveStudent(CUR);', '  setTimeout(() => renderHUD(), 10);', '}',
+    'async function bad1() {', '  const s = CUR;', '  await sleep(300);', '  s.gold += 7;', '  DB.saveStudent(CUR);', '}', ''].join('\n'));
+  fs.writeFileSync(path.join(dir, 'student/x.js'), [
+    'function bad2() {', '  const prev = CUR;', '  CUR = friend;', '  img.onload = () => { draw(); CUR = prev; };', '}',
+    'function good2() {', '  const me = CUR;', '  fetch(u).then(r => { CUR.title = r.t; DB.saveStudent(CUR); });', '}', ''].join('\n'));
+  const run = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts/unit/cur-alias-check.mjs'), ...extra], { env: { ...process.env, CUR_ALIAS_ROOT: dir }, encoding: 'utf8' });
+  const o1 = run([]), o2 = run(['--baseline', '2']);
+  fs.rmSync(dir, { recursive: true, force: true });
+  const names = [...o1.stdout.matchAll(/ ([\w$]+)\(\) — '/g)].map(m => m[1]);
+  test('비동기 경계 뒤 옛 별칭 고침(await 뒤 s.gold · onload 안 CUR = prev)은 잡고, 경계 앞에서만 쓰거나 CUR 을 다시 읽는 곳은 안 잡음', () =>
+    eq([names, o1.status], [['bad1', 'bad2'], 1]));
+  test('기준선까지는 통과(--baseline 2)', () => eq(o2.status, 0));
+} catch (e) {
+  test('CUR 별칭 검사를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);

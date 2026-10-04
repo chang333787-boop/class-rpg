@@ -1271,7 +1271,8 @@ function approveReward(student, reward) {
 //   '승인 완료' 알림이 서버 저장 전에 떴다 — 인터넷이 끊겨도 완료라고 나왔다.
 //   saveStudent 가 부르는 students/<id> 쓰기(set·update)의 약속을 그 순간에만 옆에서 받아 돌려준다. 쓰기는 한 번 그대로.
 //   saveStudent 가 나중에 약속을 돌려주게 바뀌면 그것을 그대로 쓴다.
-function saveStudentAwait(s) {
+//   [APPROVE-ATOMIC-1] opt 는 DB.saveStudent 로 그대로 넘긴다(승인 = { atomic: true } → students/<id> transaction 하나).
+function saveStudentAwait(s, opt) {
   const ref = DB._fbRef, want = 'students/' + s.id;
   let got = null;
   const canHook = !!(ref && typeof ref.child === 'function');
@@ -1289,13 +1290,15 @@ function saveStudentAwait(s) {
     };
   }
   let ret;
-  try { ret = DB.saveStudent(s); }
+  try { ret = DB.saveStudent(s, opt); }
   finally { if (canHook) { if (own) ref.child = origChild; else delete ref.child; } }
   if (ret && typeof ret.then === 'function') return ret;
   return got && typeof got.then === 'function' ? got : Promise.resolve();
 }
 
 // [APPROVE-AWAIT-1] 저장 약속들이 끝난 뒤 알린다. 8초가 지나도 안 끝나면 '아직 저장 중' 을 한 번 알린다(오프라인이면 SDK 가 계속 기다린다).
+//   [APPROVE-ATOMIC-1] onDone(실패 수, 전체 수, 이미 처리된 보상 수) — 셋째 = 승인 저장이 '이미 다른 곳에서 처리된 보상'이라
+//   아무것도 안 바꾼 수(DB._stuSendAtomic 의 REWARD_GONE · 실패 수에 들어 있다)
 function afterSaves(promises, onDone) {
   const list = (promises || []).map(p => Promise.resolve(p));
   let finished = false;
@@ -1303,7 +1306,8 @@ function afterSaves(promises, onDone) {
   return Promise.allSettled(list).then(rs => {
     finished = true; clearTimeout(slow);
     const failed = rs.filter(r => r.status === 'rejected').length;
-    onDone(failed, rs.length);
+    const gone = rs.filter(r => r.status === 'rejected' && r.reason && r.reason.code === 'REWARD_GONE').length;
+    onDone(failed, rs.length, gone);
     return failed;
   });
 }
@@ -1316,12 +1320,14 @@ function approveSingle(studentId, rewardId, opts) {
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
   if (!reward) { notify('이미 처리된 보상이에요', 'error'); renderAll(); return Promise.resolve(false); }
   approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
-  const saved = saveStudentAwait(s);
+  //  [APPROVE-ATOMIC-1] 보상 빼기 + 골드·EXP 를 한 쓰기로 — 보상이 서버에 아직 있을 때만(다른 기기가 먼저 승인했으면 아무것도 안 함)
+  const saved = saveStudentAwait(s, { atomic: true });
   renderAll();
   if (opts && opts.quiet) return saved;   // 묶음 승인(approveAllByQuest)은 끝에 한 번만 알린다
   // [APPROVE-AWAIT-1] 저장이 끝난 뒤에 알린다. 실패면 실패 안내.
-  return afterSaves([saved], failed => {
-    if (failed) notify(`⚠️ ${s.name} · ${reward.label} 승인 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error');
+  return afterSaves([saved], (failed, n, gone) => {
+    if (gone) notify(`ℹ️ ${s.name} · ${reward.label} 은(는) 이미 다른 곳에서 처리된 보상이에요 — 한 번만 지급했어요`, 'error');
+    else if (failed) notify(`⚠️ ${s.name} · ${reward.label} 승인 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error');
     else notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
   }).then(failed => !failed);
 }
@@ -1364,14 +1370,15 @@ function approveAll() {
     go.forEach(r => approveReward(s, r));
     // 승인한 것은 즉시 제거 — 남긴 것(작품·독서록)만 그대로 둔다
     s.pendingRewards = held;
-    saves.push(saveStudentAwait(s));
+    saves.push(saveStudentAwait(s, { atomic: true }));   // [APPROVE-ATOMIC-1] 학생마다 한 쓰기 · 승인할 보상이 다 있을 때만
     count += go.length;
   });
   renderAll();
   // [APPROVE-AWAIT-1] 저장이 끝난 뒤에 알린다
-  return afterSaves(saves, (failed, n) => {
+  return afterSaves(saves, (failed, n, gone) => {
     const tail = skipped ? ` · 따로 확인할 것 ${skipped}건(작품·독서록)` : '';
-    if (failed) notify(`⚠️ ${n}명 중 ${failed}명 저장 실패 — 새로고침 뒤 다시 확인해 주세요${tail}`, 'error');
+    const goneTail = gone ? ` · ${gone}명은 이미 다른 곳에서 처리돼 그대로 둠` : '';
+    if (failed) notify(`⚠️ ${n}명 중 ${failed}명 저장 안 됨 — 새로고침 뒤 다시 확인해 주세요${goneTail}${tail}`, 'error');
     else notify(`✅ ${count}개 전체 승인 완료!${tail}`);
   });
 }
@@ -1536,11 +1543,13 @@ function gridApprove(studentId, rewardId) {
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId);
   if (!reward) return;
   approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
-  const saved = saveStudentAwait(s);   // [APPROVE-AWAIT-1]
+  const saved = saveStudentAwait(s, { atomic: true });   // [APPROVE-AWAIT-1] · [APPROVE-ATOMIC-1] 한 쓰기 · 보상이 있을 때만
   renderApproveGrid();
   renderApproveList();
   renderDashboard();
-  afterSaves([saved], failed => failed
+  afterSaves([saved], (failed, n, gone) => gone
+    ? notify(`ℹ️ ${s.name} · ${reward.label} 은(는) 이미 다른 곳에서 처리된 보상이에요 — 한 번만 지급했어요`, 'error')
+    : failed
     ? notify(`⚠️ ${s.name} · ${reward.label} 승인 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error')
     : notify(`✅ ${s.name} · ${reward.label} 승인!`));
 }
@@ -2451,7 +2460,7 @@ function approveArtwork(studentId, rewardId) {
   approveReward(s, reward);
   // 작품은 승인 즉시 pendingRewards에서 제거 (학생 받기 버튼 불필요)
   s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId);
-  DB.saveStudent(s);
+  DB.saveStudent(s, { atomic: true });   // [APPROVE-ATOMIC-1] 보상 빼기 + 골드·EXP 한 쓰기 · 보상이 있을 때만
   renderAll();
   notify(`✅ ${s.name} · "${reward.artTitle||reward.label}" 전시 완료!`);
 }

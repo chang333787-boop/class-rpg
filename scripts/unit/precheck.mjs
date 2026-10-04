@@ -11,9 +11,10 @@
 //              (student.js·student/*.js·student.css·student.html·scripts/unit/deco-save-count/)을 고친 PR 이면 저절로 돈다. --no-deco 로 끈다.
 //    --save-order-baseline N   save-order-check 기준선(기본 11 = 2026-09-15 main). 새 자리가 늘면 FAIL.
 //
-//  기본으로 도는 것: smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle ·
+//  기본으로 도는 것: smoke · verify-safety · unit · buster-check · whole-set · save-order · cur-alias · char-combo · deco-bundle ·
 //    global-dup · deco-lazy · 자기검사 시뮬 다섯(esc-parity 포함) · 밸런스 둘 · 하위 앱 시험(scripts/unit/**/*.test.mjs, 저절로 모음).
 //    2026-10-04 기준(--no-deco · R6 deco-lazy 포함): PASS 25 · REVIEW 1(save-order 11곳 기준선) · FAIL 0 · SKIP 1 · 약 15초.
+//    (PR #1162 뒤 cur-alias 가 하나 더해져 PASS 26)
 //
 //  판정: 하나라도 FAIL(exit≠0)이면 exit 1. 골드 검사는 **수정 전 main 에서 LOSS 가 정상**이라
 //        --gold 는 기본 REVIEW(기록만)이고, `--gold-strict` 를 주면 --expect-fixed 로 돌려 FAIL 로 셈한다.
@@ -39,6 +40,8 @@ const CHECKS = [
   { name: 'buster-check', file: 'scripts/unit/buster-check.mjs',     args: [BASE, 'HEAD'],                    pick: /요약:[^\n]*/ },
   { name: 'whole-set',    file: 'scripts/unit/whole-set-check.mjs',  args: [],                                pick: /요약:[^\n]*/ },
   { name: 'save-order',   file: 'scripts/unit/save-order-check.mjs', args: ['--baseline', SAVE_BASELINE],     pick: /요약:[^\n]*/ },
+  // [CUR-ALIAS-CHECK-1] 비동기 경계(await·setTimeout·then…) 뒤에 옛 CUR 별칭을 고치는 자리 — 받은 판마다 학생이 새 객체라 그 고침이 안 나간다(PR #1162 검토 #7)
+  { name: 'cur-alias',    file: 'scripts/unit/cur-alias-check.mjs',  args: ['--baseline', '0'],                pick: /요약:[^\n]*/ },
   // [CHAR-COMBO-CHECK-1] 캐릭터 종이인형 84장 조립 규칙(잘림·뚫림·무기-모자 닿음). assets/char 를 고친 PR 은 여기서 잡힌다.
   { name: 'char-combo',   file: 'scripts/unit/char-combo-check.mjs', args: [],                                pick: /요약:[^\n]*/ },
   // [DECO-BUNDLE-1] 꾸미기 그림 묶음(assets/deco/bundle/art.json)이 assets/deco·floor·farm 의 SVG 와 같은가. 그림을 고친 PR 은

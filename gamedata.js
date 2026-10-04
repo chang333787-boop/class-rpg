@@ -1277,7 +1277,13 @@ const DB = {
   //   관리 화면이 '승인 완료' 알림을 저장 뒤에 띄울 때 쓴다(쓰기가 update·transaction 여럿일 수 있어 한 약속으로 묶는다).
   STU_COUNTERS: ['gold', 'totalGold', 'exp'],
 
-  saveStudent(student) {
+  //  opt.atomic: 교사 승인 — 보상 빼기와 골드·EXP 더하기를 students/<id> transaction 하나로(_stuSendAtomic).
+  //
+  //  ⚠️ CUR 별칭 규칙(검토 #7): 받은 판마다 학생은 **새 객체**다(_stuAdopt) — 자기 저장 뒤에도 곧 CUR 이 새 객체로 바뀐다.
+  //   그래서 `const s = CUR` 로 잡아 두고 await·setTimeout·then 을 건넌 뒤 s 를 고치면, 그 고침은 saveStudent(CUR)(새 객체)로는
+  //   안 나간다. 비동기 경계 뒤에는 CUR 을 다시 읽어 고칠 것(옛 객체를 saveStudent(옛 객체)로 저장하면 _stuNext 로 넘겨지긴 한다).
+  //   검사: scripts/unit/cur-alias-check.mjs(precheck 'cur-alias').
+  saveStudent(student, opt) {
     // 받은 판에 밀린 옛 객체면: 밀린 뒤에 그 객체에서 고친 것만 이은 객체(지금 캐시)에 얹고, 이은 객체를 저장한다.
     //   옛 객체 자신은 안 바꾼다(콜백이 그 옛 값과 새 값을 견준다). 밀릴 때의 고침은 이미 이은 객체가 넘겨받았다.
     if (this._stuNext.has(student)) {
@@ -1288,7 +1294,7 @@ const DB = {
         this._assign(next, this._stuApply(next, late));
         this._stuOrigin.set(student, this._clone(student));
       }
-      return this.saveStudent(next);
+      return this.saveStudent(next, opt);
     }
     const db = this.load();
     const idx = db.students.findIndex(s => s.id === student.id);
@@ -1310,14 +1316,83 @@ const DB = {
     const expected = this._stuApply(this._stuBase[student.id] || origin, ops);
     // 레벨: 경험치를 더하기로 보낼 때, 이 기기가 레벨을 경험치로 맞춰 쓰는 중이면 **합친 경험치**로 다시 맞춘다
     //   (두 곳이 동시에 경험치를 더해 문턱을 넘으면 각자 낮은 레벨을 쓰던 자리)
-    if (ops.inc.exp !== undefined && typeof Utils !== 'undefined' && student.level === Utils.levelFromExp(student.exp)) {
+    const levelTrack = ops.inc.exp !== undefined && typeof Utils !== 'undefined' && student.level === Utils.levelFromExp(student.exp);
+    if (levelTrack) {
       const lv = Utils.levelFromExp(expected.exp);
       if (lv !== expected.level) { expected.level = lv; ops.set.level = lv; }
     }
     this._assign(student, this._clone(expected));   // 이 객체도 서버 최신 + 내 고침으로(그사이 온 남의 변경 포함)
     this._stuOrigin.set(student, expected);
     this._stuBase[student.id] = expected;
-    return this._opsEmpty(ops) ? Promise.resolve() : this._stuSend(student.id, ops);
+    if (this._opsEmpty(ops)) return Promise.resolve();
+    if (opt && opt.atomic && ops.pr && ops.pr.del.length) return this._stuSendAtomic(student.id, ops, levelTrack);
+    return this._stuSend(student.id, ops);
+  },
+
+  // ── [TX-RETRY-1] transaction 다시 돌리기 ─────────────────────
+  //  SDK 9.23: 보내 놓고 답을 못 받은 transaction 은 연결이 끊기면 'disconnect' 로 끝내고 **다시 보내지 않는다**
+  //   (PersistentConnection.cancelSentTransactions_). 보통 쓰기(set·update·increment)는 다시 이어질 때 다시 보낸다(restoreState_).
+  //   그래서 교사 승인의 골드(update)만 들어가고 보상 빼기(transaction)는 취소돼 보상이 되살아나거나(두 번 승인),
+  //   서버엔 들어간 신청이 실패로 보여 아이가 다시 신청했다.
+  //  같은 일감으로 다시 돌린다 — 보상 일감은 id 합치기(있으면 안 더함·없으면 안 뺌), 승인 transaction 은 '보상이 있을 때만'이라
+  //   이미 서버에 들어간 것을 다시 돌려도 한 번 돈 것과 같다. 끊긴 동안 시작한 transaction 은 SDK 가 다시 이어질 때 보낸다.
+  //  'set': 이 기기의 다른 쓰기가 같은 자리를 덮어 SDK 가 버린 것(서버엔 안 들어감) — 이것도 다시 돈다.
+  TX_RETRY: 5,
+  _txRetry(ref, fn, left, onRetry) {
+    const n = left == null ? this.TX_RETRY : left;
+    return ref.transaction(fn).catch(e => {
+      const why = e && e.message;
+      if (n > 0 && (why === 'disconnect' || why === 'set')) {
+        if (onRetry) onRetry(why);
+        return this._txRetry(ref, fn, n - 1, onRetry);
+      }
+      throw e;
+    });
+  },
+  //  pendingRewards id 합치기 transaction — 학생 저장·addPendingReward·키오스크 신청/취소·수채화 작품 제출이 모두 이것을 쓴다.
+  //   ref = 그 학생의 pendingRewards 자리(키오스크·수채화는 자기 ref 를 넘긴다) · ops = _prApply 일감
+  prTransaction(ref, ops) {
+    return this._txRetry(ref, cur => this._prApply(cur, ops)).then(r => {
+      if (r && r.committed === false) throw new Error('[SYNC-MERGE-2] pendingRewards 합치기를 못 함');
+      return r;
+    });
+  },
+
+  // ── [APPROVE-ATOMIC-1] 승인 = students/<id> transaction 하나 ──────────
+  //  예전(바뀐 칸 update + 보상 transaction 둘)은 하나만 실패하면 골드만 들어가고 보상이 남거나(두 번 승인),
+  //   보상만 빠지고 골드가 안 들어갔다(검토 F2). 이제 **빼려는 보상이 서버에 모두 있을 때만** 빼면서 골드·EXP·그 밖을 함께 얹는다.
+  //  보상이 이미 없으면(다른 탭·다른 기기가 먼저 승인 · 학생이 취소) 아무것도 안 바꾸고 code 'REWARD_GONE' 으로 실패 —
+  //   같은 보상을 두 번 주지 않는다(검토 D2 교사 두 기기). 'disconnect'·'set' 이면 같은 일감으로 다시(_txRetry · 이미 들어갔으면 보상이 없어 멈춤).
+  //  학생 기록 전체를 보내는 쓰기라(예전 통째 set 과 같은 크기) 승인에만 쓴다. 학생 기기가 아주 잦게 저장해 SDK 가 25번 다시 해도
+  //   못 맞추면('maxretry' — 서버엔 안 들어감) 바뀐 칸 update + 보상 transaction 으로 보낸다.
+  _stuSendAtomic(id, ops, levelTrack) {
+    const ref = this._fbRef.child('students/' + id);
+    const gate = ops.pr.del.slice();
+    const gone = () => { const e = new Error('REWARD_GONE: 이미 처리된 보상이라 아무것도 안 바꿈'); e.code = 'REWARD_GONE'; return e; };
+    const fn = cur => {
+      if (cur == null) return null;   // 이 기기에 아직 값이 없을 때 — SDK 가 서버 값과 다르면 서버 값으로 다시 부른다
+      const have = new Set(this._prList(cur.pendingRewards).map(r => this._prKey(r)));
+      if (gate.some(k => !have.has(k))) return;   // 이미 없음 → 그만(아무것도 안 바꿈)
+      const out = this._stuApply(cur, ops);
+      if (levelTrack && typeof Utils !== 'undefined') out.level = Utils.levelFromExp(out.exp);
+      return out;
+    };
+    let retried = null;
+    const p = this._txRetry(ref, fn, null, why => { retried = why; }).then(r => {
+      if (!r || r.committed === false || (r.snapshot && typeof r.snapshot.val === 'function' && r.snapshot.val() == null)) {
+        //  끊김('disconnect') 뒤 다시 돌렸더니 보상이 없음 = 거의 늘 **내 첫 쓰기가 서버에 들어갔는데 답만 못 받은 것** → 승인 끝으로 본다
+        //   (드물게 그 몇 초 사이 다른 기기가 승인했거나 학생이 취소했어도 두 번 주지는 않는다 — 설계 문서 '남은 위험')
+        if (retried === 'disconnect') { console.warn('[APPROVE-ATOMIC-1] 끊긴 뒤 다시 보니 이미 들어가 있음:', id); return r; }
+        throw gone();
+      }
+      return r;
+    }, e => {
+      if (e && e.message === 'maxretry') return this._stuSend(id, ops).catch(e2 => { if (e2 && typeof e2 === 'object') e2._told = true; throw e2; });   // _stuSend 가 이미 알림
+      throw e;
+    });
+    //  REWARD_GONE 은 저장 실패가 아니라 일부러 안 바꾼 것 — '인터넷 연결 확인' 알림 대신 승인 화면이 따로 알린다
+    p.catch(e => { if (e && e.code === 'REWARD_GONE') console.warn('[APPROVE-ATOMIC-1]', id, e.message); else if (!(e && e._told)) this._onSaveError(e); });
+    return p;
   },
 
   //  보낼 일감 → 쓰기. 셈 칸은 increment, 그 밖은 칸 update, 보상은 id 합치기 transaction.
@@ -1334,12 +1409,7 @@ const DB = {
         else ps.push(this._fbRef.child('students/' + id + '/' + k).transaction(v => ((typeof v === 'number' && isFinite(v)) ? v : 0) + d));
       }
       if (Object.keys(up).length) ps.push(ref.update(up));
-      if (ops.pr) {
-        const pr = ops.pr;
-        ps.push(this._fbRef.child('students/' + id + '/pendingRewards').transaction(cur => this._prApply(cur, pr)).then(r => {
-          if (r && r.committed === false) throw new Error('[SYNC-MERGE-2] pendingRewards 합치기를 못 함');
-        }));
-      }
+      if (ops.pr) ps.push(this.prTransaction(this._fbRef.child('students/' + id + '/pendingRewards'), ops.pr));
     } catch (e) { this._onSaveError(e); }
     const all = Promise.all(ps);
     all.catch(e => this._onSaveError(e));
@@ -1405,11 +1475,11 @@ const DB = {
   // ── [SYNC-MERGE-2] pendingRewards id 합치기 (배열 모양 그대로) ──
   //  열쇠 = 보상 id(옛 보상에 id 가 없으면 내용 전체). 순수 함수 — 키오스크·수채화도 transaction 안에서 부른다(DB 상태 안 씀).
   _prKey(r) { return (r && typeof r === 'object' && r.id != null && r.id !== '') ? 'i:' + r.id : 'j:' + this._canon(r); },
+  _prList(v) { return (v == null ? [] : Array.isArray(v) ? v : Object.values(v)).filter(x => x != null); },
   _prDiff(a, b) {
-    const arr = v => (v == null ? [] : Array.isArray(v) ? v : Object.values(v)).filter(x => x != null);
     const am = new Map(), bm = new Map();
-    for (const r of arr(a)) am.set(this._prKey(r), r);
-    for (const r of arr(b)) bm.set(this._prKey(r), r);
+    for (const r of this._prList(a)) am.set(this._prKey(r), r);
+    for (const r of this._prList(b)) bm.set(this._prKey(r), r);
     const del = [], add = [], put = [];
     for (const k of am.keys()) if (!bm.has(k)) del.push(k);
     for (const [k, r] of bm) {
@@ -1420,7 +1490,7 @@ const DB = {
   },
   //  서버의 지금 목록(cur)에 일감을 얹은 새 배열. del: 열쇠로 빼기 · drop: 조건으로 빼기 · put: 있으면 바꾸기(없으면 안 살림) · add: 없으면 더하기
   _prApply(cur, ops) {
-    let list = (cur == null ? [] : Array.isArray(cur) ? cur : Object.values(cur)).filter(x => x != null);
+    let list = this._prList(cur);
     if (!ops) return list;
     if (ops.del && ops.del.length) { const d = new Set(ops.del); list = list.filter(r => !d.has(this._prKey(r))); }
     if (typeof ops.drop === 'function') list = list.filter(r => !ops.drop(r));
@@ -1755,9 +1825,8 @@ const DB = {
     const ops = { set: {}, inc: {}, pr };
     for (const o of new Set([s, student])) { const og = this._stuOrigin.get(o); if (og) this._stuOrigin.set(o, this._stuApply(og, ops)); }
     if (this._stuBase[s.id]) this._stuBase[s.id] = this._stuApply(this._stuBase[s.id], ops);
-    return this._fbRef.child('students/' + s.id + '/pendingRewards').transaction(cur => this._prApply(cur, pr))
-      .then(r => { if (r && r.committed === false) throw new Error('[SYNC-MERGE-2] pendingRewards 합치기를 못 함'); })
-      .catch(e => this._onSaveError(e));
+    return this.prTransaction(this._fbRef.child('students/' + s.id + '/pendingRewards'), pr)
+      .then(() => {}).catch(e => this._onSaveError(e));
   },
 
   // [ARTFREE-1] 좋아요 — artworks/<id>/likes/<studentId> 한 칸만 쓴다(작품 통짜 set 금지).

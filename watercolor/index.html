@@ -16,7 +16,7 @@ document.write('<script src="course_' + COURSE_KEY + '.js?v=20261004g4a"><\/scri
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="../gamedata.js?v=20261004g3a"></script>
+<script src="../gamedata.js?v=20261004g3b"></script>
 <style>
   /* 디자인 톤: 영어 복습앱(Warm Paper v2)과 통일 — 종이색 배경, 흰 카드, 코랄 포인트, 세이지 완료, Jua 큰 제목 + Pretendard 본문 */
   :root { --paper:#f8f6f1; --paper-2:#f1ede4; --ink:#2a2420; --card:#fff; --line:rgba(60,45,30,.10); --line-2:rgba(60,45,30,.18);
@@ -276,8 +276,9 @@ async function rpgSubmitArtwork(L, dataUrl){
     artTitle: COURSE.short + ' ' + L.id + '. ' + L.title, artDesc: why || ('기법: ' + L.tech), artUrl:url, subject:'미술', exp:30, gold:20, icon:'🎨', date: Utils.todayStr() };
   const key = await rpgStudentKey(student);
   /* [SYNC-MERGE-2] 배열 통째 set → 이 작품 신청 하나만 id 로 더하는 transaction(서버의 지금 목록 위에).
-     이 창 캐시가 낡아도 그사이 교사가 승인해 뺀 보상을 되살리거나(두 번 지급) 다른 신청을 지우지 않는다 */
-  await firebase.database().ref(DB.KEY + '/students/' + key + '/pendingRewards').transaction(cur => DB._prApply(cur, { add: [reward] }));
+     이 창 캐시가 낡아도 그사이 교사가 승인해 뺀 보상을 되살리거나(두 번 지급) 다른 신청을 지우지 않는다.
+     [TX-RETRY-1] 연결이 끊겨 'disconnect' 로 끝나면 같은 일감으로 다시(DB.prTransaction · id 합치기라 하나만) */
+  await DB.prTransaction(firebase.database().ref(DB.KEY + '/students/' + key + '/pendingRewards'), { add: [reward] });
 }
 
 let student = localStorage.getItem('wc.student'), studentName = localStorage.getItem('wc.studentName') || '';

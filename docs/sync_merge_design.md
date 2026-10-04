@@ -47,49 +47,82 @@
 - 서버 원문이 지난번과 같은 학생은 건너뛴다(원문 JSON 문자열 비교 — 반 전체 학생을 매번 다시 재지 않게).
 - **저장 창(`_saving`) 동안에도** 학생 기록·settings 는 바로 반영하고(R2), 나머지 노드는 창이 닫힐 때(`_endSaving`) 그 사이 마지막 판으로 바꾼다(버리지 않는다). 창을 여는 곳: 작품 고치기·설정 저장·비번 초기화 요청(4곳, 그대로).
 
-### 2-4 교사 승인도 같은 원리
-`approveReward`(admin.js)는 고치지 않는다. 교사 캐시 객체에 `exp/gold/totalGold` 를 더하고 보상을 빼고 `saveStudent` → 위 2-2 로 `increment` + 보상 id 빼기 transaction + 바뀐 칸(stats·books·totalQuests·level). 학생이 그사이 번 골드·새 신청은 그대로 남는다.
+### 2-4 교사 승인 = `students/<id>` transaction 하나 (APPROVE-ATOMIC-1 · 검토 #2)
+`approveReward`(admin.js)는 고치지 않는다(교사 캐시 객체에 `exp/gold/totalGold` 를 더하고 보상을 빼고 stats·books·totalQuests·level 을 바꾼다).
+승인 네 곳(`approveSingle`·`approveAll`·`gridApprove`·`approveArtwork`, `approveAllByQuest` 는 approveSingle)이 `saveStudent(s, { atomic: true })` 로 저장하면
+`_stuSendAtomic` 이 2-2 와 같은 일감(셈 칸 차이 · 바뀐 칸 · 보상 id 빼기)을 **`students/<id>` transaction 하나**로 서버의 그때 값 위에 얹는다(레벨은 합친 EXP 로 다시).
+- **빼려는 보상이 서버에 모두 있을 때만** 바꾼다. 이미 없으면(다른 탭·다른 기기가 먼저 승인 · 학생이 취소) 아무것도 안 바꾸고 `code 'REWARD_GONE'` → 관리 화면이 "이미 다른 곳에서 처리된 보상이에요 — 한 번만 지급했어요". 같은 보상을 두 번 주지 않는다(검토 D2: 전 1100 → 후 1050).
+- 하나라서 반만 들어가는 일이 없다(검토 F2: 전 = update 만 거부되면 보상은 빠지고 골드 그대로 → 후 = 거부되면 둘 다 그대로).
+- 끊김(`disconnect`)·`set` 이면 같은 일감으로 다시(2-5). 끊긴 뒤 다시 돌렸더니 보상이 이미 없으면 = 거의 늘 내 첫 쓰기가 들어간 것 → 승인 끝으로 본다.
+- 학생 기록 전체를 보내는 쓰기다(예전 통째 set 과 같은 크기) — 그래서 승인에만 쓴다. 학생이 아주 잦게 저장해 SDK 가 25번 다시 해도 못 맞추면(`maxretry`, 서버엔 안 들어감) 2-2 방식(바뀐 칸 update + 보상 transaction)으로 보낸다.
+- 반려(`rejectSingle`)는 보상 빼기만이라 2-2 의 보상 transaction 그대로.
 
 ### 2-5 다른 pendingRewards 쓰기
 - `DB.addPendingReward` → 그 보상 하나 id 더하기 transaction(+ 출신·기준에 "보냄"으로 적어, 교사 승인 뒤 되살아나지 않게).
 - 키오스크 신청 → id 더하기 transaction · 취소 → 그 퀘스트 신청 빼기 transaction(서버 지금 목록 위). 화면 먼저 반영·실패 때 되돌림은 그대로.
 - 수채화 작품 제출 → id 더하기 transaction.
-- 합치기 규칙은 순수 함수 `DB._prApply(목록, {add, del, put, drop})` 하나(키오스크·수채화도 이걸 부른다 — `_normalizeArrays` 처럼 DB 상태를 안 쓴다).
+- 합치기 규칙은 순수 함수 `DB._prApply(목록, {add, del, put, drop})` 하나(`_normalizeArrays` 처럼 DB 상태를 안 쓴다).
+- **보상 transaction 은 모두 `DB.prTransaction(ref, 일감)` 하나로 보낸다**(학생 저장 · addPendingReward · 키오스크 신청/취소 · 수채화 제출 — TX-RETRY-1 · 검토 #1).
+  SDK 9.23 은 보내 놓고 답을 못 받은 transaction 을 연결이 끊기면 `Error('disconnect')` 로 끝내고 **다시 보내지 않는다**(`PersistentConnection.cancelSentTransactions_` — 보낸 put 중 `h`(해시)가 있는 것만).
+  보통 쓰기(set·update·increment)는 다시 이어질 때 다시 보낸다(`restoreState_`). 그래서 전에는 승인의 골드(update)만 들어가고 보상 빼기는 취소돼 보상이 되살아나거나(sim X2: 보상 남음),
+  서버엔 들어간 신청이 실패로 보여 다시 눌러 신청이 둘이 되거나(X3), 안 들어간 신청이 그냥 사라졌다(X4·X5).
+  `_txRetry` 가 `disconnect`·`set` 이면 같은 일감으로 **5번까지** 다시 돌린다 — id 합치기(있으면 안 더함·없으면 안 뺌)·승인은 '보상이 있을 때만'이라 이미 들어간 것을 다시 돌려도 한 번과 같다.
+  끊긴 동안 시작한 transaction 은 SDK 가 다시 이어질 때 보낸다. 권한 거부·그 밖의 실패는 그대로 실패.
 
 ### 2-6 학생 상세 창 = 바뀐 칸만
 `saveStudentDetail` 은 칸마다 **연 때 값(input.defaultValue)과 다를 때만** 쓴다. 골드는 "바꾼 만큼"(지금 값 + (적은 값 − 연 때 값), 0 아래로 안 감)을 더한다. 레벨·EXP 는 둘 중 하나라도 바꿨을 때만 지금 규칙(레벨 기준 맞춤) 그대로. 칭호 select 는 처음 고른 항목과 다를 때만.
+
+### 2-7 ⚠️ CUR 별칭 규칙 (검토 #7)
+받은 판마다 학생은 새 객체라(2-3) **자기 저장 뒤에도 곧(마이크로태스크) CUR 이 새 객체로 바뀐다.** 그래서
+`const s = CUR` 로 잡아 두고 `await`·`setTimeout`·`.then`·`onload` 를 건넌 뒤 `s` 를 고치면, 그 고침은 `saveStudent(CUR)`(새 객체)로는 **안 나간다**
+(검토자가 실제 SDK 로 재현: `O = CUR; CUR.gold += 1; save; await 0; O.gold += 7; save(CUR)` → +7 사라짐). 옛 객체를 `saveStudent(옛 객체)` 로 저장하면 `_stuNext` 로 넘겨지긴 한다.
+- **규칙: 비동기 경계 뒤에는 CUR 을 다시 읽어 고칠 것. 별칭은 경계 앞에서만.** `prev = CUR; CUR = 친구; … CUR = prev` 되돌리기도 경계 앞에서.
+- 지금 학생 코드(student.js + student/*.js 9파일)의 별칭 11곳은 모두 경계 앞에서만 쓴다(그리기 함수 · 친구 마당 그리기).
+- 검사: `scripts/unit/cur-alias-check.mjs`(precheck 'cur-alias', 기준선 0 — 새로 생기면 FAIL). 줄 단위 글자 검사라 인자로 넘긴 CUR·안쪽 함수 범위는 못 가린다.
 
 ## 3. 바뀌는 쓰기 경로
 
 | 경로 | 전 | 후 |
 |---|---|---|
 | `DB.saveStudent(s)` (student.js 35 · admin.js 27 · gamedata 내부) | `students/<id>` 통째 `set` + `_saving` 0.5초 · 돌려주는 값 없음 | 바뀐 칸만 `students/<id>` `update`(셈 칸은 `increment`) + 보상은 `students/<id>/pendingRewards` `transaction`. 바뀐 게 없으면 쓰기 0. 새 학생·숫자 키 학생만 통째 `set` · 쓰기 전부의 약속을 돌려줌 |
-| `DB.addPendingReward` | `students/<id>/pendingRewards` 배열 통째 `set` | 같은 경로 `transaction`(id 더하기) |
-| kiosk.js `requestQuest` · `cancelQuest` | 같은 경로 배열 통째 `set` | 같은 경로 `transaction`(id 더하기 · 그 퀘스트 빼기) |
-| watercolor/index.html `rpgSubmitArtwork` | 같은 경로 배열 통째 `set` | 같은 경로 `transaction`(id 더하기) |
+| 교사 승인(`approveSingle`·`approveAll`·`gridApprove`·`approveArtwork`) | `students/<id>` 통째 `set` | `students/<id>` `transaction` 하나(보상이 있을 때만 · `maxretry` 면 위 줄 방식) |
+| `DB.addPendingReward` | `students/<id>/pendingRewards` 배열 통째 `set` | 같은 경로 `transaction`(id 더하기 · 끊기면 다시) |
+| kiosk.js `requestQuest` · `cancelQuest` | 같은 경로 배열 통째 `set` | 같은 경로 `transaction`(id 더하기 · 그 퀘스트 빼기 · 끊기면 다시) |
+| watercolor/index.html `rpgSubmitArtwork` | 같은 경로 배열 통째 `set` | 같은 경로 `transaction`(id 더하기 · 끊기면 다시) |
 | admin.js `saveStudentDetail` | 모든 칸을 연 때 값으로 | 바뀐 칸만, 골드는 차이 |
 | value 리스너(`DB.init` · 학생 판 노드 구독) | 동기 처리 · `_saving` 중이면 settings 말고 버림 · 캐시 통째 교체 | 마이크로태스크로 미뤄 마지막 판만 · 학생은 새 객체 + 안 보낸 고침 넘겨받기 · `_saving` 중 나머지는 창 닫힐 때 |
 
 ## 4. 안 바뀌는 것
 - 데이터 모양: `students/<id>` 칸 이름·모양, `pendingRewards` **배열**(객체맵 전환 없음), 숫자 키·id 키 공존 규칙(DUP-STUDENT-1), root 구조. 마이그레이션·운영 데이터 정리 없음.
-- 호출부: student.js 는 한 줄도 안 바뀐다. admin.js 는 상세 창 한 함수만.
+- 호출부: student.js(+student/*.js) 는 한 줄도 안 바뀐다. admin.js 는 상세 창 · 승인 네 곳의 저장 옵션(`{ atomic: true }`)과 '이미 처리' 알림만.
 - `_normalizeArrays` · `_migrate` 는 그대로 순수 함수(키오스크가 빌려 씀).
 - 학생 기기 부분 캐시(STUDENT-COLD-1: 노드별 구독·`attachMine`·G1 root 저장 금지), 로컬 폴백(root 판), 키오스크 자체 구독, 수채화 손님 모드.
 - 경제 수치(가격·보상·확률), `logGold`·`logSpend` 기록 방식, DECO-LIFE 잎 쓰기.
 
 ## 5. 남는 한계 (정직하게)
 - 셈 칸·보상 말고는 **칸 단위 마지막 저장 승**이다. 같은 칸을 두 기기가 같은 순간에 바꾸면 한쪽이 진다(예: 두 탭이 같은 순간 서로 다른 장식을 놓음 → `houseDecorations` 한쪽). 전에는 학생 기록 **전체**에서 그랬다.
-- 셈 칸을 더하기로 바꿨기 때문에, **같은 학생이 두 기기에서 같은 낡은 화면으로 같은 일을 1초 안에** 하면 두 번 들어갈 수 있다(예: 두 탭이 같은 밭을 동시에 수확 → 골드 두 번, 교사 두 기기가 같은 보상을 동시에 승인 → 두 번). 전에는 한쪽이 통째로 사라졌다(유실). 스냅샷을 받으면 곧바로 화면이 맞춰지므로 창은 왕복 시간(0.1~0.5초)이다.
+- 셈 칸을 더하기로 바꿨기 때문에, **같은 학생이 두 기기에서 같은 낡은 화면으로 같은 일을 1초 안에** 하면 두 번 들어갈 수 있다 — 검토 D3: 두 탭이 같은 다 자란 작물을 0.02초 차이로 수확(40G) → **1080(기대 1040, +40)**. 전에는 한쪽이 통째로 사라졌다(유실). 스냅샷을 받으면 곧바로 화면이 맞춰지므로 창은 왕복 시간(0.1~0.5초)이다. **감수**(보스 결정).
+  교사 두 기기가 같은 보상을 동시에 승인하는 것(D2)은 2-4 로 막았다(1100 → 1050).
+- **골드가 0 아래로 갈 수 있다** — 검토 N1: 학생 100G 로 100G 물건 구매 ↔ 교사 [골드 지급 −80] 같은 순간 → **−80**(전: 0 또는 20 — 한쪽이 사라졌다). 둘 다 자기 화면에선 0 이상을 보고 차이만 보낸다. **감수**(다음 판매·지급에서 다시 0 이상으로 · 화면은 음수 그대로 보임).
+- **성능**: 자기 저장마다 받은 판을 한 번 합치고 화면(onDataChange → renderMain)을 한 번 더 그린다(전에는 `_saving` 창이 자기 에코를 버려 안 그렸다). 검토 측정 **+15ms 쯤** —
+  다시 잼(헤드리스 크롬 · 큰 반: 학생 기록 54KB · 26명 · 퀘스트 기록 3000 · CPU 4배 느림 · 저장 12번 중앙값): 저장 동기 부분 **22.7 → 4.2ms**(통째 직렬화가 없어 빨라짐),
+  콜백까지 **26.8 → 36.9ms(+10ms · 최대 +30ms)**, 꾸미기 창 저장 **25.8 → 38.5ms(+13ms)**. 작은 반(1KB · 느리게 안 함)은 12번에 콜백 합 16~18ms(한 번 ~1.4ms). **감수**(보스 결정).
+- 보통 쓰기의 increment 는 SDK 가 다시 이어질 때 다시 보낸다 — 서버엔 들어갔는데 답만 못 받은 그 순간에 끊기면 **두 번 더해질 수 있다**(RTDB 의 성질 · 창은 끊김 순간 한 번의 왕복). 승인은 2-4 로 한 번만이다.
+- 끊긴 뒤 다시 돌린 승인이 '보상이 이미 없음'을 보면 승인 끝으로 본다(2-4). 그 몇 초 사이 학생이 신청을 취소했으면 실제로는 골드가 안 들어갔는데 "승인 완료"로 보일 수 있다(드묾 · 두 번 주지는 않음).
 - 같은 이유로 두 탭이 같은 순간 서로 다른 물건을 사면 골드는 둘 다 빠지고 `inventory` 는 한쪽만 남을 수 있다(인벤토리는 칸 단위).
-- 교사 승인은 `update`(골드) 와 `transaction`(보상 빼기) 두 번의 쓰기다. 둘 중 하나만 실패하면(권한 오류 등) `onDbSaveError` 훅으로 알린다. 같은 기기 안에서 보상 transaction 을 깨는 통째 set 은 새 학생·root 복원뿐이다.
-- 이 배포 전에 열려 있던 탭(옛 JS)은 새로고침 전까지 통째 set 을 한다 — 캐시버스터는 새로 연 탭부터 먹는다.
+- 이 배포 전에 열려 있던 탭(옛 JS)은 새로고침 전까지 통째 set 을 한다 — 캐시버스터는 새로 연 탭부터 먹는다. 검토 G(학생 0.3초마다 7G · 교사 승인 50G, 기대 1127):
+  옛 학생 탭 + 옛/새 교사 = 1064(−63) · 새 학생 + 옛 교사 탭 = 1120(−7) · 새 + 새 = 1127. 아침에 새로 연 탭부터 0.
 - `logSpend` 는 여전히 학생 판(`_snaps`)에서만 쓴다(GOLD-SPEND-2 의 막음은 이 PR 이 root 판 에코를 막았으니 풀어도 되지만, 기록 범위가 바뀌는 일이라 따로).
 
 ## 6. 확인
 - `node scripts/unit/gold-sync-sim.mjs --expect-fixed` — 실제 gamedata.js·admin.js(승인·상세 창·골드 지급)·kiosk.js(신청) 를 vm 에 올리고 가짜 RTDB 로 여러 기기. 가짜 서버의 transaction 은 실제 SDK 처럼 **서버에 닿을 때 서버 값으로 다시 계산**한다.
   더한 시나리오: F1·F2(상세 창) · K1~K3(키오스크) · P1(학생 보상 신청) · M3·M4(꾸미기 묶음 저장 대기 중 깊은 복사 CUR + 교사 골드 지급·승인) · L1(꾸미기 저장 대기 중 레벨 오르는 승인 → 콜백이 레벨 오름을 한 번 봄, #1161). `GOLD_SIM_ROOT=<옛 체크아웃>` 으로 수정 전 코드에 같은 시험.
+  끊김·거부(검토 #1·#2): 가짜 서버가 SDK 처럼 transaction 을 먼저 이 기기 값으로 돌려 보고(undefined 면 안 보냄) 서버에서 undefined 면 committed false, `c.inject` 로 끊김(들어감/안 들어감)·거부·maxretry 를 넣는다.
+  X1·X2(승인 중 끊김) · X3·X4(키오스크 신청 중 끊김) · X5(학생 작품 신청 중 끊김) · X6(승인 maxretry) · D2(교사 두 기기 같은 보상) · F3(승인 쓰기 거부 → 아무것도 안 바뀜).
 - `node scripts/unit/gold-loss-real-sdk/run.mjs --profile=both --expect-fixed` — 실제 student.html + firebase SDK 9.23(가짜 프로젝트·오프라인). 맥에서는 `BROWSER=<크롬 헤드리스>`. `study` 케이스 = 실제 `grantStudyReward`(M1′). `Q1_REPO=<옛 체크아웃>` 으로 수정 전.
 - `node scripts/unit/run.mjs` 의 'gamedata 학생 기록 합치기(SYNC-MERGE-2)' — `_prApply`·`_stuDiff`·`_stuApply`·saveStudent 쓰기 모양·받은 판 새 객체 넘겨받기·밀린 옛 객체 저장(순수 셈).
+- `node scripts/unit/run.mjs` 의 '끊김 다시 돌리기 · 승인 한 쓰기' — disconnect 다시·거부 그대로·5번까지·승인 일감(서버 값 + 더하기 + 그 보상만 빼기 · 없으면 undefined)·REWARD_GONE·끊김 뒤 끝·maxretry 예전 방식. 'CUR 별칭 검사' — 시험 폴더로 잡힘/안 잡힘.
+- `node scripts/unit/cur-alias-check.mjs` — 2-7.
 - 꾸미기 하네스(`deco-save-count`)는 구매 쓰기 1번을 set·update 로 센다(옛 판 set 1 · 지금 판 update 1).
 - promo-sync-sim · deco-life-sync-sim · settings-field-sim · deco-save-real-sdk · precheck.
 
