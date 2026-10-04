@@ -324,7 +324,7 @@ student.js(16,774줄 · 976KB)를 **글자 하나 안 바꾸고** 덩어리째 �
 
 ---
 
-## 17. admin 나누기 (R3 · 떼어 옮기기)
+## 18. admin 나누기 (R3 · 떼어 옮기기)
 
 admin.js(6,589줄)를 §16 과 같은 방식으로 **글자 하나 안 바꾸고** 덩어리째 새 클래식 스크립트 9개로 옮겼다. 경계는 줄 번호가 아니라 **══ 머리 상자의 제목 글자**(그 위 ═ 한 줄 포함)이고, 모두 최상위 문장 사이다.
 
@@ -346,6 +346,28 @@ admin.js(6,589줄)를 §16 과 같은 방식으로 **글자 하나 안 바꾸고
 - **시험**: `scripts/unit/admin-sources.mjs`(`adminScriptFiles`·`readAdminSources`·`adminWhere`·`adminDirFiles`) — admin.html 의 `<script>` 순서가 단일 출처. 바꾼 것: run.mjs(`read('admin.js')` 는 오류) · gold/promo/deco-life/settings-field 시뮬 · save-order · whole-set('admin.js' 칸 = 관리 전체, 기준선 그대로) · student-known(BACKUP_NODES 를 못 찾으면 FAIL) · esc-parity · verify-safety · smoke-test(+admin/ 폴더 파일이 모두 admin.html 에 있나) · global-dup 기준선.
 - 숫자: verify-safety 26 → **35**(`node --check` admin/*.js 9개) · smoke 30 → **31** · save-order **11곳 그대로**(줄 표시만 새 파일) · whole-set 14 · student-known 29 · esc 8 · global-dup 4 · 시뮬 출력 글자 같음.
 - **새로 고칠 때**: 그 기능이 있는 `admin/` 파일을 고치고 그 줄의 `?v=` 만 올린다. 불러오는 즉시 도는 코드에서 뒤 파일 이름을 부르지 말 것(아직 없음).
+
+
+---
+
+## 19. 2026-10-04 gamedata 나누기 (R4 · 떼어 옮기기)
+
+gamedata.js(3,779줄)를 §16(student) 과 같은 방식으로 **글자 하나 안 바꾸고** 덩어리째 새 클래식 스크립트 4개로 옮겼다. 경계는 줄 번호가 아니라 **맨 앞 칸 머리 글자**(`//  …` 상자 제목이면 그 위 ═ 한 줄 포함 · `// ─── …` 한 줄 머리)이고, 모두 최상위 문장 사이다. **DB 객체 리터럴(`const DB = { … }`)은 통째로 gamedata.js 에 남겼다**(안쪽 함수 경계로 자르지 않음).
+
+| 파일 | 줄 | KB | 담은 것 (원래 gamedata.js 줄) |
+|------|---:|---:|------|
+| `gamedata.js` | 1,482 | 81 | 바탕 — 머리 주석 · FIREBASE_CONFIG · **DB 저장층 통째** · Utils |
+| `gamedata/data.js` | 838 | 80 | 게임 상수 표 — BALANCE(전투·사냥터 계수 원본) · 장비/몬스터/경험치표 만들기 · GAME_DATA · 씨앗·장식 가격 · 꾸미기 무료 기간 · 돌연변이 씨앗 · 스킬 계수·마스터리북 (6–840) |
+| `gamedata/rules.js` | 400 | 39 | 업적(ACHIEVEMENTS·AchievementUtils) · 관리자 설정 덮기(getActiveMonsters·applyShopOverrides·applyBattleSettings·BATTLE_CONSTS) (2313–2709) |
+| `gamedata/emotion.js` | 357 | 16 | 오늘의 감정(EMOTION_DATA·점수·DB_EMOTION·감정 보상) · 감정 돌아보기(문구·후보 고르기·횟수·저장) (2710–2926 + 3644–3779) |
+| `gamedata/battle.js` | 720 | 34 | 전투 — 장비/마스터리북 구매 판정 · 턴제 전투 엔진(데미지·상성·스킬2·종료 처리) · 사냥터 3마리 제시 (2927–3643) |
+
+- html **네 곳**(student · admin · kiosk · watercolor/index.html)이 `gamedata.js` 바로 뒤에 data → rules → emotion → battle 순서로 4줄 · gamedata.js 와 같은 `?v=`. 표시 줄 = `// ── [GAMEDATA-SPLIT-1] 여기 있던 '<이름>' 덩어리(N줄)는 gamedata/<파일> 로 옮겼다 ──`.
+- **불러오는 순서가 원래 글 순서와 다른 곳 둘**: ① 상수 표(`data`, 원래 맨 위)가 바탕(FIREBASE_CONFIG·DB·Utils) **뒤에** 온다 ② 감정 돌아보기 함수 넷(원래 맨 끝)이 `emotion.js` 에 붙어 전투보다 **앞에** 온다. 둘 다 괜찮은 까닭: 바탕의 즉시 실행(객체 리터럴 셋)은 GAME_DATA·BALANCE 를 메서드 **안에서만** 쓰고, 돌아보기 덩어리는 함수 선언만 있다(지도: 즉시 문장 → 뒤 파일 이름 = 0).
+- **확인**: 다시 끼우면 원본과 바이트 같음 · 원본 한 덩어리 vs 나눈 파일 따로 실행의 전역(최상위 이름 전부의 typeof·값·함수 글자) 같음 · 밸런스 identity(전 출력 sha) 같음 · 헤드리스 네 화면 지문 같음.
+- **시험**: `scripts/unit/gamedata-sources.mjs`(`gamedataScriptFiles`·`readGamedataSources`·`gamedataWhere`·`gamedataDirFiles`·`gamedataSourcesAt`·`gamedataSourcesFromGit`) — student.html 의 `<script>` 순서가 단일 출처. 바꾼 것: run.mjs(`read('gamedata.js')` 는 오류) · gold/promo/deco-life/settings-field 시뮬 · save-order(옮긴 파일도 메서드 경계) · whole-set('gamedata.js' 칸 = 공유 전체) · student-known(_normalizeArrays 를 못 찾으면 FAIL) · verify-safety · smoke-test(+gamedata/ 가 html 네 곳에 같은 순서·같은 ?v=) · global-dup 기준선 · 밸런스 lib·identity(옛 커밋은 그 커밋 html 순서) · deco-perf.
+- **새로 고칠 때**: 그 기능이 있는 파일을 고치고 html **네 곳**의 그 줄 `?v=` 를 같은 값으로. 불러오는 즉시 도는 코드에서 뒤 파일 이름을 부르지 말 것(아직 없음) — 특히 gamedata.js(바탕)의 DB·Utils 리터럴에 GAME_DATA 를 바로 쓰는 칸을 만들면 안 된다(메서드 안은 괜찮다).
+- **배포 순간**: 옛 html(캐시, 최대 10분) + 새 gamedata.js 조합이면 GAME_DATA·applyShopOverrides 가 없어 학생 화면이 데이터를 못 받는다(새로고침이면 풀림). 수업 없는 때 넣는다. 거꾸로(새 html + 옛 gamedata.js 통째)는 새 파일이 '이미 선언됨' SyntaxError 로 통째로 안 돌고 화면은 그대로 동작한다.
 
 ---
 

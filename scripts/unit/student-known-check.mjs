@@ -17,15 +17,16 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from './student-sources.mjs';
+import { gamedataScriptFiles, readGamedataSources } from './gamedata-sources.mjs';
 import { adminScriptFiles, readAdminSources } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const FILES = ['gamedata.js', ...studentScriptFiles(ROOT), ...adminScriptFiles(ROOT), 'kiosk.js'];   // [SPLIT-1] student/*.js 까지 · [ADMIN-SPLIT-1] admin/*.js 까지
+const FILES = [...gamedataScriptFiles(ROOT), ...studentScriptFiles(ROOT), ...adminScriptFiles(ROOT), 'kiosk.js'];   // [SPLIT-1] student/*.js 까지 · [ADMIN-SPLIT-1] admin/*.js 까지
 
 const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
 sb.globalThis = sb; vm.createContext(sb);
-vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB;', sb);   // [GAMEDATA-SPLIT-1]
 const DB = sb.__DB;
 const KNOWN = new Set(DB.STUDENT_KNOWN || []), COLD = new Set(DB.STUDENT_COLD || []);
 if (!KNOWN.size) { console.log('❌ FAIL  gamedata DB.STUDENT_KNOWN 이 없음'); process.exitCode = 1; }
@@ -39,8 +40,9 @@ for (const f of FILES) {
   for (const m of src.matchAll(/\.child\(\s*(['"`])([A-Za-z][A-Za-z0-9_]*)(?:\/|\1)/g)) add(m[2], `${f}:${lineOf(src, m.index)}`);
 }
 {
-  const src = read('gamedata.js');
+  const src = readGamedataSources(ROOT);   // [GAMEDATA-SPLIT-1] 공유 코드 전체
   const s = src.indexOf('_normalizeArrays(');
+  if (s < 0) { console.log('❌ FAIL   공유 코드에서 _normalizeArrays 를 못 찾음 — 노드 목록이 조용히 줄어든다 [GAMEDATA-SPLIT-1]'); process.exitCode = 1; }
   const body = s >= 0 ? src.slice(s, src.indexOf('\n  },', s)) : '';
   for (const m of body.matchAll(/\bdata\.([A-Za-z][A-Za-z0-9_]*)\s*=/g)) add(m[1], 'gamedata.js _normalizeArrays');
 }

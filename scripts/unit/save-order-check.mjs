@@ -22,10 +22,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from './student-sources.mjs';
+import { gamedataScriptFiles } from './gamedata-sources.mjs';
 import { adminScriptFiles } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FILES = [...studentScriptFiles(ROOT), 'gamedata.js', ...adminScriptFiles(ROOT)];   // [SPLIT-1] student.js + student/*.js(html 순서) · [ADMIN-SPLIT-1] admin.js + admin/*.js
+const FILES = [...studentScriptFiles(ROOT), ...gamedataScriptFiles(ROOT), ...adminScriptFiles(ROOT)];   // [SPLIT-1] student.js + student/*.js(html 순서) · [ADMIN-SPLIT-1] admin.js + admin/*.js
 const argv = process.argv.slice(2);
 const STRICT = argv.includes('--strict');
 const bi = argv.indexOf('--baseline');
@@ -47,7 +48,7 @@ const isComment = (l) => /^\s*\/\//.test(l);
 const findings = [];
 for (const f of FILES) {
   const lines = fs.readFileSync(path.join(ROOT, f), 'utf8').split(/\r?\n/);
-  const methods = f === 'gamedata.js';
+  const methods = f === 'gamedata.js' || f.startsWith('gamedata/');   // [GAMEDATA-SPLIT-1] 옮긴 파일의 객체(AchievementUtils·DB_EMOTION…)도 메서드 경계로
   const headOf = (l) => {
     const m = l.match(TOP_HEAD) || (methods ? l.match(METHOD_HEAD) : null);
     return m && !KEYWORDS.has(m[1]) ? m[1] : null;

@@ -19,6 +19,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles, studentTagFiles, studentDirFiles, LAZY_STUDENT_FILES, lazyRefsIn } from './unit/student-sources.mjs';
+import { gamedataScriptFiles, gamedataDirFiles, gamedataTagsIn, readGamedataSources, GAMEDATA_HTMLS } from './unit/gamedata-sources.mjs';
 import { adminScriptFiles, adminDirFiles, readAdminSources } from './unit/admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,11 +33,14 @@ const read = (f) => fs.readFileSync(rel(f), 'utf8');
 // [SPLIT-1] 학생 코드 = student.js + student/*.js(student.html 의 <script> 순서가 단일 출처)
 let STUDENT_FILES = ['student.js'], STUDENT_TAGS = ['student.js'];
 try { STUDENT_FILES = studentScriptFiles(ROOT); STUDENT_TAGS = studentTagFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+// [GAMEDATA-SPLIT-1] 공유 코드 = gamedata.js + gamedata/*.js(student.html 의 <script> 순서가 단일 출처)
+let GAMEDATA_FILES = ['gamedata.js'];
+try { GAMEDATA_FILES = gamedataScriptFiles(ROOT); } catch (e) { add('FAIL', `student.html 공유 코드 목록: ${e.message}`); }
 // [ADMIN-SPLIT-1] 관리 코드 = admin.js + admin/*.js(admin.html 의 <script> 순서가 단일 출처)
 let ADMIN_FILES = ['admin.js'];
 try { ADMIN_FILES = adminScriptFiles(ROOT); } catch (e) { add('FAIL', `admin.html 관리 스크립트 목록: ${e.message}`); }
 //  [DECO-LAZY-1] 필수 파일·문법·DB 캐시 정렬은 늦게 부르는 파일(student/deco.js)까지 · 클래식 태그는 html 태그로 부르는 것만
-const JS_FILES = ['gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', ...STUDENT_FILES, ...ADMIN_FILES, 'kiosk.js'];
+const JS_FILES = [...GAMEDATA_FILES, 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js', ...STUDENT_FILES, ...ADMIN_FILES, 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -248,6 +252,31 @@ for (const f of HTML_FILES) {
   else add('PASS', `admin/ 폴더 js ${onDisk.length}개 모두 admin.html 에서 admin.js 뒤에 부름`);
 }
 
+// ── [GAMEDATA-SPLIT-1] gamedata/ 폴더 js 는 html 네 곳(student · admin · kiosk · watercolor)에서 gamedata.js **바로 뒤에** 같은 순서·같은 ?v= 로 ──
+//  gamedata.js 에서 떼어 옮긴 파일(gamedata/*.js)을 한 html 에라도 안 적으면 그 화면은 GAME_DATA·전투 엔진 등이 없어 **켜지자마자 멈춘다**.
+//  순서가 다르면 앞 파일이 아직 없는 이름을 부를 수 있고, ?v= 가 다르면 한 화면만 옛 조각을 문다.
+{
+  const onDisk = gamedataDirFiles(ROOT);
+  const want = JSON.stringify(GAMEDATA_FILES.map((x) => x));
+  const probs = [];
+  const notLoaded = onDisk.filter((x) => !GAMEDATA_FILES.includes(x));
+  if (notLoaded.length) probs.push(`gamedata/ 파일이 student.html 에 없음: ${notLoaded.join(', ')}`);
+  const vers = new Set();
+  for (const h of GAMEDATA_HTMLS) {
+    if (!exists(h)) { probs.push(`${h} 없음`); continue; }
+    const html = read(h);
+    const tags = gamedataTagsIn(html);
+    if (JSON.stringify(tags.map((t) => t.file)) !== want) probs.push(`${h} 순서 ${tags.map((t) => t.file).join(',')} ≠ ${GAMEDATA_FILES.join(',')}`);
+    tags.forEach((t) => vers.add(t.ver));
+    const all = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1].split('?')[0].replace(/^(?:\.\.?\/)+/, ''));
+    const gi = all.indexOf('gamedata.js');
+    if (gi >= 0 && JSON.stringify(all.slice(gi, gi + GAMEDATA_FILES.length)) !== want) probs.push(`${h}: gamedata.js 바로 뒤가 아님(${all.slice(gi, gi + GAMEDATA_FILES.length).join(',')})`);
+  }
+  if (vers.size > 1) probs.push(`?v= 가 서로 다름: ${[...vers].join(' · ')}`);
+  if (probs.length) add('FAIL', `공유 코드(gamedata) 태그: ${probs.join(' · ')}`);
+  else add('PASS', `공유 코드 gamedata.js + gamedata/ ${onDisk.length}개 — html ${GAMEDATA_HTMLS.length}곳 모두 gamedata.js 바로 뒤에 같은 순서·같은 ?v=(${[...vers][0] || '없음'})`);
+}
+
 // ── 4) 주요 문자열/심볼 존재 (실행 없이 텍스트 기준) ──
 {
   const checks = [
@@ -296,7 +325,7 @@ for (const f of HTML_FILES) {
       localStorage: { getItem: () => null, setItem: () => {} }, alert: () => {} };
     sb.globalThis = sb;
     vm.createContext(sb);
-    vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+    vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB;', sb);   // [GAMEDATA-SPLIT-1]
     const out = sb.__DB._normalizeArrays({ students: JSON.parse(JSON.stringify(raw)) }).students;
     const okCount = out.length === ids.length;
     const okWinner = out.every(s => s.level === NEW.level && s.gold === NEW.gold);

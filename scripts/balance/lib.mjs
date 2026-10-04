@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { gamedataSourcesAt } from '../unit/gamedata-sources.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -42,7 +43,7 @@ export function loadWorld({ gamedata = path.join(ROOT, 'gamedata.js'), settings 
   M.random = rng;
   const ctx = { console, Date, Math: M, JSON, Object, Array, Number, String, Boolean, setTimeout, firebase: { apps: [] } };
   vm.createContext(ctx);
-  let src = fs.readFileSync(gamedata, 'utf8');
+  let src = gamedataSourcesAt(gamedata);   // [GAMEDATA-SPLIT-1] '…/gamedata.js' = 그 체크아웃의 gamedata.js + gamedata/*.js(html 순서)
   if (balance) src = wrapBalance(src, balance);
   // patches = [[원문, 바꿀 글], …] — **구조 제안**(코드에 아직 없는 식)을 메모리에서만 시험. 원문이 정확히 1번 있어야 한다.
   for (const [from, to] of patches || []) {
