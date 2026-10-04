@@ -440,6 +440,7 @@ function claimEmotionReward(rewardId) {
   if (!reward) { toast('아직 받을 수 없는 보상이에요'); return; }
 
   // 지급
+  const oldLv = CUR.level || 1;   // [LVUP-FX-1] 보스·학습 보상처럼 오르면 축하
   CUR.exp   = (CUR.exp||0)   + reward.exp;
   CUR.gold  = (CUR.gold||0)  + reward.gold;
   CUR.totalGold = (CUR.totalGold||0) + reward.gold;
@@ -467,6 +468,7 @@ function claimEmotionReward(rewardId) {
   DB.saveStudent(CUR);
   renderAll();
   toast(`🎉 ${reward.label} +${reward.exp}EXP +${reward.gold}G!`);
+  if (CUR.level > oldLv && typeof triggerLevelUp === 'function') triggerLevelUp(CUR.level);   // [LVUP-FX-1]
 }
 let _emoCurrentPeriod = 'am';
 let _emoSelectedKey   = null;
