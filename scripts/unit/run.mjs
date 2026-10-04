@@ -1930,6 +1930,221 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = 'gamedata 학생 기록 합치기(SYNC-MERGE-2)';
+try {
+  //  설계 docs/sync_merge_design.md. 여러 기기 겹침은 gold-sync-sim · 실제 SDK 는 gold-loss-real-sdk 가 잰다 — 여기는 순수 셈만.
+  const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+  const DB = sb.__DB;
+  const ids = (l) => l.map(r => r.id);
+  test('보상 합치기: 서버 목록(객체 꼴·구멍) 위에 더하기 — 이미 있는 id 는 안 겹침', () =>
+    eq(ids(DB._prApply({ 0: { id: 'a' }, 2: { id: 'b' } }, { add: [{ id: 'b' }, { id: 'c' }] })), ['a', 'b', 'c']));
+  test('보상 합치기: id 로 빼기 · 바꾸기는 있을 때만(남이 승인해 뺀 보상을 안 살림)', () =>
+    eq(DB._prApply([{ id: 'a', x: 1 }, { id: 'b' }], { del: ['i:b'], put: [{ id: 'a', x: 2 }, { id: 'z' }] }), [{ id: 'a', x: 2 }]));
+  test('보상 합치기: 조건 빼기(키오스크 취소) · 빈 서버 목록에 더하기', () => {
+    eq(ids(DB._prApply([{ id: 'a', boardQuestId: 'q' }, { id: 'b' }], { drop: r => r.boardQuestId === 'q' })), ['b']);
+    eq(ids(DB._prApply(null, { add: [{ id: 'a' }] })), ['a']);
+  });
+  test('보상 합치기: id 없는 옛 보상은 내용 전체가 열쇠(키 순서 무관)', () =>
+    eq(DB._prApply([{ label: '옛', gold: 5 }, { id: 'n' }], { del: [DB._prKey({ gold: 5, label: '옛' })] }), [{ id: 'n' }]));
+  test('바뀐 칸만: 셈 칸은 차이(없던 칸은 0 에서) · 그 밖은 칸 통째 · 키 순서만 다르면 안 바뀐 것', () => {
+    const ops = DB._stuDiff({ id: 's', gold: 100, stats: { a: 1, b: 2 }, job: 'x' }, { id: 's', gold: 130, totalGold: 30, stats: { b: 2, a: 1 }, job: 'y' });
+    eq([ops.inc, ops.set, ops.pr], [{ gold: 30, totalGold: 30 }, { job: 'y' }, null]);
+  });
+  test('바뀐 칸만: 지운 칸은 null · NaN 섞인 칸은 안 보냄 · 숫자 아닌 옛 골드는 덮어쓰기', () => {
+    const ops = DB._stuDiff({ id: 's', title: '용사', gold: '7', bd: { used: 1 } }, { id: 's', gold: 9, bd: { used: NaN } });
+    eq([ops.set, ops.inc], [{ title: null, gold: 9 }, {}]);
+  });
+  test('바뀐 칸만: pendingRewards 는 id 로 더한 것·뺀 것·바뀐 것', () =>
+    eq(DB._stuDiff({ pendingRewards: [{ id: 'a' }, { id: 'b', g: 1 }] }, { pendingRewards: [{ id: 'b', g: 2 }, { id: 'c' }] }).pr,
+      { del: ['i:a'], add: [{ id: 'c' }], put: [{ id: 'b', g: 2 }] }));
+  test('일감 얹기 = 서버 increment 와 같은 셈(남이 더한 것 보존) · 원본은 그대로', () => {
+    const srv = { gold: 150, pendingRewards: [{ id: 'x' }] };
+    const out = DB._stuApply(srv, { set: { job: 'y' }, inc: { gold: 30, exp: 5 }, pr: { del: [], add: [{ id: 'y' }], put: [] } });
+    eq([out, srv.gold], [{ gold: 180, pendingRewards: [{ id: 'x' }, { id: 'y' }], job: 'y', exp: 5 }, 150]);
+  });
+  // saveStudent · 받은 판 합치기 — 가짜 ref 로 쓰기 모양만 본다
+  const calls = [];
+  const mkRef = (p) => ({ child: (k) => mkRef(p ? p + '/' + k : k),
+    update: (v) => { calls.push(['update', p, JSON.parse(JSON.stringify(v))]); return Promise.resolve(); },
+    set: (v) => { calls.push(['set', p]); return Promise.resolve(); },
+    transaction: (fn) => { calls.push(['tx', p, fn([{ id: 'srv' }])]); return Promise.resolve({ committed: true }); } });
+  DB._fbRef = mkRef('');
+  const stu = (o) => ({ id: 's1', name: '가', level: 1, exp: 0, gold: 100, totalGold: 100, pendingRewards: [], ...o });
+  DB._cache = DB._ingest({ students: { s1: stu(), 0: { id: 's5', name: '옛', gold: 1 } } });
+  const s = DB.getStudent('s1');
+  DB.saveStudent(s);
+  test('saveStudent: 바뀐 게 없으면 쓰기 0', () => eq(calls.length, 0));
+  s.gold += 30; s.totalGold += 30; DB.saveStudent(s);
+  test('saveStudent: 골드만 바뀌면 students/<id> update 한 번(increment) — 통째 set 없음', () => eq(calls.splice(0), [['update', 'students/s1', { gold: { inc: 30 }, totalGold: { inc: 30 } }]]));
+  s.pendingRewards = [{ id: 'r1' }]; DB.saveStudent(s);
+  test('saveStudent: 보상 신청은 pendingRewards transaction(서버 목록 위에 더함)', () => eq(calls.splice(0), [['tx', 'students/s1/pendingRewards', [{ id: 'srv' }, { id: 'r1' }]]]));
+  {  // 다른 기기가 경험치를 더한 것(아직 이 객체엔 안 들어온 기준)이 있을 때, 둘을 합치면 레벨 문턱을 넘는다
+    const lv2 = vm.runInContext('Utils.expForLevel(2)', sb);
+    DB._stuBase.s1 = { ...DB._stuBase.s1, exp: lv2 - 5 };
+    s.exp += 10; s.level = vm.runInContext(`Utils.levelFromExp(${s.exp})`, sb);   // 이 기기 혼자 보면 아직 레벨 1
+    DB.saveStudent(s);
+    test('saveStudent: 경험치 더하기 → 합친 경험치(남의 것 + 내 것)로 레벨도 같이 맞춰 보냄', () => {
+      const c = calls.splice(0);
+      eq([c.length, c[0][2].exp, c[0][2].level, s.level, s.exp], [1, { inc: 10 }, 2, 2, lv2 + 5]);
+    });
+  }
+  DB.saveStudent({ id: 's9', name: '새 학생' });
+  const o = DB.getStudent('s5'); o.gold = 2; DB.saveStudent(o);
+  test('saveStudent: 새 학생 · id 키 기록이 없는(옛 숫자 키만) 학생은 지금처럼 통째 set', () => eq(calls.splice(0), [['set', 'students/s9'], ['set', 'students/s5']]));
+  s.gold += 5;   // 아직 안 보낸 고침
+  const sGold = s.gold, sLv = s.level;
+  //  student.js onDataChange 순서 그대로: prevLv = CUR.level → CUR = DB.getStudent(id) (#1161 승인 레벨업 축하가 이 앞뒤를 견준다)
+  let seen = null;
+  DB.onDataChange(() => { const prevLv = s.level; const fresh = DB.getStudent('s1'); seen = { prevLv, lv: fresh.level }; });
+  DB._onSnap({ val: () => ({ students: { s1: stu({ gold: 180, totalGold: 180, exp: 300, level: sLv + 1, pendingRewards: [{ id: 'r1' }], job: '교사가 고침' }) } }) });
+  DB.onDataChange(null);
+  const n = DB.getStudent('s1');
+  test('받은 판 합치기: 새 객체 = 남의 변경 + 안 보낸 고침(+5) · 옛 객체는 그대로', () =>
+    eq([n === s, n.gold, n.job, s.gold, s.job], [false, 185, '교사가 고침', sGold, undefined]));
+  test('받은 판 합치기: 콜백 안에서 옛 CUR 레벨과 새 레벨을 견줄 수 있다(#1161 승인 레벨업 축하)', () => eq(seen, { prevLv: sLv, lv: sLv + 1 }));
+  //  콜백 첫머리 decoFlush 처럼 **옛 객체**를 저장 → 이은 객체(n)로 넘겨 n 의 안 보낸 고침(+5)을 한 번 보낸다 · 옛 객체는 그대로
+  DB.saveStudent(s);
+  test('밀린 옛 객체 저장 = 이은 객체 저장: 안 보낸 고침(+5)만 한 번 · 옛 객체 값은 그대로', () =>
+    eq([calls.splice(0), s.gold, DB.getStudent('s1') === n], [[['update', 'students/s1', { gold: { inc: 5 } }]], sGold, true]));
+  DB.saveStudent(n);
+  test('그다음 이은 객체를 저장해도 다시 안 보낸다(두 번 지급 없음)', () => eq(calls.splice(0), []));
+  s.title = '늦은 고침'; DB.saveStudent(s);
+  test('밀린 뒤 옛 객체에 고친 것은 이은 객체에 얹어 그 칸만 보낸다(교사가 고친 칸 안 되돌림)', () =>
+    eq([calls.splice(0), n.title, n.job], [[['update', 'students/s1', { title: '늦은 고침' }]], '늦은 고침', '교사가 고침']));
+} catch (e) {
+  test('합치기 함수를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = 'gamedata 끊김 다시 돌리기 · 승인 한 쓰기(TX-RETRY-1 · APPROVE-ATOMIC-1)';
+try {
+  //  SDK 9.23 은 보낸 transaction 이 답 전에 끊기면 Error('disconnect') 로 끝내고 다시 안 보낸다 — 같은 일감으로 다시 돌리는지.
+  //  승인은 students/<id> transaction 하나 · 보상이 서버에 있을 때만. 여러 기기·실제 흐름은 gold-sync-sim X1~X6·D2·F3.
+  const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB; globalThis.__U = Utils;', sb);
+  const DB = sb.__DB, U = sb.__U;
+  //  가짜 ref — transaction 은 script 에서 한 걸음씩(Error 면 그 오류로 끝 · 객체면 그 결과) · script 가 비면 일감을 srv[자리] 값으로
+  //   실제로 돌려(undefined 면 committed false) 그 결과로 끝 · 일감 fn 은 log 에 남겨 둔다
+  const log = [], script = [], srv = {};
+  const mkRef = (p) => ({ child: (k) => mkRef(p ? p + '/' + k : k),
+    update: (v) => { log.push(['update', p, JSON.parse(JSON.stringify(v))]); return Promise.resolve(); },
+    set: () => { log.push(['set', p]); return Promise.resolve(); },
+    transaction: (fn) => {
+      log.push(['tx', p, fn]);
+      const st = script.shift();
+      if (st instanceof Error) return Promise.reject(st);
+      if (st) return Promise.resolve(st);
+      if (!(p in srv)) return Promise.resolve({ committed: true, snapshot: { val: () => ({}) } });
+      const out = fn(JSON.parse(JSON.stringify(srv[p])));
+      return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => (out === undefined ? srv[p] : out) } });
+    } });
+  DB._fbRef = mkRef('');
+  const settle = (p) => p.then(v => ['ok', v && v.committed], e => ['err', e.code || e.message]);
+  const txs = () => log.filter(c => c[0] === 'tx').length;
+
+  script.push(new Error('disconnect'));
+  const r1 = await settle(DB.prTransaction(mkRef('students/s1/pendingRewards'), { add: [{ id: 'a' }] }));
+  const n1 = txs(); log.length = 0;
+  test("보상 transaction 이 'disconnect' 로 끝나면 같은 일감으로 다시 → 성공", () => eq([r1, n1], [['ok', true], 2]));
+  script.push(new Error('PERMISSION_DENIED'));
+  const r2 = await settle(DB.prTransaction(mkRef('students/s1/pendingRewards'), { add: [{ id: 'a' }] }));
+  const n2 = txs(); log.length = 0;
+  test('권한 거부는 다시 안 돌림(그대로 실패)', () => eq([r2, n2], [['err', 'PERMISSION_DENIED'], 1]));
+  for (let i = 0; i < 9; i++) script.push(new Error('disconnect'));
+  const r3 = await settle(DB.prTransaction(mkRef('students/s1/pendingRewards'), { add: [{ id: 'a' }] }));
+  const n3 = txs(); log.length = 0; script.length = 0;
+  test(`계속 끊기면 ${DB.TX_RETRY}번까지만 다시(무한 반복 없음)`, () => eq([r3, n3], [['err', 'disconnect'], DB.TX_RETRY + 1]));
+
+  //  승인 모양 저장(골드 더하기 + 보상 빼기)
+  const stu = (o) => ({ id: 's1', name: '가', level: 1, exp: 0, gold: 100, totalGold: 100, pendingRewards: [{ id: 'rw', gold: 50, exp: 0 }], ...o });
+  const approve = (opt, exp = 0) => {
+    DB._cache = null; DB._stuRaw = {}; DB._stuBase = {};   // 판마다 새로 받은 것처럼(앞 판 객체를 이어 쓰지 않게)
+    DB._cache = DB._ingest({ students: { s1: stu() } });
+    const s = DB.getStudent('s1');
+    s.gold += 50; s.totalGold += 50; s.exp += exp; s.level = U.levelFromExp(s.exp); s.pendingRewards = [];
+    return DB.saveStudent(s, opt);
+  };
+  const lv2 = U.expForLevel(2);
+  const pa = settle(approve({ atomic: true }, lv2));
+  const c = log.splice(0);
+  const fn = c[0] && c[0][2];
+  const onSrv = fn && fn({ id: 's1', gold: 130, totalGold: 130, exp: 5, level: 1, pendingRewards: [{ id: 'rw' }, { id: 'other' }], job: '남이 고침' });
+  const onGone = fn && fn({ id: 's1', gold: 130, totalGold: 130, exp: 5, level: 1, pendingRewards: [{ id: 'other' }] });
+  await pa;
+  test('승인(atomic): students/<id> transaction 하나 — update·보상 transaction 따로 없음', () => eq(c.map(x => [x[0], x[1]]), [['tx', 'students/s1']]));
+  test('승인 일감 = 서버 값 + 골드·EXP 더하기 + 그 보상만 빼기 · 레벨은 합친 EXP 로 · 남의 칸 그대로', () =>
+    eq([onSrv.gold, onSrv.totalGold, onSrv.exp, onSrv.level, onSrv.pendingRewards, onSrv.job], [180, 180, lv2 + 5, U.levelFromExp(lv2 + 5), [{ id: 'other' }], '남이 고침']));
+  test('보상이 서버에 이미 없으면(다른 기기가 먼저 승인) 일감이 아무것도 안 바꿈(undefined = 그만)', () => eq(onGone, undefined));
+  script.push({ committed: false, snapshot: { val: () => ({}) } });
+  const r4 = await settle(approve({ atomic: true })); log.length = 0;
+  test("이미 처리된 보상이면 code 'REWARD_GONE' 으로 실패(관리 화면이 '이미 다른 곳에서 처리' 로 알림)", () => eq(r4, ['err', 'REWARD_GONE']));
+  script.push(new Error('disconnect'), { committed: false, snapshot: { val: () => ({}) } });
+  const r5 = await settle(approve({ atomic: true })); const n5 = txs(); log.length = 0;
+  test("끊긴 뒤 다시 돌렸더니 보상이 없음 = 내 첫 쓰기가 들어간 것 → 승인 끝(두 번 안 줌)", () => eq([r5[0], n5], ['ok', 2]));
+  srv['students/s1/pendingRewards'] = [{ id: 'rw' }, { id: 'other' }];
+  script.push(new Error('maxretry'));
+  const r6 = await settle(approve({ atomic: true })); const c6 = log.splice(0).map(x => [x[0], x[1]]);
+  test("'maxretry' → 폴백: 보상 transaction 으로 그 보상을 **실제로 뺀 뒤에만** 골드 update(순서: 보상 → 골드)", () =>
+    eq([r6[0], c6], ['ok', [['tx', 'students/s1'], ['tx', 'students/s1/pendingRewards'], ['update', 'students/s1']]]));
+  srv['students/s1/pendingRewards'] = [{ id: 'other' }];
+  script.push(new Error('maxretry'));
+  const r6b = await settle(approve({ atomic: true })); const c6b = log.splice(0).map(x => [x[0], x[1]]);
+  test("폴백인데 보상이 이미 없음(다른 교사 기기가 먼저 승인) → 골드 update 안 보냄 · REWARD_GONE", () =>
+    eq([r6b, c6b], [['err', 'REWARD_GONE'], [['tx', 'students/s1'], ['tx', 'students/s1/pendingRewards']]]));
+  delete srv['students/s1/pendingRewards'];
+  //  학생이 아주 잦게 저장 = 서버 값이 계속 바뀌어 SDK 가 일감을 거듭 다시 부름 → ATOMIC_RUNS 번을 넘으면 그만두고 폴백(통째 기록을 25번 보내지 않게)
+  {
+    const p7 = settle(approve({ atomic: true }));
+    const big = log.find(x => x[0] === 'tx' && x[1] === 'students/s1');
+    const node = { id: 's1', gold: 100, totalGold: 100, exp: 0, level: 1, pendingRewards: [{ id: 'rw' }] };
+    const outs = []; for (let i = 0; i < DB.ATOMIC_RUNS + 2; i++) outs.push(big[2](JSON.parse(JSON.stringify(node))) === undefined ? 'stop' : 'val');
+    await p7;
+    test(`일감이 ${DB.ATOMIC_RUNS}번까지는 값을 내고 그 뒤로는 그만(→ 폴백) — 통째 기록을 25번 보내지 않음`, () =>
+      eq(outs, [...Array(DB.ATOMIC_RUNS).fill('val'), 'stop', 'stop']));
+    log.length = 0;
+  }
+  script.push(new Error('disconnect'), new Error('set'), { committed: false, snapshot: { val: () => ({}) } });
+  const r8 = await settle(approve({ atomic: true })); log.length = 0;
+  test("끊김 → 'set' → 다시 보니 보상 없음: 끊김을 한 번이라도 봤으면 승인 끝(마지막 이유만 보지 않음 · 검토 Y6)", () => eq(r8[0], 'ok'));
+  await approve(); const c7 = log.splice(0).map(x => [x[0], x[1]]);
+  test('atomic 없이(학생 기기 저장)는 그대로 바뀐 칸 update + 보상 transaction', () => eq(c7, [['update', 'students/s1'], ['tx', 'students/s1/pendingRewards']]));
+} catch (e) {
+  test('다시 돌리기·승인 한 쓰기를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+cur = 'CUR 별칭 검사(CUR-ALIAS-CHECK-1)';
+try {
+  //  scripts/unit/cur-alias-check.mjs 가 '비동기 경계 뒤 옛 CUR 별칭 고침'을 잡고, 경계 앞에서만 쓰는 별칭은 안 잡는지 — 시험 폴더로
+  const { spawnSync } = await import('node:child_process');
+  const os = await import('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cur-alias-'));
+  fs.mkdirSync(path.join(dir, 'student'));
+  fs.writeFileSync(path.join(dir, 'student.html'), '<script src="./student.js?v=1"></script><script src="./student/x.js?v=1"></script>');
+  fs.writeFileSync(path.join(dir, 'student/deco.js'), 'function decoNothing() {\n}\n');   // [DECO-LAZY-1] 늦게 부르는 파일도 늘 읽는다
+  fs.writeFileSync(path.join(dir, 'student.js'), [
+    'function good() {', '  const s = CUR;', '  s.gold += 1;', '  DB.saveStudent(CUR);', '  setTimeout(() => renderHUD(), 10);', '}',
+    'async function bad1() {', '  const s = CUR;', '  await sleep(300);', '  s.gold += 7;', '  DB.saveStudent(CUR);', '}', ''].join('\n'));
+  fs.writeFileSync(path.join(dir, 'student/x.js'), [
+    'function bad2() {', '  const prev = CUR;', '  CUR = friend;', '  img.onload = () => { draw(); CUR = prev; };', '}',
+    'function good2() {', '  const me = CUR;', '  fetch(u).then(r => { CUR.title = r.t; DB.saveStudent(CUR); });', '}', ''].join('\n'));
+  const run = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts/unit/cur-alias-check.mjs'), ...extra], { env: { ...process.env, CUR_ALIAS_ROOT: dir }, encoding: 'utf8' });
+  const o1 = run([]), o2 = run(['--baseline', '2']);
+  fs.rmSync(dir, { recursive: true, force: true });
+  const names = [...o1.stdout.matchAll(/ ([\w$]+)\(\) — '/g)].map(m => m[1]);
+  test('비동기 경계 뒤 옛 별칭 고침(await 뒤 s.gold · onload 안 CUR = prev)은 잡고, 경계 앞에서만 쓰거나 CUR 을 다시 읽는 곳은 안 잡음', () =>
+    eq([names, o1.status], [['bad1', 'bad2'], 1]));
+  test('기준선까지는 통과(--baseline 2)', () => eq(o2.status, 0));
+} catch (e) {
+  test('CUR 별칭 검사를 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);

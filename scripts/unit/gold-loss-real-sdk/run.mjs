@@ -7,9 +7,16 @@
 //  사용: node scripts/unit/gold-loss-real-sdk/run.mjs [battle|buySeed|farm|infinite]   → 케이스별 판정 출력(인자 없으면 전부)
 //        node scripts/unit/gold-loss-real-sdk/run.mjs --expect-fixed      → 기대와 다른 케이스가 있으면 exit 1
 //        --profile=student|root|both (기본 root) — student = 학생 기기 판(STUDENT-COLD-1 노드별 구독), root = 교사·옛 판
-import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os';
 import { execFile } from 'node:child_process'; import { promisify } from 'node:util'; import { fileURLToPath } from 'node:url';
 const run = promisify(execFile);
+//  [SYNC-MERGE-2] 브라우저: BROWSER 환경변수 > 맥 크롬 > 윈도 엣지(deco-save-real-sdk 와 같은 규칙 — 맥북에서도 돌게).
+//   프로필 폴더는 실행마다 새로. 운영 DB 주소는 이름풀이에서 막는다(가짜 프로젝트·오프라인이라 원래 안 닿지만 한 겹 더).
+const BROWSER = process.env.BROWSER || (process.platform === 'darwin'
+  ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  : 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
+const PROFILE_ROOT = fs.mkdtempSync(path.join(process.env.TEMP || process.env.TMPDIR || os.tmpdir(), 'qa_q1_realsdk_'));
+const BLOCK_DB = '--host-resolver-rules=MAP *.firebaseio.com ~NOTFOUND, MAP *.firebasedatabase.app ~NOTFOUND, MAP firestore.googleapis.com ~NOTFOUND';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.Q1_REPO || path.resolve(HERE, '..', '..', '..');   // Q1_REPO=<다른 체크아웃> 이면 그 앱 코드로
 const EXPECT_FIXED = process.argv.includes('--expect-fixed');
@@ -33,15 +40,15 @@ const srv = http.createServer((req, res) => {
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 
 // 케이스마다 새 브라우저 한 번. 기대값: battle=NO_LOSS · buySeed=OK
-const CASES = { battle: 'NO_LOSS', buySeed: 'OK', farm: 'NO_LOSS', infinite: 'NO_LOSS', buyEquip: 'OK', buyDeco: 'OK', skill: 'OK' };
+const CASES = { battle: 'NO_LOSS', buySeed: 'OK', farm: 'NO_LOSS', infinite: 'NO_LOSS', buyEquip: 'OK', buyDeco: 'OK', skill: 'OK', study: 'NO_LOSS' };   // study = [SYNC-MERGE-2]
 const only = process.argv.slice(2).find(a => !a.startsWith('--'));
 const PROF = ((process.argv.find(a => a.startsWith('--profile=')) || '--profile=root').split('=')[1]);
 const PROFILES = PROF === 'both' ? ['root', 'student'] : [PROF];
 let bad = 0;
 for (const profile of PROFILES) for (const [name, want] of Object.entries(CASES)) {
   if (only && only !== name) continue;
-  const { stdout } = await run('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${process.env.TEMP}/qa_q1_realsdk_${profile}_${name}`, '--virtual-time-budget=20000', '--dump-dom',
+  const { stdout } = await run(BROWSER,
+    ['--headless=new', '--disable-gpu', '--no-first-run', `--user-data-dir=${path.join(PROFILE_ROOT, profile + '_' + name)}`, BLOCK_DB, '--virtual-time-budget=20000', '--dump-dom',
      `http://127.0.0.1:${srv.address().port}/student.html?case=${name}&profile=${profile}`], { maxBuffer: 1e8, timeout: 120000 });
   const text = (stdout.match(/<pre id="q1-out">([\s\S]*?)<\/pre>/) || [, 'no output — title: ' + (stdout.match(/<title>([^<]*)/) || [])[1]])[1].replace(/&quot;/g, '"');
   const verdict = (text.match(/VERDICT="(\w+)"/) || [])[1] || 'UNKNOWN';
@@ -53,5 +60,6 @@ for (const profile of PROFILES) for (const [name, want] of Object.entries(CASES)
   console.log('');
 }
 srv.close();
+try { fs.rmSync(PROFILE_ROOT, { recursive: true, force: true }); } catch (e) {}
 console.log(bad ? `최종 결과: 🔴 ${bad}건 기대와 다름` : '최종 결과: ✅ 전부 기대대로');
 if (EXPECT_FIXED && bad) process.exit(1);

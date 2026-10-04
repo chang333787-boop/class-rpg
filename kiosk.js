@@ -698,7 +698,7 @@ function requestQuest(studentId, questId, btn) {
 
   s.pendingRewards = s.pendingRewards || [];
   const newRewardId = 'pr_'+Date.now()+'_'+studentId;
-  s.pendingRewards.push({
+  const newReward = {
     id: newRewardId,
     boardQuestId: questId,
     boardQuestType: q.type||'special',
@@ -708,12 +708,17 @@ function requestQuest(studentId, questId, btn) {
     stat: q.stat||'', statVal: q.stat ? (Math.round((parseFloat(q.statVal)||1)*10)/10) : 0,
     icon: q.icon||'📋',
     date: Utils.todayStr(),
-  });
+  };
+  s.pendingRewards.push(newReward);
 
   // Firebase 저장 — pendingRewards 경로만 부분 저장 (학생 exp/gold 등 다른 필드 클로버 방지)
   // 저장 성공 후에만 완료 토스트 — 실패 시 실패 안내 + 버튼 잠금 복구
   // [HOTFIX-KIOSK-PENDING-PATH-1] 실제 student 저장 key 경로에만 부분 저장(껍데기 노드 방지)
-  fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards').set(s.pendingRewards)
+  // [SYNC-MERGE-2] 배열 통째 set → 이 신청 하나만 id 로 더하는 transaction(서버의 지금 목록 위에).
+  //   키오스크 화면 캐시가 낡아도 그사이 교사가 승인해 뺀 보상을 되살리지 않고(두 번 지급), 학생 기기가 막 넣은 신청을 지우지 않는다.
+  //   [TX-RETRY-1] 연결이 끊겨 SDK 가 'disconnect' 로 끝낸 transaction 은 같은 일감으로 다시(DB.prTransaction) — 서버엔 들어갔는데
+  //   실패로 보여 다시 눌러 신청이 두 개 되던 것을 막는다(id 합치기라 다시 돌려도 하나).
+  DB.prTransaction(fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards'), { add: [newReward] })
     .then(() => { showToast(`✅ ${s.name} · ${q.name} 신청했어요 — 선생님 승인 후 보상을 받아요`); })
     .catch(() => {
       // [C6] 저장에 실패했으면 화면에만 추가돼 있던 신청을 되돌린다.
@@ -751,7 +756,8 @@ function cancelQuest(studentId, questId) {
   if (canIdx >= 0) {
     // pendingRewards 경로만 부분 저장 — 저장 성공 후에만 취소 완료 토스트
     // [HOTFIX-KIOSK-PENDING-PATH-1] 실제 student 저장 key 경로에만 부분 저장
-    fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards').set(s.pendingRewards)
+    // [SYNC-MERGE-2] 배열 통째 set → 서버의 지금 목록에서 이 퀘스트 신청만 빼는 transaction(다른 보상은 그대로)
+    DB.prTransaction(fbRef.child('students/'+getStudentStorageKey(s.id)+'/pendingRewards'), { drop: r => r && r.boardQuestId === questId })
       .then(() => { showToast('↩️ 신청을 취소했어요'); })
       .catch(() => { showToast('⚠️ 취소를 저장하지 못했어요 — 다시 시도해주세요'); });
   }

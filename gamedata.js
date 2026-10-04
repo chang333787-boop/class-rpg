@@ -858,6 +858,14 @@ const DB = {
   _fbAdminRef: null,
   _onChangeCb: null,
   _saving: false,
+  // [SYNC-MERGE-2] 학생 기록 합치기 상태 — 설계 docs/sync_merge_design.md
+  _stuBase: {},          // 학생 id → 이 기기가 서버(내 쓰기 포함)에서 마지막으로 본 값(깊은 복사 · 화면 코드가 못 건드림)
+  _stuBaseCb: null,      // onDataChange 콜백이 도는 동안만: 이번 판 **전** 기준(출신 모르는 깊은 복사 CUR 용)
+  _stuRaw: {},           // 학생 id → 지난 판 서버 원문(JSON) — 안 바뀐 학생은 다시 재지 않는다
+  _stuKeyed: null,       // students/<id> 키에 진짜 기록이 있는 학생 id 모음(없으면 칸 저장 대신 통째 set)
+  _stuOrigin: new WeakMap(),   // 학생 객체 → 그 객체가 맞춰져 있는 서버 값(안 보낸 고침 = 객체 − 이것)
+  _stuNext: new WeakMap(),     // 받은 판에 밀린 옛 학생 객체 → 그 자리를 이은 새 객체(옛 객체를 저장하면 새 객체로 넘긴다)
+  _snapLatest: null, _snapQueued: false, _held: null,
 
   async init(opts) {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -866,24 +874,21 @@ const DB = {
     this._profile = (opts && opts.profile) || null;   // [STUDENT-COLD-1] 'student' = 학생 기기
 
     // 실시간 동기화 리스너 — 다른 기기 변경사항 반영
-    //   [STUDENT-COLD-1] 본문은 그대로 두고 이름만 붙였다: root 판은 root on('value') 로,
-    //   학생 판은 노드별 구독을 합친 "가상 root 스냅샷"으로 **같은 함수**를 부른다.
+    //   [STUDENT-COLD-1] root 판은 root on('value') 로, 학생 판은 노드별 구독을 합친 "가상 root 스냅샷"으로 **같은 함수**를 부른다.
+    //   [SYNC-MERGE-2] 받은 판은 적어 두기만 하고 **마이크로태스크에서 마지막 판 하나만** 처리한다.
+    //     SDK 는 이 기기의 set/update **안에서** 이 콜백을 동기로 부른다. 'CUR.gold += g → DB.logGold() → DB.saveStudent(CUR)'
+    //     한가운데서 캐시를 갈아 끼우면 CUR 이 옛 값으로 바뀌어 번 골드가 사라졌다(M1). 한 덩어리 코드가 다 돈 뒤에 바꾼다.
+    //     SDK 는 내 쓰기를 판에 겹쳐 보여 주므로 마지막 판이 앞의 판을 다 담고 있다.
     const liveHandler = (snap) => {
-      const d = snap.val();
-      if (!d) return;
-
-      if (this._saving) {
-        // 내가 저장 중일 때도 settings 변경은 반드시 처리
-        const newSettings = d.settings;
-        const oldSettings = (this._cache || {}).settings;
-        if (JSON.stringify(newSettings) === JSON.stringify(oldSettings)) return;
-        if (this._cache) this._cache.settings = newSettings;
-        if (this._onChangeCb) this._onChangeCb();
-        return;
-      }
-
-      this._cache = this._migrate(this._normalizeArrays(d));
-      if (this._onChangeCb) this._onChangeCb();
+      this._snapLatest = snap;
+      if (this._snapQueued) return;
+      this._snapQueued = true;
+      Promise.resolve().then(() => {
+        this._snapQueued = false;
+        const s = this._snapLatest;
+        this._snapLatest = null;
+        if (s) this._onSnap(s);
+      });
     };
     this._liveHandler = liveHandler;
 
@@ -904,12 +909,102 @@ const DB = {
       data = this._defaultData();
       if (this._profile !== 'student') await this._rootSet(data);   // [STUDENT-COLD-1] G1 — 빈 DB 설치는 교사 화면만
     }
-    this._cache = this._migrate(this._normalizeArrays(data));
+    this._cache = this._ingest(data);   // [SYNC-MERGE-2] 정규화 + 학생 기준 적기
 
     // 첫 리스너는 아래 실시간 리스너를 건 **뒤**에 뗀다 — 먼저 떼면 구독이 끊겨 root 를 다시 통째로 받는다
     setTimeout(() => this._fbRef.off('value', firstLoad), 0);
 
     this._fbRef.on('value', liveHandler);
+  },
+
+  // ── [SYNC-MERGE-2] 받은 판 처리 ──────────────────────────────
+  //  학생은 판마다 새 객체(예전과 같음)인데, 이전 객체에 아직 안 보낸 고침이 있으면 새 서버 값 위에 다시 얹는다(_stuAdopt).
+  //  서버 원문이 안 바뀐 학생은 이전 객체를 그대로 쓴다.
+  //  저장 창(_saving: 작품 고치기·설정 저장·비번 요청이 연다) 동안에도 학생 기록·settings 는 바로 반영한다.
+  //  예전엔 창 동안 온 판을 settings 말고 **버려서**, 학생이 계속 저장하면 교사 승인이 영영 안 보이고(R2)
+  //  다음 통째 저장이 승인 전 값으로 덮었다(M2). 나머지 노드는 창이 닫힐 때(_endSaving) 그 사이 마지막 판으로 바꾼다.
+  _onSnap(snap) {
+    const d = snap.val();
+    if (!d) return;
+    const prevBase = this._stuBase;
+    const next = this._ingest(d);
+    if (this._saving && this._cache) {
+      const sameSettings = JSON.stringify(next.settings) === JSON.stringify(this._cache.settings);
+      this._cache.students = next.students;
+      if (!sameSettings) this._cache.settings = next.settings;
+      this._held = next;
+    } else {
+      this._held = null;
+      this._cache = next;
+    }
+    this._fireChange(prevBase);
+  },
+
+  // 저장 창을 닫는 자리(창을 여는 곳마다 setTimeout 으로 부른다). 창 동안 받아 둔 판이 있으면 지금 캐시로.
+  _endSaving() {
+    this._saving = false;
+    const held = this._held;
+    this._held = null;
+    if (!held || !this._cache) return;
+    held.students = this._cache.students;   // 학생·설정은 창 동안 이미 반영(그 뒤 이 기기 저장까지 들어 있다)
+    held.settings = this._cache.settings;
+    this._cache = held;
+    this._fireChange(this._stuBase);
+  },
+
+  // onDataChange 콜백 — 도는 동안만 '이번 판 전 기준'을 열어 둔다. student.js 콜백 첫머리의 decoFlush('스냅샷') 이
+  //   아직 안 바뀐 **깊은 복사 CUR**(로그인 때 만든 것, 출신 모름)을 저장할 때 방금 온 남의 변경을 되돌리지 않게.
+  _fireChange(prevBase) {
+    if (!this._onChangeCb) return;
+    this._stuBaseCb = prevBase;
+    try { this._onChangeCb(); } finally { this._stuBaseCb = null; }
+  },
+
+  // 서버 판(d) → 캐시 모양. 학생 기준·출신을 적고 이전 캐시의 학생 객체를 이어 쓴다. d 는 이 함수가 바꾼다(정규화).
+  _ingest(d) {
+    const raw = d && d.students;
+    const keyed = new Set(), rawStr = {};
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      for (const k of Object.keys(raw)) {
+        const v = raw[k];
+        if (v && typeof v === 'object' && v.id === k) { keyed.add(k); rawStr[k] = JSON.stringify(v); }
+      }
+    }
+    const next = this._migrate(this._normalizeArrays(d));
+    this._stuKeyed = keyed;
+    this._stuAdopt(next.students, rawStr);
+    return next;
+  },
+
+  _stuAdopt(list, rawStr) {
+    const prev = new Map();
+    for (const s of ((this._cache && this._cache.students) || [])) if (s && s.id) prev.set(s.id, s);
+    const oldBase = this._stuBase || {}, oldRaw = this._stuRaw || {};
+    const base = {};
+    for (let i = 0; i < list.length; i++) {
+      const N = list[i], id = N.id, O = prev.get(id);
+      // 서버 원문이 지난 판과 같으면 이 학생은 그대로(안 보낸 고침도 그대로 둔다)
+      if (O && O !== N && rawStr[id] !== undefined && rawStr[id] === oldRaw[id] && oldBase[id] && this._stuOrigin.has(O)) {
+        base[id] = oldBase[id];
+        list[i] = O;
+        continue;
+      }
+      const nb = this._clone(N);
+      base[id] = nb;
+      this._stuOrigin.set(N, nb);
+      if (!O || O === N) continue;
+      // 옛 객체(O)는 건드리지 않고 **새 객체(N)** 를 캐시에 둔다 — 예전처럼 판마다 새 객체라 화면 코드의 'CUR = fresh' 앞뒤 비교
+      //   (#1161 선생님 승인 레벨업 축하: prevLv = CUR.level → CUR = fresh)가 그대로 맞는다.
+      //   O 에 안 보낸 고침이 있으면 N 이 **넘겨받는다**(셈 칸은 차이 · 보상은 id · 그 밖은 내 값을 N 에 얹고, O 는 고침 없음으로).
+      //   O 를 나중에 저장하면(스냅샷 콜백 첫머리 decoFlush 가 옛 CUR 을 저장) N 으로 넘겨 저장한다(_stuNext) — 한 번만 나간다.
+      const orig = this._stuOrigin.get(O) || oldBase[id];
+      const edits = orig ? this._stuDiff(orig, O) : null;
+      if (edits && !this._opsEmpty(edits)) this._assign(N, this._stuApply(nb, edits));
+      this._stuOrigin.set(O, this._clone(O));
+      this._stuNext.set(O, N);
+    }
+    this._stuBase = base;
+    this._stuRaw = rawStr;
   },
 
   // ── [STUDENT-COLD-1] 학생 기기 부분 캐시 ─────────────────────
@@ -969,7 +1064,7 @@ const DB = {
         if (this._studentReady) this._studentEmit();
       }, reject);
     })));
-    this._cache = this._migrate(this._normalizeArrays(this._studentVal()));
+    this._cache = this._ingest(this._studentVal());   // [SYNC-MERGE-2] 정규화 + 학생 기준 적기
     this._studentReady = true;
     return true;
   },
@@ -1169,16 +1264,266 @@ const DB = {
     try { if (typeof window !== 'undefined' && typeof window.onDbSaveError === 'function') window.onDbSaveError(e); } catch(_) {}
   },
 
-  saveStudent(student) {
+  // ── [SYNC-MERGE-2] 학생 저장 = 바뀐 칸만 ─────────────────────
+  //  예전: students/<id> 통째 set → 마지막 저장이 이겨, 그사이 교사 승인·다른 탭·키오스크가 바꾼 골드·보상이 사라졌다(M2,
+  //    운영 2명 5,293G). 지금: 이 객체가 맞춰져 있던 서버 값(출신)과 비교해 **바뀐 것만** 보낸다.
+  //   · 셈 칸(STU_COUNTERS)은 차이를 ServerValue.increment 로 — 두 기기가 동시에 더해도 둘 다 남는다
+  //   · pendingRewards 는 id 로 더한 것·뺀 것·바뀐 것을 transaction 으로 서버의 지금 목록에 합친다(배열 모양 그대로)
+  //   · 그 밖은 바뀐 칸만 update(칸 단위). 안 바뀐 칸은 안 보낸다 — 바뀐 게 없으면 쓰기 0
+  //   · 처음 보는 학생(새 학생)·students/<id> 키에 진짜 기록이 없는 학생(옛 숫자 키만)은 지금처럼 통째 set(껍데기 노드 방지)
+  //  호출부(student.js·admin.js)는 그대로 — 객체를 고치고 saveStudent(객체). 학생 기록은 받을 때 합치므로(_stuAdopt)
+  //  저장 창(_saving)을 열지 않는다.
+  //  돌려주는 값: 이번 저장의 쓰기가 **모두** 끝나면 풀리는 약속(바뀐 게 없으면 바로 풀림). 실패는 _onSaveError 로도 알린다.
+  //   관리 화면이 '승인 완료' 알림을 저장 뒤에 띄울 때 쓴다(쓰기가 update·transaction 여럿일 수 있어 한 약속으로 묶는다).
+  STU_COUNTERS: ['gold', 'totalGold', 'exp'],
+
+  //  opt.atomic: 교사 승인 — 보상 빼기와 골드·EXP 더하기를 students/<id> transaction 하나로(_stuSendAtomic).
+  //
+  //  ⚠️ CUR 별칭 규칙(검토 #7): 받은 판마다 학생은 **새 객체**다(_stuAdopt) — 자기 저장 뒤에도 곧 CUR 이 새 객체로 바뀐다.
+  //   그래서 `const s = CUR` 로 잡아 두고 await·setTimeout·then 을 건넌 뒤 s 를 고치면, 그 고침은 saveStudent(CUR)(새 객체)로는
+  //   안 나간다. 비동기 경계 뒤에는 CUR 을 다시 읽어 고칠 것(옛 객체를 saveStudent(옛 객체)로 저장하면 _stuNext 로 넘겨지긴 한다).
+  //   검사: scripts/unit/cur-alias-check.mjs(precheck 'cur-alias').
+  saveStudent(student, opt) {
+    // 받은 판에 밀린 옛 객체면: 밀린 뒤에 그 객체에서 고친 것만 이은 객체(지금 캐시)에 얹고, 이은 객체를 저장한다.
+    //   옛 객체 자신은 안 바꾼다(콜백이 그 옛 값과 새 값을 견준다). 밀릴 때의 고침은 이미 이은 객체가 넘겨받았다.
+    if (this._stuNext.has(student)) {
+      let next = this._stuNext.get(student);
+      while (this._stuNext.has(next)) next = this._stuNext.get(next);
+      const late = this._stuDiff(this._stuOrigin.get(student) || {}, student);
+      if (!this._opsEmpty(late)) {
+        this._assign(next, this._stuApply(next, late));
+        this._stuOrigin.set(student, this._clone(student));
+      }
+      return this.saveStudent(next, opt);
+    }
     const db = this.load();
     const idx = db.students.findIndex(s => s.id === student.id);
+    // 출신을 모르는 객체(로그인 때 깊은 복사한 CUR)는 기준으로 본다 — onDataChange 콜백 안이면 이번 판 전 기준
+    const origin = this._stuOrigin.get(student) || (this._stuBaseCb || this._stuBase)[student.id] || null;
     if (idx >= 0) db.students[idx] = student; else db.students.push(student);
     this._cache = db;
-    this._saving = true;
-    // id 키 기반 저장 (인덱스 충돌 방지)
-    this._fbRef.child('students/' + student.id).set(student).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+    const ref = this._fbRef.child('students/' + student.id);
+    if (!origin || !this._stuKeyed || !this._stuKeyed.has(student.id)) {
+      const whole = this._clone(student);
+      this._stuOrigin.set(student, whole);
+      this._stuBase[student.id] = whole;
+      if (this._stuKeyed) this._stuKeyed.add(student.id);
+      const p = ref.set(student);   // id 키 기반 저장 (인덱스 충돌 방지)
+      p.catch(e => this._onSaveError(e));
+      return p;
+    }
+    const ops = this._stuDiff(origin, student);
+    const expected = this._stuApply(this._stuBase[student.id] || origin, ops);
+    // 레벨: 경험치를 더하기로 보낼 때, 이 기기가 레벨을 경험치로 맞춰 쓰는 중이면 **합친 경험치**로 다시 맞춘다
+    //   (두 곳이 동시에 경험치를 더해 문턱을 넘으면 각자 낮은 레벨을 쓰던 자리)
+    const levelTrack = ops.inc.exp !== undefined && typeof Utils !== 'undefined' && student.level === Utils.levelFromExp(student.exp);
+    if (levelTrack) {
+      const lv = Utils.levelFromExp(expected.exp);
+      if (lv !== expected.level) { expected.level = lv; ops.set.level = lv; }
+    }
+    this._assign(student, this._clone(expected));   // 이 객체도 서버 최신 + 내 고침으로(그사이 온 남의 변경 포함)
+    this._stuOrigin.set(student, expected);
+    this._stuBase[student.id] = expected;
+    if (this._opsEmpty(ops)) return Promise.resolve();
+    if (opt && opt.atomic && ops.pr && ops.pr.del.length) return this._stuSendAtomic(student.id, ops, levelTrack);
+    return this._stuSend(student.id, ops);
+  },
+
+  // ── [TX-RETRY-1] transaction 다시 돌리기 ─────────────────────
+  //  SDK 9.23: 보내 놓고 답을 못 받은 transaction 은 연결이 끊기면 'disconnect' 로 끝내고 **다시 보내지 않는다**
+  //   (PersistentConnection.cancelSentTransactions_). 보통 쓰기(set·update·increment)는 다시 이어질 때 다시 보낸다(restoreState_).
+  //   그래서 교사 승인의 골드(update)만 들어가고 보상 빼기(transaction)는 취소돼 보상이 되살아나거나(두 번 승인),
+  //   서버엔 들어간 신청이 실패로 보여 아이가 다시 신청했다.
+  //  같은 일감으로 다시 돌린다 — 보상 일감은 id 합치기(있으면 안 더함·없으면 안 뺌), 승인 transaction 은 '보상이 있을 때만'이라
+  //   이미 서버에 들어간 것을 다시 돌려도 한 번 돈 것과 같다. 끊긴 동안 시작한 transaction 은 SDK 가 다시 이어질 때 보낸다.
+  //  'set': 이 기기의 다른 쓰기가 같은 자리를 덮어 SDK 가 버린 것(서버엔 안 들어감) — 이것도 다시 돈다.
+  TX_RETRY: 5,
+  _txRetry(ref, fn, left, onRetry) {
+    const n = left == null ? this.TX_RETRY : left;
+    return ref.transaction(fn).catch(e => {
+      const why = e && e.message;
+      if (n > 0 && (why === 'disconnect' || why === 'set')) {
+        if (onRetry) onRetry(why);
+        return this._txRetry(ref, fn, n - 1, onRetry);
+      }
+      throw e;
     });
+  },
+  //  pendingRewards id 합치기 transaction — 학생 저장·addPendingReward·키오스크 신청/취소·수채화 작품 제출이 모두 이것을 쓴다.
+  //   ref = 그 학생의 pendingRewards 자리(키오스크·수채화는 자기 ref 를 넘긴다) · ops = _prApply 일감
+  prTransaction(ref, ops) {
+    return this._txRetry(ref, cur => this._prApply(cur, ops)).then(r => {
+      if (r && r.committed === false) throw new Error('[SYNC-MERGE-2] pendingRewards 합치기를 못 함');
+      return r;
+    });
+  },
+
+  // ── [APPROVE-ATOMIC-1] 승인 = students/<id> transaction 하나 ──────────
+  //  예전(바뀐 칸 update + 보상 transaction 둘)은 하나만 실패하면 골드만 들어가고 보상이 남거나(두 번 승인),
+  //   보상만 빠지고 골드가 안 들어갔다(검토 F2). 이제 **빼려는 보상이 서버에 모두 있을 때만** 빼면서 골드·EXP·그 밖을 함께 얹는다.
+  //  보상이 이미 없으면(다른 탭·다른 기기가 먼저 승인 · 학생이 취소) 아무것도 안 바꾸고 code 'REWARD_GONE' 으로 실패 —
+  //   같은 보상을 두 번 주지 않는다(검토 D2 교사 두 기기). 'disconnect'·'set' 이면 같은 일감으로 다시(_txRetry · 이미 들어갔으면 보상이 없어 멈춤).
+  //  관리 화면은 보상마다 한 번씩 부른다(approveAndSave — 한 학생의 여러 보상을 한 쓰기로 묶으면 하나가 사라질 때 나머지도 막힌다).
+  //  학생 기록 전체를 보내는 쓰기라(예전 통째 set 과 같은 크기) 승인에만 쓴다. 학생 기기가 아주 잦게 저장해 서버 값이 계속 바뀌면
+  //   SDK 가 통째 기록을 25번까지 다시 보낸다(검토 실측 391KB·3.5초) — 그래서 일감이 ATOMIC_RUNS 번을 넘게 불리면 그만두고
+  //   _stuSendGated(작은 보상 transaction 으로 그 보상을 실제로 뺐을 때만 골드·EXP update)로 보낸다. SDK 'maxretry' 도 같은 길.
+  ATOMIC_RUNS: 4,
+  _rewardGone() { const e = new Error('REWARD_GONE: 이미 처리된 보상이라 아무것도 안 바꿈'); e.code = 'REWARD_GONE'; return e; },
+  _stuSendAtomic(id, ops, levelTrack) {
+    const ref = this._fbRef.child('students/' + id);
+    const gate = ops.pr.del.slice();
+    let runs = 0, busy = false, sawDisc = false;
+    const fn = cur => {
+      if (++runs > this.ATOMIC_RUNS) { busy = true; return; }   // 계속 낡음 → 그만(아래에서 작은 쓰기로)
+      if (cur == null) return null;   // 이 기기에 아직 값이 없을 때 — SDK 가 서버 값과 다르면 서버 값으로 다시 부른다
+      const have = new Set(this._prList(cur.pendingRewards).map(r => this._prKey(r)));
+      if (gate.some(k => !have.has(k))) return;   // 이미 없음 → 그만(아무것도 안 바꿈)
+      const out = this._stuApply(cur, ops);
+      if (levelTrack && typeof Utils !== 'undefined') out.level = Utils.levelFromExp(out.exp);
+      return out;
+    };
+    //  끊김은 **한 번이라도** 있었는지 기억한다(검토 Y6: 끊김 뒤 다시 → 'set' 으로 또 다시 → 마지막 이유만 보면 '이미 처리'로 잘못 알림)
+    const onRetry = why => { if (why === 'disconnect') sawDisc = true; runs = 0; busy = false; };
+    const p = this._txRetry(ref, fn, null, onRetry).then(r => {
+      //  들어갔으면(committed) 그걸로 끝 — '그만'은 들어가지 않았을 때만 폴백으로
+      if (busy && !(r && r.committed)) return this._stuSendGated(id, ops, false);   // 폴백은 자기 끊김만 본다 — 앞 transaction 의 끊김을 넘기면 그 쓰기가 들어갔는데 골드를 또 보낼 수 있다(3차 검토 #3)
+      if (!r || r.committed === false || (r.snapshot && typeof r.snapshot.val === 'function' && r.snapshot.val() == null)) {
+        //  끊김('disconnect') 뒤 다시 돌렸더니 보상이 없음 = 거의 늘 **내 첫 쓰기가 서버에 들어갔는데 답만 못 받은 것** → 승인 끝으로 본다
+        //   (드물게 그 몇 초 사이 다른 기기가 승인했거나 학생이 취소했어도 두 번 주지는 않는다 — 설계 문서 '남은 위험')
+        if (sawDisc) { console.warn('[APPROVE-ATOMIC-1] 끊긴 뒤 다시 보니 이미 들어가 있음:', id); return r; }
+        throw this._rewardGone();
+      }
+      return r;
+    }, e => {
+      if (e && e.message === 'maxretry') return this._stuSendGated(id, ops, false);   // 폴백은 자기 끊김만 본다 — 앞 transaction 의 끊김을 넘기면 그 쓰기가 들어갔는데 골드를 또 보낼 수 있다(3차 검토 #3)
+      throw e;
+    });
+    //  REWARD_GONE 은 저장 실패가 아니라 일부러 안 바꾼 것 — '인터넷 연결 확인' 알림 대신 승인 화면이 따로 알린다
+    p.catch(e => { if (e && e.code === 'REWARD_GONE') console.warn('[APPROVE-ATOMIC-1]', id, e.message); else if (!(e && e._told)) this._onSaveError(e); });
+    return p;
+  },
+  //  승인 폴백: 보상 transaction(작은 pendingRewards 자리)으로 빼려는 보상이 **모두 있을 때만** 빼고, 그게 된 뒤에만 골드·EXP 등을 update.
+  //   '있을 때만'은 지킨다(다른 교사 기기와 겹쳐도 한 번 — 검토 Y4). 두 쓰기라 둘 사이(왕복 하나)에 update 가 거부되거나 창이 닫히면 보상만 빠진다(설계 문서 §5).
+  //   끊김 뒤 다시 보니 보상이 없으면 내 첫 보상 쓰기가 들어간 것으로 보고 update 를 보낸다(_stuSendAtomic 과 같은 가정).
+  _stuSendGated(id, ops, sawDisc) {
+    const gate = ops.pr.del.slice();
+    let had = false, disc = !!sawDisc;
+    const prRef = this._fbRef.child('students/' + id + '/pendingRewards');
+    return this._txRetry(prRef, cur => {
+      if (cur == null) { had = false; return null; }   // 값이 없으면 null(SDK 가 서버 값으로 다시 부름 · 정말 없으면 아무것도 안 바뀜)
+      const have = new Set(this._prList(cur).map(r => this._prKey(r)));
+      had = gate.every(k => have.has(k));
+      return had ? this._prApply(cur, ops.pr) : undefined;
+    }, null, why => { if (why === 'disconnect') disc = true; }).then(r => {
+      if (!(r && r.committed !== false && had) && !disc) throw this._rewardGone();
+      const rest = { set: ops.set, inc: ops.inc, pr: null };
+      //  _stuSend 는 실패를 스스로 알린다(_onSaveError) — 두 번 안 알리게 표시
+      return this._opsEmpty(rest) ? r : this._stuSend(id, rest).catch(e => { if (e && typeof e === 'object') e._told = true; throw e; });
+    });
+  },
+
+  //  보낼 일감 → 쓰기. 셈 칸은 increment, 그 밖은 칸 update, 보상은 id 합치기 transaction.
+  _stuSend(id, ops) {
+    const ps = [];
+    try {
+      const ref = this._fbRef.child('students/' + id);
+      const SV = (typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue) || null;
+      const up = {};
+      for (const k of Object.keys(ops.set)) up[k] = ops.set[k];
+      for (const k of Object.keys(ops.inc)) {
+        const d = ops.inc[k];
+        if (SV && SV.increment) up[k] = SV.increment(d);
+        else ps.push(this._fbRef.child('students/' + id + '/' + k).transaction(v => ((typeof v === 'number' && isFinite(v)) ? v : 0) + d));
+      }
+      if (Object.keys(up).length) ps.push(ref.update(up));
+      if (ops.pr) ps.push(this.prTransaction(this._fbRef.child('students/' + id + '/pendingRewards'), ops.pr));
+    } catch (e) { this._onSaveError(e); }
+    const all = Promise.all(ps);
+    all.catch(e => this._onSaveError(e));
+    return all;
+  },
+
+  //  기준(a) → 지금(b) 사이 바뀐 것 = 보낼 일감 { set, inc, pr }. 순수 함수.
+  _stuDiff(a, b) {
+    const ops = { set: {}, inc: {}, pr: null };
+    a = a || {}; b = b || {};
+    for (const k of new Set(Object.keys(a).concat(Object.keys(b)))) {
+      if (k === 'id') continue;
+      const av = a[k], bv = b[k];
+      if (this._same(av, bv)) continue;
+      if (k === 'pendingRewards') { ops.pr = this._prDiff(av, bv); continue; }
+      if (this._badNum(bv)) { console.error('[SYNC-MERGE-2] 숫자가 아닌 값(NaN·Infinity)이라 이 칸은 안 보냄:', k); continue; }
+      if (this.STU_COUNTERS.includes(k) && typeof bv === 'number' && (av == null || (typeof av === 'number' && isFinite(av)))) {
+        ops.inc[k] = bv - (av || 0);
+        continue;
+      }
+      ops.set[k] = bv === undefined ? null : this._clone(bv);
+    }
+    return ops;
+  },
+  //  학생 값 s 에 일감을 얹은 새 값(s 는 안 바꾼다). 셈 칸은 서버 increment 와 같은 셈(숫자가 아니면 0 에서).
+  _stuApply(s, ops) {
+    const out = this._clone(s || {}) || {};
+    for (const k of Object.keys(ops.set)) { const v = ops.set[k]; if (v == null) delete out[k]; else out[k] = this._clone(v); }
+    for (const k of Object.keys(ops.inc)) { const c = out[k]; out[k] = ((typeof c === 'number' && isFinite(c)) ? c : 0) + ops.inc[k]; }
+    if (ops.pr) out.pendingRewards = this._prApply(out.pendingRewards, ops.pr);
+    return out;
+  },
+  _opsEmpty(ops) { return !ops || (!Object.keys(ops.set).length && !Object.keys(ops.inc).length && !ops.pr); },
+  //  o 를 src 와 같게 **제자리로** 맞춘다(바뀐 칸만 갈아 끼움 · src 에 없는 칸은 지움). src 값은 o 가 가져간다.
+  _assign(o, src) {
+    for (const k of Object.keys(o)) if (!(k in src)) delete o[k];
+    for (const k of Object.keys(src)) if (!this._same(o[k], src[k])) o[k] = src[k];
+  },
+  _clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); },
+  //  같은 값인가 — undefined·null 은 같게(Firebase 에서 둘 다 '없음'), 키 순서가 달라도 같게(서버는 키를 정렬해 준다)
+  _same(a, b) {
+    if (a === b) return true;
+    const ja = a === undefined ? 'null' : JSON.stringify(a), jb = b === undefined ? 'null' : JSON.stringify(b);
+    if (ja === jb) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+    return this._canon(a) === this._canon(b);
+  },
+  _canon(v) {
+    return JSON.stringify(v, (k, x) => {
+      if (!x || typeof x !== 'object' || Array.isArray(x)) return x;
+      const o = {};
+      for (const key of Object.keys(x).sort()) o[key] = x[key];
+      return o;
+    });
+  },
+  _badNum(v) {
+    if (typeof v === 'number') return !isFinite(v);
+    if (!v || typeof v !== 'object') return false;
+    for (const k of Object.keys(v)) if (this._badNum(v[k])) return true;
+    return false;
+  },
+
+  // ── [SYNC-MERGE-2] pendingRewards id 합치기 (배열 모양 그대로) ──
+  //  열쇠 = 보상 id(옛 보상에 id 가 없으면 내용 전체). 순수 함수 — 키오스크·수채화도 transaction 안에서 부른다(DB 상태 안 씀).
+  _prKey(r) { return (r && typeof r === 'object' && r.id != null && r.id !== '') ? 'i:' + r.id : 'j:' + this._canon(r); },
+  _prList(v) { return (v == null ? [] : Array.isArray(v) ? v : Object.values(v)).filter(x => x != null); },
+  _prDiff(a, b) {
+    const am = new Map(), bm = new Map();
+    for (const r of this._prList(a)) am.set(this._prKey(r), r);
+    for (const r of this._prList(b)) bm.set(this._prKey(r), r);
+    const del = [], add = [], put = [];
+    for (const k of am.keys()) if (!bm.has(k)) del.push(k);
+    for (const [k, r] of bm) {
+      if (!am.has(k)) add.push(this._clone(r));
+      else if (!this._same(am.get(k), r)) put.push(this._clone(r));
+    }
+    return (del.length || add.length || put.length) ? { del, add, put } : null;
+  },
+  //  서버의 지금 목록(cur)에 일감을 얹은 새 배열. del: 열쇠로 빼기 · drop: 조건으로 빼기 · put: 있으면 바꾸기(없으면 안 살림) · add: 없으면 더하기
+  _prApply(cur, ops) {
+    let list = this._prList(cur);
+    if (!ops) return list;
+    if (ops.del && ops.del.length) { const d = new Set(ops.del); list = list.filter(r => !d.has(this._prKey(r))); }
+    if (typeof ops.drop === 'function') list = list.filter(r => !ops.drop(r));
+    for (const r of (ops.put || [])) { const k = this._prKey(r); list = list.map(x => (this._prKey(x) === k ? this._clone(r) : x)); }
+    for (const r of (ops.add || [])) { const k = this._prKey(r); if (!list.some(x => this._prKey(x) === k)) list.push(this._clone(r)); }
+    return list;
   },
 
   saveQuestLog(log) {
@@ -1349,7 +1694,7 @@ const DB = {
     this._saving = true;
     const rec = db.artworks[idx];
     return this._artworkKeys(id).then(keys => Promise.all(keys.map(k => this._fbRef.child('artworks/' + k).set(rec)))).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 300);
+      setTimeout(() => this._endSaving(), 300);   // [SYNC-MERGE-2] 창 동안 받은 판을 버리지 않고 이때 반영
     });
   },
 
@@ -1364,7 +1709,7 @@ const DB = {
     this._saving = true;
     // settings 노드만 부분 저장 (root 전체 set 방지)
     this._fbRef.child('settings').set(s).catch(e => this._onSaveError(e)).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);   // [SYNC-MERGE-2] 창 동안 받은 판을 버리지 않고 이때 반영
     });
   },
 
@@ -1501,8 +1846,14 @@ const DB = {
     s.pendingRewards = [...(s.pendingRewards || []), reward];
     this._cache = db;
     if (student !== s) student.pendingRewards = s.pendingRewards;
-    return this._fbRef.child('students/' + s.id + '/pendingRewards').set(s.pendingRewards)
-      .catch(e => this._onSaveError(e));
+    // [SYNC-MERGE-2] 배열 통째 set → 이 보상 하나만 id 로 더하는 transaction. 그사이 교사가 승인해 뺀 보상을 되살리거나
+    //   다른 기기가 막 넣은 신청을 지우지 않는다. 보낸 것으로 적어 두어(출신·기준) 뒤의 saveStudent 가 다시 더하지 않게.
+    const pr = { del: [], add: [this._clone(reward)], put: [] };
+    const ops = { set: {}, inc: {}, pr };
+    for (const o of new Set([s, student])) { const og = this._stuOrigin.get(o); if (og) this._stuOrigin.set(o, this._stuApply(og, ops)); }
+    if (this._stuBase[s.id]) this._stuBase[s.id] = this._stuApply(this._stuBase[s.id], ops);
+    return this.prTransaction(this._fbRef.child('students/' + s.id + '/pendingRewards'), pr)
+      .then(() => {}).catch(e => this._onSaveError(e));
   },
 
   // [ARTFREE-1] 좋아요 — artworks/<id>/likes/<studentId> 한 칸만 쓴다(작품 통짜 set 금지).
@@ -1780,7 +2131,7 @@ const DB = {
     this._saving = true;
     // 요청 단위 부분 저장 (root 전체 set 방지, id 키 기반)
     this._fbRef.child('pwResetRequests/' + r.id).set(r).finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);   // [SYNC-MERGE-2] 창 동안 받은 판을 버리지 않고 이때 반영
     });
   },
   removePwResetRequest(id) {
@@ -1790,7 +2141,7 @@ const DB = {
     this._saving = true;
     // 요청 단위 삭제 (root 전체 set 방지)
     this._fbRef.child('pwResetRequests/' + id).remove().finally(() => {
-      setTimeout(() => { this._saving = false; }, 500);
+      setTimeout(() => this._endSaving(), 500);   // [SYNC-MERGE-2] 창 동안 받은 판을 버리지 않고 이때 반영
     });
   },
   getPwResetRequests()    { return this.load().pwResetRequests || []; },
