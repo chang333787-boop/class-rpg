@@ -142,8 +142,8 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard'];
-const titles = {thinkboard:'생각판',dashboard:'대시보드',students:'학생 목록',approve:'활동 승인',
+const pages = ['dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard','learnapps'];
+const titles = {thinkboard:'생각판', learnapps:'학습 앱 기록',dashboard:'대시보드',students:'학생 목록',approve:'활동 승인',
   rank:'랭킹',quests:'퀘스트 관리',reward:'보상 지급',artwork:'작품 관리', books:'독서 현황', villages:'우리 마을',
   memories:'추억 관리',
   recorder:'리코더 관리',
@@ -165,6 +165,7 @@ const NAV_ICONS = {
   stats: '<path d="M4 20V11M10 20V5M16 20v-7M2.5 20.5h19"/>',
   artwork: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/>',
   thinkboard: '<path d="M4 4h16v12H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/>',
+  learnapps: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><path d="M17.25 13.5v7.5M13.5 17.25H21"/>',
   villages: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   books: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5zM4 19.5A1.5 1.5 0 0 0 5.5 21H20"/>',
   memories: '<path d="M4 7.5h3l1.8-2.5h6.4L17 7.5h3a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
@@ -182,6 +183,51 @@ function fillNavIcons() {
   });
 }
 fillNavIcons();
+
+// ══ [ADMIN-TPL-1] admin.html 은 정적 HTML 이다 ══════════════════════
+//  예전엔 칭호 선택지·스킬 계수 칸·도감 보상 칸·독서 주제 선택지를 HTML 안에 `${...}` JS 템플릿으로 적어 두어
+//  (3월 첫 업로드부터) 화면에 글자 그대로 나왔다 — 칭호는 '${t}' 하나, 계수 칸은 id 'bs-nm-${lv}' 하나뿐이라
+//  저장하면 battleNum 이 칸을 못 찾아 계수가 기본값으로 덮였고, 도감 보상 칸은 없어서 loadDexSettings 가 깨졌다.
+//  이제 여기서 한 번 그린다(admin.js 는 body 끝에서 읽혀 칸 자리가 이미 있다).
+const BOOK_CATEGORIES = ['우정', '가족', '용기', '배려', '꿈·성장', '자연·생명'];   // student.js 독서 기록 주제와 같다
+const DEX_ZONES = [
+  { z: 'beginner',     label: '🌿 초급', n: 30 },
+  { z: 'intermediate', label: '🔥 중급', n: 50 },
+  { z: 'advanced',     label: '⚡ 고급', n: 20 },
+];
+function fillStaticTemplates() {
+  const titleSel = document.getElementById('rw-title');
+  if (titleSel && titleSel.options.length <= 1) {
+    (GAME_DATA.titles || []).forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; titleSel.appendChild(o); });
+  }
+  const multCell = (pre, lv) => `
+              <div class="text-center">
+                <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.2rem">Lv${lv}</div>
+                <input class="form-input" type="number" id="${pre}-${lv}" step="0.01"
+                  style="width:68px;text-align:center;font-size:.8rem">
+              </div>`;
+  const nmWrap = document.getElementById('bs-nm-wrap');
+  if (nmWrap && !nmWrap.children.length) nmWrap.innerHTML = [1, 2, 3, 4, 5, 6, 7].map(lv => multCell('bs-nm', lv)).join('');
+  const elWrap = document.getElementById('bs-el-wrap');
+  if (elWrap && !elWrap.children.length) elWrap.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7].map(lv => multCell('bs-el', lv)).join('');
+  const dexWrap = document.getElementById('dex-zone-wrap');
+  if (dexWrap && !dexWrap.children.length) dexWrap.innerHTML = DEX_ZONES.map(({ z, label, n }) => `
+            <div style="background:rgba(255,255,255,.03);border-radius:8px;padding:.7rem">
+              <div style="font-size:.8rem;font-weight:700;margin-bottom:.5rem">${label} (${n}마리 완성)</div>
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+                <span class="text-muted-base">달성 골드:</span>
+                <input class="form-input w-80" type="number" id="dex-${z}-gold" value="100" min="0">
+                <span class="text-muted-base">G</span>
+                <span class="text-muted-base">칭호:</span>
+                <input class="form-input" id="dex-${z}-title" placeholder="없음" style="width:100px;font-size:.78rem">
+              </div>
+            </div>`).join('');
+  const catSel = document.getElementById('books-cat-filter');
+  if (catSel && catSel.options.length <= 1) {
+    BOOK_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+  }
+}
+fillStaticTemplates();
 
 // ══ [NARROW-1] 좁은 화면 메뉴 서랍 ════════════════════════════
 //  768px 이하에서만 의미가 있다. 넓은 화면에서는 햄버거 버튼이 CSS 로 숨겨져 있어
@@ -229,6 +275,7 @@ function nav(page, el) {
   // 페이지 전환 시 스크롤 최상단으로
   document.querySelector('.main').scrollTop = 0;
   if (page === 'thinkboard') openThinkboardInline();   // [THINKBOARD-2] 관리 화면 안에서
+  if (page === 'learnapps')  renderLearnAppsPage();    // [LEARN-APPS-1]
   if (page === 'reward')   populateRewardStudents();
   if (page === 'artwork')  { renderArtworkPending(); renderArtworkAdmin(); }
   if (page === 'books')    renderBooksPage();
@@ -381,6 +428,26 @@ function renderDashboard() {
     </div>`;
   } else {
     urgentEl.style.display = 'none';
+  }
+
+  // ── [DASH-EMO-ALERT-1] 감정 대화 요청 배너 ──
+  //   사이드 메뉴의 작은 숫자만으로는 놓치기 쉬웠다(대시보드에 없었음). 안 읽은 요청이 있으면 맨 위에 건수 + 바로 가기.
+  //   기준은 메뉴 배지(updateEmotionAlertBadge)와 같다: emotionAlerts 중 read 가 아닌 것.
+  const emoEl = document.getElementById('dash-emo-banner');
+  if (emoEl) {
+    const emoUnread = Object.values(DB.load().emotionAlerts || {}).filter(a => a && !a.read).length;
+    if (emoUnread > 0) {
+      emoEl.style.display = '';
+      emoEl.innerHTML = `<div style="background:rgba(93,173,226,.08);border:1px solid rgba(93,173,226,.3);
+        border-radius:var(--r);padding:.75rem 1.2rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <span style="font-size:.82rem;font-weight:700;color:var(--sky)">🔔 감정 대화 요청 ${emoUnread}건</span>
+        <span style="font-size:.76rem;color:var(--txt2)">선생님과 이야기하고 싶다고 한 학생이 있어요</span>
+        <button class="btn-sm outline" style="margin-left:auto" onclick="nav('emotionalerts',document.getElementById('nav-emotionalerts'))">보러 가기</button>
+      </div>`;
+    } else {
+      emoEl.style.display = 'none';
+      emoEl.innerHTML = '';
+    }
   }
 
   // ── 오늘 처리할 것 (보상 대기 전체) ──
@@ -818,14 +885,33 @@ function resetStudentStats(id) {
   s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {}; s.indoor = {};   // [DECO-SPACE-1] 공간 2·3 바닥도 · [IN-2] 집 안 벽지·바닥
   s.decoLife = {};   // [DECO-LIFE-1] 친해지기·손님·선물도(보스 결정 ③)
   s.lastAttendDate = '';
+  resetPromotionState(s);   // [PROMO-RESET-1] 다시 그 레벨에 오르면 승급할 수 있게
+  DB.getPromotionRequests().filter(r => r.studentId === s.id).forEach(r => DB.removePromotionRequest(r.id));
   DB.saveStudent(s);
   closeModal();
   renderAll();
   notify(`🔄 ${s.name} 수치 초기화 완료!`);
 }
 
-function resetAllStudents() {
-  if (!confirm('⚠️ 모든 학생의 수치를 초기화할까요?\n이름·비번·아바타는 유지됩니다.')) return;
+// [PROMO-RESET-1] 수치를 처음으로 돌리면 승급 기록도 처음으로.
+//   예전엔 promotedLevels 가 남아 Lv5 를 다시 올라도 승급 단추가 안 떴고(student.js renderHUD canPromo),
+//   job(중학생 등)이 남아 student.js 자동 복구가 그 레벨을 '이미 승급'으로 다시 적었다.
+function resetPromotionState(s) {
+  s.promotedLevels = [];
+  s.promotionPending = false;
+  if (s.job) s.job = Utils.getJobTitle(s.dream || s.job, 1);
+}
+
+// [RESET-ALL-SAFE-1] 확인창 한 번 → '초기화' 글자 입력 + 먼저 백업(실패하면 멈춤).
+async function resetAllStudents() {
+  const n = DB.getStudents().length;
+  const typed = prompt(`⚠️ 학생 ${n}명의 레벨·EXP·골드·아이템·기록을 모두 처음으로 돌려요.\n이름·비번·아바타는 그대로예요. 먼저 지금 상태를 백업해요.\n\n계속하려면 '초기화' 라고 적어 주세요.`);
+  if (typed === null) return;
+  if (String(typed).trim() !== '초기화') { notify('글자가 달라 초기화를 멈췄어요', 'error'); return; }
+  notify('💾 초기화 전 백업 중…');
+  try { await saveBackup(true, '초기화 전'); }
+  catch (e) { notify('⚠️ 백업에 실패해 초기화를 멈췄어요. 인터넷 연결을 확인해 주세요.', 'error'); return; }
+  const saves = [];
   DB.getStudents().forEach(s => {
     s.level = 1; s.exp = 0; s.gold = 0;
     s.stats = {read:0, study:0, art:0, value:0, health:0, life:0};
@@ -838,15 +924,20 @@ function resetAllStudents() {
     s.houseDecorations = []; s.yardFloor = {}; s.yardFloors = {}; s.indoor = {};   // [DECO-SPACE-1] 공간 2·3 바닥도 · [IN-2] 집 안 벽지·바닥
     s.decoLife = {};   // [DECO-LIFE-1] 친해지기·손님·선물도(보스 결정 ③)
     s.lastAttendDate = '';
-    DB.saveStudent(s);
+    resetPromotionState(s);   // [PROMO-RESET-1]
+    saves.push(saveStudentAwait(s));
   });
-  // 퀘스트 로그도 초기화
-  DB._fbRef.update({
+  // 퀘스트 로그도 초기화 · [PROMO-RESET-1] 남은 승급 신청도(초기화 전 레벨의 신청이라 승인하면 보상이 잘못 나간다)
+  saves.push(DB._fbRef.update({
     quests: null,
-    questLogs: null
-  });
+    questLogs: null,
+    promotionRequests: null,
+  }));
+  const db = DB.load(); if (db) db.promotionRequests = [];
   renderAll();
-  notify('🔄 전체 학생 수치 초기화 완료!');
+  afterSaves(saves, failed => failed
+    ? notify(`⚠️ 초기화 저장 ${failed}건 실패 — 새로고침 뒤 확인해 주세요 (초기화 전 상태는 백업에 있어요)`, 'error')
+    : notify('🔄 전체 학생 수치 초기화 완료! (초기화 전 상태는 백업에 있어요)'));
 }
 
 function saveStudentDetail(id) {
@@ -1018,8 +1109,7 @@ function approveSelfApply(studentId, rewardId) {
 
 // ══ 대시보드 인라인 처리 함수 ══
 function approveAllDash() {
-  if (!confirm('대기 중인 보상을 전체 승인할까요?')) return;
-  approveAll();
+  approveAllAsk();   // [APPROVE-ALL-ASK-1] 확인창은 approveAllAsk 한 곳(건수·따로 볼 것 안내)
 }
 
 function approveSingleDash(studentId, rewardId, btn) {
@@ -1029,7 +1119,7 @@ function approveSingleDash(studentId, rewardId, btn) {
 
 function rejectSingleDash(studentId, rewardId, btn) {
   btn.disabled = true;
-  rejectSingle(studentId, rewardId);
+  if (!rejectSingle(studentId, rewardId)) btn.disabled = false;   // [REJECT-ASK-1] 확인창에서 취소하면 단추 되살림
 }
 
 function approvePromoDash(reqId, btn) {
@@ -1164,42 +1254,133 @@ function approveReward(student, reward) {
   return student;
 }
 
-function approveSingle(studentId, rewardId) {
+// [APPROVE-AWAIT-1] 학생 저장의 약속(Promise)을 받는다.
+//   DB.saveStudent 는 약속을 돌려주지 않아(gamedata.js 저장 내부는 묶음 3 구역이라 여기서 안 바꾼다)
+//   '승인 완료' 알림이 서버 저장 전에 떴다 — 인터넷이 끊겨도 완료라고 나왔다.
+//   saveStudent 가 부르는 students/<id> 쓰기(set·update)의 약속을 그 순간에만 옆에서 받아 돌려준다. 쓰기는 한 번 그대로.
+//   saveStudent 가 나중에 약속을 돌려주게 바뀌면 그것을 그대로 쓴다.
+function saveStudentAwait(s) {
+  const ref = DB._fbRef, want = 'students/' + s.id;
+  let got = null;
+  const canHook = !!(ref && typeof ref.child === 'function');
+  const own = canHook && Object.prototype.hasOwnProperty.call(ref, 'child');
+  const origChild = canHook ? ref.child : null;
+  if (canHook) {
+    ref.child = function (p) {
+      const c = origChild.apply(this, arguments);
+      if (p === want && c) ['set', 'update'].forEach(m => {
+        if (typeof c[m] !== 'function') return;
+        const orig = c[m];
+        c[m] = function () { const pr = orig.apply(this, arguments); if (!got) got = pr; return pr; };
+      });
+      return c;
+    };
+  }
+  let ret;
+  try { ret = DB.saveStudent(s); }
+  finally { if (canHook) { if (own) ref.child = origChild; else delete ref.child; } }
+  if (ret && typeof ret.then === 'function') return ret;
+  return got && typeof got.then === 'function' ? got : Promise.resolve();
+}
+
+// [APPROVE-AWAIT-1] 저장 약속들이 끝난 뒤 알린다. 8초가 지나도 안 끝나면 '아직 저장 중' 을 한 번 알린다(오프라인이면 SDK 가 계속 기다린다).
+function afterSaves(promises, onDone) {
+  const list = (promises || []).map(p => Promise.resolve(p));
+  let finished = false;
+  const slow = setTimeout(() => { if (!finished) notify('⏳ 아직 저장 중이에요 — 인터넷 연결을 확인해 주세요', 'error'); }, 8000);
+  return Promise.allSettled(list).then(rs => {
+    finished = true; clearTimeout(slow);
+    const failed = rs.filter(r => r.status === 'rejected').length;
+    onDone(failed, rs.length);
+    return failed;
+  });
+}
+
+function approveSingle(studentId, rewardId, opts) {
   const s = DB.getStudent(studentId);
   // [C9] 무음 return이면 대시보드 버튼이 '...' 상태로 영구 고착된다(교사는 멈춘 줄 앎).
   //      찾지 못한 이유를 알리고 화면을 다시 그려 버튼 상태를 복구한다.
-  if (!s) { notify('학생을 찾을 수 없어요', 'error'); renderAll(); return; }
+  if (!s) { notify('학생을 찾을 수 없어요', 'error'); renderAll(); return Promise.resolve(false); }
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId || r.label === rewardId);
-  if (!reward) { notify('이미 처리된 보상이에요', 'error'); renderAll(); return; }
+  if (!reward) { notify('이미 처리된 보상이에요', 'error'); renderAll(); return Promise.resolve(false); }
   approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
-  DB.saveStudent(s);
+  const saved = saveStudentAwait(s);
   renderAll();
-  notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
+  if (opts && opts.quiet) return saved;   // 묶음 승인(approveAllByQuest)은 끝에 한 번만 알린다
+  // [APPROVE-AWAIT-1] 저장이 끝난 뒤에 알린다. 실패면 실패 안내.
+  return afterSaves([saved], failed => {
+    if (failed) notify(`⚠️ ${s.name} · ${reward.label} 승인 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error');
+    else notify(`✅ ${s.name} · ${reward.label} 승인 완료!`);
+  }).then(failed => !failed);
+}
+
+// [APPROVE-ALL-ASK-1] [전체 승인]에서 빼는 것 — 작품(그림·사진)·독서록은 교사가 하나씩 보고 승인한다.
+//   한꺼번에 승인하면 내용을 보지 않은 그림·글이 그대로 작품 관리·독서 기록에 올라간다.
+const APPROVE_ALL_SKIP_TYPES = ['artwork', 'book'];
+function approveAllCounts() {
+  let ok = 0, skip = 0;
+  DB.getStudents().forEach(s => (s.pendingRewards || []).forEach(r => {
+    if (!r) return;
+    if (APPROVE_ALL_SKIP_TYPES.includes(r.type)) skip++; else ok++;
+  }));
+  return { ok, skip };
+}
+// 단추가 부르는 자리 — 건수를 보여 주고 묻는다
+function approveAllAsk() {
+  const { ok, skip } = approveAllCounts();
+  if (ok === 0) {
+    notify(skip ? `한꺼번에 승인할 보상이 없어요 · 작품·독서록 ${skip}건은 하나씩 보고 승인해 주세요` : '승인할 대기가 없어요', 'error');
+    return;
+  }
+  const skipLine = skip ? `\n\n작품(그림·사진)·독서록 ${skip}건은 빼요 — 하나씩 보고 승인해 주세요.` : '';
+  if (!confirm(`보상 ${ok}건을 한꺼번에 승인할까요?\n보상이 바로 지급되고 되돌릴 수 없어요.${skipLine}`)) return;
+  approveAll();
 }
 
 function approveAll() {
   const students = DB.getStudents();
-  let count = 0;
+  let count = 0, skipped = 0;
+  const saves = [];
   students.forEach(s => {
-    const pending = s.pendingRewards||[];
+    const pending = (s.pendingRewards||[]).filter(Boolean);
     if (pending.length === 0) return;
-    pending.forEach(r => approveReward(s, r));
-    // 모든 타입 승인 즉시 제거
-    s.pendingRewards = [];
-    DB.saveStudent(s);
-    count += pending.length;
+    // [APPROVE-ALL-ASK-1] 작품·독서록은 남겨 둔다(따로 확인)
+    const held = pending.filter(r => APPROVE_ALL_SKIP_TYPES.includes(r.type));
+    const go   = pending.filter(r => !APPROVE_ALL_SKIP_TYPES.includes(r.type));
+    skipped += held.length;
+    if (go.length === 0) return;
+    go.forEach(r => approveReward(s, r));
+    // 승인한 것은 즉시 제거 — 남긴 것(작품·독서록)만 그대로 둔다
+    s.pendingRewards = held;
+    saves.push(saveStudentAwait(s));
+    count += go.length;
   });
   renderAll();
-  notify(`✅ ${count}개 전체 승인 완료!`);
+  // [APPROVE-AWAIT-1] 저장이 끝난 뒤에 알린다
+  return afterSaves(saves, (failed, n) => {
+    const tail = skipped ? ` · 따로 확인할 것 ${skipped}건(작품·독서록)` : '';
+    if (failed) notify(`⚠️ ${n}명 중 ${failed}명 저장 실패 — 새로고침 뒤 다시 확인해 주세요${tail}`, 'error');
+    else notify(`✅ ${count}개 전체 승인 완료!${tail}`);
+  });
 }
 
+// [REJECT-ASK-1] 반려하면 신청이 지워진다 — 작품·독서록이면 아이가 쓴 글·그림 신청도 함께 사라진다. 먼저 묻는다.
+//   돌려주는 값: 실제로 반려했으면 true(대시보드 단추 되살리기에 쓴다)
 function rejectSingle(studentId, rewardId) {
   const s = DB.getStudent(studentId);
-  if (!s) return;
+  if (!s) return false;
+  const r = (s.pendingRewards||[]).find(x => x && (x.id === rewardId || x.label === rewardId));
+  const what = r && r.type === 'book' ? '\n\n독서록이에요 — 아이가 쓴 글이 함께 지워져요.'
+             : r && r.type === 'artwork' ? '\n\n작품이에요 — 아이가 올린 그림·사진 신청이 함께 지워져요.' : '';
+  if (!confirm(`${s.name} · ${(r && r.label) || '이 신청'}을(를) 반려할까요?\n보상 없이 신청이 지워지고 되돌릴 수 없어요.${what}`)) return false;
   s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
-  DB.saveStudent(s);
+  const saved = saveStudentAwait(s);
   renderAll();
-  notify('🗑️ 반려됨', 'error');
+  afterSaves([saved], failed => {
+    if (failed) notify(`⚠️ ${s.name} 반려 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error');
+    else notify('🗑️ 반려됨', 'error');
+  });
+  return true;
 }
 
 function quickApprove() {
@@ -1343,11 +1524,13 @@ function gridApprove(studentId, rewardId) {
   const reward = (s.pendingRewards||[]).find(r => r.id === rewardId);
   if (!reward) return;
   approveReward(s, reward); // 내부에서 pendingRewards 제거 처리
-  DB.saveStudent(s);
+  const saved = saveStudentAwait(s);   // [APPROVE-AWAIT-1]
   renderApproveGrid();
   renderApproveList();
   renderDashboard();
-  notify(`✅ ${s.name} · ${reward.label} 승인!`);
+  afterSaves([saved], failed => failed
+    ? notify(`⚠️ ${s.name} · ${reward.label} 승인 저장에 실패했어요. 새로고침 뒤 다시 확인해 주세요.`, 'error')
+    : notify(`✅ ${s.name} · ${reward.label} 승인!`));
 }
 
 function renderApproveList() {
@@ -1510,11 +1693,15 @@ function approveAllByQuest(boardQuestId) {
   if (!confirm(`"${qName}" 신청 ${targets.length}명을 모두 승인할까요?\n\n보상이 즉시 지급되며 되돌릴 수 없어요.`)) return;
 
   let count = 0;
+  const saves = [];
   targets.forEach(s => {
     const reward = (s.pendingRewards||[]).find(r=>r.boardQuestId===boardQuestId);
-    if (reward) { approveSingle(s.id, reward.id); count++; }
+    if (reward) { saves.push(approveSingle(s.id, reward.id, { quiet: true })); count++; }
   });
-  if (count > 0) notify(`✅ ${count}명 전체 승인 완료!`);
+  // [APPROVE-AWAIT-1] 저장이 끝난 뒤 한 번만 알린다
+  if (count > 0) afterSaves(saves, failed => failed
+    ? notify(`⚠️ ${count}명 중 ${failed}명 저장 실패 — 새로고침 뒤 다시 확인해 주세요`, 'error')
+    : notify(`✅ ${count}명 전체 승인 완료!`));
 }
 
 // ══════════════════════════════════════════════════
@@ -4491,24 +4678,47 @@ function renderInactiveQuests() {
 // renderQuestTable은 renderBoardQuestList 로 대체
 function renderQuestTable() { renderBoardQuestList(); }
 
+// [IMPORT-SAFE-1] 가져오기는 RPG 데이터 전체를 덮어쓴다 — 확인 한 번(확인창)으로는 너무 쉬웠다.
+//   ① '가져오기' 글자를 적어야 진행 ② 덮기 전에 지금 상태를 백업(실패하면 멈춤) ③ 그다음 덮어쓰기.
+//   새 형식(classRPG-export-2)이면 rpg 칸만 되돌린다 — 학습 앱·마을(roots)은 수업 중인 판을 되감지 않게 자동으로 되돌리지 않고 안내만.
+//   쓸 때 학생은 id 키로, 승급 신청은 id 키로(_promoObj), 파생 배열 quests 는 빼고 쓴다 — 지금 저장 모양과 같게
+//   (예전엔 캐시 배열 그대로 써서 students/0·1… 숫자 키가 생겼고, 저장할 때 students/<id> 가 따로 생겨 두 벌이 됐다).
+function importPayload(rpg) {
+  const out = { ...rpg };
+  delete out.quests;   // questLogs 에서 매번 다시 만드는 파생 배열(cleanupDerivedNodes 참고)
+  if (Array.isArray(out.students) && out.students.every(st => st && st.id)) {
+    const o = {}; out.students.forEach(st => { o[st.id] = st; }); out.students = o;
+  }
+  if (out.promotionRequests != null) {
+    out.promotionRequests = DB._promoObj(Array.isArray(out.promotionRequests) ? out.promotionRequests : Object.values(out.promotionRequests));
+  }
+  return out;
+}
 function importData(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!data.students || !Array.isArray(data.students)) {
-        notify('올바른 데이터 파일이 아닙니다', 'error'); return;
-      }
-      if (!confirm(`⚠️ 현재 데이터를 덮어쓰시겠습니까?\n학생 ${data.students.length}명 데이터가 복원됩니다.`)) return;
-      DB._fbRef.set(data).then(() => {
-        notify('✅ 데이터 가져오기 완료!');
-        location.reload();
-      });
-    } catch(err) {
-      notify('파일 파싱 오류: ' + err.message, 'error');
+  reader.onload = async e => {
+    let data;
+    try { data = JSON.parse(e.target.result); }
+    catch (err) { notify('파일 파싱 오류: ' + err.message, 'error'); return; }
+    const isNew = !!(data && data.format === EXPORT_FORMAT && data.rpg);
+    const rpg = isNew ? data.rpg : data;
+    if (!rpg || !rpg.students || !Array.isArray(rpg.students)) {
+      notify('올바른 데이터 파일이 아닙니다', 'error'); return;
     }
+    const typed = prompt(`⚠️ 지금 RPG 데이터를 이 파일로 덮어써요 (학생 ${rpg.students.length}명).\n되돌리기 전에 지금 상태를 먼저 백업해요.\n\n계속하려면 '가져오기' 라고 적어 주세요.`);
+    if (typed === null) return;
+    if (String(typed).trim() !== '가져오기') { notify('글자가 달라 가져오기를 멈췄어요', 'error'); return; }
+    notify('💾 가져오기 전 백업 중…');
+    try { await saveBackup(true, '가져오기 전'); }
+    catch (err) { notify('⚠️ 백업에 실패해 가져오기를 멈췄어요. 인터넷 연결을 확인해 주세요.', 'error'); return; }
+    try {
+      await DB._fbRef.set(importPayload(rpg));
+    } catch (err) { notify('⚠️ 가져오기 저장에 실패했어요: ' + (err && err.message || err), 'error'); return; }
+    const appNote = isNew && data.roots && Object.keys(data.roots).length ? ' · 학습 앱·마을 기록은 파일에만 있고 자동으로 되돌리지 않아요' : '';
+    notify('✅ 데이터 가져오기 완료! (가져오기 전 상태는 백업에 있어요)' + appNote);
+    setTimeout(() => location.reload(), appNote ? 2500 : 800);
   };
   reader.readAsText(file);
   input.value = ''; // 같은 파일 재선택 허용
@@ -4990,7 +5200,7 @@ function loadDexSettings() {
   document.getElementById('dex-first-kill-on').checked = ds.firstKillEnabled ?? false;
   document.getElementById('dex-first-gold').value = ds.firstKillGold ?? 10;
   ['beginner','intermediate','advanced'].forEach(z => {
-    document.getElementById(`dex-${z}-gold`).value  = ds[z]?.gold  ?? 100;
+    document.getElementById(`dex-${z}-gold`).value  = ds[z]?.gold  ?? 0;   // 저장 전엔 구역 보상이 없었다 — 기본 0(첫 저장에 100G×3 이 몰래 켜지지 않게)
     document.getElementById(`dex-${z}-title`).value = ds[z]?.title ?? '';
   });
 }
@@ -5001,9 +5211,12 @@ function saveDexSettings() {
   db.settings.dexRewards = {
     firstKillEnabled: document.getElementById('dex-first-kill-on').checked,
     firstKillGold:    parseInt(document.getElementById('dex-first-gold').value) || 10,
-    beginner:     { gold: parseInt(document.getElementById('dex-beginner-gold').value)||100,     title: document.getElementById('dex-beginner-title').value },
-    intermediate: { gold: parseInt(document.getElementById('dex-intermediate-gold').value)||100, title: document.getElementById('dex-intermediate-title').value },
-    advanced:     { gold: parseInt(document.getElementById('dex-advanced-gold').value)||100,     title: document.getElementById('dex-advanced-title').value },
+    //  구역 보상은 금액이나 칭호가 있을 때만 적는다 — 0·빈칸으로 저장하면 그 구역을 '받음'으로만 표시하고 보상은 없는 채
+    //  넘어가 버려(gamedata dexZoneClaimed_*), 나중에 보상을 정해도 이미 다 깬 아이는 못 받는다.
+    ...Object.fromEntries(['beginner','intermediate','advanced'].map(z => {
+      const gold = parseInt(document.getElementById(`dex-${z}-gold`).value) || 0, title = document.getElementById(`dex-${z}-title`).value;
+      return [z, (gold > 0 || title) ? { gold, title } : null];
+    })),
   };
   DB._cache = db;
   DB._fbRef.child('settings/dexRewards').set(db.settings.dexRewards);
@@ -5640,7 +5853,64 @@ function renderEmotionCharts(baseDate) {
 // ══════════════════════════════════════════════════
 //  BACKUP & ROLLBACK
 // ══════════════════════════════════════════════════
-const BACKUP_KEEP_DAYS = 14; // 14일치 보관 (구독 범위 밖이라 용량 부담이 없어 7→14로 확대)
+const BACKUP_KEEP_DAYS = 14; // 최근 14개 보관 (구독 범위 밖이라 용량 부담이 없어 7→14로 확대) · [BACKUP-KEY-1] 날짜 14일 → 백업 14개
+
+// [BACKUP-KEY-1] 백업 키 = 'YYYY-MM-DD_HHMMSS'(한국 시각).
+//   예전엔 날짜 한 칸('YYYY-MM-DD')이라 같은 날 [💾 백업]을 누르면 그날 아침 자동 백업을 덮었다
+//   (문제가 생긴 걸 알고 눌러도 '문제 전' 본이 사라졌다). 이제 누를 때마다 새 칸이 생긴다.
+//   옛 날짜 키도 그대로 목록·롤백에 나온다 — 정렬하면 같은 날의 옛 키가 시각 키보다 앞(더 이른 것)이다.
+function backupKeyNow() {
+  const iso = new Date(Date.now() + 9 * 3600000).toISOString();   // Utils.todayStr 와 같은 KST
+  return iso.slice(0, 10) + '_' + iso.slice(11, 19).replace(/:/g, '');
+}
+function backupKeyLabel(k) {
+  const m = /^(\d{4}-\d{2}-\d{2})(?:_(\d{2})(\d{2})(\d{2}))?$/.exec(String(k));
+  if (!m) return String(k);
+  return m[2] ? `${m[1]} ${m[2]}:${m[3]}` : m[1];
+}
+
+// [BACKUP-ROOTS-1] RPG 본 루트(classRPG_v3) 밖에 따로 저장하는 학습 앱 루트들 — 예전 백업·내보내기에는 생각판만(백업) 또는 아무것도(내보내기) 없었다.
+//   이름은 각 앱 store.js 의 ROOT 와 같다(watercolor/drawing 은 watercolor/index.html 이 'classRPG_' + 과정 키로 쓴다).
+//   생각판은 예전처럼 백업의 thinkboard 칸에, 나머지는 apps.<루트> 칸에 담는다.
+//   마을(classRPG_villages)은 **자동 백업에서 뺀다** — 학생마다 구역 문자열이 커서(학생당 최대 약 135KB, renderVillagesPage 주석)
+//   반 전체 크기를 미리 알 수 없고, 로그인마다 도는 자동 백업 14개에 그대로 쌓이면 무료 저장 한도를 위협한다.
+//   마을은 [데이터 내보내기](파일로 받기)에만 담는다. 마을 전용 백업은 scripts/village-backup.mjs.
+const BACKUP_APP_ROOTS = ['classRPG_music', 'classRPG_coding', 'classRPG_pattern', 'classRPG_paint', 'classRPG_art',
+  'classRPG_ink', 'classRPG_print', 'classRPG_watercolor', 'classRPG_drawing'];
+const EXPORT_ROOTS = ['classRPG_thinkboard', ...BACKUP_APP_ROOTS, 'classRPG_villages'];
+const EXPORT_FORMAT = 'classRPG-export-2';
+
+// 루트 하나를 한 번 읽는다. 오래 걸리면(오프라인 등) 건너뛴다 — 백업·내보내기 전체가 멈추지 않게.
+function readRootOnce(root, ms) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('시간 초과')), ms || 15000);
+    firebase.database().ref(root).once('value').then(snap => { clearTimeout(t); resolve(snap.val()); }, e => { clearTimeout(t); reject(e); });
+  });
+}
+
+// [BACKUP-KEY-1] 백업 키 목록만 받는다(shallow REST — 백업 본문을 내려받지 않는다). 안 되면 예전처럼 SDK 로 통째 읽어 키만.
+//   예전 renderBackupList 는 로그인할 때마다 백업 전체(14개 × 약 1.6MB)를 내려받았다.
+async function backupKeysAt(path, sdkRef) {
+  try {
+    const base = new URL(firebase.app().options.databaseURL);
+    const u = new URL(base.origin + base.pathname.replace(/\/+$/, '') + '/' + path + '.json');
+    base.searchParams.forEach((v, k) => u.searchParams.set(k, v));
+    u.searchParams.set('shallow', 'true');
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), 8000) : 0;
+    const res = await fetch(u.toString(), ctl ? { signal: ctl.signal } : undefined);
+    if (t) clearTimeout(t);
+    if (!res.ok) throw new Error(res.status);
+    const j = await res.json();
+    return j && typeof j === 'object' ? Object.keys(j) : [];
+  } catch (e) {
+    const snap = await sdkRef.once('value');
+    return Object.keys(snap.val() || {});
+  }
+}
+async function listBackupKeys() {
+  return (await backupKeysAt('classRPG_backups', backupsRef())).sort();
+}
 
 // [ER-4] 백업은 실시간 구독 루트(classRPG_v3) **밖**에 저장한다.
 //   같은 루트 안에 두면 학생이 한 번 저장할 때마다 접속 중인 모든 기기가 백업 전체를
@@ -5683,37 +5953,62 @@ const BACKUP_NODES = [
   'customProblems',  // 교사가 만든 문제
 ];
 
-async function saveBackup(auto) {
+// auto: 알림 없이(자동·초기화 전·가져오기 전). kind: 백업 칸에 남기는 까닭(목록에 보인다).
+//   돌려주는 값: 만든 백업 키. 저장이 실패하면 던진다(초기화·가져오기는 이때 멈춘다).
+async function saveBackup(auto, kind) {
   const db = DB.load();
-  const dateKey = Utils.todayStr();
-  const snapshot = { savedAt: new Date().toISOString() };
+  const key = backupKeyNow();   // [BACKUP-KEY-1]
+  const snapshot = { savedAt: new Date().toISOString(), kind: kind || (auto ? '자동' : '수동') };
   BACKUP_NODES.forEach(k => {
     if (db[k] !== undefined && db[k] !== null) snapshot[k] = db[k];
   });
-  // [THINKBOARD-2] 생각판(classRPG_thinkboard)도 같은 날짜 백업에 담는다 — 연구 자료가 RPG 기록과 함께 남게.
+  // [THINKBOARD-2] 생각판(classRPG_thinkboard)도 같은 백업에 담는다 — 연구 자료가 RPG 기록과 함께 남게.
   //   되돌리기(롤백)는 BACKUP_NODES 만 되살린다 — 생각판은 백업에서 꺼내 볼 수만 있다(수업 중 판이 갑자기 되감기지 않게).
-  try { const tb = await firebase.database().ref('classRPG_thinkboard').once('value'); if (tb.exists()) snapshot.thinkboard = tb.val(); } catch (e) { console.warn('생각판 백업 건너뜀', e); }
-  await backupsRef().child(dateKey).set(snapshot);
+  let skippedTb = false;   // 생각판을 못 읽었으면 appsSkipped 에 같이 적는다(백업에서 빠진 걸 알 수 있게)
+  try { const tb = await readRootOnce('classRPG_thinkboard'); if (tb != null) snapshot.thinkboard = tb; } catch (e) { console.warn('생각판 백업 건너뜀', e); skippedTb = true; }
+  // [BACKUP-ROOTS-1] 학습 앱 루트도 담는다(롤백은 하지 않는다 — 생각판과 같은 까닭). 못 읽은 루트는 appsSkipped 에 적는다.
+  const apps = {}, skipped = skippedTb ? ['classRPG_thinkboard'] : [];
+  await Promise.all(BACKUP_APP_ROOTS.map(async r => {
+    try { const v = await readRootOnce(r); if (v != null) apps[r] = v; }
+    catch (e) { console.warn('학습 앱 백업 건너뜀', r, e); skipped.push(r); }
+  }));
+  if (Object.keys(apps).length) snapshot.apps = apps;
+  if (skipped.length) snapshot.appsSkipped = skipped.sort();
+  try {
+    await backupsRef().child(key).set(snapshot);
+  } catch (e) {
+    if (!auto) notify('⚠️ 백업 저장에 실패했어요. 인터넷 연결을 확인해 주세요.', 'error');
+    throw e;
+  }
 
-  // 보관기간 초과분 자동 삭제 (새 위치만 — 옛 위치는 건드리지 않는다)
-  const snap = await backupsRef().once('value');
-  const allKeys = Object.keys(snap.val() || {}).sort();
-  const toDelete = allKeys.slice(0, Math.max(0, allKeys.length - BACKUP_KEEP_DAYS));
-  for (const k of toDelete) await backupsRef().child(k).remove();
+  // 보관 개수 초과분 자동 삭제 (새 위치만 — 옛 위치는 건드리지 않는다) · 키 목록만 받아 오래된 것부터
+  try {
+    const allKeys = await listBackupKeys();
+    const toDelete = allKeys.slice(0, Math.max(0, allKeys.length - BACKUP_KEEP_DAYS));
+    for (const k of toDelete) if (k !== key) await backupsRef().child(k).remove();
+  } catch (e) { console.warn('오래된 백업 정리 건너뜀', e); }
 
-  if (!auto) { notify(`💾 ${dateKey} 백업 완료!`); renderBackupList(); }
+  if (!auto) { notify(`💾 ${backupKeyLabel(key)} 백업 완료!`); renderBackupList(); }
+  return key;
 }
 
 async function renderBackupList() {
   const el = document.getElementById('backup-list-wrap');
   if (!el) return;
-  const all = await loadAllBackups();
-  const keys = Object.keys(all).sort().reverse();
+  // [BACKUP-KEY-1] 키만 받는다(새 위치 + 옛 위치). 옛 위치는 shallow 가 안 되면 건너뛴다(본문을 받지 않게).
+  let keys = [];
+  try {
+    const [cur, old] = await Promise.all([
+      listBackupKeys(),
+      backupKeysAt(DB.KEY + '/backups', legacyBackupsRef()).catch(() => []),
+    ]);
+    keys = [...new Set([...cur, ...old])].sort().reverse();
+  } catch (e) { el.textContent = '백업 목록을 읽지 못했어요'; return; }
   if (keys.length === 0) {
     el.textContent = '저장된 백업 없음';
   } else {
     el.innerHTML = `저장된 백업: <span style="color:var(--gold);font-weight:700">${keys.length}개</span>
-      <span style="margin-left:.4rem">(${keys[keys.length-1]} ~ ${keys[0]})</span>`;
+      <span style="margin-left:.4rem">(${escHtml(backupKeyLabel(keys[keys.length-1]))} ~ ${escHtml(backupKeyLabel(keys[0]))})</span>`;
   }
 }
 
@@ -5725,14 +6020,16 @@ async function openRollbackModal() {
   if (keys.length === 0) {
     el.innerHTML = '<div style="color:var(--txt3);font-size:.8rem">저장된 백업이 없어요. 먼저 백업을 실행해주세요.</div>';
   } else {
+    // [BACKUP-KEY-1] 키 = 날짜(옛) 또는 날짜_시각(새). 같은 날 여러 개가 있을 수 있어 까닭(kind)도 보인다.
     el.innerHTML = keys.map(k => `
       <label style="display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;
         background:rgba(255,255,255,.04);border-radius:8px;cursor:pointer;
         border:1px solid rgba(255,255,255,.08)">
-        <input type="radio" name="rb-date" value="${k}" style="accent-color:var(--gold)">
-        <span style="font-weight:600">${k}</span>
+        <input type="radio" name="rb-date" value="${escHtml(k)}" style="accent-color:var(--gold)">
+        <span style="font-weight:600">${escHtml(backupKeyLabel(k).slice(0, 10))}</span>
+        ${data[k] && data[k].kind ? `<span style="font-size:.68rem;color:var(--gold);border:1px solid rgba(255,215,0,.3);border-radius:8px;padding:0 .35rem">${escHtml(data[k].kind)}</span>` : ''}
         <span style="font-size:.72rem;color:var(--txt3);margin-left:auto">
-          ${data[k].savedAt ? new Date(data[k].savedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : ''} 저장
+          ${data[k] && data[k].savedAt ? new Date(data[k].savedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : ''} 저장
         </span>
       </label>`).join('');
   }
@@ -5766,7 +6063,9 @@ async function confirmRollback() {
       : backup[k];
     await DB._fbRef.child(k).set(v);
   }
-  notify(`✅ ${selected} 데이터로 롤백 완료 (${nodes.length}개 항목) — 곧 새로고침돼요`);
+  // [BACKUP-ROOTS-1] 학습 앱 기록(생각판·음악실 등)은 백업에 들어 있어도 롤백하지 않는다 — 안내만
+  const appNote = (backup.thinkboard || backup.apps) ? ' · 학습 앱 기록은 그대로 둬요' : '';
+  notify(`✅ ${backupKeyLabel(selected)} 데이터로 롤백 완료 (${nodes.length}개 항목${appNote}) — 곧 새로고침돼요`);
   setTimeout(() => location.reload(), 1500);
 }
 
@@ -5830,8 +6129,12 @@ async function cleanupDerivedNodes() {
 
 // 관리자 로그인 시 자동 백업
 async function autoBackupOnLogin() {
-  const today = await readBackup(Utils.todayStr());
-  if (!today) await saveBackup(true); // 오늘 백업 없으면 자동 저장
+  // [BACKUP-KEY-1] 오늘 날짜로 시작하는 키(옛 날짜 키 또는 오늘_시각 키)가 하나라도 있으면 건너뛴다 — 키 목록만 본다.
+  const today = Utils.todayStr();
+  try {
+    const keys = await listBackupKeys();
+    if (!keys.some(k => k === today || k.startsWith(today + '_'))) await saveBackup(true, '자동'); // 오늘 백업 없으면 자동 저장
+  } catch (e) { console.warn('자동 백업 건너뜀', e); }
   renderBackupList();
 }
 
@@ -5845,8 +6148,12 @@ function loadSettings() {
   document.getElementById('set-boss-name').value    = s.bossName||'거대 트롤';
   document.getElementById('set-boss-icon').value    = s.bossIcon||'🧌';
   document.getElementById('set-boss-gold').value    = s.bossGold||150;
-  document.getElementById('set-base-exp').value     = s.baseExp||30;
-  document.getElementById('set-base-gold').value    = s.baseGold||30;
+  // [AUTO-DAILY-REWARD-1] 이 두 칸 = 자동 일일 퀘스트 보상(예전 baseExp·baseGold 는 읽는 곳이 없던 값이라 안 쓴다)
+  const _adr = DB.autoDailyReward(s);
+  document.getElementById('set-base-exp').value     = _adr.exp;
+  document.getElementById('set-base-gold').value    = _adr.gold;
+  const _adrTxt = document.getElementById('auto-daily-reward-txt');
+  if (_adrTxt) _adrTxt.textContent = `${_adr.exp}EXP + ${_adr.gold}G`;
   document.getElementById('set-monster-rate').value = s.monsterWinRate||80;
   const limitEl = document.getElementById('set-monster-limit');
   // [BATTLE-SET-1] 이 칸은 예전에 settings.monsterDailyLimit(읽는 곳 0)에 썼다. 실제 전투가 읽는 키로 통일.
@@ -5921,8 +6228,9 @@ function saveSettings() {
     bossName:         document.getElementById('set-boss-name').value,
     bossIcon:         document.getElementById('set-boss-icon').value,
     bossGold:         parseInt(document.getElementById('set-boss-gold').value)||150,
-    baseExp:          parseInt(document.getElementById('set-base-exp').value)||30,
-    baseGold:         parseInt(document.getElementById('set-base-gold').value)||30,
+    // [AUTO-DAILY-REWARD-1] 빈 칸·글자는 기본값(35/25) — 검사·자르기는 DB.autoDailyReward 한 곳에서
+    ...(() => { const r = DB.autoDailyReward({ autoDailyExp: document.getElementById('set-base-exp').value, autoDailyGold: document.getElementById('set-base-gold').value });
+               return { autoDailyExp: r.exp, autoDailyGold: r.gold }; })(),
     monsterWinRate:   parseInt(document.getElementById('set-monster-rate').value)||80,
     ...(limitEl ? { customBattleSettings: { ...(prev.customBattleSettings || {}), dailyBattleLimit: parseInt(limitEl.value) || 3 } } : {}),   // [BATTLE-SET-1]
     accessStart: document.getElementById('set-access-start')?.value || '08:30',
@@ -5941,14 +6249,26 @@ function confirmReset() {
   });
 }
 
-function exportData() {
-  const data = DB.load();
+// [EXPORT-ROOTS-1] 내보내기 = RPG 본 데이터(classRPG_v3) + 루트 밖 학습 앱·마을(EXPORT_ROOTS) 한 파일.
+//   예전엔 classRPG_v3 만 담아 생각판·음악실 등 학습 앱 기록과 마을이 파일에 없었다(운영 안내서는 '마을 뺀 전체'라고 잘못 적혀 있었다).
+//   새 형식: { format:'classRPG-export-2', exportedAt, rpgRoot, rpg:<예전 파일 내용>, roots:{ 루트이름: 값 }, missing:[못 읽은 루트] }
+//   가져오기(importData)는 옛 형식(classRPG_v3 만)도 그대로 받는다.
+async function exportData() {
+  notify('📁 내보내기 준비 중… 학습 앱·마을 기록도 함께 담아요');
+  const roots = {}, missing = [];
+  await Promise.all(EXPORT_ROOTS.map(async r => {
+    try { const v = await readRootOnce(r, 30000); if (v != null) roots[r] = v; }
+    catch (e) { console.warn('내보내기 건너뜀', r, e); missing.push(r); }
+  }));
+  const data = { format: EXPORT_FORMAT, exportedAt: new Date().toISOString(), rpgRoot: DB.KEY, rpg: DB.load(), roots, missing: missing.sort() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `classRPG_${Utils.todayStr()}.json`;
   a.click();
-  notify('📁 데이터 내보내기 완료!');
+  notify(missing.length
+    ? `📁 내보내기 완료 — 못 담은 것 ${missing.length}개(${missing.map(r => r.replace('classRPG_', '')).join(', ')})`
+    : '📁 데이터 내보내기 완료! (RPG + 학습 앱 + 마을)', missing.length ? 'error' : undefined);
 }
 
 // ══════════════════════════════════════════════════
@@ -6173,4 +6493,40 @@ function openThinkboard() {   // 새 탭(TV 등)
   _tbTeacherMark();
   const w = window.open('thinkboard/index.html?rpg=1#/t', '_blank');
   if (!w) location.href = 'thinkboard/index.html?rpg=1#/t';
+}
+
+// [LEARN-APPS-1] 학습 앱 선생님 화면 — 그동안 관리 화면에 링크가 없어 주소를 직접 쳐야 했다(생각판만 있었음).
+//   <app>/index.html?teacher=1#/t 를 새 탭으로 연다. 각 앱 teacher.js 는 sessionStorage '<app>.teacher'='1' 이면
+//   비밀번호를 다시 묻지 않는다 → 열기 전에 이 탭에 그 표시를 세운다. window.open(noopener 없이)은 sessionStorage 를
+//   새 탭에 복사하므로 새 탭도 통과한다. 학생 크롬북에는 이 표시가 없다(관리 화면에 들어온 탭에서만 선다).
+const LEARN_APPS = [
+  { key: 'music',   icon: '🎵', name: '음악실',     what: '아이별 곡 · 리코더 연습 횟수 · 음악회 내리기' },
+  { key: 'coding',  icon: '🧩', name: '기초 코딩',   what: '막힘 지도 · 판마다 많이 한 실수 · 마지막 코드' },
+  { key: 'pattern', icon: '🔷', name: '무늬 공방',   what: '헷갈림 지도 · 좌우·돌리기 헷갈림 · 무늬 전시 내리기' },
+  { key: 'paint',   icon: '🎨', name: '물감 연구소', what: '헷갈림 지도 · 밝기·선명함 · 느낌의 색 모자이크' },
+  { key: 'art',     icon: '🔍', name: '명화 탐정',   what: '탐정 기록 · 질문 사다리 · 조형 요소 찾기' },
+  { key: 'ink',     icon: '🖌️', name: '먹 연구소',   what: '헷갈림 지도 · 농담(진함·옅음) · 먹색 꼬리' },
+  { key: 'print',   icon: '🖨️', name: '판화 놀이',   what: '헷갈림 지도 · 거울(좌우 반전) 실수 · 넘쳐 팜' },
+];
+function learnAppUrl(key) { return key + '/index.html?teacher=1#/t'; }
+function renderLearnAppsPage() {
+  const el = document.getElementById('learnapps-grid');
+  if (!el) return;
+  el.innerHTML = LEARN_APPS.map(a => `
+    <button type="button" class="learnapp-card" data-app="${a.key}" onclick="openLearnApp('${a.key}')"
+      style="display:flex;flex-direction:column;align-items:flex-start;gap:.35rem;text-align:left;cursor:pointer;
+      background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:1rem 1.1rem;color:inherit;font:inherit">
+      <span style="font-size:1.5rem;line-height:1">${a.icon}</span>
+      <span style="font-size:.95rem;font-weight:700">${escHtml(a.name)}</span>
+      <span style="font-size:.74rem;color:var(--txt2);line-height:1.5">${escHtml(a.what)}</span>
+      <span style="margin-top:auto;font-size:.72rem;color:var(--sky);font-weight:600">새 탭으로 열기 ↗</span>
+    </button>`).join('');
+}
+function openLearnApp(key) {
+  const app = LEARN_APPS.find(a => a.key === key);
+  if (!app) return;
+  try { sessionStorage.setItem(key + '.teacher', '1'); } catch (e) {}
+  const url = learnAppUrl(key);
+  const w = window.open(url, '_blank');
+  if (!w) location.href = url;   // 팝업이 막히면 이 탭에서(생각판 openThinkboard 와 같다)
 }

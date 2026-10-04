@@ -1370,6 +1370,15 @@ const DB = {
 
   getQuests()      { return this.load().quests || []; },
 
+  // [AUTO-DAILY-REWARD-1] 자동 일일 퀘스트 1개 보상. 교사 설정(autoDailyExp·autoDailyGold)이 없으면 예전 고정값 35EXP·25G.
+  //   옛 키 baseExp·baseGold 는 읽지 않는다 — 운영에 기본값(80/50·30)이 저장돼 있어 읽으면 배포 순간 지급이 바뀐다.
+  //   0 은 값으로 받는다(보상 없이 올리기). 글자·음수는 기본값, 지나친 값은 1000 에서 자른다(오타 막기).
+  autoDailyReward(settings) {
+    const s = settings || {};
+    const pick = (v, def) => { const n = Math.floor(Number(v)); return (v === '' || v == null || !Number.isFinite(n) || n < 0) ? def : Math.min(n, 1000); };
+    return { exp: pick(s.autoDailyExp, 35), gold: pick(s.autoDailyGold, 25) };
+  },
+
   // ── 오늘 일일퀘스트 자동 등록 (앱 로드 시 1회) ──
   // [Q-2A] admin.checkAutoDailyQuests()의 핵심 로직을 공용 DB helper로 이전.
   //        호출처: admin.js window.onload + student.js enterGame() ([Q-2B]).
@@ -1386,6 +1395,7 @@ const DB = {
     //   그 사이 교사가 추가한 퀘스트가 소리 없이 사라졌다.
     //   인덱스 부분 저장도 안 된다 — 배열 인덱스는 기기마다 가리키는 퀘스트가 다르다.
     //   서버의 현재 목록 위에 적용하는 transaction으로 처리한다(경합 시 Firebase가 재시도).
+    const reward = this.autoDailyReward(settings);   // [AUTO-DAILY-REWARD-1]
     const applyDaily = (list) => {
       const next = (list || []).slice();
       // 어제 일일퀘스트 중 아직 active인 것 내리기
@@ -1402,7 +1412,7 @@ const DB = {
           id: 'bq_auto_' + today + '_' + i,
           name: item.name,
           type: 'daily',
-          exp: 35, gold: 25,
+          exp: reward.exp, gold: reward.gold,
           icon: '📋',
           stat: item.stat || '',
           statVal: item.statVal || 0,

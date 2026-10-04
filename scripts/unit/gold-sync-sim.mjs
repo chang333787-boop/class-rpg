@@ -166,12 +166,19 @@ function sliceFn(src, name) {
   for (; i < src.length; i++) { if (src[i] === '{') d++; else if (src[i] === '}' && --d === 0) return src.slice(m.index, i + 1); }
   throw new Error('중괄호: ' + name);
 }
+// [APPROVE-AWAIT-1] admin.js 의 한 줄 상수(const 이름 = ...;)를 잘라 온다
+function sliceConst(src, name) {
+  const m = new RegExp(`^const ${name}\\s*=.*;\\s*$`, 'm').exec(src);
+  if (!m) throw new Error('admin.js 상수 없음: ' + name);
+  return m[0];
+}
 async function bootTeacher(world, clock, opt) {
   const c = world.makeClient('교사', opt);
   const p = c.DB.init(); await clock.run(clock.now); await p; await clock.run(clock.now);
   c.DB.onDataChange(() => {});
   // admin.js 의 approveReward / approveSingle 을 그대로 잘라 넣는다(화면 함수는 빈 스텁)
-  vm.runInContext(`var notify=function(){}, renderAll=function(){};\n${sliceFn(ADMIN, 'approveReward')}\n${sliceFn(ADMIN, 'approveSingle')}\n${sliceFn(ADMIN, 'approveAll')}\n` +
+  //   [APPROVE-AWAIT-1] 승인 함수가 쓰는 저장 약속 받기(saveStudentAwait·afterSaves)와 [전체 승인] 제외 목록도 함께
+  vm.runInContext(`var notify=function(){}, renderAll=function(){};\n${sliceConst(ADMIN, 'APPROVE_ALL_SKIP_TYPES')}\n${sliceFn(ADMIN, 'saveStudentAwait')}\n${sliceFn(ADMIN, 'afterSaves')}\n${sliceFn(ADMIN, 'approveReward')}\n${sliceFn(ADMIN, 'approveSingle')}\n${sliceFn(ADMIN, 'approveAll')}\n` +
     'globalThis.__approveSingle = approveSingle; globalThis.__approveAll = approveAll;', c.sb);
   c.approveSingle = (sid, rid) => c.sb.__approveSingle(sid, rid);
   c.approveAll = () => c.sb.__approveAll();

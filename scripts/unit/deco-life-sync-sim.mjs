@@ -162,7 +162,7 @@ async function bootTeacher(world, clock, opt) {
   const c = world.makeClient('교사', opt);
   const p = c.DB.init(); await clock.run(clock.now); await p; await clock.run(clock.now);
   c.DB.onDataChange(() => {});
-  vm.runInContext(`var notify=function(){}, renderAll=function(){};\n${sliceFn(ADMIN, 'approveReward')}\n${sliceFn(ADMIN, 'approveSingle')}\n` +
+  vm.runInContext(`var notify=function(){}, renderAll=function(){};\n${sliceFn(ADMIN, 'saveStudentAwait')}\n${sliceFn(ADMIN, 'afterSaves')}\n${sliceFn(ADMIN, 'approveReward')}\n${sliceFn(ADMIN, 'approveSingle')}\n` +   // [APPROVE-AWAIT-1]
     'globalThis.__approveSingle = approveSingle;', c.sb);
   c.approve = (sid, id, gold) => {
     const s = c.DB.getStudent(sid);
