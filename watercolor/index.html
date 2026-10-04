@@ -361,6 +361,12 @@ function renderHome(){
   document.querySelectorAll('.lesson').forEach(el => el.onclick = () => openLesson(+el.dataset.id));
 }
 function openLesson(id){ const L = LESSONS.find(l=>l.id===id); cur = { lesson:L, step: -1 }; show('lessonScreen'); renderStep(); }
+/* [ART-WC-1] 명화 탐정 4장(수채화)과 서로 오가기 — 차시 → 그 기법이 보이는 명화 · 명화 탐정의 '해 보기' 단추 → ?lesson=<차시> */
+const SEE = COURSE.key === 'watercolor' ? { 4: [['blue_rigi', '터너 「푸른 리기산, 해돋이」']], 5: [['hare', '뒤러 「어린 산토끼」'], ['blue_boat', '호머 「파란 배」']],
+  6: [['sloop_nassau', '호머 「나소의 돛단배」'], ['alligators', '사전트 「진흙투성이 악어들」']], 13: [['turf', '뒤러 「커다란 풀숲」']] } : {};
+function seeHTML(L){ const list = SEE[L.id]; if (!list) return '';
+  const q = new URLSearchParams(); if (student && student !== '0'){ q.set('sid', student); q.set('n', studentName || ''); } q.set('from', 'wc'); q.set('lesson', String(L.id));
+  return `<div class="see" style="margin-top:10px">🔎 <b>명작에서 이 기법 찾아보기</b> · ${list.map(([id, t]) => `<a href="../art/index.html?${q}#/c/${id}" style="color:var(--accent)">${escHtml(t)}</a>`).join(' · ')}</div>`; }
 $('backBtn').onclick = () => { stopTimer(); speechSynthesis.cancel(); renderHome(); show('home'); };
 
 function renderStep(){
@@ -372,7 +378,7 @@ function renderStep(){
   if (i === -1){
     html = `<div class="card"><div class="art">${renderArt(L.steps[0].art)}</div>
       <div class="step-no">오늘의 목표 <span class="term">${L.tech}</span></div><div class="text">${L.goal}</div>
-      <div class="sub" style="margin-top:8px">준비물</div><div>${L.materials.map(m=>`<span class="chip">${m}</span>`).join('')}</div>
+      <div class="sub" style="margin-top:8px">준비물</div><div>${L.materials.map(m=>`<span class="chip">${m}</span>`).join('')}</div>${seeHTML(L)}
       <div class="tip"><b>선생님 포인트</b> · 성취기준 ${L.std}. 이 차시는 ${n}단계이며, 한 단계씩 "다 했어요"를 누르며 진행합니다. 기다리는 단계에는 타이머가 있습니다. 한 번에 한 기법만 시범 → 5~10분 연습이 기본 흐름입니다.</div>
       <div class="nav"><div class="spacer"></div><button class="primary" id="nextBtn">시작해요 ▶</button></div></div>`;
   } else if (i < n){
@@ -474,6 +480,7 @@ $('ttsBtn').onclick = () => {
   const u = new URL(location.href); u.searchParams.set('course', other.key); $('courseLink').href = u.toString(); $('courseLink').textContent = other.label;
 })();
 setTeacher(teacher); setTv(tv); updateStuBtn(); renderHome();
+(function deepLink(){ const p = new URLSearchParams(location.search).get('lesson'), id = p == null || p === '' ? NaN : +p; if (Number.isInteger(id) && LESSONS.some(l => l.id === id)) openLesson(id); })();   /* ?lesson=<차시> — 명화 탐정에서 바로 */
 if (!tv) rpgInit().then(() => { updateStuBtn(); if (student === null) openStuPick(); });
 </script>
 </body>

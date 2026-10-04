@@ -244,3 +244,21 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .btn.try{align-self:flex-start;text-decoration:none;color:#2a1a08;background:#cfe3c6}
 .btn.back-ink{text-decoration:none;color:inherit}
 .btn.try:hover{background:#dff0d6}
+/* 4장 수채화 — 경계 재기(줄 · 곡선) · 고른 보기 */
+.opt.on{box-shadow:inset 0 0 0 3px var(--gold);background:#4a3a24}
+.erow{display:flex;gap:8px;align-items:stretch}
+.erow .opt{flex:1}
+.erow .btn.small{height:auto;min-height:46px}
+.mk-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mk-line{stroke:#ffd166;stroke-width:3;stroke-dasharray:6 4;filter:drop-shadow(0 0 2px rgba(0,0,0,.8))}
+.mk-line.on{stroke:#7cf29a;stroke-dasharray:none}
+.mk-ll{position:absolute;pointer-events:none}
+.mk-ll .mk-l{transform:translate(-50%,-115%)}
+.mk-ll.on .mk-l{background:#7cf29a}
+.echart{width:100%;height:auto;background:#f6f0e4;border-radius:10px}
+.echart .et{font-size:9px;font-weight:800;fill:#6b5a48}
+.echart .ep{fill:none;stroke-width:2.4;stroke-linejoin:round}
+.echart .ep.e0,.ek.e0{stroke:#d9480f;background:#d9480f}
+.echart .ep.e1,.ek.e1{stroke:#1c7ed6;background:#1c7ed6}
+.ek{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.erow-r b{color:var(--gold2)}

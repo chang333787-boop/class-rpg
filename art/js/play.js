@@ -1,11 +1,11 @@
 // 사건 화면 — 왼쪽 그림(확대 · 짚기) · 오른쪽 탐정 수첩(① 찾기 → ② 생각 → ③ 느낌 → ④ 질문 → 사건 해결)
-//  ② 생각 갈래: 단서 짚기 · 놀이 고르기 · 흑백 실험 · 색 점 세기 · 먹색 차례 재기(order) · 붓 자국 읽기(how) — 뒤의 둘은 3장 수묵화(먹 연구소와 이어짐)
+//  ② 생각 갈래: 단서 짚기 · 놀이 고르기 · 흑백 실험 · 색 점 세기 · 먹색 차례 재기(order) · 붓 자국 읽기(how) · 경계 재기(edge) — 뒤의 셋은 3 · 4장(먹 연구소 · 수채화 기초와 이어짐)
 //  [4미03-01] 작품을 자세히 보고(찾기) · 무엇을 보고 그렇게 생각했는지 단서로 말하고(생각) · 느낌을 고르고 · 작품과 화가에게 질문을 만든다
 import { h, modal, toast } from './util.js';
 import { makeViewer } from './viewer.js';
 import { FEELS, BECAUSE } from './cases.js';
 import { kindsFor, kindOf, questionText, partAt, inRect } from './ask.js';
-import { COLOR_NAMES, colorShare, judgeColors } from './colors.js';
+import { COLOR_NAMES, colorShare, judgeColors, edgeWidth } from './colors.js';
 import { MAX_ASK } from './store.js';
 
 export const HOST = '../assets/monsters/m30.png';   // 재털이 고양이 — 명화 탐정(파적도의 고양이와 같은 고양이 무리)
@@ -19,9 +19,12 @@ const r1 = v => Math.round(v * 10) / 10;
 const grayOf = L => { const Y = L > 8 ? Math.pow((L + 16) / 116, 3) : L / 903.3, v = Y <= 0.0031308 ? 12.92 * Y : 1.055 * Math.pow(Y, 1 / 2.4) - 0.055, n = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0'); return '#' + n + n + n; };
 const INK_TONES = [[7.5, '진한 먹'], [34.3, '조금 진한 먹'], [57.8, '중간 먹'], [73.3, '옅은 먹'], [92.1, '종이색']];
 const inkName = L => INK_TONES.reduce((a, t) => (Math.abs(t[0] - L) < Math.abs(a[0] - L) ? t : a))[1];
-// 붓 자국 읽기 — 먹 연구소 2장 붓 놀이와 같은 낱말
-export const TECH = [['dot', '점을 콕콕 찍었어요'], ['line', '선을 죽죽 내리그었어요'], ['wet', '물을 많이 써서 번지게 칠했어요'], ['dry', '마른 붓으로 거칠게 문질렀어요']];
-const TECH_WORD = { dot: '먹점', line: '내리그은 선', wet: '번지기', dry: '마른 붓' };
+// 붓 자국 읽기 — 먹 연구소 2장 붓 놀이 · 수채화 기초 차시와 같은 낱말. 사건마다 think.choices 로 넷을 고른다(없으면 먹 넷)
+export const TECH = { dot: '점을 콕콕 찍었어요', line: '선을 죽죽 내리그었어요', wet: '물을 많이 써서 번지게 칠했어요', dry: '마른 붓으로 거칠게 문질렀어요',
+  fine: '가는 붓으로 한 올씩 그었어요', wash: '물 많은 붓으로 넓게 쓱 칠했어요', white: '칠하지 않고 종이를 남겨 두었어요', layer: '마른 뒤에 진한 색을 겹쳐 칠했어요' };
+const TECH_WORD = { dot: '먹점', line: '내리그은 선', wet: '번지기', dry: '마른 붓', fine: '가는 붓으로 한 올씩', wash: '넓게 쓱(평칠)', white: '흰 종이 남기기', layer: '겹쳐 칠하기' };
+export const choicesOf = t => t.choices || ['dot', 'line', 'wet', 'dry'];
+const EL = ['ㄱ', 'ㄴ'];   // 경계 재기 줄 이름
 
 // 반 셈 — { sid: { key: 'a,b' } } → { a: n, b: n }
 const tally = (obj, key) => { const cnt = {}; for (const v of Object.values(obj || {})) for (const k of String((v || {})[key] || '').split(',').filter(Boolean)) cnt[k] = (cnt[k] || 0) + 1; return cnt; };
@@ -43,6 +46,7 @@ export function mountCase(root, ctx, c) {
   // 생각
   let tChoice = c.think.mode === 'evidence' && c.think.opts.length === 1 ? 0 : -1, tEv = new Set(), tShown = false, tPick = null, tColors = new Set(), tShare = null;
   let tOrder = [], tMeasure = null, hIdx = 0, hBad = new Set(), hFirst = [], hZoomed = -1;   // 먹색 차례 재기 · 붓 자국 읽기
+  let eGuess = -1, eRes = null;   // 경계 재기 — 고른 줄 · 잰 값
   // 느낌 · 질문
   const fPick = new Set(); let fBec = '', aPart = -1, aKind = '', aPos = null, aSel = '';
 
@@ -91,6 +95,7 @@ export function mountCase(root, ctx, c) {
       if (t.mode === 'gray' && tShown) { list.push({ r: t.sun, kind: 'ev', label: '해' }); for (const s of t.sky) list.push({ r: s, kind: 'region' }); }
       if (t.mode === 'order') t.spots.forEach(([n, r], i) => { const k = tOrder.indexOf(i), m = tMeasure && tMeasure.find(x => x.i === i); list.push({ r, kind: k >= 0 ? 'ev' : 'region', label: m ? `${n} ${Math.round(m.L)}` : k >= 0 ? `${k + 1} ${n}` : n }); });
       if (t.mode === 'how') t.items.forEach((x, i) => { if (tShown) list.push({ r: x.r, kind: 'ev', label: `${x.n} — ${TECH_WORD[x.a]}` }); else if (i === hIdx) list.push({ r: x.r, kind: 'region' }); });
+      if (t.mode === 'edge') t.edges.forEach((e, i) => list.push({ line: [e.a, e.b], label: EL[i] + (eRes ? ' ' + (i === softOf(eRes) ? '부드러움' : '또렷함') : ''), on: eGuess === i }));
     }
     if (step === 3) {
       const qs = askList();
@@ -120,7 +125,7 @@ export function mountCase(root, ctx, c) {
     footNext.replaceChildren(...(ready ? [h('button', { class: 'btn primary', 'data-act': step === 3 ? 'solve' : 'next', onclick: fn }, label)] : []));
   }
   //  생각 단계는 결과(해설)까지 본 뒤에 다음으로 — 전에 붙인 생각이 있어도 이번에 다시 해 보게
-  const thinkShownNow = () => { const m = c.think.mode; return m === 'pick' ? thinkDone : m === 'colors' ? !!tShare : m === 'order' ? !!tMeasure : tShown; };
+  const thinkShownNow = () => { const m = c.think.mode; return m === 'pick' ? thinkDone : m === 'colors' ? !!tShare : m === 'order' ? !!tMeasure : m === 'edge' ? !!eRes : tShown; };
   function unlock(i) { if (open < i) { open = i; renderTabs(); } }
 
   function onTap(t) {
@@ -248,18 +253,61 @@ export function mountCase(root, ctx, c) {
         if (hZoomed !== hIdx) { hZoomed = hIdx; viewer.zoomTo(it.r, 3); }
         parts.push(h('p', { class: 'lead' }, `${hIdx + 1} / ${t.items.length} — 점선 네모 안을 크게 봐요. 붓 자국이 어떤 모양인가요?`),
           h('div', { class: 'picked' }, h('span', { class: 'muted small' }, '읽을 곳'), h('b', {}, it.n)),
-          h('div', { class: 'opts' }, ...TECH.map(([k, label]) => h('button', { class: 'opt' + (hBad.has(k) ? ' no' : ''), 'data-h': k, disabled: hBad.has(k), onclick: () => pickHow(k) }, label))),
+          h('div', { class: 'opts' }, ...choicesOf(t).map(k => h('button', { class: 'opt' + (hBad.has(k) ? ' no' : ''), 'data-h': k, disabled: hBad.has(k), onclick: () => pickHow(k) }, TECH[k]))),
           hIdx ? h('ul', { class: 'evs' }, ...t.items.slice(0, hIdx).map(x => h('li', {}, `🖌 ${x.n} — ${TECH_WORD[x.a]}`))) : null);
       } else parts.push(h('ul', { class: 'evs' }, ...t.items.map(x => h('li', {}, `🖌 ${x.n} — ${TECH_WORD[x.a]}`))), rev(), tryBtn(),
         thinkTally(k => (k === 'right' ? '첫눈에 알아봤어요' : '한 번 더 보고 알았어요')));
     }
+    if (t.mode === 'edge') {
+      if (!eRes) {
+        parts.push(h('p', { class: 'lead' }, '그림 위 두 줄(ㄱ · ㄴ)이 경계를 가로질러요. 🔍로 크게 보고, 더 부드럽게 번진 쪽을 골라요.'),
+          ...t.edges.map((e, i) => h('div', { class: 'erow' },
+            h('button', { class: 'opt' + (eGuess === i ? ' on' : ''), 'data-e': i, onclick: () => { eGuess = i; say(`예상: ${EL[i]} ${e.n} 쪽이 더 부드러워요`); render(); } }, `${EL[i]} ${e.n}`),
+            h('button', { class: 'btn small', title: '크게 보기', onclick: () => viewer.zoomTo(lineBox(e), 3) }, '🔍'))),
+          h('div', { class: 'go-row' }, h('span', { class: 'sp' }), h('button', { class: 'btn primary', 'data-act': 'edge', disabled: eGuess < 0, onclick: () => edgeTest() }, '📏 경계 재기')));
+      } else {
+        const soft = softOf(eRes);
+        parts.push(h('div', { class: 'measure' }, h('b', {}, '재어 보니 — 줄을 따라 밝기가 바뀌는 모습'), edgeChart(eRes),
+          ...eRes.map((r, i) => h('p', { class: 'small erow-r' }, h('i', { class: 'ek e' + i }), `${EL[i]} ${t.edges[i].n} — 그림 점 ${Math.round(r.w)}개 거리에 걸쳐 바뀌어요 · `, h('b', {}, i === soft ? '부드러운 경계' : '또렷한 경계'))),
+          h('p', { class: eGuess === soft ? 'good' : 'bad' }, eGuess === soft ? '예상이 맞았어요!' : '예상과 달랐어요 — 그래서 재어 보는 거예요.'),
+          h('p', { class: 'muted small' }, '곡선이 절벽처럼 뚝 떨어지면 또렷한 경계, 비탈처럼 천천히 바뀌면 부드러운 경계예요.')),
+          rev(), tryBtn(), thinkTally(k => `${EL[+k] || ''} ${(t.edges[+k] || {}).n || k}`));
+      }
+    }
     body.replaceChildren(...parts.filter(Boolean));
   }
-  //  먹 연구소로 — 본 것을 직접 해 보기(같은 sid · 이름 그대로)
+  //  해 보러 가기 — 먹 연구소(hash) · 수채화 기초(차시 번호). 같은 sid · 이름 그대로
   function tryBtn() {
     const t = c.think; if (!t.try) return null;
-    const q = new URLSearchParams(location.search); q.delete('from'); q.delete('debug');
+    const q = new URLSearchParams(location.search); q.delete('from'); q.delete('debug'); q.delete('lesson');
+    if (t.try.app === 'watercolor') {
+      const w = new URLSearchParams(); if (q.get('sid')) w.set('sid', q.get('sid')); w.set('lesson', String(t.try.lesson));
+      return h('a', { class: 'btn try', href: `../watercolor/index.html?${w}`, 'data-act': 'try' }, '🎨 ' + t.try.label);
+    }
     return h('a', { class: 'btn try', href: `../ink/index.html${q.toString() ? '?' + q : ''}${t.try.hash}`, 'data-act': 'try' }, '🖌 ' + t.try.label);
+  }
+  //  경계 재기 — 두 줄의 밝기 곡선(가로 = 그림 점 거리 · 세로 = 밝기) · 더 길게 바뀐 쪽이 부드러운 경계
+  const softOf = res => (res[0].w >= res[1].w ? 0 : 1);
+  const lineBox = e => { const pad = 6; return [Math.max(0, Math.min(e.a[0], e.b[0]) - pad), Math.max(0, Math.min(e.a[1], e.b[1]) - pad), Math.min(100, Math.max(e.a[0], e.b[0]) + pad), Math.min(100, Math.max(e.a[1], e.b[1]) + pad)]; };
+  function edgeChart(res) {
+    const NS = 'http://www.w3.org/2000/svg', W = 300, H = 120, maxX = Math.max(...res.map(r => r.step * (r.vals.length - 1)));
+    const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('class', 'echart');
+    const lo = Math.min(...res.flatMap(r => r.vals)) - 4, hi = Math.max(...res.flatMap(r => r.vals)) + 4;
+    const X = d => 8 + (W - 16) * d / maxX, Y = v => H - 16 - (H - 28) * (v - lo) / Math.max(1, hi - lo);
+    svg.innerHTML = `<text x="8" y="11" class="et">밝게</text><text x="8" y="${H - 3}" class="et">어둡게</text><text x="${W - 8}" y="${H - 3}" class="et" text-anchor="end">줄을 따라 →</text>`;
+    res.forEach((r, i) => { const pl = document.createElementNS(NS, 'polyline'); pl.setAttribute('points', r.vals.map((v, k) => `${X(k * r.step).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')); pl.setAttribute('class', 'ep e' + i); svg.append(pl); });
+    return svg;
+  }
+  async function edgeTest() {
+    const t = c.think;
+    say('경계를 재는 중…');
+    const out = [];
+    for (const e of t.edges) { const p = await viewer.lineL(e.a, e.b); out.push({ ...edgeWidth(p.vals, p.step), vals: p.vals, step: p.step }); }
+    if (!alive) return;
+    eRes = out; tShown = true;
+    await saveThink(eGuess);
+    if (!alive) return;
+    viewer.reset(); say('재었어요! 곡선이 가파를수록 또렷한 경계예요.', 'good'); render();
   }
   function pickSpot(i) {
     if (tMeasure || tOrder.includes(i) || tOrder.length >= c.think.spots.length) return;
@@ -308,6 +356,7 @@ export function mountCase(root, ctx, c) {
       viewer.ripple(x, y, 'good'); pickSpot(i); return;
     }
     if (t.mode === 'how') { say('오른쪽에서 붓 자국을 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
+    if (t.mode === 'edge') { say('오른쪽에서 ㄱ · ㄴ 가운데 더 부드러운 쪽을 골라요 — 그림은 마음껏 확대해 봐요.'); return; }
     if (t.mode === 'pick' && !thinkDone) {
       const sp = t.spots.find(s => inRect(x, y, s[1], 1));
       tPick = sp ? { label: sp[0], r: sp[1] } : { label: t.other, x, y };
