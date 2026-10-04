@@ -117,7 +117,10 @@ function _assignRenderBits(lists) {
   _assignRaf = { lists: !!lists };
   setTimeout(() => {
     const o = _assignRaf; _assignRaf = 0;
-    try { _assignRenderStale(); _assignRenderLive(); _assignRenderLists(); _assignRenderResult(); } catch (e) { console.error('[CLASS-ASSIGN-1] 그리기', e); }
+    try {
+      const m = document.getElementById('asg-mask'); if (m) m.checked = _assignMasked();   // 수업이 다른 기기에서 켜져도 '이름 가리기'가 따라감
+      _assignRenderStale(); _assignRenderLive(); _assignRenderLists(); _assignRenderResult();
+    } catch (e) { console.error('[CLASS-ASSIGN-1] 그리기', e); }
   }, 30);
 }
 
