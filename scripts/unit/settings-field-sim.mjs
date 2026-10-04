@@ -12,10 +12,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { readGamedataSources } from './gamedata-sources.mjs';
 import { readAdminSources } from './admin-sources.mjs';
 
 const ROOT = process.env.SIM_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const GAMEDATA = fs.readFileSync(path.join(ROOT, 'gamedata.js'), 'utf8');
+const GAMEDATA = readGamedataSources(ROOT);   // [GAMEDATA-SPLIT-1] gamedata.js + gamedata/*.js(html 순서) — 나누기 전 체크아웃이면 gamedata.js 하나
 const ADMIN = readAdminSources(ROOT);   // [ADMIN-SPLIT-1] admin.js + admin/*.js(admin.html 순서)
 const EXPECT_FIXED = process.argv.includes('--expect-fixed');
 

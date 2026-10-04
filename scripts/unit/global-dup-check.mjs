@@ -29,9 +29,10 @@ const PAGES = ['student.html', 'admin.html', 'kiosk.html', 'watercolor/index.htm
 
 // 의도된 덮어쓰기 — 'html|이름|앞 파일|뒤 파일': 까닭
 const BASELINE = {
+  // [GAMEDATA-SPLIT-1] gamedata.js 를 나눈 뒤 gamedata 판은 gamedata/rules.js 에 있다(admin.html 에서 admin 판보다 앞 — 덮는 순서 그대로)
   // admin 판은 GAME_DATA 몬스터에 _custom 표시를 붙여 관리 화면 목록이 '고친 몬스터'를 가려 본다. 학생·키오스크는 gamedata 판.
   // [ADMIN-SPLIT-1] admin.js 를 나눈 뒤 이 함수는 admin/battle.js 에 있다(admin.html 에서 gamedata.js 뒤 — 덮는 순서 그대로)
-  'admin.html|getActiveMonsters|gamedata.js|admin/battle.js': '관리 화면 전용 판(_custom 표시) — 2026-10-04 확인',
+  'admin.html|getActiveMonsters|gamedata/rules.js|admin/battle.js': '관리 화면 전용 판(_custom 표시) — 2026-10-04 확인',
 };
 
 const DECL = /^(?:(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|(var|let|const|class)\s+([A-Za-z_$][\w$]*))/;

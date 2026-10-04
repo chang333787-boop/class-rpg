@@ -18,7 +18,7 @@
   - **HTML 인라인 `<script>` 0건 / 인라인 `<style>` 0건** (11-I `_lbTouchX`, 11-J `@keyframes ldBar` 제거 완료)
   - CSS link 캐시버스터 적용: `student/admin/kiosk.css?v=20260604`
   - 날짜 기준·kiosk 정규화 단일 소스 통일 완료
-  - `node scripts/verify-safety.mjs` → **PASS 18 · REVIEW 1 · FAIL 0** (2026-10-04 student 나누기 뒤 **PASS 26** — `node --check` 가 student/*.js 8개를 더 본다 · admin 나누기(R3) 뒤 **PASS 35** — admin/*.js 9개)
+  - `node scripts/verify-safety.mjs` → **PASS 18 · REVIEW 1 · FAIL 0** (2026-10-04 student 나누기 뒤 **PASS 26** — `node --check` 가 student/*.js 8개를 더 본다 · admin 나누기(R3) 뒤 **PASS 35** — admin/*.js 9개 · gamedata 나누기(R4)로 gamedata/*.js 4개 더 → **PASS 39 · REVIEW 1 · FAIL 0**)
   - 남은 REVIEW 1건 = root write 후보 5건(gamedata.js:1, admin.js:4)으로 **모두 의도된 게이팅 경로**(init 부트스트랩·import·rollback·reset·전체수치 초기화). 안전 알림으로 **유지 권장**(0으로 강제 시 신규 root write 탐지 사각 발생)
 - **리팩토링 1차 마감 가능 상태**: 저위험 외부화·인라인 제거·저장 안전·단일 소스 통일 목표 달성. 남은 후보(§11)는 저가치·선택. 기능 개발 복귀는 사용자 지시 전까지 보류.
 

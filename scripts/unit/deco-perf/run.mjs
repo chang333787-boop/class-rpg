@@ -12,6 +12,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from '../student-sources.mjs';
+import { gamedataScriptFiles } from '../gamedata-sources.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.REPO || path.resolve(HERE, '..', '..', '..');
 const argv = process.argv.slice(2);
@@ -115,7 +116,7 @@ const sizeKB = f => fs.existsSync(path.join(REPO, f)) ? Math.round(fs.statSync(p
 //  [SPLIT-1] 학생 코드는 student.js + student/*.js — 파일마다 + 합(나누기 전 판 student.js 와 견줄 값)
 let stuFiles = ['student.js'];
 try { stuFiles = studentScriptFiles(REPO); } catch (e) {}
-const files = [...stuFiles, 'student.css', 'student.html', 'gamedata.js', 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js'];
+const files = [...stuFiles, 'student.css', 'student.html', ...gamedataScriptFiles(REPO), 'curriculum.js', 'curriculum_review.js', 'curriculum_reading.js', 'figures.js'];
 const result = { 'CPU감속': CPU, '횟수': RUNS, '그래픽': String(GPU_NAME || '없음').replace(/[=\n]/g, ' ') };
 for (const k of Object.keys(all[0])) result[k] = median(all.map(o => o[k]).filter(v => v != null));
 for (const f of files) result['파일KB_' + f] = sizeKB(f);

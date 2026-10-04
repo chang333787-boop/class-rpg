@@ -15,12 +15,14 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { readStudentSources } from './student-sources.mjs';
+import { readGamedataSources } from './gamedata-sources.mjs';
 import { readAdminSources } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 //  [SPLIT-1] 학생 코드는 student.js + student/*.js 로 나뉘었다 — student.js 만 읽으면 옮긴 코드를 빠뜨리므로 막는다.
 const read = (f) => {
   if (f === 'student.js') throw new Error('student.js 만 읽지 말 것 — readStudentSources(ROOT) 로(student/*.js 까지) [SPLIT-1]');
+  if (f === 'gamedata.js') throw new Error('gamedata.js 만 읽지 말 것 — readGamedataSources(ROOT) 로(gamedata/*.js 까지) [GAMEDATA-SPLIT-1]');
   if (f === 'admin.js') throw new Error('admin.js 만 읽지 말 것 — readAdminSources(ROOT) 로(admin/*.js 까지) [ADMIN-SPLIT-1]');
   return fs.readFileSync(path.join(ROOT, f), 'utf8');
 };
@@ -264,7 +266,7 @@ cur = 'gamedata._normalizeArrays';
     localStorage: { getItem: () => null, setItem: () => {} }, alert: () => {} };
   sb.globalThis = sb;
   vm.createContext(sb);
-  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+  vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB;', sb);
   const norm = (d) => sb.__DB._normalizeArrays(JSON.parse(JSON.stringify(d)));
 
   test('학생 객체 → 배열, 하위 배열 필드 8개 전부 배열화', () => {
@@ -538,7 +540,7 @@ try {
     const node = { once: async () => ({ val: () => JSON.parse(JSON.stringify(raw)) }), update: async (u) => { writes.push(u); }, set: async () => { writes.push('SET'); } };
     // 규칙은 gamedata DB._artworkKeyFix(ART-KEY-FIX-1) — 실제 gamedata.js 에서 가져온다
     const gd = { console, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
-    gd.globalThis = gd; vm.createContext(gd); vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', gd);
+    gd.globalThis = gd; vm.createContext(gd); vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB;', gd);
     const sb = { DB: { _artworkKeyFix: gd.__DB._artworkKeyFix, _fbRef: { child: (p) => { if (p !== 'artworks') throw new Error('다른 경로: ' + p); return node; } } } };
     sb.globalThis = sb; vm.createContext(sb);
     vm.runInContext(sliceAsync('normalizeArtworkKeys') + '\nglobalThis.__n = normalizeArtworkKeys;', sb);
@@ -593,7 +595,7 @@ cur = 'gamedata 작품 쓰기가 실제 키에(ART-RAW-KEY-1)';
   const boot = (artworks) => {
     const sb = { console, window: {}, setTimeout: (f) => f(), document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
     sb.globalThis = sb; vm.createContext(sb);
-    vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+    vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB;', sb);
     const root = { tree: { artworks: clone(artworks) } };
     const DB = sb.__DB;
     DB._fbRef = memRef(root);
@@ -643,7 +645,7 @@ try {
   const mk = () => {
     const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
     sb.globalThis = sb; vm.createContext(sb);
-    vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB; globalThis.__AU = AchievementUtils;', sb);
+    vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB; globalThis.__AU = AchievementUtils;', sb);
     return sb;
   };
   // G1
@@ -842,7 +844,7 @@ cur = 'admin 승급 직업은 꿈 기준(PROMO-JOB-DREAM-1)';
 try {
   const ADMIN = readAdminSources(ROOT);
   const gd = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
-  gd.globalThis = gd; vm.createContext(gd); vm.runInContext(read('gamedata.js') + ';globalThis.__U = Utils;', gd);
+  gd.globalThis = gd; vm.createContext(gd); vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__U = Utils;', gd);
   const stu = { id: 's1', name: '가', job: '대학생', dream: '의사', level: 19, exp: 0, gold: 0, totalGold: 0, promotedLevels: [] };
   const req = { id: 'r1', studentId: 's1', level: 20 };
   const sb = { Utils: gd.__U, notify() {}, renderAll() {},
@@ -1938,7 +1940,7 @@ try {
   const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
   sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
   sb.globalThis = sb; vm.createContext(sb);
-  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB;', sb);
+  vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB;', sb);
   const DB = sb.__DB;
   const ids = (l) => l.map(r => r.id);
   test('보상 합치기: 서버 목록(객체 꼴·구멍) 위에 더하기 — 이미 있는 id 는 안 겹침', () =>
@@ -2028,7 +2030,7 @@ try {
   const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
   sb.firebase = { database: Object.assign(() => ({}), { ServerValue: { increment: (n) => ({ inc: n }) } }) };
   sb.globalThis = sb; vm.createContext(sb);
-  vm.runInContext(read('gamedata.js') + ';globalThis.__DB = DB; globalThis.__U = Utils;', sb);
+  vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB; globalThis.__U = Utils;', sb);
   const DB = sb.__DB, U = sb.__U;
   //  가짜 ref — transaction 은 script 에서 한 걸음씩(Error 면 그 오류로 끝 · 객체면 그 결과) · script 가 비면 일감을 srv[자리] 값으로
   //   실제로 돌려(undefined 면 committed false) 그 결과로 끝 · 일감 fn 은 log 에 남겨 둔다

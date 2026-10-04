@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { studentScriptFiles, studentTagFiles } from './unit/student-sources.mjs';
+import { gamedataScriptFiles } from './unit/gamedata-sources.mjs';
 import { adminScriptFiles } from './unit/admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,11 +25,14 @@ const countMatches = (text, re) => (text.match(re) || []).length;
 // [SPLIT-1] 학생 코드 = student.js + student/*.js(student.html 의 <script> 순서가 단일 출처). 문법·저장 패턴을 모두 본다.
 let STUDENT_FILES = ['student.js'], STUDENT_TAGS = ['student.js'];
 try { STUDENT_FILES = studentScriptFiles(ROOT); STUDENT_TAGS = studentTagFiles(ROOT); } catch (e) { add('FAIL', `student.html 학생 스크립트 목록: ${e.message}`); }
+// [GAMEDATA-SPLIT-1] 공유 코드 = gamedata.js + gamedata/*.js(student.html 의 <script> 순서가 단일 출처 · 네 html 같은지는 smoke-test)
+let GAMEDATA_FILES = ['gamedata.js'];
+try { GAMEDATA_FILES = gamedataScriptFiles(ROOT); } catch (e) { add('FAIL', `student.html 공유 코드 목록: ${e.message}`); }
 // [ADMIN-SPLIT-1] 관리 코드 = admin.js + admin/*.js(admin.html 의 <script> 순서가 단일 출처)
 let ADMIN_FILES = ['admin.js'];
 try { ADMIN_FILES = adminScriptFiles(ROOT); } catch (e) { add('FAIL', `admin.html 관리 스크립트 목록: ${e.message}`); }
 //  [DECO-LAZY-1] 문법·저장 패턴은 늦게 부르는 파일(student/deco.js)까지 · 로드 순서·클래식 태그는 html 태그로 부르는 것만
-const JS_FILES = ['gamedata.js', ...STUDENT_FILES, ...ADMIN_FILES, 'kiosk.js'];
+const JS_FILES = [...GAMEDATA_FILES, ...STUDENT_FILES, ...ADMIN_FILES, 'kiosk.js'];
 const HTML_FILES = ['student.html', 'admin.html', 'kiosk.html'];
 const CSS_FILES = ['student.css', 'admin.css', 'kiosk.css'];
 const REQUIRED = [...JS_FILES, ...HTML_FILES, ...CSS_FILES];
@@ -118,6 +122,9 @@ for (const f of HTML_FILES) {
   if (!exists(f)) continue;
   const html = read(f);
   const gi = html.indexOf('./gamedata.js');
+  //  [GAMEDATA-SPLIT-1] gamedata/*.js 는 gamedata.js 뒤 · 전용 JS 앞(전용 JS 가 불러오는 즉시 GAME_DATA 등 옮긴 이름을 쓴다)
+  const gdBad = GAMEDATA_FILES.filter((x) => x !== 'gamedata.js').filter((x) => { const k = html.indexOf('./' + x); return k === -1 || k < gi || k > html.indexOf('./' + PAGE_JS[f]); });
+  if (gdBad.length) add('FAIL', `${f} 로드 순서: gamedata/ 파일이 gamedata.js 뒤·${PAGE_JS[f]} 앞에 없음 (${gdBad.join(', ')})`);
   const pj = PAGE_JS[f];
   const di = html.indexOf('./' + pj);
   // [SPLIT-1] student.html 은 student.js 뒤에 student/*.js 가 와야 한다(옮긴 코드가 student.js 의 전역을 쓴다)
@@ -197,7 +204,7 @@ if (exists('kiosk.js')) {
 
 // ── 12) gamedata 정규화 helper 존재 (_normalizeArrays / _migrate) ──
 if (exists('gamedata.js')) {
-  const g = read('gamedata.js');
+  const g = GAMEDATA_FILES.map(read).join('\n');   // [GAMEDATA-SPLIT-1] gamedata.js + gamedata/*.js
   const hasNorm = /_normalizeArrays\s*\(\s*data\s*\)\s*\{/.test(g);
   const hasMig  = /_migrate\s*\(\s*data\s*\)\s*\{/.test(g);
   if (hasNorm && hasMig) add('PASS', 'gamedata 정규화 helper 존재 (_normalizeArrays/_migrate)');

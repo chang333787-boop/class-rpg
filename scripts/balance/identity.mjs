@@ -29,11 +29,13 @@ import vm from 'node:vm';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { makeRng, ROOT } from './lib.mjs';
+import { gamedataSourcesAt, gamedataSourcesFromGit } from '../unit/gamedata-sources.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
-const srcA = arg('a') ? fs.readFileSync(path.resolve(arg('a')), 'utf8')
-  : execFileSync('git', ['-C', ROOT, 'show', `${arg('a-ref', 'origin/main')}:gamedata.js`], { encoding: 'utf8', maxBuffer: 64 << 20 });
-const srcB = fs.readFileSync(path.resolve(arg('b', path.join(ROOT, 'gamedata.js'))), 'utf8');
+// [GAMEDATA-SPLIT-1] A·B = 공유 코드 전체(gamedata.js + gamedata/*.js · 그 판 student.html 순서). 나누기 전 커밋은 gamedata.js 하나.
+const srcA = arg('a') ? gamedataSourcesAt(path.resolve(arg('a')))
+  : gamedataSourcesFromGit(ROOT, arg('a-ref', 'origin/main'));
+const srcB = gamedataSourcesAt(path.resolve(arg('b', path.join(ROOT, 'gamedata.js'))));
 
 const PROD = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/balance/settings/prod-20260915.json'), 'utf8'));
 // 관리자 화면이 저장할 수 있는 키 전부에 기본과 다른 값

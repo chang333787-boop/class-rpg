@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { studentScriptFiles } from './student-sources.mjs';
+import { readGamedataSources, gamedataWhere } from './gamedata-sources.mjs';
 import { readAdminSources, adminWhere } from './admin-sources.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -45,13 +46,15 @@ const ROOT_SET_BASELINE = { 'gamedata.js': 1, 'admin.js': 1 };   // _fbRef.set(d
 
 const RE = /\.child\((['"`])([A-Za-z_]+)\1\)\s*\.set\(/g;
 const RE_ROOT = /_fbRef\.set\(/g;
-const lineOf = (src, i) => src.slice(0, i).split('\n').length;
+// [GAMEDATA-SPLIT-1] 'gamedata.js' 칸 = 공유 코드 전체(gamedata.js + gamedata/*.js, html 순서) — 덩어리를 옮겨도 BASELINE 수는 그대로 · 줄 표시는 gamedata/<파일>:줄
+const GD_SRC = readGamedataSources(ROOT), GD_AT = gamedataWhere(ROOT);
+const lineOf = (src, i) => src === GD_SRC ? GD_AT(i) : src.slice(0, i).split('\n').length;
 
 let pass = 0, fail = 0;
 const out = [];
 for (const f of FILES) {
   // [ADMIN-SPLIT-1] 'admin.js' 칸 = 관리 화면 전체(admin.js + admin/*.js, admin.html 순서) — 덩어리를 옮겨도 BASELINE 수는 그대로
-  const src = f === 'admin.js' ? readAdminSources(ROOT) : fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const src = f === 'admin.js' ? readAdminSources(ROOT) : (f === 'gamedata.js' ? GD_SRC : fs.readFileSync(path.join(ROOT, f), 'utf8'));
   const at = f === 'admin.js' ? adminWhere(ROOT) : (i) => lineOf(src, i);
   const found = {};
   for (const m of src.matchAll(RE)) (found[m[2]] ||= []).push(at(m.index));
