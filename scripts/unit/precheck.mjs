@@ -11,6 +11,10 @@
 //              (student.js·student.css·student.html·scripts/unit/deco-save-count/)을 고친 PR 이면 저절로 돈다. --no-deco 로 끈다.
 //    --save-order-baseline N   save-order-check 기준선(기본 11 = 2026-09-15 main). 새 자리가 늘면 FAIL.
 //
+//  기본으로 도는 것: smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle ·
+//    global-dup · 자기검사 시뮬 다섯(esc-parity 포함) · 밸런스 둘 · 하위 앱 시험(scripts/unit/**/*.test.mjs, 저절로 모음).
+//    2026-10-04 main 기준(--no-deco): PASS 23 · REVIEW 1(save-order 11곳 기준선) · FAIL 0 · SKIP 1 · 약 10초.
+//
 //  판정: 하나라도 FAIL(exit≠0)이면 exit 1. 골드 검사는 **수정 전 main 에서 LOSS 가 정상**이라
 //        --gold 는 기본 REVIEW(기록만)이고, `--gold-strict` 를 주면 --expect-fixed 로 돌려 FAIL 로 셈한다.
 
@@ -41,9 +45,22 @@ const CHECKS = [
   //   `node scripts/deco-bundle.mjs` 로 묶음을 다시 만들어 같이 올린다(안 하면 여기서 FAIL — 화면은 낡은 묶음을 쓴다).
   { name: 'deco-bundle',  file: 'scripts/deco-bundle.mjs',            args: ['--check'],                       pick: /요약:[^\n]*/ },
 ];
+// [GLOBAL-DUP-1] 한 페이지 클래식 스크립트끼리 최상위 function/const 이름 겹침(뒤 파일이 말없이 덮음 · SyntaxError)
+CHECKS.push({ name: 'global-dup', file: 'scripts/unit/global-dup-check.mjs', args: [], pick: /요약:[^\n]*/ });
 // 폴더에 있는 다른 자기검사 시뮬들(각자 exit 코드로 판정)
 for (const f of ['fraction-grade', 'promo-sync-sim', 'settings-field-sim', 'student-known-check']) {
   CHECKS.push({ name: f, file: `scripts/unit/${f}.mjs`, args: [], pick: /(최종 결과:[^\n]*|PASS[^\n]*|FAIL[^\n]*)$/m, optional: true });
+}
+// [PRECHECK-APPS-1] 출력 이스케이프 도우미(escHtml·escJsAttr·safeUrl) 복사본들이 같은 결과를 내나(ESC-PARITY-1)
+CHECKS.push({ name: 'esc-parity', file: 'scripts/unit/esc-parity.mjs', args: [], pick: /요약:[^\n]*/, optional: true });
+// [PRECHECK-APPS-1] 하위 앱 시험(scripts/unit/<앱>/*.test.mjs) — 저절로 모아 한 줄씩. 순수 node · 각 1초 안쪽.
+//   새 앱이 시험 파일을 더하면 여기서 바로 돈다(목록 고칠 일 없음). 판정은 각 파일 exit 코드, 표시는 마지막 줄.
+{
+  const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })
+    .flatMap(e => e.isDirectory() ? walk(`${d}/${e.name}`) : (e.name.endsWith('.test.mjs') ? [`${d}/${e.name}`] : []));
+  let tests = [];
+  try { tests = walk('scripts/unit').sort(); } catch (e) {}
+  for (const f of tests) CHECKS.push({ name: 'app:' + f.replace(/^scripts\/unit\//, '').replace(/\.test\.mjs$/, ''), file: f, args: [], timeout: 60000 });
 }
 // [PRECHECK-BALANCE-1] 밸런스 빠른 검사(밸런스 조수 제공, 각 약 2초).
 //   identity: main 대비 밸런스 출력이 같은가. --review 라 달라도 exit 0 이고 요약 줄이 'REVIEW' → 여기서 REVIEW 로 표시
@@ -81,7 +98,7 @@ for (const c of CHECKS) {
   const t0 = Date.now();
   const r = spawnSync(process.execPath, [c.file, ...c.args], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64e6, timeout: c.timeout || 300000 });
   const outText = (r.stdout || '') + (r.stderr || '');
-  const m = outText.match(c.pick);
+  const m = c.pick ? outText.match(c.pick) : null;   // pick 없으면 마지막 줄
   const line = (m ? m[0] : outText.trim().split('\n').pop() || '').replace(/\s+/g, ' ').slice(0, 110);
   let status = r.status === 0 ? 'PASS' : 'FAIL';
   if (r.error) status = 'FAIL';

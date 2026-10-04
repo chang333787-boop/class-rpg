@@ -2164,14 +2164,8 @@ const AchievementUtils = {
 };
 
 // ── 과목 목록 ────────────────────────────────────────
-// DEFAULT_SUBJECTS는 각 HTML 파일에서 선언
-
-function getActiveSubjects(db) {
-  const d = db || (typeof DB !== 'undefined' ? DB.load() : {});
-  const s = d.activeSubjects;
-  if (!s) return (typeof DEFAULT_SUBJECTS !== 'undefined' ? DEFAULT_SUBJECTS : ['국어','수학','사회','과학','음악','미술','체육','영어','창체']);
-  return s;
-}
+// [GLOBAL-DUP-1] getActiveSubjects 는 admin.js 에만 둔다(settings.activeSubjects 를 읽음).
+//   여기 있던 옛 판(d.activeSubjects 를 읽음)은 admin 에서 늘 덮였고 학생·키오스크는 부르지 않아 지웠다.
 
 // ── 커스텀 몬스터 포함 전체 목록 ──────────────────────────
 function getActiveMonsters(db) {
