@@ -89,10 +89,23 @@ export function makeViewer({ src, w, h: H0, alt = '', onTap = () => {} }) {
   }
 
   // ── 표시 ──
-  //  { r:[x0,y0,x1,y1], kind:'found'|'ev'|'hint'|'region'|'pick', label } · { x, y, kind:'pin', n, me, on }
+  //  { r:[x0,y0,x1,y1], kind:'found'|'ev'|'hint'|'region'|'pick', label } · { x, y, kind:'pin', n, me, on } · { line:[[x,y],[x,y]], label, on } (경계 재기 줄)
   function setMarks(list) {
-    marks.querySelectorAll('.mk,.pin').forEach(m => m.remove());
+    marks.querySelectorAll('.mk,.pin,.mk-lines,.mk-ll').forEach(m => m.remove());
+    const lines = list.filter(m => m.line);
+    if (lines.length) {
+      const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'mk-lines'); svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('preserveAspectRatio', 'none');
+      for (const m of lines) {
+        const [[x1, y1], [x2, y2]] = m.line, ln = document.createElementNS(NS, 'line');
+        Object.entries({ x1, y1, x2, y2, class: 'mk-line' + (m.on ? ' on' : ''), 'vector-effect': 'non-scaling-stroke' }).forEach(([k, v]) => ln.setAttribute(k, v));
+        svg.append(ln);
+      }
+      marks.append(svg);
+      for (const m of lines) if (m.label) marks.append(h('div', { class: 'mk-ll' + (m.on ? ' on' : ''), style: { left: m.line[0][0] + '%', top: m.line[0][1] + '%' } }, h('span', { class: 'mk-l' }, m.label)));
+    }
     for (const m of list) {
+      if (m.line) continue;
       if (m.r) {
         const [x0, y0, x1, y1] = m.r;
         marks.append(h('div', { class: 'mk ' + (m.kind || 'found'), style: { left: x0 + '%', top: y0 + '%', width: (x1 - x0) + '%', height: (y1 - y0) + '%' } }, m.label ? h('span', { class: 'mk-l' }, m.label) : null));
@@ -127,8 +140,28 @@ export function makeViewer({ src, w, h: H0, alt = '', onTap = () => {} }) {
     return out;
   }
   async function lightOf(rects) { let sum = 0, n = 0; for (const r of rects) for (const [a, b, c] of await sample(r, 8000)) { sum += lstar(a, b, c); n++; } return n ? sum / n : 0; }
+  // 줄을 따라 밝기 재기(경계 재기) — 줄 위 n 곳마다 줄에 수직으로 ±half 점을 모아 L* 평균. step = 한 칸 사이 거리(그림 점)
+  //  (그림 크기 그대로에서 잰다 — scratchpad 의 같은 셈으로 미리 재 둔 값과 같게)
+  async function lineL(a, b, n = 64, half = 3) {
+    const { g, W: cw, H: ch } = await pixelsCanvas();
+    const ax = a[0] / 100 * cw, ay = a[1] / 100 * ch, bx = b[0] / 100 * cw, by = b[1] / 100 * ch, len = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / len, ny = (bx - ax) / len;
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - half - 2)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - half - 2));
+    const x1 = Math.min(cw, Math.ceil(Math.max(ax, bx) + half + 2)), y1 = Math.min(ch, Math.ceil(Math.max(ay, by) + half + 2));
+    const bw = Math.max(1, x1 - x0), d = g.getImageData(x0, y0, bw, Math.max(1, y1 - y0)).data, vals = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1), x = ax + (bx - ax) * t, y = ay + (by - ay) * t;
+      let sum = 0, k = 0;
+      for (let j = -half; j <= half; j++) {
+        const px = Math.round(x + nx * j) - x0, py = Math.round(y + ny * j) - y0;
+        if (px < 0 || py < 0 || px >= bw || py >= y1 - y0) continue;
+        const o = (py * bw + px) * 4; sum += lstar(d[o], d[o + 1], d[o + 2]); k++;
+      }
+      vals.push(k ? sum / k : 0);
+    }
+    return { vals, step: len / (n - 1) };
+  }
 
   const ro = new ResizeObserver(() => fit()); ro.observe(el);
   ready.then(fit);
-  return { el, img, ready, setMarks, ripple, zoomTo, reset, setGray, sample, lightOf, get gray() { return grayOn; }, destroy() { ro.disconnect(); } };
+  return { el, img, ready, setMarks, ripple, zoomTo, reset, setGray, sample, lightOf, lineL, get gray() { return grayOn; }, destroy() { ro.disconnect(); } };
 }

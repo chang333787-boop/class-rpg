@@ -36,7 +36,8 @@ export async function mountTeacher(root, ctx) {
     const qs = Object.entries(ask[c.id] || {}).map(([id, q]) => ({ id, ...q, likes: Object.keys((like[c.id] || {})[id] || {}).length })).filter(q => kindOf(q.k) && c.parts[q.p]).sort((a, z) => z.likes - a.likes || a.t - z.t);
     const t = c.think, thinkWord = k => (t.mode === 'evidence' || t.mode === 'gray') ? ((t.opts[+k] || {}).t || t.opts[+k] || k)
       : t.mode === 'order' ? String(k).split(',').map(i => (t.spots[+i] || [])[0] || '?').join(' → ')   // 아이가 짚은 진한 차례
-      : t.mode === 'how' ? (k === 'right' ? '붓 자국을 첫눈에 알아봄' : '한 번 더 보고 알아봄') : k;
+      : t.mode === 'how' ? (k === 'right' ? '붓 자국을 첫눈에 알아봄' : '한 번 더 보고 알아봄')
+      : t.mode === 'edge' ? `${['ㄱ', 'ㄴ'][+k] || ''} ${(t.edges[+k] || {}).n || k} 쪽이 부드럽다고 예상` : k;
     return h('details', { class: 'tcase' }, h('summary', {}, h('b', {}, `${c.title}`), h('span', { class: 'muted small' }, ` ${c.artist} · 질문 ${qs.length}`)),
       h('div', { class: 'tcols' },
         h('div', {}, h('b', {}, '생각 — ' + t.q), h('ul', {}, ...count(think[c.id], 'o').map(([k, n]) => h('li', {}, `${thinkWord(k)} — ${n}명`)))),
