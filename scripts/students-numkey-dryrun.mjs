@@ -53,7 +53,7 @@ async function main() {
   // ② 교사 화면 자동 백업(classRPG_backups) 최신 날짜
   const days = Object.keys(backups || {}).sort();
   const last = days[days.length - 1] || null;
-  const ageDays = last ? Math.floor((Date.parse(d.toISOString().slice(0, 10)) - Date.parse(last)) / 86400000) : null;
+  const ageDays = last ? Math.floor((Date.parse(d.toISOString().slice(0, 10)) - Date.parse(last.slice(0, 10))) / 86400000) : null;
 
   // ③ 숫자 키 판정
   const logs = arr(logsRaw).filter(l => l.approved !== false);

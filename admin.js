@@ -1372,7 +1372,7 @@ function rejectSingle(studentId, rewardId) {
   const r = (s.pendingRewards||[]).find(x => x && (x.id === rewardId || x.label === rewardId));
   const what = r && r.type === 'book' ? '\n\n독서록이에요 — 아이가 쓴 글이 함께 지워져요.'
              : r && r.type === 'artwork' ? '\n\n작품이에요 — 아이가 올린 그림·사진 신청이 함께 지워져요.' : '';
-  if (!confirm(`${s.name} · ${(r && r.label) || '이 신청'} 을(를) 반려할까요?\n보상 없이 신청이 지워지고 되돌릴 수 없어요.${what}`)) return false;
+  if (!confirm(`${s.name} · ${(r && r.label) || '이 신청'}을(를) 반려할까요?\n보상 없이 신청이 지워지고 되돌릴 수 없어요.${what}`)) return false;
   s.pendingRewards = (s.pendingRewards||[]).filter(r => r.id !== rewardId && r.label !== rewardId);
   const saved = saveStudentAwait(s);
   renderAll();
@@ -5200,7 +5200,7 @@ function loadDexSettings() {
   document.getElementById('dex-first-kill-on').checked = ds.firstKillEnabled ?? false;
   document.getElementById('dex-first-gold').value = ds.firstKillGold ?? 10;
   ['beginner','intermediate','advanced'].forEach(z => {
-    document.getElementById(`dex-${z}-gold`).value  = ds[z]?.gold  ?? 100;
+    document.getElementById(`dex-${z}-gold`).value  = ds[z]?.gold  ?? 0;   // 저장 전엔 구역 보상이 없었다 — 기본 0(첫 저장에 100G×3 이 몰래 켜지지 않게)
     document.getElementById(`dex-${z}-title`).value = ds[z]?.title ?? '';
   });
 }
@@ -5211,9 +5211,12 @@ function saveDexSettings() {
   db.settings.dexRewards = {
     firstKillEnabled: document.getElementById('dex-first-kill-on').checked,
     firstKillGold:    parseInt(document.getElementById('dex-first-gold').value) || 10,
-    beginner:     { gold: parseInt(document.getElementById('dex-beginner-gold').value)||100,     title: document.getElementById('dex-beginner-title').value },
-    intermediate: { gold: parseInt(document.getElementById('dex-intermediate-gold').value)||100, title: document.getElementById('dex-intermediate-title').value },
-    advanced:     { gold: parseInt(document.getElementById('dex-advanced-gold').value)||100,     title: document.getElementById('dex-advanced-title').value },
+    //  구역 보상은 금액이나 칭호가 있을 때만 적는다 — 0·빈칸으로 저장하면 그 구역을 '받음'으로만 표시하고 보상은 없는 채
+    //  넘어가 버려(gamedata dexZoneClaimed_*), 나중에 보상을 정해도 이미 다 깬 아이는 못 받는다.
+    ...Object.fromEntries(['beginner','intermediate','advanced'].map(z => {
+      const gold = parseInt(document.getElementById(`dex-${z}-gold`).value) || 0, title = document.getElementById(`dex-${z}-title`).value;
+      return [z, (gold > 0 || title) ? { gold, title } : null];
+    })),
   };
   DB._cache = db;
   DB._fbRef.child('settings/dexRewards').set(db.settings.dexRewards);
@@ -5961,9 +5964,10 @@ async function saveBackup(auto, kind) {
   });
   // [THINKBOARD-2] 생각판(classRPG_thinkboard)도 같은 백업에 담는다 — 연구 자료가 RPG 기록과 함께 남게.
   //   되돌리기(롤백)는 BACKUP_NODES 만 되살린다 — 생각판은 백업에서 꺼내 볼 수만 있다(수업 중 판이 갑자기 되감기지 않게).
-  try { const tb = await readRootOnce('classRPG_thinkboard'); if (tb != null) snapshot.thinkboard = tb; } catch (e) { console.warn('생각판 백업 건너뜀', e); }
+  let skippedTb = false;   // 생각판을 못 읽었으면 appsSkipped 에 같이 적는다(백업에서 빠진 걸 알 수 있게)
+  try { const tb = await readRootOnce('classRPG_thinkboard'); if (tb != null) snapshot.thinkboard = tb; } catch (e) { console.warn('생각판 백업 건너뜀', e); skippedTb = true; }
   // [BACKUP-ROOTS-1] 학습 앱 루트도 담는다(롤백은 하지 않는다 — 생각판과 같은 까닭). 못 읽은 루트는 appsSkipped 에 적는다.
-  const apps = {}, skipped = [];
+  const apps = {}, skipped = skippedTb ? ['classRPG_thinkboard'] : [];
   await Promise.all(BACKUP_APP_ROOTS.map(async r => {
     try { const v = await readRootOnce(r); if (v != null) apps[r] = v; }
     catch (e) { console.warn('학습 앱 백업 건너뜀', r, e); skipped.push(r); }
