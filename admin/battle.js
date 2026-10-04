@@ -432,7 +432,7 @@ function saveDexSettings() {
   db.settings = db.settings || {};
   db.settings.dexRewards = {
     firstKillEnabled: document.getElementById('dex-first-kill-on').checked,
-    firstKillGold:    parseInt(document.getElementById('dex-first-gold').value) || 10,
+    firstKillGold:    Utils.intOr(document.getElementById('dex-first-gold').value, 10),   // [ZERO-OK-1]
     //  구역 보상은 금액이나 칭호가 있을 때만 적는다 — 0·빈칸으로 저장하면 그 구역을 '받음'으로만 표시하고 보상은 없는 채
     //  넘어가 버려(gamedata dexZoneClaimed_*), 나중에 보상을 정해도 이미 다 깬 아이는 못 받는다.
     ...Object.fromEntries(['beginner','intermediate','advanced'].map(z => {
@@ -534,8 +534,8 @@ function saveMonsterEdit() {
     name,
     icon,
     recLv: parseInt(document.getElementById('me-lv').value)||1,
-    gold:  parseInt(document.getElementById('me-gold').value)||30,
-    exp:   parseInt(document.getElementById('me-exp').value)||25,
+    gold:  Utils.intOr(document.getElementById('me-gold').value, 30),   // [ZERO-OK-1] 0 은 0
+    exp:   Utils.intOr(document.getElementById('me-exp').value, 25),
     _custom: true,
     _new: isNew,
   };

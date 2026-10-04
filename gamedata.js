@@ -1316,6 +1316,13 @@ const DB = {
 // ─── 유틸리티 ────────────────────────────────────────
 const Utils = {
 
+  // [ZERO-OK-1] 교사가 넣은 숫자 칸 읽기 — 0 은 0 으로 받고, 빈칸·글자·음수만 기본값(DB.autoDailyReward 의 pick 과 같은 규칙).
+  //   예전 `parseInt(v) || 기본값` 은 0 을 넣어도 기본값(예: 0G → 30G)이 됐다. 위 끝(1000 자르기)은 두지 않는다 — 지금 받는 값 그대로.
+  intOr(v, def) {
+    const n = Math.floor(Number(v));
+    return (v === '' || v == null || !Number.isFinite(n) || n < 0) ? def : n;
+  },
+
   levelFromExp(exp) {
     const t = GAME_DATA.expTable;
     for (let i = t.length - 1; i >= 0; i--) { if (exp >= t[i]) return i + 1; }

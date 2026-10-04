@@ -177,9 +177,10 @@ function getClaimableEmotionRewards(student, weekStart) {
     emo_reflect:     cfg.reflect     || 3,
   };
   const rewards = {
-    emo_participate: { exp: cfg.participateExp  || 20, gold: cfg.participateGold || 15 },
-    emo_steady:      { exp: cfg.steadyExp       || 50, gold: cfg.steadyGold      || 40 },
-    emo_reflect:     { exp: cfg.reflectExp      || 30, gold: cfg.reflectGold     || 20 },
+    // [ZERO-OK-1] 교사가 0 을 넣으면 0 — 빈칸·글자·음수만 기본값
+    emo_participate: { exp: Utils.intOr(cfg.participateExp, 20), gold: Utils.intOr(cfg.participateGold, 15) },
+    emo_steady:      { exp: Utils.intOr(cfg.steadyExp,      50), gold: Utils.intOr(cfg.steadyGold,      40) },
+    emo_reflect:     { exp: Utils.intOr(cfg.reflectExp,     30), gold: Utils.intOr(cfg.reflectGold,     20) },
   };
   return EMOTION_REWARDS.filter(r => {
     if (claimed.includes(r.id)) return false;

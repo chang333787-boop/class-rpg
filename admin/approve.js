@@ -318,8 +318,8 @@ function rejectSingle(studentId, rewardId) {
 function quickApprove() {
   const studentId = document.getElementById('qa-student').value;
   const name  = document.getElementById('qa-name').value.trim();
-  const exp   = parseInt(document.getElementById('qa-exp').value)  || 30;
-  const gold  = parseInt(document.getElementById('qa-gold').value) || 30;
+  const exp   = Utils.intOr(document.getElementById('qa-exp').value, 30);   // [ZERO-OK-1] 0 은 0
+  const gold  = Utils.intOr(document.getElementById('qa-gold').value, 30);
   const stat  = document.getElementById('qa-stat').value;
   const icon  = document.getElementById('qa-icon')?.value?.trim() || '📋';
   if (!name) { notify('활동명을 입력하세요', 'error'); return; }

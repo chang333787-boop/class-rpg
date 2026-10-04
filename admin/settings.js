@@ -84,17 +84,18 @@ function saveEmotionRewardSettings() {
   const body = document.getElementById('emo-reward-settings-body');
   if (lbl)  lbl.textContent = enabled ? '켜짐' : '꺼짐';
   if (body) body.style.opacity = enabled ? '1' : '0.4';
+  // [ZERO-OK-1] EXP·골드 칸은 0 을 0 으로(Utils.intOr). 며칠 기준 칸은 0 이 뜻이 없어 그대로(빈칸·0 → 기본값).
   db.settings.emotionRewards = {
     enabled,
     participate: parseInt(document.getElementById('emo-reward-participate')?.value) || 4,
-    participateExp:  parseInt(document.getElementById('emo-reward-participate-exp')?.value) || 20,
-    participateGold: parseInt(document.getElementById('emo-reward-participate-gold')?.value) || 15,
+    participateExp:  Utils.intOr(document.getElementById('emo-reward-participate-exp')?.value, 20),
+    participateGold: Utils.intOr(document.getElementById('emo-reward-participate-gold')?.value, 15),
     steady:      parseInt(document.getElementById('emo-reward-steady')?.value) || 8,
-    steadyExp:   parseInt(document.getElementById('emo-reward-steady-exp')?.value) || 50,
-    steadyGold:  parseInt(document.getElementById('emo-reward-steady-gold')?.value) || 40,
+    steadyExp:   Utils.intOr(document.getElementById('emo-reward-steady-exp')?.value, 50),
+    steadyGold:  Utils.intOr(document.getElementById('emo-reward-steady-gold')?.value, 40),
     reflect:     parseInt(document.getElementById('emo-reward-reflect')?.value) || 3,
-    reflectExp:  parseInt(document.getElementById('emo-reward-reflect-exp')?.value) || 30,
-    reflectGold: parseInt(document.getElementById('emo-reward-reflect-gold')?.value) || 20,
+    reflectExp:  Utils.intOr(document.getElementById('emo-reward-reflect-exp')?.value, 30),
+    reflectGold: Utils.intOr(document.getElementById('emo-reward-reflect-gold')?.value, 20),
   };
   DB._cache = db;
   DB._fbRef.child('settings').set(db.settings);
@@ -106,14 +107,14 @@ function loadEmotionRewardSettings() {
   const emo = (db.settings || {}).emotionRewards || {};
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   set('emo-reward-participate',      emo.participate      || 4);
-  set('emo-reward-participate-exp',  emo.participateExp   || 20);
-  set('emo-reward-participate-gold', emo.participateGold  || 15);
+  set('emo-reward-participate-exp',  Utils.intOr(emo.participateExp, 20));
+  set('emo-reward-participate-gold', Utils.intOr(emo.participateGold, 15));
   set('emo-reward-steady',           emo.steady           || 8);
-  set('emo-reward-steady-exp',       emo.steadyExp        || 50);
-  set('emo-reward-steady-gold',      emo.steadyGold       || 40);
+  set('emo-reward-steady-exp',       Utils.intOr(emo.steadyExp, 50));
+  set('emo-reward-steady-gold',      Utils.intOr(emo.steadyGold, 40));
   set('emo-reward-reflect',          emo.reflect          || 3);
-  set('emo-reward-reflect-exp',      emo.reflectExp       || 30);
-  set('emo-reward-reflect-gold',     emo.reflectGold      || 20);
+  set('emo-reward-reflect-exp',      Utils.intOr(emo.reflectExp, 30));
+  set('emo-reward-reflect-gold',     Utils.intOr(emo.reflectGold, 20));
   // enabled 체크박스
   const enabled = emo.enabled !== false; // 기본 true
   const chk = document.getElementById('emo-reward-enabled');
@@ -784,27 +785,38 @@ async function autoBackupOnLogin() {
 // ══════════════════════════════════════════════════
 //  SETTINGS
 // ══════════════════════════════════════════════════
+// [LIVE-INPUT-1] 설정 칸 채우기 — 교사가 쓰는 중(포커스)이거나, 지난번 채운 값에서 고쳐 놓고 아직 저장 안 한 칸은 건드리지 않는다.
+//  학생 저장마다 renderAll → loadSettings 가 돌아 쓰던 학급명·보스·접속 시간이 옛 값으로 돌아가던 것. 저장된 값이 바뀌었고
+//  교사가 손대지 않은 칸만 새 값으로 바뀐다(저장 뒤엔 칸 값 = 새 값이라 그대로 이어진다).
+function _fillSettingField(el, val, prop = 'value') {
+  if (!el) return;
+  const v = prop === 'checked' ? !!val : String(val);
+  const cur = el[prop];
+  if (document.activeElement === el) return;
+  if (el.dataset.filled !== undefined && String(cur) !== el.dataset.filled && String(cur) !== String(v)) return;
+  el[prop] = v;
+  el.dataset.filled = String(v);
+}
+
 function loadSettings() {
   const s = DB.getSettings();
-  document.getElementById('set-classname').value    = s.className||'우리반';
-  document.getElementById('set-boss-active').checked = s.bossActive||false;
-  document.getElementById('set-boss-name').value    = s.bossName||'거대 트롤';
-  document.getElementById('set-boss-icon').value    = s.bossIcon||'🧌';
-  document.getElementById('set-boss-gold').value    = s.bossGold||150;
+  const $ = id => document.getElementById(id);
+  _fillSettingField($('set-classname'),   s.className||'우리반');
+  _fillSettingField($('set-boss-active'), s.bossActive||false, 'checked');
+  _fillSettingField($('set-boss-name'),   s.bossName||'거대 트롤');
+  _fillSettingField($('set-boss-icon'),   s.bossIcon||'🧌');
+  _fillSettingField($('set-boss-gold'),   Utils.intOr(s.bossGold, 150));   // [ZERO-OK-1]
   // [AUTO-DAILY-REWARD-1] 이 두 칸 = 자동 일일 퀘스트 보상(예전 baseExp·baseGold 는 읽는 곳이 없던 값이라 안 쓴다)
   const _adr = DB.autoDailyReward(s);
-  document.getElementById('set-base-exp').value     = _adr.exp;
-  document.getElementById('set-base-gold').value    = _adr.gold;
+  _fillSettingField($('set-base-exp'),  _adr.exp);
+  _fillSettingField($('set-base-gold'), _adr.gold);
   const _adrTxt = document.getElementById('auto-daily-reward-txt');
   if (_adrTxt) _adrTxt.textContent = `${_adr.exp}EXP + ${_adr.gold}G`;
-  document.getElementById('set-monster-rate').value = s.monsterWinRate||80;
-  const limitEl = document.getElementById('set-monster-limit');
+  _fillSettingField($('set-monster-rate'), s.monsterWinRate||80);
   // [BATTLE-SET-1] 이 칸은 예전에 settings.monsterDailyLimit(읽는 곳 0)에 썼다. 실제 전투가 읽는 키로 통일.
-  if (limitEl) limitEl.value = (s.customBattleSettings || {}).dailyBattleLimit ?? 3;
-  const startEl = document.getElementById('set-access-start');
-  const endEl   = document.getElementById('set-access-end');
-  if (startEl) startEl.value = s.accessStart||'08:30';
-  if (endEl)   endEl.value   = s.accessEnd  ||'16:00';
+  _fillSettingField($('set-monster-limit'), (s.customBattleSettings || {}).dailyBattleLimit ?? 3);
+  _fillSettingField($('set-access-start'), s.accessStart||'08:30');
+  _fillSettingField($('set-access-end'),   s.accessEnd  ||'16:00');
   renderTodayLinksList();
 }
 
@@ -870,7 +882,7 @@ function saveSettings() {
     bossActive:       document.getElementById('set-boss-active').checked,
     bossName:         document.getElementById('set-boss-name').value,
     bossIcon:         document.getElementById('set-boss-icon').value,
-    bossGold:         parseInt(document.getElementById('set-boss-gold').value)||150,
+    bossGold:         Utils.intOr(document.getElementById('set-boss-gold').value, 150),   // [ZERO-OK-1]
     // [AUTO-DAILY-REWARD-1] 빈 칸·글자는 기본값(35/25) — 검사·자르기는 DB.autoDailyReward 한 곳에서
     ...(() => { const r = DB.autoDailyReward({ autoDailyExp: document.getElementById('set-base-exp').value, autoDailyGold: document.getElementById('set-base-gold').value });
                return { autoDailyExp: r.exp, autoDailyGold: r.gold }; })(),
