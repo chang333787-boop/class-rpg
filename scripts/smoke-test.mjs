@@ -346,7 +346,7 @@ for (const f of HTML_FILES) {
 //  kiosk 의 DB_DATA 는 스냅샷마다 새로 만드는 읽기 전용 사본이라 보지 않는다.
 {
   const GETTERS = ['getStudents', 'getQuests', 'getPromotionRequests', 'getAllWeeklyGoals', 'getAllWeeklyReflections',
-    'getAllRecorderLogs', 'getCustomProblems', 'getAlbums', 'getPwResetRequests', 'getMemories', 'getProblemRecords'];
+    'getCustomProblems', 'getAlbums', 'getPwResetRequests', 'getMemories', 'getProblemRecords'];   // [RECORDER-CUT-1] getAllRecorderLogs 는 10-05 걷어냄
   const MUT = 'sort|reverse|splice|push|pop|shift|unshift|fill|copyWithin';
   const g = GETTERS.join('|');
   const hits = [];

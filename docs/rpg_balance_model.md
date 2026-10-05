@@ -265,7 +265,7 @@ B-2(출력 동일 리팩토링)는 **이 다섯 가지를 그대로 재현해야
 | 독서 | admin.js `confirmBookRecord` | 설정값 (지금 0G) | — | **미기록** |
 | 승급 | admin.js `approvePromotion` | 100G · 50EXP | 레벨 도달 시 | **미기록** |
 | 감정 기록 | student.js | 15·40·20 (운영: 꺼짐) | 주 1회씩 | **미기록** |
-| 업적 92개 | gamedata.js | 합 4,400G, 평생 1회 | — | **미기록** |
+| 업적 83개(10-05 리코더·영어 9개 걷어냄 · 옛 92개) | gamedata/rules.js | 합 4,185G(reward.gold, 없으면 20), 평생 1회 | — | **미기록** |
 | 보스 | student.js `claimBoss` | `settings.bossGold` 150 · +30EXP | 이벤트 | **미기록** |
 | 장비 판매 | student.js `sellEquip` | `floor(price / 2)` | — | **미기록** |
 | 교사 직접 | admin.js `quickGiveGold` · `applyReward` · `saveStudentDetail` | 입력값 | — | **미기록**(게임 수입 아님) |

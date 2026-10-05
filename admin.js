@@ -166,11 +166,10 @@ function updatePwResetBadge() {
 // ══════════════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════════════
-const pages = ['assign','dashboard','students','approve','rank','quests','reward','artwork','books','memories','recorder','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard','learnapps'];
+const pages = ['assign','dashboard','students','approve','rank','quests','reward','artwork','books','memories','weekly','study','monsters','settings','promotion','pwreset','activity','stats','emotion','emotionalerts','villages','thinkboard','learnapps'];
 const titles = {assign:'과제·수업', thinkboard:'생각판', learnapps:'학습 앱 기록',dashboard:'대시보드',students:'학생 목록',approve:'활동 승인',
   rank:'랭킹',quests:'퀘스트 관리',reward:'보상 지급',artwork:'작품 관리', books:'독서 현황', villages:'우리 마을',
   memories:'추억 관리',
-  recorder:'리코더 관리',
   weekly:'주간 다짐', study:'학습 범위',
   monsters:'몬스터',settings:'설정',promotion:'승급 관리',pwreset:'비번 초기화',activity:'활동 내역', stats:'능력치 내역', emotion:'감정 현황', emotionalerts:'감정 대화 요청'};
 
@@ -196,7 +195,6 @@ const NAV_ICONS = {
   memories: '<path d="M4 7.5h3l1.8-2.5h6.4L17 7.5h3a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
   weekly: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M9 15l2 2 4-4"/>',
   study: '<path d="M2.5 5.5h6A3.5 3.5 0 0 1 12 9v11a2.5 2.5 0 0 0-2.5-2.5h-7zM21.5 5.5h-6A3.5 3.5 0 0 0 12 9v11a2.5 2.5 0 0 1 2.5-2.5h7z"/>',
-  recorder: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
   monsters: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>',
   pwreset: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'
@@ -306,7 +304,6 @@ function nav(page, el) {
   if (page === 'artwork')  { renderArtworkPending(); renderArtworkAdmin(); }
   if (page === 'books')    renderBooksPage();
   if (page === 'memories') { renderMemoriesPage(); renderBulkRenameList(); }
-  if (page === 'recorder') renderRecorderPage();
   if (page === 'weekly')   renderWeeklyAdminPage();
   if (page === 'study')    renderStudyScopePage();
   if (page === 'settings') setTimeout(initAchRecalcSelect, 100);

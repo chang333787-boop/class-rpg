@@ -69,20 +69,7 @@ function getChipVal(containerId) {
   return hidden ? hidden.value : '';
 }
 
-// ── 자동 팝업 체크 ──────────────────────────────────
-function checkWeeklyRoutine() {
-  if (!CUR) return;
-  const d = new Date(Date.now()+9*3600000);
-  const day = d.getUTCDay(); // 1=월, 5=금
-  const wk  = Utils.weekKey();
-  if (day === 1) {
-    const existing = DB.getWeeklyGoal(CUR.id, wk);
-    if (!existing) openWeeklyModal('monday');
-  } else if (day === 5) {
-    const existing = DB.getWeeklyReflection(CUR.id, wk);
-    if (!existing) openWeeklyModal('friday');
-  }
-}
+// ── [REFLECT-CUT-1] 월·금 자동 팝업(checkWeeklyRoutine)은 부르는 곳이 없어 10-05 걷어냄 — 다짐·돌아보기는 칸을 눌러 연다 ──
 
 // ── 모달 열기 ────────────────────────────────────────
 function openWeeklyModal(mode) {
