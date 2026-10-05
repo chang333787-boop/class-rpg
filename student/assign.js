@@ -229,6 +229,8 @@ function _asgLiveEl() {
       <span class="asg-live-st" id="asgl-st"><i class="asg-dot"></i><span id="asgl-st-txt">연결됨</span></span>
     </div>
     <div class="asg-live-wrap"><div id="asgl-body" class="asg-body"></div></div>`;
+  //  [CLASS-LIVE-KEY-1] 덮개 안의 키는 덮개에서 멈춘다 — document · window 의 다른 키 처리기(꾸미기 되돌리기 등)까지 안 올라가게
+  for (const t of ['keydown', 'keyup', 'keypress']) el.addEventListener(t, e => e.stopPropagation());
   document.body.appendChild(el);
   return el;
 }
@@ -327,6 +329,8 @@ if (typeof window !== 'undefined' && window.addEventListener) {
   //  student.js 의 popstate 처리기는 덮개가 열려 있으면 학습 앱 창을 닫지 않는다(그 처리기 첫 줄) — 여기서는 덮개 칸을 다시 쌓는다
   window.addEventListener('popstate', () => { if (_asgLv.open && !(history.state && history.state.asgLive)) _asgPushHistory(_asgLv.aid); });
   //  키 — 창(window) 캡처 단계에서 먼저 받는다. 덮개 동안 Esc 는 늘 막고(학습 앱 창 · 꾸미기 Esc 처리기까지 못 감) 덮개 밖을 향한 키도 막는다
+  //  [CLASS-LIVE-KEY-1] 덮개 안이라도 입력 칸(input · textarea)으로 가는 키만 그 칸까지 보낸다(Enter 로 내기) — 보기 단추 · 연습장 · 빈 곳의 키는
+  //   여기서 끊는다(밑의 꾸미기 Ctrl+Z 되돌리기 · Delete 처리기가 덮개 밑에서 돌지 않게). 입력 칸의 키도 덮개(#class-live)에서 위로는 안 올라간다(_asgLiveEl)
   window.addEventListener('keydown', e => {
     if (!_asgLv.open) return;
     const el = document.getElementById('class-live');
@@ -337,10 +341,11 @@ if (typeof window !== 'undefined' && window.addEventListener) {
     }
     if (e.key === 'Tab') {
       const f = [...el.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex="0"]')].filter(x => x.offsetParent !== null);
-      if (!f.length) { e.preventDefault(); return; }
+      if (!f.length) { e.preventDefault(); e.stopImmediatePropagation(); return; }
       if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     }
+    if (!_asgTypingTarget(e.target)) e.stopImmediatePropagation();   // 단추의 Enter · Space 누름(기본 동작)은 그대로 된다
   }, true);
   document.addEventListener('visibilitychange', () => { if (_asgLv.open && _asgLv.presRef) _asgPresenceOn(_asgLv.aid); });
   //  하위 앱(기초 코딩 · 음악실) 결과 — iframe 이 부모에게 넘기면 이 화면(연결이 이미 있음)이 내 칸에 쓴다 · 쓰는 곳 하나
@@ -351,6 +356,13 @@ if (typeof window !== 'undefined' && window.addEventListener) {
     if (!f || e.source !== f.contentWindow) return;
     _asgApplyReport(d, ok => { try { e.source.postMessage({ type: 'rpg:assign-ack', id: d.id, ok }, location.origin); } catch (er) {} });
   });
+}
+//  글자를 쓰는 칸인가 — 그 칸의 키(Enter 로 내기 · 글자)는 칸까지 가야 한다 [CLASS-LIVE-KEY-1]
+function _asgTypingTarget(t) {
+  if (!t || !t.tagName) return false;
+  if (t.tagName === 'TEXTAREA') return true;
+  if (t.tagName !== 'INPUT') return !!t.isContentEditable;
+  return !/^(button|submit|reset|checkbox|radio|range|color|file|image)$/i.test(t.type || 'text');
 }
 //  포커스가 덮개 밖(밑의 iframe 등)으로 가면 되찾는다 — 키가 밑으로 새지 않게
 function _asgKeepFocus() {

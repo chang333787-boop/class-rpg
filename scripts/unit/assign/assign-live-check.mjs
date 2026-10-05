@@ -5,7 +5,10 @@
 //      → 교사 '지금 모두 같이 · 한 문제씩' → 모두 덮개(밑 상태 그대로 · Esc · 뒤로 · 밑 클릭 막힘 · 꾸미기 먼저 저장) → 늦게 로그인한 학생4 바로 덮개
 //      → 문제 1: 셋이 답(정답 1 · 같은 오답 2) → 교사 분포 · 답 공개 → 학생 공개 화면 · TV 막대(가장 많이 고른 오답 주황) → 정리 → 끝내기
 //      → 덮개 걷힘 · 하던 자리 그대로(학습 창 같은 문제 · 전투 · 꾸미기 · 코딩 창 · 뒤로 칸)
+//      + [CLASS-LIVE-KEY-1] 덮개에 포커스(입력 칸 밖)일 때 Ctrl+Z · Delete 가 밑의 꾸미기 · document 처리기로 안 감
 //   C 갇힘 방지: 교사 기기(관리 · TV)를 모두 닫고 끊긴 지 4분으로 → 학생 화면 풀림 → 관리 화면 다시 열면 다시 덮임
+//      + 덮개 안 입력 칸의 Enter 는 그 칸(내기)까지 가고 document 로는 안 올라감
+//   D [ASSIGN-END-INBOX-1] 과제함 과제를 수업으로 돌린 뒤 그냥 끝내기(관리 · TV E) → 과제함으로 되돌아감(안 한 아이 카드 그대로)
 //   + 네트워크: 운영 주소 요청 0 · 페이지 오류 0
 //  실행: PP=8871 DP=9551 node scripts/unit/assign/assign-live-check.mjs
 //        (가짜 서버가 다른 체크아웃에 있으면 FAKE_RTDB=<…/fake-rtdb/server.mjs> · 스크린샷 OUT=<폴더>)
@@ -255,6 +258,13 @@ try {
   ok(emb3b.src === emb3 && emb3b.emb === 'flex', 'B8 뒤로를 눌러도 밑의 코딩 창이 안 닫힘', JSON.stringify(emb3b));
   const hit = await S2.ev(`(() => { const e = document.elementFromPoint(683, 400); return !!e && !!e.closest('#class-live'); })()`);
   ok(hit === true, 'B9 화면 어디를 눌러도 덮개가 받음(밑 전투 단추에 안 닿음)');
+  //  [CLASS-LIVE-KEY-1] 덮개에 포커스(입력 칸 밖) — Ctrl+Z · Delete 가 밑의 꾸미기 되돌리기 · document 듣기에 안 닿음
+  const kz = await S3.ev(`(() => { window.__dk = 0; document.addEventListener('keydown', () => { window.__dk++; }); window.__yf = JSON.stringify(CUR.yardFloor || {});
+    const el = document.getElementById('class-live'); el.focus(); return { focus: document.activeElement === el, fs: document.getElementById('interior-fullscreen').style.display, n: Object.keys(CUR.yardFloor || {}).length }; })()`);
+  await S3.key('z', 2); await S3.key('Z', 2); await S3.key('Delete');
+  await sleep(400);
+  const kz2 = await S3.ev(`({ same: JSON.stringify(CUR.yardFloor || {}) === window.__yf, dk: window.__dk, open: classLiveIsOpen() })`);
+  ok(kz && kz.focus && kz.fs !== 'none' && kz2.same && kz2.dk === 0 && kz2.open, 'B9b 덮개 포커스에서 Ctrl+Z · Delete → 밑 꾸미기 바닥 그대로 · document keydown 0번', JSON.stringify({ kz, kz2 }));
   //  늦게 로그인한 학생4 — 바로 덮개
   const S4 = await device('학생4', '/student.html?as=s4');
   ok(await until(S4, `typeof classLiveIsOpen === 'function' && classLiveIsOpen() && getComputedStyle(document.getElementById('class-live')).display === 'flex'`, 25000), 'B10 늦게 로그인한 학생4도 바로 수업 방');
@@ -329,9 +339,17 @@ try {
   ok(Object.keys(res).sort().join() === 's1,s2,s3' && db(`classRPG_assign/archive/${aidB}`) && !db(`classRPG_assign/open/${aidB}`), 'B33 결과 칸 = 낸 아이 셋 · 정의는 archive', Object.keys(res).join());
 
   // ═════ C. 갇힘 방지 — 교사 기기를 모두 닫음 ═════
-  await T.ev(`(() => { const d = _assignBuildDef({ ...(() => { assignNew(); return _AS.draft; })(), subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').slice(0, 2).map(p => p.id), deliver: 'live', pacing: 'self', title: '갇힘 시험' }); _assignStartLive(d.def, 40, false, true); return 1; })()`);
+  await T.ev(`(() => { const d = _assignBuildDef({ ...(() => { assignNew(); return _AS.draft; })(), subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').filter(p => p.type === 'number').slice(0, 2).map(p => p.id), deliver: 'live', pacing: 'self', title: '갇힘 시험' }); _assignStartLive(d.def, 40, false, true); return 1; })()`);
   ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.pacing === 'self')`, 6000), 'C1 각자 풀기 수업 시작');
   ok((await Promise.all([S1, S2].map(S => until(S, `classLiveIsOpen()`, 6000)))).every(Boolean), 'C2 학생 덮개');
+  //  [CLASS-LIVE-KEY-1] 덮개 안 입력 칸의 Enter → 그 칸의 내기(asgSubmit)까지 감 · document 로는 안 올라감
+  const aidC = await T.ev(`_AS.live.aid`);
+  await until(S1, `!!document.querySelector('#class-live input.st-input')`, 5000);
+  const inC = await S1.ev(`(() => { const i = document.querySelector('#class-live input.st-input'); if (!i) return null; window.__dk1 = 0; document.addEventListener('keydown', () => { window.__dk1++; }); i.focus(); i.value = '7'; return { focus: document.activeElement === i }; })()`);
+  await S1.key('Enter');
+  const sentC = await until(S1, `!!(_ASG.cells['${aidC}'] && AssignCore.ansAt(_ASG.cells['${aidC}'], 0))`, 5000);
+  const dk1 = await S1.ev(`window.__dk1`);
+  ok(inC && inC.focus && sentC && dk1 === 0, 'C2b 덮개 안 입력 칸 Enter → 답 냄 · document keydown 0번', JSON.stringify({ inC, sentC, dk1 }));
   await send('Target.closeTarget', { targetId: T.targetId });
   await send('Target.closeTarget', { targetId: V.targetId });
   await sleep(1500);
@@ -349,6 +367,32 @@ try {
   ok((await Promise.all([S1, S2].map(S => until(S, `classLiveIsOpen()`, 8000)))).every(Boolean), 'C6 관리 화면을 다시 열면(빈 틈 4분 < 15분) 다시 덮임');
   await T2.ev(`window.confirm = () => true; assignLiveEnd(false); 1`);
   ok((await Promise.all([S1, S2].map(S => until(S, `!classLiveIsOpen()`, 6000)))).every(Boolean), 'C7 끝내기 → 풀림');
+
+  // ═════ D. 과제함 과제 → [수업으로] → 그냥 끝내기 = 과제함으로 되돌림 [ASSIGN-END-INBOX-1] ═════
+  const aidD = await T2.ev(`(async () => { assignNew(); const d = _AS.draft; Object.assign(d, { subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').slice(4, 6).map(p => p.id), deliver: 'inbox' }); const aid = d.aid; await assignSend(); return aid; })()`);
+  const hasCard = (S) => until(S, `_asgMyDefs().some(d => d.id === '${aidD}') && !!document.querySelector('.asg-row')`, 8000);
+  ok(!!db(`classRPG_assign/open/${aidD}`) && await hasCard(S2), 'D1 과제함으로 보냄 → 학생2 홈 카드');
+  await T2.ev(`assignStartFromGo('${aidD}', 'self'); 1`);
+  ok(await until(T2, `!!(_AS.live && _AS.live.on && _AS.live.aid === '${aidD}')`, 6000) && (db(`classRPG_assign/open/${aidD}`) || {}).fromInbox === true, 'D2 [수업으로] → live 켜짐 · 정의에 fromInbox 표시');
+  ok(await until(S2, `classLiveIsOpen()`, 6000), 'D3 학생2 덮개');
+  await T2.ev(`assignLiveEnd(false); 1`);
+  ok(await until(T2, `!_AS.live.on`, 6000), 'D4 관리 [끝내기] → live 꺼짐');
+  await sleep(600);
+  const oD = db(`classRPG_assign/open/${aidD}`);
+  ok(oD && oD.deliver === 'inbox' && oD.pacing === 'self' && !oD.fromInbox && !db(`classRPG_assign/archive/${aidD}`), 'D5 과제는 과제함으로 되돌아감(archive 아님 · fromInbox 지움)', JSON.stringify(oD && { deliver: oD.deliver, pacing: oD.pacing, fromInbox: oD.fromInbox }));
+  ok(await until(S2, `!classLiveIsOpen()`, 5000) && await hasCard(S2), 'D6 학생2(안 함) 홈 카드 그대로');
+  //  TV 의 E(끝내기)도 같게 — 그리고 끝내기가 된 때만
+  const V2 = await device('TV2', '/assign/index.html#/', { w: 1920, h: 1080 });
+  await V2.ev(`window.confirm = () => true; 1`);
+  await sleep(2500);
+  await T2.ev(`assignStartFromGo('${aidD}', 'self'); 1`);
+  ok(await until(T2, `!!(_AS.live && _AS.live.on && _AS.live.aid === '${aidD}')`, 6000), 'D7 다시 [수업으로]');
+  await sleep(1500);
+  await V2.key('e');
+  ok(await until(T2, `!_AS.live.on`, 6000), 'D8 TV E → live 꺼짐');
+  await sleep(800);
+  const oD2 = db(`classRPG_assign/open/${aidD}`);
+  ok(oD2 && oD2.deliver === 'inbox' && !oD2.fromInbox && !db(`classRPG_assign/archive/${aidD}`) && await hasCard(S2), 'D9 TV 끝내기도 과제함으로 되돌림 · 카드 그대로', JSON.stringify(oD2 && { deliver: oD2.deliver, fromInbox: oD2.fromInbox }));
 
   // ── 네트워크 · 오류 ──
   ok(net.prod.length === 0, `운영 주소 요청 0 (전체 ${net.all.length})`, net.prod.slice(0, 5).join(' | '));

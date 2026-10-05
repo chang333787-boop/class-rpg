@@ -213,7 +213,8 @@ function appView(def) {
 
 // ── 선생님 조작(TV 에서 — 관리 화면과 같은 transaction) ──
 function tx(fn, what) {
-  return ref(AC.path.live).transaction(cur => fn(cur)).then(r => { if (!r.committed) toast(what + ' — 이미 바뀌었어요'); }).catch(() => toast(what + '이 안 됐어요 — 다시 눌러 주세요'));
+  //  [ASSIGN-END-INBOX-1] committed 를 돌려준다 — 끝내기가 안 됐는데 과제를 닫는 일이 없게
+  return ref(AC.path.live).transaction(cur => fn(cur)).then(r => { if (!r.committed) toast(what + ' — 이미 바뀌었어요'); return !!r.committed; }).catch(() => { toast(what + '이 안 됐어요 — 다시 눌러 주세요'); return false; });
 }
 function act(kind) {
   const l = S.live, def = shownDef();
@@ -223,8 +224,18 @@ function act(kind) {
   if (kind === 'prev') tx(AC.ctl.prev(l.aid, s, ph), '앞');
   if (kind === 'reveal') tx(AC.ctl.reveal(l.aid, s, now()), '답 공개');
   if (kind === 'names') ref('live/names').set(!l.names).catch(() => {});
-  if (kind === 'end' && confirm('수업을 끝낼까요? 아이 화면의 수업 방이 닫혀요.\n(못 한 아이에게 과제함으로 남기려면 관리 화면에서 끝내 주세요)'))
-    tx(AC.ctl.end(l.aid, now()), '끝내기').then(() => ref('').update({ [`open/${l.aid}`]: null, [`archive/${l.aid}`]: { ...(S.openRaw[l.aid] || {}), closedAt: globalThis.firebase.database.ServerValue.TIMESTAMP } }).catch(() => {}));
+  //  [ASSIGN-END-INBOX-1] 과제함에서 돌린 수업(fromInbox)은 과제함으로 되돌리고, 아니면 과제도 닫는다(관리 화면 '끝내기'와 같게) · 끝내기가 된 때만
+  if (kind === 'end') {
+    const raw = S.openRaw[l.aid], back = !!(raw && raw.fromInbox), aid = l.aid, revealAt = l.revealAt || null;
+    if (!confirm(back ? '수업을 끝낼까요? 아이 화면의 수업 방이 닫혀요.\n이 과제는 원래대로 과제함에 남아요.'
+      : '수업을 끝낼까요? 아이 화면의 수업 방이 닫히고 이 과제도 닫혀요.\n(못 한 아이에게 과제함으로 남기려면 관리 화면에서 끝내 주세요)')) return;
+    tx(AC.ctl.end(aid, now()), '끝내기').then(ok => {
+      if (!ok || !raw) return;
+      const u = back ? { [`open/${aid}/deliver`]: 'inbox', [`open/${aid}/pacing`]: 'self', [`open/${aid}/fromInbox`]: null, [`open/${aid}/revealed`]: revealAt }
+        : { [`open/${aid}`]: null, [`archive/${aid}`]: { ...raw, closedAt: globalThis.firebase.database.ServerValue.TIMESTAMP } };
+      return ref('').update(u).catch(() => {});
+    });
+  }
 }
 function onKey(e) {
   if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;

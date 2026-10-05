@@ -20,6 +20,8 @@ const ASSIGN_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
 //  기초 코딩 · 음악실 리듬 과제는 앱 쪽(common/assign.js 를 쓰는 판 · 곡 바로 열기)이 붙은 뒤 켠다 — 다음 단계
 const ASSIGN_APP_KINDS_READY = false;
 
+//  [CLASS-LIVE-NOTE-1] 수업 방이 저절로 풀리는 때 · 덮개 밑에서 멈추지 않는 학습 앱 — 만들기 화면과 수업 띠에 한 줄(사용자 확인 전 기본값 3분 · 안전 시간)
+const ASSIGN_LIVE_NOTE = '⚠️ 선생님 화면(관리 · TV)이 3분 넘게 꺼지거나 안전 시간이 지나면 아이 화면의 수업 방이 저절로 풀려요. 🎵 음악실 · 🧩 기초 코딩을 켜 둔 아이는 덮개 밑에서 소리 · 게임이 계속될 수 있어요 — 수업 전에 닫게 해 주세요.';
 function _assignRef(p) { return _AS.db.ref(AssignCore.path.full(p)); }
 function _assignNow() { return Date.now() + (_AS.offset || 0); }
 function _assignTS() { return firebase.database.ServerValue.TIMESTAMP; }
@@ -249,6 +251,7 @@ function _assignRenderLive() {
       ${battling.length ? `<span class="asg-live-absent">⚔️ 전투 중 ${battling.length} — 새로고침하면 진 걸로 쳐져요</span>` : ''}
       ${away.length ? `<span class="asg-live-absent">다른 화면 봄 ${away.length}</span>` : ''}</div>
     ${mid}
+    <div class="text-muted-sm asg-live-note">${ASSIGN_LIVE_NOTE}</div>
     <div class="asg-live-ctl">${ctl}
       <label class="asg-inline"><input type="checkbox" ${live.names ? 'checked' : ''} onchange="assignLiveNames(this.checked)"> TV 에 이름</label>
       <button class="btn-sm outline" onclick="assignLiveExtend()">10분 더</button>
@@ -285,15 +288,25 @@ function assignExcuse(sid, on) {
 async function assignLiveEnd(toInbox, force) {
   const x = _assignLiveNow();
   if (!x) return;
-  const msg = toInbox ? '수업을 끝낼까요?\n못 한 아이에게는 홈에 과제가 남아요(이어서 풀 수 있어요).' : '수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.';
+  //  [ASSIGN-END-INBOX-1] 과제함에 있던 과제를 수업으로 돌린 것(fromInbox)은 그냥 끝내도 과제함으로 돌아간다 — 안 한 아이 카드가 사라지지 않게
+  const back = !toInbox && !!(_AS.openRaw[x.l.aid] && _AS.openRaw[x.l.aid].fromInbox);
+  const msg = toInbox ? '수업을 끝낼까요?\n못 한 아이에게는 홈에 과제가 남아요(이어서 풀 수 있어요).'
+    : back ? '수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n이 과제는 원래대로 과제함에 남아요(안 한 아이는 홈 카드로 풀어요).'
+    : '수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n이 과제도 함께 닫혀요(아이 홈 카드가 사라져요 · 낸 답과 결과는 남아요).';
   if (!confirm(msg)) return;
   const aid = x.l.aid, revealAt = x.l.revealAt || null;
   const ok = await _assignTx(AssignCore.ctl.end(force ? '' : aid, _assignNow()), '끝내기');
   if (!ok) return;
   if (!_AS.openRaw[aid]) return;
-  if (toInbox) await _assignRef('').update({ [`open/${aid}/deliver`]: 'inbox', [`open/${aid}/pacing`]: 'self', [`open/${aid}/fromLive`]: true, [`open/${aid}/revealed`]: revealAt }).catch(() => notify('⚠️ 과제함으로 남기기가 안 됐어요', 'error'));
+  if (toInbox || back) await _assignToInbox(aid, revealAt, toInbox);
   else await _assignClose(aid);
-  notify(toInbox ? '수업을 끝냈어요 — 못 한 아이는 과제함에서 이어 해요' : '수업을 끝냈어요');
+  notify(toInbox ? '수업을 끝냈어요 — 못 한 아이는 과제함에서 이어 해요' : back ? '수업을 끝냈어요 — 과제는 과제함에 그대로 있어요' : '수업을 끝냈어요');
+}
+//  수업이 끝난 과제를 과제함으로 — fromLive: '수업 → 과제함' 표시(못 한 아이에게 남김) · fromInbox 표시는 지운다 [ASSIGN-END-INBOX-1]
+function _assignToInbox(aid, revealAt, fromLive) {
+  const u = { [`open/${aid}/deliver`]: 'inbox', [`open/${aid}/pacing`]: 'self', [`open/${aid}/fromInbox`]: null, [`open/${aid}/revealed`]: revealAt || null };
+  if (fromLive) u[`open/${aid}/fromLive`] = true;
+  return _assignRef('').update(u).catch(() => notify('⚠️ 과제함으로 남기기가 안 됐어요', 'error'));
 }
 
 // ── 목록 ──
@@ -361,7 +374,7 @@ function _assignClose(aid) {
 function assignReopen(aid) {
   const raw = (_AS.archRaw || {})[aid];
   if (!raw) return;
-  _assignRef('').update({ [`archive/${aid}`]: null, [`open/${aid}`]: { ...raw, closedAt: null, deliver: 'inbox', pacing: 'self' } })
+  _assignRef('').update({ [`archive/${aid}`]: null, [`open/${aid}`]: { ...raw, closedAt: null, deliver: 'inbox', pacing: 'self', fromInbox: null } })
     .then(() => { delete _AS.archRaw[aid]; notify('다시 열었어요 — 아이 홈에 카드가 떠요'); _assignRenderBits(true); }).catch(() => notify('⚠️ 다시 열기가 안 됐어요', 'error'));
 }
 //  열린 과제를 그대로 수업으로(같은 결과 칸 — 이미 낸 답은 건너뛴다)
@@ -638,7 +651,7 @@ function _assignCMeta() {
     <div class="asg-c-row"><span class="text-muted-sm">어떻게</span>
       <span class="asg-segs"><button class="asg-seg${!live ? ' on' : ''}" onclick="assignDraft('deliver','inbox')">📥 과제함에 넣기</button>
       <button class="asg-seg live${live ? ' on' : ''}" ${app ? 'disabled title="기초 코딩 · 리듬은 지금은 과제함으로만 보내요"' : `onclick="assignDraft('deliver','live')"`}>🔴 지금 모두 같이</button></span></div>
-    <div class="text-muted-sm asg-explain">${live ? '로그인한 아이 화면 위에 바로 수업 방이 열려요. 하던 것은 그대로 멈춰 두고, 선생님이 끝내면 하던 자리로 돌아가요. 아이는 스스로 못 나가요.' : '아이는 하던 것을 그대로 하고, 홈 \'오늘\' 맨 위 카드를 눌러 풀어요.'}</div>
+    <div class="text-muted-sm asg-explain">${live ? `로그인한 아이 화면 위에 바로 수업 방이 열려요. 하던 것은 그대로 멈춰 두고, 선생님이 끝내면 하던 자리로 돌아가요. 아이는 스스로 못 나가요.<br>${ASSIGN_LIVE_NOTE}` : '아이는 하던 것을 그대로 하고, 홈 \'오늘\' 맨 위 카드를 눌러 풀어요.'}</div>
     ${live ? `<div class="asg-c-row"><span class="text-muted-sm">진행</span>
       <label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'self' ? 'checked' : ''} onchange="assignDraft('pacing','self')"> 각자 풀기</label>
       <label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'step' ? 'checked' : ''} onchange="assignDraft('pacing','step')"> 한 문제씩 같이(선생님이 넘김 · 답 공개 · TV 막대)</label>
@@ -704,14 +717,18 @@ async function _assignStartLive(def, minutes, fromOpen, asked) {
     if (!confirm('지금 다른 수업이 켜져 있어요. 그 수업을 끝내고 새로 시작할까요?')) return;
     const ok = await _assignTx(AssignCore.ctl.end('', _assignNow()), '앞 수업 끝내기');
     if (!ok) return;
-    if (cur.aid && _AS.openRaw[cur.aid] && cur.aid !== def.id) await _assignClose(cur.aid);
+    if (cur.aid && _AS.openRaw[cur.aid] && cur.aid !== def.id) {
+      if (_AS.openRaw[cur.aid].fromInbox) await _assignToInbox(cur.aid, cur.revealAt, false);   // [ASSIGN-END-INBOX-1]
+      else await _assignClose(cur.aid);
+    }
   } else if (!asked && !confirm(`'${def.title}'\n지금 로그인한 아이 화면에 수업 방이 열려요. 하던 것은 그대로 멈춰 둬요.\n시작할까요?`)) return;
   _AS.sending = true; _assignCMeta();
   try {
     const ndef = AssignCore.normDef({ ...def, createdAt: 1 }, def.id);
     const ok = await _assignTx(AssignCore.ctl.start(ndef, { minutes }, _assignNow()), '수업 시작');
     if (!ok) return;
-    if (fromOpen) await _assignRef('').update({ [`open/${def.id}/deliver`]: 'live', [`open/${def.id}/pacing`]: ndef.pacing });
+    //  [ASSIGN-END-INBOX-1] 과제함에서 돌린 수업은 표시(fromInbox)를 남겨 끝낼 때 과제함으로 되돌린다
+    if (fromOpen) await _assignRef('').update({ [`open/${def.id}/deliver`]: 'live', [`open/${def.id}/pacing`]: ndef.pacing, [`open/${def.id}/fromInbox`]: true });
     else await _assignRef(AssignCore.path.open(def.id)).set({ ...def, createdAt: _assignTS() });
     notify(`🔴 수업을 시작했어요 — ${def.title}`);
     if (!fromOpen) _AS.draft = null;
