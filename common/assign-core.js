@@ -173,7 +173,7 @@
     if (!def) return '';
     if (def.kind === 'quiz') return 'quiz:' + def.content.quiz.items.map(i => i.id).join(',');
     if (def.kind === 'coding') return 'coding:' + def.content.coding.stages.join(',');
-    const m = def.content.music; return 'music:' + m.song + ':' + m.level + ':' + m.tempo;
+    const m = def.content.music; return 'music:' + m.song + ':' + m.level + ':' + m.tempo + ':' + m.keys;   // 키 수만 달라도 다른 과제 [ASSIGN-MUSIC-1 · 검토 반영]
   }
 
   // ── 채점 ──

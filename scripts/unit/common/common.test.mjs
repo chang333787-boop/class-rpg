@@ -122,9 +122,9 @@ await test('공통 파일 ?v= — 부르는 index.html 모두 같은 값', () =>
   for (const a of FB_APPS) for (const [k, v] of Object.entries(importMap(read(`${a}/index.html`)))) if (k.startsWith('../common/')) (seen[k] = seen[k] || new Set()).add(v);
   for (const a of CSS_APPS) { const m = read(`${a}/index.html`).match(/href="(\.\.\/common\/subapp\.css[^"]*)"/); ok(m, a + ' 에 subapp.css 없음'); (seen.css = seen.css || new Set()).add(m[1]); }
   for (const [k, s] of Object.entries(seen)) ok(s.size === 1, `${k} 값이 여럿: ${[...s].join(' · ')}`);
-  //  과제 계약(common/assign.js · assign-core.js)은 그것을 붙인 앱만 부른다 [ASSIGN-CODING-1] — 그 밖의 새 공통 파일이 생기면 여기서 알린다
-  const extra = Object.keys(seen).filter(k => !['../common/util.js', '../common/rpg-firebase.js', '../common/teacher-gate.js', 'css'].includes(k));
-  ok(Object.keys(seen).length - extra.length === 4 && extra.every(k => ['../common/assign.js', '../common/assign-core.js'].includes(k)), '공통 파일 수 ' + Object.keys(seen).join(','));
+  //  기본 넷(util · rpg-firebase · teacher-gate · subapp.css) + 과제를 받는 앱만 부르는 과제 계약 둘(assign · assign-core) [ASSIGN-MUSIC-1]
+  const base = ['../common/util.js', '../common/rpg-firebase.js', '../common/teacher-gate.js', 'css'];
+  ok(base.every(k => seen[k]) && Object.keys(seen).every(k => base.includes(k) || /^\.\.\/common\/assign(-core)?\.js$/.test(k)), '공통 파일 ' + Object.keys(seen).join(','));
 });
 await test('subapp.css 는 앱 css 보다 먼저(같은 특이도 규칙의 차례 = 원래 줄 차례)', () => {
   for (const a of CSS_APPS) { const h = read(`${a}/index.html`), i = h.indexOf('../common/subapp.css'), j = h.search(/href="css\/[a-z]+\.css/); ok(i > 0 && j > i, a + ' 차례'); }

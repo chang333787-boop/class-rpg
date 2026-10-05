@@ -285,7 +285,8 @@ function classLiveClose(why) {
   window.removeEventListener('beforeunload', _asgBeforeUnload);
   clearInterval(_asgLv.focusTimer); _asgLv.focusTimer = 0;
   const el = document.getElementById('class-live');
-  if (el) el.style.display = 'none';
+  if (el) { el.style.display = 'none'; el.classList.remove('asg-app-mode'); }
+  const lf = document.getElementById('asgl-app'); if (lf) lf.src = 'about:blank';   // 덮개 안 앱의 소리 · 타이머 정지 [ASSIGN-MUSIC-1]
   document.body.style.overflow = _asgLv.overflow || '';
   if (_asgLv.pushed && history.state && history.state.asgLive) { _asgLv.pushed = false; try { history.back(); } catch (e) {} }
   _asgLv.pushed = false;
@@ -477,6 +478,7 @@ function _asgRender(inst, force) {
   }
   body.innerHTML = _asgScreenHTML(st, sc, cell);
   _asgNoteShow(st);
+  if (inst === 'l') _asgLiveAppMode(document.getElementById('asgl-app'));
   if (sc.view === 'self' || sc.view === 'ask') { _asgAfterQuestion(st, sc.i); if (sc.view === 'self') _asgStartedMark(st); }
 }
 //  처음 연 때(걸린 시간의 시작 · 교사 표 '하는 중') — 내 칸에 없을 때 한 번만
@@ -505,7 +507,12 @@ function _asgScreenHTML(st, sc, cell) {
     case 'loading': return wrapC(`<div class="asg-wait"><div class="asg-wait-ic">⏳</div><b>불러오는 중이에요</b><span>오래 걸리면 인터넷을 확인해요</span></div>`);
     case 'closed': return wrapC(`<div class="asg-wait"><div class="asg-wait-ic">📪</div><b>선생님이 이 과제를 닫았어요</b><span>낸 답은 그대로 남아요</span>
       <button class="st-btn asg-main-btn" onclick="asgCloseInbox()">닫기</button></div>`);
-    case 'app': return wrapC(`<div class="asg-wait"><div class="asg-wait-ic">🧩</div><b>이 과제는 과제함에서 풀어요</b><span>홈의 '선생님 과제'를 눌러요</span></div>`);
+    case 'app': {
+      //  [ASSIGN-MUSIC-1] 수업 덮개 안에서 그 앱을 하나 더 연다(…&assign=<과제>&live=1) — 밑의 학습 앱 창은 그대로 멈춰 둔다
+      const src = live ? _asgLiveAppSrc(def) : '';
+      if (src) return `<iframe id="asgl-app" class="asg-app-frame" title="선생님과 수업 — ${escHtml(def.title)}" allow="autoplay; fullscreen" src="${escHtml(src)}"></iframe>`;
+      return wrapC(`<div class="asg-wait"><div class="asg-wait-ic">🧩</div><b>이 과제는 과제함에서 풀어요</b><span>홈의 '선생님 과제'를 눌러요</span></div>`);
+    }
     case 'lobby': return wrapC(`<div class="asg-wait"><div class="asg-wait-ic asg-bob">🙋</div><b>곧 시작해요</b><span>선생님이 첫 문제를 열면 여기에 나와요</span></div>`);
     case 'self': case 'ask': return _asgQuestionHTML(st, sc.i, live) + note;
     case 'sent': {
@@ -799,6 +806,21 @@ function asgScratchClear(inst) {
   if (!cv) return;
   const ctx = cv.getContext('2d');
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore();
+}
+
+// ── 수업 덮개 안의 앱(음악실 리듬 · 각자 풀기) [ASSIGN-MUSIC-1] ──
+//  그 앱의 학습 앱 창 주소(student.js externalStudyItems — sid · 이름이 붙은 것) + 과제 · 수업 표시. 문제 묶음이나 모르는 앱이면 ''
+function _asgLiveAppSrc(def) {
+  if (!def || def.kind === 'quiz' || !AssignCore.safeAid(def.id) || typeof externalStudyItems !== 'function') return '';
+  const x = externalStudyItems().find(i => i.key === def.kind && i.embed);
+  return x && x.href ? x.href + '&assign=' + def.id + '&live=1' : '';
+}
+//  앱 창이 있으면 덮개를 꽉 채우는 모양으로 · 다 읽히면 키(리듬 A S D F …)가 바로 그 창에 들어가게 포커스(창은 덮개 안 — 밑으로 새지 않음)
+function _asgLiveAppMode(frame) {
+  const el = document.getElementById('class-live');
+  if (el) el.classList.toggle('asg-app-mode', !!frame);
+  if (!frame) return;
+  frame.addEventListener('load', () => { if (_asgLv.open) { try { frame.contentWindow.focus(); } catch (e) {} } });
 }
 
 // ── 하위 앱 결과 받아 쓰기(common/assign.js 의 reportAssign → postMessage) ──

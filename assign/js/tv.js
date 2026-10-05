@@ -87,7 +87,7 @@ function render() {
   let view;
   if (!def) view = idle();
   else if (!isLive) view = summaryView(def, null);
-  else if (def.kind !== 'quiz') view = appView(def);
+  else if (def.kind !== 'quiz') view = appView(def, live);
   else if (live.pacing === 'step') view = stepView(def, live);
   else view = selfView(def, live);
   app.replaceChildren(view, controls(def, isLive));
@@ -184,7 +184,7 @@ function selfView(def, live) {
 }
 //  정리 — 문제별 맞힌 비율 막대 · 가장 어려웠던 문제 · 막대를 누르면 그 문제(수업 중 한 문제씩이면 아이 화면도 그 문제 공개로)
 function summaryView(def, live) {
-  if (def.kind !== 'quiz') return appView(def);
+  if (def.kind !== 'quiz') return appView(def, live);
   const R = S.results || {}, ros = roster(def);
   const t = AC.tally(def, R, ros.map(x => ({ sid: x.sid, name: x.name })), { revealed: (live && live.revealAt) || def.revealed });
   const sel = S.pickItem != null && S.pickItem < def.n ? S.pickItem : -1;
@@ -204,11 +204,24 @@ function pickItem(def, live, i) {
   if (live && live.on && live.pacing === 'step' && live.aid === def.id) { tx(AC.ctl.goto(live.aid, Math.floor(Number(live.step)), String(live.phase || ''), i), '문제 보기'); return; }
   S.pickItem = i; draw();
 }
-function appView(def) {
+//  [ASSIGN-MUSIC-1] 음악 정확도 평균 — 관리 화면 assignMusicSummary 와 같은 셈(끝낸 아이 · 가장 좋은 판 acc · 소수 한 자리 · 시험이 견줌)
+function musicAvg(t) {
+  let sum = 0, n = 0;
+  for (const r of t.rows) { const b = r && r.detail && r.detail.best; if (!b || typeof b !== 'object' || r.status !== 'done') continue; sum += Number(b.acc) || 0; n++; }
+  return n ? Math.round(sum / n * 10) / 10 : null;
+}
+//  live = 수업 중이면 그 수업(이름 보이기 단추가 여기에도 듣는다 — 순위 없이 명단 차례 그대로) [검토 반영]
+function appView(def, live) {
   const R = S.results || {}, ros = roster(def);
   const t = AC.tally(def, R, ros.map(x => ({ sid: x.sid, name: x.name })), {});
+  const names = !!(live && live.names), avg = def.kind === 'music' ? musicAvg(t) : null;
   return h('main', { class: 'tv' }, head(def, def.kind === 'coding' ? '기초 코딩' : '음악실 리듬'),
-    h('div', { class: 'tv-center' }, h('div', { class: 'tv-h1' }, `끝낸 친구 ${t.counts.done} / ${t.rows.length}`), h('div', { class: 'tv-sub' }, `하는 중 ${t.counts.doing}`)));
+    h('div', { class: 'tv-center' }, h('div', { class: 'tv-h1' }, `끝낸 친구 ${t.counts.done} / ${t.rows.length}`),
+      h('div', { class: 'tv-sub' }, `하는 중 ${t.counts.doing}${avg != null ? ` · 끝낸 친구 정확도 평균 ${avg}%` : ''}`),   // [ASSIGN-MUSIC-1] 이름 · 순위 없이 반 평균만
+      h('div', { class: 'tv-dots' }, ...t.rows.map(r => names
+        ? h('span', { class: 'tv-name ' + r.status }, (r.status === 'done' ? '✓ ' : '') + (r.name || ''))
+        : h('span', { class: 'tv-dot ' + r.status, title: r.status === 'done' ? '다 함' : r.status === 'doing' ? '하는 중' : '아직' }))),
+      h('div', { class: 'tv-legend' }, '● 다 함 · ◐ 하는 중 · ○ 아직')));
 }
 
 // ── 선생님 조작(TV 에서 — 관리 화면과 같은 transaction) ──
