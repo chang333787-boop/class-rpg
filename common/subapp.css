@@ -39,3 +39,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 /* 첫 화면 틀 */
 .home{max-width:1240px;margin:0 auto;padding:16px 22px 26px;display:grid;gap:14px}
 
+
+/* 선생님 표 — 반 명단에만 있는 아이(이 앱을 아직 안 한 아이) 회색 줄 [APP-ROSTER-1] · 표(.tmap) 꼴은 앱 css · 줄은 common/roster.js idleRow */
+.tmap tr.idle .nm{color:var(--txt3);font-weight:700}
+.tmap td.idle-msg{color:var(--txt3);text-align:left;padding-left:10px}

@@ -1,4 +1,4 @@
-// 하위 앱 공통 뼈대(common/) 시험 [SUBAPP-COMMON-1] — util · rpg-firebase · teacher-gate · subapp.css 가 앱들과 제대로 이어졌나
+// 하위 앱 공통 뼈대(common/) 시험 [SUBAPP-COMMON-1] — util · rpg-firebase · teacher-gate · roster · subapp.css 가 앱들과 제대로 이어졌나
 //  node scripts/unit/common/common.test.mjs   (DOM 없음 · 네트워크 없음 · 가짜 firebase)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import * as U from '../../../common/util.js';
 import { RPG_FIREBASE, rpgDb, adminPwOK } from '../../../common/rpg-firebase.js';
 import { teacherGate } from '../../../common/teacher-gate.js';
+import { ROSTER_PATH, rosterOf, loadRoster, rosterFor, rosterNames, rosterRows } from '../../../common/roster.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -115,6 +116,84 @@ for (const a of GATE_APPS) {
   });
 }
 
+// ── roster — 반 명단(선생님 화면) [APP-ROSTER-1] ──
+const ROSTER_APPS = GATE_APPS;                                                      // 선생님 화면이 반 명단을 씀(생각판은 따로 · 수채화는 안 씀)
+const STUDENTS = {   // 옛 숫자 키(낡은 본)가 먼저 · id 키(지금 본)가 뒤 — 운영 DB 꼴 [DUP-STUDENT-1]
+  0: { id: 's2', name: '옛바다', pw: '0000', gold: 1 },
+  s1: { id: 's1', name: '하늘', pw: '1111', gold: 50, inventory: [1, 2] },
+  s2: { id: 's2', name: '바다', pw: '2222' },
+  s3: { id: 's3', name: '', pw: '3' },            // 이름 없는 껍데기
+  s4: { id: 's4', name: '숨김', hidden: true },
+  s5: { name: '아이디없음' },
+  'id_7.x': { id: 'id_7.x', name: '가람' },        // 키에 못 쓰는 글자 → 앱 저장 키(keyOf)와 같게
+  s9: null,
+};
+const fakeRosterDb = (val, mode = 'ok') => { const reads = []; return { reads, ref: p => ({ once: () => { reads.push(p);
+  if (mode === 'fail') return Promise.reject(new Error('permission_denied'));
+  if (mode === 'hang') return new Promise(() => {});
+  return Promise.resolve({ val: () => val }); } }) }; };
+const quiet = async fn => { const w = console.warn; console.warn = () => {}; try { return await fn(); } finally { console.warn = w; } };
+await test('rosterOf — id · 이름만 · 두 벌은 id 키 본 · 껍데기 · 숨김 · 아이디 없음 빼기', () => {
+  const r = rosterOf(STUDENTS);
+  ok(JSON.stringify(r) === JSON.stringify([{ sid: 's2', name: '바다' }, { sid: 's1', name: '하늘' }, { sid: 'id_7_x', name: '가람' }]), JSON.stringify(r));
+  ok(r.every(x => JSON.stringify(Object.keys(x)) === '["sid","name"]'), '다른 칸이 남음');
+  ok(!/0000|1111|2222|pw|gold|inventory/.test(JSON.stringify(r)), '비밀번호 · 다른 칸이 새어 나감');
+});
+await test('rosterOf — 배열 · 빈 값 · 글자도 견딤', () => {
+  ok(JSON.stringify(rosterOf([null, { id: 's1', name: '하늘' }])) === '[{"sid":"s1","name":"하늘"}]', '배열');
+  ok(rosterOf(null).length === 0 && rosterOf(undefined).length === 0 && rosterOf('x').length === 0 && rosterOf(7).length === 0, '빈 값');
+});
+await test('loadRoster — classRPG_v3/students 한 번만 읽고 id · 이름만', async () => {
+  const db = fakeRosterDb(STUDENTS), r = await loadRoster(db);
+  ok(ROSTER_PATH === 'classRPG_v3/students' && db.reads.length === 1 && db.reads[0] === ROSTER_PATH, '읽은 곳: ' + db.reads.join(','));
+  ok(r.length === 3 && r[1].sid === 's1' && r[1].name === '하늘' && !('pw' in r[1]), JSON.stringify(r));
+});
+await test('loadRoster — 못 읽으면(규칙 · 끊김) 빈 목록', async () => { ok((await quiet(() => loadRoster(fakeRosterDb(null, 'fail')))).length === 0, '실패인데 명단'); });
+await test('loadRoster — 늦으면(ms) 빈 목록 · 선생님 화면이 멈추지 않음', async () => {
+  const t0 = Date.now(), r = await loadRoster(fakeRosterDb(STUDENTS, 'hang'), { ms: 40 });
+  ok(r.length === 0 && Date.now() - t0 < 1000, '기다림 ' + (Date.now() - t0) + 'ms');
+});
+await test('loadRoster — 학생이 없거나 db 가 없으면 빈 목록', async () => {
+  ok((await loadRoster(fakeRosterDb(null))).length === 0, '학생 없음');
+  ok((await loadRoster(null)).length === 0 && (await loadRoster({})).length === 0, 'db 없음');
+});
+await test('rosterFor — 손님 · 오프라인은 읽지 않음 · 온라인 저장소는 store.db 로', async () => {
+  const db = fakeRosterDb(STUDENTS);
+  ok((await rosterFor({ me: { guest: true }, online: false, db })).length === 0 && db.reads.length === 0, '손님인데 읽음');
+  ok((await rosterFor({ me: { guest: false }, online: false, db })).length === 0 && db.reads.length === 0, '오프라인인데 읽음');
+  ok((await rosterFor({ me: { guest: false }, online: true })).length === 0, 'db 없는 저장소');
+  ok((await rosterFor(null)).length === 0, '저장소 없음');
+  ok((await rosterFor({ me: { guest: false }, online: true, db })).length === 3 && db.reads.length === 1, '온라인인데 안 읽음');
+});
+await test('rosterRows — 기록 있는 아이 차례 그대로 · 명단에만 있는 아이는 뒤에 이름 차례 · teacher 빼기', () => {
+  const roster = [{ sid: 's3', name: '하나' }, { sid: 's1', name: '다솜' }, { sid: 's2', name: '가람' }, { sid: 'teacher', name: '선생님' }];
+  const { rows, idle } = rosterRows(['s9', 's1'], roster);
+  ok(JSON.stringify(rows) === '["s9","s1","s2","s3"]', rows.join(','));
+  ok(idle.size === 2 && idle.has('s2') && idle.has('s3') && !idle.has('s1') && !idle.has('s9'), [...idle].join(','));
+  const none = rosterRows(['s1', 's2'], []);
+  ok(JSON.stringify(none.rows) === '["s1","s2"]' && none.idle.size === 0, '명단 없으면 지금 그대로');
+});
+await test('rosterNames — 명단 이름이 앱 이름표 위에 · 원본은 그대로', () => {
+  const names = { s1: '옛이름', s8: '명단밖' }, r = rosterNames(names, [{ sid: 's1', name: '새이름' }, { sid: 's2', name: '바다' }]);
+  ok(r.s1 === '새이름' && r.s2 === '바다' && r.s8 === '명단밖', JSON.stringify(r));
+  ok(names.s1 === '옛이름' && !('s2' in names), '원본이 바뀜');
+  ok(JSON.stringify(rosterNames(undefined, [])) === '{}', '빈 이름표');
+});
+for (const a of ROSTER_APPS) {
+  await test(`${a} — 저장소가 db 를 내보내고(손님은 없음) 선생님 화면이 반 명단으로 줄을 만든다`, async () => {
+    const { createStore } = await import(`../../../${a}/js/store.js`);
+    const st = createStore({ sid: 's_1', name: '시험', fb: fakeFb2('1') }), guest = createStore({ fb: fakeFb2('1') });
+    ok(st.db && typeof st.db.ref === 'function', '온라인 저장소에 db 없음');
+    ok(!guest.db && (await rosterFor(guest)).length === 0, '손님 저장소가 명단을 읽음');
+    const t = read(`${a}/js/teacher.js`);
+    ok(t.includes("from '../../common/roster.js'") && t.includes('rosterFor(ctx.store)') && /rosterRows\(/.test(t), '반 명단을 안 씀');
+    ok(!/classRPG_v3/.test(t), 'teacher.js 가 명단 경로를 직접 읽음(공통으로)');
+  });
+}
+await test('회색 줄 꼴 — subapp.css 에 .tmap tr.idle · td.idle-msg', () => {
+  const c = read('common/subapp.css'); ok(c.includes('.tmap tr.idle .nm{') && c.includes('.tmap td.idle-msg{'), '꼴 없음');
+});
+
 // ── index.html · css ──
 const importMap = h => JSON.parse(h.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]).imports;
 await test('공통 파일 ?v= — 부르는 index.html 모두 같은 값', () => {
@@ -122,8 +201,8 @@ await test('공통 파일 ?v= — 부르는 index.html 모두 같은 값', () =>
   for (const a of FB_APPS) for (const [k, v] of Object.entries(importMap(read(`${a}/index.html`)))) if (k.startsWith('../common/')) (seen[k] = seen[k] || new Set()).add(v);
   for (const a of CSS_APPS) { const m = read(`${a}/index.html`).match(/href="(\.\.\/common\/subapp\.css[^"]*)"/); ok(m, a + ' 에 subapp.css 없음'); (seen.css = seen.css || new Set()).add(m[1]); }
   for (const [k, s] of Object.entries(seen)) ok(s.size === 1, `${k} 값이 여럿: ${[...s].join(' · ')}`);
-  //  기본 넷(util · rpg-firebase · teacher-gate · subapp.css) + 과제를 받는 앱만 부르는 과제 계약 둘(assign · assign-core) [ASSIGN-MUSIC-1]
-  const base = ['../common/util.js', '../common/rpg-firebase.js', '../common/teacher-gate.js', 'css'];
+  //  기본 다섯(util · rpg-firebase · teacher-gate · roster · subapp.css) + 과제를 받는 앱만 부르는 과제 계약 둘(assign · assign-core) [ASSIGN-MUSIC-1 · APP-ROSTER-1]
+  const base = ['../common/util.js', '../common/rpg-firebase.js', '../common/teacher-gate.js', '../common/roster.js', 'css'];
   ok(base.every(k => seen[k]) && Object.keys(seen).every(k => base.includes(k) || /^\.\.\/common\/assign(-core)?\.js$/.test(k)), '공통 파일 ' + Object.keys(seen).join(','));
 });
 await test('subapp.css 는 앱 css 보다 먼저(같은 특이도 규칙의 차례 = 원래 줄 차례)', () => {

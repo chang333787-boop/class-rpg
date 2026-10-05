@@ -1,5 +1,5 @@
 // 저장소 — 학급 RPG 와 같은 Firebase RTDB(compat 9.23)의 classRPG_art 아래만 쓴다(물감 연구소 classRPG_paint 와 같은 꼴).
-//  RPG 본 데이터(classRPG_v3)는 읽지도 쓰지도 않는다(선생님 화면의 관리자 비밀번호 확인용 classRPG_adminPw 한 번 읽기만 예외).
+//  RPG 본 데이터(classRPG_v3)는 쓰지 않는다 — 읽기는 선생님 화면의 반 명단 classRPG_v3/students 하나(id · 이름만 · common/roster.js 가 store.db 로) [APP-ROSTER-1]. 관리자 비밀번호 확인용 classRPG_adminPw 한 번 읽기도 선생님 화면만.
 //  progress/<sid>/<그림>    = 사건 해결 { st 별, n 헛짚은 수, h 힌트 수, t }
 //  stats/<sid>/<그림>       = 셈 { tries 짚은 수, ok 찾은 수, miss 헛짚음, hint, tmiss 생각 단서 헛짚음 }
 //  think/<그림>/<sid>       = 생각 { o 고른 것(번호 · 놀이 이름 · 색 'blue,white'), t }
@@ -31,7 +31,7 @@ function rtdbStore(fb, sid, name) {
   let mine = null;
   const withName = up => { if (name) up[`names/${sid}`] = name; return up; };
   const st = {
-    me: { sid, name: name || '', guest: false }, online: true,
+    me: { sid, name: name || '', guest: false }, online: true, db,   // db = 선생님 화면 반 명단 읽기(common/roster.js) [APP-ROSTER-1]
     async progress() { if (!mine) mine = (await root.child('progress/' + sid).once('value')).val() || {}; return mine; },
     async tap(c, kind) { const up = {}; up[`stats/${sid}/${keyOf(c)}/tries`] = inc(1); up[`stats/${sid}/${keyOf(c)}/${keyOf(kind)}`] = inc(1); await root.update(up); },
     async solve(c, { st: stars, n, h }) {

@@ -38,13 +38,13 @@ HTML이 외부 JS/CSS와 Firebase SDK(CDN)를 직접 불러오는 단순 구조�
 ### 하위 앱 (폴더마다 `index.html` 하나)
 
 학생 홈에서 iframe 으로 열고 주소에 `?sid=<학생id>&n=<이름>` 을 붙인다(없으면 손님 — 그 기기에만 저장).
-학습 앱은 **자기 저장 루트만** 쓰고 RPG 본 데이터(`classRPG_v3`)는 쓰지 않는다(선생님 화면 비밀번호 확인용 `classRPG_adminPw` 읽기만).
+학습 앱은 **자기 저장 루트만** 쓰고 RPG 본 데이터(`classRPG_v3`)는 쓰지 않는다(선생님 화면만 읽음 — 비밀번호 확인용 `classRPG_adminPw` · 반 명단 `classRPG_v3/students` 의 id · 이름(`common/roster.js`, 안 한 아이도 회색 줄로)).
 선생님 화면 = `<폴더>/index.html?teacher=1#/t` (관리 비밀번호를 한 번 묻는다). ES 모듈 + import map 이라 버스터는 **import map 의 `?v=` 숫자**를 올린다.
 공통 뼈대는 `common/`(아래 표 첫 줄) — 고치면 그 파일을 부르는 **모든** 앱 index.html 의 `"../common/…"` 값을 같게 올린다(`buster-check` 가 다르면 FAIL).
 
 | 폴더 | 이름 | 하는 일 | 저장 루트 | 시험 |
 |---|---|---|---|---|
-| `common/` | 하위 앱 공통 뼈대 | `util.js`(h · toast · modal · lsGet … — 6앱 `js/util.js` 는 다시 내보내기만 · 음악실은 + 자기 것) · `rpg-firebase.js`(학급 RPG 설정 하나 · 앱 만들기 · 관리자 비밀번호 확인 — 8앱) · `teacher-gate.js`(선생님 화면 문 — 7앱 · 키 `<앱>.teacher` 그대로) · `subapp.css`(바탕 · 단추 · 창 · 윗줄 — 6앱, 앱 css 보다 **먼저** 부른다). 생각판 util · 음악실 · 생각판 css 는 모양이 달라 따로 | 없음 | `scripts/unit/common/common.test.mjs` |
+| `common/` | 하위 앱 공통 뼈대 | `util.js`(h · toast · modal · lsGet … — 6앱 `js/util.js` 는 다시 내보내기만 · 음악실은 + 자기 것) · `rpg-firebase.js`(학급 RPG 설정 하나 · 앱 만들기 · 관리자 비밀번호 확인 — 8앱) · `teacher-gate.js`(선생님 화면 문 — 7앱 · 키 `<앱>.teacher` 그대로) · `roster.js`(선생님 화면 반 명단 — 7앱 · id · 이름만 · 손님 · 못 읽으면 빈 목록) · `subapp.css`(바탕 · 단추 · 창 · 윗줄 — 6앱, 앱 css 보다 **먼저** 부른다). 생각판 util · 음악실 · 생각판 css 는 모양이 달라 따로 | 없음 | `scripts/unit/common/common.test.mjs` |
 | `art/` | 명화 탐정 | 옛 명화를 자세히 보며 찾기 → 단서 → 느낌 → 질문 · 조형 요소 돋보기 카드 | `classRPG_art` | `scripts/unit/art/cases.test.mjs` |
 | `coding/` | 기초 코딩 | 블록 코딩(Blockly) — 몬스터에게 명령하기(길 찾기) · 그림 그리기 · 선생님 막힘 지도 | `classRPG_coding` | `scripts/unit/coding/stages.test.mjs` |
 | `ink/` | 먹 연구소 | 먹색(농담) 만들기 · 한지에 붓 긋기 · 판본체 쓰기 | `classRPG_ink` | `scripts/unit/ink/stages.test.mjs` |

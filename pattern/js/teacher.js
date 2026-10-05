@@ -2,6 +2,7 @@
 //  관리자 비밀번호로 연다(기초 코딩 · 음악실과 같은 방식). 쓰는 것 = 우리 반 무늬 전시에서 내리기 하나뿐.
 import { h, toast, modal } from './util.js';
 import { teacherGate } from '../../common/teacher-gate.js';
+import { rosterFor, rosterNames, rosterRows, idleRow } from '../../common/roster.js';   // 반 명단 — 안 한 아이도 회색 줄 [APP-ROSTER-1]
 import { PUZ, CHAPTERS } from './stages.js';
 import { MISTAKES, validWork, wallpaper, WALL } from './tiles.js';
 import { wallCanvas } from './draw.js';
@@ -17,9 +18,12 @@ export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
   root.replaceChildren(ctx.topBar('무늬 공방 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
-  const { progress, stats, names, works = {} } = await ctx.store.all();
-  const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
+  const [{ progress, stats, names: names0, works = {} }, roster] = await Promise.all([ctx.store.all(), rosterFor(ctx.store)]);
+  const names = rosterNames(names0, roster);
+  //  나의 무늬만 만든 아이도 줄에 — 명단과 견줄 때 '아직 안 했어요'로 잘못 보이지 않게 [APP-ROSTER-1]
+  const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats), ...Object.keys(works)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));
+  const { rows, idle } = rosterRows(kids, roster);   // 기록 있는 아이(이름 차례) 뒤에 명단에만 있는 아이 [APP-ROSTER-1]
   //  [PATTERN-6] 우리 반 무늬 전시 — 선생님이 내릴 수 있다(글은 없지만 칸 그림이라도 수업에 맞지 않으면)
   const gallerySec = () => {
     const list = [];
@@ -31,7 +35,7 @@ export async function mountTeacher(root, ctx) {
         h('button', { class: 'btn small', onclick: async () => { if (!confirm('이 무늬를 전시에서 내릴까요?')) return; try { await ctx.store.deleteWork(x.sid, x.id); toast('내렸어요'); } catch (e) { console.warn(e); } mountTeacher(root, ctx); } }, '내리기'))))
         : h('p', { class: 'muted' }, '아직 건 무늬가 없어요.'));
   };
-  if (!kids.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 풀지 않았어요.'), gallerySec()); return { unmount() {} }; }
+  if (!rows.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 풀지 않았어요.'), gallerySec()); return { unmount() {} }; }
   const st = (k, p) => ((stats[k] || {})[p.id]) || {}, pg = (k, p) => (progress[k] || {})[p.id];
   const mkOf = k => { const o = {}; PUZ.forEach(p => MK.forEach(m => { o[m] = (o[m] || 0) + (st(k, p)[m] || 0); })); return o; };
   const topMk = o => Object.entries(o).filter(([, n]) => n).sort((a, z) => z[1] - a[1]);
@@ -49,13 +53,13 @@ export async function mountTeacher(root, ctx) {
       h('p', { class: 'muted' }, MK.filter(m => t[m]).map(m => `${MISTAKES[m]} ${t[m]}`).join(' · ') || '헷갈림 기록 없음')));
   }
   box.replaceChildren(...[
-    h('p', { class: 'muted', style: { margin: '0 0 10px' } }, `아이 ${kids.length}명 · 칸: ★ = 푼 판(별 수) · 숫자 = 아직 못 푼 판에 답한 수. 오른쪽 끝 = 그 아이가 가장 많이 헷갈린 것.`),
+    h('p', { class: 'muted', style: { margin: '0 0 10px' } }, `아이 ${kids.length}명${idle.size ? ` · 아직 안 한 아이 ${idle.size}명(회색 줄)` : ''} · 칸: ★ = 푼 판(별 수) · 숫자 = 아직 못 푼 판에 답한 수. 오른쪽 끝 = 그 아이가 가장 많이 헷갈린 것.`),
     cls.length ? h('div', { class: 'hard' }, h('b', {}, '우리 반이 많이 헷갈린 것'), ...cls.map(([m, n]) => h('span', {}, `${MISTAKES[m]} ${n}번`))) : null,
     h('div', { class: 'tscroll' }, h('table', { class: 'tmap' },
       h('thead', {},
         h('tr', {}, h('th', { rowspan: 2 }, '이름'), ...CHAPTERS.filter(c => c.open && !c.free).map(c => h('th', { colspan: PUZ.filter(p => p.ch === c.id).length, class: 'u' }, `${c.id}장 ${c.title}`)), h('th', { rowspan: 2 }, '많이 헷갈린 것')),
         h('tr', {}, ...PUZ.map(p => h('th', { title: p.title }, p.id)))),
-      h('tbody', {}, ...kids.map(k => { const top = topMk(mkOf(k))[0]; return h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...PUZ.map(p => cell(k, p)), h('td', { class: 'mk' }, top ? `${MISTAKES[top[0]]} ${top[1]}` : '—')); })))),
+      h('tbody', {}, ...rows.map(k => { if (idle.has(k)) return idleRow(names[k] || k, PUZ.length + 1); const top = topMk(mkOf(k))[0]; return h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...PUZ.map(p => cell(k, p)), h('td', { class: 'mk' }, top ? `${MISTAKES[top[0]]} ${top[1]}` : '—')); })))),
     gallerySec(),
   ].filter(Boolean));
   return { unmount() {} };
