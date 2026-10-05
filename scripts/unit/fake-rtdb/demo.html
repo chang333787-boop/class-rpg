@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>과제 수업 시연판</title>
+<!-- 시연판 [CLASS-DEMO-1] — 가짜 RTDB 서버(server.mjs --demo)가 내준다. 한 화면에 네 칸(교사 관리 · 학생 A · 학생 B · TV).
+     교사 · TV 칸 = 이 포트 · 학생 A · B 칸 = 포트+1 · 포트+2(다른 출처라 localStorage · sessionStorage 가 섞이지 않는다). 모두 같은 메모리 DB.
+     운영 DB 와 이어지지 않는다(server.mjs 가 html 마다 shim.js 를 끼움). -->
+<style>
+:root{
+  --bg:#f4efe6; --panel:#fffaf2; --ink:#2b2218; --ink2:#6b5a45; --line:#e2d6c3; --accent:#c0392b; --gold:#d9a441; --ok:#2e7d4f;
+  --pane-head:#efe5d4; --stage:#d9cdb9; --chip:#f6ead2; --shadow:0 1px 3px rgba(60,40,10,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16120d; --panel:#211a12; --ink:#f1e7d6; --ink2:#bfae94; --line:#3a2f22; --accent:#ff6f5e; --gold:#e8b75a; --ok:#6fcf97;
+    --pane-head:#2a2117; --stage:#0d0a07; --chip:#33281b; --shadow:0 1px 3px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16120d; --panel:#211a12; --ink:#f1e7d6; --ink2:#bfae94; --line:#3a2f22; --accent:#ff6f5e; --gold:#e8b75a; --ok:#6fcf97;
+  --pane-head:#2a2117; --stage:#0d0a07; --chip:#33281b; --shadow:0 1px 3px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit}
+.top{display:flex;align-items:center;gap:.6rem;padding:.45rem .8rem;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.top h1{font-size:15px;margin:0;font-weight:800;white-space:nowrap}
+.tag{background:#7a2;color:#fff;border-radius:6px;padding:2px 8px;font-weight:800;font-size:12px;white-space:nowrap}
+.top .sp{flex:1}
+.tb{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:.3rem .7rem;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap}
+.tb:hover{border-color:var(--gold)}
+.tb.on{background:var(--gold);color:#1a1206;border-color:var(--gold)}
+.warn{background:var(--accent);color:#fff;padding:.35rem .8rem;font-weight:700;font-size:13px}
+.main{flex:1;min-height:0;display:flex}
+.grid{flex:1;min-width:0;position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;padding:6px}
+.pane{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+.pane.big{position:absolute;inset:6px;z-index:5}
+.ph{display:flex;align-items:center;gap:.4rem;padding:.25rem .45rem .25rem .6rem;background:var(--pane-head);border-bottom:1px solid var(--line);min-height:32px}
+.ph b{font-size:13px;white-space:nowrap}
+.ph small{color:var(--ink2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ph .sp{flex:1}
+.pb{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:.12rem .5rem;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap}
+.pb.big-btn{background:var(--gold);color:#1a1206;border-color:var(--gold)}
+.stage{position:relative;flex:1;min-height:0;background:var(--stage);overflow:hidden}
+.stage iframe{position:absolute;left:0;top:0;border:0;background:#fff;transform-origin:0 0}
+.guide{width:370px;flex:none;border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:.6rem .8rem 2rem}
+.guide.off{display:none}
+.guide h2{font-size:15px;margin:.2rem 0 .4rem}
+.guide p.lead{margin:.2rem 0 .7rem;color:var(--ink2);font-size:12.5px}
+.g-sec{border:1px solid var(--line);border-radius:10px;margin:.5rem 0;overflow:hidden}
+.g-sec>summary{list-style:none;cursor:pointer;padding:.45rem .6rem;font-weight:800;background:var(--pane-head);display:flex;gap:.4rem;align-items:center}
+.g-sec>summary::-webkit-details-marker{display:none}
+.g-sec>summary .n{background:var(--gold);color:#1a1206;border-radius:50%;width:1.35rem;height:1.35rem;display:grid;place-items:center;font-size:12px;flex:none}
+.g-sec ol{margin:.4rem .6rem .6rem 1.9rem;padding:0}
+.g-sec li{margin:.28rem 0;font-size:13px}
+.g-sec li label{display:flex;gap:.35rem;align-items:flex-start;cursor:pointer}
+.g-sec li input{margin-top:.22rem;flex:none}
+.g-sec li.done span{color:var(--ink2);text-decoration:line-through}
+.who{display:inline-block;border-radius:5px;padding:0 .3rem;font-size:11.5px;font-weight:800;background:var(--chip);border:1px solid var(--line)}
+.who.t{color:#a0522d}.who.a{color:#2f6db0}.who.b{color:#2e7d4f}.who.tv{color:#7b4bb5}
+kbd{background:var(--chip);border:1px solid var(--line);border-radius:4px;padding:0 .3rem;font-size:12px}
+.g-foot{font-size:12px;color:var(--ink2);margin-top:.8rem}
+.g-foot li{margin:.25rem 0}
+@media (max-width:900px){
+  body{overflow:auto}
+  .main{flex-direction:column}
+  .grid{grid-template-columns:1fr;grid-template-rows:repeat(4,60vh)}
+  .guide{width:auto;border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>📝 과제 · 수업 시연판</h1><span class="tag">🧪 시연용 — 진짜 기록 아님</span>
+  <span class="sp"></span>
+  <button class="tb" id="b-guide" onclick="toggleGuide()">📋 눌러 볼 순서</button>
+  <button class="tb" onclick="resetAll()" title="가짜 DB 를 처음 데이터로 되돌리고 네 칸을 다시 불러와요">↺ 처음으로</button>
+</div>
+<div id="warn"></div>
+<div class="main">
+  <div class="grid" id="grid"></div>
+  <aside class="guide" id="guide">
+    <h2>선생님이 눌러 볼 순서</h2>
+    <p class="lead">네 칸은 모두 같은 가짜 DB 를 써요. 한 칸에서 누르면 다른 칸에 바로 보여요. 작게 보이면 칸 위 <b>⤢ 크게</b>를 눌러요.</p>
+
+    <details class="g-sec" open><summary><span class="n">1</span>과제함 — 수학 자동 5문제</summary><ol>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> 왼쪽 메뉴 <b>과제·수업</b> → <b>+ 새 과제</b></span></label></li>
+      <li><label><input type="checkbox"><span><b>📝 문제 묶음</b> · 과목 <b>수학</b> · <b>자동 뽑기</b> · 개수 <b>5</b> → <b>미리 뽑아 보기 🎲</b></span></label></li>
+      <li><label><input type="checkbox"><span>어떻게 = <b>📥 과제함에 넣기</b> → 맨 아래 <b>📥 과제함에 보내기</b></span></label></li>
+      <li><label><input type="checkbox"><span><span class="who a">학생 A</span> 홈 '오늘' 맨 위 <b>선생님 과제</b> 카드 → 다섯 문제 풀기 → <b>닫기</b>(카드에 '다 했어요 ✓')</span></label></li>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> 열린 과제 줄의 <b>결과</b> → A 는 '끝', B 는 '안 함' · 아래 '맞힌 비율' 칸을 누르면 그 문제 보기 분포</span></label></li>
+    </ol></details>
+
+    <details class="g-sec" open><summary><span class="n">2</span>지금 모두 같이 · 한 문제씩</summary><ol>
+      <li><label><input type="checkbox"><span><span class="who a">학생 A</span> <b>오늘의 학습</b>을 열고 한 문제 풀어 둠 · <span class="who b">학생 B</span> <b>꾸미기</b>(마당)를 열어 둠</span></label></li>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>+ 새 과제</b> → 수학 · <b>직접 고르기</b>로 단원을 펼쳐 문제 3개 체크</span></label></li>
+      <li><label><input type="checkbox"><span><b>🔴 지금 모두 같이</b> → 진행 <b>한 문제씩 같이</b> → <b>🔴 지금 보내고 수업 시작</b></span></label></li>
+      <li><label><input type="checkbox"><span><span class="who a">A</span> <span class="who b">B</span> 화면에 '선생님과 수업 중' 덮개 · <span class="who tv">TV</span> 가 수업을 따라감</span></label></li>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> 수업 띠 <b>첫 문제 ▶</b> → A · B 가 답 → <b>답 공개</b>(TV 막대 · 아이 화면 '맞았어요/아쉬워요') → <b>다음 ▶</b> … <b>정리 ▶</b></span></label></li>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>끝내기</b> → A 는 풀던 학습 문제로, B 는 꾸미기로 그대로 돌아감</span></label></li>
+    </ol></details>
+
+    <details class="g-sec"><summary><span class="n">3</span>영어 — 직접 고르기</summary><ol>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>+ 새 과제</b> → 과목 <b>영어</b> → <b>직접 고르기</b></span></label></li>
+      <li><label><input type="checkbox"><span>단원을 펼쳐 문제 두세 개 체크(줄 끝 <b>미리 보기</b>로 확인 · '소리' 칩 = 🔊 문제)</span></label></li>
+      <li><label><input type="checkbox"><span><b>📥 과제함에 보내기</b> → <span class="who b">학생 B</span> 카드로 풀기 → <span class="who t">교사</span> <b>결과</b></span></label></li>
+    </ol></details>
+
+    <details class="g-sec"><summary><span class="n">4</span>기초 코딩 — 판 보내기</summary><ol>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>+ 새 과제</b> → <b>🧩 기초 코딩</b> → 단원을 펼쳐 판 1~3개(예: 1-1 · 1-2)</span></label></li>
+      <li><label><input type="checkbox"><span><b>📥 과제함에 보내기</b> (또는 <b>🔴 지금 모두 같이</b> = 덮개 안에서 코딩이 열림)</span></label></li>
+      <li><label><input type="checkbox"><span><span class="who a">학생 A</span> 카드 → 코딩 창이 그 판을 바로 엶 · 윗줄 '📝 선생님 과제' 칩 → 블록 맞추고 ▶</span></label></li>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>결과</b> → 판마다 ★ · 실행 수 · 막힘 · 칸을 누르면 마지막 코드</span></label></li>
+    </ol></details>
+
+    <details class="g-sec"><summary><span class="n">5</span>음악실 리듬 — 곡 보내기</summary><ol>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>+ 새 과제</b> → <b>🎵 음악실 리듬</b> → 곡 하나(예: 솔·라·시 연습) · 난이도 · 빠르기</span></label></li>
+      <li><label><input type="checkbox"><span><b>📥 과제함에 보내기</b> (또는 <b>🔴 지금 모두 같이</b> · 각자 풀기)</span></label></li>
+      <li><label><input type="checkbox"><span><span class="who b">학생 B</span> 카드 → 그 곡이 바로 열림 → <b>▶ 시작</b> → 칸을 한 번 누른 뒤 <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd></span></label></li>
+      <li><label><input type="checkbox"><span><span class="who t">교사</span> <b>결과</b> → 정확도 · 판정 · 처음 판 · 친 횟수</span></label></li>
+    </ol></details>
+
+    <ul class="g-foot">
+      <li>교사 칸의 <b>📺 TV</b> 단추는 새 창 대신 오른쪽 위 TV 칸을 그 화면으로 바꿔요.</li>
+      <li>소리는 그 칸을 한 번 누른 뒤에 나요(브라우저 규칙).</li>
+      <li>사진 올리기 · 영어앱 보상 읽기는 가짜 서버에 없어서 안 돼요.</li>
+      <li><b>↺ 처음으로</b> = 가짜 DB 를 처음 데이터(학생 5명)로 되돌리고 네 칸을 다시 불러와요. 서버를 끄면 기록은 모두 사라져요.</li>
+    </ul>
+  </aside>
+</div>
+<script>
+//  서버가 채운다: { teacher, a, b, host } — 학생 칸 포트가 없으면(--demo 없이 켬) 같은 포트로 열고 위에 경고
+const CFG = /*DEMO_CFG*/null || { teacher: Number(location.port) || 80, a: null, b: null, host: location.hostname };
+const Q = new URLSearchParams(location.search);
+const SID_A = (Q.get('a') || 's1').slice(0, 40), SID_B = (Q.get('b') || 's2').slice(0, 40);
+const base = (port) => `${location.protocol}//${CFG.host}:${port}`;
+const PANES = [
+  { id: 'teacher', label: '교사 관리 화면', sub: '노트북 1366×768', w: 1366, h: 768, url: base(CFG.teacher) + '/admin.html?auto' },
+  { id: 'tv', label: 'TV', sub: '교실 TV 1600×900 · 수업을 따라가요', w: 1600, h: 900, url: base(CFG.teacher) + '/assign/index.html#/' },
+  { id: 'a', label: '학생 A', sub: '크롬북 1366×610', w: 1366, h: 610, url: base(CFG.a || CFG.teacher) + '/student.html?as=' + encodeURIComponent(SID_A) },
+  { id: 'b', label: '학생 B', sub: '크롬북 1366×610', w: 1366, h: 610, url: base(CFG.b || CFG.teacher) + '/student.html?as=' + encodeURIComponent(SID_B) },
+];
+//  TV 칸은 이 쪽과 같은 출처 — 관리 화면의 'TV 로 보기'처럼 선생님 표시를 남겨 비밀번호를 묻지 않게
+try { sessionStorage.setItem('assign.teacher', '1'); } catch (e) {}
+if (!CFG.a || !CFG.b) document.getElementById('warn').innerHTML = '<div class="warn">학생 칸이 교사 칸과 같은 출처로 열렸어요 — 두 학생 기록이 섞일 수 있어요. 서버를 <code>--demo</code> 로 켜 주세요.</div>';
+
+const grid = document.getElementById('grid');
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+for (const p of PANES) {
+  const el = document.createElement('section');
+  el.className = 'pane'; el.id = 'pane-' + p.id;
+  el.innerHTML = `<div class="ph"><b>${esc(p.label)}</b><small id="sub-${p.id}">${esc(p.sub)}</small><span class="sp"></span>
+    <button class="pb" onclick="reloadPane('${p.id}')" title="이 칸만 다시 불러오기">↻</button>
+    <button class="pb" onclick="window.open(document.getElementById('f-${p.id}').src, '_blank')" title="새 창으로">↗</button>
+    <button class="pb big-btn" id="big-${p.id}" onclick="toggleBig('${p.id}')">⤢ 크게</button></div>
+    <div class="stage" id="st-${p.id}"><iframe id="f-${p.id}" title="${esc(p.label)}" width="${p.w}" height="${p.h}" allow="autoplay; fullscreen; clipboard-write; screen-wake-lock" src="${esc(p.url)}"></iframe></div>`;
+  grid.appendChild(el);
+}
+//  칸 크기에 맞춰 줄이기(가로 · 세로 중 작은 쪽) · 가운데
+function fit(p) {
+  const st = document.getElementById('st-' + p.id), f = document.getElementById('f-' + p.id);
+  if (!st || !f) return;
+  const W = st.clientWidth, H = st.clientHeight;
+  if (!W || !H) return;
+  const s = Math.min(W / p.w, H / p.h);
+  f.style.transform = `translate(${Math.round((W - p.w * s) / 2)}px, ${Math.round((H - p.h * s) / 2)}px) scale(${s})`;
+  f.dataset.scale = String(s);
+}
+const fitAll = () => PANES.forEach(fit);
+if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(fitAll); PANES.forEach(p => ro.observe(document.getElementById('st-' + p.id))); }
+addEventListener('resize', fitAll);
+fitAll();
+
+function toggleBig(id) {
+  const el = document.getElementById('pane-' + id), on = !el.classList.contains('big');
+  document.querySelectorAll('.pane.big').forEach(x => { x.classList.remove('big'); const b = document.getElementById('big-' + x.id.slice(5)); if (b) b.textContent = '⤢ 크게'; });
+  if (on) { el.classList.add('big'); document.getElementById('big-' + id).textContent = '⤡ 작게'; }
+  requestAnimationFrame(fitAll);
+}
+function reloadPane(id) { const p = PANES.find(x => x.id === id), f = document.getElementById('f-' + id); if (!p || !f) return; f.src = 'about:blank'; setTimeout(() => { f.src = p.url; }, 50); }
+async function resetAll() {
+  if (!confirm('가짜 DB 를 처음 데이터로 되돌리고 네 칸을 다시 불러올까요?')) return;
+  try { await fetch('/.fake/reset', { method: 'POST' }); } catch (e) {}
+  PANES.forEach(p => reloadPane(p.id));
+}
+function toggleGuide() {
+  const g = document.getElementById('guide'), off = !g.classList.contains('off');
+  g.classList.toggle('off', off); document.getElementById('b-guide').classList.toggle('on', !off);
+  try { localStorage.setItem('demo.guideOff', off ? '1' : ''); } catch (e) {}
+  requestAnimationFrame(fitAll);
+}
+(function () {
+  let off = false; try { off = localStorage.getItem('demo.guideOff') === '1'; } catch (e) {}
+  document.getElementById('guide').classList.toggle('off', off); document.getElementById('b-guide').classList.toggle('on', !off);
+  //  눌러 본 단계 표시(이 기기에만 · 없어도 그대로 동작)
+  let done = {}; try { done = JSON.parse(localStorage.getItem('demo.steps') || '{}') || {}; } catch (e) {}
+  document.querySelectorAll('.g-sec li input').forEach((c, i) => {
+    c.checked = !!done[i]; c.closest('li').classList.toggle('done', c.checked);
+    c.addEventListener('change', () => { done[i] = c.checked; c.closest('li').classList.toggle('done', c.checked); try { localStorage.setItem('demo.steps', JSON.stringify(done)); } catch (e) {} });
+  });
+})();
+
+//  학생 칸 이름(가짜 DB 의 학생 기록)
+fetch('/.fake/db?path=classRPG_v3/students').then(r => r.json()).then(st => {
+  const name = (sid) => { const s = Object.values(st || {}).find(x => x && (x.id === sid || x.name === sid)); return s ? s.name : sid; };
+  document.getElementById('sub-a').textContent = `${name(SID_A)} · 크롬북 1366×610`;
+  document.getElementById('sub-b').textContent = `${name(SID_B)} · 크롬북 1366×610`;
+}).catch(() => {});
+
+//  교사 칸의 'TV' 단추(window.open) → 새 창 대신 TV 칸을 그 주소로(같은 출처라 바꿀 수 있음)
+document.getElementById('f-teacher').addEventListener('load', () => {
+  try {
+    const w = document.getElementById('f-teacher').contentWindow;
+    w.open = (url) => {
+      const tv = document.getElementById('f-tv');
+      tv.src = new URL(String(url || 'assign/index.html#/'), w.location.href).href;
+      return tv.contentWindow;
+    };
+  } catch (e) {}
+});
+</script>
+</body>
+</html>
