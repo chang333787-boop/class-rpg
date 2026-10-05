@@ -129,6 +129,8 @@ try {
   await T.ev(`document.querySelector('#asg-create input[maxlength]').value = '분수 복습'; assignDraft('title', '분수 복습'); 1`);
   await T.shot('A_create');
   const aidA = await T.ev(`_AS.draft.aid`);
+  const todoNum = async S => { const t = await S.ev(`(document.querySelector('#main-area .hs-head h2') || {}).textContent || ''`); const m = /할 일 (\d+)개/.exec(t); return m ? +m[1] : 0; };
+  const todoBefore = await todoNum(S1);   // [ASG-TODO-FIRST-1] 첫 과제가 오면 '오늘 할 일' 이 하나 늘어야 한다(예전 시험은 숫자 꼴만 봐서 놓침)
   await T.press('#asg-send');
   ok(await until(T, `!!_AS.open[${JSON.stringify(aidA)}]`, 5000) && !!db(`classRPG_assign/open/${aidA}`), 'A3 [과제함에 보내기] → open/<과제> 하나(서버)', aidA);
   const defA = db(`classRPG_assign/open/${aidA}`);
@@ -140,8 +142,8 @@ try {
   //  학생 홈 카드
   const cardOk = await Promise.all([S1, S2, S3].map(S => until(S, `!!document.querySelector('#main-area .asg-card') && document.querySelector('#main-area .asg-card').textContent.includes('분수 복습')`, 6000)));
   ok(cardOk.every(Boolean), 'A6 학생 셋 홈 \'오늘\' 맨 위에 선생님 과제 카드', JSON.stringify(cardOk));
-  const todo = await S1.ev(`document.querySelector('#main-area .hs-head h2').textContent`);
-  ok(/할 일 \d+개/.test(todo), 'A7 오늘 할 일 수에 과제가 들어감', todo);
+  const todoAfter = await (async () => { for (let i = 0; i < 30; i++) { const n = await todoNum(S1); if (n === todoBefore + 1) return n; await sleep(100); } return todoNum(S1); })();
+  ok(todoAfter === todoBefore + 1, 'A7 첫 과제가 오면 오늘 할 일 수가 하나 늘어남', `${todoBefore} → ${todoAfter}`);
   await S1.shot('A_home_card');
   //  학생1: 카드 → 과제함 창 → 넷 다 실제로 풂(정답)
   await S1.press('#main-area .asg-row');

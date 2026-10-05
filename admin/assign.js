@@ -750,7 +750,7 @@ async function assignSend() {
     await _assignRef(AssignCore.path.open(d.aid)).set({ ...def, createdAt: _assignTS() });
     notify(`📥 '${def.title}' 을(를) 과제함에 보냈어요`);
     _AS.draft = null; _AS.sel = d.aid; _assignRenderCreate(); _assignSyncResults(); _assignRenderBits(true);
-  } catch (e) { console.warn(e); notify('⚠️ 보내기가 안 됐어요 — 인터넷을 확인하고 다시 눌러 주세요(같은 과제로 다시 보내져요)', 'error'); }
+  } catch (e) { console.warn(e); notify(_asgDenied(e) ? '⚠️ 보내기가 막혔어요 — 저장 권한이 없어요(DB 규칙). 관리자에게 classRPG_assign 쓰기를 열어 달라고 해 주세요' : '⚠️ 보내기가 안 됐어요 — 인터넷을 확인하고 다시 눌러 주세요(같은 과제로 다시 보내져요)', 'error'); }
   finally { _AS.sending = false; _assignCMeta(); }
 }
 //  지금 모두 같이 — 수업 상태(live)를 transaction 으로 먼저 켜고(수업 중이 아닐 때만 — 두 관리 탭이 동시에 눌러도 하나) 정의를 쓴다
@@ -784,6 +784,9 @@ async function _assignStartLive(def, minutes, fromOpen, asked) {
     _AS.sel = def.id; _AS.mask = null;
     _assignRenderCreate(); _assignSyncResults(); _assignRenderBits(true);
     const m = document.getElementById('asg-mask'); if (m) m.checked = _assignMasked();
-  } catch (e) { console.warn(e); notify('⚠️ 수업 시작이 안 됐어요 — 인터넷을 확인해 주세요', 'error'); }
+  } catch (e) { console.warn(e); notify(_asgDenied(e) ? '⚠️ 수업 시작이 막혔어요 — 저장 권한이 없어요(DB 규칙)' : '⚠️ 수업 시작이 안 됐어요 — 인터넷을 확인해 주세요', 'error'); }
   finally { _AS.sending = false; _assignCMeta(); }
 }
+
+// [ASG-DENIED-1] DB 규칙에 막힌 것과 인터넷 끊김을 따로 말한다(리허설 때 원인을 헷갈리지 않게)
+function _asgDenied(e) { const m = String((e && (e.code || e.message)) || ''); return /permission[_ ]denied/i.test(m); }

@@ -73,7 +73,8 @@ function asgEnter() {
   }
   if (_ASG.inst.i && !_asgInboxShown()) _asgInstStop('i');
   _asgSyncCells(); _asgExcusedWatch(); _asgOutboxFlush();
-  _ASG.lastTodo = -1;
+  //  [ASG-TODO-FIRST-1] 들어올 때 지금 수로 맞춘다 — -1 이면 로그인 뒤 첫 과제 변화를 '처음 값'으로 여겨 '오늘 할 일 N개'가 안 바뀌었다
+  _ASG.lastTodo = (typeof CUR !== 'undefined' && CUR) ? assignTodoCount() : -1;
   _asgLiveSync();
 }
 
@@ -81,7 +82,9 @@ function asgEnter() {
 function _asgOnOpen() {
   const next = {};
   const raw = _ASG.openRaw && typeof _ASG.openRaw === 'object' ? _ASG.openRaw : {};
-  for (const aid of Object.keys(raw).slice(0, 40)) { const d = AssignCore.normDef(raw[aid], aid); if (d) next[aid] = d; }
+  //  [ASG-OPEN-NEWEST-1] 많을 때는 **새 과제부터** 40개 — 예전엔 키 차례 앞(오래된 것) 40개라 41번째부터 새 과제가 아이에게 안 보였다
+  const keys = Object.keys(raw).sort((a, b) => ((raw[b] && raw[b].createdAt) || 0) - ((raw[a] && raw[a].createdAt) || 0)).slice(0, 40);
+  for (const aid of keys) { const d = AssignCore.normDef(raw[aid], aid); if (d) next[aid] = d; }
   _ASG.open = next;
   for (const k of ['i', 'l']) {
     const st = _ASG.inst[k];
@@ -139,7 +142,8 @@ function _asgProgress(def) {
 //  '오늘 할 일' 수에 더하는 것 — 안 끝낸 과제
 function assignTodoCount() { return _asgMyDefs().filter(d => !_asgProgress(d).done).length; }
 function _asgCardsInner() {
-  const list = _asgMyDefs();
+  //  [ASG-CARD-MORE-1] 안 한 과제 먼저 · 같은 무리 안에서는 새 것 먼저 · 6개 넘으면 '더 보기'(예전엔 6줄에서 잘려 오래된 과제를 열 길이 없었다)
+  const list = _asgMyDefs().slice().sort((a, b) => (_asgProgress(a).done - _asgProgress(b).done) || ((b.createdAt || 0) - (a.createdAt || 0)));
   if (!list.length) return '';
   const left = list.filter(d => !_asgProgress(d).done).length;
   const row = d => {
@@ -154,9 +158,11 @@ function _asgCardsInner() {
   };
   return `<div class="today-card asg-card">
     <div class="asg-card-head">📝 선생님 과제${left ? ` · 할 것 ${left}개` : ' · 다 했어요 ✓'}</div>
-    ${list.slice(0, 6).map(row).join('')}
+    ${(_ASG.cardAll ? list : list.slice(0, 6)).map(row).join('')}
+    ${list.length > 6 ? `<button class="asg-card-more" onclick="event.stopPropagation();asgCardMore()">${_ASG.cardAll ? '접기' : `＋ ${list.length - 6}개 더 보기`}</button>` : ''}
   </div>`;
 }
+function asgCardMore() { _ASG.cardAll = !_ASG.cardAll; _asgRefreshHome(); }
 function _asgRefreshHome() {
   if (typeof document === 'undefined') return;
   const html = _asgCardsInner();
@@ -743,7 +749,7 @@ function _asgRevealHTML(st, i, cell) {
   const head = !a || a.skip ? `<div class="st-emoji">📝</div><div class="asg-fb-title">이 문제는 못 냈어요</div>`
     : `<div class="st-emoji ${a.ok ? '' : 'wrong'}">${a.ok ? '🎉' : '🤔'}</div><div class="asg-fb-title ${a.ok ? 'ok' : 'no'}">${a.ok ? '맞았어요!' : '아쉬워요'}</div>`;
   return `<div class="st-center asg-center">${head}
-    <div class="asg-fb-box">${a && !a.skip ? `<span>내 답</span><div class="asg-fb-mine">${_asgAnsLabel(def, i, a)}${late ? ' <small>(공개 뒤에 닿았어요)</small>' : ''}</div>` : ''}
+    <div class="asg-fb-box">${a && !a.skip ? `<span>내 답</span><div class="asg-fb-mine">${_asgAnsLabel(def, i, a)}${late ? ' <small>(정답을 본 뒤에 냈어요)</small>' : ''}</div>` : ''}
       <span>정답</span><div class="asg-fb-ans">${_asgCorrectLabel(it)}</div>
       ${it.hint ? `<div class="asg-fb-hint">💡 ${escHtml(it.hint)}</div>` : ''}</div>
     <div class="asg-fb-sub">선생님과 이야기해 봐요 · 다음 문제는 선생님이 열어요</div></div>`;
