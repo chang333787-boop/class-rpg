@@ -33,6 +33,9 @@
 - [thinkboard_story_design.md](thinkboard_story_design.md) — 생각판 이야기 줄 · 나무 `thinkboard/`
 - [learning_platform_research_20260731.md](learning_platform_research_20260731.md) — 학습 플랫폼 설계 연구(바탕 자료)
 
+### 수업 · 과제
+- [class_assign_design.md](class_assign_design.md) — 과제 · 수업(선생님이 문제 묶음 · 기초 코딩 · 리듬을 과제함 또는 '지금 모두 같이'로 보내고 반 결과 · TV 로 본다) 설계 정본 · 2026-10-04 설계만 · 갈래 `feat/class-assign`
+
 ### 밸런스 · 경제
 - [rpg_balance_model.md](rpg_balance_model.md) — 밸런스 모델 정본(B-1). 빠른 검사 = `scripts/balance/`(precheck 에 들어 있음)
 

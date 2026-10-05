@@ -18,7 +18,7 @@ const DIAT = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
 //  [MUSIC-LEVEL-2] 화음 음표(두 키 같이 · 테두리 음표)는 뺐다 — 사용자 10-03 '누르면 안 되는 걸로 낚시하는 것 같아 너무 빡세다'.
 //   테두리만 있는 음표가 미끼처럼 보였다. 이제 어려움은 '더 빠르고 · 더 정확하게'로만 오른다(악보는 가락 그대로).
 //  [MUSIC-6KEY-1] lanes = 그 난이도의 기본 키 수. 키 수(4 · 6 · 8)는 따로 고를 수 있다(사용자 10-03 '6키짜리도') — 안 고르면 기본 그대로
-const LEVELS = {
+export const LEVELS = {
   easy:   { name: '쉬움', lanes: 4, win: { perfect: 0.075, great: 0.13, good: 0.2 }, tempo: 1, hide: false },
   normal: { name: '보통', lanes: 8, win: { perfect: 0.055, great: 0.105, good: 0.16 }, tempo: 1, hide: false },
   hard:   { name: '어려움', lanes: 8, win: { perfect: 0.042, great: 0.085, good: 0.13 }, tempo: 1.1, hide: false },
@@ -28,10 +28,13 @@ const LANE8_P = [60, 62, 64, 65, 67, 69, 71, 72];
 const JUDGE = { perfect: { ko: '완벽!', w: 1, c: '#ffe48f' }, great: { ko: '좋아!', w: 0.7, c: '#8fd07d' }, good: { ko: '괜찮아', w: 0.4, c: '#7fc4f0' }, miss: { ko: '놓쳤어', w: 0, c: '#e5484d' } };
 const SPEEDS = [[300, '음표 느리게'], [420, '음표 보통'], [560, '음표 빠르게']];   // 떨어지는 빠르기 — 난이도 '보통'과 헷갈리지 않게 '음표'를 앞에
 
-export function mountRhythm(root, ctx, { song, key }) {
-  let level = LEVELS[lsGet('music.rlevel', 'normal')] ? lsGet('music.rlevel', 'normal') : 'normal';
-  let keysPick = [4, 6, 8].includes(lsGet('music.rkeys', 0)) ? lsGet('music.rkeys', 0) : 0;   // [MUSIC-6KEY-1] 0 = 난이도 기본
-  let lanes = keysPick || LEVELS[level].lanes, WIN = LEVELS[level].win, pxSec = lsGet('music.rspeed', 420), guide = false, tempo = 1;
+//  assign = 선생님 과제일 때(app.js) { level, keys, tempo, live, send(res) → Promise<'ok'|'closed'|'fail'> } [ASSIGN-MUSIC-1]
+//   — 난이도 · 키 수 · 빠르기는 선생님 것(아이 기기 설정을 읽지도 쓰지도 않음) · 우리 반 최고 판 숨김(순위 없음) · 끝나면 결과를 선생님께
+export function mountRhythm(root, ctx, { song, key, assign = null }) {
+  const A = assign;
+  let level = A ? (LEVELS[A.level] ? A.level : 'easy') : LEVELS[lsGet('music.rlevel', 'normal')] ? lsGet('music.rlevel', 'normal') : 'normal';
+  let keysPick = A ? ([4, 6, 8].includes(A.keys) ? A.keys : 0) : [4, 6, 8].includes(lsGet('music.rkeys', 0)) ? lsGet('music.rkeys', 0) : 0;   // [MUSIC-6KEY-1] 0 = 난이도 기본
+  let lanes = keysPick || LEVELS[level].lanes, WIN = LEVELS[level].win, pxSec = lsGet('music.rspeed', 420), guide = false, tempo = A && A.tempo === 0.8 ? 0.8 : 1;
   const effTempo = () => tempo * LEVELS[level].tempo;
   //  기록은 난이도마다 따로(보통 = 예전 기록 그대로) · 키 수가 그 난이도의 기본과 다르면 키 수마다 따로(예전 짝은 예전 기록 그대로)
   const levelKey = () => (level === 'normal' ? key : key + '__' + level) + (lanes === LEVELS[level].lanes ? '' : '__' + lanes + 'k');
@@ -73,7 +76,11 @@ export function mountRhythm(root, ctx, { song, key }) {
   }
   const laneColor = i => lanes === 8 ? LANE8_COLOR[i] : lanes === 6 ? (six[i].length ? colorOf(six[i][0]) : '#6b5a48') : LANE4_COLOR[i];
   const laneName = i => lanes === 8 ? LANE8[i] : lanes === 6 ? six[i].map(p => solfege(p, { short: six[i].length > 1 })).join('·') : '';
-  const top = ctx.topBar('리듬 게임 · ' + (song.title || '곡'), {
+  //  과제: 고르기 칸 대신 '선생님이 정한 판' 칩(뒤로 단추 없음 — 과제 창은 RPG 의 ✕ 로 닫는다 · 수업이면 선생님이 끝낸다)
+  const setChip = () => h('span', { class: 'r-asg-chip', title: '선생님이 정한 판이에요' }, `👩‍🏫 ${LEVELS[level].name} · ${lanes}키${tempo !== 1 ? ' · 조금 느리게' : ''}`);
+  const top = A ? ctx.topBar((A.live ? '선생님과 리듬 · ' : '선생님 과제 · ') + (song.title || '곡'), {
+    right: [setChip(), sel([...SPEEDS, [700, '음표 아주 빠르게']], pxSec, v => { pxSec = +v; lsSet('music.rspeed', pxSec); draw(); })],
+  }) : ctx.topBar('리듬 게임 · ' + (song.title || '곡'), {
     back: () => ctx.go('#/pick/rhythm'),
     right: [sel(Object.entries(LEVELS).map(([k, v]) => [k, v.name]), level, v => { level = v; lsSet('music.rlevel', v); if (!keysPick) lanes = LEVELS[v].lanes; WIN = LEVELS[v].win; refresh(); }),
       keySel = sel([[4, '4키'], [6, '6키'], [8, '8키 · 건반']], lanes, v => { keysPick = +v; lsSet('music.rkeys', keysPick); lanes = keysPick; refresh(); }),   // [MUSIC-6KEY-1]
@@ -239,7 +246,10 @@ export function mountRhythm(root, ctx, { song, key }) {
 
   // ── 흐름 ──
   function loop() { if (state !== 'play') return; sweep(now()); draw(); raf = requestAnimationFrame(loop); }
+  //  [ASSIGN-MUSIC-1 · 검토 반영] 수업 덮개로 멈춘 판은 그 판을 버린다(소리와 박자가 묶여 이어 치기 어려움) — 준비 화면에 까닭 한 줄
+  let pausedByClass = false;
   function start() {
+    pausedByClass = false;
     engine.ensure(); engine.setReverb(0.1);
     makeChart(); held = {}; fx = []; judgeShow = null;
     built = buildEvents(song, { scale: effTempo(), countIn: song.beats, melody: guide, harm: guide });
@@ -264,13 +274,25 @@ export function mountRhythm(root, ctx, { song, key }) {
       h('p', {}, `정확도 ${acc}% · 최대 콤보 ${stats.maxCombo}`),
       h('p', { class: 'muted' }, ['perfect', 'great', 'good', 'miss'].map(k => `${JUDGE[k].ko} ${stats[k]}`).join(' · ')),
       tops,
-      h('div', { class: 'stars-row' }, h('button', { class: 'btn primary', onclick: () => start() }, '다시 하기'), h('button', { class: 'btn', onclick: () => ctx.go('#/pick/rhythm') }, '다른 곡'))));
+      h('div', { class: 'stars-row' }, h('button', { class: 'btn primary', onclick: () => start() }, '다시 하기'), A ? null : h('button', { class: 'btn', onclick: () => ctx.go('#/pick/rhythm') }, '다른 곡'))));
+    if (A) { sendAssign(res, tops); return; }
     try {
       const r = await ctx.store.saveRhythm(levelKey(), res);
       const list = await ctx.store.topRhythm(levelKey(), 3);
       tops.replaceChildren(r.newBest ? h('p', { class: 'newbest' }, r.prev ? `새 최고 기록! (전 ${r.prev.toLocaleString()})` : '첫 기록!') : h('p', { class: 'muted' }, '내 최고 기록은 그대로예요'),
         list.length ? h('div', { class: 'r-board' }, h('b', {}, `이 곡 우리 반 최고 · ${LEVELS[level].name} · ${lanes}키`), ...list.map((x, i) => h('span', {}, `${i + 1}. ${x.n || '친구'} ${Number(x.best).toLocaleString()} (${x.grade})`))) : null);
     } catch (e) { console.warn(e); tops.replaceChildren(h('p', { class: 'muted' }, '기록을 저장하지 못했어요')); }
+  }
+  //  [ASSIGN-MUSIC-1] 과제 — 결과는 선생님께(우리 반 최고 판은 안 보임) · 내 최고 기록은 원래 빠르기일 때만 원래 자리에(조금 느리게 판은 섞지 않음)
+  async function sendAssign(res, tops) {
+    const hit = stats.perfect + stats.great + stats.good;
+    tops.replaceChildren(h('span', { class: 'muted' }, '선생님께 보내는 중…'));
+    let r = 'fail';
+    try { r = await A.send({ ...res, perfect: stats.perfect, great: stats.great, good: stats.good, miss: stats.miss }); } catch (e) { console.warn(e); }
+    const msg = r === 'ok' ? (hit ? '선생님께 보냈어요 ✓' : '선생님께 보냈어요 — 음표를 하나도 못 쳐서 아직 \'끝\'은 아니에요')
+      : r === 'closed' ? '선생님이 과제를 닫아서 보내지 못했어요' : '보내지 못했어요 — 인터넷을 확인하고 한 번 더 쳐 봐요';
+    tops.replaceChildren(h('p', { class: r === 'ok' ? 'newbest' : 'muted' }, msg), A.live ? h('p', { class: 'muted' }, '더 쳐도 돼요 · 가장 좋은 기록이 남아요 · 선생님이 끝낼 때까지 기다려요') : null);
+    if (tempo === 1 && hit) ctx.store.saveRhythm(levelKey(), res).catch(() => {});
   }
   function showReady() {
     over.style.display = 'grid';
@@ -282,6 +304,9 @@ export function mountRhythm(root, ctx, { song, key }) {
         : lanes === 6 ? '6키: 왼손 S D F · 오른손 J K L — 이 곡의 음을 낮은 음부터 왼쪽에 놓았어요(키 아래 계이름)' + (distinct.length > 6 ? ' · 음이 여섯보다 많아 이웃한 음이 한 키를 같이 써요' : '')
         : '4키: D F J K — 가락이 올라가면 오른쪽, 내려가면 왼쪽'),
       h('p', { class: 'muted' }, '길게 이어진 음표는 끝까지 누르고 있어요. 화면을 눌러서 칠 수도 있어요.'),
+      A ? h('p', { class: 'r-asg-note' }, A.live ? '👩‍🏫 선생님과 수업 중 — 끝까지 치면 결과가 선생님께 가요. 여러 번 쳐도 돼요.' : '📝 선생님 과제 — 끝까지 치면 결과가 선생님께 가요. 여러 번 쳐도 가장 좋은 기록이 남아요.') : null,
+      A && A.line && A.line() ? h('p', { class: 'muted small' }, A.line()) : null,
+      pausedByClass ? h('p', { class: 'r-asg-note' }, '⏸ 선생님과 수업 때문에 치던 판이 멈췄어요 — ▶ 시작을 눌러 처음부터 다시 쳐요') : null,
       h('div', { class: 'stars-row' }, guideBtn),
       h('button', { class: 'btn primary big', onclick: () => start() }, '▶ 시작'),
       h('p', { class: 'muted small' }, 'Esc = 그만')));
@@ -306,5 +331,5 @@ export function mountRhythm(root, ctx, { song, key }) {
   makeChart(); showReady(); size();
   cheer.onload = () => draw();
   if (/[?&]debug=1/.test(location.search)) window.__rhythm = { chart: () => chart, now, press, release, stats: () => stats, start, state: () => state, setLevel: v => { level = v; if (!keysPick) lanes = LEVELS[v].lanes; WIN = LEVELS[v].win; makeChart(); }, setKeys: n => { keysPick = n; lanes = n; makeChart(); }, layout: () => ({ lanes, six, key: levelKey() }) };   // 시험용(주소에 debug=1 일 때만)
-  return { unmount() { player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp); ro.disconnect(); for (const c of chart) c.voice && c.voice.stop(); } };
+  return { pause() { if (state === 'play') { pausedByClass = true; stop(); } }, unmount() { player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp); ro.disconnect(); for (const c of chart) c.voice && c.voice.stop(); } };
 }

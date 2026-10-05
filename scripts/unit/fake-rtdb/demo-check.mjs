@@ -280,7 +280,7 @@ try {
   ok(await until('teacher', `_AS.live.phase === 'summary'`, 5000) && await until('a', `!!document.querySelector('#asgl-body .asg-score')`, 5000), '2-7 [정리 ▶] → 학생 정리 화면(점수)');
   await shot('13_live_summary');
   const aid2 = await ev('teacher', `_AS.live.aid`);
-  await press('teacher', `#asg-live .btn-sm.danger[onclick="assignLiveEnd(false)"]`);
+  await press('teacher', `#asg-live .btn-sm.danger[onclick^="assignLiveEnd("]`);   // [끝내기] — '못 한 아이는 과제함으로' 칸(기본 켬)을 따름 · 둘 다 다 해서 닫힘 [ASSIGN-END-INBOX-2]
   ok(await until('teacher', `!_AS.live.on`, 6000), '2-8 [끝내기] → 수업 꺼짐');
   const unc = await Promise.all(['a', 'b'].map(k => until(k, `!classLiveIsOpen() && getComputedStyle(document.getElementById('class-live')).display === 'none'`, 6000)));
   await sleep(600);
@@ -288,7 +288,10 @@ try {
   const backB = await ev('b', `({ if: _ifMode, fs: document.getElementById('interior-fullscreen').style.display })`);
   ok(unc.every(Boolean) && backA.same && backA.cur === 1 && backA.open && backB.if === true && backB.fs !== 'none', '2-9 덮개 걷힘 → A 풀던 학습 2번째 문제 그대로 · B 꾸미기 그대로', JSON.stringify({ unc, backA, backB }));
   await shot('14_after_live_back');
-  ok(Object.keys(db(`classRPG_assign/results/${aid2}`) || {}).sort().join() === 's1,s2' && !!db(`classRPG_assign/archive/${aid2}`), '2-10 서버: 결과 칸 A · B · 수업 과제는 닫은 과제로');
+  //  [ASSIGN-END-INBOX-2] 보스 결정(10-05) '못 한 아이는 과제함으로 남기기' 기본 켬 — 반 다섯 중 셋(구름 · 별님 · 나무)이 안 했으니 과제함으로 남음
+  const o210 = db(`classRPG_assign/open/${aid2}`) || {};
+  ok(Object.keys(db(`classRPG_assign/results/${aid2}`) || {}).sort().join() === 's1,s2' && o210.deliver === 'inbox' && o210.fromLive === true && !db(`classRPG_assign/archive/${aid2}`),
+    '2-10 서버: 결과 칸 A · B · 못 한 아이 셋이 있어 수업 과제는 과제함으로 남음(기본 켬)', JSON.stringify({ deliver: o210.deliver, fromLive: o210.fromLive }));
   //  다음 단계를 위해 하던 창을 닫고 홈으로(아이가 닫는 것과 같음)
   await ev('a', `closeStudyModal(); 1`);
   await ev('b', `closeInteriorFullscreen(); closeModal('m-house'); 1`);
