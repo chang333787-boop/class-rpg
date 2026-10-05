@@ -2809,7 +2809,11 @@ const CurriculumUtils = {
       const fm = this.fractionMatch(problem, userAnswer);
       if (fm === 'exact' || (fm === 'equal' && !FRACTION_REQUIRE_MIXED)) return true;
     }
-    const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, '');
+    //  [CHOICE-SPACING-1] 고르기 문항은 띄어쓰기를 지켜 비교한다(여러 칸 → 한 칸만 맞춤). 예전엔 공백을 모두 지워
+    //   '할 수 있다' 정답에 '할수 있다'·'할수있다'(오답 보기)도 맞다고 셌다 — 국어 띄어쓰기 16문항 오답 43개.
+    const norm = problem.type === 'choice'
+      ? v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ')
+      : v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, '');
     let ua = norm(userAnswer);
     if (!ua) return false;
     if (ua === norm(problem.a)) return true;
