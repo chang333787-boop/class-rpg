@@ -1,5 +1,5 @@
 // 저장소 — 학급 RPG 와 같은 Firebase RTDB(compat 9.23)의 classRPG_coding 아래만 쓴다(음악실 classRPG_music 과 같은 꼴).
-//  RPG 본 데이터(classRPG_v3)는 읽지도 쓰지도 않는다(선생님 화면의 관리자 비밀번호 확인용 classRPG_adminPw 한 번 읽기만 예외).
+//  RPG 본 데이터(classRPG_v3)는 쓰지 않는다 — 읽기는 선생님 화면의 반 명단 classRPG_v3/students 하나(id · 이름만 · common/roster.js 가 store.db 로) [APP-ROSTER-1]. 관리자 비밀번호 확인용 classRPG_adminPw 한 번 읽기도 선생님 화면만.
 //  progress/<sid>/<판>  = 가장 좋은 기록 { n 블록 수, st 별, t 때 }  — 풀었을 때만
 //  stats/<sid>/<판>     = 셈 { tries 실행 수, ok 성공 수, wall · water · edge · tree · land · noacorn · short · acorns · loop · draw · empty 실패 까닭별 }
 //  code/<sid>/<판>      = 마지막 코드 { j Blockly 저장 꼴(글) , t }  — 이어서 하기 · 선생님이 코드 보기
@@ -21,7 +21,7 @@ function rtdbStore(fb, sid, name) {
   const db = rpgDb(fb), root = db.ref(ROOT), inc = n => fb.database.ServerValue.increment(n);
   let mine = null;
   const st = {
-    me: { sid, name: name || '', guest: false }, online: true,
+    me: { sid, name: name || '', guest: false }, online: true, db,   // db = 선생님 화면 반 명단 읽기(common/roster.js) [APP-ROSTER-1]
     async progress() { if (!mine) mine = (await root.child('progress/' + sid).once('value')).val() || {}; return mine; },
     // 한 번 실행한 결과 — 셈은 늘 · 기록은 더 좋을 때만 · 이름도 같이(선생님 표)
     async saveRun(stage, { ok, why, n, stars }) {

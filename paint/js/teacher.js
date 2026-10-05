@@ -2,6 +2,7 @@
 //  관리자 비밀번호로 연다(무늬 공방 · 기초 코딩과 같은 방식). 쓰는 것 없음(읽기만).
 import { h, modal } from './util.js';
 import { teacherGate } from '../../common/teacher-gate.js';
+import { rosterFor, rosterNames, rosterRows, idleRow } from '../../common/roster.js';   // 반 명단 — 안 한 아이도 회색 줄 [APP-ROSTER-1]
 import { ST, CHAPTERS } from './stages.js';
 import { mosaicEl } from './feel.js';
 //  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
@@ -18,13 +19,15 @@ export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
   root.replaceChildren(ctx.topBar('물감 연구소 · 헷갈림 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
-  const { progress, stats, names, feel = {} } = await ctx.store.all();
+  const [{ progress, stats, names: names0, feel = {} }, roster] = await Promise.all([ctx.store.all(), rosterFor(ctx.store)]);
+  const names = rosterNames(names0, roster);
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));
+  const { rows, idle } = rosterRows(kids, roster);   // 기록 있는 아이(이름 차례) 뒤에 명단에만 있는 아이 [APP-ROSTER-1]
   const feelSec = () => h('div', { class: 'tfeel' }, h('h3', {}, '느낌의 색 — 우리 반 모자이크'),
     ...FEEL.map(s => h('div', { class: 'tfeel-one' }, h('b', {}, `${s.id} ${s.title}`), mosaicEl(feel[s.id] || {}, names, { showNames: true }))),
     h('p', { class: 'muted small' }, '정답이 없는 판이에요. 같은 장면을 왜 다른 색으로 느꼈는지 — 고른 까닭 칩(밝아서 · 따뜻해서 …)으로 이야기 나누기 좋아요.'));
-  if (!kids.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 풀지 않았어요.'), feelSec()); return { unmount() {} }; }
+  if (!rows.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 풀지 않았어요.'), feelSec()); return { unmount() {} }; }
   const st = (k, s) => ((stats[k] || {})[s.id]) || {}, pg = (k, s) => (progress[k] || {})[s.id];
   const mkOf = k => { const o = {}; SCORED.forEach(s => MK.forEach(m => { o[m] = (o[m] || 0) + (st(k, s)[m] || 0); })); return o; };
   const topMk = o => Object.entries(o).filter(([, n]) => n).sort((a, z) => z[1] - a[1]);
@@ -45,13 +48,13 @@ export async function mountTeacher(root, ctx) {
       h('p', { class: 'muted' }, MK.filter(m => t[m]).map(m => `${MISTAKES[m]} ${t[m]}`).join(' · ') || '헷갈림 기록 없음')));
   }
   box.replaceChildren(...[
-    h('p', { class: 'muted', style: { margin: '0 0 10px' } }, `아이 ${kids.length}명 · 칸: ★ = 푼 판(별 수 · 옆 동그라미 = 아이가 만든 색) · 숫자 = 아직 못 푼 판에 답한 수 · ✓ = 느낌의 색을 붙임. 오른쪽 끝 = 그 아이가 가장 많이 헷갈린 것.`),
+    h('p', { class: 'muted', style: { margin: '0 0 10px' } }, `아이 ${kids.length}명${idle.size ? ` · 아직 안 한 아이 ${idle.size}명(회색 줄)` : ''} · 칸: ★ = 푼 판(별 수 · 옆 동그라미 = 아이가 만든 색) · 숫자 = 아직 못 푼 판에 답한 수 · ✓ = 느낌의 색을 붙임. 오른쪽 끝 = 그 아이가 가장 많이 헷갈린 것.`),
     cls.length ? h('div', { class: 'hard' }, h('b', {}, '우리 반이 많이 헷갈린 것'), ...cls.map(([m, n]) => h('span', {}, `${MISTAKES[m]} ${n}번`))) : null,
     h('div', { class: 'tscroll' }, h('table', { class: 'tmap' },
       h('thead', {},
         h('tr', {}, h('th', { rowspan: 2 }, '이름'), ...CHAPTERS.map(c => h('th', { colspan: ST.filter(s => s.ch === c.id).length, class: 'u' }, `${c.id}장 ${c.title}`)), h('th', { rowspan: 2 }, '많이 헷갈린 것')),
         h('tr', {}, ...ST.map(s => h('th', { title: s.title }, s.id)))),
-      h('tbody', {}, ...kids.map(k => { const top = topMk(mkOf(k))[0]; return h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...ST.map(s => cell(k, s)), h('td', { class: 'mk' }, top ? `${MISTAKES[top[0]]} ${top[1]}` : '—')); })))),
+      h('tbody', {}, ...rows.map(k => { if (idle.has(k)) return idleRow(names[k] || k, ST.length + 1); const top = topMk(mkOf(k))[0]; return h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...ST.map(s => cell(k, s)), h('td', { class: 'mk' }, top ? `${MISTAKES[top[0]]} ${top[1]}` : '—')); })))),
     h('p', { class: 'muted small', style: { margin: '8px 2px 0' } }, '밝기가 다름 = 흰색 · 검정 양 · 선명함이 다름 = 섞은 가짓수(보색 · 흰색 · 검정) · 색깔이 다름 = 두 색의 비율. 숫자는 그 판에서 ‘이 색으로 할래요’를 눌렀다가 안 맞은 횟수예요.'),
     feelSec(),
   ].filter(Boolean));

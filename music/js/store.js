@@ -1,5 +1,5 @@
 // 저장소 — 학급 RPG 와 같은 Firebase RTDB(compat 9.23)의 classRPG_music 아래만 쓴다.
-//  RPG 본 데이터(classRPG_v3)는 읽지도 쓰지도 않는다(선생님 화면에서 관리자 비밀번호 확인용 classRPG_adminPw 한 번 읽기만 예외).
+//  RPG 본 데이터(classRPG_v3)는 쓰지 않는다 — 읽기는 선생님 화면의 반 명단 classRPG_v3/students 하나(id · 이름만 · common/roster.js 가 store.db 로) [APP-ROSTER-1]. 관리자 비밀번호 확인용 classRPG_adminPw 한 번 읽기도 선생님 화면만.
 //  songs/<sid>/<곡id>        = 곡 전체
 //  songlog/<sid>/<곡id>/<때> = 저장할 때마다 한 줄 { ev new|save, nn 음 수, bars, pub } — 지우지 않고 쌓는다(만든 과정)
 //  concert/<sid>_<곡id>      = 우리 반 음악회 목록 한 줄 { sid, n 이름, t 제목, u 고친 때, beats, sub, bars, scale, hide }

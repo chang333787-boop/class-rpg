@@ -2,6 +2,7 @@
 //  칸을 누르면 그 아이의 마지막 코드(글 코드)와 실수 셈. 관리자 비밀번호로 연다(음악실 · 생각판과 같은 방식). 쓰는 것 0.
 import { h, modal } from './util.js';
 import { teacherGate } from '../../common/teacher-gate.js';
+import { rosterFor, rosterNames, rosterRows, idleRow } from '../../common/roster.js';   // 반 명단 — 안 한 아이도 회색 줄 [APP-ROSTER-1]
 import { STAGES, UNITS } from './stages.js';
 import { defineAll, pythonOf } from './blocks.js';
 //  [UX-TRIM-G4] 성취기준 · 교과 근거 — 아이 첫 화면 바닥글에서 선생님 화면으로 옮겼다(아이 화면엔 쉬운 말 한 줄)
@@ -17,10 +18,12 @@ export async function mountTeacher(root, ctx) {
   if (!(await gate(ctx))) { ctx.go('#/'); return { unmount() {} }; }
   const box = h('div', { class: 'teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
   root.replaceChildren(ctx.topBar('기초 코딩 · 막힘 지도', { back: '#/' }), h('div', { class: 'view' }, h('p', { class: 'muted small std', style: { margin: '12px 18px 0' } }, STD), box));
-  const { progress, stats, names } = await ctx.store.all();
+  const [{ progress, stats, names: names0 }, roster] = await Promise.all([ctx.store.all(), rosterFor(ctx.store)]);
+  const names = rosterNames(names0, roster);
   const kids = [...new Set([...Object.keys(progress), ...Object.keys(stats)])].filter(k => k !== 'teacher')
     .sort((a, z) => String(names[a] || a).localeCompare(String(names[z] || z), 'ko'));
-  if (!kids.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 풀지 않았어요.')); return { unmount() {} }; }
+  const { rows, idle } = rosterRows(kids, roster);   // 기록 있는 아이(이름 차례) 뒤에 명단에만 있는 아이 [APP-ROSTER-1]
+  if (!rows.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 풀지 않았어요.')); return { unmount() {} }; }
   const st = (k, s) => ((stats[k] || {})[s.id]) || {}, pg = (k, s) => (progress[k] || {})[s.id];
   const stuck = (k, s) => !pg(k, s) && (st(k, s).tries || 0) >= 5;
   // 판마다 — 푼 아이 · 막힌 아이 · 가장 많은 실수
@@ -46,13 +49,13 @@ export async function mountTeacher(root, ctx) {
       h('pre', { class: 'py' }, code || '(저장된 코드 없음)')), [{ label: '닫기', primary: true }], { wide: true });
   }
   box.replaceChildren(...[
-    h('p', { class: 'muted', style: { margin: '0 0 10px' } }, `아이 ${kids.length}명 · 칸: ★ = 푼 판(별 수) · 숫자 = 아직 못 푼 판의 실행 횟수 · 빨강 = 5번 넘게 해도 못 푼 판(막힘). 칸을 누르면 그 아이의 마지막 코드.`),
+    h('p', { class: 'muted', style: { margin: '0 0 10px' } }, `아이 ${kids.length}명${idle.size ? ` · 아직 안 한 아이 ${idle.size}명(회색 줄)` : ''} · 칸: ★ = 푼 판(별 수) · 숫자 = 아직 못 푼 판의 실행 횟수 · 빨강 = 5번 넘게 해도 못 푼 판(막힘). 칸을 누르면 그 아이의 마지막 코드.`),
     hard.length ? h('div', { class: 'hard' }, h('b', {}, '많이 막힌 판'), ...hard.map(p => h('span', {}, `${p.s.id} ${p.s.title} — ${p.stuckN}명${p.top ? ' · 많은 실수: ' + WHY_KO[p.top] : ''}`))) : null,
     h('div', { class: 'tscroll' }, h('table', { class: 'tmap' },
       h('thead', {},
         h('tr', {}, h('th', { rowspan: 2 }, '이름'), ...UNITS.filter(u => u.open).map(u => h('th', { colspan: STAGES.filter(s => s.unit === u.id).length, class: 'u' }, `${u.id}단원 ${u.title}`)), h('th', { rowspan: 2 }, '푼 판')),
         h('tr', {}, ...STAGES.map(s => h('th', { class: 'sid', title: s.title }, s.id)))),
-      h('tbody', {}, ...kids.map(k => h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...STAGES.map(s => cell(k, s)), h('td', { class: 'sum' }, String(STAGES.filter(s => pg(k, s)).length))))),
+      h('tbody', {}, ...rows.map(k => idle.has(k) ? idleRow(names[k] || k, STAGES.length + 1) : h('tr', {}, h('td', { class: 'nm' }, names[k] || k), ...STAGES.map(s => cell(k, s)), h('td', { class: 'sum' }, String(STAGES.filter(s => pg(k, s)).length))))),
       h('tfoot', {}, h('tr', {}, h('td', { class: 'nm' }, '푼 아이'), ...per.map(p => h('td', { class: 'c foot' + (p.stuckN ? ' warn' : ''), title: p.top ? '많은 실수: ' + WHY_KO[p.top] : '' }, String(p.solved))), h('td', {}, ''))))),
   ].filter(Boolean));
   return { unmount() {} };
