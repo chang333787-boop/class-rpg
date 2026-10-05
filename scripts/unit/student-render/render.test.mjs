@@ -392,6 +392,24 @@ check('수업 덮개: 열면 밑의 학습 세션 · 학습 앱 창을 안 건�
   if (STUDY_SESSION !== ss || STUDY_SESSION.cur !== 0) return '학습 세션이 바뀜';
   return true;
 })()`, 'assign-live'));
+check('하위 앱 결과: 부모가 쓰기를 넣자마자 받음(ack) — 서버 확인을 안 기다림(느린 와이파이에서 앱이 직접 또 써 실행 수가 두 번 오르던 것) [ASSIGN-ACK-1]', () => run(`(function () {
+  const def = AssignCore.normDef({ id: 'aAck1', kind: 'coding', title: '코딩 과제', content: { coding: { stages: ['2-1'] } }, createdAt: 3 }, 'aAck1');
+  if (!def) return '정의';
+  const realDb = _ASG.db, ups = [];
+  _ASG.open.aAck1 = def; _ASG.cells.aAck1 = { startedAt: 1 }; _ASG.sid = CUR.id;
+  _ASG.db = { ref: () => ({ update: (u) => { ups.push(u); return new Promise(() => {}); } }) };   // 서버가 끝내 확인을 안 줌
+  try {
+    const acks = [];
+    _asgApplyReport({ aid: 'aAck1', patch: { attempt: true } }, ok => acks.push(ok));
+    if (ups.length !== 1) return '쓰기 ' + ups.length;
+    if (JSON.stringify(acks) !== '[true]') return '바로 받음이 아님 ' + JSON.stringify(acks);
+    _ASG.db = { ref: () => ({ update: () => { throw new Error('bad path'); } }) };
+    const acks2 = []; _asgApplyReport({ aid: 'aAck1', patch: { attempt: true } }, ok => acks2.push(ok));
+    if (JSON.stringify(acks2) !== '[false]') return '쓰기 실패인데 ' + JSON.stringify(acks2);
+    const acks3 = []; _asgApplyReport({ aid: 'nope1', patch: { attempt: true } }, ok => acks3.push(ok));
+    return JSON.stringify(acks3) === '[false]' ? true : '없는 과제인데 ' + JSON.stringify(acks3);
+  } finally { _ASG.db = realDb; delete _ASG.open.aAck1; delete _ASG.cells.aAck1; }
+})()`, 'assign-ack'));
 check('싣기·그리기 중 console.error · 약속 거절 0', () => (errors.length ? errors.slice(0, 5).join(' / ') : true));
 
 process.off('unhandledRejection', onRej);

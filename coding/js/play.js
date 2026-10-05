@@ -21,6 +21,8 @@ export async function mountPlay(root, ctx, stage) {
   const Bk = globalThis.Blockly;
   const hero = HEROES[stage.hero], unit = UNITS.find(u => u.id === stage.unit);
   const list = stagesOf(stage.unit), idx = list.indexOf(stage), next = list[idx + 1] || null;
+  //  [ASSIGN-CODING-1] 선생님 과제 판이면 이긴 카드의 '다음'은 과제의 다음 판(null = 과제 목록으로 · undefined = 과제 밖 판이라 보통 다음 판)
+  const asgNext = ctx.nextOf ? ctx.nextOf(stage.id) : undefined;
   const isGame = !!stage.game;
   let game = null, q = [], busy = false, tickT = 0, manual = false;   // [CODING-U9] 게임 — 일 줄(키 · 똑딱) · 지금 묶음이 도는 중 · 똑딱 시계 · 시험용 손 시계
   let speed = lsGet('coding.speed', 'normal'), running = false, gen = null, world = null, view = null, raf = 0, failN = 0, pyOpen = lsGet('coding.py', false), saveT = 0, alive = true;
@@ -66,7 +68,7 @@ export async function mountPlay(root, ctx, stage) {
   }
   const ctrl = h('div', { class: 'ctrl' }, runBtn, isGame ? null : stepBtn, resetBtn, speedSel, h('span', { class: 'sp' }), pad, hintBtn, bugBtn);
   root.replaceChildren(
-    ctx.topBar(`${stage.id} · ${stage.title}`, { back: '#/', right: [h('span', { class: 'chip c-unit' }, `${unit.id}단원 ${unit.title}`), h('span', { class: 'chip' }, hero.name)] }),
+    ctx.topBar(`${stage.id} · ${stage.title}`, { back: '#/', right: [ctx.assignChip ? ctx.assignChip(stage.id) : null, h('span', { class: 'chip c-unit' }, `${unit.id}단원 ${unit.title}`), h('span', { class: 'chip' }, hero.name)] }),
     h('div', { class: 'play' },
       h('section', { class: 'world' },
         h('div', { class: 'story' }, heroPic, h('div', {}, h('b', {}, stage.title), h('p', {}, stage.story))),
@@ -130,6 +132,7 @@ export async function mountPlay(root, ctx, stage) {
     countEl.classList.toggle('over', !!stage.limit && n > stage.limit);
   }
   function updatePy() { if (pyOpen) pyPre.textContent = pythonOf(ws) || '# ‘시작하면’ 아래에 블록을 이어요'; }
+  const pyNow = () => { try { return pythonOf(ws) || ''; } catch (e) { return ''; } };   // [ASSIGN-CODING-1] 선생님 결과 표의 '마지막 코드'
 
   // ── 세계 ──
   function fresh(i = mi) {
@@ -292,6 +295,7 @@ export async function mountPlay(root, ctx, stage) {
     highlight(null);
     const stars = starsOf(n, stage.best);
     say(`🎉 성공! ${STAR(stars)} · 블록 ${n}개${maps ? ' · 길 ' + maps.length + '개 모두' : ''}`, 'good');
+    ctx.onRun && ctx.onRun(stage.id, { ok: true, n, stars }, pyNow());   // [ASSIGN-CODING-1] 선생님 과제 판이면 결과를 보낸다
     try { await ctx.store.saveRun(stage.id, { ok: true, n, stars }); } catch (e) { console.warn(e); }
     ctx.onProgress && ctx.onProgress();
     over.style.display = 'grid';
@@ -302,7 +306,8 @@ export async function mountPlay(root, ctx, stage) {
       h('p', {}, (isGame ? `게임 완성! 블록 ${n}개로 만들었어요.` : `블록 ${n}개로 풀었어요.`) + (maps ? ` 같은 코드로 길 ${maps.length}개를 다 갔어요.` : '') + (n > stage.best ? ` 블록 ${stage.best}개로도 풀 수 있어요 — 더 줄여 볼래요?` : ' 가장 짧은 코드예요!')),
       h('div', { class: 'row' },
         h('button', { class: 'btn', onclick: () => { over.style.display = 'none'; reset(); } }, '다시 하기'),
-        next ? h('button', { class: 'btn primary', onclick: () => ctx.go('#/s/' + next.id) }, '다음 판 →') : h('button', { class: 'btn primary', onclick: () => ctx.go('#/') }, `${stage.unit}단원 끝! 목록으로`))));
+        asgNext !== undefined ? (asgNext ? h('button', { class: 'btn primary', onclick: () => ctx.go('#/s/' + asgNext) }, '다음 과제 판 →') : h('button', { class: 'btn primary', onclick: () => ctx.go('#/') }, '📝 과제 목록으로'))
+          : next ? h('button', { class: 'btn primary', onclick: () => ctx.go('#/s/' + next.id) }, '다음 판 →') : h('button', { class: 'btn primary', onclick: () => ctx.go('#/') }, `${stage.unit}단원 끝! 목록으로`))));
   }
   async function fail(why, id, res = {}) {
     const n = nUsed;
@@ -312,6 +317,7 @@ export async function mountPlay(root, ctx, stage) {
     failN++;
     say((maps ? `길 ${mi + 1}: ` : '') + whyText(why, stage.hero, res), 'bad');
     if (failN >= 2 && stage.hint) hintBtn.style.display = '';
+    ctx.onRun && ctx.onRun(stage.id, { ok: false, why, n }, pyNow());   // [ASSIGN-CODING-1]
     try { await ctx.store.saveRun(stage.id, { ok: false, why, n }); } catch (e) { console.warn(e); }
   }
 
@@ -337,5 +343,7 @@ export async function mountPlay(root, ctx, stage) {
   //  나갈 때 아직 안 쓴 코드는 바로 쓴다(고치고 0.7초 안에 나가도 남게)
   const flush = () => { if (!saveT) return; clearTimeout(saveT); saveT = 0; try { ctx.store.saveCode(stage.id, JSON.stringify(Bk.serialization.workspaces.save(ws))).catch(err => console.warn(err)); } catch (err) { console.warn(err); } };
   addEventListener('pagehide', flush);
-  return { unmount() { alive = false; stopGame(); removeEventListener('keydown', onKey, true); flush(); removeEventListener('pagehide', flush); cancelAnimationFrame(raf); ro.disconnect(); try { ws.dispose(); } catch (e) {} } };
+  //  [ASSIGN-CODING-1] 선생님과 수업 덮개가 열리면(rpg:classlive) 돌던 실행 · 게임을 멈춘다 — 코드는 그대로
+  const pause = () => { if (running || gen || game) { stopRun(); say('잠깐 멈췄어요 — 선생님 말씀이 끝나면 다시 ▶ 해요', ''); } };
+  return { pause, unmount() { alive = false; stopGame(); removeEventListener('keydown', onKey, true); flush(); removeEventListener('pagehide', flush); cancelAnimationFrame(raf); ro.disconnect(); try { ws.dispose(); } catch (e) {} } };
 }

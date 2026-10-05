@@ -504,3 +504,21 @@ tr.asg-ex td{opacity:.55;}
 .asg-note-t{font-size:.76rem;color:var(--gold);}
 .asg-send{margin-top:.3rem;}
 @media (prefers-reduced-motion: reduce){ .asg-live-dot{animation:none;} }
+/* [ASSIGN-CODING-1] 과제·수업 · 기초 코딩 — 판 칩 · 결과 칸 · 마지막 코드 */
+.asg-cd{display:grid;gap:.5rem;}
+.asg-cd-picked{display:flex;flex-wrap:wrap;gap:.35rem;}
+.asg-cd-pk{background:rgba(217,164,65,.15);border:1px solid var(--accent);color:var(--accent);border-radius:20px;padding:.18rem .3rem .18rem .65rem;font-size:.76rem;font-weight:700;}
+.asg-cd-stages{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.35rem;padding:.3rem .8rem .7rem;}
+.asg-cd-stage{position:relative;display:grid;gap:.1rem;text-align:left;background:rgba(255,255,255,.04);border:1px solid var(--border2);color:var(--txt);border-radius:8px;padding:.4rem .55rem;font-size:.78rem;cursor:pointer;font-family:inherit;}
+.asg-cd-stage small{color:var(--txt3);font-size:.66rem;}
+.asg-cd-stage.on{background:rgba(217,164,65,.18);border-color:var(--accent);}
+.asg-cd-stage[disabled]{opacity:.4;cursor:not-allowed;}
+.asg-cd-n{position:absolute;top:.3rem;right:.4rem;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--accent);color:#1a1206;font-size:.68rem;font-weight:900;display:grid;place-items:center;}
+.asg-cd-c{cursor:pointer;white-space:nowrap;}
+.asg-cd-c small{font-size:.66rem;color:var(--txt3);}
+.asg-cd-c.ok{color:#ffd36b;}
+.asg-cd-c.stuck,.asg-cd-red{color:#ff8a7d;font-weight:700;}
+.asg-cd-c.on{background:rgba(217,164,65,.18);}
+.asg-cd-sum{font-size:.72rem;color:var(--txt2);white-space:nowrap;}
+.asg-cd-stuck{font-size:.72rem;color:#ff8a7d;}
+.asg-cd-py{background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:8px;padding:.6rem .8rem;font-size:.76rem;line-height:1.45;white-space:pre-wrap;max-height:16rem;overflow:auto;color:var(--txt);}
