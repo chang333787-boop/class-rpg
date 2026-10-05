@@ -29,9 +29,9 @@ Firebase 데이터 직접 수정 금지 / 운영 write 버튼 클릭 금지.
 
 - 시작: `git checkout main && git pull --ff-only` → 최신화, working tree clean 확인
 - read-only 조사 먼저 → 수정 Phase면 새 브랜치(`refactor/...`)
-- 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 39 · REVIEW 1 · FAIL 0` — student 나누기로 `node --check` 가 student/*.js 8개, admin 나누기(R3)로 admin/*.js 9개를 더 본다 · gamedata 나누기(R4)로 gamedata/*.js 4개를 더 본다 · smoke-test 는 `PASS 32 · REVIEW 0 · FAIL 0`)
+- 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 43 · REVIEW 1 · FAIL 0` — student 나누기로 `node --check` 가 student/*.js 8개, admin 나누기(R3)로 admin/*.js 9개를 더 본다 · gamedata 나누기(R4)로 gamedata/*.js 4개를 더 본다 · smoke-test 는 `PASS 32 · REVIEW 0 · FAIL 0`)
 - JS 변경 시 `node --check <file>.js`
-- PR 전 한 번에: `node scripts/unit/precheck.mjs --no-deco` (기대값 `PASS 26 · REVIEW 1 · FAIL 0 · SKIP 1`, 2026-10-04 · admin 나누기 뒤에도 같음 · common·cur-alias·deco-lazy 시험 포함 · 약 10초)
+- PR 전 한 번에: `node scripts/unit/precheck.mjs --no-deco` (기대값 `PASS 34 · REVIEW 1 · FAIL 0 · SKIP 1`, 2026-10-04 · admin 나누기 뒤에도 같음 · common·cur-alias·deco-lazy 시험 포함 · 약 10초)
   — smoke · verify-safety · unit · buster-check · global-dup · esc-parity · 밸런스 · **하위 앱 시험(`scripts/unit/**/*.test.mjs`)** 까지 모아 돈다.
   꾸미기 파일을 고쳤으면 `--deco`, 저장 경로를 고쳤으면 `--gold` 를 더한다.
 - **학생 코드 = `student.js` + `student/*.js`**(2026-10-04 떼어 옮기기 · 클래식 `<script>` · 전역 그대로 · `docs/module_architecture.md` §16). 학생 코드를 글자로 읽는 시험은 `scripts/unit/student-sources.mjs`(`readStudentSources`·`studentScriptFiles`)로 읽는다 — student.js 만 읽으면 옮긴 코드를 조용히 빠뜨린다. `student/` 에 파일을 더하면 student.html 에 `<script>` 한 줄(student.js 뒤 · `?v=`)을 꼭 같이.

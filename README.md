@@ -201,9 +201,9 @@ node scripts/verify-safety.mjs
 ```
 
 - 작업 **시작과 끝**에 실행한다. `FAIL`이 1개라도 있으면 중단한다.
-- 현재 기대 결과: **`PASS 39 · REVIEW 1 · FAIL 0`** (exit code 0 · student 나누기로 18→26 = `node --check` student/*.js 8개 · admin 나누기(R3)로 26→35 = admin/*.js 9개 · gamedata 나누기(R4)로 gamedata/*.js 4개)
+- 현재 기대 결과: **`PASS 43 · REVIEW 1 · FAIL 0`** (exit code 0 · student 나누기로 18→26 = `node --check` student/*.js 8개 · admin 나누기(R3)로 26→35 = admin/*.js 9개 · gamedata 나누기(R4)로 gamedata/*.js 4개)
 - 함께 돌리는 것: `node scripts/smoke-test.mjs` → **`PASS 32 · REVIEW 0 · FAIL 0`** · `node scripts/unit/run.mjs` → **`PASS 331 · FAIL 0`** (2026-10-04 기준 · smoke 30번째 = student/ 폴더 js 가 모두 student.html 에 있나 [SPLIT-1] · 31번째 = admin/ 폴더 js 가 모두 admin.html 에 있나 [ADMIN-SPLIT-1] · gamedata/ 폴더 js 가 html 네 곳에 같은 순서·같은 ?v= 로 있나 [GAMEDATA-SPLIT-1])
-- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 26 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초 · R5 공통 뼈대 시험 · cur-alias · deco-lazy 검사가 더해져 26 · admin 나누기 뒤에도 같음).
+- **PR 전 한 번에**: `node scripts/unit/precheck.mjs --no-deco` → **`PASS 34 · REVIEW 1 · FAIL 0 · SKIP 1`** (약 10초 · R5 공통 뼈대 시험 · cur-alias · deco-lazy 검사가 더해져 26 · admin 나누기 뒤에도 같음).
   smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle · global-dup · 시뮬 다섯(esc-parity 포함) · 밸런스 둘 ·
   하위 앱 시험 9개(공통 뼈대 포함)를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).
   저장 경로를 건드렸으면 `--gold` 도(골드 유실 시뮬 · 지금 main 에서는 REPRO 가 정상이라 REVIEW).
