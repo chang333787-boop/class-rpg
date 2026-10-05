@@ -797,5 +797,9 @@ function _asgApplyReport(d, ack) {
   if (!def || def.kind === 'quiz' || !sid || typeof CUR === 'undefined' || !CUR || CUR.id !== sid || !AssignCore.isTarget(def, sid) || !_ASG.db) { ack(false); return; }
   const p = AssignCore.appPatch(def, sid, _ASG.cells[aid] || null, d.patch, { TS: _asgTS(), INC: n => firebase.database.ServerValue.increment(n) });
   if (!p) { ack(false); return; }
-  _asgRef('').update(p).then(() => ack(true), () => ack(false));
+  //  [ASSIGN-ACK-1] 쓰기를 내 연결에 넣자마자 '받음' — 서버 확인(느린 와이파이 2초+)을 기다리면 앱이 직접 또 써서 실행 수가 두 번 오른다
+  //   보내는 건 부모 연결이 책임진다(앱 창을 닫아도 남음). 서버가 거절하면 앱이 직접 써도 같은 규칙에 막히므로 다시 쓰지 않는다
+  try { _asgRef('').update(p).catch(e => console.warn('[ASSIGN-ACK-1] 과제 결과 쓰기 실패', e)); }
+  catch (e) { ack(false); return; }
+  ack(true);
 }
