@@ -265,7 +265,7 @@ student.js(16,774줄 · 976KB)를 **글자 하나 안 바꾸고** 덩어리째 �
 | `student/battle.js` | 1,713 | 90 | 몬스터·사냥터·전투 (2535–4244) — 보스는 student.js |
 | `student/deco.js` | 8,188 | 516 | 꾸미기 인테리어(마당·집 안) (4573–12402) + 친구 마당 구경·방문 (14159–14512) |
 | `student/art.js` | 787 | 39 | 작품 전시(Storage) (12403–12948) + 우리 반 작품 올리기 ARTFREE (15415–15651) |
-| `student/emotion.js` | 525 | 23 | 감정 돌아보기 팝업 (12949–13470) |
+| `student/emotion.js` | 525 | 23 | 감정 돌아보기 팝업 (12949–13470) — 10-05 돌아보기 팝업 걷어냄, 지금은 오늘의 감정(기록·보기·차트·보상)만 |
 | `student/reading.js` | 295 | 13 | 독서 기록 (13867–14158) |
 | `student/weekly.js` | 389 | 22 | 주간 다짐 (14698–15083) |
 | `student/study.js` | 1,266 | 72 | 영어 단어장·팝업 퀴즈 (15084–15211) + 오늘의 학습 (15405–15414) + 문항별 숙달도 MASTERY (15652–끝) |
@@ -335,7 +335,7 @@ admin.js(6,589줄)를 §16 과 같은 방식으로 **글자 하나 안 바꾸고
 | `admin/approve.js` | 834 | 44 | 대시보드 인라인 처리 · 핵심 승인(approveReward·approveAll) · 승인 탭(프리셋·필터·격자·목록) · 선택 상자·배지 · 승급 관리 (1122–1952) |
 | `admin/records.js` | 469 | 24 | 랭킹(공용 빌더) · 능력치 내역 · 활동 내역(일일퀘스트 주간/월간 기록) · renderRank (1953–2418) |
 | `admin/works.js` | 599 | 31 | 작품 관리(승인·반려·라이트박스·작품 종류) · 독서 현황 (2419–3014) |
-| `admin/memories.js` | 899 | 43 | 추억 관리(앨범·여러 장 올리기·이름 바꾸기) · 리코더 관리 · 업적 재계산 · 주간 다짐 · 중복 정리·작품 키 정리·작품 내리기/지우기 (3015–3910) |
+| `admin/memories.js` | 899 | 43 | 추억 관리(앨범·여러 장 올리기·이름 바꾸기) · 리코더 관리(10-05 걷어냄) · 업적 재계산 · 주간 다짐 · 중복 정리·작품 키 정리·작품 내리기/지우기 (3015–3910) |
 | `admin/quests.js` | 931 | 45 | 비번 초기화 · 퀘스트(템플릿·능력치 퀘스트·자동 일일·게시판 퀘스트) · 가져오기(importData) · 개별 보상 지급 (3911–4838) |
 | `admin/battle.js` | 582 | 30 | 몬스터·전투 설정(일괄 조정·장비·마스터리북·도감 보상) · getActiveMonsters(관리 화면 판 — gamedata.js 판을 덮는다) · 몬스터 편집 (4839–5417) |
 | `admin/settings.js` | 916 | 48 | 상점 관리(+감정 보상 설정) · 과목 관리(+감정 대화 요청) · 감정 현황(차트) · 백업·되돌리기 · 설정(오늘의 링크·저장·초기화·내보내기) (5418–6330) |
@@ -359,11 +359,11 @@ gamedata.js(3,779줄)를 §16(student) 과 같은 방식으로 **글자 하나 �
 | `gamedata.js` | 1,482 | 81 | 바탕 — 머리 주석 · FIREBASE_CONFIG · **DB 저장층 통째** · Utils |
 | `gamedata/data.js` | 838 | 80 | 게임 상수 표 — BALANCE(전투·사냥터 계수 원본) · 장비/몬스터/경험치표 만들기 · GAME_DATA · 씨앗·장식 가격 · 꾸미기 무료 기간 · 돌연변이 씨앗 · 스킬 계수·마스터리북 (6–840) |
 | `gamedata/rules.js` | 400 | 39 | 업적(ACHIEVEMENTS·AchievementUtils) · 관리자 설정 덮기(getActiveMonsters·applyShopOverrides·applyBattleSettings·BATTLE_CONSTS) (2313–2709) |
-| `gamedata/emotion.js` | 357 | 16 | 오늘의 감정(EMOTION_DATA·점수·DB_EMOTION·감정 보상) · 감정 돌아보기(문구·후보 고르기·횟수·저장) (2710–2926 + 3644–3779) |
+| `gamedata/emotion.js` | 357 | 16 | 오늘의 감정(EMOTION_DATA·점수·DB_EMOTION·감정 보상) · 감정 돌아보기(문구·후보 고르기·횟수·저장 — 10-05 걷어냄) (2710–2926 + 3644–3779) |
 | `gamedata/battle.js` | 720 | 34 | 전투 — 장비/마스터리북 구매 판정 · 턴제 전투 엔진(데미지·상성·스킬2·종료 처리) · 사냥터 3마리 제시 (2927–3643) |
 
 - html **네 곳**(student · admin · kiosk · watercolor/index.html)이 `gamedata.js` 바로 뒤에 data → rules → emotion → battle 순서로 4줄 · gamedata.js 와 같은 `?v=`. 표시 줄 = `// ── [GAMEDATA-SPLIT-1] 여기 있던 '<이름>' 덩어리(N줄)는 gamedata/<파일> 로 옮겼다 ──`.
-- **불러오는 순서가 원래 글 순서와 다른 곳 둘**: ① 상수 표(`data`, 원래 맨 위)가 바탕(FIREBASE_CONFIG·DB·Utils) **뒤에** 온다 ② 감정 돌아보기 함수 넷(원래 맨 끝)이 `emotion.js` 에 붙어 전투보다 **앞에** 온다. 둘 다 괜찮은 까닭: 바탕의 즉시 실행(객체 리터럴 셋)은 GAME_DATA·BALANCE 를 메서드 **안에서만** 쓰고, 돌아보기 덩어리는 함수 선언만 있다(지도: 즉시 문장 → 뒤 파일 이름 = 0).
+- **불러오는 순서가 원래 글 순서와 다른 곳 둘**: ① 상수 표(`data`, 원래 맨 위)가 바탕(FIREBASE_CONFIG·DB·Utils) **뒤에** 온다 ② 감정 돌아보기 함수 넷(원래 맨 끝 · 10-05 걷어냄)이 `emotion.js` 에 붙어 전투보다 **앞에** 온다. 둘 다 괜찮은 까닭: 바탕의 즉시 실행(객체 리터럴 셋)은 GAME_DATA·BALANCE 를 메서드 **안에서만** 쓰고, 돌아보기 덩어리는 함수 선언만 있다(지도: 즉시 문장 → 뒤 파일 이름 = 0).
 - **확인**: 다시 끼우면 원본과 바이트 같음 · 원본 한 덩어리 vs 나눈 파일 따로 실행의 전역(최상위 이름 전부의 typeof·값·함수 글자) 같음 · 밸런스 identity(전 출력 sha) 같음 · 헤드리스 네 화면 지문 같음.
 - **시험**: `scripts/unit/gamedata-sources.mjs`(`gamedataScriptFiles`·`readGamedataSources`·`gamedataWhere`·`gamedataDirFiles`·`gamedataSourcesAt`·`gamedataSourcesFromGit`) — student.html 의 `<script>` 순서가 단일 출처. 바꾼 것: run.mjs(`read('gamedata.js')` 는 오류) · gold/promo/deco-life/settings-field 시뮬 · save-order(옮긴 파일도 메서드 경계) · whole-set('gamedata.js' 칸 = 공유 전체) · student-known(_normalizeArrays 를 못 찾으면 FAIL) · verify-safety · smoke-test(+gamedata/ 가 html 네 곳에 같은 순서·같은 ?v=) · global-dup 기준선 · 밸런스 lib·identity(옛 커밋은 그 커밋 html 순서) · deco-perf.
 - **새로 고칠 때**: 그 기능이 있는 파일을 고치고 html **네 곳**의 그 줄 `?v=` 를 같은 값으로. 불러오는 즉시 도는 코드에서 뒤 파일 이름을 부르지 말 것(아직 없음) — 특히 gamedata.js(바탕)의 DB·Utils 리터럴에 GAME_DATA 를 바로 쓰는 칸을 만들면 안 된다(메서드 안은 괜찮다).

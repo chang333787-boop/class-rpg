@@ -181,13 +181,16 @@ const DB = {
   //  goldDaily 는 학생 화면이 읽지 않고 logGold 가 한 칸 increment 로 쓰기만 한다. 학생 기기가 이 경로를 **들으면**
   //  logGold 의 update() 가 동기 value 이벤트를 띄워 onDataChange 가 CUR 을 옛 캐시로 바꾸고 다음 saveStudent 가
   //  골드 빠진 학생을 저장했다(골드 유실 M1). 안 들으면 이벤트가 안 뜬다 — [STUDENT-GOLDDAILY-COLD-1] 실제 SDK 로 확인.
-  STUDENT_COLD: ['quests', 'quizRecords', 'emotionLogs', 'emotionReflections', 'backups', 'goldDaily'],
+  //  [RECORDER-CUT-1·REFLECT-CUT-1] 10-05 — 학생 화면이 더는 안 읽는 리코더 두 노드와 돌아보기 팝업 두 노드(emotionAlerts = 남의 '선생님께 말하고 싶어요'
+  //   기록까지 들어 있음)는 KNOWN 에서 빼 COLD 로. 운영 값은 그대로 두고, 교사·백업은 지금처럼 root 로 읽는다.
+  STUDENT_COLD: ['quests', 'quizRecords', 'emotionLogs', 'emotionReflections', 'backups', 'goldDaily',
+    'recorderLogs', 'recorderSongs', 'emotionAlerts', 'emotionPromptStats'],
   STUDENT_MINE: ['emotionLogs', 'emotionReflections'],   // 키가 `<sid>_…` 로 시작 → orderByKey 범위, 색인 불필요
   //  지금 운영에 없어도(null) 학생 화면이 읽는 노드 — 나중에 생기면 바로 받도록 미리 구독(null 구독은 비용 0)
   STUDENT_KNOWN: ['settings', 'students', 'questLogs', 'boardQuests', 'artworks', 'memories', 'memoryAlbums',
     'promotionRequests', 'pwResetRequests', 'weeklyGoals', 'weeklyReflections', 'customProblems', 'customWords',
-    'teacherWordSets', 'recorderLogs', 'recorderSongs', 'problemRecords', 'studentNotes', 'emotionPromptStats',
-    'emotionAlerts', 'customMonsters', 'customQuestTemplates', 'hiddenQuestTemplates'],
+    'teacherWordSets', 'problemRecords', 'studentNotes',
+    'customMonsters', 'customQuestTemplates', 'hiddenQuestTemplates'],
 
   // G1: 부분 캐시로 root 통째 저장하면 빠진 노드가 운영에서 지워진다
   _rootSet(data) {
@@ -1164,74 +1167,8 @@ const DB = {
     this._fbRef.child('weeklyReflections/' + ref.id).set(db.weeklyReflections.find(r=>r.id===ref.id));
   },
 
-  // ── 리코더 곡 목록 ─────────────────────────────────
-  // { id, title, grade, memo, order, isFocusSong, active, createdAt, updatedAt }
-  getRecorderSongs() {
-    return (this.load().recorderSongs || [])
-      .sort((a,b) => (a.order??99) - (b.order??99));
-  },
-  getActiveRecorderSongs() {
-    return this.getRecorderSongs().filter(s => s.active !== false);
-  },
-  saveRecorderSong(song) {
-    const db = this.load();
-    db.recorderSongs = db.recorderSongs || [];
-    const idx = db.recorderSongs.findIndex(s => s.id === song.id);
-    const now = Date.now();
-    if (idx >= 0) {
-      db.recorderSongs[idx] = { ...db.recorderSongs[idx], ...song, updatedAt: now };
-    } else {
-      db.recorderSongs.push({
-        order: db.recorderSongs.length, active: true, isFocusSong: false,
-        ...song, createdAt: now, updatedAt: now
-      });
-    }
-    this._cache = db;
-    this._fbRef.child('recorderSongs').set(db.recorderSongs);
-  },
-  deleteRecorderSong(id) {
-    const db = this.load();
-    db.recorderSongs = (db.recorderSongs || []).filter(s => s.id !== id);
-    this._cache = db;
-    this._fbRef.child('recorderSongs').set(db.recorderSongs);
-  },
-
-  // ── 리코더 기록 ─────────────────────────────────────
-  // 저장 단위: 학생 + 곡 + 날짜 = 1레코드
-  // { id, studentId, studentName, songId, songTitle, date,
-  //   practiceCount(0~5), recordingUrl, recordingName,
-  //   reflection, bestToday, difficultPart, selfRating(1~5),
-  //   teacherComment, createdAt, updatedAt }
-  getAllRecorderLogs() { return this.load().recorderLogs || []; },
-  getRecorderLogs(studentId) {
-    return (this.load().recorderLogs || []).filter(r => r.studentId === studentId);
-  },
-  getRecorderLog(studentId, songId, date) {
-    return (this.load().recorderLogs || []).find(
-      r => r.studentId===studentId && r.songId===songId && r.date===date
-    ) || null;
-  },
-  saveRecorderLog(log) {
-    const db = this.load();
-    db.recorderLogs = db.recorderLogs || [];
-    const idx = db.recorderLogs.findIndex(r => r.id === log.id);
-    const now = Date.now();
-    if (idx >= 0) {
-      db.recorderLogs[idx] = { ...db.recorderLogs[idx], ...log, updatedAt: now };
-    } else {
-      db.recorderLogs.push({ ...log, createdAt: now, updatedAt: now });
-    }
-    this._cache = db;
-    this._fbRef.child('recorderLogs/' + log.id).set(
-      db.recorderLogs.find(r => r.id === log.id)
-    );
-  },
-  deleteRecorderLog(id) {
-    const db = this.load();
-    db.recorderLogs = (db.recorderLogs || []).filter(r => r.id !== id);
-    this._cache = db;
-    this._fbRef.child('recorderLogs/' + id).remove();
-  },
+  // ── [RECORDER-CUT-1] 리코더 곡·기록 메서드(getRecorderSongs·saveRecorderSong·getAllRecorderLogs·saveRecorderLog 등 9개)는
+  //   10-05 리코더 관리 쪽과 함께 걷어냄 — 부르던 곳이 관리 화면 그 쪽뿐. 노드(recorderLogs·recorderSongs)는 _normalizeArrays·백업에 남긴다.
 
   // ── 교육과정 문제 은행 (curriculum.js의 BASE_PROBLEMS + 교사 추가분) ──
   // customProblems: { id, unitId, type, q, a, choices?, alt?, hint?, level, createdAt }

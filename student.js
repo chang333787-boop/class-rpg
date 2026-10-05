@@ -643,8 +643,8 @@ function enterGame() {
   // [DAILY-STUDY-1] 로그인 직후 자동 팝업 3종(주간다짐 1.5초·단어퀴즈 20초·회고 30초) 폐기.
   //   기습적으로 학습을 끊고 튀어나와 실제 도움이 안 된다는 운영 판단.
   //   할 일은 홈 카드에서 학생이 눌러서 시작한다(오늘의 학습 카드 / 할 일 목록).
-  //   각 기능 자체는 살아 있고 진입점만 바뀜: checkWeeklyRoutine·startPopupQuiz·
-  //   tryShowReflectionPopup 함수는 보존(수동 호출·교사 안내용).
+  //   [REFLECT-CUT-1] 그때 남겨 둔 자동 팝업 함수(checkWeeklyRoutine·tryShowReflectionPopup)는 부르는 곳이 없어 10-05 걷어냈다.
+  //   주간 다짐은 홈·내 집의 주간 다짐 칸에서 연다. 감정 돌아보기 팝업은 통째로 없앴다(운영 기록은 그대로).
 }
 
 function cleanInactivePending() {

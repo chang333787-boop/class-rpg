@@ -11,11 +11,11 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="./gamedata.js?v=20261004qa3"></script>
-<script src="./gamedata/data.js?v=20261004qa3"></script>
-<script src="./gamedata/rules.js?v=20261004qa3"></script>
-<script src="./gamedata/emotion.js?v=20261004qa3"></script>
-<script src="./gamedata/battle.js?v=20261004qa3"></script>
+<script src="./gamedata.js?v=20261005rm1"></script>
+<script src="./gamedata/data.js?v=20261005rm1"></script>
+<script src="./gamedata/rules.js?v=20261005rm1"></script>
+<script src="./gamedata/emotion.js?v=20261005rm1"></script>
+<script src="./gamedata/battle.js?v=20261005rm1"></script>
 <script src="./curriculum.js?v=20261005cs1"></script>
 <script src="./figures.js?v=20260915stl"></script>
 <script src="./curriculum_review.js?v=20260907q"></script>
@@ -596,38 +596,6 @@
     <div id="house-ach-list"></div>
   </div>
 
-  <!-- 탭8: 리코더 기록장 (구조 준비, 현재 비활성) -->
-  <div id="house-tab-recorder" style="display:none;padding-bottom:.5rem">
-    <!-- ══ 비활성 안내 카드 ══ -->
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-      padding:2.5rem 1rem;text-align:center;
-      background:rgba(255,255,255,.03);border:1.5px dashed rgba(255,255,255,.12);
-      border-radius:16px;margin-bottom:1rem;opacity:.8">
-      <div style="font-size:2.8rem;margin-bottom:.6rem;filter:grayscale(.4)">🎵</div>
-      <div style="font-size:1rem;font-weight:800;color:var(--txt1);margin-bottom:.35rem">리코더 기록장</div>
-      <div style="font-size:.82rem;color:var(--txt2);margin-bottom:.7rem">연습방 문이 곧 열려요</div>
-      <span style="font-size:.7rem;font-weight:700;background:rgba(230,126,34,.18);
-        color:#e67e22;border:1px solid rgba(230,126,34,.35);
-        border-radius:20px;padding:.2rem .8rem">업데이트 예정</span>
-    </div>
-
-    <!-- ══ 향후 기능 구조 (현재 hidden, 오픈 시 display 풀기) ══
-    실제 기능 열릴 때:
-    1. 위 비활성 카드 제거
-    2. 아래 renderRecorderTab() 호출
-    3. houseTab()에서 renderRecorderTab() 연결
-
-    구조:
-    - 상단: 곡 선택 드롭다운 (songId, songTitle)
-    - 날짜 목록: 접기/펼치기
-      각 날짜 안:
-        - 연습 체크 5칸 (practiceCount 0~5, 오늘만 클릭 가능)
-        - 녹음 1개 (recordingUrl, recordingName) — Firebase Storage
-        - 느낀점 textarea (reflection)
-      저장: saveRecorderLog({ id, studentId, songId, songTitle,
-                date, practiceCount, recordingUrl, recordingName,
-                reflection, updatedAt })
-    ══ --></div>
 </div>
 
 </div>
@@ -886,43 +854,7 @@
   <div class="lup-promo" id="lup-promo"></div>
 </div>
 
-<!-- 감정 돌아보기 팝업 -->
-<div class="overlay" id="m-reflection"><div class="modal" style="max-width:420px">
-  <div class="modal-hd">
-    <div class="modal-title">잠깐, 돌아볼까요?</div>
-    <button class="modal-close" onclick="dismissReflection()">✕</button>
-  </div>
-  <!-- step1: 질문 + 기본 선택지 -->
-  <div id="ref-step1">
-    <div id="ref-question" style="font-size:.88rem;line-height:1.7;color:var(--txt);
-      background:rgba(255,255,255,.04);border-radius:12px;padding:.8rem;margin-bottom:1rem"></div>
-    <div style="display:flex;flex-direction:column;gap:.5rem">
-      <button onclick="onReflectionResponse('better')" class="btn-sm success" style="text-align:left;padding:.55rem .9rem">😊 좋아졌어요</button>
-      <button onclick="onReflectionResponse('same')"   class="btn-sm outline" style="text-align:left;padding:.55rem .9rem">😐 비슷해요</button>
-      <button onclick="onReflectionResponse('worse')"  class="btn-sm outline" style="text-align:left;padding:.55rem .9rem;color:var(--red);border-color:rgba(231,76,60,.3)">😔 나빠졌어요</button>
-      <button onclick="onReflectionResponse('custom')" class="btn-sm outline" style="text-align:left;padding:.55rem .9rem">✏️ 직접 적을래요</button>
-      <button onclick="onReflectionResponse('later')"  style="background:none;border:none;color:var(--txt3);font-size:.78rem;cursor:pointer;padding:.4rem;font-family:inherit">나중에 할게요</button>
-    </div>
-  </div>
-  <!-- step2: 후속 메시지 -->
-  <div id="ref-step2" style="display:none">
-    <div id="ref-followup-msg" style="font-size:.88rem;line-height:1.7;color:var(--txt);
-      background:rgba(255,255,255,.04);border-radius:12px;padding:.8rem;margin-bottom:1rem"></div>
-    <div id="ref-followup-actions" style="display:flex;flex-direction:column;gap:.5rem"></div>
-  </div>
-  <!-- step2b: 직접 입력 -->
-  <div id="ref-step-custom" style="display:none">
-    <textarea id="ref-custom-text" rows="3" placeholder="지금 마음을 짧게 적어보세요"
-      style="width:100%;padding:.7rem;border-radius:10px;background:rgba(255,255,255,.06);
-        border:1px solid rgba(255,255,255,.15);color:var(--txt);font-size:.85rem;
-        font-family:inherit;resize:none;margin-bottom:.7rem"></textarea>
-    <div style="display:flex;flex-direction:column;gap:.5rem">
-      <button onclick="submitReflectionCustom(false)" class="btn-sm success">저장</button>
-      <button onclick="submitReflectionCustom(true)"  class="btn-sm outline" style="border-color:rgba(93,173,226,.3);color:var(--sky)">선생님께도 전할래요</button>
-      <button onclick="dismissReflection()" style="background:none;border:none;color:var(--txt3);font-size:.78rem;cursor:pointer;padding:.4rem;font-family:inherit">취소</button>
-    </div>
-  </div>
-</div></div>
+<!-- [REFLECT-CUT-1] 감정 돌아보기 팝업(#m-reflection)은 10-05 걷어냄 — 들어가는 문이 없었다 -->
 
 <!-- 감정 입력 모달 -->
 <div class="overlay" id="m-emotion"><div class="modal" style="max-width:480px">
@@ -963,14 +895,14 @@
   </div>
 </div></div>
 
-<script src="./student.js?v=20261005ca1"></script>
+<script src="./student.js?v=20261005rm1"></script>
 <script src="./student/char.js?v=20261004r1a"></script>
 <script src="./student/battle.js?v=20261004qb1"></script>
 <!-- [DECO-LAZY-1] 꾸미기(student/deco.js)는 태그 없이 꾸미기·친구 마당을 열 때 부른다 — 주소·?v= 는 그 코드의 DECO_SRC 한 줄 -->
 <script src="./student/art.js?v=20261004r1a"></script>
-<script src="./student/emotion.js?v=20261004qc1"></script>
+<script src="./student/emotion.js?v=20261005rm1"></script>
 <script src="./student/reading.js?v=20261004r1a"></script>
-<script src="./student/weekly.js?v=20261004r1a"></script>
+<script src="./student/weekly.js?v=20261005rm1"></script>
 <script src="./student/study.js?v=20261005ca1"></script>
 <!-- [CLASS-ASSIGN-1] 선생님 과제 · 선생님과 수업(규칙 = common/assign-core.js) -->
 <script src="./student/assign.js?v=20261005ai2"></script>

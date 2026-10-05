@@ -29,7 +29,7 @@ const BASELINE = {
     memories:          { n: 3, why: '여러 기기(학생 올리기↔교사 승인) — 판정 대기, 보고_20260915/판정_추억사진_저장방식_rf.md' },
     memoryAlbums:      { n: 2, why: '교사만' },
     promotionRequests: { n: 1, why: '교사 고아 정리 savePromotionRequests — id 키 객체(#271). 학생 신청·승인은 한 건씩' },
-    recorderSongs:     { n: 2, why: '교사만(리코더 제거 판정 대기)' },
+    // recorderSongs(교사만 2곳)는 10-05 리코더 관리와 함께 걷어냄 [RECORDER-CUT-1]
   },
   'admin.js': {
     settings:             { n: 5, why: '교사만' },

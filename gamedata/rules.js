@@ -105,18 +105,10 @@ const ACHIEVEMENTS = [
   { id:'ach_week_both',icon:'🗓️', name:'한 주 완성',     desc:'같은 주 월+금 모두 작성',   check: s=>{const db=typeof DB!=='undefined'?DB.load():{};const gs=new Set((db.weeklyGoals||[]).filter(g=>g.studentId===s.id).map(g=>g.weekKey));return (db.weeklyReflections||[]).some(r=>r.studentId===s.id&&gs.has(r.weekKey));}, reward:{exp:40,gold:30,title:null,deco:null} },
   { id:'ach_week_3',   icon:'📆', name:'3주 루틴',        desc:'3주 이상 다짐 작성',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return [...new Set((db.weeklyGoals||[]).filter(g=>g.studentId===s.id).map(g=>g.weekKey))].length>=3;}, reward:{exp:70,gold:50,title:'루틴러',deco:null} },
 
-  // ══ I. 리코더 ════════════════════════════════════════════
-  { id:'ach_rec1',     icon:'🎵', name:'첫 연습',          desc:'리코더 첫 연습 기록',       check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).some(r=>r.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
-  { id:'ach_rec5',     icon:'🎶', name:'리듬의 시작',     desc:'리코더 연습 5회 이상',      check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).filter(r=>r.studentId===s.id).length>=5;}, reward:{exp:40,gold:25,title:null,deco:null} },
-  { id:'ach_rec_sound',icon:'🎙️', name:'첫 녹음',          desc:'녹음 파일 첫 업로드',       check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).some(r=>r.studentId===s.id&&r.recordingUrl);}, reward:{exp:50,gold:35,title:null,deco:null} },
-  { id:'ach_rec_song2',icon:'🎼', name:'곡 수집가',        desc:'2곡 이상 연습 기록',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return [...new Set((db.recorderLogs||[]).filter(r=>r.studentId===s.id).map(r=>r.songId))].length>=2;}, reward:{exp:40,gold:30,title:null,deco:null} },
-  { id:'ach_rec_refl', icon:'💭', name:'성장의 귀',        desc:'느낀점 있는 연습 기록 3회', check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.recorderLogs||[]).filter(r=>r.studentId===s.id&&r.reflection&&r.reflection.length>2).length>=3;}, reward:{exp:30,gold:20,title:null,deco:null} },
-
-  // ══ J. 영어 단어장 ════════════════════════════════════════
-  { id:'ach_voc1',     icon:'🔤', name:'오늘의 5문제',    desc:'첫 영어 퀴즈 완료',         check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).some(r=>r.studentId===s.id);}, reward:{exp:20,gold:15,title:null,deco:null} },
-  { id:'ach_voc5',     icon:'📝', name:'영어 워밍업',     desc:'퀴즈 5회 완료',             check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).filter(r=>r.studentId===s.id).length>=5;}, reward:{exp:40,gold:25,title:null,deco:null} },
-  { id:'ach_voc_perfect',icon:'⭐',name:'5문제 만점',    desc:'퀴즈 5개 전부 정답',        check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).some(r=>r.studentId===s.id&&r.correct===r.total);}, reward:{exp:50,gold:40,title:null,deco:null} },
-  { id:'ach_voc_10',   icon:'🏅', name:'영어 발자국',     desc:'퀴즈 10회 완료',            check: s=>{const db=typeof DB!=='undefined'?DB.load():{};return (db.quizRecords||[]).filter(r=>r.studentId===s.id).length>=10;}, reward:{exp:70,gold:50,title:'영어 친구',deco:null} },
+  // ══ I·J. 리코더(5) · 영어 단어장(4) — 10-05 걷어냄 [ACH-CUT-1] ═══════════
+  //   받을 길이 없던 9개: ach_rec1·ach_rec5·ach_rec_sound·ach_rec_song2·ach_rec_refl · ach_voc1·ach_voc5·ach_voc_perfect·ach_voc_10.
+  //   이미 받은 아이의 student.achievements 에는 이 id 가 그대로 남는다(지우지 않음). 화면은 정의가 있는 것만 센다
+  //   (renderHouseAchievements = ACHIEVEMENTS.filter) · checkNew 는 남은 id 를 손대지 않는다. 같은 id 를 다른 업적에 다시 쓰지 말 것.
 
   // ══ K. 집꾸미기 / 인테리어 ═══════════════════════════════
   { id:'ach_deco1',    icon:'🏠', name:'내 방 첫 꾸미기', desc:'장식품 첫 배치',            check: s=>(s.houseDecorations||[]).length>=1, reward:{exp:20,gold:15,title:null,deco:null} },
@@ -208,8 +200,7 @@ const AchievementUtils = {
     '작품':      ['ach_art1','ach_art3','ach_art7','ach_art15','ach_art_desc'],
     '추억':      ['ach_mem1','ach_mem5','ach_mem10','ach_mem_desc','ach_mem_pub'],
     '감정/주간': ['ach_emo1','ach_emo5','ach_emo15','ach_week_mon','ach_week_fri','ach_week_both','ach_week_3'],
-    '리코더':    ['ach_rec1','ach_rec5','ach_rec_sound','ach_rec_song2','ach_rec_refl'],
-    '영어단어':  ['ach_voc1','ach_voc5','ach_voc_perfect','ach_voc_10'],
+    //  '리코더'·'영어단어' 묶음은 10-05 걷어냄 [ACH-CUT-1]
     '집꾸미기':  ['ach_deco1','ach_deco3','ach_deco7'],
     '메타':      ['ach_meta_balance','ach_meta_record','ach_meta_port','ach_meta_10ach','ach_meta_20ach','ach_meta_all'],
   },

@@ -2170,6 +2170,41 @@ try {
 }
 
 // ═══════════════════════════════════════════════════════════════
+cur = '걷어낸 업적 9개(ACH-CUT-1)';
+try {
+  //  10-05 리코더 5 · 영어 단어장 4 업적 정의를 지웠다. 이미 받은 아이의 achievements 에 남은 id 는
+  //  ① checkNew 가 지우지도 다시 주지도 않고 ② 내 집 업적 탭은 정의 있는 것만 센다(분모 = 정의 수).
+  const CUT = ['ach_rec1', 'ach_rec5', 'ach_rec_sound', 'ach_rec_song2', 'ach_rec_refl', 'ach_voc1', 'ach_voc5', 'ach_voc_perfect', 'ach_voc_10'];
+  const sb = { console: { log() {}, warn() {}, error() {} }, window: {}, setTimeout, document: { getElementById: () => null, querySelectorAll: () => [] }, localStorage: { getItem: () => null, setItem() {} }, alert() {} };
+  sb.globalThis = sb; vm.createContext(sb);
+  vm.runInContext(readGamedataSources(ROOT) + ';globalThis.__DB = DB; globalThis.__AU = AchievementUtils; globalThis.__A = ACHIEVEMENTS;', sb);
+  const A = sb.__A, ids = new Set(A.map(a => a.id)), cats = Object.values(sb.__AU.categories).flat();
+  test('정의에서 9개가 빠지고 묶음(categories)도 정의와 같은 수', () => {
+    eq(CUT.filter(i => ids.has(i)), []);
+    eq([cats.length, cats.filter(i => !ids.has(i)), [...ids].filter(i => !cats.includes(i))], [A.length, [], []]);
+  });
+  sb.__DB._cache = sb.__DB._normalizeArrays({ students: {}, settings: {}, recorderLogs: [{ id: 'r1', studentId: 's1', songId: 'a', reflection: '좋았다' }], quizRecords: [{ studentId: 's1', correct: 5, total: 5 }] });
+  const stu = { id: 's1', name: '가', exp: 0, gold: 0, totalGold: 0, level: 1, totalQuests: 1, achievements: ['ach_rec1', 'ach_voc_10', 'ach_quest1'] };
+  const got = sb.__AU.checkNew(stu);
+  test('지운 id 를 가진 학생 — checkNew 가 그 id 를 남기고, 리코더·퀴즈 기록이 있어도 다시 주지 않음', () => {
+    eq(['ach_rec1', 'ach_voc_10', 'ach_quest1'].every(i => stu.achievements.includes(i)), true);
+    eq(got.filter(a => CUT.includes(a.id)).length, 0);
+  });
+  //  내 집 업적 탭 — 학생 코드에서 함수 둘만 잘라 그려 본다
+  const STU = readStudentSources(ROOT);
+  const el = { innerHTML: '' };
+  const sb2 = { ACHIEVEMENTS: A, CUR: { achievements: ['ach_rec1', 'ach_voc_10', 'ach_quest1'] }, document: { getElementById: (id) => (id === 'house-ach-list' ? el : null) } };
+  vm.createContext(sb2);
+  vm.runInContext(sliceFn(STU, 'achRewardGold') + NL + sliceFn(STU, 'renderHouseAchievements') + NL + 'renderHouseAchievements();', sb2);
+  test('내 집 업적 탭: 지운 id 는 조용히 건너뜀 — 달성 1 / 정의 수', () => {
+    if (!el.innerHTML.includes(`>1</span> / ${A.length}<`)) throw new Error(el.innerHTML.slice(0, 300));
+    if (/리코더|영어 퀴즈|undefined/.test(el.innerHTML)) throw new Error('지운 업적 글자나 undefined 가 보임');
+  });
+} catch (e) {
+  test('걷어낸 업적 시험을 돌릴 수 있다', () => { throw e; });
+}
+
+// ═══════════════════════════════════════════════════════════════
 const pass = results.filter(r => r.ok), fail = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✅ PASS' : '❌ FAIL'}  ${r.msg}`);
 console.log(`\n요약: PASS ${pass.length} · FAIL ${fail.length}`);

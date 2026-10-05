@@ -9,11 +9,11 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="./gamedata.js?v=20261004qa3"></script>
-<script src="./gamedata/data.js?v=20261004qa3"></script>
-<script src="./gamedata/rules.js?v=20261004qa3"></script>
-<script src="./gamedata/emotion.js?v=20261004qa3"></script>
-<script src="./gamedata/battle.js?v=20261004qa3"></script>
+<script src="./gamedata.js?v=20261005rm1"></script>
+<script src="./gamedata/data.js?v=20261005rm1"></script>
+<script src="./gamedata/rules.js?v=20261005rm1"></script>
+<script src="./gamedata/emotion.js?v=20261005rm1"></script>
+<script src="./gamedata/battle.js?v=20261005rm1"></script>
 <script src="./curriculum.js?v=20261005cs1"></script>
 <script src="./curriculum_reading.js?v=20260915sta"></script>
 <script src="./figures.js?v=20260915stl"></script>
@@ -86,7 +86,6 @@
     <div class="nav-item" onclick="nav('memories',this)"><span class="nav-icon" data-i="memories"></span> 추억 관리</div>
     <div class="nav-item" onclick="nav('weekly',this)"><span class="nav-icon" data-i="weekly"></span> 주간 다짐</div>
     <div class="nav-item" onclick="nav('study',this)"><span class="nav-icon" data-i="study"></span> 학습 범위</div>
-    <div class="nav-item" onclick="nav('recorder',this)"><span class="nav-icon" data-i="recorder"></span> 리코더 관리</div>
     <div class="nav-item" onclick="nav('monsters',this)"><span class="nav-icon" data-i="monsters"></span> 몬스터 관리</div>
     <div class="nav-section">시스템</div>
     <div class="nav-item" id="nav-pwreset" onclick="nav('pwreset',this)"><span class="nav-icon" data-i="pwreset"></span> 비번 초기화 <span id="pwreset-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:10px;display:none">0</span></div>
@@ -365,7 +364,9 @@
     <div class="page" id="p-emotionalerts">
       <div class="section-header">
         <div><div class="sh-title">🔔 감정 대화 요청</div>
-        <div class="sh-sub">학생이 선생님께 말하고 싶다고 한 기록이에요</div></div>
+        <div class="sh-sub">학생이 선생님께 말하고 싶다고 한 기록이에요</div>
+        <!-- [REFLECT-CUT-1] 아이 쪽 돌아보기 팝업을 걷어내 새 요청은 더 생기지 않는다 — 예전 요청 보기·확인은 그대로 -->
+        <div class="sh-sub">돌아보기 팝업은 10-05 걷어냄 · 예전 요청만 보여요</div></div>
       </div>
       <div class="table-card">
         <div id="emotion-alerts-list" class="py-05"></div>
@@ -1214,64 +1215,7 @@
       </div>
     </div>
 
-    <!-- ── RECORDER ── -->
-    <div class="page" id="p-recorder">
-      <div class="section-header">
-        <div>
-          <div class="sh-title">🎵 리코더 관리</div>
-          <div class="sh-sub">연습 곡을 관리하고 학생 기록을 확인하세요 · 학생 탭은 여는 준비 중</div>
-        </div>
-      </div>
-
-      <!-- 곡 관리 카드 -->
-      <div class="table-card mb-1">
-        <div class="tc-header">
-          <div class="tc-title">🎼 연습 곡 목록</div>
-          <span class="text-muted-base">★ 집중곡 지정 · 활성/비활성 관리</span>
-        </div>
-        <div style="padding:.8rem 1.2rem">
-          <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap">
-            <input class="form-input" id="rec-song-title" placeholder="곡 제목 (예: 아리랑)" style="flex:2;min-width:140px">
-            <input class="form-input" id="rec-song-grade" placeholder="학년/단계" style="flex:1;min-width:90px">
-            <input class="form-input" id="rec-song-memo" placeholder="메모" style="flex:2;min-width:120px">
-            <button class="btn-sm success nowrap" onclick="addRecorderSong()">+ 추가</button>
-          </div>
-          <div id="recorder-song-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
-        </div>
-      </div>
-
-      <!-- 기록 요약 -->
-      <div class="table-card mb-1">
-        <div class="tc-header"><div class="tc-title">📊 기록 요약</div></div>
-        <div id="recorder-summary" style="padding:.8rem 1.2rem"></div>
-      </div>
-
-      <!-- 기록 목록 — 4중 필터 -->
-      <div class="table-card">
-        <div class="tc-header">
-          <div class="tc-title">📋 학생 연습 기록</div>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-            <select id="rec-filter-student" class="form-select" style="width:auto;font-size:.78rem" onchange="renderRecorderPage()">
-              <option value="all">전체 학생</option>
-            </select>
-            <select id="rec-filter-song" class="form-select" style="width:auto;font-size:.78rem" onchange="renderRecorderPage()">
-              <option value="all">전체 곡</option>
-            </select>
-            <select id="rec-filter-hasrec" class="form-select" style="width:auto;font-size:.78rem" onchange="renderRecorderPage()">
-              <option value="all">전체</option>
-              <option value="yes">녹음 있음</option>
-              <option value="no">녹음 없음</option>
-            </select>
-            <select id="rec-sort" class="form-select" style="width:auto;font-size:.78rem" onchange="renderRecorderPage()">
-              <option value="date-desc">최신순</option>
-              <option value="date-asc">오래된순</option>
-              <option value="student">학생순</option>
-            </select>
-          </div>
-        </div>
-        <div id="recorder-list" class="py-05" style="max-height:60vh;overflow-y:auto"></div>
-      </div>
-    </div>
+    <!-- ── RECORDER ── [RECORDER-CUT-1] 리코더 관리 쪽은 10-05 걷어냄 · 운영 recorderLogs·recorderSongs 는 그대로(백업에 남음) -->
 
     <!-- ── WEEKLY ── -->
     <div class="page" id="p-weekly">
@@ -1598,12 +1542,12 @@
 <!-- NOTIF -->
 <div class="notif" id="notif-wrap"></div>
 
-<script src="./admin.js?v=20261005ca1"></script>
+<script src="./admin.js?v=20261005rm1"></script>
 <script src="./admin/students.js?v=20261004r3a"></script>
 <script src="./admin/approve.js?v=20261004qa1"></script>
 <script src="./admin/records.js?v=20261004r3a"></script>
 <script src="./admin/works.js?v=20261004r3a"></script>
-<script src="./admin/memories.js?v=20261004r3a"></script>
+<script src="./admin/memories.js?v=20261005rm1"></script>
 <script src="./admin/quests.js?v=20261004r3a"></script>
 <script src="./admin/battle.js?v=20261004qa1"></script>
 <script src="./admin/settings.js?v=20261004qa2"></script>
