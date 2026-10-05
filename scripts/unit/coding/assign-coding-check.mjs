@@ -5,6 +5,7 @@
 //      → 서버 결과 칸(판 기록 · 실행 수 · 푼 판 · doneAt) · 과제 판 코드는 다른 열쇠 · 교사 결과 표(명단 기준 · ★/실행/막힘 · 막힌 판 · 마지막 코드)
 //   B 수업: 학생1 보통 코딩 창을 열어 둔 채 · 교사 [🔴 지금 모두 같이](기초 코딩 1-2 · 각자 풀기) → 모두 덮개 안 기초 코딩(&live=1) · 밑 창 그대로
 //      → 학생1 덮개 안에서 풂 → 서버 결과 · 교사 수업 띠 '다 한 아이 1' · 뒤로 칸 안 쌓임 → 끝내기 → 덮개 걷힘 · iframe 뗌 · 밑 코딩 창 그대로
+//   C 닫기(검토 반영 [ASSIGN-CODING-2]): 명단 밖 줄도 이름 가리기 · 머리 '푼 판 평균' · [수업으로] 문구 → 학생2 과제 쪽을 연 채 교사가 닫음 → 알림 · 문구 바뀜 · 예외 0
 //   + 네트워크: 운영 주소 요청 0 · 페이지 오류 0
 //  실행: PP=8852 DP=9552 node scripts/unit/coding/assign-coding-check.mjs   (FAKE_RTDB=<…/fake-rtdb/server.mjs> · 스크린샷 OUT=<폴더>)
 //  포트는 쓰기 전에 lsof -nP -iTCP:<포트> -sTCP:LISTEN 으로 비었는지 본다. 끝나면 크롬 · 서버를 닫는다.
@@ -224,6 +225,7 @@ try {
   await T.press('#asg-c-meta .asg-seg.live'); await sleep(150);
   const paceTxt = await T.ev(`document.querySelector('#asg-c-meta').textContent`);
   ok(/각자 풀기/.test(paceTxt) && !/한 문제씩 같이/.test(paceTxt), 'B1 기초 코딩 · 지금 모두 같이 → 진행은 각자 풀기만');
+  ok(/받는 아이 \d+명 — 기초 코딩 수업은 아이 한 명이 인터넷 연결을 2~3개/.test(paceTxt), 'B1b 만들기 창에 받는 아이 수 · 연결 수 안내(요금제 확인 전) [ASSIGN-CODING-2]', paceTxt.replace(/\s+/g, ' ').slice(-260));
   const aidB = await T.ev(`_AS.draft.aid`);
   await T.press('#asg-send');
   ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.aid === ${JSON.stringify(aidB)} && _AS.live.kind === 'coding' && _AS.live.pacing === 'self')`, 6000), 'B2 수업 시작(live: coding · 각자 풀기)');
@@ -251,6 +253,33 @@ try {
   ok(closed.every(Boolean), 'B11 끝내기 → 덮개 걷힘 · 덮개 안 iframe 뗌', JSON.stringify(closed));
   const after = await S1.ev(`({ emb: document.getElementById('m-embed').style.display, src: document.getElementById('embed-frame').src, hist: history.state && history.state.embed })`);
   ok(after.emb === 'flex' && after.src === embSrc && after.hist === 'coding', 'B12 학생1 하던 자리 그대로(보통 코딩 창 · 뒤로 칸 embed)', JSON.stringify(after));
+
+  // ═════ C. 검토 반영 [ASSIGN-CODING-2] ═════
+  //  명단 밖(명단에서 지운 아이) 결과 줄 — 이름 가리기 중엔 이름 · sid 가 안 보임
+  await T.ev(`_assignRef('results/' + ${JSON.stringify(aidA)} + '/zzGone').set({ startedAt: 1, name: '지운아이', app: { attempts: 1, score: 0, total: 2 } }); 1`);
+  await T.ev(`_AS.sel = ${JSON.stringify(aidA)}; _AS.selItem = -1; _assignSyncResults(); _assignRenderBits(true); 1`);   // 수업(B) 뒤 골라진 과제가 B 로 바뀌어 있음
+  await until(T, `!!document.querySelector('#asg-result .asg-cd-table') && /명단 밖/.test(document.querySelector('#asg-result').textContent)`, 5000);
+  const outside = await T.ev(`(() => { _AS.mask = true; _assignRenderResult(); const m = document.querySelector('#asg-result').textContent; _AS.mask = false; _assignRenderResult(); const u = document.querySelector('#asg-result').textContent; return { m: /명단 밖/.test(m) && !/지운아이|zzGone/.test(m), u: /명단 밖/.test(u) && /지운아이|zzGone/.test(u) }; })()`);
+  ok(outside && outside.m === true && outside.u === true, 'C1 명단 밖 줄 — 가리기 중엔 이름 · sid 숨김(풀면 보임)', JSON.stringify(outside));
+  const headTxt = await T.ev(`(document.querySelector('#asg-result .tc-title') || {}).textContent || ''`);
+  ok(/시작한 아이 푼 판 평균 [\d.]+ \/ 2/.test(headTxt) && !/끝낸 아이 평균/.test(headTxt), "C2 결과 머리 = '시작한 아이 푼 판 평균 n / 2'(점수 아님)", headTxt.replace(/\s+/g, ' '));
+  await T.ev(`assignStartFrom(${JSON.stringify(aidA)}); 1`);
+  await until(T, `!!document.querySelector('#asg-lists .asg-ask')`, 3000);
+  const askTxt = await T.ev(`(document.querySelector('#asg-lists .asg-ask') || {}).textContent || ''`);
+  await T.ev(`assignStartFrom(''); 1`);
+  ok(/이미 푼 판은 ★가 남아요/.test(askTxt) && !/이미 낸 답은 건너뛰어요/.test(askTxt), "C3 코딩 [수업으로] 확인 줄 = '이미 푼 판은 ★가 남아요'", askTxt.replace(/\s+/g, ' '));
+  //  학생2 과제 쪽(#/)을 연 채 교사가 과제를 닫음
+  await S2.ev(`asgOpenInbox(${JSON.stringify(aidA)}); 1`);
+  await until(S2, `/assign=${aidA}/.test(document.getElementById('embed-frame').src)`, 5000);
+  await untilIn(S2, '#embed-frame', `location.hash === '#/s/2-1'`, 25000);
+  await S2.fev('#embed-frame', `location.hash = '#/'; 1`);
+  ok(await untilIn(S2, '#embed-frame', `!!document.querySelector('.asg-home') && !/닫았어요/.test(document.querySelector('.asg-home').textContent)`, 8000), 'C4 학생2 과제 쪽(#/) 열림');
+  const errBefore = (errs['학생2'] || []).length;
+  await T.ev(`assignCloseAsk(${JSON.stringify(aidA)}); 1`);
+  ok(await until(T, `!_AS.open[${JSON.stringify(aidA)}]`, 5000), 'C5 교사 [닫기] → open 에서 빠짐');
+  const closedSeen = await untilIn(S2, '#embed-frame', `[...document.querySelectorAll('.toast')].some(t => /선생님이 이 과제를 닫았어요/.test(t.textContent)) && /선생님이 이 과제를 닫았어요 — 지금부터 푼 것은 과제에 안 들어가요/.test(document.querySelector('.asg-home').textContent)`, 8000);
+  ok(closedSeen && (errs['학생2'] || []).length === errBefore, "C6 학생2 앱: 알림 '선생님이 이 과제를 닫았어요' · 과제 쪽 문구 바뀜 · 예외 0", JSON.stringify((errs['학생2'] || []).slice(errBefore)));
+  await S2.ev(`closeExternalEmbed(); 1`);
 
   ok(net.prod.length === 0, `운영 주소 요청 0 (전체 ${net.all.length})`, net.prod.slice(0, 5).join(' | '));
   const errList = Object.entries(errs).map(([k, v]) => k + ': ' + [...new Set(v)].slice(0, 4).join(' / '));

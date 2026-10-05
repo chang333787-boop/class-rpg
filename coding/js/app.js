@@ -3,7 +3,7 @@
 //  [ASSIGN-CODING-1] ?assign=<과제>(RPG 홈 '선생님 과제' 카드 · 수업 덮개는 &live=1) — #/ = 과제 쪽(그 판들만 · 잠금 없음) · #/all = 보통 첫 화면(과제함일 때만)
 //   결과는 common/assign.js reportAssign → 부모 학생 화면이 내 칸에 쓴다 · 셈 = asg.js · 설계 = docs/class_assign_design.md §7-3
 //  설계 = docs/coding_room_design.md · 판 정본 = stages.js(정답 시험 = scripts/unit/coding/stages.test.mjs)
-import { h } from './util.js';
+import { h, toast } from './util.js';
 import { createStore } from './store.js';
 import { HEROES } from './world.js';
 import { UNITS, STAGES, stageById, stagesOf } from './stages.js';

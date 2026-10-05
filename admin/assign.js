@@ -22,6 +22,11 @@ const ASSIGN_APP_KINDS_READY = false;
 //  [ASSIGN-CODING-1] 앱 쪽이 붙은 종류 — 그 앱의 고르기 칸(admin/assign-<앱>.js)이 실렸으면 켠다 · 수업(각자 풀기 · 덮개 안 iframe)은 기초 코딩만
 function _assignKindReady(kind) { return kind === 'quiz' || ASSIGN_APP_KINDS_READY || (kind === 'coding' && typeof assignCodingPickerHTML === 'function'); }
 function _assignLiveOK(kind) { return kind === 'quiz' || (kind === 'coding' && _assignKindReady('coding')); }
+//  [ASSIGN-CODING-2] 덮개 안 학습 앱(기초 코딩)은 아이마다 연결을 1~2개 더 쓴다(학생 화면 1 + 덮개 안 앱 1 + 밑 학습 앱 창 1)
+//   요금제(설계 §17 Q10) 확인 전 — 받는 아이가 이만큼 넘으면 시작 전에 한 번 더 묻는다
+const ASSIGN_APP_LIVE_WARN = 20;
+function _assignReceivers(def) { return def && Array.isArray(def.targets) && def.targets.length ? def.targets.length : _assignStudents().length; }
+function _assignAppLiveNote(n) { return `받는 아이 ${n}명 — 기초 코딩 수업은 아이 한 명이 인터넷 연결을 2~3개 써요(모두 약 ${n * 2}~${n * 3}개). 무료 요금제는 동시 연결 100개까지라 넘으면 우리 반 RPG 화면이 새로 안 열릴 수 있어요.`; }
 
 function _assignRef(p) { return _AS.db.ref(AssignCore.path.full(p)); }
 function _assignNow() { return Date.now() + (_AS.offset || 0); }
@@ -323,7 +328,7 @@ function _assignRenderLists() {
         ${_assignLiveOK(d.kind) && !isLive ? `<button class="btn-sm outline" onclick="assignStartFrom('${d.id}')" title="이 과제를 반 전체가 지금 같이 풀어요">수업으로</button>` : ''}
         <button class="btn-sm outline" onclick="assignOpenTV('${d.id}')">TV</button>
         ${isLive ? '' : `<button class="btn-sm danger" onclick="assignCloseAsk('${d.id}')">닫기</button>`}</td></tr>
-      ${_AS.startAsk === d.id ? `<tr class="asg-ask"><td colspan="3">지금 반 모두 같이 풀까요? 로그인한 아이 화면에 수업 방이 열려요 · 이미 낸 답은 건너뛰어요
+      ${_AS.startAsk === d.id ? `<tr class="asg-ask"><td colspan="3">지금 반 모두 같이 풀까요? 로그인한 아이 화면에 수업 방이 열려요 · ${d.kind === 'coding' ? `덮개 안에서 기초 코딩이 열리고, 이미 푼 판은 ★가 남아요${_assignReceivers(d) > ASSIGN_APP_LIVE_WARN ? ` · <b>받는 아이 ${_assignReceivers(d)}명 — 연결이 많아요</b>` : ''}` : '이미 낸 답은 건너뛰어요'}
         ${d.kind === 'quiz' ? `<button class="btn-sm" onclick="assignStartFromGo('${d.id}','step')">한 문제씩 같이</button>` : ''}<button class="btn-sm" onclick="assignStartFromGo('${d.id}','self')">각자 풀기</button>
         <button class="btn-sm outline" onclick="assignStartFrom('')">그만</button></td></tr>` : ''}`;
   };
@@ -387,7 +392,7 @@ function _assignRenderResult() {
   const liveOn = _AS.live && _AS.live.on === true && _AS.live.aid === aid;
   const revealed = liveOn ? (_AS.live.revealAt || def.revealed) : def.revealed;
   const t = AssignCore.tally(def, R, roster, { revealed, excused: liveOn ? _AS.excused : {} });
-  const head = `<div class="tc-header"><div class="tc-title">${escHtml(def.title)} <span class="text-muted-sm">${_assignKindLabel(def)} · 받는 아이 ${t.rows.length}명 · 끝 ${t.counts.done} · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${t.avg != null ? ` · 끝낸 아이 평균 ${t.avg}점` : ''}</span></div>
+  const head = `<div class="tc-header"><div class="tc-title">${escHtml(def.title)} <span class="text-muted-sm">${_assignKindLabel(def)} · 받는 아이 ${t.rows.length}명 · 끝 ${t.counts.done} · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${_assignAvgText(def, t)}</span></div>
     <div class="tc-actions"><button class="btn-sm outline" onclick="assignOpenTV('${aid}')">TV 로 보기</button><button class="btn-sm outline" onclick="assignSelect('${aid}')">접기</button></div></div>`;
   let body;
   if (def.kind === 'coding' && typeof assignCodingResultHTML === 'function') body = assignCodingResultHTML(def, t);   // [ASSIGN-CODING-1] 판마다 ★ · 실행 · 막힘 · 마지막 코드
@@ -400,7 +405,7 @@ function _assignRenderResult() {
     const cell = (a) => !a ? '<td class="asg-c none">·</td>' : a.skip ? '<td class="asg-c skip" title="건너뜀">⤼</td>'
       : `<td class="asg-c ${a.ok ? 'ok' : 'no'}${a.late ? ' late' : ''}" title="${escHtml(a.a)}${a.late ? ' (공개 뒤)' : ''}">${a.ok ? '✓' : '✗' + (a.ci != null && a.ci >= 0 ? (ASSIGN_NUM[a.ci] || '') : '')}${a.late ? '⏰' : ''}</td>`;
     const rows = [...t.rows, ...t.outside].map((r, i) => `<tr class="${r.excused ? 'asg-ex' : ''}">
-      <td class="td-name">${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${escHtml(r.name || r.sid)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}
+      <td class="td-name">${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${_assignNameHTML(r.name || r.sid, i)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}
         ${liveOn && !r.outside ? `<button class="asg-mini" onclick="assignExcuse('${escJsAttr(r.sid)}', ${r.excused ? 'false' : 'true'})">${r.excused ? '다시 넣기' : '빼기'}</button>` : ''}</td>
       <td>${_assignStatus(r)}</td><td class="nowrap">${mask ? '●' : r.status === 'none' ? '-' : `${r.correct}/${n}`}</td>
       <td class="nowrap">${mask || r.ms == null || def.pacing === 'step' ? '-' : _assignMs(r.ms)}</td>
@@ -411,6 +416,16 @@ function _assignRenderResult() {
   }
   const html = `<div class="table-card asg-result">${head}${body}</div>`;
   if (el.innerHTML !== html) el.innerHTML = html;
+}
+//  머리 평균 — 문제 묶음 = 끝낸 아이 점수 · 기초 코딩 = 시작한 아이가 푼 판 수(끝낸 아이만 보면 늘 다 푼 값) [ASSIGN-CODING-2]
+function _assignAvgText(def, t) {
+  if (def.kind === 'coding') {
+    const st = t.rows.filter(r => r.status !== 'none');
+    if (!st.length) return '';
+    const a = st.reduce((s, r) => s + (Number(r.correct) || 0), 0) / st.length;
+    return ` · 시작한 아이 푼 판 평균 ${Math.round(a * 10) / 10} / ${def.n}`;
+  }
+  return t.avg != null ? ` · 끝낸 아이 평균 ${t.avg}점` : '';
 }
 function _assignStatus(r) { return r.status === 'done' ? '<span class="tag approved">끝</span>' : r.status === 'doing' ? '<span class="tag pending">하는 중</span>' : '<span class="tag wait">안 함</span>'; }
 function _assignMs(ms) { const s = Math.round(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`; }
@@ -648,6 +663,7 @@ function _assignCMeta() {
       <label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'self' ? 'checked' : ''} onchange="assignDraft('pacing','self')"> 각자 풀기${app ? '(덮개 안에서 기초 코딩이 열려요)' : ''}</label>
       ${app ? '' : `<label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'step' ? 'checked' : ''} onchange="assignDraft('pacing','step')"> 한 문제씩 같이(선생님이 넘김 · 답 공개 · TV 막대)</label>`}
       <span class="text-muted-sm">안전 시간</span><select class="form-select asg-sel-sm" onchange="assignDraft('minutes', this.value)">${[20, 30, 40, 50, 60, 90, 120].map(m => `<option value="${m}" ${d.minutes === m ? 'selected' : ''}>${m}분</option>`).join('')}</select></div>` : ''}
+    ${live && app ? (() => { const n = d.who === 'some' ? d.targets.length : studs.length; return `<div class="asg-note-t">🔌 ${_assignAppLiveNote(n)}${n > ASSIGN_APP_LIVE_WARN ? ' <b>모둠을 골라 보내는 것을 권해요.</b>' : ''}</div>`; })() : ''}
     ${!app && (!live || d.pacing === 'self') ? `<div class="asg-c-row"><label class="asg-inline"><input type="checkbox" ${d.showAnswer ? 'checked' : ''} onchange="assignDraft('showAnswer', this.checked)"> 문제마다 정답 바로 보여 주기</label></div>` : ''}
     ${nAudio ? `<div class="asg-note-t">🔊 소리 문제 ${nAudio}개 — ${live && d.pacing === 'step' ? 'TV 화면의 🔊 로 선생님이 들려줘요' : '각자 풀기는 이어폰이 있으면 좋아요(수업 중에는 자동으로 읽지 않아요)'}</div>` : ''}
     ${nEnText ? `<div class="asg-note-t">⌨️ 영어로 쓰는 문제 ${nEnText}개 — 한글로 쓰면 아이 화면에 '한/영 키' 안내가 떠요(오답으로 세지 않음)</div>` : ''}
@@ -711,6 +727,10 @@ async function _assignStartLive(def, minutes, fromOpen, asked) {
     if (!ok) return;
     if (cur.aid && _AS.openRaw[cur.aid] && cur.aid !== def.id) await _assignClose(cur.aid);
   } else if (!asked && !confirm(`'${def.title}'\n지금 로그인한 아이 화면에 수업 방이 열려요. 하던 것은 그대로 멈춰 둬요.\n시작할까요?`)) return;
+  if (def.kind !== 'quiz') {   // [ASSIGN-CODING-2] 연결 수 — 큰 반이면 한 번 더
+    const n = _assignReceivers(def);
+    if (n > ASSIGN_APP_LIVE_WARN && !confirm(`${_assignAppLiveNote(n)}\n\n모둠을 골라 보내거나 과제함으로 보내는 것을 권해요. 그래도 시작할까요?`)) return;
+  }
   _AS.sending = true; _assignCMeta();
   try {
     const ndef = AssignCore.normDef({ ...def, createdAt: 1 }, def.id);

@@ -79,7 +79,7 @@ function assignCodingResultHTML(def, t) {
   };
   const body = rows.map((r, i) => {
     const xs = info(r), stuck = xs.filter(x => x.stuck).map(x => x.id);
-    return `<tr class="${r.excused ? 'asg-ex' : ''}"><td class="td-name">${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${escHtml(r.name || r.sid)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}</td>
+    return `<tr class="${r.excused ? 'asg-ex' : ''}"><td class="td-name">${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${_assignNameHTML(r.name || r.sid, i)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}</td>
       <td>${_assignStatus(r)}</td><td class="nowrap">${mask ? '●' : r.status === 'none' ? '-' : `${r.correct} / ${r.total}`}</td><td class="nowrap">${mask ? '●' : r.attempts || 0}</td>
       <td class="nowrap">${mask || r.ms == null ? '-' : _assignMs(r.ms)}</td>
       ${mask ? `<td colspan="${stages.length + 1}" class="text-muted-sm">이름 가리기 중</td>` : `${xs.map(x => cell(r, x)).join('')}<td class="asg-cd-stuck">${stuck.length ? escHtml(stuck.join(' · ')) : ''}</td>`}</tr>`;
