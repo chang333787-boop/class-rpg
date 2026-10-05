@@ -186,6 +186,7 @@ function masteryMap(studentId) {
   const m = new Map();
   try {
     const recs = (typeof DB.getProblemRecords === 'function' ? DB.getProblemRecords(id) : [])
+      .concat(typeof asgMasteryRecords === 'function' ? asgMasteryRecords(id) : [])   // [CLASS-ASSIGN-1] 선생님 과제에서 낸 답도 별 · 복습에(student/assign.js · 하루 10문제 셈과 보상에는 안 들어감)
       .filter(r => r && !r.review && Array.isArray(r.answers))
       .sort((a, b) => String(a.date) < String(b.date) ? -1 : String(a.date) > String(b.date) ? 1 : 0);
     for (const r of recs) for (const a of r.answers) {
@@ -352,7 +353,7 @@ function closeStudyModal() {
 function getUnitStats(studentId) {
   if (typeof DB.getProblemRecords !== 'function') return {};
   const st = {};
-  for (const r of DB.getProblemRecords(studentId)) {
+  for (const r of DB.getProblemRecords(studentId).concat(typeof asgMasteryRecords === 'function' ? asgMasteryRecords(studentId) : [])) {   // [CLASS-ASSIGN-1]
     for (const a of (r.answers || [])) {
       if (!a || !a.unitId) continue;
       st[a.unitId] = st[a.unitId] || { t: 0, c: 0 };
@@ -710,7 +711,9 @@ function startStudySession(subjectKey, unitId, onlyDue) {
 // 풀에서 하루 분량을 뽑는다 — 교과·보충 공용
 function pickStudyQuestions(pool) {
   // 최근에 틀린 문제를 자주 나오게(단어장 복습 가중치와 같은 방식)
-  const recent = DB.getProblemRecords(CUR.id).slice(-8);
+  //  [CLASS-ASSIGN-1] 선생님 과제 기록(id prob_<날짜>_…_asg_…)도 키 차례(= 날짜 차례)로 섞어 '최근 8건'을 고른다
+  const _asg = typeof asgMasteryRecords === 'function' ? asgMasteryRecords(CUR.id) : [];
+  const recent = (_asg.length ? DB.getProblemRecords(CUR.id).concat(_asg).sort((a, b) => String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0) : DB.getProblemRecords(CUR.id)).slice(-8);
   const wrongIds = new Set(recent.flatMap(r => r.wrongIds || []));
   const weighted = [];
   pool.forEach(p => {

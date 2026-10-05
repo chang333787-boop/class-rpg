@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>수업 TV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tv.css?v=20261005ca1">
+  <!-- [ASSIGN-TV-1] 수업 TV — 학급 RPG 와 같은 Firebase(compat 9.23)의 classRPG_assign 만 읽는다(+ 문 통과 때 관리자 비밀번호 한 번 · 교사 기기 연결 표시) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../figures.js?v=20260915stl"></script>
+  <!-- 캐시: 모듈마다 ?v= 대신 여기 한 곳(import map)에서 판 번호를 올린다 -->
+  <script type="importmap">{ "imports": {
+    "./js/tv.js": "./js/tv.js?v=20261005ca2",
+    "../common/util.js": "../common/util.js?v=20261004r5a", "../common/rpg-firebase.js": "../common/rpg-firebase.js?v=20261004r5a",
+    "../common/assign-core.js": "../common/assign-core.js?v=20261005ca1" } }</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="js/tv.js?v=20261005ca2"></script>
+</body>
+</html>
