@@ -208,7 +208,8 @@ function appView(def) {
   const R = S.results || {}, ros = roster(def);
   const t = AC.tally(def, R, ros.map(x => ({ sid: x.sid, name: x.name })), {});
   return h('main', { class: 'tv' }, head(def, def.kind === 'coding' ? '기초 코딩' : '음악실 리듬'),
-    h('div', { class: 'tv-center' }, h('div', { class: 'tv-h1' }, `끝낸 친구 ${t.counts.done} / ${t.rows.length}`), h('div', { class: 'tv-sub' }, `하는 중 ${t.counts.doing}`)));
+    h('div', { class: 'tv-center' }, h('div', { class: 'tv-h1' }, `끝낸 친구 ${t.counts.done} / ${t.rows.length}`),
+      h('div', { class: 'tv-sub' }, `하는 중 ${t.counts.doing}${def.kind === 'music' && t.avg != null ? ` · 끝낸 친구 정확도 평균 ${t.avg}%` : ''}`)));   // [ASSIGN-MUSIC-1] 이름 · 순위 없이 반 평균만
 }
 
 // ── 선생님 조작(TV 에서 — 관리 화면과 같은 transaction) ──

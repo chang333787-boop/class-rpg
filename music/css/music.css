@@ -270,3 +270,9 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .kh-key b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--gold);color:#2a1a08}
 .staff .st-voice{font-size:11px;font-weight:800;fill:#8a7a62}
 .p-card .lv-line{font-weight:800;color:var(--gold2)}
+/* [ASSIGN-MUSIC-1] 선생님 과제 — 정한 판 칩 · 안내 줄 · 불러오기/닫힘 화면 */
+.top .r-asg-chip{height:34px;display:inline-flex;align-items:center;padding:0 .75rem;border-radius:9px;background:rgba(242,169,59,.16);border:1px solid rgba(242,169,59,.45);color:var(--gold2);font-weight:800;font-size:.85rem;white-space:nowrap}
+.p-card .r-asg-note{padding:8px 12px;border-radius:10px;background:rgba(242,169,59,.12);color:var(--gold2);font-weight:700;font-size:.9rem;line-height:1.5}
+.asg-screen{margin:auto;max-width:440px;padding:28px 30px;border-radius:20px;background:var(--bg2);text-align:center;display:grid;gap:10px;justify-items:center}
+.asg-screen-ic{font-size:2.6rem}
+.asg-screen h2{font-size:1.25rem;font-weight:900}

@@ -252,7 +252,7 @@ sequenceDiagram
 | 정리 | 마지막 '다음' → `summary` | "10문제 중 7개 맞혔어요" + 다시 볼 문제 · `doneAt` | 문제별 맞힌 비율 · 가장 어려웠던 문제 · 문제 누르면 그 막대(교사가 고르면 `step=i, phase=reveal`) |
 | 끝 | 4-3 과 같음 | 4-3 과 같음 | 4-3 과 같음 |
 
-### 4-5 수업 · 각자 · 기초 코딩 / 음악실 리듬 — **1차에는 하지 않음**(반박 #6)
+### 4-5 수업 · 각자 · 기초 코딩 / 음악실 리듬 — 코딩은 1차에 하지 않음(반박 #6) · **음악실 리듬은 붙임(§21 · 선생님 지시 10-05)**
 
 덮개 안 두 번째 iframe 은 아이마다 RTDB 연결을 하나 더 만든다(25명 × 최대 3 = 75 + 교사 · TV). 무료 요금제 동시 연결 100 에 닿을 수 있어
 1차는 코딩 · 리듬을 **과제함만** 둔다(관리 화면 '지금 모두 같이' 단추가 막혀 있음). 아래 표는 연결 수를 확인한 뒤의 몫으로 남긴다.
@@ -463,9 +463,9 @@ export function onClassPause(cb, win) → off                  // 부모 RPG 의
 
 | 곳 | 바꿀 것 |
 |---|---|
-| `music/js/app.js` | `ASG` 가 kind 'music' 이면 처음 길을 `#/rhythm/<content.music.song>` 로 · `ctx.assign` · 수업이면 뒤로 단추 숨김(과제함이면 `#/` 허용) |
-| `music/js/rhythm.js` | `ctx.assign` 이면 난이도 · **키 수**(`content.music.keys` · 0 이면 난이도 기본 — 아이 기기 localStorage 무시) · 빠르기 고르기 대신 칩('선생님이 정한 난이도 · 쉬움 · 원래 빠르기') · `finish()` 에서 `ctx.onRhythm && ctx.onRhythm({score, acc, grade, maxCombo, perfect, great, good, miss})` → attempt · best(rank) · done(**친 음표 ≥ 1 일 때만**) · **'이 곡 우리 반 최고' 판은 과제일 때 숨김** · 빠르기 0.8 과제 판은 개인 최고 · 반 최고 저장에서 빼거나 키에 `__t08`(반박 #15) |
-| 멈춤 | `current.pause` = 리듬 `stop()` · 연습 멈춤 · 작곡 재생 멈춤 · `listenPlayer.stop()` |
+| `music/js/app.js` | ✅ `?assign` 이면 **모든 길**을 `#/rhythm/<content.music.song>` 로(과제함 · 수업 둘 다 — 뒤로 단추 없음, 과제 창은 RPG ✕ 로 닫음) · 불러오기 실패 = '다시 불러오기' · 닫힌 과제(과제함) = 닫힘 화면 · `start` 한 번 |
+| `music/js/rhythm.js` | ✅(구현: `mountRhythm(…, { assign })` · 결과 모양 = `music/js/assign-music.js` `rhythmPatch` — best(rank = 점수) + **first(rank 0 — 처음 판, 안 덮임)** · 점수 = 정확도 반올림 / 100) `ctx.assign` 이면 난이도 · **키 수**(`content.music.keys` · 0 이면 난이도 기본 — 아이 기기 localStorage 무시) · 빠르기 고르기 대신 칩('선생님이 정한 난이도 · 쉬움 · 원래 빠르기') · `finish()` 에서 `ctx.onRhythm && ctx.onRhythm({score, acc, grade, maxCombo, perfect, great, good, miss})` → attempt · best(rank) · done(**친 음표 ≥ 1 일 때만**) · **'이 곡 우리 반 최고' 판은 과제일 때 숨김** · 빠르기 0.8 과제 판은 개인 최고 · 반 최고 저장에서 빼거나 키에 `__t08`(반박 #15) |
+| 멈춤 | ✅ `current.pause` = 리듬 `stop()` · `listenPlayer.stop()` · 소리 장치 `suspend()`(연습 · 작곡 재생도 시간이 멈춤) — 덮개가 걷히면 `resume()`. 덮개 **안**의 리듬(`&live=1`)은 멈추지 않음 |
 
 ### 7-5 멈춤 신호
 
@@ -517,7 +517,7 @@ export function onClassPause(cb, win) → off                  // 부모 RPG 의
              □ 문제마다 정답 바로 보여 주기(각자 풀기)                                   [보내기]
 ```
 
-- 코딩 판 목록 · 음악 곡 목록 칸은 **자리만**(`#asg-pick-coding` · `#asg-pick-music` · `assignCodingPickerHTML(d)` / `assignMusicPickerHTML(d)` 가 있으면 그것을 부름) — 다음 단계가 그 앱 파일을 그때 불러 채운다(`import('./coding/js/stages.js?v=…')` 등 · ?v= 는 각 앱 import map 값과 같게 · 시험으로 견줄 것). 앱 쪽이 붙기 전에는 [기초 코딩] [음악실 리듬] 단추가 '곧'으로 막혀 있다(`ASSIGN_APP_KINDS_READY`).
+- 코딩 판 목록 · 음악 곡 목록 칸은 **자리만**(`#asg-pick-coding` · `#asg-pick-music` · `assignCodingPickerHTML(d)` / `assignMusicPickerHTML(d)` 가 있으면 그것을 부름) — 다음 단계가 그 앱 파일을 그때 불러 채운다(`import('./coding/js/stages.js?v=…')` 등 · ?v= 는 각 앱 import map 값과 같게 · 시험으로 견줄 것). 앱 쪽이 붙기 전에는 그 단추가 '곧'으로 막혀 있다(`_assignKindReady(kind)` = 그 앱의 고르기 칸 함수가 있나 — 종류마다 따로).
 - 자동 뽑기 · 보기 섞기는 `AssignCore.pickSet` · `snapItem`(시드 없는 Math.random — 보낼 때 한 번).
 - 문제 미리 보기는 학생 화면과 같은 꼴은 아니어도(관리 화면은 study.js 가 없다) 지문 · 그림(figures.js) · 물음 · 보기(정답 ✓) · 정답 · 소리 글 · 힌트를 escHtml 로.
 - 지문 문항은 **지문 세트 한 줄**(세트 통째로 고름 · 연달아) · 찾기 칸(물음 · 정답 글자) · 성격 칩 · 고른 문제 목록([섞기] — 지문 세트는 한 덩어리로 · [모두 빼기] · ✕).
@@ -725,7 +725,7 @@ node scripts/unit/fake-rtdb/server.mjs 8870    # (#1173 머지 전이면 그 갈
 | **P4** 관리 과제·수업 | ✅ (백업 · 내보내기에 `classRPG_assign` 넣기는 안 함 — §17 Q11) | `admin/assign.js` · `admin.html` · `admin.js` · `admin.css` |
 | **P5** 수업 모드 + TV | ✅ | `student/assign.js` · `admin/assign.js` · `assign/index.html` · `assign/js/tv.js` · `assign/css/tv.css` · `scripts/unit/assign/assign-live-check.mjs` |
 | 하위 앱 계약 | ✅ 계약 · 결과 쓰기(부모) · 시험 | `common/assign.js` · `scripts/unit/common/assign-subapp.test.mjs` |
-| **P6** 코딩 · 음악 앱 쪽 | ⏭ 다음 단계 — §7-3 · §7-4 · 관리 만들기의 `assignCodingPickerHTML(d)` · `assignMusicPickerHTML(d)` 를 채우고 `ASSIGN_APP_KINDS_READY = true` · 코딩/음악 import map 에 `common/assign*.js` | |
+| **P6** 코딩 · 음악 앱 쪽 | 음악 ✅(§21 · 갈래 `feat/class-assign-music`) · 코딩 ⏭ — 관리 만들기는 그 앱 고르기 칸 함수(`assignCodingPickerHTML` · `assignMusicPickerHTML`)가 있으면 종류마다 열림(`_assignKindReady`) | `music/js/{app,rhythm,assign-music}.js` · `music/index.html` · `admin/assign-music.js` |
 | **P7** 문서 | 이 문서 · 운영 안내 · 패치 노트는 시연 뒤 | |
 
 - `village/` · 경제 수치 · gamedata.js · gamedata/*.js 는 안 고쳤다.
@@ -797,7 +797,7 @@ node scripts/unit/fake-rtdb/server.mjs 8870    # (#1173 머지 전이면 그 갈
 | 12 | 교사 화면이 TV 에 비침 | ✅ [이름 가리기(TV 비추는 중)] — 수업 중 기본 켬 · 이름 · 점수 · 문항 칸 · 안 들어온 이름 · 오답 낸 이름 접기 |
 | 13 | 코딩 '새 종이'가 아이 저장 코드를 덮음 | ⏭ 다음 단계 몫 — §7-3 표에 '다른 열쇠 · B5 시험' 못 박음 |
 | 14 | iframe 결과 유실 · 4초 넘으면 보통 모드 · 더 좋을 때만 견주기 | ✅ 부모가 쓴다(postMessage · ack · 2초 무응답이면 직접) · loadAssign 실패 = 다시 불러오기(계약) · rank 로 서버 칸과 견줌(부모가 가진 최신 칸) · 점수는 늘 때만 · B5 |
-| 15 | 리듬 키 수 · 빠르기 · 아무것도 안 쳐도 끝 · 소리 | ⏭ 다음 단계 몫 — `content.music.keys` 를 정의에 둠(normDef) · §7-4 에 '친 음표 ≥ 1 · tempo 0.8 따로 · 이어폰 경고' 못 박음 |
+| 15 | 리듬 키 수 · 빠르기 · 아무것도 안 쳐도 끝 · 소리 | ✅(§21) 키 수 · 난이도 · 빠르기 = 선생님 것(아이 기기 설정 무시) · 친 음표 0 판 = 판 수만(끝 아님) · 조금 느리게 판은 내 최고 기록에 안 섞음 · 만들기 칸에 이어폰 안내 |
 | 16 | 영어 입력 · 소리 | ✅ `lang="en"` 등 · 한글 막기(오답 아님) · 둥근 따옴표 · 영어 목소리 없을 때도 건너뛰기 · 만들기 화면 '소리 문제 n · 영어로 쓰는 문제 n' |
 | 17 | 덮개 밑 전투 + 새로고침 = 패배 | ✅ 들어옴 표시 `b:1` → 교사 '⚔️ 전투 중 n — 새로고침하면 진 걸로' · 기회 돌려주기는 §17 Q9 |
 | 18 | 빠져나갈 길(로그인 화면 · 새 탭 · iframe 포커스) | ✅ 로그인 화면 띠 · 들어옴 표시 `v` → '다른 화면 봄 n' · iframe load 처리기 포커스 가드 · 포커스 지킴이 |
@@ -814,3 +814,21 @@ node scripts/unit/fake-rtdb/server.mjs 8870    # (#1173 머지 전이면 그 갈
 3. 같은 둘로 **지금 모두 같이 · 한 문제씩** → 크롬북 덮개 → 답 → [답 공개] → [끝내기] → 덮개가 걷히고 하던 자리로.
 4. 다시 수업을 켜고 **노트북 뚜껑을 닫는다** → 크롬북이 몇 분 뒤 풀리는지 시계로 잰다(기대: 3분 + 서버 감지 1~2분 = 5분 안) → 뚜껑을 열면(15분 안) 다시 덮이는지.
 5. [끝내기] · 시험 과제 [닫기]. 결과가 이상하면 draft 를 넣지 않는다.
+
+---
+
+## 21. 음악실 리듬 붙이기 [ASSIGN-MUSIC-1] (2026-10-05 · 갈래 `feat/class-assign-music` · base `feat/class-assign`)
+
+| 곳 | 한 것 |
+|---|---|
+| 관리 만들기 | [🎵 음악실 리듬] 열림 · 곡(음악실 기본 15곡 · ★) · 난이도 넷 · 키 수(난이도 기본 · 4 · 6 · 8) · 빠르기(원래 · 조금 느리게) · 이름 자동 '리듬 · 나비야 · 쉬움' · 곡 목록 = `music/js/library.js?v=` (music import map 값과 같게 — 시험) |
+| 보내기 | 과제함 · **지금 모두 같이(각자 풀기만)** · 열린 리듬 과제 [수업으로](각자 풀기) |
+| 아이 · 과제함 | 카드 → 학습 앱 창 `music/index.html?sid&n&assign=<과제>` → 그 곡 리듬만 · 칩 '👩‍🏫 쉬움 · 4키' · 끝까지 치면 '선생님께 보냈어요 ✓' · 다시 하기 가능 · 우리 반 최고 판 없음 |
+| 아이 · 수업 | 덮개 안에 앱 창 하나(`#asgl-app` · `&live=1` · 덮개를 꽉 채움 · 다 읽히면 포커스) — 밑의 음악실 창이 있으면 그것은 멈춤 신호로 멈춤 · 덮개가 닫히면 `about:blank` |
+| 결과 칸 | `app/score`(가장 좋은 정확도 반올림 · 늘 때만) · `app/total` 100 · `app/attempts`(끝까지 친 판) · `app/detail/best`(rank = 점수) · `app/detail/first`(rank 0 — 처음 판) · `doneAt`(친 음표 ≥ 1 인 첫 판) · 쓰는 곳 = 부모 학생 화면(덮개 안 앱 창이 보낸 것도 받음) |
+| 관리 결과 표 | 이름 · 상태 · 정확도(등급) · 판정 넷(완벽 · 좋아 · 괜찮아 · 놓침) · 최대 콤보 · 처음 판 · 친 횟수 · 걸린 시간 / 위 줄: 끝까지 친 아이 · 정확도 평균 · 등급별 수 · 이름 가리기 중엔 숫자 숨김 · 수업 띠에도 한 줄 |
+| TV | '끝낸 친구 n / 명단' + 끝낸 친구 정확도 평균(이름 · 순위 없음) |
+| 시험 | `scripts/unit/music/assign-music.test.mjs`(13) · 헤드리스 `scripts/unit/music/assign-music-live.mjs` **PASS 49**(공유 가짜 RTDB — 교사가 고름 → 학생이 실제 리듬 판을 끝까지 침 → 결과 칸 · 결과 표 · 수업 덮개 · TV · 밑의 리듬 멈춤 · 운영 주소 0). 실행: `FAKE_RTDB=<…/fake-rtdb/server.mjs> PP=8873 DP=9553 node scripts/unit/music/assign-music-live.mjs` — 헤드리스는 `--disable-audio-output` 이어야 소리 시각이 흐름 · 판을 치려고 앱 창 주소에 `&debug=1` 을 덧붙임 |
+
+남은 걱정: **동시 연결 수**(반박 #6 · §17 Q10) — 리듬 수업은 아이마다 연결이 하나 더(덮개 안 앱 창), 밑에 음악실 창이 열려 있던 아이는 둘 더. 25명 반이면 최대 ≈ 75 + 교사 · TV. 요금제가 무료(동시 100)면 첫 수업 전에 §20 리허설에 '리듬 수업 한 번'을 더해 연결 수를 본다.
+
