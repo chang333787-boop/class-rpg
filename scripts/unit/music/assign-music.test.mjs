@@ -85,7 +85,10 @@ test('음악실 기본 곡 15곡 — 모두 과제 곡 id 로 받아짐(normDef)
     const d = AC.normDef({ ...RAW, id: 'aX', content: { music: { song: 'lib_' + x.key, level: 'easy' } } }, 'aX');
     ok(d && d.content.music.song === 'lib_' + x.key, x.key);
   }
-  ok(AC.contentSig(DEF) === 'music:lib_nabiya:normal:0.8', AC.contentSig(DEF));
+  ok(AC.contentSig(DEF) === 'music:lib_nabiya:normal:0.8:6', AC.contentSig(DEF));
+  //  키 수만 다른 과제 = 다른 내용(잘못된 '같은 내용' 확인 창 없음) [검토 반영]
+  const k8 = AC.normDef({ ...RAW, id: 'aK8', content: { music: { ...RAW.content.music, keys: 8 } } }, 'aK8');
+  ok(AC.contentSig(k8) !== AC.contentSig(DEF), AC.contentSig(k8));
 });
 test('난이도 표 — rhythm.js LEVELS = 과제 정의 난이도(assign-core) = 관리 고르기 표(이름 · 기본 키 · 빠르기)', () => {
   eq(Object.keys(LEVELS), LEVEL_KEYS, 'rhythm 키');
@@ -152,13 +155,58 @@ test('관리 결과 표 — 명단 기준(안 한 아이도) · 정확도 · 등
   ok(sum.n === 1 && sum.avg === 96 && sum.grades.S === 1, JSON.stringify(sum));
   admin._mask = false;
   const html = admin.assignMusicResultHTML(DEF, t);
-  ok((html.match(/<tr><td class="td-name">/g) || []).length === 3, '줄 셋');
+  ok((html.match(/<tr class="[^"]*"><td class="td-name">/g) || []).length === 3, "줄 셋");
   ok(html.includes('<b>96%</b>') && html.includes('70% (C)') && html.includes('&lt;구름&gt;') && !html.includes('<구름>'), '칸 · escape');
   ok(/<td>none<\/td>/.test(html) && /<td>doing<\/td>/.test(html) && /<td>done<\/td>/.test(html), '상태 셋');
   ok(admin.assignMusicLiveHTML(DEF, t).includes('정확도 평균 <b>96%</b>'), '수업 띠');
   admin._mask = true;
   const m = admin.assignMusicResultHTML(DEF, t);
   ok(!m.includes('96') && !m.includes('하늘') && (m.match(/이름 가리기 중/g) || []).length === 3, '가리기');
+});
+
+test('관리 결과 표 — 수업 중이면 이름 칸 [빼기 / 다시 넣기] · 빠짐 표시 · asg-ex (문제 묶음 표와 같음) / 수업 밖 · 명단 밖은 단추 없음 [검토 반영]', () => {
+  const c1 = write(null, rhythmPatch(res(80))).cell;
+  const roster = [{ sid: 's1', name: '하늘' }, { sid: 's2', name: '바다' }];
+  const t = AC.tally(DEF, { s1: c1, zz: c1 }, roster, { excused: { s2: true } });
+  admin._mask = false;
+  const on = admin.assignMusicResultHTML(DEF, t, true);
+  ok(on.includes(`assignExcuse('s1', true)`) && on.includes('>빼기</button>'), '빼기 ' + on);
+  ok(on.includes(`assignExcuse('s2', false)`) && on.includes('>다시 넣기</button>') && on.includes('<span class="asg-tag">빠짐</span>'), '다시 넣기 · 빠짐');
+  ok((on.match(/<tr class="asg-ex">/g) || []).length === 1, 'asg-ex 하나');
+  ok(!on.includes(`assignExcuse('zz'`), '명단 밖은 단추 없음');
+  ok(!admin.assignMusicResultHTML(DEF, t, false).includes('assignExcuse'), '수업 밖 단추 없음');
+  admin._mask = true;
+  ok(admin.assignMusicResultHTML(DEF, t, true).includes(`assignExcuse('s1', true)`), '이름 가리기 중에도 빼기는 됨');
+  admin._mask = false;
+  const a = read('admin/assign.js');
+  ok(/assignMusicResultHTML\(def, t, liveOn\)/.test(a), 'assign.js 가 liveOn 을 넘김');
+  ok(/t\.avg != null && def\.kind !== 'music' \? ` · 끝낸 아이 평균/.test(a), '음악 결과 머리에 \'평균 N점\' 없음(표 위 정확도 평균 % 하나)');
+});
+test('곡 이름 — 쪽을 새로 열어 목록이 없으면 종류 줄이 곡 목록을 읽고 다시 그림 · 영어 열쇠만 남지 않음 [검토 반영]', () => {
+  const src = read('admin/assign-music.js');
+  ok(/function assignMusicKindLabel\(def\) \{\n  if \(_assignMusicLib === null\) _assignMusicLoad\(\);/.test(src), '종류 줄이 읽기를 부름(실패 뒤에는 되풀이 안 함)');
+  ok(/if \(typeof _assignRenderBits === 'function' && Array\.isArray\(_assignMusicLib\)\) _assignRenderBits\(true\);/.test(src), '다 읽히면 목록 다시 그림');
+  ok(admin.assignMusicKindLabel(DEF).includes('나비야') && !admin.assignMusicKindLabel(DEF).includes('nabiya'), admin.assignMusicKindLabel(DEF));
+});
+test('TV — 정확도 평균 = 관리 화면 assignMusicSummary 와 같은 숫자 · 이름 보이기가 음악 화면에도 듣는다 [검토 반영]', () => {
+  const tv = read('assign/js/tv.js');
+  const fnSrc = tv.match(/function musicAvg\(t\) \{[\s\S]*?\n\}\n/)[0];
+  const musicAvg = new Function(fnSrc + 'return musicAvg;')();
+  let c1 = write(null, rhythmPatch(res(100))).cell;
+  const c2 = write(null, rhythmPatch(res(56.3))).cell;
+  const t = AC.tally(DEF, { s1: c1, s2: c2 }, [{ sid: 's1', name: '하늘' }, { sid: 's2', name: '바다' }, { sid: 's3', name: '구름' }]);
+  const want = admin.assignMusicSummary(t).avg;
+  ok(want === 78.2 && musicAvg(t) === want, `관리 ${want} · TV ${musicAvg(t)} · tally ${t.avg}`);
+  ok(/function appView\(def, live\)/.test(tv) && /const names = !!\(live && live\.names\)/.test(tv), 'appView 가 live.names 를 읽음');
+  ok(/view = appView\(def, live\)/.test(tv) && /return appView\(def, live\)/.test(tv), '부르는 곳 둘 다 live 넘김');
+  ok(!/t\.avg/.test(tv.match(/function appView[\s\S]*?\n\}\n/)[0]), 'TV 음악 평균은 tally.avg(반올림 점수) 안 씀');
+});
+test('밑의 리듬 판이 수업 덮개로 멈추면 — 그 판은 버리고 준비 화면에 까닭 한 줄 · 다시 시작하면 지움 [검토 반영]', () => {
+  const r = read('music/js/rhythm.js');
+  ok(/pause\(\) \{ if \(state === 'play'\) \{ pausedByClass = true; stop\(\); \} \}/.test(r), 'pause 표시');
+  ok(/pausedByClass \? h\('p', \{ class: 'r-asg-note' \}, '⏸ 선생님과 수업 때문에 치던 판이 멈췄어요/.test(r), '준비 화면 한 줄');
+  ok(/function start\(\) \{\n    pausedByClass = false;/.test(r), 'start 에서 지움');
+  ok(/리듬 판은 멈춤 = 그 판을 버림/.test(read('docs/class_assign_design.md')), '설계 §21 에 적음');
 });
 
 // ── 학생 화면 덮개 안 앱 주소(student/assign.js 를 vm 에서) ──

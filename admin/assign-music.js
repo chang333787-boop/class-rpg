@@ -23,6 +23,8 @@ function _assignMusicLoad() {
   }).catch(e => { console.warn('[ASSIGN-MUSIC-1] 곡 목록', e); _assignMusicLib = 'err'; _assignMusicRefresh(); });
 }
 function _assignMusicRefresh() {
+  //  목록 · 결과 머리의 곡 이름도 영어 열쇠(nabiya) 대신 제목으로 다시 그린다 [ASSIGN-MUSIC-1 · 검토 반영]
+  if (typeof _assignRenderBits === 'function' && Array.isArray(_assignMusicLib)) _assignRenderBits(true);
   const d = _AS.draft, el = document.getElementById('asg-pick-music');
   if (!d || d.kind !== 'music' || !el) return;
   el.innerHTML = assignMusicPickerHTML(d);
@@ -74,6 +76,7 @@ function assignMusicAutoTitle(d) {
 }
 //  목록 줄 머리
 function assignMusicKindLabel(def) {
+  if (_assignMusicLib === null) _assignMusicLoad();   // 쪽을 새로 열면 곡 목록이 아직 없다 — 읽고 나서 다시 그림(_assignMusicRefresh) [검토 반영]
   const m = def.content.music, lv = _assignMusicLevel(m.level);
   return `🎵 리듬 · ${escHtml(assignMusicSongTitle(m.song))} · ${lv[1]} · ${m.keys || lv[2]}키${m.tempo === 0.8 ? ' · 조금 느리게' : ''}`;
 }
@@ -101,14 +104,18 @@ function assignMusicLiveHTML(def, t) {
   return `<div class="asg-live-row"><span class="text-muted-sm">끝까지 친 아이</span> <b>${s.n}</b>${s.avg != null ? ` · 정확도 평균 <b>${s.avg}%</b>` : ''} ${_assignMusicGradeChips(s)}</div>`;
 }
 //  결과 표 — 명단 기준(안 한 아이도) · 이름 가리기 중엔 숫자 숨김
-function assignMusicResultHTML(def, t) {
+//   liveOn = 이 과제로 수업 중 — 문제 묶음 표처럼 한 아이만 [빼기 / 다시 넣기](보건실 · 화장실) · '빠짐' 표시 [검토 반영]
+function assignMusicResultHTML(def, t, liveOn) {
   const mask = _assignMasked(), s = assignMusicSummary(t);
   const J = b => b ? `<span class="asg-mu-j"><i class="p">${b.perfect || 0}</i><i class="g">${b.great || 0}</i><i class="o">${b.good || 0}</i><i class="m">${b.miss || 0}</i></span>` : '-';
   const rows = [...t.rows, ...t.outside].map((r, i) => {
     const b = _assignMusicBest(r), f = _assignMusicFirst(r);
-    const nm = r.outside ? `<span class="text-muted-sm">명단 밖</span> ${escHtml(r.name || r.sid)}` : _assignNameHTML(r.name, i);
-    if (mask) return `<tr><td class="td-name">${nm}</td><td>${_assignStatus(r)}</td><td colspan="6" class="text-muted-sm">이름 가리기 중</td></tr>`;
-    return `<tr><td class="td-name">${nm}</td><td>${_assignStatus(r)}</td>
+    const nm = (r.outside ? `<span class="text-muted-sm">명단 밖</span> ${escHtml(r.name || r.sid)}` : _assignNameHTML(r.name, i))
+      + (r.excused ? ' <span class="asg-tag">빠짐</span>' : '')
+      + (liveOn && !r.outside ? `<button class="asg-mini" onclick="assignExcuse('${escJsAttr(r.sid)}', ${r.excused ? 'false' : 'true'})">${r.excused ? '다시 넣기' : '빼기'}</button>` : '');
+    const tr = `<tr class="${r.excused ? 'asg-ex' : ''}">`;
+    if (mask) return `${tr}<td class="td-name">${nm}</td><td>${_assignStatus(r)}</td><td colspan="6" class="text-muted-sm">이름 가리기 중</td></tr>`;
+    return `${tr}<td class="td-name">${nm}</td><td>${_assignStatus(r)}</td>
       <td class="nowrap">${b ? `<b>${Number(b.acc) || 0}%</b> <span class="asg-mu-g g-${escHtml(b.grade)}">${escHtml(b.grade)}</span>` : '-'}</td>
       <td class="nowrap">${J(b)}</td><td>${b ? b.maxCombo || 0 : '-'}</td>
       <td class="nowrap">${f ? `${Number(f.acc) || 0}% (${escHtml(f.grade)})` : '-'}</td>

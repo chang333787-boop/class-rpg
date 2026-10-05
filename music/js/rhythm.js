@@ -246,7 +246,10 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
 
   // ── 흐름 ──
   function loop() { if (state !== 'play') return; sweep(now()); draw(); raf = requestAnimationFrame(loop); }
+  //  [ASSIGN-MUSIC-1 · 검토 반영] 수업 덮개로 멈춘 판은 그 판을 버린다(소리와 박자가 묶여 이어 치기 어려움) — 준비 화면에 까닭 한 줄
+  let pausedByClass = false;
   function start() {
+    pausedByClass = false;
     engine.ensure(); engine.setReverb(0.1);
     makeChart(); held = {}; fx = []; judgeShow = null;
     built = buildEvents(song, { scale: effTempo(), countIn: song.beats, melody: guide, harm: guide });
@@ -303,6 +306,7 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
       h('p', { class: 'muted' }, '길게 이어진 음표는 끝까지 누르고 있어요. 화면을 눌러서 칠 수도 있어요.'),
       A ? h('p', { class: 'r-asg-note' }, A.live ? '👩‍🏫 선생님과 수업 중 — 끝까지 치면 결과가 선생님께 가요. 여러 번 쳐도 돼요.' : '📝 선생님 과제 — 끝까지 치면 결과가 선생님께 가요. 여러 번 쳐도 가장 좋은 기록이 남아요.') : null,
       A && A.line && A.line() ? h('p', { class: 'muted small' }, A.line()) : null,
+      pausedByClass ? h('p', { class: 'r-asg-note' }, '⏸ 선생님과 수업 때문에 치던 판이 멈췄어요 — ▶ 시작을 눌러 처음부터 다시 쳐요') : null,
       h('div', { class: 'stars-row' }, guideBtn),
       h('button', { class: 'btn primary big', onclick: () => start() }, '▶ 시작'),
       h('p', { class: 'muted small' }, 'Esc = 그만')));
@@ -327,5 +331,5 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
   makeChart(); showReady(); size();
   cheer.onload = () => draw();
   if (/[?&]debug=1/.test(location.search)) window.__rhythm = { chart: () => chart, now, press, release, stats: () => stats, start, state: () => state, setLevel: v => { level = v; if (!keysPick) lanes = LEVELS[v].lanes; WIN = LEVELS[v].win; makeChart(); }, setKeys: n => { keysPick = n; lanes = n; makeChart(); }, layout: () => ({ lanes, six, key: levelKey() }) };   // 시험용(주소에 debug=1 일 때만)
-  return { pause() { if (state === 'play') stop(); }, unmount() { player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp); ro.disconnect(); for (const c of chart) c.voice && c.voice.stop(); } };
+  return { pause() { if (state === 'play') { pausedByClass = true; stop(); } }, unmount() { player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp); ro.disconnect(); for (const c of chart) c.voice && c.voice.stop(); } };
 }

@@ -184,11 +184,25 @@ try {
   ok(r1 && r1[1] === '끝' && r1[2].startsWith(b1.acc + '%') && r1[6] === '2' && r2 && r2[1] === '끝' && r3 && r3[1] === '안 함' && r3[2] === '-',
     'A22 하늘 끝 · 정확도 · 친 횟수 2 / 바다 끝 / 구름 안 함', JSON.stringify([r1, r2, r3]));
   ok(tbl && /끝까지 친 아이 2 \/ 5/.test(String(tbl.sum).replace(/\s+/g, ' ')) && /정확도 평균/.test(tbl.sum), 'A23 위 줄: 끝까지 친 아이 2 / 5 · 정확도 평균 · 등급별 수', String(tbl && tbl.sum).replace(/\s+/g, ' ').slice(0, 200));
+  const headA = await T.ev(`(document.querySelector('#asg-result .tc-title') || {}).textContent || ''`);
+  ok(/끝 2/.test(headA) && !/평균 [\d.]+점/.test(headA), 'A23b [검토 반영] 결과 머리에 \'끝낸 아이 평균 N점\' 없음(평균은 위 줄 정확도 % 하나)', headA.replace(/\s+/g, ' ').slice(0, 160));
+  const avgAdminA = (String(tbl && tbl.sum).match(/정확도 평균 ([\d.]+)%/) || [])[1];
   await T.shot('A_teacher_result');
   await T.ev(`_AS.mask = true; _assignRenderBits(true); 1`); await sleep(300);
   const masked = await T.ev(`document.querySelector('#asg-result .asg-table tbody').textContent`);
   ok(/이름 가리기 중/.test(masked) && !masked.includes(String(b1.acc) + '%'), 'A24 이름 가리기 중엔 정확도 숫자 숨김');
   await T.ev(`_AS.mask = null; _AS.sel = ''; _assignRenderBits(true); 1`);
+
+  //  [검토 반영] 관리 화면을 새로 열면(만들기 칸을 안 열어도) 목록 종류 줄이 곡 제목 — 영어 열쇠(sola) 아님
+  const T2 = await device('교사2', '/admin.html?auto');
+  await until(T2, `document.getElementById('admin-app')?.style.display === 'grid' && typeof _AS !== 'undefined' && _AS.booted`, 25000);
+  await T2.ev(`window.confirm = () => true; nav('assign', document.getElementById('nav-assign')); 1`);
+  const fresh = await until(T2, `/🎵 리듬 · 솔·라·시 연습/.test((document.getElementById('assign-page') || {}).textContent || '')`, 10000);
+  const freshTxt = await T2.ev(`((document.getElementById('assign-page') || {}).textContent || '').replace(/\s+/g, ' ')`);
+  ok(fresh && !/🎵 리듬 · sola/.test(freshTxt), 'A25 [검토 반영] 새로 연 관리 화면 목록: \'🎵 리듬 · 솔·라·시 연습\'(영어 열쇠 아님)', (freshTxt.match(/🎵 리듬[^·]*·[^·]*/) || [''])[0]);
+  await T2.shot('A_teacher2_list');
+  await send('Target.closeTarget', { targetId: T2.targetId });
+  await sleep(300);
 
   // ═════ B. 수업(각자 풀기) ═════
   //  학생2: 밑에 음악실(보통 모드) 리듬을 치는 중
@@ -245,8 +259,33 @@ try {
     await V.ev(`document.body.textContent.replace(/\\s+/g, ' ').slice(0, 200)`));
   ok(!/(하늘|바다|구름|별님|나무)/.test(await V.ev(`document.body.textContent`)), 'B14 TV 에 이름 0');
   await V.shot('B_tv');
+  //  [검토 반영] TV 평균 = 관리 화면 평균(같은 셈 · 소수 한 자리)
+  const tvTxt = await V.ev(`document.body.textContent`);
+  const avgTv = (tvTxt.match(/정확도 평균 ([\d.]+)%/) || [])[1], avgStrip = (strip.match(/정확도 평균 ([\d.]+)%/) || [])[1];
+  ok(avgTv && avgTv === avgStrip, 'B14b [검토 반영] TV 정확도 평균 = 관리 수업 띠 평균', JSON.stringify({ avgTv, avgStrip, avgAdminA }));
+  //  [검토 반영] TV [이름 보이기] → 음악 화면에도 명단 차례 이름 · 다시 누르면 숨김
+  const dots = await V.ev(`document.querySelectorAll('.tv-dots .tv-dot').length`);
+  await V.ev(`[...document.querySelectorAll('.tv-ctl button')].find(b => /이름 보이기/.test(b.textContent)).click(); 1`);
+  const shown = await until(V, `/✓ 하늘/.test(document.body.textContent) && /구름/.test(document.body.textContent)`, 6000);
+  await V.shot('B_tv_names');
+  await V.ev(`[...document.querySelectorAll('.tv-ctl button')].find(b => /이름 숨기기/.test(b.textContent)).click(); 1`);
+  const hidden = await until(V, `!/(하늘|바다|구름)/.test(document.body.textContent)`, 6000);
+  ok(dots === 5 && shown && hidden, 'B14c [검토 반영] TV 음악: 점 5 · [이름 보이기] → \'✓ 하늘\' … · [이름 숨기기] → 이름 0', JSON.stringify({ dots, shown, hidden }));
   await T.ev(`if (_AS.sel !== ${JSON.stringify(aidB)}) assignSelect(${JSON.stringify(aidB)}); 1`);
   ok(await until(T, `!!document.querySelector('#asg-result .asg-mu-sum') && /끝까지 친 아이 1/.test(document.querySelector('#asg-result .asg-mu-sum').textContent)`, 5000), 'B15 수업 과제 결과 표(음악용)');
+  //  [검토 반영] 수업 중 한 아이만 빼기(보건실 · 화장실) — 음악 결과 표 이름 칸 [빼기] → 그 아이 덮개만 걷힘 · '빠짐' → [다시 넣기] → 다시 덮임
+  const exBtns = await T.ev(`[...document.querySelectorAll('#asg-result .asg-table tbody tr button.asg-mini')].map(b => b.textContent.trim())`);
+  ok(Array.isArray(exBtns) && exBtns.length === 5 && exBtns.every(t => t === '빼기'), 'B15b [검토 반영] 음악 결과 표 이름 칸마다 [빼기](5)', JSON.stringify(exBtns));
+  const rowIdx = await T.ev(`[...document.querySelectorAll('#asg-result .asg-table tbody tr')].findIndex(r => r.textContent.includes('구름'))`);
+  const pr1 = await T.press('#asg-result .asg-table tbody tr button.asg-mini', rowIdx);
+  const s3out = await until(S3, `!classLiveIsOpen()`, 8000);
+  const exRow = await until(T, `(() => { const r = [...document.querySelectorAll('#asg-result .asg-table tbody tr')].find(r => r.textContent.includes('구름')); return !!r && r.classList.contains('asg-ex') && r.textContent.includes('빠짐') && r.textContent.includes('다시 넣기'); })()`, 5000);
+  const othersIn = (await Promise.all([S1, S2].map(S => S.ev(`classLiveIsOpen()`)))).every(v => v === true);
+  ok(pr1 === true && s3out && exRow && othersIn, 'B15c [검토 반영] [빼기](구름) → 학생3 덮개만 걷힘 · 표에 \'빠짐\' · [다시 넣기] · 다른 아이 그대로', JSON.stringify({ pr1, s3out, exRow, othersIn }));
+  await T.shot('B_teacher_excused');
+  const pr2 = await T.press('#asg-result .asg-table tbody tr button.asg-mini', rowIdx);
+  const s3in = await until(S3, `classLiveIsOpen() && !!document.querySelector('#class-live.asg-app-mode #asgl-app')`, 8000);
+  ok(pr2 === true && s3in, 'B15d [검토 반영] [다시 넣기] → 학생3 다시 덮개(리듬 앱 창)', JSON.stringify({ pr2, s3in }));
   //  끝내기
   await T.ev(`assignLiveEnd(false); 1`);
   ok(await until(T, `!_AS.live.on`, 5000), 'B16 교사 [끝내기] → live 꺼짐');
@@ -258,6 +297,8 @@ try {
   const back2 = await S2.ev(`({ src: document.getElementById('embed-frame').src, emb: document.getElementById('m-embed').style.display })`);
   const back2r = await S2.fr('#embed-frame', `window.__rhythm.state()`);
   ok(back2.src === emb2 && back2.emb === 'flex' && back2r === 'ready', 'B19 학생2 밑의 음악실 창 그대로(멈춘 판 = 준비 화면)', JSON.stringify({ back2, back2r }));
+  const pauseNote = await S2.fr('#embed-frame', `document.body.textContent.includes('선생님과 수업 때문에 치던 판이 멈췄어요')`);
+  ok(pauseNote === true, 'B19b [검토 반영] 밑의 리듬 준비 화면에 \'⏸ 선생님과 수업 때문에 치던 판이 멈췄어요 — ▶ 시작을 눌러 처음부터\'');
   await S2.shot('B_s2_back');
   ok(!!db(`classRPG_assign/archive/${aidB}`) && Object.keys(db(`classRPG_assign/results/${aidB}`) || {}).includes('s1'), 'B20 정의는 archive · 결과 칸 남음');
 

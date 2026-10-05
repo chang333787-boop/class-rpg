@@ -392,10 +392,10 @@ function _assignRenderResult() {
   const liveOn = _AS.live && _AS.live.on === true && _AS.live.aid === aid;
   const revealed = liveOn ? (_AS.live.revealAt || def.revealed) : def.revealed;
   const t = AssignCore.tally(def, R, roster, { revealed, excused: liveOn ? _AS.excused : {} });
-  const head = `<div class="tc-header"><div class="tc-title">${escHtml(def.title)} <span class="text-muted-sm">${_assignKindLabel(def)} · 받는 아이 ${t.rows.length}명 · 끝 ${t.counts.done} · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${t.avg != null ? ` · 끝낸 아이 평균 ${t.avg}점` : ''}</span></div>
+  const head = `<div class="tc-header"><div class="tc-title">${escHtml(def.title)} <span class="text-muted-sm">${_assignKindLabel(def)} · 받는 아이 ${t.rows.length}명 · 끝 ${t.counts.done} · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${t.avg != null && def.kind !== 'music' ? ` · 끝낸 아이 평균 ${t.avg}점` : ''}</span></div>
     <div class="tc-actions"><button class="btn-sm outline" onclick="assignOpenTV('${aid}')">TV 로 보기</button><button class="btn-sm outline" onclick="assignSelect('${aid}')">접기</button></div></div>`;
   let body;
-  if (def.kind === 'music' && typeof assignMusicResultHTML === 'function') body = assignMusicResultHTML(def, t);   // [ASSIGN-MUSIC-1] 음악용 칸
+  if (def.kind === 'music' && typeof assignMusicResultHTML === 'function') body = assignMusicResultHTML(def, t, liveOn);   // [ASSIGN-MUSIC-1] 음악용 칸 · 평균은 표 위 '정확도 평균 %' 하나만
   else if (def.kind !== 'quiz') {
     body = `<table><thead><tr><th>이름</th><th>상태</th><th>점수</th><th>실행 · 판</th><th>자세히</th></tr></thead><tbody>${t.rows.map((r, i) => `<tr>
       <td class="td-name">${_assignNameHTML(r.name, i)}</td><td>${_assignStatus(r)}</td><td>${r.status === 'none' ? '-' : `${r.correct} / ${r.total}`}</td><td>${r.attempts || 0}</td>
