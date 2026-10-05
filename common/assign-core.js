@@ -10,9 +10,14 @@
   const ROOT = 'classRPG_assign';
   const HOST_GRACE_MS = 3 * 60 * 1000;    // 교사 기기(관리 · TV)가 모두 끊긴 뒤 이만큼 지나면 아이 화면이 풀린다
   const STALE_MS = 15 * 60 * 1000;        // 이만큼 비어 있던 수업 = '멈춘 수업' — 교사 기기가 돌아와도 저절로 다시 덮지 않는다(이어 하기를 눌러야)
-  const MIN_DEFAULT = 40, MIN_MIN = 10, MIN_MAX = 120;   // 수업 안전 시간(분)
+  const MIN_DEFAULT = 45, MIN_MIN = 10, MIN_MAX = 120;   // 수업 안전 시간(분) — 기본 45분(보스 결정 10-05 · 한 차시 40분 + 여유)
   const ITEMS_MAX = 30, ANS_MAX = 80, TITLE_MAX = 40, STAGES_MAX = 3;
   const KINDS = ['quiz', 'coding', 'music'];
+  //  [ASSIGN-LIVE-APPS-1] '지금 모두 같이'(수업 덮개)로 열 수 있는 학습 앱 — **스위치 한 곳**. 비어 있으면 기초 코딩 · 음악실 리듬은 과제함으로만.
+  //   보스 결정(10-05): 수업 덮개 안 앱 창은 아이마다 RTDB 연결을 하나 더 연다(25명 반이면 70+ — 무료 요금제 동시 100 에 닿음 · 요금제 미확인).
+  //   켜려면 여기에 'coding' · 'music' 을 넣는다 — 관리 만들기 · 목록 [수업으로] · 아이 덮개 안 앱 창(student/assign.js) · liveState 가 모두 이 값을 본다.
+  const LIVE_APPS = Object.freeze([]);
+  const isLiveKind = kind => kind === 'quiz' || LIVE_APPS.includes(kind);
   const TYPES = ['choice', 'number', 'short', 'fraction'];
 
   // ── 작은 도구 ──
@@ -255,12 +260,13 @@
     return Math.min(e || base + MIN_DEFAULT * 60000, base + MIN_MAX * 60000);
   }
   //  이 아이 화면에 수업 덮개가 보이나 — 한 함수(학생 · 관리 · TV · 시험)
-  //   why: off · noDef · notTarget · excused · expired · stale(멈춘 수업) · hostAway(3분 넘게 교사 기기 없음) · waitHost(덮개 + '기다려 볼게요') · ok
+  //   why: off · noDef · appOff(수업으로 못 여는 학습 앱) · notTarget · excused · expired · stale(멈춘 수업) · hostAway(3분 넘게 교사 기기 없음) · waitHost(덮개 + '기다려 볼게요') · ok
   function liveState(live, def, sid, ctx) {
     const c = ctx || {};
     const now = num(c.now, Date.now());
     if (!isObj(live) || live.on !== true || !safeAid(live.aid)) return { show: false, why: 'off' };
     if (!def || def.id !== live.aid) return { show: false, why: 'noDef' };
+    if (!isLiveKind(def.kind)) return { show: false, why: 'appOff' };   // 수업으로 못 여는 학습 앱(장난 쓰기 · 옛 탭) — 덮지 않는다 [ASSIGN-LIVE-APPS-1]
     if (sid !== undefined && !isTarget(def, sid)) return { show: false, why: 'notTarget' };
     if (c.excused) return { show: false, why: 'excused' };
     const endsAt = endsAtOf(live);
@@ -527,6 +533,39 @@
     for (const s of items) if (s.rate != null && s.rate < low) { low = s.rate; hardest = s.i; }
     return { rows, outside, counts, items, avg, hardest };
   }
+  //  [ASSIGN-AVG-1] 반 평균 한 줄 — 종류마다 뜻이 다르다(관리 결과 머리 · TV 가 같은 셈 · 같은 말)
+  //   문제 묶음 = 끝낸 아이 점수(100점 만점) · 기초 코딩 = 시작한 아이가 푼 판 수(끝낸 아이만 보면 늘 다 푼 값) · 음악실 리듬 = 끝까지 친 아이의 가장 좋은 판 정확도
+  function avgOf(def, t) {
+    if (!def || !isObj(t) || !Array.isArray(t.rows)) return null;
+    const r1 = v => Math.round(v * 10) / 10;
+    if (def.kind === 'coding') {
+      const st = t.rows.filter(r => r.status !== 'none');
+      return st.length ? { v: r1(st.reduce((s, r) => s + Math.max(0, num(r.correct, 0)), 0) / st.length), n: st.length, of: def.n } : null;
+    }
+    if (def.kind === 'music') {
+      let sum = 0, n = 0;
+      for (const r of t.rows) { const b = isObj(r.detail) && isObj(r.detail.best) ? r.detail.best : null; if (!b || r.status !== 'done') continue; sum += num(b.acc, 0); n++; }
+      return n ? { v: r1(sum / n), n } : null;
+    }
+    const n = t.rows.filter(r => r.status === 'done').length;
+    return t.avg != null ? { v: t.avg, n } : null;
+  }
+  //  who = '아이'(관리) · '친구'(TV) → ' · …' 없이 글만 · 없으면 ''
+  function avgText(def, t, who) {
+    const a = avgOf(def, t), w = who || '아이';
+    if (!a) return '';
+    if (def.kind === 'coding') return `시작한 ${w} 푼 판 평균 ${a.v} / ${a.of}`;
+    if (def.kind === 'music') return `끝까지 친 ${w} 정확도 평균 ${a.v}%`;
+    return `끝낸 ${w} 평균 ${a.v}점`;
+  }
+  //  [ASSIGN-END-INBOX-2] 수업을 끝낸 뒤 과제를 어떻게 둘까 — 관리 [끝내기] · TV E 가 같은 판단(보스 결정 10-05: '못 한 아이는 과제함으로' 기본 켬)
+  //   keep(못 한 아이 과제함으로) 켜짐 + 못 한 아이가 있음 → 'inbox'(fromLive) · 과제함에서 돌린 수업(fromInbox) → 'back' · 그 밖 → 'close'(archive)
+  function endPlan(raw, t, keep) {
+    const left = isObj(t) && Array.isArray(t.rows) && t.rows.some(r => r.status !== 'done');
+    if (keep && left) return 'inbox';
+    if (isObj(raw) && raw.fromInbox) return 'back';
+    return 'close';
+  }
 
   // ── 숙달도 — 아이 칸 mine/<sid>/<aid> = { s 과목, q: { q3: { p 문항 id, u 단원, c 맞음, d 날짜 } } } ──
   //  오늘의 학습 기록(problemRecords)과 같은 모양의 기록으로 바꾼다. 과제 하나 · 날짜 하나마다 한 건.
@@ -567,11 +606,11 @@
   };
 
   g.AssignCore = Object.freeze({
-    ROOT, HOST_GRACE_MS, STALE_MS, MIN_DEFAULT, MIN_MIN, MIN_MAX, ITEMS_MAX, ANS_MAX, TITLE_MAX, STAGES_MAX, KINDS,
+    ROOT, HOST_GRACE_MS, STALE_MS, MIN_DEFAULT, MIN_MIN, MIN_MAX, ITEMS_MAX, ANS_MAX, TITLE_MAX, STAGES_MAX, KINDS, LIVE_APPS, isLiveKind,
     path, safeKey, safeAid, qkey, newId, isOX, itemLang, isEnglish, hasHangul, fixQuotes, normAns, choiceJosa,
     snapItem, pickSet, normItem, normDef, isTarget, contentSig, grade,
     answersOf, ansAt, answeredCount, firstOpen, isLate,
     hostGaps, endsAtOf, liveState, liveScreen, canAnswer, answerPatch, appPatch, ctl,
-    summarize, itemStats, tally, masteryRecords,
+    summarize, itemStats, tally, avgOf, avgText, endPlan, masteryRecords,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

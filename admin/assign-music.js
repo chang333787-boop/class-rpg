@@ -1,6 +1,7 @@
 // admin/assign-music.js — 📝 과제·수업 · 🎵 음악실 리듬 [ASSIGN-MUSIC-1]
-//  · 만들기 '① 무엇을' 칸: 곡(음악실 기본 곡 · ★ 난이도) · 난이도 · 키 수 · 빠르기 — admin/assign.js 가 assignMusicPickerHTML(d) 를 부른다
-//  · 결과 표(음악용 칸): 가장 좋은 정확도 · 등급 · 판정 넷 · 최대 콤보 · 처음 판 · 친 횟수 · 걸린 시간 / 반: 등급별 수 · 정확도 평균
+//  · 만들기 '① 무엇을' 칸: 곡(음악실 기본 곡 · ★ 난이도) · 난이도 · 키 수 · 빠르기
+//  · 결과 칸(틀 = admin/assign.js _assignAppResultHTML): 가장 좋은 정확도 · 등급 · 판정 넷 · 최대 콤보 · 처음 판 · 친 횟수 · 걸린 시간 / 표 위: 등급별 수 · 정확도 평균
+//  · 공용 틀(admin/assign.js ASSIGN_APPS)에 맨 아래에서 단다 — 여기는 곡 고르기 · 결과 칸만 [ASSIGN-APPS-1]
 //  · 아이 쪽 = music/js/app.js · rhythm.js(?assign) · 결과 모양 = music/js/assign-music.js rhythmPatch · 쓰는 곳 = AssignCore.appPatch
 //  · 곡 목록은 음악실 파일(music/js/library.js)을 그때 한 번 읽는다 — ?v= 는 music/index.html import map 값과 같게(시험이 견줌)
 //  · 전역 이름 머리 = assignMusic · _assignMusic · ASSIGN_MUSIC
@@ -22,15 +23,17 @@ function _assignMusicLoad() {
     _assignMusicRefresh();
   }).catch(e => { console.warn('[ASSIGN-MUSIC-1] 곡 목록', e); _assignMusicLib = 'err'; _assignMusicRefresh(); });
 }
-function _assignMusicRefresh() {
+//  force = 고른 값이 바뀜(늘 다시 그림) · 아니면 목록을 다 읽은 때 — 고르기 칸이 '읽는 중'일 때만 다시 그린다(이미 곡이 보이면 그대로 → 누르는 사이 칸이 바뀌어 클릭이 빠지지 않게) [ASSIGN-APPS-1]
+function _assignMusicRefresh(force) {
   //  목록 · 결과 머리의 곡 이름도 영어 열쇠(nabiya) 대신 제목으로 다시 그린다 [ASSIGN-MUSIC-1 · 검토 반영]
-  if (typeof _assignRenderBits === 'function' && Array.isArray(_assignMusicLib)) _assignRenderBits(true);
-  const d = _AS.draft, el = document.getElementById('asg-pick-music');
+  if (!force && typeof _assignRenderBits === 'function' && Array.isArray(_assignMusicLib)) _assignRenderBits(true);
+  const d = typeof _AS !== 'undefined' && _AS.draft, el = document.getElementById('asg-pick-music');
   if (!d || d.kind !== 'music' || !el) return;
+  if (!force && el.querySelector('.asg-mu-song')) return;
   el.innerHTML = assignMusicPickerHTML(d);
   if (typeof _assignCMeta === 'function') _assignCMeta();   // 이름(곡 제목) 따라감
 }
-function assignMusicRetry() { _assignMusicLib = null; _assignMusicRefresh(); }
+function assignMusicRetry() { _assignMusicLib = null; _assignMusicRefresh(true); }
 function assignMusicSongTitle(id) {
   const s = Array.isArray(_assignMusicLib) ? _assignMusicLib.find(x => x.id === id) : null;
   return s ? s.title : String(id || '').replace(/^lib_/, '');
@@ -66,7 +69,7 @@ function assignMusicDraft(key, val) {
   if (key === 'level') m.level = ASSIGN_MUSIC_LEVELS.some(l => l[0] === val) ? val : 'easy';
   if (key === 'keys') m.keys = [4, 6, 8].includes(Number(val)) ? Number(val) : 0;
   if (key === 'tempo') m.tempo = Number(val) === 0.8 ? 0.8 : 1;
-  _assignMusicRefresh();
+  _assignMusicRefresh(true);
 }
 //  과제 이름 — '리듬 · 나비야 · 쉬움'(조금 느리게면 덧붙임)
 function assignMusicAutoTitle(d) {
@@ -85,15 +88,17 @@ function assignMusicKindLabel(def) {
 function _assignMusicBest(r) { const b = r && r.detail && r.detail.best; return b && typeof b === 'object' ? b : null; }
 function _assignMusicFirst(r) { const b = r && r.detail && r.detail.first; return b && typeof b === 'object' ? b : null; }
 //  반 요약 — 끝낸 아이 등급별 수 · 정확도 평균(끝낸 아이) · 친 아이 수
+//   평균은 AssignCore.avgOf 한 셈(TV · 관리 결과 머리와 같은 숫자) [ASSIGN-AVG-1]
 function assignMusicSummary(t) {
-  const g = {}; let sum = 0, n = 0;
+  const g = {}; let n = 0;
   for (const r of t.rows) {
     const b = _assignMusicBest(r);
     if (!b || r.status !== 'done') continue;
     const k = ASSIGN_MUSIC_GRADES.includes(b.grade) ? b.grade : 'D';
-    g[k] = (g[k] || 0) + 1; sum += Number(b.acc) || 0; n++;
+    g[k] = (g[k] || 0) + 1; n++;
   }
-  return { grades: g, avg: n ? Math.round(sum / n * 10) / 10 : null, n };
+  const a = AssignCore.avgOf({ kind: 'music', n: 1 }, t);
+  return { grades: g, avg: a ? a.v : null, n };
 }
 function _assignMusicGradeChips(sum) {
   return ASSIGN_MUSIC_GRADES.filter(k => sum.grades[k]).map(k => `<span class="asg-dist-chip asg-mu-g g-${k}">${k} ${sum.grades[k]}</span>`).join('');
@@ -103,26 +108,29 @@ function assignMusicLiveHTML(def, t) {
   const s = assignMusicSummary(t);
   return `<div class="asg-live-row"><span class="text-muted-sm">끝까지 친 아이</span> <b>${s.n}</b>${s.avg != null ? ` · 정확도 평균 <b>${s.avg}%</b>` : ''} ${_assignMusicGradeChips(s)}</div>`;
 }
-//  결과 표 — 명단 기준(안 한 아이도) · 이름 가리기 중엔 숫자 숨김
-//   liveOn = 이 과제로 수업 중 — 문제 묶음 표처럼 한 아이만 [빼기 / 다시 넣기](보건실 · 화장실) · '빠짐' 표시 [검토 반영]
-function assignMusicResultHTML(def, t, liveOn) {
-  const mask = _assignMasked(), s = assignMusicSummary(t);
-  const J = b => b ? `<span class="asg-mu-j"><i class="p">${b.perfect || 0}</i><i class="g">${b.great || 0}</i><i class="o">${b.good || 0}</i><i class="m">${b.miss || 0}</i></span>` : '-';
-  const rows = [...t.rows, ...t.outside].map((r, i) => {
-    const b = _assignMusicBest(r), f = _assignMusicFirst(r);
-    const nm = (r.outside ? `<span class="text-muted-sm">명단 밖</span> ${escHtml(r.name || r.sid)}` : _assignNameHTML(r.name, i))
-      + (r.excused ? ' <span class="asg-tag">빠짐</span>' : '')
-      + (liveOn && !r.outside ? `<button class="asg-mini" onclick="assignExcuse('${escJsAttr(r.sid)}', ${r.excused ? 'false' : 'true'})">${r.excused ? '다시 넣기' : '빼기'}</button>` : '');
-    const tr = `<tr class="${r.excused ? 'asg-ex' : ''}">`;
-    if (mask) return `${tr}<td class="td-name">${nm}</td><td>${_assignStatus(r)}</td><td colspan="6" class="text-muted-sm">이름 가리기 중</td></tr>`;
-    return `${tr}<td class="td-name">${nm}</td><td>${_assignStatus(r)}</td>
-      <td class="nowrap">${b ? `<b>${Number(b.acc) || 0}%</b> <span class="asg-mu-g g-${escHtml(b.grade)}">${escHtml(b.grade)}</span>` : '-'}</td>
-      <td class="nowrap">${J(b)}</td><td>${b ? b.maxCombo || 0 : '-'}</td>
+//  결과 칸 — 판정 = 완벽 · 좋아 · 괜찮아 · 놓침 · 정확도 = 가장 좋은 판(보스 결정 10-05) · 처음 판도 같이 · 아이 기기가 쓴 값이라 수는 Number 로만
+function _assignMusicCols() { return ['<th>정확도</th>', '<th>판정</th>', '<th>최대 콤보</th>', '<th>처음 판</th>', '<th>친 횟수</th>', '<th>걸린 시간</th>']; }
+function _assignMusicCells(r) {
+  const b = _assignMusicBest(r), f = _assignMusicFirst(r);
+  const J = b ? `<span class="asg-mu-j"><i class="p">${Number(b.perfect) || 0}</i><i class="g">${Number(b.great) || 0}</i><i class="o">${Number(b.good) || 0}</i><i class="m">${Number(b.miss) || 0}</i></span>` : '-';
+  return `<td class="nowrap">${b ? `<b>${Number(b.acc) || 0}%</b> <span class="asg-mu-g g-${escHtml(b.grade)}">${escHtml(b.grade)}</span>` : '-'}</td>
+      <td class="nowrap">${J}</td><td>${b ? Number(b.maxCombo) || 0 : '-'}</td>
       <td class="nowrap">${f ? `${Number(f.acc) || 0}% (${escHtml(f.grade)})` : '-'}</td>
-      <td>${r.attempts || 0}</td><td class="nowrap">${r.ms == null ? '-' : _assignMs(r.ms)}</td></tr>`;
-  }).join('');
-  return `<div class="asg-mu-sum">끝까지 친 아이 <b>${s.n}</b> / ${t.rows.length}${s.avg != null && !mask ? ` · 정확도 평균 <b>${s.avg}%</b>` : ''} ${mask ? '' : _assignMusicGradeChips(s)}
-      <span class="text-muted-sm">판정 = <i class="asg-mu-k p">완벽</i><i class="asg-mu-k g">좋아</i><i class="asg-mu-k o">괜찮아</i><i class="asg-mu-k m">놓침</i> · 정확도 = 가장 좋은 판</span></div>
-    <div class="asg-table-wrap"><table class="asg-table"><thead><tr><th>이름</th><th>상태</th><th>정확도</th><th>판정</th><th>최대 콤보</th><th>처음 판</th><th>친 횟수</th><th>걸린 시간</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+      <td>${r.attempts || 0}</td><td class="nowrap">${r.ms == null ? '-' : _assignMs(r.ms)}</td>`;
 }
+//  표 위 한 줄(이름 가리기 중엔 틀이 숨김)
+function _assignMusicTop(def, t) {
+  const s = assignMusicSummary(t);
+  return `<div class="asg-mu-sum">끝까지 친 아이 <b>${s.n}</b> / ${t.rows.length}${s.avg != null ? ` · 정확도 평균 <b>${s.avg}%</b>` : ''} ${_assignMusicGradeChips(s)}
+      <span class="text-muted-sm">판정 = <i class="asg-mu-k p">완벽</i><i class="asg-mu-k g">좋아</i><i class="asg-mu-k o">괜찮아</i><i class="asg-mu-k m">놓침</i> · 정확도 = 가장 좋은 판</span></div>`;
+}
+
+// ── 공용 틀에 달기 [ASSIGN-APPS-1] ──
+if (typeof ASSIGN_APPS !== 'undefined') ASSIGN_APPS.music = {
+  cls: 'mu', preload: _assignMusicLoad, picker: assignMusicPickerHTML,
+  build: d => d.music.song ? { content: { music: { ...d.music } } } : { err: '곡을 골라 주세요' },
+  autoTitle: assignMusicAutoTitle, what: assignMusicKindLabel,
+  cols: _assignMusicCols, cells: _assignMusicCells, top: _assignMusicTop, liveRow: assignMusicLiveHTML,
+  liveCtl: '아이들이 각자 그 곡을 쳐요 · 끝까지 친 아이는 더 쳐도 되고, 선생님이 끝낼 때까지 기다려요',
+  selfNote: '아이마다 그 곡을 쳐요 · 끝까지 친 아이는 더 쳐도 되고, 선생님이 끝낼 때까지 기다려요', startNote: '덮개 안에서 그 곡 리듬이 열리고, 가장 좋은 기록이 남아요',
+};

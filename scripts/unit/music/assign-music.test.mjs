@@ -126,6 +126,7 @@ const admin = (() => {
   const ctx = { console, document: { baseURI: 'https://funclassrpg.kr/admin.html', getElementById: () => null }, URL, AssignCore: AC, _AS: { draft: null }, _mask: false };
   vm.createContext(ctx);
   vm.runInContext(read('admin.js').match(/function escHtml[\s\S]*?\n}\n/)[0] + read('admin.js').match(/function escJsAttr[\s\S]*?\n}\n/)[0], ctx);
+  vm.runInContext(read('admin/assign.js').replace('const _AS = {', 'var _AS_unused = {'), ctx);   // 공용 틀(_assignAppResultHTML · ASSIGN_APPS) — _AS 는 시험이 쥔다 [ASSIGN-APPS-1]
   vm.runInContext(`function _assignMasked() { return _mask; }
     function _assignNameHTML(n, i) { return _assignMasked() ? '학생 ' + (i + 1) : escHtml(n); }
     function _assignStatus(r) { return r.status; } function _assignMs(ms) { return Math.round(ms / 1000) + '초'; }`, ctx);
@@ -154,13 +155,13 @@ test('관리 결과 표 — 명단 기준(안 한 아이도) · 정확도 · 등
   const sum = admin.assignMusicSummary(t);
   ok(sum.n === 1 && sum.avg === 96 && sum.grades.S === 1, JSON.stringify(sum));
   admin._mask = false;
-  const html = admin.assignMusicResultHTML(DEF, t);
+  const html = admin._assignAppResultHTML(DEF, t, false);
   ok((html.match(/<tr class="[^"]*"><td class="td-name">/g) || []).length === 3, "줄 셋");
   ok(html.includes('<b>96%</b>') && html.includes('70% (C)') && html.includes('&lt;구름&gt;') && !html.includes('<구름>'), '칸 · escape');
   ok(/<td>none<\/td>/.test(html) && /<td>doing<\/td>/.test(html) && /<td>done<\/td>/.test(html), '상태 셋');
   ok(admin.assignMusicLiveHTML(DEF, t).includes('정확도 평균 <b>96%</b>'), '수업 띠');
   admin._mask = true;
-  const m = admin.assignMusicResultHTML(DEF, t);
+  const m = admin._assignAppResultHTML(DEF, t, false);
   ok(!m.includes('96') && !m.includes('하늘') && (m.match(/이름 가리기 중/g) || []).length === 3, '가리기');
 });
 
@@ -169,35 +170,37 @@ test('관리 결과 표 — 수업 중이면 이름 칸 [빼기 / 다시 넣기]
   const roster = [{ sid: 's1', name: '하늘' }, { sid: 's2', name: '바다' }];
   const t = AC.tally(DEF, { s1: c1, zz: c1 }, roster, { excused: { s2: true } });
   admin._mask = false;
-  const on = admin.assignMusicResultHTML(DEF, t, true);
+  const on = admin._assignAppResultHTML(DEF, t, true);
   ok(on.includes(`assignExcuse('s1', true)`) && on.includes('>빼기</button>'), '빼기 ' + on);
   ok(on.includes(`assignExcuse('s2', false)`) && on.includes('>다시 넣기</button>') && on.includes('<span class="asg-tag">빠짐</span>'), '다시 넣기 · 빠짐');
   ok((on.match(/<tr class="asg-ex">/g) || []).length === 1, 'asg-ex 하나');
   ok(!on.includes(`assignExcuse('zz'`), '명단 밖은 단추 없음');
-  ok(!admin.assignMusicResultHTML(DEF, t, false).includes('assignExcuse'), '수업 밖 단추 없음');
+  ok(!admin._assignAppResultHTML(DEF, t, false).includes('assignExcuse'), '수업 밖 단추 없음');
   admin._mask = true;
-  ok(admin.assignMusicResultHTML(DEF, t, true).includes(`assignExcuse('s1', true)`), '이름 가리기 중에도 빼기는 됨');
+  ok(admin._assignAppResultHTML(DEF, t, true).includes(`assignExcuse('s1', true)`), '이름 가리기 중에도 빼기는 됨');
   admin._mask = false;
   const a = read('admin/assign.js');
-  ok(/assignMusicResultHTML\(def, t, liveOn\)/.test(a), 'assign.js 가 liveOn 을 넘김');
-  ok(/t\.avg != null && def\.kind !== 'music' \? ` · 끝낸 아이 평균/.test(a), '음악 결과 머리에 \'평균 N점\' 없음(표 위 정확도 평균 % 하나)');
+  ok(/_assignAppResultHTML\(def, t, liveOn\)/.test(a), 'assign.js 가 liveOn 을 넘김');
+  ok(/AssignCore\.avgText\(def, t, '아이'\)/.test(a) && !/끝낸 아이 평균/.test(a), '결과 머리 평균은 종류별 한 함수(AssignCore.avgText) [ASSIGN-AVG-1]');
+  const c9 = write(null, rhythmPatch(res(96))).cell, t9 = AC.tally(DEF, { s1: c9 }, roster);
+  ok(AC.avgText(DEF, t9, '아이') === '끝까지 친 아이 정확도 평균 96%' && !/점$/.test(AC.avgText(DEF, t9)), '음악 머리 = 정확도 평균 %(점수 아님) ' + AC.avgText(DEF, t9));
 });
 test('곡 이름 — 쪽을 새로 열어 목록이 없으면 종류 줄이 곡 목록을 읽고 다시 그림 · 영어 열쇠만 남지 않음 [검토 반영]', () => {
   const src = read('admin/assign-music.js');
   ok(/function assignMusicKindLabel\(def\) \{\n  if \(_assignMusicLib === null\) _assignMusicLoad\(\);/.test(src), '종류 줄이 읽기를 부름(실패 뒤에는 되풀이 안 함)');
-  ok(/if \(typeof _assignRenderBits === 'function' && Array\.isArray\(_assignMusicLib\)\) _assignRenderBits\(true\);/.test(src), '다 읽히면 목록 다시 그림');
+  ok(/if \(!force && typeof _assignRenderBits === 'function' && Array\.isArray\(_assignMusicLib\)\) _assignRenderBits\(true\);/.test(src), '다 읽히면 목록 다시 그림');
+  ok(/if \(!force && el\.querySelector\('\.asg-mu-song'\)\) return;/.test(src) && /preload: _assignMusicLoad/.test(src) && /a\.preload\(\)/.test(read('admin/assign.js')), '쪽을 열 때 미리 읽음 · 곡이 이미 보이면 다시 안 그림(첫 클릭 안 빠짐)');
   ok(admin.assignMusicKindLabel(DEF).includes('나비야') && !admin.assignMusicKindLabel(DEF).includes('nabiya'), admin.assignMusicKindLabel(DEF));
 });
-test('TV — 정확도 평균 = 관리 화면 assignMusicSummary 와 같은 숫자 · 이름 보이기가 음악 화면에도 듣는다 [검토 반영]', () => {
+test('TV — 정확도 평균 = 관리 화면 assignMusicSummary 와 같은 숫자(AssignCore.avgOf 한 셈) · 이름 보이기가 음악 화면에도 듣는다 [검토 반영]', () => {
   const tv = read('assign/js/tv.js');
-  const fnSrc = tv.match(/function musicAvg\(t\) \{[\s\S]*?\n\}\n/)[0];
-  const musicAvg = new Function(fnSrc + 'return musicAvg;')();
+  const musicAvg = t => (AC.avgOf(DEF, t) || {}).v;
   let c1 = write(null, rhythmPatch(res(100))).cell;
   const c2 = write(null, rhythmPatch(res(56.3))).cell;
   const t = AC.tally(DEF, { s1: c1, s2: c2 }, [{ sid: 's1', name: '하늘' }, { sid: 's2', name: '바다' }, { sid: 's3', name: '구름' }]);
   const want = admin.assignMusicSummary(t).avg;
   ok(want === 78.2 && musicAvg(t) === want, `관리 ${want} · TV ${musicAvg(t)} · tally ${t.avg}`);
-  ok(/function appView\(def, live\)/.test(tv) && /const names = !!\(live && live\.names\)/.test(tv), 'appView 가 live.names 를 읽음');
+  ok(/function appView\(def, live\)/.test(tv) && /const names = !!\(live && live\.names\), avg = AC\.avgText\(def, t, '친구'\)/.test(tv), 'appView 가 live.names · 같은 평균 함수를 읽음');
   ok(/view = appView\(def, live\)/.test(tv) && /return appView\(def, live\)/.test(tv), '부르는 곳 둘 다 live 넘김');
   ok(!/t\.avg/.test(tv.match(/function appView[\s\S]*?\n\}\n/)[0]), 'TV 음악 평균은 tally.avg(반올림 점수) 안 씀');
 });
@@ -210,17 +213,17 @@ test('밑의 리듬 판이 수업 덮개로 멈추면 — 그 판은 버리고 �
 });
 
 // ── 학생 화면 덮개 안 앱 주소(student/assign.js 를 vm 에서) ──
-test('수업 덮개 안 앱 주소 — 음악 = 학습 앱 창 주소 + &assign=<과제>&live=1 · 문제 묶음 · 모르는 앱 · 이상한 id 는 없음', () => {
-  const ctx = { console, AssignCore: AC, externalStudyItems: () => [{ key: 'music', embed: true, href: 'music/index.html?sid=s1&n=%ED%95%98' }] };
-  vm.createContext(ctx);
-  vm.runInContext(read('student/assign.js'), ctx);
-  ok(ctx._asgLiveAppSrc(DEF) === 'music/index.html?sid=s1&n=%ED%95%98&assign=aMus1&live=1', ctx._asgLiveAppSrc(DEF));
-  ok(ctx._asgLiveAppSrc({ ...DEF, kind: 'quiz' }) === '', 'quiz');
-  ok(ctx._asgLiveAppSrc({ ...DEF, kind: 'coding' }) === '', '코딩 앱 창이 없으면');
-  ok(ctx._asgLiveAppSrc({ ...DEF, id: "a'><x" }) === '', '이상한 id');
+test('수업 덮개 안 앱 주소 — 스위치(AssignCore.LIVE_APPS)가 꺼져 있으면 없음(과제함으로만 · 보스 결정 10-05) · 켜면 학습 앱 창 주소 + &assign=<과제>&live=1 · 문제 묶음 · 모르는 앱 · 이상한 id 는 없음', () => {
+  const mk = core => { const c = { console, AssignCore: core, externalStudyItems: () => [{ key: 'music', embed: true, href: 'music/index.html?sid=s1&n=%ED%95%98' }] }; vm.createContext(c); vm.runInContext(read('student/assign.js'), c); return c; };
+  ok(mk(AC)._asgAppSrc(DEF) === '', '꺼짐 — 리듬은 덮개 안에 안 열림');
+  const ctx = mk({ ...AC, isLiveKind: k => k === 'quiz' || k === 'music' });
+  ok(ctx._asgAppSrc(DEF) === 'music/index.html?sid=s1&n=%ED%95%98&assign=aMus1&live=1', ctx._asgAppSrc(DEF));
+  ok(ctx._asgAppSrc({ ...DEF, kind: 'quiz' }) === '', 'quiz');
+  ok(ctx._asgAppSrc({ ...DEF, kind: 'coding' }) === '', '코딩(스위치에 없음 · 앱 창 없음)');
+  ok(ctx._asgAppSrc({ ...DEF, id: "a'><x" }) === '', '이상한 id');
   const src = read('student/assign.js');
   ok(/lf && e\.source === lf\.contentWindow/.test(src), '덮개 안 앱 창이 보낸 결과도 받음');
-  ok(/if \(lf\) lf\.src = 'about:blank'/.test(src), '덮개 닫으면 앱 창 소리 정지');
+  ok(/_asgAppFrameOff\(inst\);\n  _ASG\.inst\[inst\] = null;/.test(src) && /if \(fr\) fr\.remove\(\);/.test(src), '덮개 닫으면 앱 창을 뗌(소리 · 타이머 정지)');
 });
 
 const fail = results.filter(r => r[0] === 'FAIL');

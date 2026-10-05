@@ -3,8 +3,9 @@
 //   A 과제함: 교사가 만들기 창에서 [🎵 음악실 리듬] → 곡(솔·라·시 연습) 실제로 눌러 고름 → 과제함에 보냄
 //      → 학생1 홈 카드 → 학습 앱 창(음악실 ?assign=) → 정한 판 칩 · 고르기 칸 없음 → 리듬을 끝까지 침(모든 음표) · 학생2 하나 걸러 침 · 학생3 안 함
 //      → 서버 결과 칸(점수 = 정확도 · best · first · 판 수 · doneAt) → 교사 결과 표(명단 기준 · 정확도 · 판정 넷 · 처음 판 · 친 횟수)
-//   B 수업(각자 풀기): 학생2 는 밑에 음악실 리듬을 치는 중 → 교사 '지금 모두 같이' → 덮개 안에 리듬 앱 창(&live=1) · 밑의 리듬은 멈춤
-//      → 학생1 덮개 안에서 침 → 교사 수업 띠 · TV '끝낸 친구 1' · 결과 표 → 끝내기 → 덮개 걷힘 · 밑의 음악실 창 그대로
+//   B 수업 모드(보스 결정 10-05 — 리듬은 과제함으로만): 만들기 '지금 모두 같이' 막힘 · 안내 · 목록 [수업으로] 없음
+//      → 학생2 는 밑에 음악실 리듬을 치는 중 → 교사 문제 묶음 수업 → 덮개(앱 창 0) · 밑의 리듬은 멈춤 → 끝내기 → 밑의 음악실 창 그대로 · 멈춘 판 안내
+//      → TV 리듬 과제 정리(이름 0 · 정확도 평균 = 관리 결과 표)
 //   + 네트워크: 운영 주소 요청 0 · 페이지 오류 0
 //  실행: FAKE_RTDB=<…/fake-rtdb/server.mjs> PP=8873 DP=9553 node scripts/unit/music/assign-music-live.mjs   (스크린샷 OUT=<폴더>)
 //  리듬 판을 치려고 앱 창 주소에 &debug=1(window.__rhythm — 시험 전용 손잡이)을 덧붙인다. 그 밖에는 실제 화면 그대로.
@@ -204,95 +205,42 @@ try {
   await send('Target.closeTarget', { targetId: T2.targetId });
   await sleep(300);
 
-  // ═════ B. 수업(각자 풀기) ═════
+  // ═════ B. 수업 모드 — 리듬은 과제함으로만(보스 결정 10-05 · AssignCore.LIVE_APPS 비어 있음) · 문제 묶음 수업이 덮으면 밑의 리듬은 멈춤 ═════
   //  학생2: 밑에 음악실(보통 모드) 리듬을 치는 중
   await S2.ev(`openExternalEmbed('music', '&debug=1#/rhythm/lib_star'); 1`);
   ok(await untilFr(S2, '#embed-frame', `!!window.__rhythm && !document.querySelector('.r-asg-chip')`, 15000), 'B0 학생2 밑에서 음악실 리듬(보통 모드 · 과제 아님) 준비');
   const s2pre = await S2.fr('#embed-frame', `(() => { [...document.querySelectorAll('button')].find(x => x.textContent.includes('▶ 시작')).click(); return window.__rhythm.state(); })()`);
   const emb2 = await S2.ev(`document.getElementById('embed-frame').src`);
-  //  교사: 새 과제 → 리듬(도·레·미 연습 · 조금 느리게 아님) → 지금 모두 같이 → 보내기
+  //  교사: 새 과제 → 리듬 → '지금 모두 같이'는 막힘 · 안내 한 줄
   await T.ev(`assignNew(); 1`); await sleep(200);
   await T.press('#asg-c-kind .asg-seg[onclick*="music"]');
   await until(T, `document.querySelectorAll('#asg-pick-music .asg-mu-song').length === 15`, 6000);
   await T.press(`#asg-pick-music .asg-mu-song[onclick*="lib_dore"]`);
   await sleep(150);
-  await T.press('#asg-create .asg-seg.live');
-  await sleep(150);
-  const metaB = await T.ev(`({ deliver: _AS.draft.deliver, pacing: _AS.draft.pacing, step: !!document.querySelector('#asg-create input[name=asg-pace][onchange*="step"]'), btn: document.getElementById('asg-send').textContent })`);
-  ok(metaB.deliver === 'live' && metaB.pacing === 'self' && !metaB.step && /수업 시작/.test(metaB.btn), 'B1 지금 모두 같이 · 각자 풀기만(한 문제씩 없음)', JSON.stringify(metaB));
-  await T.shot('B_create_live');
-  await T.press('#asg-send');
-  ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.pacing === 'self')`, 6000), 'B2 수업 시작(live transaction · 각자 풀기)');
+  const metaB = await T.ev(`({ deliver: _AS.draft.deliver, dis: !!document.querySelector('#asg-create .asg-seg.live[disabled]'), note: ((document.getElementById('asg-c-meta') || {}).textContent || '').includes('과제함으로만 보낼 수 있어요'), btn: document.getElementById('asg-send').textContent })`);
+  ok(metaB.deliver === 'inbox' && metaB.dis && metaB.note && /과제함에 보내기/.test(metaB.btn), "B1 리듬은 '지금 모두 같이' 막힘 · '과제함으로만 보낼 수 있어요' 안내 · 보내기 = 과제함", JSON.stringify(metaB));
+  await T.shot('B_create_inbox_only');
+  await T.ev(`assignCancel(); 1`);
+  ok(await T.ev(`!document.querySelector('#asg-lists button[onclick="assignStartFrom(${JSON.stringify(aidA).replace(/"/g, "'")})"]')`) === true, 'B2 열린 리듬 과제 줄에 [수업으로] 없음');
+  //  교사: 문제 묶음 수업(각자 풀기) — 리듬을 치던 학생2 화면도 덮인다
+  await T.ev(`(() => { const d = _assignBuildDef({ ...(() => { assignNew(); return _AS.draft; })(), subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').filter(p => p.type === 'number').slice(0, 2).map(p => p.id), deliver: 'live', pacing: 'self', title: '덮개 시험' }); _assignStartLive(d.def, 40, false, true); return 1; })()`);
+  ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.pacing === 'self')`, 6000), 'B3 문제 묶음 수업 시작');
   const aidB = await T.ev(`_AS.live.aid`);
-  const covered = await Promise.all([S1, S2, S3].map(S => until(S, `typeof classLiveIsOpen === 'function' && classLiveIsOpen() && !!document.querySelector('#class-live.asg-app-mode #asgl-app') && document.getElementById('asgl-app').src.includes('assign=${aidB}&live=1')`, 8000)));
-  ok(covered.every(Boolean), 'B3 학생 셋 덮개 안에 리듬 앱 창(&assign=<과제>&live=1 · 덮개를 꽉 채움)', JSON.stringify(covered));
-  ok(await untilFr(S1, '#asgl-app', `!!document.querySelector('.r-asg-chip') && /선생님과 리듬/.test(document.body.textContent)`, 15000), 'B4 덮개 안 앱: \'선생님과 리듬 · 도·레·미 연습\' · 칩');
+  const covered = await Promise.all([S1, S2, S3].map(S => until(S, `typeof classLiveIsOpen === 'function' && classLiveIsOpen() && !document.getElementById('asgl-app') && !!document.querySelector('#asgl-body .asg-q')`, 8000)));
+  ok(covered.every(Boolean), 'B4 학생 셋 덮개(문제 · 덮개 안 앱 창 0)', JSON.stringify(covered));
   await sleep(600);
   const s2under = await S2.fr('#embed-frame', `window.__rhythm.state()`);
   const s2src = await S2.ev(`({ src: document.getElementById('embed-frame').src, emb: document.getElementById('m-embed').style.display })`);
-  ok(s2pre === 'play' && s2under === 'ready' && s2src.src === emb2 && s2src.emb === 'flex', 'B5 학생2 밑의 리듬: 치던 판이 멈춤(play → ready) · 창은 그대로', JSON.stringify({ s2pre, s2under, s2src }));
+  ok(s2pre === 'play' && s2under === 'ready' && s2src.src === emb2 && s2src.emb === 'flex', 'B5 학생2 밑의 리듬: 치던 판이 멈춤(play → ready · 멈춤 신호) · 창은 그대로', JSON.stringify({ s2pre, s2under, s2src }));
   await S2.shot('B_s2_cover');
   //  못 나감: Esc · 뒤로
   for (const S of [S1, S2]) { await S.key('Escape'); await S.ev(`history.back(); 1`); await sleep(300); }
   ok((await Promise.all([S1, S2].map(S => S.ev(`classLiveIsOpen() && getComputedStyle(document.getElementById('class-live')).display === 'flex'`)))).every(v => v === true), 'B6 Esc · 뒤로 → 덮개 그대로');
-  //  학생1 덮개 안에서 침
-  await S1.ev(FRAME_DEBUG('#asgl-app'));
-  ok(await untilFr(S1, '#asgl-app', `!!window.__rhythm && !!document.querySelector('.r-asg-chip')`, 15000), 'B7 덮개 안 리듬 준비');
-  await sleep(700);
-  ok(await S1.ev(`document.activeElement === document.getElementById('asgl-app')`) === true, 'B7b 다 읽힌 덮개 안 앱 창에 포커스(키 D F J K 가 그 창으로 · 포커스 지킴이가 안 뺏음)');
-  const nB = await S1.fr('#asgl-app', BOT(1));
-  ok(nB > 0, 'B8 [▶ 시작] → 침', String(nB));
-  await sleep(3000); await S1.shot('B_s1_play');
-  ok(await untilFr(S1, '#asgl-app', `document.body.textContent.includes('선생님께 보냈어요')`, 60000), 'B9 끝까지 침 → 선생님께 보냈어요 · 덮개 그대로');
-  const liveNote = await S1.fr('#asgl-app', `document.body.textContent.includes('선생님이 끝낼 때까지')`);
-  ok(liveNote === true && await S1.ev(`classLiveIsOpen()`) === true, 'B10 \'선생님이 끝낼 때까지 기다려요\' · 아이는 못 나감');
-  await sleep(600);
-  const cB = db(`classRPG_assign/results/${aidB}/s1`) || {};
-  ok(cB.app && cB.app.detail && cB.app.detail.best && typeof cB.doneAt === 'number' && cB.app.score >= 80, 'B11 서버 칸(덮개 안 앱 → 부모가 씀): best · doneAt', JSON.stringify(cB).slice(0, 300));
-  //  교사 수업 띠 · TV
-  await T.ev(`_AS.mask = false; _assignRenderBits(true); 1`); await sleep(400);
-  const strip = await T.ev(`document.querySelector('#asg-live .asg-live-card') ? document.querySelector('#asg-live .asg-live-card').textContent.replace(/\\s+/g, ' ') : ''`);
-  ok(/다 한 아이 1 \/ 5/.test(strip) && /끝까지 친 아이 1/.test(strip) && /정확도 평균/.test(strip), 'B12 교사 수업 띠: 다 한 아이 1 / 5 · 끝까지 친 아이 · 정확도 평균', strip.slice(0, 260));
-  await T.shot('B_teacher_strip');
-  const V = await device('TV', '/assign/index.html#/', { w: 1920, h: 1080 });
-  ok(await until(V, `/끝낸 친구 1 \\/ 5/.test(document.body.textContent) && /정확도 평균/.test(document.body.textContent)`, 15000), 'B13 TV: 끝낸 친구 1 / 5 · 정확도 평균',
-    await V.ev(`document.body.textContent.replace(/\\s+/g, ' ').slice(0, 200)`));
-  ok(!/(하늘|바다|구름|별님|나무)/.test(await V.ev(`document.body.textContent`)), 'B14 TV 에 이름 0');
-  await V.shot('B_tv');
-  //  [검토 반영] TV 평균 = 관리 화면 평균(같은 셈 · 소수 한 자리)
-  const tvTxt = await V.ev(`document.body.textContent`);
-  const avgTv = (tvTxt.match(/정확도 평균 ([\d.]+)%/) || [])[1], avgStrip = (strip.match(/정확도 평균 ([\d.]+)%/) || [])[1];
-  ok(avgTv && avgTv === avgStrip, 'B14b [검토 반영] TV 정확도 평균 = 관리 수업 띠 평균', JSON.stringify({ avgTv, avgStrip, avgAdminA }));
-  //  [검토 반영] TV [이름 보이기] → 음악 화면에도 명단 차례 이름 · 다시 누르면 숨김
-  const dots = await V.ev(`document.querySelectorAll('.tv-dots .tv-dot').length`);
-  await V.ev(`[...document.querySelectorAll('.tv-ctl button')].find(b => /이름 보이기/.test(b.textContent)).click(); 1`);
-  const shown = await until(V, `/✓ 하늘/.test(document.body.textContent) && /구름/.test(document.body.textContent)`, 6000);
-  await V.shot('B_tv_names');
-  await V.ev(`[...document.querySelectorAll('.tv-ctl button')].find(b => /이름 숨기기/.test(b.textContent)).click(); 1`);
-  const hidden = await until(V, `!/(하늘|바다|구름)/.test(document.body.textContent)`, 6000);
-  ok(dots === 5 && shown && hidden, 'B14c [검토 반영] TV 음악: 점 5 · [이름 보이기] → \'✓ 하늘\' … · [이름 숨기기] → 이름 0', JSON.stringify({ dots, shown, hidden }));
-  await T.ev(`if (_AS.sel !== ${JSON.stringify(aidB)}) assignSelect(${JSON.stringify(aidB)}); 1`);
-  ok(await until(T, `!!document.querySelector('#asg-result .asg-mu-sum') && /끝까지 친 아이 1/.test(document.querySelector('#asg-result .asg-mu-sum').textContent)`, 5000), 'B15 수업 과제 결과 표(음악용)');
-  //  [검토 반영] 수업 중 한 아이만 빼기(보건실 · 화장실) — 음악 결과 표 이름 칸 [빼기] → 그 아이 덮개만 걷힘 · '빠짐' → [다시 넣기] → 다시 덮임
-  const exBtns = await T.ev(`[...document.querySelectorAll('#asg-result .asg-table tbody tr button.asg-mini')].map(b => b.textContent.trim())`);
-  ok(Array.isArray(exBtns) && exBtns.length === 5 && exBtns.every(t => t === '빼기'), 'B15b [검토 반영] 음악 결과 표 이름 칸마다 [빼기](5)', JSON.stringify(exBtns));
-  const rowIdx = await T.ev(`[...document.querySelectorAll('#asg-result .asg-table tbody tr')].findIndex(r => r.textContent.includes('구름'))`);
-  const pr1 = await T.press('#asg-result .asg-table tbody tr button.asg-mini', rowIdx);
-  const s3out = await until(S3, `!classLiveIsOpen()`, 8000);
-  const exRow = await until(T, `(() => { const r = [...document.querySelectorAll('#asg-result .asg-table tbody tr')].find(r => r.textContent.includes('구름')); return !!r && r.classList.contains('asg-ex') && r.textContent.includes('빠짐') && r.textContent.includes('다시 넣기'); })()`, 5000);
-  const othersIn = (await Promise.all([S1, S2].map(S => S.ev(`classLiveIsOpen()`)))).every(v => v === true);
-  ok(pr1 === true && s3out && exRow && othersIn, 'B15c [검토 반영] [빼기](구름) → 학생3 덮개만 걷힘 · 표에 \'빠짐\' · [다시 넣기] · 다른 아이 그대로', JSON.stringify({ pr1, s3out, exRow, othersIn }));
-  await T.shot('B_teacher_excused');
-  const pr2 = await T.press('#asg-result .asg-table tbody tr button.asg-mini', rowIdx);
-  const s3in = await until(S3, `classLiveIsOpen() && !!document.querySelector('#class-live.asg-app-mode #asgl-app')`, 8000);
-  ok(pr2 === true && s3in, 'B15d [검토 반영] [다시 넣기] → 학생3 다시 덮개(리듬 앱 창)', JSON.stringify({ pr2, s3in }));
   //  끝내기
   await T.ev(`assignLiveEnd(false); 1`);
   ok(await until(T, `!_AS.live.on`, 5000), 'B16 교사 [끝내기] → live 꺼짐');
   const closed = await Promise.all([S1, S2, S3].map(S => until(S, `!classLiveIsOpen() && getComputedStyle(document.getElementById('class-live')).display === 'none' && !document.getElementById('class-live').classList.contains('asg-app-mode')`, 6000)));
   ok(closed.every(Boolean), 'B17 학생 셋 덮개 걷힘', JSON.stringify(closed));
-  const lf = await S1.ev(`(document.getElementById('asgl-app') || { src: 'gone' }).src`);
-  ok(lf === 'about:blank' || lf === 'gone', 'B18 덮개 안 앱 창 = about:blank(소리 · 타이머 정지)', lf);
   await sleep(500);
   const back2 = await S2.ev(`({ src: document.getElementById('embed-frame').src, emb: document.getElementById('m-embed').style.display })`);
   const back2r = await S2.fr('#embed-frame', `window.__rhythm.state()`);
@@ -300,7 +248,16 @@ try {
   const pauseNote = await S2.fr('#embed-frame', `document.body.textContent.includes('선생님과 수업 때문에 치던 판이 멈췄어요')`);
   ok(pauseNote === true, 'B19b [검토 반영] 밑의 리듬 준비 화면에 \'⏸ 선생님과 수업 때문에 치던 판이 멈췄어요 — ▶ 시작을 눌러 처음부터\'');
   await S2.shot('B_s2_back');
-  ok(!!db(`classRPG_assign/archive/${aidB}`) && Object.keys(db(`classRPG_assign/results/${aidB}`) || {}).includes('s1'), 'B20 정의는 archive · 결과 칸 남음');
+  ok(!!db(`classRPG_assign/archive/${aidB}`), 'B20 수업 과제는 닫은 과제로');
+  //  TV — 리듬 과제 정리(과제함 결과) · 이름 0 · 반 평균 = 관리 결과 표 평균(같은 셈 AssignCore.avgOf)
+  const V = await device('TV', `/assign/index.html#/a/${aidA}`, { w: 1920, h: 1080 });
+  ok(await until(V, `/끝낸 친구 \\d+ \\/ 5/.test(document.body.textContent) && /정확도 평균/.test(document.body.textContent)`, 15000), 'B21 TV 리듬 과제 정리: 끝낸 친구 · 정확도 평균',
+    await V.ev(`document.body.textContent.replace(/\\s+/g, ' ').slice(0, 200)`));
+  const tvTxt = await V.ev(`document.body.textContent`);
+  ok(!/(하늘|바다|구름|별님|나무)/.test(tvTxt), 'B22 TV 에 이름 0');
+  const avgTv = (tvTxt.match(/정확도 평균 ([\d.]+)%/) || [])[1];
+  ok(avgTv && avgTv === avgAdminA, 'B23 [검토 반영] TV 정확도 평균 = 관리 결과 표 평균', JSON.stringify({ avgTv, avgAdminA }));
+  await V.shot('B_tv');
 
   ok(net.prod.length === 0, `운영 주소 요청 0 (전체 ${net.all.length})`, net.prod.slice(0, 5).join(' | '));
   const errList = Object.entries(errs).map(([k, v]) => k + ': ' + [...new Set(v)].slice(0, 4).join(' / '));

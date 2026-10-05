@@ -280,7 +280,7 @@ try {
   ok(await until('teacher', `_AS.live.phase === 'summary'`, 5000) && await until('a', `!!document.querySelector('#asgl-body .asg-score')`, 5000), '2-7 [정리 ▶] → 학생 정리 화면(점수)');
   await shot('13_live_summary');
   const aid2 = await ev('teacher', `_AS.live.aid`);
-  await press('teacher', `#asg-live .btn-sm.danger[onclick="assignLiveEnd(false)"]`);
+  await press('teacher', `#asg-live .btn-sm.danger[onclick^="assignLiveEnd("]`);   // [끝내기] — '못 한 아이는 과제함으로' 칸(기본 켬)을 따름 · 둘 다 다 해서 닫힘 [ASSIGN-END-INBOX-2]
   ok(await until('teacher', `!_AS.live.on`, 6000), '2-8 [끝내기] → 수업 꺼짐');
   const unc = await Promise.all(['a', 'b'].map(k => until(k, `!classLiveIsOpen() && getComputedStyle(document.getElementById('class-live')).display === 'none'`, 6000)));
   await sleep(600);

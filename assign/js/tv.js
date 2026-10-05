@@ -204,20 +204,15 @@ function pickItem(def, live, i) {
   if (live && live.on && live.pacing === 'step' && live.aid === def.id) { tx(AC.ctl.goto(live.aid, Math.floor(Number(live.step)), String(live.phase || ''), i), '문제 보기'); return; }
   S.pickItem = i; draw();
 }
-//  [ASSIGN-MUSIC-1] 음악 정확도 평균 — 관리 화면 assignMusicSummary 와 같은 셈(끝낸 아이 · 가장 좋은 판 acc · 소수 한 자리 · 시험이 견줌)
-function musicAvg(t) {
-  let sum = 0, n = 0;
-  for (const r of t.rows) { const b = r && r.detail && r.detail.best; if (!b || typeof b !== 'object' || r.status !== 'done') continue; sum += Number(b.acc) || 0; n++; }
-  return n ? Math.round(sum / n * 10) / 10 : null;
-}
+//  학습 앱(기초 코딩 · 음악실 리듬) — 끝낸 친구 수 · 반 평균 한 줄(AssignCore.avgText — 관리 결과 머리와 같은 셈 · 종류마다 뜻이 다름) [ASSIGN-AVG-1]
 //  live = 수업 중이면 그 수업(이름 보이기 단추가 여기에도 듣는다 — 순위 없이 명단 차례 그대로) [검토 반영]
 function appView(def, live) {
   const R = S.results || {}, ros = roster(def);
   const t = AC.tally(def, R, ros.map(x => ({ sid: x.sid, name: x.name })), {});
-  const names = !!(live && live.names), avg = def.kind === 'music' ? musicAvg(t) : null;
+  const names = !!(live && live.names), avg = AC.avgText(def, t, '친구');
   return h('main', { class: 'tv' }, head(def, def.kind === 'coding' ? '기초 코딩' : '음악실 리듬'),
     h('div', { class: 'tv-center' }, h('div', { class: 'tv-h1' }, `끝낸 친구 ${t.counts.done} / ${t.rows.length}`),
-      h('div', { class: 'tv-sub' }, `하는 중 ${t.counts.doing}${avg != null ? ` · 끝낸 친구 정확도 평균 ${avg}%` : ''}`),   // [ASSIGN-MUSIC-1] 이름 · 순위 없이 반 평균만
+      h('div', { class: 'tv-sub' }, `하는 중 ${t.counts.doing}${avg ? ' · ' + avg : ''}`),   // 이름 · 순위 없이 반 평균만
       h('div', { class: 'tv-dots' }, ...t.rows.map(r => names
         ? h('span', { class: 'tv-name ' + r.status }, (r.status === 'done' ? '✓ ' : '') + (r.name || ''))
         : h('span', { class: 'tv-dot ' + r.status, title: r.status === 'done' ? '다 함' : r.status === 'doing' ? '하는 중' : '아직' }))),
@@ -237,15 +232,20 @@ function act(kind) {
   if (kind === 'prev') tx(AC.ctl.prev(l.aid, s, ph), '앞');
   if (kind === 'reveal') tx(AC.ctl.reveal(l.aid, s, now()), '답 공개');
   if (kind === 'names') ref('live/names').set(!l.names).catch(() => {});
-  //  [ASSIGN-END-INBOX-1] 과제함에서 돌린 수업(fromInbox)은 과제함으로 되돌리고, 아니면 과제도 닫는다(관리 화면 '끝내기'와 같게) · 끝내기가 된 때만
+  //  [ASSIGN-END-INBOX-2] 끝낸 뒤 과제는 관리 화면 [끝내기](기본 '못 한 아이는 과제함으로' 켬)와 같은 판단 — AssignCore.endPlan
+  //   못 한 아이가 있으면 과제함으로(fromLive) · 과제함에서 돌린 수업(fromInbox)은 원래대로 · 모두 다 했으면 닫기 · 끝내기가 된 때만 쓴다
   if (kind === 'end') {
-    const raw = S.openRaw[l.aid], back = !!(raw && raw.fromInbox), aid = l.aid, revealAt = l.revealAt || null;
-    if (!confirm(back ? '수업을 끝낼까요? 아이 화면의 수업 방이 닫혀요.\n이 과제는 원래대로 과제함에 남아요.'
-      : '수업을 끝낼까요? 아이 화면의 수업 방이 닫히고 이 과제도 닫혀요.\n(못 한 아이에게 과제함으로 남기려면 관리 화면에서 끝내 주세요)')) return;
+    const raw = S.openRaw[l.aid], aid = l.aid, revealAt = l.revealAt || null;
+    const t = AC.tally(def, S.results || {}, roster(def).map(x => ({ sid: x.sid, name: x.name })));
+    const plan = AC.endPlan(raw, t, true), left = t.rows.filter(r => r.status !== 'done').length;
+    if (!confirm(plan === 'inbox' ? `수업을 끝낼까요? 아이 화면의 수업 방이 닫혀요.\n못 한 친구 ${left}명에게는 과제함에 남아요.`
+      : plan === 'back' ? '수업을 끝낼까요? 아이 화면의 수업 방이 닫혀요.\n이 과제는 원래대로 과제함에 남아요.'
+      : '수업을 끝낼까요? 아이 화면의 수업 방이 닫히고, 모두 다 해서 이 과제도 닫혀요.')) return;
     tx(AC.ctl.end(aid, now()), '끝내기').then(ok => {
       if (!ok || !raw) return;
-      const u = back ? { [`open/${aid}/deliver`]: 'inbox', [`open/${aid}/pacing`]: 'self', [`open/${aid}/fromInbox`]: null, [`open/${aid}/revealed`]: revealAt }
-        : { [`open/${aid}`]: null, [`archive/${aid}`]: { ...raw, closedAt: globalThis.firebase.database.ServerValue.TIMESTAMP } };
+      const u = plan === 'close' ? { [`open/${aid}`]: null, [`archive/${aid}`]: { ...raw, closedAt: globalThis.firebase.database.ServerValue.TIMESTAMP } }
+        : { [`open/${aid}/deliver`]: 'inbox', [`open/${aid}/pacing`]: 'self', [`open/${aid}/fromInbox`]: null, [`open/${aid}/revealed`]: revealAt };
+      if (plan === 'inbox') u[`open/${aid}/fromLive`] = true;
       return ref('').update(u).catch(() => {});
     });
   }

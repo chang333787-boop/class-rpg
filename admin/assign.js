@@ -10,31 +10,34 @@ const _AS = {
   live: null, openRaw: {}, open: {}, hosts: null,
   presAid: '', presOff: null, presence: {}, excAid: '', excOff: null, excused: {},
   results: {}, resOffs: {}, archive: null, archOpen: false, archRaw: {},
-  sel: '', selItem: -1, selStu: '', mask: null, draft: null, sending: false, busy: false, startAsk: '',
+  sel: '', selItem: -1, selStu: '', mask: null, draft: null, sending: false, busy: false, startAsk: '', endInbox: true,
   hostN: 0, hostRef: null, wake: null, cleaned: false,
 };
 const ASSIGN_CAT_LABEL = { calc: '계산', word: '문장제', concept: '개념', expr: '표현', vocab: '낱말', dialog: '대화', apply: '적용', listen: '듣기',
   ox: 'OX', situation: '상황 판단', reason: '따져보기', spell: '맞춤법', grammar: '문법', read: '지문 읽기', dictation: '받아쓰기' };
 const ASSIGN_TYPE_LABEL = { choice: '보기', number: '수', short: '글', fraction: '분수' };
 const ASSIGN_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
-//  [ASSIGN-CODING-2] 덮개 안 학습 앱(기초 코딩)은 아이마다 연결을 1~2개 더 쓴다(학생 화면 1 + 덮개 안 앱 1 + 밑 학습 앱 창 1)
-//   요금제(설계 §17 Q10) 확인 전 — 받는 아이가 이만큼 넘으면 시작 전에 한 번 더 묻는다
+//  [ASSIGN-APPS-1] 학습 앱 과제(🧩 기초 코딩 · 🎵 음악실 리듬) — 만들기 · 목록 · 결과 표 · 수업 띠는 이 파일의 공용 틀 하나.
+//   앱마다 다른 것만 admin/assign-<앱>.js 가 ASSIGN_APPS.<종류> 에 단다(없으면 그 종류 단추가 '곧'):
+//    picker(d) 고르기 칸 · build(d) → { content } | { err } · autoTitle(d) · what(def) 목록 줄 머리
+//    cols(def) 결과 표 머리 칸(<th>…) · cells(r, def) 그 줄 칸(<td>…) · top(def, t) 표 위 한 줄 · foot(def, t, lead) 표 끝 줄 · after(def, rows) 표 밑
+//    cls 결과 표 class 머리(asg-<cls>-table) · liveRow(def, t) 수업 띠 한 줄 · liveCtl 수업 띠 글 · selfNote '각자 풀기' 옆 글 · startNote [수업으로] 물음 글 · preload() 쪽을 열 때 목록 미리 읽기
+const ASSIGN_APPS = {};
+const ASSIGN_KIND_LABEL = { quiz: '📝 문제 묶음', coding: '🧩 기초 코딩', music: '🎵 음악실 리듬' };
+function _assignApp(kind) { return kind !== 'quiz' && Object.prototype.hasOwnProperty.call(ASSIGN_APPS, kind) ? ASSIGN_APPS[kind] : null; }
+function _assignKindReady(kind) { return kind === 'quiz' || !!_assignApp(kind); }
+//  '지금 모두 같이'로 보낼 수 있나 — 스위치는 AssignCore.LIVE_APPS 한 곳(지금 비어 있음 = 문제 묶음만 · 보스 결정 10-05) [ASSIGN-LIVE-APPS-1]
+function _assignLiveOK(kind) { return AssignCore.isLiveKind(kind) && _assignKindReady(kind); }
+//  [ASSIGN-CODING-2] 덮개 안 학습 앱은 아이마다 연결을 1~2개 더 쓴다(학생 화면 1 + 덮개 안 앱 1 + 밑 학습 앱 창 1)
+//   요금제(설계 §17 Q10) 확인 전 — 스위치를 켠 뒤에도 받는 아이가 이만큼 넘으면 시작 전에 한 번 더 묻는다
 const ASSIGN_APP_LIVE_WARN = 20;
 function _assignReceivers(def) { return def && Array.isArray(def.targets) && def.targets.length ? def.targets.length : _assignStudents().length; }
-function _assignAppLiveNote(n) { return `받는 아이 ${n}명 — 기초 코딩 수업은 아이 한 명이 인터넷 연결을 2~3개 써요(모두 약 ${n * 2}~${n * 3}개). 무료 요금제는 동시 연결 100개까지라 넘으면 우리 반 RPG 화면이 새로 안 열릴 수 있어요.`; }
-//  기초 코딩 · 음악실 리듬 과제는 앱 쪽(common/assign.js 를 쓰는 판 · 곡 바로 열기)이 붙은 뒤 켠다 — 종류마다 따로:
-//   그 앱의 고르기 칸 함수(assignCodingPickerHTML · assignMusicPickerHTML — admin/assign-<앱>.js)가 있으면 열림 [ASSIGN-MUSIC-1]
-function _assignKindReady(kind) {
-  if (kind === 'quiz') return true;
-  if (kind === 'coding') return typeof assignCodingPickerHTML === 'function';
-  if (kind === 'music') return typeof assignMusicPickerHTML === 'function';
-  return false;
-}
-//  '지금 모두 같이'로 보낼 수 있는 종류 — 문제 묶음(각자 · 한 문제씩) · 음악실 리듬(각자 풀기만 · 덮개 안에 앱 창 하나) [ASSIGN-MUSIC-1]
-function _assignLiveOK(kind) { return kind === 'quiz' || (kind === 'music' && _assignKindReady('music')); }
+function _assignAppLiveNote(n, kind) { return `받는 아이 ${n}명 — ${ASSIGN_KIND_LABEL[kind] || '학습 앱'} 수업은 아이 한 명이 인터넷 연결을 2~3개 써요(모두 약 ${n * 2}~${n * 3}개). 무료 요금제는 동시 연결 100개까지라 넘으면 우리 반 RPG 화면이 새로 안 열릴 수 있어요.`; }
+//  과제함으로만 보내는 종류의 안내 한 줄(만들기 · 목록 공용)
+function _assignInboxOnlyNote(kind) { return `${ASSIGN_KIND_LABEL[kind] || '이 앱'} 과제는 과제함으로만 보낼 수 있어요 — '지금 모두 같이'(수업 방)는 문제 묶음만 열려요`; }
 
-//  [CLASS-LIVE-NOTE-1] 수업 방이 저절로 풀리는 때 · 덮개 밑에서 멈추지 않는 학습 앱 — 만들기 화면과 수업 띠에 한 줄(사용자 확인 전 기본값 3분 · 안전 시간)
-const ASSIGN_LIVE_NOTE = '⚠️ 선생님 화면(관리 · TV)이 3분 넘게 꺼지거나 안전 시간이 지나면 아이 화면의 수업 방이 저절로 풀려요. 🎵 음악실 · 🧩 기초 코딩을 켜 둔 아이는 덮개 밑에서 소리 · 게임이 계속될 수 있어요 — 수업 전에 닫게 해 주세요.';
+//  [CLASS-LIVE-NOTE-1] 수업 방이 저절로 풀리는 때 · 덮개 밑에서 멈추지 않는 학습 앱 — 만들기 화면과 수업 띠에 한 줄(교사 기기 3분 · 안전 시간)
+const ASSIGN_LIVE_NOTE = '⚠️ 선생님 화면(관리 · TV)이 3분 넘게 꺼지거나 안전 시간이 지나면 아이 화면의 수업 방이 저절로 풀려요. 🧩 기초 코딩 · 🎵 음악실 창은 덮개 밑에서 저절로 멈추지만, 우리 마을 같은 다른 학습 앱은 계속 돌 수 있어요 — 수업 전에 닫게 해 주세요.';
 function _assignRef(p) { return _AS.db.ref(AssignCore.path.full(p)); }
 function _assignNow() { return Date.now() + (_AS.offset || 0); }
 function _assignTS() { return firebase.database.ServerValue.TIMESTAMP; }
@@ -192,6 +195,8 @@ function renderAssignPage() {
       <div id="asg-stale"></div><div id="asg-live"></div><div id="asg-create"></div><div id="asg-lists"></div><div id="asg-result"></div>`;
   }
   const m = document.getElementById('asg-mask'); if (m) m.checked = _assignMasked();
+  //  [ASSIGN-APPS-1] 학습 앱 목록(코딩 판 · 음악 곡)을 쪽을 열 때 미리 읽는다 — 고르기 칸을 처음 열 때 다시 그리기로 첫 클릭이 빠지지 않게
+  for (const a of Object.values(ASSIGN_APPS)) { try { if (a.preload) a.preload(); } catch (e) { console.warn('[ASSIGN-APPS-1]', e); } }
   if (!_AS.db) {
     document.getElementById('asg-lists').innerHTML = `<div class="table-card"><div class="asg-empty">연결을 기다리는 중이에요…</div></div>`;
     return;
@@ -212,9 +217,11 @@ function _assignRenderStale() {
   let html = '';
   if (st.why === 'stale') html = `<div class="asg-alert"><b>⚠️ 지난 수업이 아직 켜져 있어요 — ${escHtml(def ? def.title : '정의 없는 수업')}</b>
       <span>선생님 화면이 15분 넘게 꺼져 있어서 아이 화면은 지금 덮여 있지 않아요. 이어 하면 로그인한 아이 화면이 다시 덮여요.</span>
-      <div class="asg-btns">${def ? `<button class="btn-sm" onclick="assignLiveResume()">이어 하기</button>` : ''}<button class="btn-sm danger" onclick="assignLiveEnd(false)">끝내기</button></div></div>`;
+      <div class="asg-btns">${def ? `<button class="btn-sm" onclick="assignLiveResume()">이어 하기</button>` : ''}<button class="btn-sm danger" onclick="assignLiveEnd()">끝내기</button></div></div>`;
   else if (st.why === 'expired') html = `<div class="asg-alert"><b>⏰ 수업 안전 시간이 지나 아이 화면이 풀렸어요</b>
-      <div class="asg-btns"><button class="btn-sm" onclick="assignLiveExtend()">10분 더</button><button class="btn-sm danger" onclick="assignLiveEnd(false)">끝내기</button></div></div>`;
+      <div class="asg-btns"><button class="btn-sm" onclick="assignLiveExtend()">10분 더</button><button class="btn-sm danger" onclick="assignLiveEnd()">끝내기</button></div></div>`;
+  else if (st.why === 'appOff') html = `<div class="asg-alert"><b>⚠️ ${escHtml(def.title)} — ${_assignInboxOnlyNote(def.kind)}</b><span>아이 화면은 덮이지 않아요.</span>
+      <div class="asg-btns"><button class="btn-sm danger" onclick="assignLiveEnd()">끝내기</button></div></div>`;
   else if (st.why === 'noDef') html = `<div class="asg-alert"><b>⚠️ 과제 정의가 없는 수업이 켜져 있어요</b><span>아이 화면은 덮이지 않아요.</span>
       <div class="asg-btns"><button class="btn-sm danger" onclick="assignLiveEnd(false, true)">끝내기</button></div></div>`;
   if (el.innerHTML !== html) el.innerHTML = html;
@@ -250,13 +257,14 @@ function _assignRenderLive() {
       <div class="asg-live-row"><b>냈어요 ${sent} / ${present.length}</b>${is.late ? ` · 공개 뒤 ${is.late}` : ''}<span class="asg-live-sep"></span><span class="text-muted-sm">선생님만 보는 분포</span> ${dist}</div>${wrongWho}`;
   } else if (!step) {
     mid = `<div class="asg-live-row"><b>다 한 아이 ${t.counts.done} / ${roster.length}</b> · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${t.counts.excused ? ` · 빠짐 ${t.counts.excused}` : ''}</div>`;
-    if (def.kind === 'music' && typeof assignMusicLiveHTML === 'function' && !_assignMasked()) mid += assignMusicLiveHTML(def, t);   // [ASSIGN-MUSIC-1]
+    const A = _assignApp(def.kind);
+    if (A && A.liveRow && !_assignMasked()) mid += A.liveRow(def, t);   // [ASSIGN-APPS-1] 앱마다 한 줄(리듬 = 정확도 평균 · 등급)
   }
   const ctl = step
     ? `<button class="btn-sm outline" onclick="assignLivePrev()" ${s <= 0 ? 'disabled' : ''}>◀ 앞</button>
        ${s >= 0 && s < n && ph === 'answer' ? `<button class="btn-sm gold" onclick="assignLiveReveal()">답 공개</button>` : ''}
        ${ph !== 'summary' ? `<button class="btn-sm" onclick="assignLiveNext()">${s < 0 ? '첫 문제 ▶' : s >= n - 1 ? '정리 ▶' : '다음 ▶'}</button>` : ''}`
-    : def.kind !== 'quiz' ? '<span class="text-muted-sm">아이들이 각자 판을 풀어요 · 다 한 아이는 더 줄여 보거나 기다려요</span>'
+    : def.kind !== 'quiz' ? `<span class="text-muted-sm">${(_assignApp(def.kind) || {}).liveCtl || '아이들이 각자 해요 · 다 한 아이는 더 해 보거나 기다려요'}</span>`
     : (ph !== 'summary' ? `<button class="btn-sm gold" onclick="assignLiveSummary()">결과 보기</button>` : '<span class="text-muted-sm">다 한 아이는 자기 답과 정답을 보고 있어요</span>');
   const html = `<div class="asg-live-card">
     <div class="asg-live-top"><span class="asg-live-dot"></span><b>지금 수업 중</b> · ${escHtml(def.title)} · ${step ? '한 문제씩' : '각자 풀기'} · ${where}
@@ -272,8 +280,8 @@ function _assignRenderLive() {
       <button class="btn-sm outline" onclick="assignLiveExtend()">10분 더</button>
       <button class="btn-sm outline" onclick="assignOpenTV()">📺 TV</button>
       <span class="asg-live-sep"></span>
-      <button class="btn-sm outline" onclick="assignLiveEnd(true)">끝내고 못 한 아이는 과제함으로</button>
-      <button class="btn-sm danger" onclick="assignLiveEnd(false)">끝내기</button></div></div>`;
+      <label class="asg-inline" title="끝낼 때 다 못 한 아이에게 홈 카드로 남겨 이어서 풀게 해요"><input type="checkbox" id="asg-end-inbox" ${_AS.endInbox ? 'checked' : ''} onchange="assignEndInbox(this.checked)"> 못 한 아이는 과제함으로 남기기</label>
+      <button class="btn-sm danger" onclick="assignLiveEnd()">끝내기</button></div></div>`;
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
@@ -300,22 +308,28 @@ function assignExcuse(sid, on) {
   _assignRef(AssignCore.path.excused(x.l.aid, sid)).set(on ? true : null).catch(() => notify('⚠️ 저장이 안 됐어요', 'error'));
 }
 //  끝내기 — live 를 끄고(transaction) 정의는 닫거나(archive) 못 한 아이에게 과제함으로 남긴다
+//   toInbox: true(늘 과제함으로) · false(과제함에 안 남김 — 과제함에서 돌린 수업만 되돌림) · 없으면 '못 한 아이는 과제함으로 남기기' 칸(기본 켬 · 보스 결정 10-05)을 따른다 [ASSIGN-END-INBOX-2]
+//   어떻게 둘지는 AssignCore.endPlan 한 함수(TV E 와 같음): 칸 켬 + 못 한 아이 있음 → 과제함 · 과제함에서 돌린 수업 → 과제함으로 되돌림 · 그 밖 → 닫기
+function assignEndInbox(on) { _AS.endInbox = !!on; }
 async function assignLiveEnd(toInbox, force) {
   const x = _assignLiveNow();
   if (!x) return;
-  //  [ASSIGN-END-INBOX-1] 과제함에 있던 과제를 수업으로 돌린 것(fromInbox)은 그냥 끝내도 과제함으로 돌아간다 — 안 한 아이 카드가 사라지지 않게
-  const back = !toInbox && !!(_AS.openRaw[x.l.aid] && _AS.openRaw[x.l.aid].fromInbox);
-  const msg = toInbox ? '수업을 끝낼까요?\n못 한 아이에게는 홈에 과제가 남아요(이어서 풀 수 있어요).'
-    : back ? '수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n이 과제는 원래대로 과제함에 남아요(안 한 아이는 홈 카드로 풀어요).'
-    : '수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n이 과제도 함께 닫혀요(아이 홈 카드가 사라져요 · 낸 답과 결과는 남아요).';
+  const aid = x.l.aid, raw = _AS.openRaw[aid], def = _AS.open[aid];
+  const keep = toInbox === undefined ? _AS.endInbox : !!toInbox;
+  const t = def ? AssignCore.tally(def, _AS.results[aid], _assignRoster(def)) : null;
+  const plan = toInbox === true ? 'inbox' : AssignCore.endPlan(raw, t, keep);   // true = 못 한 아이가 없어도 과제함으로(옛 [끝내고 과제함으로])
+  const left = t ? t.rows.filter(r => r.status !== 'done').length : 0;
+  const msg = plan === 'inbox' ? `수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n못 한 아이 ${left}명에게는 홈에 과제가 남아요(이어서 풀 수 있어요).`
+    : plan === 'back' ? '수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n이 과제는 원래대로 과제함에 남아요(안 한 아이는 홈 카드로 풀어요).'
+    : `수업을 끝낼까요?\n아이 화면의 수업 방이 닫히고 하던 자리로 돌아가요.\n${keep && t ? '모두 다 해서 ' : ''}이 과제도 함께 닫혀요(아이 홈 카드가 사라져요 · 낸 답과 결과는 남아요).`;
   if (!confirm(msg)) return;
-  const aid = x.l.aid, revealAt = x.l.revealAt || null;
+  const revealAt = x.l.revealAt || null;
   const ok = await _assignTx(AssignCore.ctl.end(force ? '' : aid, _assignNow()), '끝내기');
   if (!ok) return;
   if (!_AS.openRaw[aid]) return;
-  if (toInbox || back) await _assignToInbox(aid, revealAt, toInbox);
+  if (plan === 'inbox' || plan === 'back') await _assignToInbox(aid, revealAt, plan === 'inbox');
   else await _assignClose(aid);
-  notify(toInbox ? '수업을 끝냈어요 — 못 한 아이는 과제함에서 이어 해요' : back ? '수업을 끝냈어요 — 과제는 과제함에 그대로 있어요' : '수업을 끝냈어요');
+  notify(plan === 'inbox' ? '수업을 끝냈어요 — 못 한 아이는 과제함에서 이어 해요' : plan === 'back' ? '수업을 끝냈어요 — 과제는 과제함에 그대로 있어요' : '수업을 끝냈어요');
 }
 //  수업이 끝난 과제를 과제함으로 — fromLive: '수업 → 과제함' 표시(못 한 아이에게 남김) · fromInbox 표시는 지운다 [ASSIGN-END-INBOX-1]
 function _assignToInbox(aid, revealAt, fromLive) {
@@ -326,8 +340,7 @@ function _assignToInbox(aid, revealAt, fromLive) {
 
 // ── 목록 ──
 function _assignKindLabel(def) {
-  if (def.kind === 'coding') return `🧩 기초 코딩 ${def.n}판`;
-  if (def.kind === 'music') return typeof assignMusicKindLabel === 'function' ? assignMusicKindLabel(def) : '🎵 음악실 리듬';
+  if (def.kind !== 'quiz') { const A = _assignApp(def.kind); return A && A.what ? A.what(def) : ASSIGN_KIND_LABEL[def.kind] || ''; }   // [ASSIGN-APPS-1] 앱이 정한 줄 머리(곡 이름 · 판 수)
   const sub = (() => { try { const s = CurriculumUtils.subjects().find(x => x.key === def.content.quiz.subject); return s ? s.label : ''; } catch (e) { return ''; } })();
   return `📝 ${escHtml(sub)} ${def.n}문제`;
 }
@@ -347,7 +360,7 @@ function _assignRenderLists() {
         ${_assignLiveOK(d.kind) && !isLive ? `<button class="btn-sm outline" onclick="assignStartFrom('${d.id}')" title="이 과제를 반 전체가 지금 같이 풀어요">수업으로</button>` : ''}
         <button class="btn-sm outline" onclick="assignOpenTV('${d.id}')">TV</button>
         ${isLive ? '' : `<button class="btn-sm danger" onclick="assignCloseAsk('${d.id}')">닫기</button>`}</td></tr>
-      ${_AS.startAsk === d.id ? `<tr class="asg-ask"><td colspan="3">지금 반 모두 같이 풀까요? 로그인한 아이 화면에 수업 방이 열려요 · ${d.kind === 'coding' ? `덮개 안에서 기초 코딩이 열리고, 이미 푼 판은 ★가 남아요${_assignReceivers(d) > ASSIGN_APP_LIVE_WARN ? ` · <b>받는 아이 ${_assignReceivers(d)}명 — 연결이 많아요</b>` : ''}` : '이미 낸 답은 건너뛰어요'}
+      ${_AS.startAsk === d.id ? `<tr class="asg-ask"><td colspan="3">지금 반 모두 같이 풀까요? 로그인한 아이 화면에 수업 방이 열려요 · ${d.kind !== 'quiz' ? `${(_assignApp(d.kind) || {}).startNote || '덮개 안에서 그 앱이 열려요'}${_assignReceivers(d) > ASSIGN_APP_LIVE_WARN ? ` · <b>받는 아이 ${_assignReceivers(d)}명 — 연결이 많아요</b>` : ''}` : '이미 낸 답은 건너뛰어요'}
         ${d.kind === 'quiz' ? `<button class="btn-sm" onclick="assignStartFromGo('${d.id}','step')">한 문제씩 같이</button>` : ''}<button class="btn-sm" onclick="assignStartFromGo('${d.id}','self')">각자 풀기</button>
         <button class="btn-sm outline" onclick="assignStartFrom('')">그만</button></td></tr>` : ''}`;
   };
@@ -393,7 +406,11 @@ function assignReopen(aid) {
     .then(() => { delete _AS.archRaw[aid]; notify('다시 열었어요 — 아이 홈에 카드가 떠요'); _assignRenderBits(true); }).catch(() => notify('⚠️ 다시 열기가 안 됐어요', 'error'));
 }
 //  열린 과제를 그대로 수업으로(같은 결과 칸 — 이미 낸 답은 건너뛴다)
-function assignStartFrom(aid) { _AS.startAsk = _AS.startAsk === aid ? '' : aid; _assignRenderBits(true); }
+function assignStartFrom(aid) {
+  const d = aid ? _AS.open[aid] : null;
+  if (d && !_assignLiveOK(d.kind)) { _AS.startAsk = ''; notify('📥 ' + _assignInboxOnlyNote(d.kind)); return; }   // 스위치가 꺼진 학습 앱 [ASSIGN-LIVE-APPS-1]
+  _AS.startAsk = _AS.startAsk === aid ? '' : aid; _assignRenderBits(true);
+}
 function assignStartFromGo(aid, pacing) {
   _AS.startAsk = '';
   if (!_AS.open[aid] || !_AS.openRaw[aid]) return;
@@ -411,22 +428,16 @@ function _assignRenderResult() {
   const liveOn = _AS.live && _AS.live.on === true && _AS.live.aid === aid;
   const revealed = liveOn ? (_AS.live.revealAt || def.revealed) : def.revealed;
   const t = AssignCore.tally(def, R, roster, { revealed, excused: liveOn ? _AS.excused : {} });
-  const head = `<div class="tc-header"><div class="tc-title">${escHtml(def.title)} <span class="text-muted-sm">${_assignKindLabel(def)} · 받는 아이 ${t.rows.length}명 · 끝 ${t.counts.done} · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${_assignAvgText(def, t)}</span></div>
+  const avg = AssignCore.avgText(def, t, '아이');   // [ASSIGN-AVG-1] 종류마다 뜻이 다른 반 평균(TV 와 같은 셈 · 이름 없는 반 숫자라 가리기 중에도 보임)
+  const head = `<div class="tc-header"><div class="tc-title">${escHtml(def.title)} <span class="text-muted-sm">${_assignKindLabel(def)} · 받는 아이 ${t.rows.length}명 · 끝 ${t.counts.done} · 하는 중 ${t.counts.doing} · 안 함 ${t.counts.none}${avg ? ' · ' + avg : ''}</span></div>
     <div class="tc-actions"><button class="btn-sm outline" onclick="assignOpenTV('${aid}')">TV 로 보기</button><button class="btn-sm outline" onclick="assignSelect('${aid}')">접기</button></div></div>`;
   let body;
-  if (def.kind === 'coding' && typeof assignCodingResultHTML === 'function') body = assignCodingResultHTML(def, t);   // [ASSIGN-CODING-1] 판마다 ★ · 실행 · 막힘 · 마지막 코드
-  else if (def.kind === 'music' && typeof assignMusicResultHTML === 'function') body = assignMusicResultHTML(def, t, liveOn);   // [ASSIGN-MUSIC-1] 음악용 칸 · 평균은 표 위 '정확도 평균 %' 하나만
-  else if (def.kind !== 'quiz') {
-    body = `<table><thead><tr><th>이름</th><th>상태</th><th>점수</th><th>실행 · 판</th><th>자세히</th></tr></thead><tbody>${t.rows.map((r, i) => `<tr>
-      <td class="td-name">${_assignNameHTML(r.name, i)}</td><td>${_assignStatus(r)}</td><td>${r.status === 'none' ? '-' : `${r.correct} / ${r.total}`}</td><td>${r.attempts || 0}</td>
-      <td class="text-muted-sm">${escHtml(Object.keys(r.detail || {}).join(' · '))}</td></tr>`).join('')}</tbody></table>`;
-  } else {
+  if (def.kind !== 'quiz') body = _assignAppResultHTML(def, t, liveOn);   // [ASSIGN-APPS-1] 학습 앱 — 공용 틀 + 앱 칸
+  else {
     const n = def.n, mask = _assignMasked();
     const cell = (a) => !a ? '<td class="asg-c none">·</td>' : a.skip ? '<td class="asg-c skip" title="건너뜀">⤼</td>'
       : `<td class="asg-c ${a.ok ? 'ok' : 'no'}${a.late ? ' late' : ''}" title="${escHtml(a.a)}${a.late ? ' (공개 뒤)' : ''}">${a.ok ? '✓' : '✗' + (a.ci != null && a.ci >= 0 ? (ASSIGN_NUM[a.ci] || '') : '')}${a.late ? '⏰' : ''}</td>`;
-    const rows = [...t.rows, ...t.outside].map((r, i) => `<tr class="${r.excused ? 'asg-ex' : ''}">
-      <td class="td-name">${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${_assignNameHTML(r.name || r.sid, i)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}
-        ${liveOn && !r.outside ? `<button class="asg-mini" onclick="assignExcuse('${escJsAttr(r.sid)}', ${r.excused ? 'false' : 'true'})">${r.excused ? '다시 넣기' : '빼기'}</button>` : ''}</td>
+    const rows = [...t.rows, ...t.outside].map((r, i) => `<tr class="${r.excused ? 'asg-ex' : ''}"><td class="td-name">${_assignRowName(r, i, liveOn)}</td>
       <td>${_assignStatus(r)}</td><td class="nowrap">${mask ? '●' : r.status === 'none' ? '-' : `${r.correct}/${n}`}</td>
       <td class="nowrap">${mask || r.ms == null || def.pacing === 'step' ? '-' : _assignMs(r.ms)}</td>
       ${mask ? `<td colspan="${n}" class="text-muted-sm">이름 가리기 중</td>` : r.items.map(cell).join('')}</tr>`).join('');
@@ -437,15 +448,18 @@ function _assignRenderResult() {
   const html = `<div class="table-card asg-result">${head}${body}</div>`;
   if (el.innerHTML !== html) el.innerHTML = html;
 }
-//  머리 평균 — 문제 묶음 = 끝낸 아이 점수 · 기초 코딩 = 시작한 아이가 푼 판 수(끝낸 아이만 보면 늘 다 푼 값) [ASSIGN-CODING-2]
-function _assignAvgText(def, t) {
-  if (def.kind === 'coding') {
-    const st = t.rows.filter(r => r.status !== 'none');
-    if (!st.length) return '';
-    const a = st.reduce((s, r) => s + (Number(r.correct) || 0), 0) / st.length;
-    return ` · 시작한 아이 푼 판 평균 ${Math.round(a * 10) / 10} / ${def.n}`;
-  }
-  return t.avg != null ? ` · 끝낸 아이 평균 ${t.avg}점` : '';
+//  결과 표 이름 칸(문제 묶음 · 학습 앱 공용) — 명단 밖 이름도 가리기를 따른다 · 수업 중이면 [빼기 / 다시 넣기](보건실 · 화장실)
+function _assignRowName(r, i, liveOn) {
+  return `${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${_assignNameHTML(r.name || r.sid, i)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}${liveOn && !r.outside ? ` <button class="asg-mini" onclick="assignExcuse('${escJsAttr(r.sid)}', ${r.excused ? 'false' : 'true'})">${r.excused ? '다시 넣기' : '빼기'}</button>` : ''}`;
+}
+//  [ASSIGN-APPS-1] 학습 앱 결과 표 — 틀(명단 차례 · 이름 · 상태 · 이름 가리기 · 빼기)은 하나, 칸은 앱이(cols · cells · top · foot · after)
+function _assignAppResultHTML(def, t, liveOn) {
+  const A = _assignApp(def.kind), mask = _assignMasked(), all = [...t.rows, ...t.outside];
+  const cols = A ? A.cols(def) : ['<th>점수</th>', '<th>실행 · 판</th>', '<th>자세히</th>'];
+  const cells = r => A ? A.cells(r, def) : `<td>${r.status === 'none' ? '-' : `${r.correct} / ${r.total}`}</td><td>${r.attempts || 0}</td><td class="text-muted-sm">${escHtml(Object.keys(r.detail || {}).join(' · '))}</td>`;
+  const rows = all.map((r, i) => `<tr class="${r.excused ? 'asg-ex' : ''}"><td class="td-name">${_assignRowName(r, i, liveOn)}</td><td>${_assignStatus(r)}</td>${mask ? `<td colspan="${cols.length}" class="text-muted-sm">이름 가리기 중</td>` : cells(r)}</tr>`).join('');
+  const foot = !mask && A && A.foot ? A.foot(def, t, 2) : '';
+  return `${!mask && A && A.top ? A.top(def, t) : ''}<div class="asg-table-wrap"><table class="asg-table asg-app-table asg-${(A && A.cls) || def.kind}-table"><thead><tr><th>이름</th><th>상태</th>${cols.join('')}</tr></thead><tbody>${rows}${foot}</tbody></table></div>${!mask && A && A.after ? A.after(def, all) : ''}`;
 }
 function _assignStatus(r) { return r.status === 'done' ? '<span class="tag approved">끝</span>' : r.status === 'doing' ? '<span class="tag pending">하는 중</span>' : '<span class="tag wait">안 함</span>'; }
 function _assignMs(ms) { const s = Math.round(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`; }
@@ -489,7 +503,7 @@ function assignNew() {
   //  과제 id 는 창을 열 때 정한다 — [보내기]를 여러 번 눌러도 같은 자리에 쓰여 과제가 하나(멱등)
   _AS.draft = { aid: AssignCore.newId(_assignNow()), kind: 'quiz', subject: (subs.find(s => s.key === 'math') || subs[0] || {}).key || 'math',
     how: 'pick', picked: [], units: [], n: 10, cat: '', drawn: null, q: '', openUnit: '', preview: '',
-    title: '', titleTouched: false, who: 'all', targets: [], deliver: 'inbox', pacing: 'self', minutes: 40, showAnswer: true,
+    title: '', titleTouched: false, who: 'all', targets: [], deliver: 'inbox', pacing: 'self', minutes: AssignCore.MIN_DEFAULT, showAnswer: true,
     coding: { stages: [] }, music: { song: '', level: 'easy', tempo: 1, keys: 0 } };
   _assignRenderCreate();
   setTimeout(() => { const c = document.getElementById('asg-create'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
@@ -507,8 +521,7 @@ function _assignPicked(d) {
   return d.picked.map(id => all.get(id)).filter(Boolean);
 }
 function _assignAutoTitle(d) {
-  if (d.kind === 'coding') return `기초 코딩 ${d.coding.stages.join(' · ')}`.trim();
-  if (d.kind === 'music') return typeof assignMusicAutoTitle === 'function' ? assignMusicAutoTitle(d).slice(0, AssignCore.TITLE_MAX) : d.music.song ? `리듬 · ${d.music.song}` : '음악실 리듬';
+  if (d.kind !== 'quiz') { const A = _assignApp(d.kind); return String(A && A.autoTitle ? A.autoTitle(d) : (ASSIGN_KIND_LABEL[d.kind] || '').replace(/^\S+ /, '')).slice(0, AssignCore.TITLE_MAX); }
   const sub = (CurriculumUtils.subjects().find(s => s.key === d.subject) || {}).label || '';
   const items = _assignPicked(d), units = [...new Set(items.map(p => p.unitId))];
   const uName = units.length === 1 ? ((CurriculumUtils.unitById(units[0]) || {}).name || '') : units.length ? '여러 단원' : '';
@@ -530,7 +543,7 @@ function _assignCKind() {
   const d = _AS.draft, el = document.getElementById('asg-c-kind');
   if (!d || !el) return;
   const k = (key, label, ready) => `<button class="asg-seg${d.kind === key ? ' on' : ''}" ${ready ? `onclick="assignDraft('kind','${key}')"` : 'disabled title="앱 쪽 준비가 끝나면 열려요(다음 단계)"'}>${label}${ready ? '' : ' <small>곧</small>'}</button>`;
-  el.innerHTML = `<div class="asg-segs">${k('quiz', '📝 문제 묶음', true)}${k('coding', '🧩 기초 코딩', _assignKindReady('coding'))}${k('music', '🎵 음악실 리듬', _assignKindReady('music'))}</div>`;
+  el.innerHTML = `<div class="asg-segs">${AssignCore.KINDS.map(x => k(x, ASSIGN_KIND_LABEL[x] || x, _assignKindReady(x))).join('')}</div>`;
 }
 function assignDraft(key, val) {
   const d = _AS.draft;
@@ -544,7 +557,7 @@ function assignDraft(key, val) {
   if (key === 'who') { d.who = val; _assignCMeta(); return; }
   if (key === 'deliver') { d.deliver = val; if (val === 'inbox') d.pacing = 'self'; _assignCMeta(); return; }
   if (key === 'pacing') { d.pacing = d.kind === 'quiz' ? val : 'self'; _assignCMeta(); return; }
-  if (key === 'minutes') { d.minutes = Number(val) || 40; return; }
+  if (key === 'minutes') { d.minutes = Number(val) || AssignCore.MIN_DEFAULT; return; }
   if (key === 'showAnswer') { d.showAnswer = !!val; return; }
 }
 function _assignTypeChips(p) {
@@ -555,8 +568,11 @@ function _assignTypeChips(p) {
 function _assignCWhat() {
   const d = _AS.draft, el = document.getElementById('asg-c-what');
   if (!d || !el) return;
-  if (d.kind === 'coding') { el.innerHTML = `<div id="asg-pick-coding" class="asg-slot">${typeof assignCodingPickerHTML === 'function' ? assignCodingPickerHTML(d) : '기초 코딩 판 고르기(1~3판) — 앱 쪽이 붙으면 여기에 판 목록이 떠요'}</div>`; return; }
-  if (d.kind === 'music') { el.innerHTML = `<div id="asg-pick-music" class="asg-slot">${typeof assignMusicPickerHTML === 'function' ? assignMusicPickerHTML(d) : '음악실 리듬 곡 · 난이도 · 빠르기 고르기 — 앱 쪽이 붙으면 여기에 곡 목록이 떠요'}</div>`; return; }
+  if (d.kind !== 'quiz') {   // [ASSIGN-APPS-1] 학습 앱 — 고르기 칸은 그 앱이(#asg-pick-<종류>)
+    const A = _assignApp(d.kind);
+    el.innerHTML = `<div id="asg-pick-${d.kind}" class="asg-slot${A ? ' asg-slot-app' : ''}">${A ? A.picker(d) : '앱 쪽이 붙으면 여기에 고르기 칸이 떠요'}</div>`;
+    return;
+  }
   const subs = CurriculumUtils.subjects();
   const top = `<div class="asg-c-row"><label>과목 <select class="form-select asg-sel-sm" onchange="assignDraft('subject', this.value)">${subs.map(s => `<option value="${s.key}" ${s.key === d.subject ? 'selected' : ''}>${escHtml(s.label)}</option>`).join('')}</select></label>
     <span class="asg-segs small"><button class="asg-seg${d.how === 'pick' ? ' on' : ''}" onclick="assignDraft('how','pick')">직접 고르기</button><button class="asg-seg${d.how === 'auto' ? ' on' : ''}" onclick="assignDraft('how','auto')">자동 뽑기</button></span>
@@ -669,7 +685,7 @@ function _assignCMeta() {
   const studs = _assignStudents();
   const items = _assignPicked(d);
   const nAudio = items.filter(p => p.audio).length, nEnText = items.filter(p => AssignCore.isEnglish(p) && p.type !== 'choice').length;
-  const live = d.deliver === 'live', app = d.kind !== 'quiz', liveOK = _assignLiveOK(d.kind);
+  const live = d.deliver === 'live', app = d.kind !== 'quiz', liveOK = _assignLiveOK(d.kind), A = _assignApp(d.kind);
   el.innerHTML = `<div class="asg-c-row"><label class="asg-grow">이름 <input class="form-input" maxlength="${AssignCore.TITLE_MAX}" value="${escHtml(d.title)}" oninput="assignDraft('title', this.value)"></label></div>
     <div class="asg-c-row"><span class="text-muted-sm">누구에게</span>
       <label class="asg-inline"><input type="radio" name="asg-who" ${d.who === 'all' ? 'checked' : ''} onchange="assignDraft('who','all')"> 우리 반 모두(${studs.length}명)</label>
@@ -677,13 +693,14 @@ function _assignCMeta() {
     ${d.who === 'some' ? `<div class="asg-c-row asg-who">${studs.map(s => `<label class="asg-ucheck"><input type="checkbox" ${d.targets.includes(s.sid) ? 'checked' : ''} onchange="assignTarget('${escJsAttr(s.sid)}', this.checked)"> ${escHtml(s.name)}</label>`).join('')}</div>` : ''}
     <div class="asg-c-row"><span class="text-muted-sm">어떻게</span>
       <span class="asg-segs"><button class="asg-seg${!live ? ' on' : ''}" onclick="assignDraft('deliver','inbox')">📥 과제함에 넣기</button>
-      <button class="asg-seg live${live ? ' on' : ''}" ${!liveOK ? 'disabled title="음악실 리듬은 지금은 과제함으로만 보내요"' : `onclick="assignDraft('deliver','live')"`}>🔴 지금 모두 같이</button></span></div>
+      <button class="asg-seg live${live ? ' on' : ''}" ${!liveOK ? `disabled title="${escHtml(_assignInboxOnlyNote(d.kind))}"` : `onclick="assignDraft('deliver','live')"`}>🔴 지금 모두 같이</button></span></div>
+    ${app && !liveOK ? `<div class="asg-note-t">📥 ${escHtml(_assignInboxOnlyNote(d.kind))}</div>` : ''}
     <div class="text-muted-sm asg-explain">${live ? `로그인한 아이 화면 위에 바로 수업 방이 열려요. 하던 것은 그대로 멈춰 두고, 선생님이 끝내면 하던 자리로 돌아가요. 아이는 스스로 못 나가요.<br>${ASSIGN_LIVE_NOTE}` : '아이는 하던 것을 그대로 하고, 홈 \'오늘\' 맨 위 카드를 눌러 풀어요.'}</div>
     ${live ? `<div class="asg-c-row"><span class="text-muted-sm">진행</span>
-      <label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'self' ? 'checked' : ''} onchange="assignDraft('pacing','self')"> 각자 풀기${app ? '(덮개 안에서 기초 코딩이 열려요)' : ''}</label>
+      <label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'self' ? 'checked' : ''} onchange="assignDraft('pacing','self')"> 각자 풀기</label>${app ? `<span class="text-muted-sm">— ${(A && A.selfNote) || '덮개 안에서 그 앱이 열려요'}</span>` : ''}
       ${app ? '' : `<label class="asg-inline"><input type="radio" name="asg-pace" ${d.pacing === 'step' ? 'checked' : ''} onchange="assignDraft('pacing','step')"> 한 문제씩 같이(선생님이 넘김 · 답 공개 · TV 막대)</label>`}
-      <span class="text-muted-sm">안전 시간</span><select class="form-select asg-sel-sm" onchange="assignDraft('minutes', this.value)">${[20, 30, 40, 50, 60, 90, 120].map(m => `<option value="${m}" ${d.minutes === m ? 'selected' : ''}>${m}분</option>`).join('')}</select></div>` : ''}
-    ${live && app ? (() => { const n = d.who === 'some' ? d.targets.length : studs.length; return `<div class="asg-note-t">🔌 ${_assignAppLiveNote(n)}${n > ASSIGN_APP_LIVE_WARN ? ' <b>모둠을 골라 보내는 것을 권해요.</b>' : ''}</div>`; })() : ''}
+      <span class="text-muted-sm">안전 시간</span><select class="form-select asg-sel-sm" onchange="assignDraft('minutes', this.value)">${[20, 30, 40, 45, 50, 60, 90, 120].map(m => `<option value="${m}" ${d.minutes === m ? 'selected' : ''}>${m}분</option>`).join('')}</select></div>` : ''}
+    ${live && app ? (() => { const n = d.who === 'some' ? d.targets.length : studs.length; return `<div class="asg-note-t">🔌 ${_assignAppLiveNote(n, d.kind)}${n > ASSIGN_APP_LIVE_WARN ? ' <b>모둠을 골라 보내는 것을 권해요.</b>' : ''}</div>`; })() : ''}
     ${!app && (!live || d.pacing === 'self') ? `<div class="asg-c-row"><label class="asg-inline"><input type="checkbox" ${d.showAnswer ? 'checked' : ''} onchange="assignDraft('showAnswer', this.checked)"> 문제마다 정답 바로 보여 주기</label></div>` : ''}
     ${nAudio ? `<div class="asg-note-t">🔊 소리 문제 ${nAudio}개 — ${live && d.pacing === 'step' ? 'TV 화면의 🔊 로 선생님이 들려줘요' : '각자 풀기는 이어폰이 있으면 좋아요(수업 중에는 자동으로 읽지 않아요)'}</div>` : ''}
     ${nEnText ? `<div class="asg-note-t">⌨️ 영어로 쓰는 문제 ${nEnText}개 — 한글로 쓰면 아이 화면에 '한/영 키' 안내가 떠요(오답으로 세지 않음)</div>` : ''}
@@ -710,12 +727,11 @@ function _assignBuildDef(d) {
     const passages = {};
     for (const p of items) if (p.passageId && typeof READING_PASSAGES !== 'undefined') { const x = READING_PASSAGES.find(r => r.id === p.passageId); if (x) passages[x.id] = { id: x.id, title: x.title || '', text: x.text || '' }; }
     base.content = { quiz: { subject: d.subject, items, passages, src: { how: d.how, units: d.how === 'auto' ? d.units.slice() : [...new Set(items.map(i => i.unitId))], n: items.length, cat: d.cat || '' } } };
-  } else if (d.kind === 'coding') {
-    if (!d.coding.stages.length) return { err: '판을 골라 주세요' };
-    base.content = { coding: { stages: d.coding.stages.slice(0, AssignCore.STAGES_MAX) } };
-  } else {
-    if (!d.music.song) return { err: '곡을 골라 주세요' };
-    base.content = { music: { ...d.music } };
+  } else {   // [ASSIGN-APPS-1] 학습 앱 — 내용은 그 앱이(판 · 곡)
+    const A = _assignApp(d.kind);
+    const r = A && A.build ? A.build(d) : { err: '이 종류는 아직 보낼 수 없어요' };
+    if (r.err) return r;
+    base.content = r.content;
   }
   if (!AssignCore.normDef({ ...base, createdAt: 1 }, d.aid)) return { err: '과제 모양이 맞지 않아요' };
   return { def: base };
@@ -740,6 +756,7 @@ async function assignSend() {
 //  지금 모두 같이 — 수업 상태(live)를 transaction 으로 먼저 켜고(수업 중이 아닐 때만 — 두 관리 탭이 동시에 눌러도 하나) 정의를 쓴다
 async function _assignStartLive(def, minutes, fromOpen, asked) {
   if (_AS.sending) return;
+  if (!_assignLiveOK(def.kind)) { notify('⚠️ ' + _assignInboxOnlyNote(def.kind), 'error'); return; }   // 스위치(AssignCore.LIVE_APPS)가 꺼진 종류 [ASSIGN-LIVE-APPS-1]
   const cur = _AS.live;
   if (cur && cur.on === true) {
     if (!confirm('지금 다른 수업이 켜져 있어요. 그 수업을 끝내고 새로 시작할까요?')) return;
@@ -752,7 +769,7 @@ async function _assignStartLive(def, minutes, fromOpen, asked) {
   } else if (!asked && !confirm(`'${def.title}'\n지금 로그인한 아이 화면에 수업 방이 열려요. 하던 것은 그대로 멈춰 둬요.\n시작할까요?`)) return;
   if (def.kind !== 'quiz') {   // [ASSIGN-CODING-2] 연결 수 — 큰 반이면 한 번 더
     const n = _assignReceivers(def);
-    if (n > ASSIGN_APP_LIVE_WARN && !confirm(`${_assignAppLiveNote(n)}\n\n모둠을 골라 보내거나 과제함으로 보내는 것을 권해요. 그래도 시작할까요?`)) return;
+    if (n > ASSIGN_APP_LIVE_WARN && !confirm(`${_assignAppLiveNote(n, def.kind)}\n\n모둠을 골라 보내거나 과제함으로 보내는 것을 권해요. 그래도 시작할까요?`)) return;
   }
   _AS.sending = true; _assignCMeta();
   try {

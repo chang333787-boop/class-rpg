@@ -2,7 +2,8 @@
 //  · 만들기: 단원 → 판 칩(1~3판 · 고른 차례 = 아이가 푸는 차례) — 판 목록은 기초 코딩 앱의 정본(coding/js/stages.js)을 그때 불러온다
 //  · 결과: 반 명단 기준 · 판마다 ★ / 실행 수 · 막힘(못 풀고 실행 5번 이상 — 막힘 지도와 같은 기준) · 많이 한 실수 · 칸을 누르면 마지막 코드(글 코드)
 //  · 아이 쪽 결과 칸 app.detail[<판>] = { rank, ok, st, n, tries, why, py } — coding/js/asg.js 가 만든다
-//  · 전역 이름 머리 = assignCoding · _assignCoding · _ASC (admin/assign.js 가 typeof 로 부른다)
+//  · 공용 틀(admin/assign.js ASSIGN_APPS · 결과 표 틀 · 만들기 · 수업 띠)에 맨 아래에서 단다 — 여기는 판 칩 · 결과 칸만 [ASSIGN-APPS-1]
+//  · 전역 이름 머리 = assignCoding · _assignCoding · _ASC
 
 //  = coding/index.html import map 의 "./js/stages.js" ?v= (시험 scripts/unit/coding/assign.test.mjs 가 견준다)
 const ASSIGN_CODING_STAGES_V = '4';
@@ -60,44 +61,42 @@ function assignCodingToggle(id) {
   _assignCWhat(); _assignCMeta();
 }
 
-// ── 결과 ──
-//  t = AssignCore.tally(def, …) — 줄은 명단 차례 그대로. 칸 = 판마다 ★★☆(실행 4) · ✗ 실행 6 막힘 · ·
-function assignCodingResultHTML(def, t) {
-  _assignCodingLoad();
-  const stages = def.content.coding.stages, mask = typeof _assignMasked === 'function' && _assignMasked();
-  const info = r => stages.map(id => {
+// ── 결과 칸(틀 = admin/assign.js _assignAppResultHTML · 줄은 명단 차례 그대로) ──
+//  칸 = 푼 판 · 실행 · 걸린 시간 · 판마다 ★★☆(실행 4) · ✗ 실행 6 막힘 · · · 막힌 판 / 끝 줄 = 판마다 푼 아이 · 막힌 아이 · 많이 한 실수 / 표 밑 = 누른 칸의 마지막 코드
+function _assignCodingInfo(def, r) {
+  return def.content.coding.stages.map(id => {
     const d = r.detail && r.detail[id] && typeof r.detail[id] === 'object' ? r.detail[id] : null;
     const tries = d ? Math.max(0, Math.floor(Number(d.tries) || 0)) : 0, ok = !!(d && d.ok);
     return { id, d, ok, st: ok ? Math.max(1, Math.min(3, Math.floor(Number(d.st) || 1))) : 0, n: d ? Math.floor(Number(d.n) || 0) : 0, tries, stuck: !ok && tries >= ASSIGN_CODING_STUCK };
   });
-  const rows = [...t.rows, ...t.outside];
-  const cell = (r, x) => {
+}
+function _assignCodingCols(def) {
+  return ['<th>푼 판</th>', '<th>실행</th>', '<th>걸린 시간</th>', ...def.content.coding.stages.map(id => `<th class="asg-c" title="${escHtml(_assignCodingName(id))}">${escHtml(id)}</th>`), '<th>막힌 판</th>'];
+}
+function _assignCodingCells(r, def) {
+  _assignCodingLoad();
+  const xs = _assignCodingInfo(def, r), stuck = xs.filter(x => x.stuck).map(x => x.id);
+  const cell = x => {
     const key = r.sid + '|' + x.id, on = _ASC.cell === key;
     if (!x.d) return `<td class="asg-c none">·</td>`;
     const txt = x.ok ? `${'★'.repeat(x.st)}${'☆'.repeat(3 - x.st)} <small>(실행 ${x.tries})</small>` : `✗ <small>실행 ${x.tries}${x.stuck ? ' 막힘' : ''}</small>`;
     return `<td class="asg-c asg-cd-c ${x.ok ? 'ok' : x.stuck ? 'stuck' : 'no'}${on ? ' on' : ''}" onclick="assignCodingCell('${escJsAttr(key)}')" title="누르면 마지막 코드">${txt}</td>`;
   };
-  const body = rows.map((r, i) => {
-    const xs = info(r), stuck = xs.filter(x => x.stuck).map(x => x.id);
-    return `<tr class="${r.excused ? 'asg-ex' : ''}"><td class="td-name">${r.outside ? `<span class="text-muted-sm">명단 밖</span> ${_assignNameHTML(r.name || r.sid, i)}` : _assignNameHTML(r.name, i)}${r.excused ? ' <span class="asg-tag">빠짐</span>' : ''}</td>
-      <td>${_assignStatus(r)}</td><td class="nowrap">${mask ? '●' : r.status === 'none' ? '-' : `${r.correct} / ${r.total}`}</td><td class="nowrap">${mask ? '●' : r.attempts || 0}</td>
-      <td class="nowrap">${mask || r.ms == null ? '-' : _assignMs(r.ms)}</td>
-      ${mask ? `<td colspan="${stages.length + 1}" class="text-muted-sm">이름 가리기 중</td>` : `${xs.map(x => cell(r, x)).join('')}<td class="asg-cd-stuck">${stuck.length ? escHtml(stuck.join(' · ')) : ''}</td>`}</tr>`;
-  }).join('');
-  //  판마다 — 푼 아이 · 막힌 아이 · 많이 한 실수
-  const per = stages.map(id => {
+  return `<td class="nowrap">${r.status === 'none' ? '-' : `${r.correct} / ${r.total}`}</td><td class="nowrap">${r.attempts || 0}</td><td class="nowrap">${r.ms == null ? '-' : _assignMs(r.ms)}</td>${xs.map(cell).join('')}<td class="asg-cd-stuck">${stuck.length ? escHtml(stuck.join(' · ')) : ''}</td>`;
+}
+//  판마다 — 푼 아이 · 막힌 아이 · 많이 한 실수(명단 안 아이만) · lead = 앞 칸 수(이름 · 상태)
+function _assignCodingFoot(def, t, lead) {
+  const per = def.content.coding.stages.map(id => {
     let solved = 0, stuckN = 0; const why = {};
     for (const r of t.rows) {
-      const x = info(r).find(y => y.id === id);
+      const x = _assignCodingInfo(def, r).find(y => y.id === id);
       if (x.ok) solved++; if (x.stuck) stuckN++;
       if (x.d && x.d.why && typeof x.d.why === 'object') for (const k of Object.keys(x.d.why)) why[k] = (why[k] || 0) + (Number(x.d.why[k]) || 0);
     }
     const top = Object.entries(why).sort((a, b) => b[1] - a[1])[0];
     return `<td class="asg-c asg-cd-sum">푼 ${solved}${stuckN ? ` · <span class="asg-cd-red">막힘 ${stuckN}</span>` : ''}${top && top[1] ? `<br><small>${escHtml(ASSIGN_CODING_WHY[top[0]] || top[0])} ${top[1]}</small>` : ''}</td>`;
   }).join('');
-  const head = `<tr><th>이름</th><th>상태</th><th>푼 판</th><th>실행</th><th>걸린 시간</th>${stages.map(id => `<th class="asg-c" title="${escHtml(_assignCodingName(id))}">${escHtml(id)}</th>`).join('')}<th>막힌 판</th></tr>`;
-  const sumRow = mask ? '' : `<tr class="asg-rate"><td colspan="5">판마다 · 푼 아이 · 막힌 아이(못 풀고 실행 ${ASSIGN_CODING_STUCK}번 이상) · 많이 한 실수</td>${per}<td></td></tr>`;
-  return `<div class="asg-table-wrap"><table class="asg-table asg-cd-table"><thead>${head}</thead><tbody>${body}${sumRow}</tbody></table></div>${mask ? '' : _assignCodingCodeHTML(def, rows)}`;
+  return `<tr class="asg-rate"><td colspan="${lead + 3}">판마다 · 푼 아이 · 막힌 아이(못 풀고 실행 ${ASSIGN_CODING_STUCK}번 이상) · 많이 한 실수</td>${per}<td></td></tr>`;
 }
 function assignCodingCell(key) { _ASC.cell = _ASC.cell === key ? '' : key; if (typeof _assignRenderBits === 'function') _assignRenderBits(); }
 //  고른 칸의 마지막 코드(글 코드 앞 300자) · 실수 셈
@@ -112,3 +111,14 @@ function _assignCodingCodeHTML(def, rows) {
     <pre class="asg-cd-py">${escHtml(String(d.py || '(코드 없음)'))}</pre>
     <button class="btn-sm outline" onclick="assignCodingCell('')">닫기</button></div>`;
 }
+
+// ── 공용 틀에 달기 [ASSIGN-APPS-1] ──
+if (typeof ASSIGN_APPS !== 'undefined') ASSIGN_APPS.coding = {
+  cls: 'cd', preload: _assignCodingLoad, picker: assignCodingPickerHTML,
+  build: d => d.coding.stages.length ? { content: { coding: { stages: d.coding.stages.slice(0, AssignCore.STAGES_MAX) } } } : { err: '판을 골라 주세요' },
+  autoTitle: d => `기초 코딩 ${d.coding.stages.join(' · ')}`.trim(),
+  what: def => `🧩 기초 코딩 ${def.n}판`,
+  cols: _assignCodingCols, cells: _assignCodingCells, foot: _assignCodingFoot, after: _assignCodingCodeHTML,
+  liveCtl: '아이들이 각자 판을 풀어요 · 다 한 아이는 더 줄여 보거나 기다려요',
+  selfNote: '덮개 안에서 기초 코딩이 열려요', startNote: '덮개 안에서 기초 코딩이 열리고, 이미 푼 판은 ★가 남아요',
+};

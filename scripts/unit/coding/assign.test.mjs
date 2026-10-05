@@ -117,12 +117,18 @@ test('app.js · play.js · store.js — 과제 판은 다른 열쇠 · 결과는
   ok((play.match(/ctx\.onRun && ctx\.onRun\(/g) || []).length === 2 && /return \{ pause,/.test(play) && /ctx\.nextOf \? ctx\.nextOf\(stage\.id\)/.test(play), 'play 갈고리');
   ok(/saveRun\(stage, \{ ok, why, n, stars \}, opt = \{\}\)/.test(store) && /online: true, db,/.test(store), 'store');
 });
-test('student/assign.js — 수업 덮개 안 기초 코딩 iframe(&live=1) · 그 iframe 의 결과도 받는다 · 끝나면 뗀다', () => {
+test('student/assign.js — 덮개 안 앱 창은 공용 하나(#asgl-app) · 스위치 AssignCore.LIVE_APPS(지금 비어 있음 = 코딩은 과제함으로만) · 결과 받기 · 끝나면 뗀다 [ASSIGN-APP-FRAME-1]', () => {
   const s = read('student/assign.js');
-  ok(/const ASG_LIVE_APPS = \['coding'\]/.test(s), 'ASG_LIVE_APPS');
+  ok(!/ASG_LIVE_APPS/.test(s) && /AssignCore\.isLiveKind\(def\.kind\)/.test(s), '스위치 한 곳(AssignCore)');
   ok(s.includes("'&assign=' + encodeURIComponent(def.id) + '&live=1'"), 'live 주소');
-  ok(/lf && e\.source === lf\.contentWindow/.test(s), '덮개 iframe 결과');
+  ok(/lf = document\.getElementById\('asgl-app'\)/.test(s) && /lf && e\.source === lf\.contentWindow/.test(s) && !/asgl-frame/.test(s), '덮개 iframe 결과(하나의 id)');
   ok(/_asgAppFrameOff\(inst\);\n  _ASG\.inst\[inst\] = null;/.test(s), '끝날 때 뗌');
+  eq(AC.LIVE_APPS, [], '보스 결정 10-05 — 코딩 · 리듬은 과제함으로만');
+  ok(AC.isLiveKind('quiz') && !AC.isLiveKind('coding'), 'isLiveKind');
+  //  스위치가 꺼져 있으면 덮개 안 앱 주소가 없다 · 켜면(시험용 사본) 학습 앱 창 주소 + &assign &live=1
+  const run = core => { const c = { console, AssignCore: core, externalStudyItems: () => [{ key: 'coding', embed: true, href: 'coding/index.html?sid=s1&n=a' }] }; vm.createContext(c); vm.runInContext(s, c); return c; };
+  eq(run(AC)._asgAppSrc(DEF), '', '꺼짐');
+  eq(run({ ...AC, isLiveKind: k => k === 'quiz' || k === 'coding' })._asgAppSrc(DEF), 'coding/index.html?sid=s1&n=a&assign=' + DEF.id + '&live=1', '켬');
 });
 
 // ── 관리 화면 결과 칸(vm — escHtml · 명단 · tally 그대로) ──
@@ -131,6 +137,7 @@ test('관리 결과 표 — 명단 기준 · 판마다 ★/실행/막힘 · 막�
   g.globalThis = g;
   vm.createContext(g);
   vm.runInContext(read('admin.js').split('\n').slice(0, 27).join('\n'), g);   // escHtml · escJsAttr
+  vm.runInContext(read('admin/assign.js'), g);   // 공용 틀(_assignAppResultHTML · ASSIGN_APPS) [ASSIGN-APPS-1]
   vm.runInContext(`var _maskOn = false; function _assignMasked(){ return _maskOn; }
     function _assignNameHTML(n, i){ return _assignMasked() ? '학생 ' + (i + 1) : escHtml(n); }
     function _assignStatus(r){ return r.status; } function _assignMs(ms){ return Math.round(ms / 1000) + '초'; }`, g);
@@ -142,18 +149,27 @@ test('관리 결과 표 — 명단 기준 · 판마다 ★/실행/막힘 · 막�
   };
   const t = AC.tally(DEF, R, [{ sid: 's1', name: '하늘' }, { sid: 's2', name: '바다' }, { sid: 's3', name: '<b>별</b>' }]);
   g.T = t; g.D = DEF;
-  let html = vm.runInContext('assignCodingResultHTML(D, T)', g);
+  let html = vm.runInContext('_assignAppResultHTML(D, T, false)', g);
   ok(html.includes('하늘') && html.includes('&lt;b&gt;별&lt;/b&gt;') && !html.includes('<b>별</b>'), '명단 · escape');
   ok(html.includes('★★★ <small>(실행 2)') && html.includes('✗ <small>실행 6 막힘'), '칸');
   ok(html.includes('3 / 3') && html.includes('61초'), '푼 판 · 걸린 시간');
   ok(/class="asg-cd-stuck">2-3</.test(html), '막힌 판');
   ok(html.includes('막힘 1') && html.includes('나무에 부딪힘 4'), '판마다 셈 · 많이 한 실수');
   vm.runInContext("_ASC.cell = 's1|9-1'", g);
-  html = vm.runInContext('assignCodingResultHTML(D, T)', g);
+  html = vm.runInContext('_assignAppResultHTML(D, T, false)', g);
   ok(html.includes('&lt;script&gt;x&lt;/script&gt;') && !html.includes('<script>x'), '마지막 코드 escape');
   vm.runInContext('_maskOn = true', g);
-  html = vm.runInContext('assignCodingResultHTML(D, T)', g);
+  html = vm.runInContext('_assignAppResultHTML(D, T, false)', g);
   ok(!html.includes('하늘') && html.includes('이름 가리기 중') && !html.includes('&lt;script'), '이름 가리기');
+  //  공용 틀에 달림 · 명단 밖 이름도 가리기를 따름(검토 반영 — 틀 하나라 음악 표도 같음)
+  ok(vm.runInContext('ASSIGN_APPS.coding.cls === "cd" && typeof ASSIGN_APPS.coding.cells === "function" && _assignKindReady("coding") && !_assignLiveOK("coding")', g), '달림 · 과제함으로만');
+  g.T2 = AC.tally(DEF, { ...R, zz: R.s2 }, [{ sid: 's1', name: '하늘' }]);
+  vm.runInContext('_maskOn = true', g);
+  html = vm.runInContext('_assignAppResultHTML(D, T2, false)', g);
+  ok(html.includes('명단 밖') && !html.includes('>zz<') && !/명단 밖<\/span> zz/.test(html), '명단 밖 이름 가림');
+  vm.runInContext('_maskOn = false', g);
+  html = vm.runInContext('_assignAppResultHTML(D, T, true)', g);
+  ok(html.includes(`assignExcuse('s1', true)`), '수업 중이면 빼기(틀 공용)');
 });
 test('관리 고르기 칸 — 단원 펼침 · 3판까지 · 고른 차례 번호', () => {
   const g = { console, URL, document: { baseURI: 'http://x/admin.html' }, AssignCore: AC };

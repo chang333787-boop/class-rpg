@@ -202,6 +202,43 @@ test('liveState — host 기록이 아예 없으면 시작부터 셈 · 안전 �
   eq(AC.liveState(LIVE(), mkDef(), 's1', { now: T0 + 4 * MIN, hosts: {} }).why, 'hostAway');
   ok(AC.endsAtOf(LIVE({ endsAt: T0 + 9e9 })) === T0 + 120 * MIN, '120분');
 });
+test('[ASSIGN-LIVE-APPS-1] 스위치 — LIVE_APPS 비어 있음(보스 결정 10-05) · 수업으로 못 여는 학습 앱은 덮지 않음(appOff) · 기본 안전 시간 45분', () => {
+  eq(AC.LIVE_APPS, [], '코딩 · 리듬은 과제함으로만');
+  ok(Object.isFrozen(AC.LIVE_APPS), '고정');
+  ok(AC.isLiveKind('quiz') && !AC.isLiveKind('coding') && !AC.isLiveKind('music') && !AC.isLiveKind('x'), 'isLiveKind');
+  const hosts = H([T0]);
+  const c = AC.normDef({ id: 'aT1', kind: 'coding', content: { coding: { stages: ['2-3'] } } }, 'aT1');
+  const m = AC.normDef({ id: 'aT1', kind: 'music', content: { music: { song: 'lib_sola' } } }, 'aT1');
+  eq(AC.liveState(LIVE({ kind: 'coding' }), c, 's1', { now: T0 + MIN, hosts }).why, 'appOff');
+  eq(AC.liveState(LIVE({ kind: 'music' }), m, undefined, { now: T0 + MIN, hosts }).show, false, '로그인 화면 띠도 안 뜸');
+  eq(AC.liveState(LIVE(), mkDef(), 's1', { now: T0 + MIN, hosts }).why, 'ok', '문제 묶음은 그대로');
+  eq(AC.MIN_DEFAULT, 45);
+  const st = AC.ctl.start(mkDef(), {}, T0)(null);
+  eq(st.endsAt - st.startedAt, 45 * MIN, '분을 안 주면 45분');
+});
+test('[ASSIGN-AVG-1] avgOf · avgText — 문제 묶음 = 끝낸 아이 점수 · 기초 코딩 = 시작한 아이 푼 판 · 리듬 = 끝까지 친 아이 정확도', () => {
+  const q = mkDef();
+  const tq = { rows: [{ status: 'done', correct: 3, total: 4 }, { status: 'none' }], avg: 75 };
+  eq(AC.avgText(q, tq, '아이'), '끝낸 아이 평균 75점');
+  const c = AC.normDef({ id: 'aC', kind: 'coding', content: { coding: { stages: ['2-3', '2-4', '2-5'] } } }, 'aC');
+  const tc = { rows: [{ status: 'done', correct: 3 }, { status: 'doing', correct: 1 }, { status: 'none', correct: 0 }], avg: 100 };
+  eq(AC.avgOf(c, tc), { v: 2, n: 2, of: 3 }, '안 한 아이는 빼고 · 끝낸 아이만이면 늘 3');
+  eq(AC.avgText(c, tc, '친구'), '시작한 친구 푼 판 평균 2 / 3');
+  const m = AC.normDef({ id: 'aM', kind: 'music', content: { music: { song: 'lib_sola' } } }, 'aM');
+  const tm = { rows: [{ status: 'done', detail: { best: { acc: 100 } } }, { status: 'done', detail: { best: { acc: 56.3 } } }, { status: 'doing', detail: { best: { acc: 99 } } }], avg: 78 };
+  eq(AC.avgText(m, tm), '끝까지 친 아이 정확도 평균 78.2%', '끝까지 친 판만 · 소수 한 자리');
+  eq(AC.avgText(m, { rows: [{ status: 'none' }] }), '', '아무도 없으면 빈 글');
+  eq(AC.avgOf(null, tm), null);
+});
+test('[ASSIGN-END-INBOX-2] endPlan — 못 한 아이 과제함으로(기본 켬) · 모두 다 했으면 닫기 · 과제함에서 돌린 수업은 원래대로', () => {
+  const left = { rows: [{ status: 'done' }, { status: 'doing' }] }, all = { rows: [{ status: 'done' }, { status: 'done' }] };
+  eq(AC.endPlan({}, left, true), 'inbox');
+  eq(AC.endPlan({}, all, true), 'close', '모두 다 함');
+  eq(AC.endPlan({ fromInbox: true }, all, true), 'back');
+  eq(AC.endPlan({ fromInbox: true }, left, false), 'back', '칸 끔 + 과제함에서 돌림');
+  eq(AC.endPlan({}, left, false), 'close', '칸 끔');
+  eq(AC.endPlan(null, null, true), 'close', '셈 없음');
+});
 test('liveScreen — 각자: 안 푼 첫 문항 · 다 하면 done(정리면 summary 표시)', () => {
   const d = mkDef(), cell = { answers: { q0: { a: '2', ok: true, at: T0 } } };
   eq(AC.liveScreen(LIVE(), d, cell), { view: 'self', i: 1 });

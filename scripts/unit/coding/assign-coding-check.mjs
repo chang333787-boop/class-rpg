@@ -3,9 +3,9 @@
 //   A 과제함: 교사가 만들기 창에서 [🧩 기초 코딩] → 2단원 펼쳐 판 둘(2-1 · 2-2)을 눌러 고르고 보냄 → 학생 홈 카드 → 학습 앱 창(?assign=) 이 첫 판을 바로 엶
 //      → 학생1: 틀린 코드 한 번 · 맞는 코드 → 이긴 카드 '다음 과제 판' → 둘째 판 → 다 함 · 학생2: 다섯 번 틀림(막힘) · 학생3: 안 함
 //      → 서버 결과 칸(판 기록 · 실행 수 · 푼 판 · doneAt) · 과제 판 코드는 다른 열쇠 · 교사 결과 표(명단 기준 · ★/실행/막힘 · 막힌 판 · 마지막 코드)
-//   B 수업: 학생1 보통 코딩 창을 열어 둔 채 · 교사 [🔴 지금 모두 같이](기초 코딩 1-2 · 각자 풀기) → 모두 덮개 안 기초 코딩(&live=1) · 밑 창 그대로
-//      → 학생1 덮개 안에서 풂 → 서버 결과 · 교사 수업 띠 '다 한 아이 1' · 뒤로 칸 안 쌓임 → 끝내기 → 덮개 걷힘 · iframe 뗌 · 밑 코딩 창 그대로
-//   C 닫기(검토 반영 [ASSIGN-CODING-2]): 명단 밖 줄도 이름 가리기 · 머리 '푼 판 평균' · [수업으로] 문구 → 학생2 과제 쪽을 연 채 교사가 닫음 → 알림 · 문구 바뀜 · 예외 0
+//   B 수업 모드(보스 결정 10-05 — 코딩은 과제함으로만): 만들기 '지금 모두 같이' 막힘 · 안내 · 억지로 불러도 안 켜짐
+//      → 학생1 밑 보통 코딩 창에서 천천히 실행 중 → 교사 문제 묶음 수업 → 덮개(앱 창 0) · 밑 실행 멈춤('잠깐 멈췄어요') → 끝내기 → 밑 코딩 창 그대로
+//   C 닫기(검토 반영 [ASSIGN-CODING-2]): 명단 밖 줄도 이름 가리기 · 머리 '푼 판 평균' · [수업으로] 없음 → 학생2 과제 쪽을 연 채 교사가 닫음 → 알림 · 문구 바뀜 · 예외 0
 //   + 네트워크: 운영 주소 요청 0 · 페이지 오류 0
 //  실행: PP=8852 DP=9552 node scripts/unit/coding/assign-coding-check.mjs   (FAKE_RTDB=<…/fake-rtdb/server.mjs> · 스크린샷 OUT=<폴더>)
 //  포트는 쓰기 전에 lsof -nP -iTCP:<포트> -sTCP:LISTEN 으로 비었는지 본다. 끝나면 크롬 · 서버를 닫는다.
@@ -211,48 +211,46 @@ try {
   const tvMasked = await T.ev(`(() => { _AS.mask = true; _assignRenderResult(); const t = document.querySelector('#asg-result').textContent; _AS.mask = false; _assignRenderResult(); return !t.includes(${JSON.stringify(nm('s1'))}) && t.includes('이름 가리기 중'); })()`);
   ok(tvMasked === true, 'A29 이름 가리기 — 이름 · 판 칸 · 코드 숨김');
 
-  // ═════ B. 수업 모드 · 각자 풀기 ═════
+  // ═════ B. 수업 모드 — 기초 코딩은 과제함으로만(보스 결정 10-05 · AssignCore.LIVE_APPS 비어 있음) · 문제 묶음 수업이 덮으면 밑의 코딩 실행이 멈춤 ═════
   await S1.ev(`openExternalEmbed('coding'); 1`);
   await until(S1, `document.getElementById('m-embed').style.display === 'flex'`, 4000);
   const embSrc = await S1.ev(`document.getElementById('embed-frame').src`);
-  const hist0 = await S1.ev('history.length');
   await T.press('.asg-toolbar .btn-sm');
   await until(T, `!!document.querySelector('#asg-create .asg-create')`, 3000);
   await T.press(`.asg-seg[onclick*="'kind','coding'"]`);
   await until(T, `!!document.querySelector('#asg-pick-coding .asg-cd')`, 5000);
   await T.press('.asg-unit-h[onclick="assignCodingUnit(1)"]'); await sleep(150);
   await T.press(`.asg-cd-stage[onclick*="'1-2'"]`); await sleep(120);
-  await T.press('#asg-c-meta .asg-seg.live'); await sleep(150);
-  const paceTxt = await T.ev(`document.querySelector('#asg-c-meta').textContent`);
-  ok(/각자 풀기/.test(paceTxt) && !/한 문제씩 같이/.test(paceTxt), 'B1 기초 코딩 · 지금 모두 같이 → 진행은 각자 풀기만');
-  ok(/받는 아이 \d+명 — 기초 코딩 수업은 아이 한 명이 인터넷 연결을 2~3개/.test(paceTxt), 'B1b 만들기 창에 받는 아이 수 · 연결 수 안내(요금제 확인 전) [ASSIGN-CODING-2]', paceTxt.replace(/\s+/g, ' ').slice(-260));
-  const aidB = await T.ev(`_AS.draft.aid`);
-  await T.press('#asg-send');
-  ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.aid === ${JSON.stringify(aidB)} && _AS.live.kind === 'coding' && _AS.live.pacing === 'self')`, 6000), 'B2 수업 시작(live: coding · 각자 풀기)');
-  const lv = await Promise.all([S1, S2, S3].map(S => until(S, `classLiveIsOpen() && !!document.getElementById('asgl-frame') && /&assign=${aidB}&live=1/.test(document.getElementById('asgl-frame').src) && document.getElementById('class-live').classList.contains('asg-app')`, 8000)));
-  ok(lv.every(Boolean), 'B3 학생 셋 모두 수업 덮개 · 덮개 안 기초 코딩 iframe(&assign=<과제>&live=1)', JSON.stringify(lv));
-  const under = await S1.ev(`({ emb: document.getElementById('m-embed').style.display, src: document.getElementById('embed-frame').src })`);
-  ok(under.emb === 'flex' && under.src === embSrc, 'B4 학생1 밑의 보통 코딩 창은 그대로(같은 주소)', JSON.stringify(under));
-  ok(await untilIn(S1, '#asgl-frame', `location.hash === '#/s/1-2' && !!document.querySelector('.chip.asg-chip')`, 25000), 'B5 덮개 안 앱이 1-2 판을 바로 엶');
+  const metaB = await T.ev(`({ deliver: _AS.draft.deliver, dis: !!document.querySelector('#asg-c-meta .asg-seg.live[disabled]'), txt: document.querySelector('#asg-c-meta').textContent })`);
+  ok(metaB.deliver === 'inbox' && metaB.dis && /기초 코딩 과제는 과제함으로만 보낼 수 있어요/.test(metaB.txt), "B1 기초 코딩 · '지금 모두 같이' 막힘 · '과제함으로만 보낼 수 있어요' 안내", metaB.txt.replace(/\s+/g, ' ').slice(-200));
+  await T.ev(`assignDraft('deliver', 'live'); _assignStartLive(_assignBuildDef({ ..._AS.draft, deliver: 'live' }).def, 40, false, true); 1`);
+  await sleep(800);
+  ok(await T.ev(`!(_AS.live && _AS.live.on)`) === true, 'B2 억지로 불러도 수업이 안 켜짐(_assignStartLive 막음)');
+  await T.ev(`assignCancel(); 1`);
+  //  학생1: 밑의 보통 코딩 창에서 천천히 실행 중 → 교사 문제 묶음 수업 → 덮개 · 밑 실행 멈춤
+  await debugFrame(S1, '#embed-frame');
+  await S1.fev('#embed-frame', `location.hash = '#/s/1-1'; 1`);
+  await untilIn(S1, '#embed-frame', `typeof __coding !== 'undefined' && __coding.stage.id === '1-1'`, 25000);
+  await S1.fev('#embed-frame', `(() => { const sp = document.querySelector('select.speed'); sp.value = 'slow'; sp.dispatchEvent(new Event('change')); __coding.load('L L L L L L L L L L L L'); __coding.run(false); return 1; })()`);
+  await sleep(300);
+  const runPre = await S1.fev('#embed-frame', `__coding.state().running`);
+  await T.ev(`(() => { const d = _assignBuildDef({ ...(() => { assignNew(); return _AS.draft; })(), subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').filter(p => p.type === 'number').slice(0, 2).map(p => p.id), deliver: 'live', pacing: 'self', title: '덮개 시험' }); _assignStartLive(d.def, 40, false, true); return 1; })()`);
+  ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.kind === 'quiz')`, 6000), 'B3 문제 묶음 수업 시작');
+  const lv = await Promise.all([S1, S2, S3].map(S => until(S, `classLiveIsOpen() && !document.getElementById('asgl-app') && !!document.querySelector('#asgl-body .asg-q')`, 8000)));
+  ok(lv.every(Boolean), 'B4 학생 셋 모두 수업 덮개(문제 · 덮개 안 앱 창 0 = 코딩 iframe 하나뿐)', JSON.stringify(lv));
+  const paused = await untilIn(S1, '#embed-frame', `!__coding.state().running && /잠깐 멈췄어요/.test(__coding.state().msg)`, 5000);
+  ok(runPre === true && paused, "B5 밑의 코딩 실행이 덮개 신호로 멈춤('잠깐 멈췄어요')", JSON.stringify({ runPre, msg: await S1.fev('#embed-frame', '__coding.state().msg') }));
+  const under = await S1.ev(`({ emb: document.getElementById('m-embed').style.display, src: document.getElementById('embed-frame').src, n: document.querySelectorAll('iframe').length })`);
+  ok(under.emb === 'flex' && under.src === embSrc, 'B6 학생1 밑의 보통 코딩 창은 그대로(같은 주소)', JSON.stringify(under));
   await S1.key('Escape'); await sleep(300);
-  ok(await S1.ev(`classLiveIsOpen() && !!document.getElementById('asgl-frame')`) === true, 'B6 Esc 로 못 나감');
-  await S1.shot('B_s1_live_coding');
-  await debugFrame(S1, '#asgl-frame');
-  await untilIn(S1, '#asgl-frame', `typeof __coding !== 'undefined' && __coding.stage.id === '1-2'`, 25000);
-  const mb = await runCode(S1, '#asgl-frame', 'F F F L F F');
-  await sleep(1000);
-  const cb = db(`classRPG_assign/results/${aidB}/s1`) || {};
-  ok(/성공/.test(mb) && cb.app && cb.app.score === 1 && typeof cb.doneAt === 'number' && cb.app.detail['1-2'].ok === true, 'B7 덮개 안에서 풂 → 서버 결과(부모가 씀) · doneAt', JSON.stringify(cb).slice(0, 200));
-  await S1.pressIn('#asgl-frame', '.win-card .btn.primary');
-  ok(await untilIn(S1, '#asgl-frame', `!!document.querySelector('.asg-home') && /선생님이 끝낼 때까지/.test(document.querySelector('.asg-home').textContent) && !document.querySelector('.top .btn.small')`, 8000), "B8 다 하면 과제 쪽 '선생님이 끝낼 때까지…' · 다른 판 보기 단추 없음");
-  ok(await S1.ev('history.length') === hist0 + 1, 'B9 덮개 안에서 판을 옮겨도 뒤로 칸이 늘지 않음(덮개 칸 하나만)', String(await S1.ev('history.length')) + ' vs ' + hist0);
-  ok(await until(T, `/다 한 아이 1/.test(document.querySelector('#asg-live').textContent)`, 5000), "B10 교사 수업 띠 '다 한 아이 1'");
-  await T.shot('B_teacher_band');
+  ok(await S1.ev(`classLiveIsOpen()`) === true, 'B7 Esc 로 못 나감');
+  await S1.shot('B_s1_quiz_over_coding');
   await T.ev(`assignLiveEnd(false); 1`);
-  const closed = await Promise.all([S1, S2, S3].map(S => until(S, `!classLiveIsOpen() && !document.getElementById('asgl-frame')`, 6000)));
-  ok(closed.every(Boolean), 'B11 끝내기 → 덮개 걷힘 · 덮개 안 iframe 뗌', JSON.stringify(closed));
+  const closed = await Promise.all([S1, S2, S3].map(S => until(S, `!classLiveIsOpen() && !document.getElementById('asgl-app')`, 6000)));
+  ok(closed.every(Boolean), 'B11 끝내기 → 덮개 걷힘', JSON.stringify(closed));
   const after = await S1.ev(`({ emb: document.getElementById('m-embed').style.display, src: document.getElementById('embed-frame').src, hist: history.state && history.state.embed })`);
   ok(after.emb === 'flex' && after.src === embSrc && after.hist === 'coding', 'B12 학생1 하던 자리 그대로(보통 코딩 창 · 뒤로 칸 embed)', JSON.stringify(after));
+  await S1.ev(`closeExternalEmbed(); 1`);
 
   // ═════ C. 검토 반영 [ASSIGN-CODING-2] ═════
   //  명단 밖(명단에서 지운 아이) 결과 줄 — 이름 가리기 중엔 이름 · sid 가 안 보임
@@ -263,11 +261,10 @@ try {
   ok(outside && outside.m === true && outside.u === true, 'C1 명단 밖 줄 — 가리기 중엔 이름 · sid 숨김(풀면 보임)', JSON.stringify(outside));
   const headTxt = await T.ev(`(document.querySelector('#asg-result .tc-title') || {}).textContent || ''`);
   ok(/시작한 아이 푼 판 평균 [\d.]+ \/ 2/.test(headTxt) && !/끝낸 아이 평균/.test(headTxt), "C2 결과 머리 = '시작한 아이 푼 판 평균 n / 2'(점수 아님)", headTxt.replace(/\s+/g, ' '));
-  await T.ev(`assignStartFrom(${JSON.stringify(aidA)}); 1`);
-  await until(T, `!!document.querySelector('#asg-lists .asg-ask')`, 3000);
-  const askTxt = await T.ev(`(document.querySelector('#asg-lists .asg-ask') || {}).textContent || ''`);
-  await T.ev(`assignStartFrom(''); 1`);
-  ok(/이미 푼 판은 ★가 남아요/.test(askTxt) && !/이미 낸 답은 건너뛰어요/.test(askTxt), "C3 코딩 [수업으로] 확인 줄 = '이미 푼 판은 ★가 남아요'", askTxt.replace(/\s+/g, ' '));
+  const noBtn = await T.ev(`!document.querySelector('#asg-lists button[onclick="assignStartFrom(' + "'" + ${JSON.stringify(aidA)} + "'" + ')"]')`);
+  await T.ev(`assignStartFrom(${JSON.stringify(aidA)}); 1`); await sleep(300);
+  const noAsk = await T.ev(`!document.querySelector('#asg-lists .asg-ask')`);
+  ok(noBtn === true && noAsk === true, '[ASSIGN-LIVE-APPS-1] C3 코딩 과제 줄에 [수업으로] 없음 · 불러도 물음 줄 안 뜸', JSON.stringify({ noBtn, noAsk }));
   //  학생2 과제 쪽(#/)을 연 채 교사가 과제를 닫음
   await S2.ev(`asgOpenInbox(${JSON.stringify(aidA)}); 1`);
   await until(S2, `/assign=${aidA}/.test(document.getElementById('embed-frame').src)`, 5000);
