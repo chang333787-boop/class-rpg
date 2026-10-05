@@ -122,7 +122,7 @@ try {
   await sleep(200);
   const draftA = await T.ev(`({ m: _AS.draft.music, title: (document.querySelector('#asg-create input[maxlength]') || {}).value, on: document.querySelectorAll('#asg-pick-music .asg-mu-song.on').length, live: (document.querySelector('#asg-create .asg-seg.live') || {}).disabled })`);
   ok(songPress === true && draftA.m.song === 'lib_sola' && draftA.m.level === 'easy' && draftA.on === 1 && /솔·라·시 연습/.test(draftA.title || ''), 'A4 곡을 실제로 눌러 고름 · 이름 자동(곡 · 난이도)', JSON.stringify(draftA));
-  ok(draftA.live === false, 'A5 리듬은 \'지금 모두 같이\'도 열림');
+  ok(draftA.live === true, 'A5 [ASSIGN-LIVE-APPS-1] 리듬은 \'지금 모두 같이\' 막힘(과제함으로만 · 보스 결정 10-05)');
   await T.shot('A_create_music');
   const aidA = await T.ev(`_AS.draft.aid`);
   await T.press('#asg-send');
@@ -221,7 +221,8 @@ try {
   ok(metaB.deliver === 'inbox' && metaB.dis && metaB.note && /과제함에 보내기/.test(metaB.btn), "B1 리듬은 '지금 모두 같이' 막힘 · '과제함으로만 보낼 수 있어요' 안내 · 보내기 = 과제함", JSON.stringify(metaB));
   await T.shot('B_create_inbox_only');
   await T.ev(`assignCancel(); 1`);
-  ok(await T.ev(`!document.querySelector('#asg-lists button[onclick="assignStartFrom(${JSON.stringify(aidA).replace(/"/g, "'")})"]')`) === true, 'B2 열린 리듬 과제 줄에 [수업으로] 없음');
+  const noLive = await T.ev(`(() => { const has = [...document.querySelectorAll('#asg-lists button')].some(b => (b.getAttribute('onclick') || '').includes('assignStartFrom(') && (b.getAttribute('onclick') || '').includes(${JSON.stringify(aidA)})); assignStartFrom(${JSON.stringify(aidA)}); return { has, row: !!document.getElementById('asg-lists').querySelector('tr td b') && _AS.open[${JSON.stringify(aidA)}] && _AS.open[${JSON.stringify(aidA)}].kind, ask: _AS.startAsk }; })()`);
+  ok(noLive && noLive.has === false && noLive.row === 'music' && noLive.ask === '', 'B2 열린 리듬 과제 줄에 [수업으로] 없음 · 불러도 물음 줄 안 뜸', JSON.stringify(noLive));
   //  교사: 문제 묶음 수업(각자 풀기) — 리듬을 치던 학생2 화면도 덮인다
   await T.ev(`(() => { const d = _assignBuildDef({ ...(() => { assignNew(); return _AS.draft; })(), subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').filter(p => p.type === 'number').slice(0, 2).map(p => p.id), deliver: 'live', pacing: 'self', title: '덮개 시험' }); _assignStartLive(d.def, 40, false, true); return 1; })()`);
   ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.pacing === 'self')`, 6000), 'B3 문제 묶음 수업 시작');

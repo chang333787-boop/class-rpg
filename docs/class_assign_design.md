@@ -868,4 +868,4 @@ node scripts/unit/fake-rtdb/server.mjs 8870    # (#1173 머지 전이면 그 갈
 
 검토에서 고친 것: 코딩 '선생님이 닫으면 toast' = `import { h, toast }`(#1175 검토 반영 그대로 살아 있음) · 음악 결과 표 명단 밖 이름이 가리기를 안 따르던 것(틀 하나로 해결) · 음악 판정 · 콤보 칸을 수로만 · `contentSig(music)` 키 수 포함(#1176 그대로) · 음악 TV 이름 보이기(appView 가 live.names) · 코딩 iframe 두 개(과제함 창 + 덮개)가 같은 과제 코드 열쇠를 덮어쓰던 걱정 — 스위치가 꺼져 덮개 안 앱 창이 안 생기므로 과제 하나에 코딩 창 하나.
 
-시험: `scripts/unit/common/assign-core.test.mjs`(스위치 · avg · endPlan · 45분 추가) · `coding/assign.test.mjs` · `music/assign-music.test.mjs`(공용 틀로 바뀐 부름) · 헤드리스 `coding/assign-coding-check.mjs` · `music/assign-music-live.mjs` B = '과제함으로만 · 문제 묶음 수업이 덮으면 밑의 코딩 실행 · 리듬 판이 멈춤' · `assign/assign-live-check.mjs` · `fake-rtdb/demo-check.mjs`([끝내기] 고르개만 바뀜).
+시험: `scripts/unit/common/assign-core.test.mjs`(스위치 · avg · endPlan · 45분 추가) · `coding/assign.test.mjs` · `music/assign-music.test.mjs`(공용 틀로 바뀐 부름) · 헤드리스 `coding/assign-coding-check.mjs` · `music/assign-music-live.mjs` B = '과제함으로만 · 문제 묶음 수업이 덮으면 밑의 코딩 실행 · 리듬 판이 멈춤' · `assign/assign-live-check.mjs` · `fake-rtdb/demo-check.mjs`([끝내기] 고르개 · 2-10 = 안 한 아이 셋이 있어 과제함으로 남음 — 기본 켬 반영 · 시연판 안내 한 줄).
