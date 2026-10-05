@@ -122,7 +122,7 @@ test('grade — 보기는 번호로 · 보기 글자 그대로(===) 견줌', () 
   eq(AC.grade(it, { ci: 1 }, deps), { a: '2', ci: 1, ok: true });
   ok(AC.grade(it, { ci: 0 }, deps).ok === false && AC.grade(it, { ci: 9 }, deps) === null && AC.grade(it, {}, deps) === null, '틀림 · 범위 밖');
 });
-test('grade — 은행 보기 1,532문항: 정답 보기만 맞음 · 공백만 다른 보기(17문항)의 오답 43개가 정답으로 안 셈', () => {
+test('grade — 은행 보기 1,532문항: 정답 보기만 맞음 · 공백만 다른 보기(17문항)의 오답 43개가 정답으로 안 셈(과제·오늘의 학습 둘 다)', () => {
   let ch = 0, wrongOk = 0, spaceItems = 0, spaceWrong = 0, isCorrectWrongOk = 0;
   for (const p of bank.all) {
     if (p.type !== 'choice') continue; ch++;
@@ -137,7 +137,8 @@ test('grade — 은행 보기 1,532문항: 정답 보기만 맞음 · 공백만 
     });
   }
   ok(ch === 1532 && wrongOk === 0, `보기 ${ch} · 오답이 정답 ${wrongOk}`);
-  ok(spaceItems === 17 && isCorrectWrongOk === 43, `공백만 다른 보기 문항 ${spaceItems} · isCorrect 로는 오답이 정답 ${isCorrectWrongOk}(이 시험이 막는 것)`);
+  //  #1178(CHOICE-SPACING-1) 뒤로는 오늘의 학습 채점(isCorrect)도 띄어쓰기를 지켜 0 이다 — 둘 다 0 이어야 한다(예전엔 isCorrect 만 43)
+  ok(spaceItems === 17 && isCorrectWrongOk === 0, `공백만 다른 보기 문항 ${spaceItems} · isCorrect 로도 오답이 정답 ${isCorrectWrongOk}(#1178 뒤 0)`);
 });
 test('grade — 글 · 수 · 분수는 isCorrect(단위 · 값 같은 분수) · 받아쓰기는 dictationGrade(띄어쓰기는 점수 밖)', () => {
   ok(AC.grade(AC.normItem(items[1]), { v: '5개' }, deps).ok, '단위');
