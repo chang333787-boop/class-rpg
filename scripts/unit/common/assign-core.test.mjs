@@ -1,6 +1,7 @@
 // 과제 · 수업 규칙 시험 [CLASS-ASSIGN-1] — common/assign-core.js 의 순수 함수(브라우저 · 네트워크 · Firebase 없음)
 //  node scripts/unit/common/assign-core.test.mjs   (precheck 가 저절로 모은다)
-//  문제 은행(curriculum.js · curriculum_reading.js)을 vm 에 올려 2,516문항 전체로도 본다: 보기 채점 · 소리 말(itemLang) · 크기.
+//  문제 은행(curriculum.js · curriculum_reading.js)을 vm 에 올려 2,646문항 전체로도 본다: 보기 채점 · 소리 말(itemLang) · 크기.
+//  [ENGLISH-L78-1] 10-05 영어 2학기 L7·L8 130문항(보기 86) 더함 → 2,516→2,646 · 보기 1,532→1,618.
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -122,7 +123,7 @@ test('grade — 보기는 번호로 · 보기 글자 그대로(===) 견줌', () 
   eq(AC.grade(it, { ci: 1 }, deps), { a: '2', ci: 1, ok: true });
   ok(AC.grade(it, { ci: 0 }, deps).ok === false && AC.grade(it, { ci: 9 }, deps) === null && AC.grade(it, {}, deps) === null, '틀림 · 범위 밖');
 });
-test('grade — 은행 보기 1,532문항: 정답 보기만 맞음 · 공백만 다른 보기(17문항)의 오답 43개가 정답으로 안 셈(과제·오늘의 학습 둘 다)', () => {
+test('grade — 은행 보기 1,618문항: 정답 보기만 맞음 · 공백만 다른 보기(17문항)의 오답 43개가 정답으로 안 셈(과제·오늘의 학습 둘 다)', () => {
   let ch = 0, wrongOk = 0, spaceItems = 0, spaceWrong = 0, isCorrectWrongOk = 0;
   for (const p of bank.all) {
     if (p.type !== 'choice') continue; ch++;
@@ -136,7 +137,7 @@ test('grade — 은행 보기 1,532문항: 정답 보기만 맞음 · 공백만 
       else { if (r.ok) wrongOk++; if (spaced) { spaceWrong++; if (bank.CU.isCorrect(p, c)) isCorrectWrongOk++; } }
     });
   }
-  ok(ch === 1532 && wrongOk === 0, `보기 ${ch} · 오답이 정답 ${wrongOk}`);
+  ok(ch === 1618 && wrongOk === 0, `보기 ${ch} · 오답이 정답 ${wrongOk}`);
   //  #1178(CHOICE-SPACING-1) 뒤로는 오늘의 학습 채점(isCorrect)도 띄어쓰기를 지켜 0 이다 — 둘 다 0 이어야 한다(예전엔 isCorrect 만 43)
   ok(spaceItems === 17 && isCorrectWrongOk === 0, `공백만 다른 보기 문항 ${spaceItems} · isCorrect 로도 오답이 정답 ${isCorrectWrongOk}(#1178 뒤 0)`);
 });
@@ -157,9 +158,9 @@ test('grade — 영어 글 답: 한글이 섞이면 채점 안 함(blocked) · �
   ok(AC.grade(ap, { v: curly }, deps).ok, `둥근 따옴표 ${curly}`);
   ok(AC.grade(AC.normItem({ ...items[1], unitId: 'ma4-1-1' }), { v: '오' }, deps).ok === false, '영어가 아니면 한글 답도 그냥 채점');
 });
-test('itemLang = study.js problemLang (은행 2,516문항 전체)', () => {
+test('itemLang = study.js problemLang (은행 2,646문항 전체)', () => {
   let n = 0; for (const p of bank.all) { if (AC.itemLang(AC.normItem(p)) !== study.problemLang(p)) throw new Error(p.id); n++; }
-  ok(n === 2516, '문항 수 ' + n);
+  ok(n === 2646, '문항 수 ' + n);
 });
 
 // ═════ 교사 기기 연결 · 덮개 ═════
