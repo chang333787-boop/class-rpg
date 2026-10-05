@@ -10,6 +10,7 @@
 //        transaction(해시 조건 → datastale) · ServerValue.increment/timestamp · get · onDisconnect · REST 읽기(shallow)·쓰기 · SSE.
 //  실행: node scripts/unit/fake-rtdb/server.mjs 8870            → http://127.0.0.1:8870/.fake/
 //        --seed <json> (기본 seed.json) · --repo <폴더> (기본 이 저장소) · --lan (같은 와이파이 기기도 접속 · 0.0.0.0)
+//        --demo  한 화면 네 칸 시연판(/.fake/demo) — 학생 A · B 칸은 포트+1 · 포트+2 로 따로 연다(같은 DB · 저장소는 따로) [CLASS-DEMO-1]
 //  시험: node scripts/unit/fake-rtdb/fake-rtdb.test.mjs (브라우저 없이 프로토콜만)
 import http from 'node:http';
 import fs from 'node:fs';
@@ -178,7 +179,7 @@ export function injectHtml(html) {
   return html;
 }
 
-export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_REPO, seed = path.join(HERE, 'seed.json'), quiet = false } = {}) {
+export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_REPO, seed = path.join(HERE, 'seed.json'), quiet = false, extraPorts = [] } = {}) {
   const seedData = typeof seed === 'string' ? JSON.parse(fs.readFileSync(seed, 'utf8')) : seed;
   const S = createStore(seedData);
   const conns = new Set();
@@ -257,6 +258,7 @@ export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_RE
     if (p === '/.fake/db') { res.writeHead(200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-store' }); return res.end(JSON.stringify(S.get(u.searchParams.get('path') || ''), null, 1)); }
     if (p === '/.fake/stats') { res.writeHead(200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ ...stats, clients: [...conns].map(c => ({ id: c.id, ua: c.ua, listens: c.listens.length })) }, null, 1)); }
     if (p === '/.fake/reset' && req.method === 'POST') { S.tree = norm(clone(seedData)); broadcast(''); log('처음 데이터로 되돌림'); res.writeHead(200); return res.end('ok'); }
+    if (p === '/.fake/demo' || p === '/.fake/demo.html') return sendDemo(res, req);
     if (p === '/.fake' || p === '/.fake/' || p === '/') return sendHome(res, req);
 
     // REST(shallow 읽기 · 마을 sync 쓰기): ?ns= 가 붙은 *.json 또는 shim 이 돌린 /.rtdb/…
@@ -310,6 +312,15 @@ export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_RE
     });
   }
 
+  //  시연판 [CLASS-DEMO-1] — 교사 · TV 칸은 이 포트, 학생 A · B 칸은 다른 포트(= 다른 출처: localStorage · sessionStorage 가 섞이지 않는다)
+  function sendDemo(res, req) {
+    const hostName = String(req.headers.host || '127.0.0.1').replace(/:\d+$/, '');
+    const cfg = { teacher: listenPorts[0], a: listenPorts[1] || null, b: listenPorts[2] || null, host: hostName };
+    const html = fs.readFileSync(path.join(HERE, 'demo.html'), 'utf8').replace('/*DEMO_CFG*/null', JSON.stringify(cfg));
+    res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' });
+    res.end(html);
+  }
+
   function sendHome(res, req) {
     const st = S.get('classRPG_v3/students') || {};
     const kids = Object.values(st).filter(s => s && s.id).map(s => `<li><a href="/student.html?as=${encodeURIComponent(s.id)}">${escHtml(s.name)}</a> <small>(${escHtml(s.id)})</small></li>`).join('');
@@ -324,6 +335,7 @@ export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_RE
 <p><a href="/student.html">학생 로그인 화면</a></p>
 <h2>선생님</h2><p><a href="/admin.html?auto">관리 화면 (바로 입장)</a> · <a href="/admin.html">관리 로그인 화면</a> (비밀번호 x) · <a href="/kiosk.html">키오스크</a></p>
 <h2>학습 앱</h2><p>${apps}</p>
+<h2>시연판</h2><p><a href="/.fake/demo">한 화면 네 칸(교사 · 학생 A · 학생 B · TV)</a> — 서버를 <code>--demo</code> 로 켜야 학생 칸이 따로 열려요</p>
 <h2>도구</h2><p><a href="/.fake/db?path=classRPG_v3/students">학생 기록 보기</a> · <a href="/.fake/stats">연결 수</a> · 처음으로 되돌리기: <code>curl -X POST ${escHtml('http://' + (req.headers.host || '') + '/.fake/reset')}</code></p>`);
   }
 
@@ -343,17 +355,29 @@ export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_RE
     c.ws.send(JSON.stringify({ t: 'c', d: { t: 'h', d: { ts: Date.now(), v: '5', h: req.headers.host, s: 'fake' + c.id } } }));
   });
 
-  return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, host, () => {
-      const addr = server.address();
-      log(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${addr.port}/.fake/  (저장소 ${repo})`);
-      resolve({
-        server, store: S, stats, port: addr.port, conns,
-        close: () => new Promise(r => { for (const c of conns) { try { c.ws.close(); } catch (e) {} } for (const e of sse) { try { e.send('cancel', null); } catch (er) {} } server.close(() => r()); server.closeAllConnections?.(); }),
-      });
-    });
-  });
+  //  [CLASS-DEMO-1] 같은 처리기 · 같은 메모리 DB 를 다른 포트에도 연다(시연판 학생 칸 = 다른 출처)
+  const listenPorts = [];
+  const servers = [server, ...extraPorts.map(() => {
+    const s2 = http.createServer(server.listeners('request')[0]);
+    s2.on('upgrade', server.listeners('upgrade')[0]);
+    return s2;
+  })];
+  const listen = (sv, pt) => new Promise((resolve, reject) => { sv.once('error', reject); sv.listen(pt, host, () => resolve(sv.address().port)); });
+  return (async () => {
+    listenPorts.push(await listen(server, port));
+    try { for (let i = 0; i < extraPorts.length; i++) listenPorts.push(await listen(servers[i + 1], extraPorts[i])); }
+    catch (e) { server.close(); for (const sv of servers.slice(1)) { try { sv.close(); } catch (er) {} } throw e; }
+    log(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${listenPorts[0]}/.fake/  (저장소 ${repo})${listenPorts.length > 1 ? ' · 함께 여는 포트 ' + listenPorts.slice(1).join(' · ') : ''}`);
+    return {
+      server, store: S, stats, port: listenPorts[0], ports: listenPorts.slice(), conns,
+      close: () => new Promise(r => {
+        for (const c of conns) { try { c.ws.close(); } catch (e) {} }
+        for (const e of sse) { try { e.send('cancel', null); } catch (er) {} }
+        let left = servers.length;
+        for (const sv of servers) { sv.close(() => { if (--left === 0) r(); }); sv.closeAllConnections?.(); }
+      }),
+    };
+  })();
 }
 
 function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -364,7 +388,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const opt = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
   const port = Number(argv.find(a => /^\d+$/.test(a)) || 8870);
   const lan = argv.includes('--lan');
-  const { port: real } = await startServer({ port, host: lan ? '0.0.0.0' : '127.0.0.1', repo: opt('--repo') ? path.resolve(opt('--repo')) : DEFAULT_REPO, seed: opt('--seed') ? path.resolve(opt('--seed')) : undefined });
+  const demo = argv.includes('--demo');
+  const { port: real } = await startServer({ port, host: lan ? '0.0.0.0' : '127.0.0.1', repo: opt('--repo') ? path.resolve(opt('--repo')) : DEFAULT_REPO, seed: opt('--seed') ? path.resolve(opt('--seed')) : undefined,
+    extraPorts: demo ? [port + 1, port + 2] : [] });
+  if (demo) console.log(`[가짜 RTDB] 시연판(교사 · 학생 A · 학생 B · TV): http://127.0.0.1:${real}/.fake/demo`);
   if (lan) {
     const ips = Object.values(os.networkInterfaces()).flat().filter(n => n && n.family === 'IPv4' && !n.internal).map(n => n.address);
     for (const ip of ips) console.log(`[가짜 RTDB] 같은 와이파이 기기: http://${ip}:${real}/.fake/`);
