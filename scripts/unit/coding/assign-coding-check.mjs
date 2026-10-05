@@ -131,8 +131,8 @@ try {
   const p2 = await T.press(`.asg-cd-stage[onclick*="'2-2'"]`); await sleep(120);
   const picked = await T.ev(`JSON.stringify(_AS.draft.coding.stages)`);
   ok(p1 === true && p2 === true && picked === '["2-1","2-2"]', 'A4 2단원을 펼쳐 판 둘을 실제로 눌러 고름(고른 차례)', picked);
-  const liveBtn = await T.ev(`!document.querySelector('#asg-c-meta .asg-seg.live').disabled`);
-  ok(liveBtn === true, 'A5 기초 코딩도 [🔴 지금 모두 같이] 단추가 열림');
+  const liveBtn = await T.ev(`document.querySelector('#asg-c-meta .asg-seg.live').disabled`);
+  ok(liveBtn === true, 'A5 [ASSIGN-LIVE-APPS-1] 기초 코딩은 [🔴 지금 모두 같이] 막힘(과제함으로만 · 보스 결정 10-05)');
   await T.shot('A_create_coding');
   const aidA = await T.ev(`_AS.draft.aid`);
   await T.press('#asg-send');
@@ -229,17 +229,30 @@ try {
   await T.ev(`assignCancel(); 1`);
   //  학생1: 밑의 보통 코딩 창에서 천천히 실행 중 → 교사 문제 묶음 수업 → 덮개 · 밑 실행 멈춤
   await debugFrame(S1, '#embed-frame');
+  await untilIn(S1, '#embed-frame', `/debug=1/.test(location.search) && document.readyState === 'complete' && !!document.querySelector('.home')`, 25000);
+  const spd = v => `(() => { const sp = document.querySelector('select.speed'); sp.value = '${v}'; sp.dispatchEvent(new Event('change')); return 1; })()`;
+  //  1-1 을 먼저 풀어(보통 모드 · 바로) 1-2 를 연다 — 1-2 를 천천히 돌리는 중에 수업이 덮게
   await S1.fev('#embed-frame', `location.hash = '#/s/1-1'; 1`);
   await untilIn(S1, '#embed-frame', `typeof __coding !== 'undefined' && __coding.stage.id === '1-1'`, 25000);
-  await S1.fev('#embed-frame', `(() => { const sp = document.querySelector('select.speed'); sp.value = 'slow'; sp.dispatchEvent(new Event('change')); __coding.load('L L L L L L L L L L L L'); __coding.run(false); return 1; })()`);
+  await sleep(400);
+  await S1.fev('#embed-frame', spd('instant'));
+  const m11 = await runCode(S1, '#embed-frame', 'F F F');
+  await sleep(600);
+  await S1.fev('#embed-frame', `location.hash = '#/s/1-2'; 1`);
+  const at12 = await untilIn(S1, '#embed-frame', `typeof __coding !== 'undefined' && __coding.stage.id === '1-2'`, 25000);
+  await sleep(500);
+  await S1.fev('#embed-frame', spd('slow'));
+  await S1.fev('#embed-frame', `__coding.load('F F F L F F'); 1`);
+  await sleep(400);   // 블록을 넣은 변경 알림이 다 지난 뒤 실행(실행 중 코드가 바뀌면 앱이 실행을 멈춘다)
+  const dbg = await S1.fev('#embed-frame', `(() => { __coding.run(false); return JSON.stringify({ n: __coding.program().length, sp: document.querySelector('select.speed').value }); })()`);   // 천천히 = 한 칸 0.7초 · 여섯 칸 ≈ 4초
   await sleep(300);
-  const runPre = await S1.fev('#embed-frame', `__coding.state().running`);
+  const runPre = await S1.fev('#embed-frame', `JSON.stringify(__coding.state())`).then(v => { try { return JSON.parse(v).running; } catch (e) { return v; } });
   await T.ev(`(() => { const d = _assignBuildDef({ ...(() => { assignNew(); return _AS.draft; })(), subject: 'math', how: 'pick', picked: CurriculumUtils.problemsBySubject('math').filter(p => p.type === 'number').slice(0, 2).map(p => p.id), deliver: 'live', pacing: 'self', title: '덮개 시험' }); _assignStartLive(d.def, 40, false, true); return 1; })()`);
   ok(await until(T, `!!(_AS.live && _AS.live.on && _AS.live.kind === 'quiz')`, 6000), 'B3 문제 묶음 수업 시작');
   const lv = await Promise.all([S1, S2, S3].map(S => until(S, `classLiveIsOpen() && !document.getElementById('asgl-app') && !!document.querySelector('#asgl-body .asg-q')`, 8000)));
   ok(lv.every(Boolean), 'B4 학생 셋 모두 수업 덮개(문제 · 덮개 안 앱 창 0 = 코딩 iframe 하나뿐)', JSON.stringify(lv));
   const paused = await untilIn(S1, '#embed-frame', `!__coding.state().running && /잠깐 멈췄어요/.test(__coding.state().msg)`, 5000);
-  ok(runPre === true && paused, "B5 밑의 코딩 실행이 덮개 신호로 멈춤('잠깐 멈췄어요')", JSON.stringify({ runPre, msg: await S1.fev('#embed-frame', '__coding.state().msg') }));
+  ok(runPre === true && paused, "B5 밑의 코딩 실행이 덮개 신호로 멈춤('잠깐 멈췄어요')", JSON.stringify({ m11, at12, dbg, runPre, msg: await S1.fev('#embed-frame', '__coding.state().msg') }));
   const under = await S1.ev(`({ emb: document.getElementById('m-embed').style.display, src: document.getElementById('embed-frame').src, n: document.querySelectorAll('iframe').length })`);
   ok(under.emb === 'flex' && under.src === embSrc, 'B6 학생1 밑의 보통 코딩 창은 그대로(같은 주소)', JSON.stringify(under));
   await S1.key('Escape'); await sleep(300);
