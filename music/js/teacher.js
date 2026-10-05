@@ -16,7 +16,7 @@ export async function mountTeacher(root, ctx) {
   const box = h('div', { class: 'pick teacher' }, h('div', { class: 'empty' }, '불러오는 중…'));
   root.replaceChildren(ctx.topBar('음악실 · 선생님', { back: '#/' }), h('div', { class: 'view' }, box));
   const [songs, practice, concert, roster] = await Promise.all([ctx.store.allSongs(), ctx.store.allPractice(), ctx.store.allConcert(), rosterFor(ctx.store)]);
-  const hidden = new Set(concert.filter(c => c.hide).map(c => c.sid + '_' + c.id));
+  const hiddenSet = new Set(concert.filter(c => c.hide).map(c => c.sid + '_' + c.id));   // [MUSIC-T-HIDDEN-1] 이름이 고운 말 가리기 함수 hidden 을 가려, 걸린 곡이 있으면 화면이 TypeError 로 안 그려졌다
   const kids = new Map();
   const kid = sid => { if (!kids.has(sid)) kids.set(sid, { sid, name: '', songs: [], practice: 0, last: 0 }); return kids.get(sid); };
   for (const [sid, list] of Object.entries(songs || {})) for (const raw of Object.values(list || {})) { const k = kid(sid); const s = normalize(raw); k.songs.push(s); k.name = k.name || raw.byName || ''; k.last = Math.max(k.last, raw.updated || 0); }
@@ -34,11 +34,11 @@ export async function mountTeacher(root, ctx) {
     h('div', { class: 'list' }, ...rows.map(k => h('div', { class: 'tk' },
       h('div', { class: 'tk-head' }, h('b', {}, k.name || k.sid), h('span', { class: 'muted' }, `곡 ${k.songs.length} · 연습 ${k.practice}번 · 마지막 ${day(k.last)}`)),
       ...k.songs.sort((a, z) => (z.updated || 0) - (a.updated || 0)).map(s => {
-        const ck = k.sid + '_' + s.id, isHidden = hidden.has(ck);
+        const ck = k.sid + '_' + s.id, isHidden = hiddenSet.has(ck);
         const play = h('button', { class: 'play-i', onclick: () => ctx.listen(s, play) });
         const hideBtn = s.pub ? h('button', { class: 'btn small' + (isHidden ? ' on' : ''), onclick: async () => {
-          const nowHidden = !hidden.has(ck);
-          try { await ctx.store.setHidden(k.sid, s.id, nowHidden); nowHidden ? hidden.add(ck) : hidden.delete(ck); hideBtn.textContent = nowHidden ? '다시 올리기' : '음악회에서 내리기'; hideBtn.classList.toggle('on', nowHidden); toast(nowHidden ? '음악회에서 내렸어요' : '다시 올렸어요'); }
+          const nowHidden = !hiddenSet.has(ck);
+          try { await ctx.store.setHidden(k.sid, s.id, nowHidden); nowHidden ? hiddenSet.add(ck) : hiddenSet.delete(ck); hideBtn.textContent = nowHidden ? '다시 올리기' : '음악회에서 내리기'; hideBtn.classList.toggle('on', nowHidden); toast(nowHidden ? '음악회에서 내렸어요' : '다시 올렸어요'); }
           catch (e) { console.warn(e); toast('바꾸지 못했어요'); }
         } }, isHidden ? '다시 올리기' : '음악회에서 내리기') : h('span', { class: 'muted', style: { fontSize: '.8rem' } }, '나만 보기');
         const bad = songBad(s), badAll = [...bad.title, ...bad.lyrics];
