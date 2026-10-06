@@ -3,7 +3,7 @@
 //           chords:[마디별로 손으로 고른 화음 'I'|'IV'|'V'|null], acc:{ chord, bass, drum }, mood, reverb,
 //           harm:[{ s, d, p }] = 아이가 직접 쌓는 화음 음(같은 때 최대 3음 · 같은 때 시작한 음은 길이가 같다 = 화음 하나) }
 import { chordName } from './theory.js';
-import { parsePitch, barSteps, totalSteps, stepSec, fitChords, chordPcs, chordRoot, chordByName, ROMAN, SCALES } from './theory.js';
+import { parsePitch, letter, barSteps, totalSteps, stepSec, fitChords, chordPcs, chordRoot, chordByName, ROMAN, SCALES } from './theory.js';
 import { LIBRARY } from './library.js';
 
 export const INSTS = {
@@ -17,24 +17,43 @@ export function emptySong() {
 }
 
 // 'G4/1 E4/1 E4/2 | F4/1 …' → { notes, bars }
+//  [MUSIC-TSONG-1] 붙임줄 '~' — 'C4/4~ | C4/4' = 다음 음(다음 마디여도)과 이어 한 음(길이 = 둘의 합 · 'A4/1~ A4/3~ | A4/4' 처럼 줄줄이도).
+//   이어지는 음은 높이가 같아야 하고, 쉼표에는 못 붙인다. 마디 칸 수는 전처럼 마디마다 제 칸만 센다.
+//   기본 곡(library)은 '~' 를 안 쓴다 → 결과가 전과 같다(scripts/unit/music/teacher-songs.test.mjs 가 견줌)
 export function parseMelody(str, bs) {
   const notes = [];
-  let s = 0, bars = 0;
+  let s = 0, bars = 0, tie = null;     // tie = '~' 로 다음 음에 이어질 음(다음 음 길이를 여기에 더한다)
   for (const bar of String(str).split('|')) {
     const toks = bar.trim().split(/\s+/).filter(Boolean);
     if (!toks.length) continue;
     const start = bars * bs;
     s = start;
     for (const t of toks) {
-      const [ps, ds] = t.split('/');
+      const tied = t.endsWith('~');
+      const [ps, ds] = (tied ? t.slice(0, -1) : t).split('/');
       const d = Number(ds);
       if (!(d > 0)) throw new Error('길이 없음: ' + t);
-      if (ps !== 'R') { const p = parsePitch(ps); if (p == null) throw new Error('음 이름: ' + t); notes.push({ s, d, p }); }
+      if (ps === 'R') {
+        if (tie) throw new Error('붙임줄(~) 다음이 쉼표예요: ' + t);
+        if (tied) throw new Error('쉼표에는 붙임줄(~)을 못 붙여요: ' + t);
+      } else {
+        const p = parsePitch(ps); if (p == null) throw new Error('음 이름: ' + t);
+        if (tie) {
+          if (tie.p !== p) throw new Error('붙임줄(~)로 이은 음의 높이가 달라요: ' + t);
+          tie.d += d;
+          if (!tied) tie = null;
+        } else {
+          const n = { s, d, p };
+          notes.push(n);
+          if (tied) tie = n;
+        }
+      }
       s += d;
     }
     if (s - start !== bs) throw new Error(`마디 ${bars + 1} 칸 수 ${s - start} ≠ ${bs}`);
     bars++;
   }
+  if (tie) throw new Error('마지막 음에 붙임줄(~)이 있어요 — 이어질 음이 없어요');
   return { notes, bars };
 }
 
@@ -48,6 +67,96 @@ export function fromLibrary(item) {
     ...(item.prog ? { prog: item.prog.trim().split(/\s+/), progEvery: item.progEvery || 1 } : {}) };
 }
 export const librarySongs = () => LIBRARY.map(fromLibrary);
+
+// ── 선생님 곡(공연 곡) [MUSIC-TSONG-1] ──
+//  선생님이 교사 화면에서 넣는 곡 파일(.json)의 곡 하나. 저작권이 있는 곡이라 공개 저장소(library.js)에 넣지 않고 반 저장소 tsongs/<곡키> 에만.
+//  가락 글은 library 꼴 그대로('~' 붙임줄 포함) · normalize 를 거치지 않는다(16마디로 자르지 않음 — 긴 공연 곡 · 노랫말 없음).
+export const TSONG_KEY = /^[a-z0-9_-]{1,40}$/i;
+export const TSONG_LIMIT = { title: 30, part: 12, origin: 30, memo: 60, melody: 40000, bars: 200, prog: 2000 };
+//  곡 파일 하나(JSON.parse 한 값) → 곡 목록 — 곡 하나 · 곡 배열 · { kind: 'rpg-music-song', v: 1, songs: [ … ] }
+export function teacherSongsIn(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== 'object') throw new Error('곡 파일 모양이 아니에요');
+  if (data.songs == null && data.kind == null) return [data];
+  if (data.kind != null && data.kind !== 'rpg-music-song') throw new Error('곡 파일 종류(kind)가 달라요: ' + String(data.kind).slice(0, 30));
+  if (!Array.isArray(data.songs)) throw new Error('곡 파일의 songs 칸이 목록이 아니에요');
+  return data.songs;
+}
+//  받은 곡 하나를 믿지 않고 살핀다 → { c = 저장할 모양(정한 칸만 · 앞뒤 빈칸 뺌 · 기본값 채움), notes, bars } · 틀리면 까닭을 담아 Error
+function checkTeacherSong(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('곡 모양이 아니에요');
+  const text = (k, name, need) => {
+    const v = raw[k];
+    if (v != null && typeof v !== 'string') throw new Error(`${name}: 글이어야 해요`);
+    const t = (v || '').trim();
+    if (need && !t) throw new Error(`${name}: 비었어요`);
+    if (t.length > TSONG_LIMIT[k]) throw new Error(`${name}: ${TSONG_LIMIT[k]}자까지예요(지금 ${t.length}자)`);
+    return t;
+  };
+  const oneOf = (k, name, list, d) => {
+    const v = raw[k] == null ? d : typeof list[0] === 'number' ? Number(raw[k]) : raw[k];
+    if (!list.includes(v)) throw new Error(`${name}: ${list.join(' · ')} 중 하나예요(지금 ${raw[k] == null ? '없음' : String(raw[k]).slice(0, 20)})`);
+    return v;
+  };
+  const key = typeof raw.key === 'string' ? raw.key.trim() : '';
+  if (!TSONG_KEY.test(key)) throw new Error(`곡키(key): 영어 · 숫자 · _ · - 로 1~40자예요(지금 ${raw.key == null ? '없음' : String(raw.key).slice(0, 44)})`);
+  const c = { key, title: text('title', '제목(title)', true) };
+  const part = text('part', '부분(part)'), memo = text('memo', '메모(memo)');
+  if (part) c.part = part;
+  c.origin = text('origin', '출처(origin)') || '선생님 곡';
+  if (memo) c.memo = memo;
+  if (raw.order == null) c.order = 99;
+  else { c.order = Number(raw.order); if (!Number.isFinite(c.order)) throw new Error('순서(order): 숫자여야 해요'); }
+  c.beats = oneOf('beats', '박(beats)', [2, 3, 4]);
+  c.sub = oneOf('sub', '한 박 칸 수(sub)', [2, 3, 4]);
+  c.tempo = Math.round(Number(raw.tempo));
+  if (!(c.tempo >= 40 && c.tempo <= 200)) throw new Error(`빠르기(tempo): 40~200이에요(지금 ${raw.tempo == null ? '없음' : String(raw.tempo).slice(0, 20)})`);
+  c.key2 = oneOf('key2', '조(key2)', [0, 2, 5, 7], 0);
+  c.scale = oneOf('scale', '음계(scale)', Object.keys(SCALES), 'major');
+  c.inst = oneOf('inst', '악기(inst)', Object.keys(INSTS), 'recorder');
+  if (raw.drum != null) c.drum = oneOf('drum', '북(drum)', Object.keys(DRUMS));
+  c.level = raw.level == null ? 2 : Number(raw.level);
+  if (!Number.isInteger(c.level) || c.level < 0 || c.level > 4) throw new Error('난이도(level): 0~4예요');
+  if (typeof raw.melody !== 'string' || !raw.melody.trim()) throw new Error('가락(melody): 비었어요');
+  c.melody = raw.melody.trim();
+  if (c.melody.length > TSONG_LIMIT.melody) throw new Error(`가락(melody): 너무 길어요(${TSONG_LIMIT.melody}자까지 · 지금 ${c.melody.length}자)`);
+  const bs = c.beats * c.sub;
+  let got;
+  try { got = parseMelody(c.melody, bs); } catch (e) { throw new Error('가락(melody): ' + e.message); }
+  const { notes, bars } = got;
+  if (!bars) throw new Error('가락(melody): 마디가 없어요');
+  if (bars > TSONG_LIMIT.bars) throw new Error(`가락(melody): ${TSONG_LIMIT.bars}마디까지예요(지금 ${bars}마디)`);
+  if (!notes.length) throw new Error('가락(melody): 음이 하나도 없어요');
+  for (const n of notes) {
+    if (!Number.isInteger(n.s) || !Number.isInteger(n.d)) throw new Error(`가락(melody) ${Math.floor(n.s / bs) + 1}마디: 길이는 칸 수(정수)로 적어요`);
+    if (n.p < 48 || n.p > 84) throw new Error(`가락(melody) ${Math.floor(n.s / bs) + 1}마디: ${letter(n.p)} 음은 너무 낮거나 높아요(C3~C6 안)`);
+  }
+  if (raw.prog != null && raw.prog !== '') {
+    if (typeof raw.prog !== 'string') throw new Error('화음(prog): 글이어야 해요');
+    const prog = raw.prog.trim().split(/\s+/).filter(Boolean).join(' ');
+    if (prog.length > TSONG_LIMIT.prog) throw new Error(`화음(prog): 너무 길어요(${TSONG_LIMIT.prog}자까지)`);
+    const bad = prog.split(' ').find(x => x !== '-' && !chordByName(x));
+    if (bad) throw new Error('화음(prog): 모르는 화음 이름 ' + bad.slice(0, 12));
+    if (prog) c.prog = prog;
+  }
+  if (raw.progEvery != null) {
+    c.progEvery = Number(raw.progEvery);
+    if (!Number.isInteger(c.progEvery) || c.progEvery < 1 || c.progEvery > 8) throw new Error('화음 바꾸는 박 수(progEvery): 1~8이에요');
+  }
+  return { c, notes, bars };
+}
+//  저장할 모양만(교사 화면 → store.saveTeacherSong) — 정한 칸 말고는 버린다(노랫말 · 모르는 칸 없음)
+export const cleanTeacherSong = raw => checkTeacherSong(raw).c;
+//  곡 파일의 곡 하나 → 곡(fromLibrary 와 같은 모양 · 16마디로 자르지 않음). id = 'ts_<곡키>' · 화면 제목 = 제목 · 부분
+export function fromTeacherSong(raw) {
+  const { c, notes, bars } = checkTeacherSong(raw);
+  const drum = c.drum || (c.beats === 3 && c.sub === 3 ? 'semachi' : c.beats === 4 && c.sub === 3 ? 'gutgeori' : 'basic');
+  return { v: 1, id: 'ts_' + c.key, ts: true, tk: c.key, lib: false, title: c.title + (c.part ? ' · ' + c.part : ''), name: c.title, part: c.part || '',
+    origin: c.origin, memo: c.memo || '', order: c.order, level: c.level,
+    beats: c.beats, sub: c.sub, bars, tempo: c.tempo, key: c.key2, scale: c.scale, inst: c.inst,
+    notes, harm: [], chords: [], acc: { chord: true, bass: true, drum }, mood: null, reverb: 0.12, practice: false,
+    ...(c.prog ? { prog: c.prog.split(' '), progEvery: c.progEvery || 1 } : {}) };
+}
 
 const num = (v, a, b, d) => { const n = Number(v); return Number.isFinite(n) ? Math.max(a, Math.min(b, Math.round(n))) : d; };
 // 받은 곡(저장소·친구 곡)을 믿지 않고 모양을 맞춘다
@@ -142,8 +251,8 @@ export function placeNote(song, s, p, d) {
 }
 export function removeNote(song, n) { song.notes = song.notes.filter(x => x !== n && !(x.s === n.s && x.p === n.p)); }
 
-// 곡 키 — 연습 기록·리듬 기록이 곡을 가리키는 이름
-export const songKey = song => song.lib ? 'lib_' + song.lk : 'u_' + String(song.by || 'me').replace(/[^\w-]/g, '_').slice(0, 30) + '_' + String(song.id || 'x').replace(/[^\w-]/g, '_').slice(0, 30);
+// 곡 키 — 연습 기록·리듬 기록이 곡을 가리키는 이름 · 선생님 곡 = 'ts_<곡키>'(practice/<sid>/ts_… · rhythm/ts_…) [MUSIC-TSONG-1]
+export const songKey = song => song.ts ? 'ts_' + song.tk : song.lib ? 'lib_' + song.lk : 'u_' + String(song.by || 'me').replace(/[^\w-]/g, '_').slice(0, 30) + '_' + String(song.id || 'x').replace(/[^\w-]/g, '_').slice(0, 30);
 
 // ── 소리 사건 만들기 ──  t = 시작부터 초. 반주는 '친구'들
 // 화음 소리 자리: 50~61(레3~시3) 안에서 · 베이스: 45~56(라2~솔#3) 안에서 — 가락(도4 위)과 안 겹치게

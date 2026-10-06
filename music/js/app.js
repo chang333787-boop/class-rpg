@@ -3,7 +3,7 @@
 //  [ASSIGN-MUSIC-1] ?assign=<과제>(선생님 과제 · &live=1 = 선생님과 수업) — 그 곡 리듬 화면만 연다(다른 길은 막음) · 결과는 common/assign.js 로
 import { h, toast, modal, lsGet, lsSet } from './util.js';
 import { createStore } from './store.js';
-import { librarySongs, normalize, buildEvents, songKey, emptySong } from './song.js';
+import { librarySongs, normalize, buildEvents, songKey, emptySong, fromTeacherSong } from './song.js';
 import { engine, Player } from './audio.js';
 import { SCALES, colorOf, meterOf, solfege } from './theory.js';
 import { recorderOK, SYSTEMS } from './recorder.js';
@@ -26,12 +26,24 @@ let current = null, temp = null;     // temp = 저장 전 곡(작곡 → 연습�
 //  [ASSIGN-MUSIC-1] 선생님 과제 — A = { aid, sid, live } · asg = 불러온 뒤 { def, set, closed, cell } (null = 아직 · false = 못 불러옴)
 const A = store.online ? assignFromUrl() : null;
 let asg = null;
+//  [MUSIC-TSONG-1] 선생님 곡(공연 곡) — 반 저장소 tsongs 를 쪽마다 한 번만 읽는다(교사 화면이 넣거나 지우면 다시 읽게 비움).
+//   곡마다 fromTeacherSong 으로 살펴 틀린 곡은 건너뛴다 · 못 읽으면 빈 목록(다음에 다시) · 순서 = order → 제목
+let tsongsP = null;
+function teacherSongs() {
+  if (!tsongsP) tsongsP = store.listTeacherSongs().then(list => {
+    const out = [];
+    for (const raw of list || []) { try { out.push(fromTeacherSong(raw)); } catch (e) { console.warn('[MUSIC-TSONG-1] 곡을 건너뜀', raw && raw.key, e.message); } }
+    return out.sort((a, z) => (a.order - z.order) || a.title.localeCompare(z.title, 'ko'));
+  }).catch(e => { console.warn('[MUSIC-TSONG-1] 선생님 곡을 못 읽음', e); tsongsP = null; return []; });
+  return tsongsP;
+}
 
 const ctx = {
   store, LIB,
   go: hash => { location.hash = hash; },
   replaceRef: ref => { history.replaceState(null, '', '#/compose/' + ref); shownHash = location.hash; },
-  refOf: s => s.lib ? s.id : `u.${s.by || store.me.sid}.${s.id}`,
+  refOf: s => s.lib || s.ts ? s.id : `u.${s.by || store.me.sid}.${s.id}`,
+  teacherSongs, resetTeacherSongs: () => { tsongsP = null; },   // [MUSIC-TSONG-1] 교사 화면이 곡을 넣거나 지운 뒤 비운다
   sys: () => lsGet('music.sys', 'baroque'),
   setSys: v => lsSet('music.sys', v),
   openPractice: s => { temp = s; ctx.go('#/practice/_temp'); },
@@ -48,6 +60,7 @@ const ctx = {
   async resolve(ref) {
     if (ref === '_temp') return temp;
     if (ref.startsWith('lib_')) return LIB.find(s => s.id === ref) || null;
+    if (ref.startsWith('ts_')) return (await teacherSongs()).find(s => s.id === ref) || null;   // [MUSIC-TSONG-1]
     if (ref.startsWith('u.')) {
       const [, owner, id] = ref.split('.');
       const raw = await store.getSong(owner, id);
@@ -76,6 +89,7 @@ function listen(song, btn) {
 // ── 첫 화면 ──
 function mountHome(root) {
   const mine = h('div', { class: 'list' }, h('div', { class: 'empty' }, '불러오는 중…'));
+  const tsBadge = h('em', { class: 'ts-badge', style: { display: 'none' } });   // [MUSIC-TSONG-1] '선생님 곡 N' — 늦게 와도 · 못 읽어도 첫 화면은 그대로
   const concert = h('div', { class: 'list' }, h('div', { class: 'empty' }, '불러오는 중…'));
   const logLine = h('button', { class: 'btn small', onclick: () => ctx.go('#/log') }, '리코더 기록장');
   root.replaceChildren(
@@ -85,7 +99,7 @@ function mountHome(root) {
         h('button', { class: 'door d-compose', onclick: () => ctx.go('#/compose/new') },
           h('img', { src: '../assets/monsters/m22.png', alt: '' }), h('b', {}, '작곡하기'), h('span', {}, '칸을 눌러 가락을 짓고, 반주 친구와 함께 들어요')),
         h('button', { class: 'door d-practice', onclick: () => ctx.go('#/pick/practice') },
-          h('img', { src: '../assets/monsters/m1.png', alt: '' }), h('b', {}, '리코더 연습'), h('span', {}, '음표 발판이 흘러가요. 운지를 보며 따라 불어요')),
+          h('img', { src: '../assets/monsters/m1.png', alt: '' }), h('b', {}, '리코더 연습'), h('span', {}, '음표 발판이 흘러가요. 운지를 보며 따라 불어요'), tsBadge),
         h('button', { class: 'door d-rhythm', onclick: () => ctx.go('#/pick/rhythm') },
           h('img', { src: '../assets/monsters/m28.png', alt: '' }), h('b', {}, '리듬 게임'), h('span', {}, '떨어지는 음표를 박에 맞춰 키보드로'),
           h('span', { class: 'keys' }, ...'ASDFJKL;'.split('').map(k => h('i', {}, k))))),
@@ -102,6 +116,7 @@ function mountHome(root) {
     if (list.length > 4) concert.append(h('button', { class: 'btn small', onclick: () => ctx.go('#/pick/class') }, `모두 보기 (${list.length})`));
   });
   store.listPractice().then(p => { const n = p.reduce((a, x) => a + (x.n || 0), 0); if (n) logLine.textContent = `리코더 기록장 · ${n}번`; }).catch(() => {});
+  teacherSongs().then(list => { if (list.length) { tsBadge.textContent = `선생님 곡 ${list.length}`; tsBadge.style.display = ''; } }).catch(() => {});
   return { unmount: () => { stopWatch && stopWatch(); listenPlayer.stop(); } };
 }
 
@@ -126,40 +141,53 @@ function concertRow(c) {
 }
 
 // ── 곡 고르기 ──  mode: practice | rhythm | mine | class
+//  [MUSIC-TSONG-1] 연습 · 리듬이면 선생님 곡이 있을 때 맨 앞 칸 '선생님 곡'을 처음 칸으로(연습 · 리듬 게임 · 듣기만 — 고치기 · 바꿔 쓰기 없음).
+//   선생님 곡을 2초 안에 못 읽으면 기본 곡부터 보이고, 늦게 오면 칸만 더한다(아이가 보던 칸은 안 바꿈)
 function mountPick(root, mode) {
   const forPlay = mode === 'practice' || mode === 'rhythm';
   let tab = mode === 'mine' ? 'mine' : mode === 'class' ? 'class' : 'lib';
-  const list = h('div', { class: 'list' });
+  let ts = [], drawn = false, alive = true, drawSeq = 0;
+  const list = h('div', { class: 'list' }, h('div', { class: 'empty' }, '불러오는 중…'));
   const sysSel = h('select', { onchange: e => { ctx.setSys(e.target.value); draw(); } }, ...Object.entries(SYSTEMS).map(([k, v]) => { const o = h('option', { value: k }, v + ' 리코더'); if (k === ctx.sys()) o.selected = true; return o; }));
   const tabs = h('div', { class: 'tabs' });
   const title = mode === 'practice' ? '리코더 연습 — 곡 고르기' : mode === 'rhythm' ? '리듬 게임 — 곡 고르기' : mode === 'mine' ? '내 곡' : '우리 반 음악회';
   root.replaceChildren(ctx.topBar(title, { back: '#/', right: mode === 'practice' ? [sysSel] : [] }), h('div', { class: 'view' }, h('div', { class: 'pick' }, tabs, list)));
   async function draw() {
-    tabs.replaceChildren(...[['lib', '기본 곡'], ['mine', '내 곡'], ['class', '우리 반 곡']].map(([k, t]) => h('button', { class: 'btn' + (tab === k ? ' on' : ''), onclick: () => { tab = k; draw(); } }, t)));
+    drawn = true;
+    const my = ++drawSeq;
+    tabs.replaceChildren(...[...(forPlay && ts.length ? [['ts', '선생님 곡']] : []), ['lib', '기본 곡'], ['mine', '내 곡'], ['class', '우리 반 곡']].map(([k, t]) => h('button', { class: 'btn' + (tab === k ? ' on' : ''), onclick: () => { tab = k; draw(); } }, t)));
     list.replaceChildren(h('div', { class: 'empty' }, '불러오는 중…'));
     let songs = [];
     try {
-      if (tab === 'lib') songs = LIB.map(s => ({ s, ref: s.id }));
+      if (tab === 'ts') songs = ts.map(s => ({ s, ref: s.id }));
+      else if (tab === 'lib') songs = LIB.map(s => ({ s, ref: s.id }));
       else if (tab === 'mine') songs = (await store.listMySongs()).map(r => normalize(r)).map(s => ({ s, ref: ctx.refOf(s) }));
       else songs = (await store.listConcert()).filter(c => !badWords(c.t).length).map(c => ({ c, ref: `u.${c.sid}.${c.id}` }));
     } catch (e) { console.warn(e); }
-    if (!songs.length) { list.replaceChildren(h('div', { class: 'empty' }, tab === 'mine' ? '아직 지은 곡이 없어요.' : tab === 'class' ? '아직 음악회에 올라온 곡이 없어요.' : '')); return; }
+    if (my !== drawSeq) return;   // 그사이 다른 칸을 눌렀으면 그 칸이 그린다
+    if (!songs.length) { list.replaceChildren(h('div', { class: 'empty' }, tab === 'mine' ? '아직 지은 곡이 없어요.' : tab === 'class' ? '아직 음악회에 올라온 곡이 없어요.' : tab === 'ts' ? '선생님 곡이 아직 없어요.' : '')); return; }
     list.replaceChildren(...songs.map(({ s, c, ref }) => {
-      const name = s ? s.title : c.t, sub = s ? (s.lib ? `${s.origin} · ` : '') + tagOf(s) : `${c.n || '친구'} · ${tagOf({ beats: c.beats, sub: c.sub, bars: c.bars, scale: c.scale })}`;
-      const lv = s && s.lib ? h('span', { class: 'lv' }, s.practice ? '첫걸음' : '★'.repeat(s.level || 1)) : null;
+      const name = s ? s.title : c.t;
+      const sub = s ? (s.ts ? `${s.origin} · ${tagOf(s)}${s.memo ? ' · ' + s.memo : ''}` : (s.lib ? `${s.origin} · ` : '') + tagOf(s)) : `${c.n || '친구'} · ${tagOf({ beats: c.beats, sub: c.sub, bars: c.bars, scale: c.scale })}`;
+      const lv = s && (s.lib || s.ts) ? h('span', { class: 'lv' }, s.practice ? '첫걸음' : '★'.repeat(s.level || 1)) : null;
       const okRec = !s || recorderOK(s, ctx.sys());
       const play = h('button', { class: 'play-i', title: '듣기', onclick: async () => { const x = s || await ctx.resolve(ref); if (x) listen(x, play); } });
       const acts = [play];
       if (mode !== 'rhythm') acts.push(h('button', { class: 'btn small' + (mode === 'practice' ? ' primary' : ''), disabled: !okRec, title: okRec ? '' : '이 리코더로 불 수 없는 음이 있어요', onclick: () => ctx.go('#/practice/' + ref) }, '연습'));
       if (mode !== 'practice') acts.push(h('button', { class: 'btn small' + (mode === 'rhythm' ? ' primary' : ''), onclick: () => ctx.go('#/rhythm/' + ref) }, '리듬 게임'));
       if (s && s.lib && !forPlay) acts.push(h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/' + ref) }, '바꿔 쓰기'));
-      if (s && !s.lib) acts.push(h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/' + ref) }, '고치기'));
+      if (s && !s.lib && !s.ts) acts.push(h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/' + ref) }, '고치기'));
       if (s && s.lib && forPlay && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, '저먼식으로는 불 수 없는 음'));
+      if (s && s.ts && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, `${SYSTEMS[ctx.sys()] || ''}으로는 불 수 없는 음`));
       return h('div', { class: 'song-row' }, dotOf(name, s?.notes[0]?.p), h('div', { class: 't' }, h('b', {}, name, lv), h('span', {}, sub)), h('div', { class: 'acts' }, ...acts));
     }));
   }
-  draw();
-  return { unmount: () => listenPlayer.stop() };
+  if (!forPlay) draw();
+  else {
+    const late = setTimeout(() => { if (alive && !drawn) draw(); }, 2000);
+    teacherSongs().then(got => { clearTimeout(late); if (!alive) return; ts = got; if (ts.length && !drawn) tab = 'ts'; draw(); });
+  }
+  return { unmount: () => { alive = false; listenPlayer.stop(); } };
 }
 
 // ── 리코더 기록장 ──
@@ -206,6 +234,7 @@ async function route() {
     else if (parts[0] === 't') current = await mountTeacher(app, ctx);
     else if (parts[0] === 'compose') {
       const ref = parts.slice(1).join('/');
+      if (decodeURIComponent(ref).startsWith('ts_')) { toast('선생님 곡은 연습 · 리듬 게임으로 해요'); ctx.go('#/'); return; }   // [MUSIC-TSONG-1] 고치기 · 바꿔 쓰기 없음
       const song = ref && ref !== 'new' ? await ctx.resolve(decodeURIComponent(ref)) : emptySong();
       if (my !== seq) return;
       if (!song) { toast('곡을 찾지 못했어요'); ctx.go('#/'); return; }

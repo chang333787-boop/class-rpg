@@ -12,6 +12,7 @@ const BAROQUE = {
   66: [1, 1, 1, 1, 0, 1, 1, 0],    // 파#
   67: [1, 1, 1, 1, 0, 0, 0, 0],    // 솔
   69: [1, 1, 1, 0, 0, 0, 0, 0],    // 라
+  70: [1, 1, 0, 1, 1, 0, 0, 0],    // 시♭ — 엄지 · 1 · 3 · 4 (바로크식 '0 1 3 4' · dolmetsch.com/dlesson9.htm) [MUSIC-TSONG-1]
   71: [1, 1, 0, 0, 0, 0, 0, 0],    // 시
   72: [1, 0, 1, 0, 0, 0, 0, 0],    // 높은 도
   74: [0, 0, 1, 0, 0, 0, 0, 0],    // 높은 레
@@ -22,6 +23,7 @@ const BAROQUE = {
 };
 const GERMAN = { ...BAROQUE, 65: [1, 1, 1, 1, 1, 0, 0, 0] };
 delete GERMAN[66]; delete GERMAN[77];
+delete GERMAN[70];   // 시♭ — 저먼식 운지는 확인 안 됨 → 넣지 않는다(그 음이 있는 곡은 저먼식 연습에서 빠짐) [MUSIC-TSONG-1]
 
 export const SYSTEMS = { baroque: '바로크식', german: '저먼식' };
 export const fingering = (p, sys = 'baroque') => (sys === 'german' ? GERMAN : BAROQUE)[p] || null;
