@@ -59,14 +59,18 @@ export function parseMelody(str, bs) {
 
 export function fromLibrary(item) {
   const bs = item.beats * item.sub;
-  const { notes, bars } = parseMelody(item.melody, bs);
+  //  [MUSIC-LIB-REPEAT-1] repeat = 가락을 그만큼 이어 부름(짧은 기본 곡은 두 번 · library.js 머리)
+  const rep = Math.max(1, Math.min(4, Math.floor(Number(item.repeat) || 1)));
+  const { notes, bars } = parseMelody(rep > 1 ? Array(rep).fill(item.melody).join(' | ') : item.melody, bs);
   const drum = item.beats === 3 && item.sub === 3 ? 'semachi' : item.beats === 4 && item.sub === 3 ? 'gutgeori' : 'basic';
   return { v: 1, id: 'lib_' + item.key, lib: true, lk: item.key, title: item.title, origin: item.origin, level: item.level,
     beats: item.beats, sub: item.sub, bars, tempo: item.tempo, key: item.key2 || 0, scale: item.scale, inst: item.inst,
-    notes, harm: [], chords: [], acc: { chord: true, bass: true, drum: item.drum || drum }, mood: null, reverb: 0.12, practice: !!item.practice,
+    notes, harm: [], chords: [], acc: { chord: true, bass: true, drum: item.drum || drum }, mood: null, reverb: 0.12, practice: !!item.practice, rep,
     ...(item.prog ? { prog: item.prog.trim().split(/\s+/), progEvery: item.progEvery || 1 } : {}) };
 }
 export const librarySongs = () => LIBRARY.map(fromLibrary);
+//  작곡 '바꿔 쓰기'용 — 되풀이 없이 한 번(작곡 칸은 16마디까지라 두 번 이은 곡을 그대로 열면 뒤가 잘린다) [MUSIC-LIB-REPEAT-1]
+export function libraryOnce(key) { const item = LIBRARY.find(x => x.key === key); return item ? fromLibrary({ ...item, repeat: 1 }) : null; }
 
 // ── 선생님 곡(공연 곡) [MUSIC-TSONG-1] ──
 //  선생님이 교사 화면에서 넣는 곡 파일(.json)의 곡 하나. 저작권이 있는 곡이라 공개 저장소(library.js)에 넣지 않고 반 저장소 tsongs/<곡키> 에만.
