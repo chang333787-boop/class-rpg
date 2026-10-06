@@ -5,10 +5,13 @@
 //  concert/<sid>_<곡id>      = 우리 반 음악회 목록 한 줄 { sid, n 이름, t 제목, u 고친 때, beats, sub, bars, scale, hide }
 //  practice/<sid>/<곡키>     = 리코더 기록장 { n 횟수, last, stars, t 제목 } + log/<자동키> = { t 때, sp 빠르기, st 별 }  (지우지 않고 쌓는다)
 //  rhythm/<곡키>/<sid>       = 리듬 게임 최고 기록 { best, acc, combo, grade, t 때, n 이름 }
+//  tsongs/<곡키> = 선생님이 올린 곡(공연 곡) — 가락 글(library 꼴) · 공개 저장소에 넣지 않는 곡(저작권) [MUSIC-TSONG-1]
+//                  { key, title, part?, origin, memo?, order, beats, sub, tempo, key2, scale, inst, drum?, level, melody, prog?, progEvery?, t 넣은 때 } — 쓰기는 교사 화면만
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { uid, keyOf, lsGet, lsSet } from './util.js';
 import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
 import { songBad } from './safety.js';
+import { cleanTeacherSong } from './song.js';   // 선생님 곡 — 정한 칸만 저장 [MUSIC-TSONG-1]
 const clean = s => { const b = songBad(s); return !b.title.length && !b.lyrics.length; };
 
 export const ROOT = 'classRPG_music';
@@ -62,6 +65,10 @@ function rtdbStore(fb, sid, name) {
       return { newBest: true, prev: prev ? prev.best : 0 };
     },
     async topRhythm(key, n = 5) { return Object.entries((await root.child('rhythm/' + keyOf(key)).once('value')).val() || {}).map(([s, x]) => ({ sid: s, ...x })).sort((a, z) => z.best - a.best).slice(0, n); },
+    // ── 선생님 곡(공연 곡) [MUSIC-TSONG-1] ── 읽기 = 아이 고르기 칸 · 쓰기 = 교사 화면(곡 파일 넣기 · 지우기)
+    async listTeacherSongs() { return vals((await root.child('tsongs').once('value')).val()).filter(x => x && typeof x === 'object'); },
+    async saveTeacherSong(raw) { const c = cleanTeacherSong(raw), k = keyOf(c.key); await root.child('tsongs/' + k).set(plain({ ...c, t: Date.now() })); return k; },
+    async deleteTeacherSong(key) { await root.child('tsongs/' + keyOf(key)).remove(); },
     // ── 선생님 ──
     async teacherOK(pw) { return adminPwOK(db, pw); },
     async allSongs() { return (await root.child('songs').once('value')).val() || {}; },
@@ -75,7 +82,7 @@ function rtdbStore(fb, sid, name) {
 // 이 기기에만(손님) — 같은 모양
 function localStore(sid, name) {
   const K = 'music.local';
-  const load = () => lsGet(K, { songs: {}, practice: {}, rhythm: {} });
+  const load = () => lsGet(K, { songs: {}, practice: {}, rhythm: {}, tsongs: {} });
   const save = d => lsSet(K, d);
   const st = {
     me: { sid, name, guest: true }, online: false,
@@ -103,6 +110,9 @@ function localStore(sid, name) {
       return { newBest: true, prev: prev ? prev.best : 0 };
     },
     async topRhythm(key) { const x = load().rhythm[keyOf(key)]; return x ? [{ sid, ...x }] : []; },
+    async listTeacherSongs() { return vals(load().tsongs).filter(x => x && typeof x === 'object'); },   // [MUSIC-TSONG-1]
+    async saveTeacherSong(raw) { const c = cleanTeacherSong(raw), k = keyOf(c.key), d = load(); d.tsongs = { ...(d.tsongs || {}), [k]: plain({ ...c, t: Date.now() }) }; save(d); return k; },
+    async deleteTeacherSong(key) { const d = load(); if (d.tsongs) { delete d.tsongs[keyOf(key)]; save(d); } },
     async teacherOK() { return true; },
     async allSongs() { return { [sid]: load().songs }; },
     async allPractice() { return { [sid]: load().practice }; },

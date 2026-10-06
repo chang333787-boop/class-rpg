@@ -5,8 +5,8 @@ import { svg } from './util.js';
 import { pc, solfege, colorOf, barSteps, fitChords, chordName, SCALES, chordByName } from './theory.js';
 
 const LG = 10;                                   // 오선 줄 사이(px)
-const DIAT = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];   // 반음 번호 → 음이름 자리(C=0 … B=6)
-const SHARP = new Set([1, 3, 6, 8, 10]);
+const DIAT = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 6, 6];   // 반음 번호 → 음이름 자리(C=0 … B=6) · 10 = 시♭ → 시 자리에 ♭(계이름 '시♭'과 같게) [MUSIC-TSONG-1]
+const SHARP = new Set([1, 3, 6, 8]), FLAT = new Set([10]);
 export const staffPos = p => (Math.floor(p / 12) - 5) * 7 + DIAT[pc(p)] - 2;   // 아래 첫 줄(미4) = 0, 한 칸 위 = +1
 
 // 칸 수 → [칸, 모양, 점] (w 온 · h 2분 · q 4분 · e 8분 · s 16분)
@@ -163,6 +163,7 @@ function drawBar(root, items, top, X, { song, words, addEl, ties, o, carry }) {
       const second = k > 0 && pos - poss[k - 1] === 1 && !(heads[k - 1] && heads[k - 1].shift);   // 2도로 붙은 음은 옆으로 비킴
       const hx = cx + (second ? (up ? 11.5 : -11.5) : 0);
       if (SHARP.has(pc(p))) el.append(svg('text', { x: cx - 16 - (it.ps.length > 1 ? 4 * k : 0), y: cy + 5, class: 'st-acc' }, '♯'));
+      else if (FLAT.has(pc(p))) el.append(svg('text', { x: cx - 15 - (it.ps.length > 1 ? 4 * k : 0), y: cy + 4, class: 'st-acc' }, '♭'));
       el.append(svg('ellipse', { cx: hx, cy, rx: 6.3, ry: 4.6, transform: `rotate(-20 ${hx} ${cy})`, class: hollow ? 'st-head hollow' : 'st-head' }));
       if (it.dots) el.append(svg('circle', { cx: cx + 10.5 + (second && up ? 11.5 : 0), cy: pos % 2 === 0 ? cy - 4 : cy, r: 1.9, class: 'st-dot' }));
       heads.push({ p, cx: hx, cy, shift: second });

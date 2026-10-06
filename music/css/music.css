@@ -276,3 +276,12 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .asg-screen{margin:auto;max-width:440px;padding:28px 30px;border-radius:20px;background:var(--bg2);text-align:center;display:grid;gap:10px;justify-items:center}
 .asg-screen-ic{font-size:2.6rem}
 .asg-screen h2{font-size:1.25rem;font-weight:900}
+/* [MUSIC-TSONG-1] 선생님 곡(공연 곡) — 교사 화면 맨 위 곡 파일 칸 · 리코더 연습 문 위 '선생님 곡 N' 표 */
+.ts-card{margin-bottom:16px;box-shadow:inset 0 0 0 1px rgba(242,169,59,.35)}
+.ts-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ts-head b{font-size:1rem;font-weight:900}
+.ts-head .btn{margin-left:auto}
+.ts-help{font-size:.85rem;line-height:1.5}
+.ts-note{font-size:.85rem;line-height:1.55;font-weight:700;color:#ff8a7a;white-space:pre-line}
+.ts-note.ok{color:var(--ok)}
+.door .ts-badge{position:absolute;left:16px;top:14px;font-style:normal;font-size:.8rem;font-weight:900;color:#2a1a08;background:var(--gold);border-radius:999px;padding:3px 10px;box-shadow:0 3px 8px rgba(0,0,0,.3)}
