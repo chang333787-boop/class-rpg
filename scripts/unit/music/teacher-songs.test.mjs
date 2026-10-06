@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseMelody, fromLibrary, librarySongs, fromTeacherSong, cleanTeacherSong, teacherSongsIn, songKey, buildEvents, beatChords, TSONG_LIMIT } from '../../../music/js/song.js';
+import { parseMelody, fromLibrary, librarySongs, libraryOnce, fromTeacherSong, cleanTeacherSong, teacherSongsIn, songKey, buildEvents, beatChords, TSONG_LIMIT } from '../../../music/js/song.js';
 import { LIBRARY } from '../../../music/js/library.js';
 import { parsePitch, solfege, totalSteps, fitChords } from '../../../music/js/theory.js';
 import { fingering, recorderOK } from '../../../music/js/recorder.js';
@@ -70,7 +70,7 @@ await test('기본 곡 15곡 — 붙임줄을 더한 parseMelody 결과가 예�
     eq(parseMelody(x.melody, bs), parseMelodyBefore(x.melody, bs), x.key);
   }
   const libs = librarySongs();
-  for (const [i, x] of LIBRARY.entries()) eq(libs[i].notes, parseMelodyBefore(x.melody, x.beats * x.sub).notes, 'librarySongs ' + x.key);
+  for (const [i, x] of LIBRARY.entries()) eq(libs[i].notes, parseMelodyBefore(Array(x.repeat || 1).fill(x.melody).join(' | '), x.beats * x.sub).notes, 'librarySongs ' + x.key);   // [MUSIC-LIB-REPEAT-1] 짧은 곡은 두 번
   ok(libs.every(s => s.lib === true && !s.ts && songKey(s) === 'lib_' + s.lk), '기본 곡 곡 키 그대로');
   eq(fromLibrary(LIBRARY[0]).id, 'lib_nabiya');
 });
@@ -277,9 +277,32 @@ await test('화면 연결(글로 확인) — 고르기 첫 칸 · 작곡 막기 
   ok(/if \(s && !s\.lib && !s\.ts\) acts\.push\(h\('button', \{ class: 'btn small', onclick: \(\) => ctx\.go\('#\/compose\/' \+ ref\) \}, '고치기'\)\)/.test(app), '선생님 곡에 고치기 없음');
   ok(read('music/js/store.js').includes('tsongs/<곡키> = 선생님이 올린 곡(공연 곡) — 가락 글(library 꼴) · 공개 저장소에 넣지 않는 곡(저작권)'), '저장 경로 설명');
   const v = m => (html.match(new RegExp(`"\\./js/${m}\\.js": "\\./js/${m}\\.js\\?v=([^"]+)"`)) || [])[1];
-  ok(['app', 'song', 'store', 'teacher', 'recorder', 'theory', 'notation'].every(m => v(m) === '20261006ts1'), '고친 모듈 버스터 ' + ['app', 'song', 'store', 'teacher', 'recorder', 'theory', 'notation'].map(v).join(','));
-  ok(html.includes('<script type="module" src="js/app.js?v=20261006ts1">') && html.includes('css/music.css?v=20261006ts1'), 'script · css 버스터');
-  ok(v('library') === '2' && read('admin/assign-music.js').includes("'music/js/library.js?v=2'"), 'library.js 는 그대로(관리 화면 짝)');
+  //  10-06 선생님 곡(ts1) 뒤로 다시 고친 모듈(예: 짧은 곡 두 번 lr1)도 있으니 '10-06 이후 값'인지만 본다
+  ok(['app', 'song', 'store', 'teacher', 'recorder', 'theory', 'notation'].every(m => Number(String(v(m) || '').slice(0, 8)) >= 20261006), '고친 모듈 버스터 ' + ['app', 'song', 'store', 'teacher', 'recorder', 'theory', 'notation'].map(v).join(','));
+  //  script 태그 app.js 값 = import map app.js 값(10-06 이후) · css 는 선생님 곡 칸 모양 뒤 값
+  const tagV = (html.match(/<script type="module" src="js\/app\.js\?v=([^"]+)">/) || [])[1], cssV = (html.match(/css\/music\.css\?v=([^"]+)"/) || [])[1];
+  ok(tagV === v('app') && Number(String(cssV || '').slice(0, 8)) >= 20261006, 'script · css 버스터 ' + tagV + ' · ' + cssV);
+  ok(v('library') && read('admin/assign-music.js').includes(`'music/js/library.js?v=${v('library')}'`), 'library.js 값 = 관리 화면 짝 ' + v('library'));   // 짧은 곡 두 번(lr1)에서 함께 올림
+});
+
+await test('짧은 기본 곡 두 번 [MUSIC-LIB-REPEAT-1] — repeat 2 = 마디·음 두 배 · 30초 넘음 · 작곡용 libraryOnce 는 한 번 · 나머지 곡은 그대로', () => {
+  const sec = s => s.bars * s.beats * 60 / s.tempo;
+  const twice = LIBRARY.filter(x => x.repeat === 2);
+  ok(twice.length === 12, '두 번 곡 수 ' + twice.length);
+  for (const x of LIBRARY) {
+    const s = fromLibrary(x), one = libraryOnce(x.key), base = parseMelodyBefore(x.melody, x.beats * x.sub);
+    eq([one.bars, one.notes.length, one.rep], [base.bars, base.notes.length, 1], 'libraryOnce ' + x.key);
+    if (x.repeat === 2) {
+      eq([s.bars, s.notes.length, s.rep], [base.bars * 2, base.notes.length * 2, 2], '두 번 ' + x.key);
+      ok(sec(one) < 30 && sec(s) >= 24, `${x.key} 한 번 ${sec(one).toFixed(1)}초 → 두 번 ${sec(s).toFixed(1)}초`);
+      eq(s.notes.slice(base.notes.length).map(n => ({ ...n, s: n.s - base.bars * x.beats * x.sub })), base.notes, '뒤 절반 = 앞 절반 ' + x.key);
+    } else {
+      ok(!x.repeat && sec(s) >= 30, `${x.key} 그대로 ${sec(s).toFixed(1)}초`);
+      eq(s.notes, base.notes, '그대로 ' + x.key);
+    }
+    ok(one.bars <= 16, '작곡 칸 16마디 안 ' + x.key);
+  }
+  ok(read('music/js/app.js').includes('song.rep > 1) song = libraryOnce(song.lk)'), '작곡 길은 한 번짜리');
 });
 
 const fail = results.filter(r => r[0] === 'FAIL');

@@ -6,7 +6,7 @@
 //  · 곡 목록은 음악실 파일(music/js/library.js)을 그때 한 번 읽는다 — ?v= 는 music/index.html import map 값과 같게(시험이 견줌)
 //  · 전역 이름 머리 = assignMusic · _assignMusic · ASSIGN_MUSIC
 
-const ASSIGN_MUSIC_LIB_SRC = 'music/js/library.js?v=2';
+const ASSIGN_MUSIC_LIB_SRC = 'music/js/library.js?v=20261006lr1';
 //  rhythm.js LEVELS 와 같은 차례 · 이름 · 기본 키 수 · 빠르기 배(시험이 견줌)
 const ASSIGN_MUSIC_LEVELS = [['easy', '쉬움', 4, 1], ['normal', '보통', 8, 1], ['hard', '어려움', 8, 1.1], ['expert', '아주 어려움', 8, 1.25]];
 const ASSIGN_MUSIC_GRADES = ['S', 'A', 'B', 'C', 'D'];

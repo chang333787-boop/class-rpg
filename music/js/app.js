@@ -3,7 +3,7 @@
 //  [ASSIGN-MUSIC-1] ?assign=<과제>(선생님 과제 · &live=1 = 선생님과 수업) — 그 곡 리듬 화면만 연다(다른 길은 막음) · 결과는 common/assign.js 로
 import { h, toast, modal, lsGet, lsSet } from './util.js';
 import { createStore } from './store.js';
-import { librarySongs, normalize, buildEvents, songKey, emptySong, fromTeacherSong } from './song.js';
+import { librarySongs, normalize, buildEvents, songKey, emptySong, fromTeacherSong, libraryOnce } from './song.js';
 import { engine, Player } from './audio.js';
 import { SCALES, colorOf, meterOf, solfege } from './theory.js';
 import { recorderOK, SYSTEMS } from './recorder.js';
@@ -235,7 +235,8 @@ async function route() {
     else if (parts[0] === 'compose') {
       const ref = parts.slice(1).join('/');
       if (decodeURIComponent(ref).startsWith('ts_')) { toast('선생님 곡은 연습 · 리듬 게임으로 해요'); ctx.go('#/'); return; }   // [MUSIC-TSONG-1] 고치기 · 바꿔 쓰기 없음
-      const song = ref && ref !== 'new' ? await ctx.resolve(decodeURIComponent(ref)) : emptySong();
+      let song = ref && ref !== 'new' ? await ctx.resolve(decodeURIComponent(ref)) : emptySong();
+      if (song && song.lib && song.rep > 1) song = libraryOnce(song.lk) || song;   // [MUSIC-LIB-REPEAT-1] 바꿔 쓰기는 되풀이 없이 한 번(작곡 칸 16마디)
       if (my !== seq) return;
       if (!song) { toast('곡을 찾지 못했어요'); ctx.go('#/'); return; }
       if (!song.lib && song.by && song.by !== store.me.sid) { toast('친구 곡은 고칠 수 없어요 — 리듬 게임 · 연습은 할 수 있어요'); ctx.go('#/'); return; }
