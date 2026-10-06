@@ -85,7 +85,8 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
     right: [sel(Object.entries(LEVELS).map(([k, v]) => [k, v.name]), level, v => { level = v; lsSet('music.rlevel', v); if (!keysPick) lanes = LEVELS[v].lanes; WIN = LEVELS[v].win; refresh(); }),
       keySel = sel([[4, '4키'], [6, '6키'], [8, '8키 · 건반']], lanes, v => { keysPick = +v; lsSet('music.rkeys', keysPick); lanes = keysPick; refresh(); }),   // [MUSIC-6KEY-1]
       sel([...SPEEDS, [700, '음표 아주 빠르게']], pxSec, v => { pxSec = +v; lsSet('music.rspeed', pxSec); draw(); }),
-      sel([[1, '원래 빠르기'], [0.8, '조금 느리게']], tempo, v => { tempo = +v; if (state !== 'play') { makeChart(); draw(); } })],
+      //  [MUSIC-FAST-1] 원래 빠르기보다 빠르게도 — 1.2 · 1.4 · 1.6배(난이도 빠르기와 곱해진다)
+      sel([[0.8, '조금 느리게'], [1, '원래 빠르기'], [1.2, '조금 빠르게'], [1.4, '빠르게'], [1.6, '아주 빠르게']], tempo, v => { tempo = +v; if (state !== 'play') { makeChart(); draw(); showReady(); } })],
   });
   const cv = h('canvas', { class: 'r-cv' });
   const over = h('div', { class: 'p-over' });
@@ -270,7 +271,7 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
     over.replaceChildren(h('div', { class: 'p-card r-card' },
       h('div', { class: 'grade g-' + grade }, grade),
       h('h2', {}, score.toLocaleString() + '점'),
-      h('p', { class: 'muted' }, `난이도 ${LEVELS[level].name} · ${lanes}키${LEVELS[level].tempo !== 1 ? ' · 빠르기 ×' + LEVELS[level].tempo : ''}`),
+      h('p', { class: 'muted' }, `난이도 ${LEVELS[level].name} · ${lanes}키${effTempo() !== 1 ? ' · 빠르기 ×' + +effTempo().toFixed(2) : ''}`),
       h('p', {}, `정확도 ${acc}% · 최대 콤보 ${stats.maxCombo}`),
       h('p', { class: 'muted' }, ['perfect', 'great', 'good', 'miss'].map(k => `${JUDGE[k].ko} ${stats[k]}`).join(' · ')),
       tops,
@@ -299,7 +300,7 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
     const guideBtn = h('button', { class: 'btn small' + (guide ? ' on' : ''), onclick: () => { guide = !guide; guideBtn.classList.toggle('on', guide); } }, '가락 도와주기');
     over.replaceChildren(h('div', { class: 'p-card' },
       h('h2', {}, song.title || '곡'),
-      h('p', { class: 'lv-line' }, `난이도 ${LEVELS[level].name} · ${lanes}키`, LEVELS[level].tempo !== 1 ? ` · 빠르기 ×${LEVELS[level].tempo}` : '', LEVELS[level].hide ? ' · 음표가 판정선 앞에서 사라져요' : ''),
+      h('p', { class: 'lv-line' }, `난이도 ${LEVELS[level].name} · ${lanes}키`, effTempo() !== 1 ? ` · 빠르기 ×${+effTempo().toFixed(2)}` : '', LEVELS[level].hide ? ' · 음표가 판정선 앞에서 사라져요' : ''),
       h('p', { class: 'muted' }, lanes === 8 ? '건반처럼: 왼손 A S D F = 도 레 미 파 · 오른손 J K L ; = 솔 라 시 높은 도'
         : lanes === 6 ? '6키: 왼손 S D F · 오른손 J K L — 이 곡의 음을 낮은 음부터 왼쪽에 놓았어요(키 아래 계이름)' + (distinct.length > 6 ? ' · 음이 여섯보다 많아 이웃한 음이 한 키를 같이 써요' : '')
         : '4키: D F J K — 가락이 올라가면 오른쪽, 내려가면 왼쪽'),

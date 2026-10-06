@@ -6,7 +6,8 @@ import { buildEvents } from './song.js';
 import { engine, Player } from './audio.js';
 import { fingerSVG, fingering, SYSTEMS } from './recorder.js';
 
-const SPEEDS = [[0.6, '느리게'], [0.8, '조금 느리게'], [1, '원래 빠르기']];
+//  [MUSIC-FAST-1] 원래 빠르기보다 빠르게도(사용자 10-06 '원래 빠르기보다 더 빠르게도 · 리코더도') — 1.2 · 1.4 · 1.6배
+const SPEEDS = [[0.6, '느리게'], [0.8, '조금 느리게'], [1, '원래 빠르기'], [1.2, '조금 빠르게'], [1.4, '빠르게'], [1.6, '아주 빠르게']];
 const HOPPERS = ['m1', 'm22', 'm27', 'm24'];
 
 export function mountPractice(root, ctx, { song, key }) {
@@ -179,7 +180,7 @@ export function mountPractice(root, ctx, { song, key }) {
     let count = null;
     try { count = await ctx.store.addPractice(key, song.title, { sp: speed, stars: n }); } catch (e) { console.warn(e); toast('기록을 저장하지 못했어요'); }
     over.replaceChildren(h('div', { class: 'p-card' }, h('img', { src: hopper.src, alt: '' }),
-      h('h2', {}, count ? `이 곡 ${count}번째 연습!` : '연습 끝!'), h('p', { class: 'muted' }, n === 3 ? '좋아요! 다음엔 빠르기를 한 단계 올려 볼까요?' : n === 2 ? '틀린 곳 앞에서 운지를 한 번 더 보고 불어 봐요.' : '느리게로 바꿔서 한 번 더 해 봐요. 가락 소리를 켜고 따라 하면 쉬워요.'),
+      h('h2', {}, count ? `이 곡 ${count}번째 연습!` : '연습 끝!'), h('p', { class: 'muted' }, n === 3 ? (speed >= SPEEDS[SPEEDS.length - 1][0] ? '아주 빠르게까지 해냈어요! 대단해요.' : `좋아요! 다음엔 '${SPEEDS[SPEEDS.findIndex(x => x[0] === speed) + 1]?.[1] || '조금 빠르게'}'(으)로 한 단계 올려 볼까요?`) : n === 2 ? '틀린 곳 앞에서 운지를 한 번 더 보고 불어 봐요.' : '느리게로 바꿔서 한 번 더 해 봐요. 가락 소리를 켜고 따라 하면 쉬워요.'),
       h('div', { class: 'stars-row' }, h('button', { class: 'btn primary', onclick: () => start() }, '한 번 더'), h('button', { class: 'btn', onclick: () => ctx.go('#/log') }, '리코더 기록장'), h('button', { class: 'btn', onclick: () => ctx.go('#/pick/practice') }, '다른 곡'))));
   }
   function showReady() {
