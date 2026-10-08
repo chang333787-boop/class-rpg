@@ -161,8 +161,9 @@ export function mountPractice(root, ctx, { song, key }) {
   function loop() { draw(currentTime()); if (state === 'play') raf = requestAnimationFrame(loop); }
   function start() {
     engine.ensure(); engine.setReverb(0.1);
-    built = buildEvents(song, { scale: speed, countIn: song.beats, melody: true, chord: acc && song.acc.chord, bass: acc && song.acc.bass, drum: acc ? song.acc.drum : 'none' });
-    player.mute = { melody: !guide };
+    //  [MUSIC-ORCH-1] 오케스트라 곡 — '반주'를 끄면 오케스트라도 끔(orch: acc) · 가락은 아이가 부는 높이 그대로(lead: false) · 늘이기(점점 느리게)는 안 함
+    built = buildEvents(song, { scale: speed, countIn: song.beats, melody: true, chord: acc && song.acc.chord, bass: acc && song.acc.bass, drum: acc ? song.acc.drum : 'none', orch: acc, lead: false });
+    player.mute = { melody: !guide, sparkle: !guide };   // '가락 소리'를 끄면 가락을 따라 치는 반짝이(첼레스타)도 쉼
     t0 = player.start(built.events.map(e => e.track === 'melody' ? { ...e, inst: 'recorder', vel: 0.75 } : { ...e, vel: (e.vel || 0.8) * 0.7 }), { at: engine.now + READY_SEC + 0.1, total: built.total, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작(리코더를 들 시간)
     state = 'play'; over.replaceChildren(); over.style.display = 'none';
     stopBtn.style.display = '';

@@ -253,7 +253,7 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
     pausedByClass = false;
     engine.ensure(); engine.setReverb(0.1);
     makeChart(); held = {}; fx = []; judgeShow = null;
-    built = buildEvents(song, { scale: effTempo(), countIn: song.beats, melody: guide, harm: guide });
+    built = buildEvents(song, { scale: effTempo(), countIn: song.beats, melody: guide, harm: guide, lead: false });   // [MUSIC-ORCH-1] 가락 도움 = 치는 높이 그대로(lead: false) · 늘이기 없음
     t0 = player.start(built.events.map(e => e.track === 'melody' ? { ...e, vel: 0.35 } : e), { at: engine.now + READY_SEC + 0.1, total: built.total + 0.6, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작
     state = 'play'; over.style.display = 'none';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);

@@ -81,7 +81,7 @@ function listen(song, btn) {
   if (listenPlayer.playing && listenBtn === btn) { listenPlayer.stop(); btn && btn.classList.remove('stop'); listenBtn = null; return; }
   if (listenBtn) listenBtn.classList.remove('stop');
   engine.ensure(); engine.setReverb(song.reverb || 0.12);
-  const b = buildEvents(song);
+  const b = buildEvents(song, { orchFinale: true });   // [MUSIC-ORCH-1] 오케스트라 곡은 '점점 느리게 끝내기'까지(내 곡 · 음악회 · 선생님 화면 듣기)
   listenPlayer.start(b.events, { total: b.total, onEnd: () => { btn && btn.classList.remove('stop'); listenBtn = null; } });
   listenBtn = btn; btn && btn.classList.add('stop');
 }

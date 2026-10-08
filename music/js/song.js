@@ -1,19 +1,27 @@
 // 곡 한 개의 모양과 다루기 — 저장 모양 = 화면 모양(점 경로 없음). 한 번에 한 음(단선율)만 울리는 가락.
 //  song = { v, id, title, beats, sub, bars, tempo, key(조: 다장조 0), scale, inst, notes:[{ s 시작 칸, d 칸 수, p 음 높이, w 노랫말 한 글자 }],
 //           chords:[마디별로 손으로 고른 화음 'I'|'IV'|'V'|null], acc:{ chord, bass, drum }, mood, reverb,
-//           harm:[{ s, d, p }] = 아이가 직접 쌓는 화음 음(같은 때 최대 3음 · 같은 때 시작한 음은 길이가 같다 = 화음 하나) }
+//           harm:[{ s, d, p }] = 아이가 직접 쌓는 화음 음(같은 때 최대 3음 · 같은 때 시작한 음은 길이가 같다 = 화음 하나),
+//           orch:{ on, preset, parts, dyn, rit } = 오케스트라로 들려주기(orchestra.js · 꺼져 있으면 예전 반주 친구 그대로) [MUSIC-ORCH-1] }
 import { chordName } from './theory.js';
 import { parsePitch, letter, barSteps, totalSteps, stepSec, fitChords, chordPcs, chordRoot, chordByName, ROMAN, SCALES } from './theory.js';
 import { LIBRARY } from './library.js';
+import { orchOn, arrange, leadShift, ritWarp, dynAt, normOrch, defaultOrch } from './orchestra.js';
 
 export const INSTS = {
   piano: '피아노', xylo: '실로폰', marimba: '마림바', recorder: '리코더', gayageum: '가야금',
+  // [MUSIC-ORCH-1] 오케스트라 악기 — 가락 악기로도 고를 수 있다(화면에서는 현악기 · 목관악기 · 금관악기 · 건반·타악기 · 목소리로 묶음 — orchestra.js INST_GROUPS)
+  violin: '바이올린', strings: '현악 합주', cello: '첼로', contrabass: '콘트라베이스', pizz: '피치카토', harp: '하프',
+  flute: '플루트', clarinet: '클라리넷', oboe: '오보에', trumpet: '트럼펫', horn: '호른', tuba: '튜바',
+  celesta: '첼레스타', glock: '글로켄슈필', choir: '합창',
 };
+//  선생님 곡(공연 곡) 악기는 예전 다섯 가지만 — 리코더 연습 · 리듬 게임용(곡 파일 살피기 그대로) [MUSIC-ORCH-1]
+const TS_INSTS = ['piano', 'xylo', 'marimba', 'recorder', 'gayageum'];
 export const DRUMS = { basic: '쿵짝 리듬', semachi: '세마치 장단', gutgeori: '굿거리 장단', none: '없음' };
 
 export function emptySong() {
   return { v: 1, id: null, title: '', beats: 4, sub: 2, bars: 4, tempo: 100, key: 0, scale: 'penta', inst: 'piano',
-    notes: [], harm: [], chords: [], acc: { chord: true, bass: true, drum: 'basic' }, mood: null, reverb: 0.12 };
+    notes: [], harm: [], chords: [], acc: { chord: true, bass: true, drum: 'basic' }, mood: null, reverb: 0.12, orch: defaultOrch() };
 }
 
 // 'G4/1 E4/1 E4/2 | F4/1 …' → { notes, bars }
@@ -117,7 +125,7 @@ function checkTeacherSong(raw) {
   if (!(c.tempo >= 40 && c.tempo <= 200)) throw new Error(`빠르기(tempo): 40~200이에요(지금 ${raw.tempo == null ? '없음' : String(raw.tempo).slice(0, 20)})`);
   c.key2 = oneOf('key2', '조(key2)', [0, 2, 5, 7], 0);
   c.scale = oneOf('scale', '음계(scale)', Object.keys(SCALES), 'major');
-  c.inst = oneOf('inst', '악기(inst)', Object.keys(INSTS), 'recorder');
+  c.inst = oneOf('inst', '악기(inst)', TS_INSTS, 'recorder');
   if (raw.drum != null) c.drum = oneOf('drum', '북(drum)', Object.keys(DRUMS));
   c.level = raw.level == null ? 2 : Number(raw.level);
   if (!Number.isInteger(c.level) || c.level < 0 || c.level > 4) throw new Error('난이도(level): 0~4예요');
@@ -180,6 +188,7 @@ export function normalize(raw) {
   s.acc = { chord: acc.chord !== false, bass: acc.bass !== false, drum: DRUMS[acc.drum] ? acc.drum : 'basic' };
   s.mood = ['bright', 'dreamy', 'sad'].includes(raw.mood) ? raw.mood : null;
   s.reverb = Math.max(0, Math.min(0.6, Number(raw.reverb) || 0.12));
+  s.orch = normOrch(raw.orch);   // [MUSIC-ORCH-1] 모르는 값은 기본(꺼짐) — 친구 곡 · 옛 곡도 안 깨진다
   const total = totalSteps(s);
   const list = Array.isArray(raw.notes) ? raw.notes : raw.notes && typeof raw.notes === 'object' ? Object.values(raw.notes) : [];
   s.notes = list.map(n => ({ s: Math.round(+n.s), d: Math.round(+n.d), p: Math.round(+n.p), w: n.w ? String(n.w).slice(0, 3) : '' }))
@@ -281,14 +290,19 @@ export function beatChords(song) {
   }
   return out;
 }
+//  opt — melody/harm/chord/bass/drum(켜고 끄기) · scale(빠르기 배) · countIn(세기 박 수)
+//   [MUSIC-ORCH-1] orch: false = 오케스트라를 안 씀(연습 '반주' 끔 · 아이디어 친구 미리 듣기) · lead: false = 가락을 그 악기 높이로 옮기지 않음(연습 · 리듬 — 아이가 부는/치는 높이 그대로)
+//    orchFinale: true = '점점 느리게 끝내기'(끝 두 마디 리타르단도 + 마지막 화음 늘임) — 작곡 ▶ · 목록 · 음악회 듣기에서만(연습 · 리듬은 n.s 로 박을 재므로 늘이면 안 됨)
 export function buildEvents(song, o = {}) {
   const opt = { melody: true, chord: song.acc.chord, bass: song.acc.bass, drum: song.acc.drum, scale: 1, countIn: 0, ...o };
   const sd = stepSec(song, opt.scale), bs = barSteps(song), beat = sd * song.sub;
   const off = opt.countIn * beat;
   const ev = [];
   for (let i = 0; i < opt.countIn; i++) ev.push({ t: i * beat, kind: 'click', accent: i === 0, track: 'count' });
-  if (opt.melody) song.notes.forEach((n, i) => ev.push({ t: off + n.s * sd, d: n.d * sd, kind: 'note', inst: song.inst, p: n.p, vel: 0.85, track: 'melody', i }));
-  if (opt.harm !== false) for (const n of song.harm || []) ev.push({ t: off + n.s * sd, d: n.d * sd, kind: 'note', inst: song.inst, p: n.p, vel: 0.5, track: 'harm' });   // 아이가 쌓은 화음
+  if (opt.orch !== false && orchOn(song)) return orchEvents(song, opt, ev, { sd, bs, beat, off });   // [MUSIC-ORCH-1]
+  const shift = opt.lead === false ? 0 : leadShift(song);   // [MUSIC-ORCH-1] 첼로 · 튜바 · 첼레스타 … 는 그 악기다운 높이로(예전 악기는 0 — 그대로)
+  if (opt.melody) song.notes.forEach((n, i) => ev.push({ t: off + n.s * sd, d: n.d * sd, kind: 'note', inst: song.inst, p: n.p + shift, vel: 0.85, track: 'melody', i }));
+  if (opt.harm !== false) for (const n of song.harm || []) ev.push({ t: off + n.s * sd, d: n.d * sd, kind: 'note', inst: song.inst, p: n.p + shift, vel: 0.5, track: 'harm' });   // 아이가 쌓은 화음
   const korean = SCALES[song.scale]?.family === 'korean';
   const chords = fitChords(song, song.chords);
   for (let b = 0; b < song.bars; b++) {
@@ -308,6 +322,40 @@ export function buildEvents(song, o = {}) {
   }
   ev.sort((a, z) => a.t - z.t);
   return { events: ev, total: off + totalSteps(song) * sd, stepDur: sd, beatDur: beat, barDur: bs * sd, offset: off, chords };
+}
+
+// ── 오케스트라로 들려주기 [MUSIC-ORCH-1] ──  가락(가락 악기 · 그 악기 높이) + 편곡(orchestra.js arrange) · 반주 친구(화음 · 베이스 · 장단)는 쉰다
+//  트랙 = melody · harm · strings · bass · winds · brass · harp · perc · sparkle(연습 화면이 melody · sparkle 을 '가락 소리'로 끄고 켠다)
+//  아이가 쌓은 화음(harm)은 목관 칸이 켜져 있으면 목관이 분다(가락 악기로는 안 겹쳐 울림)
+function orchEvents(song, opt, ev, { sd, bs, beat, off }) {
+  const orch = song.orch, total = totalSteps(song);
+  const shift = opt.lead === false ? 0 : leadShift(song);
+  const T = s => off + s * sd;
+  const lv = s => 0.86 * (0.8 + 0.2 * dynAt(orch.dyn, s / Math.max(1, total)));   // 가락은 셈여림을 조금만 따른다(늘 또렷하게)
+  if (opt.melody) song.notes.forEach((n, i) => ev.push({ t: T(n.s), d: n.d * sd, kind: 'note', inst: song.inst, p: n.p + shift, vel: Math.round(lv(n.s) * 1000) / 1000, track: 'melody', i }));
+  const windsTake = orch.parts.winds && song.harm && song.harm.length;
+  if (opt.harm !== false && !windsTake) for (const n of song.harm || []) ev.push({ t: T(n.s), d: n.d * sd, kind: 'note', inst: song.inst, p: n.p + shift, vel: 0.5, track: 'harm' });
+  for (const a of arrange(song, { sd, shift, melody: opt.melody })) {
+    if (a.kind === 'drum') ev.push({ t: T(a.s), kind: 'drum', drum: a.drum, vel: a.vel, track: a.track, span: (a.span || 1) * sd });
+    else ev.push({ t: T(a.s), d: a.d * sd, kind: 'note', inst: a.inst, p: a.p, vel: a.vel, track: a.track, ...(a.art ? { art: a.art } : {}) });
+  }
+  let end = off + total * sd, tot = end, stepAt = null;
+  if (opt.orchFinale && orch.rit) {
+    //  점점 느리게 끝내기 — 끝 두 마디를 늘이고(ritWarp) · 끝까지 울리던 음(마지막 화음 · 마지막 가락 음 · 팀파니 굴리기)을 한 박 반쯤 더(늘임표)
+    const W = ritWarp(off + Math.max(0, song.bars - 2) * bs * sd, end), hold = beat * 2.1;
+    for (const e of ev) {
+      const a = W.at(e.t);
+      if (e.d != null) e.d = W.at(e.t + e.d) - a;
+      if (e.kind === 'drum' && e.span != null) e.span = W.at(e.t + e.span) - a;
+      e.t = a;
+    }
+    const wend = W.end;
+    for (const e of ev) if (e.kind === 'note' && e.t + e.d >= wend - 0.02) e.d += hold;
+    tot = wend + hold + 0.5;   // 마지막 화음이 저절로 잦아들 틈
+    stepAt = t => Math.max(0, Math.min(total, (W.inv(t) - off) / sd));
+  }
+  ev.sort((a, z) => a.t - z.t);
+  return { events: ev, total: tot, stepDur: sd, beatDur: beat, barDur: bs * sd, offset: off, chords: fitChords(song, song.chords), orch: true, ...(stepAt ? { stepAt } : {}) };
 }
 
 // 한 마디의 북 — at = 칸(소수 가능). 장단은 박자가 맞을 때만(아니면 쿵짝)

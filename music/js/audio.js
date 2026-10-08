@@ -181,9 +181,10 @@ export class Engine {
   // ── 오케스트라 악기 [MUSIC-ORCH-1] ──
   //  크기: 한 음(세기 0.85)의 꼭대기가 피아노 한 음과 비슷하게(0.3~0.6) · 반주로 쓸 때는 편곡(orchestra.js)이 세기를 낮게 준다 → 다 합쳐도 compressor 아래에서 1.0 을 안 넘게
   //  노드 수: 음마다 4~12개(합창이 가장 많다) · 다 울리면 스스로 멈춘다(stop 시각)
-  //  활로 긋거나 부는 소리의 크기 — 천천히 커졌다가(att) 이어지고 손을 떼면 줄어든다(rel) · art 'swell' = 음 끝까지 점점 크게 → 다 사라지는 때
+  //  활로 긋거나 부는 소리의 크기 — 천천히 커졌다가(att) 이어지고 손을 떼면 줄어든다(rel) · art 'swell' = 음 끝까지 점점 크게 · 'stacc' = 짧고 또렷하게(왈츠 '짝' · 행진곡 엇박) → 다 사라지는 때
   _bowEnv(g, t, dur, peak, att, rel, art) {
     const end = t + dur;
+    if (art === 'stacc') { att = Math.min(att, 0.03); rel = Math.min(rel, 0.07); }
     att = Math.min(att, dur * 0.6);
     g.gain.setValueAtTime(0, t);
     if (art === 'swell') { g.gain.linearRampToValueAtTime(peak * 0.28, t + att); g.gain.linearRampToValueAtTime(peak, t + Math.max(att + 0.02, dur * 0.9)); }
@@ -342,7 +343,7 @@ export class Engine {
     if (art === 'swell') { lp.frequency.setValueAtTime(Math.min(1400, f * 1.6), t); lp.frequency.linearRampToValueAtTime(Math.min(2600, f * 3.2), t + dur * 0.9); }
     else lp.frequency.setTargetAtTime(Math.min(1500, f * 2.2), t + 0.06, 0.15);
     lp.connect(g).connect(out);
-    const fin = this._bowEnv(g, t, dur, vel * 0.22, 0.06, 0.14, art);
+    const fin = this._bowEnv(g, t, dur, vel * 0.27, 0.06, 0.14, art);
     for (const o of os) { o.start(t); o.stop(fin); }
     return this._handle(g, os, 0.14, fin);
   }
