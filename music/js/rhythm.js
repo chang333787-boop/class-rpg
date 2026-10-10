@@ -255,7 +255,8 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
     //  [MUSIC-READY-1] 시작하면 먼저 3 · 2 · 1(초 · 음표는 아직 위에서 안 내려옴) → 그다음 한 마디 '하나 둘 셋 넷'(딸깍 소리와 같이) → 첫 음
     if (state === 'play' && t < 0) readyCount(g, t, built ? built.offset : 0, 60 / (song.tempo * effTempo()), song.beats, bx + boardW / 2, H * 0.45);
   }
-  function round(x, y, w, hh, r) { r = Math.min(r, hh / 2, w / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + hh, r); g.arcTo(x + w, y + hh, x, y + hh, r); g.arcTo(x, y + hh, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  //  [MUSIC-ENSEMBLE-1 · 덤] 반지름은 0 아래로 안 감 — 폰 너비(줄 넓이 < 10px)에서 음수 반지름으로 arcTo 가 오류를 내며 그리기가 멈추던 것
+  function round(x, y, w, hh, r) { r = Math.max(0, Math.min(r, hh / 2, w / 2)); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + hh, r); g.arcTo(x + w, y + hh, x, y + hh, r); g.arcTo(x, y + hh, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
 
   // ── 흐름 ──
