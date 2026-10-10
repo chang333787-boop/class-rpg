@@ -606,6 +606,8 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .top .ens-box{display:inline-flex;align-items:center;gap:6px}
 .top .ens-chip{height:34px;display:inline-flex;align-items:center;padding:0 .7rem;border-radius:9px;background:rgba(127,196,240,.14);border:1px solid rgba(127,196,240,.45);color:#bfe3ff;font-weight:800;font-size:.85rem;white-space:nowrap}
 .p-card .ens-line{color:#bfe3ff;font-weight:700;font-size:.9rem}
+.ts-ens{display:grid;gap:2px;padding:4px 4px 0;font-size:.85rem;line-height:1.5;color:#bfe3ff}
+.ts-ens .bad{color:#ff8a7a;font-weight:700}
 /* 고르기 목록 칸(grid)이 긴 제목 · 표 때문에 화면보다 넓어지지 않게 — 제목은 … 으로 줄고 단추는 화면 안에 */
 .pick .list > .song-row,.pick .ens-grp,.pick .ens-grp > .song-row{min-width:0}
 /* 좁은 화면(폰) — 연습 · 리듬 윗줄이 넘치면 둘째 줄로(단추가 화면 밖으로 밀려나지 않게) */

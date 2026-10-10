@@ -36,6 +36,12 @@ export function ensembleGroups(list) {
   for (const [name, arr] of by) if (!ensembleWhy(arr)) out.push({ name, members: [...arr].sort(byOrder) });
   return out;
 }
+//  교사 화면 — 부분 이름이 있는 같은 제목 묶음마다 { name, parts(순서대로), why('' = 합주로 묶임 · 아니면 까닭) }
+export function ensembleReport(list) {
+  const by = new Map();
+  for (const s of list || []) { if (!isPart(s)) continue; const k = nameOf(s); if (!by.has(k)) by.set(k, []); by.get(k).push(s); }
+  return [...by].map(([name, arr]) => ({ name, parts: [...arr].sort(byOrder).map(s => s.part), why: ensembleWhy(arr) }));
+}
 //  이 곡이 든 합주 묶음(없으면 null) · 짝 부분(나를 뺀 나머지 · 순서대로)
 export function groupOf(song, list) {
   if (!isPart(song)) return null;

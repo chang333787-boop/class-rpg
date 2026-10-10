@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { fromTeacherSong, fromLibrary, buildEvents } from '../../../music/js/song.js';
 import { LIBRARY } from '../../../music/js/library.js';
 import { totalSteps } from '../../../music/js/theory.js';
-import { PARTNER, TOGETHER_KEY, ensembleWhy, ensembleGroups, groupOf, partnersOf, ensembleOrder, pickPartners, partLabel, partnerEvents, withPartners, ghostNotes, tapFired } from '../../../music/js/ensemble.js';
+import { PARTNER, TOGETHER_KEY, ensembleWhy, ensembleGroups, ensembleReport, groupOf, partnersOf, ensembleOrder, pickPartners, partLabel, partnerEvents, withPartners, ghostNotes, tapFired } from '../../../music/js/ensemble.js';
 import { practiceEvents } from '../../../music/js/practice.js';
 import { rhythmEvents } from '../../../music/js/rhythm.js';
 
@@ -60,6 +60,14 @@ await test('안 묶는 까닭 — 마디 수 · 빠르기 · 박 · 한 박 칸 
   eq(ensembleWhy([SOLO]), '부분이 하나뿐이에요');
   eq(ensembleWhy([TW1, TW2]), '');
   for (const s of [BAR_A, BAR_B, TEM_A, TEM_B, BEA_A, BEA_B, SUB_A, SUB_B, DUP_A, DUP_B, SOLO, PLAIN]) { eq(partnersOf(s, ALL), [], s.tk + ' 짝 없음'); ok(groupOf(s, ALL) === null, s.tk + ' 묶음 없음'); }
+});
+await test('교사 알림 — 부분 이름이 있는 같은 제목 묶음마다 묶임 · 못 묶인 까닭', () => {
+  const r = Object.fromEntries(ensembleReport(ALL).map(g => [g.name, [g.parts.join('|'), g.why]]));
+  eq(r['작은 별 합주'], ['①|②', '']); eq(r['세 부분 시험'], ['1부|2부|3부', '']); eq(r['겨울 밤 시험'], ['1부(S1)|2부(S2)', '']); eq(r['띄어 쓰기'], ['①|②', '']);
+  eq(r['마디 다름'], ['A|B', '부분마다 마디 수가 달라요']); eq(r['빠르기 다름'][1], '부분마다 빠르기가 달라요'); eq(r['박 다름'][1], '부분마다 박이 달라요');
+  eq(r['칸 다름'][1], '부분마다 한 박 칸 수가 달라요'); eq(r['같은 부분'][1], '같은 부분 이름이 두 번 있어요'); eq(r['혼자'], ['1부', '부분이 하나뿐이에요']);
+  ok(!('그냥 곡' in r), '부분 이름 없는 곡은 알림에 없음');
+  eq(ensembleReport([]), []);
 });
 await test('짝 부분 — 나를 뺀 나머지(순서대로) · 목록에 없는 곡 · 기본 곡 · 빈 목록', () => {
   eq(keys(partnersOf(TW1, ALL)), ['tw_2']); eq(keys(partnersOf(TW2, ALL)), ['tw_1']);
@@ -185,10 +193,11 @@ await test('화면 연결(글로 확인) — 연습 · 리듬이 같은 사건 �
   ok(prac.includes("tog('🎶 함께 연주'") && prac.includes("'함께: ' + partLabel(activePartners())") && prac.includes('ctx.teacherSongs().then(list =>'), '연습 윗줄 · 짝 찾기');
   ok(rh.includes('built = rhythmEvents(song, { tempo: effTempo(), guide, partners: activePartners(), together });') && rh.includes('lsGet(TOGETHER_KEY, true) !== false') && rh.includes('lsSet(TOGETHER_KEY, together)'), '리듬');
   ok(app.includes('ensembleOrder(ts).map(') && app.includes('ensBoxes(rowEls,') && app.includes('`합주 · ${grp.members.length}성부`') && app.includes('listenEnsemble(g, play)'), '목록');
-  ok(css.includes('.ens-grp{') && css.includes('.ens-badge{') && css.includes('.top .ens-chip{'), 'css');
+  ok(css.includes('.ens-grp{') && css.includes('.ens-badge{') && css.includes('.top .ens-chip{') && css.includes('.ts-ens{'), 'css');
+  ok(read('music/js/teacher.js').includes('ensembleReport(rows.map(r => r.s).filter(Boolean))') && read('music/js/teacher.js').includes('⚠ 합주로 못 묶음:'), '교사 화면 알림');
   const v = m => (html.match(new RegExp(`"\\./js/${m}\\.js": "\\./js/${m}\\.js\\?v=([^"]+)"`)) || [])[1];
   const after = x => Number(String(x || '').slice(0, 8)) >= 20261011;
-  for (const m of ['ensemble', 'app', 'practice', 'rhythm']) ok(after(v(m)), m + ' 버스터 ' + v(m));
+  for (const m of ['ensemble', 'app', 'practice', 'rhythm', 'teacher']) ok(after(v(m)), m + ' 버스터 ' + v(m));
   const tagV = (html.match(/<script type="module" src="js\/app\.js\?v=([^"]+)">/) || [])[1], cssV = (html.match(/css\/music\.css\?v=([^"]+)"/) || [])[1];
   ok(tagV === v('app') && after(cssV), 'script · css 버스터 ' + tagV + ' · ' + cssV);
   ok(!/브랜치/.test(prac + rh + app + read('music/js/ensemble.js')), '쓰지 않기로 한 낱말 없음');

@@ -23,6 +23,7 @@ const FAKE = process.env.FAKE_RTDB || path.join(HERE, '..', 'fake-rtdb', 'server
 const CHROME = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell');
 const PROD = /firebaseio\.com|firebasedatabase\.app|firestore\.googleapis\.com|firebasestorage\.googleapis\.com|identitytoolkit|securetoken/i;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const T0 = Date.now();
 const results = [];
 const ok = (c, name, info) => { results.push([c ? 'PASS' : 'FAIL', name, info || '']); console.log(c ? 'PASS' : 'FAIL', name, info ? String(info).slice(0, 400) : ''); };
 if (OUT) fs.mkdirSync(OUT, { recursive: true });
@@ -41,6 +42,9 @@ const F1 = path.join(TMP, 'ensemble-songs.json');
 fs.writeFileSync(F1, JSON.stringify({ kind: 'rpg-music-song', v: 1, songs: SONGS }, null, 1));
 
 if (!fs.existsSync(FAKE)) { console.log('SKIP 가짜 RTDB 서버가 없음: ' + FAKE); process.exit(0); }
+process.stdout.on('error', () => {});   // 출력이 끊겨도(| head) 끝까지 돌고 크롬 · 서버를 닫는다
+//  포트가 이미 쓰이면(남은 크롬 · 다른 시험) 그 크롬에 붙지 않고 바로 멈춘다
+if (await fetch(`http://127.0.0.1:${DP}/json/version`).then(() => true, () => false)) { console.log(`FAIL 포트 ${DP} 를 이미 쓰고 있어요(lsof -nP -iTCP:${DP} -sTCP:LISTEN)`); process.exit(2); }
 const { startServer } = await import(pathToFileURL(FAKE).href);
 const srv = await startServer({ port: PP, host: '127.0.0.1', repo: ROOT, quiet: true });
 const PROF = fs.mkdtempSync(path.join(os.tmpdir(), 'ens-live-'));
@@ -141,11 +145,17 @@ try {
   await cdp();
   // ═════ A. 교사 — 곡 파일 넣기 ═════
   const T = await device('교사', '/music/index.html?teacher=1#/t');
-  ok(await until(T, `!!document.querySelector('.ts-card input[type=file]')`, 20000), 'A1 교사 화면 \'🎤 선생님 곡\' 칸');
+  ok(await until(T, `!!document.querySelector('.ts-card input[type=file]')`, 40000), 'A1 교사 화면 \'🎤 선생님 곡\' 칸',
+    await T.ev(`location.href + ' | ' + (document.body ? document.body.innerText.replace(/\\s+/g, ' ').slice(0, 200) : '')`));
   ok(await T.setFiles('.ts-card input[type=file]', [F1]), 'A2 곡 파일 고르기(합주 · 어긋난 묶음 · 그냥 곡 8곡)');
   ok(await until(T, `document.querySelectorAll('.ts-card .song-row').length === 8 && /8곡 넣었어요/.test((document.querySelector('.ts-card .ts-note') || {}).textContent || '')`, 10000), 'A3 \'8곡 넣었어요\' · 목록 8줄',
     await T.ev(`(document.querySelector('.ts-card .ts-note') || {}).textContent`));
   ok(Object.keys(db('classRPG_music/tsongs') || {}).length === 8, 'A4 서버 tsongs 8곡');
+  if (Object.keys(db('classRPG_music/tsongs') || {}).length !== 8) throw new Error('선생님 곡을 못 넣어서 여기서 멈춤 — ' + JSON.stringify(errs).slice(0, 300));
+  const ens = await T.ev(`[...document.querySelectorAll('.ts-card .ts-ens > div')].map(d => (d.className === 'bad' ? '!' : '') + d.textContent)`);
+  ok(Array.isArray(ens) && ens.length === 3 && ens.some(x => x.startsWith('🎶 합주: 작은 별 합주 — ① · ②')) && ens.some(x => x.startsWith('🎶 합주: 세 부분 시험 — 1부 · 2부 · 3부'))
+    && ens.includes('!⚠ 합주로 못 묶음: 마디 다름 — 부분마다 마디 수가 달라요'), 'A5 교사 화면 합주 알림: 묶인 둘 · 못 묶인 하나(까닭 = 마디 수)', JSON.stringify(ens));
+  await T.shot('A_teacher_ensemble');
 
   // ═════ B. 학생 — 고르기 목록 ═════
   const S = await device('학생', `/music/index.html?sid=s1&n=${encodeURIComponent('테스트')}&debug=1#/pick/practice`);
@@ -289,9 +299,10 @@ try {
   ws.close();
 } catch (e) {
   ok(false, '예외', e && e.stack);
+  console.log('페이지 오류:', JSON.stringify(errs).slice(0, 600));
 }
 clearTimeout(killer);
 await cleanup();
 const fails = results.filter(r => r[0] === 'FAIL');
-console.log(`음악실 합주 실제 화면 확인 — PASS ${results.length - fails.length} · FAIL ${fails.length}`);
+console.log(`음악실 합주 실제 화면 확인 — PASS ${results.length - fails.length} · FAIL ${fails.length} (${Math.round((Date.now() - T0) / 1000)}초)`);
 process.exit(fails.length ? 1 : 0);
