@@ -269,8 +269,8 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     let groups;
     if (palTab === 'mel') {
       const mb = [...C.MEL.map((x, i) => [i, x.n, colorOf(x.p)]), [C.B_REST, '쉼', '#6b5a48'], ['erase', '지우개', '']];
-      const leadSel = h('select', { class: 'bt-lead', title: '가락 악기 — 비트마다 하나', onchange: e => setLead(e.target.value) },
-        ...C.LEAD_KEYS.map(k => { const o = h('option', { value: k }, `${C.LEADS[k].em} ${C.LEADS[k].name}`); if (k === beat.lead) o.selected = true; return o; }));
+      const leadSel = h('select', { class: 'bt-lead', title: `가락 악기(비트마다 하나) — ${C.LEADS[C.leadOf(beat.lead)].hint}`, onchange: e => setLead(e.target.value) },
+        ...C.LEAD_KEYS.map(k => { const o = h('option', { value: k, title: C.LEADS[k].hint }, `${C.LEADS[k].em} ${C.LEADS[k].name}`); if (k === beat.lead) o.selected = true; return o; }));
       groups = [h('div', { class: 'bt-palg' }, h('span', { class: 'lbl', title: '고른 음을 가락 칸에 칠해요(같은 음을 다시 누르면 지워요)' }, '가락 붓'),
         ...mb.map(([v, t, col]) => brushBtn(melBrush === v, v, t, col, () => { melBrush = v; renderPal(); if (typeof v === 'number' && v <= C.M_TOP) previewMel(v); }))),
         h('label', { class: 'bt-palg' }, h('span', { class: 'lbl' }, '가락 악기'), leadSel)];
