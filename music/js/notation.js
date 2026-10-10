@@ -297,18 +297,22 @@ function extentOf(st, items, minA = 14, minB = 12, pad = 4) {
     else { bot = Math.max(bot, yOf(lo) + (it.base === 'w' ? 8 : 37) + art); top = Math.min(top, yOf(hi) - 7 - (ex.stacc ? 10 : 0)); }
   }
   if (st.words) bot = Math.max(bot, 40 + (st.solY || 30) + 4);
+  if (st.oct > 0) top = Math.min(top, st.clef === 'bass' ? -14 : -22);            // 음자리표 위 작은 8 · 15
+  if (st.oct < 0) bot = Math.max(bot, st.clef === 'bass' ? 40 : 58);
   return { above: Math.max(minA, -top + pad), below: Math.max(minB, bot - 40 + pad) };
 }
 //  한 마디가 쉼뿐이면 '온마디 쉼'(가운데 온쉼표 하나)
 const barRest = (items, bs) => (items.length && items.every(it => it.rest) ? [{ rest: true, base: 'w', dots: 0, x: (bs - 1) / 2 }] : items);
 
 export function renderScore(score, o = {}) {
-  const W = o.width || 900, A = o.align || null;
+  const A = o.align || null;
+  let W = o.width || 900;
   const bs = score.beats * score.sub, bars = Math.max(1, score.bars);
   const song = { beats: score.beats, sub: score.sub, bars, notes: [] };
   const staves = score.staves.filter(Boolean);
   const named = !A && o.names !== false && staves.some(s => s.name);
-  const clefX = A ? 2 : (named ? NAMEW : 4);
+  const narrow = !A && W < 600, NW = narrow ? 66 : NAMEW;                // 좁은 화면 = 이름 칸을 좁게(글자도 작게 — css .staff.narrow)
+  const clefX = A ? 2 : (named ? NW : 4);
   const left0 = A ? A.left : clefX + CLEFW;
   //  칸마다(음성마다) 마디별 조각 — 두째 음성은 음이 없는 마디를 비운다(쉼표 숨김)
   //  계이름 줄 높이 — 오선 아래로 내려간 음(덧줄)보다 아래에(오선마다 한 번 · 맞춤 모드는 음 범위로)
@@ -335,11 +339,10 @@ export function renderScore(score, o = {}) {
   const hasChords = (score.chords || []).length > 0, hasKo = hasChords && score.chords.some(c => c.ko);
   //  한 줄(시스템)에 마디 몇 — 가장 빽빽한 칸이 읽히게
   let perLine = A ? bars : o.barsPerLine;
-  if (!perLine) {
-    const minStep = o.minStep || (score.sub === 4 ? 15 : score.sub === 3 ? 17 : 20);
-    perLine = Math.max(1, Math.min(o.maxPerLine || 4, Math.floor((W - left0 - TSW - 8) / (bs * minStep + 26))));
-  }
+  const minStep = o.minStep || (score.sub === 4 ? 16 : score.sub === 3 ? 17 : 20);
+  if (!perLine) perLine = Math.max(1, Math.min(o.maxPerLine || 4, Math.floor((W - left0 - TSW - 8) / (bs * minStep + 26))));
   perLine = Math.min(perLine, bars);
+  if (!A) W = Math.max(W, left0 + TSW + 8 + perLine * (bs * minStep + 26));   // 좁은 화면 — 음표가 겹칠 만큼 좁으면 악보를 넓히고 옆으로 밀어 본다
   const lines = Math.ceil(bars / perLine);
   const rep = score.repeat || null;
   //  세로 자리 — 표시(글자 · 빠르기) 줄 · 화음 줄 · 오선마다(위 여백 · 오선 · 아래 여백)
@@ -349,7 +352,7 @@ export function renderScore(score, o = {}) {
   const tops = []; let H = A ? 1 : 6;
   for (let L = 0; L < lines; L++) { tops.push(H); H += sysH(L) + (A ? 0 : 12); }
   const totalW = A ? A.left + bars * bs * A.stepW + 2 : W;
-  const root = svg('svg', { viewBox: `0 0 ${totalW} ${H}`, width: totalW, height: H, class: 'staff score' + (o.cls ? ' ' + o.cls : '') });
+  const root = svg('svg', { viewBox: `0 0 ${totalW} ${H}`, width: totalW, height: H, class: 'staff score' + (narrow ? ' narrow' : '') + (o.cls ? ' ' + o.cls : '') });
   const noteEls = new Map(), xs = new Map();
   const addEl = (i, el) => { if (!noteEls.has(i)) noteEls.set(i, []); noteEls.get(i).push(el); };
   const ties = [], carries = staves.map(st => st.voices.map(() => new Map()));
@@ -380,8 +383,10 @@ export function renderScore(score, o = {}) {
         root.append(svg('text', { x: tx, y: top + 38, class: 'st-ts', 'text-anchor': 'middle' }, String(score.ts[1])));
       }
       if (named && st.name) {
-        root.append(svg('text', { x: 6, y: top + (st.sub ? 18 : 24), class: 'st-name' }, st.name));
-        if (st.sub) root.append(svg('text', { x: 6, y: top + 32, class: 'st-name sub' }, st.sub));
+        //  작은 이름 줄 — ' · ' 마디로 9글자쯤에서 접는다(이름 칸 너비)
+        const subs = []; for (const t of String(st.sub || '').split(' · ').filter(Boolean)) { const l = subs[subs.length - 1]; if (l && (l + ' · ' + t).length <= (narrow ? 6 : 9)) subs[subs.length - 1] = l + ' · ' + t; else subs.push(t); }
+        root.append(svg('text', { x: 6, y: top + (subs.length ? 16 : 24), class: 'st-name' }, st.name));
+        subs.slice(0, 3).forEach((t, j) => root.append(svg('text', { x: 6, y: top + 29 + j * 11, class: 'st-name sub' }, t)));
       }
     });
     //  가족 묶음(왼쪽 색 막대) · 하프 묶음 · 시스템 앞 세로줄
@@ -389,7 +394,7 @@ export function renderScore(score, o = {}) {
       for (let k = 0; k < staves.length;) {
         const f = staves[k].fam; let j = k;
         while (j + 1 < staves.length && staves[j + 1].fam === f) j++;
-        if (f) root.append(svg('rect', { x: NAMEW - 9, y: staffTop[k] - 2, width: 4, height: staffTop[j] + 44 - staffTop[k], rx: 2, class: 'st-fam f-' + f }));
+        if (f) root.append(svg('rect', { x: NW - 9, y: staffTop[k] - 2, width: 4, height: staffTop[j] + 44 - staffTop[k], rx: 2, class: 'st-fam f-' + f }));
         k = j + 1;
       }
       staves.forEach((st, k) => { if (st.brace === 'start' && staves[k + 1]) root.append(svg('path', { d: `M${clefX - 1} ${staffTop[k]} q -7 0 -7 8 V ${(staffTop[k] + staffTop[k + 1] + 40) / 2 - 6} q 0 6 -5 6 q 5 0 5 6 V ${staffTop[k + 1] + 32} q 0 8 7 8`, class: 'st-brace' })); });
@@ -474,12 +479,12 @@ function drawClef(root, st, x, top) {
   else root.append(svg('text', { x, y: top + 33, class: 'st-clef' }, '\u{1D11E}'));
   if (st.oct) {
     const t = String(Math.abs(st.oct) === 2 ? 15 : 8), above = st.oct > 0;
-    root.append(svg('text', { x: x + (st.clef === 'bass' ? 11 : 13), y: above ? top - (st.clef === 'bass' ? 3 : 9) : top + (st.clef === 'bass' ? 34 : 54), 'text-anchor': 'middle', class: 'st-oct' }, t));
+    root.append(svg('text', { x: x + (st.clef === 'bass' ? 10 : 15), y: above ? top - (st.clef === 'bass' ? 5 : 13) : top + (st.clef === 'bass' ? 36 : 56), 'text-anchor': 'middle', class: 'st-oct' }, t));
   }
 }
 //  안내용 작은 오선 — 칸판 줄 하나가 악보 어디에 적히나(북 자리 · 머리 · 기둥 방향 / 음자리표만)
 export function legendStaff({ pos = null, head = 'n', stem = 'up', clef = null, oct = 0, w = 54 } = {}) {
-  const top = clef ? 12 : 30, H = clef ? 64 : 86, root = svg('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, class: 'staff mini' });
+  const top = clef ? 18 : 30, H = clef ? 70 : 86, root = svg('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, class: 'staff mini' });
   for (let j = 0; j < 5; j++) root.append(svg('line', { x1: 2, x2: w - 2, y1: top + j * LG, y2: top + j * LG, class: 'st-line' }));
   if (clef) { drawClef(root, { clef, oct }, 4, top); return root; }
   const cx = w / 2 + 2, yOf = p => top + 40 - p * 5, cy = yOf(pos);

@@ -569,6 +569,7 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .staff .st-ph{stroke:#e2a12b;stroke-width:2.5;opacity:.85}
 .staff .st-note.now .st-xhead,.staff .st-note.now .st-trihead{stroke:#d98a14;stroke-width:2.6}
 .staff.score{margin:0 auto}
+.staff.narrow .st-name{font-size:10.5px}.staff.narrow .st-name.sub{font-size:8.5px}
 .staff.mini{background:transparent;border-radius:0;flex:none}
 /* 작곡 띠 — 칸판 바로 아래(같이 가로로 밀림) */
 .c-strip{padding-top:4px}

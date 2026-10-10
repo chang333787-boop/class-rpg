@@ -159,9 +159,11 @@ export function orchScore(song) {
       gl.push({ s: s0, d: Math.min(sub, end - s0), ps: [a.p], ex: { gliss: true }, i: 'gliss:a' });
       if (end - s0 > sub) gl.push({ s: s0 + sub, d: end - s0 - sub, ps: [z.p], i: 'gliss:z' });
     }
-    const rv = { events: [...monoLine(stacksOf(R.map(e => quant(e)))).map(ids('harpR')).filter(e => !gl.length || e.s + e.d <= gl[0].s), ...gl] };
-    out.harpR = { id: 'harpR', name: '하프', sub: 'l.v.', clef: 'treble', oct: 0, fam: 'str', brace: 'start', voices: [rv] };
-    out.harpL = { id: 'harpL', name: '', clef: 'bass', oct: 0, fam: 'str', voices: [{ events: monoLine(stacksOf(L.map(e => quant(e)))).map(ids('harpL')) }] };
+    //  펼친 화음 = 뜯는 차례만 적는다(다음 음 · 박 끝까지) — 소리는 저절로 울림(l.v.) · 박을 넘는 붙임줄 사슬이 안 생기게
+    const harpLine = list => monoLine(stacksOf(list.map(e => quant(e))), x => beatEnd(x.s));
+    const rv = { events: [...harpLine(R).map(ids('harpR')).filter(e => !gl.length || e.s + e.d <= gl[0].s), ...gl] };
+    out.harpR = { id: 'harpR', name: '하프', sub: 'l.v. 울림', clef: 'treble', oct: 0, fam: 'str', brace: 'start', voices: [rv] };
+    out.harpL = { id: 'harpL', name: '', clef: 'bass', oct: 0, fam: 'str', voices: [{ events: harpLine(L).map(ids('harpL')) }] };
   }
   //  가락 = 아이가 지은 가락(가락 악기 높이로 옮긴 그대로) · 화음 칸을 목관이 안 맡으면 그 화음도 가락 악기로(둘째 음성)
   const lead = song.notes.map((n, i) => ({ s: n.s, d: n.d, ps: [n.p + shift], i }));
