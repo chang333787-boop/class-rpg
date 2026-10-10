@@ -5,7 +5,7 @@
 //  · 조옮김 악기 없이 실제 소리 높이로 적는다. 높이 차이가 큰 악기(글로켄 · 첼레스타 · 콘트라베이스 · 비트 가락)는
 //    음자리표에 작은 8 · 15(한 · 두 옥타브 높게/낮게 소리남)를 달아 덧줄을 줄인다 — 총보에서 쓰는 보통 방법
 //  · 음표 길이: 칸 수를 박 안에서 읽기 쉬운 음표로(notation.js splitValue) · 북은 다음 칠 때까지(박 끝을 넘지 않게) · 짧게 끊는 음 = 그 박 끝까지 + 점(스타카토)
-import { SCALES, fitChords, chordName, chordByName, barSteps, stepSec, pc } from './theory.js';
+import { SCALES, fitChords, chordName, chordByName, barSteps, stepSec } from './theory.js';
 import { arrange, leadShift, chordLine, normOrch, PRESETS, familyOf, orchOn } from './orchestra.js';
 import { INSTS } from './song.js';
 import * as C from './beatcore.js';

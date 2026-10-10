@@ -290,6 +290,14 @@ try {
   ok(await N.pressEl(`document.querySelector('.c-scorebtn')`) === true, '390 — 끄기 단추 누름');
   await N.pressEl(`document.querySelector('.c-scorebtn')`);
   await N.shot('s11_narrow_compose');
+  //  예시 곡 '용사의 출발'(화음 칸 + 영화 음악) 총보 — 화음 칸은 목관이 분다 · 좁은 화면은 악보를 넓혀 옆으로 밀어 봄
+  await N.pressEl(btnQ('악보 보기', `document.querySelector('.c-tools')`));
+  await until(N, `!!document.querySelector('.modal-wrap .scv-tabs [data-tab="orch"]')`, 4000);
+  await N.pressEl(`document.querySelector('.modal-wrap .scv-tabs [data-tab="orch"]')`); await sleep(400);
+  const no = await N.ev(`(() => { const s = document.querySelector('.modal-wrap .staff-wrap svg.score'), w = document.querySelector('.modal-wrap .staff-wrap'); return s ? { ids: [...new Set([...s.querySelectorAll('g.st-staff')].map(g => g.dataset.staff))].join(','), narrow: s.classList.contains('narrow'), docW: document.documentElement.scrollWidth, scroll: w.scrollWidth > w.clientWidth } : null; })()`);
+  ok(no && no.ids.includes('winds') && no.ids.includes('lead') && no.ids.includes('harpR') && no.narrow && no.docW <= 390 && no.scroll, "390 — 예시 곡 총보(화음 칸 = 목관) · 좁은 이름 칸 · 옆으로 밀어 봄", JSON.stringify(no));
+  await N.shot('s13_narrow_orch');
+  await N.ev(closeModals);
   const NB = await device('좁은-비트', `/music/index.html?sid=s3&n=${encodeURIComponent('좁게')}&debug=1#/beat`, { w: 390, h: 844 });
   ok(await until(NB, `!!document.querySelector('.bt-card')`, 15000), '좁은 화면 비트');
   await NB.pressEl(`[...document.querySelectorAll('.bt-card:not(.ex)')].find(c => c.textContent.includes('달리는'))`); await sleep(500);

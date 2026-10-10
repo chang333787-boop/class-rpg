@@ -6,7 +6,7 @@
 import { h, modal, toast, svg } from './util.js';
 import { renderScore, legendStaff } from './notation.js';
 import { melodyScore, orchScore, beatScore, beatLegend, CHORD_LETTER } from './score.js';
-import { PRESETS, normOrch } from './orchestra.js';
+import { PRESETS } from './orchestra.js';
 import * as C from './beatcore.js';
 
 const DEBUG = typeof location !== 'undefined' && /[?&]debug=1/.test(location.search);

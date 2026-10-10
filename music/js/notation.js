@@ -336,7 +336,6 @@ export function renderScore(score, o = {}) {
   const narrow = !A && W < 600, NW = narrow ? 66 : NAMEW;                // 좁은 화면 = 이름 칸을 좁게(글자도 작게 — css .staff.narrow)
   const clefX = A ? 2 : (named ? NW : 4);
   const left0 = A ? A.left : clefX + CLEFW;
-  //  칸마다(음성마다) 마디별 조각 — 두째 음성은 음이 없는 마디를 비운다(쉼표 숨김)
   //  계이름 줄 높이 — 오선 아래로 내려간 음(덧줄)보다 아래에(오선마다 한 번 · 맞춤 모드는 음 범위로)
   const solYs = staves.map((st, k) => {
     if (!st.words) return 0;
@@ -346,6 +345,7 @@ export function renderScore(score, o = {}) {
     else for (const v of st.voices) for (const e of v.events || []) for (const p of e.ps) lo = Math.min(lo, P(p));
     return Math.max(st.solY || 30, Number.isFinite(lo) ? -lo * 5 + 19 : 0);
   });
+  //  칸마다(음성마다) 마디별 조각 — 쉼표는 박 단위(splitRest) · 쉼뿐인 마디 = 온마디 쉼 · 둘째 음성은 음이 없는 마디를 비운다(쉼표 숨김)
   const lay = staves.map(st => st.voices.map((v, k) => {
     const bars2 = layoutVoice(song, v.events || [], splitRest);
     return bars2.map(items => (items.some(it => !it.rest) ? items : k > 0 ? [] : barRest(items, bs)));
@@ -357,7 +357,6 @@ export function renderScore(score, o = {}) {
     const its = []; st.voices.forEach((v, j) => lay[k][j].forEach(b => b.forEach(it => its.push([{ ...it, dy: v.restDy || 0 }, v.stem]))));
     return extentOf(st2, its);
   });
-  const chordStaff = Math.min(staves.length - 1, Math.max(0, score.chordStaff || 0));
   const hasChords = (score.chords || []).length > 0, hasKo = hasChords && score.chords.some(c => c.ko);
   //  한 줄(시스템)에 마디 몇 — 가장 빽빽한 칸이 읽히게
   let perLine = A ? bars : o.barsPerLine;
