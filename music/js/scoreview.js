@@ -17,11 +17,12 @@ export function scoreStrip() {
   const el = h('div', { class: 'c-strip', 'aria-label': '악보 같이 보기' });
   let res = null, key = '', spans = [], now = new Set(), ph = null, geom = null, hgt = 0, renders = 0;
   //  g = { left 이름 칸 너비, stepW 한 칸 너비, rows [가장 낮은 음, 가장 높은 음] } — 칸판과 같은 가로 자리 · 음 범위로 높이를 정해 음을 놓아도 높이가 그대로
+  //  g.compact = 칸 줄이 많을 때 계이름 · 화음 이름 줄을 뺀 얇은 띠
   function render(song, g) {
     const k = JSON.stringify([song.notes.map(n => [n.s, n.d, n.p]), song.harm, song.chords, song.bars, song.beats, song.sub, song.scale, song.key, song.acc, song.orch, song.prog, song.progEvery, song.inst, g]);   // 노랫말 글자는 띠에 안 나옴
     if (k === key && res) return hgt;
     key = k; geom = g; renders++;
-    const sc = melodyScore(song);
+    const sc = melodyScore(song, { compact: !!g.compact });
     res = renderScore(sc, { align: { left: g.left, stepW: g.stepW }, ranges: sc.staves.map(() => g.rows), cls: 'strip' });
     ph = svg('line', { x1: 0, x2: 0, y1: 2, y2: res.height - 2, class: 'st-ph', display: 'none' });
     res.el.append(ph);
@@ -29,7 +30,7 @@ export function scoreStrip() {
     now = new Set();
     el.replaceChildren(res.el);
     hgt = res.height;
-    dbg('strip', () => ({ renders, height: hgt, heads: el.querySelectorAll('.st-head').length, notes: el.querySelectorAll('.st-note').length, now: [...now] }));
+    dbg('strip', () => ({ renders, height: hgt, compact: !!g.compact, heads: el.querySelectorAll('.st-head').length, notes: el.querySelectorAll('.st-note').length, now: [...now] }));
     return hgt;
   }
   //  ▶ 따라가기 — step = 지금 칸(소수) · null = 끔

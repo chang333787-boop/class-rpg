@@ -78,11 +78,12 @@ export function songChords(song) {
 }
 
 // ── ① 작곡 '악보 같이 보기' — 가락(+ 아이가 쌓은 화음 = 둘째 오선) ──
-export function melodyScore(song, { harmony = true } = {}) {
+//  compact = 칸 줄이 많아 1366×610 에 다 안 들어갈 때 — 계이름 줄 · 화음 이름 줄을 뺀다(바로 위 칸판에 같은 이름이 있음)
+export function melodyScore(song, { harmony = true, compact = false } = {}) {
   const hasH = harmony && (song.harm || []).length > 0;
-  const staves = [{ id: 'mel', name: '가락', clef: 'treble', words: true, solY: 22, voices: [{ events: song.notes.map((n, i) => ({ s: n.s, d: n.d, ps: [n.p], i })) }] }];
+  const staves = [{ id: 'mel', name: '가락', clef: 'treble', words: !compact, solY: 22, voices: [{ events: song.notes.map((n, i) => ({ s: n.s, d: n.d, ps: [n.p], i })) }] }];
   if (hasH) staves.push({ id: 'harm', name: '화음', clef: 'treble', voices: [{ events: harmStacks(song.harm) }] });
-  return { beats: song.beats, sub: song.sub, bars: song.bars, ts: tsOf(song), staves, chords: songChords(song) };
+  return { beats: song.beats, sub: song.sub, bars: song.bars, ts: tsOf(song), staves, chords: compact ? [] : songChords(song) };
 }
 
 // ── ② 오케스트라 총보 ──  편곡 사건 → 악기마다 오선(악기 차례 = 반짝이 · 목관 · 금관 · 타악기 · 하프 · 가락 · 현악기 화음 · 낮은 현)

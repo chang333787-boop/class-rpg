@@ -57,7 +57,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   const grid = h('div', { class: 'c-grid', role: 'grid', 'aria-label': '작곡 칸' });
   //  [MUSIC-SCORE-1] 칸 바로 아래 오선 띠(칸과 같이 가로로 밀림) — '🎼 악보 같이 보기'로 켜고 끔(이 기기에 기억 · 처음엔 켬)
   const strip = scoreStrip(), SCORE_LS = 'music.compose.score';
-  let scoreOn = lsGet(SCORE_LS, true) !== false, stripH = -1, stripRaf = 0;
+  let scoreOn = lsGet(SCORE_LS, true) !== false, stripH = -1, stripRaf = 0, stripCompact = false;
   strip.el.style.display = scoreOn ? '' : 'none';
   const gridWrap = h('div', { class: 'c-gridwrap' }, chordRow, grid, strip.el);
   const lyric = h('input', { class: 'c-lyric', placeholder: '노랫말을 쓰면 음표에 한 글자씩 붙어요 (예: 나비야나비야)', maxlength: 120, oninput: () => applyLyrics() });
@@ -114,14 +114,18 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     const steps = totalSteps(song);
     cellW = clamp(Math.floor((Math.max(400, main.clientWidth - 8) - LABEL) / steps), 16, 46);
     //  [MUSIC-SCORE-1] 띠 높이만큼 칸 줄을 낮춘다(띠 높이는 음 범위로 정해져 음을 놓아도 그대로) · 도구 줄(1366 에서 두 줄) · 코치 칸은 잰 높이로
+    //   칸 줄이 많아(넓은 음역 · 화음 칸) 칸이 22px 아래로 줄어야 하면 띠를 얇게(계이름 · 화음 이름 줄 빼기 — 바로 위 칸판에 같은 이름)
+    const fixed = 16 + tools.offsetHeight + 6 + 36 + (lyricsOn ? lyricRow.offsetHeight + 6 : 0) + 6 + Math.max(72, coachBox.offsetHeight);   // 코치 말은 음을 놓을 때마다 바뀜(세 줄까지 자리)
+    const room = root.clientHeight - 50 - fixed - 2;   // 2 = 반올림 여유(1px 넘침 막기)
+    stripCompact = false;
     stripH = scoreOn ? strip.render(song, stripGeom()) + 4 : 0;
-    const fixed = 16 + tools.offsetHeight + 6 + 36 + (lyricsOn ? lyricRow.offsetHeight + 6 : 0) + 6 + coachBox.offsetHeight;
-    const avH = Math.max(scoreOn ? rows.length * 22 : 200, root.clientHeight - 50 - fixed - stripH);
+    if (scoreOn && room - stripH < rows.length * 22) { stripCompact = true; stripH = strip.render(song, stripGeom()) + 4; }
+    const avH = Math.max(scoreOn ? rows.length * 22 : 200, room - stripH);
     rowH = clamp(Math.floor(avH / rows.length), 22, 40);
     renderGrid();
   }
   //  [MUSIC-SCORE-1] 악보 같이 보기 — 칸과 같은 가로 자리(이름 칸 · 한 칸 너비) · 음 범위(칸 줄의 가장 낮은 음 ~ 가장 높은 음)
-  const stripGeom = () => ({ left: LABEL, stepW: cellW, rows: [rows[rows.length - 1], rows[0]] });
+  const stripGeom = () => ({ left: LABEL, stepW: cellW, rows: [rows[rows.length - 1], rows[0]], compact: stripCompact });
   function stripNow() {
     if (!scoreOn || !rows.length) return;
     const hh = strip.render(song, stripGeom()) + 4;

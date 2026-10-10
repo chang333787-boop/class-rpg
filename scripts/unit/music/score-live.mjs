@@ -163,6 +163,14 @@ try {
   ok(await until(S, `!!document.querySelector('.modal-wrap .staff-wrap svg.staff') && !document.querySelector('.modal-wrap .scv-tabs')`, 4000), '오케스트라를 안 켜면 가락 악보만(예전 그대로)');
   await S.ev(closeModals);
 
+  //  칸 줄이 많은 곡(생일 축하 12줄) — 띠를 얇게(계이름 · 화음 이름 줄 빼기) · 넘침 없음
+  const SB = await device('학생-넓은음역', `/music/index.html?sid=s1&n=${encodeURIComponent('테스트')}&debug=1#/compose/lib_birthday`);
+  ok(await until(SB, `!!document.querySelector('.c-strip svg') && !!document.querySelector('.c-grid .c-row')`, 15000), '생일 축하 열기');
+  await sleep(300); await SB.ev(closeModals);
+  const sb = await SB.ev(`(() => { const v = document.querySelector('.view'), st = window.__score.strip(); return { rows: document.querySelectorAll('.c-lab').length, compact: st.compact, sol: document.querySelectorAll('.c-strip text.st-sol').length, heads: st.heads, overflow: v.scrollHeight - v.clientHeight, rh: parseFloat(getComputedStyle(document.querySelector('.c-grid')).getPropertyValue('--rh')) }; })()`);
+  ok(sb.rows >= 12 && sb.compact && sb.sol === 0 && sb.heads > 20 && sb.overflow <= 0 && sb.rh >= 22, '칸 줄 12 — 얇은 띠 · 넘침 없음', JSON.stringify(sb));
+  await SB.shot('s3b_compose_compact');
+
   //  오케스트라 총보 — 작은 별(기본 곡) 바꿔 쓰기에서 편성 셋
   const SO = await device('학생-총보', `/music/index.html?sid=s1&n=${encodeURIComponent('테스트')}&debug=1#/compose/lib_star`);
   ok(await until(SO, `!!document.querySelector('.c-grid .c-row') && !!document.querySelector('.oc-switch')`, 15000), '작은 별 열기');

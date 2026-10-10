@@ -278,6 +278,8 @@ await test('작곡 악보 띠 — 칸과 같은 가로 자리 · 음을 놓아�
   const rh = renderScore(h, { align: A, ranges: [[55, 76], [55, 76]] });
   ok(rh.height > r.height && headsIn(rh.el, 'harm') === 3, '화음 오선 그림 ' + headsIn(rh.el, 'harm'));
   const o = orchSong('star', 'film'); ok(SC.melodyScore(o).chords.map(c => c.name).join(',') === O.chordLine(o).filter(g => g.name).map(g => g.name).join(','), '오케스트라 = 편곡 화음(G7 마침 포함)');
+  const cp = SC.melodyScore(song, { compact: true }), rc = renderScore(cp, { align: A, ranges });
+  ok(!cp.staves[0].words && !cp.chords.length && rc.height <= r.height - 25 && rc.el.querySelectorAll('text.st-sol').length === 0, `얇은 띠(칸 줄이 많을 때) — 계이름 · 화음 이름 뺌 ${r.height} → ${rc.height}`);
 });
 await test('안내 작은 오선 · 낮은음자리표 글자(Noto Music 받는 글자에 𝄢)', () => {
   const m = legendStaff({ pos: 9, head: 'xo', stem: 'up' });
