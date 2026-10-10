@@ -6,6 +6,7 @@
 //  · 소리 길: 줄마다 Gain(소리 크기 · 음소거 · 혼자 듣기) → 좌우(StereoPanner) → 비트 버스(master) → engine.bus()
 //  · 우리 장단의 장구(덩 · 덕 · 쿵 · 기 · 더러러러)는 audio.js drum('deong' · 'deok' · 'kung' · 'gi' · 'roll')과 같은 재료(주파수 · 길이 · 세기)로 만든다
 //    — 작곡 화면의 장단 반주와 같은 장구 소리. 꽹과리(쨍 · 손으로 막아 짧게) · 징(낮게 웅 · 맥놀이 · 3초 넘게) · 북(둥)은 새로 만들었다.
+//  · [MUSIC-BEAT-MEL-1] 가락 악기 — 신스 · 대금은 여기서 만들고, 실로폰 · 피아노 · 플루트 · 글로켄 · 가야금은 공용 엔진의 note(audio.js 는 안 고침)로 낸다.
 import { MIX, VOL_DEF, ROWS } from './beatcore.js';
 
 const SOFT = (() => { const n = 2048, a = new Float32Array(n); for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; a[i] = Math.tanh(2.4 * x) / Math.tanh(2.4); } return a; })();
@@ -135,7 +136,16 @@ const LAYER = { elec: { bass: 1, chord: 0.68 }, real: { bass: 0.72, chord: 0.27 
 const STYLE_GAIN = { long: 0.5, oom: 1, short: 1 };
 //  소리 묶음 전체 크기 — 진짜 북은 짧고 가벼워 다 합친 소리가 작다(같은 카드로 재면 전자 북보다 약 4.7dB 작음) → 조금 키운다
 const KIT_GAIN = { elec: 1, real: 1.5, kor: 1 };
-const PAN = { kick: 0, snare: 0.04, clap: -0.14, hatc: 0.24, hato: 0.24, tom: -0.2, shaker: -0.3, cymbal: 0.18, bass: 0, chord: -0.06 };
+const PAN = { kick: 0, snare: 0.04, clap: -0.14, hatc: 0.24, hato: 0.24, tom: -0.2, shaker: -0.3, cymbal: 0.18, mel: 0.1, bass: 0, chord: -0.06 };
+//  가락 악기 [MUSIC-BEAT-MEL-1] — inst = 공용 엔진 악기(없으면 여기서 만듦) · oct = 올림(반음): 가락 칸(도 60 ~ 높은 미 76)보다 한 옥타브 위에서 울려
+//   화음(60 ~ 69)과 겹치지 않고 위에 뜨게(글로켄은 진짜 글로켄처럼 두 옥타브 위) · gain = 같은 가락을 작은 스피커 크기로 재어 악기끼리 맞춘 값
+const LEAD_SND = {
+  synth: { oct: 12, gain: 1 }, daegeum: { oct: 12, gain: 0.61 },
+  xylo: { inst: 'xylo', oct: 12, gain: 0.78 }, piano: { inst: 'piano', oct: 12, gain: 0.76 }, flute: { inst: 'flute', oct: 12, gain: 0.62 },
+  glock: { inst: 'glock', oct: 24, gain: 0.94 }, gayageum: { inst: 'gayageum', oct: 12, gain: 2.4 },
+};
+//  가락 크기(소리 묶음마다) — 기본 리듬 카드를 작은 스피커 크기로 재어 '화음과 비슷하거나 조금 크게 · 쿵 · 짝보다 작게'(북 대비 약 -5dB · beat-live A43 이 다시 잰다)
+const MEL_LAYER = { elec: 0.3, real: 0.2, kor: 0.27 };
 
 function noiseBuf(sr) {
   let b;
@@ -267,6 +277,68 @@ export class BeatKit {
     g.gain.setTargetAtTime(0, end, long ? 0.08 : 0.03);
     lp.connect(g).connect(out);
     return this._voice(c, g, oscs, t, end + (long ? 0.5 : 0.25), long ? 0.04 : 0.015);
+  }
+  //  가락 한 음 [MUSIC-BEAT-MEL-1] — lead(악기) · p(가락 칸의 미디 번호 · 악기마다 옥타브를 올려 냄) · dur 초 → { stop(at), end }
+  //   두드리거나 뜯는 악기(실로폰 · 글로켄 · 가야금)는 dur 와 상관없이 저절로 잦아든다(엔진 소리 그대로)
+  lead(leadId, kitId, p, t, dur, vel, out) {
+    const c = this.e.ctx; if (!c || !out) return null;
+    const L = LEAD_SND[leadId] || LEAD_SND.synth;
+    vel *= (MEL_LAYER[kitId] || 1) * L.gain;
+    t = Math.max(t, c.currentTime);
+    const q = p + L.oct;
+    if (!L.inst) return leadId === 'daegeum' ? this._daegeum(c, q, t, dur, vel, out) : this._synth(c, q, t, dur, vel, out);
+    if (typeof this.e.note !== 'function') return null;
+    //  엔진 소리는 우리 Gain(vg)을 지나게 하고, 끊을 때는 vg 만 줄인다. 엔진의 stop 은 '부르는 때'의 크기를 읽어 그 값에서 줄이므로
+    //   아직 시작 안 한 음(빠른 16분음 · 0.12초 앞 예약 · 오프라인 그리기)을 끊으면 기본값 1 로 '퍽' 커진다 → 이미 울리는 음일 때만 엔진 stop 도 불러 발진기를 일찍 멈춘다
+    const vg = c.createGain(); vg.connect(out);
+    const hd = this.e.note(L.inst, q, t, Math.max(0.06, dur), vel, vg);
+    if (!hd) { try { vg.disconnect(); } catch (e) {} return null; }
+    const rel = /xylo|glock|gayageum/.test(L.inst) ? 0.05 : 0.035;
+    let stopped = false;
+    return { end: Number.isFinite(hd.end) ? hd.end : t + Math.max(0.06, dur) + 1, stop: at => {
+      if (stopped) return; stopped = true;
+      at = Math.max(at, c.currentTime);
+      try { vg.gain.setTargetAtTime(0, at, rel); } catch (e) {}
+      if (c.currentTime >= t) { try { hd.stop(at + rel * 6); } catch (e) {} }
+    } };
+  }
+  //  신스 — 네모파 + 톱니파(살짝 어긋나게) → 처음엔 밝았다 부드러워지는 필터 · 긴 음은 늦게 오는 떨림
+  _synth(c, p, t, dur, vel, out) {
+    const f = freqOf(p), end = t + Math.max(0.06, dur), g = c.createGain(), lp = bq(c, 'lowpass', Math.min(5000, f * 4), 1.1);
+    const a = osc(c, 'square', f, t), b = osc(c, 'sawtooth', f, t), bg = amp(c, 0.6);
+    b.detune.setValueAtTime(8, t);
+    lp.frequency.setValueAtTime(Math.min(7000, f * 7), t); lp.frequency.exponentialRampToValueAtTime(Math.min(5000, f * 4), t + 0.16);
+    a.connect(lp); b.connect(bg).connect(lp);
+    const oscs = [a, b];
+    if (dur > 0.38) {
+      const l = osc(c, 'sine', 5.6, t), lg = c.createGain();
+      lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + 0.18); lg.gain.linearRampToValueAtTime(10, t + 0.42);
+      l.connect(lg); lg.connect(a.detune); lg.connect(b.detune); oscs.push(l);
+    }
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel * 0.2, t + 0.006); g.gain.setTargetAtTime(vel * 0.15, t + 0.012, 0.12);
+    g.gain.setTargetAtTime(0, end, 0.035);
+    lp.connect(g).connect(out);
+    return this._voice(c, g, oscs, t, end + 0.3, 0.03);
+  }
+  //  대금 — 대나무 피리: 둥근 소리(사인 + 세모) + 청(얇은 막) 떨림(톱니를 2.4kHz 띠로 · 작게) + 숨소리 · 아래에서 밀어 올려 붙는 음 · 긴 음은 천천히 깊게 흔들기(농음)
+  _daegeum(c, p, t, dur, vel, out) {
+    if (!this.N) this.N = noiseBuf(this.sr);
+    const f = freqOf(p), end = t + Math.max(0.08, dur), g = c.createGain(), lp = bq(c, 'lowpass', Math.min(6500, f * 5), 0.5);
+    const a = osc(c, 'sine', f, t), b = osc(c, 'triangle', f, t), z = osc(c, 'sawtooth', f, t);
+    const bg = amp(c, 0.35), zb = bq(c, 'bandpass', 2400, 1.3), zg = amp(c, 0.2);
+    for (const o of [a, b, z]) { o.detune.setValueAtTime(-50, t); o.detune.linearRampToValueAtTime(0, t + 0.06); }
+    a.connect(lp); b.connect(bg).connect(lp); z.connect(zb).connect(zg).connect(lp);
+    const oscs = [a, b, z];
+    if (dur > 0.45) {
+      const l = osc(c, 'sine', 4.4, t), lg = c.createGain();
+      lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + 0.25); lg.gain.linearRampToValueAtTime(26, t + 0.75);
+      l.connect(lg); for (const o of oscs) lg.connect(o.detune); oscs.push(l);
+    }
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel * 0.3, t + 0.04); g.gain.setTargetAtTime(vel * 0.25, t + 0.05, 0.2);
+    g.gain.setTargetAtTime(0, end, 0.06);
+    lp.connect(g).connect(out);
+    hiss(c, out, t, vel * 0.05, this.N, 'bandpass', Math.min(7000, f * 2), 0.9, Math.min(0.25, Math.max(0.08, dur)), 0.02);   // 숨소리(처음에 조금 · 짧은 음은 짧게)
+    return this._voice(c, g, oscs, t, end + 0.45, 0.06);
   }
   //  발진기 묶음 → { stop(at), end } · 다 울리면 끊는다
   _voice(c, g, oscs, t, stopAt, rel) {
