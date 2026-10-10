@@ -346,6 +346,73 @@ await test('박자기 — 베이스 길이 = 다음 음까지 · 쉼 = 끊기 ·
   ok(ev.some(e => e.kind === 'drum' && e.row === 'clap' && e.bar === 0 && e.step === 12), '같은 마디 안에서 바로 들림');
 });
 
+//  ── 저장소 ── 손님(이 기기) · 학급 RTDB(가짜 firebase) 가 같은 모양: listMyBeats · getBeat · saveBeat(살핀 모양만) · deleteBeat · 비트 모음
+const mem = new Map();
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true,
+  value: { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) } });
+const { createStore } = await import('../../../music/js/store.js');
+const sample = () => { const b = B.applyStarter(B.emptyBeat(), 'basic').beat; b.title = '쿵짝 비트'; b.arr = [0, 0, 1, 0]; b.mode = 'song'; b.pats[1] = B.starterPattern(B.STARTERS[4]); return b; };
+await test('저장소(손님 · 이 기기) — 저장 · 목록 · 다시 열기 = 같은 비트 · 이상한 값은 살핀 뒤 저장 · 모음 = 고운 이름만 · 지우기 · 다른 기록 그대로', async () => {
+  mem.set('music.local', JSON.stringify({ songs: { s1: { id: 's1', title: '내 곡' } }, practice: {}, rhythm: {} }));   // beats 칸이 없던 예전 기록
+  const st = createStore({});
+  ok(st.me.guest === true);
+  eq(await st.listMyBeats(), []);
+  const b = sample();
+  const saved = await st.saveBeat({ ...B.packBeat(b), bpm: 9999, junk: '버릴 칸', pats: { ...B.packBeat(b).pats, 9: { d: {} } } });
+  ok(saved.id && saved.rev === 1 && saved.by === 'guest' && saved.bpm === 160 && !('junk' in saved), '살핀 모양 · 누가 · 몇 번째 ' + JSON.stringify(Object.keys(saved)));
+  const got = B.normalizeBeat(await st.getBeat('guest', saved.id));
+  eq(got.pats, b.pats, '패턴 그대로'); eq([got.title, got.arr, got.mode], ['쿵짝 비트', [0, 0, 1, 0], 'song']);
+  eq((await st.listMyBeats()).map(x => x.id), [saved.id]);
+  eq(await st.listBeatClass(), [], '올리지 않으면 모음에 없음');
+  await st.saveBeat({ ...B.packBeat(got), id: saved.id, rev: saved.rev, pub: true });
+  const row = (await st.listBeatClass())[0];
+  ok(row && row.t === '쿵짝 비트' && row.sid === 'guest' && row.bpm === got.bpm && row.na === 4, '모음 한 줄 ' + JSON.stringify(row));
+  await st.saveBeat({ ...B.packBeat(got), id: saved.id, rev: 2, title: '시발 비트', pub: true });
+  eq(await st.listBeatClass(), [], '고운 말이 아닌 이름은 모음에 안 뜸');
+  await st.deleteBeat(saved.id);
+  eq(await st.listMyBeats(), []);
+  ok(JSON.parse(mem.get('music.local')).songs.s1.title === '내 곡', '내 곡은 그대로');
+});
+await test('저장소(학급 RTDB) — beats/<sid>/<id> + beatclass/<sid>_<id> 에만 · 다시 저장해도 선생님 숨김 남음 · 내리면 줄 지움 · 숨긴 줄은 목록에서 빠짐', async () => {
+  const tree = {};
+  const seg = p => p.split('/').filter(Boolean);
+  const get = p => seg(p).reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), tree) ?? null;
+  const put = (p, v) => { const ks = seg(p); let o = tree; ks.slice(0, -1).forEach(k => { o = o[k] = o[k] && typeof o[k] === 'object' ? o[k] : {}; }); if (v == null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = JSON.parse(JSON.stringify(v)); };
+  const writes = [];
+  const ref = p => ({ child: c => ref(p + '/' + c), once: async () => ({ val: () => get(p) }), set: async v => { writes.push(p); put(p, v); }, remove: async () => { writes.push(p); put(p, null); },
+    update: async up => { for (const [k, v] of Object.entries(up)) { writes.push(p + '/' + k); put(p + '/' + k, v); } }, push: () => ref(p + '/x'), on(ev, fn) { fn({ val: () => get(p) }); }, off() {} });
+  const fb = { apps: [1], database: () => ({ ref }) };
+  const st = createStore({ sid: 's1', name: '하늘', fb });
+  const b = sample(); b.pub = true;
+  const s1 = await st.saveBeat(B.packBeat(b));
+  const k = 'classRPG_music/beatclass/s1_' + s1.id;
+  ok(get(`classRPG_music/beats/s1/${s1.id}`).pats[0].d.kick === '2000000020000000' && get(k).t === '쿵짝 비트' && get(k).n === '하늘', '두 곳에 씀');
+  ok(writes.every(w => w.startsWith('classRPG_music/beats/s1/') || w.startsWith(k)), '다른 곳은 안 씀 ' + writes.join());
+  await st.setBeatHidden('s1', s1.id, true);
+  eq(await st.listBeatClass(), [], '숨긴 줄은 목록에서 빠짐');
+  let seen = null; const stop = st.watchBeatClass(list => { seen = list; }); stop(); eq(seen, [], '지켜보기도 같음');
+  await st.saveBeat({ ...B.packBeat(b), id: s1.id, rev: s1.rev, title: '새 이름' });
+  ok(get(k).hide === true && get(k).t === '새 이름' && get(`classRPG_music/beats/s1/${s1.id}`).rev === 2, '다시 저장 = 숨김 남음 · 이름만 바뀜');
+  await st.setBeatHidden('s1', s1.id, false);
+  eq((await st.listBeatClass()).map(r => r.t), ['새 이름']);
+  await st.saveBeat({ ...B.packBeat(b), id: s1.id, rev: 2, pub: false });
+  ok(get(k) === null, '내리면(올리기 끔) 모음 줄 지움');
+  ok(Object.keys(await st.allBeats()).join() === 's1' && (await st.allBeatClass()).length === 0, '선생님 읽기');
+  await st.deleteBeat(s1.id);
+  ok(get(`classRPG_music/beats/s1/${s1.id}`) === null, '지우기');
+});
+await test('화면 연결(글로 확인) — 첫 화면 넷째 문 · #/beat 길(처음 열 때만 불러옴) · import map 버스터 · 교사 화면 · 장르 이름 · \'브랜치\' 없음 · 공용 소리 파일은 안 고침', () => {
+  const app = read('music/js/app.js'), html = read('music/index.html'), beat = read('music/js/beat.js'), core = read('music/js/beatcore.js'), kitjs = read('music/js/beatkit.js'), teacher = read('music/js/teacher.js'), store = read('music/js/store.js');
+  ok(app.includes("h('button', { class: 'door d-beat', onclick: () => ctx.go('#/beat') }") && app.includes("await import('./beat.js')") && app.includes('replaceBeatRef'), 'app 문 · 길');
+  const v = m => (html.match(new RegExp(`"\\./js/${m}\\.js": "\\./js/${m}\\.js\\?v=([^"]+)"`)) || [])[1];
+  for (const m of ['beat', 'beatcore', 'beatkit', 'app', 'store', 'teacher']) ok(Number(String(v(m) || '').slice(0, 8)) >= 20261010, m + ' 버스터 ' + v(m));
+  ok(html.includes(`<script type="module" src="js/app.js?v=${v('app')}">`) && Number(((html.match(/css\/music\.css\?v=(\d{8})/) || [])[1]) || 0) >= 20261010, 'script · css');
+  ok(teacher.includes('비트 모음에서 내리기') && teacher.includes('setBeatHidden') && store.includes("beatclass/") && store.includes("'beats/' + sid"), '교사 · 저장소');
+  const GENRE = /붐뱁|트랩|힙합|하우스|테크노|디스코|레게|재즈|펑크|로파이|\bEDM\b|\blo-?fi\b/;   // 글(아이에게 보이는 말 · 주석) — 영어 이름은 낱말로만(warnedMute 같은 이름 안 걸리게)
+  for (const [n, src] of [['beat', beat], ['beatcore', core], ['beatkit', kitjs]]) { ok(!GENRE.test(src), n + ' 장르 이름'); ok(!src.includes('브랜치'), n + " '브랜치'"); }
+  ok(!/from '\.\/(song|compose)\.js'/.test(beat + core + kitjs), '비트는 song · compose 를 안 부름');
+});
+
 const fail = results.filter(r => r[0] === 'FAIL');
 for (const r of results) console.log(r[0], r[1], r[2] || '');
 console.log(`\n음악실 비트: PASS ${results.length - fail.length} · FAIL ${fail.length}`);

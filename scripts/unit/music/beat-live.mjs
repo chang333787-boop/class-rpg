@@ -92,6 +92,25 @@ const toastHas = txt => `[...document.querySelectorAll('.toast')].some(t => t.te
 const onSteps = (row) => `(window.__beat.beat().pats[window.__beat.state().cur].d.${row} || '').split('').map((v, i) => v !== '0' ? i : -1).filter(i => i >= 0)`;
 const setRange = (sel, v) => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${v}; e.dispatchEvent(new Event('input', { bubbles: true })); return +e.value; })()`;
 const near = (a, b, e = 1e-6) => Math.abs(a - b) <= e;
+//  음 높이 재기(시험 전용) — 베이스 '도'(36 · 우리 장단은 한 옥타브 위) 를 자기상관으로 · 화음(도 미 솔)은 그 세 음 자리 힘 ÷ 다른 음 자리 힘(괴르첼)
+const PITCH_PROBE = `(async () => { try {
+  const K = await import('./js/beatkit.js'), sr = 44100, out = {};
+  const f0 = d => { const lo = Math.floor(sr / 400), hi = Math.ceil(sr / 40), n = d.length - hi, r = new Float32Array(hi + 2); let e0 = 0; for (let i = 0; i < n; i++) e0 += d[i] * d[i];
+    for (let L = lo; L <= hi + 1; L++) { let s = 0, e1 = 0; for (let i = 0; i < n; i++) { s += d[i] * d[i + L]; e1 += d[i + L] * d[i + L]; } r[L] = s / Math.sqrt(e0 * e1 || 1); }
+    let mx = 0; for (let L = lo; L <= hi; L++) mx = Math.max(mx, r[L]);
+    let L = lo; while (L < hi && !(r[L] >= 0.9 * mx && r[L] >= r[L - 1] && r[L] >= r[L + 1])) L++;
+    const a = r[L - 1], b = r[L], c = r[L + 1], sh = (a - c) / (2 * (a - 2 * b + c) || 1); return sr / (L + sh); };
+  const gz = (d, f) => { const w = 2 * Math.PI * f / sr, k = 2 * Math.cos(w); let s1 = 0, s2 = 0; for (const x of d) { const s0 = x + k * s1 - s2; s2 = s1; s1 = s0; } return s1 * s1 + s2 * s2 - k * s1 * s2; };
+  for (const kitId of ['elec', 'real', 'kor']) {
+    const o1 = new OfflineAudioContext(1, sr, sr), k1 = new K.BeatKit({ ctx: o1 }); k1.bass(kitId, 36, 0, 0.8, 0.9, o1.destination);
+    const d1 = (await o1.startRendering()).getChannelData(0).subarray(Math.round(sr * 0.06), Math.round(sr * 0.5));
+    const o2 = new OfflineAudioContext(1, sr, sr), k2 = new K.BeatKit({ ctx: o2 }); k2.chord(kitId, [60, 64, 67], 0, 0.8, 0.8, o2.destination, 'long');
+    const d2 = (await o2.startRendering()).getChannelData(0).subarray(Math.round(sr * 0.06), Math.round(sr * 0.6));
+    const on = [261.63, 329.63, 392].map(f => gz(d2, f)), offs = [233.08, 293.66, 349.23, 440].map(f => gz(d2, f));
+    out[kitId] = { bass: +f0(d1).toFixed(2), chord: +(10 * Math.log10(Math.min(...on) / Math.max(...offs))).toFixed(1) };
+  }
+  return out;
+} catch (e) { return { err: String(e && e.stack || e).slice(0, 300) }; } })()`;
 //  쪽 안에서 도는 어울림 재기(시험 전용) — 실제 모듈(beatkit · beatcore)을 OfflineAudioContext 에 붙여 박자기 그대로 그린다
 const MIX_PROBE = `(async () => { try {
   const K = await import('./js/beatkit.js'), C = await import('./js/beatcore.js');
@@ -215,6 +234,9 @@ try {
   //  어울림(귀 대신 셈) — 기본 리듬 카드를 오프라인으로 두 마디 그려 '작은 스피커 크기'(150Hz 아래 깎은 RMS)로 북 · 베이스 · 화음을 견준다
   const mixRes = await S.ev(MIX_PROBE);
   const mixOK = mixRes && !mixRes.err && Object.values(mixRes.cards).every(c => c.bass >= -6 && c.bass <= 6 && c.chord >= -11 && c.chord <= -1 && c.pk <= 1.1) && mixRes.kitSpread <= 3;
+  const pit = await S.ev(PITCH_PROBE);
+  const want = { elec: 65.41, real: 65.41, kor: 130.81 };
+  ok(pit && !pit.err && Object.entries(want).every(([k, f]) => Math.abs(pit[k].bass / f - 1) < 0.01 && pit[k].chord >= 10), 'A44 음 높이 — 베이스 도 = 65.41Hz(우리 장단 130.81 · ±1%) · 화음 도 미 솔 자리 힘이 다른 음 자리보다 10dB 넘게 큼', JSON.stringify(pit));
   ok(mixOK, 'A43 어울림(작은 스피커 크기 · dB) — 카드마다 베이스 = 북 ±6 · 화음 = 북 −11~−1 · 꼭대기 ≤ 1.1 · 같은 카드를 소리 묶음 셋으로 = 전체 크기 차 ≤ 3dB',
     mixRes && (mixRes.err || Object.entries(mixRes.cards).map(([k, c]) => `${k} 베이스${c.bass} 화음${c.chord} 꼭대기${c.pk}`).join(' · ') + ` · 묶음 차 ${mixRes.kitSpread}dB`));
   //  패턴 B · 기본 리듬 카드 · 복사 · 순서
