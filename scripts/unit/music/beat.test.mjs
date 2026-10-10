@@ -541,8 +541,10 @@ await test('화면 연결(글로 확인) — 첫 화면 넷째 문 · #/beat 길
   for (const [n, src] of [['beat', beat], ['beatcore', core], ['beatkit', kitjs]]) { ok(!GENRE.test(src), n + ' 장르 이름'); ok(!src.includes(NO_WORD), n + ' 쓰지 않기로 한 낱말'); }
   ok(!/from '\.\/(song|compose)\.js'/.test(beat + core + kitjs), '비트는 song · compose 를 안 부름');
   //  [MUSIC-BEAT-MEL-1] 가락 — 버스터 · 화면 조각 · 공용 엔진 악기는 note 로만(audio.js 무수정은 git 이 지킴)
-  for (const m of ['beat', 'beatcore', 'beatkit']) eq(v(m), '20261010bm1', m + ' 가락 버스터');
-  ok(/css\/music\.css\?v=20261010bm1/.test(html), 'css 가락 버스터');
+  //  가락(bm1) 뒤에 다시 고친 모듈(예: 예시 작품 sh1)도 있으니 '10-10 이후 값'인지만 본다
+  const after10 = x => Number(String(x || '').slice(0, 8)) >= 20261010;
+  for (const m of ['beat', 'beatcore', 'beatkit']) ok(after10(v(m)), m + ' 가락 버스터 ' + v(m));
+  ok(after10((html.match(/css\/music\.css\?v=([^"]+)"/) || [])[1]), 'css 가락 버스터');
   ok(beat.includes("rowLabel('mel')") && beat.includes('bt-mcell') && beat.includes('가락 주사위') && beat.includes('메아리') && beat.includes("'KeyZ'") && beat.includes('setPalTab') && beat.includes('bt-lead'), '가락 줄 · 붓 상자 · 주사위 · 메아리 · 건반 · 악기');
   ok(kitjs.includes('this.e.note(') && kitjs.includes('_synth(') && kitjs.includes('_daegeum('), '가락 악기 소리');
 });

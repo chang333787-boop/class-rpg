@@ -8,6 +8,7 @@ import { renderStaff } from './notation.js';
 import { coach, ideas } from './coach.js';
 import { fingerSVG, recorderOK } from './recorder.js';
 import { songBad, hidden } from './safety.js';
+import { EX_SONGS, EX_BY } from './showcase.js';   // [MUSIC-SHOWCASE-1]
 
 const NOTE_ICON = { 1: '♪', 2: '♩', 3: '♩.', 4: '𝅗𝅥', 6: '𝅗𝅥.', 8: '𝅝' };
 const MOODS = {
@@ -25,6 +26,7 @@ const BAND = [
 ];
 
 export function mountCompose(root, ctx, { song: init, ref }) {
+  const exKey = init && typeof init.lk === 'string' && init.lk.startsWith('ex_') ? init.lk.slice(3) : null;   // [MUSIC-SHOWCASE-1] 예시 곡에서 열었나
   let song = normalize(init || emptySong());
   if (init && init.lib) { song.title = init.title + ' 바꿔 쓰기'; song.id = null; delete song.lib; delete song.lk; delete song.pub; }
   //  [MUSIC-HALF-1] 처음 음 길이 = 한 칸(2/4 · 3/4 · 4/4 = 반 박 · 겹박자 = 8분음표) — 선생님 10-10 '기본이 1박이면 덜 직관적 · 반 박으로'
@@ -464,7 +466,8 @@ export function mountCompose(root, ctx, { song: init, ref }) {
       if (!player.playing) return;
       const t = engine.now - playStart, step = built.stepAt ? built.stepAt(t) : t / built.stepDur;   // 늘인 끝 두 마디도 소리를 따라감
       if (el && step >= 0) { el.style.display = 'block'; el.style.left = LABEL + step * cellW + 'px'; }
-      grid.querySelectorAll('.c-note').forEach(nel => nel.classList.toggle('now', step >= nel._n.s && step < nel._n.s + nel._n.d));
+      //  [MUSIC-SHOWCASE-1] 화음 칸 음(.c-note.harm)은 _h — 예전엔 _n 만 읽어 화음 칸이 있는 곡을 ▶ 하면 첫 그림에서 TypeError(재생 막대 · 지금 음 빛이 멈춤)
+      grid.querySelectorAll('.c-note').forEach(nel => { const n = nel._n || nel._h; if (n) nel.classList.toggle('now', step >= n.s && step < n.s + n.d); });
       raf = requestAnimationFrame(head);
     };
     raf = requestAnimationFrame(head);
@@ -509,6 +512,17 @@ export function mountCompose(root, ctx, { song: init, ref }) {
 
   renderTools(); renderSide();
   requestAnimationFrame(layout);
+  //  [MUSIC-SHOWCASE-1] 예시 곡 — 작품 노트(어떻게 만들었나 · 해 볼 것) → ▶ 들어 보기
+  const ex = exKey && EX_SONGS.find(x => x.key === exKey);
+  if (ex) setTimeout(() => {
+    if (!root.isConnected) return;
+    modal(`${ex.em} ${ex.title}`, h('div', { class: 'ex-note' },
+      h('p', { class: 'muted' }, `${ex.kind} · 만든 사람: ${EX_BY} · ${song.bars}마디 · 빠르기 ${song.tempo}`),
+      h('h4', {}, '🛠 이렇게 만들었어요'), h('ul', {}, ...ex.notes.map(t => h('li', {}, t))),
+      h('h4', {}, '🙋 이렇게 바꿔 봐요'), h('ul', {}, ...ex.tryIt.map(t => h('li', {}, t))),
+      h('p', { class: 'muted' }, '바꾼 다음 \'저장\'하면 내 곡이 돼요(예시는 그대로 남아요).')),
+      [{ label: '닫기' }, { label: '▶ 들어 보기', primary: true, onclick: c => { c(); togglePlay(true); } }], { wide: true });
+  }, 60);
   const onResize = () => layout();
   addEventListener('resize', onResize);
   // [MUSIC-KEYS-1] 키보드로 작곡 — 리듬 게임과 같은 자리: A S D F J K L ; = 도 레 미 파 솔 라 시 높은 도 (Shift = 한 옥타브 위)
