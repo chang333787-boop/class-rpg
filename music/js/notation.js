@@ -36,8 +36,30 @@ export function splitValue(x, len, sub, bs) {
   return out;
 }
 
-// 소리 사건(겹치지 않는 줄) → 마디별 조각. ev = [{ s, d, ps:[음…], i, w }]
-export function layoutVoice(song, events) {
+//  [MUSIC-SCORE-1] 쉼표 나누기(여러 줄 악보) — 박 사이에서 시작하면 먼저 그 박 끝까지(짧은 쉼표부터) · 박 위에서는 박 단위
+//   (4/4 · 12/8 의 2분 쉼표 · 점2분 쉼표는 1 · 3 박에서만) — 쉼표가 박을 가로지르지 않게. 가락 악보(renderStaff)는 예전 그대로 splitValue
+export function splitRest(x, len, sub, bs) {
+  const out = [], vals = VALUES[sub] || VALUES[2], beats = bs / sub;
+  const pick = v => { const e = vals.find(q => q[0] === v); return e ? { v, base: e[1], dots: e[2] } : null; };
+  while (len > 0) {
+    const inBeat = x % sub;
+    let v;
+    if (inBeat) {
+      const toBeat = Math.min(sub - inBeat, len);
+      v = sub === 3 ? 1 : [4, 2, 1].find(q => q <= toBeat && inBeat % q === 0) || 1;
+    } else if (len >= bs && x % bs === 0 && pick(bs)) v = bs;
+    else if (beats === 4 && x % (2 * sub) === 0 && len >= 2 * sub) v = 2 * sub;
+    else v = Math.min(sub, len);
+    let r = pick(v);
+    if (!r) { v = 1; r = pick(1) || { v: 1, base: sub === 4 ? 's' : 'e', dots: 0 }; }
+    out.push({ x, ...r });
+    x += v; len -= v;
+  }
+  return out;
+}
+
+// 소리 사건(겹치지 않는 줄) → 마디별 조각. ev = [{ s, d, ps:[음…], i, w }] · restFn = 쉼표 나누기(안 주면 예전 splitValue)
+export function layoutVoice(song, events, restFn = splitValue) {
   const bs = barSteps(song), bars = [];
   const evs = [...events].sort((a, z) => a.s - z.s);
   for (let b = 0; b < song.bars; b++) {
@@ -46,12 +68,12 @@ export function layoutVoice(song, events) {
     for (const n of evs.filter(n => n.s < z && n.s + n.d > a)) {
       const s0 = Math.max(n.s, a, cur), s1 = Math.min(n.s + n.d, z);
       if (s1 <= s0) continue;
-      if (s0 > cur) for (const r of splitValue(cur - a, s0 - cur, song.sub, bs)) items.push({ rest: true, ...r });
+      if (s0 > cur) for (const r of restFn(cur - a, s0 - cur, song.sub, bs)) items.push({ rest: true, ...r });
       const parts = splitValue(s0 - a, s1 - s0, song.sub, bs);
       parts.forEach((r, k) => items.push({ ...r, ps: n.ps, i: n.i, w: n.w, first: s0 === n.s && k === 0, tieNext: k < parts.length - 1 || s1 < n.s + n.d, ...(n.hs ? { hs: n.hs } : {}), ...(n.ex ? { ex: n.ex } : {}), ...(n.lab != null ? { lab: n.lab } : {}) }));
       cur = s1;
     }
-    if (cur < z) for (const r of splitValue(cur - a, z - cur, song.sub, bs)) items.push({ rest: true, ...r });
+    if (cur < z) for (const r of restFn(cur - a, z - cur, song.sub, bs)) items.push({ rest: true, ...r });
     bars.push(items);
   }
   return bars;
@@ -325,7 +347,7 @@ export function renderScore(score, o = {}) {
     return Math.max(st.solY || 30, Number.isFinite(lo) ? -lo * 5 + 19 : 0);
   });
   const lay = staves.map(st => st.voices.map((v, k) => {
-    const bars2 = layoutVoice(song, v.events || []);
+    const bars2 = layoutVoice(song, v.events || [], splitRest);
     return bars2.map(items => (items.some(it => !it.rest) ? items : k > 0 ? [] : barRest(items, bs)));
   }));
   //  위아래 자리(맞춤 모드 = 음 범위로 고정 · 음을 놓아도 높이가 안 바뀜)

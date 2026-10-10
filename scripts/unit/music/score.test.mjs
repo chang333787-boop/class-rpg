@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { installFakeDom, serialize } from './fake-svg-dom.mjs';
 installFakeDom();
-const { renderStaff, renderScore, layoutVoice, staffPos, clefPos, ledgerCount, legendStaff } = await import('../../../music/js/notation.js');
+const { renderStaff, renderScore, layoutVoice, splitRest, staffPos, clefPos, ledgerCount, legendStaff } = await import('../../../music/js/notation.js');
 const { librarySongs, libraryOnce, chordify, normalize, emptySong, buildEvents } = await import('../../../music/js/song.js');
 const { scaleRows, barSteps, stepSec, chordName, fitChords } = await import('../../../music/js/theory.js');
 const SC = await import('../../../music/js/score.js');
@@ -71,11 +71,29 @@ await test('한 기둥(같은 때 = 화음) · 겹치면 둘째 음성 · 셋째
   ok(v3.length === 2 && v3.flat().every(x => x.d >= 1), '셋째 겹침 = 앞 음 끊음 ' + JSON.stringify(v3));
 });
 
+await test('쉼표 나누기 — 박을 가로지르지 않음 · 2분 쉼표는 1 · 3박에서만 · 합 = 길이', () => {
+  for (const [beats, sub] of [[2, 2], [3, 2], [4, 2], [4, 4], [4, 3], [3, 3]]) {
+    const bs = beats * sub;
+    for (let x = 0; x < bs; x++) for (let len = 1; x + len <= bs; len++) {
+      const r = splitRest(x, len, sub, bs);
+      ok(r.reduce((a, q) => a + q.v, 0) === len && r[0].x === x, `${beats}/${sub} ${x}+${len} 합`);
+      for (const q of r) {
+        const inBeat = q.x % sub, full = q.v === bs && q.x === 0;
+        ok(full || (inBeat === 0 ? q.v % sub === 0 || q.v < sub : q.x + q.v <= q.x - inBeat + sub), `${beats}/${sub} ${x}+${len} 박 넘음 ${JSON.stringify(q)}`);
+        if (q.v === 2 * sub && !full) ok(beats === 4 && q.x % (2 * sub) === 0, `${beats}/${sub} 2분 쉼표 자리 ${JSON.stringify(q)}`);
+        ok(q.v <= 2 * sub || full, '큰 쉼표는 온마디만');
+      }
+    }
+  }
+  eq(splitRest(3, 5, 2, 8).map(q => [q.x, q.base]), [[3, 'e'], [4, 'h']], '4/4 셋째 8분 뒤 = 8분 쉼표 + 2분 쉼표');
+  eq(splitRest(2, 6, 2, 8).map(q => [q.x, q.base]), [[2, 'q'], [4, 'h']], '둘째 박부터 = 4분 + 2분');
+});
+
 // ── 마디 안 음표 길이 합 = 한 마디(쉼표 포함 · 그려지는 음성마다) ──
 function checkBars(sc, name) {
   const bs = sc.beats * sc.sub, song = { beats: sc.beats, sub: sc.sub, bars: sc.bars, notes: [] };
   for (const st of sc.staves) st.voices.forEach((v, j) => {
-    const lay = layoutVoice(song, v.events);
+    const lay = layoutVoice(song, v.events, splitRest);
     lay.forEach((items, b) => {
       if (j > 0 && !items.some(it => !it.rest)) return;   // 둘째 음성 빈 마디 = 안 그림
       const sum = items.reduce((a, it) => a + it.v, 0);
