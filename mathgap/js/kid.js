@@ -8,7 +8,7 @@ import { parseNum } from './core/math.js';
 import { towerEl, fire, unitName } from './tower.js';
 import {
   todayOf, towerOf, cardOf, dayKey, startScan, finishScan, startFloor, finishFloor, startReview, currentReview, answerReview,
-  addTime, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug,
+  addTime, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
 } from './today.js';
 
 const html = (s) => { const d = document.createElement('div'); d.innerHTML = s; return [...d.childNodes]; };
@@ -74,7 +74,12 @@ export function mountKid(app, ctx) {
             t.stage === 'done' ? h('button', { class: 'kbtn ghost', onclick: () => { addExtra(kid); save(); home(); } }, '5분만 더 할래요') : null,
             !plan[1] ? h('button', { class: 'kbtn green', onclick: backToRPG }, 'RPG로 돌아가기') : null))));
   }
-  const floorLabel = (c) => { const tw = towerOf(cfg.unit, kid), f = tw.all.find((x) => x.c === c); return f ? `${f.base ? '기초' : f.no + '층'} ${f.name}` : byId[c].kid; };
+  const floorLabel = (c) => {
+    const tw = towerOf(cfg.unit, kid), f = tw.all.find((x) => x.c === c);
+    if (f) return `${f.base ? '기초' : f.no + '층'} ${f.name}`;
+    for (const u of Object.keys(kid.scans)) { const g = towerOf(u, kid).all.find((x) => x.c === c); if (g) return `${unitName(u)} 탑 ${g.base ? '기초' : g.no + '층'} ${g.name}`; }
+    return byId[c].kid;
+  };
 
   // ── 하는 법(처음 한 번 · ? 단추) ──
   function howPanels() {
@@ -166,7 +171,9 @@ export function mountKid(app, ctx) {
       onAnswer: async (a) => {
         busy = true;
         const ms = Math.round(performance.now() - shown);
-        if (!a.idk) { const r = q.item.check(a.vals || [], a.raws || []); if (!r.ok) noteBug(kid, q.c, r.bug); }
+        const r0 = a.idk ? { ok: false } : q.item.check(a.vals || [], a.raws || []);
+        if (!r0.ok && !a.idk) noteBug(kid, q.c, r0.bug);
+        logItem(kid, { c: q.c, ok: r0.ok, idk: a.idk, ms, kind: 's', bug: r0.bug });
         answer(S, { ...a, ms, t: Date.now() }); addTime(kid, ms);
         await save();
         busy = false;
@@ -273,6 +280,7 @@ export function mountKid(app, ctx) {
         const ms = Math.round(performance.now() - shown);
         const fb = answerPractice(P, { ...a, ms, t: Date.now() }); addTime(kid, ms);
         if (!fb.ok && !a.idk) noteBug(kid, q.c, fb.bug);
+        logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'p', bug: fb.bug });
         await save();
         busy = false;
         if (P.done) return floorEnd(fb);
@@ -409,6 +417,7 @@ export function mountKid(app, ctx) {
       busy = true;
       const ms = Math.round(performance.now() - shown);
       const fb = answerReview(kid, R, a); addTime(kid, ms);
+      logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'r', bug: fb.bug });
       await save(!!fb.done);
       busy = false;
       const msg = fb.ok ? '맞았어요! 불이 잘 켜져 있어요.' : fb.again ? '아까워요 — 같은 층 문제를 하나 더 볼게요.' : `이 층 불이 꺼졌어요. 다음에 다시 켜요. (답: ${fb.ans})`;

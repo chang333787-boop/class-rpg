@@ -9,6 +9,7 @@
 //  kids/<sid>/days/<날짜> = { ms 푼 시간, n 문제 수, lit 켠 층, review 불 점검 함 }
 //  kids/<sid>/seen     = { intro 하는 법 본 때 }
 //  kids/<sid>/card     = 짧은 요약(RPG 홈 카드 · 선생님 표) — today.js cardOf
+//  log/<sid>/<날짜>/<키> = 문항 한 줄('차시|결과|0.1초|무엇|틀린 모양' · today.js logItem) — kids 와 따로 두어 아이 기록을 열 때 같이 받지 않는다
 //  이름은 저장하지 않는다(학급 DB 는 로그인 없이 읽힌다) — 선생님 화면은 반 명단에서 이름을 붙인다.
 //  JSON 글로 두는 까닭: 세션 안의 빈 배열 · null 이 RTDB 에서 사라져 이어 풀기가 깨지지 않게.
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
@@ -61,6 +62,8 @@ function rtdbStore(fb, sid, name) {
         up[base + 'seen'] = Object.keys(kid.seen).length ? clean(kid.seen) : null;
         up[base + 'days'] = Object.keys(kid.days).length ? clean(kid.days) : null;
       } else if (day) up[base + 'days/' + day] = clean(kid.days[day]);
+      // 쌓인 문항 기록을 한 줄씩(키 = 때 + 두 글자 · 같은 때에 겹치지 않게)
+      for (const q of (kid.logq || []).splice(0)) up[`log/${sid}/${q.day}/${q.t.toString(36)}${Math.random().toString(36).slice(2, 4)}`] = q.line;
       await root.update(up);
     },
     // ── 선생님 ──
@@ -86,6 +89,7 @@ function localStore(sid, name) {
     async kid(id = sid) { return kidFrom(load().kids[id]); },
     async save(kid, { card = null } = {}) {
       const d = load();
+      d.log = (d.log || []).concat((kid.logq || []).splice(0).map((q) => q.line)).slice(-300);
       d.kids[sid] = { st: JSON.stringify(kid.states), scans: JSON.stringify(kid.scans), marks: JSON.stringify(kid.marks), rev: JSON.stringify(kid.rev), bugs: JSON.stringify(kid.bugs), run: kid.run ? JSON.stringify(kid.run) : null, days: kid.days, seen: kid.seen, card: card || (d.kids[sid] || {}).card || null };
       lsSet(KEY, d);
     },

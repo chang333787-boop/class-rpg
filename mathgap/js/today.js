@@ -7,6 +7,8 @@
 //   · Math Academy 간격 복습: 켠 층마다 1 → 3 → 7 → 14 → 30일 뒤 점검 · '포함' 복습: 위층을 맞히면 그 아래 켜진 층은 복습한 셈(점검 날을 뒤로)
 //   · Math Academy · ALEKS 예제 먼저: 층에 불을 켜기 전 같은 단계로 푼 예제 하나(exampleOf)
 //   · Eedi 오답 모으기: 아이가 낸 틀린 모양을 차시별로 센다(noteBug) — 선생님 화면 '자주 나온 실수'
+//   · 지난 단원도 잊지 않게: 예전 탑에서 켠 층도 점검 날이 되면 몸풀기에 섞는다(지금 탑이 먼저) · 두 번 틀려 꺼지면 지금 탑의 기초 층으로
+//  문항 기록(logItem → 저장소 log/<sid>/<날짜>): 차시 · 맞음/틀림 · 걸린 시간 · 틀린 모양 — 효과 확인과 실수 판정 모형을 실제 기록으로 맞추기 위해(이름 없음)
 //  아이 기록(kid) = { states, scans: { 단원: 요약 }, marks: { 차시: 'teacher' }, rev: { 차시: { i 간격 단계, due 점검 날(ms) } },
 //                     bugs: { '차시|오답 이름': 수 }, run: 하던 것 | null, days: { 날짜: { ms, n, lit, review, extra } }, seen: { intro } }
 import { byId, lessonsOfUnit, sortByGrade, makeItem, corePre } from './core/lessons/index.js';
@@ -45,12 +47,19 @@ function schedule(kid, c, i, now) { const k = Math.max(0, Math.min(REVIEW_DAYS.l
 const ancestorsOf = (c) => { const seen = new Set(), st = [c]; while (st.length) for (const y of corePre(st.pop())) if (!seen.has(y)) { seen.add(y); st.push(y); } return seen; };
 // 위층을 맞히면 그 아래 켜진 층도 복습한 셈 — 점검 날을 그 단계 간격만큼 뒤로(단계는 올리지 않음)
 function creditBelow(kid, unit, c, now) {
-  const lit = new Set(towerOf(unit, kid).all.filter((f) => f.st === 'lit').map((f) => f.c));
-  for (const a of ancestorsOf(c)) { const r = kid.rev[a]; if (lit.has(a) && r) r.due = Math.max(r.due, dayStart(now) + REVIEW_DAYS[r.i] * DAY); }
+  for (const a of ancestorsOf(c)) { const r = kid.rev[a]; if (r && isLit(kid, a)) r.due = Math.max(r.due, dayStart(now) + REVIEW_DAYS[r.i] * DAY); }
 }
-// 오늘 점검할 켠 층 — 점검 날이 지난 것부터(오래 밀린 순)
+// 오늘 점검할 켠 층 — 지금 탑에서 점검 날이 지난 것(오래 밀린 순) 다음에 예전 탑의 것(old: 그 탑 단원)
 export function dueFloors(kid, unit, now = Date.now()) {
-  return towerOf(unit, kid).all.filter((f) => f.st === 'lit' && kid.rev[f.c] && kid.rev[f.c].due <= dayStart(now)).sort((a, b) => kid.rev[a.c].due - kid.rev[b.c].due);
+  const due = (f) => f.st === 'lit' && kid.rev[f.c] && kid.rev[f.c].due <= dayStart(now);
+  const byDue = (a, b) => kid.rev[a.c].due - kid.rev[b.c].due;
+  const here = towerOf(unit, kid).all.filter(due).sort(byDue), seen = new Set(here.map((f) => f.c));
+  const old = [];
+  for (const u of Object.keys(kid.scans)) {
+    if (u === unit || !lessonsOfUnit(u).length) continue;
+    for (const f of towerOf(u, kid).all) if (due(f) && !seen.has(f.c)) { seen.add(f.c); old.push({ ...f, old: u }); }
+  }
+  return [...here, ...old.sort(byDue)];
 }
 
 // ── 오늘 할 일 ──
@@ -150,11 +159,24 @@ export function answerReview(kid, R, a, now = Date.now()) {
     R.todo.shift(); R.out.push({ c, ok: false });
     kid.states[c] = { ...(kid.states[c] || {}), s: 'unstable', t: now };
     delete kid.rev[c];
+    // 예전 탑의 층이면 지금 탑의 기초 층으로 데려와 다시 켠다
+    const sc = R.unit && kid.scans[R.unit];
+    if (sc && !towerOf(R.unit, kid).all.some((f) => f.c === c)) sc.base = sortByGrade([...new Set([...(sc.base || []), c])]).slice(0, 6);
   } else R.miss[c] = 1;            // 한 번 틀림 → 같은 층 새 숫자로 한 번 더
   if (!res.ok && !a.idk) noteBug(kid, c, res.bug);
   nextReview(R);
   if (R.done) endReview(kid, now);
   return { ok: !!res.ok, bug: res.bug || null, ans: q.item.ans, c, again: !res.ok && !!R.cur && R.cur.c === c, done: R.done, out: R.out };
+}
+
+// ── 문항 기록 — 한 줄 글 '차시|결과|걸린 0.1초|무엇|틀린 모양' (결과 1 맞음 · 0 틀림 · 2 모르겠어요 · 무엇 s 살펴보기 · p 연습 · r 점검) ──
+//  저장소가 날짜별로 따로 쌓는다(아이 기록을 열 때 같이 받지 않게) · 하루 400줄까지
+export function logItem(kid, { c, ok, idk, ms, kind, bug }, now = Date.now()) {
+  if (!byId[c]) return null;
+  const line = [c, idk ? 2 : ok ? 1 : 0, Math.round(Math.min(ms || 0, 600000) / 100), kind || '', bug && bug.name ? String(bug.name).slice(0, 40).replace(/\|/g, '/') : ''].join('|');
+  const k = dayKey(now), L = (kid.logq = kid.logq || []);
+  if (L.length < 400) L.push({ day: k, t: now, line });
+  return line;
 }
 
 // ── 틀린 모양 모으기(선생님 화면 '자주 나온 실수') — 많이 나온 40가지만 둔다 ──

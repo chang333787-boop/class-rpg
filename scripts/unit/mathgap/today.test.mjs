@@ -8,12 +8,13 @@
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
 import { blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
-  currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey } from '../../../mathgap/js/today.js';
-import { kidFrom } from '../../../mathgap/js/store.js';
+  currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem } from '../../../mathgap/js/today.js';
+import { kidFrom, createStore } from '../../../mathgap/js/store.js';
 import { rng } from '../../../mathgap/js/core/math.js';
 
 const results = [];
-const test = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.stack.split('\n').slice(0, 3).join(' | ')]); } };
+const pending = [];
+const test = (name, fn) => { const fail = (e) => results.push(['FAIL', name, e.stack.split('\n').slice(0, 3).join(' | ')]); try { const r = fn(); if (r && typeof r.then === 'function') pending.push(r.then(() => results.push(['PASS', name]), fail)); else results.push(['PASS', name]); } catch (e) { fail(e); } };
 const ok = (c, m) => { if (!c) throw new Error(m); };
 const R = rng(11);
 const DAY = 864e5, T0 = new Date(2026, 9, 12, 9, 0).getTime();
@@ -182,6 +183,56 @@ test('카드 요약 — 어느 단계에서도 빈 값(undefined)이 없다(RTDB
   ok(seen.has('review:이어서') && seen.has('scan:이어서') && seen.has('prac:이어서'), '확인 못 한 단계 ' + [...seen]);
 });
 
+test('지난 단원도 잊지 않게 — 단원이 바뀌어도 예전 탑의 켠 층이 점검에 섞이고(지금 탑 먼저), 꺼지면 지금 탑의 기초 층으로', () => {
+  const A = { unit: '4-2-1' }, B = { unit: '4-2-3' };
+  const m = kidModel(new Set(), { slip: 0 });
+  let kid = playDay(blankKid(), m, A, T0).kid;                       // 4-2 분수 탑을 다 켬
+  kid = playDay(kid, m, B, T0 + DAY).kid;                            // 선생님이 4-2 소수로 바꿈
+  ok(towerOf(B.unit, kid).scanned, '새 단원 살펴보기');
+  const late = T0 + 40 * DAY;
+  const due = dueFloors(kid, B.unit, late);
+  const firstOld = due.findIndex((f) => f.old);
+  ok(firstOld > 0 && due.slice(0, firstOld).every((f) => !f.old) && due.slice(firstOld).every((f) => f.old === A.unit), '지금 탑 먼저 · 예전 탑 다음이 아님 ' + due.map((f) => (f.old ? 'old' : 'now')).join(','));
+  // 지금 탑 점검 표를 미래로 미뤄 예전 탑만 남기고 → 예전 층 하나를 두 번 틀림
+  for (const f of towerOf(B.unit, kid).all) if (kid.rev[f.c]) kid.rev[f.c].due = late + 9 * DAY;
+  const target = dueFloors(kid, B.unit, late)[0].c;
+  const R = startReview(kid, B.unit, 'xr', late);
+  while (!R.done) { const q = currentReview(R); answerReview(kid, R, q.c === target ? { idk: true } : { vals: q.item.sol.map(Number), raws: q.item.sol.map(String) }, late); }
+  const tw = towerOf(B.unit, kid);
+  ok(tw.base.some((f) => f.c === target) && tw.next && tw.next.c === target, `꺼진 예전 층이 지금 탑 기초로 안 옴 ${target} · 기초 ${tw.base.map((f) => f.c)} · 다음 ${tw.next && tw.next.c}`);
+});
+
+test('문항 기록 — 한 줄 글 · 하루 400줄까지 · 저장소는 log/<번호>/<날짜>/ 에 따로 쓰고 아이 기록 자리엔 안 섞는다 · 빈 값 0', async () => {
+  const kid = blankKid();
+  const line = logItem(kid, { c: '4-2-1:3', ok: false, ms: 12345, kind: 'p', bug: { name: '분모끼리도 더함' } }, T0);
+  ok(line === '4-2-1:3|0|123|p|분모끼리도 더함', line);
+  ok(logItem(kid, { c: '없는차시', ok: true }) === null, '없는 차시를 적음');
+  for (let i = 0; i < 500; i++) logItem(kid, { c: '4-2-1:2', ok: true, ms: 1000, kind: 's' }, T0);
+  ok(kid.logq.length === 400, '줄 수 ' + kid.logq.length);
+});
+
+test('저장소 쓰기 — 가짜 Firebase 로 경로와 값을 본다(문항 기록은 log/ 에 · 쓴 뒤 줄이 비워짐 · undefined 0)', () => {
+  const writes = [];
+  const ref = (path) => ({ path, child: (c) => ref(path + '/' + c), update: async (up) => { writes.push({ path, up }); }, set: async (v) => { writes.push({ path, up: { '': v } }); }, once: async () => ({ val: () => null }) });
+  const fb = { apps: [1], initializeApp() {}, database: () => ({ ref }) };
+  const st = createStore({ sid: 's7', name: '', fb });
+  const kid = withPracticeLit('4-2-1:3');
+  logItem(kid, { c: '4-2-1:3', ok: true, ms: 3000, kind: 'p' }, T0); logItem(kid, { c: '4-2-1:2', ok: false, ms: 9000, kind: 'r', bug: { name: 'x|y' } }, T0);
+  kid.days[dayKey(T0)].oops = undefined;
+  return st.save(kid, { full: true, card: { a: 1, b: undefined } }).then(() => {
+    const up = writes[0].up, keys = Object.keys(up);
+    ok(writes[0].path === 'classRPG_mathgap', '루트 ' + writes[0].path);
+    const logs = keys.filter((k) => k.startsWith('log/s7/' + dayKey(T0) + '/'));
+    ok(logs.length === 2 && logs.every((k) => /^log\/s7\/\d{4}-\d\d-\d\d\/[0-9a-z]+$/.test(k)), '기록 경로 ' + keys.filter((k) => k.startsWith('log')).join(','));
+    ok(Object.values(up).includes('4-2-1:2|0|90|r|x/y'), '기록 줄 ' + logs.map((k) => up[k]));
+    ok(!keys.some((k) => k.startsWith('kids/s7/log')), '아이 기록 자리에 기록이 섞임');
+    const holes = (o) => (o === undefined ? 1 : o && typeof o === 'object' ? Object.values(o).reduce((a, v) => a + holes(v), 0) : 0);
+    ok(holes(up) === 0, 'undefined 가 남음');
+    ok(typeof up['kids/s7/st'] === 'string' && typeof up['kids/s7/rev'] === 'string', '상태 · 점검 표가 글이 아님');
+    ok(kid.logq.length === 0, '쓴 뒤 줄이 안 비워짐');
+  });
+});
+
 test('불씨 규칙 — 5개 · 틀리면 하나 꺼짐', () => ok(RULE.streak === 5, 'RULE.streak ' + RULE.streak));
 
 // 연습으로 켠 층 하나를 가진 아이를 만든다(살펴보기 뒤 c 층만 연습으로 켬)
@@ -282,6 +333,7 @@ test('모든 단원 — 살펴보기와 연습이 오류 없이 돈다', () => {
   ok(n >= 35, '단원 수 ' + n);
 });
 
+await Promise.all(pending);
 const fails = results.filter((r) => r[0] === 'FAIL');
 for (const r of fails) console.log('FAIL', r[1], r[2] || '');
 console.log(`오늘의 수학 하루 흐름 시험 — PASS ${results.length - fails.length} · FAIL ${fails.length}`);
