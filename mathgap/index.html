@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>오늘의 수학</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../common/subapp.css?v=20261005ro1">
+  <link rel="stylesheet" href="css/mathgap.css?v=1">
+  <!-- 학급 RPG 안(?sid=)에서는 RPG 와 같은 Firebase(compat 9.23)의 classRPG_mathgap 에 저장 -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- 캐시: 모듈마다 ?v= 대신 여기 한 곳(import map)에서 판 번호를 올린다 · js/core 는 수학 빈칸 찾기에서 옮긴 것(통째로 바꾸면 core 줄을 모두 올린다) -->
+  <script type="importmap">{ "imports": {
+    "./js/app.js": "./js/app.js?v=1",
+    "./js/core/concepts/dec.js": "./js/core/concepts/dec.js?v=1",
+    "./js/core/concepts/div.js": "./js/core/concepts/div.js?v=1",
+    "./js/core/concepts/frac.js": "./js/core/concepts/frac.js?v=1",
+    "./js/core/concepts/index.js": "./js/core/concepts/index.js?v=1",
+    "./js/core/concepts/kit.js": "./js/core/concepts/kit.js?v=1",
+    "./js/core/concepts/mul.js": "./js/core/concepts/mul.js?v=1",
+    "./js/core/concepts/num.js": "./js/core/concepts/num.js?v=1",
+    "./js/core/concepts/ratio.js": "./js/core/concepts/ratio.js?v=1",
+    "./js/core/engine.js": "./js/core/engine.js?v=1",
+    "./js/core/lessons/catalog.js": "./js/core/lessons/catalog.js?v=1",
+    "./js/core/lessons/g1.js": "./js/core/lessons/g1.js?v=1",
+    "./js/core/lessons/g2.js": "./js/core/lessons/g2.js?v=1",
+    "./js/core/lessons/g3.js": "./js/core/lessons/g3.js?v=1",
+    "./js/core/lessons/g4.js": "./js/core/lessons/g4.js?v=1",
+    "./js/core/lessons/g5.js": "./js/core/lessons/g5.js?v=1",
+    "./js/core/lessons/g6.js": "./js/core/lessons/g6.js?v=1",
+    "./js/core/lessons/index.js": "./js/core/lessons/index.js?v=1",
+    "./js/core/lessons/ops.js": "./js/core/lessons/ops.js?v=1",
+    "./js/core/lessons/read.js": "./js/core/lessons/read.js?v=1",
+    "./js/core/math.js": "./js/core/math.js?v=1",
+    "./js/core/parse.js": "./js/core/parse.js?v=1",
+    "./js/core/practice.js": "./js/core/practice.js?v=1",
+    "./js/core/tokens.js": "./js/core/tokens.js?v=1",
+    "./js/kid.js": "./js/kid.js?v=1",
+    "./js/store.js": "./js/store.js?v=1",
+    "./js/teacher.js": "./js/teacher.js?v=1",
+    "./js/today.js": "./js/today.js?v=1",
+    "./js/tower.js": "./js/tower.js?v=1",
+    "./js/util.js": "./js/util.js?v=1",
+    "../common/util.js": "../common/util.js?v=20261004r5a",
+    "../common/rpg-firebase.js": "../common/rpg-firebase.js?v=20261004r5a",
+    "../common/teacher-gate.js": "../common/teacher-gate.js?v=20261004r5a",
+    "../common/roster.js": "../common/roster.js?v=20261005ro1" } }</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>

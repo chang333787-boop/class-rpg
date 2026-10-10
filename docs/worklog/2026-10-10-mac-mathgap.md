@@ -1,0 +1,19 @@
+# 2026-10-10 (기기: 맥북) — 오늘의 수학(mathgap/) 1단계: 새 학습 앱 폴더만
+
+> 사용자 지시: "rpg의 학습과 합쳐야될거같은데" · "별개로 해도되고 내가 단원을 정해줘도됨" · "애들이볼때는 애들용으로 · 디자인부터" · "처음보는 사람들에게도 직관적으로" · "너추천대로해".
+> 설계 = docs/mathgap_design.md · 디자인 시안 = 아티팩트 '오늘의 수학 — 아이 화면'.
+
+## ① 한 것 (브랜치 feat/mathgap · 기존 파일은 가짜 RTDB 앱 목록 한 줄만)
+- `mathgap/` 새 학습 앱 — 아이: 하는 법 → 탑 살펴보기(단원 점검) → 불 꺼진 층 연습(불씨 5개 · 틀리면 하나 꺼짐 · 같이 풀기) → 불 점검 · 하루 10분 / 선생님: 단원 열기 · 우리 반 탑 · 수업 추천 · 아이별
+- 저장 classRPG_mathgap(이름 없음 · JSON 글) · 시험 scripts/unit/mathgap/(today 8 · core 2)
+- `scripts/unit/fake-rtdb/server.mjs` 바로 가기 목록에 mathgap
+
+- (같은 날 이어서) 참고 프로그램에서 가져옴 — 예제 먼저(Math Academy · ALEKS) · 간격 복습 + '포함' 복습(Math Academy) · 틀린 모양 모으기(Eedi) · 새 화면 0개. 가짜 RTDB 로 고친 버그: 불 점검을 이어서 할 때 카드 칸이 undefined 라 RTDB 가 그날 쓰기를 모두 거절 → 저장 전 거르기 + 시험.
+- 시험: today 15 · core 2.
+
+## ② 기준 숫자
+precheck --no-deco PASS 41 · REVIEW 1(save-order 기준선 11 그대로) · FAIL 0 · SKIP 1 (시작 때 39 + 새 시험 2) · 가짜 RTDB 로 선생님 단원 열기 → 하늘 살펴보기 → 선생님 표 확인 · 운영 주소 요청 0
+
+## ③ 🤝 핸드오프 · 다음
+- 2단계(student.js 카드 · externalStudyItems · admin LEARN_APPS · 백업 루트)는 **사용자 확인 뒤**. student.js 는 여러 세션이 고치므로 그때 main 을 다시 받는다.
+- 학생 화면에 닿는 머지는 16시 뒤.
