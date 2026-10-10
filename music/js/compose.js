@@ -1,5 +1,5 @@
 // 작곡 — 칸을 눌러 음을 놓고(음 길이를 골라서), 반주 친구와 함께 들어 보고, 악보·운지로 확인하고, 저장한다.
-import { h, toast, modal, clamp } from './util.js';
+import { h, toast, modal, clamp, lsGet, lsSet } from './util.js';
 import { SCALES, METERS, solfege, colorOf, scaleRows, barSteps, totalSteps, lengthChoices, valueName, beatsText, fitChords, chordName, ROMAN, pc } from './theory.js';
 import { emptySong, normalize, placeNote, removeNote, buildEvents, INSTS, DRUMS, placeHarm, removeHarm, chordify } from './song.js';
 import { engine, Player } from './audio.js';
@@ -9,6 +9,7 @@ import { coach, ideas } from './coach.js';
 import { fingerSVG, recorderOK } from './recorder.js';
 import { songBad, hidden } from './safety.js';
 import { EX_SONGS, EX_BY } from './showcase.js';   // [MUSIC-SHOWCASE-1]
+import { scoreStrip, scoreTabs } from './scoreview.js';   // [MUSIC-SCORE-1] 악보 같이 보기 띠 · 오케스트라 총보
 
 const NOTE_ICON = { 1: '♪', 2: '♩', 3: '♩.', 4: '𝅗𝅥', 6: '𝅗𝅥.', 8: '𝅝' };
 const MOODS = {
@@ -54,7 +55,11 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   const tools = h('div', { class: 'c-tools' });
   const chordRow = h('div', { class: 'c-chords' });
   const grid = h('div', { class: 'c-grid', role: 'grid', 'aria-label': '작곡 칸' });
-  const gridWrap = h('div', { class: 'c-gridwrap' }, chordRow, grid);
+  //  [MUSIC-SCORE-1] 칸 바로 아래 오선 띠(칸과 같이 가로로 밀림) — '🎼 악보 같이 보기'로 켜고 끔(이 기기에 기억 · 처음엔 켬)
+  const strip = scoreStrip(), SCORE_LS = 'music.compose.score';
+  let scoreOn = lsGet(SCORE_LS, true) !== false, stripH = -1, stripRaf = 0;
+  strip.el.style.display = scoreOn ? '' : 'none';
+  const gridWrap = h('div', { class: 'c-gridwrap' }, chordRow, grid, strip.el);
   const lyric = h('input', { class: 'c-lyric', placeholder: '노랫말을 쓰면 음표에 한 글자씩 붙어요 (예: 나비야나비야)', maxlength: 120, oninput: () => applyLyrics() });
   const lyricRow = h('div', { class: 'c-lyricrow' }, h('b', {}, '노랫말'), lyric, h('span', { class: 'muted c-lyrichint' }));
   const coachBox = h('div', { class: 'c-coach' });
@@ -81,6 +86,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
       layer === 'mel' ? h('button', { class: 'btn small' + (lyricsOn ? ' on' : ''), onclick: () => { lyricsOn = !lyricsOn; renderTools(); layout(); } }, '노랫말') : null,
       h('button', { class: 'btn small', title: '키보드로 작곡하는 법', onclick: () => showKeys() }, '⌨ 키보드'),
       h('button', { class: 'btn small', onclick: () => showStaff() }, '악보 보기'),
+      h('button', { class: 'btn small c-scorebtn' + (scoreOn ? ' on' : ''), 'aria-pressed': String(scoreOn), title: '칸 아래에 오선 악보를 같이 보여 줘요 — 음을 놓으면 바로 음표가 돼요', onclick: () => toggleScore() }, '🎼 악보 같이 보기'),
       layer === 'mel' ? h('button', { class: 'btn small', onclick: () => showFingers() }, '리코더 운지') : null,
       layer === 'mel' ? h('button', { class: 'btn small', onclick: () => { if (!song.notes.length) return; modal('모두 지울까요?', '놓은 음을 전부 지워요.', [{ label: '그만두기' }, { label: '모두 지우기', primary: true, onclick: c => { song.notes = []; dirty = true; c(); renderGrid(); } }]); } }, '다 지우기') : null,
     ].filter(Boolean));
@@ -105,11 +111,26 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   function layout() {
     rows = scaleRows(song.scale, [...song.notes, ...song.harm]).reverse();      // 위가 높은 음
     lyricRow.style.display = lyricsOn ? '' : 'none';
-    const avW = Math.max(400, main.clientWidth - 8), avH = Math.max(200, root.clientHeight - 50 - 46 - 34 - (lyricsOn ? 44 : 0) - 74);
     const steps = totalSteps(song);
-    cellW = clamp(Math.floor((avW - LABEL) / steps), 16, 46);
+    cellW = clamp(Math.floor((Math.max(400, main.clientWidth - 8) - LABEL) / steps), 16, 46);
+    stripH = scoreOn ? strip.render(song, stripGeom()) + 6 : 0;   // [MUSIC-SCORE-1] 띠 높이만큼 칸 줄을 낮춘다(음 범위로 정해져 음을 놓아도 그대로)
+    const avH = Math.max(scoreOn ? rows.length * 22 : 200, root.clientHeight - 50 - 46 - 34 - (lyricsOn ? 44 : 0) - 74 - stripH);
     rowH = clamp(Math.floor(avH / rows.length), 22, 40);
     renderGrid();
+  }
+  //  [MUSIC-SCORE-1] 악보 같이 보기 — 칸과 같은 가로 자리(이름 칸 · 한 칸 너비) · 음 범위(칸 줄의 가장 낮은 음 ~ 가장 높은 음)
+  const stripGeom = () => ({ left: LABEL, stepW: cellW, rows: [rows[rows.length - 1], rows[0]] });
+  function stripNow() {
+    if (!scoreOn || !rows.length) return;
+    const hh = strip.render(song, stripGeom()) + 6;
+    if (hh !== stripH) requestAnimationFrame(layout);   // 화음 칸을 처음 놓거나 다 지우면 오선이 늘고 줄어 → 칸 줄 높이를 다시
+  }
+  const stripSoon = () => { if (scoreOn && !stripRaf) stripRaf = requestAnimationFrame(() => { stripRaf = 0; stripNow(); }); };   // 끌어 늘이는 동안(한 그림에 한 번)
+  function toggleScore() {
+    scoreOn = !scoreOn; lsSet(SCORE_LS, scoreOn);
+    strip.el.style.display = scoreOn ? '' : 'none';
+    if (!scoreOn) strip.highlight(null);
+    renderTools(); layout();
   }
 
   function renderGrid() {
@@ -160,6 +181,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
       }));
     renderCoach();
     if (lyricsOn) syncLyricInput();
+    stripNow();   // [MUSIC-SCORE-1]
   }
 
   // ── 칸 누르기 · 길이 늘이기 ──
@@ -206,7 +228,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
       const barEnd = (Math.floor(n.s / bs) + 1) * bs;
       const next = song.harm.filter(x => x.s > n.s).sort((a, z) => a.s - z.s)[0];
       const d = clamp(step - n.s + 1, 1, Math.min(barEnd, next ? next.s : Infinity) - n.s);
-      if (d !== n.d) { for (const x of song.harm) if (x.s === n.s) x.d = d; dirty = true; grid.querySelectorAll('.c-note.harm').forEach(el => { if (el._h.s === n.s) el.style.width = d * cellW - 2 + 'px'; }); }
+      if (d !== n.d) { for (const x of song.harm) if (x.s === n.s) x.d = d; dirty = true; grid.querySelectorAll('.c-note.harm').forEach(el => { if (el._h.s === n.s) el.style.width = d * cellW - 2 + 'px'; }); stripSoon(); }
       return;
     }
     if (!drag || drag.kind !== 'resize') return;
@@ -215,7 +237,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     const next = song.notes.filter(x => x.s > n.s).sort((a, z) => a.s - z.s)[0];
     const lim = Math.min(barEnd, next ? next.s : Infinity);
     const d = clamp(step - n.s + 1, 1, lim - n.s);
-    if (d !== n.d) { n.d = d; drag.el.style.width = d * cellW - 2 + 'px'; dirty = true; }
+    if (d !== n.d) { n.d = d; drag.el.style.width = d * cellW - 2 + 'px'; dirty = true; stripSoon(); }
   });
   grid.addEventListener('pointerup', e => {
     if (!drag) return;
@@ -430,13 +452,16 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   function showStaff() {
     const w = Math.min(1060, innerWidth - 80);
     const { el } = renderStaff(song, { width: w - 10 });
-    modal(song.title || '내 곡', h('div', { class: 'staff-wrap' }, el, h('p', { class: 'muted', style: { marginTop: '8px' } }, `음 아래 색 글자 = 계이름(다장조) · 위 빨간 글자 = 화음 · ${valueName(L, song.sub) ? '음 길이는 칸 수대로 음표가 돼요' : ''}`)),
-      [{ label: '인쇄', onclick: () => printStaff(el) }, { label: '닫기', primary: true }], { wide: true });
+    const note = h('p', { class: 'muted', style: { marginTop: '8px' } }, `음 아래 색 글자 = 계이름(다장조) · 위 빨간 글자 = 화음 · ${valueName(L, song.sub) ? '음 길이는 칸 수대로 음표가 돼요' : ''}`);
+    //  [MUSIC-SCORE-1] 오케스트라가 켜져 있으면 '가락 악보 | 오케스트라 총보' 두 칸 — 인쇄는 보고 있는 칸
+    const tabs = orchOn(song) ? scoreTabs(song, el, w - 10, note) : null;
+    modal(song.title || '내 곡', tabs ? tabs.body : h('div', { class: 'staff-wrap' }, el, note),
+      [{ label: '인쇄', onclick: () => printStaff(tabs ? tabs.current() : el) }, { label: '닫기', primary: true }], { wide: true });
   }
   function printStaff(el) {
     const w = window.open('', '_blank');
     if (!w) { toast('새 창이 막혀 있어요'); return; }
-    w.document.write(`<!doctype html><meta charset="utf-8"><title>${(song.title || '내 곡').replace(/</g, '')}</title><link rel="stylesheet" href="${new URL('css/music.css', location.href)}"><style>body{background:#fff;color:#000;overflow:auto;padding:24px}h1{font:900 22px 'Noto Sans KR',sans-serif;margin-bottom:12px}</style><h1></h1>`);
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>${(song.title || '내 곡').replace(/</g, '')}</title><link rel="stylesheet" href="${(document.querySelector('link[href*="music.css"]') || {}).href || new URL('css/music.css', location.href)}"><style>body{background:#fff;color:#000;overflow:auto;padding:24px}h1{font:900 22px 'Noto Sans KR',sans-serif;margin-bottom:12px}</style><h1></h1>`);
     w.document.querySelector('h1').textContent = (song.title || '내 곡') + (ctx.store.me.name ? ' — ' + ctx.store.me.name : '');
     w.document.body.append(w.document.importNode(el, true));
     setTimeout(() => w.print(), 400);
@@ -468,6 +493,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
       if (el && step >= 0) { el.style.display = 'block'; el.style.left = LABEL + step * cellW + 'px'; }
       //  [MUSIC-SHOWCASE-1] 화음 칸 음(.c-note.harm)은 _h — 예전엔 _n 만 읽어 화음 칸이 있는 곡을 ▶ 하면 첫 그림에서 TypeError(재생 막대 · 지금 음 빛이 멈춤)
       grid.querySelectorAll('.c-note').forEach(nel => { const n = nel._n || nel._h; if (n) nel.classList.toggle('now', step >= n.s && step < n.s + n.d); });
+      if (scoreOn) strip.highlight(step);   // [MUSIC-SCORE-1] 악보 띠도 울리는 음이 빛남
       raf = requestAnimationFrame(head);
     };
     raf = requestAnimationFrame(head);
@@ -476,6 +502,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     cancelAnimationFrame(raf); playBtn.textContent = '▶ 들어 보기';
     const el = grid.querySelector('#c-head'); if (el) el.style.display = 'none';
     grid.querySelectorAll('.c-note.now').forEach(n => n.classList.remove('now'));
+    strip.highlight(null);
   }
 
   // ── 저장 ──

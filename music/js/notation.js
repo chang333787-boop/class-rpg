@@ -313,7 +313,7 @@ export function renderScore(score, o = {}) {
   //  칸마다(음성마다) 마디별 조각 — 두째 음성은 음이 없는 마디를 비운다(쉼표 숨김)
   const lay = staves.map(st => st.voices.map((v, k) => {
     const bars2 = layoutVoice(song, v.events || []);
-    return bars2.map(items => (k > 0 && !items.some(it => !it.rest) ? [] : k === 0 && st.voices.length > 1 && !items.some(it => !it.rest) && st.voices.slice(1).some(v2 => (v2.events || []).length) ? items : barRest(items, bs)));
+    return bars2.map(items => (items.some(it => !it.rest) ? items : k > 0 ? [] : barRest(items, bs)));
   }));
   //  위아래 자리(맞춤 모드 = 음 범위로 고정 · 음을 놓아도 높이가 안 바뀜)
   const ext = staves.map((st, k) => {
@@ -337,7 +337,7 @@ export function renderScore(score, o = {}) {
   const sysH = L => (marksAt(L) ? 20 : 0) + (hasChords ? (hasKo ? 30 : 18) : 0) + ext.reduce((a, e) => a + e.above + 40 + e.below, 0) + (staves.length - 1) * (A ? 4 : 8) + 10;
   const tops = []; let H = 6;
   for (let L = 0; L < lines; L++) { tops.push(H); H += sysH(L) + (A ? 0 : 12); }
-  const totalW = A ? A.left + bars * bs * A.stepW + 8 : W;
+  const totalW = A ? A.left + bars * bs * A.stepW + 2 : W;
   const root = svg('svg', { viewBox: `0 0 ${totalW} ${H}`, width: totalW, height: H, class: 'staff score' + (o.cls ? ' ' + o.cls : '') });
   const noteEls = new Map(), xs = new Map();
   const addEl = (i, el) => { if (!noteEls.has(i)) noteEls.set(i, []); noteEls.get(i).push(el); };
@@ -390,7 +390,7 @@ export function renderScore(score, o = {}) {
       staves.forEach((st, k) => {
         const top = staffTop[k], y1 = st.clef === 'perc1' ? top + 12 : top, y2 = st.clef === 'perc1' ? top + 28 : top + 40;
         const repEnd = rep && b === rep.to, repStart = rep && b === rep.from && !A;
-        if (repEnd || (lastBar && !A)) {
+        if (repEnd || lastBar) {
           root.append(svg('line', { x1: ex - 6, x2: ex - 6, y1, y2, class: 'st-bar' }));
           root.append(svg('line', { x1: ex - 1.5, x2: ex - 1.5, y1, y2, class: 'st-bar end' }));
           if (repEnd) for (const dy of [15, 25]) root.append(svg('circle', { cx: ex - 12, cy: top + dy, r: 2.3, class: 'st-dot' }));
@@ -426,12 +426,13 @@ export function renderScore(score, o = {}) {
     }
     //  음표 — 칸마다 · 음성마다 · 마디마다(가락 악보와 같은 붓)
     staves.forEach((st, k) => {
-      const P = posFn(st), top = staffTop[k];
+      const P = posFn(st), top = staffTop[k], sg = svg('g', { class: 'st-staff', 'data-staff': st.id || String(k) });
+      root.append(sg);
       st.voices.forEach((v, j) => {
         for (let b = b0; b < b1; b++) {
           const items = lay[k][j][b];
           if (!items || !items.length) continue;
-          drawBar(root, items, top, it => X(b, it.x), { song, words: st.words ? st.words : false, addEl, ties, o: { solfege: true, lyrics: false }, carry: carries[k][j],
+          drawBar(sg, items, top, it => X(b, it.x), { song, words: st.words ? st.words : false, addEl, ties, o: { solfege: true, lyrics: false }, carry: carries[k][j],
             posOf: P, stem: v.stem, acc: !isPerc(st.clef), unison: isPerc(st.clef), restDy: v.restDy || 0, solY: st.solY || 30 });
         }
       });
@@ -463,4 +464,19 @@ function drawClef(root, st, x, top) {
     const t = String(Math.abs(st.oct) === 2 ? 15 : 8), above = st.oct > 0;
     root.append(svg('text', { x: x + (st.clef === 'bass' ? 11 : 13), y: above ? top - (st.clef === 'bass' ? 3 : 9) : top + (st.clef === 'bass' ? 34 : 54), 'text-anchor': 'middle', class: 'st-oct' }, t));
   }
+}
+//  안내용 작은 오선 — 칸판 줄 하나가 악보 어디에 적히나(북 자리 · 머리 · 기둥 방향 / 음자리표만)
+export function legendStaff({ pos = null, head = 'n', stem = 'up', clef = null, oct = 0, w = 54 } = {}) {
+  const top = clef ? 12 : 30, H = clef ? 64 : 86, root = svg('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, class: 'staff mini' });
+  for (let j = 0; j < 5; j++) root.append(svg('line', { x1: 2, x2: w - 2, y1: top + j * LG, y2: top + j * LG, class: 'st-line' }));
+  if (clef) { drawClef(root, { clef, oct }, 4, top); return root; }
+  const cx = w / 2 + 2, yOf = p => top + 40 - p * 5, cy = yOf(pos);
+  const el = svg('g', { class: 'st-note' });
+  for (let lp = 10; lp <= pos; lp += 2) el.append(svg('line', { x1: cx - 9, x2: cx + 9, y1: yOf(lp), y2: yOf(lp), class: 'st-ledger' }));
+  drawHead(el, head, cx, cy, false);
+  const sx = stem === 'up' ? cx + 5.8 : cx - 5.8;
+  el.append(svg('line', { x1: sx, x2: sx, y1: cy, y2: stem === 'up' ? cy - 17 : cy + 17, class: 'st-stem' }));
+  if (head === 'xo') el.append(svg('circle', { cx, cy: cy - 22, r: 3, class: 'st-open' }));
+  root.append(el);
+  return root;
 }

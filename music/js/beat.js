@@ -14,6 +14,7 @@ import { badWords, hidden } from './safety.js';
 import * as C from './beatcore.js';
 import { BeatKit, BeatMixer } from './beatkit.js';
 import { EX_BEATS, EX_BY } from './showcase.js';   // [MUSIC-SHOWCASE-1] 예시 비트(4학년 음악 친구 작품)
+import { openBeatScore } from './scoreview.js';   // [MUSIC-SCORE-1] 🎼 악보
 
 const kit = new BeatKit(engine);        // 구운 소리는 화면을 나갔다 와도 그대로
 const KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon'], CAPS = ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'];
@@ -73,10 +74,12 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   const copyBtn = h('button', { class: 'btn small', onclick: () => copyDialog() }, '복사');
   const clearBtn = h('button', { class: 'btn small', onclick: () => clearDialog() }, '지우기');
   const undoBtn = h('button', { class: 'btn small', title: '되돌리기 (Ctrl+Z)', onclick: () => doUndo() }, '↶ 되돌리기');
+  const scoreBtn = h('button', { class: 'btn small bt-scorebtn', title: '지금 비트를 악보로 보기 — 북 · 가락 · 베이스 · 화음', onclick: () => openScore() }, '🎼 악보');   // [MUSIC-SCORE-1] 친구 비트(듣기만)에서도
+  let scoreView = null;                       // [MUSIC-SCORE-1] 열린 악보 창(update · step · close)
   const arrBox = h('div', { class: 'bt-arr' });
   const arrBack = h('button', { class: 'btn small bt-arrdel', title: '순서 끝 칸 빼기', onclick: () => { if (readOnly || !beat.arr.length) return; pushUndo(); beat.arr.pop(); if (!beat.arr.length && beat.mode === 'song') beat.mode = 'loop'; markDirty(); renderPats(); } }, '⌫');
   const modeSeg = h('div', { class: 'seg bt-mode' });
-  const pats = h('div', { class: 'bt-pats' }, h('span', { class: 'lbl' }, '패턴'), h('div', { class: 'bt-patbtns' }, ...patBtns), copyBtn, clearBtn, undoBtn,
+  const pats = h('div', { class: 'bt-pats' }, h('span', { class: 'lbl' }, '패턴'), h('div', { class: 'bt-patbtns' }, ...patBtns), copyBtn, clearBtn, undoBtn, scoreBtn,
     h('span', { class: 'sp' }), h('span', { class: 'lbl' }, '순서'), arrBox, arrBack, modeSeg);
   const grid = h('div', { class: 'bt-grid' });
   const countCv = h('canvas', { class: 'bt-count' });
@@ -299,6 +302,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function renderTip() { const list = C.tipsFor(beat); tipText.textContent = C.TIPS[list[tipIdx % list.length]] || ''; }
   let tipTimer = 0, sideTimer = 0;
   function markDirty(content = true) {
+    if (scoreView) scoreView.update();   // [MUSIC-SCORE-1] 악보 창이 열려 있으면 다시 그림(바뀐 것만 · 0.12초 모아서)
     if (readOnly) return;
     dirty = true;
     if (!content) return;
@@ -531,6 +535,13 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     toast(r.clamped ? `메아리를 넣었어요 — 가장 ${dir > 0 ? '높은' : '낮은'} 음은 더 갈 수 없어서 그대로 두었어요` : `메아리를 넣었어요 — 뒤 절반이 한 칸 ${dir > 0 ? '위로' : '아래로'} 따라 해요`, 3000);
     if (!playing) play({ count: false });
   }
+  //  [MUSIC-SCORE-1] 🎼 악보 — 북 · 가락 · 베이스 오선 + 화음 이름 + 칸판 줄 안내 · 인쇄 · ▶ 들으며 보기(울리는 칸이 악보에서 빛남)
+  function openScore() {
+    if (scoreView) return;
+    const title = readOnly ? `${ownerName || '친구'}의 비트${beat.title ? ' · ' + beat.title : ''}` : beat.title || '내 비트';
+    scoreView = openBeatScore({ getBeat: () => beat, title, who: readOnly ? '' : me.name || '', colors: ROW_COLOR, patColors: PAT_COLOR,
+      play: () => play({ count: false }), stop: () => stop(), playing: () => playing, onclose: () => { scoreView = null; } });
+  }
   function copyDialog() {
     const src = beat.cur;
     if (C.patternEmpty(cur())) { toast('빈 패턴은 복사할 것이 없어요'); return; }
@@ -699,6 +710,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (seq) seq.stop();
     clearInterval(timer); timer = 0; seq = null; playing = false; rec = false; counting = false; playPat = -1; playPos = -1;
     cutAll(V); vq.length = 0; skipOnce.clear(); held.clear(); hideCount(); setPlayhead(-1);
+    if (scoreView) scoreView.step(null);   // [MUSIC-SCORE-1]
     if (!built) return;
     renderTransport(); renderPats(); if (tab === 'pad') renderSide();
   }
@@ -710,6 +722,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (playing || vq.length) raf = requestAnimationFrame(frame);
   }
   function applyStep(e) {
+    if (scoreView) scoreView.step(e);   // [MUSIC-SCORE-1] 악보에서도 지금 칸이 빛남
     const changed = playPat !== e.pat || playPos !== e.pos;
     playPat = e.pat; playPos = e.pos;
     if (e.step === 0 && e.song && follow && beat.cur !== e.pat) { beat.cur = e.pat; renderGrid(); renderPal(); renderTip(); }
@@ -915,6 +928,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     pause() { stop(); stopPreview(); },
     unmount() {
       alive = false; stop(); stopPreview();
+      if (scoreView) scoreView.close();   // [MUSIC-SCORE-1] 화면을 나가면 악보 창도 닫음
       cancelAnimationFrame(raf); clearTimeout(tipTimer); clearTimeout(sideTimer);
       if (stopClass) { stopClass(); stopClass = null; }
       removeEventListener('keydown', onKey); removeEventListener('keyup', onKeyUp); removeEventListener('blur', releaseAll); removeEventListener('beforeunload', beforeUnload); document.removeEventListener('visibilitychange', onVis);
