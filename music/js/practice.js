@@ -1,5 +1,6 @@
 // 리코더 연습 — 음표 발판이 오른쪽에서 흘러오고, 몬스터가 박에 맞춰 발판을 밟는다. 왼쪽 = 지금 음의 큰 운지.
 //  소리를 듣고 틀린 음을 잡지는 않는다(마이크 없음). 끝나면 스스로 별을 매기고 '리코더 기록장'에 쌓인다.
+//  [MUSIC-ENSEMBLE-1] 선생님 곡이 합주의 한 부분이면 '🎶 함께 연주' — 다른 부분이 같은 칸 시각에 클라리넷으로 같이 울리고 맨 아래 얇은 줄에 그 음표가 지나간다(ensemble.js)
 import { h, toast, lsGet, lsSet, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, totalSteps } from './theory.js';
 import { buildEvents } from './song.js';

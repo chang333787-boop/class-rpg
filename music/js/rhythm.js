@@ -2,6 +2,7 @@
 //  8키 = 건반처럼 A S D F | J K L ; = 도 레 미 파 | 솔 라 시 높은도 (음 높이를 손으로 익힘) · 4키 = D F J K (쉬움, 가락의 오르내림대로)
 //  6키 = S D F | J K L — 이 곡의 음을 낮은 음부터 왼쪽에(한 키 = 한 음 · 여섯을 넘으면 이웃 음끼리) [MUSIC-6KEY-1]
 //  2박 넘는 긴 음은 끝까지 누르고 있기. 반주(화음·베이스·장단)는 뒤에서 깔린다.
+//  [MUSIC-ENSEMBLE-1] 선생님 곡이 합주의 한 부분이면 준비 칸 '🎶 함께 연주' — 다른 부분이 반주처럼 같이 울린다(소리만 · 악보 · 점수는 내 음만)
 import { h, toast, lsGet, lsSet, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, pc } from './theory.js';
 import { buildEvents } from './song.js';
