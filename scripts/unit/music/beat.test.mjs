@@ -13,6 +13,7 @@ const test = async (name, fn) => { try { await fn(); results.push(['PASS', name]
 const ok = (c, m) => { if (!c) throw new Error(m || '아님'); };
 const eq = (a, b, m) => { const sa = JSON.stringify(a), sb = JSON.stringify(b); if (sa !== sb) throw new Error(`${m ? m + ': ' : ''}기대 ${sb.slice(0, 300)} · 실제 ${sa.slice(0, 300)}`); };
 const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
+const NO_WORD = '\uBE0C\uB79C\uCE58';   // 쓰지 않기로 한 낱말(사용자 규칙) — 글자 그대로 적지 않으려고 유니코드로
 
 //  아무 비트(무작위) — 왕복 시험용
 function randomBeat(rng) {
@@ -241,7 +242,7 @@ await test('왜 그럴까? — 빈 패턴 = 시작 안내 · 쿵 1·3 짝 2·4 =
   b.pats[0].d.kick[7] = 1; b.swing = 30; ok(B.tipsFor(b).includes('offbeat') && B.tipsFor(b).includes('swing'));
   b.arr = [0, 0, 0, 1]; ok(B.tipsFor(b).includes('repeat'));
   const k = B.applyStarter(B.emptyBeat(), 'semachi').beat; ok(B.tipsFor(k).includes('jangdan'));
-  for (const key of Object.keys(B.TIPS)) ok(/[가-힣]/.test(B.TIPS[key]) && !/브랜치/.test(B.TIPS[key]), key);
+  for (const key of Object.keys(B.TIPS)) ok(/[가-힣]/.test(B.TIPS[key]) && !B.TIPS[key].includes(NO_WORD), key);
 });
 
 //  ── 되풀이 박자기(가짜 시계) ──
@@ -401,7 +402,7 @@ await test('저장소(학급 RTDB) — beats/<sid>/<id> + beatclass/<sid>_<id> �
   await st.deleteBeat(s1.id);
   ok(get(`classRPG_music/beats/s1/${s1.id}`) === null, '지우기');
 });
-await test('화면 연결(글로 확인) — 첫 화면 넷째 문 · #/beat 길(처음 열 때만 불러옴) · import map 버스터 · 교사 화면 · 장르 이름 · \'브랜치\' 없음 · 공용 소리 파일은 안 고침', () => {
+await test('화면 연결(글로 확인) — 첫 화면 넷째 문 · #/beat 길(처음 열 때만 불러옴) · import map 버스터 · 교사 화면 · 장르 이름 · 쓰지 않기로 한 낱말 없음 · 공용 소리 파일은 안 고침', () => {
   const app = read('music/js/app.js'), html = read('music/index.html'), beat = read('music/js/beat.js'), core = read('music/js/beatcore.js'), kitjs = read('music/js/beatkit.js'), teacher = read('music/js/teacher.js'), store = read('music/js/store.js');
   ok(app.includes("h('button', { class: 'door d-beat', onclick: () => ctx.go('#/beat') }") && app.includes("await import('./beat.js')") && app.includes('replaceBeatRef'), 'app 문 · 길');
   const v = m => (html.match(new RegExp(`"\\./js/${m}\\.js": "\\./js/${m}\\.js\\?v=([^"]+)"`)) || [])[1];
@@ -409,7 +410,7 @@ await test('화면 연결(글로 확인) — 첫 화면 넷째 문 · #/beat 길
   ok(html.includes(`<script type="module" src="js/app.js?v=${v('app')}">`) && Number(((html.match(/css\/music\.css\?v=(\d{8})/) || [])[1]) || 0) >= 20261010, 'script · css');
   ok(teacher.includes('비트 모음에서 내리기') && teacher.includes('setBeatHidden') && store.includes("beatclass/") && store.includes("'beats/' + sid"), '교사 · 저장소');
   const GENRE = /붐뱁|트랩|힙합|하우스|테크노|디스코|레게|재즈|펑크|로파이|\bEDM\b|\blo-?fi\b/;   // 글(아이에게 보이는 말 · 주석) — 영어 이름은 낱말로만(warnedMute 같은 이름 안 걸리게)
-  for (const [n, src] of [['beat', beat], ['beatcore', core], ['beatkit', kitjs]]) { ok(!GENRE.test(src), n + ' 장르 이름'); ok(!src.includes('브랜치'), n + " '브랜치'"); }
+  for (const [n, src] of [['beat', beat], ['beatcore', core], ['beatkit', kitjs]]) { ok(!GENRE.test(src), n + ' 장르 이름'); ok(!src.includes(NO_WORD), n + ' 쓰지 않기로 한 낱말'); }
   ok(!/from '\.\/(song|compose)\.js'/.test(beat + core + kitjs), '비트는 song · compose 를 안 부름');
 });
 
