@@ -233,15 +233,26 @@ async function onAttached(parentSid, p) {
     }
   } finally { if (p.waitingForDebugger) await s('Runtime.runIfWaitingForDebugger'); }
 }
-//  CDN 파일(Blockly · Firebase SDK · 글꼴) — 저장본으로 바로 준다. 못 받으면 크롬이 직접 받게 둔다
+//  CDN 파일(Blockly · Firebase SDK · 글꼴) — 저장본이 있으면 바로 준다. 없으면 크롬이 그대로 받게 두고(기다리지 않음)
+//   뒤에서 node 로 받아 다음 판을 위해 둔다 — 저장본 때문에 느려지는 일은 없다(이 망은 jsdelivr 연결이 가끔 10초).
+//   단 CSS(구글 글꼴 · Pretendard)는 <head> 에서 스크립트 실행을 막아, 망이 느리면 화면이 통째로 안 뜬다(키오스크 20초 사례)
+//   → 3초만 기다려 받고, 못 받으면 빈 CSS 를 준다(글꼴 모양만 다름 · 오류 찾기와 무관 · '바깥 파일 실패' 참고로 적음).
 async function onPaused(sid, p) {
   const send = (m, prm) => B.send(m, prm, sid, 30000).catch(() => {});
   const req = p.request || {};
+  const fulfill = (r) => send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: r.status, responseHeaders: r.headers, body: r.body.toString('base64') });
+  const have = CDN && req.method === 'GET' ? CDN.load(req.url) : null;
+  if (have) { CDN.stat.hit++; return fulfill(have); }
   if (!CDN || req.method !== 'GET') return send('Fetch.continueRequest', { requestId: p.requestId });
-  try {
-    const r = await CDN.get(req.url, req.headers || {});
-    return send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: r.status, responseHeaders: r.headers, body: r.body.toString('base64') });
-  } catch (e) { return send('Fetch.continueRequest', { requestId: p.requestId }); }
+  const job = CDN.get(req.url, req.headers || {});
+  job.catch(() => {});
+  if (p.resourceType === 'Stylesheet' || /fonts\.googleapis\.com\/css|\.css(\?|$)/.test(req.url)) {
+    const r = await Promise.race([job.catch(() => null), sleep(3000).then(() => null)]);
+    if (r) return fulfill(r);
+    note('ext', owner.get(sid), `CSS 를 3초 안에 못 받아 빈 CSS 로 ${short(req.url, 80)}`);
+    return fulfill({ status: 200, headers: [{ name: 'Content-Type', value: 'text/css; charset=utf-8' }], body: Buffer.from('/* [GATE-1] 바깥 CSS 를 못 받아 비움 */') });
+  }
+  return send('Fetch.continueRequest', { requestId: p.requestId });
 }
 function onEvent(sid, method, p) {
   if (!sid) {
@@ -284,7 +295,8 @@ function onEvent(sid, method, p) {
     case 'Network.requestWillBeSent': {
       const u = (p.request && p.request.url) || '';
       reqUrl.set(sid + ':' + p.requestId, u);
-      try { const h = new URL(u).host; if (h && !u.startsWith(ORIGIN)) hosts.add(h); } catch (e) {}
+      if (!/^(data|blob):/.test(u)) (pg.pending = pg.pending || new Map()).set(sid + ':' + p.requestId, u);
+      try { const h = new URL(u).host; if (h && !u.startsWith(ORIGIN) && pg.name !== '자기 시험') hosts.add(h); } catch (e) {}
       if (PROD_RE.test(u)) rec('prod', pg, short(u, 120));
       break;
     }
@@ -299,7 +311,9 @@ function onEvent(sid, method, p) {
       if (r.status >= 400 && String(r.url).startsWith(ORIGIN)) rec('http', pg, `${r.status} ${short(r.url)}`);
       break;
     }
+    case 'Network.loadingFinished': if (pg.pending) pg.pending.delete(sid + ':' + p.requestId); break;
     case 'Network.loadingFailed': {
+      if (pg.pending) pg.pending.delete(sid + ':' + p.requestId);
       const u = reqUrl.get(sid + ':' + p.requestId) || '';
       if (p.canceled || /ERR_ABORTED/.test(p.errorText || '') || PROD_RE.test(u)) break;   // 운영 주소는 보내려던 순간 이미 셈
       if (u.startsWith(ORIGIN)) rec('http', pg, `불러오기 실패 ${p.errorText} ${short(u)}`);
@@ -341,6 +355,8 @@ async function clickBy(pg, findExpr) {
   return { how: 'js', hit: r.hit };
 }
 const late = () => Date.now() > SOFT_END;
+//  '안 뜸' 이유를 돕는 말: 아직 안 끝난 요청(바깥 CDN 이 느리면 여기 보인다)
+const waiting = (pg) => { const l = [...((pg && pg.pending) || new Map()).values()].filter(u => !/^wss?:/.test(u)); return l.length ? ` · 아직 받는 중 ${l.length}: ${l.slice(0, 3).map(u => short(u, 70)).join(' , ')}` : ''; };
 
 // ══ ① 학생 — 크롬북 1366×610 ══════════════════════════════════
 const SEC_KO = { today: '오늘', learn: '배우고 만들기', me: '나의 공간', adv: '모험' };
@@ -352,7 +368,7 @@ async function studentHome(pg, mobile) {
   const ok = await pg.goto(`${ORIGIN}/student.html?as=s1`).catch(e => { rec('render', pg, e.message); return false; });
   const box = mobile ? '#mob-main-tab' : '#main-area';
   if (!ok || !await pg.until(`typeof CUR !== 'undefined' && !!CUR && CUR.id === 's1' && document.querySelectorAll('${box} .home-sec').length === 4`, 20000)) {
-    rec('render', pg, '학생 홈이 안 뜸(?as=s1 입장 · 홈 네 구역)'); return null;
+    rec('render', pg, '학생 홈이 안 뜸(?as=s1 입장 · 홈 네 구역)' + waiting(pg)); return null;
   }
   await sleep(1200);   // 첫 그리기 뒤 늦게 오는 구독 · 그림
   const st = await pg.evSafe(`${L}.state(null)`);
@@ -375,11 +391,11 @@ async function afterClick(pg, ctx) {
     const ok = await pg.until(`(() => { const f = document.getElementById('embed-frame'); if (!f) return false;
       const fb = document.getElementById('embed-fallback'); if (fb && fb.style.display === 'flex') return true;
       let d; try { d = f.contentDocument; } catch (e) { return true; }
-      if (!d || d.readyState !== 'complete' || d.location.href === 'about:blank') return false;
-      const a = d.getElementById('app') || d.body; return !!a && (a.children.length > 0 || (a.innerText || '').trim().length > 0); })()`, 12000);
+      if (!d || d.readyState === 'loading' || d.location.href === 'about:blank') return false;   // 다 읽었고(글꼴 · 그림은 늦어도 됨)
+      const a = d.getElementById('app') || d.body; return !!a && (a.children.length > 0 || (a.innerText || '').trim().length > 0); })()`, 15000);
     if (!ok) {
       const why = await pg.evSafe(`(() => { const d = document.getElementById('embed-frame').contentDocument; return d ? 'readyState ' + d.readyState + ' · #app ' + ((d.getElementById('app') || {}).children || []).length : '문서 없음'; })()`);
-      rec('render', pg, `학습 앱 창이 12초 안에 안 뜸(${why || '?'})`);
+      rec('render', pg, `학습 앱 창이 15초 안에 안 뜸(${why || '?'})${waiting(pg)}`);
     }
     else if (await pg.evSafe(`(document.getElementById('embed-fallback') || {}).style?.display === 'flex'`)) rec('render', pg, '학습 앱 창이 "앱을 불러오지 못했어요"');
     await sleep(1000);   // 앱 안에서 데이터 받은 뒤 그리며 나는 오류까지
@@ -498,7 +514,7 @@ async function phaseAdmin() {
   const pg = await newPage('관리', { width: 1366, height: 610 });
   pg.action = '입장';
   const ok = await pg.goto(`${ORIGIN}/admin.html?auto`).catch(e => { rec('render', pg, e.message); return false; });
-  if (!ok || !await pg.until(`(document.getElementById('admin-app') || {}).style?.display === 'grid'`, 20000)) { rec('render', pg, '관리 화면이 안 열림(?auto 입장)'); await pg.close(); return { line: `관리   입장 실패 · ${took(t0)}` }; }
+  if (!ok || !await pg.until(`(document.getElementById('admin-app') || {}).style?.display === 'grid'`, 20000)) { rec('render', pg, '관리 화면이 안 열림(?auto 입장)' + waiting(pg)); await pg.close(); return { line: `관리   입장 실패 · ${took(t0)}` }; }
   await sleep(1000);
   const navs = await pg.evSafe(`${L}.list('#admin-sidebar', '.nav-item')`) || [];
   if (!navs.length) rec('render', pg, '왼쪽 메뉴가 안 보임');
@@ -536,7 +552,7 @@ async function phaseKiosk() {
   pg.action = '첫 화면';
   const ok = await pg.goto(`${ORIGIN}/kiosk.html`).catch(e => { rec('render', pg, e.message); return false; });
   if (!ok || !await pg.until(`(() => { const m = document.getElementById('main-wrap'), c = document.getElementById('kiosk-content'); return !!m && m.style.display !== 'none' && !!c && c.children.length > 0; })()`, 20000)) {
-    rec('render', pg, '키오스크 첫 화면(#kiosk-content)이 안 그려짐'); await pg.close(); return { line: `키오스크 첫 화면 실패 · ${took(t0)}` };
+    rec('render', pg, '키오스크 첫 화면(#kiosk-content)이 안 그려짐' + waiting(pg)); await pg.close(); return { line: `키오스크 첫 화면 실패 · ${took(t0)}` };
   }
   await sleep(800);
   const tabs = await pg.evSafe(`${L}.list('#header', '.kiosk-tab')`) || [];
@@ -588,7 +604,7 @@ async function phaseApps() {
     pg.action = label; pg.prompted = false;
     if (late()) { cnt.left = (cnt.left || 0) + 1; return; }
     const ok = await pg.goto(url, 15000).catch(e => { rec('render', pg, e.message); return false; });
-    if (!ok || !await pg.until(RENDERED, 10000)) rec('render', pg, '화면이 안 그려짐');
+    if (!ok || !await pg.until(RENDERED, 10000)) rec('render', pg, '화면이 안 그려짐' + waiting(pg));
     await sleep(1100);   // 데이터 받은 뒤 그리며 나는 오류까지
     if (kind === 'teacher' && pg.prompted) rec('render', pg, `선생님 문이 비밀번호를 물음 — 미리 넣은 '${it.key}' 가 안 먹음`);
     cnt[kind]++;
@@ -616,6 +632,39 @@ async function phaseApps() {
   return { line: `학습 앱 pages ${J({ home: cnt.home, teacher: cnt.teacher, music: cnt.music })} (${apps.join(' ')})${cnt.left ? ` · 시간이 모자라 못 봄 ${cnt.left}` : ''} · ${took(t0)}` };
 }
 
+// ══ 자기 시험 — 이 장치가 눈을 감고 있지 않나(크롬 · CDP 가 바뀌어 이벤트를 못 받으면 늘 CLEAN 이 나온다) ══
+//  빈 페이지에서 일부러 예외 · console.error · 없는 파일 · 운영 주소 요청을 하나씩(같은 출처 iframe 안에서도) 내고 모두 잡혔나 본다.
+//  운영 주소 요청은 크롬 안에서 막혀(setBlockedURLs · 이름 풀기 실패) 이 기계 밖으로 나가지 않는다. 잡은 것은 결과에서 지운다.
+async function selfTest() {
+  const pg = await newPage('자기 시험', { width: 800, height: 600 });
+  pg.action = '자기 시험';
+  await pg.goto(`${ORIGIN}/.fake/stats`);
+  await pg.ev(`(() => {
+    setTimeout(() => { throw new Error('GATE-SELFTEST-exc'); }, 0);
+    console.error('GATE-SELFTEST-cerr');
+    fetch('/GATE-SELFTEST-404.js').catch(() => {});
+    fetch('https://gate-selftest-blocked.firebaseio.com/.json').catch(() => {});
+    const f = document.createElement('iframe');
+    f.srcdoc = '<script>setTimeout(function () { throw new Error("GATE-SELFTEST-iframe"); }, 0); console.error("GATE-SELFTEST-iframe-cerr");<' + '/script>';
+    document.body.appendChild(f);
+    const d = document.createElement('div'); d.className = 'page active'; d.textContent = '점수 undefined · 평균 NaN · \${x}';
+    document.body.appendChild(d);
+    return true;
+  })()`);
+  const want = { exc: ['GATE-SELFTEST-exc', 'GATE-SELFTEST-iframe'], cerr: ['GATE-SELFTEST-cerr', 'GATE-SELFTEST-iframe-cerr'], http: ['GATE-SELFTEST-404'], prod: ['gate-selftest-blocked.firebaseio.com'] };
+  const has = (k, s) => [...found[k].keys()].some(key => key.includes(s));
+  const t0 = Date.now();
+  while (Date.now() - t0 < 4000 && Object.entries(want).some(([k, l]) => l.some(x => !has(k, x)))) await sleep(100);
+  const lit = await pg.evSafe(LITERAL);
+  const miss = [];
+  for (const [k, l] of Object.entries(want)) for (const x of l) if (!has(k, x)) miss.push(`${KINDS[k]}(${x})`);
+  if (!Array.isArray(lit) || lit.length !== 3) miss.push(`adminLiteral(${Array.isArray(lit) ? lit.length : '?'}/3)`);
+  await pg.close();
+  for (const k of Object.keys(found)) for (const key of [...found[k].keys()]) if (key.startsWith('자기 시험 ›')) found[k].delete(key);
+  for (const k of Object.keys(notes)) for (const key of [...notes[k].keys()]) if (key.startsWith('자기 시험 ›')) notes[k].delete(key);
+  return miss;
+}
+
 // ── 돌리기 ──────────────────────────────────────────────────
 function tally() {
   const n = (k) => [...found[k].values()].reduce((a, v) => a + v.n, 0);
@@ -630,6 +679,11 @@ if (ONLY.includes('admin')) lanes.push([phaseAdmin]);
 if (ONLY.includes('kiosk')) lanes.push([phaseKiosk]);
 if (ONLY.includes('apps')) lanes.push([phaseApps]);
 const lines = [];
+{
+  const miss = await selfTest().catch(e => [`자기 시험이 멈춤: ${first(e && e.message)}`]);
+  if (miss.length) { log(`자기 시험 실패 — 이 장치가 못 잡는 것: ${miss.join(' · ')}`); await cleanup(); log('NOT CLEAN — 확인 장치를 돌리지 못함: 자기 시험 실패(장치가 오류를 못 봄)'); process.exit(2); }
+  log('자기 시험 OK — 예외 · console.error(iframe 안 포함) · http≥400 · 운영 주소 · adminLiteral 를 잡음');
+}
 const runLane = async (fns) => {
   for (const fn of fns) {
     try { const r = await fn(); if (r && r.line) { lines.push(r.line); log(r.line); } }

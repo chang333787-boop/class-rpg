@@ -42,16 +42,19 @@ export class CdnCache {
   //  없으면 node 로 받아(크롬이 보낸 User-Agent 그대로 — 구글 글꼴 CSS 는 UA 따라 다름) 저장. 받는 중이면 그것을 기다린다
   async get(url, reqHeaders = {}) {
     const have = this.load(url);
-    if (have) { this.stat.hit++; return have; }
+    if (have) return have;
     if (this.flight.has(url)) return this.flight.get(url);
     const job = (async () => {
       const h = {};
       for (const [k, v] of Object.entries(reqHeaders)) if (/^(user-agent|accept|accept-language|origin|referer)$/i.test(k)) h[k] = v;
-      const r = await fetch(url, { headers: h, redirect: 'follow', signal: AbortSignal.timeout(20000) });
-      const body = Buffer.from(await r.arrayBuffer());
+      let r, body;
+      for (let i = 0; ; i++) {   // 이 망에서 jsdelivr 연결이 가끔 10초씩 걸려 한 번 더
+        try { r = await fetch(url, { headers: h, redirect: 'follow', signal: AbortSignal.timeout(15000) }); body = Buffer.from(await r.arrayBuffer()); break; }
+        catch (e) { if (i >= 1) throw e; }
+      }
       const headers = [...r.headers].filter(([k]) => !/^(content-encoding|content-length|transfer-encoding|connection|keep-alive|set-cookie|alt-svc|report-to|nel)$/i.test(k)).map(([name, value]) => ({ name, value }));
       const rec = { status: r.status, headers, body };
-      if (r.status === 200) {
+      if (r.status < 500) {   // 판 번호가 박힌 주소라 404 도 그대로 둔다(늘 같은 결과)
         try { const f = this.file(url); fs.writeFileSync(f + '.bin', body); fs.writeFileSync(f + '.json', JSON.stringify({ url, status: r.status, headers, at: new Date().toISOString() })); } catch (e) {}
         this.mem.set(url, rec);
       }
@@ -164,7 +167,8 @@ export class Page {
   async goto(url, ms = 20000) {
     const r = await this.send('Page.navigate', { url }, ms);
     if (r.errorText) throw new Error(`불러오기 실패 ${r.errorText} — ${url}`);
-    return this.until(`document.readyState === 'complete' && location.href !== 'about:blank'`, ms);
+    //  다 읽었으면(DOMContentLoaded) — 바깥 글꼴 · 그림이 늦게 와도 기다리지 않는다
+    return this.until(`document.readyState !== 'loading' && location.href !== 'about:blank'`, ms);
   }
   //  진짜 마우스 누르기(움직임 → 누름 → 뗌)
   async click(x, y) {
