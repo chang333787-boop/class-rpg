@@ -7,10 +7,13 @@
 //  rhythm/<곡키>/<sid>       = 리듬 게임 최고 기록 { best, acc, combo, grade, t 때, n 이름 }
 //  tsongs/<곡키> = 선생님이 올린 곡(공연 곡) — 가락 글(library 꼴) · 공개 저장소에 넣지 않는 곡(저작권) [MUSIC-TSONG-1]
 //                  { key, title, part?, origin, memo?, order, beats, sub, tempo, key2, scale, inst, drum?, level, melody, prog?, progEvery?, t 넣은 때 } — 쓰기는 교사 화면만
+//  beats/<sid>/<비트id>      = 비트 만들기 한 비트(글자 줄 모양 — 쓰기 전 · 읽은 뒤 beatcore normalizeBeat 이 살핀다) [MUSIC-BEAT-1]
+//  beatclass/<sid>_<비트id> = 우리 반 비트 모음 한 줄 { sid, n 이름, id, t 제목, u 고친 때, bpm, kit, grid, na 순서 칸 수, hide } — 제목이 고운 말일 때만 · 다시 저장해도 선생님 숨김(hide)은 남는다
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { uid, keyOf, lsGet, lsSet } from './util.js';
 import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';   // 설정 · 앱 만들기 · 관리자 비밀번호 확인 [SUBAPP-COMMON-1]
-import { songBad } from './safety.js';
+import { songBad, badWords } from './safety.js';
+import { normalizeBeat, packBeat } from './beatcore.js';   // 비트 — 정한 모양만 저장 [MUSIC-BEAT-1]
 import { cleanTeacherSong } from './song.js';   // 선생님 곡 — 정한 칸만 저장 [MUSIC-TSONG-1]
 const clean = s => { const b = songBad(s); return !b.title.length && !b.lyrics.length; };
 
@@ -18,6 +21,11 @@ export const ROOT = 'classRPG_music';
 const plain = v => JSON.parse(JSON.stringify(v));   // undefined 빼기
 const vals = o => o && typeof o === 'object' ? Object.values(o) : [];
 const songOut = s => plain({ ...s, notes: s.notes.map(n => n.w ? n : { s: n.s, d: n.d, p: n.p }) });
+//  [MUSIC-BEAT-1] 비트 모음 한 줄 · 살핀 비트(저장 모양) · 목록 거르기
+const beatRow = (b, sid, name) => ({ sid, n: name || '', id: b.id, t: b.title || '이름 없는 비트', u: b.updated, bpm: b.bpm, kit: b.kit, grid: b.grid, na: (b.arr || []).length });
+const beatClean = b => { const c = packBeat(normalizeBeat(b)); if (c.id) c.id = keyOf(c.id); return c; };
+const beatOK = c => c && typeof c === 'object' && !c.hide && typeof c.t === 'string' && !!c.t && !!c.sid && !!c.id;
+const byU = (a, z) => (z.u || 0) - (a.u || 0);
 
 export function createStore({ sid, name, fb = globalThis.firebase, offline = false } = {}) {
   sid = sid ? keyOf(sid) : '';
@@ -69,12 +77,31 @@ function rtdbStore(fb, sid, name) {
     async listTeacherSongs() { return vals((await root.child('tsongs').once('value')).val()).filter(x => x && typeof x === 'object'); },
     async saveTeacherSong(raw) { const c = cleanTeacherSong(raw), k = keyOf(c.key); await root.child('tsongs/' + k).set(plain({ ...c, t: Date.now() })); return k; },
     async deleteTeacherSong(key) { await root.child('tsongs/' + keyOf(key)).remove(); },
+    // ── 비트 만들기 [MUSIC-BEAT-1] ── 모음 줄은 칸마다 써서(통째로 바꾸지 않아) 선생님 숨김(hide)이 남는다 · 내리면 줄을 지운다
+    async listMyBeats() { return vals((await root.child('beats/' + sid).once('value')).val()).filter(x => x && typeof x === 'object').sort((a, z) => (z.updated || 0) - (a.updated || 0)); },
+    async getBeat(owner, id) { return (await root.child(`beats/${keyOf(owner)}/${keyOf(id)}`).once('value')).val(); },
+    async saveBeat(raw) {
+      const b = beatClean(raw), t = Date.now();
+      if (!b.id) { b.id = uid('b'); b.created = t; }
+      b.by = sid; b.byName = name || ''; b.updated = t; b.rev = (b.rev || 0) + 1; b.pub = !!b.pub;
+      const up = { [`beats/${sid}/${b.id}`]: plain(b) }, ck = 'beatclass/' + keyOf(sid + '_' + b.id);
+      if (b.pub && !badWords(b.title).length) for (const [k, v] of Object.entries(beatRow(b, sid, name))) up[`${ck}/${k}`] = v;
+      else up[ck] = null;
+      await root.update(up);
+      return b;
+    },
+    async deleteBeat(id) { await root.update({ [`beats/${sid}/${keyOf(id)}`]: null, [`beatclass/${keyOf(sid + '_' + id)}`]: null }); },
+    async listBeatClass() { return vals((await root.child('beatclass').once('value')).val()).filter(beatOK).sort(byU); },
+    watchBeatClass(cb) { const r = root.child('beatclass'); const fn = s => cb(vals(s.val()).filter(beatOK).sort(byU)); r.on('value', fn, e => console.warn('[music]', e)); return () => r.off('value', fn); },
     // ── 선생님 ──
     async teacherOK(pw) { return adminPwOK(db, pw); },
     async allSongs() { return (await root.child('songs').once('value')).val() || {}; },
     async allPractice() { return (await root.child('practice').once('value')).val() || {}; },
     async allConcert() { return vals((await root.child('concert').once('value')).val()); },
     async setHidden(owner, id, hide) { await root.child(`concert/${keyOf(owner + '_' + id)}/hide`).set(hide ? true : null); },
+    async allBeats() { return (await root.child('beats').once('value')).val() || {}; },   // [MUSIC-BEAT-1]
+    async allBeatClass() { return vals((await root.child('beatclass').once('value')).val()).filter(c => c && typeof c === 'object'); },
+    async setBeatHidden(owner, id, hide) { await root.child(`beatclass/${keyOf(owner + '_' + id)}/hide`).set(hide ? true : null); },
   };
   return st;
 }
@@ -113,11 +140,26 @@ function localStore(sid, name) {
     async listTeacherSongs() { return vals(load().tsongs).filter(x => x && typeof x === 'object'); },   // [MUSIC-TSONG-1]
     async saveTeacherSong(raw) { const c = cleanTeacherSong(raw), k = keyOf(c.key), d = load(); d.tsongs = { ...(d.tsongs || {}), [k]: plain({ ...c, t: Date.now() }) }; save(d); return k; },
     async deleteTeacherSong(key) { const d = load(); if (d.tsongs) { delete d.tsongs[keyOf(key)]; save(d); } },
+    // ── 비트 만들기 [MUSIC-BEAT-1] ── 손님도 같은 모양(이 기기에만) · 비트 모음 = 내가 올린 것만
+    async listMyBeats() { return vals(load().beats).filter(x => x && typeof x === 'object').sort((a, z) => (z.updated || 0) - (a.updated || 0)); },
+    async getBeat(owner, id) { return (load().beats || {})[keyOf(id)] || null; },
+    async saveBeat(raw) {
+      const d = load(), b = beatClean(raw), t = Date.now();
+      if (!b.id) { b.id = uid('b'); b.created = t; }
+      b.by = sid; b.byName = name; b.updated = t; b.rev = (b.rev || 0) + 1; b.pub = !!b.pub;
+      d.beats = { ...(d.beats || {}), [b.id]: plain(b) }; save(d); return b;
+    },
+    async deleteBeat(id) { const d = load(); if (d.beats) { delete d.beats[keyOf(id)]; save(d); } },
+    async listBeatClass() { return vals(load().beats).filter(b => b && b.pub && !badWords(b.title).length).map(b => beatRow(b, sid, name)).filter(beatOK).sort(byU); },
+    watchBeatClass(cb) { st.listBeatClass().then(cb); return () => {}; },
     async teacherOK() { return true; },
     async allSongs() { return { [sid]: load().songs }; },
     async allPractice() { return { [sid]: load().practice }; },
     async allConcert() { return st.listConcert(); },
     async setHidden() {},
+    async allBeats() { return { [sid]: load().beats || {} }; },   // [MUSIC-BEAT-1]
+    async allBeatClass() { return st.listBeatClass(); },
+    async setBeatHidden() {},
   };
   return st;
 }

@@ -1,5 +1,6 @@
 // 선생님 화면 — 아이별 곡 · 리코더 연습 횟수 · 음악회에서 내리기/다시 올리기. 관리자 비밀번호로 연다(생각판과 같은 방식).
 //  쓰는 것은 음악회 목록의 숨김 표시(concert/<키>/hide) + 선생님 곡(tsongs/<곡키> — 맨 위 칸)뿐. 아이 곡은 고치지 않는다.
+//  [MUSIC-BEAT-1] 아이별 비트 수 · 비트 줄(열어 보기 = 듣기만) · 우리 반 비트 모음에서 내리기(beatclass/<키>/hide)
 import { h, toast, modal } from './util.js';
 import { teacherGate } from '../../common/teacher-gate.js';
 import { rosterFor, rosterNames, rosterRows } from '../../common/roster.js';   // 반 명단 — 곡 · 연습 기록 없는 아이도 [APP-ROSTER-1]
@@ -7,7 +8,8 @@ import { normalize, fromTeacherSong, cleanTeacherSong, teacherSongsIn } from './
 import { renderStaff } from './notation.js';
 import { meterOf } from './theory.js';
 import { recorderOK } from './recorder.js';
-import { songBad, hidden } from './safety.js';
+import { songBad, hidden, badWords } from './safety.js';
+import { normalizeBeat, usedCount } from './beatcore.js';   // [MUSIC-BEAT-1]
 
 // 선생님 화면 문 — 손님 · 이 창에서 통과('music.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
 function gate(ctx) { return teacherGate(ctx, 'music.teacher'); }
@@ -25,12 +27,22 @@ export async function mountTeacher(root, ctx) {
 
 // 아이별 곡 · 연습 칸(예전 선생님 화면 그대로)
 async function kidsSection(box, ctx) {
-  const [songs, practice, concert, roster] = await Promise.all([ctx.store.allSongs(), ctx.store.allPractice(), ctx.store.allConcert(), rosterFor(ctx.store)]);
+  //  [MUSIC-BEAT-1] 비트는 못 읽어도 곡 · 연습 칸은 그대로
+  const quiet = p => Promise.resolve().then(p).catch(e => { console.warn('[MUSIC-BEAT-1]', e); return null; });
+  const [songs, practice, concert, roster, beats, beatClass] = await Promise.all([ctx.store.allSongs(), ctx.store.allPractice(), ctx.store.allConcert(), rosterFor(ctx.store),
+    quiet(() => ctx.store.allBeats && ctx.store.allBeats()), quiet(() => ctx.store.allBeatClass && ctx.store.allBeatClass())]);
   const hiddenSet = new Set(concert.filter(c => c.hide).map(c => c.sid + '_' + c.id));   // [MUSIC-T-HIDDEN-1] 이름이 고운 말 가리기 함수 hidden 을 가려, 걸린 곡이 있으면 화면이 TypeError 로 안 그려졌다
+  const bc = (Array.isArray(beatClass) ? beatClass : []).filter(c => c && c.sid && c.id);
+  const beatPub = new Set(bc.map(c => c.sid + '_' + c.id)), beatHidden = new Set(bc.filter(c => c.hide).map(c => c.sid + '_' + c.id));
   const kids = new Map();
-  const kid = sid => { if (!kids.has(sid)) kids.set(sid, { sid, name: '', songs: [], practice: 0, last: 0 }); return kids.get(sid); };
+  const kid = sid => { if (!kids.has(sid)) kids.set(sid, { sid, name: '', songs: [], beats: [], practice: 0, last: 0 }); return kids.get(sid); };
   for (const [sid, list] of Object.entries(songs || {})) for (const raw of Object.values(list || {})) { const k = kid(sid); const s = normalize(raw); k.songs.push(s); k.name = k.name || raw.byName || ''; k.last = Math.max(k.last, raw.updated || 0); }
   for (const [sid, list] of Object.entries(practice || {})) for (const p of Object.values(list || {})) { const k = kid(sid); k.practice += p.n || 0; k.last = Math.max(k.last, p.last || 0); }
+  for (const [sid, list] of Object.entries(beats && typeof beats === 'object' ? beats : {})) for (const raw of Object.values(list && typeof list === 'object' ? list : {})) {
+    if (!raw || typeof raw !== 'object') continue;
+    const k = kid(sid), b = normalizeBeat(raw); if (!b.id) continue;
+    k.beats.push(b); k.name = k.name || b.byName || ''; k.last = Math.max(k.last, b.updated || 0);
+  }
   //  이름 = 반 명단 이름(RPG 에서 고쳤으면 새 이름) · 없으면 곡에 적힌 이름 [APP-ROSTER-1]
   const rn = rosterNames({}, roster);
   for (const k of kids.values()) k.name = rn[k.sid] || k.name;
@@ -40,9 +52,9 @@ async function kidsSection(box, ctx) {
   const day = t => t ? `${new Date(t).getMonth() + 1}/${new Date(t).getDate()}` : '-';
   if (!rows.length && !idle.length) { box.replaceChildren(h('div', { class: 'empty' }, '아직 아무도 곡을 짓거나 연습하지 않았어요.')); return; }
   box.replaceChildren(
-    h('p', { class: 'muted', style: { marginBottom: '10px' } }, `아이 ${rows.length}명${idle.length ? ` · 아직 곡 · 연습이 없는 아이 ${idle.length}명(맨 아래)` : ''} · 곡 ${rows.reduce((a, k) => a + k.songs.length, 0)}개 · 리코더 연습 ${rows.reduce((a, k) => a + k.practice, 0)}번. 음악회에 올린 곡은 '내리기'로 숨길 수 있어요(곡은 지워지지 않아요).`),
+    h('p', { class: 'muted', style: { marginBottom: '10px' } }, `아이 ${rows.length}명${idle.length ? ` · 아직 곡 · 연습이 없는 아이 ${idle.length}명(맨 아래)` : ''} · 곡 ${rows.reduce((a, k) => a + k.songs.length, 0)}개 · 비트 ${rows.reduce((a, k) => a + k.beats.length, 0)}개 · 리코더 연습 ${rows.reduce((a, k) => a + k.practice, 0)}번. 음악회 · 비트 모음에 올린 것은 '내리기'로 숨길 수 있어요(지워지지 않아요).`),
     h('div', { class: 'list' }, ...rows.map(k => h('div', { class: 'tk' },
-      h('div', { class: 'tk-head' }, h('b', {}, k.name || k.sid), h('span', { class: 'muted' }, `곡 ${k.songs.length} · 연습 ${k.practice}번 · 마지막 ${day(k.last)}`)),
+      h('div', { class: 'tk-head' }, h('b', {}, k.name || k.sid), h('span', { class: 'muted' }, `곡 ${k.songs.length} · 비트 ${k.beats.length} · 연습 ${k.practice}번 · 마지막 ${day(k.last)}`)),
       ...k.songs.sort((a, z) => (z.updated || 0) - (a.updated || 0)).map(s => {
         const ck = k.sid + '_' + s.id, isHidden = hiddenSet.has(ck);
         const play = h('button', { class: 'play-i', onclick: () => ctx.listen(s, play) });
@@ -54,9 +66,23 @@ async function kidsSection(box, ctx) {
         const bad = songBad(s), badAll = [...bad.title, ...bad.lyrics];
         return h('div', { class: 'song-row' }, h('div', { class: 't' }, h('b', {}, s.title || '제목 없는 곡', badAll.length ? h('span', { class: 'bad-tag', title: '음악회에는 안 올라가요' }, '고운 말 확인: ' + badAll.map(hidden).join(', ')) : null), h('span', {}, `${meterOf(s).key} · ${s.bars}마디 · 음 ${s.notes.length}개 · 고친 때 ${day(s.updated)} · ${s.rev || 1}번 저장`)),
           h('div', { class: 'acts' }, play, h('button', { class: 'btn small', onclick: () => { const { el } = renderStaff(s, { width: Math.min(1040, innerWidth - 90) }); modal(`${s.title || '곡'} — ${k.name || ''}`, el, [{ label: '닫기', primary: true }], { wide: true }); } }, '악보'), hideBtn));
-      }))),
+      }),
+      ...k.beats.sort((a, z) => (z.updated || 0) - (a.updated || 0)).map(b => beatRowT(k, b, ctx, beatPub, beatHidden, day)))),
       idle.length ? h('div', { class: 'tk idle' }, h('div', { class: 'tk-head' }, h('b', { class: 'muted' }, '아직 안 했어요'), h('span', { class: 'muted' }, `곡 · 리코더 연습 기록이 없는 아이 ${idle.length}명`)),
         h('div', { class: 'muted' }, idle.join(' · '))) : null));
+}
+
+//  [MUSIC-BEAT-1] 아이 비트 한 줄 — 열어 보기(비트 화면 · 듣기만) · 비트 모음에 올렸으면 내리기/다시 올리기
+function beatRowT(k, b, ctx, pub, hiddenB, day) {
+  const ck = k.sid + '_' + b.id, bad = badWords(b.title);
+  const hideBtn = pub.has(ck) ? h('button', { class: 'btn small' + (hiddenB.has(ck) ? ' on' : ''), onclick: async () => {
+    const now = !hiddenB.has(ck);
+    try { await ctx.store.setBeatHidden(k.sid, b.id, now); now ? hiddenB.add(ck) : hiddenB.delete(ck); hideBtn.textContent = now ? '다시 올리기' : '비트 모음에서 내리기'; hideBtn.classList.toggle('on', now); toast(now ? '비트 모음에서 내렸어요' : '다시 올렸어요'); }
+    catch (e) { console.warn(e); toast('바꾸지 못했어요'); }
+  } }, hiddenB.has(ck) ? '다시 올리기' : '비트 모음에서 내리기') : h('span', { class: 'muted', style: { fontSize: '.8rem' } }, '나만 보기');
+  return h('div', { class: 'song-row' }, h('div', { class: 't' }, h('b', {}, '🥁 ' + (b.title || '이름 없는 비트'), bad.length ? h('span', { class: 'bad-tag', title: '비트 모음에는 안 올라가요' }, '고운 말 확인: ' + bad.map(hidden).join(', ')) : null),
+    h('span', {}, `비트 · 빠르기 ${b.bpm} · 패턴 ${usedCount(b)}개 · 고친 때 ${day(b.updated)} · ${b.rev || 1}번 저장`)),
+    h('div', { class: 'acts' }, h('button', { class: 'btn small', onclick: () => ctx.go(`#/beat/u.${k.sid}.${b.id}`) }, '열어 보기'), hideBtn));
 }
 
 // ── 선생님 곡(공연 곡) [MUSIC-TSONG-1] ──

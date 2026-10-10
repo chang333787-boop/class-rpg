@@ -361,8 +361,11 @@ await test('화면 연결(글로 확인) — 작곡 ▶ · 목록 듣기만 orch
   ok(/lead: false/.test(rh) && !/orchFinale/.test(rh), '리듬');
   ok(au.includes('this.e.note(ev.inst, ev.p, t, ev.d, ev.vel, this.bus, ev.art)'), 'Player 연주법');
   const v = m => (html.match(new RegExp(`"\\./js/${m}\\.js": "\\./js/${m}\\.js\\?v=([^"]+)"`)) || [])[1];
-  for (const m of ['orchestra', 'audio', 'song', 'compose', 'app', 'practice', 'rhythm']) ok(v(m) === '20261008or1', m + ' 버스터 ' + v(m));
-  ok(html.includes('<script type="module" src="js/app.js?v=20261008or1">') && html.includes('css/music.css?v=20261008or1'), 'script · css 버스터');
+  //  [MUSIC-BEAT-1] 뒤에 다시 고친 모듈(app · css — 비트 만들기 bt1)도 있으니 '10-08 이후 값'인지만 본다(teacher-songs 시험과 같은 방식)
+  const after = x => Number(String(x || '').slice(0, 8)) >= 20261008;
+  for (const m of ['orchestra', 'audio', 'song', 'compose', 'app', 'practice', 'rhythm']) ok(after(v(m)), m + ' 버스터 ' + v(m));
+  const tagV = (html.match(/<script type="module" src="js\/app\.js\?v=([^"]+)">/) || [])[1], cssV = (html.match(/css\/music\.css\?v=([^"]+)"/) || [])[1];
+  ok(tagV === v('app') && after(cssV), 'script · css 버스터 ' + tagV + ' · ' + cssV);
 });
 
 const fail = results.filter(r => r[0] === 'FAIL');

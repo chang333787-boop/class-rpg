@@ -1,6 +1,7 @@
 // 음악실 — 작곡 · 리코더 연습 · 리듬 게임 · 우리 반 음악회 · 리코더 기록장
 //  RPG 안(?sid=&n=)에서 열면 내 이름으로 저장, 아니면 손님(이 기기에만). 주소: #/ · #/compose/<곡> · #/practice/<곡> · #/rhythm/<곡> · #/pick/<모드> · #/log · #/t
 //  [ASSIGN-MUSIC-1] ?assign=<과제>(선생님 과제 · &live=1 = 선생님과 수업) — 그 곡 리듬 화면만 연다(다른 길은 막음) · 결과는 common/assign.js 로
+//  [MUSIC-BEAT-1] #/beat · #/beat/u.<sid>.<비트id> = 비트 만들기(beat.js — 처음 열 때만 불러온다)
 import { h, toast, modal, lsGet, lsSet } from './util.js';
 import { createStore } from './store.js';
 import { librarySongs, normalize, buildEvents, songKey, emptySong, fromTeacherSong, libraryOnce } from './song.js';
@@ -42,6 +43,7 @@ const ctx = {
   store, LIB,
   go: hash => { location.hash = hash; },
   replaceRef: ref => { history.replaceState(null, '', '#/compose/' + ref); shownHash = location.hash; },
+  replaceBeatRef: ref => { history.replaceState(null, '', '#/beat' + (ref ? '/' + ref : '')); shownHash = location.hash; },   // [MUSIC-BEAT-1]
   refOf: s => s.lib || s.ts ? s.id : `u.${s.by || store.me.sid}.${s.id}`,
   teacherSongs, resetTeacherSongs: () => { tsongsP = null; },   // [MUSIC-TSONG-1] 교사 화면이 곡을 넣거나 지운 뒤 비운다
   sys: () => lsGet('music.sys', 'baroque'),
@@ -102,7 +104,9 @@ function mountHome(root) {
           h('img', { src: '../assets/monsters/m1.png', alt: '' }), h('b', {}, '리코더 연습'), h('span', {}, '음표 발판이 흘러가요. 운지를 보며 따라 불어요'), tsBadge),
         h('button', { class: 'door d-rhythm', onclick: () => ctx.go('#/pick/rhythm') },
           h('img', { src: '../assets/monsters/m28.png', alt: '' }), h('b', {}, '리듬 게임'), h('span', {}, '떨어지는 음표를 박에 맞춰 키보드로'),
-          h('span', { class: 'keys' }, ...'ASDFJKL;'.split('').map(k => h('i', {}, k))))),
+          h('span', { class: 'keys' }, ...'ASDFJKL;'.split('').map(k => h('i', {}, k)))),
+        h('button', { class: 'door d-beat', onclick: () => ctx.go('#/beat') },   // [MUSIC-BEAT-1]
+          h('img', { src: '../assets/monsters/m23.png', alt: '' }), h('b', {}, '비트 만들기'), h('span', {}, '쿵 짝 칙! 짧은 마디를 반복하며 북 · 베이스 · 화음을 쌓아요'))),
       h('div', { class: 'shelf' },
         h('section', {}, h('h2', {}, '내 곡', h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/new') }, '+ 새 곡')), mine),
         h('section', {}, h('h2', {}, '우리 반 음악회'), concert)))));
@@ -219,7 +223,7 @@ async function route() {
   const my = ++seq;
   const hash = (location.hash || '#/').slice(1) || '/';
   // 작곡 중 저장 안 하고 (뒤로 가기 등으로) 나가려 하면 한 번 묻는다 — 남으면 주소만 되돌린다(화면은 그대로)
-  if (current && current.isDirty && current.isDirty() && !confirm('저장하지 않은 곡이 있어요. 나갈까요?')) { history.replaceState(null, '', shownHash); return; }
+  if (current && current.isDirty && current.isDirty() && !confirm(current.leaveMsg || '저장하지 않은 곡이 있어요. 나갈까요?')) { history.replaceState(null, '', shownHash); return; }
   shownHash = location.hash;
   current && current.unmount && current.unmount();
   current = null;
@@ -232,6 +236,11 @@ async function route() {
     else if (parts[0] === 'pick') current = mountPick(app, parts[1] || 'practice');
     else if (parts[0] === 'log') current = mountLog(app);
     else if (parts[0] === 't') current = await mountTeacher(app, ctx);
+    else if (parts[0] === 'beat') {   // [MUSIC-BEAT-1]
+      const { mountBeat } = await import('./beat.js');
+      if (my !== seq) return;
+      current = mountBeat(app, ctx, { ref: decodeURIComponent(parts.slice(1).join('/')) });
+    }
     else if (parts[0] === 'compose') {
       const ref = parts.slice(1).join('/');
       if (decodeURIComponent(ref).startsWith('ts_')) { toast('선생님 곡은 연습 · 리듬 게임으로 해요'); ctx.go('#/'); return; }   // [MUSIC-TSONG-1] 고치기 · 바꿔 쓰기 없음
