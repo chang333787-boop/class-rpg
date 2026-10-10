@@ -18,7 +18,7 @@ export function scoreStrip() {
   let res = null, key = '', spans = [], now = new Set(), ph = null, geom = null, hgt = 0, renders = 0;
   //  g = { left 이름 칸 너비, stepW 한 칸 너비, rows [가장 낮은 음, 가장 높은 음] } — 칸판과 같은 가로 자리 · 음 범위로 높이를 정해 음을 놓아도 높이가 그대로
   function render(song, g) {
-    const k = JSON.stringify([song.notes, song.harm, song.chords, song.bars, song.beats, song.sub, song.scale, song.key, song.acc, song.orch, song.prog, song.progEvery, song.inst, g]);
+    const k = JSON.stringify([song.notes.map(n => [n.s, n.d, n.p]), song.harm, song.chords, song.bars, song.beats, song.sub, song.scale, song.key, song.acc, song.orch, song.prog, song.progEvery, song.inst, g]);   // 노랫말 글자는 띠에 안 나옴
     if (k === key && res) return hgt;
     key = k; geom = g; renders++;
     const sc = melodyScore(song);
@@ -104,7 +104,7 @@ function legendEls(b, sc, colors) {
 }
 export function openBeatScore({ getBeat, title = '', who = '', colors = {}, patColors, play, stop, playing, onclose } = {}) {
   const head = h('p', { class: 'scv-head' }), wrap = h('div', { class: 'staff-wrap scv-wrap' }), legend = h('div', { class: 'scv-legend' });
-  let key = '', res = null, sc = null, timer = 0, startedHere = false, lit = new Set(), byStep = null, draws = 0, closed = false;
+  let key = '', res = null, sc = null, timer = 0, startedHere = false, lit = new Set(), byStep = null, draws = 0, closed = false, shownPlaying = false;
   const width = () => Math.max(320, Math.min(1040, innerWidth - 96));
   function draw() {
     const b = getBeat();
@@ -154,7 +154,7 @@ export function openBeatScore({ getBeat, title = '', who = '', colors = {}, patC
     for (const i of lit) if (!want.has(i)) for (const n of res.noteEls.get(i) || []) n.classList.remove('now');
     for (const i of want) if (!lit.has(i)) for (const n of res.noteEls.get(i) || []) n.classList.add('now');
     lit = want;
-    if (!e) label();
+    if (!e || !shownPlaying) { shownPlaying = !!e; label(); }
   }
   return { update() { clearTimeout(timer); timer = setTimeout(() => { if (!closed && body.isConnected) draw(); }, 120); }, step, close, redraw: draw, open: () => !closed && body.isConnected };
 }

@@ -15,13 +15,14 @@ export const tsOf = s => [s.beats * (s.sub === 3 ? 3 : 1), s.sub === 3 ? 8 : 4];
 
 // ── 공통 ──
 //  같은 때 시작한 음 = 한 기둥(길이는 가장 짧은 것) · 겹치면(앞 음이 끝나기 전에 다음이 시작) 둘째 음성으로 · 셋째부터는 앞 음을 그 자리에서 끊음
+//  북(e.h 머리가 있음)은 같은 자리라도 머리가 다르면 따로(짝 ● + 박수 × = 셋째 칸에 둘)
 export function stacksOf(list) {
   const by = new Map();
   for (const e of list) {
     if (!by.has(e.s)) by.set(e.s, { s: e.s, d: e.d, ps: [], hs: e.h ? [] : null, ex: null });
     const st = by.get(e.s);
     st.d = Math.min(st.d, e.d);
-    if (st.ps.includes(e.p)) continue;
+    if (st.ps.some((p, k) => p === e.p && (!st.hs || st.hs[k] === (e.h || 'n')))) continue;   // 같은 음(북은 같은 자리 · 같은 머리)은 한 번
     st.ps.push(e.p); if (st.hs) st.hs.push(e.h || 'n');
     if (e.ex) st.ex = { ...(st.ex || {}), ...e.ex };
   }
