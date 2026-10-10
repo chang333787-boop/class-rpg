@@ -425,6 +425,8 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .bt-cslot .marks i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.12)}
 .bt-cslot .marks i.on{background:var(--c)}
 .bt-cslot.blank{justify-content:center;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.08)}
+.bt-cslot.blank.cont{justify-content:flex-start;background:color-mix(in srgb,var(--c) 10%,var(--bg2));box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--c) 45%,transparent);opacity:.8}   /* [MUSIC-BEAT-1] 앞 화음이 이어지는 빈 칸 */
+.bt-cslot.blank.cont b{font-size:.9rem;opacity:.75}
 .bt-cslot .add{font-size:.76rem;font-weight:800;color:var(--txt3);pointer-events:none}
 .bt-cslot.ph{outline:2px solid rgba(255,228,143,.75);outline-offset:-2px}
 .bt-count{position:absolute;inset:0;z-index:5;display:none;border-radius:14px;pointer-events:none}

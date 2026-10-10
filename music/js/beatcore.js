@@ -271,17 +271,26 @@ export function bassAt(p, i, len) {
   let j = i + 1; while (j < len && p.b[j] === B_EMPTY) j++;
   return { n: v, end: j };
 }
-//  칸 i 에서 화음을 친다면 { ch, d(칸), vel } — 길게 = 화음 칸 처음에 한 번(칸 끝까지) · 쿵짝 · 짧게 톡톡 = 박 안 정한 자리마다
+//  빈 화음 칸 = 앞 화음이 이어진다(베이스 빈칸과 같은 규칙 — '도'만 놓고 '길게'면 패턴 끝까지 도) [MUSIC-BEAT-1 · 검토 반영]
+//   예전에는 빈 칸에서 화음이 끊겨 '도 하나 + 길게'가 한 박만 울렸다 · 우리 장단 카드(['I', -, -])도 이제 마디 내내 깔린다
+//  칸 k 를 맡은 화음 칸 번호(k 이하에서 가장 가까운 채운 칸 · 없으면 -1)
+export function chordOwner(p, k) { for (let j = Math.min(k, p.c.length - 1); j >= 0; j--) if (p.c[j]) return j; return -1; }
+//  칸 i 에서 화음을 친다면 { ch, d(칸), vel } — 길게 = 화음을 놓은 칸 처음에 한 번(다음 화음 칸 · 없으면 패턴 끝까지) · 쿵짝 · 짧게 톡톡 = 박 안 정한 자리마다(빈 칸이면 앞 화음으로)
 export function chordAt(p, g, i) {
-  const sl = slotLen(g), k = Math.floor(i / sl), ch = p.c[k];
-  if (!ch) return null;
-  if (p.cs === 'long') return i % sl === 0 ? { ch, d: sl, vel: 0.75 } : null;
+  const sl = slotLen(g), k = Math.floor(i / sl), k0 = chordOwner(p, k);
+  if (k0 < 0) return null;
+  const ch = p.c[k0];
+  if (p.cs === 'long') {
+    if (i % sl !== 0 || !p.c[k]) return null;
+    let j = k + 1; while (j < p.c.length && !p.c[j]) j++;
+    return { ch, d: (j - k) * sl, vel: 0.75 };
+  }
   const inBeat = i % g.sub, pos = STYLE_POS[p.cs][g.sub];
   if (!pos.includes(inBeat)) return null;
   return { ch, d: p.cs === 'short' ? 1 : g.sub === 4 ? 2 : 1, vel: inBeat === 0 ? 0.8 : 0.62 };
 }
-//  화음 칸 처음인데 그 칸이 비었으면(길게 치던 화음을 거기서 끝낸다)
-export const chordGap = (p, g, i) => i % slotLen(g) === 0 && !p.c[i / slotLen(g)];
+//  화음 칸 처음인데 맡은 화음이 없으면(앞쪽 칸이 모두 비었으면 — 치던 중에 화음을 지운 때 등) 울리던 화음을 거기서 끝낸다
+export const chordGap = (p, g, i) => i % slotLen(g) === 0 && chordOwner(p, i / slotLen(g)) < 0;
 
 // ── 칸 수 바꾸기 ──  박 자리로 옮긴다(16칸 '2박 첫 칸' → 8칸 '2박 첫 칸'). 두 마디 ↔ 한 마디 = 첫 마디만 / 되풀이
 export function convertPattern(p, fromKey, toKey) {

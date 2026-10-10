@@ -219,9 +219,16 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       const ch = p.c[k];
       c.className = 'bt-cslot' + (ch ? '' : ' blank') + (ph >= 0 && Math.floor(ph / sl) === k ? ' ph' : '');
       c.style.setProperty('--c', ch ? CHORD_COLOR[ch] : '#5a4a3a');
-      if (!ch) { c.replaceChildren(h('span', { class: 'add' }, readOnly ? '' : '+ 화음')); return; }
       //  치는 자리 점(길게 = 하나 · 쿵짝 · 짧게 톡톡 = 박마다)
       const marks = []; for (let j = 0; j < sl; j++) marks.push(h('i', { class: C.chordAt(p, G, k * sl + j) ? 'on' : '' }));
+      if (!ch) {
+        //  [MUSIC-BEAT-1] 빈 칸 — 앞 화음이 이어지면 흐리게 '도 이어서'(누르면 새 화음을 놓을 수 있음) · 앞에도 없으면 '+ 화음'
+        const k0 = C.chordOwner(p, k);
+        if (k0 < 0) { c.replaceChildren(h('span', { class: 'add' }, readOnly ? '' : '+ 화음')); return; }
+        c.classList.add('cont'); c.style.setProperty('--c', CHORD_COLOR[p.c[k0]]);
+        c.replaceChildren(h('b', {}, '⟵ ' + C.CHORDS[p.c[k0]].name), h('small', {}, '이어서'), h('span', { class: 'marks', style: { '--m': sl } }, ...marks));
+        return;
+      }
       c.replaceChildren(h('b', {}, C.CHORDS[ch].name), h('small', {}, ch === 'vi' ? '화음 · 단조' : '화음'), h('span', { class: 'marks', style: { '--m': sl } }, ...marks));
     });
   }

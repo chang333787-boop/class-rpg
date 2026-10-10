@@ -220,14 +220,17 @@ await test('칸 수 바꾸기 — 16→8 박 자리 · 8→16 · 16→32 되풀�
   const cb = B.convertBeat(B.emptyBeat(), '32'); eq([cb.grid, cb.pats[2].d.kick.length], ['32', 32]); eq(B.convertBeat(cb, '없음'), cb);
 });
 
-await test('베이스 · 화음 사건 — 다음 음 · 쉼까지 이어짐 · 쉼 = 끊기 · 치는 법 셋 · 빈 화음 칸 = 길게 치던 화음 끝', () => {
+await test('베이스 · 화음 사건 — 다음 음 · 쉼까지 이어짐 · 쉼 = 끊기 · 치는 법 셋 · 빈 화음 칸 = 앞 화음이 이어짐(베이스와 같은 규칙)', () => {
   const g = B.gridOf('16'), p = B.emptyPattern(g);
   p.b[0] = 0; p.b[6] = 3; p.b[8] = B.B_REST; p.b[12] = 5;
   eq(B.bassAt(p, 0, 16), { n: 0, end: 6 }); eq(B.bassAt(p, 6, 16), { n: 3, end: 8 }); eq(B.bassAt(p, 8, 16), { rest: true }); eq(B.bassAt(p, 12, 16), { n: 5, end: 16 }); eq(B.bassAt(p, 3, 16), null);
   p.c = ['I', null, 'V', 'vi'];
   const hitsOf = cs => { p.cs = cs; return Array.from({ length: 16 }, (_, i) => B.chordAt(p, g, i)).map((h, i) => (h ? `${i}${h.ch}:${h.d}` : '')).filter(Boolean).join(' '); };
-  eq(hitsOf('long'), '0I:4 8V:4 12vi:4'); eq(hitsOf('oom'), '2I:2 10V:2 14vi:2'); eq(hitsOf('short'), '0I:1 2I:1 8V:1 10V:1 12vi:1 14vi:1');
-  ok(B.chordGap(p, g, 4) && !B.chordGap(p, g, 0) && !B.chordGap(p, g, 5));
+  eq(hitsOf('long'), '0I:8 8V:4 12vi:4'); eq(hitsOf('oom'), '2I:2 6I:2 10V:2 14vi:2'); eq(hitsOf('short'), '0I:1 2I:1 4I:1 6I:1 8V:1 10V:1 12vi:1 14vi:1');
+  ok(!B.chordGap(p, g, 4) && !B.chordGap(p, g, 0) && !B.chordGap(p, g, 5), '앞 화음이 있으면 끊지 않음');
+  p.c = [null, 'I', null, null]; p.cs = 'long';
+  eq(hitsOf('long'), '4I:12', '도 하나 + 길게 = 패턴 끝까지'); ok(B.chordGap(p, g, 0) && !B.chordGap(p, g, 4) && !B.chordGap(p, g, 8), '맡은 화음이 없는 칸만 끊음');
+  eq([B.chordOwner(p, 0), B.chordOwner(p, 1), B.chordOwner(p, 3)], [-1, 1, 1]);
   const g9 = B.gridOf('9'), q = B.emptyPattern(g9); q.c = ['I', 'IV', 'V']; q.cs = 'oom';
   eq(Array.from({ length: 9 }, (_, i) => (B.chordAt(q, g9, i) ? i : -1)).filter(i => i >= 0), [1, 2, 4, 5, 7, 8], '세 박: 쿵짝짝');
   for (const k of B.CHORD_KEYS) { const n = B.CHORDS[k].notes; ok(n.length === 3 && n.every(x => x >= 57 && x <= 72), k); }

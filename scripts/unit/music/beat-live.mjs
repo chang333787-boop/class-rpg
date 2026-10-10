@@ -198,7 +198,7 @@ try {
     && drums.filter(e => e.r === 'snare' && e.s === 12).every(e => e.v === 2) && drums.filter(e => e.r === 'snare' && e.s === 4).every(e => e.v === 1) && timeOK && L1.ph >= 6,
     `A8 ▶ → 3.4초 동안 울린 북 ${drums.length}번 = 정한 칸만(쿵 0 · 8 / 짝 4 · 12(세게) / 칙 0~7) · 칸 시각 = 시작 + 칸 × ${sd.toFixed(5)}초(마디 2.5초) · 지금 칸 빛`, JSON.stringify({ n: drums.length, bars: [...bars], ph: L1.ph, timeOK }));
   ok(bassEv.length >= 2 && bassEv.filter(e => e.s === 0).every(e => e.n === 0) && bassEv.filter(e => e.s === 8).every(e => e.n === 3) && fired.some(e => e.k === 'bassoff' && e.s === 12)
-    && chordEv.filter(e => e.s === 0).every(e => e.ch === 'I') && chordEv.filter(e => e.s === 8).every(e => e.ch === 'V') && fired.some(e => e.k === 'chordoff'), 'A9 베이스(0칸 도 · 8칸 솔 · 12칸 쉼) · 화음(0칸 도 · 8칸 솔 · 빈 칸에서 끝)');
+    && chordEv.filter(e => e.s === 0).every(e => e.ch === 'I') && chordEv.filter(e => e.s === 8).every(e => e.ch === 'V') && !fired.some(e => e.k === 'chordoff') && !chordEv.some(e => e.s === 4 || e.s === 12), 'A9 베이스(0칸 도 · 8칸 솔 · 12칸 쉼) · 화음(0칸 도 · 8칸 솔 · 빈 칸은 앞 화음이 이어짐 — 끊기 · 새로 치기 없음)');
   const late = L1.log.filter(e => e.k === 'step').length - fired.filter(e => e.k === 'step').length;
   ok(late >= 0 && late <= 2, 'A10 예약은 0.12초 앞까지만(아직 안 울린 칸 ' + late + '개)');
   ok(L1.st.dance.bounce >= 3 && L1.st.dance.wiggle >= 2 && L1.st.dance.flash >= 20, 'A10b 춤 친구가 쿵에 통통 · 짝에 흔들 · 소리 나는 칸이 반짝', JSON.stringify(L1.st.dance));
