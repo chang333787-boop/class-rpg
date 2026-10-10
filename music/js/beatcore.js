@@ -411,6 +411,20 @@ export function starterPattern(st) {
   p.cs = st.cs;
   return p;
 }
+//  [MUSIC-SHOWCASE-1] 예시 비트(showcase.js EX_BEATS 한 줄) → 비트 한 개 — 패턴 A~D(시작 카드 꼴) · 순서 · 이어 붙인 순서대로 · 필인
+//   저장 모양(packBeat)을 한 번 거쳐 살핀 모양(normalizeBeat)으로 돌려준다 — 저장한 비트와 똑같이 다뤄진다(id 없음 = 새 비트)
+export function exampleBeat(ex) {
+  const b = emptyBeat(), g = gridOf(ex && ex.grid);
+  if (!ex || !Array.isArray(ex.pats)) return b;
+  b.grid = g.key; b.title = String(ex.title || '').slice(0, 30);
+  b.bpm = ex.bpm; b.swing = ex.swing || 0; b.kit = own(KITS, ex.kit) ? ex.kit : 'elec'; b.lead = leadOf(ex.lead || LEAD_DEF[b.kit]);
+  b.pats = [0, 1, 2, 3].map(i => (ex.pats[i] ? starterPattern({ d: {}, c: [], ...ex.pats[i], grid: g.key }) : emptyPattern(g)));
+  b.arr = Array.isArray(ex.arr) ? ex.arr.slice(0, 8) : [];
+  b.mode = b.arr.length ? 'song' : 'loop';
+  b.fill = !!ex.fill;
+  for (const r of ex.show || []) if (r in b.show) b.show[r] = true;
+  return normalizeBeat(packBeat(b));
+}
 //  카드를 지금 패턴에 — 빠르기 · 스윙 · 소리 묶음 · 가락 악기도 카드대로. 칸 수가 다르면 다른 패턴도 그 칸 수로 옮긴다(converted)
 export function applyStarter(b, id) {
   const st = STARTERS.find(s => s.id === id);

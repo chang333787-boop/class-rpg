@@ -13,6 +13,7 @@ import { colorOf } from './theory.js';
 import { badWords, hidden } from './safety.js';
 import * as C from './beatcore.js';
 import { BeatKit, BeatMixer } from './beatkit.js';
+import { EX_BEATS, EX_BY } from './showcase.js';   // [MUSIC-SHOWCASE-1] 예시 비트(4학년 음악 친구 작품)
 
 const kit = new BeatKit(engine);        // 구운 소리는 화면을 나갔다 와도 그대로
 const KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon'], CAPS = ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'];
@@ -94,6 +95,14 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
 
   // ── 불러오기 ──
   async function load() {
+    //  [MUSIC-SHOWCASE-1] #/beat/ex.<키> = 예시 비트 — 새 비트로 열고(저장하면 내 비트) 작품 노트를 보여 준다
+    if (ref && ref.startsWith('ex.')) {
+      const ex = EX_BEATS.find(e => e.key === ref.slice(3));
+      if (ex) beat = C.exampleBeat(ex); else { toast('예시 비트를 찾지 못했어요'); setRef(''); }
+      build();
+      if (ex) setTimeout(() => alive && exampleNote(ex), 60);
+      return;
+    }
     if (ref) {
       const m = /^u\.([^.]+)\.([^.]+)$/.exec(ref);
       let raw = null;
@@ -306,11 +315,26 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (tab !== 'class' && stopClass) { stopClass(); stopClass = null; }
     tabBody.replaceChildren(...({ start: sideStart, idea: sideIdea, pad: sidePad, mine: sideMine, class: sideClass }[tab] || sideStart)());
   }
+  //  [MUSIC-SHOWCASE-1] 예시 비트 작품 노트 — 어떻게 만들었나 · 해 볼 것 · ▶ 들어 보기(순서대로 이어서)
+  function exampleNote(ex) {
+    modal(`${ex.em} ${ex.title}`, h('div', { class: 'ex-note' },
+      h('p', { class: 'muted' }, `${ex.kind} · 만든 사람: ${EX_BY} · 패턴 ${beat.pats.filter(p => !C.patternEmpty(p)).length}개 · 순서 ${beat.arr.map(i => L[i]).join(' ')}`),
+      h('h4', {}, '🛠 이렇게 만들었어요'), h('ul', {}, ...ex.notes.map(t => h('li', {}, t))),
+      h('h4', {}, '🙋 이렇게 바꿔 봐요'), h('ul', {}, ...ex.tryIt.map(t => h('li', {}, t))),
+      h('p', { class: 'muted' }, '바꾼 다음 \'저장\'하면 내 비트가 돼요(예시는 그대로 남아요).')),
+      [{ label: '닫기' }, { label: '▶ 들어 보기', primary: true, onclick: c => { c(); if (!playing) play({ count: false }); } }], { wide: true });
+  }
   function sideStart() {
     return [h('p', { class: 'bt-help' }, '카드를 누르면 지금 패턴(', h('b', {}, L[beat.cur]), ')에 북 · 가락 · 베이스 · 화음이 들어가요. 그다음 칸을 바꿔 내 비트로!'),
       h('div', { class: 'bt-cards' }, ...C.STARTERS.map(st => h('button', { class: 'bt-card', onclick: () => useStarter(st.id) },
         h('span', { class: 'em' }, st.em), h('b', {}, st.name), h('small', {}, st.desc),
-        h('i', {}, `${C.KITS[st.kit].name}${st.m ? ` · ${C.LEADS[C.leadOf(st.lead)].name} 가락` : ''} · 빠르기 ${st.bpm}${st.swing ? ` · 통통 ${st.swing}%` : ''}${st.grid !== '16' ? ` · ${C.GRIDS[st.grid].name}` : ''}`))))];
+        h('i', {}, `${C.KITS[st.kit].name}${st.m ? ` · ${C.LEADS[C.leadOf(st.lead)].name} 가락` : ''} · 빠르기 ${st.bpm}${st.swing ? ` · 통통 ${st.swing}%` : ''}${st.grid !== '16' ? ` · ${C.GRIDS[st.grid].name}` : ''}`)))),
+      //  [MUSIC-SHOWCASE-1] 예시 비트 — 패턴 넷 · 순서까지 다 들어 있는 작품(열면 새 비트로)
+      h('h4', { class: 'bt-exh' }, '🌟 예시 비트 — 패턴 넷 · 순서까지'),
+      h('p', { class: 'bt-help' }, `${EX_BY}가 만든 작품이에요. 열어서 들어 보고, 바꿔서 내 비트로!`),
+      h('div', { class: 'bt-cards' }, ...EX_BEATS.map(ex => h('button', { class: 'bt-card ex', 'data-ex': ex.key, onclick: () => ctx.go('#/beat/ex.' + ex.key) },
+        h('span', { class: 'em' }, ex.em), h('b', {}, ex.title), h('small', {}, ex.line),
+        h('i', {}, `${C.KITS[ex.kit].name} · ${C.LEADS[C.leadOf(ex.lead)].name} 가락 · 빠르기 ${ex.bpm}${ex.swing ? ` · 통통 ${ex.swing}%` : ''} · 순서 ${ex.arr.map(i => L[i]).join('')}`))))];
   }
   function sideIdea() {
     const G = g(), len = C.lenOf(G), rows = visibleRows();

@@ -15,6 +15,7 @@ import { mountRhythm } from './rhythm.js';
 import { mountTeacher } from './teacher.js';
 import { assignFromUrl, loadAssign, watchAssign, watchMine, reportAssign, onClassPause } from '../../common/assign.js';
 import { rhythmSettings, rhythmPatch, myLine } from './assign-music.js';
+import { EX_SONGS, EX_BEATS, EX_BY, exampleSong } from './showcase.js';   // [MUSIC-SHOWCASE-1] 예시 작품(4학년 음악 친구)
 
 const Q = new URLSearchParams(location.search);
 // 선생님은 관리 화면에서 ?teacher=1 로 연다 → sid 'teacher' 로 같은 저장소(선생님이 지은 곡도 음악회에 올릴 수 있다)
@@ -63,6 +64,7 @@ const ctx = {
     if (ref === '_temp') return temp;
     if (ref.startsWith('lib_')) return LIB.find(s => s.id === ref) || null;
     if (ref.startsWith('ts_')) return (await teacherSongs()).find(s => s.id === ref) || null;   // [MUSIC-TSONG-1]
+    if (ref.startsWith('ex_')) return exampleSong(ref.slice(3));   // [MUSIC-SHOWCASE-1] 예시 곡(작곡에서 열면 '바꿔 쓰기' 새 곡)
     if (ref.startsWith('u.')) {
       const [, owner, id] = ref.split('.');
       const raw = await store.getSong(owner, id);
@@ -107,6 +109,7 @@ function mountHome(root) {
           h('span', { class: 'keys' }, ...'ASDFJKL;'.split('').map(k => h('i', {}, k)))),
         h('button', { class: 'door d-beat', onclick: () => ctx.go('#/beat') },   // [MUSIC-BEAT-1]
           h('img', { src: '../assets/monsters/m23.png', alt: '' }), h('b', {}, '비트 만들기'), h('span', {}, '쿵 짝 칙! 짧은 마디를 반복하며 북 · 베이스 · 화음을 쌓아요'))),
+      showcaseShelf(),
       h('div', { class: 'shelf' },
         h('section', {}, h('h2', {}, '내 곡', h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/new') }, '+ 새 곡')), mine),
         h('section', {}, h('h2', {}, '우리 반 음악회'), concert)))));
@@ -122,6 +125,26 @@ function mountHome(root) {
   store.listPractice().then(p => { const n = p.reduce((a, x) => a + (x.n || 0), 0); if (n) logLine.textContent = `리코더 기록장 · ${n}번`; }).catch(() => {});
   teacherSongs().then(list => { if (list.length) { tsBadge.textContent = `선생님 곡 ${list.length}`; tsBadge.style.display = ''; } }).catch(() => {});
   return { unmount: () => { stopWatch && stopWatch(); listenPlayer.stop(); } };
+}
+
+// ── 예시 작품 [MUSIC-SHOWCASE-1] ──  '이렇게도 만들 수 있어요' — 누르면 작곡 · 비트 화면에서 열려 작품 노트 → ▶ 들어 보기 · 바꿔서 내 것으로
+//  작곡 곡 카드: ▶ = 여기서 바로 듣기(오케스트라 그대로) · 🪈 = 리코더로 같이 불기(바로크식으로 불 수 있는 곡만)
+function showcaseShelf() {
+  const card = (x, kind) => {
+    const open = () => ctx.go(kind === 'song' ? '#/compose/ex_' + x.key : '#/beat/ex.' + x.key);
+    const acts = [];
+    if (kind === 'song') {
+      const s = exampleSong(x.key);
+      const play = h('button', { class: 'play-i', title: '듣기', 'aria-label': x.title + ' 듣기', onclick: e => { e.stopPropagation(); listen(s, play); } });
+      acts.push(play);
+      if (recorderOK(s, 'baroque')) acts.push(h('button', { class: 'btn small sc-rec', title: '오케스트라 반주에 맞춰 리코더로 불어요', onclick: e => { e.stopPropagation(); ctx.go('#/practice/ex_' + x.key); } }, '🪈 리코더로'));
+    }
+    return h('div', { class: 'sc-card k-' + kind, role: 'button', tabindex: 0, 'data-ex': x.key, title: '열어서 어떻게 만들었는지 보기', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
+      h('span', { class: 'em' }, x.em), h('b', {}, x.title), h('small', {}, x.line), h('i', {}, x.kind), acts.length ? h('div', { class: 'sc-acts' }, ...acts) : null);
+  };
+  return h('section', { class: 'showcase' },
+    h('h2', {}, '🌟 이렇게도 만들 수 있어요', h('small', {}, `${EX_BY}가 이 음악실로 만든 작품 — 눌러서 어떻게 만들었는지 보고, 바꿔서 내 것으로!`)),
+    h('div', { class: 'sc-cards' }, ...EX_SONGS.map(x => card(x, 'song')), ...EX_BEATS.map(x => card(x, 'beat'))));
 }
 
 const tagOf = s => `${meterOf(s).key} · ${s.bars}마디 · ${SCALES[s.scale]?.short || ''}`;
