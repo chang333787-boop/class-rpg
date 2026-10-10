@@ -88,7 +88,7 @@ function _assignMusicTsLoad(forKey) {
     _assignMusicTsBusy = false;
     if (err) { console.warn('[ASSIGN-TSONG-1] 선생님 곡', err); if (!Array.isArray(_assignMusicTs)) _assignMusicTs = 'err'; }
     else _assignMusicTs = _assignMusicTsList(val);
-    _assignMusicTsRefresh();
+    try { _assignMusicTsRefresh(); } catch (e) { console.warn('[ASSIGN-TSONG-1] 다시 그리기', e); }
   };
   timer = setTimeout(() => done(null, '시간 초과'), ASSIGN_MUSIC_TS_WAIT);
   try { db.ref(ASSIGN_MUSIC_TS_PATH).once('value').then(s => done(s.val()), e => done(null, e)); }
