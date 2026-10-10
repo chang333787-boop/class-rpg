@@ -537,7 +537,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
   //  [MUSIC-SCORE-1] 🎼 악보 — 북 · 가락 · 베이스 오선 + 화음 이름 + 칸판 줄 안내 · 인쇄 · ▶ 들으며 보기(울리는 칸이 악보에서 빛남)
   function openScore() {
-    if (scoreView) return;
+    if (scoreView && scoreView.open()) return;
     const title = readOnly ? `${ownerName || '친구'}의 비트${beat.title ? ' · ' + beat.title : ''}` : beat.title || '내 비트';
     scoreView = openBeatScore({ getBeat: () => beat, title, who: readOnly ? '' : me.name || '', colors: ROW_COLOR, patColors: PAT_COLOR,
       play: () => play({ count: false }), stop: () => stop(), playing: () => playing, onclose: () => { scoreView = null; } });

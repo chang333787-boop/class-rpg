@@ -134,7 +134,7 @@ export function renderStaff(song, o = {}) {
 // 한 오선 · 한 마디 그리기(가락 또는 화음). 같은 때 음(ps)은 한 기둥에 쌓는다
 //  [MUSIC-SCORE-1] 고를 것(안 주면 예전 그대로): posOf 음 → 자리(낮은음자리표 · 북 자리) · stem 기둥 방향 고정('up'|'down') · acc 올림표 그리기 · unison 같은 자리 음 옆으로 ·
 //   restDy 쉼표 위아래 · hideRests 쉼표 안 그림 · solY 계이름 높이 · words 'lab' = 계이름 대신 it.lab(칸에 적힌 글)
-function drawBar(root, items, top, X, { song, words, addEl, ties, o, carry, posOf = staffPos, stem, acc = true, unison = false, restDy = 0, hideRests = false, solY = 34 }) {
+function drawBar(root, items, top, X, { song, words, addEl, ties, o, carry, posOf = staffPos, stem, acc = true, unison = false, restDy = 0, hideRests = false, solY = 34, labFs = 0 }) {
   const bottom = top + 4 * LG, yOf = pos => bottom - pos * (LG / 2);
   // 이음줄 묶음: 같은 박 안의 8분·16분(쉼표 없이 이어진 것)
   const groups = []; let g = null;
@@ -185,7 +185,7 @@ function drawBar(root, items, top, X, { song, words, addEl, ties, o, carry, posO
         }
       }
     }
-    if (words === 'lab' && it.first && it.lab) el.append(svg('text', { x: cx, y: bottom + solY, 'text-anchor': 'middle', class: 'st-sol', fill: colorOf(it.ps[it.ps.length - 1]) }, it.lab));   // [MUSIC-SCORE-1] 칸에 적힌 글 그대로
+    if (words === 'lab' && it.first && it.lab) el.append(svg('text', { x: cx, y: bottom + solY, 'text-anchor': 'middle', class: 'st-sol', fill: colorOf(it.ps[it.ps.length - 1]), ...(labFs ? { style: `font-size:${labFs}px` } : {}) }, it.lab));   // [MUSIC-SCORE-1] 칸에 적힌 글 그대로
     else if (words && it.first && o.solfege !== false) {
       const p = it.ps[0], nm = solfege(p, { short: true });
       el.append(svg('text', { x: cx, y: bottom + solY, 'text-anchor': 'middle', class: 'st-sol', fill: colorOf(p) }, nm));
@@ -285,7 +285,7 @@ function drawTies(root, ties) {
   }
 }
 //  오선 하나가 위아래로 얼마나 차지하나(오선 맨 윗줄 = 0 · 맨 아랫줄 = 40) — 덧줄 · 기둥 · 붙임표 · 계이름까지
-function extentOf(st, items, minA = 14, minB = 12) {
+function extentOf(st, items, minA = 14, minB = 12, pad = 4) {
   const P = posFn(st), yOf = pos => 40 - pos * 5;
   let top = 0, bot = 40;
   for (const [it, stem] of items) {
@@ -296,8 +296,8 @@ function extentOf(st, items, minA = 14, minB = 12) {
     if (up) { top = Math.min(top, yOf(hi) - (it.base === 'w' ? 8 : 37) - art); bot = Math.max(bot, yOf(lo) + 7 + (ex.stacc ? 10 : 0)); }
     else { bot = Math.max(bot, yOf(lo) + (it.base === 'w' ? 8 : 37) + art); top = Math.min(top, yOf(hi) - 7 - (ex.stacc ? 10 : 0)); }
   }
-  if (st.words) bot = Math.max(bot, 40 + (st.solY || 30) + 5);
-  return { above: Math.max(minA, -top + 4), below: Math.max(minB, bot - 40 + 4) };
+  if (st.words) bot = Math.max(bot, 40 + (st.solY || 30) + 4);
+  return { above: Math.max(minA, -top + pad), below: Math.max(minB, bot - 40 + pad) };
 }
 //  한 마디가 쉼뿐이면 '온마디 쉼'(가운데 온쉼표 하나)
 const barRest = (items, bs) => (items.length && items.every(it => it.rest) ? [{ rest: true, base: 'w', dots: 0, x: (bs - 1) / 2 }] : items);
@@ -311,15 +311,25 @@ export function renderScore(score, o = {}) {
   const clefX = A ? 2 : (named ? NAMEW : 4);
   const left0 = A ? A.left : clefX + CLEFW;
   //  칸마다(음성마다) 마디별 조각 — 두째 음성은 음이 없는 마디를 비운다(쉼표 숨김)
+  //  계이름 줄 높이 — 오선 아래로 내려간 음(덧줄)보다 아래에(오선마다 한 번 · 맞춤 모드는 음 범위로)
+  const solYs = staves.map((st, k) => {
+    if (!st.words) return 0;
+    const P = posFn(st);
+    let lo = Infinity;
+    if (A && o.ranges && o.ranges[k]) lo = P(o.ranges[k][0]);
+    else for (const v of st.voices) for (const e of v.events || []) for (const p of e.ps) lo = Math.min(lo, P(p));
+    return Math.max(st.solY || 30, Number.isFinite(lo) ? -lo * 5 + 19 : 0);
+  });
   const lay = staves.map(st => st.voices.map((v, k) => {
     const bars2 = layoutVoice(song, v.events || []);
     return bars2.map(items => (items.some(it => !it.rest) ? items : k > 0 ? [] : barRest(items, bs)));
   }));
   //  위아래 자리(맞춤 모드 = 음 범위로 고정 · 음을 놓아도 높이가 안 바뀜)
   const ext = staves.map((st, k) => {
-    if (A && o.ranges && o.ranges[k]) { const [lo, hi] = o.ranges[k], its = []; for (let p = lo; p <= hi; p++) its.push([{ ps: [p], base: 'q' }, null]); return extentOf(st, its, 10, 8); }
+    const st2 = st.words ? { ...st, solY: solYs[k] } : st;
+    if (A && o.ranges && o.ranges[k]) { const [lo, hi] = o.ranges[k], its = []; for (let p = lo; p <= hi; p++) its.push([{ ps: [p], base: 'q' }, null]); return extentOf(st2, its, 8, 6, 1); }
     const its = []; st.voices.forEach((v, j) => lay[k][j].forEach(b => b.forEach(it => its.push([{ ...it, dy: v.restDy || 0 }, v.stem]))));
-    return extentOf(st, its);
+    return extentOf(st2, its);
   });
   const chordStaff = Math.min(staves.length - 1, Math.max(0, score.chordStaff || 0));
   const hasChords = (score.chords || []).length > 0, hasKo = hasChords && score.chords.some(c => c.ko);
@@ -334,8 +344,9 @@ export function renderScore(score, o = {}) {
   const rep = score.repeat || null;
   //  세로 자리 — 표시(글자 · 빠르기) 줄 · 화음 줄 · 오선마다(위 여백 · 오선 · 아래 여백)
   const marksAt = L => (score.marks || []).some(m => Math.floor(m.bar / perLine) === L) || (L === 0 && !!score.tempo);
-  const sysH = L => (marksAt(L) ? 20 : 0) + (hasChords ? (hasKo ? 30 : 18) : 0) + ext.reduce((a, e) => a + e.above + 40 + e.below, 0) + (staves.length - 1) * (A ? 4 : 8) + 10;
-  const tops = []; let H = 6;
+  const chordH = hasChords ? (hasKo ? 30 : A ? 14 : 18) : 0;
+  const sysH = L => (marksAt(L) ? 20 : 0) + chordH + ext.reduce((a, e) => a + e.above + 40 + e.below, 0) + (staves.length - 1) * (A ? 2 : 8) + (A ? 2 : 10);
+  const tops = []; let H = A ? 1 : 6;
   for (let L = 0; L < lines; L++) { tops.push(H); H += sysH(L) + (A ? 0 : 12); }
   const totalW = A ? A.left + bars * bs * A.stepW + 2 : W;
   const root = svg('svg', { viewBox: `0 0 ${totalW} ${H}`, width: totalW, height: H, class: 'staff score' + (o.cls ? ' ' + o.cls : '') });
@@ -347,8 +358,8 @@ export function renderScore(score, o = {}) {
     const b0 = L * perLine, b1 = Math.min(bars, b0 + perLine);
     let y = tops[L];
     const marksY = marksAt(L) ? (y += 20) - 6 : null;
-    const chordY = hasChords ? (y += hasKo ? 30 : 18) - (hasKo ? 15 : 4) : null;
-    const staffTop = staves.map((st, k) => { y += ext[k].above; const t = y; y += 40 + ext[k].below + (A ? 4 : 8); return t; });
+    const chordY = hasChords ? (y += chordH) - (hasKo ? 15 : A ? 2 : 4) : null;
+    const staffTop = staves.map((st, k) => { y += ext[k].above; const t = y; y += 40 + ext[k].below + (A ? 2 : 8); return t; });
     const left = A ? A.left : left0 + (L === 0 ? TSW : 0);
     let barW = A ? bs * A.stepW : (W - left - 8) / perLine;
     if (!A) barW = Math.min(barW, bs * 44 + 30);
@@ -432,8 +443,9 @@ export function renderScore(score, o = {}) {
         for (let b = b0; b < b1; b++) {
           const items = lay[k][j][b];
           if (!items || !items.length) continue;
-          drawBar(sg, items, top, it => X(b, it.x), { song, words: st.words ? st.words : false, addEl, ties, o: { solfege: true, lyrics: false }, carry: carries[k][j],
-            posOf: P, stem: v.stem, acc: !isPerc(st.clef), unison: isPerc(st.clef), restDy: v.restDy || 0, solY: st.solY || 30 });
+          const sw = A ? A.stepW : (barW - 18 - padOf(b)) / bs, labFs = sw < 19 ? 10.5 : sw < 25 ? 11.5 : 0;   // 칸이 좁으면 칸 글자를 작게(옆 글자와 안 겹치게)
+          drawBar(sg, items, top, it => X(b, it.x), { song, words: st.words ? st.words : false, addEl, ties, o: { solfege: true, lyrics: false }, carry: carries[k][j], labFs,
+            posOf: P, stem: v.stem, acc: !isPerc(st.clef), unison: isPerc(st.clef), restDy: v.restDy || 0, solY: solYs[k] || 30 });
         }
       });
     });

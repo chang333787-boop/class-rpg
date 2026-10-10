@@ -156,5 +156,5 @@ export function openBeatScore({ getBeat, title = '', who = '', colors = {}, patC
     lit = want;
     if (!e) label();
   }
-  return { update() { clearTimeout(timer); timer = setTimeout(() => { if (!closed) draw(); }, 120); }, step, close, redraw: draw };
+  return { update() { clearTimeout(timer); timer = setTimeout(() => { if (!closed && body.isConnected) draw(); }, 120); }, step, close, redraw: draw, open: () => !closed && body.isConnected };
 }

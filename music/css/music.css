@@ -571,15 +571,16 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .staff.score{margin:0 auto}
 .staff.mini{background:transparent;border-radius:0;flex:none}
 /* 작곡 띠 — 칸판 바로 아래(같이 가로로 밀림) */
-.c-strip{padding-top:6px}
+.c-strip{padding-top:4px}
 .c-strip .staff{border-radius:10px}
+.c-strip .st-sol{font-size:12px}
 /* 악보 보기 창 두 칸 · 총보 안내 */
 .scv-tabs{margin-bottom:10px}
 .scv-note{margin-top:8px;font-size:.88rem;line-height:1.55}
 .scv-note .muted{font-size:.82rem;margin-top:4px}
 /* 비트 악보 창 */
 .scv-beat .scv-head{margin-bottom:8px;font-size:.92rem;color:var(--txt2)}
-.scv-beat .scv-wrap{max-height:calc(100vh - 330px);min-height:150px}
+.scv-beat .scv-wrap{max-height:none;overflow-x:auto;overflow-y:visible}
 .scv-legend{margin-top:10px}
 .scv-legend h4{font-size:.86rem;font-weight:900;color:var(--txt3);margin-bottom:6px}
 .scv-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:6px}

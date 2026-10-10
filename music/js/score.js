@@ -79,7 +79,7 @@ export function songChords(song) {
 // ── ① 작곡 '악보 같이 보기' — 가락(+ 아이가 쌓은 화음 = 둘째 오선) ──
 export function melodyScore(song, { harmony = true } = {}) {
   const hasH = harmony && (song.harm || []).length > 0;
-  const staves = [{ id: 'mel', name: '가락', clef: 'treble', words: true, solY: 25, voices: [{ events: song.notes.map((n, i) => ({ s: n.s, d: n.d, ps: [n.p], i })) }] }];
+  const staves = [{ id: 'mel', name: '가락', clef: 'treble', words: true, solY: 22, voices: [{ events: song.notes.map((n, i) => ({ s: n.s, d: n.d, ps: [n.p], i })) }] }];
   if (hasH) staves.push({ id: 'harm', name: '화음', clef: 'treble', voices: [{ events: harmStacks(song.harm) }] });
   return { beats: song.beats, sub: song.sub, bars: song.bars, ts: tsOf(song), staves, chords: songChords(song) };
 }
@@ -220,7 +220,7 @@ export function beatScore(b, { patColors = ['#f2a93b', '#4cc9b0', '#ff8ab3', '#b
   if (mel.length) staves.push({ id: 'mel', name: '가락', sub: C.LEADS[C.leadOf(b.lead)].name, clef: 'treble', oct: LEAD_OCT[C.leadOf(b.lead)] || 1, words: 'lab', solY: 26, voices: [{ events: mel }] });
   if (bass.length) staves.push({ id: 'bass', name: '베이스', clef: 'bass', oct: b.kit === 'kor' ? 1 : 0, words: 'lab', solY: 26, voices: [{ events: bass }] });
   staves.push({ id: 'drums', name: b.kit === 'kor' ? '장단' : '북', sub: C.KITS[C.KIT_KEYS.includes(b.kit) ? b.kit : 'elec'].name, clef: 'perc', oct: 0,
-    voices: [{ stem: 'up', restDy: -8, events: hands }, { stem: 'down', restDy: 12, events: feet }] });
+    voices: [{ stem: 'up', restDy: -8, events: hands }, { stem: 'down', restDy: 22, events: feet }] });
   const swingTxt = b.swing > 0 && C.swingable(G) ? `통통 튀게 ${b.swing}%` : '';
   return { beats: G.beats, sub, bars: order.length * G.bars, ts: tsOf({ beats: G.beats, sub }), staves, chords, marks,
     repeat: song ? null : { from: 0, to: G.bars - 1 }, tempo: { bpm: b.bpm, dotted: sub === 3, ...(swingTxt ? { extra: swingTxt } : {}) },

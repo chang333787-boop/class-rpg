@@ -113,8 +113,10 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     lyricRow.style.display = lyricsOn ? '' : 'none';
     const steps = totalSteps(song);
     cellW = clamp(Math.floor((Math.max(400, main.clientWidth - 8) - LABEL) / steps), 16, 46);
-    stripH = scoreOn ? strip.render(song, stripGeom()) + 6 : 0;   // [MUSIC-SCORE-1] 띠 높이만큼 칸 줄을 낮춘다(음 범위로 정해져 음을 놓아도 그대로)
-    const avH = Math.max(scoreOn ? rows.length * 22 : 200, root.clientHeight - 50 - 46 - 34 - (lyricsOn ? 44 : 0) - 74 - stripH);
+    //  [MUSIC-SCORE-1] 띠 높이만큼 칸 줄을 낮춘다(띠 높이는 음 범위로 정해져 음을 놓아도 그대로) · 도구 줄(1366 에서 두 줄) · 코치 칸은 잰 높이로
+    stripH = scoreOn ? strip.render(song, stripGeom()) + 4 : 0;
+    const fixed = 16 + tools.offsetHeight + 6 + 36 + (lyricsOn ? lyricRow.offsetHeight + 6 : 0) + 6 + coachBox.offsetHeight;
+    const avH = Math.max(scoreOn ? rows.length * 22 : 200, root.clientHeight - 50 - fixed - stripH);
     rowH = clamp(Math.floor(avH / rows.length), 22, 40);
     renderGrid();
   }
@@ -122,7 +124,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   const stripGeom = () => ({ left: LABEL, stepW: cellW, rows: [rows[rows.length - 1], rows[0]] });
   function stripNow() {
     if (!scoreOn || !rows.length) return;
-    const hh = strip.render(song, stripGeom()) + 6;
+    const hh = strip.render(song, stripGeom()) + 4;
     if (hh !== stripH) requestAnimationFrame(layout);   // 화음 칸을 처음 놓거나 다 지우면 오선이 늘고 줄어 → 칸 줄 높이를 다시
   }
   const stripSoon = () => { if (scoreOn && !stripRaf) stripRaf = requestAnimationFrame(() => { stripRaf = 0; stripNow(); }); };   // 끌어 늘이는 동안(한 그림에 한 번)
