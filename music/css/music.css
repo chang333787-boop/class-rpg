@@ -523,3 +523,24 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
   .top .bt-title{width:84px}
   .bt-mode button{padding:0 8px}
 }
+
+/* ── 예시 작품 [MUSIC-SHOWCASE-1] ── 첫 화면 '🌟 이렇게도 만들 수 있어요' · 작품 노트 · 비트 시작 카드의 예시 칸 */
+.showcase h2{font-size:.98rem;font-weight:900;color:var(--txt2);margin-bottom:10px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.showcase h2 small{font-size:.78rem;font-weight:600;color:var(--txt3)}
+.sc-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.sc-card{position:relative;display:flex;flex-direction:column;gap:3px;min-height:118px;padding:12px 12px 10px;border-radius:14px;background:var(--bg2);border:1px solid var(--line);cursor:pointer;text-align:left;transition:transform .12s,border-color .12s}
+.sc-card:hover,.sc-card:focus-visible{transform:translateY(-2px);border-color:var(--gold);outline:none}
+.sc-card.k-beat{background:linear-gradient(160deg,#20262d,var(--bg2) 70%)}
+.sc-card .em{font-size:1.45rem;line-height:1}
+.sc-card b{font-size:.98rem;font-weight:900;padding-right:40px}
+.sc-card small{font-size:.76rem;line-height:1.35;color:var(--txt2)}
+.sc-card i{margin-top:auto;font-style:normal;font-size:.7rem;font-weight:700;color:var(--gold2)}
+.sc-card .sc-acts{position:absolute;right:10px;top:10px;display:flex;gap:6px;align-items:center}
+.sc-card .sc-acts .sc-rec{height:30px;padding:0 .55rem;font-size:.75rem}
+.ex-note h4{margin:12px 0 6px;font-size:.92rem;font-weight:900;color:var(--gold2)}
+.ex-note ul{padding-left:1.2rem;display:grid;gap:5px;line-height:1.5}
+.ex-note p.muted{line-height:1.5}
+.bt-exh{margin:16px 0 4px;font-size:.9rem;font-weight:900;color:var(--gold2)}
+.bt-card.ex{border:1px solid color-mix(in srgb,var(--gold) 45%,transparent)}
+@media (max-width:760px){.sc-cards{grid-template-columns:1fr 1fr}.sc-card .sc-acts{position:static;margin-top:6px}.sc-card b{padding-right:0}}
+

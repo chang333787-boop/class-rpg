@@ -183,11 +183,11 @@ try {
   ok(dP === true && await until(S, `location.hash === '#/beat' && !!document.querySelector('.bt-grid .bt-cell')`, 10000), 'A2 \'비트 만들기\' 문(가려지지 않음) → #/beat 칸판', String(dP));
   ok(await until(S, `!!window.__beat && window.__beat.ready() === true`, 10000), 'A3 전자 북 소리 굽기 끝(window.__beat · debug=1 일 때만)');
   const lay = await S.ev(`({ labs: [...document.querySelectorAll('.bt-lab b')].map(b => b.textContent), cells: document.querySelectorAll('.bt-cell').length, nums: [...document.querySelectorAll('.bt-num b')].map(b => b.textContent).join(''), b1: document.querySelectorAll('.bt-cell.b1').length,
-    tabs: [...document.querySelectorAll('.bt-tab')].map(b => b.textContent), cards: document.querySelectorAll('.bt-card').length, bpm: document.querySelector('.bt-val').textContent, scrollX: document.scrollingElement.scrollWidth - innerWidth,
+    tabs: [...document.querySelectorAll('.bt-tab')].map(b => b.textContent), cards: document.querySelectorAll('.bt-card:not(.ex)').length, exCards: document.querySelectorAll('.bt-card.ex').length, bpm: document.querySelector('.bt-val').textContent, scrollX: document.scrollingElement.scrollWidth - innerWidth,
     mainOver: document.querySelector('.bt-main').scrollHeight - document.querySelector('.bt-main').clientHeight,
     mcells: document.querySelectorAll('.bt-mcell').length, seg: [...document.querySelectorAll('.bt-palseg button')].map(b => b.textContent).join(','),
     tipBottom: Math.round(document.querySelector('.bt-tip').getBoundingClientRect().bottom), palBottom: Math.round(document.querySelector('.bt-pal').getBoundingClientRect().bottom) })`);
-  ok(lay && same(lay.labs, ['쿵', '짝', '박수', '칙', '치이', '통', '가락', '베이스', '화음']) && lay.cells === 96 && lay.mcells === 16 && lay.nums === '1234' && lay.b1 === 48 && lay.cards === 7 && lay.bpm === '96' && lay.scrollX <= 0 && lay.mainOver <= 0
+  ok(lay && same(lay.labs, ['쿵', '짝', '박수', '칙', '치이', '통', '가락', '베이스', '화음']) && lay.cells === 96 && lay.mcells === 16 && lay.nums === '1234' && lay.b1 === 48 && lay.cards === 7 && lay.exCards === 3 && lay.bpm === '96' && lay.scrollX <= 0 && lay.mainOver <= 0
     && lay.seg === '베이스,가락,화음' && lay.tipBottom <= 610 && lay.palBottom < lay.tipBottom,
     'A4 줄 여섯(쿵 짝 박수 칙 치이 통) + 가락 · 베이스 · 화음 · 16칸 × 6 + 가락 16칸 · 박 1~4 · 박마다 칠(둘째 · 넷째 박) · 카드 일곱 · 빠르기 96 · 붓 상자 베이스 | 가락 | 화음 · 1366×610 에 다 들어감(팁까지)', JSON.stringify(lay));
   await S.shot('A_beat_empty');
