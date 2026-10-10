@@ -336,7 +336,8 @@ async function routeAssign(my) {
   if (location.hash !== want) { history.replaceState(null, '', want); shownHash = location.hash; }   // 다른 길(홈 · 작곡 …)은 과제 곡으로 되돌린다
   const song = await ctx.resolve(asg.set.song);
   if (my !== seq) return;
-  if (!song) { current = asgScreen('🎵', '곡을 찾지 못했어요', '선생님께 알려 주세요'); return; }
+  //  [ASSIGN-TSONG-1] 선생님 곡(ts_)을 음악실에서 지웠거나 바꿨으면 깨지지 않고 한 줄 · [다시 불러오기] = 잠깐 못 읽었던 때
+  if (!song) { current = asgScreen('🎵', asg.set.song.startsWith('ts_') ? '선생님 곡이 바뀌었어요' : '곡을 찾지 못했어요', '선생님께 알려 주세요', h('button', { class: 'btn', onclick: () => location.reload() }, '다시 불러오기')); return; }
   current = mountRhythm(app, ctx, { song, key: songKey(song), assign: { ...asg.set, live: A.live, line: () => myLine(asg.cell), send: sendAssign } });
 }
 //  한 판 끝 → 선생님께(RPG 안이면 부모 학생 화면이 쓴다 · 2초 안에 답이 없으면 직접) → 'ok' | 'closed' | 'fail'

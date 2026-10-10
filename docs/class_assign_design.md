@@ -87,7 +87,7 @@ classRPG_assign/                                   (새 루트 — classRPG_v3 �
 | `kind` | `'quiz'` \| `'coding'` \| `'music'` | 내용 종류 |
 | `content.quiz` | `{ subject, items:[문항 사본…] (1~30), passages:{<pid>:{id,title,text}}, src:{how:'pick'\|'auto', units:[…], n, cat} }` | 문항 사본 = 은행 문항 객체 그대로(id · unitId · type · cat · level · q · a · alt · choices · hint · fig · audio · lang · passageId) — **choices 만 보낼 때 한 번 섞음**(OX 는 O · X 그대로) |
 | `content.coding` | `{ stages:['2-3','2-4'] }` (1~3) | 기초 코딩 판 id(coding/js/stages.js · 66판) |
-| `content.music` | `{ song:'lib_nabiya', level:'easy'\|'normal'\|'hard'\|'expert', tempo:1\|0.8, keys:0\|4\|6\|8 }` | 음악실 기본 곡 15곡 중 하나 · 난이도 · 빠르기 · 키 수(0 = 난이도 기본 · 아이 기기 설정 무시 — 반박 #15) |
+| `content.music` | `{ song:'lib_nabiya'\|'ts_<곡키>', level:'easy'\|'normal'\|'hard'\|'expert', tempo:1\|0.8, keys:0\|4\|6\|8 }` | 음악실 기본 곡 15곡(`lib_`) 또는 🎤 선생님 곡(`ts_` · 반 저장소 `classRPG_music/tsongs` — 관리 고르기 둘째 칸 · 음악실에서 지운 곡이면 아이 화면 '선생님 곡이 바뀌었어요') 중 하나 — 곡 id 는 `AssignCore.musicSongOK`(lib_ · ts_ + 곡키 1~40자)만 [ASSIGN-TSONG-1] · 난이도 · 빠르기 · 키 수(0 = 난이도 기본 · 아이 기기 설정 무시 — 반박 #15) |
 | `deliver` | `'inbox'` \| `'live'` | 보내는 법 |
 | `pacing` | `'self'` \| `'step'` | 진행(과제함 = 늘 self · step 은 문제 묶음 + 수업만) |
 | `showAnswer` | bool(기본 true) | 각자 풀기에서 문제마다 정답을 바로 보여 줄지(끄면 끝/정리 때) |
