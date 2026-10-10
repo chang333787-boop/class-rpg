@@ -8,7 +8,8 @@
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
 import { blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
-  currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem } from '../../../mathgap/js/today.js';
+  currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
+  startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark } from '../../../mathgap/js/today.js';
 import { kidFrom, createStore } from '../../../mathgap/js/store.js';
 import { rng } from '../../../mathgap/js/core/math.js';
 
@@ -21,14 +22,14 @@ const DAY = 864e5, T0 = new Date(2026, 9, 12, 9, 0).getTime();
 const roundtrip = (kid) => JSON.parse(JSON.stringify(kid));
 
 // 가상 아이 — gaps 에 든 차시와 그 위(언제나 필요한 줄)는 못 푼다. learn: 연습에서 틀리고 풀이를 n번 보면 그 차시를 배운다
-function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000 } = {}) {
+function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000, factMs = 1500 } = {}) {
   const seen = {};
   const okC = (c) => !gaps.has(c) && corePre(c).every(okC);
   const can = (c, p) => !gaps.has(c) && preOf(c, p).every(okC);
   return {
     gaps,
     respond(c, p, item) {
-      const t = ms + Math.floor(R.next() * 3000);
+      const t = (c.startsWith('2-2-2:') ? factMs : ms) + Math.floor(R.next() * (c.startsWith('2-2-2:') ? 1000 : 3000));   // 구구단은 2~3초
       if (can(c, p) && !R.chance(slip)) return { vals: item.sol.map(Number), raws: item.sol.map(String), ms: t };
       if (item.choices) return { vals: [(item.sol[0] + 1) % item.choices.length], ms: t };
       return { vals: item.sol.map((x) => (x == null ? x : Number(x) + 1)), raws: item.sol.map((x) => String(Number(x) + 1)), ms: t };
@@ -59,6 +60,12 @@ function playDay(kidIn, model, cfg, now, until = null) {
       const fb = answerPractice(P, { ...a, t: now }); addTime(kid, a.ms, now); items++;
       if (!fb.ok) { model.sawHelp(q.c); noteBug(kid, q.c, fb.bug); }
       if (P.done) { const r = finishFloor(kid, P, now); if (r.lit) markLit(kid, q.c, now); log.push(r.lit ? 'lit:' + q.c : 'teacher:' + q.c); }
+    } else if (T.stage === 'facts') {
+      const F = kid.run ? kid.run.F : startFacts(kid, cfg.unit, 'fx' + now, now);
+      const q = currentFact(F);
+      const a = model.respond(q.c, q.p, q.item);
+      const fb = answerFact(kid, F, a, now); addTime(kid, a.ms, now); items++;
+      if (fb.done) log.push('facts');
     } else if (T.stage === 'review') {
       const Rv = kid.run ? kid.run.R : startReview(kid, cfg.unit, 'rv' + now, now);
       const q = currentReview(Rv);
@@ -81,8 +88,8 @@ test('다 아는 아이 — 첫날 살펴보기로 탑이 다 켜지고, 점검 
   ok(d1.log.includes('scanned'), '살펴보기 안 끝남 ' + d1.log);
   const tw = towerOf(cfg.unit, d1.kid);
   ok(tw.lit === tw.total && tw.base.length === 0, `탑 ${tw.lit}/${tw.total} 기초 ${tw.base.length}`);
-  ok(d1.items <= 14, '살펴보기 문항 ' + d1.items);
-  ok(d1.items <= 14 && d1.log[d1.log.length - 1] === 'top', '첫날 끝 ' + d1.log);
+  ok(d1.log.includes('facts') && d1.items <= 14 + 16, '살펴보기 + 구구단 빠르기 문항 ' + d1.items + ' ' + d1.log);
+  ok(d1.log[d1.log.length - 1] === 'top', '첫날 끝 ' + d1.log);
   const d2 = playDay(d1.kid, m, cfg, T0 + DAY);
   ok(d2.items === 0 && d2.log[0] === 'top', `둘째 날은 점검 날이 아님 ${d2.log} ${d2.items}문항`);
   const d4 = playDay(d1.kid, m, cfg, T0 + 7 * DAY);
@@ -176,11 +183,12 @@ test('카드 요약 — 어느 단계에서도 빈 값(undefined)이 없다(RTDB
       if (['done', 'top', 'wait', 'none'].includes(T.stage)) break;
       if (T.stage === 'scan') { const S = kid.run ? kid.run.S : startScan(kid, cfg.unit, 's' + now, now); const q = currentItem(S); answer(S, { ...m.respond(q.c, q.p, q.item), t: now }); addTime(kid, 5000, now); if (S.done) finishScan(kid, cfg.unit, S, now); }
       else if (T.stage === 'prac') { const P = kid.run ? kid.run.P : startFloor(kid, cfg.unit, T.floor.c, 'f' + now, now); const q = currentPractice(P); const fb = answerPractice(P, { ...m.respond(q.c, q.p, q.item), t: now }); addTime(kid, 5000, now); if (!fb.ok) m.sawHelp(q.c); if (P.done) finishFloor(kid, P, now); }
+      else if (T.stage === 'facts') { const F = kid.run ? kid.run.F : startFacts(kid, cfg.unit, 'x' + now, now); check(kid, now); const q = currentFact(F); answerFact(kid, F, m.respond(q.c, q.p, q.item), now); addTime(kid, 2000, now); }
       else if (T.stage === 'review') { const Rv = kid.run ? kid.run.R : startReview(kid, cfg.unit, 'r' + now, now); check(kid, now); const q = currentReview(Rv); answerReview(kid, Rv, m.respond(q.c, q.p, q.item), now); addTime(kid, 5000, now); }
       kid = roundtrip(kid);
     }
   }
-  ok(seen.has('review:이어서') && seen.has('scan:이어서') && seen.has('prac:이어서'), '확인 못 한 단계 ' + [...seen]);
+  ok(seen.has('review:이어서') && seen.has('scan:이어서') && seen.has('prac:이어서') && seen.has('facts:이어서'), '확인 못 한 단계 ' + [...seen]);
 });
 
 test('지난 단원도 잊지 않게 — 단원이 바뀌어도 예전 탑의 켠 층이 점검에 섞이고(지금 탑 먼저), 꺼지면 지금 탑의 기초 층으로', () => {
@@ -233,6 +241,54 @@ test('저장소 쓰기 — 가짜 Firebase 로 경로와 값을 본다(문항 �
   });
 });
 
+test('구구단 빠르기 — 곱셈에 기대는 단원만 · 7단을 모르면 7단 곱셈구구가 기초 층(맨 먼저 켤 층) → 연습으로 켜짐', () => {
+  ok(needsFacts('4-2-1') && needsFacts('5-2-4') && !needsFacts('4-2-3') && !needsFacts('2-2-2') && !needsFacts('1-2-6'), '단원 고르기');
+  const m = kidModel(new Set(['2-2-2:6']));
+  const d1 = playDay(blankKid(), m, cfg, T0, (x) => x === 'facts');
+  const tw = towerOf(cfg.unit, d1.kid);
+  ok(d1.kid.facts && d1.kid.facts.weak.includes('2-2-2:6'), '약한 단 ' + JSON.stringify(d1.kid.facts && d1.kid.facts.weak));
+  ok(tw.base.some((f) => f.c === '2-2-2:6') && tw.next.c === '2-2-2:6', '7단이 기초 · 다음 층이 아님 ' + tw.base.map((f) => f.c) + ' 다음 ' + (tw.next && tw.next.c));
+  let kid = d1.kid;
+  for (let day = 0; day < 4; day++) kid = playDay(kid, m, cfg, T0 + day * DAY).kid;
+  ok(towerOf(cfg.unit, kid).all.find((f) => f.c === '2-2-2:6').st === 'lit', '7단 층이 안 켜짐');
+});
+
+test('구구단 빠르기 — 맞히지만 느린 단(두 문제 다 기준 시간 넘김)도 기초 층 · 한 달 안의 다음 단원은 다시 묻지 않고 결과만 반영', () => {
+  // 7단만 느린 아이: 7단 문제에 6초
+  const slow = kidModel(new Set(), { slip: 0, factMs: 1500 });
+  const resp = slow.respond.bind(slow);
+  slow.respond = (c, p, item) => { const a = resp(c, p, item); if (c === '2-2-2:6') a.ms = 6500; return a; };
+  const d1 = playDay(blankKid(), slow, cfg, T0, (x) => x === 'facts');
+  ok(d1.kid.facts.weak.includes('2-2-2:6') && d1.kid.states['2-2-2:6'].s === 'unstable', '느린 7단 ' + JSON.stringify(d1.kid.facts.res['2-2-2:6']));
+  ok(d1.kid.facts.weak.length === 1, '다른 단까지 약하다고 봄 ' + d1.kid.facts.weak);
+  // 열흘 뒤 다른 곱셈 단원(5-1 약분과 통분) — 구구단 빠르기를 다시 하지 않고, 아직 안 켜진 7단은 이 탑에도 기초로
+  const B = { unit: '5-1-4' };
+  const d2 = playDay(d1.kid, slow, B, T0 + 10 * DAY, (x) => x === 'scanned');
+  ok(!d2.log.includes('facts') && todayOf(d2.kid, B, T0 + 10 * DAY).stage !== 'facts', '한 달 안에 또 물음');
+  ok(towerOf(B.unit, d2.kid).base.some((f) => f.c === '2-2-2:6'), '새 탑에 7단 기초가 없음');
+  // 마흔 날 뒤 새 단원이면 다시 묻는다
+  const C = { unit: '6-1-1' };
+  const d3 = playDay(d2.kid, slow, C, T0 + 40 * DAY, (x) => x === 'scanned');
+  ok(todayOf(d3.kid, C, T0 + 40 * DAY).stage === 'facts', '한 달이 지났는데 안 물음');
+});
+
+test('구구단 빠르기 — 한 번 실수는 같은 단 한 문제를 더 내고 넘어간다(약한 단 아님)', () => {
+  const kid = blankKid(); kid.seen.intro = T0; kid.scans[cfg.unit] = { t: T0, base: [] };
+  const F = startFacts(kid, cfg.unit, 'slip', T0);
+  let first = true, n = 0;
+  while (currentFact(F)) { const q = currentFact(F); const wrong = first && q.item.sol[0] !== undefined; first = false; answerFact(kid, F, wrong ? { vals: [q.item.sol[0] + 1], raws: [String(q.item.sol[0] + 1)], ms: 1500 } : { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: 1500 }, T0); n++; }
+  ok(n === 17 && kid.facts.weak.length === 0, `문항 ${n} · 약한 단 ${kid.facts.weak}`);
+});
+
+test('처음과 지금 — 기록 줄을 읽어 차시마다 처음 · 최근 정답률과 가운데 시간을 견준다 · 꺼져 있다가 켠 층을 센다', () => {
+  ok(parseLog('4-2-1:3|1|123|p|') && parseLog('4-2-1:3|1|123|p|').ms === 12300 && parseLog('없음|1|1|p|') === null, '줄 읽기');
+  const lines = ['4-2-1:3|0|400|s|', '4-2-1:3|2|300|s|', '4-2-1:3|1|410|p|', '4-2-1:3|1|200|p|', '4-2-1:3|1|180|p|', '4-2-1:3|1|150|p|', '4-2-1:2|1|50|s|'];
+  const c = compareLogs(lines, ['4-2-1:3', '4-2-1:2']);
+  ok(c['4-2-1:3'] && c['4-2-1:3'].first.acc === 33 && c['4-2-1:3'].first.med === 41 && c['4-2-1:3'].last.acc === 100 && c['4-2-1:3'].last.med === 18 && !c['4-2-1:2'], JSON.stringify(c));
+  const kid = withPracticeLit('4-2-1:3');
+  ok(litAfterDark(kid, cfg.unit) >= 1, '꺼져 있다가 켠 층 ' + litAfterDark(kid, cfg.unit));
+});
+
 test('불씨 규칙 — 5개 · 틀리면 하나 꺼짐', () => ok(RULE.streak === 5, 'RULE.streak ' + RULE.streak));
 
 // 연습으로 켠 층 하나를 가진 아이를 만든다(살펴보기 뒤 c 층만 연습으로 켬)
@@ -281,7 +337,7 @@ test('포함 복습 — 위층을 켜면 그 아래 켜진 층은 복습한 셈(
 
 test('몸풀기 — 아직 켤 층이 있는 날은 점검 2문제까지, 탑 완성 뒤엔 3문제까지', () => {
   const m = kidModel(new Set(['4-2-1:7']), { slip: 0, learnAfter: 999 });
-  const kid = playDay(blankKid(), m, cfg, T0, (x) => x === 'scanned').kid;
+  const kid = playDay(blankKid(), m, cfg, T0, (x) => x === 'facts').kid;
   for (const f of towerOf(cfg.unit, kid).all) if (f.st === 'lit') kid.rev[f.c] = { i: 1, due: T0 - DAY };
   const T = todayOf(kid, cfg, T0 + DAY);
   ok(T.stage === 'review' && T.warm && T.n === 2, '몸풀기 ' + JSON.stringify({ s: T.stage, w: T.warm, n: T.n }));

@@ -2,7 +2,7 @@
 //  쓰기는 config(단원 · 하루 시간)와 아이 한 명 '다시 살펴보기' · '선생님과 함께 표시 지우기'뿐. 이름은 반 명단(common/roster.js)에서.
 import { h, modal, toast } from './util.js';
 import { UNITS, byId, lessonsOfUnit, unitLabel, lessonLabel } from './core/lessons/index.js';
-import { towerOf, dayKey, bugsOf } from './today.js';
+import { towerOf, dayKey, bugsOf, compareLogs, litAfterDark } from './today.js';
 import { towerEl, miniEl, unitName } from './tower.js';
 import { teacherGate } from '../../common/teacher-gate.js';
 import { rosterFor } from '../../common/roster.js';
@@ -43,6 +43,7 @@ export async function mountTeacher(app, ctx) {
     const hot = floorStat.filter((f) => f.dark >= hotN).sort((a, b) => b.dark - a.dark);
     const hotBase = bases.filter((b) => b.have - b.lit >= hotN);
     const todayN = rows.filter((r) => r.today).length;
+    const grown = scanned.reduce((a, r) => a + litAfterDark(r.kid, unit), 0);   // 살펴볼 때 꺼져 있다가 연습으로 켠 층(반 전체)
 
     const unitSel = h('select', { 'aria-label': '지금 배우는 단원', onchange: (e) => { unit = e.target.value; draw(); } },
       ...['1', '2', '3', '4', '5', '6'].map((g) => h('optgroup', { label: `${g}학년` }, ...units.filter((u) => u.g[0] === g).map((u) => h('option', { value: u.id, selected: u.id === unit }, `${u.g} ${u.nm}`)))));
@@ -92,7 +93,7 @@ export async function mountTeacher(app, ctx) {
             h('p', {}, '여러 명이 불 꺼진 층은 수업에서 다시, 한두 명은 아이가 연습으로 채워요. 이름을 누르면 그 아이의 탑과 처음 막힌 차시를 봐요.')))),
         h('div', { class: 'tgrid' },
           h('div', { class: 'tbox' },
-            h('h3', {}, `우리 반 탑 · ${unitName(unit)}`, h('small', {}, `층마다 불을 켠 아이 수 · ${rows.length}명 중 살펴본 아이 ${scanned.length}명`)),
+            h('h3', {}, `우리 반 탑 · ${unitName(unit)}`, h('small', {}, `층마다 불을 켠 아이 수 · ${rows.length}명 중 살펴본 아이 ${scanned.length}명${grown ? ` · 꺼져 있다가 켠 층 ${grown}개` : ''}`)),
             h('div', { style: { display: 'flex', flexDirection: 'column-reverse', marginTop: '10px' } },
               ...bases.slice(0, 4).map((b) => frow(b, { base: true })),
               bases.length ? h('div', { style: { height: '6px', borderRadius: '3px', background: '#5a4733', margin: '4px 0' } }) : null,
@@ -120,12 +121,22 @@ export async function mountTeacher(app, ctx) {
         ...dark.map((f) => h('div', { class: 'root' }, h('b', {}, `${f.base ? '기초' : f.no + '층'} ${f.name}`), f.st === 'teacher' ? ' — 선생님과 함께(연습 12문제 안에 못 켬)' : '',
           h('br'), h('span', { class: 'muted' }, lessonLabel(f.c)), byId[f.c].tip ? [h('br'), `가르치는 법 — ${byId[f.c].tip}`] : null, byId[f.c].bridge ? [h('br'), `다리 — ${byId[f.c].bridge}`] : null)),
         bugsOf(kid).length ? h('div', { class: 'root' }, h('b', {}, '자주 나온 실수'), ...bugsOf(kid).slice(0, 5).map((b) => [h('br'), `${b.name} ×${b.n} `, h('span', { class: 'muted' }, `· ${lessonLabel(b.c, { title: false })}`)])) : null,
+        h('div', { class: 'root cmp-box' }, h('b', {}, '처음과 지금'), h('br'), h('span', { class: 'muted' }, '문항 기록을 불러오는 중…')),
         days.length ? h('p', { class: 'muted' }, '최근: ', days.map((d) => `${d.slice(5)} ${kid.days[d].ms < 60000 ? '1분 안' : Math.round(kid.days[d].ms / 60000) + '분'}${kid.days[d].lit.length ? ` · ${kid.days[d].lit.length}층 켬` : ''}`).join(' / ')) : null));
-    modal(r.name, body, [
+    const close = modal(r.name, body, [
       { label: '이 단원 다시 살펴보기', onclick: async (close) => { if (!confirm(`${r.name}의 ${unitName(unit)} 탑을 처음부터 다시 살펴보게 할까요? (배운 기록은 남아요)`)) return; await store.resetKid(r.sid, unit); close(); await load(); draw(); toast('다음에 열면 탑 살펴보기부터 해요'); } },
       tw.waiting ? { label: "'선생님과' 표시 지우기", onclick: async (close) => { await store.clearMarks(r.sid); close(); await load(); draw(); toast('그 층들을 다시 연습할 수 있어요'); } } : null,
       { label: '닫기', primary: true },
     ].filter(Boolean), { wide: true });
+    // 처음과 지금 — 같은 차시를 처음 몇 문제와 최근 몇 문제로 견준다(정답률 · 맞힌 문제의 가운데 시간)
+    const box = body.querySelector('.cmp-box');
+    const fmt = (x) => `${x.acc}%${x.med ? ` · ${x.med}초` : ''}`;
+    Promise.resolve(store.logs ? store.logs(r.sid) : []).then((lines) => {
+      const ids = tw.all.map((f) => f.c), cmp = compareLogs(lines, ids);
+      const list = tw.all.filter((f) => cmp[f.c]).map((f) => { const x = cmp[f.c]; return [h('br'), h('b', { style: { color: '#f3e8d6' } }, `${f.base ? '기초' : f.no + '층'} ${f.name}`), ` — 처음 ${x.first.n}문제 ${fmt(x.first)} → 최근 ${x.last.n}문제 ${fmt(x.last)}`]; });
+      box.replaceChildren(h('b', {}, '처음과 지금'), ...(list.length ? list.flat() : [h('br'), h('span', { class: 'muted' }, '아직 견줄 만큼 푼 차시가 없어요(한 차시에 4문제 넘게 풀면 보여요).')]));
+    }).catch(() => box.replaceChildren(h('b', {}, '처음과 지금'), h('br'), h('span', { class: 'muted' }, '기록을 불러오지 못했어요.')));
+    void close;
   }
 
   draw();

@@ -76,6 +76,8 @@ function rtdbStore(fb, sid, name) {
       await root.child('kids/' + keyOf(id)).update({ scans: JSON.stringify(k.scans), run: k.run ? JSON.stringify(k.run) : null, marks: JSON.stringify(k.marks) });
     },
     async clearMarks(id) { await root.child(`kids/${keyOf(id)}/marks`).set(JSON.stringify({})); },
+    // 한 아이 문항 기록(때 순서 · 선생님 화면 '처음과 지금') — 날짜 → 키 순서
+    async logs(id) { const v = obj((await root.child('log/' + keyOf(id)).once('value')).val()); return Object.keys(v).sort().flatMap((d) => Object.keys(obj(v[d])).sort().map((k) => v[d][k]).filter((x) => typeof x === 'string')); },
   };
   return st;
 }
@@ -98,5 +100,6 @@ function localStore(sid, name) {
     async all() { const d = load(); return Object.fromEntries(Object.entries(d.kids).map(([k, x]) => [k, { kid: kidFrom(x), card: obj(x.card) }])); },
     async resetKid(id, unit) { const d = load(), x = d.kids[id]; if (!x) return; const k = kidFrom(x); delete k.scans[unit]; if (k.run && k.run.unit === unit) k.run = null; k.marks = {}; x.scans = JSON.stringify(k.scans); x.run = k.run ? JSON.stringify(k.run) : null; x.marks = '{}'; lsSet(KEY, d); },
     async clearMarks(id) { const d = load(); if (d.kids[id]) { d.kids[id].marks = '{}'; lsSet(KEY, d); } },
+    async logs() { return (load().log || []).filter((x) => typeof x === 'string'); },
   };
 }

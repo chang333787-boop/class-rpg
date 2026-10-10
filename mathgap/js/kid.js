@@ -9,6 +9,7 @@ import { towerEl, fire, unitName } from './tower.js';
 import {
   todayOf, towerOf, cardOf, dayKey, startScan, finishScan, startFloor, finishFloor, startReview, currentReview, answerReview,
   addTime, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
+  startFacts, currentFact, answerFact,
 } from './today.js';
 
 const html = (s) => { const d = document.createElement('div'); d.innerHTML = s; return [...d.childNodes]; };
@@ -52,12 +53,13 @@ export function mountKid(app, ctx) {
     const next = tw.next, nextLabel = next ? `${next.base ? '기초' : next.no + '층'} ${next.name}` : '';
     const plan = {
       scan: t.resume ? ['어제 살펴보던 데서 이어서 해요', '이어서 살펴보기'] : [`오늘은 ${unitName(cfg.unit)} 탑을 살펴봐요`, '탑 살펴보기 시작'],
+      facts: t.resume ? ['구구단 빠르기를 이어서 해요', '이어서 하기'] : ['탑 살펴보기 마지막 — 구구단 빠르기 16문제', '구구단 빠르기'],
       prac: t.resume ? [`${t.run_c || nextLabel}에 불을 켜던 중이에요`, '이어서 불 켜기'] : [`오늘은 ${nextLabel}에 불을 켜요`, '불 켜러 가기'],
       review: t.resume ? ['불 점검을 이어서 해요', '이어서 점검'] : t.warm ? [`먼저 불 점검 ${t.n}문제, 그다음 ${nextLabel}`, '불 점검 시작'] : [`탑 완성! 오늘은 불 점검 ${t.n}문제`, '불 점검 시작'],
       top: ['오늘 수학 끝! 탑이 환해요', null], done: ['오늘 10분 끝! 내일 또 만나요', null], wait: ['남은 층은 선생님이랑 같이 켜요', null],
     }[t.stage] || ['', null];
     if (t.stage === 'prac' && t.resume && kid.run && kid.run.c) plan[0] = `${floorLabel(kid.run.c)}에 불을 켜던 중이에요`;
-    const go = () => { if (t.stage === 'scan') return runScan(); if (t.stage === 'prac') return runFloor(); if (t.stage === 'review') return runReview(); };
+    const go = () => { if (t.stage === 'scan') return runScan(); if (t.stage === 'facts') return t.resume ? runFacts() : factsIntro(); if (t.stage === 'prac') return runFloor(); if (t.stage === 'review') return runReview(); };
     const minLeft = Math.ceil(t.left / 60000);
     screen(
       bar(plan[1] ? `'${plan[1]}'${josa(plan[1], '을', '를')} 눌러요` : '오늘은 여기까지예요', { tone: plan[1] ? '' : 'green', right: [h('span', {}, plan[1] ? `오늘 남은 시간 ${minLeft}분` : ''), helpBtn()] }),
@@ -192,9 +194,52 @@ export function mountKid(app, ctx) {
     P.focus();
   }
   async function scanEnd() {
-    const before = towerOf(cfg.unit, kid);
-    const tw = finishScan(kid, cfg.unit, kid.run.S);
+    finishScan(kid, cfg.unit, kid.run.S);
     await save(true);
+    if (T().stage === 'facts') return factsIntro();
+    revealTower();
+  }
+
+  // ── 구구단 빠르기(살펴보기 마지막 · 곱셈에 기대는 단원 · 한 달에 한 번) ──
+  function factsIntro() {
+    screen(bar('탑 살펴보기 마지막 — 구구단 빠르기', { right: [helpBtn()] }),
+      h('div', { class: 'kcenter' }, h('div', { class: 'fade-in', style: { display: 'flex', flexDirection: 'column', gap: '18px', maxWidth: '640px' } },
+        h('div', { class: 'big-t' }, '마지막! ', h('span', { class: 'gold' }, '구구단 빠르기 16문제')),
+        h('p', { class: 'lead' }, '2단부터 9단까지 두 문제씩 나와요. 생각나는 대로 빠르게! 틀려도 괜찮아요 — 느리거나 헷갈리는 단은 탑의 ', h('b', {}, '기초 층'), '에 넣어 연습해요.'),
+        h('div', { class: 'btnrow' }, h('button', { class: 'kbtn', onclick: () => runFacts() }, '시작')))));
+  }
+  async function runFacts() {
+    if (!kid.run || kid.run.kind !== 'facts') { startFacts(kid, cfg.unit, 'fx-' + Date.now()); await save(); }
+    factItem();
+  }
+  function factItem() {
+    const F = kid.run && kid.run.F, q = currentFact(F);
+    if (!q) return revealTower();
+    const shown = performance.now();
+    const pe = problemEl(q.item, { tag: '구구단 빠르기', tagR: `${q.n} / ${q.of}`, idkLabel: '모르겠어요', onAnswer: async (a) => {
+      busy = true;
+      const ms = Math.round(performance.now() - shown);
+      const fb = answerFact(kid, F, { ...a, ms }); addTime(kid, ms);
+      logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'f', bug: fb.bug });
+      await save(!!fb.done);
+      busy = false;
+      if (fb.done) return factsEnd(fb);
+      factItem();
+    } });
+    const prog = h('span', { class: 'prog', 'aria-label': `${q.n} / ${q.of}` }, ...Array.from({ length: q.of }, (_, i) => h('i', { class: i < q.n - 1 ? 'on' : i === q.n - 1 ? 'cur' : '' })));
+    screen(bar('생각나는 대로 빠르게!', { right: [prog, stopBtn()] }),
+      h('div', { class: 'kwrap' }, h('div', { class: 'kmain fade-in' }, pe.paper, pe.actions), pe.pad));
+    pe.focus();
+  }
+  function factsEnd(fb) {
+    const added = towerOf(cfg.unit, kid).base.filter((f) => (fb.weak || []).includes(f.c)).map((f) => f.name);
+    const last = added[added.length - 1] || '';
+    revealTower(added.length ? `구구단 빠르기에서 ${added.join(', ')}${josa(last, '이', '가')} 느리거나 헷갈렸어요 — 기초 층에 넣었어요. 연습하면 금방 빨라져요!` : '구구단 빠르기도 튼튼해요!');
+  }
+
+  // 살펴보기 끝 — 내 탑(불 켜진 층 · 켤 순서)
+  function revealTower(note = null) {
+    const tw = towerOf(cfg.unit, kid);
     const t = T(), canGo = t.stage === 'prac', allLit = tw.lit === tw.total;
     screen(bar(allLit ? '탑이 다 켜져 있어요!' : canGo ? "내 탑을 보고 '불 켜러 가기'를 눌러요" : '오늘은 여기까지 — 내일 이어서 불을 켜요', { tone: allLit || !canGo ? 'green' : '', right: [h('span', {}, canGo ? `오늘 남은 시간 ${Math.ceil(t.left / 60000)}분` : '')] }),
       h('div', { class: 'kwrap', style: { gap: '48px' } },
@@ -202,13 +247,13 @@ export function mountKid(app, ctx) {
         h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '20px', maxWidth: '620px' } },
           h('div', { class: 'big-t fade-in' }, '살펴보기 끝!', h('br'), h('span', { class: 'gold' }, allLit ? '와, 탑에 불이 다 켜져 있어요' : tw.lit ? `벌써 ${tw.lit}층이나 불이 켜져 있어요` : '이제 아래부터 불을 켜 봐요')),
           h('div', { class: 'pills' }, h('span', { class: 'pill on' }, `불 켜진 층 ${tw.lit}`), tw.total - tw.lit ? h('span', { class: 'pill dk' }, `불 켤 층 ${tw.total - tw.lit}`) : null),
+          note ? h('div', { class: 'panel lead', style: { borderColor: '#7cc0f0' } }, note) : null,
           allLit ? h('div', { class: 'panel lead' }, '이제는 점검할 날이 오면 몇 문제로 불이 잘 켜져 있는지만 봐요.')
             : h('div', { class: 'panel lead' }, '숫자 순서대로 불을 켜요. ', tw.base.length ? h('b', {}, "맨 아래 '기초'부터") : h('b', {}, '아래층부터'), ' — 아래층이 밝아야 위층 불도 잘 켜져요.'),
           h('div', { class: 'btnrow' },
             canGo ? h('button', { class: 'kbtn ghost', onclick: () => done() }, '내일 할래요') : null,
             canGo ? h('button', { class: 'kbtn', onclick: () => runFloor() }, h('span', { class: 'no' }, '1'), `${tw.next.base ? '기초' : tw.next.no + '층'}에 불 켜러 가기`)
               : h('button', { class: 'kbtn green', onclick: () => done() }, '오늘 끝')))));
-    void before;
   }
 
   // ── 한 층 불 켜기 ──

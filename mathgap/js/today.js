@@ -8,10 +8,12 @@
 //   · Math Academy · ALEKS 예제 먼저: 층에 불을 켜기 전 같은 단계로 푼 예제 하나(exampleOf)
 //   · Eedi 오답 모으기: 아이가 낸 틀린 모양을 차시별로 센다(noteBug) — 선생님 화면 '자주 나온 실수'
 //   · 지난 단원도 잊지 않게: 예전 탑에서 켠 층도 점검 날이 되면 몸풀기에 섞는다(지금 탑이 먼저) · 두 번 틀려 꺼지면 지금 탑의 기초 층으로
+//   · 구구단 빠르기(교사 '구구단 안 되는 애가 통분을 어떻게 해'): 곱셈에 기대는 단원이면 살펴보기 끝에 2~9단 두 문제씩 16문제(한 달에 한 번 · 틀리면 같은 단 한 문제 더) —
+//     틀림 + 느림이 둘 이상인 단은 그 단 곱셈구구 차시를 기초 층으로(단원 점검은 차시마다 2~3문제라 '7단만 느린 아이'를 놓칠 수 있어서)
 //  문항 기록(logItem → 저장소 log/<sid>/<날짜>): 차시 · 맞음/틀림 · 걸린 시간 · 틀린 모양 — 효과 확인과 실수 판정 모형을 실제 기록으로 맞추기 위해(이름 없음)
 //  아이 기록(kid) = { states, scans: { 단원: 요약 }, marks: { 차시: 'teacher' }, rev: { 차시: { i 간격 단계, due 점검 날(ms) } },
 //                     bugs: { '차시|오답 이름': 수 }, run: 하던 것 | null, days: { 날짜: { ms, n, lit, review, extra } }, seen: { intro } }
-import { byId, lessonsOfUnit, sortByGrade, makeItem, corePre } from './core/lessons/index.js';
+import { byId, lessonsOfUnit, sortByGrade, makeItem, corePre, resolve } from './core/lessons/index.js';
 import { newUnitScan, currentItem, answer, mergeStates } from './core/engine.js';
 import { newPractice, currentPractice, answerPractice, workedSteps, limitOf, RULE } from './core/practice.js';
 import { rng } from './core/math.js';
@@ -75,6 +77,7 @@ export function todayOf(kid, cfg = {}, now = Date.now()) {
   if (kid.run && kid.run.unit === unit) return { ...base, stage: kid.run.kind, resume: true, over: d.ms >= budget };
   if (d.ms >= budget) return { ...base, stage: 'done' };
   if (!tw.scanned) return { ...base, stage: 'scan' };
+  if (needsFacts(unit) && !kid.scans[unit].facts) return { ...base, stage: 'facts' };
   const due = d.review ? [] : dueFloors(kid, unit, now);
   if (due.length) return { ...base, stage: 'review', due, warm: !!tw.next, n: Math.min(due.length, tw.next ? WARM_N : TOP_N) };
   if (tw.next) return { ...base, stage: 'prac', floor: tw.next };
@@ -95,9 +98,10 @@ export function finishScan(kid, unit, S, now = Date.now()) {
   const below = [...R.roots, ...R.bridges, ...R.unstable].filter((c) => byId[c] && !inUnit.has(c));
   kid.scans[unit] = { t: now, n: S.log.length, ms: S.log.reduce((a, l) => a + Math.min(l.ms || 0, 60000), 0), base: sortByGrade([...new Set(below)]).slice(0, 4), boundaries: R.boundaries || [], roots: R.roots || [] };
   kid.run = null;
+  if (needsFacts(unit) && kid.facts && now - kid.facts.t < FACTS_EVERY * DAY) applyFacts(kid, unit);
   const tw = towerOf(unit, kid);
   for (const f of tw.all) if (f.st === 'lit' && !kid.rev[f.c]) schedule(kid, f.c, kid.states[f.c].inf ? 1 : 2, now);
-  return tw;
+  return towerOf(unit, kid);
 }
 
 // ── 한 층 불 켜기(연습) ──
@@ -127,6 +131,59 @@ export function finishFloor(kid, P, now = Date.now()) {
 export function exampleOf(c, seed = 1) {
   const p = byId[c].gen(rng(seed)), item = makeItem(c, p);
   return { item, steps: workedSteps(c, p).slice(0, 4) };
+}
+
+// ── 구구단 빠르기 — 2~9단 두 문제씩(16) · 단마다 틀림 · 느림(그 차시 기준 시간 넘김)을 센다 ──
+export const FACTS_EVERY = 30;   // 날 — 한 번 하면 한 달은 그 결과를 쓴다
+const FACT_STRANDS = ['M', 'D', 'F', 'G', 'R', 'X'];
+// 곱셈에 기대는 단원 — 3학년 이상 곱셈 · 나눗셈 · 분수 · 약수배수 · 비 · 혼합 계산, 그리고 5학년 이상 소수(소수의 곱셈 · 나눗셈)
+export const needsFacts = (unit) => { const g = Number(String(unit)[0]); return g >= 3 && lessonsOfUnit(unit).some((c) => FACT_STRANDS.includes(byId[c].s) || (g >= 5 && byId[c].s === 'DEC')); };
+export function startFacts(kid, unit, id, now = Date.now()) {
+  const r = rng(String(id).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 11));
+  const items = [];
+  for (let a = 2; a <= 9; a++) { const b1 = r.int(2, 9); let b2; do { b2 = r.int(2, 9); } while (b2 === b1); items.push({ a, b: b1 }, { a, b: b2 }); }
+  for (let i = items.length - 1; i > 0; i--) { const j = r.int(0, i); [items[i], items[j]] = [items[j], items[i]]; }
+  const F = { id, kind: 'facts', items, i: 0, out: [] };
+  kid.run = { unit, kind: 'facts', F, t: now };
+  return F;
+}
+export function currentFact(F) {
+  if (!F || F.i >= F.items.length) return null;
+  const { a, b } = F.items[F.i], r = resolve('MUL', { a, b });
+  return { c: r.c, p: r.p, item: makeItem(r.c, r.p), n: F.i + 1, of: F.items.length, sec: byId[r.c].sec };
+}
+export function answerFact(kid, F, a, now = Date.now()) {
+  const q = currentFact(F);
+  if (!q) return null;
+  const res = a.idk ? { ok: false } : q.item.check(a.vals || [], a.raws || []);
+  F.out.push({ c: q.c, ok: !!res.ok, ms: a.ms || 0 });
+  // 한 번 틀리면 같은 단에서 한 문제 더(실수 하나로 약한 단이 되지 않게) — 단마다 한 번만
+  const cur = F.items[F.i];
+  if (!res.ok && !cur.extra) { const r = rng(F.i * 7919 + cur.a * 31 + cur.b); let b; do { b = r.int(2, 9); } while (b === cur.b); F.items.splice(F.i + 1, 0, { a: cur.a, b, extra: true }); }
+  F.i++;
+  const fb = { ok: !!res.ok, bug: res.bug || null, c: q.c, ans: q.item.ans, done: F.i >= F.items.length };
+  if (fb.done) Object.assign(fb, finishFacts(kid, F, now));
+  return fb;
+}
+function finishFacts(kid, F, now) {
+  const by = {};
+  for (const o of F.out) { const b = (by[o.c] = by[o.c] || { n: 0, wrong: 0, slow: 0 }); b.n++; if (!o.ok) b.wrong++; else if (o.ms > byId[o.c].sec * 1000) b.slow++; }
+  // 약한 단 = 틀림 + 느림이 둘 이상(틀린 뒤 한 번 더 낸 문제까지 세어) — 한 번 실수는 넘어가고, 모르거나 늘 느린 단만
+  const weak = Object.entries(by).filter(([, b]) => b.wrong + b.slow >= 2).sort((x, y) => y[1].wrong - x[1].wrong || y[1].slow - x[1].slow).map(([c]) => c);
+  kid.facts = { t: now, res: by, weak };
+  for (const c of weak) { kid.states[c] = { s: by[c].wrong ? 'gap' : 'unstable', t: now, src: 'facts' }; delete kid.rev[c]; }
+  const unit = kid.run && kid.run.unit;
+  kid.run = null;
+  if (unit) applyFacts(kid, unit);
+  return { weak, res: by };
+}
+// 구구단 빠르기 결과를 탑에 — 아직 안 켜진 약한 단 차시 둘까지 기초 층으로
+function applyFacts(kid, unit) {
+  const sc = kid.scans[unit];
+  if (!sc) return;
+  sc.facts = true;
+  const weak = ((kid.facts && kid.facts.weak) || []).filter((c) => byId[c] && !isLit(kid, c)).slice(0, 2);
+  if (weak.length) sc.base = sortByGrade([...new Set([...(sc.base || []), ...weak])]).slice(0, 6);
 }
 
 // ── 불 점검 — 점검 날이 된 켠 층에서 · 한 번 틀리면 같은 층 한 문제 더 · 두 번 틀리면 그 층 불이 꺼진다 ──
@@ -178,6 +235,29 @@ export function logItem(kid, { c, ok, idk, ms, kind, bug }, now = Date.now()) {
   if (L.length < 400) L.push({ day: k, t: now, line });
   return line;
 }
+
+// 기록 한 줄 읽기 · 처음과 지금 견주기(선생님 화면) — lines 는 때 순서
+export function parseLog(line) {
+  const [c, r, ds, kind, bug] = String(line || '').split('|');
+  if (!byId[c]) return null;
+  return { c, ok: r === '1', idk: r === '2', ms: (+ds || 0) * 100, kind: kind || '', bug: bug || '' };
+}
+const median = (xs) => { const v = xs.slice().sort((x, y) => x - y); return v.length ? v[Math.floor(v.length / 2)] : 0; };
+// 차시마다 처음 몇 문제와 최근 몇 문제(겹치지 않게 · 4문제 넘게 푼 차시만): { c: { n, first: { n, acc, med }, last: { n, acc, med } } }
+export function compareLogs(lines, ids = null) {
+  const by = {};
+  for (const ln of lines) { const x = typeof ln === 'string' ? parseLog(ln) : ln; if (x && (!ids || ids.includes(x.c))) (by[x.c] = by[x.c] || []).push(x); }
+  const sum = (xs) => ({ n: xs.length, acc: Math.round(100 * xs.filter((x) => x.ok).length / xs.length), med: Math.round(median(xs.filter((x) => x.ok).map((x) => x.ms)) / 1000) });
+  const out = {};
+  for (const [c, xs] of Object.entries(by)) {
+    if (xs.length < 4) continue;
+    const k = Math.min(3, Math.floor(xs.length / 2));
+    out[c] = { n: xs.length, first: sum(xs.slice(0, k)), last: sum(xs.slice(-k)) };
+  }
+  return out;
+}
+// 살펴볼 때(또는 그 뒤) 꺼져 있다가 지금 켜진 층 — 상태 기록에 켜지지 않은 때가 있었던 층
+export const litAfterDark = (kid, unit) => towerOf(unit, kid).all.filter((f) => f.st === 'lit' && ((kid.states[f.c] && kid.states[f.c].h) || []).some((x) => !LIT.includes(x.s))).length;
 
 // ── 틀린 모양 모으기(선생님 화면 '자주 나온 실수') — 많이 나온 40가지만 둔다 ──
 export function noteBug(kid, c, bug) {
