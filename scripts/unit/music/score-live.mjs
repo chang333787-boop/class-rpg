@@ -66,7 +66,8 @@ async function device(name, url, { w = 1366, h = 610 } = {}) {
     ['Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false }]]) await send(mth, p || {}, sessionId);
   await send('Page.navigate', { url: `http://127.0.0.1:${PP}${url}` }, sessionId);
   const ev = async x => { const r = await send('Runtime.evaluate', { expression: x, awaitPromise: true, returnByValue: true, userGesture: true }, sessionId); return r.exceptionDetails ? 'ERR:' + (r.exceptionDetails.exception?.description || r.exceptionDetails.text).slice(0, 300) : r.result.value; };
-  const shot = async n => { if (!OUT) return; const r = await send('Page.captureScreenshot', { format: 'png' }, sessionId); fs.writeFileSync(path.join(OUT, n + '.png'), Buffer.from(r.data, 'base64')); };
+  //  사진 — 음표 글자(Noto Music)를 다 받은 뒤(받는 동안은 글자가 안 보임 · display=block)
+  const shot = async n => { if (!OUT) return; await ev(`Promise.race([document.fonts.ready.then(() => document.fonts.load('40px "Noto Music"', '\u{1D11E}\u{1D122}')), new Promise(r => setTimeout(r, 4000))]).then(() => 1)`); const r = await send('Page.captureScreenshot', { format: 'png' }, sessionId); fs.writeFileSync(path.join(OUT, n + '.png'), Buffer.from(r.data, 'base64')); };
   const mouse = (type, x, y, buttons = 0) => send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? (buttons ? 'left' : 'none') : 'left', buttons, clickCount: 1 }, sessionId);
   const click = async (x, y) => { await mouse('mousePressed', x, y, 1); await mouse('mouseReleased', x, y, 0); };
   //  요소 찾는 식 → 가운데를 진짜 마우스로(덮여 있으면 'covered' · 꺼져 있으면 'disabled' · 없으면 false)
@@ -222,16 +223,19 @@ try {
   ok(sc.legend >= 5 && /쿵/.test(sc.names) && /짝/.test(sc.names) && /칙/.test(sc.names) && /가락/.test(sc.names) && /베이스/.test(sc.names), '칸판 줄 ↔ 악보 안내', sc.names);
   await B.shot('s6_beat_score');
   //  ▶ 들으며 보기 — 악보에서 빛나는 칸이 움직임
-  ok(await B.pressEl(modalBtn('▶ 들으며 보기')) === true, '▶ 들으며 보기 누름');
+  const before = await B.ev(`Math.round(document.querySelector('.scv-wrap').getBoundingClientRect().top)`);
+  ok(await B.pressEl(`document.querySelector('.scv-play')`) === true, '▶ 들으며 보기 누름(악보 바로 위)');
+  const after = await B.ev(`(() => { const w = document.querySelector('.scv-wrap').getBoundingClientRect(); return { top: Math.round(w.top), vis: w.top >= 0 && w.top < innerHeight - 150 }; })()`);
+  ok(after.vis && Math.abs(after.top - before) < 2, '눌러도 악보가 그 자리(창 안에서 보임)', before + ' → ' + JSON.stringify(after));
   const lit = [];
   for (let k = 0; k < 12; k++) { await sleep(130); lit.push(await B.ev(`[...document.querySelectorAll('.scv-beat g.st-note.now')].map(e => e.dataset.i).join('/')`)); }
-  const label = await B.ev(`document.querySelector('.modal-wrap .modal-btns button').textContent`);
+  const label = await B.ev(`document.querySelector('.scv-play').textContent`);
   ok(lit.filter(Boolean).length >= 5 && new Set(lit.filter(Boolean)).size >= 4 && label.includes('멈추기') && await B.ev(`window.__beat.state().playing`), '들으며 보기 — 악보에서 지금 칸이 빛남(움직임) · 단추 ■', lit.join(' | ') + ' ' + label);
   await B.shot('s7_beat_listen');
-  await B.pressEl(modalBtn('■ 멈추기')); await sleep(200);
+  await B.pressEl(`document.querySelector('.scv-play')`); await sleep(200);
   ok(!(await B.ev(`window.__beat.state().playing`)) && await B.ev(`document.querySelectorAll('.scv-beat g.st-note.now').length === 0`), '멈추기 → 빛 꺼짐');
   await B.ev(STUB_PRINT);
-  await B.pressEl(modalBtn('인쇄')); await sleep(900);
+  await B.pressEl(`document.querySelector('.scv-print')`); await sleep(900);
   const bp = await B.ev(`({ n: window.__printed, svg: window.__printSvg, st: window.__printStaves })`);
   ok(bp.n === 1 && bp.svg >= 1 && bp.st >= 3, '비트 악보 인쇄(악보 + 안내)', JSON.stringify(bp));
   await B.pressEl(modalBtn('닫기')); await sleep(150);

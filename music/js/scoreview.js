@@ -103,7 +103,10 @@ function legendEls(b, sc, colors) {
   return [h('h4', {}, '칸판 줄 ↔ 악보'), h('div', { class: 'scv-items' }, ...out), h('div', { class: 'scv-tips' }, ...tips)];
 }
 export function openBeatScore({ getBeat, title = '', who = '', colors = {}, patColors, play, stop, playing, onclose } = {}) {
-  const head = h('p', { class: 'scv-head' }), wrap = h('div', { class: 'staff-wrap scv-wrap' }), legend = h('div', { class: 'scv-legend' });
+  //  ▶ 들으며 보기 · 인쇄 = 악보 바로 위(1366×610 에서 악보 + 안내가 창보다 길어 아래 단추를 누르면 악보가 밀려 올라감)
+  const info = h('p', {}), playB = h('button', { class: 'btn small primary scv-play', onclick: () => toggle() }, '▶ 들으며 보기');
+  const printB = h('button', { class: 'btn small scv-print', onclick: () => printScore([res.el, legend], `${title || '내 비트'} — 악보${who ? ' · ' + who : ''}`) }, '인쇄');
+  const head = h('div', { class: 'scv-head' }, info, h('span', { class: 'sp' }), play ? playB : null, printB), wrap = h('div', { class: 'staff-wrap scv-wrap' }), legend = h('div', { class: 'scv-legend' });
   let key = '', res = null, sc = null, timer = 0, startedHere = false, lit = new Set(), byStep = null, draws = 0, closed = false, shownPlaying = false;
   const width = () => Math.max(320, Math.min(1040, innerWidth - 96));
   function draw() {
@@ -115,7 +118,7 @@ export function openBeatScore({ getBeat, title = '', who = '', colors = {}, patC
     res = renderScore(sc, { width: width() });
     wrap.replaceChildren(res.el);
     lit = new Set(); byStep = null;
-    head.replaceChildren(h('b', {}, sc.song ? `이어 붙인 순서대로 ${sc.order.map(i => C.LETTERS[i]).join(' ')}` : `패턴 ${C.LETTERS[b.cur]} 되풀이`),
+    info.replaceChildren(h('b', {}, sc.song ? `이어 붙인 순서대로 ${sc.order.map(i => C.LETTERS[i]).join(' ')}` : `패턴 ${C.LETTERS[b.cur]} 되풀이`),
       ` · ${C.GRIDS[b.grid] ? C.GRIDS[b.grid].name : ''} · 빠르기 ${b.bpm}${!sc.song && b.arr.length ? " · 순서 전체는 '이어 붙인 순서대로'를 고르고 열어요" : ''}`);
     legend.replaceChildren(...legendEls(b, sc, colors));
     dbg('beat', () => ({ draws, score: sc, heads: {
@@ -125,12 +128,9 @@ export function openBeatScore({ getBeat, title = '', who = '', colors = {}, patC
   }
   draw();
   const body = h('div', { class: 'scv-beat' }, head, wrap, legend);
-  const close = modal(`🎼 ${title || '내 비트'} — 악보`, body, [
-    { label: '▶ 들으며 보기', onclick: () => toggle() },
-    { label: '인쇄', onclick: () => printScore([res.el, legend], `${title || '내 비트'} — 악보${who ? ' · ' + who : ''}`) },
-    { label: '닫기', primary: true }], { wide: true, onclose: () => { closed = true; clearTimeout(timer); if (startedHere && playing && playing()) stop && stop(); onclose && onclose(); } });
-  const playBtn = () => body.closest('.modal') && body.closest('.modal').querySelector('.modal-btns button');
-  const label = () => { const btn = playBtn(); if (btn) btn.textContent = playing && playing() ? '■ 멈추기' : '▶ 들으며 보기'; };
+  const close = modal(`🎼 ${title || '내 비트'} — 악보`, body, [{ label: '닫기', primary: true }],
+    { wide: true, onclose: () => { closed = true; clearTimeout(timer); if (startedHere && playing && playing()) stop && stop(); onclose && onclose(); } });
+  const label = () => { playB.textContent = playing && playing() ? '■ 멈추기' : '▶ 들으며 보기'; };
   function toggle() {
     if (!play) return;
     if (playing && playing()) { stop(); startedHere = false; } else { startedHere = true; play(); }

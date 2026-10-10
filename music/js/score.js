@@ -52,11 +52,11 @@ function monoLine(stacks, cap) {
   }
   return out;
 }
-//  덧줄이 덜 생기는 음자리표(같으면 높은음자리표)
-export function chooseClef(ps) {
+//  덧줄이 덜 생기는 음자리표 — 비슷하면 높은음자리표(아이들이 리코더로 읽는 자리 · bias = 낮은음자리표가 몇 배 나아야 고르나)
+export function chooseClef(ps, bias = 1.3) {
   if (!ps.length) return 'treble';
   const cost = clef => ps.reduce((a, p) => a + ledgerCount(clefPos(p, clef)) * 2 + (clefPos(p, clef) < -6 || clefPos(p, clef) > 14 ? 3 : 0), 0);
-  return cost('bass') < cost('treble') ? 'bass' : 'treble';
+  return cost('bass') * bias < cost('treble') ? 'bass' : 'treble';
 }
 const harmStacks = (harm, shift = 0) => stacksOf((harm || []).map(n => ({ s: n.s, d: n.d, p: n.p + shift }))).map(st => ({ ...st, i: 'h' + st.s }));
 

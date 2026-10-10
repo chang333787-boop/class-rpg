@@ -580,7 +580,8 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .scv-note{margin-top:8px;font-size:.88rem;line-height:1.55}
 .scv-note .muted{font-size:.82rem;margin-top:4px}
 /* 비트 악보 창 */
-.scv-beat .scv-head{margin-bottom:8px;font-size:.92rem;color:var(--txt2)}
+.scv-beat .scv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:.92rem;color:var(--txt2)}
+.scv-beat .scv-head .sp{flex:1}
 .scv-beat .scv-wrap{max-height:none;overflow-x:auto;overflow-y:visible}
 .scv-legend{margin-top:10px}
 .scv-legend h4{font-size:.86rem;font-weight:900;color:var(--txt3);margin-bottom:6px}
