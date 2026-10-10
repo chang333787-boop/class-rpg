@@ -67,19 +67,20 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   const buddyImg = h('img', { alt: '', src: `../assets/monsters/${BUDDIES[buddyIdx]}.png` });
   const buddy = h('button', { class: 'bt-buddy', title: '춤 친구 — 눌러서 바꾸기', onclick: () => { buddyIdx = (buddyIdx + 1) % BUDDIES.length; lsSet('music.beat.buddy', buddyIdx); buddyImg.src = `../assets/monsters/${BUDDIES[buddyIdx]}.png`; bounce(); } }, buddyImg);
   const swingBox = h('label', { class: 'bt-knob', title: '둘째 칸마다 살짝 늦게 — 0% 는 곧게' }, h('span', { class: 'lbl' }, '통통 튀는 정도'), swIn, swVal);
+  //  [MUSIC-SCORE-1] 🎼 악보 — 패턴 줄 바로 위(패턴 줄은 1366 에서 한 줄이 꽉 참 · 친구 비트(듣기만)에서도 보임)
+  const scoreBtn = h('button', { class: 'btn small bt-scorebtn', title: '지금 비트를 악보로 보기 — 북 · 가락 · 베이스 · 화음', onclick: () => openScore() }, '🎼 악보');
+  let scoreView = null;                       // 열린 악보 창(update · step · close)
   const trans = h('div', { class: 'bt-trans' }, playBtn, recBtn,
     h('div', { class: 'bt-knob' }, h('span', { class: 'lbl' }, '빠르기'), h('button', { class: 'bt-pm', onclick: () => setBpm(beat.bpm - 2) }, '−'), bpmIn, h('button', { class: 'bt-pm', onclick: () => setBpm(beat.bpm + 2) }, '+'), bpmVal),
-    swingBox, clickBtn, countBtn, h('span', { class: 'sp' }), buddy);
+    swingBox, clickBtn, countBtn, scoreBtn, h('span', { class: 'sp' }), buddy);
   const patBtns = [0, 1, 2, 3].map(i => h('button', { class: 'bt-pat', style: { '--c': PAT_COLOR[i] }, title: `패턴 ${L[i]} (${i + 1})`, onclick: () => selectPattern(i) }, L[i]));
   const copyBtn = h('button', { class: 'btn small', onclick: () => copyDialog() }, '복사');
   const clearBtn = h('button', { class: 'btn small', onclick: () => clearDialog() }, '지우기');
   const undoBtn = h('button', { class: 'btn small', title: '되돌리기 (Ctrl+Z)', onclick: () => doUndo() }, '↶ 되돌리기');
-  const scoreBtn = h('button', { class: 'btn small bt-scorebtn', title: '지금 비트를 악보로 보기 — 북 · 가락 · 베이스 · 화음', onclick: () => openScore() }, '🎼 악보');   // [MUSIC-SCORE-1] 친구 비트(듣기만)에서도
-  let scoreView = null;                       // [MUSIC-SCORE-1] 열린 악보 창(update · step · close)
   const arrBox = h('div', { class: 'bt-arr' });
   const arrBack = h('button', { class: 'btn small bt-arrdel', title: '순서 끝 칸 빼기', onclick: () => { if (readOnly || !beat.arr.length) return; pushUndo(); beat.arr.pop(); if (!beat.arr.length && beat.mode === 'song') beat.mode = 'loop'; markDirty(); renderPats(); } }, '⌫');
   const modeSeg = h('div', { class: 'seg bt-mode' });
-  const pats = h('div', { class: 'bt-pats' }, h('span', { class: 'lbl' }, '패턴'), h('div', { class: 'bt-patbtns' }, ...patBtns), copyBtn, clearBtn, undoBtn, scoreBtn,
+  const pats = h('div', { class: 'bt-pats' }, h('span', { class: 'lbl' }, '패턴'), h('div', { class: 'bt-patbtns' }, ...patBtns), copyBtn, clearBtn, undoBtn,
     h('span', { class: 'sp' }), h('span', { class: 'lbl' }, '순서'), arrBox, arrBack, modeSeg);
   const grid = h('div', { class: 'bt-grid' });
   const countCv = h('canvas', { class: 'bt-count' });

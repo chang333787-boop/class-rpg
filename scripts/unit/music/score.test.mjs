@@ -117,7 +117,7 @@ for (const st of C.STARTERS) {
     ok(headsIn(r.el, 'drums') === sc.hits, `그린 북 머리 ${headsIn(r.el, 'drums')} = ${sc.hits}`);
     if (mel) ok(headsIn(r.el, 'mel') >= mel.voices[0].events.length, '가락 머리');
     if (bass) ok(headsIn(r.el, 'bass') >= bass.voices[0].events.length, '베이스 머리');
-    ok(r.el.querySelectorAll('circle.st-dot').length >= 4 * sc.staves.length, '도돌이표 점');
+    ok(r.el.querySelectorAll('circle.st-rdot').length === 4 * sc.staves.length, '도돌이표 점(오선마다 넷)');
     ok(r.el.querySelectorAll('text.st-chord').length === want.length && r.el.querySelectorAll('text.st-chordko').length >= 1, '화음 이름 그림');
     ok(strong === 0 || r.el.querySelectorAll('path.st-accent').length > 0, '> 그림');
   });
@@ -130,6 +130,7 @@ await test('비트 악보 — 이어 붙인 순서대로(A B A C) · 32칸(두 �
   const sc = SC.beatScore(b);
   checkBars(sc, 'song');
   ok(sc.bars === 4 && sc.repeat === null && sc.song, '네 마디 · 도돌이 없음');
+  ok(renderScore(sc, { width: 1000 }).el.querySelectorAll('circle.st-rdot').length === 0, '순서대로 = 도돌이표 안 그림');
   eq(sc.marks.map(m => [m.bar, m.text]), [[0, 'A'], [1, 'B'], [2, 'A'], [3, 'C']], '마디 위 패턴 글자');
   const hits = [0, 1, 0, 2].reduce((a, i) => a + C.ROWS.reduce((x, r) => x + b.pats[i].d[r].filter(Boolean).length, 0), 0);
   ok(sc.hits === hits, `북 ${sc.hits} = ${hits}`);

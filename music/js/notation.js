@@ -409,13 +409,13 @@ export function renderScore(score, o = {}) {
         if (repEnd || lastBar) {
           root.append(svg('line', { x1: ex - 6, x2: ex - 6, y1, y2, class: 'st-bar' }));
           root.append(svg('line', { x1: ex - 1.5, x2: ex - 1.5, y1, y2, class: 'st-bar end' }));
-          if (repEnd) for (const dy of [15, 25]) root.append(svg('circle', { cx: ex - 12, cy: top + dy, r: 2.3, class: 'st-dot' }));
+          if (repEnd) for (const dy of [15, 25]) root.append(svg('circle', { cx: ex - 12, cy: top + dy, r: 2.3, class: 'st-dot st-rdot' }));
         } else root.append(svg('line', { x1: ex, x2: ex, y1, y2, class: 'st-bar' }));
         if (repStart) {
           const sx = bx + 2;
           root.append(svg('line', { x1: sx + 1.5, x2: sx + 1.5, y1, y2, class: 'st-bar end' }));
           root.append(svg('line', { x1: sx + 6, x2: sx + 6, y1, y2, class: 'st-bar' }));
-          for (const dy of [15, 25]) root.append(svg('circle', { cx: sx + 12, cy: top + dy, r: 2.3, class: 'st-dot' }));
+          for (const dy of [15, 25]) root.append(svg('circle', { cx: sx + 12, cy: top + dy, r: 2.3, class: 'st-dot st-rdot' }));
         }
       });
       if (o.barNumbers !== false && (A || b === b0)) root.append(svg('text', { x: bx + (A ? 3 : 2), y: staffTop[0] - ext[0].above + (A ? 9 : 10), class: 'st-num' }, String(b + 1)));
