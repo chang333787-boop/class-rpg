@@ -173,6 +173,39 @@
 .root{background:#221a12;border:1px solid #3d3024;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.6}
 .root b{color:var(--lit2)}
 
+/* ── 도전 층(문제 유형 · 10-11) — 꼭대기 위 · 보라 점선 = 아직 · 점선 회색 = 아래층을 다 켜면 열림 ── */
+.violet{color:#c9b6ff}
+.tower .roof{display:flex;align-items:center;gap:8px;margin:8px 2px 2px;color:#b9a6ee;font-family:'Jua',sans-serif;font-size:14px}
+.tower .roof::before,.tower .roof::after{content:'';flex:1;border-top:2.5px dashed #6a5a8f}
+.fl.top .no{font-size:15px}
+.fl.top.dk{background:#1d1828;border:2px dashed #7d6aa8;color:#d2c6f0}
+.fl.top.lock{background:#17131d;border:2px dotted #3f3550;color:#7f7393}
+.fl.top .tag.lk{border:1.5px dotted #5a4d70;color:#8f84a6;font-weight:700}
+.fl.top.on{background:linear-gradient(90deg,#f2a93b,#ffc766)}
+.fl.top.next{border:2.5px solid var(--lit2);box-shadow:0 0 0 5px rgba(255,199,102,.12)}
+.pill.vt{border:2px dashed #7d6aa8;color:#d2c6f0}
+.tower.small .fl.top .tag.lk{display:none}
+.tower.small .roof{font-size:11px;margin:4px 2px 0}
+.mt i.tp{border-radius:5px 5px 2px 2px;border-color:#7d6aa8}.mt i.tp.on{background:var(--lit2)}.mt i.lk{border:1px dotted #3f3550}
+/* 문장제 — 문제 글은 왼쪽 맞춤 글, 수(분수 · 대분수)는 Jua · 수 카드는 그림 */
+.paper.has-story{justify-content:flex-start;align-items:stretch}
+.paper.has-story .math{justify-content:flex-start}
+.paper.blue{box-shadow:0 0 0 4px rgba(124,192,240,.45)}
+.story{font-family:'Noto Sans KR',sans-serif;font-weight:500;font-size:clamp(17px,4.3cqi,23px);line-height:1.85;color:var(--pink);text-align:left;word-break:keep-all;overflow-wrap:anywhere}
+.story .tx{white-space:pre-wrap}
+.story .num{font-family:'Jua',sans-serif}
+.story .fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 3px;line-height:1.05;font-family:'Jua',sans-serif;font-size:1.02em}
+.story .fr-t{border-bottom:2.5px solid currentColor;padding:0 4px 2px}.story .fr-b{padding:2px 4px 0}
+.story .mx{display:inline-flex;align-items:center;gap:1px;vertical-align:middle;font-family:'Jua',sans-serif}
+.story .br{display:block;height:6px}
+.story .pic{display:flex;justify-content:center;margin:2px 0 10px}.story .pic svg{max-width:100%;height:auto}
+.story .card{fill:#fffaf0;stroke:#b9a27f;stroke-width:3}.story .cardt{font-family:'Jua',sans-serif;font-size:32px;fill:#2b1f12}
+.story.sm{font-size:15px;line-height:1.7}
+.story.ex{color:#f3e8d6;font-size:16px;line-height:1.75}.story.ex .card{fill:#2e241a;stroke:#6b5640}.story.ex .cardt{fill:#f3e8d6}
+.step.now.pick .choices{max-width:none;grid-template-columns:1fr;gap:10px}
+.step.now.pick .choices button{min-height:58px;padding:6px 16px}
+.step.now.pick .choices .math{font-size:26px;justify-content:flex-start}
+
 /* ── 좁은 화면(휴대폰 · 세로 태블릿) ── */
 @media (max-width:900px){
   .kwrap{flex-direction:column;gap:16px;padding:16px}

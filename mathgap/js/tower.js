@@ -34,17 +34,34 @@ export function towerEl(tw, opts = {}) {
     return h('div', { class: `fl ${cls}${isNext ? ' next' : ''}`, style: reveal ? { animationDelay: `${i * 0.12}s` } : null, title: f.name },
       h('span', { class: 'no' }, f.base ? '기초' : `${f.no}층`), h('span', { class: 'nm' }, f.name), right);
   };
+  // 도전 층(문제 유형) — 꼭대기 위 · 아래층을 다 켜기 전엔 잠김
+  const top = (f, i) => {
+    const isCur = cur === f.c, isNew = justLit === f.c, isNext = order && !tw.next && tw.topNext && tw.topNext.c === f.c;
+    const cls = isNew ? 'new' : isCur ? 'cur' : f.st === 'lit' ? 'on' : f.st === 'teacher' ? 'tc' : f.st === 'q' ? 'q' : f.st === 'lock' ? 'lock' : 'dk';
+    const tag = tags[f.c] || (isCur ? '지금' : '');
+    const right = f.st === 'lock' && !small ? h('span', { class: 'tag lk' }, '아래층을 다 켜면')
+      : f.st === 'teacher' ? h('span', { class: 'tag', style: { border: '1.5px solid #4f6a80', color: '#a9c3d6' } }, '선생님과')
+        : tag ? h('span', { class: 'tag', style: isCur ? { color: '#ffc766' } : f.st === 'lit' ? { background: '#2a1a08', color: '#ffc766' } : { border: '1.5px solid #ffc766', color: '#ffc766' } }, tag)
+          : f.st === 'lit' && !isNew && !small ? fire('on', '#2a1a08') : null;
+    return h('div', { class: `fl top ${cls}${isNext ? ' next' : ''}`, style: reveal ? { animationDelay: `${i * 0.12}s` } : null, title: `도전 층 · ${f.name}` },
+      h('span', { class: 'no' }, '도전'), h('span', { class: 'nm' }, f.name), right);
+  };
   let i = 0;
+  const tops = tw.tops || [];
   const kids = [
     ...tw.base.map((f) => floor(f, i++)),
     tw.base.length ? h('div', { class: 'ground', 'aria-hidden': 'true' }) : null,
     ...tw.floors.map((f) => floor(f, i++)),
+    tops.length ? h('div', { class: 'roof', 'aria-hidden': 'true' }, h('span', {}, '도전 층')) : null,
+    ...tops.map((f) => top(f, i++)),
     title ? h('div', { class: 'flag' }, flag(), `${unitName(tw.unit)} 탑`) : null,
   ];
-  return h('div', { class: `tower${small ? ' small' : ''}${reveal ? ' reveal' : ''}`, role: 'img', 'aria-label': `${unitName(tw.unit)} 탑 — ${tw.total}층 중 ${tw.lit}층 불이 켜짐` }, ...kids);
+  const topsLabel = tops.length ? ` · 도전 층 ${tops.length}개 중 ${tops.filter((f) => f.st === 'lit').length}개 켜짐` : '';
+  return h('div', { class: `tower${small ? ' small' : ''}${reveal ? ' reveal' : ''}`, role: 'img', 'aria-label': `${unitName(tw.unit)} 탑 — ${tw.total}층 중 ${tw.lit}층 불이 켜짐${topsLabel}` }, ...kids);
 }
 
-// 아주 작은 탑(선생님 표 한 줄) — card.floors '1009…'(1 켬 · 0 꺼짐 · 2 선생님과 · 9 아직)
-export function miniEl(code) {
-  return h('span', { class: 'mt', 'aria-hidden': 'true' }, ...String(code || '').split('').map((x) => h('i', { class: x === '1' ? 'on' : x === '2' ? 'tc' : x === '9' ? 'q' : '' })));
+// 아주 작은 탑(선생님 표 한 줄) — card.floors '1009…'(1 켬 · 0 꺼짐 · 2 선생님과 · 9 아직) · tops = 도전 층(8 잠김)
+export function miniEl(code, tops = '') {
+  const cell = (x, top) => h('i', { class: (x === '1' ? 'on' : x === '2' ? 'tc' : x === '9' ? 'q' : x === '8' ? 'lk' : '') + (top ? ' tp' : '') });
+  return h('span', { class: 'mt', 'aria-hidden': 'true' }, ...String(code || '').split('').map((x) => cell(x, false)), ...String(tops || '').split('').map((x) => cell(x, true)));
 }

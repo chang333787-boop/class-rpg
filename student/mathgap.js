@@ -1,7 +1,7 @@
 // [MATHGAP-HOME-1] 오늘의 수학 — 홈 '오늘' 칸 카드 + '배우고 만들기' 문 · 앱 = mathgap/ (전체화면 창 · openExternalEmbed('mathgap'))
 //  선생님이 단원을 열었을 때만 카드가 뜬다. 읽기 둘(쓰기 없음):
 //    classRPG_mathgap/config          { unit, name 단원 이름, minutes }      — 선생님 화면이 쓴다
-//    classRPG_mathgap/kids/<sid>/card { unit, stage, lit, total, floors, next, nextName, nextNo, review, day, doneToday } — 앱이 문항마다 쓴다
+//    classRPG_mathgap/kids/<sid>/card { unit, stage, lit, total, floors, tops, next, nextName, nextNo, review, day, doneToday } — 앱이 문항마다 쓴다(tops = 도전 층)
 //  누구나 쓸 수 있는 DB 라 글은 escHtml · 숫자 · 층 그림은 거른다. 보상과 묶지 않음(교사 결정 10-10).
 //  앱의 'RPG로 돌아가기' = postMessage { type: 'rpg:embed-close', app: 'mathgap' } → 창 닫기.
 let _mgCfg = null, _mgCard = null, _mgSid = null, _mgRefs = [];
@@ -45,17 +45,20 @@ function mathgapCardState() {
   if (today && c.doneToday && c.stage !== 'top') return { title: '오늘 수학 끝!', sub: `오늘 ${Math.max(1, Math.round((Number(c.ms) || 0) / 60000))}분 · 내일 또 만나요`, btn: '내 탑 보기', tone: 'green' };
   if (c.stage === 'top') return { title: '탑 완성!', sub: `${uname} 탑에 불이 다 켜졌어요 · 점검할 날이 오면 몇 문제`, btn: '내 탑 보기', tone: 'gold2' };
   if (c.stage === 'wait') return { title: '오늘의 수학', sub: '남은 층은 선생님이랑 같이 켜요', btn: '내 탑 보기', tone: 'blue' };
+  if (c.stage === 'type') return { title: '오늘의 수학', sub: `탑을 다 켰어요! 오늘은 <b>도전 층 ${escHtml(String(c.nextName || '').slice(0, 30))}</b>`, btn: today ? '이어서' : '시작하기', tone: 'gold' };
   if (c.stage === 'scan' || c.stage === 'facts' || !c.scanned) return { title: '오늘의 수학', sub: `${uname} 탑 살펴보기를 이어서 해요`, btn: '이어서', tone: 'gold' };
   if (today && c.stage === 'review' && Number(c.review) > 0) return { title: '오늘의 수학', sub: `먼저 불 점검 ${Number(c.review)}문제${nextL ? `, 그다음 <b>${nextL}</b>` : ''}`, btn: '이어서', tone: 'gold' };
   return { title: '오늘의 수학', sub: nextL ? `오늘은 <b>${nextL}</b>에 불을 켜요` : '오늘의 수학을 이어서 해요', btn: today ? '이어서' : '시작하기', tone: 'gold' };
 }
-// 카드 왼쪽 작은 탑 — floors '1009…'(1 켬 · 0 꺼짐 · 2 선생님과 · 9 아직)
-function mathgapMiniTower(code) {
+// 카드 왼쪽 작은 탑 — floors '1009…'(1 켬 · 0 꺼짐 · 2 선생님과 · 9 아직) · tops = 꼭대기 위 도전 층(8 잠김 · 보라 점선)
+function mathgapMiniTower(code, tops) {
   const cells = String(code || '').replace(/[^0129]/g, '').slice(0, 12).split('');
+  const tcs = String(tops || '').replace(/[^01289]/g, '').slice(0, 3).split('').filter(Boolean);
   const n = cells.length || 6;
   return `<div style="display:flex;flex-direction:column-reverse;gap:3px;width:32px;flex:none" aria-hidden="true">
     <i style="display:block;height:4px;border-radius:2px;background:#5a4733;margin-top:2px"></i>
     ${(cells.length ? cells : Array(n).fill('9')).map(x => `<i style="display:block;height:8px;border-radius:3px;${x === '1' ? 'background:#f2a93b;box-shadow:0 0 6px rgba(242,169,59,.5)' : x === '2' ? 'background:#1c2229;border:1.5px dashed #4f6a80' : x === '9' ? 'background:#2e241a;border:1.5px solid #4a3a2a' : 'background:#2e241a;border:1.5px dashed #6b5640'}"></i>`).join('')}
+    ${tcs.map(x => `<i style="display:block;height:8px;border-radius:5px 5px 3px 3px;${x === '1' ? 'background:#ffc766;box-shadow:0 0 6px rgba(255,199,102,.5)' : x === '2' ? 'background:#1c2229;border:1.5px dashed #4f6a80' : x === '8' || x === '9' ? 'background:#17131d;border:1.5px dotted #3f3550' : 'background:#1d1828;border:1.5px dashed #7d6aa8'}"></i>`).join('')}
   </div>`;
 }
 function mathgapCardInner() {
@@ -66,7 +69,7 @@ function mathgapCardInner() {
     <div class="today-card" onclick="openExternalEmbed('mathgap')"
       style="cursor:pointer;grid-column:1/-1;border:1.5px solid ${col};margin-top:.5rem">
       <div style="display:flex;align-items:center;gap:.8rem">
-        ${mathgapMiniTower(_mgCard && _mgCard.unit === _mgCfg.unit ? _mgCard.floors : '')}
+        ${mathgapMiniTower(_mgCard && _mgCard.unit === _mgCfg.unit ? _mgCard.floors : '', _mgCard && _mgCard.unit === _mgCfg.unit ? _mgCard.tops : '')}
         <div style="flex:1;min-width:0">
           <div style="font-size:.9rem;font-weight:800;color:${col}">🧮 ${st.title}</div>
           <div style="font-size:.74rem;color:var(--txt2);margin-top:.15rem;line-height:1.45">${st.sub}</div>

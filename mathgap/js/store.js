@@ -8,6 +8,7 @@
 //  kids/<sid>/run      = 하던 것(살펴보기 · 연습 · 불 점검 세션) JSON 글 | 없음 — 다음에 열면 같은 문제로 이어서
 //  kids/<sid>/days/<날짜> = { ms 푼 시간, n 문제 수, lit 켠 층, review 불 점검 함 }
 //  kids/<sid>/seen     = { intro 하는 법 본 때 }
+//  kids/<sid>/types    = 도전 층(문제 유형) JSON 글(유형 → { lit: { 단원: 때 }, diag: { tpl, dom, calc, plan }, n })
 //  kids/<sid>/card     = 짧은 요약(RPG 홈 카드 · 선생님 표) — today.js cardOf
 //  log/<sid>/<날짜>/<키> = 문항 한 줄('차시|결과|0.1초|무엇|틀린 모양' · today.js logItem) — kids 와 따로 두어 아이 기록을 열 때 같이 받지 않는다
 //  이름은 저장하지 않는다(학급 DB 는 로그인 없이 읽힌다) — 선생님 화면은 반 명단에서 이름을 붙인다.
@@ -15,7 +16,7 @@
 //  sid 가 없으면(손님 · 파일로 열기) 이 기기 localStorage 에만.
 import { keyOf, lsGet, lsSet } from './util.js';
 import { rpgDb, adminPwOK } from '../../common/rpg-firebase.js';
-import { blankKid } from './today.js';
+import { blankKid, TYPES } from './today.js';
 
 export const ROOT = 'classRPG_mathgap';
 const J = { st: 'states', scans: 'scans', marks: 'marks', run: 'run' };
@@ -35,6 +36,14 @@ export function kidFrom(v) {
   const run = parse(v.run, null); k.run = run && typeof run === 'object' && run.kind ? run : null;
   for (const [d, x] of Object.entries(obj(v.days))) if (/^\d{4}-\d\d-\d\d$/.test(d) && x && typeof x === 'object') k.days[d] = { ms: +x.ms || 0, n: +x.n || 0, lit: Array.isArray(x.lit) ? x.lit.filter((c) => typeof c === 'string') : [], review: !!x.review, extra: Math.min(30, Math.max(0, +x.extra || 0)) };
   k.seen = obj(v.seen);
+  const num = (x, hi = 9999) => Math.max(0, Math.min(hi, Math.round(+x) || 0));
+  for (const [t, x] of Object.entries(obj(parse(v.types, {})))) {
+    if (!TYPES[t] || !x || typeof x !== 'object') continue;
+    const lit = {}, diag = {};
+    for (const [u, w] of Object.entries(obj(x.lit))) if (/^\d-\d-\d$/.test(u) && Number.isFinite(+w) && +w > 0) lit[u] = +w;
+    for (const d of ['tpl', 'dom', 'calc', 'plan']) if (num(obj(x.diag)[d], 999)) diag[d] = num(obj(x.diag)[d], 999);
+    k.types[t] = { lit, diag, n: num(x.n) };
+  }
   return k;
 }
 export const cleanCfg = (c) => { c = obj(c); return { unit: typeof c.unit === 'string' && /^\d-\d-\d$/.test(c.unit) ? c.unit : null, name: typeof c.name === 'string' ? c.name.slice(0, 40) : '', minutes: [5, 10, 15, 20].includes(+c.minutes) ? +c.minutes : 10, t: +c.t || 0 }; };
@@ -55,7 +64,7 @@ function rtdbStore(fb, sid, name) {
     async save(kid, { full = false, card = null, day = null } = {}) {
       const up = {}, base = `kids/${sid}/`;
       up[base + 'run'] = kid.run ? JSON.stringify(kid.run) : null;
-      up[base + 'rev'] = JSON.stringify(kid.rev); up[base + 'bugs'] = JSON.stringify(kid.bugs);
+      up[base + 'rev'] = JSON.stringify(kid.rev); up[base + 'bugs'] = JSON.stringify(kid.bugs); up[base + 'types'] = JSON.stringify(kid.types || {});
       if (card) up[base + 'card'] = clean(card);
       if (full) {   // 날짜 기록은 통째로(30일 넘은 날은 빠진다) — 그래서 한 날짜 칸과 같이 쓰지 않는다
         up[base + 'st'] = JSON.stringify(kid.states); up[base + 'scans'] = JSON.stringify(kid.scans); up[base + 'marks'] = JSON.stringify(kid.marks);
@@ -92,7 +101,7 @@ function localStore(sid, name) {
     async save(kid, { card = null } = {}) {
       const d = load();
       d.log = (d.log || []).concat((kid.logq || []).splice(0).map((q) => q.line)).slice(-300);
-      d.kids[sid] = { st: JSON.stringify(kid.states), scans: JSON.stringify(kid.scans), marks: JSON.stringify(kid.marks), rev: JSON.stringify(kid.rev), bugs: JSON.stringify(kid.bugs), run: kid.run ? JSON.stringify(kid.run) : null, days: kid.days, seen: kid.seen, card: card || (d.kids[sid] || {}).card || null };
+      d.kids[sid] = { st: JSON.stringify(kid.states), scans: JSON.stringify(kid.scans), marks: JSON.stringify(kid.marks), rev: JSON.stringify(kid.rev), bugs: JSON.stringify(kid.bugs), types: JSON.stringify(kid.types || {}), run: kid.run ? JSON.stringify(kid.run) : null, days: kid.days, seen: kid.seen, card: card || (d.kids[sid] || {}).card || null };
       lsSet(KEY, d);
     },
     async teacherOK() { return true; },

@@ -1,9 +1,10 @@
-// 오늘의 수학 핵심(js/core — 수학 빈칸 찾기에서 옮김) 빠른 시험 — 차시마다 문제를 뽑아 정답은 정답으로 · 틀린 답은 틀림으로 채점되는지,
+// 오늘의 수학 핵심(js/core — 수학 빈칸 찾기에서 옮김) 빠른 시험 — 차시마다 문제를 뽑아 정답은 정답으로 · 틀린 답은 틀림으로 채점되는지 · 도전 층 유형이 만들어지는지,
 //  같은 숫자로 쪼갠 단계가 있는 차시로 이어지는지, 단원 점검 세션이 JSON 으로 저장했다 이어 가도 같은지
 //  node scripts/unit/mathgap/core.test.mjs   (DOM 없음 · 네트워크 없음 · 전체 시험은 수학 빈칸 찾기 저장소의 npm test)
 import { NODES, byId, makeItem, stepsOf, lessonsOfUnit, UNITS } from '../../../mathgap/js/core/lessons/index.js';
 import { newUnitScan, currentItem, answer } from '../../../mathgap/js/core/engine.js';
 import { rng } from '../../../mathgap/js/core/math.js';
+import { makeType, typesOfUnit, UNIT_TYPES } from '../../../mathgap/js/core/types/index.js';
 
 const results = [];
 const test = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, e.message]); } };
@@ -41,6 +42,18 @@ test('단원 점검 — 문항마다 JSON 으로 저장했다 이어 가도 같�
     n++;
   }
   ok(!diff && n >= 30, `달라진 단원 ${diff}/${n}`);
+});
+
+test('도전 층 유형 — 단원마다 문제를 만들고 정답은 정답 · 단계마다 정답은 정답 · 같은 seed 는 같은 문제(전체 시험은 수학 빈칸 찾기 tests/types.test.mjs)', () => {
+  const bad = [];
+  const right = (it) => (it.choices ? it.check([it.sol[0]]) : it.check(it.sol.map(Number), it.sol.map(String))).ok;
+  for (const u of Object.keys(UNIT_TYPES)) for (const t of typesOfUnit(u)) for (let s = 1; s <= 25; s++) {
+    let a; try { a = makeType(t, u, s * 7919); } catch (e) { bad.push(`${u} ${t} 만들기 ${e.message}`); break; }
+    if (!right(a.item)) bad.push(`${u} ${t} 정답이 틀림 ${a.ans}`);
+    a.steps.forEach((st, i) => { if (!right(st.item)) bad.push(`${u} ${t} 단계 ${i + 1}`); });
+    if (JSON.stringify(makeType(t, u, s * 7919).story) !== JSON.stringify(a.story)) bad.push(`${u} ${t} seed 가 같은데 다른 문제`);
+  }
+  ok(!bad.length, bad.slice(0, 5).join(' | '));
 });
 
 const fails = results.filter((r) => r[0] === 'FAIL');

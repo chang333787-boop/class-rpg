@@ -6,10 +6,12 @@
 //  · 기초가 빈 아이: 살펴보기가 기초 층을 찾고, 날마다 10분 안에서 아래부터 켜며 올라가 탑을 완성
 //  · 끝내 못 배우는 아이: 12문제 안에 못 켜면 '선생님과 함께'로 남기고 멈춤(끝없이 돌지 않음)
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
+//  · 도전 층(문제 유형): 아래층을 다 켜야 열림 · 불씨 3개 · 같이 풀기 까닭(문제 모양 · 숫자 영역 · 계산 · 단계) · 8문제 → 선생님과 · 점검은 지금 단원 숫자로 · 하루 하나
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
 import { blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
   currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
-  startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark } from '../../../mathgap/js/today.js';
+  startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark,
+  startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit } from '../../../mathgap/js/today.js';
 import { kidFrom, createStore } from '../../../mathgap/js/store.js';
 import { rng } from '../../../mathgap/js/core/math.js';
 
@@ -22,7 +24,8 @@ const DAY = 864e5, T0 = new Date(2026, 9, 12, 9, 0).getTime();
 const roundtrip = (kid) => JSON.parse(JSON.stringify(kid));
 
 // 가상 아이 — gaps 에 든 차시와 그 위(언제나 필요한 줄)는 못 푼다. learn: 연습에서 틀리고 풀이를 n번 보면 그 차시를 배운다
-function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000, factMs = 1500 } = {}) {
+//  types: 'know' 도전 층도 앎 · 'none' 문제 모양을 모름(쉬운 숫자도 못 풂) · 'dom' 쉬운 숫자로는 풀지만 분수 · 소수면 식을 못 고름 · 'calc' 식은 고르지만 계산에서 틀림
+function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000, factMs = 1500, types = 'know' } = {}) {
   const seen = {};
   const okC = (c) => !gaps.has(c) && corePre(c).every(okC);
   const can = (c, p) => !gaps.has(c) && preOf(c, p).every(okC);
@@ -35,8 +38,13 @@ function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000, factMs = 1500 
       return { vals: item.sol.map((x) => (x == null ? x : Number(x) + 1)), raws: item.sol.map((x) => String(Number(x) + 1)), ms: t };
     },
     sawHelp(c) { seen[c] = (seen[c] || 0) + 1; if (seen[c] >= learnAfter) gaps.delete(c); },
+    // 도전 층 문제 · 같이 풀기 단계
+    typeOk(q) { return types === 'know' || (types === 'dom' && q.easy); },
+    stepOk(s, q) { if (types === 'know') return true; if (types === 'calc') return s.kind !== 'calc'; if (types === 'dom') return q.easy || !s.key; return false; },
   };
 }
+const solve = (it) => ({ vals: it.sol.map(Number), raws: it.sol.map(String) });
+const wrong = (it) => (it.choices ? { vals: [(it.sol[0] + 1) % it.choices.length] } : { vals: it.sol.map((x) => Number(x) + 1), raws: it.sol.map((x) => String(Number(x) + 1)) });
 
 // 하루 — 화면이 하는 일을 그대로: 오늘 할 일을 묻고, 문제를 풀고, 끝나면 정리. 문항마다 저장(roundtrip)
 function playDay(kidIn, model, cfg, now, until = null) {
@@ -66,6 +74,13 @@ function playDay(kidIn, model, cfg, now, until = null) {
       const a = model.respond(q.c, q.p, q.item);
       const fb = answerFact(kid, F, a, now); addTime(kid, a.ms, now); items++;
       if (fb.done) log.push('facts');
+    } else if (T.stage === 'type') {
+      const Y = kid.run ? kid.run.Y : startType(kid, cfg.unit, T.top.t, 'y' + now + T.top.t, now);
+      const q = currentType(Y), good = model.typeOk(q), ms2 = 20000;
+      const fb = answerType(kid, Y, { ...(good ? solve(q.item) : wrong(q.item)), ms: ms2 }, now); addTime(kid, ms2, now); items++;
+      if (fb.help) { const r = typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: model.stepOk(st, q), c: st.c || null, bug: null })), now); log.push('help:' + r.diag); }
+      if (q.easy) log.push('easy:' + fb.diag);
+      if (Y.done) { const r = finishType(kid, Y, now); if (r.lit) markLit(kid, 'T:' + Y.t, now); log.push(r.lit ? 'tlit:' + Y.t : 'tteacher:' + Y.t); }
     } else if (T.stage === 'review') {
       const Rv = kid.run ? kid.run.R : startReview(kid, cfg.unit, 'rv' + now, now);
       const q = currentReview(Rv);
@@ -88,10 +103,12 @@ test('다 아는 아이 — 첫날 살펴보기로 탑이 다 켜지고, 점검 
   ok(d1.log.includes('scanned'), '살펴보기 안 끝남 ' + d1.log);
   const tw = towerOf(cfg.unit, d1.kid);
   ok(tw.lit === tw.total && tw.base.length === 0, `탑 ${tw.lit}/${tw.total} 기초 ${tw.base.length}`);
-  ok(d1.log.includes('facts') && d1.items <= 14 + 16, '살펴보기 + 구구단 빠르기 문항 ' + d1.items + ' ' + d1.log);
+  const nTop = typesOfUnit(cfg.unit).length;
+  ok(d1.log.includes('facts') && d1.items <= 14 + 16 + nTop * TRULE.streak, '살펴보기 + 구구단 빠르기 + 도전 층 문항 ' + d1.items + ' ' + d1.log);
+  ok(d1.log.filter((x) => x.startsWith('tlit:')).length === nTop, '도전 층을 다 켜지 않음 ' + d1.log);
   ok(d1.log[d1.log.length - 1] === 'top', '첫날 끝 ' + d1.log);
   const d2 = playDay(d1.kid, m, cfg, T0 + DAY);
-  ok(d2.items === 0 && d2.log[0] === 'top', `둘째 날은 점검 날이 아님 ${d2.log} ${d2.items}문항`);
+  ok(d2.items === 1 && d2.log.includes('reviewed') && d2.log[d2.log.length - 1] === 'top', `둘째 날은 갓 켠 도전 층 하나만 점검 ${d2.log} ${d2.items}문항`);
   const d4 = playDay(d1.kid, m, cfg, T0 + 7 * DAY);
   ok(d4.log.includes('reviewed') && d4.items === 3, `7일 뒤 불 점검 3문제 ${d4.log} ${d4.items}문항`);
   const d4b = playDay(d4.kid, m, cfg, T0 + 7 * DAY + 3600e3);
@@ -125,7 +142,8 @@ test('끝내 못 배우는 아이 — 12문제 안에 못 켜면 선생님과 �
   while (days < 8) { const d = playDay(kid, m, cfg, T0 + days * DAY); kid = d.kid; days++; stages.push(d.log[d.log.length - 1]); if (d.log.includes('wait')) break; }
   const tw = towerOf(cfg.unit, kid);
   ok(tw.waiting >= 1, '선생님과 함께 층이 없음 ' + JSON.stringify(tw.all.map((f) => f.st)));
-  ok(todayOf(kid, cfg, T0 + days * DAY).stage === 'wait', '멈추지 않음 ' + todayOf(kid, cfg, T0 + days * DAY).stage);
+  const last = T0 + (days - 1) * DAY + 3600e3;   // 그날 다시 열어도(다음 날은 점검이 먼저 나올 수 있음)
+  ok(todayOf(kid, cfg, last).stage === 'wait', '멈추지 않음 ' + todayOf(kid, cfg, last).stage);
   ok(cardOf(kid, cfg, T0 + days * DAY).floors.includes('2'), '카드에 선생님 층 표시 없음');
 });
 
@@ -203,6 +221,7 @@ test('지난 단원도 잊지 않게 — 단원이 바뀌어도 예전 탑의 �
   ok(firstOld > 0 && due.slice(0, firstOld).every((f) => !f.old) && due.slice(firstOld).every((f) => f.old === A.unit), '지금 탑 먼저 · 예전 탑 다음이 아님 ' + due.map((f) => (f.old ? 'old' : 'now')).join(','));
   // 지금 탑 점검 표를 미래로 미뤄 예전 탑만 남기고 → 예전 층 하나를 두 번 틀림
   for (const f of towerOf(B.unit, kid).all) if (kid.rev[f.c]) kid.rev[f.c].due = late + 9 * DAY;
+  for (const k of Object.keys(kid.rev)) if (k.startsWith('T:')) kid.rev[k].due = late + 9 * DAY;   // 도전 층 점검도 미룬다
   const target = dueFloors(kid, B.unit, late)[0].c;
   const R = startReview(kid, B.unit, 'xr', late);
   while (!R.done) { const q = currentReview(R); answerReview(kid, R, q.c === target ? { idk: true } : { vals: q.item.sol.map(Number), raws: q.item.sol.map(String) }, late); }
@@ -371,6 +390,142 @@ test('저장소 거르기 — 점검 표 · 틀린 모양이 JSON 글로 왕복�
   ok(k.rev['4-2-1:3'] && k.rev['4-2-1:3'].i === 0 && !k.rev.bad, '점검 표 ' + JSON.stringify(k.rev));
   ok(k.bugs['4-2-1:3|분모끼리도 더함'] === 1 && !k.bugs['x|y'], '틀린 모양 ' + JSON.stringify(k.bugs));
   ok(kidFrom({ rev: '{망가짐', bugs: 5 }).rev && Object.keys(kidFrom({ rev: '{망가짐' }).rev).length === 0, '망가진 글');
+});
+
+// ── 도전 층(문제 유형) ──
+// 탑(차시 층)을 다 켠 아이 — 살펴보기에서 모두 맞힘
+function towerDone(unit, now = T0) {
+  const m = kidModel(new Set(), { slip: 0 });
+  let kid = playDay(blankKid(), m, { unit }, now, (x) => x === 'scanned').kid;
+  if (todayOf(kid, { unit }, now).stage === 'facts') kid = playDay(kid, m, { unit }, now, (x) => x === 'facts').kid;
+  return kid;
+}
+const diagOf = (kid, t) => (kid.types[t] || {}).diag || {};
+
+test('도전 층 — 아래층을 다 켜기 전엔 잠김 · 다 켜면 열림 · 불씨 3개로 켜짐 · 다음 날 점검 · 카드에 도전 층', () => {
+  const m = kidModel(new Set(['4-2-1:7']), { slip: 0, learnAfter: 999 });
+  const k0 = playDay(blankKid(), m, cfg, T0, (x) => x === 'facts').kid;
+  const tw0 = towerOf(cfg.unit, k0);
+  ok(tw0.tops.length === typesOfUnit(cfg.unit).length && tw0.tops.every((f) => f.st === 'lock') && !tw0.topNext, '아래층이 남았는데 잠기지 않음 ' + tw0.tops.map((f) => f.st));
+  const kid = towerDone(cfg.unit);
+  const T1 = todayOf(kid, cfg, T0);
+  ok(T1.stage === 'type' && T1.top && T1.top.t === typesOfUnit(cfg.unit)[0], '탑을 다 켰는데 도전 층이 아님 ' + T1.stage);
+  const card = cardOf(kid, cfg, T0);
+  ok(card.stage === 'type' && card.nextName === T1.top.name && card.tops === '0'.repeat(typesOfUnit(cfg.unit).length), '카드 ' + JSON.stringify(card));
+  const Y = startType(kid, cfg.unit, T1.top.t, 'yy', T0);
+  for (let i = 0; i < TRULE.streak; i++) { const q = currentType(Y); ok(q.flames === i, '불씨 ' + q.flames); answerType(kid, Y, solve(q.item), T0); }
+  ok(Y.done, '3개 맞혔는데 안 끝남');
+  const r = finishType(kid, Y, T0);
+  ok(r.lit && typeLit(kid, T1.top.t, cfg.unit) && kid.rev['T:' + T1.top.t].i === 0, '켜지지 않음 ' + JSON.stringify(kid.types));
+  ok(towerOf(cfg.unit, kid).tops[0].st === 'lit', '탑에 안 보임');
+  ok(dueFloors(kid, cfg.unit, T0 + DAY).some((f) => f.c === 'T:' + T1.top.t), '다음 날 점검에 없음');
+});
+
+test('도전 층 — 틀리면 불씨 하나 꺼짐 · 분수 단원에서 식을 못 고르면 다음은 쉬운 숫자 · 풀면 숫자 영역(dom) · 못 풀면 문제 모양(tpl)', () => {
+  ok(!plainUnit('INV', '4-2-1') && plainUnit('INV', '3-1-1'), '쉬운 숫자 판 가정');
+  for (const [model, want] of [['dom', 'dom'], ['none', 'tpl']]) {
+    const kid = towerDone(cfg.unit), m = kidModel(new Set(), { types: model });
+    const Y = startType(kid, cfg.unit, 'INV', 'yd' + model, T0);
+    answerType(kid, Y, solve(currentType(Y).item), T0);            // 불씨 1
+    const q = currentType(Y), fb = answerType(kid, Y, wrong(q.item), T0);
+    ok(!fb.ok && fb.help && fb.flames === 0 && fb.before === 1, '틀렸는데 ' + JSON.stringify(fb));
+    const h1 = typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null })), T0);
+    ok(h1.diag === 'easy', '식 고르기를 틀렸는데 쉬운 숫자로 안 감 ' + h1.diag);
+    const e = currentType(Y);
+    ok(e.easy && e.inst.st === 'W', '다음 문제가 쉬운 숫자가 아님');
+    ok(e.inst.p.good === q.inst.p.good && e.inst.p.bad === q.inst.p.bad, `쉬운 숫자 판의 연산 짝이 다름 ${e.inst.p.good}${e.inst.p.bad} ≠ ${q.inst.p.good}${q.inst.p.bad}`);
+    const fe = answerType(kid, Y, m.typeOk(e) ? solve(e.item) : wrong(e.item), T0);
+    ok(fe.easy && fe.diag === want && diagOf(kid, 'INV')[want] === 1, `${model} 아이 까닭 ${fe.diag}`);
+    ok(fe.flames === 0 && !currentType(Y).easy, '쉬운 숫자 문제가 불씨를 바꿈 / 다음도 쉬운 숫자');
+  }
+});
+
+test('도전 층 — 자연수 단원은 식을 못 고르면 바로 문제 모양 · 계산에서 막히면 그 차시 틀린 모양 · 다 풀면 단계', () => {
+  const u = { unit: '3-1-1' };
+  for (const [model, want] of [['none', 'tpl'], ['calc', 'calc'], ['know', 'plan']]) {
+    const kid = towerDone(u.unit), m = kidModel(new Set(), { types: model });
+    const Y = startType(kid, u.unit, 'INV', 'yw' + model, T0);
+    const q = currentType(Y); answerType(kid, Y, wrong(q.item), T0);
+    const steps = q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null, bug: st.kind === 'calc' ? { name: '받아내린 자리에서 1을 빼지 않음' } : null }));
+    const r = typeHelpDone(kid, Y, steps, T0);
+    ok(r.diag === want && diagOf(kid, 'INV')[want] === 1, `${model} → ${r.diag}`);
+    if (want === 'calc') ok(r.calc && byId[r.calc] && bugsOf(kid).some((b) => b.c === r.calc), '계산 차시 틀린 모양이 안 모임 ' + JSON.stringify(kid.bugs));
+    ok(!currentType(Y).easy, '자연수 단원인데 쉬운 숫자로 감');
+  }
+});
+
+test('도전 층 — 8문제 안에 못 켜면 선생님과(표시) · 하루가 멈춤 · 표시 지우면 다시 연습', () => {
+  const kid = towerDone(cfg.unit), t = typesOfUnit(cfg.unit)[0];
+  const Y = startType(kid, cfg.unit, t, 'yt', T0);
+  let g = 0; while (!Y.done && g++ < 30) { const q = currentType(Y); const fb = answerType(kid, Y, wrong(q.item), T0); if (fb.help) typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: true, c: st.c || null })), T0); }
+  ok(Y.done && Y.out.filter((x) => !x.easy).length === TRULE.max, '8문제에서 안 멈춤 ' + Y.out.length);
+  const r = finishType(kid, Y, T0);
+  ok(r.teacher && kid.marks[`T:${t}@${cfg.unit}`] === 'teacher' && towerOf(cfg.unit, kid).tops[0].st === 'teacher', '선생님과 표시 없음');
+  ok(todayOf(kid, cfg, T0).top.t !== t, '선생님과 층을 또 냄');
+  delete kid.marks[`T:${t}@${cfg.unit}`];
+  ok(todayOf(kid, cfg, T0).top.t === t, '표시를 지웠는데 다시 안 열림');
+});
+
+test('도전 층 점검 — 다른 단원에서 켠 유형이 지금 단원 숫자로 · 하루 하나 · 두 번 틀리면 꺼지고 지금 단원 도전 층에서 다시', () => {
+  const A = '3-1-1', B = '4-2-1';                     // 어떤 수 구하기: 세 자리 수 → 분모가 같은 분수
+  const kid = towerDone(A);
+  for (const t of typesOfUnit(A)) { const Y = startType(kid, A, t, 'ya' + t, T0); while (!Y.done) answerType(kid, Y, solve(currentType(Y).item), T0); finishType(kid, Y, T0); }
+  ok(typesOfUnit(A).every((t) => typeLit(kid, t, A)), 'A 단원 유형이 다 안 켜짐');
+  const later = T0 + 3 * DAY;
+  const due = dueFloors(kid, B, later).filter((f) => f.type);
+  const inv = due.find((f) => f.t === 'INV'), card = due.find((f) => f.t === 'CARD');
+  ok(inv && inv.u === B && !inv.old, '어떤 수 점검이 지금 단원 숫자가 아님 ' + JSON.stringify(inv));
+  ok(card && card.u === A && card.old === A, 'B 에 없는 유형(수 카드)은 켠 단원 숫자로 ' + JSON.stringify(card));
+  const kidB = roundtrip(kid); kidB.seen.intro = T0;
+  const R = startReview(kidB, B, 'rb', later);
+  ok(R.todo.filter((c) => c.startsWith('T:')).length === 1, '하루 점검에 유형이 하나가 아님 ' + R.todo);
+  const c = R.todo.find((x) => x.startsWith('T:'));
+  let saw = null;
+  while (!R.done) { const q = currentReview(R); if (q.c === c) { saw = q; answerReview(kidB, R, { idk: true }, later); } else answerReview(kidB, R, solve(q.item), later); }
+  ok(saw && saw.type && saw.inst.unit === (c === 'T:INV' ? B : A), '점검 문제 단원 ' + (saw && saw.inst.unit));
+  ok(!typeLit(kidB, c.slice(2)) && !kidB.rev[c], '두 번 틀렸는데 안 꺼짐');
+  if (c === 'T:INV') { kidB.scans[B] = kidB.scans[B] || { t: later, base: [] }; const tw = towerOf(B, kidB); ok(tw.tops.find((f) => f.t === 'INV').st !== 'lit', 'B 도전 층이 켜진 채'); }
+});
+
+test('도전 층 저장 — 하던 것이 JSON 왕복 뒤 같은 문제 · 저장소가 이상한 값을 거름 · 카드에 빈 값 없음', () => {
+  const holes = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v === undefined ? [p + k] : v && typeof v === 'object' ? holes(v, p + k + '.') : []));
+  const kid = towerDone(cfg.unit), t = typesOfUnit(cfg.unit)[0];
+  const Y = startType(kid, cfg.unit, t, 'ys', T0);
+  answerType(kid, Y, solve(currentType(Y).item), T0);
+  const k2 = roundtrip(kid), a = currentType(kid.run.Y), b = currentType(k2.run.Y);
+  ok(JSON.stringify(a.inst.story) === JSON.stringify(b.inst.story) && a.flames === b.flames && a.flames === 1, '이어서 할 때 다른 문제');
+  const T2 = todayOf(k2, cfg, T0);
+  ok(T2.stage === 'type' && T2.resume && T2.top && T2.top.t === t, '이어서 하기 ' + T2.stage);
+  const c = cardOf(k2, cfg, T0);
+  ok(!holes(c).length && c.stage === 'type' && c.nextName, '카드 빈 값 ' + holes(c) + JSON.stringify(c));
+  kid.types.INV.diag = { tpl: 2, dom: -1, calc: 'x' };
+  const raw = { st: JSON.stringify(kid.states), scans: JSON.stringify(kid.scans), marks: '{}', rev: '{}', bugs: '{}', types: JSON.stringify({ ...kid.types, ZZZ: { lit: { '4-2-1': 1 } }, OVL: { lit: { '../x': 5, '4-2-1': -2, '3-1-1': T0 }, diag: {}, n: 'a' } }), run: null, days: {}, seen: {} };
+  const k = kidFrom(raw);
+  ok(k.types.INV && k.types.INV.diag.tpl === 2 && !('dom' in k.types.INV.diag) && !('calc' in k.types.INV.diag), '까닭 거르기 ' + JSON.stringify(k.types.INV));
+  ok(!k.types.ZZZ && Object.keys(k.types.OVL.lit).join() === '3-1-1' && k.types.OVL.n === 0, '유형 거르기 ' + JSON.stringify(k.types));
+  ok(Object.keys(kidFrom({}).types).length === 0, '빈 기록');
+});
+
+test('모든 도전 층 단원 — 탑을 다 켠 아이가 도전 층을 끝까지(오류 없음) · 모르는 아이는 선생님과로 멈춤', () => {
+  let n = 0;
+  for (const u of [...new Set(Object.keys(byId).map((c) => byId[c].u))]) {
+    if (!typesOfUnit(u).length) continue;
+    for (const model of ['know', 'none']) {
+      const kid = towerDone(u), m = kidModel(new Set(), { types: model });
+      for (const t of typesOfUnit(u)) {
+        const Y = startType(kid, u, t, 'ya' + u + t + model, T0);
+        let g = 0;
+        while (!Y.done && g++ < 40) {
+          const q = currentType(Y), fb = answerType(kid, Y, m.typeOk(q) ? solve(q.item) : wrong(q.item), T0);
+          if (fb.help) typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null })), T0);
+        }
+        const r = finishType(kid, Y, T0);
+        ok(model === 'know' ? r.lit : r.teacher, `${u} ${t} ${model} → ${JSON.stringify(r)}`);
+      }
+      n++;
+    }
+  }
+  ok(n >= 30, '단원 수 ' + n);
 });
 
 // 단원마다 한 번씩 — 어느 단원이든 살펴보기 → 연습 → 완성이 돈다(기초 빈칸 하나씩)
