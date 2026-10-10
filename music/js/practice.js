@@ -1,18 +1,34 @@
 // 리코더 연습 — 음표 발판이 오른쪽에서 흘러오고, 몬스터가 박에 맞춰 발판을 밟는다. 왼쪽 = 지금 음의 큰 운지.
 //  소리를 듣고 틀린 음을 잡지는 않는다(마이크 없음). 끝나면 스스로 별을 매기고 '리코더 기록장'에 쌓인다.
-import { h, toast, READY_SEC, readyCount } from './util.js';
+//  [MUSIC-ENSEMBLE-1] 선생님 곡이 합주의 한 부분이면 '🎶 함께 연주' — 다른 부분이 같은 칸 시각에 클라리넷으로 같이 울리고 맨 아래 얇은 줄에 그 음표가 지나간다(ensemble.js)
+import { h, toast, lsGet, lsSet, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, totalSteps } from './theory.js';
 import { buildEvents } from './song.js';
 import { engine, Player } from './audio.js';
 import { fingerSVG, fingering, SYSTEMS } from './recorder.js';
+import { TOGETHER_KEY, partnersOf, pickPartners, partLabel, partnerEvents, withPartners, ghostNotes, tapFired } from './ensemble.js';   // [MUSIC-ENSEMBLE-1] 합주 연습
 
 //  [MUSIC-FAST-1] 원래 빠르기보다 빠르게도(사용자 10-06 '원래 빠르기보다 더 빠르게도 · 리코더도') — 1.2 · 1.4 · 1.6배
 const SPEEDS = [[0.6, '느리게'], [0.8, '조금 느리게'], [1, '원래 빠르기'], [1.2, '조금 빠르게'], [1.4, '빠르게'], [1.6, '아주 빠르게']];
 const HOPPERS = ['m1', 'm22', 'm27', 'm24'];
 
+//  [MUSIC-ENSEMBLE-1] 연습 소리 사건 — 가락(리코더 · '가락 소리'는 Player.mute 로 끄고 켬) + 반주(세기 ×0.7) + 함께 연주(짝 부분 · 켰을 때만 · 세기 그대로)
+//   짝 부분은 이 곡의 offset · stepDur 로 얹으니 빠르기(0.6~1.6) · 세기 박이 바뀌어도 칸이 같으면 시각이 똑같다. start() 와 시험(ensemble.test)이 같이 쓴다
+export function practiceEvents(song, { speed = 1, acc = true, partners = [], together = false } = {}) {
+  //  [MUSIC-ORCH-1] 오케스트라 곡 — '반주'를 끄면 오케스트라도 끔(orch: acc) · 가락은 아이가 부는 높이 그대로(lead: false) · 늘이기(점점 느리게)는 안 함
+  const built = buildEvents(song, { scale: speed, countIn: song.beats, melody: true, chord: acc && song.acc.chord, bass: acc && song.acc.bass, drum: acc ? song.acc.drum : 'none', orch: acc, lead: false });
+  const events = built.events.map(e => e.track === 'melody' ? { ...e, inst: 'recorder', vel: 0.75 } : { ...e, vel: (e.vel || 0.8) * 0.7 });
+  return withPartners({ ...built, events }, together ? partnerEvents(song, partners, built) : []);
+}
+
 export function mountPractice(root, ctx, { song, key }) {
-  let speed = 0.8, guide = true, acc = true, sys = ctx.sys(), state = 'ready', raf = 0, t0 = 0, built = null, lastIdx = -2;
+  let speed = 0.8, guide = true, acc = true, sys = ctx.sys(), state = 'ready', raf = 0, t0 = 0, built = null, lastIdx = -2, alive = true;
   const player = new Player(engine);
+  //  [MUSIC-ENSEMBLE-1] 함께 연주 — 이 곡이 합주의 한 부분이면(선생님 곡 목록을 읽은 뒤) 윗줄에 켬 · 끔(처음 = 켬 · 이 기기에 기억) + '함께: 2부'
+  //   부분이 셋 이상이면 칩 대신 작은 고르기(모두 · 한 부분) · 치는 중에 바꾸면 처음부터(가락 소리 · 반주와 같음) · 반주를 꺼도 함께 연주는 따로
+  let together = lsGet(TOGETHER_KEY, true) !== false, partners = [], pick = 'all', ghost = [];
+  const activePartners = () => pickPartners(partners, pick);
+  const fired = [];   // 시험용(?debug=1) — Player 가 소리 장치에 넘긴 사건
   const notes = [...song.notes].sort((a, z) => a.s - z.s);
   const pitches = [...new Set(notes.map(n => n.p))].sort((a, z) => a - z);
   // [MUSIC-REST-1] 쉼표 — 음과 음 사이 빈 곳(처음·끝 포함). 발판처럼 보여서 '여기서 쉬어요'를 눈으로 센다
@@ -22,10 +38,28 @@ export function mountPractice(root, ctx, { song, key }) {
 
   const sel = (opts, val, on) => h('select', { onchange: e => on(e.target.value) }, ...opts.map(([v, t]) => { const o = h('option', { value: v }, t); if (String(v) === String(val)) o.selected = true; return o; }));
   const tog = (label, get, set) => { const b = h('button', { class: 'btn small' + (get() ? ' on' : ''), onclick: () => { set(!get()); b.classList.toggle('on', get()); if (state === 'play') restart(); } }, label); return b; };
+  const ensTog = tog('🎶 함께 연주', () => together, v => { together = v; lsSet(TOGETHER_KEY, v); ensShow(); });
+  ensTog.title = '같은 곡의 다른 부분이 같이 연주해요';
+  const ensChip = h('span', { class: 'ens-chip' });
+  let ensSel = null;
+  const ensBox = h('span', { class: 'ens-box', style: { display: 'none' } }, ensTog, ensChip);
+  function ensShow() {
+    ghost = together ? ghostNotes(activePartners()) : [];
+    ensBox.style.display = partners.length ? '' : 'none';
+    if (partners.length > 1 && !ensSel) {
+      ensSel = sel([['all', '함께: 모두'], ...partners.map(q => [q.tk, '함께: ' + q.part])], pick, v => { pick = v; ensShow(); if (state === 'play') restart(); });
+      ensSel.classList.add('ens-sel'); ensSel.title = '같이 연주할 부분'; ensBox.append(ensSel);
+    }
+    ensChip.textContent = '함께: ' + partLabel(activePartners());
+    ensChip.style.display = together && partners.length === 1 ? '' : 'none';
+    if (ensSel) ensSel.style.display = together ? '' : 'none';
+    if (state === 'ready') showReady();
+    draw(currentTime());
+  }
   const top = ctx.topBar('리코더 연습 · ' + (song.title || '곡'), {
     back: () => ctx.go('#/pick/practice'),
     right: [sel(SPEEDS, speed, v => { speed = +v; if (state === 'play') restart(); }),
-      tog('가락 소리', () => guide, v => { guide = v; }), tog('반주', () => acc, v => { acc = v; }),
+      tog('가락 소리', () => guide, v => { guide = v; }), tog('반주', () => acc, v => { acc = v; }), ensBox,
       sel(Object.entries(SYSTEMS), sys, v => { sys = v; ctx.setSys(v); lastIdx = -2; })],
   });
   const bigF = h('div', { class: 'p-big' }), bigName = h('div', { class: 'p-name' }), nextBox = h('div', { class: 'p-next' });
@@ -121,6 +155,19 @@ export function mountPractice(root, ctx, { song, key }) {
       if (w >= 26) { g.fillStyle = '#fff'; g.font = '900 13px "Noto Sans KR",sans-serif'; g.textAlign = 'left'; g.fillText(solfege(n.p, { short: true }), x + 7, y + ph / 2 + 1); }
       g.globalAlpha = 1;
     });
+    // [MUSIC-ENSEMBLE-1] 함께 연주 — 짝 부분 음표를 맨 아래 얇은 줄에(언제 같이 나오는지만 · 높이는 안 그림 · 화면을 어지럽히지 않게)
+    if (ghost.length) {
+      const gy = H - 15, gh = 7;
+      g.fillStyle = 'rgba(127,196,240,.07)'; g.fillRect(0, gy - 3, W, gh + 6);
+      for (const n of ghost) {
+        const a = n.s * stepSec(), z = (n.s + n.d) * stepSec(), x = playX + (a - t) * pxSec, w = Math.max(4, (z - a) * pxSec - 3);
+        if (x > W + 10 || x + w < -10) continue;
+        g.fillStyle = a <= t && t < z ? 'rgba(191,227,255,.95)' : z < t ? 'rgba(127,196,240,.2)' : 'rgba(127,196,240,.55)';
+        round(x, gy, w, gh, 3); g.fill();
+      }
+      g.fillStyle = 'rgba(16,22,18,.88)'; g.fillRect(0, gy - 5, 40, gh + 10);
+      g.fillStyle = '#bfe3ff'; g.font = '800 10px "Noto Sans KR",sans-serif'; g.textAlign = 'left'; g.fillText('함께', 7, gy + gh / 2 + 1);
+    }
     // 줄 이름(발판 위에 덮어 그림)
     g.fillStyle = 'rgba(16,22,18,.82)'; g.fillRect(0, topM - 12, 40, H - topM - botM + 24);
     g.font = '800 13px "Noto Sans KR",sans-serif'; g.textAlign = 'left';
@@ -161,10 +208,10 @@ export function mountPractice(root, ctx, { song, key }) {
   function loop() { draw(currentTime()); if (state === 'play') raf = requestAnimationFrame(loop); }
   function start() {
     engine.ensure(); engine.setReverb(0.1);
-    //  [MUSIC-ORCH-1] 오케스트라 곡 — '반주'를 끄면 오케스트라도 끔(orch: acc) · 가락은 아이가 부는 높이 그대로(lead: false) · 늘이기(점점 느리게)는 안 함
-    built = buildEvents(song, { scale: speed, countIn: song.beats, melody: true, chord: acc && song.acc.chord, bass: acc && song.acc.bass, drum: acc ? song.acc.drum : 'none', orch: acc, lead: false });
+    built = practiceEvents(song, { speed, acc, partners: activePartners(), together });   // [MUSIC-ENSEMBLE-1] 가락 · 반주 · 함께 연주
     player.mute = { melody: !guide, sparkle: !guide };   // '가락 소리'를 끄면 가락을 따라 치는 반짝이(첼레스타)도 쉼
-    t0 = player.start(built.events.map(e => e.track === 'melody' ? { ...e, inst: 'recorder', vel: 0.75 } : { ...e, vel: (e.vel || 0.8) * 0.7 }), { at: engine.now + READY_SEC + 0.1, total: built.total, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작(리코더를 들 시간)
+    fired.length = 0;
+    t0 = player.start(built.events, { at: engine.now + READY_SEC + 0.1, total: built.total, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작(리코더를 들 시간)
     state = 'play'; over.replaceChildren(); over.style.display = 'none';
     stopBtn.style.display = '';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
@@ -191,6 +238,7 @@ export function mountPractice(root, ctx, { song, key }) {
       h('h2', {}, song.title || '곡'),
       h('p', { class: 'muted' }, `${song.bars}마디 · 음 ${notes.length}개 · 처음에 ${song.beats}번 세고 시작해요`),
       bad ? h('p', { class: 'warn' }, `${SYSTEMS[sys]} 리코더로 불 수 없는 음이 ${bad}개 있어요(물음표).`) : null,
+      partners.length ? h('p', { class: 'ens-line' }, together ? `🎶 함께 연주: ${partLabel(activePartners())} 소리도 같이 나와요` : `🎶 '함께 연주'를 켜면 ${partLabel(partners)} 소리도 같이 나와요`) : null,   // [MUSIC-ENSEMBLE-1]
       h('button', { class: 'btn primary big', onclick: () => start() }, '▶ 시작'),
       h('p', { class: 'muted small' }, '스페이스 키로도 시작 · 멈춤')));
   }
@@ -201,5 +249,14 @@ export function mountPractice(root, ctx, { song, key }) {
   const ro = new ResizeObserver(() => size()); ro.observe(stage);
   hopper.onload = () => draw(currentTime());
   showReady(); size();
-  return { unmount() { player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onKey); ro.disconnect(); } };
+  //  [MUSIC-ENSEMBLE-1] 짝 부분 찾기 — 선생님 곡이고 합주로 묶일 때만(목록은 이미 읽어 둔 것 · 못 읽으면 함께 연주 없이 그대로)
+  if (song.ts && ctx.teacherSongs) ctx.teacherSongs().then(list => { if (!alive) return; partners = partnersOf(song, list); if (partners.length) ensShow(); }).catch(() => {});
+  //  시험용(?debug=1 일 때만) — Player 가 소리 장치에 넘긴 사건 · 짝 사건 계획(읽기만 · 복사본)
+  if (/[?&]debug=1/.test(location.search)) {
+    tapFired(player, fired, () => engine.now);
+    window.__practice = { fired: () => fired.map(x => ({ ...x })), plan: () => (built ? built.events.filter(e => e.track === 'partner').map(e => ({ ...e })) : []),
+      built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0 } : null), state: () => state, speed: () => speed, guide: () => guide, acc: () => acc,
+      together: () => together, partners: () => partners.map(q => q.tk), active: () => (together ? activePartners().map(q => q.tk) : []), ghost: () => ghost.length };
+  }
+  return { unmount() { alive = false; player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onKey); ro.disconnect(); } };
 }

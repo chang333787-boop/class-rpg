@@ -595,3 +595,24 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .scv-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;margin-right:4px;vertical-align:-1px}
 .scv-tips{margin-top:8px;display:grid;gap:3px;font-size:.84rem;line-height:1.5}
 @media (max-width:520px){.scv-items{grid-template-columns:1fr}.scv-beat .scv-wrap{max-height:none}}
+
+/* ── 합주 연습 [MUSIC-ENSEMBLE-1] ── 고르기 목록의 합주 상자 · '합주 · 2성부' 표 · 🎶 합주 듣기 · 윗줄 '🎶 함께 연주' + '함께: 2부' 칩 · 준비 칸 안내(짝 부분 = 파란색) */
+.ens-grp{display:grid;gap:6px;padding:6px;border-radius:14px;background:rgba(127,196,240,.06);box-shadow:inset 0 0 0 1px rgba(127,196,240,.3)}
+.song-row .t .ens-badge{display:inline-block;font-size:.72rem;font-weight:900;color:#bfe3ff;background:rgba(127,196,240,.16);border:1px solid rgba(127,196,240,.45);border-radius:6px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.ens-bar{display:flex;align-items:center;gap:10px;padding:2px 6px 2px 10px;font-size:.8rem;color:var(--txt3)}
+.ens-bar span{flex:1;min-width:0}
+.ens-listen .b{display:none}.ens-listen.stop .a{display:none}.ens-listen.stop .b{display:inline}
+.ens-listen.stop{box-shadow:inset 0 0 0 2px #7fc4f0}
+.top .ens-box{display:inline-flex;align-items:center;gap:6px}
+.top .ens-chip{height:34px;display:inline-flex;align-items:center;padding:0 .7rem;border-radius:9px;background:rgba(127,196,240,.14);border:1px solid rgba(127,196,240,.45);color:#bfe3ff;font-weight:800;font-size:.85rem;white-space:nowrap}
+.p-card .ens-line{color:#bfe3ff;font-weight:700;font-size:.9rem}
+.ts-ens{display:grid;gap:2px;padding:4px 4px 0;font-size:.85rem;line-height:1.5;color:#bfe3ff}
+.ts-ens .bad{color:#ff8a7a;font-weight:700}
+/* 고르기 목록 칸(grid)이 긴 제목 · 표 때문에 화면보다 넓어지지 않게 — 제목은 … 으로 줄고 단추는 화면 안에 */
+.pick .list > .song-row,.pick .ens-grp,.pick .ens-grp > .song-row{min-width:0}
+/* 좁은 화면(폰) — 연습 · 리듬 윗줄이 넘치면 둘째 줄로(단추가 화면 밖으로 밀려나지 않게) */
+@media (max-width:820px){
+  body[data-view=practice] .top,body[data-view=rhythm] .top{height:auto;min-height:50px;flex-wrap:wrap;row-gap:6px;padding:6px 12px}
+  body[data-view=practice] .top h1,body[data-view=rhythm] .top h1{flex:1 1 140px;min-width:0}
+  body[data-view=practice] .top .sp,body[data-view=rhythm] .top .sp{display:none}
+}
