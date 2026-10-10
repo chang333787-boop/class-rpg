@@ -92,6 +92,39 @@ const toastHas = txt => `[...document.querySelectorAll('.toast')].some(t => t.te
 const onSteps = (row) => `(window.__beat.beat().pats[window.__beat.state().cur].d.${row} || '').split('').map((v, i) => v !== '0' ? i : -1).filter(i => i >= 0)`;
 const setRange = (sel, v) => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${v}; e.dispatchEvent(new Event('input', { bubbles: true })); return +e.value; })()`;
 const near = (a, b, e = 1e-6) => Math.abs(a - b) <= e;
+//  쪽 안에서 도는 어울림 재기(시험 전용) — 실제 모듈(beatkit · beatcore)을 OfflineAudioContext 에 붙여 박자기 그대로 그린다
+const MIX_PROBE = `(async () => { try {
+  const K = await import('./js/beatkit.js'), C = await import('./js/beatcore.js');
+  const sr = 22050;
+  async function render(id, kitId, layer) {
+    const st = C.applyStarter(C.emptyBeat(), id).beat; st.kit = kitId;
+    const G = C.gridOf(st.grid), secs = 2 * C.barDur(st.bpm, G) + 1, off = new OfflineAudioContext(1, Math.ceil(sr * secs), sr);
+    const eng = { ctx: off, bus: () => { const g = off.createGain(); g.connect(off.destination); return g; } };
+    const kit = new K.BeatKit(eng); await kit.prepare(kitId);
+    const mx = new K.BeatMixer(eng);
+    for (const r of C.MIX) st.mix[r].m = layer === 'all' ? false : layer === 'drums' ? (r === 'bass' || r === 'chord') : r !== layer;
+    mx.apply(st.mix, kitId);
+    let now = 0; const vs = {};
+    const seq = new C.Sequencer({ now: () => now, beat: () => st, emit: e => {
+      if (e.kind === 'drum') kit.hit(kitId, e.row, e.t, e.crash ? 0.75 : e.vel === 2 ? 1 : 0.62, mx.ch[e.row]);
+      else if (e.kind === 'bass') { vs.b && vs.b.stop(e.t); vs.b = kit.bass(kitId, C.BASS[e.n].p, e.t, e.d, 0.9, mx.ch.bass); }
+      else if (e.kind === 'bassoff') { vs.b && vs.b.stop(e.t); vs.b = null; }
+      else if (e.kind === 'chord') { vs.c && vs.c.stop(e.t); vs.c = kit.chord(kitId, C.CHORDS[e.ch].notes, e.t, e.d, e.vel, mx.ch.chord, e.style); }
+      else if (e.kind === 'chordoff') { vs.c && vs.c.stop(e.t); vs.c = null; } } });
+    seq.start({ at: 0.05 });
+    while (now < 2 * C.barDur(st.bpm, G) - 0.1) { now += 0.05; seq.tick(); }
+    const d = (await off.startRendering()).getChannelData(0);
+    let pk = 0; for (const x of d) pk = Math.max(pk, Math.abs(x));
+    return { w: K.speakerLoud(d, sr, d.length / sr), pk };
+  }
+  const db = (a, b) => +(20 * Math.log10(a / b)).toFixed(1), cards = {}, alls = [];
+  for (const [id, kitId] of [['basic', 'elec'], ['dance', 'elec'], ['bounce', 'real'], ['chill', 'real'], ['semachi', 'kor'], ['basic', 'real'], ['basic', 'kor']]) {
+    const dr = await render(id, kitId, 'drums'), ba = await render(id, kitId, 'bass'), ch = await render(id, kitId, 'chord'), al = await render(id, kitId, 'all');
+    cards[id + '/' + kitId] = { bass: db(ba.w, dr.w), chord: db(ch.w, dr.w), pk: +al.pk.toFixed(2) };
+    if (id === 'basic') alls.push(al.w);
+  }
+  return { cards, kitSpread: db(Math.max(...alls), Math.min(...alls)) };
+} catch (e) { return { err: String(e && e.stack || e).slice(0, 300) }; } })()`;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 try {
@@ -179,6 +212,11 @@ try {
     allBufs.map(([k, r, s]) => `${k}.${r}:${s ? s.peak + '/' + s.rms + '/' + s.zcr + '/' + s.ring : '없음'}`).join(' '));
   await S.ev(`(() => { const s = document.querySelector('.bt-kit'); s.value = 'elec'; s.dispatchEvent(new Event('change', { bubbles: true })); return 1; })()`);
   ok(same(await S.ev(`[...document.querySelectorAll('.bt-lab b')].map(b => b.textContent).slice(0, 2)`), ['쿵', '짝']), 'A17 전자 북으로 돌아오면 줄 이름도 쿵 · 짝');
+  //  어울림(귀 대신 셈) — 기본 리듬 카드를 오프라인으로 두 마디 그려 '작은 스피커 크기'(150Hz 아래 깎은 RMS)로 북 · 베이스 · 화음을 견준다
+  const mixRes = await S.ev(MIX_PROBE);
+  const mixOK = mixRes && !mixRes.err && Object.values(mixRes.cards).every(c => c.bass >= -6 && c.bass <= 6 && c.chord >= -11 && c.chord <= -1 && c.pk <= 1.1) && mixRes.kitSpread <= 3;
+  ok(mixOK, 'A43 어울림(작은 스피커 크기 · dB) — 카드마다 베이스 = 북 ±6 · 화음 = 북 −11~−1 · 꼭대기 ≤ 1.1 · 같은 카드를 소리 묶음 셋으로 = 전체 크기 차 ≤ 3dB',
+    mixRes && (mixRes.err || Object.entries(mixRes.cards).map(([k, c]) => `${k} 베이스${c.bass} 화음${c.chord} 꼭대기${c.pk}`).join(' · ') + ` · 묶음 차 ${mixRes.kitSpread}dB`));
   //  패턴 B · 기본 리듬 카드 · 복사 · 순서
   await S.pressEl(`document.querySelectorAll('.bt-pat')[1]`);
   ok(await S.ev(`window.__beat.state().cur === 1 && document.querySelectorAll('.bt-cell.v1, .bt-cell.v2').length === 0 && document.querySelectorAll('.bt-pat')[1].classList.contains('on')`), 'A18 패턴 B — 빈 칸판');

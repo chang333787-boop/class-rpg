@@ -192,9 +192,9 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       dot, h('b', {}, C.rowName(beat.kit, r)),
       h('button', { class: 'bt-m' + (m.m ? ' on' : ''), title: '음소거', onclick: () => { m.m = !m.m; mixChanged(); } }, 'M'),
       h('button', { class: 'bt-s' + (m.s ? ' on' : ''), title: '혼자 듣기', onclick: () => { m.s = !m.s; mixChanged(); } }, 'S'),
-      h('input', { type: 'range', class: 'bt-vol', min: 0, max: 1, step: 0.05, value: m.v, title: '소리 크기', oninput: e => { m.v = +e.target.value; mixer && mixer.apply(beat.mix); markDirty(false); } }));
+      h('input', { type: 'range', class: 'bt-vol', min: 0, max: 1, step: 0.05, value: m.v, title: '소리 크기', oninput: e => { m.v = +e.target.value; mixer && mixer.apply(beat.mix, beat.kit); markDirty(false); } }));
   }
-  function mixChanged() { mixer && mixer.apply(beat.mix); markDirty(false); renderGrid(); }
+  function mixChanged() { mixer && mixer.apply(beat.mix, beat.kit); markDirty(false); renderGrid(); }
   function updateCell(r, i) { const c = cells[r] && cells[r][i]; if (c) c.className = cellClass(r, i, cur().d[r][i]); }
   //  베이스 줄 — 음 칩(높이에 따라 위아래) · 이어지는 칸은 가는 꼬리 · 쉼
   function renderBass() {
@@ -337,10 +337,10 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const s = JSON.parse(undo.pop());
     const nb = C.normalizeBeat({ ...C.packBeat(beat), ...s });
     nb.cur = beat.cur;
-    beat = nb; kit.prepare(beat.kit); mixer && mixer.apply(beat.mix);
+    beat = nb; kit.prepare(beat.kit); mixer && mixer.apply(beat.mix, beat.kit);
     dirty = true; renderAll();
   }
-  function setBeat(nb) { beat = nb; kit.prepare(beat.kit).then(() => alive && renderGrid()); mixer && mixer.apply(beat.mix); markDirty(); renderAll(); }
+  function setBeat(nb) { beat = nb; kit.prepare(beat.kit).then(() => alive && renderGrid()); mixer && mixer.apply(beat.mix, beat.kit); markDirty(); renderAll(); }
   function setDrum(r, i, v) { cur().d[r][i] = v; updateCell(r, i); markDirty(); }
   function setBass(i, v) { cur().b[i] = v; renderBass(); markDirty(); }
   function setChord(k, v) { cur().c[k] = v; renderChords(); markDirty(); }
@@ -399,7 +399,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function setSwing(v) { beat.swing = clamp(Math.round(v), 0, C.SWING_MAX); markDirty(false); renderTransport(); clearTimeout(tipTimer); tipTimer = setTimeout(renderTip, 350); }
   function setKit(k) {
     if (!C.KITS[k] || k === beat.kit) return;
-    beat.kit = k; markDirty(false);
+    beat.kit = k; markDirty(false); mixer && mixer.apply(beat.mix, k);
     kit.prepare(k).then(() => alive && renderGrid());
     renderGrid(); renderTip(); if (tab === 'pad' || tab === 'idea') renderSide();
     if (!playing) previewDrum('kick', 2);
@@ -515,7 +515,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
 
   // ── 소리 ──
-  function ensureAudio() { engine.ensure(); if (!mixer) mixer = new BeatMixer(engine); mixer.apply(beat.mix); return mixer; }
+  function ensureAudio() { engine.ensure(); if (!mixer) mixer = new BeatMixer(engine); mixer.apply(beat.mix, beat.kit); return mixer; }
   const outLat = () => { const c = engine.ctx; return c ? clamp(Number(c.outputLatency) || Number(c.baseLatency) || 0, 0, 0.15) : 0; };
   function track(hd) { if (!hd) return; V.live.push(hd); if (V.live.length > 48) { const now = engine.now; V.live = V.live.filter(x => x.end > now); } }
   function previewDrum(r, v = 1) { ensureAudio(); track(kit.hit(beat.kit, r, engine.now, v === 2 ? 1 : 0.62, mixer.ch[r])); }
@@ -665,7 +665,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (b.arr.length) b.mode = 'song';
     else { b.mode = 'loop'; if (C.patternEmpty(b.pats[b.cur])) b.cur = Math.max(0, b.pats.findIndex(p => !C.patternEmpty(p))); }
     const bars = b.arr.length ? Math.min(16, b.arr.length * 2) : 4;
-    const mx = new BeatMixer(engine); mx.apply(b.mix);
+    const mx = new BeatMixer(engine); mx.apply(b.mix, b.kit);
     const vs = { live: [], bass: null, chord: null, openHat: null };
     const sq = new C.Sequencer({ now: () => engine.now, emit: e => { if (e.kind !== 'step') sound(e, mx, vs, b.kit); }, beat: () => b });
     sq.start({ at: engine.now + 0.08 });

@@ -74,7 +74,7 @@ export const VOICES = {
     cymbal(c, o, t, v, N) { metal(c, o, t, v * 0.8, 1.47, 5000, 8000, 1.4); hiss(c, o, t, v * 0.5, N, 'highpass', 6000, 0.7, 1.2); },
   },
   real: {
-    kick(c, o, t, v, N) { thump(c, o, t, v, 120, 55, 0.05, 0.42, true); tone(c, o, t, v * 0.25, 85, 0.18); hiss(c, o, t, v * 0.45, N, 'lowpass', 4000, 0.8, 0.012); },
+    kick(c, o, t, v, N) { thump(c, o, t, v, 120, 55, 0.05, 0.42, true); tone(c, o, t, v * 0.45, 170, 0.07); tone(c, o, t, v * 0.25, 85, 0.18); hiss(c, o, t, v * 0.45, N, 'lowpass', 4000, 0.8, 0.012); hiss(c, o, t, v * 0.5, N, 'bandpass', 3200, 0.9, 0.018); },   // 몸통 + '똑'(작은 스피커에서도 들리게)
     snare(c, o, t, v, N) { tone(c, o, t, v * 0.45, 200, 0.09); tone(c, o, t, v * 0.25, 340, 0.06, 'sine'); hiss(c, o, t, v * 0.75, N, 'bandpass', 4500, 0.6, 0.24); hiss(c, o, t, v * 0.35, N, 'highpass', 1200, 0.7, 0.12); },
     clap(c, o, t, v, N) { clapNoise(c, o, t, v, N, 1600, [0, 0.013, 0.022, 0.037], 0.28); },
     hatc(c, o, t, v, N) { hiss(c, o, t, v * 0.7, N, 'highpass', 7000, 0.7, 0.045); hiss(c, o, t, v * 0.5, N, 'bandpass', 10500, 0.9, 0.035); metal(c, o, t, v * 0.25, 1.2, 8000, 11000, 0.04); },
@@ -84,7 +84,7 @@ export const VOICES = {
     cymbal(c, o, t, v, N) { hiss(c, o, t, v * 0.7, N, 'highpass', 4500, 0.7, 1.8); metal(c, o, t, v * 0.5, 1.73, 3500, 7000, 1.6); },
   },
   kor: {
-    kick(c, o, t, v, N) { thump(c, o, t, v, 98, 62, 0.12, 0.8, true); tone(c, o, t, v * 0.3, 140, 0.2); hiss(c, o, t, v * 0.35, N, 'lowpass', 300, 0.8, 0.18); hiss(c, o, t, v * 0.25, N, 'bandpass', 1200, 1, 0.015); },   // 북
+    kick(c, o, t, v, N) { thump(c, o, t, v, 98, 62, 0.12, 0.8, true); tone(c, o, t, v * 0.3, 140, 0.2); tone(c, o, t, v * 0.35, 190, 0.09); hiss(c, o, t, v * 0.35, N, 'lowpass', 300, 0.8, 0.18); hiss(c, o, t, v * 0.3, N, 'bandpass', 1200, 1, 0.02); },   // 북
     snare: deok,                                                                                                                     // 장구 덕
     clap(c, o, t, v, N) { kung(c, o, t, v, N); deok(c, o, t + 0.004, v, N); },                                                     // 장구 덩
     hatc(c, o, t, v, N) {                                                                                                            // 꽹과리 — 놋쇠 작은 징 · 높고 쨍 · 손으로 막아 짧게
@@ -108,17 +108,33 @@ export const VOICES = {
     cymbal(c, o, t, v, N) { [0.95, 0.8, 0.75, 0.9].forEach((k, i) => gi(c, o, t + 0.06 * i, v * k, N)); },                           // 더러러러(굴리기)
   },
 };
-//  구운 소리의 길이(초) · 꼭대기 크기(줄끼리 어울리게 — 귀로 맞추지 못한 값이라 믹서로 더 맞춘다)
+//  구운 소리의 길이(초) · 크기 — 크롬북 같은 작은 스피커로 들리는 크기(150Hz 아래를 깎고 처음 0.12초 RMS)를 줄마다 정한 값에 맞춘다.
+//   꼭대기는 0.98 을 넘기지 않는다(넘으면 그만큼 덜 키움). 귀로 맞춘 값이 아니라 셈으로 맞춘 값 — 믹서(소리 크기)로 더 맞출 수 있다.
 const DUR = {
   elec: { kick: 1.3, snare: 0.35, clap: 0.3, hatc: 0.12, hato: 0.5, tom: 0.5, shaker: 0.15, cymbal: 1.5 },
   real: { kick: 0.5, snare: 0.36, clap: 0.38, hatc: 0.1, hato: 0.6, tom: 0.62, shaker: 0.13, cymbal: 1.9 },
   kor: { kick: 0.85, snare: 0.12, clap: 0.55, hatc: 0.42, hato: 3.6, tom: 0.2, shaker: 0.55, cymbal: 0.3 },
 };
-const LEVEL = {
-  elec: { kick: 0.95, snare: 0.72, clap: 0.66, hatc: 0.34, hato: 0.3, tom: 0.66, shaker: 0.3, cymbal: 0.34 },
-  real: { kick: 0.92, snare: 0.72, clap: 0.62, hatc: 0.34, hato: 0.3, tom: 0.66, shaker: 0.3, cymbal: 0.34 },
-  kor: { kick: 0.9, snare: 0.66, clap: 0.88, hatc: 0.34, hato: 0.42, tom: 0.62, shaker: 0.78, cymbal: 0.55 },
-};
+const DRUM_LOUD = { kick: 0.15, snare: 0.12, clap: 0.11, hatc: 0.04, hato: 0.05, tom: 0.11, shaker: 0.035, cymbal: 0.07 };
+const TARGET = { elec: DRUM_LOUD, real: DRUM_LOUD,
+  kor: { kick: 0.13, snare: 0.1, clap: 0.13, hatc: 0.06, hato: 0.08, tom: 0.09, shaker: 0.1, cymbal: 0.07 } };   // 북 · 덕 · 덩 · 꽹과리 · 징 · 기덕 · 쿵 · 더러러러
+//  낮은 북(진짜 북 쿵 · 북 · 장구 덩 · 쿵)은 구운 뒤 살짝 찌그러뜨린다(tanh) — 아주 낮은 소리 꼭대기를 눌러 작은 스피커에 들리는 배음을 키운다
+const DRIVE = { real: { kick: 3 }, kor: { kick: 3, clap: 2.5, shaker: 2.5, snare: 1.6 } };
+//  작은 스피커로 들리는 크기 — 150Hz 아래를 가파르게 깎고(2차 고역 통과 두 번) 처음 win 초의 RMS
+export function speakerLoud(d, sr, win = 0.12) {
+  const n = Math.min(d.length, Math.round(sr * win)), w = 2 * Math.PI * 150 / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * 0.707), a0 = 1 + al;
+  const b0 = (1 + cs) / 2 / a0, b1 = -(1 + cs) / a0, b2 = b0, a1 = -2 * cs / a0, a2 = (1 - al) / a0;
+  let x = d.subarray ? d.subarray(0, n) : d.slice(0, n);
+  for (let pass = 0; pass < 2; pass++) { const y = new Float32Array(n); let x1 = 0, x2 = 0, y1 = 0, y2 = 0; for (let i = 0; i < n; i++) { const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; } x = y; }
+  let ss = 0; for (let i = 0; i < n; i++) ss += x[i] * x[i];
+  return Math.sqrt(ss / Math.max(1, n));
+}
+//  베이스 · 화음 크기(소리 묶음마다) — 작은 스피커로 잰 크기로 맞춤: 베이스 ≈ 북과 비슷하게 · 화음 ≈ 북보다 6dB 작게(뒤에서 받쳐 주게)
+//   기본 리듬 카드 여덟 판을 오프라인으로 그려 견준 값(scripts/unit/music/beat-live.mjs A43 이 다시 잰다) · 길게 치는 화음은 소리가 계속 나서 반(-6dB)으로
+const LAYER = { elec: { bass: 1, chord: 0.68 }, real: { bass: 0.72, chord: 0.27 }, kor: { bass: 1.2, chord: 0.57 } };
+const STYLE_GAIN = { long: 0.5, oom: 1, short: 1 };
+//  소리 묶음 전체 크기 — 진짜 북은 짧고 가벼워 다 합친 소리가 작다(같은 카드로 재면 전자 북보다 약 4.7dB 작음) → 조금 키운다
+const KIT_GAIN = { elec: 1, real: 1.5, kor: 1 };
 const PAN = { kick: 0, snare: 0.04, clap: -0.14, hatc: 0.24, hato: 0.24, tom: -0.2, shaker: -0.3, cymbal: 0.18, bass: 0, chord: -0.06 };
 
 function noiseBuf(sr) {
@@ -143,7 +159,7 @@ export class BeatKit {
     const t0 = performance.now();
     this.pending[kit] = Promise.all(ROWS.map(r => this._render(OAC, kit, r))).then(list => {
       const out = {}; ROWS.forEach((r, i) => { out[r] = list[i]; });
-      this.buf[kit] = out; this.info[kit] = { ms: Math.round(performance.now() - t0) };
+      this.buf[kit] = out; (this.info[kit] = this.info[kit] || {}).ms = Math.round(performance.now() - t0);
       return true;
     }).catch(e => { console.warn('[MUSIC-BEAT-1] 소리 굽기 실패 — 바로 합성으로', kit, e); return false; }).finally(() => { delete this.pending[kit]; });
     return this.pending[kit];
@@ -153,9 +169,13 @@ export class BeatKit {
     VOICES[kit][row](c, c.destination, 0, 1, this.N);
     const buf = await c.startRendering();
     const d = buf.getChannelData(0);
+    const drive = (DRIVE[kit] || {})[row];
+    if (drive) { let p0 = 0; for (let i = 0; i < d.length; i++) p0 = Math.max(p0, Math.abs(d[i])); if (p0 > 0) { const nk = Math.tanh(drive); for (let i = 0; i < d.length; i++) d[i] = Math.tanh(drive * d[i] / p0) / nk; } }
     let pk = 0; for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > pk) pk = a; }
-    if (!(pk > 1e-5) || !Number.isFinite(pk)) throw new Error(`소리가 비었어요 ${kit}/${row}`);
-    const k = LEVEL[kit][row] / pk, fade = Math.min(d.length, Math.round(sr * 0.004));
+    const loud = speakerLoud(d, sr);
+    if (!(pk > 1e-5) || !Number.isFinite(pk) || !(loud > 1e-6)) throw new Error(`소리가 비었어요 ${kit}/${row}`);
+    const k = Math.min(TARGET[kit][row] / loud, 0.98 / pk), fade = Math.min(d.length, Math.round(sr * 0.004));
+    (this.info[kit] = this.info[kit] || {})[row] = { loud: +(loud * k).toFixed(4), want: TARGET[kit][row], capped: k < TARGET[kit][row] / loud };
     for (let i = 0; i < d.length; i++) d[i] *= k;
     for (let i = 0; i < fade; i++) d[d.length - 1 - i] *= i / fade;   // 끝을 살짝 줄여 딱 소리 없게
     return buf;
@@ -187,6 +207,7 @@ export class BeatKit {
   //  베이스 한 음 — p(미디 번호) · dur 초 · 소리 묶음마다 다른 소리: 전자 = 톱니 + 몸통 사인(필터가 닫히며 '뚱') · 진짜 = 손가락 베이스 · 우리 장단 = 한 옥타브 위 뜯는 줄
   bass(kit, p, t, dur, vel, out) {
     const c = this.e.ctx; if (!c || !out) return null;
+    vel *= (LAYER[kit] || LAYER.elec).bass;
     t = Math.max(t, c.currentTime);
     const f = freqOf(p), g = c.createGain(), lp = c.createBiquadFilter(), end = t + Math.max(0.06, dur);
     lp.type = 'lowpass';
@@ -216,6 +237,7 @@ export class BeatKit {
   //   전자 = 어긋난 톱니 둘(넓게) · 진짜 = 전기 피아노 · 우리 장단 = 가야금처럼 뜯고 한 줄씩 살짝 늦게(긴 음은 농현)
   chord(kit, notes, t, dur, vel, out, style = 'long') {
     const c = this.e.ctx; if (!c || !out) return null;
+    vel *= (LAYER[kit] || LAYER.elec).chord * (STYLE_GAIN[style] || 1);
     t = Math.max(t, c.currentTime);
     const long = style === 'long', g = c.createGain(), lp = c.createBiquadFilter(), end = t + Math.max(0.05, dur), oscs = [];
     lp.type = 'lowpass';
@@ -266,7 +288,8 @@ export class BeatKit {
       for (const [r, b] of Object.entries(rows)) {
         const d = b.getChannelData(0); let pk = 0, ss = 0, zc = 0, nan = 0, tail = 0;
         for (let i = 0; i < d.length; i++) { const x = d[i]; if (!Number.isFinite(x)) { nan++; continue; } pk = Math.max(pk, Math.abs(x)); ss += x * x; if (i && (d[i - 1] < 0) !== (x < 0)) zc++; if (Math.abs(x) > 0.01) tail = i; }
-        out[kit][r] = { peak: +pk.toFixed(3), rms: +Math.sqrt(ss / d.length).toFixed(4), zcr: Math.round(zc / b.duration), sec: +b.duration.toFixed(2), ring: +(tail / b.sampleRate).toFixed(2), nan };
+        const inf = (this.info[kit] || {})[r] || {};
+        out[kit][r] = { peak: +pk.toFixed(3), rms: +Math.sqrt(ss / d.length).toFixed(4), zcr: Math.round(zc / b.duration), sec: +b.duration.toFixed(2), ring: +(tail / b.sampleRate).toFixed(2), nan, loud: inf.loud, want: inf.want, capped: !!inf.capped };
       }
     }
     return out;
@@ -285,8 +308,9 @@ export class BeatMixer {
       this.ch[r] = g;
     }
   }
-  apply(mix) {
+  apply(mix, kit) {
     const solo = MIX.some(r => mix[r] && mix[r].s), now = this.c.currentTime;
+    if (kit) this.master.gain.setTargetAtTime(0.72 * (KIT_GAIN[kit] || 1), now, 0.02);
     for (const r of MIX) { const m = mix[r] || { v: VOL_DEF }; const on = !m.m && (!solo || m.s); this.ch[r].gain.setTargetAtTime(on ? m.v : 0, now, 0.012); }
   }
   audible(mix, r) { const solo = MIX.some(x => mix[x] && mix[x].s); return !mix[r].m && (!solo || mix[r].s) && mix[r].v > 0; }
