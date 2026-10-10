@@ -443,6 +443,7 @@ export function renderScore(score, o = {}) {
     }
     //  빠르기 · 표시(패턴 글자 · rit.) · 화음 이름
     if (L === 0 && score.tempo) root.append(svg('text', { x: A ? 4 : clefX + 2, y: marksY, class: 'st-tempo' }, `${score.tempo.dotted ? '♩. ' : '♩ '}= ${score.tempo.bpm}`));
+    if (L === 0 && score.tempo && score.tempo.extra) root.append(svg('text', { x: left + 30, y: marksY, class: 'st-mark swing' }, score.tempo.extra));   // 통통 튀게(스윙) 몇 %
     for (const m of score.marks || []) {
       if (m.bar < b0 || m.bar >= b1) continue;
       const mx = xs.get(m.bar).x0 + 4 + (L === 0 && m.bar === b0 && score.tempo ? (A ? 0 : 0) : 0);

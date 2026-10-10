@@ -138,6 +138,7 @@ for (const st of C.STARTERS) {
     ok(r.el.querySelectorAll('circle.st-rdot').length === 4 * sc.staves.length, '도돌이표 점(오선마다 넷)');
     ok(r.el.querySelectorAll('text.st-chord').length === want.length && r.el.querySelectorAll('text.st-chordko').length >= 1, '화음 이름 그림');
     ok(strong === 0 || r.el.querySelectorAll('path.st-accent').length > 0, '> 그림');
+    ok(!st.swing || r.el.querySelectorAll('text.st-mark').some(t => t.textContent === `통통 튀게 ${st.swing}%`), '통통 튀는 정도 글');
   });
 }
 await test('비트 악보 — 이어 붙인 순서대로(A B A C) · 32칸(두 마디) · 열린 칙 o · 짝+박수 같은 칸', () => {
