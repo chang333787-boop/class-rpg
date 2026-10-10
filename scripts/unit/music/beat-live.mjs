@@ -191,6 +191,15 @@ try {
     && lay.seg === '베이스,가락,화음' && lay.tipBottom <= 610 && lay.palBottom < lay.tipBottom,
     'A4 줄 여섯(쿵 짝 박수 칙 치이 통) + 가락 · 베이스 · 화음 · 16칸 × 6 + 가락 16칸 · 박 1~4 · 박마다 칠(둘째 · 넷째 박) · 카드 일곱 · 빠르기 96 · 붓 상자 베이스 | 가락 | 화음 · 1366×610 에 다 들어감(팁까지)', JSON.stringify(lay));
   await S.shot('A_beat_empty');
+  //  [MUSIC-BEAT-MEL-1] 북 줄 여덟(쉐이커 · 심벌 펴기 — 진짜 클릭)이어도 가락 · 베이스 · 화음 · 붓 상자 · 팁까지 1366×610 에 다 들어감 → 다시 접기
+  const moreQ = t => `[...document.querySelectorAll('.bt-morebtn')].find(b => b.textContent.includes(${JSON.stringify(t)}))`;
+  const mo = [await S.pressEl(moreQ('쉐이커')), await S.pressEl(moreQ('심벌'))];
+  const lay8 = await S.ev(`({ rows: document.querySelectorAll('.bt-lab').length, many: document.querySelector('.bt-grid').classList.contains('many'), over: document.querySelector('.bt-main').scrollHeight - document.querySelector('.bt-main').clientHeight,
+    tip: Math.round(document.querySelector('.bt-tip').getBoundingClientRect().bottom), m: Math.round(document.querySelector('.bt-mcell').getBoundingClientRect().height), chip: (() => { const l = document.querySelector('.bt-lab[data-r="chord"]').getBoundingClientRect(), c = document.querySelector('.bt-cslot').getBoundingClientRect(); return Math.round(l.height) === Math.round(c.height); })() })`);
+  ok(mo.every(x => x === true) && lay8.rows === 11 && lay8.many && lay8.over <= 0 && lay8.tip <= 610 && lay8.m === 34 && lay8.chip, 'A4b 북 줄 여덟(쉐이커 · 심벌)이어도 1366×610 에 팁까지(넘침 0) · 가락 줄 34px · 이름 칸 = 줄 높이', JSON.stringify(lay8));
+  await S.shot('A_beat_rows8');
+  await S.pressEl(moreQ('쉐이커')); await S.pressEl(moreQ('심벌'));
+  ok(await S.ev(`document.querySelectorAll('.bt-lab').length === 9 && !document.querySelector('.bt-grid').classList.contains('many')`), 'A4c 다시 접으면 줄 여섯 + 가락 · 베이스 · 화음');
   //  칸 — 진짜 마우스
   for (const [r, i] of [['kick', 0], ['kick', 8], ['snare', 4], ['snare', 12], ['snare', 12], ['clap', 2], ['clap', 2], ['clap', 2]]) { const p = await S.pressEl(cellQ(r, i)); if (p !== true) { ok(false, `A5 칸 누르기 ${r}${i}`, String(p)); break; } }
   const c5 = await S.ev(`({ kick: ${onSteps('kick')}, snare: window.__beat.beat().pats[0].d.snare, clap: ${onSteps('clap')}, cls: ${cellQ('snare', 12)}.className, cls4: ${cellQ('snare', 4)}.className })`);

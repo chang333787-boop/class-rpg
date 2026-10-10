@@ -324,7 +324,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       h('h4', {}, '🎵 가락 만들기'),
       h('button', { class: 'btn bt-wide bt-meldice', onclick: () => rollMel() }, '🎲 가락 주사위'),
       h('p', { class: 'bt-help' }, '짧은 가락을 두 번 반복하고 끝만 살짝 바꾸면 귀에 쏙 들어와요. 첫 음은 그 박 화음의 음에서 시작해요.'),
-      h('div', { class: 'bt-rot' }, h('button', { class: 'btn small', 'data-echo': '1', onclick: () => echo(1) }, '메아리 ⤴ 한 칸 위로'), h('button', { class: 'btn small', 'data-echo': '-1', onclick: () => echo(-1) }, '메아리 ⤵ 한 칸 아래로')),
+      h('div', { class: 'bt-rot' }, h('button', { class: 'btn small', 'data-echo': '1', title: '뒤 절반 = 앞 절반을 한 칸 위로', onclick: () => echo(1) }, '메아리 ⤴ 위로'), h('button', { class: 'btn small', 'data-echo': '-1', title: '뒤 절반 = 앞 절반을 한 칸 아래로', onclick: () => echo(-1) }, '메아리 ⤵ 아래로')),
       h('p', { class: 'bt-help' }, '메아리 = 앞 절반 가락을 뒤 절반에서 한 칸 높게(낮게) 따라 불러요 — 묻고 대답하는 느낌.'),
       h('h4', {}, '➗ 고르게 나누기'),
       h('div', { class: 'bt-chips' }, ...rows.map(r => h('button', { class: 'bt-chip' + (ideaRow === r ? ' on' : ''), style: { '--c': ROW_COLOR[r] }, onclick: () => { ideaRow = r; renderSide(); } }, C.rowName(beat.kit, r)))),
@@ -786,19 +786,21 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const p = beat.pats[best.pat]; if (!p || best.step >= p.m.length) return;
     p.m[best.step] = n;
     if (best.next) skipOnce.add(best.bar + '|' + best.step + '|mel');
-    x.rec = { pat: best.pat, step: best.step, t: best.t };
+    x.rec = { pat: best.pat, step: best.step, bar: best.bar };
     if (best.pat === beat.cur) renderMel();
     markDirty();
   }
-  //  건반을 뗌 — 소리 멈춤(두드리는 악기는 저절로) · 녹음 중이면 뗀 자리(가까운 칸)에 쉼: 짧게 누르면 짧은 음 · 사이에 다른 음이 있거나 마디 끝을 넘으면 그대로
+  //  건반을 뗌 — 소리 멈춤(두드리는 악기는 저절로) · 녹음 중이면 뗀 자리(가까운 칸 — 누른 칸과 같은 셈이라 스윙이어도 맞음)에 쉼:
+  //   짧게 누르면 짧은 음(적어도 한 칸) · 사이에 다른 음이 있거나 마디를 넘겨 떼면 그대로(그 마디 끝까지)
   function melRelease(n) {
     const x = held.get(n); if (!x) return;
     held.delete(n);
     const now = engine.now, ring = C.isRing(beat.lead);
     if (x.hd && !ring) x.hd.stop(now);
-    if (!x.rec || ring || !rec || !playing || readOnly) return;
-    const p = beat.pats[x.rec.pat]; if (!p) return;
-    const r = x.rec.step + Math.max(1, Math.round((now - outLat() - x.rec.t) / C.stepDur(beat.bpm, g())));
+    if (!x.rec || ring || !rec || !playing || readOnly || !seq) return;
+    const p = beat.pats[x.rec.pat], best = recSlot(now - outLat());
+    if (!p || !best || best.bar !== x.rec.bar) return;
+    const r = Math.max(x.rec.step + 1, best.step);
     if (r >= p.m.length) return;
     for (let j = x.rec.step + 1; j <= r; j++) if (p.m[j] !== C.B_EMPTY) return;
     p.m[r] = C.B_REST;
