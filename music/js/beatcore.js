@@ -349,15 +349,16 @@ export function convertPattern(p, fromKey, toKey) {
   if (from.key === to.key) return clonePattern(p);
   const fBar = from.beats * from.sub, tBar = to.beats * to.sub, out = emptyPattern(to);
   const map = i => { const beat = i / from.sub; if (beat >= to.beats) return -1; const j = Math.round(beat * to.sub); return j < tBar ? j : -1; };
+  //  베이스 · 가락: 두 칸이 한 자리로 모이면 먼저 온 음이 그 자리 — 다만 음이 쉼을 이긴다 [MUSIC-BEAT-MEL-1]
+  //   (16칸 → 8칸에서 '반 박 앞 쉼'이 '박 첫 음'을 지워 버리던 것 · 예: 7칸 쉼 + 8칸 음 → 4칸에 음)
+  const put = (row, k, v) => { if (v === B_EMPTY) return; const o = row[k]; if (o === B_EMPTY || (o === B_REST && v !== B_REST)) row[k] = v; };
   for (let bar = 0; bar < to.bars; bar++) {
     const fo = (bar % from.bars) * fBar, to0 = bar * tBar;
     for (let i = 0; i < fBar; i++) {
       const j = map(i); if (j < 0) continue;
       for (const r of ROWS) out.d[r][to0 + j] = Math.max(out.d[r][to0 + j], p.d[r][fo + i] || 0);
-      const v = p.b[fo + i];
-      if (v !== B_EMPTY && out.b[to0 + j] === B_EMPTY) out.b[to0 + j] = v;
-      const mv = p.m[fo + i];                                   // 가락도 베이스처럼(먼저 온 음이 그 자리) [MUSIC-BEAT-MEL-1]
-      if (mv !== B_EMPTY && out.m[to0 + j] === B_EMPTY) out.m[to0 + j] = mv;
+      put(out.b, to0 + j, p.b[fo + i]);
+      put(out.m, to0 + j, p.m[fo + i]);
     }
   }
   //  화음: 새 칸이 시작하는 박의 화음(옛 패턴이 짧으면 되풀이한 자리)

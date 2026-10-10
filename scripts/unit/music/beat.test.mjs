@@ -1,5 +1,6 @@
 // 음악실 비트 만들기 시험 [MUSIC-BEAT-1] — 모양 · 살피기(틀린 값 · 너무 큰 값) · 저장 모양 왕복 · 고르게 나누기 · 스윙 시각 · 녹음 칸 고르기
 //  · 필인 · 주사위 · 기본 리듬 카드 · 칸 수 바꾸기 · 되풀이 박자기(가짜 시계 — 시각이 안 밀리는지 · 늦는 칸이 없는지) · 저장소(손님 · 가짜 Firebase)
+//  [MUSIC-BEAT-MEL-1] 가락 줄 — 살피기 · 예전 비트(m · lead 없음) · 왕복 · 칸 수 바꾸기 · 박자기 가락 사건(이어짐 · 쉼 · 패턴 끝) · 가락 주사위 · 메아리 · 카드 가락
 //  node scripts/unit/music/beat.test.mjs   (DOM 없음 · 네트워크 없음)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,12 +25,13 @@ function randomBeat(rng) {
     const p = B.emptyPattern(g);
     for (const r of B.ROWS) p.d[r] = Array.from({ length: len }, () => [0, 0, 1, 2][Math.floor(rng() * 4)]);
     p.b = Array.from({ length: len }, () => [-1, -1, -1, 0, 1, 2, 3, 4, 5, 9][Math.floor(rng() * 10)]);
+    p.m = Array.from({ length: len }, () => [-1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 9][Math.floor(rng() * 12)]);
     p.c = p.c.map(() => [null, 'I', 'IV', 'V', 'vi'][Math.floor(rng() * 5)]);
     p.cs = B.STYLE_KEYS[Math.floor(rng() * 3)];
     return p;
   });
   b.title = '비트 ' + Math.floor(rng() * 1000);
-  b.bpm = B.BPM_MIN + Math.floor(rng() * 91); b.swing = Math.floor(rng() * 61); b.kit = B.KIT_KEYS[Math.floor(rng() * 3)];
+  b.bpm = B.BPM_MIN + Math.floor(rng() * 91); b.swing = Math.floor(rng() * 61); b.kit = B.KIT_KEYS[Math.floor(rng() * 3)]; b.lead = B.LEAD_KEYS[Math.floor(rng() * B.LEAD_KEYS.length)];
   b.arr = Array.from({ length: Math.floor(rng() * 9) }, () => Math.floor(rng() * 4));
   b.mode = rng() < 0.5 ? 'song' : 'loop'; b.cur = Math.floor(rng() * 4);
   for (const r of B.MIX) b.mix[r] = { v: Math.round(rng() * 100) / 100, m: rng() < 0.2, s: rng() < 0.1 };
@@ -40,7 +42,8 @@ function randomBeat(rng) {
 await test('빈 비트 모양 — 16칸 · 패턴 넷 · 줄 여덟 · 베이스 빈칸 · 화음 넷 · 빠르기 96', () => {
   const b = B.emptyBeat();
   eq([b.grid, b.bpm, b.swing, b.kit, b.pats.length, b.mode, b.cur, b.arr.length], ['16', 96, 0, 'elec', 4, 'loop', 0, 0]);
-  for (const p of b.pats) { eq(Object.keys(p.d), B.ROWS); ok(B.ROWS.every(r => p.d[r].length === 16 && p.d[r].every(v => v === 0))); eq(p.b.length, 16); ok(p.b.every(v => v === -1)); eq(p.c, [null, null, null, null]); eq(p.cs, 'long'); }
+  for (const p of b.pats) { eq(Object.keys(p.d), B.ROWS); ok(B.ROWS.every(r => p.d[r].length === 16 && p.d[r].every(v => v === 0))); eq(p.b.length, 16); ok(p.b.every(v => v === -1)); eq(p.m.length, 16); ok(p.m.every(v => v === -1)); eq(p.c, [null, null, null, null]); eq(p.cs, 'long'); }
+  eq(b.lead, 'synth', '가락 악기 = 전자 북의 처음 악기(신스)');
   ok(!B.hasContent(b) && B.patternEmpty(b.pats[0]));
   eq(Object.keys(b.mix), [...B.ROWS, 'mel', 'bass', 'chord']);
   eq(B.normalizeBeat(b), b, '빈 비트 살피기 = 그대로');
@@ -54,7 +57,8 @@ await test('칸 수 다섯 — 16 · 8 · 32 · 12 · 9 = 길이 · 박 · 화�
 await test('살피기 — 틀린 값 · 모르는 칸 · 너무 큰 값은 버리거나 기본값(화면이 안 깨짐)', () => {
   for (const raw of [null, undefined, 0, 1, 'x', [], [1, 2], true, () => 1]) eq(B.normalizeBeat(raw), B.emptyBeat(), '이상한 값 ' + String(raw));
   const huge = { grid: 'toString', kit: '__proto__', bpm: 9999, swing: -5, title: '가'.repeat(500), id: 'x'.repeat(500), cur: 99, mode: 'party',
-    pats: { 0: { d: { kick: '2'.repeat(100000), snare: { 0: 2, 3: '1', 5: 7, 4294967294: 2 }, hatc: [1, 1, 'a', null, true, 2.5], tom: 12345 }, b: '0123459x?-'.repeat(1000), c: ['I', 'toString', '__proto__', 'vi', 'V'], cs: 'constructor' }, 7: { d: {} } },
+    pats: { 0: { d: { kick: '2'.repeat(100000), snare: { 0: 2, 3: '1', 5: 7, 4294967294: 2 }, hatc: [1, 1, 'a', null, true, 2.5], tom: 12345 }, b: '0123459x?-'.repeat(1000), m: '0123456789x?-'.repeat(1000), c: ['I', 'toString', '__proto__', 'vi', 'V'], cs: 'constructor' }, 7: { d: {} } },
+    lead: '__proto__',
     arr: [0, 1, 2, 3, 4, -1, '2', 'x', 1, 1, 1, 1, 1], mix: { kick: { v: 7, m: 'yes', s: 1 }, snare: { v: -3 }, bass: { v: '0.5' }, chord: null, toString: { v: 1 } },
     show: { shaker: 1, cymbal: 'true' }, fill: 'true', click: 1, extra: { deep: [1, 2, 3] } };
   const t0 = Date.now();
@@ -66,6 +70,10 @@ await test('살피기 — 틀린 값 · 모르는 칸 · 너무 큰 값은 버�
   eq(b.pats[0].d.hatc, [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "'a' · null · true · 2.5 는 0");
   eq(b.pats[0].d.tom, new Array(16).fill(0), '숫자 하나는 줄이 아님');
   eq(b.pats[0].b, [0, 1, 2, 3, 4, 5, 9, 9, -1, -1, 0, 1, 2, 3, 4, 5], "베이스: '9' · 'x' = 쉼 · '?' · '-' 는 빈칸");
+  eq(b.pats[0].m, [0, 1, 2, 3, 4, 5, 6, 7, -1, 9, 9, -1, -1, 0, 1, 2], "가락: 0~7 음 · '8' 은 빈칸 · '9' · 'x' = 쉼 · 긴 글은 16칸만");
+  eq(b.lead, 'synth', '모르는 악기 이름(__proto__) = 처음 악기');
+  eq(B.normalizeBeat({ pats: [{ m: [0, 7, 8, -3, 2.5, '7', 'x', 9, null, true, {}, '05'] }] }).pats[0].m.slice(0, 12), [0, 7, -1, -1, -1, 7, 9, 9, -1, -1, -1, -1], '가락 배열 꼴 · 틀린 값은 빈칸');
+  eq([B.normalizeBeat({ kit: 'kor' }).lead, B.normalizeBeat({ kit: 'real' }).lead, B.normalizeBeat({ kit: 'kor', lead: 'glock' }).lead, B.normalizeBeat({ lead: 'toString' }).lead], ['daegeum', 'xylo', 'glock', 'synth'], '악기 없음 = 소리 묶음의 처음 악기');
   eq(b.pats[0].c, ['I', null, null, 'vi'], '모르는 화음 카드 · 물려받은 이름(toString) 은 빈칸 · 다섯째는 버림');
   eq(b.pats[0].cs, 'long');
   eq(b.arr, [0, 1, 2, 3, 2], '순서: 0~3 만 · 앞 여덟 칸만 읽음');
@@ -74,9 +82,9 @@ await test('살피기 — 틀린 값 · 모르는 칸 · 너무 큰 값은 버�
   ok(!('extra' in b) && !('toString' in b.mix && b.mix.toString !== Object.prototype.toString), '모르는 칸은 안 남김');
   //  칸 수가 바뀌면 줄 길이도 그 칸 수
   const b9 = B.normalizeBeat({ grid: 9, pats: [{ d: { kick: '2'.repeat(40) }, b: '0'.repeat(40), c: ['I', 'V', 'IV', 'vi'] }] });
-  eq([b9.grid, b9.pats[0].d.kick.length, b9.pats[0].b.length, b9.pats[0].c], ['9', 9, 9, ['I', 'V', 'IV']]);
+  eq([b9.grid, b9.pats[0].d.kick.length, b9.pats[0].b.length, b9.pats[0].m.length, b9.pats[0].c], ['9', 9, 9, 9, ['I', 'V', 'IV']]);
   const b32 = B.normalizeBeat({ grid: '32' });
-  eq([b32.pats[3].d.cymbal.length, b32.pats[3].b.length, b32.pats[3].c.length], [32, 32, 4]);
+  eq([b32.pats[3].d.cymbal.length, b32.pats[3].b.length, b32.pats[3].m.length, b32.pats[3].c.length], [32, 32, 32, 4]);
 });
 
 await test('저장 모양 왕복 — 무작위 비트 300개: normalizeBeat(packBeat(b)) = b · 글자 줄 · JSON 크기 4KB 아래', () => {
@@ -86,7 +94,8 @@ await test('저장 모양 왕복 — 무작위 비트 300개: normalizeBeat(pack
     const b = randomBeat(rng);
     const packed = B.packBeat(b);
     const json = JSON.stringify(packed); maxSize = Math.max(maxSize, json.length);
-    ok(typeof packed.pats[0].d.kick === 'string' && typeof packed.pats[0].b === 'string' && packed.pats[0].c.every(c => typeof c === 'string'), '글자 줄');
+    ok(typeof packed.pats[0].d.kick === 'string' && typeof packed.pats[0].b === 'string' && typeof packed.pats[0].m === 'string' && /^[0-7x.]+$/.test(packed.pats[0].m) && packed.pats[0].c.every(c => typeof c === 'string'), '글자 줄');
+    ok(B.LEAD_KEYS.includes(packed.lead), '가락 악기 ' + packed.lead);
     eq(B.normalizeBeat(JSON.parse(json)), b, '왕복 ' + k);
     //  Firebase 가 배열을 객체로 바꿔도
     const fb = JSON.parse(json); fb.pats = Object.assign({}, fb.pats); fb.arr = Object.assign({}, fb.arr); for (const p of Object.values(fb.pats)) p.c = Object.assign({}, p.c);
@@ -350,6 +359,121 @@ await test('박자기 — 베이스 길이 = 다음 음까지 · 쉼 = 끊기 ·
   ok(ev.some(e => e.kind === 'drum' && e.row === 'clap' && e.bar === 0 && e.step === 12), '같은 마디 안에서 바로 들림');
 });
 
+//  ── 가락 [MUSIC-BEAT-MEL-1] ──
+const melStr = m => m.map(v => (v === B.B_REST ? 'x' : v < 0 ? '.' : String(v))).join('');
+const onsets = m => m.map((v, i) => (v >= 0 && v <= B.M_TOP ? i : -1)).filter(i => i >= 0);
+//  칸 i 의 화음(빈 칸 = 앞 화음이 이어짐)
+const chordAtStep = (c, g, i) => { const k = Math.floor(i / B.slotLen(g)); for (let j = Math.min(k, c.length - 1); j >= 0; j--) if (c[j]) return c[j]; return null; };
+await test('가락 — 예전에 저장한 비트(m · lead 없음) = 빈 가락 · 소리 묶음의 처음 악기 · 다시 저장하면 m · lead 가 붙음 · 패턴이 빈지 셈에 가락도', () => {
+  const old = B.packBeat(B.applyStarter(B.emptyBeat(), 'basic').beat);
+  delete old.lead; for (const p of old.pats) delete p.m;
+  const b = B.normalizeBeat(JSON.parse(JSON.stringify(old)));
+  ok(b.pats.every(p => p.m.length === 16 && p.m.every(v => v === -1)), '빈 가락'); eq(b.lead, 'synth');
+  eq(b.pats[0].d, B.starterPattern(B.STARTERS[0]).d, '북은 그대로'); eq(b.pats[0].b, B.starterPattern(B.STARTERS[0]).b, '베이스는 그대로');
+  const re = B.packBeat(b); eq([re.lead, re.pats[0].m], ['synth', '................']);
+  const k = B.normalizeBeat({ kit: 'kor', pats: [{ d: { kick: '2' } }] }); eq(k.lead, 'daegeum');
+  //  가락만 있는 패턴도 '빈 패턴이 아님' · 사용한 패턴 수 · 내용 있음
+  const e = B.emptyBeat(); e.pats[2].m[5] = 3;
+  ok(!B.patternEmpty(e.pats[2]) && B.hasContent(e) && B.usedCount(e) === 1 && B.melCount(e.pats[2]) === 1, '가락만 있어도 내용');
+  const c = B.clonePattern(e.pats[2]); c.m[5] = 4; eq(e.pats[2].m[5], 3, '복사본을 고쳐도 원래 패턴은 그대로');
+});
+await test('가락 — 칸 수 바꾸기: 박 자리로 옮김 · 16→8 에서 쉼이 박 첫 음을 지우지 않음(음이 쉼을 이김 · 베이스도) · 16→32 되풀이 · 32→16 첫 마디', () => {
+  const p = B.starterPattern(B.STARTERS[0]);
+  eq(melStr(p.m), '2.3.4.3x2.3.1...');
+  const p8 = B.convertPattern(p, '16', '8');
+  eq(melStr(p8.m), '2343231.', '7칸 쉼 + 8칸 미 → 8칸 판 4칸에 미(쉼에 지워지지 않음)');
+  const p32 = B.convertPattern(p, '16', '32'); eq(p32.m.slice(16), p32.m.slice(0, 16)); eq(melStr(p32.m.slice(0, 16)), melStr(p.m));
+  eq(melStr(B.convertPattern(p32, '32', '16').m), melStr(p.m), '32 → 16 = 첫 마디');
+  ok(B.convertPattern(p, '16', '12').m.length === 12 && B.convertPattern(p, '16', '9').m.length === 9, '길이');
+  ok(onsets(B.convertPattern(p, '16', '9').m).every(i => i < 9), '9칸 — 넷째 박은 버림');
+  //  베이스도 같은 규칙: 쉼(7) + 음(8) → 4칸에 음
+  const q = B.emptyPattern(B.gridOf('16')); q.b[0] = 0; q.b[7] = B.B_REST; q.b[8] = 3;
+  eq(B.convertPattern(q, '16', '8').b.slice(0, 5), [0, -1, -1, -1, 3], '베이스 — 음이 쉼을 이김');
+  //  쉼끼리 · 음끼리는 먼저 온 것
+  const r = B.emptyPattern(B.gridOf('16')); r.m[6] = 2; r.m[7] = 4; eq(B.convertPattern(r, '16', '8').m[3], 2, '음끼리는 먼저 온 음');
+});
+await test('가락 — 박자기 사건: 다음 음 · 쉼까지 이어짐 · 쉼 = 끊기 · 패턴 끝에서 끝남(다음 마디로 안 넘어감) · 스윙 · 순서대로면 패턴마다 그 패턴 가락', () => {
+  const b = B.emptyBeat(); b.bpm = 120;
+  const p = b.pats[0]; p.m[0] = 2; p.m[6] = 3; p.m[8] = B.B_REST; p.m[12] = 7;
+  eq(B.melAt(p, 0, 16), { n: 2, end: 6 }); eq(B.melAt(p, 8, 16), { rest: true }); eq(B.melAt(p, 12, 16), { n: 7, end: 16 }); eq(B.melAt(p, 3, 16), null);
+  let { ev } = runSeq(b, { secs: 4.2 });
+  const sd = 60 / 120 / 4, mel = ev.filter(e => e.kind === 'mel'), off = ev.filter(e => e.kind === 'meloff');
+  eq(mel.filter(e => e.bar === 0).map(e => [e.step, e.n]), [[0, 2], [6, 3], [12, 7]]);
+  ok(near(mel[0].d, 6 * sd) && near(mel[1].d, 2 * sd) && near(mel[2].d, 4 * sd), '길이 = 다음 음 · 쉼 · 패턴 끝까지 ' + mel.slice(0, 3).map(e => e.d.toFixed(3)));
+  eq(off.filter(e => e.bar === 0).map(e => e.step), [8], '쉼 = 끊기');
+  ok(mel.filter(e => e.bar === 1).map(e => e.step).join() === '0,6,12' && near(mel.find(e => e.bar === 1).t, 0.1 + 16 * sd), '둘째 마디도 같은 칸 · 같은 시각');
+  ok(ev.filter(e => e.kind === 'step' && e.step === 0).every(e => e.hits.includes('mel')) && ev.filter(e => e.kind === 'step' && e.step === 3).every(e => !e.hits.includes('mel')), '칸 반짝(hits)에 가락');
+  //  스윙 50%: 1칸에서 시작해 2칸까지 = 반 칸 짧게(둘째 칸이 늦게 오니까)
+  const s = B.emptyBeat(); s.bpm = 120; s.swing = 50; s.pats[0].m[1] = 0; s.pats[0].m[2] = 1; s.pats[0].m[4] = 2;
+  ({ ev } = runSeq(s, { secs: 1 }));
+  const sm = ev.filter(e => e.kind === 'mel');
+  ok(near(sm[0].d, 0.5 * sd) && near(sm[1].d, 2 * sd) && near(sm[0].t, 0.1 + 1.5 * sd), '스윙 길이 ' + sm.slice(0, 2).map(e => e.d.toFixed(4)));
+  //  순서대로 A B — 마디마다 그 패턴의 가락 · 필인 마디에도 가락은 그대로
+  const a = B.emptyBeat(); a.bpm = 160; a.mode = 'song'; a.arr = [0, 1]; a.fill = true;
+  a.pats[0] = B.starterPattern(B.STARTERS[0]); a.pats[1] = B.starterPattern(B.STARTERS[4]);
+  ({ ev } = runSeq(a, { secs: 6.2 }));
+  const byBar = {}; for (const e of ev.filter(x => x.kind === 'mel')) (byBar[e.bar] = byBar[e.bar] || []).push(e.step);
+  eq([byBar[0], byBar[1], byBar[2], byBar[3]].map(x => (x || []).join(',')), ['0,2,4,6,8,10,12', '0,3,6,8,11,14', '0,2,4,6,8,10,12', '0,3,6,8,11,14'], 'A B A B(넷째 마디 = 필인 마디에도 가락)');
+});
+await test('가락 주사위 — 다섯 칸 수 × 씨앗 150: 0~7 음만 · 첫 음 = 첫 박 화음의 음 · 끝 음 = 그 박 화음의 음 · 끝 음은 한 박 길이로 마디 끝까지 · 짧은 가락 음 3~5개 · 뒤에서 앞 첫 박을 그대로 한 번 더 · 같은 씨앗 = 같은 가락', () => {
+  const seen = new Set();
+  const CH = { 16: ['I', 'IV', 'V', 'vi'], 8: ['vi', null, 'IV', 'V'], 32: ['I', 'V', 'vi', 'IV'], 12: ['IV', 'I', null, 'V'], 9: ['I', 'V', 'vi'] };
+  for (const k of B.GRID_KEYS) {
+    const g = B.gridOf(k), len = B.lenOf(g), S = g.sub;
+    for (let seed = 1; seed <= 150; seed++) {
+      for (const chords of [CH[k], []]) {
+        const m = B.melDice(g, chords, B.mulberry32(seed));
+        ok(m.length === len && m.every(v => v === -1 || v === B.B_REST || (Number.isInteger(v) && v >= 0 && v <= B.M_TOP)), `${k} 값 ${melStr(m)}`);
+        const on = onsets(m), tonesAt = i => { const c = chordAtStep(chords, g, i); return c ? B.CHORD_MEL[c] : [0, 2, 3, 5]; };
+        ok(on[0] === 0 && tonesAt(0).includes(m[0]), `${k} 첫 음 ${melStr(m)} ${chords}`);
+        const last = on[on.length - 1];
+        ok(last === len - S && m.slice(last + 1).every(v => v === -1) && tonesAt(last).includes(m[last]), `${k} 끝 음(한 박 · 화음의 음) ${melStr(m)} ${chords}`);
+        if (g.beats === 4) {
+          const ml = 2 * S, n1 = onsets(m.slice(0, ml)).length;
+          ok(n1 >= 3 && n1 <= 5, `${k} 짧은 가락 음 ${n1}개 ${melStr(m)}`);
+          const tail = len - ml;                                    // 마지막 두 박 = 끝바꿈: 앞 첫 박 음이 그대로
+          ok(m.slice(0, S).every((v, i) => v < 0 || v > B.M_TOP || m[tail + i] === v), `${k} 되풀이 ${melStr(m)}`);
+        } else ok(onsets(m.slice(0, S)).length >= 2 && onsets(m.slice(S, 2 * S)).length >= 2, `세 박 — 한 박 가락 · 따라 하기 ${melStr(m)}`);
+        seen.add(melStr(m));
+      }
+      eq(B.melDice(g, CH[k], B.mulberry32(seed)), B.melDice(g, CH[k], B.mulberry32(seed)), '같은 씨앗');
+    }
+  }
+  ok(seen.size > 900, '여러 가락 ' + seen.size);
+});
+await test('메아리 — 앞 절반을 뒤 절반에 한 칸 위 · 아래로 · 끝에서 멈춤(셈) · 조용히 시작하면 뒤도 쉼으로 시작 · 세 박 = 첫 박 → 둘째 박 · 가락 없으면 0', () => {
+  const g = B.gridOf('16'), m = B.melRow('2.3.4.x.5.111...', 16);
+  eq(melStr(B.echoMel(m, g, 1).m), '2.3.4.x.3.4.5.x.'); eq(melStr(B.echoMel(m, g, -1).m), '2.3.4.x.1.2.3.x.');
+  eq(B.echoMel(m, g, 1).notes, 3);
+  const top = B.melRow('7.6.....', 16); const r = B.echoMel(top, g, 1); eq([melStr(r.m), r.clamped], ['7.6.....7.7.....', 1], '높은 미 위로는 못 감');
+  eq(melStr(B.echoMel(B.melRow('..3.....', 16), g, -1).m), '..3.....x.2.....', '앞이 조용히 시작하면 뒤 첫 칸은 쉼');
+  const g9 = B.gridOf('9'); eq(melStr(B.echoMel(B.melRow('3.4x....5', 9), g9, 1).m), '3.44.5..5', '세 박 — 첫 박 → 둘째 박 · 셋째 박은 그대로');
+  eq(B.echoMel(new Array(16).fill(-1), g, 1).notes, 0);
+  const g32 = B.gridOf('32'); eq(melStr(B.echoMel(B.melRow('2'.padEnd(32, '.'), 32), g32, 1).m).slice(16, 18), '3.', '두 마디 = 첫 마디 → 둘째 마디');
+});
+await test('카드 가락 — 일곱 장 모두 가락 · 칸 길이 · 0~7 음만 · 첫 음 · 끝 음 = 그 박 화음의 음 · 악기는 아는 악기(우리 장단 = 대금) · 카드 넣으면 악기도 카드대로', () => {
+  for (const st of B.STARTERS) {
+    const g = B.gridOf(st.grid), len = B.lenOf(g), p = B.starterPattern(st);
+    ok(typeof st.m === 'string' && /^[0-7x. ]+$/.test(st.m) && st.m.replace(/\s/g, '').length === len, st.id + ' 가락 글');
+    const on = onsets(p.m); ok(on.length >= 4, st.id + ' 음 수');
+    const tonesAt = i => B.CHORD_MEL[chordAtStep(p.c, g, i)];
+    ok(tonesAt(on[0]).includes(p.m[on[0]]) && tonesAt(on[on.length - 1]).includes(p.m[on[on.length - 1]]), `${st.id} 첫 음 · 끝 음 ${melStr(p.m)}`);
+    ok(B.LEAD_KEYS.includes(st.lead), st.id + ' 악기');
+    eq(B.applyStarter(B.emptyBeat(), st.id).beat.lead, st.lead, st.id + ' 카드 넣으면 악기');
+  }
+  eq(B.STARTERS.filter(s => s.kit === 'kor').map(s => s.lead), ['daegeum', 'daegeum']);
+  eq(B.MEL.map(x => x.p), [60, 62, 64, 67, 69, 72, 74, 76], '다섯 음 음계 한 옥타브 반'); ok(B.MEL.every(x => [0, 2, 4, 7, 9].includes(x.p % 12)), '파 · 시 없음');
+  for (const [ch, tones] of Object.entries(B.CHORD_MEL)) ok(tones.every(i => B.CHORDS[ch].notes.some(n => n % 12 === B.MEL[i].p % 12)), ch + ' 화음의 음');
+  eq(B.LEAD_KEYS.filter(k => B.isRing(k)), ['xylo', 'glock', 'gayageum'], '두드리거나 뜯는 악기'); eq([B.leadOf('x'), B.leadOf('flute')], ['synth', 'flute']);
+});
+await test('가락 왜 그럴까? — 가락이 있으면 반복 · 화음의 음 / 없는데 베이스 · 화음이 있으면 \'가락까지 쌓기\' · 쉼 이야기', () => {
+  const b = B.emptyBeat(); b.pats[0] = B.starterPattern(B.STARTERS[0]);
+  ok(B.tipsFor(b).includes('mel') && B.tipsFor(b).includes('melchord') && !B.tipsFor(b).includes('layers'));
+  b.pats[0].m.fill(-1); ok(B.tipsFor(b).includes('layers') && !B.tipsFor(b).includes('mel'));
+  b.pats[0].m = B.melRow('2222', 16); ok(B.tipsFor(b).includes('melrest'), '쉼 없이 음 넷 = 쉼 이야기');
+  for (const k of ['mel', 'melchord', 'layers', 'melrest']) ok(/[가-힣]/.test(B.TIPS[k]) && !B.TIPS[k].includes(NO_WORD), k);
+});
+
 //  ── 저장소 ── 손님(이 기기) · 학급 RTDB(가짜 firebase) 가 같은 모양: listMyBeats · getBeat · saveBeat(살핀 모양만) · deleteBeat · 비트 모음
 const mem = new Map();
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true,
@@ -365,7 +489,7 @@ await test('저장소(손님 · 이 기기) — 저장 · 목록 · 다시 열�
   const saved = await st.saveBeat({ ...B.packBeat(b), bpm: 9999, junk: '버릴 칸', pats: { ...B.packBeat(b).pats, 9: { d: {} } } });
   ok(saved.id && saved.rev === 1 && saved.by === 'guest' && saved.bpm === 160 && !('junk' in saved), '살핀 모양 · 누가 · 몇 번째 ' + JSON.stringify(Object.keys(saved)));
   const got = B.normalizeBeat(await st.getBeat('guest', saved.id));
-  eq(got.pats, b.pats, '패턴 그대로'); eq([got.title, got.arr, got.mode], ['쿵짝 비트', [0, 0, 1, 0], 'song']);
+  eq(got.pats, b.pats, '패턴 그대로'); eq([got.title, got.arr, got.mode, got.lead, melStr(got.pats[0].m)], ['쿵짝 비트', [0, 0, 1, 0], 'song', 'synth', '2.3.4.3x2.3.1...'], '가락 · 악기도 그대로');
   eq((await st.listMyBeats()).map(x => x.id), [saved.id]);
   eq(await st.listBeatClass(), [], '올리지 않으면 모음에 없음');
   await st.saveBeat({ ...B.packBeat(got), id: saved.id, rev: saved.rev, pub: true });
@@ -391,6 +515,7 @@ await test('저장소(학급 RTDB) — beats/<sid>/<id> + beatclass/<sid>_<id> �
   const s1 = await st.saveBeat(B.packBeat(b));
   const k = 'classRPG_music/beatclass/s1_' + s1.id;
   ok(get(`classRPG_music/beats/s1/${s1.id}`).pats[0].d.kick === '2000000020000000' && get(k).t === '쿵짝 비트' && get(k).n === '하늘', '두 곳에 씀');
+  ok(get(`classRPG_music/beats/s1/${s1.id}`).pats[0].m === '2.3.4.3x2.3.1...' && get(`classRPG_music/beats/s1/${s1.id}`).lead === 'synth', '가락 글자 줄 · 악기 저장 [MUSIC-BEAT-MEL-1]');
   ok(writes.every(w => w.startsWith('classRPG_music/beats/s1/') || w.startsWith(k)), '다른 곳은 안 씀 ' + writes.join());
   await st.setBeatHidden('s1', s1.id, true);
   eq(await st.listBeatClass(), [], '숨긴 줄은 목록에서 빠짐');
@@ -415,6 +540,11 @@ await test('화면 연결(글로 확인) — 첫 화면 넷째 문 · #/beat 길
   const GENRE = /붐뱁|트랩|힙합|하우스|테크노|디스코|레게|재즈|펑크|로파이|\bEDM\b|\blo-?fi\b/;   // 글(아이에게 보이는 말 · 주석) — 영어 이름은 낱말로만(warnedMute 같은 이름 안 걸리게)
   for (const [n, src] of [['beat', beat], ['beatcore', core], ['beatkit', kitjs]]) { ok(!GENRE.test(src), n + ' 장르 이름'); ok(!src.includes(NO_WORD), n + ' 쓰지 않기로 한 낱말'); }
   ok(!/from '\.\/(song|compose)\.js'/.test(beat + core + kitjs), '비트는 song · compose 를 안 부름');
+  //  [MUSIC-BEAT-MEL-1] 가락 — 버스터 · 화면 조각 · 공용 엔진 악기는 note 로만(audio.js 무수정은 git 이 지킴)
+  for (const m of ['beat', 'beatcore', 'beatkit']) eq(v(m), '20261010bm1', m + ' 가락 버스터');
+  ok(/css\/music\.css\?v=20261010bm1/.test(html), 'css 가락 버스터');
+  ok(beat.includes("rowLabel('mel')") && beat.includes('bt-mcell') && beat.includes('가락 주사위') && beat.includes('메아리') && beat.includes("'KeyZ'") && beat.includes('setPalTab') && beat.includes('bt-lead'), '가락 줄 · 붓 상자 · 주사위 · 메아리 · 건반 · 악기');
+  ok(kitjs.includes('this.e.note(') && kitjs.includes('_synth(') && kitjs.includes('_daegeum('), '가락 악기 소리');
 });
 
 const fail = results.filter(r => r[0] === 'FAIL');
