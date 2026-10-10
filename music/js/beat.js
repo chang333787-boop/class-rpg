@@ -239,11 +239,14 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
         h('div', { class: 'seg' }, ...C.STYLE_KEYS.map(k => h('button', { class: cur().cs === k ? 'on' : '', onclick: () => { if (cur().cs === k) return; pushUndo(); cur().cs = k; markDirty(); renderChords(); renderPal(); } }, C.STYLES[k])))));
   }
   function renderTip() { const list = C.tipsFor(beat); tipText.textContent = C.TIPS[list[tipIdx % list.length]] || ''; }
-  let tipTimer = 0;
+  let tipTimer = 0, sideTimer = 0;
   function markDirty(content = true) {
     if (readOnly) return;
     dirty = true;
-    if (content) { renderPats(); clearTimeout(tipTimer); tipTimer = setTimeout(() => { tipIdx = 0; renderTip(); }, 350); }
+    if (!content) return;
+    renderPats(); clearTimeout(tipTimer); tipTimer = setTimeout(() => { tipIdx = 0; renderTip(); }, 350);
+    //  아이디어 칸의 '몇 번'(고르게 나누기)도 칸을 고친 뒤 맞게
+    if (tab === 'idea') { clearTimeout(sideTimer); sideTimer = setTimeout(() => { if (alive && tab === 'idea' && !document.querySelector('.modal-wrap')) renderSide(); }, 300); }
   }
 
   // ── 옆 칸 ──
@@ -399,7 +402,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function setBpm(v) { beat.bpm = clamp(Math.round(v), C.BPM_MIN, C.BPM_MAX); markDirty(false); renderTransport(); }
   function setSwing(v) { beat.swing = clamp(Math.round(v), 0, C.SWING_MAX); markDirty(false); renderTransport(); clearTimeout(tipTimer); tipTimer = setTimeout(renderTip, 350); }
   function setKit(k) {
-    if (!C.KITS[k] || k === beat.kit) return;
+    if (!C.KIT_KEYS.includes(k) || k === beat.kit) return;
     beat.kit = k; markDirty(false); mixer && mixer.apply(beat.mix, k);
     kit.prepare(k).then(() => alive && renderGrid());
     renderGrid(); renderTip(); if (tab === 'pad' || tab === 'idea') renderSide();
@@ -726,7 +729,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     pause() { stop(); stopPreview(); },
     unmount() {
       alive = false; stop(); stopPreview();
-      cancelAnimationFrame(raf); clearTimeout(tipTimer);
+      cancelAnimationFrame(raf); clearTimeout(tipTimer); clearTimeout(sideTimer);
       if (stopClass) { stopClass(); stopClass = null; }
       removeEventListener('keydown', onKey); removeEventListener('beforeunload', beforeUnload); document.removeEventListener('visibilitychange', onVis);
       if (mixer) { const m = mixer; mixer = null; setTimeout(() => m.dispose(), 400); }
