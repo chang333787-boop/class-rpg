@@ -3,6 +3,7 @@ import { h, toast, modal, clamp } from './util.js';
 import { SCALES, METERS, solfege, colorOf, scaleRows, barSteps, totalSteps, lengthChoices, valueName, beatsText, fitChords, chordName, ROMAN, pc } from './theory.js';
 import { emptySong, normalize, placeNote, removeNote, buildEvents, INSTS, DRUMS, placeHarm, removeHarm, chordify } from './song.js';
 import { engine, Player } from './audio.js';
+import { PRESETS, PRESET_KEYS, PARTS, PART_KEYS, DYN, FAMILIES, INST_GROUPS, orchOK, orchOn, applyPreset, defaultOrch, leadShift, chordLine, samplePhrase } from './orchestra.js';   // [MUSIC-ORCH-1]
 import { renderStaff } from './notation.js';
 import { coach, ideas } from './coach.js';
 import { fingerSVG, recorderOK } from './recorder.js';
@@ -29,6 +30,9 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   let dirty = false, L = song.sub === 3 ? 3 : 2, erase = false, lyricsOn = song.notes.some(n => n.w);
   let layer = 'mel', cursor = 0;   // [MUSIC-HARM-1] 가락 칸 / 화음 칸 · [MUSIC-KEYS-1] 키보드로 놓는 자리
   const player = new Player(engine);
+  //  [MUSIC-ORCH-1] 가락 악기 높이(첼로 = 한 옥타브 아래 · 첼레스타 = 위 …) — 칸을 누를 때 나는 소리도 들어 보기와 같은 높이 · 예전 악기는 0
+  const sh = () => leadShift(song);
+  let beforeOrch = null, lastOrch = null, lastChip = null;   // 오케스트라를 켜기 전 악기 · 울림(끄면 되돌림) · 끄기 전 오케스트라 악기(다시 켜면 그것) · 마지막으로 누른 칸
   let raf = 0, playStart = 0, built = null;
 
   // ── 윗줄 ──
@@ -114,7 +118,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     rows.forEach((p, r) => {
       const isTonic = pc(p) === SCALES[song.scale].tonic;
       kids.push(h('div', { class: 'c-row' + (isTonic ? ' tonic' : ''), style: { top: r * rowH + 'px', height: rowH + 'px' } }));
-      kids.push(h('button', { class: 'c-lab' + (p >= 72 ? ' hi' : ''), style: { top: r * rowH + 'px', height: rowH + 'px', '--c': colorOf(p) }, title: solfege(p), onclick: () => engine.note(song.inst, p, engine.now, 0.5, 0.8) },
+      kids.push(h('button', { class: 'c-lab' + (p >= 72 ? ' hi' : ''), style: { top: r * rowH + 'px', height: rowH + 'px', '--c': colorOf(p) }, title: solfege(p), onclick: () => engine.note(song.inst, p + sh(), engine.now, 0.5, 0.8) },
         h('i', {}), h('span', {}, solfege(p, { short: true }))));
     });
     song.notes.forEach(n => {
@@ -138,15 +142,18 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     grid.replaceChildren(...kids);
     // 화음 이름(화음 친구가 켜졌을 때) — 누르면 I → IV → V → 자동
     const chords = fitChords(song, song.chords), korean = SCALES[song.scale].family === 'korean';
+    //  [MUSIC-ORCH-1] 오케스트라가 켜져 있으면 오케스트라가 치는 화음 이름(끝 마디 'G7→C' 마침 · 딸림7 포함) — 반주 친구를 쉬게 해도 화음은 고를 수 있다
+    const orchLine = orchOn(song) ? chordLine(song) : null;
     chordRow.style.width = W + 'px';
-    chordRow.replaceChildren(h('span', { class: 'c-chordlbl', style: { width: LABEL + 'px' } }, korean ? '지속음' : song.acc.chord ? '화음' : ''),
+    chordRow.replaceChildren(h('span', { class: 'c-chordlbl', style: { width: LABEL + 'px' } }, korean ? '지속음' : song.acc.chord || orchLine ? '화음' : ''),
       ...Array.from({ length: song.bars }, (_, b) => {
         if (korean) return h('span', { class: 'c-chord drone', style: { width: bs * cellW + 'px' } }, b === 0 ? (song.scale === 'pyeong' ? '솔 + 레' : '라 + 미') : '');
-        if (!song.acc.chord) return h('span', { class: 'c-chord', style: { width: bs * cellW + 'px' } });
+        if (!song.acc.chord && !orchLine) return h('span', { class: 'c-chord', style: { width: bs * cellW + 'px' } });
         const manual = !!song.chords[b];
+        const name = orchLine ? orchLine.filter(g => g.bar === b).map(g => g.name).join('→') : chordName(chords[b], song.key || 0);
         return h('button', { class: 'c-chord' + (manual ? ' manual' : ''), style: { width: bs * cellW + 'px' }, title: ROMAN[chords[b]].ko + (manual ? ' (내가 고름)' : ' (자동) — 누르면 바꿔요'),
           onclick: () => { const order = [null, 'I', 'IV', 'V']; const cur = song.chords[b] || null; song.chords[b] = order[(order.indexOf(cur) + 1) % order.length]; dirty = true; renderGrid(); } },
-          h('b', {}, chordName(chords[b], song.key || 0)), h('small', {}, ROMAN[chords[b]].ko));
+          h('b', {}, name), h('small', {}, ROMAN[chords[b]].ko));
       }));
     renderCoach();
     if (lyricsOn) syncLyricInput();
@@ -173,7 +180,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
       if (step < 0 || step >= totalSteps(song) || row < 0 || row >= rows.length || erase) return;
       const r = placeHarm(song, step, rows[row], L);
       if (r === 'full') { toast('화음은 한 자리에 세 음까지예요'); return; }
-      if (r) { dirty = true; cursor = step; engine.note(song.inst, rows[row], engine.now, 0.6, 0.7); renderGrid(); }
+      if (r) { dirty = true; cursor = step; engine.note(song.inst, rows[row] + sh(), engine.now, 0.6, 0.7); renderGrid(); }
       return;
     }
     if (noteEl) {
@@ -187,7 +194,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     const bs = barSteps(song), barEnd = (Math.floor(step / bs) + 1) * bs;
     const n = placeNote(song, step, rows[row], Math.min(L, barEnd - step));
     dirty = true; cursor = n.s + n.d;
-    engine.note(song.inst, n.p, engine.now, Math.min(0.9, n.d * 60 / song.tempo / song.sub), 0.85);
+    engine.note(song.inst, n.p + sh(), engine.now, Math.min(0.9, n.d * 60 / song.tempo / song.sub), 0.85);
     renderGrid();
   });
   grid.addEventListener('pointermove', e => {
@@ -234,35 +241,148 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   function renderSide() {
     const sel = (opts, val, on) => h('select', { onchange: e => on(e.target.value) }, ...opts.map(([v, t]) => { const o = h('option', { value: v }, t); if (String(v) === String(val)) o.selected = true; return o; }));
     const korean = SCALES[song.scale].family === 'korean';
-    side.replaceChildren(
+    const orchActive = orchOn(song);   // [MUSIC-ORCH-1] 오케스트라가 반주하면 반주 친구는 쉰다
+    side.replaceChildren(...[   // replaceChildren 은 null 을 'null' 글자로 넣는다 → 걸러서(장단 친구를 쉬게 했을 때 보이던 'null' 도)
       h('h3', {}, '반주 친구'),
-      h('div', { class: 'band' }, ...BAND.map(b => {
+      h('div', { class: 'band' + (orchActive ? ' resting' : '') }, ...BAND.map(b => {
         const on = b.k === 'drum' ? song.acc.drum !== 'none' : song.acc[b.k];
-        const disabled = b.k === 'bass' && korean;
-        return h('button', { class: 'member' + (on && !disabled ? ' on' : ''), disabled, title: disabled ? '국악 느낌에서는 베이스 대신 지속음이 깔려요' : '',
+        const disabled = (b.k === 'bass' && korean) || orchActive;
+        return h('button', { class: 'member' + (on && !disabled ? ' on' : ''), disabled, title: orchActive ? '지금은 오케스트라가 반주해요' : disabled ? '국악 느낌에서는 베이스 대신 지속음이 깔려요' : '',
           onclick: () => { if (b.k === 'drum') song.acc.drum = song.acc.drum === 'none' ? defaultDrum() : 'none'; else song.acc[b.k] = !song.acc[b.k]; dirty = true; renderSide(); renderGrid(); if (player.playing) togglePlay(true); } },
           h('img', { src: `../assets/monsters/${b.img}.png`, alt: '' }), h('b', {}, b.k === 'chord' && korean ? '지속음 친구' : b.name), h('small', {}, on && !disabled ? (b.k === 'drum' ? DRUMS[song.acc.drum] : '함께 연주 중') : '쉬는 중'));
       })),
-      song.acc.drum !== 'none' ? h('label', { class: 'row' }, '장단', sel(Object.entries(DRUMS).filter(([k]) => k !== 'none'), song.acc.drum, v => { song.acc.drum = v; dirty = true; if (v !== 'basic' && !drumFits(v)) toast(v === 'semachi' ? '세마치 장단은 9/8 박자에서 쳐요 — 박자를 바꿔 보세요' : '굿거리 장단은 12/8 박자에서 쳐요 — 박자를 바꿔 보세요', 3200); if (player.playing) togglePlay(true); })) : null,
+      orchActive ? h('p', { class: 'hint band-note' }, '🎻 지금은 오케스트라가 반주해요 — 반주 친구는 쉬어요') : null,
+      !orchActive && song.acc.drum !== 'none' ? h('label', { class: 'row' }, '장단', sel(Object.entries(DRUMS).filter(([k]) => k !== 'none'), song.acc.drum, v => { song.acc.drum = v; dirty = true; if (v !== 'basic' && !drumFits(v)) toast(v === 'semachi' ? '세마치 장단은 9/8 박자에서 쳐요 — 박자를 바꿔 보세요' : '굿거리 장단은 12/8 박자에서 쳐요 — 박자를 바꿔 보세요', 3200); if (player.playing) togglePlay(true); })) : null,
+      orchSection(sel),
       h('h3', {}, '느낌 바꾸기'),
       h('div', { class: 'moods' }, ...Object.entries(MOODS).map(([k, m]) => h('button', { class: 'btn small' + (song.mood === k ? ' on' : ''), onclick: () => applyMood(k) }, m.name))),
       h('h3', {}, '음계'),
-      sel(Object.entries(SCALES).map(([k, s]) => [k, s.name]), song.scale, v => { song.scale = v; dirty = true; if (SCALES[v].family === 'korean' && song.acc.drum === 'basic') song.acc.drum = defaultDrum(); layout(); renderSide(); }),
+      sel(Object.entries(SCALES).map(([k, s]) => [k, s.name]), song.scale, v => { song.scale = v; dirty = true; if (SCALES[v].family === 'korean' && song.acc.drum === 'basic') song.acc.drum = defaultDrum(); orchRestForKorean(); layout(); renderSide(); }),
       h('p', { class: 'hint' }, SCALES[song.scale].hint),
-      h('h3', {}, '박자 · 마디 · 악기'),
+      h('h3', {}, orchActive ? '박자 · 마디' : '박자 · 마디 · 악기'),
       h('label', { class: 'row' }, '박자', sel(METERS.map(m => [m.key, m.name]), METERS.find(m => m.beats === song.beats && m.sub === song.sub)?.key, v => changeMeter(METERS.find(m => m.key === v)))),
       h('label', { class: 'row' }, '마디', sel([[2, '2마디'], [4, '4마디'], [8, '8마디'], [12, '12마디'], [16, '16마디']], song.bars, v => changeBars(+v))),
-      h('label', { class: 'row' }, '악기', sel(Object.entries(INSTS), song.inst, v => { song.inst = v; dirty = true; engine.note(v, 67, engine.now, 0.5, 0.8); })),
-    );
+      orchActive ? null : h('label', { class: 'row' }, '악기', instSel()),
+    ].filter(Boolean));
+  }
+  //  [MUSIC-ORCH-1] 가락 악기 고르기 — 현악기 · 목관악기 · 금관악기 · 건반·타악기 · 목소리로 묶음 · 고르면 그 악기 소리로 한 음
+  function instSel() {
+    return h('select', { class: 'inst-sel', 'aria-label': '가락 악기', onchange: e => { song.inst = e.target.value; dirty = true; engine.note(song.inst, 67 + sh(), engine.now, 0.6, 0.8); if (player.playing) togglePlay(true); } },
+      ...INST_GROUPS.map(([name, ks]) => h('optgroup', { label: name }, ...ks.map(k => { const o = h('option', { value: k }, INSTS[k]); if (k === song.inst) o.selected = true; return o; }))));
+  }
+
+  // ── 오케스트라 [MUSIC-ORCH-1] ──  켜기 · 편성 여섯 · 가락 악기 · 칸 일곱 · 셈여림 흐름 · 점점 느리게 끝내기 · 악기 소개
+  function orchSection(sel) {
+    const ok = orchOK(song), on = orchOn(song), o = song.orch;
+    const sw = h('button', { class: 'oc-switch' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(on), 'aria-label': '오케스트라 켜기', disabled: !ok, title: ok ? '' : '국악 느낌 음계에서는 쓸 수 없어요', onclick: () => orchToggle() });
+    const intro = h('button', { class: 'btn small oc-intro', onclick: () => showFamilies() }, '🎼 악기 소개');
+    const head = h('div', { class: 'oc-head' }, h('h3', {}, '🎻 오케스트라'), sw);
+    if (!ok) return h('section', { class: 'oc' }, head, h('p', { class: 'hint' }, '국악 느낌 음계(평조 · 계면조)에서는 오케스트라 대신 지속음과 장단이 반주해요. 5음 음계나 장음계로 바꾸면 쓸 수 있어요.'), h('div', { class: 'oc-acts' }, intro));
+    if (!on) return h('section', { class: 'oc' }, head, h('p', { class: 'hint' }, '가락은 그대로 두고, 바이올린 · 플루트 · 트럼펫 · 팀파니 … 오케스트라가 반주해요. 켜 보세요!'), h('div', { class: 'oc-acts' }, intro));
+    const chip = k => h('button', { class: 'oc-chip f-' + PARTS[k].fam + (o.parts[k] ? ' on' : ''), 'aria-pressed': String(!!o.parts[k]), 'data-part': k, title: PARTS[k].desc,
+      onclick: () => { o.parts[k] = !o.parts[k]; lastChip = k; dirty = true; renderSide(); if (player.playing) togglePlay(true); } }, PARTS[k].name);
+    return h('section', { class: 'oc on' }, head,
+      h('div', { class: 'oc-cards', role: 'group', 'aria-label': '편성' }, ...PRESET_KEYS.map(k => {
+        const P = PRESETS[k];
+        return h('button', { class: 'oc-card' + (o.preset === k ? ' on' : ''), 'data-preset': k, 'aria-pressed': String(o.preset === k), title: P.line, onclick: () => pickPreset(k) },
+          h('span', { class: 'em' }, P.emoji), h('b', {}, P.name), h('small', {}, P.line));
+      })),
+      h('label', { class: 'row' }, '가락 악기', instSel()),
+      h('div', { class: 'oc-lbl' }, '함께 연주하는 칸 — 눌러서 켜고 꺼요'),
+      h('div', { class: 'oc-chips' }, ...PART_KEYS.map(chip)),
+      h('p', { class: 'hint oc-chiphint' }, lastChip ? `${PARTS[lastChip].name}${o.parts[lastChip] ? ' 켬' : ' 끔'} — ${PARTS[lastChip].desc}` : '칸 위에 마우스를 올리면 무엇을 하는지 보여요'),
+      h('label', { class: 'row' }, '셈여림', sel(Object.entries(DYN), o.dyn, v => { o.dyn = v; dirty = true; if (player.playing) togglePlay(true); })),
+      h('div', { class: 'oc-acts' },
+        h('button', { class: 'btn small oc-rit' + (o.rit ? ' on' : ''), 'aria-pressed': String(!!o.rit), title: '끝 두 마디를 점점 느리게 · 마지막 화음을 길게', onclick: () => { o.rit = !o.rit; dirty = true; renderSide(); if (player.playing) togglePlay(true); } }, '🐢 점점 느리게 끝내기'),
+        intro));
+  }
+  function orchToggle() {
+    if (!orchOK(song)) return;
+    if (!song.orch.on) {
+      beforeOrch = { inst: song.inst, reverb: song.reverb };
+      const fresh = JSON.stringify(song.orch) === JSON.stringify(defaultOrch(song.orch.preset));   // 처음 켬 = 편성 기본(가락 악기 · 칸 · 울림)
+      if (fresh || !lastOrch) applyPreset(song, song.orch.preset);
+      else { song.orch.on = true; song.inst = lastOrch.inst; song.reverb = lastOrch.reverb; }
+      dirty = true; engine.setReverb(song.reverb); renderSide(); renderGrid();
+      explainPreset(song.orch.preset, true);
+    } else {
+      lastOrch = { inst: song.inst, reverb: song.reverb };
+      song.orch.on = false;
+      if (beforeOrch) { song.inst = beforeOrch.inst; song.reverb = beforeOrch.reverb; beforeOrch = null; }
+      dirty = true; engine.setReverb(song.reverb); renderSide(); renderGrid();
+      if (player.playing) togglePlay(true);
+      toast('오케스트라를 껐어요 — 반주 친구가 다시 함께해요');
+    }
+  }
+  function pickPreset(k) {
+    if (!song.orch.on) beforeOrch = { inst: song.inst, reverb: song.reverb };
+    applyPreset(song, k); dirty = true; engine.setReverb(song.reverb);
+    renderSide(); renderGrid();
+    explainPreset(k, false);
+  }
+  //  무엇이 바뀌었나(느낌 바꾸기처럼) — 가락은 그대로 · 바뀐 악기 · 칸 · 울림 · 끝맺기 + 이 곡 박자 · 빠르기에 맞는 귀띔 한 줄
+  function explainPreset(k, first) {
+    const P = PRESETS[k];
+    const tip = k === 'waltz' && song.beats !== 3 ? `왈츠는 세 박자(3/4)에서 가장 왈츠다워요 — 지금은 ${song.beats}박이라 '쿵 짝'으로 쳐요.`
+      : k === 'march' && song.beats === 3 ? '행진곡은 두 박이나 네 박이 발맞추기 좋아요(박자 바꾸기).'
+      : k === 'march' && song.tempo < 100 ? '행진곡은 빠르기를 110쯤으로 올리면 더 씩씩해요(위 빠르기 +).'
+      : k === 'film' && song.tempo > 120 ? '영화 음악은 느릴수록 넓게 들려요(위 빠르기 −).' : '';
+    const on = Object.entries(song.orch.parts).filter(([, v]) => v).map(([x]) => PARTS[x].name);
+    modal(first ? `🎻 오케스트라가 함께해요 — ${P.emoji} ${P.name}` : `${P.emoji} '${P.name}'(으)로 바꿨어요`, h('div', { class: 'oc-why' },
+      h('p', {}, '가락(음 높이와 리듬)은 그대로예요. 바뀐 것은:'),
+      h('p', { class: 'why' }, P.why),
+      h('p', { class: 'muted' }, `가락 악기 = ${INSTS[P.lead]} · 함께하는 칸 = ${on.join(' · ') || '없음'} · ${P.rit ? '끝에서 점점 느리게' : '끝까지 같은 빠르기'}`),
+      tip ? h('p', { class: 'oc-tip' }, '💡 ' + tip) : null,
+      h('p', { class: 'muted' }, '칸을 켜고 끄며 들어 보세요. 반주 친구는 오케스트라가 쉬면 다시 나와요.')),
+      [{ label: '닫기' }, { label: '▶ 들어 보기', primary: true, onclick: c => { c(); togglePlay(true); } }]);
+  }
+  //  국악 느낌 음계로 바꾸면 오케스트라는 쉰다(되돌리면 다시 켜면 됨)
+  function orchRestForKorean() {
+    if (song.orch.on && !orchOK(song)) {
+      song.orch.on = false;
+      if (beforeOrch) { song.inst = beforeOrch.inst; song.reverb = beforeOrch.reverb; beforeOrch = null; }
+      toast('국악 느낌 음계에서는 오케스트라 대신 지속음과 장단이 반주해요', 3200);
+    }
+  }
+  //  악기 소개 — 가족(현악기 · 목관악기 · 금관악기 · 건반·타악기 · 목소리) 칸을 눌러 보고 ▶ 로 짧은 소리 · 가락 악기로 고르기
+  function showFamilies() {
+    if (player.playing) { player.stop(); stopHead(); }
+    const sp = new Player(engine);
+    let fam = FAMILIES.find(f => f.items.some(x => x[0] === song.inst))?.key || 'str', nowBtn = null;
+    const tabs = h('div', { class: 'fam-tabs', role: 'tablist' }), body = h('div', { class: 'fam-body' });
+    const play = (k, btn) => {
+      if (nowBtn) nowBtn.classList.remove('stop');
+      if (nowBtn === btn && sp.playing) { sp.stop(); nowBtn = null; return; }
+      engine.ensure(); engine.setReverb(0.22);
+      const ev = samplePhrase(k), end = Math.max(...ev.map(e => e.t + (e.d || 0.6))) + 0.4;
+      sp.start(ev, { total: end, onEnd: () => { btn.classList.remove('stop'); if (nowBtn === btn) nowBtn = null; engine.setReverb(song.reverb); } });
+      nowBtn = btn; btn.classList.add('stop');
+    };
+    const draw = () => {
+      tabs.replaceChildren(...FAMILIES.map(f => h('button', { class: 'btn small' + (f.key === fam ? ' on' : ''), role: 'tab', 'aria-selected': String(f.key === fam), style: { '--fc': f.color }, onclick: () => { fam = f.key; draw(); } }, f.emoji + ' ' + f.name)));
+      const f = FAMILIES.find(x => x.key === fam);
+      body.replaceChildren(h('p', { class: 'fam-how' }, f.how),
+        h('div', { class: 'fam-list', style: { '--fc': f.color } }, ...f.items.map(([k, name, line]) => {
+          const b = h('button', { class: 'play-i', title: name + ' 소리 듣기', 'aria-label': name + ' 소리 듣기', 'data-sample': k, onclick: () => play(k, b) });
+          const lead = INSTS[k] ? h('button', { class: 'btn small' + (song.inst === k ? ' on' : ''), title: '이 악기로 가락을 연주해요', onclick: () => { song.inst = k; dirty = true; toast(`가락 악기 = ${name}`); renderSide(); draw(); } }, song.inst === k ? '가락 악기' : '가락으로') : null;
+          return h('div', { class: 'fam-item' }, b, h('div', { class: 'fam-t' }, h('b', {}, name), h('span', {}, line)), lead);
+        })));
+    };
+    draw();
+    modal('🎼 오케스트라 악기 소개', h('div', { class: 'fam-wrap' }, h('p', { class: 'muted' }, '오케스트라는 악기 가족 넷이 함께 연주해요. ▶ 를 눌러 소리를 들어 보세요.'), tabs, body),
+      [{ label: '닫기', primary: true }], { wide: true, onclose: () => { sp.stop(); engine.setReverb(song.reverb); } });
   }
   const drumFits = k => (k === 'semachi' && song.beats === 3 && song.sub === 3) || (k === 'gutgeori' && song.beats === 4 && song.sub === 3);
   const defaultDrum = () => drumFits('semachi') ? 'semachi' : drumFits('gutgeori') ? 'gutgeori' : 'basic';
   function applyMood(k) {
+    const wasOrch = orchOn(song);
     MOODS[k].apply(song); song.mood = k; dirty = true;
+    orchRestForKorean();   // [MUSIC-ORCH-1] '쓸쓸하게'(계면조)면 오케스트라는 쉼
     engine.setReverb(song.reverb);
     tempoV.textContent = song.tempo;
     layout(); renderSide();
-    modal(`'${MOODS[k].name}' 느낌으로 바꿨어요`, h('div', {}, h('p', {}, '가락(음 높이)은 그대로예요. 바뀐 것은:'), h('p', { class: 'why' }, MOODS[k].why), h('p', { class: 'muted', style: { marginTop: '8px' } }, '같은 가락이라도 빠르기 · 소리 · 울림 · 음계가 바뀌면 느낌이 달라져요. 들어 보세요!')),
+    const orchLine = wasOrch ? (orchOn(song) ? `🎻 오케스트라는 그대로 반주해요 — 가락 악기만 ${INSTS[song.inst]}(으)로 바뀌었어요(반주 친구 설정은 오케스트라를 끄면 들려요).` : '🎻 국악 느낌 음계라서 오케스트라는 쉬고, 반주 친구가 나와요.') : '';
+    modal(`'${MOODS[k].name}' 느낌으로 바꿨어요`, h('div', {}, h('p', {}, '가락(음 높이)은 그대로예요. 바뀐 것은:'), h('p', { class: 'why' }, MOODS[k].why), orchLine ? h('p', { class: 'oc-tip' }, orchLine) : null, h('p', { class: 'muted', style: { marginTop: '8px' } }, '같은 가락이라도 빠르기 · 소리 · 울림 · 음계가 바뀌면 느낌이 달라져요. 들어 보세요!')),
       [{ label: '▶ 들어 보기', primary: true, onclick: c => { c(); togglePlay(true); } }]);
   }
   function changeMeter(m) {
@@ -295,7 +415,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     const r = ideas(song, scaleRows(song.scale, song.notes));
     if (!r) { modal('아이디어 친구', song.notes.length ? '이어서 지을 빈 마디가 없어요. 마디를 늘리거나(오른쪽 \'마디\'), 마디 하나를 비워 보세요.' : '먼저 첫 마디에 음을 몇 개 놓아 주세요. 그걸 보고 다음 마디를 같이 생각해 볼게요.'); return; }
     let close = null;
-    const listen = o => { const tmp = { ...song, notes: [...song.notes.filter(n => Math.floor(n.s / barSteps(song)) === r.bar - 1), ...o.notes] }; const b = buildEvents(tmp, { chord: false, bass: false, drum: 'none' }); const off = (r.bar - 1) * barSteps(song) * b.stepDur; player.start(b.events.filter(e => e.t >= off - 1e-6).map(e => ({ ...e, t: e.t - off })), { total: b.total - off }); };
+    const listen = o => { const tmp = { ...song, notes: [...song.notes.filter(n => Math.floor(n.s / barSteps(song)) === r.bar - 1), ...o.notes] }; const b = buildEvents(tmp, { chord: false, bass: false, drum: 'none', orch: false }); const off = (r.bar - 1) * barSteps(song) * b.stepDur; player.start(b.events.filter(e => e.t >= off - 1e-6).map(e => ({ ...e, t: e.t - off })), { total: b.total - off }); };
     close = modal(`${r.bar + 1}마디를 같이 지어 볼까?`, h('div', { class: 'ideas' },
       h('p', { class: 'muted' }, `${r.bar}마디를 보고 생각한 것들이에요. 들어 보고 마음에 드는 것을 넣은 다음, 마음대로 고쳐도 돼요.`),
       ...r.options.map(o => h('div', { class: 'idea-row' }, h('div', {}, h('b', {}, o.name), h('span', { class: 'muted' }, o.why)),
@@ -334,14 +454,14 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   function togglePlay(restart = false) {
     if (player.playing && !restart) { player.stop(); stopHead(); return; }
     engine.ensure(); engine.setReverb(song.reverb);
-    built = buildEvents(song);
+    built = buildEvents(song, { orchFinale: true });   // [MUSIC-ORCH-1] 오케스트라 곡이면 '점점 느리게 끝내기'까지
     playStart = player.start(built.events, { total: built.total, onEnd: () => stopHead() });
     playBtn.textContent = '■ 멈추기';
     cancelAnimationFrame(raf);
     const head = () => {
       const el = grid.querySelector('#c-head');
       if (!player.playing) return;
-      const t = engine.now - playStart, step = t / built.stepDur;
+      const t = engine.now - playStart, step = built.stepAt ? built.stepAt(t) : t / built.stepDur;   // 늘인 끝 두 마디도 소리를 따라감
       if (el && step >= 0) { el.style.display = 'block'; el.style.left = LABEL + step * cellW + 'px'; }
       grid.querySelectorAll('.c-note').forEach(nel => nel.classList.toggle('now', step >= nel._n.s && step < nel._n.s + nel._n.d));
       raf = requestAnimationFrame(head);
@@ -411,10 +531,10 @@ export function mountCompose(root, ctx, { song: init, ref }) {
     if (layer === 'harm') {
       const r = placeHarm(song, cursor, p, L);
       if (r === 'full') { toast('화음은 한 자리에 세 음까지예요'); return; }
-      engine.note(song.inst, p, engine.now, 0.6, 0.7); dirty = true; layout(); return;
+      engine.note(song.inst, p + sh(), engine.now, 0.6, 0.7); dirty = true; layout(); return;
     }
     const n = placeNote(song, cursor, p, Math.min(L, (Math.floor(cursor / bs) + 1) * bs - cursor));
-    engine.note(song.inst, p, engine.now, Math.min(0.9, n.d * 60 / song.tempo / song.sub), 0.85);
+    engine.note(song.inst, p + sh(), engine.now, Math.min(0.9, n.d * 60 / song.tempo / song.sub), 0.85);
     cursor = n.s + n.d; dirty = true; layout();
   };
   // 화음 칸에서 스페이스 = 다음 가락 음 자리로(가락 음마다 화음을 쌓기 좋게)
