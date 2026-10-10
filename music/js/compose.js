@@ -27,7 +27,8 @@ const BAND = [
 export function mountCompose(root, ctx, { song: init, ref }) {
   let song = normalize(init || emptySong());
   if (init && init.lib) { song.title = init.title + ' 바꿔 쓰기'; song.id = null; delete song.lib; delete song.lk; delete song.pub; }
-  let dirty = false, L = song.sub === 3 ? 3 : 2, erase = false, lyricsOn = song.notes.some(n => n.w);
+  //  [MUSIC-HALF-1] 처음 음 길이 = 한 칸(2/4 · 3/4 · 4/4 = 반 박 · 겹박자 = 8분음표) — 선생님 10-10 '기본이 1박이면 덜 직관적 · 반 박으로'
+  let dirty = false, L = 1, erase = false, lyricsOn = song.notes.some(n => n.w);
   let layer = 'mel', cursor = 0;   // [MUSIC-HARM-1] 가락 칸 / 화음 칸 · [MUSIC-KEYS-1] 키보드로 놓는 자리
   const player = new Player(engine);
   //  [MUSIC-ORCH-1] 가락 악기 높이(첼로 = 한 옥타브 아래 · 첼레스타 = 위 …) — 칸을 누를 때 나는 소리도 들어 보기와 같은 높이 · 예전 악기는 0
@@ -388,7 +389,7 @@ export function mountCompose(root, ctx, { song: init, ref }) {
   function changeMeter(m) {
     if (!m || (m.beats === song.beats && m.sub === song.sub)) return;
     const go = () => {
-      song.beats = m.beats; song.sub = m.sub; song.notes = []; song.chords = []; L = m.sub === 3 ? 3 : 2;
+      song.beats = m.beats; song.sub = m.sub; song.notes = []; song.chords = []; L = 1;
       if (m.jangdan) song.acc.drum = m.jangdan; else if (song.acc.drum !== 'none') song.acc.drum = 'basic';
       dirty = true; renderTools(); layout(); renderSide();
     };
