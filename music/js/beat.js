@@ -28,7 +28,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   let beat = C.emptyBeat(), readOnly = false, ownerName = '', dirty = false, alive = true, built = false;
   //  화면 상태(저장 안 함 · 이 기기 편의만)
   let tab = lsGet('music.beat.tab', 'start'); if (!TABS.some(([k]) => k === tab)) tab = 'start';
-  let bassBrush = 0, chordBrush = 'I', ideaRow = 'kick', countPref = lsGet('music.beat.count', false) === true, tipIdx = 0, eucAt = 0;
+  let bassBrush = 0, chordBrush = 'I', ideaRow = 'kick', countPref = lsGet('music.beat.count', false) === true, tipIdx = 0, eucAt = 0, mixOpen = lsGet('music.beat.mix', false) === true;
   let buddyIdx = clamp(Number(lsGet('music.beat.buddy', 0)) | 0, 0, BUDDIES.length - 1);
   const undo = [];
   //  소리 · 재생
@@ -128,7 +128,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
   function renderPats() {
     patBtns.forEach((b, i) => {
-      b.className = 'bt-pat' + (i === beat.cur ? ' on' : '') + (C.patternEmpty(beat.pats[i]) ? ' empty' : '') + (playing && playPat === i ? ' playing' : '') + (playing && !isSong() && i === beat.cur && playPat !== i ? ' next' : '');
+      b.className = 'bt-pat' + (i === beat.cur ? ' on' : '') + (C.patternEmpty(beat.pats[i]) ? ' blank' : '') + (playing && playPat === i ? ' playing' : '') + (playing && !isSong() && i === beat.cur && playPat !== i ? ' next' : '');
       b.title = `패턴 ${L[i]} (${i + 1})` + (playing && !isSong() && i === beat.cur && playPat !== i ? ' — 다음 마디부터 들려요' : '');
     });
     for (const b of [copyBtn, clearBtn, undoBtn, arrBack]) b.style.display = readOnly ? 'none' : '';
@@ -152,6 +152,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     grid.style.setProperty('--n', len);
     grid.classList.toggle('many', rows.length > 6);
     grid.classList.toggle('long', len > 16);
+    grid.classList.toggle('mixopen', mixOpen);
     const kitSel = h('select', { class: 'bt-kit', title: '소리 묶음 — 바꾸면 줄 이름도 바뀌어요', onchange: e => setKit(e.target.value) },
       ...C.KIT_KEYS.map(k => { const o = h('option', { value: k }, `${C.KITS[k].em} ${C.KITS[k].name}`); if (k === beat.kit) o.selected = true; return o; }));
     const kids = [h('div', { class: 'bt-corner' }, kitSel)];
@@ -165,14 +166,14 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
         cells[r].push(c); kids.push(c);
       }
     }
-    if (!readOnly) {
-      const more = C.EXTRA.map(r => {
-        const used = beat.pats.some(q => q.d[r].some(Boolean)), shown = beat.show[r] || used;
-        return h('button', { class: 'bt-morebtn' + (shown ? ' on' : ''), disabled: used, title: used ? '칸이 들어 있어서 숨길 수 없어요' : '',
-          onclick: () => { beat.show[r] = !beat.show[r]; markDirty(false); renderGrid(); renderSide(); } }, (shown ? '− ' : '+ ') + C.rowName(beat.kit, r) + ' 줄');
-      });
-      kids.push(h('div', { class: 'bt-more' }, ...more));
-    }
+    //  줄 더 보기(쉐이커 · 심벌) · 소리 크기 막대 펴기(믹서 — 이름 칸이 넓어진다)
+    const more = readOnly ? [] : C.EXTRA.map(r => {
+      const used = beat.pats.some(q => q.d[r].some(Boolean)), shown = beat.show[r] || used;
+      return h('button', { class: 'bt-morebtn' + (shown ? ' on' : ''), disabled: used, title: used ? '칸이 들어 있어서 숨길 수 없어요' : '',
+        onclick: () => { beat.show[r] = !beat.show[r]; markDirty(false); renderGrid(); renderSide(); } }, (shown ? '− ' : '+ ') + C.rowName(beat.kit, r) + ' 줄');
+    });
+    more.push(h('button', { class: 'bt-morebtn mix' + (mixOpen ? ' on' : ''), title: '줄마다 소리 크기 막대', onclick: () => { mixOpen = !mixOpen; lsSet('music.beat.mix', mixOpen); renderGrid(); } }, mixOpen ? '🎚 소리 크기 접기' : '🎚 소리 크기'));
+    kids.push(h('div', { class: 'bt-more' }, ...more));
     kids.push(rowLabel('bass'));
     bassCells = [];
     for (let i = 0; i < len; i++) { const c = h('button', { class: 'bt-bcell', 'data-k': 'b', 'data-i': i }); bassCells.push(c); kids.push(c); }
@@ -215,7 +216,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const p = cur(), G = g(), sl = C.slotLen(G);
     chordCells.forEach((c, k) => {
       const ch = p.c[k];
-      c.className = 'bt-cslot' + (ch ? '' : ' empty') + (ph >= 0 && Math.floor(ph / sl) === k ? ' ph' : '');
+      c.className = 'bt-cslot' + (ch ? '' : ' blank') + (ph >= 0 && Math.floor(ph / sl) === k ? ' ph' : '');
       c.style.setProperty('--c', ch ? CHORD_COLOR[ch] : '#5a4a3a');
       if (!ch) { c.replaceChildren(h('span', { class: 'add' }, readOnly ? '' : '+ 화음')); return; }
       //  치는 자리 점(길게 = 하나 · 쿵짝 · 짧게 톡톡 = 박마다)
