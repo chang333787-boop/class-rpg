@@ -29,6 +29,9 @@
   const safeKey = s => typeof s === 'string' && s.length > 0 && s.length <= 60 && !/[.#$/[\]\u0000-\u001F\u007F]/.test(s);
   //  과제 id 는 더 좁게(글자 · 숫자 · _ · -) — 화면의 onclick 글자 안에 그대로 들어간다
   const safeAid = s => typeof s === 'string' && /^[\w-]{1,40}$/.test(s);
+  //  [ASSIGN-TSONG-1] 리듬 과제 곡 id — 음악실 기본 곡 'lib_<곡키>' · 선생님 곡(공연 곡) 'ts_<곡키>'(곡키 = 영어 · 숫자 · _ · - 1~40자 · music/js/song.js TSONG_KEY 와 같음)
+  //   그 밖(이름만 · 친구 곡 u.… · 예시 곡 ex_…)은 과제 곡으로 받지 않는다 — 음악실 app.js ctx.resolve 가 lib_ · ts_ 를 연다
+  const musicSongOK = s => typeof s === 'string' && /^(?:lib|ts)_[\w-]{1,40}$/.test(s);
   const qkey = i => 'q' + i;
   const newId = (now, rand) => {
     const r = typeof rand === 'function' ? rand : Math.random;
@@ -165,7 +168,7 @@
     } else {
       const m = isObj(c.music) ? c.music : {};
       const song = str(m.song, 60);
-      if (!/^[\w-]{1,60}$/.test(song)) return null;
+      if (!musicSongOK(song)) return null;   // [ASSIGN-TSONG-1] lib_ · ts_ 둘만
       const level = ['easy', 'normal', 'hard', 'expert'].includes(m.level) ? m.level : 'easy';
       def.content.music = { song, level, tempo: num(m.tempo, 1) === 0.8 ? 0.8 : 1, keys: [4, 6, 8].includes(num(m.keys, 0)) ? num(m.keys, 0) : 0 };
       def.n = 1;
@@ -607,7 +610,7 @@
 
   g.AssignCore = Object.freeze({
     ROOT, HOST_GRACE_MS, STALE_MS, MIN_DEFAULT, MIN_MIN, MIN_MAX, ITEMS_MAX, ANS_MAX, TITLE_MAX, STAGES_MAX, KINDS, LIVE_APPS, isLiveKind,
-    path, safeKey, safeAid, qkey, newId, isOX, itemLang, isEnglish, hasHangul, fixQuotes, normAns, choiceJosa,
+    path, safeKey, safeAid, musicSongOK, qkey, newId, isOX, itemLang, isEnglish, hasHangul, fixQuotes, normAns, choiceJosa,
     snapItem, pickSet, normItem, normDef, isTarget, contentSig, grade,
     answersOf, ansAt, answeredCount, firstOpen, isLate,
     hostGaps, endsAtOf, liveState, liveScreen, canAnswer, answerPatch, appPatch, ctl,

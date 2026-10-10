@@ -75,6 +75,23 @@ test('normDef — 받는 아이 · 명단 · 공개 시각 · 진행(한 문제�
   eq(m.content.music, { song: 'lib_nabiya', level: 'easy', tempo: 0.8, keys: 6 });
   ok(AC.normDef({ id: 'a5', kind: 'music', content: { music: { song: '../x' } } }, 'a5') === null, '곡 id 검사');
 });
+test('[ASSIGN-TSONG-1] 리듬 과제 곡 id — 기본 곡 lib_<곡키> · 선생님 곡 ts_<곡키>(영어 · 숫자 · _ · - 1~40자)만 · 그 밖은 정의째 버림', () => {
+  const mk = song => AC.normDef({ id: 'aS', kind: 'music', content: { music: { song, level: 'normal', keys: 6 } } }, 'aS');
+  const k40 = 'A'.repeat(20) + 'z9_-'.repeat(5);
+  for (const s of ['lib_nabiya', 'lib_sola', 'ts_concert_1', 'ts_A-b_9', 'ts_x', 'ts_' + k40]) {
+    const d = mk(s);
+    ok(d && d.content.music.song === s && AC.musicSongOK(s), '받음 ' + s);
+  }
+  eq(mk('ts_concert_1').content.music, { song: 'ts_concert_1', level: 'normal', tempo: 1, keys: 6 }, '설정은 그대로');
+  for (const s of ['ts_', 'lib_', 'ts_' + k40 + 'x', 'ts_a.b', 'ts_a/b', 'ts_a b', 'ts_가락', 'ts_a#1', " ts_a", 'ts_a\n', 'TS_abc', 'Ts_abc', 'nabiya', 'ex_star', 'u.s1.song1', '_temp', 'ts', '', null, 7, { a: 1 }]) {
+    ok(mk(s) === null && !AC.musicSongOK(s), '버림 ' + JSON.stringify(s));
+  }
+  //  같은 내용 견주기 — 곡이 다르면 다른 과제(선생님 곡 부분이 달라도)
+  ok(AC.contentSig(mk('ts_ens_p1')) !== AC.contentSig(mk('ts_ens_p2')) && AC.contentSig(mk('ts_ens_p1')) === 'music:ts_ens_p1:normal:1:6', AC.contentSig(mk('ts_ens_p1')));
+  //  곡키 규칙 = 음악실 선생님 곡 곡키(song.js TSONG_KEY) — 글자로 견줌
+  const song = read('music/js/song.js');
+  ok(/export const TSONG_KEY = \/\^\[a-z0-9_-\]\{1,40\}\$\/i;/.test(song) && /id: 'ts_' \+ c\.key/.test(song), 'song.js 곡키 규칙 · ts_ id');
+});
 test('isTarget — targets 없으면 반 모두 · 있으면 그 아이만', () => {
   ok(AC.isTarget(mkDef(), 's9'), '모두'); const d = mkDef({ targets: ['s1'] });
   ok(AC.isTarget(d, 's1') && !AC.isTarget(d, 's2') && !AC.isTarget(d, ''), '골라서');

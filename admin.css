@@ -538,3 +538,8 @@ tr.asg-ex td{opacity:.55;}
 .asg-mu-j i,.asg-mu-k{font-style:normal;font-size:.74rem;font-weight:800;border-radius:5px;padding:0 .3rem;background:rgba(255,255,255,.06)}
 .asg-mu-k{margin-right:.2rem}
 .asg-mu-j .p,.asg-mu-k.p{color:#ffe48f}.asg-mu-j .g,.asg-mu-k.g{color:#8fd07d}.asg-mu-j .o,.asg-mu-k.o{color:#7fc4f0}.asg-mu-j .m,.asg-mu-k.m{color:#ff8a7a}
+/* [ASSIGN-TSONG-1] 🎤 선생님 곡(공연 곡) — 기본 곡 밑 둘째 칸 · 합주 부분은 한 묶음(그 줄을 다 씀) */
+.asg-mu-ts{display:flex;flex-direction:column;gap:.35rem}
+.asg-mu-ens{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:.3rem;border:1px dashed var(--border);border-radius:8px;padding:.35rem .45rem}
+.asg-mu-ens-h{flex:1 0 100%;font-size:.78rem;color:var(--txt2)}
+.asg-mu-ens .asg-mu-song{flex:1 1 220px}
