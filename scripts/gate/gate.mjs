@@ -20,7 +20,7 @@
 //  사용: node scripts/gate/gate.mjs [--only student,admin,kiosk,apps] [--repo <체크아웃>] [--serial] [-v]
 //    --only    일부만(쉼표로 여럿). student = 크롬북 홈 + 폰 아래 탭
 //    --repo    다른 체크아웃을 시험(기본 = 이 파일이 든 저장소). 가짜 서버 · 이 장치는 이 저장소 것을 쓴다.
-//    --serial  화면들을 하나씩 차례로(기본은 네 줄을 함께 — 더 빠름)
+//    --serial  화면들을 하나씩 차례로(기본은 다섯 줄 — 학생 · 학생 폰 · 관리 · 키오스크 · 학습 앱 — 을 함께 · 더 빠름)
 //    -v        누른 것 하나하나 · 찾은 오류를 바로 찍음
 //    --no-cdn-cache  바깥 라이브러리 · 글꼴을 진짜 CDN 에서(기본은 처음 받은 것을 ~/Library/Caches/class-rpg-gate/cdn 에 두고 씀 · GATE_CACHE)
 //    포트: PP(가짜 서버 · 기본 8971) · DP(크롬 디버깅 · 기본 9651) — GPP · GDP 가 있으면 그것. 이미 쓰고 있으면 바로 멈춘다(lsof).
@@ -470,6 +470,7 @@ async function phaseStudent() {
   }
   //  HUD(위 띠) — 아바타 · 승급 배지 등
   await pressAll(pg, ctx, { scope: '.hud', region: 'hud', ext, label: 'HUD' });
+  if (stu.left) rec('render', { name: '학생', action: '끝' }, `시간이 모자라 ${stu.left}개를 못 누름(GATE_LIMIT_S ${LIMIT_S})`);
   await pg.close();
   return { line: `학생   doors ${J(doors)} · 열린 창 ${stu.opened} · 학습 앱 창 ${stu.embeds}(${[...new Set(stu.embedApps)].join(' ')})`
     + `${stu.skipped.length ? ` · 건너뜀 ${stu.skipped.length}(${[...new Set(stu.skipped)].join(' · ')})` : ''}${stu.left ? ` · 시간이 모자라 못 누름 ${stu.left}` : ''} · ${took(t0)}` };
@@ -481,10 +482,11 @@ async function phasePhone() {
   const ctx = { base: await studentHome(pg, true), mobile: true };
   if (!ctx.base) return { line: `학생 폰 홈이 안 떠서 멈춤 · ${took(t0)}` };
   const list = await pg.evSafe(`${L}.list('.bottom-tabs', '.btab')`) || [];
+  let phoneLeft = 0;
   if (!list.length) rec('render', pg, '아래 탭이 안 보임');
   for (const t of list) {
     pg.action = `아래 탭 "${t.text}"`;
-    if (late()) { stu.left++; continue; }
+    if (late()) { phoneLeft++; continue; }
     const st = await pg.evSafe(`${L}.state(${J(ctx.base)})`);
     if (!st || st.cur !== 's1') ctx.base = await studentHome(pg, true);
     const r = await clickBy(pg, `${L}.find('.bottom-tabs', '.btab', ${J({ k: t.k, nth: t.nth })})`);
@@ -492,6 +494,7 @@ async function phasePhone() {
     doors.phone++;
     await afterClick(pg, ctx);
   }
+  if (phoneLeft) rec('render', { name: '학생 폰', action: '끝' }, `시간이 모자라 ${phoneLeft}개를 못 누름`);
   await pg.close();
   return { line: `학생 폰 아래 탭 ${doors.phone} · ${took(t0)}` };
 }
@@ -541,6 +544,7 @@ async function phaseAdmin() {
       await adminLiteral(pg);
     }
   }
+  if (adm.left) rec('render', { name: '관리', action: '끝' }, `시간이 모자라 ${adm.left}개를 못 누름`);
   await pg.close();
   return { line: `관리   tabs ${J({ nav: adm.nav, inner: adm.inner })} · adminLiteral ${adm.literal}${adm.left ? ` · 시간이 모자라 못 누름 ${adm.left}` : ''} · ${took(t0)}` };
 }
@@ -628,6 +632,7 @@ async function phaseApps() {
       if (it.local) await pg.evSafe(`localStorage.removeItem(${J(it.key)})`);
     }
   }
+  if (cnt.left) rec('render', { name: '학습 앱', action: '끝' }, `시간이 모자라 ${cnt.left}개를 못 봄`);
   await pg.close();
   return { line: `학습 앱 pages ${J({ home: cnt.home, teacher: cnt.teacher, music: cnt.music })} (${apps.join(' ')})${cnt.left ? ` · 시간이 모자라 못 봄 ${cnt.left}` : ''} · ${took(t0)}` };
 }
@@ -678,7 +683,6 @@ if (ONLY.includes('student')) lanes.push([phaseStudent], [phasePhone]);
 if (ONLY.includes('admin')) lanes.push([phaseAdmin]);
 if (ONLY.includes('kiosk')) lanes.push([phaseKiosk]);
 if (ONLY.includes('apps')) lanes.push([phaseApps]);
-const lines = [];
 {
   const miss = await selfTest().catch(e => [`자기 시험이 멈춤: ${first(e && e.message)}`]);
   if (miss.length) { log(`자기 시험 실패 — 이 장치가 못 잡는 것: ${miss.join(' · ')}`); await cleanup(); log('NOT CLEAN — 확인 장치를 돌리지 못함: 자기 시험 실패(장치가 오류를 못 봄)'); process.exit(2); }
@@ -686,7 +690,7 @@ const lines = [];
 }
 const runLane = async (fns) => {
   for (const fn of fns) {
-    try { const r = await fn(); if (r && r.line) { lines.push(r.line); log(r.line); } }
+    try { const r = await fn(); if (r && r.line) log(r.line); }
     catch (e) { rec('render', { name: fn.name, action: '진행' }, `확인 장치가 멈춤: ${first(e && e.message)}`); log(`${fn.name} 멈춤: ${e && e.message}`); }
   }
 };

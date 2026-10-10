@@ -32,6 +32,7 @@ Firebase 데이터 직접 수정 금지 / 운영 write 버튼 클릭 금지.
 - 시작/끝 검증: `node scripts/verify-safety.mjs` (FAIL이면 중단 / 기대값 `PASS 43 · REVIEW 1 · FAIL 0` — student 나누기로 `node --check` 가 student/*.js 8개, admin 나누기(R3)로 admin/*.js 9개를 더 본다 · gamedata 나누기(R4)로 gamedata/*.js 4개를 더 본다 · smoke-test 는 `PASS 32 · REVIEW 0 · FAIL 0`)
 - JS 변경 시 `node --check <file>.js`
 - PR 전 한 번에: `node scripts/unit/precheck.mjs --no-deco` (기대값 `PASS 34 · REVIEW 1 · FAIL 0 · SKIP 1` — CLAUDE.md 와 같음 · 2026-10-04 admin 나누기 뒤)
+- 넣기 전(머지 전) 한 번에 + **화면을 실제로 누르기**: `scripts/gate/checkall.sh <작업 폴더>` — 위 검사 전부 + 확인 장치(헤드리스 크롬 · 가짜 DB · 학생 · 관리 · 키오스크 · 학습 앱 · 예외/console.error 0) · 끝줄 `결과: ✅ 모두 통과` · 약 80초 · 포트 `GPP`/`GDP` · [scripts/gate/README.md](scripts/gate/README.md) [GATE-1]
 - 검증은 **Firebase write 없이** (로드·정적·typeof·grep으로 대체)
 - JS/CSS 수정 시 해당 HTML의 `?v=` 캐시버스터 갱신 검토
 

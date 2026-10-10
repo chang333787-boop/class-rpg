@@ -207,6 +207,7 @@ node scripts/verify-safety.mjs
   smoke · verify-safety · unit · buster-check · whole-set · save-order · char-combo · deco-bundle · global-dup · 시뮬 다섯(esc-parity 포함) · 밸런스 둘 ·
   하위 앱 시험 9개(공통 뼈대 포함)를 따로 프로세스로 돌려 한 줄씩 보여 준다. REVIEW 1 = save-order 11곳 기준선. SKIP 1 = 꾸미기 하네스(헤드리스 크롬, `--deco` 로 켬 · 꾸미기 파일을 고치면 저절로 켜짐).
   저장 경로를 건드렸으면 `--gold` 도(골드 유실 시뮬 · 지금 main 에서는 REPRO 가 정상이라 REVIEW).
+- 넣기 전(머지 전) 한 번에 + **화면을 실제로 누르기**: `scripts/gate/checkall.sh <작업 폴더>` — 위 검사 전부 + 확인 장치(헤드리스 크롬 · 가짜 DB · 학생 · 관리 · 키오스크 · 학습 앱 · 예외/console.error 0) · 끝줄 `결과: ✅ 모두 통과` · 약 80초 · 포트 `GPP`/`GDP` · [scripts/gate/README.md](scripts/gate/README.md) [GATE-1]
 - 하위 앱 시험만: `for f in $(find scripts/unit -name '*.test.mjs' | sort); do node "$f" | tail -1; done` → 9개 모두 FAIL 0(2026-10-04 · 하위 앱 382 + 공통 뼈대 46 = 428개).
 - **CI(준비됨 · 아직 꺼짐)**: `scripts/ci/check.yml` — PR · main push 마다 verify-safety · smoke-test · precheck --no-deco · 하위 앱 시험(node 22 · 비밀값 없음 · 브랜치 보호 없음 — 결과만 보여 줌).
   GitHub 은 `.github/workflows/` 안의 파일만 돌린다. 세션 토큰에 `workflow` 권한이 없어 거기로 못 올렸으니, 켤 때 사용자가 `git mv scripts/ci/check.yml .github/workflows/check.yml` 뒤 push(또는 웹에서 새 파일).
