@@ -5,6 +5,9 @@
 //     → 손으로 쳐서 녹음(셈 3 · 2 · 1 + 한 마디 → 정한 칸에 들어감 · 되돌리기) → 저장(고운 말 거르기 · 비트 모음) → 다시 불러오기 → 내 비트 · 우리 반 목록 → 폰 너비
 //  학생2(s2): 우리 반 목록 듣기 · 열어 보기(듣기만 — 칸 안 바뀜) / 손님: 이 기기에만 저장 · 다시 열기 / 선생님: 아이별 비트 수 · 비트 모음에서 내리기
 //  + 네트워크: 운영 주소 요청 0 · 페이지 오류 0
+//  [MUSIC-BEAT-MEL-1] 가락 줄: 붓 상자(베이스 · 가락 · 화음) 진짜 클릭 · 가락 칸 칠하기(끌기) · 칩 높이 = 음 높이 · ▶ 가락 사건(칸 · 시각 · 길이 · 쉼) · 악기 바꾸기 ·
+//   가락 음소거(M) · 어울림(A43 에 가락 — 화음과 비슷하거나 조금 크게 · 북 꼭대기보다 작게) · 악기 음 높이 · 순서대로 패턴마다 가락 · 가락 주사위 · 메아리 ·
+//   가락 건반 녹음(셈 → 가까운 칸 · 뗀 자리 쉼 · 되돌리기) · 저장 → 새로 고침 · 친구(듣기만) · 들어 보기 · 선생님 열어 보기 · 폰 너비
 //  실행: PP=8911 DP=9591 node scripts/unit/music/beat-live.mjs   (스크린샷 OUT=<폴더> · 가짜 서버 FAKE_RTDB=<…/server.mjs>)
 //  포트는 쓰기 전에 lsof -nP -iTCP:<포트> -sTCP:LISTEN 으로 비었는지 본다. 끝나면(시간 초과여도) 크롬 · 서버를 닫는다 — 안쪽 시계 150초.
 import { spawn } from 'node:child_process';
@@ -81,7 +84,7 @@ async function device(name, url, { w = 1366, h = 610 } = {}) {
     if (!r.hit) return 'covered';
     await click(r.x, r.y); return true;
   };
-  const key = async (code, k, vk) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, code, key: k, windowsVirtualKeyCode: vk }, sessionId); };
+  const key = async (code, k, vk, only) => { for (const type of only ? [only] : ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, code, key: k, windowsVirtualKeyCode: vk }, sessionId); };   // only = 'keyDown' · 'keyUp'(누르고 있기)
   return { name, ev, shot, mouse, click, where, pressEl, key, sessionId };
 }
 const until = async (d, expr, ms = 10000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await d.ev(expr) === true) return true; await sleep(100); } return false; };
@@ -111,21 +114,44 @@ const PITCH_PROBE = `(async () => { try {
   }
   return out;
 } catch (e) { return { err: String(e && e.stack || e).slice(0, 300) }; } })()`;
+//  가락 악기 음 높이(시험 전용) [MUSIC-BEAT-MEL-1] — 악기마다 가락 '도'(60) · '솔'(67) 한 음: 그 음 자리(한 옥타브 위 · 글로켄은 두 옥타브 위) 힘이
+//   반음 위 · 아래 · 한 옥타브 아래 자리 힘보다 10dB 넘게 큰지(괴르첼) — 옥타브까지 맞는지 본다
+const LEAD_PITCH_PROBE = `(async () => { try {
+  const K = await import('./js/beatkit.js'), C = await import('./js/beatcore.js'), A = await import('./js/audio.js'), sr = 44100, out = {};
+  const gz = (d, f) => { const w = 2 * Math.PI * f / sr, k = 2 * Math.cos(w); let s1 = 0, s2 = 0; for (const x of d) { const s0 = x + k * s1 - s2; s2 = s1; s1 = s0; } return s1 * s1 + s2 * s2 - k * s1 * s2; };
+  for (const lead of C.LEAD_KEYS) {
+    const res = [];
+    for (const p of [60, 67]) {
+      const off = new OfflineAudioContext(1, sr, sr), e = new A.Engine(); e.ctx = off; e.noise = e._noiseBuf();
+      const kit = new K.BeatKit(e), g = off.createGain(); g.connect(off.destination);
+      kit.lead(lead, 'elec', p, 0, 0.6, 0.9, g);
+      const d = (await off.startRendering()).getChannelData(0).subarray(Math.round(sr * 0.1), Math.round(sr * 0.5));
+      const f = 440 * Math.pow(2, (p + (lead === 'glock' ? 24 : 12) - 69) / 12);
+      const on = gz(d, f), offs = [f * Math.pow(2, 1 / 12), f / Math.pow(2, 1 / 12), f / 2].map(x => gz(d, x));
+      res.push(+(10 * Math.log10(on / Math.max(...offs))).toFixed(1));
+    }
+    out[lead] = res;
+  }
+  return out;
+} catch (e) { return { err: String(e && e.stack || e).slice(0, 300) }; } })()`;
 //  쪽 안에서 도는 어울림 재기(시험 전용) — 실제 모듈(beatkit · beatcore)을 OfflineAudioContext 에 붙여 박자기 그대로 그린다
 const MIX_PROBE = `(async () => { try {
-  const K = await import('./js/beatkit.js'), C = await import('./js/beatcore.js');
+  const K = await import('./js/beatkit.js'), C = await import('./js/beatcore.js'), A = await import('./js/audio.js');
   const sr = 22050;
   async function render(id, kitId, layer) {
     const st = C.applyStarter(C.emptyBeat(), id).beat; st.kit = kitId;
     const G = C.gridOf(st.grid), secs = 2 * C.barDur(st.bpm, G) + 1, off = new OfflineAudioContext(1, Math.ceil(sr * secs), sr);
-    const eng = { ctx: off, bus: () => { const g = off.createGain(); g.connect(off.destination); return g; } };
+    //  공용 엔진(가락 악기 실로폰 · 피아노 … 는 엔진 note) — 소리 장치만 오프라인으로 · 출구는 바로
+    const eng = new A.Engine(); eng.ctx = off; eng.noise = eng._noiseBuf(); eng.bus = () => { const g = off.createGain(); g.connect(off.destination); return g; };
     const kit = new K.BeatKit(eng); await kit.prepare(kitId);
     const mx = new K.BeatMixer(eng);
-    for (const r of C.MIX) st.mix[r].m = layer === 'all' ? false : layer === 'drums' ? (r === 'bass' || r === 'chord') : r !== layer;
+    for (const r of C.MIX) st.mix[r].m = layer === 'all' ? false : layer === 'drums' ? (r === 'bass' || r === 'chord' || r === 'mel') : r !== layer;
     mx.apply(st.mix, kitId);
     let now = 0; const vs = {};
     const seq = new C.Sequencer({ now: () => now, beat: () => st, emit: e => {
       if (e.kind === 'drum') kit.hit(kitId, e.row, e.t, e.crash ? 0.75 : e.vel === 2 ? 1 : 0.62, mx.ch[e.row]);
+      else if (e.kind === 'mel') { if (C.isRing(st.lead)) { vs.mp && vs.mp.stop(e.t); vs.mp = vs.m; } else if (vs.m) vs.m.stop(e.t); vs.m = kit.lead(st.lead, kitId, C.MEL[e.n].p, e.t, e.d, 0.9, mx.ch.mel); }
+      else if (e.kind === 'meloff') { vs.m && vs.m.stop(e.t); vs.mp && vs.mp.stop(e.t); vs.m = vs.mp = null; }
       else if (e.kind === 'bass') { vs.b && vs.b.stop(e.t); vs.b = kit.bass(kitId, C.BASS[e.n].p, e.t, e.d, 0.9, mx.ch.bass); }
       else if (e.kind === 'bassoff') { vs.b && vs.b.stop(e.t); vs.b = null; }
       else if (e.kind === 'chord') { vs.c && vs.c.stop(e.t); vs.c = kit.chord(kitId, C.CHORDS[e.ch].notes, e.t, e.d, e.vel, mx.ch.chord, e.style); }
@@ -137,9 +163,9 @@ const MIX_PROBE = `(async () => { try {
     return { w: K.speakerLoud(d, sr, d.length / sr), pk };
   }
   const db = (a, b) => +(20 * Math.log10(a / b)).toFixed(1), cards = {}, alls = [];
-  for (const [id, kitId] of [['basic', 'elec'], ['dance', 'elec'], ['bounce', 'real'], ['chill', 'real'], ['semachi', 'kor'], ['basic', 'real'], ['basic', 'kor']]) {
-    const dr = await render(id, kitId, 'drums'), ba = await render(id, kitId, 'bass'), ch = await render(id, kitId, 'chord'), al = await render(id, kitId, 'all');
-    cards[id + '/' + kitId] = { bass: db(ba.w, dr.w), chord: db(ch.w, dr.w), pk: +al.pk.toFixed(2) };
+  for (const [id, kitId] of [['basic', 'elec'], ['dance', 'elec'], ['bounce', 'real'], ['chill', 'real'], ['semachi', 'kor'], ['gutgeori', 'kor'], ['basic', 'real'], ['basic', 'kor']]) {
+    const dr = await render(id, kitId, 'drums'), ba = await render(id, kitId, 'bass'), ch = await render(id, kitId, 'chord'), ml = await render(id, kitId, 'mel'), al = await render(id, kitId, 'all');
+    cards[id + '/' + kitId] = { bass: db(ba.w, dr.w), chord: db(ch.w, dr.w), mel: db(ml.w, dr.w), melPk: +ml.pk.toFixed(3), drPk: +dr.pk.toFixed(3), pk: +al.pk.toFixed(2) };
     if (id === 'basic') alls.push(al.w);
   }
   return { cards, kitSpread: db(Math.max(...alls), Math.min(...alls)) };
@@ -158,9 +184,12 @@ try {
   ok(await until(S, `!!window.__beat && window.__beat.ready() === true`, 10000), 'A3 전자 북 소리 굽기 끝(window.__beat · debug=1 일 때만)');
   const lay = await S.ev(`({ labs: [...document.querySelectorAll('.bt-lab b')].map(b => b.textContent), cells: document.querySelectorAll('.bt-cell').length, nums: [...document.querySelectorAll('.bt-num b')].map(b => b.textContent).join(''), b1: document.querySelectorAll('.bt-cell.b1').length,
     tabs: [...document.querySelectorAll('.bt-tab')].map(b => b.textContent), cards: document.querySelectorAll('.bt-card').length, bpm: document.querySelector('.bt-val').textContent, scrollX: document.scrollingElement.scrollWidth - innerWidth,
-    mainOver: document.querySelector('.bt-main').scrollHeight - document.querySelector('.bt-main').clientHeight })`);
-  ok(lay && same(lay.labs, ['쿵', '짝', '박수', '칙', '치이', '통', '베이스', '화음']) && lay.cells === 96 && lay.nums === '1234' && lay.b1 === 48 && lay.cards === 7 && lay.bpm === '96' && lay.scrollX <= 0 && lay.mainOver <= 0,
-    'A4 줄 여섯(쿵 짝 박수 칙 치이 통) + 베이스 · 화음 · 16칸 × 6 · 박 1~4 · 박마다 칠(둘째 · 넷째 박) · 카드 일곱 · 빠르기 96 · 1366×610 에 다 들어감', JSON.stringify(lay));
+    mainOver: document.querySelector('.bt-main').scrollHeight - document.querySelector('.bt-main').clientHeight,
+    mcells: document.querySelectorAll('.bt-mcell').length, seg: [...document.querySelectorAll('.bt-palseg button')].map(b => b.textContent).join(','),
+    tipBottom: Math.round(document.querySelector('.bt-tip').getBoundingClientRect().bottom), palBottom: Math.round(document.querySelector('.bt-pal').getBoundingClientRect().bottom) })`);
+  ok(lay && same(lay.labs, ['쿵', '짝', '박수', '칙', '치이', '통', '가락', '베이스', '화음']) && lay.cells === 96 && lay.mcells === 16 && lay.nums === '1234' && lay.b1 === 48 && lay.cards === 7 && lay.bpm === '96' && lay.scrollX <= 0 && lay.mainOver <= 0
+    && lay.seg === '베이스,가락,화음' && lay.tipBottom <= 610 && lay.palBottom < lay.tipBottom,
+    'A4 줄 여섯(쿵 짝 박수 칙 치이 통) + 가락 · 베이스 · 화음 · 16칸 × 6 + 가락 16칸 · 박 1~4 · 박마다 칠(둘째 · 넷째 박) · 카드 일곱 · 빠르기 96 · 붓 상자 베이스 | 가락 | 화음 · 1366×610 에 다 들어감(팁까지)', JSON.stringify(lay));
   await S.shot('A_beat_empty');
   //  칸 — 진짜 마우스
   for (const [r, i] of [['kick', 0], ['kick', 8], ['snare', 4], ['snare', 12], ['snare', 12], ['clap', 2], ['clap', 2], ['clap', 2]]) { const p = await S.pressEl(cellQ(r, i)); if (p !== true) { ok(false, `A5 칸 누르기 ${r}${i}`, String(p)); break; } }
@@ -177,12 +206,32 @@ try {
   await S.pressEl(btnQ('도', `document.querySelector('.bt-pal')`)); await S.pressEl(`document.querySelector('.bt-bcell[data-i="0"]')`);
   await S.pressEl(btnQ('솔', `document.querySelector('.bt-pal')`)); await S.pressEl(`document.querySelector('.bt-bcell[data-i="8"]')`);
   await S.pressEl(btnQ('쉼', `document.querySelector('.bt-pal')`)); await S.pressEl(`document.querySelector('.bt-bcell[data-i="12"]')`);
-  const cardBtns = `[...document.querySelectorAll('.bt-pal .bt-palg')][1]`;
+  const segP = await S.pressEl(`document.querySelector('.bt-palseg [data-pal="chord"]')`);   // [MUSIC-BEAT-MEL-1] 붓 상자 — 화음
+  const cardBtns = `document.querySelector('.bt-pal .bt-palg')`;
+  ok(segP === true && await S.ev(`window.__beat.state().palTab === 'chord' && ${cardBtns}.textContent.includes('화음 카드')`), 'A7a 붓 상자 \'화음\'(진짜 클릭 · 가려지지 않음) → 화음 카드', String(segP));
   await S.pressEl(btnQ('도', cardBtns)); await S.pressEl(`document.querySelector('.bt-cslot[data-i="0"]')`);
   await S.pressEl(btnQ('솔', cardBtns)); await S.pressEl(`document.querySelector('.bt-cslot[data-i="2"]')`);
   const bc = await S.ev(`({ b: window.__beat.beat().pats[0].b, c: window.__beat.beat().pats[0].c, chips: [...document.querySelectorAll('.bt-bcell .chip')].map(c => c.textContent).join(','), tails: document.querySelectorAll('.bt-bcell .tail').length, slot: document.querySelector('.bt-cslot[data-i="2"]').textContent })`);
   ok(bc && bc.b === '0.......3...x...' && same(bc.c, ['I', '-', 'V', '-']) && bc.chips === '도,솔' && bc.tails === 10 && /솔화음/.test(bc.slot),
     'A7 베이스 붓(도 · 솔 · 쉼) · 이어지는 칸 꼬리 · 화음 카드(도 · 솔) — 저장 모양 그대로', JSON.stringify(bc));
+  //  [MUSIC-BEAT-MEL-1] 가락 붓 — 붓 상자 '가락'(진짜 클릭) → 미 0 · 솔 2 · 라 4 · 쉼 6 · 높은 도 8 · 레 끌어 칠하기 10 → 12
+  const mSeg = await S.pressEl(`document.querySelector('.bt-palseg [data-pal="mel"]')`);
+  const mcellQ = i => `document.querySelector('.bt-mcell[data-i="${i}"]')`, palQ = `document.querySelector('.bt-pal')`;
+  const mp = [];
+  for (const [b, i] of [['미', 0], ['솔', 2], ['라', 4], ['쉼', 6], ['높은 도', 8]]) mp.push(await S.pressEl(btnQ(b, palQ)), await S.pressEl(mcellQ(i)));
+  mp.push(await S.pressEl(btnQ('레', palQ)));
+  const m10 = await S.where(mcellQ(10)), m12 = await S.where(mcellQ(12));
+  await S.mouse('mousePressed', m10.x, m10.y, 1);
+  for (let k = 1; k <= 10; k++) await S.mouse('mouseMoved', m10.x + (m12.x - m10.x) * k / 10, m10.y, 1);
+  await S.mouse('mouseReleased', m12.x, m12.y, 0);
+  const mm = await S.ev(`({ m: window.__beat.beat().pats[0].m, b: window.__beat.beat().pats[0].b, lead: window.__beat.state().lead, chips: [...document.querySelectorAll('.bt-mcell .chip')].map(c => [c.textContent, Math.round(c.getBoundingClientRect().top)]),
+    tails: document.querySelectorAll('.bt-mcell .tail').length, rest: document.querySelectorAll('.bt-mcell .rest').length, opts: [...document.querySelectorAll('.bt-lead option')].map(o => o.value).join(','), sel: document.querySelector('.bt-lead').value,
+    over: document.querySelector('.bt-main').scrollHeight - document.querySelector('.bt-main').clientHeight, palR: Math.round(Math.max(...[...document.querySelectorAll('.bt-pal > *')].map(e => e.getBoundingClientRect().right))), mainR: Math.round(document.querySelector('.bt-main').getBoundingClientRect().right) })`);
+  const ctop = {}; for (const [t, y] of mm.chips) ctop[t] = y;
+  ok(mSeg === true && mp.every(x => x === true) && mm.m === '2.3.4.x.5.111...' && mm.b === '0.......3...x...' && mm.tails === 7 && mm.rest === 1 && mm.chips.map(c => c[0]).join(',') === '미,솔,라,도˙,레,레,레'
+    && ctop['도˙'] < ctop['라'] && ctop['라'] < ctop['솔'] && ctop['솔'] < ctop['미'] && ctop['미'] < ctop['레'] && mm.over <= 0 && mm.palR <= mm.mainR,
+    'A7m 가락 붓(진짜 클릭 · 가려지지 않음) 미 · 솔 · 라 · 쉼 · 높은 도 + 끌어 칠하기 레(10~12) → 저장 모양 2.3.4.x.5.111... · 꼬리 7 · 쉼 · 칩 높이 = 음 높이 · 베이스 그대로 · 가락 붓 상자도 한 줄(넘침 0)', JSON.stringify(mm));
+  ok(mm.opts === 'synth,xylo,piano,flute,glock,daegeum,gayageum' && mm.sel === 'synth' && mm.lead === 'synth', 'A7n 가락 악기 일곱(신스 · 실로폰 · 피아노 · 플루트 · 글로켄 · 대금 · 가야금) · 전자 북 = 신스', mm.opts);
   await S.shot('A_beat_made');
   //  ▶ — 박자기가 정한 칸 · 정한 시각에
   const pP = await S.pressEl(`document.querySelector('.bt-play')`);
@@ -199,6 +248,10 @@ try {
     `A8 ▶ → 3.4초 동안 울린 북 ${drums.length}번 = 정한 칸만(쿵 0 · 8 / 짝 4 · 12(세게) / 칙 0~7) · 칸 시각 = 시작 + 칸 × ${sd.toFixed(5)}초(마디 2.5초) · 지금 칸 빛`, JSON.stringify({ n: drums.length, bars: [...bars], ph: L1.ph, timeOK }));
   ok(bassEv.length >= 2 && bassEv.filter(e => e.s === 0).every(e => e.n === 0) && bassEv.filter(e => e.s === 8).every(e => e.n === 3) && fired.some(e => e.k === 'bassoff' && e.s === 12)
     && chordEv.filter(e => e.s === 0).every(e => e.ch === 'I') && chordEv.filter(e => e.s === 8).every(e => e.ch === 'V') && !fired.some(e => e.k === 'chordoff') && !chordEv.some(e => e.s === 4 || e.s === 12), 'A9 베이스(0칸 도 · 8칸 솔 · 12칸 쉼) · 화음(0칸 도 · 8칸 솔 · 빈 칸은 앞 화음이 이어짐 — 끊기 · 새로 치기 없음)');
+  const melEv = fired.filter(e => e.k === 'mel' && e.b === 0), melOff = fired.filter(e => e.k === 'meloff' && e.b === 0);
+  ok(same(melEv.map(e => [e.s, e.n, Math.round(e.d / sd * 1000) / 1000]), [[0, 2, 2], [2, 3, 2], [4, 4, 2], [8, 5, 2], [10, 1, 1], [11, 1, 1], [12, 1, 4]]) && same(melOff.map(e => e.s), [6])
+    && melEv.every(e => e.L === 'synth' && near(e.t, t0 + e.s * sd, 1e-6)) && fired.some(e => e.k === 'mel' && e.b === 1 && e.s === 0),
+    'A9m 가락(첫 마디) — 0 미 · 2 솔 · 4 라(6칸 쉼에서 끊김) · 8 높은 도 · 10 · 11 · 12 레(12칸은 마디 끝까지 네 칸) · 칸 시각 그대로 · 신스 · 둘째 마디도', JSON.stringify(melEv.map(e => [e.s, e.n, +(e.d / sd).toFixed(3), e.L])));
   const late = L1.log.filter(e => e.k === 'step').length - fired.filter(e => e.k === 'step').length;
   ok(late >= 0 && late <= 2, 'A10 예약은 0.12초 앞까지만(아직 안 울린 칸 ' + late + '개)');
   ok(L1.st.dance.bounce >= 3 && L1.st.dance.wiggle >= 2 && L1.st.dance.flash >= 20, 'A10b 춤 친구가 쿵에 통통 · 짝에 흔들 · 소리 나는 칸이 반짝', JSON.stringify(L1.st.dance));
@@ -214,6 +267,20 @@ try {
   L2 = await S.ev(`window.__beat.log().filter(e => e.k === 'step').slice(-8)`);
   const odd = L2.findIndex((e, i) => i > 0 && e.s % 2 === 1 && L2[i - 1].s === e.s - 1);
   ok(odd > 0 && near(L2[odd].t - L2[odd - 1].t, 0.125 * 1.5, 1e-6) && near(L2[odd + 1].t - L2[odd].t, 0.125 * 0.5, 1e-6), 'A12 통통 튀는 정도 50% — 둘째 칸만 반 칸 늦게(0.1875 · 0.0625초)', L2.map(e => e.s + ':' + e.t.toFixed(4)).join(' '));
+  //  [MUSIC-BEAT-MEL-1] 가락 악기 바꾸기(울리는 중) → 다음 음부터 · 가락 M(음소거)
+  await S.ev(`(() => { const s = document.querySelector('.bt-lead'); s.value = 'xylo'; s.dispatchEvent(new Event('change', { bubbles: true })); return 1; })()`);
+  const tSw = await S.ev(`window.__beat.now()`);
+  await sleep(1300);
+  const LX = await S.ev(`window.__beat.log().filter(e => e.k === 'mel')`), afterSw = LX.filter(e => e.w > tSw + 0.005);
+  ok(await S.ev(`window.__beat.state().lead`) === 'xylo' && afterSw.length >= 2 && afterSw.every(e => e.L === 'xylo') && LX.some(e => e.L === 'synth') && await S.ev(`window.__beat.voices()`) > 0, 'A12m 가락 악기 → 실로폰(울리는 중) — 다음 음부터 실로폰', JSON.stringify(afterSw.slice(0, 3).map(e => [e.b, e.s, e.L])));
+  const mBtn = `document.querySelector('.bt-lab[data-r="mel"] .bt-m')`;
+  const muP = await S.pressEl(mBtn);
+  await sleep(300);
+  const mu = await S.ev(`({ m: window.__beat.beat().mix.mel.m, g: window.__beat.chGain('mel'), gb: window.__beat.chGain('bass'), cls: document.querySelector('.bt-lab[data-r="mel"]').className })`);
+  ok(muP === true && mu.m === true && mu.g < 0.01 && mu.gb > 0.5 && /muted/.test(mu.cls), 'A12n 가락 M(진짜 클릭) → 가락 줄 크기 0 · 베이스는 그대로 · 이름에 줄', JSON.stringify(mu));
+  await S.pressEl(mBtn);
+  await sleep(300);
+  ok(await S.ev(`window.__beat.beat().mix.mel.m === false && window.__beat.chGain('mel') > 0.5`), 'A12o 다시 누르면 가락이 들림');
   await S.key('Space', ' ', 32);
   ok(await until(S, `window.__beat.state().playing === false && document.querySelector('.bt-play').textContent === '▶'`, 2000), 'A13 스페이스 = 멈춤');
   const nAfter = await S.ev(`window.__beat.log().length`); await sleep(400);
@@ -234,12 +301,15 @@ try {
   ok(same(await S.ev(`[...document.querySelectorAll('.bt-lab b')].map(b => b.textContent).slice(0, 2)`), ['쿵', '짝']), 'A17 전자 북으로 돌아오면 줄 이름도 쿵 · 짝');
   //  어울림(귀 대신 셈) — 기본 리듬 카드를 오프라인으로 두 마디 그려 '작은 스피커 크기'(150Hz 아래 깎은 RMS)로 북 · 베이스 · 화음을 견준다
   const mixRes = await S.ev(MIX_PROBE);
-  const mixOK = mixRes && !mixRes.err && Object.values(mixRes.cards).every(c => c.bass >= -6 && c.bass <= 6 && c.chord >= -11 && c.chord <= -1 && c.pk <= 1.1) && mixRes.kitSpread <= 3;
+  const mixOK = mixRes && !mixRes.err && Object.values(mixRes.cards).every(c => c.bass >= -6 && c.bass <= 6 && c.chord >= -11 && c.chord <= -1 && c.pk <= 1.1
+    && c.mel >= -10 && c.mel <= -1 && c.mel - c.chord >= -4 && c.mel - c.chord <= 5 && c.melPk < c.drPk) && mixRes.kitSpread <= 3;   // [MUSIC-BEAT-MEL-1] 가락 = 북 -10~-1 · 화음 -4~+5 · 꼭대기는 북보다 작게
   const pit = await S.ev(PITCH_PROBE);
   const want = { elec: 65.41, real: 65.41, kor: 130.81 };
   ok(pit && !pit.err && Object.entries(want).every(([k, f]) => Math.abs(pit[k].bass / f - 1) < 0.01 && pit[k].chord >= 10), 'A44 음 높이 — 베이스 도 = 65.41Hz(우리 장단 130.81 · ±1%) · 화음 도 미 솔 자리 힘이 다른 음 자리보다 10dB 넘게 큼', JSON.stringify(pit));
-  ok(mixOK, 'A43 어울림(작은 스피커 크기 · dB) — 카드마다 베이스 = 북 ±6 · 화음 = 북 −11~−1 · 꼭대기 ≤ 1.1 · 같은 카드를 소리 묶음 셋으로 = 전체 크기 차 ≤ 3dB',
-    mixRes && (mixRes.err || Object.entries(mixRes.cards).map(([k, c]) => `${k} 베이스${c.bass} 화음${c.chord} 꼭대기${c.pk}`).join(' · ') + ` · 묶음 차 ${mixRes.kitSpread}dB`));
+  ok(mixOK, 'A43 어울림(작은 스피커 크기 · dB) — 카드마다 베이스 = 북 ±6 · 화음 = 북 −11~−1 · 가락 = 북 −10~−1 · 가락 − 화음 −4~+5 · 가락 꼭대기 < 북 꼭대기 · 꼭대기 ≤ 1.1 · 같은 카드를 소리 묶음 셋으로 = 전체 크기 차 ≤ 3dB',
+    mixRes && (mixRes.err || Object.entries(mixRes.cards).map(([k, c]) => `${k} 베이스${c.bass} 화음${c.chord} 가락${c.mel}(꼭대기 ${c.melPk}/북 ${c.drPk}) 꼭대기${c.pk}`).join(' · ') + ` · 묶음 차 ${mixRes.kitSpread}dB`));
+  const lpit = await S.ev(LEAD_PITCH_PROBE);
+  ok(lpit && !lpit.err && Object.keys(lpit).length === 7 && Object.values(lpit).every(r => r.every(x => x >= 10)), 'A44b 가락 악기 일곱 음 높이 — 가락 도 · 솔이 한 옥타브 위(글로켄 두 옥타브 위)에서 울림: 그 음 자리 힘 > 반음 위 · 아래 · 옥타브 아래 +10dB', JSON.stringify(lpit));
   //  패턴 B · 기본 리듬 카드 · 복사 · 순서
   await S.pressEl(`document.querySelectorAll('.bt-pat')[1]`);
   ok(await S.ev(`window.__beat.state().cur === 1 && document.querySelectorAll('.bt-cell.v1, .bt-cell.v2').length === 0 && document.querySelectorAll('.bt-pat')[1].classList.contains('on')`), 'A18 패턴 B — 빈 칸판');
@@ -273,6 +343,8 @@ try {
   const toms = f3.filter(e => e.k === 'drum' && e.r === 'tom'), crash = f3.filter(e => e.k === 'drum' && e.crash);
   ok(L3.st.fill === true && order.startsWith('AABCA') && toms.length > 0 && toms.every(e => e.b === 3 && e.s >= 12) && crash.length === 1 && crash[0].b === 4 && crash[0].s === 0,
     `A23 순서대로(빠르기 160) — 마디 차례 ${order} · 필인(통)은 넷째 마디 마지막 박에만 · 다섯째 마디 첫 칸 심벌`, JSON.stringify({ toms: toms.map(e => e.b + ':' + e.s), crash: crash.map(e => e.b + ':' + e.s) }));
+  const melBars = {}; for (const e of f3.filter(x => x.k === 'mel')) (melBars[e.b] = melBars[e.b] || []).push(e.s);
+  ok(same([0, 1, 2, 3].map(b => (melBars[b] || []).join(',')), ['0,2,4,8,10,11,12', '0,2,4,8,10,11,12', '0,3,6,8,11,14', '0,3,6,8,11,14']), 'A23m 순서대로 — 마디마다 그 패턴의 가락(A A = 칠한 가락 · B C = 카드 가락 · 넷째 = 필인 마디에도 가락)', JSON.stringify(melBars));
   //  고르게 나누기 · 엇박으로 밀기 · 주사위(지금 패턴 = 순서가 보여 준 패턴이므로 A 로)
   await S.pressEl(btnQ('지금 패턴만 반복'));
   await S.pressEl(`document.querySelectorAll('.bt-pat')[0]`);
@@ -290,6 +362,24 @@ try {
   await S.key('Space', ' ', 32);
   await S.pressEl(btnQ('↶ 되돌리기'));
   ok(same(await S.ev(onSteps('kick')), [0, 8]) && same(await S.ev(onSteps('tom')), [1, 7, 12]), 'A27 ↶ 되돌리기 — 주사위 앞으로');
+  //  [MUSIC-BEAT-MEL-1] 🎲 가락 주사위 · 메아리 — 패턴 A(화음 도 · - · 솔 · -)
+  const mdP = await S.pressEl(`document.querySelector('.bt-meldice')`);
+  await sleep(300);
+  const md = await S.ev(`({ m: window.__beat.beat().pats[0].m, playing: window.__beat.state().playing, pal: window.__beat.state().palTab, d: window.__beat.beat().pats[0].d.kick })`);
+  const mdOn = [...md.m].map((c, i) => (/[0-7]/.test(c) ? i : -1)).filter(i => i >= 0);
+  ok(mdP === true && /^[0-7x.]{16}$/.test(md.m) && md.m !== '2.3.4.x.5.111...' && mdOn[0] === 0 && '02357'.includes(md.m[0]) && mdOn[mdOn.length - 1] === 12 && md.m.slice(13) === '...' && '136'.includes(md.m[12])
+    && md.d === '1000000010000000' && md.playing === true && md.pal === 'mel',
+    'A27m 🎲 가락 주사위 — 0~7 음만 · 첫 음 = 도 화음의 음 · 끝 음 = 12칸(마디 끝까지 한 박) 솔 화음의 음 · 북은 그대로 · 바로 들림 · 붓 상자 가락', JSON.stringify(md));
+  await S.key('Space', ' ', 32);
+  const ecP = await S.pressEl(`document.querySelector('[data-echo="1"]')`);
+  await sleep(250);
+  const ec = await S.ev(`window.__beat.beat().pats[0].m`), half = md.m.slice(0, 8);
+  const wantEc = [...half].map((c, i) => (/[0-7]/.test(c) ? String(Math.min(7, +c + 1)) : i === 0 && c === '.' ? 'x' : c)).join('');
+  ok(ecP === true && ec.slice(0, 8) === half && ec.slice(8) === wantEc, 'A27n 메아리 ⤴ — 뒤 절반 = 앞 절반을 한 칸 위로', `${md.m} → ${ec}`);
+  await S.key('Space', ' ', 32);
+  await S.shot('A_beat_meldice');
+  await S.pressEl(btnQ('↶ 되돌리기')); await S.pressEl(btnQ('↶ 되돌리기'));
+  ok(await S.ev(`window.__beat.beat().pats[0].m`) === '2.3.4.x.5.111...', 'A27o ↶ 되돌리기 두 번 = 칠한 가락으로');
   //  손으로 쳐서 녹음 — 빠르기 100 · 셈(3초 + 한 마디) 뒤 2 · 10칸에 A(쿵)
   await S.ev(setRange('.bt-trans .bt-range:not(.sw)', 100));
   await S.pressEl(`[...document.querySelectorAll('.bt-tab')].find(b => b.textContent === '손으로 치기')`);
@@ -316,6 +406,37 @@ try {
   await S.key('Space', ' ', 32);
   await S.pressEl(btnQ('↶ 되돌리기'));
   ok(same(await S.ev(onSteps('kick')), [0, 8]), 'A33 ↶ 되돌리기 = 방금 녹음한 한 바퀴를 한 번에');
+  //  [MUSIC-BEAT-MEL-1] 가락 건반 녹음 — 빈 패턴 D · 신스(누르는 동안 울림) · 녹음할 곳 '가락 건반' · Z(도) 2칸에서 두 칸 누름 · C(미) 10칸에서 한 칸 누름
+  await S.pressEl(`document.querySelector('.bt-palseg [data-pal="mel"]')`);
+  await S.ev(`(() => { const s = document.querySelector('.bt-lead'); s.value = 'synth'; s.dispatchEvent(new Event('change', { bubbles: true })); return 1; })()`);
+  await S.pressEl(`document.querySelectorAll('.bt-pat')[3]`);
+  const mk = await S.ev(`({ n: document.querySelectorAll('.bt-mkey').length, k: [...document.querySelectorAll('.bt-mkey kbd')].map(k => k.textContent).join(''), b: [...document.querySelectorAll('.bt-mkey b')].map(k => k.textContent).join(','), cur: window.__beat.state().cur, lead: window.__beat.state().lead })`);
+  ok(mk.n === 8 && mk.k === 'ZXCVBNM,' && mk.b === '도,레,미,솔,라,도˙,레˙,미˙' && mk.cur === 3 && mk.lead === 'synth', 'A33m 가락 건반 여덟(Z X C V B N M ,) · 패턴 D', JSON.stringify(mk));
+  const vk0 = await S.ev(`window.__beat.voices()`);
+  const kP = await S.pressEl(`document.querySelector('.bt-mkey[data-n="4"]')`);
+  await sleep(120);
+  ok(kP === true && await S.ev(`window.__beat.voices()`) > vk0 && await S.ev(`window.__beat.beat().pats[3].m`) === '................' && same(await S.ev(`window.__beat.state().held`), []), 'A33n 건반 누르기(진짜 클릭 · 녹음 아님) → 소리 · 칸은 그대로 · 떼면 놓임');
+  const rtP = await S.pressEl(`document.querySelector('[data-rt="mel"]')`);
+  ok(rtP === true && await S.ev(`window.__beat.state().recTarget === 'mel' && document.querySelector('.bt-rec2').textContent.includes('가락')`), 'A33o 녹음할 곳 → 🎵 가락 건반(진짜 클릭)');
+  await S.pressEl(`document.querySelector('.bt-rec2')`);
+  ok(await until(S, `window.__beat.state().counting === false && window.__beat.state().rec && window.__beat.now() > window.__beat.state().loopStart + 0.3`, 9000), 'A33p 녹음(가락) — 셈 3 · 2 · 1 + 한 마디 뒤 시작');
+  const holdAt = async (step, code, kname, vk, holdSteps) => {   // 다음 그 칸 시각에 맞춰 누르고 holdSteps 칸 동안 있다가 뗌
+    const st = await S.ev(`({ now: window.__beat.now(), t0: window.__beat.state().loopStart, lat: window.__beat.lat() })`);
+    const sdd = 60 / 100 / 4, bar = 16 * sdd, k = Math.ceil((st.now - st.t0 - step * sdd + 0.25) / bar);
+    const target = st.t0 + k * bar + step * sdd + st.lat;
+    await sleep(Math.max(0, (target - st.now) * 1000 - 8));
+    await S.key(code, kname, vk, 'keyDown'); await sleep(holdSteps * sdd * 1000); await S.key(code, kname, vk, 'keyUp');
+  };
+  await holdAt(2, 'KeyZ', 'z', 90, 2); await holdAt(10, 'KeyC', 'c', 67, 1);
+  await sleep(250);
+  const rm = await S.ev(`({ m: window.__beat.beat().pats[3].m, k: window.__beat.beat().pats[3].d.kick, a: window.__beat.beat().pats[0].m, held: window.__beat.state().held, chips: [...document.querySelectorAll('.bt-mcell .chip')].map(c => c.textContent).join(',') })`);
+  ok(rm.m === '..0.x.....2x....' && rm.k === '0000000000000000' && rm.a === '2.3.4.x.5.111...' && same(rm.held, []) && rm.chips === '도,미', 'A33q 가락 녹음 — Z(도) 2칸 · 두 칸 누름 → 4칸에 쉼 · C(미) 10칸 · 한 칸 → 11칸에 쉼 · 북 · 다른 패턴 그대로 · 칸판에 바로', JSON.stringify(rm));
+  await S.shot('A_beat_melrec');
+  await S.pressEl(`document.querySelector('.bt-rec2')`);
+  await S.key('Space', ' ', 32);
+  await S.pressEl(btnQ('↶ 되돌리기'));
+  ok(await S.ev(`window.__beat.beat().pats[3].m`) === '................', 'A33r ↶ 되돌리기 = 방금 녹음한 가락을 한 번에');
+  await S.pressEl(`document.querySelectorAll('.bt-pat')[0]`);
   //  저장 — 고운 말 거르기 → 비트 모음
   await S.pressEl(`document.querySelector('.top .btn.primary')`);
   ok(await until(S, `!!document.querySelector('.modal') && document.querySelector('.modal h2').textContent === '비트 저장하기'`, 3000), 'A34 [저장] → 저장 창');
@@ -328,8 +449,9 @@ try {
   const bid = await S.ev(`location.hash.split('.').pop()`);
   const sv = db(`classRPG_music/beats/s1/${bid}`) || {}, row = db(`classRPG_music/beatclass/s1_${bid}`) || {};
   ok(sv.title === '쿵짝 시험 비트' && sv.grid === '16' && sv.pats && sv.pats[0].d.kick === '1000000010000000' && sv.pats[1].d.kick === '2000200020002000' && sv.by === 's1' && sv.byName === '테스트' && sv.pub === true && sv.rev === 1 && Object.values(sv.arr || {}).join('') === '0012'
-    && row.t === '쿵짝 시험 비트' && row.sid === 's1' && row.id === bid && row.n === '테스트' && row.bpm === 100 && Object.keys(db('classRPG_music') || {}).sort().join() === 'beatclass,beats',
-    'A37 서버: beats/s1/<id>(글자 줄 모양 · 누가 · 몇 번째 저장) + beatclass/s1_<id> 한 줄 · 음악실에 쓴 곳 = 이 둘뿐', JSON.stringify({ keys: Object.keys(sv), row }));
+    && row.t === '쿵짝 시험 비트' && row.sid === 's1' && row.id === bid && row.n === '테스트' && row.bpm === 100 && Object.keys(db('classRPG_music') || {}).sort().join() === 'beatclass,beats'
+    && sv.pats[0].m === '2.3.4.x.5.111...' && sv.pats[1].m === '4..4..5.4..4..3.' && sv.pats[3].m === '................' && sv.lead === 'synth',
+    'A37 서버: beats/s1/<id>(글자 줄 모양 · 누가 · 몇 번째 저장 · 가락 m · 가락 악기 lead) + beatclass/s1_<id> 한 줄 · 음악실에 쓴 곳 = 이 둘뿐', JSON.stringify({ keys: Object.keys(sv), row, m: Object.values(sv.pats || {}).map(p => p.m), lead: sv.lead }));
   await S.shot('A_beat_saved');
   //  다시 불러오기
   await S.ev(`window.__old = 1`);   // 새로 고친 쪽인지 알아보는 표(Page.reload 는 옛 쪽이 살아 있을 때 돌아온다)
@@ -337,6 +459,7 @@ try {
   ok(await until(S, `!window.__old && !!window.__beat && window.__beat.state().id === ${JSON.stringify(bid)} && document.querySelector('.bt-title').value === '쿵짝 시험 비트'`, 10000), 'A38 새로 고침 → 저장한 비트 그대로 열림(이름 · id)');
   const rl = await S.ev(`window.__beat.beat()`);
   ok(rl && rl.pats && rl.pats[0].d.kick === sv.pats[0].d.kick && rl.pats[1].b === sv.pats[1].b && same(rl.arr, [0, 0, 1, 2]) && rl.bpm === 100 && rl.fill === true && rl.mode === 'loop' && sv.mode === 'loop', 'A39 패턴 · 베이스 · 순서 · 빠르기 · 필인 · 모드(지금 패턴만) 다 같음', JSON.stringify(rl && { arr: rl.arr, bpm: rl.bpm, fill: rl.fill, mode: rl.mode }));
+  ok(rl && rl.pats[0].m === '2.3.4.x.5.111...' && rl.pats[1].m === sv.pats[1].m && rl.lead === 'synth' && await S.ev(`[...document.querySelectorAll('.bt-mcell .chip')].map(c => c.textContent).join(',')`) === '미,솔,라,도˙,레,레,레', 'A39m 새로 고침 → 가락 · 가락 악기 그대로 · 가락 줄 칩');
   await S.pressEl(`[...document.querySelectorAll('.bt-tab')].find(b => b.textContent === '내 비트')`);
   ok(await until(S, `[...document.querySelectorAll('.bt-tabbody .song-row')].some(r => r.textContent.includes('쿵짝 시험 비트') && r.classList.contains('open'))`, 5000), 'A40 \'내 비트\' 목록 — 지금 연 비트 표시');
   await S.pressEl(`[...document.querySelectorAll('.bt-tab')].find(b => b.textContent === '우리 반')`);
@@ -356,8 +479,10 @@ try {
   //  폰 너비
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 780, deviceScaleFactor: 1, mobile: true }, S.sessionId);
   await sleep(500);
-  const ph = await S.ev(`({ sx: document.scrollingElement.scrollWidth - innerWidth, grid: document.querySelector('.bt-gridbox').scrollWidth > document.querySelector('.bt-gridbox').clientWidth, hit: (() => { const c = ${cellQ('kick', 0)}; c.scrollIntoView({ block: 'nearest', inline: 'nearest' }); const b = c.getBoundingClientRect(); return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) === c; })() })`);
-  ok(ph.sx <= 0 && ph.hit, 'A42 폰 너비(390) — 쪽은 옆으로 안 밀림(칸판만 옆으로 넘김) · 칸이 가려지지 않음', JSON.stringify(ph));
+  const ph = await S.ev(`({ sx: document.scrollingElement.scrollWidth - innerWidth, grid: document.querySelector('.bt-gridbox').scrollWidth > document.querySelector('.bt-gridbox').clientWidth, hit: (() => { const c = ${cellQ('kick', 0)}; c.scrollIntoView({ block: 'nearest', inline: 'nearest' }); const b = c.getBoundingClientRect(); return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) === c; })(),
+    mhit: (() => { const c = document.querySelector('.bt-mcell[data-i="3"]'); c.scrollIntoView({ block: 'nearest', inline: 'nearest' }); const b = c.getBoundingClientRect(); return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) === c; })(),
+    pal: (() => { const e = document.querySelector('.bt-palseg [data-pal="mel"]'); e.scrollIntoView({ block: 'nearest' }); const b = e.getBoundingClientRect(); const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!hit && (hit === e || e.contains(hit)) && b.right <= innerWidth; })() })`);
+  ok(ph.sx <= 0 && ph.hit && ph.mhit && ph.pal, 'A42 폰 너비(390) — 쪽은 옆으로 안 밀림(칸판만 옆으로 넘김) · 북 칸 · 가락 칸 · 붓 상자 고르기가 가려지지 않음', JSON.stringify(ph));
   await S.shot('A_beat_phone');
   await send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 610, deviceScaleFactor: 1, mobile: false }, S.sessionId);
 
@@ -369,17 +494,23 @@ try {
   const lp = await T.pressEl(`[...document.querySelectorAll('.bt-tabbody .song-row')].find(r => r.textContent.includes('쿵짝 시험 비트')).querySelector('.play-i')`);
   ok(lp === true && await until(T, `!!document.querySelector('.bt-tabbody .play-i.stop')`, 4000), 'B3 ▶ 듣기(따로 박자기 · 따로 믹서)');
   await sleep(900);
+  ok(await T.ev(`window.__beat.state().dance.pvMel`) >= 2, 'B3m 듣기에도 가락(들어 보기 박자기가 친구 비트의 가락 음을 냄)', String(await T.ev(`window.__beat.state().dance.pvMel`)));
   await T.pressEl(`document.querySelector('.bt-tabbody .play-i.stop')`);
   ok(await until(T, `!document.querySelector('.bt-tabbody .play-i.stop')`, 2000), 'B4 다시 누르면 멈춤');
   await T.pressEl(btnQ('열어 보기', `[...document.querySelectorAll('.bt-tabbody .song-row')].find(r => r.textContent.includes('쿵짝 시험 비트'))`));
   ok(await until(T, `location.hash === '#/beat/u.s1.${bid}' && !!document.querySelector('.bt-view.ro') && window.__beat.state().readOnly === true`, 8000), 'B5 열어 보기 → 듣기만 화면');
   const ro = await T.ev(`({ h1: document.querySelector('.top h1').textContent, save: !!document.querySelector('.bt-title'), pal: getComputedStyle(document.querySelector('.bt-pal')).display, tabs: [...document.querySelectorAll('.bt-tab')].map(b => b.textContent).join(','), rec: getComputedStyle(document.querySelector('.bt-rec')).display })`);
   ok(ro.h1.includes('테스트의 비트') && ro.h1.includes('쿵짝 시험 비트') && !ro.save && ro.pal === 'none' && ro.tabs === '손으로 치기,내 비트,우리 반' && ro.rec === 'none', 'B6 제목 \'테스트의 비트\' · 저장 · 붓 · 녹음 · 카드 · 아이디어 없음', JSON.stringify(ro));
+  const rom = await T.ev(`({ chips: [...document.querySelectorAll('.bt-mcell .chip')].map(c => c.textContent).join(','), lead: window.__beat.state().lead })`);
+  ok(rom.chips === '미,솔,라,도˙,레,레,레' && rom.lead === 'synth', 'B6m 친구 비트(듣기만)에도 가락 줄 그대로', JSON.stringify(rom));
+  const mBefore = await T.ev(`window.__beat.beat().pats[0].m`);
+  await T.pressEl(`document.querySelector('.bt-mcell[data-i="1"]')`);
+  ok(await T.ev(`window.__beat.beat().pats[0].m`) === mBefore && await T.ev(`window.__beat.state().dirty`) === false, 'B6n 가락 칸을 눌러도 안 바뀜');
   const before = await T.ev(`window.__beat.beat().pats[0].d.kick`);
   await T.pressEl(cellQ('kick', 4));
   ok(await until(T, toastHas('친구 비트는 들어 보기만'), 2000) && await T.ev(`window.__beat.beat().pats[0].d.kick`) === before && await T.ev(`window.__beat.state().dirty`) === false, 'B7 칸을 눌러도 안 바뀜 · \'친구 비트는 들어 보기만\'');
   await T.pressEl(`document.querySelector('.bt-play')`);
-  ok(await until(T, `window.__beat.state().playing && window.__beat.log().some(e => e.k === 'drum')`, 4000), 'B8 친구 비트 ▶ 들림');
+  ok(await until(T, `window.__beat.state().playing && window.__beat.log().some(e => e.k === 'drum') && window.__beat.log().some(e => e.k === 'mel')`, 4000), 'B8 친구 비트 ▶ 들림(북 · 가락)');
   await T.shot('B_friend_readonly');
   await T.key('Space', ' ', 32);
 
@@ -417,6 +548,14 @@ try {
   await until(S, `!!document.querySelector('.modal')`, 3000);
   await S.pressEl(btnQ('저장', `document.querySelector('.modal')`));
   ok(await until(S, `${toastHas('올렸어요')}`, 4000) && (db(`classRPG_music/beatclass/s1_${bid}`) || {}).hide === true && (db(`classRPG_music/beats/s1/${bid}`) || {}).rev === 2, 'D6 아이가 다시 저장해도 선생님 숨김은 남음 · rev 2');
+  //  [MUSIC-BEAT-MEL-1] 선생님 '열어 보기' → 듣기만 화면에 가락 줄
+  const oP = await P.pressEl(`[...document.querySelectorAll('.tk .song-row')].find(r => r.textContent.includes('쿵짝 시험 비트')).querySelector('.acts button')`);
+  //   서버에 저장된 지금 패턴(cur)의 가락 → 보여야 할 칩(D6 은 패턴 D = 달리는 비트 카드가 열린 채 저장)
+  const svd = db(`classRPG_music/beats/s1/${bid}`) || {}, svm = (Object.values(svd.pats || {})[svd.cur || 0] || {}).m || '';
+  const wantChips = [...svm].filter(c => /[0-7]/.test(c)).map(c => ['도', '레', '미', '솔', '라', '도˙', '레˙', '미˙'][+c]).join(',');
+  ok(oP === true && wantChips.length > 0 && await until(P, `location.hash === '#/beat/u.s1.${bid}' && !!document.querySelector('.bt-view.ro') && [...document.querySelectorAll('.bt-mcell .chip')].map(c => c.textContent).join(',') === ${JSON.stringify(wantChips)}`, 8000),
+    'D7 선생님 \'열어 보기\' → 듣기만 화면 · 가락 줄 칩 = 서버에 저장된 가락', `${svm} → ${wantChips}`);
+  await P.shot('D_teacher_open');
 
   ok(net.prod.length === 0, `운영 주소 요청 0 (전체 ${net.all})`, net.prod.slice(0, 5).join(' | '));
   const errList = Object.entries(errs).map(([k, v]) => k + ': ' + [...new Set(v)].slice(0, 4).join(' / '));

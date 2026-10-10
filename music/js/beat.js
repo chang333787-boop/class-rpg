@@ -41,7 +41,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   //  소리 · 재생
   let mixer = null, seq = null, timer = 0, raf = 0, playing = false, rec = false, counting = false, loopStart = 0, follow = true;
   let playPat = -1, playPos = -1, ph = -1, paint = null, warnedMute = 0, pv = null, mineList = [], classList = [], stopClass = null;
-  const dance = { bounce: 0, wiggle: 0, flash: 0 };   // 시험용 셈(춤 친구 · 칸 반짝)
+  const dance = { bounce: 0, wiggle: 0, flash: 0, pvMel: 0 };   // 시험용 셈(춤 친구 · 칸 반짝 · 들어 보기에서 울린 가락 음 수)
   const V = { live: [], bass: null, chord: null, openHat: null, mel: null, melPrev: null };
   const vq = [], stepLog = [], fired = [], skipOnce = new Set();
   const held = new Map();   // 누르고 있는 가락 건반: 음 번호 → { hd 소리, rec 녹음한 칸 }
@@ -824,7 +824,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const bars = b.arr.length ? Math.min(16, b.arr.length * 2) : 4;
     const mx = new BeatMixer(engine); mx.apply(b.mix, b.kit);
     const vs = { live: [], bass: null, chord: null, openHat: null, mel: null, melPrev: null };
-    const sq = new C.Sequencer({ now: () => engine.now, emit: e => { if (e.kind !== 'step') sound(e, mx, vs, b.kit, b.lead); }, beat: () => b });
+    const sq = new C.Sequencer({ now: () => engine.now, emit: e => { if (e.kind === 'step') return; if (e.kind === 'mel') dance.pvMel++; sound(e, mx, vs, b.kit, b.lead); }, beat: () => b });
     sq.start({ at: engine.now + 0.08 });
     const tm = setInterval(() => { sq.tick(); if (sq.bar >= bars) stopPreview(); }, C.TICK_MS);
     btn.classList.add('stop');
@@ -880,6 +880,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       prepare: k => kit.prepare(k),
       kitStats: () => kit.stats(),
       voices: () => { const now = engine.now; return V.live.filter(x => x.end > now).length; },   // 지금 울리고 있는(끝나지 않은) 소리 수
+      chGain: r => (mixer && mixer.ch[r] ? mixer.ch[r].gain.value : null),                            // 믹서 줄 크기(음소거 확인) [MUSIC-BEAT-MEL-1]
     };
   }
 
