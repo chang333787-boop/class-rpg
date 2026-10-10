@@ -16,6 +16,7 @@ import { mountTeacher } from './teacher.js';
 import { assignFromUrl, loadAssign, watchAssign, watchMine, reportAssign, onClassPause } from '../../common/assign.js';
 import { rhythmSettings, rhythmPatch, myLine } from './assign-music.js';
 import { EX_SONGS, EX_BEATS, EX_BY, exampleSong } from './showcase.js';   // [MUSIC-SHOWCASE-1] 예시 작품(4학년 음악 친구)
+import { ensembleOrder, groupOf, partnerEvents, withPartners, tapFired } from './ensemble.js';   // [MUSIC-ENSEMBLE-1] 합주(같은 제목 · 다른 부분)
 
 const Q = new URLSearchParams(location.search);
 // 선생님은 관리 화면에서 ?teacher=1 로 연다 → sid 'teacher' 로 같은 저장소(선생님이 지은 곡도 음악회에 올릴 수 있다)
@@ -89,6 +90,30 @@ function listen(song, btn) {
   listenPlayer.start(b.events, { total: b.total, onEnd: () => { btn && btn.classList.remove('stop'); listenBtn = null; } });
   listenBtn = btn; btn && btn.classList.add('stop');
 }
+//  [MUSIC-ENSEMBLE-1] 합주 듣기 — 첫 부분(반주까지) + 나머지 부분(제 악기 · 조금 작게)을 같은 칸 시각으로 한꺼번에 · 같은 단추를 다시 누르면 멈춤
+function listenEnsemble(g, btn) {
+  if (listenPlayer.playing && listenBtn === btn) { listenPlayer.stop(); btn.classList.remove('stop'); listenBtn = null; return; }
+  if (listenBtn) listenBtn.classList.remove('stop');
+  engine.ensure(); engine.setReverb(0.12);
+  const [lead, ...rest] = g.members, b = buildEvents(lead), all = withPartners(b, partnerEvents(lead, rest, b, { ownInst: true }));
+  listenPlayer.start(all.events, { total: all.total, onEnd: () => { btn.classList.remove('stop'); listenBtn = null; } });
+  listenBtn = btn; btn.classList.add('stop');
+}
+//  고르기 목록 '선생님 곡' 칸 — 합주 부분끼리 한 상자에(ensembleOrder 로 붙여 둠) · 상자 아래 줄에 '🎶 합주 듣기'
+function ensBoxes(rows, ss, all) {
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const g = groupOf(ss[i], all), n = g ? g.members.length : 0;
+    if (!g || !g.members.every((m, j) => ss[i + j] === m)) { out.push(rows[i]); continue; }
+    const play = h('button', { class: 'btn small ens-listen', title: '모든 부분을 한꺼번에 들어요', onclick: () => listenEnsemble(g, play) }, h('span', { class: 'a' }, '🎶 합주 듣기'), h('span', { class: 'b' }, '■ 멈추기'));
+    out.push(h('div', { class: 'ens-grp', 'data-ens': g.name }, ...rows.slice(i, i + n),
+      h('div', { class: 'ens-bar' }, h('span', {}, `🎶 ${n}부분 합주 — 한 부분을 연습할 때 '함께 연주'를 켜면 다른 부분이 같이 나와요`), play)));
+    i += n - 1;
+  }
+  return out;
+}
+//  시험용(?debug=1 일 때만) — 목록 듣기 Player 가 소리 장치에 넘긴 사건(읽기만)
+if (/[?&]debug=1/.test(location.search)) { const fired = []; tapFired(listenPlayer, fired, () => engine.now); window.__listen = { fired: () => fired.map(x => ({ ...x })), playing: () => listenPlayer.playing }; }
 
 // ── 첫 화면 ──
 function mountHome(root) {
@@ -186,14 +211,14 @@ function mountPick(root, mode) {
     list.replaceChildren(h('div', { class: 'empty' }, '불러오는 중…'));
     let songs = [];
     try {
-      if (tab === 'ts') songs = ts.map(s => ({ s, ref: s.id }));
+      if (tab === 'ts') songs = ensembleOrder(ts).map(s => ({ s, ref: s.id }));   // [MUSIC-ENSEMBLE-1] 합주 부분끼리 붙여서
       else if (tab === 'lib') songs = LIB.map(s => ({ s, ref: s.id }));
       else if (tab === 'mine') songs = (await store.listMySongs()).map(r => normalize(r)).map(s => ({ s, ref: ctx.refOf(s) }));
       else songs = (await store.listConcert()).filter(c => !badWords(c.t).length).map(c => ({ c, ref: `u.${c.sid}.${c.id}` }));
     } catch (e) { console.warn(e); }
     if (my !== drawSeq) return;   // 그사이 다른 칸을 눌렀으면 그 칸이 그린다
     if (!songs.length) { list.replaceChildren(h('div', { class: 'empty' }, tab === 'mine' ? '아직 지은 곡이 없어요.' : tab === 'class' ? '아직 음악회에 올라온 곡이 없어요.' : tab === 'ts' ? '선생님 곡이 아직 없어요.' : '')); return; }
-    list.replaceChildren(...songs.map(({ s, c, ref }) => {
+    const rowEls = songs.map(({ s, c, ref }) => {
       const name = s ? s.title : c.t;
       const sub = s ? (s.ts ? `${s.origin} · ${tagOf(s)}${s.memo ? ' · ' + s.memo : ''}` : (s.lib ? `${s.origin} · ` : '') + tagOf(s)) : `${c.n || '친구'} · ${tagOf({ beats: c.beats, sub: c.sub, bars: c.bars, scale: c.scale })}`;
       const lv = s && (s.lib || s.ts) ? h('span', { class: 'lv' }, s.practice ? '첫걸음' : '★'.repeat(s.level || 1)) : null;
@@ -206,8 +231,10 @@ function mountPick(root, mode) {
       if (s && !s.lib && !s.ts) acts.push(h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/' + ref) }, '고치기'));
       if (s && s.lib && forPlay && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, '저먼식으로는 불 수 없는 음'));
       if (s && s.ts && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, `${SYSTEMS[ctx.sys()] || ''}으로는 불 수 없는 음`));
-      return h('div', { class: 'song-row' }, dotOf(name, s?.notes[0]?.p), h('div', { class: 't' }, h('b', {}, name, lv), h('span', {}, sub)), h('div', { class: 'acts' }, ...acts));
-    }));
+      const grp = tab === 'ts' && s ? groupOf(s, ts) : null;   // [MUSIC-ENSEMBLE-1] '합주 · 2성부' 표
+      return h('div', { class: 'song-row', 'data-tk': s && s.ts ? s.tk : null }, dotOf(name, s?.notes[0]?.p), h('div', { class: 't' }, h('b', {}, name, lv, grp ? h('span', { class: 'ens-badge' }, `합주 · ${grp.members.length}성부`) : null), h('span', {}, sub)), h('div', { class: 'acts' }, ...acts));
+    });
+    list.replaceChildren(...(tab === 'ts' ? ensBoxes(rowEls, songs.map(x => x.s), ts) : rowEls));
   }
   if (!forPlay) draw();
   else {

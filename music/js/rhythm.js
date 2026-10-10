@@ -6,6 +6,7 @@ import { h, toast, lsGet, lsSet, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, pc } from './theory.js';
 import { buildEvents } from './song.js';
 import { engine, Player } from './audio.js';
+import { TOGETHER_KEY, partnersOf, pickPartners, partLabel, partnerEvents, withPartners, tapFired } from './ensemble.js';   // [MUSIC-ENSEMBLE-1] 합주 연습
 
 const KEYS = { 8: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon'], 6: ['KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL'], 4: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'] };
 const CAPS = { 8: ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'], 6: ['S', 'D', 'F', 'J', 'K', 'L'], 4: ['D', 'F', 'J', 'K'] };
@@ -28,6 +29,14 @@ const LANE8_P = [60, 62, 64, 65, 67, 69, 71, 72];
 const JUDGE = { perfect: { ko: '완벽!', w: 1, c: '#ffe48f' }, great: { ko: '좋아!', w: 0.7, c: '#8fd07d' }, good: { ko: '괜찮아', w: 0.4, c: '#7fc4f0' }, miss: { ko: '놓쳤어', w: 0, c: '#e5484d' } };
 const SPEEDS = [[300, '음표 느리게'], [420, '음표 보통'], [560, '음표 빠르게']];   // 떨어지는 빠르기 — 난이도 '보통'과 헷갈리지 않게 '음표'를 앞에
 
+//  [MUSIC-ENSEMBLE-1] 리듬 소리 사건 — 반주 + 가락 도와주기(작게) + 함께 연주(짝 부분 · 켰을 때만) · 악보(chart)는 song.notes 로만 짜니 점수와 상관없다
+//   짝 부분은 이 곡의 offset · stepDur 로 얹는다(빠르기 · 세기 박 그대로). start() 와 시험(ensemble.test)이 같이 쓴다
+export function rhythmEvents(song, { tempo = 1, guide = false, partners = [], together = false } = {}) {
+  const built = buildEvents(song, { scale: tempo, countIn: song.beats, melody: guide, harm: guide, lead: false });   // [MUSIC-ORCH-1] 가락 도움 = 치는 높이 그대로(lead: false) · 늘이기 없음
+  const events = built.events.map(e => e.track === 'melody' ? { ...e, vel: 0.35 } : e);
+  return withPartners({ ...built, events }, together ? partnerEvents(song, partners, built) : []);
+}
+
 //  assign = 선생님 과제일 때(app.js) { level, keys, tempo, live, send(res) → Promise<'ok'|'closed'|'fail'> } [ASSIGN-MUSIC-1]
 //   — 난이도 · 키 수 · 빠르기는 선생님 것(아이 기기 설정을 읽지도 쓰지도 않음) · 우리 반 최고 판 숨김(순위 없음) · 끝나면 결과를 선생님께
 export function mountRhythm(root, ctx, { song, key, assign = null }) {
@@ -40,6 +49,10 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
   const levelKey = () => (level === 'normal' ? key : key + '__' + level) + (lanes === LEVELS[level].lanes ? '' : '__' + lanes + 'k');
   let state = 'ready', raf = 0, t0 = 0, built = null, chart = [], stats = null, held = {}, fx = [], judgeShow = null, cheerT = -9;
   const player = new Player(engine);
+  //  [MUSIC-ENSEMBLE-1] 함께 연주 — 이 곡이 합주의 한 부분이면 준비 칸에 켬 · 끔(처음 = 켬 · 이 기기에 기억 · 과제 판에서도 · 점수와 상관없음)
+  let together = lsGet(TOGETHER_KEY, true) !== false, partners = [], pick = 'all', alive = true;
+  const activePartners = () => pickPartners(partners, pick);
+  const fired = [];   // 시험용(?debug=1) — Player 가 소리 장치에 넘긴 사건
   const cheer = new Image(); cheer.src = '../assets/monsters/m28.png';
   const notes = [...song.notes].sort((a, z) => a.s - z.s);
   const distinct = [...new Set(notes.map(n => n.p))].sort((a, z) => a - z);
@@ -253,8 +266,9 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
     pausedByClass = false;
     engine.ensure(); engine.setReverb(0.1);
     makeChart(); held = {}; fx = []; judgeShow = null;
-    built = buildEvents(song, { scale: effTempo(), countIn: song.beats, melody: guide, harm: guide, lead: false });   // [MUSIC-ORCH-1] 가락 도움 = 치는 높이 그대로(lead: false) · 늘이기 없음
-    t0 = player.start(built.events.map(e => e.track === 'melody' ? { ...e, vel: 0.35 } : e), { at: engine.now + READY_SEC + 0.1, total: built.total + 0.6, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작
+    built = rhythmEvents(song, { tempo: effTempo(), guide, partners: activePartners(), together });   // [MUSIC-ENSEMBLE-1] 반주 · 가락 도움 · 함께 연주
+    fired.length = 0;
+    t0 = player.start(built.events, { at: engine.now + READY_SEC + 0.1, total: built.total + 0.6, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 뒤에 반주가 시작
     state = 'play'; over.style.display = 'none';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     try { stage.focus(); } catch {}
@@ -298,6 +312,10 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
   function showReady() {
     over.style.display = 'grid';
     const guideBtn = h('button', { class: 'btn small' + (guide ? ' on' : ''), onclick: () => { guide = !guide; guideBtn.classList.toggle('on', guide); } }, '가락 도와주기');
+    //  [MUSIC-ENSEMBLE-1] 함께 연주 켬 · 끔(+ 부분이 셋 이상이면 고르기) — 누르면 준비 칸을 다시 그린다(안내 줄 · 고르기)
+    const ensBtn = partners.length ? h('button', { class: 'btn small ens-tog' + (together ? ' on' : ''), title: '같은 곡의 다른 부분이 같이 연주해요', onclick: () => { together = !together; lsSet(TOGETHER_KEY, together); showReady(); } }, '🎶 함께 연주') : null;
+    const ensSel = partners.length > 1 && together ? sel([['all', '함께: 모두'], ...partners.map(q => [q.tk, '함께: ' + q.part])], pick, v => { pick = v; showReady(); }) : null;
+    if (ensSel) { ensSel.classList.add('ens-sel'); ensSel.title = '같이 연주할 부분'; }
     over.replaceChildren(h('div', { class: 'p-card' },
       h('h2', {}, song.title || '곡'),
       h('p', { class: 'lv-line' }, `난이도 ${LEVELS[level].name} · ${lanes}키`, effTempo() !== 1 ? ` · 빠르기 ×${+effTempo().toFixed(2)}` : '', LEVELS[level].hide ? ' · 음표가 판정선 앞에서 사라져요' : ''),
@@ -308,7 +326,8 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
       A ? h('p', { class: 'r-asg-note' }, A.live ? '👩‍🏫 선생님과 수업 중 — 끝까지 치면 결과가 선생님께 가요. 여러 번 쳐도 돼요.' : '📝 선생님 과제 — 끝까지 치면 결과가 선생님께 가요. 여러 번 쳐도 가장 좋은 기록이 남아요.') : null,
       A && A.line && A.line() ? h('p', { class: 'muted small' }, A.line()) : null,
       pausedByClass ? h('p', { class: 'r-asg-note' }, '⏸ 선생님과 수업 때문에 치던 판이 멈췄어요 — ▶ 시작을 눌러 처음부터 다시 쳐요') : null,
-      h('div', { class: 'stars-row' }, guideBtn),
+      h('div', { class: 'stars-row' }, guideBtn, ensBtn, ensSel),
+      partners.length ? h('p', { class: 'muted small ens-line' }, together ? `🎶 ${partLabel(activePartners())} 소리도 같이 나와요 · 점수와는 상관없어요` : `🎶 '함께 연주'를 켜면 ${partLabel(partners)} 소리도 같이 나와요`) : null,
       h('button', { class: 'btn primary big', onclick: () => start() }, '▶ 시작'),
       h('p', { class: 'muted small' }, 'Esc = 그만')));
   }
@@ -332,5 +351,12 @@ export function mountRhythm(root, ctx, { song, key, assign = null }) {
   makeChart(); showReady(); size();
   cheer.onload = () => draw();
   if (/[?&]debug=1/.test(location.search)) window.__rhythm = { chart: () => chart, now, press, release, stats: () => stats, start, state: () => state, setLevel: v => { level = v; if (!keysPick) lanes = LEVELS[v].lanes; WIN = LEVELS[v].win; makeChart(); }, setKeys: n => { keysPick = n; lanes = n; makeChart(); }, layout: () => ({ lanes, six, key: levelKey() }) };   // 시험용(주소에 debug=1 일 때만)
-  return { pause() { if (state === 'play') { pausedByClass = true; stop(); } }, unmount() { player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp); ro.disconnect(); for (const c of chart) c.voice && c.voice.stop(); } };
+  //  [MUSIC-ENSEMBLE-1] 짝 부분 찾기 — 선생님 곡이고 합주로 묶일 때만(이미 읽어 둔 목록 · 못 읽으면 함께 연주 없이 그대로) · 시험용 손잡이(읽기만)
+  if (song.ts && ctx.teacherSongs) ctx.teacherSongs().then(list => { if (!alive) return; partners = partnersOf(song, list); if (partners.length && state === 'ready') showReady(); }).catch(() => {});
+  if (window.__rhythm && /[?&]debug=1/.test(location.search)) {
+    tapFired(player, fired, () => engine.now);
+    window.__rhythm.ens = { fired: () => fired.map(x => ({ ...x })), plan: () => (built ? built.events.filter(e => e.track === 'partner').map(e => ({ ...e })) : []),
+      built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0 } : null), together: () => together, partners: () => partners.map(q => q.tk), active: () => (together ? activePartners().map(q => q.tk) : []) };
+  }
+  return { pause() { if (state === 'play') { pausedByClass = true; stop(); } }, unmount() { alive = false; player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp); ro.disconnect(); for (const c of chart) c.voice && c.voice.stop(); } };
 }
