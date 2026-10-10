@@ -201,6 +201,7 @@ try {
     && chordEv.filter(e => e.s === 0).every(e => e.ch === 'I') && chordEv.filter(e => e.s === 8).every(e => e.ch === 'V') && fired.some(e => e.k === 'chordoff'), 'A9 베이스(0칸 도 · 8칸 솔 · 12칸 쉼) · 화음(0칸 도 · 8칸 솔 · 빈 칸에서 끝)');
   const late = L1.log.filter(e => e.k === 'step').length - fired.filter(e => e.k === 'step').length;
   ok(late >= 0 && late <= 2, 'A10 예약은 0.12초 앞까지만(아직 안 울린 칸 ' + late + '개)');
+  ok(L1.st.dance.bounce >= 3 && L1.st.dance.wiggle >= 2 && L1.st.dance.flash >= 20, 'A10b 춤 친구가 쿵에 통통 · 짝에 흔들 · 소리 나는 칸이 반짝', JSON.stringify(L1.st.dance));
   await S.shot('A_beat_playing');
   //  빠르기 · 스윙(울리는 중에 바꿔도 다음 칸부터)
   await S.ev(setRange('.bt-trans .bt-range:not(.sw)', 120));
@@ -341,6 +342,17 @@ try {
   await S.pressEl(`[...document.querySelectorAll('.bt-tab')].find(b => b.textContent === '우리 반')`);
   ok(await until(S, `[...document.querySelectorAll('.bt-tabbody .song-row')].some(r => r.textContent.includes('쿵짝 시험 비트') && r.textContent.includes('테스트 (나)'))`, 5000), 'A41 \'우리 반\' 목록에 내 비트(나)');
   await S.shot('A_beat_class');
+  //  빽빽한 비트(달리는 비트 · 빠르기 160)를 4초 — 메인 줄 긴 일(50ms 넘게) · 늦게 예약한 소리 · 한꺼번에 울리는 소리 수
+  await S.pressEl(`[...document.querySelectorAll('.bt-tab')].find(b => b.textContent === '시작 카드')`);
+  await S.pressEl(`document.querySelectorAll('.bt-pat')[3]`);
+  await S.pressEl(`[...document.querySelectorAll('.bt-card')].find(c => c.textContent.includes('달리는 비트'))`);
+  await until(S, `window.__beat.state().playing`, 3000);
+  await S.ev(setRange('.bt-trans .bt-range:not(.sw)', 160));
+  await S.ev(`window.__beat.clearLog(); window.__lt = []; window.__vmax = 0; window.__po = new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push(Math.round(e.duration)); }); window.__po.observe({ entryTypes: ['longtask'] }); window.__vt = setInterval(() => { window.__vmax = Math.max(window.__vmax, window.__beat.voices()); }, 50); 1`);
+  await sleep(4000);
+  const dn = await S.ev(`(() => { clearInterval(window.__vt); window.__po.disconnect(); const L = window.__beat.log(); return { lt: window.__lt, vmax: window.__vmax, n: L.filter(e => e.k === 'drum').length, late: L.filter(e => e.w > e.t + 1e-6).length, lead: Math.max(...L.filter(e => e.k === 'step').map(e => e.t - e.w)) }; })()`);
+  await S.key('Space', ' ', 32);
+  ok(dn.lt.length === 0 && dn.late === 0 && dn.n > 50 && dn.lead <= 0.121 && dn.vmax <= 40, `A45 빽빽한 비트 4초(북 ${dn.n}번 · 칙 16분) — 메인 줄 긴 일 0 · 늦게 예약 0 · 가장 앞선 예약 ${dn.lead.toFixed(3)}초 · 한꺼번에 울리는 소리 ${dn.vmax}개 이하`, JSON.stringify(dn));
   //  폰 너비
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 780, deviceScaleFactor: 1, mobile: true }, S.sessionId);
   await sleep(500);

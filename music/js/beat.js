@@ -34,6 +34,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   //  소리 · 재생
   let mixer = null, seq = null, timer = 0, raf = 0, playing = false, rec = false, counting = false, loopStart = 0, follow = true;
   let playPat = -1, playPos = -1, ph = -1, paint = null, warnedMute = 0, pv = null, mineList = [], classList = [], stopClass = null;
+  const dance = { bounce: 0, wiggle: 0, flash: 0 };   // 시험용 셈(춤 친구 · 칸 반짝)
   const V = { live: [], bass: null, chord: null, openHat: null };
   const vq = [], stepLog = [], fired = [], skipOnce = new Set();
   //  화면 조각
@@ -536,7 +537,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
   function cutAll(vs) { const now = engine.now; for (const x of vs.live) x.stop(now); vs.live = []; vs.bass = vs.chord = vs.openHat = null; }
   function emit(e) {
-    if (DEBUG) { fired.push({ k: e.kind, t: e.t, r: e.row, p: e.pat, s: e.step, b: e.bar, v: e.vel, n: e.n, ch: e.ch, c: !!e.count, crash: !!e.crash, fill: !!e.fill }); if (fired.length > 6000) fired.splice(0, 2000); }
+    if (DEBUG) { fired.push({ k: e.kind, t: e.t, w: engine.now, r: e.row, p: e.pat, s: e.step, b: e.bar, v: e.vel, n: e.n, ch: e.ch, c: !!e.count, crash: !!e.crash, fill: !!e.fill }); if (fired.length > 6000) fired.splice(0, 2000); }
     if (e.kind === 'step') { stepLog.push({ t: e.t, pat: e.pat, step: e.step, bar: e.bar }); if (stepLog.length > 64) stepLog.shift(); vq.push(e); return; }
     if (e.kind === 'drum' && skipOnce.size && skipOnce.delete(e.bar + '|' + e.step + '|' + e.row)) return;
     sound(e, mixer, V, beat.kit);
@@ -600,11 +601,11 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
   function flash(r, i) {
     const el = r === 'bass' ? bassCells[i] : r === 'chord' ? chordCells[Math.floor(i / C.slotLen(g()))] : cells[r] && cells[r][i];
-    if (el && el.animate) el.animate([{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 170, easing: 'ease-out' });
+    if (el && el.animate) { dance.flash++; el.animate([{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 170, easing: 'ease-out' }); }
     const d = labDots[r]; if (d && d.animate) d.animate([{ transform: 'scale(1.9)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.55 }], { duration: 220, easing: 'ease-out' });
   }
-  function bounce() { buddyImg.animate && buddyImg.animate([{ transform: 'translateY(0) scale(1,1)' }, { transform: 'translateY(5px) scale(1.12,.86)', offset: 0.25 }, { transform: 'translateY(-9px) scale(.94,1.08)', offset: 0.6 }, { transform: 'translateY(0) scale(1,1)' }], { duration: 300, easing: 'ease-out' }); }
-  function wiggle() { buddyImg.animate && buddyImg.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-12deg)' }, { transform: 'rotate(10deg)' }, { transform: 'rotate(0)' }], { duration: 260, easing: 'ease-out' }); }
+  function bounce() { dance.bounce++; buddyImg.animate && buddyImg.animate([{ transform: 'translateY(0) scale(1,1)' }, { transform: 'translateY(5px) scale(1.12,.86)', offset: 0.25 }, { transform: 'translateY(-9px) scale(.94,1.08)', offset: 0.6 }, { transform: 'translateY(0) scale(1,1)' }], { duration: 300, easing: 'ease-out' }); }
+  function wiggle() { dance.wiggle++; buddyImg.animate && buddyImg.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-12deg)' }, { transform: 'rotate(10deg)' }, { transform: 'rotate(0)' }], { duration: 260, easing: 'ease-out' }); }
   //  셈(3 · 2 · 1 → 하나 둘 셋 넷) — 칸판 위 덮개 [MUSIC-READY-1 과 같은 글자 · 같은 차례]
   function showCount() {
     const dpr = Math.min(2, devicePixelRatio || 1), W = gridBox.clientWidth, H = gridBox.clientHeight;
@@ -707,7 +708,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   // ── 시험용(?debug=1) — 읽기만(복사본) ──
   function exposeDebug() {
     window.__beat = {
-      state: () => ({ playing, rec, counting, cur: beat.cur, playPat, playPos, bpm: beat.bpm, swing: beat.swing, kit: beat.kit, grid: beat.grid, mode: beat.mode, arr: beat.arr.slice(), fill: beat.fill, click: beat.click, tab, readOnly, dirty, undo: undo.length, loopStart, id: beat.id, title: beat.title }),
+      state: () => ({ dance: { ...dance }, playing, rec, counting, cur: beat.cur, playPat, playPos, bpm: beat.bpm, swing: beat.swing, kit: beat.kit, grid: beat.grid, mode: beat.mode, arr: beat.arr.slice(), fill: beat.fill, click: beat.click, tab, readOnly, dirty, undo: undo.length, loopStart, id: beat.id, title: beat.title }),
       beat: () => JSON.parse(JSON.stringify(C.packBeat(beat))),
       log: () => fired.slice(),
       clearLog: () => { fired.length = 0; return true; },
@@ -716,7 +717,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       ready: k => kit.ready(k || beat.kit),
       prepare: k => kit.prepare(k),
       kitStats: () => kit.stats(),
-      voices: () => V.live.length,
+      voices: () => { const now = engine.now; return V.live.filter(x => x.end > now).length; },   // 지금 울리고 있는(끝나지 않은) 소리 수
     };
   }
 
