@@ -10,6 +10,7 @@ import { meterOf } from './theory.js';
 import { recorderOK } from './recorder.js';
 import { songBad, hidden, badWords } from './safety.js';
 import { normalizeBeat, usedCount } from './beatcore.js';   // [MUSIC-BEAT-1]
+import { ensembleReport } from './ensemble.js';   // [MUSIC-ENSEMBLE-1] 합주 묶음 알림
 
 // 선생님 화면 문 — 손님 · 이 창에서 통과('music.teacher') · 아니면 관리자 비밀번호(하위 앱 공통 common/teacher-gate.js) [SUBAPP-COMMON-1]
 function gate(ctx) { return teacherGate(ctx, 'music.teacher'); }
@@ -108,6 +109,11 @@ function teacherSongsCard(el, ctx) {
       .sort((a, z) => ((a.s ? a.s.order : 999) - (z.s ? z.s.order : 999)) || String(a.s ? a.s.title : a.raw.title || '').localeCompare(String(z.s ? z.s.title : z.raw.title || ''), 'ko'));
     if (!rows.length) { list.replaceChildren(h('div', { class: 'empty' }, '아직 넣은 곡이 없어요.')); return; }
     list.replaceChildren(...rows.map(row));
+    //  [MUSIC-ENSEMBLE-1] 같은 제목 · 다른 부분 = 합주(아이가 한 부분을 연습할 때 '함께 연주'로 다른 부분이 같이 나옴) · 못 묶이면 까닭(박 · 마디 · 빠르기가 다름 …)
+    const ens = ensembleReport(rows.map(r => r.s).filter(Boolean));
+    if (ens.length) list.append(h('div', { class: 'ts-ens' }, ...ens.map(g => g.why
+      ? h('div', { class: 'bad' }, `⚠ 합주로 못 묶음: ${g.name} — ${g.why}`)
+      : h('div', {}, `🎶 합주: ${g.name} — ${g.parts.join(' · ')} (아이가 한 부분을 연습할 때 다른 부분이 같이 나와요)`))));
   }
   function row({ raw, s, err }) {
     const name = s ? s.title : String(raw.title || raw.key || '곡');
