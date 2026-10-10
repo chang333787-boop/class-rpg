@@ -5,6 +5,8 @@
 //  소리 = beatkit.js(공용 엔진의 소리 장치 위 · audio.js 는 안 고침) · 모양 · 셈 · 되풀이 박자기 = beatcore.js(node 시험)
 //  저장 = classRPG_music/beats/<sid>/<id> · 우리 반 비트 모음 = beatclass/<sid>_<id>(제목이 고운 말일 때만) — store.js
 //  ?debug=1 이면 window.__beat(읽기만 · 시험용)
+//  [MUSIC-BEAT-MEL-1] 가락 줄(북 줄과 베이스 사이) — 가락 붓(도 ~ 높은 미 · 쉼 · 지우개)으로 칠하기 · 가락 악기 · 가락 주사위 · 메아리 ·
+//   손으로 치기의 가락 건반(Z X C V B N M ,) 녹음. 붓 상자는 베이스 · 가락 · 화음 셋 가운데 하나만(1366×610 에 한 줄로) — 칸을 누른 줄을 따라 바뀐다.
 import { h, toast, modal, lsGet, lsSet, READY_SEC, readyCount, clamp } from './util.js';
 import { engine } from './audio.js';
 import { colorOf } from './theory.js';
@@ -14,8 +16,10 @@ import { BeatKit, BeatMixer } from './beatkit.js';
 
 const kit = new BeatKit(engine);        // 구운 소리는 화면을 나갔다 와도 그대로
 const KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon'], CAPS = ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'];
+const MKEYS = ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma'], MCAPS = ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ','];   // 가락 건반 [MUSIC-BEAT-MEL-1]
 const BUDDIES = ['m23', 'm41', 'm27', 'm55', 'm29'];
-const ROW_COLOR = { kick: '#e5484d', snare: '#f2a93b', clap: '#f2c230', hatc: '#4cc9b0', hato: '#59b7e8', tom: '#a77bdb', shaker: '#8fd07d', cymbal: '#7fa7e6', bass: '#ff8ab3', chord: '#ffc766' };
+const ROW_COLOR = { kick: '#e5484d', snare: '#f2a93b', clap: '#f2c230', hatc: '#4cc9b0', hato: '#59b7e8', tom: '#a77bdb', shaker: '#8fd07d', cymbal: '#7fa7e6', mel: '#7ee8fa', bass: '#ff8ab3', chord: '#ffc766' };
+const PAL_TABS = [['bass', '베이스'], ['mel', '가락'], ['chord', '화음']];
 const CHORD_COLOR = { I: '#f2a93b', IV: '#8fd07d', V: '#59b7e8', vi: '#b48be6' };
 const PAT_COLOR = ['#f2a93b', '#4cc9b0', '#ff8ab3', '#b48be6'];
 const L = C.LETTERS;
@@ -30,15 +34,19 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   let tab = lsGet('music.beat.tab', 'start'); if (!TABS.some(([k]) => k === tab)) tab = 'start';
   let bassBrush = 0, chordBrush = 'I', ideaRow = 'kick', countPref = lsGet('music.beat.count', false) === true, tipIdx = 0, eucAt = 0, mixOpen = lsGet('music.beat.mix', false) === true;
   let buddyIdx = clamp(Number(lsGet('music.beat.buddy', 0)) | 0, 0, BUDDIES.length - 1);
+  //  [MUSIC-BEAT-MEL-1] 가락 붓 · 붓 상자(베이스 · 가락 · 화음 가운데 보이는 것) · 녹음할 곳(북 패드 · 가락 건반)
+  let melBrush = 0, palTab = lsGet('music.beat.pal', 'bass'), recTarget = 'drum';
+  if (!PAL_TABS.some(([k]) => k === palTab)) palTab = 'bass';
   const undo = [];
   //  소리 · 재생
   let mixer = null, seq = null, timer = 0, raf = 0, playing = false, rec = false, counting = false, loopStart = 0, follow = true;
   let playPat = -1, playPos = -1, ph = -1, paint = null, warnedMute = 0, pv = null, mineList = [], classList = [], stopClass = null;
   const dance = { bounce: 0, wiggle: 0, flash: 0 };   // 시험용 셈(춤 친구 · 칸 반짝)
-  const V = { live: [], bass: null, chord: null, openHat: null };
+  const V = { live: [], bass: null, chord: null, openHat: null, mel: null, melPrev: null };
   const vq = [], stepLog = [], fired = [], skipOnce = new Set();
+  const held = new Map();   // 누르고 있는 가락 건반: 음 번호 → { hd 소리, rec 녹음한 칸 }
   //  화면 조각
-  let cells = {}, labDots = {}, bassCells = [], chordCells = [];
+  let cells = {}, labDots = {}, bassCells = [], chordCells = [], melCells = [];
   const cur = () => beat.pats[beat.cur];
   const g = () => C.gridOf(beat.grid);
   const isSong = () => beat.mode === 'song' && beat.arr.length > 0;
@@ -175,6 +183,10 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     });
     more.push(h('button', { class: 'bt-morebtn mix' + (mixOpen ? ' on' : ''), title: '줄마다 소리 크기 막대', onclick: () => { mixOpen = !mixOpen; lsSet('music.beat.mix', mixOpen); renderGrid(); } }, mixOpen ? '🎚 소리 크기 접기' : '🎚 소리 크기'));
     kids.push(h('div', { class: 'bt-more' }, ...more));
+    //  가락 줄 [MUSIC-BEAT-MEL-1] — 북 줄과 베이스 사이(음 칩 높이 = 음 높이 · 이어지는 칸 꼬리 · 쉼)
+    kids.push(rowLabel('mel'));
+    melCells = [];
+    for (let i = 0; i < len; i++) { const c = h('button', { class: 'bt-mcell', 'data-k': 'm', 'data-i': i, 'aria-label': `가락 ${i + 1}칸` }); melCells.push(c); kids.push(c); }
     kids.push(rowLabel('bass'));
     bassCells = [];
     for (let i = 0; i < len; i++) { const c = h('button', { class: 'bt-bcell', 'data-k': 'b', 'data-i': i }); bassCells.push(c); kids.push(c); }
@@ -182,7 +194,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     chordCells = [];
     for (let k = 0; k < C.slotsOf(G); k++) { const c = h('button', { class: 'bt-cslot', 'data-k': 'c', 'data-i': k, style: { gridColumn: `span ${sl}` } }); chordCells.push(c); kids.push(c); }
     grid.replaceChildren(...kids);
-    renderBass(); renderChords();
+    renderMel(); renderBass(); renderChords();
     if (ph >= 0) { const i = ph; ph = -1; setPlayhead(i); }
   }
   function rowLabel(r) {
@@ -197,6 +209,21 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
   function mixChanged() { mixer && mixer.apply(beat.mix, beat.kit); markDirty(false); renderGrid(); }
   function updateCell(r, i) { const c = cells[r] && cells[r][i]; if (c) c.className = cellClass(r, i, cur().d[r][i]); }
+  //  가락 줄 [MUSIC-BEAT-MEL-1] — 베이스 줄과 같은 그림(음 여덟 높이 · 높은 음은 위 점 · 이어지는 칸 꼬리 · 쉼)
+  function renderMel() {
+    const p = cur(), G = g(), len = C.lenOf(G);
+    let ring = -1;
+    for (let i = 0; i < len; i++) {
+      const v = p.m[i], c = melCells[i]; if (!c) continue;
+      c.className = 'bt-mcell b' + (Math.floor(i / G.sub) % 2) + (i % G.sub === 0 ? ' beat' : '') + (i && i % (G.beats * G.sub) === 0 ? ' bar' : '') + (ph === i ? ' ph' : '');
+      if (v >= 0 && v <= C.M_TOP) {
+        ring = v;
+        c.replaceChildren(h('span', { class: 'chip', style: { '--y': (C.M_TOP - v) / C.M_TOP, background: colorOf(C.MEL[v].p) } }, C.melShort(v)));
+      } else if (v === C.B_REST) { ring = -1; c.replaceChildren(h('span', { class: 'rest' }, '쉼')); }
+      else if (ring >= 0) c.replaceChildren(h('span', { class: 'tail', style: { '--y': (C.M_TOP - ring) / C.M_TOP, background: colorOf(C.MEL[ring].p) } }));
+      else c.replaceChildren();
+    }
+  }
   //  베이스 줄 — 음 칩(높이에 따라 위아래) · 이어지는 칸은 가는 꼬리 · 쉼
   function renderBass() {
     const p = cur(), len = C.lenOf(g());
@@ -232,18 +259,33 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       c.replaceChildren(h('b', {}, C.CHORDS[ch].name), h('small', {}, ch === 'vi' ? '화음 · 단조' : '화음'), h('span', { class: 'marks', style: { '--m': sl } }, ...marks));
     });
   }
+  //  붓 상자 [MUSIC-BEAT-MEL-1] — 베이스 · 가락 · 화음 셋 가운데 하나만 보인다(한 줄에 다 넣으면 1366×610 에서 넘침) · 칸을 누른 줄을 따라 바뀐다
+  function setPalTab(k) { if (palTab === k || !PAL_TABS.some(([x]) => x === k)) return; palTab = k; lsSet('music.beat.pal', k); renderPal(); }
   function renderPal() {
     if (readOnly) { pal.style.display = 'none'; return; }
     pal.style.display = '';
-    const bb = [...C.BASS.map((x, i) => [i, i === 5 ? '높은 도' : x.n, colorOf(x.p + 24)]), [C.B_REST, '쉼', '#6b5a48'], ['erase', '지우개', '']];
-    const cb = [...C.CHORD_KEYS.map(k => [k, C.CHORDS[k].name + (k === 'vi' ? '(단조)' : ''), CHORD_COLOR[k]]), ['erase', '지우개', '']];
-    pal.replaceChildren(
-      h('div', { class: 'bt-palg' }, h('span', { class: 'lbl', title: '고른 음을 베이스 칸에 칠해요(같은 음을 다시 누르면 지워요)' }, '베이스 붓'),
-        ...bb.map(([v, t, col]) => h('button', { class: 'bt-brush' + (bassBrush === v ? ' on' : '') + (v === 'erase' ? ' er' : ''), style: col ? { '--c': col } : {}, onclick: () => { bassBrush = v; renderPal(); if (typeof v === 'number' && v <= 5) previewBass(v); } }, t))),
-      h('div', { class: 'bt-palg' }, h('span', { class: 'lbl', title: '고른 화음 카드를 화음 칸에 넣어요' }, '화음 카드'),
-        ...cb.map(([v, t, col]) => h('button', { class: 'bt-brush' + (chordBrush === v ? ' on' : '') + (v === 'erase' ? ' er' : ''), style: col ? { '--c': col } : {}, onclick: () => { chordBrush = v; renderPal(); if (v !== 'erase') previewChord(v); } }, t))),
-      h('div', { class: 'bt-palg' }, h('span', { class: 'lbl' }, '화음 치는 법'),
-        h('div', { class: 'seg' }, ...C.STYLE_KEYS.map(k => h('button', { class: cur().cs === k ? 'on' : '', onclick: () => { if (cur().cs === k) return; pushUndo(); cur().cs = k; markDirty(); renderChords(); renderPal(); } }, C.STYLES[k])))));
+    const brushBtn = (on, v, t, col, pick) => h('button', { class: 'bt-brush' + (on ? ' on' : '') + (v === 'erase' ? ' er' : ''), style: col ? { '--c': col } : {}, onclick: pick }, t);
+    const seg = h('div', { class: 'seg bt-palseg', title: '어느 줄을 칠할 붓인지 골라요' }, ...PAL_TABS.map(([k, t]) => h('button', { class: palTab === k ? 'on' : '', 'data-pal': k, onclick: () => setPalTab(k) }, t)));
+    let groups;
+    if (palTab === 'mel') {
+      const mb = [...C.MEL.map((x, i) => [i, x.n, colorOf(x.p)]), [C.B_REST, '쉼', '#6b5a48'], ['erase', '지우개', '']];
+      const leadSel = h('select', { class: 'bt-lead', title: '가락 악기 — 비트마다 하나', onchange: e => setLead(e.target.value) },
+        ...C.LEAD_KEYS.map(k => { const o = h('option', { value: k }, `${C.LEADS[k].em} ${C.LEADS[k].name}`); if (k === beat.lead) o.selected = true; return o; }));
+      groups = [h('div', { class: 'bt-palg' }, h('span', { class: 'lbl', title: '고른 음을 가락 칸에 칠해요(같은 음을 다시 누르면 지워요)' }, '가락 붓'),
+        ...mb.map(([v, t, col]) => brushBtn(melBrush === v, v, t, col, () => { melBrush = v; renderPal(); if (typeof v === 'number' && v <= C.M_TOP) previewMel(v); }))),
+        h('label', { class: 'bt-palg' }, h('span', { class: 'lbl' }, '가락 악기'), leadSel)];
+    } else if (palTab === 'chord') {
+      const cb = [...C.CHORD_KEYS.map(k => [k, C.CHORDS[k].name + (k === 'vi' ? '(단조)' : ''), CHORD_COLOR[k]]), ['erase', '지우개', '']];
+      groups = [h('div', { class: 'bt-palg' }, h('span', { class: 'lbl', title: '고른 화음 카드를 화음 칸에 넣어요' }, '화음 카드'),
+        ...cb.map(([v, t, col]) => brushBtn(chordBrush === v, v, t, col, () => { chordBrush = v; renderPal(); if (v !== 'erase') previewChord(v); }))),
+        h('div', { class: 'bt-palg' }, h('span', { class: 'lbl' }, '화음 치는 법'),
+          h('div', { class: 'seg' }, ...C.STYLE_KEYS.map(k => h('button', { class: cur().cs === k ? 'on' : '', onclick: () => { if (cur().cs === k) return; pushUndo(); cur().cs = k; markDirty(); renderChords(); renderPal(); } }, C.STYLES[k]))))];
+    } else {
+      const bb = [...C.BASS.map((x, i) => [i, i === 5 ? '높은 도' : x.n, colorOf(x.p + 24)]), [C.B_REST, '쉼', '#6b5a48'], ['erase', '지우개', '']];
+      groups = [h('div', { class: 'bt-palg' }, h('span', { class: 'lbl', title: '고른 음을 베이스 칸에 칠해요(같은 음을 다시 누르면 지워요)' }, '베이스 붓'),
+        ...bb.map(([v, t, col]) => brushBtn(bassBrush === v, v, t, col, () => { bassBrush = v; renderPal(); if (typeof v === 'number' && v <= 5) previewBass(v); })))];
+    }
+    pal.replaceChildren(seg, ...groups);
   }
   function renderTip() { const list = C.tipsFor(beat); tipText.textContent = C.TIPS[list[tipIdx % list.length]] || ''; }
   let tipTimer = 0, sideTimer = 0;
@@ -265,10 +307,10 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     tabBody.replaceChildren(...({ start: sideStart, idea: sideIdea, pad: sidePad, mine: sideMine, class: sideClass }[tab] || sideStart)());
   }
   function sideStart() {
-    return [h('p', { class: 'bt-help' }, '카드를 누르면 지금 패턴(', h('b', {}, L[beat.cur]), ')에 북 · 베이스 · 화음이 들어가요. 그다음 칸을 바꿔 내 비트로!'),
+    return [h('p', { class: 'bt-help' }, '카드를 누르면 지금 패턴(', h('b', {}, L[beat.cur]), ')에 북 · 가락 · 베이스 · 화음이 들어가요. 그다음 칸을 바꿔 내 비트로!'),
       h('div', { class: 'bt-cards' }, ...C.STARTERS.map(st => h('button', { class: 'bt-card', onclick: () => useStarter(st.id) },
         h('span', { class: 'em' }, st.em), h('b', {}, st.name), h('small', {}, st.desc),
-        h('i', {}, `${C.KITS[st.kit].name} · 빠르기 ${st.bpm}${st.swing ? ` · 통통 ${st.swing}%` : ''}${st.grid !== '16' ? ` · ${C.GRIDS[st.grid].name}` : ''}`))))];
+        h('i', {}, `${C.KITS[st.kit].name}${st.m ? ` · ${C.LEADS[C.leadOf(st.lead)].name} 가락` : ''} · 빠르기 ${st.bpm}${st.swing ? ` · 통통 ${st.swing}%` : ''}${st.grid !== '16' ? ` · ${C.GRIDS[st.grid].name}` : ''}`))))];
   }
   function sideIdea() {
     const G = g(), len = C.lenOf(G), rows = visibleRows();
@@ -278,6 +320,12 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       h('h4', {}, '🎲 주사위'),
       h('button', { class: 'btn primary bt-wide', onclick: () => rollDice() }, '🎲 북 새로 만들기'),
       h('p', { class: 'bt-help' }, '아무렇게나가 아니라 규칙 안에서: 첫 박 쿵 · 2·4박 짝 · 칙은 고르게. 마음에 안 들면 ↶ 되돌리기.'),
+      //  [MUSIC-BEAT-MEL-1] 가락 주사위 · 메아리
+      h('h4', {}, '🎵 가락 만들기'),
+      h('button', { class: 'btn bt-wide bt-meldice', onclick: () => rollMel() }, '🎲 가락 주사위'),
+      h('p', { class: 'bt-help' }, '짧은 가락을 두 번 반복하고 끝만 살짝 바꾸면 귀에 쏙 들어와요. 첫 음은 그 박 화음의 음에서 시작해요.'),
+      h('div', { class: 'bt-rot' }, h('button', { class: 'btn small', 'data-echo': '1', onclick: () => echo(1) }, '메아리 ⤴ 한 칸 위로'), h('button', { class: 'btn small', 'data-echo': '-1', onclick: () => echo(-1) }, '메아리 ⤵ 한 칸 아래로')),
+      h('p', { class: 'bt-help' }, '메아리 = 앞 절반 가락을 뒤 절반에서 한 칸 높게(낮게) 따라 불러요 — 묻고 대답하는 느낌.'),
       h('h4', {}, '➗ 고르게 나누기'),
       h('div', { class: 'bt-chips' }, ...rows.map(r => h('button', { class: 'bt-chip' + (ideaRow === r ? ' on' : ''), style: { '--c': ROW_COLOR[r] }, onclick: () => { ideaRow = r; renderSide(); } }, C.rowName(beat.kit, r)))),
       h('div', { class: 'bt-euc' }, h('button', { class: 'btn small', onclick: () => setEuclid(n - 1) }, '−'), h('b', {}, `${n}번`), h('button', { class: 'btn small', onclick: () => setEuclid(n + 1) }, '+')),
@@ -294,13 +342,22 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     ];
   }
   function sidePad() {
+    //  가락 건반 [MUSIC-BEAT-MEL-1] — 누르는 동안 울리고(신스 · 피아노 · 플루트 · 대금) 떼면 멈춘다 · 녹음할 곳이 '가락'이면 가장 가까운 칸에 들어감
+    const melKey = (n) => h('button', { class: 'bt-mkey', 'data-n': n, style: { '--c': colorOf(C.MEL[n].p) },
+      onpointerdown: e => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} melHit(n); },
+      onpointerup: () => melRelease(n), onpointercancel: () => melRelease(n), onlostpointercapture: () => melRelease(n) },
+      h('kbd', {}, MCAPS[n]), h('b', {}, C.melShort(n)));
     return [
       h('div', { class: 'bt-pads' }, ...C.ROWS.map((r, k) => h('button', { class: 'bt-pad', 'data-r': r, style: { '--c': ROW_COLOR[r] }, onpointerdown: e => { e.preventDefault(); padHit(r); } },
         h('kbd', {}, CAPS[k]), h('b', {}, C.rowName(beat.kit, r))))),
-      readOnly ? null : h('button', { class: 'btn bt-wide bt-rec2' + (rec ? ' on' : ''), onclick: () => toggleRec() }, rec ? '■ 녹음 그만' : '● 녹음 시작'),
-      h('p', { class: 'bt-help' }, readOnly ? '패드를 눌러 친구 비트에 맞춰 같이 쳐 봐요(넣지는 않아요).'
-        : '녹음을 켜면 3 · 2 · 1 다음 한 마디를 세고 시작해요. 친 소리는 가장 가까운 칸에 들어가요 — 반복하니까 여러 바퀴 겹쳐 쳐도 돼요.'),
-      h('p', { class: 'bt-help' }, '글쇠: A S D F J K L ; = 위 패드 차례 · ', readOnly ? '' : 'R = 녹음 · ', '스페이스 = ▶ / ■'),
+      h('h4', {}, `🎵 가락 건반 · ${C.LEADS[C.leadOf(beat.lead)].name}`),
+      h('div', { class: 'bt-mkeys' }, ...C.MEL.map((_, n) => melKey(n))),
+      readOnly ? null : h('div', { class: 'bt-rectg' }, h('span', { class: 'lbl' }, '녹음할 곳'),
+        h('div', { class: 'seg' }, ...[['drum', '🥁 북 패드'], ['mel', '🎵 가락 건반']].map(([k, t]) => h('button', { class: recTarget === k ? 'on' : '', 'data-rt': k, onclick: () => { recTarget = k; renderSide(); } }, t)))),
+      readOnly ? null : h('button', { class: 'btn bt-wide bt-rec2' + (rec ? ' on' : ''), onclick: () => toggleRec() }, rec ? '■ 녹음 그만' : `● 녹음 시작 (${recTarget === 'mel' ? '가락' : '북'})`),
+      h('p', { class: 'bt-help' }, readOnly ? '패드 · 건반을 눌러 친구 비트에 맞춰 같이 쳐 봐요(넣지는 않아요).'
+        : '녹음을 켜면 3 · 2 · 1 다음 한 마디를 세고 시작해요. 친 소리는 가장 가까운 칸에 들어가요 — 반복하니까 여러 바퀴 겹쳐 쳐도 돼요. 가락은 길게 누르면 길게, 짧게 누르면 짧게 들어가요.'),
+      h('p', { class: 'bt-help' }, '글쇠: A S D F J K L ; = 북 패드 · Z X C V B N M , = 가락 건반 · ', readOnly ? '' : 'R = 녹음 · ', '스페이스 = ▶ / ■'),
       readOnly ? null : h('p', { class: 'bt-help' }, '↶ 되돌리기 = 방금 녹음한 한 바퀴를 한 번에 지우기'),
     ];
   }
@@ -341,7 +398,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function setRef(r) { if (ctx.replaceBeatRef) ctx.replaceBeatRef(r); else history.replaceState(null, '', '#/beat' + (r ? '/' + r : '')); }
 
   // ── 고치기 ──
-  function snapshot() { const p = C.packBeat(beat); return JSON.stringify({ grid: p.grid, pats: p.pats, arr: p.arr, bpm: p.bpm, swing: p.swing, kit: p.kit, show: p.show, fill: p.fill, mode: p.mode }); }
+  function snapshot() { const p = C.packBeat(beat); return JSON.stringify({ grid: p.grid, pats: p.pats, arr: p.arr, bpm: p.bpm, swing: p.swing, kit: p.kit, lead: p.lead, show: p.show, fill: p.fill, mode: p.mode }); }
   function pushUndo() { if (readOnly) return; undo.push(snapshot()); if (undo.length > 40) undo.shift(); undoBtn.disabled = false; }
   function doUndo() {
     if (readOnly || !undo.length) { if (!readOnly) toast('되돌릴 것이 없어요'); return; }
@@ -354,20 +411,24 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function setBeat(nb) { beat = nb; kit.prepare(beat.kit).then(() => alive && renderGrid()); mixer && mixer.apply(beat.mix, beat.kit); markDirty(); renderAll(); }
   function setDrum(r, i, v) { cur().d[r][i] = v; updateCell(r, i); markDirty(); }
   function setBass(i, v) { cur().b[i] = v; renderBass(); markDirty(); }
+  function setMel(i, v) { cur().m[i] = v; renderMel(); markDirty(); }   // [MUSIC-BEAT-MEL-1]
   function setChord(k, v) { cur().c[k] = v; renderChords(); markDirty(); }
   function roToast() { toast('친구 비트는 들어 보기만 해요 — \'내 비트 만들기\'에서 만들어요'); }
   function cellValue(el) {
     const k = el.dataset.k, i = +el.dataset.i, p = cur();
     if (k === 'd') { const v = p.d[el.dataset.r][i]; return v === 0 ? 1 : v === 1 ? 2 : 0; }
     if (k === 'b') return bassBrush === 'erase' || p.b[i] === bassBrush ? C.B_EMPTY : bassBrush;
+    if (k === 'm') return melBrush === 'erase' || p.m[i] === melBrush ? C.B_EMPTY : melBrush;
     return chordBrush === 'erase' || p.c[i] === chordBrush ? null : chordBrush;
   }
   function applyCell(el, v) {
     const k = el.dataset.k, i = +el.dataset.i;
     if (k === 'd') { setDrum(el.dataset.r, i, v); if (v && !playing) previewDrum(el.dataset.r, v); }
     else if (k === 'b') { setBass(i, v); if (v >= 0 && v <= 5 && !playing) previewBass(v); }
+    else if (k === 'm') { setMel(i, v); if (v >= 0 && v <= C.M_TOP && !playing) previewMel(v); }
     else { setChord(i, v); if (v && !playing) previewChord(v); }
   }
+  const PAL_OF = { b: 'bass', m: 'mel', c: 'chord' };            // 칸을 누른 줄의 붓 상자를 보여 준다
   grid.addEventListener('pointerdown', e => {
     const el = e.target.closest('[data-k]'); if (!el) return;
     e.preventDefault();
@@ -376,6 +437,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     pushUndo();
     const v = cellValue(el);
     applyCell(el, v);
+    if (PAL_OF[el.dataset.k]) setPalTab(PAL_OF[el.dataset.k]);
     paint = { k: el.dataset.k, r: el.dataset.r, v, last: el };
     try { grid.setPointerCapture(e.pointerId); } catch (err) {}
   });
@@ -384,7 +446,8 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const hit = document.elementFromPoint(e.clientX, e.clientY), el = hit && hit.closest ? hit.closest('[data-k]') : null;
     if (!el || el === paint.last || el.dataset.k !== paint.k || (paint.k === 'd' && el.dataset.r !== paint.r)) return;
     paint.last = el;
-    if (paint.k === 'd') setDrum(paint.r, +el.dataset.i, paint.v); else if (paint.k === 'b') setBass(+el.dataset.i, paint.v); else setChord(+el.dataset.i, paint.v);
+    const i = +el.dataset.i;
+    if (paint.k === 'd') setDrum(paint.r, i, paint.v); else if (paint.k === 'b') setBass(i, paint.v); else if (paint.k === 'm') setMel(i, paint.v); else setChord(i, paint.v);
   });
   const endPaint = () => { paint = null; };
   grid.addEventListener('pointerup', endPaint); grid.addEventListener('pointercancel', endPaint);
@@ -394,6 +457,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const el = e.target.closest('[data-k]'); if (!el) return;
     if (readOnly) { roToast(); return; }
     pushUndo(); applyCell(el, cellValue(el));
+    if (PAL_OF[el.dataset.k]) setPalTab(PAL_OF[el.dataset.k]);
   });
   function selectPattern(i) {
     if (i === beat.cur) return;
@@ -410,10 +474,38 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function setSwing(v) { beat.swing = clamp(Math.round(v), 0, C.SWING_MAX); markDirty(false); renderTransport(); clearTimeout(tipTimer); tipTimer = setTimeout(renderTip, 350); }
   function setKit(k) {
     if (!C.KIT_KEYS.includes(k) || k === beat.kit) return;
+    //  [MUSIC-BEAT-MEL-1] 가락 악기를 고른 적이 없으면(그 묶음의 처음 악기 그대로면) 새 묶음의 처음 악기로 같이 바꾼다 — 고른 악기는 그대로
+    if (beat.lead === C.LEAD_DEF[beat.kit]) beat.lead = C.LEAD_DEF[k];
     beat.kit = k; markDirty(false); mixer && mixer.apply(beat.mix, k);
     kit.prepare(k).then(() => alive && renderGrid());
-    renderGrid(); renderTip(); if (tab === 'pad' || tab === 'idea') renderSide();
+    renderGrid(); renderPal(); renderTip(); if (tab === 'pad' || tab === 'idea') renderSide();
     if (!playing) previewDrum('kick', 2);
+  }
+  //  가락 악기 [MUSIC-BEAT-MEL-1] — 바꾸면 다음 음부터(울리는 중이어도) · 멈춰 있으면 지금 붓 음으로 한 번 들려줌
+  function setLead(k) {
+    if (readOnly || !C.LEAD_KEYS.includes(k) || k === beat.lead) return;
+    beat.lead = k; markDirty(false);
+    renderPal(); if (tab === 'pad') renderSide();
+    if (!playing) previewMel(typeof melBrush === 'number' && melBrush <= C.M_TOP ? melBrush : 2);
+  }
+  //  가락 주사위 — 지금 패턴의 화음을 보고 한 마디 가락(짧은 가락 → 한 번 더 → 끝만 바꿔 길게)
+  function rollMel() {
+    if (readOnly) return;
+    pushUndo();
+    cur().m = C.melDice(g(), cur().c);
+    markDirty(); renderMel(); setPalTab('mel');
+    if (!playing) play({ count: false });
+  }
+  //  메아리 — 앞 절반 가락을 뒤 절반에 한 칸 위(아래)로
+  function echo(dir) {
+    if (readOnly) return;
+    const r = C.echoMel(cur().m, g(), dir);
+    if (!r.notes) { toast('앞 절반에 가락이 없어요 — 먼저 가락 칸을 칠하거나 🎲 가락 주사위를 눌러요', 3200); return; }
+    pushUndo();
+    cur().m = r.m;
+    markDirty(); renderMel(); setPalTab('mel');
+    toast(r.clamped ? `메아리를 넣었어요 — 가장 ${dir > 0 ? '높은' : '낮은'} 음은 더 갈 수 없어서 그대로 두었어요` : `메아리를 넣었어요 — 뒤 절반이 한 칸 ${dir > 0 ? '위로' : '아래로'} 따라 해요`, 3000);
+    if (!playing) play({ count: false });
   }
   function copyDialog() {
     const src = beat.cur;
@@ -426,7 +518,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   }
   function clearDialog() {
     if (C.patternEmpty(cur())) { toast('이미 비어 있어요'); return; }
-    modal(`패턴 ${L[beat.cur]} 를 지울까요?`, '북 · 베이스 · 화음 칸을 모두 비워요. ↶ 되돌리기로 돌아올 수 있어요.', [{ label: '그만두기' },
+    modal(`패턴 ${L[beat.cur]} 를 지울까요?`, '북 · 가락 · 베이스 · 화음 칸을 모두 비워요. ↶ 되돌리기로 돌아올 수 있어요.', [{ label: '그만두기' },
       { label: '지우기', primary: true, onclick: c => { c(); pushUndo(); beat.pats[beat.cur] = C.emptyPattern(g()); markDirty(); renderAll(); } }]);
   }
   function useStarter(id) {
@@ -531,26 +623,34 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function track(hd) { if (!hd) return; V.live.push(hd); if (V.live.length > 48) { const now = engine.now; V.live = V.live.filter(x => x.end > now); } }
   function previewDrum(r, v = 1) { ensureAudio(); track(kit.hit(beat.kit, r, engine.now, v === 2 ? 1 : 0.62, mixer.ch[r])); }
   function previewBass(n) { ensureAudio(); track(kit.bass(beat.kit, C.BASS[n].p, engine.now, 0.32, 0.9, mixer.ch.bass)); }
+  function previewMel(n) { ensureAudio(); track(kit.lead(beat.lead, beat.kit, C.MEL[n].p, engine.now, 0.36, 0.9, mixer.ch.mel)); }   // [MUSIC-BEAT-MEL-1]
   function previewChord(ch) { ensureAudio(); track(kit.chord(beat.kit, C.CHORDS[ch].notes, engine.now, 0.6, 0.75, mixer.ch.chord, 'long')); }
   //  사건 → 소리(재생 · 듣기 공용) — 열린 칙은 닫힌 칙이 오면 멈춤(드럼 세트처럼 · 우리 장단의 꽹과리 · 징은 그대로) · 베이스 · 화음은 한 번에 하나
-  function sound(e, mx, vs, kitId) {
+  //   [MUSIC-BEAT-MEL-1] 가락도 한 번에 하나(다음 음 · 쉼에서 앞 음을 끊음) — 두드리거나 뜯는 악기만 앞 음을 하나 더 울리게 둔다(쉼에서는 모두 멈춤)
+  function sound(e, mx, vs, kitId, leadId) {
     if (!mx) return;
     if (e.kind === 'drum') {
       if (kitId !== 'kor' && (e.row === 'hatc' || e.row === 'hato') && vs.openHat && vs.openHat.t < e.t - 0.001) { vs.openHat.h.stop(e.t); vs.openHat = null; }
       const hd = kit.hit(kitId, e.row, e.t, e.crash ? 0.75 : e.vel === 2 ? 1 : 0.62, mx.ch[e.row]);
       if (hd) { vs.live.push(hd); if (e.row === 'hato' && kitId !== 'kor') vs.openHat = { h: hd, t: e.t }; }
-    } else if (e.kind === 'bass') { if (vs.bass) vs.bass.stop(e.t); vs.bass = kit.bass(kitId, C.BASS[e.n].p, e.t, e.d, 0.9, mx.ch.bass); vs.bass && vs.live.push(vs.bass); }
+    } else if (e.kind === 'mel') {
+      if (C.isRing(leadId)) { if (vs.melPrev) vs.melPrev.stop(e.t); vs.melPrev = vs.mel; } else if (vs.mel) vs.mel.stop(e.t);
+      vs.mel = kit.lead(leadId, kitId, C.MEL[e.n].p, e.t, e.d, 0.9, mx.ch.mel); vs.mel && vs.live.push(vs.mel);
+    } else if (e.kind === 'meloff') { for (const k of ['mel', 'melPrev']) if (vs[k]) { vs[k].stop(e.t); vs[k] = null; } }
+    else if (e.kind === 'bass') { if (vs.bass) vs.bass.stop(e.t); vs.bass = kit.bass(kitId, C.BASS[e.n].p, e.t, e.d, 0.9, mx.ch.bass); vs.bass && vs.live.push(vs.bass); }
     else if (e.kind === 'bassoff') { if (vs.bass) { vs.bass.stop(e.t); vs.bass = null; } }
     else if (e.kind === 'chord') { if (vs.chord) vs.chord.stop(e.t); vs.chord = kit.chord(kitId, C.CHORDS[e.ch].notes, e.t, e.d, e.vel, mx.ch.chord, e.style); vs.chord && vs.live.push(vs.chord); }
     else if (e.kind === 'chordoff') { if (vs.chord) { vs.chord.stop(e.t); vs.chord = null; } }
     else if (e.kind === 'click') engine.click(e.t, e.accent, mx.master);
   }
-  function cutAll(vs) { const now = engine.now; for (const x of vs.live) x.stop(now); vs.live = []; vs.bass = vs.chord = vs.openHat = null; }
+  function cutAll(vs) { const now = engine.now; for (const x of vs.live) x.stop(now); vs.live = []; vs.bass = vs.chord = vs.openHat = vs.mel = vs.melPrev = null; }
   function emit(e) {
-    if (DEBUG) { fired.push({ k: e.kind, t: e.t, w: engine.now, r: e.row, p: e.pat, s: e.step, b: e.bar, v: e.vel, n: e.n, ch: e.ch, c: !!e.count, crash: !!e.crash, fill: !!e.fill }); if (fired.length > 6000) fired.splice(0, 2000); }
+    if (DEBUG) { fired.push({ k: e.kind, t: e.t, w: engine.now, r: e.row, p: e.pat, s: e.step, b: e.bar, v: e.vel, n: e.n, d: e.d, L: e.kind === 'mel' ? beat.lead : undefined, ch: e.ch, c: !!e.count, crash: !!e.crash, fill: !!e.fill }); if (fired.length > 6000) fired.splice(0, 2000); }
     if (e.kind === 'step') { stepLog.push({ t: e.t, pat: e.pat, step: e.step, bar: e.bar }); if (stepLog.length > 64) stepLog.shift(); vq.push(e); return; }
     if (e.kind === 'drum' && skipOnce.size && skipOnce.delete(e.bar + '|' + e.step + '|' + e.row)) return;
-    sound(e, mixer, V, beat.kit);
+    //  손으로 넣은 가락(아직 예약 안 한 칸) — 이번엔 손으로 친 소리만: 앞 음만 끊고 새로 치지 않는다 [MUSIC-BEAT-MEL-1]
+    if (e.kind === 'mel' && skipOnce.size && skipOnce.delete(e.bar + '|' + e.step + '|mel')) { sound({ kind: 'meloff', t: e.t }, mixer, V, beat.kit, beat.lead); return; }
+    sound(e, mixer, V, beat.kit, beat.lead);
   }
   async function play({ count = countPref, recording = false } = {}) {
     if (playing || !alive) return;
@@ -574,7 +674,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (!playing && !seq) return;
     if (seq) seq.stop();
     clearInterval(timer); timer = 0; seq = null; playing = false; rec = false; counting = false; playPat = -1; playPos = -1;
-    cutAll(V); vq.length = 0; skipOnce.clear(); hideCount(); setPlayhead(-1);
+    cutAll(V); vq.length = 0; skipOnce.clear(); held.clear(); hideCount(); setPlayhead(-1);
     if (!built) return;
     renderTransport(); renderPats(); if (tab === 'pad') renderSide();
   }
@@ -599,6 +699,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   function colCells(i) {
     if (i < 0) return [];
     const out = []; for (const r in cells) cells[r][i] && out.push(cells[r][i]);
+    melCells[i] && out.push(melCells[i]);
     bassCells[i] && out.push(bassCells[i]);
     const k = Math.floor(i / C.slotLen(g())); chordCells[k] && out.push(chordCells[k]);
     return out;
@@ -610,7 +711,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     for (const c of colCells(i)) c.classList.add('ph');
   }
   function flash(r, i) {
-    const el = r === 'bass' ? bassCells[i] : r === 'chord' ? chordCells[Math.floor(i / C.slotLen(g()))] : cells[r] && cells[r][i];
+    const el = r === 'bass' ? bassCells[i] : r === 'mel' ? melCells[i] : r === 'chord' ? chordCells[Math.floor(i / C.slotLen(g()))] : cells[r] && cells[r][i];
     if (el && el.animate) { dance.flash++; el.animate([{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 170, easing: 'ease-out' }); }
     const d = labDots[r]; if (d && d.animate) d.animate([{ transform: 'scale(1.9)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.55 }], { duration: 220, easing: 'ease-out' });
   }
@@ -633,8 +734,18 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (readOnly) return;
     if (rec) { rec = false; renderTransport(); if (tab === 'pad') renderSide(); toast('녹음을 멈췄어요 — 비트는 계속 돌아요'); return; }
     pushUndo();
+    if (recTarget === 'mel') toast('가락 녹음 — 가락 건반(Z X C V B N M ,)을 쳐요. 길게 누르면 길게 들어가요', 3200);   // [MUSIC-BEAT-MEL-1]
     if (!playing) play({ count: true, recording: true });
     else { rec = true; renderTransport(); if (tab === 'pad') renderSide(); }
+  }
+  //  친 시각 T → 가장 가까운 칸(예약해 둔 칸 + 아직 예약 안 한 다음 칸) — 셈하는 동안 친 것 · 너무 먼 것은 null
+  function recSlot(T) {
+    const half = C.stepDur(beat.bpm, g()) / 2;
+    if (T < loopStart - half) return null;                              // 셈하는 동안 친 것은 넣지 않는다
+    const cands = stepLog.slice(-24), nx = seq.peek();
+    if (nx) cands.push({ ...nx, bar: seq.bar, next: true });
+    const best = C.nearestOf(T, cands);
+    return !best || Math.abs(best.t - T) > half * 2.2 ? null : best;
   }
   function padHit(r) {
     ensureAudio();
@@ -645,13 +756,8 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     const pad = tabBody.querySelector(`.bt-pad[data-r="${r}"]`); pad && pad.animate && pad.animate([{ transform: 'scale(.9)', filter: 'brightness(1.6)' }, { transform: 'scale(1)', filter: 'none' }], { duration: 160 });
     flashLabel(r);
     if (!mixer.audible(beat.mix, r) && Date.now() - warnedMute > 4000) { warnedMute = Date.now(); toast('그 줄은 음소거(M)나 혼자 듣기(S) 때문에 안 들려요'); }
-    if (!rec || !playing || readOnly || !seq) return;
-    const T = now - outLat(), half = C.stepDur(beat.bpm, g()) / 2;
-    if (T < loopStart - half) return;                                   // 셈하는 동안 친 것은 넣지 않는다
-    const cands = stepLog.slice(-24), nx = seq.peek();
-    if (nx) cands.push({ ...nx, bar: seq.bar, next: true });
-    const best = C.nearestOf(T, cands);
-    if (!best || Math.abs(best.t - T) > half * 2.2) return;
+    if (!rec || !playing || readOnly || !seq || recTarget !== 'drum') return;   // 녹음할 곳이 가락이면 북은 치기만
+    const best = recSlot(now - outLat()); if (!best) return;
     const p = beat.pats[best.pat]; if (!p || !p.d[r] || best.step >= p.d[r].length) return;
     if (!p.d[r][best.step]) p.d[r][best.step] = 1;
     if (best.next) skipOnce.add(best.bar + '|' + best.step + '|' + r);   // 아직 예약 안 한 칸 — 이번엔 손으로 친 소리만(두 번 울리지 않게)
@@ -660,6 +766,46 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     markDirty();
   }
   function flashLabel(r) { const d = labDots[r]; d && d.animate && d.animate([{ transform: 'scale(1.9)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.55 }], { duration: 220 }); }
+  //  가락 건반 [MUSIC-BEAT-MEL-1] — 누르면 울리고(한 줄 가락: 누르고 있던 다른 건반은 멈춤 · 두드리는 악기는 그대로 울림) ·
+  //   녹음 중 + 녹음할 곳 '가락' 이면 가장 가까운 칸에 그 음(있던 음은 바꿈) · 아직 예약 안 한 칸이면 이번엔 손으로 친 소리만(두 번 울리지 않게)
+  function melHit(n) {
+    if (!(n >= 0 && n <= C.M_TOP)) return;
+    ensureAudio();
+    const now = engine.now, ring = C.isRing(beat.lead);
+    if (!ring) for (const [k, x] of held) if (k !== n && x.hd) { x.hd.stop(now); x.hd = null; }
+    const old = held.get(n); if (old && old.hd && !ring) old.hd.stop(now);
+    const hd = kit.lead(beat.lead, beat.kit, C.MEL[n].p, now, ring ? 1 : 4, 0.9, mixer.ch.mel);
+    track(hd);
+    const key = tabBody.querySelector(`.bt-mkey[data-n="${n}"]`); key && key.animate && key.animate([{ transform: 'translateY(3px)', filter: 'brightness(1.5)' }, { transform: 'none', filter: 'none' }], { duration: 170 });
+    flashLabel('mel');
+    if (!mixer.audible(beat.mix, 'mel') && Date.now() - warnedMute > 4000) { warnedMute = Date.now(); toast('가락 줄은 음소거(M)나 혼자 듣기(S) 때문에 안 들려요'); }
+    const x = { hd, rec: null };
+    held.set(n, x);
+    if (!rec || !playing || readOnly || !seq || recTarget !== 'mel') return;
+    const best = recSlot(now - outLat()); if (!best) return;
+    const p = beat.pats[best.pat]; if (!p || best.step >= p.m.length) return;
+    p.m[best.step] = n;
+    if (best.next) skipOnce.add(best.bar + '|' + best.step + '|mel');
+    x.rec = { pat: best.pat, step: best.step, t: best.t };
+    if (best.pat === beat.cur) renderMel();
+    markDirty();
+  }
+  //  건반을 뗌 — 소리 멈춤(두드리는 악기는 저절로) · 녹음 중이면 뗀 자리(가까운 칸)에 쉼: 짧게 누르면 짧은 음 · 사이에 다른 음이 있거나 마디 끝을 넘으면 그대로
+  function melRelease(n) {
+    const x = held.get(n); if (!x) return;
+    held.delete(n);
+    const now = engine.now, ring = C.isRing(beat.lead);
+    if (x.hd && !ring) x.hd.stop(now);
+    if (!x.rec || ring || !rec || !playing || readOnly) return;
+    const p = beat.pats[x.rec.pat]; if (!p) return;
+    const r = x.rec.step + Math.max(1, Math.round((now - outLat() - x.rec.t) / C.stepDur(beat.bpm, g())));
+    if (r >= p.m.length) return;
+    for (let j = x.rec.step + 1; j <= r; j++) if (p.m[j] !== C.B_EMPTY) return;
+    p.m[r] = C.B_REST;
+    if (x.rec.pat === beat.cur) renderMel();
+    markDirty();
+  }
+  function releaseAll() { for (const n of [...held.keys()]) melRelease(n); }
   // ── 들어 보기(내 비트 · 우리 반 목록) ── 화면의 비트와 따로 — 따로 믹서 · 따로 박자기 · 순서가 있으면 순서 두 바퀴(16마디까지) · 없으면 네 마디
   async function preview(src, btn) {
     if (pv && pv.btn === btn) { stopPreview(); return; }
@@ -677,8 +823,8 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     else { b.mode = 'loop'; if (C.patternEmpty(b.pats[b.cur])) b.cur = Math.max(0, b.pats.findIndex(p => !C.patternEmpty(p))); }
     const bars = b.arr.length ? Math.min(16, b.arr.length * 2) : 4;
     const mx = new BeatMixer(engine); mx.apply(b.mix, b.kit);
-    const vs = { live: [], bass: null, chord: null, openHat: null };
-    const sq = new C.Sequencer({ now: () => engine.now, emit: e => { if (e.kind !== 'step') sound(e, mx, vs, b.kit); }, beat: () => b });
+    const vs = { live: [], bass: null, chord: null, openHat: null, mel: null, melPrev: null };
+    const sq = new C.Sequencer({ now: () => engine.now, emit: e => { if (e.kind !== 'step') sound(e, mx, vs, b.kit, b.lead); }, beat: () => b });
     sq.start({ at: engine.now + 0.08 });
     const tm = setInterval(() => { sq.tick(); if (sq.bar >= bars) stopPreview(); }, C.TICK_MS);
     btn.classList.add('stop');
@@ -705,11 +851,16 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
     if (/^Digit[1-4]$/.test(e.code)) { selectPattern(+e.code.slice(5) - 1); return; }
     if (e.code === 'KeyR') { if (!e.repeat) toggleRec(); return; }
     if (k >= 0) { e.preventDefault(); if (!e.repeat) padHit(C.ROWS[k]); return; }
+    const mk = MKEYS.indexOf(e.code);                                 // 가락 건반 [MUSIC-BEAT-MEL-1]
+    if (mk >= 0) { e.preventDefault(); if (!e.repeat) melHit(mk); return; }
     if (tag === 'INPUT') return;                                      // 소리 크기 · 빠르기 막대는 화살표를 막대가 쓴다
     if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { e.preventDefault(); setBpm(beat.bpm + (e.code === 'ArrowUp' ? 2 : -2)); return; }
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { e.preventDefault(); selectPattern((beat.cur + (e.code === 'ArrowRight' ? 1 : 3)) % 4); }
   };
   addEventListener('keydown', onKey);
+  const onKeyUp = e => { const mk = MKEYS.indexOf(e.code); if (mk >= 0) melRelease(mk); };   // 가락 건반 떼기
+  addEventListener('keyup', onKeyUp);
+  addEventListener('blur', releaseAll);
   const onVis = () => { if (document.hidden) { stop(); stopPreview(); } };
   document.addEventListener('visibilitychange', onVis);
   const beforeUnload = e => { if (dirty && !readOnly && C.hasContent(beat)) { e.preventDefault(); e.returnValue = ''; } };
@@ -718,7 +869,8 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
   // ── 시험용(?debug=1) — 읽기만(복사본) ──
   function exposeDebug() {
     window.__beat = {
-      state: () => ({ dance: { ...dance }, playing, rec, counting, cur: beat.cur, playPat, playPos, bpm: beat.bpm, swing: beat.swing, kit: beat.kit, grid: beat.grid, mode: beat.mode, arr: beat.arr.slice(), fill: beat.fill, click: beat.click, tab, readOnly, dirty, undo: undo.length, loopStart, id: beat.id, title: beat.title }),
+      state: () => ({ dance: { ...dance }, playing, rec, counting, cur: beat.cur, playPat, playPos, bpm: beat.bpm, swing: beat.swing, kit: beat.kit, grid: beat.grid, mode: beat.mode, arr: beat.arr.slice(), fill: beat.fill, click: beat.click, tab, readOnly, dirty, undo: undo.length, loopStart, id: beat.id, title: beat.title,
+        lead: beat.lead, palTab, recTarget, held: [...held.keys()] }),   // [MUSIC-BEAT-MEL-1]
       beat: () => JSON.parse(JSON.stringify(C.packBeat(beat))),
       log: () => fired.slice(),
       clearLog: () => { fired.length = 0; return true; },
@@ -738,7 +890,7 @@ export function mountBeat(root, ctx, { ref = '' } = {}) {
       alive = false; stop(); stopPreview();
       cancelAnimationFrame(raf); clearTimeout(tipTimer); clearTimeout(sideTimer);
       if (stopClass) { stopClass(); stopClass = null; }
-      removeEventListener('keydown', onKey); removeEventListener('beforeunload', beforeUnload); document.removeEventListener('visibilitychange', onVis);
+      removeEventListener('keydown', onKey); removeEventListener('keyup', onKeyUp); removeEventListener('blur', releaseAll); removeEventListener('beforeunload', beforeUnload); document.removeEventListener('visibilitychange', onVis);
       if (mixer) { const m = mixer; mixer = null; setTimeout(() => m.dispose(), 400); }
       if (DEBUG) { try { delete window.__beat; } catch (e) {} }
     },

@@ -42,7 +42,7 @@ await test('빈 비트 모양 — 16칸 · 패턴 넷 · 줄 여덟 · 베이스
   eq([b.grid, b.bpm, b.swing, b.kit, b.pats.length, b.mode, b.cur, b.arr.length], ['16', 96, 0, 'elec', 4, 'loop', 0, 0]);
   for (const p of b.pats) { eq(Object.keys(p.d), B.ROWS); ok(B.ROWS.every(r => p.d[r].length === 16 && p.d[r].every(v => v === 0))); eq(p.b.length, 16); ok(p.b.every(v => v === -1)); eq(p.c, [null, null, null, null]); eq(p.cs, 'long'); }
   ok(!B.hasContent(b) && B.patternEmpty(b.pats[0]));
-  eq(Object.keys(b.mix), [...B.ROWS, 'bass', 'chord']);
+  eq(Object.keys(b.mix), [...B.ROWS, 'mel', 'bass', 'chord']);
   eq(B.normalizeBeat(b), b, '빈 비트 살피기 = 그대로');
 });
 
