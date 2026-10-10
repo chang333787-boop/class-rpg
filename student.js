@@ -354,6 +354,12 @@ function externalStudyItems() {
       sub: '연필로 선·명암·형태 익히기 10차시 · 작품 사진은 선생님 확인 후 전시',
       href: 'watercolor/index.html?course=drawing&sid=' + sid,
       border: 'rgba(200,200,210,.40)', bg: 'rgba(200,200,210,.08)', embed: true },
+    // [MATHGAP-HOME-1] 오늘의 수학 — 선생님이 연 단원 탑에 불을 켜며 수학 빈칸 채우기(하루 10분 · 단원 점검 → 막힌 차시부터 연습 · 간격 복습)
+    //   저장 = classRPG_mathgap · 이름 저장 안 함 · 보상과 묶지 않음 · 홈 카드 = student/mathgap.js · '오늘의 학습' 고르기에서는 뺀다(study:false)
+    { key: 'mathgap', icon: '🧮', title: '오늘의 수학',
+      sub: '내 수학 탑에 불을 켜요 · 막힌 차시부터 한 층씩',
+      href: 'mathgap/index.html?sid=' + sid + '&n=' + encodeURIComponent((typeof CUR !== 'undefined' && CUR && CUR.name) || ''),
+      border: 'rgba(242,169,59,.45)', bg: 'rgba(242,169,59,.08)', embed: true, study: false },
     // [VILLAGE-DOOR-1] 미니 세상 마을(G5 ②). 공부가 아니라 "오늘의 학습" 카드에서는 뺀다(study:false) —
     //   홈 메뉴의 🏘️ 타일이 여는 문이다. 저장은 아직 이 기기 localStorage(rpg.village.<sid>).
     //   autoFocus: 3D 조작 키(R·스페이스·Ctrl+Z)가 캔버스를 한 번 누르기 전에는 부모로 샜다(G5 설계 §1 실측).
@@ -617,6 +623,7 @@ function enterGame() {
 
   loadCharDolls();   // [CHAR-DOLL-1] 캐릭터 SVG 84장 미리 받기(실패해도 게임 진행에 영향 없음)
   watchThinkboardHome();   // [THINKBOARD-HOME-1] 선생님이 연 생각판을 홈에 바로
+  if (typeof watchMathgapHome === 'function') watchMathgapHome();   // [MATHGAP-HOME-1] 오늘의 수학 카드(선생님이 연 단원 · 내 요약)
 
   // ★ 미완료 전투 감지: 전투 도중 창을 닫고 재접속한 경우
   // 횟수는 startBattle()에서 이미 차감됐으므로 상태만 정리 (패배 처리)
@@ -1256,6 +1263,7 @@ function buildMainHTML() {
         ${typeof buildAssignCardsHTML === 'function' ? buildAssignCardsHTML() : ''}
         ${alerts.join('')}
         ${buildStudyTaskHTML(s)}
+        ${typeof buildMathgapCardHTML === 'function' ? buildMathgapCardHTML() : ''}
         ${openQuests.length ? `
         <div class="home-quest-open">
           <div style="font-size:.78rem;font-weight:800;color:var(--gold);margin:.2rem 0 .35rem">📋 선생님 퀘스트 ${openQuests.length}개 · 다 하면 눌러서 신청해요</div>
@@ -1361,6 +1369,7 @@ function buildMainHTML() {
     <div class="hc-grid">
       <!-- [UX-TRIM-G4] 매일 쓰는 문(학습 · 생각판 · 보상 있는 영어 · 독서 · 우리 반 작품)이 앞 — 1366×610 첫 화면 안. 학습 앱 일곱은 뒤 · 늘 붙던 NEW 뗌 -->
       ${door(asset('deco/d_i5.svg'), '오늘의 학습', typeof CurriculumUtils === 'undefined' ? '교과 문제' : studyLeft ? `하루 ${STUDY_PER_DAY}문제 · ${studyDone}문제 했어요` : '오늘 공부 끝!', 'openStudyModal()', studyLeft ? '오늘' : '')}
+      ${typeof mathgapOpen === 'function' && mathgapOpen() ? door(asset('deco/ev_lanterns.svg'), '오늘의 수학', '탑에 불을 켜며 수학 빈칸 채우기', "openExternalEmbed('mathgap')") : ''}
       ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
       ${ext('english') ? door(asset('deco/guest_owl.svg'), '영어 복습', '단어 · 표현 · 듣기 · 말하기', "openExternalEmbed('english')") : ''}
       ${door(asset('deco/in_w_bookshelf.svg'), '독서 기록', `읽은 책 ${(s.books || []).length}권`, "openHouseTab('book')")}

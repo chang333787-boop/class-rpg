@@ -520,7 +520,7 @@ function backupKeyLabel(k) {
 //   반 전체 크기를 미리 알 수 없고, 로그인마다 도는 자동 백업 14개에 그대로 쌓이면 무료 저장 한도를 위협한다.
 //   마을은 [데이터 내보내기](파일로 받기)에만 담는다. 마을 전용 백업은 scripts/village-backup.mjs.
 const BACKUP_APP_ROOTS = ['classRPG_music', 'classRPG_coding', 'classRPG_pattern', 'classRPG_paint', 'classRPG_art',
-  'classRPG_ink', 'classRPG_print', 'classRPG_watercolor', 'classRPG_drawing'];
+  'classRPG_ink', 'classRPG_print', 'classRPG_watercolor', 'classRPG_drawing', 'classRPG_mathgap'];
 const EXPORT_ROOTS = ['classRPG_thinkboard', ...BACKUP_APP_ROOTS, 'classRPG_villages'];
 const EXPORT_FORMAT = 'classRPG-export-2';
 

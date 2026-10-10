@@ -49,7 +49,7 @@ export async function mountTeacher(app, ctx) {
     const minSel = h('select', { 'aria-label': '하루 시간' }, ...[5, 10, 15, 20].map((m) => h('option', { value: m, selected: m === cfg.minutes }, `하루 ${m}분`)));
     const isCur = cfg.unit === unit;
     const saveBtn = h('button', { class: 'btn primary small', style: { marginTop: '8px' }, onclick: async () => {
-      cfg = { unit, minutes: +minSel.value };
+      cfg = { unit, minutes: +minSel.value, name: unitLabel(unit) };   // name = RPG 홈 카드가 '○○ 탑'이라고 쓰는 단원 이름
       try { await store.setConfig(cfg); toast('저장했어요 — 아이들 카드가 이 단원 탑으로 바뀌어요'); } catch (e) { console.warn(e); toast('저장하지 못했어요 — 인터넷을 확인해 주세요'); }
       draw();
     } }, isCur ? '하루 시간 바꾸기' : '이 단원으로 열기');

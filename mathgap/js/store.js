@@ -37,7 +37,7 @@ export function kidFrom(v) {
   k.seen = obj(v.seen);
   return k;
 }
-export const cleanCfg = (c) => { c = obj(c); return { unit: typeof c.unit === 'string' && /^\d-\d-\d$/.test(c.unit) ? c.unit : null, minutes: [5, 10, 15, 20].includes(+c.minutes) ? +c.minutes : 10, t: +c.t || 0 }; };
+export const cleanCfg = (c) => { c = obj(c); return { unit: typeof c.unit === 'string' && /^\d-\d-\d$/.test(c.unit) ? c.unit : null, name: typeof c.name === 'string' ? c.name.slice(0, 40) : '', minutes: [5, 10, 15, 20].includes(+c.minutes) ? +c.minutes : 10, t: +c.t || 0 }; };
 
 export function createStore({ sid, name, fb = globalThis.firebase, offline = false } = {}) {
   sid = sid ? keyOf(sid) : '';
