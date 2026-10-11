@@ -6,6 +6,7 @@
 import { R, F, val, whole, lt, ar, txt, tok, q, S, pj, uj, uro, expr, exprT, answerItem, choose, calcItem, divRemItem, until, fs, places, gcd, lcm, INV, eqv } from './kit.js';
 import { RO, P } from '../concepts/kit.js';
 import { resolve, makeItem } from '../lessons/index.js';
+import { toText } from '../tokens.js';
 
 const W = (n) => F(n, 1);
 const ro = (x, st) => { const t = txt(x, st); return RO(t).slice(t.length); };
@@ -22,8 +23,13 @@ const okStep = (s) => s && s.item;
 const pickStep = (why, prompt, opts, r) => ({ kind: 'pick', key: true, why, item: choose(prompt, opts, r) });
 // 진단 사다리 앞 두 칸(10-11 · 교사 '국어 · 구조 · 유형을 가르고 싶다') — 같이 풀기 맨 앞
 //   read 이야기 확인: 문장에 그대로 있는 사실 · struct 같은 상황 고르기: 말을 바꾼 문장 중 같은 뜻(숫자 계산 없이 · Ufer 외 2024 방식)
-const readStep = (prompt, opts, r) => ({ kind: 'pick', read: true, key: false, why: '먼저 이야기를 확인해요.', item: choose(prompt, opts, r) });
-const structStep = (prompt, opts, r) => ({ kind: 'pick', struct: true, key: false, why: '이야기의 상황을 다른 말로 바꿔 봐요. 같은 뜻은 어느 것일까요?', item: choose(prompt, opts, r) });
+//   안내 글은 그 단계 물음에 맞게(10-11 교정: 이야기가 없는 문제 · '같은 뜻'을 묻지 않는 물음에 같은 안내가 붙음)
+const readStep = (prompt, opts, r) => ({ kind: 'pick', read: true, key: false, why: '먼저 문제를 꼼꼼히 읽어요.', item: choose(prompt, opts, r) });
+const structWhy = (prompt) => (/같은 뜻/.test(prompt) ? '문제의 상황을 다른 말로 바꿔 봐요.' : /구해야 하는 것|크게 만들어야/.test(prompt) ? '구하는 것을 다시 확인해요.' : '문제의 모양을 그림처럼 떠올려 봐요.');
+const structStep = (prompt, opts, r, why = structWhy(prompt)) => ({ kind: 'pick', struct: true, key: false, why, item: choose(prompt, opts, r) });
+// 단계 문제의 답(마지막 '=' 뒤) — 다음 단계 글에서 그 답을 그대로 이어 쓸 때(약분 전 · 후가 다르면 둘 다)
+const ansOf = (st) => toText(st.item.prompt, st.item.sol.map(String)).split('=').pop().trim();
+const REL = { '+': '덧셈과 뺄셈의 관계', '−': '덧셈과 뺄셈의 관계', '×': '곱셈과 나눗셈의 관계', '÷': '곱셈과 나눗셈의 관계' };
 const roadStep = (r) => structStep('"처음부터 끝까지 심어요."와 같은 뜻은?', [{ t: '길의 양 끝에도 나무가 있어요.', right: true }, { t: '길의 처음에만 나무가 있고 끝에는 없어요.', name: '양 끝을 놓침' }, { t: '길의 양 끝에는 나무가 없어요.', name: '양 끝을 놓침' }], r);
 const calcStep = (why, op, x, y, st, more = {}) => { const k = calcItem(op, x, y, st); return { kind: 'calc', why, item: k.item, c: k.c, z: k.z, ...more }; };
 // 카드 그림(수 카드) — 색은 CSS(.card · .cardt)
@@ -98,20 +104,21 @@ function invMake(spec, r) {
   const g2 = ar(good, Rv, b, st); if (g2.n > 0) bugs.push({ x: g2, name: '잘못 계산한 값에 바로 바르게 계산함' });
   const w1 = ar(bad, Rv, b, st); if (w1.n > 0) { const w2 = ar(good, w1, b, st); if (w2.n > 0) bugs.push({ x: w2, name: '어떤 수를 거꾸로 구하지 않음' }); }
   const steps = [
-    pickStep('잘못 계산한 것을 어떤 수 대신 □를 써서 식으로 나타내 봐요.', '어떤 식일까요?', [
+    pickStep('어떤 수를 □로 하여, 잘못 계산한 것을 식으로 나타내 봐요.', '어떤 식일까요?', [
       { t: S('□ ', bad, ' ', tok(b, st), ' = ', tok(Rv, st)), right: true },
       { t: S('□ ', good, ' ', tok(b, st), ' = ', tok(Rv, st)), name: '잘못한 계산 대신 바르게 할 계산으로 식을 씀' },
       { t: S('□ ', bad, ' ', tok(Rv, st), ' = ', tok(b, st)), name: '두 수의 자리를 바꿔 씀' },
     ], r),
-    calcStep(`□ ${bad} ${txt(b, st)} = ${txt(Rv, st)}이면 □는 거꾸로 ${ye(exprT(INV[bad], Rv, b, st))}. 어떤 수를 구해요.`, INV[bad], Rv, b, st),
-    calcStep(`어떤 수는 ${ye(txt(back, st))}. 이제 바르게 계산해요.`, good, x, b, st),
+    calcStep(`□ ${bad} ${txt(b, st)} = ${txt(Rv, st)}이면 ${REL[bad]}로 □ = ${ye(exprT(INV[bad], Rv, b, st))}. 어떤 수를 구해요.`, INV[bad], Rv, b, st),   // 조사 고정: …관계로(받침 없음)
   ];
+  const got = ansOf(steps[1]), bk = txt(back, st);
+  steps.push(calcStep(`어떤 수는 ${got === bk ? ye(bk) : `${got} = ${ye(bk)}`}. 이제 바르게 계산해요.`, good, x, b, st));
   steps.unshift(
     readStep('잘못 계산해서 나온 수는 얼마인가요?', [{ t: q(Rv, st), right: true }, { t: q(b, st), name: '수의 역할을 헷갈림' }], r),
-    structStep('이야기와 같은 뜻은?', [
+    structStep('잘못 계산한 것과 같은 뜻은?', [
       { t: S('어떤 수', SUBJ[bad], q(b, st), obj(bad, b, st), ` ${IF[bad]} `, q(Rv, st), pj(Rv, st, '이에요.', '예요.')), right: true },
       { t: S('어떤 수', SUBJ[good], q(b, st), obj(good, b, st), ` ${IF[good]} `, q(Rv, st), pj(Rv, st, '이에요.', '예요.')), name: '잘못 계산한 값을 바르게 계산한 값으로 봄' },
-      { t: S(q(Rv, st), subjOf(bad, Rv, st), q(b, st), obj(bad, b, st), ` ${IF[bad]} 어떤 수예요.`), name: '관계의 방향을 거꾸로 봄' }], r));
+      { t: S(q(Rv, st), subjOf(bad, Rv, st), q(b, st), obj(bad, b, st), ` ${IF[bad]} 어떤 수예요.`), name: '관계의 방향을 거꾸로 봄' }], r, '잘못 계산한 것을 다른 말로 바꿔 봐요.'));
   return { story, item: answerItem('답 ', A, st, '', bugs), x: A, steps, p: { good, bad } };
 }
 
@@ -124,23 +131,23 @@ const RANGE_SPECS = {
 const RANGE_EASY = (r) => { const kind = r.pick(['plus', 'more', 'minus']), T = r.int(15, 30), a = r.int(4, T - 6); return { kind, T, a }; };
 function rangeMake(spec, r) {
   const p = spec.gen(r), { kind, T, a } = p;
-  const box = (s) => S('□ 안에 들어갈 수 있는 수 중에서 ', s, '를 구하세요.');
+  const box = (s) => S('□ 안에 들어갈 수 있는 자연수 중에서 ', s, '를 구하세요.');
   if (kind === 'mul') {
     const k = p.k, M = T - a, qq = Math.floor(M / k), rem = M % k, best = rem ? qq : qq - 1;
     const ineq = `□ × ${k} + ${a} < ${T}`;
-    const story = S(box('가장 큰 자연수'), { br: 1 }, ineq);
+    const story = S(box('가장 큰 수'), { br: 1 }, ineq);
     const dr = divRemItem(M, k);
     const steps = [
-      calcStep(`먼저 □ × ${k} + ${a} = ${T}${P_(T, '이라고', '라고')} 생각해요. □ × ${k}${P_(k, '은', '는')} ${T}에서 ${a}${P_(a, '을', '를')} 뺀 수예요.`, '−', W(T), W(a), 'W'),
+      calcStep(`□ × ${k} + ${a} = ${T}${P_(T, '이라고', '라고')} 생각해요. □ × ${k}${P_(k, '은', '는')} ${T}에서 ${a}${P_(a, '을', '를')} 뺀 수예요.`, '−', W(T), W(a), 'W'),
       pickStep(`${ineq}이려면 □ × ${k}${P_(k, '은', '는')} ${M}보다 어때야 할까요?`, `□ × ${k}${P_(k, '은', '는')} ${M}보다…`, [
         { t: '작아야 해요', right: true }, { t: '커야 해요', name: '부등호 방향을 거꾸로 봄' }], r),
-      { kind: 'calc', why: `${M} ÷ ${k}${P_(k, '을', '를')} 해 봐요. □ × ${k}${P_(k, '이', '가')} ${M}보다 작은 가장 큰 □를 찾는 데 써요.`, item: dr.item, c: dr.c },
-      pickStep(rem ? `${k} × ${qq} = ${k * qq}, ${k} × ${qq + 1} = ${k * (qq + 1)}이에요. ${M}보다 작으려면?` : `${k} × ${qq} = ${M}이에요. ${M}보다 작아야 하니까?`, '가장 큰 □는?', [
+      { kind: 'calc', why: `${M} ÷ ${k}의 몫과 나머지를 구해 봐요. 몫을 보면 □ × ${k}${P_(k, '이', '가')} ${M}보다 작은 가장 큰 □를 찾을 수 있어요.`, item: dr.item, c: dr.c },
+      pickStep(rem ? `${k} × ${qq} = ${k * qq}, ${k} × ${qq + 1} = ${k * (qq + 1)}${P_(k * (qq + 1), '이에요', '예요')}. ${M}보다 작으려면?` : `${k} × ${qq} = ${M}${P_(M, '이에요', '예요')}. ${M}보다 작아야 하니까?`, '가장 큰 □는?', [
         { t: String(best), right: true }, { t: String(best + 1), name: '경계의 수도 넣음' }, { t: String(best - 1), name: '하나 작게 셈' }], r),
     ];
     steps.unshift(
       readStep('무엇을 구하나요?', [{ t: '□에 들어갈 수 있는 가장 큰 자연수', right: true }, { t: '□에 들어갈 수 있는 가장 작은 자연수', name: '구하는 것을 잘못 읽음' }, { t: '□에 들어갈 수 있는 수의 개수', name: '구하는 것을 잘못 읽음' }], r),
-      structStep(`${ineq}${P_(T, '과', '와')} 같은 뜻은?`, [
+      structStep(`${ineq}${P_(kind === 'minus' ? a : T, '과', '와')} 같은 뜻은?`, [
         { t: `□에 ${k}${P_(k, '을', '를')} 곱하고 ${a}${P_(a, '을', '를')} 더하면 ${T}보다 작아요.`, right: true },
         { t: `□에 ${k}${P_(k, '을', '를')} 곱하고 ${a}${P_(a, '을', '를')} 더하면 ${T}보다 커요.`, name: '부등호 방향을 거꾸로 봄' },
         { t: `□에 ${a}${P_(a, '을', '를')} 더하고 ${k}${P_(k, '을', '를')} 곱하면 ${T}보다 작아요.`, name: '계산 순서를 바꿔 봄' }], r));
@@ -154,7 +161,7 @@ function rangeMake(spec, r) {
   const story = S(box(ask), { br: 1 }, ineq);
   const eq = kind === 'plus' ? `${a} + □ = ${T}` : kind === 'more' ? `□ + ${a} = ${T}` : `${T} − □ = ${a}`;
   const steps = [
-    calcStep(`먼저 ${eq}${P_(T, '이', '가')} 되는 □를 구해요.`, '−', W(T), W(a), 'W'),
+    calcStep(`등호(=)가 되는 수부터 구해요. ${eq}${P_(kind === 'minus' ? a : T, '이', '가')} 되는 □는?`, '−', W(T), W(a), 'W'),
     pickStep(`${ineq}이려면 □는 ${B0}보다 어때야 할까요?${kind === 'minus' ? ` (□가 커지면 ${T} − □는 작아져요)` : ''}`, `□는 ${B0}보다…`, [
       { t: '작아야 해요', right: small, name: small ? null : '부등호 방향을 거꾸로 봄' }, { t: '커야 해요', right: !small, name: small ? '부등호 방향을 거꾸로 봄' : null }], r),
     pickStep(`그러면 □ 안에 들어갈 수 있는 수 중에서 ${ask}${P_(ask, '은', '는')}?`, `${ask}${P_(ask, '은', '는')}?`, [
@@ -191,7 +198,7 @@ function cardMake(spec, r) {
     const steps = [
       pickStep('가장 큰 세 자리 수는 높은 자리부터 큰 숫자를 놓아요.', '가장 큰 세 자리 수는?', [
         { t: String(big), right: true }, { t: String(sw(big)), name: '높은 자리부터 큰 숫자를 놓지 않음' }, { t: String(num([desc[1], desc[0], desc[2]])), name: '높은 자리부터 큰 숫자를 놓지 않음' }], r),
-      pickStep(zeroFirst != null ? '가장 작은 세 자리 수는 높은 자리부터 작은 숫자를 놓아요. 0은 맨 앞에 올 수 없어요.' : '가장 작은 세 자리 수는 높은 자리부터 작은 숫자를 놓아요.', '가장 작은 세 자리 수는?', [
+      pickStep(zeroFirst != null ? '가장 작은 세 자리 수는 높은 자리부터 작은 숫자를 놓아요. 0은 백의 자리에 올 수 없어요.' : '가장 작은 세 자리 수는 높은 자리부터 작은 숫자를 놓아요.', '가장 작은 세 자리 수는?', [
         { t: String(small), right: true }, ...(zeroFirst != null ? [{ t: '0' + String(zeroFirst).padStart(2, '0'), name: '0을 맨 앞에 놓음' }] : []), { t: String(sw(small)), name: '높은 자리부터 작은 숫자를 놓지 않음' }], r),
       calcStep(`이제 ${big}${P_(big, '과', '와')} ${small}의 ${op === '+' ? '합을' : '차를'} 구해요.`, op, W(big), W(small), 'W'),
     ];
@@ -209,11 +216,13 @@ function cardMake(spec, r) {
     const best = all[0], desc = [...ds].sort((a, b) => b - a);
     const naive = { a: num(desc.slice(0, la)), b: num(desc.slice(la)) };   // 큰 숫자를 한 수에 몰아 놓기
     const prod = (e) => e.a * e.b, others = all.filter((e) => prod(e) !== prod(best));
-    const d1 = others.find((e) => e.a === naive.a && e.b === naive.b) || others[0];
-    const d2 = others.find((e) => prod(e) !== prod(d1));
+    const d1 = others.find((e) => e.a === naive.a && e.b === naive.b) || others.find((e) => k === 'm21' || !lead2(e)) || others[0];
+    // 둘째 보기 — 가장 큰 두 숫자가 두 수의 맨 앞에 오지 않은 식(곱이 눈에 띄게 작음 · 10-11 교정: 비슷한 곱끼리는 어림으로 못 가림)
+    const lead2 = (e) => { const t = [String(e.a)[0], String(e.b)[0]].map(Number).sort((x, y) => y - x); return t[0] === desc[0] && t[1] === desc[1]; };
+    const d2 = others.find((e) => prod(e) !== prod(d1) && !lead2(e)) || others.find((e) => prod(e) !== prod(d1));
     const shape = { m21: '(두 자리 수) × (한 자리 수)', m22: '(두 자리 수) × (두 자리 수)', m32: '(세 자리 수) × (두 자리 수)' }[k];
     const story = S({ svg: cardsSvg(r.shuffle(ds)) }, `수 카드 ${n}장을 한 번씩 모두 써서 ${shape}의 곱셈식을 만들려고 해요. 곱이 가장 크게 되도록 만들었을 때, 그 곱은 얼마일까요?`);
-    const hint = k === 'm21' ? '한 자리 수에는 가장 큰 숫자를 놓아야 곱이 커져요. 여러 가지를 어림해 견주어 봐요.' : '큰 숫자를 두 수의 가장 높은 자리에 나누어 놓아요. 어림해서 견주어 봐요.';
+    const hint = k === 'm21' ? '한 자리 수에 가장 큰 숫자를 놓고, 남은 두 숫자로 큰 두 자리 수를 만들어요.' : '가장 큰 두 숫자를 두 수의 맨 앞자리(가장 높은 자리)에 하나씩 놓아요.';
     const steps = [
       pickStep(hint, '곱이 가장 큰 식은?', [
         { t: `${best.a} × ${best.b}`, right: true },
@@ -253,7 +262,7 @@ function cardMake(spec, r) {
   const fx = (e) => S(tok(e.x, 'F'), ' ÷ ', tok(e.y, 'F'));
   const story = S({ svg: cardsSvg(r.shuffle(ds)) }, '수 카드 4장을 한 번씩 모두 써서 진분수 두 개를 만들고, (진분수) ÷ (진분수)의 나눗셈식을 만들려고 해요. 몫이 가장 크게 되도록 만들었을 때, 그 몫은 얼마일까요?');
   const steps = [
-    pickStep('몫이 크려면 나누어지는 수는 크게, 나누는 수는 작게 만들어요. 1보다 작은 수로 나누면 몫이 커져요.', '몫이 가장 큰 식은?', [
+    pickStep('몫이 크려면 나누어지는 분수는 크게, 나누는 분수는 작게 만들어요. 나누는 분수가 작을수록 몫이 커요.', '몫이 가장 큰 식은?', [
       { t: fx(best), right: true }, { t: fx(bigDiv), name: '나누는 수도 크게 만듦 (나누면 작아진다고 봄)' }, { t: fx(other), name: '몫이 가장 큰 식을 고르지 못함' }], r),
     calcStep('그 나눗셈을 해요.', '÷', best.x, best.y, 'F'),
   ];
@@ -280,9 +289,9 @@ function ovlMake(spec, r) {
     const steps = [
       pickStep(`테이프 ${n}장을 한 줄로 이으면 겹친 곳은 몇 군데일까요? 그림을 떠올려 봐요.`, '겹친 곳은?', [
         { t: `${n - 1}군데`, right: true }, { t: `${n}군데`, name: '겹친 곳을 테이프 수만큼 셈' }, { t: `${n + 1}군데`, name: '겹친 곳을 잘못 셈' }], r),
-      calcStep(`먼저 테이프 ${n}장의 길이를 모두 더해요(곱셈으로).`, '×', L, W(n), st),
-      calcStep(`겹친 길이는 ${n - 1}군데만큼이에요.`, '×', o, W(n - 1), st),
-      calcStep('전체 길이에서 겹친 길이를 빼요.', '−', tot, ov, st),
+      calcStep(`테이프 ${n}장의 길이를 모두 더해요. 길이가 같으니까 곱셈으로 해요.`, '×', L, W(n), st),
+      calcStep(`겹친 곳 ${n - 1}군데의 길이를 모두 구해요.`, '×', o, W(n - 1), st),
+      calcStep(`테이프 ${n}장의 길이의 합에서 겹친 길이를 빼요.`, '−', tot, ov, st),
     ];
     const bugs = [{ x: tot, name: '겹친 부분을 빼지 않음' }, { x: ar('−', tot, ar('×', o, W(n))), name: '겹친 곳을 테이프 수만큼 셈' }];
     steps.unshift(
@@ -343,17 +352,17 @@ function gapMake(spec, r) {
   const k = p.k, L = ar('×', g, W(k)), kind = p.kind;
   let story, ans, choices;
   if (kind === 'road') {
-    story = S('길이가 ', q(L, st, 'm'), '인 길 한쪽에 처음부터 끝까지 ', q(g, st, 'm'), ' 간격으로 나무를 심으려고 해요. 나무는 모두 몇 그루 필요할까요? (나무의 두께는 생각하지 않아요.)');
+    story = S('길이가 ', q(L, st, 'm'), '인 길 한쪽에 처음부터 끝까지 ', q(g, st, 'm'), ' 간격으로 나무를 심으려고 해요. 나무는 모두 몇 그루가 필요할까요? (나무의 두께는 생각하지 않아요.)');
     ans = k + 1; choices = [{ t: `${k + 1}그루`, right: true }, { t: `${k}그루`, name: '간격 수와 나무 수를 같게 봄' }, { t: `${k - 1}그루`, name: '양 끝을 빼고 셈' }];
   } else if (kind === 'pond') {
-    story = S('둘레가 ', q(L, st, 'm'), '인 둥근 연못 둘레에 ', q(g, st, 'm'), ' 간격으로 의자를 놓으려고 해요. 의자는 모두 몇 개 필요할까요? (의자의 크기는 생각하지 않아요.)');
+    story = S('둘레가 ', q(L, st, 'm'), '인 둥근 연못가에 ', q(g, st, 'm'), ' 간격으로 의자를 놓으려고 해요. 의자는 모두 몇 개가 필요할까요? (의자의 크기는 생각하지 않아요.)');
     ans = k; choices = [{ t: `${k}개`, right: true }, { t: `${k + 1}개`, name: '둥글게 놓을 때도 하나를 더함' }, { t: `${k - 1}개`, name: '간격 수를 잘못 셈' }];
   } else {
     story = S('길이가 ', q(L, st, 'cm'), '인 끈을 ', q(g, st, 'cm'), '씩 똑같이 자르려고 해요. 모두 몇 번 잘라야 할까요?');
     ans = k - 1; choices = [{ t: `${k - 1}번`, right: true }, { t: `${k}번`, name: '자르는 횟수와 도막 수를 같게 봄' }, { t: `${k + 1}번`, name: '자르는 횟수를 잘못 셈' }];
   }
   const steps = [
-    calcStep(kind === 'cut' ? '먼저 끈이 몇 도막이 되는지 구해요.' : `먼저 ${kind === 'pond' ? '둘레' : '길'}에 간격이 몇 군데 생기는지 구해요.`, '÷', L, g, st),
+    calcStep(kind === 'cut' ? '끈이 몇 도막이 되는지 구해요.' : `${kind === 'pond' ? '연못 둘레' : '길'}에 간격이 몇 군데 생기는지 구해요.`, '÷', L, g, st),
     pickStep(kind === 'road' ? `간격이 ${k}군데예요. 길의 처음과 끝에 모두 심으면 나무는?` : kind === 'pond' ? `간격이 ${k}군데예요. 둥글게 놓으면 처음과 끝이 만나요. 의자는?` : `${k}도막이 되려면 몇 번 잘라야 할까요?`,
       kind === 'road' ? '나무는 모두?' : kind === 'pond' ? '의자는 모두?' : '자르는 횟수는?', choices, r),
   ];
@@ -373,18 +382,20 @@ const SUMDIF_SPECS = {
   '3-2-2': { st: 'W', gen: (r) => { const s = r.int(14, 120), d = r.int(4, 60); return { small: W(s), dif: W(d) }; } },
 };
 const SUMDIF_EASY = (r) => ({ small: W(r.int(5, 20)), dif: W(r.int(2, 9)) });
-const THINGS = [['빨간 구슬', '파란 구슬', '개'], ['노란 색종이', '초록 색종이', '장'], ['동화책', '과학책', '권'], ['딸기 사탕', '포도 사탕', '개']];
+const THINGS = [['빨간 구슬', '파란 구슬', '개', '구슬'], ['노란 색종이', '초록 색종이', '장', '색종이'], ['동화책', '과학책', '권', '책'], ['딸기 사탕', '포도 사탕', '개', '사탕']];
 function sumdifMake(spec, r) {
   const st = spec.st, { small, dif } = spec.gen(r), big = ar('+', small, dif), sum = ar('+', big, small);
-  const [A, Bn, u] = r.pick(THINGS), askBig = r.chance(0.5), ans = askBig ? big : small;
+  const [A, Bn, u, kindN] = r.pick(THINGS), askBig = r.chance(0.5), ans = askBig ? big : small;
+  const nS = txt(sum, st), nD = txt(dif, st);
   const story = S(`${A}${P_(A, '과', '와')} ${Bn}${P_(Bn, '이', '가')} 모두 `, q(sum, st, u), ` 있어요. ${A}${P_(A, '이', '가')} ${Bn}보다 `, q(dif, st, u), ` 더 많아요. ${askBig ? A : Bn}${P_(askBig ? A : Bn, '은', '는')} 몇 ${u}일까요?`);
   const S2 = ar('−', sum, dif);
   const steps = [
-    pickStep(`${A}에서 더 많은 만큼인 ${txt(dif, st)}${P_(txt(dif, st), '을', '를')} 빼면 두 가지가 같은 수가 돼요. ${Bn}의 수를 구하는 식은?`, `${Bn}의 수는?`, [
-      { t: `(${txt(sum, st)} − ${txt(dif, st)}) ÷ 2`, right: true }, { t: `${txt(sum, st)} ÷ 2`, name: '합을 반으로만 나눔' }, { t: `(${txt(sum, st)} + ${txt(dif, st)}) ÷ 2`, name: '많은 쪽과 적은 쪽을 헷갈림' }, { t: `${txt(sum, st)} − ${txt(dif, st)}`, name: '2로 나누지 않음' }], r),
-    calcStep('모두에서 더 많은 만큼을 빼요.', '−', sum, dif, st),
+    // 보기는 말로(10-11 교정: 괄호가 있는 식은 5학년 — 3학년 보기에 쓰지 않음)
+    pickStep(`${A}에서 더 많은 ${nD}${u}${P_(u, '을', '를')} 빼면 두 ${kindN}의 수가 같아져요. ${Bn}의 수는 어떻게 구할까요?`, `${Bn}의 수는?`, [
+      { t: `${nS}에서 ${nD}${P_(nD, '을', '를')} 뺀 다음 2로 나눠요`, right: true }, { t: `${nS}${P_(nS, '을', '를')} 2로 나눠요`, name: '합을 반으로만 나눔' }, { t: `${nS}에 ${nD}${P_(nD, '을', '를')} 더한 다음 2로 나눠요`, name: '많은 쪽과 적은 쪽을 헷갈림' }, { t: `${nS}에서 ${nD}만 빼요`, name: '2로 나누지 않음' }], r),
+    calcStep(`모두 ${nS}${u}에서 더 많은 ${nD}${u}${P_(u, '을', '를')} 빼요.`, '−', sum, dif, st),
     calcStep('똑같은 두 묶음이 되었으니 2로 나눠요.', '÷', S2, W(2), st),
-    ...(askBig ? [calcStep(`${A}${P_(A, '은', '는')} ${Bn}보다 ${txt(dif, st)} 더 많아요.`, '+', small, dif, st)] : []),
+    ...(askBig ? [calcStep(`${A}${P_(A, '은', '는')} ${Bn}보다 ${nD}${u} 더 많아요.`, '+', small, dif, st)] : []),
   ];
   const bugs = [{ x: askBig ? small : big, name: '많은 쪽과 적은 쪽을 헷갈림' }, ...(whole(ar('÷', sum, W(2))) ? [{ x: ar('÷', sum, W(2)), name: '합을 반으로만 나눔' }] : []), { x: S2, name: '2로 나누지 않음' }];
   steps.unshift(
@@ -411,96 +422,98 @@ function f4Step(N, n, d, why) {
   } catch (e) { /* 아래 식으로 */ }
   return calcStep(why, '×', W(N), F(n, d), 'F');
 }
+// 5학년 '처음 전체의 몇 분의 몇' — 두 번째 '남은'은 무엇까지 하고 남은 것인지 밝힌다(10-11 교정: '남은 돈'이 두 때를 가리킴)
 const PART_THINGS = [
-  { all: '가진 돈', p: '로', a: '책을 사고', b: '공책을 샀어요', left: '남은 돈', first: '처음 가진 돈' },
-  { all: '가진 색 테이프', p: '로', a: '꽃을 만들고', b: '상자를 꾸몄어요', left: '남은 색 테이프', first: '처음 가진 색 테이프' },
-  { all: '밭', p: '에', a: '감자를 심고', b: '상추를 심었어요', left: '아무것도 심지 않은 밭', first: '전체 밭' },
+  { noun: '돈', start: '처음 가진 돈', p: '로', a: '책을 사고', b: '공책을 샀어요', b2: '공책까지 사고 남은 돈', t1: '책을 산 돈', t2: '공책을 산 돈' },
+  { noun: '테이프', start: '처음 가진 색 테이프', p: '로', a: '꽃을 만들고', b: '상자를 꾸몄어요', b2: '상자까지 꾸미고 남은 색 테이프', t1: '꽃을 만든 색 테이프', t2: '상자를 꾸민 색 테이프' },
+  { noun: '밭', start: '전체 밭', p: '에', a: '감자를 심고', b: '상추를 심었어요', b2: '아무것도 심지 않은 밭', t1: '감자를 심은 밭', t2: '상추를 심은 밭' },
 ];
+const after1 = (T) => `${T.a} 남은 ${T.noun}`;   // 책을 사고 남은 돈
 function partMake(spec, r) {
   const kind = spec.kind;
-  if (kind === 'count') {
+  if (kind === 'count') {   // 3학년 — 사탕은 동생 · 친구에게 준다(먹는 양이 많아지지 않게)
     const p = until(r, (r) => { const b = r.int(2, 6), a = r.int(1, b - 1), e = r.int(2, 5), c = r.int(1, e - 1), N = b * e * r.int(1, 4) * (r.chance(0.5) ? 1 : 2); return { a, b, c, e, N }; },
       (p) => p.N >= 12 && p.N <= 96 && gcd(p.a, p.b) === 1 && gcd(p.c, p.e) === 1 && (p.N - (p.N / p.b) * p.a) % p.e === 0);
     const { a, b, c, e, N } = p, eat = (N / b) * a, M = N - eat, give = (M / e) * c, A = M - give;
-    const story = S(`사탕이 ${N}개 있어요. 그중에서 `, { f: [a, b] }, `${P_(`${a}/${b}`, '을', '를')} 먹고, 남은 사탕의 `, { f: [c, e] }, `${P_(`${c}/${e}`, '을', '를')} 친구에게 주었어요. 지금 남은 사탕은 몇 개일까요?`);
+    const story = S(`사탕이 ${N}개 있었어요. 그중에서 `, { f: [a, b] }, `${P_(`${a}/${b}`, '을', '를')} 동생에게 주고, 남은 사탕의 `, { f: [c, e] }, `${P_(`${c}/${e}`, '을', '를')} 친구에게 주었어요. 지금 남은 사탕은 몇 개일까요?`);
     const steps = [
-      f4Step(N, a, b, `먼저 ${N}의 ${a}/${b}${P_(`${a}/${b}`, '을', '를')} 구해요. 먹은 사탕이에요.`),
-      calcStep('처음 사탕에서 먹은 사탕을 빼요.', '−', W(N), W(eat), 'W'),
+      f4Step(N, a, b, `${N}의 ${a}/${b}${P_(`${a}/${b}`, '을', '를')} 구해요. 동생에게 준 사탕이에요.`),
+      calcStep('처음 사탕에서 동생에게 준 사탕을 빼요.', '−', W(N), W(eat), 'W'),
       pickStep(`친구에게 준 사탕은 무엇의 ${c}/${e}일까요?`, '무엇의 몇 분의 몇?', [
-        { t: `남은 사탕 ${M}개의 ${c}/${e}`, right: true }, { t: `처음 사탕 ${N}개의 ${c}/${e}`, name: '처음 전체를 기준으로 봄' }], r),
+        { t: `동생에게 주고 남은 사탕 ${M}개의 ${c}/${e}`, right: true }, { t: `처음 사탕 ${N}개의 ${c}/${e}`, name: '처음 전체를 기준으로 봄' }], r),
       f4Step(M, c, e, `${M}의 ${c}/${e}${P_(`${c}/${e}`, '을', '를')} 구해요. 친구에게 준 사탕이에요.`),
       calcStep('남은 사탕에서 친구에게 준 사탕을 빼요.', '−', W(M), W(give), 'W'),
     ];
     const bugs = [{ x: W(N - eat - (N / e) * c), name: '처음 전체를 기준으로 봄' }, { x: W(M), name: '한 번만 뺌' }, { x: W(give), name: '준 사탕 수를 답함' }];
     steps.unshift(
       readStep('처음에 사탕은 몇 개 있었나요?', [{ t: `${N}개`, right: true }, { t: `${a}개`, name: '분수를 개수로 봄' }], r),
-      structStep(`"그중에서 ${a}/${b}${P_(`${a}/${b}`, '을', '를')} 먹었어요."와 같은 뜻은?`, [
-        { t: `사탕을 ${b}묶음으로 똑같이 나눈 것 중 ${a}묶음을 먹었어요.`, right: true },
-        { t: `사탕 ${a}개를 먹었어요.`, name: '분수를 개수로 봄' },
-        { t: `사탕을 ${a}묶음으로 똑같이 나눈 것 중 ${b}묶음을 먹었어요.`, name: '분자와 분모를 바꿔 봄' }], r));
+      structStep(`"그중에서 ${a}/${b}${P_(`${a}/${b}`, '을', '를')} 동생에게 주었어요."와 같은 뜻은?`, [
+        { t: `사탕을 ${b}묶음으로 똑같이 나눈 것 중 ${a}묶음을 동생에게 주었어요.`, right: true },
+        { t: `사탕 ${a}개를 동생에게 주었어요.`, name: '분수를 개수로 봄' },
+        { t: `사탕을 ${a}묶음으로 똑같이 나눈 것 중 ${b}묶음을 동생에게 주었어요.`, name: '분자와 분모를 바꿔 봄' }], r));
     return { story, item: answerItem('답 ', W(A), 'W', '개', bugs.filter((x) => x.x.n > 0)), x: W(A), steps, p: { kind } };
   }
   if (kind === 'frac') {
     const p = until(r, (r) => ({ a: frc(r, 3, 7), c: frc(r, 2, 6) }), (p) => !eqv(p.a, p.c));   // 두 분수가 같으면 '이야기 확인'이 가를 수 없음
     const left = ar('−', W(1), p.a), give = ar('×', left, p.c), A = ar('−', left, give);
-    const T = r.pick(PART_THINGS);
+    const T = r.pick(PART_THINGS), af = after1(T);
     const pp = (x) => (T.p === '로' ? ro(x, 'F') : T.p);
-    const story = S(`${T.all}의 `, tok(p.a, 'F'), `${pp(p.a)} ${T.a}, ${T.left.startsWith('남은') ? T.left : '남은 ' + T.all}의 `, tok(p.c, 'F'), `${pp(p.c)} ${T.b}. ${T.left}${P_(T.left, '은', '는')} ${T.first}의 몇 분의 몇일까요?`);
+    const story = S(`${T.start}의 `, tok(p.a, 'F'), `${pp(p.a)} ${T.a}, ${af}의 `, tok(p.c, 'F'), `${pp(p.c)} ${T.b}. ${T.b2}${P_(T.b2, '은', '는')} ${T.start}의 몇 분의 몇일까요?`);
     const steps = [
-      calcStep(`${T.first}${P_(T.first, '을', '를')} 1로 봐요. 처음에 쓰고 남은 것은 1에서 ${txt(p.a, 'F')}${P_(txt(p.a, 'F'), '을', '를')} 뺀 만큼이에요.`, '−', W(1), p.a, 'F'),
-      pickStep(`두 번째로 쓴 것은 무엇의 ${txt(p.c, 'F')}일까요?`, '무엇의 몇 분의 몇?', [
-        { t: S('남은 것(', tok(left, 'F'), ')의 ', tok(p.c, 'F')), right: true }, { t: S('처음 전체(1)의 ', tok(p.c, 'F')), name: '처음 전체를 기준으로 봄' }], r),
-      calcStep('남은 것의 몇 분의 몇은 곱셈으로 구해요.', '×', left, p.c, 'F'),
-      calcStep('남은 것에서 두 번째로 쓴 것을 빼요.', '−', left, give, 'F'),
+      calcStep(`${T.start}${P_(T.start, '을', '를')} 1로 봐요. ${af}${P_(af, '은', '는')} 1에서 ${txt(p.a, 'F')}${P_(txt(p.a, 'F'), '을', '를')} 뺀 만큼이에요.`, '−', W(1), p.a, 'F'),
+      pickStep(`${T.t2}${P_(T.t2, '은', '는')} 무엇의 ${txt(p.c, 'F')}일까요?`, '무엇의 몇 분의 몇?', [
+        { t: S(`${af}(`, tok(left, 'F'), ')의 ', tok(p.c, 'F')), right: true }, { t: S(`${T.start}(1)의 `, tok(p.c, 'F')), name: '처음 전체를 기준으로 봄' }], r),
+      calcStep(`${af}의 ${txt(p.c, 'F')}${P_(txt(p.c, 'F'), '은', '는')} 곱셈으로 구해요.`, '×', left, p.c, 'F'),
+      calcStep(`${af}에서 ${T.t2}${P_(T.t2, '을', '를')} 빼요.`, '−', left, give, 'F'),
     ];
     const wrong = ar('−', left, p.c);
     const bugs = [...(wrong.n > 0 ? [{ x: wrong, name: '처음 전체를 기준으로 봄' }] : []), { x: left, name: '한 번만 뺌' }, { x: give, name: '두 번째로 쓴 양을 답함' }];
     steps.unshift(
-      readStep(`처음에 쓴 것은 ${T.first}의 얼마인가요?`, [{ t: tok(p.a, 'F'), right: true }, { t: tok(p.c, 'F'), name: '두 분수의 역할을 헷갈림' }], r),
-      structStep(`"${T.all}의 ${txt(p.a, 'F')}"${P_(txt(p.a, 'F'), '과', '와')} 같은 뜻은?`, [
-        { t: `전체를 ${p.a.d}칸으로 똑같이 나눈 것 중 ${p.a.n}칸`, right: true },
-        { t: `전체를 ${p.a.n}칸으로 똑같이 나눈 것 중 ${p.a.d}칸`, name: '분자와 분모를 바꿔 봄' },
-        { t: `전체를 ${p.a.d}칸으로 나눈 것 중 아무 ${p.a.n}칸(칸 크기는 달라도 돼요)`, name: '똑같이 나누는 것을 놓침' }], r));
+      readStep(`${T.t1}${P_(T.t1, '은', '는')} ${T.start}의 몇 분의 몇인가요?`, [{ t: tok(p.a, 'F'), right: true }, { t: tok(p.c, 'F'), name: '두 분수의 역할을 헷갈림' }], r),
+      structStep(`"${T.start}의 ${txt(p.a, 'F')}"${P_(txt(p.a, 'F'), '과', '와')} 같은 뜻은?`, [
+        { t: `전체를 똑같이 ${RO(String(p.a.d))} 나눈 것 중의 ${p.a.n}`, right: true },
+        { t: `전체를 똑같이 ${RO(String(p.a.n))} 나눈 것 중의 ${p.a.d}`, name: '분자와 분모를 바꿔 봄' },
+        { t: `전체를 ${RO(String(p.a.d))} 나눈 것 중 아무 ${p.a.n}(크기는 달라도 돼요)`, name: '똑같이 나누는 것을 놓침' }], r));
     return { story, item: answerItem('답 ', A, 'F', '', bugs), x: A, steps, p: { kind } };
   }
-  if (kind === 'sharew') {   // 남은 양 나누기의 쉬운 판 — 사탕 N개의 a/b를 먹고 남은 것을 k명이 똑같이
+  if (kind === 'sharew') {   // 남은 양 나누기의 쉬운 판 — 사탕 N개의 a/b를 동생에게 주고 남은 것을 k명이 똑같이
     const p = until(r, (r) => { const b = r.int(2, 5), a = r.int(1, b - 1), k = r.int(2, 5); return { a, b, k, N: b * k * r.int(1, 4) }; }, (p) => gcd(p.a, p.b) === 1 && p.N <= 80 && p.N >= 12);
     const { a, b, k, N } = p, eat = (N / b) * a, M = N - eat, A = M / k;
-    const story = S(`사탕이 ${N}개 있어요. 그중에서 `, { f: [a, b] }, `${P_(`${a}/${b}`, '을', '를')} 먹고, 남은 사탕을 ${k}명이 똑같이 나누어 가졌어요. 한 명이 가진 사탕은 몇 개일까요?`);
+    const story = S(`사탕이 ${N}개 있었어요. 그중에서 `, { f: [a, b] }, `${P_(`${a}/${b}`, '을', '를')} 동생에게 주고, 남은 사탕을 친구 ${k}명이 똑같이 나누어 가졌어요. 친구 한 명이 가진 사탕은 몇 개일까요?`);
     const steps = [
-      f4Step(N, a, b, `먼저 ${N}의 ${a}/${b}${P_(`${a}/${b}`, '을', '를')} 구해요. 먹은 사탕이에요.`),
-      calcStep('처음 사탕에서 먹은 사탕을 빼요.', '−', W(N), W(eat), 'W'),
-      pickStep(`${k}명이 똑같이 나누는 것은 어떤 사탕일까요?`, '나누는 식은?', [
+      f4Step(N, a, b, `${N}의 ${a}/${b}${P_(`${a}/${b}`, '을', '를')} 구해요. 동생에게 준 사탕이에요.`),
+      calcStep('처음 사탕에서 동생에게 준 사탕을 빼요.', '−', W(N), W(eat), 'W'),
+      pickStep(`친구 ${k}명이 똑같이 나누는 것은 어떤 사탕일까요?`, '나누는 식은?', [
         { t: `${M} ÷ ${k}`, right: true }, { t: `${N} ÷ ${k}`, name: '처음 전체를 나눔' }, { t: `${M} × ${k}`, name: '나누지 않고 곱함' }], r),
       calcStep(`남은 사탕을 ${k}명이 똑같이 나눠요.`, '÷', W(M), W(k), 'W'),
     ];
     const bugs = [{ x: W(N / k), name: '처음 전체를 나눔' }, { x: W(M), name: '나누지 않음' }];
     steps.unshift(
       readStep('남은 사탕을 몇 명이 나누어 가졌나요?', [{ t: `${k}명`, right: true }, { t: `${b === k ? N : b}명`, name: '수의 역할을 헷갈림' }], r),
-      structStep(`"남은 사탕을 ${k}명이 똑같이 나누어 가졌어요."와 같은 뜻은?`, [
-        { t: `먹고 남은 사탕을 ${k}명이 같은 수씩 가졌어요.`, right: true },
+      structStep(`"남은 사탕을 친구 ${k}명이 똑같이 나누어 가졌어요."와 같은 뜻은?`, [
+        { t: `동생에게 주고 남은 사탕을 ${k}명이 같은 수씩 가졌어요.`, right: true },
         { t: `처음 사탕을 ${k}명이 같은 수씩 가졌어요.`, name: '처음 전체를 나눔' },
         { t: `남은 사탕을 한 명이 ${k}개씩 가졌어요.`, name: '사람 수와 한 사람 몫을 헷갈림' }], r));
     return { story, item: answerItem('답 ', W(A), 'W', '개', bugs.filter((x) => whole(x.x))), x: W(A), steps, p: { kind } };
   }
-  // share — 주스 m L 의 a 를 마시고 남은 것을 k 명이 똑같이
+  // share — 주스 m L 의 a 를 어른들이 마시고 남은 것을 아이 k 명이 똑같이(누가 마셨는지 밝힘 · 10-11 교정)
   const p = until(r, (r) => ({ m: r.int(2, 6), a: frc(r, 2, 6), k: r.int(2, 5) }), (p) => !whole(ar('÷', ar('×', W(p.m), ar('−', W(1), p.a)), W(p.k))) && !whole(ar('×', W(p.m), p.a)));
   const drink = ar('×', W(p.m), p.a), left = ar('−', W(p.m), drink), A = ar('÷', left, W(p.k));
-  const story = S(`주스 ${p.m} L 중에서 `, tok(p.a, 'F'), `${pj(p.a, 'F', '을', '를')} 마시고, 남은 주스를 ${p.k}명이 똑같이 나누어 마셨어요. 한 명이 마신 주스는 몇 L일까요?`);
-  const steps = [
-    calcStep(`먼저 마신 주스는 ${p.m} L의 ${ye(txt(p.a, 'F'))}.`, '×', W(p.m), p.a, 'F'),
-    calcStep('처음 주스에서 마신 주스를 빼요.', '−', W(p.m), drink, 'F'),
-    pickStep(`${p.k}명이 똑같이 나누는 것은 어떤 주스일까요?`, '나누는 식은?', [
+  const story = S(`주스 ${p.m} L 중에서 `, tok(p.a, 'F'), `${pj(p.a, 'F', '을', '를')} 어른들이 마셨어요. 남은 주스는 아이 ${p.k}명이 똑같이 나누어 마셨어요. 아이 한 명이 마신 주스는 몇 L일까요?`);
+  const steps = [calcStep(`어른들이 마신 주스는 ${p.m} L의 ${ye(txt(p.a, 'F'))}.`, '×', W(p.m), p.a, 'F')];
+  const got = ansOf(steps[0]), dk = txt(drink, 'F');
+  steps.push(
+    calcStep(`처음 주스에서 어른들이 마신 주스(${got === dk ? dk : `${got} = ${dk}`} L)를 빼요.`, '−', W(p.m), drink, 'F'),
+    pickStep(`아이 ${p.k}명이 똑같이 나누는 것은 어떤 주스일까요?`, '나누는 식은?', [
       { t: S(tok(left, 'F'), ` ÷ ${p.k}`), right: true }, { t: `${p.m} ÷ ${p.k}`, name: '처음 전체를 나눔' }, { t: S(tok(left, 'F'), ` × ${p.k}`), name: '나누지 않고 곱함' }], r),
-    calcStep(`남은 주스를 ${p.k}명이 똑같이 나눠요.`, '÷', left, W(p.k), 'F'),
-  ];
-  const bugs = [{ x: ar('÷', W(p.m), W(p.k)), name: '처음 전체를 나눔' }, { x: left, name: '나누지 않음' }, { x: ar('÷', drink, W(p.k)), name: '마신 주스를 나눔' }];
+    calcStep(`남은 주스를 아이 ${p.k}명이 똑같이 나눠요.`, '÷', left, W(p.k), 'F'));
+  const bugs = [{ x: ar('÷', W(p.m), W(p.k)), name: '처음 전체를 나눔' }, { x: left, name: '나누지 않음' }, { x: ar('÷', drink, W(p.k)), name: '어른들이 마신 주스를 나눔' }];
   steps.unshift(
     readStep('주스는 처음에 몇 L 있었나요?', [{ t: `${p.m} L`, right: true }, { t: `${p.k === p.m ? p.m + 1 : p.k} L`, name: '수의 역할을 헷갈림' }], r),
-    structStep(`"남은 주스를 ${p.k}명이 똑같이 나누어 마셨어요."와 같은 뜻은?`, [
-      { t: `마시고 남은 주스를 ${p.k}명이 같은 양씩 마셨어요.`, right: true },
-      { t: `처음 주스를 ${p.k}명이 같은 양씩 마셨어요.`, name: '처음 전체를 나눔' },
-      { t: `남은 주스를 한 명이 ${p.k} L씩 마셨어요.`, name: '사람 수와 한 사람 몫을 헷갈림' }], r));
+    structStep(`"남은 주스는 아이 ${p.k}명이 똑같이 나누어 마셨어요."와 같은 뜻은?`, [
+      { t: `어른들이 마시고 남은 주스를 아이 ${p.k}명이 같은 양씩 마셨어요.`, right: true },
+      { t: `처음 주스를 아이 ${p.k}명이 같은 양씩 마셨어요.`, name: '처음 전체를 나눔' },
+      { t: `남은 주스를 아이 한 명이 ${p.k} L씩 마셨어요.`, name: '사람 수와 한 사람 몫을 헷갈림' }], r));
   return { story, item: answerItem('답 ', A, 'F', ' L', bugs), x: A, steps, p: { kind } };
 }
 

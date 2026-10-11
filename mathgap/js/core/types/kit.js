@@ -43,12 +43,14 @@ const parts = (x) => { const w = Math.floor(x.n / x.d); return { w, n: x.n - w *
 export function txt(x, st) {
   if (whole(x)) return String(x.n / x.d);
   if (st === 'D') return fmt(val(x));
+  if (x.imp) return `${x.n}/${x.d}`;   // 가분수로 보인 수(차시 문제가 8/7 로 냄 · words.js) — 대분수로 바꾸지 않음
   const { w, n, d } = parts(x);
   return w ? `${w} ${n}/${d}` : `${n}/${d}`;
 }
 // 문제 조각(문제 글 안 · 고르기 보기)
 export function tok(x, st) {
   if (whole(x) || st === 'D' || st === 'W') return txt(x, st);
+  if (x.imp) return { f: [x.n, x.d] };
   const { w, n, d } = parts(x);
   return w ? { m: [w, n, d] } : { f: [n, d] };
 }

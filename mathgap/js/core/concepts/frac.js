@@ -18,7 +18,7 @@ function pair(r, maxL = 36, wantShared = 0.7) {
 export default [
   {
     id: 'F1', name: '똑같이 나눈 것 중 몇 (분수)', kid: '분수 읽기', g: '3-1', s: 'F', pre: ['D1'],
-    tip: '종이띠·원을 직접 접어 똑같이 나누고, "전체를 4로 똑같이 나눈 것 중 3"을 3/4로 써요. 똑같지 않게 나눈 것과 비교해요.',
+    tip: '종이띠·원을 직접 접어 똑같이 나누고, "전체를 4로 똑같이 나눈 것 중 3"을 3/4으로 써요. 똑같지 않게 나눈 것과 비교해요.',
     gen: (r) => { const d = r.int(2, 8); return { d, n: r.int(1, d - 1), shape: r.pick(['bar', 'pie']) }; },
     make: (p) => frac([{ svg: p.shape === 'pie' ? pie(p.d, p.n) : bar(p.d, p.n) }, '색칠한 부분은 전체의 ', fb(0, 1)], F(p.n, p.d), {
       bugs: [
@@ -37,7 +37,7 @@ export default [
   },
   {
     id: 'F3', name: '분모가 같은 분수 = 단위분수 몇 개', kid: '1/몇이 몇 개', g: '3-1', s: 'F', pre: ['F1'],
-    tip: '"3/5는 1/5이 3개"를 수 막대로 세어요. 4학년 분수의 덧셈, 6학년 분수의 나눗셈까지 쓰이는 생각이에요.',
+    tip: '"3/5은 1/5이 3개"를 수 막대로 세어요. 4학년 분수의 덧셈, 6학년 분수의 나눗셈까지 쓰이는 생각이에요.',
     gen: (r) => { const d = r.int(3, 9), v = r.pick(['count', 'build', 'cmp']); let n = r.int(2, d - 1), m; do { m = r.int(1, d - 1); } while (m === n); return { v, d, n, m }; },
     make: (p) => {
       if (p.v === 'count') return nums([fx(p.n, p.d), `${P(p.n, '은', '는')} `, fx(1, p.d), '이 ', B(0), '개예요.'], p.n, { bugs: [{ test: (v) => v[0] === p.d, name: '분모를 셈', to: 'F1' }] });
@@ -140,7 +140,7 @@ export default [
           },
         };
       }
-      return nums([`분모를 ${RO(L)} 통분해요.`, { br: 1 }, fx(p.n1, p.d1), ' → ', { f: [B(0), L] }, '      ', fx(p.n2, p.d2), ' → ', { f: [B(1), L] }], [p.n1 * L / p.d1, p.n2 * L / p.d2], {
+      return nums([`분모를 ${RO(L)} 하여 통분하세요.`, { br: 1 }, fx(p.n1, p.d1), ' → ', { f: [B(0), L] }, '      ', fx(p.n2, p.d2), ' → ', { f: [B(1), L] }], [p.n1 * L / p.d1, p.n2 * L / p.d2], {
         bugs: [
           { test: (v) => v[0] === p.n1 && v[1] === p.n2, name: '분모만 바꿈', to: 'F7' },
           { test: (v) => v[0] === p.n1 + L - p.d1 || v[1] === p.n2 + L - p.d2, name: '분모·분자에 같은 수를 더함 (덧셈으로 지키기)', to: 'F7' },
@@ -171,7 +171,7 @@ export default [
     }),
     steps: (p) => {
       const ten = 10 % p.d === 0, D = ten ? 10 : 100, k = D / p.d, out = [];
-      if (k > 1) out.push({ c: 'F7', p: { v: 'up', n: p.n, d: p.d, k }, why: `분모를 ${D}으로 만들어요.` });
+      if (k > 1) out.push({ c: 'F7', p: { v: 'up', n: p.n, d: p.d, k }, why: `분모를 ${RO(D)} 만들어요.` });
       out.push({ c: ten ? 'DEC1' : 'DEC2', p: { v: 'frac', n: p.n * k }, why: '소수로 써요.' });
       return out;
     },
@@ -210,7 +210,7 @@ export default [
   },
   {
     id: 'F14', name: '(자연수)×(분수)', kid: '자연수 × 분수', g: '5-2', s: 'F', pre: ['F4'],
-    tip: '12 × 2/3은 "12의 2/3"이에요. 3학년의 "분수만큼은 얼마"와 같은 계산이에요.',
+    tip: '12 × 2/3는 "12의 2/3"이에요. 3학년의 "분수만큼은 얼마"와 같은 계산이에요.',
     gen: (r) => { const d = r.int(2, 6); return { d, n: r.int(1, d - 1), N: d * r.int(2, 6) }; },
     make: (p) => {
       const tok = [`${p.N} × `, FX(p.n, p.d, p.mix), ' = '];
@@ -234,7 +234,7 @@ export default [
   },
   {
     id: 'F15', name: '(분수)×(분수)', kid: '분수 × 분수', g: '5-2', s: 'F', pre: ['F15a', 'F14'],
-    tip: '넓이 그림(모눈)으로 분자끼리·분모끼리 곱하는 까닭을 보여 줘요. 진분수를 곱하면 작아진다는 것도 함께.',
+    tip: '넓이 그림(모눈)으로 분자끼리·분모끼리 곱하는 까닭을 보여 줘요. 진분수를 곱하면 작아진다는 것도 함께 보여 줘요.',
     gen: (r) => { const d1 = r.int(2, 7), d2 = r.int(2, 7); return { n1: r.int(1, d1 - 1), d1, n2: r.int(1, d2 - 1), d2 }; },
     make: (p) => frac([FX(p.n1, p.d1, p.mix1), ' × ', FX(p.n2, p.d2, p.mix2), ' = ', fb(0, 1)], mul(F(p.n1, p.d1), F(p.n2, p.d2)), {
       bugs: [
@@ -257,7 +257,7 @@ export default [
     make: (p) => frac([`${p.a} ÷ ${p.b} = `, fb(0, 1)], F(p.a, p.b), {
       bugs: [
         { test: (v) => v[0] === p.b && v[1] === p.a, name: '나누는 수를 위로 씀', to: 'F1' },
-        { test: (v) => p.v === 'big' && v[1] === p.a, name: '나머지를 나뉠 수로 나눔', to: 'D5' },
+        { test: (v) => p.v === 'big' && v[1] === p.a, name: '나머지를 나누어지는 수로 나눔', to: 'D5' },
       ],
     }),
     steps: (p) => p.v === 'big'
@@ -266,7 +266,7 @@ export default [
   },
   {
     id: 'F17', name: '(분수)÷(자연수)', kid: '분수 ÷ 자연수', g: '6-1', s: 'F', pre: ['F7', 'F16'],
-    tip: '3/4 ÷ 2: 분자 3이 2로 안 나누어지면 크기가 같은 분수 6/8로 바꿔 나눠요. × 1/2과 같다는 것도.',
+    tip: '3/4 ÷ 2: 분자 3이 2로 안 나누어지면 크기가 같은 분수 6/8으로 바꿔 나눠요. × 1/2과 같다는 것도.',
     gen: (r) => {
       if (r.chance(0.5)) { let d, k, m; do { d = r.int(4, 9); k = r.int(2, 3); m = r.int(1, 3); } while (m * k >= d); return { v: 'div', d, k, n: m * k }; }
       let d, k, n; do { d = r.int(3, 9); k = r.int(2, 4); n = r.int(1, d - 1); } while (n % k === 0); return { v: 'eq', d, k, n };
@@ -283,7 +283,7 @@ export default [
   },
   {
     id: 'F18', name: '분모가 같은 (분수)÷(분수)', kid: '분모가 같은 분수끼리 나누기', g: '6-2', s: 'F', pre: (p) => ['F3', 'D2', ...(p && p.a % p.b ? ['F16'] : [])],
-    tip: '6/7 ÷ 2/7는 "6/7 안에 2/7가 몇 번 들어가나"예요. 1/7이 6개 ÷ 1/7이 2개 = 6 ÷ 2. 3학년 "몇 번 덜어내기"와 같아요.',
+    tip: '6/7 ÷ 2/7는 "6/7 안에 2/7가 몇 번 들어가나"예요. 1/7이 6개 ÷ 1/7이 2개 = 6 ÷ 2. 3학년 "몇 번 덜어 내기"와 같아요.',
     gen: (r) => {
       if (r.chance(0.7)) { let d, b, q; do { d = r.int(5, 13); b = r.int(1, 4); q = r.int(2, 6); } while (b * q >= d); return { a: b * q, b, d }; }
       let d, a, b; do { d = r.int(5, 13); b = r.int(2, 5); a = r.int(b + 1, d - 1); } while (a % b === 0); return { a, b, d };
@@ -331,7 +331,7 @@ export default [
   },
   {
     id: 'F20', name: '(분수)÷(분수)를 곱셈으로', kid: '나누는 분수를 뒤집어 곱하기', g: '6-2', s: 'F', pre: ['F15', 'F21', 'F17'],
-    tip: '÷ 4/5는 "4/5가 1이 되게 하는 것"이라 × 5/4. 먼저 1 ÷ 4/5 = 5/4를 그림으로 보여 줘요.',
+    tip: '÷ 4/5는 "4/5에 곱하면 1이 되는 수"를 곱하는 것이라 × 5/4. 먼저 1 ÷ 4/5 = 5/4를 그림으로 보여 줘요.',
     gen: (r) => { const d1 = r.int(2, 7), d2 = r.int(2, 7); return { n1: r.int(1, d1 - 1), d1, n2: r.int(1, d2 - 1), d2 }; },
     make: (p) => {
       const res = div(F(p.n1, p.d1), F(p.n2, p.d2));
@@ -356,7 +356,7 @@ export default [
   },
   {
     id: 'F21', name: '(자연수)÷(분수)', kid: '자연수 ÷ 분수', g: '6-2', s: 'F', pre: ['F18', 'D4'],
-    tip: '6 ÷ 3/4: 3/4이 6이면 1/4은 2, 1(= 4/4)은 8. 분수로 나누면 커질 수 있다는 것을 띠 그림으로 보여 줘요.',
+    tip: '6 ÷ 3/4: 어떤 양의 3/4이 6이면 1/4은 2, 전체(1 = 4/4)는 8. 분수로 나누면 커질 수 있다는 것을 띠 그림으로 보여 줘요.',
     gen: (r) => { const d = r.int(2, 7), n = r.int(1, d - 1); return r.chance(0.3) ? { v: 'one', n, d } : { v: 'n', n, d, N: n * r.int(2, 5) }; },
     make: (p) => {
       if (p.v === 'one' && p.n === 1) return nums(['1 ÷ ', fx(1, p.d), ' = ', B(0)], p.d, { bugs: [{ test: (v) => near(v[0], 1 / p.d), name: '나누면 작아진다고 봄 (자연수 규칙)', to: null }] });

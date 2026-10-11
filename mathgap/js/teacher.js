@@ -1,4 +1,5 @@
-// 선생님 화면(#/t) — ① 단원 하나 정하기 ② 아이들은 RPG 홈 카드에서 하루 10분 ③ 반 전체 탑 · 수업 추천 · 아이별
+// 선생님 화면(#/t) — ① 단원 하나 정하기 ② 아이들은 RPG 홈 카드에서 하루 ○분 ③ 반 전체 탑 · 수업 추천 · 아이별
+//  10-11 점검: 5초 안에 '누가 도움이 필요한지' — 수업 추천을 맨 위로 · 아이별은 '선생님과'부터 · 쓰는 법 설명은 접어 둠
 //  쓰기는 config(단원 · 하루 시간)와 아이 한 명 '다시 살펴보기' · '선생님과 함께 표시 지우기'뿐. 이름은 반 명단(common/roster.js)에서.
 import { h, modal, toast } from './util.js';
 import { UNITS, byId, lessonsOfUnit, unitLabel, lessonLabel, corePre, allPre, sortByGrade } from './core/lessons/index.js';
@@ -10,6 +11,7 @@ const kj = (n, a, b) => josaK(String(n).replace(/\s*\([^)]*\)\s*$/, ''), a, b);
 // 도전 층 까닭 — 같이 풀기에서 처음 막힌 곳(today.js typeHelpDone)
 const DIAG = { read: '이야기 읽기', struct: '상황(구조) 파악', tpl: '문제 모양(식 세우기)', dom: '분수 · 소수가 되면 흔들림(쉬운 숫자로는 풂)', calc: '계산에서 막힘', plan: '단계를 나눠 주면 풂' };
 import { towerEl, miniEl, unitName } from './tower.js';
+import { printSheet } from './print.js';
 import { teacherGate } from '../../common/teacher-gate.js';
 import { rosterFor } from '../../common/roster.js';
 
@@ -35,7 +37,9 @@ export async function mountTeacher(app, ctx) {
       const tw = kid ? towerOf(unit, kid) : null;
       const d = kid && kid.days[today];
       return { sid, name: nameOf(sid), kid, tw, today: d && d.ms > 0 ? d : null };
-    }).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    });
+    const need = (r) => (!r.tw ? 2 : (r.tw.waiting || r.tw.topWaiting) ? 0 : !r.today ? 1 : 2);   // 선생님과 0 · 오늘 안 함 1 · 나머지 2
+    rows.sort((a, b) => need(a) - need(b) || a.name.localeCompare(b.name, 'ko'));
     const scanned = rows.filter((r) => r.tw && r.tw.scanned);
     // 층마다 불 켠 아이 수 · 기초 층(옛 단원)은 그 층을 가진 아이 기준
     const floorStat = ids.map((c, i) => {
@@ -81,8 +85,8 @@ export async function mountTeacher(app, ctx) {
         h('span', { class: 'ct' }, of ? `${lit} / ${of}${!base && f.tc ? ` · 선생님과 ${f.tc}` : ''}` : '—'));
     };
     const recText = hot.length || hotBase.length
-      ? [...hotBase.map((b) => `기초 '${b.name}'(${lessonLabel(b.c, { title: false })})에서 ${b.have - b.lit}명`), ...hot.map((f) => `${f.no}층 '${f.name}'에서 ${f.dark}명`)].join(' · ') + '이 불이 꺼져 있어요 — 반 전체로 한 번 더 다뤄 보세요.'
-      : scanned.length ? '여러 명이 한꺼번에 막힌 층은 없어요. 한두 명은 아이가 연습으로 채워요.' : '아이들이 살펴보기를 하면 여기에 층마다 불 켠 아이 수가 보여요.';
+      ? [...hotBase.map((b) => `기초 '${b.name}'(${lessonLabel(b.c, { title: false })})에서 ${b.have - b.lit}명`), ...hot.map((f) => `${f.no}층 '${f.name}'에서 ${f.dark}명`)].join(' · ') + '이 아직 불을 못 켰어요 — 반 전체로 한 번 더 다뤄 보세요.'
+      : scanned.length ? '여러 명이 한꺼번에 막힌 층은 없어요. 한두 명만 막힌 층은 아이가 연습으로 켜요.' : '아이들이 살펴보기를 하면 여기에 층마다 불 켠 아이 수가 보여요.';
     const firstHot = hotBase[0] ? hotBase[0].c : hot[0] ? hot[0].c : null;
     const topRec = hotTop ? [h('span', { style: { display: 'block', marginTop: '8px', color: '#d2c6f0' } }, h('b', { style: { color: '#c9b6ff' } }, `도전 층 '${hotTop.name}'`),
       ` — 식을 세우기 전에 막힌 아이 ${early(hotTop)}명: ${[['read', '이야기 읽기'], ['struct', '상황 파악'], ['tpl', '문제 모양'], ['dom', '분수 · 소수가 되면 흔들림']].filter(([k]) => hotTop.dg[k]).map(([k, n]) => `${n} ${hotTop.dg[k]}`).join(' · ')}.`,
@@ -104,7 +108,7 @@ export async function mountTeacher(app, ctx) {
       h('span', { class: 'nm', title: TYPES[x.t].idea }, h('b', { style: { color: '#c9b6ff' } }, '도전'), x.name,
         h('i', { style: { fontStyle: 'normal', color: '#a8977d', fontSize: '12px', marginLeft: '6px' } }, '문제집 유형')),
       h('span', { class: 'bar' }, h('i', { style: { width: x.of ? `${Math.round(100 * x.lit / x.of)}%` : '0', background: '#ffc766' } })),
-      h('span', { class: 'ct' }, x.of ? `${x.lit} / ${x.of}${x.tc ? ` · 선생님과 ${x.tc}` : ''}` : '아직 열린 아이 없음'));
+      h('span', { class: 'ct', title: x.of ? '' : '아래층을 다 켠 아이가 아직 없어요' }, x.of ? `${x.lit} / ${x.of}${x.tc ? ` · 선생님과 ${x.tc}` : ''}` : '아직'));
 
     app.replaceChildren(
       h('header', { class: 'top' }, h('h1', { class: 'jua', style: { color: '#f2a93b', fontSize: '1.5rem' } }, '오늘의 수학'), h('span', { class: 'muted' }, '선생님 화면'), h('span', { class: 'sp' }),
@@ -114,23 +118,25 @@ export async function mountTeacher(app, ctx) {
           h('div', { class: 'tstep on' }, h('span', { class: 'n' }, '1'), h('div', { style: { flex: '1', minWidth: '0' } }, h('b', {}, '단원 하나 정하기'),
             unitSel, h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } }, minSel, saveBtn),
             h('p', { style: { marginTop: '6px' } }, isCur ? `지금 아이들에게 열린 탑이에요 · 하루 ${cfg.minutes}분` : cfg.unit ? `지금 열린 탑: ${unitLabel(cfg.unit)} — 이 단원으로 바꾸려면 '이 단원으로 열기'` : '아직 열린 탑이 없어요 — 단원을 고르고 \'이 단원으로 열기\''))),
-          h('div', { class: 'tstep' }, h('span', { class: 'n' }, '2'), h('div', {}, h('b', {}, '아이들은 알아서 하루 10분'),
-            h('p', {}, "RPG 홈의 '오늘의 수학' 카드 → 첫날은 탑 살펴보기(문제를 풀며 단원 점검), 다음 날부터 불 꺼진 층을 아래부터 연습. 탑을 다 켜면 꼭대기 위 '도전 층'(그 단원 숫자로 낸 문제집 유형)이 열려요. 보상은 없어요."))),
-          h('div', { class: 'tstep' }, h('span', { class: 'n' }, '3'), h('div', {}, h('b', {}, '아래에서 반 전체를 봐요'),
-            h('p', {}, '여러 명이 불 꺼진 층은 수업에서 다시, 한두 명은 아이가 연습으로 채워요. 이름을 누르면 그 아이의 탑과 처음 막힌 차시를 봐요.')))),
+          h('details', { class: 'tstep how2' }, h('summary', {}, h('span', { class: 'n' }, '?'), h('b', {}, '어떻게 돌아가나요')),
+            h('p', {}, `① 아이들은 RPG 홈의 '오늘의 수학' 카드로 하루 ${cfg.minutes}분 — 첫날은 탑 살펴보기(문제를 풀며 단원 점검), 다음 날부터 불 꺼진 층을 아래부터 연습. 탑을 다 켜면 꼭대기 위 '도전 층'(그 단원 숫자로 낸 문제집 유형)이 열려요. 보상은 없어요.`),
+            h('p', {}, '② 여러 명이 못 켠 층은 수업에서 다시 다루고, 한두 명만 못 켠 층은 아이가 연습으로 켜요. 이름을 누르면 그 아이의 탑 · 처음 막힌 차시 · 가정에 보낼 글을 봐요.'))),
         h('div', { class: 'tgrid' },
           h('div', { class: 'tbox' },
             h('h3', {}, `우리 반 탑 · ${unitName(unit)}`, h('small', {}, `층마다 불을 켠 아이 수 · ${rows.length}명 중 살펴본 아이 ${scanned.length}명${grown ? ` · 꺼져 있다가 켠 층 ${grown}개` : ''}`)),
+            h('div', { class: 'rec', style: { marginTop: '10px' } }, h('b', {}, '수업 추천'), h('span', {}, recText,
+              hot.length || hotBase.length ? h('button', { class: 'btn small', style: { display: 'block', marginTop: '8px' }, onclick: () => printSheet({ title: `${unitName(unit)} 학습지`,
+                floors: [...hotBase.slice(0, 1).map((b) => ({ c: b.c, label: `기초 ${b.name}` })), ...hot.slice(0, 2).map((f) => ({ c: f.c, label: `${f.no}층 ${f.name}` }))] }) }, '이 층들 학습지 인쇄(반 전체 · 정답 포함)') : null, hotBug ? h('span', { style: { display: 'block', marginTop: '6px', color: '#f3e8d6' } }, hotBug) : null, firstHot && byId[firstHot].tip ? h('span', { style: { display: 'block', marginTop: '6px', color: '#d9c9ae' } }, `가르치는 법 — ${byId[firstHot].tip}`) : null, topRec)),
             h('div', { style: { display: 'flex', flexDirection: 'column-reverse', marginTop: '10px' } },
               ...bases.slice(0, 4).map((b) => frow(b, { base: true })),
               bases.length ? h('div', { style: { height: '6px', borderRadius: '3px', background: '#5a4733', margin: '4px 0' } }) : null,
               ...floorStat.map((f) => frow(f)),
               topStat.length ? h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: '#b9a6ee', fontFamily: 'Jua, sans-serif', fontSize: '14px', margin: '8px 0 2px' } },
                 h('span', { style: { flex: '1', borderTop: '2px dashed #6a5a8f' } }), '도전 층 — 아래층을 다 켠 아이에게 열려요', h('span', { style: { flex: '1', borderTop: '2px dashed #6a5a8f' } })) : null,
-              ...topStat.map((x) => trow(x))),
-            h('div', { class: 'rec' }, h('b', {}, '수업 추천'), h('span', {}, recText, hotBug ? h('span', { style: { display: 'block', marginTop: '6px', color: '#f3e8d6' } }, hotBug) : null, firstHot && byId[firstHot].tip ? h('span', { style: { display: 'block', marginTop: '6px', color: '#d9c9ae' } }, `가르치는 법 — ${byId[firstHot].tip}`) : null, topRec))),
+              ...topStat.map((x) => trow(x)))),
           h('div', { class: 'tbox' },
-            h('h3', {}, '아이별', h('small', {}, `오늘 한 아이 ${todayN}명`)),
+            h('h3', {}, '아이별', h('small', {}, `오늘 한 아이 ${todayN}명 · 선생님이 볼 아이가 맨 위`)),
+            h('div', { class: 'mlegend' }, h('span', {}, h('i', { class: 'on' }), '켬'), h('span', {}, h('i', {}), '아직'), h('span', {}, h('i', { class: 'tc' }), '선생님과'), h('span', {}, h('i', { class: 'q' }), '안 살펴봄'), h('span', {}, h('i', { class: 'tp' }), '도전 층')),
             h('div', { style: { marginTop: '8px' } }, ...rows.map((r) => {
               const [label, tone] = statusOf(r);
               return h('button', { class: 'krow', onclick: () => r.kid ? detail(r) : toast('아직 오늘의 수학을 열지 않았어요') },
@@ -143,7 +149,7 @@ export async function mountTeacher(app, ctx) {
   function typeBox(kid, tw) {
     const T = kid.types || {};
     if (!tw.tops.length && !Object.keys(T).length) return null;
-    const st = { lit: '켬', dark: '아직', teacher: '선생님과', lock: '잠김(아래층을 다 켜면)', q: '안 살펴봄' };
+    const st = { lit: '켬', dark: '아직', teacher: '선생님과', lock: '잠김(아래층을 다 켜면 열림)', q: '안 살펴봄' };
     const dg = (t) => { const d = (T[t] || {}).diag || {}; const xs = Object.keys(DIAG).filter((k) => d[k]).map((k) => `${DIAG[k]} ${d[k]}`); return xs.length ? ` — 처음 막힌 곳: ${xs.join(' · ')}` : ''; };
     const here = new Set(tw.tops.map((f) => f.t));
     const other = Object.keys(T).filter((t) => TYPES[t] && !here.has(t) && Object.keys(T[t].lit || {}).length);
@@ -153,11 +159,13 @@ export async function mountTeacher(app, ctx) {
   }
 
   // 그날 켠 층 — 차시 층 · 도전 층을 나눠서
-  const litText = (lit) => { const t = lit.filter((c) => isType(c)).length, f = lit.length - t; return `${f ? ` · ${f}층 켬` : ''}${t ? ` · 도전 층 ${t}개 켬` : ''}`; };
+  const litText = (lit) => { const t = lit.filter((c) => isType(c)).length, f = lit.length - t; return `${f ? ` · 층 ${f}개 켬` : ''}${t ? ` · 도전 층 ${t}개 켬` : ''}`; };
 
   // 가정에 보낼 글(10-11 · 교사 '학부모는 교육과정 연결을 몰라 확인하기 어렵다') — 이 아이 탑에서 쉬운 말로 · 화면에서만 만들고 저장하지 않음
   //  교육과정 연결 = 막힌 차시가 기대는 앞 차시(corePre) 중 앞 단원 것 · 집에서 할 일 = 기초 층 예제 한 문제 · 문장제는 처음 막힌 곳에 맞춰
-  const gl = (c) => { const L = byId[c]; return L ? `${unitLabel(L.u).replace(/^(\d)-(\d)/, '$1학년 $2학기')} '${L.kid}'` : c; };
+  //  학부모가 교과서에서 찾을 수 있게 차시 제목(교과서 그대로)으로 — 아이 화면용 줄임 이름은 쓰지 않음(10-11 교정)
+  const ttl = (c) => byId[c].title || byId[c].kid;
+  const gl = (c) => { const L = byId[c]; return L ? `${unitLabel(L.u).replace(/^(\d)-(\d)\s*(.*)$/, "$1학년 $2학기 '$3' 단원의")} '${ttl(c)}'` : c; };   // 3학년 2학기 '분수' 단원의 '분수만큼은 얼마일까요'
   // 교육과정 연결 — 다리가 있으면 그 '예전에 배운 것', 없으면 앞 차시 줄에서 다른 단원의 가장 가까운 것
   const linkOf = (c) => {
     let ex = null; try { ex = exampleOf(c, 7); } catch (e) { /* */ }
@@ -166,39 +174,41 @@ export async function mountTeacher(app, ctx) {
     const a = other(corePre(c)); if (a.length) return sortByGrade(a).slice(-1)[0];
     const b = other(allPre(c)); return b.length ? sortByGrade(b).slice(-1)[0] : null;
   };
+  //  10-11 점검: 앱 안 말(층 · 불 · 차시 · 도전 층 · 기대요)을 빼고 '익혔어요 · 교과서 몇 번째 공부 · 바탕'으로 · 선생님과 볼 것은 따로
   function parentText(name, kid, tw) {
-    const lines = [`[오늘의 수학 · ${unitLabel(unit).replace(/^(\d)-(\d)/, '$1학년 $2학기')}] ${name}`];
-    if (!tw.scanned) return [...lines, '아직 이 단원 탑을 살펴보지 않았어요. 학교에서 하루 10분씩 이어서 해요.'].join('\n');
-    lines.push(`· 이 단원 ${tw.floors.length}층 중 ${tw.floors.filter((f) => f.st === 'lit').length}층에 불을 켰어요(잘하는 차시).${tw.tops.length ? ` 문제집 유형 도전 층은 ${tw.tops.length}개 중 ${tw.topLit}개를 켰어요.` : ''}`);
-    const dark = tw.all.filter((f) => f.st !== 'lit');
+    const lines = [`[오늘의 수학 · ${unitLabel(unit).replace(/^(\d)-(\d)/, '$1학년 $2학기')}] ${name}`, `(학교에서 하루 ${cfg.minutes}분씩, 지금 배우는 단원과 그 바탕이 되는 예전 내용을 문제로 확인하고 연습해요.)`];
+    if (!tw.scanned) return [...lines, `아직 이 단원 살펴보기(처음 확인)를 하지 않았어요. 학교에서 하루 ${cfg.minutes}분씩 이어서 해요.`].join('\n');
+    const litN = tw.floors.filter((f) => f.st === 'lit').length;
+    const topsLine = !tw.tops.length ? '' : tw.topLit ? ` 문제집에 자주 나오는 문장제 유형 ${tw.tops.length}가지 중 ${tw.topLit}가지도 해냈어요.` : litN === tw.floors.length ? ` 이제 문제집에 자주 나오는 문장제 유형 ${tw.tops.length}가지에 도전하고 있어요.` : '';
+    lines.push(`· 이 단원에서 배우는 ${tw.floors.length}가지 중 ${litN}가지를 익혔어요.${topsLine}`);
+    const dark = tw.all.filter((f) => f.st !== 'lit' && f.st !== 'teacher'), tc = tw.all.filter((f) => f.st === 'teacher');
+    const what = (f) => { const L = byId[f.c], here = L.u === unit; return here ? `'${ttl(f.c)}'(교과서 이 단원 ${L.n}번째 공부)` : `예전에 배운 ${gl(f.c)}`; };
     if (dark.length) {
-      lines.push('· 아직 연습 중인 곳(교과서 차시와 그 바탕):');
-      for (const f of dark.slice(0, 4)) {
-        const L = byId[f.c], here = L.u === unit;
-        lines.push(`  - ${here ? `'${L.kid}'(${L.span || L.n}차시)` : `예전에 배운 ${gl(f.c)}`}${linkOf(f.c) ? ` — 이 내용은 ${gl(linkOf(f.c))}에 기대요` : ''}`);
-      }
-    } else lines.push('· 이 단원 차시는 모두 불이 켜졌어요.');
+      lines.push('· 아직 연습하고 있는 것:');
+      for (const f of dark.slice(0, 4)) { const k = linkOf(f.c); lines.push(`  - ${what(f)}${k ? ` — ${gl(k)}${kj(ttl(k), '을', '를')} 바탕으로 해요` : ''}`); }
+    } else if (!tc.length) lines.push('· 이 단원에서 배우는 것을 모두 익혔어요.');
+    if (tc.length) { const tl = tc.slice(0, 3); lines.push(`· 여러 번 연습해도 어려워한 ${tl.map(what).join(', ')}${kj(ttl(tl[tl.length - 1].c), '은', '는')} 학교에서 선생님과 함께 다시 봐요.`); }
     const T = kid.types || {}, sum = { read: 0, struct: 0, tpl: 0, dom: 0, calc: 0, plan: 0 };
     for (const t of Object.keys(T)) for (const k of Object.keys(sum)) sum[k] += (T[t].diag || {})[k] || 0;
     const top = Object.entries(sum).sort((a, b) => b[1] - a[1])[0];
     const home = [];
     const firstBase = tw.base.find((f) => f.st !== 'lit'), firstDark = tw.floors.find((f) => f.st !== 'lit');
     if (!firstBase && firstDark) { let ex = null; try { ex = exampleOf(firstDark.c, 7); } catch (e) { /* */ } if (ex && ex.bridge) home.push(`'${byId[firstDark.c].kid}'${kj(byId[firstDark.c].kid, '은', '는')} 예전에 배운 '${byId[ex.bridge.old.c].kid}'${kj(byId[ex.bridge.old.c].kid, '과', '와')} 같은 생각이에요. ${ex.bridge.same} 집에 있는 물건으로 먼저 해 보고 분수로 바꿔 보세요.`); }
-    if (firstBase) { let ex = null; try { ex = exampleOf(firstBase.c, 7); } catch (e) { /* */ } home.push(`예전에 배운 ${gl(firstBase.c)}부터 다시 다지면 좋아요.${ex ? ` 예: ${toText(ex.item.prompt).replace(/□/g, '(  )')}` : ''}`); }
+    if (firstBase) { let ex = null; try { ex = exampleOf(firstBase.c, 7); } catch (e) { /* */ } home.push(`예전에 배운 ${gl(firstBase.c)}부터 다시 다지면 좋아요.${ex && !ex.item.prompt.some((t) => t && typeof t === 'object' && 'svg' in t) ? ` 예: ${toText(ex.item.prompt).replace(/□/g, '(  )')}` : ''}`); }   // 그림 문제는 글로 못 보내므로 예를 빼요
     if (top && top[1] >= 2) {
-      lines.push(`· 문장제(문제집 유형)에서 처음 막힌 곳: ${{ read: '이야기 읽기', struct: '상황(구조) 파악', tpl: '식 세우기(유형)', dom: '분수 · 소수가 되면 흔들림', calc: '계산', plan: '혼자 단계 나누기' }[top[0]]}`);
-      home.push({ read: '문제를 소리 내어 끝까지 읽고, 수마다 무엇을 말하는지 짚어 보게 해 주세요.', struct: '문제를 자기 말로 다시 말해 보게 해 주세요 — 누가 더 많은지, 무엇이 바뀌었는지.', tpl: '식을 세우기 전에 그림(막대)으로 상황을 그려 보게 해 주세요.', dom: '같은 문제를 작은 자연수로 바꿔 먼저 풀고, 다시 분수 · 소수로 풀어 보게 해 주세요.', calc: '식은 잘 세우니 계산을 천천히 확인하는 습관을 칭찬해 주세요.', plan: "'먼저 무엇을 구할까?'를 물어 단계를 나누게 해 주세요." }[top[0]]);
+      lines.push(`· 문장제에서 처음 막힌 곳: ${{ read: '이야기 읽기', struct: '상황(구조) 파악', tpl: '식 세우기(유형)', dom: '분수 · 소수가 되면 흔들림', calc: '계산', plan: '혼자 단계 나누기' }[top[0]]}`);
+      home.push({ read: '문제를 소리 내어 끝까지 읽고, 수마다 무엇을 말하는지 짚어 보게 해 주세요.', struct: '문제를 자기 말로 다시 말해 보게 해 주세요 — 누가 더 많은지, 무엇이 바뀌었는지.', tpl: '식을 세우기 전에 그림(막대)으로 상황을 그려 보게 해 주세요.', dom: '같은 문제를 작은 자연수로 바꿔 먼저 풀고, 다시 분수 · 소수로 풀어 보게 해 주세요.', calc: '식은 잘 세워요. 계산한 뒤 한 번 더 확인하게 하고, 확인하면 칭찬해 주세요.', plan: "'먼저 무엇을 구할까?'를 물어 단계를 나누게 해 주세요." }[top[0]]);
     }
-    if (!home.length) home.push('학교에서 하루 10분씩 꾸준히 하고 있어요. 오늘 켠 층을 물어봐 주세요.');
+    if (!home.length) home.push('오늘 무엇을 익혔는지 물어봐 주세요. 아이가 직접 설명해 보면 더 오래 기억해요.');   // 하루 몇 분은 둘째 줄에 이미 있음
     lines.push('· 집에서 도와주실 수 있는 것:', ...home.map((x) => `  - ${x}`));
     return lines.join('\n');
   }
 
   function parentBox(name, kid, tw) {
-    const ta = h('textarea', { id: 'mg-parent-text', rows: '9', readonly: true, style: { width: '100%', background: '#1c1610', color: 'var(--ink)', border: '1px solid #3d3024', borderRadius: '10px', padding: '10px', font: 'inherit', fontSize: '13px', lineHeight: '1.6' } });
+    const ta = h('textarea', { id: 'mg-parent-text', rows: '9', 'aria-label': '가정에 보낼 글(고쳐 써도 돼요)', style: { width: '100%', background: '#1c1610', color: 'var(--ink)', border: '1px solid #3d3024', borderRadius: '10px', padding: '10px', font: 'inherit', fontSize: '13px', lineHeight: '1.6' } });
     ta.value = parentText(name, kid, tw);
-    const copy = h('button', { class: 'btn small', onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('복사했어요 — 알림장 · 문자에 붙여 넣으세요'); } catch (e) { ta.select(); toast('글을 골랐어요 — Ctrl+C 로 복사하세요'); } } }, '복사');
-    return h('div', { class: 'root' }, h('b', {}, '가정에 보낼 글'), ' ', h('span', { class: 'muted' }, '(이 화면에서만 만들어요 · 저장하지 않아요)'), ta, h('div', { style: { marginTop: '6px' } }, copy));
+    const copy = h('button', { class: 'btn primary small', onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('복사했어요 — 알림장 · 문자에 붙여 넣으세요'); } catch (e) { ta.select(); toast('글을 선택했어요 — Ctrl+C로 복사하세요'); } } }, '복사');
+    return h('div', { class: 'root' }, h('b', {}, '가정에 보낼 글'), ' ', h('span', { class: 'muted' }, '(한 줄 덧붙여 고쳐 써도 돼요 · 저장하지 않아요)'), ta, h('div', { style: { marginTop: '6px' } }, copy));
   }
 
   function detail(r) {
@@ -210,14 +220,16 @@ export async function mountTeacher(app, ctx) {
       h('div', { style: { flex: '0 0 300px', maxWidth: '100%' } }, tw.scanned ? towerEl(tw, { order: true, small: true }) : h('p', {}, '이 단원은 아직 살펴보지 않았어요.')),
       h('div', { class: 'roots', style: { flex: '1', minWidth: '240px' } },
         sc ? h('p', {}, `살펴보기 ${new Date(sc.t).toLocaleDateString('ko-KR')} · ${sc.n}문제`) : null,
-        ...dark.map((f) => h('div', { class: 'root' }, h('b', {}, `${f.base ? '기초' : f.no + '층'} ${f.name}`), f.st === 'teacher' ? ' — 선생님과 함께(연습 12문제 안에 못 켬)' : '',
+        parentBox(r.name, kid, tw),
+        ...dark.sort((a, b) => (b.st === 'teacher') - (a.st === 'teacher')).map((f) => h('div', { class: 'root' + (f.st === 'teacher' ? ' tcx' : '') }, h('b', {}, `${f.base ? '기초' : f.no + '층'} ${f.name}`), f.st === 'teacher' ? ' — 선생님과 함께(연습 12문제 안에 못 켬)' : '',
           h('br'), h('span', { class: 'muted' }, lessonLabel(f.c)), byId[f.c].tip ? [h('br'), `가르치는 법 — ${byId[f.c].tip}`] : null, byId[f.c].bridge ? [h('br'), `다리 — ${byId[f.c].bridge}`] : null)),
         bugsOf(kid).length ? h('div', { class: 'root' }, h('b', {}, '자주 나온 실수'), ...bugsOf(kid).slice(0, 5).map((b) => [h('br'), `${b.name} ×${b.n} `, h('span', { class: 'muted' }, `· ${isType(b.c) ? `도전 층 ${typeName(b.c)}` : lessonLabel(b.c, { title: false })}`)])) : null,
         typeBox(kid, tw),
         h('div', { class: 'root cmp-box' }, h('b', {}, '처음과 지금'), h('br'), h('span', { class: 'muted' }, '문항 기록을 불러오는 중…')),
-        parentBox(r.name, kid, tw),
-        days.length ? h('p', { class: 'muted' }, '최근: ', days.map((d) => `${d.slice(5)} ${kid.days[d].ms < 60000 ? '1분 안' : Math.round(kid.days[d].ms / 60000) + '분'}${litText(kid.days[d].lit)}`).join(' / ')) : null));
+        days.length ? h('p', { class: 'muted' }, '최근: ', days.map((d) => `${d.slice(5)} ${kid.days[d].ms < 60000 ? '1분 미만' : Math.round(kid.days[d].ms / 60000) + '분'}${litText(kid.days[d].lit)}`).join(' / ')) : null));
+    const darkF = tw.scanned ? tw.all.filter((f) => f.st !== 'lit').slice(0, 3) : [];
     const close = modal(r.name, body, [
+      darkF.length ? { label: '학습지 인쇄', onclick: () => printSheet({ title: `${unitName(unit)} 학습지`, who: r.name, floors: darkF.map((f) => ({ c: f.c, label: `${f.base ? '기초' : f.no + '층'} ${f.name}` })) }) } : null,
       { label: '이 단원 다시 살펴보기', onclick: async (close) => { if (!confirm(`${r.name}의 ${unitName(unit)} 탑을 처음부터 다시 살펴보게 할까요? (배운 기록은 남아요)`)) return; await store.resetKid(r.sid, unit); close(); await load(); draw(); toast('다음에 열면 탑 살펴보기부터 해요'); } },
       tw.waiting ? { label: "'선생님과' 표시 지우기", onclick: async (close) => { await store.clearMarks(r.sid); close(); await load(); draw(); toast('그 층들을 다시 연습할 수 있어요'); } } : null,
       { label: '닫기', primary: true },

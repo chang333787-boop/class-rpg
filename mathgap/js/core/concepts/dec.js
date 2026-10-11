@@ -7,7 +7,7 @@ const d2 = (k) => fmt(k / 100), d1 = (k) => fmt(k / 10);
 export default [
   {
     id: 'DEC1', name: '소수 한 자리 (0.1이 몇 개)', kid: '0.1이 몇 개', g: '3-1', s: 'DEC', pre: ['F3'],
-    tip: '1 cm = 10 mm 자로 0.1 cm = 1 mm를 보여 줘요. 0.7은 0.1이 7개.',
+    tip: '1 cm = 10 mm 자로 0.1 cm = 1 mm를 보여 줘요. 0.7은 0.1이 7개예요.',
     gen: (r) => r.pick([{ v: 'count', n: r.int(2, 9) }, { v: 'frac', n: r.int(1, 9) }, { v: 'units', n: r.int(11, 49) }]),
     make: (p) => {
       if (p.v === 'count') return nums([`0.1이 ${p.n}개이면 `, B(0)], p.n / 10, { noFrac: true, bugs: [{ test: (v) => v[0] === p.n, name: '개수를 그대로 씀', to: 'F3' }, { test: (v) => near(v[0], p.n / 100), name: '0.1과 0.01을 헷갈림', to: 'F3' }] });
@@ -41,7 +41,7 @@ export default [
   },
   {
     id: 'DEC4', name: '소수의 10배·100배·1/10', kid: '소수 10배, 100배', g: '4-2', s: 'DEC', pre: ['DEC2'],
-    tip: '수 카드를 자리판에서 한 칸·두 칸 옮겨요. 소수점이 움직이는 게 아니라 숫자가 자리를 옮겨요.',
+    tip: '수 카드를 자리판에서 한 칸·두 칸 옮겨요. 숫자가 자리를 옮긴다고 보면 까닭이 보여요. 결과는 소수점을 옮긴 것과 같아요(5학년에서는 그렇게 말해요).',
     gen: (r) => ({ v: r.pick(['x10', 'x100', 'd10']), k: r.int(11, 299) }),
     make: (p) => {
       const x = p.k / 100, f = { x10: 10, x100: 100, d10: 0.1 }[p.v], lab = { x10: '10배', x100: '100배', d10: '1/10' }[p.v];
@@ -86,7 +86,7 @@ export default [
   },
   {
     id: 'G3', name: '최대공약수', kid: '최대공약수', g: '5-1', s: 'G', pre: ['G1'],
-    tip: '두 수의 약수를 나란히 쓰고 겹치는 것에 동그라미 → 그중 가장 큰 수.',
+    tip: '두 수의 약수를 나란히 쓰고 겹치는 것에 동그라미를 치고, 그중 가장 큰 수를 찾게 해요.',
     gen: (r) => { let g, x, y; do { g = r.int(2, 9); x = r.int(1, 6); y = r.int(2, 7); } while (x === y || gcd(x, y) !== 1 || g * x > 60 || g * y > 60); return { a: g * x, b: g * y }; },
     make: (p) => {
       const g = gcd(p.a, p.b);

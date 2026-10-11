@@ -182,7 +182,7 @@ const FAMS = [
     make: (p) => {
       const pos = p.side === 'R' ? p.d - p.k + 1 : p.k, sw = p.side === 'R' ? '오른쪽' : '왼쪽';
       if (p.v === 'before') {
-        return nums([{ svg: row(p.d, p.k) }, `색칠한 네모는 ${sw}에서 ${ORD[pos]}예요. 색칠한 네모보다 ${sw}에 있는 네모는 몇 개인가요? `, B(0), '개'], pos - 1, {
+        return nums([{ svg: row(p.d, p.k) }, `색칠한 네모는 ${sw}에서 ${ORD[pos]}예요. 색칠한 네모보다 ${sw}에 있는 네모는 몇 개인가요? `, B(0), '개'], pos - 1, {   // 조사 고정: 첫째 · 둘째 …(모두 받침 없음)
           bugs: [{ test: (v) => v[0] === pos, name: '몇째와 몇 개를 헷갈림', to: null }],
         });
       }
@@ -259,7 +259,7 @@ const FAMS = [
   },
   {
     id: 'g1_SUBM', s: 'A', sec: 15,
-    tip: '"남은 것은?"(덜어 내기)과 "몇 개 더 많은가?"(비교) 두 상황을 모두 − 로 쓴다는 것을 그림으로 보여 줘요. 큰 수를 앞에 써요.',
+    tip: '"남은 것은?"(덜어 내기)과 "몇 개 더 많은가?"(비교) 두 상황을 모두 −로 쓴다는 것을 그림으로 보여 줘요. 큰 수를 앞에 써요.',
     // {a, b, v:'pic'|'take'|'cmp', o, o2}
     make: (p) => {
       const o = OBJ[p.o || 0], o2 = OBJ[p.o2 == null ? 1 : p.o2];
@@ -285,7 +285,7 @@ const FAMS = [
       const sub = p.op === '-';
       if (p.v === 'make') {
         const s = p.x + p.y, list = [[p.x, p.y, s], [p.x, s, p.y], [p.y, p.x, s], [p.y, s, p.x], [s, p.x, p.y], [s, p.y, p.x]][p.ord || 0];
-        const lead = `세 수 ${list[0]}, ${list[1]}, ${RO(list[2])} ${sub ? '뺄셈식' : '덧셈식'}을 만들어 보세요.`;
+        const lead = `세 수 ${list[0]}, ${list[1]}, ${RO(list[2])} ${sub ? '뺄셈식' : '덧셈식'}을 만들어 보세요.`;   // 조사 고정: 뺄셈식 · 덧셈식
         return sub
           ? anyOf([lead, { br: 1 }, B(0), ' − ', B(1), ' = ', B(2)], [[s, p.x, p.y], [s, p.y, p.x]], { bugs: [{ test: (v) => v[0] !== s, name: '가장 큰 수에서 빼야 함을 모름', to: '1-1-3:9' }] })
           : anyOf([lead, { br: 1 }, B(0), ' + ', B(1), ' = ', B(2)], [[p.x, p.y, s], [p.y, p.x, s]], { bugs: [{ test: (v) => v[2] !== s, name: '가장 큰 수가 합이 됨을 모름', to: '1-1-3:5' }] });
@@ -307,16 +307,16 @@ const FAMS = [
       bugs: [{ test: (v) => v[0] === p.a - p.b + p.c, name: '마지막 수를 더함', to: null },
         { test: (v) => v[0] === p.a - p.b || v[0] === p.a - p.c, name: '수 하나를 빼지 않음', to: null }],
     }),
-    steps: (p) => [{ c: 'SUB', p: { a: p.a, b: p.b }, why: '앞의 두 수를 먼저 빼요.' }, { c: 'SUB', p: { a: p.a - p.b, b: p.c }, why: '그 결과에서 남은 수를 빼요.' }],
+    steps: (p) => [{ c: 'SUB', p: { a: p.a, b: p.b }, why: '첫째 수에서 둘째 수를 먼저 빼요.' }, { c: 'SUB', p: { a: p.a - p.b, b: p.c }, why: '그 결과에서 셋째 수를 빼요.' }],
   },
   {
     id: 'g1_EVEN', s: 'N', sec: 6,
-    tip: '바둑돌을 둘씩 짝 지어 남는 것이 없으면 짝수, 하나 남으면 홀수예요. 두 자리 수는 일의 자리만 보면 된다는 것을 찾게 해요.',
+    tip: '바둑돌을 둘씩 짝지어 남는 것이 없으면 짝수, 하나 남으면 홀수예요. 두 자리 수는 일의 자리만 보면 된다는 것을 찾게 해요.',
     // {v:'which', n} · {v:'pic', n} · {v:'find', even, ns:[3수], k}
     make: (p) => {
       if (p.v === 'find') {
         const want = p.even ? '짝수' : '홀수', r = p.ns[0];
-        return choose([`${want}를 고르세요.`], r, p.ns.slice(1), p.k, [{ name: '짝수와 홀수를 헷갈림', to: null }, { name: '짝수와 홀수를 헷갈림', to: null }]);
+        return choose([`${want}를 고르세요.`], r, p.ns.slice(1), p.k, [{ name: '짝수와 홀수를 헷갈림', to: null }, { name: '짝수와 홀수를 헷갈림', to: null }]);   // 조사 고정: 짝수 · 홀수
       }
       const ev = p.n % 2 === 0;
       const lead = p.v === 'pic' ? [{ svg: dots(p.n, { cols: Math.ceil(p.n / 2) }) }, '둘씩 짝을 지어 보세요. 점의 수는 짝수인가요, 홀수인가요?'] : [`${p.n}${P(p.n, '은', '는')} 짝수인가요, 홀수인가요?`];
@@ -426,7 +426,7 @@ export default {
         : until(r, (r) => ({ a: r.int(1, 9), b: r.int(1, 9), lo: r.chance(0.35) }), (p) => p.a !== p.b)), make: cmpMake,
       is: (p) => cmpMax(p) <= 9, prev: '1-1-1:7', pre: [],
       hint: '수를 차례로 셀 때 뒤에 나오는 수가 더 커요. 7은 5보다 뒤에 나오니까 7이 더 커요.',
-      tip: '수 카드를 차례로 늘어놓고 "뒤에 있을수록 큰 수"를 짚어 보게 해요. 바둑돌을 하나씩 짝 지어 남는 쪽이 더 많다는 것도 보여 줘요.',
+      tip: '수 카드를 차례로 늘어놓고 "뒤에 있을수록 큰 수"를 짚어 보게 해요. 바둑돌을 하나씩 짝지어 남는 쪽이 더 많다는 것도 보여 줘요.',
     },
     // ── 1-1-3 덧셈과 뺄셈 (모으기 → 덧셈 · 가르기 → 뺄셈 두 갈래)
     {
@@ -440,14 +440,14 @@ export default {
       id: '1-1-3:3', fam: 'N3', name: '가르기 (9까지)', kid: '수를 둘로 가르기', sec: 6, def: true,
       gen: (r) => { const t = r.int(2, 9); return { v: 'split', t, a: r.int(1, t - 1) }; }, make: n3Make,
       is: (p) => p.v === 'split' && p.t <= 9, prev: null, pre: ['1-1-1:3'],
-      hint: '바둑돌을 두 쪽으로 나눠 놓는다고 생각해요. 7을 3과 몇으로 가르면? 3에서 7까지 이어 세면 4예요.',
+      hint: '바둑돌을 두 쪽으로 나눠 놓는다고 생각해요. 7을 3과 몇으로 가르면? 3 다음부터 4, 5, 6, 7 하고 이어 세면 4번이라 4예요.',
       tip: '바둑돌을 두 접시에 여러 가지로 나눠 담아 보며(7 = 1과 6, 2와 5 …) 한쪽이 늘면 다른 쪽이 준다는 것을 보게 해요.',
     },
     {
       id: '1-1-3:5', fam: 'g1_ADDM', name: '덧셈식으로 나타내기', kid: '덧셈식 알기', sec: 18,
       gen: (r) => { const a = r.int(1, 8); return { a, b: r.int(1, 9 - a), v: r.pick(['pic', 'story']), o: r.int(0, OBJ.length - 1), t: r.int(0, 1) }; },
       prev: '1-1-3:2', pre: [],
-      hint: '"모으면 모두"는 + 와 = 로 써요. 3개와 2개를 모으면 3 + 2 = 5예요.',
+      hint: '"모으면 모두"는 +와 =로 써요. 3개와 2개를 모으면 3 + 2 = 5예요.',
     },
     {
       id: '1-1-3:6', fam: 'ADD', name: '합이 9까지인 덧셈', kid: '한 자리 수 더하기 (9까지)', sec: 5, timed: true,
@@ -459,7 +459,7 @@ export default {
       id: '1-1-3:9', fam: 'g1_SUBM', name: '뺄셈식으로 나타내기', kid: '뺄셈식 알기', sec: 18,
       gen: (r) => { const a = r.int(2, 9), o = r.int(0, OBJ.length - 1); return { a, b: r.int(1, a - 1), v: r.pick(['pic', 'take', 'cmp']), o, o2: r.pick(kinOf(o).filter((x) => x !== o)) }; },
       prev: '1-1-3:3', pre: [],
-      hint: '"남은 것"이나 "몇 개 더 많은지"는 − 로 써요. 큰 수를 앞에 써요. 7개에서 3개를 주면 7 − 3 = 4예요.',
+      hint: '"남은 것"이나 "몇 개 더 많은지"는 −로 써요. 큰 수를 앞에 써요. 7개 중 3개를 주면 7 − 3 = 4예요.',
     },
     {
       id: '1-1-3:10', fam: 'SUB', name: '9까지 수의 뺄셈', kid: '한 자리 수 빼기', sec: 5, timed: true,
@@ -539,7 +539,7 @@ export default {
         return runGen(10, 50)(r);
       },
       is: (p) => seqMax(p) >= 10 && seqMax(p) <= 50, prev: '1-1-5:6', pre: [],
-      hint: '일의 자리가 1씩 커지다가 9 다음에는 십의 자리가 1 커져요. 29 다음은 30이에요.',
+      hint: '낱개가 1씩 커지다가 9 다음에는 10개씩 묶음이 하나 늘어요. 29 다음은 30이에요.',
     },
     {
       id: '1-1-5:9', fam: 'N2', name: '50까지 수의 크기 비교', kid: '어느 수가 더 클까요 (50까지)', sec: 5,
@@ -554,7 +554,7 @@ export default {
       gen: (r) => { const t = r.int(6, 9), v = r.pick(['bundle', 'split', 'read', 'read', 'pic']); return v === 'bundle' || v === 'pic' ? { v, t, o: 0 } : v === 'read' ? { v, n: t * 10, nat: r.chance(0.6), k: r.int(0, 2) } : { v, n: t * 10 }; },
       make: n4Make, is: isN4(60, 90, true), prev: null, pre: ['1-1-5:5'],
       hint: '10개씩 묶음 7개는 70이에요. 칠십 또는 일흔이라고 읽어요. 60 예순, 80 여든, 90 아흔!',
-      tip: '10개 막대 6~9개로 몇십을 만들고 예순·일흔·여든·아흔을 소리 내어 읽게 해요. 일흔과 칠십처럼 두 가지 읽기를 짝 지어 봐요.',
+      tip: '10개 막대 6~9개로 몇십을 만들고 예순·일흔·여든·아흔을 소리 내어 읽게 해요. 일흔과 칠십처럼 두 가지 읽기를 짝지어 봐요.',
     },
     {
       id: '1-2-1:3', fam: 'N4', name: '99까지의 수', kid: '99까지의 수 알기', sec: 10, def: true,

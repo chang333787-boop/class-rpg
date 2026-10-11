@@ -190,7 +190,7 @@ function subColumns(a, b) {
     const x = dig(a, i) - br, y = dig(b, i);
     if (i >= len(b) && !br) break;
     if (x < y) { out.push({ c: 'SUB', p: { a: x + 10, b: y }, why: `${names[i]}의 자리: 윗자리에서 10을 받아내려 ${x + 10} − ${y}${P(y, '을', '를')} 해요.` }); br = 1; }
-    else { if (x >= 0 && !(x === 0 && y === 0)) out.push({ c: 'SUB', p: { a: x, b: y }, why: br ? `${names[i]}의 자리: 1을 받아내려 주고 남은 ${x}에서 빼요.` : `${names[i]}의 자리끼리 빼요.` }); br = 0; }
+    else { if (x >= 0 && !(x === 0 && y === 0)) out.push({ c: 'SUB', p: { a: x, b: y }, why: br ? `${names[i]}의 자리: 아랫자리에 10을 내려 주어 ${x}${P(x, '이', '가')} 남아요. ${x}에서 ${y}${P(y, '을', '를')} 빼요.` : `${names[i]}의 자리끼리 빼요.` }); br = 0; }
   }
   return out.filter((s) => s.p.a >= s.p.b && !(s.p.a === 0));
 }
@@ -201,15 +201,15 @@ function mulParts(a, b) {
   const ms = (big, small, sw) => (sw ? `${small} × ${big}` : `${big} × ${small}`);
   const sw = a <= 9 && b > 9;
   const [A, Bb] = sw ? [b, a] : [a, b];
-  if (Bb <= 9 && A % 10 === 0 && A < 100) return [{ c: 'MUL', p: m(A / 10, Bb, sw), why: `0을 뺀 ${ms(A / 10, Bb, sw)}부터 해요. 그다음 10배예요.` }];
-  if (Bb <= 9 && A % 100 === 0 && A < 1000) return [{ c: 'MUL', p: m(A / 100, Bb, sw), why: `0을 뺀 ${ms(A / 100, Bb, sw)}부터 해요. 그다음 100배예요.` }];
+  if (Bb <= 9 && A % 10 === 0 && A < 100) return [{ c: 'MUL', p: m(A / 10, Bb, sw), why: `${A}${P(A, '은', '는')} ${A / 10}의 10배예요. ${ms(A / 10, Bb, sw)}부터 해요. 그다음 10배예요.` }];
+  if (Bb <= 9 && A % 100 === 0 && A < 1000) return [{ c: 'MUL', p: m(A / 100, Bb, sw), why: `${A}${P(A, '은', '는')} ${A / 100}의 100배예요. ${ms(A / 100, Bb, sw)}부터 해요. 그다음 100배예요.` }];
   if (Bb <= 9) {
     // 일의 자리부터 자리마다 곱해서 더한다 (교과서 세로셈 순서)
     const parts = [];
     for (let i = 0; i < len(A); i++) { const d = dig(A, i); if (d) parts.push(d * 10 ** i); }
     const steps = parts.map((x) => ({ c: 'MUL', p: m(x, Bb, sw), why: `${ms(x, Bb, sw)}${P(sw ? x : Bb, '을', '를')} 해요.` }));
-    if (parts.length === 2) steps.push({ c: 'ADD', p: { a: parts[1] * Bb, b: parts[0] * Bb }, why: '부분 곱을 더해요.' });
-    if (parts.length === 3) { steps.push({ c: 'ADD', p: { a: parts[1] * Bb, b: parts[0] * Bb }, why: '아래 두 자리의 곱을 더해요.' }, { c: 'ADD', p: { a: parts[2] * Bb, b: (parts[0] + parts[1]) * Bb }, why: '남은 자리의 곱을 더해요.' }); }
+    if (parts.length === 2) steps.push({ c: 'ADD', p: { a: parts[1] * Bb, b: parts[0] * Bb }, why: '두 곱을 더해요.' });
+    if (parts.length === 3) { steps.push({ c: 'ADD', p: { a: parts[1] * Bb, b: parts[0] * Bb }, why: '일의 자리 곱과 십의 자리 곱을 더해요.' }, { c: 'ADD', p: { a: parts[2] * Bb, b: (parts[0] + parts[1]) * Bb }, why: '그 합에 백의 자리 곱을 더해요.' }); }
     return steps;
   }
   if (b % 10 === 0 && b < 100) return [{ c: 'MUL', p: { a, b: b / 10 }, why: `${a} × ${b / 10}부터 해요. 그다음 10배예요.` }];
@@ -226,7 +226,7 @@ function mulParts(a, b) {
 }
 function divParts(a, b) {
   const q = Math.floor(a / b), r = a % b;
-  if (b <= 9 && q <= 9) return r ? [{ c: 'MUL', p: { a: b, b: q }, why: `${b}의 단에서 ${a}보다 크지 않은 가장 큰 곱을 찾아요.` }, { c: 'SUB', p: { a, b: b * q }, why: '남는 수를 구해요.' }] : [{ c: 'MUL', p: { a: b, b: q }, why: `${b}의 단에서 곱이 ${a}인 것을 찾아요.` }];
+  if (b <= 9 && q <= 9) return r ? [{ c: 'MUL', p: { a: b, b: q }, why: `${b}단에서 ${a}보다 크지 않은 가장 큰 곱을 찾아요.` }, { c: 'SUB', p: { a, b: b * q }, why: '남는 수를 구해요.' }] : [{ c: 'MUL', p: { a: b, b: q }, why: `${b}의 단에서 곱이 ${a}인 것을 찾아요.` }];
   if (b <= 9) {
     // 높은 자리부터 나눈다
     const out = [];

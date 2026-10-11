@@ -7,17 +7,17 @@ export default [
     id: 'D1', name: '똑같이 나누기 (몇 묶음으로)', kid: '똑같이 나누기', g: '3-1', s: 'D', pre: ['M1', 'N3'],
     tip: '바둑돌을 접시 몇 개에 하나씩 번갈아 놓아 똑같이 나눠요(등분).',
     gen: (r) => ({ d: r.int(2, 5), q: r.int(2, 6) }),
-    make: (p) => nums([{ svg: dots(p.d * p.q, { cols: Math.min(p.d * p.q, 6) }) }, `사탕 ${p.d * p.q}개를 ${p.d}명이 똑같이 나누면 한 명에 `, B(0), '개씩이에요.'], p.q, {
+    make: (p) => nums([{ svg: dots(p.d * p.q, { cols: Math.min(p.d * p.q, 6) }) }, `사탕 ${p.d * p.q}개를 ${p.d}명이 똑같이 나누면 한 명에게 `, B(0), '개씩이에요.'], p.q, {
       bugs: [{ test: (v) => v[0] === p.d * p.q - p.d, name: '나누기를 빼기로 함', to: 'M1' }, { test: (v) => v[0] === p.d, name: '사람 수를 씀', to: 'M1' }],
     }),
   },
   {
-    id: 'D2', name: '몇씩 덜어내기 (몇 번 들어가나)', kid: '몇 번 덜어낼 수 있나', g: '3-1', s: 'D', pre: ['M1', 'A2'],
-    tip: '12 − 3 − 3 − 3 − 3 = 0처럼 덜어내고, 덜어낸 횟수가 몫이라는 것을 보여 줘요(포함). 6학년 분수 ÷ 분수의 뿌리예요.',
+    id: 'D2', name: '몇씩 덜어 내기 (몇 번 들어가나)', kid: '몇 번 덜어 낼 수 있나', g: '3-1', s: 'D', pre: ['M1', 'A2'],
+    tip: '12 − 3 − 3 − 3 − 3 = 0처럼 덜어 내고, 덜어 낸 횟수가 몫이라는 것을 보여 줘요(포함). 6학년 분수 ÷ 분수의 뿌리예요.',
     gen: (r) => ({ d: r.int(2, 5), q: r.int(2, 6) }),
     make: (p) => {
       const n = p.d * p.q;
-      return nums([`${n} − ${Array(p.q).fill(p.d).join(' − ')} = 0`, { br: 1 }, `${n}에서 ${J(p.d, '을', '를')} `, B(0), '번 덜어낼 수 있어요. ', `${n} ÷ ${p.d} = `, B(1)], [p.q, p.q], {
+      return nums([`${n} − ${Array(p.q).fill(p.d).join(' − ')} = 0`, { br: 1 }, `${n}에서 ${J(p.d, '을', '를')} `, B(0), '번 덜어 낼 수 있어요. ', `${n} ÷ ${p.d} = `, B(1)], [p.q, p.q], {
         bugs: [{ test: (v) => v[0] === n - p.d || v[1] === n - p.d, name: '나누기를 한 번 빼기로 봄', to: 'A2' }],
       });
     },
@@ -48,7 +48,7 @@ export default [
   },
   {
     id: 'D5', name: '몫과 나머지', kid: '나머지가 있는 나눗셈', g: '3-2', s: 'D', pre: (p) => ['D4', 'D2', 'A6'],
-    tip: '17 ÷ 5: 5씩 덜어내다 5보다 작게 남으면 멈춰요. 나머지는 나누는 수보다 작아야 해요.',
+    tip: '17 ÷ 5: 5씩 덜어 내다 5보다 작게 남으면 멈춰요. 나머지는 나누는 수보다 작아야 해요.',
     gen: (r) => { let d, q, x; do { d = r.int(3, 9); q = r.int(2, 9); x = r.int(1, d - 1); } while (d * q + x > 89); return { d, q, x }; },
     make: (p) => {
       const n = p.d * p.q + p.x;
@@ -84,7 +84,7 @@ export default [
     steps: (p) => {
       const qt = Math.floor(p.q / 10) * 10, qo = p.q % 10, n = p.dv * p.q;
       return [
-        { c: 'M9', p: { v: 'mt', a: p.dv, t: qt }, why: `${p.dv} × ${qt}을 먼저 빼요.` },
+        { c: 'M9', p: { v: 'mt', a: p.dv, t: qt }, why: `${p.dv} × ${qt}을 먼저 빼요.` },   // 조사 고정: 몇십은 늘 받침
         { c: 'A8', p: { op: '-', a: n, b: p.dv * qt }, why: '남은 수를 구해요.' },
         { c: 'M8', p: { a: p.dv, b: qo }, why: `남은 수가 ${p.dv}의 몇 배인지 봐요.` },
       ];

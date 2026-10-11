@@ -22,7 +22,8 @@
 //                     types: { 유형: { lit: { 단원: 때 }, diag: { read, struct, tpl, dom, calc, plan }, n } } } · 도전 층 '선생님과' = marks['T:유형@단원']
 import { byId, lessonsOfUnit, sortByGrade, makeItem, corePre, resolve } from './core/lessons/index.js';
 import { newUnitScan, currentItem, answer, mergeStates } from './core/engine.js';
-import { newPractice, currentPractice, answerPractice, workedSteps, limitOf, RULE } from './core/practice.js';
+import { newPractice, currentPractice as coreCurrent, answerPractice as coreAnswer, workedSteps, limitOf, RULE } from './core/practice.js';
+import { hasWords, storyOf } from './core/words.js';
 import { rng } from './core/math.js';
 import { TYPES, typesOfUnit, makeType, plainUnit, isType } from './core/types/index.js';
 import { bridgeOf, hasBridge } from './core/bridges.js';
@@ -136,6 +137,26 @@ export function finishScan(kid, unit, S, now = Date.now()) {
 }
 
 // ── 한 층 불 켜기(연습) ──
+// ── 문장제 섞기(10-11 · 교사 '문제은행처럼 많이 · 진단하고 밖에서 연습하라면 연속성이 끊김') ──
+//  계산 차시 연습에서 STORY_EVERY 번째 문제마다 같은 숫자의 문장제(core/words.js — 그 차시 식 그대로라 차시 규칙을 지킴)
+//  답이 같아 불씨 규칙은 그대로 · 읽는 시간만큼 시간 ×STORY_X · 같이 풀기 = 식 고르기 → 그 차시 단계(kid.js)
+export const STORY_EVERY = 3, STORY_X = 1.6;
+const hs = (s) => String(s).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 17);
+function storyNow(P, q) {
+  if (!q || q.final || !hasWords(q.c) || q.n % STORY_EVERY) return null;
+  try { return storyOf(q.c, q.p, hs(`${P.id}:${q.n}`), { plain: true }); } catch (e) { return null; }
+}
+export function currentPractice(P) {
+  const q = coreCurrent(P), s = storyNow(P, q);
+  return s ? { ...q, item: s.item, story: s, limit: Math.round(q.limit * STORY_X) } : q;
+}
+export function answerPractice(P, a) {
+  const q = currentPractice(P);
+  if (!q || !q.story) return coreAnswer(P, a);
+  const pre = a.idk ? null : q.item.check(a.vals || [], a.raws || []);
+  return { ...coreAnswer(P, { ...a, pre, limit: q.limit, story: true }), story: true };
+}
+
 export function startFloor(kid, unit, c, id, now = Date.now()) {
   const P = newPractice({ id, sid: 'kid', plan: [c], now });
   kid.run = { unit, kind: 'prac', c, P, t: now };
@@ -272,8 +293,10 @@ export function startFacts(kid, unit, id, now = Date.now()) {
 }
 export function currentFact(F) {
   if (!F || F.i >= F.items.length) return null;
-  const { a, b } = F.items[F.i], r = resolve('MUL', { a, b });
-  return { c: r.c, p: r.p, item: makeItem(r.c, r.p), n: F.i + 1, of: F.items.length, sec: byId[r.c].sec };
+  const cur = F.items[F.i], { a, b } = cur, r = resolve('MUL', { a, b });
+  // 번호는 처음 16문제만 센다 — 덤(틀린 단 한 문제 더)은 번호를 늘리지 않음(10-11 점검: '16문제'라 했는데 21까지 늘어남)
+  const n = F.items.slice(0, F.i + 1).filter((x) => !x.extra).length, of = F.items.filter((x) => !x.extra).length;
+  return { c: r.c, p: r.p, item: makeItem(r.c, r.p), n, of, extra: !!cur.extra, sec: byId[r.c].sec };
 }
 export function answerFact(kid, F, a, now = Date.now()) {
   const q = currentFact(F);
@@ -404,6 +427,8 @@ export function noteBug(kid, c, bug) {
 export const bugsOf = (kid) => Object.entries(kid.bugs || {}).map(([k, n]) => { const i = k.indexOf('|'); return { c: k.slice(0, i), name: k.slice(i + 1), n }; }).filter((b) => byId[b.c] || isType(b.c)).sort((a, b) => b.n - a.n);
 
 // ── 하루 기록 ──
+// 문제 밖에서 배운 시간(예제 읽기 · 같이 풀기) — 문제 수는 늘리지 않고 시간만(cap 까지 · 10-11 점검: 같이 푼 시간이 오늘 시간에 안 들어감)
+export function addStudy(kid, ms, cap = 180000, now = Date.now()) { const d = dayOf(kid, now); d.ms += Math.max(0, Math.min(ms || 0, cap)); return d; }
 export function addTime(kid, ms, now = Date.now()) {
   const d = dayOf(kid, now);
   d.ms += Math.max(0, Math.min(ms || 0, 60000));   // 한 문제에 1분 넘게 걸려도 1분까지만 센다(자리 비움)
@@ -431,4 +456,4 @@ export function cardOf(kid, cfg, now = Date.now()) {
   };
 }
 
-export { currentItem, answer, currentPractice, answerPractice, newPractice, TYPES, typesOfUnit, isType, plainUnit };
+export { currentItem, answer, newPractice, TYPES, typesOfUnit, isType, plainUnit };

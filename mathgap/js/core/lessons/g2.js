@@ -95,11 +95,11 @@ const FAMS = [
             { test: (v) => p.k >= 10 && v[0] === x + Number(String(p.k)[0]), name: '몇십(몇백)만큼을 몇만큼으로 셈', to: b === 100 ? '1-2-1:4' : '2-1-1:6' }],
         });
       }
-      if (p.v === 'gap') return nums([`${b}은 ${x}보다 `, B(0), '만큼 더 큰 수예요.'], p.k, { bugs: [{ test: (v) => v[0] === p.k * 10 || v[0] * 10 === p.k, name: '자리를 잘못 봄', to: low }] });
+      if (p.v === 'gap') return nums([`${b}${P(b, '은', '는')} ${x}보다 `, B(0), '만큼 더 큰 수예요.'], p.k, { bugs: [{ test: (v) => v[0] === p.k * 10 || v[0] * 10 === p.k, name: '자리를 잘못 봄', to: low }] });
       const ans = b / p.u;
       const bugs = [{ test: (v) => v[0] === ans * 10 || v[0] * 10 === ans, name: '0의 개수를 틀림', to: low }];
-      if (p.v === 'tensto') return nums([`${p.u}이 `, B(0), `개이면 ${b}이에요.`], ans, { bugs });
-      return nums([`${b}은 ${p.u}이 `, B(0), '개인 수예요.'], ans, { bugs });
+      if (p.v === 'tensto') return nums([`${p.u}이 `, B(0), `개이면 ${b}${P(b, '이에요', '예요')}.`], ans, { bugs });   // 조사 고정: p.u = 10 · 100
+      return nums([`${b}${P(b, '은', '는')} ${p.u}이 `, B(0), '개인 수예요.'], ans, { bugs });   // 조사 고정: p.u = 10 · 100
     },
   },
   {
@@ -108,7 +108,7 @@ const FAMS = [
     // {u:100|1000, k, v:'units'|'count'|'word'|'read', o(보기 순서)}
     make: (p) => {
       const n = p.k * p.u, low = p.u === 100 ? '1-2-1:2' : '2-1-1:3', w = sino(n);
-      if (p.v === 'count') return nums([`${n}은 ${p.u}이 `, B(0), '개인 수예요.'], p.k, { bugs: [{ test: (v) => v[0] === p.k * 10 || v[0] === n, name: '0의 개수를 틀림', to: low }] });
+      if (p.v === 'count') return nums([`${n}${P(n, '은', '는')} ${p.u}이 `, B(0), '개인 수예요.'], p.k, { bugs: [{ test: (v) => v[0] === p.k * 10 || v[0] === n, name: '0의 개수를 틀림', to: low }] });   // 조사 고정: p.u = 100 · 1000
       if (p.v === 'word') {
         return nums([`'${w}'${PJ(w, '을', '를')} 수로 쓰면 `, B(0)], n, {
           bugs: [{ test: (v) => v[0] === Number(`${p.k}${p.u}`), name: '읽은 대로 이어 씀', to: low }, { test: (v) => v[0] * 10 === n || v[0] === n * 10, name: '0의 개수를 틀림', to: low }],
@@ -118,7 +118,7 @@ const FAMS = [
         const wr = [sino(n / 10), sino(((p.k % 9) + 1) * p.u)];
         return choose([`${J(n, '을', '를')} 바르게 읽은 것을 고르세요.`], w, wr, p.o, [{ name: '자리를 하나 잘못 읽음', to: low }, { name: '다른 수로 읽음', to: null }]);
       }
-      return nums([`${p.u}이 ${p.k}개이면 `, B(0)], n, { bugs: [{ test: (v) => v[0] * 10 === n || v[0] === n * 10, name: '0의 개수를 틀림', to: low }, { test: (v) => v[0] === p.u + p.k, name: `${p.u}에 개수를 더함`, to: null }] });
+      return nums([`${p.u}이 ${p.k}개이면 `, B(0)], n, { bugs: [{ test: (v) => v[0] * 10 === n || v[0] === n * 10, name: '0의 개수를 틀림', to: low }, { test: (v) => v[0] === p.u + p.k, name: `${p.u}에 개수를 더함`, to: null }] });   // 조사 고정: p.u = 100 · 1000
     },
   },
   {
@@ -136,7 +136,7 @@ const FAMS = [
         return choose([`${J(n, '을', '를')} 바르게 읽은 것을 고르세요.`], w, wr.map((x) => x[0]), p.o, wr.map((x) => ({ name: x[1], to: x[1] === '다른 수로 읽음' ? null : low })));
       }
       const parts = [];
-      for (let i = L - 1; i >= 0; i--) if (dig(n, i)) parts.push(`${10 ** i}이 ${dig(n, i)}개`);
+      for (let i = L - 1; i >= 0; i--) if (dig(n, i)) parts.push(`${10 ** i}이 ${dig(n, i)}개`);   // 조사 고정: 10의 거듭제곱(일 · 십 · 백 · 천)
       return nums([`${parts.join(', ')}인 수는 `, B(0)], n, { bugs: [zbug] });
     },
   },
@@ -341,7 +341,7 @@ export default {
     {
       id: '2-1-1:5', fam: 'N5', name: '세 자리 수의 자릿값', kid: '각 자리 숫자가 나타내는 값 (세 자리)', sec: 10, def: true,
       gen: placeGen(3), make: placeMake, is: (p) => p.n != null && len(p.n) === 3, prev: '2-1-1:4', pre: ['1-2-1:3'],
-      hint: '352에서 3은 백의 자리라서 300, 5는 십의 자리라서 50, 2는 2를 나타내요.',
+      hint: '352에서 3은 백의 자리 숫자라서 300, 5는 십의 자리 숫자라서 50, 2는 2를 나타내요.',
       tip: '수 모형(백·십·일)으로 수를 만들고 자리마다 나타내는 값을 말하게 해요(352 = 300 + 50 + 2). 같은 숫자라도 자리에 따라 값이 달라지는 수(333 등)를 꼭 다뤄요.',
     },
     {
@@ -363,14 +363,14 @@ export default {
         const big = Math.max(p.a, p.b), small = Math.min(p.a, p.b), t = big - ones(big), s1 = ones(big) + small;
         return [{ c: 'ADD', p: { a: ones(big), b: small }, why: '일의 자리끼리 더해요.' }, { c: 'ADD', p: { a: t, b: s1 }, why: `${t}에 ${J(s1, '을', '를')} 더해요.` }];
       },
-      hint: '일의 자리끼리 더해 10이 넘으면 십의 자리로 1을 올려요. 27 + 5 → 7 + 5 = 12, 20 + 12 = 32!',
+      hint: '일의 자리끼리 더해 10이거나 10보다 크면 십의 자리로 1을 올려요. 27 + 5 → 7 + 5 = 12, 20 + 12 = 32!',
       tip: '수 모형으로 일 모형 10개를 십 모형 1개로 바꾸는 장면을 보여 줘요. 27 + 5는 7 + 5 = 12에서 10을 십의 자리로 올려 32가 돼요.',
     },
     {
       id: '2-1-3:3', fam: 'ADD', name: '받아올림 (두 자리)+(두 자리) 1', kid: '두 자리 수 + 두 자리 수 (일의 자리에서 받아올림)', sec: 15,
       gen: (r) => until(r, (r) => ({ a: r.int(11, 79), b: r.int(11, 79) }), (p) => addKind(p.a, p.b) === '2-1-3:3'),
       make: carryAddMake, is: isKind('ADD', '2-1-3:3'), prev: '2-1-3:2', pre: ['1-2-6:2', '2-1-1:5'],
-      hint: '일의 자리 합이 10이 넘으면 십의 자리 위에 1을 작게 쓰고, 십의 자리를 더할 때 같이 더해요. 38 + 45 = 83!',
+      hint: '일의 자리 합이 10이거나 10보다 크면 십의 자리 위에 1을 작게 쓰고, 십의 자리를 더할 때 같이 더해요. 38 + 45 = 83!',
       tip: '세로셈에서 받아올린 1을 십의 자리 위에 작게 쓰게 하고, 십의 자리를 더할 때 그 1을 손가락으로 짚게 해요.',
       bridge: '일의 자리에서 만든 10을 십의 자리 1로 바꿔 올리는 생각 — 수 모형으로 낱개 10개를 십 모형 1개로 바꾸는 장면을 꼭 보여 줘요.',
     },
@@ -378,7 +378,7 @@ export default {
       id: '2-1-3:4', fam: 'ADD', name: '받아올림 (두 자리)+(두 자리) 2', kid: '두 자리 수 + 두 자리 수 (합이 100을 넘음)', sec: 18,
       gen: (r) => until(r, (r) => ({ a: r.int(21, 98), b: r.int(21, 98) }), (p) => addKind(p.a, p.b) === '2-1-3:4'),
       make: carryAddMake, is: isKind('ADD', '2-1-3:4'), prev: '2-1-3:3', pre: ['2-1-1:4'],
-      hint: '십의 자리 합이 10이 넘으면 백의 자리로 1을 올려요. 76 + 58 → 일의 자리 14, 십의 자리 7 + 5 + 1 = 13 → 134!',
+      hint: '십의 자리 합이 10이거나 10보다 크면 백의 자리로 1을 올려요. 76 + 58 → 일의 자리 14, 십의 자리 7 + 5 + 1 = 13 → 134!',
       tip: '십 모형 10개를 백 모형 1개로 바꾸는 장면을 보여 줘요. 받아올림이 두 번 있는 계산은 올린 1을 자리마다 작게 쓰게 해요.',
     },
     {
@@ -456,7 +456,7 @@ export default {
       id: '2-1-6:4', fam: 'M2', name: '몇의 몇 배', kid: '2의 몇 배 (몇의 몇 배)', sec: 10,
       gen: (r) => { const a = r.chance(0.6) ? 2 : r.int(3, 5); return { a, k: r.int(2, a === 2 ? 9 : 5), ask: r.chance(0.45) }; },
       make: (p) => (p.ask
-        ? nums([{ svg: groups(p.k, p.a) }, `${p.a}씩 묶었어요. 모두 ${p.a * p.k}개는 ${p.a}의 `, B(0), '배예요.'], p.k, { bugs: [{ test: (v) => v[0] === p.a * p.k, name: '몇 배 대신 전체 수를 씀', to: '2-1-6:3' }, { test: (v) => v[0] === p.a, name: '한 묶음의 수를 씀', to: '2-1-6:3' }] })
+        ? nums([{ svg: groups(p.k, p.a) }, `${p.a}씩 묶었어요. 모두 ${p.a * p.k}개예요. ${p.a * p.k}${P(p.a * p.k, '은', '는')} ${p.a}의 `, B(0), '배예요.'], p.k, { bugs: [{ test: (v) => v[0] === p.a * p.k, name: '몇 배 대신 전체 수를 씀', to: '2-1-6:3' }, { test: (v) => v[0] === p.a, name: '한 묶음의 수를 씀', to: '2-1-6:3' }] })
         : nums([`${p.a}의 ${p.k}배는 `, B(0)], p.a * p.k, { bugs: [{ test: (v) => v[0] === p.a + p.k, name: '몇 배를 더하기로 봄', to: '2-1-6:3' }, { test: (v) => Math.abs(v[0] - p.a * p.k) === p.a, name: '한 묶음을 더 세거나 덜 셈', to: '2-1-6:3' }] })),
       steps: (p) => [{ c: 'M1', p: { k: p.k, n: p.a }, why: p.ask ? `${p.a}씩 몇 묶음인지 세어 봐요.` : `${p.a}의 ${p.k}배는 ${p.a}씩 ${p.k}묶음이에요. 모두 몇 개인지 세어 봐요.` }],
       prev: '2-1-6:3', pre: [],

@@ -36,19 +36,20 @@ export function currentPractice(P) {
 const median = (xs) => { const s = xs.slice().sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
 // 답하기 → 화면에 보여 줄 되먹임 { ok, bug, ans, mastered?, gaveUp?, finalOk? }
-export function answerPractice(P, { vals = [], raws = [], idk = false, ms = 0, t = Date.now() }) {
+//  pre · limit · story = 같은 숫자의 다른 모양 문제(문장제)를 냈을 때 — 그 문제로 채점한 결과 · 그 문제의 시간(초) · 기록 표시(오늘의 수학 · words.js)
+export function answerPractice(P, { vals = [], raws = [], idk = false, ms = 0, t = Date.now(), pre = null, limit = null, story = false }) {
   const q = currentPractice(P);
   if (!q) return null;
-  const res = idk ? { ok: false } : q.item.check(vals, raws);
-  P.log.push({ c: q.c, p: q.p, vals, idk, ok: !!res.ok, bug: res.bug || null, ms, t, final: !!q.final });
+  const res = idk ? { ok: false } : pre || q.item.check(vals, raws);
+  P.log.push({ c: q.c, p: q.p, vals, idk, ok: !!res.ok, bug: res.bug || null, ms, t, final: !!q.final, ...(story ? { story: true } : {}) });
   const fb = { ok: !!res.ok, bug: res.bug || null, ans: q.item.ans, c: q.c, p: q.p, final: !!q.final };
   if (q.final) { P.finalOk = !!res.ok; finishPractice(P); fb.finalOk = !!res.ok; return fb; }
 
   const per = P.per[q.c], c = byId[q.c];
-  const fast = !!res.ok && ms <= limitOf(q.c) * 1000;
+  const lim = limit || limitOf(q.c), fast = !!res.ok && ms <= lim * 1000;
   per.items.push({ ok: !!res.ok, ms, idk, fast });
   const ch = chainOf(per.items);
-  Object.assign(fb, { fast, dots: ch.fast, run: ch.all, limit: limitOf(q.c) });
+  Object.assign(fb, { fast, dots: ch.fast, run: ch.all, limit: lim });
   const chainMs = (ch.all ? per.items.slice(-ch.all) : []).filter((x) => x.fast).map((x) => x.ms);
   if (ch.fast >= RULE.streak) { per.state = 'mastered'; per.ms = median(chainMs); fb.mastered = true; }
   else if (ch.all >= RULE.slowStreak) { per.state = 'mastered-slow'; per.ms = median(per.items.slice(-ch.all).map((x) => x.ms)); fb.mastered = true; fb.slow = true; }

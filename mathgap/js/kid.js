@@ -8,16 +8,30 @@ import { parseNum } from './core/math.js';
 import { towerEl, fire, unitName } from './tower.js';
 import {
   todayOf, towerOf, cardOf, dayKey, startScan, finishScan, startFloor, finishFloor, startReview, currentReview, answerReview,
-  addTime, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
+  addTime, addStudy, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
   startFacts, currentFact, answerFact,
   startType, currentType, answerType, typeHelpDone, finishType, typeExample, typeName, TRULE, TYPES, litElsewhere, isType,
-  bridgeOf, bridgeMiss,
+  bridgeOf, bridgeMiss, bugsOf, BRIDGE_BUG,
 } from './today.js';
 
 const html = (s) => { const d = document.createElement('div'); d.innerHTML = s; return [...d.childNodes]; };
 // 이름 뒤 조사 — 괄호는 앞말의 보충이라 괄호 앞말에 맞춘다('일정한 간격 (나무 심기)을')
 const tj = (name, a, b) => josa(String(name || '').replace(/\s*\([^)]*\)\s*$/, ''), a, b);
 const sec = (ms) => Math.max(0, Math.ceil(ms / 1000));
+// 글 속 분수(4/7 · 1 2/7)를 문제와 같은 세로 분수로 — 힌트 · 단계 글 · 다리 글(10-11 점검: 같은 화면에서 빗금과 세로 분수가 섞임)
+const FRX = /(\d+) (\d+)\/(\d+)|(\d+)\/(\d+)/g;
+function rich(s) {
+  const t = String(s || ''), out = []; let last = 0;
+  for (const m of t.matchAll(FRX)) { if (m.index > last) out.push(t.slice(last, m.index)); out.push(m[1] ? { m: [m[1], m[2], m[3]] } : { f: [m[4], m[5]] }); last = m.index + m[0].length; }
+  if (last < t.length) out.push(t.slice(last));
+  return h('span', { class: 'ftx', html: toHTML(out, { static: true }) });
+}
+// 문제 시계 — 창(그만할까요 · 하는 법)이 떠 있는 동안은 멈춘다(10-11 점검: 창이 열린 동안 시간이 흘러 불씨를 못 받음)
+const clock = { t0: 0, paused: 0, at: 0 };
+const clockStart = () => { clock.t0 = performance.now(); clock.paused = 0; clock.at = 0; };
+const clockNow = () => (clock.at || performance.now()) - clock.t0 - clock.paused;
+const clockPause = () => { if (!clock.at) clock.at = performance.now(); };
+const clockResume = () => { if (clock.at) { clock.paused += performance.now() - clock.at; clock.at = 0; } };
 const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 export function mountKid(app, ctx) {
@@ -38,10 +52,17 @@ export function mountKid(app, ctx) {
     h('span', { class: 'right' }, ...right));
   const helpBtn = () => h('button', { class: 'qbtn', 'aria-label': '하는 법 다시 보기', onclick: () => howModal() }, '?');
   const stopBtn = () => h('button', { class: 'stopbtn', onclick: () => askStop() }, '오늘은 그만');
-  const screen = (...kids) => { app.replaceChildren(...kids.filter(Boolean)); window.scrollTo(0, 0); };
+  // 옆 탑이 길면(기초 층 · 도전 층) 옆 칸만 따로 스크롤 — '지금 · 다음' 층이 보이게 가운데로(10-11 점검: 지금 층이 화면 밖)
+  const screen = (...kids) => {
+    app.replaceChildren(...kids.filter(Boolean)); window.scrollTo(0, 0);
+    requestAnimationFrame(() => app.querySelectorAll('.kside').forEach((sd) => {
+      const el = sd.querySelector('.fl.cur, .fl.new, .fl.next');
+      if (el && sd.scrollHeight > sd.clientHeight + 4) sd.scrollTop += el.getBoundingClientRect().top - sd.getBoundingClientRect().top - sd.clientHeight / 2;
+    }));
+  };
   const backToRPG = () => {
     try { if (window.parent !== window) window.parent.postMessage({ type: 'rpg:embed-close', app: 'mathgap' }, location.origin); } catch (e) { /* */ }
-    toast('위쪽의 ✕ 를 눌러도 RPG 로 돌아가요');
+    toast('위쪽의 ✕를 눌러도 RPG로 돌아가요');
   };
   const T = () => todayOf(kid, cfg);
 
@@ -56,12 +77,12 @@ export function mountKid(app, ctx) {
     const tw = t.tower, hi = name ? `안녕, ${name}!` : '안녕!';
     const next = tw.next, nextLabel = next ? `${next.base ? '기초' : next.no + '층'} ${next.name}` : '';
     const plan = {
-      scan: t.resume ? ['어제 살펴보던 데서 이어서 해요', '이어서 살펴보기'] : [`오늘은 ${unitName(cfg.unit)} 탑을 살펴봐요`, '탑 살펴보기 시작'],
-      facts: t.resume ? ['구구단 빠르기를 이어서 해요', '이어서 하기'] : ['탑 살펴보기 마지막 — 구구단 빠르기 16문제', '구구단 빠르기'],
+      scan: t.resume ? ['지난번에 살펴보던 데서 이어서 해요', '이어서 살펴보기'] : [`오늘은 ${unitName(cfg.unit)} 탑을 살펴봐요`, '탑 살펴보기 시작'],
+      facts: t.resume ? ['곱셈구구 빠르기를 이어서 해요', '이어서 하기'] : ['탑 살펴보기 마지막 — 곱셈구구 빠르기 16문제', '곱셈구구 빠르기'],
       prac: t.resume ? [`${t.run_c || nextLabel}에 불을 켜던 중이에요`, '이어서 불 켜기'] : [`오늘은 ${nextLabel}에 불을 켜요`, '불 켜러 가기'],
       review: t.resume ? ['불 점검을 이어서 해요', '이어서 점검'] : t.warm ? [`먼저 불 점검 ${t.n}문제, 그다음 ${nextLabel}`, '불 점검 시작'] : tw.topNext ? [`먼저 불 점검 ${t.n}문제, 그다음 도전 층 ${tw.topNext.name}`, '불 점검 시작'] : [`탑 완성! 오늘은 불 점검 ${t.n}문제`, '불 점검 시작'],
-      type: !t.top ? ['도전 층을 이어서 해요', '이어서 하기'] : t.resume ? [`도전 층 ${t.top.name}${tj(t.top.name, '을', '를')} 이어서 해요`, '이어서 하기'] : [`탑을 다 켰어요! 이제 도전 층 ${t.top.name}`, '도전 층 가기'],   // 다른 단계에서도 이 줄이 계산되므로 t.top 이 없을 수 있음
-      top: ['오늘 수학 끝! 탑이 환해요', null], done: ['오늘 10분 끝! 내일 또 만나요', null], wait: ['남은 층은 선생님이랑 같이 켜요', null],
+      type: !t.top ? ['도전 층을 이어서 해요', '이어서 하기'] : t.resume ? [`도전 층 '${t.top.name}'${tj(t.top.name, '을', '를')} 이어서 해요`, '이어서 하기'] : [`탑을 다 켰어요! 이제 도전 층 '${t.top.name}'에 도전해요`, '도전 층 가기'],   // 다른 단계에서도 이 줄이 계산되므로 t.top 이 없을 수 있음
+      top: ['오늘 수학 끝! 탑이 환해요', null], done: [`오늘 ${cfg.minutes}분 끝! 내일 또 만나요`, null], wait: ['남은 층은 선생님이랑 같이 켜요', null],
     }[t.stage] || ['', null];
     if (t.stage === 'prac' && t.resume && kid.run && kid.run.c) plan[0] = `${floorLabel(kid.run.c)}에 불을 켜던 중이에요`;
     const go = () => { if (t.stage === 'scan') return runScan(); if (t.stage === 'facts') return t.resume ? runFacts() : factsIntro(); if (t.stage === 'prac') return runFloor(); if (t.stage === 'review') return runReview(); if (t.stage === 'type') return runType(); };
@@ -70,14 +91,14 @@ export function mountKid(app, ctx) {
       bar(plan[1] ? `'${plan[1]}'${josa(plan[1], '을', '를')} 눌러요` : '오늘은 여기까지예요', { tone: plan[1] ? '' : 'green', right: [h('span', {}, plan[1] ? `오늘 남은 시간 ${minLeft}분` : ''), helpBtn()] }),
       h('div', { class: 'kwrap' },
         h('div', { class: 'kside', style: { flexBasis: '400px' } }, towerEl(tw, { order: tw.scanned })),
-        h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '22px', maxWidth: '640px' } },
+        h('div', { class: 'kmain vc', style: { gap: '22px', maxWidth: '640px' } },
           h('div', { class: 'big-t fade-in' }, hi, h('br'), h('span', { class: plan[1] ? 'gold' : 'green' }, plan[0])),
           tw.scanned ? h('div', { class: 'pills' }, h('span', { class: 'pill on' }, `불 켜진 층 ${tw.lit}`), tw.total - tw.lit ? h('span', { class: 'pill dk' }, `불 켤 층 ${tw.total - tw.lit}`) : null,
-            tw.tops.length && !tw.next ? h('span', { class: 'pill vt' }, `도전 층 ${tw.topLit} / ${tw.tops.length}`) : null) : null,
-          t.stage === 'prac' && next ? h('div', { class: 'panel lead' }, h('b', {}, nextLabel), h('br'), byId[next.c].hint || '') : null,
+            tw.tops.length && !tw.next ? h('span', { class: tw.topLit === tw.tops.length ? 'pill on' : 'pill vt' }, `도전 층 ${tw.topLit} / ${tw.tops.length}`) : null) : null,
+          t.stage === 'prac' && next ? h('div', { class: 'panel lead' }, h('b', {}, nextLabel), h('br'), rich(byId[next.c].hint || '')) : null,
           t.stage === 'scan' && !t.resume ? h('div', { class: 'panel lead' }, '층마다 문제가 나와요. 맞았는지는 끝에 탑으로 한꺼번에 보여 줘요. 모르면 ', h('b', {}, "'아직 몰라요'"), '를 눌러도 괜찮아요.') : null,
           t.stage === 'wait' ? h('div', { class: 'panel lead' }, '연습을 많이 했는데 아직 불이 안 켜진 층이 있어요. 선생님께 같이 보자고 말해 주세요!') : null,
-          t.stage === 'type' && !t.resume ? h('div', { class: 'panel lead' }, h('b', {}, '도전 층'), ' — 문제집에 자주 나오는 문제 모양이에요. 학년이 바뀌어도 숫자만 바뀌어 또 나와요.') : null,
+          t.stage === 'type' && !t.resume ? h('div', { class: 'panel lead' }, h('b', {}, '도전 층'), ' — 문제집에 자주 나오는 문제 모양이에요. 학년이 올라가도 숫자만 달라져서 또 나와요.') : null,
           h('div', { class: 'btnrow' },
             plan[1] ? h('button', { class: 'kbtn', onclick: go }, plan[1]) : null,
             t.stage === 'done' ? h('button', { class: 'kbtn ghost', onclick: () => { addExtra(kid); save(); home(); } }, '5분만 더 할래요') : null,
@@ -104,17 +125,24 @@ export function mountKid(app, ctx) {
         h('p', {}, '시간 안에 맞히면 불씨 하나, 틀리면 하나 꺼져요. 불 꺼진 층부터 ', h('b', {}, '한 층씩'), ' 켜며 올라가요.')));
   }
   function intro() {
-    screen(bar("세 가지만 보고 '알겠어요'를 눌러요", { right: [h('span', {}, '처음 한 번만 나와요')] }),
+    screen(bar("세 가지만 보고 '알겠어요, 시작!'을 눌러요", { right: [h('span', {}, '처음 한 번만 나와요')] }),
       h('div', { class: 'kwrap', style: { flexDirection: 'column' } },
         h('div', { class: 'big-t' }, '오늘의 수학은 ', h('span', { class: 'gold' }, '탑에 불을 켜는'), ' 놀이예요'),
         howPanels(),
-        h('div', { class: 'btnrow', style: { alignItems: 'center' } }, h('span', { class: 'muted', style: { flex: '1', fontSize: '15px' } }, `하루 ${cfg.minutes}분 · 다 못 하면 다음 날 이어서 해요`),
+        h('div', { class: 'btnrow sticky', style: { alignItems: 'center' } }, h('span', { class: 'muted', style: { flex: '1', fontSize: '15px' } }, `하루 ${cfg.minutes}분 · 다 못 하면 다음 날 이어서 해요`),
           h('button', { class: 'kbtn', style: { flex: '0 0 auto' }, onclick: () => { kid.seen.intro = Date.now(); save(true); home(); } }, '알겠어요, 시작!'))));
   }
-  const howModal = () => modal('오늘의 수학 하는 법', howPanels(), [{ label: '알겠어요', primary: true }], { wide: true });
+  // 탑의 다른 칸 — 하는 법 창에서만(처음 화면은 세 가지만)
+  const legendEl = () => h('div', { class: 'legend' },
+    h('div', {}, h('span', { class: 'lg base' }, '기초'), h('span', {}, '탑 아래 땅속 칸 — 예전에 배운 것 중 다시 다질 곳이에요. 여기부터 켜요.')),
+    h('div', {}, h('span', { class: 'lg top' }, '도전'), h('span', {}, '탑을 다 켜면 꼭대기 위에 열려요 — 문제집에 자주 나오는 이야기 문제 모양이에요.')),
+    h('div', {}, h('span', { class: 'lg rev' }, '점검'), h('span', {}, '며칠 지나면 켠 층이 아직 잘 켜져 있는지 한두 문제로 확인해요.')),
+    h('div', {}, h('span', { class: 'lg tc' }, '선생님과'), h('span', {}, '여러 번 해도 안 켜진 층은 선생님이랑 같이 켜요. 혼자 끙끙대지 않아도 돼요.')));
+  const howModal = () => { clockPause(); modal('오늘의 수학 하는 법', [howPanels(), legendEl()], [{ label: '알겠어요', primary: true }], { wide: true, onclose: clockResume }); };
   function askStop() {
+    clockPause();
     modal('오늘은 여기까지 할까요?', h('p', {}, '푼 데까지 저장돼요. 다음에 열면 같은 자리에서 이어서 해요.'), [
-      { label: '계속 풀기' }, { label: '그만할래요', primary: true, onclick: (close) => { close(); save(true); done(); } }]);
+      { label: '계속 풀기' }, { label: '그만할래요', primary: true, onclick: (close) => { close(); save(true); done(); } }], { onclose: clockResume });
   }
 
   // ── 문제 그리기(숫자판 · 빈칸 · 보기) ──
@@ -155,9 +183,9 @@ export function mountKid(app, ctx) {
       if (!COARSE) focused.focus();
     };
     const pad = item.choices ? null : h('div', { class: 'kpad' },
-      h('div', { class: 'keys' }, ...['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0'].map((k) => h('button', { class: 'key', type: 'button', onmousedown: (e) => e.preventDefault(), onclick: () => press(k) }, k)),
-        h('button', { class: 'key sm', type: 'button', 'aria-label': '지우기', onmousedown: (e) => e.preventDefault(), onclick: () => press('del') }, '지우기'),
-        h('button', { class: 'key sm wide', type: 'button', onmousedown: (e) => e.preventDefault(), onclick: () => press('next') }, blanks.length > 1 ? '다음 칸 →' : '확인')),
+      h('div', { class: 'keys' }, ...['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0'].map((k) => h('button', { class: `key k${k === '.' ? 'dot' : k}`, type: 'button', onmousedown: (e) => e.preventDefault(), onclick: () => press(k) }, k)),
+        h('button', { class: 'key sm kdel', type: 'button', 'aria-label': '지우기', onmousedown: (e) => e.preventDefault(), onclick: () => press('del') }, '지우기'),
+        h('button', { class: 'key sm wide knx', type: 'button', onmousedown: (e) => e.preventDefault(), onclick: () => press('next') }, blanks.length > 1 ? '다음 칸 →' : '확인')),
       h('div', { class: 'padnote' }, '키보드로 써도 돼요', h('br'), blanks.length > 1 ? 'Tab = 다음 칸 · Enter = 확인' : 'Enter = 확인'));
     // 빈칸 너비 — 긴 답이면 넓게
     blanks.forEach((b) => b.addEventListener('input', () => b.classList.toggle('wide', b.value.length > 2)));
@@ -176,12 +204,12 @@ export function mountKid(app, ctx) {
     const seen = new Set(S.log.map((l) => l.c));
     const n = S.log.length, est = Math.max(12, n + 2);
     const prog = h('span', { class: 'prog', 'aria-label': `${n + 1}번째 문제` }, ...Array.from({ length: Math.min(est, 14) }, (_, i) => h('i', { class: i < n ? 'on' : i === n ? 'cur' : '' })));
-    const shown = performance.now();
+    clockStart();
     const P = problemEl(q.item, {
       tag: inUnit ? `${tw.floors.find((f) => f.c === q.c).no}층 · ${byId[q.c].kid}` : `기초 살펴보기 · ${byId[q.c].kid}`,
       onAnswer: async (a) => {
         busy = true;
-        const ms = Math.round(performance.now() - shown);
+        const ms = Math.round(clockNow());
         const r0 = a.idk ? { ok: false } : q.item.check(a.vals || [], a.raws || []);
         if (!r0.ok && !a.idk) noteBug(kid, q.c, r0.bug);
         logItem(kid, { c: q.c, ok: r0.ok, idk: a.idk, ms, kind: 's', bug: r0.bug });
@@ -211,10 +239,10 @@ export function mountKid(app, ctx) {
 
   // ── 구구단 빠르기(살펴보기 마지막 · 곱셈에 기대는 단원 · 한 달에 한 번) ──
   function factsIntro() {
-    screen(bar('탑 살펴보기 마지막 — 구구단 빠르기', { right: [helpBtn()] }),
+    screen(bar("탑 살펴보기 마지막 — '시작'을 눌러요", { right: [helpBtn()] }),
       h('div', { class: 'kcenter' }, h('div', { class: 'fade-in', style: { display: 'flex', flexDirection: 'column', gap: '18px', maxWidth: '640px' } },
-        h('div', { class: 'big-t' }, '마지막! ', h('span', { class: 'gold' }, '구구단 빠르기 16문제')),
-        h('p', { class: 'lead' }, '2단부터 9단까지 두 문제씩 나와요. 생각나는 대로 빠르게! 틀려도 괜찮아요 — 느리거나 헷갈리는 단은 탑의 ', h('b', {}, '기초 층'), '에 넣어 연습해요.'),
+        h('div', { class: 'big-t' }, '마지막! ', h('span', { class: 'gold' }, '곱셈구구 빠르기 16문제')),
+        h('p', { class: 'lead' }, '2단부터 9단까지 두 문제씩 나와요. 생각나는 대로 빠르게! 한 번 틀리면 그 단을 한 문제 더 봐요 — 실수 하나로 약한 단이 되지 않아요. 느리거나 헷갈리는 단은 탑의 ', h('b', {}, '기초 층'), '에 넣어 연습해요.'),
         h('div', { class: 'btnrow' }, h('button', { class: 'kbtn', onclick: () => runFacts() }, '시작')))));
   }
   async function runFacts() {
@@ -224,10 +252,10 @@ export function mountKid(app, ctx) {
   function factItem() {
     const F = kid.run && kid.run.F, q = currentFact(F);
     if (!q) return revealTower();
-    const shown = performance.now();
-    const pe = problemEl(q.item, { tag: '구구단 빠르기', tagR: `${q.n} / ${q.of}`, idkLabel: '모르겠어요', onAnswer: async (a) => {
+    clockStart();
+    const pe = problemEl(q.item, { tag: q.extra ? '곱셈구구 빠르기 · 같은 단 한 문제 더' : '곱셈구구 빠르기', tagR: `${q.n} / ${q.of}`, onAnswer: async (a) => {
       busy = true;
-      const ms = Math.round(performance.now() - shown);
+      const ms = Math.round(clockNow());
       const fb = answerFact(kid, F, { ...a, ms }); addTime(kid, ms);
       logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'f', bug: fb.bug });
       await save(!!fb.done);
@@ -235,7 +263,7 @@ export function mountKid(app, ctx) {
       if (fb.done) return factsEnd(fb);
       factItem();
     } });
-    const prog = h('span', { class: 'prog', 'aria-label': `${q.n} / ${q.of}` }, ...Array.from({ length: q.of }, (_, i) => h('i', { class: i < q.n - 1 ? 'on' : i === q.n - 1 ? 'cur' : '' })));
+    const prog = h('span', { class: 'prog', 'aria-label': `${q.n} / ${q.of}` }, ...Array.from({ length: q.of }, (_, i) => h('i', { class: i < q.n - 1 ? 'on' : i === q.n - 1 ? 'cur' : '' })));   // 덤 문제는 같은 칸에 머무름
     screen(bar('생각나는 대로 빠르게!', { right: [prog, stopBtn()] }),
       h('div', { class: 'kwrap' }, h('div', { class: 'kmain fade-in' }, pe.paper, pe.actions), pe.pad));
     pe.focus();
@@ -243,7 +271,7 @@ export function mountKid(app, ctx) {
   function factsEnd(fb) {
     const added = towerOf(cfg.unit, kid).base.filter((f) => (fb.weak || []).includes(f.c)).map((f) => f.name);
     const last = added[added.length - 1] || '';
-    revealTower(added.length ? `구구단 빠르기에서 ${added.join(', ')}${josa(last, '이', '가')} 느리거나 헷갈렸어요 — 기초 층에 넣었어요. 연습하면 금방 빨라져요!` : '구구단 빠르기도 튼튼해요!');
+    revealTower(added.length ? `곱셈구구 빠르기에서 ${added.join(', ')}${josa(last, '이', '가')} 느리거나 헷갈렸어요 — 기초 층에 넣었어요. 연습하면 금방 빨라져요!` : '곱셈구구 빠르기도 튼튼해요!');
   }
 
   // 살펴보기 끝 — 내 탑(불 켜진 층 · 켤 순서)
@@ -253,15 +281,15 @@ export function mountKid(app, ctx) {
     screen(bar(allLit ? (toType ? "탑이 다 켜져 있어요! '도전 층 가기'를 눌러요" : '탑이 다 켜져 있어요!') : canGo ? "내 탑을 보고 '불 켜러 가기'를 눌러요" : '오늘은 여기까지 — 내일 이어서 불을 켜요', { tone: (allLit && !toType) || (!canGo && !toType) ? 'green' : '', right: [h('span', {}, canGo || toType ? `오늘 남은 시간 ${Math.ceil(t.left / 60000)}분` : '')] }),
       h('div', { class: 'kwrap', style: { gap: '48px' } },
         h('div', { class: 'kside', style: { flexBasis: '430px' } }, towerEl(tw, { order: true, reveal: true })),
-        h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '20px', maxWidth: '620px' } },
-          h('div', { class: 'big-t fade-in' }, '살펴보기 끝!', h('br'), h('span', { class: 'gold' }, allLit ? '와, 탑에 불이 다 켜져 있어요' : tw.lit ? `벌써 ${tw.lit}층이나 불이 켜져 있어요` : '이제 아래부터 불을 켜 봐요')),
+        h('div', { class: 'kmain vc', style: { gap: '20px', maxWidth: '620px' } },
+          h('div', { class: 'big-t fade-in' }, '살펴보기 끝!', h('br'), h('span', { class: 'gold' }, allLit ? '와, 탑에 불이 다 켜져 있어요' : tw.lit ? `벌써 ${tw.lit}개 층에 불이 켜져 있어요` : '이제 아래부터 불을 켜 봐요')),
           h('div', { class: 'pills' }, h('span', { class: 'pill on' }, `불 켜진 층 ${tw.lit}`), tw.total - tw.lit ? h('span', { class: 'pill dk' }, `불 켤 층 ${tw.total - tw.lit}`) : null),
           note ? h('div', { class: 'panel lead', style: { borderColor: '#7cc0f0' } }, note) : null,
           allLit ? h('div', { class: 'panel lead' }, toType ? [h('b', {}, '꼭대기 위에 도전 층이 열렸어요'), ' — 문제집에 자주 나오는 문제 모양이에요.'] : '이제는 점검할 날이 오면 몇 문제로 불이 잘 켜져 있는지만 봐요.')
-            : h('div', { class: 'panel lead' }, '숫자 순서대로 불을 켜요. ', tw.base.length ? h('b', {}, "맨 아래 '기초'부터") : h('b', {}, '아래층부터'), ' — 아래층이 밝아야 위층 불도 잘 켜져요.'),
+            : h('div', { class: 'panel lead' }, "'다음' 표시가 있는 층부터 켜요. ", tw.base.length ? h('b', {}, "맨 아래 '기초'부터") : h('b', {}, '아래층부터'), ' — 아래층이 밝아야 위층 불도 잘 켜져요.'),
           h('div', { class: 'btnrow' },
             canGo ? h('button', { class: 'kbtn ghost', onclick: () => done() }, '내일 할래요') : null,
-            canGo ? h('button', { class: 'kbtn', onclick: () => runFloor() }, h('span', { class: 'no' }, '1'), `${tw.next.base ? '기초' : tw.next.no + '층'}에 불 켜러 가기`)
+            canGo ? h('button', { class: 'kbtn', onclick: () => runFloor() }, `${tw.next.base ? '기초' : tw.next.no + '층'}에 불 켜러 가기`)
               : toType ? h('button', { class: 'kbtn', onclick: () => runType() }, '도전 층 가기')
                 : h('button', { class: 'kbtn green', onclick: () => done() }, '오늘 끝')))));
   }
@@ -279,17 +307,19 @@ export function mountKid(app, ctx) {
     pracItem();
   }
   function floorIntro() {
-    const c = kid.run.c, L = byId[c], tw = towerOf(cfg.unit, kid);
-    screen(bar(`${floorLabel(c)}에 불을 켜요`, { right: [helpBtn()] }),
+    const c = kid.run.c, L = byId[c], tw = towerOf(cfg.unit, kid), read0 = performance.now();
+    const go = () => { addStudy(kid, performance.now() - read0); pracItem(); };   // 예제 읽은 시간도 오늘 한 시간(3분까지)
+    screen(bar("예제를 보고 '시작'을 눌러요", { right: [helpBtn()] }),
       h('div', { class: 'kwrap', style: { gap: '48px' } },
         h('div', { class: 'kside', style: { flexBasis: '380px' } }, towerEl(tw, { cur: c })),
-        h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '20px', maxWidth: '600px' } },
+        h('div', { class: 'kmain vc', style: { gap: '20px', maxWidth: '600px' } },
           h('div', { class: 'big-t fade-in' }, floorLabel(c)),
-          L.hint ? h('div', { class: 'panel lead' }, h('b', {}, '이렇게 해요 · '), L.hint) : null,
+          L.hint ? h('div', { class: 'panel lead' }, h('b', {}, '이렇게 풀어요 · '), rich(L.hint)) : null,
           exampleEl(c),
+          mineBugs(c),
           h('div', { class: 'fires', style: { justifyContent: 'flex-start' } }, ...Array.from({ length: RULE.streak }, () => fire('off'))),
           h('p', { class: 'lead' }, `${limitText(c)} 안에 맞히면 불씨 하나 · ${RULE.streak}개 모으면 불이 켜져요. 틀리면 불씨 하나가 꺼지고 같이 풀어 봐요.`),
-          h('div', { class: 'btnrow' }, h('button', { class: 'kbtn', onclick: () => pracItem() }, '시작')))));
+          h('div', { class: 'btnrow sticky' }, h('button', { class: 'kbtn', onclick: go }, '시작')))));
   }
   // 예제 — 같은 단계로 푼 문제 하나(Math Academy · ALEKS 의 '예제 먼저'). 단계가 없는 차시는 문제와 답만
   function exampleEl(c) {
@@ -298,7 +328,7 @@ export function mountKid(app, ctx) {
     return [ex.bridge ? bridgeEl(ex.bridge, ex.item) : null, h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
       h('div', { style: { fontSize: '14px', fontWeight: '800', color: '#7cc0f0' } }, '예제 — 이렇게 풀어요'),
       ...ex.steps.map((s, i) => h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } },
-        h('span', { style: { fontSize: '14px', color: '#d9c9ae', minWidth: '0', flex: '1 1 180px' } }, `${i + 1}. ${s.why}`), ans(s.item))),
+        h('span', { style: { fontSize: '14px', color: '#d9c9ae', minWidth: '0', flex: '1 1 180px' } }, `${i + 1}. `, rich(s.why)), ans(s.item))),
       h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', borderTop: ex.steps.length ? '1px solid #3d3024' : '0', paddingTop: ex.steps.length ? '8px' : '0' } },
         h('span', { style: { fontSize: '14px', color: '#ffc766', fontWeight: '700' } }, ex.steps.length ? '그래서' : '예'), ans(ex.item)))];
   }
@@ -306,12 +336,17 @@ export function mountKid(app, ctx) {
   function bridgeEl(b, nowItem) {
     const solved = (it) => h('div', { class: 'math', style: { fontSize: '22px', color: '#f3e8d6', justifyContent: 'flex-start' }, html: it.choices ? toHTML(it.choices[it.sol[0]], { static: true }) : toHTML(it.prompt, { static: true, vals: it.sol.map(String) }) });
     return h('div', { class: 'panel bridge', style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-      h('div', { class: 'br-t' }, '옛날에 배운 것 — 숫자만 바뀐 거야'),
-      h('div', { class: 'br-row' }, h('span', { class: 'br-lab' }, `예전에 배운 문제 · ${b.idea}`), solved(b.old.item)),
+      h('div', { class: 'br-t' }, '예전에 배운 것 — 숫자만 바뀌었어요'),
+      h('div', { class: 'br-row' }, h('span', { class: 'br-lab' }, '예전에 배운 문제 · ', rich(b.idea)), solved(b.old.item)),
       nowItem ? h('div', { class: 'br-row' }, h('span', { class: 'br-lab' }, '지금 배우는 문제'), solved(nowItem)) : null,
-      h('p', { class: 'br-same' }, b.same),
-      h('p', { class: 'br-change' }, h('b', {}, '바뀐 것 · '), b.change),
-      b.leap ? h('p', { class: 'br-leap' }, h('b', {}, '여기는 새로 배우는 곳 · '), b.leap) : null);
+      h('p', { class: 'br-same' }, rich(b.same)),
+      h('p', { class: 'br-change' }, h('b', {}, '바뀐 것 · '), rich(b.change)),
+      b.leap ? h('p', { class: 'br-leap' }, h('b', {}, '여기는 새로 배우는 곳 · '), rich(b.leap)) : null);
+  }
+  // 이 층에서 내가 전에 한 실수(많은 순 2개) — '이번엔 조심!'(개념 카드의 마지막 줄)
+  function mineBugs(c) {
+    const bs = bugsOf(kid).filter((b) => b.c === c && b.name !== BRIDGE_BUG).slice(0, 2);
+    return bs.length ? h('div', { class: 'panel lead', style: { borderColor: '#ff9d6a' } }, h('b', { style: { color: '#ff9d6a' } }, '지난번에 이런 실수가 있었어요 · '), bs.map((b) => b.name).join(' · '), ' — 이번엔 조심!') : null;
   }
   const limitText = (c) => `${Math.round(byId[c].sec * RULE.fastX)}초`;
   function flamesEl(n, { pop = -1, gone = -1, max = RULE.streak } = {}) {
@@ -324,9 +359,9 @@ export function mountKid(app, ctx) {
     wrap.innerHTML = `<svg width="190" height="190" viewBox="0 0 190 190" aria-hidden="true"><circle cx="95" cy="95" r="82" fill="#1f1812" stroke="#3d3024" stroke-width="14"/><circle class="arc" cx="95" cy="95" r="82" fill="none" stroke="#f2a93b" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="0" transform="rotate(-90 95 95)"/></svg>`;
     const num = h('div', { class: 'num' }, h('b', {}, String(limit)), h('span', {}, '초 남았어요'));
     wrap.append(num);
-    const t0 = performance.now(), arc = wrap.querySelector('.arc');
+    const arc = wrap.querySelector('.arc');
     const upd = () => {
-      const left = limit * 1000 - (performance.now() - t0);
+      const left = limit * 1000 - clockNow();
       if (left <= 0) { wrap.classList.add('over'); num.firstChild.textContent = '시간 지남'; num.lastChild.textContent = '그래도 풀 수 있어요'; arc.style.strokeDashoffset = String(C); arc.style.stroke = '#6b5640'; stopTick(); return; }
       num.firstChild.textContent = String(sec(left)); wrap.classList.toggle('low', left <= 3000);
       arc.style.strokeDashoffset = String(C * (1 - left / (limit * 1000)));
@@ -338,12 +373,12 @@ export function mountKid(app, ctx) {
     const P = kid.run.P, q = currentPractice(P);
     if (!q) return floorEnd();
     const c = q.c, tw = towerOf(cfg.unit, kid);
-    const shown = performance.now();
+    clockStart();
     const pe = problemEl(q.item, {
-      tag: floorLabel(c), tagR: `${q.n}번째 문제`, idkLabel: '모르겠어요',
+      tag: q.story ? `${floorLabel(c)} · 문장제` : floorLabel(c), tagR: `${q.n}번째 문제`,
       onAnswer: async (a) => {
         busy = true; stopTick();
-        const ms = Math.round(performance.now() - shown);
+        const ms = Math.round(clockNow());
         const fb = answerPractice(P, { ...a, ms, t: Date.now() }); addTime(kid, ms);
         if (!fb.ok && !a.idk) noteBug(kid, q.c, fb.bug);
         logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'p', bug: fb.bug });
@@ -358,7 +393,7 @@ export function mountKid(app, ctx) {
     const flamesBefore = q.streak;
     const side = h('div', { class: 'kside timer', style: { alignItems: 'center', gap: '16px' } }, ringEl(q.limit),
       flamesEl(q.streak, extra), h('div', { class: 'fcount' }, `불씨 ${q.streak} / ${RULE.streak}`),
-      h('div', { style: { marginTop: 'auto', width: '100%' } }, towerEl(tw, { cur: c, small: true, title: false })));
+      h('div', { style: { marginTop: 'auto', width: '100%' } }, towerEl(tw, { cur: c, small: true, title: false, hideLock: true })));
     screen(bar(`시간 안에 맞히면 불씨 하나 · ${RULE.streak}개 모으면 이 층에 불이 켜져요`, { right: [helpBtn(), stopBtn()] }),
       h('div', { class: 'kwrap' }, side, h('div', { class: 'kmain fade-in' }, pe.paper, pe.actions), pe.pad));
     pe.focus();
@@ -370,6 +405,7 @@ export function mountKid(app, ctx) {
       : h('div', { class: 'fb late fade-in' }, `맞았어요! ${fb.limit}초가 지나서 불씨는 그대로예요. 다음엔 시간 안에!`);
     if (main) main.prepend(band);
     const fl = app.querySelector('.kside .fires'); if (fl && fb.fast) fl.replaceWith(flamesEl(fb.dots, { pop: fb.dots - 1, max }));
+    const fc = app.querySelector('.kside .fcount'); if (fc && fb.fast) fc.textContent = `불씨 ${fb.dots} / ${max}`;
     app.querySelectorAll('.kmain button, .kpad button').forEach((b) => { b.disabled = true; });
     setTimeout(next, fb.fast ? 900 : 1700);
   }
@@ -377,31 +413,38 @@ export function mountKid(app, ctx) {
   // ── 같이 풀기(틀렸을 때) — 같은 숫자로 한 단계씩, 시간 재지 않음 ──
   function helpScreen(q, a, fb, before) {
     // 옛 개념 다리가 있는 차시면 맨 앞에 예전 문제(그 차시 문제 그대로) — 두 번 못 풀면 그 차시를 기초 층으로(today.js bridgeMiss)
-    const br = bridgeOf(q.c, q.p);
-    const steps = br ? [{ why: `예전에 배운 문제예요(${br.idea}). 먼저 풀어 봐요. ${br.same} ${br.change}`, c: br.old.c, item: br.old.item, sol: br.old.item.sol, bridge: true }, ...workedSteps(q.c, q.p)] : workedSteps(q.c, q.p);
+    const br = q.story ? null : bridgeOf(q.c, q.p);   // 문장제는 식 고르기부터(다리는 계산 문제에서)
+    // 다리 단계의 '같은 것 · 바뀐 것'은 답을 알려 주므로 그 단계를 푼 뒤에 보여 준다(whyDone)
+    const ws = workedSteps(q.c, q.p);
+    const steps = q.story ? [q.story.steps[0], ...(ws.length ? ws : [q.story.steps[1]])]   // 문장제 — 식 고르기 → 그 차시 단계(없으면 그 식 계산)
+      : br ? [{ why: `예전에 배운 문제예요(${br.idea}). 먼저 풀어 봐요.`, whyDone: `${br.same} ${br.change}`, c: br.old.c, item: br.old.item, sol: br.old.item.sol, bridge: true }, ...ws] : ws;
     let added = false;
     const after = Math.max(0, before - 1);
-    const mineEl = a.idk ? h('span', { class: 'mine' }, '모르겠어요') : h('span', { class: 'mine' }, h('span', { class: 'math', style: { fontSize: '30px', color: '#8a5a20' }, html: toHTML(answerOnly(q.item.prompt), { static: true, vals: a.vals || [] }) }), '내 답');
-    const left = h('div', { class: 'kside', style: { flexBasis: '360px', gap: '16px' } },
-      h('div', { class: 'mid-t' }, a.idk ? '괜찮아요!' : '아까워요!', h('br'), h('span', { class: 'blue' }, '같이 한 번 풀어 볼까요?')),
-      h('div', { class: 'paper', style: { flex: 'none', minHeight: '0', padding: '44px 18px 18px', gap: '12px' } }, h('div', { class: 'ptag' }, h('span', {}, '아까 문제')),
-        h('div', { class: 'math', style: { fontSize: '30px' }, html: toHTML(q.item.prompt, { static: true, vals: [] }) }), mineEl,
-        fb.bug && fb.bug.name ? h('div', { class: 'msg', style: { color: '#5d4a36', fontWeight: '500' } }, `혹시 — ${fb.bug.name}?`) : null,
+    const mineEl = a.idk ? h('span', { class: 'mine' }, '아직 몰라요') : h('span', { class: 'mine' }, h('span', { class: 'math', style: { fontSize: '30px', color: '#8a5a20' }, html: toHTML(answerOnly(q.item.prompt), { static: true, vals: a.vals || [] }) }), '내 답');
+    const left = h('div', { class: 'kside help', style: { flexBasis: '360px', gap: '16px' } },
+      h('div', { class: 'mid-t' }, a.idk ? '괜찮아요!' : '아까워요!', h('br'), h('span', { class: 'blue' }, '같이 한번 풀어 볼까요?')),
+      h('div', { class: 'paper' + (q.story ? ' has-story' : ''), style: { flex: 'none', minHeight: '0', padding: '44px 18px 18px', gap: '12px' } }, h('div', { class: 'ptag' }, h('span', {}, '아까 문제')),
+        q.story ? h('div', { class: 'story sm', html: toHTML(q.item.story, { static: true }) }) : h('div', { class: 'math', style: { fontSize: '30px' }, html: toHTML(q.item.prompt, { static: true, vals: [] }) }), mineEl,
+        fb.bug && fb.bug.name ? h('div', { class: 'msg', style: { color: '#5d4a36', fontWeight: '500' } }, '혹시 이런 실수였을까요? ', h('b', {}, fb.bug.name)) : null,
         bugHint(fb.bug, q.c)),
       h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', marginTop: 'auto' } },
         flamesEl(after, { gone: before > 0 ? after : -1 }),
-        h('div', { style: { fontSize: '14px', lineHeight: '1.5', color: '#d9c9ae' } }, before > 0 ? `불씨가 하나만 꺼졌어요 (${before} → ${after}).` : '불씨는 0개 그대로예요.', h('br'), '방법을 알았으니 금방 다시 모여요!')));
-    const finalEl = h('div', { class: 'math', style: { color: '#f3e8d6' }, html: toHTML(q.item.prompt, { static: true, vals: q.item.sol.map(String) }) });
-    stepRunner(left, steps.length ? steps : null, { finalEl, emptyEl: h('div', { class: 'panel lead' }, byId[q.c].hint || ''),
+        h('div', { style: { fontSize: '14px', lineHeight: '1.5', color: '#d9c9ae' } }, before > 0 ? `불씨가 하나만 꺼졌어요 (${before} → ${after}).` : '불씨는 0개 그대로예요.', h('br'), '방법을 알면 불씨는 금방 다시 모여요!')));
+    const filled = (it) => toHTML(it.prompt, { static: true, vals: it.sol.map(String) });
+    const finalEl = q.story ? h('div', { class: 'math', style: { color: '#f3e8d6' }, html: `${filled(q.story.steps[1].item)}<span class="br"></span>${filled(q.item)}` })   // 문장제 — 식과 답(단위까지)
+      : h('div', { class: 'math', style: { color: '#f3e8d6' }, html: filled(q.item) });
+    stepRunner(left, steps.length ? steps : null, { finalEl, emptyEl: h('div', { class: 'panel lead' }, rich(byId[q.c].hint || '')),
       onFirst: (i, ok) => { if (steps[i].bridge && !ok) { added = bridgeMiss(kid, cfg.unit, steps[i].c).added || added; save(true); } },
       onEnd: () => (br && (br.leap || added) ? h('div', { class: 'panel lead fade-in', style: { borderColor: '#c9b6ff' } },
-        br.leap ? [h('b', {}, '여기는 새로 배우는 곳 · '), br.leap] : null,
+        br.leap ? [h('b', {}, '여기는 새로 배우는 곳 · '), rich(br.leap)] : null,
         added ? [br.leap ? h('br') : null, h('b', {}, `예전에 배운 '${byId[steps[0].c].kid}'부터 다시 다져요`), ' — 탑의 기초 층에 넣었어요.'] : null) : null),
       again: () => { if (T().day.ms >= T().budget) done(); else pracItem(); } });
   }
   // 단계 하나씩 풀기(같이 풀기 공통) — steps = [{ why, item, kind? }] · 단계마다 첫 시도가 맞았는지 onFirst(i, ok, bug) · 다 하면 finalEl · onEnd() → 끝에 덧붙일 글
   //  고르기 단계(식 고르기)는 보기를 누르면 바로 · 두 번 틀리거나 '알려 줘요'면 보여 주고 다음 단계로
+  //  아직 안 푼 단계는 번호만(단계 글이 앞 단계의 답을 미리 말하지 않게) · 푼 단계는 whyDone(있으면) · 같이 푼 시간도 오늘 한 시간(5분까지)
   function stepRunner(left, steps, { finalEl, emptyEl = null, again, againLabel = '새 문제로 다시 해 볼게요', onFirst = null, onEnd = null, bar: barText = '같은 숫자로 한 단계씩 같이 풀어 봐요' }) {
+    const t0 = performance.now(), told = new Set();
     const list = h('div', { class: 'steps' });
     const right = h('div', { class: 'kmain', style: { gap: '14px' } }, list);
     const padBox = h('div', { class: 'kpad', style: { flexBasis: '220px' } });
@@ -413,29 +456,29 @@ export function mountKid(app, ctx) {
       list.append(h('div', { class: 'step done fade-in' }, h('span', { class: 'sn' }, '✓'), h('div', { class: 'why' }, '그래서 답은'), finalEl));
       const extra = onEnd ? onEnd() : null;
       if (extra) right.append(extra);
-      right.append(h('div', { class: 'btnrow fade-in', style: { marginTop: 'auto' } }, h('button', { class: 'kbtn blue', onclick: again }, againLabel)));
+      right.append(h('div', { class: 'btnrow fade-in', style: { marginTop: 'auto' } }, h('button', { class: 'kbtn blue', onclick: () => { addStudy(kid, performance.now() - t0, 300000); save(); again(); } }, againLabel)));
       right.querySelector('.kbtn').focus();
     };
     if (!steps) { if (emptyEl) list.append(emptyEl); return finish(); }
     let k = 0, tries = 0;
     const drawStep = () => {
       list.replaceChildren(...steps.map((s, i) => {
-        if (i < k) return h('div', { class: 'step done' }, h('span', { class: 'sn' }, '✓'), h('div', { class: 'why' }, s.why), doneMath(s.item));
-        if (i > k) return h('div', { class: 'step wait' }, h('span', { class: 'sn' }, String(i + 1)), h('div', { class: 'why' }, s.why));
+        if (i < k) return h('div', { class: 'step done' + (told.has(i) ? ' told' : '') }, h('span', { class: 'sn' }, '✓'), h('div', { class: 'why' }, rich(s.whyDone || s.why), told.has(i) ? h('span', { class: 'toldtag' }, '같이 봤어요') : null), doneMath(s.item));
+        if (i > k) return h('div', { class: 'step wait' }, h('span', { class: 'sn' }, String(i + 1)), h('div', { class: 'why' }, `${i + 1}단계 — 앞 단계를 풀면 열려요`));
         return null;
       }).filter(Boolean));
       if (k >= steps.length) return finish();
       const s = steps[k];
-      const pe = problemEl(s.item, { tone: 'blue', idkLabel: '모르겠어요 — 알려 줘요', onAnswer: (ans) => {
+      const pe = problemEl(s.item, { tone: 'blue', idkLabel: '알려 줘요', onAnswer: (ans) => {
         const r = ans.idk ? { ok: false } : s.item.check(ans.vals || [], ans.raws || []);
         if (tries === 0 && onFirst) onFirst(k, !!r.ok, r.bug || null);
         if (r.ok) { k++; tries = 0; return drawStep(); }
         tries++;
-        if (ans.idk || tries >= 2) { toast('이렇게 돼요 — 보고 다음 단계로'); k++; tries = 0; return drawStep(); }
+        if (ans.idk || tries >= 2) { told.add(k); k++; tries = 0; return drawStep(); }   // 답을 보여 주고(푼 단계 칸에) 다음 단계로
         pe.msg.textContent = '한 번 더 생각해 봐요';
       } });
       pe.msg.style.flexBasis = '100%';
-      const now = h('div', { class: 'step now fade-in' + (s.item.choices ? ' pick' : '') }, h('span', { class: 'sn' }, String(k + 1)), h('div', { class: 'why' }, s.why), pe.math, s.item.choices ? pe.paper.querySelector('.choices') : null, pe.msg);
+      const now = h('div', { class: 'step now fade-in' + (s.item.choices ? ' pick' : '') }, h('span', { class: 'sn' }, String(k + 1)), h('div', { class: 'why' }, rich(s.why)), pe.math, s.item.choices ? pe.paper.querySelector('.choices') : null, pe.msg);
       list.insertBefore(now, list.children[k] || null);
       const acts = pe.actions; acts.style.marginTop = '4px';
       right.querySelectorAll('.btnrow').forEach((x) => x.remove());
@@ -450,7 +493,7 @@ export function mountKid(app, ctx) {
     const to = bug && bug.to ? [].concat(bug.to).find((x) => byId[x] && x !== c && byId[x].hint) : null;
     if (!to) return null;
     const hint = byId[to].hint.length > 90 ? byId[to].hint.slice(0, 88) + '…' : byId[to].hint;
-    return h('div', { style: { fontSize: '14px', lineHeight: '1.55', color: '#5d4a36', background: '#efe4cf', borderRadius: '10px', padding: '8px 10px' } }, h('b', {}, `'${byId[to].kid}'에서 배운 생각이에요 · `), hint);
+    return h('div', { style: { fontSize: '14px', lineHeight: '1.55', color: '#5d4a36', background: '#efe4cf', borderRadius: '10px', padding: '8px 10px' } }, h('b', {}, `'${byId[to].kid}'에서 배운 생각이에요 · `), rich(hint));
   }
   // 답 칸만 보여 줄 때(내 답) — 문제 글에서 빈칸이 든 마지막 덩어리만
   const answerOnly = (prompt) => { const i = prompt.findIndex((t) => t && typeof t === 'object' && ('b' in t || (t.f && t.f.some((x) => x && typeof x === 'object')) || (t.m && t.m.some((x) => x && typeof x === 'object')))); return i >= 0 ? prompt.slice(i).filter((t) => typeof t === 'object' || /\S/.test(t)).slice(0, 4) : prompt; };
@@ -467,19 +510,19 @@ export function mountKid(app, ctx) {
     if (r.teacher) {
       return screen(bar('이 층은 선생님이랑 같이 켜요', { tone: 'blue' }),
         h('div', { class: 'kwrap', style: { gap: '48px' } }, h('div', { class: 'kside', style: { flexBasis: '380px' } }, towerEl(tw, { order: true })),
-          h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '18px', maxWidth: '600px' } },
-            h('div', { class: 'big-t' }, '열심히 했어요!', h('br'), h('span', { class: 'blue' }, `${floorLabel(c)}은 선생님이랑 같이 켜요`)),
+          h('div', { class: 'kmain vc', style: { gap: '18px', maxWidth: '600px' } },
+            h('div', { class: 'big-t' }, '열심히 했어요!', h('br'), h('span', { class: 'blue' }, `${floorLabel(c)}${tj(floorLabel(c), '은', '는')} 선생님이랑 같이 켜요`)),
             h('p', { class: 'lead' }, '여러 번 풀어 봤는데 아직 불이 안 켜졌어요. 선생님이 알 수 있게 표시해 둘게요.'),
             h('div', { class: 'btnrow' }, more ? h('button', { class: 'kbtn', onclick: () => runFloor() }, `다음: ${nextL}`) : toType ? h('button', { class: 'kbtn', onclick: () => runType() }, '도전 층 가기') : h('button', { class: 'kbtn green', onclick: () => done() }, '오늘 끝')))));
     }
     const all = tw.lit === tw.total;
-    screen(bar(all ? (toType ? '탑 꼭대기까지 불이 켜졌어요! 이제 도전 층' : '탑 꼭대기까지 불이 켜졌어요!') : more ? '다음 층으로 올라가요' : '오늘은 여기까지 — 내일 다음 층으로', { tone: (all && !toType) || (!more && !toType) ? 'green' : '', right: [h('span', {}, more || toType ? `오늘 남은 시간 ${Math.ceil(t.left / 60000)}분` : '')] }),
+    screen(bar(all ? (toType ? "탑 꼭대기까지 켜졌어요! '도전 층 가기'를 눌러요" : '탑 꼭대기까지 불이 켜졌어요!') : more ? `'${nextL.split(' ')[0]} 불 켜러 가기'를 눌러요` : '오늘은 여기까지 — 내일 다음 층으로', { tone: (all && !toType) || (!more && !toType) ? 'green' : '', right: [h('span', {}, more || toType ? `오늘 남은 시간 ${Math.ceil(t.left / 60000)}분` : '')] }),
       h('div', { class: 'kwrap', style: { gap: '56px', alignItems: 'center' } },
         h('div', { class: 'kside', style: { flexBasis: '380px' } }, towerEl(tw, { justLit: c, order: !all })),
-        h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '20px', maxWidth: '600px' } },
+        h('div', { class: 'kmain vc', style: { gap: '20px', maxWidth: '600px' } },
           fire('on', '#ffc766', 'fire big-fire'),
           h('div', { class: 'big-t fade-in' }, `${floorLabel(c).split(' ')[0]}에`, h('br'), h('span', { class: 'gold2' }, '불이 켜졌어요!')),
-          h('p', { class: 'lead' }, r.slow ? '시간이 좀 걸렸지만 끝까지 맞혔어요. 다음엔 조금 더 빠르게!' : `불씨 ${RULE.streak}개를 다 모았어요.`, all ? (toType ? [' 이제 탑이 다 환해요!', h('br'), '꼭대기 위에 ', h('b', {}, '도전 층'), '이 열렸어요 — 문제집에 자주 나오는 문제 모양이에요.'] : ' 이제 탑이 다 환해요!') : tw.next ? [h('br'), '다음은 ', h('b', {}, nextL), '예요.'] : ''),
+          h('p', { class: 'lead' }, r.slow ? '시간이 좀 걸렸지만 끝까지 맞혔어요. 다음엔 조금 더 빠르게!' : `불씨 ${RULE.streak}개를 다 모았어요.`, all ? (toType ? [' 이제 탑이 다 환해요!', h('br'), '꼭대기 위에 ', h('b', {}, '도전 층'), '이 열렸어요 — 문제집에 자주 나오는 문제 모양이에요.'] : ' 이제 탑이 다 환해요!') : tw.next ? [h('br'), '다음은 ', h('b', {}, nextL), `${tj(nextL, '이에요', '예요')}.`] : ''),
           h('div', { class: 'btnrow' },
             more || toType ? h('button', { class: 'kbtn ghost', onclick: () => done() }, '오늘은 여기까지') : null,
             more ? h('button', { class: 'kbtn', onclick: () => runFloor() }, `${nextL.split(' ')[0]} 불 켜러 가기`) : toType ? h('button', { class: 'kbtn', onclick: () => runType() }, '도전 층 가기') : h('button', { class: 'kbtn green', onclick: () => done() }, all ? '탑 완성!' : '오늘 끝')))));
@@ -494,17 +537,18 @@ export function mountKid(app, ctx) {
   function reviewItem(note = null) {
     const R = kid.run && kid.run.R, q = R && currentReview(R);
     if (!q) return done();
-    const shown = performance.now(), i = R.out.length;
+    clockStart(); const i = R.out.length;
     const N = R.total || 3;
-    const pe = problemEl(q.item, { tag: `불 점검 · ${floorLabel(q.c)}`, tagR: `${Math.min(i + 1, N)} / ${N}`, idkLabel: '모르겠어요', onAnswer: async (a) => {
+    const again = !!(R.miss && R.miss[q.c]);
+    const pe = problemEl(q.item, { tag: `불 점검 · ${floorLabel(q.c)}`, tagR: again ? '같은 층 한 번 더' : `${Math.min(i + 1, N)} / ${N}`, onAnswer: async (a) => {
       busy = true;
-      const ms = Math.round(performance.now() - shown);
+      const ms = Math.round(clockNow());
       const fb = answerReview(kid, R, a); addTime(kid, ms);
       logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'r', bug: fb.bug });
       await save(!!fb.done);
       busy = false;
       const msg = fb.ok ? '맞았어요! 불이 잘 켜져 있어요.' : fb.again ? '아까워요 — 같은 층 문제를 하나 더 볼게요.' : `이 층 불이 꺼졌어요. 다음에 다시 켜요. (답: ${fb.ans})`;
-      if (fb.done) return reviewDone(fb.out);
+      if (fb.done) return reviewDone(fb.out, fb.ok ? null : { c: q.c, item: q.item });
       reviewItem(msg);
     } });
     screen(bar(`예전에 켠 층이 아직 잘 켜져 있는지 ${N}문제로 확인해요`, { right: [helpBtn()] }),
@@ -512,7 +556,8 @@ export function mountKid(app, ctx) {
         h('div', { class: 'kmain fade-in' }, note ? h('div', { class: 'fb ' + (note.startsWith('맞') ? 'ok' : 'no') }, note) : null, pe.paper, pe.actions), pe.pad));
     pe.focus();
   }
-  function reviewDone(out) {
+  // last = 마지막에 틀린 문제(답과 함께 보여 줌 — 10-11 점검: 두 번 틀리면 정답도 없이 끝남)
+  function reviewDone(out, last = null) {
     const off = out.filter((x) => !x.ok).map((x) => floorLabel(x.c));
     const t = T(), more = t.stage === 'prac', toType = t.stage === 'type';
     const nextL = more ? floorLabel(t.floor.c) : '';
@@ -521,6 +566,8 @@ export function mountKid(app, ctx) {
         h('div', { class: 'big-t' }, off.length ? '불 점검 끝!' : '불이 다 잘 켜져 있어요!'),
         off.length ? h('p', { class: 'lead' }, h('b', {}, off.join(', ')), more ? ' 불이 꺼졌어요. 아래층부터 다시 켜요.' : ' 불이 꺼졌어요. 다음 시간에 다시 켜요.')
           : h('p', { class: 'lead' }, more || toType ? '좋아요. 이제 오늘 켤 층으로 가요.' : '오늘 수학 끝. 다음에 또 확인해요.'),
+        last ? h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, h('span', { class: 'muted', style: { fontSize: '14px', fontWeight: '700' } }, '마지막 문제의 답'),
+          h('div', { class: 'math', style: { fontSize: '26px', color: '#f3e8d6', justifyContent: 'flex-start' }, html: last.item.choices ? toHTML(last.item.choices[last.item.sol[0]], { static: true }) : toHTML(last.item.prompt, { static: true, vals: last.item.sol.map(String) }) })) : null,
         h('div', { class: 'btnrow' }, more ? h('button', { class: 'kbtn', onclick: () => runFloor() }, `${nextL.split(' ')[0]} 불 켜러 가기`) : toType ? h('button', { class: 'kbtn', onclick: () => runType() }, '도전 층 가기') : h('button', { class: 'kbtn green', onclick: () => done() }, '오늘 끝')))));
   }
 
@@ -538,20 +585,21 @@ export function mountKid(app, ctx) {
   }
   const typeLabel = (ty) => `도전 층 ${TYPES[ty].name}`;
   function typeIntro() {
-    const ty = kid.run.ty, TY = TYPES[ty], tw = towerOf(cfg.unit, kid), c = `T:${ty}`;
+    const ty = kid.run.ty, TY = TYPES[ty], tw = towerOf(cfg.unit, kid), c = `T:${ty}`, read0 = performance.now();
     const was = litElsewhere(kid, ty, cfg.unit);
-    screen(bar(`${typeLabel(ty)}에 불을 켜요`, { right: [helpBtn()] }),
+    const go = () => { addStudy(kid, performance.now() - read0); typeItemScreen(); };
+    screen(bar("예제를 보고 '시작'을 눌러요", { right: [helpBtn()] }),
       h('div', { class: 'kwrap', style: { gap: '40px' } },
         h('div', { class: 'kside hide-n', style: { flexBasis: '360px' } }, towerEl(tw, { cur: c })),
         h('div', { class: 'kmain', style: { gap: '18px', maxWidth: '680px' } },
           h('div', { class: 'big-t fade-in' }, h('span', { class: 'violet' }, '도전 층'), h('br'), TY.name),
-          h('div', { class: 'panel lead' }, '문제집에 자주 나오는 ', h('b', {}, '문제 모양'), '이에요. 학년이 바뀌어도 숫자만 바뀌어 또 나와요.',
+          h('div', { class: 'panel lead' }, '문제집에 자주 나오는 ', h('b', {}, '문제 모양'), '이에요. 학년이 올라가도 숫자만 달라져서 또 나와요.',
             was ? [h('br'), h('b', { class: 'gold2' }, `${unitName(was)} 탑에서 이미 켠 모양이에요 — 이번엔 숫자만 바뀌었어요!`)] : null),
-          h('div', { class: 'panel lead' }, h('b', {}, '이렇게 풀어요 · '), TY.idea),
+          h('div', { class: 'panel lead' }, h('b', {}, '이렇게 풀어요 · '), rich(TY.idea)),
           typeExampleEl(ty),
           h('div', { class: 'fires', style: { justifyContent: 'flex-start' } }, ...Array.from({ length: TRULE.streak }, () => fire('off'))),
           h('p', { class: 'lead' }, `시간은 재지 않아요. 맞히면 불씨 하나 · ${TRULE.streak}개 모으면 불이 켜져요. 틀리면 하나 꺼지고 같이 풀어 봐요.`),
-          h('div', { class: 'btnrow' }, h('button', { class: 'kbtn', onclick: () => typeItemScreen() }, '시작')))));
+          h('div', { class: 'btnrow sticky' }, h('button', { class: 'kbtn', onclick: go }, '시작')))));
   }
   // 예제 — 같은 틀 문제 하나를 단계와 답까지(고르기는 맞는 보기)
   function typeExampleEl(ty) {
@@ -561,19 +609,19 @@ export function mountKid(app, ctx) {
       h('div', { style: { fontSize: '14px', fontWeight: '800', color: '#7cc0f0' } }, '예제 — 이렇게 풀어요'),
       h('div', { class: 'story ex', html: toHTML(ex.story, { static: true }) }),
       ...ex.steps.filter((s) => !s.read && !s.struct).map((s, i) => h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } },
-        h('span', { style: { fontSize: '14px', color: '#d9c9ae', minWidth: '0', flex: '1 1 220px' } }, `${i + 1}. ${s.why}`), ans(s.item))),
+        h('span', { style: { fontSize: '14px', color: '#d9c9ae', minWidth: '0', flex: '1 1 220px' } }, `${i + 1}. `, rich(s.why)), ans(s.item))),
       h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #3d3024', paddingTop: '8px' } },
         h('span', { style: { fontSize: '14px', color: '#ffc766', fontWeight: '700' } }, '그래서'), ans(ex.item)));
   }
   function typeItemScreen(note = null) {
     const Y = kid.run && kid.run.Y, q = currentType(Y);
     if (!q) return typeEnd();
-    const ty = Y.t, tw = towerOf(cfg.unit, kid), shown = performance.now();
+    const ty = Y.t, tw = towerOf(cfg.unit, kid); clockStart();
     const pe = problemEl(q.item, {
-      tag: q.easy ? '쉬운 숫자로 먼저 — 불씨와 상관없어요' : typeLabel(ty), tagR: q.easy ? '' : `${q.n}번째 문제`, idkLabel: '모르겠어요', tone: q.easy ? 'blue' : '',
+      tag: q.easy ? '쉬운 숫자로 먼저 — 불씨와 상관없어요' : typeLabel(ty), tagR: q.easy ? '' : `${q.n}번째 문제`, tone: q.easy ? 'blue' : '',
       onAnswer: async (a) => {
         busy = true;
-        const ms = Math.round(performance.now() - shown);
+        const ms = Math.round(clockNow());
         const fb = answerType(kid, Y, { ...a, ms }); addTime(kid, ms);
         logItem(kid, { c: `T:${ty}`, ok: fb.ok, idk: a.idk, ms, kind: q.easy ? 'ye' : 'y', bug: fb.bug });
         await save();
@@ -591,7 +639,7 @@ export function mountKid(app, ctx) {
     const side = h('div', { class: 'kside timer', style: { alignItems: 'center', gap: '16px' } },
       q.easy ? h('div', { class: 'panel', style: { fontSize: '15px', lineHeight: '1.6', color: '#d9c9ae' } }, h('b', { class: 'blue' }, '같은 문제, 쉬운 숫자'), h('br'), '숫자만 작게 바꿨어요. 이걸 풀 수 있으면 문제 모양은 아는 거예요.')
         : [flamesEl(q.flames, { max: TRULE.streak }), h('div', { class: 'fcount' }, `불씨 ${q.flames} / ${TRULE.streak}`), h('div', { class: 'padnote', style: { textAlign: 'center' } }, '여기선 시간을 재지 않아요')],
-      h('div', { style: { marginTop: 'auto', width: '100%' } }, towerEl(tw, { cur: `T:${ty}`, small: true, title: false })));
+      h('div', { style: { marginTop: 'auto', width: '100%' } }, towerEl(tw, { cur: `T:${ty}`, small: true, title: false, hideLock: true })));
     screen(bar(q.easy ? '같은 문제를 쉬운 숫자로 풀어 봐요' : `맞히면 불씨 하나 · ${TRULE.streak}개 모으면 도전 층에 불이 켜져요`, { tone: q.easy ? 'blue' : '', right: [helpBtn(), stopBtn()] }),
       h('div', { class: 'kwrap' }, side, h('div', { class: 'kmain fade-in' }, note ? h('div', { class: 'fb ok' }, note) : null, pe.paper, pe.actions), pe.pad));
     pe.focus();
@@ -600,15 +648,15 @@ export function mountKid(app, ctx) {
   function typeHelp(q, a, fb, { easy = false } = {}) {
     const Y = kid.run && kid.run.Y, steps = q.inst.steps, first = [];
     const before = fb.before, after = fb.flames;
-    const mineEl = a.idk ? h('span', { class: 'mine' }, '모르겠어요') : h('span', { class: 'mine' }, h('span', { class: 'math', style: { fontSize: '26px', color: '#8a5a20' }, html: toHTML(answerOnly(q.item.prompt), { static: true, vals: a.vals || [] }) }), '내 답');
-    const left = h('div', { class: 'kside', style: { flexBasis: '380px', gap: '14px' } },
+    const mineEl = a.idk ? h('span', { class: 'mine' }, '아직 몰라요') : h('span', { class: 'mine' }, h('span', { class: 'math', style: { fontSize: '26px', color: '#8a5a20' }, html: toHTML(answerOnly(q.item.prompt), { static: true, vals: a.vals || [] }) }), '내 답');
+    const left = h('div', { class: 'kside help', style: { flexBasis: '380px', gap: '14px' } },
       h('div', { class: 'mid-t' }, a.idk ? '괜찮아요!' : '아까워요!', h('br'), h('span', { class: 'blue' }, '한 단계씩 같이 풀어 봐요')),
       h('div', { class: 'paper has-story', style: { flex: 'none', minHeight: '0', padding: '44px 18px 18px', gap: '10px' } }, h('div', { class: 'ptag' }, h('span', {}, '아까 문제')),
         h('div', { class: 'story sm', html: toHTML(q.inst.story, { static: true }) }), mineEl,
-        fb.bug && fb.bug.name ? h('div', { class: 'msg', style: { color: '#5d4a36', fontWeight: '500' } }, `혹시 — ${fb.bug.name}?`) : null),
+        fb.bug && fb.bug.name ? h('div', { class: 'msg', style: { color: '#5d4a36', fontWeight: '500' } }, '혹시 이런 실수였을까요? ', h('b', {}, fb.bug.name)) : null),
       easy ? null : h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', marginTop: 'auto' } },
         flamesEl(after, { gone: before > 0 ? after : -1, max: TRULE.streak }),
-        h('div', { style: { fontSize: '14px', lineHeight: '1.5', color: '#d9c9ae' } }, before > 0 ? `불씨가 하나만 꺼졌어요 (${before} → ${after}).` : '불씨는 0개 그대로예요.', h('br'), '방법을 알았으니 금방 다시 모여요!')));
+        h('div', { style: { fontSize: '14px', lineHeight: '1.5', color: '#d9c9ae' } }, before > 0 ? `불씨가 하나만 꺼졌어요 (${before} → ${after}).` : '불씨는 0개 그대로예요.', h('br'), '방법을 알면 불씨는 금방 다시 모여요!')));
     const finalEl = h('div', { class: 'math', style: { color: '#f3e8d6' }, html: toHTML(q.item.prompt, { static: true, vals: q.item.sol.map(String) }) });
     stepRunner(left, steps, {
       finalEl, bar: '문제를 단계로 나눠 같이 풀어 봐요',
@@ -640,19 +688,19 @@ export function mountKid(app, ctx) {
     if (r.teacher) {
       return screen(bar('이 도전 층은 선생님이랑 같이 켜요', { tone: 'blue' }),
         h('div', { class: 'kwrap', style: { gap: '48px' } }, h('div', { class: 'kside', style: { flexBasis: '380px' } }, towerEl(tw, { order: true })),
-          h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '18px', maxWidth: '600px' } },
+          h('div', { class: 'kmain vc', style: { gap: '18px', maxWidth: '600px' } },
             h('div', { class: 'big-t' }, '열심히 했어요!', h('br'), h('span', { class: 'blue' }, `${typeLabel(ty)}${tj(TYPES[ty].name, '은', '는')} 선생님이랑 같이 켜요`)),
             h('p', { class: 'lead' }, '여러 번 풀어 봤는데 아직 불이 안 켜졌어요. 선생님이 알 수 있게 표시해 둘게요.'),
             h('div', { class: 'btnrow' }, more ? h('button', { class: 'kbtn', onclick: () => runType() }, `다음: ${nextL}`) : h('button', { class: 'kbtn green', onclick: () => done() }, '오늘 끝')))));
     }
     const all = tw.topLit === tw.tops.length && tw.lit === tw.total;
-    screen(bar(all ? '도전 층까지 모두 켜졌어요!' : more ? '다음 도전 층으로 올라가요' : '오늘은 여기까지', { tone: all || !more ? 'green' : '', right: [h('span', {}, more ? `오늘 남은 시간 ${Math.ceil(t.left / 60000)}분` : '')] }),
+    screen(bar(all ? '도전 층까지 모두 켜졌어요!' : more ? "'다음 도전 층 가기'를 눌러요" : '오늘은 여기까지', { tone: all || !more ? 'green' : '', right: [h('span', {}, more ? `오늘 남은 시간 ${Math.ceil(t.left / 60000)}분` : '')] }),
       h('div', { class: 'kwrap', style: { gap: '56px', alignItems: 'center' } },
         h('div', { class: 'kside', style: { flexBasis: '380px' } }, towerEl(tw, { justLit: c, order: !all })),
-        h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '20px', maxWidth: '600px' } },
+        h('div', { class: 'kmain vc', style: { gap: '20px', maxWidth: '600px' } },
           fire('on', '#ffc766', 'fire big-fire'),
           h('div', { class: 'big-t fade-in' }, `${typeLabel(ty)}에`, h('br'), h('span', { class: 'gold2' }, '불이 켜졌어요!')),
-          h('p', { class: 'lead' }, `불씨 ${TRULE.streak}개를 다 모았어요. 이 문제 모양은 다른 단원 · 학년에서도 숫자만 바뀌어 또 나와요 — 오늘 익힌 단계 그대로 풀면 돼요.`, more ? [h('br'), '다음은 ', h('b', {}, nextL), '예요.'] : ''),
+          h('p', { class: 'lead' }, `불씨 ${TRULE.streak}개를 다 모았어요. 이 문제 모양은 다른 단원 · 학년에서도 숫자만 달라져서 또 나와요 — 오늘 익힌 단계 그대로 풀면 돼요.`, more ? [h('br'), '다음은 ', h('b', {}, nextL), `${tj(nextL, '이에요', '예요')}.`] : ''),
           h('div', { class: 'btnrow' },
             more ? h('button', { class: 'kbtn ghost', onclick: () => done() }, '오늘은 여기까지') : null,
             more ? h('button', { class: 'kbtn', onclick: () => runType() }, '다음 도전 층 가기') : h('button', { class: 'kbtn green', onclick: () => done() }, all ? '탑 완성!' : '오늘 끝')))));
@@ -671,16 +719,17 @@ export function mountKid(app, ctx) {
     else if (tw.topNext) tags[tw.topNext.c] = tags[tw.topNext.c] || '다음';
     screen(bar('오늘은 끝! RPG로 돌아가요', { tone: 'green' }),
       h('div', { class: 'kwrap', style: { gap: '56px', alignItems: 'center' } },
-        h('div', { class: 'kmain', style: { justifyContent: 'center', gap: '22px', maxWidth: '620px' } },
+        h('div', { class: 'kmain vc', style: { gap: '22px', maxWidth: '620px' } },
           h('div', { class: 'big-t fade-in' }, '오늘 수학 ', h('span', { class: 'green' }, '끝!')),
           h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
             h('div', { class: 'muted', style: { fontSize: '14px', fontWeight: '700' } }, `오늘 한 일 · ${Math.max(1, Math.round(d.ms / 60000))}분 · ${d.n}문제`),
             kid.scans[cfg.unit] && dayKey(kid.scans[cfg.unit].t) === dayKey() ? h('div', { class: 'check' }, h('span', { class: 'ck' }, '✓'), '탑을 끝까지 살펴봤어요') : null,
             ...lit.map((x) => h('div', { class: 'check' }, h('span', { class: 'ck' }, '✓'), `${x}에 불을 켰어요`)),
             d.review ? h('div', { class: 'check' }, h('span', { class: 'ck' }, '✓'), '불 점검을 했어요') : null,
-            kid.run && kid.run.kind === 'prac' ? h('div', { class: 'check muted' }, h('span', { class: 'ck no' }), `${floorLabel(kid.run.c)}은 불씨 ${currentPractice(kid.run.P) ? currentPractice(kid.run.P).streak : 0}개까지 모았어요`) : null,
+            kid.run && kid.run.kind === 'prac' ? h('div', { class: 'check muted' }, h('span', { class: 'ck no' }), `${floorLabel(kid.run.c)}${tj(floorLabel(kid.run.c), '은', '는')} 불씨 ${currentPractice(kid.run.P) ? currentPractice(kid.run.P).streak : 0}개까지 모았어요`) : null,
             kid.run && kid.run.kind === 'scan' ? h('div', { class: 'check muted' }, h('span', { class: 'ck no' }), '탑 살펴보기는 다음에 이어서 해요') : null,
-            kid.run && kid.run.kind === 'type' && currentType(kid.run.Y) ? h('div', { class: 'check muted' }, h('span', { class: 'ck no' }), `${typeLabel(kid.run.ty)}${tj(TYPES[kid.run.ty].name, '은', '는')} 불씨 ${currentType(kid.run.Y).flames}개까지 모았어요`) : null),
+            kid.run && kid.run.kind === 'type' && currentType(kid.run.Y) ? h('div', { class: 'check muted' }, h('span', { class: 'ck no' }), `${typeLabel(kid.run.ty)}${tj(TYPES[kid.run.ty].name, '은', '는')} 불씨 ${currentType(kid.run.Y).flames}개까지 모았어요`) : null,
+            ...tw.all.filter((f) => f.st === 'teacher').map((f) => h('div', { class: 'check muted' }, h('span', { class: 'ck tc' }, '♡'), `${floorLabel(f.c)}${tj(floorLabel(f.c), '은', '는')} 선생님이랑 같이 켜요`))),
           next ? h('div', { class: 'panel', style: { display: 'flex', alignItems: 'center', gap: '14px', border: '2px solid #f2a93b' } },
             h('div', {}, h('div', { class: 'muted', style: { fontSize: '13px' } }, '다음에 할 일'), h('div', { class: 'mid-t gold2', style: { fontSize: '23px' } }, `${next}에 불 켜기`))) : null,
           h('div', { class: 'btnrow' }, h('button', { class: 'kbtn green', onclick: backToRPG }, 'RPG로 돌아가기'))),

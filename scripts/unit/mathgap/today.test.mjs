@@ -8,7 +8,7 @@
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
 //  · 도전 층(문제 유형): 아래층을 다 켜야 열림 · 불씨 3개 · 같이 풀기 까닭(문제 모양 · 숫자 영역 · 계산 · 단계) · 8문제 → 선생님과 · 점검은 지금 단원 숫자로 · 하루 하나
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
-import { blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
+import { STORY_EVERY, limitOf, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
   currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
   startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark,
   startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit, bridgeOf, bridgeMiss } from '../../../mathgap/js/today.js';
@@ -555,6 +555,20 @@ test('모든 단원 — 살펴보기와 연습이 오류 없이 돈다', () => {
     n++;
   }
   ok(n >= 35, '단원 수 ' + n);
+});
+
+test('문장제 섞기 — 계산 차시 연습 3번째 문제마다 같은 숫자의 문장제 · 시간 1.6배 · 맞히면 불씨 · 5개 모으면 켜짐', () => {
+  const kid = blankKid(); kid.seen.intro = T0; kid.scans['4-2-1'] = { t: T0, base: [], facts: true };
+  const c = lessonsOfUnit('4-2-1')[0], P = startFloor(kid, '4-2-1', c, 'story-t', T0);
+  let n = 0, stories = 0;
+  while (currentPractice(P) && n < 20) {
+    const q = currentPractice(P); n++;
+    if (q.story) { stories++; ok(q.n % STORY_EVERY === 0, `문장제가 ${q.n}번째에`); ok(q.item.story && q.limit > limitOf(c), '문장제 글 · 시간'); }
+    const fb = answerPractice(P, { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: 1000, t: T0 });
+    ok(fb.ok && fb.fast, `${q.n}번째 정답이 틀림 ${q.story ? '(문장제)' : ''}`);
+  }
+  ok(n === RULE.streak && stories === 1, `문제 ${n} · 문장제 ${stories}`);
+  ok(finishFloor(kid, P, T0).lit, '불이 안 켜짐');
 });
 
 await Promise.all(pending);

@@ -43,7 +43,7 @@ function mathgapCardState() {
   const nextL = c.next ? `${Number(c.nextNo) > 0 ? Number(c.nextNo) + '층' : '기초'} ${escHtml(String(c.nextName || '').slice(0, 30))}` : '';
   const today = c.day === _mgToday();
   if (today && c.doneToday && c.stage !== 'top') return { title: '오늘 수학 끝!', sub: `오늘 ${Math.max(1, Math.round((Number(c.ms) || 0) / 60000))}분 · 내일 또 만나요`, btn: '내 탑 보기', tone: 'green' };
-  if (c.stage === 'top') return { title: '탑 완성!', sub: `${uname} 탑에 불이 다 켜졌어요 · 점검할 날이 오면 몇 문제`, btn: '내 탑 보기', tone: 'gold2' };
+  if (c.stage === 'top') return { title: '탑 완성!', sub: `${uname} 탑에 불이 다 켜졌어요 · 이제 점검하는 날에만 몇 문제 풀어요`, btn: '내 탑 보기', tone: 'gold2' };
   if (c.stage === 'wait') return { title: '오늘의 수학', sub: '남은 층은 선생님이랑 같이 켜요', btn: '내 탑 보기', tone: 'blue' };
   if (c.stage === 'type') return { title: '오늘의 수학', sub: `탑을 다 켰어요! 오늘은 <b>도전 층 ${escHtml(String(c.nextName || '').slice(0, 30))}</b>`, btn: today ? '이어서' : '시작하기', tone: 'gold' };
   if (c.stage === 'scan' || c.stage === 'facts' || !c.scanned) return { title: '오늘의 수학', sub: `${uname} 탑 살펴보기를 이어서 해요`, btn: '이어서', tone: 'gold' };

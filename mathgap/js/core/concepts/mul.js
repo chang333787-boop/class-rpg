@@ -1,5 +1,5 @@
 // 곱셈 (2~3학년)
-import { nums, B, tbl } from './kit.js';
+import { nums, B, tbl, P } from './kit.js';
 import { groups } from '../tokens.js';
 import { addNoCarry } from './num.js';
 
@@ -74,8 +74,8 @@ export default [
       bugs: [{ test: (v) => v[0] * 10 === p.a * p.t, name: '0을 하나만 붙임', to: 'N5' }],
     }),
     steps: (p) => p.v === 'mt'
-      ? [{ c: 'M8', p: { a: p.a, b: p.t / 10 }, why: `먼저 ${p.a} × ${p.t / 10}을 해요.` }, { c: 'N5', p: { v: 'tens', k: p.a * (p.t / 10) }, why: '그 수의 10배예요.' }]
-      : [{ c: tbl(p.a / 10), p: { a: p.a / 10, b: p.t / 10 }, why: '0을 뺀 수끼리 곱해요.' }, { c: 'N5', p: { v: 'tens', k: (p.a / 10) * (p.t / 10) * 10 }, why: '10 × 10 = 100이에요.' }],
+      ? [{ c: 'M8', p: { a: p.a, b: p.t / 10 }, why: `먼저 ${p.a} × ${p.t / 10}${P(p.t / 10, '을', '를')} 해요.` }, { c: 'N5', p: { v: 'tens', k: p.a * (p.t / 10) }, why: '그 수의 10배예요.' }]
+      : [{ c: tbl(p.a / 10), p: { a: p.a / 10, b: p.t / 10 }, why: `${p.a}${P(p.a, '은', '는')} ${p.a / 10}의 10배, ${p.t}${P(p.t, '은', '는')} ${p.t / 10}의 10배예요. ${p.a / 10} × ${p.t / 10}부터 곱해요.` }, { c: 'N5', p: { v: 'tens', k: (p.a / 10) * (p.t / 10) * 10 }, why: '10배의 10배는 100배예요.' }],
   },
   {
     id: 'M10', name: '(두 자리)×(두 자리)', kid: '두 자리 수 × 두 자리 수', g: '3-2', s: 'M', pre: ['M8', 'M9', 'A8'],
@@ -93,8 +93,8 @@ export default [
       });
     },
     steps: (p) => [
-      { c: 'M8', p: { a: p.a, b: ones(p.b) }, why: `먼저 일의 자리 ${ones(p.b)}을(를) 곱해요.`.replace('을(를)', [0, 1, 3, 6, 7, 8].includes(ones(p.b)) ? '을' : '를') },
-      { c: 'M9', p: { v: 'mt', a: p.a, t: tens(p.b) * 10 }, why: `이번엔 십의 자리 ${tens(p.b) * 10}을 곱해요. (세로셈의 둘째 줄)` },
+      { c: 'M8', p: { a: p.a, b: ones(p.b) }, why: `먼저 일의 자리 ${ones(p.b)}${P(ones(p.b), '을', '를')} 곱해요.` },
+      { c: 'M9', p: { v: 'mt', a: p.a, t: tens(p.b) * 10 }, why: `이번엔 십의 자리 ${tens(p.b) * 10}을 곱해요. (세로셈의 둘째 줄)` },   // 조사 고정: 몇십은 늘 받침
       { c: 'A8', p: { op: '+', a: p.a * ones(p.b), b: p.a * tens(p.b) * 10 }, why: '두 줄을 더해요.' },
     ],
   },

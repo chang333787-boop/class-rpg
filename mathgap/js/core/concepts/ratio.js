@@ -2,7 +2,7 @@
 import { nums, frac, pick, fx, fb, B, P, J, RO, tbl, F, gcd } from './kit.js';
 import { near, fmt, lcm, eqv } from '../math.js';
 
-const CTX = [['탁자', '의자', '개'], ['모둠', '연필', '자루'], ['오징어', '다리', '개'], ['자전거', '바퀴', '개']];
+const CTX = [['탁자', '의자', '개', '개'], ['모둠', '연필', '자루', '개'], ['오징어', '다리', '개', '마리'], ['자전거', '바퀴', '개', '대']];   // [△, ○, ○ 단위, △ 단위]
 const RATE = { 탁자: 4, 오징어: 10, 자전거: 2 };
 
 export default [
@@ -11,8 +11,8 @@ export default [
     tip: '표를 가로로만 보지 말고 위아래 짝을 보게 해요("탁자 1개에 의자 4개"). 한 양만 보면 덧셈 규칙으로 착각해요.',
     gen: (r) => { const c = r.int(0, CTX.length - 1), k = RATE[CTX[c][0]] || r.int(3, 6); return { c, k, op: '×', x: r.int(6, 9) }; },
     make: (p) => {
-      const [a, b, u] = CTX[p.c], ys = [1, 2, 3, 4].map((x) => x * p.k);
-      return nums([`${a} 수: 1, 2, 3, 4`, { br: 1 }, `${b} 수: ${ys.join(', ')}`, { br: 1 }, `${a} 수가 ${J(p.x, '이면', '면')} ${b} 수는 `, B(0), u], p.x * p.k, {
+      const [a, b, u, ua] = CTX[p.c], ys = [1, 2, 3, 4].map((x) => x * p.k);
+      return nums([`${a} 수: 1, 2, 3, 4`, { br: 1 }, `${b} 수: ${ys.join(', ')}`, { br: 1 }, `${a}${P(a, '이', '가')} ${p.x}${ua}일 때 ${b} 수는 `, B(0), `${u}${P(u, '이에요', '예요')}.`], p.x * p.k, {
         bugs: [{ test: (v) => v[0] === p.x + p.k - 1, name: '차이로 봄 (덧셈 규칙)', to: 'M2' }, { test: (v) => v[0] === ys[3] + p.k, name: '표의 다음 칸만 구함', to: null }],
       });
     },
