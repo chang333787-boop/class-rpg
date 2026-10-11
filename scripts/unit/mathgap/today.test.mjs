@@ -11,7 +11,7 @@ import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/le
 import { blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
   currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
   startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark,
-  startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit } from '../../../mathgap/js/today.js';
+  startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit, bridgeOf, bridgeMiss } from '../../../mathgap/js/today.js';
 import { kidFrom, createStore } from '../../../mathgap/js/store.js';
 import { rng } from '../../../mathgap/js/core/math.js';
 
@@ -24,7 +24,8 @@ const DAY = 864e5, T0 = new Date(2026, 9, 12, 9, 0).getTime();
 const roundtrip = (kid) => JSON.parse(JSON.stringify(kid));
 
 // 가상 아이 — gaps 에 든 차시와 그 위(언제나 필요한 줄)는 못 푼다. learn: 연습에서 틀리고 풀이를 n번 보면 그 차시를 배운다
-//  types: 'know' 도전 층도 앎 · 'none' 문제 모양을 모름(쉬운 숫자도 못 풂) · 'dom' 쉬운 숫자로는 풀지만 분수 · 소수면 식을 못 고름 · 'calc' 식은 고르지만 계산에서 틀림
+//  types: 'know' 도전 층도 앎 · 'none' 문제 모양을 모름(이야기 · 상황은 읽지만 식을 못 세우고 쉬운 숫자도 못 풂) · 'dom' 쉬운 숫자로는 풀지만 분수 · 소수면 식을 못 고름
+//         'calc' 식은 고르지만 계산에서 틀림 · 'read' 이야기 확인부터 틀림 · 'struct' 이야기는 읽지만 같은 상황을 못 고름
 function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000, factMs = 1500, types = 'know' } = {}) {
   const seen = {};
   const okC = (c) => !gaps.has(c) && corePre(c).every(okC);
@@ -40,7 +41,7 @@ function kidModel(gaps, { learnAfter = 2, slip = 0.03, ms = 6000, factMs = 1500,
     sawHelp(c) { seen[c] = (seen[c] || 0) + 1; if (seen[c] >= learnAfter) gaps.delete(c); },
     // 도전 층 문제 · 같이 풀기 단계
     typeOk(q) { return types === 'know' || (types === 'dom' && q.easy); },
-    stepOk(s, q) { if (types === 'know') return true; if (types === 'calc') return s.kind !== 'calc'; if (types === 'dom') return q.easy || !s.key; return false; },
+    stepOk(s, q) { if (types === 'know') return true; if (types === 'read') return false; if (types === 'struct') return !!s.read; if (types === 'calc') return s.kind !== 'calc'; if (types === 'dom') return q.easy || !s.key; return !!(s.read || s.struct); },
   };
 }
 const solve = (it) => ({ vals: it.sol.map(Number), raws: it.sol.map(String) });
@@ -78,7 +79,7 @@ function playDay(kidIn, model, cfg, now, until = null) {
       const Y = kid.run ? kid.run.Y : startType(kid, cfg.unit, T.top.t, 'y' + now + T.top.t, now);
       const q = currentType(Y), good = model.typeOk(q), ms2 = 20000;
       const fb = answerType(kid, Y, { ...(good ? solve(q.item) : wrong(q.item)), ms: ms2 }, now); addTime(kid, ms2, now); items++;
-      if (fb.help) { const r = typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: model.stepOk(st, q), c: st.c || null, bug: null })), now); log.push('help:' + r.diag); }
+      if (fb.help) { const r = typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, read: !!st.read, struct: !!st.struct, key: !!st.key, ok: model.stepOk(st, q), c: st.c || null, bug: null })), now); log.push('help:' + r.diag); }
       if (q.easy) log.push('easy:' + fb.diag);
       if (Y.done) { const r = finishType(kid, Y, now); if (r.lit) markLit(kid, 'T:' + Y.t, now); log.push(r.lit ? 'tlit:' + Y.t : 'tteacher:' + Y.t); }
     } else if (T.stage === 'review') {
@@ -429,7 +430,7 @@ test('도전 층 — 틀리면 불씨 하나 꺼짐 · 분수 단원에서 식�
     answerType(kid, Y, solve(currentType(Y).item), T0);            // 불씨 1
     const q = currentType(Y), fb = answerType(kid, Y, wrong(q.item), T0);
     ok(!fb.ok && fb.help && fb.flames === 0 && fb.before === 1, '틀렸는데 ' + JSON.stringify(fb));
-    const h1 = typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null })), T0);
+    const h1 = typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, read: !!st.read, struct: !!st.struct, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null })), T0);
     ok(h1.diag === 'easy', '식 고르기를 틀렸는데 쉬운 숫자로 안 감 ' + h1.diag);
     const e = currentType(Y);
     ok(e.easy && e.inst.st === 'W', '다음 문제가 쉬운 숫자가 아님');
@@ -440,13 +441,13 @@ test('도전 층 — 틀리면 불씨 하나 꺼짐 · 분수 단원에서 식�
   }
 });
 
-test('도전 층 — 자연수 단원은 식을 못 고르면 바로 문제 모양 · 계산에서 막히면 그 차시 틀린 모양 · 다 풀면 단계', () => {
+test('도전 층 — 진단 사다리: 이야기 확인부터 막히면 읽기 · 같은 상황을 못 고르면 구조 · 자연수 단원은 식을 못 고르면 바로 문제 모양 · 계산에서 막히면 그 차시 틀린 모양 · 다 풀면 단계', () => {
   const u = { unit: '3-1-1' };
-  for (const [model, want] of [['none', 'tpl'], ['calc', 'calc'], ['know', 'plan']]) {
+  for (const [model, want] of [['read', 'read'], ['struct', 'struct'], ['none', 'tpl'], ['calc', 'calc'], ['know', 'plan']]) {
     const kid = towerDone(u.unit), m = kidModel(new Set(), { types: model });
     const Y = startType(kid, u.unit, 'INV', 'yw' + model, T0);
     const q = currentType(Y); answerType(kid, Y, wrong(q.item), T0);
-    const steps = q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null, bug: st.kind === 'calc' ? { name: '받아내린 자리에서 1을 빼지 않음' } : null }));
+    const steps = q.inst.steps.map((st) => ({ kind: st.kind, read: !!st.read, struct: !!st.struct, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null, bug: st.kind === 'calc' ? { name: '받아내린 자리에서 1을 빼지 않음' } : null }));
     const r = typeHelpDone(kid, Y, steps, T0);
     ok(r.diag === want && diagOf(kid, 'INV')[want] === 1, `${model} → ${r.diag}`);
     if (want === 'calc') ok(r.calc && byId[r.calc] && bugsOf(kid).some((b) => b.c === r.calc), '계산 차시 틀린 모양이 안 모임 ' + JSON.stringify(kid.bugs));
@@ -457,7 +458,7 @@ test('도전 층 — 자연수 단원은 식을 못 고르면 바로 문제 모�
 test('도전 층 — 8문제 안에 못 켜면 선생님과(표시) · 하루가 멈춤 · 표시 지우면 다시 연습', () => {
   const kid = towerDone(cfg.unit), t = typesOfUnit(cfg.unit)[0];
   const Y = startType(kid, cfg.unit, t, 'yt', T0);
-  let g = 0; while (!Y.done && g++ < 30) { const q = currentType(Y); const fb = answerType(kid, Y, wrong(q.item), T0); if (fb.help) typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: true, c: st.c || null })), T0); }
+  let g = 0; while (!Y.done && g++ < 30) { const q = currentType(Y); const fb = answerType(kid, Y, wrong(q.item), T0); if (fb.help) typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, read: !!st.read, struct: !!st.struct, key: !!st.key, ok: true, c: st.c || null })), T0); }
   ok(Y.done && Y.out.filter((x) => !x.easy).length === TRULE.max, '8문제에서 안 멈춤 ' + Y.out.length);
   const r = finishType(kid, Y, T0);
   ok(r.teacher && kid.marks[`T:${t}@${cfg.unit}`] === 'teacher' && towerOf(cfg.unit, kid).tops[0].st === 'teacher', '선생님과 표시 없음');
@@ -517,7 +518,7 @@ test('모든 도전 층 단원 — 탑을 다 켠 아이가 도전 층을 끝까
         let g = 0;
         while (!Y.done && g++ < 40) {
           const q = currentType(Y), fb = answerType(kid, Y, m.typeOk(q) ? solve(q.item) : wrong(q.item), T0);
-          if (fb.help) typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null })), T0);
+          if (fb.help) typeHelpDone(kid, Y, q.inst.steps.map((st) => ({ kind: st.kind, read: !!st.read, struct: !!st.struct, key: !!st.key, ok: m.stepOk(st, q), c: st.c || null })), T0);
         }
         const r = finishType(kid, Y, T0);
         ok(model === 'know' ? r.lit : r.teacher, `${u} ${t} ${model} → ${JSON.stringify(r)}`);
@@ -526,6 +527,18 @@ test('모든 도전 층 단원 — 탑을 다 켠 아이가 도전 층을 끝까
     }
   }
   ok(n >= 30, '단원 수 ' + n);
+});
+
+test('옛 개념 다리 — 분수의 나눗셈 층 예제에 예전 문제가 붙고, 같이 풀기에서 예전 문제를 두 번 못 풀면 그 차시가 기초 층으로', () => {
+  const unit = '6-2-1', kid = towerDone(unit), c = '6-2-1:2';
+  const ex = exampleOf(c, 5);
+  ok(ex.bridge && ex.bridge.old && byId[ex.bridge.old.c] && ex.bridge.same && ex.bridge.change, '예제에 다리가 없음');
+  const old = ex.bridge.old.c;
+  ok(!towerOf(unit, kid).all.some((f) => f.c === old), '가정: 예전 차시가 탑에 없음');
+  ok(!bridgeMiss(kid, unit, old, T0).added, '한 번 못 풀었는데 기초 층으로 옴');
+  const r2 = bridgeMiss(kid, unit, old, T0 + DAY);
+  ok(r2.added && towerOf(unit, kid).base.some((f) => f.c === old) && towerOf(unit, kid).next.c === old, `두 번 못 풀었는데 기초 층이 아님 ${JSON.stringify(r2)}`);
+  ok(!bridgeOf('4-2-1:3', { op: '+', w1: 1, n1: 1, w2: 1, n2: 1, d: 5 }), '다리가 없는 차시에 다리가 생김');
 });
 
 // 단원마다 한 번씩 — 어느 단원이든 살펴보기 → 연습 → 완성이 돈다(기초 빈칸 하나씩)

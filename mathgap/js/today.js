@@ -10,19 +10,22 @@
 //   · 지난 단원도 잊지 않게: 예전 탑에서 켠 층도 점검 날이 되면 몸풀기에 섞는다(지금 탑이 먼저) · 두 번 틀려 꺼지면 지금 탑의 기초 층으로
 //   · 구구단 빠르기(교사 '구구단 안 되는 애가 통분을 어떻게 해'): 곱셈에 기대는 단원이면 살펴보기 끝에 2~9단 두 문제씩 16문제(한 달에 한 번 · 틀리면 같은 단 한 문제 더) —
 //     틀림 + 느림이 둘 이상인 단은 그 단 곱셈구구 차시를 기초 층으로(단원 점검은 차시마다 2~3문제라 '7단만 느린 아이'를 놓칠 수 있어서)
+//  옛 개념 다리(bridgeOf): 층 안내에 '예전에 배운 것 — 숫자만 바뀐 거야' · 같이 풀기 맨 앞에 예전 문제 · 두 번 못 풀면 그 차시가 기초 층으로
 //  문항 기록(logItem → 저장소 log/<sid>/<날짜>): 차시 · 맞음/틀림 · 걸린 시간 · 틀린 모양 — 효과 확인과 실수 판정 모형을 실제 기록으로 맞추기 위해(이름 없음)
 //  도전 층(10-11 · 교사 '문장제는 유형이 겹치고 단원 · 학년에 따라 숫자만 바뀐다'): 탑의 층을 다 켜면 꼭대기 위에 그 단원 숫자로 낸 문제집 유형 층(어떤 수 · 간격 · 수 카드 …)이 열린다.
 //    불씨 3개(시간 재지 않음 · 틀리면 하나 꺼짐) · 틀리면 같이 풀기(식 고르기 → 계산)에서 처음 막힌 곳으로 까닭을 가른다:
+//    read 이야기 읽기(이야기 확인에서 막힘) · struct 상황 파악(같은 상황 고르기에서 막힘 — 교사 '문장을 통으로 구조적으로 보는 능력')
 //    tpl 문제 모양(식 고르기에서 막힘) · dom 숫자 영역(분수 · 소수 단원에서 식을 못 골랐는데 같은 문제를 작은 자연수로는 풂) · calc 계산 · plan 단계를 나눠 주면 다 풂
 //    켠 유형은 단원과 상관없이 간격 복습(키 'T:유형') — 점검 날이면 지금 단원 숫자로 다시 나온다(숫자만 바뀐 같은 유형). 유형 시험 = 수학 빈칸 찾기 tests/types.test.mjs
 //  아이 기록(kid) = { states, scans: { 단원: 요약 }, marks: { 차시: 'teacher' }, rev: { 차시: { i 간격 단계, due 점검 날(ms) } },
 //                     bugs: { '차시|오답 이름': 수 }, run: 하던 것 | null, days: { 날짜: { ms, n, lit, review, extra } }, seen: { intro },
-//                     types: { 유형: { lit: { 단원: 때 }, diag: { tpl, dom, calc, plan }, n } } } · 도전 층 '선생님과' = marks['T:유형@단원']
+//                     types: { 유형: { lit: { 단원: 때 }, diag: { read, struct, tpl, dom, calc, plan }, n } } } · 도전 층 '선생님과' = marks['T:유형@단원']
 import { byId, lessonsOfUnit, sortByGrade, makeItem, corePre, resolve } from './core/lessons/index.js';
 import { newUnitScan, currentItem, answer, mergeStates } from './core/engine.js';
 import { newPractice, currentPractice, answerPractice, workedSteps, limitOf, RULE } from './core/practice.js';
 import { rng } from './core/math.js';
 import { TYPES, typesOfUnit, makeType, plainUnit, isType } from './core/types/index.js';
+import { bridgeOf, hasBridge } from './core/bridges.js';
 
 export const LIT = ['known', 'auto', 'slow'];
 export const DEFAULT_MIN = 10;
@@ -158,8 +161,24 @@ export function finishFloor(kid, P, now = Date.now()) {
 // 예제 하나 — 그 차시 문제를 같은 숫자로 쪼갠 단계와 답까지(층에 불을 켜기 전 '이렇게 풀어요')
 export function exampleOf(c, seed = 1) {
   const p = byId[c].gen(rng(seed)), item = makeItem(c, p);
-  return { item, steps: workedSteps(c, p).slice(0, 4) };
+  return { item, p, steps: workedSteps(c, p).slice(0, 4), bridge: bridgeOf(c, p) };
 }
+
+// ── 옛 개념 다리(10-11 · 교사 '옛날에 배웠지? 숫자만 바뀐 거야') — 지금 분수의 나눗셈 차시 · 내용 = core/bridges.js ──
+//  같이 풀기 맨 앞에 예전 문제(그 차시 문제 그대로)를 낸다. 처음 시도에 두 번 못 풀면(다른 날이어도) 그 차시가 진짜 빈칸 →
+//  지금 탑의 기초 층으로 데려온다(살펴보기 · 불 점검과 같은 길). 센 횟수는 틀린 모양 모으기(bugs)에 '다리 문제에서 막힘'으로.
+export const BRIDGE_BUG = '다리 문제(예전에 배운 문제)에서 막힘';
+export function bridgeMiss(kid, unit, oldC, now = Date.now()) {
+  noteBug(kid, oldC, { name: BRIDGE_BUG });
+  const n = kid.bugs[`${oldC}|${BRIDGE_BUG}`] || 0, sc = kid.scans[unit];
+  if (n < 2 || !sc || !byId[oldC] || isLit(kid, oldC) && n < 3) return { added: false, n };
+  if (towerOf(unit, kid).all.some((f) => f.c === oldC)) return { added: false, n };
+  kid.states[oldC] = { ...(kid.states[oldC] || {}), s: 'unstable', t: now, src: 'bridge' };
+  delete kid.rev[oldC];
+  sc.base = sortByGrade([...new Set([...(sc.base || []), oldC])]).slice(0, 6);
+  return { added: true, n };
+}
+export { bridgeOf, hasBridge };
 
 // ── 도전 층(문제 유형) — 불씨 3개 · 시간 재지 않음 · 틀리면 하나 꺼짐 · 8문제 안에 못 켜면 '선생님과' ──
 export const TRULE = { streak: 3, max: 8 };
@@ -209,12 +228,16 @@ export function answerType(kid, Y, a, now = Date.now()) {
   nextType(Y);
   return fb;
 }
-// 같이 풀기 끝 — 단계마다 처음 시도 결과 [{ kind, key, ok, c, bug }] → 까닭 tpl · dom(쉬운 숫자 문제로 정함) · calc · plan
+// 같이 풀기 끝 — 단계마다 처음 시도 결과 [{ kind, read, struct, key, ok, c, bug }] → 처음 막힌 겹(진단 사다리 · 10-11):
+//   read 이야기 읽기 → struct 상황(구조) 파악 → tpl 문제 모양(식 세우기) · dom 숫자 영역(쉬운 숫자 문제로 정함) → calc 계산 → plan 단계를 나눠 주면 풂
 export function typeHelpDone(kid, Y, steps, now = Date.now()) {
   const X = typeOf(kid, Y.t);
-  const keyMiss = steps.some((s) => s.key && !s.ok), calc = steps.find((s) => s.kind === 'calc' && !s.ok);
+  const miss = (f) => steps.some((s) => f(s) && !s.ok);
+  const keyMiss = miss((s) => s.key), calc = steps.find((s) => s.kind === 'calc' && !s.ok);
   let d;
-  if (keyMiss) {
+  if (miss((s) => s.read)) d = 'read';
+  else if (miss((s) => s.struct)) d = 'struct';
+  else if (keyMiss) {
     if (plainUnit(Y.t, Y.unit) || !Y.cur || Y.done) d = 'tpl';
     else { Y.cur = { seed: Y.prevSeed != null ? Y.prevSeed : Y.cur.seed, easy: true }; d = 'easy'; }     // 다음 문제 = 방금 문제와 같은 틀 · 같은 연산 짝 · 작은 자연수 — 거기서 정한다
   } else if (calc) { d = 'calc'; if (calc.c && byId[calc.c]) noteBug(kid, calc.c, calc.bug); }

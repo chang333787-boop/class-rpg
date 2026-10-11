@@ -206,6 +206,15 @@
 .step.now.pick .choices button{min-height:58px;padding:6px 16px}
 .step.now.pick .choices .math{font-size:26px;justify-content:flex-start}
 
+/* 옛 개념 다리 판(10-11) — 보라 테두리 · 예전 문제와 지금 문제를 위아래로 · 끊기는 곳은 주황 */
+.panel.bridge{border:1.5px solid #6a5a8f;background:#1c1724}
+.bridge .br-t{font-family:'Jua',sans-serif;font-size:19px;color:var(--lit2)}
+.bridge .br-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bridge .br-lab{font-size:13.5px;color:#cbbfe6;font-weight:700;flex:1 1 200px;min-width:0}
+.bridge .br-same,.bridge .br-change,.bridge .br-leap{font-size:15px;line-height:1.65;color:var(--txt2)}
+.bridge .br-change b{color:#c9b6ff}
+.bridge .br-leap{border-left:3px solid #ff9d6a;padding-left:10px}.bridge .br-leap b{color:#ff9d6a}
+
 /* ── 좁은 화면(휴대폰 · 세로 태블릿) ── */
 @media (max-width:900px){
   .kwrap{flex-direction:column;gap:16px;padding:16px}

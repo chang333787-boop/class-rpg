@@ -11,6 +11,7 @@ import {
   addTime, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
   startFacts, currentFact, answerFact,
   startType, currentType, answerType, typeHelpDone, finishType, typeExample, typeName, TRULE, TYPES, litElsewhere, isType,
+  bridgeOf, bridgeMiss,
 } from './today.js';
 
 const html = (s) => { const d = document.createElement('div'); d.innerHTML = s; return [...d.childNodes]; };
@@ -58,8 +59,8 @@ export function mountKid(app, ctx) {
       scan: t.resume ? ['어제 살펴보던 데서 이어서 해요', '이어서 살펴보기'] : [`오늘은 ${unitName(cfg.unit)} 탑을 살펴봐요`, '탑 살펴보기 시작'],
       facts: t.resume ? ['구구단 빠르기를 이어서 해요', '이어서 하기'] : ['탑 살펴보기 마지막 — 구구단 빠르기 16문제', '구구단 빠르기'],
       prac: t.resume ? [`${t.run_c || nextLabel}에 불을 켜던 중이에요`, '이어서 불 켜기'] : [`오늘은 ${nextLabel}에 불을 켜요`, '불 켜러 가기'],
-      review: t.resume ? ['불 점검을 이어서 해요', '이어서 점검'] : t.warm ? [`먼저 불 점검 ${t.n}문제, 그다음 ${nextLabel}`, '불 점검 시작'] : [`탑 완성! 오늘은 불 점검 ${t.n}문제`, '불 점검 시작'],
-      type: t.resume ? [`도전 층 ${t.top ? t.top.name : ''}${tj(t.top ? t.top.name : '', '을', '를')} 이어서 해요`, '이어서 하기'] : [`탑을 다 켰어요! 이제 도전 층 ${t.top.name}`, '도전 층 가기'],
+      review: t.resume ? ['불 점검을 이어서 해요', '이어서 점검'] : t.warm ? [`먼저 불 점검 ${t.n}문제, 그다음 ${nextLabel}`, '불 점검 시작'] : tw.topNext ? [`먼저 불 점검 ${t.n}문제, 그다음 도전 층 ${tw.topNext.name}`, '불 점검 시작'] : [`탑 완성! 오늘은 불 점검 ${t.n}문제`, '불 점검 시작'],
+      type: !t.top ? ['도전 층을 이어서 해요', '이어서 하기'] : t.resume ? [`도전 층 ${t.top.name}${tj(t.top.name, '을', '를')} 이어서 해요`, '이어서 하기'] : [`탑을 다 켰어요! 이제 도전 층 ${t.top.name}`, '도전 층 가기'],   // 다른 단계에서도 이 줄이 계산되므로 t.top 이 없을 수 있음
       top: ['오늘 수학 끝! 탑이 환해요', null], done: ['오늘 10분 끝! 내일 또 만나요', null], wait: ['남은 층은 선생님이랑 같이 켜요', null],
     }[t.stage] || ['', null];
     if (t.stage === 'prac' && t.resume && kid.run && kid.run.c) plan[0] = `${floorLabel(kid.run.c)}에 불을 켜던 중이에요`;
@@ -294,12 +295,23 @@ export function mountKid(app, ctx) {
   function exampleEl(c) {
     let ex; try { ex = exampleOf(c, (kid.run && kid.run.P ? kid.run.P.id : c).length * 97 + 5); } catch (e) { return null; }
     const ans = (it) => h('div', { class: 'math', style: { fontSize: '26px', color: '#f3e8d6', justifyContent: 'flex-start' }, html: toHTML(it.prompt, { static: true, vals: it.sol.map(String) }) });
-    return h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+    return [ex.bridge ? bridgeEl(ex.bridge, ex.item) : null, h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
       h('div', { style: { fontSize: '14px', fontWeight: '800', color: '#7cc0f0' } }, '예제 — 이렇게 풀어요'),
       ...ex.steps.map((s, i) => h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } },
         h('span', { style: { fontSize: '14px', color: '#d9c9ae', minWidth: '0', flex: '1 1 180px' } }, `${i + 1}. ${s.why}`), ans(s.item))),
       h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', borderTop: ex.steps.length ? '1px solid #3d3024' : '0', paddingTop: ex.steps.length ? '8px' : '0' } },
-        h('span', { style: { fontSize: '14px', color: '#ffc766', fontWeight: '700' } }, ex.steps.length ? '그래서' : '예'), ans(ex.item)));
+        h('span', { style: { fontSize: '14px', color: '#ffc766', fontWeight: '700' } }, ex.steps.length ? '그래서' : '예'), ans(ex.item)))];
+  }
+  // 옛 개념 다리 판 — 예전에 배운 문제(답까지) · 같은 것 · 바뀐 것 · 끊기는 곳(있으면)
+  function bridgeEl(b, nowItem) {
+    const solved = (it) => h('div', { class: 'math', style: { fontSize: '22px', color: '#f3e8d6', justifyContent: 'flex-start' }, html: it.choices ? toHTML(it.choices[it.sol[0]], { static: true }) : toHTML(it.prompt, { static: true, vals: it.sol.map(String) }) });
+    return h('div', { class: 'panel bridge', style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+      h('div', { class: 'br-t' }, '옛날에 배운 것 — 숫자만 바뀐 거야'),
+      h('div', { class: 'br-row' }, h('span', { class: 'br-lab' }, `예전에 배운 문제 · ${b.idea}`), solved(b.old.item)),
+      nowItem ? h('div', { class: 'br-row' }, h('span', { class: 'br-lab' }, '지금 배우는 문제'), solved(nowItem)) : null,
+      h('p', { class: 'br-same' }, b.same),
+      h('p', { class: 'br-change' }, h('b', {}, '바뀐 것 · '), b.change),
+      b.leap ? h('p', { class: 'br-leap' }, h('b', {}, '여기는 새로 배우는 곳 · '), b.leap) : null);
   }
   const limitText = (c) => `${Math.round(byId[c].sec * RULE.fastX)}초`;
   function flamesEl(n, { pop = -1, gone = -1, max = RULE.streak } = {}) {
@@ -364,7 +376,10 @@ export function mountKid(app, ctx) {
 
   // ── 같이 풀기(틀렸을 때) — 같은 숫자로 한 단계씩, 시간 재지 않음 ──
   function helpScreen(q, a, fb, before) {
-    const steps = workedSteps(q.c, q.p);
+    // 옛 개념 다리가 있는 차시면 맨 앞에 예전 문제(그 차시 문제 그대로) — 두 번 못 풀면 그 차시를 기초 층으로(today.js bridgeMiss)
+    const br = bridgeOf(q.c, q.p);
+    const steps = br ? [{ why: `예전에 배운 문제예요(${br.idea}). 먼저 풀어 봐요. ${br.same} ${br.change}`, c: br.old.c, item: br.old.item, sol: br.old.item.sol, bridge: true }, ...workedSteps(q.c, q.p)] : workedSteps(q.c, q.p);
+    let added = false;
     const after = Math.max(0, before - 1);
     const mineEl = a.idk ? h('span', { class: 'mine' }, '모르겠어요') : h('span', { class: 'mine' }, h('span', { class: 'math', style: { fontSize: '30px', color: '#8a5a20' }, html: toHTML(answerOnly(q.item.prompt), { static: true, vals: a.vals || [] }) }), '내 답');
     const left = h('div', { class: 'kside', style: { flexBasis: '360px', gap: '16px' } },
@@ -378,6 +393,10 @@ export function mountKid(app, ctx) {
         h('div', { style: { fontSize: '14px', lineHeight: '1.5', color: '#d9c9ae' } }, before > 0 ? `불씨가 하나만 꺼졌어요 (${before} → ${after}).` : '불씨는 0개 그대로예요.', h('br'), '방법을 알았으니 금방 다시 모여요!')));
     const finalEl = h('div', { class: 'math', style: { color: '#f3e8d6' }, html: toHTML(q.item.prompt, { static: true, vals: q.item.sol.map(String) }) });
     stepRunner(left, steps.length ? steps : null, { finalEl, emptyEl: h('div', { class: 'panel lead' }, byId[q.c].hint || ''),
+      onFirst: (i, ok) => { if (steps[i].bridge && !ok) { added = bridgeMiss(kid, cfg.unit, steps[i].c).added || added; save(true); } },
+      onEnd: () => (br && (br.leap || added) ? h('div', { class: 'panel lead fade-in', style: { borderColor: '#c9b6ff' } },
+        br.leap ? [h('b', {}, '여기는 새로 배우는 곳 · '), br.leap] : null,
+        added ? [br.leap ? h('br') : null, h('b', {}, `예전에 배운 '${byId[steps[0].c].kid}'부터 다시 다져요`), ' — 탑의 기초 층에 넣었어요.'] : null) : null),
       again: () => { if (T().day.ms >= T().budget) done(); else pracItem(); } });
   }
   // 단계 하나씩 풀기(같이 풀기 공통) — steps = [{ why, item, kind? }] · 단계마다 첫 시도가 맞았는지 onFirst(i, ok, bug) · 다 하면 finalEl · onEnd() → 끝에 덧붙일 글
@@ -541,7 +560,7 @@ export function mountKid(app, ctx) {
     return h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       h('div', { style: { fontSize: '14px', fontWeight: '800', color: '#7cc0f0' } }, '예제 — 이렇게 풀어요'),
       h('div', { class: 'story ex', html: toHTML(ex.story, { static: true }) }),
-      ...ex.steps.map((s, i) => h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } },
+      ...ex.steps.filter((s) => !s.read && !s.struct).map((s, i) => h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } },
         h('span', { style: { fontSize: '14px', color: '#d9c9ae', minWidth: '0', flex: '1 1 220px' } }, `${i + 1}. ${s.why}`), ans(s.item))),
       h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #3d3024', paddingTop: '8px' } },
         h('span', { style: { fontSize: '14px', color: '#ffc766', fontWeight: '700' } }, '그래서'), ans(ex.item)));
@@ -593,12 +612,14 @@ export function mountKid(app, ctx) {
     const finalEl = h('div', { class: 'math', style: { color: '#f3e8d6' }, html: toHTML(q.item.prompt, { static: true, vals: q.item.sol.map(String) }) });
     stepRunner(left, steps, {
       finalEl, bar: '문제를 단계로 나눠 같이 풀어 봐요',
-      onFirst: (i, ok, bug) => { first[i] = { kind: steps[i].kind, key: !!steps[i].key, ok, c: steps[i].c || null, bug }; },
+      onFirst: (i, ok, bug) => { first[i] = { kind: steps[i].kind, read: !!steps[i].read, struct: !!steps[i].struct, key: !!steps[i].key, ok, c: steps[i].c || null, bug }; },
       onEnd: () => {
         if (easy) return h('div', { class: 'panel lead fade-in' }, '이 문제 모양을 같이 익혔어요. 이제 원래 숫자로 다시 해 봐요.');
-        const r = typeHelpDone(kid, Y, steps.map((s, i) => first[i] || { kind: s.kind, key: !!s.key, ok: false, c: s.c || null }));
+        const r = typeHelpDone(kid, Y, steps.map((s, i) => first[i] || { kind: s.kind, read: !!s.read, struct: !!s.struct, key: !!s.key, ok: false, c: s.c || null }));
         save();
         const msg = {
+          read: '이야기를 끝까지 천천히 읽는 것부터 해 봐요. 수가 무엇을 말하는지 하나씩 짚어 보면 돼요.',
+          struct: '이야기 속 상황을 그림처럼 떠올려 봐요. 누가 더 많은지, 무엇이 바뀌었는지를 먼저 말해 보면 식이 보여요.',
           easy: '식 고르기가 어려웠어요. 다음 문제는 같은 모양을 쉬운 숫자로 먼저 풀어 봐요.',
           tpl: '이 문제 모양은 식을 세우는 게 핵심이에요. 위 단계를 한 번 더 보고 다음 문제로!',
           calc: `식은 잘 골랐어요! ${r.calc ? `'${byId[r.calc] ? byId[r.calc].kid : ''}' 계산` : '계산'}에서 막혔어요 — 차근차근 다시 해 봐요.`,

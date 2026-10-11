@@ -8,7 +8,7 @@
 //  kids/<sid>/run      = 하던 것(살펴보기 · 연습 · 불 점검 세션) JSON 글 | 없음 — 다음에 열면 같은 문제로 이어서
 //  kids/<sid>/days/<날짜> = { ms 푼 시간, n 문제 수, lit 켠 층, review 불 점검 함 }
 //  kids/<sid>/seen     = { intro 하는 법 본 때 }
-//  kids/<sid>/types    = 도전 층(문제 유형) JSON 글(유형 → { lit: { 단원: 때 }, diag: { tpl, dom, calc, plan }, n })
+//  kids/<sid>/types    = 도전 층(문제 유형) JSON 글(유형 → { lit: { 단원: 때 }, diag: { read, struct, tpl, dom, calc, plan }, n })
 //  kids/<sid>/card     = 짧은 요약(RPG 홈 카드 · 선생님 표) — today.js cardOf
 //  log/<sid>/<날짜>/<키> = 문항 한 줄('차시|결과|0.1초|무엇|틀린 모양' · today.js logItem) — kids 와 따로 두어 아이 기록을 열 때 같이 받지 않는다
 //  이름은 저장하지 않는다(학급 DB 는 로그인 없이 읽힌다) — 선생님 화면은 반 명단에서 이름을 붙인다.
@@ -41,7 +41,7 @@ export function kidFrom(v) {
     if (!TYPES[t] || !x || typeof x !== 'object') continue;
     const lit = {}, diag = {};
     for (const [u, w] of Object.entries(obj(x.lit))) if (/^\d-\d-\d$/.test(u) && Number.isFinite(+w) && +w > 0) lit[u] = +w;
-    for (const d of ['tpl', 'dom', 'calc', 'plan']) if (num(obj(x.diag)[d], 999)) diag[d] = num(obj(x.diag)[d], 999);
+    for (const d of ['read', 'struct', 'tpl', 'dom', 'calc', 'plan']) if (num(obj(x.diag)[d], 999)) diag[d] = num(obj(x.diag)[d], 999);
     k.types[t] = { lit, diag, n: num(x.n) };
   }
   return k;

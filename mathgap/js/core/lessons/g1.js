@@ -601,7 +601,7 @@ export default {
     // ── 1-2-2 덧셈과 뺄셈 (1) 받아올림·받아내림 없음
     {
       id: '1-2-2:2', fam: 'ADD', name: '(몇십몇)+(몇)', kid: '두 자리 수 + 한 자리 수 (받아올림 없이)', sec: 10,
-      gen: (r) => until(r, (r) => { const big = r.int(11, 98), small = r.int(1, 9); return r.chance(0.2) ? { a: small, b: big } : { a: big, b: small }; }, (p) => addKind(p.a, p.b) === '1-2-2:2'),
+      gen: (r) => until(r, (r) => ({ a: r.int(11, 98), b: r.int(1, 9) }), (p) => addKind(p.a, p.b) === '1-2-2:2'),   // 차시 이름 순서 그대로 (몇십몇)+(몇) — tests/rules.test.mjs
       make: placeAddMake, is: isKind('ADD', '1-2-2:2'), prev: null, pre: ['1-1-3:6', '1-2-1:3'],
       steps: (p) => {
         const big = Math.max(p.a, p.b), small = Math.min(p.a, p.b);

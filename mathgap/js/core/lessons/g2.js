@@ -357,7 +357,7 @@ export default {
     // ── 2-1-3 덧셈과 뺄셈 (덧셈 2~4 · 뺄셈 5~7 · 세 수 8 · 관계와 □ 9~11)
     {
       id: '2-1-3:2', fam: 'ADD', name: '받아올림 (두 자리)+(한 자리)', kid: '두 자리 수 + 한 자리 수 (받아올림)', sec: 12,
-      gen: (r) => until(r, (r) => { const big = r.int(11, 89), small = r.int(2, 9); return r.chance(0.2) ? { a: small, b: big } : { a: big, b: small }; }, (p) => addKind(p.a, p.b) === '2-1-3:2' && p.a + p.b <= 99),
+      gen: (r) => until(r, (r) => ({ a: r.int(11, 89), b: r.int(2, 9) }), (p) => addKind(p.a, p.b) === '2-1-3:2' && p.a + p.b <= 99),   // 차시 이름 순서 그대로 (두 자리 수)+(한 자리 수)
       make: carryAddMake, is: isKind('ADD', '2-1-3:2'), prev: null, pre: ['1-2-6:2', '1-2-2:2'],
       steps: (p) => {
         const big = Math.max(p.a, p.b), small = Math.min(p.a, p.b), t = big - ones(big), s1 = ones(big) + small;
