@@ -27,9 +27,8 @@ function saveStudyRewardCfg() {
   renderStudyScopePage();
 }
 
-function _activeUnitSet() {
-  const list = (DB.getSettings() || {}).activeProblemUnits;
-  return new Set(Array.isArray(list) ? list : []);
+function _activeUnitSet() {   // 학생 화면과 같은 셈 — 범위 저장 뒤 새로 들어온 단원도 켜짐으로 [UNIT-NEW-ON-1]
+  return new Set(CurriculumUtils.activeUnitIds() || []);
 }
 
 function renderStudyScopePage() {
@@ -153,7 +152,7 @@ function renderStudyScopePage() {
 
 function _saveActiveUnits(arr) {
   const prev = DB.getSettings();
-  DB.saveSettings({ ...prev, activeProblemUnits: arr });
+  DB.saveSettings({ ...prev, activeProblemUnits: arr, activeProblemUnitsAt: Date.now() });   // 저장한 때 — 그 뒤에 들어온 단원(since)만 저절로 켜짐
 }
 
 function toggleStudyUnit(unitId, on) {

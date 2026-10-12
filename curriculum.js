@@ -96,7 +96,9 @@ const CURRICULUM = {
         // [ENGLISH-L78-1] 2학기 L7·L8을 국어처럼 '2학기 · ' 붙여 같은 과목에 더함(10-05). 단원 이름·낱말·핵심 표현 근거 =
         //   반에서 쓰는 영어 복습앱(jeongrim-english)의 L7·8 자료 + T셀파 함순애 '영어 4' 단원 목록
         //   (ele.tsherpa.co.kr/curri/E-curri01-ko-A_list.html?semester=1&grade=4&curri=E-curri04-eng-H_2025).
-        //   L9~12(Is This Your Bag? · What Time Is It? · I'm Drawing a Picture · What Do You Do?)는 반이 거기까지 가면 같은 방식으로.
+        // [ENGLISH-L9-1] 10-12 L9 Is This Your Bag? 더함(반 영어 복습앱 L9 자료 · 문항은 새로 씀).
+        //   L10~12(What Time Is It? · I'm Drawing a Picture · What Do You Do?)는 반이 거기까지 가면 같은 방식으로.
+        //   since = 들어온 날 — 선생님이 학습 범위를 그 전에 저장해 두었어도 끄기 전까지 켜진 것으로 본다(activeUnitIds).
         units: [
           { id:'en4-1-1', no:1, name:'My Name Is Amy (이름·인사)' },
           { id:'en4-1-2', no:2, name:'I\'m Happy (감정·안부)' },
@@ -104,8 +106,9 @@ const CURRICULUM = {
           { id:'en4-1-4', no:4, name:'Let\'s Play Basketball (제안)' },
           { id:'en4-1-5', no:5, name:'I Want Chicken (음식·원하는 것)' },
           { id:'en4-1-6', no:6, name:'Where\'s My Cap? (위치)' },
-          { id:'en4-2-7', no:7, name:'2학기 · It\'s Wednesday (요일·수업)' },
-          { id:'en4-2-8', no:8, name:'2학기 · How Much Is It? (물건 값·사기)' },
+          { id:'en4-2-7', no:7, name:'2학기 · It\'s Wednesday (요일·수업)', since:'2026-10-05' },
+          { id:'en4-2-8', no:8, name:'2학기 · How Much Is It? (물건 값·사기)', since:'2026-10-05' },
+          { id:'en4-2-9', no:9, name:'2학기 · Is This Your Bag? (물건 주인 찾기)', since:'2026-10-12' },
         ],
       },
       social: {
@@ -1206,6 +1209,74 @@ const BASE_PROBLEMS = [
   { id:'p_en428_138', unitId:'en4-2-8', type:'choice', cat:'dialog', level:3, q:'가격표에 8,000원이라고 쓰여 있어요. A: "How much is the toy car?" / B: "It\'s ___ won." 빈칸에 알맞은 말은?', choices:['eight thousand','eight hundred','eighty','eight'], a:'eight thousand', hint:'8,000 = 8 × 1,000' },
   { id:'p_en428_139', unitId:'en4-2-8', type:'short', cat:'vocab', level:2, q:'"여기 있어요."를 영어로 쓰세요. (Here로 시작)', a:'Here you are.', alt:['Here you are','here you are.','here you are','HERE YOU ARE.'], hint:'Here ___ are.' },
   { id:'p_en428_140', unitId:'en4-2-8', type:'short', cat:'vocab', level:3, q:'"500원이에요."를 영어로 쓰세요. (It으로 시작 · 500은 숫자로 써도 돼요)', a:'It\'s 500 won.', alt:['It is 500 won.','It\'s 500 won','It is 500 won','Its 500 won.','Its 500 won','It\'s five hundred won.','It is five hundred won.','It\'s five hundred won','It is five hundred won','Its five hundred won.','Its five hundred won'], hint:'It\'s ___ won.' },
+  // ── 영어 L9. Is This Your Bag? (물건 주인 찾기) ── [ENGLISH-L9-1] 2학기 · 근거=반 영어 복습앱 L9 자료(낱말·핵심 표현)+T셀파 목차 · 문항은 새로 씀
+  { id:'p_en429_01', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"Is this your bag?" 는 무엇을 묻는 말일까요?', choices:['가방의 주인','가방의 값','가방이 있는 곳','가방의 색깔'], a:'가방의 주인', hint:'your = 너의' },
+  { id:'p_en429_02', unitId:'en4-2-9', type:'choice', cat:'dialog', level:1, q:'"Is this your bag?" 에 대한 알맞은 대답은?', choices:['Yes, it is.','It\'s 500 won.','It\'s Monday.','I\'m happy.'], a:'Yes, it is.', hint:'맞으면 Yes, 아니면 No로 답해요' },
+  { id:'p_en429_03', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"우산"을 뜻하는 영어 단어를 쓰세요.', a:'umbrella', alt:['Umbrella','UMBRELLA'], hint:'u로 시작하고 l이 두 개예요' },
+  { id:'p_en429_04', unitId:'en4-2-9', type:'choice', cat:'dialog', level:2, q:'친구가 내 것이 아닌 모자를 보여 주며 "Is this your cap?" 하고 물었어요. 알맞은 대답은?', choices:['No, it isn\'t.','Yes, it is.','Here you are.','How much is it?'], a:'No, it isn\'t.', hint:'내 모자가 아니에요' },
+  { id:'p_en429_05', unitId:'en4-2-9', type:'choice', cat:'dialog', level:2, q:'보라는 빨간 우산을 가지고 왔어요. 친구가 파란 우산을 들고 "Is this your umbrella, Bora?" 하고 물었어요. 보라의 대답은?', choices:['No, it isn\'t.','Yes, it is.','Nice to meet you.','It\'s Friday.'], a:'No, it isn\'t.', hint:'보라의 우산은 빨간색이에요' },
+  { id:'p_en429_06', unitId:'en4-2-9', type:'choice', cat:'vocab', level:2, q:'분실물 상자에 장갑 · 시계 · 목도리 · 공책이 있어요. 손목에 차는 물건은?', choices:['watch','glove','scarf','notebook'], a:'watch', hint:'시간을 알려 줘요' },
+  { id:'p_en429_07', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"It\'s my umbrella." 의 뜻은?', choices:['그건 내 우산이야.','그건 네 우산이야.','우산이 어디 있니?','우산은 얼마예요?'], a:'그건 내 우산이야.', hint:'my = 나의' },
+  { id:'p_en429_08', unitId:'en4-2-9', type:'short', cat:'vocab', level:2, q:'"이거 네 가방이니?"를 영어로 쓰세요. (Is로 시작)', a:'Is this your bag?', alt:['Is this your bag','is this your bag?','is this your bag','IS THIS YOUR BAG?'], hint:'Is ___ your bag?' },
+  { id:'p_en429_09', unitId:'en4-2-9', type:'choice', cat:'dialog', level:3, q:'친구가 "No, it isn\'t. My watch is blue."라고 대답했어요. 친구가 먼저 받은 질문은 무엇일까요?', choices:['Is this your watch?','How much is it?','What day is it today?','What\'s your name?'], a:'Is this your watch?', hint:'친구가 시계 이야기를 했어요' },
+  { id:'p_en429_10', unitId:'en4-2-9', type:'choice', cat:'dialog', level:3, q:'에릭의 가방은 파란색이에요. 선생님이 초록 가방과 파란 가방을 하나씩 보여 주며 "Is this your bag?" 하고 물었어요. 에릭이 "Yes, it is."라고 답할 가방은?', choices:['파란 가방','초록 가방','둘 다','하나도 없어요'], a:'파란 가방', hint:'에릭 가방의 색을 떠올려요' },
+  // ── 영어 L9. Is This Your Bag? (물건 주인 찾기) — 듣기 ──
+  { id:'p_en429_301', unitId:'en4-2-9', type:'choice', cat:'listen', level:1, audio:'Is this your bag?', q:'듣고 알맞은 뜻을 고르세요.', choices:['이거 네 가방이니?','이거 얼마예요?','가방이 어디 있니?','이건 내 가방이야.'], a:'이거 네 가방이니?', hint:'your = 너의' },
+  { id:'p_en429_302', unitId:'en4-2-9', type:'choice', cat:'listen', level:1, audio:'Yes, it is.', q:'듣고 알맞은 뜻을 고르세요.', choices:['응, 맞아.','아니, 아니야.','여기 있어.','고마워.'], a:'응, 맞아.', hint:'Yes = 응' },
+  { id:'p_en429_303', unitId:'en4-2-9', type:'choice', cat:'listen', level:2, audio:'No, it isn\'t.', q:'듣고 알맞은 뜻을 고르세요.', choices:['아니, 아니야.','응, 맞아.','미안해.','괜찮아.'], a:'아니, 아니야.', hint:'No = 아니' },
+  { id:'p_en429_304', unitId:'en4-2-9', type:'choice', cat:'listen', level:2, audio:'It\'s my jacket.', q:'듣고 알맞은 뜻을 고르세요.', choices:['그건 내 재킷이야.','그건 네 재킷이야.','재킷이 어디 있니?','재킷은 얼마예요?'], a:'그건 내 재킷이야.', hint:'my = 나의' },
+  { id:'p_en429_305', unitId:'en4-2-9', type:'choice', cat:'listen', level:3, audio:'Is that your umbrella?', q:'듣고 알맞은 뜻을 고르세요.', choices:['저거 네 우산이니?','이거 네 우산이니?','우산이 어디 있니?','저건 내 우산이야.'], a:'저거 네 우산이니?', hint:'that = 저것' },
+  { id:'p_en429_306', unitId:'en4-2-9', type:'choice', cat:'listen', level:3, audio:'It\'s not my watch.', q:'듣고 알맞은 뜻을 고르세요.', choices:['그건 내 시계가 아니야.','그건 내 시계야.','네 시계는 어디 있니?','시계는 얼마예요?'], a:'그건 내 시계가 아니야.', hint:'not = 아니다' },
+  { id:'p_en429_307', unitId:'en4-2-9', type:'short', cat:'listen', level:1, audio:'bag', q:'듣고 알맞은 영어 단어를 쓰세요.', a:'bag', alt:['Bag','BAG'], hint:'b로 시작하는 세 글자, 가방' },
+  { id:'p_en429_308', unitId:'en4-2-9', type:'short', cat:'listen', level:1, audio:'watch', q:'듣고 알맞은 영어 단어를 쓰세요.', a:'watch', alt:['Watch','WATCH'], hint:'w로 시작해요, 손목시계' },
+  { id:'p_en429_309', unitId:'en4-2-9', type:'short', cat:'listen', level:2, audio:'glove', q:'듣고 알맞은 영어 단어를 쓰세요.', a:'glove', alt:['Glove','GLOVE','gloves','Gloves'], hint:'g로 시작해요, 장갑' },
+  { id:'p_en429_310', unitId:'en4-2-9', type:'short', cat:'listen', level:2, audio:'jacket', q:'듣고 알맞은 영어 단어를 쓰세요.', a:'jacket', alt:['Jacket','JACKET'], hint:'j로 시작해요, 재킷' },
+  { id:'p_en429_311', unitId:'en4-2-9', type:'choice', cat:'listen', level:1, audio:'Yes, it is. Thank you!', q:'듣고 알맞은 상황을 고르세요.', choices:['잃어버린 물건을 찾아 준 친구에게 고마워하는 모습','가게에서 물건 값을 묻는 모습','생일 파티에 친구를 부르는 모습','교실에서 자리에 앉는 모습'], a:'잃어버린 물건을 찾아 준 친구에게 고마워하는 모습', hint:'내 물건이 맞다고 하며 고마워해요' },
+  { id:'p_en429_312', unitId:'en4-2-9', type:'choice', cat:'listen', level:2, audio:'It\'s raining. Is this your umbrella?', q:'듣고 알맞은 상황을 고르세요.', choices:['비 오는 날 우산 주인을 찾는 모습','맑은 날 공원에서 노는 모습','가게에서 우산을 파는 모습','생일 선물을 고르는 모습'], a:'비 오는 날 우산 주인을 찾는 모습', hint:'raining = 비가 와요' },
+  { id:'p_en429_313', unitId:'en4-2-9', type:'choice', cat:'listen', level:2, audio:'Let\'s go to the lost and found.', q:'듣고 알맞은 상황을 고르세요.', choices:['분실물 보관소에 물건을 찾으러 가는 모습','도서관에 책을 빌리러 가는 모습','운동장에 축구를 하러 가는 모습','식당에 점심을 먹으러 가는 모습'], a:'분실물 보관소에 물건을 찾으러 가는 모습', hint:'lost and found = 분실물 보관소' },
+  { id:'p_en429_314', unitId:'en4-2-9', type:'choice', cat:'listen', level:1, audio:'Is this your notebook?', q:'듣고 알맞은 대답을 고르세요.', choices:['Yes, it is.','It\'s Monday.','It\'s 500 won.','I\'m hungry.'], a:'Yes, it is.', hint:'주인인지 묻고 있어요' },
+  { id:'p_en429_315', unitId:'en4-2-9', type:'choice', cat:'listen', level:3, audio:'Is this your scarf, Kate?', q:'듣고 알맞은 대답을 고르세요.', choices:['No, it isn\'t. My scarf is red.','It\'s 2,000 won.','Yes, I like soccer.','Let\'s play together.'], a:'No, it isn\'t. My scarf is red.', hint:'주인인지 묻고 있어요 — 아니라고 하며 내 목도리 색을 말해요' },
+  // ── 영어 L9. Is This Your Bag? (물건 주인 찾기) (확장) ──
+  { id:'p_en429_101', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"가방"을 뜻하는 영어 단어를 쓰세요.', a:'bag', alt:['Bag','BAG'], hint:'b로 시작하는 세 글자예요' },
+  { id:'p_en429_102', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"손목시계"를 뜻하는 영어 단어를 쓰세요.', a:'watch', alt:['Watch','WATCH'], hint:'w로 시작하고 tch로 끝나요' },
+  { id:'p_en429_103', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"장갑"을 뜻하는 영어 단어를 쓰세요.', a:'glove', alt:['Glove','GLOVE','gloves','Gloves','GLOVES'], hint:'g로 시작하고 e로 끝나요(한 짝)' },
+  { id:'p_en429_104', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"공책"을 뜻하는 영어 단어를 쓰세요.', a:'notebook', alt:['Notebook','NOTEBOOK','note book'], hint:'note + book' },
+  { id:'p_en429_105', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"양말"을 뜻하는 영어 단어를 쓰세요.', a:'socks', alt:['Socks','SOCKS','sock','Sock'], hint:'s로 시작해요(보통 두 짝이라 s를 붙여요)' },
+  { id:'p_en429_106', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"신발"을 뜻하는 영어 단어를 쓰세요.', a:'shoes', alt:['Shoes','SHOES','shoe','Shoe'], hint:'sh로 시작해요' },
+  { id:'p_en429_107', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"열쇠"를 뜻하는 영어 단어를 쓰세요.', a:'key', alt:['Key','KEY'], hint:'k로 시작하는 세 글자예요' },
+  { id:'p_en429_108', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"지갑"을 뜻하는 영어 단어를 쓰세요.', a:'wallet', alt:['Wallet','WALLET'], hint:'w로 시작하고 l이 두 개예요' },
+  { id:'p_en429_109', unitId:'en4-2-9', type:'short', cat:'vocab', level:1, q:'"재킷"을 뜻하는 영어 단어를 쓰세요.', a:'jacket', alt:['Jacket','JACKET'], hint:'j로 시작해요' },
+  { id:'p_en429_110', unitId:'en4-2-9', type:'short', cat:'vocab', level:2, q:'"목도리"를 뜻하는 영어 단어를 쓰세요.', a:'scarf', alt:['Scarf','SCARF'], hint:'sc로 시작해요' },
+  { id:'p_en429_111', unitId:'en4-2-9', type:'short', cat:'vocab', level:2, q:'"안경"을 뜻하는 영어 단어를 쓰세요.', a:'glasses', alt:['Glasses','GLASSES'], hint:'gl로 시작하고 s가 세 개예요' },
+  { id:'p_en429_112', unitId:'en4-2-9', type:'short', cat:'vocab', level:2, q:'"찾다"를 뜻하는 영어 단어를 쓰세요.', a:'find', alt:['Find','FIND'], hint:'f로 시작하는 네 글자예요' },
+  { id:'p_en429_113', unitId:'en4-2-9', type:'short', cat:'vocab', level:2, q:'"도시락"을 뜻하는 영어 단어를 쓰세요.', a:'lunch box', alt:['Lunch box','Lunch Box','LUNCH BOX','lunchbox'], hint:'lunch + box' },
+  { id:'p_en429_114', unitId:'en4-2-9', type:'short', cat:'vocab', level:3, q:'"물병"을 뜻하는 영어 단어를 쓰세요.', a:'water bottle', alt:['Water bottle','Water Bottle','WATER BOTTLE','waterbottle'], hint:'water + bottle' },
+  { id:'p_en429_115', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"umbrella"의 뜻으로 알맞은 것은?', choices:['우산','장갑','모자','가방'], a:'우산', hint:'비 오는 날 써요' },
+  { id:'p_en429_116', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"glove"의 뜻으로 알맞은 것은?', choices:['장갑','양말','신발','목도리'], a:'장갑', hint:'손에 껴요' },
+  { id:'p_en429_117', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"notebook"의 뜻으로 알맞은 것은?', choices:['공책','필통','지우개','크레용'], a:'공책', hint:'글씨를 써요' },
+  { id:'p_en429_118', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"crayon"의 뜻으로 알맞은 것은?', choices:['크레용','연필','자','가위'], a:'크레용', hint:'색칠할 때 써요' },
+  { id:'p_en429_119', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"socks"의 뜻으로 알맞은 것은?', choices:['양말','신발','장갑','바지'], a:'양말', hint:'신발 안에 신어요' },
+  { id:'p_en429_120', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"mine"의 뜻으로 알맞은 것은?', choices:['내 것','네 것','우리 것','저것'], a:'내 것', hint:'"It\'s mine." = 그건 내 거야.' },
+  { id:'p_en429_121', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"yours"의 뜻으로 알맞은 것은?', choices:['네 것','내 것','이것','저것'], a:'네 것', hint:'"Is this yours?" = 이거 네 거니?' },
+  { id:'p_en429_122', unitId:'en4-2-9', type:'choice', cat:'expr', level:3, q:'다음 중 뜻이 "잃어버리다"인 영어 단어는?', choices:['lose','find','buy','sell'], a:'lose', hint:'찾다(find)와 반대예요' },
+  { id:'p_en429_123', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"Is this your bag?"의 뜻으로 알맞은 것은?', choices:['이거 네 가방이니?','이건 내 가방이야.','가방은 얼마예요?','가방이 어디 있니?'], a:'이거 네 가방이니?', hint:'Is this ~? = 이거 ~이니?' },
+  { id:'p_en429_124', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"No, it isn\'t."는 언제 하는 말일까요?', choices:['내 물건이 아니라고 할 때','내 물건이 맞다고 할 때','물건 값을 물을 때','처음 만났을 때'], a:'내 물건이 아니라고 할 때', hint:'No = 아니' },
+  { id:'p_en429_125', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"Yes, it is."는 언제 하는 말일까요?', choices:['맞다고 대답할 때','아니라고 대답할 때','물건을 건넬 때','작별 인사를 할 때'], a:'맞다고 대답할 때', hint:'Yes = 응, 맞아' },
+  { id:'p_en429_126', unitId:'en4-2-9', type:'choice', cat:'expr', level:1, q:'"this"와 "that" 가운데 가까이 있는 물건을 가리키는 말은?', choices:['this','that','둘 다 같아요','알 수 없어요'], a:'this', hint:'this = 이것, that = 저것' },
+  { id:'p_en429_127', unitId:'en4-2-9', type:'choice', cat:'expr', level:3, q:'"Is that your water bottle?"의 뜻으로 알맞은 것은?', choices:['저거 네 물병이니?','이거 네 물병이니?','저건 내 물병이야.','물병은 얼마예요?'], a:'저거 네 물병이니?', hint:'that = 저것' },
+  { id:'p_en429_128', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"Where\'s my watch?"의 뜻으로 알맞은 것은?', choices:['내 시계가 어디 있지?','이거 네 시계니?','내 시계는 파란색이야.','시계는 얼마예요?'], a:'내 시계가 어디 있지?', hint:'Where = 어디' },
+  { id:'p_en429_129', unitId:'en4-2-9', type:'choice', cat:'expr', level:3, q:'"It\'s not my bag. It\'s Kate\'s bag."의 뜻으로 알맞은 것은?', choices:['그건 내 가방이 아니야. 케이트의 가방이야.','그건 내 가방이야. 케이트도 가방이 있어.','케이트가 가방을 잃어버렸어.','케이트의 가방은 어디 있니?'], a:'그건 내 가방이 아니야. 케이트의 가방이야.', hint:'Kate\'s = 케이트의' },
+  { id:'p_en429_130', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"This is my scarf."의 뜻으로 알맞은 것은?', choices:['이건 내 목도리야.','저건 내 목도리야.','이건 네 목도리니?','목도리가 어디 있니?'], a:'이건 내 목도리야.', hint:'This is ~ = 이건 ~야' },
+  { id:'p_en429_131', unitId:'en4-2-9', type:'choice', cat:'expr', level:3, q:'"My gloves are red. Your gloves are blue." 빨간 장갑의 주인은?', choices:['나(말하는 사람)','너(듣는 사람)','둘 다','알 수 없어요'], a:'나(말하는 사람)', hint:'my = 나의, your = 너의' },
+  { id:'p_en429_132', unitId:'en4-2-9', type:'choice', cat:'expr', level:2, q:'"Is this yours?"의 뜻으로 알맞은 것은?', choices:['이거 네 거니?','이거 내 거야.','이거 얼마예요?','이거 어디 있었니?'], a:'이거 네 거니?', hint:'yours = 네 것' },
+  { id:'p_en429_133', unitId:'en4-2-9', type:'choice', cat:'dialog', level:1, q:'A: "Is this your notebook?" / B: ___ 에 알맞은 말은? (B의 공책이 맞아요)', choices:['Yes, it is.','No, it isn\'t.','It\'s 1,000 won.','It\'s Tuesday.'], a:'Yes, it is.', hint:'맞으면 Yes' },
+  { id:'p_en429_134', unitId:'en4-2-9', type:'choice', cat:'dialog', level:2, q:'A: "Is this your jacket?" / B: "Yes, it is." / A: ___ 에 알맞은 말은? (재킷을 건네요)', choices:['Here you are.','How much is it?','Nice to meet you.','Don\'t sit here.'], a:'Here you are.', hint:'물건을 건네요' },
+  { id:'p_en429_135', unitId:'en4-2-9', type:'choice', cat:'dialog', level:2, q:'A: "Here you are." / B: ___ 에 알맞은 말은? (잃어버린 물건을 돌려받았어요)', choices:['Thank you!','How much is it?','I\'m sorry.','No, it isn\'t.'], a:'Thank you!', hint:'물건을 돌려받았어요' },
+  { id:'p_en429_136', unitId:'en4-2-9', type:'choice', cat:'dialog', level:3, q:'A: ___ / B: "No, it isn\'t. My umbrella is yellow." 빈칸에 알맞은 말은?', choices:['Is this your umbrella?','Where is the umbrella?','How much is the umbrella?','Let\'s buy an umbrella.'], a:'Is this your umbrella?', hint:'B가 자기 것이 아니라고 했어요' },
+  { id:'p_en429_137', unitId:'en4-2-9', type:'choice', cat:'dialog', level:3, q:'A: "Is this your water bottle?" / B: "No, it isn\'t. It\'s Sam\'s water bottle." 물병의 주인은?', choices:['Sam','A','B','알 수 없어요'], a:'Sam', hint:'Sam\'s = Sam의' },
+  { id:'p_en429_138', unitId:'en4-2-9', type:'choice', cat:'dialog', level:3, q:'분실물 상자에 노란 우산과 초록 우산이 있어요. 호아의 우산은 노란색이에요. 선생님이 초록 우산을 보여 주며 "Is this your umbrella, Hoa?" 하고 물었어요. 호아의 대답은?', choices:['No, it isn\'t.','Yes, it is.','Thank you.','Here you are.'], a:'No, it isn\'t.', hint:'호아의 우산은 노란색이에요' },
+  { id:'p_en429_139', unitId:'en4-2-9', type:'short', cat:'vocab', level:2, q:'"응, 맞아."를 영어로 쓰세요. (Yes로 시작)', a:'Yes, it is.', alt:['Yes it is.','Yes, it is','Yes it is','yes, it is.','yes it is','YES, IT IS.'], hint:'Yes, it ___.' },
+  { id:'p_en429_140', unitId:'en4-2-9', type:'short', cat:'vocab', level:3, q:'"아니, 아니야."를 영어로 쓰세요. (No로 시작 · isn\'t 를 써요)', a:'No, it isn\'t.', alt:['No, it is not.','No it isn\'t.','No, it isn\'t','No it isn\'t','No, it isnt.','No, it isnt','No it isnt','No it is not','no, it isn\'t.','no it isnt'], hint:'No, it ___.' },
   // ── 사회 1. 지도로 만나는 우리 지역 (확장) ──
   { id:'p_so411_101', unitId:'so4-1-1', type:'choice', cat:'concept', level:1, q:'위에서 내려다본 땅의 모습을 일정하게 줄여서 나타낸 것을 무엇이라고 하나요?', choices:['지도','일기','달력','시간표'], a:'지도', hint:'땅의 모습을 위에서 본 것처럼 줄여 그린 것이에요.' },
   { id:'p_so411_102', unitId:'so4-1-1', type:'choice', cat:'concept', level:1, q:'지도에서 동쪽, 서쪽, 남쪽, 북쪽을 알려 주는 것은 무엇인가요?', choices:['방위표','범례','축척','등고선'], a:'방위표', hint:'방향을 알려 주는 표시예요.' },
@@ -2919,10 +2990,16 @@ const CurriculumUtils = {
   },
 
   // 교사가 켜 둔 단원(없으면 전체 허용)
+  //  [UNIT-NEW-ON-1] 범위를 저장한 때(activeProblemUnitsAt · 없으면 0)보다 뒤에 들어온 단원(units 의 since)은
+  //  선생님이 끄기 전까지 켜진 것으로 본다 — 10-12 선생님 "새 단원 때마다 내가 설정해야 되는 것 말고". 저장하면 그때 목록이 된다.
   activeUnitIds() {
     const s = (typeof DB !== 'undefined') ? (DB.getSettings() || {}) : {};
     const list = s.activeProblemUnits;
-    return Array.isArray(list) && list.length ? list : null;
+    if (!(Array.isArray(list) && list.length)) return null;
+    const at = Number(s.activeProblemUnitsAt) || 0;
+    const fresh = this.subjects().flatMap(sub => sub.units)
+      .filter(u => u.since && Date.parse(u.since) > at && !list.includes(u.id)).map(u => u.id);
+    return fresh.length ? list.concat(fresh) : list;
   },
 
   // [FRACTION-INPUT-1] '4와 2/5' · '4 2/5' · '22/5' · '3' → { w, n, d } (못 읽으면 null). 전각 숫자도 받는다.
