@@ -5,10 +5,15 @@
 // ③ 양성 대조: 짐작 하나 고르고 [시작] → 쥔 [] · 멈춤 false · 배속 1 · step(600) → 틱 ≥ 50 · 4× 단추 숨김(판 칸 배속최대 2)
 //    ③-2 시작 저장본 speed 0(임시 판) — 멈춘 채 열려도 [시작] = 1배속으로 흐름 · 켜진 단추 ⏸ → 1× · 카드 동안 저장은 풀린 뒤 배속(1)
 // ④ ❓ 여는 조건(수업 판): 시계가 도는 동안 ❓ → 카드 0 · 짧은 말 / ⏸ 뒤 ❓ → 카드 뜸 · 닫아도 멈춘 채(아이가 멈춘 판)
+//    ④-2 ⏸ 로 멈춘 판에서 📋 할 일 다시 보기(모형 띠)로 시작 카드를 다시 열고 닫아도 멈춘 채 — 늘 흐르는 것은 처음 뜬 시작 카드의 [시작] 뿐
 // ⑤ 다시 열기(이미 시작함) → 카드 0 · boot 는 규칙 뒤 풂 · 프레임을 흘리면 틱이 는다 / #끝 으로 열기 → 끝 카드는 쥐지 않음
 // ⑥ 기본 마을(새 프로필): 첫 안내 위에 ❓ 를 열고 안내를 닫아도 멈춘 채(쥔 bhelp — 옛 엔진은 여기서 흘렀다) · ❓ 를 닫으면 흐름 ·
 //    도는 동안에도 ❓ 열림(수업 판 아님) · 쥔 동안 ⏸ 를 누르면 닫아도 멈춘 채 / ⑥-3 pop88 저장본: ❓ 위에 칭호 카드 → ❓ 를 먼저 닫아도 칭호 카드가 쥔 채 ·
 //    칭호 카드를 닫으면 흐름 / ⑥-2 자유 판(town · 교과 없음)도 도는 동안 ❓ 열림
+// ⑧ 첫 안내 → 시작 카드(시작 저장본 없는 첫 수업 farm): 안내를 9.5초 읽는 동안 boot · guide 가 쥔 채 · 틱 0 → 안내를 닫고(같은 평가 안에서 프레임 12장) 카드가 뜰 때까지 틱 0
+//    (boot 안전망이 안내 동안 기다리지 않으면 8초에 boot 가 풀려, 안내를 닫은 뒤 카드 전까지 시간이 흐른다)
+// ⑨ 판을 싣다가 module 이 죽어도(일부러 — 규칙 덮기 앞 VRULES.stageReset 대입에서 throw · 이 단계에만 심는 글) boot 는 쥐는 자리에서 건 8초 안전망이 푼다 ·
+//    페이지 오류는 일부러 낸 하나뿐(보고 나서 늘 보는 기대 '페이지 오류 0'에서 뺀다)
 // ⑦ 모형 화면 단추 — empty-shop-ga(생산멈춤 false) · 임시 판(proto-flow + 판규칙 멈춤.생산)은 '⏸ 생산 멈춤' 없음 · 🔗 공급 경로 보기는 그대로 / 양성 대조 proto-flow 는 ⏸ 있음
 // 임시 판(zz-dclock-*)을 장면 안에서 쓰고 끝에 지운다(try/finally · 커밋 안 함). 판 쪽 페이지는 바깥 시도 0 을 함께 본다.
 import fs from 'node:fs'; import path from 'node:path';
@@ -58,6 +63,11 @@ export default async function startCard(ctx) {
     ctx.expect(q2 && q2.뜸 && J(h6.쥔) === '["bhelp"]', '④ ⏸ 뒤 ❓ → 카드 뜸 · 쥔 bhelp ' + J({ q2, 쥔: h6.쥔 }));
     await bhClose(); const t5 = await ticks(); await step(120); const h7 = await hold(), t6 = await ticks();
     ctx.expect(!h7.쥔.length && h7.멈춤 && t6 === t5, '④ ❓ 를 닫아도 아이가 멈춘 판은 멈춘 채 ' + J({ 쥔: h7.쥔, 멈춤: h7.멈춤, 틱: [t5, t6] }));
+    /* ④-2 📋 할 일 다시 보기 — 멈춘 판에서 시작 카드를 다시 열고([시작]으로) 닫아도 멈춘 채(다시 보기는 판 시간 시작이 아니다) */
+    const rv = await E(`const b = [...document.querySelectorAll('#pmapBar button')].find(x => x.textContent.includes('할 일 다시 보기')); if (!b) return null; b.click(); return !!document.getElementById('stageCard')`);
+    const h7b = await hold(), rgo = await start(); await step(120); const t6b = await ticks(), h7c = await hold(); out['④다시보기'] = { 카드: rv, 쥠: h7b, 틱: [t6, t6b] };
+    ctx.expect(rv && rgo && J(h7b.쥔) === '["scard"]' && !h7b.처음카드 && !(await card()) && !h7c.쥔.length && h7c.멈춤 && t6b === t6,
+      '④-2 ⏸ 뒤 📋 다시 보기 카드를 닫아도 멈춘 채 ' + J({ 카드: rv, 닫음: rgo, 쥔: h7b.쥔, 처음카드: h7b.처음카드, 뒤: { 쥔: h7c.쥔, 멈춤: h7c.멈춤 }, 틱: [t6, t6b] }));
     /* ⑤ 다시 열기(이미 시작함) · #끝 */
     await P('(window.__setSpeed(1), window.__save())');
     await C.nav(url('two-villages')); await ready('two-villages 다시 열기'); await E(`window.__gfxMode('fixed'); return 1`);
@@ -100,6 +110,30 @@ export default async function startCard(ctx) {
     await fresh('town'); await ctx.advance(1000);
     const h14 = await hold(), q4 = await E(`window.__bubbleHelp(0); const h = document.getElementById('bubbleHelp'); return !!(h && h.classList.contains('show'))`), h15 = await hold();
     ctx.expect(!h14.쥔.length && !h14.멈춤 && q4 && J(h15.쥔) === '["bhelp"]' && h15.막은물음 === 0, '⑥-2 자유 판 town — 도는 동안 ❓ 열림 ' + J({ 전: { 쥔: h14.쥔, 멈춤: h14.멈춤 }, 뜸: q4, 쥔: h15.쥔 }));
+    /* ⑧ 첫 안내 → 시작 카드(farm — 시작 저장본 없음 · 빈 땅이라 안내가 먼저 뜨고 카드는 안내가 닫힌 뒤) */
+    o0 = outside(); await fresh('farm');
+    for (let k = 0; k < 40 && !(await P('window.__guide().보임')); k++) await ctx.advance(250);
+    await ctx.advance(9500); const g1 = await hold(), gt1 = await ticks(), gv = await P('window.__guide().보임'); out['⑧안내'] = { 보임: gv, 쥔: g1.쥔, 시간끝: g1.시간끝, 틱: gt1 };
+    ctx.expect(gv && J(g1.쥔) === '["boot","guide"]' && g1.시간끝 === 0 && gt1 === 0, '⑧ farm 첫 안내를 9.5초 읽는 동안 boot · guide 가 쥔 채 · 틱 0 ' + J({ 보임: gv, 쥔: g1.쥔, 시간끝: g1.시간끝, 틱: gt1 }));
+    await E(`document.getElementById('guideSkip').click(); window.__shots.step(12, 1000 / 60); return 1`);   /* 안내를 닫자마자 프레임 12장(같은 평가 — 카드 타이머가 끼지 못함) */
+    const gf = await waitCard(), g2 = await hold(), gt2 = await ticks(); out['⑧카드'] = { 프레임: gf + 12, 쥠: g2, 틱: gt2 };
+    ctx.expect(await card() && g2.카드틱 === 0 && gt2 === 0 && J(g2.쥔) === '["scard"]' && g2.넘김 === 1 && g2.처음카드,
+      `⑧ 안내를 닫고 카드가 뜰 때까지(프레임 ${gf + 12}장) 틱 0 · boot → scard 넘김 ` + J({ 카드틱: g2.카드틱, 틱: gt2, 쥔: g2.쥔, 넘김: g2.넘김 }));
+    ctx.expect(outside() === o0, '⑧ farm 페이지 바깥 시도 0');
+    /* ⑨ module 이 규칙 덮기 앞에서 죽은 판 — 이 단계에만 심는 글: VRULES 를 Proxy 로 두고 판 페이지에서 stageReset 칸을 대입할 때 throw(그 뒤 module 이 안 돎) */
+    const kill = await ctx.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { window.VRULES = new Proxy({}, { set(t, k, x) { if (k === 'stageReset' && /[?&]stage=/.test(location.search)) throw new Error('dcheck 일부러 죽임'); t[k] = x; return true; } }); })();` });
+    const e0 = C.st.pageErr.length; let dead = null;
+    try { await C.nav(ctx.BASE + '/village/stages/rules.json'); await E('localStorage.clear(); sessionStorage.clear(); return 1'); await C.nav(url('two-villages'));
+      await C.until(`typeof window.__sim === 'function' && window.__shots`, 30000, 'two-villages(죽인 module) 불러오기');
+      for (let k = 0; k < 50 && !C.st.pageErr.slice(e0).some(m => /일부러 죽임/.test(m)); k++) await ctx.sleep(100);
+      const d0 = await P(`({ 죽음: typeof window.__clockHold !== 'function', 멈춤: window.__sim().멈춤, 틱: window.__sim().틱 })`);
+      await ctx.advance(11000); const d1 = await P(`({ 멈춤: window.__sim().멈춤, 틱: window.__sim().틱 })`); dead = { 연뒤: d0, '11초뒤': d1, 오류: C.st.pageErr.slice(e0) };
+    } finally { await ctx.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: kill.identifier }); }
+    out['⑨죽음'] = dead;
+    ctx.expect(dead.연뒤.죽음 && dead.연뒤.멈춤 && dead.연뒤.틱 === 0 && !dead['11초뒤'].멈춤 && dead['11초뒤'].틱 - dead.연뒤.틱 >= 5,
+      '⑨ module 이 규칙 덮기 앞에서 죽어도 boot 안전망이 풂(쥔 채 열림 → 11초 뒤 흐름) ' + J({ 연뒤: dead.연뒤, '11초뒤': dead['11초뒤'] }));
+    ctx.expect(dead.오류.length === 1 && /일부러 죽임/.test(dead.오류[0]), '⑨ 페이지 오류는 일부러 낸 하나뿐 ' + J(dead.오류));
+    C.st.pageErr.splice(e0);   /* 일부러 낸 오류(위 줄이 하나뿐임을 봄)는 늘 보는 기대 '페이지 오류 0' 에서 뺀다 */
     /* ⑦ 모형 화면 단추 */
     const pmap = async stage => { o0 = outside(); await fresh(stage); for (let k = 0; k < 40 && !(await P('!!document.getElementById("pmapBar")')); k++) await ctx.advance(250);
       const r = await E(`const t = w => { window.__protoMap(w); return [...document.querySelectorAll('#pmapExtra button')].map(b => b.textContent.trim()); }; return { v0: t('v0'), v1: t('v1'), 생산멈춤: window.__protoMap().생산멈춤 }`);

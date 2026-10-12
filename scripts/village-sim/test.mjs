@@ -184,14 +184,17 @@ process.stdout.write('@@' + JSON.stringify({ days, 사람: w.__pop().사람, cs:
    (나) 멈춤.일자리 → 하루 __jobs().출근 0 · 출근막음 ≥ 1 · 배정은 그대로 셈(찬자리 > 0) / 양성 대조: zz-clock-job0 은 하루 출근 > 0 · 출근막음 0
    (다) 배속최대 2 + 저장본 speed 4 → 열 때 2(깎음 1) · __setSpeed(4) → 2 · 내보낸 clock.speed 2 / 칸 없는 판(help-places)은 4 그대로
    (라) boot 쥠 — 카드가 안 뜰 판(town)은 규칙 뒤 풂(쥔 [] · 쥠 1 · 풂 1) · 뜰 판(two-villages · help-places)은 쥔 ['boot'](무화면은 카드가 안 와 그대로) ·
-       쥔 동안 __setSpeed 는 다시 쥠 · 저장은 풀린 뒤의 배속(쥔 멈춤을 0 으로 안 적음) · 기본 마을(pop88)은 쥠 0 · 배속최대 4 · __setSpeed(4) → 4 · 멈춤 false */
+       쥔 동안 __setSpeed 는 다시 쥠 · 저장은 풀린 뒤의 배속(쥔 멈춤을 0 으로 안 적음 — 연 직후 저장 1) · 기본 마을(pop88)은 쥠 0 · 배속최대 4 · __setSpeed(4) → 4 · 멈춤 false
+   (마) 되돌리기 스위치 — help-places 를 연 뒤 VRULES.stageClock.on = false: 쥔 채(boot)라도 저장은 옛 값(멈춤 = 0) · __setSpeed(4) 는 다시 쥐지 않고 흐름(되쥠 0)
+       (이 둘은 기본 마을의 첫 안내 · ❓ · 칭호 카드에서도 도는 감싸기 — 스위치로 옛 동작으로 돌아가는지 · PA-06 반박 🟡4) */
 const clOne = c => new Promise(done => {
   const src = `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${c.save ? `(await import('node:fs')).readFileSync(${JSON.stringify(path.join(ROOT, c.save))}, 'utf8')` : 'null'}, seed: 1, hash: 'hour=10', query: ${JSON.stringify(c.stage ? 'stage=' + c.stage : '')} });
 w.VRULES.speedQuiet.on = false;   /* 무화면엔 getComputedStyle 이 없다 — 배속 말 쉼 고리가 그것을 부른다(배속 셈과 무관) */
-const 처음 = w.__clockHold(), f0 = w.__flow().만듦, j0 = w.__jobs().출근, 배속 = ${c.speed != null ? 'w.__setSpeed(' + c.speed + ')' : 'null'};
+${c.off ? 'w.VRULES.stageClock.on = false;' : ''}
+const 처음 = w.__clockHold(), 저장0 = JSON.parse(w.__exportText()).clock.speed, f0 = w.__flow().만듦, j0 = w.__jobs().출근, 배속 = ${c.speed != null ? 'w.__setSpeed(' + c.speed + ')' : 'null'};
 w.__tickBench(1800);
-process.stdout.write('@@' + JSON.stringify({ 처음, 배속, 뒤: w.__clockHold(), 만듦: w.__flow().만듦 - f0, 출근: w.__jobs().출근 - j0, 찬자리: w.__jobs().찬자리, cs: w.__campStats(), 모형: w.__protoMap().생산멈춤, 저장: JSON.parse(w.__exportText()).clock }) + '\\n', () => process.exit(0));`;
+process.stdout.write('@@' + JSON.stringify({ 처음, 저장0, 배속, 뒤: w.__clockHold(), 만듦: w.__flow().만듦 - f0, 출근: w.__jobs().출근 - j0, 찬자리: w.__jobs().찬자리, cs: w.__campStats(), 모형: w.__protoMap().생산멈춤, 저장: JSON.parse(w.__exportText()).clock }) + '\\n', () => process.exit(0));`;
   const p = spawn(process.execPath, ['--input-type=module', '-e', src], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let out = '', err = '';
   p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { err += d; });
   p.on('close', () => { const l = out.split('\n').find(x => x.startsWith('@@')), e = (err || out).trim().split('\n');
@@ -200,7 +203,8 @@ process.stdout.write('@@' + JSON.stringify({ 처음, 배속, 뒤: w.__clockHold(
   const put = (f, o) => { fs.writeFileSync(path.join(dir, f), JSON.stringify(o, null, 1)); made.push(path.join(dir, f)); };
   const tv = 바탕('two-villages.json'), st = 바탕('starts/two-villages.json'), job = { id: 'zz-clock-job', 이름: '시험 판', 교과: null, 시작: 'stages/boards/pop88.json' };
   const C = [{ n: 'tv', stage: 'two-villages' }, { n: 'make', stage: 'zz-clock-make' }, { n: 'job0', stage: 'zz-clock-job0' }, { n: 'job', stage: 'zz-clock-job' },
-    { n: 'speed', stage: 'zz-clock-speed', speed: 4 }, { n: 'hp', stage: 'help-places', speed: 4 }, { n: 'town', stage: 'town' }, { n: '기본', stage: null, save: 'village/stages/boards/pop88.json', speed: 4 }];
+    { n: 'speed', stage: 'zz-clock-speed', speed: 4 }, { n: 'hp', stage: 'help-places', speed: 4 }, { n: 'town', stage: 'town' }, { n: '기본', stage: null, save: 'village/stages/boards/pop88.json', speed: 4 },
+    { n: 'off', stage: 'help-places', speed: 4, off: true }];
   const R = {};
   try { put('zz-clock-make.json', { ...tv, id: 'zz-clock-make', 판규칙: { 멈춤: { 생산: true, 뜻 } } });
     put('zz-clock-job.json', { ...job, 판규칙: { 멈춤: { 일자리: true, 뜻 } } }); put('zz-clock-job0.json', { ...job, id: 'zz-clock-job0' });
@@ -210,9 +214,9 @@ process.stdout.write('@@' + JSON.stringify({ 처음, 배속, 뒤: w.__clockHold(
     C.forEach((c, i) => { R[c.n] = out[i]; });
   } finally { made.forEach(f => fs.rmSync(f, { force: true })); }
   const J = JSON.stringify;
-  test('CLOCK: 판규칙 멈춤.생산 → 하루 만듦 0 · 멈춤.일자리 → 하루 새 출근 0(출근막음 ≥ 1 · 배정 그대로) · 배속최대 2 → 저장본 4 를 열 때 2 · __setSpeed(4) → 2 · 저장 2 · boot 쥠은 카드가 안 뜰 판에서 규칙 뒤 풂 · 판 칸 없는 판 · 기본 마을 그대로', () => {
+  test('CLOCK: 판규칙 멈춤.생산 → 하루 만듦 0 · 멈춤.일자리 → 하루 새 출근 0(출근막음 ≥ 1 · 배정 그대로) · 배속최대 2 → 저장본 4 를 열 때 2 · __setSpeed(4) → 2 · 저장 2 · boot 쥠은 카드가 안 뜰 판에서 규칙 뒤 풂 · 판 칸 없는 판 · 기본 마을 그대로 · 되돌리기 스위치', () => {
     const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
-    const { tv: a, make, job0, job, speed, hp, town, 기본: base } = R;
+    const { tv: a, make, job0, job, speed, hp, town, 기본: base, off } = R;
     ok(a.만듦 > 0 && make.만듦 === 0 && make.cs.생산막음 === 1 && make.모형 === true && J(make.cs.지금막음) === J(['생산']),
       '(가) 멈춤.생산 — 하루 만듦 two-villages ' + a.만듦 + ' → 판규칙 ' + make.만듦 + ' ' + J({ 생산막음: make.cs.생산막음, 모형: make.모형, 지금막음: make.cs.지금막음 }));
     ok(job0.출근 > 0 && job0.cs.출근막음 === 0 && job.출근 === 0 && job.cs.출근막음 >= 1 && job.찬자리 > 0 && J(job.cs.지금막음) === J(['일자리']),
@@ -221,10 +225,12 @@ process.stdout.write('@@' + JSON.stringify({ 처음, 배속, 뒤: w.__clockHold(
       '(다) 배속최대 2 — 열 때 · __setSpeed(4) · 저장 ' + J({ 처음: speed.처음.배속, 깎음: speed.처음.깎음, 단추: speed.배속.배속, 저장: speed.저장 }));
     ok(hp.처음.배속최대 === 4 && hp.처음.깎음 === 0 && hp.배속.배속 === 4, '(다) 배속최대 칸 없는 판(help-places)이 깎임 ' + J({ 처음: hp.처음, 단추: hp.배속 }));
     ok(J(town.처음.쥔) === '[]' && town.처음.쥠 === 1 && town.처음.풂 === 1 && !town.처음.멈춤, '(라) 카드가 안 뜰 판(town)인데 boot 를 안 풂 ' + J(town.처음));
-    ok(J(a.처음.쥔) === J(['boot']) && J(hp.처음.쥔) === J(['boot']) && hp.배속.멈춤 === true && hp.뒤.되쥠 === 1 && hp.저장.speed === 4,
-      '(라) 카드가 뜰 판 — 카드까지 boot 쥠 · 쥔 동안 __setSpeed 는 다시 쥠 · 저장은 풀린 뒤 배속 ' + J({ tv: a.처음.쥔, hp: hp.처음.쥔, 단추: hp.배속, 되쥠: hp.뒤.되쥠, 저장: hp.저장 }));
+    ok(J(a.처음.쥔) === J(['boot']) && J(hp.처음.쥔) === J(['boot']) && hp.저장0 === 1 && hp.배속.멈춤 === true && hp.뒤.되쥠 === 1 && hp.저장.speed === 4,
+      '(라) 카드가 뜰 판 — 카드까지 boot 쥠 · 쥔 동안 __setSpeed 는 다시 쥠 · 저장은 풀린 뒤 배속 ' + J({ tv: a.처음.쥔, hp: hp.처음.쥔, 저장0: hp.저장0, 단추: hp.배속, 되쥠: hp.뒤.되쥠, 저장: hp.저장 }));
     ok(J(base.처음.쥔) === '[]' && base.처음.쥠 === 0 && base.처음.배속최대 === 4 && base.배속.배속 === 4 && base.배속.멈춤 === false && base.cs.출근막음 === 0,
       '(라) 기본 마을(pop88)에서 판 시계가 돎 ' + J({ 처음: base.처음, 단추: base.배속 }));
+    ok(J(off.처음.쥔) === J(['boot']) && off.처음.멈춤 === true && off.처음.켜짐 === false && off.저장0 === 0 && off.배속.멈춤 === false && off.배속.배속 === 4 && off.뒤.되쥠 === 0 && off.저장.speed === 4,
+      '(마) 되돌리기 스위치(stageClock.on = false) — 쥔 채 저장 0(옛 값) · __setSpeed(4) 는 다시 쥐지 않음 ' + J({ 쥔: off.처음.쥔, 저장0: off.저장0, 단추: off.배속, 되쥠: off.뒤.되쥠, 저장: off.저장 }));
   });
 }
 
