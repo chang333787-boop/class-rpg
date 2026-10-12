@@ -14070,14 +14070,15 @@ stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 �
    · 트레이를 모르는 말은 거짓인 조각만 뺀다: 🔓 해금 소식에서 트레이에 안 뜨는 종류(다 빠지면 안 띄움 · 해금 · 저장은 그대로) ·
      보기 모드 물건 말의 '🖐 로 옮기거나 🧽 로 치울 수 있어요'(트레이 밖) · '더 놓으려면 아래에서 카드를 골라요'(`[]`) · 빈 땅 '먼저 고르세요'(`[]`).
    · 트레이 판은 카드 아래 값 줄('무료' · 'nG' · '내 집')을 숨긴다(값을 다루지 않는 판) — 'NEW' 표지와 잠긴 카드의 🔒 까닭 글은 둔다.
+   · 트레이에 안 뜨는 종류의 노란 자리(spotShow)는 밝히지 않는다 · `[]` 판은 🔄 도 숨긴다(고를 카드가 없어 '먼저 고르세요'만 남았다 — 길게 누름 메뉴의 돌리기는 그대로).
    스위치 VRULES.stageTray(조작) — on:false = `건물`만으로 · price:false = 값 줄 다시 보임. 저장 0 · 판정 0. 원래 줄 수정 0 — 다시 대입 + 고리(canPlace · crowdWidenAt · toast).
    시험 훅: window.__tray() · window.__trayTry(무엇, x, y) — 무엇 = 'erase' · 'sweep' · 'carry' · 'hold' · 'turn' · 'look' 을 실제 손 함수로 눌러 보고 칸 · 말을 돌려준다 · window.__pmapCut(). */
 (window.VRULES = window.VRULES || {}).stageTray = { on: true, price: true };
-const TRAY = { 말: null, probe: 0, held: null, listen: null, 해금말: [], stats: { 막음: 0, 손막음: 0, 탐침통과: 0, 복원통과: 0, 되돌림통과: 0, 다리통과: 0, 손통과: 0, 쓸기건너뜀: 0, 값숨김: 0, 해금말뺌: 0, 해금말줄임: 0, 말조각뺌: 0, 빈땅말뺌: 0 } };
+const TRAY = { 말: null, probe: 0, held: null, listen: null, 해금말: [], 나감: [], stats: { 자리숨김: 0, 막음: 0, 손막음: 0, 탐침통과: 0, 복원통과: 0, 되돌림통과: 0, 다리통과: 0, 손통과: 0, 쓸기건너뜀: 0, 값숨김: 0, 해금말뺌: 0, 해금말줄임: 0, 말조각뺌: 0, 빈땅말뺌: 0 } };
 const trayDef = () => (STAGE.def && Array.isArray(STAGE.def.트레이) && window.VRULES.stageTray.on ? STAGE.def.트레이 : null);
 const trayKindOf = (rec, T) => (rec.k === 'sbr' ? 'road' : ec2KindAt(rec, rec.root, T));
 const trayHand = rec => { const T = trayDef(); return !T || !rec || T.includes(trayKindOf(rec, T)); };
-const trayShown = () => { const T = trayDef(); return T ? ORDER.filter(k => T.includes(k)) : null; };
+const trayShown = () => { const T = trayDef(); return T ? ORDER.filter(k => T.includes(k) && GROUPS.includes(K[k].grp0 != null ? K[k].grp0 : K[k].grp)) : null; };   /* 탭에 서는 것만 — 옛 모양 · 숨김 묶음(fence · wall · 물 끈 판의 well)은 트레이에 적혀도 안 뜬다 */
 const trayDeny = () => { TRAY.stats.손막음++; TRAY.말 = '✋ 이번엔 옮기거나 치우지 않아요'; toast(TRAY.말); };
 { const b0 = buildTray; buildTray = function () { const T = trayDef(); if (!T) return b0.apply(this, arguments);
     const keep = ORDER.slice(), now = k => K[k].season == null || K[k].season === seasonIdx(), tabsOf = () => new Set(ORDER.filter(now).map(k => K[k].grp)); let tabs = null;
@@ -14086,7 +14087,7 @@ const trayDeny = () => { TRAY.stats.손막음++; TRAY.말 = '✋ 이번엔 옮�
       const r = b0.apply(this, arguments); tabs = tabsOf(); return r; }   /* tabs 는 b0 안의 trayTrim 이 잠긴 것을 옮긴 뒤에 잰다 */
     finally { ORDER.splice(0, ORDER.length, ...keep);   /* 되돌리기가 맨 앞 — 아래에서 무엇이 멈춰도 ORDER 는 제자리 */
       if (tabs) document.querySelectorAll('#trayTabs .gtab').forEach((b, i) => { if (!tabs.has(GROUPS[i])) b.style.display = 'none'; });   /* 탭 단추는 GROUPS 차례로 선다 */
-      if (!T.length) ['cMove', 'cErase'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+      if (!T.length) ['cMove', 'cErase', 'cRot'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
       if (window.VRULES.stageTray.price !== false) { document.querySelectorAll('#trayIn .card[data-kind]:not(.lock) .pr').forEach(e => { e.hidden = true; TRAY.stats.값숨김++; });
         setTimeout(() => document.querySelectorAll('#trayIn .card[data-kind]:not(.lock) .pr').forEach(e => { if (e.hidden && e.textContent.startsWith('NEW · ')) { e.textContent = 'NEW'; e.hidden = false; } }), 0); } } }; }   /* NEW 표지는 남긴다 — trayTrim 이 0초 뒤 값 글 앞에 붙인다(먼저 걸린 타이머) */
 hookAdd('canPlace', function (next, args) { const [kind, , , , opts] = args, T = trayDef();
@@ -14111,17 +14112,20 @@ hookAdd('canPlace', function (next, args) { const [kind, , , , opts] = args, T =
     TRAY.held = rec ? rec.k : null; try { return hr0.apply(this, arguments); } finally { TRAY.held = null; } }; }   /* 돌리기 = 치우고 다음 방향으로 다시 놓기 — 손 검사를 지난 그것은 다시 놓을 때 지난다 */
 { const ts0 = thingSay; thingSay = function (rec) { const s = ts0.apply(this, arguments), T = trayDef(); if (!T || !rec || trayHand(rec)) return s;
     let t = s.replace(' — 🖐 로 옮기거나 🧽 로 치울 수 있어요 · ', ' — '); if (!T.length) t = t.replace(' — 더 놓으려면 아래에서 카드를 골라요', ''); if (t !== s) TRAY.stats.말조각뺌++; return t; };   /* 트레이 밖이면 손 조각 · [] 이면 카드 조각도 */
+  { const sr = sayOnce; sayOnce = function (m) { if (typeof m === 'string' && m.startsWith('🔓')) { TRAY.나감.push(m); if (TRAY.나감.length > 12) TRAY.나감.shift(); } return sr.apply(this, arguments); }; }   /* 실제로 나간 🔓 소식(아래 거르기보다 안쪽 — 시험이 장부가 아니라 나간 말을 본다) */
   const so0 = sayOnce; sayOnce = function (m, ok) { const T = trayDef(), p = T && typeof m === 'string' ? /^(🔓 (?:목표 보상! )?)(.+?) ?(?:이|가) 열렸어요(.*)$/.exec(m) : null; if (!p) return so0.apply(this, arguments);
     const shown = trayShown(), names = p[2].split('·'), keep = names.filter(nm => shown.some(k => K[k].nm === nm)); if (keep.length === names.length) return so0.apply(this, arguments);
     const t = keep.length ? p[1] + josa(keep.join('·'), '이', '가') + ' 열렸어요' + p[3] : null; TRAY.해금말.push([m, t]); if (TRAY.해금말.length > 8) TRAY.해금말.shift();
     if (!t) { TRAY.stats.해금말뺌++; return; } TRAY.stats.해금말줄임++; return so0.call(this, t, ok); };   /* 해금 · 저장은 그대로 — 소식 말에서 트레이에 안 뜨는 종류만 뺀다(checkUnlocks · 목표 보상) */
+  hookAdd('toast', function (next, a) { if (TRAY.listen) TRAY.listen.push(String(a[0])); return next(a); });   /* 듣기는 안쪽 — 아래 거르기를 지난 말만 적힌다 */
   hookAdd('toast', function (next, a) { const T = trayDef();
     if (T && !T.length && String(a[0]) === '아래에서 놓을 물건을 먼저 고르세요') { TRAY.stats.빈땅말뺌++; return; }   /* 고를 카드가 없는 판 */
-    if (TRAY.listen) TRAY.listen.push(String(a[0])); return next(a); }); }
+    return next(a); });
+  const ss0 = spotShow; spotShow = function (kind) { const s = trayShown(); if (s && !s.includes(kind)) { TRAY.stats.자리숨김++; return; } return ss0.apply(this, arguments); }; }   /* 노란 자리 — 트레이에 안 뜨는 종류(해금된 기차역 …)의 자리는 밝히지 않는다 */
 if (trayDef()) buildTray();   /* 트레이 칸이 있는 판에서만 다시 그린다 — 없는 판은 한 픽셀도 안 달라진다 */
 window.__tray = () => { const shown = trayShown(); return { 켜짐: window.VRULES.stageTray.on, 트레이: trayDef(), 뜨는종류: shown, 뜨는길: shown && shown.filter(k => K[k].road),
   보이는카드: [...document.querySelectorAll('#trayIn .card[data-kind]')].map(e => e.dataset.kind), 값숨김규칙: !!trayDef() && window.VRULES.stageTray.price !== false,
-  값줄: [...document.querySelectorAll('#trayIn .card[data-kind]:not(.lock) .pr')].filter(e => !e.hidden && e.textContent !== 'NEW').length, 손말: TRAY.말, 해금말: TRAY.해금말.slice(), ...TRAY.stats }; };
+  값줄: [...document.querySelectorAll('#trayIn .card[data-kind]:not(.lock) .pr')].filter(e => !e.hidden && e.textContent !== 'NEW').length, 손말: TRAY.말, 해금말: TRAY.해금말.slice(), 나감: TRAY.나감.slice(), 탐침중: TRAY.probe, ...TRAY.stats }; };
 window.__pmapCut = () => { const c = pmapCutSpots(); return c ? { 칸: c.칸, 자리: c.자리.map(i => [cX(i), cY(i)]) } : null; };   /* 프로토 지도 '🔗 공급 경로'가 짚을 칸(탐침) — 단추로만 닿아 무화면에서 켬 ↔ 끔을 견주려고 */
 window.__trayTry = (what, x, y) => { const p = window.__cellScreen(x, y); if (!p) return { 무엇: what, 오류: '그 칸을 가리키는 화면 좌표를 못 찾음' };
   const at = () => { const r = inb(x, y) ? cells[idx(x, y)] : null; return r ? r.k + '@' + cX(r.root) + ',' + cY(r.root) + '/' + r.rot : null; };

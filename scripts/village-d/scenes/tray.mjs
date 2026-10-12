@@ -101,7 +101,7 @@ export default async function tray(ctx) {
     const b = await E(`const vis = [...document.querySelectorAll('#trayTabs .gtab')].filter(x => x.style.display !== 'none').length, cards = document.querySelectorAll('#trayIn .card[data-kind]').length;
       return { 보인탭: vis, 카드: cards, 값줄: window.__tray().값줄, 도구: Object.fromEntries(['cRot', 'cMove', 'cErase', 'cUndo'].map(id => { const e = document.getElementById(id); return [id, !!e && e.style.display !== 'none' && !!e.offsetParent]; })) }`);
     ctx.expect(b.보인탭 === 0 && b.카드 === 0 && b.값줄 === 0, '[] 탭 0 · 카드 0 · 값 줄 0 ' + JSON.stringify(b));
-    ctx.expect(b.도구.cRot && b.도구.cUndo && !b.도구.cMove && !b.도구.cErase, '[] 🖐 · 🧽 숨김 · 🔄 · ↩ 보임 ' + JSON.stringify(b.도구));
+    ctx.expect(!b.도구.cRot && b.도구.cUndo && !b.도구.cMove && !b.도구.cErase, '[] 🖐 · 🧽 · 🔄 숨김 · ↩ 보임(고를 카드가 없으면 🔄 도 할 일이 없음) ' + JSON.stringify(b.도구));
     await ctx.shot('b_빈_트레이');
     const 집b = await pick('house'), 나무b = await pick('tree');
     ctx.expect(집b && 나무b, '[] 누를 칸 — 집 · 나무 ' + JSON.stringify({ 집: 집b && [집b.x, 집b.y], 나무: 나무b && [나무b.x, 나무b.y] }));
