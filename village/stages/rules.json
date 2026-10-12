@@ -119,6 +119,7 @@
   "widenShift": "조작",
   "jobCheck": "보기",
   "stageCard": "보기",
+  "lookKit": "보기",
   "cardMap": "보기",
   "voice": "보기",
   "mapWide": "보기",
@@ -180,5 +181,11 @@
     "일자리": ["jobsHomes", "jobAway"],
     "붐빔": ["crowdHomes", "crowdSkipNight"],
     "수용량": ["shopCap"]
-  }
+  },
+  "_보기끔설명": "[LK-CARD] 같은 모습 잣대 판 검사 'LK ④'(build/D §LK L7) — 판 `규칙` 이 분류 '보기' 스위치를 on:false 로 두면 어느 등급이든 FAIL. 이 목록만 판이 끌 수 있다(사진 모드용 — cardDay = 판 카드 사진을 낮 빛으로 찍기 · 밤이 주제인 판이 끈다(10-03 엔진 회신 #1114) · cardMap = 사진 오기 전 빈 틀을 판 지도로). VRULES.lookKit.on = false 면 LK ②④ 의 FAIL 은 REVIEW 로 낮춘다.",
+  "보기끔허용": ["cardDay", "cardMap"],
+  "_색설명": "[LK-CARD] 판 검사 'LK ③' — 판 `건물정의` 조각 색 c 는 팔레트 이름(index.html P) · 팔레트 값 · 이 목록의 16진이면 그대로, 그 밖의 16진은 REVIEW('새 색'), 모르는 이름은 FAIL(엔진 skinHex 가 그 조각을 버린다). 목록 = PA-09 때 판 파일들이 이미 쓰던 색(머지된 판). 새 색을 받으면 여기에 더한다(소문자).",
+  "색허용": ["#2f5c3f", "#3a6d49", "#3f4249", "#4a7fb5", "#4a90d9", "#4d8a5c", "#5c5f66", "#5fc46a", "#6b3a26", "#6b533a", "#6e2620", "#7a4630", "#7a5a3a", "#7a6546", "#7b746a",
+    "#7d6038", "#7fb4cc", "#8a6038", "#8a6b3f", "#8e877c", "#8f8c85", "#93a35f", "#9a7044", "#a29a8d", "#a67a46", "#a9865a", "#b8a34e", "#bb8e56", "#c0442f", "#c8553d",
+    "#c9c5ba", "#d3c088", "#d7d3c8", "#e0cf99", "#e0d8c6", "#e8b04b", "#e9e5da", "#eceadf", "#f1e6cf", "#f2c14a", "#f2ece0", "#f2ede0", "#f4efe2", "#f7b6c8", "#fbe3ea"]
 }

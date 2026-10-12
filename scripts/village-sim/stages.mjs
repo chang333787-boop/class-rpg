@@ -2,6 +2,7 @@
 // ① 칸 모양 ② 교과 칸이 docs/village_curriculum_map.md 에 있나 ③ 시작 땅 파일 ④ 규칙 키가 VRULES 에 있나 ⑤ 건물 종류가 있나
 // ⑥ VRULES 가 전부 rules.json 에 분류됐나(새 규칙은 판정/연기… 한 줄 필수) ⑦ 판이 바꾸는 판정 규칙 ≤ 3 (FAIL) · 수업 판(교과 칸 있음)은 켜진 판정 규칙 ≤ 6 (FAIL) — 자유 놀이 판은 면제
 // ⑧ 판을 실제로 얹어 하루 돈다(시뮬 · 네트워크 0 · 판 오류 없음)
+// [LK-CARD] 같은 모습 잣대(PA-09 · build/D §LK) — LK ② 조작 끔 · ③ 건물 색 · ④ 보기 끔 · 등급 · 양상(판마다) · LK ⑥ 새 fixed 카드 CSS(엔진 줄 한 번)
 import { spawnSync } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(HERE, '../..'), DIR = path.join(ROOT, 'village/stages');
 const results = [];
@@ -9,7 +10,7 @@ const add = (kind, name, why) => results.push([kind, name, why || '']);
 const FIELDS = ['id', '이름', '교과', '질문', '되돌아보기', '현상', '변수', '시작', '규칙', '건물', '목표'];
 /* [MAC-TRAY] 아는 칸 — FIELDS 말고 엔진 · 뒤 PR 이 읽는 판 칸. 이 밖의 칸은 REVIEW(오타 잡기 · FAIL 아님). 새 판 칸을 여는 PR 은 같은 PR 에서 여기에 더한다 */
 const KNOWN = new Set([...FIELDS, '모습', '건물정의', '흐름', '시작칸', '지형', '끄기', '카드', '첫안내', '역할', '예상', '결정', '동네', '트레이', '_기획', '끝카드', '권유', '드는것',
-  '시드', '안내최대층', '배속최대', '생산멈춤', '첫화면', '연결글', '찾음', '견줌', '놓음종류', '말함', '기억', '앞기억', '옮겨적기', '결과값', '손맛대상', '판규칙', '학년', '집이름', '대사', '유즈맵', '지도', '놓을곳', '입구']);
+  '시드', '안내최대층', '배속최대', '생산멈춤', '첫화면', '연결글', '찾음', '견줌', '놓음종류', '말함', '기억', '앞기억', '옮겨적기', '결과값', '손맛대상', '판규칙', '학년', '집이름', '대사', '유즈맵', '지도', '놓을곳', '입구', '등급', '양상']);   /* 등급 · 양상 = [LK-CARD] PA-09(build/D §LK 판 칸 꼴) */
 const SEMS = { kind: g => typeof g.k === 'string' && g.n > 0, pop: g => g.n > 0, hook: g => typeof g.훅 === 'string' && typeof g.n === 'number' && ['>=', '<='].includes(g.비교) };
 const HOOKS = ['일닿음%', '다있음%'];   // index.html STAGE_HOOKS 와 같게
 const 지형이름 = ['물', '모래', '비탈', '고개'];   // index.html [MAC-TERRAIN] TERR_NAMES 와 같게
@@ -19,11 +20,11 @@ const 시드꼴 = v => Number.isInteger(v) && v >= 1;   // [MAC-ESEED] index.htm
 const probe = path.join(os.tmpdir(), 'village-stages-probe-' + process.pid + '.mjs');
 fs.writeFileSync(probe, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1 });
-process.stdout.write('@@' + JSON.stringify({ vrules: w.VRULES, 끄기이름: (w.__stageOff ? w.__stageOff().쓸수있는이름 : null), 캠프: (w.__campStats ? w.__campStats() : null) }) + '\\n'); process.exit(0);`);
+process.stdout.write('@@' + JSON.stringify({ vrules: w.VRULES, 끄기이름: (w.__stageOff ? w.__stageOff().쓸수있는이름 : null), 캠프: (w.__campStats ? w.__campStats() : null), 룩: (w.__lookKit ? w.__lookKit() : null) }) + '\\n'); process.exit(0);`);
 const pr = spawnSync(process.execPath, [probe], { encoding: 'utf8' }); fs.rmSync(probe, { force: true });
 const line = (pr.stdout || '').split('\n').find(l => l.startsWith('@@'));
 if (!line) { console.log('FAIL 마을을 못 실음 —', (pr.stderr || '').trim().split('\n').slice(-2).join(' ')); process.exit(1); }
-const { vrules, 끄기이름, 캠프 } = JSON.parse(line.slice(2));
+const { vrules, 끄기이름, 캠프, 룩 } = JSON.parse(line.slice(2));
 
 /* [MAC-CAMP] PA-05 판규칙(CAMP) 검사 — 흰 목록 · 멈춤 키 · 고리(엔진이 지금 하는 것)는 엔진 __campStats 가 정본(위 탐침이 읽음).
    꼴: 객체 · 키 ⊆ 흰 목록(밖 = REVIEW · 엔진은 버림) · 덮기마다 뜻 한 줄(없으면 FAIL · 목표셈 빼고) · 판필요 · 목표셈은 배열 · 나머지는 객체 ·
@@ -94,6 +95,45 @@ process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`);
   const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : { err: (r.stderr || '').trim().split('\n').slice(-1)[0] };
 }
 
+/* [LK-CARD] PA-09 같은 모습 잣대 판 검사(build/D §LK 판 검사 줄) — 판 루프와 자기 시험이 같은 lkFile 을 부른다(지난 판은 룩지남에 · 등급과 함께).
+   ② 캠페인 판(등급 없음 = 캠페인)의 규칙이 '조작' 스위치를 on:false 로 두면 FAIL · 유즈맵은 REVIEW(까닭 한 줄 — 판 카드에)
+   ③ 건물정의 조각 색 c — 팔레트 이름 · 값(엔진 P = __lookKit().팔레트) · rules.json 색허용이면 그대로 · 그 밖의 #rrggbb 는 REVIEW '새 색' ·
+      모르는 이름 · #rgb · 글이 아닌 값은 FAIL(엔진 skinHex 가 그 조각을 버리거나 '#fff' 를 0x000fff 로 읽는다). 엔진 사실: __palette() 는 저장 칸의 종류 표라 색 목록이 아니다.
+      있는 종류 이름을 다시 정의하는 것은 위 [MAC-SKIN] '이미 있는 종류를 덮으려 함' FAIL 그대로(자기 시험이 그 길을 굳힌다).
+   ④ 어느 등급이든 '보기' 스위치를 on:false 로 두면 FAIL(L7 · rules.json 보기끔허용만 됨) · 등급 꼴(캠페인 · 유즈맵) · 양상 꼴(유즈맵 판만 · 회의 · 지도 · 표)
+   VRULES.lookKit.on = false(엔진 기본값을 끈 되돌리기)면 ②④ 의 FAIL 을 REVIEW 로 낮춘다. ①(등급별 양상 걷기 · 손맛대상)은 PA-14a · ⑤(words 거르개)는 W-T(PA-14a) 몫이라 여기 없다. */
+const LKR = JSON.parse(fs.readFileSync(path.join(DIR, 'rules.json'), 'utf8')), LK_보기허용 = Array.isArray(LKR.보기끔허용) ? LKR.보기끔허용 : [], LK_색 = new Set((LKR.색허용 || []).map(s => String(s).toLowerCase()));
+const LK_등급 = ['캠페인', '유즈맵'], LK_양상 = ['회의', '지도', '표'], 룩지남 = new Map();
+function lkFile(def, n, off = !(vrules.lookKit && vrules.lookKit.on)) {
+  const 등급 = def.등급 == null ? '캠페인' : def.등급, out = [], 낮춤 = k => (off && k === 'FAIL' ? 'REVIEW' : k); if (n) 룩지남.set(n, 등급);
+  const rk = def.규칙 && typeof def.규칙 === 'object' ? def.규칙 : {}, 끔 = k => !!rk[k] && typeof rk[k] === 'object' && rk[k].on === false;
+  if (def.등급 != null && !LK_등급.includes(def.등급)) out.push(['FAIL', 'LK 등급', `${JSON.stringify(def.등급)} — 캠페인 · 유즈맵 만(없으면 캠페인)`]);
+  if (def.양상 != null && !(등급 === '유즈맵' && LK_양상.includes(def.양상))) out.push(['FAIL', 'LK 양상', `${JSON.stringify(def.양상)} — 유즈맵 판만 · 회의 · 지도 · 표 가운데 하나(캠페인은 양상을 바꾸지 않는다 · L1)`]);
+  const 조작 = Object.keys(rk).filter(k => rulesMap[k] === '조작' && 끔(k)), 보기 = Object.keys(rk).filter(k => rulesMap[k] === '보기' && 끔(k) && !LK_보기허용.includes(k));
+  if (조작.length) out.push(등급 === '유즈맵' ? ['REVIEW', 'LK ② 조작', `유즈맵 판이 조작 스위치를 끔: ${조작.join(' ')} — 까닭 한 줄을 판 카드에(L2)`]
+    : [낮춤('FAIL'), 'LK ② 조작', `캠페인 판은 조작 스위치를 끄지 않는다(L2 — 자유 모드와 같은 조작): ${조작.join(' ')}`]);
+  if (보기.length) out.push([낮춤('FAIL'), 'LK ④ 보기', `보기 스위치를 끄지 않는다(L7 · 어느 등급이든 · 끌 수 있는 것 = rules.json 보기끔허용 ${LK_보기허용.join('·') || '없음'}): ${보기.join(' ')}`]);
+  const pal = 룩 && 룩.팔레트 ? 룩.팔레트 : {}, 이름 = new Set(Object.keys(pal)), 값 = new Set(Object.values(pal).map(s => String(s).toLowerCase())), 새색 = new Set(), 나쁜색 = new Set();
+  for (const [k, t] of Object.entries(def.건물정의 && typeof def.건물정의 === 'object' ? def.건물정의 : {})) for (const q of (t && Array.isArray(t.parts) ? t.parts : [])) { const c = q ? q.c : null;
+    if (c == null) continue;   /* 비었음은 위 [MAC-SKIN] 꼴 검사가 FAIL */
+    const h = typeof c === 'number' && Number.isInteger(c) && c >= 0 && c <= 0xffffff ? '#' + c.toString(16).padStart(6, '0') : typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : null;
+    if (h) { if (!값.has(h) && !LK_색.has(h)) 새색.add(k + ' ' + h); } else if (!(typeof c === 'string' && 이름.has(c))) 나쁜색.add(k + ' ' + JSON.stringify(c)); }
+  if (나쁜색.size) out.push(['FAIL', 'LK ③ 색', `팔레트 이름도 #rrggbb 도 아닌 색 — 엔진은 그 조각을 버리거나(모르는 이름) #rgb 를 0x000rgb 로 읽는다: ${[...나쁜색].join(' · ')}`]);
+  if (새색.size) out.push(['REVIEW', 'LK ③ 새 색', `팔레트 · rules.json 색허용 밖 — 같은 모습(L3)인지 보고 받으면 색허용에 더한다: ${[...새색].join(' · ')}`]);
+  return out; }
+/* [LK-CARD] LK ⑥(엔진 줄 · village-check 의 판 검사 단계 안) — index.html 의 position:fixed + 제 바탕(background:#…) CSS 를 찾는다.
+   CSS 규칙은 선택자의 #id · JS 인라인(cssText)은 앞쪽 .id = '…' 로 주인을 찾는다 · [LK-LOOK] <style> 블록 안(카드 틀 자리)은 뺀다. 돌려줌 [{ 줄, ids, 인라인 }] */
+function lkFixed(src) {
+  const at = src.indexOf('[LK-LOOK]'), a = at < 0 ? -1 : src.lastIndexOf('<style', at), b = at < 0 ? -1 : src.indexOf('</style>', at), out = [];
+  for (const m of src.matchAll(/position\s*:\s*fixed/g)) { const i = m.index; if (a >= 0 && i > a && i < b) continue;
+    const w0 = Math.max(0, i - 600), before = src.slice(w0, i), inl = /cssText\s*=\s*(['"])[^'"\n]*$/.exec(before); let body, ids;
+    if (inl) { const qa = w0 + inl.index + inl[0].indexOf(inl[1]), qb = src.indexOf(inl[1], i); body = src.slice(qa + 1, qb);
+      const idm = [...src.slice(Math.max(0, i - 800), i).matchAll(/\.id\s*=\s*['"]([^'"]+)['"]/g)]; ids = idm.length ? [idm[idm.length - 1][1]] : []; }
+    else { const ob = src.lastIndexOf('{', i), cb = src.indexOf('}', i), so = src.lastIndexOf('<style', ob), te = so >= 0 ? src.indexOf('>', so) : -1;
+      const st = Math.max(src.lastIndexOf('}', ob), src.lastIndexOf("'", ob), src.lastIndexOf('"', ob), te < ob ? te : -1);
+      body = src.slice(ob + 1, cb); ids = [...src.slice(st + 1, ob).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/#([A-Za-z][\w-]*)/g)].map(x => x[1]); }
+    if (/background(?:-color)?\s*:\s*#/.test(body)) out.push({ 줄: src.slice(0, i).split('\n').length, ids, 인라인: !!inl }); }
+  return out; }
 const rulesMap = JSON.parse(fs.readFileSync(path.join(DIR, 'rules.json'), 'utf8')).규칙;
 const missing = Object.keys(vrules).filter(k => !rulesMap[k]), extra = Object.keys(rulesMap).filter(k => !vrules[k]);
 if (missing.length) add('FAIL', 'rules.json 분류', '분류 안 된 VRULES: ' + missing.join(' ')); else add('PASS', `rules.json 분류 (VRULES ${Object.keys(vrules).length}개 전부)`);
@@ -209,6 +249,7 @@ for (const f of files) {
     const 겹침 = 새종류.filter(k => !kindsOk([k]).length);
     if (겹침.length) add('FAIL', P('건물정의'), '이미 있는 종류를 덮으려 함: ' + 겹침.join(' '));
   }
+  lkFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [LK-CARD] LK ②③④ — 위 lkFile(자기 시험이 같은 함수를 부른다 · 문제가 없으면 줄 0) */
   if (Array.isArray(def.건물) && !def.건물.length) add('FAIL', P('건물'), '건물: [] 는 전부 허용으로 읽힘 — 아이 손은 트레이로');   /* [MAC-TRAY] ㉓ FAIL 만(PASS 줄 0) */
   if (def.건물 != null) { const bad = kindsOk(def.건물.filter(k => !새종류.includes(k))); bad.length ? add('FAIL', P('건물'), '없는 종류: ' + bad.join(' ')) : add('PASS', P(`건물 ${def.건물.length}종`)); if (!def.건물.includes('road')) add('FAIL', P('건물'), '길(road)이 없음'); }
   /* [MAC-TRAY] ㉔ 트레이 — 배열 · 모르는 종류 · 건물 목록 안(엔진은 목록 밖 종류를 ORDER 에서 뺀다 — 건물정의 종류도) · 값 줄 숨김은 하루 돌림(run.mjs tray) 뒤에 PASS 한 줄 */
@@ -272,6 +313,41 @@ for (const f of files) {
   { const 의원씀 = (def.목표 || []).some(g => g.k === 'clinic') || ((def.역할 || {}).정한다 || []).some(d => (d.놓기 || []).includes('clinic')) || !!(def.결정 && def.결정.시설 === 'clinic');
     if (의원씀 && !조건부.health(def)) add('FAIL', P('건강'), '의원을 쓰는 판인데 건강이 안 돎 — keepStages · 수업 판 규칙 health · 건물 목록'); }
 }
+
+/* [LK-CARD] LK ⑥ — 엔진 줄 한 번: [LK-LOOK] 밖 · 묵은 카드(엔진 __lookKit().묵은카드 = LK_OLD) 밖에 새로 생긴 fixed + 제 바탕 CSS 는 REVIEW('카드 틀을 쓰세요').
+   묵은 카드 = 화면을 덮는 막 · 카드 꼴 판 · 칩이 서른 곳 넘게(엔진 사실 ②) — PA-09 가 틀로 옮긴 것은 시작 · 끝 · 되묻기뿐이다. */
+{ const 묵은 = 룩 && Array.isArray(룩.묵은카드) ? 룩.묵은카드 : null, ㄹ = [...룩지남.values()];
+  add('PASS', `LK ②③④ 판 ${룩지남.size}개 지남 — 등급 캠페인 ${ㄹ.filter(x => x === '캠페인').length} · 유즈맵 ${ㄹ.filter(x => x === '유즈맵').length}(문제가 있는 판만 위에 줄 · ①은 PA-14a · ⑤는 W-T)`);
+  if (!묵은) add('FAIL', 'LK ⑥ 카드 CSS', 'index.html 에 __lookKit 이 없다([LK-CARD] 가 안 실렸다)');
+  else { const all = lkFixed(fs.readFileSync(path.join(ROOT, 'village/index.html'), 'utf8')), 새것 = all.filter(x => !x.ids.some(id => 묵은.includes(id)));
+    새것.length ? 새것.forEach(x => add('REVIEW', 'LK ⑥ 새 카드 CSS', `index.html ${x.줄}줄 ${x.ids.map(i => '#' + i).join(' ') || '(id 없음)'}${x.인라인 ? '(인라인)' : ''} — position:fixed + 제 바탕 · [LK-LOOK] 밖 · 묵은 카드 밖 — 카드 틀(vcardShow · [LK-LOOK] 변수)을 쓰세요`))
+      : add('PASS', `LK ⑥ 새 fixed 카드 CSS 0 — fixed + 제 바탕 ${all.length}곳 모두 묵은 카드(목록 ${묵은.length}곳 · 틀로 옮긴 것은 시작 · 끝 · 되묻기뿐) · [LK-LOOK] 안 틀은 셈 밖`); } }
+/* [LK-CARD] LK 판 검사 자기 시험 — 판 루프와 같은 lkFile · lkFixed 를 지어낸 판 · 지어낸 index.html 조각으로 부른다:
+   l 판 루프가 판마다 lkFile 을 지남 / a 캠페인 조작 끔 FAIL · 유즈맵 REVIEW · 켬은 줄 0 / b 보기 끔 FAIL(유즈맵도) · 보기끔허용 끔은 줄 0 / c lookKit 끔이면 ②④ FAIL → REVIEW /
+   d 등급 · 양상 꼴 / e 색 — 팔레트 이름 · 값(16진 · 수) · 색허용(대문자도) 줄 0 · 새 16진 REVIEW · 모르는 이름 · #rgb · 참 FAIL / f 있는 종류(house) 덮기 = kindsOk 가 있는 종류로 앎([MAC-SKIN] FAIL 길) /
+   g ⑥ — 새 카드 CSS · 인라인 새 id 는 잡고 · [LK-LOOK] 안 · 묵은 id · 바탕 없는 fixed 는 안 잡음 / h rules.json 보기끔허용은 모두 '보기' · 색허용은 #rrggbb 소문자 */
+{ const 틀림 = [], T = (id, ok, v) => { if (!ok) 틀림.push(id + ' ' + JSON.stringify(v)); }, n = (L, k, nm) => L.filter(x => x[0] === k && (!nm || x[1] === nm)).length;
+  const 안지남 = files.map(f => f.replace(/\.json$/, '')).filter(x => !룩지남.has(x)); T('l', !안지남.length, 안지남);
+  const 조작1 = Object.keys(rulesMap).find(k => rulesMap[k] === '조작'), 보기1 = Object.keys(rulesMap).find(k => rulesMap[k] === '보기' && !LK_보기허용.includes(k));
+  const a = [lkFile({ 규칙: { [조작1]: { on: false } } }, null, false), lkFile({ 등급: '유즈맵', 양상: '지도', 규칙: { [조작1]: { on: false } } }, null, false), lkFile({ 규칙: { [조작1]: { on: true } } }, null, false)];
+  T('a', a[0].length === 1 && n(a[0], 'FAIL', 'LK ② 조작') === 1 && a[1].length === 1 && n(a[1], 'REVIEW', 'LK ② 조작') === 1 && !a[2].length, a);
+  const b = [lkFile({ 규칙: { [보기1]: { on: false } } }, null, false), lkFile({ 등급: '유즈맵', 양상: '회의', 규칙: { [보기1]: { on: false } } }, null, false), lkFile({ 규칙: Object.fromEntries(LK_보기허용.map(k => [k, { on: false }])) }, null, false)];
+  T('b', n(b[0], 'FAIL', 'LK ④ 보기') === 1 && n(b[1], 'FAIL', 'LK ④ 보기') === 1 && LK_보기허용.length >= 1 && !b[2].length, b);
+  const c = lkFile({ 규칙: { [조작1]: { on: false }, [보기1]: { on: false } } }, null, true); T('c', c.length === 2 && n(c, 'REVIEW') === 2, c);
+  const d = [lkFile({ 등급: '캠패인' }, null, false), lkFile({ 양상: '지도' }, null, false), lkFile({ 등급: '유즈맵', 양상: '지돈' }, null, false), lkFile({ 등급: '유즈맵', 양상: '표' }, null, false), lkFile({ 등급: '캠페인' }, null, false)];
+  T('d', n(d[0], 'FAIL', 'LK 등급') === 1 && n(d[1], 'FAIL', 'LK 양상') === 1 && n(d[2], 'FAIL', 'LK 양상') === 1 && !d[3].length && !d[4].length, d);
+  const pal = 룩 && 룩.팔레트 ? 룩.팔레트 : {}, 한이름 = Object.keys(pal)[0], 한값 = pal[한이름], 한허용 = [...LK_색][0], 조각 = v => ({ 건물정의: { zzk: { parts: [{ g: 'box', c: v, s: [1, 1, 1], p: [0, .5, 0] }] } } });
+  const e0 = [한이름, 한값, 한허용, String(한허용).toUpperCase(), parseInt(String(한값).slice(1), 16)].map(v => lkFile(조각(v), null, false).length), e1 = lkFile(조각('#123457'), null, false);
+  const e2 = ['stonee', '#fff', true].map(v => n(lkFile(조각(v), null, false), 'FAIL', 'LK ③ 색'));
+  T('e', !!한이름 && !!한허용 && e0.every(x => x === 0) && e1.length === 1 && n(e1, 'REVIEW', 'LK ③ 새 색') === 1 && e2.every(x => x === 1), [e0, e1, e2]);
+  T('f', kindsOk(['house']).length === 0 && kindsOk(['zzkind']).length === 1, 'kindsOk house · zzkind');
+  const 묵은 = 룩 && Array.isArray(룩.묵은카드) ? 룩.묵은카드 : [], 옛 = 묵은.find(x => x === 'album') || 묵은[0];
+  const g0 = lkFixed('<style>\n  #zzNew{position:fixed;inset:0;background:#123456}\n  #' + 옛 + '{position:fixed;background:#000}\n  #zzBare{position:fixed;left:0}\n</style>\n<style>\n  /* [LK-LOOK] */\n  #zzIn{position:fixed;background:#222}\n</style>\n'
+    + "<script>el.id = 'zzChip'; el.style.cssText = 'position:fixed;right:0;background:#333';</script>"), g1 = g0.filter(x => !x.ids.some(id => 묵은.includes(id))).map(x => x.ids.join('') + (x.인라인 ? '(인라인)' : ''));
+  T('g', g0.length === 3 && JSON.stringify(g1) === JSON.stringify(['zzNew', 'zzChip(인라인)']), [g0, g1]);
+  T('h', LK_보기허용.every(k => rulesMap[k] === '보기') && (LKR.색허용 || []).every(s => /^#[0-9a-f]{6}$/.test(s)), [LK_보기허용, (LKR.색허용 || []).length]);
+  !틀림.length ? add('PASS', `LK 판 검사 자기 시험 — 판 루프와 같은 lkFile(판 ${룩지남.size}개 지남) · 캠페인 조작 끔 FAIL · 유즈맵 REVIEW · 보기 끔 FAIL(허용 ${LK_보기허용.join('·')} 빼고) · lookKit 끔이면 REVIEW · 등급 · 양상 꼴 · 색(팔레트 ${Object.keys(pal).length} · 색허용 ${LK_색.size} · 새 색 REVIEW · 나쁜 색 FAIL) · 있는 종류 덮기 길 · ⑥ 새 카드 CSS 잡음(묵은 · [LK-LOOK] 안 · 바탕 없음은 안 잡음)`)
+    : add('FAIL', 'LK 판 검사 자기 시험', 틀림.join(' · ')); }
 
 /* [MAC-SHOPCAP] ㉮ 반대쪽 자기 시험 — 조건부 셈이 규칙을 **숨기지 않나**. city 를 베껴 끄기를 빼고 상가에 정원을 적으면
    켜진 판정이 하나 늘어 **한도를 넘어 FAIL** 이어야 한다(정원을 빼면 하나 줄어야 한다). 보스 09-23 '반대쪽 시험을 같이'

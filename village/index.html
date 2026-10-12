@@ -195,6 +195,59 @@
   @media(max-width:1500px){ #top .hint{display:none} }
   @media(max-width:1340px){ #top{flex-wrap:wrap;row-gap:6px} }   /* 901~1340px 에서 '판 전체 보기'·놓은 것·👥 인구가 화면 밖으로 잘렸다(줄바꿈 규칙이 900px 아래에만 있었다) */
 </style>
+<style>
+  /* [LK-LOOK] 같은 모습 잣대 — 모습 표 한 곳 + 카드 틀(vcardShow · [LK-CARD])의 CSS (build/D §LK · PA-09)
+     카드마다 바탕 · 테두리 · 모서리 · 글꼴 · 주 단추를 CSS 글자로 따로 적어 조금씩 달랐다 → 모습 표 변수 한 벌 · 새 카드는 이 틀만(판 검사 'LK ⑥' — 이 블록 밖 새 fixed 카드 CSS 는 REVIEW).
+     값은 지금 판 카드(시작 · 끝) 값 그대로 — 판 카드를 틀로 옮겨도 모습 차이 0(village-look --shots card). 되묻기(ask)만 금 테두리 2px(되돌릴 수 없는 일 신호 · 둘째 지문).
+     선택자 = 막 .vk-dim > 카드 .card[data-vcard="kind"] — 카드 class 는 'card' 하나만 기댄다(setMode 가 모든 .card 의 className 을 'card' 로 되쓴다).
+     '크게'(:root.vk-big · 부록 J3): 카드 글 ×1.25 · 단추 높이 그대로(44) · 사진 상한 320 → 240(1366 에선 42vw · 32vw 가 둘 다 320 상한이라 줄지 않음 — 엔진 사실 H17 #13)
+       · 판 카드 폭 720 → 900 · 목표 줄 인라인(사진만 줄이면 짐작 상자가 줄 높이를 정해 town3 시작 카드가 넘쳤다 — 잰 값 647 > 584).
+     되돌리기 VRULES.lookKit.on = false → 옛 scardShow · askCard 꼴(옛 CSS 그대로 · 값이 같아 눈에 차이 0). */
+  :root{--vk-bg:#1a1d26;--vk-line:#3a4050;--vk-radius:16px;--vk-font:"Malgun Gothic",sans-serif;--vk-ink:#e8e6e0;--vk-q:#ffe9b8;--vk-sub:#a8adba;--vk-btn:#e8b04b;--vk-btn-ink:#1a1d26;
+    --vk-btn-h:44px;--vk-warn:#c8553d;--vk-focus:#7bc6ff;--vk-dim:#0f111699;--vk-k:1;--vk-pic:320px;--vk-pic-vw:42vw}
+  :root.vk-big{--vk-k:1.25;--vk-pic:240px;--vk-pic-vw:32vw}
+  .vk-dim{position:fixed;inset:0;z-index:22;background:var(--vk-dim);display:flex;align-items:center;justify-content:center;padding:12px}
+  .vk-dim>.card[data-vcard]{background:var(--vk-bg);border:1px solid var(--vk-line);border-radius:var(--vk-radius);padding:14px 18px;max-width:min(94vw,720px);max-height:calc(100vh - 24px);overflow:auto;
+    box-shadow:0 12px 40px #000b;font:calc(15px * var(--vk-k))/1.5 var(--vk-font);color:var(--vk-ink);text-align:center}
+  .vk-dim>.card[data-vcard] .top{font-size:calc(12px * var(--vk-k));color:var(--vk-sub);margin-bottom:4px}
+  .vk-dim>.card[data-vcard] .q{font-size:calc(18px * var(--vk-k));font-weight:800;color:var(--vk-q);margin:4px 0 8px}
+  .vk-dim>.card[data-vcard] button{background:var(--vk-btn);color:var(--vk-btn-ink);border:none;border-radius:10px;min-height:var(--vk-btn-h);min-width:120px;padding:0 18px;
+    font-size:calc(16px * var(--vk-k));font-weight:800;cursor:pointer;margin-top:8px}
+  .vk-dim>.card[data-vcard] button:focus-visible{outline:3px solid var(--vk-focus);outline-offset:2px}
+  .vk-dim>.card[data-vcard] .vk-btns>button+button{margin-left:10px}
+  .vk-dim>.card[data-vcard] button.vk-sub{background:#262b38;color:var(--vk-ink);border:2px solid var(--vk-line)}
+  .vk-dim>.card[data-vcard] button.vk-warn{background:var(--vk-warn);color:#fff;border:2px solid #e8866e}
+  .vk-dim>.card[data-vcard] .vk-tools{display:flex;gap:6px;justify-content:flex-end;margin:-4px -6px 4px 0}
+  .vk-dim>.card[data-vcard] .vk-tools button{min-width:var(--vk-btn-h);padding:0 8px;margin-top:0;background:#262b38;color:var(--vk-ink);border:2px solid var(--vk-line);font-size:calc(18px * var(--vk-k))}
+  /* 시작 · 끝(kind start · end) 몸 — 옛 판 카드 CSS 그대로(감싸기들의 #stageCard 덮기와 세기가 같게 #stageCard 로) */
+  #stageCard .goal{font-size:calc(14px * var(--vk-k));color:#e8b04b;margin:2px 0}
+  #stageCard .pics{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+  #stageCard figure{margin:0}
+  #stageCard figure img,#stageCard figure .ph{width:min(var(--vk-pic-vw),var(--vk-pic));aspect-ratio:16/9;border:3px solid #fff;border-radius:6px;background:#222 center/cover;display:block;object-fit:cover}
+  #stageCard figure .ph{display:flex;align-items:center;justify-content:center;font-size:40px;color:#556}
+  #stageCard figcaption{font-size:calc(13px * var(--vk-k));color:#ffe9b8;font-weight:800;margin-top:3px}
+  #stageCard .see{font-size:calc(16px * var(--vk-k));margin:6px 0;letter-spacing:1px}
+  #stageCard .see small{font-size:calc(12px * var(--vk-k));color:var(--vk-sub);letter-spacing:0}
+  #stageCard .cur{font-size:calc(11px * var(--vk-k));color:#7d8394;margin-top:6px}
+  /* '크게' — 감싸기들이 따로 넣은 글(역할 줄 · 짐작 상자 · 지난/이번 줄)도 같은 배율로 */
+  :root.vk-big .vk-dim>.card[data-vcard="start"],:root.vk-big .vk-dim>.card[data-vcard="end"]{max-width:min(96vw,900px)}   /* 크게 — 판 카드는 글이 커진 만큼 넓히고(1366 에서 900) 목표는 줄지어(인라인) — 넘치면 줄이 아니라 폭으로 받는다 */
+  :root.vk-big #stageCard .goal{display:inline-block;margin:1px 10px}
+  :root.vk-big #stageCard .role{font-size:calc(14px * var(--vk-k))!important}
+  :root.vk-big #stageCard .pred .pq{font-size:calc(14px * var(--vk-k))}
+  :root.vk-big #stageCard .pred .pq b{font-size:calc(15px * var(--vk-k))}
+  :root.vk-big #stageCard .pred .po button{font-size:calc(14px * var(--vk-k))}
+  :root.vk-big #stageCard .pred .pn{font-size:calc(12px * var(--vk-k))}
+  :root.vk-big #stageCard .pend{font-size:calc(14px * var(--vk-k))}
+  :root.vk-big #stageCard button.skip{font-size:calc(13px * var(--vk-k))}
+  /* 되묻기(kind ask) — 맨 위(z 30) · 금 테두리 2px · 좁은 폭 · 사진 모드에선 숨음
+     옛 되묻기(askCss) 그대로 지키는 셋(PA-09 고침): 단추 글꼴 = 카드 글꼴(틀 단추 규칙엔 글꼴이 없어 UA 기본이 됐다 — 시작 · 끝 카드 단추는 옛날부터 UA 라 그대로) ·
+     커서 auto(카드 class 가 'card' 라 트레이 .card 의 손가락 커서가 먹었다 — 옛 .box 는 auto) · 둘째 줄 흐림 #c9ccd6(옛 .s 색 · 안 적으면 카드 글 색 #e8e6e0 이 된다) */
+  #askCard.vk-dim{z-index:30;padding:16px}
+  .vk-dim>.card[data-vcard="ask"]{border:2px solid var(--vk-btn);max-width:min(380px,100%);padding:16px 16px 14px;cursor:auto}
+  .vk-dim>.card[data-vcard="ask"] .s{margin-top:6px;color:#c9ccd6}
+  .vk-dim>.card[data-vcard="ask"] button{font-family:var(--vk-font)}
+  body.photo #askCard{display:none!important}
+</style>
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -14068,6 +14121,69 @@ function askCard(o, yes) {
   addEventListener('keydown', ASK.key, true);
   document.body.appendChild(bg); ASK.el = bg; no.focus(); }
 window.__ask = pick => { if (pick && ASK.el) ASK.el.querySelector(pick === 'ok' ? '.ok' : '.no').click(); return { 켜짐: window.VRULES.askCard.on, 떠있음: !!ASK.el, 글: ASK.el ? ASK.el.textContent : '', ...ASK.stats }; };
+/* ── [LK-CARD] 카드 틀 하나 — vcardShow({ kind, … }) · 판 카드(시작 · 끝)와 되묻기를 이 틀로 (build/D §LK · PA-09 · 엔진 사실 H17 #13 · 10-03 엔진 회신 §1) ──
+   틀 = 막(.vk-dim · --vk-dim) > 카드(.card[data-vcard=kind] — 바탕 · 테두리 · 모서리 · 글꼴) · 윗줄 .top · 물음 .q · 몸 · 단추 줄 .vk-btns(주 단추 = 금 ·
+        둘째 = 테 단추 .vk-sub · 되돌릴 수 없는 일 = .vk-warn · 지문이 읽는 주 단추 = .vk-go) · 🔊/🌐 자리 tools(A-SP · A-2L 이 채움 · 지금 쓰는 카드 0) ·
+        초점 가둠 trap(Tab 이 카드 안을 돎 — 되묻기만 · 시작 · 끝은 A-KB 에서). CSS 는 머리 [LK-LOOK] 한 곳(모습 표 변수).
+   · 시작 · 끝(scardShow 감싸기) — DOM 은 옛 꼴 그대로: #stageCard > .card > (html) + div > button. 감싸기 열둘이 기대는 것(id · 'card' class · scardTop ·
+     .card > div:last-child > button · go.onclick() · go.after(건너뛰기) · dataset.kind · SCARD.el · scardClose)을 지킨다.
+     단추는 명시적으로 묶는다 — 옛 꼴은 el.querySelector('button') 이라 html 에 단추가 섞이면 그 단추가 닫기로 묶였다(엔진 사실 ③).
+   · 되묻기(askCard 감싸기) — 물음 · 한 줄 · [그만두기](테) [확인](--vk-warn) · 처음 초점 = 그만두기 · Esc · 바깥 누름 = 그만두기 · 떠 있는 동안 게임 단축키 쉼(옛 그대로) + Tab 가둠.
+     ASK.el · ASK.key · .no · .ok · __ask 그대로. 틀 값으로 바뀌는 것(전부는 되먹임 표 docs/village_feedback/2026-10-13.md PA-09 '되묻기' 줄): 막 · 바탕 · 글 크기 · 그림자 · 물음 · 단추 크기 · 모서리 · 여백
+     (금 테두리 2px 는 둠 · 둘째 지문) · 옛 그대로 지키는 셋 = 단추 글꼴(카드 글꼴) · 커서 auto · 둘째 줄 #c9ccd6([LK-LOOK] · PA-09 고침 · dcheck lk 가 옛 askCss 와 견줌).
+   · 묵은 카드(LK_OLD): 화면을 덮는 막 · 카드 꼴 판 · 칩이 엔진에 서른 곳 넘게 있다(엔진 사실 ②) — 이 PR 이 옮긴 것은 시작 · 끝 · 되묻기뿐이다(둘은 되돌리기용 옛 CSS 가 남아 목록에 둠).
+     판 검사 stages.mjs 'LK ⑥' 은 이 목록 밖에 새로 생긴 fixed + 제 바탕(#…) CSS 만 REVIEW 로 본다('카드 틀을 쓰세요').
+   · '크게': VRULES.lookKit.big → :root.vk-big(카드 글 ×1.25 · 단추 높이 그대로 · 사진 상한 낮춤 · 판 카드 폭 900 · 목표 인라인). 켜는 길(해시 낱말 크게 · C0-H)은 뒤 PR — 지금은 시험 훅 __lookKit({ big }).
+   판정 · 저장 0 · 원래 줄 수정 0(scardShow · askCard · stageCardStart · stageCardEnd 감싸기). 스위치 VRULES.lookKit(보기) — on:false = 옛 scardShow · askCard 꼴(값이 같아 눈에 차이 0). */
+(window.VRULES = window.VRULES || {}).lookKit = { on: true, big: false };
+const LK = { kind: null, stats: { start: 0, end: 0, ask: 0, 그밖: 0, 크게켬: 0 } };
+const LK_VARS = ['bg', 'line', 'radius', 'font', 'ink', 'q', 'sub', 'btn', 'btn-ink', 'btn-h', 'warn', 'focus', 'dim'];
+const LK_OLD = ['top', 'saved', 'album', 'photoHint', 'shot', 'goals', 'guide', 'filebox', 'hist', 'friends', 'visitBar', 'mini', 'toast', 'why', 'tray', 'boot', 'err',
+  'jobsChip', 'voiceCard', 'chirpBtn', 'chirp', 'roadTag', 'waitHomes', 'hold', 'holdRing', 'viewPad', 'seat', 'vpop', 'snapCard', 'titleCard', 'calmBar',
+  'pmapBar', 'pmapCard', 'bubbleHelp', 'showEnd', 'stageReset', 'votePanel', 'stageCard', 'askCard'];   /* 옮긴 둘(stageCard · askCard)은 끝에 — 되돌리기용 옛 CSS(scardCss · askCss)가 남는다 */
+const lkOn = () => !!(window.VRULES.lookKit && window.VRULES.lookKit.on);
+function lkBig() { const on = lkOn() && !!window.VRULES.lookKit.big; try { document.documentElement.classList.toggle('vk-big', on); } catch (e) {} return on; }
+function lkBtn(b) { const x = document.createElement('button'); x.type = 'button'; const c = [b.go ? 'vk-go' : '', b.cls || ''].filter(Boolean).join(' '); if (c) x.className = c;
+  x.textContent = String(b.t == null ? '' : b.t); if (b.label) x.setAttribute('aria-label', b.label); if (b.on) x.onclick = b.on; return x; }
+function lkTrap(card, e) { const f = [...card.querySelectorAll('button, [href], input, select, textarea, [tabindex]')].filter(x => !x.disabled && x.tabIndex >= 0 && x.getClientRects().length > 0);
+  if (!f.length) return; const i = f.indexOf(document.activeElement), n = f.length; e.preventDefault(); f[i < 0 ? (e.shiftKey ? n - 1 : 0) : (i + (e.shiftKey ? n - 1 : 1)) % n].focus(); }
+/* o = { kind, id, role, top(html), q(글), html(몸 — 시작 · 끝은 옛 html 그대로), tools[], buttons[{ t, cls, go, on, label }], keys, trap, esc, backdrop, stop, focus } → { el, card, key, close } */
+function vcardShow(o) { o = o || {};
+  const kind = String(o.kind || 'card'), el = document.createElement('div'), card = document.createElement('div'); let key = null;
+  el.id = o.id || 'vcard_' + kind; el.className = 'vk-dim'; el.dataset.kind = kind; card.className = 'card'; card.setAttribute('data-vcard', kind);
+  if (o.role) { card.setAttribute('role', o.role); card.setAttribute('aria-modal', 'true'); }
+  if (Array.isArray(o.tools) && o.tools.length) { const t = document.createElement('div'); t.className = 'vk-tools'; o.tools.forEach(b => t.appendChild(lkBtn(b))); card.appendChild(t); }
+  if (o.top) card.insertAdjacentHTML('beforeend', '<div class="top">' + o.top + '</div>');
+  if (o.q != null) { const q = document.createElement('div'); q.className = 'q'; q.textContent = String(o.q); card.appendChild(q); }
+  if (o.html) card.insertAdjacentHTML('beforeend', o.html);
+  const row = document.createElement('div'); row.className = 'vk-btns'; (o.buttons || []).forEach(b => row.appendChild(lkBtn(b))); card.appendChild(row); el.appendChild(card);
+  if (o.stop) ['pointerdown', 'pointerup', 'click', 'wheel', 'contextmenu'].forEach(t => el.addEventListener(t, e => e.stopPropagation()));
+  if (o.backdrop) el.addEventListener('click', e => { if (e.target === el) o.backdrop(); });
+  if (o.keys || o.trap || o.esc) { key = e => { if (!el.isConnected) return; if (e.key === 'Escape' && o.esc) { e.preventDefault(); o.esc(); } else if (o.trap && e.key === 'Tab') lkTrap(card, e); if (o.keys) e.stopImmediatePropagation(); };
+    addEventListener('keydown', key, true); }
+  document.body.appendChild(el); lkBig(); LK.stats[kind in LK.stats ? kind : '그밖']++;
+  if (o.focus) { const f = card.querySelector(o.focus); if (f) f.focus(); }
+  return { el, card, key, close: () => { el.remove(); if (key) removeEventListener('keydown', key, true); } }; }
+{ const st0 = stageCardStart; stageCardStart = function () { const k = LK.kind; LK.kind = 'start'; try { return st0.apply(this, arguments); } finally { LK.kind = k; } };
+  const se0 = stageCardEnd; stageCardEnd = function () { const k = LK.kind; LK.kind = 'end'; try { return se0.apply(this, arguments); } finally { LK.kind = k; } };
+  const ss0 = scardShow; scardShow = function (html, btn, onClose) { if (!lkOn()) return ss0.apply(this, arguments);
+    scardClose(); const v = vcardShow({ kind: LK.kind || (btn === '시작' ? 'start' : 'end'), id: 'stageCard', html, buttons: [{ t: btn, go: true, on: () => { scardClose(); if (onClose) onClose(); } }] });
+    SCARD.el = v.el; };
+  const ak0 = askCard; askCard = function (o, yes) { if (!lkOn() || !window.VRULES.askCard.on) return ak0.apply(this, arguments);
+    askClose(); ASK.stats.물음++; const cancel = () => { askClose(); ASK.stats.그만++; };
+    const v = vcardShow({ kind: 'ask', id: 'askCard', role: 'alertdialog', q: o.q, html: o.sub ? '<div class="s">' + scardEsc(o.sub) + '</div>' : '',
+      buttons: [{ t: o.no || '그만두기', cls: 'vk-sub no', on: cancel }, { t: o.ok || '네', cls: 'vk-warn ok', go: true, on: () => { askClose(); ASK.stats.예++; yes(); } }],
+      keys: true, trap: true, esc: cancel, backdrop: cancel, stop: true, focus: '.no' });
+    ASK.el = v.el; ASK.key = v.key; }; }
+/* 시험 훅 — 모습 표 · 묵은 카드 목록 · '크게'(__lookKit({ big: true })) · 시험 카드 하나(__vcard({ kind, top, q, html, tools }) · __vcard(null) 닫기 — 새 kind 도 같은 틀인지 지문을 견준다) */
+window.__lookKit = o => { const R = window.VRULES.lookKit; if (o && typeof o === 'object' && 'big' in o) { R.big = !!o.big; if (R.big) LK.stats.크게켬++; lkBig(); }
+  let 표 = null, 떠있음 = []; try { const cs = getComputedStyle(document.documentElement); 표 = Object.fromEntries(LK_VARS.map(k => [k, cs.getPropertyValue('--vk-' + k).trim()])); } catch (e) {}
+  try { 떠있음 = [...document.querySelectorAll('.vk-dim')].map(x => x.dataset.kind); } catch (e) {}
+  return { 켜짐: !!R.on, 크게: lkOn() && !!R.big, 표, 떠있음, 옮긴카드: ['start', 'end', 'ask'], 묵은카드: LK_OLD.slice(),
+    팔레트: Object.fromEntries(Object.entries(P).map(([k, v]) => [k, '#' + v.toString(16).padStart(6, '0')])), ...LK.stats }; };
+window.__vcard = o => { const old = document.getElementById('vcardTest'); if (old) old.remove(); if (o === null) return null; const c = o || {};
+  const v = vcardShow({ kind: c.kind || 'test', id: 'vcardTest', top: c.top, q: c.q, html: c.html, tools: c.tools, buttons: [{ t: c.ok || '닫기', go: true, on: () => v.close() }] });
+  return { id: v.el.id, kind: v.el.dataset.kind }; };
 /* ── [ACT-SHOWMODE] 교실 TV '보여 주기 모드' ① 숨김 + 글씨 (설계 docs/village_tv_mode.md · 창조자 30회 §3 · 보스 09-24) ──
    1920×1080 교실 TV 에서 글씨(윗줄 13px · 토스트 13.5px)는 뒷자리에서 못 읽고, 아래 물건 상자가 화면의 17% 를 가렸다.
    📺 단추(사진 📷 옆) 또는 주소 ?show=1 로 켠다 · 오른쪽 아래 구석 [📺 끝] 또는 Esc 로 끈다.
