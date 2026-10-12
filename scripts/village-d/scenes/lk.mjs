@@ -1,13 +1,15 @@
 // 장면 lk — [LK-CARD] PA-09 같은 모습 잣대 · 카드 틀 하나(vcardShow): node scripts/village-d/dcheck.mjs --scene lk
 // build/D §LK 수용 시험 가운데 **지금 있는 카드만**(시작 · 끝 · 되묻기 — pick = PA-13 · qr = PA-14q · 양상 걷기 = PA-14a) · 엔진 사실 H17 #13:
-//   ① 틀 지문 — getComputedStyle {카드 바탕 · 모서리 · 글꼴 · 주 단추 바탕 · 높이 · 초점 테 색}이 시작 카드 지문과 같음(끝 · 시험 kind 한 장) ·
-//      되묻기 = 둘째 지문(주 단추 = --vk-warn · 금 테두리 2px) · 셋 다 틀 표지(막 .vk-dim · 카드 data-vcard)
+//   ① 틀 지문 — getComputedStyle {카드 바탕 · 모서리 · 글꼴 · 주 단추 바탕 · 높이 · 글꼴 · 초점 테 색}이 시작 카드 지문과 같음(끝 · 시험 kind 한 장) ·
+//      되묻기 = 둘째 지문(주 단추 = --vk-warn · 금 테두리 2px) · 셋 다 틀 표지(막 .vk-dim · 카드 data-vcard) ·
+//      되묻기 옛 그대로 셋(단추 글꼴 = 카드 글꼴 · 커서 auto · 둘째 줄 #c9ccd6 — 시작 카드 단추는 옛날부터 UA 글꼴이라 둘째 지문 쪽 · 되돌리기에서 옛 askCss 와 견줌)
 //   ② 넘침 — 카드가 뜨는 판 전부 × 시작 · 끝 · 되묻기 × 보통 · 크게: card.scrollHeight ≤ clientHeight + 주 단추([시작] · [닫기] · [↺]) bottom ≤ innerHeight
 //      ('카드 높이 ≤ 586' · '1366×610 넘침 0' 은 CSS max-height · overflow:auto 때문에 늘 참 — 그 잣대는 쓰지 않는다)
 //   ③ 겹침 — 카드가 뜬 동안 #cv 보임 · 막 불투명도 < 1 · 카드 밖 화면이 마을 그림(색이 여럿)
 //   ④ 💬 · ❓ · 카드 — 자유 모드(판 없음 · 판 카드만 한 시험 카드) 1366×610 보통 · 크게 · 900×610: 카드 단추 · 🔊 자리가 맨 위 · 💬 · ❓ 는 막 아래 ·
 //      겹친 넓이 1366×610 은 0 · 900×610 은 적기만(카드가 위)
-//   손: 되묻기 처음 초점 = 그만두기 · Tab · Shift+Tab 가둠 · Esc · 바깥 누름 = 그만두기(CDP 진짜 키 · 마우스) · 몸 안 단추는 카드를 안 닫음(단추 명시적 묶기)
+//   손: 되묻기 처음 초점 = 그만두기 · Tab · Shift+Tab 가둠 · Esc · 바깥 누름 = 그만두기(CDP 진짜 키 · 마우스) · 몸 안 단추는 카드를 안 닫음(단추 명시적 묶기) ·
+//      떠 있는 동안 게임 단축키 쉼(KeyD → __pan(0,0) 그대로) · 카드 안 · 막 누름은 window pointerdown 0(옛 ACT-ASKCARD 그대로) — 닫은 뒤 양성 대조(같은 KeyD 가 카메라를 옮김 · 누름이 window 에 감)
 //      (H16 '수업 판에 💬 #chirpBtn 0' 은 💬 기본 끔이 들어오는 PA-07 뒤 — 여기선 '대기'로 지금 수만 적는다)
 //   ⑤ 되돌리기 — VRULES.lookKit.on = false 면 옛 꼴(틀 표지 0)로 뜨고 지문은 같음
 //   양성 대조(헛 PASS 막기): 긴 글을 넣은 카드 → 넘침 잣대가 잡음 · 지문 한 칸(모서리)을 바꾸면 잡음 · 막을 불투명하게 하면 '마을 그림' 잣대가 잡음 · 크게가 실제로 글을 키움
@@ -20,9 +22,10 @@ const HELP = `window.__lkT = (() => {
   const R = r => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), r: Math.round(r.right), b: Math.round(r.bottom) });
   return {
     has: s => !!q(s),
-    fp(s) { const el = q(s), c = cardOf(el), g = goOf(c); if (!c) return null; const cs = getComputedStyle(c), bs = g ? getComputedStyle(g) : null;
+    fp(s) { const el = q(s), c = cardOf(el), g = goOf(c); if (!c) return null; const cs = getComputedStyle(c), bs = g ? getComputedStyle(g) : null, sub = c.querySelector(':scope > .s');
       return { 바탕: cs.backgroundColor, 모서리: cs.borderTopLeftRadius, 글꼴: cs.fontFamily, 테: cs.borderTopWidth + ' ' + cs.borderTopStyle + ' ' + cs.borderTopColor,
-        단추바탕: bs && bs.backgroundColor, 단추높이: bs && bs.minHeight, 단추글: g && g.textContent.trim(), 틀: el.classList.contains('vk-dim') && c.hasAttribute('data-vcard'), kind: c.getAttribute('data-vcard') || null }; },
+        단추바탕: bs && bs.backgroundColor, 단추높이: bs && bs.minHeight, 단추글꼴: bs && bs.fontFamily, 단추글: g && g.textContent.trim(), 커서: cs.cursor, 둘째색: sub ? getComputedStyle(sub).color : null,
+        틀: el.classList.contains('vk-dim') && c.hasAttribute('data-vcard'), kind: c.getAttribute('data-vcard') || null }; },
     of(s) { const el = q(s), c = cardOf(el), g = goOf(c); if (!c) return null; const r = c.getBoundingClientRect(), b = g ? g.getBoundingClientRect() : null;
       return { 스크롤: c.scrollHeight, 보임: c.clientHeight, 높이: Math.round(r.height), 아래: Math.round(r.bottom), 단추아래: b ? Math.round(b.bottom * 10) / 10 : null, 창: innerHeight,
         글: parseFloat(getComputedStyle(c).fontSize), ok: c.scrollHeight <= c.clientHeight && !!b && b.bottom <= innerHeight && b.top >= 0 }; },
@@ -61,7 +64,8 @@ export default async function lk(ctx) {
       await ctx.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }); forceOk = true; return v; } catch (e) { forceOk = false; return 'ERR ' + String(e.message || e).slice(0, 60); } };
   const fpFull = async (dim, goSel) => { const f = await P(`window.__lkT.fp(${J(dim)})`); if (f) f.초점 = await focusFp(goSel); return f; };
   const same = (a, b, keys) => keys.every(k => a && b && a[k] === b[k]);
-  const FPK = ['바탕', '모서리', '글꼴', '단추바탕', '단추높이', '초점'], FPK2 = ['바탕', '모서리', '글꼴', '단추높이', '초점'];
+  const FPK = ['바탕', '모서리', '글꼴', '단추바탕', '단추높이', '단추글꼴', '초점'], FPK2 = ['바탕', '모서리', '글꼴', '단추높이', '초점'];   /* 되묻기는 단추 바탕(--vk-warn)과 단추 글꼴(카드 글꼴 — 옛 askCss)이 둘째 지문 */
+  const ASK3 = f => !!f && f.단추글꼴 === f.글꼴 && f.커서 === 'auto' && f.둘째색 === 'rgb(201, 204, 214)';   /* 되묻기 옛 그대로 셋(PA-09 고침) — 단추 글꼴 = 카드 글꼴 · 커서 auto · 둘째 줄 #c9ccd6 */
   const out = { 판: [], 지문: {}, 대조: {}, 자유: {}, 되돌리기: {}, 대기: {} };
   let startFp = null;
 
@@ -112,6 +116,7 @@ export default async function lk(ctx) {
         const fp = await fpFull('#askCard', '#askCard .vk-go');
         ctx.expect(fp && fp.틀 && fp.kind === 'ask' && same(fp, startFp, FPK2) && fp.단추바탕 === 'rgb(200, 85, 61)' && /^2px solid rgb\(232, 176, 75\)$/.test(fp.테),
           id + ' 되묻기 = 틀 · 지문 = 시작 카드(둘째 지문: 주 단추 --vk-warn · 금 테 2px) ' + J(fp && { 단추바탕: fp.단추바탕, 테: fp.테, 초점: fp.초점 }));
+        ctx.expect(ASK3(fp), id + ' 되묻기 옛 그대로 셋 — 단추 글꼴 = 카드 글꼴 · 커서 auto · 둘째 줄 #c9ccd6 ' + J(fp && { 단추글꼴: fp.단추글꼴, 글꼴: fp.글꼴, 커서: fp.커서, 둘째색: fp.둘째색 }));
         if (!out.지문.되묻기) out.지문.되묻기 = fp;
         row.되묻기 = await measure(id, '#askCard', '되묻기');
         const f0 = await P('document.activeElement && document.activeElement.className');
@@ -143,27 +148,42 @@ export default async function lk(ctx) {
     const k1 = await P(`(() => { const c = document.querySelector('#stageCard > .card'), f = c.querySelector('figure img, figure .ph'); return { 글: parseFloat(getComputedStyle(c).fontSize), 사진: f ? Math.round(f.getBoundingClientRect().width) : null }; })()`);
     await big(false); out.대조.크게 = { 보통: k0, 크게: k1 };
     ctx.expect(k0.글 === 15 && k1.글 === 18.75 && k1.사진 < k0.사진, `대조 — 크게 = 글 ${k0.글} → ${k1.글}px · 사진 ${k0.사진} → ${k1.사진}px`);
-    /* 되묻기 손 — Tab · Shift+Tab 이 카드 안에서 돎(초점 가둠) · Esc · 바깥 누름 = 그만두기(ACT-ASKCARD 옛 동작 그대로) — 진짜 키 · 마우스(CDP) */
+    /* 되묻기 손 — Tab · Shift+Tab 이 카드 안에서 돎(초점 가둠) · Esc · 바깥 누름 = 그만두기 · 떠 있는 동안 게임 단축키 쉼 · 카드 안 · 막 누름은 window 에 안 감(ACT-ASKCARD 옛 동작 그대로) — 진짜 키 · 마우스(CDP)
+       단축키 = KeyD(WASD 카메라 — window 거품 손잡이 · 한 번 톡에 바로 옮김) → __pan(0,0) 그대로 · 누름 = window 거품 pointerdown 수(게임의 window 손잡이 자리) ·
+       양성 대조: 카드를 닫은 뒤엔 같은 KeyD 가 카메라를 옮기고 · 누름이 window 에 간다(틀의 keys · stop 을 빼면 FAIL — PA-09 고침) */
     await P(`window.__lkT.close('#stageCard')`); await settle(20, 300);
     const key = async (k, code, vk, mod = 0) => { for (const type of ['keyDown', 'keyUp']) await ctx.send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: mod }); await sl(60); };
+    const press = async (x, y) => { for (const type of ['mousePressed', 'mouseReleased']) await ctx.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 }); await sl(100); };
     const act = () => P(`(document.activeElement && document.activeElement.closest('#askCard') ? document.activeElement.className : 'out:' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)))`);
+    const cam = () => P(`(() => { const c = window.__pan(0, 0); return c.x + ',' + c.z; })()`), ptr0 = () => E('window.__lkPtr = 0; return 1'), ptr = () => P('window.__lkPtr');
+    await E(`if (!window.__lkPtrOn) { window.__lkPtrOn = true; addEventListener('pointerdown', () => { window.__lkPtr++; }); } window.__lkPtr = 0; return 1`);
     if (await P('window.__lkT.reset()')) { await settle(4, 150); const f = [await act()];
       await key('Tab', 'Tab', 9); f.push(await act()); await key('Tab', 'Tab', 9); f.push(await act()); await key('Tab', 'Tab', 9, 8); f.push(await act());
+      const c0 = await cam(); await key('d', 'KeyD', 68); await ctx.pump(8); const c1 = await cam();
+      const qp = await P(`(() => { const e = document.querySelector('#askCard .q'); if (!e) return null; const r = e.getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; })()`);
+      await ptr0(); if (qp) await press(qp[0], qp[1]); const 안 = { 열림: await P(`window.__lkT.has('#askCard')`), 창: await ptr() };
       const n0 = await P('window.__ask().그만'); await key('Escape', 'Escape', 27); const esc = { 닫힘: !(await P(`window.__lkT.has('#askCard')`)), 그만: (await P('window.__ask().그만')) - n0 };
+      const c2 = await cam(); await key('d', 'KeyD', 68); await ctx.pump(8); const c3 = await cam(); await ptr0(); await press(6, 300); const 닫은뒤 = { 카메라: [c2, c3], 창: await ptr() };
       await P('window.__lkT.reset()'); await settle(4, 150);
-      for (const type of ['mousePressed', 'mouseReleased']) await ctx.send('Input.dispatchMouseEvent', { type, x: 6, y: 300, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
-      await sl(100); const out0 = { 닫힘: !(await P(`window.__lkT.has('#askCard')`)), 그만: (await P('window.__ask().그만')) - n0 };
-      out.대조.되묻기손 = { 초점: f, Esc: esc, 바깥: out0 };
+      await ptr0(); await press(6, 300); const out0 = { 닫힘: !(await P(`window.__lkT.has('#askCard')`)), 그만: (await P('window.__ask().그만')) - n0, 창: await ptr() };
+      out.대조.되묻기손 = { 초점: f, Esc: esc, 바깥: out0, 떠있는동안: { 카메라: [c0, c1], 안누름: 안, 누른곳: qp }, 닫은뒤 };
       ctx.expect(J(f) === J(['vk-sub no', 'vk-go vk-warn ok', 'vk-sub no', 'vk-go vk-warn ok']), '되묻기 초점 가둠 — 그만두기 → Tab 확인 → Tab 그만두기 → Shift+Tab 확인 ' + J(f));
-      ctx.expect(esc.닫힘 && esc.그만 === 1 && out0.닫힘 && out0.그만 === 2, '되묻기 Esc · 바깥 누름 = 그만두기 ' + J({ esc, out0 })); }
+      ctx.expect(esc.닫힘 && esc.그만 === 1 && out0.닫힘 && out0.그만 === 2, '되묻기 Esc · 바깥 누름 = 그만두기 ' + J({ esc, out0 }));
+      ctx.expect(!!qp && c0 === c1 && 안.열림 && 안.창 === 0 && out0.창 === 0, `되묻기 떠 있는 동안 — KeyD 카메라 그대로(${c0} → ${c1}) · 카드 안 누름은 안 닫고 window pointerdown ${안.창} · 막 누름도 window ${out0.창}(0 이어야)`);
+      ctx.expect(c2 !== c3 && 닫은뒤.창 >= 1, `양성 대조 — 닫은 뒤엔 같은 KeyD 가 카메라를 옮김(${c2} → ${c3}) · 누름이 window 에 감(${닫은뒤.창})`); }
     else ctx.expect(false, C0 + ' 에 ↺ 처음부터가 없음(되묻기 손 시험)');
     /* ⑤ 되돌리기 — lookKit 끔: 끝 카드 · 되묻기가 옛 꼴로 뜨고 지문은 같다 */
     await E('window.VRULES.lookKit.on = false; window.__stageEnd(); return 1'); await settle(10, 300);
     const oe = await P(`window.__lkT.fp('#stageCard')`); if (oe) oe.초점 = await focusFp('#stageCard > .card > div:last-child > button');
-    out.되돌리기.끝 = oe; ctx.expect(oe && !oe.틀 && same(oe, startFp, ['바탕', '모서리', '글꼴', '단추바탕', '단추높이']), '되돌리기 — lookKit 끔이면 끝 카드가 옛 꼴(틀 표지 0) · 지문 같음 ' + J(oe && { 틀: oe.틀, 초점: oe.초점 }));
+    out.되돌리기.끝 = oe; ctx.expect(oe && !oe.틀 && same(oe, startFp, ['바탕', '모서리', '글꼴', '단추바탕', '단추높이', '단추글꼴']), '되돌리기 — lookKit 끔이면 끝 카드가 옛 꼴(틀 표지 0) · 지문 같음(단추 글꼴까지) ' + J(oe && { 틀: oe.틀, 단추글꼴: oe.단추글꼴, 초점: oe.초점 }));
     await P(`window.__lkT.close('#stageCard')`); await settle(10, 200);
     if (await P('window.__lkT.reset()')) { await settle(4, 150); const oa = await P(`!!document.querySelector('#askCard > .box') && !document.querySelector('#askCard.vk-dim')`);
-      out.되돌리기.되묻기 = oa; ctx.expect(oa, '되돌리기 — lookKit 끔이면 되묻기도 옛 꼴(#askCard > .box)'); await E(`window.__ask('no'); return 1`); }
+      /* 되묻기 옛 그대로 셋 — 옛 askCss(.box) 의 단추 글꼴 · 커서 · 둘째 줄 색이 틀 되묻기(위 첫 판 지문)와 같은가(PA-09 고침 · 옛 CSS 가 정본) */
+      const ov = await P(`(() => { const b = document.querySelector('#askCard > .box'), s = b && b.querySelector('.s'), n = b && b.querySelector('button.ok'); return b ? { 단추글꼴: n ? getComputedStyle(n).fontFamily : null, 커서: getComputedStyle(b).cursor, 둘째색: s ? getComputedStyle(s).color : null } : null; })()`);
+      const nv = out.지문.되묻기 || null, n3 = nv && { 단추글꼴: nv.단추글꼴, 커서: nv.커서, 둘째색: nv.둘째색 };
+      out.되돌리기.되묻기 = { 옛꼴: oa, 옛: ov, 틀: n3 }; ctx.expect(oa, '되돌리기 — lookKit 끔이면 되묻기도 옛 꼴(#askCard > .box)');
+      ctx.expect(!!ov && !!n3 && J(ov) === J(n3), '되묻기 옛 그대로 셋 = 옛 askCss 와 같음(단추 글꼴 · 커서 · 둘째 줄 색) ' + J({ 옛: ov, 틀: n3 }));
+      await E(`window.__ask('no'); return 1`); }
     await E('window.VRULES.lookKit.on = true; return 1');
   } else ctx.expect(false, '대조 판 ' + C0 + ' 시작 카드가 안 뜸');
 
