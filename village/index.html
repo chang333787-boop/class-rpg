@@ -11501,6 +11501,35 @@ const ESEED = { on: false, seed: null, tool: typeof window.__SIM_RAND === 'funct
     return esTick0.apply(this, arguments); }; }
 window.__eseed = () => ({ 켜짐: window.VRULES.eseed.on, 판시드: ESEED.on ? ESEED.seed : null, 줄기: ESEED.tool ? '도구(__SIM_RAND)' : ESEED.on ? '판 시드' : 'Math.random',
   틱머리: ESEED.on && window.VRULES.eseed.tickSync !== false, ...ESEED.stats });
+/* ── [MAC-CAMP] PA-05 수업 판 멈춤 — 판 규칙 층(CAMP) 뼈대 최소 (기획 build/C §3 PR⑦ · 엔진 사실 H17 · 10-03 엔진 회신 §1-2) ──
+   판 파일 `판규칙` = 그 판 안에서만 켜는 규칙 칸. 이번에 짓는 것 = 읽기(campRead) + `멈춤` 의 이사 · 층자람 고리 둘.
+   · campRead: 흰 목록(CAMP.흰목록 — build/C §3 정본 표의 키) 밖 키는 버리고 적어 둔다. 덮기마다 `뜻` 한 줄이 없으면 적어만 둔다(엔진은 쓰고 판 검사가 FAIL).
+     판규칙이 없거나 비면 CAMP 는 통째로 잠잠하다 — 기본 마을 · 자유 놀이 · 판규칙 없는 판은 한 줄도 안 달라진다(vsref 0).
+   · 멈춤.이사 = tryMoveIn 머리. 새 이웃은 모두 여기서 나온다(조용한 이사 moveInQuiet 도 그 안에서만 불림 · 돌아섰다 다시 오는 이는 먼저 걸어온 이가 있어야 생김).
+     멈춤.층자람 = growHouse 머리. 둘 다 hookable 이 아니라 다시 대입으로 감싼다 — 이름으로만 불리고 값으로 붙잡은 곳(setTimeout · 이벤트 · 객체 칸)은 0.
+     멈춤.성장 은 받되 고리가 없다(growTick 은 나무 · 꽃이 자라는 보기 · 인구와 무관). 땅고르기 · 생산 · 일자리 는 키만 받는다(고리는 뒤 PR).
+   · 층자람을 막아도 satTick 은 조건이 찬 집에 growHouse 를 계속 다시 부른다(그림 · 말 0) — 멈춤을 풀면 그런 집이 한꺼번에 한 층 오른다.
+   · 자리: 판 읽기 블록 바로 뒤 = 첫 틱 전(뒤에 선언되는 이름은 건드리지 않는다 — TDZ). 판 `규칙` 으로 camp 를 덮는 길은 module 끝이라 늦어 판 검사가 FAIL 로 막는다.
+   · 스위치 VRULES.camp(rules.json '때' — 셈 식은 그대로 두고 판이 그 일을 세운다) — on:false = 판규칙이 없는 판과 같은 동작(도구 · 콘솔용). 저장 0 · 화면 0 · 원래 줄 수정 0. 시험 훅 __campStats. */
+(window.VRULES = window.VRULES || {}).camp = { on: true };
+const CAMP = { 흰목록: ['판수치', '판필요', '필요목록', '멈춤', '잠김', '결정', '차로', '판정', '뚫림', '시든칸쉼', '뱃길', '목표셈', '입구'],
+  멈춤키: ['이사', '성장', '층자람', '땅고르기', '생산', '일자리'], 고리: ['이사', '층자람'], 읽는칸: ['멈춤'],
+  def: null, 모르는키: [], 뜻없음: [], 꼴틀림: false, stats: { 이사막음: 0, 층막음: 0 } };
+function campRead(p) { if (p == null) return null;
+  if (typeof p !== 'object' || Array.isArray(p)) { CAMP.꼴틀림 = true; return null; }
+  const out = {}, 뜻 = v => !!(v && typeof v === 'object' && typeof v.뜻 === 'string' && v.뜻.trim());
+  Object.keys(p).forEach(k => { const v = p[k];
+    if (!CAMP.흰목록.includes(k)) { CAMP.모르는키.push(k); return; }
+    if (k !== '목표셈' && !(Array.isArray(v) ? v.length && v.every(뜻) : 뜻(v))) CAMP.뜻없음.push(k);
+    out[k] = v; });
+  return Object.keys(out).length ? out : null; }
+CAMP.def = campRead(STAGE.def ? STAGE.def.판규칙 : null);
+const campStop = k => !!(window.VRULES.camp.on && CAMP.def && CAMP.def.멈춤 && CAMP.def.멈춤[k] === true);
+{ const cpMove0 = tryMoveIn; tryMoveIn = function () { if (campStop('이사')) { CAMP.stats.이사막음++; return; } return cpMove0.apply(this, arguments); }; }
+{ const cpGrow0 = growHouse; growHouse = function () { if (campStop('층자람')) { CAMP.stats.층막음++; return; } return cpGrow0.apply(this, arguments); }; }
+window.__campStats = () => ({ 켜짐: window.VRULES.camp.on, 판규칙: CAMP.def ? Object.keys(CAMP.def) : null, 꼴틀림: CAMP.꼴틀림,
+  멈춤: CAMP.멈춤키.filter(k => !!(CAMP.def && CAMP.def.멈춤 && CAMP.def.멈춤[k] === true)), 지금막음: CAMP.고리.filter(campStop),
+  모르는키: CAMP.모르는키.slice(), 뜻없음: CAMP.뜻없음.slice(), 흰목록: CAMP.흰목록.slice(), 멈춤키: CAMP.멈춤키.slice(), 고리: CAMP.고리.slice(), 읽는칸: CAMP.읽는칸.slice(), ...CAMP.stats });
 /* ── [MAC-TERRAIN] 환경이 선택을 만드는 판 — 지형 바닥 + 칠하기 (설계 docs/village_environment_boards.md #898 · 보스 09-23 승인 · 바다 판 먼저: 물 · 모래) ──
    판 파일 `지형: { 칸: [[x0, y0, x1, y1, '물'|'모래'], …] }`(뒤엣것이 앞엣것을 덮음). 지형은 **물건이 아니라 바닥**이다 — 칸(cells)에 들어가지 않으니
    치우기·옮기기로 없어지지 않고, 저장본에도 안 들어간다(판 파일에만).
