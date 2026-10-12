@@ -9,6 +9,7 @@
 //   --soft(GPU 가 안 잡힐 때만 CPU 그리기) · --view 1366,610 · --fps 30 · --rest 5(판 사이 초)
 //   --input  판마다 60초 뒤 입력 단계(흰 공 · 반응 · 말 충돌 — 집 하나를 누르고 빈 집 하나를 치운다 · 판이 바뀌므로 잰 것 뒤에)
 // ⚠ 무겁다(판마다 60초) — 사람·연기를 건드린 PR 에서만 돌린다(보스 09-24).
+// 재기 전에 안내 · 판 카드를 없어질 때까지 닫고(짐작 상자 카드는 '건너뛰기'), 시계가 안 돌면(쥔 이 남음 · 준비 시간 틱 0 · 잰 동안 틱 0) 그 판은 FAIL(헛 PASS 막기 · PA-06).
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import http from 'node:http'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -47,8 +48,16 @@ const SEC = ${SEC}, HOUR = ${HOUR == null ? 'null' : +HOUR}, WARM = ${WARM};
 const sleep = ms => new Promise(r => setTimeout(r, ms)), PASS_LONG = ${PASS.오래포갬ms}, PASS_FR = ${PASS.오래포갬프레임};
 for (let k = 0; k < 80 && window.__LOADMS == null; k++) await sleep(250);
 if (window.__LOADMS == null) return { 오류: '부팅 안 됨' };
-[...document.querySelectorAll('button')].filter(x => ['시작', '닫기'].includes(x.textContent.trim()) && x.offsetParent).forEach(b => b.click());
-if (HOUR != null && window.__setHour) { window.__setHour(HOUR); await sleep(WARM * 1000); }   /* 시각을 건너뛴 직후 몇 프레임은 사람이 한꺼번에 나오며 벽 안에 그려진다(09-23 farm · 0.26초 안 · 저절로 나올 땐 0) — 준비 시간 */
+/* [PA-06] 안내 · 판 카드가 없어질 때까지 닫는다(1.5초 조용할 때까지 · 15초 안 — village-look shots.mjs 와 같은 꼴). 짐작 상자가 있는 시작 카드는 [시작]이 꺼져 있어
+   (짐작을 골라야 켜짐) '건너뛰기'로 닫는다 — 시작 카드는 시계를 쥔다([MAC-CLOCK]) · 한 번만 눌러 카드가 남으면 얼어붙은 마을을 재 헛 PASS 였다(town3 · farm/city/sea/mountain+mid36) */
+{ let quiet = 0; for (let k = 0; k < 60 && quiet < 6; k++) { const bs = [...document.querySelectorAll('button')].filter(b => ['시작', '건너뛰기', '닫기'].includes(b.textContent.trim()) && b.offsetParent && !b.disabled);
+    bs.forEach(b => b.click()); const g = document.getElementById('guide'); quiet = bs.length || (g && g.classList.contains('show')) || document.getElementById('stageCard') ? 0 : quiet + 1; await sleep(250); } }
+const tick = () => typeof window.__sim === 'function' ? window.__sim().틱 : null, k0 = tick();
+if (HOUR != null && window.__setHour) { window.__setHour(HOUR); await sleep(WARM * 1000); } else await sleep(1000);   /* 시각을 건너뛴 직후 몇 프레임은 사람이 한꺼번에 나오며 벽 안에 그려진다(09-23 farm · 0.26초 안 · 저절로 나올 땐 0) — 준비 시간 */
+/* 시계가 도는지 — 서 있으면 아무도 안 움직여 튐 · 포갬 · 벽 통과가 0 으로 PASS 한다(헛 PASS). 쥔 이가 남았거나 준비 시간에 틱이 안 늘면 재지 않고 FAIL */
+const k1 = tick(), clk = typeof window.__clockHold === 'function' ? window.__clockHold() : null;
+if (clk && clk.쥔.length) return { 오류: '시계 쥠(' + clk.쥔.join(',') + ') — 카드 · 안내가 안 닫힘' };
+if (k0 != null && k1 <= k0) return { 오류: '시계 멈춤(준비 시간 틱 ' + k0 + ' → ' + k1 + ')' };
 const has = h => typeof window[h] === 'function', e0 = has('__errors') ? window.__errors() : null;
 /* 우표 마을 — 놓인 물건의 화면 폭 ÷ 창 폭 */
 let 우표 = null; try { const cs = (window.__snapshot().물건 || []).map(t => /@(\\d+),(\\d+)/.exec(t)).filter(Boolean).map(m => [+m[1], +m[2]]);
@@ -80,7 +89,7 @@ await new Promise(done => { const f = () => { const now = performance.now() - t0
 obs.disconnect();
 const e1 = has('__errors') ? window.__errors() : null, g = has('__gfx') ? window.__gfx() : null;
 const 렌더러 = (() => { try { const c = document.querySelector('canvas'), g = c && (c.getContext('webgl2') || c.getContext('webgl')), e = g && g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : null; } catch (err) { return null; } })();
-return { ...R, 렌더러, 오래포갬: longOv.size, 오래포갬예: [...longOv.values()].slice(0, 3).map(e => e.kind + ' @' + Math.round(e.t / 1000) + 's'), 한칸박자: R.박자표본 ? +(R.박자합 / R.박자표본).toFixed(2) : null, 우표, 빈30초말: said.filter(s => s[0] < 30000).length, 말: said.slice(0, 5), 삼킨오류: e1 && e0 ? (e1.삼킨오류 || 0) + (e1.덮개 || 0) - (e0.삼킨오류 || 0) - (e0.덮개 || 0) : null, 오류예: e1 ? e1.목록.slice(0, 2).map(x => x.말 + '@' + x.줄) : [], 저장멈춤: e1 ? !!e1.저장꺼짐 : null, 프레임평균ms: g ? g.프레임평균ms : null, 놓친비율: g ? g.놓친비율 : null };`;
+return { ...R, 렌더러, 틱: [k1, tick()], 오래포갬: longOv.size, 오래포갬예: [...longOv.values()].slice(0, 3).map(e => e.kind + ' @' + Math.round(e.t / 1000) + 's'), 한칸박자: R.박자표본 ? +(R.박자합 / R.박자표본).toFixed(2) : null, 우표, 빈30초말: said.filter(s => s[0] < 30000).length, 말: said.slice(0, 5), 삼킨오류: e1 && e0 ? (e1.삼킨오류 || 0) + (e1.덮개 || 0) - (e0.삼킨오류 || 0) - (e0.덮개 || 0) : null, 오류예: e1 ? e1.목록.slice(0, 2).map(x => x.말 + '@' + x.줄) : [], 저장멈춤: e1 ? !!e1.저장꺼짐 : null, 프레임평균ms: g ? g.프레임평균ms : null, 놓친비율: g ? g.놓친비율 : null };`;
 
 /* ── 입력 단계(--input) — 입력은 CDP 마우스(진짜 포인터 사건) · 기록은 페이지 안 MutationObserver(#toast · #why) ──
    흰 공: 풍선 판의 세계 크기 × (월드 1 의 화면 px) × 그림 원 60/64 — 얼굴 2.2(MAC-BUBBLEMIN 이 키운 뒤 · __bubbleMin().지금지름px) · 말 표(🪣✓ 꼴 · 안 키움) 3.6. (09-25 고침: 전엔 한칸px(칸 대각선)로 셈해 √2 배 컸고 얼굴 키움을 안 봤다 — 실제 사진 픽셀로 맞춤) 24px 아래면 그림이 안 읽힌다(창조자 25회 ⓑ48 제안 기준 · 주의만).
@@ -153,7 +162,7 @@ for (const x of results) {
   if (x.오류) { L.push(`| ${x.판} | 오류: ${x.오류} |||||||||||||| FAIL |`); continue; }
   const 쌍 = x.포갬쌍합 / Math.max(1, x.표본), 오류 = (x.페이지오류 || 0) + (x.삼킨오류 || 0);
   const I = x.입력 || null, 충돌 = I && [I.누름, I.치우기].some(a => a && a.충돌), 느림 = I && [I.누름, I.치우기].some(a => a && a.반응ms > PASS.반응ms);
-  const fail = [x.오래포갬 && '오래 포갬', x.줄세움표본 && '줄 세움', x.벽통과표본 && '벽 통과', x.튐 && '튐', x.갇힘표본 && '갇힘', 오류 && '오류', 충돌 && '말 충돌'].filter(Boolean);
+  const fail = [x.오래포갬 && '오래 포갬', x.줄세움표본 && '줄 세움', x.벽통과표본 && '벽 통과', x.튐 && '튐', x.갇힘표본 && '갇힘', 오류 && '오류', 충돌 && '말 충돌', x.틱 && x.틱[0] != null && !(x.틱[1] > x.틱[0]) && '시계 멈춤'].filter(Boolean);
   const warn = [쌍 > PASS.포갬쌍 && '포갬 평균', x.한칸박자 != null && x.한칸박자 > PASS.한칸박자 && '한 칸 박자', x.우표 != null && x.우표 < PASS.우표 && '우표 마을', SEC >= 30 && x.빈30초말 === 0 && '빈 30초', x.프레임평균ms > PASS.프레임ms && '프레임', 느림 && '반응 느림', I && I.흰공 && I.흰공.얼굴 < PASS.흰공px && '흰 공'].filter(Boolean);
   x.판정 = fail.length ? 'FAIL(' + fail.join('·') + ')' : x.사람최대 ? 'PASS' : 'REVIEW(사람 0 · 잴 게 없다)'; x.주의 = warn;
   L.push(`| ${x.판} | ${x.사람최대} | ${x.오래포갬}${x.오래포갬예.length ? ' (' + x.오래포갬예.join(', ') + ')' : ''} | ${r2(쌍)} (${x.스침}) | ${r2(x.한칸박자)} | ${pct(x.셈포갬표본, x.표본)} | ${pct(x.줄세움표본, x.표본)} | ${x.벽통과표본}${x.벽예.length ? ' (' + x.벽예.join(', ') + ')' : ''} | ${x.튐}${x.튐예.length ? ' (' + x.튐예.join(', ') + ')' : ''} | ${x.갇힘표본} | ${오류} | ${r2(x.우표)} | ${x.빈30초말} | ${r2(x.프레임평균ms)} | ${x.긴프레임}${x.긴프레임 ? ' (최대 ' + x.긴프레임최대ms + 'ms)' : ''} | **${x.판정}**${warn.length ? ' · 주의: ' + warn.join('·') : ''} |`);
@@ -163,7 +172,7 @@ if (INPUT) { const one = a => !a ? '—' : a.없음 ? '(' + a.없음 + ')' : (a.
     '| 판 | 흰 공 px(얼굴 · 말 표) | 누름: 반응 · 말 | 치우기: 반응 · 말 | 말 충돌 |', '|---|---|---|---|---|');
   for (const x of results) { const I = x.입력; if (!I) continue; if (I.오류) { L.push(`| ${x.판} | 오류: ${I.오류} |||| `); continue; }
     L.push(`| ${x.판} | ${I.흰공.얼굴} · ${I.흰공.말표} | ${one(I.누름)} | ${one(I.치우기)} | ${[I.누름, I.치우기].map(a => a && a.충돌).filter(Boolean).join(' / ') || 0} |`); } }
-L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게 · ${PASS.오래포갬프레임}프레임 넘게) ≥ 1 · 줄 세움(가장 가까운 **같은 둘**이 두 표본 잇달아 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1.`,
+L.push('', `기준 — FAIL: 오래 포갬(같은 둘이 그려진 자리 0.6 안에 ${PASS.오래포갬ms / 1000}초 넘게 · ${PASS.오래포갬프레임}프레임 넘게) ≥ 1 · 줄 세움(가장 가까운 **같은 둘**이 두 표본 잇달아 정확히 4.00) 표본 ≥ 1 · 벽 통과(몸 높이 부위 안 · 곁 자리·놀이터 등 뺌) ≥ 1 · 튐(같은 상태로 한 프레임 2.0 넘게 · 100ms 넘는 긴 프레임 뒤는 빼고 '긴 프레임'으로 따로) ≥ 1 · 갇힘(until 로 나오는 '들름'이 1초 넘게 안 나옴 · 집·일터·학교는 시각으로 나오니 뺀다) ≥ 1 · 오류(페이지 + 삼킨 오류) ≥ 1 · 시계 멈춤(잰 동안 틱이 안 늚 — 재기 전 쥔 이가 남거나 준비 시간 틱이 안 늘면 재지 않고 오류).`,
   `주의: 포갬 평균(0.5초 표본마다 0.6 안 쌍 > ${PASS.포갬쌍} · 괄호 = 0.3초 안에 풀린 스침 수) · 한 칸 박자(서 있는 사람 가운데 가장 가까운 서 있는 이웃이 3.6~4.4 인 몫 > ${PASS.한칸박자}) · 우표 마을(물건 화면 폭 ÷ 창 폭 < ${PASS.우표}) · 빈 30초(아무것도 안 누른 30초 동안 말 0) · 프레임 > ${PASS.프레임ms}ms(헤드리스 · 틀 수 상한 ${FPS || '없음'} 이라 **참고만**).`,
   (INPUT ? `입력 단계 — FAIL: 말 충돌 ≥ 1 · 주의: 반응 > ${PASS.반응ms}ms · 흰 공(얼굴 풍선 지름 < ${PASS.흰공px}px · 창조자 25회 ⓑ48 제안 기준). ` : '안 잼(입력이 필요하다 — --input): 말 충돌(한 입력 뒤 #toast 와 #why) · 반응 ms · 흰 공(풍선 지름). ') + '셈 포갬은 창조자 25회 표와 견주려고 함께 적는다(__folkOverlap · 셈 자리 2.0 안).');
 L.push('', '그린 것: ' + ([...new Set(results.map(x => x.렌더러).filter(Boolean))].join(' · ') || '(못 읽음)'));
