@@ -418,6 +418,30 @@ function _redrawCharSpots() {
   });
 }
 
+// [CHAR-AURA-1] 높은 등급(8 황금·9 전설·10 왕) 장비를 여러 칸 입으면 캐릭터 뒤에 빛 — 멀리서도 등급이 보이게.
+//  3~4칸 = 은은한 빛, 5칸 모두 = 빛 + 반짝이. 등급은 id 끝 번호(e_b18 → 8, e_ws10 → 10).
+let _charAuraSeq = 0;
+function _charTier(id) {
+  const m = /(\d+)$/.exec(String(id || ''));
+  return m ? ((+m[1] - 1) % 10) + 1 : 0;
+}
+function _charAuraSVG(eq) {
+  const n = ['head', 'body', 'weapon', 'glove', 'shoe'].filter(k => eq[k] && eq[k] !== 'none' && _charTier(eq[k]) >= 8).length;
+  if (n < 3) return '';
+  const gid = 'cdAura' + (++_charAuraSeq);
+  let out = '<defs><radialGradient id="' + gid + '" cx="50%" cy="50%" r="50%">'
+          + '<stop offset="0" stop-color="#fff0b0" stop-opacity=".95"/><stop offset=".5" stop-color="#ffcf55" stop-opacity=".5"/>'
+          + '<stop offset="1" stop-color="#ffb020" stop-opacity="0"/></radialGradient></defs>'
+          + '<g class="cd-aura"><ellipse cx="60" cy="86" rx="50" ry="68" fill="url(#' + gid + ')"/>';
+  if (n >= 5) {
+    const star = (x, y, r, d) => '<path class="cd-spark" style="animation-delay:' + d + 's" d="M' + x + ',' + (y - r)
+      + ' Q' + x + ',' + y + ' ' + (x + r) + ',' + y + ' Q' + x + ',' + y + ' ' + x + ',' + (y + r)
+      + ' Q' + x + ',' + y + ' ' + (x - r) + ',' + y + ' Q' + x + ',' + y + ' ' + x + ',' + (y - r) + 'z" fill="#fff4c2"/>';
+    out += star(16, 40, 6, 0) + star(105, 56, 5, .9) + star(11, 102, 4.4, 1.7) + star(109, 118, 5.4, 2.4) + star(98, 18, 4, 3.1);
+  }
+  return out + '</g>';
+}
+
 // 종이인형 합성. base 가 없으면 null 을 돌려 호출부가 폴백하게 한다.
 function buildCharDoll(s) {
   const ct = (s && s.charType >= 1 && s.charType <= 4) ? s.charType : 1;
@@ -429,13 +453,19 @@ function buildCharDoll(s) {
 
   // 머리: 투구를 쓰면 base 의 정수리(hair-top)를 뺀다. 왕관처럼 정수리를 안 덮는 것은 남긴다.
   const headSvg = pick('head', eq.head);
-  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) base = _dropGroup(base, 'hair-top');
+  //   정수리를 빼면 모자 챙 아래로 앞머리·옆머리(hair-cap)를 대신 보인다 — 맨이마·대머리처럼 보이지 않게.
+  if (headSvg && headSvg.indexOf('keep-hair-top') === -1) {
+    base = _dropGroup(base, 'hair-top');
+    //   볼가리개 투구(full-helm)는 이마 띠가 눈썹 바로 위라 앞머리가 끼면 한 줄 눈썹처럼 보인다 — 그땐 안 보인다.
+    if (headSvg.indexOf('full-helm') === -1) base = base.replace('<g class="hair-cap" display="none">', '<g class="hair-cap">');
+  }
 
   // 손: 손가락(fingers-front)은 무기 자루 앞에 다시 그려야 해서 따로 떼어 둔다.
   let fingers = _grabGroup(base, 'fingers-front');
   base = _dropGroup(base, 'fingers-front');
 
-  let out = base + pick('shoe', eq.shoe) + pick('body', eq.body);
+  // 신발은 옷 다음(위)에 그린다 — 로브·갑옷의 바짓단이 부츠 목 안으로 들어가게(옷이 신발을 덮으면 바지가 부츠 위로 튀어나온다).
+  let out = base + pick('body', eq.body) + pick('shoe', eq.shoe);
 
   const gloveSvg = pick('glove', eq.glove);
   if (gloveSvg) {                       // 장갑이 있으면 손가락도 장갑 것을 쓴다
@@ -444,8 +474,15 @@ function buildCharDoll(s) {
   }
 
   out += headSvg + pick('weapon', eq.weapon) + fingers;
-  return '<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
-       + 'style="width:100%;height:100%">' + out + '</svg>';
+  // [CHAR-IDLE-1] 땅 그림자만 떼고 나머지를 한 묶음(cd-body)으로 — student.css 가 숨쉬기(발 기준 세로 늘임)·눈 깜빡임을 준다.
+  const shadowM = out.match(/<ellipse cx="60" cy="151"[^>]*\/>/);
+  const shadow = shadowM ? shadowM[0] : '';
+  if (shadow) out = out.replace(shadow, '');
+  return '<svg class="cdoll" viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" '
+       + 'style="width:100%;height:100%">'
+       + _charAuraSVG(eq)
+       + (shadow ? shadow.replace('<ellipse ', '<ellipse class="cd-shadow" ') : '')
+       + '<g class="cd-body">' + out + '</g></svg>';
 }
 
 // 화면이 쓰는 입구. 에셋이 준비됐으면 종이인형, 아니면 예전 그림.
