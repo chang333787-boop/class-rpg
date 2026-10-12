@@ -8,8 +8,12 @@ node scripts/village-d/dcheck.mjs --self                               # 틀이 
 node scripts/village-d/dcheck.mjs --stage town3 --eval 'window.__sim()'  # 판을 열고 탐침 하나
 node scripts/village-d/dcheck.mjs --scene <이름>                        # scenes/<이름>.mjs
 node scripts/village-d/dcheck.mjs --scene tray                          # [MAC-TRAY] 판 트레이 — 카드 · 탭 · 값 줄 · 오른쪽 누름 · 길게 누름 · 끌어 치우기(임시 판을 쓰고 지움)
+node scripts/village-d/dcheck.mjs --save village/stages/boards/pop88.json --eval 'window.__state().사람'   # 저장본을 넣고 엶
+node scripts/village-d/dcheck.mjs --dc                                 # [PA-03] TL-0 판별 draw call 표(판 다섯 + @base) → out/dc_baseline.json
 node scripts/village-d/dcheck.mjs --help                               # 옵션 전부
 ```
+- `--save <경로>` — 저장소 안 저장본(.json)을 판 밖 쪽(rules.json)에서 그 판의 저장 키(`rpg.village.guest` · 판이면 `.<판>`)에 넣고 연다(village-look 의 `기본+pop88` 꼴 · 판의 `시작` 땅 대신).
+- `--dc <판,판>` — 판 id 또는 `@base`(기본 마을 + pop88). [시작] 뒤 첫 화면(시작칸 배율)에서 10시 · 20시 `__state().drawCalls`(본 패스 · 그림자 제외)를 한 프레임씩 펌프하며 다섯 번 → 가운데 값 · 표 · `out/dc_baseline.json`(기대가 다 맞을 때만 · 견주기만 할 땐 `--dc-out tmp/…`). 🗺️ 모형이 첫 화면인 동네 판은 시작칸에 가장 가까운 동네 단추로 마을 화면을 잰다(모형 · 전체 보기 값은 `_참고`).
 
 ## 지키는 것
 - **sid 는 늘 guest** — 운영 저장본 · 운영 DB 에 닿지 않는다. 판(`?stage=`)은 원격 동기를 끈다(엔진) — dcheck 가 그것도 확인한다.
@@ -37,7 +41,8 @@ export default async function (ctx) {
 
 ## 옵션 요약
 `--size 1366x610` · `--hour 10` · `--gfx fixed` · `--lookseed 1`(그림 난수) · `--simrand tool|stage`(tool = 판정 난수도 이 틀이 심음 · stage = 심지 않아 판 파일의 시드 길을 그대로) ·
-`--frames 60` · `--reduce-motion` · `--voice`(읽어 주기 흉내 — `window.__dVoice`) · `--net-delay <ms>[:<글자>]`(서버 응답 늦춤 · 학교망 흉내) · `--out tmp/village-d` · `--keep`.
+`--frames 60` · `--reduce-motion` · `--voice`(읽어 주기 흉내 — `window.__dVoice`) · `--net-delay <ms>[:<글자>]`(서버 응답 늦춤 · 학교망 흉내) · `--out tmp/village-d` · `--keep` ·
+`--save <경로>` · `--dc [판,판]` · `--dc-out <파일>`.
 
 ## 출력
 `tmp/village-d/<장면>/` 스크린샷 · `result.json`(탐침 · 접근성 단추 · 바깥 시도 · 페이지 오류 · 기대). 끝값 0 = 기대대로 · 1 = 기대 어긋남 · 2 = 돌리지 못함.
