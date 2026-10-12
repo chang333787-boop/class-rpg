@@ -2093,6 +2093,9 @@ body .toast-msg{background:rgba(36,30,22,.97);border-color:rgba(217,164,65,.35);
 .hc-empty{font-size:.8rem;color:var(--txt3);line-height:1.6;padding:.6rem .2rem}
 /* 입구 카드 */
 .hc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem}
+/* [LEARN-GROUP-1] 배우고 만들기 묶음 이름(매일 공부 · 미술 · 음악 · 코딩 · 수학 놀이) */
+.hc-group-h{margin:1.05rem 0 .5rem;font-size:.9rem;font-weight:900;color:var(--txt2);letter-spacing:-.01em}
+.hs-head + .hc-group-h{margin-top:.15rem}
 .hc-grid.small{grid-template-columns:repeat(5,minmax(0,1fr));gap:.55rem}
 .hc-door{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.2rem;min-height:150px;padding:.8rem .6rem .75rem;
   border-radius:14px;background:var(--bg2);cursor:pointer;text-align:center;transition:background .15s}
