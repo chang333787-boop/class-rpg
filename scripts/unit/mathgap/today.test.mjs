@@ -8,7 +8,7 @@
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
 //  · 도전 층(문제 유형): 아래층을 다 켜야 열림 · 불씨 3개 · 같이 풀기 까닭(문제 모양 · 숫자 영역 · 계산 · 단계) · 8문제 → 선생님과 · 점검은 지금 단원 숫자로 · 하루 하나
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
-import { STORY_EVERY, levelOf, MASTER_OK, limitOf, stepMiss, stuckOn, giveUp, STUCK, STEP_BUG, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
+import { noteWhy, whyOf, whyLine, STORY_EVERY, levelOf, MASTER_OK, limitOf, stepMiss, stuckOn, giveUp, STUCK, STEP_BUG, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
   currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
   startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark,
   startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit, bridgeOf, bridgeMiss } from '../../../mathgap/js/today.js';
@@ -640,6 +640,39 @@ test('불빛 3단계 — 느린 층은 할 수 있음(희미) · 꺼진 층 다�
   ok(fb.faster && levelOf(k2, fl[2]) === 2, '빨라졌는데 밝아지지 않음');
   // 저장 — 점검 횟수(ok)가 남음
   ok(kidFrom({ rev: JSON.stringify({ [c]: kid.rev[c] }) }).rev[c].ok === kid.rev[c].ok, 'rev.ok 저장 안 됨');
+});
+
+test('틀린 까닭 — 같은 틀린 방법 두 번이면 확실 · 계산 실수만이면 계산 실수 · 맞힌 문제는 반대 증거 · 저장', () => {
+  const kid = blankKid();
+  const it = (A, B) => ({ prompt: [`${A} + ${B} = `, { m: [{ b: 0 }, { b: 1 }, { b: 2 }] }], sol: [] });
+  // 분모끼리도 더함: 1 2/7 + 2 3/7 → 3 5/14 · 2 1/5 + 1 2/5 → 3 3/10
+  const i1 = it('1 2/7', '2 3/7'); i1.sol = [3, 5, 7]; const i2 = it('2 1/5', '1 2/5'); i2.sol = [3, 3, 5];
+  noteWhy(kid, '4-2-1:3', i1, i1, { vals: [3, 5, 14] }, false);
+  const d = noteWhy(kid, '4-2-1:3', i2, i2, { vals: [3, 3, 10] }, false);
+  ok(d && d.hyps.some((h) => h.id === 'fr.addDen'), '한 문제 가설 없음');
+  let w = whyOf(kid, '4-2-1:3');
+  ok(w.verdict === 'concept' && w.sure[0].id === 'fr.addDen' && w.ex && w.ex.a === '3 3/10', '확실 판정 ' + JSON.stringify(w));
+  // 계산 실수만 — 47 + 38 = 86(한 자리 1 차이) · 25 + 13 = 39
+  const k2 = blankKid(), n = (A, B, s) => ({ prompt: [`${A} + ${B} = `, { b: 0 }], sol: [s] });
+  noteWhy(k2, '2-1-3:3', n(47, 38, 85), n(47, 38, 85), { vals: [86] }, false);
+  noteWhy(k2, '2-1-3:3', n(25, 13, 38), n(25, 13, 38), { vals: [39] }, false);
+  noteWhy(k2, '2-1-3:3', n(56, 27, 83), n(56, 27, 83), { vals: [83] }, true);
+  w = whyOf(k2, '2-1-3:3');
+  ok(w.verdict === 'slip' && !w.sure.length, '계산 실수 판정 ' + JSON.stringify(w));
+  // 받아올림 잊음이 한 번 맞아도 받아올림 문제를 맞힌 게 많으면 확실 아님
+  const k3 = blankKid();
+  noteWhy(k3, '2-1-3:3', n(47, 38, 85), n(47, 38, 85), { vals: [75] }, false);
+  noteWhy(k3, '2-1-3:3', n(56, 27, 83), n(56, 27, 83), { vals: [83] }, true);
+  noteWhy(k3, '2-1-3:3', n(68, 15, 83), n(68, 15, 83), { vals: [83] }, true);
+  ok(!whyOf(k3, '2-1-3:3').sure.length, '반대 증거 무시');
+  // 가운데 칸만 틀림(2/3 + 2/3 = 5/3 = 1 1/3) — 계산 실수 · 예는 줄 전체
+  const k4 = blankKid(), m = { prompt: [{ f: [2, 3] }, ' + ', { f: [2, 3] }, ' = ', { f: [{ b: 0 }, 3] }, ' = ', { m: [{ b: 1 }, { b: 2 }, 3] }], sol: [4, 1, 1] };
+  const dm = noteWhy(k4, '4-2-1:2', m, m, { vals: [5, 1, 1] }, false);
+  ok(dm && dm.kind === 'slip' && whyLine(dm).text === '가운데 칸 계산 실수', '가운데 칸 ' + JSON.stringify(dm));
+  ok(whyOf(k4, '4-2-1:2').ex.a === '5/3 = 1 1/3' && whyOf(k4, '4-2-1:2').ex.e === '4/3 = 1 1/3', '가운데 칸 예 ' + JSON.stringify(whyOf(k4, '4-2-1:2').ex));
+  // 저장
+  const back = kidFrom({ why: JSON.stringify(kid.why) });
+  ok(whyOf(back, '4-2-1:3').verdict === 'concept', '저장 뒤 판정이 다름');
 });
 
 await Promise.all(pending);

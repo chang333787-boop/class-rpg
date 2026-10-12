@@ -3,7 +3,7 @@
 //  쓰기는 config(단원 · 하루 시간)와 아이 한 명 '다시 살펴보기' · '선생님과 함께 표시 지우기'뿐. 이름은 반 명단(common/roster.js)에서.
 import { h, modal, toast } from './util.js';
 import { UNITS, byId, lessonsOfUnit, unitLabel, lessonLabel, corePre, allPre, sortByGrade } from './core/lessons/index.js';
-import { towerOf, dayKey, bugsOf, compareLogs, litAfterDark, TYPES, typesOfUnit, isType, typeName, exampleOf } from './today.js';
+import { towerOf, dayKey, bugsOf, compareLogs, litAfterDark, TYPES, typesOfUnit, isType, typeName, exampleOf, whyOf } from './today.js';
 import { toText } from './core/tokens.js';
 import { P as josaK } from './core/concepts/kit.js';
 // 이름 뒤 조사 — 괄호는 앞말의 보충이라 괄호 앞말에 맞춤
@@ -101,6 +101,18 @@ export async function mountTeacher(app, ctx) {
     // 그 차시에서 반 아이들이 가장 많이 낸 틀린 모양(아이 수로) — Eedi 의 오개념 보고처럼
     const topBug = (c) => { const m = {}; scanned.forEach((r) => bugsOf(r.kid).filter((b) => b.c === c).forEach((b) => { m[b.name] = (m[b.name] || 0) + 1; })); const e = Object.entries(m).sort((a, b) => b[1] - a[1])[0]; return e && e[1] >= 2 ? `자주 나온 실수 — ${e[0]} (${e[1]}명)` : null; };
     const hotBug = firstHot ? topBug(firstHot) : null;
+    // 그 층에서 틀린 까닭(아이 수) — 계산 실수가 많으면 다시 가르치기보다 검산 습관 · 개념 오류가 많으면 그 생각을 다시(core/errors.js)
+    const whyRec = (() => {
+      if (!firstHot) return null;
+      const n = { concept: 0, proc: 0, slip: 0 }, names = {};
+      scanned.forEach((r) => { const w = whyOf(r.kid, firstHot); if (!w || !n.hasOwnProperty(w.verdict)) return; n[w.verdict]++; if (w.sure[0]) names[w.sure[0].name] = (names[w.sure[0].name] || 0) + 1; });
+      const tot = n.concept + n.proc + n.slip;
+      if (!tot) return null;
+      const top = Object.entries(names).sort((a, b) => b[1] - a[1])[0];
+      const parts = [n.concept ? `개념 오류 ${n.concept}명` : '', n.proc ? `절차 실수 ${n.proc}명` : '', n.slip ? `계산 실수 ${n.slip}명` : ''].filter(Boolean).join(' · ');
+      const tip = n.slip > n.concept + n.proc ? ' — 방법은 알아요. 다시 가르치기보다 거꾸로 계산해 확인하는 습관을 권해요.' : top ? ` — 가장 많은 것: ${top[0]}(${top[1]}명)` : '';
+      return h('span', { style: { display: 'block', marginTop: '6px', color: '#f3e8d6' } }, `틀린 까닭 — ${parts}${tip}`);
+    })();
 
     const statusOf = (r) => {
       if (!r.tw || !r.tw.scanned) return r.kid && r.kid.run && r.kid.run.unit === unit ? ['살펴보는 중', 'gold'] : ['안 살펴봄', 'idle'];
@@ -130,7 +142,7 @@ export async function mountTeacher(app, ctx) {
         h('div', { class: 'tgrid' },
           h('div', { class: 'tbox' },
             h('h3', {}, `우리 반 탑 · ${unitName(unit)}`, h('small', {}, `층마다 불을 켠 아이 수 · ${rows.length}명 중 살펴본 아이 ${scanned.length}명${grown ? ` · 꺼져 있다가 켠 층 ${grown}개` : ''}`)),
-            h('div', { class: 'rec', style: { marginTop: '10px' } }, h('b', {}, '수업 추천'), h('span', {}, recText, slowRec,
+            h('div', { class: 'rec', style: { marginTop: '10px' } }, h('b', {}, '수업 추천'), h('span', {}, recText, whyRec, slowRec,
               hot.length || hotBase.length ? h('button', { class: 'btn small', style: { display: 'block', marginTop: '8px' }, onclick: () => printSheet({ title: `${unitName(unit)} 학습지`,
                 floors: [...hotBase.slice(0, 1).map((b) => ({ c: b.c, label: `기초 ${b.name}` })), ...hot.slice(0, 2).map((f) => ({ c: f.c, label: `${f.no}층 ${f.name}` }))] }) }, '이 층들 학습지 인쇄(반 전체 · 정답 포함)') : null, hotBug ? h('span', { style: { display: 'block', marginTop: '6px', color: '#f3e8d6' } }, hotBug) : null, firstHot && byId[firstHot].tip ? h('span', { style: { display: 'block', marginTop: '6px', color: '#d9c9ae' } }, `가르치는 법 — ${byId[firstHot].tip}`) : null, topRec)),
             h('div', { style: { display: 'flex', flexDirection: 'column-reverse', marginTop: '10px' } },
@@ -152,6 +164,18 @@ export async function mountTeacher(app, ctx) {
   }
 
   // 도전 층(문제 유형) — 이 단원 유형마다 상태 · 같이 풀기에서 처음 막힌 곳 · 다른 단원에서 켠 유형
+  // 틀린 까닭(차시마다 모아 본 결과) — 확실한 틀린 방법 · 계산 실수 · 혹시(한 번) · 대표 오답
+  const VERD = { concept: '개념을 헷갈려요', proc: '절차에서 틀려요', slip: '방법은 알아요 · 계산 실수', maybe: '한 번 — 더 봐야 해요', idk: "'아직 몰라요'가 많아요", unknown: '까닭을 못 찾았어요' };
+  function whyBox(kid, tw) {
+    const label = (c) => { const f = tw.all.find((x) => x.c === c); return f ? `${f.base ? '기초' : f.no + '층'} ${f.name}` : `${byId[c].kid}(${unitLabel(byId[c].u)})`; };
+    const order = { concept: 0, proc: 1, slip: 2, maybe: 3, idk: 4, unknown: 5 };
+    const rows = Object.keys(kid.why || {}).filter((c) => byId[c]).map((c) => ({ c, w: whyOf(kid, c) })).filter((x) => x.w && x.w.wrong).sort((a, b) => order[a.w.verdict] - order[b.w.verdict]).slice(0, 6);
+    if (!rows.length) return null;
+    return h('div', { class: 'root' }, h('b', {}, '틀린 까닭'), h('span', { class: 'muted' }, ' (틀린 답을 틀린 방법들로 맞춰 봄 · 두 번 맞아떨어져야 확실)'),
+      ...rows.map(({ c, w }) => [h('br'), h('b', { style: { color: '#f3e8d6' } }, label(c)), ` — ${VERD[w.verdict] || ''}`,
+        w.sure.length ? `: ${w.sure.slice(0, 2).map((x) => `${x.name}(${x.s}번)`).join(' · ')}` : w.verdict === 'slip' ? `(계산 실수 ${w.slips}번)` : w.maybe.length ? `: 혹시 ${w.maybe[0].name}` : '',
+        w.ex ? h('span', { class: 'muted' }, ` · 예: 아이 ${w.ex.a} · 정답 ${w.ex.e}`) : null]));
+  }
   function typeBox(kid, tw) {
     const T = kid.types || {};
     if (!tw.tops.length && !Object.keys(T).length) return null;
@@ -206,6 +230,13 @@ export async function mountTeacher(app, ctx) {
       lines.push(`· 문장제에서 처음 막힌 곳: ${{ read: '이야기 읽기', struct: '상황(구조) 파악', tpl: '식 세우기(유형)', dom: '분수 · 소수가 되면 흔들림', calc: '계산', plan: '혼자 단계 나누기' }[top[0]]}`);
       home.push({ read: '문제를 소리 내어 끝까지 읽고, 수마다 무엇을 말하는지 짚어 보게 해 주세요.', struct: '문제를 자기 말로 다시 말해 보게 해 주세요 — 누가 더 많은지, 무엇이 바뀌었는지.', tpl: '식을 세우기 전에 그림(막대)으로 상황을 그려 보게 해 주세요.', dom: '같은 문제를 작은 자연수로 바꿔 먼저 풀고, 다시 분수 · 소수로 풀어 보게 해 주세요.', calc: '식은 잘 세워요. 계산한 뒤 한 번 더 확인하게 하고, 확인하면 칭찬해 주세요.', plan: "'먼저 무엇을 구할까?'를 물어 단계를 나누게 해 주세요." }[top[0]]);
     }
+    // 틀린 까닭 — 계산 실수가 잦으면 검산 습관 · 확실한 개념 오류는 그 이름으로(가장 많이 나온 하나)
+    const ws = Object.keys(kid.why || {}).filter((c) => byId[c]).map((c) => whyOf(kid, c)).filter((w) => w && w.wrong);
+    const con = ws.flatMap((w) => w.sure).find((x) => x.kind === 'concept'), slipN = ws.filter((w) => w.verdict === 'slip').length;
+    // 실수 종류에 맞는 도구 — 분수는 수 막대 · 소수는 소수점을 맞춘 자릿값 표 · 자연수(자릿값 · 곱셈)는 일 · 십 · 백 칸
+    const aid = !con ? '' : /^fr\./.test(con.id) ? '그림(수 막대)으로 그려' : /^dec\./.test(con.id) ? '소수점을 세로로 맞춘 자릿값 표에 써' : /^(add|sub|mul|div)\./.test(con.id) ? '자릿값 표(일 · 십 · 백 칸)에 써' : '그림으로 그려';
+    if (con) home.push(`'${con.name}' 실수가 여러 번 보여요. 같은 문제를 ${aid} 보며 왜 그런지 이야기해 주세요.`);
+    if (slipN >= 2) home.push('방법은 알지만 계산에서 자주 삐끗해요. 다 푼 뒤 거꾸로 계산해 확인하는 습관을 칭찬해 주세요.');
     if (!home.length) home.push('오늘 무엇을 익혔는지 물어봐 주세요. 아이가 직접 설명해 보면 더 오래 기억해요.');   // 하루 몇 분은 둘째 줄에 이미 있음
     lines.push('· 집에서 도와주실 수 있는 것:', ...home.map((x) => `  - ${x}`));
     return lines.join('\n');
@@ -234,6 +265,7 @@ export async function mountTeacher(app, ctx) {
           sc && sc.down && byId[sc.down[f.c]] ? h('span', { style: { color: '#7cc0f0' } }, ` — '${byId[sc.down[f.c]].kid}' 연습 중 막혀 내려옴`) : null,
           h('br'), h('span', { class: 'muted' }, lessonLabel(f.c)), byId[f.c].tip ? [h('br'), `가르치는 법 — ${byId[f.c].tip}`] : null, byId[f.c].bridge ? [h('br'), `다리 — ${byId[f.c].bridge}`] : null)),
         bugsOf(kid).length ? h('div', { class: 'root' }, h('b', {}, '자주 나온 실수'), ...bugsOf(kid).slice(0, 5).map((b) => [h('br'), `${b.name} ×${b.n} `, h('span', { class: 'muted' }, `· ${isType(b.c) ? `도전 층 ${typeName(b.c)}` : lessonLabel(b.c, { title: false })}`)])) : null,
+        whyBox(kid, tw),
         typeBox(kid, tw),
         h('div', { class: 'root cmp-box' }, h('b', {}, '처음과 지금'), h('br'), h('span', { class: 'muted' }, '문항 기록을 불러오는 중…')),
         days.length ? h('p', { class: 'muted' }, '최근: ', days.map((d) => `${d.slice(5)} ${kid.days[d].ms < 60000 ? '1분 미만' : Math.round(kid.days[d].ms / 60000) + '분'}${litText(kid.days[d].lit)}`).join(' / ')) : null));

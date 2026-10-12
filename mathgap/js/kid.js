@@ -11,7 +11,7 @@ import {
   addTime, addStudy, addExtra, markLit, levelOf, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
   startFacts, currentFact, answerFact,
   startType, currentType, answerType, typeHelpDone, finishType, typeExample, typeName, TRULE, TYPES, litElsewhere, isType,
-  bridgeOf, bridgeMiss, bugsOf, BRIDGE_BUG, stepMiss, giveUp,
+  bridgeOf, bridgeMiss, bugsOf, BRIDGE_BUG, stepMiss, giveUp, noteWhy, whyLine,
 } from './today.js';
 
 const html = (s) => { const d = document.createElement('div'); d.innerHTML = s; return [...d.childNodes]; };
@@ -219,6 +219,7 @@ export function mountKid(app, ctx) {
         const r0 = a.idk ? { ok: false } : q.item.check(a.vals || [], a.raws || []);
         if (!r0.ok && !a.idk) noteBug(kid, q.c, r0.bug);
         logItem(kid, { c: q.c, ok: r0.ok, idk: a.idk, ms, kind: 's', bug: r0.bug });
+        noteWhy(kid, q.c, q.item, q.item, a, !!r0.ok, r0.bug);   // 틀린 까닭 기록(맞힌 문제도 — 반대 증거)
         answer(S, { ...a, ms, t: Date.now() }); addTime(kid, ms);
         await save();
         busy = false;
@@ -264,6 +265,7 @@ export function mountKid(app, ctx) {
       const ms = Math.round(clockNow());
       const fb = answerFact(kid, F, { ...a, ms }); addTime(kid, ms);
       logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'f', bug: fb.bug });
+      noteWhy(kid, q.c, q.item, q.item, a, !!fb.ok, fb.bug);
       await save(!!fb.done);
       busy = false;
       if (fb.done) return factsEnd(fb);
@@ -389,6 +391,7 @@ export function mountKid(app, ctx) {
         const fb = answerPractice(P, { ...a, ms, t: Date.now() }); addTime(kid, ms);
         if (!fb.ok && !a.idk) noteBug(kid, q.c, fb.bug);
         logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'p', bug: fb.bug });
+        fb.why = noteWhy(kid, q.c, q.story ? q.story.steps[1].item : q.item, q.item, a, !!fb.ok, fb.bug);   // 문장제는 그 차시 계산 문제로 맞춰 봄
         await save();
         busy = false;
         if (P.done) return floorEnd(fb);
@@ -432,7 +435,7 @@ export function mountKid(app, ctx) {
       h('div', { class: 'mid-t' }, a.idk ? '괜찮아요!' : '아까워요!', h('br'), h('span', { class: 'blue' }, '같이 한번 풀어 볼까요?')),
       h('div', { class: 'paper' + (q.story ? ' has-story' : ''), style: { flex: 'none', minHeight: '0', padding: '44px 18px 18px', gap: '12px' } }, h('div', { class: 'ptag' }, h('span', {}, '아까 문제')),
         q.story ? h('div', { class: 'story sm', html: toHTML(q.item.story, { static: true }) }) : h('div', { class: 'math', style: { fontSize: '30px' }, html: toHTML(q.item.prompt, { static: true, vals: [] }) }), mineEl,
-        fb.bug && fb.bug.name ? h('div', { class: 'msg', style: { color: '#5d4a36', fontWeight: '500' } }, '혹시 이런 실수였을까요? ', h('b', {}, fb.bug.name)) : null,
+        whyEl(fb),
         bugHint(fb.bug, q.c)),
       h('div', { class: 'panel', style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', marginTop: 'auto' } },
         flamesEl(after, { gone: before > 0 ? after : -1, max: need }),
@@ -521,6 +524,13 @@ export function mountKid(app, ctx) {
     };
     drawStep();
   }
+  // 틀린 까닭 한 줄(core/errors.js) — 계산 실수면 가볍게 · 절차 · 개념이면 '혹시 이런 실수였을까요?' · 둘 다면 '아니면 계산 실수'
+  function whyEl(fb) {
+    const w = whyLine(fb.why), st = { color: '#5d4a36', fontWeight: '500' };
+    if (w && w.kind === 'slip') return h('div', { class: 'msg', style: st }, h('b', {}, '방법은 맞아요! '), `계산만 한 번 더 확인해요 — ${w.text}`);
+    if (w) return h('div', { class: 'msg', style: st }, '혹시 이런 실수였을까요? ', h('b', {}, w.text), w.also ? ' (아니면 계산 실수)' : '');
+    return fb.bug && fb.bug.name ? h('div', { class: 'msg', style: st }, '혹시 이런 실수였을까요? ', h('b', {}, fb.bug.name)) : null;
+  }
   // 그 실수가 가리키는 차시의 생각 한 줄 — '이건 ○○에서 배운 생각이에요'
   function bugHint(bug, c) {
     const to = bug && bug.to ? [].concat(bug.to).find((x) => byId[x] && x !== c && byId[x].hint) : null;
@@ -588,6 +598,7 @@ export function mountKid(app, ctx) {
       const ms = Math.round(clockNow());
       const fb = answerReview(kid, R, { ...a, ms }); addTime(kid, ms);
       logItem(kid, { c: q.c, ok: fb.ok, idk: a.idk, ms, kind: 'r', bug: fb.bug });
+      if (!q.type) noteWhy(kid, q.c, q.item, q.item, a, !!fb.ok, fb.bug);
       await save(!!fb.done);
       busy = false;
       const msg = fb.ok ? (fb.faster ? '맞았어요! 빨라졌어요 — 이 층이 밝게 켜졌어요.' : fb.master ? '맞았어요! 며칠 지나도 바로 해냈어요 — 이 층은 이제 숙련 ★' : '맞았어요! 불이 잘 켜져 있어요.') : fb.again ? '아까워요 — 같은 층 문제를 하나 더 볼게요.' : `이 층 불이 꺼졌어요. 다음에 다시 켜요. (답: ${fb.ans})`;

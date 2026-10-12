@@ -27,6 +27,7 @@ import { hasWords, storyOf } from './core/words.js';
 import { rng } from './core/math.js';
 import { TYPES, typesOfUnit, makeType, plainUnit, isType } from './core/types/index.js';
 import { bridgeOf, hasBridge } from './core/bridges.js';
+import { readExpr, answerOf, diagnose, testable, judge, chainOf } from './core/errors.js';
 
 export const LIT = ['known', 'auto', 'slow'];
 export const DEFAULT_MIN = 10;
@@ -38,7 +39,7 @@ const DAY = 864e5;
 const pad = (n) => String(n).padStart(2, '0');
 export const dayKey = (t = Date.now()) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-export const blankKid = () => ({ states: {}, scans: {}, marks: {}, rev: {}, bugs: {}, run: null, days: {}, seen: {}, types: {} });
+export const blankKid = () => ({ states: {}, scans: {}, marks: {}, rev: {}, bugs: {}, run: null, days: {}, seen: {}, types: {}, why: {} });
 const isLit = (kid, c) => !!(kid.states[c] && LIT.includes(kid.states[c].s));
 // ── 불빛 3단계(10-12 교사 '아는 것과 숙련된 것 구분이 잘 안 됨' → 기준은 Claude) ──
 //  1 할 수 있음(희미한 불) = 맞히지만 느림 — 살펴보기에서 가운데 시간이 기준 시간의 2배를 넘음(engine 'slow') · 연습에서 느리게 6연속
@@ -529,3 +530,49 @@ export function cardOf(kid, cfg, now = Date.now()) {
 }
 
 export { currentItem, answer, newPractice, TYPES, typesOfUnit, isType, plainUnit };
+
+// ── 틀린 까닭(10-12 교사 '틀린 건 알겠는데 어떤 점으로 틀렸는지 — 단순 계산 실수인지, 어떤 개념을 헷갈렸는지') — core/errors.js ──
+//  문제마다: 식이 보이는 계산 문제면 그 답을 틀린 방법(버그)들로 맞춰 본 가설 · 계산 실수 · 이 문제로 가릴 수 있던 버그를 남긴다(맞힌 문제도 — 반대 증거)
+//  차시마다 모아 judge: 확실(같은 방법이 두 번 · 반대 증거가 더 많지 않음) · 계산 실수 · 혹시(한 번) · 모름 — 가상 아이 시험 tests/errors.test.mjs
+const fmtAns = (x) => (!x ? '' : x.q != null ? `${x.q} … ${x.r}` : x.d ? `${x.w ? `${x.w} ` : ''}${x.n}/${x.d}` : x.v ? String(Number((x.v.n / x.v.d).toFixed(6))) : '');
+//  calc = 식이 보이는 차시 문제(문장제면 그 차시 계산 문제) · ansItem = 아이가 답한 칸(문장제 답 칸) · a = { vals, idk } · ok · bug = 차시가 짚은 틀린 모양
+export function noteWhy(kid, c, calc, ansItem, a, ok, bug = null, now = Date.now()) {
+  if (!calc || !readExpr(calc)) return null;
+  const rec = { o: ok ? 1 : 0, t: testable(calc), at: now };
+  let d = null;
+  if (!ok) {
+    if (a.idk) rec.k = 1;
+    else {
+      const ans = answerOf(ansItem || calc, a.vals || []);
+      d = ans ? diagnose(calc, ans, { lessonBug: bug }) : null;
+      if (d && d.hyps.length) rec.h = d.hyps.map((x) => x.id);
+      if (d && d.slip) rec.sl = d.slip;
+      if (!d || d.kind === 'unknown') rec.u = 1;
+      const ai = ansItem || calc;
+      if (d && d.mid) { rec.a = chainOf(ai, a.vals || []); rec.e = chainOf(ai, ai.sol.map(Number)); }   // 가운데 칸만 틀림 — 줄 전체로 보여야 다른 곳이 보임
+      else { rec.a = fmtAns(ans); rec.e = fmtAns(answerOf(ai, ai.sol.map(Number))); }
+    }
+  }
+  kid.why = kid.why || {};
+  const rs = (kid.why[c] = [...(kid.why[c] || []), rec].slice(-8));
+  delete kid.why[c]; kid.why[c] = rs;   // 최근 차시가 뒤로
+  const ks = Object.keys(kid.why); if (ks.length > 20) ks.slice(0, ks.length - 20).forEach((x) => delete kid.why[x]);
+  return d;
+}
+// 한 차시를 모아 본 결과 — { verdict: concept · proc · slip · maybe · idk · unknown · none, sure, maybe, wrong, slips, ex: 대표 오답 }
+export function whyOf(kid, c) {
+  const rs = (kid.why && kid.why[c]) || [];
+  if (!rs.length) return null;
+  const J = judge(rs.map((r) => ({ ok: !!r.o, idk: !!r.k, d: r.o || r.k ? null : { hyps: (r.h || []).map((id) => ({ id })), slip: r.sl || null, kind: r.u ? 'unknown' : r.h && r.h.length ? 'bug' : r.sl ? 'slip' : 'unknown' }, tests: r.t || [] })));
+  const top = J.sure[0] || J.maybe[0] || null;
+  const ex = rs.slice().reverse().find((r) => !r.o && !r.k && r.a && (!top || (r.h || []).includes(top.id) || J.verdict === 'slip')) || null;
+  return { ...J, ex: ex ? { a: ex.a, e: ex.e, sl: ex.sl || null } : null };
+}
+// 한 문제의 짧은 말(아이 · 같이 풀기 첫 줄) — d = noteWhy 결과
+export function whyLine(d) {
+  if (!d) return null;
+  const h = d.hyps.find((x) => x.kind === 'concept') || d.hyps[0];
+  if (h) return { kind: h.kind, text: h.name, also: !!d.slip };
+  if (d.slip) return { kind: 'slip', text: d.slip };
+  return null;
+}
