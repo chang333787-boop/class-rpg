@@ -19,11 +19,44 @@ const 시드꼴 = v => Number.isInteger(v) && v >= 1;   // [MAC-ESEED] index.htm
 const probe = path.join(os.tmpdir(), 'village-stages-probe-' + process.pid + '.mjs');
 fs.writeFileSync(probe, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1 });
-process.stdout.write('@@' + JSON.stringify({ vrules: w.VRULES, 끄기이름: (w.__stageOff ? w.__stageOff().쓸수있는이름 : null) }) + '\\n'); process.exit(0);`);
+process.stdout.write('@@' + JSON.stringify({ vrules: w.VRULES, 끄기이름: (w.__stageOff ? w.__stageOff().쓸수있는이름 : null), 캠프: (w.__campStats ? w.__campStats() : null) }) + '\\n'); process.exit(0);`);
 const pr = spawnSync(process.execPath, [probe], { encoding: 'utf8' }); fs.rmSync(probe, { force: true });
 const line = (pr.stdout || '').split('\n').find(l => l.startsWith('@@'));
 if (!line) { console.log('FAIL 마을을 못 실음 —', (pr.stderr || '').trim().split('\n').slice(-2).join(' ')); process.exit(1); }
-const { vrules, 끄기이름 } = JSON.parse(line.slice(2));
+const { vrules, 끄기이름, 캠프 } = JSON.parse(line.slice(2));
+
+/* [MAC-CAMP] PA-05 판규칙(CAMP) 검사 — 흰 목록 · 멈춤 키 · 고리(엔진이 지금 하는 것)는 엔진 __campStats 가 정본(위 탐침이 읽음).
+   꼴: 객체 · 키 ⊆ 흰 목록(밖 = REVIEW · 엔진은 버림) · 덮기마다 뜻 한 줄(없으면 FAIL · 목표셈 빼고) · 판필요 · 목표셈은 배열 · 나머지는 객체 ·
+   멈춤 값은 true 만 · 모르는 멈춤 = FAIL · 엔진이 아직 안 하는 칸 · 멈춤 = REVIEW(성장은 받되 고리 없음 — 나무 · 꽃 자람은 보기 · 인구는 이사 · 층자람이 막음 · H17) */
+function campCheck(p, C) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return [['FAIL', '판규칙은 객체 — { "멈춤": { "이사": true, "뜻": "…" } } 꼴']];
+  const out = [], 뜻 = v => !!(v && typeof v === 'object' && typeof v.뜻 === 'string' && v.뜻.trim());
+  for (const [k, v] of Object.entries(p)) {
+    if (!C.흰목록.includes(k)) { out.push(['REVIEW', `모르는 판규칙 키 ${k} — 엔진이 버린다(흰 목록 ${C.흰목록.join('·')})`]); continue; }
+    const 배열칸 = k === '판필요' || k === '목표셈';
+    if (배열칸 !== Array.isArray(v) || (!배열칸 && (!v || typeof v !== 'object'))) { out.push(['FAIL', `${k}: ${배열칸 ? '배열' : '객체'}이어야 한다`]); continue; }
+    if (k !== '목표셈' && !(배열칸 ? v.length && v.every(뜻) : 뜻(v))) out.push(['FAIL', `${k}: 뜻 없음 — 판이 바꾼 규칙은 뜻 한 줄로 드러낸다`]);
+    if (k !== '멈춤') { if (!C.읽는칸.includes(k)) out.push(['REVIEW', `${k}: 엔진이 아직 안 읽는 칸 — 그 칸을 짓는 PR 뒤에 돈다`]); continue; }
+    for (const [x, y] of Object.entries(v)) { if (x === '뜻') continue;
+      if (!C.멈춤키.includes(x)) out.push(['FAIL', `멈춤.${x}: 모르는 멈춤(${C.멈춤키.join('·')})`]);
+      else if (y !== true) out.push(['FAIL', `멈춤.${x}: true 만`]);
+      else if (!C.고리.includes(x) && x !== '성장') out.push(['REVIEW', `멈춤.${x}: 엔진 고리가 아직 없음 — 그 고리를 짓는 PR 뒤에 돈다`]); }
+  }
+  return out;
+}
+/* [MAC-CAMP] 판 파일 하나의 판규칙 줄 [칸, 이름, 까닭] — 판 루프와 자기 시험이 이 함수를 같이 부른다(판규칙을 쓰는 판이 아직 없어도 이 길이 시험에 걸림 · 지난 판은 캠프지남에).
+   판규칙이 없으면 줄 0 · 판 규칙 camp 는 module 끝에 얹혀 판규칙을 읽는 자리(판 읽기 바로 뒤)보다 늦다 → FAIL ·
+   멈춤.이사인데 빈집이 생길 수 있는 판(아이 손 = 트레이 · 없으면 건물 목록에 집 · 아파트, 또는 열자마자 식구 0 인 집)은 REVIEW — 빈집 말이 아직 '곧 누가 걸어올 거예요'다 */
+const 캠프지남 = new Set(), 빈집잼 = new Map(), 빈집수 = n => { if (!빈집잼.has(n)) 빈집잼.set(n, (terrainProbe(n, [['empty']]).r || [])[0]); return 빈집잼.get(n); };
+function campFile(def, n) {
+  캠프지남.add(n); const out = [], p = def.판규칙;
+  if (p != null) { const L = 캠프 ? campCheck(p, 캠프) : [['FAIL', 'index.html 에 __campStats 가 없다([MAC-CAMP] 가 안 실렸다)']];
+    L.forEach(([k, m]) => out.push([k, '판규칙', m])); if (!L.length) out.push(['PASS', Object.keys(p).length ? `판규칙 ${Object.keys(p).join('·')} — 흰 목록 · 뜻 · 엔진이 하는 칸` : '판규칙 {} — 없음과 같음', '']);
+    if (p.멈춤 && p.멈춤.이사 === true) { const 손 = Array.isArray(def.트레이) ? def.트레이 : Array.isArray(def.건물) && def.건물.length ? def.건물 : null, 손집 = !손 || 손.includes('house') || 손.includes('apart'), 빈 = 손집 ? 0 : 빈집수(n);
+      if (손집 || 빈 > 0) out.push(['REVIEW', '판규칙', `멈춤.이사인데 ${손집 ? '아이 손에 집이 있다' : '시작 땅에 빈집 ' + 빈 + '채'} — 빈집 말(집 누름 · 빈집 카드 · 🏠 칩) · 놓은 뒤 귀띔이 아직 '곧 누가 걸어올 거예요 · 이웃이 와요'(멈춤.뜻을 보이는 말은 이 판을 여는 PR 몫)`]); } }
+  if (def.규칙 && def.규칙.camp != null) out.push(['FAIL', '규칙 camp', '판 규칙으로 camp 를 덮지 않는다(늦게 얹힘) — CAMP 를 안 쓰려면 판규칙을 빼세요']);
+  return out;
+}
 
 /* 건물 종류 확인: 판 밖 칸에 놓아 보면 모르는 종류는 오류가 난다(load.mjs 의 run.mjs 와 같은 꾀) */
 function kindsOk(list) {
@@ -36,14 +69,15 @@ process.stdout.write('@@' + JSON.stringify(bad) + '\\n'); process.exit(0);`);
   const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : list;
 }
 
-/* [MAC-TERRAIN] 지형이 깔린 판을 실제로 열어 규칙을 누른다(시뮬 · 네트워크 0). 한 수 = ['put', 종류, x, y] · ['erase', x, y] · ['kinds', [[x, y], …]] — 차례대로 */
+/* [MAC-TERRAIN] 지형이 깔린 판을 실제로 열어 규칙을 누른다(시뮬 · 네트워크 0). 한 수 = ['put', 종류, x, y] · ['erase', x, y] · ['kinds', [[x, y], …]] · ['empty'](식구 0 인 집 수 · [MAC-CAMP]) — 차례대로 */
 function terrainProbe(n, tries) {
   const f = path.join(os.tmpdir(), 'village-stages-terrain-' + process.pid + '.mjs');
   fs.writeFileSync(f, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: 'stage=' + ${JSON.stringify(n)} });
 if (w.VRULES.stageTray) w.VRULES.stageTray.on = false;   /* [MAC-TRAY] 지형 검사는 지형 규칙을 재는 도구 — 판 트레이가 놓기를 막지 않게 */
 const kind = (x, y) => { const s = w.__stream(x, y); return s.칸 ? s.칸.종류 : null; };
-const one = ([op, a, b, c]) => { try { if (op === 'put') return w.__put(a, b, c, 0); if (op === 'erase') return w.__erase(a, b); if (op === 'kinds') return a.map(([x, y]) => kind(x, y)); return 'ERR 모르는 수 ' + op; } catch (e) { return 'ERR ' + e.message; } };
+const empty = () => { const s = w.__snapshot(); return s.물건.filter(t => { const m = /^house@(\\d+),(\\d+)/.exec(t); return !!m && !((s.집[+m[2] * 256 + +m[1]] || [0])[0] > 0); }).length; };   /* __snapshot().집 = { root: [식구, 층] } — run.mjs measure 와 같은 셈 */
+const one = ([op, a, b, c]) => { try { if (op === 'put') return w.__put(a, b, c, 0); if (op === 'erase') return w.__erase(a, b); if (op === 'kinds') return a.map(([x, y]) => kind(x, y)); if (op === 'empty') return empty(); return 'ERR 모르는 수 ' + op; } catch (e) { return 'ERR ' + e.message; } };
 const out = { t: w.__terrain ? w.__terrain() : null, r: ${JSON.stringify(tries)}.map(one) };
 process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`);
   const r = spawnSync(process.execPath, [f], { encoding: 'utf8' }); fs.rmSync(f, { force: true });
@@ -94,6 +128,7 @@ for (const f of files) {
   unk.length ? add('FAIL', P('규칙'), 'VRULES 에 없음: ' + unk.join(' ')) : add('PASS', P(`규칙 ${rk.length}개 모두 VRULES 에 있음`));
   const changed = rk.filter(k => rulesMap[k] === '판정' && vrules[k] && Object.keys(def.규칙[k]).some(x => JSON.stringify(def.규칙[k][x]) !== JSON.stringify(vrules[k][x])));
   changed.length <= 3 ? add('PASS', P(`기본과 다른 판정 규칙 ${changed.length}개 (≤3)` + (changed.length ? ': ' + changed.join(' ') : ''))) : add('FAIL', P('판정 규칙 차이'), `${changed.length}개 > 3: ${changed.join(' ')}`);
+  campFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-CAMP] 판규칙 · 판 규칙 camp — 위 campFile(자기 시험이 같은 함수를 부른다) */
   /* [MAC-STAGEOFF] 판이 끄는 묶음 — 모르는 이름은 조용히 지나가면 안 된다(아무것도 안 꺼진 채 PASS 한다) */
   let 끈것 = new Set();
   if (def.끄기 != null) {
@@ -244,6 +279,32 @@ for (const f of files) {
 { const 샘 = [0, -1, 1.5, '1', true].filter(시드꼴), 막힘 = [1, 7].filter(v => !시드꼴(v));
   !샘.length && !막힘.length ? add('PASS', '시드 꼴 자기 시험 — 1 · 7 통과 · 0 · -1 · 1.5 · "1" · true 는 FAIL')
     : add('FAIL', '시드 꼴 자기 시험', `잘못 통과: ${샘.map(v => JSON.stringify(v)).join(' ') || '없음'} · 잘못 막힘: ${막힘.join(' ') || '없음'}`); }
+
+/* [MAC-CAMP] 판규칙 검사 자기 시험(build/C §3 수용 시험 9 꼴) — 판 루프가 부르는 campFile · campCheck 그대로라 판규칙을 쓰는 판이 아직 없어도 검사가 선다.
+   l 판 루프가 판 파일마다 campFile 을 지남 / a 흰 목록 밖 키 멈쳄 REVIEW 1 · 뜻 빠진 멈춤 FAIL 1 · 판 규칙 camp FAIL 1 / b 바른 멈춤{이사 · 성장 · 층자람}(집 없는 손 · 빈집 0) = PASS 줄 하나 /
+   c 멈춤 값 '네' · 모르는 멈춤 층자랑 = FAIL 2 / d 판필요 = 아직 안 읽는 칸 REVIEW(말까지 — 모르는 키와 가름) / e 멈춤.땅고르기 = 고리 없음 REVIEW / f 꼴 — 멈춤 배열 · 판필요 객체 · 판규칙 배열 = FAIL 하나씩 /
+   g 목표셈 = 뜻 없이 REVIEW 하나 / h 판필요 항목 하나라도 뜻 없음 = FAIL / i 멈춤.이사 빈집 말 REVIEW — 손(트레이 · 없으면 건물)에 집 · 아파트면 뜸 · 트레이가 이김 · [] = 빈손 ·
+   열자마자 빈집(help-places 0 · jobs-short ≥ 1)으로도 뜸 · 층자람만이면 안 뜸 / j 흰 목록 13 · 멈춤 키 6 = build/C §3 정본 표(R62 아이연기 뺌 · R69 입구 — 엔진 CAMP 를 바꾸면 여기도) */
+{ const n = (L, k) => L.filter(x => x[0] === k).length, 뜻 = '자기 시험', s = JSON.stringify, 틀림 = [], T = (id, ok, v) => { if (!ok) 틀림.push(id + ' ' + s(v)); };
+  const 안지남 = files.map(f => f.replace(/\.json$/, '')).filter(x => !캠프지남.has(x)); T('l', !안지남.length, 안지남);
+  if (!캠프) 틀림.push('index.html 에 __campStats 가 없다([MAC-CAMP] 가 안 실렸다)');
+  else { const 빈손 = { 트레이: ['road'] }, 멈 = { 멈춤: { 이사: true, 뜻 } }, 이사말 = L => L.filter(x => x[0] === 'REVIEW' && x[2].startsWith('멈춤.이사인데')).length;
+    const a = campFile({ 판규칙: { 멈쳄: { 이사: true, 뜻 }, 멈춤: { 층자람: true } }, 규칙: { camp: { on: false } }, ...빈손 }, 'help-places'); T('a', n(a, 'REVIEW') === 1 && n(a, 'FAIL') === 2 && a.some(x => x[1] === '규칙 camp'), a);
+    const b = campFile({ 판규칙: { 멈춤: { 이사: true, 성장: true, 층자람: true, 뜻 } }, ...빈손 }, 'help-places'); T('b', b.length === 1 && b[0][0] === 'PASS', b);
+    const c = campCheck({ 멈춤: { 이사: '네', 층자랑: true, 뜻 } }, 캠프); T('c', n(c, 'FAIL') === 2 && !n(c, 'REVIEW'), c);
+    const d = campCheck({ 판필요: [{ 이름: '돌봄', 뜻 }] }, 캠프); T('d', d.length === 1 && d[0][0] === 'REVIEW' && d[0][1].includes('아직 안 읽는 칸'), d);
+    const e = campCheck({ 멈춤: { 땅고르기: true, 뜻 } }, 캠프); T('e', e.length === 1 && e[0][0] === 'REVIEW' && e[0][1].includes('고리가 아직 없음'), e);
+    const f = [[{ 멈춤: ['이사'] }, '객체이어야'], [{ 판필요: { 이름: '돌봄', 뜻 } }, '배열이어야'], [[], '판규칙은 객체']].map(([p, m]) => { const L = campCheck(p, 캠프); return (L.length === 1 && L[0][0] === 'FAIL' && L[0][1].includes(m)) || L; }); T('f', f.every(x => x === true), f);
+    const g = campCheck({ 목표셈: ['결정함'] }, 캠프); T('g', g.length === 1 && g[0][0] === 'REVIEW', g);
+    const h = campCheck({ 판필요: [{ 이름: '돌봄', 뜻 }, { 이름: '안전' }] }, 캠프); T('h', n(h, 'FAIL') === 1, h);
+    const i = [[{ 트레이: ['road', 'house'] }, 'help-places', 1], [{ 트레이: ['road', 'apart'] }, 'help-places', 1], [{ 건물: null }, 'help-places', 1], [{ 트레이: ['road'], 건물: null }, 'help-places', 0],
+      [{ 트레이: [], 건물: null }, 'help-places', 0], [{ 건물: ['road', 'clinic'] }, 'help-places', 0], [빈손, 'jobs-short', 1]].map(([x, st, 기대]) => 이사말(campFile({ 판규칙: 멈, ...x }, st)) === 기대)
+      .concat(이사말(campFile({ 판규칙: { 멈춤: { 층자람: true, 뜻 } }, 트레이: ['house'] }, 'help-places')) === 0);
+    T('i', i.every(Boolean), [i, [...빈집잼]]);
+    const 같음 = (L, M) => s([...L].sort()) === s([...M].sort());
+    T('j', 같음(캠프.흰목록, ['판수치', '판필요', '필요목록', '멈춤', '잠김', '결정', '차로', '입구', '판정', '뚫림', '시든칸쉼', '뱃길', '목표셈']) && 같음(캠프.멈춤키, ['이사', '성장', '층자람', '땅고르기', '생산', '일자리']), [캠프.흰목록, 캠프.멈춤키]); }
+  !틀림.length ? add('PASS', `판규칙 검사 자기 시험 — 판 루프와 같은 campFile(판 ${캠프지남.size}개 지남) · 흰 목록 밖 키 REVIEW · 뜻 빠짐 FAIL · 판 규칙 camp FAIL · 꼴 FAIL · 멈춤 값 true 만 · 모르는 멈춤 FAIL · 아직 안 읽는 칸 · 고리 REVIEW · 멈춤.이사 빈집 말 REVIEW(손 · 열자마자 빈집 ${[...빈집잼].map(([k, v]) => k + ' ' + v).join(' · ')}) · 흰 목록 ${캠프.흰목록.length}칸 · 멈춤 키 ${캠프.멈춤키.length} = 정본 표 (고리 ${캠프.고리.join('·')} — 엔진 __campStats)`)
+    : add('FAIL', '판규칙 검사 자기 시험', 틀림.join(' · ')); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
 끈판 ? add('PASS', `판정을 끈 판 ${끈판}개 (정본 2번 — 끄기를 실제로 쓴 판이 있다)`)

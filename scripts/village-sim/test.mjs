@@ -125,6 +125,57 @@ test('규칙 덮기: VRULES 에 없는 키는 멈춘다', () => {
   const r = spawnSync(process.execPath, [path.join(HERE, 'run.mjs'), '--days', '1', '--seeds', '1', '--rules', 'nope.on=false'], { cwd: ROOT, encoding: 'utf8' });
   ok(r.status !== 0 && /VRULES 에 없음/.test(r.stderr + r.stdout), '멈추지 않음');
 });
+/* [MAC-CAMP] PA-05 수업 판 멈춤(CAMP 뼈대 최소) — 판규칙 흰 목록 거르기 · 뜻 검사 · VRULES.camp · 멈춤 고리 둘(이사 = tryMoveIn · 층자람 = growHouse).
+   자기 시험 판 = help-places 를 베껴 판규칙만 더함(시험 안에서 쓰고 finally 에서 지움) · 도구 시드 1 · hour=10 · 4일(하루 1800틱) · 날마다 [인구, 2층 이상 집 수].
+   (가) 멈춤{이사 · 층자람} → 다섯 날 모두 첫날 값 · __campStats 이사막음 ≥ 1 · 층막음 ≥ 1
+   (나) 양성 대조 — 판규칙 없는 help-places 는 4일에 인구 · 2층 이상이 는다(고리를 빼면 (가)가 이 값) · 같은 판을 VRULES.camp.on = false 로 열면 판규칙 없는 판과 판정 값이 같다(되돌리기)
+   (다) 칸마다 따로 — 이사만: 인구 그대로 · 층은 오름 / 층자람만: 인구는 늚 · 2층 이상 그대로
+   (라) campRead — 흰 목록 밖 키(멈쳄)는 버리고 적음(= 층자람만 판과 같은 값) · 뜻 없는 덮기는 적음(엔진은 씀 · 판 검사가 FAIL) · 판규칙 없는 판(farm) · 기본 마을은 CAMP 길 0
+   (마) 조용한 이사(moveInQuiet — 보이는 사람이 120 상한에 찬 큰 마을)도 tryMoveIn 안에서만 → jobs-short(pop167 땅) 판규칙 없으면 하루에 늚 · 멈춤{이사}면 그대로 */
+const cpOne = c => new Promise(done => {
+  const src = `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import crypto from 'node:crypto';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${c.save ? `(await import('node:fs')).readFileSync(${JSON.stringify(path.join(ROOT, c.save))}, 'utf8')` : 'null'}, seed: 1, hash: 'hour=10', query: ${JSON.stringify(c.stage ? 'stage=' + c.stage : '')} });
+${c.pre || ''}
+const day = () => { const p = w.__pop(); return [p.인구, p.층[1] + p.층[2]]; }, days = [day()];
+for (let d = 0; d < ${c.days}; d++) { w.__tickBench(1800); days.push(day()); }
+const h = v => crypto.createHash('sha1').update(JSON.stringify(v)).digest('hex').slice(0, 12), { 저장키, ...s } = w.__snapshot();
+process.stdout.write('@@' + JSON.stringify({ days, 사람: w.__pop().사람, cs: w.__campStats(), 판정: { pop: w.__pop(), away: w.__away(), goals: w.__goals().이룬것, 물건: h(s.물건), 집: h(s.집), 나머지: h(s) } }) + '\\n', () => process.exit(0));`;
+  const p = spawn(process.execPath, ['--input-type=module', '-e', src], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let out = '', err = '';
+  p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { err += d; });
+  p.on('close', () => { const l = out.split('\n').find(x => x.startsWith('@@')), e = (err || out).trim().split('\n');
+    done(l ? JSON.parse(l.slice(2)) : { 오류: c.n + ' — ' + (e.filter(x => /Error|ERR/.test(x)).slice(-1)[0] || e.slice(-1)[0] || '출력 없음') }); }); });
+{ const dir = path.join(ROOT, 'village/stages'), 바탕 = n => JSON.parse(fs.readFileSync(path.join(dir, n + '.json'), 'utf8')), 뜻 = '시험 판 — 새 이웃 · 층 오름을 세운다';
+  const SELF = { 'zz-camp-both': ['help-places', { 멈춤: { 이사: true, 층자람: true, 뜻 } }], 'zz-camp-move': ['help-places', { 멈춤: { 이사: true, 뜻 } }],
+    'zz-camp-floor': ['help-places', { 멈춤: { 층자람: true, 뜻 } }], 'zz-camp-typo': ['help-places', { 멈쳄: { 이사: true, 뜻 }, 멈춤: { 층자람: true } }],
+    'zz-camp-quiet': ['jobs-short', { 멈춤: { 이사: true, 뜻 } }] };
+  const C = [{ n: 'hp', stage: 'help-places' }, { n: 'both', stage: 'zz-camp-both' }, { n: 'off', stage: 'zz-camp-both', pre: 'w.VRULES.camp.on = false;' },
+    { n: 'move', stage: 'zz-camp-move' }, { n: 'floor', stage: 'zz-camp-floor' }, { n: 'typo', stage: 'zz-camp-typo' },
+    { n: 'js', stage: 'jobs-short', days: 1 }, { n: 'quiet', stage: 'zz-camp-quiet', days: 1 },
+    { n: 'farm', stage: 'farm', days: 1 }, { n: '기본', stage: null, save: 'village/stages/boards/pop88.json', days: 1 }].map(c => ({ days: 4, ...c }));
+  const R = {};
+  Object.entries(SELF).forEach(([id, [b, 판규칙]]) => fs.writeFileSync(path.join(dir, id + '.json'), JSON.stringify({ ...바탕(b), id, 판규칙 }, null, 1)));
+  try { const out = new Array(C.length); let next = 0;   /* 판 하나 = 프로세스 하나 — 여섯씩 나란히 */
+    await Promise.all(Array.from({ length: Math.min(6, C.length) }, async () => { while (next < C.length) { const i = next++; out[i] = await cpOne(C[i]); } }));
+    C.forEach((c, i) => { R[c.n] = out[i]; });
+  } finally { Object.keys(SELF).forEach(id => fs.rmSync(path.join(dir, id + '.json'), { force: true })); }
+  const J = JSON.stringify, flat = (r, i) => r.days.every(d => d[i] === r.days[0][i]), grew = (r, i) => r.days[r.days.length - 1][i] > r.days[0][i], show = n => n + ' ' + J(R[n].days);
+  test('CAMP: 판규칙 멈춤{이사 · 층자람} → help-places 4일 인구 · 2층 이상 매일 같음(판규칙 없으면 둘 다 늚) · 이사막음 · 층막음 ≥ 1 · 칸마다 따로 · camp 끄면 판규칙 없는 판과 같음 · 흰 목록 밖 키는 버림 · 뜻 없음 적음 · 조용한 이사도 막힘 · 판규칙 없는 판 길 0', () => {
+    const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
+    const { hp: base, both, off, move, floor, typo } = R;
+    ok(J(base.days[0]) === J([74, 6]) && grew(base, 0) && grew(base, 1), '(나) 판규칙 없는 help-places 가 4일에 안 자람 — 견줄 것이 없는 헛 같음 ' + show('hp'));
+    ok(flat(both, 0) && flat(both, 1) && J(both.days[0]) === J(base.days[0]), '(가) 멈춤{이사 · 층자람}인데 인구나 2층 이상이 움직임 ' + show('both') + ' · ' + show('hp'));
+    ok(both.cs.이사막음 >= 1 && both.cs.층막음 >= 1 && J(both.cs.지금막음) === J(['이사', '층자람']) && J(both.cs.판규칙) === J(['멈춤']), '(가) 고리가 안 걸림 ' + J(both.cs));
+    ok(J(off.days) === J(base.days) && J(off.판정) === J(base.판정) && off.cs.켜짐 === false && off.cs.이사막음 === 0 && off.cs.층막음 === 0, '(나) VRULES.camp.on = false 인데 판규칙 없는 판과 다름 ' + show('off') + ' · ' + J(off.cs));
+    ok(flat(move, 0) && grew(move, 1) && move.cs.이사막음 >= 1 && move.cs.층막음 === 0, '(다) 이사만 멈춘 판 — 인구 그대로 · 층은 올라야 한다 ' + show('move') + ' ' + J(move.cs));
+    ok(grew(floor, 0) && flat(floor, 1) && floor.cs.층막음 >= 1 && floor.cs.이사막음 === 0, '(다) 층자람만 멈춘 판 — 인구는 늘고 2층 이상은 그대로여야 한다 ' + show('floor') + ' ' + J(floor.cs));
+    ok(J(typo.cs.모르는키) === J(['멈쳄']) && J(typo.cs.뜻없음) === J(['멈춤']) && J(typo.cs.판규칙) === J(['멈춤']) && J(typo.days) === J(floor.days) && J(typo.판정) === J(floor.판정),
+      '(라) 흰 목록 밖 키 · 뜻 없음 — 멈쳄은 버리고(= 층자람만 판) 둘 다 적어야 한다 ' + show('typo') + ' ' + J(typo.cs));
+    ok(R.js.사람 >= 120 && R.js.days[0][0] > R.js.사람 && grew(R.js, 0) && flat(R.quiet, 0) && J(R.quiet.days[0]) === J(R.js.days[0]) && R.quiet.cs.이사막음 >= 1,
+      '(마) 조용한 이사 — jobs-short 는 보이는 사람이 상한에 찬 채 늘고(조용한 이사) 멈춤{이사}면 그대로여야 한다 ' + show('js') + ' 사람 ' + R.js.사람 + ' · ' + show('quiet') + ' ' + J(R.quiet.cs));
+    ok(['farm', '기본'].every(n => R[n].cs.판규칙 === null && !R[n].cs.모르는키.length && R[n].cs.이사막음 === 0 && R[n].cs.층막음 === 0 && R[n].cs.켜짐 === true) && grew(R.기본, 0),
+      '(라) 판규칙 없는 판 · 기본 마을(pop88 — 하루에 이웃이 듦)에서 CAMP 길이 돎 ' + J([R.farm.cs, R.기본.cs]) + ' ' + show('기본'));
+  });
+}
 
 /* [MAC-FLOWEND] 53-ⓑ102 — 목표 없는 흐름 판(proto-flow)만 실험 값을 결과로 · 길을 끊으면 못 받은 집이 는다 · 다른 판은 안 씀 */
 test('FLOWEND: proto-flow 결과 = 곡식·선반·못 받은 집 · 끊으면 못 받은 집이 는다 · farm/town3/proto-vote 는 안 씀', () => {
