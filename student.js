@@ -1366,23 +1366,30 @@ function buildMainHTML() {
 
   <section class="home-sec hs-learn" data-sec="learn">
     <div class="hs-head"><h2>배우고 만들기</h2><span class="hs-sub">문제 풀고 · 생각 나누고 · 만들어요</span></div>
+    <!-- [LEARN-GROUP-1] 10-12 사용자 "미술은 미술끼리" — 매일 공부 / 미술 / 음악 · 코딩 · 수학 놀이 세 묶음. 매일 쓰는 문이 앞 · 늘 붙던 NEW 뗌(UX-TRIM-G4) -->
+    <div class="hc-group-h">📚 매일 공부</div>
     <div class="hc-grid">
-      <!-- [UX-TRIM-G4] 매일 쓰는 문(학습 · 생각판 · 보상 있는 영어 · 독서 · 우리 반 작품)이 앞 — 1366×610 첫 화면 안. 학습 앱 일곱은 뒤 · 늘 붙던 NEW 뗌 -->
       ${door(asset('deco/d_i5.svg'), '오늘의 학습', typeof CurriculumUtils === 'undefined' ? '교과 문제' : studyLeft ? `하루 ${STUDY_PER_DAY}문제 · ${studyDone}문제 했어요` : '오늘 공부 끝!', 'openStudyModal()', studyLeft ? '오늘' : '')}
       ${typeof mathgapOpen === 'function' && mathgapOpen() ? door(asset('deco/ev_lanterns.svg'), '오늘의 수학', '탑에 불을 켜며 수학 빈칸 채우기', "openExternalEmbed('mathgap')") : ''}
       ${door(asset('deco/in_w_board.svg'), '생각판', '선생님이 연 판에 내 생각을 붙여요', "openExternalEmbed('thinkboard')")}
       ${ext('english') ? door(asset('deco/guest_owl.svg'), '영어 복습', '단어 · 표현 · 듣기 · 말하기', "openExternalEmbed('english')") : ''}
       ${door(asset('deco/in_w_bookshelf.svg'), '독서 기록', `읽은 책 ${(s.books || []).length}권`, "openHouseTab('book')")}
+    </div>
+    <div class="hc-group-h">🎨 미술</div>
+    <div class="hc-grid">
       ${door(asset('deco/d_i4_wall.svg'), '우리 반 작품', '그린 그림을 올리고 친구 작품도 봐요', "openArtFree('class')")}
-      ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')")}
-      ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')")}
-      ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')")}
-      ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')")}
       ${door(asset('monsters/m30.png'), '명화 탐정', '옛 그림 속 숨은 것 찾기 · 질문 만들기', "openExternalEmbed('art')")}
+      ${door(asset('monsters/m22.png'), '물감 연구소', '세 물감으로 색 섞기 · 보색 · 느낌의 색', "openExternalEmbed('paint')")}
       ${door(asset('monsters/m49.png'), '먹 연구소', '먹색 · 붓 놀이 · 판본체 글씨 · 수묵화', "openExternalEmbed('ink')")}
       ${door(asset('monsters/m71.png'), '판화 놀이', '새기고 찍으면 거울처럼 · 판화 읽기', "openExternalEmbed('print')")}
       ${ext('watercolor') ? door(asset('deco/gift_photo.svg'), '수채화 기초', '태블릿 보며 진짜 종이에 연습', "openExternalEmbed('watercolor')") : ''}
       ${ext('drawing') ? door(asset('deco/gift_feather.svg'), '데생 기초', '연필로 선 · 명암 · 형태', "openExternalEmbed('drawing')") : ''}
+    </div>
+    <div class="hc-group-h">🎵 음악 · 🧩 코딩 · 수학 놀이</div>
+    <div class="hc-grid">
+      ${door(asset('deco/d_i9.svg'), '음악실', '작곡 · 리코더 연습 · 리듬 게임', "openExternalEmbed('music')")}
+      ${door(asset('monsters/m1.png'), '기초 코딩', '블록으로 몬스터에게 명령해요', "openExternalEmbed('coding')")}
+      ${door(asset('monsters/m3.png'), '무늬 공방', '밀고 · 뒤집고 · 돌려서 무늬 만들기', "openExternalEmbed('pattern')")}
     </div>
   </section>
 
