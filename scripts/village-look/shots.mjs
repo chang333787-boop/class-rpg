@@ -21,7 +21,8 @@
 //   그 밖: --hour 10 · --gfx fixed|high · --lookseed 1 · --frames 60 · --max 0(%) · --tol 2(채널 차) · --ui · --json <파일> · --dir tmp/village-look · --keep
 //   --more <판,판>(표준 판에 더함) · --soft <판이름,…>(그 판 장면은 달라도 FAIL 이 아니라 '⚠ 바뀐 판 · 의도한 차이? — PR 에 적기') — village-check 가 PR 이 바꾼 판에 쓴다
 //   --vs-ref 에서 옛(ref)에 판 파일이 없는 **새 판**은 견주지 않는다('새 판 — 옛에 없음')
-import { spawn, spawnSync } from 'node:child_process'; import crypto from 'node:crypto'; import fs from 'node:fs'; import http from 'node:http'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process'; import crypto from 'node:crypto'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+import { sleep, findChrome, glArgs, serve, initScript, openChrome } from './lib.mjs';   // [PA-00] 크롬 · 서버 · 바깥 주소 막기 · 가짜 시계 = 틀 한 벌(village-d/dcheck 와 함께 씀)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2), flag = k => args.includes('--' + k), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && args[i + 1] != null && !String(args[i + 1]).startsWith('--') ? args[i + 1] : d; };
@@ -37,11 +38,10 @@ const VIEW = { w: 1366, h: 610 };
 const bad = SHOTS.filter(s => !['card', 'default', 'hud', 'near', 'whole'].includes(s)); if (bad.length) { console.error('모르는 장면: ' + bad.join(' ') + ' (card · default · hud · near · whole)'); process.exit(2); }
 if ([UPDATE, !!VSREF, SELF].filter(Boolean).length > 1) { console.error('--update · --vs-ref · --self 는 하나만(--vs-ref·--self 는 저장된 기준을 안 건드린다)'); process.exit(2); }
 if (REF && !UPDATE) { console.error('--ref 는 --update 와 함께(기준을 그 ref 로 찍는다) — 바로 견주려면 --vs-ref'); process.exit(2); }
-const CHROME = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell');
+const CHROME = findChrome();
 if (!fs.existsSync(CHROME)) { console.error('헤드리스 크로미움이 없다: ' + CHROME + ' — CHROME=<경로> 로 알려 주거나 npx playwright install chromium-headless-shell'); process.exit(2); }
-const GL = opt('gl', process.platform === 'darwin' ? 'metal' : 'default'), GLARGS = GL === 'metal' ? ['--use-angle=metal', '--use-gl=angle'] : GL === 'default' ? [] : null;
+const GL = opt('gl', process.platform === 'darwin' ? 'metal' : 'default'), GLARGS = glArgs(GL);
 if (!GLARGS) { console.error('--gl 은 metal · default 만 — swiftshader 는 쓰지 않는다(보스 09-24 GPU 규칙)'); process.exit(2); }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const git = (...a) => { const r = spawnSync('git', a, { cwd: ROOT, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
 const boardName = spec => { const [name, save] = spec.split('+'); return name + (save ? '+' + path.basename(save, '.json') : ''); };
 const fname = (spec, shot) => (boardName(spec) + '__' + shot + '.png').replace(/[\\/:*?"<>|]/g, '_');
@@ -57,41 +57,14 @@ function refRoot(ref) {
 }
 
 /* ── 정적 서버(뿌리를 바꿔 끼운다 — --vs-ref 는 ref 한 번 · 작업 트리 한 번) ── */
-let SERVE = ROOT;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.txt': 'text/plain; charset=utf-8' };
-const server = http.createServer((q, s) => {
-  if (q.method !== 'GET' && q.method !== 'HEAD') { s.writeHead(405); return s.end(); }
-  let u; try { u = decodeURIComponent(q.url.split('?')[0]); } catch { s.writeHead(400); return s.end(); }
-  const f = path.join(SERVE, u); if (!f.startsWith(SERVE + path.sep)) { s.writeHead(403); return s.end(); }
-  fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.writeHead(200, { 'content-type': TYPES[path.extname(f).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store' }); s.end(d); });
-});
-await new Promise(r => server.listen(0, '127.0.0.1', r));
-const BASE = 'http://127.0.0.1:' + server.address().port;
+const SRV = await serve(ROOT), BASE = SRV.base;
 
 /* ── 페이지에 먼저 심는 것: 시드 고정 난수 두 줄기 + 가짜 시계(이 스크립트가 한 장씩 돌린다) ── */
-const INIT = `(() => {
-  const mb = s => { let a = (s >>> 0) || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-  Math.random = mb(${LOOKSEED}); window.__SIM_RAND = mb(${(LOOKSEED ^ 0x5EED5EED) >>> 0});
-  const q = new Map(), nativeRAF = window.requestAnimationFrame.bind(window); let id = 0, vt = 1000;
-  window.requestAnimationFrame = cb => { const i = ++id; q.set(i, cb); return i; };
-  window.cancelAnimationFrame = i => { q.delete(i); };
-  Object.defineProperty(performance, 'now', { value: () => vt, configurable: true, writable: true });
-  window.__shots = { errs: [],
-    step(n, dt) { for (let k = 0; k < n; k++) { vt += dt; const cbs = [...q.values()]; q.clear(); for (const cb of cbs) { try { cb(vt); } catch (e) { this.errs.push(String((e && e.message) || e).slice(0, 160)); } } } return vt; },
-    real: () => new Promise(r => nativeRAF(() => nativeRAF(r))) };
-})();`;
+const INIT = initScript({ lookseed: LOOKSEED });
 
-/* ── CDP ── */
-const port = 9700 + (process.pid % 250), prof = fs.mkdtempSync(path.join(os.tmpdir(), 'village-look-')); temps.push(prof);
-const ch = spawn(CHROME, ['--remote-debugging-port=' + port, '--user-data-dir=' + prof, `--window-size=${VIEW.w},${VIEW.h}`, ...GLARGS, '--no-first-run', '--hide-scrollbars', '--mute-audio', '--force-device-scale-factor=1', 'about:blank'], { stdio: 'ignore' });
-let ws, id = 0, blocked = 0, lastNet = 0; const inflight = new Set(), wait = new Map(), pageErr = [];
-const send = (method, params = {}) => new Promise((res, rej) => { const i = ++id; wait.set(i, m => (m.error ? rej(new Error(method + ': ' + m.error.message)) : res(m.result))); ws.send(JSON.stringify({ id: i, method, params })); });
-const evaluate = async (src, ms = 60000) => { const r = await send('Runtime.evaluate', { expression: '(async () => {' + src + '})()', awaitPromise: true, returnByValue: true, timeout: ms });
-  if (r.exceptionDetails) throw new Error(((r.exceptionDetails.exception || {}).description || r.exceptionDetails.text || '평가 오류').split('\n')[0]); return r.result ? r.result.value : null; };
-const nav = async url => { await send('Page.navigate', { url }); for (let k = 0; k < 150; k++) { await sleep(100); try { if (await evaluate('return document.readyState') === 'complete') return; } catch {} } };
-const until = async (cond, ms, what) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await evaluate('return !!(' + cond + ')')) return; } catch {} await sleep(150); } throw new Error(what + ' — ' + ms / 1000 + '초 안에 안 됨'); };
-const netIdle = async (ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (!inflight.size && Date.now() - lastNet > 400) return true; await sleep(100); } return false; };
-const pump = n => evaluate(`return window.__shots.step(${n | 0}, 1000 / 60)`);
+/* ── CDP — 크롬은 lib 가 띄운다(돌리기 맨 앞) · 아래 이름은 그대로 ── */
+let C = null;
+const send = (method, params) => C.send(method, params), evaluate = (src, ms) => C.evaluate(src, ms), nav = url => C.nav(url), until = (cond, ms, what) => C.until(cond, ms, what), netIdle = ms => C.netIdle(ms), pump = n => C.pump(n);
 const STILL = '*, *::before, *::after { transition: none !important; animation: none !important; } ';   // CSS 전환·애니메이션은 실제 시간이라 사진을 흔든다(visibility 전환이 0.2초 남아 트레이가 찍혔다) — 끈다
 const HIDE = STILL + 'body * { visibility: hidden !important; } #cv, #mini { visibility: visible !important; }', HIDE_UI = STILL + '#toast, #why { visibility: hidden !important; }';   // --ui 여도 토스트·풍선은 숨긴다(실제 시간으로 떴다 사라져 사진이 흔들린다)
 
@@ -102,7 +75,7 @@ async function shootBoard(spec, outDir, onShot) {
   await nav(BASE + '/village/stages/rules.json');
   await evaluate('localStorage.clear(); sessionStorage.clear(); return 1');
   if (save) await evaluate(`const r = await fetch(${JSON.stringify('/' + save)}); if (!r.ok) throw new Error('저장본 ' + r.status); localStorage.setItem(${JSON.stringify(key)}, await r.text()); return 1`);
-  pageErr.length = 0;
+  C.st.pageErr.length = 0;
   await nav(BASE + '/village/index.html?' + (stage ? 'stage=' + encodeURIComponent(stage) + '&' : '') + 'sid=guest');
   await until(`typeof window.__setSpeed === 'function' && typeof window.__view === 'function' && typeof window.__gfxMode === 'function' && window.__shots`, 30000, boardName(spec) + ' 불러오기');
   await pump(1); await until('window.__LOADMS != null', 5000, boardName(spec) + ' 첫 프레임');
@@ -142,7 +115,7 @@ async function shootBoard(spec, outDir, onShot) {
     if (shot === 'hud') await setStyle(UI ? HIDE_UI : HIDE);
   }
   const errs = await evaluate('return window.__shots.errs.slice(0, 3)');
-  return { 판: boardName(spec), spec, 렌더러: meta.gl, 시뮬: meta.sim, 장면: out, 오류: pageErr.length + errs.length, 오류예: [...pageErr.slice(0, 2), ...errs.slice(0, 2)] };
+  return { 판: boardName(spec), spec, 렌더러: meta.gl, 시뮬: meta.sim, 장면: out, 오류: C.st.pageErr.length + errs.length, 오류예: [...C.st.pageErr.slice(0, 2), ...errs.slice(0, 2)] };
 }
 
 /* 두 장 견주기 — 이 브라우저 안에서(PNG 풀기 · 칸 짚기 · 차이 그림). 칸은 지금 페이지의 카메라(= 방금 찍은 장면)에서 __screenCell 로 짚는다(3칸마다 한 점 · ×9) */
@@ -169,7 +142,7 @@ async function compare(fileA, fileB, diffFile) {
 /* ── 돌리기 ── */
 let renderer = null;
 async function runAll(rootDir, outDir, label, onShot) {
-  SERVE = rootDir; fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true });
+  SRV.setRoot(rootDir); fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true });
   const rows = [];
   for (const b of BOARDS) { const [bn] = b.split('+');
     if (rootDir !== ROOT && bn !== '기본' && !fs.existsSync(path.join(rootDir, 'village/stages', bn + '.json'))) { NEWB.add(boardName(b)); rows.push({ 판: boardName(b), spec: b, 옛에없음: true, 장면: [] }); process.stderr.write(`  [${label}] ${boardName(b)} … 옛에 없음(새 판)\n`); continue; }
@@ -181,21 +154,7 @@ async function runAll(rootDir, outDir, label, onShot) {
 const pct = (n, all) => all ? Math.round(n / all * 1e6) / 1e4 : 0;   // 소수 넷째 자리 %
 let code = 0, report = null;
 try {
-  let list; for (let k = 0; k < 60; k++) { try { list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); break; } catch { await sleep(200); } }
-  if (!list) throw new Error('크로미움에 못 붙음');
-  ws = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
-  await new Promise((r, j) => { ws.addEventListener('open', r); ws.addEventListener('error', j); });
-  ws.addEventListener('message', e => { const m = JSON.parse(e.data);
-    if (m.id && wait.has(m.id)) { wait.get(m.id)(m); wait.delete(m.id); return; }
-    if (m.method === 'Fetch.requestPaused') { const u = m.params.request.url;                  /* 바깥 주소는 전부 막는다 — 이 서버와 data:/blob: 만 */
-      if (u.startsWith(BASE + '/') || u.startsWith('data:') || u.startsWith('blob:')) send('Fetch.continueRequest', { requestId: m.params.requestId }).catch(() => {});
-      else { blocked++; send('Fetch.failRequest', { requestId: m.params.requestId, errorReason: 'BlockedByClient' }).catch(() => {}); } }
-    else if (m.method === 'Network.requestWillBeSent') { inflight.add(m.params.requestId); lastNet = Date.now(); }
-    else if (m.method === 'Network.loadingFinished' || m.method === 'Network.loadingFailed') { inflight.delete(m.params.requestId); lastNet = Date.now(); }
-    else if (m.method === 'Runtime.exceptionThrown') pageErr.push(((m.params.exceptionDetails.exception || {}).description || m.params.exceptionDetails.text || '').split('\n')[0].slice(0, 160)); });
-  await send('Page.enable'); await send('Runtime.enable'); await send('Network.enable'); await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
-  await send('Emulation.setDeviceMetricsOverride', { width: VIEW.w, height: VIEW.h, deviceScaleFactor: 1, mobile: false });
-  await send('Page.addScriptToEvaluateOnNewDocument', { source: INIT });
+  C = await openChrome({ chrome: CHROME, view: VIEW, gl: GLARGS, init: INIT, allow: u => u.startsWith(BASE + '/') || u.startsWith('data:') || u.startsWith('blob:'), keep: flag('keep') });   /* 바깥 주소는 전부 막는다 — 이 서버와 data:/blob: 만 */
 
   const head = git('rev-parse', '--short', 'HEAD'), dirty = !!git('status', '--porcelain', '--', 'village'), nowLabel = '작업 트리 ' + head + (dirty ? ' + 고친 것' : '');
   const cond = { 판: BOARDS, 장면: SHOTS, 시각: HOUR, 그래픽: GFX, lookseed: LOOKSEED, 프레임: FRAMES, 화면: VIEW, UI };
@@ -204,7 +163,7 @@ try {
     const label = REF ? 'ref ' + REF + ' (' + git('rev-parse', '--short', REF) + ')' : nowLabel;
     fs.writeFileSync(path.join(BASEDIR, 'meta.json'), JSON.stringify({ 찍은때: new Date().toISOString(), 코드: label, 렌더러: renderer, 조건: cond, 판: rows.map(r => ({ 판: r.판, 실패: r.실패 || null, 오류: r.오류 || 0, 장면: r.장면.map(s => [s.shot, s.sha]) })) }, null, 1));
     const badRows = rows.filter(r => r.실패 || r.오류);
-    console.log(`기준 사진 ${rows.reduce((a, r) => a + r.장면.filter(s => s.file).length, 0)}장 — ${path.relative(ROOT, BASEDIR)} · ${label} · 렌더러 ${renderer} · 바깥 주소 막음 ${blocked}`);
+    console.log(`기준 사진 ${rows.reduce((a, r) => a + r.장면.filter(s => s.file).length, 0)}장 — ${path.relative(ROOT, BASEDIR)} · ${label} · 렌더러 ${renderer} · 바깥 주소 막음 ${C.st.blocked}`);
     badRows.forEach(r => console.log(`  ⚠ ${r.판}: ${r.실패 || '페이지 오류 ' + r.오류 + ' — ' + (r.오류예 || []).join(' / ')}`));
     code = badRows.length ? 1 : 0; report = { 기준: label, 렌더러: renderer, 판: rows };
   } else {
@@ -221,7 +180,7 @@ try {
     const rows = await runAll(ROOT, NOWDIR, '지금', onShot);
     if (baseGL && renderer && baseGL !== renderer) { console.error(`그리는 방식이 기준과 다르다 — 기준 ${baseGL} · 지금 ${renderer}. 같은 방식끼리만 견준다(기준을 다시 찍을 것).`); code = 2; }
     /* 표 */
-    const L = [`화면 회귀 — 판 ${BOARDS.length} × 장면 ${SHOTS.length} · 기준 ${baseLabel} · 지금 ${nowLabel} · 렌더러 ${renderer} · ${HOUR}시 · 그래픽 ${GFX} · lookseed ${LOOKSEED} · ${VIEW.w}×${VIEW.h}${UI ? ' · UI 포함' : ' · UI 숨김(3D·미니맵)'} · 허용 ${MAX}% (한 점 = 채널 차 > ${TOL}) · 바깥 주소 막음 ${blocked}`, '',
+    const L = [`화면 회귀 — 판 ${BOARDS.length} × 장면 ${SHOTS.length} · 기준 ${baseLabel} · 지금 ${nowLabel} · 렌더러 ${renderer} · ${HOUR}시 · 그래픽 ${GFX} · lookseed ${LOOKSEED} · ${VIEW.w}×${VIEW.h}${UI ? ' · UI 포함' : ' · UI 숨김(3D·미니맵)'} · 허용 ${MAX}% (한 점 = 채널 차 > ${TOL}) · 바깥 주소 막음 ${C.st.blocked}`, '',
       '| 판 | 장면 | 차이 % | 차이 점 | 차이 네모(화면) | 가장 많이 다른 칸 |', '|---|---|---|---|---|---|'];
     let over = 0, missing = 0; const softList = [];
     for (const r of rows) {
@@ -243,6 +202,6 @@ try {
     if (!code) code = over ? 1 : 0; report = { 기준: baseLabel, 지금: nowLabel, 렌더러: renderer, 판: rows, 바뀐판다름: softList, 새판: [...NEWB] };
   }
 } catch (e) { if (!e.quiet) console.error('멈춤: ' + (e.message || e)); code = 2; }
-finally { try { ws && ws.close(); } catch {} ch.kill('SIGKILL'); server.close(); await sleep(400); if (!flag('keep')) for (const d of temps) { try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {} } }
+finally { try { C && await C.close(); } catch {} SRV.close(); await sleep(400); if (!flag('keep')) for (const d of temps) { try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {} } }
 if (JSON_OUT && report) fs.writeFileSync(path.resolve(JSON_OUT), JSON.stringify(report, null, 1));
 process.exit(code);
