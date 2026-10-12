@@ -324,7 +324,7 @@ export function startServer({ port = 8870, host = '127.0.0.1', repo = DEFAULT_RE
   function sendHome(res, req) {
     const st = S.get('classRPG_v3/students') || {};
     const kids = Object.values(st).filter(s => s && s.id).map(s => `<li><a href="/student.html?as=${encodeURIComponent(s.id)}">${escHtml(s.name)}</a> <small>(${escHtml(s.id)})</small></li>`).join('');
-    const apps = ['art', 'coding', 'ink', 'music', 'paint', 'pattern', 'print', 'thinkboard', 'watercolor'].filter(a => fs.existsSync(path.join(repo, a, 'index.html')))
+    const apps = ['art', 'coding', 'ink', 'mathgap', 'music', 'paint', 'pattern', 'print', 'thinkboard', 'watercolor'].filter(a => fs.existsSync(path.join(repo, a, 'index.html')))
       .map(a => `<a href="/${a}/">${a}</a>`).join(' · ');
     res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' });
     res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>가짜 DB 시연</title>

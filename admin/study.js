@@ -214,6 +214,7 @@ const LEARN_APPS = [
   { key: 'art',     icon: '🔍', name: '명화 탐정',   what: '탐정 기록 · 질문 사다리 · 조형 요소 찾기' },
   { key: 'ink',     icon: '🖌️', name: '먹 연구소',   what: '헷갈림 지도 · 농담(진함·옅음) · 먹색 꼬리' },
   { key: 'print',   icon: '🖨️', name: '판화 놀이',   what: '헷갈림 지도 · 거울(좌우 반전) 실수 · 넘쳐 팜' },
+  { key: 'mathgap', icon: '🧮', name: '오늘의 수학', what: '단원 열기 · 우리 반 탑 · 막힌 차시 · 수업 추천 · 자주 나온 실수' },
 ];
 function learnAppUrl(key) { return key + '/index.html?teacher=1#/t'; }
 function renderLearnAppsPage() {
