@@ -368,10 +368,68 @@ function _charGroupRe(cls) {
 function _grabGroup(svg, cls) { const m = svg.match(_charGroupRe(cls)); return m ? m[0] : ''; }
 function _dropGroup(svg, cls) { return svg.replace(_charGroupRe(cls), ''); }
 
+// ══ 캐릭터 모습 층 (CHAR-LOOK-0) ════════════════════════════════
+//  base_1~4 한 장에 묶여 있던 피부·머리 모양·머리색·눈색·입을 층으로 나눴다.
+//   lk_body.svg  — 몸·얼굴 틀. 색 자리 {{SKIN}} {{SKIN_SH}} {{EYE}} {{HAIR}}(눈썹) · 머리 자리 {{hair-bottom|mid|cap|top}} · {{mouth}}
+//   lk_hair_<모양>.svg — hair-bottom·hair-mid·hair-cap·hair-top 묶음(없는 묶음은 빈칸) · 색 {{HAIR}} {{HAIR_HI}}
+//  색은 파일을 늘리지 않고 자리표시를 바꿔 끼운다. charType 1~4 의 조합은 옛 base_N 과 **글자 하나까지 같다**
+//  (scripts/unit/char-look-check.mjs). 층 파일이 안 오면 base_N 으로 그린다.
+//  look 은 아직 저장하지 않는다 — 저장(LOOK-2)은 사용자 승인 뒤. docs/char_look_custom_design_20260928.md
+const CHAR_LOOK = {
+  skin:      { s1: ['#f6cf9e', '#d9a874'], s2: ['#fadcbb', '#e0b48e'], s3: ['#c68642', '#9e6530'], s4: ['#9a5f34', '#734422'] },
+  hairColor: { brown: ['#5a3a1e', '#7d5630'], purple: ['#7b4fa8', '#9d74c9'], navy: ['#2b3f7a', '#3f5aa3'], green: ['#3f7a3a', '#5c9c55'] },
+  eye:       { brown: '#3e2723', violet: '#5e2b8a', blue: '#1a3a78', green: '#245e2a' },
+  hair:      { messy: 1, long: 1, short: 1, pony: 1 },
+  mouth: {
+    a: '<path d="M55,53 q5,3 10,0" fill="none" stroke="#2b2118" stroke-width="1.6" stroke-linecap="round"/>',
+    b: '<path d="M55,53 q5,4 10,0" fill="none" stroke="#c9504a" stroke-width="1.8" stroke-linecap="round"/>',
+  },
+};
+const CHAR_LOOK_OF_TYPE = {
+  1: { skin: 's1', hair: 'messy', hairColor: 'brown',  eye: 'brown',  mouth: 'a' },
+  2: { skin: 's2', hair: 'long',  hairColor: 'purple', eye: 'violet', mouth: 'b' },
+  3: { skin: 's3', hair: 'short', hairColor: 'navy',   eye: 'blue',   mouth: 'a' },
+  4: { skin: 's4', hair: 'pony',  hairColor: 'green',  eye: 'green',  mouth: 'b' },
+};
+
+// 학생의 모습 — charType 기본값 위에 look(있으면) 칸별로 덮는다. 모르는 값은 기본값(데이터가 코드보다 앞서도 안 깨짐).
+function charLookOf(s) {
+  const ct = (s && s.charType >= 1 && s.charType <= 4) ? s.charType : 1;
+  const out = { ...CHAR_LOOK_OF_TYPE[ct] };
+  const lk = (s && s.look && typeof s.look === 'object') ? s.look : null;
+  if (lk) {
+    if (CHAR_LOOK.skin[lk.skin])           out.skin = lk.skin;
+    if (CHAR_LOOK.hair[lk.hair])           out.hair = lk.hair;
+    if (CHAR_LOOK.hairColor[lk.hairColor]) out.hairColor = lk.hairColor;
+    if (CHAR_LOOK.eye[lk.eye])             out.eye = lk.eye;
+    if (CHAR_LOOK.mouth[lk.mouth])         out.mouth = lk.mouth;
+  }
+  return out;
+}
+
+// 층을 합쳐 base 한 장 문자열을 만든다. 층 파일이 없으면 null.
+const _charLookCache = {};
+function composeCharBase(look) {
+  const body = _CHAR_SVG['lk_body'], hairSvg = _CHAR_SVG['lk_hair_' + look.hair];
+  if (!body || !hairSvg) return null;
+  const key = [look.skin, look.hair, look.hairColor, look.eye, look.mouth].join('|');
+  if (_charLookCache[key]) return _charLookCache[key];
+  const [skin, skinSh] = CHAR_LOOK.skin[look.skin], [hair, hairHi] = CHAR_LOOK.hairColor[look.hairColor];
+  let out = body;
+  ['hair-bottom', 'hair-mid', 'hair-cap', 'hair-top'].forEach(g => { out = out.replace('{{' + g + '}}', _grabGroup(hairSvg, g)); });
+  out = out.replace('{{mouth}}', CHAR_LOOK.mouth[look.mouth])
+           .split('{{SKIN}}').join(skin).split('{{SKIN_SH}}').join(skinSh)
+           .split('{{EYE}}').join(CHAR_LOOK.eye[look.eye])
+           .split('{{HAIR_HI}}').join(hairHi).split('{{HAIR}}').join(hair);
+  return (_charLookCache[key] = out);
+}
+
 // 받아올 84장의 이름
 function _charFileNames() {
   const out = [];
   for (let i = 1; i <= 4;  i++) out.push('base_' + i);
+  out.push('lk_body');                                                  // [CHAR-LOOK-0] 층 나눈 몸 틀 + 머리 모양
+  Object.keys(CHAR_LOOK.hair).forEach(h => out.push('lk_hair_' + h));
   for (let i = 1; i <= 30; i++) out.push('body_e_b' + i);
   for (let i = 1; i <= 10; i++) out.push('head_e_h' + i, 'glove_e_g' + i, 'shoe_e_s' + i,
                                          'weapon_e_w' + i, 'weapon_e_ws' + i);
@@ -445,7 +503,7 @@ function _charAuraSVG(eq) {
 // 종이인형 합성. base 가 없으면 null 을 돌려 호출부가 폴백하게 한다.
 function buildCharDoll(s) {
   const ct = (s && s.charType >= 1 && s.charType <= 4) ? s.charType : 1;
-  let base = _CHAR_SVG['base_' + ct];
+  let base = composeCharBase(charLookOf(s)) || _CHAR_SVG['base_' + ct];   // [CHAR-LOOK-0] 층 → 없으면 옛 한 장
   if (!base) return null;
 
   const eq = (s && s.equipmentIds) || {};

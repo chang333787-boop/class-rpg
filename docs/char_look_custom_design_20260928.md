@@ -1,6 +1,7 @@
 # 캐릭터 머리·얼굴·피부 따로 고르기 — 설계 (CHAR-LOOK-1 · 2026-09-28)
 
-> **상태: 설계만. 구현 전 사용자 승인 필요** (학생 저장 구조에 새 필드 — CLAUDE.md §6 고위험).
+> **상태: LOOK-0 완료(10-12, 층 나누기·저장 무변경).** LOOK-2(look 저장)부터는 사용자 승인 필요 (학생 저장 구조에 새 필드 — CLAUDE.md §6 고위험).
+> LOOK-0 실제: 몸 틀 `lk_body.svg` 1장 + 머리 `lk_hair_{messy,long,short,pony}.svg` + 색·입 표 `CHAR_LOOK`(student/char.js). 네 base 는 색만 빼면 완전히 같은 틀이었다(피부·그늘·눈동자·눈썹=머리색). 옛 base_N 과 글자 하나까지 같음 = `scripts/unit/char-look-check.mjs`. base_N 은 폴백·검사기용으로 남김.
 > 앞선 작업: CHAR-DRESS-FIT-1(겹침 규칙·어깨·위팔) · CHAR-IDLE-1(숨쉬기·깜빡임) · SHOP-TRYON-1 · CHAR-AURA-1 — PR #1117.
 
 ## 1. 지금 구조 (조사 결과)
