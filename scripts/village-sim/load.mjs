@@ -1,6 +1,6 @@
 // 마을 한 판을 node 에 통째로 싣는다 — village/index.html 은 한 줄도 안 고친다(엔진 제안서 ①).
 // three 는 진짜(계산만) · 렌더러와 DOM 은 무엇을 불러도 빈 값을 돌려주는 가짜 · Math.random 은 시드.
-// 네트워크 0: fetch 는 늘 거절 · sync.js 는 싣지 않는다(module 만) · sid 는 늘 guest.
+// 네트워크 0: fetch 는 늘 거절 · sync.js 는 싣지 않는다(module 만) · sid 는 guest(?sid=guest — 판 + 해시 n= 이면 그 번호 · 가짜 저장소 안에서만).
 // 한 프로세스에 한 판만 — 모듈 상태가 전역이라 두 판을 한 프로세스에 싣지 않는다(run.mjs 가 판마다 새 프로세스를 띄운다).
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 
@@ -32,16 +32,26 @@ function any() {
   });
 }
 
-function fakeGlobals({ saveText, hash, query, root }) {
+function fakeGlobals({ saveText, hash, query, root, store, session }) {
   const g = globalThis, def = (k, v) => Object.defineProperty(g, k, { value: v, configurable: true, writable: true });
   const ls = new Map(); if (saveText != null) ls.set('rpg.village.guest', saveText);
   /* 판(?stage=id)은 저장 칸이 따로다(`rpg.village.guest.<id>` · index.html stageKeyPart) — 그래서 --save 와 --stage 를 함께 주면
      저장본이 기본 칸에만 들어가 판이 **빈 땅으로** 열렸다. 판 칸에도 같은 저장본을 넣는다(흐름이 켜진 판에서 시험 판을 재려면 이게 있어야 한다). */
   { const st = /(?:^|&)stage=([^&]*)/.exec(query || ''); const id = st ? decodeURIComponent(st[1]).replace(/[^a-z0-9\-]/g, '').slice(0, 40) : '';
     if (saveText != null && id) ls.set('rpg.village.guest.' + id, saveText); }
-  def('localStorage', { getItem: k => ls.has(k) ? ls.get(k) : null, setItem: (k, v) => ls.set(k, String(v)), removeItem: k => ls.delete(k), key: i => [...ls.keys()][i] ?? null, clear: () => ls.clear(), get length() { return ls.size; } });
-  def('sessionStorage', g.localStorage);
+  for (const [k, v] of Object.entries(store || {})) ls.set(k, String(v));   // [MAC-C0T] opts.store — 시험에서 미리 넣을 키(시각 키 · 번호 칸 …)
+  const box = m => ({ getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i] ?? null, clear: () => m.clear(), get length() { return m.size; } });
+  def('localStorage', box(ls));
+  g.__simSession = new Map(Object.entries(session || {}).map(([k, v]) => [k, String(v)])); def('sessionStorage', box(g.__simSession));   // 탭 저장소는 따로(opts.session)
   def('location', new URL('http://sim.local/village/index.html?sid=guest&dev=1' + (query ? '&' + query : '') + '#' + (hash || '')));
+  /* [MAC-C0T] 주소 옮기기는 하지 않고 적는다(__simNav) — URL 객체엔 replace · assign · reload · history 가 없어 싣는 중(twoClear(true))에 부르면 LOAD ERR 였다.
+     다시싣기 = 브라우저 규칙 그대로: 지금 문서 주소(조각 뺀)와 같고 조각이 붙은 주소는 조각 이동이라 다시 안 싣는다(그때만 location.hash 를 바꾼다) · history 는 주소만 바꾼다 */
+  g.__simNav = [];
+  const nav = how => u => { const L = g.location, to = new URL(String(u), L.href), frag = how !== 'reload' && /#/.test(String(u)) && to.href.split('#')[0] === L.href.split('#')[0];
+    g.__simNav.push({ 어떻게: how, 주소: to.href, 다시싣기: !frag }); if (frag) L.hash = to.hash; };
+  for (const how of ['replace', 'assign', 'reload']) Object.defineProperty(g.location, how, { value: how === 'reload' ? () => nav('reload')(g.location.href) : nav(how), configurable: true });
+  const hist = how => (s, t, u) => { if (u != null) g.location.href = new URL(String(u), g.location.href).href; g.__simNav.push({ 어떻게: how, 주소: g.location.href, 다시싣기: false }); };
+  def('history', { length: 1, state: null, replaceState: hist('replaceState'), pushState: hist('pushState'), back() {}, forward() {}, go() {} });
   def('navigator', { userAgent: 'village-sim', maxTouchPoints: 0, language: 'ko', onLine: false });
   def('document', any()); def('window', g); def('self', g);
   // 네트워크를 쓰려 한 주소 — 쓰려 해도 늘 거절한다. 마을 자기 파일(모델 glb 등 같은 출처)은 __simLocal, 그 밖은 __simNet 에 센다
@@ -67,7 +77,7 @@ function fakeGlobals({ saveText, hash, query, root }) {
   return ls;
 }
 
-/* opts: { root, html, saveText, seed, lookSeed, stageSeed, hash, query, quiet } → 마을의 window(시험 훅 __*) */
+/* opts: { root, html, saveText, seed, lookSeed, stageSeed, hash, query, store, session, quiet } → 마을의 window(시험 훅 __*) · 주소 옮김 기록 window.__simNav · 탭 저장소 window.__simSession */
 export async function loadVillage(opts) {
   const root = opts.root, html = fs.readFileSync(opts.html ? path.resolve(root, opts.html) : path.join(root, 'village/index.html'), 'utf8');   // opts.html: 다른 index.html(전/후 비교용 · vendor·stages 는 root 것)
   const m = html.match(/<script type="module">([\s\S]*?)<\/script>/);

@@ -25,7 +25,7 @@ node scripts/village-d/dcheck.mjs --help                               # 옵션 
   남는 줄과 조건(창 · 그래픽 · 단계 · lookseed · simrand · 렌더러 · 시각 · 읽기)이 다르면 섞지 않고 FAIL — 그 판까지 함께 재거나, 견주기만 할 땐 `--dc-out tmp/…`.
 
 ## 지키는 것
-- **sid 는 늘 guest** — 운영 저장본 · 운영 DB 에 닿지 않는다. 판(`?stage=`)은 원격 동기를 끈다(엔진) — dcheck 가 그것도 확인한다.
+- **sid 는 guest · 판 + `#n=` 은 그 번호가 SID** — 판은 원격 동기 꺼짐(sync.js 를 싣지도 않는다 — 엔진) · 임시 프로필 · 운영 DB 0. 기본 마을도 sid=guest 라 sync.js 가 네트워크를 안 쓴다. dcheck 가 그것도 확인한다.
 - **바깥 주소는 전부 막는다**(이 서버와 `data:` · `blob:`만 통과). 막은 채 **시도를 주소째 적는다**(`result.json` 의 `바깥시도`). `?stage=` 페이지는 바깥 시도 0 이 기대다.
 - **크롬 동시 실행 금지**(발열) — village-look · village-check · gate 와 같은 때 돌리지 않는다. 끝나면 브라우저 · 서버를 닫는다.
 - 크롬 = `CHROME=` 가 먼저 · 없으면 ms-playwright 캐시의 chrome-headless-shell 가운데 가장 새 빌드 · 맥은 Metal GPU.
@@ -69,3 +69,14 @@ node scripts/village-d/dcheck.mjs --scene lk     # 약 1분 반 — 카드가 �
 - **되돌리기**: `VRULES.lookKit.on = false` → 끝 카드 · 되묻기가 옛 꼴(틀 표지 0) · 지문 같음(단추 글꼴까지) · 되묻기 옛 그대로 셋이 옛 askCss 와 같음.
 - **양성 대조**(헛 PASS 막기): 긴 글 → 넘침 잡음 · 모서리 한 칸 → 지문 잡음 · 막을 불투명하게 → 마을 그림 잣대 잡음 · 크게가 실제로 글(15 → 18.75px)과 사진(320 → 240)을 바꿈 · 몸 안 단추는 카드를 안 닫음(단추 명시적 묶기).
 - 재는 동안 CSS 전환 · 움직임을 끈다(`.card` 의 `transition: .1s` 가 잰 값을 흔든다). 사진은 help-places · town3 두 판만.
+
+## 장면 c0t — 교실 기기 기록 ([MAC-C0T] · PA-12)
+```
+node scripts/village-d/dcheck.mjs --scene c0t    # 약 20초 — help-places · 번호 1 · 2 · c3-07(가짜 번호)
+```
+- **(가)** 판 `?stage=help-places#n=1` = 요청 목록에 sync.js 0 · sync 태그 0 · 바깥 시도 0 · 요청 주소에 `#` · `n=` 0 / 양성 대조: 기본 마을 sync.js 1건 · `VillageSync.current`(부팅) · 그 태그가 module 앞 · 캐시버스터 그대로.
+- **(나)** `#n=c3-07` → [시작] · 결정 A → ↺ 처음부터 → 되묻기 [↺] → **다시 실림**(앞 문서에 심은 표지가 사라지고 `performance.timeOrigin` 이 바뀜 · 주소에 `?r=`) · 해시 `#n=c3-07` · 저장 키 c3-07 · 시작판.
+- **(다)** 번호 1 · 2 로 몇 수 → `#기록지움,n=1` 로 엶 → 다시 실린 문서의 **첫 순간**(새 문서 스크립트 `Page.addScriptToEvaluateOnNewDocument` — 마을 module 이 쓰기 전) help-places 키 `[]` ·
+  해시 `#n=1` · 시작 카드 첫날부터 · `rpg.village.guest` 그대로 · 토스트 글(`#toast` 를 MutationObserver 로 적음). 양성 대조: 처음 연 문서의 첫 순간엔 키가 있었다. (다-2) 해시만 바꿔도(hashchange) 같은 몸.
+- **(라)** 시각 키를 −1시간으로 써 두고 다시 열면 이어짐 · −4시간이면 시작판(서로 양성 대조). 시각 키는 **마을 밖 쪽(rules.json)에서** 쓴다 — 마을이 닫힐 때 저장(pagehide)이 시각 키를 지금으로 덮는다.
+- 마을 밖 쪽을 거쳐 연다 — 같은 주소에 해시만 다른 주소로 `Page.navigate` 하면 조각 이동이라 다시 안 실린다(엔진 사실 H17 #9 와 같은 까닭).

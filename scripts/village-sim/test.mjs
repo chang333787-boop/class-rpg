@@ -233,6 +233,144 @@ process.stdout.write('@@' + JSON.stringify({ 처음, 저장0, 배속, 뒤: w.__c
       '(마) 되돌리기 스위치(stageClock.on = false) — 쥔 채 저장 0(옛 값) · __setSpeed(4) 는 다시 쥐지 않음 ' + J({ 쥔: off.처음.쥔, 저장0: off.저장0, 단추: off.배속, 되쥠: off.뒤.되쥠, 저장: off.저장 }));
   });
 }
+/* [MAC-C0T] PA-12 C0-T 기기 기록 + C0-H 해시 낱말 — 무화면 몫(화면 몫 — 다시 실림 · 토스트 · sync.js 요청 — 은 dcheck --scene c0t). 판 = help-places(시작 저장본 · 결정 칸).
+   load.mjs: opts.store(미리 넣을 키) · opts.session(탭 저장소) · location.replace/assign/reload 는 적기만(__simNav — 다시싣기 = 조각 이동이 아님) · history 는 주소만.
+   Date.now 는 싣는 순간 멈춘다 — 시각 키는 싣기 전 지금(now) 기준으로 넣고, 적힌 값은 멈춘 값(frozen)과 견준다.
+   C0T (가) 번호 → SID: c3-07 · 07(글 그대로 — HP 는 7) · t · 교사(퍼센트 · 날글) → t · 한글 이름 · 7번 · 41자 → guest + 번호 칸 0 · & · 차례 무관 · 해시 없음 · adv · full · demo · guest · 반 기호 adv → 번호 없음 · 기본 마을 · 구경은 무시
+       (나) 3시간: −4시간 → 지움 1 · 마을 · guide 지움 · 시작판 / −1시간 → 이어짐 / 시각 키 없음 → 적기만 / 앞머리 같은 번호 보존 / 시계가 뒤로 → 지움 0 / 번호 둘 → 그 번호만
+       (다) #기록지움(정오 ① ② ③): 시각 키가 있는 번호 전부 · 뒤붙이(.backup · .broken · .지난놓은 · .offered · .물없음)까지 / 시각 키 없는 번호(?sid=) · guest · 다른 판 · 앞머리 같은 번호는 그대로 ·
+           싣는 중 location.replace 인데 LOAD ERR 0 · 다시싣기(?r= · 조각 이동 아님) · 해시 = 기록지움만 뺌 · & 로 이어도 · 저장 꺼짐(__save 해도 그 키 없음) · 표지 → 다시 실린 판이 읽고 지움 ·
+           #n= 없는 판 = 옛 몸(그 번호 카드 기록만 · 해시 지움 · 다시 싣지 않음)
+       (라) 저장이 되면 시각 키를 지금으로 · 꺼져 있으면(c0t 끔 · savingOff) 안 적음 · 번호 없는 판은 시각 키 0 · voteReset = ?r= + #n=(원래 줄) · 하네스 양성 대조(같은 주소 + # = 조각 이동)
+       (마) 되돌리기 VRULES.c0t.on = false(엔진 기본값 한 줄을 바꾼 사본 — 판 `규칙` 은 싣기 뒤라 못 끔) — 3시간 지움 0 · 시각 키 그대로 · #기록지움 옛 몸 · 번호 읽기는 남음
+       (바) 판에서 sync.js 를 안 싣는 고전 스크립트 — 엔진 STAGE.id(구경이면 null · stageIdOf) 와 같은 주소에서만 안 씀 · 쓰는 태그 꼴 · module 앞 · 옛 태그 0
+   C0H 사례 셋: n=c3-07,끝 · 기록지움,n=c3-07 · 말2=vi,소리=끔 (+ 반 · 학년 · 대사 · 크게 · end · 모르는 낱말 · 같은 낱말 둘) */
+const c0One = c => new Promise(done => {
+  const J = JSON.stringify, src = `import { loadVillage } from ${J(path.join(HERE, 'load.mjs'))}; import fs from 'node:fs';
+const now = Date.now(), H = 3600e3, START = fs.readFileSync(${J(path.join(ROOT, 'village/stages/starts/help-places.json'))}, 'utf8');
+const { w, ls } = await loadVillage({ root: ${J(ROOT)}, saveText: null, seed: 1, query: ${J(c.query != null ? c.query : 'stage=help-places')}, hash: ${J(c.hash || '')}, store: ${c.store || '{}'}, session: ${c.session || '{}'}${c.html ? ', html: ' + J(c.html) : ''} });
+const o = { now, frozen: Date.now(), st: w.__stage(), c0: w.__c0t(), h: w.__c0hash(), nav: w.__simNav.slice(), ss: Object.fromEntries(w.__simSession), keys: [...ls.keys()].sort(), 해시: w.location.hash };
+${c.body || ''}
+process.stdout.write('@@' + JSON.stringify(o) + '\\n', () => process.exit(0));`;
+  const p = spawn(process.execPath, ['--input-type=module', '-e', src], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let out = '', err = '';
+  p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { err += d; });
+  p.on('close', () => { const l = out.split('\n').find(x => x.startsWith('@@')), e = (err || out).trim().split('\n');
+    done(l ? JSON.parse(l.slice(2)) : { 오류: c.n + ' — ' + (e.filter(x => /Error|ERR/.test(x)).slice(-1)[0] || e.slice(-1)[0] || '출력 없음') }); }); });
+{ const J = JSON.stringify, R = {}, OFF = path.join(os.tmpdir(), 'village-sim-c0t-off-' + process.pid + '.html'), ON = '(window.VRULES = window.VRULES || {}).c0t = { on: true, 시간: 3 };';
+  const html = fs.readFileSync(path.join(ROOT, 'village/index.html'), 'utf8'), onN = html.split(ON).length - 1;
+  const old4 = `{ 'rpg.village.c3-07.help-places': START, 'rpg.guide.c3-07': '1', 'rpg.stagetime.c3-07.help-places': String(now - 4 * H) }`;
+  const WIPE = `{ 'rpg.village.t.help-places': START, 'rpg.stagecard.t.help-places': '{"started":1}',
+    'rpg.village.c3-07.help-places': START, 'rpg.village.c3-07.help-places.backup': START, 'rpg.village.c3-07.help-places.broken': 'x', 'rpg.stagecard.c3-07.help-places': '{"started":1}',
+    'rpg.stagecard.c3-07.help-places.지난놓은': '{}', 'rpg.stagetime.c3-07.help-places': String(now - H), 'rpg.guide.c3-07': '1', 'rpg.album.c3-07': '[]', 'rpg.snap.c3-07': '{}', 'rpg.like.c3-07': '{}',
+    'rpg.village.title.c3-07': '{}', 'rpg.village.title.c3-07.offered': '1', 'rpg.village.awaySeen.c3-07.물없음': '1', 'rpg.village.jobsNews.c3-07': '1',
+    'rpg.village.stu1.help-places': START, 'rpg.stagecard.stu1.help-places': '{}', 'rpg.album.stu1': '[]', 'rpg.guide.guest': '1', 'rpg.album.guest': '[]', 'rpg.village.guest': START,
+    'rpg.village.c3-07.farm': START, 'rpg.stagetime.c3-07.farm': String(now), 'rpg.guide.c3-0': '1', 'rpg.stagetime.x9.farm': String(now), 'rpg.village.x9.help-places': START, 'rpg.album.x9': '[]' }`;
+  const C = [{ n: 'c307', hash: 'n=c3-07' }, { n: '07', hash: 'n=07' }, { n: 't', hash: 'n=t' }, { n: '교사', hash: 'n=%EA%B5%90%EC%82%AC' }, { n: '교사날글', hash: 'n=교사' },
+    { n: '김', hash: 'n=%EA%B9%80' }, { n: '7번', hash: 'n=7번' }, { n: '41자', hash: 'n=' + 'a'.repeat(41) }, { n: '&', hash: 'n=c3-07&끝' }, { n: '차례', hash: '끝,n=c3-07' }, { n: '없음', hash: '' },
+    { n: 'adv', hash: 'n=adv-07' }, { n: 'full', hash: 'n=c3-full' }, { n: 'demo', hash: 'n=demo7' }, { n: 'guest', hash: 'n=guest' }, { n: '반adv', hash: '반=adv,n=07' },
+    { n: '기본', query: '', hash: 'n=c3-07' }, { n: '구경', query: 'stage=help-places&visit=c3-07', hash: 'n=c3-07' },
+    { n: '4시간', hash: 'n=c3-07', store: old4 },
+    { n: '1시간', hash: 'n=c3-07', store: `{ 'rpg.village.c3-07.help-places': START, 'rpg.guide.c3-07': '1', 'rpg.stagetime.c3-07.help-places': String(now - 1 * H) }` },
+    { n: '시각없음', hash: 'n=c3-07', store: `{ 'rpg.village.c3-07.help-places': START }` },
+    { n: '앞머리', hash: 'n=c3-07', store: `{ 'rpg.guide.c3-0': '1', 'rpg.guide.c3-07': '1', 'rpg.stagetime.c3-07.help-places': String(now - 4 * H) }` },
+    { n: '앞머리2', hash: 'n=c3-0', store: `{ 'rpg.guide.c3-0': '1', 'rpg.guide.c3-07': '1', 'rpg.album.c3-07': '[]', 'rpg.village.title.c3-07.offered': '1', 'rpg.stagetime.c3-0.help-places': String(now - 4 * H) }` },
+    { n: '뒤로', hash: 'n=c3-07', store: `{ 'rpg.village.c3-07.help-places': START, 'rpg.stagetime.c3-07.help-places': String(now + 2 * H) }` },
+    { n: '둘', hash: 'n=1', store: `{ 'rpg.village.1.help-places': START, 'rpg.village.2.help-places': START, 'rpg.stagetime.1.help-places': String(now - 4 * H), 'rpg.stagetime.2.help-places': String(now - 4 * H) }` },
+    { n: '지움', hash: '기록지움,n=t', store: WIPE, body: `w.__save(); o.저장뒤 = [...ls.keys()].filter(k => k.includes('.t.help-places'));` },
+    { n: '지움&', hash: 'n=c3-07&기록지움&끝', store: `{ 'rpg.village.c3-07.help-places': START }` },
+    { n: '다시', hash: 'n=t', session: `{ 'rpg.c0t.wiped.help-places': '2' }` },
+    { n: '옛몸', hash: '기록지움', store: `{ 'rpg.stagecard.guest.help-places': '{"started":1}', 'rpg.village.guest.help-places': START, 'rpg.village.c3-07.help-places': START, 'rpg.stagetime.c3-07.help-places': String(now - H) }` },
+    { n: '저장', hash: 'n=c3-07', body: `const k = 'rpg.stagetime.c3-07.help-places'; ls.set(k, '1'); w.__save(); o.저장뒤 = ls.get(k); o.저장시각 = w.__c0t().stats.저장시각;
+w.VRULES.c0t.on = false; ls.set(k, '2'); w.__save(); o.끈뒤 = ls.get(k); w.VRULES.c0t.on = true;
+o.되돌림 = w.__voteReset(true); ls.set(k, '3'); w.__save(); o.꺼진뒤 = ls.get(k); o.nav2 = w.__simNav.slice();` },
+    { n: '번호없음', hash: '', body: `w.__save(); o.시각키들 = [...ls.keys()].filter(k => k.startsWith('rpg.stagetime.')); o.되돌림 = w.__voteReset(true); o.nav2 = w.__simNav.slice();` },
+    { n: '조각', hash: 'n=c3-07', body: `const last = () => w.__simNav[w.__simNav.length - 1]; w.location.replace(w.location.href); o.조각1 = last();
+w.location.replace(w.location.pathname + w.location.search + '#n=x'); o.조각2 = last(); o.조각2해시 = w.location.hash; w.location.replace(w.__reopenUrl() + w.location.hash); o.다시1 = last();` },
+    { n: 'H1', hash: 'n=c3-07,끝' }, { n: 'H2', hash: '기록지움,n=c3-07' }, { n: 'H3', hash: '말2=vi,소리=끔' }, { n: 'H4', hash: '반=c3,n=1,n=2,학년=3,대사=끔,크게,zz=9,end' },
+    { n: '끔4시간', html: OFF, hash: 'n=c3-07', store: old4 },
+    { n: '끔지움', html: OFF, hash: '기록지움,n=t', store: `{ 'rpg.village.t.help-places': START, 'rpg.stagecard.t.help-places': '{}', 'rpg.village.c3-07.help-places': START, 'rpg.stagetime.c3-07.help-places': String(now) }` }];
+  try { if (onN === 1) fs.writeFileSync(OFF, html.replace(ON, ON.replace('on: true', 'on: false')));
+    const out = new Array(C.length); let next = 0;   /* 판 하나 = 프로세스 하나 — 여섯씩 나란히 */
+    await Promise.all(Array.from({ length: Math.min(6, C.length) }, async () => { while (next < C.length) { const i = next++; out[i] = await c0One(C[i]); } }));
+    C.forEach((c, i) => { R[c.n] = out[i]; });
+  } finally { fs.rmSync(OFF, { force: true }); }
+  const bad = () => { const b = C.filter(c => !R[c.n] || R[c.n].오류); ok(!b.length, '못 돎(LOAD ERR?): ' + b.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / ')); };
+  const key = n => R[n].st.저장키, num = n => R[n].c0.번호, has = (n, k) => R[n].keys.includes(k), url = x => new URL(x.주소), stamp = n => R[n].keys.filter(k => k.startsWith('rpg.stagetime.'));
+  test('C0T (가) 번호 → SID: 판 + #n=c3-07 · 07 · t · 교사 → 그 번호 칸 · 시각 키 / 한글 · % · 41자 · adv · full · demo · guest → guest(번호 칸 0) · & · 차례 무관 · 기본 마을 · 구경 · 해시 없음은 번호 없음', () => { bad();
+    ok(key('c307') === 'rpg.village.c3-07.help-places' && num('c307') === 'c3-07' && R.c307.c0.시각키 === String(R.c307.frozen) && R.c307.st.시작판 === true, 'c3-07 ' + J({ 키: key('c307'), c0: R.c307.c0 }));
+    ok(key('07') === 'rpg.village.07.help-places' && num('07') === '07', 'n=07 은 글 그대로(HP 는 7) ' + key('07'));
+    ok(key('t') === 'rpg.village.t.help-places' && num('t') === 't', '교사 기기 n=t ' + key('t'));
+    ok(['교사', '교사날글'].every(n => key(n) === 'rpg.village.t.help-places' && num(n) === 't'), 'n=교사(퍼센트 · 날글) → t ' + J(['교사', '교사날글'].map(key)));
+    ok(['김', '7번', '41자'].every(n => key(n) === 'rpg.village.guest.help-places' && num(n) === null && R[n].c0.시각키 === null && !stamp(n).length && !R[n].keys.some(k => /EA|B9|%|7번|aaaa/.test(k))),
+      '틀린 꼴 n= → guest · 번호 칸 0 ' + J(['김', '7번', '41자'].map(n => [key(n), num(n), R[n].keys])));
+    ok(['&', '차례'].every(n => key(n) === 'rpg.village.c3-07.help-places' && R[n].h.끝 === true), '& · 차례 무관 ' + J(['&', '차례'].map(n => [key(n), R[n].h])));
+    ok(key('없음') === 'rpg.village.guest.help-places' && num('없음') === null && R.없음.c0.시각키 === null && !stamp('없음').length, '해시 없음 ' + J([key('없음'), stamp('없음')]));
+    ok(['adv', 'full', 'demo', 'guest', '반adv'].every(n => num(n) === null && key(n) === 'rpg.village.guest.help-places' && !stamp(n).length), 'adv · full · demo · guest · 반 adv → 번호 없음(정오 ④) ' + J(['adv', 'full', 'demo', 'guest', '반adv'].map(n => [num(n), key(n)])));
+    ok(key('기본') === 'rpg.village.guest' && num('기본') === null && !stamp('기본').length && R.구경.st.id === null && num('구경') === null && !stamp('구경').length, '기본 마을 · 구경은 #n= 무시 ' + J([key('기본'), R.구경.st]));
+  });
+  test('C0T (나) 3시간: −4시간 → 그 번호 마을 · guide 지움 · 시작판 새로 / −1시간 → 이어짐 / 시각 키 없음 → 적기만 / 앞머리 같은 번호(c3-0) 그대로 / 시계가 뒤로 → 지움 0 / 번호 둘 → 그 번호만', () => { bad();
+    const a4 = R['4시간'], a1 = R['1시간'], n0 = R.시각없음, pf = R.앞머리, bk = R.뒤로, tw = R.둘;
+    ok(a4.c0.지움 === 1 && a4.c0.지운키.includes('rpg.village.c3-07.help-places') && a4.c0.지운키.includes('rpg.guide.c3-07') && !has('4시간', 'rpg.guide.c3-07') && a4.st.시작판 === true && a4.c0.시각키 === String(a4.frozen),
+      '−4시간 ' + J({ c0: a4.c0, 시작판: a4.st.시작판 }));
+    ok(a1.c0.지움 === 0 && a1.st.시작판 === false && has('1시간', 'rpg.guide.c3-07') && a1.c0.시각키 === String(a1.frozen), '−1시간 이어짐 ' + J({ c0: a1.c0, 시작판: a1.st.시작판 }));
+    ok(n0.c0.지움 === 0 && n0.c0.시각 === null && n0.st.시작판 === false && n0.c0.시각키 === String(n0.frozen), '시각 키 없음 → 적기만 ' + J({ c0: n0.c0, 시작판: n0.st.시작판 }));
+    ok(pf.c0.지움 === 1 && !has('앞머리', 'rpg.guide.c3-07') && has('앞머리', 'rpg.guide.c3-0'), '앞머리 같은 번호 ' + J(pf.keys));
+    ok(R.앞머리2.c0.지움 === 1 && !has('앞머리2', 'rpg.guide.c3-0') && ['rpg.guide.c3-07', 'rpg.album.c3-07', 'rpg.village.title.c3-07.offered'].every(k => has('앞머리2', k)), '짧은 번호(c3-0)를 지우며 c3-07 곁 키를 먹음 ' + J(R.앞머리2.keys));
+    ok(bk.c0.지움 === 0 && bk.st.시작판 === false && bk.c0.시각 > bk.frozen, '시계가 뒤로 ' + J(bk.c0));
+    ok(tw.c0.지움 === 1 && tw.c0.지운키.includes('rpg.village.1.help-places') && tw.st.시작판 === true && has('둘', 'rpg.village.2.help-places') && has('둘', 'rpg.stagetime.2.help-places') && !tw.c0.지운키.some(k => k.includes('.2.')),
+      '번호 둘 → 그 번호만 ' + J({ 지운키: tw.c0.지운키, keys: tw.keys }));
+  });
+  test('C0T (다) #기록지움: 시각 키가 있는 번호 전부(뒤붙이 · 곁 키까지) · ?sid= · guest · 다른 판 · 앞머리 그대로 · 싣는 중 replace 인데 LOAD ERR 0 · 다시싣기(?r=) · 해시 = 기록지움만 뺌 · 저장 꺼짐 · 표지 → 다시 실린 판 · #n= 없는 판 = 옛 몸', () => { bad();
+    const wp = R.지움, nv = wp.nav, gone = ['rpg.village.t.help-places', 'rpg.stagecard.t.help-places', 'rpg.stagetime.t.help-places', 'rpg.village.c3-07.help-places', 'rpg.village.c3-07.help-places.backup',
+      'rpg.village.c3-07.help-places.broken', 'rpg.stagecard.c3-07.help-places', 'rpg.stagecard.c3-07.help-places.지난놓은', 'rpg.stagetime.c3-07.help-places', 'rpg.guide.c3-07', 'rpg.album.c3-07', 'rpg.snap.c3-07',
+      'rpg.like.c3-07', 'rpg.village.title.c3-07', 'rpg.village.title.c3-07.offered', 'rpg.village.awaySeen.c3-07.물없음', 'rpg.village.jobsNews.c3-07'];
+    const kept = ['rpg.village.stu1.help-places', 'rpg.stagecard.stu1.help-places', 'rpg.album.stu1', 'rpg.guide.guest', 'rpg.album.guest', 'rpg.village.guest', 'rpg.village.c3-07.farm', 'rpg.stagetime.c3-07.farm', 'rpg.guide.c3-0',
+      'rpg.stagetime.x9.farm', 'rpg.village.x9.help-places', 'rpg.album.x9'];   /* x9 = 다른 판(farm)에만 시각 키 — 이 판 번호가 아니다 */
+    ok(gone.every(k => !wp.keys.includes(k)), '지울 키가 남음(정오 ③ · 뒤붙이): ' + gone.filter(k => wp.keys.includes(k)).join(' '));
+    ok(kept.every(k => wp.keys.includes(k)), '남을 키가 지워짐(시각 키 없는 번호 · guest · 다른 판 · 앞머리): ' + kept.filter(k => !wp.keys.includes(k)).join(' '));
+    ok(J(wp.c0.기록지움 && wp.c0.기록지움.번호.slice().sort()) === J(['c3-07', 't']) && wp.c0.떠남 === true && wp.ss['rpg.c0t.wiped.help-places'] === '2', '모은 번호 · 표지 ' + J({ c0: wp.c0.기록지움, ss: wp.ss }));
+    ok(nv.length === 1 && nv[0].어떻게 === 'replace' && nv[0].다시싣기 === true && url(nv[0]).hash === '#n=t' && /^\d+$/.test(url(nv[0]).searchParams.get('r') || '') && url(nv[0]).searchParams.get('stage') === 'help-places',
+      '다시 싣기(정오 ① — ?r= · 조각 이동 아님 · 해시 #n=t) ' + J(nv));
+    ok(Array.isArray(wp.저장뒤) && !wp.저장뒤.length, '떠나는 판의 저장이 안 꺼짐 — __save 뒤 t 키 ' + J(wp.저장뒤));
+    const am = R['지움&']; ok(am.nav.length === 1 && am.nav[0].다시싣기 && decodeURIComponent(url(am.nav[0]).hash) === '#n=c3-07,끝' && !am.keys.includes('rpg.village.c3-07.help-places'), '& 로 이은 #기록지움 ' + J(am.nav));
+    ok(R.다시.c0.다시실린뒤 === 2 && !('rpg.c0t.wiped.help-places' in R.다시.ss) && R.다시.c0.떠남 === false, '다시 실린 판이 표지를 읽고 지움 ' + J({ c0: R.다시.c0, ss: R.다시.ss }));
+    const old = R.옛몸; ok(old.c0.번호 === null && old.c0.기록지움 === null && !has('옛몸', 'rpg.stagecard.guest.help-places') && has('옛몸', 'rpg.village.guest.help-places') && has('옛몸', 'rpg.village.c3-07.help-places')
+      && has('옛몸', 'rpg.stagetime.c3-07.help-places') && old.nav.length === 1 && old.nav[0].어떻게 === 'replaceState' && old.해시 === '' && !Object.keys(old.ss).length, '#n= 없는 판은 옛 몸 ' + J({ nav: old.nav, keys: old.keys, 해시: old.해시 }));
+  });
+  test('C0T (라) 저장이 되면 시각 키 = 지금 · c0t 끔 · 저장 꺼짐이면 안 적음 · 번호 없는 판 시각 키 0 · voteReset 다시 싣기 = ?r= + #n= · 하네스 양성 대조(같은 주소 + # = 조각 이동)', () => { bad();
+    const sv = R.저장, vr = (sv.nav2 || []).filter(x => x.어떻게 === 'replace'), nn = R.번호없음, fr = R.조각;
+    ok(sv.저장뒤 === String(sv.frozen) && sv.저장시각 >= 1, '저장 → 시각 키 ' + J({ 저장뒤: sv.저장뒤, frozen: sv.frozen, 저장시각: sv.저장시각 }));
+    ok(sv.끈뒤 === '2' && sv.되돌림 === true && sv.꺼진뒤 === '3', 'c0t 끔 · savingOff 인데 시각 키를 적음 ' + J({ 끈뒤: sv.끈뒤, 꺼진뒤: sv.꺼진뒤 }));
+    ok(vr.length === 1 && vr[0].다시싣기 && url(vr[0]).hash === '#n=c3-07' && /^\d+$/.test(url(vr[0]).searchParams.get('r') || ''), 'voteReset 다시 싣기 ' + J(vr));
+    ok(!nn.시각키들.length && nn.nav2.length === 1 && nn.nav2[0].다시싣기 && url(nn.nav2[0]).hash === '', '번호 없는 판 ' + J({ 시각키: nn.시각키들, nav: nn.nav2 }));
+    ok(fr.조각1.다시싣기 === false && fr.조각2.다시싣기 === false && fr.조각2해시 === '#n=x' && fr.다시1.다시싣기 === true, '하네스 양성 대조 — location.replace(같은 주소 + #…) = 조각 이동 ' + J([fr.조각1, fr.조각2, fr.다시1]));
+  });
+  test('C0T (마) 되돌리기 VRULES.c0t.on = false(엔진 기본값 사본) — −4시간도 이어짐 · 시각 키 그대로 · #기록지움은 옛 몸 · 번호 읽기는 남음', () => { ok(onN === 1, 'c0t 기본값 줄을 못 찾음(' + onN + ')'); bad();
+    const f4 = R.끔4시간, fw = R.끔지움;
+    ok(f4.c0.켜짐 === false && num('끔4시간') === 'c3-07' && key('끔4시간') === 'rpg.village.c3-07.help-places' && f4.c0.지움 === 0 && f4.st.시작판 === false && has('끔4시간', 'rpg.guide.c3-07')
+      && f4.c0.시각키 === String(f4.now - 4 * 3600e3), '끈 사본 −4시간 ' + J({ c0: f4.c0, 시작판: f4.st.시작판 }));
+    ok(fw.c0.기록지움 === null && !has('끔지움', 'rpg.stagecard.t.help-places') && has('끔지움', 'rpg.village.t.help-places') && has('끔지움', 'rpg.village.c3-07.help-places') && fw.nav.length === 1 && fw.nav[0].어떻게 === 'replaceState' && fw.해시 === '',
+      '끈 사본 #기록지움 ' + J({ nav: fw.nav, keys: fw.keys }));
+  });
+  { const vm = await import('node:vm'), line = html.split('\n').find(l => l.includes('[MAC-C0T]') && l.includes('document.write')), m = line ? /^<script>(.*)<\/script>\s*$/.exec(line.trim()) : null;
+    const run = search => { const w = []; vm.runInNewContext(m[1], { location: { search }, URLSearchParams, document: { write: s => w.push(s) } }); return w; };
+    test('C0T (바) 판에서 sync.js 를 안 싣는 고전 스크립트 — 엔진 STAGE.id 와 같은 주소에서만 안 씀 · 쓰는 태그 꼴 · module 앞 · 옛 태그 0', () => { ok(m, 'sync 고전 스크립트 줄을 못 찾음'); bad();
+      const want = { '': 1, '?sid=guest': 1, '?sid=guest&dev=1': 1, '?stage=help-places': 0, '?stage=help-places&sid=guest': 0, '?sid=guest&stage=two-villages': 0, '?visit=c3-07': 1, '?visit=c3-07&stage=help-places': 1, '?stage=': 1, '?stage=%21%21': 1, '?stage=Help-Places': 0 };
+      const miss = Object.entries(want).filter(([q, n]) => run(q).length !== n); ok(!miss.length, '쓰는 주소가 다름: ' + J(miss.map(([q, n]) => [q, '기대 ' + n, '씀 ' + run(q).length])));
+      ok(/^<script src="\.\/sync\.js\?v=[^"]+"><\/script>$/.test(run('')[0] || ''), '쓰는 태그 꼴 ' + run('')[0]);
+      const H0 = '?sid=guest&dev=1&', same = ['c307', '기본', '구경'].map(n => [n, !!R[n].st.id, run(H0 + (C.find(c => c.n === n).query ?? 'stage=help-places')).length === 0]);
+      ok(same.every(([, st, skip]) => st === skip), '엔진 STAGE.id 와 다름(판이면 안 싣고 · 판이 아니면 싣는다): ' + J(same));
+      const i = html.indexOf(line), j = html.indexOf('<script type="importmap">'), k = html.indexOf('<script type="module">');
+      ok(i > 0 && i < j && j < k && !/<script src="\.\/sync\.js/.test(html.replace(line, '')), '차례(고전 스크립트 → importmap → module) · 옛 태그 0 ' + J([i, j, k]));
+    }); }
+  test('C0H 해시 낱말 사례 셋 — n=c3-07,끝(번호 + 끝) · 기록지움,n=c3-07(다시 연 해시 #n=c3-07) · 말2=vi,소리=끔(둘 다) · 반 · 학년 · 대사 · 크게 · end = 끝 · 모르는 낱말 버림 · 같은 낱말은 뒤엣것', () => { bad();
+    const h1 = R.H1, h2 = R.H2, h3 = R.H3, h4 = R.H4;
+    ok(h1.st.저장키 === 'rpg.village.c3-07.help-places' && h1.h.n === 'c3-07' && h1.h.끝 === true && h1.h.기록지움 === false, 'n=c3-07,끝 ' + J(h1.h));
+    ok(h2.nav.length === 1 && h2.nav[0].다시싣기 && url(h2.nav[0]).hash === '#n=c3-07' && h2.h.기록지움 === true, '기록지움,n=c3-07 ' + J(h2.nav));
+    ok(h3.h.말2 === 'vi' && h3.h.소리 === '끔' && h3.h.n === null && h3.c0.번호 === null, '말2=vi,소리=끔 ' + J(h3.h));
+    ok(h4.h.n === '2' && h4.c0.번호 === '2' && h4.h.반 === 'c3' && h4.h.학년 === '3' && h4.h.대사 === '끔' && h4.h.크게 === true && h4.h.끝 === true && !('zz' in h4.h) && Object.keys(h4.h).length === 9, '낱말 여럿 ' + J(h4.h));
+  });
+}
 
 /* [MAC-FLOWEND] 53-ⓑ102 — 목표 없는 흐름 판(proto-flow)만 실험 값을 결과로 · 길을 끊으면 못 받은 집이 는다 · 다른 판은 안 씀 */
 test('FLOWEND: proto-flow 결과 = 곡식·선반·못 받은 집 · 끊으면 못 받은 집이 는다 · farm/town3/proto-vote 는 안 씀', () => {
