@@ -1,0 +1,140 @@
+{
+ "v": 2,
+ "w": 256,
+ "h": 256,
+ "palette": [
+  "road",
+  "field",
+  "shop",
+  "well",
+  "play",
+  "bench",
+  "house",
+  "tree"
+ ],
+ "plotStr": {
+  "4_4": "~70.AAAE~u.AA~c.AU~g.AE~1.AAAE~3.AI~1.AAAY~1.AM~2.AQ~2.AU~2.AQ~7.AM~4.AA~6.AA~e.AU~9.AA~4.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA~1.AAAAAAAAAA~7.AY~2.AY~2.AY~2.AY~1j.Ac~5.Ac~7.Ac~l.AAAAAAAAAAAAAAAAAAAAAAAA"
+ },
+ "clock": {
+  "t": 1657500,
+  "speed": 2
+ },
+ "flow": {
+  "v": 1,
+  "밭": {
+   "34717": 5,
+   "35226": 5,
+   "35229": 5
+  },
+  "가게": {},
+  "집": {
+   "35460": [
+    9,
+    0
+   ],
+   "36229": [
+    9,
+    0
+   ],
+   "36232": [
+    9,
+    0
+   ],
+   "36235": [
+    9,
+    0
+   ],
+   "36238": [
+    9,
+    0
+   ],
+   "36246": [
+    3,
+    1
+   ],
+   "36249": [
+    3,
+    1
+   ]
+  },
+  "짐": []
+ },
+ "houses": {
+  "35460": [
+   2,
+   1,
+   -1
+  ],
+  "36229": [
+   2,
+   1,
+   -1
+  ],
+  "36232": [
+   2,
+   1,
+   -1
+  ],
+  "36235": [
+   2,
+   1,
+   -1
+  ],
+  "36238": [
+   2,
+   1,
+   -1
+  ]
+ },
+ "unlocked": [
+  "fountain",
+  "pavilion",
+  "flower_ty",
+  "flower_wv",
+  "clock",
+  "windmill",
+  "dream",
+  "flower_hb"
+ ],
+ "goals": [
+  "road6",
+  "house3",
+  "pop1",
+  "well",
+  "shop",
+  "pop10",
+  "play",
+  "bench1",
+  "happy",
+  "lv2",
+  "pop30"
+ ],
+ "festSeen": false,
+ "dream": "",
+ "plots": [
+  "4,4",
+  "4,3"
+ ],
+ "plotsEarned": 99,
+ "signs": {},
+ "hist": [
+  {
+   "d": 1,
+   "인구": 12,
+   "만족": 0,
+   "일자리": 100
+  },
+  {
+   "d": 2,
+   "인구": 12,
+   "만족": 0,
+   "일자리": 100
+  },
+  {
+   "d": 3,
+   "인구": 12,
+   "만족": 0,
+   "일자리": 100
+  }
+ ]
+}

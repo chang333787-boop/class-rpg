@@ -1,0 +1,51 @@
+{
+ "v": 2,
+ "w": 256,
+ "h": 256,
+ "palette": [
+  "house",
+  "road",
+  "tree",
+  "shop",
+  "play"
+ ],
+ "plotStr": {
+  "4_4": "~4p.AI~2.AI~2.AI~y.AI~1g.AI~2.AA~2.AA~2.AA~2.AI~1h.AEAEAEAEAEAEAEAEAEAEAEAE~g.AI~4.AM~2.AQ~14.AA~z.AI~1p.AI"
+ },
+ "clock": {
+  "t": 0,
+  "speed": 1
+ },
+ "houses": {
+  "34954": [
+   2,
+   1,
+   -1
+  ],
+  "34957": [
+   2,
+   1,
+   -1
+  ],
+  "34960": [
+   2,
+   1,
+   -1
+  ],
+  "35990": [
+   2,
+   1,
+   -1
+  ]
+ },
+ "unlocked": [],
+ "goals": [],
+ "festSeen": false,
+ "dream": "",
+ "plots": [
+  "4,4"
+ ],
+ "plotsEarned": 99,
+ "signs": {},
+ "hist": []
+}
