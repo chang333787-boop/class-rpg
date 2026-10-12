@@ -18,3 +18,5 @@ village/_simrun-*.mjs
 
 # 성능 재기용 임시 사본(끝나면 지움)
 village/_perf_*.html
+# 마을 기획 검사 꾸러미 — 엔진(공개) 밖에 두는 것이 원칙(../village-plan-pack/) · 혹시 안에 풀어도 올라가지 않게 [PA-00]
+scripts/village-plan/
