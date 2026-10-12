@@ -306,7 +306,7 @@ const FREE = true;                               // 오픈 기념 무료 (2026-0
 const idx = (x, y) => y * W + x;
 const cX = i => i % W, cY = i => (i / W) | 0;
 const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
-const simRand = typeof window.__SIM_RAND === 'function' ? window.__SIM_RAND : () => Math.random();   /* [MAC-SIMRAND] 판정(사람 발길·드나듦·바람·이웃)만 쓰는 난수. 브라우저에선 Math.random 그대로. 시뮬(load.mjs)은 따로 시드한 줄기를 끼워, 그림·모형·three uuid 가 Math.random 을 몇 번 먹든 판정 값이 안 움직인다(보스 09-24 · #906·#918 거짓 FAIL) */
+let simRand = typeof window.__SIM_RAND === 'function' ? window.__SIM_RAND : () => Math.random();   /* [MAC-SIMRAND] 판정(사람 발길·드나듦·바람·이웃)만 쓰는 난수. 브라우저에선 Math.random 그대로. 시뮬(load.mjs)은 따로 시드한 줄기를 끼워, 그림·모형·three uuid 가 Math.random 을 몇 번 먹든 판정 값이 안 움직인다(보스 09-24 · #906·#918 거짓 FAIL) */
 const cells = new Array(W * H).fill(null);  // null 이거나 {k, root}
 /* 칸 (x,y) 의 한가운데 월드 좌표 */
 const wx = x => (x - (W - 1) / 2) * CS;
@@ -11476,6 +11476,31 @@ if (STAGE.id) {
     STAGE.def = def; stageApplyEarly(def);
   } catch (e) { STAGE.err = String(e && e.message || e); console.warn('[MAC-STAGE]', STAGE.err); }
 }
+/* ── [MAC-ESEED] PA-04 판 시드 — 같은 판 + 같은 수(같은 틱) = 같은 결과 (기획 build/B §B-13 · 엔진 사실 H17 · 10-03 엔진 회신 §1-2) ──
+   판 파일 `시드`(정수 ≥ 1)가 있으면 판정 난수 simRand(309 [MAC-SIMRAND])를 그 시드의 결정 줄기로 바꾼다 — 판을 열 때마다 처음부터 선다.
+   ↺ 처음부터 · 두 시도 · 결정 다시 열기는 모두 다시 싣기라 같은 줄기다. 새로 고침은 저장본에서 이어 열려도 줄기는 처음부터다(한 줄기 보장 밖).
+   · 자리: 판 읽기 블록 바로 뒤 — 첫 simRand 소비(아래 module 흐름의 syncFolks)보다 먼저. stageApplyEarly 는 위에서 한 번만 불려 module 끝 감싸기로는 늦다.
+   · 도구 난수가 이긴다: 하네스 · village-look 이 __SIM_RAND 를 심었으면 그대로 둔다(vsref · 시험 값 불변). 줄기 꼴은 load.mjs 와 같다(mulberry32(시드 ^ 0x5EED5EED)) —
+     시드 1 판의 브라우저 줄기 = 하네스 시드 1 의 줄기.
+   · 시드 판은 틱 머리에서 사람 맞추기(syncFolks — 새 사람마다 simRand 한 번). 브라우저는 프레임 머리(loop)마다, 하네스는 이사 틱 · 묶음 머리에서만 맞춰
+     같은 시드도 값이 갈렸다(help-places 시드 1 · 300틱 + 이틀 인구: 묶음 150틱 90 · 프레임당 1틱 91 · 2틱 92). 틱 머리에서 맞추면 셋이 한 값이다.
+   · 판정 셈은 한 줄도 안 바꾼다(어느 난수가 나오느냐만). 시드 없는 판 · 기본 마을은 한 줄도 안 돈다(vsref 0). 풍선 lookRand 는 뺐다(프레임 함수라 무화면에서 못 잰다).
+   · 스위치 VRULES.eseed(rules.json '시드') — on:false = 옛 동작(판 규칙 eseed 는 여기서 미리 읽는다 — 판 규칙은 module 끝에야 VRULES 에 얹힘 · 도중에 끄면 그 틱부터 옛 줄기) ·
+     tickSync:false = 틱 머리 맞추기만 끔(시험의 양성 대조). 저장 0 · 화면 0 · 원래 줄 수정 1(309 const → let) + simTick 감싸기. 시험 훅 __eseed. */
+(window.VRULES = window.VRULES || {}).eseed = { on: true, tickSync: true };
+function mulberry32(seed) { let a = (seed >>> 0) || 1;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const ESEED = { on: false, seed: null, tool: typeof window.__SIM_RAND === 'function', base: simRand, stats: { 틱머리맞춤: 0, 도중끔: 0 } };
+{ const d = STAGE.def, g = d && d.규칙 && d.규칙.eseed && typeof d.규칙.eseed === 'object' ? d.규칙.eseed : null;
+  if (d && (g && 'on' in g ? !!g.on : window.VRULES.eseed.on) && Number.isInteger(d.시드) && d.시드 > 0) {
+    ESEED.on = true; ESEED.seed = d.시드; if (!ESEED.tool) simRand = mulberry32((d.시드 ^ 0x5EED5EED) >>> 0); } }
+{ const esTick0 = simTick; simTick = function () {
+    if (ESEED.on) { const R = window.VRULES.eseed;
+      if (!R.on) { ESEED.on = false; simRand = ESEED.base; ESEED.stats.도중끔++; }
+      else if (R.tickSync !== false && folksDirty) { syncFolks(); folksDirty = false; ESEED.stats.틱머리맞춤++; } }
+    return esTick0.apply(this, arguments); }; }
+window.__eseed = () => ({ 켜짐: window.VRULES.eseed.on, 판시드: ESEED.on ? ESEED.seed : null, 줄기: ESEED.tool ? '도구(__SIM_RAND)' : ESEED.on ? '판 시드' : 'Math.random',
+  틱머리: ESEED.on && window.VRULES.eseed.tickSync !== false, ...ESEED.stats });
 /* ── [MAC-TERRAIN] 환경이 선택을 만드는 판 — 지형 바닥 + 칠하기 (설계 docs/village_environment_boards.md #898 · 보스 09-23 승인 · 바다 판 먼저: 물 · 모래) ──
    판 파일 `지형: { 칸: [[x0, y0, x1, y1, '물'|'모래'], …] }`(뒤엣것이 앞엣것을 덮음). 지형은 **물건이 아니라 바닥**이다 — 칸(cells)에 들어가지 않으니
    치우기·옮기기로 없어지지 않고, 저장본에도 안 들어간다(판 파일에만).

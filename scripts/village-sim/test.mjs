@@ -1,5 +1,5 @@
 // 마을 시뮬 도구 시험 — 네트워크 0 · 같은 시드는 같은 값 · 한 수가 표에 잡힌다 (약 20초)
-import { spawnSync } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+import { spawn, spawnSync } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(HERE, '../..');
 const results = [];
 const test = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name, String(e.message).split('\n')[0]]); } };
@@ -34,6 +34,58 @@ test('그림 난수를 흔들어도 판정 값이 같다 (pop88 · 하루 · loo
   ok(!diff.length, '판정 값이 움직임(판정 코드가 Math.random 을 씀?): ' + diff.slice(0, 5).join(' '));
   ok(JSON.stringify(a1.samples) === JSON.stringify(b.samples), '그림 흔들기 전 값이 같은 시드 값과 다름');
 });
+/* [MAC-ESEED] PA-04 판 시드 — 판 파일 `시드`가 판정 난수 줄기를 정하고, 시드 판은 틱 머리에서 사람을 맞춘다(브라우저 프레임 = 하네스 묶음).
+   판은 stageSeed(load.mjs — __SIM_RAND 를 심지 않음 · 브라우저처럼)로 연다: 시드 판은 엔진이 판 시드 줄기를 세우고, 시드가 없으면 simRand = Math.random = lookSeed 줄기.
+   견주는 칸 = 판정 값(__pop · __away · __flow · __goals · __snapshot(저장키 뺌) 조각별 해시) — 풍선(lookRand)은 뺐다(프레임 함수라 무화면에서 못 잰다).
+   (가) help-places(시드 1) 이틀 · lookSeed 1 ↔ 7 같음 · 하네스 꼴(도구 __SIM_RAND 시드 1) = 판 시드 1 줄기
+   (나) 시드를 뺀 자기 시험 판(시험 안에서 쓰고 finally 에서 지움) · lookSeed 1 ↔ 7 다름(시드가 실제로 걸렸다는 증거) · 판 규칙 eseed 끔 사본 = 시드 뺀 판(되돌리기 = 옛 동작)
+       · 싣고 난 뒤 VRULES.eseed.on = false(하네스 --rules 꼴) = 그 틱부터 옛 동작(도구 시드 1 = tickSync 끔 · 판 시드 줄기는 Math.random 으로 돌아와 lookSeed 따라 다름)
+   (다) 브라우저 꼴 — 프레임당 1틱 · 2틱(__tickBench(1)·(2) = 프레임 머리 syncFolks + 틱) = 묶음 150틱(help-places · two-villages) · 양성 대조: tickSync 끔이면 1틱 ↔ 150틱 다름
+   (라) 시드 없는 판(farm) · 기본 마을은 엔진 길 0(판시드 null · 틱머리맞춤 0 — 옛과 같은 값인지는 village-check 의 vsref) */
+const esOne = c => new Promise(done => {
+  const src = `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))}; import crypto from 'node:crypto';
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, lookSeed: ${c.look || 1}, stageSeed: ${!c.tool}, query: ${JSON.stringify(c.stage ? 'stage=' + c.stage : '')} });
+${c.pre || ''}
+for (let i = 0; i < ${c.ticks}; i += ${c.k}) w.__tickBench(Math.min(${c.k}, ${c.ticks} - i));
+const h = v => crypto.createHash('sha1').update(JSON.stringify(v)).digest('hex').slice(0, 12), { 저장키, ...s } = w.__snapshot();
+const 판정 = { pop: w.__pop(), away: w.__away(), flow: h(w.__flow()), goals: w.__goals().이룬것, 물건: h(s.물건), 집: h(s.집), 이름: h(s.이름), 나머지: h({ ...s, 물건: 0, 집: 0, 이름: 0 }) };
+process.stdout.write('@@' + JSON.stringify({ 판정, es: w.__eseed(), 틱: w.__sim().틱 }) + '\\n', () => process.exit(0));`;
+  const p = spawn(process.execPath, ['--input-type=module', '-e', src], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let out = '', err = '';
+  p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { err += d; });
+  p.on('close', () => { const l = out.split('\n').find(x => x.startsWith('@@')); done(l ? JSON.parse(l.slice(2)) : { 오류: c.n + ' — ' + ((err || out).trim().split('\n').slice(-1)[0] || '출력 없음') }); }); });
+{ const SELF = 'zz-eseed-selftest', OFF = 'zz-eseed-off', dir = path.join(ROOT, 'village/stages'), T = 3600;
+  const hp = JSON.parse(fs.readFileSync(path.join(dir, 'help-places.json'), 'utf8')), noSeed = { ...hp, id: SELF }; delete noSeed.시드;
+  const C = [{ n: '가1', stage: 'help-places', k: 150 }, { n: '가7', stage: 'help-places', k: 150, look: 7 }, { n: '도구', stage: 'help-places', k: 150, tool: true },
+    { n: '틱1', stage: 'help-places', k: 1 }, { n: '틱2', stage: 'help-places', k: 2 }, { n: '끔1', stage: 'help-places', k: 1, pre: 'w.VRULES.eseed.tickSync = false;' }, { n: '끔150', stage: 'help-places', k: 150, pre: 'w.VRULES.eseed.tickSync = false;' },
+    { n: '둘150', stage: 'two-villages', k: 150 }, { n: '둘1', stage: 'two-villages', k: 1 }, { n: '뺌1', stage: SELF, k: 150 }, { n: '뺌7', stage: SELF, k: 150, look: 7 }, { n: '규칙끔', stage: OFF, k: 150 },
+    { n: '도중끔', stage: 'help-places', k: 150, tool: true, pre: 'w.VRULES.eseed.on = false;' }, { n: '도중끔1', stage: 'help-places', k: 150, pre: 'w.VRULES.eseed.on = false;' }, { n: '도중끔7', stage: 'help-places', k: 150, look: 7, pre: 'w.VRULES.eseed.on = false;' },
+    { n: 'farm', stage: 'farm', k: 150, ticks: 300, tool: true }, { n: '기본', stage: null, k: 150, ticks: 300, tool: true }].map(c => ({ ticks: T, ...c }));
+  const R = {};
+  fs.writeFileSync(path.join(dir, SELF + '.json'), JSON.stringify(noSeed, null, 1));
+  fs.writeFileSync(path.join(dir, OFF + '.json'), JSON.stringify({ ...hp, id: OFF, 규칙: { ...(hp.규칙 || {}), eseed: { on: false } } }, null, 1));
+  try { const out = new Array(C.length); let next = 0;   /* 판 하나 = 프로세스 하나(모듈 상태가 전역) — 여섯씩 나란히 */
+    await Promise.all(Array.from({ length: Math.min(6, C.length) }, async () => { while (next < C.length) { const i = next++; out[i] = await esOne(C[i]); } }));
+    C.forEach((c, i) => { R[c.n] = out[i]; });
+  } finally { fs.rmSync(path.join(dir, SELF + '.json'), { force: true }); fs.rmSync(path.join(dir, OFF + '.json'), { force: true }); }
+  const same = (a, b) => JSON.stringify(R[a].판정) === JSON.stringify(R[b].판정);
+  const where = (a, b) => `${a}↔${b} ` + Object.keys(R[a].판정).filter(k => JSON.stringify(R[a].판정[k]) !== JSON.stringify(R[b].판정[k])).join('·') + ` (인구 ${R[a].판정.pop.인구} ↔ ${R[b].판정.pop.인구})`;
+  test('E-SEED: help-places(시드 1) 이틀 lookSeed 1 ↔ 7 같음 · 하네스 시드 1 = 판 시드 · 프레임당 1틱 · 2틱 = 묶음(two-villages 도) · 시드 뺀 판은 lookSeed 따라 다름 · 끄면(판 규칙 · 도중) 옛 동작 · 시드 없는 판 길 0', () => {
+    const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
+    const a = R.가1;
+    ok(a.틱 === T && a.es.판시드 === 1 && a.es.줄기 === '판 시드' && a.es.틱머리 === true && a.es.틱머리맞춤 > 0, '(가) 판 시드 길이 안 돎 ' + JSON.stringify({ 틱: a.틱, es: a.es }));
+    ok(a.판정.pop.인구 > 74, '(가) 이틀 동안 마을이 안 자람(시작 인구 74) — 견줄 것이 없는 헛 같음 ' + a.판정.pop.인구);
+    ok(same('가1', '가7'), '(가) lookSeed 1 ↔ 7 판정 값이 다름(판정 코드가 Math.random 을 씀?) — ' + where('가1', '가7'));
+    ok(same('가1', '도구') && R.도구.es.줄기 === '도구(__SIM_RAND)' && R.도구.es.판시드 === 1, '(가) 하네스 꼴(도구 시드 1)이 판 시드 1 줄기와 다름 — ' + where('가1', '도구'));
+    ok(same('가1', '틱1') && same('가1', '틱2') && same('둘150', '둘1'), '(다) 프레임당 1틱 · 2틱 ↔ 묶음 150틱이 다름 — ' + [where('가1', '틱1'), where('가1', '틱2'), where('둘150', '둘1')].join(' / '));
+    ok(!same('끔1', '끔150') && R.끔1.es.틱머리 === false, '(다) 양성 대조 — tickSync 를 끄면 1틱 ↔ 150틱이 갈려야 한다(안 갈리면 이 시험이 틱 머리 맞추기를 못 본다) ' + where('끔1', '끔150'));
+    ok(!same('뺌1', '뺌7'), '(나) 시드 뺀 판인데 lookSeed 1 ↔ 7 이 같음 — 시드가 걸렸는지 못 가린다(같으면 7 → 8) ' + where('뺌1', '뺌7'));
+    ok(R.뺌1.es.판시드 === null && R.뺌1.es.줄기 === 'Math.random' && R.뺌1.es.틱머리맞춤 === 0, '(나) 시드 뺀 판에서 엔진 길이 돎(판 시드 줄기 · 틱 머리 맞추기는 시드 판만) ' + JSON.stringify(R.뺌1.es));
+    ok(same('뺌1', '규칙끔') && R.규칙끔.es.판시드 === null && R.규칙끔.es.켜짐 === false, '(나) 판 규칙 eseed 끔 ≠ 시드 뺀 판 — ' + where('뺌1', '규칙끔') + ' ' + JSON.stringify(R.규칙끔.es));
+    ok(same('도중끔', '끔150') && R.도중끔.es.도중끔 === 1 && R.도중끔.es.판시드 === null && !same('도중끔1', '도중끔7'), '(나) 도중에 끄기(VRULES.eseed.on = false · 싣고 난 뒤) — 틱 머리 맞추기가 멎고(도구 시드 1 = tickSync 끔) 줄기가 옛 것(Math.random)으로 돌아와야 한다 '
+      + [where('도중끔', '끔150'), where('도중끔1', '도중끔7'), JSON.stringify(R.도중끔.es)].join(' / '));
+    ok(['farm', '기본'].every(n => R[n].es.판시드 === null && R[n].es.틱머리맞춤 === 0 && R[n].es.줄기 === '도구(__SIM_RAND)'), '(라) 시드 없는 판 · 기본 마을에서 엔진 길이 돎 ' + JSON.stringify([R.farm.es, R.기본.es]));
+  });
+}
 /* [MAC-SIMCLOCK] 벽시계가 판정에 스미지 않나 — wallclock.mjs 로 벽시계를 일부러 빨리(부를 때마다 500ms) 돌려도 값이 같아야 한다.
    09-24 에 두 곳이 스몄다: 싣기 끝 첫 loop() 가 미리 돈 틱(부하 때 1~2틱) · 땅 고르기 '진짜 30초' 저절로 열기(pop88 이틀째 인구 94 → 92). load.mjs 가 벽시계를 멈춘다. */
 test('벽시계를 흔들어도 판정 값이 같다 (pop88 · 2일 · 시드 1)', () => {

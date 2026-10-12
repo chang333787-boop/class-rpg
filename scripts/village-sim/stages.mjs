@@ -13,6 +13,7 @@ const KNOWN = new Set([...FIELDS, '모습', '건물정의', '흐름', '시작칸
 const SEMS = { kind: g => typeof g.k === 'string' && g.n > 0, pop: g => g.n > 0, hook: g => typeof g.훅 === 'string' && typeof g.n === 'number' && ['>=', '<='].includes(g.비교) };
 const HOOKS = ['일닿음%', '다있음%'];   // index.html STAGE_HOOKS 와 같게
 const 지형이름 = ['물', '모래', '비탈', '고개'];   // index.html [MAC-TERRAIN] TERR_NAMES 와 같게
+const 시드꼴 = v => Number.isInteger(v) && v >= 1;   // [MAC-ESEED] index.html 이 시드로 쓰는 값(Number.isInteger · > 0)과 같게 — 그 밖의 값이면 엔진은 시드 없이 연다
 
 /* 마을을 한 번 실어 VRULES 기본값·건물 종류를 읽는다(시뮬 · 네트워크 0) */
 const probe = path.join(os.tmpdir(), 'village-stages-probe-' + process.pid + '.mjs');
@@ -85,6 +86,7 @@ for (const f of files) {
   let def; try { def = JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')); } catch (e) { add('FAIL', P('JSON'), e.message); continue; }
   const lack = FIELDS.filter(k => !(k in def)); lack.length ? add('FAIL', P('칸'), '없는 칸: ' + lack.join(' ')) : add('PASS', P('칸 ' + FIELDS.length + '개'));
   { const 모름칸 = Object.keys(def).filter(k => !KNOWN.has(k)); if (모름칸.length) add('REVIEW', P('칸'), '모르는 칸: ' + 모름칸.join(' ') + ' — 오타가 아니면 stages.mjs 의 KNOWN 에 더한다'); }   /* [MAC-TRAY] PASS 줄 0 */
+  if (def.시드 != null) 시드꼴(def.시드) ? add('PASS', P(`시드 ${def.시드} — 판정 난수 줄기(E-SEED)`)) : add('FAIL', P('시드 꼴'), `시드 ${JSON.stringify(def.시드)} — 정수 ≥ 1 이어야 한다(엔진은 그 밖의 값이면 시드 없이 연다)`);   /* [MAC-ESEED] */
   def.id === n && /^[a-z0-9\-]{1,40}$/.test(n) ? add('PASS', P('id = 파일 이름')) : add('FAIL', P('id'), `id ${def.id} · 파일 ${n} (소문자·숫자·- 만)`);
   if (def.교과 != null) curri.includes('| ' + def.교과 + ' |') ? add('PASS', P('교과 칸이 교과 지도에 있음')) : add('FAIL', P('교과'), `docs/village_curriculum_map.md 에 '| ${def.교과} |' 가 없음`);
   if (def.시작 != null) fs.existsSync(path.join(ROOT, 'village', def.시작)) ? add('PASS', P('시작 땅 ' + def.시작)) : add('FAIL', P('시작'), 'village/' + def.시작 + ' 없음');
@@ -237,6 +239,11 @@ for (const f of files) {
   (a.includes('shopCap') && !b.includes('shopCap') && a.length === b.length + 1 && a.length > 한도)
     ? add('PASS', `조건부 판정 자기 시험 — city 에 정원(${시설})을 두고 끄기를 빼면 켜진 판정 ${a.length}개 > ${한도} → FAIL 로 잡힌다 (정원 없으면 ${b.length}개)`)
     : add('FAIL', '조건부 판정 자기 시험', `정원 있음 ${a.length}개(${a.join(' ')}) · 없음 ${b.length}개 — 정원이 적힌 판이 한도 넘김으로 안 잡힌다`); }
+
+/* [MAC-ESEED] 시드 꼴 자기 시험 — 엔진이 시드로 안 쓰는 값(0 · 음수 · 소수 · 글자 "1" · 참거짓)은 위 '시드 꼴'에서 FAIL 로 잡혀야 한다(조용히 시드 없는 판이 되지 않게) */
+{ const 샘 = [0, -1, 1.5, '1', true].filter(시드꼴), 막힘 = [1, 7].filter(v => !시드꼴(v));
+  !샘.length && !막힘.length ? add('PASS', '시드 꼴 자기 시험 — 1 · 7 통과 · 0 · -1 · 1.5 · "1" · true 는 FAIL')
+    : add('FAIL', '시드 꼴 자기 시험', `잘못 통과: ${샘.map(v => JSON.stringify(v)).join(' ') || '없음'} · 잘못 막힘: ${막힘.join(' ') || '없음'}`); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
 끈판 ? add('PASS', `판정을 끈 판 ${끈판}개 (정본 2번 — 끄기를 실제로 쓴 판이 있다)`)
