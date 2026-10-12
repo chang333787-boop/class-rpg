@@ -54,6 +54,14 @@
 .fl.dk{background:var(--dark);border:2px dashed var(--dash);color:#bfae94}
 .fl.q{background:#2a2016;border:2px solid #4a3a2a;color:var(--txt3)}
 .fl.tc{background:#1c2229;border:2px dashed #4f6a80;color:#a9c3d6}
+.fl.on.dim{background:#4a3820;color:#f3e8d6;box-shadow:none;border:2px solid rgba(242,169,59,.7);font-weight:500}   /* 할 수 있음(느림) */
+.fl.on.star{background:linear-gradient(90deg,#ffc766,#ffe9b0);box-shadow:0 0 22px rgba(255,214,120,.6)}   /* 숙련 */
+.fl .starI{margin-left:auto;flex:none;font-size:20px;color:#8a5a00;line-height:1}
+.fl .tag.dimt{border:1.5px solid #ffc766;color:#ffc766}
+.pill.dim{background:#4a3820;color:#ffd99a;border:2px solid rgba(242,169,59,.7)}.pill.star{background:linear-gradient(90deg,#ffc766,#ffe9b0);color:#2a1a08}
+.legend .lg.dim{background:#4a3820;border:1.5px solid rgba(242,169,59,.7);color:#ffd99a}.legend .lg.on{background:var(--lit);color:#2a1a08}.legend .lg.star{background:linear-gradient(90deg,#ffc766,#ffe9b0);color:#8a5a00}
+.mt i.on.dim{background:#6b5130;border:1px solid var(--lit)}.mt i.on.star{background:#ffe29a;box-shadow:0 0 4px #ffc766}
+.mlegend i.on.dim{background:#6b5130;border:1px solid var(--lit)}.mlegend i.on.star{background:#ffe29a}
 .fl.cur{background:#3a2c1c;border:2.5px solid var(--lit2);color:var(--ink);box-shadow:0 0 0 5px rgba(255,199,102,.14)}
 .fl.next{border:2.5px solid var(--lit2);border-style:solid;box-shadow:0 0 0 5px rgba(255,199,102,.12)}
 .fl.next .st{background:var(--lit2);color:#2a1a08}
@@ -178,7 +186,8 @@
 .frow{display:flex;align-items:center;gap:10px;min-height:38px;padding:2px 6px;border-radius:8px}
 .frow .nm{flex:0 0 250px;font-size:14px;min-width:0;line-height:1.3}.frow .nm b{font-family:'Jua',sans-serif;font-weight:400;font-size:16px;margin-right:6px}
 .frow .bar{flex:1;height:20px;border-radius:6px;background:#2e241a;overflow:hidden}.frow .bar i{display:block;height:100%;background:var(--lit)}
-.frow .ct{flex:0 0 84px;font-size:13px;color:var(--txt2);text-align:right}
+.frow .bar.lv{display:flex}.frow .bar.lv i{height:100%}.frow .bar.lv i.master{background:#ffe29a}.frow .bar.lv i.fluent{background:var(--lit)}.frow .bar.lv i.can{background:#6b5130;box-shadow:inset 0 0 0 1px var(--lit)}
+.frow .ct{flex:0 0 118px;font-size:13px;color:var(--txt2);text-align:right}
 .frow.hot{background:rgba(124,192,240,.10);box-shadow:inset 0 0 0 2px var(--blue)}.frow.hot .ct{color:var(--blue);font-weight:800}
 .rec{display:flex;gap:12px;align-items:flex-start;background:var(--blue-bg);border:1px solid #2c4a5e;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.55;margin-top:10px}
 .rec b{color:var(--blue);flex:none}

@@ -40,6 +40,18 @@ export const dayKey = (t = Date.now()) => { const d = new Date(t); return `${d.g
 const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 export const blankKid = () => ({ states: {}, scans: {}, marks: {}, rev: {}, bugs: {}, run: null, days: {}, seen: {}, types: {} });
 const isLit = (kid, c) => !!(kid.states[c] && LIT.includes(kid.states[c].s));
+// ── 불빛 3단계(10-12 교사 '아는 것과 숙련된 것 구분이 잘 안 됨' → 기준은 Claude) ──
+//  1 할 수 있음(희미한 불) = 맞히지만 느림 — 살펴보기에서 가운데 시간이 기준 시간의 2배를 넘음(engine 'slow') · 연습에서 느리게 6연속
+//  2 능숙(밝은 불) = 정확하고 빠름 — 연습 불씨 5개 · 살펴보기에서 빠르게 · 희미한 층은 빠르기 연습 불씨 3개 · 불 점검을 시간 안에
+//  3 숙련(별) = 능숙 + 며칠 뒤 불 점검을 처음 시도에 두 번 맞힘(rev.ok ≥ MASTER_OK) · 도전 층(문장제)은 시간을 재지 않아 켜짐(2) → 숙련(3)
+export const MASTER_OK = 2;
+export function levelOf(kid, c) {
+  if (isType(c)) { const t = c.slice(2); return typeLit(kid, t) ? (kid.rev[c] && kid.rev[c].ok >= MASTER_OK ? 3 : 2) : 0; }
+  const s = kid.states[c] && kid.states[c].s;
+  if (!LIT.includes(s)) return 0;
+  if (s === 'slow') return 1;
+  return kid.rev[c] && kid.rev[c].ok >= MASTER_OK ? 3 : 2;
+}
 const dayOf = (kid, now) => { const k = dayKey(now); return (kid.days[k] = kid.days[k] || { ms: 0, n: 0, lit: [] }); };
 
 // ── 탑 ──
@@ -47,18 +59,20 @@ const dayOf = (kid, now) => { const k = dayKey(now); return (kid.days[k] = kid.d
 export function towerOf(unit, kid) {
   const scan = kid.scans[unit];
   const st = (c) => (!scan ? 'q' : isLit(kid, c) ? 'lit' : kid.marks[c] === 'teacher' ? 'teacher' : 'dark');
-  const floors = lessonsOfUnit(unit).map((c, i) => ({ c, no: i + 1, name: byId[c].kid, st: st(c) }));
-  const base = scan ? (scan.base || []).filter((c) => byId[c]).map((c) => ({ c, name: byId[c].kid, st: st(c), base: true })) : [];
+  const lv = (c) => (scan && isLit(kid, c) ? levelOf(kid, c) : 0);
+  const floors = lessonsOfUnit(unit).map((c, i) => ({ c, no: i + 1, name: byId[c].kid, st: st(c), lv: lv(c) }));
+  const base = scan ? (scan.base || []).filter((c) => byId[c]).map((c) => ({ c, name: byId[c].kid, st: st(c), lv: lv(c), base: true })) : [];
   const all = [...base, ...floors];
   const next = scan ? all.find((f) => f.st === 'dark') || null : null;
   // 도전 층 — 꼭대기 위 · 아래층을 다 켜기 전엔 잠김(lock)
   const tops = typesOfUnit(unit).map((t, i) => {
     const c = typeKey(t), on = typeLit(kid, t, unit);
     const st1 = !scan ? 'q' : on ? 'lit' : next ? 'lock' : kid.marks[`${c}@${unit}`] === 'teacher' ? 'teacher' : 'dark';
-    return { c, t, no: i + 1, name: TYPES[t].name, st: st1, top: true };
+    return { c, t, no: i + 1, name: TYPES[t].name, st: st1, lv: on ? levelOf(kid, c) : 0, top: true };
   });
   const topNext = tops.find((f) => f.st === 'dark') || null;
   return { unit, floors, base, all, next, lit: all.filter((f) => f.st === 'lit').length, total: all.length, scanned: !!scan, waiting: all.filter((f) => f.st === 'teacher').length,
+    dim: all.filter((f) => f.lv === 1).length, star: all.filter((f) => f.lv === 3).length,
     tops, topNext, topLit: tops.filter((f) => f.st === 'lit').length, topWaiting: tops.filter((f) => f.st === 'teacher').length };
 }
 export const typeKey = (t) => `T:${t}`;
@@ -68,7 +82,8 @@ export const typeLit = (kid, t, unit = null) => { const x = kid.types && kid.typ
 export const litElsewhere = (kid, t, unit) => { const x = kid.types && kid.types[t]; if (!x || !x.lit) return null; const us = Object.keys(x.lit).filter((u) => u !== unit).sort((a, b) => x.lit[b] - x.lit[a]); return us[0] || null; };
 
 // ── 간격 복습 ──
-function schedule(kid, c, i, now) { const k = Math.max(0, Math.min(REVIEW_DAYS.length - 1, i)); kid.rev[c] = { i: k, due: dayStart(now) + REVIEW_DAYS[k] * DAY }; }
+//  ok = 처음 시도에 맞힌 점검 수(숙련 판정) — 새로 켜면 0부터
+function schedule(kid, c, i, now, ok = 0) { const k = Math.max(0, Math.min(REVIEW_DAYS.length - 1, i)); kid.rev[c] = { i: k, due: dayStart(now) + REVIEW_DAYS[k] * DAY, ...(ok ? { ok } : {}) }; }
 const ancestorsOf = (c) => { const seen = new Set(), st = [c]; while (st.length) for (const y of corePre(st.pop())) if (!seen.has(y)) { seen.add(y); st.push(y); } return seen; };
 // 위층을 맞히면 그 아래 켜진 층도 복습한 셈 — 점검 날을 그 단계 간격만큼 뒤로(단계는 올리지 않음)
 function creditBelow(kid, unit, c, now) {
@@ -112,6 +127,8 @@ export function todayOf(kid, cfg = {}, now = Date.now()) {
   const due = d.review ? [] : dueFloors(kid, unit, now);
   if (due.length) return { ...base, stage: 'review', due, warm: !!tw.next, n: Math.min(due.length, tw.next ? WARM_N : TOP_N) };
   if (tw.next) return { ...base, stage: 'prac', floor: tw.next };
+  const dim = tw.all.find((f) => f.lv === 1 && (kid.states[f.c] || {}).speedDay !== dayKey(now));   // 빠르기 연습은 한 층에 하루 한 번
+  if (dim) return { ...base, stage: 'prac', floor: dim, speed: true };
   if (tw.topNext) return { ...base, stage: 'type', top: tw.topNext };
   if (tw.waiting || tw.topWaiting) return { ...base, stage: 'wait' };
   return { ...base, stage: 'top' };
@@ -143,7 +160,7 @@ export function finishScan(kid, unit, S, now = Date.now()) {
 export const STORY_EVERY = 3, STORY_X = 1.6;
 const hs = (s) => String(s).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 17);
 function storyNow(P, q) {
-  if (!q || q.final || !hasWords(q.c) || q.n % STORY_EVERY) return null;
+  if (!q || q.final || P.speed || !hasWords(q.c) || q.n % STORY_EVERY) return null;
   try { return storyOf(q.c, q.p, hs(`${P.id}:${q.n}`), { plain: true }); } catch (e) { return null; }
 }
 export function currentPractice(P) {
@@ -160,9 +177,9 @@ export function answerPractice(P, a) {
   return fb;
 }
 
-export function startFloor(kid, unit, c, id, now = Date.now()) {
-  const P = newPractice({ id, sid: 'kid', plan: [c], now });
-  kid.run = { unit, kind: 'prac', c, P, t: now };
+export function startFloor(kid, unit, c, id, now = Date.now(), { speed = false } = {}) {
+  const P = newPractice({ id, sid: 'kid', plan: [c], speed, now });
+  kid.run = { unit, kind: 'prac', c, P, t: now, ...(speed ? { speed: true } : {}) };
   return P;
 }
 // 연습이 끝났을 때(불이 켜졌거나 12문제 안에 못 켬) — { lit, teacher, slow }
@@ -170,6 +187,11 @@ export function finishFloor(kid, P, now = Date.now()) {
   const c = P.plan[0], o = (P.outcome || {})[c], unit = kid.run && kid.run.unit;
   kid.run = null;
   if (!o) return { lit: false };
+  if (P.speed && !LIT.includes(o.s) || P.speed && o.s === 'slow') {   // 빠르기 연습에서 못 밝힘 — 정확도가 절반 넘으면 '할 수 있음' 그대로, 아니면 다시 꺼진 층
+    const keep = o.ok / Math.max(1, o.n) >= 0.5, old = kid.states[c] || {};
+    kid.states[c] = keep ? { ...old, speedDay: dayKey(now) } : { ...old, s: 'unstable', t: now };
+    return { lit: false, speed: true, stay: keep };
+  }
   const old = kid.states[c] || {};
   kid.states[c] = { s: o.s, t: now, h: [...(old.h || []), { t: now, s: o.s, sess: P.id, ok: o.ok, n: o.n }].slice(-12) };
   if (LIT.includes(o.s)) {
@@ -405,9 +427,14 @@ export function answerReview(kid, R, a, now = Date.now()) {
   if (!q) return null;
   const res = a.idk ? { ok: false } : q.item.check(a.vals || [], a.raws || []);
   const c = q.c, r = kid.rev[c] || { i: 0 };
+  let faster = false, master = false;
   if (res.ok) {
     R.todo.shift(); R.out.push({ c, ok: true });
-    schedule(kid, c, R.miss[c] ? r.i : r.i + 1, now);   // 한 번에 맞히면 다음 간격으로, 다시 해서 맞히면 같은 간격
+    const okN = (r.ok || 0) + (R.miss[c] ? 0 : 1), lv0 = levelOf(kid, c);
+    // 느렸던 층을 처음 시도에 시간 안에 맞히면 밝게(할 수 있음 → 능숙)
+    if (!R.miss[c] && !isType(c) && kid.states[c] && kid.states[c].s === 'slow' && (a.ms || 0) > 0 && a.ms <= limitOf(c) * 1000) { kid.states[c] = { ...kid.states[c], s: 'known', t: now }; faster = true; }
+    schedule(kid, c, R.miss[c] ? r.i : r.i + 1, now, okN);   // 한 번에 맞히면 다음 간격으로, 다시 해서 맞히면 같은 간격
+    master = lv0 === 2 && levelOf(kid, c) === 3;
     if (R.unit && !isType(c)) creditBelow(kid, R.unit, c, now);
   } else if (R.miss[c] && isType(c)) {   // 유형 — 두 번째로 틀리면 그 유형 불이 꺼진다(어느 단원에서 켰든) → 그 단원 도전 층에서 다시
     R.todo.shift(); R.out.push({ c, ok: false });
@@ -424,7 +451,7 @@ export function answerReview(kid, R, a, now = Date.now()) {
   if (!res.ok && !a.idk) noteBug(kid, c, res.bug);
   nextReview(R);
   if (R.done) endReview(kid, now);
-  return { ok: !!res.ok, bug: res.bug || null, ans: q.item.ans, c, again: !res.ok && !!R.cur && R.cur.c === c, done: R.done, out: R.out, type: !!q.type };
+  return { ok: !!res.ok, bug: res.bug || null, ans: q.item.ans, c, again: !res.ok && !!R.cur && R.cur.c === c, done: R.done, out: R.out, type: !!q.type, faster, master };
 }
 
 // ── 문항 기록 — 한 줄 글 '차시|결과|걸린 0.1초|무엇|틀린 모양' (결과 1 맞음 · 0 틀림 · 2 모르겠어요 · 무엇 s 살펴보기 · p 연습 · r 점검) ──
@@ -492,7 +519,8 @@ export function cardOf(kid, cfg, now = Date.now()) {
   const tw = T.tower, d = T.day;
   return {
     unit: cfg.unit, stage: T.stage === 'intro' ? 'scan' : T.stage, lit: tw.lit, total: tw.total, scanned: tw.scanned,
-    next: tw.next ? tw.next.c : T.stage === 'type' && T.top ? T.top.c : null, nextName: tw.next ? tw.next.name : T.stage === 'type' && T.top ? T.top.name : '', nextNo: tw.next ? (tw.next.base ? 0 : tw.next.no) : null,
+    ...(() => { const nx = tw.next || (T.stage === 'prac' && T.floor) || null; return { next: nx ? nx.c : T.stage === 'type' && T.top ? T.top.c : null, nextName: nx ? nx.name : T.stage === 'type' && T.top ? T.top.name : '', nextNo: nx ? (nx.base ? 0 : nx.no) : null }; })(),
+    ...(T.speed ? { speed: true } : {}), dim: tw.dim, star: tw.star,   // 빠르기 연습 날 · 희미한 층 수 · 숙련 층 수
     floors: tw.all.map((f) => (f.st === 'lit' ? 1 : f.st === 'q' ? 9 : f.st === 'teacher' ? 2 : 0)).join(''),
     tops: tw.tops.map((f) => (f.st === 'lit' ? 1 : f.st === 'q' ? 9 : f.st === 'teacher' ? 2 : f.st === 'lock' ? 8 : 0)).join(''),
     review: T.stage === 'review' ? (T.n || (kid.run && kid.run.R ? kid.run.R.todo.length : 0)) : 0,
