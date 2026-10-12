@@ -33,6 +33,11 @@ export function kidFrom(v) {
   k.marks = obj(parse(v.marks, {}));
   for (const [c, r] of Object.entries(obj(parse(v.rev, {})))) if (r && Number.isFinite(+r.due)) k.rev[c] = { i: Math.max(0, Math.min(4, +r.i || 0)), due: +r.due, ...(+r.ok > 0 ? { ok: Math.min(99, Math.round(+r.ok)) } : {}) };   // ok = 처음 시도에 맞힌 점검 수(숙련)
   for (const [key, n] of Object.entries(obj(parse(v.bugs, {})))) if (Number.isFinite(+n) && +n > 0) k.bugs[String(key).slice(0, 80)] = Math.min(999, +n);
+  // 오답 분석 기록(today.js noteWhy) — 차시 → [{ o 맞음 · k 모름 · h 가설 · sl 계산 실수 · u 설명 못 함 · t 가릴 수 있던 버그 · a 아이 답 · e 정답 · at }] · 차시 20개 · 차시마다 8개까지
+  const sid = (x) => String(x).slice(0, 60);
+  for (const [c, rs] of Object.entries(obj(parse(v.why, {}))).slice(-20)) if (Array.isArray(rs)) k.why[String(c).slice(0, 20)] = rs.slice(-8).filter((r) => r && typeof r === 'object').map((r) => ({
+    o: r.o ? 1 : 0, ...(r.k ? { k: 1 } : {}), ...(r.u ? { u: 1 } : {}), ...(Array.isArray(r.h) && r.h.length ? { h: r.h.slice(0, 4).map(sid) } : {}), ...(r.sl ? { sl: sid(r.sl) } : {}),
+    t: Array.isArray(r.t) ? r.t.slice(0, 8).map(sid) : [], ...(r.a != null ? { a: String(r.a).slice(0, 20) } : {}), ...(r.e != null ? { e: String(r.e).slice(0, 20) } : {}), at: +r.at || 0 }));
   const run = parse(v.run, null); k.run = run && typeof run === 'object' && run.kind ? run : null;
   for (const [d, x] of Object.entries(obj(v.days))) if (/^\d{4}-\d\d-\d\d$/.test(d) && x && typeof x === 'object') k.days[d] = { ms: +x.ms || 0, n: +x.n || 0, lit: Array.isArray(x.lit) ? x.lit.filter((c) => typeof c === 'string') : [], review: !!x.review, extra: Math.min(30, Math.max(0, +x.extra || 0)) };
   k.seen = obj(v.seen);
@@ -64,7 +69,7 @@ function rtdbStore(fb, sid, name) {
     async save(kid, { full = false, card = null, day = null } = {}) {
       const up = {}, base = `kids/${sid}/`;
       up[base + 'run'] = kid.run ? JSON.stringify(kid.run) : null;
-      up[base + 'rev'] = JSON.stringify(kid.rev); up[base + 'bugs'] = JSON.stringify(kid.bugs); up[base + 'types'] = JSON.stringify(kid.types || {});
+      up[base + 'rev'] = JSON.stringify(kid.rev); up[base + 'bugs'] = JSON.stringify(kid.bugs); up[base + 'types'] = JSON.stringify(kid.types || {}); up[base + 'why'] = JSON.stringify(kid.why || {});
       if (card) up[base + 'card'] = clean(card);
       if (full) {   // 날짜 기록은 통째로(30일 넘은 날은 빠진다) — 그래서 한 날짜 칸과 같이 쓰지 않는다
         up[base + 'st'] = JSON.stringify(kid.states); up[base + 'scans'] = JSON.stringify(kid.scans); up[base + 'marks'] = JSON.stringify(kid.marks);
@@ -101,7 +106,7 @@ function localStore(sid, name) {
     async save(kid, { card = null } = {}) {
       const d = load();
       d.log = (d.log || []).concat((kid.logq || []).splice(0).map((q) => q.line)).slice(-300);
-      d.kids[sid] = { st: JSON.stringify(kid.states), scans: JSON.stringify(kid.scans), marks: JSON.stringify(kid.marks), rev: JSON.stringify(kid.rev), bugs: JSON.stringify(kid.bugs), types: JSON.stringify(kid.types || {}), run: kid.run ? JSON.stringify(kid.run) : null, days: kid.days, seen: kid.seen, card: card || (d.kids[sid] || {}).card || null };
+      d.kids[sid] = { st: JSON.stringify(kid.states), scans: JSON.stringify(kid.scans), marks: JSON.stringify(kid.marks), rev: JSON.stringify(kid.rev), bugs: JSON.stringify(kid.bugs), types: JSON.stringify(kid.types || {}), why: JSON.stringify(kid.why || {}), run: kid.run ? JSON.stringify(kid.run) : null, days: kid.days, seen: kid.seen, card: card || (d.kids[sid] || {}).card || null };
       lsSet(KEY, d);
     },
     async teacherOK() { return true; },
