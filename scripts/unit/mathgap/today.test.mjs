@@ -8,7 +8,7 @@
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
 //  · 도전 층(문제 유형): 아래층을 다 켜야 열림 · 불씨 3개 · 같이 풀기 까닭(문제 모양 · 숫자 영역 · 계산 · 단계) · 8문제 → 선생님과 · 점검은 지금 단원 숫자로 · 하루 하나
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
-import { STORY_EVERY, limitOf, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
+import { STORY_EVERY, limitOf, stepMiss, stuckOn, giveUp, STUCK, STEP_BUG, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
   currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
   startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark,
   startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit, bridgeOf, bridgeMiss } from '../../../mathgap/js/today.js';
@@ -569,6 +569,35 @@ test('문장제 섞기 — 계산 차시 연습 3번째 문제마다 같은 숫�
   }
   ok(n === RULE.streak && stories === 1, `문제 ${n} · 문장제 ${stories}`);
   ok(finishFloor(kid, P, T0).lit, '불이 안 켜짐');
+});
+
+test('막힌 단계 → 내려가기 · 아직 어려워요 — 같은 앞 차시 두 번이면 기초 층 · 같은 탑 아래층은 불을 다시 끔 · 연달아 3문제면 막힘 · 앞 차시 없으면 선생님과', () => {
+  const kid = blankKid(); kid.seen.intro = T0; kid.scans['4-2-1'] = { t: T0, base: [], facts: true };
+  const [f1, f2] = lessonsOfUnit('4-2-1');
+  kid.states[f1] = { s: 'known', t: T0 };   // 1층은 켜져 있음
+  // 앞 단원 차시(가분수 ↔ 대분수) — 한 번은 그대로, 두 번째에 기초 층
+  ok(!stepMiss(kid, '4-2-1', '3-2-4:6', f2, T0).added, '한 번에 내려감');
+  const r = stepMiss(kid, '4-2-1', '3-2-4:6', f2, T0);
+  ok(r.added && towerOf('4-2-1', kid).base.some((f) => f.c === '3-2-4:6') && kid.scans['4-2-1'].down['3-2-4:6'] === f2, '두 번째에 기초 층으로 안 감');
+  ok(towerOf('4-2-1', kid).next.c === '3-2-4:6', '다음 켤 층이 기초가 아님');
+  // 같은 탑 아래층(켜진 1층) — 두 번이면 불을 다시 끔
+  stepMiss(kid, '4-2-1', f1, f2, T0); stepMiss(kid, '4-2-1', f1, f2, T0);
+  ok(towerOf('4-2-1', kid).floors[0].st === 'dark', '아래층 불을 끄지 않음');
+  // 뒤 차시 · 같은 차시는 내려가지 않음
+  ok(!stepMiss(kid, '4-2-1', '6-2-1:2', f2, T0).added && !stepMiss(kid, '4-2-1', f2, f2, T0).added, '뒤 차시로 내려감');
+  // 연달아 3문제 못 풂 → 막힘
+  const P = startFloor(kid, '4-2-1', f2, 'stuck-t', T0);
+  let fb;
+  for (let i = 0; i < STUCK.row; i++) { const q = currentPractice(P); fb = answerPractice(P, { idk: true, ms: 1000, t: T0 }); ok(!!fb.stuck === (i === STUCK.row - 1), `${i + 1}번째 막힘 판정 ${fb.stuck}`); void q; }
+  ok(stuckOn(P, f2), 'stuckOn');
+  // 막힌 앞 차시가 없으면 선생님과
+  const k2 = blankKid(); k2.scans['4-2-1'] = { t: T0, base: [], facts: true };
+  ok(giveUp(k2, '4-2-1', f2, null, T0).teacher && towerOf('4-2-1', k2).all.find((f) => f.c === f2).st === 'teacher', '선생님과 표시 안 됨');
+  // 켜면 '단계에서 막힘' 셈은 지움
+  const k3 = blankKid(); k3.scans['4-2-1'] = { t: T0, base: [], facts: true }; k3.bugs[`${f1}|${STEP_BUG}`] = 1;
+  const P3 = startFloor(k3, '4-2-1', f1, 'lit-t', T0);
+  while (currentPractice(P3)) { const q = currentPractice(P3); answerPractice(P3, { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: 1000, t: T0 }); }
+  ok(finishFloor(k3, P3, T0).lit && !k3.bugs[`${f1}|${STEP_BUG}`], '켜도 셈이 남음');
 });
 
 await Promise.all(pending);

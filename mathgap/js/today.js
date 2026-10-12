@@ -152,9 +152,12 @@ export function currentPractice(P) {
 }
 export function answerPractice(P, a) {
   const q = currentPractice(P);
-  if (!q || !q.story) return coreAnswer(P, a);
-  const pre = a.idk ? null : q.item.check(a.vals || [], a.raws || []);
-  return { ...coreAnswer(P, { ...a, pre, limit: q.limit, story: true }), story: true };
+  if (!q) return null;
+  let fb;
+  if (!q.story) fb = coreAnswer(P, a);
+  else { const pre = a.idk ? null : q.item.check(a.vals || [], a.raws || []); fb = { ...coreAnswer(P, { ...a, pre, limit: q.limit, story: true }), story: true }; }
+  if (fb && !fb.ok && !P.done && stuckOn(P, q.c)) fb.stuck = true;   // 연달아 못 풂 → 같이 풀기 끝에 '아직 어려워요'
+  return fb;
 }
 
 export function startFloor(kid, unit, c, id, now = Date.now()) {
@@ -171,6 +174,7 @@ export function finishFloor(kid, P, now = Date.now()) {
   kid.states[c] = { s: o.s, t: now, h: [...(old.h || []), { t: now, s: o.s, sess: P.id, ok: o.ok, n: o.n }].slice(-12) };
   if (LIT.includes(o.s)) {
     delete kid.marks[c];
+    delete kid.bugs[`${c}|${STEP_BUG}`];       // 다시 켰으니 '단계에서 막힘' 셈은 처음부터
     schedule(kid, c, 0, now);                 // 갓 켠 층은 다음 날 한 번 점검
     if (unit) creditBelow(kid, unit, c, now);
     return { lit: true, slow: o.s === 'slow' };
@@ -191,13 +195,53 @@ export function exampleOf(c, seed = 1) {
 export const BRIDGE_BUG = '다리 문제(예전에 배운 문제)에서 막힘';
 export function bridgeMiss(kid, unit, oldC, now = Date.now()) {
   noteBug(kid, oldC, { name: BRIDGE_BUG });
-  const n = kid.bugs[`${oldC}|${BRIDGE_BUG}`] || 0, sc = kid.scans[unit];
-  if (n < 2 || !sc || !byId[oldC] || isLit(kid, oldC) && n < 3) return { added: false, n };
-  if (towerOf(unit, kid).all.some((f) => f.c === oldC)) return { added: false, n };
-  kid.states[oldC] = { ...(kid.states[oldC] || {}), s: 'unstable', t: now, src: 'bridge' };
-  delete kid.rev[oldC];
-  sc.base = sortByGrade([...new Set([...(sc.base || []), oldC])]).slice(0, 6);
-  return { added: true, n };
+  const n = kid.bugs[`${oldC}|${BRIDGE_BUG}`] || 0;
+  if (n < 2 || isLit(kid, oldC) && n < 3) return { added: false, n };
+  const d = goDown(kid, unit, oldC, kid.run && kid.run.c, now, 'bridge');
+  return { added: d.added, n };
+}
+
+// ── 막힌 단계 → 그 차시로 내려가기 · '아직 어려워요' 인정하기(10-11 교사 시연: '가분수 ↔ 대분수를 모르는데 계속 새 문제 —
+//    여러 번 틀려도 별일 없음 · 못 한다고 인정하는 장치가 없다') ──
+//  같이 풀기 한 단계를 혼자 못 하면(첫 시도 틀림 · 알려 줘요) 그 단계 차시에 '막힘' 하나 → STUCK.miss 번이면 내려감
+//  한 층에서 연달아 STUCK.row 문제를 못 풀거나 STUCK.max 문제가 되면 '아직 어려워요' — 막힌 앞 차시가 있으면 내려가고, 없으면 '선생님과'
+export const STEP_BUG = '같이 풀기 단계에서 막힘';
+export const STUCK = { miss: 2, row: 3, max: 8 };
+const earlier = (a, b) => a !== b && sortByGrade([a, b])[0] === a;
+// c 차시를 지금 탑에서 다시 켜야 할 곳으로 — 같은 탑의 아래층이면 불을 끄고, 앞 단원이면 기초 층으로 · from = 막힌 층(선생님 화면 기록)
+export function goDown(kid, unit, c, from = null, now = Date.now(), src = 'step') {
+  const sc = kid.scans[unit];
+  if (!sc || !byId[c] || (from && !earlier(c, from))) return { added: false };
+  const tw = towerOf(unit, kid), at = tw.all.find((f) => f.c === c);
+  if (at && at.st !== 'lit') return { added: false, already: true, c };
+  kid.states[c] = { ...(kid.states[c] || {}), s: 'unstable', t: now, src };
+  delete kid.rev[c];
+  if (!at) sc.base = sortByGrade([...new Set([...(sc.base || []), c])]).slice(0, 6);
+  if (from) sc.down = { ...(sc.down || {}), [c]: from };
+  return { added: true, c };
+}
+export function stepMiss(kid, unit, c, from, now = Date.now()) {
+  if (!byId[c] || c === from || (from && !earlier(c, from))) return { added: false, n: 0 };
+  noteBug(kid, c, { name: STEP_BUG });
+  const n = kid.bugs[`${c}|${STEP_BUG}`] || 0;
+  if (n < STUCK.miss) return { added: false, n };
+  return { ...goDown(kid, unit, c, from, now), n };
+}
+// 이 층에서 막혔나 — 연달아 STUCK.row 문제 틀림(모름 포함) 또는 STUCK.max 문제째
+export function stuckOn(P, c) {
+  const per = P && P.per && P.per[c];
+  if (!per || per.state !== 'doing') return false;
+  const xs = per.items, tail = xs.slice(-STUCK.row);
+  return (tail.length === STUCK.row && tail.every((x) => !x.ok)) || xs.length >= STUCK.max;
+}
+// '아직 어려워요' — 막힌 앞 차시(down)가 있으면 그리로 내려가고 지금 층은 그대로 두고, 없으면 지금 층을 '선생님과'로
+export function giveUp(kid, unit, c, down = null, now = Date.now()) {
+  kid.run = null;
+  if (down) { const d = goDown(kid, unit, down, c, now); if (d.added || d.already) return { down }; }
+  const old = kid.states[c] || {};
+  kid.states[c] = { ...old, s: 'gap', t: now };
+  kid.marks[c] = 'teacher';
+  return { teacher: true };
 }
 export { bridgeOf, hasBridge };
 

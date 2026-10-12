@@ -88,6 +88,8 @@ export function mixed(prompt, ans, { wi = 0, ni = 1, di = 2, den = null, simples
       const W = vals[wi], N = vals[ni], D = den != null ? den : vals[di];
       if (fails([W, N, D]) || !D || ![W, N, D].every(Number.isInteger)) return withBugs(false, vals, bugs);
       let ok = N >= 0 && N < D && eqv(F(W * D + N, D), ans);
+      // 값은 같은데 분수 부분이 1보다 큼(5 10/6) — 가분수를 대분수로 바꾸지 않음(10-11 교사 시연: 그냥 틀림으로만 보임)
+      if (!ok && N >= D && eqv(F(W * D + N, D), ans)) return { ok: false, bug: { name: '분수 부분이 1보다 커요 — 대분수로 바꾸지 않음', to: '3-2-4:6' } };
       if (ok && simplest && N > 0 && !isSimplest(F(N, D))) return { ok: false, bug: { name: '분수 부분을 끝까지 약분하지 않음', to: 'G3' } };
       return withBugs(ok, vals, bugs);
     },

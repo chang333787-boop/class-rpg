@@ -11,7 +11,7 @@ import {
   addTime, addStudy, addExtra, markLit, pruneDays, currentItem, answer, currentPractice, answerPractice, workedSteps, RULE, exampleOf, noteBug, logItem,
   startFacts, currentFact, answerFact,
   startType, currentType, answerType, typeHelpDone, finishType, typeExample, typeName, TRULE, TYPES, litElsewhere, isType,
-  bridgeOf, bridgeMiss, bugsOf, BRIDGE_BUG,
+  bridgeOf, bridgeMiss, bugsOf, BRIDGE_BUG, stepMiss, giveUp,
 } from './today.js';
 
 const html = (s) => { const d = document.createElement('div'); d.innerHTML = s; return [...d.childNodes]; };
@@ -77,7 +77,7 @@ export function mountKid(app, ctx) {
     const tw = t.tower, hi = name ? `안녕, ${name}!` : '안녕!';
     const next = tw.next, nextLabel = next ? `${next.base ? '기초' : next.no + '층'} ${next.name}` : '';
     const plan = {
-      scan: t.resume ? ['지난번에 살펴보던 데서 이어서 해요', '이어서 살펴보기'] : [`오늘은 ${unitName(cfg.unit)} 탑을 살펴봐요`, '탑 살펴보기 시작'],
+      scan: t.resume ? ['살펴보던 데서 이어서 해요', '탑 살펴보기 이어서 하기'] : [`오늘은 ${unitName(cfg.unit)} 탑을 살펴봐요`, '탑 살펴보기 시작'],
       facts: t.resume ? ['곱셈구구 빠르기를 이어서 해요', '이어서 하기'] : ['탑 살펴보기 마지막 — 곱셈구구 빠르기 16문제', '곱셈구구 빠르기'],
       prac: t.resume ? [`${t.run_c || nextLabel}에 불을 켜던 중이에요`, '이어서 불 켜기'] : [`오늘은 ${nextLabel}에 불을 켜요`, '불 켜러 가기'],
       review: t.resume ? ['불 점검을 이어서 해요', '이어서 점검'] : t.warm ? [`먼저 불 점검 ${t.n}문제, 그다음 ${nextLabel}`, '불 점검 시작'] : tw.topNext ? [`먼저 불 점검 ${t.n}문제, 그다음 도전 층 ${tw.topNext.name}`, '불 점검 시작'] : [`탑 완성! 오늘은 불 점검 ${t.n}문제`, '불 점검 시작'],
@@ -188,7 +188,7 @@ export function mountKid(app, ctx) {
         h('button', { class: 'key sm wide knx', type: 'button', onmousedown: (e) => e.preventDefault(), onclick: () => press('next') }, blanks.length > 1 ? '다음 칸 →' : '확인')),
       h('div', { class: 'padnote' }, '키보드로 써도 돼요', h('br'), blanks.length > 1 ? 'Tab = 다음 칸 · Enter = 확인' : 'Enter = 확인'));
     // 빈칸 너비 — 긴 답이면 넓게
-    blanks.forEach((b) => b.addEventListener('input', () => b.classList.toggle('wide', b.value.length > 2)));
+    blanks.forEach((b) => b.addEventListener('input', () => { b.classList.toggle('wide', b.value.length > 2); msg.textContent = ''; }));   // 고쳐 쓰기 시작하면 지난 알림은 지움
     return { paper, actions, pad, math, msg, focus: () => { if (focused && !COARSE) focused.focus(); } };
   }
 
@@ -433,12 +433,38 @@ export function mountKid(app, ctx) {
     const filled = (it) => toHTML(it.prompt, { static: true, vals: it.sol.map(String) });
     const finalEl = q.story ? h('div', { class: 'math', style: { color: '#f3e8d6' }, html: `${filled(q.story.steps[1].item)}<span class="br"></span>${filled(q.item)}` })   // 문장제 — 식과 답(단위까지)
       : h('div', { class: 'math', style: { color: '#f3e8d6' }, html: filled(q.item) });
+    // 막힌 단계 → 그 차시로 내려가기(today.js stepMiss · giveUp) — 단계를 혼자 못 하면 그 단계 차시에 '막힘' 하나, 두 번이면 내려감
+    //  답 모양 실수(5 10/6 → 가분수 ↔ 대분수)처럼 틀린 답이 가리키는 앞 차시도 같은 셈
+    const lessonOf = (bug) => { const t = bug && bug.to; const x = Array.isArray(t) ? t[0] : t; return x && byId[x] ? x : null; };
+    let down = null, firstMiss = null;
+    const counted = new Set();   // 한 번 같이 풀기에서 같은 차시는 한 번만 셈(두 번 = 다른 문제에서 두 번)
+    const miss = (c) => { if (!c || c === q.c) return; firstMiss = firstMiss || c; if (counted.has(c)) return; counted.add(c); const r = stepMiss(kid, cfg.unit, c, q.c); if (r.added) down = down || c; };
+    if (!a.idk) miss(lessonOf(fb.bug));
+    let stuck = null;   // '아직 어려워요' 결과 { down } | { teacher }
     stepRunner(left, steps.length ? steps : null, { finalEl, emptyEl: h('div', { class: 'panel lead' }, rich(byId[q.c].hint || '')),
-      onFirst: (i, ok) => { if (steps[i].bridge && !ok) { added = bridgeMiss(kid, cfg.unit, steps[i].c).added || added; save(true); } },
-      onEnd: () => (br && (br.leap || added) ? h('div', { class: 'panel lead fade-in', style: { borderColor: '#c9b6ff' } },
-        br.leap ? [h('b', {}, '여기는 새로 배우는 곳 · '), rich(br.leap)] : null,
-        added ? [br.leap ? h('br') : null, h('b', {}, `예전에 배운 '${byId[steps[0].c].kid}'부터 다시 다져요`), ' — 탑의 기초 층에 넣었어요.'] : null) : null),
-      again: () => { if (T().day.ms >= T().budget) done(); else pracItem(); } });
+      onFirst: (i, ok, bug) => {
+        if (ok) return;
+        if (steps[i].bridge) { added = bridgeMiss(kid, cfg.unit, steps[i].c).added || added; if (added) down = down || steps[i].c; }
+        else miss(lessonOf(bug) || steps[i].c);
+        save(true);
+      },
+      onEnd: () => {
+        if (!down && fb.stuck) { stuck = giveUp(kid, cfg.unit, q.c, firstMiss); save(true); }   // 연달아 못 풂 — 막힌 앞 차시가 있으면 그리로, 없으면 '선생님과'
+        const to = down || (stuck && stuck.down);
+        const parts = [];
+        if (br && br.leap) parts.push(h('div', { class: 'panel lead fade-in', style: { borderColor: '#c9b6ff' } }, h('b', {}, '여기는 새로 배우는 곳 · '), rich(br.leap)));
+        if (to) parts.push(h('div', { class: 'panel lead fade-in down', style: { borderColor: '#7cc0f0' } }, h('b', {}, `'${byId[to].kid}'부터 다시 다져요`),
+          h('br'), stuck ? '연달아 어려웠어요. 이 층은 잠깐 두고, 막힌 곳부터 익혀서 다시 올라와요.' : '같은 곳에서 두 번 막혔어요. 거기부터 익히면 이 층도 금방 켜져요.', h('br'),
+          h('span', { class: 'muted', style: { fontSize: '14px' } }, '탑에 넣었어요 — 그 층에 불을 켜면 이 층으로 돌아와요.')));
+        else if (stuck && stuck.teacher) parts.push(h('div', { class: 'panel lead fade-in down', style: { borderColor: '#7cc0f0' } }, h('b', {}, '이 층은 아직 어려워요'),
+          h('br'), '혼자 끙끙대지 않아도 돼요. 선생님이랑 같이 켜요 — 선생님께 표시해 둘게요.'));
+        return parts.length ? parts : null;
+      },
+      againLabel: () => { const to = down || (stuck && stuck.down); return to ? `'${byId[to].kid}' 먼저 하러 가기` : stuck ? '다음 층으로' : '새 문제로 다시 해 볼게요'; },
+      again: () => {
+        if (down || stuck) { if (kid.run && kid.run.kind === 'prac') kid.run = null; save(true); return T().day.ms >= T().budget ? done() : runFloor(); }   // 지금 층은 멈추고 탑의 다음 층(막힌 차시)으로
+        if (T().day.ms >= T().budget) done(); else pracItem();
+      } });
   }
   // 단계 하나씩 풀기(같이 풀기 공통) — steps = [{ why, item, kind? }] · 단계마다 첫 시도가 맞았는지 onFirst(i, ok, bug) · 다 하면 finalEl · onEnd() → 끝에 덧붙일 글
   //  고르기 단계(식 고르기)는 보기를 누르면 바로 · 두 번 틀리거나 '알려 줘요'면 보여 주고 다음 단계로
@@ -455,8 +481,8 @@ export function mountKid(app, ctx) {
       right.querySelectorAll('.btnrow').forEach((x) => x.remove());
       list.append(h('div', { class: 'step done fade-in' }, h('span', { class: 'sn' }, '✓'), h('div', { class: 'why' }, '그래서 답은'), finalEl));
       const extra = onEnd ? onEnd() : null;
-      if (extra) right.append(extra);
-      right.append(h('div', { class: 'btnrow fade-in', style: { marginTop: 'auto' } }, h('button', { class: 'kbtn blue', onclick: () => { addStudy(kid, performance.now() - t0, 300000); save(); again(); } }, againLabel)));
+      if (extra) right.append(...[].concat(extra));
+      right.append(h('div', { class: 'btnrow fade-in', style: { marginTop: 'auto' } }, h('button', { class: 'kbtn blue', onclick: () => { addStudy(kid, performance.now() - t0, 300000); save(); again(); } }, typeof againLabel === 'function' ? againLabel() : againLabel)));
       right.querySelector('.kbtn').focus();
     };
     if (!steps) { if (emptyEl) list.append(emptyEl); return finish(); }
