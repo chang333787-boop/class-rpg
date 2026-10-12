@@ -11,6 +11,7 @@ node scripts/village-d/dcheck.mjs --scene tray                          # [MAC-T
 node scripts/village-d/dcheck.mjs --save village/stages/boards/pop88.json --eval 'window.__state().사람'   # 저장본을 넣고 엶
 node scripts/village-d/dcheck.mjs --dc                                 # [PA-03] TL-0 판별 draw call 표(판 다섯 + @base) → out/dc_baseline.json
 node scripts/village-d/dcheck.mjs --scene start-card                    # [MAC-CLOCK] 시계 쥐기 — 카드 전 틱 0 · 카드 동안 가짜 60초 틱 그대로(+[시작] 양성 대조) · Space · ❓ 여는 조건 · 쥐는 이 겹침 · 4× · 모형 ⏸ 단추 · 다시 보기 카드 · 첫 안내 → 카드 틱 0 · module 이 죽어도 8초 안전망
+node scripts/village-d/dcheck.mjs --scene k7 --net-delay 2500:stages/   # [MAC-K7] 안내 층 · 수업 판 💬 · 길 끌기 기본 끔 — 망 늦춤에도 💬 단추 0번(관찰자) · 탐정 판 가게 누름 ✨ 0 · 🔗 공급 경로 말 꼬리 0 · 길 끌기 이름표 0 / 양성 대조(판 규칙 켬 · 3층 사본 · 자유 모드)
 node scripts/village-d/dcheck.mjs --help                               # 옵션 전부
 ```
 - `--save <경로>` — 저장소 안 저장본(.json)을 판 밖 쪽(rules.json)에서 그 판의 저장 키(`rpg.village.guest` · 판이면 `.<판>`)에 넣고 연다(village-look 의 `기본+pop88` 꼴 · 판의 `시작` 땅 대신).

@@ -68,6 +68,16 @@ function clockFile(def, n) {
   if (def.생산멈춤 != null && typeof def.생산멈춤 !== 'boolean') out.push(['FAIL', '생산멈춤', `${JSON.stringify(def.생산멈춤)} — true · false 만(false = 모형 화면 '⏸ 생산 멈춤' 단추 숨김)`]);
   return out;
 }
+/* [MAC-K7] PA-07 안내 층 칸 — 안내최대층 ∈ {2, 3}(없으면 3 · 그 밖이면 FAIL '안내 층 꼴') · 2 인데 권유가 있으면 FAIL '탐정 판 권유'(권유는 자리를 짚는다 = 4층 · 엔진은 이중 안전으로 끈다) ·
+   맞으면 PASS 한 줄 · 칸이 없는 판은 줄 0 · 판 루프와 자기 시험이 같이 부른다 */
+const 층지남 = new Set();
+function k7File(def, n) {
+  if (n) 층지남.add(n); const v = def.안내최대층;
+  if (v == null) return [];
+  if (v !== 2 && v !== 3) return [['FAIL', '안내 층 꼴', `안내최대층 ${JSON.stringify(v)} — 2 · 3 만(없으면 3 · 2 = 탐정 판: 까닭까지 · 할 일 · 자리 0)`]];
+  if (v === 2 && def.권유 != null) return [['FAIL', '탐정 판 권유', '안내최대층 2 인데 권유가 있다 — 권유는 자리(✨)를 짚는다(4층) · 빼거나 안내최대층 3 으로']];
+  return [['PASS', `안내최대층 ${v}` + (v === 2 ? ' — 탐정 판(까닭까지 · 할 일 · 자리 0 · 권유 없음)' : ''), '']];
+}
 
 /* 건물 종류 확인: 판 밖 칸에 놓아 보면 모르는 종류는 오류가 난다(load.mjs 의 run.mjs 와 같은 꾀) */
 function kindsOk(list) {
@@ -180,6 +190,7 @@ for (const f of files) {
   changed.length <= 3 ? add('PASS', P(`기본과 다른 판정 규칙 ${changed.length}개 (≤3)` + (changed.length ? ': ' + changed.join(' ') : ''))) : add('FAIL', P('판정 규칙 차이'), `${changed.length}개 > 3: ${changed.join(' ')}`);
   campFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-CAMP] 판규칙 · 판 규칙 camp — 위 campFile(자기 시험이 같은 함수를 부른다) */
   clockFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-CLOCK] 배속최대 · 생산멈춤 — 위 clockFile(자기 시험이 같은 함수를 부른다) */
+  k7File(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-K7] 안내최대층 · 탐정 판 권유 — 위 k7File(자기 시험이 같은 함수를 부른다) */
   /* [MAC-STAGEOFF] 판이 끄는 묶음 — 모르는 이름은 조용히 지나가면 안 된다(아무것도 안 꺼진 채 PASS 한다) */
   let 끈것 = new Set();
   if (def.끄기 != null) {
@@ -407,6 +418,19 @@ for (const f of files) {
   T('고리', !!캠프 && 캠프.고리.includes('생산') && 캠프.고리.includes('일자리') && !campCheck({ 멈춤: { 생산: true, 일자리: true, 뜻: '자기 시험' } }, 캠프).length, 캠프 && 캠프.고리);
   !틀림.length ? add('PASS', `판 시계 칸 자기 시험 — 판 루프와 같은 clockFile(판 ${시계지남.size}개 지남) · 배속최대 1·2·4 만 · 생산멈춤 불만 · 배속최대 < 4 + 첫 안내가 뜰 판 REVIEW · 칸 없는 판 줄 0 · 멈춤.생산 · 일자리 고리 있음(엔진 고리 ${캠프.고리.join('·')})`)
     : add('FAIL', '판 시계 칸 자기 시험', 틀림.join(' · ')); }
+
+/* [MAC-K7] 안내 층 칸 자기 시험(build/B §B-14 수용 시험 (다) — 가짜 판 2층 + 권유 → FAIL 1) — 판 루프가 부르는 k7File 그대로(판마다 지났나도 셈):
+   2층 + 권유 FAIL '탐정 판 권유' 하나 · 4 · 1 · 0 · "2" · 2.5 · null 아닌 글 FAIL '안내 층 꼴' 하나씩 · 3 + 권유 · 2 · 3 PASS 한 줄 · 칸 없음 줄 0 · 바닥 판 다섯이 칸을 씀(탐정 판 둘 = 2) */
+{ const 틀림 = [], T = (id, ok, v) => { if (!ok) 틀림.push(id + ' ' + JSON.stringify(v)); }, 꼴 = (L, k, nm) => L.length === 1 && L[0][0] === k && (!nm || L[0][1] === nm), 권 = { 말: '자기 시험', 집: [0, 0, 1, 1] };
+  const 안지남 = files.map(f => f.replace(/\.json$/, '')).filter(x => !층지남.has(x)); T('loop', !안지남.length, 안지남);
+  T('2+권유', 꼴(k7File({ 안내최대층: 2, 권유: 권 }), 'FAIL', '탐정 판 권유'), k7File({ 안내최대층: 2, 권유: 권 }));
+  [4, 1, 0, '2', 2.5, true].forEach(v => T('꼴 ' + JSON.stringify(v), 꼴(k7File({ 안내최대층: v }), 'FAIL', '안내 층 꼴'), k7File({ 안내최대층: v })));
+  [[{ 안내최대층: 3, 권유: 권 }], [{ 안내최대층: 2 }], [{ 안내최대층: 3 }]].forEach(([d]) => T('PASS ' + JSON.stringify(d.안내최대층), 꼴(k7File(d), 'PASS'), k7File(d)));
+  T('칸 없음', !k7File({}).length && !k7File({ 권유: 권 }).length, k7File({}));
+  const 바닥 = { lesson0: 3, 'help-places': 3, 'empty-shop-ga': 2, 'empty-shop-na': 2, 'two-villages': 3 }, 판값 = Object.fromEntries(Object.keys(바닥).map(id => { try { return [id, JSON.parse(fs.readFileSync(path.join(DIR, id + '.json'), 'utf8')).안내최대층]; } catch (e) { return [id, '없음']; } }));
+  T('바닥 판', JSON.stringify(판값) === JSON.stringify(바닥), 판값);
+  !틀림.length ? add('PASS', `안내 층 칸 자기 시험 — 판 루프와 같은 k7File(판 ${층지남.size}개 지남) · 2층 + 권유 FAIL '탐정 판 권유' · 2 · 3 밖 FAIL '안내 층 꼴' · 칸 없음 줄 0 · 바닥 판 다섯 = 3 · 3 · 2 · 2 · 3`)
+    : add('FAIL', '안내 층 칸 자기 시험', 틀림.join(' · ')); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
 끈판 ? add('PASS', `판정을 끈 판 ${끈판}개 (정본 2번 — 끄기를 실제로 쓴 판이 있다)`)
