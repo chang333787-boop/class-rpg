@@ -11507,7 +11507,7 @@ window.__eseed = () => ({ 켜짐: window.VRULES.eseed.on, 판시드: ESEED.on ? 
      판규칙이 없거나 비면 CAMP 는 통째로 잠잠하다 — 기본 마을 · 자유 놀이 · 판규칙 없는 판은 한 줄도 안 달라진다(vsref 0).
    · 멈춤.이사 = tryMoveIn 머리. 새 이웃은 모두 여기서 나온다(조용한 이사 moveInQuiet 도 그 안에서만 불림 · 돌아섰다 다시 오는 이는 먼저 걸어온 이가 있어야 생김).
      멈춤.층자람 = growHouse 머리. 둘 다 hookable 이 아니라 다시 대입으로 감싼다 — 이름으로만 불리고 값으로 붙잡은 곳(setTimeout · 이벤트 · 객체 칸)은 0.
-     멈춤.성장 은 받되 고리가 없다(growTick 은 나무 · 꽃이 자라는 보기 · 인구와 무관). 땅고르기 · 생산 · 일자리 는 키만 받는다(고리는 뒤 PR).
+     멈춤.성장 은 받되 고리가 없다(growTick 은 나무 · 꽃이 자라는 보기 · 인구와 무관). 땅고르기 는 키만 받는다(고리는 뒤 PR) · 생산 · 일자리 고리 = PA-06 [MAC-CLOCK](아래).
    · 층자람을 막아도 satTick 은 조건이 찬 집에 growHouse 를 계속 다시 부른다(그림 · 말 0) — 멈춤을 풀면 그런 집이 한꺼번에 한 층 오른다.
    · 자리: 판 읽기 블록 바로 뒤 = 첫 틱 전(뒤에 선언되는 이름은 건드리지 않는다 — TDZ). 판 `규칙` 으로 camp 를 덮는 길은 module 끝이라 늦어 판 검사가 FAIL 로 막는다.
    · 스위치 VRULES.camp(rules.json '때' — 셈 식은 그대로 두고 판이 그 일을 세운다) — on:false = 판규칙이 없는 판과 같은 동작(도구 · 콘솔용). 저장 0 · 화면 0 · 원래 줄 수정 0. 시험 훅 __campStats. */
@@ -11527,9 +11527,36 @@ CAMP.def = campRead(STAGE.def ? STAGE.def.판규칙 : null);
 const campStop = k => !!(window.VRULES.camp.on && CAMP.def && CAMP.def.멈춤 && CAMP.def.멈춤[k] === true);
 { const cpMove0 = tryMoveIn; tryMoveIn = function () { if (campStop('이사')) { CAMP.stats.이사막음++; return; } return cpMove0.apply(this, arguments); }; }
 { const cpGrow0 = growHouse; growHouse = function () { if (campStop('층자람')) { CAMP.stats.층막음++; return; } return cpGrow0.apply(this, arguments); }; }
+/* [MAC-CLOCK] PA-06 멈춤 고리 둘 더 — 일자리 · 생산(기획 build/C §3 R60 · 엔진 사실 H17 #1) · CAMP.고리(엔진이 하는 멈춤 — 판 검사가 읽는 표)에 더한다.
+   · 일자리 = rhythmTick(hookable) 안에서만 일터를 잠깐 가린다(f.job → null → 되돌림) — 일하러 나서는 사람 0 · 배정(JOBH) · 집 카드 일자리 말은 그대로 셈 ·
+     출근막음 = 일하는 시간에 일터를 가린 사람(사람마다 하루 한 번 셈).
+     enterPlace 는 막지 않는다 — 부르는 쪽 둘(일터 앞 · 걸어서 닿음)이 저마다 출근++ 라 막힌 사람이 문 앞에서 틱마다 다시 세어졌다(하루 +1954 · 엔진 회신).
+     배정 다시 셈(jobsHomesStep)도 막지 않는다 — 첫 바퀴 전에 막으면 배정 칸이 없는 저장본(pop88 등)은 한바퀴 0 으로 남아 jobsTick · joblessHome 이 옛 표본 셈으로 돈다.
+   · 생산 = 모형 화면 '⏸ 생산 멈춤'(pmapPause)과 같은 스위치 — PMAP 은 아래에 선언되고 흐름 칸은 규칙 덮기가 얹으니 stageApplyRules 뒤 [MAC-CLOCK] 에서 켠다. */
+CAMP.고리.push('생산', '일자리'); CAMP.stats.출근막음 = 0; CAMP.stats.생산막음 = 0;
+hookAdd('rhythmTick', function (next, args) { const f = args[0]; if (!f || f.job == null || !campStop('일자리')) return next(args);
+  const j = f.job; if (f.state !== 'inside' && isWorkHour(simHour()) && f.clkJobDay !== simDay()) { f.clkJobDay = simDay(); CAMP.stats.출근막음++; } f.job = null; try { return next(args); } finally { f.job = j; } });
 window.__campStats = () => ({ 켜짐: window.VRULES.camp.on, 판규칙: CAMP.def ? Object.keys(CAMP.def) : null, 꼴틀림: CAMP.꼴틀림,
   멈춤: CAMP.멈춤키.filter(k => !!(CAMP.def && CAMP.def.멈춤 && CAMP.def.멈춤[k] === true)), 지금막음: CAMP.고리.filter(campStop),
   모르는키: CAMP.모르는키.slice(), 뜻없음: CAMP.뜻없음.slice(), 흰목록: CAMP.흰목록.slice(), 멈춤키: CAMP.멈춤키.slice(), 고리: CAMP.고리.slice(), 읽는칸: CAMP.읽는칸.slice(), ...CAMP.stats });
+/* ── [MAC-CLOCK] PA-06 시계 쥐기 — 쥐는 이를 한 곳으로 · 시작 카드 동안 멈춤 · 규칙 전 틱 막기 · 배속최대 (기획 build/B §B-3 · 엔진 사실 H17 · 10-03 엔진 회신 §1-1 #2 · §1-2) ──
+   시계를 세우는 이가 넷 — 제목 카드(title) · 첫 안내(guide) · ❓ 풍선 뜻 카드(bhelp) · 판 시계(boot · scard). 전엔 저마다 SIM.paused 를 껐다 켜서 뒤에 닫힌 쪽이
+   앞의 쥠까지 풀었다(첫 안내 위에 ❓ 를 열고 안내를 닫으면 ❓ 카드 뒤로 시간이 흘렀다). 이제 clockHold(이름, 켬/끔) 하나 — 쥔 이가 남아 있으면 멈춘 채.
+   · 다 풀리면 쥐기 전으로(아이가 멈춰 둔 판은 멈춘 채) — 처음 뜬 판 시작 카드의 [시작] 만은 판 시간 시작이라 늘 흐르게(저장본 speed 0 이면 1배속).
+   · 쥔 동안 배속 단추 · Space 는 다시 쥔다(고른 배속은 풀릴 때 씀) · 멈춤 단추 표시는 안 바꾼다(아이가 누른 멈춤이 아니다) · 저장본에는 풀린 뒤의 배속(쥔 멈춤을 0 으로 안 적음).
+   · 자리: 판 읽기 바로 뒤 — 쥐는 이 셋(제목 카드 · 첫 안내 · ❓)이 모두 이 아래라 먼저 불려도 TDZ 0. boot 쥠은 첫 loop() 앞 · 풂 · 넘김 · 감싸기는 stageApplyRules 뒤.
+   · 스위치 VRULES.stageClock(조작) — on:false = 판 시계(boot · scard) · 수업 판 ❓ 여는 조건 끔(배속최대 · 생산멈춤 · 판규칙 멈춤은 판 칸이 정한다). 판정 0 · 새 저장 칸 0.
+     시험 훅 __clockHold(__clock 은 __folkRun 의 시계 수가 이미 쓴다). */
+(window.VRULES = window.VRULES || {}).stageClock = { on: true };
+const CLK = { who: new Set(), mine: false, start: false, stats: { 쥠: 0, 풂: 0, 넘김: 0, 되쥠: 0, 깎음: 0, 막은물음: 0, 시간끝: 0, 카드틱: null } };
+const spdMax = () => (STAGE.def && [1, 2, 4].includes(STAGE.def.배속최대)) ? STAGE.def.배속최대 : 4;
+const clkStage = () => !!(STAGE.def && window.VRULES.stageClock.on);
+const clkBtns = () => { const s = CLK.who.size ? (CLK.mine || CLK.start ? SIM.speed : 0) : (SIM.paused ? 0 : SIM.speed); document.querySelectorAll('#spd button').forEach(b => b.classList.toggle('on', +b.dataset.s === s)); };
+function clockHold(who, on) {
+  if (on) { if (CLK.who.has(who)) return; if (!CLK.who.size) CLK.mine = !SIM.paused; CLK.who.add(who); SIM.paused = true; CLK.stats.쥠++; return; }
+  if (!CLK.who.delete(who) || CLK.who.size) return; CLK.stats.풂++;
+  if (CLK.start || CLK.mine) { SIM.paused = false; SIM.speed = Math.min(SIM.speed || 1, spdMax()); if (STAGE.def) clkBtns(); }
+  CLK.mine = CLK.start = false; }
 /* ── [MAC-TERRAIN] 환경이 선택을 만드는 판 — 지형 바닥 + 칠하기 (설계 docs/village_environment_boards.md #898 · 보스 09-23 승인 · 바다 판 먼저: 물 · 모래) ──
    판 파일 `지형: { 칸: [[x0, y0, x1, y1, '물'|'모래'], …] }`(뒤엣것이 앞엣것을 덮음). 지형은 **물건이 아니라 바닥**이다 — 칸(cells)에 들어가지 않으니
    치우기·옮기기로 없어지지 않고, 저장본에도 안 들어간다(판 파일에만).
@@ -11850,9 +11877,9 @@ function titleSpread(n, max) { if (n <= max) return Array.from({ length: n }, (_
     if (id && id !== prev) { const roots = titleReasonCells(id); titleSpread(roots.length, TITLE_MIRROR.max).forEach(n => { const root = roots[n], rec = cells[root]; if (!rec) return; const c = centerOf(rec.k, cX(root), cY(root), rec.rot); sparkle.push({ x: c.x, z: c.z, until: SIM.t + TITLE_MIRROR.ms }); }); TITLE.stats.반짝 = roots.length; }
     return r; };
   const cardM0 = titleCard; titleCard = function () { const r = cardM0.apply(this, arguments);
-    if (document.getElementById('titleCard') && !TITLE.held && !SIM.paused) { TITLE.held = true; SIM.paused = true; }   // 카드가 실제로 떴을 때만
+    if (document.getElementById('titleCard') && !TITLE.held) { TITLE.held = true; clockHold('title', true); }   // 카드가 실제로 떴을 때만 · [MAC-CLOCK] 쥐는 이 한 곳
     return r; };
-  if (window.MutationObserver) new MutationObserver(() => { if (TITLE.held && !document.getElementById('titleCard')) { TITLE.held = false; SIM.paused = false; } }).observe(document.body, { childList: true }); }
+  if (window.MutationObserver) new MutationObserver(() => { if (TITLE.held && !document.getElementById('titleCard')) { TITLE.held = false; clockHold('title', false); } }).observe(document.body, { childList: true }); }
 /* ══════════════════════════════════════════════════════════════
    [DESIGN-TITLESIGN-1] 칭호 간판 — 마을 어귀에 저절로 서는 지붕 팻말(보스 결정 ⓑ). 새 물건 아님: cells 에 안 들고 저장 0.
    · 자리: 프로그램 담당의 __entranceSpot(prev)(#566). 칭호가 없으면(id null) 간판도 없다. 친구 마을 구경 중엔 내린다.
@@ -12591,8 +12618,8 @@ function guideRender() { const c = GUIDE_CARDS[GUIDE.i]; document.getElementById
 /* [MAC-GUIDE] 첫 안내 3장을 읽는 동안 시계를 세운다. 하루가 3분이라, 천천히 읽는 아이는 안내를 닫았을 때 이미 저녁·밤이었다
    (실측: 안내 2장째에서 '밤 10시'). 멈춤 단추 표시는 안 건드린다 — 아이가 누른 멈춤이 아니다. 아이가 이미 멈춰 둔 판이면 손대지 않는다. */
 function guideHold(on) {
-  if (on) { GUIDE.held = !SIM.paused; if (GUIDE.held) SIM.paused = true; }
-  else if (GUIDE.held) { GUIDE.held = false; SIM.paused = false; }
+  if (on) { GUIDE.held = true; clockHold('guide', true); }   /* [MAC-CLOCK] 쥐는 이 한 곳 — 다른 이가 쥔 채면 안내를 닫아도 멈춘 채 */
+  else if (GUIDE.held) { GUIDE.held = false; clockHold('guide', false); }
 }
 /* ── [MAC-FIRST5-3] 처음 안내의 집 장 — 터치에선 '톡 → 자리를 보고 → ✓' (보스 09-20 · 터치 앉히기 MAC-SEAT #621 에 맞춰) ──
    안내 둘째 장은 "집은 길 옆에 놓아요"뿐이었다. 터치에선 이제 집·우물·가게를 톡하면 **바로 놓이지 않고 자리부터 보여 준다** — 처음 온 아이가
@@ -13506,6 +13533,7 @@ const STARTCELL = (() => { const d = STAGE.def && STAGE.def.시작칸; if (!d ||
 if (STARTCELL) camTarget.set(wx(STARTCELL.x), 2, wz(STARTCELL.y));
 { const szC = startZoom; startZoom = function () { const z = szC.apply(this, arguments); return STARTCELL && STARTCELL.z ? Math.max(z, STARTCELL.z) : z; }; }
 window.__startCell = () => ({ 판: STAGE.id || null, 칸: STARTCELL ? [STARTCELL.x, STARTCELL.y] : null, 배율: STARTCELL ? STARTCELL.z : null, 지금배율: +zoomMul.toFixed(2) });
+if (clkStage()) clockHold('boot', true);   /* [MAC-CLOCK] 규칙 전 틱 막기 — 판 규칙 덮기(stageApplyRules)는 module 끝이라 첫 loop() 의 프레임 틱이 기본 규칙으로 돌았다 */
 resize(); placeCamera(); loop();   // resize 가 시작 배율까지 잡는다
 setTimeout(() => { if (HP.q) GFX.mode = 'fixed'; else { setGfxMode('auto'); if (HP.step != null) applyStep(+HP.step, 'init'); } }, 0);   // #q= 로 재는 중엔 자동을 끈다
 if (window.VillageSync) VillageSync.attach();   // 마을의 pagehide 로컬 저장 뒤에 붙는다(G5 ④)
@@ -13882,8 +13910,8 @@ function bhRender() { const el = bhEl(), P = bhPages(), p = P[BHELP.i] || P[0];
   el.querySelector('.pic').textContent = p.pic; el.querySelector('.txt').innerHTML = p.txt; el.querySelector('.dots').innerHTML = P.map((_, k) => k === BHELP.i ? '<b>●</b>' : '○').join(' ');
   el.querySelector('button[data-bh="back"]').style.visibility = BHELP.i ? '' : 'hidden'; el.querySelector('button[data-bh="next"]').textContent = BHELP.i === P.length - 1 ? '알겠어요' : '다음'; }
 function bhOpen(page) { if (!window.VRULES.bubbleHelp.on) return false; const el = bhEl(); BHELP.i = page | 0; BHELP.on = true; BHELP.stats.열림++;
-  BHELP.held = !SIM.paused; if (BHELP.held) SIM.paused = true; el.classList.add('show'); bhRender(); return true; }
-function bhClose() { if (!BHELP.el) return; BHELP.el.classList.remove('show'); BHELP.on = false; if (BHELP.held) { BHELP.held = false; SIM.paused = false; } }
+  BHELP.held = true; clockHold('bhelp', true); el.classList.add('show'); bhRender(); return true; }
+function bhClose() { if (!BHELP.el) return; BHELP.el.classList.remove('show'); BHELP.on = false; if (BHELP.held) { BHELP.held = false; clockHold('bhelp', false); } }
 { const rg0 = renderGoals; renderGoals = function () { const x = rg0.apply(this, arguments); if (!window.VRULES.bubbleHelp.on) return x; const el = document.getElementById('goals'); if (!el || !el.insertAdjacentHTML) return x; bhCss();
     el.insertAdjacentHTML('beforeend', '<div class="g bh"><button data-bh="open">❓ 풍선 뜻 · 이사 규칙</button></div>');
     const b = el.querySelector && el.querySelector('button[data-bh="open"]'); if (b) b.onclick = e => { e.stopPropagation(); bhOpen(0); }; return x; }; }
@@ -14107,6 +14135,26 @@ function stageResetBoot() { if (SRESET.el || !sresetLive()) return;
 setTimeout(stageResetBoot, 700);   /* 판 규칙(protoMap 등)이 얹힌 뒤 */
 window.__stageReset = () => ({ 켜짐: window.VRULES.stageReset.on, 쓸수있나: sresetLive(), 보임: !!SRESET.el, 시작땅: !!(STAGE.def && STAGE.def.시작), ...SRESET.stats });
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
+/* [MAC-CLOCK] 규칙 뒤 — ① 배속최대: 저장본 clock.speed 는 setSpeed 를 안 거치고 들어온다 → 열 때 깎고 그보다 빠른 단추를 숨긴다 ② 판규칙 멈춤.생산 = 모형 ⏸ 스위치를 판이 켬
+   ③ boot 쥠 — 시작 카드가 뜰 판이면 카드가 뜰 때 scard 로 넘긴다(그때까지 쥔 채 · 600ms 타이머 동안 틱 0) · 안 뜰 판(교과 · 카드 칸 없음 · #끝 · 이미 시작함)이면 곧바로 풂 ·
+      뜰 판인데 끝내 안 뜨면 8초 뒤 풂(첫 안내가 떠 있는 동안은 기다림) ④ 감싸기 — 시작 카드 열기 · 닫기 · setSpeed · 모형 단추 · ❓ 여는 조건(수업 판은 시계가 멈춘 동안만) · 저장 */
+if (STAGE.def) { if (SIM.speed > spdMax()) { SIM.speed = spdMax(); CLK.stats.깎음++; clkBtns(); }
+  document.querySelectorAll('#spd button').forEach(b => { if (+b.dataset.s > spdMax()) b.style.display = 'none'; });
+  if (campStop('생산') && flowOn()) { pmapPause(true); CAMP.stats.생산막음++; }
+  let endAsk = false; try { endAsk = /(^|,)(끝|end)(,|$)/.test(decodeURIComponent(location.hash.slice(1))); } catch (e) {}
+  if (!(clkStage() && window.VRULES.stageCard && window.VRULES.stageCard.on && !VISIT_SID && (STAGE.def.교과 != null || stageWantCard()) && !endAsk && !scardLoad().started)) clockHold('boot', false);
+  else { let t0 = Date.now(); setTimeout(function clkWait() { if (!CLK.who.has('boot')) return; if (GUIDE.on) t0 = Date.now(); if (Date.now() - t0 < 8000) { setTimeout(clkWait, 1000); return; } CLK.stats.시간끝++; clockHold('boot', false); }, 1000); } }
+{ const st0 = stageCardStart; stageCardStart = function () { const first = !scardLoad().started;
+    try { return st0.apply(this, arguments); } finally { if (SCARD.el && clkStage()) { SCARD.el.dataset.clk = 'scard'; if (first) CLK.start = true; clockHold('scard', true);
+        if (CLK.who.has('boot')) { clockHold('boot', false); CLK.stats.넘김++; } if (CLK.stats.카드틱 == null) CLK.stats.카드틱 = SIM.ticks; } else clockHold('boot', false); } };
+  const sc0 = scardClose; scardClose = function () { const was = !!(SCARD.el && SCARD.el.dataset.clk); const r = sc0.apply(this, arguments); if (was) clockHold('scard', false); return r; };
+  const ss0 = setSpeed; setSpeed = function (n) { if (STAGE.def && n > spdMax()) n = spdMax(); const r = ss0.call(this, n);
+    if (CLK.who.size) { if (!SIM.paused) { CLK.mine = true; SIM.paused = true; CLK.stats.되쥠++; } else if (n === 0) CLK.mine = false; } return r; };
+  const pe0 = pmapExtra; pmapExtra = function () { const r = pe0.apply(this, arguments);
+    if (STAGE.def && (STAGE.def.생산멈춤 === false || campStop('생산')) && PMAP.덧) PMAP.덧.querySelectorAll('button').forEach(b => { if (/생산 (멈춤|다시)$/.test(b.textContent)) b.remove(); }); return r; };
+  const bo0 = bhOpen; bhOpen = function () { if (clkStage() && STAGE.def.교과 != null && !SIM.paused) { CLK.stats.막은물음++; toast('⏸ 로 시간을 멈추면 풍선 뜻을 볼 수 있어요', true); return false; } return bo0.apply(this, arguments); };
+  const se0 = serialize; serialize = function () { const d = se0.apply(this, arguments); if (d && d.clock && d.clock.speed === 0 && CLK.who.size && (CLK.mine || CLK.start)) d.clock.speed = Math.min(SIM.speed || 1, spdMax()); return d; }; }
+window.__clockHold = () => ({ 켜짐: window.VRULES.stageClock.on, 쥔: [...CLK.who], 멈춤: SIM.paused, 배속: SIM.speed, 배속최대: spdMax(), 풀면흐름: !!(CLK.who.size && (CLK.mine || CLK.start)), 처음카드: CLK.start, ...CLK.stats });
 /* ══════════════════════════════════════════════════════════════
    [MAC-TRAY] 판 칸 `트레이` — 아이 트레이와 아이 손을 판이 정한다 (PA-01)
    `건물` 목록 하나로는 '처음 땅에 놓여 있는 것'과 '아이가 손댈 수 있는 것'을 가를 수 없었다 — 그 둘째를 이 칸이 맡는다.
