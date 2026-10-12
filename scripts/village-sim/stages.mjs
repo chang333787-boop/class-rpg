@@ -7,6 +7,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(H
 const results = [];
 const add = (kind, name, why) => results.push([kind, name, why || '']);
 const FIELDS = ['id', '이름', '교과', '질문', '되돌아보기', '현상', '변수', '시작', '규칙', '건물', '목표'];
+/* [MAC-TRAY] 아는 칸 — FIELDS 말고 엔진 · 뒤 PR 이 읽는 판 칸. 이 밖의 칸은 REVIEW(오타 잡기 · FAIL 아님). 새 판 칸을 여는 PR 은 같은 PR 에서 여기에 더한다 */
+const KNOWN = new Set([...FIELDS, '모습', '건물정의', '흐름', '시작칸', '지형', '끄기', '카드', '첫안내', '역할', '예상', '결정', '동네', '트레이', '_기획', '끝카드', '권유', '드는것',
+  '시드', '안내최대층', '배속최대', '생산멈춤', '첫화면', '연결글', '찾음', '견줌', '놓음종류', '말함', '기억', '앞기억', '옮겨적기', '결과값', '손맛대상', '판규칙', '학년', '집이름', '대사', '유즈맵', '지도', '놓을곳', '입구']);
 const SEMS = { kind: g => typeof g.k === 'string' && g.n > 0, pop: g => g.n > 0, hook: g => typeof g.훅 === 'string' && typeof g.n === 'number' && ['>=', '<='].includes(g.비교) };
 const HOOKS = ['일닿음%', '다있음%'];   // index.html STAGE_HOOKS 와 같게
 const 지형이름 = ['물', '모래', '비탈', '고개'];   // index.html [MAC-TERRAIN] TERR_NAMES 와 같게
@@ -37,6 +40,7 @@ function terrainProbe(n, tries) {
   const f = path.join(os.tmpdir(), 'village-stages-terrain-' + process.pid + '.mjs');
   fs.writeFileSync(f, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: 'stage=' + ${JSON.stringify(n)} });
+if (w.VRULES.stageTray) w.VRULES.stageTray.on = false;   /* [MAC-TRAY] 지형 검사는 지형 규칙을 재는 도구 — 판 트레이가 놓기를 막지 않게 */
 const kind = (x, y) => { const s = w.__stream(x, y); return s.칸 ? s.칸.종류 : null; };
 const one = ([op, a, b, c]) => { try { if (op === 'put') return w.__put(a, b, c, 0); if (op === 'erase') return w.__erase(a, b); if (op === 'kinds') return a.map(([x, y]) => kind(x, y)); return 'ERR 모르는 수 ' + op; } catch (e) { return 'ERR ' + e.message; } };
 const out = { t: w.__terrain ? w.__terrain() : null, r: ${JSON.stringify(tries)}.map(one) };
@@ -80,6 +84,7 @@ for (const f of files) {
   const n = f.replace(/\.json$/, ''), P = s => `${n}: ${s}`;
   let def; try { def = JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')); } catch (e) { add('FAIL', P('JSON'), e.message); continue; }
   const lack = FIELDS.filter(k => !(k in def)); lack.length ? add('FAIL', P('칸'), '없는 칸: ' + lack.join(' ')) : add('PASS', P('칸 ' + FIELDS.length + '개'));
+  { const 모름칸 = Object.keys(def).filter(k => !KNOWN.has(k)); if (모름칸.length) add('REVIEW', P('칸'), '모르는 칸: ' + 모름칸.join(' ') + ' — 오타가 아니면 stages.mjs 의 KNOWN 에 더한다'); }   /* [MAC-TRAY] PASS 줄 0 */
   def.id === n && /^[a-z0-9\-]{1,40}$/.test(n) ? add('PASS', P('id = 파일 이름')) : add('FAIL', P('id'), `id ${def.id} · 파일 ${n} (소문자·숫자·- 만)`);
   if (def.교과 != null) curri.includes('| ' + def.교과 + ' |') ? add('PASS', P('교과 칸이 교과 지도에 있음')) : add('FAIL', P('교과'), `docs/village_curriculum_map.md 에 '| ${def.교과} |' 가 없음`);
   if (def.시작 != null) fs.existsSync(path.join(ROOT, 'village', def.시작)) ? add('PASS', P('시작 땅 ' + def.시작)) : add('FAIL', P('시작'), 'village/' + def.시작 + ' 없음');
@@ -156,7 +161,16 @@ for (const f of files) {
     const 겹침 = 새종류.filter(k => !kindsOk([k]).length);
     if (겹침.length) add('FAIL', P('건물정의'), '이미 있는 종류를 덮으려 함: ' + 겹침.join(' '));
   }
+  if (Array.isArray(def.건물) && !def.건물.length) add('FAIL', P('건물'), '건물: [] 는 전부 허용으로 읽힘 — 아이 손은 트레이로');   /* [MAC-TRAY] ㉓ FAIL 만(PASS 줄 0) */
   if (def.건물 != null) { const bad = kindsOk(def.건물.filter(k => !새종류.includes(k))); bad.length ? add('FAIL', P('건물'), '없는 종류: ' + bad.join(' ')) : add('PASS', P(`건물 ${def.건물.length}종`)); if (!def.건물.includes('road')) add('FAIL', P('건물'), '길(road)이 없음'); }
+  /* [MAC-TRAY] ㉔ 트레이 — 배열 · 모르는 종류 · 건물 목록 안(엔진은 목록 밖 종류를 ORDER 에서 뺀다 — 건물정의 종류도) · 값 줄 숨김은 하루 돌림(run.mjs tray) 뒤에 PASS 한 줄 */
+  let 트레이 = null;
+  if (def.트레이 != null) {
+    if (!Array.isArray(def.트레이)) add('FAIL', P('트레이'), '배열이어야 한다 — ["road", …] · [] 는 트레이 비움');
+    else { const T = def.트레이, 쓸 = T.filter(k => !새종류.includes(k)), 모름 = 쓸.length ? kindsOk(쓸) : [], 목록 = Array.isArray(def.건물) && def.건물.length ? def.건물 : null, 밖 = 목록 ? T.filter(k => !목록.includes(k)) : [];
+      if (모름.length) add('FAIL', P('트레이'), '없는 종류: ' + 모름.join(' '));
+      if (밖.length) add('FAIL', P('트레이'), '건물 목록에 없는 종류: ' + 밖.join(' ') + ' — 트레이에 안 뜬다(트레이 ⊆ 건물)');
+      if (!모름.length && !밖.length) 트레이 = T; } }
   if (def.역할 != null) { const r = def.역할 || {}, 나쁨 = [], 목록 = Array.isArray(def.건물) ? def.건물 : null, 새 = def.건물정의 && typeof def.건물정의 === 'object' ? Object.keys(def.건물정의) : [];   /* [MAC-ROLE] 역할 — 화면이 지킬 수 없는 약속을 막는다 */
     if (typeof r.나는 !== 'string' || !r.나는.trim()) 나쁨.push('나는 이 비었음');
     const 정 = Array.isArray(r.정한다) && r.정한다.length ? r.정한다 : null; if (!정) 나쁨.push('정한다 가 비었음');
@@ -165,6 +179,7 @@ for (const f of files) {
       if (d.놓기 != null) { if (!Array.isArray(d.놓기) || !d.놓기.length) 나쁨.push(`'${d.말}' — 놓기는 종류 목록`); else { const 못 = 목록 ? d.놓기.filter(k => !목록.includes(k)) : []; if (못.length) 나쁨.push(`'${d.말}' — 이 판에 없는 종류: ${못.join(' ')}`); 놓을것.push(...d.놓기.filter(k => !새.includes(k))); } }
       if (d.잇기 && 목록 && !목록.includes('road')) 나쁨.push(`'${d.말}' — 길(road)이 없음`);
       if (d.고르기 && !def.결정) 나쁨.push(`'${d.말}' — 결정 칸이 없음`); });
+    if (Array.isArray(def.트레이)) (정 || []).forEach(d => { const 밖 = d && Array.isArray(d.놓기) ? d.놓기.filter(k => !def.트레이.includes(k)) : []; if (밖.length) 나쁨.push(`'${d.말}' — 트레이에 없는 종류: ${밖.join(' ')}`); });   /* [MAC-TRAY] 정한다[].놓기 ⊆ 트레이 */
     if (!목록 && 놓을것.length) { const 모름 = kindsOk([...new Set(놓을것)]); if (모름.length) 나쁨.push('모르는 종류: ' + 모름.join(' ')); }
     나쁨.length ? add('FAIL', P('역할'), 나쁨.join(' · ')) : add('PASS', P(`역할 '${r.나는}' · 정할 것 ${정.length}`)); }
   if (def.예상 != null) { const e = def.예상 || {}, 나쁨 = [], g = e.결과;   /* [MAC-PREDICT] 예상(L2) — 물음 · 보기 셋('모르겠어요'는 엔진이 붙인다) · 결과(목표 셈 꼴 + 이름) · 시작 카드가 뜨는 판이어야 물을 자리가 있다 */
@@ -197,6 +212,13 @@ for (const f of files) {
     const 빠짐 = 새종류.filter(k => !생김.includes(k));
     빠짐.length ? add('FAIL', P('건물정의'), '판을 열었는데 안 생긴 종류: ' + 빠짐.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종이 판에서 실제로 생김`)); }
   ok ? add('PASS', P(`시뮬로 얹어 하루 돎 · 인구 ${res.samples[0].m.인구}→${res.samples[res.samples.length - 1].m.인구} · 네트워크 0`)) : add('FAIL', P('시뮬로 얹기'), JSON.stringify({ 네트워크: res.네트워크, 판: res.판 }));
+  if (트레이) { const tr = res.tray || {}, 뜸 = Array.isArray(tr.뜨는종류) ? tr.뜨는종류 : null, 안뜸 = 뜸 ? 트레이.filter(k => !뜸.includes(k)) : 트레이, 나쁨 = [];   /* [MAC-TRAY] ㉔ 끝 — 엔진이 실제로 띄우는 것(run.mjs tray)으로 잰다 */
+    if (tr.값숨김규칙 !== true) 나쁨.push('트레이 판인데 값 줄이 보임');
+    if (안뜸.length) 나쁨.push('엔진이 트레이에 안 띄우는 종류: ' + 안뜸.map(k => k + (k === 'clinic' ? '(건강이 꺼져 의원이 없음)' : '')).join(' ') + ' — 이 판의 규칙이 그 종류를 ORDER 에서 뺀다');
+    const 잇기 = ((def.역할 || {}).정한다 || []).filter(d => d && d.잇기);   /* 엔진의 길(K.road — road · avenue · gravel …) 가운데 트레이에 뜨는 것(tray.뜨는길) */
+    if (잇기.length && !(Array.isArray(tr.뜨는길) && tr.뜨는길.length)) 나쁨.push(`역할 '${잇기[0].말}' 은 잇기인데 트레이에 길 종류가 없음 — 아이가 길을 놓을 수 없다`);
+    나쁨.length ? add('FAIL', P('트레이'), 나쁨.join(' · ') + ' — run.mjs tray ' + JSON.stringify({ 뜨는종류: 뜸, 뜨는길: tr.뜨는길 || null, 값숨김규칙: tr.값숨김규칙 }))
+      : add('PASS', P(`트레이 ${트레이.length}종(${트레이.join('·') || '비움'})${Array.isArray(def.건물) && def.건물.length ? ' ⊆ 건물' : ''} · 엔진이 띄우는 종류 = 트레이 · 값 줄 0`)); }
   /* [MAC-STAGEKEEP] ③ · [MAC-HEALTH] PR 3a 가드 — FAIL 만 낸다(PASS 줄 0): ① 판 목록이 시작 땅의 물건을 조용히 막나 ② 의원을 쓰는 판인데 건강이 안 도나(keepStages · 판 규칙 health · 목록이 반쪽만 바뀐 때) */
   if (def.시작 != null && res.못살림) add('FAIL', P('시작 땅'), `판에 얹으면 못 살린 것 ${res.못살림}개 — 판 목록(건물)이 시작 땅의 물건을 막는다([MAC-STAGEKEEP])`);
   { const 의원씀 = (def.목표 || []).some(g => g.k === 'clinic') || ((def.역할 || {}).정한다 || []).some(d => (d.놓기 || []).includes('clinic')) || !!(def.결정 && def.결정.시설 === 'clinic');

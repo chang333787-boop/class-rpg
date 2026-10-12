@@ -276,6 +276,136 @@ const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(ou
   ok(c.every(n => n === 0) && d.every(n => n === 0), '열고 3~11초 💼 ' + JSON.stringify({ origin: c, pop88: d }));
 });
 
+/* [MAC-TRAY] PA-01 판 칸 `트레이` — 자기 시험 판 = nohealth 를 베껴 `트레이: []` + 결정 칸(시험 안에서 쓰고 finally 에서 지운다).
+   놓기 · 옮기기 · 치우기 모드 누름(오른쪽 누름 · 메뉴 치우기도 같은 keepGuard 길)이 막히고, 되살리기 · 되돌리기 · 결정 적용은 지난다 · 트레이 판은 값 줄 숨김 · 트레이 칸 없는 nohealth 는 그대로.
+   끌어 치우기(sweepCell) · 길게 누름(holdOpen) · 오른쪽 누름(rcErase)은 __trayTry 로 실제 손 함수를 불러 잰다(칸이 그대로인가 · 손말이 났나).
+   되살리기는 '구경 되살림'으로 잰다 — 부팅 때 되살리기는 판 고리가 붙기 전에 돌아(module 끝) 막힐 일이 없다. 양성 대조 = 스위치를 끄면 같은 수가 그대로 된다. */
+const trayGo = (query, body, saveText) => { const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${JSON.stringify(saveText == null ? null : saveText)}, seed: 1, query: ${JSON.stringify(query)} });
+const n = k => w.__snapshot().물건.filter(t => t.startsWith(k + '@')).length, tap = (x, y) => { const p = w.__cellScreen(x, y); if (p) w.__click(p[0], p[1]); return !!p; };
+const seen = (k, m) => w.__snapshot().물건.filter(t => t.startsWith(k + '@')).map(t => t.slice(k.length + 1).split(/[,/]/).slice(0, 2).map(Number)).filter(([x, y]) => w.__cellScreen(x, y)).slice(0, m || 2);
+const out = (() => { ${body} })(); process.stdout.write('@@' + JSON.stringify(out) + '\\n'); process.exit(0);`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 27 });
+  const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); if (!l) throw new Error(query + ' 훅 없음: ' + (r.stderr || '').trim().split('\n').slice(-1)[0]); return JSON.parse(l.slice(2)); };
+const trayStage = (id, base, extra) => { const f = path.join(ROOT, 'village/stages', id + '.json'); fs.writeFileSync(f, JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(ROOT, 'village/stages', base + '.json'), 'utf8')), ...extra, id }, null, 1)); return f; };
+const 손 = '✋ 이번엔 옮기거나 치우지 않아요';
+test('트레이: 트레이 [] 판 놓기·옮기기·치우기(누름 · 오른쪽 누름 · 끌기 · 길게 누름) 막힘 · 되살리기·되돌리기·결정 적용 통과 · 값 줄 숨김 · nohealth 그대로 · 끄면 풀림', () => {
+  const SELF = 'zz-tray-selftest', file = path.join(ROOT, 'village/stages', SELF + '.json');
+  const def = JSON.parse(fs.readFileSync(path.join(ROOT, 'village/stages/nohealth.json'), 'utf8'));
+  Object.assign(def, { id: SELF, 트레이: [], 결정: { on: true, 시설: 'clinic', 이름: '동네 의원', 필요: '건강',
+    동네: [{ 이름: '서쪽', 집: [[112, 130], [112, 136], [115, 130], [115, 136], [118, 130]], 의견: '시험' }, { 이름: '동쪽', 집: [[121, 130], [121, 136], [124, 130], [124, 136]], 의견: '시험' }],
+    후보: [{ id: 'A', 이름: 'A 자리', 자리: [109, 136], rot: 0 }, { id: 'B', 이름: 'B 자리', 자리: [125, 140], rot: 0 }] } });
+  const go = trayGo, fileD = trayStage('zz-tray-noclinic', 'nohealth', { 규칙: {}, 트레이: ['road', 'clinic'] }), fileF = trayStage('zz-tray-fence', 'nohealth', { 트레이: ['road', 'fence'] });
+  fs.writeFileSync(file, JSON.stringify(def, null, 1));
+  try {
+    const a = go('stage=' + SELF, `const ORDER수 = Object.keys(w.__placeRules().놓는법).length, put = w.__put('clinic', 109, 136, 0), carry = w.__carry(112, 130), t1 = w.__tray();
+  w.__mode(null, 'erase'); const 누름 = tap(112, 130); w.__mode(null, null); const 집 = w.__stream(112, 130).칸.종류, 지킴 = w.__keep().막음;
+  const er = w.__erase(115, 130); w.__undo(); const 되돌림 = w.__stream(115, 130).칸.종류;
+  const c0 = n('clinic'), v = w.__voteApply('A'), c1 = n('clinic'), carry2 = w.__carry(109, 136);
+  const [t0, t2] = seen('tree'), 손들 = { 끌기: w.__trayTry('sweep', ...t0), 메뉴: w.__trayTry('hold', 112, 130), 오른쪽: w.__trayTry('erase', ...t2) };
+  const vis = w.__visitLoad(JSON.parse(w.__exportText())), t = w.__tray(); w.VRULES.stageTray.price = false;
+  return { ORDER수, put, carry, t1, 누름, 집, 지킴, er, 되돌림, c0, v: typeof v === 'string' ? v : 'ok', c1, carry2, 손들, vis, t, 값끔: w.__tray().값숨김규칙 };`);
+    const b = go('stage=' + SELF, `w.VRULES.stageTray.on = false; const put = w.__put('clinic', 109, 136, 0), carry = w.__carry(112, 130); w.__drop(112, 130);
+  w.__mode(null, 'erase'); tap(112, 130); w.__mode(null, null); const 지킴 = w.__keep().막음, vis = w.__visitLoad(JSON.parse(w.__exportText()));
+  return { put, carry, 지킴, vis, t: w.__tray() };`);
+    b.손들 = go('stage=' + SELF, `w.VRULES.stageTray.on = false; const [t0, t2] = seen('tree'); return { 메뉴: w.__trayTry('hold', 112, 130), 끌기: w.__trayTry('sweep', ...t0), 오른쪽: w.__trayTry('erase', ...t2) };`);   /* 끄면 됨 — 구경 되살림 수를 흔들지 않게 따로 연다 */
+    const c = go('stage=nohealth', `return { ORDER수: Object.keys(w.__placeRules().놓는법).length, put: w.__put('clinic', 109, 136, 0), t: w.__tray() };`);
+    const d = go('stage=zz-tray-noclinic', `return w.__tray();`), fe = go('stage=zz-tray-fence', `return w.__tray();`);   /* fence = 옛 모양 묶음 — 트레이에 적혀도 탭에 안 선다 */   /* 건강이 꺼진 판(규칙 {}) — 의원은 ORDER 에 없어 트레이에 안 뜬다 */
+    const s = sim(['--stage', SELF, '--days', '1', '--seeds', '1']).results[0];
+    ok(a.put === '이번엔 놓지 않아요' && a.carry === false && a.t1.손말 === 손, '놓기·옮기기 ' + JSON.stringify([a.put, a.carry, a.t1.손말]));
+    ok(a.t1.켜짐 === true && JSON.stringify(a.t1.트레이) === '[]' && JSON.stringify(a.t1.뜨는종류) === '[]' && JSON.stringify(a.t1.보이는카드) === '[]' && a.t1.막음 === 1 && a.t1.손막음 === 1, '__tray() ' + JSON.stringify(a.t1));
+    { const h = a.손들, g = b.손들; ok(h.끌기.전 && /^tree@/.test(h.끌기.전) && h.끌기.그대로 && a.t.쓸기건너뜀 >= 1 && h.메뉴.메뉴 === false && h.메뉴.손말 === 손 && h.오른쪽.그대로 && h.오른쪽.손말 === 손
+        && g.메뉴.메뉴 === true && g.끌기.후 === null && g.오른쪽.후 === null, '끌기 · 길게 누름 · 오른쪽 누름(켬 막힘 ↔ 끔 됨) ' + JSON.stringify({ 켬: h, 끔: g })); }
+    ok(a.누름 && a.집 === 'house' && a.지킴 === 0 && a.t.손막음 >= 2, '치우기 모드 누름 ' + JSON.stringify({ 누름: a.누름, 집: a.집, 지킴: a.지킴, 손막음: a.t.손막음 }));
+    ok(b.put === true && b.carry === true && b.지킴 === 1 && b.t.트레이 === null, '양성 대조(스위치 끔) — 같은 수가 되어야 함 ' + JSON.stringify({ put: b.put, carry: b.carry, 지킴: b.지킴 }));
+    ok(a.er === true && a.되돌림 === 'house' && a.t.되돌림통과 >= 1, '되돌리기 ' + JSON.stringify([a.er, a.되돌림, a.t.되돌림통과]));
+    ok(a.c0 === 3 && a.v === 'ok' && a.c1 === 4 && a.carry2 === false, '결정 적용 ' + JSON.stringify([a.c0, a.v, a.c1, a.carry2]));
+    ok(a.vis.ok && a.vis.placed > 1000 && a.vis.placed === b.vis.placed && a.vis.skipped === b.vis.skipped && a.t.복원통과 >= a.vis.placed, '구경 되살림 ' + JSON.stringify({ 켬: a.vis, 끔: b.vis, 복원통과: a.t.복원통과 }));
+    ok(a.t.값숨김규칙 === true && a.값끔 === false && c.put === true && c.t.트레이 === null && c.t.뜨는종류 === null && c.t.값숨김규칙 === false, '값 줄 · nohealth ' + JSON.stringify({ 켬: a.t.값숨김규칙, 끔: a.값끔, nohealth: [c.put, c.t.트레이, c.t.뜨는종류, c.t.값숨김규칙] }));
+    ok(s.못살림 === 0 && s.판 && s.판.id === SELF && s.tray && s.tray.값숨김규칙 === true && JSON.stringify(s.tray.트레이) === '[]', 'run.mjs ' + JSON.stringify({ 못살림: s.못살림, tray: s.tray }));
+    ok(a.ORDER수 > 20 && a.ORDER수 === c.ORDER수, '그릴 때만 거름 — ORDER 를 잘라 두지 않음 ' + JSON.stringify({ 트레이판: a.ORDER수, nohealth: c.ORDER수 }));
+    ok(JSON.stringify(d.트레이) === '["road","clinic"]' && JSON.stringify(d.뜨는종류) === '["road"]' && JSON.stringify(d.뜨는길) === '["road"]', '뜨는종류 = 엔진이 실제로 띄우는 것(건강 꺼짐 → 의원 없음) ' + JSON.stringify({ 트레이: d.트레이, 뜨는종류: d.뜨는종류, 뜨는길: d.뜨는길 }));
+    ok(JSON.stringify(fe.뜨는종류) === '["road"]', '뜨는종류 = 탭에 서는 것만(옛 모양 fence 는 빠짐) ' + JSON.stringify(fe.뜨는종류));
+  } finally { fs.rmSync(file, { force: true }); fs.rmSync(fileD, { force: true }); fs.rmSync(fileF, { force: true }); }
+});
+
+/* [MAC-TRAY] 엔진 탐침(가정 놓기 — 이을 칸 셈 · 끊긴 칸 짚기 · 큰길 넓힐 자리)은 트레이를 모른다 — 트레이는 아이 손만 막는다.
+   `트레이: []` 사본을 같은 시드 · 같은 틱으로 켬 ↔ 끔(VRULES.stageTray.on=false) 열어 견준다 — 집 말(모든 집 __houseText) · 일자리 까닭(JOB_WHY) ·
+   ✨ 짚을 칸(__where) · 붐빔 점(__crowdPoint) · 밭 카드(__flowAt) · 공급 경로 칸(__pmapCut)까지 같아야 한다. 고침 전에는 '넓힐 자리가 없어요' 43집 · cut → none 으로 갈렸다.
+   판 셋: jobs-short + pop167(붐빔 · 큰길 넓힐 자리) · jobs-short + pop88(길 끊음 + 길 곁이 다 끊긴 집 138,145 — 둘레 빈칸에서 셈) · proto-flow(밭 길 끊음 — 몇 칸 이으면). */
+test('트레이: 엔진 탐침은 트레이를 모른다 — 트레이 [] 켬 ↔ 끔 집 말 · JOB_WHY · ✨ 짚을 칸 · 붐빔 점 · 밭 카드 · 공급 경로 같음 (pop167 · pop88 길 끊음 · proto-flow 밭 끊음)', () => {
+  const runs = [['zz-tray-probe-a', 'jobs-short', 'stages/boards/pop167.json', [], 900], ['zz-tray-probe-b', 'jobs-short', 'stages/boards/pop88.json', [[139, 144], [138, 144]], 600],
+    ['zz-tray-probe-c', 'proto-flow', null, [[142, 140]], 900]];
+  const files = runs.map(([id, base, 시작]) => trayStage(id, base, { ...(시작 ? { 시작 } : {}), 트레이: [] }));
+  const go = (id, off, cut, ticks, Wd) => trayGo('stage=' + id, `if (${off}) w.VRULES.stageTray.on = false; ${JSON.stringify(cut)}.forEach(([x, y]) => w.__del(x, y)); w.__tickBench(${ticks});
+  const at = k => w.__snapshot().물건.filter(t => t.startsWith(k + '@')).map(t => t.slice(k.length + 1).split(/[,/]/).slice(0, 2).map(Number)), hs = at('house');
+  return { 집: hs.length, 집칸: hs.map(([x, y]) => x + ',' + y), 말: hs.map(([x, y]) => w.__houseText(x, y)), 까닭: hs.map(([x, y]) => String(w.JOB_WHY(y * ${Wd} + x))), 자리: hs.map(([x, y]) => JSON.stringify((w.__where(x, y) || {}).짚을칸 || null)),
+    점: [JSON.stringify(w.__crowdPoint(true))], 밭: at('field').map(([x, y]) => JSON.stringify(w.__flowAt(x, y))), 경로: [JSON.stringify(w.__pmapCut())], t: w.__tray(), 막기: ${off} ? null : w.__put('bench', 128, 100, 0) };`);
+  try {
+    runs.forEach(([id, base, 시작, cut, ticks]) => { const board = 시작 || JSON.parse(fs.readFileSync(path.join(ROOT, 'village/stages', base + '.json'), 'utf8')).시작, Wd = JSON.parse(fs.readFileSync(path.join(ROOT, 'village', board), 'utf8')).w || 256;
+      const on = go(id, false, cut, ticks, Wd), off = go(id, true, cut, ticks, Wd), 다른 = k => on[k].filter((v, i) => v !== off[k][i]).length, 이름 = base + (시작 ? '+' + path.basename(시작, '.json') : '');
+      ok((base === 'proto-flow' ? on.밭.length >= 3 : on.집 > 40) && on.집 === off.집 && on.밭.length === off.밭.length && JSON.stringify(on.t.트레이) === '[]' && off.t.트레이 === null, 이름 + ' 판 ' + JSON.stringify({ 켬: on.집, 끔: off.집, 트레이: [on.t.트레이, off.t.트레이] }));
+      ok(['말', '까닭', '자리', '점', '밭', '경로'].every(k => !다른(k)), 이름 + ' 켬 ↔ 끔 다름 — ' + ['말', '까닭', '자리', '점', '밭', '경로'].map(k => k + ' ' + 다른(k)).join(' · ') + ' · 막음 ' + on.t.막음 + ' · 예 ' + (on.말.find((v, i) => v !== off.말[i]) || on.밭.find((v, i) => v !== off.밭[i]) || '').slice(-90));
+      ok(on.t.탐침통과 > 0 && on.t.막음 === 0, 이름 + ' 탐침이 고리를 지났다(셈이 있었다) ' + JSON.stringify({ 탐침통과: on.t.탐침통과, 막음: on.t.막음 }));
+      ok(on.t.탐침중 === 0 && on.막기 === '이번엔 놓지 않아요', 이름 + ' 탐침 셈이 새지 않음 — 다 돈 뒤 트레이 밖 놓기는 여전히 막힘 ' + JSON.stringify({ 탐침중: on.t.탐침중, 막기: on.막기 }));   /* 셈이 새면 트레이가 통째로 꺼진 것과 같아져 켬 ↔ 끔 같음이 헛 PASS 가 된다 */
+      if (base === 'jobs-short' && cut.length) ok(off.까닭.includes('cut') && off.까닭[off.집칸.indexOf('138,145')] === 'cut', 이름 + ' 끊은 길 · 길 곁이 다 끊긴 집(138,145)이 까닭 cut 이 아님(시험이 헛돎) ' + JSON.stringify([...new Set(off.까닭)]) + ' · 138,145 ' + off.까닭[off.집칸.indexOf('138,145')]);
+      if (base === 'proto-flow') ok(off.밭.length && off.밭.every(s => /"상태":"cut"/.test(s) && /"이으면":\{"칸":\d/.test(s)) && /"칸":\d/.test(off.경로[0]), 이름 + ' 끊은 밭이 cut · 이으면 · 공급 경로 칸이 아님(시험이 헛돎) ' + off.밭.join(' ').slice(0, 160) + ' · 경로 ' + off.경로[0]); });
+  } finally { files.forEach(f => fs.rmSync(f, { force: true })); }
+});
+
+/* [MAC-TRAY] 손이 보는 종류 — 개울 다리(sbr)는 길의 한 모습(판이 길을 쓰면 다리도 쓴다) · 아파트는 놓이면 집 + 세대라 세대 수로 트레이 카드(apart)와 맞춘다.
+   ⚠ 무화면은 벽시계가 멈춰 '30ms 안에 집 여러 채'(KEEP 맡김) 방어가 둘째 집 치움부터 세대를 버린다 — 아파트를 치우는 수(옮기기 · 돌리기)는 판 하나에 한 번씩. */
+test('트레이: 손이 보는 종류 — 개울 다리 = 길(onebridge ["road"] 치우기·옮기기·길게 누름 됨) · 아파트 = apart(city ["road","apart"] 옮기기·돌리기·치우기 됨 · 보통 집은 막힘)', () => {
+  const files = [trayStage('zz-tray-hand-a', 'onebridge', { 트레이: ['road'] }), trayStage('zz-tray-hand-b', 'city', { 트레이: ['road', 'apart'] })];
+  try {
+    const s = trayGo('stage=zz-tray-hand-a', `const st = w.__snapshot().물건.filter(t => t.startsWith('stream@')).map(t => t.slice(7).split(/[,/]/).slice(0, 2).map(Number));
+  let at = null; for (const [x, y] of st) { const q = w.__stream(x, y); if (q.칸 && q.칸.곧음 >= 0 && w.__cellScreen(x, y) && w.__put('road', x, y, 0) === true) { at = [x, y]; break; } }
+  if (!at) return { at }; const [x, y] = at, k = w.__stream(x, y).칸.종류, c = w.__trayTry('carry', x, y), h = w.__trayTry('hold', x, y), e = w.__trayTry('erase', x, y), [hs] = seen('house', 1);
+  return { at, k, c, h, e, 집: hs ? w.__trayTry('carry', ...hs) : null };`);
+    ok(s.at && s.k === 'sbr', '개울에 길 → 다리가 안 됨 ' + JSON.stringify([s.at, s.k]));
+    ok(s.c.손종류 === 'road' && s.c.들림 === true && s.c.그대로 && s.h.메뉴 === true && !s.h.손말 && /^stream@/.test(s.e.후 || '') && !s.e.손말, '개울 다리 옮기기 · 길게 누름 · 치우기 ' + JSON.stringify({ c: s.c, h: s.h, e: s.e }));
+    ok(s.집 && s.집.들림 === false && s.집.손말 === 손, '같은 판의 집(트레이 밖)은 막힘 ' + JSON.stringify(s.집));
+    const a = trayGo('stage=zz-tray-hand-b', `const p = w.__put('apart', 140, 142, 0); w.VRULES.stageTray.on = false; const q = w.__put('house', 144, 142, 0); w.VRULES.stageTray.on = true;
+  const 집 = w.__trayTry('erase', 144, 142), mv = w.__carry(140, 142), dr = w.__drop(146, 142), h = w.__trayTry('hold', 146, 142), e = w.__trayTry('erase', 146, 142);
+  return { p, q, 집, mv, dr, 옛자리: w.__stream(140, 142).칸.종류, h, e, t: w.__tray() };`);
+    ok(a.p === true && a.q === true && a.집.전 === 'house@144,142/0' && a.집.그대로 && a.집.손종류 === 'house' && a.집.손말 === 손, '보통 집(트레이 밖) 막힘 ' + JSON.stringify({ p: a.p, q: a.q, 집: a.집 }));
+    ok(a.mv === true && a.옛자리 === null && a.h.전 === 'house@146,142/0' && a.h.손종류 === 'apart' && a.h.메뉴 === true && a.e.후 === null && a.t.손통과 >= 1, '아파트 옮기기(든 것 통과) · 길게 누름 · 치우기 ' + JSON.stringify({ mv: a.mv, 옛자리: a.옛자리, h: a.h, e: a.e, 손통과: a.t.손통과 }));
+    const r = trayGo('stage=zz-tray-hand-b', `w.__put('apart', 140, 142, 0); const t = w.__trayTry('turn', 140, 142); return { t, 다시: w.__trayTry('hold', 140, 142).손종류 };`);
+    ok(r.t.메뉴 === true && r.t.전 === 'house@140,142/0' && r.t.후 === 'house@140,142/1' && r.다시 === 'apart', '아파트 돌리기(돌리는 것 통과) ' + JSON.stringify(r));
+  } finally { files.forEach(f => fs.rmSync(f, { force: true })); }
+});
+
+/* [MAC-TRAY] 트레이를 모르는 말 셋 — 새 말을 짓지 않고 거짓인 조각만 뺀다(해금 · 저장은 그대로).
+   ① 🔓 해금 소식(checkUnlocks · 목표 보상): origin 시작 땅에서 인구 80 줄을 잠가 두고 연다 — 트레이에 기차역만 있으면 '기차역이 열렸어요' · 없으면 안 띄움.
+   ② 보기 모드 물건 말: 트레이 밖이면 '🖐 로 옮기거나 🧽 로 치울 수 있어요'를 · [] 이면 '더 놓으려면 …'도 뺀다. ③ [] 판 빈 땅은 '먼저 고르세요'를 안 띄운다. 끄면 그대로. */
+test('트레이: 트레이를 모르는 말 — 🔓 해금 소식은 트레이 종류만(origin 인구 80 · 목표 보상) · 물건 말은 거짓 조각만 뺌 · [] 빈 땅 말 없음 · 끄면 그대로', () => {
+  const files = [trayStage('zz-tray-say-a', 'nohealth', { 트레이: ['road', 'bench'] }), trayStage('zz-tray-say-b', 'nohealth', { 트레이: [] }),
+    trayStage('zz-tray-say-c', 'origin', { 트레이: ['road', 'house', 'station'] }), trayStage('zz-tray-say-d', 'origin', { 트레이: ['road', 'house'] })];
+  try {
+    const a = trayGo('stage=zz-tray-say-a', `const [tr] = seen('tree', 1), [rd] = seen('road', 1); return { 나무: w.__trayTry('look', ...tr).말, 길: w.__trayTry('look', ...rd).말 };`);
+    ok(a.나무[0] === '🌳 나무 — 더 놓으려면 아래에서 카드를 골라요' && a.길[0] === '⬜ 길 — 🖐 로 옮기거나 🧽 로 치울 수 있어요 · 더 놓으려면 아래에서 카드를 골라요', '["road","bench"] 물건 말 ' + JSON.stringify(a));
+    const b = trayGo('stage=zz-tray-say-b', `const [tr] = seen('tree', 1); let 빈칸 = null; for (let y = 125; y < 145 && !빈칸; y++) for (let x = 100; x < 130 && !빈칸; x++) if (!w.__stream(x, y).칸.종류 && w.__cellScreen(x, y)) 빈칸 = [x, y];
+  const 빈 = w.__trayTry('look', ...빈칸), 나무 = w.__trayTry('look', ...tr).말; w.VRULES.stageTray.on = false;
+  return { 빈칸, 빈: 빈.말, 빈전: 빈.전, 나무, 끈빈: w.__trayTry('look', ...빈칸).말, 끈나무: w.__trayTry('look', ...tr).말 };`);
+    ok(b.빈전 === null && b.빈.length === 0 && b.나무[0] === '🌳 나무' && b.끈빈[0] === '아래에서 놓을 물건을 먼저 고르세요' && b.끈나무[0] === '🌳 나무 — 🖐 로 옮기거나 🧽 로 치울 수 있어요 · 더 놓으려면 아래에서 카드를 골라요', '[] 빈 땅 · 물건 말(끄면 그대로) ' + JSON.stringify(b));
+    const d = JSON.parse(fs.readFileSync(path.join(ROOT, 'village/stages/starts/origin.json'), 'utf8')); d.unlocked = d.unlocked.filter(k => !['green', 'sbridge', 'station', 'clinic'].includes(k)); d.palette = d.palette.map(k => k === 'clinic' ? 'field' : k);   /* 건강 시험과 같은 원본(의원 없는 80 줄) */
+    const u = id => trayGo('stage=' + id, `let n = 0; while (!w.__unlocked().includes('station') && n < 80) { w.__tickBench(100); n++; }
+  const 저장 = JSON.parse(w.__exportText()).unlocked || []; return { 열림: ['green', 'sbridge', 'station'].every(k => w.__unlocked().includes(k) && 저장.includes(k)), 해금말: w.__tray().해금말, t: w.__tray(), 자리: w.__spots('station') };`, JSON.stringify(d));
+    const c = u('zz-tray-say-c'), e = u('zz-tray-say-d'), 팔십 = ([m]) => /^🔓 .*기차역.*열렸어요! \(인구 80명\)$/.test(m);
+    ok(c.열림 && c.해금말.some(x => 팔십(x) && x[1] === '🔓 기차역이 열렸어요! (인구 80명)') && c.해금말.some(([m, t]) => m.startsWith('🔓 목표 보상! ') && t === null) && c.t.해금말줄임 >= 1, '["road","house","station"] 해금 소식 ' + JSON.stringify(c.해금말));
+    ok(c.t.나감.includes('🔓 기차역이 열렸어요! (인구 80명)') && !c.t.나감.some(m => m.startsWith('🔓 목표 보상! ')) && c.자리.밝힘 >= 1, '["road","house","station"] 실제로 나간 소식 · 기차역 노란 자리 ' + JSON.stringify({ 나감: c.t.나감, 밝힘: c.자리.밝힘 }));   /* 장부가 아니라 나간 말(안쪽 기록) */
+    ok(e.열림 && e.해금말.some(팔십) && e.해금말.every(([, t]) => t === null) && e.t.해금말뺌 >= 1 && e.t.해금말줄임 === 0, '["road","house"] 해금 소식 안 띄움 · 해금 · 저장 그대로 ' + JSON.stringify({ 열림: e.열림, 해금말: e.해금말 }));
+    ok(!e.t.나감.some(m => /기차역|목표 보상/.test(m)) && e.자리.밝힘 === 0 && e.자리.밝힌것 === 0 && e.t.자리숨김 >= 1, '["road","house"] 실제로 나간 소식 0 · 트레이 밖 기차역 노란 자리 0 ' + JSON.stringify({ 나감: e.t.나감, 자리: e.자리, 자리숨김: e.t.자리숨김 }));
+  } finally { files.forEach(f => fs.rmSync(f, { force: true })); }
+});
+
+/* [MAC-TRAY] 모르는 종류는 원래 canPlace 가 답한다 — 트레이 고리가 먼저 '이번엔 놓지 않아요'로 덮으면 run.mjs 의 '모르는 건물' 확인이 헛돈다 */
+test('트레이: 트레이 판에서도 모르는 종류는 run.mjs 가 멈춘다(put raod → 모르는 건물)', () => {
+  const f = trayStage('zz-tray-x', 'nohealth', { 트레이: ['road'] });
+  try { const r = spawnSync(process.execPath, [path.join(HERE, 'run.mjs'), '--stage', 'zz-tray-x', '--days', '1', '--seeds', '1', '--do', 'put raod 140 140'], { cwd: ROOT, encoding: 'utf8' });
+    ok(r.status !== 0 && /모르는 건물: raod/.test((r.stderr || '') + (r.stdout || '')), '끝값 ' + r.status + ' · ' + ((r.stderr || '') + (r.stdout || '')).trim().split('\n').slice(-1)[0]);
+  } finally { fs.rmSync(f, { force: true }); }
+});
+
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
 const f = results.filter(r => r[0] === 'FAIL').length;
 console.log(`\n요약: PASS ${results.length - f} · FAIL ${f}`);
