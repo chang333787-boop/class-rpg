@@ -15,7 +15,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(H
 const args = process.argv.slice(2), flag = k => args.includes('--' + k), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && args[i + 1] != null && !String(args[i + 1]).startsWith('--') ? args[i + 1] : d; };
 if (flag('help') || flag('h')) { console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter(l => l.startsWith('//')).map(l => l.slice(3)).join('\n')); process.exit(0); }
 const MID = 'village/stages/boards/mid36.json';
-const BOARDS = [...new Set(opt('boards', `기본+village/stages/boards/pop88.json,기본+village/stages/boards/pop167.json,farm+${MID},farm,city,town3,town3-origin,origin,sea,mountain,proto-flow,proto-vote`).split(',').concat(String(opt('more', '')).split(',')).map(s => s.trim()).filter(Boolean))];   // [MAC-CHECKCHANGED] --more 는 더하기
+const BOARDS = [...new Set(opt('boards', `기본+village/stages/boards/pop88.json,기본+village/stages/boards/pop167.json,farm+${MID},farm,city,town3,town3-origin,origin,sea,mountain,proto-flow,proto-vote,lesson0,help-places,empty-shop-ga,empty-shop-na,two-villages`).split(',').concat(String(opt('more', '')).split(',')).map(s => s.trim()).filter(Boolean))];   // [MAC-CHECKCHANGED] --more 는 더하기
 const SOFT = new Set(String(opt('soft', '')).split(',').map(s => s.trim()).filter(Boolean));
 const REF = opt('ref', 'origin/main'), DAYS = opt('days', '2'), SEEDS = opt('seeds', '1-3'), LOOK = !flag('no-look'), ALLOW = flag('allow'), JSON_OUT = opt('json', null);
 const git = (...a) => { const r = spawnSync('git', a, { cwd: ROOT, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
