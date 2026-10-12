@@ -212,7 +212,13 @@ for (const f of files) {
     const 빠짐 = 새종류.filter(k => !생김.includes(k));
     빠짐.length ? add('FAIL', P('건물정의'), '판을 열었는데 안 생긴 종류: ' + 빠짐.join(' ')) : add('PASS', P(`건물정의 ${새종류.length}종이 판에서 실제로 생김`)); }
   ok ? add('PASS', P(`시뮬로 얹어 하루 돎 · 인구 ${res.samples[0].m.인구}→${res.samples[res.samples.length - 1].m.인구} · 네트워크 0`)) : add('FAIL', P('시뮬로 얹기'), JSON.stringify({ 네트워크: res.네트워크, 판: res.판 }));
-  if (트레이) res.tray && res.tray.값숨김규칙 === true ? add('PASS', P(`트레이 ${트레이.length}종(${트레이.join('·') || '비움'}) ⊆ 건물 · 값 줄 0`)) : add('FAIL', P('트레이'), '트레이 판인데 값 줄이 보임 — run.mjs tray ' + JSON.stringify(res.tray || null));   /* [MAC-TRAY] ㉔ 끝 */
+  if (트레이) { const tr = res.tray || {}, 뜸 = Array.isArray(tr.뜨는종류) ? tr.뜨는종류 : null, 안뜸 = 뜸 ? 트레이.filter(k => !뜸.includes(k)) : 트레이, 나쁨 = [];   /* [MAC-TRAY] ㉔ 끝 — 엔진이 실제로 띄우는 것(run.mjs tray)으로 잰다 */
+    if (tr.값숨김규칙 !== true) 나쁨.push('트레이 판인데 값 줄이 보임');
+    if (안뜸.length) 나쁨.push('엔진이 트레이에 안 띄우는 종류: ' + 안뜸.map(k => k + (k === 'clinic' ? '(건강이 꺼져 의원이 없음)' : '')).join(' ') + ' — 이 판의 규칙이 그 종류를 ORDER 에서 뺀다');
+    const 잇기 = ((def.역할 || {}).정한다 || []).filter(d => d && d.잇기);   /* 엔진의 길(K.road — road · avenue · gravel …) 가운데 트레이에 뜨는 것(tray.뜨는길) */
+    if (잇기.length && !(Array.isArray(tr.뜨는길) && tr.뜨는길.length)) 나쁨.push(`역할 '${잇기[0].말}' 은 잇기인데 트레이에 길 종류가 없음 — 아이가 길을 놓을 수 없다`);
+    나쁨.length ? add('FAIL', P('트레이'), 나쁨.join(' · ') + ' — run.mjs tray ' + JSON.stringify({ 뜨는종류: 뜸, 뜨는길: tr.뜨는길 || null, 값숨김규칙: tr.값숨김규칙 }))
+      : add('PASS', P(`트레이 ${트레이.length}종(${트레이.join('·') || '비움'})${Array.isArray(def.건물) && def.건물.length ? ' ⊆ 건물' : ''} · 엔진이 띄우는 종류 = 트레이 · 값 줄 0`)); }
   /* [MAC-STAGEKEEP] ③ · [MAC-HEALTH] PR 3a 가드 — FAIL 만 낸다(PASS 줄 0): ① 판 목록이 시작 땅의 물건을 조용히 막나 ② 의원을 쓰는 판인데 건강이 안 도나(keepStages · 판 규칙 health · 목록이 반쪽만 바뀐 때) */
   if (def.시작 != null && res.못살림) add('FAIL', P('시작 땅'), `판에 얹으면 못 살린 것 ${res.못살림}개 — 판 목록(건물)이 시작 땅의 물건을 막는다([MAC-STAGEKEEP])`);
   { const 의원씀 = (def.목표 || []).some(g => g.k === 'clinic') || ((def.역할 || {}).정한다 || []).some(d => (d.놓기 || []).includes('clinic')) || !!(def.결정 && def.결정.시설 === 'clinic');

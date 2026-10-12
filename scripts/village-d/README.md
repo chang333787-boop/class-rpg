@@ -7,6 +7,7 @@
 node scripts/village-d/dcheck.mjs --self                               # 틀이 도는지: 기본 마을 스크린샷 1 · 단추 ≥ 1 · 가짜 시계
 node scripts/village-d/dcheck.mjs --stage town3 --eval 'window.__sim()'  # 판을 열고 탐침 하나
 node scripts/village-d/dcheck.mjs --scene <이름>                        # scenes/<이름>.mjs
+node scripts/village-d/dcheck.mjs --scene tray                          # [MAC-TRAY] 판 트레이 — 카드 · 탭 · 값 줄 · 오른쪽 누름 · 길게 누름 · 끌어 치우기(임시 판을 쓰고 지움)
 node scripts/village-d/dcheck.mjs --help                               # 옵션 전부
 ```
 
