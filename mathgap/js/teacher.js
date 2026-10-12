@@ -44,7 +44,8 @@ export async function mountTeacher(app, ctx) {
     // 층마다 불 켠 아이 수 · 기초 층(옛 단원)은 그 층을 가진 아이 기준
     const floorStat = ids.map((c, i) => {
       const lit = scanned.filter((r) => r.tw.floors[i].st === 'lit').length, tc = scanned.filter((r) => r.tw.floors[i].st === 'teacher').length;
-      return { c, no: i + 1, name: byId[c].kid, lit, of: scanned.length, dark: scanned.length - lit, tc };
+      const lv = (k) => scanned.filter((r) => r.tw.floors[i].lv === k).length;   // 불빛 단계별 아이 수 — 1 할 수 있음(느림) · 2 능숙 · 3 숙련
+      return { c, no: i + 1, name: byId[c].kid, lit, of: scanned.length, dark: scanned.length - lit, tc, can: lv(1), fluent: lv(2), master: lv(3) };
     });
     const baseMap = {};
     scanned.forEach((r) => r.tw.base.forEach((f) => { const b = baseMap[f.c] = baseMap[f.c] || { c: f.c, name: f.name, have: 0, lit: 0 }; b.have++; if (f.st === 'lit') b.lit++; }));
@@ -81,13 +82,18 @@ export async function mountTeacher(app, ctx) {
       return h('div', { class: 'frow' + (isHot ? ' hot' : '') },
         h('span', { class: 'nm', title: base ? lessonLabel(f.c) : byId[f.c].title }, h('b', {}, base ? '기초' : `${f.no}층`), f.name,
           h('i', { style: { fontStyle: 'normal', color: '#a8977d', fontSize: '12px', marginLeft: '6px' } }, base ? `${byId[f.c].u.slice(0, 3)} · ${byId[f.c].span}차시` : `${byId[f.c].span}차시`)),
-        h('span', { class: 'bar' }, h('i', { style: { width: of ? `${Math.round(100 * lit / of)}%` : '0' } })),
-        h('span', { class: 'ct' }, of ? `${lit} / ${of}${!base && f.tc ? ` · 선생님과 ${f.tc}` : ''}` : '—'));
+        // 막대 = 숙련(금) · 능숙(주황) · 할 수 있음(흐린 주황) 아이 수를 이어서 · 숫자 = 켠 아이(그중 느림)
+        base ? h('span', { class: 'bar' }, h('i', { style: { width: of ? `${Math.round(100 * lit / of)}%` : '0' } }))
+          : h('span', { class: 'bar lv' }, ...[['master', f.master], ['fluent', f.fluent], ['can', f.can]].map(([k, v]) => h('i', { class: k, style: { width: of ? `${(100 * v) / of}%` : '0' } }))),
+        h('span', { class: 'ct', title: base ? '' : `숙련 ${f.master} · 능숙 ${f.fluent} · 할 수 있음(느림) ${f.can}` }, of ? `${lit} / ${of}${!base && f.can ? ` · 느림 ${f.can}` : ''}${!base && f.tc ? ` · 선생님과 ${f.tc}` : ''}` : '—'));
     };
     const recText = hot.length || hotBase.length
       ? [...hotBase.map((b) => `기초 '${b.name}'(${lessonLabel(b.c, { title: false })})에서 ${b.have - b.lit}명`), ...hot.map((f) => `${f.no}층 '${f.name}'에서 ${f.dark}명`)].join(' · ') + '이 아직 불을 못 켰어요 — 반 전체로 한 번 더 다뤄 보세요.'
       : scanned.length ? '여러 명이 한꺼번에 막힌 층은 없어요. 한두 명만 막힌 층은 아이가 연습으로 켜요.' : '아이들이 살펴보기를 하면 여기에 층마다 불 켠 아이 수가 보여요.';
     const firstHot = hotBase[0] ? hotBase[0].c : hot[0] ? hot[0].c : null;
+    // 할 수 있지만 느린 아이가 많은 층 — 개념은 됐고 빠르기(반복)가 필요한 곳 · 수업 추천에 따로
+    const slowF = floorStat.filter((f) => f.can >= hotN).sort((a, b) => b.can - a.can);
+    const slowRec = slowF.length ? h('span', { style: { display: 'block', marginTop: '8px', color: '#ffd99a' } }, `빠르기가 필요한 층 — ${slowF.map((f) => `${f.no}층 '${f.name}' ${f.can}명`).join(' · ')}: 정확하게는 풀지만 느려요. 다시 가르치기보다 짧은 반복(하루 3~5분)을 권해요.`) : null;
     const topRec = hotTop ? [h('span', { style: { display: 'block', marginTop: '8px', color: '#d2c6f0' } }, h('b', { style: { color: '#c9b6ff' } }, `도전 층 '${hotTop.name}'`),
       ` — 식을 세우기 전에 막힌 아이 ${early(hotTop)}명: ${[['read', '이야기 읽기'], ['struct', '상황 파악'], ['tpl', '문제 모양'], ['dom', '분수 · 소수가 되면 흔들림']].filter(([k]) => hotTop.dg[k]).map(([k, n]) => `${n} ${hotTop.dg[k]}`).join(' · ')}.`,
       hotTop.dg.read + hotTop.dg.struct >= Math.max(1, Math.ceil(early(hotTop) / 2)) ? ' 이야기를 다시 말하게 하거나(누가 더 많은지 · 무엇이 바뀌었는지), 같은 상황을 다른 말로 바꿔 보는 활동부터 권해요.' : ''),
@@ -102,7 +108,7 @@ export async function mountTeacher(app, ctx) {
       if (r.tw.waiting) return [`선생님과 ${r.tw.waiting}`, 'blue'];
       return r.today ? ['오늘 함', 'green'] : ['아직', 'idle'];
     };
-    const codeOf = (tw) => tw.all.map((f) => (f.st === 'lit' ? 1 : f.st === 'q' ? 9 : f.st === 'teacher' ? 2 : 0)).join('');
+    const codeOf = (tw) => tw.all.map((f) => (f.st === 'lit' ? (f.lv === 1 ? 3 : f.lv === 3 ? 4 : 1) : f.st === 'q' ? 9 : f.st === 'teacher' ? 2 : 0)).join('');
     const topsOf = (tw) => tw.tops.map((f) => (f.st === 'lit' ? 1 : f.st === 'q' ? 9 : f.st === 'teacher' ? 2 : f.st === 'lock' ? 8 : 0)).join('');
     const trow = (x) => h('div', { class: 'frow' + (hotTop && hotTop.t === x.t ? ' hot' : '') },
       h('span', { class: 'nm', title: TYPES[x.t].idea }, h('b', { style: { color: '#c9b6ff' } }, '도전'), x.name,
@@ -124,7 +130,7 @@ export async function mountTeacher(app, ctx) {
         h('div', { class: 'tgrid' },
           h('div', { class: 'tbox' },
             h('h3', {}, `우리 반 탑 · ${unitName(unit)}`, h('small', {}, `층마다 불을 켠 아이 수 · ${rows.length}명 중 살펴본 아이 ${scanned.length}명${grown ? ` · 꺼져 있다가 켠 층 ${grown}개` : ''}`)),
-            h('div', { class: 'rec', style: { marginTop: '10px' } }, h('b', {}, '수업 추천'), h('span', {}, recText,
+            h('div', { class: 'rec', style: { marginTop: '10px' } }, h('b', {}, '수업 추천'), h('span', {}, recText, slowRec,
               hot.length || hotBase.length ? h('button', { class: 'btn small', style: { display: 'block', marginTop: '8px' }, onclick: () => printSheet({ title: `${unitName(unit)} 학습지`,
                 floors: [...hotBase.slice(0, 1).map((b) => ({ c: b.c, label: `기초 ${b.name}` })), ...hot.slice(0, 2).map((f) => ({ c: f.c, label: `${f.no}층 ${f.name}` }))] }) }, '이 층들 학습지 인쇄(반 전체 · 정답 포함)') : null, hotBug ? h('span', { style: { display: 'block', marginTop: '6px', color: '#f3e8d6' } }, hotBug) : null, firstHot && byId[firstHot].tip ? h('span', { style: { display: 'block', marginTop: '6px', color: '#d9c9ae' } }, `가르치는 법 — ${byId[firstHot].tip}`) : null, topRec)),
             h('div', { style: { display: 'flex', flexDirection: 'column-reverse', marginTop: '10px' } },
@@ -136,7 +142,7 @@ export async function mountTeacher(app, ctx) {
               ...topStat.map((x) => trow(x)))),
           h('div', { class: 'tbox' },
             h('h3', {}, '아이별', h('small', {}, `오늘 한 아이 ${todayN}명 · 선생님이 볼 아이가 맨 위`)),
-            h('div', { class: 'mlegend' }, h('span', {}, h('i', { class: 'on' }), '켬'), h('span', {}, h('i', {}), '아직'), h('span', {}, h('i', { class: 'tc' }), '선생님과'), h('span', {}, h('i', { class: 'q' }), '안 살펴봄'), h('span', {}, h('i', { class: 'tp' }), '도전 층')),
+            h('div', { class: 'mlegend' }, h('span', {}, h('i', { class: 'on star' }), '숙련'), h('span', {}, h('i', { class: 'on' }), '능숙'), h('span', {}, h('i', { class: 'on dim' }), '할 수 있음(느림)'), h('span', {}, h('i', {}), '아직'), h('span', {}, h('i', { class: 'tc' }), '선생님과'), h('span', {}, h('i', { class: 'q' }), '안 살펴봄'), h('span', {}, h('i', { class: 'tp' }), '도전 층')),
             h('div', { style: { marginTop: '8px' } }, ...rows.map((r) => {
               const [label, tone] = statusOf(r);
               return h('button', { class: 'krow', onclick: () => r.kid ? detail(r) : toast('아직 오늘의 수학을 열지 않았어요') },
@@ -180,7 +186,8 @@ export async function mountTeacher(app, ctx) {
     if (!tw.scanned) return [...lines, `아직 이 단원 살펴보기(처음 확인)를 하지 않았어요. 학교에서 하루 ${cfg.minutes}분씩 이어서 해요.`].join('\n');
     const litN = tw.floors.filter((f) => f.st === 'lit').length;
     const topsLine = !tw.tops.length ? '' : tw.topLit ? ` 문제집에 자주 나오는 문장제 유형 ${tw.tops.length}가지 중 ${tw.topLit}가지도 해냈어요.` : litN === tw.floors.length ? ` 이제 문제집에 자주 나오는 문장제 유형 ${tw.tops.length}가지에 도전하고 있어요.` : '';
-    lines.push(`· 이 단원에서 배우는 ${tw.floors.length}가지 중 ${litN}가지를 익혔어요.${topsLine}`);
+    const canN = tw.floors.filter((f) => f.lv === 1).length, starN = tw.floors.filter((f) => f.lv === 3).length;
+    lines.push(`· 이 단원에서 배우는 ${tw.floors.length}가지 중 ${litN}가지를 익혔어요.${canN ? ` 그중 ${canN}가지는 정확하지만 아직 느려서 빠르기 연습을 해요.` : ''}${starN ? ` ${starN}가지는 며칠 지나도 바로 해내는 단계예요.` : ''}${topsLine}`);
     const dark = tw.all.filter((f) => f.st !== 'lit' && f.st !== 'teacher'), tc = tw.all.filter((f) => f.st === 'teacher');
     const what = (f) => { const L = byId[f.c], here = L.u === unit; return here ? `'${ttl(f.c)}'(교과서 이 단원 ${L.n}번째 공부)` : `예전에 배운 ${gl(f.c)}`; };
     if (dark.length) {
@@ -221,6 +228,8 @@ export async function mountTeacher(app, ctx) {
       h('div', { class: 'roots', style: { flex: '1', minWidth: '240px' } },
         sc ? h('p', {}, `살펴보기 ${new Date(sc.t).toLocaleDateString('ko-KR')} · ${sc.n}문제`) : null,
         parentBox(r.name, kid, tw),
+        tw.dim ? h('div', { class: 'root' }, h('b', { style: { color: '#ffd99a' } }, '할 수 있지만 느린 층'), ` — ${tw.all.filter((f) => f.lv === 1).map((f) => `${f.base ? '기초' : f.no + '층'} ${f.name}`).join(' · ')}`, h('br'), h('span', { class: 'muted' }, '정확하게는 풀어요. 다른 층을 다 켜면 아이가 빠르기 연습(시간 안에 3번)으로 밝혀요.')) : null,
+        tw.star ? h('div', { class: 'root' }, h('b', { style: { color: '#ffc766' } }, '★ 숙련'), ` — ${tw.all.filter((f) => f.lv === 3).map((f) => `${f.base ? '기초' : f.no + '층'} ${f.name}`).join(' · ')}`, h('span', { class: 'muted' }, ' (며칠 뒤 점검에서 두 번 바로 맞힘)')) : null,
         ...dark.sort((a, b) => (b.st === 'teacher') - (a.st === 'teacher')).map((f) => h('div', { class: 'root' + (f.st === 'teacher' ? ' tcx' : '') }, h('b', {}, `${f.base ? '기초' : f.no + '층'} ${f.name}`), f.st === 'teacher' ? ' — 선생님과 함께(연달아 못 풀었고 막힌 앞 차시도 없음)' : '',
           sc && sc.down && byId[sc.down[f.c]] ? h('span', { style: { color: '#7cc0f0' } }, ` — '${byId[sc.down[f.c]].kid}' 연습 중 막혀 내려옴`) : null,
           h('br'), h('span', { class: 'muted' }, lessonLabel(f.c)), byId[f.c].tip ? [h('br'), `가르치는 법 — ${byId[f.c].tip}`] : null, byId[f.c].bridge ? [h('br'), `다리 — ${byId[f.c].bridge}`] : null)),

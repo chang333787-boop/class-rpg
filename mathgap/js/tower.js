@@ -22,13 +22,13 @@ export const unitName = (u) => unitLabel(u).replace(/^\d-\d\s*/, '');
 // opts: { cur: 차시(지금 보는 층) · order: 다음 켤 층에 '다음' · justLit: 방금 켠 층 · small · reveal · tags: { 차시: '오늘 켬' } · seen: 살펴보기 중 '봤어요' · hideLock: 잠긴 도전 층 숨김(연습 옆 작은 탑) }
 //  켤 순서 번호(①②)는 층 번호와 헷갈려(10-11 점검: 4층 옆 ③) '다음' 하나만 둔다
 export function towerEl(tw, opts = {}) {
-  const { cur = null, order = false, justLit = null, small = false, reveal = false, tags = {}, seen = null, title = true, hideLock = false } = opts;
+  const { cur = null, order = false, justLit = null, small = false, reveal = false, tags = {}, seen = null, title = true, hideLock = false, nextC = null } = opts;   // nextC = 오늘 할 층(빠르기 연습이면 희미한 층)
   const floor = (f, i) => {
-    const isCur = cur === f.c, isNew = justLit === f.c, isNext = order && tw.next && tw.next.c === f.c;
-    const cls = isNew ? 'new' : isCur ? 'cur' : f.st === 'lit' ? 'on' : f.st === 'teacher' ? 'tc' : f.st === 'q' ? 'q' : 'dk';
+    const isCur = cur === f.c, isNew = justLit === f.c, isNext = order && (nextC ? nextC === f.c : tw.next && tw.next.c === f.c);
+    const cls = isNew ? 'new' : isCur ? 'cur' : f.st === 'lit' ? (f.lv === 1 ? 'on dim' : f.lv === 3 ? 'on star' : 'on') : f.st === 'teacher' ? 'tc' : f.st === 'q' ? 'q' : 'dk';
     const tag = tags[f.c] || (isCur ? '지금' : seen && seen.has(f.c) && f.st === 'q' ? '봤어요' : '');
     const right = isNext && !tags[f.c] && !isCur ? h('span', { class: 'tag nx' }, '다음')
-      : f.st === 'lit' && !isNew && !small && !tags[f.c] ? fire('on', '#2a1a08')
+      : f.st === 'lit' && !isNew && !small && !tags[f.c] ? (f.lv === 3 ? h('span', { class: 'starI', 'aria-label': '숙련' }, '★') : f.lv === 1 ? h('span', { class: 'tag dimt' }, '빠르게!') : fire('on', '#2a1a08'))
         : f.st === 'teacher' ? h('span', { class: 'tag', style: { border: '1.5px solid #4f6a80', color: '#a9c3d6' } }, '선생님과')
           : tag ? h('span', { class: 'tag', style: isCur ? { color: '#ffc766' } : f.st === 'lit' ? { background: '#2a1a08', color: '#ffc766' } : { border: '1.5px solid #ffc766', color: '#ffc766' } }, tag) : null;
     return h('div', { class: `fl ${cls}${isNext ? ' next' : ''}`, style: reveal ? { animationDelay: `${i * 0.12}s` } : null, title: f.name },
@@ -36,13 +36,13 @@ export function towerEl(tw, opts = {}) {
   };
   // 도전 층(문제 유형) — 꼭대기 위 · 아래층을 다 켜기 전엔 잠김
   const top = (f, i) => {
-    const isCur = cur === f.c, isNew = justLit === f.c, isNext = order && !tw.next && tw.topNext && tw.topNext.c === f.c;
-    const cls = isNew ? 'new' : isCur ? 'cur' : f.st === 'lit' ? 'on' : f.st === 'teacher' ? 'tc' : f.st === 'q' ? 'q' : f.st === 'lock' ? 'lock' : 'dk';
+    const isCur = cur === f.c, isNew = justLit === f.c, isNext = order && (nextC ? nextC === f.c : !tw.next && tw.topNext && tw.topNext.c === f.c);
+    const cls = isNew ? 'new' : isCur ? 'cur' : f.st === 'lit' ? (f.lv === 3 ? 'on star' : 'on') : f.st === 'teacher' ? 'tc' : f.st === 'q' ? 'q' : f.st === 'lock' ? 'lock' : 'dk';
     const tag = tags[f.c] || (isCur ? '지금' : isNext ? '다음' : '');
     const right = f.st === 'lock' && !small ? h('span', { class: 'tag lk' }, '아래층을 다 켜면')
       : f.st === 'teacher' ? h('span', { class: 'tag', style: { border: '1.5px solid #4f6a80', color: '#a9c3d6' } }, '선생님과')
         : tag ? h('span', { class: 'tag', style: isCur ? { color: '#ffc766' } : f.st === 'lit' ? { background: '#2a1a08', color: '#ffc766' } : { border: '1.5px solid #ffc766', color: '#ffc766' } }, tag)
-          : f.st === 'lit' && !isNew && !small ? fire('on', '#2a1a08') : null;
+          : f.st === 'lit' && !isNew && !small ? (f.lv === 3 ? h('span', { class: 'starI', 'aria-label': '숙련' }, '★') : fire('on', '#2a1a08')) : null;
     return h('div', { class: `fl top ${cls}${isNext ? ' next' : ''}`, style: reveal ? { animationDelay: `${i * 0.12}s` } : null, title: `도전 층 · ${f.name}` },
       h('span', { class: 'no' }, '도전'), h('span', { class: 'nm' }, f.name), right);
   };
@@ -58,11 +58,12 @@ export function towerEl(tw, opts = {}) {
   ];
   const topsLabel = tops.length ? ` · 도전 층 ${tops.length}개 중 ${tops.filter((f) => f.st === 'lit').length}개 켜짐` : '';
   const dense = !small && tw.base.length + tw.floors.length + tops.length > 8;   // 층이 많으면 촘촘하게(한 화면에)
-  return h('div', { class: `tower${small ? ' small' : ''}${dense ? ' dense' : ''}${reveal ? ' reveal' : ''}`, role: 'img', 'aria-label': `${unitName(tw.unit)} 탑 — ${tw.total}개 층 중 ${tw.lit}개 층에 불이 켜짐${topsLabel}` }, ...kids);
+  const lvLabel = `${tw.dim ? ` · 그중 ${tw.dim}개는 희미함(할 수 있음)` : ''}${tw.star ? ` · ${tw.star}개는 숙련` : ''}`;
+  return h('div', { class: `tower${small ? ' small' : ''}${dense ? ' dense' : ''}${reveal ? ' reveal' : ''}`, role: 'img', 'aria-label': `${unitName(tw.unit)} 탑 — ${tw.total}개 층 중 ${tw.lit}개 층에 불이 켜짐${lvLabel}${topsLabel}` }, ...kids);
 }
 
-// 아주 작은 탑(선생님 표 한 줄) — card.floors '1009…'(1 켬 · 0 꺼짐 · 2 선생님과 · 9 아직) · tops = 도전 층(8 잠김)
+// 아주 작은 탑(선생님 표 한 줄) — card.floors '1009…'(1 켬 · 3 희미(할 수 있음) · 4 숙련 · 0 꺼짐 · 2 선생님과 · 9 아직) · tops = 도전 층(8 잠김)
 export function miniEl(code, tops = '') {
-  const cell = (x, top) => h('i', { class: (x === '1' ? 'on' : x === '2' ? 'tc' : x === '9' ? 'q' : x === '8' ? 'lk' : '') + (top ? ' tp' : '') });
+  const cell = (x, top) => h('i', { class: (x === '1' ? 'on' : x === '3' ? 'on dim' : x === '4' ? 'on star' : x === '2' ? 'tc' : x === '9' ? 'q' : x === '8' ? 'lk' : '') + (top ? ' tp' : '') });
   return h('span', { class: 'mt', 'aria-hidden': 'true' }, ...String(code || '').split('').map((x) => cell(x, false)), ...String(tops || '').split('').map((x) => cell(x, true)));
 }

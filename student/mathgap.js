@@ -48,6 +48,7 @@ function mathgapCardState() {
   if (c.stage === 'type') return { title: '오늘의 수학', sub: `탑을 다 켰어요! 오늘은 <b>도전 층 ${escHtml(String(c.nextName || '').slice(0, 30))}</b>`, btn: today ? '이어서' : '시작하기', tone: 'gold' };
   if (c.stage === 'scan' || c.stage === 'facts' || !c.scanned) return { title: '오늘의 수학', sub: `${uname} 탑 살펴보기를 이어서 해요`, btn: '이어서', tone: 'gold' };
   if (today && c.stage === 'review' && Number(c.review) > 0) return { title: '오늘의 수학', sub: `먼저 불 점검 ${Number(c.review)}문제${nextL ? `, 그다음 <b>${nextL}</b>` : ''}`, btn: '이어서', tone: 'gold' };
+  if (c.speed && nextL) return { title: '오늘의 수학', sub: `오늘은 <b>${nextL}</b> 빠르기 연습 — 시간 안에 풀면 밝게 켜져요`, btn: today ? '이어서' : '시작하기', tone: 'gold' };   // 할 수 있지만 느린 층(희미한 불)
   return { title: '오늘의 수학', sub: nextL ? `오늘은 <b>${nextL}</b>에 불을 켜요` : '오늘의 수학을 이어서 해요', btn: today ? '이어서' : '시작하기', tone: 'gold' };
 }
 // 카드 왼쪽 작은 탑 — floors '1009…'(1 켬 · 0 꺼짐 · 2 선생님과 · 9 아직) · tops = 꼭대기 위 도전 층(8 잠김 · 보라 점선)

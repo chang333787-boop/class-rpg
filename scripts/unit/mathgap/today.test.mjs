@@ -8,7 +8,7 @@
 //  · 날마다 기록을 JSON 으로 저장했다 다시 읽어도(저장소 흉내) 같은 문제로 이어진다
 //  · 도전 층(문제 유형): 아래층을 다 켜야 열림 · 불씨 3개 · 같이 풀기 까닭(문제 모양 · 숫자 영역 · 계산 · 단계) · 8문제 → 선생님과 · 점검은 지금 단원 숫자로 · 하루 하나
 import { byId, preOf, corePre, lessonsOfUnit } from '../../../mathgap/js/core/lessons/index.js';
-import { STORY_EVERY, limitOf, stepMiss, stuckOn, giveUp, STUCK, STEP_BUG, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
+import { STORY_EVERY, levelOf, MASTER_OK, limitOf, stepMiss, stuckOn, giveUp, STUCK, STEP_BUG, blankKid, todayOf, towerOf, startScan, finishScan, startFloor, finishFloor, startReview, answerReview, currentReview, addTime, markLit, cardOf,
   currentItem, answer, currentPractice, answerPractice, RULE, DEFAULT_MIN, REVIEW_DAYS, dueFloors, noteBug, bugsOf, exampleOf, dayKey, logItem,
   startFacts, currentFact, answerFact, needsFacts, parseLog, compareLogs, litAfterDark,
   startType, currentType, answerType, typeHelpDone, finishType, TRULE, typesOfUnit, plainUnit, typeLit, bridgeOf, bridgeMiss } from '../../../mathgap/js/today.js';
@@ -598,6 +598,48 @@ test('막힌 단계 → 내려가기 · 아직 어려워요 — 같은 앞 차�
   const P3 = startFloor(k3, '4-2-1', f1, 'lit-t', T0);
   while (currentPractice(P3)) { const q = currentPractice(P3); answerPractice(P3, { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: 1000, t: T0 }); }
   ok(finishFloor(k3, P3, T0).lit && !k3.bugs[`${f1}|${STEP_BUG}`], '켜도 셈이 남음');
+});
+
+test('불빛 3단계 — 느린 층은 할 수 있음(희미) · 꺼진 층 다음 빠르기 연습(불씨 3 · 하루 한 번 · 못 밝혀도 그대로) · 점검 두 번 바로 맞히면 숙련 · 느린 층을 점검에서 빠르게 맞히면 밝게', () => {
+  const kid = blankKid(); kid.seen.intro = T0; kid.scans['4-2-1'] = { t: T0, base: [], facts: true };
+  const fl = lessonsOfUnit('4-2-1');
+  fl.forEach((c, i) => { kid.states[c] = { s: i === 1 ? 'slow' : 'known', t: T0 }; });
+  ok(levelOf(kid, fl[1]) === 1 && levelOf(kid, fl[0]) === 2, '단계 판정');
+  const tw = towerOf('4-2-1', kid);
+  ok(tw.dim === 1 && tw.floors[1].lv === 1 && !tw.next, '희미한 층 수');
+  const t1 = todayOf(kid, cfg, T0 + 3600e3);
+  ok(t1.stage === 'prac' && t1.speed && t1.floor.c === fl[1], '빠르기 연습 단계가 아님 ' + t1.stage);
+  // 빠르기 연습 — 느리게만 맞히면 못 밝힘(할 수 있음 그대로 · 선생님과 아님) · 같은 날은 다시 안 나옴
+  let P = startFloor(kid, '4-2-1', fl[1], 'sp1', T0, { speed: true });
+  while (currentPractice(P)) { const q = currentPractice(P); ok(!q.story && q.need === RULE.speedStreak, '빠르기 연습에 문장제 · 불씨 수'); answerPractice(P, { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: q.limit * 1000 + 5000, t: T0 }); }
+  const r1 = finishFloor(kid, P, T0 + 3600e3);
+  ok(r1.speed && r1.stay && levelOf(kid, fl[1]) === 1 && !kid.marks[fl[1]], '못 밝혀도 그대로여야 함');
+  ok(todayOf(kid, cfg, T0 + 3600e3 + 1000).stage !== 'prac', '같은 날 또 빠르기 연습');
+  // 다음 날 — 시간 안에 3번 → 밝게(능숙)
+  P = startFloor(kid, '4-2-1', fl[1], 'sp2', T0 + DAY, { speed: true });
+  let k = 0;
+  while (currentPractice(P)) { const q = currentPractice(P); answerPractice(P, { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: 1000, t: T0 + DAY }); k++; }
+  ok(k === RULE.speedStreak && finishFloor(kid, P, T0 + DAY).lit && levelOf(kid, fl[1]) === 2, '시간 안에 3번에 밝아지지 않음 ' + k);
+  // 숙련 — 점검을 처음 시도에 두 번 맞힘
+  const c = fl[0]; kid.rev = { [c]: { i: 0, due: 0 } };
+  for (let i = 0; i < MASTER_OK; i++) {
+    const R = { id: 'rv' + i, kind: 'review', unit: '4-2-1', seq: 0, todo: [c], total: 1, miss: {}, out: [], cur: null, done: false, tyUnit: {} };
+    const now = T0 + (2 + i * 5) * DAY; startReview(kid, '4-2-1', 'rv' + i, now);
+    const RR = kid.run.R; RR.todo = [c]; RR.total = 1; RR.cur = null; RR.done = false; RR.out = [];
+    // 그 층 문제로 바로 답함
+    void R;
+    let q = currentReview(RR);
+    if (!q || q.c !== c) { RR.todo = [c]; RR.seq = 0; RR.cur = { c, p: byId[c].gen(rng(9 + i)) }; q = currentReview(RR); }
+    answerReview(kid, RR, { vals: q.item.sol.map(Number), raws: q.item.sol.map(String), ms: 1000 }, now);
+  }
+  ok(levelOf(kid, c) === 3, '점검 두 번에 숙련이 아님 ' + JSON.stringify(kid.rev[c]));
+  // 느린 층을 점검에서 시간 안에 맞히면 밝게
+  const k2 = blankKid(); k2.scans['4-2-1'] = { t: T0, base: [], facts: true }; k2.states[fl[2]] = { s: 'slow', t: T0 }; k2.rev[fl[2]] = { i: 0, due: 0 };
+  startReview(k2, '4-2-1', 'rvs', T0 + 2 * DAY); const R2 = k2.run.R; R2.todo = [fl[2]]; R2.cur = { c: fl[2], p: byId[fl[2]].gen(rng(5)) };
+  const q2 = currentReview(R2), fb = answerReview(k2, R2, { vals: q2.item.sol.map(Number), raws: q2.item.sol.map(String), ms: 1000 }, T0 + 2 * DAY);
+  ok(fb.faster && levelOf(k2, fl[2]) === 2, '빨라졌는데 밝아지지 않음');
+  // 저장 — 점검 횟수(ok)가 남음
+  ok(kidFrom({ rev: JSON.stringify({ [c]: kid.rev[c] }) }).rev[c].ok === kid.rev[c].ok, 'rev.ok 저장 안 됨');
 });
 
 await Promise.all(pending);

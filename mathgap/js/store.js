@@ -31,7 +31,7 @@ export function kidFrom(v) {
   k.states = obj(parse(v.st, {}));
   k.scans = obj(parse(v.scans, {}));
   k.marks = obj(parse(v.marks, {}));
-  for (const [c, r] of Object.entries(obj(parse(v.rev, {})))) if (r && Number.isFinite(+r.due)) k.rev[c] = { i: Math.max(0, Math.min(4, +r.i || 0)), due: +r.due };
+  for (const [c, r] of Object.entries(obj(parse(v.rev, {})))) if (r && Number.isFinite(+r.due)) k.rev[c] = { i: Math.max(0, Math.min(4, +r.i || 0)), due: +r.due, ...(+r.ok > 0 ? { ok: Math.min(99, Math.round(+r.ok)) } : {}) };   // ok = 처음 시도에 맞힌 점검 수(숙련)
   for (const [key, n] of Object.entries(obj(parse(v.bugs, {})))) if (Number.isFinite(+n) && +n > 0) k.bugs[String(key).slice(0, 80)] = Math.min(999, +n);
   const run = parse(v.run, null); k.run = run && typeof run === 'object' && run.kind ? run : null;
   for (const [d, x] of Object.entries(obj(v.days))) if (/^\d{4}-\d\d-\d\d$/.test(d) && x && typeof x === 'object') k.days[d] = { ms: +x.ms || 0, n: +x.n || 0, lit: Array.isArray(x.lit) ? x.lit.filter((c) => typeof c === 'string') : [], review: !!x.review, extra: Math.min(30, Math.max(0, +x.extra || 0)) };

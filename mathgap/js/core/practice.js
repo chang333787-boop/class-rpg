@@ -7,7 +7,8 @@
 import { byId, makeItem, stepsOf, sortByGrade, gradeIdx } from './lessons/index.js';
 import { rng } from './math.js';
 
-export const RULE = { streak: 5, slowStreak: 6, max: 12, fastX: 2 };
+export const RULE = { streak: 5, slowStreak: 6, max: 12, fastX: 2, speedStreak: 3, speedMax: 8 };
+const needOf = (P) => (P.speed ? RULE.speedStreak : RULE.streak);
 export const limitOf = (cid) => Math.round(byId[cid].sec * RULE.fastX); // 제한 시간(초)
 const hash = (s) => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 // { fast: 지금 모은 ●(시간 안 정답 +1 · 틀림 −1 · 늦은 정답 0), all: 끝에서부터 이어서 맞힌 수 }
@@ -18,8 +19,9 @@ export function chainOf(items) {
   return { fast, all };
 }
 
-export function newPractice({ id, sid, plan, origin = null, from = null, now = Date.now() }) {
-  const P = { v: 1, kind: 'prac', id, sid, t0: now, plan: plan.filter((c) => byId[c]), origin, from, idx: 0, seq: 0, per: {}, log: [], done: false };
+//  speed = 빠르기 연습(10-12 · '할 수 있지만 느린' 층을 밝히기) — 불씨 RULE.speedStreak 개 · 느린 통과 없음 · RULE.speedMax 문제까지
+export function newPractice({ id, sid, plan, origin = null, from = null, speed = false, now = Date.now() }) {
+  const P = { v: 1, kind: 'prac', id, sid, t0: now, plan: plan.filter((c) => byId[c]), origin, from, idx: 0, seq: 0, per: {}, log: [], done: false, ...(speed ? { speed: true } : {}) };
   P.plan.forEach((c) => { P.per[c] = { items: [], state: 'doing' }; });
   if (!P.plan.length && origin) P.final = true;
   P.cur = P.plan.length ? nextItem(P, P.plan[0]) : origin ? { c: origin.c, p: origin.p, final: true } : null;
@@ -31,7 +33,7 @@ function nextItem(P, c) { P.seq++; return { c, p: byId[c].gen(rng(hash(`${P.id}:
 export function currentPractice(P) {
   if (P.done || !P.cur) return null;
   const c = P.cur.c, per = P.per[c];
-  return { ...P.cur, item: makeItem(c, P.cur.p), n: per ? per.items.length + 1 : 1, streak: per ? chainOf(per.items).fast : 0, limit: limitOf(c), conceptIdx: P.idx, of: P.plan.length };
+  return { ...P.cur, item: makeItem(c, P.cur.p), n: per ? per.items.length + 1 : 1, streak: per ? chainOf(per.items).fast : 0, need: needOf(P), limit: limitOf(c), conceptIdx: P.idx, of: P.plan.length };
 }
 const median = (xs) => { const s = xs.slice().sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
@@ -51,9 +53,9 @@ export function answerPractice(P, { vals = [], raws = [], idk = false, ms = 0, t
   const ch = chainOf(per.items);
   Object.assign(fb, { fast, dots: ch.fast, run: ch.all, limit: lim });
   const chainMs = (ch.all ? per.items.slice(-ch.all) : []).filter((x) => x.fast).map((x) => x.ms);
-  if (ch.fast >= RULE.streak) { per.state = 'mastered'; per.ms = median(chainMs); fb.mastered = true; }
-  else if (ch.all >= RULE.slowStreak) { per.state = 'mastered-slow'; per.ms = median(per.items.slice(-ch.all).map((x) => x.ms)); fb.mastered = true; fb.slow = true; }
-  else if (per.items.length >= RULE.max) { per.state = 'teacher'; fb.gaveUp = true; }
+  if (ch.fast >= needOf(P)) { per.state = 'mastered'; per.ms = median(chainMs); fb.mastered = true; }
+  else if (!P.speed && ch.all >= RULE.slowStreak) { per.state = 'mastered-slow'; per.ms = median(per.items.slice(-ch.all).map((x) => x.ms)); fb.mastered = true; fb.slow = true; }
+  else if (per.items.length >= (P.speed ? RULE.speedMax : RULE.max)) { per.state = 'teacher'; fb.gaveUp = true; }
   if (per.state !== 'doing') advance(P);
   else P.cur = nextItem(P, q.c);
   return fb;
