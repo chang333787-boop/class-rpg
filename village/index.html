@@ -14325,6 +14325,8 @@ window.__k7Job = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; re
 window.__k7Point = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; return rec && rec.k === 'house' ? jobWhyPoint([rec.root]) : null; };
 window.__k7Route = () => { let said = null; const t0 = toast; toast = function (m) { said = String(m); return t0.apply(this, arguments); }; let r = null;
   try { r = pmapRoute(); } finally { toast = t0; } return { 말: said, 짚음: r, 반짝: sparkle.filter(s => s.until > SIM.t).length }; };
+/* [MAC-HINTCUT] PA-08 스위치 — 판 `규칙` hintCut 이 덮을 수 있게 규칙 덮기 앞에 둔다(고리 · 감싸기는 module 맨 끝 [MAC-HINTCUT] 블록 · 칸마다 false = 그 갈래만 옛 그대로) */
+(window.VRULES = window.VRULES || {}).hintCut = { on: true, card: true, toast: true, title: true, first: true, link: true };
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
 /* [MAC-CLOCK] 규칙 뒤 — ① 배속최대: 저장본 clock.speed 는 setSpeed 를 안 거치고 들어온다 → 열 때 깎고 그보다 빠른 단추를 숨긴다 ② 판규칙 멈춤.생산 = 모형 ⏸ 스위치를 판이 켬
    ③ boot 쥠 — 시작 카드가 뜰 판이면 카드가 뜰 때 scard 로 넘긴다(그때까지 쥔 채 · 600ms 타이머 동안 틱 0) · 안 뜰 판(교과 · 카드 칸 없음 · #끝 · 이미 시작함)이면 곧바로 풂 ·
@@ -14735,6 +14737,52 @@ function voteKeepFind() { const d = voteDef(); if (!d || VOTE.적용 || !window.
   if (!c) return null; VOTE.적용 = c.id; VOTE.표 = {}; d.후보.forEach(q => { VOTE.표[q.id] = votePreviewCalc(q.id); }); VKEEP.stats.되찾음++; if (VOTE.el) voteDraw(); return c.id; }
 voteKeepFind();
 window.__voteKeep = () => ({ 켜짐: window.VRULES.voteKeep.on, 적용: VOTE.적용, 표: VOTE.표 ? Object.keys(VOTE.표) : null, 결정시설되살림: SKEEP.stats.결정시설, ...VKEEP.stats });
+/* ══════════════════════════════════════════════════════════════
+   [MAC-HINTCUT] PA-08 권유 꼬리 숨김 — 트레이 판(trayDef() != null)은 '…해 봐요' 권유를 말하지 않는다 (기획 build/B §B-5 · H3 PA-08 · 엔진 사실 H17 #6~#8 · 10-03 엔진 회신 §1-2)
+   **판 거르개는 module 맨 끝 블록이다** — toast · satText 에 고리를 거는 뒤 PR 은 이 블록 앞에 둔다(나중에 건 것이 바깥 · 이 블록이 맨 바깥이어야 권유가 새지 않는다).
+   조각 규칙(hcutCut): ' · ' 조각마다 — 권유만인 조각은 뺀다 · '현상 — 권유' 조각은 ' — ' 마디 가운데 첫 권유 마디부터 뗀다(까닭 마디는 남음) · '장을 봐요'는 권유가 아니다.
+   ① 집 카드 — satText 맨 바깥 고리(얼굴 · 필요 · 붐빔 · 도서관 · 빈집 말 모두 · 판정 0 · 말만).
+   ② 토스트 — toast 맨 바깥 다시 대입(대기줄 [MAC-TOASTQ] · 소식 줄 · 빈집 톤 · fit 감싸기보다 바깥 — 줄에 서기 전에 거른다 · 권유만인 말은 띄우지 않음).
+      집을 눌러 뜨는 빈집 말은 satText 를 안 지나 여기서 ①과 같은 규칙으로 맞는다. 제외(HCUT_KEEP) = '봐요'가 권유가 아닌 대답(기울기 · 가까이 보기 단추)과 놓기 거절 말.
+      이름 제안 두 말은 ③ 스위치를 따른다(켜면 버림 · 끄면 원문 — 잘라 띄우면 titleNudge 의 글 되읽기가 어긋나 30초마다 되풀이). 트레이 판 토스트는 글째 HCUT.기록(마지막 40).
+   ③ 마을 이름 제안 — 이미 있는 VRULES.titles.on 을 끈다(판 `규칙` 에 titles.on 을 적은 판은 그대로). 함께 꺼짐: 💡 소식 둘 · 마을 이름을 눌러 여는 칭호 카드 · __titleOpen —
+      이름은 눌러도 반응이 없으니 손가락 커서 · 풍선 글을 뗀다(titleDraw 감싸기). 저장 칸 title · titleWas 는 그대로(고른 칭호가 없으면 원래 안 둔다).
+   ④ 판 칸 `첫화면: "마을"`(동네 판) — setTimeout(pmapBar, 900) 이 처음 함수 값을 붙잡아 pmapBar 다시 대입은 안 돈다 → pmapShow 감싸기: 처음 'map' 이면 'v0' 으로 열고 시작칸 카메라를 되살린다 ·
+      되살렸으면 동네 단추 불 · 그 동네 단추 줄도 끈다(비추는 곳과 켜진 동네가 다르지 않게 — 동네 단추 줄은 아이가 동네를 고를 때) · '🗺️ 고장 전체' · 동네 단추는 그대로.
+   ⑤ 판 칸 `연결글: false`(탐정 판) — 모형 화면 두 덩이 사이 글을 '↔' 로(pmapCard 감싸기 · 덩이 글 · 🔗 공급 경로 보기는 둠).
+   스위치 VRULES.hintCut(rules.json '말' · 규칙 덮기 앞에 정의) — on:false = 전부 옛 그대로 · card · toast · title · first · link = false 면 그 갈래만. 저장 0 · 원래 줄 수정 0.
+   시험 훅 window.__hintCut() · window.__hintCutSay(m, ok)(toast 에 넣고 거르개를 나간 글 — 무화면 document 는 부를 때마다 새 Proxy 라 #toast 를 되읽을 수 없다). */
+const HCUT = { 나감: undefined, 마지막: null, 기록: [], 첫본: false, stats: { 숨김: 0, 토스트: 0, 토스트버림: 0, 이름막음: 0, 첫마을: 0, 연결숨김: 0 } };
+const hcutOn = k => { const R = window.VRULES.hintCut; return !!(R && R.on && R[k] !== false); };
+const hcutTray = k => hcutOn(k) && trayDef() != null;
+const hcutAsk = t => / 봐요/.test(String(t).replace(/장을 봐요/g, ''));
+function hcutCut(t) { const out = [];
+  String(t).split(' · ').forEach(p => { if (!hcutAsk(p)) { out.push(p); return; } const q = p.split(' — '), k = q.findIndex(hcutAsk); if (k > 0) out.push(q.slice(0, k).join(' — ')); });
+  return out.join(' · '); }
+hookAdd('satText', function (next, args) { const t = next(args); if (typeof t !== 'string' || !hcutAsk(t) || !hcutTray('card')) return t;
+  HCUT.stats.숨김++; return hcutCut(t) || t.split(' · ')[0].split(' — ')[0]; });
+const HCUT_KEEP = [m => TILT_SAY.includes(m), m => m === '가까이 봐요. 끌어서 옮기세요', m => /^큰길은 두 칸 폭이에요 — /.test(m), m => / — 배울 곳이 먼 동네엔 도서관을 지어 봐요$/.test(m)];
+const hcutTitle = m => m === TITLE_NUDGE || /^💡 이제 .+이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요$/.test(m);
+{ const tc0 = toast; toast = function (msg) { const a = [...arguments]; let out = msg;
+    if (typeof msg === 'string' && trayDef() != null) {
+      if (hcutAsk(msg) && hcutOn('toast')) out = hcutTitle(msg) ? (hcutOn('title') ? '' : msg) : HCUT_KEEP.some(f => f(msg)) ? msg : hcutCut(msg);
+      HCUT.기록.push({ 원문: msg, 뒤: out || null, 틱: SIM.ticks }); if (HCUT.기록.length > 40) HCUT.기록.shift();
+      if (out !== msg) { if (!out) { HCUT.stats.토스트버림++; HCUT.나감 = null; return; } HCUT.stats.토스트++; a[0] = out; } }
+    HCUT.나감 = out; HCUT.마지막 = out; return tc0.apply(this, a); }; }
+if (trayDef() != null && hcutOn('title') && window.VRULES.titles.on && !(STAGE.def.규칙 && STAGE.def.규칙.titles && 'on' in STAGE.def.규칙.titles)) { window.VRULES.titles.on = false; HCUT.stats.이름막음++; }
+{ const td0 = titleDraw; titleDraw = function () { const r = td0.apply(this, arguments), el = document.querySelector('#top .ttl');
+    if (el && !window.VRULES.titles.on) { el.style.cursor = ''; el.title = ''; } return r; }; }
+{ const ps0 = pmapShow; pmapShow = function (which) { if (which !== 'map' || HCUT.첫본) return ps0.apply(this, arguments);
+    HCUT.첫본 = true; if (!hcutOn('first') || !STAGE.def || STAGE.def.첫화면 !== '마을' || !pmapLive()) return ps0.apply(this, arguments);
+    const cx = camTarget.x, cz = camTarget.z, r = ps0.call(this, 'v0'); HCUT.stats.첫마을++;
+    if (STARTCELL) { camTarget.x = cx; camTarget.z = cz; if (PMAP.el) [...PMAP.el.children].forEach(b => b.classList.remove('on')); if (PMAP.덧) PMAP.덧.innerHTML = ''; }
+    return r; }; }
+{ const pc0 = pmapCard; pmapCard = function () { const r = pc0.apply(this, arguments);
+    if (hcutOn('link') && STAGE.def && STAGE.def.연결글 === false && PMAP.카드) PMAP.카드.querySelectorAll('.pm-l').forEach(e => { if (e.textContent !== '↔') { e.textContent = '↔'; HCUT.stats.연결숨김++; } });
+    return r; }; }
+window.__hintCut = () => ({ 켜짐: hcutTray('card'), 트레이판: trayDef() != null, 스위치: { ...window.VRULES.hintCut }, 이름제안: !!window.VRULES.titles.on,
+  첫화면: STAGE.def && STAGE.def.첫화면 != null ? STAGE.def.첫화면 : null, 연결글: STAGE.def && STAGE.def.연결글 === false ? false : null, ...HCUT.stats, 마지막: HCUT.마지막, 기록: HCUT.기록.slice() });
+window.__hintCutSay = (m, ok) => { HCUT.나감 = undefined; toast(m, ok); return { 들어감: m, 나감: HCUT.나감 === undefined ? '(거르개를 안 지남)' : HCUT.나감, 마지막: HCUT.마지막 }; };
 </script>
 </body>
 </html>

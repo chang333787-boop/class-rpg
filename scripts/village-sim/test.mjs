@@ -698,6 +698,139 @@ process.stdout.write('@@' + JSON.stringify({ 집, 흐름, 주민, 얼굴, 바람
   });
 }
 
+/* [MAC-HINTCUT] PA-08 권유 꼬리 숨김(build/B §B-5 PR⑤ · PR⑤-나 · H3 PA-08 TAIL) — 트레이 판은 집 카드 · 토스트의 '…해 봐요' 권유 조각을 숨긴다(트레이 없는 판 · 기본 마을은 원문 그대로).
+   무화면은 #toast 를 되읽을 수 없고(load.mjs document = 부를 때마다 새 Proxy) toast 는 module 안 함수라 w.toast 가 없다 → 엔진 탐침 __hintCutSay(m, ok) · __hintCut()(정오표 H17 #8).
+   자기 시험 판(시험 안에서 쓰고 finally 에서 지움 · 도구 시드 1): zz-tail-selftest = 시작 pop88 + 트레이 ["road"] + 카드(엔진 기본 규칙 그대로) · zz-tail-off = 판 규칙 hintCut 끔 ·
+     zz-tail-title = 판 규칙 hintCut.title 끔(이름 제안만 옛 그대로) · zz-tail-titles = 판 규칙 titles.on 을 적은 판 · zz-tail-mid = 시작 mid36 + 트레이(붐빔 '넓혀 봐요').
+   (가) 트레이 판 다섯(바닥 판) 300틱 뒤 모든 집 __houseText '봐요' 0 · __chirp().켜짐 false(H16) · 마을 이름 제안 끔(VRULES.titles.on false · 이름막음 1)
+   (나) two-villages 첫 화면 · 큰길(153,139)을 치운 뒤(+150틱) 집 넷 = build/B §B-5 표 'PR⑤ 뒤' 글 그대로 / 양성 대조: 같은 판 hintCut.card 끔 → '봐요' 2 · 4
+   (다) 집 카드 조각 규칙 — 같은 순간 card 끔 글(T0) ↔ 켬 글(T1): T1 = 조각 규칙(T0) · T1 '봐요' 0 · T0 '봐요' ≥ 1(pop88 📚 · mid36 🛣️ 넓혀) / 기본 마을 pop88 📚 '…지어 봐요' · mid36 '넓혀 봐요' 그대로 · 숨김 0
+       (명세 '기본 마을 pop88 붐빈 집 넓혀 봐요' — pop88 은 300틱 안에 붐빈 '다 있어요' 집이 없어 넓혀 말이 0 · 📚 로 보고 넓혀는 mid36 으로 봄)
+   (라) 토스트 — 수용 시험 표 1~3: zz-tail-selftest '💼 …더 지어 봐요' → '💼 마을이 커져서 어른들 일할 곳이 모자라요' · 토스트 1 / 이름 제안 → 띄우지 않음 · 앞 글 그대로 · 토스트버림 1 /
+       기본 마을 · hintCut 끔 판 → 원문 그대로 · 토스트 0
+   (마) 엔진의 '봐요' 글 분류 — module 의 글자 마디(주석 · 정규식 뺌)에서 '봐요'가 든 것을 모두 찾아 아래 표에 없으면 FAIL(새 말은 분류부터) · 분류마다 실제 말 꼴을 __hintCutSay 로:
+       권유 = 그 조각을 뗀 글 · 대답 · 거절 · 현상 = 그대로(제외 목록) · 이름 = 버림(스위치) · 카드 = 토스트 밖(시작 카드 짐작 칸) — 기본 마을 · hintCut 끔 판은 모두 원문
+   (바) 스위치 — 판 규칙 hintCut.title 끔 → 이름 제안 켬 · 이름 말 원문(권유 거르개는 그대로) · 판 규칙 titles.on 적은 판 → 그대로 켬
+   무화면에선 titleTick 이 늘 일찍 돌아간다(__LOADMS null · titleBusy 는 #titleCard 를 Proxy 로 봄) — '알림 0'은 헛 PASS 라 쓰지 않고 이름 제안 실제 소식은 dcheck tail ③ 이 본다. */
+const tailOne = c => new Promise(done => {
+  const src = `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${c.save ? `(await import('node:fs')).readFileSync(${JSON.stringify(path.join(ROOT, c.save))}, 'utf8')` : 'null'}, seed: 1, query: ${JSON.stringify(c.stage ? 'stage=' + c.stage : '')} });
+w.VRULES.speedQuiet.on = false;
+${c.pre || ''}
+w.__tickBench(${c.ticks || 300});
+${c.post || ''}
+const 집목록 = () => w.__snapshot().물건.map(t => /^house@(\\d+),(\\d+)/.exec(t)).filter(Boolean).map(m => [+m[1], +m[2]]);
+const 글 = () => 집목록().map(([x, y]) => [x + ',' + y, w.__houseText(x, y)]);
+const R = w.VRULES.hintCut, k0 = R ? R.card : null, 켬 = 글(); let 끔 = null; if (R) { R.card = false; 끔 = 글(); R.card = k0; }
+const hc0 = w.__hintCut(), 말 = ${JSON.stringify(c.say || [])}.map(m => w.__hintCutSay(m, true));
+process.stdout.write('@@' + JSON.stringify({ 켬, 끔, 말, hc0, hc: w.__hintCut(), 채팅: w.__chirp().켜짐, 이름: w.VRULES.titles.on, 집: ${c.at ? JSON.stringify(c.at) + '.map(([x, y]) => w.__houseText(x, y))' : 'null'} }) + '\\n', () => process.exit(0));`;
+  const p = spawn(process.execPath, ['--input-type=module', '-e', src], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let out = '', err = '';
+  p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { err += d; });
+  p.on('close', () => { const l = out.split('\n').find(x => x.startsWith('@@')), e = (err || out).trim().split('\n');
+    done(l ? JSON.parse(l.slice(2)) : { 오류: c.n + ' — ' + (e.filter(x => /Error|ERR/.test(x)).slice(-1)[0] || e.slice(-1)[0] || '출력 없음') }); }); });
+/* (마) 엔진의 '봐요' 글자 마디 — 주석 · 정규식은 빼고 '…' · "…" · `…` 만(줄 번호는 index.html 기준) */
+function tailLiterals() { const html = fs.readFileSync(path.join(ROOT, 'village/index.html'), 'utf8'), m = html.match(/<script type="module">([\s\S]*?)<\/script>/), base = html.slice(0, m.index).split('\n').length, s = m[1], out = [];
+  let i = 0, line = 0, prev = ''; const reStart = p => !p || /[(,=:[!&|?{};+\-*%<>~^]$/.test(p) || /\b(return|typeof)$/.test(p);
+  while (i < s.length) { const c = s[i], d = s[i + 1];
+    if (c === '\n') { line++; i++; continue; }
+    if (c === '/' && d === '*') { const j = s.indexOf('*/', i + 2); line += (s.slice(i, j).match(/\n/g) || []).length; i = j + 2; continue; }
+    if (c === '/' && d === '/') { const j = s.indexOf('\n', i); i = j < 0 ? s.length : j; continue; }
+    if (c === "'" || c === '"' || c === '`') { let j = i + 1, t = ''; const at = line;
+      while (j < s.length && s[j] !== c) { if (s[j] === '\\') { t += s[j] + s[j + 1]; j += 2; continue; } if (s[j] === '\n') line++; t += s[j]; j++; }
+      if (t.includes('봐요')) out.push({ 줄: base + at, 글: t }); i = j + 1; prev = 'x'; continue; }
+    if (c === '/' && reStart(prev.trimEnd())) { let j = i + 1, cls = false;
+      while (j < s.length && s[j] !== '\n') { if (s[j] === '\\') { j += 2; continue; } if (s[j] === '[') cls = true; else if (s[j] === ']') cls = false; else if (s[j] === '/' && !cls) break; j++; }
+      if (s[j] === '/') { i = j + 1; prev = 'x'; continue; } }
+    if (!/\s/.test(c)) prev = (prev + c).slice(-12); i++; }
+  return out; }
+{ const dir = path.join(ROOT, 'village/stages'), 바탕 = n => JSON.parse(fs.readFileSync(path.join(dir, n + '.json'), 'utf8')), made = [];
+  const put = (id, o) => { fs.writeFileSync(path.join(dir, id + '.json'), JSON.stringify({ ...o, id }, null, 1)); made.push(path.join(dir, id + '.json')); };
+  const 시험판 = 시작 => ({ 이름: '시험 판 — 권유 꼬리', 교과: null, 카드: true, 질문: '시험 판', 시작, 트레이: ['road'], 첫안내: false });
+  const TRAYS = ['lesson0', 'help-places', 'empty-shop-ga', 'empty-shop-na', 'two-villages'];
+  /* (마) 분류 표 — 글자 마디 → [분류, 실제 말 꼴(토스트로 넣어 볼 글 · null = 토스트 밖), 트레이 판 기대(null = 띄우지 않음)] */
+  const NUDGE = '💡 우리 마을에 어울리는 이름이 생겼어요 — 눌러 봐요', 붐 = '😐 다 있어요 · 길이 붐벼요';
+  const TBL = {
+    '🗺️ 노란 땅이 화면 밖에 있어요 — 미니맵의 노란 칸을 눌러 봐요': ['권유', '🗺️ 노란 땅이 화면 밖에 있어요 — 미니맵의 노란 칸을 눌러 봐요', '🗺️ 노란 땅이 화면 밖에 있어요'],
+    '장을 봐요': ['현상', '가게는 길 옆에 있어야 주민이 와서 장을 봐요 — 길에 붙여 보세요', '가게는 길 옆에 있어야 주민이 와서 장을 봐요 — 길에 붙여 보세요'],
+    ' · 📚 ✋ 로 도서관을 가까이 옮겨 봐요': ['권유', '😐 배울 곳이 멀어요 · 📚 ✋ 로 도서관을 가까이 옮겨 봐요', '😐 배울 곳이 멀어요'],
+    ' · 📚 이 동네에 도서관을 하나 더 지어 봐요': ['권유', '😐 배울 곳이 멀어요 · 📚 이 동네에 도서관을 하나 더 지어 봐요', '😐 배울 곳이 멀어요'],
+    ' · 📚 가까이에 도서관을 지어 봐요': ['권유', '😐 배울 곳이 멀어요 · 📚 가까이에 도서관을 지어 봐요', '😐 배울 곳이 멀어요'],
+    ' — 배울 곳이 먼 동네엔 도서관을 지어 봐요': ['거절', '학교는 마을에 하나만 있어요 — 배울 곳이 먼 동네엔 도서관을 지어 봐요', '학교는 마을에 하나만 있어요 — 배울 곳이 먼 동네엔 도서관을 지어 봐요'],
+    '💼 마을이 커져서 어른들 일할 곳이 모자라요 — 가게·온실·풍차를 더 지어 봐요': ['권유', '💼 마을이 커져서 어른들 일할 곳이 모자라요 — 가게·온실·풍차를 더 지어 봐요', '💼 마을이 커져서 어른들 일할 곳이 모자라요'],
+    ' — 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요': ['권유', '풍차 · 일하는 어른 0/2 — 길에 안 닿아서 일하러 올 수 없어요 · 🖐 로 길 곁에 옮기거나 길을 이어 봐요', '풍차 · 일하는 어른 0/2 — 길에 안 닿아서 일하러 올 수 없어요'],
+    '💼 일터가 멀어요 — 이 동네에 하나 지어 봐요': ['권유', '이 동네 3채 · 💼 일터가 멀어요 — 이 동네에 하나 지어 봐요', '이 동네 3채 · 💼 일터가 멀어요'],
+    '💼 일할 곳이 없어요 — 가까이 일터를 하나 지어 봐요': ['권유', '이 동네 3채 · 💼 일할 곳이 없어요 — 가까이 일터를 하나 지어 봐요', '이 동네 3채 · 💼 일할 곳이 없어요'],
+    '💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요': ['권유', '빈집이에요 · 💼 일할 곳이 닿지 않아요 — 가까이 가게·온실·풍차를 지어 봐요', '빈집이에요 · 💼 일할 곳이 닿지 않아요'],
+    '비스듬히 봐요': ['대답', '비스듬히 봐요', '비스듬히 봐요'], '위에서 내려다봐요': ['대답', '위에서 내려다봐요', '위에서 내려다봐요'], '낮게 봐요 — 집들이 서 보여요': ['대답', '낮게 봐요 — 집들이 서 보여요', '낮게 봐요 — 집들이 서 보여요'],
+    '가까이 봐요. 끌어서 옮기세요': ['대답', '가까이 봐요. 끌어서 옮기세요', '가까이 봐요. 끌어서 옮기세요'],
+    ' · 🛣️ 곁이 빈 길을 큰길로 넓혀 봐요 — 길 위에 큰길을 놓으면 돼요': ['권유', 붐 + ' · 🛣️ 곁이 빈 길을 큰길로 넓혀 봐요 — 길 위에 큰길을 놓으면 돼요', 붐],
+    ' · 🛣️ 집 뒤쪽에 길을 한 줄 더 내 봐요 — 끝은 본길과 이어 줘요': ['권유', 붐 + ' · 🛣️ 집 뒤쪽에 길을 한 줄 더 내 봐요 — 끝은 본길과 이어 줘요', 붐],
+    ' · 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요': ['거절', '큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요', '큰길은 두 칸 폭이에요 — 곁에 물러날 자리가 없어요 · 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요'],
+    ' · 🛣️ 문 앞 길을 큰길로 넓혀 봐요 — 문 앞 길 위에 큰길을 놓으면 돼요': ['권유', 붐 + ' · 🛣️ 문 앞 길을 큰길로 넓혀 봐요 — 문 앞 길 위에 큰길을 놓으면 돼요', 붐],
+    ' · 🛣️ 이 길은 넓힐 자리가 없어요 — 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요': ['권유', 붐 + ' · 🛣️ 이 길은 넓힐 자리가 없어요 — 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요', 붐 + ' · 🛣️ 이 길은 넓힐 자리가 없어요'],
+    [NUDGE]: ['이름', NUDGE, null],
+    '이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요': ['이름', '💡 이제 🌳 숲속 마을이라고 불러도 되겠어요 — 위쪽 마을 이름을 눌러 봐요', null],
+    '<div class="pq">🤔 먼저 짐작해 봐요<br><b>': ['카드', null, null],
+    ' 길을 이어 봐요': ['권유', '🌉 다리 끝이 길과 이어져야 건널 수 있어요 — 양쪽 끝에 길을 이어 봐요', '🌉 다리 끝이 길과 이어져야 건널 수 있어요'] };
+  const SAY = Object.values(TBL).filter(v => v[1]).map(v => v[1]), JOBS = TBL['💼 마을이 커져서 어른들 일할 곳이 모자라요 — 가게·온실·풍차를 더 지어 봐요'][1];
+  const 끔 = 'w.VRULES.hintCut.card = false;', 큰길치움 = 'w.__del(153, 139); w.__tickBench(150);', 넷 = [[139, 141], [149, 143], [151, 145], [153, 145]];
+  const C = [...TRAYS.map(s => ({ n: s, stage: s })),
+    { n: 'tv뒤', stage: 'two-villages', post: 큰길치움, at: 넷 }, { n: 'tv끔', stage: 'two-villages', pre: 끔 }, { n: 'tv뒤끔', stage: 'two-villages', pre: 끔, post: 큰길치움, at: 넷 },
+    { n: 'self', stage: 'zz-tail-selftest', say: [JOBS, NUDGE] }, { n: 'self표', stage: 'zz-tail-selftest', say: SAY }, { n: 'mid', stage: 'zz-tail-mid' },
+    { n: '기본', stage: null, save: 'village/stages/boards/pop88.json', say: [JOBS, NUDGE, ...SAY] }, { n: '기본mid', stage: null, save: 'village/stages/boards/mid36.json' },
+    { n: 'off', stage: 'zz-tail-off', say: SAY }, { n: 'title', stage: 'zz-tail-title', say: [NUDGE, JOBS] }, { n: 'titles', stage: 'zz-tail-titles' }];
+  const R = {};
+  try { put('zz-tail-selftest', 시험판('stages/boards/pop88.json')); put('zz-tail-mid', 시험판('stages/boards/mid36.json'));
+    put('zz-tail-off', { ...시험판('stages/boards/pop88.json'), 규칙: { hintCut: { on: false } } }); put('zz-tail-title', { ...시험판('stages/boards/pop88.json'), 규칙: { hintCut: { title: false } } });
+    put('zz-tail-titles', { ...시험판('stages/boards/pop88.json'), 규칙: { titles: { on: true } } });
+    const out = new Array(C.length); let next = 0;   /* 판 하나 = 프로세스 하나 — 여섯씩 나란히 */
+    await Promise.all(Array.from({ length: Math.min(6, C.length) }, async () => { while (next < C.length) { const i = next++; out[i] = await tailOne(C[i]); } }));
+    C.forEach((c, i) => { R[c.n] = out[i]; });
+  } finally { made.forEach(f => fs.rmSync(f, { force: true })); }
+  const J = JSON.stringify, 권 = t => / 봐요/.test(String(t).replace(/장을 봐요/g, '')), 봐요집 = r => r.켬.filter(([, t]) => 권(t)), 끔봐요 = r => (r.끔 || []).filter(([, t]) => 권(t));
+  const 규칙 = t => String(t).split(' · ').flatMap(p => { if (!권(p)) return [p]; const q = p.split(' — '), k = q.findIndex(권); return k > 0 ? [q.slice(0, k).join(' — ')] : []; }).join(' · ');   /* 명세 조각 규칙(엔진 hcutCut 과 따로 적은 것) */
+  test('TAIL: 트레이 판 다섯 300틱 뒤 집 카드 권유 0 · two-villages §B-5 표 그대로 · 조각 규칙(같은 순간 끔 ↔ 켬) · 기본 마을 원문 · 💬 · 이름 제안 끔', () => {
+    const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
+    TRAYS.forEach(s => { const r = R[s];
+      ok(!봐요집(r).length && r.hc.트레이판 && r.hc.켜짐, `(가) ${s} 집 카드 권유 ${봐요집(r).length} ` + J(봐요집(r).slice(0, 3)));
+      ok(r.채팅 === false && r.이름 === false && r.hc.이름제안 === false && r.hc.이름막음 === 1, `(가) ${s} 💬 끔 · 이름 제안 끔 ` + J({ 채팅: r.채팅, 이름: r.이름, 이름막음: r.hc.이름막음 })); });
+    ok(R['two-villages'].hc.숨김 >= 1 && 끔봐요(R['two-villages']).length === 2, '(가) 양성 대조 — two-villages 같은 순간 card 끔이면 권유 집 2 ' + J(끔봐요(R['two-villages'])));
+    const 표 = ['😐 다 있어요 · 길이 붐벼요 · 🛣️ 이 길은 넓힐 자리가 없어요', '😐 다 있어요 · 길이 붐벼요', '😐 다 있어요 · 길이 붐벼요', '😐 다 있어요 · 길이 붐벼요 · 나무가 많아 좋아요'];
+    ok(J(R.tv뒤.집) === J(표), '(나) two-villages 큰길 치운 뒤 139,141 · 149,143 · 151,145 · 153,145 = §B-5 표 PR⑤ 뒤 ' + J(R.tv뒤.집));
+    ok(봐요집(R.tv끔).length === 2 && R.tv뒤끔.집.filter(권).length === 4 && R.tv뒤끔.집.every((t, i) => 규칙(t) === 표[i]), '(나) 양성 대조 — hintCut.card 끔 → 첫 화면 권유 2 · 큰길 치운 뒤 4(§B-5 표 PR⑤ 전) ' + J({ 첫: 봐요집(R.tv끔).length, 뒤: R.tv뒤끔.집 }));
+    [R.self, R.mid].forEach((r, i) => { const n = ['zz-tail-selftest(pop88)', 'zz-tail-mid(mid36)'][i];
+      ok(!봐요집(r).length && 끔봐요(r).length >= (i ? 10 : 30) && r.켬.every(([k, t], j) => r.끔[j][0] === k && t === 규칙(r.끔[j][1])), `(다) ${n} 켬 = 조각 규칙(끔) · 끔 권유 ${끔봐요(r).length} ` + J(r.켬.filter(([, t], j) => t !== 규칙(r.끔[j][1])).slice(0, 2))); });
+    ok(R.mid.끔.some(([, t]) => /넓혀 봐요/.test(t)) && R.self.끔.some(([, t]) => /📚 .*지어 봐요/.test(t)), '(다) 양성 대조에 넓혀 · 📚 권유가 실제로 있음');
+    ok(봐요집(R.기본).length >= 30 && 봐요집(R.기본).every(([, t]) => /📚 /.test(t)) && R.기본.hc.숨김 === 0 && !R.기본.hc.트레이판 && R.기본.이름 === true && R.기본.채팅 === true,
+      '(다) 기본 마을 pop88 📚 …지어 봐요 그대로 · 숨김 0 · 이름 제안 켬 ' + J({ 권유집: 봐요집(R.기본).length, 숨김: R.기본.hc.숨김 }));
+    ok(봐요집(R.기본mid).some(([, t]) => /🛣️ .*넓혀 봐요/.test(t)) && R.기본mid.hc.숨김 === 0, '(다) 기본 마을 mid36 붐빈 집 넓혀 봐요 그대로 ' + J(봐요집(R.기본mid).slice(0, 1)));
+  });
+  test("TAIL: 토스트 권유 — '💼 …모자라요'(꼬리 뗌) · 이름 제안 띄우지 않음(앞 글 그대로) · 기본 마을 · 끈 판 원문 · 엔진 '봐요' 글 분류 표(대답 · 거절 · 현상 그대로) · 스위치", () => {
+    const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
+    const [a, b] = R.self.말, 앞 = '💼 마을이 커져서 어른들 일할 곳이 모자라요', d = (r, k) => r.hc[k] - r.hc0[k];
+    ok(a.나감 === 앞, '(라) 1 일자리 소식 꼬리 뗌 ' + J(a));
+    ok(b.나감 === null && b.마지막 === 앞 && d(R.self, '토스트') === 1 && d(R.self, '토스트버림') === 1, '(라) 2 이름 제안 띄우지 않음 · 앞 글 그대로 · 토스트 1 · 토스트버림 1 ' + J({ b, 토스트: d(R.self, '토스트'), 버림: d(R.self, '토스트버림') }));
+    const 기 = R.기본.말;
+    ok(기.every(x => x.나감 === x.들어감) && R.기본.hc.토스트 === 0 && R.기본.hc.토스트버림 === 0 && !R.기본.hc.기록.length, '(라) 3 기본 마을 원문 그대로 · 토스트 0 · 기록 0 ' + J(기.filter(x => x.나감 !== x.들어감).slice(0, 2)));
+    ok(R.off.말.every(x => x.나감 === x.들어감) && R.off.hc.토스트 === 0 && R.off.hc.숨김 === 0 && 봐요집(R.off).length >= 30 && R.off.이름 === true && R.off.hc.기록.length > 0,
+      '(라) 되돌리기 — 판 규칙 hintCut 끔 판 토스트 · 집 카드 원문 · 이름 제안 켬(기록은 남김) ' + J({ 다름: R.off.말.filter(x => x.나감 !== x.들어감).length, 권유집: 봐요집(R.off).length, 이름: R.off.이름 }));
+    const lits = tailLiterals(), 모름 = lits.filter(l => !TBL[l.글]), 안씀 = Object.keys(TBL).filter(k => !lits.some(l => l.글 === k));
+    ok(!모름.length, "(마) 분류 안 된 엔진 '봐요' 글 — 분류 표(권유 · 대답 · 거절 · 현상 · 이름 · 카드)에 더한다: " + J(모름));
+    ok(!안씀.length, "(마) 엔진에 없는 분류 표 줄(글이 바뀜?): " + J(안씀));
+    const 셈 = {}; lits.forEach(l => { const k = TBL[l.글][0]; 셈[k] = (셈[k] || 0) + 1; });
+    const 틀림 = []; Object.entries(TBL).forEach(([k, [cls, m, want]]) => { if (!m) return; const i = SAY.indexOf(m), s = R.self표.말[i], o = R.off.말[i], g = R.기본.말[2 + i];
+      if (!s || s.나감 !== want) 틀림.push(['트레이 판', cls, m, s && s.나감]);
+      if (!o || o.나감 !== m) 틀림.push(['hintCut 끔 판', cls, m, o && o.나감]);
+      if (!g || g.나감 !== m) 틀림.push(['기본 마을', cls, m, g && g.나감]); });
+    ok(!틀림.length, '(마) 분류마다 말 꼴 — 권유 뗌 · 대답 · 거절 · 현상 그대로 · 이름 버림 / 끈 판 · 기본 마을 원문 ' + J(틀림.slice(0, 3)));
+    const 셈기대 = { 권유: 14, 현상: 1, 거절: 2, 대답: 5, 이름: 2, 카드: 1 };
+    ok(Object.keys(셈).length === 6 && Object.keys(셈기대).every(k => 셈[k] === 셈기대[k]), "(마) 분류 셈(글자 마디 25 — 대답 5 = 기울기 셋 · '가까이 봐요' 둘(단추 · 제외 목록)) " + J({ 글자마디: lits.length, ...셈 }));
+    const t = R.title;
+    ok(t.이름 === true && t.hc.이름막음 === 0 && t.말[0].나감 === NUDGE && t.말[1].나감 === 앞 && R.titles.이름 === true && R.titles.hc.이름막음 === 0,
+      '(바) 판 규칙 hintCut.title 끔 → 이름 제안 켬 · 이름 말 원문 · 일자리 소식은 그대로 뗌 / 판 규칙 titles.on 적은 판 → 켬 ' + J({ 이름: t.이름, 말: t.말.map(x => x.나감), titles: R.titles.이름 }));
+  });
+}
+
 results.forEach(r => console.log(r[0], r[1], r[2] ? '— ' + r[2] : ''));
 const f = results.filter(r => r[0] === 'FAIL').length;
 console.log(`\n요약: PASS ${results.length - f} · FAIL ${f}`);

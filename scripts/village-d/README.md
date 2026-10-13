@@ -12,6 +12,7 @@ node scripts/village-d/dcheck.mjs --save village/stages/boards/pop88.json --eval
 node scripts/village-d/dcheck.mjs --dc                                 # [PA-03] TL-0 판별 draw call 표(판 다섯 + @base) → out/dc_baseline.json
 node scripts/village-d/dcheck.mjs --scene start-card                    # [MAC-CLOCK] 시계 쥐기 — 카드 전 틱 0 · 카드 동안 가짜 60초 틱 그대로(+[시작] 양성 대조) · Space · ❓ 여는 조건 · 쥐는 이 겹침 · 4× · 모형 ⏸ 단추 · 다시 보기 카드 · 첫 안내 → 카드 틱 0 · module 이 죽어도 8초 안전망
 node scripts/village-d/dcheck.mjs --scene k7 --net-delay 2500:stages/   # [MAC-K7] 안내 층 · 수업 판 💬 · 길 끌기 기본 끔 — 망 늦춤에도 💬 단추 0번(관찰자) · 탐정 판 가게 누름 ✨ 0 · 🔗 공급 경로 말 꼬리 0 · 진짜 💬 바람 · 🛒? 풍선 주민 카드(2배속으로 흘려 모음) · 빈 가게 팻말 까닭 그림 0(판 시계가 흐른 뒤) · 길 끌기 이름표 0 / 양성 대조(판 규칙 켬 · 3층 사본 · 자유 모드 · 같은 순간 flowSay 끔)
+node scripts/village-d/dcheck.mjs --scene tail                          # [MAC-HINTCUT] 권유 꼬리 숨김 — 탐정 판 첫 화면 마을(트레이 · 시작칸) · 모형 연결 글 ↔ · two-villages 연결 글 그대로 · help-places 45초 이름 제안 0 · 💼 소식 꼬리 뗌 / 양성 대조(판 규칙 hintCut 끔)
 node scripts/village-d/dcheck.mjs --help                               # 옵션 전부
 ```
 - `--save <경로>` — 저장소 안 저장본(.json)을 판 밖 쪽(rules.json)에서 그 판의 저장 키(`rpg.village.guest` · 판이면 `.<판>`)에 넣고 연다(village-look 의 `기본+pop88` 꼴 · 판의 `시작` 땅 대신).
@@ -20,7 +21,7 @@ node scripts/village-d/dcheck.mjs --help                               # 옵션 
   **300장(판 시계 ≥ 5초 = 1배속 300장) 흘린 뒤** 60장 간격으로 `__state().drawCalls`(본 패스 · 그림자 제외) 다섯 번 → 가운데 값(표) · [최소, 최대](`_참고` 의 `낮범위` · `밤범위`).
   `__setHour` 로 시각을 건너뛴 직후엔 사람마다 다음 풍선 때가 한 프레임에 몰려 풍선(종류 하나 = draw call 하나)이 한꺼번에 뜬다(4초 안에 짐) — 그 몰림이 진 뒤에 읽는다(낮 · 밤 같은 규칙).
   기대: 판 열림 · [시작] 누름(카드가 있는 판) · 읽은 시각(`__sim().시`)이 낮 7~18시 · 밤 20~5시 · 첫 읽기가 300장 · 판 시계 5초 뒤 · 다섯 번씩 숫자.
-  🗺️ 모형이 첫 화면인 동네 판은 시작칸에 가장 가까운 동네 단추로 마을 화면을 잰다(모형 · 전체 보기 값은 `_참고`).
+  🗺️ 모형이 첫 화면인 동네 판은 시작칸에 가장 가까운 동네 단추로 마을 화면을 잰다(모형 · 전체 보기 값은 `_참고`). 판 칸 `첫화면: "마을"`(PA-08)인 동네 판은 첫 화면(시작칸) 그대로 재고, 모형 값은 맨 끝에 '🗺️ 고장 전체'로 `_참고.<판>.모형`(`첫화면: "마을(판 칸)"`).
 - 기준표(`out/dc_baseline.json` · `--dc-out <파일>`)는 기대가 다 맞을 때만 쓰고, **덮어쓰지 않고 잰 판의 줄만 바꿔 넣는다**(머리 `_조건` · 잰때는 새로 · 줄마다 `_참고.<판>.잰때`).
   남는 줄과 조건(창 · 그래픽 · 단계 · lookseed · simrand · 렌더러 · 시각 · 읽기)이 다르면 섞지 않고 FAIL — 그 판까지 함께 재거나, 견주기만 할 땐 `--dc-out tmp/…`.
 

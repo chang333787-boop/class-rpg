@@ -78,6 +78,40 @@ function k7File(def, n) {
   if (v === 2 && def.권유 != null) return [['FAIL', '탐정 판 권유', '안내최대층 2 인데 권유가 있다 — 권유는 자리(✨)를 짚는다(4층) · 빼거나 안내최대층 3 으로']];
   return [['PASS', `안내최대층 ${v}` + (v === 2 ? ' — 탐정 판(까닭까지 · 할 일 · 자리 0 · 권유 없음)' : ''), '']];
 }
+/* [MAC-HINTCUT] PA-08 첫 화면 · 연결 글 칸 — 첫화면 ∈ {"마을"}(밖 FAIL) · 연결글 = false 만(true 는 뜻 없음 — 칸을 빼기 · 밖 FAIL) ·
+   칸이 있는데 동네 < 2 면 REVIEW(모형 화면이 없는 판 — 칸이 할 일이 없다) · 맞으면 PASS 한 줄 · 칸이 없는 판은 줄 0 · 판 루프와 자기 시험이 같이 부른다 */
+const 꼬리지남 = new Set(), 권유판 = new Set();
+function tailFile(def, n) {
+  if (n) 꼬리지남.add(n); const a = def.첫화면, b = def.연결글, 동 = Array.isArray(def.동네) ? def.동네.length : 0, out = [];
+  if (a == null && b == null) return out;
+  if (a != null && a !== '마을') out.push(['FAIL', '첫화면 꼴', `첫화면 ${JSON.stringify(a)} — "마을" 만(없으면 동네 판은 🗺️ 모형으로 엶)`]);
+  if (b != null && b !== false) out.push(['FAIL', '연결글 꼴', `연결글 ${JSON.stringify(b)} — false 만(true 는 뜻 없음 — 칸을 빼기)`]);
+  if (!out.length && 동 < 2) out.push(['REVIEW', '첫화면 · 연결글', `동네 ${동} — 모형 화면이 없는 판(칸이 할 일이 없다)`]);
+  if (!out.length) out.push(['PASS', [a === '마을' ? '첫화면 마을(🗺️ 모형은 단추로)' : null, b === false ? '연결글 숨김(모형 두 덩이 사이 ↔)' : null].filter(Boolean).join(' · ') + ` — 동네 ${동}`, '']);
+  return out;
+}
+/* [MAC-HINTCUT] 트레이 판 권유 줄 — 판을 열어 300틱 뒤 모든 집 __houseText 와 그동안 나간 토스트(__hintCut().기록 · 거르개를 지난 글)에서 '봐요'('장을 봐요' 뺌) 0 ·
+   거르개가 자른 토스트가 있으면 REVIEW 로 글째(대답을 잘랐나 볼 수 있게) · 시뮬 · 네트워크 0 */
+function tailProbe(n) {
+  const f = path.join(os.tmpdir(), 'village-stages-tail-' + process.pid + '.mjs');
+  fs.writeFileSync(f, `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
+const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: null, seed: 1, query: 'stage=' + ${JSON.stringify(n)} });
+w.__tickBench(300);
+const 집 = w.__snapshot().물건.map(t => /^house@(\\d+),(\\d+)/.exec(t)).filter(Boolean).map(m => [m[1] + ',' + m[2], w.__houseText(+m[1], +m[2])]);
+process.stdout.write('@@' + JSON.stringify({ 집, h: w.__hintCut ? w.__hintCut() : null }) + '\\n'); process.exit(0);`);
+  const r = spawnSync(process.execPath, [f], { encoding: 'utf8' }); fs.rmSync(f, { force: true });
+  const l = (r.stdout || '').split('\n').find(x => x.startsWith('@@')); return l ? JSON.parse(l.slice(2)) : { err: (r.stderr || '').trim().split('\n').slice(-1)[0] };
+}
+const tailAsk = t => / 봐요/.test(String(t).replace(/장을 봐요/g, ''));
+function tailLine(o) {
+  if (!o || o.err || !o.h) return [['FAIL', '권유', '판을 열어 보지 못함(__hintCut 없음?): ' + (o && (o.err || '탐침 없음'))]];
+  const 집 = o.집.filter(([, t]) => tailAsk(t)), 말 = (o.h.기록 || []).filter(x => x.뒤 && tailAsk(x.뒤)), 자름 = (o.h.기록 || []).filter(x => x.뒤 !== x.원문), out = [];
+  if (!o.h.켜짐) out.push(['FAIL', '권유', '트레이 판인데 거르개가 꺼짐(__hintCut().켜짐 false — VRULES.hintCut · 판 규칙)']);
+  else if (집.length || 말.length) out.push(['FAIL', '권유', `300틱 뒤 권유 — 집 ${집.length}채 ${JSON.stringify(집.slice(0, 3))} · 토스트 ${말.length} ${JSON.stringify(말.slice(0, 2).map(x => x.뒤))}`]);
+  else out.push(['PASS', `트레이 판 첫 화면 권유 0 — 300틱 뒤 집 ${o.집.length}채 · 나간 토스트 ${(o.h.기록 || []).length} 에 '봐요' 0(숨긴 집 카드 조각 ${o.h.숨김})`, '']);
+  if (자름.length) out.push(['REVIEW', '권유 토스트', `거르개가 자른 토스트 ${자름.length} — 대답이면 제외 목록(HCUT_KEEP)에: ` + 자름.slice(0, 3).map(x => JSON.stringify(x.원문) + ' → ' + JSON.stringify(x.뒤)).join(' · ')]);
+  return out;
+}
 
 /* 건물 종류 확인: 판 밖 칸에 놓아 보면 모르는 종류는 오류가 난다(load.mjs 의 run.mjs 와 같은 꾀) */
 function kindsOk(list) {
@@ -191,6 +225,7 @@ for (const f of files) {
   campFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-CAMP] 판규칙 · 판 규칙 camp — 위 campFile(자기 시험이 같은 함수를 부른다) */
   clockFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-CLOCK] 배속최대 · 생산멈춤 — 위 clockFile(자기 시험이 같은 함수를 부른다) */
   k7File(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-K7] 안내최대층 · 탐정 판 권유 — 위 k7File(자기 시험이 같은 함수를 부른다) */
+  tailFile(def, n).forEach(([k, nm, m]) => add(k, P(nm), m));   /* [MAC-HINTCUT] 첫화면 · 연결글 — 위 tailFile(자기 시험이 같은 함수를 부른다) */
   /* [MAC-STAGEOFF] 판이 끄는 묶음 — 모르는 이름은 조용히 지나가면 안 된다(아무것도 안 꺼진 채 PASS 한다) */
   let 끈것 = new Set();
   if (def.끄기 != null) {
@@ -318,7 +353,8 @@ for (const f of files) {
     const 잇기 = ((def.역할 || {}).정한다 || []).filter(d => d && d.잇기);   /* 엔진의 길(K.road — road · avenue · gravel …) 가운데 트레이에 뜨는 것(tray.뜨는길) */
     if (잇기.length && !(Array.isArray(tr.뜨는길) && tr.뜨는길.length)) 나쁨.push(`역할 '${잇기[0].말}' 은 잇기인데 트레이에 길 종류가 없음 — 아이가 길을 놓을 수 없다`);
     나쁨.length ? add('FAIL', P('트레이'), 나쁨.join(' · ') + ' — run.mjs tray ' + JSON.stringify({ 뜨는종류: 뜸, 뜨는길: tr.뜨는길 || null, 값숨김규칙: tr.값숨김규칙 }))
-      : add('PASS', P(`트레이 ${트레이.length}종(${트레이.join('·') || '비움'})${Array.isArray(def.건물) && def.건물.length ? ' ⊆ 건물' : ''} · 엔진이 띄우는 종류 = 트레이 · 값 줄 0`)); }
+      : add('PASS', P(`트레이 ${트레이.length}종(${트레이.join('·') || '비움'})${Array.isArray(def.건물) && def.건물.length ? ' ⊆ 건물' : ''} · 엔진이 띄우는 종류 = 트레이 · 값 줄 0`));
+    tailLine(tailProbe(n)).forEach(([k, nm, m]) => add(k, P(nm), m)); 권유판.add(n); }   /* [MAC-HINTCUT] 트레이 판 권유 줄 */
   /* [MAC-STAGEKEEP] ③ · [MAC-HEALTH] PR 3a 가드 — FAIL 만 낸다(PASS 줄 0): ① 판 목록이 시작 땅의 물건을 조용히 막나 ② 의원을 쓰는 판인데 건강이 안 도나(keepStages · 판 규칙 health · 목록이 반쪽만 바뀐 때) */
   if (def.시작 != null && res.못살림) add('FAIL', P('시작 땅'), `판에 얹으면 못 살린 것 ${res.못살림}개 — 판 목록(건물)이 시작 땅의 물건을 막는다([MAC-STAGEKEEP])`);
   { const 의원씀 = (def.목표 || []).some(g => g.k === 'clinic') || ((def.역할 || {}).정한다 || []).some(d => (d.놓기 || []).includes('clinic')) || !!(def.결정 && def.결정.시설 === 'clinic');
@@ -431,6 +467,30 @@ for (const f of files) {
   T('바닥 판', JSON.stringify(판값) === JSON.stringify(바닥), 판값);
   !틀림.length ? add('PASS', `안내 층 칸 자기 시험 — 판 루프와 같은 k7File(판 ${층지남.size}개 지남) · 2층 + 권유 FAIL '탐정 판 권유' · 2 · 3 밖 FAIL '안내 층 꼴' · 칸 없음 줄 0 · 바닥 판 다섯 = 3 · 3 · 2 · 2 · 3`)
     : add('FAIL', '안내 층 칸 자기 시험', 틀림.join(' · ')); }
+
+/* [MAC-HINTCUT] 첫 화면 · 연결 글 칸 · 트레이 판 권유 줄 자기 시험 — 판 루프가 부르는 tailFile · tailLine 그대로(판마다 지났나 · 트레이 판마다 권유 줄이 섰나도 셈):
+   첫화면 "모형" · true · 연결글 true · "false" FAIL 하나씩 · 칸 + 동네 < 2 REVIEW · 둘 다 맞으면 PASS 한 줄 · 칸 없음(null 포함) 줄 0 · 바닥 판 셋의 칸 값(ga · na 둘 다 · two-villages 첫화면만) /
+   권유 줄 — 집 '봐요' · 나간 토스트 '봐요' · 거르개 꺼짐 · 탐침 없음 FAIL · '장을 봐요'만이면 PASS · 자른 토스트는 REVIEW 로 더함 · 트레이 판 다섯 모두 권유 줄 */
+{ const 틀림 = [], T = (id, ok, v) => { if (!ok) 틀림.push(id + ' ' + JSON.stringify(v)); }, 꼴 = (L, k, nm) => L.length === 1 && L[0][0] === k && (!nm || L[0][1] === nm), 둘 = [{ 이름: 'a' }, { 이름: 'b' }];
+  const 안지남 = files.map(f => f.replace(/\.json$/, '')).filter(x => !꼬리지남.has(x)); T('loop', !안지남.length, 안지남);
+  [['모형', '첫화면 꼴'], [true, '첫화면 꼴']].forEach(([v, nm]) => T('첫화면 ' + JSON.stringify(v), 꼴(tailFile({ 첫화면: v, 동네: 둘 }), 'FAIL', nm), tailFile({ 첫화면: v, 동네: 둘 })));
+  [[true, '연결글 꼴'], ['false', '연결글 꼴']].forEach(([v, nm]) => T('연결글 ' + JSON.stringify(v), 꼴(tailFile({ 연결글: v, 동네: 둘 }), 'FAIL', nm), tailFile({ 연결글: v, 동네: 둘 })));
+  T('동네 < 2', 꼴(tailFile({ 첫화면: '마을', 동네: [둘[0]] }), 'REVIEW') && 꼴(tailFile({ 연결글: false }), 'REVIEW'), [tailFile({ 첫화면: '마을', 동네: [둘[0]] }), tailFile({ 연결글: false })]);
+  T('PASS', 꼴(tailFile({ 첫화면: '마을', 연결글: false, 동네: 둘 }), 'PASS') && 꼴(tailFile({ 첫화면: '마을', 동네: 둘 }), 'PASS'), tailFile({ 첫화면: '마을', 연결글: false, 동네: 둘 }));
+  T('칸 없음', !tailFile({}).length && !tailFile({ 첫화면: null, 연결글: null, 동네: 둘 }).length, tailFile({ 첫화면: null }));
+  const 바닥 = { 'empty-shop-ga': ['마을', false], 'empty-shop-na': ['마을', false], 'two-villages': ['마을', null], lesson0: [null, null], 'help-places': [null, null] };
+  const 판값 = Object.fromEntries(Object.keys(바닥).map(id => { try { const d = JSON.parse(fs.readFileSync(path.join(DIR, id + '.json'), 'utf8')); return [id, [d.첫화면 ?? null, d.연결글 ?? null]]; } catch (e) { return [id, '없음']; } }));
+  T('바닥 판', JSON.stringify(판값) === JSON.stringify(바닥), 판값);
+  const 깨끗 = { 집: [['1,1', '😐 다 있어요']], h: { 켜짐: true, 숨김: 0, 기록: [{ 원문: '가게는 … 장을 봐요', 뒤: '가게는 … 장을 봐요' }] } };
+  T('권유 PASS', 꼴(tailLine(깨끗), 'PASS'), tailLine(깨끗));
+  T('집 봐요', 꼴(tailLine({ ...깨끗, 집: [['1,1', '😐 다 있어요 · 📚 가까이에 도서관을 지어 봐요']] }), 'FAIL', '권유'), 0);
+  T('토스트 봐요', 꼴(tailLine({ ...깨끗, h: { ...깨끗.h, 기록: [{ 원문: 'x 지어 봐요', 뒤: 'x 지어 봐요' }] } }), 'FAIL', '권유'), 0);
+  T('꺼짐', 꼴(tailLine({ ...깨끗, h: { ...깨끗.h, 켜짐: false } }), 'FAIL', '권유') && 꼴(tailLine({ err: 'x' }), 'FAIL', '권유'), 0);
+  const 자름 = tailLine({ ...깨끗, h: { ...깨끗.h, 기록: [{ 원문: '현상 — 지어 봐요', 뒤: '현상' }] } }); T('자름 REVIEW', 자름.length === 2 && 자름[0][0] === 'PASS' && 자름[1][0] === 'REVIEW', 자름);
+  const 트레이판 = files.map(f => f.replace(/\.json$/, '')).filter(id => { try { return Array.isArray(JSON.parse(fs.readFileSync(path.join(DIR, id + '.json'), 'utf8')).트레이); } catch (e) { return false; } });
+  T('권유 줄', JSON.stringify([...권유판].sort()) === JSON.stringify(트레이판.slice().sort()) && ['lesson0', 'help-places', 'empty-shop-ga', 'empty-shop-na', 'two-villages'].every(id => 권유판.has(id)), { 권유판: [...권유판], 트레이판 });
+  !틀림.length ? add('PASS', `첫 화면 · 연결 글 칸 · 권유 줄 자기 시험 — 판 루프와 같은 tailFile(판 ${꼬리지남.size}개 지남) · 첫화면 "마을" 만 · 연결글 false 만 · 동네 < 2 REVIEW · 칸 없음 줄 0 · 바닥 판 셋 칸 값 · 같은 tailLine(집 · 토스트 '봐요' · 꺼짐 FAIL · 자른 토스트 REVIEW) · 트레이 판 ${권유판.size}개 모두 권유 줄`)
+    : add('FAIL', '첫 화면 · 연결 글 칸 자기 시험', 틀림.join(' · ')); }
 
 /* [MAC-STAGEOFF] 정본 2번 — 끄기를 한 번도 안 써 보면 이 칸이 서지 않는다. 판이 하나도 안 끄면 FAIL */
 끈판 ? add('PASS', `판정을 끈 판 ${끈판}개 (정본 2번 — 끄기를 실제로 쓴 판이 있다)`)

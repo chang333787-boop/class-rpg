@@ -140,10 +140,13 @@ try {
         row.단추 = { k: 'v' + bi, 이름: (ns[bi] && ns[bi].이름) || null, 시작칸까지칸: Number.isFinite(bd) ? +bd.toFixed(2) : null };
         const ok = await C.evaluate(`const b = document.querySelector('#pmapBar button[data-k="v${bi}"]'); if (!b) return false; b.click(); return !window.__protoMap().켜짐`);
         expect(ok, 판 + ' 첫 화면 모형 → 마을 단추 ' + (row.단추.이름 || row.단추.k)); await settle(); }
+      else if (def && def.첫화면 === '마을' && Array.isArray(def.동네) && def.동네.length >= 2) row.첫화면 = '마을(판 칸)';   /* [PA-08] 판 칸 첫화면 "마을" — 첫 화면이 이미 마을(시작칸) · 모형 값은 맨 끝에 '🗺️ 고장 전체'로(참고) */
       /* 10시 → 20시(20시 = 밤 1.0 — 빛 웅덩이 · 반딧불이 더해지는 게 정상) — 맞춘 뒤 settle 하고 DC_WAIT 장째부터 */
       for (const [k, h] of [['낮', DC_HOURS[0]], ['밤', DC_HOURS[1]]]) { const mk = await setHourMark(h); await settle(); row[k] = { 시: h, ...(await dcReads(mk)) }; }
       /* 판 전체 보기 — 참고(D §TL-0 '참고 줄') · 카메라가 첫 화면으로 못 돌아와 맨 끝(마지막 시각 그대로) */
       await C.evaluate('document.getElementById("fitBtn").onclick(); return 1'); await settle(); row.전체 = { 시: DC_HOURS[DC_HOURS.length - 1], ...(await dcReads()) };
+      if (row.첫화면 === '마을(판 칸)') { const ok = await C.evaluate(`const b = document.querySelector('#pmapBar button[data-k="map"]'); if (!b) return false; b.click(); return window.__protoMap().켜짐`);   /* [PA-08] 모형 값(참고) — 맨 끝(카메라 · 시각은 그대로) */
+        expect(ok, 판 + ' 판 칸 첫화면 마을 — 끝에 🗺️ 고장 전체 단추로 모형(참고 값)'); await settle(); row.모형 = await dcReads(); }
       row.시작카드 = await probe('window.__stageCard ? window.__stageCard() : null');   /* 맨 끝에 — 카드가 늦게 떠 아직 떠 있으면 걸린다 */
       const errs = await C.evaluate('return window.__shots.errs.slice(0, 5)'); row.페이지오류 = [...C.st.pageErr.slice(0, 5), ...errs];
     } catch (e) { row.실패 = String(e.message || e).slice(0, 200); expect(false, 판 + ' 잼 — ' + row.실패); }
@@ -203,6 +206,7 @@ if (DC) {   /* ── [PA-03] 표 · 기준표(dc_baseline.json) ── */
   const CB = '크롬북 실기 대조는 dc 가 아니라 __gfx()(단계 · 놓친 비율) · __benchP99(ms) 몫';
   const rg = x => x && x.범위 ? '[' + x.범위.join(', ') + ']' : '?';
   const ref = r => [`낮 ${rg(r.낮)} · 밤 ${rg(r.밤)}`, r.첫화면 === '모형' ? `첫 화면 🗺️ 모형 ${r.모형 ? r.모형.dc : '?'} → '${(r.단추 && (r.단추.이름 || r.단추.k)) || '?'}' 단추로 마을(시작칸과 ${r.단추 ? r.단추.시작칸까지칸 : '?'}칸)` : null,
+    r.첫화면 === '마을(판 칸)' ? `판 칸 첫화면 마을(시작칸) · 끝에 🗺️ 모형 ${r.모형 ? r.모형.dc : '?'}(참고)` : null,
     r.전체 ? `전체 보기 ${r.전체.dc}(${r.전체.시}시${r.전체.지도모드 ? ' · 지도 모드' : ''})` : null, r.낮 ? `사람 ${r.낮.사람}` : null, r.낮 && r.낮.시뮬 && r.낮.시뮬.배속 !== 1 ? r.낮.시뮬.배속 + '배속' : null, r.낮 && r.낮.비 ? '비' : null].filter(Boolean).join(' · ');
   /* 기준표 — 덮어쓰지 않고 잰 판의 줄만 바꿔 넣는다(머리 _조건 · 잰때는 새로 · 판 차례는 있던 대로 · 새 판은 뒤에).
      남는 줄(이번에 안 잰 판)이 있는데 조건(창 · 그래픽 · 단계 · lookseed · simrand · 렌더러 · 시각 · 읽기)이 다르면 섞지 않는다 — 한 표에 다른 잣대가 섞이면 안 됨 */
@@ -219,12 +223,13 @@ if (DC) {   /* ── [PA-03] 표 · 기준표(dc_baseline.json) ── */
     else {
       const order = [...(J0 ? Object.keys(J0).filter(isRow) : []), ...okRows.map(r => r.판).filter(b => !has(b))], byId = new Map(okRows.map(r => [r.판, r]));
       const J = { _조건: { 창: COND.창, 그래픽: GFX, 단계: stepTxt, lookseed: LOOKSEED, simrand: SIMRAND, 렌더러: COND.렌더러, 잰때: at, 시각: COND.시각, 읽기: READ, 엔진: 'village/ 를 마지막으로 바꾼 커밋(git log -1 -- village)',
-        첫화면: '판 카드 [시작] 뒤 시작칸 배율 · 첫 화면이 🗺️ 모형인 판(동네)은 시작칸에 가장 가까운 동네 단추를 누른 마을 화면 · @base = 기본 마을 + pop88 저장본',
+        첫화면: '판 카드 [시작] 뒤 시작칸 배율 · 첫 화면이 🗺️ 모형인 판(동네)은 시작칸에 가장 가까운 동네 단추를 누른 마을 화면 · 판 칸 첫화면 "마을"인 동네 판(PA-08)은 그 첫 화면(시작칸) 그대로 · 모형 값은 맨 끝에 🗺️ 고장 전체로(_참고) · @base = 기본 마을 + pop88 저장본',
         크롬북: CB, 명령: 'node scripts/village-d/dcheck.mjs --dc ' + DC.join(',') } };
       for (const b of order) { const r = byId.get(b); J[b] = r ? { 엔진: eng, 낮: r.낮.dc, 밤: r.밤.dc, 삼각: r.낮.삼각, TL뒤: null } : J0[b]; }
       J._참고 = Object.fromEntries(order.map(b => { const r = byId.get(b); return [b, !r ? (J0 && J0._참고 && J0._참고[b]) || null : { 낮범위: r.낮.범위, 밤범위: r.밤.범위, 밤삼각: r.밤.삼각,
         전체: r.전체 ? r.전체.dc : null, 전체지도: r.전체 ? r.전체.지도모드 : null, 사람: r.낮.사람, ...(r.낮.시뮬 && r.낮.시뮬.배속 !== 1 ? { 배속: r.낮.시뮬.배속 } : {}),
-        ...(r.첫화면 === '모형' ? { 첫화면: '모형', 모형: r.모형 ? r.모형.dc : null, 마을단추: r.단추 ? r.단추.이름 || r.단추.k : null } : {}), 잰때: at }]; }));
+        ...(r.첫화면 === '모형' ? { 첫화면: '모형', 모형: r.모형 ? r.모형.dc : null, 마을단추: r.단추 ? r.단추.이름 || r.단추.k : null } : {}),
+        ...(r.첫화면 === '마을(판 칸)' ? { 첫화면: '마을(판 칸)', 모형: r.모형 ? r.모형.dc : null } : {}), 잰때: at }]; }));
       fs.mkdirSync(path.dirname(DC_OUT), { recursive: true }); fs.writeFileSync(DC_OUT, JSON.stringify(J, null, 1) + '\n'); wrote = { 줄: order.length, 바꿈: mine.size, 그대로: kept.length };
     }
   }
