@@ -8,7 +8,7 @@
 //   node scripts/village-d/dcheck.mjs --save village/stages/boards/pop88.json --eval 'window.__sim()'   # 저장본을 넣고 엶(판 밖 쪽에서 localStorage 'rpg.village.guest[.<판>]')
 //   node scripts/village-d/dcheck.mjs --dc lesson0,help-places,empty-shop-ga,empty-shop-na,two-villages,@base   # [PA-03] TL-0 판별 draw call 표(--dc 만 = 이 여섯)
 // 옵션: --size 1366x610 · --hour 10 · --gfx fixed · --lookseed 1 · --simrand tool|stage · --frames 60 · --reduce-motion · --voice
-//       --net-delay <ms>[:<글자>](서버 응답을 늦춤 — 주소에 그 글자가 든 것만 · 학교망 흉내) · --out tmp/village-d · --keep
+//       --net-delay <ms>[:<글자>](서버 응답을 늦춤 — 주소 경로에 그 글자가 든 것만 · 학교망 흉내 · 장면 안에서는 ctx.netDelay(ms, 글자)로 잠깐 켜고 끔) · --out tmp/village-d · --keep
 //       --save <경로>(저장소 안 저장본 .json — 열기 전에 그 판의 저장 키에 넣음 · 판의 '시작' 땅 대신) · --dc-out <파일>(기본 scripts/village-d/out/dc_baseline.json)
 // --dc: 판마다 엶 → 판 카드([시작] · 건너뛰기 · 닫기)를 닫음 → 그래픽 고정 → 10시 · 20시 차례로(앞으로만) 시각을 맞추고 300장(판 시계 ≥ 5초 = 1배속 300장) 흘린 뒤
 //       60장 간격으로 __state().drawCalls · triangles 다섯 번 → 가운데 값(표) · [최소, 최대](_참고) — 본 패스(그림자 패스 제외) · __bench 류는 판을 움직여 안 씀.
@@ -56,7 +56,8 @@ const VOICE = `(() => { const v = [{ name: '가짜 한국어', lang: 'ko-KR', de
   try { Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { getVoices: () => v, speak: u => { window.__dVoice.push({ 글: String(u && u.text || ''), 말: u && u.lang || null, 목소리: u && u.voice ? u.voice.name : null }); try { u.onend && u.onend({}); } catch (e) {} },
     cancel() {}, pause() {}, resume() {}, speaking: false, pending: false, onvoiceschanged: null, addEventListener() {}, removeEventListener() {} } }); } catch (e) {} })();`;
 
-const srv = await serve(ROOT, { delay: DELAY }), BASE = srv.base;
+const NETD = { ms: DELAY ? DELAY.ms : 0, match: DELAY ? DELAY.match : null };   /* 서버 늦춤 한 벌 — --net-delay 가 처음 값 · 장면이 ctx.netDelay(ms, 글자)로 잠깐 바꾼다(0 = 끔 · 인자 없이 = 처음 값) */
+const srv = await serve(ROOT, { delay: NETD }), BASE = srv.base;
 const allow = u => u.startsWith(BASE + '/') || u.startsWith('data:') || u.startsWith('blob:');
 const pageUrl = (stage = STAGE_ID, hash = HASH) => BASE + '/village/index.html?' + (stage ? 'stage=' + encodeURIComponent(stage) + '&' : '') + 'sid=guest' + (hash ? '#' + String(hash).replace(/^#/, '') : '');
 const name = DC ? 'dc' : SCENE || (STAGE_ID ? 'stage-' + STAGE_ID : 'page'), dir = path.join(OUT, name);
@@ -171,7 +172,8 @@ try {
     R.바깥시도 = C.st.tries.filter(t => !t.ok); R.같은출처 = C.st.tries.filter(t => t.ok && t.url.startsWith(BASE + '/')).length;
   } else {
     await open();
-    const ctx = { C, BASE, ROOT, dir, args, open, shot, ax, probe, expect, pump: n => C.pump(n), advance: ms => C.advance(ms), sleep, evaluate: (s, ms) => C.evaluate(s, ms), send: (m, p) => C.send(m, p), result: R };
+    const netDelay = (ms, match) => { if (ms == null) Object.assign(NETD, { ms: DELAY ? DELAY.ms : 0, match: DELAY ? DELAY.match : null }); else Object.assign(NETD, { ms: Math.max(0, +ms | 0), match: match || null }); return { ...NETD }; };
+    const ctx = { C, BASE, ROOT, dir, args, open, shot, ax, probe, expect, pump: n => C.pump(n), advance: ms => C.advance(ms), sleep, evaluate: (s, ms) => C.evaluate(s, ms), send: (m, p) => C.send(m, p), netDelay, result: R };
     if (scene) R.장면값 = await scene(ctx);
     else { await shot(name); R.접근성단추 = await ax(); }
     if (EVAL) R.탐침[EVAL] = await probe(EVAL);

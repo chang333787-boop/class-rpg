@@ -303,7 +303,7 @@
   };
 </script>
 
-<script src="./sync.js?v=20260920-hidden"></script>
+<script>/* [MAC-C0T] 판(?stage= · 구경 아님 — 엔진 STAGE.id 와 같은 조건)에서는 sync.js 를 싣지 않는다(요청 0) · 기본 마을 · ?visit= 는 같은 태그를 이 자리에 써 차례 그대로(module 앞) */ (function () { var q = new URLSearchParams(location.search), v = (q.get('visit') || '').replace(/[^A-Za-z0-9_\-]/g, ''), s = (q.get('stage') || '').replace(/[^a-z0-9\-]/g, ''); if (v || !s) document.write('<script src="./sync.js?v=20260920-hidden"><\/script>'); })();</script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
 </script>
@@ -11085,7 +11085,26 @@ window.__kids = () => ({ 켜짐: window.VRULES.kids.on, ...KIDS.stats, 지금밖
    학생 id 가 아직 없어 자리만 잡아 뒀다(SID).
    ══════════════════════════════════════════════════════════════ */
 const SAVE_V = 2;                       // v2 = 구역 문자열 + palette (G5 ③). v1(items) 은 읽기만
-const SID = (QS.get('sid') || 'guest').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || 'guest';   // ?sid=<학생id>, 없으면 guest (G5 훅)
+/* [MAC-C0T] 해시 낱말(C0-H) — `#반=c3,n=07,끝` · `&` 로 이어도 같다. HP(쉼표만 · 07 → 7 · 퍼센트 안 풂)로 읽지 않는다: 낱말과 값을 풀어(못 풀면 원문) 아는 낱말만 · 같은 낱말은 뒤엣것.
+   값 낱말(반 · n · 소리 · 말2 · 학년 · 대사)은 글(없으면 null) · 표 낱말(끝 · 기록지움 · 크게)은 참/거짓 · end = 끝. 부를 때마다 지금 해시를 읽는다(hashchange 뒤에도).
+   다시 열 때(↺ 처음부터 · voteReset)는 남는 낱말(값 낱말 · 크게 = C0H_KEEP)만 붙인다(c0hKeep) — 한 번 쓰는 낱말(끝 · end · 기록지움)과 그 밖(fresh · demo · 재기 낱말)은 버림: 옛 ↺ 는 해시를 통째로 버렸다(#fresh 빈 판에서 나오는 길 · ACT-STAGERESET) · 끝 이 남으면 처음부터가 끝 카드로 열린다. */
+const C0H_V = ['반', 'n', '소리', '말2', '학년', '대사'], C0H_F = ['끝', '기록지움', '크게'], C0H_KEEP = [...C0H_V, '크게'];
+function c0Hash() { const V = C0H_V, F = C0H_F, o = {}, un = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+  V.forEach(k => { o[k] = null; }); F.forEach(k => { o[k] = false; });
+  String(location.hash || '').slice(1).split(/[,&]/).forEach(w => { if (!w) return; const i = w.indexOf('='), k0 = un(i < 0 ? w : w.slice(0, i)), k = k0 === 'end' ? '끝' : k0;
+    if (F.includes(k)) o[k] = true; else if (V.includes(k)) o[k] = i < 0 ? '' : un(w.slice(i + 1)); });
+  return o; }
+/* 해시 낱말을 원문 그대로 고른다 — keep(풀어 본 낱말 이름)이 참인 것만 · 차례 그대로 · 쉼표로 잇는다(c0Hash 는 , · & 둘 다 읽음) · 하나도 없으면 '' */
+function c0hPick(keep) { const w = String(location.hash || '').slice(1).split(/[,&]/).filter(x => { if (!x) return false; let k = x.split('=')[0]; try { k = decodeURIComponent(k); } catch (e) {} return keep(k); });
+  return w.length ? '#' + w.join(',') : ''; }
+function c0hKeep() { return c0hPick(k => C0H_KEEP.includes(k)); }   // ↺ 처음부터 · voteReset 이 다시 열 때 붙이는 해시
+/* [MAC-C0T] 판 번호 C0N — 판(?stage · 구경 아님) + 해시 n= 일 때만. n=교사 → t(교사 기기) · 그 밖엔 [A-Za-z0-9_-] 40자에 통째로 맞을 때만 그 글(거르지 않고 버림 — % 만 지우면 엉뚱한 번호가 된다) ·
+   guest 와 adv · full · demo 가 든 번호 · 반 기호는 버림(아래 부팅이 해시 안의 그 글자를 보고 시연 판을 깔고 저장을 끈다) → guest + console.warn */
+const C0N = (() => { if (VISIT_SID || !stageIdOf(QS.get('stage'))) return null; const h = c0Hash(); if (h.n == null) return null;
+  const n = h.n === '교사' ? 't' : h.n, demo = s => /adv|full|demo/.test(s || '');
+  if (/^[A-Za-z0-9_-]{1,40}$/.test(n) && n !== 'guest' && !demo(n) && !demo(h.반)) return n;
+  console.warn('[MAC-C0T] 판 번호로 못 쓰는 n= — guest 로 엶:', h.n); return null; })();
+const SID = (C0N || QS.get('sid') || 'guest').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40) || 'guest';   // ?sid=<학생id>, 없으면 guest (G5 훅) · [MAC-C0T] 판 + #n= 이면 그 번호(위 C0N)
 const SAVE_KEY = 'rpg.village.' + SID + stageKeyPart();   // [MAC-STAGE] 판마다 따로 — ?stage 가 없으면(기본 판) 옛 키 그대로
 /* ══════════════════════════════════════════════════════════════
    [MAC-STAGE] 판(스테이지) 파일 — 엔진 제안서 ② (docs/village_engine_proposal.md · docs/village_socialsim_absorb.md C1·C2·C4·C10)
@@ -11529,6 +11548,38 @@ window.__stageKeep = () => ({ 켜짐: window.VRULES.stageKeep.on, ...SKEEP.stats
 { hookAdd('goalTick', function (next, args) { const r = next(args);
     if (STAGE.def && STAGE.goals.length && !STAGE.saidEnd && STAGE.goals.every(g => goalsDone.has(g.id))) { STAGE.saidEnd = true; if (typeof stageCardEnd === 'function' && window.VRULES.stageCard && window.VRULES.stageCard.on) stageCardEnd('목표'); else if (STAGE.def.되돌아보기) sayOnce('🎉 ' + STAGE.def.되돌아보기, true); }   // [MAC-STAGECARD] 끝 카드
     return r; }); }
+/* ── [MAC-C0T] PA-12 C0-T 기기 기록 — 판 + #n= 이면 그 번호가 SID · 3시간이 지나면 그 번호의 이 판 기록을 지우고 새로 · #기록지움 = 이 기기 이 판의 번호 전부 (기획 build/B §B-4 · build/D §C0-H · 엔진 사실 H17 #9 · #10) ──
+   공용 기기에서 다음 반 같은 번호가 앞 반 마을을 열지 않게 — 교사가 기기마다 지우지 않아도 된다.
+   ① 번호 = 위 C0N(해시 낱말 n=). 저장 키 rpg.village.<번호>.<판> · 판 카드 rpg.stagecard.<번호>.<판> 이 번호로 갈린다. #n= 없는 판(guest · ?sid=) · 기본 마을 · 구경은 지금과 같다.
+   ② 3시간 — 시각 키 rpg.stagetime.<번호>.<판>(벽시계 ms · 저장 글 밖이라 저장 왕복 0). 열 때와 저장이 될 때(module 끝 saveNow 감싸기) 지금으로 적는다.
+      열 때 지금 − 시각 > 3시간이면 c0tKeys 를 지운다 → 바로 아래 판 읽기가 시작 저장본을 새로 깐다(지난 시도로도 안 남김 · 말 없음 — 시작 카드가 첫날부터 다시 뜨는 것이 표시).
+      시각 키가 없으면(처음 · 옛 저장본) 지우지 않고 적기만 · 기기 시계가 뒤로 가 지금 < 시각이면 지우지 않음 · 번호마다 따로 센다.
+   ③ #기록지움(twoClear 가 c0tClear 를 부름) — 이 판의 시각 키가 있는 번호만 모아(guest · ?sid= 의 자유 마을 곁 키는 안 건드림) 모두 지우고 저장을 끈 뒤 reopenUrl(?r=) + 남은 해시로
+      진짜로 다시 싣는다 — 해시가 붙은 주소의 location.replace(같은 주소 + #…)는 조각 이동이라 다시 싣지 않아 옛 마을이 화면에 남는다. 해시는 기록지움만 뺀다(n= 이 남아 같은 번호가 시작 저장본부터) ·
+      토스트는 다시 실린 판에서(sessionStorage 표지 하나 — localStorage 새 키 0) · 떠나는 판은 판 카드 기록을 안 쓴다(module 끝).
+   지우는 키는 c0tKeys 한 곳 — SID 로 갈린 키를 새로 만들면 여기에 더한다(저장 키 .backup · .broken · 판 카드 .지난놓은 · 곁 키의 .offered · .물없음 은 뒤붙이로 함께).
+   여기서는 scardKey · GUIDE_KEY · savingOff 를 쓰지 않는다(뒤에 선언 — TDZ) — 키를 글자로 만든다. 판 파일을 받기 전이라 판 `규칙` 으로는 못 끈다.
+   스위치 VRULES.c0t(rules.json '저장·안전') — on:false = 3시간 지움 · 시각 키 · 넓힌 #기록지움 끔(옛 몸 — 그 번호 카드 기록만 · #n= 읽기는 남음). 판정 0 · 저장 글 0. 시험 훅 __c0t() · __c0hash(). */
+(window.VRULES = window.VRULES || {}).c0t = { on: true, 시간: 3 };
+const C0T = { 번호: C0N, 지움: 0, 지운키: [], 시각: null, 떠남: false, 기록지움: null, 다시실린뒤: null, stats: { 시각씀: 0, 저장시각: 0, 떠남막음: 0 } };
+function c0tKeys(sid, id) { const 마을 = 'rpg.village.' + sid + '.' + id, 카드 = 'rpg.stagecard.' + sid + '.' + id, 판 = [마을, 마을 + '.backup', 마을 + '.broken', 카드, 카드 + '.지난놓은', 'rpg.stagetime.' + sid + '.' + id];
+  const 번호 = ['rpg.guide.', 'rpg.album.', 'rpg.snap.', 'rpg.like.', 'rpg.village.title.', 'rpg.village.awaySeen.', 'rpg.village.jobsNews.'].map(p => p + sid), 모두 = [];
+  try { for (let i = 0; i < localStorage.length; i++) 모두.push(localStorage.key(i)); } catch (e) {}   // Object.keys(localStorage) 는 도구의 가짜 저장소에서 키를 안 준다
+  return 모두.filter(k => k != null && (판.includes(k) || 번호.some(p => k === p || k.startsWith(p + '.')))); }   /* 앞머리만 같은 다른 번호(c3-0 ↔ c3-07)는 안 건드림 */
+function c0tDrop(keys) { keys.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); return keys; }
+if (STAGE.id && C0N && window.VRULES.c0t.on) { const tk = 'rpg.stagetime.' + SID + '.' + STAGE.id, now = Date.now(); let last = null;
+  try { const v = localStorage.getItem(tk); last = v == null ? null : Number(v); } catch (e) {} C0T.시각 = last;
+  if (Number.isFinite(last) && last > 0 && now - last > window.VRULES.c0t.시간 * 3600e3) { C0T.지운키 = c0tDrop(c0tKeys(SID, STAGE.id)); C0T.지움++; }
+  try { localStorage.setItem(tk, String(now)); C0T.stats.시각씀++; } catch (e) {} }
+/* #기록지움 — twoClear([MAC-TWOTRY] ④)가 부른다 · 번호 판(C0N)이 아니거나 꺼져 있으면 false(옛 몸) */
+function c0tClear() { if (!STAGE.id || !C0N || !window.VRULES.c0t.on) return false;
+  const re = /^rpg\.stagetime\.([A-Za-z0-9_-]{1,40})\.([a-z0-9-]{1,40})$/, sids = [];
+  try { for (let i = 0; i < localStorage.length; i++) { const m = re.exec(localStorage.key(i) || ''); if (m && m[2] === STAGE.id && !sids.includes(m[1])) sids.push(m[1]); } } catch (e) {}
+  const ks = c0tDrop([].concat(...sids.map(s => c0tKeys(s, STAGE.id))));
+  clearTimeout(saveTimer); savingOff = true; C0T.떠남 = true; SCARD.rec = null; TWO.stats.기록지움++; C0T.기록지움 = { 번호: sids.slice(), 키: ks.length };
+  try { sessionStorage.setItem('rpg.c0t.wiped.' + STAGE.id, String(sids.length)); } catch (e) {}
+  location.replace(reopenUrl() + c0hPick(k => k !== '기록지움'));
+  return true; }
 if (STAGE.id) {
   window.VillageSync = null;   // 판은 원격 동기를 쓰지 않는다(저장은 이 기기에만 · 키도 따로)
   try {
@@ -13904,7 +13955,7 @@ function twoNow() { const gs = STAGE.goals, e = typeof predDef === 'function' ? 
 function twoLine(lab, p, r) { const e = typeof predDef === 'function' ? predDef() : null, g = e && e.결과;
   return '<div class="pend"><b>' + lab + '</b> ' + [p && p.글 ? '🤔 ' + scardEsc(p.글) : '', r.목표 ? '🎯 ' + r.목표[0] + '/' + r.목표[1] : '', r.값 != null && g && g.t ? scardEsc(g.t) + ' ' + scardEsc(r.값) : '', g && g.셈 === 'pop' && r.값 != null ? '' : '👥 ' + r.인구 + '명'].filter(Boolean).join(' · ') + '</div>'; }   // 결과가 인구면 👥 는 겹쳐 뺀다
 /* ↺ 처음부터 — 두 곳(ACT-STAGERESET · 모형 화면 단추 줄)이 부른다 */
-function stageResetKeep() { const R = window.VRULES.twoTry, go = () => location.replace(location.pathname + location.search);
+function stageResetKeep() { const R = window.VRULES.twoTry, go = () => location.replace(reopenUrl() + c0hKeep());   // [MAC-C0T] ?r= 로 진짜 다시 싣고 남는 해시 낱말(#n= 등)만 지킨다 — 끝 · fresh 는 버림(처음부터 · 빈 판에서 나옴)
   try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) {}
   if (!R || !R.on || !STAGE.id) { try { localStorage.removeItem(scardKey()); } catch (e) {} go(); return; }
   const rec = scardLoad(), 지난 = { t: Date.now(), 셈: scardCounts(), 예상: rec.예상 || null, ...twoNow(), 사진: null };
@@ -13931,7 +13982,8 @@ function stageResetKeep() { const R = window.VRULES.twoTry, go = () => location.
     pn.insertAdjacentHTML('afterend', '<div class="pn">지난번: ' + [L.예상 && L.예상.글 ? '🤔 ' + scardEsc(L.예상.글) : '짐작 없음', L.목표 ? '🎯 ' + L.목표[0] + '/' + L.목표[1] : '', L.값 != null && g && g.t ? scardEsc(g.t) + ' ' + scardEsc(L.값) : ''].filter(Boolean).join(' · ') + '</div>');
     return r; }; }
 /* ④ 교사 — 판 카드 기록 지우기. 열 때(#기록지움 을 붙여 연 주소)와 열린 뒤(주소 끝만 바꾸면 다시 불러오지 않는다 — hashchange) 둘 다 */
-function twoClear(open) { if (!STAGE.id || !window.VRULES.twoTry.on || !/(^|,)기록지움(,|$)/.test(decodeURIComponent(location.hash.slice(1)))) return;
+function twoClear(open) { if (!STAGE.id || !window.VRULES.twoTry.on || !c0Hash().기록지움) return;   /* [MAC-C0T] 해시 낱말로 읽는다(쉼표 · & · 못 푸는 % 에도 안 멈춤) */
+  if (c0tClear()) return;   /* [MAC-C0T] 판 + #n= — 이 기기 이 판의 번호 전부를 지우고 진짜로 다시 싣는다 */
   try { localStorage.removeItem(scardKey()); } catch (e) {} SCARD.rec = null; TWO.stats.기록지움++;
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
   setTimeout(() => toast('🧽 이 판의 카드 기록(첫날·지난 시도·짐작)을 지웠어요' + (open ? '' : ' — 다시 열면 첫 카드부터'), true), open ? 900 : 0); }
@@ -14575,7 +14627,7 @@ function voteReset(quiet) {
   if (!quiet) { askCard({ q: '처음 상태로 되돌릴까요?', sub: '이번에 한 것은 남지 않아요.', ok: '↺ 처음부터' }, () => voteReset(true)); return false; }   /* [ACT-ASKCARD] 게임 안 카드로 — 예를 누르면 조용히 다시 */
   VOTE.stats.되돌린횟수++; VOTE.표 = null; VOTE.적용 = null; VOTE.미리 = null;
   try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) { console.warn('[MAC-VOTE] 되돌리기', e); }
-  location.replace(location.href);   // 판 파일의 `시작` 저장본이 다시 깔린다 → 앞 실행의 흔적 0
+  location.replace(reopenUrl() + c0hKeep());   // 판 파일의 `시작` 저장본이 다시 깔린다 → 앞 실행의 흔적 0 · [MAC-C0T] ?r= 로 진짜 다시 싣는다(같은 주소 + #… 는 조각 이동) · 남는 해시 낱말(#n= 등)만 — fresh 가 남으면 시작 저장본이 안 깔린다
   return true;
 }
 
@@ -14735,6 +14787,17 @@ function voteKeepFind() { const d = voteDef(); if (!d || VOTE.적용 || !window.
   if (!c) return null; VOTE.적용 = c.id; VOTE.표 = {}; d.후보.forEach(q => { VOTE.표[q.id] = votePreviewCalc(q.id); }); VKEEP.stats.되찾음++; if (VOTE.el) voteDraw(); return c.id; }
 voteKeepFind();
 window.__voteKeep = () => ({ 켜짐: window.VRULES.voteKeep.on, 적용: VOTE.적용, 표: VOTE.표 ? Object.keys(VOTE.표) : null, 결정시설되살림: SKEEP.stats.결정시설, ...VKEEP.stats });
+/* ── [MAC-C0T] 끝 — 저장이 되면 시각 키를 지금으로 · #기록지움 뒤 다시 실린 판에 토스트 · 떠나는 판(c0tClear 뒤 다시 싣는 동안)은 판 카드 기록을 안 쓴다 ──
+   '저장이 됐다' = saveNow 가 막히지 않고(savingOff — 더 새 저장본 지킴 FRESH 도 savingOff 를 켬) 저장소에 썼다(STORAGE_OK · saveBroken 아님). saveNow · scardSave 는 hookable 이 아니라 다시 대입(부르는 곳은 모두 이름으로). */
+{ const sn0 = saveNow; saveNow = function () { const r = sn0.apply(this, arguments);
+    if (STAGE.id && C0N && window.VRULES.c0t.on && !savingOff && STORAGE_OK && !saveBroken) { try { localStorage.setItem('rpg.stagetime.' + SID + '.' + STAGE.id, String(Date.now())); C0T.stats.저장시각++; } catch (e) {} }
+    return r; };
+  const ss0 = scardSave; scardSave = function () { if (C0T.떠남) { C0T.stats.떠남막음++; return; } return ss0.apply(this, arguments); }; }
+if (STAGE.id && !C0T.떠남) { const k = 'rpg.c0t.wiped.' + STAGE.id; let n = null; try { n = sessionStorage.getItem(k); if (n != null) sessionStorage.removeItem(k); } catch (e) {}
+  if (n != null) { C0T.다시실린뒤 = Math.max(0, parseInt(n, 10) || 0); setTimeout(() => toast('🧽 이 기기에서 이 판의 기록을 모두 지웠어요(번호 ' + C0T.다시실린뒤 + '개)', true), 900); } }
+window.__c0t = () => { let 시각키 = null; try { 시각키 = STAGE.id && C0N ? localStorage.getItem('rpg.stagetime.' + SID + '.' + STAGE.id) : null; } catch (e) {}
+  return { 켜짐: window.VRULES.c0t.on, ...C0T, 지운키: C0T.지운키.slice(), stats: { ...C0T.stats }, 시각키 }; };
+window.__c0hash = () => c0Hash();
 </script>
 </body>
 </html>

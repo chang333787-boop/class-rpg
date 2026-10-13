@@ -8,7 +8,9 @@
   - 이것이 없을 때는 부하가 크면 값이 흔들렸다. 싣기 끝의 첫 그리기(loop)가 싣는 데 걸린 시간만큼 틱을 미리 돌렸고(1~2틱), 땅 고르기가 '진짜 30초' 뒤 저절로 열렸다.
   - 틱 시간은 진짜 시계로 따로 잰다(`__tickBench` 의 `틱평균ms` · run.mjs 끝줄 '틱 시간').
   - 벽시계를 일부러 빨리 돌려 보는 시험 도구가 `wallclock.mjs` 다(`NODE_OPTIONS=--import=…/wallclock.mjs` · test.mjs '벽시계를 흔들어도 판정 값이 같다').
-- **운영에 안 닿는다**: `fetch`·XHR·WebSocket 을 모두 거절한다(쓰려 한 횟수는 결과 `네트워크` 에 센다 — 0 이어야 한다). sync.js 는 싣지 않는다. sid 는 늘 guest.
+- **운영에 안 닿는다**: `fetch`·XHR·WebSocket 을 모두 거절한다(쓰려 한 횟수는 결과 `네트워크` 에 센다 — 0 이어야 한다). sync.js 는 싣지 않는다. sid 는 guest(판 + 해시 `n=` 이면 그 번호 — 가짜 저장소 안에서만).
+- **주소 옮기기는 적기만 한다**(`[MAC-C0T]`): `location.replace` · `assign` · `reload` 는 `window.__simNav` 에 `{ 어떻게, 주소, 다시싣기 }` 로 적는다(같은 문서 주소 + `#…` 는 브라우저처럼 조각 이동 — 다시싣기 false · 해시만 바뀜) · `history.replaceState` 는 주소만 바꾼다.
+  `loadVillage` 의 `store`(미리 넣을 localStorage 키) · `session`(sessionStorage — 따로 · `window.__simSession`)으로 시험 판을 꾸민다.
 - 모델 glb 도 불러오지 못한다 → 프리미티브 모양으로 돈다. 모양만 다르고 셈은 같다.
 - 판마다 새 node 프로세스를 띄운다(모듈 상태가 전역이라서). 기본 동시 6개. 하루(1800틱)에 약 2초.
 
