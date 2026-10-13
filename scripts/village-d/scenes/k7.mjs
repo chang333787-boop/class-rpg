@@ -7,6 +7,11 @@
 // ② 탐정 판 가게 누름 — empty-shop-ga [시작] → 가게 마을 단추 → 가게(129,138)를 실제로 누름: ✨ 0(__k7().반짝 · whereGo 짚음 그대로) · 토스트 '빈 선반이에요' · '끊겼' 0
 //    양성 대조: 3층 사본(임시 판) → ✨ ≥ 1 · 토스트 '끊겼어요'
 // ③ 🔗 공급 경로 보기(가게 마을 단추 줄) — 2층 토스트 '✂️ 여기예요'(꼬리 0) · ✨ ≥ 1(그대로) / 3층 사본 '… 이으면 가게에 닿아요'
+// ⑤ (PA-07 고침) 진짜 주민 — 가짜 시계 2배속으로 흘려 지금 뜬 💬 바람 · 🛒? 풍선 주민의 카드 글(주민을 누르면 뜨는 folkCard · __k7Cards):
+//    2층 바람 글 '있으면 좋겠어요' 0 · '💬 가게에 물건이 없어요 — ' / 3층 사본 '있으면 좋겠어요' · 🛒? 풍선 뜻 = 집 카드와 같은 '가게에 물건이 없어요'(층과 무관) ·
+//    양성 대조: 같은 순간 VRULES.flowSay 를 끄면 옛 말('가게가 멀어요' · 3층은 '— 집 가까이 지어 주세요')
+// ⑨ (PA-07 고침) 빈 가게 문 앞 팻말 — ⑤ 로 판 시계가 흐른 뒤 가게 마을로 다시 가 사진: 2층 __flowShape(129,138).까닭 null(팻말째 안 섬 · 조각 적음) / 3층 사본 '길'
+//    (그리기 틱 fsTick 은 30틱마다라 [시작] 바로 뒤엔 2층 · 3층 모두 null — 다시 합친 수 ≥ 1 로 틱이 돌았나도 봄)
 // ④ 길 끌기 — 수업 판(lesson0 · 트레이 길)에서 길 카드를 고르고 빈 땅을 끌면 #roadTag 0번 · 길은 여러 칸 놓임(끌어 놓기는 원래 동작)
 //    판 규칙 roadLine 켬(임시 판 · 💬 는 꺼진 채) → 이름표 생김 · position fixed(💬 style 없이도 이름표 모양) / 양성 대조: 자유 모드(pop88) → 이름표 생김
 // 임시 판(zz-dk7-*)은 장면 안에서 쓰고 끝에 지운다(try/finally · 커밋 안 함). 판 쪽 페이지는 바깥 시도 0 을 함께 본다.
@@ -96,7 +101,27 @@ export default async function k7(ctx) {
       await ctx.pump(2); const rt = await toastNow(), r1 = await P('window.__k7().반짝'); out['③' + 층] = { 토스트: rt, 반짝: r1 - r0 };
       if (층 === 2) ctx.expect(rt === '✂️ 여기예요' && r1 - r0 >= 1, '③ 🔗 공급 경로 — 2층 토스트 꼬리 0 · ✨ 그대로 ' + J(out['③2']));
       else ctx.expect(/이으면 가게에 닿아요$/.test(rt) && r1 - r0 >= 1, '③ 양성 대조 — 3층 공급 경로 토스트 꼬리 있음 ' + J(out['③3']));
+      /* ⑤ 진짜 주민 — 2배속으로 흘리며 지금 뜬 💬 바람 · 🛒? 풍선 주민의 카드 글을 모은다(같은 순간 flowSay 를 끈 글 = 양성 대조) */
+      await E(`window.__setSpeed(2); return 1`); const 본 = { 바람: [], 풍선: [], 끈말: [], 장: 0 };
+      for (let k = 0; k < 60 && !(본.바람.length && 본.풍선.length); k++) { await ctx.pump(60); 본.장 += 60;
+        const cs = await P(`(() => { const a = window.__k7Cards(), s = a.filter(c => c.풍선 === '장보기'); if (!s.length) return { a, 끈: [] };
+          window.VRULES.flowSay.on = false; const b = window.__k7Cards().filter(c => c.풍선 === '장보기'); window.VRULES.flowSay.on = true; return { a, 끈: b }; })()`);
+        cs.a.forEach(c => { if (c.바람 && !본.바람.includes(c.글)) 본.바람.push(c.글); if (c.풍선 === '장보기' && !본.풍선.includes(c.글)) 본.풍선.push(c.글); });
+        cs.끈.forEach(c => { if (!본.끈말.includes(c.글)) 본.끈말.push(c.글); }); }
+      await E(`window.__setSpeed(0); return 1`); out['⑤' + 층] = 본;
+      const 뜻 = t => String(t).split('\n')[1] || '';
+      if (층 === 2) ctx.expect(본.바람.length && 본.바람.every(t => !/있으면 좋겠어요/.test(t) && /^💬 가게에 물건이 없어요 — /.test(t)), "⑤ 2층 진짜 바람 주민 카드 '있으면 좋겠어요' 0 · 그 집 현상 말 " + J(본.바람));
+      else ctx.expect(본.바람.length && 본.바람.every(t => /있으면 좋겠어요/.test(t)), "⑤ 양성 대조 — 3층 사본 진짜 바람 주민 카드 '있으면 좋겠어요' " + J(본.바람));
+      ctx.expect(본.풍선.length && 본.풍선.every(t => 뜻(t) === '머리 위 🛒? 가게에 물건이 없어요'), `⑤ ${층}층 진짜 🛒? 풍선 주민 카드 = 집 카드와 같은 까닭('가게에 물건이 없어요') ` + J(본.풍선));
+      ctx.expect(본.끈말.length && 본.끈말.every(t => 뜻(t) === (층 === 2 ? '머리 위 🛒? 가게가 멀어요' : '머리 위 🛒? 가게가 멀어요 — 집 가까이 지어 주세요')), `⑤ 양성 대조 — 같은 순간 flowSay 끄면 옛 말(${층}층) ` + J(본.끈말));
+      /* ⑨ 빈 가게 문 앞 팻말 — ⑤ 로 판 시계가 흐른 뒤(그리기 틱 fsTick 은 30틱마다 · [시작] 바로 뒤엔 아직 안 돎 — 그때 읽으면 2층 · 3층 모두 null 인 헛 PASS) ·
+         가게 마을로 다시 가 사진 · 그리기 틱이 적은 까닭 · 그 가게의 조각 수(partsOf) · 다시 합친 수 ≥ 1(틱이 돌았다는 표) */
+      await shopTown(); await ctx.shot('팻말_' + 층 + '층');
+      const 표 = await P(`(s => ({ 가게: s.가게 || null, 까닭: s.까닭 || null, 조각수: s.조각수, 다시합침: s.다시합침, 팻말셈: window.__k7().팻말 }))(window.__flowShape(129, 138))`); out['⑨' + 층] = 표;
+      if (층 === 2) ctx.expect(표.가게 === 'empty' && 표.까닭 === null && 표.다시합침 >= 1 && 표.팻말셈 >= 1, '⑨ 2층 빈 가게 문 앞 팻말 까닭 그림 0(그리기 틱이 돈 뒤) ' + J(표));
+      else ctx.expect(표.가게 === 'empty' && 표.까닭 === '길' && 표.다시합침 >= 1 && 표.팻말셈 === 0, "⑨ 양성 대조 — 3층 사본 팻말 까닭 '길' " + J(표));
       ctx.expect(outside() === o0, `②③ ${st} 바깥 시도 0`); }
+    ctx.expect(out['⑨2'] && out['⑨3'] && out['⑨2'].조각수 < out['⑨3'].조각수, '⑨ 2층 가게 조각이 3층보다 적음(팻말 · 까닭 그림이 실제로 안 그려짐) ' + J([out['⑨2'], out['⑨3']]));
     /* ── ④ 길 끌기 — 수업 판(끔) · 판 규칙 켬 · 자유 모드 ── */
     for (const [st, save, 켬] of [['lesson0', null, false], ['zz-dk7-road', null, true], [null, 'pop88', true]]) { const o0 = outside(), 이름 = st || '자유 모드(pop88)'; await fresh(st, save); await closeCards();
       await E(`window.__setSpeed(0); return 1`); await ctx.pump(30); await ctx.sleep(2300); await ptsMap();

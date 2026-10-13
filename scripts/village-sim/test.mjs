@@ -582,7 +582,13 @@ test('트레이: 트레이 판에서도 모르는 종류는 run.mjs 가 멈춘�
        일터 cut 집 '💼 길이 끊겨 일터에 못 가요' · 문 앞 ✨ 0 · 💼 칩 일터 ✨(__k7Point) 0 / 3층 사본은 📚 · 🛣️ · 넓힐 자리 없음 · ✨ · 긴 말 꼬리 · '…지어 봐요' ·
        '💼 길 1칸만 이으면 일터에 닿아요' · ✨(139,144)가 있다(양성 대조)
    (바) 💬 · 길 끌기 — ?stage= 판(help-places · 2층 · 3층) 켜짐 false · false · W·A·S·D 켬 / 판 규칙 chirp 켬 → 💬 true(길 끌기 false 그대로) / 자유 모드(pop88) 셋 다 true · K7 길 0
-   (사) 되돌리기 — 2층 판을 연 뒤 VRULES.k7.on = false · 판 규칙 k7 끔 → 3층 사본과 같은 글 · ✨ · 권유 / ③ flowEnd: 결과값 판은 쓰는판 false · k7 끄면 true · proto-flow true */
+   (사) 되돌리기 — 2층 판을 연 뒤 VRULES.k7.on = false · 판 규칙 k7 끔 → 3층 사본과 같은 글 · ✨ · 권유 / ③ flowEnd: 결과값 판은 쓰는판 false · k7 끄면 true · proto-flow true
+   PA-07 고침(반박 검증 🟡 · 10-13) — zz-k7-na3 = empty-shop-na 사본 · 안내최대층 3:
+   (가′) 진짜 바람 주민(합성 아님 · __k7Cards) — 2층(ga · na) 300틱 뒤 바람 주민 카드 글에 '있으면 좋겠어요' 0 · 그 집 카드의 현상 말('💬 가게에 물건이 없어요 — ') /
+        3층 사본은 '있으면 좋겠어요' · 바람이 생긴 셈(나옴 · 누구 · 어느 집 · 무엇)은 2층 = 3층(생성 그대로 — 글만) · 판 규칙 k7 끔 · 연 뒤 끔 = 3층
+   ⑨ 빈 가게 문 앞 팻말 — __flowShape(129,138).까닭 2층(ga · na) null · 조각수 3층보다 적음(팻말째 안 섬) / 3층 사본 ga '길' · na '밭' · 판 규칙 k7 끔 '길'
+   ⑪ (층과 무관 · 맞는 말로 고침) 풍선 뜻 🛒? — 집 카드가 '가게에 물건이 없어요'인 집은 __k7Folk('장보기', x, y) = '머리 위 🛒? 가게에 물건이 없어요'(2층 · 3층 모두) ·
+        그 밖의 집(proto-flow — 흐름 판이지만 몫을 못 받은 집이 아님)은 '가게가 멀어요' 그대로 / flowSay 끄면 옛 말('— 집 가까이 지어 주세요') · 자유 모드(흐름 없음) 0 */
 const k7One = c => new Promise(done => {
   const src = `import { loadVillage } from ${JSON.stringify(path.join(HERE, 'load.mjs'))};
 const { w } = await loadVillage({ root: ${JSON.stringify(ROOT)}, saveText: ${c.save ? `(await import('node:fs')).readFileSync(${JSON.stringify(path.join(ROOT, c.save))}, 'utf8')` : 'null'}, seed: 1, hash: 'hour=10', query: ${JSON.stringify(c.stage ? 'stage=' + c.stage : '')} });
@@ -591,11 +597,13 @@ ${c.pre || ''}
 w.__tickBench(${c.ticks || 300});
 ${c.post || ''}
 const 물건 = w.__snapshot().물건.map(t => /^([a-z0-9_]+)@(\\d+),(\\d+)/.exec(t)).filter(Boolean).map(m => [m[1], +m[2], +m[3]]);
-const 집 = 물건.filter(o => o[0] === 'house').map(([, x, y]) => ({ at: [x, y], 글: w.__houseText(x, y), 짚: w.__where(x, y).짚을칸, 일: w.__k7Job(x, y) || '' }));
+const 집 = 물건.filter(o => o[0] === 'house').map(([, x, y]) => ({ at: [x, y], 글: w.__houseText(x, y), 짚: w.__where(x, y).짚을칸, 일: w.__k7Job(x, y) || '', 풍: w.__k7Folk('장보기', x, y) }));
 const 흐름 = 물건.filter(o => o[0] !== 'house').map(([k, x, y]) => { const f = w.__flowAt(x, y); return f && f.카드 != null ? { k, at: [x, y], 카드: f.카드, 짚: w.__where(x, y).짚을칸 } : null; }).filter(Boolean);
 const 주민 = ['장보기', '놀이', '쉼', '배움', '건강', '붐빔', '삭막', '일자리'].map(k => w.__k7Folk(k)), 얼굴 = [1, 2].map(n => w.__bhFolk({ faceShow: n, faceUntil: Infinity }));
+const 바람 = w.__k7Cards().filter(c => c.바람).map(c => c.글), 바람셈 = (s => ({ 나옴: s.나옴, 지금: s.지금.map(o => [o.이름, o.집, o.바람]) }))(w.__wishes());
+const 표 = (s => ({ 가게: s.가게 || null, 까닭: s.까닭 || null, 조각수: s.조각수 == null ? null : s.조각수 }))(w.__flowShape(129, 138));
 const 공급 = ${c.route ? 'w.__k7Route()' : 'null'}, 일터점 = ${c.point ? `w.__k7Point(${c.point.join(', ')})` : 'null'};
-process.stdout.write('@@' + JSON.stringify({ 집, 흐름, 주민, 얼굴, 공급, 일터점, 권유: w.__stageHint().판권유, k7: w.__k7(), 채팅: w.__chirp().켜짐, 길끌기: w.__roadLine().켜짐, wasd: w.VRULES.wasd.on, 끝: w.__flowEnd().쓰는판 }) + '\\n', () => process.exit(0));`;
+process.stdout.write('@@' + JSON.stringify({ 집, 흐름, 주민, 얼굴, 바람, 바람셈, 표, 공급, 일터점, 권유: w.__stageHint().판권유, k7: w.__k7(), 채팅: w.__chirp().켜짐, 길끌기: w.__roadLine().켜짐, wasd: w.VRULES.wasd.on, 끝: w.__flowEnd().쓰는판 }) + '\\n', () => process.exit(0));`;
   const p = spawn(process.execPath, ['--input-type=module', '-e', src], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let out = '', err = '';
   p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8'); p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { err += d; });
   p.on('close', () => { const l = out.split('\n').find(x => x.startsWith('@@')), e = (err || out).trim().split('\n');
@@ -614,9 +622,10 @@ process.stdout.write('@@' + JSON.stringify({ 집, 흐름, 주민, 얼굴, 공급
     { n: 'full2', stage: 'zz-k7-full2', post: 다시이음 }, { n: 'full3', stage: 'zz-k7-full3', post: 다시이음 },
     { n: 'mid2w', stage: 'zz-k7-mid2', pre: 넓힘끔 }, { n: 'mid3w', stage: 'zz-k7-mid3', pre: 넓힘끔 },
     { n: 'hp', stage: 'help-places' }, { n: 'chirp', stage: 'zz-k7-chirp' }, { n: '기본', stage: null, save: 'village/stages/boards/pop88.json' },
-    { n: 'end', stage: 'zz-k7-end' }, { n: 'endoff', stage: 'zz-k7-end', post: 끔 }, { n: 'pf', stage: 'proto-flow' }];
+    { n: 'end', stage: 'zz-k7-end' }, { n: 'endoff', stage: 'zz-k7-end', post: 끔 }, { n: 'pf', stage: 'proto-flow' },
+    { n: 'na3', stage: 'zz-k7-na3' }, { n: 'gasay', stage: 'zz-k7-ga3', pre: 'w.VRULES.flowSay.on = false;' }];   /* PA-07 고침 — 빈 가게 na 3층 사본 · 집 카드 흐름 말(flowSay)을 끈 3층 사본 */
   const R = {};
-  try { put('zz-k7-ga3', { ...ga, 안내최대층: 3 }); put('zz-k7-garule', { ...ga, 규칙: { ...(ga.규칙 || {}), k7: { on: false } } });
+  try { put('zz-k7-ga3', { ...ga, 안내최대층: 3 }); put('zz-k7-garule', { ...ga, 규칙: { ...(ga.규칙 || {}), k7: { on: false } } }); put('zz-k7-na3', { ...바탕('empty-shop-na'), 안내최대층: 3 });
     put('zz-k7-hint', { ...바탕('onebridge'), 안내최대층: 2 });
     put('zz-k7-pop2', { ...판('stages/boards/pop88.json'), 안내최대층: 2 }); put('zz-k7-pop3', { ...판('stages/boards/pop88.json'), 안내최대층: 3 });
     put('zz-k7-mid2', { ...판('stages/boards/mid36.json'), 안내최대층: 2 }); put('zz-k7-mid3', { ...판('stages/boards/mid36.json'), 안내최대층: 3 });
@@ -629,10 +638,10 @@ process.stdout.write('@@' + JSON.stringify({ 집, 흐름, 주민, 얼굴, 공급
   } finally { made.forEach(f => fs.rmSync(f, { force: true })); }
   const J = JSON.stringify, 꼬리 = /주세요|봐요|보세요|이으면|볼까요|하나 더/, 줄 = r => [...r.주민, ...r.얼굴], 글 = r => r.집.map(h => h.글);
   const at = (r, x, y) => (r.흐름.find(f => f.at[0] === x && f.at[1] === y) || {}), 짚음 = r => [...r.집, ...r.흐름].filter(o => o.짚 && o.짚.length).length, 셈 = (r, k) => r.k7[k] | 0;
-  const K7S = ['권유', '주민', '흐름카드', '짚기', '집', '일자리', '일터반짝', '공급'];
+  const K7S = ['권유', '주민', '흐름카드', '짚기', '집', '일자리', '일터반짝', '공급', '팻말', '바람'];
   test('K7: 탐정 판(2층) 주민 · 흐름 카드 · 집 카드 · 💼 긴 말에 할 일 꼬리 0 · ✨ 짚기 0(공급 경로 ✨ 는 그대로) · 권유 null / 3층 사본 · 자유 모드 그대로 · 되돌리기 · 결과값 판 flowEnd 0 · 수업 판 💬 · 길 끌기 기본 끔(판 규칙이 켬)', () => {
     const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
-    const { ga, ga3, gaoff, garule, na, hint, hint3, hintoff, pop2, pop3, mid2, mid3, mid2w, mid3w, pop2b, pop3b, cut2, cut3, full2, full3, hp, chirp, 기본: base, end, endoff, pf } = R;
+    const { ga, ga3, gaoff, garule, na, hint, hint3, hintoff, pop2, pop3, mid2, mid3, mid2w, mid3w, pop2b, pop3b, cut2, cut3, full2, full3, hp, chirp, 기본: base, end, endoff, pf, na3, gasay } = R;
     ok(ga.k7.판층 === 2 && ga.k7.자름 && ga3.k7.판층 === 3 && !ga3.k7.자름, '판층 ' + J([ga.k7, ga3.k7]));
     ok(줄(ga).every(t => !t.includes(' — ') && !꼬리.test(t)) && 줄(ga).filter(Boolean).length === 10 && 셈(ga, '주민') >= 9, '(가) 2층 주민 줄에 꼬리 ' + J(줄(ga)));
     ok(ga3.주민.some(t => /주세요/.test(t)) && ga3.얼굴.every(t => /보세요/.test(t)) && 셈(ga3, '주민') === 0, '(나) 3층 사본 주민 줄 꼬리 없음 — 양성 대조가 안 섬 ' + J(줄(ga3)));
@@ -667,6 +676,25 @@ process.stdout.write('@@' + JSON.stringify({ 집, 흐름, 주민, 얼굴, 공급
     ok(base.채팅 === true && base.길끌기 === true && base.wasd === true && base.k7.판층 === 3 && !base.k7.자름 && K7S.every(k => 셈(base, k) === 0) && 글(base).some(t => /📚 /.test(t)) && 짚음(base) > 0,
       '(바) 자유 모드 셋 다 켬 · K7 길 0 · 집 글 · ✨ 그대로 ' + J({ 셋: [base.채팅, base.길끌기, base.wasd], k7: base.k7 }));
     ok(end.끝 === false && end.k7.끝카드양보 && endoff.끝 === true && !endoff.k7.끝카드양보 && pf.끝 === true, '(사) ③ flowEnd — 결과값 판 0 · k7 끄면 · proto-flow 그대로 ' + J([end.끝, endoff.끝, pf.끝]));
+  });
+  test("K7 고침: 탐정 판(2층) 진짜 바람 주민 카드 '있으면 좋겠어요' 0(생성 그대로) · 빈 가게 팻말 까닭 그림 0 / 3층 사본 그대로 · 풍선 뜻 🛒? 는 집 카드와 같은 까닭(층과 무관)", () => {
+    const bad = C.filter(c => !R[c.n] || R[c.n].오류); ok(!bad.length, '못 돎: ' + bad.map(c => R[c.n] ? R[c.n].오류 : c.n).join(' / '));
+    const { ga, ga3, gaoff, garule, na, na3, gasay, pf, 기본: base } = R, 좋겠 = /있으면 좋겠어요/, 물없음 = /가게에 물건이 없어요/;
+    /* (가′) 진짜 바람 주민 — 2층은 그 집 카드의 현상 말 · 3층은 옛 말 · 바람이 생긴 셈은 같음 */
+    ok([ga, na].every(r => r.바람.length >= 1 && r.바람.every(t => !좋겠.test(t) && /^💬 가게에 물건이 없어요 — /.test(t)) && 셈(r, '바람') >= 1), "(가′) 2층 진짜 바람 주민 카드에 '있으면 좋겠어요' 0 · 그 집 현상 말 " + J([ga.바람, na.바람]));
+    ok([ga3, na3].every(r => r.바람.length >= 1 && r.바람.every(t => 좋겠.test(t)) && 셈(r, '바람') === 0), "(가′) 양성 대조 — 3층 사본 바람 주민 카드 '있으면 좋겠어요' " + J([ga3.바람, na3.바람]));
+    ok(ga.바람셈.나옴 >= 1 && J(ga.바람셈) === J(ga3.바람셈) && J(na.바람셈) === J(na3.바람셈), '(가′) 바람이 생긴 셈(나옴 · 누구 · 어느 집 · 무엇)은 2층 = 3층 — 글만 바꿈 ' + J([ga.바람셈, ga3.바람셈, na.바람셈, na3.바람셈]));
+    ok([gaoff, garule].every(r => J(r.바람) === J(ga3.바람)), '(가′) 되돌리기 — 연 뒤 k7 끔 · 판 규칙 k7 끔 = 3층 사본 바람 글 ' + J([gaoff.바람, garule.바람]));
+    /* ⑨ 빈 가게 문 앞 팻말 — 2층은 까닭 그림 0(팻말째 안 섬) · 3층 · 판 규칙 k7 끔은 그대로 */
+    ok([ga, na].every(r => r.표.가게 === 'empty' && r.표.까닭 === null && 셈(r, '팻말') >= 1) && ga.표.조각수 < ga3.표.조각수 && na.표.조각수 < na3.표.조각수,
+      '⑨ 2층 빈 가게 팻말 까닭 그림 0 · 조각 적음 ' + J({ ga: ga.표, ga3: ga3.표, na: na.표, na3: na3.표 }));
+    ok(ga3.표.까닭 === '길' && na3.표.까닭 === '밭' && garule.표.까닭 === '길' && J(garule.표) === J(ga3.표) && 셈(ga3, '팻말') === 0, "⑨ 양성 대조 — 3층 사본 '길' · '밭' · 판 규칙 k7 끔 '길' " + J({ ga3: ga3.표, na3: na3.표, garule: garule.표 }));
+    /* ⑪ 풍선 뜻 🛒? — 집 카드와 같은 까닭(층과 무관) · flowSay 끄면 옛 말 · 자유 모드 0 */
+    const 맞음 = r => r.집.every(h => 물없음.test(h.글) ? h.풍 === '머리 위 🛒? 가게에 물건이 없어요' : /^머리 위 🛒\? 가게가 멀어요/.test(h.풍 || ''));
+    ok([ga, ga3, na, na3].every(r => r.집.some(h => 물없음.test(h.글)) && 맞음(r)), "⑪ 풍선 뜻 🛒? — 집 카드가 '가게에 물건이 없어요'인 집은 같은 까닭(2층 · 3층) " + J([ga, ga3].map(r => r.집.map(h => [물없음.test(h.글), h.풍]))));
+    ok(pf.집.length >= 1 && pf.집.every(h => !물없음.test(h.글)) && 맞음(pf), "⑪ 흐름 판이라도 몫을 못 받은 집이 아니면 '가게가 멀어요' 그대로(proto-flow) " + J(pf.집.map(h => [h.글, h.풍])));
+    ok(gasay.집.every(h => !물없음.test(h.글) && h.풍 === '머리 위 🛒? 가게가 멀어요 — 집 가까이 지어 주세요') && base.집.length > 0 && base.집.every(h => !물없음.test(h.풍 || '')),
+      '⑪ 양성 대조 — flowSay 끄면 옛 말 · 자유 모드(흐름 없음) 0 ' + J([gasay.집.slice(0, 2).map(h => [h.글, h.풍]), [...new Set(base.집.map(h => h.풍))]]));
   });
 }
 

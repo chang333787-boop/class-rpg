@@ -14281,12 +14281,25 @@ window.__stageReset = () => ({ 켜짐: window.VRULES.stageReset.on, 쓸수있나
    · 스위치 VRULES.k7(rules.json '말') — on:false = 옛 말 · 옛 ✨ 그대로(되돌리기). 판정 · 저장 0. 시험 훅 __k7() · __k7Folk(k) · __k7Route() · __k7Job(x, y) · __k7Point(x, y)
      (__jobWhy 는 연기 셈이 같은 이름으로 덮어 집 까닭 긴 말을 무화면에서 못 읽는다 — 그래서 __k7Job). */
 (window.VRULES = window.VRULES || {}).k7 = { on: true };
-const K7 = { 권유: null, stats: { 권유: 0, 주민: 0, 흐름카드: 0, 짚기: 0, 집: 0, 일자리: 0, 일터반짝: 0, 공급: 0 } };
+const K7 = { 권유: null, stats: { 권유: 0, 주민: 0, 흐름카드: 0, 짚기: 0, 집: 0, 일자리: 0, 일터반짝: 0, 공급: 0, 팻말: 0, 바람: 0 } };
 function k7Lv() { const v = STAGE.def ? STAGE.def.안내최대층 : null; return typeof v === 'number' && v <= 2 ? 2 : 3; }
 function k7Cut() { return !!(window.VRULES.k7 && window.VRULES.k7.on && STAGE.def && k7Lv() <= 2); }
 function k7EndOff() { return !!(window.VRULES.k7 && window.VRULES.k7.on && STAGE.def && STAGE.def.결과값 != null); }
 if (STAGE.def && STAGE.def.권유 != null && k7Lv() <= 2) { K7.권유 = STAGE.def.권유;
   Object.defineProperty(STAGE.def, '권유', { configurable: true, enumerable: true, get: () => { if (!k7Cut()) return K7.권유; K7.stats.권유++; return null; } }); }
+/* ── [MAC-K7] PA-07 고침(반박 검증 🟡 · 10-13) — 탐정 판에서 새던 까닭 그림 · 할 일 둘 + 층과 무관한 거짓 까닭 하나 ──
+   ⑨ 빈 가게 문 앞 팻말의 까닭 그림(fsWhy — 밭 · 길 · 물건) — 2층이면 null: 가게 앞은 제 현상(빈 선반 · 접힌 차양 · 꺼진 진열창)만 · 까닭은 밭 · 길을 눌러 알아낸다.
+      까닭이 없으면 팻말째 안 서는 원래 갈래(fsShopParts) 그대로. fsWhy 는 그리기 틱(fsTick → FSHAPE.까닭 → partsOf)만 부른다 — 흐름 판정 · 목표 값을 읽는 곳 0.
+   ⑩ 💬 바람 주민 카드(folkCard) — '💬 우리 집 근처에 …이 있으면 좋겠어요'(할 일 + 자리)를 2층이면 그 집 카드와 같은 현상 말로(새 말 0):
+      흐름 때문에 못 받은 장보기 '가게에 물건이 없어요'(MAC-FLOWSAY) · 꽉 찬 필요 '…가 꽉 찼어요'(capSayOf) · 그 밖 '…이 멀어요'(satText).
+      바람이 생기고 · 들어지고 · 사라지는 셈(wishTick · simRand 차례 · 머리 위 💬)은 그대로 — 보이는 글만.
+   ⑪ (층과 무관 · 맞는 말로 고침) 풍선 뜻 🛒? — 흐름 때문에 못 받은 집(sat.flowMiss — 가게는 길로 닿는데 몫을 못 받음)에 '가게가 멀어요 — 집 가까이 지어 주세요'는
+      거짓 까닭이었다 → 집 카드와 같은 '🛒? 가게에 물건이 없어요'(할 일 꼬리 없음 · 3층 판 · 흐름 판 모두 · 흐름 없는 판은 sat.flowMiss 가 늘 거짓이라 그대로).
+      스위치는 집 카드 말과 같은 VRULES.flowSay(말 · 끄면 둘 다 옛 말) · ② 감싸기보다 안쪽(고친 말엔 ' — ' 가 없다).
+   시험 훅 __k7Cards()(진짜 주민 — 바람 · 지금 뜬 풍선 주민의 카드 글) · __k7Folk(k, x, y)(그 집 주민인 셈 — 무화면은 풍선이 안 생김). */
+{ FSAY.stats.풍선 = 0; const bf1 = bhFolkLine; bhFolkLine = function (f) { const t = bf1.apply(this, arguments), p = '머리 위 ' + WHY_ICON.장보기 + '? ';
+    if (!t || !window.VRULES.flowSay.on || !f || f.whyShow !== '장보기' || t.indexOf(p) !== 0 || !flowOn()) return t;
+    const st = sat.get(f.home); if (!st || !st.flowMiss) return t; FSAY.stats.풍선++; return p + '가게에 물건이 없어요'; }; }
 { const bf0 = bhFolkLine; bhFolkLine = function () { const t = bf0.apply(this, arguments), i = t && k7Cut() ? t.indexOf(' — ') : -1; if (i < 0) return t; K7.stats.주민++; return t.slice(0, i); };
   const fc0 = flowCardText; flowCardText = function (root) { const t = fc0.apply(this, arguments); if (!t || !k7Cut()) return t;
     const st = flowFieldState(root) || flowStoreState(root), w = st ? ' · ' + flowTxt(st) : null, i = w ? t.indexOf(w) : -1;
@@ -14298,8 +14311,16 @@ if (STAGE.def && STAGE.def.권유 != null && k7Lv() <= 2) { K7.권유 = STAGE.de
   const js0 = jobWhySay; jobWhySay = function () { const t = js0.apply(this, arguments), i = t && k7Cut() ? t.indexOf(' — ') : -1; if (i < 0) return t; K7.stats.일자리++; return t.slice(0, i); };
   const jp0 = jobWhyPoint; jobWhyPoint = function () { if (!k7Cut()) return jp0.apply(this, arguments); K7.stats.일터반짝++; return 0; };
   const pr0 = pmapRoute; pmapRoute = function () { const r = pr0.apply(this, arguments); if (r === 'cut' && k7Cut()) K7.stats.공급++; return r; }; }
+function k7WishSay(f) { const k = f.wish.need, st = sat.get(f.home);
+  if (capIsFull(f.home, k)) return capSayOf(k).replace(/^\S+ /, '');
+  if (k === '장보기' && st && st.flowMiss && window.VRULES.flowSay.on) return '가게에 물건이 없어요';
+  return (NEED_TXT[k] || k) + '이 멀어요'; }
+{ const fw0 = fsWhy; fsWhy = function () { if (!k7Cut()) return fw0.apply(this, arguments); K7.stats.팻말++; return null; };
+  const fk0 = folkCard; folkCard = function (f) { const t = fk0.apply(this, arguments), w = f && f.wish && k7Cut() ? wishText(f) : null;
+    if (!w || t.indexOf(w) !== 0) return t; K7.stats.바람++; return '💬 ' + k7WishSay(f) + t.slice(w.length); }; }
 window.__k7 = () => ({ 켜짐: window.VRULES.k7.on, 판층: k7Lv(), 자름: k7Cut(), 끝카드양보: k7EndOff(), 반짝: sparkle.filter(s => s.until > SIM.t).length, ...K7.stats });
-window.__k7Folk = k => bhFolkLine({ whyShow: k, whyUntil: Infinity });
+window.__k7Folk = (k, x, y) => { const rec = x != null && inb(x, y) ? cells[idx(x, y)] : null; return bhFolkLine({ whyShow: k, whyUntil: Infinity, home: rec ? rec.root : -1 }); };
+window.__k7Cards = () => { const now = SIM.t + SIM.acc; return folks.filter(f => f.wish || (f.whyShow && now <= (f.whyUntil || 0))).map(f => ({ 집: [cX(f.home), cY(f.home)], 바람: f.wish ? f.wish.need : null, 풍선: f.wish ? null : f.whyShow, 글: folkCard(f) })); };
 window.__k7Job = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; return rec && rec.k === 'house' ? jobWhySay(rec) : null; };
 window.__k7Point = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; return rec && rec.k === 'house' ? jobWhyPoint([rec.root]) : null; };
 window.__k7Route = () => { let said = null; const t0 = toast; toast = function (m) { said = String(m); return t0.apply(this, arguments); }; let r = null;
