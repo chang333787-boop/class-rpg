@@ -7190,7 +7190,7 @@ function crowdPointDoorCell(rec) { if (!window.VRULES.crowdPoint.문앞 || !rec 
     if (c < 0) { CPOINT.stats.자리없음++; return null; }                                                  // 짚지 않는다 — 말(아래)이 그렇다고 한다
     CPOINT.stats.짚음++; if (c !== r[0]) CPOINT.stats.바꿔짚음++; return [c]; };
   hookAdd('satText', function (next, args) { const [rec] = args; const t = next(args);
-    if (!window.VRULES.crowdPoint.on || !rec || rec.k !== 'house' || !/길이 붐벼요/.test(t) || crowdPointAvenueOff()) return t;
+    if (!window.VRULES.crowdPoint.on || !rec || rec.k !== 'house' || !/길이 붐벼요/.test(t) || crowdPointAvenueOff() || k7Cut()) return t;
     const s = crowdSegOfHome(rec.root); if (s < 0 || crowdPointCell(s) >= 0) return t;
     const say = ' · 🛣️ 이 길은 넓힐 자리가 없어요 — 🖐 로 집을 옮기거나 집 뒤쪽에 길을 한 줄 더 내 봐요';
     return /넓혀 봐요/.test(t) ? t.replace(/ · 🛣️ [^·]*넓혀 봐요[^·]*/, say) : t + say; }); }
@@ -11100,6 +11100,18 @@ function stageIdOf(s) { return String(s || '').replace(/[^a-z0-9\-]/g, '').slice
 function stageKeyPart() { const id = VISIT_SID ? null : stageIdOf(QS.get('stage')); return id ? '.' + id : ''; }
 const STAGE = { id: VISIT_SID ? null : stageIdOf(QS.get('stage')), def: null, err: null, goals: [], saidEnd: false,
   stats: { 규칙수: 0, 모르는규칙: [], 건물수: 0, 모르는건물: [], 목표수: 0, 시작판: false, 막음: 0 } };
+/* ── [MAC-K7] ⓪ (H16 · #1122) 수업 판(?stage=) 기본 = 💬 주민 소식 끔 · 길 끌기 미리 보기 끔 (기획 build/B §B-14 머리 · H3 PA-07 · 엔진 사실 H17 · 10-03 엔진 회신 §1-2) ──
+   💬 는 걱정하는 집 목록(모든 집의 satText)을 한눈에 줘 수업 판의 '알아내기'(집을 눌러 까닭 읽기)를 대신한다 · 길 끌기는 0차시 조작(누르기 · 누르고 누르기) 밖이다.
+   · 판 `규칙` 이 켜면 켠다 — module 끝 stageApplyRules 가 덮는다(그래서 그보다 앞 · 판 파일을 받는 첫 top-level await 앞인 여기). W·A·S·D 는 켬 그대로 · 자유 모드(판 없음)는 셋 다 그대로.
+   · 💬 박자(setInterval 2초)는 판 파일 받기(await)보다 먼저 걸린다 — module 끝에서 끄면 받기가 2초를 넘을 때(학교망 · 크롬북) 단추가 먼저 생기고 남았다.
+     꺼지면 단추 · 창을 지운다(chirpSync 감싸기 — 도중에 꺼도). 길 끌기 이름표 모양은 💬 의 style 안에 있어 💬 가 꺼진 판에서는 이름표 모양만 따로 넣는다(roadTag 감싸기).
+   · 길 끌기 끔 = 곧은 줄 미리 보기만 끈다 — 끌어 여러 칸 놓기(paintStart)는 원래 동작 그대로('끌기 0' 은 PB-01 몫). 판정 · 저장 0 · 원래 줄 수정 0. */
+if (STAGE.id) { window.VRULES.chirp.on = false; window.VRULES.roadLine.on = false; }
+{ const cs0 = chirpSync; chirpSync = function () { if (window.VRULES.chirp.on) return cs0.apply(this, arguments);
+    ['chirpBtn', 'chirp'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); }); CHIRP.open = false; CHIRP.html = ''; };
+  const rt0 = roadTag; roadTag = function (n) { if (n != null && !document.getElementById('chirpCss') && !document.getElementById('roadTagCss')) { const st = document.createElement('style'); st.id = 'roadTagCss';
+      st.textContent = '#roadTag{position:fixed;z-index:9;pointer-events:none;padding:4px 8px;border-radius:6px;background:rgba(20,26,36,.85);color:#fff;font:600 12px/1.3 system-ui,sans-serif;white-space:nowrap}'; document.head.appendChild(st); }
+    return rt0.apply(this, arguments); }; }
 const STAGE_HOOKS = {
   /* [MAC-STAGEOFF] 사는 집 가운데 **필요가 다 찬 집**의 비율(%) — '가까우면 쓸 수 있다'를 목표로 셀 수 있게(3학년 동네 판).
      판정이 아니라 목표 셈이다 — 이미 있는 computeSat 을 읽기만 한다. 사는 집이 없으면 null(아직 못 잰다). */
@@ -13378,7 +13390,7 @@ function pmapRoute() {
   pmapShow('v' + Math.max(0, i));
   cut.자리.forEach(j => sparkle.push({ x: wx(cX(j)) + CS / 2, z: wz(cY(j)) + CS / 2, until: SIM.t + 6000 }));
   camTarget.x = wx(cX(cut.자리[0] != null ? cut.자리[0] : cut.밭.root)); camTarget.z = wz(cY(cut.자리[0] != null ? cut.자리[0] : cut.밭.root));
-  toast('✂️ 여기예요 — 반짝이는 칸에 길 ' + cut.칸 + '칸만 이으면 가게에 닿아요', true);
+  toast('✂️ 여기예요' + (k7Cut() ? '' : ' — 반짝이는 칸에 길 ' + cut.칸 + '칸만 이으면 가게에 닿아요'), true);
   PMAP.stats.짚음 = (PMAP.stats.짚음 || 0) + 1;
   return 'cut';
 }
@@ -14067,7 +14079,7 @@ window.__endCard2 = () => ({ 켜짐: window.VRULES.endCard2.on, 시작땅: EC2.r
 (window.VRULES = window.VRULES || {}).flowEnd = { on: true };
 (window.VRULES = window.VRULES || {}).cardDay = { on: true, hour: 12, clear: true, night: .05 };
 const FEND = { stats: { 값셈: 0, 줄: 0, 첫날값: 0, 낮사진: 0 } };
-const fendOn = () => { const e = typeof predDef === 'function' ? predDef() : null; return !!(window.VRULES.flowEnd.on && STAGE.def && flowOn() && !STAGE.goals.length && !(e && e.결과)); };
+const fendOn = () => { const e = typeof predDef === 'function' ? predDef() : null; return !!(window.VRULES.flowEnd.on && STAGE.def && flowOn() && !STAGE.goals.length && !(e && e.결과) && !k7EndOff()); };
 function fendNow() { const f = window.__flow(); return { 곡식: f.밭.reduce((a, o) => a + o.양, 0), 선반: f.가게.reduce((a, o) => a + o.양, 0), 못받음: f.세대.못받음 }; }
 function fendText(v, v0) { const R = window.VRULES.flow, mk = K[Object.keys(R.만드는곳 || {}).find(k => K[k]) || ''] || {}, a = k => (v0 && v0[k] != null ? v0[k] + ' → ' : '') + v[k];
   return (mk.ic || '📦') + ' 쌓인 ' + (R.물건 || '물건') + ' ' + a('곡식') + ' · 🏪 선반 ' + a('선반') + ' · 🏠 못 받은 집 ' + a('못받음'); }
@@ -14253,6 +14265,66 @@ function stageResetBoot() { if (SRESET.el || !sresetLive()) return;
   el.onclick = stageResetGo; document.body.appendChild(el); SRESET.el = el; SRESET.stats.보임++; }
 setTimeout(stageResetBoot, 700);   /* 판 규칙(protoMap 등)이 얹힌 뒤 */
 window.__stageReset = () => ({ 켜짐: window.VRULES.stageReset.on, 쓸수있나: sresetLive(), 보임: !!SRESET.el, 시작땅: !!(STAGE.def && STAGE.def.시작), ...SRESET.stats });
+/* ── [MAC-K7] PA-07 K7-LAYER 안내 층 — 탐정 판(안내최대층 2)은 까닭까지만 말한다 · 할 일 · 자리(✨) 0 (기획 build/B §B-14 · H3 PA-07 · 엔진 사실 H17 · 10-03 엔진 회신 §1-1 #3~#5 · §1-2) ──
+   층 = 1 현상 → 2 까닭 → 3 할 일 → 4 자리 ✨. 판 칸 `안내최대층` 2 | 3(판 JSON 최상위 · 없으면 3 = 지금 그대로). 2층 판은 카드마다 제 현상 · 까닭만 — 가게 '빈 선반이에요' · 밭 '길이 끊겨 못 가요'.
+   글 거르개(정규식)로 자르지 않는다 — '보세요' 를 거르면 놓기 거절 말까지 먹는다. 말을 만드는 함수 · 갈래에서 자른다:
+     ① 판 권유(stageHint) 없음 — 판 검사가 먼저 FAIL '탐정 판 권유'(이중 안전 · 스위치를 끄면 되살아나게 STAGE.def 의 읽기 칸으로)
+     ② 주민 풍선 뜻(bhFolkLine) — ' — ' 뒤 할 일을 뗌(그 함수의 갈래가 모두 '현상 — 할 일' 꼴) · 무화면은 풍선이 안 생겨 시험 훅 __k7Folk(k)로 본다
+     ③ 끝 카드 실험 값(flowEnd · #1114) — 판 `결과값` 이 있으면 쓰지 않음(C0-E 끝 카드가 결과를 맡음 · 원래 줄 1 = fendOn 끝 조건)
+     ④ 흐름 카드(flowCardText) — 상태 말(flowTxt(st))까지: 끊긴 밭의 ' — 길 N칸만 이으면 가게에 닿아요' · 빈 가게의 ' — 까닭' 을 뗌(' — ' 수가 아니라 상태로 — full 은 상태 말 안에 까닭)
+     ⑤ 짚기(whereSpots) — 2층이면 null: 흐름 갈래(가게 · 밭을 누르면 끊긴 칸 ✨ · 카메라)가 4층 자리다. 집 갈래(일터 cut · 붐빔 토막 · 권유 자리)도 같은 ✨ 라 함께 null.
+        whereTo 는 '보기' 분류라 판 규칙으로 끄면 LK ④ 위반 — 그래서 코드에서.
+     ⑥ 집 카드(satText)의 할 일 조각 — 📚 도서관 귀띔(libHint) · 🛣️ 붐빔 귀띔(crowdHint 고리) · 🛣️ 넓힐 자리 없음(crowdPoint · 원래 줄 1 = 그 고리 머리 조건) · 권유(①)
+     ⑦ 일자리 긴 말 — 💼 칩 · 돌아섬 말이 쓰는 jobWhySay: 까닭 넷(jwLong 갈래) → 짧은 까닭(JW_SHORT) · 까닭이 없을 때의 옛 말은 ' — ' 뒤 할 일을 뗌 · 💼 칩의 일터 ✨(jobWhyPoint) 0
+     ⑧ 🔗 공급 경로 토스트(pmapRoute) — '반짝이는 칸에 길 N칸만 이으면 가게에 닿아요' 꼬리만 뗌(원래 줄 1) · ✨ · 카메라는 둠(B-15 가 이 단추를 아이가 고르는 '세계에 묻기'로 씀)
+   · 자리: module 끝 · stageApplyRules 앞(판 `규칙` k7 이 덮을 수 있게). 판 칸은 STAGE.def 를 그때그때 읽는다(stageApplyEarly 는 판 읽기 블록에서 한 번만 불려 module 끝 감싸기로는 안 돎).
+   · 스위치 VRULES.k7(rules.json '말') — on:false = 옛 말 · 옛 ✨ 그대로(되돌리기). 판정 · 저장 0. 시험 훅 __k7() · __k7Folk(k) · __k7Route() · __k7Job(x, y) · __k7Point(x, y)
+     (__jobWhy 는 연기 셈이 같은 이름으로 덮어 집 까닭 긴 말을 무화면에서 못 읽는다 — 그래서 __k7Job). */
+(window.VRULES = window.VRULES || {}).k7 = { on: true };
+const K7 = { 권유: null, stats: { 권유: 0, 주민: 0, 흐름카드: 0, 짚기: 0, 집: 0, 일자리: 0, 일터반짝: 0, 공급: 0, 팻말: 0, 바람: 0 } };
+function k7Lv() { const v = STAGE.def ? STAGE.def.안내최대층 : null; return typeof v === 'number' && v <= 2 ? 2 : 3; }
+function k7Cut() { return !!(window.VRULES.k7 && window.VRULES.k7.on && STAGE.def && k7Lv() <= 2); }
+function k7EndOff() { return !!(window.VRULES.k7 && window.VRULES.k7.on && STAGE.def && STAGE.def.결과값 != null); }
+if (STAGE.def && STAGE.def.권유 != null && k7Lv() <= 2) { K7.권유 = STAGE.def.권유;
+  Object.defineProperty(STAGE.def, '권유', { configurable: true, enumerable: true, get: () => { if (!k7Cut()) return K7.권유; K7.stats.권유++; return null; } }); }
+/* ── [MAC-K7] PA-07 고침(반박 검증 🟡 · 10-13) — 탐정 판에서 새던 까닭 그림 · 할 일 둘 + 층과 무관한 거짓 까닭 하나 ──
+   ⑨ 빈 가게 문 앞 팻말의 까닭 그림(fsWhy — 밭 · 길 · 물건) — 2층이면 null: 가게 앞은 제 현상(빈 선반 · 접힌 차양 · 꺼진 진열창)만 · 까닭은 밭 · 길을 눌러 알아낸다.
+      까닭이 없으면 팻말째 안 서는 원래 갈래(fsShopParts) 그대로. fsWhy 는 그리기 틱(fsTick → FSHAPE.까닭 → partsOf)만 부른다 — 흐름 판정 · 목표 값을 읽는 곳 0.
+   ⑩ 💬 바람 주민 카드(folkCard) — '💬 우리 집 근처에 …이 있으면 좋겠어요'(할 일 + 자리)를 2층이면 그 집 카드와 같은 현상 말로(새 말 0):
+      흐름 때문에 못 받은 장보기 '가게에 물건이 없어요'(MAC-FLOWSAY) · 꽉 찬 필요 '…가 꽉 찼어요'(capSayOf) · 그 밖 '…이 멀어요'(satText).
+      바람이 생기고 · 들어지고 · 사라지는 셈(wishTick · simRand 차례 · 머리 위 💬)은 그대로 — 보이는 글만.
+   ⑪ (층과 무관 · 맞는 말로 고침) 풍선 뜻 🛒? — 흐름 때문에 못 받은 집(sat.flowMiss — 가게는 길로 닿는데 몫을 못 받음)에 '가게가 멀어요 — 집 가까이 지어 주세요'는
+      거짓 까닭이었다 → 집 카드와 같은 '🛒? 가게에 물건이 없어요'(할 일 꼬리 없음 · 3층 판 · 흐름 판 모두 · 흐름 없는 판은 sat.flowMiss 가 늘 거짓이라 그대로).
+      스위치는 집 카드 말과 같은 VRULES.flowSay(말 · 끄면 둘 다 옛 말) · ② 감싸기보다 안쪽(고친 말엔 ' — ' 가 없다).
+   시험 훅 __k7Cards()(진짜 주민 — 바람 · 지금 뜬 풍선 주민의 카드 글) · __k7Folk(k, x, y)(그 집 주민인 셈 — 무화면은 풍선이 안 생김). */
+{ FSAY.stats.풍선 = 0; const bf1 = bhFolkLine; bhFolkLine = function (f) { const t = bf1.apply(this, arguments), p = '머리 위 ' + WHY_ICON.장보기 + '? ';
+    if (!t || !window.VRULES.flowSay.on || !f || f.whyShow !== '장보기' || t.indexOf(p) !== 0 || !flowOn()) return t;
+    const st = sat.get(f.home); if (!st || !st.flowMiss) return t; FSAY.stats.풍선++; return p + '가게에 물건이 없어요'; }; }
+{ const bf0 = bhFolkLine; bhFolkLine = function () { const t = bf0.apply(this, arguments), i = t && k7Cut() ? t.indexOf(' — ') : -1; if (i < 0) return t; K7.stats.주민++; return t.slice(0, i); };
+  const fc0 = flowCardText; flowCardText = function (root) { const t = fc0.apply(this, arguments); if (!t || !k7Cut()) return t;
+    const st = flowFieldState(root) || flowStoreState(root), w = st ? ' · ' + flowTxt(st) : null, i = w ? t.indexOf(w) : -1;
+    if (i < 0 || i + w.length >= t.length) return t; K7.stats.흐름카드++; return t.slice(0, i + w.length); };
+  const ws0 = whereSpots; whereSpots = function () { if (!k7Cut()) return ws0.apply(this, arguments); K7.stats.짚기++; return null; };
+  const lh0 = libHint; libHint = function () { const h = lh0.apply(this, arguments); if (!h || !k7Cut()) return h; K7.stats.집++; return ''; };
+  hookAdd('crowdHint', function (next, args) { const h = next(args); if (!h || !k7Cut()) return h; K7.stats.집++; return ''; });
+  const jl0 = jwLong; jwLong = function (why) { if (!k7Cut()) return jl0.apply(this, arguments); K7.stats.일자리++; return '💼 ' + (JW_SHORT[why] || JW_SHORT.none); };
+  const js0 = jobWhySay; jobWhySay = function () { const t = js0.apply(this, arguments), i = t && k7Cut() ? t.indexOf(' — ') : -1; if (i < 0) return t; K7.stats.일자리++; return t.slice(0, i); };
+  const jp0 = jobWhyPoint; jobWhyPoint = function () { if (!k7Cut()) return jp0.apply(this, arguments); K7.stats.일터반짝++; return 0; };
+  const pr0 = pmapRoute; pmapRoute = function () { const r = pr0.apply(this, arguments); if (r === 'cut' && k7Cut()) K7.stats.공급++; return r; }; }
+function k7WishSay(f) { const k = f.wish.need, st = sat.get(f.home);
+  if (capIsFull(f.home, k)) return capSayOf(k).replace(/^\S+ /, '');
+  if (k === '장보기' && st && st.flowMiss && window.VRULES.flowSay.on) return '가게에 물건이 없어요';
+  return (NEED_TXT[k] || k) + '이 멀어요'; }
+{ const fw0 = fsWhy; fsWhy = function () { if (!k7Cut()) return fw0.apply(this, arguments); K7.stats.팻말++; return null; };
+  const fk0 = folkCard; folkCard = function (f) { const t = fk0.apply(this, arguments), w = f && f.wish && k7Cut() ? wishText(f) : null;
+    if (!w || t.indexOf(w) !== 0) return t; K7.stats.바람++; return '💬 ' + k7WishSay(f) + t.slice(w.length); }; }
+window.__k7 = () => ({ 켜짐: window.VRULES.k7.on, 판층: k7Lv(), 자름: k7Cut(), 끝카드양보: k7EndOff(), 반짝: sparkle.filter(s => s.until > SIM.t).length, ...K7.stats });
+window.__k7Folk = (k, x, y) => { const rec = x != null && inb(x, y) ? cells[idx(x, y)] : null; return bhFolkLine({ whyShow: k, whyUntil: Infinity, home: rec ? rec.root : -1 }); };
+window.__k7Cards = () => { const now = SIM.t + SIM.acc; return folks.filter(f => f.wish || (f.whyShow && now <= (f.whyUntil || 0))).map(f => ({ 집: [cX(f.home), cY(f.home)], 바람: f.wish ? f.wish.need : null, 풍선: f.wish ? null : f.whyShow, 글: folkCard(f) })); };
+window.__k7Job = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; return rec && rec.k === 'house' ? jobWhySay(rec) : null; };
+window.__k7Point = (x, y) => { const rec = inb(x, y) ? cells[idx(x, y)] : null; return rec && rec.k === 'house' ? jobWhyPoint([rec.root]) : null; };
+window.__k7Route = () => { let said = null; const t0 = toast; toast = function (m) { said = String(m); return t0.apply(this, arguments); }; let r = null;
+  try { r = pmapRoute(); } finally { toast = t0; } return { 말: said, 짚음: r, 반짝: sparkle.filter(s => s.until > SIM.t).length }; };
 stageApplyRules();   // [MAC-STAGE] 판의 규칙 덮기 — 모든 VRULES 가 정의된 뒤 · 첫 틱 전
 /* [MAC-CLOCK] 규칙 뒤 — ① 배속최대: 저장본 clock.speed 는 setSpeed 를 안 거치고 들어온다 → 열 때 깎고 그보다 빠른 단추를 숨긴다 ② 판규칙 멈춤.생산 = 모형 ⏸ 스위치를 판이 켬
    ③ boot 쥠 — 시작 카드가 뜰 판이면 카드가 뜰 때 scard 로 넘긴다(그때까지 쥔 채 · 600ms 타이머 동안 틱 0) · 안 뜰 판(교과 · 카드 칸 없음 · #끝 · 이미 시작함)이면 곧바로 풂 ·
