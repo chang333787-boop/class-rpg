@@ -10,6 +10,10 @@
 //      (다-2) 열린 판에서 해시만 바꿈(hashchange) → 같은 몸(지우고 다시 실림 · 해시 #n=2)
 // (라) 3시간: 시각 키를 −1시간으로 써 두고 다시 열면 이어짐(적용 A · 시작함 · 카드 안 뜸) / −4시간이면 시작판(적용 0 · 시작 카드 첫날부터 · 지움 1) — 서로 양성 대조.
 //      시각 키는 마을 밖 쪽(rules.json)에서 쓴다 — 마을이 닫힐 때 저장(pagehide)이 시각 키를 지금으로 덮기 때문.
+// (마) ↺ 처음부터가 붙이는 해시 = 남는 낱말만(c0hKeep): (A) #fresh(번호 없음 · 빈 판) → [시작] → ↺ → #fresh 가 빠져 시작 저장본부터(빈 판에서 나오는 길 · ACT-STAGERESET) /
+//      (B) #n=c3-07,끝,소리=끔 → 끝 카드 [닫기] → ↺ → 다시 실린 판은 시작 카드 · 해시 #n=c3-07,소리=끔(끝만 빠짐) — 양성 대조: 열 때 #fresh = 빈 판 · #끝 = 끝 카드
+// (바) 망 늦춤(ctx.netDelay 3000 — 다시 실리는 문서만 3초 늦게 · 학교망 흉내): 번호 2 로 몇 수 → 끝 카드 사진을 찍고(사진 글은 쉬는 때 콜백) 곧바로 해시만 바꿈(#기록지움,n=2) →
+//      그 콜백이 지운 뒤에 떠나는 판에서 판 카드 기록을 쓰려 해도 막힘(앞 문서 pagehide 값: 막음 ≥ 1 · help-places 키 0 · 3초 가까이 살아 있었음) → 다시 실린 첫 순간 키 []
 // 판 쪽은 늘 바깥 시도 0(틀이 바깥 주소를 막고 적음 · 운영 DB 0) · 임시 프로필 · 창 0.
 export default async function c0t(ctx) {
   const C = ctx.C, E = (s, ms) => ctx.evaluate(s, ms), P = e => ctx.probe(e), J = JSON.stringify, X = ctx.expect, out = {};
@@ -122,7 +126,45 @@ export default async function c0t(ctx) {
     X(l4.c0.지움 === 1 && l4.st.시작판 === true && l4.vote === null && !l4.card.시작함 && l4.종류 === 'start' && !l4.지난 && Number(l4.c0.시각키) > Date.now() - 600000,
       '(라) −4시간 → 시작판(적용 0 · 시작 카드 첫날부터 · 지난 시도 0) · 시각 키는 지금 ' + J(out.라.네시간));
     X(outside(i0).length === 0, '(라) 바깥 시도 0 ' + J(outside(i0).map(t => t.url)));
-  } finally { if (snapId) await C.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: snapId }).catch(() => {}); }
+
+    /* (마) ↺ 처음부터가 붙이는 해시 = 남는 낱말만 */
+    const waitCard = async () => { for (let k = 0; k < 40 && !(await P('!!document.querySelector("#stageCard .card[data-vcard]")')); k++) await ctx.advance(150); return P('(() => { const c = document.querySelector("#stageCard .card[data-vcard]"); return c ? c.dataset.vcard : null; })()'); };
+    const resetGo = async what => { const m = await mark();
+      const r = await E(`const b = document.getElementById('stageReset'); if (!b) return '↺ 단추 없음'; b.click(); const k = document.querySelector('#askCard .ok'); if (!k) return '되묻기 없음'; k.click(); return 'ok'`);
+      return { 누름: r, 다시실림: await reloaded(m, what) }; };
+    const land = () => P(`({ 시작판: window.__stage().시작판, 물건: window.__snapshot().물건.length, 저장키: window.__stage().저장키, 해시: location.hash, 주소: location.pathname + location.search })`);
+    await clean(); i0 = n0(); await go('help-places', 'fresh'); const fa0 = await land(), faS = await startCard(), faR = await resetGo('(마) A ↺ 뒤 다시 실림'), fa1 = await land();
+    out.마A = { 전: fa0, 시작: faS, ...faR, 뒤: { ...fa1, 주소: fa1.주소.replace(/r=\d+/, 'r=…') } };
+    X(fa0.해시 === '#fresh' && fa0.시작판 === false && fa0.저장키 === 'rpg.village.guest.help-places', '(마) A 양성 대조 — #fresh 로 열면 시작 저장본이 안 깔림(빈 판) ' + J(fa0));
+    X(faS && faR.누름 === 'ok' && faR.다시실림 && fa1.해시 === '' && fa1.시작판 === true && fa1.물건 > fa0.물건, '(마) A ↺ → #fresh 빠짐 · 시작 저장본부터(물건 ' + fa0.물건 + ' → ' + fa1.물건 + ') ' + J(out.마A.뒤));
+    await clean(); await go('help-places', 'n=c3-07,끝,소리=끔'); const fb0 = { 카드: await waitCard(), ...(await land()) };
+    const fbC = await E(`const b = [...document.querySelectorAll('#stageCard button')].find(b => b.textContent.trim() === '닫기'); if (!b) return false; b.click(); return true`);
+    const fbR = await resetGo('(마) B ↺ 뒤 다시 실림'), fb1 = { 카드: await waitCard(), ...(await land()) };
+    out.마B = { 전: { 카드: fb0.카드, 해시: decodeURIComponent(fb0.해시), 저장키: fb0.저장키 }, 닫음: fbC, ...fbR, 뒤: { 카드: fb1.카드, 해시: decodeURIComponent(fb1.해시), 저장키: fb1.저장키, 시작판: fb1.시작판 } };
+    X(fb0.카드 === 'end' && fb0.저장키 === 'rpg.village.c3-07.help-places', '(마) B 양성 대조 — #n=c3-07,끝,소리=끔 으로 열면 끝 카드 · 번호 c3-07 칸 ' + J(out.마B.전));
+    X(fbC && fbR.누름 === 'ok' && fbR.다시실림 && out.마B.뒤.해시 === '#n=c3-07,소리=끔' && fb1.카드 === 'start' && fb1.저장키 === 'rpg.village.c3-07.help-places' && fb1.시작판 === true,
+      '(마) B ↺ → 끝 만 빠짐(n · 소리 남음) · 다시 실린 판은 시작 카드 · 시작 저장본부터 ' + J(out.마B.뒤));
+    X(outside(i0).length === 0, '(마) 바깥 시도 0 ' + J(outside(i0).map(t => t.url)));
+
+    /* (바) 망 늦춤 — 다시 실리는 문서만 3초 늦게(ctx.netDelay) · 앞 문서가 살아 있는 동안 판 카드 기록을 쓰지 않는다.
+       다시 싣기가 걸려 있는 동안 CDP 는 앞 문서에 닿지 않는다(잰 것: 해시를 바꾼 뒤 첫 evaluate 가 3초 뒤 새 문서에서 돎) — 그래서 한 evaluate 안에서 끝 카드 → 두 장(사진 → 쉬는 때 콜백이 사진 글을 넘기려 기다림) → 해시를 바꾸고,
+       앞 문서 값은 그 문서의 pagehide 가 sessionStorage 에 적어 둔 것을 새 문서에서 읽는다. 쉬는 때 콜백은 hashchange(c0tClear) 다음에 돈다 → 떠나는 판의 scardSave */
+    await clean(); i0 = n0(); await go('help-places', 'n=2'); out.바_시작 = await play();
+    await E(`sessionStorage.removeItem('__c0tSeen'); sessionStorage.removeItem('__c0tOld'); return 1`); snapId = (await C.send('Page.addScriptToEvaluateOnNewDocument', { source: SNAP })).identifier;
+    const m6 = await mark(); ctx.netDelay(3000, '/village/index.html'); const t6 = Date.now();
+    const pre6 = await E(`addEventListener('pagehide', () => { try { const c = window.__c0t(); sessionStorage.setItem('__c0tOld', JSON.stringify({ 떠남: c.떠남, 막음: c.stats.떠남막음, 키: Object.keys(localStorage).filter(k => /help-places/.test(k)), t: Date.now() })); } catch (e) {} });
+      const s0 = window.__stageCard().찍음; window.__stageEnd(); const card = !!document.querySelector('#stageCard .card[data-vcard="end"]'); window.__shots.step(2, 1000 / 60);
+      const s1 = window.__stageCard().찍음; location.hash = '기록지움,n=2'; return { 끝카드: card, 찍음: [s0, s1], t: Date.now() }`);
+    const re6 = await reloaded(m6, '(바) 망 늦춤 · #기록지움 뒤 다시 실림'), dt6 = Date.now() - t6; ctx.netDelay(0);
+    const old6 = await E(`return JSON.parse(sessionStorage.getItem('__c0tOld') || 'null')`), sn6 = await seen(), c6 = await state();
+    out.바 = { 앞: pre6, 앞문서: old6 && { ...old6, 산ms: old6.t - pre6.t }, 다시실림: re6, 걸림ms: dt6, 첫순간: sn6[sn6.length - 1], 해시: c6.hash, 시작판: c6.st.시작판 };
+    X(pre6.끝카드 && pre6.찍음[1] > pre6.찍음[0], '(바) 양성 대조 — 해시를 바꾸기 전 끝 카드 사진을 찍었다(사진 글은 쉬는 때 콜백 — 아직 안 넘김) ' + J(pre6));
+    X(old6 && old6.떠남 === true && old6.막음 >= 1 && !old6.키.length && old6.t - pre6.t >= 2900,
+      '(바) 앞 문서가 3초 가까이 살아 있는 동안 판 카드 기록을 쓰려 했고(막음 ≥ 1) 막혔다(닫힐 때 help-places 키 0) ' + J(out.바.앞문서));
+    X(re6 && dt6 >= 2900 && c6.hash === '#n=2' && c6.st.시작판 === true && sn6.length && J(sn6[sn6.length - 1].keys) === '[]',
+      '(바) 늦춤이 먹고(' + dt6 + 'ms ≥ 3초) 다시 실린 첫 순간 help-places 키 [] · #n=2 · 시작판 ' + J({ 첫순간: out.바.첫순간, 해시: c6.hash }));
+    X(outside(i0).length === 0, '(바) 바깥 시도 0 ' + J(outside(i0).map(t => t.url)));
+  } finally { ctx.netDelay(0); if (snapId) await C.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: snapId }).catch(() => {}); }
   out.바깥시도 = outside(t00).map(t => t.url); out.요청 = since(t00).length;
   return out;
 }

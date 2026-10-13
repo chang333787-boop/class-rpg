@@ -46,7 +46,8 @@ export default async function (ctx) {
   return { 단추: (await ctx.ax()).length };  // result.json 의 장면값
 }
 ```
-`ctx` = `open · shot · ax · probe · expect · pump · advance · sleep · evaluate · send · result · dir · BASE`.
+`ctx` = `open · shot · ax · probe · expect · pump · advance · sleep · evaluate · send · netDelay · result · dir · BASE`.
+`ctx.netDelay(ms, 글자)` — 서버 응답 늦춤을 장면 안에서 잠깐 켠다(주소 **경로**에 그 글자가 든 것만 · 쿼리는 안 봄) · `ctx.netDelay(0)` 끔 · 인자 없이 = `--net-delay` 값으로 되돌림.
 
 ## 옵션 요약
 `--size 1366x610` · `--hour 10` · `--gfx fixed` · `--lookseed 1`(그림 난수) · `--simrand tool|stage`(tool = 판정 난수도 이 틀이 심음 · stage = 심지 않아 판 파일의 시드 길을 그대로) ·
@@ -72,11 +73,14 @@ node scripts/village-d/dcheck.mjs --scene lk     # 약 1분 반 — 카드가 �
 
 ## 장면 c0t — 교실 기기 기록 ([MAC-C0T] · PA-12)
 ```
-node scripts/village-d/dcheck.mjs --scene c0t    # 약 20초 — help-places · 번호 1 · 2 · c3-07(가짜 번호)
+node scripts/village-d/dcheck.mjs --scene c0t    # 약 30초 — help-places · 번호 1 · 2 · c3-07(가짜 번호)
 ```
 - **(가)** 판 `?stage=help-places#n=1` = 요청 목록에 sync.js 0 · sync 태그 0 · 바깥 시도 0 · 요청 주소에 `#` · `n=` 0 / 양성 대조: 기본 마을 sync.js 1건 · `VillageSync.current`(부팅) · 그 태그가 module 앞 · 캐시버스터 그대로.
 - **(나)** `#n=c3-07` → [시작] · 결정 A → ↺ 처음부터 → 되묻기 [↺] → **다시 실림**(앞 문서에 심은 표지가 사라지고 `performance.timeOrigin` 이 바뀜 · 주소에 `?r=`) · 해시 `#n=c3-07` · 저장 키 c3-07 · 시작판.
 - **(다)** 번호 1 · 2 로 몇 수 → `#기록지움,n=1` 로 엶 → 다시 실린 문서의 **첫 순간**(새 문서 스크립트 `Page.addScriptToEvaluateOnNewDocument` — 마을 module 이 쓰기 전) help-places 키 `[]` ·
   해시 `#n=1` · 시작 카드 첫날부터 · `rpg.village.guest` 그대로 · 토스트 글(`#toast` 를 MutationObserver 로 적음). 양성 대조: 처음 연 문서의 첫 순간엔 키가 있었다. (다-2) 해시만 바꿔도(hashchange) 같은 몸.
 - **(라)** 시각 키를 −1시간으로 써 두고 다시 열면 이어짐 · −4시간이면 시작판(서로 양성 대조). 시각 키는 **마을 밖 쪽(rules.json)에서** 쓴다 — 마을이 닫힐 때 저장(pagehide)이 시각 키를 지금으로 덮는다.
+- **(마)** ↺ 처음부터가 붙이는 해시 = 남는 낱말만: `#fresh`(빈 판) → ↺ → `#fresh` 가 빠져 시작 저장본부터 · `#n=c3-07,끝,소리=끔`(끝 카드) → [닫기] → ↺ → 시작 카드 · 해시 `#n=c3-07,소리=끔`(양성 대조 = 열 때 빈 판 · 끝 카드).
+- **(바)** 망 늦춤(`ctx.netDelay(3000, '/village/index.html')` — 다시 실리는 문서만 3초 늦게): 끝 카드 사진을 찍고(사진 글은 쉬는 때 콜백) 곧바로 해시만 `#기록지움,n=2` 로 → 그 콜백이 지운 뒤 떠나는 판에서 판 카드 기록을 쓰려 해도 막힘(앞 문서 pagehide 값 `떠남막음` ≥ 1 · help-places 키 0) → 다시 실린 첫 순간 키 `[]`.
+  다시 싣기가 걸려 있는 동안엔 CDP 가 앞 문서에 닿지 않는다(잰 것: 해시를 바꾼 뒤 첫 evaluate 가 3초 뒤 새 문서에서 돌았다) — 앞 문서 값은 그 문서의 pagehide 가 sessionStorage 에 적은 것을 새 문서에서 읽는다.
 - 마을 밖 쪽을 거쳐 연다 — 같은 주소에 해시만 다른 주소로 `Page.navigate` 하면 조각 이동이라 다시 안 실린다(엔진 사실 H17 #9 와 같은 까닭).

@@ -11086,12 +11086,18 @@ window.__kids = () => ({ 켜짐: window.VRULES.kids.on, ...KIDS.stats, 지금밖
    ══════════════════════════════════════════════════════════════ */
 const SAVE_V = 2;                       // v2 = 구역 문자열 + palette (G5 ③). v1(items) 은 읽기만
 /* [MAC-C0T] 해시 낱말(C0-H) — `#반=c3,n=07,끝` · `&` 로 이어도 같다. HP(쉼표만 · 07 → 7 · 퍼센트 안 풂)로 읽지 않는다: 낱말과 값을 풀어(못 풀면 원문) 아는 낱말만 · 같은 낱말은 뒤엣것.
-   값 낱말(반 · n · 소리 · 말2 · 학년 · 대사)은 글(없으면 null) · 표 낱말(끝 · 기록지움 · 크게)은 참/거짓 · end = 끝. 부를 때마다 지금 해시를 읽는다(hashchange 뒤에도). */
-function c0Hash() { const V = ['반', 'n', '소리', '말2', '학년', '대사'], F = ['끝', '기록지움', '크게'], o = {}, un = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+   값 낱말(반 · n · 소리 · 말2 · 학년 · 대사)은 글(없으면 null) · 표 낱말(끝 · 기록지움 · 크게)은 참/거짓 · end = 끝. 부를 때마다 지금 해시를 읽는다(hashchange 뒤에도).
+   다시 열 때(↺ 처음부터 · voteReset)는 남는 낱말(값 낱말 · 크게 = C0H_KEEP)만 붙인다(c0hKeep) — 한 번 쓰는 낱말(끝 · end · 기록지움)과 그 밖(fresh · demo · 재기 낱말)은 버림: 옛 ↺ 는 해시를 통째로 버렸다(#fresh 빈 판에서 나오는 길 · ACT-STAGERESET) · 끝 이 남으면 처음부터가 끝 카드로 열린다. */
+const C0H_V = ['반', 'n', '소리', '말2', '학년', '대사'], C0H_F = ['끝', '기록지움', '크게'], C0H_KEEP = [...C0H_V, '크게'];
+function c0Hash() { const V = C0H_V, F = C0H_F, o = {}, un = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
   V.forEach(k => { o[k] = null; }); F.forEach(k => { o[k] = false; });
   String(location.hash || '').slice(1).split(/[,&]/).forEach(w => { if (!w) return; const i = w.indexOf('='), k0 = un(i < 0 ? w : w.slice(0, i)), k = k0 === 'end' ? '끝' : k0;
     if (F.includes(k)) o[k] = true; else if (V.includes(k)) o[k] = i < 0 ? '' : un(w.slice(i + 1)); });
   return o; }
+/* 해시 낱말을 원문 그대로 고른다 — keep(풀어 본 낱말 이름)이 참인 것만 · 차례 그대로 · 쉼표로 잇는다(c0Hash 는 , · & 둘 다 읽음) · 하나도 없으면 '' */
+function c0hPick(keep) { const w = String(location.hash || '').slice(1).split(/[,&]/).filter(x => { if (!x) return false; let k = x.split('=')[0]; try { k = decodeURIComponent(k); } catch (e) {} return keep(k); });
+  return w.length ? '#' + w.join(',') : ''; }
+function c0hKeep() { return c0hPick(k => C0H_KEEP.includes(k)); }   // ↺ 처음부터 · voteReset 이 다시 열 때 붙이는 해시
 /* [MAC-C0T] 판 번호 C0N — 판(?stage · 구경 아님) + 해시 n= 일 때만. n=교사 → t(교사 기기) · 그 밖엔 [A-Za-z0-9_-] 40자에 통째로 맞을 때만 그 글(거르지 않고 버림 — % 만 지우면 엉뚱한 번호가 된다) ·
    guest 와 adv · full · demo 가 든 번호 · 반 기호는 버림(아래 부팅이 해시 안의 그 글자를 보고 시연 판을 깔고 저장을 끈다) → guest + console.warn */
 const C0N = (() => { if (VISIT_SID || !stageIdOf(QS.get('stage'))) return null; const h = c0Hash(); if (h.n == null) return null;
@@ -11572,8 +11578,7 @@ function c0tClear() { if (!STAGE.id || !C0N || !window.VRULES.c0t.on) return fal
   const ks = c0tDrop([].concat(...sids.map(s => c0tKeys(s, STAGE.id))));
   clearTimeout(saveTimer); savingOff = true; C0T.떠남 = true; SCARD.rec = null; TWO.stats.기록지움++; C0T.기록지움 = { 번호: sids.slice(), 키: ks.length };
   try { sessionStorage.setItem('rpg.c0t.wiped.' + STAGE.id, String(sids.length)); } catch (e) {}
-  const rest = String(location.hash || '').slice(1).split(/[,&]/).filter(w => { if (!w) return false; let k = w.split('=')[0]; try { k = decodeURIComponent(k); } catch (e) {} return k !== '기록지움'; });
-  location.replace(reopenUrl() + (rest.length ? '#' + rest.join(',') : ''));
+  location.replace(reopenUrl() + c0hPick(k => k !== '기록지움'));
   return true; }
 if (STAGE.id) {
   window.VillageSync = null;   // 판은 원격 동기를 쓰지 않는다(저장은 이 기기에만 · 키도 따로)
@@ -13950,7 +13955,7 @@ function twoNow() { const gs = STAGE.goals, e = typeof predDef === 'function' ? 
 function twoLine(lab, p, r) { const e = typeof predDef === 'function' ? predDef() : null, g = e && e.결과;
   return '<div class="pend"><b>' + lab + '</b> ' + [p && p.글 ? '🤔 ' + scardEsc(p.글) : '', r.목표 ? '🎯 ' + r.목표[0] + '/' + r.목표[1] : '', r.값 != null && g && g.t ? scardEsc(g.t) + ' ' + scardEsc(r.값) : '', g && g.셈 === 'pop' && r.값 != null ? '' : '👥 ' + r.인구 + '명'].filter(Boolean).join(' · ') + '</div>'; }   // 결과가 인구면 👥 는 겹쳐 뺀다
 /* ↺ 처음부터 — 두 곳(ACT-STAGERESET · 모형 화면 단추 줄)이 부른다 */
-function stageResetKeep() { const R = window.VRULES.twoTry, go = () => location.replace(reopenUrl() + location.hash);   // [MAC-C0T] ?r= 로 진짜 다시 싣고 해시(#n=)를 지킨다
+function stageResetKeep() { const R = window.VRULES.twoTry, go = () => location.replace(reopenUrl() + c0hKeep());   // [MAC-C0T] ?r= 로 진짜 다시 싣고 남는 해시 낱말(#n= 등)만 지킨다 — 끝 · fresh 는 버림(처음부터 · 빈 판에서 나옴)
   try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) {}
   if (!R || !R.on || !STAGE.id) { try { localStorage.removeItem(scardKey()); } catch (e) {} go(); return; }
   const rec = scardLoad(), 지난 = { t: Date.now(), 셈: scardCounts(), 예상: rec.예상 || null, ...twoNow(), 사진: null };
@@ -14622,7 +14627,7 @@ function voteReset(quiet) {
   if (!quiet) { askCard({ q: '처음 상태로 되돌릴까요?', sub: '이번에 한 것은 남지 않아요.', ok: '↺ 처음부터' }, () => voteReset(true)); return false; }   /* [ACT-ASKCARD] 게임 안 카드로 — 예를 누르면 조용히 다시 */
   VOTE.stats.되돌린횟수++; VOTE.표 = null; VOTE.적용 = null; VOTE.미리 = null;
   try { clearTimeout(saveTimer); savingOff = true; localStorage.removeItem(SAVE_KEY); } catch (e) { console.warn('[MAC-VOTE] 되돌리기', e); }
-  location.replace(reopenUrl() + location.hash);   // 판 파일의 `시작` 저장본이 다시 깔린다 → 앞 실행의 흔적 0 · [MAC-C0T] ?r= 로 진짜 다시 싣는다(같은 주소 + #… 는 조각 이동) · #n= 지킴
+  location.replace(reopenUrl() + c0hKeep());   // 판 파일의 `시작` 저장본이 다시 깔린다 → 앞 실행의 흔적 0 · [MAC-C0T] ?r= 로 진짜 다시 싣는다(같은 주소 + #… 는 조각 이동) · 남는 해시 낱말(#n= 등)만 — fresh 가 남으면 시작 저장본이 안 깔린다
   return true;
 }
 

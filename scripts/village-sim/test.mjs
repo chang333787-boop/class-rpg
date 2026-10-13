@@ -237,11 +237,12 @@ process.stdout.write('@@' + JSON.stringify({ 처음, 저장0, 배속, 뒤: w.__c
    load.mjs: opts.store(미리 넣을 키) · opts.session(탭 저장소) · location.replace/assign/reload 는 적기만(__simNav — 다시싣기 = 조각 이동이 아님) · history 는 주소만.
    Date.now 는 싣는 순간 멈춘다 — 시각 키는 싣기 전 지금(now) 기준으로 넣고, 적힌 값은 멈춘 값(frozen)과 견준다.
    C0T (가) 번호 → SID: c3-07 · 07(글 그대로 — HP 는 7) · t · 교사(퍼센트 · 날글) → t · 한글 이름 · 7번 · 41자 → guest + 번호 칸 0 · & · 차례 무관 · 해시 없음 · adv · full · demo · guest · 반 기호 adv → 번호 없음 · 기본 마을 · 구경은 무시
-       (나) 3시간: −4시간 → 지움 1 · 마을 · guide 지움 · 시작판 / −1시간 → 이어짐 / 시각 키 없음 → 적기만 / 앞머리 같은 번호 보존 / 시계가 뒤로 → 지움 0 / 번호 둘 → 그 번호만
+       (나) 3시간: −4시간 → 지움 1 · 마을 · guide 지움 · 시작판 / −1시간 → 이어짐 / 시각 키 없음 → 적기만 / 앞머리 같은 번호 보존 / 시계가 뒤로(+4시간 — 3시간보다 크게 · 부호를 안 보면 지운다) → 지움 0 / 번호 둘 → 그 번호만
        (다) #기록지움(정오 ① ② ③): 시각 키가 있는 번호 전부 · 뒤붙이(.backup · .broken · .지난놓은 · .offered · .물없음)까지 / 시각 키 없는 번호(?sid=) · guest · 다른 판 · 앞머리 같은 번호는 그대로 ·
            싣는 중 location.replace 인데 LOAD ERR 0 · 다시싣기(?r= · 조각 이동 아님) · 해시 = 기록지움만 뺌 · & 로 이어도 · 저장 꺼짐(__save 해도 그 키 없음) · 표지 → 다시 실린 판이 읽고 지움 ·
            #n= 없는 판 = 옛 몸(그 번호 카드 기록만 · 해시 지움 · 다시 싣지 않음)
-       (라) 저장이 되면 시각 키를 지금으로 · 꺼져 있으면(c0t 끔 · savingOff) 안 적음 · 번호 없는 판은 시각 키 0 · voteReset = ?r= + #n=(원래 줄) · 하네스 양성 대조(같은 주소 + # = 조각 이동)
+       (라) 저장이 되면 시각 키를 지금으로 · 꺼져 있으면(c0t 끔 · savingOff) 안 적음 · 번호 없는 판은 시각 키 0 · voteReset = ?r= + #n=(원래 줄) · 하네스 양성 대조(같은 주소 + # = 조각 이동) ·
+           voteReset 이 붙이는 해시 = 남는 낱말만(n · 소리 · 크게 · 말2 — 끝 · end · fresh · 모르는 낱말은 버림 · & 로 이어도 쉼표로 · 차례 그대로) — ↺ 처음부터는 화면 몫(dcheck c0t (마))
        (마) 되돌리기 VRULES.c0t.on = false(엔진 기본값 한 줄을 바꾼 사본 — 판 `규칙` 은 싣기 뒤라 못 끔) — 3시간 지움 0 · 시각 키 그대로 · #기록지움 옛 몸 · 번호 읽기는 남음
        (바) 판에서 sync.js 를 안 싣는 고전 스크립트 — 엔진 STAGE.id(구경이면 null · stageIdOf) 와 같은 주소에서만 안 씀 · 쓰는 태그 꼴 · module 앞 · 옛 태그 0
    C0H 사례 셋: n=c3-07,끝 · 기록지움,n=c3-07 · 말2=vi,소리=끔 (+ 반 · 학년 · 대사 · 크게 · end · 모르는 낱말 · 같은 낱말 둘) */
@@ -274,7 +275,7 @@ process.stdout.write('@@' + JSON.stringify(o) + '\\n', () => process.exit(0));`;
     { n: '시각없음', hash: 'n=c3-07', store: `{ 'rpg.village.c3-07.help-places': START }` },
     { n: '앞머리', hash: 'n=c3-07', store: `{ 'rpg.guide.c3-0': '1', 'rpg.guide.c3-07': '1', 'rpg.stagetime.c3-07.help-places': String(now - 4 * H) }` },
     { n: '앞머리2', hash: 'n=c3-0', store: `{ 'rpg.guide.c3-0': '1', 'rpg.guide.c3-07': '1', 'rpg.album.c3-07': '[]', 'rpg.village.title.c3-07.offered': '1', 'rpg.stagetime.c3-0.help-places': String(now - 4 * H) }` },
-    { n: '뒤로', hash: 'n=c3-07', store: `{ 'rpg.village.c3-07.help-places': START, 'rpg.stagetime.c3-07.help-places': String(now + 2 * H) }` },
+    { n: '뒤로', hash: 'n=c3-07', store: `{ 'rpg.village.c3-07.help-places': START, 'rpg.stagetime.c3-07.help-places': String(now + 4 * H) }` },   /* +4시간 — 차이가 3시간보다 커야 '부호를 안 본 셈'(Math.abs)을 가른다 */
     { n: '둘', hash: 'n=1', store: `{ 'rpg.village.1.help-places': START, 'rpg.village.2.help-places': START, 'rpg.stagetime.1.help-places': String(now - 4 * H), 'rpg.stagetime.2.help-places': String(now - 4 * H) }` },
     { n: '지움', hash: '기록지움,n=t', store: WIPE, body: `w.__save(); o.저장뒤 = [...ls.keys()].filter(k => k.includes('.t.help-places'));` },
     { n: '지움&', hash: 'n=c3-07&기록지움&끝', store: `{ 'rpg.village.c3-07.help-places': START }` },
@@ -284,6 +285,7 @@ process.stdout.write('@@' + JSON.stringify(o) + '\\n', () => process.exit(0));`;
 w.VRULES.c0t.on = false; ls.set(k, '2'); w.__save(); o.끈뒤 = ls.get(k); w.VRULES.c0t.on = true;
 o.되돌림 = w.__voteReset(true); ls.set(k, '3'); w.__save(); o.꺼진뒤 = ls.get(k); o.nav2 = w.__simNav.slice();` },
     { n: '번호없음', hash: '', body: `w.__save(); o.시각키들 = [...ls.keys()].filter(k => k.startsWith('rpg.stagetime.')); o.되돌림 = w.__voteReset(true); o.nav2 = w.__simNav.slice();` },
+    { n: '되돌림해시', hash: 'fresh,n=c3-07,끝,소리=끔&크게,zz=9,end,말2=vi', body: `o.되돌림 = w.__voteReset(true); o.nav2 = w.__simNav.slice();` },
     { n: '조각', hash: 'n=c3-07', body: `const last = () => w.__simNav[w.__simNav.length - 1]; w.location.replace(w.location.href); o.조각1 = last();
 w.location.replace(w.location.pathname + w.location.search + '#n=x'); o.조각2 = last(); o.조각2해시 = w.location.hash; w.location.replace(w.__reopenUrl() + w.location.hash); o.다시1 = last();` },
     { n: 'H1', hash: 'n=c3-07,끝' }, { n: 'H2', hash: '기록지움,n=c3-07' }, { n: 'H3', hash: '말2=vi,소리=끔' }, { n: 'H4', hash: '반=c3,n=1,n=2,학년=3,대사=끔,크게,zz=9,end' },
@@ -316,7 +318,7 @@ w.location.replace(w.location.pathname + w.location.search + '#n=x'); o.조각2 
     ok(n0.c0.지움 === 0 && n0.c0.시각 === null && n0.st.시작판 === false && n0.c0.시각키 === String(n0.frozen), '시각 키 없음 → 적기만 ' + J({ c0: n0.c0, 시작판: n0.st.시작판 }));
     ok(pf.c0.지움 === 1 && !has('앞머리', 'rpg.guide.c3-07') && has('앞머리', 'rpg.guide.c3-0'), '앞머리 같은 번호 ' + J(pf.keys));
     ok(R.앞머리2.c0.지움 === 1 && !has('앞머리2', 'rpg.guide.c3-0') && ['rpg.guide.c3-07', 'rpg.album.c3-07', 'rpg.village.title.c3-07.offered'].every(k => has('앞머리2', k)), '짧은 번호(c3-0)를 지우며 c3-07 곁 키를 먹음 ' + J(R.앞머리2.keys));
-    ok(bk.c0.지움 === 0 && bk.st.시작판 === false && bk.c0.시각 > bk.frozen, '시계가 뒤로 ' + J(bk.c0));
+    ok(bk.c0.지움 === 0 && bk.st.시작판 === false && bk.c0.시각 - bk.frozen > 3 * 3600e3, '시계가 뒤로(3시간보다 크게) ' + J(bk.c0));
     ok(tw.c0.지움 === 1 && tw.c0.지운키.includes('rpg.village.1.help-places') && tw.st.시작판 === true && has('둘', 'rpg.village.2.help-places') && has('둘', 'rpg.stagetime.2.help-places') && !tw.c0.지운키.some(k => k.includes('.2.')),
       '번호 둘 → 그 번호만 ' + J({ 지운키: tw.c0.지운키, keys: tw.keys }));
   });
@@ -337,8 +339,10 @@ w.location.replace(w.location.pathname + w.location.search + '#n=x'); o.조각2 
     const old = R.옛몸; ok(old.c0.번호 === null && old.c0.기록지움 === null && !has('옛몸', 'rpg.stagecard.guest.help-places') && has('옛몸', 'rpg.village.guest.help-places') && has('옛몸', 'rpg.village.c3-07.help-places')
       && has('옛몸', 'rpg.stagetime.c3-07.help-places') && old.nav.length === 1 && old.nav[0].어떻게 === 'replaceState' && old.해시 === '' && !Object.keys(old.ss).length, '#n= 없는 판은 옛 몸 ' + J({ nav: old.nav, keys: old.keys, 해시: old.해시 }));
   });
-  test('C0T (라) 저장이 되면 시각 키 = 지금 · c0t 끔 · 저장 꺼짐이면 안 적음 · 번호 없는 판 시각 키 0 · voteReset 다시 싣기 = ?r= + #n= · 하네스 양성 대조(같은 주소 + # = 조각 이동)', () => { bad();
-    const sv = R.저장, vr = (sv.nav2 || []).filter(x => x.어떻게 === 'replace'), nn = R.번호없음, fr = R.조각;
+  test('C0T (라) 저장이 되면 시각 키 = 지금 · c0t 끔 · 저장 꺼짐이면 안 적음 · 번호 없는 판 시각 키 0 · voteReset 다시 싣기 = ?r= + #n= · 남는 낱말만(끝 · end · fresh · 모르는 낱말 버림) · 하네스 양성 대조(같은 주소 + # = 조각 이동)', () => { bad();
+    const sv = R.저장, vr = (sv.nav2 || []).filter(x => x.어떻게 === 'replace'), nn = R.번호없음, fr = R.조각, kh = R.되돌림해시, kv = (kh.nav2 || []).filter(x => x.어떻게 === 'replace');
+    ok(kh.되돌림 === true && kh.c0.번호 === 'c3-07' && kv.length === 1 && kv[0].다시싣기 && decodeURIComponent(url(kv[0]).hash) === '#n=c3-07,소리=끔,크게,말2=vi' && /^\d+$/.test(url(kv[0]).searchParams.get('r') || ''),
+      'voteReset 해시 = 남는 낱말만(#fresh 가 남으면 시작 저장본이 안 깔리고 · 끝 이 남으면 처음부터가 끝 카드) ' + J(kv.map(x => decodeURIComponent(x.주소))));
     ok(sv.저장뒤 === String(sv.frozen) && sv.저장시각 >= 1, '저장 → 시각 키 ' + J({ 저장뒤: sv.저장뒤, frozen: sv.frozen, 저장시각: sv.저장시각 }));
     ok(sv.끈뒤 === '2' && sv.되돌림 === true && sv.꺼진뒤 === '3', 'c0t 끔 · savingOff 인데 시각 키를 적음 ' + J({ 끈뒤: sv.끈뒤, 꺼진뒤: sv.꺼진뒤 }));
     ok(vr.length === 1 && vr[0].다시싣기 && url(vr[0]).hash === '#n=c3-07' && /^\d+$/.test(url(vr[0]).searchParams.get('r') || ''), 'voteReset 다시 싣기 ' + J(vr));
