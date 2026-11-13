@@ -149,6 +149,64 @@ await test('구음 띠 칸 — 박 머리 표시 · 칸마다 소리', () => {
   eq(cells.map(c => c.k || '.').join(''), 'D.K.DDK.');
   eq(cells.filter(c => c.beat).length, s.beats);
 });
+// ── 공연 편곡 [MUSIC-DRUM-ARR-1] ──  진짜 공연 곡 가락은 쓰지 않는다(저작권) — 같은 박 · 칸 · 마디 수의 빈 가락(온음표)으로 본뜸
+const { TEACHER_DRUMS } = await import('../../../music/js/drumparts.js');
+const shell = (tk, a, bars = a.bars) => fromTeacherSong({ key: tk, title: '본뜬 곡', tempo: 100, beats: a.beats, sub: a.sub, origin: '시험', melody: Array(bars).fill(`C4/${a.beats * a.sub}`).join(' | ') });
+await test('공연 편곡 — 마디 글 칸 수 · 글자 · seq 이름 · 마디 수 · 이름표 순서', () => {
+  ok(Object.keys(TEACHER_DRUMS).length >= 2, '바나나 차차 · 피노키오');
+  for (const [tk, a] of Object.entries(TEACHER_DRUMS)) {
+    for (const [k, p] of Object.entries(a.pats)) D.parseBar(p, a.beats * a.sub);   // 틀리면 오류
+    const seq = D.arrangedSeq(a);
+    eq(seq.length, a.bars, tk + ' seq 마디 수');
+    ok(seq.every(k => a.pats[k]), tk + ' seq 에 없는 마디 글');
+    ok(a.marks.every((m, i) => m[0] >= 1 && m[0] <= a.bars && (!i || a.marks[i - 1][0] < m[0])), tk + ' 이름표 순서');
+    const c = D.arrangedChart(shell(tk, a)), gap = a.sub / 2;
+    ok(c.every((x, i) => !i || x.s - c[i - 1].s >= gap), tk + ' 두 소리 사이는 반 박 이상(16분 연타 없음)');
+  }
+});
+await test('공연 편곡 — 박 · 칸 · 마디가 같을 때만 · 다르면 자동 반주로 · 난이도 목록', () => {
+  for (const [tk, a] of Object.entries(TEACHER_DRUMS)) {
+    const s = shell(tk, a), c = D.arrangedChart(s);
+    ok(c && c.length > a.bars && D.chartOK(s, c), tk + ' 악보');
+    eq(c[c.length - 1].k, 'B', tk + ' 덩으로 맺음');
+    eq(D.levelsFor(s)[0], 'arr', tk + ' 편곡이 맨 앞');
+    eq(D.songChart(s, 'arr'), c);
+    const bad = shell(tk, a, a.bars - 1);
+    eq(D.arrangedChart(bad), null, tk + ' 마디가 다르면 안 씀');
+    ok(!D.levelsFor(bad).includes('arr'), tk + ' 그때는 편곡 칸도 없음');
+    eq(D.songChart(bad, 'arr'), D.songChart(bad, 'normal'), tk + ' 반주 리듬으로');
+  }
+  ok(!D.levelsFor(lib('star')).includes('arr'), '기본 곡엔 편곡 없음');
+  eq(D.arrangedChart(fromTeacherSong({ key: 'banana_chacha_x', title: 'x', tempo: 100, beats: 4, sub: 4, origin: '시험', melody: 'C4/16' })), null, '곡 키가 다르면 없음');
+});
+await test('공연 편곡 — 바나나 차차: 들어가기 · 후렴 구음 · 이름표 · 반 박 표시', () => {
+  const a = TEACHER_DRUMS.banana_chacha, s = shell('banana_chacha', a), c = D.arrangedChart(s);
+  eq(D.sayText(s, c, 0), '· · ·딱 딱딱', '들어가기 = 차 차 차');
+  eq(D.sayText(s, c, 1), '덩쿵 · 쿵딱 딱딱', 'A 후렴');
+  eq([D.markAt(s, 0), D.markAt(s, 1), D.markAt(s, 18), D.markAt(s, 58), D.markAt(s, 66)], ['들어가기', 'A 후렴', 'C', '마무리', '끝']);
+  const p = TEACHER_DRUMS.pinocchio, ps = shell('pinocchio', p), pc = D.arrangedChart(ps);
+  eq(D.sayText(ps, pc, 0), '딱딱 딱딱 쿵 쿵', '피노키오 톡톡 = 테두리');
+});
+await test('맞추기 시험 — 가운데 값 · 손 풀기 · 튄 누름 · 다섯 번 미만', () => {
+  const beat = 60 / 90, N = 16, skip = 4;
+  const taps = Array.from({ length: N }, (_, i) => i * beat + 0.06 + ((i * 7) % 5 - 2) * 0.004);   // +0.06초 ± 조금
+  taps.push(9 * beat + 0.29);   // 튄 누름 하나(0.3초 안 — 그래도 가운데 값은 안 흔들림)
+  taps.push(1 * beat + 0.2);    // 손 풀기 자리(안 셈)
+  const r = D.calibrateFrom(taps, beat, N, skip);
+  ok(r && Math.abs(r.offset - 0.06) < 0.006, '가운데 값 ' + (r && r.offset));
+  eq(r.n, N - skip + 1);
+  ok(r.spread < 0.02, '고르기');
+  eq(D.calibrateFrom(taps.slice(0, 6), beat, N, skip), null, '손 풀기 뒤 다섯 번이 안 되면 잴 수 없음');
+  const early = D.calibrateFrom(Array.from({ length: 12 }, (_, i) => (i + 4) * beat - 0.03), beat, N, skip);
+  ok(Math.abs(early.offset + 0.03) < 1e-9, '서둘러 누르면 음수');
+});
+await test('화면 연결(글) — 편곡 · 맞추기 시험', () => {
+  const html = read('music/index.html'), app = read('music/js/app.js'), drum = read('music/js/drum.js');
+  ok(/"\.\/js\/drumparts\.js": "\.\/js\/drumparts\.js\?v=\w+"/.test(html), 'import map drumparts');
+  ok(app.includes("from './drumparts.js'") && app.includes('공연 편곡'), '곡 고르기 편곡 표');
+  ok(drum.includes('function calibrate()') && drum.includes('calibrateFrom(') && drum.includes('e.timeStamp'), '맞추기 시험');
+  ok(drum.includes('levelsFor(song)') && drum.includes('markAt(song'), '편곡 난이도 · 이름표');
+});
 await test('화면 연결(글) — 길 · 문 · 곡 고르기 · import map · 북 소리 이름', () => {
   const app = read('music/js/app.js'), html = read('music/index.html'), audio = read('music/js/audio.js'), drum = read('music/js/drum.js');
   ok(/parts\[0\] === 'drum'/.test(app) && app.includes("import('./drum.js')"), 'app.js 길');

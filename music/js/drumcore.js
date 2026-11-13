@@ -7,6 +7,7 @@
 import { barSteps, totalSteps } from './theory.js';
 import { buildEvents, fromLibrary } from './song.js';
 import { LIBRARY } from './library.js';
+import { TEACHER_DRUMS } from './drumparts.js';   // [MUSIC-DRUM-ARR-1] 공연 곡 손 편곡(북 리듬만)
 
 //  치는 곳 셋 — drum = 소리 장치(audio.js Engine.drum) 이름 · say = 입으로 말하는 소리(구음)
 export const HITS = {
@@ -91,6 +92,7 @@ export const stageChart = (stage, song = stageSong(stage)) => patternChart(song,
 
 // ── 곡 반주 ──  리코더 곡 하나 → 북 반주 악보. 난이도 셋
 export const DRUM_LEVELS = {
+  arr:    { name: '🎼 공연 편곡', line: '이 곡에 맞춰 짠 북 파트 — 가락 리듬을 받쳐 주고 큰 마디마다 덩', arr: true },   // [MUSIC-DRUM-ARR-1] 편곡이 있는 곡만
   easy:   { name: '박 치기', line: '박마다 한 번 — 센 박은 쿵, 여린 박은 딱' },
   normal: { name: '반주 리듬', line: '반 박이 섞인 반주 · 네 마디마다 첫 박은 덩' },
   hard:   { name: '가락 리듬 따라', line: '리코더 가락의 리듬을 그대로 · 센 박은 쿵, 나머지는 딱' },
@@ -112,7 +114,43 @@ export function accompBars(song, level) {
   }[level === 'easy' ? 'easy' : 'normal'][beats] || ['D.K.'];
   return E.map(s => fromEighths(s, sub));
 }
+// ── 공연 편곡 [MUSIC-DRUM-ARR-1] ──  선생님 곡 키 · 박 · 칸 · 마디 수가 편곡과 같을 때만(곡 파일이 바뀌면 자동 반주로)
+export function arrangementOf(song) {
+  const a = song && song.ts && song.tk ? TEACHER_DRUMS[song.tk] : null;
+  return a && a.beats === song.beats && a.sub === song.sub && a.bars === song.bars ? a : null;
+}
+export const arrangedSeq = a => a.seq.replace(/\s+/g, '').split('');
+export function arrangedChart(song) {
+  const a = arrangementOf(song);
+  if (!a) return null;
+  const seq = arrangedSeq(a);
+  if (seq.length !== song.bars) return null;
+  return patternChart(song, seq.map(k => a.pats[k]), 'B');
+}
+//  마디(0부터)의 편곡 이름표 — 구음 띠 '이번 마디 · A 후렴'
+export function markAt(song, bar) {
+  const a = arrangementOf(song);
+  if (!a || !a.marks) return '';
+  let name = '';
+  for (const [from, nm] of a.marks) if (from - 1 <= bar) name = nm;
+  return name;
+}
+export const levelsFor = song => Object.keys(DRUM_LEVELS).filter(k => !DRUM_LEVELS[k].arr || !!arrangementOf(song));
+
+// ── 소리 · 화면 맞추기 시험 [MUSIC-DRUM-SYNC-2] ──  딸깍(beat 초 간격 · N 번)에 맞춰 누른 때(들리는 소리 시계 · 첫 딸깍 = 0) → 얼마나 늦게 눌렀나
+//  앞 skip 번은 버림(손 풀기) · 가장 가까운 딸깍과 0.3초 넘게 떨어진 누름은 버림 · 가운데 값(median)으로 — 한두 번 튄 누름에 안 흔들리게
+//  → { offset 초(+ = 늦게 눌렀다 = 소리가 실제로 더 늦게 들린다), spread 고르기(가운데 값에서 떨어진 정도의 가운데) , n } · 다섯 번이 안 되면 null
+export function calibrateFrom(taps, beat, N, skip = 3) {
+  const err = [];
+  for (const x of taps) { const i = Math.round(x / beat); if (i >= skip && i < N && Math.abs(x - i * beat) <= 0.3) err.push(x - i * beat); }
+  if (err.length < 5) return null;
+  const med = a => { const s = [...a].sort((p, q) => p - q), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const offset = med(err);
+  return { offset, spread: med(err.map(e => Math.abs(e - offset))), n: err.length };
+}
+
 export function songChart(song, level = 'easy') {
+  if (level === 'arr') return arrangedChart(song) || songChart(song, 'normal');   // [MUSIC-DRUM-ARR-1]
   const bs = barSteps(song), out = [];
   if (level === 'hard') {
     //  가락 리듬 따라 — 음이 시작하는 칸마다 · 센 박(첫 박 · 4박자의 셋째 박) 머리 = 쿵 · 그 밖(여린 박 · 박 사이) = 딱 ·
@@ -209,7 +247,8 @@ export function sayText(song, chart, bar) {
   for (let b = 0; b < song.beats; b++) {
     const cs = cells.slice(b * song.sub, (b + 1) * song.sub), lastHit = cs.map(c => !!c.k).lastIndexOf(true);
     //  박 머리 쉼 = · · 박 안에서 두 소리 사이 쉼 = · (세마치 '덩·덩') · 박 끝에 남는 쉼은 안 적음
-    beats.push(cs.map((c, i) => (c.k ? HITS[c.k].say : i === 0 || i < lastHit ? '·' : '')).join('') || '·');
+    //  한 박 4칸 곡은 반 박 자리(짝수 칸)만 쉼 표시 — '딱·딱'(16분 쉼까지)이 아니라 '딱딱'(반 박 둘)로 읽히게 [MUSIC-DRUM-ARR-1]
+    beats.push(cs.map((c, i) => (c.k ? HITS[c.k].say : i === 0 || (i < lastHit && (song.sub !== 4 || i % 2 === 0)) ? '·' : '')).join('') || '·');
   }
   return beats.join(' ');
 }
