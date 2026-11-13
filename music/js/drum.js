@@ -64,6 +64,12 @@ function noteIcon(g, x, y, k, r) {
     g.strokeStyle = '#fff'; g.stroke();
     g.fillStyle = CREAM; g.beginPath(); g.arc(x, y, r * 0.58, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#1b5f8a'; g.font = `900 ${Math.round(r * 0.66)}px "Noto Sans KR",sans-serif`;
+  } else if (k === 'R') {   // [MUSIC-DRUM-ROLL-1] 굴리기 머리 — 주황 원 '다라'
+    g.fillStyle = HITS.R.color; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#fff'; g.stroke();
+    g.fillStyle = '#3a1d00'; g.font = `900 ${Math.round(r * 0.62)}px "Noto Sans KR",sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('다라', x, y + 1);
+    return;
   } else {
     g.fillStyle = BLUE; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
     g.strokeStyle = '#ffe48f'; g.lineWidth = Math.max(3, r * 0.1); g.stroke();
@@ -122,7 +128,9 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   const levels = stage ? [] : levelsFor(song), savedLv = lsGet('music.drumLevel', 'easy');
   let level = stage ? null : levels.includes('arr') ? 'arr' : levels.includes(savedLv) && savedLv !== 'arr' ? savedLv : 'easy';
   let how = lsGet(HOW_KEY, 'real') === 'keys' ? 'keys' : 'real';
-  let speed = stage ? 1 : 0.8, guide = how === 'real', melodyOn = true;
+  //  [MUSIC-DRUM-ROLL-1] 곡 반주 빠르기는 이 기기에 기억(사용자 11-13 '애들 조금 빠르게로 할 거라서' — 한 번 고르면 다음에도)
+  const savedSp = lsGet('music.drumSpeed', 0.8);
+  let speed = stage ? 1 : SPEEDS.some(([v]) => v === savedSp) ? savedSp : 0.8, guide = how === 'real', melodyOn = true;
   let sync = okSync(lsGet(SYNC_KEY, 0)) ? lsGet(SYNC_KEY, 0) : 0, lastT = -1e9;   // [MUSIC-DRUM-SYNC-1]
   let chart = [], J = null, state = 'ready', raf = 0, t0 = 0, built = null, tEnd = 0, cue = 0, alive = true, partners = [];
   let flash = { D: -9, K: -9 }, bursts = [], judgeShow = null, hint = null, cheerT = -9;
@@ -140,7 +148,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     chart = stage ? stageChart(stage, song) : songChart(song, level);
     if (!chartOK(song, chart)) { console.warn('[MUSIC-DRUM-1] 악보 이상 — 칸 밖 · 겹침을 뺌'); chart = chart.filter(c => c.s >= 0 && c.s < totalSteps(song)); }
     const sd = stepDur();
-    J = createJudge(chart.map(c => ({ ...c, t: c.s * sd })));
+    J = createJudge(chart.map(c => ({ ...c, t: c.s * sd, dur: (c.d || 0) * sd })));   // [MUSIC-DRUM-ROLL-1] 굴리기 길이(초)
     cue = 0;
   }
 
@@ -150,7 +158,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   const melBtn = hasMel ? tog('🎵 가락 소리', () => melodyOn, v => { melodyOn = v; }, '리코더 가락 소리(진짜 리코더와 같이 하면 꺼도 돼요)') : null;
   const right = [];
   if (!stage) right.push(sel(levels.map(k => [k, DRUM_LEVELS[k].name]), level, v => { level = v; if (v !== 'arr') lsSet('music.drumLevel', v); changed(); }));
-  right.push(sel(SPEEDS, speed, v => { speed = +v; changed(); }), guideBtn);
+  right.push(sel(SPEEDS, speed, v => { speed = +v; if (!stage) lsSet('music.drumSpeed', speed); changed(); }), guideBtn);
   if (melBtn) right.push(melBtn);
   const top = ctx.topBar(stage ? `북 치기 · ${stageNo}단계 ${stage.title}` : `북 반주 · ${song.title || '곡'}`, { back: () => ctx.go(stage ? '#/drum' : '#/pick/drum'), right });
   const cv = h('canvas', { class: 'r-cv dr-cv' });
@@ -214,7 +222,9 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   // ── 시간 ──
   //  [MUSIC-DRUM-SYNC-1] 첫 음부터 초 — 들리는 소리 기준 − 맞추기 · 치는 중에는 뒤로 가지 않게(시계 이음새에서 음표가 뒤로 튀지 않게)
   const playT = perf => heard(perf) - t0 - (built ? built.offset : 0) - sync;
+  let peekT = null;   // 시험용(?debug=1) — 그 시각의 화면만 그려 보기(소리 없음)
   const now = () => {
+    if (peekT != null) return peekT;
     if (state === 'play') { const v = playT(); if (v < lastT && lastT - v < 0.05) return lastT; return (lastT = v); }
     return state === 'done' ? tEnd : -1;
   };
@@ -249,6 +259,20 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     const ns = J ? J.notes : [];
     for (let i = ns.length - 1; i >= 0; i--) {
       const n = ns[i], x = jx + (n.t - t) * pxSec;
+      if (n.k === 'R') {   // [MUSIC-DRUM-ROLL-1] 굴리기 — 주황 띠(머리 → 꼬리). 굴리는 동안 머리는 판정 원에 붙어 있고 띠가 줄어든다 · 친 횟수 표시
+        const xe = jx + (n.t + n.dur - t) * pxSec;
+        if (xe < lx - rN || x > W + rB) continue;
+        if (how === 'keys' && n.hit && n.hit !== 'miss') continue;
+        const on = t >= n.t && t <= n.t + n.dur, xh = on ? jx : x, h0 = rN * 1.3;
+        g.globalAlpha = how === 'keys' && n.hit === 'miss' ? 0.3 : how === 'real' && t > n.t + n.dur ? 0.2 : 1;
+        g.fillStyle = 'rgba(255,159,26,.55)'; rr(xh, laneY - h0 / 2, Math.max(0, xe - xh), h0, h0 / 2); g.fill();
+        g.strokeStyle = 'rgba(255,228,143,.9)'; g.lineWidth = 2; rr(xh, laneY - h0 / 2, Math.max(0, xe - xh), h0, h0 / 2); g.stroke();
+        if (xe - xh > rN * 3) { g.fillStyle = '#3a1d00'; g.font = `900 ${Math.round(rN * 0.62)}px "Noto Sans KR",sans-serif`; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('라라라라라', xh + rN * 1.2, laneY + 1); }
+        noteIcon(g, xh, laneY, 'R', rN * (on ? 1 + 0.08 * Math.sin(t * 40) : 1));
+        if (on && how === 'keys' && n.rolls) { g.fillStyle = '#ffe48f'; g.font = '900 22px "Noto Sans KR",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText(`×${n.rolls}`, jx, laneY + rN + 26); }
+        g.globalAlpha = 1;
+        continue;
+      }
       if (x > W + rB || x < lx - rB) continue;
       if (how === 'keys' && n.hit && n.hit !== 'miss') continue;
       const dead = how === 'keys' && n.hit === 'miss', gone = how === 'real' && n.t < t;
@@ -292,6 +316,16 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
       cells.forEach((c, i) => {
         const x = x0 + i * cw + cw / 2, y = sayY + sayH / 2 + 8;
         if (c.beat && i) { g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(x0 + i * cw - 0.5, sayY + 16, 1, sayH - 22); }
+        if (c.k === 'R') {   // [MUSIC-DRUM-ROLL-1] 굴리기 — 덮는 칸 넓이에 '다라라라라라'(주황 띠)
+          const s = bar * bs + i, span = Math.min(c.d, bs - i) * cw, x1 = x0 + i * cw + 2, now$ = !j && J && J.notes.some(n => n.s === s && t >= n.t - 0.06 && t <= n.t + n.dur);
+          g.globalAlpha = j ? 0.7 : 1;
+          g.fillStyle = now$ ? 'rgba(255,159,26,.4)' : 'rgba(255,159,26,.18)'; rr(x1, y - fs * 0.62, span - 4, fs * 1.24, fs * 0.5); g.fill();
+          g.fillStyle = HITS.R.color; g.font = `900 ${Math.round(fs * (now$ ? 1.12 : 1))}px "Noto Sans KR",sans-serif`; g.textAlign = 'left'; g.textBaseline = 'middle';
+          const word = '다라라라라라라라라라'.slice(0, Math.max(3, Math.min(10, Math.floor((span - 12) / (fs * 0.92)))));
+          g.fillText(word, x1 + 6, y); g.globalAlpha = 1;
+          return;
+        }
+        if (c.roll) return;   // 굴리기가 덮은 칸(앞 마디에서 이어진 것 포함) — 쉼 표시 안 함
         if (!c.k) { if (c.beat) { g.fillStyle = 'rgba(255,255,255,.28)'; g.font = `900 ${fs}px "Noto Sans KR",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('·', x, y); } return; }
         const s = bar * bs + i, isNow = !j && act && act.s === s, past = !j && J && J.notes.some(n => n.s === s && n.t < t - 0.3);
         g.globalAlpha = past ? 0.35 : j ? 0.7 : 1;
@@ -379,6 +413,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     if (state !== 'play' || how !== 'keys' || t < -0.3) return;
     const r = J.hit(side, t);
     if (JUDGE[r.kind]) shown(r);
+    else if (r.kind === 'roll') { bursts.push({ at: t, c: HITS.R.color }); cheerT = t; }   // [MUSIC-DRUM-ROLL-1] 굴리기 — 칠 때마다 반짝 · 횟수는 길 위 ×N
     else if (r.kind === 'wrong') hint = { text: r.want === 'D' ? '✋ 가운데!' : '✋ 테두리!', c: r.want === 'D' ? '#ff8a8a' : '#8fd0ff', at: t };
   }
   function shown(r) {
@@ -393,7 +428,12 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     if (state !== 'play') return;
     const t = now();
     if (how === 'keys') for (const r of J.sweep(t)) shown(r);
-    else while (cue < J.notes.length && J.notes[cue].t <= t + VIS_LEAD) { const k = J.notes[cue].k; if (k !== 'K') flash.D = J.notes[cue].t; if (k !== 'D') flash.K = J.notes[cue].t; cue++; }   // 진짜 북: 칠 때 북 그림이 빛남
+    else {
+      while (cue < J.notes.length && J.notes[cue].t <= t + VIS_LEAD) { const k = J.notes[cue].k; if (k !== 'K') flash.D = J.notes[cue].t; if (k === 'K' || k === 'B') flash.K = J.notes[cue].t; cue++; }
+      //  [MUSIC-DRUM-ROLL-1] 굴리는 동안 가운데가 0.08초마다 빛남(다라라라)
+      const tv = t + VIS_LEAD, rl = J.notes.find(n => n.k === 'R' && tv >= n.t && tv <= n.t + n.dur);
+      if (rl && tv - flash.D >= 0.08) flash.D = tv;
+    }   // 진짜 북: 칠 때 북 그림이 빛남
     draw(); raf = requestAnimationFrame(loop);
   }
   function start() {
@@ -557,6 +597,6 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   //  시험용(?debug=1 일 때만)
   if (/[?&]debug=1/.test(location.search)) window.__drum = { chart: () => chart.map(c => ({ ...c })), notes: () => J.notes.map(n => ({ ...n })), now, press, stats: () => ({ ...J.stats }), start, stop, state: () => state, how: () => how,
     setHow: k => { how = k; guide = k === 'real'; }, layout: () => ({ ...L }), sideAt, sync: () => sync, setSync: v => { sync = v; },
-    clock: () => { const c = engine.ctx; return c ? { cur: c.currentTime, heard: heard(), out: c.outputLatency || 0, base: c.baseLatency || 0 } : null; }, mute: () => ({ ...player.mute }), built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0, guide: built.events.filter(e => e.track === 'guide').length } : null), recKey, level: () => level, calibrate, calTap, cal: () => (cal ? { taps: cal.taps.length, c0: cal.c0, beat: cal.beat } : null), heard: () => heard() };
+    clock: () => { const c = engine.ctx; return c ? { cur: c.currentTime, heard: heard(), out: c.outputLatency || 0, base: c.baseLatency || 0 } : null; }, mute: () => ({ ...player.mute }), built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0, guide: built.events.filter(e => e.track === 'guide').length } : null), recKey, level: () => level, calibrate, calTap, cal: () => (cal ? { taps: cal.taps.length, c0: cal.c0, beat: cal.beat } : null), heard: () => heard(), peek: sec => { peekT = sec; over.style.display = sec == null ? 'grid' : 'none'; draw(); } };
   return { pause() { calStop(false); if (state === 'play') stop(); }, unmount() { alive = false; calStop(false); player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); ro.disconnect(); } };
 }

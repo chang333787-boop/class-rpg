@@ -686,3 +686,5 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .dr-cal-dot.hit{box-shadow:0 0 0 8px rgba(255,228,143,.45)}
 .dr-cal-n{font-size:1.1rem;color:var(--gold2);min-height:1.4em}
 .ens-badge.dr-arr-badge{background:rgba(242,169,59,.18);color:var(--gold2)}
+/* [MUSIC-DRUM-ROLL-1] 굴리기 표 */
+.dr-dot.k-R{background:#ff9f1a;color:#3a1d00;font-size:.62rem;letter-spacing:-.05em}

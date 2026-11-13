@@ -14,9 +14,12 @@ export const HITS = {
   D: { say: '쿵', part: '가운데', drum: 'don', color: '#e5484d' },
   K: { say: '딱', part: '테두리', drum: 'ka', color: '#2fa3e6' },
   B: { say: '덩', part: '가운데 + 테두리 같이', drum: 'donka', color: '#f2a93b' },
+  //  [MUSIC-DRUM-ROLL-1] 굴리기 '다라라라라' — 정한 길이(d 칸) 동안 가운데를 두 채로 빠르게 번갈아(장구의 '더러러러'처럼) · 몇 번을 쳐도 됨
+  R: { say: '다라라', part: '가운데를 두 채로 빠르게 굴리기', drum: 'don', color: '#ff9f1a', roll: true },
 };
 
 // ── 마디 글 ──  한 글자 = 한 칸(곡의 sub 칸이 한 박) · D 쿵 · K 딱 · B 덩 · . 쉼 · 띄어쓰기는 읽기 좋게(무시)
+//  [MUSIC-DRUM-ROLL-1] R~~~ = 굴리기(R 칸부터 ~ 칸까지 · d = 칸 수) — 'R~~~~~~~~~~~B...' = 세 박 다라라라 → 넷째 박 덩
 export function parseBar(str, bs) {
   const s = String(str).replace(/\s+/g, '');
   if (s.length !== bs) throw new Error(`마디 글 '${str}' 칸 수 ${s.length} ≠ ${bs}`);
@@ -24,19 +27,23 @@ export function parseBar(str, bs) {
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (c === '.') continue;
+    if (c === '~') throw new Error(`마디 글 '${str}' ~ 앞에 R 이 없어요`);
     if (!HITS[c]) throw new Error(`마디 글 '${str}' 모르는 글자 ${c}`);
+    if (c === 'R') { let d = 1; while (s[i + d] === '~') d++; out.push({ at: i, k: 'R', d }); i += d - 1; continue; }
     out.push({ at: i, k: c });
   }
   return out;
 }
-//  같은 칸에 둘 → 하나로(쿵 + 딱 = 덩) · 칸 순서대로
+//  같은 칸에 둘 → 하나로(쿵 + 딱 = 덩 · 굴리기가 있으면 굴리기) · 칸 순서대로
 export function tidy(hits) {
   const by = new Map();
   for (const x of hits) {
     const p = by.get(x.s);
-    by.set(x.s, !p ? x.k : p === x.k ? p : 'B');
+    if (x.k === 'R') by.set(x.s, { k: 'R', d: x.d });
+    else if (!p) by.set(x.s, { k: x.k });
+    else if (p.k !== 'R') by.set(x.s, { k: p.k === x.k ? p.k : 'B' });
   }
-  return [...by.entries()].sort((a, z) => a[0] - z[0]).map(([s, k]) => ({ s, k }));
+  return [...by.entries()].sort((a, z) => a[0] - z[0]).map(([s, v]) => (v.k === 'R' ? { s, k: 'R', d: v.d } : { s, k: v.k }));
 }
 //  끝맺기 — 마지막 가락 음이 나오는 칸에 '맺는 소리'(덩, 덩을 아직 안 배운 단계는 쿵) 한 번 · 그 뒤는 쉼.
 //   마지막 음이 마지막 두 마디 밖이면(끝이 길게 쉬는 곡) 마지막 마디 첫 박에서 맺는다 · 가락이 없으면 마지막 마디 첫 박
@@ -83,11 +90,12 @@ export function stageSong(stage) {
     scale: 'pyeong', inst: 'piano', notes: [], harm: [], chords: [], acc: { chord: true, bass: false, drum: 'none' }, mood: null, reverb: 0.12 };
 }
 //  마디 글을 곡 길이만큼 돌려 쓴 북 악보
-export function patternChart(song, bars, end = 'B') {
+function patternHits(song, bars) {
   const bs = barSteps(song), parsed = bars.map(b => parseBar(b, bs)), out = [];
-  for (let b = 0; b < song.bars; b++) for (const x of parsed[b % parsed.length]) out.push({ s: b * bs + x.at, k: x.k });
-  return ending(song, out, end);
+  for (let b = 0; b < song.bars; b++) for (const x of parsed[b % parsed.length]) out.push(x.k === 'R' ? { s: b * bs + x.at, k: 'R', d: x.d } : { s: b * bs + x.at, k: x.k });
+  return out;
 }
+export const patternChart = (song, bars, end = 'B') => ending(song, patternHits(song, bars), end);
 export const stageChart = (stage, song = stageSong(stage)) => patternChart(song, stage.bars, stage.end);
 
 // ── 곡 반주 ──  리코더 곡 하나 → 북 반주 악보. 난이도 셋
@@ -125,7 +133,7 @@ export function arrangedChart(song) {
   if (!a) return null;
   const seq = arrangedSeq(a);
   if (seq.length !== song.bars) return null;
-  return patternChart(song, seq.map(k => a.pats[k]), 'B');
+  return tidy(patternHits(song, seq.map(k => a.pats[k])));   // 손 편곡은 끝맺기를 손으로 짰다(다라라 → 덩) — 자동 끝맺기를 안 씌움 [MUSIC-DRUM-ROLL-1]
 }
 //  마디(0부터)의 편곡 이름표 — 구음 띠 '이번 마디 · A 후렴'
 export function markAt(song, bar) {
@@ -180,7 +188,13 @@ export function drumEvents(song, chart, { speed = 1 } = {}) {
   const built = buildEvents(song, { scale: speed, countIn: song.beats, melody: true, drum: 'none', orch: false, lead: false });
   const events = built.events.map(e => (e.track === 'melody' ? { ...e, inst: 'recorder', vel: 0.6 } : e.track === 'count' ? e : { ...e, vel: (e.vel ?? 0.8) * 0.75 }));
   if (!(song.notes || []).length) for (let b = 0; b < song.bars * song.beats; b++) events.push({ t: built.offset + b * built.beatDur, kind: 'drum', drum: 'hat', vel: b % song.beats ? 0.16 : 0.28, track: 'metro' });
-  for (const c of chart) events.push({ t: built.offset + c.s * built.stepDur, kind: 'drum', drum: HITS[c.k].drum, vel: 0.62, track: 'guide' });
+  for (const c of chart) {
+    const t = built.offset + c.s * built.stepDur;
+    if (c.k !== 'R') { events.push({ t, kind: 'drum', drum: HITS[c.k].drum, vel: 0.62, track: 'guide' }); continue; }
+    //  굴리기 도움 소리 — 0.06초쯤마다(한 칸의 반 · 너무 빠르면 0.05초) 점점 크게
+    const dur = c.d * built.stepDur, iv = Math.max(0.05, Math.min(0.07, built.stepDur / 2)), n = Math.max(2, Math.floor(dur / iv));
+    for (let i = 0; i < n; i++) events.push({ t: t + i * iv, kind: 'drum', drum: 'don', vel: Math.round((0.32 + 0.4 * i / n) * 1000) / 1000, track: 'guide' });
+  }
   events.sort((a, z) => a.t - z.t);
   return { ...built, events };
 }
@@ -193,8 +207,10 @@ export const DRUM_WIN = { perfect: 0.05, great: 0.1, good: 0.15 };
 export const PAIR = 0.09;
 export const JUDGE_W = { perfect: 1, great: 0.7, good: 0.4, half: 0.5, miss: 0 };
 export function createJudge(chart, win = DRUM_WIN) {
-  const notes = chart.map(c => ({ t: c.t, k: c.k, s: c.s, hit: null, got: {}, wrong: false }));
-  const stats = { perfect: 0, great: 0, good: 0, miss: 0, half: 0, wrong: 0, combo: 0, maxCombo: 0, sum: 0, count: notes.length };
+  //  [MUSIC-DRUM-ROLL-1] 굴리기 = dur 초 동안 아무 쪽이나 친 횟수(rolls) — 끝나면 한 음표로 판정: 넉넉히(초당 3번쯤 · 적어도 3번) = 완벽 · 2번 = 좋아 · 1번 = 괜찮아 · 0 = 놓침
+  const notes = chart.map(c => ({ t: c.t, k: c.k, s: c.s, dur: c.dur || 0, hit: null, got: {}, wrong: false, rolls: 0 }));
+  const stats = { perfect: 0, great: 0, good: 0, miss: 0, half: 0, wrong: 0, rolls: 0, combo: 0, maxCombo: 0, sum: 0, count: notes.length };
+  const rollEnd = n => n.t + n.dur + 0.05;
   const kindOf = dt => (dt <= win.perfect ? 'perfect' : dt <= win.great ? 'great' : 'good');
   function judge(n, kind, at, half = false) {
     if (kind === 'perfect' && n.wrong) kind = 'great';
@@ -205,7 +221,9 @@ export function createJudge(chart, win = DRUM_WIN) {
     return { kind, note: n, at, half };
   }
   function hit(side, t) {
-    const near = notes.filter(n => !n.hit && Math.abs(n.t - t) <= win.good);
+    const roll = notes.find(n => n.k === 'R' && !n.hit && t >= n.t - win.good && t <= rollEnd(n));
+    if (roll) { roll.rolls++; stats.rolls++; return { kind: 'roll', note: roll, at: t, count: roll.rolls }; }
+    const near = notes.filter(n => !n.hit && n.k !== 'R' && Math.abs(n.t - t) <= win.good);
     //  ① 한쪽을 이미 받은 덩 — 다른 쪽이 PAIR 안에 오면 한 번으로
     const open = near.find(n => n.k === 'B' && !n.got[side] && Object.keys(n.got).length && Math.abs(Object.values(n.got)[0] - t) <= PAIR);
     if (open) { open.got[side] = t; const first = Math.min(...Object.values(open.got)); return judge(open, kindOf(Math.abs(first - open.t)), t); }
@@ -223,6 +241,10 @@ export function createJudge(chart, win = DRUM_WIN) {
     const out = [];
     for (const n of notes) {
       if (n.hit) continue;
+      if (n.k === 'R') {
+        if (t > rollEnd(n)) { const need = Math.max(3, Math.round(n.dur * 3)); out.push(judge(n, n.rolls >= need ? 'perfect' : n.rolls >= 2 ? 'great' : n.rolls === 1 ? 'good' : 'miss', t)); }
+        continue;
+      }
       const got = Object.values(n.got);
       if (got.length) { if (t - got[0] > PAIR) out.push(judge(n, 'good', t, true)); }
       else if (t > n.t + win.good) out.push(judge(n, 'miss', t));
@@ -237,9 +259,11 @@ export const gradeOf = acc => (acc >= 95 ? 'S' : acc >= 88 ? 'A' : acc >= 75 ? '
 export const starsOf = grade => ({ S: 3, A: 3, B: 2, C: 1 })[grade] || 0;
 
 // ── 입으로 말하기(구음) ──  한 마디 → [{ at 칸, k | null, beat 박 머리인지 }] — 화면 위 '구음 띠' · 단계 카드 미리보기
+//  [MUSIC-DRUM-ROLL-1] 굴리기 = 시작 칸 { k: 'R', d } · 굴리기가 덮은 칸 = roll: true(쉼 표시 안 함 · 앞 마디에서 이어진 것도)
 export function sayBar(song, chart, bar) {
-  const bs = barSteps(song), a = bar * bs, by = new Map(chart.filter(c => c.s >= a && c.s < a + bs).map(c => [c.s - a, c.k]));
-  return Array.from({ length: bs }, (_, i) => ({ at: i, k: by.get(i) || null, beat: i % song.sub === 0 }));
+  const bs = barSteps(song), a = bar * bs, by = new Map(chart.filter(c => c.s >= a && c.s < a + bs).map(c => [c.s - a, c]));
+  const cover = s => chart.some(c => c.k === 'R' && c.s < s && s < c.s + c.d);
+  return Array.from({ length: bs }, (_, i) => { const c = by.get(i); return { at: i, k: c ? c.k : null, d: c && c.k === 'R' ? c.d : 0, beat: i % song.sub === 0, roll: !c && cover(a + i) }; });
 }
 //  한 마디를 글로 — '쿵 · 딱 · 쿵쿵 딱 ·' (박마다 띄움 · 박 머리 쉼 = ·)
 export function sayText(song, chart, bar) {
@@ -248,7 +272,8 @@ export function sayText(song, chart, bar) {
     const cs = cells.slice(b * song.sub, (b + 1) * song.sub), lastHit = cs.map(c => !!c.k).lastIndexOf(true);
     //  박 머리 쉼 = · · 박 안에서 두 소리 사이 쉼 = · (세마치 '덩·덩') · 박 끝에 남는 쉼은 안 적음
     //  한 박 4칸 곡은 반 박 자리(짝수 칸)만 쉼 표시 — '딱·딱'(16분 쉼까지)이 아니라 '딱딱'(반 박 둘)로 읽히게 [MUSIC-DRUM-ARR-1]
-    beats.push(cs.map((c, i) => (c.k ? HITS[c.k].say : i === 0 || (i < lastHit && (song.sub !== 4 || i % 2 === 0)) ? '·' : '')).join('') || '·');
+    //  [MUSIC-DRUM-ROLL-1] 굴리기가 덮은 박 머리 = '라라'(다라라 라라 라라 덩)
+    beats.push(cs.map((c, i) => (c.k ? HITS[c.k].say : c.roll ? (i === 0 ? '라라' : '') : i === 0 || (i < lastHit && (song.sub !== 4 || i % 2 === 0)) ? '·' : '')).join('') || '·');
   }
   return beats.join(' ');
 }
@@ -256,6 +281,8 @@ export function sayText(song, chart, bar) {
 //   (저장소 열쇠는 40자에서 잘리므로 난이도를 앞에 — 긴 곡키여도 난이도끼리 안 섞인다)
 export const stageRecKey = stage => 'dst_' + stage.key;
 export const songRecKey = (songKey, level) => 'dsg' + String(level || 'easy')[0] + '_' + songKey;
-export const usedKinds = chart => ['D', 'K', 'B'].filter(k => chart.some(c => c.k === k));
+export const usedKinds = chart => ['D', 'K', 'B', 'R'].filter(k => chart.some(c => c.k === k));
 //  악보가 곡 안에 있는지(시험 · 화면 안전망) — 칸이 0 ~ 곡 끝 안 · 순서대로 · 겹침 없음
-export const chartOK = (song, chart) => chart.every((c, i) => c.s >= 0 && c.s < totalSteps(song) && HITS[c.k] && (i === 0 || chart[i - 1].s < c.s));
+//  굴리기는 곡 끝을 넘지 않고, 굴리는 동안 다른 음표가 없어야 한다
+const endOf = c => c.s + (c.k === 'R' ? c.d : 1);
+export const chartOK = (song, chart) => chart.every((c, i) => c.s >= 0 && endOf(c) <= totalSteps(song) && HITS[c.k] && (c.k !== 'R' || c.d >= 2) && (i === 0 || endOf(chart[i - 1]) <= c.s));
