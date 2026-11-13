@@ -2,6 +2,7 @@
 //  RPG 안(?sid=&n=)에서 열면 내 이름으로 저장, 아니면 손님(이 기기에만). 주소: #/ · #/compose/<곡> · #/practice/<곡> · #/rhythm/<곡> · #/pick/<모드> · #/log · #/t
 //  [ASSIGN-MUSIC-1] ?assign=<과제>(선생님 과제 · &live=1 = 선생님과 수업) — 그 곡 리듬 화면만 연다(다른 길은 막음) · 결과는 common/assign.js 로
 //  [MUSIC-BEAT-1] #/beat · #/beat/u.<sid>.<비트id> = 비트 만들기(beat.js — 처음 열 때만 불러온다)
+//  [MUSIC-DRUM-1] #/drum · #/drum/stage/<단계> · #/drum/song/<곡> = 북 치기(drum.js · drumcore.js — 처음 열 때만) · #/pick/drum = 북 반주 곡 고르기
 import { h, toast, modal, lsGet, lsSet } from './util.js';
 import { createStore } from './store.js';
 import { librarySongs, normalize, buildEvents, songKey, emptySong, fromTeacherSong, libraryOnce } from './song.js';
@@ -133,7 +134,9 @@ function mountHome(root) {
           h('img', { src: '../assets/monsters/m28.png', alt: '' }), h('b', {}, '리듬 게임'), h('span', {}, '떨어지는 음표를 박에 맞춰 키보드로'),
           h('span', { class: 'keys' }, ...'ASDFJKL;'.split('').map(k => h('i', {}, k)))),
         h('button', { class: 'door d-beat', onclick: () => ctx.go('#/beat') },   // [MUSIC-BEAT-1]
-          h('img', { src: '../assets/monsters/m23.png', alt: '' }), h('b', {}, '비트 만들기'), h('span', {}, '쿵 짝 칙! 짧은 마디를 반복하며 북 · 베이스 · 화음을 쌓아요'))),
+          h('img', { src: '../assets/monsters/m23.png', alt: '' }), h('b', {}, '비트 만들기'), h('span', {}, '쿵 짝 칙! 짧은 마디를 반복하며 북 · 베이스 · 화음을 쌓아요')),
+        h('button', { class: 'door d-drum', onclick: () => ctx.go('#/drum') },   // [MUSIC-DRUM-1]
+          h('img', { src: '../assets/monsters/m25.png', alt: '' }), h('b', {}, '북 치기'), h('span', {}, '가운데는 쿵, 테두리는 딱! 단계별 연습 · 리코더 곡 북 반주'))),
       showcaseShelf(),
       h('div', { class: 'shelf' },
         h('section', {}, h('h2', {}, '내 곡', h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/new') }, '+ 새 곡')), mine),
@@ -195,15 +198,16 @@ function concertRow(c) {
 // ── 곡 고르기 ──  mode: practice | rhythm | mine | class
 //  [MUSIC-TSONG-1] 연습 · 리듬이면 선생님 곡이 있을 때 맨 앞 칸 '선생님 곡'을 처음 칸으로(연습 · 리듬 게임 · 듣기만 — 고치기 · 바꿔 쓰기 없음).
 //   선생님 곡을 2초 안에 못 읽으면 기본 곡부터 보이고, 늦게 오면 칸만 더한다(아이가 보던 칸은 안 바꿈)
+//  [MUSIC-DRUM-1] mode 'drum' = 북 반주 곡 고르기(선생님 곡 칸이 먼저 · 줄마다 '🥁 북 반주' 하나)
 function mountPick(root, mode) {
-  const forPlay = mode === 'practice' || mode === 'rhythm';
+  const forPlay = mode === 'practice' || mode === 'rhythm' || mode === 'drum';
   let tab = mode === 'mine' ? 'mine' : mode === 'class' ? 'class' : 'lib';
   let ts = [], drawn = false, alive = true, drawSeq = 0;
   const list = h('div', { class: 'list' }, h('div', { class: 'empty' }, '불러오는 중…'));
   const sysSel = h('select', { onchange: e => { ctx.setSys(e.target.value); draw(); } }, ...Object.entries(SYSTEMS).map(([k, v]) => { const o = h('option', { value: k }, v + ' 리코더'); if (k === ctx.sys()) o.selected = true; return o; }));
   const tabs = h('div', { class: 'tabs' });
-  const title = mode === 'practice' ? '리코더 연습 — 곡 고르기' : mode === 'rhythm' ? '리듬 게임 — 곡 고르기' : mode === 'mine' ? '내 곡' : '우리 반 음악회';
-  root.replaceChildren(ctx.topBar(title, { back: '#/', right: mode === 'practice' ? [sysSel] : [] }), h('div', { class: 'view' }, h('div', { class: 'pick' }, tabs, list)));
+  const title = mode === 'practice' ? '리코더 연습 — 곡 고르기' : mode === 'rhythm' ? '리듬 게임 — 곡 고르기' : mode === 'drum' ? '북 반주 — 곡 고르기' : mode === 'mine' ? '내 곡' : '우리 반 음악회';
+  root.replaceChildren(ctx.topBar(title, { back: mode === 'drum' ? '#/drum' : '#/', right: mode === 'practice' ? [sysSel] : [] }), h('div', { class: 'view' }, h('div', { class: 'pick' }, tabs, list)));
   async function draw() {
     drawn = true;
     const my = ++drawSeq;
@@ -225,8 +229,9 @@ function mountPick(root, mode) {
       const okRec = !s || recorderOK(s, ctx.sys());
       const play = h('button', { class: 'play-i', title: '듣기', onclick: async () => { const x = s || await ctx.resolve(ref); if (x) listen(x, play); } });
       const acts = [play];
-      if (mode !== 'rhythm') acts.push(h('button', { class: 'btn small' + (mode === 'practice' ? ' primary' : ''), disabled: !okRec, title: okRec ? '' : '이 리코더로 불 수 없는 음이 있어요', onclick: () => ctx.go('#/practice/' + ref) }, '연습'));
-      if (mode !== 'practice') acts.push(h('button', { class: 'btn small' + (mode === 'rhythm' ? ' primary' : ''), onclick: () => ctx.go('#/rhythm/' + ref) }, '리듬 게임'));
+      if (mode === 'drum') acts.push(h('button', { class: 'btn small primary', onclick: () => ctx.go('#/drum/song/' + ref) }, '🥁 북 반주'));   // [MUSIC-DRUM-1]
+      if (mode !== 'rhythm' && mode !== 'drum') acts.push(h('button', { class: 'btn small' + (mode === 'practice' ? ' primary' : ''), disabled: !okRec, title: okRec ? '' : '이 리코더로 불 수 없는 음이 있어요', onclick: () => ctx.go('#/practice/' + ref) }, '연습'));
+      if (mode !== 'practice' && mode !== 'drum') acts.push(h('button', { class: 'btn small' + (mode === 'rhythm' ? ' primary' : ''), onclick: () => ctx.go('#/rhythm/' + ref) }, '리듬 게임'));
       if (s && s.lib && !forPlay) acts.push(h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/' + ref) }, '바꿔 쓰기'));
       if (s && !s.lib && !s.ts) acts.push(h('button', { class: 'btn small', onclick: () => ctx.go('#/compose/' + ref) }, '고치기'));
       if (s && s.lib && forPlay && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, '저먼식으로는 불 수 없는 음'));
@@ -290,6 +295,21 @@ async function route() {
       const { mountBeat } = await import('./beat.js');
       if (my !== seq) return;
       current = mountBeat(app, ctx, { ref: decodeURIComponent(parts.slice(1).join('/')) });
+    }
+    else if (parts[0] === 'drum') {   // [MUSIC-DRUM-1] #/drum = 단계 고르기 · #/drum/stage/<단계> · #/drum/song/<곡>
+      const D = await import('./drum.js');
+      if (my !== seq) return;
+      if (parts[1] === 'stage') {
+        const { stageByKey, stageSong } = await import('./drumcore.js');
+        const st = stageByKey(decodeURIComponent(parts[2] || ''));
+        if (!st) { toast('그런 단계가 없어요'); ctx.go('#/drum'); return; }
+        current = D.mountDrum(app, ctx, { song: stageSong(st), stage: st });
+      } else if (parts[1] === 'song') {
+        const song = await ctx.resolve(decodeURIComponent(parts.slice(2).join('/')));
+        if (my !== seq) return;
+        if (!song) { toast('곡을 찾지 못했어요'); ctx.go('#/pick/drum'); return; }
+        current = D.mountDrum(app, ctx, { song, key: songKey(song) });
+      } else current = D.mountDrumHome(app, ctx);
     }
     else if (parts[0] === 'compose') {
       const ref = parts.slice(1).join('/');
