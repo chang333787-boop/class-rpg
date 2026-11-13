@@ -18,6 +18,7 @@ import { assignFromUrl, loadAssign, watchAssign, watchMine, reportAssign, onClas
 import { rhythmSettings, rhythmPatch, myLine } from './assign-music.js';
 import { EX_SONGS, EX_BEATS, EX_BY, exampleSong } from './showcase.js';   // [MUSIC-SHOWCASE-1] 예시 작품(4학년 음악 친구)
 import { ensembleOrder, groupOf, partnerEvents, withPartners, tapFired } from './ensemble.js';   // [MUSIC-ENSEMBLE-1] 합주(같은 제목 · 다른 부분)
+import { TEACHER_DRUMS } from './drumparts.js';   // [MUSIC-DRUM-ARR-1] 북 반주 곡 고르기의 '🎼 공연 편곡' 표(북 리듬 표만 · 작음)
 
 const Q = new URLSearchParams(location.search);
 // 선생님은 관리 화면에서 ?teacher=1 로 연다 → sid 'teacher' 로 같은 저장소(선생님이 지은 곡도 음악회에 올릴 수 있다)
@@ -237,7 +238,8 @@ function mountPick(root, mode) {
       if (s && s.lib && forPlay && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, '저먼식으로는 불 수 없는 음'));
       if (s && s.ts && mode === 'practice' && !okRec) acts.push(h('span', { class: 'muted', style: { fontSize: '.78rem' } }, `${SYSTEMS[ctx.sys()] || ''}으로는 불 수 없는 음`));
       const grp = tab === 'ts' && s ? groupOf(s, ts) : null;   // [MUSIC-ENSEMBLE-1] '합주 · 2성부' 표
-      return h('div', { class: 'song-row', 'data-tk': s && s.ts ? s.tk : null }, dotOf(name, s?.notes[0]?.p), h('div', { class: 't' }, h('b', {}, name, lv, grp ? h('span', { class: 'ens-badge' }, `합주 · ${grp.members.length}성부`) : null), h('span', {}, sub)), h('div', { class: 'acts' }, ...acts));
+      const arr = mode === 'drum' && s && s.ts && TEACHER_DRUMS[s.tk] ? h('span', { class: 'ens-badge dr-arr-badge' }, '🎼 공연 편곡') : null;   // [MUSIC-DRUM-ARR-1]
+      return h('div', { class: 'song-row', 'data-tk': s && s.ts ? s.tk : null }, dotOf(name, s?.notes[0]?.p), h('div', { class: 't' }, h('b', {}, name, lv, grp ? h('span', { class: 'ens-badge' }, `합주 · ${grp.members.length}성부`) : null, arr), h('span', {}, sub)), h('div', { class: 'acts' }, ...acts));
     });
     list.replaceChildren(...(tab === 'ts' ? ensBoxes(rowEls, songs.map(x => x.s), ts) : rowEls));
   }

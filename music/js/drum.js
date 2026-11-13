@@ -8,7 +8,7 @@
 import { h, toast, lsGet, lsSet, READY_SEC, readyCount } from './util.js';
 import { solfege, colorOf, totalSteps } from './theory.js';
 import { engine, Player } from './audio.js';
-import { HITS, STAGES, stageChart, DRUM_LEVELS, songChart, drumEvents, createJudge, gradeOf, starsOf, sayBar, sayText, stageRecKey, songRecKey, usedKinds, chartOK, stageSong } from './drumcore.js';
+import { HITS, STAGES, stageChart, DRUM_LEVELS, songChart, drumEvents, createJudge, gradeOf, starsOf, sayBar, sayText, stageRecKey, songRecKey, usedKinds, chartOK, stageSong, levelsFor, markAt, calibrateFrom } from './drumcore.js';
 import { partnersOf, partnerEvents, withPartners } from './ensemble.js';   // [MUSIC-ENSEMBLE-1] 선생님 곡이 합주면 다른 부분도 '가락 소리'로
 
 const SPEEDS = [[0.6, '느리게'], [0.8, '조금 느리게'], [1, '원래 빠르기'], [1.2, '조금 빠르게'], [1.4, '빠르게']];
@@ -19,7 +19,13 @@ const HOW_KEY = 'music.drumHow';      // 치는 방법 — 'real'(진짜 북) | 
 const RED = HITS.D.color, BLUE = HITS.K.color, CREAM = '#f1e6cc';
 //  [MUSIC-DRUM-SYNC-1] 소리 · 화면 맞추기(이 기기에 기억) — 0 보다 크면 음표가 그만큼 늦게 닿는다(블루투스 · TV 스피커처럼 소리가 늦게 나는 기기)
 const SYNC_KEY = 'music.drumSync';
-const SYNCS = [[-0.12, '음표 0.12초 빨리'], [-0.08, '음표 0.08초 빨리'], [-0.04, '음표 0.04초 빨리'], [0, '맞춤 그대로'], [0.04, '음표 0.04초 늦게'], [0.08, '음표 0.08초 늦게'], [0.12, '음표 0.12초 늦게'], [0.2, '음표 0.2초 늦게'], [0.3, '음표 0.3초 늦게']];
+//  [MUSIC-DRUM-SYNC-2] 0.02초 간격 −0.12 ~ +0.40 · 맞추기 시험이 잰 값(0.01초 단위)도 받는다
+const SYNC_MIN = -0.12, SYNC_MAX = 0.4;
+const syncLabel = v => (Math.abs(v) < 0.005 ? '맞춤 그대로' : `음표 ${Math.abs(v).toFixed(2)}초 ${v > 0 ? '늦게' : '빨리'}`);
+const syncOpts = cur => { const vs = []; for (let k = -6; k <= 20; k++) vs.push(Math.round(k * 2) / 100); if (!vs.some(v => Math.abs(v - cur) < 0.001)) vs.push(cur); return vs.sort((a, z) => a - z).map(v => [v, syncLabel(v)]); };
+const okSync = v => typeof v === 'number' && Number.isFinite(v) && v >= SYNC_MIN && v <= SYNC_MAX;
+//  [MUSIC-DRUM-SYNC-2] 화면은 그린 다음 화면에 뜨기까지 한두 장면(약 0.02초) 늦다 — 그리는 시각을 그만큼 앞당긴다(판정 시계는 그대로)
+const VIS_LEAD = 0.02;
 //  [MUSIC-DRUM-SYNC-1] 귀에 '들리는' 소리 시각(초 · 소리 장치 시계).
 //   currentTime 은 소리 장치에 넘기는 시각이라 실제로 귀에 닿는 때보다 출력 지연만큼 앞서고, Windows 에서는 10~20ms 씩 뚝뚝 오른다
 //   (2026-11-13 학교 PC 잼: outputLatency 0.04 + baseLatency 0.01초 · 걸음 11~20ms) → 화면이 소리보다 약 0.05초 먼저 · 음표가 떨려 '싱크가 이상'.
@@ -112,10 +118,12 @@ export function mountDrumHome(root, ctx) {
 // ── 치기 화면 ──  stage = 단계(없으면 곡 반주) · key = songKey(곡 반주 기록 열쇠)
 export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   const stageNo = stage ? STAGES.indexOf(stage) + 1 : 0, nextStage = stage ? STAGES[stageNo] || null : null;
-  let level = stage ? null : (DRUM_LEVELS[lsGet('music.drumLevel', 'easy')] ? lsGet('music.drumLevel', 'easy') : 'easy');
+  //  [MUSIC-DRUM-ARR-1] 공연 편곡이 있는 곡은 편곡이 처음 · 그 밖은 이 기기에 기억한 난이도(편곡은 기억하지 않음)
+  const levels = stage ? [] : levelsFor(song), savedLv = lsGet('music.drumLevel', 'easy');
+  let level = stage ? null : levels.includes('arr') ? 'arr' : levels.includes(savedLv) && savedLv !== 'arr' ? savedLv : 'easy';
   let how = lsGet(HOW_KEY, 'real') === 'keys' ? 'keys' : 'real';
   let speed = stage ? 1 : 0.8, guide = how === 'real', melodyOn = true;
-  let sync = SYNCS.some(([v]) => v === lsGet(SYNC_KEY, 0)) ? lsGet(SYNC_KEY, 0) : 0, lastT = -1e9;   // [MUSIC-DRUM-SYNC-1]
+  let sync = okSync(lsGet(SYNC_KEY, 0)) ? lsGet(SYNC_KEY, 0) : 0, lastT = -1e9;   // [MUSIC-DRUM-SYNC-1]
   let chart = [], J = null, state = 'ready', raf = 0, t0 = 0, built = null, tEnd = 0, cue = 0, alive = true, partners = [];
   let flash = { D: -9, K: -9 }, bursts = [], judgeShow = null, hint = null, cheerT = -9;
   //  반짝임 세기 1 → 0(dur 초 동안) — 시계가 뒤로 가면(그만 → 준비 화면 t = −1) 0. 예전엔 음수 반지름으로 arc 가 오류 → '그만'이 멈췄다 [MUSIC-DRUM-SYNC-1]
@@ -141,7 +149,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   const guideBtn = tog('🥁 북 소리 도움', () => guide, v => { guide = v; }, '쳐야 할 북 소리를 대신 내 줘요');
   const melBtn = hasMel ? tog('🎵 가락 소리', () => melodyOn, v => { melodyOn = v; }, '리코더 가락 소리(진짜 리코더와 같이 하면 꺼도 돼요)') : null;
   const right = [];
-  if (!stage) right.push(sel(Object.entries(DRUM_LEVELS).map(([k, v]) => [k, v.name]), level, v => { level = v; lsSet('music.drumLevel', v); changed(); }));
+  if (!stage) right.push(sel(levels.map(k => [k, DRUM_LEVELS[k].name]), level, v => { level = v; if (v !== 'arr') lsSet('music.drumLevel', v); changed(); }));
   right.push(sel(SPEEDS, speed, v => { speed = +v; changed(); }), guideBtn);
   if (melBtn) right.push(melBtn);
   const top = ctx.topBar(stage ? `북 치기 · ${stageNo}단계 ${stage.title}` : `북 반주 · ${song.title || '곡'}`, { back: () => ctx.go(stage ? '#/drum' : '#/pick/drum'), right });
@@ -210,12 +218,13 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     if (state === 'play') { const v = playT(); if (v < lastT && lastT - v < 0.05) return lastT; return (lastT = v); }
     return state === 'done' ? tEnd : -1;
   };
+  const visT = () => now() + (state === 'play' ? VIS_LEAD : 0);   // [MUSIC-DRUM-SYNC-2] 그리기 · 진짜 북 빛 신호용
   const totalT = () => totalSteps(song) * stepDur();
 
   // ── 그리기 ──
   function draw() {
     if (!W || !L) return;
-    const t = now(), { laneY, laneH, jx, rN, rB, pxBeat } = L, pxSec = pxBeat / beatDur();
+    const t = visT(), { laneY, laneH, jx, rN, rB, pxBeat } = L, pxSec = pxBeat / beatDur();
     g.clearRect(0, 0, W, H);
     // 진행 막대
     g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(16, 8, W - 32, 5);
@@ -277,7 +286,9 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
       if (bar >= song.bars) return;
       const x0 = pad + 10 + j * (half + 20), cells = sayBar(song, chart, bar);
       g.font = '800 11px "Noto Sans KR",sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top'; g.fillStyle = j ? 'rgba(255,255,255,.4)' : '#ffe48f';
-      g.fillText(j ? '다음 마디' : state === 'ready' ? '첫 마디' : '이번 마디', x0, sayY + 4);
+      const mk = markAt(song, bar), mkPrev = bar ? markAt(song, bar - 1) : '';   // [MUSIC-DRUM-ARR-1] 편곡 이름표(바뀌는 마디는 금빛)
+      g.fillText((j ? '다음 마디' : state === 'ready' ? '첫 마디' : '이번 마디') + (mk ? ' · ' + mk : ''), x0, sayY + 4);
+      if (mk && mk !== mkPrev && j) { const w = g.measureText(j ? '다음 마디 · ' : '').width; g.fillStyle = '#ffe48f'; g.fillText(mk + ' ▶', x0 + w, sayY + 4); }
       cells.forEach((c, i) => {
         const x = x0 + i * cw + cw / 2, y = sayY + sayH / 2 + 8;
         if (c.beat && i) { g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(x0 + i * cw - 0.5, sayY + 16, 1, sayH - 22); }
@@ -382,7 +393,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     if (state !== 'play') return;
     const t = now();
     if (how === 'keys') for (const r of J.sweep(t)) shown(r);
-    else while (cue < J.notes.length && J.notes[cue].t <= t) { const k = J.notes[cue].k; if (k !== 'K') flash.D = J.notes[cue].t; if (k !== 'D') flash.K = J.notes[cue].t; cue++; }   // 진짜 북: 칠 때 북 그림이 빛남
+    else while (cue < J.notes.length && J.notes[cue].t <= t + VIS_LEAD) { const k = J.notes[cue].k; if (k !== 'K') flash.D = J.notes[cue].t; if (k !== 'D') flash.K = J.notes[cue].t; cue++; }   // 진짜 북: 칠 때 북 그림이 빛남
     draw(); raf = requestAnimationFrame(loop);
   }
   function start() {
@@ -462,15 +473,72 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   }
 
   //  [MUSIC-DRUM-SYNC-1] 소리 · 화면 맞추기 — 이 기기에 기억(블루투스 · TV 스피커는 소리가 늦게 나서 '음표 늦게')
+  //  [MUSIC-DRUM-SYNC-2] '🎯 맞추기 시험' — 딸깍에 맞춰 눌러 보면 얼마나 어긋났는지 숫자로 알려 주고 그 값으로 맞춘다
   function syncRow() {
-    const s = sel(SYNCS, sync, v => { sync = +v; lsSet(SYNC_KEY, sync); draw(); });
+    const s = sel(syncOpts(sync), sync, v => { sync = +v; lsSet(SYNC_KEY, sync); draw(); });
     s.classList.add('dr-sync-sel'); s.title = '음표가 동그라미에 닿은 뒤에 소리가 나면 "늦게", 소리가 먼저 나면 "빨리"';
     return h('div', { class: 'dr-sync' }, h('span', {}, '⏱ 소리 · 화면 맞추기'), s,
-      h('small', {}, '닿은 뒤에 소리가 나면 "늦게" · 소리가 먼저면 "빨리"'));
+      h('button', { class: 'btn small dr-cal-btn', onclick: () => calibrate() }, '🎯 맞추기 시험'),
+      h('small', {}, '맞는지 모르겠으면 "맞추기 시험" — 딸깍 소리에 맞춰 12번 누르면 알아서 맞춰요'));
+  }
+  // ── 맞추기 시험 [MUSIC-DRUM-SYNC-2] ──  90 빠르기 딸깍 16번(넷째마다 높게) · 동그라미가 소리와 같이 깜빡 · F J D K · 스페이스 · 동그라미 누르기
+  //   앞 4번은 손 풀기(안 셈) · 누른 때 = 들리는 소리 시계(event.timeStamp) · 가운데 값 → 맞추기 값(0.01초 단위 · −0.12 ~ +0.40)
+  let cal = null;
+  const CAL = { bpm: 90, n: 16, skip: 4 };
+  function calibrate() {
+    if (state === 'play') return;
+    engine.ensure();
+    const beat = 60 / CAL.bpm, cp = new Player(engine);
+    const ev = Array.from({ length: CAL.n }, (_, i) => ({ t: i * beat, kind: 'click', accent: i % 4 === 0, track: 'cal' }));
+    const dot = h('button', { class: 'dr-cal-dot', 'aria-label': '여기를 눌러도 돼요' }), cnt = h('b', { class: 'dr-cal-n' }, '');
+    const c0 = cp.start(ev, { at: engine.now + 1.2, total: CAL.n * beat + 0.4, ahead: 0.35, onEnd: () => calDone() });
+    cal = { taps: [], beat, c0, cp, raf: 0, dot, cnt, prev: sync };
+    dot.addEventListener('pointerdown', e => { e.preventDefault(); calTap(e.timeStamp); });
+    over.replaceChildren(h('div', { class: 'p-card dr-cal' },
+      h('h2', {}, '🎯 소리 · 화면 맞추기 시험'),
+      h('p', {}, '"딸깍" 소리에 맞춰 ', h('b', {}, 'F 키'), '(또는 아래 동그라미)를 눌러요. 처음 네 번은 손 풀기예요.'),
+      dot, cnt,
+      h('p', { class: 'muted small' }, '동그라미가 깜빡이는 때와 딸깍 소리가 같이 나는지도 눈으로 봐 주세요.'),
+      h('button', { class: 'btn small', onclick: () => calStop(true) }, '그만두기')));
+    const tick = () => {
+      if (!cal) return;
+      const x = heard() - cal.c0, i = Math.round(x / beat), d = x - i * beat;
+      dot.classList.toggle('on', i >= 0 && i < CAL.n && d >= 0 && d < 0.11);
+      dot.classList.toggle('warm', i < CAL.skip);
+      cnt.textContent = x < -0.05 ? '준비…' : i < CAL.skip ? `손 풀기 ${Math.min(CAL.skip, Math.max(1, i + 1))} / ${CAL.skip}` : `${Math.min(CAL.n - CAL.skip, Math.max(1, i - CAL.skip + 1))} / ${CAL.n - CAL.skip}`;
+      cal.raf = requestAnimationFrame(tick);
+    };
+    cal.raf = requestAnimationFrame(tick);
+  }
+  function calTap(perf) { if (!cal) return; cal.taps.push(heard(perf) - cal.c0); cal.dot.classList.add('hit'); setTimeout(() => cal && cal.dot.classList.remove('hit'), 90); }
+  function calStop(back) { if (!cal) return; cal.cp.stop(); cancelAnimationFrame(cal.raf); cal = null; if (back) showReady(); }
+  function calDone() {
+    if (!cal) return;
+    const r = calibrateFrom(cal.taps, cal.beat, CAL.n, CAL.skip), prev = cal.prev;
+    calStop(false);
+    const again = h('button', { class: 'btn', onclick: () => calibrate() }, '다시 하기');
+    if (!r) { over.replaceChildren(h('div', { class: 'p-card dr-cal' }, h('h2', {}, '조금 더 눌러 주세요'), h('p', { class: 'muted' }, '딸깍마다 한 번씩, 적어도 다섯 번은 맞춰 눌러야 잴 수 있어요.'), h('div', { class: 'stars-row' }, again, h('button', { class: 'btn', onclick: () => showReady() }, '돌아가기')))); return; }
+    const v = Math.max(SYNC_MIN, Math.min(SYNC_MAX, Math.round(r.offset * 100) / 100));
+    sync = v; lsSet(SYNC_KEY, v);
+    const ms = Math.round(Math.abs(r.offset) * 1000), steady = r.spread <= 0.04;
+    const head = ms <= 20 ? '잘 맞아요 👍' : r.offset > 0 ? `소리가 ${ms / 1000}초 늦게 들려요` : `조금 서둘러 눌렀어요(${ms / 1000}초)`;
+    over.replaceChildren(h('div', { class: 'p-card dr-cal' },
+      h('h2', {}, head),
+      h('p', {}, `가운데 값 ${r.offset >= 0 ? '+' : '−'}${ms / 1000}초 · ${r.n}번 잼 · 고르기 ±${Math.round(r.spread * 1000) / 1000}초`),
+      h('p', { class: 'lv-line' }, `→ ${syncLabel(v)}(으)로 맞췄어요`),
+      steady ? null : h('p', { class: 'warn' }, '누른 때가 고르지 않아요 — 한 번 더 해 보면 더 정확해요.'),
+      h('p', { class: 'muted small' }, '이 기기에 기억돼요. 스피커를 바꾸면(블루투스 · TV) 다시 해 주세요.'),
+      h('div', { class: 'stars-row' }, h('button', { class: 'btn primary', onclick: () => showReady() }, '좋아요'), again,
+        h('button', { class: 'btn', onclick: () => { sync = prev; lsSet(SYNC_KEY, prev); showReady(); } }, '되돌리기'))));
   }
 
   // ── 입력 ──  키보드(누르고 있으면 되풀이 무시) · 북 그림 누르기(손가락마다 따로 → 두 손가락 = 덩)
   const onDown = e => {
+    if (cal) {   // [MUSIC-DRUM-SYNC-2] 맞추기 시험 중 — F J D K · 스페이스 = 누름 · Esc = 그만두기
+      if (e.code === 'Escape') { calStop(true); return; }
+      if (KEYMAP[e.code] || e.code === 'Space') { e.preventDefault(); if (!e.repeat) calTap(e.timeStamp); }
+      return;
+    }
     if (e.code === 'Escape' && state === 'play') { stop(); return; }
     const side = KEYMAP[e.code];
     if (!side) { if (e.code === 'Space' && state !== 'play' && over.querySelector('.dr-ready')) { e.preventDefault(); start(); } return; }
@@ -489,6 +557,6 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   //  시험용(?debug=1 일 때만)
   if (/[?&]debug=1/.test(location.search)) window.__drum = { chart: () => chart.map(c => ({ ...c })), notes: () => J.notes.map(n => ({ ...n })), now, press, stats: () => ({ ...J.stats }), start, stop, state: () => state, how: () => how,
     setHow: k => { how = k; guide = k === 'real'; }, layout: () => ({ ...L }), sideAt, sync: () => sync, setSync: v => { sync = v; },
-    clock: () => { const c = engine.ctx; return c ? { cur: c.currentTime, heard: heard(), out: c.outputLatency || 0, base: c.baseLatency || 0 } : null; }, mute: () => ({ ...player.mute }), built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0, guide: built.events.filter(e => e.track === 'guide').length } : null), recKey };
-  return { pause() { if (state === 'play') stop(); }, unmount() { alive = false; player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); ro.disconnect(); } };
+    clock: () => { const c = engine.ctx; return c ? { cur: c.currentTime, heard: heard(), out: c.outputLatency || 0, base: c.baseLatency || 0 } : null; }, mute: () => ({ ...player.mute }), built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0, guide: built.events.filter(e => e.track === 'guide').length } : null), recKey, level: () => level, calibrate, calTap, cal: () => (cal ? { taps: cal.taps.length, c0: cal.c0, beat: cal.beat } : null), heard: () => heard() };
+  return { pause() { calStop(false); if (state === 'play') stop(); }, unmount() { alive = false; calStop(false); player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); ro.disconnect(); } };
 }

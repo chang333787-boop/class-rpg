@@ -677,3 +677,12 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
 .dr-sync span{font-weight:800}
 .dr-sync select{height:34px;padding:0 .5rem;font-size:.85rem;line-height:1.2;border-radius:9px;background:var(--bg3);color:var(--txt)}
 .dr-sync small{flex-basis:100%;text-align:center;color:var(--txt3);font-size:.74rem}
+/* [MUSIC-DRUM-SYNC-2] 맞추기 시험 · [MUSIC-DRUM-ARR-1] 편곡 표 */
+.dr-sync .dr-cal-btn{height:32px}
+.p-card.dr-cal{max-width:520px}
+.dr-cal-dot{width:132px;height:132px;border-radius:50%;background:radial-gradient(circle,#e5484d 0 54%,#2fa3e6 56%);border:4px solid rgba(255,255,255,.35);opacity:.35;transition:opacity .05s,transform .05s;touch-action:none}
+.dr-cal-dot.warm{filter:grayscale(.6)}
+.dr-cal-dot.on{opacity:1;transform:scale(1.06);border-color:#ffe48f}
+.dr-cal-dot.hit{box-shadow:0 0 0 8px rgba(255,228,143,.45)}
+.dr-cal-n{font-size:1.1rem;color:var(--gold2);min-height:1.4em}
+.ens-badge.dr-arr-badge{background:rgba(242,169,59,.18);color:var(--gold2)}
