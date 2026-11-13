@@ -182,10 +182,53 @@ await test('공연 편곡 — 박 · 칸 · 마디가 같을 때만 · 다르면
 await test('공연 편곡 — 바나나 차차: 들어가기 · 후렴 구음 · 이름표 · 반 박 표시', () => {
   const a = TEACHER_DRUMS.banana_chacha, s = shell('banana_chacha', a), c = D.arrangedChart(s);
   eq(D.sayText(s, c, 0), '· · ·딱 딱딱', '들어가기 = 차 차 차');
-  eq(D.sayText(s, c, 1), '덩쿵 · 쿵딱 딱딱', 'A 후렴');
+  eq(D.sayText(s, c, 1), '덩 · ·딱 딱딱', 'A 후렴(쉽게: 덩 … 딱 딱 딱)');
+  eq(D.sayText(s, c, s.bars - 1), '다라라 라라 라라 덩', '끝 = 세 박 다라라 → 덩');
   eq([D.markAt(s, 0), D.markAt(s, 1), D.markAt(s, 18), D.markAt(s, 58), D.markAt(s, 66)], ['들어가기', 'A 후렴', 'C', '마무리', '끝']);
   const p = TEACHER_DRUMS.pinocchio, ps = shell('pinocchio', p), pc = D.arrangedChart(ps);
   eq(D.sayText(ps, pc, 0), '딱딱 딱딱 쿵 쿵', '피노키오 톡톡 = 테두리');
+});
+// ── 굴리기 [MUSIC-DRUM-ROLL-1] ──
+await test('굴리기 — 마디 글 R~~ · ~ 만 있으면 오류 · 같은 칸이면 굴리기 · 곡 안/겹침', () => {
+  eq(D.parseBar('R~~~~~~~~~~~B...', 16), [{ at: 0, k: 'R', d: 12 }, { at: 12, k: 'B' }]);
+  let bad = 0; try { D.parseBar('~~D.', 4); } catch { bad++; }
+  eq(bad, 1);
+  eq(D.tidy([{ s: 4, k: 'D' }, { s: 4, k: 'R', d: 3 }, { s: 0, k: 'K' }]), [{ s: 0, k: 'K' }, { s: 4, k: 'R', d: 3 }]);
+  const s = lib('star');
+  ok(D.chartOK(s, [{ s: 0, k: 'R', d: 4 }, { s: 4, k: 'B' }]), '굴리기 끝 = 다음 음표');
+  ok(!D.chartOK(s, [{ s: 0, k: 'R', d: 5 }, { s: 4, k: 'B' }]), '굴리는 동안 다른 음표');
+  ok(!D.chartOK(s, [{ s: totalSteps(s) - 2, k: 'R', d: 4 }]), '곡 끝을 넘음');
+});
+await test('굴리기 — 판정: 굴리는 동안 친 횟수 · 끝나야 한 번 판정 · 다른 음표와 안 섞임', () => {
+  const mk = () => D.createJudge([{ t: 1, k: 'R', dur: 1.5 }, { t: 2.6, k: 'B' }]);
+  const j = mk();
+  for (let i = 0; i < 6; i++) eq(j.hit(i % 2 ? 'K' : 'D', 1 + i * 0.2).kind, 'roll');
+  eq(j.sweep(2.5).length, 0, '굴리기 끝(1+1.5+0.05) 전엔 판정 없음');
+  eq(j.sweep(2.56).map(x => x.kind), ['perfect'], '1.5초에 6번 ≥ 필요 5번');
+  eq(j.hit('D', 2.6).kind, 'pending'); eq(j.hit('K', 2.61).kind, 'perfect', '굴리기 뒤 덩');
+  eq(j.stats.rolls, 6);
+  const j2 = mk(); j2.hit('D', 1.1); j2.hit('D', 1.4);
+  eq(j2.sweep(2.6)[0].kind, 'great', '2번 = 좋아');
+  const j3 = mk(); eq(j3.sweep(2.6)[0].kind, 'miss', '0번 = 놓침');
+});
+await test('굴리기 — 도움 소리 촘촘히 · 점점 크게 · 굴리기 안에만', () => {
+  const s = shell('banana_chacha', TEACHER_DRUMS.banana_chacha), c = D.arrangedChart(s), r = c.find(x => x.k === 'R');
+  const b = D.drumEvents(s, c, { speed: 1.2 }), t0 = b.offset + r.s * b.stepDur, t1 = t0 + r.d * b.stepDur;
+  const g = b.events.filter(e => e.track === 'guide' && e.t >= t0 - 1e-9 && e.t < t1);
+  ok(g.length >= 12 && g.every(e => e.drum === 'don'), '굴리기 도움 ' + g.length);
+  ok(g[g.length - 1].vel > g[0].vel, '점점 크게');
+});
+await test('바나나 차차 쉽게 — 반 박 사이 지그재그(쿵딱쿵) 없음 · 마디당 소리 줄임 · 끝은 굴리기 → 덩', () => {
+  const a = TEACHER_DRUMS.banana_chacha, s = shell('banana_chacha', a), c = D.arrangedChart(s).filter(x => x.k !== 'R');
+  for (let i = 2; i < c.length; i++) {
+    const [x, y, z] = [c[i - 2], c[i - 1], c[i]];
+    ok(!(y.s - x.s < s.sub && z.s - y.s < s.sub && x.k !== y.k && y.k !== z.k), `${Math.floor(y.s / 16) + 1}마디 반 박 지그재그`);
+  }
+  ok(D.arrangedChart(s).length / a.bars <= 4.2, '마디당 소리 ' + (D.arrangedChart(s).length / a.bars).toFixed(2));
+  const tail = D.arrangedChart(s).slice(-2);
+  eq(tail.map(x => [x.s - 66 * 16, x.k, x.d || 0]), [[0, 'R', 12], [12, 'B', 0]]);
+  const p = TEACHER_DRUMS.pinocchio, pt = D.arrangedChart(shell('pinocchio', p)).slice(-2);
+  eq(pt.map(x => [x.s - 23 * 8, x.k, x.d || 0]), [[0, 'R', 6], [6, 'B', 0]], '피노키오 끝도 다라라 → 덩');
 });
 await test('맞추기 시험 — 가운데 값 · 손 풀기 · 튄 누름 · 다섯 번 미만', () => {
   const beat = 60 / 90, N = 16, skip = 4;
