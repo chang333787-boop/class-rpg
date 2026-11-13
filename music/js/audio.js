@@ -436,6 +436,10 @@ export class Engine {
       case 'bassdrum': this._thump(t, vel * 0.8, out, 78, 42, 1.2); this._tone(t, vel * 0.26, out, 96, 0.45); return this._hiss(t, vel * 0.18, out, 'lowpass', 280, 0.5);
       case 'triangle': this._hiss(t, vel * 0.08, out, 'highpass', 6000, 0.02); return this._ring(t, vel, out, [[2640, 0.09], [4520, 0.06], [6980, 0.04]], 1.8);
       case 'swell': return this._swell(t, vel, out, span);
+      // [MUSIC-DRUM-1] 작은 북(채 두 개) — 쿵 = 가운데 가죽(장구 궁편보다 높고 짧게 · 작은 스피커용 배음 290Hz) · 딱 = 옆 플라스틱 테두리(나무토막처럼 똑) · 덩 = 둘 같이
+      case 'don': this._thump(t, vel, out, 178, 116, 0.34); this._tone(t, vel * 0.2, out, 290, 0.09); return this._hiss(t, vel * 0.2, out, 'lowpass', 900, 0.05);
+      case 'ka': this._hiss(t, vel * 0.42, out, 'bandpass', 3300, 0.035, 2.2); this._tone(t, vel * 0.34, out, 1240, 0.04); return this._tone(t, vel * 0.12, out, 2050, 0.022);
+      case 'donka': this.drum('don', t, vel, out); return this.drum('ka', t + 0.003, vel * 0.9, out);
     }
   }
   _ring(t, vel, out, parts, len) {
