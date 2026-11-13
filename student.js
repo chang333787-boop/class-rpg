@@ -274,7 +274,7 @@ const ENGLISH_APP = {
     test:   { exp: 30, gold: 20, label: '🔤 영어 테스트 90% 이상' },
     lesson: { exp: 80, gold: 50, label: '🔤 영어 단원 마스터' },
   },
-  lessonName: { L1:'1단원', L2:'2단원', L3:'3단원', L4:'4단원', L5:'5단원', L6:'6단원', L7:'7단원',
+  lessonName: { L1:'1단원', L2:'2단원', L3:'3단원', L4:'4단원', L5:'5단원', L6:'6단원', L7:'7단원', L8:'8단원', L9:'9단원',
                 Bweek:'요일', Bnum:'숫자', Bcolor:'색깔', Bmonth:'달', Bfamily:'가족' },
 };
 
