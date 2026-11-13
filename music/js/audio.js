@@ -482,7 +482,8 @@ export class Engine {
 // 예약 재생 — 사건 목록 [{ t, kind:'note'|'drum'|'click', … }] 을 시각 순서대로
 export class Player {
   constructor(engine) { this.e = engine; this.timer = null; this.bus = null; this.playing = false; this.mute = {}; }
-  start(events, { at = null, total = null, onEnd = null, gain = 1 } = {}) {
+  //  ahead = 미리 예약하는 넓이(초) — 기본 0.15 그대로 · 북 치기는 0.35(렉 있는 학교 PC 에서 타이머가 늦어도 소리가 밀리지 않게) [MUSIC-DRUM-SYNC-1]
+  start(events, { at = null, total = null, onEnd = null, gain = 1, ahead = 0.15 } = {}) {
     const ctx = this.e.ensure();
     this.stop();
     this.e.prewarm && this.e.prewarm(events);   // [MUSIC-ORCH-1] 하프 · 피치카토 줄 버퍼를 시작 시각을 정하기 전에
@@ -491,7 +492,7 @@ export class Player {
     this.events = events; this.i = 0; this.total = total; this.onEnd = onEnd; this.playing = true;
     const tick = () => {
       if (!this.playing) return;
-      const horizon = ctx.currentTime + 0.15;
+      const horizon = ctx.currentTime + ahead;
       while (this.i < this.events.length && this.t0 + this.events[this.i].t < horizon) this._fire(this.events[this.i++]);
       if (this.total != null && ctx.currentTime > this.t0 + this.total + 0.08) { const cb = this.onEnd; this.stop(false); cb && cb(); }
     };

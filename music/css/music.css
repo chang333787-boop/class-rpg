@@ -672,3 +672,8 @@ button.c-chord:hover{background:rgba(255,255,255,.04)}
   body[data-view=drum] .top .sp{display:none}
 }
 @media (max-width:640px){.dr-intro{flex-direction:column;text-align:center}.dr-intro .dr-legend{justify-content:center}.dr-hows{grid-template-columns:1fr}.dr-songdoor{padding-right:22px}.dr-songdoor i{position:static;transform:none}}
+/* [MUSIC-DRUM-SYNC-1] 소리 · 화면 맞추기 줄 */
+.dr-sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 8px;font-size:.82rem;color:var(--txt2)}
+.dr-sync span{font-weight:800}
+.dr-sync select{height:34px;padding:0 .5rem;font-size:.85rem;line-height:1.2;border-radius:9px;background:var(--bg3);color:var(--txt)}
+.dr-sync small{flex-basis:100%;text-align:center;color:var(--txt3);font-size:.74rem}

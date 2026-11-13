@@ -17,6 +17,24 @@ const JUDGE = { perfect: { ko: '완벽!', c: '#ffe48f' }, great: { ko: '좋아!'
 const STAR_KEY = 'music.drumStars';   // 이 기기의 단계 · 곡별 가장 좋은 별(저장소 연습 기록과 합쳐 보여 줌)
 const HOW_KEY = 'music.drumHow';      // 치는 방법 — 'real'(진짜 북) | 'keys'(키보드 · 화면)
 const RED = HITS.D.color, BLUE = HITS.K.color, CREAM = '#f1e6cc';
+//  [MUSIC-DRUM-SYNC-1] 소리 · 화면 맞추기(이 기기에 기억) — 0 보다 크면 음표가 그만큼 늦게 닿는다(블루투스 · TV 스피커처럼 소리가 늦게 나는 기기)
+const SYNC_KEY = 'music.drumSync';
+const SYNCS = [[-0.12, '음표 0.12초 빨리'], [-0.08, '음표 0.08초 빨리'], [-0.04, '음표 0.04초 빨리'], [0, '맞춤 그대로'], [0.04, '음표 0.04초 늦게'], [0.08, '음표 0.08초 늦게'], [0.12, '음표 0.12초 늦게'], [0.2, '음표 0.2초 늦게'], [0.3, '음표 0.3초 늦게']];
+//  [MUSIC-DRUM-SYNC-1] 귀에 '들리는' 소리 시각(초 · 소리 장치 시계).
+//   currentTime 은 소리 장치에 넘기는 시각이라 실제로 귀에 닿는 때보다 출력 지연만큼 앞서고, Windows 에서는 10~20ms 씩 뚝뚝 오른다
+//   (2026-11-13 학교 PC 잼: outputLatency 0.04 + baseLatency 0.01초 · 걸음 11~20ms) → 화면이 소리보다 약 0.05초 먼저 · 음표가 떨려 '싱크가 이상'.
+//   getOutputTimestamp(지금 스피커로 나가는 소리의 시각 + 그때 performance 시각)로 고르게 잇는다 · perf = 누른 순간(event.timeStamp)도 받는다 · 없으면 currentTime − 지연
+function heard(perf = performance.now()) {
+  const c = engine.ctx;
+  if (!c) return 0;
+  const fall = c.currentTime - (c.outputLatency || 0) - (c.baseLatency || 0);
+  const ts = c.getOutputTimestamp ? c.getOutputTimestamp() : null;
+  if (ts && ts.performanceTime > 0 && ts.contextTime > 0) {
+    const v = ts.contextTime + (perf - ts.performanceTime) / 1000;
+    if (Math.abs(v - fall) < 0.3) return v;
+  }
+  return fall;
+}
 
 const starsLocal = () => { const m = lsGet(STAR_KEY, {}); return m && typeof m === 'object' ? m : {}; };
 function keepStars(key, n) { const m = starsLocal(); if (!(m[key] >= n)) { m[key] = n; lsSet(STAR_KEY, m); } }
@@ -97,8 +115,12 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   let level = stage ? null : (DRUM_LEVELS[lsGet('music.drumLevel', 'easy')] ? lsGet('music.drumLevel', 'easy') : 'easy');
   let how = lsGet(HOW_KEY, 'real') === 'keys' ? 'keys' : 'real';
   let speed = stage ? 1 : 0.8, guide = how === 'real', melodyOn = true;
+  let sync = SYNCS.some(([v]) => v === lsGet(SYNC_KEY, 0)) ? lsGet(SYNC_KEY, 0) : 0, lastT = -1e9;   // [MUSIC-DRUM-SYNC-1]
   let chart = [], J = null, state = 'ready', raf = 0, t0 = 0, built = null, tEnd = 0, cue = 0, alive = true, partners = [];
   let flash = { D: -9, K: -9 }, bursts = [], judgeShow = null, hint = null, cheerT = -9;
+  //  반짝임 세기 1 → 0(dur 초 동안) — 시계가 뒤로 가면(그만 → 준비 화면 t = −1) 0. 예전엔 음수 반지름으로 arc 가 오류 → '그만'이 멈췄다 [MUSIC-DRUM-SYNC-1]
+  const fade = (t, at, dur) => (t >= at && t - at < dur ? 1 - (t - at) / dur : 0);
+  const clearFx = () => { bursts = []; judgeShow = null; hint = null; flash = { D: -9, K: -9 }; cheerT = -9; };
   const player = new Player(engine);
   const hasMel = (song.notes || []).length > 0;
   const recKey = () => (stage ? stageRecKey(stage) : songRecKey(key, level));
@@ -182,7 +204,12 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   }
 
   // ── 시간 ──
-  const now = () => (state === 'play' ? engine.now - t0 - (built ? built.offset : 0) : state === 'done' ? tEnd : -1);
+  //  [MUSIC-DRUM-SYNC-1] 첫 음부터 초 — 들리는 소리 기준 − 맞추기 · 치는 중에는 뒤로 가지 않게(시계 이음새에서 음표가 뒤로 튀지 않게)
+  const playT = perf => heard(perf) - t0 - (built ? built.offset : 0) - sync;
+  const now = () => {
+    if (state === 'play') { const v = playT(); if (v < lastT && lastT - v < 0.05) return lastT; return (lastT = v); }
+    return state === 'done' ? tEnd : -1;
+  };
   const totalT = () => totalSteps(song) * stepDur();
 
   // ── 그리기 ──
@@ -205,7 +232,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
       g.fillStyle = bar ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.07)'; g.fillRect(x - (bar ? 1 : 0.5), laneY - laneH / 2 + 6, bar ? 2 : 1, laneH - 12);
     }
     // 판정 원
-    const pulse = Math.max(0, 1 - (t - Math.max(flash.D, flash.K)) / 0.15);
+    const pulse = fade(t, Math.max(flash.D, flash.K), 0.15);
     g.fillStyle = `rgba(255,228,143,${0.08 + pulse * 0.18})`; g.beginPath(); g.arc(jx, laneY, rB + 4, 0, Math.PI * 2); g.fill();
     g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3; g.beginPath(); g.arc(jx, laneY, rN + 2, 0, Math.PI * 2); g.stroke();
     g.setLineDash([5, 5]); g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 2; g.beginPath(); g.arc(jx, laneY, rB + 2, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
@@ -221,8 +248,8 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
       g.globalAlpha = 1;
     }
     // 맞힌 반짝
-    bursts = bursts.filter(b => t - b.at < 0.32);
-    for (const b of bursts) { const u = (t - b.at) / 0.32; g.globalAlpha = 1 - u; g.strokeStyle = b.c; g.lineWidth = 5 - u * 3; g.beginPath(); g.arc(jx, laneY, rB * (0.8 + u * 0.7), 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; }
+    bursts = bursts.filter(b => fade(t, b.at, 0.32) > 0);
+    for (const b of bursts) { const u = 1 - fade(t, b.at, 0.32); g.globalAlpha = 1 - u; g.strokeStyle = b.c; g.lineWidth = 5 - u * 3; g.beginPath(); g.arc(jx, laneY, rB * (0.8 + u * 0.7), 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; }
     // 판정 글 · 알림(반대! · 둘 다 같이!) — 길 위 빈 띠에
     if (judgeShow && t >= judgeShow.at && t - judgeShow.at < 0.5) {
       const J0 = JUDGE[judgeShow.kind], u = (t - judgeShow.at) / 0.5;
@@ -284,7 +311,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   //  북 그림 + 빛(쿵 = 가운데 빨강 · 딱 = 테두리 · 몸통 파랑) + 칠 곳 이름 · 키 자리
   function drawDrum(t) {
     const { cx, cy, R, ry, body } = L;
-    const fD = Math.max(0, 1 - (t - flash.D) / 0.18), fK = Math.max(0, 1 - (t - flash.K) / 0.18);
+    const fD = fade(t, flash.D, 0.18), fK = fade(t, flash.K, 0.18);
     const sq = 1 - Math.max(fD, fK) * 0.025;
     if (drumImg) { const { c, w, hh, ox, oy } = drumImg; g.drawImage(c, cx - ox, cy - oy * sq, w, hh * sq); }
     if (fK) {
@@ -312,7 +339,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
       g.textAlign = 'left'; g.fillText('테두리', cx + R + 10, cy + body * 0.5 + fs + 2);
     }
     // 응원 몬스터 — 콤보마다 폴짝
-    if (cheer.complete && cheer.naturalWidth) { const jump = Math.max(0, 1 - (t - cheerT) / 0.25), sz = Math.min(110, R * 0.75); g.drawImage(cheer, W - sz - 24, H - sz - 16 - jump * 22, sz, sz); }
+    if (cheer.complete && cheer.naturalWidth) { const jump = fade(t, cheerT, 0.25), sz = Math.min(110, R * 0.75); g.drawImage(cheer, W - sz - 24, H - sz - 16 - jump * 22, sz, sz); }
   }
   function key$(x, y, k, col, fs) {
     const s = fs * 1.7;
@@ -333,8 +360,9 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   function rr(x, y, w, hh, r) { r = Math.max(0, Math.min(r, hh / 2, w / 2)); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + hh, r); g.arcTo(x + w, y + hh, x, y + hh, r); g.arcTo(x, y + hh, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
   // ── 치기 ──
-  function press(side) {
-    const t = now();
+  //  perf = 누른 순간(event.timeStamp) — 렉 있는 PC 에서 처리가 늦게 돌아도 누른 때로 판정 [MUSIC-DRUM-SYNC-1]
+  function press(side, perf) {
+    const t = state === 'play' && perf > 0 ? playT(perf) : now();
     flash[side] = t;
     engine.drum(HITS[side].drum, engine.now, 0.85);
     if (state !== 'play' || how !== 'keys' || t < -0.3) return;
@@ -359,17 +387,18 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   }
   function start() {
     engine.ensure(); engine.setReverb(0.08);
-    makeChart(); bursts = []; judgeShow = null; hint = null; flash = { D: -9, K: -9 };
+    makeChart(); clearFx();
     const b = drumEvents(song, chart, { speed });
     built = partners.length ? withPartners(b, partnerEvents(song, partners, b, { vel: 0.5 })) : b;
     applyMute();
-    t0 = player.start(built.events, { at: engine.now + READY_SEC + 0.1, total: built.total + 0.8, onEnd: () => finish() });   // [MUSIC-READY-1] 3초 준비 → 한 마디 세기 → 첫 박
+    lastT = -1e9;
+    t0 = player.start(built.events, { at: engine.now + READY_SEC + 0.1, total: built.total + 0.8, onEnd: () => finish(), ahead: 0.35 });   // [MUSIC-READY-1] 3초 준비 → 한 마디 세기 → 첫 박 · [MUSIC-DRUM-SYNC-1] 0.35초 미리 예약
     state = 'play'; over.style.display = 'none'; stopBtn.style.display = '';
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     try { stage$.focus({ preventScroll: true }); } catch {}
   }
-  function stop() { player.stop(); state = 'ready'; cancelAnimationFrame(raf); stopBtn.style.display = 'none'; makeChart(); draw(); showReady(); }
-  function changed() { if (state === 'play') { player.stop(); start(); } else { state = 'ready'; makeChart(); draw(); showReady(); } }
+  function stop() { player.stop(); state = 'ready'; cancelAnimationFrame(raf); stopBtn.style.display = 'none'; makeChart(); clearFx(); draw(); showReady(); }
+  function changed() { if (state === 'play') { player.stop(); start(); } else { state = 'ready'; makeChart(); clearFx(); draw(); showReady(); } }
   function finish() {
     tEnd = now(); state = 'done'; cancelAnimationFrame(raf); stopBtn.style.display = 'none';
     if (how === 'keys') J.sweep(1e9);
@@ -427,8 +456,17 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
       h('div', { class: 'dr-legend' }, ...kinds.map(k => h('span', { class: 'dr-chip' }, h('i', { class: 'dr-dot k-' + k }, HITS[k].say), h('span', {}, h('b', {}, HITS[k].say), ' = ', HITS[k].part)))),
       h('div', { class: 'dr-hows' }, howBtn('real', '🥁 진짜 북으로', '화면을 보며 북을 쳐요 · 점수 없이 스스로 별'), howBtn('keys', '⌨️ 키보드 · 화면으로', 'F J = 쿵 · D K = 딱 · 같이 = 덩 · 점수')),
       h('p', { class: 'muted small' }, how === 'real' ? '음표가 동그라미에 닿을 때 쳐요. 아래 북 그림에서 칠 곳이 빛나요.' : '쿵과 딱을 같이 누르면 덩. 북 그림을 눌러도 돼요(두 손가락 = 덩).'),
+      syncRow(),
       h('button', { class: 'btn primary big', onclick: () => start() }, '▶ 시작'),
       h('p', { class: 'muted small' }, 'Space = 시작 · Esc = 그만')));
+  }
+
+  //  [MUSIC-DRUM-SYNC-1] 소리 · 화면 맞추기 — 이 기기에 기억(블루투스 · TV 스피커는 소리가 늦게 나서 '음표 늦게')
+  function syncRow() {
+    const s = sel(SYNCS, sync, v => { sync = +v; lsSet(SYNC_KEY, sync); draw(); });
+    s.classList.add('dr-sync-sel'); s.title = '음표가 동그라미에 닿은 뒤에 소리가 나면 "늦게", 소리가 먼저 나면 "빨리"';
+    return h('div', { class: 'dr-sync' }, h('span', {}, '⏱ 소리 · 화면 맞추기'), s,
+      h('small', {}, '닿은 뒤에 소리가 나면 "늦게" · 소리가 먼저면 "빨리"'));
   }
 
   // ── 입력 ──  키보드(누르고 있으면 되풀이 무시) · 북 그림 누르기(손가락마다 따로 → 두 손가락 = 덩)
@@ -439,10 +477,10 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     e.preventDefault();
     if (e.repeat) return;
-    press(side);
+    press(side, e.timeStamp);
   };
   addEventListener('keydown', onDown);
-  cv.addEventListener('pointerdown', e => { const s = sideAt(e.offsetX, e.offsetY); if (s) { e.preventDefault(); press(s); } });
+  cv.addEventListener('pointerdown', e => { const s = sideAt(e.offsetX, e.offsetY); if (s) { e.preventDefault(); press(s, e.timeStamp); } });
   const ro = new ResizeObserver(() => size()); ro.observe(stage$);
   cheer.onload = () => draw();
   makeChart(); showReady(); size();
@@ -450,6 +488,7 @@ export function mountDrum(root, ctx, { song, stage = null, key = '' }) {
   if (song.ts && ctx.teacherSongs) ctx.teacherSongs().then(list => { if (!alive) return; partners = partnersOf(song, list); if (partners.length && state === 'ready') showReady(); }).catch(() => {});
   //  시험용(?debug=1 일 때만)
   if (/[?&]debug=1/.test(location.search)) window.__drum = { chart: () => chart.map(c => ({ ...c })), notes: () => J.notes.map(n => ({ ...n })), now, press, stats: () => ({ ...J.stats }), start, stop, state: () => state, how: () => how,
-    setHow: k => { how = k; guide = k === 'real'; }, layout: () => ({ ...L }), sideAt, mute: () => ({ ...player.mute }), built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0, guide: built.events.filter(e => e.track === 'guide').length } : null), recKey };
+    setHow: k => { how = k; guide = k === 'real'; }, layout: () => ({ ...L }), sideAt, sync: () => sync, setSync: v => { sync = v; },
+    clock: () => { const c = engine.ctx; return c ? { cur: c.currentTime, heard: heard(), out: c.outputLatency || 0, base: c.baseLatency || 0 } : null; }, mute: () => ({ ...player.mute }), built: () => (built ? { offset: built.offset, stepDur: built.stepDur, total: built.total, t0, guide: built.events.filter(e => e.track === 'guide').length } : null), recKey };
   return { pause() { if (state === 'play') stop(); }, unmount() { alive = false; player.stop(); cancelAnimationFrame(raf); removeEventListener('keydown', onDown); ro.disconnect(); } };
 }
